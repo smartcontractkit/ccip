@@ -92,6 +92,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     address priceRegistry; //                    │ Price registry address
     uint32 maxDataBytes; //                      │ Maximum payload data size in bytes
     uint32 maxPerMsgGasLimit; // ────────────────╯ Maximum gas limit for messages targeting EVMs
+    address tokenAdminRegistry; //                 Token admin registry address
   }
 
   /// @dev Struct to hold the execution fee configuration for a fee token
@@ -170,8 +171,6 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   DynamicConfig internal s_dynamicConfig;
   /// @dev (address nop => uint256 weight)
   EnumerableMap.AddressToUintMap internal s_nops;
-
-  ITokenAdminRegistry internal s_tokenAdminRegistry;
 
   /// @dev The execution fee token config that can be set by the owner or fee admin
   mapping(address token => FeeTokenConfig feeTokenConfig) internal s_feeTokenConfig;
@@ -437,7 +436,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
 
   /// @inheritdoc IEVM2AnyOnRampClient
   function getPoolBySourceToken(uint64 /*destChainSelector*/, IERC20 sourceToken) public view returns (IPool) {
-    return IPool(s_tokenAdminRegistry.getPool(address(sourceToken)));
+    return IPool(ITokenAdminRegistry(s_dynamicConfig.tokenAdminRegistry).getPool(address(sourceToken)));
   }
 
   /// Not sure if this function still makes sense with 100+ tokens, but we need to keep it because the Router expects it

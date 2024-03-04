@@ -11,6 +11,7 @@ import {Client} from "../libraries/Client.sol";
 import {BurnMintERC677} from "../../shared/token/ERC677/BurnMintERC677.sol";
 import {MaybeRevertingBurnMintTokenPool} from "./helpers/MaybeRevertingBurnMintTokenPool.sol";
 import {RouterSetup} from "./router/RouterSetup.t.sol";
+import {TokenAdminRegistry} from "../pools/TokenAdminRegistry.sol";
 
 import {IERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 
@@ -25,58 +26,91 @@ contract TokenSetup is RouterSetup {
   address internal s_destFeeToken;
 
   IPool internal s_destFeeTokenPool;
+  TokenAdminRegistry internal s_tokenAdminRegistry;
 
   function setUp() public virtual override {
     RouterSetup.setUp();
 
-    // Source tokens & pools
-    if (s_sourceTokens.length == 0 && s_sourcePools.length == 0) {
-      BurnMintERC677 sourceLink = new BurnMintERC677("sLINK", "sLNK", 18, 0);
-      deal(address(sourceLink), OWNER, type(uint256).max);
-      s_sourceTokens.push(address(sourceLink));
-      s_sourcePools.push(
-        address(
-          new LockReleaseTokenPool(sourceLink, new address[](0), address(s_mockARM), true, address(s_sourceRouter))
-        )
-      );
-
-      BurnMintERC677 sourceETH = new BurnMintERC677("sETH", "sETH", 18, 0);
-      deal(address(sourceETH), OWNER, 2 ** 128);
-      s_sourceTokens.push(address(sourceETH));
-      s_sourcePools.push(
-        address(new BurnMintTokenPool(sourceETH, new address[](0), address(s_mockARM), address(s_sourceRouter)))
-      );
-      sourceETH.grantMintAndBurnRoles(s_sourcePools[1]);
+    bool isSetup = s_sourceTokens.length != 0;
+    if (isSetup) {
+      return;
     }
+
+    s_tokenAdminRegistry = new TokenAdminRegistry();
+
+    // Source tokens & pools
+    BurnMintERC677 sourceLink = new BurnMintERC677("sLINK", "sLNK", 18, 0);
+    deal(address(sourceLink), OWNER, type(uint256).max);
+    s_sourceTokens.push(address(sourceLink));
+    s_sourcePools.push(
+      address(new LockReleaseTokenPool(sourceLink, new address[](0), address(s_mockARM), true, address(s_sourceRouter)))
+    );
+
+    BurnMintERC677 sourceETH = new BurnMintERC677("sETH", "sETH", 18, 0);
+    deal(address(sourceETH), OWNER, 2 ** 128);
+    s_sourceTokens.push(address(sourceETH));
+    s_sourcePools.push(
+      address(new BurnMintTokenPool(sourceETH, new address[](0), address(s_mockARM), address(s_sourceRouter)))
+    );
+    sourceETH.grantMintAndBurnRoles(s_sourcePools[1]);
 
     s_sourceFeeToken = s_sourceTokens[0];
 
     // Destination tokens & pools
-    if (s_destTokens.length == 0 && s_destPools.length == 0) {
-      BurnMintERC677 destLink = new BurnMintERC677("dLINK", "dLNK", 18, 0);
-      deal(address(destLink), OWNER, type(uint256).max);
-      s_destTokens.push(address(destLink));
-      s_destPools.push(
-        address(new LockReleaseTokenPool(destLink, new address[](0), address(s_mockARM), true, address(s_destRouter)))
-      );
+    BurnMintERC677 destLink = new BurnMintERC677("dLINK", "dLNK", 18, 0);
+    deal(address(destLink), OWNER, type(uint256).max);
+    s_destTokens.push(address(destLink));
+    s_destPools.push(
+      address(new LockReleaseTokenPool(destLink, new address[](0), address(s_mockARM), true, address(s_destRouter)))
+    );
 
-      BurnMintERC677 destEth = new BurnMintERC677("dETH", "dETH", 18, 0);
-      deal(address(destEth), OWNER, 2 ** 128);
-      s_destTokens.push(address(destEth));
+    BurnMintERC677 destEth = new BurnMintERC677("dETH", "dETH", 18, 0);
+    deal(address(destEth), OWNER, 2 ** 128);
+    s_destTokens.push(address(destEth));
 
-      s_destPools.push(
-        address(
-          new MaybeRevertingBurnMintTokenPool(destEth, new address[](0), address(s_mockARM), address(s_destRouter))
-        )
-      );
-      destEth.grantMintAndBurnRoles(s_destPools[1]);
+    s_destPools.push(
+      address(new MaybeRevertingBurnMintTokenPool(destEth, new address[](0), address(s_mockARM), address(s_destRouter)))
+    );
+    destEth.grantMintAndBurnRoles(s_destPools[1]);
 
-      // Float the lockRelease pool with funds
-      IERC20(s_destTokens[0]).transfer(address(s_destPools[0]), POOL_BALANCE);
-    }
+    // Float the lockRelease pool with funds
+    IERC20(s_destTokens[0]).transfer(address(s_destPools[0]), POOL_BALANCE);
 
     s_destFeeToken = s_destTokens[0];
     s_destFeeTokenPool = IPool(s_destPools[0]);
+
+    // Set pools in the registry
+    for (uint256 i = 0; i < s_sourceTokens.length; ++i) {
+      s_tokenAdminRegistry.registerAdministratorPermissioned(s_sourceTokens[i], OWNER);
+      s_tokenAdminRegistry.setPool(s_sourceTokens[i], s_sourcePools[i]);
+
+      TokenPool.ChainUpdate[] memory chainUpdates = new TokenPool.ChainUpdate[](1);
+      chainUpdates[0] = TokenPool.ChainUpdate({
+        remoteChainSelector: DEST_CHAIN_SELECTOR,
+        remotePoolAddress: s_destPools[i],
+        allowed: true,
+        outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
+        inboundRateLimiterConfig: getInboundRateLimiterConfig()
+      });
+
+      TokenPool(s_sourcePools[i]).applyChainUpdates(chainUpdates);
+    }
+
+    for (uint256 i = 0; i < s_destTokens.length; ++i) {
+      s_tokenAdminRegistry.registerAdministratorPermissioned(s_destTokens[i], OWNER);
+      s_tokenAdminRegistry.setPool(s_destTokens[i], s_destPools[i]);
+
+      TokenPool.ChainUpdate[] memory chainUpdates = new TokenPool.ChainUpdate[](1);
+      chainUpdates[0] = TokenPool.ChainUpdate({
+        remoteChainSelector: SOURCE_CHAIN_SELECTOR,
+        remotePoolAddress: s_sourcePools[i],
+        allowed: true,
+        outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
+        inboundRateLimiterConfig: getInboundRateLimiterConfig()
+      });
+
+      TokenPool(s_destPools[i]).applyChainUpdates(chainUpdates);
+    }
   }
 
   function getCastedSourceEVMTokenAmountsWithZeroAmounts()

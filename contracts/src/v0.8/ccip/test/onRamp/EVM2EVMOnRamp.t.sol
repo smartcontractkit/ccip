@@ -3,6 +3,7 @@ pragma solidity 0.8.19;
 
 import "./EVM2EVMOnRampSetup.t.sol";
 import {EVM2EVMOnRamp} from "../../onRamp/EVM2EVMOnRamp.sol";
+import {TokenAdminRegistry} from "../../pools/TokenAdminRegistry.sol";
 import {AggregateRateLimiter} from "../../AggregateRateLimiter.sol";
 import {USDPriceWith18Decimals} from "../../libraries/USDPriceWith18Decimals.sol";
 import {RateLimiter} from "../../libraries/RateLimiter.sol";
@@ -27,19 +28,16 @@ contract EVM2EVMOnRamp_constructor is EVM2EVMOnRampSetup {
     });
     EVM2EVMOnRamp.DynamicConfig memory dynamicConfig = generateDynamicOnRampConfig(
       address(s_sourceRouter),
-      address(s_priceRegistry)
+      address(s_priceRegistry),
+      address(s_tokenAdminRegistry)
     );
-    Internal.PoolUpdate[] memory tokensAndPools = getTokensAndPools(s_sourceTokens, getCastedSourcePools());
 
     vm.expectEmit();
     emit ConfigSet(staticConfig, dynamicConfig);
-    vm.expectEmit();
-    emit PoolAdded(tokensAndPools[0].token, tokensAndPools[0].pool);
 
     s_onRamp = new EVM2EVMOnRampHelper(
       staticConfig,
       dynamicConfig,
-      tokensAndPools,
       getOutboundRateLimiterConfig(),
       s_feeTokenConfigArgs,
       s_tokenTransferFeeConfigArgs,
@@ -390,7 +388,7 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
     vm.stopPrank();
     vm.startPrank(OWNER);
     address router = address(0);
-    s_onRamp.setDynamicConfig(generateDynamicOnRampConfig(router, address(2)));
+    s_onRamp.setDynamicConfig(generateDynamicOnRampConfig(router, address(2), address(s_tokenAdminRegistry)));
     vm.expectRevert(EVM2EVMOnRamp.MustBeCalledByRouter.selector);
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, _generateEmptyMessage(), 0, OWNER);
   }
@@ -465,7 +463,7 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
 
     // Change back to the router
     vm.startPrank(address(s_sourceRouter));
-    vm.expectRevert(abi.encodeWithSelector(EVM2EVMOnRamp.UnsupportedToken.selector, wrongToken));
+    vm.expectRevert(abi.encodeWithSelector(TokenAdminRegistry.UnsupportedToken.selector, wrongToken));
 
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 0, OWNER);
   }
@@ -589,11 +587,7 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
     newPool.setSourceTokenData(new bytes(1));
 
     // Add TokenPool to OnRamp
-    Internal.PoolUpdate[] memory removePool = new Internal.PoolUpdate[](1);
-    removePool[0] = Internal.PoolUpdate({token: address(sourceETH), pool: s_sourcePools[1]});
-    Internal.PoolUpdate[] memory addPool = new Internal.PoolUpdate[](1);
-    addPool[0] = Internal.PoolUpdate({token: address(sourceETH), pool: address(newPool)});
-    //    s_onRamp.applyPoolUpdates(removePool, addPool);
+    s_tokenAdminRegistry.setPool(sourceETH, address(newPool));
 
     // Whitelist OnRamp in TokenPool
     TokenPool.ChainUpdate[] memory chainUpdates = new TokenPool.ChainUpdate[](1);
@@ -636,8 +630,7 @@ contract EVM2EVMOnRamp_forwardFromRouter_upgrade is EVM2EVMOnRampSetup {
         prevOnRamp: address(s_prevOnRamp),
         armProxy: address(s_mockARM)
       }),
-      generateDynamicOnRampConfig(address(s_sourceRouter), address(s_priceRegistry)),
-      getTokensAndPools(s_sourceTokens, getCastedSourcePools()),
+      generateDynamicOnRampConfig(address(s_sourceRouter), address(s_priceRegistry), address(s_tokenAdminRegistry)),
       getOutboundRateLimiterConfig(),
       s_feeTokenConfigArgs,
       s_tokenTransferFeeConfigArgs,
@@ -719,29 +712,45 @@ contract EVM2EVMOnRamp_getFeeSetup is EVM2EVMOnRampSetup {
     EVM2EVMOnRampSetup.setUp();
 
     // Add additional pool addresses for test tokens to mark them as supported
-    Internal.PoolUpdate[] memory newRamps = new Internal.PoolUpdate[](2);
-    address wrappedNativePool = address(
-      new LockReleaseTokenPool(
-        IERC20(s_sourceRouter.getWrappedNative()),
-        new address[](0),
-        address(s_mockARM),
-        true,
-        address(s_sourceRouter)
-      )
-    );
-    newRamps[0] = Internal.PoolUpdate({token: s_sourceRouter.getWrappedNative(), pool: wrappedNativePool});
+    s_tokenAdminRegistry.registerAdministratorPermissioned(s_sourceRouter.getWrappedNative(), OWNER);
+    s_tokenAdminRegistry.registerAdministratorPermissioned(CUSTOM_TOKEN, OWNER);
 
-    address customPool = address(
-      new LockReleaseTokenPool(
-        IERC20(CUSTOM_TOKEN),
-        new address[](0),
-        address(s_mockARM),
-        true,
-        address(s_sourceRouter)
-      )
+    LockReleaseTokenPool wrappedNativePool = new LockReleaseTokenPool(
+      IERC20(s_sourceRouter.getWrappedNative()),
+      new address[](0),
+      address(s_mockARM),
+      true,
+      address(s_sourceRouter)
     );
-    newRamps[1] = Internal.PoolUpdate({token: CUSTOM_TOKEN, pool: customPool});
-    //    s_onRamp.applyPoolUpdates(new Internal.PoolUpdate[](0), newRamps);
+
+    TokenPool.ChainUpdate[] memory wrappedNativeChainUpdate = new TokenPool.ChainUpdate[](1);
+    wrappedNativeChainUpdate[0] = TokenPool.ChainUpdate({
+      remoteChainSelector: DEST_CHAIN_SELECTOR,
+      remotePoolAddress: address(111111),
+      allowed: true,
+      outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
+      inboundRateLimiterConfig: getInboundRateLimiterConfig()
+    });
+    wrappedNativePool.applyChainUpdates(wrappedNativeChainUpdate);
+    s_tokenAdminRegistry.setPool(s_sourceRouter.getWrappedNative(), address(wrappedNativePool));
+
+    LockReleaseTokenPool customPool = new LockReleaseTokenPool(
+      IERC20(CUSTOM_TOKEN),
+      new address[](0),
+      address(s_mockARM),
+      true,
+      address(s_sourceRouter)
+    );
+    TokenPool.ChainUpdate[] memory customChainUpdate = new TokenPool.ChainUpdate[](1);
+    customChainUpdate[0] = TokenPool.ChainUpdate({
+      remoteChainSelector: DEST_CHAIN_SELECTOR,
+      remotePoolAddress: address(2222222),
+      allowed: true,
+      outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
+      inboundRateLimiterConfig: getInboundRateLimiterConfig()
+    });
+    customPool.applyChainUpdates(customChainUpdate);
+    s_tokenAdminRegistry.setPool(CUSTOM_TOKEN, address(customPool));
 
     s_feeTokenPrice = s_sourceTokenPrices[0];
     s_wrappedTokenPrice = s_sourceTokenPrices[2];
@@ -1709,8 +1718,9 @@ contract EVM2EVMOnRamp_getTokenPool is EVM2EVMOnRampSetup {
     assertEq(s_sourcePools[0], address(s_onRamp.getPoolBySourceToken(DEST_CHAIN_SELECTOR, IERC20(s_sourceTokens[0]))));
     assertEq(s_sourcePools[1], address(s_onRamp.getPoolBySourceToken(DEST_CHAIN_SELECTOR, IERC20(s_sourceTokens[1]))));
 
-    vm.expectRevert(abi.encodeWithSelector(EVM2EVMOnRamp.UnsupportedToken.selector, IERC20(s_destTokens[0])));
-    s_onRamp.getPoolBySourceToken(DEST_CHAIN_SELECTOR, IERC20(s_destTokens[0]));
+    address wrongToken = address(123);
+    vm.expectRevert(abi.encodeWithSelector(EVM2EVMOnRamp.UnsupportedToken.selector, IERC20(wrongToken)));
+    s_onRamp.getPoolBySourceToken(DEST_CHAIN_SELECTOR, IERC20(wrongToken));
   }
 }
 
@@ -1730,7 +1740,8 @@ contract EVM2EVMOnRamp_setDynamicConfig is EVM2EVMOnRampSetup {
       destDataAvailabilityMultiplierBps: DEST_GAS_DATA_AVAILABILITY_MULTIPLIER_BPS,
       priceRegistry: address(23423),
       maxDataBytes: 400,
-      maxPerMsgGasLimit: MAX_GAS_LIMIT / 2
+      maxPerMsgGasLimit: MAX_GAS_LIMIT / 2,
+      tokenAdminRegistry: address(s_tokenAdminRegistry)
     });
 
     vm.expectEmit();
@@ -1761,7 +1772,8 @@ contract EVM2EVMOnRamp_setDynamicConfig is EVM2EVMOnRampSetup {
       destDataAvailabilityMultiplierBps: DEST_GAS_DATA_AVAILABILITY_MULTIPLIER_BPS,
       priceRegistry: address(23423),
       maxDataBytes: 400,
-      maxPerMsgGasLimit: MAX_GAS_LIMIT / 2
+      maxPerMsgGasLimit: MAX_GAS_LIMIT / 2,
+      tokenAdminRegistry: address(s_tokenAdminRegistry)
     });
 
     // Invalid price reg reverts.
@@ -1777,9 +1789,9 @@ contract EVM2EVMOnRamp_setDynamicConfig is EVM2EVMOnRampSetup {
   function testSetConfigOnlyOwnerReverts() public {
     vm.startPrank(STRANGER);
     vm.expectRevert("Only callable by owner");
-    s_onRamp.setDynamicConfig(generateDynamicOnRampConfig(address(1), address(2)));
+    s_onRamp.setDynamicConfig(generateDynamicOnRampConfig(address(1), address(2), address(3)));
     vm.startPrank(ADMIN);
     vm.expectRevert("Only callable by owner");
-    s_onRamp.setDynamicConfig(generateDynamicOnRampConfig(address(1), address(2)));
+    s_onRamp.setDynamicConfig(generateDynamicOnRampConfig(address(1), address(2), address(3)));
   }
 }

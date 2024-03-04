@@ -102,8 +102,7 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
         prevOnRamp: address(0),
         armProxy: address(s_mockARM)
       }),
-      generateDynamicOnRampConfig(address(s_sourceRouter), address(s_priceRegistry)),
-      getTokensAndPools(s_sourceTokens, getCastedSourcePools()),
+      generateDynamicOnRampConfig(address(s_sourceRouter), address(s_priceRegistry), address(s_tokenAdminRegistry)),
       getOutboundRateLimiterConfig(),
       s_feeTokenConfigArgs,
       s_tokenTransferFeeConfigArgs,
@@ -114,18 +113,6 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
     s_metadataHash = keccak256(
       abi.encode(Internal.EVM_2_EVM_MESSAGE_HASH, SOURCE_CHAIN_SELECTOR, DEST_CHAIN_SELECTOR, address(s_onRamp))
     );
-
-    TokenPool.ChainUpdate[] memory chainUpdates = new TokenPool.ChainUpdate[](1);
-    chainUpdates[0] = TokenPool.ChainUpdate({
-      remoteChainSelector: DEST_CHAIN_SELECTOR,
-      remotePoolAddress: s_destTokenPool,
-      allowed: true,
-      outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
-      inboundRateLimiterConfig: getInboundRateLimiterConfig()
-    });
-
-    LockReleaseTokenPool(address(s_sourcePools[0])).applyChainUpdates(chainUpdates);
-    LockReleaseTokenPool(address(s_sourcePools[1])).applyChainUpdates(chainUpdates);
 
     s_offRamps = new address[](2);
     s_offRamps[0] = address(10);

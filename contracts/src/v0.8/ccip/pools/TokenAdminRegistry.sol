@@ -11,11 +11,12 @@ contract TokenAdminRegistry is ITokenAdminRegistry, OwnerIsCreator {
   using EnumerableSet for EnumerableSet.AddressSet;
 
   error OnlyRegistryModule(address sender);
-  error OnlyAdministrator(address sender, address localToken);
-  error AlreadyRegistered(address localToken, address currentAdministrator);
-  error TokenHasNoPool(address token);
+  error OnlyAdministrator(address sender, address token);
+  error AlreadyRegistered(address token, address currentAdministrator);
+  error UnsupportedToken(address token);
 
-  event AdministratorRegistered(address indexed localToken, address indexed administrator);
+  event AdministratorRegistered(address indexed token, address indexed administrator);
+  event PoolSet(address indexed token, address indexed pool);
 
   struct TokenConfig {
     address administrator; // ────────────────╮ the current administrator of the token
@@ -44,10 +45,21 @@ contract TokenAdminRegistry is ITokenAdminRegistry, OwnerIsCreator {
   function getPool(address token) external view returns (address) {
     address pool = s_tokenConfig[token].tokenPool;
     if (pool == address(0)) {
-      revert TokenHasNoPool(token);
+      revert UnsupportedToken(token);
     }
 
     return pool;
+  }
+
+  function setPool(address token, address pool) external {
+    TokenConfig storage config = s_tokenConfig[token];
+    if (config.administrator != msg.sender) {
+      revert OnlyAdministrator(msg.sender, token);
+    }
+
+    config.tokenPool = pool;
+
+    emit PoolSet(token, pool);
   }
 
   /// @notice Public getter to check for permissions of an administrator
