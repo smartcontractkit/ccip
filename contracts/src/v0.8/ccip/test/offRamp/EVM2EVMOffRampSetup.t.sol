@@ -27,6 +27,7 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSetup {
   MaybeRevertMessageReceiver internal s_reverting_receiver;
 
   EVM2EVMOffRampHelper internal s_offRamp;
+  address internal s_sourceTokenPool = makeAddr("sourceTokenPool");
 
   event ExecutionStateChanged(
     uint64 indexed sequenceNumber,
@@ -51,6 +52,7 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSetup {
     TokenPool.ChainUpdate[] memory offRamps = new TokenPool.ChainUpdate[](1);
     offRamps[0] = TokenPool.ChainUpdate({
       remoteChainSelector: SOURCE_CHAIN_SELECTOR,
+      remotePoolAddress: s_sourceTokenPool,
       allowed: true,
       outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
       inboundRateLimiterConfig: getInboundRateLimiterConfig()

@@ -29,6 +29,8 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
   EVM2EVMOnRampHelper internal s_onRamp;
   address[] internal s_offRamps;
 
+  address internal s_destTokenPool = makeAddr("destTokenPool");
+
   EVM2EVMOnRamp.FeeTokenConfigArgs[] internal s_feeTokenConfigArgs;
   EVM2EVMOnRamp.TokenTransferFeeConfigArgs[] internal s_tokenTransferFeeConfigArgs;
 
@@ -116,6 +118,7 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
     TokenPool.ChainUpdate[] memory chainUpdates = new TokenPool.ChainUpdate[](1);
     chainUpdates[0] = TokenPool.ChainUpdate({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
+      remotePoolAddress: s_destTokenPool,
       allowed: true,
       outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
       inboundRateLimiterConfig: getInboundRateLimiterConfig()

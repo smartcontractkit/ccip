@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.19;
 
+import {ITokenAdminRegistry} from "../interfaces/ITokenAdminRegistry.sol";
+
 import {OwnerIsCreator} from "../../shared/access/OwnerIsCreator.sol";
 
 import {EnumerableSet} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/structs/EnumerableSet.sol";
 
-contract TokenAdminRegistry is OwnerIsCreator {
+contract TokenAdminRegistry is ITokenAdminRegistry, OwnerIsCreator {
   using EnumerableSet for EnumerableSet.AddressSet;
 
   error OnlyRegistryModule(address sender);
@@ -38,7 +40,7 @@ contract TokenAdminRegistry is OwnerIsCreator {
     return pools;
   }
 
-  /// @notice Returns the pool for the given token.
+  /// @inheritdoc ITokenAdminRegistry
   function getPool(address token) external view returns (address) {
     address pool = s_tokenConfig[token].tokenPool;
     if (pool == address(0)) {

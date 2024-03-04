@@ -50,9 +50,17 @@ abstract contract TokenPool is IPool, OwnerIsCreator, IERC165 {
 
   struct ChainUpdate {
     uint64 remoteChainSelector; // ──╮ Remote chain selector
+    address remotePoolAddress; //    │ Address of the remote pool
     bool allowed; // ────────────────╯ Whether the chain is allowed
     RateLimiter.Config outboundRateLimiterConfig; // Outbound rate limited config, meaning the rate limits for all of the onRamps for the given chain
     RateLimiter.Config inboundRateLimiterConfig; // Inbound rate limited config, meaning the rate limits for all of the offRamps for the given chain
+  }
+
+  struct RemoteChainConfig {
+    RateLimiter.TokenBucket outboundRateLimiterConfig; // Outbound rate limited config, meaning the rate limits for all of the onRamps for the given chain
+    RateLimiter.TokenBucket inboundRateLimiterConfig; // Inbound rate limited config, meaning the rate limits for all of the offRamps for the given chain
+    address remotePoolAddress; // ──╮ Address of the remote pool
+    bool allowed; // ───────────────╯ Whether the chain is allowed
   }
 
   /// @dev The bridgeable token that is managed by this pool.
@@ -72,6 +80,8 @@ abstract contract TokenPool is IPool, OwnerIsCreator, IERC165 {
   /// be able to quickly determine (without parsing logs) who can access the pool.
   /// @dev The chain selectors are in uin256 format because of the EnumerableSet implementation.
   EnumerableSet.UintSet internal s_remoteChainSelectors;
+  mapping(uint64 remoteChainSelector => RemoteChainConfig) internal s_remoteChainConfigs;
+
   /// @dev Outbound rate limits. Corresponds to the inbound rate limit for the pool
   /// on the remote chain.
   mapping(uint64 remoteChainSelector => RateLimiter.TokenBucket) internal s_outboundRateLimits;
@@ -164,21 +174,25 @@ abstract contract TokenPool is IPool, OwnerIsCreator, IERC165 {
           revert ChainAlreadyExists(update.remoteChainSelector);
         }
 
-        s_outboundRateLimits[update.remoteChainSelector] = RateLimiter.TokenBucket({
-          rate: update.outboundRateLimiterConfig.rate,
-          capacity: update.outboundRateLimiterConfig.capacity,
-          tokens: update.outboundRateLimiterConfig.capacity,
-          lastUpdated: uint32(block.timestamp),
-          isEnabled: update.outboundRateLimiterConfig.isEnabled
+        s_remoteChainConfigs[update.remoteChainSelector] = RemoteChainConfig({
+          outboundRateLimiterConfig: RateLimiter.TokenBucket({
+            rate: update.outboundRateLimiterConfig.rate,
+            capacity: update.outboundRateLimiterConfig.capacity,
+            tokens: update.outboundRateLimiterConfig.capacity,
+            lastUpdated: uint32(block.timestamp),
+            isEnabled: update.outboundRateLimiterConfig.isEnabled
+          }),
+          inboundRateLimiterConfig: RateLimiter.TokenBucket({
+            rate: update.inboundRateLimiterConfig.rate,
+            capacity: update.inboundRateLimiterConfig.capacity,
+            tokens: update.inboundRateLimiterConfig.capacity,
+            lastUpdated: uint32(block.timestamp),
+            isEnabled: update.inboundRateLimiterConfig.isEnabled
+          }),
+          remotePoolAddress: update.remotePoolAddress,
+          allowed: update.allowed
         });
 
-        s_inboundRateLimits[update.remoteChainSelector] = RateLimiter.TokenBucket({
-          rate: update.inboundRateLimiterConfig.rate,
-          capacity: update.inboundRateLimiterConfig.capacity,
-          tokens: update.inboundRateLimiterConfig.capacity,
-          lastUpdated: uint32(block.timestamp),
-          isEnabled: update.inboundRateLimiterConfig.isEnabled
-        });
         emit ChainAdded(update.remoteChainSelector, update.outboundRateLimiterConfig, update.inboundRateLimiterConfig);
       } else {
         // If the chain doesn't exist, revert
@@ -186,11 +200,15 @@ abstract contract TokenPool is IPool, OwnerIsCreator, IERC165 {
           revert NonExistentChain(update.remoteChainSelector);
         }
 
-        delete s_inboundRateLimits[update.remoteChainSelector];
-        delete s_outboundRateLimits[update.remoteChainSelector];
+        delete s_remoteChainConfigs[update.remoteChainSelector];
+
         emit ChainRemoved(update.remoteChainSelector);
       }
     }
+  }
+
+  function setRemotePool(uint64 remoteChainSelector, address remotePoolAddress) external onlyOwner {
+    s_remoteChainConfigs[remoteChainSelector].remotePoolAddress = remotePoolAddress;
   }
 
   // ================================================================

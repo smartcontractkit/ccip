@@ -8,13 +8,13 @@ import {IPriceRegistry} from "../interfaces/IPriceRegistry.sol";
 import {IEVM2AnyOnRamp} from "../interfaces/IEVM2AnyOnRamp.sol";
 import {IEVM2AnyOnRampClient} from "../interfaces/IEVM2AnyOnRampClient.sol";
 import {ILinkAvailable} from "../interfaces/automation/ILinkAvailable.sol";
+import {ITokenAdminRegistry} from "../interfaces/ITokenAdminRegistry.sol";
 
 import {AggregateRateLimiter} from "../AggregateRateLimiter.sol";
 import {Client} from "../libraries/Client.sol";
 import {Internal} from "../libraries/Internal.sol";
 import {RateLimiter} from "../libraries/RateLimiter.sol";
 import {USDPriceWith18Decimals} from "../libraries/USDPriceWith18Decimals.sol";
-import {TokenAdminRegistry} from "../pools/TokenAdminRegistry.sol";
 
 import {SafeERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
@@ -171,7 +171,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   /// @dev (address nop => uint256 weight)
   EnumerableMap.AddressToUintMap internal s_nops;
 
-  TokenAdminRegistry internal s_tokenAdminRegistry;
+  ITokenAdminRegistry internal s_tokenAdminRegistry;
 
   /// @dev The execution fee token config that can be set by the owner or fee admin
   mapping(address token => FeeTokenConfig feeTokenConfig) internal s_feeTokenConfig;
