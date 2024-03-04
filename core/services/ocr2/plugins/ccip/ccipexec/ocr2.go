@@ -1044,29 +1044,9 @@ func (r *ExecutionReportingPlugin) prepareTokenExecData(ctx context.Context) (ex
 		return execTokenData{}, err
 	}
 
-	// Build a price registry reader from the current price registry on the onRamp.
-	// This is required since the price registry address on the onRamp can change over time.
-	priceRegistryAddress, err := r.onRampReader.GetPriceRegistry(ctx)
-	if err != nil {
-		return execTokenData{}, fmt.Errorf("getting price registry from onramp: %w", err)
-	}
-	if r.sourcePriceRegistryProvider == nil {
-		return execTokenData{}, fmt.Errorf("sourcePriceRegistryProvider is nil")
-	}
-	if r.sourcePriceRegistry == nil || priceRegistryAddress != r.sourcePriceRegistry.Address() {
-		// Price registry address changed, updating source price registry.
-		sourcePriceRegistry, err1 := r.sourcePriceRegistryProvider.NewPriceRegistryReader(ctx, priceRegistryAddress)
-		if err1 != nil {
-			return execTokenData{}, err1
-		}
-		oldPriceRegistry := r.sourcePriceRegistry
-		r.sourcePriceRegistry = sourcePriceRegistry
-		// Close the old price registry
-		if oldPriceRegistry != nil {
-			if err1 := oldPriceRegistry.Close(); err1 != nil {
-				r.lggr.Warnw("failed to close old price registry", "err", err1)
-			}
-		}
+	// Ensure that the source price registry is synchronized with the onRamp.
+	if err = r.ensurePriceRegistrySynchronization(ctx); err != nil {
+		return execTokenData{}, fmt.Errorf("ensuring price registry synchronization: %w", err)
 	}
 
 	sourceFeeTokens, err := r.sourcePriceRegistry.GetFeeTokens(ctx)
@@ -1119,6 +1099,34 @@ func (r *ExecutionReportingPlugin) prepareTokenExecData(ctx context.Context) (ex
 		destTokenPrices:        destTokenPrices,
 		gasPrice:               gasPrice,
 	}, nil
+}
+
+// ensurePriceRegistrySynchronization ensures that the source price registry points to the same as the one configured on the onRamp.
+// This is required since the price registry address on the onRamp can change over time.
+func (r *ExecutionReportingPlugin) ensurePriceRegistrySynchronization(ctx context.Context) error {
+	priceRegistryAddress, err := r.onRampReader.GetPriceRegistry(ctx)
+	if err != nil {
+		return fmt.Errorf("getting price registry from onramp: %w", err)
+	}
+	if r.sourcePriceRegistryProvider == nil {
+		panic("sourcePriceRegistryProvider is not initialized")
+	}
+	if r.sourcePriceRegistry == nil || priceRegistryAddress != r.sourcePriceRegistry.Address() {
+		// Price registry address changed or not initialized yet, updating source price registry.
+		sourcePriceRegistry, err1 := r.sourcePriceRegistryProvider.NewPriceRegistryReader(ctx, priceRegistryAddress)
+		if err1 != nil {
+			return err1
+		}
+		oldPriceRegistry := r.sourcePriceRegistry
+		r.sourcePriceRegistry = sourcePriceRegistry
+		// Close the old price registry
+		if oldPriceRegistry != nil {
+			if err1 := oldPriceRegistry.Close(); err1 != nil {
+				r.lggr.Warnw("failed to close old price registry", "err", err1)
+			}
+		}
+	}
+	return nil
 }
 
 // selectReportsToFillBatch returns the reports to fill the message limit. Single Commit Root contains exactly (Interval.Max - Interval.Min + 1) messages.
