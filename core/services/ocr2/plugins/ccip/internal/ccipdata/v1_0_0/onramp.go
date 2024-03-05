@@ -108,7 +108,7 @@ type OnRamp struct {
 	sendRequestedEventSig            common.Hash
 	sendRequestedSeqNumberWord       int
 	filters                          []logpoller.Filter
-	cachedOnRampPriceRegistryAddress cache.AutoSync[cciptypes.Address]
+	cachedSourcePriceRegistryAddress cache.AutoSync[cciptypes.Address]
 }
 
 func (o *OnRamp) Address() (cciptypes.Address, error) {
@@ -138,7 +138,7 @@ func (o *OnRamp) GetDynamicConfig() (cciptypes.OnRampDynamicConfig, error) {
 }
 
 func (o *OnRamp) GetPriceRegistry(ctx context.Context) (cciptypes.Address, error) {
-	return o.cachedOnRampPriceRegistryAddress.Get(ctx, func(ctx context.Context) (cciptypes.Address, error) {
+	return o.cachedSourcePriceRegistryAddress.Get(ctx, func(ctx context.Context) (cciptypes.Address, error) {
 		c, err := o.GetDynamicConfig()
 		if err != nil {
 			return "", err
@@ -189,7 +189,7 @@ func NewOnRamp(lggr logger.Logger, sourceSelector, destSelector uint64, onRampAd
 		// offset || sourceChainID || seqNum || ...
 		sendRequestedSeqNumberWord: 2,
 		sendRequestedEventSig:      eventSig,
-		cachedOnRampPriceRegistryAddress: cache.NewLogpollerEventsBased[cciptypes.Address](
+		cachedSourcePriceRegistryAddress: cache.NewLogpollerEventsBased[cciptypes.Address](
 			sourceLP,
 			[]common.Hash{abihelpers.MustGetEventID("ConfigSet", onRampABI)},
 			onRampAddress,

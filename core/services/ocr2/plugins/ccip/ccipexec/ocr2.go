@@ -1118,8 +1118,8 @@ func (r *ExecutionReportingPlugin) ensurePriceRegistrySynchronization(ctx contex
 		r.sourcePriceRegistry = sourcePriceRegistry
 		// Close the old price registry
 		if oldPriceRegistry != nil {
-			if err1 := oldPriceRegistry.Close(); err1 != nil {
-				r.lggr.Warnw("failed to close old price registry", "err", err1)
+			if err2 := oldPriceRegistry.Close(); err2 != nil {
+				r.lggr.Warnw("failed to close old price registry", "err", err2)
 			}
 		}
 	}
