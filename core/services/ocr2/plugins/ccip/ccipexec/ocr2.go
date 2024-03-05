@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/big"
 	"sort"
+	"sync"
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
@@ -73,6 +74,7 @@ type ExecutionReportingPlugin struct {
 	gasPriceEstimator           prices.GasPriceEstimatorExec
 	sourcePriceRegistry         ccipdata.PriceRegistryReader
 	sourcePriceRegistryProvider ccipdataprovider.PriceRegistry
+	sourcePriceRegistryLock     sync.Mutex
 	sourceWrappedNativeToken    cciptypes.Address
 	onRampReader                ccipdata.OnRampReader
 	// Dest
@@ -1108,10 +1110,12 @@ func (r *ExecutionReportingPlugin) ensurePriceRegistrySynchronization(ctx contex
 	if err != nil {
 		return fmt.Errorf("getting price registry from onramp: %w", err)
 	}
+	r.sourcePriceRegistryLock.Lock()
 	if r.sourcePriceRegistry == nil || priceRegistryAddress != r.sourcePriceRegistry.Address() {
 		// Price registry address changed or not initialized yet, updating source price registry.
 		sourcePriceRegistry, err1 := r.sourcePriceRegistryProvider.NewPriceRegistryReader(ctx, priceRegistryAddress)
 		if err1 != nil {
+			r.sourcePriceRegistryLock.Unlock()
 			return err1
 		}
 		oldPriceRegistry := r.sourcePriceRegistry
@@ -1123,6 +1127,7 @@ func (r *ExecutionReportingPlugin) ensurePriceRegistrySynchronization(ctx contex
 			}
 		}
 	}
+	r.sourcePriceRegistryLock.Unlock()
 	return nil
 }
 

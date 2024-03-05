@@ -78,6 +78,7 @@ func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.Repor
 			tokenDataWorker:             rf.config.tokenDataWorker,
 			gasPriceEstimator:           rf.config.offRampReader.GasPriceEstimator(),
 			sourcePriceRegistryProvider: rf.config.sourcePriceRegistryProvider,
+			sourcePriceRegistryLock:     sync.Mutex{},
 			sourceWrappedNativeToken:    rf.config.sourceWrappedNativeToken,
 			onRampReader:                rf.config.onRampReader,
 			commitStoreReader:           rf.config.commitStoreReader,
