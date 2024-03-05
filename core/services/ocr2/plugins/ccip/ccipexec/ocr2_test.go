@@ -1886,7 +1886,7 @@ func encodeExecutionReport(t *testing.T, report cciptypes.ExecReport) []byte {
 func TestExecutionReportingPlugin_ensurePriceRegistrySynchronization(t *testing.T) {
 	p := &ExecutionReportingPlugin{}
 	p.lggr = logger.TestLogger(t)
-	p.sourcePriceRegistryLock = sync.Mutex{}
+	p.sourcePriceRegistryLock = sync.RWMutex{}
 
 	sourcePriceRegistryAddress1 := cciptypes.Address(utils.RandomAddress().String())
 	sourcePriceRegistryAddress2 := cciptypes.Address(utils.RandomAddress().String())

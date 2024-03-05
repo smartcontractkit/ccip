@@ -74,7 +74,7 @@ type ExecutionReportingPlugin struct {
 	gasPriceEstimator           prices.GasPriceEstimatorExec
 	sourcePriceRegistry         ccipdata.PriceRegistryReader
 	sourcePriceRegistryProvider ccipdataprovider.PriceRegistry
-	sourcePriceRegistryLock     sync.Mutex
+	sourcePriceRegistryLock     sync.RWMutex
 	sourceWrappedNativeToken    cciptypes.Address
 	onRampReader                ccipdata.OnRampReader
 	// Dest
@@ -1106,25 +1106,35 @@ func (r *ExecutionReportingPlugin) prepareTokenExecData(ctx context.Context) (ex
 // ensurePriceRegistrySynchronization ensures that the source price registry points to the same as the one configured on the onRamp.
 // This is required since the price registry address on the onRamp can change over time.
 func (r *ExecutionReportingPlugin) ensurePriceRegistrySynchronization(ctx context.Context) error {
+	needPriceRegistryUpdate := false
+	r.sourcePriceRegistryLock.RLock()
 	priceRegistryAddress, err := r.onRampReader.SourcePriceRegistryAddress(ctx)
 	if err != nil {
+		r.sourcePriceRegistryLock.RUnlock()
 		return fmt.Errorf("getting price registry from onramp: %w", err)
 	}
+
+	needPriceRegistryUpdate = r.sourcePriceRegistry == nil || priceRegistryAddress != r.sourcePriceRegistry.Address()
+	r.sourcePriceRegistryLock.RUnlock()
+	if !needPriceRegistryUpdate {
+		return nil
+	}
+
+	// Update the price registry if required.
 	r.sourcePriceRegistryLock.Lock()
 	defer r.sourcePriceRegistryLock.Unlock()
-	if r.sourcePriceRegistry == nil || priceRegistryAddress != r.sourcePriceRegistry.Address() {
-		// Price registry address changed or not initialized yet, updating source price registry.
-		sourcePriceRegistry, err1 := r.sourcePriceRegistryProvider.NewPriceRegistryReader(ctx, priceRegistryAddress)
-		if err1 != nil {
-			return err1
-		}
-		oldPriceRegistry := r.sourcePriceRegistry
-		r.sourcePriceRegistry = sourcePriceRegistry
-		// Close the old price registry
-		if oldPriceRegistry != nil {
-			if err2 := oldPriceRegistry.Close(); err2 != nil {
-				r.lggr.Warnw("failed to close old price registry", "err", err2)
-			}
+
+	// Price registry address changed or not initialized yet, updating source price registry.
+	sourcePriceRegistry, err := r.sourcePriceRegistryProvider.NewPriceRegistryReader(ctx, priceRegistryAddress)
+	if err != nil {
+		return err
+	}
+	oldPriceRegistry := r.sourcePriceRegistry
+	r.sourcePriceRegistry = sourcePriceRegistry
+	// Close the old price registry
+	if oldPriceRegistry != nil {
+		if err1 := oldPriceRegistry.Close(); err1 != nil {
+			r.lggr.Warnw("failed to close old price registry", "err", err1)
 		}
 	}
 	return nil
