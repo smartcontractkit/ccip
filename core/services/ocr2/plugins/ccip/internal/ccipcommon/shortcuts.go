@@ -78,7 +78,7 @@ func FlattenUniqueSlice[T comparable](slices ...[]T) []T {
 }
 
 // VerifyNotDown returns error if the commitStore is down (paused or destination cursed) or if the source chain is cursed
-// Both RPCs are called in parallel to save some time. These calls cannot be batches because they aim different chains.
+// Both RPCs are called in parallel to save some time. These calls cannot be batched because they target different chains.
 func VerifyNotDown(ctx context.Context, lggr logger.Logger, commitStore ccipdata.CommitStoreReader, onRamp ccipdata.OnRampReader) error {
 	eg := new(errgroup.Group)
 
