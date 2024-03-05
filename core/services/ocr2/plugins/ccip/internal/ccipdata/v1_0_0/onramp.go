@@ -115,38 +115,6 @@ type OnRamp struct {
 	cachedStaticConfig cache.OnceCtxFunction[evm_2_evm_onramp_1_0_0.EVM2EVMOnRampStaticConfig]
 }
 
-func NewOnRamp(lggr logger.Logger, sourceSelector, destSelector uint64, onRampAddress common.Address, sourceLP logpoller.LogPoller, source client.Client) (*OnRamp, error) {
-	onRamp, err := evm_2_evm_onramp_1_0_0.NewEVM2EVMOnRamp(onRampAddress, source)
-	if err != nil {
-		return nil, err
-	}
-	onRampABI := abihelpers.MustParseABI(evm_2_evm_onramp_1_0_0.EVM2EVMOnRampABI)
-	eventSig := abihelpers.MustGetEventID(CCIPSendRequestedEventName, onRampABI)
-	filters := []logpoller.Filter{
-		{
-			Name:      logpoller.FilterName(ccipdata.COMMIT_CCIP_SENDS, onRampAddress),
-			EventSigs: []common.Hash{eventSig},
-			Addresses: []common.Address{onRampAddress},
-		},
-	}
-	cachedStaticConfig := cache.OnceCtxFunction[evm_2_evm_onramp_1_0_0.EVM2EVMOnRampStaticConfig](func(ctx context.Context) (evm_2_evm_onramp_1_0_0.EVM2EVMOnRampStaticConfig, error) {
-		return onRamp.GetStaticConfig(&bind.CallOpts{Context: ctx})
-	})
-	return &OnRamp{
-		lggr:       lggr,
-		address:    onRampAddress,
-		onRamp:     onRamp,
-		client:     source,
-		filters:    filters,
-		lp:         sourceLP,
-		leafHasher: NewLeafHasher(sourceSelector, destSelector, onRampAddress, hashlib.NewKeccakCtx(), onRamp),
-		// offset || sourceChainID || seqNum || ...
-		sendRequestedSeqNumberWord: 2,
-		sendRequestedEventSig:      eventSig,
-		cachedStaticConfig:         cachedStaticConfig,
-	}, nil
-}
-
 func (o *OnRamp) Address() (cciptypes.Address, error) {
 	return cciptypes.Address(o.onRamp.Address().String()), nil
 }
@@ -185,22 +153,70 @@ func (o *OnRamp) RegisterFilters(qopts ...pg.QOpt) error {
 	return logpollerutil.RegisterLpFilters(o.lp, o.filters, qopts...)
 }
 
-func (o *OnRamp) IsSourceCursed(ctx context.Context) (bool, error) {
-	staticConfig, err := o.cachedStaticConfig(ctx)
+func NewOnRamp(lggr logger.Logger, sourceSelector, destSelector uint64, onRampAddress common.Address, sourceLP logpoller.LogPoller, source client.Client) (*OnRamp, error) {
+	onRamp, err := evm_2_evm_onramp_1_0_0.NewEVM2EVMOnRamp(onRampAddress, source)
 	if err != nil {
-		return false, err
+		return nil, err
 	}
+	onRampABI := abihelpers.MustParseABI(evm_2_evm_onramp_1_0_0.EVM2EVMOnRampABI)
+	eventSig := abihelpers.MustGetEventID(CCIPSendRequestedEventName, onRampABI)
+	filters := []logpoller.Filter{
+		{
+			Name:      logpoller.FilterName(ccipdata.COMMIT_CCIP_SENDS, onRampAddress),
+			EventSigs: []common.Hash{eventSig},
+			Addresses: []common.Address{onRampAddress},
+		},
+	}
+	cachedStaticConfig := cache.OnceCtxFunction[evm_2_evm_onramp_1_0_0.EVM2EVMOnRampStaticConfig](func(ctx context.Context) (evm_2_evm_onramp_1_0_0.EVM2EVMOnRampStaticConfig, error) {
+		return onRamp.GetStaticConfig(&bind.CallOpts{Context: ctx})
+	})
+	return &OnRamp{
+		lggr:       lggr,
+		address:    onRampAddress,
+		onRamp:     onRamp,
+		client:     source,
+		filters:    filters,
+		lp:         sourceLP,
+		leafHasher: NewLeafHasher(sourceSelector, destSelector, onRampAddress, hashlib.NewKeccakCtx(), onRamp),
+		// offset || sourceChainID || seqNum || ...
+		sendRequestedSeqNumberWord: 2,
+		sendRequestedEventSig:      eventSig,
+		cachedStaticConfig:         cachedStaticConfig,
+	}, nil
+}
 
-	arm, err := arm_contract.NewARMContract(staticConfig.ArmProxy, o.client)
+func (o *OnRamp) logToMessage(log types.Log) (*cciptypes.EVM2EVMMessage, error) {
+	msg, err := o.onRamp.ParseCCIPSendRequested(log)
 	if err != nil {
-		return false, err
+		return nil, err
 	}
-
-	cursed, err := arm.IsCursed(&bind.CallOpts{Context: ctx})
+	h, err := o.leafHasher.HashLeaf(log)
 	if err != nil {
-		return false, nil
+		return nil, err
 	}
-	return cursed, nil
+	tokensAndAmounts := make([]cciptypes.TokenAmount, len(msg.Message.TokenAmounts))
+	for i, tokenAndAmount := range msg.Message.TokenAmounts {
+		tokensAndAmounts[i] = cciptypes.TokenAmount{
+			Token:  cciptypes.Address(tokenAndAmount.Token.String()),
+			Amount: tokenAndAmount.Amount,
+		}
+	}
+	return &cciptypes.EVM2EVMMessage{
+		SequenceNumber:      msg.Message.SequenceNumber,
+		GasLimit:            msg.Message.GasLimit,
+		Nonce:               msg.Message.Nonce,
+		MessageID:           msg.Message.MessageId,
+		SourceChainSelector: msg.Message.SourceChainSelector,
+		Sender:              cciptypes.Address(msg.Message.Sender.String()),
+		Receiver:            cciptypes.Address(msg.Message.Receiver.String()),
+		Strict:              msg.Message.Strict,
+		FeeToken:            cciptypes.Address(msg.Message.FeeToken.String()),
+		FeeTokenAmount:      msg.Message.FeeTokenAmount,
+		Data:                msg.Message.Data,
+		TokenAmounts:        tokensAndAmounts,
+		SourceTokenData:     make([][]byte, len(msg.Message.TokenAmounts)), // Always empty in 1.0
+		Hash:                h,
+	}, nil
 }
 
 func (o *OnRamp) GetSendRequestsBetweenSeqNums(ctx context.Context, seqNumMin, seqNumMax uint64, finalized bool) ([]cciptypes.EVM2EVMMessageWithTxMeta, error) {
@@ -239,36 +255,20 @@ func (o *OnRamp) RouterAddress() (cciptypes.Address, error) {
 	return cciptypes.Address(config.Router.String()), nil
 }
 
-func (o *OnRamp) logToMessage(log types.Log) (*cciptypes.EVM2EVMMessage, error) {
-	msg, err := o.onRamp.ParseCCIPSendRequested(log)
+func (o *OnRamp) IsSourceCursed(ctx context.Context) (bool, error) {
+	staticConfig, err := o.cachedStaticConfig(ctx)
 	if err != nil {
-		return nil, err
+		return false, err
 	}
-	h, err := o.leafHasher.HashLeaf(log)
+
+	arm, err := arm_contract.NewARMContract(staticConfig.ArmProxy, o.client)
 	if err != nil {
-		return nil, err
+		return false, err
 	}
-	tokensAndAmounts := make([]cciptypes.TokenAmount, len(msg.Message.TokenAmounts))
-	for i, tokenAndAmount := range msg.Message.TokenAmounts {
-		tokensAndAmounts[i] = cciptypes.TokenAmount{
-			Token:  cciptypes.Address(tokenAndAmount.Token.String()),
-			Amount: tokenAndAmount.Amount,
-		}
+
+	cursed, err := arm.IsCursed(&bind.CallOpts{Context: ctx})
+	if err != nil {
+		return false, nil
 	}
-	return &cciptypes.EVM2EVMMessage{
-		SequenceNumber:      msg.Message.SequenceNumber,
-		GasLimit:            msg.Message.GasLimit,
-		Nonce:               msg.Message.Nonce,
-		MessageID:           msg.Message.MessageId,
-		SourceChainSelector: msg.Message.SourceChainSelector,
-		Sender:              cciptypes.Address(msg.Message.Sender.String()),
-		Receiver:            cciptypes.Address(msg.Message.Receiver.String()),
-		Strict:              msg.Message.Strict,
-		FeeToken:            cciptypes.Address(msg.Message.FeeToken.String()),
-		FeeTokenAmount:      msg.Message.FeeTokenAmount,
-		Data:                msg.Message.Data,
-		TokenAmounts:        tokensAndAmounts,
-		SourceTokenData:     make([][]byte, len(msg.Message.TokenAmounts)), // Always empty in 1.0
-		Hash:                h,
-	}, nil
+	return cursed, nil
 }

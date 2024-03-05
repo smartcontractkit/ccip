@@ -6,13 +6,14 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 )
 
-// TestCacheFuncNoErrorCachingSuccess tests caching behavior when the function succeeds.
-func TestCacheFuncNoErrorCachingSuccess(t *testing.T) {
+// TestCallOnceOnNoErrorCachingSuccess tests caching behavior when the function succeeds.
+func TestCallOnceOnNoErrorCachingSuccess(t *testing.T) {
 	callCount := 0
 	testFunc := func(ctx context.Context) (string, error) {
 		callCount++
@@ -31,8 +32,8 @@ func TestCacheFuncNoErrorCachingSuccess(t *testing.T) {
 	assert.Equal(t, 1, callCount, "Function should be called exactly once")
 }
 
-// TestCacheFuncNoErrorCachingError tests that the function is retried after an error.
-func TestCacheFuncNoErrorCachingError(t *testing.T) {
+// TestCallOnceOnNoErrorCachingError tests that the function is retried after an error.
+func TestCallOnceOnNoErrorCachingError(t *testing.T) {
 	callCount := 0
 	testFunc := func(ctx context.Context) (string, error) {
 		callCount++
@@ -55,8 +56,8 @@ func TestCacheFuncNoErrorCachingError(t *testing.T) {
 	assert.Equal(t, 2, callCount, "Function should be called exactly twice")
 }
 
-// TestCacheFuncNoErrorCachingConcurrency tests that the function works correctly under concurrent access.
-func TestCacheFuncNoErrorCachingConcurrency(t *testing.T) {
+// TestCallOnceOnNoErrorCachingConcurrency tests that the function works correctly under concurrent access.
+func TestCallOnceOnNoErrorCachingConcurrency(t *testing.T) {
 	var wg sync.WaitGroup
 	callCount := 0
 	testFunc := func(ctx context.Context) (string, error) {

@@ -7,9 +7,11 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/stretchr/testify/assert"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
+
+	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/cciptypes"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/mocks"
 )
@@ -63,7 +65,7 @@ func TestFlattenUniqueSlice(t *testing.T) {
 	}
 }
 
-func TestIsDown(t *testing.T) {
+func TestVerifyNotDown(t *testing.T) {
 	ctx := tests.Context(t)
 
 	testCases := []struct {
@@ -72,25 +74,21 @@ func TestIsDown(t *testing.T) {
 		commitStoreErr  error
 		onRampCursed    bool
 		onRampErr       error
-		expectedDown    bool
 		expectedErr     bool
 	}{
 		{
-			name:         "Neither down nor cursed",
-			expectedDown: false,
-			expectedErr:  false,
+			name:        "Neither down nor cursed",
+			expectedErr: false,
 		},
 		{
 			name:            "CommitStore is down",
 			commitStoreDown: true,
-			expectedDown:    true,
-			expectedErr:     false,
+			expectedErr:     true,
 		},
 		{
 			name:         "OnRamp is cursed",
 			onRampCursed: true,
-			expectedDown: true,
-			expectedErr:  false,
+			expectedErr:  true,
 		},
 		{
 			name:           "CommitStore error",
@@ -112,13 +110,12 @@ func TestIsDown(t *testing.T) {
 			mockCommitStore.On("IsDown", ctx).Return(tc.commitStoreDown, tc.commitStoreErr)
 			mockOnRamp.On("IsSourceCursed", ctx).Return(tc.onRampCursed, tc.onRampErr)
 
-			isDown, err := IsDown(ctx, mockCommitStore, mockOnRamp)
+			err := VerifyNotDown(ctx, logger.TestLogger(t), mockCommitStore, mockOnRamp)
 
 			if tc.expectedErr {
 				assert.Error(t, err)
 			} else {
 				assert.NoError(t, err)
-				assert.Equal(t, tc.expectedDown, isDown)
 			}
 		})
 	}

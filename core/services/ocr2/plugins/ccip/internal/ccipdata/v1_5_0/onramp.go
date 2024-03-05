@@ -148,39 +148,6 @@ type OnRamp struct {
 	cachedStaticConfig         cache.OnceCtxFunction[evm_2_evm_onramp.EVM2EVMOnRampStaticConfig]
 }
 
-func NewOnRamp(lggr logger.Logger, sourceSelector, destSelector uint64, onRampAddress common.Address, sourceLP logpoller.LogPoller, source client.Client) (*OnRamp, error) {
-	onRamp, err := evm_2_evm_onramp.NewEVM2EVMOnRamp(onRampAddress, source)
-	if err != nil {
-		return nil, err
-	}
-	// Subscribe to the relevant logs
-	// Note we can keep the same prefix across 1.0/1.1 and 1.2 because the onramp addresses will be different
-	filters := []logpoller.Filter{
-		{
-			Name:      logpoller.FilterName(ccipdata.COMMIT_CCIP_SENDS, onRampAddress),
-			EventSigs: []common.Hash{CCIPSendRequestEventSig},
-			Addresses: []common.Address{onRampAddress},
-		},
-	}
-	cachedStaticConfig := cache.OnceCtxFunction[evm_2_evm_onramp.EVM2EVMOnRampStaticConfig](func(ctx context.Context) (evm_2_evm_onramp.EVM2EVMOnRampStaticConfig, error) {
-		return onRamp.GetStaticConfig(&bind.CallOpts{Context: ctx})
-	})
-	return &OnRamp{
-		lggr:                       lggr,
-		client:                     source,
-		lp:                         sourceLP,
-		leafHasher:                 NewLeafHasher(sourceSelector, destSelector, onRampAddress, hashlib.NewKeccakCtx(), onRamp),
-		onRamp:                     onRamp,
-		filters:                    filters,
-		address:                    onRampAddress,
-		sendRequestedSeqNumberWord: CCIPSendRequestSeqNumIndex,
-		sendRequestedEventSig:      CCIPSendRequestEventSig,
-		// Static config can be cached, because it's never expected to change.
-		// The only way to change that is through the contract's constructor (redeployment)
-		cachedStaticConfig: cachedStaticConfig,
-	}, nil
-}
-
 func (o *OnRamp) Address() (cciptypes.Address, error) {
 	return ccipcalc.EvmAddrToGeneric(o.onRamp.Address()), nil
 }
@@ -284,6 +251,39 @@ func (o *OnRamp) Close(qopts ...pg.QOpt) error {
 
 func (o *OnRamp) RegisterFilters(qopts ...pg.QOpt) error {
 	return logpollerutil.RegisterLpFilters(o.lp, o.filters, qopts...)
+}
+
+func NewOnRamp(lggr logger.Logger, sourceSelector, destSelector uint64, onRampAddress common.Address, sourceLP logpoller.LogPoller, source client.Client) (*OnRamp, error) {
+	onRamp, err := evm_2_evm_onramp.NewEVM2EVMOnRamp(onRampAddress, source)
+	if err != nil {
+		return nil, err
+	}
+	// Subscribe to the relevant logs
+	// Note we can keep the same prefix across 1.0/1.1 and 1.2 because the onramp addresses will be different
+	filters := []logpoller.Filter{
+		{
+			Name:      logpoller.FilterName(ccipdata.COMMIT_CCIP_SENDS, onRampAddress),
+			EventSigs: []common.Hash{CCIPSendRequestEventSig},
+			Addresses: []common.Address{onRampAddress},
+		},
+	}
+	cachedStaticConfig := cache.OnceCtxFunction[evm_2_evm_onramp.EVM2EVMOnRampStaticConfig](func(ctx context.Context) (evm_2_evm_onramp.EVM2EVMOnRampStaticConfig, error) {
+		return onRamp.GetStaticConfig(&bind.CallOpts{Context: ctx})
+	})
+	return &OnRamp{
+		lggr:                       lggr,
+		client:                     source,
+		lp:                         sourceLP,
+		leafHasher:                 NewLeafHasher(sourceSelector, destSelector, onRampAddress, hashlib.NewKeccakCtx(), onRamp),
+		onRamp:                     onRamp,
+		filters:                    filters,
+		address:                    onRampAddress,
+		sendRequestedSeqNumberWord: CCIPSendRequestSeqNumIndex,
+		sendRequestedEventSig:      CCIPSendRequestEventSig,
+		// Static config can be cached, because it's never expected to change.
+		// The only way to change that is through the contract's constructor (redeployment)
+		cachedStaticConfig: cachedStaticConfig,
+	}, nil
 }
 
 func (o *OnRamp) IsSourceCursed(ctx context.Context) (bool, error) {
