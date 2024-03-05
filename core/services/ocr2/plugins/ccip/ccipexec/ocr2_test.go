@@ -8,6 +8,7 @@ import (
 	"math/big"
 	"reflect"
 	"sort"
+	"sync"
 	"testing"
 	"time"
 
@@ -1879,4 +1880,40 @@ func encodeExecutionReport(t *testing.T, report cciptypes.ExecReport) []byte {
 	encodedReport, err := reader.EncodeExecutionReport(report)
 	require.NoError(t, err)
 	return encodedReport
+}
+
+// Verify the price registry update mechanism in case of configuration change on the source onRamp.
+func TestExecutionReportingPlugin_ensurePriceRegistrySynchronization(t *testing.T) {
+	p := &ExecutionReportingPlugin{}
+	p.lggr = logger.TestLogger(t)
+	p.sourcePriceRegistryLock = sync.Mutex{}
+
+	sourcePriceRegistryAddress1 := cciptypes.Address(utils.RandomAddress().String())
+	sourcePriceRegistryAddress2 := cciptypes.Address(utils.RandomAddress().String())
+
+	mockPriceRegistryReader1 := ccipdatamocks.NewPriceRegistryReader(t)
+	mockPriceRegistryReader2 := ccipdatamocks.NewPriceRegistryReader(t)
+	mockPriceRegistryReader1.On("Address").Return(sourcePriceRegistryAddress1, nil)
+	mockPriceRegistryReader2.On("Address").Return(sourcePriceRegistryAddress2, nil).Maybe()
+	mockPriceRegistryReader1.On("Close").Return(nil)
+	mockPriceRegistryReader2.On("Close").Return(nil).Maybe()
+
+	mockSourcePriceRegistryProvider := ccipdataprovidermocks.NewPriceRegistry(t)
+	mockSourcePriceRegistryProvider.On("NewPriceRegistryReader", mock.Anything, sourcePriceRegistryAddress1).Return(mockPriceRegistryReader1, nil)
+	mockSourcePriceRegistryProvider.On("NewPriceRegistryReader", mock.Anything, sourcePriceRegistryAddress2).Return(mockPriceRegistryReader2, nil)
+	p.sourcePriceRegistryProvider = mockSourcePriceRegistryProvider
+
+	mockOnRampReader := ccipdatamocks.NewOnRampReader(t)
+	p.onRampReader = mockOnRampReader
+
+	mockOnRampReader.On("SourcePriceRegistryAddress", mock.Anything).Return(sourcePriceRegistryAddress1, nil).Once()
+	require.Equal(t, nil, p.sourcePriceRegistry)
+	err := p.ensurePriceRegistrySynchronization(context.Background())
+	require.NoError(t, err)
+	require.Equal(t, mockPriceRegistryReader1, p.sourcePriceRegistry)
+
+	mockOnRampReader.On("SourcePriceRegistryAddress", mock.Anything).Return(sourcePriceRegistryAddress2, nil).Once()
+	err = p.ensurePriceRegistrySynchronization(context.Background())
+	require.NoError(t, err)
+	require.Equal(t, mockPriceRegistryReader2, p.sourcePriceRegistry)
 }

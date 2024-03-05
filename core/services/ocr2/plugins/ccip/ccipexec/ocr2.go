@@ -1111,11 +1111,11 @@ func (r *ExecutionReportingPlugin) ensurePriceRegistrySynchronization(ctx contex
 		return fmt.Errorf("getting price registry from onramp: %w", err)
 	}
 	r.sourcePriceRegistryLock.Lock()
+	defer r.sourcePriceRegistryLock.Unlock()
 	if r.sourcePriceRegistry == nil || priceRegistryAddress != r.sourcePriceRegistry.Address() {
 		// Price registry address changed or not initialized yet, updating source price registry.
 		sourcePriceRegistry, err1 := r.sourcePriceRegistryProvider.NewPriceRegistryReader(ctx, priceRegistryAddress)
 		if err1 != nil {
-			r.sourcePriceRegistryLock.Unlock()
 			return err1
 		}
 		oldPriceRegistry := r.sourcePriceRegistry
@@ -1127,7 +1127,6 @@ func (r *ExecutionReportingPlugin) ensurePriceRegistrySynchronization(ctx contex
 			}
 		}
 	}
-	r.sourcePriceRegistryLock.Unlock()
 	return nil
 }
 
