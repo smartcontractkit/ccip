@@ -94,7 +94,7 @@ func (r *ExecutionReportingPlugin) Query(context.Context, types.ReportTimestamp)
 
 func (r *ExecutionReportingPlugin) Observation(ctx context.Context, timestamp types.ReportTimestamp, query types.Query) (types.Observation, error) {
 	lggr := r.lggr.Named("ExecutionObservation")
-	down, err := r.commitStoreReader.IsDown(ctx)
+	down, err := ccipcommon.IsDown(ctx, r.commitStoreReader, r.onRampReader)
 	if err != nil {
 		return nil, errors.Wrap(err, "isDown check errored")
 	}

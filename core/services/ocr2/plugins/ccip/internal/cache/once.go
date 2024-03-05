@@ -9,6 +9,7 @@ type OnceCtxFunction[T any] func(ctx context.Context) (T, error)
 
 // CallOnceOnNoError returns a new function that wraps the given function f with caching capabilities.
 // If f returns an error, the result is not cached, allowing f to be retried on subsequent calls.
+// Use case for that is to avoid caching an error forever in case of transient errors (e.g. flaky RPC)
 func CallOnceOnNoError[T any](f OnceCtxFunction[T]) OnceCtxFunction[T] {
 	var (
 		mu     sync.Mutex

@@ -73,3 +73,36 @@ func FlattenUniqueSlice[T comparable](slices ...[]T) []T {
 	}
 	return flattened
 }
+
+// IsDown returns true if the commitStore is down (paused or destination cursed) or if the source chain is cursed
+// Both RPCs are called in parallel to save some time. These calls cannot be batches because they aim different chains.
+func IsDown(ctx context.Context, commitStore ccipdata.CommitStoreReader, onRamp ccipdata.OnRampReader) (bool, error) {
+	eg := new(errgroup.Group)
+
+	var isDown bool
+	var isCursed bool
+
+	eg.Go(func() error {
+		var err error
+		isDown, err = commitStore.IsDown(ctx)
+		if err != nil {
+			return fmt.Errorf("is down: %w", err)
+		}
+		return nil
+	})
+
+	eg.Go(func() error {
+		var err error
+		isCursed, err = onRamp.IsSourceCursed(ctx)
+		if err != nil {
+			return fmt.Errorf("is cursed: %w", err)
+		}
+		return nil
+	})
+
+	if err := eg.Wait(); err != nil {
+		return false, err
+	}
+
+	return isDown || isCursed, nil
+}
