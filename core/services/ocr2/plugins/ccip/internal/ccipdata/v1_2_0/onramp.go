@@ -13,10 +13,12 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/arm_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp_1_2_0"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/cciptypes"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_0_0"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/hashlib"
@@ -142,6 +144,38 @@ type OnRamp struct {
 	sendRequestedEventSig      common.Hash
 	sendRequestedSeqNumberWord int
 	filters                    []logpoller.Filter
+	cachedStaticConfig         cache.OnceCtxFunction[evm_2_evm_onramp_1_2_0.EVM2EVMOnRampStaticConfig]
+}
+
+func NewOnRamp(lggr logger.Logger, sourceSelector, destSelector uint64, onRampAddress common.Address, sourceLP logpoller.LogPoller, source client.Client) (*OnRamp, error) {
+	onRamp, err := evm_2_evm_onramp_1_2_0.NewEVM2EVMOnRamp(onRampAddress, source)
+	if err != nil {
+		return nil, err
+	}
+	// Subscribe to the relevant logs
+	// Note we can keep the same prefix across 1.0/1.1 and 1.2 because the onramp addresses will be different
+	filters := []logpoller.Filter{
+		{
+			Name:      logpoller.FilterName(ccipdata.COMMIT_CCIP_SENDS, onRampAddress),
+			EventSigs: []common.Hash{CCIPSendRequestEventSig},
+			Addresses: []common.Address{onRampAddress},
+		},
+	}
+	cachedStaticConfig := cache.OnceCtxFunction[evm_2_evm_onramp_1_2_0.EVM2EVMOnRampStaticConfig](func(ctx context.Context) (evm_2_evm_onramp_1_2_0.EVM2EVMOnRampStaticConfig, error) {
+		return onRamp.GetStaticConfig(&bind.CallOpts{Context: ctx})
+	})
+	return &OnRamp{
+		lggr:                       lggr,
+		client:                     source,
+		lp:                         sourceLP,
+		leafHasher:                 NewLeafHasher(sourceSelector, destSelector, onRampAddress, hashlib.NewKeccakCtx(), onRamp),
+		onRamp:                     onRamp,
+		filters:                    filters,
+		address:                    onRampAddress,
+		sendRequestedSeqNumberWord: CCIPSendRequestSeqNumIndex,
+		sendRequestedEventSig:      CCIPSendRequestEventSig,
+		cachedStaticConfig:         cachedStaticConfig,
+	}, nil
 }
 
 func (o *OnRamp) Address() (cciptypes.Address, error) {
@@ -250,29 +284,20 @@ func (o *OnRamp) RegisterFilters(qopts ...pg.QOpt) error {
 	return logpollerutil.RegisterLpFilters(o.lp, o.filters, qopts...)
 }
 
-func NewOnRamp(lggr logger.Logger, sourceSelector, destSelector uint64, onRampAddress common.Address, sourceLP logpoller.LogPoller, source client.Client) (*OnRamp, error) {
-	onRamp, err := evm_2_evm_onramp_1_2_0.NewEVM2EVMOnRamp(onRampAddress, source)
+func (o *OnRamp) IsSourceCursed(ctx context.Context) (bool, error) {
+	staticConfig, err := o.cachedStaticConfig(ctx)
 	if err != nil {
-		return nil, err
+		return false, err
 	}
-	// Subscribe to the relevant logs
-	// Note we can keep the same prefix across 1.0/1.1 and 1.2 because the onramp addresses will be different
-	filters := []logpoller.Filter{
-		{
-			Name:      logpoller.FilterName(ccipdata.COMMIT_CCIP_SENDS, onRampAddress),
-			EventSigs: []common.Hash{CCIPSendRequestEventSig},
-			Addresses: []common.Address{onRampAddress},
-		},
+
+	arm, err := arm_contract.NewARMContract(staticConfig.ArmProxy, o.client)
+	if err != nil {
+		return false, err
 	}
-	return &OnRamp{
-		lggr:                       lggr,
-		client:                     source,
-		lp:                         sourceLP,
-		leafHasher:                 NewLeafHasher(sourceSelector, destSelector, onRampAddress, hashlib.NewKeccakCtx(), onRamp),
-		onRamp:                     onRamp,
-		filters:                    filters,
-		address:                    onRampAddress,
-		sendRequestedSeqNumberWord: CCIPSendRequestSeqNumIndex,
-		sendRequestedEventSig:      CCIPSendRequestEventSig,
-	}, nil
+
+	cursed, err := arm.IsCursed(&bind.CallOpts{Context: ctx})
+	if err != nil {
+		return false, nil
+	}
+	return cursed, nil
 }
