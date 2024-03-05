@@ -1104,7 +1104,7 @@ func (r *ExecutionReportingPlugin) prepareTokenExecData(ctx context.Context) (ex
 // ensurePriceRegistrySynchronization ensures that the source price registry points to the same as the one configured on the onRamp.
 // This is required since the price registry address on the onRamp can change over time.
 func (r *ExecutionReportingPlugin) ensurePriceRegistrySynchronization(ctx context.Context) error {
-	priceRegistryAddress, err := r.onRampReader.GetPriceRegistry(ctx)
+	priceRegistryAddress, err := r.onRampReader.SourcePriceRegistryAddress(ctx)
 	if err != nil {
 		return fmt.Errorf("getting price registry from onramp: %w", err)
 	}

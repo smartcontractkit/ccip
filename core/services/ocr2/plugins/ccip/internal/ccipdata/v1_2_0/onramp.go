@@ -172,7 +172,7 @@ func (o *OnRamp) GetDynamicConfig() (cciptypes.OnRampDynamicConfig, error) {
 	}, nil
 }
 
-func (o *OnRamp) GetPriceRegistry(ctx context.Context) (cciptypes.Address, error) {
+func (o *OnRamp) SourcePriceRegistryAddress(ctx context.Context) (cciptypes.Address, error) {
 	return o.cachedSourcePriceRegistryAddress.Get(ctx, func(ctx context.Context) (cciptypes.Address, error) {
 		c, err := o.GetDynamicConfig()
 		if err != nil {
