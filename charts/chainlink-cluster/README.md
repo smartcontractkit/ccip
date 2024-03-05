@@ -23,7 +23,7 @@ Configure your `cluster` setup (one time setup, internal usage only)
 ```
 export DEVSPACE_IMAGE="..."
 cd charts/chainlink-cluster
-./setup.sh ${my-personal-namespace-name-crib}
+TBD
 ```
 
 Build and deploy current commit

@@ -1,0 +1,6 @@
+dependencies:
+- name: mockserver
+  repository: https://www.mock-server.com
+  version: 5.14.0
+digest: sha256:059ea904117893108a9e39e9c8506179847ab1a480658f4fc30f7cd4b03acd90
+generated: "2024-03-05T10:19:41.127258+01:00"
