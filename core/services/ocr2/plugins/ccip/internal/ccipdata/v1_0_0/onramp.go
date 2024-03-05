@@ -263,12 +263,12 @@ func (o *OnRamp) IsSourceCursed(ctx context.Context) (bool, error) {
 
 	arm, err := arm_contract.NewARMContract(staticConfig.ArmProxy, o.client)
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("intializing Arm contract through the ArmProxy: %w", err)
 	}
 
 	cursed, err := arm.IsCursed(&bind.CallOpts{Context: ctx})
 	if err != nil {
-		return false, nil
+		return false, fmt.Errorf("checking if source Arm is cursed: %w", err)
 	}
 	return cursed, nil
 }
