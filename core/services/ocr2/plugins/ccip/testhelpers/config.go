@@ -36,7 +36,6 @@ func (c *CCIPContracts) createCommitOffchainConfig(t *testing.T, feeUpdateHearBe
 		1,
 		*config.MustNewDuration(feeUpdateHearBeat),
 		1,
-		200e9,
 		*config.MustNewDuration(inflightCacheExpiry),
 	).Encode()
 	require.NoError(t, err)

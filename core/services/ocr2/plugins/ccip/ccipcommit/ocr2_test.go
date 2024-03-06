@@ -313,7 +313,7 @@ func TestCommitReportingPlugin_Report(t *testing.T) {
 			destPriceRegistryReader.On("GetTokensDecimals", ctx, destTokens).Return(destDecimals, nil).Maybe()
 
 			lp := mocks2.NewLogPoller(t)
-			commitStoreReader, err := v1_2_0.NewCommitStore(logger.TestLogger(t), utils.RandomAddress(), nil, lp, nil)
+			commitStoreReader, err := v1_2_0.NewCommitStore(logger.TestLogger(t), utils.RandomAddress(), nil, lp, nil, nil)
 			assert.NoError(t, err)
 
 			p := &CommitReportingPlugin{}
@@ -985,6 +985,7 @@ func TestCommitReportingPlugin_generatePriceUpdates(t *testing.T) {
 		priceGetterRespErr   error
 		feeEstimatorRespFee  *big.Int
 		feeEstimatorRespErr  error
+		maxGasPrice          uint64
 		expSourceGasPriceUSD *big.Int
 		expTokenPricesUSD    map[cciptypes.Address]*big.Int
 		expErr               bool
@@ -1004,6 +1005,7 @@ func TestCommitReportingPlugin_generatePriceUpdates(t *testing.T) {
 			priceGetterRespErr:   nil,
 			feeEstimatorRespFee:  big.NewInt(10),
 			feeEstimatorRespErr:  nil,
+			maxGasPrice:          1e18,
 			expSourceGasPriceUSD: big.NewInt(1000),
 			expTokenPricesUSD: map[cciptypes.Address]*big.Int{
 				tokens[0]: val1e18(100),
@@ -1064,6 +1066,7 @@ func TestCommitReportingPlugin_generatePriceUpdates(t *testing.T) {
 			priceGetterRespErr:   nil,
 			feeEstimatorRespFee:  big.NewInt(10),
 			feeEstimatorRespErr:  nil,
+			maxGasPrice:          1e18,
 			expSourceGasPriceUSD: big.NewInt(1000),
 			expTokenPricesUSD: map[cciptypes.Address]*big.Int{
 				tokens[0]: val1e18(100),
@@ -1086,6 +1089,7 @@ func TestCommitReportingPlugin_generatePriceUpdates(t *testing.T) {
 			priceGetterRespErr:   nil,
 			feeEstimatorRespFee:  big.NewInt(20),
 			feeEstimatorRespErr:  nil,
+			maxGasPrice:          1e18,
 			expSourceGasPriceUSD: big.NewInt(2000),
 			expTokenPricesUSD: map[cciptypes.Address]*big.Int{
 				tokens[0]: val1e18(100),
@@ -1106,6 +1110,7 @@ func TestCommitReportingPlugin_generatePriceUpdates(t *testing.T) {
 				tokens[2]: val1e18(300), // price getter returned a price for this token even though we didn't request it (should be skipped)
 			},
 			feeEstimatorRespFee: nil,
+			maxGasPrice:         1e18,
 			expErr:              true,
 		},
 	}
@@ -1129,14 +1134,13 @@ func TestCommitReportingPlugin_generatePriceUpdates(t *testing.T) {
 				priceGetter.On("TokenPricesUSD", mock.Anything, tokens).Return(tc.priceGetterRespData, tc.priceGetterRespErr)
 			}
 
-			// @MATT TODO
-			//if tc.maxGasPrice > 0 {
-			//	gasPriceEstimator.On("GetGasPrice", mock.Anything).Return(tc.feeEstimatorRespFee, tc.feeEstimatorRespErr)
-			//	if tc.feeEstimatorRespFee != nil {
-			//		pUSD := ccipcalc.CalculateUsdPerUnitGas(tc.feeEstimatorRespFee, tc.expTokenPricesUSD[tc.sourceNativeToken])
-			//		gasPriceEstimator.On("DenoteInUSD", mock.Anything, mock.Anything).Return(pUSD, nil)
-			//	}
-			//}
+			if tc.maxGasPrice > 0 {
+				gasPriceEstimator.On("GetGasPrice", mock.Anything).Return(tc.feeEstimatorRespFee, tc.feeEstimatorRespErr)
+				if tc.feeEstimatorRespFee != nil {
+					pUSD := ccipcalc.CalculateUsdPerUnitGas(tc.feeEstimatorRespFee, tc.expTokenPricesUSD[tc.sourceNativeToken])
+					gasPriceEstimator.On("DenoteInUSD", mock.Anything, mock.Anything).Return(pUSD, nil)
+				}
+			}
 
 			p := &CommitReportingPlugin{
 				sourceNative:      tc.sourceNativeToken,

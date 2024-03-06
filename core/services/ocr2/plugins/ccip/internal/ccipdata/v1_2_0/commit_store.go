@@ -40,6 +40,7 @@ type CommitStore struct {
 	lp                        logpoller.LogPoller
 	address                   common.Address
 	estimator                 gas.EvmFeeEstimator
+	maxGasPrice               *big.Int
 	filters                   []logpoller.Filter
 	reportAcceptedSig         common.Hash
 	reportAcceptedMaxSeqIndex int
@@ -225,13 +226,13 @@ func (c *CommitStore) ChangeConfig(onchainConfig []byte, offchainConfig []byte) 
 	}
 	c.configMu.Lock()
 
-	//c.lggr.Infow("Initializing NewDAGasPriceEstimator", "estimator", c.estimator, "l1Oracle", c.estimator.L1Oracle())
-	//c.gasPriceEstimator = prices.NewDAGasPriceEstimator(
-	//	c.estimator,
-	//	big.NewInt(int64(offchainConfigParsed.ComputeSourceMaxGasPrice())),
-	//	int64(offchainConfigParsed.ExecGasPriceDeviationPPB),
-	//	int64(offchainConfigParsed.DAGasPriceDeviationPPB),
-	//)
+	c.lggr.Infow("Initializing NewDAGasPriceEstimator", "estimator", c.estimator, "l1Oracle", c.estimator.L1Oracle())
+	c.gasPriceEstimator = prices.NewDAGasPriceEstimator(
+		c.estimator,
+		c.maxGasPrice,
+		int64(offchainConfigParsed.ExecGasPriceDeviationPPB),
+		int64(offchainConfigParsed.DAGasPriceDeviationPPB),
+	)
 	c.offchainConfig = ccipdata.NewCommitOffchainConfig(
 		offchainConfigParsed.ExecGasPriceDeviationPPB,
 		offchainConfigParsed.GasPriceHeartBeat.Duration(),
@@ -387,7 +388,7 @@ func (c *CommitStore) RegisterFilters(qopts ...pg.QOpt) error {
 	return logpollerutil.RegisterLpFilters(c.lp, c.filters, qopts...)
 }
 
-func NewCommitStore(lggr logger.Logger, addr common.Address, ec client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator) (*CommitStore, error) {
+func NewCommitStore(lggr logger.Logger, addr common.Address, ec client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator, maxGasPrice *big.Int) (*CommitStore, error) {
 	commitStore, err := commit_store.NewCommitStore(addr, ec)
 	if err != nil {
 		return nil, err
@@ -410,6 +411,7 @@ func NewCommitStore(lggr logger.Logger, addr common.Address, ec client.Client, l
 		lggr:              lggr,
 		lp:                lp,
 		estimator:         estimator,
+		maxGasPrice:       maxGasPrice,
 		filters:           filters,
 		commitReportArgs:  commitReportArgs,
 		reportAcceptedSig: eventSig,

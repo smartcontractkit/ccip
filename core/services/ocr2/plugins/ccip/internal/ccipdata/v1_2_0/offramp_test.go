@@ -99,20 +99,44 @@ func TestExecOffchainConfig120_Encoding(t *testing.T) {
 
 func TestExecOffchainConfig120_ParseRawJson(t *testing.T) {
 	t.Parallel()
-	decoded, err := ccipconfig.DecodeOffchainConfig[JSONExecOffchainConfig]([]byte(`{
-		"DestOptimisticConfirmations": 6,
-		"BatchGasLimit": 5000000,
-		"RelativeBoostPerWaitHour": 0.07,
-		"MaxGasPrice": 200000000000,
-		"InflightCacheExpiry": "64s",
-		"RootSnoozeTime": "128m"
-	}`))
-	require.NoError(t, err)
-	require.Equal(t, JSONExecOffchainConfig{
-		DestOptimisticConfirmations: 6,
-		BatchGasLimit:               5_000_000,
-		RelativeBoostPerWaitHour:    0.07,
-		InflightCacheExpiry:         *config.MustNewDuration(64 * time.Second),
-		RootSnoozeTime:              *config.MustNewDuration(128 * time.Minute),
-	}, decoded)
+
+	tests := []struct {
+		name   string
+		config []byte
+	}{
+		{
+			name: "with MaxGasPrice",
+			config: []byte(`{
+				"DestOptimisticConfirmations": 6,
+				"BatchGasLimit": 5000000,
+				"RelativeBoostPerWaitHour": 0.07,
+				"MaxGasPrice": 200000000000,
+				"InflightCacheExpiry": "64s",
+				"RootSnoozeTime": "128m"
+			}`),
+		},
+		{
+			name: "without MaxGasPrice",
+			config: []byte(`{
+				"DestOptimisticConfirmations": 6,
+				"BatchGasLimit": 5000000,
+				"RelativeBoostPerWaitHour": 0.07,
+				"InflightCacheExpiry": "64s",
+				"RootSnoozeTime": "128m"
+			}`),
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			decoded, err := ccipconfig.DecodeOffchainConfig[JSONExecOffchainConfig](tc.config)
+			require.NoError(t, err)
+			require.Equal(t, JSONExecOffchainConfig{
+				DestOptimisticConfirmations: 6,
+				BatchGasLimit:               5_000_000,
+				RelativeBoostPerWaitHour:    0.07,
+				InflightCacheExpiry:         *config.MustNewDuration(64 * time.Second),
+				RootSnoozeTime:              *config.MustNewDuration(128 * time.Minute),
+			}, decoded)
+		})
+	}
 }
