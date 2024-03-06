@@ -1,16 +1,17 @@
 package v1_2_0_test
 
 import (
+	"context"
 	"math/big"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
 	lpmocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/cciptypes"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_2_0"
 )
 
@@ -28,9 +29,9 @@ func TestExecutionReportEncodingV120(t *testing.T) {
 	offRamp, err := v1_2_0.NewOffRamp(logger.TestLogger(t), utils.RandomAddress(), nil, lpmocks.NewLogPoller(t), nil)
 	require.NoError(t, err)
 
-	encodeExecutionReport, err := offRamp.EncodeExecutionReport(report)
+	encodeExecutionReport, err := offRamp.EncodeExecutionReport(context.Background(), report)
 	require.NoError(t, err)
-	decodeCommitReport, err := offRamp.DecodeExecutionReport(encodeExecutionReport)
+	decodeCommitReport, err := offRamp.DecodeExecutionReport(context.Background(), encodeExecutionReport)
 	require.NoError(t, err)
 	require.Equal(t, report.Proofs, decodeCommitReport.Proofs)
 	require.Equal(t, report, decodeCommitReport)

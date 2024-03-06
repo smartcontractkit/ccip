@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	evmclientmocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/client/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
@@ -26,7 +27,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils/pgtest"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/cciptypes"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/factory"
@@ -183,7 +183,10 @@ func setupOffRampReaderTH(t *testing.T, version string) offRampReaderTH {
 	// Create the version-specific reader.
 	reader, err := factory.NewOffRampReader(log, factory.NewEvmVersionFinder(), ccipcalc.EvmAddrToGeneric(offRampAddress), bc, lp, nil, true)
 	require.NoError(t, err)
-	require.Equal(t, ccipcalc.EvmAddrToGeneric(offRampAddress), reader.Address())
+	ctx := testutils.Context(t)
+	addr, err := reader.Address(ctx)
+	assert.NoError(t, err)
+	require.Equal(t, ccipcalc.EvmAddrToGeneric(offRampAddress), addr)
 
 	return offRampReaderTH{
 		user:   user,

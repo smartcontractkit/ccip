@@ -18,7 +18,7 @@ import (
 
 	commonlogger "github.com/smartcontractkit/chainlink-common/pkg/logger"
 
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/cciptypes"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
@@ -85,6 +85,11 @@ func UnregisterExecPluginLpFilters(ctx context.Context, lggr logger.Logger, jb j
 		return err
 	}
 
+	offRampAddress, err := params.offRampReader.Address(ctx)
+	if err != nil {
+		return fmt.Errorf("get offramp address: %w", err)
+	}
+
 	versionFinder := factory.NewEvmVersionFinder()
 	unregisterFuncs := []func() error{
 		func() error {
@@ -94,7 +99,7 @@ func UnregisterExecPluginLpFilters(ctx context.Context, lggr logger.Logger, jb j
 			return factory.CloseOnRampReader(lggr, versionFinder, params.offRampConfig.SourceChainSelector, params.offRampConfig.ChainSelector, params.offRampConfig.OnRamp, params.sourceChain.LogPoller(), params.sourceChain.Client(), qopts...)
 		},
 		func() error {
-			return factory.CloseOffRampReader(lggr, versionFinder, params.offRampReader.Address(), params.destChain.Client(), params.destChain.LogPoller(), params.destChain.GasEstimator(), qopts...)
+			return factory.CloseOffRampReader(lggr, versionFinder, offRampAddress, params.destChain.Client(), params.destChain.LogPoller(), params.destChain.GasEstimator(), qopts...)
 		},
 		func() error { // usdc token data reader
 			if usdcDisabled := params.pluginConfig.USDCConfig.AttestationAPI == ""; usdcDisabled {
@@ -230,9 +235,19 @@ func jobSpecToExecPluginConfig(ctx context.Context, lggr logger.Logger, jb job.J
 
 	batchCaller := rpclib.NewDynamicLimitedBatchCaller(lggr, params.destChain.Client(), rpclib.DefaultRpcBatchSizeLimit, rpclib.DefaultRpcBatchBackOffMultiplier)
 
-	tokenPoolBatchedReader, err := batchreader.NewEVMTokenPoolBatchedReader(execLggr, sourceChainSelector, offRampReader.Address(), batchCaller)
+	offRampAddress, err := offRampReader.Address(ctx)
+	if err != nil {
+		return nil, nil, fmt.Errorf("get offramp address: %w", err)
+	}
+
+	tokenPoolBatchedReader, err := batchreader.NewEVMTokenPoolBatchedReader(execLggr, sourceChainSelector, offRampAddress, batchCaller)
 	if err != nil {
 		return nil, nil, fmt.Errorf("new token pool batched reader: %w", err)
+	}
+
+	offRampOnChainConfig, err := offRampReader.OnchainConfig(ctx)
+	if err != nil {
+		return nil, nil, fmt.Errorf("get offramp on chain config: %w", err)
 	}
 
 	return &ExecutionPluginStaticConfig{
@@ -250,7 +265,7 @@ func jobSpecToExecPluginConfig(ctx context.Context, lggr logger.Logger, jb job.J
 				tokenDataProviders,
 				numTokenDataWorkers,
 				5*time.Second,
-				offRampReader.OnchainConfig().PermissionLessExecutionThresholdSeconds,
+				offRampOnChainConfig.PermissionLessExecutionThresholdSeconds,
 			),
 			metricsCollector: metricsCollector,
 		}, &ccipcommon.BackfillArgs{

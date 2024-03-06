@@ -23,11 +23,11 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
 	lpMocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/cciptypes"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
@@ -279,7 +279,7 @@ func TestExecutionReportingPlugin_ShouldAcceptFinalizedReport(t *testing.T) {
 
 	encodedReport := encodeExecutionReport(t, report)
 	mockOffRampReader := ccipdatamocks.NewOffRampReader(t)
-	mockOffRampReader.On("DecodeExecutionReport", encodedReport).Return(report, nil)
+	mockOffRampReader.On("DecodeExecutionReport", mock.Anything, encodedReport).Return(report, nil)
 
 	plugin := ExecutionReportingPlugin{
 		offRampReader:   mockOffRampReader,
@@ -324,7 +324,7 @@ func TestExecutionReportingPlugin_ShouldTransmitAcceptedReport(t *testing.T) {
 
 	mockCommitStoreReader := ccipdatamocks.NewCommitStoreReader(t)
 	mockOffRampReader := ccipdatamocks.NewOffRampReader(t)
-	mockOffRampReader.On("DecodeExecutionReport", encodedReport).Return(report, nil)
+	mockOffRampReader.On("DecodeExecutionReport", mock.Anything, encodedReport).Return(report, nil)
 	mockedExecState := mockOffRampReader.On("GetExecutionState", mock.Anything, uint64(12)).Return(uint8(cciptypes.ExecutionStateUntouched), nil).Once()
 
 	plugin := ExecutionReportingPlugin{
@@ -1885,9 +1885,10 @@ func Test_prepareTokenExecData(t *testing.T) {
 }
 
 func encodeExecutionReport(t *testing.T, report cciptypes.ExecReport) []byte {
+	ctx := testutils.Context(t)
 	reader, err := v1_2_0.NewOffRamp(logger.TestLogger(t), utils.RandomAddress(), nil, nil, nil)
 	require.NoError(t, err)
-	encodedReport, err := reader.EncodeExecutionReport(report)
+	encodedReport, err := reader.EncodeExecutionReport(ctx, report)
 	require.NoError(t, err)
 	return encodedReport
 }

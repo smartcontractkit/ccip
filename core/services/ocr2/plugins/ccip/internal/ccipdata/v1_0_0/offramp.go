@@ -16,7 +16,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
 
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/cciptypes"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/logpollerutil"
 
@@ -350,26 +350,26 @@ func (o *OffRamp) getPoolsByDestTokens(ctx context.Context, tokenAddrs []common.
 	return destPools, nil
 }
 
-func (o *OffRamp) OffchainConfig() cciptypes.ExecOffchainConfig {
+func (o *OffRamp) OffchainConfig(ctx context.Context) (cciptypes.ExecOffchainConfig, error) {
 	o.configMu.RLock()
 	defer o.configMu.RUnlock()
-	return o.offchainConfig
+	return o.offchainConfig, nil
 }
 
-func (o *OffRamp) OnchainConfig() cciptypes.ExecOnchainConfig {
+func (o *OffRamp) OnchainConfig(ctx context.Context) (cciptypes.ExecOnchainConfig, error) {
 	o.configMu.RLock()
 	defer o.configMu.RUnlock()
-	return o.onchainConfig
+	return o.onchainConfig, nil
 }
 
-func (o *OffRamp) GasPriceEstimator() cciptypes.GasPriceEstimatorExec {
+func (o *OffRamp) GasPriceEstimator(ctx context.Context) (cciptypes.GasPriceEstimatorExec, error) {
 	o.configMu.RLock()
 	defer o.configMu.RUnlock()
-	return o.gasPriceEstimator
+	return o.gasPriceEstimator, nil
 }
 
-func (o *OffRamp) Address() cciptypes.Address {
-	return cciptypes.Address(o.addr.String())
+func (o *OffRamp) Address(ctx context.Context) (cciptypes.Address, error) {
+	return cciptypes.Address(o.addr.String()), nil
 }
 
 func (o *OffRamp) UpdateDynamicConfig(onchainConfig cciptypes.ExecOnchainConfig, offchainConfig cciptypes.ExecOffchainConfig, gasPriceEstimator prices.GasPriceEstimatorExec) {
@@ -380,7 +380,7 @@ func (o *OffRamp) UpdateDynamicConfig(onchainConfig cciptypes.ExecOnchainConfig,
 	o.configMu.Unlock()
 }
 
-func (o *OffRamp) ChangeConfig(onchainConfigBytes []byte, offchainConfigBytes []byte) (cciptypes.Address, cciptypes.Address, error) {
+func (o *OffRamp) ChangeConfig(ctx context.Context, onchainConfigBytes []byte, offchainConfigBytes []byte) (cciptypes.Address, cciptypes.Address, error) {
 	onchainConfigParsed, err := abihelpers.DecodeAbiStruct[ExecOnchainConfig](onchainConfigBytes)
 	if err != nil {
 		return "", "", err
@@ -525,7 +525,7 @@ func encodeExecutionReport(args abi.Arguments, report cciptypes.ExecReport) ([]b
 	return args.PackValues([]interface{}{&rep})
 }
 
-func (o *OffRamp) EncodeExecutionReport(report cciptypes.ExecReport) ([]byte, error) {
+func (o *OffRamp) EncodeExecutionReport(ctx context.Context, report cciptypes.ExecReport) ([]byte, error) {
 	return encodeExecutionReport(o.ExecutionReportArgs, report)
 }
 
@@ -603,7 +603,7 @@ func DecodeExecReport(args abi.Arguments, report []byte) (cciptypes.ExecReport, 
 
 }
 
-func (o *OffRamp) DecodeExecutionReport(report []byte) (cciptypes.ExecReport, error) {
+func (o *OffRamp) DecodeExecutionReport(ctx context.Context, report []byte) (cciptypes.ExecReport, error) {
 	return DecodeExecReport(o.ExecutionReportArgs, report)
 }
 

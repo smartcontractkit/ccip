@@ -12,6 +12,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
@@ -19,7 +20,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/cciptypes"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
@@ -162,7 +162,7 @@ func (o *OffRamp) CurrentRateLimiterState(ctx context.Context) (cciptypes.TokenB
 	}, nil
 }
 
-func (o *OffRamp) ChangeConfig(onchainConfigBytes []byte, offchainConfigBytes []byte) (cciptypes.Address, cciptypes.Address, error) {
+func (o *OffRamp) ChangeConfig(ctx context.Context, onchainConfigBytes []byte, offchainConfigBytes []byte) (cciptypes.Address, cciptypes.Address, error) {
 	// Same as the v1.0.0 method, except for the ExecOnchainConfig type.
 	onchainConfigParsed, err := abihelpers.DecodeAbiStruct[ExecOnchainConfig](onchainConfigBytes)
 	if err != nil {
@@ -247,7 +247,7 @@ func EncodeExecutionReport(args abi.Arguments, report cciptypes.ExecReport) ([]b
 	return args.PackValues([]interface{}{&rep})
 }
 
-func (o *OffRamp) EncodeExecutionReport(report cciptypes.ExecReport) ([]byte, error) {
+func (o *OffRamp) EncodeExecutionReport(ctx context.Context, report cciptypes.ExecReport) ([]byte, error) {
 	return EncodeExecutionReport(o.ExecutionReportArgs, report)
 }
 
@@ -326,7 +326,7 @@ func DecodeExecReport(args abi.Arguments, report []byte) (cciptypes.ExecReport, 
 
 }
 
-func (o *OffRamp) DecodeExecutionReport(report []byte) (cciptypes.ExecReport, error) {
+func (o *OffRamp) DecodeExecutionReport(ctx context.Context, report []byte) (cciptypes.ExecReport, error) {
 	return DecodeExecReport(o.ExecutionReportArgs, report)
 }
 
