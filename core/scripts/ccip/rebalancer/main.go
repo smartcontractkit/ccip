@@ -377,6 +377,45 @@ func main() {
 			common.HexToAddress(*l2ToAddress),
 			decimal.RequireFromString(*amount).BigInt(),
 		)
+	case "op-withdraw-from-l2":
+		cmd := flag.NewFlagSet("op-withdraw-from-l2", flag.ExitOnError)
+		l2ChainID := cmd.Uint64("l2-chain-id", 0, "L2 Chain ID")
+		l2BridgeAdapterAddress := cmd.String("l2-bridge-adapter-address", "", "L2 Bridge Adapter Address")
+		amount := cmd.String("amount", "1", "Amount")
+		l1ToAddress := cmd.String("l1-to-address", "", "L1 Address")
+		l2TokenAddress := cmd.String("l2-token-address", "", "Token Address")
+
+		helpers.ParseArgs(cmd, os.Args[2:],
+			"l2-chain-id", "l2-bridge-adapter-address", "l1-to-address", "l2-token-address")
+
+		env := multienv.New(false, false)
+		opstack.WithdrawFromL2(
+			env,
+			*l2ChainID,
+			common.HexToAddress(*l2BridgeAdapterAddress),
+			decimal.RequireFromString(*amount).BigInt(),
+			common.HexToAddress(*l1ToAddress),
+			common.HexToAddress(*l2TokenAddress),
+		)
+	case "op-prove-withdrawal-l1":
+		cmd := flag.NewFlagSet("op-prove-withdrawal-l1", flag.ExitOnError)
+		l1ChainID := cmd.Uint64("l1-chain-id", 0, "L1 Chain ID")
+		l2ChainID := cmd.Uint64("l2-chain-id", 0, "L2 Chain ID")
+		l2TxHash := cmd.String("l2-tx-hash", "", "L2 Tx Hash")
+		l1BridgeAdapterAddress := cmd.String("l1-bridge-adapter-address", "", "L1 Bridge Adapter Address")
+
+		helpers.ParseArgs(cmd, os.Args[2:], "l1-chain-id", "l2-chain-id", "l2-tx-hash", "l1-bridge-adapter-address")
+
+		env := multienv.New(false, false)
+
+		opstack.ProveWithdrawal(
+			env,
+			*l1ChainID,
+			*l2ChainID,
+			common.HexToAddress(*l1BridgeAdapterAddress),
+			opstack.OptimismContracts[*l1ChainID]["L2OutputOracle"],
+			opstack.OptimismContracts[*l1ChainID]["OptimismPortal"],
+			common.HexToHash(*l2TxHash))
 	}
 }
 

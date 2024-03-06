@@ -18,10 +18,13 @@ func init() {
 			"L1CrossDomainMessenger": common.HexToAddress("0x58Cc85b8D04EA49cC6DBd3CbFFd00B4B8D6cb3ef"),
 			"WETH":                   common.HexToAddress("0x7b79995e5f793a07bc00c21412e50ecae098e7f9"),
 			"FaucetTestingToken":     common.HexToAddress("0x5589BB8228C07c4e15558875fAf2B859f678d129"),
+			"OptimismPortal":         common.HexToAddress("0x16Fc5058F25648194471939df75CF27A2fdC48BC"),
+			"L2OutputOracle":         common.HexToAddress("0x90E9c4f8a994a250F6aEfd61CAFb4F2e895D458F"),
 		},
 		chainsel.ETHEREUM_TESTNET_SEPOLIA_OPTIMISM_1.EvmChainID: {
-			"WETH":               common.HexToAddress("0x4200000000000000000000000000000000000006"),
-			"FaucetTestingToken": common.HexToAddress("0xD08a2917653d4E460893203471f0000826fb4034"),
+			"WETH":                common.HexToAddress("0x4200000000000000000000000000000000000006"),
+			"FaucetTestingToken":  common.HexToAddress("0xD08a2917653d4E460893203471f0000826fb4034"),
+			"L2ToL1MessagePasser": common.HexToAddress("0x4200000000000000000000000000000000000016"),
 		},
 	}
 }

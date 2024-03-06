@@ -25,6 +25,12 @@ package rebalancer
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.19/IArbitrumTokenGateway/IArbitrumTokenGateway.abi ../../../contracts/solc/v0.8.19/IArbitrumTokenGateway/IArbitrumTokenGateway.bin ArbitrumTokenGateway arbitrum_token_gateway
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.19/IAbstractArbitrumTokenGateway/IAbstractArbitrumTokenGateway.abi ../../../contracts/solc/v0.8.19/IAbstractArbitrumTokenGateway/IAbstractArbitrumTokenGateway.bin AbstractArbitrumTokenGateway abstract_arbitrum_token_gateway
 
+// Optimism helpers
+//go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.19/IOptimismPortal/IOptimismPortal.abi ../../../contracts/solc/v0.8.19/IOptimismPortal/IOptimismPortal.bin OptimismPortal optimism_portal
+//go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.19/IOptimismL2OutputOracle/IOptimismL2OutputOracle.abi ../../../contracts/solc/v0.8.19/IOptimismL2OutputOracle/IOptimismL2OutputOracle.bin OptimismL2OutputOracle optimism_l2_output_oracle
+//go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.19/IOptimismL2ToL1MessagePasser/IOptimismL2ToL1MessagePasser.abi ../../../contracts/solc/v0.8.19/IOptimismL2ToL1MessagePasser/IOptimismL2ToL1MessagePasser.bin OptimismL2ToL1MessagePasser optimism_l2_to_l1_message_passer
+//go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.19/IOptimismCrossDomainMessenger/IOptimismCrossDomainMessenger.abi ../../../contracts/solc/v0.8.19/IOptimismCrossDomainMessenger/IOptimismCrossDomainMessenger.bin OptimismCrossDomainMessenger optimism_cross_domain_messenger
+
 // Generate mocks for tests
 //go:generate mockery --quiet --dir ./generated/arbitrum_l1_bridge_adapter/ --name ArbitrumL1BridgeAdapterInterface --output ./mocks/mock_arbitrum_l1_bridge_adapter --outpkg mock_arbitrum_l1_bridge_adapter --case=underscore
 //go:generate mockery --quiet --dir ./generated/arbitrum_l2_bridge_adapter/ --name ArbitrumL2BridgeAdapterInterface --output ./mocks/mock_arbitrum_l2_bridge_adapter --outpkg mock_arbitrum_l2_bridge_adapter --case=underscore
