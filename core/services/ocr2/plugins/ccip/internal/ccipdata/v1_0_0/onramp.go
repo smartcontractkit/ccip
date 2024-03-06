@@ -30,15 +30,16 @@ const (
 var _ ccipdata.OnRampReader = &OnRamp{}
 
 type OnRamp struct {
-	address                    common.Address
-	onRamp                     *evm_2_evm_onramp_1_0_0.EVM2EVMOnRamp
-	lp                         logpoller.LogPoller
-	lggr                       logger.Logger
-	client                     client.Client
-	leafHasher                 ccipdata.LeafHasherInterface[[32]byte]
-	sendRequestedEventSig      common.Hash
-	sendRequestedSeqNumberWord int
-	filters                    []logpoller.Filter
+	address                          common.Address
+	onRamp                           *evm_2_evm_onramp_1_0_0.EVM2EVMOnRamp
+	lp                               logpoller.LogPoller
+	lggr                             logger.Logger
+	client                           client.Client
+	leafHasher                       ccipdata.LeafHasherInterface[[32]byte]
+	sendRequestedEventSig            common.Hash
+	sendRequestedSeqNumberWord       int
+	filters                          []logpoller.Filter
+	cachedSourcePriceRegistryAddress cache.AutoSync[cciptypes.Address]
 	// Static config can be cached, because it's never expected to change.
 	// The only way to change that is through the contract's constructor (redeployment)
 	cachedStaticConfig cache.OnceCtxFunction[evm_2_evm_onramp_1_0_0.EVM2EVMOnRampStaticConfig]
@@ -57,6 +58,11 @@ func NewOnRamp(lggr logger.Logger, sourceSelector, destSelector uint64, onRampAd
 			EventSigs: []common.Hash{eventSig},
 			Addresses: []common.Address{onRampAddress},
 		},
+		{
+			Name:      logpoller.FilterName(ccipdata.CONFIG_CHANGED, onRampAddress),
+			EventSigs: []common.Hash{abihelpers.MustGetEventID("ConfigSet", onRampABI)},
+			Addresses: []common.Address{onRampAddress},
+		},
 	}
 	cachedStaticConfig := cache.OnceCtxFunction[evm_2_evm_onramp_1_0_0.EVM2EVMOnRampStaticConfig](func(ctx context.Context) (evm_2_evm_onramp_1_0_0.EVM2EVMOnRampStaticConfig, error) {
 		return onRamp.GetStaticConfig(&bind.CallOpts{Context: ctx})
@@ -72,7 +78,12 @@ func NewOnRamp(lggr logger.Logger, sourceSelector, destSelector uint64, onRampAd
 		// offset || sourceChainID || seqNum || ...
 		sendRequestedSeqNumberWord: 2,
 		sendRequestedEventSig:      eventSig,
-		cachedStaticConfig:         cachedStaticConfig,
+		cachedSourcePriceRegistryAddress: cache.NewLogpollerEventsBased[cciptypes.Address](
+			sourceLP,
+			[]common.Hash{abihelpers.MustGetEventID("ConfigSet", onRampABI)},
+			onRampAddress,
+		),
+		cachedStaticConfig: cachedStaticConfig,
 	}, nil
 }
 
@@ -100,6 +111,16 @@ func (o *OnRamp) GetDynamicConfig() (cciptypes.OnRampDynamicConfig, error) {
 		MaxDataBytes:                      legacyDynamicConfig.MaxDataSize,
 		MaxPerMsgGasLimit:                 uint32(legacyDynamicConfig.MaxGasLimit),
 	}, nil
+}
+
+func (o *OnRamp) SourcePriceRegistryAddress(ctx context.Context) (cciptypes.Address, error) {
+	return o.cachedSourcePriceRegistryAddress.Get(ctx, func(ctx context.Context) (cciptypes.Address, error) {
+		c, err := o.GetDynamicConfig()
+		if err != nil {
+			return "", err
+		}
+		return c.PriceRegistry, nil
+	})
 }
 
 func (o *OnRamp) GetSendRequestsBetweenSeqNums(ctx context.Context, seqNumMin, seqNumMax uint64, finalized bool) ([]cciptypes.EVM2EVMMessageWithTxMeta, error) {
