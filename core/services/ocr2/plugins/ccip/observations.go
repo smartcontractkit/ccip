@@ -1,11 +1,10 @@
 package ccip
 
 import (
-	"encoding/json"
 	"math/big"
 
+	gojson "github.com/goccy/go-json"
 	"github.com/smartcontractkit/libocr/commontypes"
-
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
@@ -22,7 +21,7 @@ type CommitObservation struct {
 }
 
 func (o CommitObservation) Marshal() ([]byte, error) {
-	return json.Marshal(&o)
+	return gojson.Marshal(&o)
 }
 
 // ExecutionObservation stores messages as a map pointing from a sequence number (uint) to the message payload (MsgData)
@@ -64,7 +63,7 @@ func NewObservedMessage(seqNr uint64, tokenData [][]byte) ObservedMessage {
 }
 
 func (o ExecutionObservation) Marshal() ([]byte, error) {
-	return json.Marshal(&o)
+	return gojson.Marshal(&o)
 }
 
 // GetParsableObservations checks the given observations for formatting and value errors.
@@ -80,7 +79,7 @@ func GetParsableObservations[O CommitObservation | ExecutionObservation](l logge
 			continue
 		}
 		var ob O
-		err := json.Unmarshal(ao.Observation, &ob)
+		err := gojson.Unmarshal(ao.Observation, &ob)
 		if err != nil {
 			l.Errorw("Received unmarshallable observation", "err", err, "observation", string(ao.Observation), "observer", ao.Observer)
 			continue
