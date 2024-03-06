@@ -83,7 +83,7 @@ func Test_ArmChainState(t *testing.T) {
 			mockCommitStore.On("IsDown", ctx).Return(tc.commitStoreDown, tc.commitStoreErr)
 			mockOnRamp.On("IsSourceCursed", ctx).Return(tc.onRampCursed, tc.onRampErr)
 
-			chainState := NewArmChainState(logger.TestLogger(t), mockOnRamp, mockCommitStore)
+			chainState := NewArmChainHealthcheck(logger.TestLogger(t), mockOnRamp, mockCommitStore)
 			err := chainState.ValidateNotCursed(ctx)
 
 			if tc.expectedErr {

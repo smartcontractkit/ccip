@@ -87,9 +87,9 @@ type ExecutionReportingPlugin struct {
 	tokenPoolBatchedReader batchreader.TokenPoolBatchedReader
 
 	// State
-	inflightReports *inflightExecReportsContainer
-	snoozedRoots    cache.SnoozedRoots
-	armChainState   cache.ArmChainState
+	inflightReports  *inflightExecReportsContainer
+	snoozedRoots     cache.SnoozedRoots
+	chainHealthcheck cache.ChainHealthcheck
 }
 
 func (r *ExecutionReportingPlugin) Query(context.Context, types.ReportTimestamp) (types.Query, error) {
@@ -98,7 +98,7 @@ func (r *ExecutionReportingPlugin) Query(context.Context, types.ReportTimestamp)
 
 func (r *ExecutionReportingPlugin) Observation(ctx context.Context, timestamp types.ReportTimestamp, query types.Query) (types.Observation, error) {
 	lggr := r.lggr.Named("ExecutionObservation")
-	if err := r.armChainState.ValidateNotCursed(ctx); err != nil {
+	if err := r.chainHealthcheck.ForceValidateNotCursed(ctx); err != nil {
 		return nil, err
 	}
 	// Expire any inflight reports.
@@ -756,7 +756,7 @@ func (r *ExecutionReportingPlugin) buildReport(ctx context.Context, lggr logger.
 
 func (r *ExecutionReportingPlugin) Report(ctx context.Context, timestamp types.ReportTimestamp, query types.Query, observations []types.AttributedObservation) (bool, types.Report, error) {
 	lggr := r.lggr.Named("ExecutionReport")
-	if err := r.armChainState.ValidateNotCursed(ctx); err != nil {
+	if err := r.chainHealthcheck.ValidateNotCursed(ctx); err != nil {
 		return false, nil, err
 	}
 	parsableObservations := ccip.GetParsableObservations[ccip.ExecutionObservation](lggr, observations)
@@ -849,8 +849,8 @@ func (r *ExecutionReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Conte
 		lggr.Errorw("Unable to decode report", "err", err)
 		return false, err
 	}
-	if err := r.armChainState.ValidateNotCursed(ctx); err != nil {
-		return false, err
+	if err1 := r.chainHealthcheck.ValidateNotCursed(ctx); err1 != nil {
+		return false, err1
 	}
 	lggr = lggr.With("messageIDs", ccipcommon.GetMessageIDsAsHexString(execReport.Messages))
 
@@ -878,8 +878,8 @@ func (r *ExecutionReportingPlugin) ShouldTransmitAcceptedReport(ctx context.Cont
 		lggr.Errorw("Unable to decode report", "err", err)
 		return false, nil
 	}
-	if err := r.armChainState.ForceValidateNotCursed(ctx); err != nil {
-		return false, err
+	if err1 := r.chainHealthcheck.ForceValidateNotCursed(ctx); err1 != nil {
+		return false, err1
 	}
 	lggr = lggr.With("messageIDs", ccipcommon.GetMessageIDsAsHexString(execReport.Messages))
 

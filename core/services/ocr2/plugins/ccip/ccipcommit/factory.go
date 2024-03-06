@@ -100,7 +100,7 @@ func (rf *CommitReportingPluginFactory) NewReportingPlugin(config types.Reportin
 			gasPriceEstimator:       rf.config.commitStore.GasPriceEstimator(),
 			offchainConfig:          pluginOffChainConfig,
 			metricsCollector:        rf.config.metricsCollector,
-			armChainState:           cache.NewArmChainState(lggr, rf.config.onRampReader, rf.config.commitStore),
+			chainHealthcheck:        cache.NewArmChainHealthcheck(lggr, rf.config.onRampReader, rf.config.commitStore),
 		},
 		types.ReportingPluginInfo{
 			Name:          "CCIPCommit",
