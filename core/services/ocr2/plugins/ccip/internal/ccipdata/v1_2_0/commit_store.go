@@ -226,7 +226,6 @@ func (c *CommitStore) ChangeConfig(onchainConfig []byte, offchainConfig []byte) 
 	}
 	c.configMu.Lock()
 
-	c.lggr.Infow("Initializing NewDAGasPriceEstimator", "estimator", c.estimator, "l1Oracle", c.estimator.L1Oracle())
 	c.gasPriceEstimator = prices.NewDAGasPriceEstimator(
 		c.estimator,
 		c.maxGasPrice,
@@ -403,7 +402,6 @@ func NewCommitStore(lggr logger.Logger, addr common.Address, ec client.Client, l
 			Addresses: []common.Address{addr},
 		},
 	}
-	lggr.Infow("Initializing CommitStore with estimator", "estimator", estimator)
 
 	return &CommitStore{
 		commitStore:       commitStore,

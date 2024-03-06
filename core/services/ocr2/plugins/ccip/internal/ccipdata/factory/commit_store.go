@@ -46,6 +46,8 @@ func initOrCloseCommitStoreReader(lggr logger.Logger, versionFinder VersionFinde
 		return nil, err
 	}
 
+	lggr.Infow("Initializing CommitStore Reader", "version", version.String(), "estimator", estimator.Name(), "l1oracle", estimator.L1Oracle().Name(), "masGasPrice", maxGasPrice.String())
+
 	switch version.String() {
 	case ccipdata.V1_0_0, ccipdata.V1_1_0: // Versions are identical
 		cs, err := v1_0_0.NewCommitStore(lggr, evmAddr, ec, lp, estimator, maxGasPrice)

@@ -140,3 +140,57 @@ func TestCommitStoreV120ffchainConfigEncoding(t *testing.T) {
 		})
 	}
 }
+
+func TestCommitStoreV120ffchainConfigDecoding(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		config []byte
+	}{
+		{
+			name: "with MaxGasPrice",
+			config: []byte(`{
+				"SourceFinalityDepth": 3,
+				"DestFinalityDepth": 4,
+				"GasPriceHeartBeat": "60s",
+				"DAGasPriceDeviationPPB": 10,
+				"ExecGasPriceDeviationPPB": 11,
+				"TokenPriceHeartBeat": "120s",
+				"TokenPriceDeviationPPB": 12,
+				"MaxGasPrice": 100000000,
+				"SourceMaxGasPrice": 100000000,
+				"InflightCacheExpiry": "180s"
+			}`),
+		},
+		{
+			name: "without MaxGasPrice",
+			config: []byte(`{
+				"SourceFinalityDepth": 3,
+				"DestFinalityDepth": 4,
+				"GasPriceHeartBeat": "60s",
+				"DAGasPriceDeviationPPB": 10,
+				"ExecGasPriceDeviationPPB": 11,
+				"TokenPriceHeartBeat": "120s",
+				"TokenPriceDeviationPPB": 12,
+				"InflightCacheExpiry": "180s"
+			}`),
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			decoded, err := ccipconfig.DecodeOffchainConfig[JSONCommitOffchainConfig](tc.config)
+			require.NoError(t, err)
+			require.Equal(t, JSONCommitOffchainConfig{
+				SourceFinalityDepth:      3,
+				DestFinalityDepth:        4,
+				GasPriceHeartBeat:        *config.MustNewDuration(1 * time.Minute),
+				DAGasPriceDeviationPPB:   10,
+				ExecGasPriceDeviationPPB: 11,
+				TokenPriceHeartBeat:      *config.MustNewDuration(2 * time.Minute),
+				TokenPriceDeviationPPB:   12,
+				InflightCacheExpiry:      *config.MustNewDuration(3 * time.Minute),
+			}, decoded)
+		})
+	}
+}
