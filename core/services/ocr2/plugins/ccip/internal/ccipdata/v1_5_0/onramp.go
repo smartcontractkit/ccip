@@ -101,7 +101,7 @@ func NewOnRamp(lggr logger.Logger, sourceSelector, destSelector uint64, onRampAd
 			[]common.Hash{abihelpers.MustGetEventID("ConfigSet", onRampABI)},
 			onRampAddress,
 		),
-		cachedStaticConfig:         cachedStaticConfig,
+		cachedStaticConfig: cachedStaticConfig,
 	}, nil
 }
 
