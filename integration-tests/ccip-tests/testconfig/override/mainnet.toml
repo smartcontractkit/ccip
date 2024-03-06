@@ -4,6 +4,7 @@ Data = """
 {
     "lane_configs": {
         "Arbitrum Mainnet": {
+            "is_native_fee_token": true,
             "fee_token": "0xf97f4df75117a78c1A5a0DBb814Af92458539FB4",
             "bridge_tokens": [],
             "bridge_tokens_pools": [],
@@ -80,6 +81,7 @@ Data = """
             }
         },
         "Avalanche Mainnet": {
+            "is_native_fee_token": true,
             "fee_token": "0x5947BB275c521040051D82396192181b413227A3",
             "bridge_tokens": [],
             "bridge_tokens_pools": [],
@@ -156,6 +158,7 @@ Data = """
             }
         },
         "Base Mainnet": {
+            "is_native_fee_token": true,
             "fee_token": "0x88Fb150BDc53A65fe94Dea0c9BA0a6dAf8C6e196",
             "bridge_tokens": [],
             "bridge_tokens_pools": [],
@@ -223,6 +226,7 @@ Data = """
             }
         },
         "BSC Mainnet": {
+            "is_native_fee_token": true,
             "fee_token": "0x404460C6A5EdE2D891e8297795264fDe62ADBB75",
             "bridge_tokens": [],
             "bridge_tokens_pools": [],
@@ -299,6 +303,7 @@ Data = """
             }
         },
         "Ethereum Mainnet": {
+            "is_native_fee_token": true,
             "fee_token": "0x514910771AF9Ca656af840dff83E8264EcF986CA",
             "bridge_tokens": [],
             "bridge_tokens_pools": [],
@@ -375,6 +380,7 @@ Data = """
             }
         },
         "Kroma Mainnet": {
+            "is_native_fee_token": true,
             "fee_token": "0xC1F6f7622ad37C3f46cDF6F8AA0344ADE80BF450",
             "bridge_tokens": [],
             "bridge_tokens_pools": [],
@@ -397,6 +403,7 @@ Data = """
             }
         },
         "Optimism Mainnet": {
+            "is_native_fee_token": true,
             "fee_token": "0x350a791Bfc2C21F9Ed5d10980Dad2e2638ffa7f6",
             "bridge_tokens": [],
             "bridge_tokens_pools": [],
@@ -473,6 +480,7 @@ Data = """
             }
         },
         "Polygon Mainnet": {
+            "is_native_fee_token": true,
             "fee_token": "0xb0897686c545045aFc77CF20eC7A532E3120E0F1",
             "bridge_tokens": [],
             "bridge_tokens_pools": [],
@@ -549,6 +557,7 @@ Data = """
             }
         },
         "WeMix Mainnet": {
+            "is_native_fee_token": true,
             "fee_token": "0x80f1FcdC96B55e459BF52b998aBBE2c364935d69",
             "bridge_tokens": [],
             "bridge_tokens_pools": [],
