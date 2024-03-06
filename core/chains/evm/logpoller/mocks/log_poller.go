@@ -373,6 +373,24 @@ func (_m *LogPoller) IndexedLogsWithSigsExcluding(address common.Address, eventS
 	return r0, r1
 }
 
+// IsHealthy provides a mock function with given fields:
+func (_m *LogPoller) IsHealthy() bool {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for IsHealthy")
+	}
+
+	var r0 bool
+	if rf, ok := ret.Get(0).(func() bool); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	return r0
+}
+
 // LatestBlock provides a mock function with given fields: qopts
 func (_m *LogPoller) LatestBlock(qopts ...pg.QOpt) (logpoller.LogPollerBlock, error) {
 	_va := make([]interface{}, len(qopts))
