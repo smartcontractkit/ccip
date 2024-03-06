@@ -17,6 +17,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/mathutil"
 
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/cciptypes"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache"
 
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
@@ -86,6 +87,7 @@ type CommitReportingPlugin struct {
 	metricsCollector ccip.PluginMetricsCollector
 	// State
 	inflightReports *inflightCommitReportsContainer
+	armChainState   cache.ArmChainState
 }
 
 // Query is not used by the CCIP Commit plugin.
@@ -99,7 +101,7 @@ func (r *CommitReportingPlugin) Query(context.Context, types.ReportTimestamp) (t
 // the observation will be considered invalid and rejected.
 func (r *CommitReportingPlugin) Observation(ctx context.Context, epochAndRound types.ReportTimestamp, _ types.Query) (types.Observation, error) {
 	lggr := r.lggr.Named("CommitObservation")
-	if err := ccipcommon.VerifyNotDown(ctx, r.lggr, r.commitStoreReader, r.onRampReader); err != nil {
+	if err := r.armChainState.ValidateNotCursed(ctx); err != nil {
 		return nil, err
 	}
 	r.inflightReports.expire(lggr)
@@ -355,6 +357,9 @@ func (r *CommitReportingPlugin) getLatestGasPriceUpdate(ctx context.Context, now
 func (r *CommitReportingPlugin) Report(ctx context.Context, epochAndRound types.ReportTimestamp, _ types.Query, observations []types.AttributedObservation) (bool, types.Report, error) {
 	now := time.Now()
 	lggr := r.lggr.Named("CommitReport")
+	if err := r.armChainState.ValidateNotCursed(ctx); err != nil {
+		return false, nil, err
+	}
 	parsableObservations := ccip.GetParsableObservations[ccip.CommitObservation](lggr, observations)
 
 	feeTokens, bridgeableTokens, err := ccipcommon.GetDestinationTokens(ctx, r.offRampReader, r.destPriceRegistryReader)
@@ -644,7 +649,6 @@ func (r *CommitReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Context,
 	if err != nil {
 		return false, err
 	}
-
 	lggr := r.lggr.Named("CommitShouldAcceptFinalizedReport").With(
 		"merkleRoot", parsedReport.MerkleRoot,
 		"minSeqNum", parsedReport.Interval.Min,
@@ -653,6 +657,9 @@ func (r *CommitReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Context,
 		"tokenPriceUpdates", parsedReport.TokenPrices,
 		"reportTimestamp", reportTimestamp,
 	)
+	if err := r.armChainState.ValidateNotCursed(ctx); err != nil {
+		return false, err
+	}
 	// Empty report, should not be put on chain
 	if parsedReport.MerkleRoot == [32]byte{} && len(parsedReport.GasPrices) == 0 && len(parsedReport.TokenPrices) == 0 {
 		lggr.Warn("Empty report, should not be put on chain")
@@ -678,6 +685,9 @@ func (r *CommitReportingPlugin) ShouldTransmitAcceptedReport(ctx context.Context
 	lggr := r.lggr.Named("CommitShouldTransmitAcceptedReport")
 	parsedReport, err := r.commitStoreReader.DecodeCommitReport(report)
 	if err != nil {
+		return false, err
+	}
+	if err := r.armChainState.ForceValidateNotCursed(ctx); err != nil {
 		return false, err
 	}
 	// If report is not stale we transmit.

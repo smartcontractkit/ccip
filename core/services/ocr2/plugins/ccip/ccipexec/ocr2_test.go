@@ -29,6 +29,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/cciptypes"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache"
+	ccipcachemocks "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/batchreader"
@@ -186,6 +187,7 @@ func TestExecutionReportingPlugin_Observation(t *testing.T) {
 			p.sourcePriceRegistryProvider = mockOnRampPriceRegistryProvider
 
 			p.snoozedRoots = cache.NewSnoozedRoots(time.Minute, time.Minute)
+			p.armChainState = cache.NewArmChainState(p.lggr, mockOnRampReader, commitStoreReader)
 
 			_, err = p.Observation(ctx, types.ReportTimestamp{}, types.Query{})
 			if tc.expErr {
@@ -237,6 +239,9 @@ func TestExecutionReportingPlugin_Report(t *testing.T) {
 			p.F = tc.f
 
 			p.commitStoreReader = ccipdatamocks.NewCommitStoreReader(t)
+			armChainState := ccipcachemocks.NewArmChainState(t)
+			armChainState.On("ValidateNotCursed", ctx).Return(nil)
+			p.armChainState = armChainState
 
 			observations := make([]types.AttributedObservation, len(tc.observations))
 			for i := range observations {
@@ -281,10 +286,14 @@ func TestExecutionReportingPlugin_ShouldAcceptFinalizedReport(t *testing.T) {
 	mockOffRampReader := ccipdatamocks.NewOffRampReader(t)
 	mockOffRampReader.On("DecodeExecutionReport", encodedReport).Return(report, nil)
 
+	armChainState := ccipcachemocks.NewArmChainState(t)
+	armChainState.On("ValidateNotCursed", mock.Anything).Return(nil)
+
 	plugin := ExecutionReportingPlugin{
 		offRampReader:   mockOffRampReader,
 		lggr:            logger.TestLogger(t),
 		inflightReports: newInflightExecReportsContainer(1 * time.Hour),
+		armChainState:   armChainState,
 	}
 
 	mockedExecState := mockOffRampReader.On("GetExecutionState", mock.Anything, uint64(12)).Return(uint8(cciptypes.ExecutionStateUntouched), nil).Once()
@@ -327,11 +336,15 @@ func TestExecutionReportingPlugin_ShouldTransmitAcceptedReport(t *testing.T) {
 	mockOffRampReader.On("DecodeExecutionReport", encodedReport).Return(report, nil)
 	mockedExecState := mockOffRampReader.On("GetExecutionState", mock.Anything, uint64(12)).Return(uint8(cciptypes.ExecutionStateUntouched), nil).Once()
 
+	armChainState := ccipcachemocks.NewArmChainState(t)
+	armChainState.On("ForceValidateNotCursed", mock.Anything).Return(nil)
+
 	plugin := ExecutionReportingPlugin{
 		commitStoreReader: mockCommitStoreReader,
 		offRampReader:     mockOffRampReader,
 		lggr:              logger.TestLogger(t),
 		inflightReports:   newInflightExecReportsContainer(1 * time.Hour),
+		armChainState:     armChainState,
 	}
 
 	should, err := plugin.ShouldTransmitAcceptedReport(testutils.Context(t), ocrtypes.ReportTimestamp{}, encodedReport)
