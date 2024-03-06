@@ -89,6 +89,7 @@ type ExecutionReportingPlugin struct {
 	// State
 	inflightReports *inflightExecReportsContainer
 	snoozedRoots    cache.SnoozedRoots
+	armChainState   cache.ArmChainState
 }
 
 func (r *ExecutionReportingPlugin) Query(context.Context, types.ReportTimestamp) (types.Query, error) {
@@ -97,7 +98,7 @@ func (r *ExecutionReportingPlugin) Query(context.Context, types.ReportTimestamp)
 
 func (r *ExecutionReportingPlugin) Observation(ctx context.Context, timestamp types.ReportTimestamp, query types.Query) (types.Observation, error) {
 	lggr := r.lggr.Named("ExecutionObservation")
-	if err := ccipcommon.VerifyNotDown(ctx, r.lggr, r.commitStoreReader, r.onRampReader); err != nil {
+	if err := r.armChainState.ValidateNotCursed(ctx); err != nil {
 		return nil, err
 	}
 
@@ -761,6 +762,9 @@ func (r *ExecutionReportingPlugin) buildReport(ctx context.Context, lggr logger.
 
 func (r *ExecutionReportingPlugin) Report(ctx context.Context, timestamp types.ReportTimestamp, query types.Query, observations []types.AttributedObservation) (bool, types.Report, error) {
 	lggr := r.lggr.Named("ExecutionReport")
+	if err := r.armChainState.ValidateNotCursed(ctx); err != nil {
+		return false, nil, err
+	}
 	parsableObservations := ccip.GetParsableObservations[ccip.ExecutionObservation](lggr, observations)
 	// Need at least F+1 observations
 	if len(parsableObservations) <= r.F {
@@ -851,6 +855,9 @@ func (r *ExecutionReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Conte
 		lggr.Errorw("Unable to decode report", "err", err)
 		return false, err
 	}
+	if err := r.armChainState.ValidateNotCursed(ctx); err != nil {
+		return false, err
+	}
 	lggr = lggr.With("messageIDs", ccipcommon.GetMessageIDsAsHexString(execReport.Messages))
 
 	// If the first message is executed already, this execution report is stale, and we do not accept it.
@@ -876,6 +883,9 @@ func (r *ExecutionReportingPlugin) ShouldTransmitAcceptedReport(ctx context.Cont
 	if err != nil {
 		lggr.Errorw("Unable to decode report", "err", err)
 		return false, nil
+	}
+	if err := r.armChainState.ForceValidateNotCursed(ctx); err != nil {
+		return false, err
 	}
 	lggr = lggr.With("messageIDs", ccipcommon.GetMessageIDsAsHexString(execReport.Messages))
 

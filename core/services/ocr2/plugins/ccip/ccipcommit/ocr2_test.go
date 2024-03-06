@@ -34,6 +34,8 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/cciptypes"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache"
+	ccipcachemocks "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcommon"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/factory"
@@ -164,6 +166,7 @@ func TestCommitReportingPlugin_Observation(t *testing.T) {
 			p.sourceNative = sourceNativeTokenAddr
 			p.gasPriceEstimator = gasPriceEstimator
 			p.metricsCollector = ccip.NoopMetricsCollector
+			p.armChainState = cache.NewArmChainState(p.lggr, onRampReader, commitStoreReader)
 
 			obs, err := p.Observation(ctx, tc.epochAndRound, types.Query{})
 
@@ -197,6 +200,9 @@ func TestCommitReportingPlugin_Report(t *testing.T) {
 		p.destPriceRegistryReader = destPriceRegReader
 		offRampReader.On("GetTokens", ctx).Return(cciptypes.OffRampTokens{}, nil).Maybe()
 		destPriceRegReader.On("GetFeeTokens", ctx).Return(nil, nil).Maybe()
+		armChainState := ccipcachemocks.NewArmChainState(t)
+		armChainState.On("ValidateNotCursed", ctx).Return(nil)
+		p.armChainState = armChainState
 
 		o := ccip.CommitObservation{Interval: cciptypes.CommitStoreInterval{Min: 1, Max: 1}, SourceGasPriceUSD: big.NewInt(0)}
 		obs, err := o.Marshal()
@@ -337,6 +343,7 @@ func TestCommitReportingPlugin_Report(t *testing.T) {
 			p.commitStoreReader = commitStoreReader
 			p.F = tc.f
 			p.metricsCollector = ccip.NoopMetricsCollector
+			p.armChainState = cache.NewArmChainState(p.lggr, onRampReader, commitStoreReader)
 
 			aos := make([]types.AttributedObservation, 0, len(tc.observations))
 			for _, o := range tc.observations {
