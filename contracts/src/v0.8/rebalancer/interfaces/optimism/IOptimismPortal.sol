@@ -18,4 +18,8 @@ interface IOptimismPortal {
     Types.OutputRootProof calldata _outputRootProof,
     bytes[] calldata _withdrawalProof
   ) external;
+
+  /// @notice Finalizes a withdrawal transaction.
+  /// @param _tx Withdrawal transaction to finalize.
+  function finalizeWithdrawalTransaction(Types.WithdrawalTransaction memory _tx) external;
 }

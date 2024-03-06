@@ -416,6 +416,24 @@ func main() {
 			opstack.OptimismContracts[*l1ChainID]["L2OutputOracle"],
 			opstack.OptimismContracts[*l1ChainID]["OptimismPortal"],
 			common.HexToHash(*l2TxHash))
+	case "op-finalize-l1":
+		cmd := flag.NewFlagSet("op-finalize-l1", flag.ExitOnError)
+		l1ChainID := cmd.Uint64("l1-chain-id", 0, "L1 Chain ID")
+		l2ChainID := cmd.Uint64("l2-chain-id", 0, "L2 Chain ID")
+		l2TxHash := cmd.String("l2-tx-hash", "", "L2 Tx Hash")
+		l1BridgeAdapterAddress := cmd.String("l1-bridge-adapter-address", "", "L1 Bridge Adapter Address")
+
+		helpers.ParseArgs(cmd, os.Args[2:], "l1-chain-id", "l2-chain-id", "l2-tx-hash", "l1-bridge-adapter-address")
+
+		env := multienv.New(false, false)
+
+		opstack.FinalizeL1(
+			env,
+			*l1ChainID,
+			*l2ChainID,
+			common.HexToAddress(*l1BridgeAdapterAddress),
+			opstack.OptimismContracts[*l1ChainID]["OptimismPortal"],
+			common.HexToHash(*l2TxHash))
 	}
 }
 
