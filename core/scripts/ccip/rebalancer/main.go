@@ -297,16 +297,6 @@ func main() {
 			common.HexToAddress(*l2ToAddress),
 			decimal.RequireFromString(*amount).BigInt(),
 		)
-	case "deploy-weth":
-		cmd := flag.NewFlagSet("deploy-weth", flag.ExitOnError)
-		chainID := cmd.Uint64("chain-id", 0, "Chain ID")
-
-		helpers.ParseArgs(cmd, os.Args[2:], "chain-id")
-
-		env := multienv.New(false, false)
-		_, tx, _, err := weth9.DeployWETH9(env.Transactors[*chainID], env.Clients[*chainID])
-		helpers.PanicErr(err)
-		helpers.ConfirmContractDeployed(context.Background(), env.Clients[*chainID], tx, int64(*chainID))
 	case "deposit-weth":
 		cmd := flag.NewFlagSet("deposit-weth", flag.ExitOnError)
 		chainID := cmd.Uint64("chain-id", 0, "Chain ID")
@@ -343,7 +333,6 @@ func main() {
 	case "deploy-op-l1-adapter":
 		cmd := flag.NewFlagSet("deploy-op-l1-adapter", flag.ExitOnError)
 		l1ChainID := cmd.Uint64("l1-chain-id", 0, "L1 Chain ID")
-		wethAddress := cmd.String("weth-address", "", "WETH Address")
 		helpers.ParseArgs(cmd, os.Args[2:], "l1-chain-id", "weth-address")
 
 		env := multienv.New(false, false)
@@ -351,7 +340,7 @@ func main() {
 			env.Transactors[*l1ChainID],
 			env.Clients[*l1ChainID],
 			opstack.OptimismContracts[*l1ChainID]["L1StandardBridge"],
-			common.HexToAddress(*wethAddress),
+			opstack.OptimismContracts[*l1ChainID]["WETH"],
 			opstack.OptimismContracts[*l1ChainID]["L1CrossDomainMessenger"],
 		)
 		helpers.PanicErr(err)
@@ -359,11 +348,10 @@ func main() {
 	case "deploy-op-l2-adapter":
 		cmd := flag.NewFlagSet("deploy-op-l2-adapter", flag.ExitOnError)
 		l2ChainID := cmd.Uint64("l2-chain-id", 0, "L2 Chain ID")
-		wethAddress := cmd.String("weth-address", "", "WETH Address")
 		helpers.ParseArgs(cmd, os.Args[2:], "l2-chain-id", "weth-address")
 
 		env := multienv.New(false, false)
-		_, tx, _, err := optimism_l2_bridge_adapter.DeployOptimismL2BridgeAdapter(env.Transactors[*l2ChainID], env.Clients[*l2ChainID], common.HexToAddress(*wethAddress))
+		_, tx, _, err := optimism_l2_bridge_adapter.DeployOptimismL2BridgeAdapter(env.Transactors[*l2ChainID], env.Clients[*l2ChainID], opstack.OptimismContracts[*l2ChainID]["WETH"])
 		helpers.PanicErr(err)
 		helpers.ConfirmContractDeployed(context.Background(), env.Clients[*l2ChainID], tx, int64(*l2ChainID))
 	case "op-send-to-l2":

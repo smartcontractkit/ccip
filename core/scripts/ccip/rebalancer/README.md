@@ -274,9 +274,9 @@ First, you have to deploy the L1 and L2 bridge adapters:
 # Switch into the rebalancer scripts dir
 cd core/scripts/ccip/rebalancer
 # Uses sepolia chain id, switch to 1 for mainnet, and sepolia weth contract address (same as arbitrum)
-go run . deploy-op-l1-adapter -l1-chain-id 11155111 -weth-address 0x7b79995e5f793A07Bc00c21412e50Ecae098E7f9
+go run . deploy-op-l1-adapter -l1-chain-id 11155111
 # Uses sepolia chain id, switch to 420 for OP mainnet
-go run . deploy-op-l2-adapter -l2-chain-id 11155420 -weth-address 0xbDD8F4005E03ACF345F2f38AC5e1416E7b392282
+go run . deploy-op-l2-adapter -l2-chain-id 11155420
 ```
 
 Now you're ready to do some cross-chain transfers.
