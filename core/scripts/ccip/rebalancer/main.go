@@ -297,6 +297,16 @@ func main() {
 			common.HexToAddress(*l2ToAddress),
 			decimal.RequireFromString(*amount).BigInt(),
 		)
+	case "deploy-weth":
+		cmd := flag.NewFlagSet("deploy-weth", flag.ExitOnError)
+		chainID := cmd.Uint64("chain-id", 0, "Chain ID")
+
+		helpers.ParseArgs(cmd, os.Args[2:], "chain-id")
+
+		env := multienv.New(false, false)
+		_, tx, _, err := weth9.DeployWETH9(env.Transactors[*chainID], env.Clients[*chainID])
+		helpers.PanicErr(err)
+		helpers.ConfirmContractDeployed(context.Background(), env.Clients[*chainID], tx, int64(*chainID))
 	case "deposit-weth":
 		cmd := flag.NewFlagSet("deposit-weth", flag.ExitOnError)
 		chainID := cmd.Uint64("chain-id", 0, "Chain ID")
@@ -377,6 +387,8 @@ func main() {
 			common.HexToAddress(*l2ToAddress),
 			decimal.RequireFromString(*amount).BigInt(),
 		)
+
+		fmt.Println("check", fmt.Sprintf("https://sepolia-optimism.etherscan.io/address/%s#tokentxns", *l2ToAddress), "periodically to see the deposit on L2")
 	case "op-withdraw-from-l2":
 		cmd := flag.NewFlagSet("op-withdraw-from-l2", flag.ExitOnError)
 		l2ChainID := cmd.Uint64("l2-chain-id", 0, "L2 Chain ID")
