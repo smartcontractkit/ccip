@@ -233,8 +233,9 @@ func makeStateTrieProof(
 	fmt.Println("calling eth_getProof with args, address:", address.String(), "slot:", hexutil.Encode(slot[:]), "block:", l2BlockNumber.String())
 
 	var resp getProofResponse
-	l2Client.Call(&resp, "eth_getProof",
+	err := l2Client.Call(&resp, "eth_getProof",
 		address, []string{hexutil.Encode(slot[:])}, hexutil.EncodeBig(l2BlockNumber))
+	helpers.PanicErr(err)
 
 	// TODO
 	// resp.StorageProof[0].Proof = maybeAddProofNode(
@@ -298,29 +299,29 @@ func getMessageBedrockOutput(
 	l1Client *ethclient.Client,
 ) bedrockOutput {
 	if getFPAC(optimismPortalAddress, l1Client) {
-		panic("unimplemented")
-	} else {
-		// Try to find the output index that corresponds to the block number attached to the message.
-		// We'll explicitly handle "cannot get output" errors as a null return value, but anything else
-		// needs to get thrown. Might need to revisit this in the future to be a little more robust
-		// when connected to RPCs that don't return nice error messages.
-		l2OutputOracle, err := optimism_l2_output_oracle.NewOptimismL2OutputOracle(l2OutputOracleAddress, l1Client)
-		helpers.PanicErr(err)
+		panic("fpac support not implemented")
+	}
 
-		l2OutputIndex, err := l2OutputOracle.GetL2OutputIndexAfter(nil, l2BlockNumber)
-		helpers.PanicErr(err)
+	// Try to find the output index that corresponds to the block number attached to the message.
+	// We'll explicitly handle "cannot get output" errors as a null return value, but anything else
+	// needs to get thrown. Might need to revisit this in the future to be a little more robust
+	// when connected to RPCs that don't return nice error messages.
+	l2OutputOracle, err := optimism_l2_output_oracle.NewOptimismL2OutputOracle(l2OutputOracleAddress, l1Client)
+	helpers.PanicErr(err)
 
-		// Now pull the proposal out given the output index. Should always work as long as the above
-		// codepath completed successfully.
-		proposal, err := l2OutputOracle.GetL2Output(nil, l2OutputIndex)
-		helpers.PanicErr(err)
+	l2OutputIndex, err := l2OutputOracle.GetL2OutputIndexAfter(nil, l2BlockNumber)
+	helpers.PanicErr(err)
 
-		return bedrockOutput{
-			OutputRoot:    proposal.OutputRoot,
-			L1Timestamp:   proposal.Timestamp,
-			L2BlockNumber: proposal.L2BlockNumber,
-			L2OutputIndex: l2OutputIndex,
-		}
+	// Now pull the proposal out given the output index. Should always work as long as the above
+	// codepath completed successfully.
+	proposal, err := l2OutputOracle.GetL2Output(nil, l2OutputIndex)
+	helpers.PanicErr(err)
+
+	return bedrockOutput{
+		OutputRoot:    proposal.OutputRoot,
+		L1Timestamp:   proposal.Timestamp,
+		L2BlockNumber: proposal.L2BlockNumber,
+		L2OutputIndex: l2OutputIndex,
 	}
 }
 
