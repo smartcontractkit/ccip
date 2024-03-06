@@ -166,7 +166,7 @@ func TestCommitReportingPlugin_Observation(t *testing.T) {
 			p.sourceNative = sourceNativeTokenAddr
 			p.gasPriceEstimator = gasPriceEstimator
 			p.metricsCollector = ccip.NoopMetricsCollector
-			p.armChainState = cache.NewArmChainState(p.lggr, onRampReader, commitStoreReader)
+			p.chainHealthcheck = cache.NewArmChainHealthcheck(p.lggr, onRampReader, commitStoreReader)
 
 			obs, err := p.Observation(ctx, tc.epochAndRound, types.Query{})
 
@@ -200,9 +200,9 @@ func TestCommitReportingPlugin_Report(t *testing.T) {
 		p.destPriceRegistryReader = destPriceRegReader
 		offRampReader.On("GetTokens", ctx).Return(cciptypes.OffRampTokens{}, nil).Maybe()
 		destPriceRegReader.On("GetFeeTokens", ctx).Return(nil, nil).Maybe()
-		armChainState := ccipcachemocks.NewArmChainState(t)
-		armChainState.On("ValidateNotCursed", ctx).Return(nil)
-		p.armChainState = armChainState
+		chainHealthcheck := ccipcachemocks.NewChainHealthcheck(t)
+		chainHealthcheck.On("ValidateNotCursed", ctx).Return(nil).Maybe()
+		p.chainHealthcheck = chainHealthcheck
 
 		o := ccip.CommitObservation{Interval: cciptypes.CommitStoreInterval{Min: 1, Max: 1}, SourceGasPriceUSD: big.NewInt(0)}
 		obs, err := o.Marshal()
@@ -331,6 +331,9 @@ func TestCommitReportingPlugin_Report(t *testing.T) {
 			commitStoreReader, err := v1_2_0.NewCommitStore(logger.TestLogger(t), utils.RandomAddress(), nil, lp, nil)
 			assert.NoError(t, err)
 
+			healthCheck := ccipcachemocks.NewChainHealthcheck(t)
+			healthCheck.On("ValidateNotCursed", ctx).Return(nil)
+
 			p := &CommitReportingPlugin{}
 			p.lggr = logger.TestLogger(t)
 			p.inflightReports = newInflightCommitReportsContainer(time.Minute)
@@ -343,7 +346,7 @@ func TestCommitReportingPlugin_Report(t *testing.T) {
 			p.commitStoreReader = commitStoreReader
 			p.F = tc.f
 			p.metricsCollector = ccip.NoopMetricsCollector
-			p.armChainState = cache.NewArmChainState(p.lggr, onRampReader, commitStoreReader)
+			p.chainHealthcheck = healthCheck
 
 			aos := make([]types.AttributedObservation, 0, len(tc.observations))
 			for _, o := range tc.observations {
@@ -404,6 +407,10 @@ func TestCommitReportingPlugin_ShouldAcceptFinalizedReport(t *testing.T) {
 		p.commitStoreReader = commitStoreReader
 		commitStoreReader.On("DecodeCommitReport", mock.Anything).Return(report, nil)
 
+		chainHealthCheck := ccipcachemocks.NewChainHealthcheck(t)
+		chainHealthCheck.On("ValidateNotCursed", ctx).Return(nil)
+		p.chainHealthcheck = chainHealthCheck
+
 		encodedReport, err := encodeCommitReport(report)
 		assert.NoError(t, err)
 		shouldAccept, err := p.ShouldAcceptFinalizedReport(ctx, types.ReportTimestamp{}, encodedReport)
@@ -428,6 +435,10 @@ func TestCommitReportingPlugin_ShouldAcceptFinalizedReport(t *testing.T) {
 
 		commitStoreReader.On("DecodeCommitReport", mock.Anything).Return(report, nil)
 		commitStoreReader.On("GetExpectedNextSequenceNumber", mock.Anything).Return(onChainSeqNum, nil)
+
+		chainHealthCheck := ccipcachemocks.NewChainHealthcheck(t)
+		chainHealthCheck.On("ValidateNotCursed", ctx).Return(nil)
+		p.chainHealthcheck = chainHealthCheck
 
 		// stale since report interval is behind on chain seq num
 		report.Interval = cciptypes.CommitStoreInterval{Min: onChainSeqNum - 2, Max: onChainSeqNum + 10}
@@ -478,6 +489,10 @@ func TestCommitReportingPlugin_ShouldAcceptFinalizedReport(t *testing.T) {
 		encodedReport, err := encodeCommitReport(report)
 		assert.NoError(t, err)
 
+		chainHealthCheck := ccipcachemocks.NewChainHealthcheck(t)
+		chainHealthCheck.On("ValidateNotCursed", ctx).Return(nil)
+		p.chainHealthcheck = chainHealthCheck
+
 		shouldAccept, err := p.ShouldAcceptFinalizedReport(ctx, types.ReportTimestamp{}, encodedReport)
 		assert.NoError(t, err)
 		assert.True(t, shouldAccept)
@@ -512,6 +527,10 @@ func TestCommitReportingPlugin_ShouldTransmitAcceptedReport(t *testing.T) {
 	p.commitStoreReader = commitStoreReader
 	p.inflightReports = newInflightCommitReportsContainer(time.Minute)
 	p.lggr = logger.TestLogger(t)
+
+	chainHealthCheck := ccipcachemocks.NewChainHealthcheck(t)
+	chainHealthCheck.On("ForceValidateNotCursed", ctx).Return(nil)
+	p.chainHealthcheck = chainHealthCheck
 
 	t.Run("should transmit when report is not stale", func(t *testing.T) {
 		// not-stale since report interval is not behind on chain seq num

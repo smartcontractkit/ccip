@@ -86,8 +86,8 @@ type CommitReportingPlugin struct {
 	priceGetter      pricegetter.PriceGetter
 	metricsCollector ccip.PluginMetricsCollector
 	// State
-	inflightReports *inflightCommitReportsContainer
-	armChainState   cache.ArmChainState
+	inflightReports  *inflightCommitReportsContainer
+	chainHealthcheck cache.ChainHealthcheck
 }
 
 // Query is not used by the CCIP Commit plugin.
@@ -101,7 +101,7 @@ func (r *CommitReportingPlugin) Query(context.Context, types.ReportTimestamp) (t
 // the observation will be considered invalid and rejected.
 func (r *CommitReportingPlugin) Observation(ctx context.Context, epochAndRound types.ReportTimestamp, _ types.Query) (types.Observation, error) {
 	lggr := r.lggr.Named("CommitObservation")
-	if err := r.armChainState.ValidateNotCursed(ctx); err != nil {
+	if err := r.chainHealthcheck.ForceValidateNotCursed(ctx); err != nil {
 		return nil, err
 	}
 	r.inflightReports.expire(lggr)
@@ -357,7 +357,7 @@ func (r *CommitReportingPlugin) getLatestGasPriceUpdate(ctx context.Context, now
 func (r *CommitReportingPlugin) Report(ctx context.Context, epochAndRound types.ReportTimestamp, _ types.Query, observations []types.AttributedObservation) (bool, types.Report, error) {
 	now := time.Now()
 	lggr := r.lggr.Named("CommitReport")
-	if err := r.armChainState.ValidateNotCursed(ctx); err != nil {
+	if err := r.chainHealthcheck.ValidateNotCursed(ctx); err != nil {
 		return false, nil, err
 	}
 	parsableObservations := ccip.GetParsableObservations[ccip.CommitObservation](lggr, observations)
@@ -663,7 +663,7 @@ func (r *CommitReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Context,
 		"tokenPriceUpdates", parsedReport.TokenPrices,
 		"reportTimestamp", reportTimestamp,
 	)
-	if err := r.armChainState.ValidateNotCursed(ctx); err != nil {
+	if err := r.chainHealthcheck.ValidateNotCursed(ctx); err != nil {
 		return false, err
 	}
 	// Empty report, should not be put on chain
@@ -693,7 +693,7 @@ func (r *CommitReportingPlugin) ShouldTransmitAcceptedReport(ctx context.Context
 	if err != nil {
 		return false, err
 	}
-	if err := r.armChainState.ForceValidateNotCursed(ctx); err != nil {
+	if err := r.chainHealthcheck.ForceValidateNotCursed(ctx); err != nil {
 		return false, err
 	}
 	// If report is not stale we transmit.

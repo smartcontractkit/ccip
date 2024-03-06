@@ -13,18 +13,18 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 )
 
-//go:generate mockery --quiet --name ArmChainState --filename chain_state_mock.go --case=underscore
-type ArmChainState interface {
+//go:generate mockery --quiet --name ChainHealthcheck --filename chain_health_mock.go --case=underscore
+type ChainHealthcheck interface {
 	ValidateNotCursed(ctx context.Context) error
 	ForceValidateNotCursed(ctx context.Context) error
 }
 
 const (
 	refreshInterval = 20 * time.Second
-	cacheKey        = "armChainState"
+	cacheKey        = "armChainHealthcheck"
 )
 
-type armChainState struct {
+type armChainHealthcheck struct {
 	cache    *cache.Cache
 	cacheKey string
 
@@ -33,12 +33,12 @@ type armChainState struct {
 	commitStore ccipdata.CommitStoreReader
 }
 
-func NewArmChainState(
+func NewArmChainHealthcheck(
 	lggr logger.Logger,
 	onRamp ccipdata.OnRampReader,
 	commitStore ccipdata.CommitStoreReader,
-) ArmChainState {
-	return &armChainState{
+) ChainHealthcheck {
+	return &armChainHealthcheck{
 		cache:    cache.New(refreshInterval, 0),
 		cacheKey: cacheKey,
 
@@ -53,8 +53,8 @@ func newArmChainWithCustomEviction(
 	onRamp ccipdata.OnRampReader,
 	commitStore ccipdata.CommitStoreReader,
 	eviction time.Duration,
-) ArmChainState {
-	return &armChainState{
+) ChainHealthcheck {
+	return &armChainHealthcheck{
 		cache:    cache.New(eviction, 0),
 		cacheKey: cacheKey,
 
@@ -64,7 +64,7 @@ func newArmChainWithCustomEviction(
 	}
 }
 
-func (a armChainState) ValidateNotCursed(ctx context.Context) error {
+func (a armChainHealthcheck) ValidateNotCursed(ctx context.Context) error {
 	if err, found := a.cache.Get(a.cacheKey); found {
 		if err != nil {
 			return err.(error)
@@ -77,13 +77,13 @@ func (a armChainState) ValidateNotCursed(ctx context.Context) error {
 	return err
 }
 
-func (a armChainState) ForceValidateNotCursed(ctx context.Context) error {
+func (a armChainHealthcheck) ForceValidateNotCursed(ctx context.Context) error {
 	err := a.fetch(ctx)
 	a.cache.Set(a.cacheKey, err, cache.DefaultExpiration)
 	return err
 }
 
-func (a armChainState) fetch(ctx context.Context) error {
+func (a armChainHealthcheck) fetch(ctx context.Context) error {
 	var (
 		eg       = new(errgroup.Group)
 		isDown   bool
