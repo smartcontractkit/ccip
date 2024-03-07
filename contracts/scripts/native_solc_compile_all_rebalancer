@@ -59,3 +59,5 @@ compileContract rebalancer/interfaces/optimism/IOptimismPortal.sol
 compileContract rebalancer/interfaces/optimism/IOptimismL2OutputOracle.sol
 compileContract rebalancer/interfaces/optimism/IOptimismL2ToL1MessagePasser.sol
 compileContract rebalancer/interfaces/optimism/IOptimismCrossDomainMessenger.sol
+compileContract rebalancer/interfaces/optimism/IOptimismPortal2.sol
+compileContract rebalancer/interfaces/optimism/IOptimismDisputeGameFactory.sol

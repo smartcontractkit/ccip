@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	gethtypes "github.com/ethereum/go-ethereum/core/types"
@@ -17,9 +18,11 @@ import (
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip/rebalancer/multienv"
 	helpers "github.com/smartcontractkit/chainlink/core/scripts/common"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
+	optimism_dispute_game_factory "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/optimism_dispute_game_factory"
 	optimism_l2_output_oracle "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/optimism_l2_output_oracle"
 	optimism_l2_to_l1_message_passer "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/optimism_l2_to_l1_message_passer"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/optimism_portal"
+	optimism_portal_2 "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/optimism_portal_2"
 )
 
 var (
@@ -160,6 +163,7 @@ func getBedrockMessageProof(
 
 	messageBedrockOutput := getMessageBedrockOutput(
 		optimismPortalAddress,
+		common.HexToAddress("0x0"), // TODO: dispute game factory address unknown
 		l2OutputOracleAddress,
 		receipt.BlockNumber,
 		l1Client,
@@ -294,12 +298,50 @@ func toLowLevelMessage(
 
 func getMessageBedrockOutput(
 	optimismPortalAddress,
+	disputeGameFactoryAddress,
 	l2OutputOracleAddress common.Address,
 	l2BlockNumber *big.Int,
 	l1Client *ethclient.Client,
 ) bedrockOutput {
 	if getFPAC(optimismPortalAddress, l1Client) {
-		panic("fpac support not implemented")
+		portal2, err := optimism_portal_2.NewOptimismPortal2(optimismPortalAddress, l1Client)
+		helpers.PanicErr(err)
+
+		gameType, err := portal2.RespectedGameType(nil)
+		helpers.PanicErr(err)
+
+		disputeGameFactory, err := optimism_dispute_game_factory.NewOptimismDisputeGameFactory(disputeGameFactoryAddress, l1Client)
+		helpers.PanicErr(err)
+
+		gameCount, err := disputeGameFactory.GameCount(nil)
+		helpers.PanicErr(err)
+
+		start := int64(0)
+		if gameCount.Int64()-1 > start {
+			start = gameCount.Int64() - 1
+		}
+		end := int64(100)
+		if gameCount.Int64() < end {
+			end = gameCount.Int64()
+		}
+
+		latestGames, err := disputeGameFactory.FindLatestGames(nil, gameType, big.NewInt(start), big.NewInt(end))
+		helpers.PanicErr(err)
+
+		for _, game := range latestGames {
+			blockNumber := unpackUint256(game.ExtraData)
+			if blockNumber.Cmp(l2BlockNumber) >= 0 {
+				return bedrockOutput{
+					OutputRoot:    game.RootClaim,
+					L1Timestamp:   new(big.Int).SetUint64(game.Timestamp),
+					L2BlockNumber: blockNumber,
+					L2OutputIndex: game.Index,
+				}
+			}
+		}
+
+		// if there's no match then we can't prove the message to the portal.
+		panic(fmt.Sprintf("No game found for block number %s", l2BlockNumber.String()))
 	}
 
 	// Try to find the output index that corresponds to the block number attached to the message.
@@ -366,4 +408,16 @@ type lowLevelMessage struct {
 	MessageNonce *big.Int
 	Value        *big.Int
 	MinGasLimit  *big.Int
+}
+
+func unpackUint256(data []byte) *big.Int {
+	decoded, err := utils.ABIDecode(`[{"type": "uint256"}]`, data)
+	helpers.PanicErr(err)
+
+	if len(decoded) != 1 {
+		panic("Expected 1 element in decoded data")
+	}
+
+	num := *abi.ConvertType(decoded[0], new(*big.Int)).(**big.Int)
+	return num
 }
