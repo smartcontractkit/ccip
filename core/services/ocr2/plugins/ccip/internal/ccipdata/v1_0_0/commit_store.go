@@ -341,6 +341,13 @@ func (c *CommitStore) GetLatestPriceEpochAndRound(ctx context.Context) (uint64, 
 	return c.commitStore.GetLatestPriceEpochAndRound(&bind.CallOpts{Context: ctx})
 }
 
+func (c *CommitStore) IsDestChainHealthy(context.Context) (bool, error) {
+	if err := c.lp.Healthy(); err != nil {
+		return false, nil
+	}
+	return true, nil
+}
+
 func (c *CommitStore) IsDown(ctx context.Context) (bool, error) {
 	unPausedAndHealthy, err := c.commitStore.IsUnpausedAndARMHealthy(&bind.CallOpts{Context: ctx})
 	if err != nil {
