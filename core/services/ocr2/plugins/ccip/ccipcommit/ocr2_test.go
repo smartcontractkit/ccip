@@ -51,15 +51,16 @@ func TestCommitReportingPlugin_Observation(t *testing.T) {
 	someTokenAddr := ccipcalc.HexToAddress("2000")
 
 	testCases := []struct {
-		name              string
-		epochAndRound     types.ReportTimestamp
-		commitStorePaused bool
-		sourceChainCursed bool
-		commitStoreSeqNum uint64
-		tokenPrices       map[cciptypes.Address]*big.Int
-		sendReqs          []cciptypes.EVM2EVMMessageWithTxMeta
-		tokenDecimals     map[cciptypes.Address]uint8
-		fee               *big.Int
+		name                   string
+		epochAndRound          types.ReportTimestamp
+		commitStorePaused      bool
+		sourceChainCursed      bool
+		commitStoreSeqNum      uint64
+		tokenPrices            map[cciptypes.Address]*big.Int
+		sendReqs               []cciptypes.EVM2EVMMessageWithTxMeta
+		tokenDecimals          map[cciptypes.Address]uint8
+		fee                    *big.Int
+		priceReportingDisabled bool
 
 		expErr bool
 		expObs ccip.CommitObservation
@@ -69,13 +70,13 @@ func TestCommitReportingPlugin_Observation(t *testing.T) {
 			commitStoreSeqNum: 54,
 			tokenPrices: map[cciptypes.Address]*big.Int{
 				someTokenAddr:         big.NewInt(2),
-				sourceNativeTokenAddr: big.NewInt(2),
+				sourceNativeTokenAddr: big.NewInt(2e18),
 			},
 			sendReqs: []cciptypes.EVM2EVMMessageWithTxMeta{
 				{EVM2EVMMessage: cciptypes.EVM2EVMMessage{SequenceNumber: 54}},
 				{EVM2EVMMessage: cciptypes.EVM2EVMMessage{SequenceNumber: 55}},
 			},
-			fee: big.NewInt(100),
+			fee: big.NewInt(2e18),
 			tokenDecimals: map[cciptypes.Address]uint8{
 				someTokenAddr: 8,
 			},
@@ -83,7 +84,32 @@ func TestCommitReportingPlugin_Observation(t *testing.T) {
 				TokenPricesUSD: map[cciptypes.Address]*big.Int{
 					someTokenAddr: big.NewInt(20000000000),
 				},
-				SourceGasPriceUSD: big.NewInt(0),
+				SourceGasPriceUSD: big.NewInt(4e18),
+				Interval: cciptypes.CommitStoreInterval{
+					Min: 54,
+					Max: 55,
+				},
+			},
+		},
+		{
+			name:              "price reporting disabled",
+			commitStoreSeqNum: 54,
+			tokenPrices: map[cciptypes.Address]*big.Int{
+				someTokenAddr:         big.NewInt(2),
+				sourceNativeTokenAddr: big.NewInt(2e18),
+			},
+			sendReqs: []cciptypes.EVM2EVMMessageWithTxMeta{
+				{EVM2EVMMessage: cciptypes.EVM2EVMMessage{SequenceNumber: 54}},
+				{EVM2EVMMessage: cciptypes.EVM2EVMMessage{SequenceNumber: 55}},
+			},
+			fee: big.NewInt(2e18),
+			tokenDecimals: map[cciptypes.Address]uint8{
+				someTokenAddr: 8,
+			},
+			priceReportingDisabled: true,
+			expObs: ccip.CommitObservation{
+				TokenPricesUSD:    map[cciptypes.Address]*big.Int{},
+				SourceGasPriceUSD: nil,
 				Interval: cciptypes.CommitStoreInterval{
 					Min: 54,
 					Max: 55,
@@ -121,7 +147,7 @@ func TestCommitReportingPlugin_Observation(t *testing.T) {
 			}
 
 			priceGet := pricegetter.NewMockPriceGetter(t)
-			if len(tc.tokenPrices) > 0 {
+			if !tc.priceReportingDisabled && len(tc.tokenPrices) > 0 {
 				addrs := []cciptypes.Address{sourceNativeTokenAddr}
 				for addr := range tc.tokenDecimals {
 					addrs = append(addrs, addr)
@@ -130,7 +156,7 @@ func TestCommitReportingPlugin_Observation(t *testing.T) {
 			}
 
 			gasPriceEstimator := prices.NewMockGasPriceEstimatorCommit(t)
-			if tc.fee != nil {
+			if !tc.priceReportingDisabled && tc.fee != nil {
 				var p = tc.fee
 				var pUSD = ccipcalc.CalculateUsdPerUnitGas(p, tc.tokenPrices[sourceNativeTokenAddr])
 				gasPriceEstimator.On("GetGasPrice", ctx).Return(p, nil)
@@ -163,6 +189,7 @@ func TestCommitReportingPlugin_Observation(t *testing.T) {
 			p.priceGetter = priceGet
 			p.sourceNative = sourceNativeTokenAddr
 			p.gasPriceEstimator = gasPriceEstimator
+			p.offchainConfig.PriceReportingDisabled = tc.priceReportingDisabled
 			p.metricsCollector = ccip.NoopMetricsCollector
 
 			obs, err := p.Observation(ctx, tc.epochAndRound, types.Query{})
@@ -604,11 +631,12 @@ func TestCommitReportingPlugin_validateObservations(t *testing.T) {
 	}
 
 	testCases := []struct {
-		name               string
-		commitObservations []ccip.CommitObservation
-		f                  int
-		expValidObs        []ccip.CommitObservation
-		expError           bool
+		name                   string
+		commitObservations     []ccip.CommitObservation
+		f                      int
+		priceReportingDisabled bool
+		expValidObs            []ccip.CommitObservation
+		expError               bool
 	}{
 		{
 			name:               "base",
@@ -680,10 +708,43 @@ func TestCommitReportingPlugin_validateObservations(t *testing.T) {
 			expValidObs:        nil,
 			expError:           true,
 		},
+		{
+			name:                   "no price reporting",
+			commitObservations:     []ccip.CommitObservation{obEmpty, obEmpty},
+			f:                      1,
+			priceReportingDisabled: true,
+			expValidObs:            []ccip.CommitObservation{obEmpty, obEmpty},
+			expError:               false,
+		},
+		{
+			name:                   "no price reporting passes with f=2",
+			commitObservations:     []ccip.CommitObservation{obEmpty, obEmpty, obEmpty},
+			f:                      2,
+			priceReportingDisabled: true,
+			expValidObs:            []ccip.CommitObservation{obEmpty, obEmpty, obEmpty},
+			expError:               false,
+		},
+		{
+			name:                   "no price reporting tolerates 1 observations with price",
+			commitObservations:     []ccip.CommitObservation{obEmpty, obEmpty, obEmpty, ob1},
+			f:                      2,
+			priceReportingDisabled: true,
+			expValidObs:            []ccip.CommitObservation{obEmpty, obEmpty, obEmpty},
+			expError:               false,
+		},
+		{
+			name:                   "no price reporting fails with too many observations with prices",
+			commitObservations:     []ccip.CommitObservation{obEmpty, obEmpty, obWithNilGasPrice, obWithNilTokenPrice},
+			f:                      2,
+			priceReportingDisabled: true,
+			expValidObs:            []ccip.CommitObservation{obEmpty, obEmpty},
+			expError:               true,
+		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			p.offchainConfig.PriceReportingDisabled = tc.priceReportingDisabled
 			obs, err := p.validateObservations(ctx, logger.TestLogger(t), destTokens, tc.f, tc.commitObservations)
 
 			if tc.expError {
@@ -963,7 +1024,6 @@ func TestCommitReportingPlugin_calculatePriceUpdates(t *testing.T) {
 					GasPriceHeartBeat:      tc.gasPriceHeartBeat.Duration(),
 					TokenPriceHeartBeat:    tc.tokenPriceHeartBeat.Duration(),
 					TokenPriceDeviationPPB: tc.tokenPriceDeviationPPB,
-					PriceReportingDisabled: false,
 				},
 				gasPriceEstimator: estimator,
 				F:                 tc.f,
