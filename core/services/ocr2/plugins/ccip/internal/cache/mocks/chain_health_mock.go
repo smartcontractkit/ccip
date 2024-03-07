@@ -13,40 +13,60 @@ type ChainHealthcheck struct {
 	mock.Mock
 }
 
-// ForceValidateNotCursed provides a mock function with given fields: ctx
-func (_m *ChainHealthcheck) ForceValidateNotCursed(ctx context.Context) error {
+// ForceIsHealthy provides a mock function with given fields: ctx
+func (_m *ChainHealthcheck) ForceIsHealthy(ctx context.Context) (bool, error) {
 	ret := _m.Called(ctx)
 
 	if len(ret) == 0 {
-		panic("no return value specified for ForceValidateNotCursed")
+		panic("no return value specified for ForceIsHealthy")
 	}
 
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context) error); ok {
+	var r0 bool
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context) (bool, error)); ok {
+		return rf(ctx)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context) bool); ok {
 		r0 = rf(ctx)
 	} else {
-		r0 = ret.Error(0)
+		r0 = ret.Get(0).(bool)
 	}
 
-	return r0
+	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = rf(ctx)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
-// ValidateNotCursed provides a mock function with given fields: ctx
-func (_m *ChainHealthcheck) ValidateNotCursed(ctx context.Context) error {
+// IsHealthy provides a mock function with given fields: ctx
+func (_m *ChainHealthcheck) IsHealthy(ctx context.Context) (bool, error) {
 	ret := _m.Called(ctx)
 
 	if len(ret) == 0 {
-		panic("no return value specified for ValidateNotCursed")
+		panic("no return value specified for IsHealthy")
 	}
 
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context) error); ok {
+	var r0 bool
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context) (bool, error)); ok {
+		return rf(ctx)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context) bool); ok {
 		r0 = rf(ctx)
 	} else {
-		r0 = ret.Error(0)
+		r0 = ret.Get(0).(bool)
 	}
 
-	return r0
+	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = rf(ctx)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
 // NewChainHealthcheck creates a new instance of ChainHealthcheck. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.

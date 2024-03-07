@@ -90,7 +90,7 @@ func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.Repor
 			inflightReports:             newInflightExecReportsContainer(offchainConfig.InflightCacheExpiry.Duration()),
 			snoozedRoots:                cache.NewSnoozedRoots(rf.config.offRampReader.OnchainConfig().PermissionLessExecutionThresholdSeconds, offchainConfig.RootSnoozeTime.Duration()),
 			metricsCollector:            rf.config.metricsCollector,
-			chainHealthcheck:            cache.NewArmChainHealthcheck(lggr, rf.config.onRampReader, rf.config.commitStoreReader),
+			chainHealthcheck:            cache.NewChainHealthcheck(lggr, rf.config.onRampReader, rf.config.commitStoreReader),
 		}, types.ReportingPluginInfo{
 			Name: "CCIPExecution",
 			// Setting this to false saves on calldata since OffRamp doesn't require agreement between NOPs

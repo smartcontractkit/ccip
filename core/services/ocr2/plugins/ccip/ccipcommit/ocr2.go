@@ -101,8 +101,10 @@ func (r *CommitReportingPlugin) Query(context.Context, types.ReportTimestamp) (t
 // the observation will be considered invalid and rejected.
 func (r *CommitReportingPlugin) Observation(ctx context.Context, epochAndRound types.ReportTimestamp, _ types.Query) (types.Observation, error) {
 	lggr := r.lggr.Named("CommitObservation")
-	if err := r.chainHealthcheck.ForceValidateNotCursed(ctx); err != nil {
+	if healthy, err := r.chainHealthcheck.ForceIsHealthy(ctx); err != nil {
 		return nil, err
+	} else if !healthy {
+		return nil, ccip.ErrChainIsNotHealthy
 	}
 	r.inflightReports.expire(lggr)
 
@@ -357,9 +359,12 @@ func (r *CommitReportingPlugin) getLatestGasPriceUpdate(ctx context.Context, now
 func (r *CommitReportingPlugin) Report(ctx context.Context, epochAndRound types.ReportTimestamp, _ types.Query, observations []types.AttributedObservation) (bool, types.Report, error) {
 	now := time.Now()
 	lggr := r.lggr.Named("CommitReport")
-	if err := r.chainHealthcheck.ValidateNotCursed(ctx); err != nil {
+	if healthy, err := r.chainHealthcheck.IsHealthy(ctx); err != nil {
 		return false, nil, err
+	} else if !healthy {
+		return false, nil, nil
 	}
+
 	parsableObservations := ccip.GetParsableObservations[ccip.CommitObservation](lggr, observations)
 
 	feeTokens, bridgeableTokens, err := ccipcommon.GetDestinationTokens(ctx, r.offRampReader, r.destPriceRegistryReader)
@@ -663,12 +668,15 @@ func (r *CommitReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Context,
 		"tokenPriceUpdates", parsedReport.TokenPrices,
 		"reportTimestamp", reportTimestamp,
 	)
-	if err := r.chainHealthcheck.ValidateNotCursed(ctx); err != nil {
-		return false, err
-	}
 	// Empty report, should not be put on chain
 	if parsedReport.MerkleRoot == [32]byte{} && len(parsedReport.GasPrices) == 0 && len(parsedReport.TokenPrices) == 0 {
 		lggr.Warn("Empty report, should not be put on chain")
+		return false, nil
+	}
+
+	if healthy, err1 := r.chainHealthcheck.IsHealthy(ctx); err1 != nil {
+		return false, err1
+	} else if !healthy {
 		return false, nil
 	}
 
@@ -693,8 +701,10 @@ func (r *CommitReportingPlugin) ShouldTransmitAcceptedReport(ctx context.Context
 	if err != nil {
 		return false, err
 	}
-	if err := r.chainHealthcheck.ForceValidateNotCursed(ctx); err != nil {
-		return false, err
+	if healthy, err1 := r.chainHealthcheck.ForceIsHealthy(ctx); err1 != nil {
+		return false, err1
+	} else if !healthy {
+		return false, nil
 	}
 	// If report is not stale we transmit.
 	// When the commitTransmitter enqueues the tx for tx manager,

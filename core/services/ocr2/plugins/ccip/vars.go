@@ -11,4 +11,4 @@ const (
 	ExecPluginLabel      = "exec"
 )
 
-var ErrChainPausedOrCursed = errors.New("commitStoreReader is down or source chain is cursed")
+var ErrChainIsNotHealthy = errors.New("chain is not healthy")
