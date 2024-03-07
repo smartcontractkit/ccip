@@ -89,6 +89,12 @@ func TestCommitStoreV120ffchainConfigEncoding(t *testing.T) {
 			}),
 		},
 		{
+			name: "can set PriceReportingDisabled",
+			want: modifyCopy(validConfig, func(c *JSONCommitOffchainConfig) {
+				c.PriceReportingDisabled = true
+			}),
+		},
+		{
 			name: "must set GasPriceHeartBeat",
 			want: modifyCopy(validConfig, func(c *JSONCommitOffchainConfig) {
 				c.GasPriceHeartBeat = *config.MustNewDuration(0)
