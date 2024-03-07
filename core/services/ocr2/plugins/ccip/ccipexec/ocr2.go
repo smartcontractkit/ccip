@@ -93,17 +93,28 @@ type ExecutionReportingPlugin struct {
 	chainHealthcheck cache.ChainHealthcheck
 }
 
-func (r *ExecutionReportingPlugin) Query(context.Context, types.ReportTimestamp) (types.Query, error) {
+func (r *ExecutionReportingPlugin) Query(ctx context.Context, _ types.ReportTimestamp) (types.Query, error) {
+	if healthy, err := r.chainHealthcheck.IsHealthy(ctx, false); err != nil {
+		return nil, err
+	} else if !healthy {
+		return nil, ccip.ErrChainIsNotHealthy
+	}
 	return types.Query{}, nil
 }
 
 func (r *ExecutionReportingPlugin) Observation(ctx context.Context, timestamp types.ReportTimestamp, query types.Query) (types.Observation, error) {
 	lggr := r.lggr.Named("ExecutionObservation")
-	if healthy, err := r.chainHealthcheck.ForceIsHealthy(ctx); err != nil {
+	if healthy, err := r.chainHealthcheck.IsHealthy(ctx, true); err != nil {
 		return nil, err
 	} else if !healthy {
 		return nil, ccip.ErrChainIsNotHealthy
 	}
+
+	// Ensure that the source price registry is synchronized with the onRamp.
+	if err := r.ensurePriceRegistrySynchronization(ctx); err != nil {
+		return nil, fmt.Errorf("ensuring price registry synchronization: %w", err)
+	}
+
 	// Expire any inflight reports.
 	r.inflightReports.expire(lggr)
 	inFlight := r.inflightReports.getAll()
@@ -759,10 +770,10 @@ func (r *ExecutionReportingPlugin) buildReport(ctx context.Context, lggr logger.
 
 func (r *ExecutionReportingPlugin) Report(ctx context.Context, timestamp types.ReportTimestamp, query types.Query, observations []types.AttributedObservation) (bool, types.Report, error) {
 	lggr := r.lggr.Named("ExecutionReport")
-	if healthy, err := r.chainHealthcheck.IsHealthy(ctx); err != nil {
+	if healthy, err := r.chainHealthcheck.IsHealthy(ctx, false); err != nil {
 		return false, nil, err
 	} else if !healthy {
-		return false, nil, nil
+		return false, nil, ccip.ErrChainIsNotHealthy
 	}
 	parsableObservations := ccip.GetParsableObservations[ccip.ExecutionObservation](lggr, observations)
 	// Need at least F+1 observations
@@ -856,10 +867,10 @@ func (r *ExecutionReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Conte
 	}
 	lggr = lggr.With("messageIDs", ccipcommon.GetMessageIDsAsHexString(execReport.Messages))
 
-	if healthy, err1 := r.chainHealthcheck.IsHealthy(ctx); err1 != nil {
+	if healthy, err1 := r.chainHealthcheck.IsHealthy(ctx, false); err1 != nil {
 		return false, err1
 	} else if !healthy {
-		return false, nil
+		return false, ccip.ErrChainIsNotHealthy
 	}
 	// If the first message is executed already, this execution report is stale, and we do not accept it.
 	stale, err := r.isStaleReport(ctx, execReport.Messages)
@@ -887,10 +898,10 @@ func (r *ExecutionReportingPlugin) ShouldTransmitAcceptedReport(ctx context.Cont
 	}
 	lggr = lggr.With("messageIDs", ccipcommon.GetMessageIDsAsHexString(execReport.Messages))
 
-	if healthy, err1 := r.chainHealthcheck.ForceIsHealthy(ctx); err1 != nil {
+	if healthy, err1 := r.chainHealthcheck.IsHealthy(ctx, true); err1 != nil {
 		return false, err1
 	} else if !healthy {
-		return false, nil
+		return false, ccip.ErrChainIsNotHealthy
 	}
 	// If report is not stale we transmit.
 	// When the executeTransmitter enqueues the tx for tx manager,
@@ -1059,11 +1070,6 @@ func (r *ExecutionReportingPlugin) prepareTokenExecData(ctx context.Context) (ex
 	rateLimiterTokenBucket, err := r.offRampReader.CurrentRateLimiterState(ctx)
 	if err != nil {
 		return execTokenData{}, err
-	}
-
-	// Ensure that the source price registry is synchronized with the onRamp.
-	if err = r.ensurePriceRegistrySynchronization(ctx); err != nil {
-		return execTokenData{}, fmt.Errorf("ensuring price registry synchronization: %w", err)
 	}
 
 	sourceFeeTokens, err := r.sourcePriceRegistry.GetFeeTokens(ctx)

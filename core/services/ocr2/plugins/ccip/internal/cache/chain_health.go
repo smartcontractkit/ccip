@@ -31,10 +31,9 @@ import (
 //go:generate mockery --quiet --name ChainHealthcheck --filename chain_health_mock.go --case=underscore
 type ChainHealthcheck interface {
 	// IsHealthy checks if the chain is healthy and returns true if it is, false otherwise
-	IsHealthy(ctx context.Context) (bool, error)
-	// ForceIsHealthy forces the chain health check to refresh the RMN curse state and
-	// returns true if the chain is healthy, false otherwise. Should be used in Observation and ShouldTransmit phaes of OCR2
-	ForceIsHealthy(ctx context.Context) (bool, error)
+	// If forceRefresh is set to true, it will refresh the RMN curse state. Should be used in the Observation and ShouldTransmit phases of OCR2.
+	// Otherwise, it will use the cached value of the RMN curse state.
+	IsHealthy(ctx context.Context, forceRefresh bool) (bool, error)
 }
 
 const (
@@ -96,15 +95,7 @@ func newChainHealthcheckWithCustomEviction(
 	}
 }
 
-func (c *chainHealthcheck) IsHealthy(ctx context.Context) (bool, error) {
-	return c.isHealthy(ctx, false)
-}
-
-func (c *chainHealthcheck) ForceIsHealthy(ctx context.Context) (bool, error) {
-	return c.isHealthy(ctx, true)
-}
-
-func (c *chainHealthcheck) isHealthy(ctx context.Context, forceRmnRefresh bool) (bool, error) {
+func (c *chainHealthcheck) IsHealthy(ctx context.Context, forceRefresh bool) (bool, error) {
 	// Verify if flag is raised to indicate that the chain is not healthy
 	// If set to false then immediately return false without checking the chain
 	if healthy, found := c.cache.Get(c.globalStatusKey); found && !healthy.(bool) {
@@ -118,7 +109,7 @@ func (c *chainHealthcheck) isHealthy(ctx context.Context, forceRmnRefresh bool) 
 		return healthy, nil
 	}
 
-	if healthy, err := c.checkIfRMNsAreHealthy(ctx, forceRmnRefresh); err != nil {
+	if healthy, err := c.checkIfRMNsAreHealthy(ctx, forceRefresh); err != nil {
 		return false, err
 	} else if !healthy {
 		c.cache.Set(c.globalStatusKey, false, c.globalStatusExpiration)
@@ -128,7 +119,7 @@ func (c *chainHealthcheck) isHealthy(ctx context.Context, forceRmnRefresh bool) 
 }
 
 // checkIfReadersAreHealthy checks if the source and destination chains are healthy by calling underlying LogPoller
-// These calls are very cheap, because doesn't require any communication with database or RPC, so we don't have
+// These calls are cheap because they don't require any communication with the database or RPC, so we don't have
 // to cache the result of these calls.
 func (c *chainHealthcheck) checkIfReadersAreHealthy(ctx context.Context) (bool, error) {
 	sourceChainHealthy, err := c.onRamp.IsSourceChainHealthy(ctx)
@@ -143,7 +134,7 @@ func (c *chainHealthcheck) checkIfReadersAreHealthy(ctx context.Context) (bool, 
 
 	if !sourceChainHealthy || !destChainHealthy {
 		c.lggr.Criticalw(
-			"Source or destination chain is unhealthy",
+			"Lane processing is stopped because source or destination chain is reported unhealthy",
 			"sourceChainHealthy", sourceChainHealthy,
 			"destChainHealthy", destChainHealthy,
 		)
@@ -169,14 +160,14 @@ func (c *chainHealthcheck) checkIfRMNsAreHealthy(ctx context.Context, forceFetch
 
 func (c *chainHealthcheck) fetchRMNCurseState(ctx context.Context) (bool, error) {
 	var (
-		eg             = new(errgroup.Group)
-		isDestDown     bool
-		isSourceCursed bool
+		eg                = new(errgroup.Group)
+		isCommitStoreDown bool
+		isSourceCursed    bool
 	)
 
 	eg.Go(func() error {
 		var err error
-		isDestDown, err = c.commitStore.IsDown(ctx)
+		isCommitStoreDown, err = c.commitStore.IsDown(ctx)
 		if err != nil {
 			return errors.Wrap(err, "commitStore isDown check errored")
 		}
@@ -196,10 +187,10 @@ func (c *chainHealthcheck) fetchRMNCurseState(ctx context.Context) (bool, error)
 		return false, err
 	}
 
-	if isDestDown || isSourceCursed {
+	if isCommitStoreDown || isSourceCursed {
 		c.lggr.Criticalw(
-			"Source chain is cursed or CommitStore is down",
-			"isDestDown", isDestDown,
+			"Lane processing is stopped because source chain is cursed or CommitStore is down",
+			"isCommitStoreDown", isCommitStoreDown,
 			"isSourceCursed", isSourceCursed,
 		)
 		return false, nil

@@ -5,10 +5,10 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math/big"
-	"slices"
 	"sort"
 	"time"
 
+	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/pkg/errors"
 
@@ -92,7 +92,12 @@ type CommitReportingPlugin struct {
 }
 
 // Query is not used by the CCIP Commit plugin.
-func (r *CommitReportingPlugin) Query(context.Context, types.ReportTimestamp) (types.Query, error) {
+func (r *CommitReportingPlugin) Query(ctx context.Context, _ types.ReportTimestamp) (types.Query, error) {
+	if healthy, err := r.chainHealthcheck.IsHealthy(ctx, false); err != nil {
+		return nil, err
+	} else if !healthy {
+		return nil, ccip.ErrChainIsNotHealthy
+	}
 	return types.Query{}, nil
 }
 
@@ -102,7 +107,7 @@ func (r *CommitReportingPlugin) Query(context.Context, types.ReportTimestamp) (t
 // the observation will be considered invalid and rejected.
 func (r *CommitReportingPlugin) Observation(ctx context.Context, epochAndRound types.ReportTimestamp, _ types.Query) (types.Observation, error) {
 	lggr := r.lggr.Named("CommitObservation")
-	if healthy, err := r.chainHealthcheck.ForceIsHealthy(ctx); err != nil {
+	if healthy, err := r.chainHealthcheck.IsHealthy(ctx, true); err != nil {
 		return nil, err
 	} else if !healthy {
 		return nil, ccip.ErrChainIsNotHealthy
@@ -360,10 +365,10 @@ func (r *CommitReportingPlugin) getLatestGasPriceUpdate(ctx context.Context, now
 func (r *CommitReportingPlugin) Report(ctx context.Context, epochAndRound types.ReportTimestamp, _ types.Query, observations []types.AttributedObservation) (bool, types.Report, error) {
 	now := time.Now()
 	lggr := r.lggr.Named("CommitReport")
-	if healthy, err := r.chainHealthcheck.IsHealthy(ctx); err != nil {
+	if healthy, err := r.chainHealthcheck.IsHealthy(ctx, false); err != nil {
 		return false, nil, err
 	} else if !healthy {
-		return false, nil, nil
+		return false, nil, ccip.ErrChainIsNotHealthy
 	}
 
 	parsableObservations := ccip.GetParsableObservations[ccip.CommitObservation](lggr, observations)
@@ -446,6 +451,9 @@ func validateObservations(ctx context.Context, lggr logger.Logger, destTokens []
 			lggr.Warnw("Skipping observation due to token count mismatch", "expecting", len(destTokens), "got", len(obs.TokenPricesUSD))
 			continue
 		}
+
+		destTokensSet := mapset.NewSet[cciptypes.Address](destTokens...)
+
 		// If any of the observed token prices is reported as nil, or not supported on dest chain, the observation is faulty, skip the observation.
 		// Printing all faulty prices instead of short-circuiting to make log more informative.
 		skipObservation := false
@@ -454,8 +462,11 @@ func validateObservations(ctx context.Context, lggr logger.Logger, destTokens []
 				lggr.Warnw("Nil value in observed TokenPricesUSD", "token", token)
 				skipObservation = true
 			}
-			if !slices.Contains(destTokens, token) {
-				lggr.Warnw("Unsupported token in observed TokenPricesUSD", "token", token)
+
+			if !destTokensSet.Contains(token) {
+				lggr.Warnw("Unsupported token in observed TokenPricesUSD",
+					"token", token,
+					"destTokens", destTokensSet.String())
 				skipObservation = true
 			}
 		}
@@ -669,10 +680,10 @@ func (r *CommitReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Context,
 		return false, nil
 	}
 
-	if healthy, err1 := r.chainHealthcheck.IsHealthy(ctx); err1 != nil {
+	if healthy, err1 := r.chainHealthcheck.IsHealthy(ctx, false); err1 != nil {
 		return false, err1
 	} else if !healthy {
-		return false, nil
+		return false, ccip.ErrChainIsNotHealthy
 	}
 
 	if r.isStaleReport(ctx, lggr, parsedReport, true, reportTimestamp) {
@@ -696,10 +707,10 @@ func (r *CommitReportingPlugin) ShouldTransmitAcceptedReport(ctx context.Context
 	if err != nil {
 		return false, err
 	}
-	if healthy, err1 := r.chainHealthcheck.ForceIsHealthy(ctx); err1 != nil {
+	if healthy, err1 := r.chainHealthcheck.IsHealthy(ctx, true); err1 != nil {
 		return false, err1
 	} else if !healthy {
-		return false, nil
+		return false, ccip.ErrChainIsNotHealthy
 	}
 	// If report is not stale we transmit.
 	// When the commitTransmitter enqueues the tx for tx manager,

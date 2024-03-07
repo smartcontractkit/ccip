@@ -20,8 +20,7 @@ var address = cciptypes.Address(common.HexToAddress("0x1234567890123456789012345
 
 func Test_ObservedChainStateSkipErrors(t *testing.T) {
 	mockedHealthcheck := mocks.NewChainHealthcheck(t)
-	mockedHealthcheck.On("IsHealthy", mock.Anything).Return(false, fmt.Errorf("error"))
-	mockedHealthcheck.On("ForceIsHealthy", mock.Anything).Return(false, fmt.Errorf("error"))
+	mockedHealthcheck.On("IsHealthy", mock.Anything, true).Return(false, fmt.Errorf("error"))
 
 	observedChainState := NewObservedChainHealthCheck(
 		mockedHealthcheck,
@@ -31,19 +30,14 @@ func Test_ObservedChainStateSkipErrors(t *testing.T) {
 		address,
 	)
 
-	_, err := observedChainState.IsHealthy(tests.Context(t))
-	assert.Error(t, err)
-	assert.Equal(t, float64(0), testutil.ToFloat64(laneHealthStatus.WithLabelValues("plugin", "10", "20", "0x1234567890123456789012345678901234567890")))
-
-	_, err = observedChainState.ForceIsHealthy(tests.Context(t))
+	_, err := observedChainState.IsHealthy(tests.Context(t), true)
 	assert.Error(t, err)
 	assert.Equal(t, float64(0), testutil.ToFloat64(laneHealthStatus.WithLabelValues("plugin", "10", "20", "0x1234567890123456789012345678901234567890")))
 }
 
 func Test_ObservedChainStateReportsStatus(t *testing.T) {
 	mockedHealthcheck := mocks.NewChainHealthcheck(t)
-	mockedHealthcheck.On("IsHealthy", mock.Anything).Return(true, nil).Once()
-	mockedHealthcheck.On("ForceIsHealthy", mock.Anything).Return(true, nil).Once()
+	mockedHealthcheck.On("IsHealthy", mock.Anything, false).Return(true, nil).Once()
 
 	observedChainState := NewObservedChainHealthCheck(
 		mockedHealthcheck,
@@ -53,26 +47,15 @@ func Test_ObservedChainStateReportsStatus(t *testing.T) {
 		address,
 	)
 
-	health, err := observedChainState.IsHealthy(tests.Context(t))
-	require.NoError(t, err)
-	assert.True(t, health)
-	assert.Equal(t, float64(1), testutil.ToFloat64(laneHealthStatus.WithLabelValues("plugin", "10", "20", "0x1234567890123456789012345678901234567890")))
-
-	health, err = observedChainState.ForceIsHealthy(tests.Context(t))
+	health, err := observedChainState.IsHealthy(tests.Context(t), false)
 	require.NoError(t, err)
 	assert.True(t, health)
 	assert.Equal(t, float64(1), testutil.ToFloat64(laneHealthStatus.WithLabelValues("plugin", "10", "20", "0x1234567890123456789012345678901234567890")))
 
 	// Mark as unhealthy
-	mockedHealthcheck.On("IsHealthy", mock.Anything).Return(false, nil).Once()
-	mockedHealthcheck.On("ForceIsHealthy", mock.Anything).Return(false, nil).Once()
+	mockedHealthcheck.On("IsHealthy", mock.Anything, false).Return(false, nil).Once()
 
-	health, err = observedChainState.IsHealthy(tests.Context(t))
-	require.NoError(t, err)
-	assert.False(t, health)
-	assert.Equal(t, float64(0), testutil.ToFloat64(laneHealthStatus.WithLabelValues("plugin", "10", "20", "0x1234567890123456789012345678901234567890")))
-
-	health, err = observedChainState.ForceIsHealthy(tests.Context(t))
+	health, err = observedChainState.IsHealthy(tests.Context(t), false)
 	require.NoError(t, err)
 	assert.False(t, health)
 	assert.Equal(t, float64(0), testutil.ToFloat64(laneHealthStatus.WithLabelValues("plugin", "10", "20", "0x1234567890123456789012345678901234567890")))
