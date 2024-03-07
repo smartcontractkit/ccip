@@ -33,7 +33,7 @@ type ChainHealthcheck interface {
 	// IsHealthy checks if the chain is healthy and returns true if it is, false otherwise
 	IsHealthy(ctx context.Context) (bool, error)
 	// ForceIsHealthy forces the chain health check to refresh the RMN curse state and
-	// returns true if the chain is healthy, false otherwise. Should be used in Observation and ShouldTransmit phaes of OCR2
+	// returns true if the chain is healthy, false otherwise. Should be used in the Observation and ShouldTransmit phases of OCR2.
 	ForceIsHealthy(ctx context.Context) (bool, error)
 }
 
