@@ -47,7 +47,7 @@ func initOrCloseOffRampReader(lggr logger.Logger, versionFinder VersionFinder, a
 		return nil, err
 	}
 
-	lggr.Infow("Initializing OffRamp Reader", "version", version.String(), "estimator", estimator.Name(), "l1oracle", estimator.L1Oracle().Name(), "masGasPrice", maxGasPrice.String())
+	lggr.Infow("Initializing OffRamp Reader", "version", version.String(), "masGasPrice", maxGasPrice.String())
 
 	switch version.String() {
 	case ccipdata.V1_0_0, ccipdata.V1_1_0:

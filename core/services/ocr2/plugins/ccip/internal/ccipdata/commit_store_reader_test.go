@@ -176,11 +176,14 @@ func TestCommitStoreReaders(t *testing.T) {
 	require.NoError(t, err)
 	commitAndGetBlockTs(ec) // Deploy these
 	ge := new(gasmocks.EvmFeeEstimator)
-	mp := big.NewInt(100)
-	c10r, err := factory.NewCommitStoreReader(lggr, factory.NewEvmVersionFinder(), ccipcalc.EvmAddrToGeneric(addr), ec, lp, ge, mp)
+	lm := new(rollupMocks.L1Oracle)
+	ge.On("L1Oracle").Return(lm)
+
+	maxGasPrice := big.NewInt(1e8)
+	c10r, err := factory.NewCommitStoreReader(lggr, factory.NewEvmVersionFinder(), ccipcalc.EvmAddrToGeneric(addr), ec, lp, ge, maxGasPrice)
 	require.NoError(t, err)
 	assert.Equal(t, reflect.TypeOf(c10r).String(), reflect.TypeOf(&v1_0_0.CommitStore{}).String())
-	c12r, err := factory.NewCommitStoreReader(lggr, factory.NewEvmVersionFinder(), ccipcalc.EvmAddrToGeneric(addr2), ec, lp, ge, mp)
+	c12r, err := factory.NewCommitStoreReader(lggr, factory.NewEvmVersionFinder(), ccipcalc.EvmAddrToGeneric(addr2), ec, lp, ge, maxGasPrice)
 	require.NoError(t, err)
 	assert.Equal(t, reflect.TypeOf(c12r).String(), reflect.TypeOf(&v1_2_0.CommitStore{}).String())
 
@@ -202,7 +205,6 @@ func TestCommitStoreReaders(t *testing.T) {
 		InflightCacheExpiry:    3 * time.Hour,
 		PriceReportingDisabled: false,
 	}
-	maxGas := uint64(1e9)
 	offchainConfig, err := ccipconfig.EncodeOffchainConfig[v1_0_0.CommitOffchainConfig](v1_0_0.CommitOffchainConfig{
 		SourceFinalityDepth:   sourceFinalityDepth,
 		DestFinalityDepth:     destFinalityDepth,
@@ -260,10 +262,8 @@ func TestCommitStoreReaders(t *testing.T) {
 	}
 	gasPrice := big.NewInt(10)
 	daPrice := big.NewInt(20)
-	ge.On("GetFee", mock.Anything, mock.Anything, mock.Anything, assets.NewWei(big.NewInt(int64(maxGas)))).Return(gas.EvmFee{Legacy: assets.NewWei(gasPrice)}, uint32(0), nil)
-	lm := new(rollupMocks.L1Oracle)
+	ge.On("GetFee", mock.Anything, mock.Anything, mock.Anything, assets.NewWei(maxGasPrice)).Return(gas.EvmFee{Legacy: assets.NewWei(gasPrice)}, uint32(0), nil)
 	lm.On("GasPrice", mock.Anything).Return(assets.NewWei(daPrice), nil)
-	ge.On("L1Oracle").Return(lm)
 
 	for v, cr := range crs {
 		cr := cr
