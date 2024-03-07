@@ -162,7 +162,7 @@ func (o *OnRamp) RouterAddress() (cciptypes.Address, error) {
 }
 
 func (o *OnRamp) IsSourceChainHealthy(context.Context) (bool, error) {
-	if err := o.lp.Ready(); err != nil {
+	if err := o.lp.Healthy(); err != nil {
 		return false, nil
 	}
 	return true, nil

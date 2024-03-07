@@ -369,7 +369,7 @@ func (c *CommitStore) GetLatestPriceEpochAndRound(ctx context.Context) (uint64, 
 }
 
 func (c *CommitStore) IsDestChainHealthy(context.Context) (bool, error) {
-	if err := c.lp.Ready(); err != nil {
+	if err := c.lp.Healthy(); err != nil {
 		return false, nil
 	}
 	return true, nil
