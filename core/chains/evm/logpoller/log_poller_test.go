@@ -1029,7 +1029,7 @@ func TestLogPoller_ReorgDeeperThanFinality(t *testing.T) {
 
 			// Fork deeper than finality depth
 			// Chain gen <- 1 <- 2 <- 3 (finalized) <- 4 (L1_1)
-			//			     \  2' <- 3' <- 4' <- 5' <- 6' (finalized) <- 7' <- 8' <- 9' <- 10' (L1_2)
+			//              \  2' <- 3' <- 4' <- 5' <- 6' (finalized) <- 7' <- 8' <- 9' <- 10' (L1_2)
 			lca, err := th.Client.BlockByNumber(testutils.Context(t), big.NewInt(1))
 			require.NoError(t, err)
 			require.NoError(t, th.Client.Fork(testutils.Context(t), lca.Hash()))
@@ -1049,12 +1049,12 @@ func TestLogPoller_ReorgDeeperThanFinality(t *testing.T) {
 
 			secondPoll := th.PollAndSaveLogs(testutils.Context(t), firstPoll)
 			assert.Equal(t, firstPoll, secondPoll)
-			assert.Error(t, th.LogPoller.Ready())
+			assert.Equal(t, logpoller.ErrFinalityViolated, th.LogPoller.Ready())
 
 			// Manually remove latest block from the log poller to bring it back to life
 			// LogPoller should be healthy again after first poll
 			// Chain gen <- 1
-			//			     \  2' <- 3' <- 4' <- 5' <- 6' (finalized) <- 7' <- 8' <- 9' <- 10' (L1_2)
+			//              \  2' <- 3' <- 4' <- 5' <- 6' (finalized) <- 7' <- 8' <- 9' <- 10' (L1_2)
 			require.NoError(t, th.ORM.DeleteLogsAndBlocksAfter(2))
 			// Poll from latest
 			recoveryPoll := th.PollAndSaveLogs(testutils.Context(t), 1)

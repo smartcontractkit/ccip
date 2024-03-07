@@ -116,11 +116,16 @@ type logPoller struct {
 	cachedAddresses []common.Address
 	cachedEventSigs []common.Hash
 
-	replayStart      chan int64
-	replayComplete   chan error
-	ctx              context.Context
-	cancel           context.CancelFunc
-	wg               sync.WaitGroup
+	replayStart    chan int64
+	replayComplete chan error
+	ctx            context.Context
+	cancel         context.CancelFunc
+	wg             sync.WaitGroup
+	// This flag is raised whenever the log poller detects that the chain's finality has been violated.
+	// It can happen when reorg is deeper than the latest finalized block that LogPoller saw in a previous PollAndSave tick.
+	// Usually the only way to recover is to manually remove the offending logs and block from the database.
+	// LogPoller keeps running in infinite loop, so whenever the invalid state is removed from the database it should
+	// recover automatically without needing to restart the LogPoller.
 	finalityViolated *atomic.Bool
 }
 
@@ -137,8 +142,6 @@ type logPoller struct {
 func NewLogPoller(orm ORM, ec Client, lggr logger.Logger, pollPeriod time.Duration,
 	useFinalityTag bool, finalityDepth int64, backfillBatchSize int64, rpcBatchSize int64, keepFinalizedBlocksDepth int64) *logPoller {
 	ctx, cancel := context.WithCancel(context.Background())
-	isReorged := atomic.Bool{}
-	isReorged.Store(false)
 	return &logPoller{
 		ctx:                      ctx,
 		cancel:                   cancel,
@@ -155,7 +158,7 @@ func NewLogPoller(orm ORM, ec Client, lggr logger.Logger, pollPeriod time.Durati
 		keepFinalizedBlocksDepth: keepFinalizedBlocksDepth,
 		filters:                  make(map[string]Filter),
 		filterDirty:              true, // Always build Filter on first call to cache an empty filter if nothing registered yet.
-		finalityViolated:         &isReorged,
+		finalityViolated:         new(atomic.Bool),
 	}
 }
 
