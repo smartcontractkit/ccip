@@ -98,8 +98,10 @@ func (r *ExecutionReportingPlugin) Query(context.Context, types.ReportTimestamp)
 
 func (r *ExecutionReportingPlugin) Observation(ctx context.Context, timestamp types.ReportTimestamp, query types.Query) (types.Observation, error) {
 	lggr := r.lggr.Named("ExecutionObservation")
-	if err := r.chainHealthcheck.ForceValidateNotCursed(ctx); err != nil {
+	if healthy, err := r.chainHealthcheck.ForceIsHealthy(ctx); err != nil {
 		return nil, err
+	} else if !healthy {
+		return nil, ccip.ErrChainIsNotHealthy
 	}
 	// Expire any inflight reports.
 	r.inflightReports.expire(lggr)
@@ -756,8 +758,10 @@ func (r *ExecutionReportingPlugin) buildReport(ctx context.Context, lggr logger.
 
 func (r *ExecutionReportingPlugin) Report(ctx context.Context, timestamp types.ReportTimestamp, query types.Query, observations []types.AttributedObservation) (bool, types.Report, error) {
 	lggr := r.lggr.Named("ExecutionReport")
-	if err := r.chainHealthcheck.ValidateNotCursed(ctx); err != nil {
+	if healthy, err := r.chainHealthcheck.IsHealthy(ctx); err != nil {
 		return false, nil, err
+	} else if !healthy {
+		return false, nil, nil
 	}
 	parsableObservations := ccip.GetParsableObservations[ccip.ExecutionObservation](lggr, observations)
 	// Need at least F+1 observations
@@ -849,11 +853,13 @@ func (r *ExecutionReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Conte
 		lggr.Errorw("Unable to decode report", "err", err)
 		return false, err
 	}
-	if err1 := r.chainHealthcheck.ValidateNotCursed(ctx); err1 != nil {
-		return false, err1
-	}
 	lggr = lggr.With("messageIDs", ccipcommon.GetMessageIDsAsHexString(execReport.Messages))
 
+	if healthy, err1 := r.chainHealthcheck.IsHealthy(ctx); err1 != nil {
+		return false, err1
+	} else if !healthy {
+		return false, nil
+	}
 	// If the first message is executed already, this execution report is stale, and we do not accept it.
 	stale, err := r.isStaleReport(ctx, execReport.Messages)
 	if err != nil {
@@ -878,11 +884,13 @@ func (r *ExecutionReportingPlugin) ShouldTransmitAcceptedReport(ctx context.Cont
 		lggr.Errorw("Unable to decode report", "err", err)
 		return false, nil
 	}
-	if err1 := r.chainHealthcheck.ForceValidateNotCursed(ctx); err1 != nil {
-		return false, err1
-	}
 	lggr = lggr.With("messageIDs", ccipcommon.GetMessageIDsAsHexString(execReport.Messages))
 
+	if healthy, err1 := r.chainHealthcheck.ForceIsHealthy(ctx); err1 != nil {
+		return false, err1
+	} else if !healthy {
+		return false, nil
+	}
 	// If report is not stale we transmit.
 	// When the executeTransmitter enqueues the tx for tx manager,
 	// we mark it as execution_sent, removing it from the set of inflight messages.
