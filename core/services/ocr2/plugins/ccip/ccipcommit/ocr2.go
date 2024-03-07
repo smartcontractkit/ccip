@@ -91,7 +91,12 @@ type CommitReportingPlugin struct {
 }
 
 // Query is not used by the CCIP Commit plugin.
-func (r *CommitReportingPlugin) Query(context.Context, types.ReportTimestamp) (types.Query, error) {
+func (r *CommitReportingPlugin) Query(ctx context.Context, _ types.ReportTimestamp) (types.Query, error) {
+	if healthy, err := r.chainHealthcheck.IsHealthy(ctx, false); err != nil {
+		return nil, err
+	} else if !healthy {
+		return nil, ccip.ErrChainIsNotHealthy
+	}
 	return types.Query{}, nil
 }
 
@@ -101,7 +106,7 @@ func (r *CommitReportingPlugin) Query(context.Context, types.ReportTimestamp) (t
 // the observation will be considered invalid and rejected.
 func (r *CommitReportingPlugin) Observation(ctx context.Context, epochAndRound types.ReportTimestamp, _ types.Query) (types.Observation, error) {
 	lggr := r.lggr.Named("CommitObservation")
-	if healthy, err := r.chainHealthcheck.ForceIsHealthy(ctx); err != nil {
+	if healthy, err := r.chainHealthcheck.IsHealthy(ctx, true); err != nil {
 		return nil, err
 	} else if !healthy {
 		return nil, ccip.ErrChainIsNotHealthy
@@ -359,7 +364,7 @@ func (r *CommitReportingPlugin) getLatestGasPriceUpdate(ctx context.Context, now
 func (r *CommitReportingPlugin) Report(ctx context.Context, epochAndRound types.ReportTimestamp, _ types.Query, observations []types.AttributedObservation) (bool, types.Report, error) {
 	now := time.Now()
 	lggr := r.lggr.Named("CommitReport")
-	if healthy, err := r.chainHealthcheck.IsHealthy(ctx); err != nil {
+	if healthy, err := r.chainHealthcheck.IsHealthy(ctx, false); err != nil {
 		return false, nil, err
 	} else if !healthy {
 		return false, nil, ccip.ErrChainIsNotHealthy
@@ -674,7 +679,7 @@ func (r *CommitReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Context,
 		return false, nil
 	}
 
-	if healthy, err1 := r.chainHealthcheck.IsHealthy(ctx); err1 != nil {
+	if healthy, err1 := r.chainHealthcheck.IsHealthy(ctx, false); err1 != nil {
 		return false, err1
 	} else if !healthy {
 		return false, ccip.ErrChainIsNotHealthy
@@ -701,7 +706,7 @@ func (r *CommitReportingPlugin) ShouldTransmitAcceptedReport(ctx context.Context
 	if err != nil {
 		return false, err
 	}
-	if healthy, err1 := r.chainHealthcheck.ForceIsHealthy(ctx); err1 != nil {
+	if healthy, err1 := r.chainHealthcheck.IsHealthy(ctx, true); err1 != nil {
 		return false, err1
 	} else if !healthy {
 		return false, ccip.ErrChainIsNotHealthy

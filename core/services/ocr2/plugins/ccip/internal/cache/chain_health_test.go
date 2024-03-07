@@ -32,19 +32,19 @@ func Test_RMNStateCaching(t *testing.T) {
 	mockCommitStore.On("IsDestChainHealthy", ctx).Return(true, nil).Maybe()
 	mockOnRamp.On("IsSourceCursed", ctx).Return(false, nil).Once()
 	mockOnRamp.On("IsSourceChainHealthy", ctx).Return(true, nil).Maybe()
-	healthy, err := chainState.IsHealthy(ctx)
+	healthy, err := chainState.IsHealthy(ctx, false)
 	assert.NoError(t, err)
 	assert.True(t, healthy)
 
 	// Chain is cursed, but cache is stale
 	mockCommitStore.On("IsDown", ctx).Return(true, nil).Once()
 	mockOnRamp.On("IsSourceCursed", ctx).Return(true, nil).Once()
-	healthy, err = chainState.IsHealthy(ctx)
+	healthy, err = chainState.IsHealthy(ctx, false)
 	assert.NoError(t, err)
 	assert.True(t, healthy)
 
 	// Enforce cache refresh
-	healthy, err = chainState.ForceIsHealthy(ctx)
+	healthy, err = chainState.IsHealthy(ctx, true)
 	assert.Nil(t, err)
 	assert.False(t, healthy)
 
@@ -52,7 +52,7 @@ func Test_RMNStateCaching(t *testing.T) {
 	mockCommitStore.On("IsDown", ctx).Return(false, nil).Maybe()
 	mockOnRamp.On("IsSourceCursed", ctx).Return(false, nil).Maybe()
 	// Enforce cache refresh
-	healthy, err = chainState.ForceIsHealthy(ctx)
+	healthy, err = chainState.IsHealthy(ctx, true)
 	assert.Nil(t, err)
 	assert.False(t, healthy)
 }
@@ -76,21 +76,21 @@ func Test_ChainStateIsCached(t *testing.T) {
 	mockCommitStore.On("IsDestChainHealthy", ctx).Return(true, nil).Once()
 	mockOnRamp.On("IsSourceCursed", ctx).Return(false, nil).Maybe()
 	mockOnRamp.On("IsSourceChainHealthy", ctx).Return(true, nil).Once()
-	healthy, err := chainState.IsHealthy(ctx)
+	healthy, err := chainState.IsHealthy(ctx, false)
 	assert.NoError(t, err)
 	assert.True(t, healthy)
 
 	// Chain is not healthy
 	mockCommitStore.On("IsDestChainHealthy", ctx).Return(false, nil).Once()
 	mockOnRamp.On("IsSourceChainHealthy", ctx).Return(false, nil).Once()
-	healthy, err = chainState.IsHealthy(ctx)
+	healthy, err = chainState.IsHealthy(ctx, false)
 	assert.NoError(t, err)
 	assert.False(t, healthy)
 
 	// Previous value is returned
 	mockCommitStore.On("IsDestChainHealthy", ctx).Return(true, nil).Maybe()
 	mockOnRamp.On("IsSourceChainHealthy", ctx).Return(true, nil).Maybe()
-	healthy, err = chainState.IsHealthy(ctx)
+	healthy, err = chainState.IsHealthy(ctx, false)
 	assert.NoError(t, err)
 	assert.False(t, healthy)
 }
@@ -169,7 +169,7 @@ func Test_ChainStateIsHealthy(t *testing.T) {
 			mockOnRamp.On("IsSourceChainHealthy", ctx).Return(!tc.sourceChainUnhealthy, tc.sourceChainErr).Maybe()
 
 			chainState := NewChainHealthcheck(logger.TestLogger(t), mockOnRamp, mockCommitStore)
-			healthy, err := chainState.IsHealthy(ctx)
+			healthy, err := chainState.IsHealthy(ctx, false)
 
 			if tc.expectedErr {
 				assert.Error(t, err)

@@ -92,13 +92,18 @@ type ExecutionReportingPlugin struct {
 	chainHealthcheck cache.ChainHealthcheck
 }
 
-func (r *ExecutionReportingPlugin) Query(context.Context, types.ReportTimestamp) (types.Query, error) {
+func (r *ExecutionReportingPlugin) Query(ctx context.Context, _ types.ReportTimestamp) (types.Query, error) {
+	if healthy, err := r.chainHealthcheck.IsHealthy(ctx, false); err != nil {
+		return nil, err
+	} else if !healthy {
+		return nil, ccip.ErrChainIsNotHealthy
+	}
 	return types.Query{}, nil
 }
 
 func (r *ExecutionReportingPlugin) Observation(ctx context.Context, timestamp types.ReportTimestamp, query types.Query) (types.Observation, error) {
 	lggr := r.lggr.Named("ExecutionObservation")
-	if healthy, err := r.chainHealthcheck.ForceIsHealthy(ctx); err != nil {
+	if healthy, err := r.chainHealthcheck.IsHealthy(ctx, true); err != nil {
 		return nil, err
 	} else if !healthy {
 		return nil, ccip.ErrChainIsNotHealthy
@@ -764,7 +769,7 @@ func (r *ExecutionReportingPlugin) buildReport(ctx context.Context, lggr logger.
 
 func (r *ExecutionReportingPlugin) Report(ctx context.Context, timestamp types.ReportTimestamp, query types.Query, observations []types.AttributedObservation) (bool, types.Report, error) {
 	lggr := r.lggr.Named("ExecutionReport")
-	if healthy, err := r.chainHealthcheck.IsHealthy(ctx); err != nil {
+	if healthy, err := r.chainHealthcheck.IsHealthy(ctx, false); err != nil {
 		return false, nil, err
 	} else if !healthy {
 		return false, nil, ccip.ErrChainIsNotHealthy
@@ -861,7 +866,7 @@ func (r *ExecutionReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Conte
 	}
 	lggr = lggr.With("messageIDs", ccipcommon.GetMessageIDsAsHexString(execReport.Messages))
 
-	if healthy, err1 := r.chainHealthcheck.IsHealthy(ctx); err1 != nil {
+	if healthy, err1 := r.chainHealthcheck.IsHealthy(ctx, false); err1 != nil {
 		return false, err1
 	} else if !healthy {
 		return false, ccip.ErrChainIsNotHealthy
@@ -892,7 +897,7 @@ func (r *ExecutionReportingPlugin) ShouldTransmitAcceptedReport(ctx context.Cont
 	}
 	lggr = lggr.With("messageIDs", ccipcommon.GetMessageIDsAsHexString(execReport.Messages))
 
-	if healthy, err1 := r.chainHealthcheck.ForceIsHealthy(ctx); err1 != nil {
+	if healthy, err1 := r.chainHealthcheck.IsHealthy(ctx, true); err1 != nil {
 		return false, err1
 	} else if !healthy {
 		return false, ccip.ErrChainIsNotHealthy

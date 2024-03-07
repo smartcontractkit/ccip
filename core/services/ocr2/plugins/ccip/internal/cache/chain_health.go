@@ -31,10 +31,9 @@ import (
 //go:generate mockery --quiet --name ChainHealthcheck --filename chain_health_mock.go --case=underscore
 type ChainHealthcheck interface {
 	// IsHealthy checks if the chain is healthy and returns true if it is, false otherwise
-	IsHealthy(ctx context.Context) (bool, error)
-	// ForceIsHealthy forces the chain health check to refresh the RMN curse state and
-	// returns true if the chain is healthy, false otherwise. Should be used in the Observation and ShouldTransmit phases of OCR2.
-	ForceIsHealthy(ctx context.Context) (bool, error)
+	// If forceRefresh is set to true, it will refresh the RMN curse state. Should be used in the Observation and ShouldTransmit phases of OCR2.
+	// Otherwise, it will use the cached value of the RMN curse state.
+	IsHealthy(ctx context.Context, forceRefresh bool) (bool, error)
 }
 
 const (
@@ -96,15 +95,7 @@ func newChainHealthcheckWithCustomEviction(
 	}
 }
 
-func (c *chainHealthcheck) IsHealthy(ctx context.Context) (bool, error) {
-	return c.isHealthy(ctx, false)
-}
-
-func (c *chainHealthcheck) ForceIsHealthy(ctx context.Context) (bool, error) {
-	return c.isHealthy(ctx, true)
-}
-
-func (c *chainHealthcheck) isHealthy(ctx context.Context, forceRmnRefresh bool) (bool, error) {
+func (c *chainHealthcheck) IsHealthy(ctx context.Context, forceRefresh bool) (bool, error) {
 	// Verify if flag is raised to indicate that the chain is not healthy
 	// If set to false then immediately return false without checking the chain
 	if healthy, found := c.cache.Get(c.globalStatusKey); found && !healthy.(bool) {
@@ -118,7 +109,7 @@ func (c *chainHealthcheck) isHealthy(ctx context.Context, forceRmnRefresh bool) 
 		return healthy, nil
 	}
 
-	if healthy, err := c.checkIfRMNsAreHealthy(ctx, forceRmnRefresh); err != nil {
+	if healthy, err := c.checkIfRMNsAreHealthy(ctx, forceRefresh); err != nil {
 		return false, err
 	} else if !healthy {
 		c.cache.Set(c.globalStatusKey, false, c.globalStatusExpiration)
