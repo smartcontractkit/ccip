@@ -11,4 +11,4 @@ const (
 	ExecPluginLabel      = "exec"
 )
 
-var ErrChainIsNotHealthy = errors.New("chain is not healthy")
+var ErrChainIsNotHealthy = errors.New("lane processing is stopped because of healthcheck failure, please see crit logs")

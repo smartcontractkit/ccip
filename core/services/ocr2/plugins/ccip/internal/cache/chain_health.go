@@ -143,7 +143,7 @@ func (c *chainHealthcheck) checkIfReadersAreHealthy(ctx context.Context) (bool, 
 
 	if !sourceChainHealthy || !destChainHealthy {
 		c.lggr.Criticalw(
-			"Source or destination chain is unhealthy",
+			"Lane processing is stopped because source or destination chain is reported unhealthy",
 			"sourceChainHealthy", sourceChainHealthy,
 			"destChainHealthy", destChainHealthy,
 		)
@@ -169,14 +169,14 @@ func (c *chainHealthcheck) checkIfRMNsAreHealthy(ctx context.Context, forceFetch
 
 func (c *chainHealthcheck) fetchRMNCurseState(ctx context.Context) (bool, error) {
 	var (
-		eg             = new(errgroup.Group)
-		isDestDown     bool
-		isSourceCursed bool
+		eg                = new(errgroup.Group)
+		isCommitStoreDown bool
+		isSourceCursed    bool
 	)
 
 	eg.Go(func() error {
 		var err error
-		isDestDown, err = c.commitStore.IsDown(ctx)
+		isCommitStoreDown, err = c.commitStore.IsDown(ctx)
 		if err != nil {
 			return errors.Wrap(err, "commitStore isDown check errored")
 		}
@@ -196,10 +196,10 @@ func (c *chainHealthcheck) fetchRMNCurseState(ctx context.Context) (bool, error)
 		return false, err
 	}
 
-	if isDestDown || isSourceCursed {
+	if isCommitStoreDown || isSourceCursed {
 		c.lggr.Criticalw(
-			"Source chain is cursed or CommitStore is down",
-			"isDestDown", isDestDown,
+			"Lane processing is stopped because source chain is cursed or CommitStore is down",
+			"isCommitStoreDown", isCommitStoreDown,
 			"isSourceCursed", isSourceCursed,
 		)
 		return false, nil
