@@ -492,7 +492,7 @@ func TestCommitReportingPlugin_ShouldAcceptFinalizedReport(t *testing.T) {
 		assert.NoError(t, err)
 
 		chainHealthCheck := ccipcachemocks.NewChainHealthcheck(t)
-		chainHealthCheck.On("IsHealthy", ctx).Return(nil)
+		chainHealthCheck.On("IsHealthy", ctx).Return(true, nil)
 		p.chainHealthcheck = chainHealthCheck
 
 		shouldAccept, err := p.ShouldAcceptFinalizedReport(ctx, types.ReportTimestamp{}, encodedReport)
@@ -531,7 +531,7 @@ func TestCommitReportingPlugin_ShouldTransmitAcceptedReport(t *testing.T) {
 	p.lggr = logger.TestLogger(t)
 
 	chainHealthCheck := ccipcachemocks.NewChainHealthcheck(t)
-	chainHealthCheck.On("ForceIsHealthy", ctx).Return(nil)
+	chainHealthCheck.On("ForceIsHealthy", ctx).Return(true, nil).Maybe()
 	p.chainHealthcheck = chainHealthCheck
 
 	t.Run("should transmit when report is not stale", func(t *testing.T) {

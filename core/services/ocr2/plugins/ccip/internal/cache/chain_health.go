@@ -96,32 +96,32 @@ func newChainHealthcheckWithCustomEviction(
 	}
 }
 
-func (a chainHealthcheck) IsHealthy(ctx context.Context) (bool, error) {
-	return a.isHealthy(ctx, false)
+func (c *chainHealthcheck) IsHealthy(ctx context.Context) (bool, error) {
+	return c.isHealthy(ctx, false)
 }
 
-func (a chainHealthcheck) ForceIsHealthy(ctx context.Context) (bool, error) {
-	return a.isHealthy(ctx, true)
+func (c *chainHealthcheck) ForceIsHealthy(ctx context.Context) (bool, error) {
+	return c.isHealthy(ctx, true)
 }
 
-func (a chainHealthcheck) isHealthy(ctx context.Context, forceRmnRefresh bool) (bool, error) {
+func (c *chainHealthcheck) isHealthy(ctx context.Context, forceRmnRefresh bool) (bool, error) {
 	// Verify if flag is raised to indicate that the chain is not healthy
 	// If set to false then immediately return false without checking the chain
-	if healthy, found := a.cache.Get(a.globalStatusKey); found && !healthy.(bool) {
+	if healthy, found := c.cache.Get(c.globalStatusKey); found && !healthy.(bool) {
 		return false, nil
 	}
 
-	if healthy, err := a.checkIfReadersAreHealthy(ctx); err != nil {
+	if healthy, err := c.checkIfReadersAreHealthy(ctx); err != nil {
 		return false, err
 	} else if !healthy {
-		a.cache.Set(a.globalStatusKey, false, a.globalStatusExpiration)
+		c.cache.Set(c.globalStatusKey, false, c.globalStatusExpiration)
 		return healthy, nil
 	}
 
-	if healthy, err := a.checkIfRMNsAreHealthy(ctx, forceRmnRefresh); err != nil {
+	if healthy, err := c.checkIfRMNsAreHealthy(ctx, forceRmnRefresh); err != nil {
 		return false, err
 	} else if !healthy {
-		a.cache.Set(a.globalStatusKey, false, a.globalStatusExpiration)
+		c.cache.Set(c.globalStatusKey, false, c.globalStatusExpiration)
 		return healthy, nil
 	}
 	return true, nil
@@ -130,49 +130,53 @@ func (a chainHealthcheck) isHealthy(ctx context.Context, forceRmnRefresh bool) (
 // checkIfReadersAreHealthy checks if the source and destination chains are healthy by calling underlying LogPoller
 // These calls are very cheap, because doesn't require any communication with database or RPC, so we don't have
 // to cache the result of these calls.
-func (a chainHealthcheck) checkIfReadersAreHealthy(ctx context.Context) (bool, error) {
-	sourceChainHealthy, err := a.onRamp.IsSourceChainHealthy(ctx)
+func (c *chainHealthcheck) checkIfReadersAreHealthy(ctx context.Context) (bool, error) {
+	sourceChainHealthy, err := c.onRamp.IsSourceChainHealthy(ctx)
 	if err != nil {
 		return false, errors.Wrap(err, "onRamp IsSourceChainHealthy errored")
 	}
 
-	destChainHealthy, err := a.commitStore.IsDestChainHealthy(ctx)
+	destChainHealthy, err := c.commitStore.IsDestChainHealthy(ctx)
 	if err != nil {
 		return false, errors.Wrap(err, "commitStore IsDestChainHealthy errored")
 	}
 
 	if !sourceChainHealthy || !destChainHealthy {
-		a.lggr.Errorf("Source or destination chain is unhealthy", "sourceChainHealthy", sourceChainHealthy, "destChainHealthy", destChainHealthy)
+		c.lggr.Criticalw(
+			"Source or destination chain is unhealthy",
+			"sourceChainHealthy", sourceChainHealthy,
+			"destChainHealthy", destChainHealthy,
+		)
 	}
 	return sourceChainHealthy && destChainHealthy, nil
 }
 
-func (a chainHealthcheck) checkIfRMNsAreHealthy(ctx context.Context, forceFetch bool) (bool, error) {
+func (c *chainHealthcheck) checkIfRMNsAreHealthy(ctx context.Context, forceFetch bool) (bool, error) {
 	if !forceFetch {
-		if healthy, found := a.cache.Get(a.rmnStatusKey); found {
+		if healthy, found := c.cache.Get(c.rmnStatusKey); found {
 			return healthy.(bool), nil
 		}
 	}
 
-	healthy, err := a.fetchRMNCurseState(ctx)
+	healthy, err := c.fetchRMNCurseState(ctx)
 	if err != nil {
 		return false, err
 	}
 
-	a.cache.Set(a.rmnStatusKey, healthy, a.rmnStatusExpiration)
+	c.cache.Set(c.rmnStatusKey, healthy, c.rmnStatusExpiration)
 	return healthy, nil
 }
 
-func (a chainHealthcheck) fetchRMNCurseState(ctx context.Context) (bool, error) {
+func (c *chainHealthcheck) fetchRMNCurseState(ctx context.Context) (bool, error) {
 	var (
-		eg       = new(errgroup.Group)
-		isDown   bool
-		isCursed bool
+		eg             = new(errgroup.Group)
+		isDestDown     bool
+		isSourceCursed bool
 	)
 
 	eg.Go(func() error {
 		var err error
-		isDown, err = a.commitStore.IsDown(ctx)
+		isDestDown, err = c.commitStore.IsDown(ctx)
 		if err != nil {
 			return errors.Wrap(err, "commitStore isDown check errored")
 		}
@@ -181,7 +185,7 @@ func (a chainHealthcheck) fetchRMNCurseState(ctx context.Context) (bool, error) 
 
 	eg.Go(func() error {
 		var err error
-		isCursed, err = a.onRamp.IsSourceCursed(ctx)
+		isSourceCursed, err = c.onRamp.IsSourceCursed(ctx)
 		if err != nil {
 			return errors.Wrap(err, "onRamp isSourceCursed errored")
 		}
@@ -192,8 +196,12 @@ func (a chainHealthcheck) fetchRMNCurseState(ctx context.Context) (bool, error) 
 		return false, err
 	}
 
-	if isDown || isCursed {
-		a.lggr.Errorw("Source chain is cursed or CommitStore is down", "isDown", isDown, "isCursed", isCursed)
+	if isDestDown || isSourceCursed {
+		c.lggr.Criticalw(
+			"Source chain is cursed or CommitStore is down",
+			"isDestDown", isDestDown,
+			"isSourceCursed", isSourceCursed,
+		)
 		return false, nil
 	}
 	return true, nil
