@@ -205,7 +205,7 @@ func (r *CommitReportingPlugin) observePriceUpdates(
 	lggr logger.Logger,
 ) (sourceGasPriceUSD *big.Int, tokenPricesUSD map[cciptypes.Address]*big.Int, err error) {
 	if r.offchainConfig.PriceReportingDisabled {
-		return nil, map[cciptypes.Address]*big.Int{}, nil
+		return nil, nil, nil
 	}
 
 	feeTokens, bridgeableTokens, err := ccipcommon.GetDestinationTokens(ctx, r.offRampReader, r.destPriceRegistryReader)
@@ -540,7 +540,7 @@ func calculateIntervalConsensus(intervals []cciptypes.CommitStoreInterval, f int
 // selectPriceUpdates filters out gas and token price updates that are already inflight
 func (r *CommitReportingPlugin) selectPriceUpdates(ctx context.Context, now time.Time, observations []ccip.CommitObservation) ([]cciptypes.TokenPrice, []cciptypes.GasPrice, error) {
 	if r.offchainConfig.PriceReportingDisabled {
-		return []cciptypes.TokenPrice{}, []cciptypes.GasPrice{}, nil
+		return nil, nil, nil
 	}
 
 	latestGasPrice, err := r.getLatestGasPriceUpdate(ctx, now, true)

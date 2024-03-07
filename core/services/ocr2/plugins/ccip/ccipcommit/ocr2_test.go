@@ -108,7 +108,7 @@ func TestCommitReportingPlugin_Observation(t *testing.T) {
 			},
 			priceReportingDisabled: true,
 			expObs: ccip.CommitObservation{
-				TokenPricesUSD:    map[cciptypes.Address]*big.Int{},
+				TokenPricesUSD:    nil,
 				SourceGasPriceUSD: nil,
 				Interval: cciptypes.CommitStoreInterval{
 					Min: 54,
@@ -238,16 +238,17 @@ func TestCommitReportingPlugin_Report(t *testing.T) {
 	})
 
 	testCases := []struct {
-		name              string
-		observations      []ccip.CommitObservation
-		f                 int
-		gasPriceUpdates   []cciptypes.GasPriceUpdateWithTxMeta
-		tokenDecimals     map[cciptypes.Address]uint8
-		tokenPriceUpdates []cciptypes.TokenPriceUpdateWithTxMeta
-		sendRequests      []cciptypes.EVM2EVMMessageWithTxMeta
-		expCommitReport   *cciptypes.CommitStoreReport
-		expSeqNumRange    cciptypes.CommitStoreInterval
-		expErr            bool
+		name                   string
+		observations           []ccip.CommitObservation
+		f                      int
+		gasPriceUpdates        []cciptypes.GasPriceUpdateWithTxMeta
+		tokenDecimals          map[cciptypes.Address]uint8
+		tokenPriceUpdates      []cciptypes.TokenPriceUpdateWithTxMeta
+		sendRequests           []cciptypes.EVM2EVMMessageWithTxMeta
+		priceReportingDisabled bool
+		expCommitReport        *cciptypes.CommitStoreReport
+		expSeqNumRange         cciptypes.CommitStoreInterval
+		expErr                 bool
 	}{
 		{
 			name: "base",
@@ -314,13 +315,51 @@ func TestCommitReportingPlugin_Report(t *testing.T) {
 			expSeqNumRange: cciptypes.CommitStoreInterval{Min: 2, Max: 2},
 			expErr:         true,
 		},
+		{
+			name: "price reporting disabled base case",
+			observations: []ccip.CommitObservation{
+				{Interval: cciptypes.CommitStoreInterval{Min: 1, Max: 1}, SourceGasPriceUSD: nil},
+				{Interval: cciptypes.CommitStoreInterval{Min: 1, Max: 1}, SourceGasPriceUSD: nil},
+			},
+			f: 1,
+			sendRequests: []cciptypes.EVM2EVMMessageWithTxMeta{
+				{
+					EVM2EVMMessage: cciptypes.EVM2EVMMessage{
+						SequenceNumber: 1,
+					},
+				},
+			},
+			priceReportingDisabled: true,
+			expSeqNumRange:         cciptypes.CommitStoreInterval{Min: 1, Max: 1},
+			expCommitReport: &cciptypes.CommitStoreReport{
+				MerkleRoot:  [32]byte{},
+				Interval:    cciptypes.CommitStoreInterval{Min: 1, Max: 1},
+				TokenPrices: nil,
+				GasPrices:   nil,
+			},
+			expErr: false,
+		},
+		{
+			name: "price reporting disabled with invalid observation",
+			observations: []ccip.CommitObservation{
+				{Interval: cciptypes.CommitStoreInterval{Min: 1, Max: 1}, SourceGasPriceUSD: big.NewInt(0)},
+				{Interval: cciptypes.CommitStoreInterval{Min: 1, Max: 1}, SourceGasPriceUSD: nil},
+			},
+			f:                      1,
+			sendRequests:           []cciptypes.EVM2EVMMessageWithTxMeta{},
+			priceReportingDisabled: true,
+			expSeqNumRange:         cciptypes.CommitStoreInterval{Min: 1, Max: 1},
+			expErr:                 true,
+		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			destPriceRegistryReader := ccipdatamocks.NewPriceRegistryReader(t)
-			destPriceRegistryReader.On("GetGasPriceUpdatesCreatedAfter", ctx, sourceChainSelector, mock.Anything, 0).Return(tc.gasPriceUpdates, nil)
-			destPriceRegistryReader.On("GetTokenPriceUpdatesCreatedAfter", ctx, mock.Anything, 0).Return(tc.tokenPriceUpdates, nil)
+			if !tc.priceReportingDisabled {
+				destPriceRegistryReader.On("GetGasPriceUpdatesCreatedAfter", ctx, sourceChainSelector, mock.Anything, 0).Return(tc.gasPriceUpdates, nil)
+				destPriceRegistryReader.On("GetTokenPriceUpdatesCreatedAfter", ctx, mock.Anything, 0).Return(tc.tokenPriceUpdates, nil)
+			}
 
 			onRampReader := ccipdatamocks.NewOnRampReader(t)
 			if len(tc.sendRequests) > 0 {
@@ -328,7 +367,9 @@ func TestCommitReportingPlugin_Report(t *testing.T) {
 			}
 
 			gasPriceEstimator := prices.NewMockGasPriceEstimatorCommit(t)
-			gasPriceEstimator.On("Median", mock.Anything).Return(gasPrice, nil)
+			if !tc.priceReportingDisabled {
+				gasPriceEstimator.On("Median", mock.Anything).Return(gasPrice, nil)
+			}
 			if tc.gasPriceUpdates != nil {
 				gasPriceEstimator.On("Deviates", mock.Anything, mock.Anything, mock.Anything).Return(false, nil)
 			}
@@ -364,6 +405,7 @@ func TestCommitReportingPlugin_Report(t *testing.T) {
 			p.commitStoreReader = commitStoreReader
 			p.F = tc.f
 			p.metricsCollector = ccip.NoopMetricsCollector
+			p.offchainConfig.PriceReportingDisabled = tc.priceReportingDisabled
 
 			aos := make([]types.AttributedObservation, 0, len(tc.observations))
 			for _, o := range tc.observations {
