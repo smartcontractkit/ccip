@@ -1,6 +1,8 @@
-package opstack
+package rlphelpers
 
 import (
+	"bytes"
+
 	"github.com/ethereum/go-ethereum/rlp"
 )
 
@@ -50,15 +52,32 @@ func (r *RawRLPOutput) DecodeRLP(s *rlp.Stream) error {
 			return err2
 		}
 	case rlp.Byte:
-		fallthrough
+		b, err2 := s.Raw()
+		if err2 != nil {
+			return err2
+		}
+		// Don't trim here since it's a single byte.
+		r.Data = b
 	case rlp.String:
-		b, err3 := s.Raw()
-		if err3 != nil {
-			return err3
+		b, err2 := s.Raw()
+		if err2 != nil {
+			return err2
 		}
 		// trim the first byte, which is the "type" byte.
 		// this is what the rlp npm package does.
 		r.Data = b[1:]
 	}
 	return nil
+}
+
+func (r *RawRLPOutput) Equal(o *RawRLPOutput) bool {
+	if !bytes.Equal(r.Data, o.Data) || len(r.Children) != len(o.Children) {
+		return false
+	}
+	for i := range r.Children {
+		if !r.Children[i].Equal(o.Children[i]) {
+			return false
+		}
+	}
+	return true
 }

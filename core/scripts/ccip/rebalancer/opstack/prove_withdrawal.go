@@ -23,6 +23,7 @@ import (
 	optimism_l2_to_l1_message_passer "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/optimism_l2_to_l1_message_passer"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/optimism_portal"
 	optimism_portal_2 "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/optimism_portal_2"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/bridge/opstack/merkleutils"
 )
 
 var (
@@ -192,7 +193,7 @@ func getBedrockMessageProof(
 			MessagePasserStorageRoot: stateTrieProof.StorageRoot,
 			LatestBlockHash:          header.Hash(),
 		},
-		WithdrawalProof: toProofBytes(stateTrieProof.StorageProof),
+		WithdrawalProof: stateTrieProof.StorageProof,
 		L2OutputIndex:   messageBedrockOutput.L2OutputIndex,
 	}
 }
@@ -223,7 +224,7 @@ type getProofResponse struct {
 
 type stateTrieProof struct {
 	AccountProof []hexutil.Bytes
-	StorageProof []hexutil.Bytes
+	StorageProof [][]byte
 	StorageValue *big.Int
 	StorageRoot  [32]byte
 }
@@ -241,50 +242,17 @@ func makeStateTrieProof(
 		address, []string{hexutil.Encode(slot[:])}, hexutil.EncodeBig(l2BlockNumber))
 	helpers.PanicErr(err)
 
-	// resp.StorageProof[0].Proof = maybeAddProofNode(
-	// 	crypto.Keccak256Hash(slot[:]), resp.StorageProof[0].Proof)
+	updatedProof, err := merkleutils.MaybeAddProofNode(
+		crypto.Keccak256Hash(slot[:]), toProofBytes(resp.StorageProof[0].Proof))
+	helpers.PanicErr(err)
 
 	return stateTrieProof{
 		AccountProof: resp.AccountProof,
-		StorageProof: resp.StorageProof[0].Proof,
+		StorageProof: updatedProof,
 		StorageValue: resp.StorageProof[0].Value.ToInt(),
 		StorageRoot:  resp.StorageHash,
 	}
 }
-
-// func maybeAddProofNode(
-// 	key [32]byte,
-// 	proof []hexutil.Bytes,
-// ) []hexutil.Bytes {
-// 	keyHex := hexutil.Encode(key[:])
-// 	modifiedProof := make([]hexutil.Bytes, len(proof))
-// 	copy(modifiedProof, proof)
-// 	finalProofEl := modifiedProof[len(modifiedProof)-1]
-// 	rlpBuffers := NewRLPBuffers()
-// 	err := rlp.DecodeBytes(finalProofEl, rlpBuffers)
-// 	helpers.PanicErr(err)
-// 	if len(rlpBuffers.Buffers) == 17 {
-// 		for _, item := range rlpBuffers.Buffers {
-// 			// Find any nodes located inside of the branch node.
-// 			if len(item) > 0 {
-// 				// Check if the key inside the node matches the key we're looking for. We remove the first
-// 				// two characters (0x) and then we remove one more character (the first nibble) since this
-// 				// is the identifier for the type of node we're looking at. In this case we don't actually
-// 				// care what type of node it is because a branch node would only ever be the final proof
-// 				// element if (1) it includes the leaf node we're looking for or (2) it stores the value
-// 				// within itself. If (1) then this logic will work, if (2) then this won't find anything
-// 				// and we won't append any proof elements, which is exactly what we would want.
-// 				itemSuffix := hexutil.Encode(item)[3:]
-// 				if strings.HasSuffix(keyHex, itemSuffix) {
-// 					encoded, err := rlp.EncodeToBytes(item)
-// 					helpers.PanicErr(err)
-// 					modifiedProof = append(modifiedProof, encoded)
-// 				}
-// 			}
-// 		}
-// 	}
-// 	return modifiedProof
-// }
 
 func hashMessageHash(h [32]byte) [32]byte {
 	var zeroHash [32]byte
