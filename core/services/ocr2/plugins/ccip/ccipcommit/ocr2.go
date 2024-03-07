@@ -362,7 +362,7 @@ func (r *CommitReportingPlugin) Report(ctx context.Context, epochAndRound types.
 	if healthy, err := r.chainHealthcheck.IsHealthy(ctx); err != nil {
 		return false, nil, err
 	} else if !healthy {
-		return false, nil, nil
+		return false, nil, ccip.ErrChainIsNotHealthy
 	}
 
 	parsableObservations := ccip.GetParsableObservations[ccip.CommitObservation](lggr, observations)
@@ -677,7 +677,7 @@ func (r *CommitReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Context,
 	if healthy, err1 := r.chainHealthcheck.IsHealthy(ctx); err1 != nil {
 		return false, err1
 	} else if !healthy {
-		return false, nil
+		return false, ccip.ErrChainIsNotHealthy
 	}
 
 	if r.isStaleReport(ctx, lggr, parsedReport, true, reportTimestamp) {
@@ -704,7 +704,7 @@ func (r *CommitReportingPlugin) ShouldTransmitAcceptedReport(ctx context.Context
 	if healthy, err1 := r.chainHealthcheck.ForceIsHealthy(ctx); err1 != nil {
 		return false, err1
 	} else if !healthy {
-		return false, nil
+		return false, ccip.ErrChainIsNotHealthy
 	}
 	// If report is not stale we transmit.
 	// When the commitTransmitter enqueues the tx for tx manager,

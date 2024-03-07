@@ -767,7 +767,7 @@ func (r *ExecutionReportingPlugin) Report(ctx context.Context, timestamp types.R
 	if healthy, err := r.chainHealthcheck.IsHealthy(ctx); err != nil {
 		return false, nil, err
 	} else if !healthy {
-		return false, nil, nil
+		return false, nil, ccip.ErrChainIsNotHealthy
 	}
 	parsableObservations := ccip.GetParsableObservations[ccip.ExecutionObservation](lggr, observations)
 	// Need at least F+1 observations
@@ -864,7 +864,7 @@ func (r *ExecutionReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Conte
 	if healthy, err1 := r.chainHealthcheck.IsHealthy(ctx); err1 != nil {
 		return false, err1
 	} else if !healthy {
-		return false, nil
+		return false, ccip.ErrChainIsNotHealthy
 	}
 	// If the first message is executed already, this execution report is stale, and we do not accept it.
 	stale, err := r.isStaleReport(ctx, execReport.Messages)
@@ -895,7 +895,7 @@ func (r *ExecutionReportingPlugin) ShouldTransmitAcceptedReport(ctx context.Cont
 	if healthy, err1 := r.chainHealthcheck.ForceIsHealthy(ctx); err1 != nil {
 		return false, err1
 	} else if !healthy {
-		return false, nil
+		return false, ccip.ErrChainIsNotHealthy
 	}
 	// If report is not stale we transmit.
 	// When the executeTransmitter enqueues the tx for tx manager,
