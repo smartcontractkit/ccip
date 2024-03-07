@@ -35,7 +35,6 @@ import (
 //go:generate mockery --quiet --name LogPoller --output ./mocks/ --case=underscore --structname LogPoller --filename log_poller.go
 type LogPoller interface {
 	services.Service
-	IsHealthy() bool
 	Replay(ctx context.Context, fromBlock int64) error
 	ReplayAsync(fromBlock int64)
 	RegisterFilter(filter Filter, qopts ...pg.QOpt) error
@@ -71,6 +70,8 @@ const (
 	Finalized   = Confirmations(-1)
 	Unconfirmed = Confirmations(0)
 )
+
+var ErrFinalityViolated = errors.New("finality violated")
 
 type LogPollerTest interface {
 	LogPoller
@@ -209,8 +210,11 @@ func (filter *Filter) Contains(other *Filter) bool {
 	return true
 }
 
-func (lp *logPoller) IsHealthy() bool {
-	return !lp.finalityViolated.Load()
+func (lp *logPoller) Ready() error {
+	if lp.finalityViolated.Load() {
+		return ErrFinalityViolated
+	}
+	return nil
 }
 
 // RegisterFilter adds the provided EventSigs and Addresses to the log poller's log filter query.

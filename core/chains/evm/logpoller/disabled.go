@@ -17,8 +17,6 @@ var (
 
 type disabled struct{}
 
-func (disabled) IsHealthy() bool { return false }
-
 func (disabled) Name() string { return "disabledLogPoller" }
 
 func (disabled) Start(ctx context.Context) error { return ErrDisabled }
