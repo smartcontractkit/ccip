@@ -3,6 +3,7 @@ package ccip
 import (
 	"encoding/json"
 	"math/big"
+	"strings"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -62,42 +63,58 @@ func TestObservationCompat100_120(t *testing.T) {
 	assert.Equal(t, b10, b12)
 }
 
-func TestCommitObservationJsonDeserialization(t *testing.T) {
+func TestCommitObservationJsonSerializationDeserialization(t *testing.T) {
+	jsonEncoded := `{
+		"interval": {
+			"Min":1,
+			"Max":12
+		},
+		"tokensPerFeeCoin": {
+			"0x0000000000000000000000000000000000000001": 1,
+			"0x507877C2E26f1387432D067D2DaAfa7d0420d90a": 2,
+			"0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": 3
+		},
+		"sourceGasPrice": 3
+	}`
+
 	expectedObservation := CommitObservation{
 		Interval: cciptypes.CommitStoreInterval{
 			Min: 1,
 			Max: 12,
 		},
 		TokenPricesUSD: map[cciptypes.Address]*big.Int{
-			ccipcalc.HexToAddress("0x1"): big.NewInt(1)},
+			cciptypes.Address("0x0000000000000000000000000000000000000001"): big.NewInt(1),
+			cciptypes.Address("0x507877C2E26f1387432D067D2DaAfa7d0420d90a"): big.NewInt(2), // json eip55->eip55 parsed
+			cciptypes.Address("0xaAaAaAaaAaAaAaaAaAAAAAAAAaaaAaAaAaaAaaAa"): big.NewInt(3), // json lower->eip55 parsed
+		},
 		SourceGasPriceUSD: big.NewInt(3),
 	}
 
-	json := `{
-		"interval": {
-			"Min":1,
-			"Max":12
-		},
-		"tokensPerFeeCoin": {
-			"0x0000000000000000000000000000000000000001": 1
-		},
-		"sourceGasPrice": 3
-	}`
+	observations := GetParsableObservations[CommitObservation](logger.TestLogger(t), []types.AttributedObservation{
+		{Observation: []byte(jsonEncoded)},
+	})
+	assert.Equal(t, 1, len(observations))
+	assert.Equal(t, expectedObservation, observations[0])
 
-	observations := GetParsableObservations[CommitObservation](logger.TestLogger(t), []types.AttributedObservation{{Observation: []byte(json)}})
+	backToJson, err := expectedObservation.Marshal()
+	// we expect the json encoded addresses to be lower-case
+	exp := strings.ReplaceAll(
+		jsonEncoded, "0x507877C2E26f1387432D067D2DaAfa7d0420d90a", strings.ToLower("0x507877C2E26f1387432D067D2DaAfa7d0420d90a"))
+	assert.NoError(t, err)
+	assert.JSONEq(t, exp, string(backToJson))
+
+	// and we expect to get the same results after we parse the lower-case addresses
+	observations = GetParsableObservations[CommitObservation](logger.TestLogger(t), []types.AttributedObservation{
+		{Observation: []byte(jsonEncoded)},
+	})
 	assert.Equal(t, 1, len(observations))
 	assert.Equal(t, expectedObservation, observations[0])
 }
 
 func TestExecutionObservationJsonDeserialization(t *testing.T) {
-	expectedObservation := ExecutionObservation{Messages: map[uint64]MsgData{
-		2: {TokenData: tokenData("c")},
-		1: {TokenData: tokenData("c")},
-	}}
-
 	// ["YQ=="] is "a"
 	// ["Yw=="] is "c"
-	json := `{
+	jsonEncoded := `{
 		"messages": {
 			"2":{"tokenData":["YQ=="]},
 			"1":{"tokenData":["Yw=="]},
@@ -105,7 +122,15 @@ func TestExecutionObservationJsonDeserialization(t *testing.T) {
 		}
 	}`
 
-	observations := GetParsableObservations[ExecutionObservation](logger.TestLogger(t), []types.AttributedObservation{{Observation: []byte(json)}})
+	expectedObservation := ExecutionObservation{
+		Messages: map[uint64]MsgData{
+			2: {TokenData: tokenData("c")},
+			1: {TokenData: tokenData("c")},
+		},
+	}
+
+	observations := GetParsableObservations[ExecutionObservation](
+		logger.TestLogger(t), []types.AttributedObservation{{Observation: []byte(jsonEncoded)}})
 	assert.Equal(t, 1, len(observations))
 	assert.Equal(t, 2, len(observations[0].Messages))
 	assert.Equal(t, expectedObservation, observations[0])

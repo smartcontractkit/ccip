@@ -5,6 +5,7 @@ import (
 
 	gojson "github.com/goccy/go-json"
 	"github.com/smartcontractkit/libocr/commontypes"
+
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
