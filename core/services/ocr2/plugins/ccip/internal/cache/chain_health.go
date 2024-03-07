@@ -12,13 +12,33 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 )
 
+// ChainHealthcheck checks the health of the both source and destination chain.
+// Based on the values returned, CCIP can make a decision to stop or continue processing messages.
+// There are four things verified here:
+// 1. Source chain is healthy (this is verified by checking if source LogPoller saw finality violation)
+// 2. Dest chain is healthy (this is verified by checking if destination LogPoller saw finality violation)
+// 3. CommitStore is down (this is verified by checking if CommitStore is down and destination RMN is not cursed)
+// 4. Source chain is cursed (this is verified by checking if source RMN is not cursed)
+//
+// Whenever any of the above checks fail, the chain is considered unhealthy and the CCIP should stop
+// processing messages. Additionally, when the chain is unhealthy, this information is considered "sticky"
+// and is cached for a certain period of time based on defaultGlobalStatusDuration.
+// This may lead to some false-positives, but in this case we want to be extra cautious and avoid executing any reorged messages.
+//
+// Additionally, to reduce the number of calls to the RPC, we cache RMN curse state for a certain period of
+// time based on defaultRmnStatusDuration.
+//
 //go:generate mockery --quiet --name ChainHealthcheck --filename chain_health_mock.go --case=underscore
 type ChainHealthcheck interface {
+	// IsHealthy checks if the chain is healthy and returns true if it is, false otherwise
 	IsHealthy(ctx context.Context) (bool, error)
+	// ForceIsHealthy forces the chain health check to refresh the RMN curse state and
+	// returns true if the chain is healthy, false otherwise. Should be used in Observation and ShouldTransmit phaes of OCR2
 	ForceIsHealthy(ctx context.Context) (bool, error)
 }
 
 const (
+	// RMN curse state is refreshed every 20 seconds or when ForceIsHealthy is called
 	defaultRmnStatusDuration    = 20 * time.Second
 	defaultGlobalStatusDuration = 30 * time.Minute
 
