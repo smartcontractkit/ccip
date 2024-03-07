@@ -34,6 +34,8 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/cciptypes"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache"
+	ccipcachemocks "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcommon"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/factory"
@@ -51,14 +53,15 @@ func TestCommitReportingPlugin_Observation(t *testing.T) {
 	someTokenAddr := ccipcalc.HexToAddress("2000")
 
 	testCases := []struct {
-		name                string
-		epochAndRound       types.ReportTimestamp
-		commitStoreIsPaused bool
-		commitStoreSeqNum   uint64
-		tokenPrices         map[cciptypes.Address]*big.Int
-		sendReqs            []cciptypes.EVM2EVMMessageWithTxMeta
-		tokenDecimals       map[cciptypes.Address]uint8
-		fee                 *big.Int
+		name              string
+		epochAndRound     types.ReportTimestamp
+		commitStorePaused bool
+		sourceChainCursed bool
+		commitStoreSeqNum uint64
+		tokenPrices       map[cciptypes.Address]*big.Int
+		sendReqs          []cciptypes.EVM2EVMMessageWithTxMeta
+		tokenDecimals     map[cciptypes.Address]uint8
+		fee               *big.Int
 
 		expErr bool
 		expObs ccip.CommitObservation
@@ -90,9 +93,16 @@ func TestCommitReportingPlugin_Observation(t *testing.T) {
 			},
 		},
 		{
-			name:                "commit store is down",
-			commitStoreIsPaused: true,
-			expErr:              true,
+			name:              "commit store is down",
+			commitStorePaused: true,
+			sourceChainCursed: false,
+			expErr:            true,
+		},
+		{
+			name:              "source chain is cursed",
+			commitStorePaused: false,
+			sourceChainCursed: true,
+			expErr:            true,
 		},
 	}
 
@@ -100,12 +110,15 @@ func TestCommitReportingPlugin_Observation(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			commitStoreReader := ccipdatamocks.NewCommitStoreReader(t)
-			commitStoreReader.On("IsDown", ctx).Return(tc.commitStoreIsPaused, nil)
-			if !tc.commitStoreIsPaused {
+			commitStoreReader.On("IsDown", ctx).Return(tc.commitStorePaused, nil)
+			commitStoreReader.On("IsDestChainHealthy", ctx).Return(true, nil)
+			if !tc.commitStorePaused && !tc.sourceChainCursed {
 				commitStoreReader.On("GetExpectedNextSequenceNumber", ctx).Return(tc.commitStoreSeqNum, nil)
 			}
 
 			onRampReader := ccipdatamocks.NewOnRampReader(t)
+			onRampReader.On("IsSourceChainHealthy", ctx).Return(true, nil)
+			onRampReader.On("IsSourceCursed", ctx).Return(tc.sourceChainCursed, nil)
 			if len(tc.sendReqs) > 0 {
 				onRampReader.On("GetSendRequestsBetweenSeqNums", ctx, tc.commitStoreSeqNum, tc.commitStoreSeqNum+OnRampMessagesScanLimit, true).
 					Return(tc.sendReqs, nil)
@@ -155,6 +168,7 @@ func TestCommitReportingPlugin_Observation(t *testing.T) {
 			p.sourceNative = sourceNativeTokenAddr
 			p.gasPriceEstimator = gasPriceEstimator
 			p.metricsCollector = ccip.NoopMetricsCollector
+			p.chainHealthcheck = cache.NewChainHealthcheck(p.lggr, onRampReader, commitStoreReader)
 
 			obs, err := p.Observation(ctx, tc.epochAndRound, types.Query{})
 
@@ -188,6 +202,9 @@ func TestCommitReportingPlugin_Report(t *testing.T) {
 		p.destPriceRegistryReader = destPriceRegReader
 		offRampReader.On("GetTokens", ctx).Return(cciptypes.OffRampTokens{}, nil).Maybe()
 		destPriceRegReader.On("GetFeeTokens", ctx).Return(nil, nil).Maybe()
+		chainHealthcheck := ccipcachemocks.NewChainHealthcheck(t)
+		chainHealthcheck.On("IsHealthy", ctx, false).Return(true, nil).Maybe()
+		p.chainHealthcheck = chainHealthcheck
 
 		o := ccip.CommitObservation{Interval: cciptypes.CommitStoreInterval{Min: 1, Max: 1}, SourceGasPriceUSD: big.NewInt(0)}
 		obs, err := o.Marshal()
@@ -316,6 +333,9 @@ func TestCommitReportingPlugin_Report(t *testing.T) {
 			commitStoreReader, err := v1_2_0.NewCommitStore(logger.TestLogger(t), utils.RandomAddress(), nil, lp, nil)
 			assert.NoError(t, err)
 
+			healthCheck := ccipcachemocks.NewChainHealthcheck(t)
+			healthCheck.On("IsHealthy", ctx, false).Return(true, nil)
+
 			p := &CommitReportingPlugin{}
 			p.lggr = logger.TestLogger(t)
 			p.inflightReports = newInflightCommitReportsContainer(time.Minute)
@@ -328,6 +348,7 @@ func TestCommitReportingPlugin_Report(t *testing.T) {
 			p.commitStoreReader = commitStoreReader
 			p.F = tc.f
 			p.metricsCollector = ccip.NoopMetricsCollector
+			p.chainHealthcheck = healthCheck
 
 			aos := make([]types.AttributedObservation, 0, len(tc.observations))
 			for _, o := range tc.observations {
@@ -388,6 +409,10 @@ func TestCommitReportingPlugin_ShouldAcceptFinalizedReport(t *testing.T) {
 		p.commitStoreReader = commitStoreReader
 		commitStoreReader.On("DecodeCommitReport", mock.Anything).Return(report, nil)
 
+		chainHealthCheck := ccipcachemocks.NewChainHealthcheck(t)
+		chainHealthCheck.On("IsHealthy", ctx).Return(true, nil).Maybe()
+		p.chainHealthcheck = chainHealthCheck
+
 		encodedReport, err := encodeCommitReport(report)
 		assert.NoError(t, err)
 		shouldAccept, err := p.ShouldAcceptFinalizedReport(ctx, types.ReportTimestamp{}, encodedReport)
@@ -412,6 +437,10 @@ func TestCommitReportingPlugin_ShouldAcceptFinalizedReport(t *testing.T) {
 
 		commitStoreReader.On("DecodeCommitReport", mock.Anything).Return(report, nil)
 		commitStoreReader.On("GetExpectedNextSequenceNumber", mock.Anything).Return(onChainSeqNum, nil)
+
+		chainHealthCheck := ccipcachemocks.NewChainHealthcheck(t)
+		chainHealthCheck.On("IsHealthy", ctx, false).Return(true, nil)
+		p.chainHealthcheck = chainHealthCheck
 
 		// stale since report interval is behind on chain seq num
 		report.Interval = cciptypes.CommitStoreInterval{Min: onChainSeqNum - 2, Max: onChainSeqNum + 10}
@@ -462,6 +491,10 @@ func TestCommitReportingPlugin_ShouldAcceptFinalizedReport(t *testing.T) {
 		encodedReport, err := encodeCommitReport(report)
 		assert.NoError(t, err)
 
+		chainHealthCheck := ccipcachemocks.NewChainHealthcheck(t)
+		chainHealthCheck.On("IsHealthy", ctx, false).Return(true, nil)
+		p.chainHealthcheck = chainHealthCheck
+
 		shouldAccept, err := p.ShouldAcceptFinalizedReport(ctx, types.ReportTimestamp{}, encodedReport)
 		assert.NoError(t, err)
 		assert.True(t, shouldAccept)
@@ -496,6 +529,10 @@ func TestCommitReportingPlugin_ShouldTransmitAcceptedReport(t *testing.T) {
 	p.commitStoreReader = commitStoreReader
 	p.inflightReports = newInflightCommitReportsContainer(time.Minute)
 	p.lggr = logger.TestLogger(t)
+
+	chainHealthCheck := ccipcachemocks.NewChainHealthcheck(t)
+	chainHealthCheck.On("IsHealthy", ctx, true).Return(true, nil).Maybe()
+	p.chainHealthcheck = chainHealthCheck
 
 	t.Run("should transmit when report is not stale", func(t *testing.T) {
 		// not-stale since report interval is not behind on chain seq num

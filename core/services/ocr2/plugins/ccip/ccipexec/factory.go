@@ -70,25 +70,27 @@ func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.Repor
 	}
 
 	offchainConfig := rf.config.offRampReader.OffchainConfig()
-
+	lggr := rf.config.lggr.Named("ExecutionReportingPlugin")
 	return &ExecutionReportingPlugin{
-			F:                        config.F,
-			lggr:                     rf.config.lggr.Named("ExecutionReportingPlugin"),
-			offchainConfig:           offchainConfig,
-			tokenDataWorker:          rf.config.tokenDataWorker,
-			gasPriceEstimator:        rf.config.offRampReader.GasPriceEstimator(),
-			sourcePriceRegistry:      rf.config.sourcePriceRegistry,
-			sourceWrappedNativeToken: rf.config.sourceWrappedNativeToken,
-			onRampReader:             rf.config.onRampReader,
-			commitStoreReader:        rf.config.commitStoreReader,
-			destPriceRegistry:        rf.destPriceRegReader,
-			destWrappedNative:        destWrappedNative,
-			onchainConfig:            rf.config.offRampReader.OnchainConfig(),
-			offRampReader:            rf.config.offRampReader,
-			tokenPoolBatchedReader:   rf.config.tokenPoolBatchedReader,
-			inflightReports:          newInflightExecReportsContainer(offchainConfig.InflightCacheExpiry.Duration()),
-			snoozedRoots:             cache.NewSnoozedRoots(rf.config.offRampReader.OnchainConfig().PermissionLessExecutionThresholdSeconds, offchainConfig.RootSnoozeTime.Duration()),
-			metricsCollector:         rf.config.metricsCollector,
+			F:                           config.F,
+			lggr:                        lggr,
+			offchainConfig:              offchainConfig,
+			tokenDataWorker:             rf.config.tokenDataWorker,
+			gasPriceEstimator:           rf.config.offRampReader.GasPriceEstimator(),
+			sourcePriceRegistryProvider: rf.config.sourcePriceRegistryProvider,
+			sourcePriceRegistryLock:     sync.RWMutex{},
+			sourceWrappedNativeToken:    rf.config.sourceWrappedNativeToken,
+			onRampReader:                rf.config.onRampReader,
+			commitStoreReader:           rf.config.commitStoreReader,
+			destPriceRegistry:           rf.destPriceRegReader,
+			destWrappedNative:           destWrappedNative,
+			onchainConfig:               rf.config.offRampReader.OnchainConfig(),
+			offRampReader:               rf.config.offRampReader,
+			tokenPoolBatchedReader:      rf.config.tokenPoolBatchedReader,
+			inflightReports:             newInflightExecReportsContainer(offchainConfig.InflightCacheExpiry.Duration()),
+			snoozedRoots:                cache.NewSnoozedRoots(rf.config.offRampReader.OnchainConfig().PermissionLessExecutionThresholdSeconds, offchainConfig.RootSnoozeTime.Duration()),
+			metricsCollector:            rf.config.metricsCollector,
+			chainHealthcheck:            cache.NewChainHealthcheck(lggr, rf.config.onRampReader, rf.config.commitStoreReader),
 		}, types.ReportingPluginInfo{
 			Name: "CCIPExecution",
 			// Setting this to false saves on calldata since OffRamp doesn't require agreement between NOPs

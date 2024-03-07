@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/big"
 	"sort"
+	"sync"
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
@@ -49,17 +50,17 @@ var (
 )
 
 type ExecutionPluginStaticConfig struct {
-	lggr                     logger.Logger
-	onRampReader             ccipdata.OnRampReader
-	offRampReader            ccipdata.OffRampReader
-	commitStoreReader        ccipdata.CommitStoreReader
-	sourcePriceRegistry      ccipdata.PriceRegistryReader
-	sourceWrappedNativeToken cciptypes.Address
-	tokenDataWorker          tokendata.Worker
-	destChainSelector        uint64
-	priceRegistryProvider    ccipdataprovider.PriceRegistry
-	tokenPoolBatchedReader   batchreader.TokenPoolBatchedReader
-	metricsCollector         ccip.PluginMetricsCollector
+	lggr                        logger.Logger
+	onRampReader                ccipdata.OnRampReader
+	offRampReader               ccipdata.OffRampReader
+	commitStoreReader           ccipdata.CommitStoreReader
+	sourcePriceRegistryProvider ccipdataprovider.PriceRegistry
+	sourceWrappedNativeToken    cciptypes.Address
+	tokenDataWorker             tokendata.Worker
+	destChainSelector           uint64
+	priceRegistryProvider       ccipdataprovider.PriceRegistry // destination price registry provider.
+	tokenPoolBatchedReader      batchreader.TokenPoolBatchedReader
+	metricsCollector            ccip.PluginMetricsCollector
 }
 
 type ExecutionReportingPlugin struct {
@@ -70,10 +71,12 @@ type ExecutionReportingPlugin struct {
 	tokenDataWorker  tokendata.Worker
 	metricsCollector ccip.PluginMetricsCollector
 	// Source
-	gasPriceEstimator        prices.GasPriceEstimatorExec
-	sourcePriceRegistry      ccipdata.PriceRegistryReader
-	sourceWrappedNativeToken cciptypes.Address
-	onRampReader             ccipdata.OnRampReader
+	gasPriceEstimator           prices.GasPriceEstimatorExec
+	sourcePriceRegistry         ccipdata.PriceRegistryReader
+	sourcePriceRegistryProvider ccipdataprovider.PriceRegistry
+	sourcePriceRegistryLock     sync.RWMutex
+	sourceWrappedNativeToken    cciptypes.Address
+	onRampReader                ccipdata.OnRampReader
 	// Dest
 
 	commitStoreReader      ccipdata.CommitStoreReader
@@ -84,23 +87,33 @@ type ExecutionReportingPlugin struct {
 	tokenPoolBatchedReader batchreader.TokenPoolBatchedReader
 
 	// State
-	inflightReports *inflightExecReportsContainer
-	snoozedRoots    cache.SnoozedRoots
+	inflightReports  *inflightExecReportsContainer
+	snoozedRoots     cache.SnoozedRoots
+	chainHealthcheck cache.ChainHealthcheck
 }
 
-func (r *ExecutionReportingPlugin) Query(context.Context, types.ReportTimestamp) (types.Query, error) {
+func (r *ExecutionReportingPlugin) Query(ctx context.Context, _ types.ReportTimestamp) (types.Query, error) {
+	if healthy, err := r.chainHealthcheck.IsHealthy(ctx, false); err != nil {
+		return nil, err
+	} else if !healthy {
+		return nil, ccip.ErrChainIsNotHealthy
+	}
 	return types.Query{}, nil
 }
 
 func (r *ExecutionReportingPlugin) Observation(ctx context.Context, timestamp types.ReportTimestamp, query types.Query) (types.Observation, error) {
 	lggr := r.lggr.Named("ExecutionObservation")
-	down, err := r.commitStoreReader.IsDown(ctx)
-	if err != nil {
-		return nil, errors.Wrap(err, "isDown check errored")
+	if healthy, err := r.chainHealthcheck.IsHealthy(ctx, true); err != nil {
+		return nil, err
+	} else if !healthy {
+		return nil, ccip.ErrChainIsNotHealthy
 	}
-	if down {
-		return nil, ccip.ErrCommitStoreIsDown
+
+	// Ensure that the source price registry is synchronized with the onRamp.
+	if err := r.ensurePriceRegistrySynchronization(ctx); err != nil {
+		return nil, fmt.Errorf("ensuring price registry synchronization: %w", err)
 	}
+
 	// Expire any inflight reports.
 	r.inflightReports.expire(lggr)
 	inFlight := r.inflightReports.getAll()
@@ -756,6 +769,11 @@ func (r *ExecutionReportingPlugin) buildReport(ctx context.Context, lggr logger.
 
 func (r *ExecutionReportingPlugin) Report(ctx context.Context, timestamp types.ReportTimestamp, query types.Query, observations []types.AttributedObservation) (bool, types.Report, error) {
 	lggr := r.lggr.Named("ExecutionReport")
+	if healthy, err := r.chainHealthcheck.IsHealthy(ctx, false); err != nil {
+		return false, nil, err
+	} else if !healthy {
+		return false, nil, ccip.ErrChainIsNotHealthy
+	}
 	parsableObservations := ccip.GetParsableObservations[ccip.ExecutionObservation](lggr, observations)
 	// Need at least F+1 observations
 	if len(parsableObservations) <= r.F {
@@ -848,6 +866,11 @@ func (r *ExecutionReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Conte
 	}
 	lggr = lggr.With("messageIDs", ccipcommon.GetMessageIDsAsHexString(execReport.Messages))
 
+	if healthy, err1 := r.chainHealthcheck.IsHealthy(ctx, false); err1 != nil {
+		return false, err1
+	} else if !healthy {
+		return false, ccip.ErrChainIsNotHealthy
+	}
 	// If the first message is executed already, this execution report is stale, and we do not accept it.
 	stale, err := r.isStaleReport(ctx, execReport.Messages)
 	if err != nil {
@@ -874,6 +897,11 @@ func (r *ExecutionReportingPlugin) ShouldTransmitAcceptedReport(ctx context.Cont
 	}
 	lggr = lggr.With("messageIDs", ccipcommon.GetMessageIDsAsHexString(execReport.Messages))
 
+	if healthy, err1 := r.chainHealthcheck.IsHealthy(ctx, true); err1 != nil {
+		return false, err1
+	} else if !healthy {
+		return false, ccip.ErrChainIsNotHealthy
+	}
 	// If report is not stale we transmit.
 	// When the executeTransmitter enqueues the tx for tx manager,
 	// we mark it as execution_sent, removing it from the set of inflight messages.
@@ -952,7 +980,7 @@ func inflightAggregates(
 // price values are USD per 1e18 of smallest token denomination, in base units 1e18 (e.g. 5$ = 5e18 USD per 1e18 units).
 // this function is used for price registry of both source and destination chains.
 func getTokensPrices(ctx context.Context, priceRegistry ccipdata.PriceRegistryReader, tokens []cciptypes.Address) (map[cciptypes.Address]*big.Int, error) {
-	prices := make(map[cciptypes.Address]*big.Int)
+	tokenPrices := make(map[cciptypes.Address]*big.Int)
 
 	fetchedPrices, err := priceRegistry.GetTokenPrices(ctx, tokens)
 	if err != nil {
@@ -971,16 +999,16 @@ func getTokensPrices(ctx context.Context, priceRegistry ccipdata.PriceRegistryRe
 		}
 
 		// price registry should not report different price for the same token
-		price, exists := prices[token]
+		price, exists := tokenPrices[token]
 		if exists && fetchedPrices[i].Value.Cmp(price) != 0 {
 			return nil, fmt.Errorf("price registry reported different prices (%s and %s) for the same token %s",
 				fetchedPrices[i].Value, price, token)
 		}
 
-		prices[token] = fetchedPrices[i].Value
+		tokenPrices[token] = fetchedPrices[i].Value
 	}
 
-	return prices, nil
+	return tokenPrices, nil
 }
 
 func (r *ExecutionReportingPlugin) getUnexpiredCommitReports(
@@ -1093,6 +1121,43 @@ func (r *ExecutionReportingPlugin) prepareTokenExecData(ctx context.Context) (ex
 		destTokenPrices:        destTokenPrices,
 		gasPrice:               gasPrice,
 	}, nil
+}
+
+// ensurePriceRegistrySynchronization ensures that the source price registry points to the same as the one configured on the onRamp.
+// This is required since the price registry address on the onRamp can change over time.
+func (r *ExecutionReportingPlugin) ensurePriceRegistrySynchronization(ctx context.Context) error {
+	needPriceRegistryUpdate := false
+	r.sourcePriceRegistryLock.RLock()
+	priceRegistryAddress, err := r.onRampReader.SourcePriceRegistryAddress(ctx)
+	if err != nil {
+		r.sourcePriceRegistryLock.RUnlock()
+		return fmt.Errorf("getting price registry from onramp: %w", err)
+	}
+
+	needPriceRegistryUpdate = r.sourcePriceRegistry == nil || priceRegistryAddress != r.sourcePriceRegistry.Address()
+	r.sourcePriceRegistryLock.RUnlock()
+	if !needPriceRegistryUpdate {
+		return nil
+	}
+
+	// Update the price registry if required.
+	r.sourcePriceRegistryLock.Lock()
+	defer r.sourcePriceRegistryLock.Unlock()
+
+	// Price registry address changed or not initialized yet, updating source price registry.
+	sourcePriceRegistry, err := r.sourcePriceRegistryProvider.NewPriceRegistryReader(ctx, priceRegistryAddress)
+	if err != nil {
+		return err
+	}
+	oldPriceRegistry := r.sourcePriceRegistry
+	r.sourcePriceRegistry = sourcePriceRegistry
+	// Close the old price registry
+	if oldPriceRegistry != nil {
+		if err1 := oldPriceRegistry.Close(); err1 != nil {
+			r.lggr.Warnw("failed to close old price registry", "err", err1)
+		}
+	}
+	return nil
 }
 
 // selectReportsToFillBatch returns the reports to fill the message limit. Single Commit Root contains exactly (Interval.Max - Interval.Min + 1) messages.

@@ -15,6 +15,7 @@ import (
 	"go.uber.org/multierr"
 
 	commonlogger "github.com/smartcontractkit/chainlink-common/pkg/logger"
+
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/cciptypes"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/ccipdataprovider"
@@ -22,7 +23,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcommon"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/lazyinitservice"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/rpclib"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/txmgr"
@@ -41,37 +41,34 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/pipeline"
 )
 
-func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet legacyevm.LegacyChainContainer, new bool, pr pipeline.Runner, argsNoPlugin libocr2.OCR2OracleArgs) ([]job.ServiceCtx, error) {
-	return []job.ServiceCtx{lazyinitservice.New(lggr, "CCIPCommitService", func(ctx context.Context) (job.ServiceCtx, error) {
-		pluginConfig, backfillArgs, err := jobSpecToCommitPluginConfig(lggr, jb, pr, chainSet, pg.WithParentCtx(ctx))
-		if err != nil {
-			return nil, err
-		}
-		wrappedPluginFactory := NewCommitReportingPluginFactory(*pluginConfig)
-		destChainID, err := chainselectors.ChainIdFromSelector(pluginConfig.destChainSelector)
-		if err != nil {
-			return nil, lazyinitservice.Unrecoverable(err)
-		}
-		argsNoPlugin.ReportingPluginFactory = promwrapper.NewPromFactory(wrappedPluginFactory, "CCIPCommit", jb.OCR2OracleSpec.Relay, big.NewInt(0).SetUint64(destChainID))
-		argsNoPlugin.Logger = commonlogger.NewOCRWrapper(pluginConfig.lggr, true, func(string) {})
-		oracle, err := libocr2.NewOracle(argsNoPlugin)
-		if err != nil {
-			return nil, lazyinitservice.Unrecoverable(err)
-		}
-		// If this is a brand-new job, then we make use of the start blocks.
-		// If not then we're rebooting and log poller will pick up where we left off.
-		if new {
-			return oraclelib.NewBackfilledOracle(
-				pluginConfig.lggr,
-				backfillArgs.SourceLP,
-				backfillArgs.DestLP,
-				backfillArgs.SourceStartBlock,
-				backfillArgs.DestStartBlock,
-				job.NewServiceAdapter(oracle),
-			), nil
-		}
-		return job.NewServiceAdapter(oracle), nil
-	})}, nil
+func NewCommitServices(ctx context.Context, lggr logger.Logger, jb job.Job, chainSet legacyevm.LegacyChainContainer, new bool, pr pipeline.Runner, argsNoPlugin libocr2.OCR2OracleArgs, logError func(string), qopts ...pg.QOpt) ([]job.ServiceCtx, error) {
+	pluginConfig, backfillArgs, err := jobSpecToCommitPluginConfig(lggr, jb, pr, chainSet, qopts...)
+	if err != nil {
+		return nil, err
+	}
+	wrappedPluginFactory := NewCommitReportingPluginFactory(*pluginConfig)
+	destChainID, err := chainselectors.ChainIdFromSelector(pluginConfig.destChainSelector)
+	if err != nil {
+		return nil, err
+	}
+	argsNoPlugin.ReportingPluginFactory = promwrapper.NewPromFactory(wrappedPluginFactory, "CCIPCommit", jb.OCR2OracleSpec.Relay, big.NewInt(0).SetUint64(destChainID))
+	argsNoPlugin.Logger = commonlogger.NewOCRWrapper(pluginConfig.lggr, true, logError)
+	oracle, err := libocr2.NewOracle(argsNoPlugin)
+	if err != nil {
+		return nil, err
+	}
+	// If this is a brand-new job, then we make use of the start blocks. If not then we're rebooting and log poller will pick up where we left off.
+	if new {
+		return []job.ServiceCtx{oraclelib.NewBackfilledOracle(
+			pluginConfig.lggr,
+			backfillArgs.SourceLP,
+			backfillArgs.DestLP,
+			backfillArgs.SourceStartBlock,
+			backfillArgs.DestStartBlock,
+			job.NewServiceAdapter(oracle)),
+		}, nil
+	}
+	return []job.ServiceCtx{job.NewServiceAdapter(oracle)}, nil
 }
 
 func CommitReportToEthTxMeta(typ ccipconfig.ContractType, ver semver.Version) (func(report []byte) (*txmgr.TxMeta, error), error) {
@@ -115,6 +112,13 @@ func jobSpecToCommitPluginConfig(lggr logger.Logger, jb job.Job, pr pipeline.Run
 	if err != nil {
 		return nil, nil, err
 	}
+
+	lggr.Infow("Initializing commit plugin",
+		"CommitStore", params.commitStoreAddress,
+		"OnRamp", params.commitStoreStaticCfg.OnRamp,
+		"ArmProxy", params.commitStoreStaticCfg.ArmProxy,
+		"SourceChainSelector", params.commitStoreStaticCfg.SourceChainSelector,
+		"DestChainSelector", params.commitStoreStaticCfg.ChainSelector)
 
 	versionFinder := factory.NewEvmVersionFinder()
 	commitStoreReader, err := factory.NewCommitStoreReader(lggr, versionFinder, params.commitStoreAddress, params.destChain.Client(), params.destChain.LogPoller(), params.sourceChain.GasEstimator(), qopts...)
@@ -197,7 +201,7 @@ func jobSpecToCommitPluginConfig(lggr logger.Logger, jb job.Job, pr pipeline.Run
 	commitStoreReader = observability.NewObservedCommitStoreReader(commitStoreReader, params.destChain.ID().Int64(), ccip.CommitPluginLabel)
 	metricsCollector := ccip.NewPluginMetricsCollector(ccip.CommitPluginLabel, params.sourceChain.ID().Int64(), params.destChain.ID().Int64())
 
-	lggr.Infow("NewCommitServices",
+	commitLggr.Infow("NewCommitServices",
 		"pluginConfig", params.pluginConfig,
 		"staticConfig", params.commitStoreStaticCfg,
 		// TODO bring back
