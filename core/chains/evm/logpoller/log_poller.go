@@ -115,12 +115,12 @@ type logPoller struct {
 	cachedAddresses []common.Address
 	cachedEventSigs []common.Hash
 
-	replayStart    chan int64
-	replayComplete chan error
-	ctx            context.Context
-	cancel         context.CancelFunc
-	wg             sync.WaitGroup
-	isReorged      *atomic.Bool
+	replayStart      chan int64
+	replayComplete   chan error
+	ctx              context.Context
+	cancel           context.CancelFunc
+	wg               sync.WaitGroup
+	finalityViolated *atomic.Bool
 }
 
 // NewLogPoller creates a log poller. Note there is an assumption
@@ -154,7 +154,7 @@ func NewLogPoller(orm ORM, ec Client, lggr logger.Logger, pollPeriod time.Durati
 		keepFinalizedBlocksDepth: keepFinalizedBlocksDepth,
 		filters:                  make(map[string]Filter),
 		filterDirty:              true, // Always build Filter on first call to cache an empty filter if nothing registered yet.
-		isReorged:                &isReorged,
+		finalityViolated:         &isReorged,
 	}
 }
 
@@ -210,7 +210,7 @@ func (filter *Filter) Contains(other *Filter) bool {
 }
 
 func (lp *logPoller) IsHealthy() bool {
-	return !lp.isReorged.Load()
+	return !lp.finalityViolated.Load()
 }
 
 // RegisterFilter adds the provided EventSigs and Addresses to the log poller's log filter query.
@@ -754,7 +754,6 @@ func (lp *logPoller) getCurrentBlockMaybeHandleReorg(ctx context.Context, curren
 			return nil, errors.New("Unable to find LCA after reorg, retrying")
 		}
 
-		lp.isReorged.Store(false)
 		lp.lggr.Infow("Reorg detected", "blockAfterLCA", blockAfterLCA.Number, "currentBlockNumber", currentBlockNumber)
 		// We truncate all the blocks and logs after the LCA.
 		// We could preserve the logs for forensics, since its possible
@@ -769,9 +768,11 @@ func (lp *logPoller) getCurrentBlockMaybeHandleReorg(ctx context.Context, curren
 			// We return an error here which will cause us to restart polling from lastBlockSaved + 1
 			return nil, err2
 		}
+		lp.finalityViolated.Store(false)
 		return blockAfterLCA, nil
 	}
 	// No reorg, return current block.
+	lp.finalityViolated.Store(false)
 	return currentBlock, nil
 }
 
@@ -935,7 +936,7 @@ func (lp *logPoller) findBlockAfterLCA(ctx context.Context, current *evmtypes.He
 	lp.lggr.Criticalw("Reorg greater than finality depth detected", "finalityTag", lp.useFinalityTag, "current", current.Number, "latestFinalized", latestFinalizedBlockNumber)
 	rerr := errors.New("Reorg greater than finality depth")
 	lp.SvcErrBuffer.Append(rerr)
-	lp.isReorged.Store(true)
+	lp.finalityViolated.Store(true)
 	return nil, rerr
 }
 

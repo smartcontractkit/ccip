@@ -1050,6 +1050,16 @@ func TestLogPoller_ReorgDeeperThanFinality(t *testing.T) {
 			secondPoll := th.PollAndSaveLogs(testutils.Context(t), firstPoll)
 			assert.Equal(t, firstPoll, secondPoll)
 			assert.False(t, th.LogPoller.IsHealthy())
+
+			// Manually remove latest block from the log poller to bring it back to life
+			// LogPoller should be healthy again after first poll
+			// Chain gen <- 1
+			//			     \  2' <- 3' <- 4' <- 5' <- 6' (finalized) <- 7' <- 8' <- 9' <- 10' (L1_2)
+			require.NoError(t, th.ORM.DeleteLogsAndBlocksAfter(2))
+			// Poll from latest
+			recoveryPoll := th.PollAndSaveLogs(testutils.Context(t), 1)
+			assert.Equal(t, int64(10), recoveryPoll)
+			assert.True(t, th.LogPoller.IsHealthy())
 		})
 	}
 }
