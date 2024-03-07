@@ -1025,7 +1025,7 @@ func TestLogPoller_ReorgDeeperThanFinality(t *testing.T) {
 			// Polling should get us the L1 log.
 			firstPoll := th.PollAndSaveLogs(testutils.Context(t), 1)
 			assert.Equal(t, int64(5), firstPoll)
-			assert.NoError(t, th.LogPoller.Ready())
+			assert.NoError(t, th.LogPoller.Healthy())
 
 			// Fork deeper than finality depth
 			// Chain gen <- 1 <- 2 <- 3 (finalized) <- 4 (L1_1)
@@ -1049,7 +1049,7 @@ func TestLogPoller_ReorgDeeperThanFinality(t *testing.T) {
 
 			secondPoll := th.PollAndSaveLogs(testutils.Context(t), firstPoll)
 			assert.Equal(t, firstPoll, secondPoll)
-			assert.Equal(t, logpoller.ErrFinalityViolated, th.LogPoller.Ready())
+			assert.Equal(t, logpoller.ErrFinalityViolated, th.LogPoller.Healthy())
 
 			// Manually remove latest block from the log poller to bring it back to life
 			// LogPoller should be healthy again after first poll
@@ -1059,7 +1059,7 @@ func TestLogPoller_ReorgDeeperThanFinality(t *testing.T) {
 			// Poll from latest
 			recoveryPoll := th.PollAndSaveLogs(testutils.Context(t), 1)
 			assert.Equal(t, int64(10), recoveryPoll)
-			assert.NoError(t, th.LogPoller.Ready())
+			assert.NoError(t, th.LogPoller.Healthy())
 		})
 	}
 }
@@ -1107,7 +1107,7 @@ func TestLogPoller_PollAndSaveLogsDeepReorg(t *testing.T) {
 			// Polling should get us the L1 log.
 			newStart := th.PollAndSaveLogs(testutils.Context(t), 1)
 			assert.Equal(t, int64(3), newStart)
-			assert.NoError(t, th.LogPoller.Ready())
+			assert.NoError(t, th.LogPoller.Healthy())
 			// Check that L1_1 has a proper data payload
 			lgs, err := th.ORM.SelectLogsByBlockRange(2, 2)
 			require.NoError(t, err)
@@ -1133,7 +1133,7 @@ func TestLogPoller_PollAndSaveLogsDeepReorg(t *testing.T) {
 
 			newStart = th.PollAndSaveLogs(testutils.Context(t), newStart)
 			assert.Equal(t, int64(10), newStart)
-			assert.NoError(t, th.LogPoller.Ready())
+			assert.NoError(t, th.LogPoller.Healthy())
 
 			// Expect L1_2 to be properly updated
 			lgs, err = th.ORM.SelectLogsByBlockRange(2, 2)

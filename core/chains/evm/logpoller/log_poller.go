@@ -35,6 +35,7 @@ import (
 //go:generate mockery --quiet --name LogPoller --output ./mocks/ --case=underscore --structname LogPoller --filename log_poller.go
 type LogPoller interface {
 	services.Service
+	Healthy() error
 	Replay(ctx context.Context, fromBlock int64) error
 	ReplayAsync(fromBlock int64)
 	RegisterFilter(filter Filter, qopts ...pg.QOpt) error
@@ -213,7 +214,7 @@ func (filter *Filter) Contains(other *Filter) bool {
 	return true
 }
 
-func (lp *logPoller) Ready() error {
+func (lp *logPoller) Healthy() error {
 	if lp.finalityViolated.Load() {
 		return ErrFinalityViolated
 	}
