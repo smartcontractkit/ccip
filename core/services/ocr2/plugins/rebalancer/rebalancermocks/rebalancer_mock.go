@@ -3,8 +3,8 @@
 package mocks
 
 import (
-	liquiditygraph "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/liquiditygraph"
-
+	graph "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/graph"
+	liquidityrebalancer "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/liquidityrebalancer"
 	mock "github.com/stretchr/testify/mock"
 
 	models "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/models"
@@ -15,29 +15,29 @@ type Rebalancer struct {
 	mock.Mock
 }
 
-// ComputeTransfersToBalance provides a mock function with given fields: g, inflightsTransfers
-func (_m *Rebalancer) ComputeTransfersToBalance(g liquiditygraph.LiquidityGraph, inflightsTransfers []models.PendingTransfer) ([]models.Transfer, error) {
-	ret := _m.Called(g, inflightsTransfers)
+// ComputeTransfersToBalance provides a mock function with given fields: g, unexecuted
+func (_m *Rebalancer) ComputeTransfersToBalance(g graph.Graph, unexecuted []liquidityrebalancer.UnexecutedTransfer) ([]models.ProposedTransfer, error) {
+	ret := _m.Called(g, unexecuted)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ComputeTransfersToBalance")
 	}
 
-	var r0 []models.Transfer
+	var r0 []models.ProposedTransfer
 	var r1 error
-	if rf, ok := ret.Get(0).(func(liquiditygraph.LiquidityGraph, []models.PendingTransfer) ([]models.Transfer, error)); ok {
-		return rf(g, inflightsTransfers)
+	if rf, ok := ret.Get(0).(func(graph.Graph, []liquidityrebalancer.UnexecutedTransfer) ([]models.ProposedTransfer, error)); ok {
+		return rf(g, unexecuted)
 	}
-	if rf, ok := ret.Get(0).(func(liquiditygraph.LiquidityGraph, []models.PendingTransfer) []models.Transfer); ok {
-		r0 = rf(g, inflightsTransfers)
+	if rf, ok := ret.Get(0).(func(graph.Graph, []liquidityrebalancer.UnexecutedTransfer) []models.ProposedTransfer); ok {
+		r0 = rf(g, unexecuted)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]models.Transfer)
+			r0 = ret.Get(0).([]models.ProposedTransfer)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(liquiditygraph.LiquidityGraph, []models.PendingTransfer) error); ok {
-		r1 = rf(g, inflightsTransfers)
+	if rf, ok := ret.Get(1).(func(graph.Graph, []liquidityrebalancer.UnexecutedTransfer) error); ok {
+		r1 = rf(g, unexecuted)
 	} else {
 		r1 = ret.Error(1)
 	}

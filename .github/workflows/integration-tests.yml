@@ -292,7 +292,7 @@ jobs:
 #          pyroscopeServer: ${{ matrix.product.pyroscope_env == '' && '' || !startsWith(github.ref, 'refs/tags/') && '' || secrets.QA_PYROSCOPE_INSTANCE }} # Avoid sending blank envs https://github.com/orgs/community/discussions/25725
 #          pyroscopeEnvironment: ${{ matrix.product.pyroscope_env }}
 #          pyroscopeKey: ${{ secrets.QA_PYROSCOPE_KEY }}
-#          lokiEndpoint: ${{ secrets.LOKI_URL }}
+#          lokiEndpoint: ${{ secrets.LOKI_URL_CI }}
 #          lokiTenantId: ${{ vars.LOKI_TENANT_ID }}
 #          lokiBasicAuth: ${{ secrets.LOKI_BASIC_AUTH }}
 #          logstreamLogTargets: ${{ vars.LOGSTREAM_LOG_TARGETS }}
@@ -378,7 +378,7 @@ jobs:
 #          pyroscopeServer: ${{ matrix.product.pyroscope_env == '' && '' || !startsWith(github.ref, 'refs/tags/') && '' || secrets.QA_PYROSCOPE_INSTANCE }} # Avoid sending blank envs https://github.com/orgs/community/discussions/25725
 #          pyroscopeEnvironment: ${{ matrix.product.pyroscope_env }}
 #          pyroscopeKey: ${{ secrets.QA_PYROSCOPE_KEY }}
-#          lokiEndpoint: ${{ secrets.LOKI_URL }}
+#          lokiEndpoint: ${{ secrets.LOKI_URL_CI }}
 #          lokiTenantId: ${{ vars.LOKI_TENANT_ID }}
 #          lokiBasicAuth: ${{ secrets.LOKI_BASIC_AUTH }}
 #          logstreamLogTargets: ${{ vars.LOGSTREAM_LOG_TARGETS }}
@@ -551,7 +551,7 @@ jobs:
             os: ubuntu-latest
             pyroscope_env: ci-smoke-vrf-evm-simulated
           - name: vrfv2
-            nodes: 2
+            nodes: 3
             os: ubuntu-latest
             pyroscope_env: ci-smoke-vrf2-evm-simulated
           - name: vrfv2plus
@@ -669,7 +669,7 @@ jobs:
           pyroscopeServer: ${{ matrix.product.pyroscope_env == '' && '' || !startsWith(github.ref, 'refs/tags/') && '' || secrets.QA_PYROSCOPE_INSTANCE }} # Avoid sending blank envs https://github.com/orgs/community/discussions/25725
           pyroscopeEnvironment: ${{ matrix.product.pyroscope_env }}
           pyroscopeKey: ${{ secrets.QA_PYROSCOPE_KEY }}
-          lokiEndpoint: ${{ secrets.LOKI_URL }}
+          lokiEndpoint: ${{ secrets.LOKI_URL_CI }}
           lokiTenantId: ${{ vars.LOKI_TENANT_ID }}
           lokiBasicAuth: ${{ secrets.LOKI_BASIC_AUTH }}
           logstreamLogTargets: ${{ vars.LOGSTREAM_LOG_TARGETS }}
@@ -683,7 +683,7 @@ jobs:
           selectedNetworks: SIMULATED_1,SIMULATED_2
           chainlinkImage: ${{ env.CHAINLINK_IMAGE }}
           chainlinkVersion: ${{ github.sha }}
-          lokiEndpoint: ${{ secrets.LOKI_URL }}
+          lokiEndpoint: ${{ secrets.LOKI_URL_CI }}
           lokiTenantId: ${{ vars.LOKI_TENANT_ID }}
           lokiBasicAuth: ${{ secrets.LOKI_BASIC_AUTH }}
           logstreamLogTargets: ${{ vars.LOGSTREAM_LOG_TARGETS }}
@@ -703,7 +703,9 @@ jobs:
           cl_image_tag: ${{ github.sha }}${{ matrix.product.tag_suffix }}
           aws_registries: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}
           artifacts_name: ${{ matrix.product.name }}${{ matrix.product.tag_suffix }}-test-logs
-          artifacts_location: ./integration-tests/smoke/logs/
+          artifacts_location: |
+            ./integration-tests/smoke/logs/ 
+            ./integration-tests/ccip-tests/smoke/logs/*
           publish_check_name: ${{ matrix.product.name }}
           token: ${{ secrets.GITHUB_TOKEN }}
           go_mod_path: ./integration-tests/go.mod
@@ -734,7 +736,7 @@ jobs:
           ls -l ./integration-tests/smoke/traces
       - name: Upload Trace Data
         if: steps.check-label.outputs.trace == 'true' && matrix.product.name == 'ocr2' && matrix.product.tag_suffix == '-plugins'
-        uses: actions/upload-artifact@0b7f8abb1508181956e8e162db84b466c27e18ce # v3.1.2
+        uses: actions/upload-artifact@a8a3f3ad30e3422c9c7b888a15615d19a852ae32 # v3.1.3
         with:
           name: trace-data
           path: ./integration-tests/smoke/traces/trace-data.json
@@ -882,7 +884,7 @@ jobs:
           QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
           QA_KUBECONFIG: ${{ secrets.QA_KUBECONFIG }}
       - name: Upload test log
-        uses: actions/upload-artifact@0b7f8abb1508181956e8e162db84b466c27e18ce # v3.1.2
+        uses: actions/upload-artifact@a8a3f3ad30e3422c9c7b888a15615d19a852ae32 # v3.1.3
         if: failure()
         with:
           name: test-log-${{ matrix.product.name }}
@@ -1162,7 +1164,7 @@ jobs:
 #          QA_KUBECONFIG: ""
 #          run_setup: false
 #      - name: Upload test log
-#        uses: actions/upload-artifact@0b7f8abb1508181956e8e162db84b466c27e18ce # v3.1.2
+#        uses: actions/upload-artifact@a8a3f3ad30e3422c9c7b888a15615d19a852ae32 # v3.1.3
 #        if: failure()
 #        with:
 #          name: test-log-solana

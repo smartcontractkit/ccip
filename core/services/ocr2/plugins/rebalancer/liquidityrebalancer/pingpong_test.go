@@ -6,8 +6,10 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/liquiditygraph"
+	ubig "github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils/big"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/graph"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/models"
 )
 
@@ -20,7 +22,7 @@ func TestPingPong(t *testing.T) {
 		name         string
 		balances     map[models.NetworkSelector]int64
 		lanes        [][2]models.NetworkSelector
-		inflight     []models.PendingTransfer
+		inflight     []UnexecutedTransfer
 		expTransfers []models.Transfer
 		expErr       bool
 	}{
@@ -31,7 +33,7 @@ func TestPingPong(t *testing.T) {
 				{netA, netB}, {netB, netA}, // A <--> B
 			},
 			expTransfers: []models.Transfer{
-				{From: netA, To: netB, Amount: big.NewInt(100)},
+				{From: netA, To: netB, Amount: ubig.NewI(100)},
 			},
 		},
 		{
@@ -41,7 +43,7 @@ func TestPingPong(t *testing.T) {
 				{netA, netB}, {netB, netA}, // A <--> B
 			},
 			expTransfers: []models.Transfer{
-				{From: netA, To: netB, Amount: big.NewInt(100)},
+				{From: netA, To: netB, Amount: ubig.NewI(100)},
 			},
 		},
 		{
@@ -64,8 +66,8 @@ func TestPingPong(t *testing.T) {
 				{netC, netA}, {netA, netC}, // A <--> C
 			},
 			expTransfers: []models.Transfer{
-				{From: netB, To: netA, Amount: big.NewInt(15)},
-				{From: netB, To: netC, Amount: big.NewInt(15)},
+				{From: netB, To: netA, Amount: ubig.NewI(15)},
+				{From: netB, To: netC, Amount: ubig.NewI(15)},
 			},
 		},
 		{
@@ -81,9 +83,9 @@ func TestPingPong(t *testing.T) {
 				{netC, netA}, {netA, netC}, // A <--> C
 			},
 			expTransfers: []models.Transfer{
-				{From: netA, To: netB, Amount: big.NewInt(7)},
-				{From: netA, To: netC, Amount: big.NewInt(7)},
-				{From: netC, To: netB, Amount: big.NewInt(15)},
+				{From: netA, To: netB, Amount: ubig.NewI(7)},
+				{From: netA, To: netC, Amount: ubig.NewI(7)},
+				{From: netC, To: netB, Amount: ubig.NewI(15)},
 			},
 		},
 		{
@@ -108,7 +110,7 @@ func TestPingPong(t *testing.T) {
 				{netC, netA}, {netA, netC}, // C <--> A
 			},
 			expTransfers: []models.Transfer{
-				{From: netB, To: netA, Amount: big.NewInt(30)},
+				{From: netB, To: netA, Amount: ubig.NewI(30)},
 			},
 		},
 		{
@@ -123,7 +125,7 @@ func TestPingPong(t *testing.T) {
 				{netC, netA}, {netA, netC}, // A <--> C
 			},
 			expTransfers: []models.Transfer{
-				{From: netA, To: netB, Amount: big.NewInt(1)},
+				{From: netA, To: netB, Amount: ubig.NewI(1)},
 			},
 		},
 	}
@@ -191,13 +193,13 @@ func runPingPongInfinitySimulation(t *testing.T, rounds, maxNets, maxLanes int) 
 	g := genGraph(t, balances, lanes)
 
 	pp := NewPingPong()
-	inflightTransfers := make([]models.PendingTransfer, 0)
+	inflightTransfers := make([]UnexecutedTransfer, 0)
 
 	for round := 0; round < rounds; round++ {
 		// Cleanup the executed transfers from memory.
-		filteredInflights := make([]models.PendingTransfer, 0, len(inflightTransfers))
+		filteredInflights := make([]UnexecutedTransfer, 0, len(inflightTransfers))
 		for _, tr := range inflightTransfers {
-			if tr.Status != models.TransferStatusExecuted {
+			if tr.TransferStatus() != models.TransferStatusExecuted {
 				filteredInflights = append(filteredInflights, tr)
 			}
 		}
@@ -210,9 +212,15 @@ func runPingPongInfinitySimulation(t *testing.T, rounds, maxNets, maxLanes int) 
 			assert.True(t, len(transfersToBalance) > 0, "balance should not be reached")
 		}
 
-		pendingTransfers := make([]models.PendingTransfer, len(transfersToBalance))
+		pendingTransfers := make([]UnexecutedTransfer, len(transfersToBalance))
 		for i, tr := range transfersToBalance {
-			pendingTransfers[i] = models.NewPendingTransfer(tr)
+			pendingTransfers[i] = models.PendingTransfer{
+				Transfer: models.Transfer{
+					From:   tr.From,
+					To:     tr.To,
+					Amount: tr.Amount,
+				},
+			}
 		}
 
 		// Find some random inflight transfers and mark them as done by applying them to the graph.
@@ -224,17 +232,24 @@ func runPingPongInfinitySimulation(t *testing.T, rounds, maxNets, maxLanes int) 
 		numInflightToApply := 1 + rand.Intn(len(inflightTransfers))
 		numApplied := 0
 		for idx, inf := range inflightTransfers {
-			sourceLiq, err := g.GetLiquidity(inf.From)
+			sourceLiq, err := g.GetLiquidity(inf.FromNetwork())
 			assert.NoError(t, err)
-			destLiq, err := g.GetLiquidity(inf.To)
+			destLiq, err := g.GetLiquidity(inf.ToNetwork())
 			assert.NoError(t, err)
 
-			newSourceLiq := big.NewInt(0).Sub(sourceLiq, inf.Amount)
-			newDestLiq := big.NewInt(0).Add(destLiq, inf.Amount)
+			newSourceLiq := big.NewInt(0).Sub(sourceLiq, inf.TransferAmount())
+			newDestLiq := big.NewInt(0).Add(destLiq, inf.TransferAmount())
 
-			g.SetLiquidity(inf.From, newSourceLiq)
-			g.SetLiquidity(inf.To, newDestLiq)
-			inflightTransfers[idx].Status = models.TransferStatusExecuted
+			g.SetLiquidity(inf.FromNetwork(), newSourceLiq)
+			g.SetLiquidity(inf.ToNetwork(), newDestLiq)
+
+			// XXX: this is ugly, but we need to update the transfer status to executed.
+			// We can't do it directly because the Transfer interface doesn't have a setter.
+			pendingTr, ok := inflightTransfers[idx].(models.PendingTransfer)
+			require.True(t, ok)
+
+			pendingTr.Status = models.TransferStatusExecuted
+			inflightTransfers[idx] = pendingTr
 
 			numApplied++
 			if numApplied >= numInflightToApply {
@@ -245,10 +260,12 @@ func runPingPongInfinitySimulation(t *testing.T, rounds, maxNets, maxLanes int) 
 }
 
 // Generates a graph from the provided lanes and balances.
-func genGraph(t testing.TB, balances map[models.NetworkSelector]int64, lanes [][2]models.NetworkSelector) *liquiditygraph.Graph {
-	g := liquiditygraph.NewGraph()
+func genGraph(t testing.TB, balances map[models.NetworkSelector]int64, lanes [][2]models.NetworkSelector) graph.Graph {
+	g := graph.NewGraph()
 	for netSel, balance := range balances {
-		g.AddNetwork(netSel, big.NewInt(balance))
+		g.AddNetwork(netSel, graph.Data{
+			Liquidity: big.NewInt(balance),
+		})
 	}
 
 	for _, lane := range lanes {

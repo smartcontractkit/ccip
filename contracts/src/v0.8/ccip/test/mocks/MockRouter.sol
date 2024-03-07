@@ -19,8 +19,10 @@ contract MockCCIPRouter is IRouter, IRouterClient {
 
   error InvalidAddress(bytes encodedAddress);
   error InvalidExtraArgsTag();
+  error ReceiverError(bytes error);
 
   event MessageExecuted(bytes32 messageId, uint64 sourceChainSelector, address offRamp, bytes32 calldataHash);
+  event MsgExecuted(bool success, bytes retData, uint256 gasUsed);
 
   uint16 public constant GAS_FOR_CALL_EXACT_CHECK = 5_000;
   uint64 public constant DEFAULT_GAS_LIMIT = 200_000;
@@ -31,10 +33,6 @@ contract MockCCIPRouter is IRouter, IRouterClient {
     uint256 gasLimit,
     address receiver
   ) external returns (bool success, bytes memory retData, uint256 gasUsed) {
-    // Only send through the router if the receiver is a contract and implements the IAny2EVMMessageReceiver interface.
-    if (receiver.code.length == 0 || !receiver.supportsInterface(type(IAny2EVMMessageReceiver).interfaceId))
-      return (true, "", 0);
-
     return _routeMessage(message, gasForCallExactCheck, gasLimit, receiver);
   }
 
@@ -44,6 +42,10 @@ contract MockCCIPRouter is IRouter, IRouterClient {
     uint256 gasLimit,
     address receiver
   ) internal returns (bool success, bytes memory retData, uint256 gasUsed) {
+    // Only send through the router if the receiver is a contract and implements the IAny2EVMMessageReceiver interface.
+    if (receiver.code.length == 0 || !receiver.supportsInterface(type(IAny2EVMMessageReceiver).interfaceId))
+      return (true, "", 0);
+
     bytes memory data = abi.encodeWithSelector(IAny2EVMMessageReceiver.ccipReceive.selector, message);
 
     (success, retData, gasUsed) = CallWithExactGas._callWithExactGasSafeReturnData(
@@ -54,6 +56,10 @@ contract MockCCIPRouter is IRouter, IRouterClient {
       Internal.MAX_RET_BYTES
     );
 
+    // Event to assist testing, does not exist on real deployments
+    emit MsgExecuted(success, retData, gasUsed);
+
+    // Real router event
     emit MessageExecuted(message.messageId, message.sourceChainSelector, msg.sender, keccak256(data));
     return (success, retData, gasUsed);
   }
@@ -87,7 +93,9 @@ contract MockCCIPRouter is IRouter, IRouterClient {
       IERC20(message.tokenAmounts[i].token).safeTransferFrom(msg.sender, receiver, message.tokenAmounts[i].amount);
     }
 
-    _routeMessage(executableMsg, GAS_FOR_CALL_EXACT_CHECK, gasLimit, receiver);
+    (bool success, bytes memory retData, ) = _routeMessage(executableMsg, GAS_FOR_CALL_EXACT_CHECK, gasLimit, receiver);
+
+    if (!success) revert ReceiverError(retData);
 
     return mockMsgId;
   }

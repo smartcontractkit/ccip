@@ -72,14 +72,14 @@ core/scripts/gateway @bolekk @pinebit
 /operator-ui/ @DeividasK @jkongie
 
 # Contracts
-/contracts/ @se3000 @connorwstein @RensR
-/contracts/**/*shared* @RensR @connorwstein
+/contracts/ @rensr @matyang @makramkd
+/contracts/**/*shared* @rensr @matyang @makramkd
 /contracts/srv/v0.8/automation @smartcontractkit/keepers
 /contracts/**/*Keeper* @smartcontractkit/keepers
 /contracts/**/*Upkeep* @smartcontractkit/keepers
 /contracts/**/*automation* @smartcontractkit/keepers
 /contracts/gas-snapshots/automation.gas-snapshot @smartcontractkit/keepers
-/contracts/**/ccip/ @rensr @matyang
+/contracts/**/ccip/ @rensr @matyang @makramkd
 /contracts/**/*Functions* @smartcontractkit/functions
 
 /contracts/src/v0.8/functions @smartcontractkit/functions
@@ -115,6 +115,7 @@ core/scripts/gateway @bolekk @pinebit
 # CI/CD
 /.github/** @chainchad @javuto @jkongie @jmank88 @samsondav
 /.github/workflows/integration-tests.yml @smartcontractkit/test-tooling-team @jasonmci
+/.github/workflows/**-tests.yml @smartcontractkit/test-tooling-team @jasonmci
 /.github/workflows/integration-chaos-tests.yml @smartcontractkit/test-tooling-team @jasonmci
 /.github/workflows/integration-tests-publish.yml @smartcontractkit/test-tooling-team @jasonmci
 /.github/workflows/performance-tests.yml @smartcontractkit/test-tooling-team @jasonmci
@@ -146,7 +147,8 @@ flake.lock @smartcontractkit/prodsec-public
 
 # CCIP override
 /core/ @smartcontractkit/ccip
-/contracts/ @rensr @matyang @connorwstein
+/contracts/ @rensr @matyang @makramkd
+/core/services/ocr2/plugins/rebalancer @rensr @dimkouv @makramkd
 /.github/ @rensr @connorwstein @smartcontractkit/test-tooling-team @jasonmci
 
 # CCIP ARM

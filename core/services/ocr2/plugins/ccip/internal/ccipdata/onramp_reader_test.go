@@ -1,6 +1,7 @@
 package ccipdata_test
 
 import (
+	"fmt"
 	"math/big"
 	"testing"
 	"time"
@@ -38,7 +39,7 @@ func TestNewOnRampReader_noContractAtAddress(t *testing.T) {
 	_, bc := ccipdata.NewSimulation(t)
 	addr := ccipcalc.EvmAddrToGeneric(utils.RandomAddress())
 	_, err := factory.NewOnRampReader(logger.TestLogger(t), factory.NewEvmVersionFinder(), testutils.SimulatedChainID.Uint64(), testutils.SimulatedChainID.Uint64(), addr, lpmocks.NewLogPoller(t), bc)
-	assert.EqualError(t, err, "unable to read type and version: no contract code at given address")
+	assert.EqualError(t, err, fmt.Sprintf("unable to read type and version: error calling typeAndVersion on addr: %s no contract code at given address", addr))
 }
 
 func TestOnRampReaderInit(t *testing.T) {
@@ -60,8 +61,8 @@ func TestOnRampReaderInit(t *testing.T) {
 			version: ccipdata.V1_2_0,
 		},
 		{
-			name:    "OnRampReader_V1_4_0",
-			version: ccipdata.V1_4_0,
+			name:    "OnRampReader_V1_5_0",
+			version: ccipdata.V1_5_0,
 		},
 	}
 
@@ -92,8 +93,8 @@ func setupOnRampReaderTH(t *testing.T, version string) onRampReaderTH {
 		onRampAddress = setupOnRampV1_1_0(t, user, bc)
 	case ccipdata.V1_2_0:
 		onRampAddress = setupOnRampV1_2_0(t, user, bc)
-	case ccipdata.V1_4_0:
-		onRampAddress = setupOnRampV1_4_0(t, user, bc)
+	case ccipdata.V1_5_0:
+		onRampAddress = setupOnRampV1_5_0(t, user, bc)
 	default:
 		require.Fail(t, "Unknown version: ", version)
 	}
@@ -313,7 +314,7 @@ func setupOnRampV1_2_0(t *testing.T, user *bind.TransactOpts, bc *client.Simulat
 	return onRampAddress
 }
 
-func setupOnRampV1_4_0(t *testing.T, user *bind.TransactOpts, bc *client.SimulatedBackendClient) common.Address {
+func setupOnRampV1_5_0(t *testing.T, user *bind.TransactOpts, bc *client.SimulatedBackendClient) common.Address {
 	linkTokenAddress := common.HexToAddress("0x000011")
 	staticConfig := evm_2_evm_onramp.EVM2EVMOnRampStaticConfig{
 		LinkToken:         linkTokenAddress,
@@ -325,7 +326,7 @@ func setupOnRampV1_4_0(t *testing.T, user *bind.TransactOpts, bc *client.Simulat
 		ArmProxy:          utils.RandomAddress(),
 	}
 	dynamicConfig := evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig{
-		Router:                            common.HexToAddress("0x0000000000000000000000000000000000000130"),
+		Router:                            common.HexToAddress("0x0000000000000000000000000000000000000150"),
 		MaxNumberOfTokensPerMsg:           0,
 		DestGasOverhead:                   0,
 		DestGasPerPayloadByte:             0,
@@ -392,8 +393,8 @@ func testVersionSpecificOnRampReader(t *testing.T, th onRampReaderTH, version st
 		testOnRampReader(t, th, common.HexToAddress("0x0000000000000000000000000000000000000110"))
 	case ccipdata.V1_2_0:
 		testOnRampReader(t, th, common.HexToAddress("0x0000000000000000000000000000000000000120"))
-	case ccipdata.V1_4_0:
-		testOnRampReader(t, th, common.HexToAddress("0x0000000000000000000000000000000000000130"))
+	case ccipdata.V1_5_0:
+		testOnRampReader(t, th, common.HexToAddress("0x0000000000000000000000000000000000000150"))
 	default:
 		require.Fail(t, "Unknown version: ", version)
 	}

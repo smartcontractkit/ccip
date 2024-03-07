@@ -17,7 +17,7 @@ import (
 )
 
 func TestOnRamp(t *testing.T) {
-	for _, versionStr := range []string{ccipdata.V1_0_0, ccipdata.V1_1_0, ccipdata.V1_2_0, ccipdata.V1_4_0} {
+	for _, versionStr := range []string{ccipdata.V1_0_0, ccipdata.V1_1_0, ccipdata.V1_2_0, ccipdata.V1_5_0} {
 		lggr := logger.TestLogger(t)
 		addr := cciptypes.Address(utils.RandomAddress().String())
 		lp := mocks2.NewLogPoller(t)
@@ -27,6 +27,7 @@ func TestOnRamp(t *testing.T) {
 
 		expFilterNames := []string{
 			logpoller.FilterName(ccipdata.COMMIT_CCIP_SENDS, addr),
+			logpoller.FilterName(ccipdata.CONFIG_CHANGED, addr),
 		}
 		versionFinder := newMockVersionFinder(ccipconfig.EVM2EVMOnRamp, *semver.MustParse(versionStr), nil)
 

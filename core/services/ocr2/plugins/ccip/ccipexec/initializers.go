@@ -100,7 +100,7 @@ func UnregisterExecPluginLpFilters(ctx context.Context, lggr logger.Logger, jb j
 			if usdcDisabled := params.pluginConfig.USDCConfig.AttestationAPI == ""; usdcDisabled {
 				return nil
 			}
-			return ccipdata.CloseUSDCReader(lggr, params.pluginConfig.USDCConfig.SourceMessageTransmitterAddress, params.sourceChain.LogPoller(), qopts...)
+			return ccipdata.CloseUSDCReader(lggr, jobIDToString(jb.ID), params.pluginConfig.USDCConfig.SourceMessageTransmitterAddress, params.sourceChain.LogPoller(), qopts...)
 		},
 	}
 
@@ -119,7 +119,7 @@ func ExecReportToEthTxMeta(typ ccipconfig.ContractType, ver semver.Version) (fun
 	return factory.ExecReportToEthTxMeta(typ, ver)
 }
 
-func initTokenDataProviders(lggr logger.Logger, pluginConfig ccipconfig.ExecutionPluginJobSpecConfig, sourceLP logpoller.LogPoller, qopts ...pg.QOpt) (map[cciptypes.Address]tokendata.Reader, error) {
+func initTokenDataProviders(lggr logger.Logger, jobID string, pluginConfig ccipconfig.ExecutionPluginJobSpecConfig, sourceLP logpoller.LogPoller, qopts ...pg.QOpt) (map[cciptypes.Address]tokendata.Reader, error) {
 	tokenDataProviders := make(map[cciptypes.Address]tokendata.Reader)
 
 	// init usdc token data provider
@@ -135,10 +135,9 @@ func initTokenDataProviders(lggr logger.Logger, pluginConfig ccipconfig.Executio
 			return nil, errors.Wrap(err, "failed to parse USDC attestation API")
 		}
 
-		usdcReader := ccipdata.NewUSDCReader(lggr, pluginConfig.USDCConfig.SourceMessageTransmitterAddress, sourceLP)
-
-		if err := usdcReader.RegisterFilters(qopts...); err != nil {
-			return nil, err
+		usdcReader, err := ccipdata.NewUSDCReader(lggr, jobID, pluginConfig.USDCConfig.SourceMessageTransmitterAddress, sourceLP, true)
+		if err != nil {
+			return nil, errors.Wrap(err, "new usdc reader")
 		}
 
 		tokenDataProviders[cciptypes.Address(pluginConfig.USDCConfig.SourceTokenAddress.String())] =
@@ -158,6 +157,13 @@ func jobSpecToExecPluginConfig(ctx context.Context, lggr logger.Logger, jb job.J
 	if err != nil {
 		return nil, nil, err
 	}
+
+	lggr.Infow("Initializing exec plugin",
+		"CommitStore", params.offRampConfig.CommitStore,
+		"OnRamp", params.offRampConfig.OnRamp,
+		"ArmProxy", params.offRampConfig.ArmProxy,
+		"SourceChainSelector", params.offRampConfig.SourceChainSelector,
+		"DestChainSelector", params.offRampConfig.ChainSelector)
 
 	sourceChainID := params.sourceChain.ID().Int64()
 	destChainID := params.destChain.ID().Int64()
@@ -190,25 +196,18 @@ func jobSpecToExecPluginConfig(ctx context.Context, lggr logger.Logger, jb job.J
 		return nil, nil, errors.Wrap(err, "could not get source native token")
 	}
 
-	// TODO: we don't support onramp source registry changes without a reboot yet?
-	sourcePriceRegistry, err := factory.NewPriceRegistryReader(lggr, versionFinder, dynamicOnRampConfig.PriceRegistry, params.sourceChain.LogPoller(), params.sourceChain.Client())
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "could not load source registry")
-	}
-
 	commitStoreReader, err := factory.NewCommitStoreReader(lggr, versionFinder, params.offRampConfig.CommitStore, params.destChain.Client(), params.destChain.LogPoller(), params.sourceChain.GasEstimator(), params.sourceChain.Config().EVM().GasEstimator().PriceMax().ToInt(), qopts...)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "could not load commitStoreReader reader")
 	}
 
-	tokenDataProviders, err := initTokenDataProviders(lggr, params.pluginConfig, params.sourceChain.LogPoller(), qopts...)
+	tokenDataProviders, err := initTokenDataProviders(lggr, jobIDToString(jb.ID), params.pluginConfig, params.sourceChain.LogPoller(), qopts...)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "could not get token data providers")
 	}
 
 	// Prom wrappers
 	onRampReader = observability.NewObservedOnRampReader(onRampReader, sourceChainID, ccip.ExecPluginLabel)
-	sourcePriceRegistry = observability.NewPriceRegistryReader(sourcePriceRegistry, sourceChainID, ccip.ExecPluginLabel)
 	commitStoreReader = observability.NewObservedCommitStoreReader(commitStoreReader, destChainID, ccip.ExecPluginLabel)
 	offRampReader := observability.NewObservedOffRampReader(params.offRampReader, destChainID, ccip.ExecPluginLabel)
 	metricsCollector := ccip.NewPluginMetricsCollector(ccip.ExecPluginLabel, sourceChainID, destChainID)
@@ -225,28 +224,27 @@ func jobSpecToExecPluginConfig(ctx context.Context, lggr logger.Logger, jb job.J
 	execLggr.Infow("Initialized exec plugin",
 		"pluginConfig", params.pluginConfig,
 		"onRampAddress", params.offRampConfig.OnRamp,
-		"sourcePriceRegistry", sourcePriceRegistry.Address(),
 		"dynamicOnRampConfig", dynamicOnRampConfig,
 		"sourceNative", sourceWrappedNative,
 		"sourceRouter", sourceRouter.Address())
 
 	batchCaller := rpclib.NewDynamicLimitedBatchCaller(lggr, params.destChain.Client(), rpclib.DefaultRpcBatchSizeLimit, rpclib.DefaultRpcBatchBackOffMultiplier)
 
-	tokenPoolBatchedReader, err := batchreader.NewEVMTokenPoolBatchedReader(execLggr, sourceChainSelector, offRampReader.Address(), batchCaller, params.destChain.LogPoller())
+	tokenPoolBatchedReader, err := batchreader.NewEVMTokenPoolBatchedReader(execLggr, sourceChainSelector, offRampReader.Address(), batchCaller)
 	if err != nil {
 		return nil, nil, fmt.Errorf("new token pool batched reader: %w", err)
 	}
 
 	return &ExecutionPluginStaticConfig{
-			lggr:                     execLggr,
-			onRampReader:             onRampReader,
-			commitStoreReader:        commitStoreReader,
-			offRampReader:            offRampReader,
-			sourcePriceRegistry:      sourcePriceRegistry,
-			sourceWrappedNativeToken: cciptypes.Address(sourceWrappedNative.String()),
-			destChainSelector:        destChainSelector,
-			priceRegistryProvider:    ccipdataprovider.NewEvmPriceRegistry(params.destChain.LogPoller(), params.destChain.Client(), execLggr, ccip.ExecPluginLabel),
-			tokenPoolBatchedReader:   tokenPoolBatchedReader,
+			lggr:                        execLggr,
+			onRampReader:                onRampReader,
+			commitStoreReader:           commitStoreReader,
+			offRampReader:               offRampReader,
+			sourcePriceRegistryProvider: ccipdataprovider.NewEvmPriceRegistry(params.sourceChain.LogPoller(), params.sourceChain.Client(), execLggr, ccip.ExecPluginLabel),
+			sourceWrappedNativeToken:    cciptypes.Address(sourceWrappedNative.String()),
+			destChainSelector:           destChainSelector,
+			priceRegistryProvider:       ccipdataprovider.NewEvmPriceRegistry(params.destChain.LogPoller(), params.destChain.Client(), execLggr, ccip.ExecPluginLabel),
+			tokenPoolBatchedReader:      tokenPoolBatchedReader,
 			tokenDataWorker: tokendata.NewBackgroundWorker(
 				ctx,
 				tokenDataProviders,
@@ -316,4 +314,8 @@ func extractJobSpecParams(lggr logger.Logger, jb job.Job, chainSet legacyevm.Leg
 		sourceChain:   sourceChain,
 		destChain:     destChain,
 	}, nil
+}
+
+func jobIDToString(id int32) string {
+	return fmt.Sprintf("job_%d", id)
 }

@@ -86,7 +86,7 @@ contract EVM2EVMOffRamp_constructor is EVM2EVMOffRampSetup {
     assertEq(block.number, blockNumber);
 
     // OffRamp initial values
-    assertEq("EVM2EVMOffRamp 1.4.0-dev", s_offRamp.typeAndVersion());
+    assertEq("EVM2EVMOffRamp 1.5.0-dev", s_offRamp.typeAndVersion());
     assertEq(OWNER, s_offRamp.owner());
   }
 
@@ -203,7 +203,7 @@ contract EVM2EVMOffRamp_setDynamicConfig is EVM2EVMOffRampSetup {
   }
 
   function testNonOwnerReverts() public {
-    changePrank(STRANGER);
+    vm.startPrank(STRANGER);
     EVM2EVMOffRamp.DynamicConfig memory dynamicConfig = generateDynamicOffRampConfig(USER_3, address(s_priceRegistry));
 
     vm.expectRevert("Only callable by owner");
@@ -791,7 +791,7 @@ contract EVM2EVMOffRamp_executeSingleMessage is EVM2EVMOffRampSetup {
 
   function setUp() public virtual override {
     EVM2EVMOffRampSetup.setUp();
-    changePrank(address(s_offRamp));
+    vm.startPrank(address(s_offRamp));
   }
 
   function testNoTokensSuccess() public {
@@ -1344,7 +1344,7 @@ contract EVM2EVMOffRamp_applyPoolUpdates is EVM2EVMOffRampSetup {
 
   // Reverts
   function testOnlyCallableByOwnerReverts() public {
-    changePrank(STRANGER);
+    vm.startPrank(STRANGER);
 
     vm.expectRevert("Only callable by owner");
 

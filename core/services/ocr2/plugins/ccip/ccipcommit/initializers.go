@@ -113,6 +113,13 @@ func jobSpecToCommitPluginConfig(lggr logger.Logger, jb job.Job, pr pipeline.Run
 		return nil, nil, err
 	}
 
+	lggr.Infow("Initializing commit plugin",
+		"CommitStore", params.commitStoreAddress,
+		"OnRamp", params.commitStoreStaticCfg.OnRamp,
+		"ArmProxy", params.commitStoreStaticCfg.ArmProxy,
+		"SourceChainSelector", params.commitStoreStaticCfg.SourceChainSelector,
+		"DestChainSelector", params.commitStoreStaticCfg.ChainSelector)
+
 	versionFinder := factory.NewEvmVersionFinder()
 	commitStoreReader, err := factory.NewCommitStoreReader(lggr, versionFinder, params.commitStoreAddress, params.destChain.Client(), params.destChain.LogPoller(), params.sourceChain.GasEstimator(), params.sourceChain.Config().EVM().GasEstimator().PriceMax().ToInt(), qopts...)
 	if err != nil {
@@ -153,7 +160,7 @@ func jobSpecToCommitPluginConfig(lggr logger.Logger, jb job.Job, pr pipeline.Run
 				rpclib.DefaultRpcBatchSizeLimit,
 				rpclib.DefaultRpcBatchBackOffMultiplier,
 			)
-			priceGetterClients[chainID] = pricegetter.NewDynamicPriceGetterClient(caller, chain.LogPoller())
+			priceGetterClients[chainID] = pricegetter.NewDynamicPriceGetterClient(caller)
 		}
 
 		priceGetter, err = pricegetter.NewDynamicPriceGetter(*params.pluginConfig.PriceGetterConfig, priceGetterClients)
@@ -194,7 +201,7 @@ func jobSpecToCommitPluginConfig(lggr logger.Logger, jb job.Job, pr pipeline.Run
 	commitStoreReader = observability.NewObservedCommitStoreReader(commitStoreReader, params.destChain.ID().Int64(), ccip.CommitPluginLabel)
 	metricsCollector := ccip.NewPluginMetricsCollector(ccip.CommitPluginLabel, params.sourceChain.ID().Int64(), params.destChain.ID().Int64())
 
-	lggr.Infow("NewCommitServices",
+	commitLggr.Infow("NewCommitServices",
 		"pluginConfig", params.pluginConfig,
 		"staticConfig", params.commitStoreStaticCfg,
 		// TODO bring back

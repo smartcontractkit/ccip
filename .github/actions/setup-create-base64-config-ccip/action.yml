@@ -66,9 +66,9 @@ runs:
         cat << EOF > config.toml
         [CCIP]
         [CCIP.Env]
-        [CCIP.Env.Chainlink]
-        [CCIP.Env.Chainlink.Common]
-        [CCIP.Env.Chainlink.Common.ChainlinkImage]
+        [CCIP.Env.NewCLCluster]
+        [CCIP.Env.NewCLCluster.Common]
+        [CCIP.Env.NewCLCluster.Common.ChainlinkImage]
         image="$CHAINLINK_IMAGE"
         version="$CHAINLINK_VERSION"
         
@@ -82,11 +82,11 @@ runs:
         [CCIP.Env.Logging.Loki]
         tenant_id="$LOKI_TENANT_ID"
         endpoint="$LOKI_ENDPOINT"
-        basic_auth="$LOKI_BASIC_AUTH"
+        basic_auth_secret="$LOKI_BASIC_AUTH"
         
         [CCIP.Env.Logging.Grafana]
         base_url="$GRAFANA_URL"
-        dasboard_url="$GRAFANA_DASHBOARD_URL"
+        dashboard_url="$GRAFANA_DASHBOARD_URL"
         EOF
         
         BASE64_CCIP_SECRETS_CONFIG=$(cat config.toml | base64 -w 0)

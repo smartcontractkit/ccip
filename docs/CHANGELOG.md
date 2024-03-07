@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [dev]
 
+...
+
+<!-- unreleasedstop -->
+
+## 2.9.1
+
+### Changed
+
+- `eth_call` RPC requests are now sent with both `input` and `data` fields to increase compability with servers that recognize only one.
+- GasEstimator will now include Type `0x3` (Blob) transactions in the gas calculations to estimate it more accurately.
+
+## 2.9.0 - 2024-02-22
+
 ### Added
 
 - `chainlink health` CLI command and HTML `/health` endpoint, to provide human-readable views of the underlying JSON health data.
@@ -35,8 +48,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   URL = '...'
   ServerPubKey = '...'
 ```
-
-<!-- unreleasedstop -->
 
 ## 2.8.0 - 2024-01-24
 

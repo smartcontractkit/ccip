@@ -1,9 +1,13 @@
 package testconfig
 
 import (
+	"os"
+
 	"github.com/pelletier/go-toml/v2"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
+
+	ctfK8config "github.com/smartcontractkit/chainlink-testing-framework/k8s/config"
 
 	ctfconfig "github.com/smartcontractkit/chainlink-testing-framework/config"
 
@@ -43,6 +47,12 @@ type CCIPTestConfig struct {
 	TimeoutForPriceUpdate      *config.Duration   `toml:",omitempty"`
 }
 
+func (c *CCIPTestConfig) SetTestRunName(name string) {
+	if c.TestRunName == "" && name != "" {
+		c.TestRunName = name
+	}
+}
+
 func (c *CCIPTestConfig) Validate() error {
 	if c.PhaseTimeout != nil && (c.PhaseTimeout.Duration().Minutes() < 1 || c.PhaseTimeout.Duration().Minutes() > 50) {
 		return errors.Errorf("phase timeout should be between 1 and 50 minutes")
@@ -69,6 +79,11 @@ func (c *CCIPTestConfig) Validate() error {
 	if c.MulticallInOneTx != nil {
 		if c.NoOfSendsInMulticall == 0 {
 			return errors.Errorf("number of sends in multisend should be greater than 0 if multisend is true")
+		}
+	}
+	if c.ExistingDeployment != nil && *c.ExistingDeployment {
+		if c.TestRunName == "" && os.Getenv(ctfK8config.EnvVarJobImage) != "" {
+			return errors.Errorf("test run name should be set if existing deployment is true and test is running in k8s")
 		}
 	}
 
