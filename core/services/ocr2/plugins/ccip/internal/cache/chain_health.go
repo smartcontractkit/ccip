@@ -128,7 +128,7 @@ func (c *chainHealthcheck) isHealthy(ctx context.Context, forceRmnRefresh bool) 
 }
 
 // checkIfReadersAreHealthy checks if the source and destination chains are healthy by calling underlying LogPoller
-// These calls are very cheap, because doesn't require any communication with database or RPC, so we don't have
+// These calls are cheap because they don't require any communication with the database or RPC, so we don't have
 // to cache the result of these calls.
 func (c *chainHealthcheck) checkIfReadersAreHealthy(ctx context.Context) (bool, error) {
 	sourceChainHealthy, err := c.onRamp.IsSourceChainHealthy(ctx)
