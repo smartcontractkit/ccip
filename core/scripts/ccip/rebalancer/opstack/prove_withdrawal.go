@@ -241,7 +241,6 @@ func makeStateTrieProof(
 		address, []string{hexutil.Encode(slot[:])}, hexutil.EncodeBig(l2BlockNumber))
 	helpers.PanicErr(err)
 
-	// TODO
 	// resp.StorageProof[0].Proof = maybeAddProofNode(
 	// 	crypto.Keccak256Hash(slot[:]), resp.StorageProof[0].Proof)
 
@@ -257,10 +256,34 @@ func makeStateTrieProof(
 // 	key [32]byte,
 // 	proof []hexutil.Bytes,
 // ) []hexutil.Bytes {
+// 	keyHex := hexutil.Encode(key[:])
 // 	modifiedProof := make([]hexutil.Bytes, len(proof))
 // 	copy(modifiedProof, proof)
 // 	finalProofEl := modifiedProof[len(modifiedProof)-1]
-// 	finalProofElDecoded := rlp.DecodeBytes(finalProofEl)
+// 	rlpBuffers := NewRLPBuffers()
+// 	err := rlp.DecodeBytes(finalProofEl, rlpBuffers)
+// 	helpers.PanicErr(err)
+// 	if len(rlpBuffers.Buffers) == 17 {
+// 		for _, item := range rlpBuffers.Buffers {
+// 			// Find any nodes located inside of the branch node.
+// 			if len(item) > 0 {
+// 				// Check if the key inside the node matches the key we're looking for. We remove the first
+// 				// two characters (0x) and then we remove one more character (the first nibble) since this
+// 				// is the identifier for the type of node we're looking at. In this case we don't actually
+// 				// care what type of node it is because a branch node would only ever be the final proof
+// 				// element if (1) it includes the leaf node we're looking for or (2) it stores the value
+// 				// within itself. If (1) then this logic will work, if (2) then this won't find anything
+// 				// and we won't append any proof elements, which is exactly what we would want.
+// 				itemSuffix := hexutil.Encode(item)[3:]
+// 				if strings.HasSuffix(keyHex, itemSuffix) {
+// 					encoded, err := rlp.EncodeToBytes(item)
+// 					helpers.PanicErr(err)
+// 					modifiedProof = append(modifiedProof, encoded)
+// 				}
+// 			}
+// 		}
+// 	}
+// 	return modifiedProof
 // }
 
 func hashMessageHash(h [32]byte) [32]byte {
