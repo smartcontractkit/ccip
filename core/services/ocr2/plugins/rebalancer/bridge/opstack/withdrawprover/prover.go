@@ -201,14 +201,14 @@ func (p *prover) getMessageBedrockOutput(
 		return bedrockOutput{}, err
 	}
 	if fpacEnabled {
-		gameType, err := p.optimismPortal2.RespectedGameType(&bind.CallOpts{Context: ctx})
-		if err != nil {
-			return bedrockOutput{}, err
+		gameType, err2 := p.optimismPortal2.RespectedGameType(&bind.CallOpts{Context: ctx})
+		if err2 != nil {
+			return bedrockOutput{}, err2
 		}
 
-		gameCount, err := p.disputeGameFactory.GameCount(&bind.CallOpts{Context: ctx})
-		if err != nil {
-			return bedrockOutput{}, err
+		gameCount, err2 := p.disputeGameFactory.GameCount(&bind.CallOpts{Context: ctx})
+		if err2 != nil {
+			return bedrockOutput{}, err2
 		}
 
 		start := int64(0)
@@ -220,19 +220,19 @@ func (p *prover) getMessageBedrockOutput(
 			end = gameCount.Int64()
 		}
 
-		latestGames, err := p.disputeGameFactory.FindLatestGames(
+		latestGames, err2 := p.disputeGameFactory.FindLatestGames(
 			&bind.CallOpts{Context: ctx},
 			gameType,
 			big.NewInt(start),
 			big.NewInt(end))
-		if err != nil {
-			return bedrockOutput{}, err
+		if err2 != nil {
+			return bedrockOutput{}, err2
 		}
 
 		for _, game := range latestGames {
-			blockNumber, err := abiutils.UnpackUint256(game.ExtraData)
-			if err != nil {
-				return bedrockOutput{}, err
+			blockNumber, err2 := abiutils.UnpackUint256(game.ExtraData)
+			if err2 != nil {
+				return bedrockOutput{}, err2
 			}
 
 			if blockNumber.Cmp(l2BlockNumber) >= 0 {

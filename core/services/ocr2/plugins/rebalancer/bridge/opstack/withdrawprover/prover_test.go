@@ -8,13 +8,14 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+
 	evmclientmocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/client/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/optimism_l2_output_oracle"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/mocks/mock_optimism_l2_output_oracle"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/mocks/mock_optimism_portal"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
 )
 
 func Test_prover_getFPAC(t *testing.T) {
