@@ -6,6 +6,7 @@ import (
 
 	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/require"
+	"k8s.io/utils/pointer"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-testing-framework/k8s/chaos"
@@ -296,10 +297,12 @@ func TestLoadCCIPStableWithPodChaosDiffCommitAndExec(t *testing.T) {
 	}
 }
 
-func TestLoadCCIPStableRPSAfterARMUncurse(t *testing.T) {
+func TestLoadCCIPStableRPSAfterSourceARMCurseAndUncurse(t *testing.T) {
 	t.Parallel()
 	lggr := logging.GetTestLogger(t)
 	testArgs := NewLoadArgs(t, lggr)
+	// testing on one-directional lane to explicitly test source curse
+	testArgs.TestCfg.TestGroupInput.BiDirectionalLane = pointer.Bool(false)
 	testArgs.Setup()
 	// if the test runs on remote runner
 	if len(testArgs.TestSetupArgs.Lanes) == 0 {
@@ -310,6 +313,6 @@ func TestLoadCCIPStableRPSAfterARMUncurse(t *testing.T) {
 		require.NoError(t, testArgs.TestSetupArgs.TearDown())
 	})
 	testArgs.TriggerLoadByLane()
-	testArgs.ValidateCurseFollowedByUncurse()
+	testArgs.ValidateCurseFollowedByUncurse(Source)
 	testArgs.Wait()
 }

@@ -1,6 +1,7 @@
 package load
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"math/big"
@@ -10,10 +11,10 @@ import (
 
 	"github.com/AlekSi/pointer"
 	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/require"
-	"golang.org/x/sync/errgroup"
-
 	"github.com/smartcontractkit/wasp"
+	"github.com/stretchr/testify/require"
+	"go.uber.org/atomic"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/k8s/chaos"
 	"github.com/smartcontractkit/chainlink-testing-framework/utils/testcontext"
@@ -21,7 +22,13 @@ import (
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/actions"
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/testconfig"
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/testsetups"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
+)
+
+const (
+	Source      = "Source"
+	destination = "Destination"
 )
 
 type ChaosConfig struct {
@@ -42,7 +49,7 @@ type LoadArgs struct {
 	ChaosExps        []ChaosConfig
 	LoadgenTearDowns []func()
 	Labels           map[string]string
-	pauseLoad        chan bool
+	pauseLoad        *atomic.Bool
 }
 
 func (l *LoadArgs) SetReportParams() {
@@ -113,27 +120,46 @@ func (l *LoadArgs) SanityCheck() {
 	}
 }
 
-func (l *LoadArgs) ValidateCurseFollowedByUncurse() {
+func (l *LoadArgs) ValidateCurseFollowedByUncurse(srcorDest string) {
+	if srcorDest != Source && srcorDest != destination {
+		return
+	}
 	var lanes []*actions.CCIPLane
 	for _, lane := range l.TestSetupArgs.Lanes {
 		lanes = append(lanes, lane.ForwardLane)
-		lanes = append(lanes, lane.ReverseLane)
+		if lane.ReverseLane != nil {
+			lanes = append(lanes, lane.ReverseLane)
+		}
 	}
 	// before cursing set pause
-	l.pauseLoad <- true
+	l.pauseLoad.Store(true)
 	defer func() {
-		l.pauseLoad <- false
+		l.pauseLoad.Store(false)
 	}()
+	// wait for some time for pause to be active
+	l.lggr.Info().Msg("Waiting for 1 minute after applying pause on load")
+	time.Sleep(1 * time.Minute)
+
+	var curseTimeStamps []time.Time
 	for _, lane := range lanes {
-		require.NoError(l.t, lane.Source.Common.CurseARM(), "error in cursing arm")
+		if srcorDest == Source {
+			require.NoError(l.t, lane.Source.Common.CurseARM(), "error in cursing arm")
+		}
+		if srcorDest == destination {
+			require.NoError(l.t, lane.Dest.Common.CurseARM(), "error in cursing arm")
+		}
 		// try to send requests and teh request should revert
 		failedTx, _, _, err := lane.Source.SendRequest(
 			lane.Dest.ReceiverDapp.EthAddress,
 			actions.TokenTransfer, "msg with token more than aggregated rate",
 			big.NewInt(600_000), // gas limit
 		)
+		require.Error(l.t, err)
+		receipt, err := lane.Source.Common.ChainClient.GetTxReceipt(failedTx)
 		require.NoError(l.t, err)
-		require.Error(l.t, lane.Source.Common.ChainClient.WaitForEvents())
+		hdr, err := lane.Source.Common.ChainClient.HeaderByNumber(context.Background(), receipt.BlockNumber)
+		require.NoError(l.t, err)
+		curseTimeStamps = append(curseTimeStamps, hdr.Timestamp)
 		errReason, v, err := lane.Source.Common.ChainClient.RevertReasonFromTx(failedTx, router.RouterABI)
 		require.NoError(l.t, err)
 		require.Equal(l.t, "BadARMSignal", errReason)
@@ -143,9 +169,55 @@ func (l *LoadArgs) ValidateCurseFollowedByUncurse() {
 			Str("FailedTx", failedTx.Hex()).
 			Msg("Msg sent while source ARM is cursed")
 	}
+	// no execution event should be received after the curse is applied,
+	l.lggr.Info().Msg("Curse is applied on all lanes. Waiting for 5 minutes")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+	errGrp := &errgroup.Group{}
+	for i, lane := range lanes {
+		curseTimeStamp := curseTimeStamps[i]
+		errGrp.Go(func() error {
+			ticker := time.NewTicker(time.Second)
+			for {
+				select {
+				case <-ticker.C:
+					eventFoundAfterCursing := false
+					// verify if executionstate changed is received, it's not generated much after lane is cursed
+					lane.Dest.ExecStateChangedWatcher.Range(func(key, value any) bool {
+						e, exists := value.(*evm_2_evm_offramp.EVM2EVMOffRampExecutionStateChanged)
+						if exists {
+							vLogs := e.Raw
+							hdr, err := lane.Dest.Common.ChainClient.HeaderByNumber(ctx, big.NewInt(int64(vLogs.BlockNumber)))
+							if err != nil {
+								return true
+							}
+							if hdr.Timestamp.Add(30 * time.Second).After(curseTimeStamp) {
+								eventFoundAfterCursing = true
+								return false
+							}
+						}
+						return true
+					})
+					if eventFoundAfterCursing {
+						return fmt.Errorf("ExecutionStateChanged Event detected after curse")
+					}
+				case <-ctx.Done():
+					return nil
+				}
+			}
+		})
+	}
+
+	err := errGrp.Wait()
+	require.NoError(l.t, err, "error received to validate no execution state changed is generated after lane is cursed")
 	// now uncurse all
 	for _, lane := range lanes {
-		require.NoError(l.t, lane.Source.Common.UnvoteToCurseARM(), "error to unvote in cursing arm")
+		if srcorDest == Source {
+			require.NoError(l.t, lane.Source.Common.UnvoteToCurseARM(), "error to unvote in cursing arm")
+		}
+		if srcorDest == destination {
+			require.NoError(l.t, lane.Dest.Common.UnvoteToCurseARM(), "error to unvote in cursing arm")
+		}
 	}
 }
 
@@ -210,10 +282,11 @@ func (l *LoadArgs) TriggerLoadByLane() {
 func (l *LoadArgs) AddToRunnerGroup(gen *wasp.Generator) {
 	// watch for pause signal
 	go func(gen *wasp.Generator) {
+		ticker := time.NewTicker(time.Second)
 		for {
 			select {
-			case pause := <-l.pauseLoad:
-				if pause {
+			case <-ticker.C:
+				if l.pauseLoad.Load() {
 					gen.Pause()
 					continue
 				}
@@ -344,6 +417,6 @@ func NewLoadArgs(t *testing.T, lggr zerolog.Logger, chaosExps ...ChaosConfig) *L
 		TestCfg:       testsetups.NewCCIPTestConfig(t, lggr, testconfig.Load),
 		ChaosExps:     chaosExps,
 		LoadStarterWg: &sync.WaitGroup{},
-		pauseLoad:     make(chan bool),
+		pauseLoad:     atomic.NewBool(false),
 	}
 }

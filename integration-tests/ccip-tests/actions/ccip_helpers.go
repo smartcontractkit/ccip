@@ -153,7 +153,7 @@ func (ccipModule *CCIPCommon) StopWatchingPriceUpdates() {
 }
 
 func (ccipModule *CCIPCommon) UnvoteToCurseARM() error {
-	if ccipModule.ARM == nil {
+	if ccipModule.ARM != nil {
 		return fmt.Errorf("real ARM deployed. cannot curse through test")
 	}
 	if ccipModule.ARMContract == nil {
@@ -179,7 +179,7 @@ func (ccipModule *CCIPCommon) UnvoteToCurseARM() error {
 }
 
 func (ccipModule *CCIPCommon) CurseARM() error {
-	if ccipModule.ARM == nil {
+	if ccipModule.ARM != nil {
 		return fmt.Errorf("real ARM deployed. cannot curse through test")
 	}
 	if ccipModule.ARMContract == nil {
@@ -1321,12 +1321,20 @@ func (sourceCCIP *SourceCCIPModule) SendRequest(
 	if feeToken != (common.Address{}) {
 		sendTx, err = sourceCCIP.Common.Router.CCIPSendAndProcessTx(destChainSelector, msg, nil)
 		if err != nil {
-			return common.Hash{}, time.Since(timeNow), nil, fmt.Errorf("failed initiating the transfer ccip-send: %w", err)
+			txHash := common.Hash{}
+			if sendTx != nil {
+				txHash = sendTx.Hash()
+			}
+			return txHash, time.Since(timeNow), nil, fmt.Errorf("failed initiating the transfer ccip-send: %w", err)
 		}
 	} else {
 		sendTx, err = sourceCCIP.Common.Router.CCIPSendAndProcessTx(destChainSelector, msg, fee)
 		if err != nil {
-			return common.Hash{}, time.Since(timeNow), nil, fmt.Errorf("failed initiating the transfer ccip-send: %w", err)
+			txHash := common.Hash{}
+			if sendTx != nil {
+				txHash = sendTx.Hash()
+			}
+			return txHash, time.Since(timeNow), nil, fmt.Errorf("failed initiating the transfer ccip-send: %w", err)
 		}
 	}
 
