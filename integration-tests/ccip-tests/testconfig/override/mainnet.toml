@@ -1,13 +1,15 @@
 [CCIP]
 [CCIP.Deployments]
+# We are adding una.WeMix to Arbitrum, Avalanche, BSC, Ethereum (and una.USDC), Kroma, Optimism, Polygon, Wemix
+# the first bridge token will always be una.Wemix, and the second if valid willl be una.usdc
 Data = """
 {
     "lane_configs": {
         "Arbitrum Mainnet": {
             "is_native_fee_token": true,
             "fee_token": "0xf97f4df75117a78c1A5a0DBb814Af92458539FB4",
-            "bridge_tokens": [],
-            "bridge_tokens_pools": [],
+            "bridge_tokens": ["0x89F590D8f9c1a306AEB4E939Dc923C80144998Cd"],
+            "bridge_tokens_pools": ["0x67b042ED9CC05A2aa57D6c25a2DfA2c51B9e3daD"],
             "arm": "0xe06b0e8c4bd455153e8794ad7Ea8Ff5A14B64E4b",
             "router": "0x141fa059441E0ca23ce184B6A78bafD2A517DdE8",
             "price_registry": "0x13015e4E6f839E1Aa1016DF521ea458ecA20438c",
@@ -83,8 +85,8 @@ Data = """
         "Avalanche Mainnet": {
             "is_native_fee_token": true,
             "fee_token": "0x5947BB275c521040051D82396192181b413227A3",
-            "bridge_tokens": [],
-            "bridge_tokens_pools": [],
+            "bridge_tokens": ["0x9f1453d0fADC73aE12d4e1BD8311AA2463AE7d0D"],
+            "bridge_tokens_pools": ["0xE57Ac611b3C8385Bb045E074Ee238343954F5B7D"],
             "arm": "0xdFD6C0dc67666DE3bB36b31eec5c7B1542A82C1E",
             "router": "0xF4c7E640EdA248ef95972845a62bdC74237805dB",
             "price_registry": "0xfA4edD04eaAcDB07c8D73621bc1790eC50D8c489",
@@ -228,8 +230,8 @@ Data = """
         "BSC Mainnet": {
             "is_native_fee_token": true,
             "fee_token": "0x404460C6A5EdE2D891e8297795264fDe62ADBB75",
-            "bridge_tokens": [],
-            "bridge_tokens_pools": [],
+            "bridge_tokens": ["0x98169bF9B7a44EDaD372364063b897E16eBba88e"],
+            "bridge_tokens_pools": ["0xf4c59cf58c23f747157F9F32C8b3feB0F9b718cC"],
             "arm": "0x3DB43b96B2625F4232e9Df900d464dd2c64C0021",
             "router": "0x34B03Cb9086d7D758AC55af71584F81A598759FE",
             "price_registry": "0xd64aAbD70A71d9f0A00B99F6EFc1626aA2dD43C7",
@@ -305,8 +307,15 @@ Data = """
         "Ethereum Mainnet": {
             "is_native_fee_token": true,
             "fee_token": "0x514910771AF9Ca656af840dff83E8264EcF986CA",
-            "bridge_tokens": [],
-            "bridge_tokens_pools": [],
+            "bridge_tokens": [
+                "0x2624Bd0094f474713AC9c634b37A5ebef4e0b1FE",
+                "0x66cC3FD40612F9c591F977ce026Ef1C79520C472"
+                ],
+            "bridge_tokens_pools": [
+                "0x78196436aF11b948c7036424B1ceA711fAdAd288",
+                "0x1175E4CFd6a73A4c1F1f2c1400a08D88554FA62e"
+
+            ],
             "arm": "0x8B63b3DE93431C0f756A493644d128134291fA1b",
             "router": "0x80226fc0Ee2b096224EeAc085Bb9a8cba1146f7D",
             "price_registry": "0x8c9b2Efb7c64C394119270bfecE7f54763b958Ad",
@@ -382,8 +391,8 @@ Data = """
         "Kroma Mainnet": {
             "is_native_fee_token": true,
             "fee_token": "0xC1F6f7622ad37C3f46cDF6F8AA0344ADE80BF450",
-            "bridge_tokens": [],
-            "bridge_tokens_pools": [],
+            "bridge_tokens": ["0xc319a4855162E51599bF80387A615105Fe6BEdF3"],
+            "bridge_tokens_pools": ["0x0Fe47f8Cd6214a51cCf22F3fDc9e785B35549377"],
             "arm": "0xB59779d3364BC6d71168245f9ebb96469E5a5a98",
             "router": "0xE93E8B0d1b1CEB44350C8758ed1E2799CCee31aB",
             "price_registry": "0x8155B4710e7bbC90924E957104F94Afd4f95Eca2",
@@ -405,8 +414,8 @@ Data = """
         "Optimism Mainnet": {
             "is_native_fee_token": true,
             "fee_token": "0x350a791Bfc2C21F9Ed5d10980Dad2e2638ffa7f6",
-            "bridge_tokens": [],
-            "bridge_tokens_pools": [],
+            "bridge_tokens": ["0x6ff638E48247b003E003aa3EeDDdF97BaA8f3B64"],
+            "bridge_tokens_pools": ["0x2f391A18643f23c9F6C4AB72D3Aa3E1Ff0d42e19"],
             "arm": "0x8C7C2C3362a42308BB5c368677Ad321D11693b81",
             "router": "0x3206695CaE29952f4b0c22a169725a865bc8Ce0f",
             "price_registry": "0xb52545aECE8C73A97E52a146757EC15b90Ed8488",
@@ -482,8 +491,8 @@ Data = """
         "Polygon Mainnet": {
             "is_native_fee_token": true,
             "fee_token": "0xb0897686c545045aFc77CF20eC7A532E3120E0F1",
-            "bridge_tokens": [],
-            "bridge_tokens_pools": [],
+            "bridge_tokens": ["0x186d65ceD0693382713437e34EF8723FD6aa9A1E"],
+            "bridge_tokens_pools": ["0x14765AC59b2a1ACfd8D80aEA16a6462B346331ca"],
             "arm": "0xD7AcF65dA1E1f34b663aB199a474F209bF2b0523",
             "router": "0x849c5ED5a80F5B408Dd4969b78c2C8fdf0565Bfe",
             "price_registry": "0x30D873664Ba766C983984C7AF9A921ccE36D34e1",
@@ -559,8 +568,8 @@ Data = """
         "WeMix Mainnet": {
             "is_native_fee_token": true,
             "fee_token": "0x80f1FcdC96B55e459BF52b998aBBE2c364935d69",
-            "bridge_tokens": [],
-            "bridge_tokens_pools": [],
+            "bridge_tokens": ["0xF500208d9aB68FeA3cc41bd107811e809C0B6B83"],
+            "bridge_tokens_pools": ["0xb6B458c95e5C70dFd412a6228a733f1e02E202fE"],
             "arm": "0x07aaC8B69A62dB5bd3d244091916EbF2fac17b76",
             "router": "0x7798b795Fde864f4Cd1b124a38Ba9619B7F8A442",
             "price_registry": "0x252863688762aD86868D3d3076233Eacd80c7055",
