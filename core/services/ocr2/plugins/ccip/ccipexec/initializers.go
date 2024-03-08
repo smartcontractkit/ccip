@@ -238,6 +238,7 @@ func jobSpecToExecPluginConfig(ctx context.Context, lggr logger.Logger, jb job.J
 
 	chainHealthcheck := cache.NewObservedChainHealthCheck(
 		cache.NewChainHealthcheck(
+			ctx,
 			// Adding more details to Logger to make healthcheck logs more informative
 			// It's safe because healthcheck logs only in case of unhealthy state
 			lggr.With(

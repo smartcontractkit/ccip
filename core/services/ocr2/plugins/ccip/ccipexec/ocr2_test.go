@@ -213,7 +213,7 @@ func TestExecutionReportingPlugin_Observation(t *testing.T) {
 			p.sourcePriceRegistryProvider = mockOnRampPriceRegistryProvider
 
 			p.snoozedRoots = cache.NewSnoozedRoots(time.Minute, time.Minute)
-			p.chainHealthcheck = cache.NewChainHealthcheck(p.lggr, mockOnRampReader, commitStoreReader)
+			p.chainHealthcheck = cache.NewChainHealthcheck(ctx, p.lggr, mockOnRampReader, commitStoreReader)
 
 			_, err = p.Observation(ctx, types.ReportTimestamp{}, types.Query{})
 			if tc.expErr {
@@ -266,7 +266,7 @@ func TestExecutionReportingPlugin_Report(t *testing.T) {
 
 			p.commitStoreReader = ccipdatamocks.NewCommitStoreReader(t)
 			chainHealthcheck := ccipcachemocks.NewChainHealthcheck(t)
-			chainHealthcheck.On("IsHealthy", ctx, false).Return(true, nil)
+			chainHealthcheck.On("IsHealthy", ctx).Return(true, nil)
 			p.chainHealthcheck = chainHealthcheck
 
 			observations := make([]types.AttributedObservation, len(tc.observations))

@@ -13,9 +13,9 @@ type ChainHealthcheck struct {
 	mock.Mock
 }
 
-// IsHealthy provides a mock function with given fields: ctx, forceRefresh
-func (_m *ChainHealthcheck) IsHealthy(ctx context.Context, forceRefresh bool) (bool, error) {
-	ret := _m.Called(ctx, forceRefresh)
+// IsHealthy provides a mock function with given fields: ctx
+func (_m *ChainHealthcheck) IsHealthy(ctx context.Context) (bool, error) {
+	ret := _m.Called(ctx)
 
 	if len(ret) == 0 {
 		panic("no return value specified for IsHealthy")
@@ -23,17 +23,17 @@ func (_m *ChainHealthcheck) IsHealthy(ctx context.Context, forceRefresh bool) (b
 
 	var r0 bool
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, bool) (bool, error)); ok {
-		return rf(ctx, forceRefresh)
+	if rf, ok := ret.Get(0).(func(context.Context) (bool, error)); ok {
+		return rf(ctx)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, bool) bool); ok {
-		r0 = rf(ctx, forceRefresh)
+	if rf, ok := ret.Get(0).(func(context.Context) bool); ok {
+		r0 = rf(ctx)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, bool) error); ok {
-		r1 = rf(ctx, forceRefresh)
+	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = rf(ctx)
 	} else {
 		r1 = ret.Error(1)
 	}
