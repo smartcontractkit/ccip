@@ -9,6 +9,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip/rebalancer/multienv"
 	helpers "github.com/smartcontractkit/chainlink/core/scripts/common"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/optimism_portal"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/bridge/opstack/withdrawprover"
 )
 
 func FinalizeL1(
@@ -27,14 +28,13 @@ func FinalizeL1(
 	receipt, err := l2Client.TransactionReceipt(context.Background(), l2TxHash)
 	helpers.PanicErr(err)
 
-	messagePassedLog := getMessagePassedLog(receipt.Logs)
+	messagePassedLog := withdrawprover.GetMessagePassedLog(receipt.Logs)
 	if messagePassedLog == nil {
 		panic(fmt.Sprintf("No message passed log found in receipt %s", receipt.TxHash.String()))
 	}
 
-	messagePassed := parseMessagePassedLog(messagePassedLog)
-
-	lowLevelMsg := toLowLevelMessage(messagePassed)
+	messagePassed, err := withdrawprover.ParseMessagePassedLog(messagePassedLog)
+	helpers.PanicErr(err)
 
 	portal, err := optimism_portal.NewOptimismPortal(optimismPortalAddress, env.Clients[l1ChainID])
 	helpers.PanicErr(err)
@@ -42,12 +42,12 @@ func FinalizeL1(
 	tx, err := portal.FinalizeWithdrawalTransaction(
 		env.Transactors[l1ChainID],
 		optimism_portal.TypesWithdrawalTransaction{
-			Nonce:    lowLevelMsg.MessageNonce,
-			Sender:   lowLevelMsg.Sender,
-			Target:   lowLevelMsg.Target,
-			Value:    lowLevelMsg.Value,
-			GasLimit: lowLevelMsg.MinGasLimit,
-			Data:     lowLevelMsg.Message,
+			Nonce:    messagePassed.Nonce,
+			Sender:   messagePassed.Sender,
+			Target:   messagePassed.Target,
+			Value:    messagePassed.Value,
+			GasLimit: messagePassed.GasLimit,
+			Data:     messagePassed.Data,
 		},
 	)
 	helpers.PanicErr(err)

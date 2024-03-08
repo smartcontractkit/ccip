@@ -6,7 +6,6 @@ go 1.21.3
 replace github.com/smartcontractkit/chainlink/v2 => ../../
 
 require (
-	github.com/Masterminds/semver/v3 v3.2.1
 	github.com/docker/docker v24.0.7+incompatible
 	github.com/docker/go-connections v0.4.0
 	github.com/ethereum/go-ethereum v1.13.8
@@ -52,6 +51,7 @@ require (
 	github.com/CosmWasm/wasmvm v1.2.4 // indirect
 	github.com/DataDog/zstd v1.5.2 // indirect
 	github.com/Depado/ginprom v1.8.0 // indirect
+	github.com/Masterminds/semver/v3 v3.2.1 // indirect
 	github.com/Microsoft/go-winio v0.6.1 // indirect
 	github.com/VictoriaMetrics/fastcache v1.12.1 // indirect
 	github.com/andres-erbsen/clock v0.0.0-20160526145045-9e14626cd129 // indirect
