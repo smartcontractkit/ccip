@@ -44,7 +44,8 @@ type CCIPTestConfig struct {
 	MaxNoOfLanes               int                `toml:",omitempty"`
 	ChaosDuration              *config.Duration   `toml:",omitempty"`
 	USDCMockDeployment         *bool              `toml:",omitempty"`
-	TimeoutForPriceUpdate      *config.Duration   `toml:",omitempty"`
+	TimeoutForPriceUpdLate     *config.Duration   `toml:",omitempty"`
+	FailOnFirstErrorInLoad     *bool              `toml:",omitempty"`
 }
 
 func (c *CCIPTestConfig) SetTestRunName(name string) {
