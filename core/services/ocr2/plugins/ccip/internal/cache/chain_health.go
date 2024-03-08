@@ -29,9 +29,7 @@ import (
 //
 //go:generate mockery --quiet --name ChainHealthcheck --filename chain_health_mock.go --case=underscore
 type ChainHealthcheck interface {
-	// IsHealthy checks if the chain is healthy and returns true if it is, false otherwise
-	// If forceRefresh is set to true, it will refresh the RMN curse state. Should be used in the Observation and ShouldTransmit phases of OCR2.
-	// Otherwise, it will use the cached value of the RMN curse state.
+	// IsHealthy checks if the chain is healthy and returns true if it is, false otherwise.
 	IsHealthy(ctx context.Context) (bool, error)
 }
 
