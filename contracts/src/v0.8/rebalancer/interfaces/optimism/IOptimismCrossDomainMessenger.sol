@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+// Copied from https://github.com/ethereum-optimism/optimism/blob/f707883038d527cbf1e9f8ea513fe33255deadbc/packages/contracts-bedrock/src/universal/CrossDomainMessenger.sol#L153
 pragma solidity ^0.8.0;
 
 interface IOptimismCrossDomainMessenger {

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+// Copied from https://github.com/ethereum-optimism/optimism/blob/v1.7.0/packages/contracts-bedrock/src/dispute/DisputeGameFactory.sol
 pragma solidity ^0.8.0;
 
 import {GameType, GameId, Timestamp, Claim} from "./DisputeTypes.sol";
