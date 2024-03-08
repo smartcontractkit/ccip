@@ -295,3 +295,21 @@ func TestLoadCCIPStableWithPodChaosDiffCommitAndExec(t *testing.T) {
 		})
 	}
 }
+
+func TestLoadCCIPStableRPSAfterARMUncurse(t *testing.T) {
+	t.Parallel()
+	lggr := logging.GetTestLogger(t)
+	testArgs := NewLoadArgs(t, lggr)
+	testArgs.Setup()
+	// if the test runs on remote runner
+	if len(testArgs.TestSetupArgs.Lanes) == 0 {
+		return
+	}
+	t.Cleanup(func() {
+		log.Info().Msg("Tearing down the environment")
+		require.NoError(t, testArgs.TestSetupArgs.TearDown())
+	})
+	testArgs.TriggerLoadByLane()
+	testArgs.ValidateCurseFollowedByUncurse()
+	testArgs.Wait()
+}

@@ -21,6 +21,7 @@ import (
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/actions"
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/testconfig"
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/testsetups"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
 )
 
 type ChaosConfig struct {
@@ -41,6 +42,7 @@ type LoadArgs struct {
 	ChaosExps        []ChaosConfig
 	LoadgenTearDowns []func()
 	Labels           map[string]string
+	pauseLoad        chan bool
 }
 
 func (l *LoadArgs) SetReportParams() {
@@ -111,6 +113,42 @@ func (l *LoadArgs) SanityCheck() {
 	}
 }
 
+func (l *LoadArgs) ValidateCurseFollowedByUncurse() {
+	var lanes []*actions.CCIPLane
+	for _, lane := range l.TestSetupArgs.Lanes {
+		lanes = append(lanes, lane.ForwardLane)
+		lanes = append(lanes, lane.ReverseLane)
+	}
+	// before cursing set pause
+	l.pauseLoad <- true
+	defer func() {
+		l.pauseLoad <- false
+	}()
+	for _, lane := range lanes {
+		require.NoError(l.t, lane.Source.Common.CurseARM(), "error in cursing arm")
+		// try to send requests and teh request should revert
+		failedTx, _, _, err := lane.Source.SendRequest(
+			lane.Dest.ReceiverDapp.EthAddress,
+			actions.TokenTransfer, "msg with token more than aggregated rate",
+			big.NewInt(600_000), // gas limit
+		)
+		require.NoError(l.t, err)
+		require.Error(l.t, lane.Source.Common.ChainClient.WaitForEvents())
+		errReason, v, err := lane.Source.Common.ChainClient.RevertReasonFromTx(failedTx, router.RouterABI)
+		require.NoError(l.t, err)
+		require.Equal(l.t, "BadARMSignal", errReason)
+		lane.Logger.Info().
+			Str("Revert Reason", errReason).
+			Interface("Args", v).
+			Str("FailedTx", failedTx.Hex()).
+			Msg("Msg sent while source ARM is cursed")
+	}
+	// now uncurse all
+	for _, lane := range lanes {
+		require.NoError(l.t, lane.Source.Common.UnvoteToCurseARM(), "error to unvote in cursing arm")
+	}
+}
+
 func (l *LoadArgs) TriggerLoadByLane() {
 	l.setSchedule()
 	l.TestSetupArgs.Reporter.SetDuration(l.TestCfg.TestGroupInput.TestDuration.Duration())
@@ -170,6 +208,19 @@ func (l *LoadArgs) TriggerLoadByLane() {
 }
 
 func (l *LoadArgs) AddToRunnerGroup(gen *wasp.Generator) {
+	// watch for pause signal
+	go func(gen *wasp.Generator) {
+		for {
+			select {
+			case pause := <-l.pauseLoad:
+				if pause {
+					gen.Pause()
+					continue
+				}
+				gen.Resume()
+			}
+		}
+	}(gen)
 	l.RunnerWg.Go(func() error {
 		_, failed := gen.Wait()
 		if failed {
@@ -293,5 +344,6 @@ func NewLoadArgs(t *testing.T, lggr zerolog.Logger, chaosExps ...ChaosConfig) *L
 		TestCfg:       testsetups.NewCCIPTestConfig(t, lggr, testconfig.Load),
 		ChaosExps:     chaosExps,
 		LoadStarterWg: &sync.WaitGroup{},
+		pauseLoad:     make(chan bool),
 	}
 }

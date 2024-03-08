@@ -49,6 +49,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_arm_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/price_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
@@ -149,6 +150,58 @@ func (ccipModule *CCIPCommon) StopWatchingPriceUpdates() {
 	for _, sub := range ccipModule.priceUpdateSubs {
 		sub.Unsubscribe()
 	}
+}
+
+func (ccipModule *CCIPCommon) UnvoteToCurseARM() error {
+	if ccipModule.ARM == nil {
+		return fmt.Errorf("real ARM deployed. cannot curse through test")
+	}
+	if ccipModule.ARMContract == nil {
+		return fmt.Errorf("no ARM contract is set")
+	}
+	arm, err := mock_arm_contract.NewMockARMContract(*ccipModule.ARMContract, ccipModule.ChainClient.Backend())
+	if err != nil {
+		return fmt.Errorf("error instantiating arm %w", arm)
+	}
+	opts, err := ccipModule.ChainClient.TransactionOpts(ccipModule.ChainClient.GetDefaultWallet())
+	if err != nil {
+		return fmt.Errorf("error getting owners for ARM OwnerUnvoteToCurse %w", err)
+	}
+	tx, err := arm.OwnerUnvoteToCurse(opts, []mock_arm_contract.ARMUnvoteToCurseRecord{})
+	if err != nil {
+		return fmt.Errorf("error in calling OwnerUnvoteToCurse %w", err)
+	}
+	err = ccipModule.ChainClient.ProcessTransaction(tx)
+	if err != nil {
+		return err
+	}
+	return ccipModule.ChainClient.WaitForEvents()
+}
+
+func (ccipModule *CCIPCommon) CurseARM() error {
+	if ccipModule.ARM == nil {
+		return fmt.Errorf("real ARM deployed. cannot curse through test")
+	}
+	if ccipModule.ARMContract == nil {
+		return fmt.Errorf("no ARM contract is set")
+	}
+	arm, err := mock_arm_contract.NewMockARMContract(*ccipModule.ARMContract, ccipModule.ChainClient.Backend())
+	if err != nil {
+		return fmt.Errorf("error instantiating arm %w", arm)
+	}
+	opts, err := ccipModule.ChainClient.TransactionOpts(ccipModule.ChainClient.GetDefaultWallet())
+	if err != nil {
+		return fmt.Errorf("error getting owners for ARM VoteToCurse %w", err)
+	}
+	tx, err := arm.VoteToCurse(opts, [32]byte{})
+	if err != nil {
+		return fmt.Errorf("error in calling VoteToCurse %w", err)
+	}
+	err = ccipModule.ChainClient.ProcessTransaction(tx)
+	if err != nil {
+		return err
+	}
+	return ccipModule.ChainClient.WaitForEvents()
 }
 
 func (ccipModule *CCIPCommon) Copy(logger zerolog.Logger, chainClient blockchain.EVMClient) (*CCIPCommon, error) {
