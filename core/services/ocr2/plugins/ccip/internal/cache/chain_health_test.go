@@ -15,12 +15,11 @@ import (
 
 func Test_RMNStateCaching(t *testing.T) {
 	ctx := tests.Context(t)
-	defer ctx.Done()
 	lggr := logger.TestLogger(t)
 	mockCommitStore := mocks.NewCommitStoreReader(t)
 	mockOnRamp := mocks.NewOnRampReader(t)
 
-	chainState := newChainHealthcheckWithCustomEviction(ctx, lggr, mockOnRamp, mockCommitStore, 10*time.Hour, 10*time.Hour)
+	chainState := newChainHealthcheckWithCustomEviction(lggr, mockOnRamp, mockCommitStore, 10*time.Hour, 10*time.Hour)
 
 	// Chain is not cursed and healthy
 	mockCommitStore.On("IsDown", ctx).Return(false, nil).Once()
@@ -39,7 +38,9 @@ func Test_RMNStateCaching(t *testing.T) {
 	assert.True(t, healthy)
 
 	// Enforce cache refresh
-	chainState.refresh(ctx)
+	_, err = chainState.refresh(ctx)
+	assert.NoError(t, err)
+
 	healthy, err = chainState.IsHealthy(ctx)
 	assert.Nil(t, err)
 	assert.False(t, healthy)
@@ -48,7 +49,9 @@ func Test_RMNStateCaching(t *testing.T) {
 	mockCommitStore.On("IsDown", ctx).Return(false, nil).Maybe()
 	mockOnRamp.On("IsSourceCursed", ctx).Return(false, nil).Maybe()
 	// Enforce cache refresh
-	chainState.refresh(ctx)
+	_, err = chainState.refresh(ctx)
+	assert.NoError(t, err)
+
 	healthy, err = chainState.IsHealthy(ctx)
 	assert.Nil(t, err)
 	assert.False(t, healthy)
@@ -56,19 +59,21 @@ func Test_RMNStateCaching(t *testing.T) {
 
 func Test_ChainStateIsCached(t *testing.T) {
 	ctx := tests.Context(t)
-	defer ctx.Done()
 	lggr := logger.TestLogger(t)
 	mockCommitStore := mocks.NewCommitStoreReader(t)
 	mockOnRamp := mocks.NewOnRampReader(t)
 
-	chainState := newChainHealthcheckWithCustomEviction(ctx, lggr, mockOnRamp, mockCommitStore, 10*time.Hour, 10*time.Hour)
+	chainState := newChainHealthcheckWithCustomEviction(lggr, mockOnRamp, mockCommitStore, 10*time.Hour, 10*time.Hour)
 
 	// Chain is not cursed and healthy
 	mockCommitStore.On("IsDown", ctx).Return(false, nil).Maybe()
 	mockCommitStore.On("IsDestChainHealthy", ctx).Return(true, nil).Once()
 	mockOnRamp.On("IsSourceCursed", ctx).Return(false, nil).Maybe()
 	mockOnRamp.On("IsSourceChainHealthy", ctx).Return(true, nil).Once()
-	chainState.refresh(ctx)
+
+	_, err := chainState.refresh(ctx)
+	assert.NoError(t, err)
+
 	healthy, err := chainState.IsHealthy(ctx)
 	assert.NoError(t, err)
 	assert.True(t, healthy)
@@ -76,7 +81,9 @@ func Test_ChainStateIsCached(t *testing.T) {
 	// Chain is not healthy
 	mockCommitStore.On("IsDestChainHealthy", ctx).Return(false, nil).Once()
 	mockOnRamp.On("IsSourceChainHealthy", ctx).Return(false, nil).Once()
-	chainState.refresh(ctx)
+	_, err = chainState.refresh(ctx)
+	assert.NoError(t, err)
+
 	healthy, err = chainState.IsHealthy(ctx)
 	assert.NoError(t, err)
 	assert.False(t, healthy)
@@ -84,7 +91,10 @@ func Test_ChainStateIsCached(t *testing.T) {
 	// Previous value is returned
 	mockCommitStore.On("IsDestChainHealthy", ctx).Return(true, nil).Maybe()
 	mockOnRamp.On("IsSourceChainHealthy", ctx).Return(true, nil).Maybe()
-	chainState.refresh(ctx)
+
+	_, err = chainState.refresh(ctx)
+	assert.NoError(t, err)
+
 	healthy, err = chainState.IsHealthy(ctx)
 	assert.NoError(t, err)
 	assert.False(t, healthy)
@@ -154,8 +164,6 @@ func Test_ChainStateIsHealthy(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := tests.Context(t)
-			defer ctx.Done()
-
 			mockCommitStore := mocks.NewCommitStoreReader(t)
 			mockOnRamp := mocks.NewOnRampReader(t)
 

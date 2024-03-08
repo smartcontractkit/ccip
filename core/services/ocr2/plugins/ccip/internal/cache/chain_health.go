@@ -57,17 +57,24 @@ type chainHealthcheck struct {
 }
 
 func NewChainHealthcheck(ctx context.Context, lggr logger.Logger, onRamp ccipdata.OnRampReader, commitStore ccipdata.CommitStoreReader) *chainHealthcheck {
-	return newChainHealthcheckWithCustomEviction(
-		ctx,
-		lggr,
-		onRamp,
-		commitStore,
-		defaultGlobalStatusDuration,
-		defaultRMNStateRefreshInterval,
-	)
+	ch := &chainHealthcheck{
+		// Different keys use different expiration times, so we don't need to worry about the default value
+		cache:                    cache.New(cache.NoExpiration, 0),
+		rmnStatusKey:             rmnStatusKey,
+		globalStatusKey:          globalStatusKey,
+		globalStatusExpiration:   defaultGlobalStatusDuration,
+		rmnStatusRefreshInterval: defaultRMNStateRefreshInterval,
+
+		lggr:        lggr,
+		onRamp:      onRamp,
+		commitStore: commitStore,
+	}
+	ch.spawnBackgroundRefresher(ctx)
+	return ch
 }
 
-func newChainHealthcheckWithCustomEviction(ctx context.Context, lggr logger.Logger, onRamp ccipdata.OnRampReader, commitStore ccipdata.CommitStoreReader, globalStatusDuration time.Duration, rmnStatusRefreshInterval time.Duration) *chainHealthcheck {
+// newChainHealthcheckWithCustomEviction is used for testing purposes only. It doesn't start background worker
+func newChainHealthcheckWithCustomEviction(lggr logger.Logger, onRamp ccipdata.OnRampReader, commitStore ccipdata.CommitStoreReader, globalStatusDuration time.Duration, rmnStatusRefreshInterval time.Duration) *chainHealthcheck {
 	ch := &chainHealthcheck{
 		cache:                    cache.New(rmnStatusRefreshInterval, 0),
 		rmnStatusKey:             rmnStatusKey,
@@ -79,7 +86,6 @@ func newChainHealthcheckWithCustomEviction(ctx context.Context, lggr logger.Logg
 		onRamp:      onRamp,
 		commitStore: commitStore,
 	}
-	ch.spawnBackgroundRefresher(ctx)
 	return ch
 }
 
@@ -106,7 +112,7 @@ func (c *chainHealthcheck) IsHealthy(ctx context.Context) (bool, error) {
 	if healthy, err := c.checkIfReadersAreHealthy(ctx); err != nil {
 		return false, err
 	} else if !healthy {
-		c.cache.Set(c.globalStatusKey, false, c.globalStatusExpiration)
+		c.markStickyStatusUnhealthy()
 		return healthy, nil
 	}
 
@@ -114,7 +120,7 @@ func (c *chainHealthcheck) IsHealthy(ctx context.Context) (bool, error) {
 	if healthy, err := c.checkIfRMNsAreHealthy(ctx); err != nil {
 		return false, err
 	} else if !healthy {
-		c.cache.Set(c.globalStatusKey, false, c.globalStatusExpiration)
+		c.markStickyStatusUnhealthy()
 		return healthy, nil
 	}
 	return true, nil
@@ -123,21 +129,28 @@ func (c *chainHealthcheck) IsHealthy(ctx context.Context) (bool, error) {
 func (c *chainHealthcheck) spawnBackgroundRefresher(ctx context.Context) {
 	ticker := time.NewTicker(c.rmnStatusRefreshInterval)
 	go func() {
+		// Refresh the RMN state immediately after starting the background refresher
+		_, _ = c.refresh(ctx)
+
 		for {
 			select {
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				// Refresh the RMN state
-				c.refresh(ctx)
+				_, _ = c.refresh(ctx)
 			}
 		}
 	}()
 }
 
-func (c *chainHealthcheck) refresh(ctx context.Context) {
+func (c *chainHealthcheck) refresh(ctx context.Context) (bool, error) {
 	healthy, err := c.fetchRMNCurseState(ctx)
-	c.cache.Set(c.rmnStatusKey, rmnResponse{healthy, err}, -1)
+	c.cache.Set(
+		c.rmnStatusKey,
+		rmnResponse{healthy, err},
+		3*c.rmnStatusRefreshInterval, // Cache the value for 3 refresh intervals
+	)
+	return healthy, err
 }
 
 // checkIfReadersAreHealthy checks if the source and destination chains are healthy by calling underlying LogPoller
@@ -174,9 +187,11 @@ func (c *chainHealthcheck) checkIfRMNsAreHealthy(ctx context.Context) (bool, err
 	}
 
 	// If the value is not found in the cache, fetch the RMN curse state in a sync manner for the first time
-	healthy, err := c.fetchRMNCurseState(ctx)
-	c.cache.Set(c.rmnStatusKey, rmnResponse{healthy, err}, -1)
-	return healthy, err
+	return c.refresh(ctx)
+}
+
+func (c *chainHealthcheck) markStickyStatusUnhealthy() {
+	c.cache.Set(c.globalStatusKey, false, c.globalStatusExpiration)
 }
 
 func (c *chainHealthcheck) fetchRMNCurseState(ctx context.Context) (bool, error) {

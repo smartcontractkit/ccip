@@ -334,7 +334,7 @@ func TestCommitReportingPlugin_Report(t *testing.T) {
 			assert.NoError(t, err)
 
 			healthCheck := ccipcachemocks.NewChainHealthcheck(t)
-			healthCheck.On("IsHealthy", ctx, false).Return(true, nil)
+			healthCheck.On("IsHealthy", ctx).Return(true, nil)
 
 			p := &CommitReportingPlugin{}
 			p.lggr = logger.TestLogger(t)
