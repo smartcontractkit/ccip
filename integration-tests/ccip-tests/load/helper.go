@@ -120,16 +120,15 @@ func (l *LoadArgs) SanityCheck() {
 	}
 }
 
-func (l *LoadArgs) ValidateCurseFollowedByUncurse(srcorDest string) {
-	if srcorDest != Source && srcorDest != destination {
-		return
-	}
+// ValidateCurseFollowedByUncurse assumes the lanes under test are bi-directional.
+// It curses source ARM for forward lanes so that destination curse is also validated for reverse lanes.
+// It waits for 5 minutes for curse to be seen by ccip plugins and contracts.
+// It captures the curse timestamp to verify no execution state changed event is emitted after the cure is applied.
+// It uncurses the source ARM at the end so that it can be verified that rest of the requests are processed as expected.
+func (l *LoadArgs) ValidateCurseFollowedByUncurse() {
 	var lanes []*actions.CCIPLane
 	for _, lane := range l.TestSetupArgs.Lanes {
 		lanes = append(lanes, lane.ForwardLane)
-		if lane.ReverseLane != nil {
-			lanes = append(lanes, lane.ReverseLane)
-		}
 	}
 	// before cursing set pause
 	l.pauseLoad.Store(true)
@@ -139,15 +138,24 @@ func (l *LoadArgs) ValidateCurseFollowedByUncurse(srcorDest string) {
 	// wait for some time for pause to be active
 	l.lggr.Info().Msg("Waiting for 1 minute after applying pause on load")
 	time.Sleep(1 * time.Minute)
-
-	var curseTimeStamps []time.Time
+	curseTimeStamps := make(map[string]time.Time)
 	for _, lane := range lanes {
-		if srcorDest == Source {
-			require.NoError(l.t, lane.Source.Common.CurseARM(), "error in cursing arm")
-		}
-		if srcorDest == destination {
-			require.NoError(l.t, lane.Dest.Common.CurseARM(), "error in cursing arm")
-		}
+		curseTx, err := lane.Source.Common.CurseARM()
+		require.NoError(l.t, err, "error in cursing arm")
+		require.NotNil(l.t, curseTx, "invalid cursetx")
+		receipt, err := lane.Source.Common.ChainClient.GetTxReceipt(curseTx.Hash())
+		require.NoError(l.t, err)
+		hdr, err := lane.Source.Common.ChainClient.HeaderByNumber(context.Background(), receipt.BlockNumber)
+		require.NoError(l.t, err)
+		curseTimeStamps[lane.SourceNetworkName] = hdr.Timestamp
+	}
+
+	// now add the reverse lanes so that destination curse is also verfied
+	for _, lane := range l.TestSetupArgs.Lanes {
+		lanes = append(lanes, lane.ReverseLane)
+	}
+
+	for _, lane := range lanes {
 		// try to send requests and teh request should revert
 		failedTx, _, _, err := lane.Source.SendRequest(
 			lane.Dest.ReceiverDapp.EthAddress,
@@ -155,11 +163,6 @@ func (l *LoadArgs) ValidateCurseFollowedByUncurse(srcorDest string) {
 			big.NewInt(600_000), // gas limit
 		)
 		require.Error(l.t, err)
-		receipt, err := lane.Source.Common.ChainClient.GetTxReceipt(failedTx)
-		require.NoError(l.t, err)
-		hdr, err := lane.Source.Common.ChainClient.HeaderByNumber(context.Background(), receipt.BlockNumber)
-		require.NoError(l.t, err)
-		curseTimeStamps = append(curseTimeStamps, hdr.Timestamp)
 		errReason, v, err := lane.Source.Common.ChainClient.RevertReasonFromTx(failedTx, router.RouterABI)
 		require.NoError(l.t, err)
 		require.Equal(l.t, "BadARMSignal", errReason)
@@ -174,8 +177,13 @@ func (l *LoadArgs) ValidateCurseFollowedByUncurse(srcorDest string) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 	errGrp := &errgroup.Group{}
-	for i, lane := range lanes {
-		curseTimeStamp := curseTimeStamps[i]
+	for _, lane := range lanes {
+		curseTimeStamp, exists := curseTimeStamps[lane.SourceNetworkName]
+		// if curse timestamp does not exist for source, it will exist for destination
+		if !exists {
+			curseTimeStamp, exists = curseTimeStamps[lane.DestNetworkName]
+			require.Truef(l.t, exists, "did not find curse time stamp for lane %s->%s", lane.SourceNetworkName, lane.DestNetworkName)
+		}
 		errGrp.Go(func() error {
 			ticker := time.NewTicker(time.Second)
 			for {
@@ -210,14 +218,15 @@ func (l *LoadArgs) ValidateCurseFollowedByUncurse(srcorDest string) {
 
 	err := errGrp.Wait()
 	require.NoError(l.t, err, "error received to validate no execution state changed is generated after lane is cursed")
+
 	// now uncurse all
 	for _, lane := range lanes {
-		if srcorDest == Source {
-			require.NoError(l.t, lane.Source.Common.UnvoteToCurseARM(), "error to unvote in cursing arm")
+		_, exists := curseTimeStamps[lane.SourceNetworkName]
+		// if cursetimestamp does not exist by source network name, no action needed
+		if !exists {
+			continue
 		}
-		if srcorDest == destination {
-			require.NoError(l.t, lane.Dest.Common.UnvoteToCurseARM(), "error to unvote in cursing arm")
-		}
+		require.NoError(l.t, lane.Source.Common.UnvoteToCurseARM(), "error to unvote in cursing arm")
 	}
 }
 

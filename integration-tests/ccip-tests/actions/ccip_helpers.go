@@ -175,33 +175,39 @@ func (ccipModule *CCIPCommon) UnvoteToCurseARM() error {
 	if err != nil {
 		return err
 	}
+	log.Info().
+		Str("ARM", arm.Address().Hex()).
+		Msg("ARM is uncursed")
 	return ccipModule.ChainClient.WaitForEvents()
 }
 
-func (ccipModule *CCIPCommon) CurseARM() error {
+func (ccipModule *CCIPCommon) CurseARM() (*types.Transaction, error) {
 	if ccipModule.ARM != nil {
-		return fmt.Errorf("real ARM deployed. cannot curse through test")
+		return nil, fmt.Errorf("real ARM deployed. cannot curse through test")
 	}
 	if ccipModule.ARMContract == nil {
-		return fmt.Errorf("no ARM contract is set")
+		return nil, fmt.Errorf("no ARM contract is set")
 	}
 	arm, err := mock_arm_contract.NewMockARMContract(*ccipModule.ARMContract, ccipModule.ChainClient.Backend())
 	if err != nil {
-		return fmt.Errorf("error instantiating arm %w", arm)
+		return nil, fmt.Errorf("error instantiating arm %w", arm)
 	}
 	opts, err := ccipModule.ChainClient.TransactionOpts(ccipModule.ChainClient.GetDefaultWallet())
 	if err != nil {
-		return fmt.Errorf("error getting owners for ARM VoteToCurse %w", err)
+		return nil, fmt.Errorf("error getting owners for ARM VoteToCurse %w", err)
 	}
 	tx, err := arm.VoteToCurse(opts, [32]byte{})
 	if err != nil {
-		return fmt.Errorf("error in calling VoteToCurse %w", err)
+		return nil, fmt.Errorf("error in calling VoteToCurse %w", err)
 	}
 	err = ccipModule.ChainClient.ProcessTransaction(tx)
 	if err != nil {
-		return err
+		return tx, err
 	}
-	return ccipModule.ChainClient.WaitForEvents()
+	log.Info().
+		Str("ARM", arm.Address().Hex()).
+		Msg("ARM is cursed")
+	return tx, ccipModule.ChainClient.WaitForEvents()
 }
 
 func (ccipModule *CCIPCommon) Copy(logger zerolog.Logger, chainClient blockchain.EVMClient) (*CCIPCommon, error) {
