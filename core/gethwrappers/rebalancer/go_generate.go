@@ -43,3 +43,7 @@ package rebalancer
 //go:generate mockery --quiet --dir ./generated/arb_node_interface/ --name NodeInterfaceInterface --output ./mocks/mock_node_interface --outpkg mock_node_interface --case=underscore
 //go:generate mockery --quiet --dir ./generated/l2_arbitrum_messenger/ --name L2ArbitrumMessengerInterface --output ./mocks/mock_l2_arbitrum_messenger --outpkg mock_l2_arbitrum_messenger --case=underscore
 //go:generate mockery --quiet --dir ./generated/arbitrum_rollup_core/ --name ArbRollupCoreInterface --output ./mocks/mock_arbitrum_rollup_core --outpkg mock_arbitrum_rollup_core --case=underscore
+//go:generate mockery --quiet --dir ./generated/optimism_portal/ --name OptimismPortalInterface --output ./mocks/mock_optimism_portal --outpkg mock_optimism_portal --case=underscore
+//go:generate mockery --quiet --dir ./generated/optimism_l2_output_oracle/ --name OptimismL2OutputOracleInterface --output ./mocks/mock_optimism_l2_output_oracle --outpkg mock_optimism_l2_output_oracle --case=underscore
+//go:generate mockery --quiet --dir ./generated/optimism_portal_2/ --name OptimismPortal2Interface --output ./mocks/mock_optimism_portal_2 --outpkg mock_optimism_portal_2 --case=underscore
+//go:generate mockery --quiet --dir ./generated/optimism_dispute_game_factory/ --name OptimismDisputeGameFactoryInterface --output ./mocks/mock_optimism_dispute_game_factory --outpkg mock_optimism_dispute_game_factory --case=underscore

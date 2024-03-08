@@ -1,11 +1,14 @@
 package withdrawprover
 
 import (
+	"fmt"
+
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	gethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
+
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/optimism_l2_to_l1_message_passer"
 )
@@ -63,16 +66,22 @@ func ParseMessagePassedLog(log *gethtypes.Log) (*optimism_l2_to_l1_message_passe
 }
 
 func hashLowLevelMessage(llm *optimism_l2_to_l1_message_passer.OptimismL2ToL1MessagePasserMessagePassed) ([32]byte, error) {
-	// TODO: use gethwrappers/ABI's for this.
-	encoded, err := utils.ABIEncode(
-		`[{"type": "uint256"}, {"type": "address"}, {"type": "address"}, {"type": "uint256"}, {"type": "uint256"}, {"type": "bytes"}]`,
-		llm.Nonce,
-		llm.Sender,
-		llm.Target,
-		llm.Value,
-		llm.GasLimit,
-		llm.Data,
-	)
+	event, ok := l2ToL1MessagePasserABI.Events["MessagePassed"]
+	// should be impossible, checked in init
+	if !ok {
+		return [32]byte{}, fmt.Errorf("event MessagePassed not found in L2ToL1MessagePasser ABI")
+	}
+
+	// last event argument is withdrawalHash, but we don't want to encode that.
+	var arguments abi.Arguments
+	for i, arg := range event.Inputs {
+		if i == len(event.Inputs)-1 {
+			break
+		}
+		arguments = append(arguments, arg)
+	}
+
+	encoded, err := arguments.Pack(llm.Nonce, llm.Sender, llm.Target, llm.Value, llm.GasLimit, llm.Data)
 	if err != nil {
 		return [32]byte{}, err
 	}

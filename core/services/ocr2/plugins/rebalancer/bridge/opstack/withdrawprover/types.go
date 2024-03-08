@@ -3,16 +3,12 @@ package withdrawprover
 import (
 	"math/big"
 
-	"github.com/ethereum/go-ethereum/common"
-
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/optimism_l2_to_l1_message_passer"
 )
 
 var (
 	// MessagePassedTopic is the topic of the MessagePassed event from the L2ToL1MessagePasser contract.
-	// This is emitted whenever a message from L2 to L1 is created.
-	// TODO: this should be fetched from a gethwrapper, however Optimism contracts only compile with 0.8.15 right now.
-	MessagePassedTopic = common.HexToHash("0x02a52367d10742d8032712c1bb8e0144ff1ec5ffda1ed7d70bb05a2744955054")
+	MessagePassedTopic = optimism_l2_to_l1_message_passer.OptimismL2ToL1MessagePasserMessagePassed{}.Topic()
 )
 
 // OutputRootProof contains the elements that are hashed together to generate an output root
