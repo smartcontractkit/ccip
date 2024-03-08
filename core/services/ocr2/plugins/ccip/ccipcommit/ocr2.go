@@ -391,7 +391,7 @@ func (r *CommitReportingPlugin) Report(ctx context.Context, epochAndRound types.
 	destTokens := ccipcommon.FlattenUniqueSlice(feeTokens, bridgeableTokens)
 
 	// Filters out parsable but faulty observations
-	validObservations, err := r.validateObservations(ctx, lggr, destTokens, r.F, parsableObservations)
+	validObservations, err := validateObservations(ctx, lggr, destTokens, r.F, parsableObservations, r.offchainConfig.PriceReportingDisabled)
 	if err != nil {
 		return false, nil, err
 	}
@@ -439,10 +439,10 @@ func (r *CommitReportingPlugin) Report(ctx context.Context, epochAndRound types.
 // validateObservations validates the given observations.
 // An observation is rejected if any of its gas price or token price is nil. With current CommitObservation implementation, prices
 // are checked to ensure no nil values before adding to Observation, hence an observation that contains nil values comes from a faulty node.
-func (r *CommitReportingPlugin) validateObservations(ctx context.Context, lggr logger.Logger, destTokens []cciptypes.Address, f int, observations []ccip.CommitObservation) (validObs []ccip.CommitObservation, err error) {
+func validateObservations(ctx context.Context, lggr logger.Logger, destTokens []cciptypes.Address, f int, observations []ccip.CommitObservation, priceReportingDisabled bool) (validObs []ccip.CommitObservation, err error) {
 	for _, obs := range observations {
 		// If price reporting is disabled, a valid observations should not contain price data
-		if r.offchainConfig.PriceReportingDisabled {
+		if priceReportingDisabled {
 			if obs.SourceGasPriceUSD != nil || len(obs.TokenPricesUSD) > 0 {
 				lggr.Warnw("Skipping observation due to it containing price data when price reporting is disabled")
 				continue

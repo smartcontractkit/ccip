@@ -636,7 +636,6 @@ func TestCommitReportingPlugin_ShouldTransmitAcceptedReport(t *testing.T) {
 
 func TestCommitReportingPlugin_validateObservations(t *testing.T) {
 	ctx := context.Background()
-	p := &CommitReportingPlugin{}
 
 	token1 := ccipcalc.HexToAddress("0xa")
 	token2 := ccipcalc.HexToAddress("0xb")
@@ -814,8 +813,7 @@ func TestCommitReportingPlugin_validateObservations(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			p.offchainConfig.PriceReportingDisabled = tc.priceReportingDisabled
-			obs, err := p.validateObservations(ctx, logger.TestLogger(t), destTokens, tc.f, tc.commitObservations)
+			obs, err := validateObservations(ctx, logger.TestLogger(t), destTokens, tc.f, tc.commitObservations, tc.priceReportingDisabled)
 
 			if tc.expError {
 				assert.Error(t, err)
