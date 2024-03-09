@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/AlekSi/pointer"
+	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -37,7 +38,6 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
 	"github.com/smartcontractkit/chainlink-testing-framework/k8s/environment"
 
-	"github.com/smartcontractkit/chainlink/integration-tests/actions"
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/contracts"
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/contracts/laneconfig"
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/testconfig"
@@ -1624,6 +1624,76 @@ func (destCCIP *DestCCIPModule) UpdateBalance(
 	}
 }
 
+// AssertNoReportAcceptedEventReceived validates that no ExecutionStateChangedEvent is emitted for mentioned timeRange after lastSeenTimestamp
+func (destCCIP *DestCCIPModule) AssertNoReportAcceptedEventReceived(lggr zerolog.Logger, timeRange time.Duration, lastSeenTimestamp time.Time) error {
+	ctx, cancel := context.WithTimeout(context.Background(), timeRange)
+	defer cancel()
+	ticker := time.NewTicker(time.Second)
+	for {
+		select {
+		case <-ticker.C:
+			eventFoundAfterCursing := false
+			// verify if CommitReportAccepted is received, it's not generated after provided lastSeenTimestamp
+			destCCIP.ReportAcceptedWatcher.Range(func(key, value any) bool {
+				e, exists := value.(*evm_2_evm_offramp.EVM2EVMOffRampExecutionStateChanged)
+				if exists {
+					vLogs := e.Raw
+					hdr, err := destCCIP.Common.ChainClient.HeaderByNumber(ctx, big.NewInt(int64(vLogs.BlockNumber)))
+					if err != nil {
+						return true
+					}
+					if hdr.Timestamp.After(lastSeenTimestamp) {
+						eventFoundAfterCursing = true
+						return false
+					}
+				}
+				return true
+			})
+			if eventFoundAfterCursing {
+				return fmt.Errorf("CommitReportAccepted Event detected after %s", lastSeenTimestamp)
+			}
+		case <-ctx.Done():
+			lggr.Info().Msgf("successfully validated that no CommitReportAccepted detected after %s for %s", lastSeenTimestamp, timeRange)
+			return nil
+		}
+	}
+}
+
+// AssertNoExecutionStateChangedEventReceived validates that no ExecutionStateChangedEvent is emitted for mentioned timeRange after lastSeenTimestamp
+func (destCCIP *DestCCIPModule) AssertNoExecutionStateChangedEventReceived(lggr zerolog.Logger, timeRange time.Duration, lastSeenTimestamp time.Time) error {
+	ctx, cancel := context.WithTimeout(context.Background(), timeRange)
+	defer cancel()
+	ticker := time.NewTicker(time.Second)
+	for {
+		select {
+		case <-ticker.C:
+			eventFoundAfterCursing := false
+			// verify if executionstate changed is received, it's not generated after provided lastSeenTimestamp
+			destCCIP.ExecStateChangedWatcher.Range(func(key, value any) bool {
+				e, exists := value.(*evm_2_evm_offramp.EVM2EVMOffRampExecutionStateChanged)
+				if exists {
+					vLogs := e.Raw
+					hdr, err := destCCIP.Common.ChainClient.HeaderByNumber(ctx, big.NewInt(int64(vLogs.BlockNumber)))
+					if err != nil {
+						return true
+					}
+					if hdr.Timestamp.After(lastSeenTimestamp) {
+						eventFoundAfterCursing = true
+						return false
+					}
+				}
+				return true
+			})
+			if eventFoundAfterCursing {
+				return fmt.Errorf("ExecutionStateChanged Event detected after %s", lastSeenTimestamp)
+			}
+		case <-ctx.Done():
+			lggr.Info().Msgf("successfully validated that no ExecutionStateChanged detected after %s for %s", lastSeenTimestamp, timeRange)
+			return nil
+		}
+	}
+}
+
 func (destCCIP *DestCCIPModule) AssertEventExecutionStateChanged(
 	lggr zerolog.Logger,
 	seqNum uint64,
@@ -2547,7 +2617,10 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 	if !configureCLNodes {
 		return lane.SrcNetworkLaneCfg, lane.DstNetworkLaneCfg, nil
 	}
-
+	err = lane.Source.Common.WatchForPriceUpdates()
+	if err != nil {
+		return lane.SrcNetworkLaneCfg, lane.DstNetworkLaneCfg, fmt.Errorf("error in starting price update watch")
+	}
 	if env == nil {
 		return lane.SrcNetworkLaneCfg, lane.DstNetworkLaneCfg, fmt.Errorf("test environment not set")
 	}
@@ -3067,25 +3140,50 @@ func (c *CCIPTestEnv) SetUpNodeKeysAndFund(
 			}
 		}()
 		log.Info().Str("chain id", c1.GetChainID().String()).Msg("Funding Chainlink nodes for chain")
-		err = actions.FundChainlinkNodesAddresses(chainlinkNodes[1:], c1, nodeFund)
-		if err != nil {
-			return fmt.Errorf("funding nodes for chain %s %w", c1.GetNetworkName(), err)
+		for i := 1; i < len(chainlinkNodes); i++ {
+			cl := chainlinkNodes[i]
+			m := c.nodeMutexes[i]
+			toAddress, err := cl.EthAddressesForChain(c1.GetChainID().String())
+			if err != nil {
+				return err
+			}
+			for _, addr := range toAddress {
+				toAddr := common.HexToAddress(addr)
+				gasEstimates, err := c1.EstimateGas(ethereum.CallMsg{
+					To: &toAddr,
+				})
+				if err != nil {
+					return err
+				}
+				m.Lock()
+				err = c1.Fund(addr, nodeFund, gasEstimates)
+				m.Unlock()
+				if err != nil {
+					return err
+				}
+			}
 		}
-		return nil
+		return c1.WaitForEvents()
 	}
-
+	grp, _ := errgroup.WithContext(context.Background())
 	for _, chain := range chains {
 		err := populateKeys(chain)
 		if err != nil {
 			return err
 		}
-		err = fund(chain)
-		if err != nil {
-			return err
-		}
 	}
-
+	for _, chain := range chains {
+		chain := chain
+		grp.Go(func() error {
+			return fund(chain)
+		})
+	}
+	err := grp.Wait()
+	if err != nil {
+		return fmt.Errorf("error funding nodes %w", err)
+	}
 	c.CLNodesWithKeys = nodesWithKeys
+
 	return nil
 }
 

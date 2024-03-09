@@ -309,6 +309,9 @@ func TestLoadCCIPStableRPSAfterARMCurseAndUncurse(t *testing.T) {
 		require.NoError(t, testArgs.TestSetupArgs.TearDown())
 	})
 	testArgs.TriggerLoadByLane()
+	// wait for certain time so that few messages are sent
+	time.Sleep(2 * time.Minute)
+	// now validate the curse
 	testArgs.ValidateCurseFollowedByUncurse()
 	testArgs.Wait()
 }
