@@ -187,6 +187,7 @@ jobs:
           QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
           QA_KUBECONFIG: ${{ secrets.QA_KUBECONFIG }}
           triggered_by: ${{ env.TEST_TRIGGERED_BY }}
+          publish_check_name: ${{ matrix.type.name }}
           artifacts_location: ./integration-tests/load/logs/payload_ccip.json
           aws_registries: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}
           cache_key_id: ccip-load-${{ env.MOD_CACHE_VERSION }}
