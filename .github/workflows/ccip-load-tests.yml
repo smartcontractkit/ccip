@@ -137,16 +137,16 @@ jobs:
       - name: Sets env vars
         shell: bash
         run: |
+          # if the matrix.type.config_path is set, use it as the override config
+          if [ "${{ matrix.type.config_path }}" != "" ]; then
+              echo "BASE64_CCIP_CONFIG_OVERRIDE=$(base64 -w 0 -i ${{ matrix.type.config_path }})" >> $GITHUB_ENV
+              echo "TEST_BASE64_CCIP_CONFIG_OVERRIDE=$(base64 -w 0 -i ${{ matrix.type.config_path }})" >> $GITHUB_ENV
+          fi
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             BASE64_CCIP_CONFIG_OVERRIDE=$(jq -r '.inputs.base64_test_input' $GITHUB_EVENT_PATH)
             echo ::add-mask::$BASE64_CCIP_CONFIG_OVERRIDE
             echo "BASE64_CCIP_CONFIG_OVERRIDE=$BASE64_CCIP_CONFIG_OVERRIDE" >> $GITHUB_ENV
             echo "TEST_BASE64_CCIP_CONFIG_OVERRIDE=$BASE64_CCIP_CONFIG_OVERRIDE" >> $GITHUB_ENV
-          fi
-          # if the matrix.type.config_path is set, use it as the override config
-          if [ "${{ matrix.type.config_path }}" != "" ]; then
-              echo "BASE64_CCIP_CONFIG_OVERRIDE=$(base64 -w 0 -i ${{ matrix.type.config_path }})" >> $GITHUB_ENV
-              echo "TEST_BASE64_CCIP_CONFIG_OVERRIDE=$(base64 -w 0 -i ${{ matrix.type.config_path }})" >> $GITHUB_ENV
           fi
       - name: step summary
         shell: bash
