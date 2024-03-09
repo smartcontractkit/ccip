@@ -65,9 +65,6 @@ func (d ExecOnchainConfig) Validate() error {
 	if d.MaxNumberOfTokensPerMsg == 0 {
 		return errors.New("must set MaxNumberOfTokensPerMsg")
 	}
-	if d.MaxDataBytes == 0 {
-		return errors.New("must set MaxDataBytes")
-	}
 	if d.MaxPoolReleaseOrMintGas == 0 {
 		return errors.New("must set MaxPoolReleaseOrMintGas")
 	}
