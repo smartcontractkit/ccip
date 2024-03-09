@@ -169,7 +169,7 @@ func (o *OffRamp) ChangeConfig(onchainConfigBytes []byte, offchainConfigBytes []
 		RootSnoozeTime:              offchainConfigParsed.RootSnoozeTime,
 	}
 	onchainConfig := cciptypes.ExecOnchainConfig{PermissionLessExecutionThresholdSeconds: time.Second * time.Duration(onchainConfigParsed.PermissionLessExecutionThresholdSeconds)}
-	priceEstimator := prices.NewDAGasPriceEstimator(o.Estimator, o.MaxGasPrice, 0, 0)
+	priceEstimator := prices.NewDAGasPriceEstimator(o.Estimator, o.DestMaxGasPrice, 0, 0)
 
 	o.UpdateDynamicConfig(onchainConfig, offchainConfig, priceEstimator)
 
@@ -310,8 +310,8 @@ func (o *OffRamp) DecodeExecutionReport(report []byte) (cciptypes.ExecReport, er
 	return DecodeExecReport(o.ExecutionReportArgs, report)
 }
 
-func NewOffRamp(lggr logger.Logger, addr common.Address, ec client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator, maxGasPrice *big.Int) (*OffRamp, error) {
-	v100, err := v1_0_0.NewOffRamp(lggr, addr, ec, lp, estimator, maxGasPrice)
+func NewOffRamp(lggr logger.Logger, addr common.Address, ec client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator, destMaxGasPrice *big.Int) (*OffRamp, error) {
+	v100, err := v1_0_0.NewOffRamp(lggr, addr, ec, lp, estimator, destMaxGasPrice)
 	if err != nil {
 		return nil, err
 	}

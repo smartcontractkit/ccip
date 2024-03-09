@@ -148,7 +148,7 @@ type OffRamp struct {
 	evmBatchCaller          rpclib.EvmBatchCaller
 	filters                 []logpoller.Filter
 	Estimator               gas.EvmFeeEstimator
-	MaxGasPrice             *big.Int
+	DestMaxGasPrice         *big.Int
 	ExecutionReportArgs     abi.Arguments
 	eventIndex              int
 	eventSig                common.Hash
@@ -403,7 +403,7 @@ func (o *OffRamp) ChangeConfig(onchainConfigBytes []byte, offchainConfigBytes []
 		RootSnoozeTime:              offchainConfigParsed.RootSnoozeTime,
 	}
 	onchainConfig := cciptypes.ExecOnchainConfig{PermissionLessExecutionThresholdSeconds: time.Second * time.Duration(onchainConfigParsed.PermissionLessExecutionThresholdSeconds)}
-	gasPriceEstimator := prices.NewExecGasPriceEstimator(o.Estimator, o.MaxGasPrice, 0)
+	gasPriceEstimator := prices.NewExecGasPriceEstimator(o.Estimator, o.DestMaxGasPrice, 0)
 	o.UpdateDynamicConfig(onchainConfig, offchainConfig, gasPriceEstimator)
 
 	o.Logger.Infow("Starting exec plugin",
@@ -611,7 +611,7 @@ func (o *OffRamp) RegisterFilters(qopts ...pg.QOpt) error {
 	return logpollerutil.RegisterLpFilters(o.lp, o.filters, qopts...)
 }
 
-func NewOffRamp(lggr logger.Logger, addr common.Address, ec client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator, maxGasPrice *big.Int) (*OffRamp, error) {
+func NewOffRamp(lggr logger.Logger, addr common.Address, ec client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator, destMaxGasPrice *big.Int) (*OffRamp, error) {
 	offRamp, err := evm_2_evm_offramp_1_0_0.NewEVM2EVMOffRamp(addr, ec)
 	if err != nil {
 		return nil, err
@@ -645,7 +645,7 @@ func NewOffRamp(lggr logger.Logger, addr common.Address, ec client.Client, lp lo
 		lp:                  lp,
 		filters:             filters,
 		Estimator:           estimator,
-		MaxGasPrice:         maxGasPrice,
+		DestMaxGasPrice:     destMaxGasPrice,
 		ExecutionReportArgs: executionReportArgs,
 		eventSig:            ExecutionStateChangedEvent,
 		eventIndex:          executionStateChangedSequenceNumberIndex,

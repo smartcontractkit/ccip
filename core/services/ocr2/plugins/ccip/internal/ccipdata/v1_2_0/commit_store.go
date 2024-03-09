@@ -40,7 +40,7 @@ type CommitStore struct {
 	lp                        logpoller.LogPoller
 	address                   common.Address
 	estimator                 gas.EvmFeeEstimator
-	maxGasPrice               *big.Int
+	sourceMaxGasPrice         *big.Int
 	filters                   []logpoller.Filter
 	reportAcceptedSig         common.Hash
 	reportAcceptedMaxSeqIndex int
@@ -228,7 +228,7 @@ func (c *CommitStore) ChangeConfig(onchainConfig []byte, offchainConfig []byte) 
 
 	c.gasPriceEstimator = prices.NewDAGasPriceEstimator(
 		c.estimator,
-		c.maxGasPrice,
+		c.sourceMaxGasPrice,
 		int64(offchainConfigParsed.ExecGasPriceDeviationPPB),
 		int64(offchainConfigParsed.DAGasPriceDeviationPPB),
 	)
@@ -394,7 +394,7 @@ func (c *CommitStore) RegisterFilters(qopts ...pg.QOpt) error {
 	return logpollerutil.RegisterLpFilters(c.lp, c.filters, qopts...)
 }
 
-func NewCommitStore(lggr logger.Logger, addr common.Address, ec client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator, maxGasPrice *big.Int) (*CommitStore, error) {
+func NewCommitStore(lggr logger.Logger, addr common.Address, ec client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator, sourceMaxGasPrice *big.Int) (*CommitStore, error) {
 	commitStore, err := commit_store.NewCommitStore(addr, ec)
 	if err != nil {
 		return nil, err
@@ -416,7 +416,7 @@ func NewCommitStore(lggr logger.Logger, addr common.Address, ec client.Client, l
 		lggr:              lggr,
 		lp:                lp,
 		estimator:         estimator,
-		maxGasPrice:       maxGasPrice,
+		sourceMaxGasPrice: sourceMaxGasPrice,
 		filters:           filters,
 		commitReportArgs:  commitReportArgs,
 		reportAcceptedSig: eventSig,
