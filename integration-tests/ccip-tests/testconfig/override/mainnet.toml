@@ -702,7 +702,7 @@ NetworkPairs = [
 MsgType = 'WithToken'
 DestGasLimit = 0
 BiDirectionalLane = true
-PhaseTimeout = '20m'
+PhaseTimeout = '50m'
 TestDuration = '5h'
 ExistingDeployment = true
 RequestPerUnitTime = [1]
@@ -714,7 +714,7 @@ TestRunName = 'mainnet-wemix-testing'
 FailOnFirstErrorInLoad = true
 
 [CCIP.Groups.smoke]
-MsgType = 'WithToken'
+
 # these are all the valid network pairs
 NetworkPairs = [
 #   'ETHEREUM_MAINNET,OPTIMISM_MAINNET',
@@ -759,9 +759,10 @@ NetworkPairs = [
 #   'WEMIX_MAINNET,OPTIMISM_MAINNET' # added as batch 2
 ]
 
+MsgType = 'WithToken'
 BiDirectionalLane = false
 DestGasLimit = 0
-PhaseTimeout = '20m'
+PhaseTimeout = '50m'
 LocalCluster = false
 ExistingDeployment = true
 ReuseContracts = true
