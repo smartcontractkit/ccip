@@ -568,8 +568,14 @@ Data = """
         "WeMix Mainnet": {
             "is_native_fee_token": true,
             "fee_token": "0x80f1FcdC96B55e459BF52b998aBBE2c364935d69",
-            "bridge_tokens": ["0xF500208d9aB68FeA3cc41bd107811e809C0B6B83"],
-            "bridge_tokens_pools": ["0xb6B458c95e5C70dFd412a6228a733f1e02E202fE"],
+            "bridge_tokens": [
+                "0xF500208d9aB68FeA3cc41bd107811e809C0B6B83",
+                "0xcdf764933B9a9ebB2C5DA904B9715F3Cf981572A"
+                ],
+            "bridge_tokens_pools": [
+                "0xb6B458c95e5C70dFd412a6228a733f1e02E202fE",
+                "0xb299b04a45B1692fF0bA1fe2e26A009ab9d286c8"
+                ],
             "arm": "0x07aaC8B69A62dB5bd3d244091916EbF2fac17b76",
             "router": "0x7798b795Fde864f4Cd1b124a38Ba9619B7F8A442",
             "price_registry": "0x252863688762aD86868D3d3076233Eacd80c7055",
