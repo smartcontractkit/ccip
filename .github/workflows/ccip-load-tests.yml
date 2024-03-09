@@ -111,7 +111,15 @@ jobs:
       REF_NAME: ${{ github.head_ref || github.ref_name }}
       ENV_JOB_IMAGE_BASE: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink-ccip-tests
       BASE64_NETWORK_CONFIG: ${{ secrets.BASE64_NETWORK_CONFIG }}
-
+    strategy:
+      fail-fast: false
+      matrix:
+        type:
+          - name: stable-load
+            run: ^TestLoadCCIPStableRPS$
+          - name: load-with-arm-curse-uncurse
+            run: ^TestLoadCCIPStableRPSAfterARMCurseAndUncurse$
+            config_path: ./integration-tests/ccip-tests/testconfig/tomls/load-with-arm-curse-uncurse.toml
     steps:
       - name: Collect Metrics
         id: collect-gha-metrics
@@ -134,6 +142,11 @@ jobs:
             echo ::add-mask::$BASE64_CCIP_CONFIG_OVERRIDE
             echo "BASE64_CCIP_CONFIG_OVERRIDE=$BASE64_CCIP_CONFIG_OVERRIDE" >> $GITHUB_ENV
             echo "TEST_BASE64_CCIP_CONFIG_OVERRIDE=$BASE64_CCIP_CONFIG_OVERRIDE" >> $GITHUB_ENV
+          fi
+          # if the matrix.type.config_path is set, use it as the override config
+          if [ "${{ matrix.type.config_path }}" != "" ]; then
+              echo "BASE64_CCIP_CONFIG_OVERRIDE=$(base64 -w 0 -i ${{ matrix.type.config_path }})" >> $GITHUB_ENV
+              echo "TEST_BASE64_CCIP_CONFIG_OVERRIDE=$(base64 -w 0 -i ${{ matrix.type.config_path }})" >> $GITHUB_ENV
           fi
       - name: step summary
         shell: bash
@@ -164,7 +177,7 @@ jobs:
           RR_CPU: 4
           TEST_TRIGGERED_BY: ccip-load-test-ci
         with:
-          test_command_to_run: cd ./integration-tests/ccip-tests && go test -v -timeout 70m -count=1 -json -run ^TestLoadCCIPStableRPS$ ./load 2>&1 | tee /tmp/gotest.log | gotestfmt
+          test_command_to_run: cd ./integration-tests/ccip-tests && go test -v -timeout 70m -count=1 -json -run ${{ matrix.type.run }} ./load 2>&1 | tee /tmp/gotest.log | gotestfmt
           test_download_vendor_packages_command: cd ./integration-tests && go mod download
           cl_repo: ${{ env.CHAINLINK_IMAGE }}
           cl_image_tag: ${{ env.CHAINLINK_VERSION }}

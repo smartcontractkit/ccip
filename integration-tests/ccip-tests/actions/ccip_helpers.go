@@ -161,7 +161,7 @@ func (ccipModule *CCIPCommon) UnvoteToCurseARM() error {
 	}
 	arm, err := mock_arm_contract.NewMockARMContract(*ccipModule.ARMContract, ccipModule.ChainClient.Backend())
 	if err != nil {
-		return fmt.Errorf("error instantiating arm %w", arm)
+		return fmt.Errorf("error instantiating arm %w", err)
 	}
 	opts, err := ccipModule.ChainClient.TransactionOpts(ccipModule.ChainClient.GetDefaultWallet())
 	if err != nil {
@@ -190,7 +190,7 @@ func (ccipModule *CCIPCommon) CurseARM() (*types.Transaction, error) {
 	}
 	arm, err := mock_arm_contract.NewMockARMContract(*ccipModule.ARMContract, ccipModule.ChainClient.Backend())
 	if err != nil {
-		return nil, fmt.Errorf("error instantiating arm %w", arm)
+		return nil, fmt.Errorf("error instantiating arm %w", err)
 	}
 	opts, err := ccipModule.ChainClient.TransactionOpts(ccipModule.ChainClient.GetDefaultWallet())
 	if err != nil {
@@ -206,6 +206,7 @@ func (ccipModule *CCIPCommon) CurseARM() (*types.Transaction, error) {
 	}
 	log.Info().
 		Str("ARM", arm.Address().Hex()).
+		Str("Network", ccipModule.ChainClient.GetNetworkName()).
 		Msg("ARM is cursed")
 	return tx, ccipModule.ChainClient.WaitForEvents()
 }

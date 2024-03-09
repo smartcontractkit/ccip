@@ -132,6 +132,9 @@ func (l *LoadArgs) ValidateCurseFollowedByUncurse() {
 	time.Sleep(1 * time.Minute)
 	curseTimeStamps := make(map[string]time.Time)
 	for _, lane := range lanes {
+		if _, exists := curseTimeStamps[lane.SourceNetworkName]; exists {
+			continue
+		}
 		curseTx, err := lane.Source.Common.CurseARM()
 		require.NoError(l.t, err, "error in cursing arm")
 		require.NotNil(l.t, curseTx, "invalid cursetx")
@@ -154,7 +157,11 @@ func (l *LoadArgs) ValidateCurseFollowedByUncurse() {
 			actions.TokenTransfer, "msg sent when ARM is cursed",
 			big.NewInt(600_000), // gas limit
 		)
-		require.Error(l.t, err)
+		if lane.Source.Common.ChainClient.GetNetworkConfig().MinimumConfirmations > 0 {
+			require.Error(l.t, err)
+		} else {
+			require.NoError(l.t, err)
+		}
 		errReason, v, err := lane.Source.Common.ChainClient.RevertReasonFromTx(failedTx, router.RouterABI)
 		require.NoError(l.t, err)
 		require.Equal(l.t, "BadARMSignal", errReason)
