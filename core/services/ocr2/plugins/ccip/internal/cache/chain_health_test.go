@@ -10,6 +10,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
@@ -192,9 +193,6 @@ func Test_ChainStateIsHealthy(t *testing.T) {
 }
 
 func Test_RefreshingInBackground(t *testing.T) {
-	ctx := tests.Context(t)
-	defer ctx.Done()
-
 	mockCommitStore := newCommitStoreWrapper(t, true, nil)
 	mockCommitStore.CommitStoreReader.On("IsDestChainHealthy", mock.Anything).Return(true, nil).Maybe()
 
@@ -208,7 +206,8 @@ func Test_RefreshingInBackground(t *testing.T) {
 		10*time.Microsecond,
 		10*time.Microsecond,
 	)
-	chainState.spawnBackgroundRefresher(ctx)
+	defer chainState.backgroundCancel()
+	require.NoError(t, chainState.Start())
 
 	// All healthy
 	assertHealthy(t, chainState, true)

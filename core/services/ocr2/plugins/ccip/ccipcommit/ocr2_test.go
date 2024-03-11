@@ -168,7 +168,7 @@ func TestCommitReportingPlugin_Observation(t *testing.T) {
 			p.sourceNative = sourceNativeTokenAddr
 			p.gasPriceEstimator = gasPriceEstimator
 			p.metricsCollector = ccip.NoopMetricsCollector
-			p.chainHealthcheck = cache.NewChainHealthcheck(ctx, p.lggr, onRampReader, commitStoreReader)
+			p.chainHealthcheck = cache.NewChainHealthcheck(p.lggr, onRampReader, commitStoreReader)
 
 			obs, err := p.Observation(ctx, tc.epochAndRound, types.Query{})
 

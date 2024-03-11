@@ -2,11 +2,14 @@ package cache
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"github.com/patrickmn/go-cache"
 	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/services"
 
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
@@ -52,9 +55,16 @@ type chainHealthcheck struct {
 	lggr        logger.Logger
 	onRamp      ccipdata.OnRampReader
 	commitStore ccipdata.CommitStoreReader
+
+	services.StateMachine
+	wg               *sync.WaitGroup
+	backgroundCtx    context.Context
+	backgroundCancel context.CancelFunc
 }
 
-func NewChainHealthcheck(ctx context.Context, lggr logger.Logger, onRamp ccipdata.OnRampReader, commitStore ccipdata.CommitStoreReader) *chainHealthcheck {
+func NewChainHealthcheck(lggr logger.Logger, onRamp ccipdata.OnRampReader, commitStore ccipdata.CommitStoreReader) *chainHealthcheck {
+	ctx, cancel := context.WithCancel(context.Background())
+
 	ch := &chainHealthcheck{
 		// Different keys use different expiration times, so we don't need to worry about the default value
 		cache:                    cache.New(cache.NoExpiration, 0),
@@ -66,13 +76,18 @@ func NewChainHealthcheck(ctx context.Context, lggr logger.Logger, onRamp ccipdat
 		lggr:        lggr,
 		onRamp:      onRamp,
 		commitStore: commitStore,
+
+		wg:               new(sync.WaitGroup),
+		backgroundCtx:    ctx,
+		backgroundCancel: cancel,
 	}
-	ch.spawnBackgroundRefresher(ctx)
 	return ch
 }
 
 // newChainHealthcheckWithCustomEviction is used for testing purposes only. It doesn't start background worker
 func newChainHealthcheckWithCustomEviction(lggr logger.Logger, onRamp ccipdata.OnRampReader, commitStore ccipdata.CommitStoreReader, globalStatusDuration time.Duration, rmnStatusRefreshInterval time.Duration) *chainHealthcheck {
+	ctx, cancel := context.WithCancel(context.Background())
+
 	ch := &chainHealthcheck{
 		cache:                    cache.New(rmnStatusRefreshInterval, 0),
 		rmnStatusKey:             rmnStatusKey,
@@ -83,6 +98,10 @@ func newChainHealthcheckWithCustomEviction(lggr logger.Logger, onRamp ccipdata.O
 		lggr:        lggr,
 		onRamp:      onRamp,
 		commitStore: commitStore,
+
+		wg:               new(sync.WaitGroup),
+		backgroundCtx:    ctx,
+		backgroundCancel: cancel,
 	}
 	return ch
 }
@@ -124,18 +143,36 @@ func (c *chainHealthcheck) IsHealthy(ctx context.Context) (bool, error) {
 	return true, nil
 }
 
-func (c *chainHealthcheck) spawnBackgroundRefresher(ctx context.Context) {
+func (c *chainHealthcheck) Start() error {
+	return c.StateMachine.StartOnce("ChainHealthcheck", func() error {
+		c.lggr.Info("Starting ChainHealthcheck")
+		c.wg.Add(1)
+		c.run()
+		return nil
+	})
+}
+
+func (c *chainHealthcheck) Close() error {
+	return c.StateMachine.StopOnce("ChainHealthcheck", func() error {
+		c.lggr.Info("Closing ChainHealthcheck")
+		c.backgroundCancel()
+		return nil
+	})
+}
+
+func (c *chainHealthcheck) run() {
+	defer c.wg.Done()
 	ticker := time.NewTicker(c.rmnStatusRefreshInterval)
 	go func() {
 		// Refresh the RMN state immediately after starting the background refresher
-		_, _ = c.refresh(ctx)
+		_, _ = c.refresh(c.backgroundCtx)
 
 		for {
 			select {
-			case <-ctx.Done():
+			case <-c.backgroundCtx.Done():
 				return
 			case <-ticker.C:
-				_, _ = c.refresh(ctx)
+				_, _ = c.refresh(c.backgroundCtx)
 			}
 		}
 	}()

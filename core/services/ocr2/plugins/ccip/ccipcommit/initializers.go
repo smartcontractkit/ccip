@@ -43,7 +43,7 @@ import (
 )
 
 func NewCommitServices(ctx context.Context, lggr logger.Logger, jb job.Job, chainSet legacyevm.LegacyChainContainer, new bool, pr pipeline.Runner, argsNoPlugin libocr2.OCR2OracleArgs, logError func(string), qopts ...pg.QOpt) ([]job.ServiceCtx, error) {
-	pluginConfig, backfillArgs, err := jobSpecToCommitPluginConfig(ctx, lggr, jb, pr, chainSet, qopts...)
+	pluginConfig, backfillArgs, err := jobSpecToCommitPluginConfig(lggr, jb, pr, chainSet, qopts...)
 	if err != nil {
 		return nil, err
 	}
@@ -108,7 +108,7 @@ func UnregisterCommitPluginLpFilters(ctx context.Context, lggr logger.Logger, jb
 	return multiErr
 }
 
-func jobSpecToCommitPluginConfig(ctx context.Context, lggr logger.Logger, jb job.Job, pr pipeline.Runner, chainSet legacyevm.LegacyChainContainer, qopts ...pg.QOpt) (*CommitPluginStaticConfig, *ccipcommon.BackfillArgs, error) {
+func jobSpecToCommitPluginConfig(lggr logger.Logger, jb job.Job, pr pipeline.Runner, chainSet legacyevm.LegacyChainContainer, qopts ...pg.QOpt) (*CommitPluginStaticConfig, *ccipcommon.BackfillArgs, error) {
 	params, err := extractJobSpecParams(jb, chainSet)
 	if err != nil {
 		return nil, nil, err
@@ -205,7 +205,8 @@ func jobSpecToCommitPluginConfig(ctx context.Context, lggr logger.Logger, jb job
 
 	chainHealthcheck := cache.NewObservedChainHealthCheck(
 		cache.NewChainHealthcheck(
-			ctx,
+			// Adding more details to Logger to make healthcheck logs more informative
+			// It's safe because healthcheck logs only in case of unhealthy state
 			lggr.With(
 				"onramp", onrampAddress,
 				"commitStore", params.commitStoreAddress,
