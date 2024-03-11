@@ -34,6 +34,7 @@ type ChaosConfig struct {
 
 type LoadArgs struct {
 	t                *testing.T
+	Ctx              context.Context
 	lggr             zerolog.Logger
 	schedules        []*wasp.Segment
 	RunnerWg         *errgroup.Group // to wait on individual load generators run
@@ -286,6 +287,8 @@ func (l *LoadArgs) AddToRunnerGroup(gen *wasp.Generator) {
 					gen.Resume()
 					resumedAlready = true
 				}
+			case <-l.Ctx.Done():
+				return
 			}
 		}
 	}(gen)
@@ -405,8 +408,10 @@ func (l *LoadArgs) TriggerLoadBySource() {
 
 func NewLoadArgs(t *testing.T, lggr zerolog.Logger, chaosExps ...ChaosConfig) *LoadArgs {
 	wg, _ := errgroup.WithContext(testcontext.Get(t))
+	ctx := testcontext.Get(t)
 	return &LoadArgs{
 		t:             t,
+		Ctx:           ctx,
 		lggr:          lggr,
 		RunnerWg:      wg,
 		TestCfg:       testsetups.NewCCIPTestConfig(t, lggr, testconfig.Load),
