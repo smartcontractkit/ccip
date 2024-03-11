@@ -207,7 +207,7 @@ func Test_RefreshingInBackground(t *testing.T) {
 		10*time.Microsecond,
 	)
 	defer chainState.backgroundCancel()
-	require.NoError(t, chainState.Start())
+	require.NoError(t, chainState.Start(tests.Context(t)))
 
 	// All healthy
 	assertHealthy(t, chainState, true)

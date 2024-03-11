@@ -12,6 +12,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
+	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 )
 
@@ -32,6 +33,7 @@ import (
 //
 //go:generate mockery --quiet --name ChainHealthcheck --filename chain_health_mock.go --case=underscore
 type ChainHealthcheck interface {
+	job.ServiceCtx
 	// IsHealthy checks if the chain is healthy and returns true if it is, false otherwise.
 	IsHealthy(ctx context.Context) (bool, error)
 }
@@ -143,7 +145,7 @@ func (c *chainHealthcheck) IsHealthy(ctx context.Context) (bool, error) {
 	return true, nil
 }
 
-func (c *chainHealthcheck) Start() error {
+func (c *chainHealthcheck) Start(context.Context) error {
 	return c.StateMachine.StartOnce("ChainHealthcheck", func() error {
 		c.lggr.Info("Starting ChainHealthcheck")
 		c.wg.Add(1)
@@ -222,6 +224,7 @@ func (c *chainHealthcheck) checkIfRMNsAreHealthy(ctx context.Context) (bool, err
 	}
 
 	// If the value is not found in the cache, fetch the RMN curse state in a sync manner for the first time
+	c.lggr.Warnw("Refreshing RMN state from the plugin routine, this should happen only once per lane during boot")
 	return c.refresh(ctx)
 }
 
