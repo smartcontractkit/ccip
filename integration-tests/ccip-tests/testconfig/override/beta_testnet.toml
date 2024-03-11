@@ -22,7 +22,7 @@ Data = """
           "Sepolia Testnet": {
             "off_ramp": "0xc136114F379b812345bb7e467ECDdb6D0c87De8b",
             "commit_store": "0x42b3EbEA14F6CB803e3C7df84392Efb85CE90168",
-            "receiver_dapp": "0x8Ed27Ab67aea9BC50628fba25ab52D23ae8d0eae"
+            "receiver_dapp": "0x1A2A69e3eB1382FE34Bc579AdD5Bae39e31d4A2c"
           }
         }
       },
@@ -45,7 +45,7 @@ Data = """
           "Polygon Mumbai": {
             "off_ramp": "0x572C4fc679D4Fe9652E413f4060E6d979101Ac66",
             "commit_store": "0x755b4a2472a720036527a806c95749D6623A392E",
-            "receiver_dapp": "0x8Ed27Ab67aea9BC50628fba25ab52D23ae8d0eae"
+            "receiver_dapp": "0x1A2A69e3eB1382FE34Bc579AdD5Bae39e31d4A2c"
           }
         }
       },
@@ -68,7 +68,7 @@ Data = """
           "Avalanche Fuji": {
             "off_ramp": "0x14DF61c5F65C38d149329673e59bEC38d444dF48",
             "commit_store": "0x326Acbb36C4aE866bB5BaEaAd4163fE128A9f5B5",
-            "receiver_dapp": "0x8Ed27Ab67aea9BC50628fba25ab52D23ae8d0eae"
+            "receiver_dapp": "0x1A2A69e3eB1382FE34Bc579AdD5Bae39e31d4A2c"
           }
         }
       },
@@ -91,7 +91,7 @@ Data = """
           "Arbitrum Sepolia": {
             "off_ramp": "0x224D1eB3aB2b7F23b66f093F9cBBC68dA77a1986",
             "commit_store": "0x35c54cF12FF9B29dBa60dc23EdD1de0F13CC7fc5",
-            "receiver_dapp": "0x8Ed27Ab67aea9BC50628fba25ab52D23ae8d0eae"
+            "receiver_dapp": "0x1A2A69e3eB1382FE34Bc579AdD5Bae39e31d4A2c"
           }
         }
       }
