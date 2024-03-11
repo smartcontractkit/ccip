@@ -145,7 +145,7 @@ jobs:
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             BASE64_CCIP_CONFIG_OVERRIDE=$(jq -r '.inputs.base64_test_input' $GITHUB_EVENT_PATH)
              # echo ::add-mask::$BASE64_CCIP_CONFIG_OVERRIDE
-            if [ -n "${BASE64_CCIP_CONFIG_OVERRIDE}" ]; then
+            if [ -n "${BASE64_CCIP_CONFIG_OVERRIDE}" &&  "$BASE64_CCIP_CONFIG_OVERRIDE" != "null"]; then
               echo "BASE64_CCIP_CONFIG_OVERRIDE=$BASE64_CCIP_CONFIG_OVERRIDE" >> $GITHUB_ENV
               echo "TEST_BASE64_CCIP_CONFIG_OVERRIDE=$BASE64_CCIP_CONFIG_OVERRIDE" >> $GITHUB_ENV
             fi
