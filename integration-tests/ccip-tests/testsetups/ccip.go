@@ -570,7 +570,9 @@ func (o *CCIPTestSetUpOutputs) WaitForPriceUpdates(ctx context.Context) {
 	priceUpdateGrp, _ := errgroup.WithContext(ctx)
 	for _, lanes := range o.ReadLanes() {
 		lanes := lanes
-		waitForUpdate := func(lane actions.CCIPLane) error {
+		forwardLane := lanes.ForwardLane
+		reverseLane := lanes.ReverseLane
+		waitForUpdate := func(lane *actions.CCIPLane) error {
 			defer func() {
 				lane.Logger.Info().
 					Str("source_chain", lane.Source.Common.ChainClient.GetNetworkName()).
@@ -596,11 +598,11 @@ func (o *CCIPTestSetUpOutputs) WaitForPriceUpdates(ctx context.Context) {
 		}
 
 		priceUpdateGrp.Go(func() error {
-			return waitForUpdate(*lanes.ForwardLane)
+			return waitForUpdate(forwardLane)
 		})
 		if lanes.ReverseLane != nil {
 			priceUpdateGrp.Go(func() error {
-				return waitForUpdate(*lanes.ReverseLane)
+				return waitForUpdate(reverseLane)
 			})
 		}
 	}
