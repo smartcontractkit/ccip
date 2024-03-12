@@ -1,15 +1,18 @@
 package ccip
 
 import (
+	"encoding/json"
+	"fmt"
 	"math/big"
+	"strings"
 
-	json2 "github.com/goccy/go-json"
 	"github.com/smartcontractkit/libocr/commontypes"
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/cciptypes"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
 )
 
 // Note if a breaking change is introduced to this struct nodes running different versions
@@ -22,7 +25,14 @@ type CommitObservation struct {
 }
 
 func (o CommitObservation) Marshal() ([]byte, error) {
-	return json2.Marshal(&o)
+	// Similar to: commitObservationJSONBackComp but for commit observation marshaling.
+	tokenPricesUSD := make(map[cciptypes.Address]*big.Int, len(o.TokenPricesUSD))
+	for k, v := range o.TokenPricesUSD {
+		tokenPricesUSD[cciptypes.Address(strings.ToLower(string(k)))] = v
+	}
+	o.TokenPricesUSD = tokenPricesUSD
+
+	return json.Marshal(&o)
 }
 
 // ExecutionObservation stores messages as a map pointing from a sequence number (uint) to the message payload (MsgData)
@@ -64,7 +74,7 @@ func NewObservedMessage(seqNr uint64, tokenData [][]byte) ObservedMessage {
 }
 
 func (o ExecutionObservation) Marshal() ([]byte, error) {
-	return json2.Marshal(&o)
+	return json.Marshal(&o)
 }
 
 // GetParsableObservations checks the given observations for formatting and value errors.
@@ -80,7 +90,20 @@ func GetParsableObservations[O CommitObservation | ExecutionObservation](l logge
 			continue
 		}
 		var ob O
-		err := json2.Unmarshal(ao.Observation, &ob)
+		var err error
+		obsJSON := ao.Observation
+
+		switch any(ob).(type) {
+		case CommitObservation:
+			obsJSON, err = commitObservationJSONBackComp(ao.Observation)
+			if err != nil {
+				l.Errorw("commit observation json backwards compatibility format failed", "err", err,
+					"observation", string(ao.Observation), "observer", ao.Observer)
+				continue
+			}
+		}
+
+		err = json.Unmarshal(obsJSON, &ob)
 		if err != nil {
 			l.Errorw("Received unmarshallable observation", "err", err, "observation", string(ao.Observation), "observer", ao.Observer)
 			continue
@@ -97,4 +120,22 @@ func GetParsableObservations[O CommitObservation | ExecutionObservation](l logge
 		"rawObservationLength", len(observations),
 	)
 	return parseableObservations
+}
+
+// For backwards compatibility, converts token prices to eip55.
+// Prior to cciptypes.Address we were using go-ethereum common.Address type which is
+// marshalled to lower-case while the string representation we used was eip55.
+// Nodes that run different ccip version should generate the same observations.
+func commitObservationJSONBackComp(obsJson []byte) ([]byte, error) {
+	var obs CommitObservation
+	err := json.Unmarshal(obsJson, &obs)
+	if err != nil {
+		return nil, fmt.Errorf("unmarshal observation: %w", err)
+	}
+	tokenPricesUSD := make(map[cciptypes.Address]*big.Int, len(obs.TokenPricesUSD))
+	for k, v := range obs.TokenPricesUSD {
+		tokenPricesUSD[ccipcalc.HexToAddress(string(k))] = v
+	}
+	obs.TokenPricesUSD = tokenPricesUSD
+	return json.Marshal(obs)
 }
