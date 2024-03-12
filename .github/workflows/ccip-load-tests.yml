@@ -35,7 +35,7 @@ jobs:
         uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab # v3.5.2
       - name: Check if image exists
         id: check-image
-        uses: smartcontractkit/chainlink-github-actions/docker/image-exists@e865e376b8c2d594028c8d645dd6c47169b72974 # v2.2.16
+        uses: smartcontractkit/chainlink-github-actions/docker/image-exists@ea889b3133bd7f16ab19ba4ba130de5d9162c669 # v2.3.4
         with:
           repository: chainlink
           tag: ${{ env.CHAINLINK_VERSION }}
@@ -43,7 +43,7 @@ jobs:
           AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
       - name: Build Image
         if: steps.check-image.outputs.exists == 'false'
-        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/build-image@e865e376b8c2d594028c8d645dd6c47169b72974 # v2.2.16
+        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/build-image@ea889b3133bd7f16ab19ba4ba130de5d9162c669 # v2.3.4
         env:
           GH_TOKEN: ${{ github.token }}
         with:
@@ -138,7 +138,7 @@ jobs:
         shell: bash
         run: |
           # if the matrix.type.config_path is set, use it as the override config
-          if [ "${{ matrix.type.config_path }}" != "" ]; then
+          if [ -n "${{ matrix.type.config_path }}" ]; then
               echo "BASE64_CCIP_CONFIG_OVERRIDE=$(base64 -i ${{ matrix.type.config_path }})" >> $GITHUB_ENV
               echo "TEST_BASE64_CCIP_CONFIG_OVERRIDE=$(base64 -i ${{ matrix.type.config_path }})" >> $GITHUB_ENV
           fi
@@ -170,7 +170,7 @@ jobs:
           grafanaUrl: ${{ vars.GRAFANA_URL }}
           grafanaDashboardUrl: "/d/6vjVx-1V8/ccip-long-running-tests"
       - name: Run Tests
-        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@e865e376b8c2d594028c8d645dd6c47169b72974 # v2.2.16
+        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@ea889b3133bd7f16ab19ba4ba130de5d9162c669 # v2.3.4
         env:
           TEST_SUITE: load
           TEST_ARGS: -test.timeout 900h
@@ -268,7 +268,7 @@ jobs:
           grafanaUrl: ${{ vars.GRAFANA_URL }}
           grafanaDashboardUrl: "/d/6vjVx-1V8/ccip-long-running-tests"
       - name: Run Tests
-        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@e865e376b8c2d594028c8d645dd6c47169b72974 # v2.2.16
+        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@ea889b3133bd7f16ab19ba4ba130de5d9162c669 # v2.3.4
         env:
           TEST_SUITE: load
           TEST_ARGS: -test.timeout 900h

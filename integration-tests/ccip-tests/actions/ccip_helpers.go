@@ -181,6 +181,20 @@ func (ccipModule *CCIPCommon) UnvoteToCurseARM() error {
 	return ccipModule.ChainClient.WaitForEvents()
 }
 
+func (ccipModule *CCIPCommon) IsCursed() (bool, error) {
+	if ccipModule.ARM != nil {
+		return false, fmt.Errorf("real ARM deployed. cannot validate cursing")
+	}
+	if ccipModule.ARMContract == nil {
+		return false, fmt.Errorf("no ARM contract is set")
+	}
+	arm, err := mock_arm_contract.NewMockARMContract(*ccipModule.ARMContract, ccipModule.ChainClient.Backend())
+	if err != nil {
+		return false, fmt.Errorf("error instantiating arm %w", err)
+	}
+	return arm.IsCursed(nil)
+}
+
 func (ccipModule *CCIPCommon) CurseARM() (*types.Transaction, error) {
 	if ccipModule.ARM != nil {
 		return nil, fmt.Errorf("real ARM deployed. cannot curse through test")

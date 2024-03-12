@@ -116,6 +116,7 @@ func (l *LoadArgs) SanityCheck() {
 }
 
 // ValidateCurseFollowedByUncurse assumes the lanes under test are bi-directional.
+// It assumes the ARM is not already cursed, it will fail teh test if it is in cursed state.
 // It curses source ARM for forward lanes so that destination curse is also validated for reverse lanes.
 // It waits for 5 minutes for curse to be seen by ccip plugins and contracts.
 // It captures the curse timestamp to verify no execution state changed event is emitted after the cure is applied.
@@ -126,9 +127,17 @@ func (l *LoadArgs) ValidateCurseFollowedByUncurse() {
 	for _, lane := range l.TestSetupArgs.Lanes {
 		lanes = append(lanes, lane.ForwardLane)
 	}
+	// check if source is already cursed
+	for _, lane := range lanes {
+		cursed, err := lane.Source.Common.IsCursed()
+		require.NoError(l.t, err, "cannot get cursed state")
+		if cursed {
+			require.Fail(l.t, "test will not work if ARM is already cursed")
+		}
+	}
 	// before cursing set pause
 	l.pauseLoad.Store(true)
-	// wait for some time for pause to be active
+	// wait for some time for pause to be active in wasp
 	l.lggr.Info().Msg("Waiting for 1 minute after applying pause on load")
 	time.Sleep(1 * time.Minute)
 	curseTimeStamps := make(map[string]time.Time)
