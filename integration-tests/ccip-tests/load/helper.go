@@ -191,6 +191,7 @@ func (l *LoadArgs) ValidateCurseFollowedByUncurse() {
 	l.pauseLoad.Store(false)
 
 	// now add the reverse lanes so that destination curse is also verified
+	// we add the reverse lanes now to verify absence of commit and execution for the reverse lanes
 	for _, lane := range l.TestSetupArgs.Lanes {
 		lanes = append(lanes, lane.ReverseLane)
 	}
