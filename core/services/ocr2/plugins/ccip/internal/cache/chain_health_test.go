@@ -206,7 +206,6 @@ func Test_RefreshingInBackground(t *testing.T) {
 		10*time.Microsecond,
 		10*time.Microsecond,
 	)
-	defer chainState.backgroundCancel()
 	require.NoError(t, chainState.Start(tests.Context(t)))
 
 	// All healthy
@@ -235,6 +234,8 @@ func Test_RefreshingInBackground(t *testing.T) {
 	// All back in healthy state
 	mockOnRamp.set(true, nil)
 	assertHealthy(t, chainState, true)
+
+	require.NoError(t, chainState.Close())
 }
 
 func assertHealthy(t *testing.T, ch *chainHealthcheck, expected bool) {

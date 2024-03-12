@@ -26,7 +26,7 @@ import (
 //
 // Whenever any of the above checks fail, the chain is considered unhealthy and the CCIP should stop
 // processing messages. Additionally, when the chain is unhealthy, this information is considered "sticky"
-// and is cached for a certain period of time based on defaultGlobalStatusDuration.
+// and is cached for a certain period of time based on defaultGlobalStatusExpirationDuration.
 // This may lead to some false-positives, but in this case we want to be extra cautious and avoid executing any reorged messages.
 //
 // Additionally, to reduce the number of calls to the RPC, we refresh RMN state in the background based on defaultRMNStateRefreshInterval
@@ -34,14 +34,14 @@ import (
 //go:generate mockery --quiet --name ChainHealthcheck --filename chain_health_mock.go --case=underscore
 type ChainHealthcheck interface {
 	job.ServiceCtx
-	// IsHealthy checks if the chain is healthy and returns true if it is, false otherwise.
 	IsHealthy(ctx context.Context) (bool, error)
 }
 
 const (
-	// RMN curse state is refreshed every 20 seconds or when ForceIsHealthy is called
+	// RMN curse state is refreshed every 10 seconds
 	defaultRMNStateRefreshInterval = 10 * time.Second
-	defaultGlobalStatusDuration    = 30 * time.Minute
+	// Whenever we mark the chain as unhealthy, we cache this information for 30 minutes
+	defaultGlobalStatusExpirationDuration = 30 * time.Minute
 
 	globalStatusKey = "globalStatus"
 	rmnStatusKey    = "rmnCurseCheck"
@@ -72,7 +72,7 @@ func NewChainHealthcheck(lggr logger.Logger, onRamp ccipdata.OnRampReader, commi
 		cache:                    cache.New(cache.NoExpiration, 0),
 		rmnStatusKey:             rmnStatusKey,
 		globalStatusKey:          globalStatusKey,
-		globalStatusExpiration:   defaultGlobalStatusDuration,
+		globalStatusExpiration:   defaultGlobalStatusExpirationDuration,
 		rmnStatusRefreshInterval: defaultRMNStateRefreshInterval,
 
 		lggr:        lggr,
@@ -158,6 +158,7 @@ func (c *chainHealthcheck) Close() error {
 	return c.StateMachine.StopOnce("ChainHealthcheck", func() error {
 		c.lggr.Info("Closing ChainHealthcheck")
 		c.backgroundCancel()
+		c.wg.Wait()
 		return nil
 	})
 }
@@ -174,7 +175,10 @@ func (c *chainHealthcheck) run() {
 			case <-c.backgroundCtx.Done():
 				return
 			case <-ticker.C:
-				_, _ = c.refresh(c.backgroundCtx)
+				_, err := c.refresh(c.backgroundCtx)
+				if err != nil {
+					c.lggr.Errorw("Failed to refresh RMN state in the background", "err", err)
+				}
 			}
 		}
 	}()
@@ -185,7 +189,9 @@ func (c *chainHealthcheck) refresh(ctx context.Context) (bool, error) {
 	c.cache.Set(
 		c.rmnStatusKey,
 		rmnResponse{healthy, err},
-		3*c.rmnStatusRefreshInterval, // Cache the value for 3 refresh intervals
+		// Cache the value for 3 refresh intervals, this is just a defensive approach
+		// that will enforce the RMN state to be refreshed in case of bg worker hiccup (it should never happen)
+		3*c.rmnStatusRefreshInterval,
 	)
 	return healthy, err
 }
@@ -216,15 +222,12 @@ func (c *chainHealthcheck) checkIfReadersAreHealthy(ctx context.Context) (bool, 
 
 func (c *chainHealthcheck) checkIfRMNsAreHealthy(ctx context.Context) (bool, error) {
 	if cachedValue, found := c.cache.Get(c.rmnStatusKey); found {
-		rmn, ok := cachedValue.(rmnResponse)
-		if ok {
-			return rmn.healthy, rmn.err
-		}
-		c.lggr.Criticalw("Failed to cast cached value to RMN response", "response", rmn)
+		rmn := cachedValue.(rmnResponse)
+		return rmn.healthy, rmn.err
 	}
 
 	// If the value is not found in the cache, fetch the RMN curse state in a sync manner for the first time
-	c.lggr.Warnw("Refreshing RMN state from the plugin routine, this should happen only once per lane during boot")
+	c.lggr.Info("Refreshing RMN state from the plugin routine, this should happen only once per lane during boot")
 	return c.refresh(ctx)
 }
 
