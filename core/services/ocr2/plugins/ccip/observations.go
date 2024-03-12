@@ -24,6 +24,7 @@ type CommitObservation struct {
 	SourceGasPriceUSD *big.Int                       `json:"sourceGasPrice"`
 }
 
+// Marshal MUST be used instead of raw json.Marshal(o) since it contains backwards compatibility related changes.
 func (o CommitObservation) Marshal() ([]byte, error) {
 	// Similar to: commitObservationJSONBackComp but for commit observation marshaling.
 	tokenPricesUSD := make(map[cciptypes.Address]*big.Int, len(o.TokenPricesUSD))
@@ -80,6 +81,8 @@ func (o ExecutionObservation) Marshal() ([]byte, error) {
 // GetParsableObservations checks the given observations for formatting and value errors.
 // It returns all valid observations, potentially being an empty list. It will log
 // malformed observations but never error.
+//
+// GetParsableObservations MUST be used instead of raw json.Unmarshal(o) since it contains backwards compatibility changes.
 func GetParsableObservations[O CommitObservation | ExecutionObservation](l logger.Logger, observations []types.AttributedObservation) []O {
 	var parseableObservations []O
 	var observers []commontypes.OracleID
