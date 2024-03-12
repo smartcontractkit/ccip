@@ -116,7 +116,8 @@ func (l *LoadArgs) SanityCheck() {
 }
 
 // ValidateCurseFollowedByUncurse assumes the lanes under test are bi-directional.
-// It assumes the ARM is not already cursed, it will fail teh test if it is in cursed state.
+// It assumes requests in both direction are in flight when this is called.
+// It assumes the ARM is not already cursed, it will fail the test if it is in cursed state.
 // It curses source ARM for forward lanes so that destination curse is also validated for reverse lanes.
 // It waits for 5 minutes for curse to be seen by ccip plugins and contracts.
 // It captures the curse timestamp to verify no execution state changed event is emitted after the cure is applied.
