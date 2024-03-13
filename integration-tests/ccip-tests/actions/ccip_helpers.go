@@ -2831,10 +2831,10 @@ func SetOCR2Configs(commitNodes, execNodes []*client.CLNodesWithKeys, destCCIP D
 	signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig, err := contracts.NewOffChainAggregatorV2ConfigForCCIPPlugin(
 		commitNodes, testhelpers.NewCommitOffchainConfig(
 			*config2.MustNewDuration(5 * time.Second),
-			1,
-			1,
+			1e6,
+			1e6,
 			*config2.MustNewDuration(5 * time.Second),
-			1,
+			1e6,
 			*inflightExpiry,
 		), testhelpers.NewCommitOnchainConfig(
 			destCCIP.Common.PriceRegistry.EthAddress,
@@ -2857,7 +2857,7 @@ func SetOCR2Configs(commitNodes, execNodes []*client.CLNodesWithKeys, destCCIP D
 		signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig, err = contracts.NewOffChainAggregatorV2ConfigForCCIPPlugin(
 			nodes, testhelpers.NewExecOffchainConfig(
 				1,
-				5_000_000,
+				7_000_000,
 				0.7,
 				*inflightExpiry,
 				*rootSnooze,
