@@ -6,7 +6,6 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
 
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip/rebalancer/multienv"
 	helpers "github.com/smartcontractkit/chainlink/core/scripts/common"
@@ -38,8 +37,8 @@ func WithdrawFromL2(
 			balance.String(), amount.String()))
 	}
 
-	// l2Adapter, err := optimism_l2_bridge_adapter.NewOptimismL2BridgeAdapter(l2BridgeAdapterAddress, env.Clients[l2ChainID])
-	// helpers.PanicErr(err)
+	l2Adapter, err := optimism_l2_bridge_adapter.NewOptimismL2BridgeAdapter(l2BridgeAdapterAddress, env.Clients[l2ChainID])
+	helpers.PanicErr(err)
 
 	// Approve the adapter to receive the tokens
 	tx, err := token.Approve(env.Transactors[l2ChainID], l2BridgeAdapterAddress, amount)
@@ -54,32 +53,13 @@ func WithdrawFromL2(
 	}
 
 	// at this point we should be able to withdraw the tokens to L1
-	nonce, err := env.Clients[l2ChainID].PendingNonceAt(context.Background(), env.Transactors[l2ChainID].From)
+	tx, err = l2Adapter.SendERC20(env.Transactors[l2ChainID],
+		l2TokenAddress,
+		common.HexToAddress("0x0"), // not needed
+		l1ToAddress,
+		amount,
+		[]byte{}, /* bridgeSpecificData, unused for optimism L2 adapter */
+	)
 	helpers.PanicErr(err)
-	gasPrice, err := env.Clients[l2ChainID].SuggestGasPrice(context.Background())
-	helpers.PanicErr(err)
-
-	calldata, err := l2AdapterABI.Pack("sendERC20", l2TokenAddress, common.HexToAddress("0x0"), l1ToAddress, amount, []byte{})
-	helpers.PanicErr(err)
-
-	rawTx := types.NewTx(&types.LegacyTx{
-		Nonce:    nonce,
-		GasPrice: gasPrice,
-		Gas:      500_000,
-		To:       &l2BridgeAdapterAddress,
-		Data:     calldata,
-	})
-	tx, err = env.Transactors[l2ChainID].Signer(env.Transactors[l2ChainID].From, rawTx)
-	helpers.PanicErr(err)
-	err = env.Clients[l2ChainID].SendTransaction(context.Background(), tx)
-	helpers.PanicErr(err)
-	// tx, err = l2Adapter.SendERC20(env.Transactors[l2ChainID],
-	// 	l2TokenAddress,
-	// 	common.HexToAddress("0x0"), // not needed
-	// 	l1ToAddress,
-	// 	amount,
-	// 	[]byte{}, /* bridgeSpecificData, unused for optimism L2 adapter */
-	// )
-	// helpers.PanicErr(err)
 	helpers.ConfirmTXMined(context.Background(), env.Clients[l2ChainID], tx, int64(l2ChainID), "WithdrawFromL2")
 }

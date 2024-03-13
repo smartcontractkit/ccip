@@ -8,7 +8,7 @@ import {IL1StandardBridge} from "@eth-optimism/contracts/L1/messaging/IL1Standar
 import {IERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import "../interfaces/optimism/Types.sol";
+import {Types} from "../interfaces/optimism/Types.sol";
 import {IOptimismPortal} from "../interfaces/optimism/IOptimismPortal.sol";
 
 /// @notice OptimismL1BridgeAdapter implements IBridgeAdapter for the Optimism L1<=>L2 bridge.
@@ -127,7 +127,11 @@ contract OptimismL1BridgeAdapter is IBridgeAdapter {
     bytes data;
   }
 
-  function finalizeWithdrawERC20(address /* remoteSender */, address /* localReceiver */, bytes calldata data) external override {
+  function finalizeWithdrawERC20(
+    address /* remoteSender */,
+    address /* localReceiver */,
+    bytes calldata data
+  ) external override {
     // decode the data into FinalizeWithdrawERC20Payload first and extract the action.
     FinalizeWithdrawERC20Payload memory payload = abi.decode(data, (FinalizeWithdrawERC20Payload));
     if (payload.action == FinalizationAction.ProveWithdrawal) {
@@ -138,8 +142,10 @@ contract OptimismL1BridgeAdapter is IBridgeAdapter {
     } else if (payload.action == FinalizationAction.FinalizeWithdrawal) {
       // decode the data into OptimismFinalizationPayload and call the finalizeWithdrawal function.
       OptimismFinalizationPayload memory finalizePayload = abi.decode(payload.data, (OptimismFinalizationPayload));
-      // TODO: finalizing ether withdrawals will currently send ether to the receiver address as indicated by the
-      // withdrawal tx. However, this is problematic because we need to re-wrap it into WETH. This should be fixed.
+      // NOTE: finalizing ether withdrawals will currently send ether to the receiver address as indicated by the
+      // withdrawal tx. However, this is problematic because we need to re-wrap it into WETH.
+      // However, we can't do that from within this adapter because it doesn't actually have the ether.
+      // So its up to the caller to rectify this by re-wrapping the ether.
       _finalizeWithdrawal(finalizePayload);
     } else {
       revert InvalidFinalizationAction();
@@ -160,21 +166,20 @@ contract OptimismL1BridgeAdapter is IBridgeAdapter {
     i_optimismPortal.finalizeWithdrawalTransaction(payload.withdrawalTransaction);
   }
 
-  function finalizeWithdrawNativeFromL2(address from, address to, uint256 amount, bytes calldata data) external {
-    i_L1Bridge.finalizeETHWithdrawal(from, to, amount, data);
-  }
-
-  /// @notice returns the address of the WETH contract.
+  /// @notice returns the address of the WETH token used by this adapter.
+  /// @return the address of the WETH token used by this adapter.
   function getWrappedNative() external view returns (address) {
     return address(i_wrappedNative);
   }
 
   /// @notice returns the address of the Optimism portal contract.
+  /// @return the address of the Optimism portal contract.
   function getOptimismPortal() external view returns (address) {
     return address(i_optimismPortal);
   }
 
   /// @notice returns the address of the Optimism L1StandardBridge bridge contract.
+  /// @return the address of the Optimism L1StandardBridge bridge contract.
   function getL1Bridge() external view returns (address) {
     return address(i_L1Bridge);
   }

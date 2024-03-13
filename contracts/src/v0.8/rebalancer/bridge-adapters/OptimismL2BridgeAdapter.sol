@@ -9,6 +9,8 @@ import {Lib_PredeployAddresses} from "@eth-optimism/contracts/libraries/constant
 import {IERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
 
+/// @dev copy/pasted from https://github.com/ethereum-optimism/optimism/blob/f707883038d527cbf1e9f8ea513fe33255deadbc/packages/contracts-bedrock/src/L2/L2StandardBridge.sol#L114-L122.
+/// @dev can't import it because of hard pin solidity version in the pragma (0.8.15).
 interface IL2StandardBridge {
   /// @custom:legacy
   /// @notice Initiates a withdrawal from L2 to L1 to a target account on L1.
@@ -29,9 +31,7 @@ interface IL2StandardBridge {
     uint256 _amount,
     uint32 _minGasLimit,
     bytes calldata _extraData
-  )
-    external
-    payable;
+  ) external payable;
 }
 
 contract OptimismL2BridgeAdapter is IBridgeAdapter {
@@ -99,8 +99,15 @@ contract OptimismL2BridgeAdapter is IBridgeAdapter {
     return 0;
   }
 
-  /// @notice returns the address of the
+  /// @notice returns the address of the WETH token used by this adapter.
+  /// @return the address of the WETH token used by this adapter.
   function getWrappedNative() external view returns (address) {
     return address(i_wrappedNative);
+  }
+
+  /// @notice returns the address of the L2 bridge used by this adapter.
+  /// @return the address of the L2 bridge used by this adapter.
+  function getL2Bridge() external view returns (address) {
+    return address(i_L2Bridge);
   }
 }
