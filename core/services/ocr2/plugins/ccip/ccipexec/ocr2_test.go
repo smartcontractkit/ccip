@@ -266,7 +266,7 @@ func TestExecutionReportingPlugin_Report(t *testing.T) {
 
 			p.commitStoreReader = ccipdatamocks.NewCommitStoreReader(t)
 			chainHealthcheck := ccipcachemocks.NewChainHealthcheck(t)
-			chainHealthcheck.On("IsHealthy", ctx, false).Return(true, nil)
+			chainHealthcheck.On("IsHealthy", ctx).Return(true, nil)
 			p.chainHealthcheck = chainHealthcheck
 
 			observations := make([]types.AttributedObservation, len(tc.observations))
@@ -313,7 +313,7 @@ func TestExecutionReportingPlugin_ShouldAcceptFinalizedReport(t *testing.T) {
 	mockOffRampReader.On("DecodeExecutionReport", encodedReport).Return(report, nil)
 
 	chainHealthcheck := ccipcachemocks.NewChainHealthcheck(t)
-	chainHealthcheck.On("IsHealthy", mock.Anything, false).Return(true, nil)
+	chainHealthcheck.On("IsHealthy", mock.Anything).Return(true, nil)
 
 	plugin := ExecutionReportingPlugin{
 		offRampReader:    mockOffRampReader,
@@ -363,7 +363,7 @@ func TestExecutionReportingPlugin_ShouldTransmitAcceptedReport(t *testing.T) {
 	mockedExecState := mockOffRampReader.On("GetExecutionState", mock.Anything, uint64(12)).Return(uint8(cciptypes.ExecutionStateUntouched), nil).Once()
 
 	chainHealthcheck := ccipcachemocks.NewChainHealthcheck(t)
-	chainHealthcheck.On("IsHealthy", mock.Anything, true).Return(true, nil)
+	chainHealthcheck.On("IsHealthy", mock.Anything).Return(true, nil)
 
 	plugin := ExecutionReportingPlugin{
 		commitStoreReader: mockCommitStoreReader,
@@ -423,7 +423,7 @@ func TestExecutionReportingPlugin_buildReport(t *testing.T) {
 	p.commitStoreReader = commitStore
 
 	lp := lpMocks.NewLogPoller(t)
-	offRampReader, err := v1_0_0.NewOffRamp(logger.TestLogger(t), utils.RandomAddress(), nil, lp, nil)
+	offRampReader, err := v1_0_0.NewOffRamp(logger.TestLogger(t), utils.RandomAddress(), nil, lp, nil, nil)
 	assert.NoError(t, err)
 	p.offRampReader = offRampReader
 
@@ -1924,7 +1924,7 @@ func Test_prepareTokenExecData(t *testing.T) {
 }
 
 func encodeExecutionReport(t *testing.T, report cciptypes.ExecReport) []byte {
-	reader, err := v1_2_0.NewOffRamp(logger.TestLogger(t), utils.RandomAddress(), nil, nil, nil)
+	reader, err := v1_2_0.NewOffRamp(logger.TestLogger(t), utils.RandomAddress(), nil, nil, nil, nil)
 	require.NoError(t, err)
 	encodedReport, err := reader.EncodeExecutionReport(report)
 	require.NoError(t, err)
