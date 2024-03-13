@@ -50,7 +50,7 @@ type MultiCallReturnValues struct {
 func NewMultiCallLoadGenerator(testCfg *testsetups.CCIPTestConfig, lanes []*actions.CCIPLane, noOfRequestsPerUnitTime int64, labels map[string]string) (*CCIPMultiCallLoadGenerator, error) {
 	// check if all lanes are from same network
 	source := lanes[0].Source.Common.ChainClient.GetChainID()
-	multiCall := lanes[0].SrcNetworkLaneCfg.Multicall
+	multiCall := lanes[0].Source.Common.MulticallContract.Hex()
 	if multiCall == "" {
 		return nil, fmt.Errorf("multicall address cannot be empty")
 	}
@@ -58,7 +58,7 @@ func NewMultiCallLoadGenerator(testCfg *testsetups.CCIPTestConfig, lanes []*acti
 		if source.String() != lanes[i].Source.Common.ChainClient.GetChainID().String() {
 			return nil, fmt.Errorf("all lanes should be from same network; expected %s, got %s", source, lanes[i].Source.Common.ChainClient.GetChainID())
 		}
-		if lanes[i].SrcNetworkLaneCfg.Multicall != multiCall {
+		if lanes[i].Source.Common.MulticallContract.Hex() != multiCall {
 			return nil, fmt.Errorf("multicall address should be same for all lanes")
 		}
 	}

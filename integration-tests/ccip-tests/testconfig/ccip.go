@@ -46,6 +46,7 @@ type CCIPTestConfig struct {
 	ChaosDuration              *config.Duration   `toml:",omitempty"`
 	USDCMockDeployment         *bool              `toml:",omitempty"`
 	TimeoutForPriceUpdate      *config.Duration   `toml:",omitempty"`
+	WithPipeline               *bool              `toml:",omitempty"`
 	FailOnFirstErrorInLoad     *bool              `toml:",omitempty"`
 }
 

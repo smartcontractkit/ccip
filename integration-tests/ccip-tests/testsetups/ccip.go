@@ -354,7 +354,7 @@ func (o *CCIPTestSetUpOutputs) AddLanesForNetworkPair(
 	networkA, networkB blockchain.EVMNetwork,
 	chainClientA, chainClientB blockchain.EVMClient,
 	transferAmounts []*big.Int,
-	commitAndExecOnSameDON, bidirectional bool,
+	commitAndExecOnSameDON, bidirectional, withPipeline bool,
 ) error {
 	var allErrors atomic.Error
 	t := o.Cfg.Test
@@ -478,10 +478,6 @@ func (o *CCIPTestSetUpOutputs) AddLanesForNetworkPair(
 		return errors.WithStack(fmt.Errorf("chain contracts for network %s not found", networkB.Name))
 	}
 
-	// Now testing only with dynamic price getter (no pipeline).
-	// Could be removed once the pipeline is completely removed.
-	withPipeline := false
-
 	setUpFuncs.Go(func() error {
 		lggr.Info().Msgf("Setting up lane %s to %s", networkA.Name, networkB.Name)
 		srcConfig, destConfig, err := ccipLaneA2B.DeployNewCCIPLane(o.Env, commitAndExecOnSameDON, networkACmn, networkBCmn,
@@ -565,11 +561,24 @@ func (o *CCIPTestSetUpOutputs) StartEventWatchers() {
 func (o *CCIPTestSetUpOutputs) WaitForPriceUpdates(ctx context.Context) {
 	t := o.Cfg.Test
 	priceUpdateGrp, _ := errgroup.WithContext(ctx)
+	priceUpdateTracker := sync.Map{}
 	for _, lanes := range o.ReadLanes() {
 		lanes := lanes
-		forwardLane := lanes.ForwardLane
-		reverseLane := lanes.ReverseLane
-		waitForUpdate := func(lane *actions.CCIPLane) error {
+		waitForUpdate := func(lane actions.CCIPLane) error {
+			if id, ok := priceUpdateTracker.Load(lane.Source.Common.PriceRegistry.Address()); ok &&
+				id.(uint64) == lane.Source.DestinationChainId {
+				return nil
+			}
+			priceUpdateTracker.Store(lane.Source.Common.PriceRegistry.Address(), lane.Source.DestinationChainId)
+			lane.Logger.Info().
+				Str("source_chain", lane.Source.Common.ChainClient.GetNetworkName()).
+				Uint64("dest_chain", lane.Source.DestinationChainId).
+				Str("price_registry", lane.Source.Common.PriceRegistry.Address()).
+				Msgf("Waiting for price update")
+			err := lane.Source.Common.WatchForPriceUpdates()
+			if err != nil {
+				return err
+			}
 			defer func() {
 				lane.Logger.Info().
 					Str("source_chain", lane.Source.Common.ChainClient.GetNetworkName()).
@@ -578,12 +587,7 @@ func (o *CCIPTestSetUpOutputs) WaitForPriceUpdates(ctx context.Context) {
 					Msg("Stopping price update watch")
 				lane.Source.Common.StopWatchingPriceUpdates()
 			}()
-			lane.Logger.Info().
-				Str("source_chain", lane.Source.Common.ChainClient.GetNetworkName()).
-				Uint64("dest_chain", lane.Source.DestinationChainId).
-				Str("price_registry", lane.Source.Common.PriceRegistry.Address()).
-				Msgf("Waiting for price update")
-			err := lane.Source.Common.WaitForPriceUpdates(
+			err = lane.Source.Common.WaitForPriceUpdates(
 				lane.Logger,
 				o.Cfg.TestGroupInput.TimeoutForPriceUpdate.Duration(),
 				lane.Source.DestinationChainId,
@@ -595,11 +599,11 @@ func (o *CCIPTestSetUpOutputs) WaitForPriceUpdates(ctx context.Context) {
 		}
 
 		priceUpdateGrp.Go(func() error {
-			return waitForUpdate(forwardLane)
+			return waitForUpdate(*lanes.ForwardLane)
 		})
 		if lanes.ReverseLane != nil {
 			priceUpdateGrp.Go(func() error {
-				return waitForUpdate(reverseLane)
+				return waitForUpdate(*lanes.ReverseLane)
 			})
 		}
 	}
@@ -705,15 +709,19 @@ func CCIPDefaultTestSetUp(
 	}
 	require.NoError(t, chainAddGrp.Wait(), "Deploying common contracts shouldn't fail")
 
+	withPipeline := pointer.GetBool(setUpArgs.Cfg.TestGroupInput.WithPipeline)
+
 	// set up mock server for price pipeline and usdc attestation if not using existing deployment
 	if !pointer.GetBool(setUpArgs.Cfg.TestGroupInput.ExistingDeployment) {
 		var killgrave *ctftestenv.Killgrave
 		if setUpArgs.Env.LocalCluster != nil {
 			killgrave = setUpArgs.Env.LocalCluster.MockAdapter
 		}
-		// set up mock server for price pipeline. need to set it once for all the lanes as the price pipeline path uses
-		// regex to match the path for all tokens across all lanes
-		actions.SetMockserverWithTokenPriceValue(killgrave, setUpArgs.Env.MockServer)
+		if withPipeline {
+			// set up mock server for price pipeline. need to set it once for all the lanes as the price pipeline path uses
+			// regex to match the path for all tokens across all lanes
+			actions.SetMockserverWithTokenPriceValue(killgrave, setUpArgs.Env.MockServer)
+		}
 		if pointer.GetBool(setUpArgs.Cfg.TestGroupInput.USDCMockDeployment) {
 			// if it's a new USDC deployment, set up mock server for attestation,
 			// we need to set it only once for all the lanes as the attestation path uses regex to match the path for
@@ -722,7 +730,6 @@ func CCIPDefaultTestSetUp(
 			require.NoError(t, err, "failed to set up mock server for attestation")
 		}
 	}
-
 	// deploy all lane specific contracts
 	lggr.Info().Msg("Deploying chain specific contracts")
 	laneAddGrp, _ := errgroup.WithContext(parent)
@@ -745,6 +752,7 @@ func CCIPDefaultTestSetUp(
 				chainByChainID[n.NetworkA.ChainID], chainByChainID[n.NetworkB.ChainID], transferAmounts,
 				pointer.GetBool(testConfig.TestGroupInput.CommitAndExecuteOnSameDON),
 				pointer.GetBool(testConfig.TestGroupInput.BiDirectionalLane),
+				withPipeline,
 			)
 		})
 	}
@@ -758,7 +766,7 @@ func CCIPDefaultTestSetUp(
 		// wait for all jobs to get created
 		lggr.Info().Msg("Waiting for jobs to be created")
 		require.NoError(t, setUpArgs.JobAddGrp.Wait(), "Creating jobs shouldn't fail")
-		// wait for price updates to be available
+		// wait for price updates to be available and start event watchers
 		setUpArgs.WaitForPriceUpdates(parent)
 	}
 

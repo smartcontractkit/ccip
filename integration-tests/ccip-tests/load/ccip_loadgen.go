@@ -19,8 +19,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
 
-	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
-
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers"
@@ -61,6 +59,8 @@ func NewCCIPLoad(t *testing.T, lane *actions.CCIPLane, timeout time.Duration, no
 		Dest:              lane.Dest,
 		Reports:           lane.Reports,
 	}
+	// This is to optimize memory space for load tests with high number of networks, lanes, tokens
+	lane.OptimizeStorage()
 	return &CCIPE2ELoad{
 		t:                         t,
 		Lane:                      loadLane,
@@ -130,23 +130,6 @@ func (c *CCIPE2ELoad) BeforeAllCall(msgType string, gasLimit *big.Int) {
 
 	sourceCCIP.Common.ChainClient.ParallelTransactions(false)
 	destCCIP.Common.ChainClient.ParallelTransactions(false)
-
-	// this is just to free up memory space for scalability tests with high number of tokens,pools and networks
-	sourceCCIP.Common.FreeUpUnusedSpace()
-	destCCIP.Common.FreeUpUnusedSpace()
-	// close all header subscriptions for dest chains
-	queuedEvents := destCCIP.Common.ChainClient.GetHeaderSubscriptions()
-	for subName := range queuedEvents {
-		destCCIP.Common.ChainClient.DeleteHeaderEventSubscription(subName)
-	}
-	// close all header subscriptions for source chains except for finalized header
-	queuedEvents = sourceCCIP.Common.ChainClient.GetHeaderSubscriptions()
-	for subName := range queuedEvents {
-		if subName == blockchain.FinalizedHeaderKey {
-			continue
-		}
-		sourceCCIP.Common.ChainClient.DeleteHeaderEventSubscription(subName)
-	}
 }
 
 func (c *CCIPE2ELoad) CCIPMsg() (router.ClientEVM2AnyMessage, *testreporters.RequestStat) {

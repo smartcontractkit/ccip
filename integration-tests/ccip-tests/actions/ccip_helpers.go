@@ -163,8 +163,6 @@ func (ccipModule *CCIPCommon) StopWatchingPriceUpdates() {
 	for _, sub := range ccipModule.priceUpdateSubs {
 		sub.Unsubscribe()
 	}
-	ccipModule.gasUpdateWatcher = nil
-	ccipModule.gasUpdateWatcherMu = nil
 }
 
 func (ccipModule *CCIPCommon) UnvoteToCurseARM() error {
@@ -501,7 +499,6 @@ func (ccipModule *CCIPCommon) WaitForPriceUpdates(
 					Uint64("dest chain", destChainId).
 					Str("source chain", ccipModule.ChainClient.GetNetworkName()).
 					Msg("Price updated")
-
 				return nil
 			}
 		case <-ctx.Done():
@@ -2044,6 +2041,29 @@ func (lane *CCIPLane) TokenPricesConfig() (string, error) {
 		return "", fmt.Errorf("error in AddAggregatorPriceConfig for wrapped native on source %s: %w", lane.Source.Common.WrappedNative.Hex(), err)
 	}
 	return d.String()
+}
+
+// OptimizeStorage sets nil to various elements of CCIPLane which are only used
+// during lane set up and not used for rest of the test duration
+// this is called mainly by load test to keep the memory usage minimum for high number of lanes
+func (lane *CCIPLane) OptimizeStorage() {
+	lane.Source.Common.FreeUpUnusedSpace()
+	lane.Dest.Common.FreeUpUnusedSpace()
+	lane.DstNetworkLaneCfg = nil
+	lane.SrcNetworkLaneCfg = nil
+	// close all header subscriptions for dest chains
+	queuedEvents := lane.Dest.Common.ChainClient.GetHeaderSubscriptions()
+	for subName := range queuedEvents {
+		lane.Dest.Common.ChainClient.DeleteHeaderEventSubscription(subName)
+	}
+	// close all header subscriptions for source chains except for finalized header
+	queuedEvents = lane.Source.Common.ChainClient.GetHeaderSubscriptions()
+	for subName := range queuedEvents {
+		if subName == blockchain.FinalizedHeaderKey {
+			continue
+		}
+		lane.Source.Common.ChainClient.DeleteHeaderEventSubscription(subName)
+	}
 }
 
 func (lane *CCIPLane) UpdateLaneConfig() {
