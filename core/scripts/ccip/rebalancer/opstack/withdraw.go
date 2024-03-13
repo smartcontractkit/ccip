@@ -11,11 +11,6 @@ import (
 	helpers "github.com/smartcontractkit/chainlink/core/scripts/common"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/optimism_l2_bridge_adapter"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/erc20"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
-)
-
-var (
-	l2AdapterABI = abihelpers.MustParseABI(optimism_l2_bridge_adapter.OptimismL2BridgeAdapterABI)
 )
 
 func WithdrawFromL2(
