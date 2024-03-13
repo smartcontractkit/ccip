@@ -146,11 +146,16 @@ contract ArbitrumL1BridgeAdapter is IBridgeAdapter {
   function exposeArbitrumFinalizationPayload(ArbitrumFinalizationPayload memory payload) public pure {}
 
   /// @notice Finalize an L2 -> L1 transfer.
+  /// @notice Arbitrum finalizations are single-step, so we always return true.
+  /// @notice Calls to this function will revert in two cases:
+  /// @notice 1) if the finalization payload is wrong, i.e incorrect merkle proof, or index.
+  /// @notice 2) if the withdrawal was already finalized.
+  /// @return true iff the finalization does not revert.
   function finalizeWithdrawERC20(
     address /* remoteSender */,
     address /* localReceiver */,
     bytes calldata arbitrumFinalizationPayload
-  ) external {
+  ) external override returns (bool) {
     ArbitrumFinalizationPayload memory payload = abi.decode(arbitrumFinalizationPayload, (ArbitrumFinalizationPayload));
     i_l1Outbox.executeTransaction(
       payload.proof,
@@ -163,8 +168,11 @@ contract ArbitrumL1BridgeAdapter is IBridgeAdapter {
       payload.value,
       payload.data
     );
+    return true;
   }
 
+  /// @notice Convenience function to get the L2 token address from the L1 token address.
+  /// @return The L2 token address for the given L1 token address.
   function getL2Token(address l1Token) external view returns (address) {
     return i_l1GatewayRouter.calculateL2TokenAddress(l1Token);
   }

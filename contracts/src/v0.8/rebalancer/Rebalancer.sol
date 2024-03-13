@@ -12,7 +12,7 @@ import {SafeERC20} from "../vendor/openzeppelin-solidity/v4.8.3/contracts/token/
 
 /// @notice Rebalancer for a single token over multiple chains.
 /// @dev This contract is designed to be used with the LockReleaseTokenPool contract but
-/// isn't constraint to it. It can be used with any contract that implements the ILiquidityContainer
+/// isn't constrained to it. It can be used with any contract that implements the ILiquidityContainer
 /// interface.
 /// @dev The OCR3 DON should only be able to transfer funds to other pre-approved contracts
 /// on other chains. Under no circumstances should it be able to transfer funds to arbitrary
@@ -30,6 +30,11 @@ contract Rebalancer is IRebalancer, OCR3Base {
   error InsufficientLiquidity(uint256 requested, uint256 available);
   error EmptyReport();
 
+  event FinalizationStepCompleted(
+    uint64 indexed ocrSeqNum,
+    uint64 indexed remoteChainSelector,
+    bytes bridgeSpecificData
+  );
   event LiquidityTransferred(
     uint64 indexed ocrSeqNum,
     uint64 indexed fromChainSelector,
@@ -220,9 +225,21 @@ contract Rebalancer is IRebalancer, OCR3Base {
         remoteRebalancer.remoteRebalancer, // remoteSender: the remote rebalancer
         address(this), // localReceiver: this contract
         bridgeSpecificPayload
-      )
+      ) returns (bool fundsAvailable)
     {
-      // successfully finalized the withdrawal
+      if (fundsAvailable) {
+        // finalization was successful and we can inject the liquidity into the container.
+        // approve and liquidity container should transferFrom.
+        _injectLiquidity(amount, ocrSeqNum, remoteChainSelector, bridgeSpecificPayload);
+      } else {
+        // a finalization step was completed, but funds are not available.
+        // hence, we cannot inject any liquidity yet.
+        emit FinalizationStepCompleted(ocrSeqNum, remoteChainSelector, bridgeSpecificPayload);
+      }
+
+      // return here on the happy path.
+      // sad path is when finalizeWithdrawERC20 reverts, which is handled after the catch block.
+      return;
     } catch (bytes memory lowLevelData) {
       // failed to finalize the withdrawal.
       // this could mean that the withdrawal was already finalized
@@ -231,8 +248,14 @@ contract Rebalancer is IRebalancer, OCR3Base {
       emit FinalizationFailed(ocrSeqNum, remoteChainSelector, bridgeSpecificPayload, lowLevelData);
     }
 
-    // inject liquidity into the liquidity container
-    // approve and liquidity container should transferFrom
+    // if we reach this point, the finalization failed.
+    // since we don't have enough information to know why it failed,
+    // we assume that it failed because the withdrawal was already finalized,
+    // and that the funds are available.
+    _injectLiquidity(amount, ocrSeqNum, remoteChainSelector, bridgeSpecificPayload);
+  }
+
+  function _injectLiquidity(uint256 amount, uint64 ocrSeqNum, uint64 remoteChainSelector, bytes memory bridgeSpecificPayload) private {
     i_localToken.safeIncreaseAllowance(address(s_localLiquidityContainer), amount);
     s_localLiquidityContainer.provideLiquidity(amount);
 

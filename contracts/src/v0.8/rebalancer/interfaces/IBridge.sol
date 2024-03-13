@@ -31,12 +31,19 @@ interface IBridgeAdapter {
   function getBridgeFeeInNative() external view returns (uint256);
 
   /// @notice Finalize the withdrawal of a cross-chain transfer.
+  /// @notice Not all implementations will finalize a transfer in a single call to this function.
+  /// @notice Optimism, for example, requires a two-step process to finalize a transfer. The first
+  /// @notice step requires proving the withdrawal that occurred on L2 on L1. The second step is then
+  /// @notice the finalization, whereby funds become available to the recipient. So, in that particular
+  /// @notice scenario, `false` is returned from `finalizeWithdrawERC20` when the first step is completed,
+  /// @notice and `true` is returned when the second step is completed.
   /// @param remoteSender The address of the sender on the remote chain.
   /// @param localReceiver The address of the receiver on the local chain.
   /// @param bridgeSpecificPayload The payload of the cross-chain transfer, bridge-specific, i.e a proof of some kind.
+  /// @return true iff the funds are available, false otherwise.
   function finalizeWithdrawERC20(
     address remoteSender,
     address localReceiver,
     bytes calldata bridgeSpecificPayload
-  ) external;
+  ) external returns (bool);
 }

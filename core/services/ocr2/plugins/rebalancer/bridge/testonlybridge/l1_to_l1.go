@@ -1,6 +1,7 @@
 package testonlybridge
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"math/big"
@@ -16,13 +17,15 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/mock_l1_bridge_adapter"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/rebalancer"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/abiutils"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/models"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 )
 
 var (
 	// Emitted on both source and destination
-	LiquidityTransferredTopic = rebalancer.RebalancerLiquidityTransferred{}.Topic()
+	LiquidityTransferredTopic      = rebalancer.RebalancerLiquidityTransferred{}.Topic()
+	FinalizationStepCompletedTopic = rebalancer.RebalancerFinalizationStepCompleted{}.Topic()
 )
 
 type testBridge struct {
@@ -30,8 +33,8 @@ type testBridge struct {
 	destSelector     models.NetworkSelector
 	sourceRebalancer rebalancer.RebalancerInterface
 	destRebalancer   rebalancer.RebalancerInterface
-	sourceAdapter    *mock_l1_bridge_adapter.MockL1BridgeAdapter
-	destAdapter      *mock_l1_bridge_adapter.MockL1BridgeAdapter
+	sourceAdapter    mock_l1_bridge_adapter.MockL1BridgeAdapterInterface
+	destAdapter      mock_l1_bridge_adapter.MockL1BridgeAdapterInterface
 	sourceLogPoller  logpoller.LogPoller
 	destLogPoller    logpoller.LogPoller
 	sourceClient     client.Client
@@ -47,9 +50,11 @@ func New(
 	lggr logger.Logger,
 ) (*testBridge, error) {
 	err := sourceLogPoller.RegisterFilter(logpoller.Filter{
-		Name: logpoller.FilterName("L1-LiquidityTransferred", sourceSelector),
+		Name: logpoller.FilterName("L1-LiquidityTransferred-FinalizationCompleted",
+			sourceSelector, sourceRebalancerAddress.String()),
 		EventSigs: []common.Hash{
 			LiquidityTransferredTopic,
+			FinalizationStepCompletedTopic,
 		},
 		Addresses: []common.Address{
 			common.Address(sourceRebalancerAddress),
@@ -60,9 +65,11 @@ func New(
 	}
 
 	err = destLogPoller.RegisterFilter(logpoller.Filter{
-		Name: logpoller.FilterName("L2-LiquidityTransferred", destSelector),
+		Name: logpoller.FilterName("L2-LiquidityTransferred-FinalizationCompleted",
+			destSelector, destRebalancerAddress.String()),
 		EventSigs: []common.Hash{
 			LiquidityTransferredTopic,
+			FinalizationStepCompletedTopic,
 		},
 		Addresses: []common.Address{
 			common.Address(destRebalancerAddress),
@@ -159,7 +166,7 @@ func (t *testBridge) GetTransfers(ctx context.Context, localToken models.Address
 	receiveLogs, err := t.destLogPoller.LogsWithSigs(
 		1,
 		latestDestBlock.BlockNumber,
-		[]common.Hash{LiquidityTransferredTopic},
+		[]common.Hash{LiquidityTransferredTopic, FinalizationStepCompletedTopic},
 		t.destRebalancer.Address(),
 		pg.WithParentCtx(ctx),
 	)
@@ -172,26 +179,60 @@ func (t *testBridge) GetTransfers(ctx context.Context, localToken models.Address
 		return nil, fmt.Errorf("parse source send logs: %w", err)
 	}
 
-	parsedFinalizeLogs, _, err := parseLiquidityTransferred(t.destRebalancer.ParseLiquidityTransferred, receiveLogs)
+	parsedStepCompleted, parsedFinalizeLogs, err := parseLiquidityTransferredAndFinalizationStepCompleted(
+		t.destRebalancer.ParseLiquidityTransferred,
+		t.destRebalancer.ParseFinalizationStepCompleted,
+		receiveLogs)
 	if err != nil {
 		return nil, fmt.Errorf("parse dest finalize logs: %w", err)
 	}
 
-	ready, err := t.getReadyToFinalize(parsedSendLogs, parsedFinalizeLogs)
+	readyToProve, readyToFinalize, err := filterAndGroupByStage(t.lggr, parsedSendLogs, parsedFinalizeLogs, parsedStepCompleted)
 	if err != nil {
 		return nil, fmt.Errorf("get ready to finalize: %w", err)
 	}
 
-	return t.toPendingTransfers(localToken, remoteToken, ready, parsedToLP), nil
+	return t.toPendingTransfers(localToken, remoteToken, readyToProve, readyToFinalize, parsedToLP), nil
 }
 
 func (t *testBridge) toPendingTransfers(
 	localToken, remoteToken models.Address,
-	ready []*rebalancer.RebalancerLiquidityTransferred,
+	readyToProve,
+	readyToFinalize []*rebalancer.RebalancerLiquidityTransferred,
 	parsedToLP map[logKey]logpoller.Log,
 ) []models.PendingTransfer {
 	var transfers []models.PendingTransfer
-	for _, send := range ready {
+
+	for _, send := range readyToProve {
+		lp := parsedToLP[logKey{txHash: send.Raw.TxHash, logIndex: int64(send.Raw.Index)}]
+		sendNonce, err := UnpackBridgeSendReturnData(send.BridgeReturnData)
+		if err != nil {
+			t.lggr.Errorw("unpack send bridge data", "err", err)
+			continue
+		}
+		bridgeData, err := PackProveBridgePayload(sendNonce)
+		if err != nil {
+			t.lggr.Errorw("pack bridge data", "err", err)
+			continue
+		}
+		transfers = append(transfers, models.PendingTransfer{
+			Transfer: models.Transfer{
+				From:               t.sourceSelector,
+				To:                 t.destSelector,
+				Sender:             models.Address(t.sourceAdapter.Address()),
+				Receiver:           models.Address(t.destRebalancer.Address()),
+				Amount:             ubig.New(send.Amount),
+				LocalTokenAddress:  localToken,
+				RemoteTokenAddress: remoteToken,
+				Date:               lp.BlockTimestamp,
+				BridgeData:         bridgeData,
+			},
+			Status: models.TransferStatusReady,
+			ID:     fmt.Sprintf("%s-%d-prove", send.Raw.TxHash.Hex(), send.Raw.Index),
+		})
+	}
+
+	for _, send := range readyToFinalize {
 		lp := parsedToLP[logKey{txHash: send.Raw.TxHash, logIndex: int64(send.Raw.Index)}]
 		sendNonce, err := UnpackBridgeSendReturnData(send.BridgeReturnData)
 		if err != nil {
@@ -216,7 +257,7 @@ func (t *testBridge) toPendingTransfers(
 				BridgeData:         bridgeData,
 			},
 			Status: models.TransferStatusReady,
-			ID:     fmt.Sprintf("%s-%d", send.Raw.TxHash.Hex(), send.Raw.Index),
+			ID:     fmt.Sprintf("%s-%d-finalize", send.Raw.TxHash.Hex(), send.Raw.Index),
 		})
 	}
 
@@ -227,18 +268,95 @@ func (t *testBridge) toPendingTransfers(
 	return transfers
 }
 
-func (t *testBridge) getReadyToFinalize(
+// filterAndGroupByStage filters out sends that have already been finalized
+// and groups the remaining sends into ready to prove and ready to finalize slices.
+func filterAndGroupByStage(
+	lggr logger.Logger,
 	sends []*rebalancer.RebalancerLiquidityTransferred,
 	finalizes []*rebalancer.RebalancerLiquidityTransferred,
-) ([]*rebalancer.RebalancerLiquidityTransferred, error) {
-	t.lggr.Debugw("Getting ready to finalize",
+	stepsCompleted []*rebalancer.RebalancerFinalizationStepCompleted,
+) (readyToProve, readyToFinalize []*rebalancer.RebalancerLiquidityTransferred, err error) {
+	lggr = lggr.With(
 		"sendsLen", len(sends),
 		"finalizesLen", len(finalizes),
+		"stepsCompletedLen", len(stepsCompleted),
 		"sends", sends,
-		"finalizes", finalizes)
+		"finalizes", finalizes,
+		"stepsCompleted", stepsCompleted)
+	lggr.Debugw("Getting ready to finalize")
 
 	// find sent events that don't have a matching finalized event
-	var ready []*rebalancer.RebalancerLiquidityTransferred
+	unfinalized, err := filterFinalized(sends, finalizes)
+	if err != nil {
+		return nil, nil, fmt.Errorf("filter finalized: %w", err)
+	}
+
+	// group remaining unfinalized sends into ready to finalize and ready to prove.
+	// ready to finalize sends will be finalized, while ready to prove will be proven.
+	readyToFinalize, readyToProve, err = groupByStage(unfinalized, stepsCompleted)
+	if err != nil {
+		return nil, nil, fmt.Errorf("group by stage: %w", err)
+	}
+
+	if len(readyToFinalize) > 0 {
+		lggr.Infow("found proven sends, ready to finalize",
+			"provenSendsLen", len(readyToFinalize),
+			"readyToFinalize", readyToFinalize)
+	}
+	if len(readyToProve) > 0 {
+		lggr.Infow("found unproven sends, ready to prove",
+			"unprovenSendsLen", len(readyToProve),
+			"readyToProve", readyToProve)
+	}
+
+	if len(readyToFinalize) == 0 && len(readyToProve) == 0 {
+		lggr.Debugw("No sends ready to finalize or prove",
+			"finalizes", finalizes)
+	}
+
+	return
+}
+
+func groupByStage(
+	unfinalized []*rebalancer.RebalancerLiquidityTransferred,
+	stepsCompleted []*rebalancer.RebalancerFinalizationStepCompleted,
+) (
+	readyToProve,
+	readyToFinalize []*rebalancer.RebalancerLiquidityTransferred,
+	err error,
+) {
+	for _, candidate := range unfinalized {
+		var proven bool
+		for _, stepCompleted := range stepsCompleted {
+			sendNonce, err := UnpackBridgeSendReturnData(candidate.BridgeReturnData)
+			if err != nil {
+				return nil, nil, fmt.Errorf("unpack send bridge data: %w", err)
+			}
+			proveNonce, err := UnpackProveBridgePayload(stepCompleted.BridgeSpecificData)
+			if err != nil {
+				return nil, nil, fmt.Errorf("unpack prove bridge data: %w", err)
+			}
+			if proveNonce.Cmp(sendNonce) == 0 {
+				proven = true
+				break
+			}
+		}
+		if proven {
+			readyToFinalize = append(readyToFinalize, candidate)
+		} else {
+			readyToProve = append(readyToProve, candidate)
+		}
+	}
+	return
+}
+
+func filterFinalized(
+	sends []*rebalancer.RebalancerLiquidityTransferred,
+	finalizes []*rebalancer.RebalancerLiquidityTransferred) (
+	[]*rebalancer.RebalancerLiquidityTransferred,
+	error,
+) {
+	var unfinalized []*rebalancer.RebalancerLiquidityTransferred
 	for _, send := range sends {
 		var finalized bool
 		for _, finalize := range finalizes {
@@ -256,34 +374,28 @@ func (t *testBridge) getReadyToFinalize(
 			}
 		}
 		if !finalized {
-			ready = append(ready, send)
+			unfinalized = append(unfinalized, send)
 		}
 	}
+	return unfinalized, nil
+}
 
-	if len(ready) > 0 {
-		t.lggr.Infow("found ready to finalize", "sendsLen", len(sends),
-			"finalizesLen", len(finalizes),
-			"sends", sends,
-			"finalizes", finalizes,
-			"ready", ready)
-	} else {
-		t.lggr.Debugw("no requests ready to finalize", "sendsLen", len(sends),
-			"finalizesLen", len(finalizes),
-			"sends", sends,
-			"finalizes", finalizes)
-	}
-
-	return ready, nil
+func PackProveBridgePayload(nonce *big.Int) ([]byte, error) {
+	return utils.ABIEncode(`[{"type": "uint256"}]`, nonce)
 }
 
 func PackFinalizeBridgePayload(amount, nonce *big.Int) ([]byte, error) {
 	return utils.ABIEncode(`[{"type": "uint256"}, {"type": "uint256"}]`, amount, nonce)
 }
 
+func UnpackProveBridgePayload(data []byte) (*big.Int, error) {
+	return abiutils.UnpackUint256(data)
+}
+
 func UnpackFinalizeBridgePayload(data []byte) (*big.Int, *big.Int, error) {
 	ifaces, err := utils.ABIDecode(`[{"type": "uint256"}, {"type": "uint256"}]`, data)
 	if err != nil {
-		return nil, nil, fmt.Errorf("decode bridge data: %w", err)
+		return nil, nil, fmt.Errorf("decode finalize bridge data: %w", err)
 	}
 	if len(ifaces) != 2 {
 		return nil, nil, fmt.Errorf("expected 2 arguments, got %d", len(ifaces))
@@ -294,15 +406,7 @@ func UnpackFinalizeBridgePayload(data []byte) (*big.Int, *big.Int, error) {
 }
 
 func UnpackBridgeSendReturnData(data []byte) (*big.Int, error) {
-	ifaces, err := utils.ABIDecode(`[{"type": "uint256"}]`, data)
-	if err != nil {
-		return nil, fmt.Errorf("decode bridge data: %w", err)
-	}
-	if len(ifaces) != 1 {
-		return nil, fmt.Errorf("expected 1 argument, got %d", len(ifaces))
-	}
-	val := *abi.ConvertType(ifaces[0], new(*big.Int)).(**big.Int)
-	return val, nil
+	return abiutils.UnpackUint256(data)
 }
 
 type logKey struct {
@@ -326,4 +430,36 @@ func parseLiquidityTransferred(parseFunc func(gethtypes.Log) (*rebalancer.Rebala
 		}] = lg
 	}
 	return transferred, toLP, nil
+}
+
+func parseLiquidityTransferredAndFinalizationStepCompleted(
+	transferredParse func(gethtypes.Log) (*rebalancer.RebalancerLiquidityTransferred, error),
+	finalizeParse func(gethtypes.Log) (*rebalancer.RebalancerFinalizationStepCompleted, error),
+	lgs []logpoller.Log) (
+	[]*rebalancer.RebalancerFinalizationStepCompleted,
+	[]*rebalancer.RebalancerLiquidityTransferred,
+	error,
+) {
+	var finalizationStepCompletedLogs []*rebalancer.RebalancerFinalizationStepCompleted
+	var liquidityTransferredLogs []*rebalancer.RebalancerLiquidityTransferred
+	for _, lg := range lgs {
+		if bytes.Equal(lg.Topics[0], LiquidityTransferredTopic.Bytes()) {
+			parsed, err := transferredParse(lg.ToGethLog())
+			if err != nil {
+				// should never happen
+				return nil, nil, fmt.Errorf("parse LiquidityTransferred log: %w", err)
+			}
+			liquidityTransferredLogs = append(liquidityTransferredLogs, parsed)
+		} else if bytes.Equal(lg.Topics[0], FinalizationStepCompletedTopic.Bytes()) {
+			parsed, err := finalizeParse(lg.ToGethLog())
+			if err != nil {
+				// should never happen
+				return nil, nil, fmt.Errorf("parse FinalizationStepCompleted log: %w", err)
+			}
+			finalizationStepCompletedLogs = append(finalizationStepCompletedLogs, parsed)
+		} else {
+			return nil, nil, fmt.Errorf("unexpected topic: %x", lg.Topics[0])
+		}
+	}
+	return finalizationStepCompletedLogs, liquidityTransferredLogs, nil
 }
