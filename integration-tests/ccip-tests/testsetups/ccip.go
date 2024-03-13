@@ -558,6 +558,31 @@ func (o *CCIPTestSetUpOutputs) StartEventWatchers() {
 	}
 }
 
+func (o *CCIPTestSetUpOutputs) AddRemoteChainsToPools(ctx context.Context) {
+	ccipCommonByNetwork := make(map[string]*actions.CCIPCommon)
+	var allLanes []*actions.CCIPLane
+	for _, lanes := range o.ReadLanes() {
+		allLanes = append(allLanes, lanes.ForwardLane)
+		allLanes = append(allLanes, lanes.ReverseLane)
+	}
+	for _, lane := range allLanes {
+		if _, exists := ccipCommonByNetwork[lane.SourceNetworkName]; !exists {
+			ccipCommonByNetwork[lane.SourceNetworkName] = lane.Source.Common
+		}
+		if _, exists := ccipCommonByNetwork[lane.DestNetworkName]; !exists {
+			ccipCommonByNetwork[lane.DestNetworkName] = lane.Dest.Common
+		}
+	}
+	grp, _ := errgroup.WithContext(ctx)
+	for _, cmn := range ccipCommonByNetwork {
+		cmn := cmn
+		grp.Go(func() error {
+			return cmn.SetRemoteChainsOnPools()
+		})
+	}
+	require.NoError(o.Cfg.Test, grp.Wait(), "error waiting for setting remote chains on pools")
+}
+
 func (o *CCIPTestSetUpOutputs) WaitForPriceUpdates(ctx context.Context) {
 	t := o.Cfg.Test
 	priceUpdateGrp, _ := errgroup.WithContext(ctx)
@@ -755,6 +780,8 @@ func CCIPDefaultTestSetUp(
 		"Number of bi-directional lanes should be equal to number of network pairs")
 
 	if configureCLNode {
+		// add all remote chains to pools
+		setUpArgs.AddRemoteChainsToPools(parent)
 		// wait for all jobs to get created
 		lggr.Info().Msg("Waiting for jobs to be created")
 		require.NoError(t, setUpArgs.JobAddGrp.Wait(), "Creating jobs shouldn't fail")

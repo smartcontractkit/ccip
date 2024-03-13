@@ -129,6 +129,7 @@ type CCIPCommon struct {
 	BridgeTokens       []*contracts.ERC20Token
 	PriceAggregators   map[string]*contracts.MockAggregator
 	BridgeTokenPools   []*contracts.TokenPool
+	RemoteChains       *sync.Map
 	RateLimiterConfig  contracts.RateLimiterConfig
 	ARMContract        *common.Address
 	ARM                *contracts.ARM // populate only if the ARM contracts is not a mock and can be used to verify various ARM events; keep this nil for mock ARM
@@ -153,6 +154,7 @@ type CCIPCommon struct {
 func (ccipModule *CCIPCommon) FreeUpUnusedSpace() {
 	ccipModule.PriceAggregators = nil
 	ccipModule.BridgeTokenPools = []*contracts.TokenPool{}
+	ccipModule.RemoteChains = nil
 	ccipModule.gasUpdateWatcher = nil
 	ccipModule.gasUpdateWatcherMu = nil
 	ccipModule.TokenMessenger = nil
@@ -206,6 +208,29 @@ func (ccipModule *CCIPCommon) IsCursed() (bool, error) {
 		return false, fmt.Errorf("error instantiating arm %w", err)
 	}
 	return arm.IsCursed(nil)
+}
+
+func (ccipModule *CCIPCommon) SetRemoteChainsOnPools() error {
+	if ccipModule.ExistingDeployment {
+		return nil
+	}
+	var selectors []uint64
+	ccipModule.RemoteChains.Range(func(key, value any) bool {
+		if value != nil {
+			selectors = append(selectors, key.(uint64))
+		}
+		return true
+	})
+	for _, pool := range ccipModule.BridgeTokenPools {
+		err := pool.SetRemoteChainOnPool(selectors)
+		if err != nil {
+			return fmt.Errorf("error updating remote chain selectors %w", err)
+		}
+	}
+	if err := ccipModule.ChainClient.WaitForEvents(); err != nil {
+		return fmt.Errorf("error waiting for updating remote chain selectors %w", err)
+	}
+	return nil
 }
 
 func (ccipModule *CCIPCommon) CurseARM() (*types.Transaction, error) {
@@ -288,6 +313,7 @@ func (ccipModule *CCIPCommon) Copy(logger zerolog.Logger, chainClient blockchain
 		BridgeTokens:       tokens,
 		PriceAggregators:   priceAggregators,
 		BridgeTokenPools:   pools,
+		RemoteChains:       ccipModule.RemoteChains,
 		RateLimiterConfig:  ccipModule.RateLimiterConfig,
 		ARMContract:        ccipModule.ARMContract,
 		ARM:                arm,
@@ -940,6 +966,7 @@ func DefaultCCIPModule(logger zerolog.Logger, chainClient blockchain.EVMClient, 
 			Capacity: contracts.HundredCoins,
 		},
 		ExistingDeployment: existingDeployment,
+		RemoteChains:       &sync.Map{},
 		MulticallEnabled:   multiCall,
 		USDCDeployment:     usdc,
 		poolFunds:          testhelpers.Link(5),
@@ -1111,17 +1138,8 @@ func (sourceCCIP *SourceCCIPModule) DeployContracts(lane *laneconfig.LaneConfig)
 		}
 	}
 	if !sourceCCIP.Common.ExistingDeployment {
-		// set remote chain on the pools
-		for _, pool := range sourceCCIP.Common.BridgeTokenPools {
-			err = pool.SetRemoteChainOnPool(sourceCCIP.DestChainSelector)
-			if err != nil {
-				return fmt.Errorf("setting remote chain on the bridge token pool shouldn't fail %w", err)
-			}
-		}
-		err = sourceCCIP.Common.ChainClient.WaitForEvents()
-		if err != nil {
-			return fmt.Errorf("waiting for events shouldn't fail %w", err)
-		}
+		// update list of remote chains to add on the pools later
+		sourceCCIP.Common.RemoteChains.Store(sourceCCIP.DestChainSelector, true)
 	}
 	return nil
 }
@@ -1554,13 +1572,8 @@ func (destCCIP *DestCCIPModule) DeployContracts(
 		}
 	}
 	if !destCCIP.Common.ExistingDeployment {
-		// update pools with remote chain
-		for _, pool := range destCCIP.Common.BridgeTokenPools {
-			err = pool.SetRemoteChainOnPool(destCCIP.SourceChainSelector)
-			if err != nil {
-				return fmt.Errorf("setting remote chain on the bridge token pool shouldn't fail %w", err)
-			}
-		}
+		// update list of remote chains to add on the pools later
+		destCCIP.Common.RemoteChains.Store(destCCIP.SourceChainSelector, true)
 	}
 	if destCCIP.ReceiverDapp == nil {
 		// ReceiverDapp
