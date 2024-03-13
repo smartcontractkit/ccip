@@ -24,9 +24,6 @@ contract VRFV2PlusWrapperTest is BaseTest {
   VRFV2PlusWrapper s_wrapper;
   VRFV2PlusWrapperConsumerExample s_consumer;
 
-  VRFCoordinatorV2_5.FeeConfig basicFeeConfig =
-    VRFCoordinatorV2_5.FeeConfig({fulfillmentFlatFeeLinkPPM: 0, fulfillmentFlatFeeNativePPM: 0});
-
   function setUp() public override {
     BaseTest.setUp();
 
@@ -46,20 +43,23 @@ contract VRFV2PlusWrapperTest is BaseTest {
 
     // Configure the coordinator.
     s_testCoordinator.setLINKAndLINKNativeFeed(address(s_linkToken), address(s_linkNativeFeed));
-    setConfigCoordinator(basicFeeConfig);
+    setConfigCoordinator();
     setConfigWrapper();
 
     s_testCoordinator.s_config();
   }
 
-  function setConfigCoordinator(VRFCoordinatorV2_5.FeeConfig memory feeConfig) internal {
+  function setConfigCoordinator() internal {
     s_testCoordinator.setConfig(
       0, // minRequestConfirmations
       2_500_000, // maxGasLimit
       1, // stalenessSeconds
       50_000, // gasAfterPaymentCalculation
       50000000000000000, // fallbackWeiPerUnitLink
-      feeConfig
+      500_000, // fulfillmentFlatFeeNativePPM
+      100_000, // fulfillmentFlatFeeLinkDiscountPPM
+      15, // nativePremiumPercentage
+      10 // linkPremiumPercentage
     );
   }
 
@@ -109,14 +109,13 @@ contract VRFV2PlusWrapperTest is BaseTest {
     VRFV2PlusWrapper wrapper = new VRFV2PlusWrapper(address(0), address(0), address(s_testCoordinator));
 
     // Set LINK and LINK/Native feed on wrapper.
-    wrapper.setLINK(address(s_linkToken));
-    wrapper.setLinkNativeFeed(address(s_linkNativeFeed));
+    wrapper.setLinkAndLinkNativeFeed(address(s_linkToken), address(s_linkNativeFeed));
     assertEq(address(wrapper.s_link()), address(s_linkToken));
     assertEq(address(wrapper.s_linkNativeFeed()), address(s_linkNativeFeed));
 
     // Revert for subsequent assignment.
     vm.expectRevert(VRFV2PlusWrapper.LinkAlreadySet.selector);
-    wrapper.setLINK(address(s_linkToken));
+    wrapper.setLinkAndLinkNativeFeed(address(s_linkToken), address(s_linkNativeFeed));
 
     // Consumer can set LINK token.
     VRFV2PlusWrapperConsumerExample consumer = new VRFV2PlusWrapperConsumerExample(address(0), address(wrapper));
