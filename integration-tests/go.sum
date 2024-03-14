@@ -1515,6 +1515,8 @@ github.com/smartcontractkit/chainlink-starknet/relayer v0.0.1-beta-test.0.202401
 github.com/smartcontractkit/chainlink-starknet/relayer v0.0.1-beta-test.0.20240119162652-3a7274645007/go.mod h1:EbZAlb/2K6mKr26u3+3cLBe/caJaqCHw786On94C43g=
 github.com/smartcontractkit/chainlink-testing-framework v1.24.3 h1:CMOneLuOLBN+cDgyIYE/5iT1XnCv3pDDBlAUo8OGi7c=
 github.com/smartcontractkit/chainlink-testing-framework v1.24.3/go.mod h1:gkmsafC85u6hIqWbxKjynKf4NuFuFJDRcgxIEFsSq6E=
+github.com/smartcontractkit/chainlink-testing-framework v1.26.1-0.20240314115912-624ab34b76a2 h1:nyF94PItQ0+vK+OppDoNEED2NHmWfTBur+6/s9lsrd0=
+github.com/smartcontractkit/chainlink-testing-framework v1.26.1-0.20240314115912-624ab34b76a2/go.mod h1:jN+HgXbriq6fKRlIqLw9F3I81aYImV6kBJkIfz0mdIA=
 github.com/smartcontractkit/chainlink-vrf v0.0.0-20231120191722-fef03814f868 h1:FFdvEzlYwcuVHkdZ8YnZR/XomeMGbz5E2F2HZI3I3w8=
 github.com/smartcontractkit/chainlink-vrf v0.0.0-20231120191722-fef03814f868/go.mod h1:Kn1Hape05UzFZ7bOUnm3GVsHzP0TNrVmpfXYNHdqGGs=
 github.com/smartcontractkit/go-plugin v0.0.0-20231003134350-e49dad63b306 h1:ko88+ZznniNJZbZPWAvHQU8SwKAdHngdDZ+pvVgB5ss=
@@ -1780,6 +1782,7 @@ go.uber.org/multierr v1.11.0 h1:blXXJkSxSSfBVBlC76pxqeO+LN3aDfLQo+309xJstO0=
 go.uber.org/multierr v1.11.0/go.mod h1:20+QtiLqy0Nd6FdQB9TLXag12DsQkrbs3htMFfDN80Y=
 go.uber.org/ratelimit v0.2.0 h1:UQE2Bgi7p2B85uP5dC2bbRtig0C+OeNRnNEafLjsLPA=
 go.uber.org/ratelimit v0.2.0/go.mod h1:YYBV4e4naJvhpitQrWJu1vCpgB7CboMe0qhltKt6mUg=
+go.uber.org/ratelimit v0.3.0/go.mod h1:So5LG7CV1zWpY1sHe+DXTJqQvOx+FFPFaAs2SnoyBaI=
 go.uber.org/tools v0.0.0-20190618225709-2cfd321de3ee/go.mod h1:vJERXedbb3MVM5f9Ejo0C68/HhF8uaILCdgjnY+goOA=
 go.uber.org/zap v1.9.1/go.mod h1:vwi/ZaCAaUcBkycHslxD9B2zi4UTXhF60s6SWpuDF0Q=
 go.uber.org/zap v1.10.0/go.mod h1:vwi/ZaCAaUcBkycHslxD9B2zi4UTXhF60s6SWpuDF0Q=
