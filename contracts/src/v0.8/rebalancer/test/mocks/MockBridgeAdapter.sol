@@ -17,6 +17,7 @@ contract MockL1BridgeAdapter is IBridgeAdapter, ILiquidityContainer {
   error InsufficientLiquidity();
   error NonceAlreadyUsed(uint256 nonce);
   error InvalidFinalizationAction();
+  error NonceNotProven(uint256 nonce);
 
   IERC20 internal immutable i_token;
   uint256 internal s_nonce = 1;
@@ -105,6 +106,7 @@ contract MockL1BridgeAdapter is IBridgeAdapter, ILiquidityContainer {
       return false;
     } else if (payload.action == FinalizationAction.FinalizeWithdrawal) {
       FinalizePayload memory finalizePayload = abi.decode(payload.data, (FinalizePayload));
+      if (!s_nonceProven[finalizePayload.nonce]) revert NonceNotProven(finalizePayload.nonce);
       if (s_nonceFinalized[finalizePayload.nonce]) revert NonceAlreadyUsed(finalizePayload.nonce);
       s_nonceFinalized[finalizePayload.nonce] = true;
       i_token.safeTransfer(localReceiver, finalizePayload.amount);
