@@ -50,7 +50,7 @@ func New(
 	lggr logger.Logger,
 ) (*testBridge, error) {
 	err := sourceLogPoller.RegisterFilter(logpoller.Filter{
-		Name: logpoller.FilterName("L1-LiquidityTransferred-FinalizationCompleted",
+		Name: logpoller.FilterName("Local-LiquidityTransferred-FinalizationCompleted",
 			sourceSelector, sourceRebalancerAddress.String()),
 		EventSigs: []common.Hash{
 			LiquidityTransferredTopic,
@@ -65,7 +65,7 @@ func New(
 	}
 
 	err = destLogPoller.RegisterFilter(logpoller.Filter{
-		Name: logpoller.FilterName("L2-LiquidityTransferred-FinalizationCompleted",
+		Name: logpoller.FilterName("Remote-LiquidityTransferred-FinalizationCompleted",
 			destSelector, destRebalancerAddress.String()),
 		EventSigs: []common.Hash{
 			LiquidityTransferredTopic,
