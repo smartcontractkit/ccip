@@ -225,8 +225,8 @@ contract Rebalancer is IRebalancer, OCR3Base {
         remoteRebalancer.remoteRebalancer, // remoteSender: the remote rebalancer
         address(this), // localReceiver: this contract
         bridgeSpecificPayload
-      ) returns (bool fundsAvailable)
-    {
+      )
+    returns (bool fundsAvailable) {
       if (fundsAvailable) {
         // finalization was successful and we can inject the liquidity into the container.
         // approve and liquidity container should transferFrom.
@@ -255,7 +255,12 @@ contract Rebalancer is IRebalancer, OCR3Base {
     _injectLiquidity(amount, ocrSeqNum, remoteChainSelector, bridgeSpecificPayload);
   }
 
-  function _injectLiquidity(uint256 amount, uint64 ocrSeqNum, uint64 remoteChainSelector, bytes memory bridgeSpecificPayload) private {
+  function _injectLiquidity(
+    uint256 amount,
+    uint64 ocrSeqNum,
+    uint64 remoteChainSelector,
+    bytes memory bridgeSpecificPayload
+  ) private {
     i_localToken.safeIncreaseAllowance(address(s_localLiquidityContainer), amount);
     s_localLiquidityContainer.provideLiquidity(amount);
 
