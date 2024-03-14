@@ -12,17 +12,19 @@ import (
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	ubig "github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils/big"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/mock_l1_bridge_adapter"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/rebalancer"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/abiutils"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/models"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 )
 
 var (
+	adapterABI = abihelpers.MustParseABI(mock_l1_bridge_adapter.MockL1BridgeAdapterABI)
+
 	// Emitted on both source and destination
 	LiquidityTransferredTopic      = rebalancer.RebalancerLiquidityTransferred{}.Topic()
 	FinalizationStepCompletedTopic = rebalancer.RebalancerFinalizationStepCompleted{}.Topic()
@@ -293,7 +295,7 @@ func filterAndGroupByStage(
 
 	// group remaining unfinalized sends into ready to finalize and ready to prove.
 	// ready to finalize sends will be finalized, while ready to prove will be proven.
-	readyToFinalize, readyToProve, err = groupByStage(unfinalized, stepsCompleted)
+	readyToProve, readyToFinalize, err = groupByStage(unfinalized, stepsCompleted)
 	if err != nil {
 		return nil, nil, fmt.Errorf("group by stage: %w", err)
 	}
@@ -381,28 +383,100 @@ func filterFinalized(
 }
 
 func PackProveBridgePayload(nonce *big.Int) ([]byte, error) {
-	return utils.ABIEncode(`[{"type": "uint256"}]`, nonce)
+	encodedProvePayload, err := adapterABI.Methods["encodeProvePayload"].Inputs.Pack(mock_l1_bridge_adapter.MockL1BridgeAdapterProvePayload{
+		Nonce: nonce,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("pack prove bridge data: %w", err)
+	}
+
+	encodedPayload, err := adapterABI.Methods["encodePayload"].Inputs.Pack(
+		mock_l1_bridge_adapter.MockL1BridgeAdapterPayload{
+			Action: 1, // prove withdrawal action
+			Data:   encodedProvePayload,
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("pack bridge data: %w", err)
+	}
+
+	return encodedPayload, nil
 }
 
 func PackFinalizeBridgePayload(amount, nonce *big.Int) ([]byte, error) {
-	return utils.ABIEncode(`[{"type": "uint256"}, {"type": "uint256"}]`, amount, nonce)
+	encodedFinalizePayload, err := adapterABI.Methods["encodeFinalizePayload"].Inputs.Pack(mock_l1_bridge_adapter.MockL1BridgeAdapterFinalizePayload{
+		Amount: amount,
+		Nonce:  nonce,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("pack finalize bridge data: %w", err)
+	}
+
+	encodedPayload, err := adapterABI.Methods["encodePayload"].Inputs.Pack(
+		mock_l1_bridge_adapter.MockL1BridgeAdapterPayload{
+			Action: 2, // finalize withdrawal action
+			Data:   encodedFinalizePayload,
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("pack bridge data: %w", err)
+	}
+
+	return encodedPayload, nil
 }
 
 func UnpackProveBridgePayload(data []byte) (*big.Int, error) {
-	return abiutils.UnpackUint256(data)
+	ifaces, err := adapterABI.Methods["encodePayload"].Inputs.Unpack(data)
+	if err != nil {
+		return nil, fmt.Errorf("decode prove bridge data: %w", err)
+	}
+
+	if len(ifaces) != 1 {
+		return nil, fmt.Errorf("decode payload: expected 1 argument, got %d", len(ifaces))
+	}
+
+	payload := *abi.ConvertType(ifaces[0], new(mock_l1_bridge_adapter.MockL1BridgeAdapterPayload)).(*mock_l1_bridge_adapter.MockL1BridgeAdapterPayload)
+
+	// decode the prove payload from the payload
+	proveIfaces, err := adapterABI.Methods["encodeProvePayload"].Inputs.Unpack(payload.Data)
+	if err != nil {
+		return nil, fmt.Errorf("decode prove payload: %w", err)
+	}
+
+	if len(proveIfaces) != 1 {
+		return nil, fmt.Errorf("decode prove payload: expected 1 argument, got %d", len(proveIfaces))
+	}
+
+	provePayload := *abi.ConvertType(proveIfaces[0], new(mock_l1_bridge_adapter.MockL1BridgeAdapterProvePayload)).(*mock_l1_bridge_adapter.MockL1BridgeAdapterProvePayload)
+
+	return provePayload.Nonce, nil
 }
 
 func UnpackFinalizeBridgePayload(data []byte) (*big.Int, *big.Int, error) {
-	ifaces, err := utils.ABIDecode(`[{"type": "uint256"}, {"type": "uint256"}]`, data)
+	ifaces, err := adapterABI.Methods["encodePayload"].Inputs.Unpack(data)
 	if err != nil {
-		return nil, nil, fmt.Errorf("decode finalize bridge data: %w", err)
+		return nil, nil, fmt.Errorf("decode prove bridge data: %w", err)
 	}
-	if len(ifaces) != 2 {
-		return nil, nil, fmt.Errorf("expected 2 arguments, got %d", len(ifaces))
+
+	if len(ifaces) != 1 {
+		return nil, nil, fmt.Errorf("decode payload: expected 1 argument, got %d", len(ifaces))
 	}
-	val1 := *abi.ConvertType(ifaces[0], new(*big.Int)).(**big.Int)
-	val2 := *abi.ConvertType(ifaces[1], new(*big.Int)).(**big.Int)
-	return val1, val2, nil
+
+	payload := *abi.ConvertType(ifaces[0], new(mock_l1_bridge_adapter.MockL1BridgeAdapterPayload)).(*mock_l1_bridge_adapter.MockL1BridgeAdapterPayload)
+
+	// decode the finalize payload from the payload
+	finalizeIfaces, err := adapterABI.Methods["encodeFinalizePayload"].Inputs.Unpack(payload.Data)
+	if err != nil {
+		return nil, nil, fmt.Errorf("decode finalize payload: %w", err)
+	}
+
+	if len(finalizeIfaces) != 1 {
+		return nil, nil, fmt.Errorf("decode finalize payload: expected 1 argument1, got %d", len(finalizeIfaces))
+	}
+
+	finalizePayload := *abi.ConvertType(finalizeIfaces[0], new(mock_l1_bridge_adapter.MockL1BridgeAdapterFinalizePayload)).(*mock_l1_bridge_adapter.MockL1BridgeAdapterFinalizePayload)
+
+	return finalizePayload.Amount, finalizePayload.Nonce, nil
 }
 
 func UnpackBridgeSendReturnData(data []byte) (*big.Int, error) {

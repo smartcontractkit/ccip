@@ -529,7 +529,7 @@ func Test_groupByStage(t *testing.T) {
 						BridgeReturnData: mustPackSendReturnData(t, big.NewInt(3)),
 					},
 				},
-				[]*rebalancer.RebalancerFinalizationStepCompleted{
+				[]*rebalancer.RebalancerFinalizationStepCompleted{ // all proven
 					{
 						BridgeSpecificData: mustPackProvePayload(t, big.NewInt(1)),
 					},

@@ -76,7 +76,6 @@ contract MockL1BridgeAdapter is IBridgeAdapter, ILiquidityContainer {
   /// @notice The finalization action to take.
   /// @dev This emulates Optimism's two-step withdrawal process.
   enum FinalizationAction {
-    Invalid,
     ProveWithdrawal,
     FinalizeWithdrawal
   }
@@ -86,6 +85,11 @@ contract MockL1BridgeAdapter is IBridgeAdapter, ILiquidityContainer {
     FinalizationAction action;
     bytes data;
   }
+
+  /// @dev for easy encoding offchain
+  function encodeProvePayload(ProvePayload memory payload) external pure {}
+  function encodeFinalizePayload(FinalizePayload memory payload) external pure {}
+  function encodePayload(Payload memory payload) external pure {}
 
   /// @dev Test setup is trusted, so just transfer the tokens to the localReceiver,
   /// @dev which should be the local rebalancer.

@@ -406,11 +406,18 @@ func waitForTransmissions(
 ) {
 	start := uint64(1)
 	liquidityTransferredSink := make(chan *rebalancer.RebalancerLiquidityTransferred)
+	finalizationStepSink := make(chan *rebalancer.RebalancerFinalizationStepCompleted)
 	var subs []event.Subscription
 	for _, uni := range universes {
 		sub, err := uni.rebalancer.WatchLiquidityTransferred(&bind.WatchOpts{
 			Start: &start,
 		}, liquidityTransferredSink, nil, nil, nil)
+		require.NoError(t, err, "failed to create subscription")
+		subs = append(subs, sub)
+
+		sub, err = uni.rebalancer.WatchFinalizationStepCompleted(&bind.WatchOpts{
+			Start: &start,
+		}, finalizationStepSink, nil, nil)
 		require.NoError(t, err, "failed to create subscription")
 		subs = append(subs, sub)
 	}
@@ -445,6 +452,11 @@ func waitForTransmissions(
 					return
 				}
 			}
+		case fsc := <-finalizationStepSink:
+			nonce, err := testonlybridge.UnpackProveBridgePayload(fsc.BridgeSpecificData)
+			require.NoError(t, err)
+			t.Log("received finalization step completed event with seqNr:", fsc.OcrSeqNum,
+				", nonce:", nonce.String(), ", tx hash:", fsc.Raw.TxHash.String())
 		case <-ticker.C:
 			t.Log("waiting for transmission or liquidity transferred event")
 		}
