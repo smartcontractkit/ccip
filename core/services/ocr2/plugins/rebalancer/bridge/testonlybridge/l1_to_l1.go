@@ -12,6 +12,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	ubig "github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils/big"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/mock_l1_bridge_adapter"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/rebalancer"
@@ -20,6 +21,12 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/abiutils"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/models"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
+)
+
+const (
+	// These correspond to the enumeration FinalizationAction in the MockL1BridgeAdapter contract.
+	FinalizationActionProveWithdrawal    uint8 = 0
+	FinalizationActionFinalizeWithdrawal uint8 = 1
 )
 
 var (
@@ -228,6 +235,7 @@ func (t *testBridge) toPendingTransfers(
 				RemoteTokenAddress: remoteToken,
 				Date:               lp.BlockTimestamp,
 				BridgeData:         bridgeData,
+				Stage:              1,
 			},
 			Status: models.TransferStatusReady,
 			ID:     fmt.Sprintf("%s-%d-prove", send.Raw.TxHash.Hex(), send.Raw.Index),
@@ -257,6 +265,7 @@ func (t *testBridge) toPendingTransfers(
 				RemoteTokenAddress: remoteToken,
 				Date:               lp.BlockTimestamp,
 				BridgeData:         bridgeData,
+				Stage:              2,
 			},
 			Status: models.TransferStatusReady,
 			ID:     fmt.Sprintf("%s-%d-finalize", send.Raw.TxHash.Hex(), send.Raw.Index),
@@ -392,7 +401,7 @@ func PackProveBridgePayload(nonce *big.Int) ([]byte, error) {
 
 	encodedPayload, err := adapterABI.Methods["encodePayload"].Inputs.Pack(
 		mock_l1_bridge_adapter.MockL1BridgeAdapterPayload{
-			Action: 1, // prove withdrawal action
+			Action: FinalizationActionProveWithdrawal,
 			Data:   encodedProvePayload,
 		},
 	)
@@ -414,7 +423,7 @@ func PackFinalizeBridgePayload(amount, nonce *big.Int) ([]byte, error) {
 
 	encodedPayload, err := adapterABI.Methods["encodePayload"].Inputs.Pack(
 		mock_l1_bridge_adapter.MockL1BridgeAdapterPayload{
-			Action: 2, // finalize withdrawal action
+			Action: FinalizationActionFinalizeWithdrawal,
 			Data:   encodedFinalizePayload,
 		},
 	)
@@ -481,6 +490,10 @@ func UnpackFinalizeBridgePayload(data []byte) (*big.Int, *big.Int, error) {
 
 func UnpackBridgeSendReturnData(data []byte) (*big.Int, error) {
 	return abiutils.UnpackUint256(data)
+}
+
+func PackBridgeSendReturnData(nonce *big.Int) ([]byte, error) {
+	return utils.ABIEncode(`[{"type": "uint256"}]`, nonce)
 }
 
 type logKey struct {

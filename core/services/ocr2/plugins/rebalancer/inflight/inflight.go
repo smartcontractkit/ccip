@@ -60,8 +60,8 @@ func (i *inflight) Expire(pending []models.PendingTransfer) int {
 			To:     p.To,
 			Amount: p.Amount.String(),
 		}
-		_, ok := i.transfers[k]
-		if ok {
+		t, ok := i.transfers[k]
+		if ok && p.Stage > t.Stage {
 			numExpired++
 			delete(i.transfers, k)
 		}
