@@ -92,7 +92,7 @@ type TestConfig struct {
 	Network                *ctf_config.NetworkConfig        `toml:"Network"`
 	Pyroscope              *ctf_config.PyroscopeConfig      `toml:"Pyroscope"`
 	PrivateEthereumNetwork *ctf_test_env.EthereumNetwork    `toml:"PrivateEthereumNetwork"`
-	WaspConfig             *WaspAutoBuildConfig             `toml:"WaspAutoBuild"`
+	WaspConfig             *ctf_config.WaspAutoBuildConfig  `toml:"WaspAutoBuild"`
 
 	Seth *seth.Config `toml:"Seth"`
 
