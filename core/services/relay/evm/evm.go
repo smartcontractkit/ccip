@@ -1,15 +1,19 @@
 package evm
 
 import (
+	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/big"
 	"strings"
 	"sync"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 	pkgerrors "github.com/pkg/errors"
 	"golang.org/x/exp/maps"
@@ -371,6 +375,17 @@ type configTransmitterOpts struct {
 	pluginGasLimit *uint32
 }
 
+func chainToUUID(chainID *big.Int) uuid.UUID {
+	// See https://www.rfc-editor.org/rfc/rfc4122.html#section-4.1.3 for the list of supported versions.
+	const VersionSHA1 = 5
+	var buf bytes.Buffer
+	buf.WriteString("CCIP:")
+	buf.Write(chainID.Bytes())
+	// We use SHA-256 instead of SHA-1 because the former has better collision resistance.
+	// You can't make the difference just by looking at the UUID bytes.
+	return uuid.NewHash(sha256.New(), uuid.NameSpaceOID, buf.Bytes(), VersionSHA1)
+}
+
 func newContractTransmitter(lggr logger.Logger, rargs commontypes.RelayArgs, transmitterID string, ethKeystore keystore.Eth, configWatcher *configWatcher, opts configTransmitterOpts, reportToEthMeta ReportToEthMetadata) (*contractTransmitter, error) {
 	var relayConfig types.RelayConfig
 	if err := json.Unmarshal(rargs.RelayConfig, &relayConfig); err != nil {
@@ -388,20 +403,22 @@ func newContractTransmitter(lggr logger.Logger, rargs commontypes.RelayArgs, tra
 		return nil, pkgerrors.New("no sending keys provided")
 	}
 
+	chainID := configWatcher.chain.Config().EVM().ChainID()
+
 	// If we are using multiple sending keys, then a forwarder is needed to rotate transmissions.
 	// Ensure that this forwarder is not set to a local sending key, and ensure our sending keys are enabled.
 	for _, s := range sendingKeys {
 		if sendingKeysLength > 1 && s == effectiveTransmitterAddress.String() {
 			return nil, pkgerrors.New("the transmitter is a local sending key with transaction forwarding enabled")
 		}
-		if err := ethKeystore.CheckEnabled(common.HexToAddress(s), configWatcher.chain.Config().EVM().ChainID()); err != nil {
+		if err := ethKeystore.CheckEnabled(common.HexToAddress(s), chainID); err != nil {
 			return nil, pkgerrors.Wrap(err, "one of the sending keys given is not enabled")
 		}
 		fromAddresses = append(fromAddresses, common.HexToAddress(s))
 	}
 
 	scoped := configWatcher.chain.Config()
-	strategy := txmgrcommon.NewQueueingTxStrategy(rargs.ExternalJobID, scoped.OCR2().DefaultTransactionQueueDepth(), scoped.Database().DefaultQueryTimeout())
+	strategy := txmgrcommon.NewQueueingTxStrategy(chainToUUID(chainID), scoped.OCR2().DefaultTransactionQueueDepth(), scoped.Database().DefaultQueryTimeout())
 
 	var checker txm.TransmitCheckerSpec
 	if configWatcher.chain.Config().OCR2().SimulateTransactions() {
