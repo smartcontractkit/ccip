@@ -39,7 +39,8 @@ contract OptimismL1BridgeAdapterSetup is Test {
 contract OptimismL1BridgeAdapter_finalizeWithdrawERC20 is OptimismL1BridgeAdapterSetup {
   function testfinalizeWithdrawERC20proveWithdrawalSuccess() public {
     // prepare payload
-    OptimismL1BridgeAdapter.OptimismProveWithdrawalPayload memory provePayload = OptimismL1BridgeAdapter.OptimismProveWithdrawalPayload({
+    OptimismL1BridgeAdapter.OptimismProveWithdrawalPayload memory provePayload = OptimismL1BridgeAdapter
+      .OptimismProveWithdrawalPayload({
         withdrawalTransaction: Types.WithdrawalTransaction({
           nonce: 1,
           sender: address(0xdead),
@@ -64,13 +65,17 @@ contract OptimismL1BridgeAdapter_finalizeWithdrawERC20 is OptimismL1BridgeAdapte
     bytes memory encodedPayload = abi.encode(payload);
 
     // mock out call to optimism portal
-    vm.mockCall(OP_PORTAL, abi.encodeWithSelector(
-      IOptimismPortal.proveWithdrawalTransaction.selector,
-      provePayload.withdrawalTransaction,
-      provePayload.l2OutputIndex,
-      provePayload.outputRootProof,
-      provePayload.withdrawalProof
-    ), "");
+    vm.mockCall(
+      OP_PORTAL,
+      abi.encodeWithSelector(
+        IOptimismPortal.proveWithdrawalTransaction.selector,
+        provePayload.withdrawalTransaction,
+        provePayload.l2OutputIndex,
+        provePayload.outputRootProof,
+        provePayload.withdrawalProof
+      ),
+      ""
+    );
 
     // call finalizeWithdrawERC20
     s_adapter.finalizeWithdrawERC20(address(0), address(0), encodedPayload);
@@ -78,7 +83,8 @@ contract OptimismL1BridgeAdapter_finalizeWithdrawERC20 is OptimismL1BridgeAdapte
 
   function testfinalizeWithdrawERC20FinalizeSuccess() public {
     // prepare payload
-    OptimismL1BridgeAdapter.OptimismFinalizationPayload memory finalizePayload = OptimismL1BridgeAdapter.OptimismFinalizationPayload({
+    OptimismL1BridgeAdapter.OptimismFinalizationPayload memory finalizePayload = OptimismL1BridgeAdapter
+      .OptimismFinalizationPayload({
         withdrawalTransaction: Types.WithdrawalTransaction({
           nonce: 1,
           sender: address(0xdead),
@@ -95,10 +101,14 @@ contract OptimismL1BridgeAdapter_finalizeWithdrawERC20 is OptimismL1BridgeAdapte
     bytes memory encodedPayload = abi.encode(payload);
 
     // mock out call to optimism portal
-    vm.mockCall(OP_PORTAL, abi.encodeWithSelector(
-      IOptimismPortal.finalizeWithdrawalTransaction.selector,
-      finalizePayload.withdrawalTransaction
-    ), "");
+    vm.mockCall(
+      OP_PORTAL,
+      abi.encodeWithSelector(
+        IOptimismPortal.finalizeWithdrawalTransaction.selector,
+        finalizePayload.withdrawalTransaction
+      ),
+      ""
+    );
 
     // call finalizeWithdrawERC20
     s_adapter.finalizeWithdrawERC20(address(0), address(0), encodedPayload);
