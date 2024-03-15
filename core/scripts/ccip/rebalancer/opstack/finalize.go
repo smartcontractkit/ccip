@@ -13,6 +13,11 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/bridge/opstack/withdrawprover"
 )
 
+const (
+	FinalizationActionProveWithdrawal    uint8 = 0
+	FinalizationActionFinalizeWithdrawal uint8 = 1
+)
+
 func FinalizeL1(
 	env multienv.Env,
 	l1ChainID,
@@ -62,7 +67,7 @@ func FinalizeL1(
 	// then encode the finalize withdraw erc20 payload next.
 	encodedPayload, err := encoderABI.Methods["encodeFinalizeWithdrawalERC20Payload"].Inputs.Pack(
 		optimism_l1_bridge_adapter_encoder.OptimismL1BridgeAdapterFinalizeWithdrawERC20Payload{
-			Action: 2, // 2 for finalize withdrawal action
+			Action: FinalizationActionFinalizeWithdrawal,
 			Data:   encodedFinalizeWithdrawal,
 		},
 	)
@@ -70,9 +75,9 @@ func FinalizeL1(
 
 	tx, err := l1Adapter.FinalizeWithdrawERC20(
 		env.Transactors[l1ChainID],
-		common.HexToAddress("0x0"), // doesn't matter
-		common.HexToAddress("0x0"), // doesn't matter
-		encodedPayload,             // finalization payload
+		common.Address{}, // not used
+		common.Address{}, // not used
+		encodedPayload,   // finalization payload
 	)
 	helpers.PanicErr(err)
 

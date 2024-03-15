@@ -106,7 +106,7 @@ func proveMessage(
 	// then encode the finalize withdraw erc20 payload next.
 	encodedPayload, err := encoderABI.Methods["encodeFinalizeWithdrawalERC20Payload"].Inputs.Pack(
 		optimism_l1_bridge_adapter_encoder.OptimismL1BridgeAdapterFinalizeWithdrawERC20Payload{
-			Action: 1, // 1 for proving withdrawal action
+			Action: FinalizationActionProveWithdrawal,
 			Data:   encodedProveWithdrawal,
 		},
 	)

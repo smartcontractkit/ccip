@@ -10,7 +10,7 @@ import {IERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/
 import {SafeERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /// @dev copy/pasted from https://github.com/ethereum-optimism/optimism/blob/f707883038d527cbf1e9f8ea513fe33255deadbc/packages/contracts-bedrock/src/L2/L2StandardBridge.sol#L114-L122.
-/// @dev can't import it because of hard pin solidity version in the pragma (0.8.15).
+/// We can't import it because of hard pin solidity version in the pragma (0.8.15).
 interface IL2StandardBridge {
   /// @custom:legacy
   /// @notice Initiates a withdrawal from L2 to L1 to a target account on L1.
