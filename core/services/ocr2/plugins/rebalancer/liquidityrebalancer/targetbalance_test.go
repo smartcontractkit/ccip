@@ -102,20 +102,89 @@ func TestTargetBalanceRebalancer_ComputeTransfersToBalance_arb_eth_opt(t *testin
 			pendingTransfers: []transfer{},
 			expTransfers:     []transfer{{from: opt, to: eth, am: 300}},
 		},
-		//{
-		//	name:             "arb below target but there is inflight transfer that reaches balance",
-		//	balances:         map[models.NetworkSelector]int64{eth: 1000, arb: 800, opt: 1000},
-		//	targets:          map[models.NetworkSelector]int64{eth: 1000, arb: 1000, opt: 1000},
-		//	pendingTransfers: []transfer{{from: eth, to: arb, am: 250}},
-		//	expTransfers:     []transfer{},
-		//},
-		//{
-		//	name:             "arb below target but there is inflight transfer (not seen on-chain) that reaches balance",
-		//	balances:         map[models.NetworkSelector]int64{eth: 1000, arb: 800, opt: 1000},
-		//	targets:          map[models.NetworkSelector]int64{eth: 1000, arb: 1000, opt: 1000},
-		//	pendingTransfers: []transfer{{from: eth, to: arb, am: 250, status: models.TransferStatusProposed}},
-		//	expTransfers:     []transfer{}, // we propose a transfer from balance that is inflight
-		//},
+		{
+			name:             "arb is below target but there is an inflight transfer",
+			balances:         map[models.NetworkSelector]int64{eth: 1000, arb: 800, opt: 1000},
+			targets:          map[models.NetworkSelector]int64{eth: 1000, arb: 1000, opt: 1000},
+			pendingTransfers: []transfer{{from: eth, to: arb, am: 250}},
+			expTransfers:     []transfer{},
+		},
+		{
+			name: "arb is below target but there is inflight transfer that isn't onchain yet",
+			// since it's not on-chain yet the source balance should be expected to be lower than the current value
+			balances:         map[models.NetworkSelector]int64{eth: 1250, arb: 800, opt: 1000},
+			targets:          map[models.NetworkSelector]int64{eth: 1000, arb: 1000, opt: 1000},
+			pendingTransfers: []transfer{{from: eth, to: arb, am: 250, status: models.TransferStatusProposed}},
+			expTransfers:     []transfer{},
+		},
+		{
+			name:             "eth is below target there are two sources of funding but one is already inflight",
+			balances:         map[models.NetworkSelector]int64{eth: 800, arb: 2000, opt: 2200},
+			targets:          map[models.NetworkSelector]int64{eth: 1000, arb: 1000, opt: 1000},
+			pendingTransfers: []transfer{{from: arb, to: eth, am: 250}},
+			expTransfers:     []transfer{},
+		},
+		{
+			name:             "eth is below target there are two sources of funding but one is already inflight but will not cover target",
+			balances:         map[models.NetworkSelector]int64{eth: 800, arb: 2000, opt: 2200},
+			targets:          map[models.NetworkSelector]int64{eth: 1000, arb: 1000, opt: 1000},
+			pendingTransfers: []transfer{{from: arb, to: eth, am: 100}},
+			expTransfers:     []transfer{{from: opt, to: eth, am: 100}},
+		},
+		{
+			name:             "eth is below target there are two sources of funding but one is already inflight that will not cover target, both sources are used",
+			balances:         map[models.NetworkSelector]int64{eth: 100, arb: 1100, opt: 1200},
+			targets:          map[models.NetworkSelector]int64{eth: 1000, arb: 1000, opt: 1000},
+			pendingTransfers: []transfer{{from: arb, to: eth, am: 100}},
+			expTransfers:     []transfer{{from: opt, to: eth, am: 200}, {from: arb, to: eth, am: 100}},
+		},
+		{
+			name:     "eth is below target there are multiple inflight transfers",
+			balances: map[models.NetworkSelector]int64{eth: 100, arb: 2000, opt: 2000},
+			targets:  map[models.NetworkSelector]int64{eth: 2000, arb: 1000, opt: 1000},
+			pendingTransfers: []transfer{
+				{from: arb, to: eth, am: 50},
+				{from: arb, to: eth, am: 100},
+				{from: opt, to: eth, am: 50, status: models.TransferStatusProposed},
+				{from: opt, to: eth, am: 200},
+				{from: opt, to: eth, am: 200},
+			},
+			expTransfers: []transfer{
+				{from: opt, to: eth, am: 300},
+				{from: arb, to: eth, am: 1000},
+			},
+		},
+		{
+			name:     "eth is below target there are multiple inflight transfers 2",
+			balances: map[models.NetworkSelector]int64{eth: 100, arb: 1100, opt: 2000},
+			targets:  map[models.NetworkSelector]int64{eth: 2000, arb: 1000, opt: 1000},
+			pendingTransfers: []transfer{
+				{from: arb, to: eth, am: 50},
+				{from: arb, to: eth, am: 100},
+				{from: opt, to: eth, am: 50, status: models.TransferStatusProposed},
+				{from: opt, to: eth, am: 200},
+				{from: opt, to: eth, am: 200},
+			},
+			expTransfers: []transfer{
+				{from: opt, to: eth, am: 950},
+				{from: arb, to: eth, am: 100},
+			},
+		},
+		{
+			name:     "eth is below target there are multiple inflight transfers 3",
+			balances: map[models.NetworkSelector]int64{eth: 100, arb: 4000, opt: 2000},
+			targets:  map[models.NetworkSelector]int64{eth: 2000, arb: 1000, opt: 1000},
+			pendingTransfers: []transfer{
+				{from: arb, to: eth, am: 50},
+				{from: arb, to: eth, am: 100},
+				{from: opt, to: eth, am: 50, status: models.TransferStatusProposed},
+				{from: opt, to: eth, am: 200},
+				{from: opt, to: eth, am: 200},
+			},
+			expTransfers: []transfer{
+				{from: arb, to: eth, am: 1300},
+			},
+		},
 	}
 
 	lggr := logger.TestLogger(t)
@@ -140,10 +209,13 @@ func TestTargetBalanceRebalancer_ComputeTransfersToBalance_arb_eth_opt(t *testin
 
 			unexecuted := make([]UnexecutedTransfer, 0, len(tc.pendingTransfers))
 			for _, tr := range tc.pendingTransfers {
-				unexecuted = append(unexecuted, models.Transfer{
-					From:   tr.from,
-					To:     tr.to,
-					Amount: ubig.New(big.NewInt(tr.am)),
+				unexecuted = append(unexecuted, models.PendingTransfer{
+					Transfer: models.Transfer{
+						From:   tr.from,
+						To:     tr.to,
+						Amount: ubig.New(big.NewInt(tr.am)),
+					},
+					Status: tr.status,
 				})
 			}
 			transfersToBalance, err := r.ComputeTransfersToBalance(g, unexecuted)
