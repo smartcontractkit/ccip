@@ -43,7 +43,7 @@ jobs:
           AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
       - name: Build Image
         if: steps.check-image.outputs.exists == 'false'
-        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/build-image@ea889b3133bd7f16ab19ba4ba130de5d9162c669 # v2.3.4
+        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/build-image@5bee84d30d90295010bda68b0cd46be3a1eea917 # v2.3.9
         env:
           GH_TOKEN: ${{ github.token }}
         with:
