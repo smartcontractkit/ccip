@@ -83,7 +83,7 @@ jobs:
 
       - name: Report code coverage
         if: ${{ needs.changes.outputs.changes == 'true' }}
-        uses: zgosalvez/github-actions-report-lcov@v1
+        uses: zgosalvez/github-actions-report-lcov@3b60071009dbaf817edeaa3c7226f7889a4171b8 # v4.1.2
         with:
           update-comment: true
           coverage-files: lcov.info.pruned
