@@ -89,7 +89,7 @@ jobs:
       - name: Checkout the repo
         uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
       - name: Setup Go
-        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/setup-go@ea889b3133bd7f16ab19ba4ba130de5d9162c669 # v2.3.4
+        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/setup-go@5bee84d30d90295010bda68b0cd46be3a1eea917 # v2.3.9
         with:
           test_download_vendor_packages_command: cd ./integration-tests && go mod download
           go_mod_path: ./integration-tests/go.mod
@@ -812,7 +812,7 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
       - name: Run Setup
-        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/setup-go@ea889b3133bd7f16ab19ba4ba130de5d9162c669 # v2.3.4
+        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/setup-go@5bee84d30d90295010bda68b0cd46be3a1eea917 # v2.3.9
         with:
           test_download_vendor_packages_command: |
             cd ./integration-tests
