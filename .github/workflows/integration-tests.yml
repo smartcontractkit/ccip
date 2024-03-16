@@ -27,7 +27,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout the repo
-        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+        uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
       - name: Check Merge Group Condition
         id: condition-check
         run: |
@@ -56,7 +56,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout the repo
-        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+        uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
       - uses: dorny/paths-filter@4512585405083f25c027a35db413c2b3b9006d50 # v2.11.1
         id: changes
         with:
@@ -87,7 +87,7 @@ jobs:
     runs-on: ubuntu20.04-16cores-64GB
     steps:
       - name: Checkout the repo
-        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+        uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
       - name: Setup Go
         uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/setup-go@ea889b3133bd7f16ab19ba4ba130de5d9162c669 # v2.3.4
         with:
@@ -141,7 +141,7 @@ jobs:
           this-job-name: Build Chainlink Image ${{ matrix.image.name }}
         continue-on-error: true
       - name: Checkout the repo
-        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+        uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
         with:
           ref: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
       - name: Build Chainlink Image
@@ -177,7 +177,7 @@ jobs:
           this-job-name: Build Test Image
         continue-on-error: true
       - name: Checkout the repo
-        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+        uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
         with:
           ref: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
       - name: Build Test Image
@@ -202,7 +202,7 @@ jobs:
 #          echo "## \`skip-smoke-tests\` label is active, skipping E2E smoke tests" >>$GITHUB_STEP_SUMMARY
 #          exit 0
 #      - name: Checkout the repo
-#        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+#        uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
 #      - name: Compare Test Lists
 #        run: |
 #          cd ./integration-tests
@@ -269,7 +269,7 @@ jobs:
 #          test-results-file: '{"testType":"go","filePath":"/tmp/gotest.log"}'
 #        continue-on-error: true
 #      - name: Checkout the repo
-#        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+#        uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
 #        with:
 #          ref: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
 #      - name: Build Go Test Command
@@ -355,7 +355,7 @@ jobs:
 #          test-results-file: '{"testType":"go","filePath":"/tmp/gotest.log"}'
 #        continue-on-error: true
 #      - name: Checkout the repo
-#        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+#        uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
 #        with:
 #          ref: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
 #      - name: Build Go Test Command
@@ -581,7 +581,7 @@ jobs:
           test-results-file: '{"testType":"go","filePath":"/tmp/gotest.log"}'
         continue-on-error: true
       - name: Checkout the repo
-        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+        uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
         with:
           ref: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
       - name: Build Go Test Command
@@ -778,7 +778,7 @@ jobs:
     steps:
       - name: Checkout repo
         if: ${{ github.event_name == 'pull_request' }}
-        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+        uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
 
       - name: 🧼 Clean up Environment
         if: ${{ github.event_name == 'pull_request' }}
@@ -808,7 +808,7 @@ jobs:
     continue-on-error: true
     steps:
       - name: Checkout the repo
-        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+        uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
         with:
           ref: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
       - name: Run Setup
@@ -847,7 +847,7 @@ jobs:
       TEST_SUITE: migration
     steps:
       - name: Checkout the repo
-        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+        uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
         with:
           ref: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
       - name: Get Latest Version
@@ -912,7 +912,7 @@ jobs:
 #      sha: ${{ steps.getsha.outputs.sha }}
 #    steps:
 #      - name: Checkout the repo
-#        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+#        uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
 #        with:
 #          ref: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
 #      - name: Setup Go
@@ -931,7 +931,7 @@ jobs:
 #          echo "short sha is: ${short_sha}"
 #          echo "short_sha=${short_sha}" >> "$GITHUB_OUTPUT"
 #      - name: Checkout solana
-#        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+#        uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
 #        with:
 #          repository: smartcontractkit/chainlink-solana
 #          ref: develop
@@ -958,7 +958,7 @@ jobs:
 #      projectserum_version: ${{ steps.psversion.outputs.projectserum_version }}
 #    steps:
 #      - name: Checkout the solana repo
-#        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+#        uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
 #        with:
 #          repository: smartcontractkit/chainlink-solana
 #          ref: ${{ needs.get_solana_sha.outputs.sha }}
@@ -1062,7 +1062,7 @@ jobs:
 #        continue-on-error: true
 #      - name: Checkout the repo
 #        if: (needs.changes.outputs.src == 'true' || github.event_name == 'workflow_dispatch') && needs.solana-test-image-exists.outputs.exists == 'false'
-#        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+#        uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
 #        with:
 #          repository: smartcontractkit/chainlink-solana
 #          ref: ${{ needs.get_solana_sha.outputs.sha }}
@@ -1113,7 +1113,7 @@ jobs:
 #          test-results-file: '{"testType":"go","filePath":"/tmp/gotest.log"}'
 #        continue-on-error: true
 #      - name: Checkout the repo
-#        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+#        uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
 #        with:
 #          repository: smartcontractkit/chainlink-solana
 #          ref: ${{ needs.get_solana_sha.outputs.sha }}
