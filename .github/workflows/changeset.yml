@@ -37,7 +37,7 @@ jobs:
             core-changeset:
               - added: '.changeset/**'
       - name: Make a comment
-        uses: unsplash/comment-on-pr@ffe8f97ccc63ce12c3c23c6885b169db67958d3b # v1.3.0
+        uses: unsplash/comment-on-pr@b5610c6125a7197eaec80072ea35ef53e1fc6035 # v1.3.1
         if: ${{ (steps.files-changed.outputs.core == 'true' || steps.files-changed.outputs.shared == 'true') && steps.files-changed.outputs.core-changeset == 'false' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
