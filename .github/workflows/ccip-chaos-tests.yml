@@ -152,7 +152,7 @@ jobs:
       ## Run Cleanup if the job succeeds
       - name: cleanup
         if: always()
-        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/cleanup@eccde1970eca69f079d3efb3409938a72ade8497 # v2.2.13
+        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/cleanup@5bee84d30d90295010bda68b0cd46be3a1eea917 # v2.3.9
         with:
           triggered_by: ${{ env.TEST_TRIGGERED_BY }}
 
@@ -224,6 +224,6 @@ jobs:
       ## Run Cleanup if the job succeeds
       - name: cleanup
         if: always()
-        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/cleanup@eccde1970eca69f079d3efb3409938a72ade8497 # v2.2.13
+        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/cleanup@5bee84d30d90295010bda68b0cd46be3a1eea917 # v2.3.9
         with:
           triggered_by: ${{ env.TEST_TRIGGERED_BY }}
