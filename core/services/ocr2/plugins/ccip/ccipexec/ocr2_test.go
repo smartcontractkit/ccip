@@ -139,7 +139,7 @@ func TestExecutionReportingPlugin_Observation(t *testing.T) {
 			p.inflightReports.reports = tc.inflightReports
 			p.lggr = logger.TestLogger(t)
 			p.tokenDataWorker = tokendata.NewBackgroundWorker(
-				ctx, make(map[cciptypes.Address]tokendata.Reader), 10, 5*time.Second, time.Hour)
+				make(map[cciptypes.Address]tokendata.Reader), 10, 5*time.Second, time.Hour)
 			p.metricsCollector = ccip.NoopMetricsCollector
 
 			commitStoreReader := ccipdatamocks.NewCommitStoreReader(t)
@@ -266,7 +266,7 @@ func TestExecutionReportingPlugin_Report(t *testing.T) {
 
 			p.commitStoreReader = ccipdatamocks.NewCommitStoreReader(t)
 			chainHealthcheck := ccipcachemocks.NewChainHealthcheck(t)
-			chainHealthcheck.On("IsHealthy", ctx, false).Return(true, nil)
+			chainHealthcheck.On("IsHealthy", ctx).Return(true, nil)
 			p.chainHealthcheck = chainHealthcheck
 
 			observations := make([]types.AttributedObservation, len(tc.observations))
@@ -313,7 +313,7 @@ func TestExecutionReportingPlugin_ShouldAcceptFinalizedReport(t *testing.T) {
 	mockOffRampReader.On("DecodeExecutionReport", encodedReport).Return(report, nil)
 
 	chainHealthcheck := ccipcachemocks.NewChainHealthcheck(t)
-	chainHealthcheck.On("IsHealthy", mock.Anything, false).Return(true, nil)
+	chainHealthcheck.On("IsHealthy", mock.Anything).Return(true, nil)
 
 	plugin := ExecutionReportingPlugin{
 		offRampReader:    mockOffRampReader,
@@ -363,7 +363,7 @@ func TestExecutionReportingPlugin_ShouldTransmitAcceptedReport(t *testing.T) {
 	mockedExecState := mockOffRampReader.On("GetExecutionState", mock.Anything, uint64(12)).Return(uint8(cciptypes.ExecutionStateUntouched), nil).Once()
 
 	chainHealthcheck := ccipcachemocks.NewChainHealthcheck(t)
-	chainHealthcheck.On("IsHealthy", mock.Anything, true).Return(true, nil)
+	chainHealthcheck.On("IsHealthy", mock.Anything).Return(true, nil)
 
 	plugin := ExecutionReportingPlugin{
 		commitStoreReader: mockCommitStoreReader,
@@ -668,8 +668,6 @@ func TestExecutionReportingPlugin_buildBatch(t *testing.T) {
 		},
 	}
 
-	ctx := testutils.Context(t)
-
 	for _, tc := range tt {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
@@ -685,7 +683,7 @@ func TestExecutionReportingPlugin_buildBatch(t *testing.T) {
 			mockOffRampReader.On("GetSenderNonce", mock.Anything, sender1).Return(uint64(0), nil).Maybe()
 
 			plugin := ExecutionReportingPlugin{
-				tokenDataWorker:   tokendata.NewBackgroundWorker(ctx, map[cciptypes.Address]tokendata.Reader{}, 10, 5*time.Second, time.Hour),
+				tokenDataWorker:   tokendata.NewBackgroundWorker(map[cciptypes.Address]tokendata.Reader{}, 10, 5*time.Second, time.Hour),
 				offRampReader:     mockOffRampReader,
 				destWrappedNative: destNative,
 				offchainConfig: cciptypes.ExecOffchainConfig{
