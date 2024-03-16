@@ -58,7 +58,7 @@ jobs:
         uses: ./.github/actions/setup-nodejs
 
       - name: Install Foundry
-        uses: foundry-rs/foundry-toolchain@v1
+        uses: foundry-rs/foundry-toolchain@8f1998e9878d786675189ef566a2e4bf24869773 # v1.2.0
         with:
           version: nightly
 
@@ -119,7 +119,7 @@ jobs:
 
       - name: Install Foundry
         if: needs.changes.outputs.changes == 'true'
-        uses: foundry-rs/foundry-toolchain@v1
+        uses: foundry-rs/foundry-toolchain@8f1998e9878d786675189ef566a2e4bf24869773 # v1.2.0
         with:
           # Has to match the `make foundry` version.
           version: nightly-2cb875799419c907cc3709e586ece2559e6b340e
