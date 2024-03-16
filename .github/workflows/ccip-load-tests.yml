@@ -170,7 +170,7 @@ jobs:
           grafanaUrl: ${{ vars.GRAFANA_URL }}
           grafanaDashboardUrl: "/d/6vjVx-1V8/ccip-long-running-tests"
       - name: Run Tests
-        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@ea889b3133bd7f16ab19ba4ba130de5d9162c669 # v2.3.4
+        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@5bee84d30d90295010bda68b0cd46be3a1eea917 # v2.3.9
         env:
           TEST_SUITE: load
           TEST_ARGS: -test.timeout 900h
@@ -268,7 +268,7 @@ jobs:
           grafanaUrl: ${{ vars.GRAFANA_URL }}
           grafanaDashboardUrl: "/d/6vjVx-1V8/ccip-long-running-tests"
       - name: Run Tests
-        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@ea889b3133bd7f16ab19ba4ba130de5d9162c669 # v2.3.4
+        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@5bee84d30d90295010bda68b0cd46be3a1eea917 # v2.3.9
         env:
           TEST_SUITE: load
           TEST_ARGS: -test.timeout 900h
