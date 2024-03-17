@@ -82,14 +82,7 @@ func (r *TargetBalanceRebalancer) ComputeTransfersToBalance(
 		proposedTransfers = append(proposedTransfers, netProposedTransfers...)
 	}
 
-	r.lggr.Debugf("finding networks that still require finding - unable to reach balance")
-	networksRequiringFunding, _, reqFundingLater, err = r.findNetworksRequiringFunding(graphNow, graphLater)
-	if err != nil {
-		return nil, fmt.Errorf("find networks that will remain unfunded: %w", err)
-	}
-	for _, net := range networksRequiringFunding {
-		r.lggr.Warnf("after all the rebalancing efforts network %d will still require %d tokens to reach target", net, reqFundingLater[net])
-	}
+	proposedTransfers = r.mergeProposedTransfers(proposedTransfers)
 
 	r.lggr.Debugf("sorting proposed transfers for determinism")
 	sort.Slice(proposedTransfers, func(i, j int) bool {
@@ -117,12 +110,8 @@ func (r *TargetBalanceRebalancer) findNetworksRequiringFunding(graphNow, graphLa
 		fundingNow := reqFundingNow[net]
 		fundingLater := reqFundingLater[net]
 
-		if fundingNow.Cmp(big.NewInt(0)) <= 0 {
-			r.lggr.Debugf("net %d does not require funding, donatable tokens: %d", net, big.NewInt(0).Abs(fundingNow))
-			continue
-		}
-		if fundingLater.Cmp(big.NewInt(0)) <= 0 {
-			r.lggr.Debugf("net %d does not require funding, donatable tokens will soon be: %d", net, big.NewInt(0).Abs(fundingLater))
+		if fundingNow.Cmp(big.NewInt(0)) <= 0 || fundingLater.Cmp(big.NewInt(0)) <= 0 {
+			r.lggr.Debugf("net %d does not require funding, donatable tokens: %d (*%d)", net, big.NewInt(0).Abs(fundingNow), big.NewInt(0).Abs(fundingLater))
 			continue
 		}
 
@@ -301,22 +290,17 @@ func (r *TargetBalanceRebalancer) acceptDonations(graphLater graph.Graph, potent
 			r.lggr.Debugf("skipping donation: %s", d)
 			continue
 		}
-		r.lggr.Debugf("accepting donation: %s", d)
-		// donate everything
-		donatedAmount := d.amount
 
 		// increment the raised funds
-		fundsRaised = big.NewInt(0).Add(fundsRaised, donatedAmount)
+		fundsRaised = big.NewInt(0).Add(fundsRaised, d.amount)
 
 		// in case we raised more than target amount give refund to the donor
 		if refund := big.NewInt(0).Sub(fundsRaised, requiredAmount); refund.Cmp(big.NewInt(0)) > 0 {
-			donatedAmount = big.NewInt(0).Sub(donatedAmount, refund)
+			d.amount = big.NewInt(0).Sub(d.amount, refund)
 			fundsRaised = big.NewInt(0).Sub(fundsRaised, refund)
-			r.lggr.Debugf("donated amount after refund is: %s", refund.String())
 		}
-
-		r.lggr.Debugf("appending donation to proposed transfers")
-		proposedTransfers = append(proposedTransfers, models.ProposedTransfer{From: d.donor, To: d.receiver, Amount: ubig.New(donatedAmount)})
+		r.lggr.Debugf("accepting donation: %s", d)
+		proposedTransfers = append(proposedTransfers, models.ProposedTransfer{From: d.donor, To: d.receiver, Amount: ubig.New(d.amount)})
 
 		r.lggr.Debugf("applying donation to future graph state")
 		liqBefore, err := graphLater.GetLiquidity(d.receiver)
@@ -387,6 +371,25 @@ func (r *TargetBalanceRebalancer) getExpectedGraph(
 	}
 
 	return expG, nil
+}
+
+// mergeProposedTransfers merges multiple transfers with same sender and recipient into a single transfer.
+func (r *TargetBalanceRebalancer) mergeProposedTransfers(transfers []models.ProposedTransfer) []models.ProposedTransfer {
+	sums := make(map[[2]models.NetworkSelector]*big.Int)
+	for _, tr := range transfers {
+		k := [2]models.NetworkSelector{tr.From, tr.To}
+		if _, exists := sums[k]; !exists {
+			sums[k] = tr.TransferAmount()
+			continue
+		}
+		sums[k] = big.NewInt(0).Add(sums[k], tr.TransferAmount())
+	}
+
+	merged := make([]models.ProposedTransfer, 0, len(transfers))
+	for k, v := range sums {
+		merged = append(merged, models.ProposedTransfer{From: k[0], To: k[1], Amount: ubig.New(v)})
+	}
+	return merged
 }
 
 type donation struct {

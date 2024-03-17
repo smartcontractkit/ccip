@@ -188,6 +188,43 @@ func TestTargetBalanceRebalancer_ComputeTransfersToBalance_arb_eth_opt(t *testin
 				{from: opt, to: eth, am: 50}, // 2hop transfer
 			}, // transfer is made but without reaching target
 		},
+		{
+			name:             "opt is below target and arb can fund it with a transfer to eth",
+			balances:         map[models.NetworkSelector]int64{eth: 1000, arb: 1300, opt: 800},
+			targets:          map[models.NetworkSelector]int64{eth: 1000, arb: 1000, opt: 1000},
+			pendingTransfers: []transfer{},
+			expTransfers: []transfer{
+				{from: arb, to: eth, am: 200},
+			},
+		},
+		{
+			name:             "both opt and eth are below target one transfer should be made",
+			balances:         map[models.NetworkSelector]int64{eth: 900, arb: 1300, opt: 900},
+			targets:          map[models.NetworkSelector]int64{eth: 1000, arb: 1000, opt: 1000},
+			pendingTransfers: []transfer{},
+			expTransfers: []transfer{
+				{from: arb, to: eth, am: 200},
+			},
+		},
+		{
+			name:             "both opt and eth are below target arb cannot fully fund both",
+			balances:         map[models.NetworkSelector]int64{eth: 900, arb: 1150, opt: 900},
+			targets:          map[models.NetworkSelector]int64{eth: 1000, arb: 1000, opt: 1000},
+			pendingTransfers: []transfer{},
+			expTransfers: []transfer{
+				{from: arb, to: eth, am: 150},
+			},
+		},
+		{
+			name:             "arb is below target requires transfers from both eth and opt",
+			balances:         map[models.NetworkSelector]int64{eth: 1100, arb: 800, opt: 1400},
+			targets:          map[models.NetworkSelector]int64{eth: 1000, arb: 1000, opt: 1000},
+			pendingTransfers: []transfer{},
+			expTransfers: []transfer{
+				{from: eth, to: arb, am: 100},
+				{from: opt, to: eth, am: 100},
+			},
+		},
 	}
 
 	lggr := logger.TestLogger(t)
