@@ -234,6 +234,16 @@ func TestTargetBalanceRebalancer_ComputeTransfersToBalance_arb_eth_opt(t *testin
 				{from: opt, to: eth, am: 200},
 			},
 		},
+		{
+			name: "both arb and opt are below target and balance cannot cover both",
+			// in this case owner should reconsider targets or increase liquidity
+			balances:         map[models.NetworkSelector]int64{eth: 1200, arb: 900, opt: 800},
+			targets:          map[models.NetworkSelector]int64{eth: 1000, arb: 1000, opt: 1000},
+			pendingTransfers: []transfer{},
+			expTransfers: []transfer{
+				{from: eth, to: opt, am: 200},
+			},
+		},
 	}
 
 	lggr := logger.TestLogger(t)
@@ -270,6 +280,9 @@ func TestTargetBalanceRebalancer_ComputeTransfersToBalance_arb_eth_opt(t *testin
 			transfersToBalance, err := r.ComputeTransfersToBalance(g, unexecuted)
 			assert.NoError(t, err)
 
+			for _, tr := range transfersToBalance {
+				t.Logf("actual transfer: %d->%d %s", tr.From, tr.To, tr.Amount)
+			}
 			assert.Len(t, transfersToBalance, len(tc.expTransfers))
 			for i, tr := range tc.expTransfers {
 				assert.Equal(t, tr.from, transfersToBalance[i].From)

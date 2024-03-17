@@ -298,6 +298,21 @@ func (r *TargetBalanceRebalancer) acceptDonations(graphLater graph.Graph, potent
 			continue
 		}
 
+		donorData, err := graphLater.GetData(d.donor)
+		if err != nil {
+			return nil, fmt.Errorf("get liquidity of donor %d: %w", d.donor, err)
+		}
+		availableDonation := big.NewInt(0).Sub(donorData.Liquidity, donorData.TargetLiquidity)
+		if availableDonation.Cmp(big.NewInt(0)) <= 0 {
+			r.lggr.Debugf("no more tokens to donate, skipping donation: %s", d)
+			continue
+		}
+
+		if availableDonation.Cmp(d.amount) < 0 {
+			d.amount = availableDonation
+			r.lggr.Debugf("reducing donation amount since donor's balance has dropped: %s", d)
+		}
+
 		// increment the raised funds
 		fundsRaised = big.NewInt(0).Add(fundsRaised, d.amount)
 
