@@ -52,13 +52,13 @@ func (r *TargetBalanceRebalancer) ComputeTransfersToBalance(
 	r.lggr.Debugf("computing transfers to reach balance using a direct transfer from one network to another")
 	proposedTransfers := make([]models.ProposedTransfer, 0)
 	for _, net := range networksRequiringFunding {
-		potentialDonations, err := r.find1hopPotentialDonations(graphLater, net, reqFundingNow, reqFundingLater)
-		if err != nil {
-			return nil, fmt.Errorf("find 1 hop donations for network %d: %w", net, err)
+		potentialDonations, err2 := r.find1hopPotentialDonations(graphLater, net, reqFundingNow, reqFundingLater)
+		if err2 != nil {
+			return nil, fmt.Errorf("find 1 hop donations for network %d: %w", net, err2)
 		}
-		netProposedTransfers, err := r.acceptDonations(graphLater, potentialDonations, reqFundingLater[net])
-		if err != nil {
-			return nil, fmt.Errorf("accepting donations: %w", err)
+		netProposedTransfers, err2 := r.acceptDonations(graphLater, potentialDonations, reqFundingLater[net])
+		if err2 != nil {
+			return nil, fmt.Errorf("accepting donations: %w", err2)
 		}
 		proposedTransfers = append(proposedTransfers, netProposedTransfers...)
 	}
@@ -71,13 +71,13 @@ func (r *TargetBalanceRebalancer) ComputeTransfersToBalance(
 
 	r.lggr.Debugf("computing transfers to reach balance with an initial transfer to an intermediate network")
 	for _, net := range networksRequiringFunding {
-		donations, err := r.find2hopPotentialDonations(graphLater, net, reqFundingNow, reqFundingLater)
-		if err != nil {
-			return nil, fmt.Errorf("find 2 hops donations for network %d: %w", net, err)
+		donations, err2 := r.find2hopPotentialDonations(graphLater, net, reqFundingNow, reqFundingLater)
+		if err2 != nil {
+			return nil, fmt.Errorf("find 2 hops donations for network %d: %w", net, err2)
 		}
-		netProposedTransfers, err := r.acceptDonations(graphLater, donations, reqFundingLater[net])
-		if err != nil {
-			return nil, fmt.Errorf("accepting 2hop donations: %w", err)
+		netProposedTransfers, err2 := r.acceptDonations(graphLater, donations, reqFundingLater[net])
+		if err2 != nil {
+			return nil, fmt.Errorf("accepting 2hop donations: %w", err2)
 		}
 		proposedTransfers = append(proposedTransfers, netProposedTransfers...)
 	}
