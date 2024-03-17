@@ -3,7 +3,6 @@ package discoverer
 import (
 	"context"
 	"fmt"
-	"math/big"
 
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -69,6 +68,11 @@ func (e *evmDiscoverer) Discover(ctx context.Context) (graph.Graph, error) {
 			return graph.Data{}, nil, fmt.Errorf("latest config digest and epoch: %w", err)
 		}
 
+		targetBalance, err := rebal.GetTargetBalance(&bind.CallOpts{Context: ctx})
+		if err != nil {
+			return graph.Data{}, nil, fmt.Errorf("get target balance: %w", err)
+		}
+
 		return graph.Data{
 			Liquidity:         liquidity,
 			TokenAddress:      models.Address(token),
@@ -76,7 +80,7 @@ func (e *evmDiscoverer) Discover(ctx context.Context) (graph.Graph, error) {
 			XChainRebalancers: xchainRebalancerData,
 			ConfigDigest:      models.ConfigDigest{ConfigDigest: configDigestAndEpoch.ConfigDigest},
 			NetworkSelector:   selector,
-			TargetLiquidity:   big.NewInt(0), // todo: generate wrappers and call rebal.GetTargetBalance()
+			TargetLiquidity:   targetBalance,
 		}, neighbors, nil
 	}
 
