@@ -68,13 +68,6 @@ func TestTargetBalanceRebalancer_ComputeTransfersToBalance_arb_eth_opt(t *testin
 			expTransfers:     []transfer{{from: eth, to: opt, am: 100}, {from: eth, to: arb, am: 200}},
 		},
 		{
-			name:             "arb below target but there is no full funding to reach target",
-			balances:         map[models.NetworkSelector]int64{eth: 1100, arb: 800, opt: 1050},
-			targets:          map[models.NetworkSelector]int64{eth: 1000, arb: 1000, opt: 1000},
-			pendingTransfers: []transfer{},
-			expTransfers:     []transfer{{from: eth, to: arb, am: 100}}, // transfer is made but without reaching target
-		},
-		{
 			name:             "eth below target and requires two transfers to reach target",
 			balances:         map[models.NetworkSelector]int64{eth: 800, arb: 1100, opt: 1150},
 			targets:          map[models.NetworkSelector]int64{eth: 1000, arb: 1000, opt: 1000},
@@ -184,6 +177,16 @@ func TestTargetBalanceRebalancer_ComputeTransfersToBalance_arb_eth_opt(t *testin
 			expTransfers: []transfer{
 				{from: arb, to: eth, am: 1300},
 			},
+		},
+		{
+			name:             "arb below target but there is no full funding to reach target",
+			balances:         map[models.NetworkSelector]int64{eth: 1100, arb: 800, opt: 1050},
+			targets:          map[models.NetworkSelector]int64{eth: 1000, arb: 1000, opt: 1000},
+			pendingTransfers: []transfer{},
+			expTransfers: []transfer{
+				{from: eth, to: arb, am: 100},
+				{from: opt, to: eth, am: 50}, // 2hop transfer
+			}, // transfer is made but without reaching target
 		},
 	}
 
