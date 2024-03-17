@@ -225,6 +225,15 @@ func TestTargetBalanceRebalancer_ComputeTransfersToBalance_arb_eth_opt(t *testin
 				{from: opt, to: eth, am: 100},
 			},
 		},
+		{
+			name:             "arb rebalancing is disabled and eth is below target",
+			balances:         map[models.NetworkSelector]int64{eth: 800, arb: 1000, opt: 2000},
+			targets:          map[models.NetworkSelector]int64{eth: 1000, arb: 0, opt: 1000},
+			pendingTransfers: []transfer{},
+			expTransfers: []transfer{
+				{from: opt, to: eth, am: 200},
+			},
+		},
 	}
 
 	lggr := logger.TestLogger(t)

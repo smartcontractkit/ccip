@@ -141,6 +141,13 @@ func (r *TargetBalanceRebalancer) getRequiredTokensFunding(
 			return nil, nil, fmt.Errorf("get data later of net %d: %w", net, err)
 		}
 
+		if dataNow.TargetLiquidity.Cmp(big.NewInt(0)) == 0 {
+			// automated rebalancing is disabled if target is set to 0
+			reqFundingNow[net] = big.NewInt(0)
+			reqFundingLater[net] = big.NewInt(0)
+			continue
+		}
+
 		reqFundingNow[net] = big.NewInt(0).Sub(dataNow.TargetLiquidity, dataNow.Liquidity)
 		reqFundingLater[net] = big.NewInt(0).Sub(dataLater.TargetLiquidity, dataLater.Liquidity)
 	}

@@ -42,6 +42,7 @@ contract Rebalancer is IRebalancer, OCR3Base {
   event LiquidityAddedToContainer(address indexed provider, uint256 indexed amount);
   event LiquidityRemovedFromContainer(address indexed remover, uint256 indexed amount);
   event LiquidityContainerSet(address indexed newLiquidityContainer);
+  event TargetBalanceSet(uint256 indexed targetBalance);
   event CrossChainRebalancerSet(
     uint64 indexed remoteChainSelector,
     IBridgeAdapter localBridge,
@@ -72,6 +73,10 @@ contract Rebalancer is IRebalancer, OCR3Base {
   /// @notice The chain selector belonging to the chain this pool is deployed on.
   uint64 internal immutable i_localChainSelector;
 
+  /// @notice The target balance defines the expected amount of tokens for this network.
+  /// Setting the balance to 0 will disable any automated rebalancing operations.
+  uint256 internal i_targetBalance;
+
   /// @notice Mapping of chain selector to liquidity container on other chains
   mapping(uint64 chainSelector => CrossChainRebalancer) private s_crossChainRebalancer;
 
@@ -81,7 +86,7 @@ contract Rebalancer is IRebalancer, OCR3Base {
   /// @dev In the case of CCIP, this would be the token pool.
   ILiquidityContainer private s_localLiquidityContainer;
 
-  constructor(IERC20 token, uint64 localChainSelector, ILiquidityContainer localLiquidityContainer) OCR3Base() {
+  constructor(IERC20 token, uint64 localChainSelector, ILiquidityContainer localLiquidityContainer, uint256 targetBalance) OCR3Base() {
     if (localChainSelector == 0) {
       revert ZeroChainSelector();
     }
@@ -92,6 +97,7 @@ contract Rebalancer is IRebalancer, OCR3Base {
     i_localToken = token;
     i_localChainSelector = localChainSelector;
     s_localLiquidityContainer = localLiquidityContainer;
+    i_targetBalance = targetBalance;
   }
 
   receive() external payable {}
@@ -371,5 +377,18 @@ contract Rebalancer is IRebalancer, OCR3Base {
     s_localLiquidityContainer = localLiquidityContainer;
 
     emit LiquidityContainerSet(address(localLiquidityContainer));
+  }
+
+  /// @notice Gets the target tokens balance.
+  function getTargetBalance() external view returns (uint256) {
+    return i_targetBalance;
+  }
+
+  /// @notice Sets the target tokens balance.
+  /// @dev Only the owner can call this function.
+  function setTargetBalance(uint256 targetBalance) external onlyOwner{
+    i_targetBalance = targetBalance;
+
+    emit TargetBalanceSet(targetBalance);
   }
 }

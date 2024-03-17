@@ -3,6 +3,7 @@ package discoverer
 import (
 	"context"
 	"fmt"
+	"math/big"
 
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -75,6 +76,7 @@ func (e *evmDiscoverer) Discover(ctx context.Context) (graph.Graph, error) {
 			XChainRebalancers: xchainRebalancerData,
 			ConfigDigest:      models.ConfigDigest{ConfigDigest: configDigestAndEpoch.ConfigDigest},
 			NetworkSelector:   selector,
+			TargetLiquidity:   big.NewInt(0), // todo: generate wrappers and call rebal.GetTargetBalance()
 		}, neighbors, nil
 	}
 
