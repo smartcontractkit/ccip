@@ -165,7 +165,10 @@ func (o *OffRamp) ChangeConfig(onchainConfigBytes []byte, offchainConfigBytes []
 		InflightCacheExpiry:         offchainConfigParsed.InflightCacheExpiry,
 		RootSnoozeTime:              offchainConfigParsed.RootSnoozeTime,
 	}
-	onchainConfig := cciptypes.ExecOnchainConfig{PermissionLessExecutionThresholdSeconds: time.Second * time.Duration(onchainConfigParsed.PermissionLessExecutionThresholdSeconds)}
+	onchainConfig := cciptypes.ExecOnchainConfig{
+		PermissionLessExecutionThresholdSeconds: time.Second * time.Duration(onchainConfigParsed.PermissionLessExecutionThresholdSeconds),
+		Router:                                  cciptypes.Address(onchainConfigParsed.Router.String()),
+	}
 	priceEstimator := prices.NewDAGasPriceEstimator(o.Estimator, o.DestMaxGasPrice, 0, 0)
 
 	o.UpdateDynamicConfig(onchainConfig, offchainConfig, priceEstimator)

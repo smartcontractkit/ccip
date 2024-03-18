@@ -89,6 +89,7 @@ type ExecOffchainConfig struct {
 
 type ExecOnchainConfig struct {
 	PermissionLessExecutionThresholdSeconds time.Duration
+	Router                                  Address
 }
 
 func (c ExecOnchainConfig) Validate() error {

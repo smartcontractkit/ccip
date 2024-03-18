@@ -60,7 +60,7 @@ type CommitPluginStaticConfig struct {
 	sourceChainSelector uint64
 	sourceNative        cciptypes.Address
 	// Dest
-	offRamp               ccipdata.OffRampReader
+	offRamps              []ccipdata.OffRampReader
 	commitStore           ccipdata.CommitStoreReader
 	destChainSelector     uint64
 	priceRegistryProvider ccipdataprovider.PriceRegistry
@@ -81,7 +81,7 @@ type CommitReportingPlugin struct {
 	commitStoreReader       ccipdata.CommitStoreReader
 	destPriceRegistryReader ccipdata.PriceRegistryReader
 	offchainConfig          cciptypes.CommitOffchainConfig
-	offRampReader           ccipdata.OffRampReader
+	offRampReaders          []ccipdata.OffRampReader
 	F                       int
 	// Offchain
 	priceGetter      pricegetter.PriceGetter
@@ -213,7 +213,7 @@ func (r *CommitReportingPlugin) observePriceUpdates(
 		return nil, nil, nil
 	}
 
-	feeTokens, bridgeableTokens, err := ccipcommon.GetDestinationTokens(ctx, r.offRampReader, r.destPriceRegistryReader)
+	feeTokens, bridgeableTokens, err := ccipcommon.GetChainTokens(ctx, r.offRampReaders, r.destPriceRegistryReader)
 	if err != nil {
 		return nil, nil, fmt.Errorf("get destination tokens: %w", err)
 	}
@@ -380,7 +380,7 @@ func (r *CommitReportingPlugin) Report(ctx context.Context, epochAndRound types.
 
 	parsableObservations := ccip.GetParsableObservations[ccip.CommitObservation](lggr, observations)
 
-	feeTokens, bridgeableTokens, err := ccipcommon.GetDestinationTokens(ctx, r.offRampReader, r.destPriceRegistryReader)
+	feeTokens, bridgeableTokens, err := ccipcommon.GetChainTokens(ctx, r.offRampReaders, r.destPriceRegistryReader)
 	if err != nil {
 		return false, nil, fmt.Errorf("get destination tokens: %w", err)
 	}
