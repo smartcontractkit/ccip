@@ -27,6 +27,7 @@ import (
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/testreporters"
 )
 
+// CCIPLaneOptimized is a light-weight version of CCIPLane, It only contains elements which are used during load triggering and validation
 type CCIPLaneOptimized struct {
 	Logger            zerolog.Logger
 	SourceNetworkName string
@@ -165,7 +166,6 @@ func (c *CCIPE2ELoad) Call(_ *wasp.Generator) *wasp.Response {
 	msgSerialNo := stats.ReqNo
 	lggr := c.Lane.Logger.With().Int64("msg Number", stats.ReqNo).Logger()
 
-	//defer c.Lane.Reports.UpdatePhaseStatsForReq(stats)
 	feeToken := sourceCCIP.Common.FeeToken.EthAddress
 	// initiate the transfer
 	lggr.Debug().Str("triggeredAt", time.Now().GoString()).Msg("triggering transfer")

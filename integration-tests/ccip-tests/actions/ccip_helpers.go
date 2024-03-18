@@ -7,6 +7,7 @@ import (
 	"math/big"
 	"math/rand"
 	"net/http"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -159,6 +160,7 @@ func (ccipModule *CCIPCommon) FreeUpUnusedSpace() {
 	ccipModule.gasUpdateWatcherMu = nil
 	ccipModule.TokenMessenger = nil
 	ccipModule.PriceRegistry = nil
+	runtime.GC()
 }
 
 func (ccipModule *CCIPCommon) StopWatchingPriceUpdates() {

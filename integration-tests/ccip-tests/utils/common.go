@@ -11,8 +11,9 @@ func ProjectRoot() string {
 	return filepath.Join(filepath.Dir(b), "/..")
 }
 
+// DeleteNilEntriesFromMap checks for nil entry in map, store all not-nil entries to another map and deallocates previous map
+// Deleting keys from a map actually does not delete the key, It just sets the corresponding value to nil.
 func DeleteNilEntriesFromMap(inputMap *sync.Map) *sync.Map {
-	// checks for nil entry in map, store all not-nil entries to another map and deallocates previous map
 	newMap := &sync.Map{}
 	inputMap.Range(func(key, value any) bool {
 		if value != nil {
