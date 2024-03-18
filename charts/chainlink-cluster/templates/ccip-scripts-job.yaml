@@ -1,0 +1,38 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ccip-scripts-config
+data:
+  config.json: |
+    {
+      "hello": "world"
+    }
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ccip-scripts-deploy
+spec:
+  template:
+    spec:
+      containers:
+        - name: ccip-scripts
+          image: {{.Values.ccip.ccipScriptsImage}}
+          command: ["cat", "version"]
+          volumeMounts:
+            - name: config-volume
+              mountPath: /data/config.json
+          securityContext:
+            capabilities:
+              drop:
+                - ALL
+            runAsUser: 999
+            runAsGroup: 999
+            runAsNonRoot: true
+      restartPolicy: Never
+      volumes:
+        - name: config-volume
+          configMap:
+            name: ccip-scripts-config
+  backoffLimit: 4
+

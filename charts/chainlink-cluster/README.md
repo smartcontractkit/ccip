@@ -106,10 +106,19 @@ kubectl create ns cl-cluster
 kubectl config set-context --current --namespace cl-cluster
 ```
 
+Template
+```
+helm template app -f values.yaml -n crib-radek . --output-dir .rendered \
+    --set=ingress.baseDomain="$DEVSPACE_INGRESS_BASE_DOMAIN"
+```
+
 Install
 ```
+
 helm install -f values.yaml cl-cluster .
 ```
+
+
 
 ## Create a new release
 Bump version in `Chart.yml` add your changes and add `helm_release` label to any PR to trigger a release

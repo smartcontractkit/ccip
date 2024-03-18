@@ -142,6 +142,118 @@ geth:
     limits:
       cpu: 1
       memory: 1024Mi
+
+ccip:
+  ccipScriptsImage: ccip-scripts-mage:image-tag
+  chains:
+    - NetworkId: 1337
+      WalletKey: 59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d
+      DeployLink: false
+      DeployWETH: false
+      ChainConfig:
+        EvmChainId: 1337
+        GasSettings:
+          EIP1559: true
+          GasTipCap: 1000000000
+        SupportedTokens:
+          ChainLink Token:
+            ChainId: 1337
+            Token: "0x5fbdb2315678afecb367f032d93f642f64180aa3"
+            Pool: "0xa513e6e4b8f2a923d98304ec87f64353c4d5c853"
+            TokenPriceType: "TokenPrices"
+            Price: 10000000000000000000
+            Aggregator: "0x0000000000000000000000000000000000000000"
+            TokenPoolType: "lockRelease"
+          WETH:
+            ChainId: 1337
+            Token: "0xcf7ed3acca5a467e9e704c703e8d87f634fb0fc9"
+            Pool: "0x0000000000000000000000000000000000000000"
+            TokenPriceType: "TokenPrices"
+            Price: 1.8e+21
+            Aggregator: "0x0000000000000000000000000000000000000000"
+            TokenPoolType: "feeTokenOnly"
+        Router: "0x0165878a594ca255338adfa4d48449f69242eb8f"
+        ARM: "0xdc64a140aa3e981100a9beca4e685f962f0cf6c9"
+        ARMProxy: "0x5fc8d32690cc91d4c39d9d3abcbd16989f875707"
+        PriceRegistry: "0x8a791620dd6260079bf849dc5567adc3f2fdc318"
+        DeploySettings:
+          DeployedAtBlock: 478
+        TunableChainValues:
+          FinalityDepth: 1
+          OptimisticConfirmations: 1
+          BatchGasLimit: 7000000
+          RelativeBoostPerWaitHour: 2400
+          FeeUpdateHeartBeat: "24h0m0s"
+          FeeUpdateDeviationPPB: 100000000
+          MaxGasPrice: 1000000000000
+          InflightCacheExpiry: "3m0s"
+          RootSnoozeTime: "5m0s"
+    - NetworkId: 2337
+      WalletKey: "59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d"
+      DeployLink: false
+      DeployWETH: false
+      ChainConfig:
+        EvmChainId: 2337
+        GasSettings:
+          EIP1559: true
+          GasTipCap: 1000000000
+        SupportedTokens:
+          ChainLink Token:
+            ChainId: 2337
+            Token: "0x8464135c8f25da09e49bc8782676a84730c318bc"
+            Pool: "0x1275d096b9dbf2347bd2a131fb6bdab0b4882487"
+            TokenPriceType: "TokenPrices"
+            Price: 10000000000000000000
+            Aggregator: "0x0000000000000000000000000000000000000000"
+            TokenPoolType: "lockRelease"
+          WETH:
+            ChainId: 2337
+            Token: "0x712516e61c8b383df4a63cfe83d7701bce54b03e"
+            Pool: "0x0000000000000000000000000000000000000000"
+            TokenPriceType: "TokenPrices"
+            Price: 1.8e+21
+            Aggregator: "0x0000000000000000000000000000000000000000"
+            TokenPoolType: "feeTokenOnly"
+        Router: "0xc6ba8c3233ecf65b761049ef63466945c362edd2"
+        ARM: "0xbcf26943c0197d2ee0e5d05c716be60cc2761508"
+        ARMProxy: "0x59f2f1fcfe2474fd5f0b9ba1e73ca90b143eb8d0"
+        PriceRegistry: "0x0b48af34f4c854f5ae1a3d587da471fea45bad52"
+        DeploySettings:
+          DeployedAtBlock: 479
+        TunableChainValues:
+          FinalityDepth: 1
+          OptimisticConfirmations: 1
+          BatchGasLimit: 7000000
+          RelativeBoostPerWaitHour: 2400
+          FeeUpdateHeartBeat: "24h0m0s"
+          FeeUpdateDeviationPPB: 100000000
+          MaxGasPrice: 1000000000000
+          InflightCacheExpiry: "3m0s"
+          RootSnoozeTime: "5m0s"
+  LaneDeploySettings:
+    geth_1337,geth_2337:
+      DeployLane: false
+      DeployPingPongDapp: false
+  CCIPLaneConfigs:
+    geth_1337:
+      geth_2337:
+        OnRamp: "0x610178da211fef7d417bc0e6fed39f05609ad788"
+        OffRamp: "0x0b306bf915c4d645ff596e518faf3f9669b97016"
+        CommitStore: "0x0dcd1bf9a1b36ce34237eeafef220932846bcd82"
+        PingPongDapp: "0x68b1d87f95878fe05b998f19b66f4baba5de1aed"
+        DeploySettings:
+          DeployedAtBlock: 478
+    geth_2337:
+      geth_1337:
+        OnRamp: "0x0f5d1ef48f12b6f691401bfe88c2037c690a6afe"
+        OffRamp: "0x381445710b5e73d34af196c53a3d5cda58edbf7a"
+        CommitStore: "0x2de080e97b0cae9825375d31f5d0ed5751fdf16d"
+        PingPongDapp: "0x0d4ff719551e23185aeb16ffbf2abebb90635942"
+        DeploySettings:
+          DeployedAtBlock: 479
+
+
+
 # mockserver is https://www.mock-server.com/where/kubernetes.html
 # used to stub External Adapters
 mockserver:
@@ -270,6 +382,7 @@ ingress:
   enabled: false
   annotations: {}
   ingressClassName: alb
+  baseDomain: "example.com"
   hosts:
     - host: chainlink-node-1.local
       http:
