@@ -10,6 +10,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 	pkgerrors "github.com/pkg/errors"
 	"golang.org/x/exp/maps"
@@ -367,8 +368,10 @@ func newConfigProvider(lggr logger.Logger, chain legacyevm.Chain, opts *types.Re
 }
 
 type configTransmitterOpts struct {
-	// override the gas limit default provided in the config watcher
+	// pluginGasLimit overrides the gas limit default provided in the config watcher.
 	pluginGasLimit *uint32
+	// subjectID overrides the queueing subject id (the job external id will be used by default).
+	subjectID *uuid.UUID
 }
 
 func newContractTransmitter(lggr logger.Logger, rargs commontypes.RelayArgs, transmitterID string, ethKeystore keystore.Eth, configWatcher *configWatcher, opts configTransmitterOpts, reportToEthMeta ReportToEthMetadata) (*contractTransmitter, error) {
@@ -401,7 +404,11 @@ func newContractTransmitter(lggr logger.Logger, rargs commontypes.RelayArgs, tra
 	}
 
 	scoped := configWatcher.chain.Config()
-	strategy := txmgrcommon.NewQueueingTxStrategy(rargs.ExternalJobID, scoped.OCR2().DefaultTransactionQueueDepth(), scoped.Database().DefaultQueryTimeout())
+	subject := rargs.ExternalJobID
+	if opts.subjectID != nil {
+		subject = *opts.subjectID
+	}
+	strategy := txmgrcommon.NewQueueingTxStrategy(subject, scoped.OCR2().DefaultTransactionQueueDepth(), scoped.Database().DefaultQueryTimeout())
 
 	var checker txm.TransmitCheckerSpec
 	if configWatcher.chain.Config().OCR2().SimulateTransactions() {
