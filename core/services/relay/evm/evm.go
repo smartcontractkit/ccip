@@ -491,11 +491,11 @@ func newOnChainContractTransmitter(ctx context.Context, lggr logger.Logger, rarg
 		fromAddresses = append(fromAddresses, common.HexToAddress(s))
 	}
 
-	scoped := configWatcher.chain.Config()
 	subject := rargs.ExternalJobID
 	if opts.subjectID != nil {
 		subject = *opts.subjectID
 	}
+	scoped := configWatcher.chain.Config()
 	strategy := txmgrcommon.NewQueueingTxStrategy(subject, scoped.OCR2().DefaultTransactionQueueDepth(), scoped.Database().DefaultQueryTimeout())
 
 	var checker txm.TransmitCheckerSpec
