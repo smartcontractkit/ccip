@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+	"sync"
 
 	"golang.org/x/sync/errgroup"
 
@@ -23,6 +24,56 @@ func GetMessageIDsAsHexString(messages []cciptypes.EVM2EVMMessage) []string {
 type BackfillArgs struct {
 	SourceLP, DestLP                 logpoller.LogPoller
 	SourceStartBlock, DestStartBlock uint64
+}
+
+// TODO Matt
+// GetChainTokens returns union of all tokens supported on the destination chain, including fee tokens from the provided price registry
+// and the bridgeable tokens from all the offramps living on the chain.
+func GetChainTokens(ctx context.Context, offRamps []ccipdata.OffRampReader, priceRegistry cciptypes.PriceRegistryReader) (fee, bridged []cciptypes.Address, err error) {
+	eg := new(errgroup.Group)
+
+	var destFeeTokens []cciptypes.Address
+	var destBridgeableTokens []cciptypes.Address
+	lock := &sync.RWMutex{}
+
+	eg.Go(func() error {
+		tokens, err := priceRegistry.GetFeeTokens(ctx)
+		if err != nil {
+			return fmt.Errorf("get dest fee tokens: %w", err)
+		}
+		destFeeTokens = tokens
+		return nil
+	})
+
+	for _, offRamp := range offRamps {
+		eg.Go(func() error {
+			tokens, err := offRamp.GetTokens(ctx)
+			if err != nil {
+				return fmt.Errorf("get dest bridgeable tokens from offramp %s: %w", offRamp.Address(), err)
+			}
+			lock.Lock()
+			destBridgeableTokens = append(destBridgeableTokens, tokens.DestinationTokens...)
+			lock.Unlock()
+			return nil
+		})
+	}
+
+	if err := eg.Wait(); err != nil {
+		return nil, nil, err
+	}
+
+	// Same token can be returned by multiple offRamps, we need to dedup them
+	existingTokens := make(map[cciptypes.Address]bool)
+	var uniqueBridgeableTokens []cciptypes.Address
+
+	for _, token := range destBridgeableTokens {
+		if _, ok := existingTokens[token]; !ok {
+			existingTokens[token] = true
+			uniqueBridgeableTokens = append(uniqueBridgeableTokens, token)
+		}
+	}
+
+	return destFeeTokens, uniqueBridgeableTokens, nil
 }
 
 // GetDestinationTokens returns the destination chain fee tokens from the provided price registry
