@@ -491,10 +491,6 @@ func newOnChainContractTransmitter(ctx context.Context, lggr logger.Logger, rarg
 		fromAddresses = append(fromAddresses, common.HexToAddress(s))
 	}
 
-	subject := rargs.ExternalJobID
-	if opts.subjectID != nil {
-		subject = *opts.subjectID
-	}
 	scoped := configWatcher.chain.Config()
 	subject := rargs.ExternalJobID
 	if opts.subjectID != nil {
