@@ -27,9 +27,9 @@ jobs:
       steps:
       - name: Checkout code
         uses: actions/checkout@v2
-      - name: Fetch develop branch
         with:
           repository: smartcontractkit/ccip
+      - name: Fetch develop branch
         run: git fetch --depth=1 origin ccip-develop:ccip-develop
       - name: Check for go.mod changes
         id: changes
