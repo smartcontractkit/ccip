@@ -84,6 +84,7 @@ func (rf *CommitReportingPluginFactory) NewReportingPlugin(config types.Reportin
 
 	pluginOffChainConfig := rf.config.commitStore.OffchainConfig()
 
+	lggr := rf.config.lggr.Named("CommitReportingPlugin")
 	return &CommitReportingPlugin{
 			sourceChainSelector:     rf.config.sourceChainSelector,
 			sourceNative:            rf.config.sourceNative,
@@ -91,13 +92,14 @@ func (rf *CommitReportingPluginFactory) NewReportingPlugin(config types.Reportin
 			commitStoreReader:       rf.config.commitStore,
 			priceGetter:             rf.config.priceGetter,
 			F:                       config.F,
-			lggr:                    rf.config.lggr.Named("CommitReportingPlugin"),
+			lggr:                    lggr,
 			inflightReports:         newInflightCommitReportsContainer(rf.config.commitStore.OffchainConfig().InflightCacheExpiry),
 			destPriceRegistryReader: rf.destPriceRegReader,
 			offRampReader:           rf.config.offRamp,
 			gasPriceEstimator:       rf.config.commitStore.GasPriceEstimator(),
 			offchainConfig:          pluginOffChainConfig,
 			metricsCollector:        rf.config.metricsCollector,
+			chainHealthcheck:        rf.config.chainHealthcheck,
 		},
 		types.ReportingPluginInfo{
 			Name:          "CCIPCommit",

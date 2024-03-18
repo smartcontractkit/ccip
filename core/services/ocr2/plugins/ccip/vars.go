@@ -11,4 +11,4 @@ const (
 	ExecPluginLabel      = "exec"
 )
 
-var ErrCommitStoreIsDown = errors.New("commitStoreReader is down")
+var ErrChainIsNotHealthy = errors.New("lane processing is stopped because of healthcheck failure, please see crit logs")
