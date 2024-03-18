@@ -2,6 +2,7 @@ package evm
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"math/big"
 
@@ -46,9 +47,9 @@ func chainToUUID(chainID *big.Int) uuid.UUID {
 	return uuid.NewHash(sha256.New(), uuid.NameSpaceOID, buf.Bytes(), VersionSHA1)
 }
 
-func NewCCIPCommitProvider(lggr logger.Logger, chainSet legacyevm.Chain, rargs commontypes.RelayArgs, transmitterID string, ks keystore.Eth) (CCIPCommitProvider, error) {
+func NewCCIPCommitProvider(ctx context.Context, lggr logger.Logger, chainSet legacyevm.Chain, rargs commontypes.RelayArgs, transmitterID string, ks keystore.Eth) (CCIPCommitProvider, error) {
 	relayOpts := types.NewRelayOpts(rargs)
-	configWatcher, err := newConfigProvider(lggr, chainSet, relayOpts)
+	configWatcher, err := newStandardConfigProvider(lggr, chainSet, relayOpts)
 	if err != nil {
 		return nil, err
 	}
@@ -62,9 +63,9 @@ func NewCCIPCommitProvider(lggr logger.Logger, chainSet legacyevm.Chain, rargs c
 		return nil, err
 	}
 	subjectID := chainToUUID(configWatcher.chain.ID())
-	contractTransmitter, err := newContractTransmitter(lggr, rargs, transmitterID, ks, configWatcher, configTransmitterOpts{
+	contractTransmitter, err := newOnChainContractTransmitter(ctx, lggr, rargs, transmitterID, ks, configWatcher, configTransmitterOpts{
 		subjectID: &subjectID,
-	}, fn)
+	}, OCR2AggregatorTransmissionContractABI, fn)
 	if err != nil {
 		return nil, err
 	}
@@ -93,10 +94,10 @@ type ccipExecutionProvider struct {
 
 var _ commontypes.Plugin = (*ccipExecutionProvider)(nil)
 
-func NewCCIPExecutionProvider(lggr logger.Logger, chainSet legacyevm.Chain, rargs commontypes.RelayArgs, transmitterID string, ks keystore.Eth) (CCIPExecutionProvider, error) {
+func NewCCIPExecutionProvider(ctx context.Context, lggr logger.Logger, chainSet legacyevm.Chain, rargs commontypes.RelayArgs, transmitterID string, ks keystore.Eth) (CCIPExecutionProvider, error) {
 	relayOpts := types.NewRelayOpts(rargs)
 
-	configWatcher, err := newConfigProvider(lggr, chainSet, relayOpts)
+	configWatcher, err := newStandardConfigProvider(lggr, chainSet, relayOpts)
 	if err != nil {
 		return nil, err
 	}
@@ -110,9 +111,9 @@ func NewCCIPExecutionProvider(lggr logger.Logger, chainSet legacyevm.Chain, rarg
 		return nil, err
 	}
 	subjectID := chainToUUID(configWatcher.chain.ID())
-	contractTransmitter, err := newContractTransmitter(lggr, rargs, transmitterID, ks, configWatcher, configTransmitterOpts{
+	contractTransmitter, err := newOnChainContractTransmitter(ctx, lggr, rargs, transmitterID, ks, configWatcher, configTransmitterOpts{
 		subjectID: &subjectID,
-	}, fn)
+	}, OCR2AggregatorTransmissionContractABI, fn)
 	if err != nil {
 		return nil, err
 	}
