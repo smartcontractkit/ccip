@@ -124,29 +124,30 @@ func GetUSDCDomain(networkName string, simulated bool) (uint32, error) {
 }
 
 type CCIPCommon struct {
-	ChainClient        blockchain.EVMClient
-	Deployer           *contracts.CCIPContractsDeployer
-	FeeToken           *contracts.LinkToken
-	BridgeTokens       []*contracts.ERC20Token
-	PriceAggregators   map[string]*contracts.MockAggregator
-	BridgeTokenPools   []*contracts.TokenPool
-	RemoteChains       *sync.Map
-	RateLimiterConfig  contracts.RateLimiterConfig
-	ARMContract        *common.Address
-	ARM                *contracts.ARM // populate only if the ARM contracts is not a mock and can be used to verify various ARM events; keep this nil for mock ARM
-	Router             *contracts.Router
-	PriceRegistry      *contracts.PriceRegistry
-	WrappedNative      common.Address
-	MulticallEnabled   bool
-	MulticallContract  common.Address
-	ExistingDeployment bool
-	USDCDeployment     bool
-	TokenMessenger     *common.Address
-	TokenTransmitter   *contracts.TokenTransmitter
-	poolFunds          *big.Int
-	gasUpdateWatcherMu *sync.Mutex
-	gasUpdateWatcher   map[uint64]*big.Int // key - destchain id; value - timestamp of update
-	priceUpdateSubs    []event.Subscription
+	ChainClient                  blockchain.EVMClient
+	Deployer                     *contracts.CCIPContractsDeployer
+	FeeToken                     *contracts.LinkToken
+	BridgeTokens                 []*contracts.ERC20Token
+	PriceAggregators             map[string]*contracts.MockAggregator
+	BridgeTokenPools             []*contracts.TokenPool
+	RemoteChains                 *sync.Map
+	RateLimiterConfig            contracts.RateLimiterConfig
+	ARMContract                  *common.Address
+	ARM                          *contracts.ARM // populate only if the ARM contracts is not a mock and can be used to verify various ARM events; keep this nil for mock ARM
+	Router                       *contracts.Router
+	PriceRegistry                *contracts.PriceRegistry
+	WrappedNative                common.Address
+	MulticallEnabled             bool
+	MulticallContract            common.Address
+	ExistingDeployment           bool
+	USDCDeployment               bool
+	TokenMessenger               *common.Address
+	TokenTransmitter             *contracts.TokenTransmitter
+	poolFunds                    *big.Int
+	gasUpdateWatcherMu           *sync.Mutex
+	gasUpdateWatcher             map[uint64]*big.Int // key - destchain id; value - timestamp of update
+	priceUpdateSubs              []event.Subscription
+	IsConnectionRestoredRecently *atomic.Bool
 }
 
 // FreeUpUnusedSpace sets nil to various elements of ccipModule which are only used
@@ -620,6 +621,19 @@ func (ccipModule *CCIPCommon) SyncUSDCDomain(destTransmitter *contracts.TokenTra
 		}
 	}
 	return ccipModule.ChainClient.WaitForEvents()
+}
+
+func (ccipModule *CCIPCommon) PollRPCConnection(ctx context.Context) {
+	for {
+		select {
+		case <-ccipModule.ChainClient.ConnectionRestored():
+			ccipModule.IsConnectionRestoredRecently.Store(true)
+		case <-ccipModule.ChainClient.ConnectionIssue():
+			ccipModule.IsConnectionRestoredRecently.Store(false)
+		case <-ctx.Done():
+			return
+		}
+	}
 }
 
 // DeployContracts deploys the contracts which are necessary in both source and dest chain
@@ -1457,12 +1471,12 @@ type DestCCIPModule struct {
 	CommitStore             *contracts.CommitStore
 	ReceiverDapp            *contracts.ReceiverDapp
 	OffRamp                 *contracts.OffRamp
-	WrappedNative           common.Address
 	ReportAcceptedWatcher   *sync.Map
 	ExecStateChangedWatcher *sync.Map
 	ReportBlessedWatcher    *sync.Map
 	ReportBlessedBySeqNum   *sync.Map
 	NextSeqNumToCommit      *atomic.Uint64
+	DestStartBlock          uint64
 }
 
 func (destCCIP *DestCCIPModule) LoadContracts(conf *laneconfig.LaneConfig) {
@@ -1515,7 +1529,10 @@ func (destCCIP *DestCCIPModule) DeployContracts(
 	if err != nil {
 		return fmt.Errorf("failed to get chain selector for destination chain id %d: %w", destCCIP.Common.ChainClient.GetChainID().Uint64(), err)
 	}
-
+	destCCIP.DestStartBlock, err = destCCIP.Common.ChainClient.LatestBlockNumber(context.Background())
+	if err != nil {
+		return fmt.Errorf("getting latest block number shouldn't fail %w", err)
+	}
 	if destCCIP.CommitStore == nil {
 		if destCCIP.Common.ExistingDeployment {
 			return fmt.Errorf("commit store address not provided in lane config")
@@ -2535,26 +2552,44 @@ func (lane *CCIPLane) StartEventWatchers() error {
 		}
 	}
 
+	go lane.Source.Common.PollRPCConnection(lane.Context)
+	go lane.Dest.Common.PollRPCConnection(lane.Context)
+
 	sendReqEvent := make(chan *evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested)
 	sub, err := lane.Source.OnRamp.Instance.WatchCCIPSendRequested(nil, sendReqEvent)
 	if err != nil {
 		return err
 	}
 	lane.Subscriptions = append(lane.Subscriptions, sub)
-	go func() {
+	go func(sub event.Subscription) {
 		for {
-			e := <-sendReqEvent
-			lane.Logger.Info().Msgf("CCIPSendRequested event received for seq number %d", e.Message.SequenceNumber)
-			eventsForTx, ok := lane.Source.CCIPSendRequestedWatcher.Load(e.Raw.TxHash.Hex())
-			if ok {
-				lane.Source.CCIPSendRequestedWatcher.Store(e.Raw.TxHash.Hex(), append(eventsForTx.([]*evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested), e))
-			} else {
-				lane.Source.CCIPSendRequestedWatcher.Store(e.Raw.TxHash.Hex(), []*evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested{e})
-			}
+			select {
+			case e := <-sendReqEvent:
+				lane.Logger.Info().Msgf("CCIPSendRequested event received for seq number %d", e.Message.SequenceNumber)
+				eventsForTx, ok := lane.Source.CCIPSendRequestedWatcher.Load(e.Raw.TxHash.Hex())
+				if ok {
+					lane.Source.CCIPSendRequestedWatcher.Store(e.Raw.TxHash.Hex(), append(eventsForTx.([]*evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested), e))
+				} else {
+					lane.Source.CCIPSendRequestedWatcher.Store(e.Raw.TxHash.Hex(), []*evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested{e})
+				}
 
-			lane.Source.CCIPSendRequestedWatcher = testutils.DeleteNilEntriesFromMap(lane.Source.CCIPSendRequestedWatcher)
+				lane.Source.CCIPSendRequestedWatcher = testutils.DeleteNilEntriesFromMap(lane.Source.CCIPSendRequestedWatcher)
+				// check every second if connection is restored
+			case <-time.After(1 * time.Second):
+				// if connection is restored re-subscribe
+				if lane.Source.Common.IsConnectionRestoredRecently != nil && lane.Source.Common.IsConnectionRestoredRecently.Load() {
+					lane.Logger.Info().Msg("source connection restored")
+					sub.Unsubscribe()
+					sub, err := lane.Source.OnRamp.Instance.WatchCCIPSendRequested(&bind.WatchOpts{
+						Start: pointer.ToUint64(lane.Source.SrcStartBlock),
+					}, sendReqEvent)
+					if err != nil {
+						lane.Subscriptions = append(lane.Subscriptions, sub)
+					}
+				}
+			}
 		}
-	}()
+	}(sub)
 	reportAcceptedEvent := make(chan *commit_store.CommitStoreReportAccepted)
 	sub, err = lane.Dest.CommitStore.Instance.WatchReportAccepted(nil, reportAcceptedEvent)
 	if err != nil {
@@ -2563,15 +2598,30 @@ func (lane *CCIPLane) StartEventWatchers() error {
 
 	lane.Subscriptions = append(lane.Subscriptions, sub)
 
-	go func() {
+	go func(sub event.Subscription) {
 		for {
-			e := <-reportAcceptedEvent
-			for i := e.Report.Interval.Min; i <= e.Report.Interval.Max; i++ {
-				lane.Dest.ReportAcceptedWatcher.Store(i, e)
+			select {
+			case e := <-reportAcceptedEvent:
+				for i := e.Report.Interval.Min; i <= e.Report.Interval.Max; i++ {
+					lane.Dest.ReportAcceptedWatcher.Store(i, e)
+				}
+				lane.Dest.ReportAcceptedWatcher = testutils.DeleteNilEntriesFromMap(lane.Dest.ReportAcceptedWatcher)
+				// check every second if connection is restored
+			case <-time.After(1 * time.Second):
+				// if connection is restored re-subscribe
+				if lane.Dest.Common.IsConnectionRestoredRecently != nil && lane.Dest.Common.IsConnectionRestoredRecently.Load() {
+					lane.Logger.Info().Msg("dest connection restored")
+					sub.Unsubscribe()
+					sub, err := lane.Dest.CommitStore.Instance.WatchReportAccepted(&bind.WatchOpts{
+						Start: pointer.ToUint64(lane.Dest.DestStartBlock),
+					}, reportAcceptedEvent)
+					if err != nil {
+						lane.Subscriptions = append(lane.Subscriptions, sub)
+					}
+				}
 			}
-			lane.Dest.ReportAcceptedWatcher = testutils.DeleteNilEntriesFromMap(lane.Dest.ReportAcceptedWatcher)
 		}
-	}()
+	}(sub)
 
 	if lane.Dest.Common.ARM != nil {
 		reportBlessedEvent := make(chan *arm_contract.ARMContractTaggedRootBlessed)
@@ -2582,16 +2632,31 @@ func (lane *CCIPLane) StartEventWatchers() error {
 
 		lane.Subscriptions = append(lane.Subscriptions, sub)
 
-		go func() {
+		go func(sub event.Subscription) {
 			for {
-				e := <-reportBlessedEvent
-				lane.Logger.Info().Msgf("TaggedRootBlessed event received for root %x", e.TaggedRoot.Root)
-				if e.TaggedRoot.CommitStore == lane.Dest.CommitStore.EthAddress {
-					lane.Dest.ReportBlessedWatcher.Store(e.TaggedRoot.Root, &e.Raw)
+				select {
+				case e := <-reportBlessedEvent:
+					lane.Logger.Info().Msgf("TaggedRootBlessed event received for root %x", e.TaggedRoot.Root)
+					if e.TaggedRoot.CommitStore == lane.Dest.CommitStore.EthAddress {
+						lane.Dest.ReportBlessedWatcher.Store(e.TaggedRoot.Root, &e.Raw)
+					}
+					lane.Dest.ReportBlessedWatcher = testutils.DeleteNilEntriesFromMap(lane.Dest.ReportBlessedWatcher)
+					// check every second if connection is restored
+				case <-time.After(1 * time.Second):
+					// if connection is restored re-subscribe
+					if lane.Dest.Common.IsConnectionRestoredRecently != nil && lane.Dest.Common.IsConnectionRestoredRecently.Load() {
+						lane.Logger.Info().Msg("dest connection restored")
+						sub.Unsubscribe()
+						sub, err := lane.Dest.Common.ARM.Instance.WatchTaggedRootBlessed(&bind.WatchOpts{
+							Start: pointer.ToUint64(lane.Dest.DestStartBlock),
+						}, reportBlessedEvent, nil)
+						if err != nil {
+							lane.Subscriptions = append(lane.Subscriptions, sub)
+						}
+					}
 				}
-				lane.Dest.ReportBlessedWatcher = testutils.DeleteNilEntriesFromMap(lane.Dest.ReportBlessedWatcher)
 			}
-		}()
+		}(sub)
 	}
 	execStateChangedEvent := make(chan *evm_2_evm_offramp.EVM2EVMOffRampExecutionStateChanged)
 	sub, err = lane.Dest.OffRamp.Instance.WatchExecutionStateChanged(nil, execStateChangedEvent, nil, nil)
@@ -2601,14 +2666,29 @@ func (lane *CCIPLane) StartEventWatchers() error {
 
 	lane.Subscriptions = append(lane.Subscriptions, sub)
 
-	go func() {
+	go func(sub event.Subscription) {
 		for {
-			e := <-execStateChangedEvent
-			lane.Logger.Info().Msgf("Execution state changed event received for seq number %d", e.SequenceNumber)
-			lane.Dest.ExecStateChangedWatcher.Store(e.SequenceNumber, e)
-			lane.Dest.ExecStateChangedWatcher = testutils.DeleteNilEntriesFromMap(lane.Dest.ExecStateChangedWatcher)
+			select {
+			case e := <-execStateChangedEvent:
+				lane.Logger.Info().Msgf("Execution state changed event received for seq number %d", e.SequenceNumber)
+				lane.Dest.ExecStateChangedWatcher.Store(e.SequenceNumber, e)
+				lane.Dest.ExecStateChangedWatcher = testutils.DeleteNilEntriesFromMap(lane.Dest.ExecStateChangedWatcher)
+				// check every second if connection is restored
+			case <-time.After(1 * time.Second):
+				// if connection is restored re-subscribe
+				if lane.Dest.Common.IsConnectionRestoredRecently != nil && lane.Dest.Common.IsConnectionRestoredRecently.Load() {
+					lane.Logger.Info().Msg("dest connection restored")
+					sub.Unsubscribe()
+					sub, err := lane.Dest.OffRamp.Instance.WatchExecutionStateChanged(&bind.WatchOpts{
+						Start: pointer.ToUint64(lane.Dest.DestStartBlock),
+					}, execStateChangedEvent, nil, nil)
+					if err != nil {
+						lane.Subscriptions = append(lane.Subscriptions, sub)
+					}
+				}
+			}
 		}
-	}()
+	}(sub)
 	return nil
 }
 
