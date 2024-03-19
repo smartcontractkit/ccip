@@ -3,7 +3,10 @@ apiVersion: v1
 kind: Pod
 metadata:
   name: ccip-scripts-deploy
-
+  labels:
+    app: ccip-scripts-deployer
+  annotations:
+    prometheus.io/scrape: 'true'
 spec:
   containers:
     - name: ccip-scripts

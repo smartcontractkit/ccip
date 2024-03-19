@@ -3,6 +3,10 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   name: ccip-scripts-deploy
+  labels:
+    app: ccip-scripts-deployer
+  annotations:
+    prometheus.io/scrape: 'true'
 spec:
   template:
     spec:
@@ -12,7 +16,7 @@ spec:
           env:
             - name: CONFIG_JSON_PATH
               value: /data/config.json
-          command: [ "go", "test", "pilot/crib_test.go" ]
+          command: [ "go", "test", "pilot/crib_test.go", "-v" ]
           volumeMounts:
             - name: config-volume
               mountPath: /data

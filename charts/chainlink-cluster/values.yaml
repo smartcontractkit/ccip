@@ -144,7 +144,7 @@ geth:
       memory: 1024Mi
 
 ccip:
-  ccipScriptsImage: ccip-scripts-mage:image-tag
+  ccipScriptsImage: ccip-scripts-image:image-tag
   chains:
     - NetworkId: 1337
       ChainId: geth_1337
