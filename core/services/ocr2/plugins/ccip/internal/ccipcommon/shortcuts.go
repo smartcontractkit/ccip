@@ -45,7 +45,8 @@ func GetChainTokens(ctx context.Context, offRamps []ccipdata.OffRampReader, pric
 		return nil
 	})
 
-	for _, offRamp := range offRamps {
+	for _, o := range offRamps {
+		offRamp := o
 		eg.Go(func() error {
 			tokens, err := offRamp.GetTokens(ctx)
 			if err != nil {
