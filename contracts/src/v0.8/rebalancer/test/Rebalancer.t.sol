@@ -329,7 +329,7 @@ contract Rebalancer_rebalanceLiquidity is RebalancerSetup {
       abi.encode(payload),
       bytes("")
     );
-    s_rebalancer.receiveLiquidity(i_remoteChainSelector, AMOUNT, abi.encode(payload));
+    s_rebalancer.receiveLiquidity(i_remoteChainSelector, AMOUNT, false, abi.encode(payload));
 
     // available balance on the rebalancer has been injected into the token pool.
     assertEq(s_l1Token.balanceOf(address(s_rebalancer)), 0, "rebalancer balance 2");
@@ -414,7 +414,7 @@ contract Rebalancer_rebalanceLiquidity is RebalancerSetup {
     });
     vm.expectEmit();
     emit FinalizationStepCompleted(maxSeqNum, i_remoteChainSelector, abi.encode(payload));
-    s_rebalancer.receiveLiquidity(i_remoteChainSelector, AMOUNT, abi.encode(payload));
+    s_rebalancer.receiveLiquidity(i_remoteChainSelector, AMOUNT, false, abi.encode(payload));
 
     // s_rebalancer should have no tokens.
     assertEq(s_l1Token.balanceOf(address(s_rebalancer)), 0, "rebalancer balance 1");
@@ -442,7 +442,7 @@ contract Rebalancer_rebalanceLiquidity is RebalancerSetup {
       abi.encode(payload),
       bytes("")
     );
-    s_rebalancer.receiveLiquidity(i_remoteChainSelector, AMOUNT, abi.encode(payload));
+    s_rebalancer.receiveLiquidity(i_remoteChainSelector, AMOUNT, false, abi.encode(payload));
 
     // s_rebalancer should have no tokens.
     assertEq(s_l1Token.balanceOf(address(s_rebalancer)), 0, "rebalancer balance 2");
