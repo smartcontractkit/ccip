@@ -186,7 +186,6 @@ func jobSpecToCommitPluginConfig(ctx context.Context, lggr logger.Logger, jb job
 	if err != nil {
 		return nil, nil, nil, errors.Wrap(err, "failed offramp reader")
 	}
-	// Matt TODO it seems factory.NewReportingPlugin -> changeConfig has not been called at this stage yet
 	// Look up all destination offRamps connected to the same router
 	destRouterAddr, err := offRampReader.GetRouter(ctx)
 	if err != nil {

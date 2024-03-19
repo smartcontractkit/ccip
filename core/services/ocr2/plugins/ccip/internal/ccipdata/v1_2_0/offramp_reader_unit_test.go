@@ -3,6 +3,7 @@ package v1_2_0
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
@@ -31,5 +32,5 @@ func TestGetRouter(t *testing.T) {
 
 	gotRouterEvmAddr, err := ccipcalc.GenericAddrToEvm(gotRouterAddr)
 	require.NoError(t, err)
-	require.Equal(t, routerAddr, gotRouterEvmAddr)
+	assert.Equal(t, routerAddr, gotRouterEvmAddr)
 }

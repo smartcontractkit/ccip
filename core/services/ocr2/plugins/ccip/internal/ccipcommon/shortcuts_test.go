@@ -8,7 +8,11 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
 
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
+	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/cciptypes"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
+	ccipdatamocks "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/mocks"
 )
 
 func TestGetMessageIDsAsHexString(t *testing.T) {
@@ -56,6 +60,86 @@ func TestFlattenUniqueSlice(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			res := FlattenUniqueSlice(tc.inputSlices...)
 			assert.Equal(t, tc.expectedOutput, res)
+		})
+	}
+}
+
+func TestGetChainTokens(t *testing.T) {
+	tokens := []cciptypes.Address{
+		cciptypes.Address(utils.RandomAddress().String()),
+		cciptypes.Address(utils.RandomAddress().String()),
+		cciptypes.Address(utils.RandomAddress().String()),
+		cciptypes.Address(utils.RandomAddress().String()),
+		cciptypes.Address(utils.RandomAddress().String()),
+		cciptypes.Address(utils.RandomAddress().String()),
+	}
+
+	testCases := []struct {
+		name                  string
+		feeTokens             []cciptypes.Address
+		destTokens            [][]cciptypes.Address
+		expectedFeeTokens     []cciptypes.Address
+		expectedBridgedTokens []cciptypes.Address
+	}{
+		{
+			name:                  "empty",
+			feeTokens:             []cciptypes.Address{},
+			destTokens:            [][]cciptypes.Address{{}},
+			expectedFeeTokens:     []cciptypes.Address{},
+			expectedBridgedTokens: []cciptypes.Address{},
+		},
+		{
+			name:      "single offRamp",
+			feeTokens: []cciptypes.Address{tokens[0]},
+			destTokens: [][]cciptypes.Address{
+				{tokens[1], tokens[2], tokens[3]},
+			},
+			expectedFeeTokens:     []cciptypes.Address{tokens[0]},
+			expectedBridgedTokens: []cciptypes.Address{tokens[1], tokens[2], tokens[3]},
+		},
+		{
+			name:      "multiple offRamps with distinct tokens",
+			feeTokens: []cciptypes.Address{tokens[0]},
+			destTokens: [][]cciptypes.Address{
+				{tokens[1], tokens[2]},
+				{tokens[3], tokens[4]},
+				{tokens[5]},
+			},
+			expectedFeeTokens:     []cciptypes.Address{tokens[0]},
+			expectedBridgedTokens: []cciptypes.Address{tokens[1], tokens[2], tokens[3], tokens[4], tokens[5]},
+		},
+		{
+			name:      "overlapping tokens",
+			feeTokens: []cciptypes.Address{tokens[0]},
+			destTokens: [][]cciptypes.Address{
+				{tokens[0], tokens[1], tokens[2], tokens[3]},
+				{tokens[0], tokens[2], tokens[3], tokens[4], tokens[5]},
+				{tokens[5]},
+			},
+			expectedFeeTokens:     []cciptypes.Address{tokens[0]},
+			expectedBridgedTokens: []cciptypes.Address{tokens[0], tokens[1], tokens[2], tokens[3], tokens[4], tokens[5]},
+		},
+	}
+
+	ctx := testutils.Context(t)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+
+			priceRegistry := ccipdatamocks.NewPriceRegistryReader(t)
+			priceRegistry.On("GetFeeTokens", ctx).Return(tc.feeTokens, nil).Maybe()
+
+			var offRamps []ccipdata.OffRampReader
+			for _, destTokens := range tc.destTokens {
+				offRamp := ccipdatamocks.NewOffRampReader(t)
+				offRamp.On("GetTokens", ctx).Return(cciptypes.OffRampTokens{DestinationTokens: destTokens}, nil).Once()
+				offRamps = append(offRamps, offRamp)
+			}
+
+			feeTokens, destTokens, err := GetChainTokens(ctx, offRamps, priceRegistry)
+			assert.NoError(t, err)
+
+			assert.ElementsMatch(t, tc.expectedFeeTokens, feeTokens)
+			assert.ElementsMatch(t, tc.expectedBridgedTokens, destTokens)
 		})
 	}
 }

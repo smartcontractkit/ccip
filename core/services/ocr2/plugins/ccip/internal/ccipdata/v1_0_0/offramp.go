@@ -320,8 +320,6 @@ func (o *OffRamp) GetTokens(ctx context.Context) (cciptypes.OffRampTokens, error
 	})
 }
 
-// Matt TODO
-// Add test
 func (o *OffRamp) GetRouter(ctx context.Context) (cciptypes.Address, error) {
 	dynamicConfig, err := o.offRampV100.GetDynamicConfig(&bind.CallOpts{Context: ctx})
 	if err != nil {

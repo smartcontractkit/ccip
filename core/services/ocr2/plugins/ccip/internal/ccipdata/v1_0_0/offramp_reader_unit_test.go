@@ -230,5 +230,5 @@ func TestGetRouter(t *testing.T) {
 
 	gotRouterEvmAddr, err := ccipcalc.GenericAddrToEvm(gotRouterAddr)
 	require.NoError(t, err)
-	require.Equal(t, routerAddr, gotRouterEvmAddr)
+	assert.Equal(t, routerAddr, gotRouterEvmAddr)
 }
