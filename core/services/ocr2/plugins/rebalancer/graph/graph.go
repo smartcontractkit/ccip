@@ -98,7 +98,7 @@ type Data struct {
 	XChainRebalancers map[models.NetworkSelector]XChainRebalancerData
 	ConfigDigest      models.ConfigDigest
 	NetworkSelector   models.NetworkSelector
-	TargetLiquidity   *big.Int
+	MinimumLiquidity  *big.Int
 }
 
 func (d Data) Equals(other Data) bool {
@@ -214,7 +214,7 @@ func (g *gph) SetLiquidity(n models.NetworkSelector, liquidity *big.Int) bool {
 		RebalancerAddress: prev.RebalancerAddress,
 		ConfigDigest:      prev.ConfigDigest,
 		NetworkSelector:   prev.NetworkSelector,
-		TargetLiquidity:   prev.TargetLiquidity,
+		MinimumLiquidity:  prev.MinimumLiquidity,
 	}
 	return true
 }

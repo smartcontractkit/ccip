@@ -254,9 +254,9 @@ func TestTargetBalanceRebalancer_ComputeTransfersToBalance_arb_eth_opt(t *testin
 			g := graph.NewGraph()
 			for net, b := range tc.balances {
 				g.AddNetwork(net, graph.Data{
-					Liquidity:       big.NewInt(b),
-					NetworkSelector: net,
-					TargetLiquidity: big.NewInt(tc.targets[net]),
+					Liquidity:        big.NewInt(b),
+					NetworkSelector:  net,
+					MinimumLiquidity: big.NewInt(tc.targets[net]),
 				})
 			}
 			assert.NoError(t, g.AddConnection(eth, arb))
@@ -264,7 +264,7 @@ func TestTargetBalanceRebalancer_ComputeTransfersToBalance_arb_eth_opt(t *testin
 			assert.NoError(t, g.AddConnection(eth, opt))
 			assert.NoError(t, g.AddConnection(opt, eth))
 
-			r := NewTargetBalanceRebalancer(lggr)
+			r := NewMinLiquidityRebalancer(lggr)
 
 			unexecuted := make([]UnexecutedTransfer, 0, len(tc.pendingTransfers))
 			for _, tr := range tc.pendingTransfers {

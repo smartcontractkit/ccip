@@ -501,19 +501,19 @@ contract Rebalancer_setLocalLiquidityContainer is RebalancerSetup {
   }
 }
 
-contract Rebalancer_setTargetBalance is RebalancerSetup {
-  event TargetBalanceSet(uint256 indexed targetBalance);
+contract Rebalancer_setMinimumLiquidity is RebalancerSetup {
+  event MinimumLiquiditySet(uint256 oldBalance, uint256 newBalance);
 
-  function test_setTargetBalanceSuccess() external {
+  function test_setMinimumLiquiditySuccess() external {
     vm.expectEmit();
-    emit TargetBalanceSet(uint256(1000));
-    s_rebalancer.setTargetBalance(1000);
-    assertEq(s_rebalancer.getTargetBalance(), uint256(1000));
+    emit MinimumLiquiditySet(uint256(0), uint256(1000));
+    s_rebalancer.setMinimumLiquidity(1000);
+    assertEq(s_rebalancer.getMinimumLiquidity(), uint256(1000));
   }
 
   function test_OnlyOwnerReverts() external {
     vm.stopPrank();
     vm.expectRevert("Only callable by owner");
-    s_rebalancer.setTargetBalance(uint256(1000));
+    s_rebalancer.setMinimumLiquidity(uint256(1000));
   }
 }

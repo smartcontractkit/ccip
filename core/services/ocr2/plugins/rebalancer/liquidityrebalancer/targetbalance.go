@@ -13,29 +13,22 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/models"
 )
 
-// TargetBalanceRebalancer tries to reach balance using a target balance that is configured on each network.
-type TargetBalanceRebalancer struct {
+// MinLiquidityRebalancer tries to reach balance using a target minimum liquidity that is configured on each network.
+type MinLiquidityRebalancer struct {
 	lggr logger.Logger
 }
 
-func NewTargetBalanceRebalancer(lggr logger.Logger) *TargetBalanceRebalancer {
-	return &TargetBalanceRebalancer{
+func NewMinLiquidityRebalancer(lggr logger.Logger) *MinLiquidityRebalancer {
+	return &MinLiquidityRebalancer{
 		lggr: lggr,
 	}
 }
 
-func (r *TargetBalanceRebalancer) ComputeTransfersToBalance(
+func (r *MinLiquidityRebalancer) ComputeTransfersToBalance(
 	graphNow graph.Graph,
 	nonExecutedTransfers []UnexecutedTransfer,
 ) ([]models.ProposedTransfer, error) {
-	r.lggr.Debugf("filtering out executed transfers")
-	filtered := make([]UnexecutedTransfer, 0, len(nonExecutedTransfers))
-	for _, tr := range nonExecutedTransfers {
-		if tr.TransferStatus() != models.TransferStatusExecuted {
-			filtered = append(filtered, tr)
-		}
-	}
-	nonExecutedTransfers = filtered
+	nonExecutedTransfers = r.filterUnexecutedTransfers(nonExecutedTransfers)
 
 	r.lggr.Debugf("computing the expected graph after non executed transfers get applied")
 	graphLater, err := r.getExpectedGraph(graphNow, nonExecutedTransfers)
@@ -44,7 +37,7 @@ func (r *TargetBalanceRebalancer) ComputeTransfersToBalance(
 	}
 
 	r.lggr.Debugf("finding networks that require funding")
-	networksRequiringFunding, reqFundingNow, reqFundingLater, err := r.findNetworksRequiringFunding(graphNow, graphLater)
+	networksRequiringFunding, liqDiffsNow, liqDiffsLater, err := r.findNetworksRequiringFunding(graphNow, graphLater)
 	if err != nil {
 		return nil, fmt.Errorf("find networks that require funding: %w", err)
 	}
@@ -52,32 +45,32 @@ func (r *TargetBalanceRebalancer) ComputeTransfersToBalance(
 	r.lggr.Debugf("computing transfers to reach balance using a direct transfer from one network to another")
 	proposedTransfers := make([]models.ProposedTransfer, 0)
 	for _, net := range networksRequiringFunding {
-		potentialDonations, err2 := r.find1hopPotentialDonations(graphLater, net, reqFundingNow, reqFundingLater)
+		potentialTransfers, err2 := r.oneHopTransfers(graphLater, net, liqDiffsNow, liqDiffsLater)
 		if err2 != nil {
-			return nil, fmt.Errorf("find 1 hop donations for network %d: %w", net, err2)
+			return nil, fmt.Errorf("find 1 hop transfers for network %d: %w", net, err2)
 		}
-		netProposedTransfers, err2 := r.acceptDonations(graphLater, potentialDonations, reqFundingLater[net])
+		netProposedTransfers, err2 := r.acceptTransfers(graphLater, potentialTransfers, liqDiffsLater[net])
 		if err2 != nil {
-			return nil, fmt.Errorf("accepting donations: %w", err2)
+			return nil, fmt.Errorf("accepting transfers: %w", err2)
 		}
 		proposedTransfers = append(proposedTransfers, netProposedTransfers...)
 	}
 
 	r.lggr.Debugf("finding networks that still require funding")
-	networksRequiringFunding, reqFundingNow, reqFundingLater, err = r.findNetworksRequiringFunding(graphNow, graphLater)
+	networksRequiringFunding, liqDiffsNow, liqDiffsLater, err = r.findNetworksRequiringFunding(graphNow, graphLater)
 	if err != nil {
 		return nil, fmt.Errorf("find networks that require funding: %w", err)
 	}
 
 	r.lggr.Debugf("computing transfers to reach balance with an initial transfer to an intermediate network")
 	for _, net := range networksRequiringFunding {
-		donations, err2 := r.find2hopPotentialDonations(graphLater, net, reqFundingNow, reqFundingLater)
+		transfers, err2 := r.twoHopTransfers(graphLater, net, liqDiffsNow, liqDiffsLater)
 		if err2 != nil {
-			return nil, fmt.Errorf("find 2 hops donations for network %d: %w", net, err2)
+			return nil, fmt.Errorf("find 2 hops transfers for network %d: %w", net, err2)
 		}
-		netProposedTransfers, err2 := r.acceptDonations(graphLater, donations, reqFundingLater[net])
+		netProposedTransfers, err2 := r.acceptTransfers(graphLater, transfers, liqDiffsLater[net])
 		if err2 != nil {
-			return nil, fmt.Errorf("accepting 2hop donations: %w", err2)
+			return nil, fmt.Errorf("accepting 2hop transfers: %w", err2)
 		}
 		proposedTransfers = append(proposedTransfers, netProposedTransfers...)
 	}
@@ -95,40 +88,55 @@ func (r *TargetBalanceRebalancer) ComputeTransfersToBalance(
 	return proposedTransfers, nil
 }
 
-func (r *TargetBalanceRebalancer) findNetworksRequiringFunding(graphNow, graphLater graph.Graph) (
+func (r *MinLiquidityRebalancer) findNetworksRequiringFunding(graphNow, graphLater graph.Graph) (
 	nets []models.NetworkSelector,
-	reqFundingNow, reqFundingLater map[models.NetworkSelector]*big.Int,
+	liqDiffsNow, liqDiffsLater map[models.NetworkSelector]*big.Int,
 	err error,
 ) {
-	reqFundingNow, reqFundingLater, err = r.getRequiredTokensFunding(graphNow, graphLater)
+	liqDiffsNow, liqDiffsLater, err = r.getTargetLiquidityDifferences(graphNow, graphLater)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("compute tokens funding requirements: %w", err)
 	}
 
-	res := make([]models.NetworkSelector, 0, len(reqFundingNow))
-	for net := range reqFundingNow {
-		fundingNow := reqFundingNow[net]
-		fundingLater := reqFundingLater[net]
+	res := make([]models.NetworkSelector, 0, len(liqDiffsNow))
+	for net := range liqDiffsNow {
+		diffNow := liqDiffsNow[net]
+		diffLater := liqDiffsLater[net]
 
-		if fundingNow.Cmp(big.NewInt(0)) <= 0 || fundingLater.Cmp(big.NewInt(0)) <= 0 {
-			r.lggr.Debugf("net %d does not require funding, donatable tokens: %d (*%d)", net, big.NewInt(0).Abs(fundingNow), big.NewInt(0).Abs(fundingLater))
+		if diffNow.Cmp(big.NewInt(0)) <= 0 || diffLater.Cmp(big.NewInt(0)) <= 0 {
+			r.lggr.Debugf("net %d does not require funding, transferrable tokens: %d (*%d)", net, big.NewInt(0).Abs(diffNow), big.NewInt(0).Abs(diffLater))
 			continue
 		}
 
-		r.lggr.Debugf("net %d requires funding, %d tokens to reach target", net, fundingLater)
+		r.lggr.Debugf("net %d requires funding, %s tokens to reach target", net, diffLater)
 		res = append(res, net)
 	}
 
-	return res, reqFundingNow, reqFundingLater, nil
+	return res, liqDiffsNow, liqDiffsLater, nil
 }
 
-// getRequiredTokensFunding computes for each network the required funding.
-// Negative funding means that this network can keep donating tokens until reaching zero.
-func (r *TargetBalanceRebalancer) getRequiredTokensFunding(
+func (r *MinLiquidityRebalancer) filterUnexecutedTransfers(nonExecutedTransfers []UnexecutedTransfer) []UnexecutedTransfer {
+	r.lggr.Debugf("filtering out executed transfers")
+	filtered := make([]UnexecutedTransfer, 0, len(nonExecutedTransfers))
+	for _, tr := range nonExecutedTransfers {
+		if tr.TransferStatus() != models.TransferStatusExecuted {
+			filtered = append(filtered, tr)
+		}
+	}
+	return filtered
+}
+
+// getTargetLiquidityDifferences computes for each network the difference between
+// the target liquidity of the network and the actual liquidity.
+// It does this on both the current liquidity graph (graphNow) and the liquidity graph
+// after all pending transfers have been successfully executed (graphLater).
+// A negative number indicates that there is a liquidity shortage for the network,
+// while a positive number indicates a liquidity surplus for the network.
+func (r *MinLiquidityRebalancer) getTargetLiquidityDifferences(
 	graphNow, graphLater graph.Graph,
-) (reqFundingNow, reqFundingLater map[models.NetworkSelector]*big.Int, err error) {
-	reqFundingNow = make(map[models.NetworkSelector]*big.Int)
-	reqFundingLater = make(map[models.NetworkSelector]*big.Int)
+) (liqDiffsNow, liqDiffsLater map[models.NetworkSelector]*big.Int, err error) {
+	liqDiffsNow = make(map[models.NetworkSelector]*big.Int)
+	liqDiffsLater = make(map[models.NetworkSelector]*big.Int)
 
 	for _, net := range graphNow.GetNetworks() {
 		dataNow, err := graphNow.GetData(net)
@@ -141,90 +149,89 @@ func (r *TargetBalanceRebalancer) getRequiredTokensFunding(
 			return nil, nil, fmt.Errorf("get data later of net %d: %w", net, err)
 		}
 
-		if dataNow.TargetLiquidity.Cmp(big.NewInt(0)) == 0 {
+		if dataNow.MinimumLiquidity.Cmp(big.NewInt(0)) == 0 {
 			// automated rebalancing is disabled if target is set to 0
-			reqFundingNow[net] = big.NewInt(0)
-			reqFundingLater[net] = big.NewInt(0)
+			liqDiffsNow[net] = big.NewInt(0)
+			liqDiffsLater[net] = big.NewInt(0)
 			continue
 		}
 
-		reqFundingNow[net] = big.NewInt(0).Sub(dataNow.TargetLiquidity, dataNow.Liquidity)
-		reqFundingLater[net] = big.NewInt(0).Sub(dataLater.TargetLiquidity, dataLater.Liquidity)
+		liqDiffsNow[net] = big.NewInt(0).Sub(dataNow.MinimumLiquidity, dataNow.Liquidity)
+		liqDiffsLater[net] = big.NewInt(0).Sub(dataLater.MinimumLiquidity, dataLater.Liquidity)
 	}
 
-	return reqFundingNow, reqFundingLater, nil
+	return liqDiffsNow, liqDiffsLater, nil
 }
 
-func (r *TargetBalanceRebalancer) find1hopPotentialDonations(
+func (r *MinLiquidityRebalancer) oneHopTransfers(
 	graphLater graph.Graph, // the networks graph state after all transfers are applied
-	donateTo models.NetworkSelector, // target network
-	reqFundingNow map[models.NetworkSelector]*big.Int, // the token funding requirements for each network
-	reqFundingLater map[models.NetworkSelector]*big.Int, // the token funding requirements after all pending txs are applied
-) ([]donation, error) {
+	targetNetwork models.NetworkSelector,
+	liqDiffsNow map[models.NetworkSelector]*big.Int, // the token funding requirements for each network
+	liqDiffsLater map[models.NetworkSelector]*big.Int, // the token funding requirements after all pending txs are applied
+) ([]models.ProposedTransfer, error) {
 	allEdges, err := graphLater.GetEdges()
 	if err != nil {
 		return nil, fmt.Errorf("get edges: %w", err)
 	}
 
-	potentialDonations := make([]donation, 0)
-	seenDonors := mapset.NewSet[models.NetworkSelector]()
+	potentialTransfers := make([]models.ProposedTransfer, 0)
+	seenNetworks := mapset.NewSet[models.NetworkSelector]()
 
 	for _, edge := range allEdges {
-		if edge.Dest != donateTo {
+		if edge.Dest != targetNetwork {
 			// we only care about the target network
 			continue
 		}
 
-		if seenDonors.Contains(edge.Source) {
-			// cannot have the same donor twice
+		if seenNetworks.Contains(edge.Source) {
+			// cannot have the same sender twice
 			continue
 		}
 
-		fundingNow, exists := reqFundingNow[edge.Source]
+		diffNow, exists := liqDiffsNow[edge.Source]
 		if !exists {
 			return nil, fmt.Errorf("net %d does not exist in the tokens to target offset", edge.Source)
 		}
-		funding := fundingNow
+		diff := diffNow
 
-		fundingLater, exists := reqFundingLater[edge.Source]
+		diffLater, exists := liqDiffsLater[edge.Source]
 		if !exists {
 			return nil, fmt.Errorf("net %d does not exist in the tokens to target offset", edge.Source)
 		}
 
-		// If the balance is expected to become lower, we consider the lower balance to prevent a race condition in the donations.
-		// If the balance is expected to become higher, we do not consider it since the funds are not available yet.
-		if fundingNow.Cmp(fundingLater) < 0 {
-			funding = fundingLater
+		// If the balance is expected to become lower, we consider the lower balance to prevent a race condition in the transfers.
+		if diffNow.Cmp(diffLater) < 0 {
+			diff = diffLater
 		}
 
-		donationAmount := big.NewInt(0).Sub(big.NewInt(0), funding)
-		if donationAmount.Cmp(big.NewInt(0)) <= 0 {
+		transferAmount := big.NewInt(0).Sub(big.NewInt(0), diff)
+		if transferAmount.Cmp(big.NewInt(0)) <= 0 {
 			continue
 		}
 
-		potentialDonations = append(potentialDonations, newDonation(edge.Source, donateTo, donationAmount))
-		seenDonors.Add(edge.Source)
+		potentialTransfers = append(potentialTransfers, newTransfer(edge.Source, targetNetwork, transferAmount))
+		seenNetworks.Add(edge.Source)
 	}
 
-	return potentialDonations, nil
+	return potentialTransfers, nil
 }
 
-// request2HopDonations finds networks that can increase liquidity of the target network with an intermediate network.
-func (r *TargetBalanceRebalancer) find2hopPotentialDonations(
+// twoHopTransfers finds networks that can increase liquidity of the target network with an intermediate network.
+func (r *MinLiquidityRebalancer) twoHopTransfers(
 	graphLater graph.Graph, // the networks graph state after all transfers are applied
-	donateTo models.NetworkSelector, // target network
+	targetNetwork models.NetworkSelector,
 	reqFundingNow map[models.NetworkSelector]*big.Int, // the token funding requirements for each network
 	reqFundingLater map[models.NetworkSelector]*big.Int, // the token funding requirements after all pending txs are applied
-) ([]donation, error) {
-	potentialDonations := make([]donation, 0)
-	seenDonors := mapset.NewSet[models.NetworkSelector]()
+) ([]models.ProposedTransfer, error) {
+	potentialTransfers := make([]models.ProposedTransfer, 0)
+	seenNetworks := mapset.NewSet[models.NetworkSelector]()
 
 	for _, net := range graphLater.GetNetworks() {
-		if net == donateTo {
+		if net == targetNetwork {
 			continue
 		}
-		if seenDonors.Contains(net) {
-			// cannot have the same donor twice
+		if seenNetworks.Contains(net) {
+			// cannot have the same sender twice
 			continue
 		}
 
@@ -233,8 +240,8 @@ func (r *TargetBalanceRebalancer) find2hopPotentialDonations(
 			return nil, fmt.Errorf("get neighbors of %d failed", net)
 		}
 		neibsSet := mapset.NewSet[models.NetworkSelector](neibs...)
-		if neibsSet.Contains(donateTo) {
-			// since the target network is a direct network we can donate using 1hop
+		if neibsSet.Contains(targetNetwork) {
+			// since the target network is a direct network we can transfer using 1hop
 			continue
 		}
 
@@ -244,7 +251,7 @@ func (r *TargetBalanceRebalancer) find2hopPotentialDonations(
 				return nil, fmt.Errorf("get intermediate neighbors of %d failed", net)
 			}
 			finalNeibsSet := mapset.NewSet[models.NetworkSelector](intermNeibs...)
-			if finalNeibsSet.Contains(donateTo) {
+			if finalNeibsSet.Contains(targetNetwork) {
 				fundingNow, exists := reqFundingNow[net]
 				if !exists {
 					return nil, fmt.Errorf("net %d does not exist in the tokens to target offset", net)
@@ -256,89 +263,88 @@ func (r *TargetBalanceRebalancer) find2hopPotentialDonations(
 					return nil, fmt.Errorf("net %d does not exist in the tokens to target offset", net)
 				}
 
-				// If the balance is expected to become lower, we consider the lower balance to prevent a race condition in the donations.
-				// If the balance is expected to become higher, we do not consider it since the funds are not available yet.
+				// If the balance is expected to decrease, consider the lower balance to prevent a race condition in the transfers.
 				if fundingNow.Cmp(fundingLater) < 0 {
 					funding = fundingLater
 				}
 
-				donationAmount := big.NewInt(0).Sub(big.NewInt(0), funding)
-				if donationAmount.Cmp(big.NewInt(0)) <= 0 {
+				transferAmount := big.NewInt(0).Sub(big.NewInt(0), funding)
+				if transferAmount.Cmp(big.NewInt(0)) <= 0 {
 					continue
 				}
 
-				seenDonors.Add(net)
-				potentialDonations = append(potentialDonations, newDonation(net, neib, donationAmount))
+				seenNetworks.Add(net)
+				potentialTransfers = append(potentialTransfers, newTransfer(net, neib, transferAmount))
 			}
 		}
 	}
 
-	return potentialDonations, nil
+	return potentialTransfers, nil
 }
 
-// apply changes to the intermediate state to prevent invalid donations
-func (r *TargetBalanceRebalancer) acceptDonations(graphLater graph.Graph, potentialDonations []donation, requiredAmount *big.Int) ([]models.ProposedTransfer, error) {
-	// sort by amount,donor,receiver
-	sort.Slice(potentialDonations, func(i, j int) bool {
-		if potentialDonations[i].amount.Cmp(potentialDonations[j].amount) == 0 {
-			if potentialDonations[i].donor == potentialDonations[j].donor {
-				return potentialDonations[i].receiver < potentialDonations[j].receiver
+// apply changes to the intermediate state to prevent invalid transfers
+func (r *MinLiquidityRebalancer) acceptTransfers(graphLater graph.Graph, potentialTransfers []models.ProposedTransfer, requiredAmount *big.Int) ([]models.ProposedTransfer, error) {
+	// sort by amount,sender,receiver
+	sort.Slice(potentialTransfers, func(i, j int) bool {
+		if potentialTransfers[i].Amount.Cmp(potentialTransfers[j].Amount) == 0 {
+			if potentialTransfers[i].From == potentialTransfers[j].From {
+				return potentialTransfers[i].To < potentialTransfers[j].To
 			}
-			return potentialDonations[i].donor < potentialDonations[j].donor
+			return potentialTransfers[i].From < potentialTransfers[j].From
 		}
-		return potentialDonations[i].amount.Cmp(potentialDonations[j].amount) > 0
+		return potentialTransfers[i].Amount.Cmp(potentialTransfers[j].Amount) > 0
 	})
 
 	fundsRaised := big.NewInt(0)
-	proposedTransfers := make([]models.ProposedTransfer, 0, len(potentialDonations))
+	proposedTransfers := make([]models.ProposedTransfer, 0, len(potentialTransfers))
 	skip := false
-	for _, d := range potentialDonations {
+	for _, d := range potentialTransfers {
 		if skip {
-			r.lggr.Debugf("skipping donation: %s", d)
+			r.lggr.Debugf("skipping transfer: %s", d)
 			continue
 		}
 
-		donorData, err := graphLater.GetData(d.donor)
+		senderData, err := graphLater.GetData(d.From)
 		if err != nil {
-			return nil, fmt.Errorf("get liquidity of donor %d: %w", d.donor, err)
+			return nil, fmt.Errorf("get liquidity of sender %d: %w", d.From, err)
 		}
-		availableDonation := big.NewInt(0).Sub(donorData.Liquidity, donorData.TargetLiquidity)
-		if availableDonation.Cmp(big.NewInt(0)) <= 0 {
-			r.lggr.Debugf("no more tokens to donate, skipping donation: %s", d)
+		availableAmount := big.NewInt(0).Sub(senderData.Liquidity, senderData.MinimumLiquidity)
+		if availableAmount.Cmp(big.NewInt(0)) <= 0 {
+			r.lggr.Debugf("no more tokens to transfer, skipping transfer: %s", d)
 			continue
 		}
 
-		if availableDonation.Cmp(d.amount) < 0 {
-			d.amount = availableDonation
-			r.lggr.Debugf("reducing donation amount since donor's balance has dropped: %s", d)
+		if availableAmount.Cmp(d.Amount.ToInt()) < 0 {
+			d.Amount = ubig.New(availableAmount)
+			r.lggr.Debugf("reducing transfer amount since sender balance has dropped: %s", d)
 		}
 
 		// increment the raised funds
-		fundsRaised = big.NewInt(0).Add(fundsRaised, d.amount)
+		fundsRaised = big.NewInt(0).Add(fundsRaised, d.Amount.ToInt())
 
-		// in case we raised more than target amount give refund to the donor
+		// in case we raised more than target amount give refund to the sender
 		if refund := big.NewInt(0).Sub(fundsRaised, requiredAmount); refund.Cmp(big.NewInt(0)) > 0 {
-			d.amount = big.NewInt(0).Sub(d.amount, refund)
+			d.Amount = ubig.New(big.NewInt(0).Sub(d.Amount.ToInt(), refund))
 			fundsRaised = big.NewInt(0).Sub(fundsRaised, refund)
 		}
-		r.lggr.Debugf("accepting donation: %s", d)
-		proposedTransfers = append(proposedTransfers, models.ProposedTransfer{From: d.donor, To: d.receiver, Amount: ubig.New(d.amount)})
+		r.lggr.Debugf("accepting transfer: %s", d)
+		proposedTransfers = append(proposedTransfers, models.ProposedTransfer{From: d.From, To: d.To, Amount: d.Amount})
 
-		r.lggr.Debugf("applying donation to future graph state")
-		liqBefore, err := graphLater.GetLiquidity(d.receiver)
+		r.lggr.Debugf("applying transfer to future graph state")
+		liqBefore, err := graphLater.GetLiquidity(d.To)
 		if err != nil {
-			return nil, fmt.Errorf("get liquidity of donation receiver %d: %w", d.receiver, err)
+			return nil, fmt.Errorf("get liquidity of transfer receiver %d: %w", d.To, err)
 		}
-		graphLater.SetLiquidity(d.receiver, big.NewInt(0).Add(liqBefore, d.amount))
+		graphLater.SetLiquidity(d.To, big.NewInt(0).Add(liqBefore, d.Amount.ToInt()))
 
-		liqBefore, err = graphLater.GetLiquidity(d.donor)
+		liqBefore, err = graphLater.GetLiquidity(d.From)
 		if err != nil {
-			return nil, fmt.Errorf("get liquidity of donor %d: %w", d.donor, err)
+			return nil, fmt.Errorf("get liquidity of sender %d: %w", d.From, err)
 		}
-		graphLater.SetLiquidity(d.donor, big.NewInt(0).Sub(liqBefore, d.amount))
+		graphLater.SetLiquidity(d.From, big.NewInt(0).Sub(liqBefore, d.Amount.ToInt()))
 
 		if fundsRaised.Cmp(requiredAmount) >= 0 {
-			r.lggr.Debugf("all funds raised skipping further donations")
+			r.lggr.Debugf("all funds raised skipping further transfers")
 			skip = true
 		}
 	}
@@ -347,7 +353,7 @@ func (r *TargetBalanceRebalancer) acceptDonations(graphLater graph.Graph, potent
 }
 
 // getExpectedGraph returns the a copy of the graph instance with all the non executed transfers applied.
-func (r *TargetBalanceRebalancer) getExpectedGraph(
+func (r *MinLiquidityRebalancer) getExpectedGraph(
 	g graph.Graph,
 	nonExecutedTransfers []UnexecutedTransfer,
 ) (graph.Graph, error) {
@@ -396,7 +402,7 @@ func (r *TargetBalanceRebalancer) getExpectedGraph(
 }
 
 // mergeProposedTransfers merges multiple transfers with same sender and recipient into a single transfer.
-func (r *TargetBalanceRebalancer) mergeProposedTransfers(transfers []models.ProposedTransfer) []models.ProposedTransfer {
+func (r *MinLiquidityRebalancer) mergeProposedTransfers(transfers []models.ProposedTransfer) []models.ProposedTransfer {
 	sums := make(map[[2]models.NetworkSelector]*big.Int)
 	for _, tr := range transfers {
 		k := [2]models.NetworkSelector{tr.From, tr.To}
@@ -414,20 +420,10 @@ func (r *TargetBalanceRebalancer) mergeProposedTransfers(transfers []models.Prop
 	return merged
 }
 
-type donation struct {
-	donor    models.NetworkSelector
-	receiver models.NetworkSelector
-	amount   *big.Int
-}
-
-func newDonation(donor, receiver models.NetworkSelector, amount *big.Int) donation {
-	return donation{
-		donor:    donor,
-		receiver: receiver,
-		amount:   amount,
+func newTransfer(from, to models.NetworkSelector, amount *big.Int) models.ProposedTransfer {
+	return models.ProposedTransfer{
+		From:   from,
+		To:     to,
+		Amount: ubig.New(amount),
 	}
-}
-
-func (d donation) String() string {
-	return fmt.Sprintf("%d donates %s tokens to %d", d.donor, d.amount.String(), d.receiver)
 }

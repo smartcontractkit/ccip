@@ -68,7 +68,7 @@ func (e *evmDiscoverer) Discover(ctx context.Context) (graph.Graph, error) {
 			return graph.Data{}, nil, fmt.Errorf("latest config digest and epoch: %w", err)
 		}
 
-		targetBalance, err := rebal.GetTargetBalance(&bind.CallOpts{Context: ctx})
+		minimumLiquidity, err := rebal.GetMinimumLiquidity(&bind.CallOpts{Context: ctx})
 		if err != nil {
 			return graph.Data{}, nil, fmt.Errorf("get target balance: %w", err)
 		}
@@ -80,7 +80,7 @@ func (e *evmDiscoverer) Discover(ctx context.Context) (graph.Graph, error) {
 			XChainRebalancers: xchainRebalancerData,
 			ConfigDigest:      models.ConfigDigest{ConfigDigest: configDigestAndEpoch.ConfigDigest},
 			NetworkSelector:   selector,
-			TargetLiquidity:   targetBalance,
+			MinimumLiquidity:  minimumLiquidity,
 		}, neighbors, nil
 	}
 
