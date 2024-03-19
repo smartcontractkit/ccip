@@ -141,7 +141,7 @@ func (c *CCIPE2ELoad) CCIPMsg() (router.ClientEVM2AnyMessage, *testreporters.Req
 	// form the message for transfer
 	msgStr := fmt.Sprintf("new message with Id %d", msgSerialNo)
 	if c.SendMaxDataIntermittentlyInMsgCount > 0 {
-		// every 100th message will have extra data with almost MaxDataBytes
+		// every SendMaxDataIntermittentlyInMsgCount message will have extra data with almost MaxDataBytes
 		if msgSerialNo%c.SendMaxDataIntermittentlyInMsgCount == 0 {
 			length := c.MaxDataBytes - 1
 			b := make([]byte, c.MaxDataBytes-1)

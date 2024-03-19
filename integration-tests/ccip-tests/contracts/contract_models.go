@@ -656,7 +656,7 @@ func (r *Router) CCIPSend(destChainSelector uint64, msg router.ClientEVM2AnyMess
 		opts.Value = valueForNative
 	}
 
-	log.Info().
+	log.Debug().
 		Str(Network, r.client.GetNetworkName()).
 		Str("Router", r.Address()).
 		Interface("TokensAndAmounts", msg.TokenAmounts).
@@ -914,7 +914,7 @@ func (a *MockAggregator) UpdateRoundData(answer *big.Int) error {
 		Msg("Updating Round Data")
 	round, err := a.Instance.LatestRound(nil)
 	if err != nil {
-		rand.Seed(1000000)
+		rand.Seed(uint64(time.Now().UnixNano()))
 		round = big.NewInt(int64(rand.Uint64()))
 	}
 	round = new(big.Int).Add(round, big.NewInt(1))
