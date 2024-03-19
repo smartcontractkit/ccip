@@ -90,6 +90,10 @@ type CCIPTOMLEnv struct {
 }
 
 var (
+	NetworkName = func(name string) string {
+		return strings.ReplaceAll(strings.ToLower(name), " ", "-")
+	}
+
 	GethLabel = func(name string) string {
 		return fmt.Sprintf("%s-ethereum-geth", name)
 	}
