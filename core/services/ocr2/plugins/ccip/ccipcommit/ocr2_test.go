@@ -6,6 +6,7 @@ import (
 	"math/big"
 	"math/rand"
 	"reflect"
+	"slices"
 	"sort"
 	"testing"
 	"time"
@@ -50,7 +51,28 @@ import (
 
 func TestCommitReportingPlugin_Observation(t *testing.T) {
 	sourceNativeTokenAddr := ccipcalc.HexToAddress("1000")
-	someTokenAddr := ccipcalc.HexToAddress("2000")
+
+	bridgedTokens := []cciptypes.Address{
+		ccipcalc.HexToAddress("2000"),
+		ccipcalc.HexToAddress("3000"),
+	}
+
+	// Token price in 1e18 USD precision
+	bridgedTokenPrices := map[cciptypes.Address]*big.Int{
+		bridgedTokens[0]: big.NewInt(1),
+		bridgedTokens[1]: big.NewInt(2e18),
+	}
+
+	bridgedTokenDecimals := map[cciptypes.Address]uint8{
+		bridgedTokens[0]: 8,
+		bridgedTokens[1]: 18,
+	}
+
+	// Token price of 1e18 token amount in 1e18 USD precision
+	expectedEncodedTokenPrice := map[cciptypes.Address]*big.Int{
+		bridgedTokens[0]: big.NewInt(1e10),
+		bridgedTokens[1]: big.NewInt(2e18),
+	}
 
 	testCases := []struct {
 		name                   string
@@ -63,6 +85,7 @@ func TestCommitReportingPlugin_Observation(t *testing.T) {
 		tokenDecimals          map[cciptypes.Address]uint8
 		fee                    *big.Int
 		priceReportingDisabled bool
+		multiOffRamps          bool
 
 		expErr bool
 		expObs ccip.CommitObservation
@@ -71,21 +94,42 @@ func TestCommitReportingPlugin_Observation(t *testing.T) {
 			name:              "base report",
 			commitStoreSeqNum: 54,
 			tokenPrices: map[cciptypes.Address]*big.Int{
-				someTokenAddr:         big.NewInt(2),
+				bridgedTokens[0]:      bridgedTokenPrices[bridgedTokens[0]],
+				bridgedTokens[1]:      bridgedTokenPrices[bridgedTokens[1]],
 				sourceNativeTokenAddr: big.NewInt(2e18),
 			},
 			sendReqs: []cciptypes.EVM2EVMMessageWithTxMeta{
 				{EVM2EVMMessage: cciptypes.EVM2EVMMessage{SequenceNumber: 54}},
 				{EVM2EVMMessage: cciptypes.EVM2EVMMessage{SequenceNumber: 55}},
 			},
-			fee: big.NewInt(2e18),
-			tokenDecimals: map[cciptypes.Address]uint8{
-				someTokenAddr: 8,
-			},
+			fee:           big.NewInt(2e18),
+			tokenDecimals: bridgedTokenDecimals,
 			expObs: ccip.CommitObservation{
-				TokenPricesUSD: map[cciptypes.Address]*big.Int{
-					someTokenAddr: big.NewInt(20000000000),
+				TokenPricesUSD:    expectedEncodedTokenPrice,
+				SourceGasPriceUSD: big.NewInt(4e18),
+				Interval: cciptypes.CommitStoreInterval{
+					Min: 54,
+					Max: 55,
 				},
+			},
+		},
+		{
+			name:              "multiple offRamps report",
+			commitStoreSeqNum: 54,
+			tokenPrices: map[cciptypes.Address]*big.Int{
+				bridgedTokens[0]:      bridgedTokenPrices[bridgedTokens[0]],
+				bridgedTokens[1]:      bridgedTokenPrices[bridgedTokens[1]],
+				sourceNativeTokenAddr: big.NewInt(2e18),
+			},
+			sendReqs: []cciptypes.EVM2EVMMessageWithTxMeta{
+				{EVM2EVMMessage: cciptypes.EVM2EVMMessage{SequenceNumber: 54}},
+				{EVM2EVMMessage: cciptypes.EVM2EVMMessage{SequenceNumber: 55}},
+			},
+			fee:           big.NewInt(2e18),
+			tokenDecimals: bridgedTokenDecimals,
+			multiOffRamps: true,
+			expObs: ccip.CommitObservation{
+				TokenPricesUSD:    expectedEncodedTokenPrice,
 				SourceGasPriceUSD: big.NewInt(4e18),
 				Interval: cciptypes.CommitStoreInterval{
 					Min: 54,
@@ -97,17 +141,16 @@ func TestCommitReportingPlugin_Observation(t *testing.T) {
 			name:              "price reporting disabled",
 			commitStoreSeqNum: 54,
 			tokenPrices: map[cciptypes.Address]*big.Int{
-				someTokenAddr:         big.NewInt(2),
+				bridgedTokens[0]:      bridgedTokenPrices[bridgedTokens[0]],
+				bridgedTokens[1]:      bridgedTokenPrices[bridgedTokens[1]],
 				sourceNativeTokenAddr: big.NewInt(2e18),
 			},
 			sendReqs: []cciptypes.EVM2EVMMessageWithTxMeta{
 				{EVM2EVMMessage: cciptypes.EVM2EVMMessage{SequenceNumber: 54}},
 				{EVM2EVMMessage: cciptypes.EVM2EVMMessage{SequenceNumber: 55}},
 			},
-			fee: big.NewInt(2e18),
-			tokenDecimals: map[cciptypes.Address]uint8{
-				someTokenAddr: 8,
-			},
+			fee:                    big.NewInt(2e18),
+			tokenDecimals:          bridgedTokenDecimals,
 			priceReportingDisabled: true,
 			expObs: ccip.CommitObservation{
 				TokenPricesUSD:    nil,
@@ -174,22 +217,43 @@ func TestCommitReportingPlugin_Observation(t *testing.T) {
 				destDecimals = append(destDecimals, d)
 			}
 
-			offRampReader := ccipdatamocks.NewOffRampReader(t)
-			offRampReader.On("GetTokens", ctx).Return(cciptypes.OffRampTokens{
+			offRampReaderMocks := []*ccipdatamocks.OffRampReader{ccipdatamocks.NewOffRampReader(t)}
+			offRampReaderMocks[0].On("GetTokens", ctx).Return(cciptypes.OffRampTokens{
 				DestinationTokens: destTokens,
 			}, nil).Maybe()
 
 			destPriceRegReader := ccipdatamocks.NewPriceRegistryReader(t)
 			destPriceRegReader.On("GetFeeTokens", ctx).Return(nil, nil).Maybe()
-			destPriceRegReader.On("GetTokensDecimals", ctx, destTokens).Return(destDecimals, nil).Maybe()
+			destPriceRegReader.On("GetTokensDecimals", ctx, mock.MatchedBy(func(tokens []cciptypes.Address) bool {
+				for _, token := range tokens {
+					if !slices.Contains(destTokens, token) {
+						return false
+					}
+				}
+				return true
+			})).Return(destDecimals, nil).Maybe()
+
+			if tc.multiOffRamps {
+				offRampReaderMocks = append(offRampReaderMocks, ccipdatamocks.NewOffRampReader(t))
+				offRampReaderMocks = append(offRampReaderMocks, ccipdatamocks.NewOffRampReader(t))
+				offRampReaderMocks[1].On("GetTokens", ctx).Return(cciptypes.OffRampTokens{
+					DestinationTokens: destTokens[0:1],
+				}, nil).Once()
+				offRampReaderMocks[2].On("GetTokens", ctx).Return(cciptypes.OffRampTokens{
+					DestinationTokens: destTokens[1:2],
+				}, nil).Once()
+			}
+			var offRampReaders []ccipdata.OffRampReader
+			for _, offRamp := range offRampReaderMocks {
+				offRampReaders = append(offRampReaders, offRamp)
+			}
 
 			p := &CommitReportingPlugin{}
 			p.lggr = logger.TestLogger(t)
 			p.inflightReports = newInflightCommitReportsContainer(time.Hour)
 			p.commitStoreReader = commitStoreReader
 			p.onRampReader = onRampReader
-			// Matt TODO test with multiple offramps
-			p.offRampReaders = []ccipdata.OffRampReader{offRampReader}
+			p.offRampReaders = offRampReaders
 			p.destPriceRegistryReader = destPriceRegReader
 			p.priceGetter = priceGet
 			p.sourceNative = sourceNativeTokenAddr

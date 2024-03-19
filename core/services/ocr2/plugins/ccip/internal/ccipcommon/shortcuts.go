@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+	"sort"
 	"sync"
 
 	"golang.org/x/sync/errgroup"
@@ -72,6 +73,11 @@ func GetChainTokens(ctx context.Context, offRamps []ccipdata.OffRampReader, pric
 			uniqueBridgeableTokens = append(uniqueBridgeableTokens, token)
 		}
 	}
+
+	// sort the tokens in deterministic order to aid with testing and debugging
+	sort.Slice(uniqueBridgeableTokens, func(i, j int) bool {
+		return string(uniqueBridgeableTokens[i]) < string(uniqueBridgeableTokens[j])
+	})
 
 	return destFeeTokens, uniqueBridgeableTokens, nil
 }

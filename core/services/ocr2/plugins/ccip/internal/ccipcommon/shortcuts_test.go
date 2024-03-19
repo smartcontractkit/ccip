@@ -11,6 +11,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/cciptypes"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	ccipdatamocks "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/mocks"
 )
@@ -65,14 +66,14 @@ func TestFlattenUniqueSlice(t *testing.T) {
 }
 
 func TestGetChainTokens(t *testing.T) {
-	tokens := []cciptypes.Address{
-		cciptypes.Address(utils.RandomAddress().String()),
-		cciptypes.Address(utils.RandomAddress().String()),
-		cciptypes.Address(utils.RandomAddress().String()),
-		cciptypes.Address(utils.RandomAddress().String()),
-		cciptypes.Address(utils.RandomAddress().String()),
-		cciptypes.Address(utils.RandomAddress().String()),
-	}
+	tokens := ccipcalc.EvmAddrsToGeneric(
+		utils.RandomAddress(),
+		utils.RandomAddress(),
+		utils.RandomAddress(),
+		utils.RandomAddress(),
+		utils.RandomAddress(),
+		utils.RandomAddress(),
+	)
 
 	testCases := []struct {
 		name                  string
