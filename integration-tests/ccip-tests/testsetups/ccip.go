@@ -399,7 +399,7 @@ func (o *CCIPTestSetUpOutputs) AddLanesForNetworkPair(
 		SentReqs:          make(map[common.Hash][]actions.CCIPRequest),
 		TotalFee:          big.NewInt(0),
 		Balance:           o.Balance,
-		Context:           ctx,
+		Context:           testcontext.Get(t),
 	}
 	contractsA, ok := o.LaneContractsByNetwork.Load(networkA.Name)
 	if !ok {
@@ -450,7 +450,7 @@ func (o *CCIPTestSetUpOutputs) AddLanesForNetworkPair(
 			Balance:           o.Balance,
 			SentReqs:          make(map[common.Hash][]actions.CCIPRequest),
 			TotalFee:          big.NewInt(0),
-			Context:           ctx,
+			Context:           testcontext.Get(t),
 			SrcNetworkLaneCfg: ccipLaneA2B.DstNetworkLaneCfg,
 			DstNetworkLaneCfg: ccipLaneA2B.SrcNetworkLaneCfg,
 		}
@@ -1005,8 +1005,9 @@ func (o *CCIPTestSetUpOutputs) CreateEnvironment(
 
 func createEnvironmentConfig(t *testing.T, envName string, testConfig *CCIPTestConfig) *environment.Config {
 	envConfig := &environment.Config{
-		NamespacePrefix: envName,
-		Test:            t,
+		NamespacePrefix:    envName,
+		Test:               t,
+		PreventPodEviction: true,
 	}
 	if testConfig.EnvInput.TTL != nil {
 		envConfig.TTL = testConfig.EnvInput.TTL.Duration()
