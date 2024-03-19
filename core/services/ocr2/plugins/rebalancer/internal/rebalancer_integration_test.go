@@ -63,7 +63,7 @@ var (
 )
 
 func TestRebalancer_Integration(t *testing.T) {
-	newTestUniverse(t, 2)
+	newTestUniverse(t, 2, false)
 }
 
 type ocr3Node struct {
@@ -222,10 +222,10 @@ func setupNodeOCR3(
 	}
 }
 
-func newTestUniverse(t *testing.T, numChains int) {
+func newTestUniverse(t *testing.T, numChains int, adapterHoldNative bool) {
 	// create chains and deploy contracts
 	owner, chains := createChains(t, numChains)
-	universes := deployContracts(t, owner, chains)
+	universes := deployContracts(t, owner, chains, adapterHoldNative)
 	createConnectedNetwork(t, owner, chains, universes)
 	transferBalances(t, owner, universes)
 	mainContract := universes[mainChainID].rebalancer.Address()
@@ -639,6 +639,7 @@ func deployContracts(
 	t *testing.T,
 	owner *bind.TransactOpts,
 	chains map[int64]*backends.SimulatedBackend,
+	adapterHoldNative bool,
 ) (
 	universes map[int64]onchainUniverse,
 ) {
@@ -699,7 +700,7 @@ func deployContracts(
 		require.Equal(t, rebalancerAddr, actualRebalancer)
 
 		// deploy the bridge adapter to point to the weth contract address
-		bridgeAdapterAddress, _, _, err := mock_l1_bridge_adapter.DeployMockL1BridgeAdapter(owner, backend, wethAddress)
+		bridgeAdapterAddress, _, _, err := mock_l1_bridge_adapter.DeployMockL1BridgeAdapter(owner, backend, wethAddress, adapterHoldNative)
 		require.NoError(t, err, "failed to deploy mock l1 bridge adapter")
 		backend.Commit()
 		bridgeAdapter, err := mock_l1_bridge_adapter.NewMockL1BridgeAdapter(bridgeAdapterAddress, backend)

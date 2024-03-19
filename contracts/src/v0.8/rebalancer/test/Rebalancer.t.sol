@@ -10,6 +10,8 @@ import {MockL1BridgeAdapter} from "./mocks/MockBridgeAdapter.sol";
 import {RebalancerBaseTest} from "./RebalancerBaseTest.t.sol";
 import {RebalancerHelper} from "./helpers/RebalancerHelper.sol";
 
+import {IERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
+
 contract RebalancerSetup is RebalancerBaseTest {
   event FinalizationStepCompleted(
     uint64 indexed ocrSeqNum,
@@ -43,14 +45,31 @@ contract RebalancerSetup is RebalancerBaseTest {
   LockReleaseTokenPool internal s_lockReleaseTokenPool;
   MockL1BridgeAdapter internal s_bridgeAdapter;
 
+  // Rebalancer that rebalances weth.
+  RebalancerHelper internal s_wethRebalancer;
+  LockReleaseTokenPool internal s_wethLockReleaseTokenPool;
+  MockL1BridgeAdapter internal s_wethBridgeAdapter;
+
   function setUp() public override {
     RebalancerBaseTest.setUp();
 
-    s_bridgeAdapter = new MockL1BridgeAdapter(s_l1Token);
+    s_bridgeAdapter = new MockL1BridgeAdapter(s_l1Token, false);
     s_lockReleaseTokenPool = new LockReleaseTokenPool(s_l1Token, new address[](0), address(1), true, address(123));
     s_rebalancer = new RebalancerHelper(s_l1Token, i_localChainSelector, s_lockReleaseTokenPool);
 
     s_lockReleaseTokenPool.setRebalancer(address(s_rebalancer));
+
+    s_wethBridgeAdapter = new MockL1BridgeAdapter(IERC20(address(s_l1Weth)), true);
+    s_wethLockReleaseTokenPool = new LockReleaseTokenPool(
+      IERC20(address(s_l1Weth)),
+      new address[](0),
+      address(1),
+      true,
+      address(123)
+    );
+    s_wethRebalancer = new RebalancerHelper(IERC20(address(s_l1Weth)), i_localChainSelector, s_wethLockReleaseTokenPool);
+
+    s_wethLockReleaseTokenPool.setRebalancer(address(s_wethRebalancer));
   }
 }
 
@@ -172,7 +191,7 @@ contract Rebalancer_rebalanceLiquidity is RebalancerSetup {
 
     s_rebalancer = new RebalancerHelper(s_l1Token, i_localChainSelector, s_bridgeAdapter);
 
-    MockL1BridgeAdapter mockRemoteBridgeAdapter = new MockL1BridgeAdapter(s_l1Token);
+    MockL1BridgeAdapter mockRemoteBridgeAdapter = new MockL1BridgeAdapter(s_l1Token, false);
     Rebalancer mockRemoteRebalancer = new Rebalancer(s_l1Token, i_remoteChainSelector, mockRemoteBridgeAdapter);
 
     Rebalancer.CrossChainRebalancerArgs[] memory args = new Rebalancer.CrossChainRebalancerArgs[](1);
@@ -225,7 +244,7 @@ contract Rebalancer_rebalanceLiquidity is RebalancerSetup {
     // set up a rebalancer on another chain, an "L2".
     // note we use the L1 bridge adapter because it has the reverting logic
     // when finalization is already done.
-    MockL1BridgeAdapter remoteBridgeAdapter = new MockL1BridgeAdapter(s_l2Token);
+    MockL1BridgeAdapter remoteBridgeAdapter = new MockL1BridgeAdapter(s_l2Token, false);
     LockReleaseTokenPool remotePool = new LockReleaseTokenPool(
       s_l2Token,
       new address[](0),
@@ -340,7 +359,7 @@ contract Rebalancer_rebalanceLiquidity is RebalancerSetup {
     // set up a rebalancer on another chain, an "L2".
     // note we use the L1 bridge adapter because it has the reverting logic
     // when finalization is already done.
-    MockL1BridgeAdapter remoteBridgeAdapter = new MockL1BridgeAdapter(s_l2Token);
+    MockL1BridgeAdapter remoteBridgeAdapter = new MockL1BridgeAdapter(s_l2Token, false);
     LockReleaseTokenPool remotePool = new LockReleaseTokenPool(
       s_l2Token,
       new address[](0),
@@ -448,6 +467,129 @@ contract Rebalancer_rebalanceLiquidity is RebalancerSetup {
     assertEq(s_l1Token.balanceOf(address(s_rebalancer)), 0, "rebalancer balance 2");
     // balance of s_lockReleaseTokenPool should be updated
     assertEq(s_l1Token.balanceOf(address(s_lockReleaseTokenPool)), balanceBeforeProve + AMOUNT, "s_lockReleaseTokenPool balance should be updated");
+  }
+
+  function test_rebalanceBetweenPools_NativeRewrap() external {
+    // set up a rebalancer similar to the above on another chain, an "L2".
+    MockL1BridgeAdapter remoteBridgeAdapter = new MockL1BridgeAdapter(IERC20(address(s_l2Weth)), true);
+    LockReleaseTokenPool remotePool = new LockReleaseTokenPool(
+      IERC20(address(s_l2Weth)),
+      new address[](0),
+      address(1),
+      true,
+      address(123)
+    );
+    Rebalancer remoteRebalancer = new Rebalancer(IERC20(address(s_l2Weth)), i_remoteChainSelector, remotePool);
+
+    // set rebalancer role on the pool.
+    remotePool.setRebalancer(address(remoteRebalancer));
+
+    // set up the cross chain rebalancer on "L1".
+    Rebalancer.CrossChainRebalancerArgs[] memory args = new Rebalancer.CrossChainRebalancerArgs[](1);
+    args[0] = IRebalancer.CrossChainRebalancerArgs({
+      remoteRebalancer: address(remoteRebalancer),
+      localBridge: s_wethBridgeAdapter,
+      remoteToken: address(s_l2Weth),
+      remoteChainSelector: i_remoteChainSelector,
+      enabled: true
+    });
+
+    s_wethRebalancer.setCrossChainRebalancers(args);
+
+    // set up the cross chain rebalancer on "L2".
+    args[0] = IRebalancer.CrossChainRebalancerArgs({
+      remoteRebalancer: address(s_wethRebalancer),
+      localBridge: remoteBridgeAdapter,
+      remoteToken: address(s_l1Weth),
+      remoteChainSelector: i_localChainSelector,
+      enabled: true
+    });
+
+    remoteRebalancer.setCrossChainRebalancers(args);
+
+    // deal some ether to the L1 bridge adapter so that it can send them to the rebalancer
+    // when the withdrawal gets finalized.
+    vm.deal(address(s_wethBridgeAdapter), AMOUNT);
+    // deal some L2 tokens to the remote token pool so that we can withdraw it when we rebalance.
+    deal(address(s_l2Weth), address(remotePool), AMOUNT);
+    // deposit some eth to the weth contract on L2 from the remote bridge adapter
+    // so that the withdraw() call succeeds.
+    vm.deal(address(remoteBridgeAdapter), AMOUNT);
+    vm.startPrank(address(remoteBridgeAdapter));
+    s_l2Weth.deposit{value: AMOUNT}();
+    vm.stopPrank();
+
+    // switch back to owner for the rest of the test to avoid reverts.
+    vm.startPrank(OWNER);
+
+    // initiate a send from remote rebalancer to s_wethRebalancer.
+    uint256 nonce = 1;
+    uint64 maxSeqNum = type(uint64).max;
+    bytes memory bridgeSendReturnData = abi.encode(nonce);
+    bytes memory bridgeSpecificPayload = bytes("");
+    vm.expectEmit();
+    emit LiquidityRemoved(address(remoteRebalancer), AMOUNT);
+    vm.expectEmit();
+    emit LiquidityTransferred(
+      maxSeqNum,
+      i_remoteChainSelector,
+      i_localChainSelector,
+      address(s_wethRebalancer),
+      AMOUNT,
+      bridgeSpecificPayload,
+      bridgeSendReturnData
+    );
+    remoteRebalancer.rebalanceLiquidity(i_localChainSelector, AMOUNT, 0, bridgeSpecificPayload);
+
+    // available liquidity has been moved to the remote bridge adapter from the token pool.
+    assertEq(s_l2Weth.balanceOf(address(remoteBridgeAdapter)), AMOUNT, "remoteBridgeAdapter balance");
+    assertEq(s_l2Weth.balanceOf(address(remotePool)), 0, "remotePool balance");
+
+    // prove withdrawal on the L1 bridge adapter, through the rebalancer.
+    uint256 balanceBeforeProve = s_l1Weth.balanceOf(address(s_wethLockReleaseTokenPool));
+    MockL1BridgeAdapter.ProvePayload memory provePayload = MockL1BridgeAdapter.ProvePayload({nonce: nonce});
+    MockL1BridgeAdapter.Payload memory payload = MockL1BridgeAdapter.Payload({
+      action: MockL1BridgeAdapter.FinalizationAction.ProveWithdrawal,
+      data: abi.encode(provePayload)
+    });
+    vm.expectEmit();
+    emit FinalizationStepCompleted(maxSeqNum, i_remoteChainSelector, abi.encode(payload));
+    s_wethRebalancer.receiveLiquidity(i_remoteChainSelector, AMOUNT, false, abi.encode(payload));
+
+    // s_wethRebalancer should have no tokens.
+    assertEq(s_l1Weth.balanceOf(address(s_wethRebalancer)), 0, "rebalancer balance 1");
+    // balance of s_wethLockReleaseTokenPool should be unchanged since no liquidity got added yet.
+    assertEq(s_l1Weth.balanceOf(address(s_wethLockReleaseTokenPool)), balanceBeforeProve, "s_wethLockReleaseTokenPool balance should be unchanged");
+
+    // finalize withdrawal on the L1 bridge adapter, through the rebalancer.
+    MockL1BridgeAdapter.FinalizePayload memory finalizePayload = MockL1BridgeAdapter.FinalizePayload({
+      nonce: nonce,
+      amount: AMOUNT
+    });
+    payload = MockL1BridgeAdapter.Payload({
+      action: MockL1BridgeAdapter.FinalizationAction.FinalizeWithdrawal,
+      data: abi.encode(finalizePayload)
+    });
+    vm.expectEmit();
+    emit LiquidityAdded(address(s_wethRebalancer), AMOUNT);
+    vm.expectEmit();
+    emit LiquidityTransferred(
+      maxSeqNum,
+      i_remoteChainSelector,
+      i_localChainSelector,
+      address(s_wethRebalancer),
+      AMOUNT,
+      abi.encode(payload),
+      bytes("")
+    );
+    s_wethRebalancer.receiveLiquidity(i_remoteChainSelector, AMOUNT, true, abi.encode(payload));
+
+    // s_wethRebalancer should have no tokens.
+    assertEq(s_l1Weth.balanceOf(address(s_wethRebalancer)), 0, "rebalancer balance 2");
+    // s_wethRebalancer should have no native tokens.
+    assertEq(address(s_wethRebalancer).balance, 0, "rebalancer native balance should be zero");
+    // balance of s_wethLockReleaseTokenPool should be updated
+    assertEq(s_l1Weth.balanceOf(address(s_wethLockReleaseTokenPool)), balanceBeforeProve + AMOUNT, "s_wethLockReleaseTokenPool balance should be updated");
   }
 
   // Reverts

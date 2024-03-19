@@ -4,6 +4,7 @@ pragma solidity ^0.8.0;
 
 import {IBridgeAdapter} from "../../interfaces/IBridge.sol";
 import {ILiquidityContainer} from "../../interfaces/ILiquidityContainer.sol";
+import {IWrappedNative} from "../../../ccip/interfaces/IWrappedNative.sol";
 
 import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -18,6 +19,7 @@ contract MockL1BridgeAdapter is IBridgeAdapter, ILiquidityContainer {
   error NonceAlreadyUsed(uint256 nonce);
   error InvalidFinalizationAction();
   error NonceNotProven(uint256 nonce);
+  error NativeSendFailed();
 
   /// @notice Payload to "prove" the withdrawal.
   /// @dev This is just a mock setup, there's no real proving. This is so that
@@ -54,9 +56,17 @@ contract MockL1BridgeAdapter is IBridgeAdapter, ILiquidityContainer {
   mapping(uint256 => bool) internal s_nonceProven;
   mapping(uint256 => bool) internal s_nonceFinalized;
 
-  constructor(IERC20 token) {
+  /// @dev For test cases where we want to send pure native upon finalizeWithdrawERC20 being called.
+  /// This is to emulate the behavior of bridges that do not bridge wrapped native.
+  bool internal immutable i_holdNative;
+
+  constructor(IERC20 token, bool holdNative) {
     i_token = token;
+    i_holdNative = holdNative;
   }
+
+  /// @dev The receive function is needed for IWrappedNative.withdraw() to work.
+  receive() external payable {}
 
   /// @notice Simply transferFrom msg.sender the tokens that are to be bridged to address(this).
   function sendERC20(
@@ -67,6 +77,14 @@ contract MockL1BridgeAdapter is IBridgeAdapter, ILiquidityContainer {
     bytes calldata /* bridgeSpecificPayload */
   ) external payable override returns (bytes memory) {
     IERC20(localToken).transferFrom(msg.sender, address(this), amount);
+
+    // If the flag to hold native is set we assume that i_token points to a WETH contract
+    // and withdraw native.
+    // This way we can transfer the raw native back to the sender upon finalization.
+    if (i_holdNative) {
+      IWrappedNative(address(i_token)).withdraw(amount);
+    }
+
     bytes memory encodedNonce = abi.encode(s_nonce++);
     return encodedNonce;
   }
@@ -114,7 +132,15 @@ contract MockL1BridgeAdapter is IBridgeAdapter, ILiquidityContainer {
       if (!s_nonceProven[finalizePayload.nonce]) revert NonceNotProven(finalizePayload.nonce);
       if (s_nonceFinalized[finalizePayload.nonce]) revert NonceAlreadyUsed(finalizePayload.nonce);
       s_nonceFinalized[finalizePayload.nonce] = true;
-      i_token.safeTransfer(localReceiver, finalizePayload.amount);
+      if (i_holdNative) {
+        // although this is only ever for tests, re-entrancy protection is via nonce checks above.
+        (bool success,) = payable(localReceiver).call{value: finalizePayload.amount}("");
+        if (!success) {
+          revert NativeSendFailed();
+        }
+      } else {
+        i_token.safeTransfer(localReceiver, finalizePayload.amount);
+      }
       return true;
     } else {
       revert InvalidFinalizationAction();
