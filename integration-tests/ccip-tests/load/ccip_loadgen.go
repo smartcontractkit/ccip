@@ -38,19 +38,19 @@ type CCIPLaneOptimized struct {
 }
 
 type CCIPE2ELoad struct {
-	t                         *testing.T
-	Lane                      *CCIPLaneOptimized
-	NoOfReq                   int64         // approx no of Request fired
-	CurrentMsgSerialNo        *atomic.Int64 // current msg serial number in the load sequence
-	CallTimeOut               time.Duration // max time to wait for various on-chain events
-	msg                       router.ClientEVM2AnyMessage
-	MaxDataBytes              uint32
-	SendMaxDataIntermittently bool
-	LastFinalizedTxBlock      atomic.Uint64
-	LastFinalizedTimestamp    atomic.Time
+	t                                   *testing.T
+	Lane                                *CCIPLaneOptimized
+	NoOfReq                             int64         // approx no of Request fired
+	CurrentMsgSerialNo                  *atomic.Int64 // current msg serial number in the load sequence
+	CallTimeOut                         time.Duration // max time to wait for various on-chain events
+	msg                                 router.ClientEVM2AnyMessage
+	MaxDataBytes                        uint32
+	SendMaxDataIntermittentlyInMsgCount int64
+	LastFinalizedTxBlock                atomic.Uint64
+	LastFinalizedTimestamp              atomic.Time
 }
 
-func NewCCIPLoad(t *testing.T, lane *actions.CCIPLane, timeout time.Duration, noOfReq int64) *CCIPE2ELoad {
+func NewCCIPLoad(t *testing.T, lane *actions.CCIPLane, timeout time.Duration, noOfReq int64, sendMaxDataIntermittentlyInEveryMsgCount int64) *CCIPE2ELoad {
 	// to avoid holding extra data
 	loadLane := &CCIPLaneOptimized{
 		Logger:            lane.Logger,
@@ -63,12 +63,12 @@ func NewCCIPLoad(t *testing.T, lane *actions.CCIPLane, timeout time.Duration, no
 	// This is to optimize memory space for load tests with high number of networks, lanes, tokens
 	lane.OptimizeStorage()
 	return &CCIPE2ELoad{
-		t:                         t,
-		Lane:                      loadLane,
-		CurrentMsgSerialNo:        atomic.NewInt64(1),
-		CallTimeOut:               timeout,
-		NoOfReq:                   noOfReq,
-		SendMaxDataIntermittently: true,
+		t:                                   t,
+		Lane:                                loadLane,
+		CurrentMsgSerialNo:                  atomic.NewInt64(1),
+		CallTimeOut:                         timeout,
+		NoOfReq:                             noOfReq,
+		SendMaxDataIntermittentlyInMsgCount: sendMaxDataIntermittentlyInEveryMsgCount,
 	}
 }
 
@@ -103,7 +103,7 @@ func (c *CCIPE2ELoad) BeforeAllCall(msgType string, gasLimit *big.Int) {
 	if msgType == actions.TokenTransfer {
 		c.msg.TokenAmounts = tokenAndAmounts
 	}
-	if c.SendMaxDataIntermittently {
+	if c.SendMaxDataIntermittentlyInMsgCount > 0 {
 		dCfg, err := sourceCCIP.OnRamp.Instance.GetDynamicConfig(nil)
 		require.NoError(c.t, err, "failed to fetch dynamic config")
 		c.MaxDataBytes = dCfg.MaxDataBytes
@@ -140,9 +140,9 @@ func (c *CCIPE2ELoad) CCIPMsg() (router.ClientEVM2AnyMessage, *testreporters.Req
 	stats := testreporters.NewCCIPRequestStats(msgSerialNo, c.Lane.SourceNetworkName, c.Lane.DestNetworkName)
 	// form the message for transfer
 	msgStr := fmt.Sprintf("new message with Id %d", msgSerialNo)
-	if c.SendMaxDataIntermittently {
+	if c.SendMaxDataIntermittentlyInMsgCount > 0 {
 		// every 100th message will have extra data with almost MaxDataBytes
-		if msgSerialNo%100 == 0 {
+		if msgSerialNo%c.SendMaxDataIntermittentlyInMsgCount == 0 {
 			length := c.MaxDataBytes - 1
 			b := make([]byte, c.MaxDataBytes-1)
 			_, err := crypto_rand.Read(b)

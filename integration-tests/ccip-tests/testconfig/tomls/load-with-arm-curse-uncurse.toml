@@ -22,3 +22,4 @@ TestDuration = '30m'
 NodeFunding = 1000.0
 RequestPerUnitTime = [1]
 TimeUnit = '10s'
+SendMaxDataInEveryMsgCount = 0
