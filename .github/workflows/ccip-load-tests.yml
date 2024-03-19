@@ -194,7 +194,6 @@ jobs:
           aws_registries: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}
           cache_key_id: ccip-load-${{ env.MOD_CACHE_VERSION }}
           cache_restore_only: "true"
-          should_cleanup: "true"
 
 
   ccip-version-compatibility-test:
