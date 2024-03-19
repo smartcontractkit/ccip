@@ -320,6 +320,16 @@ func (o *OffRamp) GetTokens(ctx context.Context) (cciptypes.OffRampTokens, error
 	})
 }
 
+// Matt TODO
+// Add test
+func (o *OffRamp) GetRouter(ctx context.Context) (cciptypes.Address, error) {
+	dynamicConfig, err := o.offRampV100.GetDynamicConfig(&bind.CallOpts{Context: ctx})
+	if err != nil {
+		return "", err
+	}
+	return ccipcalc.EvmAddrToGeneric(dynamicConfig.Router), nil
+}
+
 func (o *OffRamp) getPoolsByDestTokens(ctx context.Context, tokenAddrs []common.Address) ([]common.Address, error) {
 	evmCalls := make([]rpclib.EvmCall, 0, len(tokenAddrs))
 	for _, tk := range tokenAddrs {

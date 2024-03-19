@@ -37,6 +37,7 @@ import (
 	ccipcachemocks "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcommon"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/factory"
 	ccipdatamocks "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_0_0"
@@ -187,7 +188,8 @@ func TestCommitReportingPlugin_Observation(t *testing.T) {
 			p.inflightReports = newInflightCommitReportsContainer(time.Hour)
 			p.commitStoreReader = commitStoreReader
 			p.onRampReader = onRampReader
-			p.offRampReader = offRampReader
+			// Matt TODO test with multiple offramps
+			p.offRampReaders = []ccipdata.OffRampReader{offRampReader}
 			p.destPriceRegistryReader = destPriceRegReader
 			p.priceGetter = priceGet
 			p.sourceNative = sourceNativeTokenAddr
@@ -224,7 +226,8 @@ func TestCommitReportingPlugin_Report(t *testing.T) {
 
 		offRampReader := ccipdatamocks.NewOffRampReader(t)
 		destPriceRegReader := ccipdatamocks.NewPriceRegistryReader(t)
-		p.offRampReader = offRampReader
+		// Matt TODO test with multiple offramps
+		p.offRampReaders = []ccipdata.OffRampReader{offRampReader}
 		p.destPriceRegistryReader = destPriceRegReader
 		offRampReader.On("GetTokens", ctx).Return(cciptypes.OffRampTokens{}, nil).Maybe()
 		destPriceRegReader.On("GetFeeTokens", ctx).Return(nil, nil).Maybe()
@@ -409,7 +412,8 @@ func TestCommitReportingPlugin_Report(t *testing.T) {
 			p.destPriceRegistryReader = destPriceRegistryReader
 			p.onRampReader = onRampReader
 			p.sourceChainSelector = sourceChainSelector
-			p.offRampReader = offRampReader
+			// Matt TODO
+			p.offRampReaders = []ccipdata.OffRampReader{offRampReader}
 			p.gasPriceEstimator = gasPriceEstimator
 			p.offchainConfig.GasPriceHeartBeat = gasPriceHeartBeat.Duration()
 			p.commitStoreReader = commitStoreReader

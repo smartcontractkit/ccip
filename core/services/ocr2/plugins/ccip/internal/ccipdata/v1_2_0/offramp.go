@@ -139,6 +139,14 @@ func (o *OffRamp) CurrentRateLimiterState(ctx context.Context) (cciptypes.TokenB
 	}, nil
 }
 
+func (o *OffRamp) GetRouter(ctx context.Context) (cciptypes.Address, error) {
+	dynamicConfig, err := o.offRampV120.GetDynamicConfig(&bind.CallOpts{Context: ctx})
+	if err != nil {
+		return "", err
+	}
+	return ccipcalc.EvmAddrToGeneric(dynamicConfig.Router), nil
+}
+
 func (o *OffRamp) ChangeConfig(onchainConfigBytes []byte, offchainConfigBytes []byte) (cciptypes.Address, cciptypes.Address, error) {
 	// Same as the v1.0.0 method, except for the ExecOnchainConfig type.
 	onchainConfigParsed, err := abihelpers.DecodeAbiStruct[ExecOnchainConfig](onchainConfigBytes)
