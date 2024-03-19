@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
-	"math/rand"
 	"net/http"
 	"runtime"
 	"strings"
@@ -25,6 +24,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
+	"golang.org/x/exp/rand"
 	"golang.org/x/sync/errgroup"
 
 	ctftestenv "github.com/smartcontractkit/chainlink-testing-framework/docker/test_env"
@@ -570,25 +570,30 @@ func (ccipModule *CCIPCommon) WatchForPriceUpdates() error {
 	return nil
 }
 
+// UpdateTokenPricesAtRegularInterval updates aggregator contract with updated answer at regular interval.
+// At each iteration of ticker it chooses one of the aggregator contracts and updates its round answer.
 func (ccipModule *CCIPCommon) UpdateTokenPricesAtRegularInterval(ctx context.Context, interval time.Duration) {
-	updateFunc := func(aggr contracts.MockAggregator) {
+	var aggregators []contracts.MockAggregator
+	for _, aggregatorContract := range ccipModule.PriceAggregators {
+		aggregators = append(aggregators, *aggregatorContract)
+	}
+	go func() {
+		rand.Seed(uint64(time.Now().UnixNano()))
 		ticker := time.NewTicker(interval)
 		for {
 			select {
 			case <-ticker.C:
-				err := aggr.UpdateRoundData(big.NewInt(time.Now().UnixNano()))
+				// randomly choose an aggregator contract from slice of aggregators
+				randomIndex := rand.Intn(len(aggregators))
+				err := aggregators[randomIndex].UpdateRoundData(big.NewInt(time.Now().UnixNano()))
 				if err != nil {
 					continue
 				}
 			case <-ctx.Done():
 				return
 			}
-
 		}
-	}
-	for _, aggregatorContract := range ccipModule.PriceAggregators {
-		go updateFunc(*aggregatorContract)
-	}
+	}()
 }
 
 // SyncUSDCDomain makes domain updates to Source usdc pool domain with -
