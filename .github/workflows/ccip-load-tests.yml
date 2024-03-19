@@ -120,7 +120,7 @@ jobs:
           - name: load-with-arm-curse-uncurse
             run: ^TestLoadCCIPStableRPSAfterARMCurseAndUncurse$
             config_path: ./integration-tests/ccip-tests/testconfig/tomls/load-with-arm-curse-uncurse.toml
-            os: ubuntu20.04-16cores-64GB
+            os: ubuntu-latest
     runs-on: ${{ matrix.type.os }}
     steps:
       - name: Collect Metrics

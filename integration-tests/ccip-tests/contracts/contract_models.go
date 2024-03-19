@@ -917,10 +917,17 @@ func (a *MockAggregator) UpdateRoundData(answer *big.Int) error {
 		rand.Seed(1000000)
 		round = big.NewInt(int64(rand.Uint64()))
 	}
-	tx, err := a.Instance.UpdateRoundData(opts, new(big.Int).Add(round, big.NewInt(1)), answer, big.NewInt(time.Now().UTC().UnixNano()), big.NewInt(time.Now().UTC().UnixNano()))
+	round = new(big.Int).Add(round, big.NewInt(1))
+	tx, err := a.Instance.UpdateRoundData(opts, round, answer, big.NewInt(time.Now().UTC().UnixNano()), big.NewInt(time.Now().UTC().UnixNano()))
 	if err != nil {
 		return fmt.Errorf("unable to update round data: %w", err)
 	}
+	log.Info().
+		Str("Contract Address", a.ContractAddress.Hex()).
+		Str("Network Name", a.client.GetNetworkConfig().Name).
+		Str("Round", round.String()).
+		Str("Answer", answer.String()).
+		Msg("Updated Round Data")
 	return a.client.ProcessTransaction(tx)
 }
 
