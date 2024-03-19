@@ -35,11 +35,19 @@ type ccipCommitProvider struct {
 	contractTransmitter *contractTransmitter
 }
 
-func chainToUUID(chainID *big.Int) uuid.UUID {
+type pluginType string
+
+const (
+	ccipCommit pluginType = "ccipCommit"
+	ccipExec   pluginType = "ccipExec"
+)
+
+func chainToUUID(plugin pluginType, chainID *big.Int) uuid.UUID {
 	// See https://www.rfc-editor.org/rfc/rfc4122.html#section-4.1.3 for the list of supported versions.
 	const VersionSHA1 = 5
 	var buf bytes.Buffer
-	buf.WriteString("CCIP:")
+	buf.WriteString(string(plugin))
+	buf.WriteString(":")
 	buf.Write(chainID.Bytes())
 	// We use SHA-256 instead of SHA-1 because the former has better collision resistance.
 	// The UUID will contain only the first 16 bytes of the hash.
@@ -62,7 +70,7 @@ func NewCCIPCommitProvider(ctx context.Context, lggr logger.Logger, chainSet leg
 	if err != nil {
 		return nil, err
 	}
-	subjectID := chainToUUID(configWatcher.chain.ID())
+	subjectID := chainToUUID(ccipCommit, configWatcher.chain.ID())
 	contractTransmitter, err := newOnChainContractTransmitter(ctx, lggr, rargs, transmitterID, ks, configWatcher, configTransmitterOpts{
 		subjectID: &subjectID,
 	}, OCR2AggregatorTransmissionContractABI, fn)
@@ -110,7 +118,7 @@ func NewCCIPExecutionProvider(ctx context.Context, lggr logger.Logger, chainSet 
 	if err != nil {
 		return nil, err
 	}
-	subjectID := chainToUUID(configWatcher.chain.ID())
+	subjectID := chainToUUID(ccipExec, configWatcher.chain.ID())
 	contractTransmitter, err := newOnChainContractTransmitter(ctx, lggr, rargs, transmitterID, ks, configWatcher, configTransmitterOpts{
 		subjectID: &subjectID,
 	}, OCR2AggregatorTransmissionContractABI, fn)
