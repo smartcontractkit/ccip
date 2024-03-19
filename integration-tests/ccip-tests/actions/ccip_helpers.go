@@ -569,6 +569,27 @@ func (ccipModule *CCIPCommon) WatchForPriceUpdates() error {
 	return nil
 }
 
+func (ccipModule *CCIPCommon) UpdateTokenPricesAtRegularInterval(ctx context.Context, interval time.Duration) {
+	updateFunc := func(aggr contracts.MockAggregator) {
+		ticker := time.NewTicker(interval)
+		for {
+			select {
+			case <-ticker.C:
+				err := aggr.UpdateRoundData(big.NewInt(time.Now().UnixNano()))
+				if err != nil {
+					continue
+				}
+			case <-ctx.Done():
+				return
+			}
+
+		}
+	}
+	for _, aggregatorContract := range ccipModule.PriceAggregators {
+		go updateFunc(*aggregatorContract)
+	}
+}
+
 // SyncUSDCDomain makes domain updates to Source usdc pool domain with -
 // 1. USDC domain from destination chain's token transmitter contract
 // 2. Destination pool address as allowed caller
@@ -2497,6 +2518,12 @@ func (lane *CCIPLane) ValidateRequestByTxHash(txHash common.Hash, execState test
 		}
 	}
 	return nil
+}
+
+// UpdateTokenPriceAtRegularInterval is called if we want to change prices dynamically over the test duration in mentioned regular interval
+func (lane *CCIPLane) UpdateTokenPriceAtRegularInterval(interval time.Duration) {
+	lane.Dest.Common.UpdateTokenPricesAtRegularInterval(lane.Context, interval)
+	lane.Source.Common.UpdateTokenPricesAtRegularInterval(lane.Context, interval)
 }
 
 func (lane *CCIPLane) StartEventWatchers() error {

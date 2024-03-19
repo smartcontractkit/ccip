@@ -11,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/rs/zerolog/log"
+	"golang.org/x/exp/rand"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
 
@@ -911,7 +912,12 @@ func (a *MockAggregator) UpdateRoundData(answer *big.Int) error {
 		Str("Contract Address", a.ContractAddress.Hex()).
 		Str("Network Name", a.client.GetNetworkConfig().Name).
 		Msg("Updating Round Data")
-	tx, err := a.Instance.UpdateRoundData(opts, big.NewInt(50), answer, big.NewInt(time.Now().UTC().UnixNano()), big.NewInt(time.Now().UTC().UnixNano()))
+	round, err := a.Instance.LatestRound(nil)
+	if err != nil {
+		rand.Seed(1000000)
+		round = big.NewInt(int64(rand.Uint64()))
+	}
+	tx, err := a.Instance.UpdateRoundData(opts, new(big.Int).Add(round, big.NewInt(1)), answer, big.NewInt(time.Now().UTC().UnixNano()), big.NewInt(time.Now().UTC().UnixNano()))
 	if err != nil {
 		return fmt.Errorf("unable to update round data: %w", err)
 	}

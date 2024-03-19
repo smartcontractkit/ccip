@@ -16,6 +16,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
+	"github.com/smartcontractkit/chainlink-testing-framework/utils/testcontext"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
 	"go.uber.org/multierr"
@@ -368,7 +369,7 @@ func (o *CCIPTestSetUpOutputs) AddLanesForNetworkPair(
 		}
 	}
 	configureCLNode := !pointer.GetBool(o.Cfg.TestGroupInput.ExistingDeployment)
-	setUpFuncs, ctx := errgroup.WithContext(context.Background())
+	setUpFuncs, ctx := errgroup.WithContext(testcontext.Get(t))
 
 	// Use new set of clients(sourceChainClient,destChainClient)
 	// with new header subscriptions(otherwise transactions
@@ -555,6 +556,18 @@ func (o *CCIPTestSetUpOutputs) StartEventWatchers() {
 			err = lane.ReverseLane.StartEventWatchers()
 			require.NoError(o.Cfg.Test, err)
 		}
+	}
+}
+
+func (o *CCIPTestSetUpOutputs) SetupDynamicTokenPriceUpdates() {
+	var allLanes []*actions.CCIPLane
+	for _, lanes := range o.ReadLanes() {
+		allLanes = append(allLanes, lanes.ForwardLane)
+		allLanes = append(allLanes, lanes.ReverseLane)
+	}
+	interval := o.Cfg.TestGroupInput.DynamicPriceUpdateInterval.Duration()
+	for _, lane := range allLanes {
+		lane.UpdateTokenPriceAtRegularInterval(interval)
 	}
 }
 
@@ -787,6 +800,10 @@ func CCIPDefaultTestSetUp(
 		require.NoError(t, setUpArgs.JobAddGrp.Wait(), "Creating jobs shouldn't fail")
 		// wait for price updates to be available
 		setUpArgs.WaitForPriceUpdates(parent)
+		// if dynamic price update is required
+		if setUpArgs.Cfg.TestGroupInput.DynamicPriceUpdateInterval != nil {
+			setUpArgs.SetupDynamicTokenPriceUpdates()
+		}
 	}
 
 	// start event watchers for all lanes
