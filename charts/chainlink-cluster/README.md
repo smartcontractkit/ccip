@@ -106,19 +106,12 @@ kubectl create ns cl-cluster
 kubectl config set-context --current --namespace cl-cluster
 ```
 
-Template
+Install
 ```
-helm template app -f values.yaml -n crib-radek . --output-dir .rendered \
+helm install -f values.yaml cl-cluster . \
     --set=ingress.baseDomain="$DEVSPACE_INGRESS_BASE_DOMAIN" \
     --set=ccip.ccipScriptsImage=$DEVSPACE_CCIP_SCRIPTS_IMAGE
 ```
-
-Install
-```
-
-helm install -f values.yaml cl-cluster .
-```
-
 
 
 ## Create a new release
