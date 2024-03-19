@@ -26,9 +26,8 @@ type BackfillArgs struct {
 	SourceStartBlock, DestStartBlock uint64
 }
 
-// TODO Matt
 // GetChainTokens returns union of all tokens supported on the destination chain, including fee tokens from the provided price registry
-// and the bridgeable tokens from all the offramps living on the chain.
+// and the bridgeable tokens from all the offRamps living on the chain.
 func GetChainTokens(ctx context.Context, offRamps []ccipdata.OffRampReader, priceRegistry cciptypes.PriceRegistryReader) (fee, bridged []cciptypes.Address, err error) {
 	eg := new(errgroup.Group)
 

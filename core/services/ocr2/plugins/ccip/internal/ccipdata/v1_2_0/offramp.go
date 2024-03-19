@@ -122,7 +122,7 @@ func (c JSONExecOffchainConfig) Validate() error {
 // OffRamp In 1.2 we have a different estimator impl
 type OffRamp struct {
 	*v1_0_0.OffRamp
-	offRampV120 *evm_2_evm_offramp.EVM2EVMOffRamp
+	offRampV120 evm_2_evm_offramp.EVM2EVMOffRampInterface
 }
 
 func (o *OffRamp) CurrentRateLimiterState(ctx context.Context) (cciptypes.TokenBucketRateLimit, error) {
