@@ -10,8 +10,7 @@ data:
         "Env": "{{$.Release.Namespace}}",
         "Bootstrap": {
            {{- with (index $.Values.chainlink.nodes 0) }}
-           {{- $nameWithoutHyphen := .name | replace "-" "" }}
-          "URL": "https://{{$.Release.Namespace}}-{{$nameWithoutHyphen}}.{{$.Values.ingress.baseDomain}}/",
+          "URL": "http://app-{{.name}}.{{$.Release.Namespace}}.svc.cluster.local:{{$.Values.chainlink.web_port}}",
           "Email": "notreal@fakeemail.ch",
           "Password": "fj293fbBnlQ!f9vNs",
           "InternalIP": "{{$.Release.Name}}-{{.name}}",
@@ -23,7 +22,7 @@ data:
             {{- if ne $index 0}}
             {{- $nameWithoutHyphen := $cfg.name | replace "-" "" }}
           {{- if ne $index 1 }},{{- end }}{
-      "URL": "https://{{$.Release.Namespace}}-{{$nameWithoutHyphen}}.{{$.Values.ingress.baseDomain}}/",
+      "URL": "http://app-{{$cfg.name}}.{{$.Release.Namespace}}.svc.cluster.local:{{$.Values.chainlink.web_port}}",
       "Email": "notreal@fakeemail.ch",
       "Password": "fj293fbBnlQ!f9vNs",
       "InternalIP": "{{$.Release.Name}}-{{$cfg.name}}",
@@ -44,7 +43,7 @@ data:
     "CCIPChains": {
         {{- range $index, $cfg := $.Values.ccip.chains }}
         {{- if ne $index 0 }},{{- end }}"{{$cfg.ChainId}}":{
-    "NetworkURL": "wss://{{$.Release.Namespace}}-geth-{{$cfg.NetworkId}}-ws.{{$.Values.ingress.baseDomain}}",
+    "NetworkURL": "ws://geth-{{$cfg.NetworkId}}.{{$.Release.Namespace}}.svc.cluster.local:{{.Values.geth.wsrpcPort}}",
     "WalletKey": {{$cfg.WalletKey | quote}},
     "DeployLink": {{$cfg.DeployLink}},
     "DeployWETH": {{$cfg.DeployWETH}},

@@ -8,6 +8,11 @@ metadata:
     prometheus.io/scrape: 'true'
 spec:
   template:
+    metadata:
+      labels:
+        app: ccip-scripts-deployer
+      annotations:
+        prometheus.io/scrape: 'true'
     spec:
       containers:
         - name: ccip-scripts
