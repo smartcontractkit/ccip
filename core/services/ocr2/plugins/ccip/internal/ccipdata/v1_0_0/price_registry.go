@@ -142,7 +142,7 @@ func (p *PriceRegistry) GetFeeTokens(ctx context.Context) ([]cciptypes.Address, 
 	return ccipcalc.EvmAddrsToGeneric(feeTokens...), nil
 }
 
-func (p *PriceRegistry) Close(ctx context.Context) error {
+func (p *PriceRegistry) Close() error {
 	return logpollerutil.UnregisterLpFilters(p.lp, p.filters)
 }
 

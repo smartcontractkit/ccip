@@ -45,17 +45,17 @@ func (_m *PriceRegistryReader) Address(ctx context.Context) (ccip.Address, error
 	return r0, r1
 }
 
-// Close provides a mock function with given fields: ctx
-func (_m *PriceRegistryReader) Close(ctx context.Context) error {
-	ret := _m.Called(ctx)
+// Close provides a mock function with given fields:
+func (_m *PriceRegistryReader) Close() error {
+	ret := _m.Called()
 
 	if len(ret) == 0 {
 		panic("no return value specified for Close")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context) error); ok {
-		r0 = rf(ctx)
+	if rf, ok := ret.Get(0).(func() error); ok {
+		r0 = rf()
 	} else {
 		r0 = ret.Error(0)
 	}

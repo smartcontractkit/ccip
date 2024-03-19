@@ -45,7 +45,7 @@ func (rf *ExecutionReportingPluginFactory) UpdateDynamicReaders(ctx context.Cont
 	}
 	// Close old reader (if present) and open new reader if address changed.
 	if rf.destPriceRegReader != nil {
-		if err := rf.destPriceRegReader.Close(ctx); err != nil {
+		if err := rf.destPriceRegReader.Close(); err != nil {
 			return err
 		}
 	}

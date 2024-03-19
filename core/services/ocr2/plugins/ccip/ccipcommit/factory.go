@@ -49,7 +49,7 @@ func (rf *CommitReportingPluginFactory) UpdateDynamicReaders(ctx context.Context
 	}
 	// Close old reader if present and open new reader if address changed
 	if rf.destPriceRegReader != nil {
-		if err := rf.destPriceRegReader.Close(ctx); err != nil {
+		if err := rf.destPriceRegReader.Close(); err != nil {
 			return err
 		}
 	}

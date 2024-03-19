@@ -413,8 +413,8 @@ func (o *OffRamp) ChangeConfig(ctx context.Context, onchainConfigBytes []byte, o
 		cciptypes.Address(destWrappedNative.String()), nil
 }
 
-func (o *OffRamp) Close(qopts ...pg.QOpt) error {
-	return logpollerutil.UnregisterLpFilters(o.lp, o.filters, qopts...)
+func (o *OffRamp) Close() error {
+	return logpollerutil.UnregisterLpFilters(o.lp, o.filters)
 }
 
 func (o *OffRamp) GetExecutionStateChangesBetweenSeqNums(ctx context.Context, seqNumMin, seqNumMax uint64, confs int) ([]cciptypes.ExecutionStateChangedWithTxMeta, error) {

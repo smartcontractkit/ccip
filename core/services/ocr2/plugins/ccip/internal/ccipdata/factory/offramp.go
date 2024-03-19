@@ -57,7 +57,7 @@ func initOrCloseOffRampReader(lggr logger.Logger, versionFinder VersionFinder, a
 			return nil, err
 		}
 		if closeReader {
-			return nil, offRamp.Close(pgOpts...)
+			return nil, offRamp.Close()
 		}
 		return offRamp, offRamp.RegisterFilters(pgOpts...)
 	case ccipdata.V1_2_0, ccipdata.V1_5_0:
@@ -66,7 +66,7 @@ func initOrCloseOffRampReader(lggr logger.Logger, versionFinder VersionFinder, a
 			return nil, err
 		}
 		if closeReader {
-			return nil, offRamp.Close(pgOpts...)
+			return nil, offRamp.Close()
 		}
 		return offRamp, offRamp.RegisterFilters(pgOpts...)
 	default:

@@ -46,7 +46,7 @@ func initOrClosePriceRegistryReader(ctx context.Context, lggr logger.Logger, ver
 			return nil, err2
 		}
 		if closeReader {
-			return nil, pr.Close(ctx)
+			return nil, pr.Close()
 		}
 		return pr, nil
 	}
@@ -64,7 +64,7 @@ func initOrClosePriceRegistryReader(ctx context.Context, lggr logger.Logger, ver
 			return nil, err
 		}
 		if closeReader {
-			return nil, pr.Close(ctx)
+			return nil, pr.Close()
 		}
 		return pr, nil
 	default:

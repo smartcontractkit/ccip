@@ -78,6 +78,24 @@ func (_m *OffRampReader) ChangeConfig(ctx context.Context, onchainConfig []byte,
 	return r0, r1, r2
 }
 
+// Close provides a mock function with given fields:
+func (_m *OffRampReader) Close() error {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for Close")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func() error); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // CurrentRateLimiterState provides a mock function with given fields: ctx
 func (_m *OffRampReader) CurrentRateLimiterState(ctx context.Context) (ccip.TokenBucketRateLimit, error) {
 	ret := _m.Called(ctx)
