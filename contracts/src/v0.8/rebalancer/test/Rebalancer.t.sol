@@ -67,7 +67,11 @@ contract RebalancerSetup is RebalancerBaseTest {
       true,
       address(123)
     );
-    s_wethRebalancer = new RebalancerHelper(IERC20(address(s_l1Weth)), i_localChainSelector, s_wethLockReleaseTokenPool);
+    s_wethRebalancer = new RebalancerHelper(
+      IERC20(address(s_l1Weth)),
+      i_localChainSelector,
+      s_wethLockReleaseTokenPool
+    );
 
     s_wethLockReleaseTokenPool.setRebalancer(address(s_wethRebalancer));
   }
@@ -335,7 +339,12 @@ contract Rebalancer_rebalanceLiquidity is RebalancerSetup {
     // try to finalize on L1 again
     // bytes memory revertData = abi.encodeWithSelector(NonceAlreadyUsed.selector, nonce);
     vm.expectEmit();
-    emit FinalizationFailed(maxSeqNum, i_remoteChainSelector, abi.encode(payload), abi.encodeWithSelector(NonceAlreadyUsed.selector, nonce));
+    emit FinalizationFailed(
+      maxSeqNum,
+      i_remoteChainSelector,
+      abi.encode(payload),
+      abi.encodeWithSelector(NonceAlreadyUsed.selector, nonce)
+    );
     vm.expectEmit();
     emit LiquidityAdded(address(s_rebalancer), AMOUNT);
     vm.expectEmit();
@@ -438,7 +447,11 @@ contract Rebalancer_rebalanceLiquidity is RebalancerSetup {
     // s_rebalancer should have no tokens.
     assertEq(s_l1Token.balanceOf(address(s_rebalancer)), 0, "rebalancer balance 1");
     // balance of s_lockReleaseTokenPool should be unchanged since no liquidity got added yet.
-    assertEq(s_l1Token.balanceOf(address(s_lockReleaseTokenPool)), balanceBeforeProve, "s_lockReleaseTokenPool balance should be unchanged");
+    assertEq(
+      s_l1Token.balanceOf(address(s_lockReleaseTokenPool)),
+      balanceBeforeProve,
+      "s_lockReleaseTokenPool balance should be unchanged"
+    );
 
     // finalize withdrawal on the L1 bridge adapter, through the rebalancer.
     MockL1BridgeAdapter.FinalizePayload memory finalizePayload = MockL1BridgeAdapter.FinalizePayload({
@@ -466,7 +479,11 @@ contract Rebalancer_rebalanceLiquidity is RebalancerSetup {
     // s_rebalancer should have no tokens.
     assertEq(s_l1Token.balanceOf(address(s_rebalancer)), 0, "rebalancer balance 2");
     // balance of s_lockReleaseTokenPool should be updated
-    assertEq(s_l1Token.balanceOf(address(s_lockReleaseTokenPool)), balanceBeforeProve + AMOUNT, "s_lockReleaseTokenPool balance should be updated");
+    assertEq(
+      s_l1Token.balanceOf(address(s_lockReleaseTokenPool)),
+      balanceBeforeProve + AMOUNT,
+      "s_lockReleaseTokenPool balance should be updated"
+    );
   }
 
   function test_rebalanceBetweenPools_NativeRewrap() external {
@@ -559,7 +576,11 @@ contract Rebalancer_rebalanceLiquidity is RebalancerSetup {
     // s_wethRebalancer should have no tokens.
     assertEq(s_l1Weth.balanceOf(address(s_wethRebalancer)), 0, "rebalancer balance 1");
     // balance of s_wethLockReleaseTokenPool should be unchanged since no liquidity got added yet.
-    assertEq(s_l1Weth.balanceOf(address(s_wethLockReleaseTokenPool)), balanceBeforeProve, "s_wethLockReleaseTokenPool balance should be unchanged");
+    assertEq(
+      s_l1Weth.balanceOf(address(s_wethLockReleaseTokenPool)),
+      balanceBeforeProve,
+      "s_wethLockReleaseTokenPool balance should be unchanged"
+    );
 
     // finalize withdrawal on the L1 bridge adapter, through the rebalancer.
     MockL1BridgeAdapter.FinalizePayload memory finalizePayload = MockL1BridgeAdapter.FinalizePayload({
@@ -589,7 +610,11 @@ contract Rebalancer_rebalanceLiquidity is RebalancerSetup {
     // s_wethRebalancer should have no native tokens.
     assertEq(address(s_wethRebalancer).balance, 0, "rebalancer native balance should be zero");
     // balance of s_wethLockReleaseTokenPool should be updated
-    assertEq(s_l1Weth.balanceOf(address(s_wethLockReleaseTokenPool)), balanceBeforeProve + AMOUNT, "s_wethLockReleaseTokenPool balance should be updated");
+    assertEq(
+      s_l1Weth.balanceOf(address(s_wethLockReleaseTokenPool)),
+      balanceBeforeProve + AMOUNT,
+      "s_wethLockReleaseTokenPool balance should be updated"
+    );
   }
 
   // Reverts

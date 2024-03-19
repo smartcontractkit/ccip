@@ -106,7 +106,9 @@ contract MockL1BridgeAdapter is IBridgeAdapter, ILiquidityContainer {
 
   /// @dev for easy encoding offchain
   function encodeProvePayload(ProvePayload memory payload) external pure {}
+
   function encodeFinalizePayload(FinalizePayload memory payload) external pure {}
+
   function encodePayload(Payload memory payload) external pure {}
 
   /// @dev Test setup is trusted, so just transfer the tokens to the localReceiver,
@@ -134,7 +136,7 @@ contract MockL1BridgeAdapter is IBridgeAdapter, ILiquidityContainer {
       s_nonceFinalized[finalizePayload.nonce] = true;
       if (i_holdNative) {
         // although this is only ever for tests, re-entrancy protection is via nonce checks above.
-        (bool success,) = payable(localReceiver).call{value: finalizePayload.amount}("");
+        (bool success, ) = payable(localReceiver).call{value: finalizePayload.amount}("");
         if (!success) {
           revert NativeSendFailed();
         }
