@@ -109,7 +109,8 @@ kubectl config set-context --current --namespace cl-cluster
 Template
 ```
 helm template app -f values.yaml -n crib-radek . --output-dir .rendered \
-    --set=ingress.baseDomain="$DEVSPACE_INGRESS_BASE_DOMAIN"
+    --set=ingress.baseDomain="$DEVSPACE_INGRESS_BASE_DOMAIN" \
+    --set=ccip.ccipScriptsImage=$DEVSPACE_CCIP_SCRIPTS_IMAGE
 ```
 
 Install

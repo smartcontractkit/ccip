@@ -22,20 +22,20 @@ data:
           {{- range $index, $cfg := $.Values.chainlink.nodes }}
             {{- if ne $index 0}}
             {{- $nameWithoutHyphen := $cfg.name | replace "-" "" }}
-          {
+          {{- if ne $index 1 }},{{- end }}{
             "URL": "https://{{$.Release.Namespace}}-{{$nameWithoutHyphen}}.{{$.Values.ingress.baseDomain}}/",
             "Email": "notreal@fakeemail.ch",
             "Password": "fj293fbBnlQ!f9vNs",
             "InternalIP": "{{$.Release.Name}}-{{$cfg.name}}",
             "HTTPTimeout": null
-          },
+          }
             {{- end}}
           {{- end}}
         ]
       },
       {{- $networkIDs := list }}
       {{- range $index, $cfg :=$.Values.ccip.chains }}
-        {{- $networkIDs = append $networkIDs $cfg.NetworkId }}
+        {{- $networkIDs = append $networkIDs $cfg.ChainId }}
       {{- end }}
 
       {{- $delimiter := "," }}
@@ -43,13 +43,13 @@ data:
       "ChainPairs":[{{- printf $foldedString | quote }}],
       "CCIPChains": {
         {{- range $index, $cfg := $.Values.ccip.chains }}
-        "geth_{{$cfg.NetworkId}}":{
+        {{- if ne $index 0 }},{{- end }}"{{$cfg.ChainId}}":{
           "NetworkURL": "wss://{{$.Release.Namespace}}-geth-{{$cfg.NetworkId}}-ws.{{$.Values.ingress.baseDomain}}",
-          "WalletKey": "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80",
-          "DeployLink": false,
-          "DeployWETH": false,
+          "WalletKey": {{$cfg.WalletKey | quote}},
+          "DeployLink": {{$cfg.DeployLink}},
+          "DeployWETH": {{$cfg.DeployWETH}},
           "ChainConfig": {{$cfg.ChainConfig | toJson}}
-        },
+        }
         {{- end}}
       },
       "LaneDeploySettings": {{$.Values.ccip.LaneDeploySettings | toJson }}
@@ -65,13 +65,16 @@ spec:
   containers:
     - name: ccip-scripts
       image: {{.Values.ccip.ccipScriptsImage}}
+      env:
+        - name: CONFIG_JSON_PATH
+          value: /data/config.json
       command:
         - "tail"
         - "-f"
         - "/dev/null"
       volumeMounts:
         - name: config-volume
-          mountPath: /data/config.json
+          mountPath: /data
       securityContext:
         capabilities:
           drop:
@@ -84,4 +87,6 @@ spec:
     - name: config-volume
       configMap:
         name: ccip-scripts-config
+    - name: build-volume
+      emptyDir: {}
 
