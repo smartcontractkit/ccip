@@ -348,7 +348,7 @@ contract Rebalancer_rebalanceLiquidity is RebalancerSetup {
       true,
       address(123)
     );
-    Rebalancer remoteRebalancer = new Rebalancer(s_l2Token, i_remoteChainSelector, remotePool);
+    Rebalancer remoteRebalancer = new Rebalancer(s_l2Token, i_remoteChainSelector, remotePool, 0);
 
     // set rebalancer role on the pool.
     remotePool.setRebalancer(address(remoteRebalancer));
