@@ -1296,9 +1296,6 @@ func (sourceCCIP *SourceCCIPModule) AssertSendRequestedLogFinalized(
 	prevEventAt time.Time,
 	reqStats []*testreporters.RequestStat,
 ) (time.Time, uint64, error) {
-	if sourceCCIP.Common.ChainClient.NetworkSimulated() {
-		return prevEventAt, 0, nil
-	}
 	lggr.Info().Msg("Waiting for CCIPSendRequested event log to be finalized")
 	finalizedBlockNum, finalizedAt, err := sourceCCIP.Common.ChainClient.WaitForFinalizedTx(txHash)
 	if err != nil {
@@ -2553,8 +2550,7 @@ func (lane *CCIPLane) ValidateRequestByTxHash(txHash common.Hash, execState test
 }
 
 func (lane *CCIPLane) StartEventWatchers() error {
-	if !lane.Source.Common.ChainClient.NetworkSimulated() &&
-		lane.Source.Common.ChainClient.GetNetworkConfig().FinalityDepth == 0 {
+	if lane.Source.Common.ChainClient.GetNetworkConfig().FinalityDepth == 0 {
 		err := lane.Source.Common.ChainClient.PollFinality()
 		if err != nil {
 			return err
@@ -2710,8 +2706,7 @@ func (lane *CCIPLane) StartEventWatchers() error {
 
 func (lane *CCIPLane) CleanUp(clearFees bool) error {
 	lane.Logger.Info().Msg("Cleaning up lane")
-	if !lane.Source.Common.ChainClient.NetworkSimulated() &&
-		lane.Source.Common.ChainClient.GetNetworkConfig().FinalityDepth == 0 {
+	if lane.Source.Common.ChainClient.GetNetworkConfig().FinalityDepth == 0 {
 		lane.Source.Common.ChainClient.CancelFinalityPolling()
 	}
 	// recover fees from onRamp contract
