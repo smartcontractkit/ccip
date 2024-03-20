@@ -146,7 +146,7 @@ type CCIPCommon struct {
 	poolFunds                    *big.Int
 	gasUpdateWatcherMu           *sync.Mutex
 	gasUpdateWatcher             map[uint64]*big.Int // key - destchain id; value - timestamp of update
-	priceUpdateSubs              []event.Subscription
+	PriceUpdateCtx               context.Context
 	IsConnectionRestoredRecently *atomic.Bool
 }
 
@@ -162,12 +162,6 @@ func (ccipModule *CCIPCommon) FreeUpUnusedSpace() {
 	ccipModule.TokenMessenger = nil
 	ccipModule.PriceRegistry = nil
 	runtime.GC()
-}
-
-func (ccipModule *CCIPCommon) StopWatchingPriceUpdates() {
-	for _, sub := range ccipModule.priceUpdateSubs {
-		sub.Unsubscribe()
-	}
 }
 
 func (ccipModule *CCIPCommon) UnvoteToCurseARM() error {
@@ -489,6 +483,7 @@ func (ccipModule *CCIPCommon) CleanUp() error {
 }
 
 func (ccipModule *CCIPCommon) WaitForPriceUpdates(
+	ctx context.Context,
 	lggr zerolog.Logger,
 	timeout time.Duration,
 	destChainId uint64,
@@ -514,7 +509,7 @@ func (ccipModule *CCIPCommon) WaitForPriceUpdates(
 	lggr.Info().Msgf("Waiting for UsdPerUnitGas for dest chain %d Price Registry %s", destChainId, ccipModule.PriceRegistry.Address())
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	localCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	for {
 		select {
@@ -530,13 +525,13 @@ func (ccipModule *CCIPCommon) WaitForPriceUpdates(
 					Msg("Price updated")
 				return nil
 			}
-		case <-ctx.Done():
+		case <-localCtx.Done():
 			return fmt.Errorf("UsdPerUnitGasUpdated is not found for chain %d", destChainId)
 		}
 	}
 }
 
-func (ccipModule *CCIPCommon) WatchForPriceUpdates() error {
+func (ccipModule *CCIPCommon) WatchForPriceUpdates(ctx context.Context) error {
 	gasUpdateEvent := make(chan *price_registry.PriceRegistryUsdPerUnitGasUpdated)
 	sub, err := ccipModule.PriceRegistry.Instance.WatchUsdPerUnitGasUpdated(nil, gasUpdateEvent, nil)
 	if err != nil {
@@ -544,6 +539,7 @@ func (ccipModule *CCIPCommon) WatchForPriceUpdates() error {
 	}
 
 	go func() {
+		defer sub.Unsubscribe()
 		for {
 			select {
 			case e := <-gasUpdateEvent:
@@ -561,12 +557,17 @@ func (ccipModule *CCIPCommon) WatchForPriceUpdates() error {
 					Str("price_registry", ccipModule.PriceRegistry.Address()).
 					Msgf("UsdPerUnitGasUpdated event received for dest chain %d source chain %s",
 						destChain, ccipModule.ChainClient.GetNetworkName())
-			case <-sub.Err():
+			case err := <-sub.Err():
+				log.Error().Err(err).Msg("error on UsdPerUnitGasUpdated subscription attempting to resubscribe")
+				sub, err = ccipModule.PriceRegistry.Instance.WatchUsdPerUnitGasUpdated(nil, gasUpdateEvent, nil)
+				if err != nil {
+					log.Fatal().Msg("Error in resubscribing to UsdPerUnitGasUpdated event subscription")
+				}
+			case <-ctx.Done():
 				return
 			}
 		}
 	}()
-	ccipModule.priceUpdateSubs = append(ccipModule.priceUpdateSubs, sub)
 
 	return nil
 }
@@ -2726,6 +2727,7 @@ func (lane *CCIPLane) CleanUp(clearFees bool) error {
 // DeployNewCCIPLane sets up a lane and initiates lane.Source and lane.Destination
 // If configureCLNodes is true it sets up jobs and contract config for the lane
 func (lane *CCIPLane) DeployNewCCIPLane(
+	setUpCtx context.Context,
 	env *CCIPTestEnv,
 	commitAndExecOnSameDON bool,
 	sourceCommon *CCIPCommon,
@@ -2795,7 +2797,7 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 	if !configureCLNodes {
 		return lane.SrcNetworkLaneCfg, lane.DstNetworkLaneCfg, nil
 	}
-	err = lane.Source.Common.WatchForPriceUpdates()
+	err = lane.Source.Common.WatchForPriceUpdates(setUpCtx)
 	if err != nil {
 		return lane.SrcNetworkLaneCfg, lane.DstNetworkLaneCfg, fmt.Errorf("error in starting price update watch")
 	}
