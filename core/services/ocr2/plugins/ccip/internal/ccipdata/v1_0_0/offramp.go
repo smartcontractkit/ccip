@@ -16,7 +16,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
 
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/cciptypes"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/logpollerutil"
 
@@ -107,8 +107,6 @@ type ExecOffchainConfig struct {
 	BatchGasLimit uint32
 	// See [ccipdata.ExecOffchainConfig.RelativeBoostPerWaitHour]
 	RelativeBoostPerWaitHour float64
-	// MaxGasPrice is the max gas price in the native currency (e.g., wei/gas) that a node will pay for executing a transaction on the destination chain.
-	MaxGasPrice uint64
 	// See [ccipdata.ExecOffchainConfig.InflightCacheExpiry]
 	InflightCacheExpiry config.Duration
 	// See [ccipdata.ExecOffchainConfig.RootSnoozeTime]
@@ -131,9 +129,6 @@ func (c ExecOffchainConfig) Validate() error {
 	if c.RelativeBoostPerWaitHour == 0 {
 		return errors.New("must set RelativeBoostPerWaitHour")
 	}
-	if c.MaxGasPrice == 0 {
-		return errors.New("must set MaxGasPrice")
-	}
 	if c.InflightCacheExpiry.Duration() == 0 {
 		return errors.New("must set InflightCacheExpiry")
 	}
@@ -153,6 +148,7 @@ type OffRamp struct {
 	evmBatchCaller          rpclib.EvmBatchCaller
 	filters                 []logpoller.Filter
 	Estimator               gas.EvmFeeEstimator
+	DestMaxGasPrice         *big.Int
 	ExecutionReportArgs     abi.Arguments
 	eventIndex              int
 	eventSig                common.Hash
@@ -350,26 +346,26 @@ func (o *OffRamp) getPoolsByDestTokens(ctx context.Context, tokenAddrs []common.
 	return destPools, nil
 }
 
-func (o *OffRamp) OffchainConfig() cciptypes.ExecOffchainConfig {
+func (o *OffRamp) OffchainConfig(ctx context.Context) (cciptypes.ExecOffchainConfig, error) {
 	o.configMu.RLock()
 	defer o.configMu.RUnlock()
-	return o.offchainConfig
+	return o.offchainConfig, nil
 }
 
-func (o *OffRamp) OnchainConfig() cciptypes.ExecOnchainConfig {
+func (o *OffRamp) OnchainConfig(ctx context.Context) (cciptypes.ExecOnchainConfig, error) {
 	o.configMu.RLock()
 	defer o.configMu.RUnlock()
-	return o.onchainConfig
+	return o.onchainConfig, nil
 }
 
-func (o *OffRamp) GasPriceEstimator() cciptypes.GasPriceEstimatorExec {
+func (o *OffRamp) GasPriceEstimator(ctx context.Context) (cciptypes.GasPriceEstimatorExec, error) {
 	o.configMu.RLock()
 	defer o.configMu.RUnlock()
-	return o.gasPriceEstimator
+	return o.gasPriceEstimator, nil
 }
 
-func (o *OffRamp) Address() cciptypes.Address {
-	return cciptypes.Address(o.addr.String())
+func (o *OffRamp) Address(ctx context.Context) (cciptypes.Address, error) {
+	return cciptypes.Address(o.addr.String()), nil
 }
 
 func (o *OffRamp) UpdateDynamicConfig(onchainConfig cciptypes.ExecOnchainConfig, offchainConfig cciptypes.ExecOffchainConfig, gasPriceEstimator prices.GasPriceEstimatorExec) {
@@ -380,7 +376,7 @@ func (o *OffRamp) UpdateDynamicConfig(onchainConfig cciptypes.ExecOnchainConfig,
 	o.configMu.Unlock()
 }
 
-func (o *OffRamp) ChangeConfig(onchainConfigBytes []byte, offchainConfigBytes []byte) (cciptypes.Address, cciptypes.Address, error) {
+func (o *OffRamp) ChangeConfig(ctx context.Context, onchainConfigBytes []byte, offchainConfigBytes []byte) (cciptypes.Address, cciptypes.Address, error) {
 	onchainConfigParsed, err := abihelpers.DecodeAbiStruct[ExecOnchainConfig](onchainConfigBytes)
 	if err != nil {
 		return "", "", err
@@ -407,7 +403,7 @@ func (o *OffRamp) ChangeConfig(onchainConfigBytes []byte, offchainConfigBytes []
 		RootSnoozeTime:              offchainConfigParsed.RootSnoozeTime,
 	}
 	onchainConfig := cciptypes.ExecOnchainConfig{PermissionLessExecutionThresholdSeconds: time.Second * time.Duration(onchainConfigParsed.PermissionLessExecutionThresholdSeconds)}
-	gasPriceEstimator := prices.NewExecGasPriceEstimator(o.Estimator, big.NewInt(int64(offchainConfigParsed.MaxGasPrice)), 0)
+	gasPriceEstimator := prices.NewExecGasPriceEstimator(o.Estimator, o.DestMaxGasPrice, 0)
 	o.UpdateDynamicConfig(onchainConfig, offchainConfig, gasPriceEstimator)
 
 	o.Logger.Infow("Starting exec plugin",
@@ -417,8 +413,8 @@ func (o *OffRamp) ChangeConfig(onchainConfigBytes []byte, offchainConfigBytes []
 		cciptypes.Address(destWrappedNative.String()), nil
 }
 
-func (o *OffRamp) Close(qopts ...pg.QOpt) error {
-	return logpollerutil.UnregisterLpFilters(o.lp, o.filters, qopts...)
+func (o *OffRamp) Close() error {
+	return logpollerutil.UnregisterLpFilters(o.lp, o.filters)
 }
 
 func (o *OffRamp) GetExecutionStateChangesBetweenSeqNums(ctx context.Context, seqNumMin, seqNumMax uint64, confs int) ([]cciptypes.ExecutionStateChangedWithTxMeta, error) {
@@ -525,11 +521,11 @@ func encodeExecutionReport(args abi.Arguments, report cciptypes.ExecReport) ([]b
 	return args.PackValues([]interface{}{&rep})
 }
 
-func (o *OffRamp) EncodeExecutionReport(report cciptypes.ExecReport) ([]byte, error) {
+func (o *OffRamp) EncodeExecutionReport(ctx context.Context, report cciptypes.ExecReport) ([]byte, error) {
 	return encodeExecutionReport(o.ExecutionReportArgs, report)
 }
 
-func DecodeExecReport(args abi.Arguments, report []byte) (cciptypes.ExecReport, error) {
+func DecodeExecReport(ctx context.Context, args abi.Arguments, report []byte) (cciptypes.ExecReport, error) {
 	unpacked, err := args.Unpack(report)
 	if err != nil {
 		return cciptypes.ExecReport{}, err
@@ -603,19 +599,15 @@ func DecodeExecReport(args abi.Arguments, report []byte) (cciptypes.ExecReport, 
 
 }
 
-func (o *OffRamp) DecodeExecutionReport(report []byte) (cciptypes.ExecReport, error) {
-	return DecodeExecReport(o.ExecutionReportArgs, report)
-}
-
-func (o *OffRamp) TokenEvents() []common.Hash {
-	return offRamp_poolAddedPoolRemovedEvents
+func (o *OffRamp) DecodeExecutionReport(ctx context.Context, report []byte) (cciptypes.ExecReport, error) {
+	return DecodeExecReport(ctx, o.ExecutionReportArgs, report)
 }
 
 func (o *OffRamp) RegisterFilters(qopts ...pg.QOpt) error {
 	return logpollerutil.RegisterLpFilters(o.lp, o.filters, qopts...)
 }
 
-func NewOffRamp(lggr logger.Logger, addr common.Address, ec client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator) (*OffRamp, error) {
+func NewOffRamp(lggr logger.Logger, addr common.Address, ec client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator, destMaxGasPrice *big.Int) (*OffRamp, error) {
 	offRamp, err := evm_2_evm_offramp_1_0_0.NewEVM2EVMOffRamp(addr, ec)
 	if err != nil {
 		return nil, err
@@ -628,16 +620,19 @@ func NewOffRamp(lggr logger.Logger, addr common.Address, ec client.Client, lp lo
 			Name:      logpoller.FilterName(EXEC_EXECUTION_STATE_CHANGES, addr.String()),
 			EventSigs: []common.Hash{ExecutionStateChangedEvent},
 			Addresses: []common.Address{addr},
+			Retention: ccipdata.CommitExecLogsRetention,
 		},
 		{
 			Name:      logpoller.FilterName(EXEC_TOKEN_POOL_ADDED, addr.String()),
 			EventSigs: []common.Hash{PoolAddedEvent},
 			Addresses: []common.Address{addr},
+			Retention: ccipdata.CacheEvictionLogsRetention,
 		},
 		{
 			Name:      logpoller.FilterName(EXEC_TOKEN_POOL_REMOVED, addr.String()),
 			EventSigs: []common.Hash{PoolRemovedEvent},
 			Addresses: []common.Address{addr},
+			Retention: ccipdata.CacheEvictionLogsRetention,
 		},
 	}
 
@@ -649,6 +644,7 @@ func NewOffRamp(lggr logger.Logger, addr common.Address, ec client.Client, lp lo
 		lp:                  lp,
 		filters:             filters,
 		Estimator:           estimator,
+		DestMaxGasPrice:     destMaxGasPrice,
 		ExecutionReportArgs: executionReportArgs,
 		eventSig:            ExecutionStateChangedEvent,
 		eventIndex:          executionStateChangedSequenceNumberIndex,

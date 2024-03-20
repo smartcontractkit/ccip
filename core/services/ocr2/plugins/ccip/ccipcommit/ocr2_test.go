@@ -2,7 +2,6 @@ package ccipcommit
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"math/big"
 	"math/rand"
@@ -24,6 +23,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
 
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas/mocks"
 	mocks2 "github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
@@ -32,8 +32,9 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/cciptypes"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache"
+	ccipcachemocks "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcommon"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/factory"
@@ -51,14 +52,16 @@ func TestCommitReportingPlugin_Observation(t *testing.T) {
 	someTokenAddr := ccipcalc.HexToAddress("2000")
 
 	testCases := []struct {
-		name                string
-		epochAndRound       types.ReportTimestamp
-		commitStoreIsPaused bool
-		commitStoreSeqNum   uint64
-		tokenPrices         map[cciptypes.Address]*big.Int
-		sendReqs            []cciptypes.EVM2EVMMessageWithTxMeta
-		tokenDecimals       map[cciptypes.Address]uint8
-		fee                 *big.Int
+		name                   string
+		epochAndRound          types.ReportTimestamp
+		commitStorePaused      bool
+		sourceChainCursed      bool
+		commitStoreSeqNum      uint64
+		tokenPrices            map[cciptypes.Address]*big.Int
+		sendReqs               []cciptypes.EVM2EVMMessageWithTxMeta
+		tokenDecimals          map[cciptypes.Address]uint8
+		fee                    *big.Int
+		priceReportingDisabled bool
 
 		expErr bool
 		expObs ccip.CommitObservation
@@ -68,13 +71,13 @@ func TestCommitReportingPlugin_Observation(t *testing.T) {
 			commitStoreSeqNum: 54,
 			tokenPrices: map[cciptypes.Address]*big.Int{
 				someTokenAddr:         big.NewInt(2),
-				sourceNativeTokenAddr: big.NewInt(2),
+				sourceNativeTokenAddr: big.NewInt(2e18),
 			},
 			sendReqs: []cciptypes.EVM2EVMMessageWithTxMeta{
 				{EVM2EVMMessage: cciptypes.EVM2EVMMessage{SequenceNumber: 54}},
 				{EVM2EVMMessage: cciptypes.EVM2EVMMessage{SequenceNumber: 55}},
 			},
-			fee: big.NewInt(100),
+			fee: big.NewInt(2e18),
 			tokenDecimals: map[cciptypes.Address]uint8{
 				someTokenAddr: 8,
 			},
@@ -82,7 +85,7 @@ func TestCommitReportingPlugin_Observation(t *testing.T) {
 				TokenPricesUSD: map[cciptypes.Address]*big.Int{
 					someTokenAddr: big.NewInt(20000000000),
 				},
-				SourceGasPriceUSD: big.NewInt(0),
+				SourceGasPriceUSD: big.NewInt(4e18),
 				Interval: cciptypes.CommitStoreInterval{
 					Min: 54,
 					Max: 55,
@@ -90,9 +93,41 @@ func TestCommitReportingPlugin_Observation(t *testing.T) {
 			},
 		},
 		{
-			name:                "commit store is down",
-			commitStoreIsPaused: true,
-			expErr:              true,
+			name:              "price reporting disabled",
+			commitStoreSeqNum: 54,
+			tokenPrices: map[cciptypes.Address]*big.Int{
+				someTokenAddr:         big.NewInt(2),
+				sourceNativeTokenAddr: big.NewInt(2e18),
+			},
+			sendReqs: []cciptypes.EVM2EVMMessageWithTxMeta{
+				{EVM2EVMMessage: cciptypes.EVM2EVMMessage{SequenceNumber: 54}},
+				{EVM2EVMMessage: cciptypes.EVM2EVMMessage{SequenceNumber: 55}},
+			},
+			fee: big.NewInt(2e18),
+			tokenDecimals: map[cciptypes.Address]uint8{
+				someTokenAddr: 8,
+			},
+			priceReportingDisabled: true,
+			expObs: ccip.CommitObservation{
+				TokenPricesUSD:    nil,
+				SourceGasPriceUSD: nil,
+				Interval: cciptypes.CommitStoreInterval{
+					Min: 54,
+					Max: 55,
+				},
+			},
+		},
+		{
+			name:              "commit store is down",
+			commitStorePaused: true,
+			sourceChainCursed: false,
+			expErr:            true,
+		},
+		{
+			name:              "source chain is cursed",
+			commitStorePaused: false,
+			sourceChainCursed: true,
+			expErr:            true,
 		},
 	}
 
@@ -100,19 +135,22 @@ func TestCommitReportingPlugin_Observation(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			commitStoreReader := ccipdatamocks.NewCommitStoreReader(t)
-			commitStoreReader.On("IsDown", ctx).Return(tc.commitStoreIsPaused, nil)
-			if !tc.commitStoreIsPaused {
+			commitStoreReader.On("IsDown", ctx).Return(tc.commitStorePaused, nil)
+			commitStoreReader.On("IsDestChainHealthy", ctx).Return(true, nil)
+			if !tc.commitStorePaused && !tc.sourceChainCursed {
 				commitStoreReader.On("GetExpectedNextSequenceNumber", ctx).Return(tc.commitStoreSeqNum, nil)
 			}
 
 			onRampReader := ccipdatamocks.NewOnRampReader(t)
+			onRampReader.On("IsSourceChainHealthy", ctx).Return(true, nil)
+			onRampReader.On("IsSourceCursed", ctx).Return(tc.sourceChainCursed, nil)
 			if len(tc.sendReqs) > 0 {
 				onRampReader.On("GetSendRequestsBetweenSeqNums", ctx, tc.commitStoreSeqNum, tc.commitStoreSeqNum+OnRampMessagesScanLimit, true).
 					Return(tc.sendReqs, nil)
 			}
 
 			priceGet := pricegetter.NewMockPriceGetter(t)
-			if len(tc.tokenPrices) > 0 {
+			if !tc.priceReportingDisabled && len(tc.tokenPrices) > 0 {
 				addrs := []cciptypes.Address{sourceNativeTokenAddr}
 				for addr := range tc.tokenDecimals {
 					addrs = append(addrs, addr)
@@ -121,7 +159,7 @@ func TestCommitReportingPlugin_Observation(t *testing.T) {
 			}
 
 			gasPriceEstimator := prices.NewMockGasPriceEstimatorCommit(t)
-			if tc.fee != nil {
+			if !tc.priceReportingDisabled && tc.fee != nil {
 				var p = tc.fee
 				var pUSD = ccipcalc.CalculateUsdPerUnitGas(p, tc.tokenPrices[sourceNativeTokenAddr])
 				gasPriceEstimator.On("GetGasPrice", ctx).Return(p, nil)
@@ -154,7 +192,9 @@ func TestCommitReportingPlugin_Observation(t *testing.T) {
 			p.priceGetter = priceGet
 			p.sourceNative = sourceNativeTokenAddr
 			p.gasPriceEstimator = gasPriceEstimator
+			p.offchainConfig.PriceReportingDisabled = tc.priceReportingDisabled
 			p.metricsCollector = ccip.NoopMetricsCollector
+			p.chainHealthcheck = cache.NewChainHealthcheck(p.lggr, onRampReader, commitStoreReader)
 
 			obs, err := p.Observation(ctx, tc.epochAndRound, types.Query{})
 
@@ -188,6 +228,9 @@ func TestCommitReportingPlugin_Report(t *testing.T) {
 		p.destPriceRegistryReader = destPriceRegReader
 		offRampReader.On("GetTokens", ctx).Return(cciptypes.OffRampTokens{}, nil).Maybe()
 		destPriceRegReader.On("GetFeeTokens", ctx).Return(nil, nil).Maybe()
+		chainHealthcheck := ccipcachemocks.NewChainHealthcheck(t)
+		chainHealthcheck.On("IsHealthy", ctx).Return(true, nil).Maybe()
+		p.chainHealthcheck = chainHealthcheck
 
 		o := ccip.CommitObservation{Interval: cciptypes.CommitStoreInterval{Min: 1, Max: 1}, SourceGasPriceUSD: big.NewInt(0)}
 		obs, err := o.Marshal()
@@ -202,16 +245,17 @@ func TestCommitReportingPlugin_Report(t *testing.T) {
 	})
 
 	testCases := []struct {
-		name              string
-		observations      []ccip.CommitObservation
-		f                 int
-		gasPriceUpdates   []cciptypes.GasPriceUpdateWithTxMeta
-		tokenDecimals     map[cciptypes.Address]uint8
-		tokenPriceUpdates []cciptypes.TokenPriceUpdateWithTxMeta
-		sendRequests      []cciptypes.EVM2EVMMessageWithTxMeta
-		expCommitReport   *cciptypes.CommitStoreReport
-		expSeqNumRange    cciptypes.CommitStoreInterval
-		expErr            bool
+		name                   string
+		observations           []ccip.CommitObservation
+		f                      int
+		gasPriceUpdates        []cciptypes.GasPriceUpdateWithTxMeta
+		tokenDecimals          map[cciptypes.Address]uint8
+		tokenPriceUpdates      []cciptypes.TokenPriceUpdateWithTxMeta
+		sendRequests           []cciptypes.EVM2EVMMessageWithTxMeta
+		priceReportingDisabled bool
+		expCommitReport        *cciptypes.CommitStoreReport
+		expSeqNumRange         cciptypes.CommitStoreInterval
+		expErr                 bool
 	}{
 		{
 			name: "base",
@@ -278,13 +322,51 @@ func TestCommitReportingPlugin_Report(t *testing.T) {
 			expSeqNumRange: cciptypes.CommitStoreInterval{Min: 2, Max: 2},
 			expErr:         true,
 		},
+		{
+			name: "price reporting disabled base case",
+			observations: []ccip.CommitObservation{
+				{Interval: cciptypes.CommitStoreInterval{Min: 1, Max: 1}, SourceGasPriceUSD: nil},
+				{Interval: cciptypes.CommitStoreInterval{Min: 1, Max: 1}, SourceGasPriceUSD: nil},
+			},
+			f: 1,
+			sendRequests: []cciptypes.EVM2EVMMessageWithTxMeta{
+				{
+					EVM2EVMMessage: cciptypes.EVM2EVMMessage{
+						SequenceNumber: 1,
+					},
+				},
+			},
+			priceReportingDisabled: true,
+			expSeqNumRange:         cciptypes.CommitStoreInterval{Min: 1, Max: 1},
+			expCommitReport: &cciptypes.CommitStoreReport{
+				MerkleRoot:  [32]byte{},
+				Interval:    cciptypes.CommitStoreInterval{Min: 1, Max: 1},
+				TokenPrices: nil,
+				GasPrices:   nil,
+			},
+			expErr: false,
+		},
+		{
+			name: "price reporting disabled with invalid observation",
+			observations: []ccip.CommitObservation{
+				{Interval: cciptypes.CommitStoreInterval{Min: 1, Max: 1}, SourceGasPriceUSD: big.NewInt(0)},
+				{Interval: cciptypes.CommitStoreInterval{Min: 1, Max: 1}, SourceGasPriceUSD: nil},
+			},
+			f:                      1,
+			sendRequests:           []cciptypes.EVM2EVMMessageWithTxMeta{},
+			priceReportingDisabled: true,
+			expSeqNumRange:         cciptypes.CommitStoreInterval{Min: 1, Max: 1},
+			expErr:                 true,
+		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			destPriceRegistryReader := ccipdatamocks.NewPriceRegistryReader(t)
-			destPriceRegistryReader.On("GetGasPriceUpdatesCreatedAfter", ctx, sourceChainSelector, mock.Anything, 0).Return(tc.gasPriceUpdates, nil)
-			destPriceRegistryReader.On("GetTokenPriceUpdatesCreatedAfter", ctx, mock.Anything, 0).Return(tc.tokenPriceUpdates, nil)
+			if !tc.priceReportingDisabled {
+				destPriceRegistryReader.On("GetGasPriceUpdatesCreatedAfter", ctx, sourceChainSelector, mock.Anything, 0).Return(tc.gasPriceUpdates, nil)
+				destPriceRegistryReader.On("GetTokenPriceUpdatesCreatedAfter", ctx, mock.Anything, 0).Return(tc.tokenPriceUpdates, nil)
+			}
 
 			onRampReader := ccipdatamocks.NewOnRampReader(t)
 			if len(tc.sendRequests) > 0 {
@@ -292,7 +374,9 @@ func TestCommitReportingPlugin_Report(t *testing.T) {
 			}
 
 			gasPriceEstimator := prices.NewMockGasPriceEstimatorCommit(t)
-			gasPriceEstimator.On("Median", mock.Anything).Return(gasPrice, nil)
+			if !tc.priceReportingDisabled {
+				gasPriceEstimator.On("Median", mock.Anything).Return(gasPrice, nil)
+			}
 			if tc.gasPriceUpdates != nil {
 				gasPriceEstimator.On("Deviates", mock.Anything, mock.Anything, mock.Anything).Return(false, nil)
 			}
@@ -313,8 +397,11 @@ func TestCommitReportingPlugin_Report(t *testing.T) {
 			destPriceRegistryReader.On("GetTokensDecimals", ctx, destTokens).Return(destDecimals, nil).Maybe()
 
 			lp := mocks2.NewLogPoller(t)
-			commitStoreReader, err := v1_2_0.NewCommitStore(logger.TestLogger(t), utils.RandomAddress(), nil, lp, nil)
+			commitStoreReader, err := v1_2_0.NewCommitStore(logger.TestLogger(t), utils.RandomAddress(), nil, lp, nil, nil)
 			assert.NoError(t, err)
+
+			healthCheck := ccipcachemocks.NewChainHealthcheck(t)
+			healthCheck.On("IsHealthy", ctx).Return(true, nil)
 
 			p := &CommitReportingPlugin{}
 			p.lggr = logger.TestLogger(t)
@@ -328,6 +415,8 @@ func TestCommitReportingPlugin_Report(t *testing.T) {
 			p.commitStoreReader = commitStoreReader
 			p.F = tc.f
 			p.metricsCollector = ccip.NoopMetricsCollector
+			p.offchainConfig.PriceReportingDisabled = tc.priceReportingDisabled
+			p.chainHealthcheck = healthCheck
 
 			aos := make([]types.AttributedObservation, 0, len(tc.observations))
 			for _, o := range tc.observations {
@@ -388,6 +477,10 @@ func TestCommitReportingPlugin_ShouldAcceptFinalizedReport(t *testing.T) {
 		p.commitStoreReader = commitStoreReader
 		commitStoreReader.On("DecodeCommitReport", mock.Anything).Return(report, nil)
 
+		chainHealthCheck := ccipcachemocks.NewChainHealthcheck(t)
+		chainHealthCheck.On("IsHealthy", ctx).Return(true, nil).Maybe()
+		p.chainHealthcheck = chainHealthCheck
+
 		encodedReport, err := encodeCommitReport(report)
 		assert.NoError(t, err)
 		shouldAccept, err := p.ShouldAcceptFinalizedReport(ctx, types.ReportTimestamp{}, encodedReport)
@@ -412,6 +505,10 @@ func TestCommitReportingPlugin_ShouldAcceptFinalizedReport(t *testing.T) {
 
 		commitStoreReader.On("DecodeCommitReport", mock.Anything).Return(report, nil)
 		commitStoreReader.On("GetExpectedNextSequenceNumber", mock.Anything).Return(onChainSeqNum, nil)
+
+		chainHealthCheck := ccipcachemocks.NewChainHealthcheck(t)
+		chainHealthCheck.On("IsHealthy", ctx).Return(true, nil)
+		p.chainHealthcheck = chainHealthCheck
 
 		// stale since report interval is behind on chain seq num
 		report.Interval = cciptypes.CommitStoreInterval{Min: onChainSeqNum - 2, Max: onChainSeqNum + 10}
@@ -462,6 +559,10 @@ func TestCommitReportingPlugin_ShouldAcceptFinalizedReport(t *testing.T) {
 		encodedReport, err := encodeCommitReport(report)
 		assert.NoError(t, err)
 
+		chainHealthCheck := ccipcachemocks.NewChainHealthcheck(t)
+		chainHealthCheck.On("IsHealthy", ctx).Return(true, nil)
+		p.chainHealthcheck = chainHealthCheck
+
 		shouldAccept, err := p.ShouldAcceptFinalizedReport(ctx, types.ReportTimestamp{}, encodedReport)
 		assert.NoError(t, err)
 		assert.True(t, shouldAccept)
@@ -496,6 +597,10 @@ func TestCommitReportingPlugin_ShouldTransmitAcceptedReport(t *testing.T) {
 	p.commitStoreReader = commitStoreReader
 	p.inflightReports = newInflightCommitReportsContainer(time.Minute)
 	p.lggr = logger.TestLogger(t)
+
+	chainHealthCheck := ccipcachemocks.NewChainHealthcheck(t)
+	chainHealthCheck.On("IsHealthy", ctx).Return(true, nil).Maybe()
+	p.chainHealthcheck = chainHealthCheck
 
 	t.Run("should transmit when report is not stale", func(t *testing.T) {
 		// not-stale since report interval is not behind on chain seq num
@@ -553,9 +658,14 @@ func TestCommitReportingPlugin_validateObservations(t *testing.T) {
 	}
 	ob1Bytes, err := ob1.Marshal()
 	assert.NoError(t, err)
-	var ob2, ob3 ccip.CommitObservation
-	_ = json.Unmarshal(ob1Bytes, &ob2)
-	_ = json.Unmarshal(ob1Bytes, &ob3)
+	lggr := logger.TestLogger(t)
+	observations := ccip.GetParsableObservations[ccip.CommitObservation](lggr, []types.AttributedObservation{
+		{Observation: ob1Bytes},
+		{Observation: ob1Bytes},
+	})
+	assert.Len(t, observations, 2)
+	ob2 := observations[0]
+	ob3 := observations[1]
 
 	obWithNilGasPrice := ccip.CommitObservation{
 		Interval: cciptypes.CommitStoreInterval{Min: 0, Max: 0},
@@ -594,11 +704,12 @@ func TestCommitReportingPlugin_validateObservations(t *testing.T) {
 	}
 
 	testCases := []struct {
-		name               string
-		commitObservations []ccip.CommitObservation
-		f                  int
-		expValidObs        []ccip.CommitObservation
-		expError           bool
+		name                   string
+		commitObservations     []ccip.CommitObservation
+		f                      int
+		priceReportingDisabled bool
+		expValidObs            []ccip.CommitObservation
+		expError               bool
 	}{
 		{
 			name:               "base",
@@ -670,11 +781,43 @@ func TestCommitReportingPlugin_validateObservations(t *testing.T) {
 			expValidObs:        nil,
 			expError:           true,
 		},
+		{
+			name:                   "no price reporting",
+			commitObservations:     []ccip.CommitObservation{obEmpty, obEmpty},
+			f:                      1,
+			priceReportingDisabled: true,
+			expValidObs:            []ccip.CommitObservation{obEmpty, obEmpty},
+			expError:               false,
+		},
+		{
+			name:                   "no price reporting passes with f=2",
+			commitObservations:     []ccip.CommitObservation{obEmpty, obEmpty, obEmpty},
+			f:                      2,
+			priceReportingDisabled: true,
+			expValidObs:            []ccip.CommitObservation{obEmpty, obEmpty, obEmpty},
+			expError:               false,
+		},
+		{
+			name:                   "no price reporting tolerates 1 observations with price",
+			commitObservations:     []ccip.CommitObservation{obEmpty, obEmpty, obEmpty, ob1},
+			f:                      2,
+			priceReportingDisabled: true,
+			expValidObs:            []ccip.CommitObservation{obEmpty, obEmpty, obEmpty},
+			expError:               false,
+		},
+		{
+			name:                   "no price reporting fails with too many observations with prices",
+			commitObservations:     []ccip.CommitObservation{obEmpty, obEmpty, obWithNilGasPrice, obWithNilTokenPrice},
+			f:                      2,
+			priceReportingDisabled: true,
+			expValidObs:            []ccip.CommitObservation{obEmpty, obEmpty},
+			expError:               true,
+		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			obs, err := validateObservations(ctx, logger.TestLogger(t), destTokens, tc.f, tc.commitObservations)
+			obs, err := validateObservations(ctx, logger.TestLogger(t), destTokens, tc.f, tc.commitObservations, tc.priceReportingDisabled)
 
 			if tc.expError {
 				assert.Error(t, err)

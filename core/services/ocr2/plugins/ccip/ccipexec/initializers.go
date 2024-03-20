@@ -18,7 +18,8 @@ import (
 
 	commonlogger "github.com/smartcontractkit/chainlink-common/pkg/logger"
 
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/cciptypes"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
@@ -46,7 +47,7 @@ import (
 const numTokenDataWorkers = 5
 
 func NewExecutionServices(ctx context.Context, lggr logger.Logger, jb job.Job, chainSet legacyevm.LegacyChainContainer, new bool, argsNoPlugin libocr2.OCR2OracleArgs, logError func(string), qopts ...pg.QOpt) ([]job.ServiceCtx, error) {
-	execPluginConfig, backfillArgs, err := jobSpecToExecPluginConfig(ctx, lggr, jb, chainSet, qopts...)
+	execPluginConfig, backfillArgs, chainHealthcheck, tokenWorker, err := jobSpecToExecPluginConfig(ctx, lggr, jb, chainSet, qopts...)
 	if err != nil {
 		return nil, err
 	}
@@ -70,10 +71,17 @@ func NewExecutionServices(ctx context.Context, lggr logger.Logger, jb job.Job, c
 				backfillArgs.DestLP,
 				backfillArgs.SourceStartBlock,
 				backfillArgs.DestStartBlock,
-				job.NewServiceAdapter(oracle)),
+				job.NewServiceAdapter(oracle),
+			),
+			chainHealthcheck,
+			tokenWorker,
 		}, nil
 	}
-	return []job.ServiceCtx{job.NewServiceAdapter(oracle)}, nil
+	return []job.ServiceCtx{
+		job.NewServiceAdapter(oracle),
+		chainHealthcheck,
+		tokenWorker,
+	}, nil
 }
 
 // UnregisterExecPluginLpFilters unregisters all the registered filters for both source and dest chains.
@@ -85,16 +93,21 @@ func UnregisterExecPluginLpFilters(ctx context.Context, lggr logger.Logger, jb j
 		return err
 	}
 
+	offRampAddress, err := params.offRampReader.Address(ctx)
+	if err != nil {
+		return fmt.Errorf("get offramp reader address: %w", err)
+	}
+
 	versionFinder := factory.NewEvmVersionFinder()
 	unregisterFuncs := []func() error{
 		func() error {
-			return factory.CloseCommitStoreReader(lggr, versionFinder, params.offRampConfig.CommitStore, params.destChain.Client(), params.destChain.LogPoller(), params.sourceChain.GasEstimator(), qopts...)
+			return factory.CloseCommitStoreReader(lggr, versionFinder, params.offRampConfig.CommitStore, params.destChain.Client(), params.destChain.LogPoller(), params.sourceChain.GasEstimator(), params.sourceChain.Config().EVM().GasEstimator().PriceMax().ToInt(), qopts...)
 		},
 		func() error {
 			return factory.CloseOnRampReader(lggr, versionFinder, params.offRampConfig.SourceChainSelector, params.offRampConfig.ChainSelector, params.offRampConfig.OnRamp, params.sourceChain.LogPoller(), params.sourceChain.Client(), qopts...)
 		},
 		func() error {
-			return factory.CloseOffRampReader(lggr, versionFinder, params.offRampReader.Address(), params.destChain.Client(), params.destChain.LogPoller(), params.destChain.GasEstimator(), qopts...)
+			return factory.CloseOffRampReader(lggr, versionFinder, offRampAddress, params.destChain.Client(), params.destChain.LogPoller(), params.destChain.GasEstimator(), params.destChain.Config().EVM().GasEstimator().PriceMax().ToInt(), qopts...)
 		},
 		func() error { // usdc token data reader
 			if usdcDisabled := params.pluginConfig.USDCConfig.AttestationAPI == ""; usdcDisabled {
@@ -115,8 +128,8 @@ func UnregisterExecPluginLpFilters(ctx context.Context, lggr logger.Logger, jb j
 
 // ExecReportToEthTxMeta generates a txmgr.EthTxMeta from the given report.
 // Only MessageIDs will be populated in the TxMeta.
-func ExecReportToEthTxMeta(typ ccipconfig.ContractType, ver semver.Version) (func(report []byte) (*txmgr.TxMeta, error), error) {
-	return factory.ExecReportToEthTxMeta(typ, ver)
+func ExecReportToEthTxMeta(ctx context.Context, typ ccipconfig.ContractType, ver semver.Version) (func(report []byte) (*txmgr.TxMeta, error), error) {
+	return factory.ExecReportToEthTxMeta(ctx, typ, ver)
 }
 
 func initTokenDataProviders(lggr logger.Logger, jobID string, pluginConfig ccipconfig.ExecutionPluginJobSpecConfig, sourceLP logpoller.LogPoller, qopts ...pg.QOpt) (map[cciptypes.Address]tokendata.Reader, error) {
@@ -152,10 +165,10 @@ func initTokenDataProviders(lggr logger.Logger, jobID string, pluginConfig ccipc
 	return tokenDataProviders, nil
 }
 
-func jobSpecToExecPluginConfig(ctx context.Context, lggr logger.Logger, jb job.Job, chainSet legacyevm.LegacyChainContainer, qopts ...pg.QOpt) (*ExecutionPluginStaticConfig, *ccipcommon.BackfillArgs, error) {
+func jobSpecToExecPluginConfig(ctx context.Context, lggr logger.Logger, jb job.Job, chainSet legacyevm.LegacyChainContainer, qopts ...pg.QOpt) (*ExecutionPluginStaticConfig, *ccipcommon.BackfillArgs, *cache.ObservedChainHealthcheck, *tokendata.BackgroundWorker, error) {
 	params, err := extractJobSpecParams(lggr, jb, chainSet, true, qopts...)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 
 	lggr.Infow("Initializing exec plugin",
@@ -171,102 +184,126 @@ func jobSpecToExecPluginConfig(ctx context.Context, lggr logger.Logger, jb job.J
 
 	sourceChainName, destChainName, err := ccipconfig.ResolveChainNames(sourceChainID, destChainID)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 	execLggr := lggr.Named("CCIPExecution").With("sourceChain", sourceChainName, "destChain", destChainName)
 	onRampReader, err := factory.NewOnRampReader(execLggr, versionFinder, params.offRampConfig.SourceChainSelector, params.offRampConfig.ChainSelector, params.offRampConfig.OnRamp, params.sourceChain.LogPoller(), params.sourceChain.Client(), qopts...)
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "create onramp reader")
+		return nil, nil, nil, nil, errors.Wrap(err, "create onramp reader")
 	}
 	dynamicOnRampConfig, err := onRampReader.GetDynamicConfig()
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "get onramp dynamic config")
+		return nil, nil, nil, nil, errors.Wrap(err, "get onramp dynamic config")
 	}
 
 	routerAddr, err := ccipcalc.GenericAddrToEvm(dynamicOnRampConfig.Router)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 	sourceRouter, err := router.NewRouter(routerAddr, params.sourceChain.Client())
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "failed loading source router")
+		return nil, nil, nil, nil, errors.Wrap(err, "failed loading source router")
 	}
 	sourceWrappedNative, err := sourceRouter.GetWrappedNative(&bind.CallOpts{})
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "could not get source native token")
+		return nil, nil, nil, nil, errors.Wrap(err, "could not get source native token")
 	}
 
-	// TODO: we don't support onramp source registry changes without a reboot yet?
-	sourcePriceRegistry, err := factory.NewPriceRegistryReader(lggr, versionFinder, dynamicOnRampConfig.PriceRegistry, params.sourceChain.LogPoller(), params.sourceChain.Client())
+	commitStoreReader, err := factory.NewCommitStoreReader(lggr, versionFinder, params.offRampConfig.CommitStore, params.destChain.Client(), params.destChain.LogPoller(), params.sourceChain.GasEstimator(), params.sourceChain.Config().EVM().GasEstimator().PriceMax().ToInt(), qopts...)
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "could not load source registry")
-	}
-
-	commitStoreReader, err := factory.NewCommitStoreReader(lggr, versionFinder, params.offRampConfig.CommitStore, params.destChain.Client(), params.destChain.LogPoller(), params.sourceChain.GasEstimator(), qopts...)
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "could not load commitStoreReader reader")
+		return nil, nil, nil, nil, errors.Wrap(err, "could not load commitStoreReader reader")
 	}
 
 	tokenDataProviders, err := initTokenDataProviders(lggr, jobIDToString(jb.ID), params.pluginConfig, params.sourceChain.LogPoller(), qopts...)
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "could not get token data providers")
+		return nil, nil, nil, nil, errors.Wrap(err, "could not get token data providers")
 	}
 
 	// Prom wrappers
 	onRampReader = observability.NewObservedOnRampReader(onRampReader, sourceChainID, ccip.ExecPluginLabel)
-	sourcePriceRegistry = observability.NewPriceRegistryReader(sourcePriceRegistry, sourceChainID, ccip.ExecPluginLabel)
 	commitStoreReader = observability.NewObservedCommitStoreReader(commitStoreReader, destChainID, ccip.ExecPluginLabel)
 	offRampReader := observability.NewObservedOffRampReader(params.offRampReader, destChainID, ccip.ExecPluginLabel)
 	metricsCollector := ccip.NewPluginMetricsCollector(ccip.ExecPluginLabel, sourceChainID, destChainID)
 
 	destChainSelector, err := chainselectors.SelectorFromChainId(uint64(destChainID))
 	if err != nil {
-		return nil, nil, fmt.Errorf("get chain %d selector: %w", destChainID, err)
+		return nil, nil, nil, nil, fmt.Errorf("get chain %d selector: %w", destChainID, err)
 	}
 	sourceChainSelector, err := chainselectors.SelectorFromChainId(uint64(sourceChainID))
 	if err != nil {
-		return nil, nil, fmt.Errorf("get chain %d selector: %w", sourceChainID, err)
+		return nil, nil, nil, nil, fmt.Errorf("get chain %d selector: %w", sourceChainID, err)
 	}
 
 	execLggr.Infow("Initialized exec plugin",
 		"pluginConfig", params.pluginConfig,
 		"onRampAddress", params.offRampConfig.OnRamp,
-		"sourcePriceRegistry", sourcePriceRegistry.Address(),
 		"dynamicOnRampConfig", dynamicOnRampConfig,
 		"sourceNative", sourceWrappedNative,
 		"sourceRouter", sourceRouter.Address())
 
 	batchCaller := rpclib.NewDynamicLimitedBatchCaller(lggr, params.destChain.Client(), rpclib.DefaultRpcBatchSizeLimit, rpclib.DefaultRpcBatchBackOffMultiplier)
 
-	tokenPoolBatchedReader, err := batchreader.NewEVMTokenPoolBatchedReader(execLggr, sourceChainSelector, offRampReader.Address(), batchCaller)
+	offrampAddress, err := offRampReader.Address(ctx)
 	if err != nil {
-		return nil, nil, fmt.Errorf("new token pool batched reader: %w", err)
+		return nil, nil, nil, nil, fmt.Errorf("get offramp reader address: %w", err)
 	}
 
-	return &ExecutionPluginStaticConfig{
-			lggr:                     execLggr,
-			onRampReader:             onRampReader,
-			commitStoreReader:        commitStoreReader,
-			offRampReader:            offRampReader,
-			sourcePriceRegistry:      sourcePriceRegistry,
-			sourceWrappedNativeToken: cciptypes.Address(sourceWrappedNative.String()),
-			destChainSelector:        destChainSelector,
-			priceRegistryProvider:    ccipdataprovider.NewEvmPriceRegistry(params.destChain.LogPoller(), params.destChain.Client(), execLggr, ccip.ExecPluginLabel),
-			tokenPoolBatchedReader:   tokenPoolBatchedReader,
-			tokenDataWorker: tokendata.NewBackgroundWorker(
-				ctx,
-				tokenDataProviders,
-				numTokenDataWorkers,
-				5*time.Second,
-				offRampReader.OnchainConfig().PermissionLessExecutionThresholdSeconds,
+	tokenPoolBatchedReader, err := batchreader.NewEVMTokenPoolBatchedReader(execLggr, sourceChainSelector, offrampAddress, batchCaller)
+	if err != nil {
+		return nil, nil, nil, nil, fmt.Errorf("new token pool batched reader: %w", err)
+	}
+
+	chainHealthcheck := cache.NewObservedChainHealthCheck(
+		cache.NewChainHealthcheck(
+			// Adding more details to Logger to make healthcheck logs more informative
+			// It's safe because healthcheck logs only in case of unhealthy state
+			lggr.With(
+				"onramp", params.offRampConfig.OnRamp,
+				"commitStore", params.offRampConfig.CommitStore,
+				"offramp", offrampAddress,
 			),
-			metricsCollector: metricsCollector,
+			onRampReader,
+			commitStoreReader,
+		),
+		ccip.ExecPluginLabel,
+		sourceChainID,
+		destChainID,
+		params.offRampConfig.OnRamp,
+	)
+
+	onchainConfig, err := offRampReader.OnchainConfig(ctx)
+	if err != nil {
+		return nil, nil, nil, nil, fmt.Errorf("get onchain config from offramp reader: %w", err)
+	}
+
+	tokenBackgroundWorker := tokendata.NewBackgroundWorker(
+		tokenDataProviders,
+		numTokenDataWorkers,
+		5*time.Second,
+		onchainConfig.PermissionLessExecutionThresholdSeconds,
+	)
+	return &ExecutionPluginStaticConfig{
+			lggr:                        execLggr,
+			onRampReader:                onRampReader,
+			commitStoreReader:           commitStoreReader,
+			offRampReader:               offRampReader,
+			sourcePriceRegistryProvider: ccipdataprovider.NewEvmPriceRegistry(params.sourceChain.LogPoller(), params.sourceChain.Client(), execLggr, ccip.ExecPluginLabel),
+			sourceWrappedNativeToken:    cciptypes.Address(sourceWrappedNative.String()),
+			destChainSelector:           destChainSelector,
+			priceRegistryProvider:       ccipdataprovider.NewEvmPriceRegistry(params.destChain.LogPoller(), params.destChain.Client(), execLggr, ccip.ExecPluginLabel),
+			tokenPoolBatchedReader:      tokenPoolBatchedReader,
+			tokenDataWorker:             tokenBackgroundWorker,
+			metricsCollector:            metricsCollector,
+			chainHealthcheck:            chainHealthcheck,
 		}, &ccipcommon.BackfillArgs{
 			SourceLP:         params.sourceChain.LogPoller(),
 			DestLP:           params.destChain.LogPoller(),
 			SourceStartBlock: params.pluginConfig.SourceStartBlock,
 			DestStartBlock:   params.pluginConfig.DestStartBlock,
-		}, nil
+		},
+		chainHealthcheck,
+		tokenBackgroundWorker,
+		nil
 }
 
 type jobSpecParams struct {
@@ -295,7 +332,7 @@ func extractJobSpecParams(lggr logger.Logger, jb job.Job, chainSet legacyevm.Leg
 
 	versionFinder := factory.NewEvmVersionFinder()
 	offRampAddress := ccipcalc.HexToAddress(spec.ContractID)
-	offRampReader, err := factory.NewOffRampReader(lggr, versionFinder, offRampAddress, destChain.Client(), destChain.LogPoller(), destChain.GasEstimator(), registerFilters, qopts...)
+	offRampReader, err := factory.NewOffRampReader(lggr, versionFinder, offRampAddress, destChain.Client(), destChain.LogPoller(), destChain.GasEstimator(), destChain.Config().EVM().GasEstimator().PriceMax().ToInt(), registerFilters, qopts...)
 	if err != nil {
 		return nil, errors.Wrap(err, "create offRampReader")
 	}

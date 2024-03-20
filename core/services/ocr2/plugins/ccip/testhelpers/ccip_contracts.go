@@ -22,6 +22,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
 
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/arm_proxy_contract"
@@ -43,7 +44,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/burn_mint_erc677"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/cciptypes"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_2_0"
@@ -96,7 +96,6 @@ func NewCommitOffchainConfig(
 	ExecGasPriceDeviationPPB uint32,
 	TokenPriceHeartBeat config.Duration,
 	TokenPriceDeviationPPB uint32,
-	MaxGasPrice uint64,
 	InflightCacheExpiry config.Duration) CommitOffchainConfig {
 	return CommitOffchainConfig{v1_2_0.JSONCommitOffchainConfig{
 		GasPriceHeartBeat:        GasPriceHeartBeat,
@@ -104,7 +103,6 @@ func NewCommitOffchainConfig(
 		ExecGasPriceDeviationPPB: ExecGasPriceDeviationPPB,
 		TokenPriceHeartBeat:      TokenPriceHeartBeat,
 		TokenPriceDeviationPPB:   TokenPriceDeviationPPB,
-		SourceMaxGasPrice:        MaxGasPrice,
 		InflightCacheExpiry:      InflightCacheExpiry,
 	}}
 }
@@ -155,7 +153,6 @@ func NewExecOffchainConfig(
 	DestOptimisticConfirmations uint32,
 	BatchGasLimit uint32,
 	RelativeBoostPerWaitHour float64,
-	MaxGasPrice uint64,
 	InflightCacheExpiry config.Duration,
 	RootSnoozeTime config.Duration,
 ) ExecOffchainConfig {
@@ -163,7 +160,6 @@ func NewExecOffchainConfig(
 		DestOptimisticConfirmations: DestOptimisticConfirmations,
 		BatchGasLimit:               BatchGasLimit,
 		RelativeBoostPerWaitHour:    RelativeBoostPerWaitHour,
-		DestMaxGasPrice:             MaxGasPrice,
 		InflightCacheExpiry:         InflightCacheExpiry,
 		RootSnoozeTime:              RootSnoozeTime,
 	}}
