@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"math/big"
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -258,6 +259,7 @@ func deployTokenPoolAndRebalancer(
 		tokenAddress,
 		chainID,
 		tokenPoolAddress,
+		big.NewInt(0),
 	)
 	helpers.PanicErr(err)
 	rebalancerAddress := helpers.ConfirmContractDeployed(context.Background(), client, tx, int64(chainID))

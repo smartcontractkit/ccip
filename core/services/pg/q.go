@@ -10,21 +10,15 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
 	"github.com/pkg/errors"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promauto"
-
-	"github.com/jmoiron/sqlx"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil"
 )
 
-var promSQLQueryTime = promauto.NewHistogram(prometheus.HistogramOpts{
-	Name:    "sql_query_timeout_percent",
-	Help:    "SQL query time as a pecentage of timeout.",
-	Buckets: []float64{10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120},
-})
+var promSQLQueryTime = sqlutil.PromSQLQueryTime
 
 // QOpt pattern for ORM methods aims to clarify usage and remove some common footguns, notably:
 //
@@ -199,6 +193,16 @@ func (q Q) ExecQIter(query string, args ...interface{}) (sql.Result, context.Can
 	res, err := q.Queryer.ExecContext(ctx, query, args...)
 	return res, cancel, ql.withLogError(err)
 }
+func (q Q) ExecQWithRowsAffected(query string, args ...interface{}) (int64, error) {
+	res, cancel, err := q.ExecQIter(query, args...)
+	defer cancel()
+	if err != nil {
+		return 0, err
+	}
+
+	rowsDeleted, err := res.RowsAffected()
+	return rowsDeleted, err
+}
 func (q Q) ExecQ(query string, args ...interface{}) error {
 	ctx, cancel := q.Context()
 	defer cancel()
@@ -296,14 +300,25 @@ func sprintQ(query string, args []interface{}) string {
 		case common.Hash:
 			pairs = append(pairs, fmt.Sprintf("$%d", i+1), fmt.Sprintf("'\\x%x'", v.Bytes()))
 		case pq.ByteaArray:
+			pairs = append(pairs, fmt.Sprintf("$%d", i+1))
+			if v == nil {
+				pairs = append(pairs, "NULL")
+				continue
+			}
+			if len(v) == 0 {
+				pairs = append(pairs, "ARRAY[]")
+				continue
+			}
 			var s strings.Builder
-			fmt.Fprintf(&s, "('\\x%x'", v[0])
+			fmt.Fprintf(&s, "ARRAY['\\x%x'", v[0])
 			for j := 1; j < len(v); j++ {
 				fmt.Fprintf(&s, ",'\\x%x'", v[j])
 			}
-			pairs = append(pairs, fmt.Sprintf("$%d", i+1), fmt.Sprintf("%s)", s.String()))
+			pairs = append(pairs, fmt.Sprintf("%s]", s.String()))
+		case string:
+			pairs = append(pairs, fmt.Sprintf("$%d", i+1), fmt.Sprintf("'%s'", v))
 		default:
-			pairs = append(pairs, fmt.Sprintf("$%d", i+1), fmt.Sprintf("%v", arg))
+			pairs = append(pairs, fmt.Sprintf("$%d", i+1), fmt.Sprintf("%v", v))
 		}
 	}
 	replacer := strings.NewReplacer(pairs...)

@@ -8,10 +8,10 @@ import (
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas/mocks"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/cciptypes"
 )
 
 func TestExecPriceEstimator_GetGasPrice(t *testing.T) {
@@ -85,8 +85,8 @@ func TestExecPriceEstimator_GetGasPrice(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			sourceFeeEstimator := mocks.NewEvmFeeEstimator(t)
-			sourceFeeEstimator.On("GetFee", ctx, []byte(nil), uint32(0), assets.NewWei(tc.maxGasPrice)).Return(
-				tc.sourceFeeEstimatorRespFee, uint32(0), tc.sourceFeeEstimatorRespErr)
+			sourceFeeEstimator.On("GetFee", ctx, []byte(nil), uint64(0), assets.NewWei(tc.maxGasPrice)).Return(
+				tc.sourceFeeEstimatorRespFee, uint64(0), tc.sourceFeeEstimatorRespErr)
 
 			g := ExecGasPriceEstimator{
 				estimator:   sourceFeeEstimator,

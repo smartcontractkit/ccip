@@ -1,6 +1,8 @@
 package evm
 
 import (
+	"context"
+
 	"github.com/ethereum/go-ethereum/common"
 
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2/types"
@@ -31,9 +33,9 @@ type ccipCommitProvider struct {
 	contractTransmitter *contractTransmitter
 }
 
-func NewCCIPCommitProvider(lggr logger.Logger, chainSet legacyevm.Chain, rargs commontypes.RelayArgs, transmitterID string, ks keystore.Eth) (CCIPCommitProvider, error) {
+func NewCCIPCommitProvider(ctx context.Context, lggr logger.Logger, chainSet legacyevm.Chain, rargs commontypes.RelayArgs, transmitterID string, ks keystore.Eth) (CCIPCommitProvider, error) {
 	relayOpts := types.NewRelayOpts(rargs)
-	configWatcher, err := newConfigProvider(lggr, chainSet, relayOpts)
+	configWatcher, err := newStandardConfigProvider(lggr, chainSet, relayOpts)
 	if err != nil {
 		return nil, err
 	}
@@ -46,7 +48,7 @@ func NewCCIPCommitProvider(lggr logger.Logger, chainSet legacyevm.Chain, rargs c
 	if err != nil {
 		return nil, err
 	}
-	contractTransmitter, err := newContractTransmitter(lggr, rargs, transmitterID, ks, configWatcher, configTransmitterOpts{}, fn)
+	contractTransmitter, err := newOnChainContractTransmitter(ctx, lggr, rargs, transmitterID, ks, configWatcher, configTransmitterOpts{}, OCR2AggregatorTransmissionContractABI, fn)
 	if err != nil {
 		return nil, err
 	}
@@ -75,10 +77,10 @@ type ccipExecutionProvider struct {
 
 var _ commontypes.Plugin = (*ccipExecutionProvider)(nil)
 
-func NewCCIPExecutionProvider(lggr logger.Logger, chainSet legacyevm.Chain, rargs commontypes.RelayArgs, transmitterID string, ks keystore.Eth) (CCIPExecutionProvider, error) {
+func NewCCIPExecutionProvider(ctx context.Context, lggr logger.Logger, chainSet legacyevm.Chain, rargs commontypes.RelayArgs, transmitterID string, ks keystore.Eth) (CCIPExecutionProvider, error) {
 	relayOpts := types.NewRelayOpts(rargs)
 
-	configWatcher, err := newConfigProvider(lggr, chainSet, relayOpts)
+	configWatcher, err := newStandardConfigProvider(lggr, chainSet, relayOpts)
 	if err != nil {
 		return nil, err
 	}
@@ -87,11 +89,11 @@ func NewCCIPExecutionProvider(lggr logger.Logger, chainSet legacyevm.Chain, rarg
 	if err != nil {
 		return nil, err
 	}
-	fn, err := ccipexec.ExecReportToEthTxMeta(typ, ver)
+	fn, err := ccipexec.ExecReportToEthTxMeta(ctx, typ, ver)
 	if err != nil {
 		return nil, err
 	}
-	contractTransmitter, err := newContractTransmitter(lggr, rargs, transmitterID, ks, configWatcher, configTransmitterOpts{}, fn)
+	contractTransmitter, err := newOnChainContractTransmitter(ctx, lggr, rargs, transmitterID, ks, configWatcher, configTransmitterOpts{}, OCR2AggregatorTransmissionContractABI, fn)
 	if err != nil {
 		return nil, err
 	}
