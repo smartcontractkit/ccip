@@ -216,7 +216,7 @@ func (l *LoadArgs) ValidateCurseFollowedByUncurse() {
 			return lane.Dest.AssertNoExecutionStateChangedEventReceived(lane.Logger, 29*time.Minute, curseTimeStamp.Add(30*time.Second))
 		})
 	}
-
+	l.lggr.Info().Msg("waiting for no commit/execution validation")
 	err := errGrp.Wait()
 	require.NoError(l.t, err, "error received to validate no commit/execution is generated after lane is cursed")
 }

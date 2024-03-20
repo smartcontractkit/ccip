@@ -656,7 +656,7 @@ func (r *Router) CCIPSend(destChainSelector uint64, msg router.ClientEVM2AnyMess
 		opts.Value = valueForNative
 	}
 
-	log.Debug().
+	log.Info().
 		Str(Network, r.client.GetNetworkName()).
 		Str("Router", r.Address()).
 		Interface("TokensAndAmounts", msg.TokenAmounts).

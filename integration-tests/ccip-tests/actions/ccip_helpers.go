@@ -632,9 +632,17 @@ func (ccipModule *CCIPCommon) PollRPCConnection(ctx context.Context) {
 	for {
 		select {
 		case <-ccipModule.ChainClient.ConnectionRestored():
-			ccipModule.IsConnectionRestoredRecently.Store(true)
+			if ccipModule.IsConnectionRestoredRecently == nil {
+				ccipModule.IsConnectionRestoredRecently = atomic.NewBool(true)
+			} else {
+				ccipModule.IsConnectionRestoredRecently.Store(true)
+			}
 		case <-ccipModule.ChainClient.ConnectionIssue():
-			ccipModule.IsConnectionRestoredRecently.Store(false)
+			if ccipModule.IsConnectionRestoredRecently == nil {
+				ccipModule.IsConnectionRestoredRecently = atomic.NewBool(false)
+			} else {
+				ccipModule.IsConnectionRestoredRecently.Store(false)
+			}
 		case <-ctx.Done():
 			return
 		}
