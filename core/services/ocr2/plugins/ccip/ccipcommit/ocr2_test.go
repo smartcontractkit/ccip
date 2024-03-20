@@ -199,6 +199,9 @@ func TestCommitReportingPlugin_Observation(t *testing.T) {
 				for addr := range tc.tokenDecimals {
 					addrs = append(addrs, addr)
 				}
+				sort.Slice(addrs, func(i, j int) bool {
+					return addrs[i] < addrs[j]
+				})
 				priceGet.On("TokenPricesUSD", mock.Anything, addrs).Return(tc.tokenPrices, nil)
 			}
 
@@ -1410,15 +1413,15 @@ func TestCommitReportingPlugin_generatePriceUpdates(t *testing.T) {
 			gasPriceEstimator := prices.NewMockGasPriceEstimatorCommit(t)
 			defer gasPriceEstimator.AssertExpectations(t)
 
-			tokens := make([]cciptypes.Address, 0, len(tc.tokenDecimals))
+			destTokens := make([]cciptypes.Address, 0, len(tc.tokenDecimals))
 			for tk := range tc.tokenDecimals {
-				tokens = append(tokens, tk)
+				destTokens = append(destTokens, tk)
 			}
-			tokens = ccipcommon.FlattenUniqueSlice(tokens, []cciptypes.Address{tc.sourceNativeToken})
-			sort.Slice(tokens, func(i, j int) bool { return tokens[i] < tokens[j] })
+			sort.Slice(destTokens, func(i, j int) bool { return destTokens[i] < destTokens[j] })
+			queryTokens := ccipcommon.FlattenUniqueSlice([]cciptypes.Address{tc.sourceNativeToken}, destTokens)
 
-			if len(tokens) > 0 {
-				priceGetter.On("TokenPricesUSD", mock.Anything, tokens).Return(tc.priceGetterRespData, tc.priceGetterRespErr)
+			if len(queryTokens) > 0 {
+				priceGetter.On("TokenPricesUSD", mock.Anything, queryTokens).Return(tc.priceGetterRespData, tc.priceGetterRespErr)
 			}
 
 			if tc.maxGasPrice > 0 {
@@ -1435,12 +1438,11 @@ func TestCommitReportingPlugin_generatePriceUpdates(t *testing.T) {
 				gasPriceEstimator: gasPriceEstimator,
 			}
 
-			destTokens := make([]cciptypes.Address, 0, len(tc.tokenDecimals))
 			destDecimals := make([]uint8, 0, len(tc.tokenDecimals))
-			for tk, d := range tc.tokenDecimals {
-				destTokens = append(destTokens, tk)
+			for _, d := range tc.tokenDecimals {
 				destDecimals = append(destDecimals, d)
 			}
+			sort.Slice(destDecimals, func(i, j int) bool { return tokens[i] < tokens[j] })
 
 			destPriceReg := ccipdatamocks.NewPriceRegistryReader(t)
 			destPriceReg.On("GetTokensDecimals", mock.Anything, destTokens).Return(destDecimals, nil).Maybe()

@@ -76,18 +76,16 @@ func TestGetChainTokens(t *testing.T) {
 	)
 
 	testCases := []struct {
-		name                  string
-		feeTokens             []cciptypes.Address
-		destTokens            [][]cciptypes.Address
-		expectedFeeTokens     []cciptypes.Address
-		expectedBridgedTokens []cciptypes.Address
+		name                string
+		feeTokens           []cciptypes.Address
+		destTokens          [][]cciptypes.Address
+		expectedChainTokens []cciptypes.Address
 	}{
 		{
-			name:                  "empty",
-			feeTokens:             []cciptypes.Address{},
-			destTokens:            [][]cciptypes.Address{{}},
-			expectedFeeTokens:     []cciptypes.Address{},
-			expectedBridgedTokens: []cciptypes.Address{},
+			name:                "empty",
+			feeTokens:           []cciptypes.Address{},
+			destTokens:          [][]cciptypes.Address{{}},
+			expectedChainTokens: []cciptypes.Address{},
 		},
 		{
 			name:      "single offRamp",
@@ -95,8 +93,7 @@ func TestGetChainTokens(t *testing.T) {
 			destTokens: [][]cciptypes.Address{
 				{tokens[1], tokens[2], tokens[3]},
 			},
-			expectedFeeTokens:     []cciptypes.Address{tokens[0]},
-			expectedBridgedTokens: []cciptypes.Address{tokens[1], tokens[2], tokens[3]},
+			expectedChainTokens: []cciptypes.Address{tokens[0], tokens[1], tokens[2], tokens[3]},
 		},
 		{
 			name:      "multiple offRamps with distinct tokens",
@@ -106,8 +103,7 @@ func TestGetChainTokens(t *testing.T) {
 				{tokens[3], tokens[4]},
 				{tokens[5]},
 			},
-			expectedFeeTokens:     []cciptypes.Address{tokens[0]},
-			expectedBridgedTokens: []cciptypes.Address{tokens[1], tokens[2], tokens[3], tokens[4], tokens[5]},
+			expectedChainTokens: []cciptypes.Address{tokens[0], tokens[1], tokens[2], tokens[3], tokens[4], tokens[5]},
 		},
 		{
 			name:      "overlapping tokens",
@@ -117,8 +113,7 @@ func TestGetChainTokens(t *testing.T) {
 				{tokens[0], tokens[2], tokens[3], tokens[4], tokens[5]},
 				{tokens[5]},
 			},
-			expectedFeeTokens:     []cciptypes.Address{tokens[0]},
-			expectedBridgedTokens: []cciptypes.Address{tokens[0], tokens[1], tokens[2], tokens[3], tokens[4], tokens[5]},
+			expectedChainTokens: []cciptypes.Address{tokens[0], tokens[1], tokens[2], tokens[3], tokens[4], tokens[5]},
 		},
 	}
 
@@ -136,11 +131,10 @@ func TestGetChainTokens(t *testing.T) {
 				offRamps = append(offRamps, offRamp)
 			}
 
-			feeTokens, destTokens, err := GetChainTokens(ctx, offRamps, priceRegistry)
+			chainTokens, err := GetSortedChainTokens(ctx, offRamps, priceRegistry)
 			assert.NoError(t, err)
 
-			assert.ElementsMatch(t, tc.expectedFeeTokens, feeTokens)
-			assert.ElementsMatch(t, tc.expectedBridgedTokens, destTokens)
+			assert.ElementsMatch(t, tc.expectedChainTokens, chainTokens)
 		})
 	}
 }

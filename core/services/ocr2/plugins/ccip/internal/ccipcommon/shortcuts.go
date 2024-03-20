@@ -29,7 +29,7 @@ type BackfillArgs struct {
 
 // GetChainTokens returns union of all tokens supported on the destination chain, including fee tokens from the provided price registry
 // and the bridgeable tokens from all the offRamps living on the chain.
-func GetChainTokens(ctx context.Context, offRamps []ccipdata.OffRampReader, priceRegistry cciptypes.PriceRegistryReader) (fee, bridged []cciptypes.Address, err error) {
+func GetSortedChainTokens(ctx context.Context, offRamps []ccipdata.OffRampReader, priceRegistry cciptypes.PriceRegistryReader) (chainTokens []cciptypes.Address, err error) {
 	eg := new(errgroup.Group)
 
 	var destFeeTokens []cciptypes.Address
@@ -60,26 +60,19 @@ func GetChainTokens(ctx context.Context, offRamps []ccipdata.OffRampReader, pric
 	}
 
 	if err := eg.Wait(); err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	// Same token can be returned by multiple offRamps, we need to dedup them
-	existingTokens := make(map[cciptypes.Address]bool)
-	var uniqueBridgeableTokens []cciptypes.Address
+	// same token can be returned by multiple offRamps, and fee token can overlap with bridgeable tokens,
+	// we need to dedup them to arrive at chain token set
+	uniqueBridgeableTokens := FlattenUniqueSlice(destFeeTokens, destBridgeableTokens)
 
-	for _, token := range destBridgeableTokens {
-		if _, ok := existingTokens[token]; !ok {
-			existingTokens[token] = true
-			uniqueBridgeableTokens = append(uniqueBridgeableTokens, token)
-		}
-	}
-
-	// sort the tokens in deterministic order to aid with testing and debugging
+	// return the tokens in deterministic order to aid with testing and debugging
 	sort.Slice(uniqueBridgeableTokens, func(i, j int) bool {
-		return string(uniqueBridgeableTokens[i]) < string(uniqueBridgeableTokens[j])
+		return uniqueBridgeableTokens[i] < uniqueBridgeableTokens[j]
 	})
 
-	return destFeeTokens, uniqueBridgeableTokens, nil
+	return uniqueBridgeableTokens, nil
 }
 
 // GetDestinationTokens returns the destination chain fee tokens from the provided price registry

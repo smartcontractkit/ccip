@@ -213,13 +213,12 @@ func (r *CommitReportingPlugin) observePriceUpdates(
 		return nil, nil, nil
 	}
 
-	feeTokens, bridgeableTokens, err := ccipcommon.GetChainTokens(ctx, r.offRampReaders, r.destPriceRegistryReader)
+	sortedChainTokens, err := ccipcommon.GetSortedChainTokens(ctx, r.offRampReaders, r.destPriceRegistryReader)
 	if err != nil {
 		return nil, nil, fmt.Errorf("get destination tokens: %w", err)
 	}
-	destTokens := ccipcommon.FlattenUniqueSlice(feeTokens, bridgeableTokens)
 
-	return r.generatePriceUpdates(ctx, lggr, destTokens)
+	return r.generatePriceUpdates(ctx, lggr, sortedChainTokens)
 }
 
 // All prices are USD ($1=1e18) denominated. All prices must be not nil.
@@ -227,12 +226,11 @@ func (r *CommitReportingPlugin) observePriceUpdates(
 func (r *CommitReportingPlugin) generatePriceUpdates(
 	ctx context.Context,
 	lggr logger.Logger,
-	destTokens []cciptypes.Address,
+	sortedChainTokens []cciptypes.Address,
 ) (sourceGasPriceUSD *big.Int, tokenPricesUSD map[cciptypes.Address]*big.Int, err error) {
 	// Include wrapped native in our token query as way to identify the source native USD price.
 	// notice USD is in 1e18 scale, i.e. $1 = 1e18
-	queryTokens := ccipcommon.FlattenUniqueSlice([]cciptypes.Address{r.sourceNative}, destTokens)
-	sort.Slice(queryTokens, func(i, j int) bool { return queryTokens[i] < queryTokens[j] }) // make the query deterministic
+	queryTokens := ccipcommon.FlattenUniqueSlice([]cciptypes.Address{r.sourceNative}, sortedChainTokens)
 
 	rawTokenPricesUSD, err := r.priceGetter.TokenPricesUSD(ctx, queryTokens)
 	if err != nil {
@@ -252,13 +250,13 @@ func (r *CommitReportingPlugin) generatePriceUpdates(
 		return nil, nil, fmt.Errorf("missing source native (%s) price", r.sourceNative)
 	}
 
-	destTokensDecimals, err := r.destPriceRegistryReader.GetTokensDecimals(ctx, destTokens)
+	destTokensDecimals, err := r.destPriceRegistryReader.GetTokensDecimals(ctx, sortedChainTokens)
 	if err != nil {
 		return nil, nil, fmt.Errorf("get tokens decimals: %w", err)
 	}
 
 	tokenPricesUSD = make(map[cciptypes.Address]*big.Int, len(rawTokenPricesUSD))
-	for i, token := range destTokens {
+	for i, token := range sortedChainTokens {
 		tokenPricesUSD[token] = calculateUsdPer1e18TokenAmount(rawTokenPricesUSD[token], destTokensDecimals[i])
 	}
 
@@ -380,14 +378,13 @@ func (r *CommitReportingPlugin) Report(ctx context.Context, epochAndRound types.
 
 	parsableObservations := ccip.GetParsableObservations[ccip.CommitObservation](lggr, observations)
 
-	feeTokens, bridgeableTokens, err := ccipcommon.GetChainTokens(ctx, r.offRampReaders, r.destPriceRegistryReader)
+	sortedChainTokens, err := ccipcommon.GetSortedChainTokens(ctx, r.offRampReaders, r.destPriceRegistryReader)
 	if err != nil {
 		return false, nil, fmt.Errorf("get destination tokens: %w", err)
 	}
-	destTokens := ccipcommon.FlattenUniqueSlice(feeTokens, bridgeableTokens)
 
 	// Filters out parsable but faulty observations
-	validObservations, err := validateObservations(ctx, lggr, destTokens, r.F, parsableObservations, r.offchainConfig.PriceReportingDisabled)
+	validObservations, err := validateObservations(ctx, lggr, sortedChainTokens, r.F, parsableObservations, r.offchainConfig.PriceReportingDisabled)
 	if err != nil {
 		return false, nil, err
 	}
