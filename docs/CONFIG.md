@@ -6332,6 +6332,7 @@ LogKeepBlocksDepth works in conjunction with Feature.LogPoller. Controls how man
 LogPrunePageSize = 10000 # Default
 ```
 LogPrunePageSize defines size of the page for pruning logs. Controls how many logs/blocks (at most) are deleted in a single prune tick. Default value 0 means no paging, delete everything at once.
+CCIP uses paging when removing logs to avoid pushing too much presssure on the database so this value should not be set to 0.
 
 ### BackupLogPollerBlockDelay
 :warning: **_ADVANCED_**: _Do not change this setting unless you know what you are doing._
