@@ -2,6 +2,7 @@ package ccipcommit
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"math/big"
 	"math/rand"
@@ -193,16 +194,23 @@ func TestCommitReportingPlugin_Observation(t *testing.T) {
 					Return(tc.sendReqs, nil)
 			}
 
+			var destTokens []cciptypes.Address
+			for tk := range tc.tokenDecimals {
+				destTokens = append(destTokens, tk)
+			}
+			// ensure destTokens and destDecimals are in the same order, avoid flaky test from unordered map iteration
+			sort.Slice(destTokens, func(i, j int) bool {
+				return destTokens[i] < destTokens[j]
+			})
+			var destDecimals []uint8
+			for _, token := range destTokens {
+				destDecimals = append(destDecimals, tc.tokenDecimals[token])
+			}
+
 			priceGet := pricegetter.NewMockPriceGetter(t)
 			if !tc.priceReportingDisabled && len(tc.tokenPrices) > 0 {
-				addrs := []cciptypes.Address{sourceNativeTokenAddr}
-				for addr := range tc.tokenDecimals {
-					addrs = append(addrs, addr)
-				}
-				sort.Slice(addrs, func(i, j int) bool {
-					return addrs[i] < addrs[j]
-				})
-				priceGet.On("TokenPricesUSD", mock.Anything, addrs).Return(tc.tokenPrices, nil)
+				queryTokens := ccipcommon.FlattenUniqueSlice([]cciptypes.Address{sourceNativeTokenAddr}, destTokens)
+				priceGet.On("TokenPricesUSD", mock.Anything, queryTokens).Return(tc.tokenPrices, nil)
 			}
 
 			gasPriceEstimator := prices.NewMockGasPriceEstimatorCommit(t)
@@ -213,13 +221,6 @@ func TestCommitReportingPlugin_Observation(t *testing.T) {
 				gasPriceEstimator.On("DenoteInUSD", p, tc.tokenPrices[sourceNativeTokenAddr]).Return(pUSD, nil)
 			}
 
-			destTokens := make([]cciptypes.Address, 0)
-			destDecimals := make([]uint8, 0)
-			for tk, d := range tc.tokenDecimals {
-				destTokens = append(destTokens, tk)
-				destDecimals = append(destDecimals, d)
-			}
-
 			offRampReaderMocks := []*ccipdatamocks.OffRampReader{ccipdatamocks.NewOffRampReader(t)}
 			offRampReaderMocks[0].On("GetTokens", ctx).Return(cciptypes.OffRampTokens{
 				DestinationTokens: destTokens,
@@ -227,14 +228,7 @@ func TestCommitReportingPlugin_Observation(t *testing.T) {
 
 			destPriceRegReader := ccipdatamocks.NewPriceRegistryReader(t)
 			destPriceRegReader.On("GetFeeTokens", ctx).Return(nil, nil).Maybe()
-			destPriceRegReader.On("GetTokensDecimals", ctx, mock.MatchedBy(func(tokens []cciptypes.Address) bool {
-				for _, token := range tokens {
-					if !slices.Contains(destTokens, token) {
-						return false
-					}
-				}
-				return true
-			})).Return(destDecimals, nil).Maybe()
+			destPriceRegReader.On("GetTokensDecimals", ctx, destTokens).Return(destDecimals, nil).Maybe()
 
 			if tc.multiOffRamps {
 				offRampReaderMocks = append(offRampReaderMocks, ccipdatamocks.NewOffRampReader(t))
@@ -273,9 +267,19 @@ func TestCommitReportingPlugin_Observation(t *testing.T) {
 			}
 			assert.NoError(t, err)
 
-			expObsBytes, err := tc.expObs.Marshal()
-			assert.NoError(t, err)
-			assert.Equal(t, expObsBytes, []byte(obs))
+			if tc.expObs.TokenPricesUSD != nil {
+				// field ordering in mapping is not guaranteed, if TokenPricesUSD exists, unmarshal to compare mapping
+				var obsStuct ccip.CommitObservation
+				err = json.Unmarshal(obs, &obsStuct)
+				assert.NoError(t, err)
+
+				assert.Equal(t, tc.expObs, obsStuct)
+			} else {
+				// if TokenPricesUSD is nil, compare the bytes directly, unmarshing makes mapping default to empty
+				expObsBytes, err := tc.expObs.Marshal()
+				assert.NoError(t, err)
+				assert.Equal(t, expObsBytes, []byte(obs))
+			}
 		})
 	}
 }
@@ -507,11 +511,16 @@ func TestCommitReportingPlugin_Report(t *testing.T) {
 				gasPriceEstimator.On("Deviates", mock.Anything, mock.Anything, mock.Anything).Return(false, nil)
 			}
 
-			destTokens := make([]cciptypes.Address, 0)
-			destDecimals := make([]uint8, 0)
-			for tk, d := range tc.tokenDecimals {
+			var destTokens []cciptypes.Address
+			for tk := range tc.tokenDecimals {
 				destTokens = append(destTokens, tk)
-				destDecimals = append(destDecimals, d)
+			}
+			sort.Slice(destTokens, func(i, j int) bool {
+				return destTokens[i] < destTokens[j]
+			})
+			var destDecimals []uint8
+			for _, token := range destTokens {
+				destDecimals = append(destDecimals, tc.tokenDecimals[token])
 			}
 
 			offRampReaderMocks := []*ccipdatamocks.OffRampReader{ccipdatamocks.NewOffRampReader(t)}
@@ -1413,11 +1422,18 @@ func TestCommitReportingPlugin_generatePriceUpdates(t *testing.T) {
 			gasPriceEstimator := prices.NewMockGasPriceEstimatorCommit(t)
 			defer gasPriceEstimator.AssertExpectations(t)
 
-			destTokens := make([]cciptypes.Address, 0, len(tc.tokenDecimals))
+			var destTokens []cciptypes.Address
 			for tk := range tc.tokenDecimals {
 				destTokens = append(destTokens, tk)
 			}
-			sort.Slice(destTokens, func(i, j int) bool { return destTokens[i] < destTokens[j] })
+			sort.Slice(destTokens, func(i, j int) bool {
+				return destTokens[i] < destTokens[j]
+			})
+			var destDecimals []uint8
+			for _, token := range destTokens {
+				destDecimals = append(destDecimals, tc.tokenDecimals[token])
+			}
+
 			queryTokens := ccipcommon.FlattenUniqueSlice([]cciptypes.Address{tc.sourceNativeToken}, destTokens)
 
 			if len(queryTokens) > 0 {
@@ -1437,12 +1453,6 @@ func TestCommitReportingPlugin_generatePriceUpdates(t *testing.T) {
 				priceGetter:       priceGetter,
 				gasPriceEstimator: gasPriceEstimator,
 			}
-
-			destDecimals := make([]uint8, 0, len(tc.tokenDecimals))
-			for _, d := range tc.tokenDecimals {
-				destDecimals = append(destDecimals, d)
-			}
-			sort.Slice(destDecimals, func(i, j int) bool { return tokens[i] < tokens[j] })
 
 			destPriceReg := ccipdatamocks.NewPriceRegistryReader(t)
 			destPriceReg.On("GetTokensDecimals", mock.Anything, destTokens).Return(destDecimals, nil).Maybe()

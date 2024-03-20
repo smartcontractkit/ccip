@@ -2,6 +2,7 @@ package ccipcommon
 
 import (
 	"math/rand"
+	"sort"
 	"strconv"
 	"testing"
 
@@ -66,14 +67,10 @@ func TestFlattenUniqueSlice(t *testing.T) {
 }
 
 func TestGetChainTokens(t *testing.T) {
-	tokens := ccipcalc.EvmAddrsToGeneric(
-		utils.RandomAddress(),
-		utils.RandomAddress(),
-		utils.RandomAddress(),
-		utils.RandomAddress(),
-		utils.RandomAddress(),
-		utils.RandomAddress(),
-	)
+	var tokens []cciptypes.Address
+	for i := 0; i < 6; i++ {
+		tokens = append(tokens, ccipcalc.EvmAddrToGeneric(utils.RandomAddress()))
+	}
 
 	testCases := []struct {
 		name                string
@@ -134,7 +131,10 @@ func TestGetChainTokens(t *testing.T) {
 			chainTokens, err := GetSortedChainTokens(ctx, offRamps, priceRegistry)
 			assert.NoError(t, err)
 
-			assert.ElementsMatch(t, tc.expectedChainTokens, chainTokens)
+			sort.Slice(tc.expectedChainTokens, func(i, j int) bool {
+				return tc.expectedChainTokens[i] < tc.expectedChainTokens[j]
+			})
+			assert.Equal(t, tc.expectedChainTokens, chainTokens)
 		})
 	}
 }
