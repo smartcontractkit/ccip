@@ -120,8 +120,8 @@ geth:
     runAsUser: 999
     runAsGroup: 999
   version: v1.12.0
-  wsrpcPort: 8546
-  httprpcPort: 8544
+  wsRpcPort: 8546
+  httpRpcPort: 8544
   blocktime: 1
   chains:
     - networkId: 1337

@@ -20,7 +20,7 @@ spec:
           env:
             - name: CONFIG_JSON_PATH
               value: /data/config.json
-          command: [ "go", "test", "pilot/crib_test.go", "-v" ]
+          command: [  "pilot.test", "-test.v" ]
           volumeMounts:
             - name: config-volume
               mountPath: /data
