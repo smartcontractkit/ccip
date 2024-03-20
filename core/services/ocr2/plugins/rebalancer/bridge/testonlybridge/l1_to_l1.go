@@ -201,7 +201,7 @@ func (t *testBridge) GetTransfers(ctx context.Context, localToken models.Address
 		return nil, fmt.Errorf("get ready to finalize: %w", err)
 	}
 
-	return t.toPendingTransfers(localToken, remoteToken, readyToProve, readyToFinalize, parsedToLP), nil
+	return t.toPendingTransfers(localToken, remoteToken, readyToProve, readyToFinalize, parsedToLP)
 }
 
 func (t *testBridge) toPendingTransfers(
@@ -209,20 +209,18 @@ func (t *testBridge) toPendingTransfers(
 	readyToProve,
 	readyToFinalize []*rebalancer.RebalancerLiquidityTransferred,
 	parsedToLP map[logKey]logpoller.Log,
-) []models.PendingTransfer {
+) ([]models.PendingTransfer, error) {
 	var transfers []models.PendingTransfer
 
 	for _, send := range readyToProve {
 		lp := parsedToLP[logKey{txHash: send.Raw.TxHash, logIndex: int64(send.Raw.Index)}]
 		sendNonce, err := UnpackBridgeSendReturnData(send.BridgeReturnData)
 		if err != nil {
-			t.lggr.Errorw("unpack send bridge data", "err", err)
-			continue
+			return nil, fmt.Errorf("unpack send bridge data %x: %w", send.BridgeReturnData, err)
 		}
 		bridgeData, err := PackProveBridgePayload(sendNonce)
 		if err != nil {
-			t.lggr.Errorw("pack bridge data", "err", err)
-			continue
+			return nil, fmt.Errorf("pack bridge data (%s): %w", sendNonce.String(), err)
 		}
 		transfers = append(transfers, models.PendingTransfer{
 			Transfer: models.Transfer{
@@ -246,13 +244,11 @@ func (t *testBridge) toPendingTransfers(
 		lp := parsedToLP[logKey{txHash: send.Raw.TxHash, logIndex: int64(send.Raw.Index)}]
 		sendNonce, err := UnpackBridgeSendReturnData(send.BridgeReturnData)
 		if err != nil {
-			t.lggr.Errorw("unpack send bridge data", "err", err)
-			continue
+			return nil, fmt.Errorf("unpack send bridge data %x: %w", send.BridgeReturnData, err)
 		}
 		bridgeData, err := PackFinalizeBridgePayload(send.Amount, sendNonce)
 		if err != nil {
-			t.lggr.Errorw("pack bridge data", "err", err)
-			continue
+			return nil, fmt.Errorf("pack bridge data (%s): %w", sendNonce.String(), err)
 		}
 		transfers = append(transfers, models.PendingTransfer{
 			Transfer: models.Transfer{
@@ -276,7 +272,7 @@ func (t *testBridge) toPendingTransfers(
 		t.lggr.Infow("produced pending transfers", "pendingTransfers", transfers)
 	}
 
-	return transfers
+	return transfers, nil
 }
 
 // filterAndGroupByStage filters out sends that have already been finalized
@@ -328,6 +324,7 @@ func filterAndGroupByStage(
 	return
 }
 
+// groupByStage groups the unfinalized transfers into two categories: ready to prove and ready to finalize.
 func groupByStage(
 	unfinalized []*rebalancer.RebalancerLiquidityTransferred,
 	stepsCompleted []*rebalancer.RebalancerFinalizationStepCompleted,
@@ -337,21 +334,11 @@ func groupByStage(
 	err error,
 ) {
 	for _, candidate := range unfinalized {
-		var proven bool
-		for _, stepCompleted := range stepsCompleted {
-			sendNonce, err := UnpackBridgeSendReturnData(candidate.BridgeReturnData)
-			if err != nil {
-				return nil, nil, fmt.Errorf("unpack send bridge data: %w", err)
-			}
-			proveNonce, err := UnpackProveBridgePayload(stepCompleted.BridgeSpecificData)
-			if err != nil {
-				return nil, nil, fmt.Errorf("unpack prove bridge data: %w", err)
-			}
-			if proveNonce.Cmp(sendNonce) == 0 {
-				proven = true
-				break
-			}
+		proven, err := isCandidateProven(candidate, stepsCompleted)
+		if err != nil {
+			return nil, nil, fmt.Errorf("new function: %w", err)
 		}
+
 		if proven {
 			readyToFinalize = append(readyToFinalize, candidate)
 		} else {
@@ -359,6 +346,27 @@ func groupByStage(
 		}
 	}
 	return
+}
+
+// isCandidateProven returns true if the candidate transfer has already been proven.
+// it does this by checking if the candidate's nonce matches any of the nonces in the
+// stepsCompleted logs.
+// see contracts/src/v0.8/rebalancer/test/mocks/MockBridgeAdapter.sol for details on this.
+func isCandidateProven(candidate *rebalancer.RebalancerLiquidityTransferred, stepsCompleted []*rebalancer.RebalancerFinalizationStepCompleted) (bool, error) {
+	for _, stepCompleted := range stepsCompleted {
+		sendNonce, err := UnpackBridgeSendReturnData(candidate.BridgeReturnData)
+		if err != nil {
+			return false, fmt.Errorf("unpack send bridge data: %w", err)
+		}
+		proveNonce, err := UnpackProveBridgePayload(stepCompleted.BridgeSpecificData)
+		if err != nil {
+			return false, fmt.Errorf("unpack prove bridge data: %w", err)
+		}
+		if proveNonce.Cmp(sendNonce) == 0 {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 func filterFinalized(
