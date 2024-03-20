@@ -146,7 +146,6 @@ type CCIPCommon struct {
 	poolFunds                    *big.Int
 	gasUpdateWatcherMu           *sync.Mutex
 	gasUpdateWatcher             map[uint64]*big.Int // key - destchain id; value - timestamp of update
-	PriceUpdateCtx               context.Context
 	IsConnectionRestoredRecently *atomic.Bool
 }
 
@@ -2086,15 +2085,36 @@ type CCIPLane struct {
 	DstNetworkLaneCfg *laneconfig.LaneConfig
 }
 
-func (lane *CCIPLane) TokenPricesConfig() (string, error) {
+func (lane *CCIPLane) TokenPricesConfig(static bool) (string, error) {
 	d := DynamicPriceGetterConfig{
 		AggregatorPrices: make(map[common.Address]AggregatorPriceConfig),
 		StaticPrices:     make(map[common.Address]StaticPriceConfig),
 	}
-	for _, token := range lane.Dest.Common.BridgeTokens {
-		err := d.AddStaticPriceConfig(token.Address(), lane.DestChain.GetChainID().Uint64(), LinkToUSD)
+	if static {
+		for _, token := range lane.Dest.Common.BridgeTokens {
+			err := d.AddStaticPriceConfig(token.Address(), lane.DestChain.GetChainID().Uint64(), LinkToUSD)
+			if err != nil {
+				return "", fmt.Errorf("error in AddStaticPriceConfig for bridge token %s: %w", token.Address(), err)
+			}
+		}
+		err := d.AddStaticPriceConfig(lane.Dest.Common.FeeToken.Address(), lane.DestChain.GetChainID().Uint64(), LinkToUSD)
 		if err != nil {
-			return "", fmt.Errorf("error in AddStaticPriceConfig for bridge token %s: %w", token.Address(), err)
+			return "", fmt.Errorf("error in AddStaticPriceConfig for Fee token %s: %w", lane.Dest.Common.FeeToken.Address(), err)
+		}
+		err = d.AddStaticPriceConfig(lane.Dest.Common.WrappedNative.Hex(), lane.DestChain.GetChainID().Uint64(), WrappedNativeToUSD)
+		if err != nil {
+			return "", fmt.Errorf("error in AddStaticPriceConfig for WrappedNative token %s: %w", lane.Dest.Common.WrappedNative.Hex(), err)
+		}
+		err = d.AddStaticPriceConfig(lane.Source.Common.WrappedNative.Hex(), lane.SourceChain.GetChainID().Uint64(), WrappedNativeToUSD)
+		if err != nil {
+			return "", fmt.Errorf("error in AddStaticPriceConfig for WrappedNative token %s: %w", lane.Source.Common.WrappedNative.Hex(), err)
+		}
+		return d.String()
+	}
+	for _, token := range lane.Dest.Common.BridgeTokens {
+		err := d.AddAggregatorPriceConfig(token.Address(), lane.Dest.Common.PriceAggregators, LinkToUSD)
+		if err != nil {
+			return "", fmt.Errorf("error in AddAggregatorPriceConfig for bridge token %s: %w", token.Address(), err)
 		}
 	}
 	if err := d.AddAggregatorPriceConfig(lane.Dest.Common.FeeToken.Address(), lane.Dest.Common.PriceAggregators, LinkToUSD); err != nil {
@@ -2737,6 +2757,7 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 	configureCLNodes bool,
 	jobErrGroup *errgroup.Group,
 	withPipeline bool,
+	staticPrice bool,
 ) (*laneconfig.LaneConfig, *laneconfig.LaneConfig, error) {
 	var err error
 	sourceChainClient := lane.SourceChain
@@ -2852,7 +2873,7 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 		tokensUSDUrl := TokenPricePipelineURLs(tokenAddresses, killgrave, env.MockServer)
 		tokenPricesUSDPipeline = TokenFeeForMultipleTokenAddr(tokensUSDUrl)
 	} else {
-		tokenPricesConfigJson, err = lane.TokenPricesConfig()
+		tokenPricesConfigJson, err = lane.TokenPricesConfig(staticPrice)
 		if err != nil {
 			return lane.SrcNetworkLaneCfg, lane.DstNetworkLaneCfg, fmt.Errorf("error getting token prices config %w", err)
 		}

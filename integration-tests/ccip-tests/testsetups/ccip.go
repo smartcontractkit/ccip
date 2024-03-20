@@ -481,11 +481,11 @@ func (o *CCIPTestSetUpOutputs) AddLanesForNetworkPair(
 	if networkBCmn == nil {
 		return errors.WithStack(fmt.Errorf("chain contracts for network %s not found", networkB.Name))
 	}
-
+	staticPrice := o.Cfg.TestGroupInput.DynamicPriceUpdateInterval == nil
 	setUpFuncs.Go(func() error {
 		lggr.Info().Msgf("Setting up lane %s to %s", networkA.Name, networkB.Name)
 		srcConfig, destConfig, err := ccipLaneA2B.DeployNewCCIPLane(o.SetUpContext, o.Env, commitAndExecOnSameDON, networkACmn, networkBCmn,
-			transferAmounts, o.BootstrapAdded, configureCLNode, o.JobAddGrp, withPipeline)
+			transferAmounts, o.BootstrapAdded, configureCLNode, o.JobAddGrp, withPipeline, staticPrice)
 		if err != nil {
 			allErrors.Store(multierr.Append(allErrors.Load(), fmt.Errorf("deploying lane %s to %s; err - %w", networkA.Name, networkB.Name, errors.WithStack(err))))
 			return err
@@ -509,7 +509,7 @@ func (o *CCIPTestSetUpOutputs) AddLanesForNetworkPair(
 		if bidirectional {
 			lggr.Info().Msgf("Setting up lane %s to %s", networkB.Name, networkA.Name)
 			srcConfig, destConfig, err := ccipLaneB2A.DeployNewCCIPLane(o.SetUpContext, o.Env, commitAndExecOnSameDON, networkBCmn, networkACmn,
-				transferAmounts, o.BootstrapAdded, configureCLNode, o.JobAddGrp, withPipeline)
+				transferAmounts, o.BootstrapAdded, configureCLNode, o.JobAddGrp, withPipeline, staticPrice)
 			if err != nil {
 				lggr.Error().Err(err).Msgf("error deploying lane %s to %s", networkB.Name, networkA.Name)
 				allErrors.Store(multierr.Append(allErrors.Load(), fmt.Errorf("deploying lane %s to %s; err -  %w", networkB.Name, networkA.Name, errors.WithStack(err))))
