@@ -210,6 +210,7 @@ func (c *CCIPTestConfig) SetNetworkPairs(lggr zerolog.Logger) error {
 					GasEstimationBuffer:       n.GasEstimationBuffer + 1000,
 					ClientImplementation:      n.ClientImplementation,
 					DefaultGasLimit:           n.DefaultGasLimit,
+					FinalityDepth:             n.FinalityDepth,
 				})
 			}
 		}
