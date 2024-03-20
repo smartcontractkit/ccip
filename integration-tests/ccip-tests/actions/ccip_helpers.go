@@ -555,6 +555,7 @@ func (ccipModule *CCIPCommon) WatchForPriceUpdates() error {
 				ccipModule.gasUpdateWatcher[destChain] = e.Timestamp
 				ccipModule.gasUpdateWatcherMu.Unlock()
 				log.Info().
+					Uint64("chainSelector", e.DestChain).
 					Str("source_chain", ccipModule.ChainClient.GetNetworkName()).
 					Uint64("dest_chain", destChain).
 					Str("price_registry", ccipModule.PriceRegistry.Address()).
@@ -572,10 +573,12 @@ func (ccipModule *CCIPCommon) WatchForPriceUpdates() error {
 
 // UpdateTokenPricesAtRegularInterval updates aggregator contract with updated answer at regular interval.
 // At each iteration of ticker it chooses one of the aggregator contracts and updates its round answer.
-func (ccipModule *CCIPCommon) UpdateTokenPricesAtRegularInterval(ctx context.Context, interval time.Duration) {
+func (ccipModule *CCIPCommon) UpdateTokenPricesAtRegularInterval(ctx context.Context, client blockchain.EVMClient, interval time.Duration) {
 	var aggregators []contracts.MockAggregator
 	for _, aggregatorContract := range ccipModule.PriceAggregators {
-		aggregators = append(aggregators, *aggregatorContract)
+		contract := *aggregatorContract
+		contract.SetClient(client)
+		aggregators = append(aggregators, contract)
 	}
 	go func() {
 		rand.Seed(uint64(time.Now().UnixNano()))
@@ -2083,7 +2086,6 @@ type CCIPLane struct {
 	Context           context.Context
 	SrcNetworkLaneCfg *laneconfig.LaneConfig
 	DstNetworkLaneCfg *laneconfig.LaneConfig
-	Subscriptions     []event.Subscription
 }
 
 func (lane *CCIPLane) TokenPricesConfig() (string, error) {
@@ -2550,12 +2552,6 @@ func (lane *CCIPLane) ValidateRequestByTxHash(txHash common.Hash, execState test
 	return nil
 }
 
-// UpdateTokenPriceAtRegularInterval is called if we want to change prices dynamically over the test duration in mentioned regular interval
-func (lane *CCIPLane) UpdateTokenPriceAtRegularInterval(interval time.Duration) {
-	lane.Dest.Common.UpdateTokenPricesAtRegularInterval(lane.Context, interval)
-	lane.Source.Common.UpdateTokenPricesAtRegularInterval(lane.Context, interval)
-}
-
 func (lane *CCIPLane) StartEventWatchers() error {
 	if !lane.Source.Common.ChainClient.NetworkSimulated() &&
 		lane.Source.Common.ChainClient.GetNetworkConfig().FinalityDepth == 0 {
@@ -2573,8 +2569,8 @@ func (lane *CCIPLane) StartEventWatchers() error {
 	if err != nil {
 		return err
 	}
-	lane.Subscriptions = append(lane.Subscriptions, sub)
 	go func(sub event.Subscription) {
+		defer sub.Unsubscribe()
 		for {
 			select {
 			case e := <-sendReqEvent:
@@ -2593,25 +2589,27 @@ func (lane *CCIPLane) StartEventWatchers() error {
 				if lane.Source.Common.IsConnectionRestoredRecently != nil && lane.Source.Common.IsConnectionRestoredRecently.Load() {
 					lane.Logger.Info().Msg("source connection restored")
 					sub.Unsubscribe()
-					sub, err := lane.Source.OnRamp.Instance.WatchCCIPSendRequested(&bind.WatchOpts{
+					sub, err = lane.Source.OnRamp.Instance.WatchCCIPSendRequested(&bind.WatchOpts{
 						Start: pointer.ToUint64(lane.Source.SrcStartBlock),
 					}, sendReqEvent)
 					if err != nil {
-						lane.Subscriptions = append(lane.Subscriptions, sub)
+						lane.Logger.Error().Err(err).Msg("error in resubscribing to CCIPSendRequested after restoring connection")
 					}
 				}
+			case <-lane.Context.Done():
+				return
 			}
 		}
 	}(sub)
+
 	reportAcceptedEvent := make(chan *commit_store.CommitStoreReportAccepted)
 	sub, err = lane.Dest.CommitStore.Instance.WatchReportAccepted(nil, reportAcceptedEvent)
 	if err != nil {
 		return err
 	}
 
-	lane.Subscriptions = append(lane.Subscriptions, sub)
-
 	go func(sub event.Subscription) {
+		defer sub.Unsubscribe()
 		for {
 			select {
 			case e := <-reportAcceptedEvent:
@@ -2625,13 +2623,15 @@ func (lane *CCIPLane) StartEventWatchers() error {
 				if lane.Dest.Common.IsConnectionRestoredRecently != nil && lane.Dest.Common.IsConnectionRestoredRecently.Load() {
 					lane.Logger.Info().Msg("dest connection restored")
 					sub.Unsubscribe()
-					sub, err := lane.Dest.CommitStore.Instance.WatchReportAccepted(&bind.WatchOpts{
+					sub, err = lane.Dest.CommitStore.Instance.WatchReportAccepted(&bind.WatchOpts{
 						Start: pointer.ToUint64(lane.Dest.DestStartBlock),
 					}, reportAcceptedEvent)
 					if err != nil {
-						lane.Subscriptions = append(lane.Subscriptions, sub)
+						lane.Logger.Error().Err(err).Msg("error in resubscribing to ReportAccepted after restoring connection")
 					}
 				}
+			case <-lane.Context.Done():
+				return
 			}
 		}
 	}(sub)
@@ -2643,9 +2643,8 @@ func (lane *CCIPLane) StartEventWatchers() error {
 			return err
 		}
 
-		lane.Subscriptions = append(lane.Subscriptions, sub)
-
 		go func(sub event.Subscription) {
+			defer sub.Unsubscribe()
 			for {
 				select {
 				case e := <-reportBlessedEvent:
@@ -2660,26 +2659,28 @@ func (lane *CCIPLane) StartEventWatchers() error {
 					if lane.Dest.Common.IsConnectionRestoredRecently != nil && lane.Dest.Common.IsConnectionRestoredRecently.Load() {
 						lane.Logger.Info().Msg("dest connection restored")
 						sub.Unsubscribe()
-						sub, err := lane.Dest.Common.ARM.Instance.WatchTaggedRootBlessed(&bind.WatchOpts{
+						sub, err = lane.Dest.Common.ARM.Instance.WatchTaggedRootBlessed(&bind.WatchOpts{
 							Start: pointer.ToUint64(lane.Dest.DestStartBlock),
 						}, reportBlessedEvent, nil)
 						if err != nil {
-							lane.Subscriptions = append(lane.Subscriptions, sub)
+							lane.Logger.Error().Err(err).Msg("error in resubscribing to TaggedRootBlessed after restoring connection")
 						}
 					}
+				case <-lane.Context.Done():
+					return
 				}
 			}
 		}(sub)
 	}
+
 	execStateChangedEvent := make(chan *evm_2_evm_offramp.EVM2EVMOffRampExecutionStateChanged)
 	sub, err = lane.Dest.OffRamp.Instance.WatchExecutionStateChanged(nil, execStateChangedEvent, nil, nil)
 	if err != nil {
 		return err
 	}
 
-	lane.Subscriptions = append(lane.Subscriptions, sub)
-
 	go func(sub event.Subscription) {
+		defer sub.Unsubscribe()
 		for {
 			select {
 			case e := <-execStateChangedEvent:
@@ -2692,13 +2693,15 @@ func (lane *CCIPLane) StartEventWatchers() error {
 				if lane.Dest.Common.IsConnectionRestoredRecently != nil && lane.Dest.Common.IsConnectionRestoredRecently.Load() {
 					lane.Logger.Info().Msg("dest connection restored")
 					sub.Unsubscribe()
-					sub, err := lane.Dest.OffRamp.Instance.WatchExecutionStateChanged(&bind.WatchOpts{
+					sub, err = lane.Dest.OffRamp.Instance.WatchExecutionStateChanged(&bind.WatchOpts{
 						Start: pointer.ToUint64(lane.Dest.DestStartBlock),
 					}, execStateChangedEvent, nil, nil)
 					if err != nil {
-						lane.Subscriptions = append(lane.Subscriptions, sub)
+						lane.Logger.Error().Err(err).Msg("error in resubscribing to ExecutionStateChanged after restoring connection")
 					}
 				}
+			case <-lane.Context.Done():
+				return
 			}
 		}
 	}(sub)
@@ -2710,9 +2713,6 @@ func (lane *CCIPLane) CleanUp(clearFees bool) error {
 	if !lane.Source.Common.ChainClient.NetworkSimulated() &&
 		lane.Source.Common.ChainClient.GetNetworkConfig().FinalityDepth == 0 {
 		lane.Source.Common.ChainClient.CancelFinalityPolling()
-	}
-	for _, sub := range lane.Subscriptions {
-		sub.Unsubscribe()
 	}
 	// recover fees from onRamp contract
 	if clearFees && !lane.Source.Common.ChainClient.NetworkSimulated() {
