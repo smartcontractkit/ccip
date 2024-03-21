@@ -1,3 +1,4 @@
+{{- if $.Values.ccip.deployContractsAndJobs }}
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -9,7 +10,7 @@ metadata:
     prometheus.io/scrape: 'true'
     # This is what defines this resource as a hook. Without this line, the
     # job is considered part of the release.
-    "helm.sh/hook": post-install
+    "helm.sh/hook": post-install,post-upgrade
     "helm.sh/hook-weight": "0"
     "helm.sh/hook-delete-policy": before-hook-creation
 spec:
@@ -67,3 +68,4 @@ spec:
             defaultMode: 0755
             name: ccip-scripts-scripts
   backoffLimit: 0
+{{- end}}

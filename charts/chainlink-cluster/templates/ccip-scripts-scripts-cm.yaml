@@ -1,3 +1,4 @@
+{{- if $.Values.ccip.deployContractsAndJobs }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -34,3 +35,4 @@ data:
 
     echo "Endpoint is ready!"
 
+{{- end }}

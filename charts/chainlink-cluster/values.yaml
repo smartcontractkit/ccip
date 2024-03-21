@@ -145,6 +145,7 @@ geth:
 
 ccip:
   ccipScriptsImage: ccip-scripts-image:image-tag
+  deployContractsAndJobs: false
   chains:
     - NetworkId: 1337
       ChainId: geth_1337

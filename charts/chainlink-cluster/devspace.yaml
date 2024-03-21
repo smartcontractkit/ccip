@@ -74,8 +74,7 @@ pipelines:
       --set=helm.values.chainlink.nodes[3].image=$image \
       --set=helm.values.chainlink.nodes[4].image=$image \
       --set=helm.values.chainlink.nodes[5].image=$image \
-      --set=helm.values.ingress.baseDomain=$DEVSPACE_INGRESS_BASE_DOMAIN \
-      --set=helm.values.ccip.ccipScriptsImage=$DEVSPACE_CCIP_SCRIPTS_IMAGE
+      --set=helm.values.ingress.baseDomain=$DEVSPACE_INGRESS_BASE_DOMAIN
       echo
       echo "Namespace ${DEVSPACE_NAMESPACE} will be deleted in ${NS_TTL}"
       echo "To extend the TTL for e.g. 72 hours, run: devspace run ttl ${DEVSPACE_NAMESPACE} 72h"
@@ -139,7 +138,8 @@ deployments:
     namespace: ${DEVSPACE_NAMESPACE}
     helm:
       releaseName: "app"
-      upgradeArgs: ["--timeout", "10m"]
+      upgradeArgs: ["--timeout", "10m", "--debug"]
+      displayOutput: true
       chart:
         name: cl-cluster
         path: .
@@ -544,6 +544,9 @@ deployments:
             limits:
               cpu: 1
               memory: 1024Mi
+        ccip:
+          deployContractsAndJobs: true
+          ccipScriptsImage: ${DEVSPACE_CCIP_SCRIPTS_IMAGE}
         # mockserver is https://www.mock-server.com/where/kubernetes.html
         # used to stub External Adapters
         mockserver:
