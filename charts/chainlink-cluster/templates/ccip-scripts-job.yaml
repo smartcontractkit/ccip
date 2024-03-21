@@ -14,13 +14,32 @@ spec:
       annotations:
         prometheus.io/scrape: 'true'
     spec:
+      initContainers:
+        - name: wait-for-nodes
+          image: {{.Values.ccip.ccipScriptsImage}}
+          volumeMounts:
+            - name: scripts-volume
+              mountPath: /scripts
+          securityContext:
+            capabilities:
+              drop:
+                - ALL
+            runAsUser: 999
+            runAsGroup: 999
+            runAsNonRoot: true
+          command:
+            - bash
+            - /scripts/wait_for_endpoint.sh
+            {{- with (index $.Values.chainlink.nodes 0) }}
+            - "http://app-{{.name}}.{{$.Release.Namespace}}.svc.cluster.local:{{$.Values.chainlink.web_port}}"
+            {{- end }}
       containers:
         - name: ccip-scripts
           image: {{.Values.ccip.ccipScriptsImage}}
           env:
             - name: CONFIG_JSON_PATH
               value: /data/config.json
-          command: [  "pilot.test", "-test.v" ]
+          command: [ "pilot.test", "-test.v" ]
           volumeMounts:
             - name: config-volume
               mountPath: /data
@@ -36,4 +55,8 @@ spec:
         - name: config-volume
           configMap:
             name: ccip-scripts-config
+        - name: scripts-volume
+          configMap:
+            defaultMode: 0755
+            name: ccip-scripts-scripts
   backoffLimit: 1
