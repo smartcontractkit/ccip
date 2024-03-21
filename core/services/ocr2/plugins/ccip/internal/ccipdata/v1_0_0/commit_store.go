@@ -242,8 +242,8 @@ func (c *CommitStore) ChangeConfig(onchainConfig []byte, offchainConfig []byte) 
 	return cciptypes.Address(onchainConfigParsed.PriceRegistry.String()), nil
 }
 
-func (c *CommitStore) Close(qopts ...pg.QOpt) error {
-	return logpollerutil.UnregisterLpFilters(c.lp, c.filters, qopts...)
+func (c *CommitStore) Close() error {
+	return logpollerutil.UnregisterLpFilters(c.lp, c.filters)
 }
 
 func (c *CommitStore) parseReport(log types.Log) (*cciptypes.CommitStoreReport, error) {
@@ -374,8 +374,8 @@ func (c *CommitStore) VerifyExecutionReport(ctx context.Context, report cciptype
 	return true, nil
 }
 
-func (c *CommitStore) RegisterFilters(qopts ...pg.QOpt) error {
-	return logpollerutil.RegisterLpFilters(c.lp, c.filters, qopts...)
+func (c *CommitStore) RegisterFilters() error {
+	return logpollerutil.RegisterLpFilters(c.lp, c.filters)
 }
 
 func NewCommitStore(lggr logger.Logger, addr common.Address, ec client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator, sourceMaxGasPrice *big.Int) (*CommitStore, error) {

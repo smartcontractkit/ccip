@@ -206,12 +206,12 @@ func (o *OnRamp) IsSourceCursed(ctx context.Context) (bool, error) {
 	return cursed, nil
 }
 
-func (o *OnRamp) Close(qopts ...pg.QOpt) error {
-	return logpollerutil.UnregisterLpFilters(o.lp, o.filters, qopts...)
+func (o *OnRamp) Close() error {
+	return logpollerutil.UnregisterLpFilters(o.lp, o.filters)
 }
 
-func (o *OnRamp) RegisterFilters(qopts ...pg.QOpt) error {
-	return logpollerutil.RegisterLpFilters(o.lp, o.filters, qopts...)
+func (o *OnRamp) RegisterFilters() error {
+	return logpollerutil.RegisterLpFilters(o.lp, o.filters)
 }
 
 func (o *OnRamp) logToMessage(log types.Log) (*cciptypes.EVM2EVMMessage, error) {

@@ -34,12 +34,12 @@ type USDCReaderImpl struct {
 	transmitterAddress common.Address
 }
 
-func (u *USDCReaderImpl) Close(qopts ...pg.QOpt) error {
-	return u.lp.UnregisterFilter(u.filter.Name, qopts...)
+func (u *USDCReaderImpl) Close() error {
+	return u.lp.UnregisterFilter(u.filter.Name)
 }
 
-func (u *USDCReaderImpl) RegisterFilters(qopts ...pg.QOpt) error {
-	return u.lp.RegisterFilter(u.filter, qopts...)
+func (u *USDCReaderImpl) RegisterFilters() error {
+	return u.lp.RegisterFilter(u.filter)
 }
 
 // usdcPayload has to match the onchain event emitted by the USDC message transmitter
@@ -85,7 +85,7 @@ func (u *USDCReaderImpl) GetLastUSDCMessagePriorToLogIndexInTx(ctx context.Conte
 	return nil, errors.Errorf("no USDC message found prior to log index %d in tx %s", logIndex, txHash)
 }
 
-func NewUSDCReader(lggr logger.Logger, jobID string, transmitter common.Address, lp logpoller.LogPoller, registerFilters bool, qopts ...pg.QOpt) (*USDCReaderImpl, error) {
+func NewUSDCReader(lggr logger.Logger, jobID string, transmitter common.Address, lp logpoller.LogPoller, registerFilters bool) (*USDCReaderImpl, error) {
 	eventSig := utils.Keccak256Fixed([]byte("MessageSent(bytes)"))
 
 	r := &USDCReaderImpl{
@@ -102,17 +102,17 @@ func NewUSDCReader(lggr logger.Logger, jobID string, transmitter common.Address,
 	}
 
 	if registerFilters {
-		if err := r.RegisterFilters(qopts...); err != nil {
+		if err := r.RegisterFilters(); err != nil {
 			return nil, fmt.Errorf("register filters: %w", err)
 		}
 	}
 	return r, nil
 }
 
-func CloseUSDCReader(lggr logger.Logger, jobID string, transmitter common.Address, lp logpoller.LogPoller, qopts ...pg.QOpt) error {
+func CloseUSDCReader(lggr logger.Logger, jobID string, transmitter common.Address, lp logpoller.LogPoller) error {
 	r, err := NewUSDCReader(lggr, jobID, transmitter, lp, false)
 	if err != nil {
 		return err
 	}
-	return r.Close(qopts...)
+	return r.Close()
 }
