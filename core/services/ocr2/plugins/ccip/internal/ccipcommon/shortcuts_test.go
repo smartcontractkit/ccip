@@ -119,7 +119,7 @@ func TestGetChainTokens(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 
 			priceRegistry := ccipdatamocks.NewPriceRegistryReader(t)
-			priceRegistry.On("GetFeeTokens", ctx).Return(tc.feeTokens, nil).Maybe()
+			priceRegistry.On("GetFeeTokens", ctx).Return(tc.feeTokens, nil).Once()
 
 			var offRamps []ccipdata.OffRampReader
 			for _, destTokens := range tc.destTokens {
@@ -135,6 +135,89 @@ func TestGetChainTokens(t *testing.T) {
 				return tc.expectedChainTokens[i] < tc.expectedChainTokens[j]
 			})
 			assert.Equal(t, tc.expectedChainTokens, chainTokens)
+		})
+	}
+}
+
+func TestGetChainTokensWithBatchLimit(t *testing.T) {
+	numTokens := 100
+	var tokens []cciptypes.Address
+	for i := 0; i < numTokens; i++ {
+		tokens = append(tokens, ccipcalc.EvmAddrToGeneric(utils.RandomAddress()))
+	}
+
+	expectedTokens := make([]cciptypes.Address, numTokens)
+	copy(expectedTokens, tokens)
+	sort.Slice(expectedTokens, func(i, j int) bool {
+		return expectedTokens[i] < expectedTokens[j]
+	})
+
+	testCases := []struct {
+		name        string
+		batchSize   uint
+		numOffRamps uint
+		expectError bool
+	}{
+		{
+			name:        "default case",
+			batchSize:   offRampBatchSizeLimit,
+			numOffRamps: 20,
+			expectError: false,
+		},
+		{
+			name:        "limit of 0 expects error",
+			batchSize:   0,
+			numOffRamps: 20,
+			expectError: true,
+		},
+		{
+			name:        "low limit of 1 with 1 offRamps",
+			batchSize:   1,
+			numOffRamps: 1,
+			expectError: false,
+		},
+		{
+			name:        "low limit of 1 with many offRamps",
+			batchSize:   1,
+			numOffRamps: 200,
+			expectError: false,
+		},
+		{
+			name:        "high limit of 1000 with few offRamps",
+			batchSize:   1000,
+			numOffRamps: 20,
+			expectError: false,
+		},
+		{
+			name:        "high limit of 1000 with many offRamps",
+			batchSize:   1000,
+			numOffRamps: 200,
+			expectError: false,
+		},
+	}
+
+	ctx := testutils.Context(t)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+
+			priceRegistry := ccipdatamocks.NewPriceRegistryReader(t)
+			priceRegistry.On("GetFeeTokens", ctx).Return(tokens[0:10], nil).Maybe()
+
+			var offRamps []ccipdata.OffRampReader
+			for i := 0; i < int(tc.numOffRamps); i++ {
+				offRamp := ccipdatamocks.NewOffRampReader(t)
+				offRamp.On("GetTokens", ctx).Return(cciptypes.OffRampTokens{DestinationTokens: tokens[i%numTokens:]}, nil).Maybe()
+				offRamps = append(offRamps, offRamp)
+			}
+
+			chainTokens, err := getSortedChainTokensWithBatchLimit(ctx, offRamps, priceRegistry, tc.batchSize)
+			if tc.expectError {
+				assert.Error(t, err)
+				return
+			}
+
+			assert.NoError(t, err)
+			assert.Equal(t, expectedTokens, chainTokens)
 		})
 	}
 }

@@ -14,6 +14,10 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 )
 
+const (
+	offRampBatchSizeLimit = 30
+)
+
 func GetMessageIDsAsHexString(messages []cciptypes.EVM2EVMMessage) []string {
 	messageIDs := make([]string, 0, len(messages))
 	for _, m := range messages {
@@ -27,9 +31,17 @@ type BackfillArgs struct {
 	SourceStartBlock, DestStartBlock uint64
 }
 
+func GetSortedChainTokens(ctx context.Context, offRamps []ccipdata.OffRampReader, priceRegistry cciptypes.PriceRegistryReader) (chainTokens []cciptypes.Address, err error) {
+	return getSortedChainTokensWithBatchLimit(ctx, offRamps, priceRegistry, offRampBatchSizeLimit)
+}
+
 // GetChainTokens returns union of all tokens supported on the destination chain, including fee tokens from the provided price registry
 // and the bridgeable tokens from all the offRamps living on the chain.
-func GetSortedChainTokens(ctx context.Context, offRamps []ccipdata.OffRampReader, priceRegistry cciptypes.PriceRegistryReader) (chainTokens []cciptypes.Address, err error) {
+func getSortedChainTokensWithBatchLimit(ctx context.Context, offRamps []ccipdata.OffRampReader, priceRegistry cciptypes.PriceRegistryReader, batchSize uint) (chainTokens []cciptypes.Address, err error) {
+	if batchSize == 0 {
+		return nil, fmt.Errorf("batch size must be greater than 0")
+	}
+
 	eg := new(errgroup.Group)
 
 	var destFeeTokens []cciptypes.Address
@@ -45,6 +57,7 @@ func GetSortedChainTokens(ctx context.Context, offRamps []ccipdata.OffRampReader
 		return nil
 	})
 
+	var batchCounter uint = 0
 	for _, o := range offRamps {
 		offRamp := o
 		eg.Go(func() error {
@@ -57,6 +70,14 @@ func GetSortedChainTokens(ctx context.Context, offRamps []ccipdata.OffRampReader
 			lock.Unlock()
 			return nil
 		})
+
+		batchCounter++
+		if batchCounter == batchSize {
+			if err := eg.Wait(); err != nil {
+				return nil, err
+			}
+			batchCounter = 0
+		}
 	}
 
 	if err := eg.Wait(); err != nil {

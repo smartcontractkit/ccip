@@ -275,7 +275,7 @@ func TestCommitReportingPlugin_Observation(t *testing.T) {
 
 				assert.Equal(t, tc.expObs, obsStuct)
 			} else {
-				// if TokenPricesUSD is nil, compare the bytes directly, unmarshing makes mapping default to empty
+				// if TokenPricesUSD is nil, compare the bytes directly, marshal then unmarshal turns nil map to empty
 				expObsBytes, err := tc.expObs.Marshal()
 				assert.NoError(t, err)
 				assert.Equal(t, expObsBytes, []byte(obs))
