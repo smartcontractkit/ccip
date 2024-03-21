@@ -630,21 +630,23 @@ func (ccipModule *CCIPCommon) SyncUSDCDomain(destTransmitter *contracts.TokenTra
 	return ccipModule.ChainClient.WaitForEvents()
 }
 
-func (ccipModule *CCIPCommon) PollRPCConnection(ctx context.Context) {
+func (ccipModule *CCIPCommon) PollRPCConnection(lggr zerolog.Logger, ctx context.Context) {
 	for {
 		select {
-		case <-ccipModule.ChainClient.ConnectionRestored():
+		case reconnectTime := <-ccipModule.ChainClient.ConnectionRestored():
 			if ccipModule.IsConnectionRestoredRecently == nil {
 				ccipModule.IsConnectionRestoredRecently = atomic.NewBool(true)
 			} else {
 				ccipModule.IsConnectionRestoredRecently.Store(true)
 			}
-		case <-ccipModule.ChainClient.ConnectionIssue():
+			lggr.Info().Time("Restored At", reconnectTime).Str("Network", ccipModule.ChainClient.GetNetworkName()).Msg("Connection Restored")
+		case issueTime := <-ccipModule.ChainClient.ConnectionIssue():
 			if ccipModule.IsConnectionRestoredRecently == nil {
 				ccipModule.IsConnectionRestoredRecently = atomic.NewBool(false)
 			} else {
 				ccipModule.IsConnectionRestoredRecently.Store(false)
 			}
+			lggr.Info().Time("Started At", issueTime).Str("Network", ccipModule.ChainClient.GetNetworkName()).Msg("RPC Disconnected")
 		case <-ctx.Done():
 			return
 		}
@@ -1346,6 +1348,12 @@ func (sourceCCIP *SourceCCIPModule) AssertEventCCIPSendRequested(
 				}
 			}
 		case <-ctx.Done():
+			// if there is connection issue reset the context :
+			if sourceCCIP.Common.IsConnectionRestoredRecently != nil && !sourceCCIP.Common.IsConnectionRestoredRecently.Load() {
+				ctx, cancel = context.WithTimeout(context.Background(), timeout)
+				defer cancel()
+				continue
+			}
 			for _, stat := range reqStat {
 				stat.UpdateState(lggr, 0, testreporters.CCIPSendRe, time.Since(prevEventAt), testreporters.Failure)
 			}
@@ -1799,6 +1807,7 @@ func (destCCIP *DestCCIPModule) AssertEventExecutionStateChanged(
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
 	for {
 		select {
 		case <-ticker.C:
@@ -1838,6 +1847,12 @@ func (destCCIP *DestCCIPModule) AssertEventExecutionStateChanged(
 				}
 			}
 		case <-ctx.Done():
+			// if there is connection issue reset the context :
+			if destCCIP.Common.IsConnectionRestoredRecently != nil && !destCCIP.Common.IsConnectionRestoredRecently.Load() {
+				ctx, cancel = context.WithTimeout(context.Background(), timeout)
+				defer cancel()
+				continue
+			}
 			reqStat.UpdateState(lggr, seqNum, testreporters.ExecStateChanged, time.Since(timeNow), testreporters.Failure)
 			return 0, fmt.Errorf("ExecutionStateChanged event not found for seq num %d for lane %d-->%d",
 				seqNum, destCCIP.SourceChainId, destCCIP.Common.ChainClient.GetChainID())
@@ -1856,6 +1871,7 @@ func (destCCIP *DestCCIPModule) AssertEventReportAccepted(
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
 	for {
 		select {
 		case <-ticker.C:
@@ -1903,6 +1919,12 @@ func (destCCIP *DestCCIPModule) AssertEventReportAccepted(
 				}
 			}
 		case <-ctx.Done():
+			// if there is connection issue reset the context :
+			if destCCIP.Common.IsConnectionRestoredRecently != nil && !destCCIP.Common.IsConnectionRestoredRecently.Load() {
+				ctx, cancel = context.WithTimeout(context.Background(), timeout)
+				defer cancel()
+				continue
+			}
 			reqStat.UpdateState(lggr, seqNum, testreporters.Commit, time.Since(prevEventAt), testreporters.Failure)
 			return nil, time.Now().UTC(), fmt.Errorf("ReportAccepted is not found for seq num %d lane %d-->%d",
 				seqNum, destCCIP.SourceChainId, destCCIP.Common.ChainClient.GetChainID())
@@ -1926,6 +1948,7 @@ func (destCCIP *DestCCIPModule) AssertReportBlessed(
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
 	for {
 		select {
 		case <-ticker.C:
@@ -1975,6 +1998,12 @@ func (destCCIP *DestCCIPModule) AssertReportBlessed(
 				}
 			}
 		case <-ctx.Done():
+			// if there is connection issue reset the context :
+			if destCCIP.Common.IsConnectionRestoredRecently != nil && !destCCIP.Common.IsConnectionRestoredRecently.Load() {
+				ctx, cancel = context.WithTimeout(context.Background(), timeout)
+				defer cancel()
+				continue
+			}
 			reqStat.UpdateState(lggr, seqNum, testreporters.ReportBlessed, time.Since(prevEventAt), testreporters.Failure)
 			return time.Now().UTC(), fmt.Errorf("ReportBlessed is not found for interval %+v lane %d-->%d",
 				CommitReport.Interval, destCCIP.SourceChainId, destCCIP.Common.ChainClient.GetChainID())
@@ -1993,6 +2022,7 @@ func (destCCIP *DestCCIPModule) AssertSeqNumberExecuted(
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
 	for {
 		select {
 		case <-ticker.C:
@@ -2009,6 +2039,12 @@ func (destCCIP *DestCCIPModule) AssertSeqNumberExecuted(
 				return nil
 			}
 		case <-ctx.Done():
+			// if there is connection issue reset the context :
+			if destCCIP.Common.IsConnectionRestoredRecently != nil && !destCCIP.Common.IsConnectionRestoredRecently.Load() {
+				ctx, cancel = context.WithTimeout(context.Background(), timeout)
+				defer cancel()
+				continue
+			}
 			reqStat.UpdateState(lggr, seqNumberBefore, testreporters.Commit, time.Since(timeNow), testreporters.Failure)
 			return fmt.Errorf("sequence number is not increased for seq num %d lane %d-->%d",
 				seqNumberBefore, destCCIP.SourceChainId, destCCIP.Common.ChainClient.GetChainID())
@@ -2577,8 +2613,8 @@ func (lane *CCIPLane) StartEventWatchers() error {
 		}
 	}
 
-	go lane.Source.Common.PollRPCConnection(lane.Context)
-	go lane.Dest.Common.PollRPCConnection(lane.Context)
+	go lane.Source.Common.PollRPCConnection(lane.Logger, lane.Context)
+	go lane.Dest.Common.PollRPCConnection(lane.Logger, lane.Context)
 
 	sendReqEvent := make(chan *evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested)
 	sub, err := lane.Source.OnRamp.Instance.WatchCCIPSendRequested(nil, sendReqEvent)
