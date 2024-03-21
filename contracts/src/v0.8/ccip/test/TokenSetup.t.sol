@@ -154,25 +154,4 @@ contract TokenSetup is RouterSetup {
       tokenAmounts[i].token = s_sourceTokens[i];
     }
   }
-
-  function getCastedDestinationEVMTokenAmountsWithZeroAmounts()
-    internal
-    view
-    returns (Client.EVMTokenAmount[] memory tokenAmounts)
-  {
-    tokenAmounts = new Client.EVMTokenAmount[](s_destTokens.length);
-    for (uint256 i = 0; i < tokenAmounts.length; ++i) {
-      tokenAmounts[i].token = s_destTokens[i];
-    }
-  }
-
-  function getCastedSourceTokens() internal view returns (IERC20[] memory sourceTokens) {
-    // Convert address array into IERC20 array in one line
-    sourceTokens = abi.decode(abi.encode(s_sourceTokens), (IERC20[]));
-  }
-
-  function getCastedDestinationPools() internal view returns (IPool[] memory destPools) {
-    // Convert address array into IPool array in one line
-    destPools = abi.decode(abi.encode(s_destPools), (IPool[]));
-  }
 }

@@ -7,8 +7,6 @@ import {IgnoreContractSize} from "./IgnoreContractSize.sol";
 contract EVM2EVMOffRampHelper is EVM2EVMOffRamp, IgnoreContractSize {
   constructor(
     StaticConfig memory staticConfig,
-    IERC20[] memory sourceTokens,
-    IPool[] memory pools,
     RateLimiter.Config memory rateLimiterConfig
   ) EVM2EVMOffRamp(staticConfig, rateLimiterConfig) {}
 

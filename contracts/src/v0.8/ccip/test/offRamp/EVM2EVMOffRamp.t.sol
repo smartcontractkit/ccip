@@ -43,15 +43,8 @@ contract EVM2EVMOffRamp_constructor is EVM2EVMOffRampSetup {
       address(s_destRouter),
       address(s_priceRegistry)
     );
-    IERC20[] memory sourceTokens = getCastedSourceTokens();
-    IPool[] memory castedPools = getCastedDestinationPools();
 
-    for (uint256 i = 0; i < sourceTokens.length; ++i) {
-      vm.expectEmit();
-      emit PoolAdded(address(sourceTokens[i]), address(castedPools[i]));
-    }
-
-    s_offRamp = new EVM2EVMOffRampHelper(staticConfig, sourceTokens, castedPools, getInboundRateLimiterConfig());
+    s_offRamp = new EVM2EVMOffRampHelper(staticConfig, getInboundRateLimiterConfig());
 
     s_offRamp.setOCR2Config(
       s_valid_signers,
@@ -84,38 +77,7 @@ contract EVM2EVMOffRamp_constructor is EVM2EVMOffRampSetup {
   }
 
   // Revert
-  function testTokenConfigMismatchReverts() public {
-    vm.expectRevert(EVM2EVMOffRamp.InvalidTokenPoolConfig.selector);
-
-    IPool[] memory pools = new IPool[](1);
-
-    IERC20[] memory wrongTokens = new IERC20[](5);
-    s_offRamp = new EVM2EVMOffRampHelper(
-      EVM2EVMOffRamp.StaticConfig({
-        commitStore: address(s_mockCommitStore),
-        chainSelector: DEST_CHAIN_SELECTOR,
-        sourceChainSelector: SOURCE_CHAIN_SELECTOR,
-        onRamp: ON_RAMP_ADDRESS,
-        prevOffRamp: address(0),
-        armProxy: address(s_mockARM)
-      }),
-      wrongTokens,
-      pools,
-      getInboundRateLimiterConfig()
-    );
-  }
-
   function testZeroOnRampAddressReverts() public {
-    IPool[] memory pools = new IPool[](2);
-    pools[0] = IPool(address(234234243));
-    pools[1] = new LockReleaseTokenPool(
-      IERC20(s_sourceTokens[1]),
-      new address[](0),
-      address(s_mockARM),
-      true,
-      address(s_destRouter)
-    );
-
     vm.expectRevert(EVM2EVMOffRamp.ZeroAddressNotAllowed.selector);
 
     s_offRamp = new EVM2EVMOffRampHelper(
@@ -127,8 +89,6 @@ contract EVM2EVMOffRamp_constructor is EVM2EVMOffRampSetup {
         prevOffRamp: address(0),
         armProxy: address(s_mockARM)
       }),
-      getCastedSourceTokens(),
-      pools,
       RateLimiter.Config({isEnabled: true, rate: 1e20, capacity: 1e20})
     );
   }
@@ -147,8 +107,6 @@ contract EVM2EVMOffRamp_constructor is EVM2EVMOffRampSetup {
         prevOffRamp: address(0),
         armProxy: address(s_mockARM)
       }),
-      getCastedSourceTokens(),
-      getCastedDestinationPools(),
       getInboundRateLimiterConfig()
     );
   }
@@ -577,7 +535,7 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
 
   function testUnsupportedTokenReverts() public {
     Internal.EVM2EVMMessage[] memory messages = _generateMessagesWithTokens();
-    messages[0].tokenAmounts[0] = getCastedDestinationEVMTokenAmountsWithZeroAmounts()[0];
+    messages[0].tokenAmounts[0].token = s_destTokens[0];
     messages[0].feeToken = messages[0].tokenAmounts[0].token;
     messages[0].messageId = Internal._hash(messages[0], s_offRamp.metadataHash());
     messages[1].messageId = Internal._hash(messages[1], s_offRamp.metadataHash());
@@ -794,7 +752,7 @@ contract EVM2EVMOffRamp_executeSingleMessage is EVM2EVMOffRampSetup {
     Internal.EVM2EVMMessage memory message = _generateMessagesWithTokens()[0];
     bytes[] memory offchainTokenData = new bytes[](message.tokenAmounts.length);
     vm.expectCall(
-      s_destPools[0],
+      s_destPoolByToken[s_destTokens[0]],
       abi.encodeWithSelector(
         LockReleaseTokenPool.releaseOrMint.selector,
         abi.encode(message.sender),

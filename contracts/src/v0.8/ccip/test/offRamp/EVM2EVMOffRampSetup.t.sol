@@ -60,8 +60,6 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSetup {
         prevOffRamp: prevOffRamp,
         armProxy: address(s_mockARM)
       }),
-      getCastedSourceTokens(),
-      getCastedDestinationPools(),
       getInboundRateLimiterConfig()
     );
     s_offRamp.setOCR2Config(
