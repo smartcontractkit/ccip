@@ -1298,7 +1298,7 @@ func (sourceCCIP *SourceCCIPModule) AssertSendRequestedLogFinalized(
 ) (time.Time, uint64, error) {
 	lggr.Info().Msg("Waiting for CCIPSendRequested event log to be finalized")
 	finalizedBlockNum, finalizedAt, err := sourceCCIP.Common.ChainClient.WaitForFinalizedTx(txHash)
-	if err != nil {
+	if err != nil || finalizedBlockNum == nil {
 		for _, stat := range reqStats {
 			stat.UpdateState(lggr, stat.SeqNum, testreporters.SourceLogFinalized, time.Since(prevEventAt), testreporters.Failure)
 		}
@@ -2604,8 +2604,10 @@ func (lane *CCIPLane) StartEventWatchers() error {
 			case <-time.After(1 * time.Second):
 				// if connection is restored re-subscribe
 				if lane.Source.Common.IsConnectionRestoredRecently != nil && lane.Source.Common.IsConnectionRestoredRecently.Load() {
-					lane.Logger.Info().Msg("source connection restored")
-					sub.Unsubscribe()
+					lane.Logger.Info().Msg("source connection restored restarting subscription")
+					if sub != nil {
+						sub.Unsubscribe()
+					}
 					sub, err = lane.Source.OnRamp.Instance.WatchCCIPSendRequested(&bind.WatchOpts{
 						Start: pointer.ToUint64(lane.Source.SrcStartBlock),
 					}, sendReqEvent)
@@ -2638,8 +2640,10 @@ func (lane *CCIPLane) StartEventWatchers() error {
 			case <-time.After(1 * time.Second):
 				// if connection is restored re-subscribe
 				if lane.Dest.Common.IsConnectionRestoredRecently != nil && lane.Dest.Common.IsConnectionRestoredRecently.Load() {
-					lane.Logger.Info().Msg("dest connection restored")
-					sub.Unsubscribe()
+					lane.Logger.Info().Msg("dest connection restored restarting ReportAccepted subscription")
+					if sub != nil {
+						sub.Unsubscribe()
+					}
 					sub, err = lane.Dest.CommitStore.Instance.WatchReportAccepted(&bind.WatchOpts{
 						Start: pointer.ToUint64(lane.Dest.DestStartBlock),
 					}, reportAcceptedEvent)
@@ -2674,8 +2678,10 @@ func (lane *CCIPLane) StartEventWatchers() error {
 				case <-time.After(1 * time.Second):
 					// if connection is restored re-subscribe
 					if lane.Dest.Common.IsConnectionRestoredRecently != nil && lane.Dest.Common.IsConnectionRestoredRecently.Load() {
-						lane.Logger.Info().Msg("dest connection restored")
-						sub.Unsubscribe()
+						lane.Logger.Info().Msg("dest connection restored restarting TaggedRootBlessed subscription")
+						if sub != nil {
+							sub.Unsubscribe()
+						}
 						sub, err = lane.Dest.Common.ARM.Instance.WatchTaggedRootBlessed(&bind.WatchOpts{
 							Start: pointer.ToUint64(lane.Dest.DestStartBlock),
 						}, reportBlessedEvent, nil)
@@ -2708,8 +2714,10 @@ func (lane *CCIPLane) StartEventWatchers() error {
 			case <-time.After(1 * time.Second):
 				// if connection is restored re-subscribe
 				if lane.Dest.Common.IsConnectionRestoredRecently != nil && lane.Dest.Common.IsConnectionRestoredRecently.Load() {
-					lane.Logger.Info().Msg("dest connection restored")
-					sub.Unsubscribe()
+					lane.Logger.Info().Msg("dest connection restored restarting ExecutionStateChanged subscription")
+					if sub != nil {
+						sub.Unsubscribe()
+					}
 					sub, err = lane.Dest.OffRamp.Instance.WatchExecutionStateChanged(&bind.WatchOpts{
 						Start: pointer.ToUint64(lane.Dest.DestStartBlock),
 					}, execStateChangedEvent, nil, nil)
