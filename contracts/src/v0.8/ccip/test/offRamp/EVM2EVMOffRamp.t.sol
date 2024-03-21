@@ -107,7 +107,7 @@ contract EVM2EVMOffRamp_constructor is EVM2EVMOffRampSetup {
 
   function testZeroOnRampAddressReverts() public {
     IPool[] memory pools = new IPool[](2);
-    pools[0] = IPool(s_sourcePools[0]);
+    pools[0] = IPool(address(234234243));
     pools[1] = new LockReleaseTokenPool(
       IERC20(s_sourceTokens[1]),
       new address[](0),
@@ -117,8 +117,6 @@ contract EVM2EVMOffRamp_constructor is EVM2EVMOffRampSetup {
     );
 
     vm.expectRevert(EVM2EVMOffRamp.ZeroAddressNotAllowed.selector);
-
-    RateLimiter.Config memory rateLimitConfig = RateLimiter.Config({isEnabled: true, rate: 1e20, capacity: 1e20});
 
     s_offRamp = new EVM2EVMOffRampHelper(
       EVM2EVMOffRamp.StaticConfig({
@@ -131,7 +129,7 @@ contract EVM2EVMOffRamp_constructor is EVM2EVMOffRampSetup {
       }),
       getCastedSourceTokens(),
       pools,
-      rateLimitConfig
+      RateLimiter.Config({isEnabled: true, rate: 1e20, capacity: 1e20})
     );
   }
 

@@ -1715,8 +1715,14 @@ contract EVM2EVMOnRamp_setTokenTransferFeeConfig is EVM2EVMOnRampSetup {
 // #getTokenPool
 contract EVM2EVMOnRamp_getTokenPool is EVM2EVMOnRampSetup {
   function testGetTokenPoolSuccess() public {
-    assertEq(s_sourcePools[0], address(s_onRamp.getPoolBySourceToken(DEST_CHAIN_SELECTOR, IERC20(s_sourceTokens[0]))));
-    assertEq(s_sourcePools[1], address(s_onRamp.getPoolBySourceToken(DEST_CHAIN_SELECTOR, IERC20(s_sourceTokens[1]))));
+    assertEq(
+      s_sourcePoolByToken[s_sourceTokens[0]],
+      address(s_onRamp.getPoolBySourceToken(DEST_CHAIN_SELECTOR, IERC20(s_sourceTokens[0])))
+    );
+    assertEq(
+      s_sourcePoolByToken[s_sourceTokens[1]],
+      address(s_onRamp.getPoolBySourceToken(DEST_CHAIN_SELECTOR, IERC20(s_sourceTokens[1])))
+    );
 
     address wrongToken = address(123);
     vm.expectRevert(abi.encodeWithSelector(EVM2EVMOnRamp.UnsupportedToken.selector, IERC20(wrongToken)));

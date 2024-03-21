@@ -34,7 +34,7 @@ contract OnRampTokenPoolReentrancy is EVM2EVMOnRampSetup {
 
     Internal.PoolUpdate[] memory removes = new Internal.PoolUpdate[](1);
     removes[0].token = address(s_sourceToken);
-    removes[0].pool = address(s_sourcePools[0]);
+    removes[0].pool = address(s_sourcePoolByToken[address(s_sourceToken)]);
     Internal.PoolUpdate[] memory adds = new Internal.PoolUpdate[](1);
     adds[0].token = address(s_sourceToken);
     adds[0].pool = address(s_maliciousTokenPool);
