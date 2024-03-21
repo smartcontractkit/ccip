@@ -573,11 +573,10 @@ func (ccipModule *CCIPCommon) WatchForPriceUpdates(ctx context.Context) error {
 
 // UpdateTokenPricesAtRegularInterval updates aggregator contract with updated answer at regular interval.
 // At each iteration of ticker it chooses one of the aggregator contracts and updates its round answer.
-func (ccipModule *CCIPCommon) UpdateTokenPricesAtRegularInterval(ctx context.Context, client blockchain.EVMClient, interval time.Duration) {
+func (ccipModule *CCIPCommon) UpdateTokenPricesAtRegularInterval(ctx context.Context, interval time.Duration) {
 	var aggregators []contracts.MockAggregator
 	for _, aggregatorContract := range ccipModule.PriceAggregators {
 		contract := *aggregatorContract
-		contract.SetClient(client)
 		aggregators = append(aggregators, contract)
 	}
 	go func() {

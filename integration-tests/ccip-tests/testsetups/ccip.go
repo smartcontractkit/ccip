@@ -569,21 +569,11 @@ func (o *CCIPTestSetUpOutputs) SetupDynamicTokenPriceUpdates() {
 		lane := lanes.ForwardLane
 		if _, exists := covered[lane.SourceNetworkName]; !exists {
 			covered[lane.SourceNetworkName] = struct{}{}
-			c1, ok := o.CommonContractsByNetwork.Load(lane.SourceNetworkName)
-			var networkACmn *actions.CCIPCommon
-			if ok {
-				networkACmn = c1.(*actions.CCIPCommon)
-			}
-			networkACmn.UpdateTokenPricesAtRegularInterval(lane.Context, lane.SourceChain, interval)
+			lane.Source.Common.UpdateTokenPricesAtRegularInterval(lane.Context, interval)
 		}
 		if _, exists := covered[lane.DestNetworkName]; !exists {
 			covered[lane.DestNetworkName] = struct{}{}
-			c2, ok := o.CommonContractsByNetwork.Load(lane.DestNetworkName)
-			var networkBCmn *actions.CCIPCommon
-			if ok {
-				networkBCmn = c2.(*actions.CCIPCommon)
-			}
-			networkBCmn.UpdateTokenPricesAtRegularInterval(lane.Context, lane.DestChain, interval)
+			lane.Dest.Common.UpdateTokenPricesAtRegularInterval(lane.Context, interval)
 		}
 	}
 }
