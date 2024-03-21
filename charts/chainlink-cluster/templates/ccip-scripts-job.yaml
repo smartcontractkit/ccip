@@ -4,13 +4,20 @@ metadata:
   name: ccip-scripts-deploy
   labels:
     app: ccip-scripts-deployer
+    helm.sh/chart: "{{ .Chart.Name }}-{{ .Chart.Version }}"
   annotations:
     prometheus.io/scrape: 'true'
+    # This is what defines this resource as a hook. Without this line, the
+    # job is considered part of the release.
+    "helm.sh/hook": post-install
+    "helm.sh/hook-weight": "0"
+    "helm.sh/hook-delete-policy": before-hook-creation
 spec:
   template:
     metadata:
       labels:
         app: ccip-scripts-deployer
+        helm.sh/chart: "{{ .Chart.Name }}-{{ .Chart.Version }}"
       annotations:
         prometheus.io/scrape: 'true'
     spec:
@@ -59,4 +66,4 @@ spec:
           configMap:
             defaultMode: 0755
             name: ccip-scripts-scripts
-  backoffLimit: 1
+  backoffLimit: 0

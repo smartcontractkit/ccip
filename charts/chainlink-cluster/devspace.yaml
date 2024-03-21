@@ -139,6 +139,7 @@ deployments:
     namespace: ${DEVSPACE_NAMESPACE}
     helm:
       releaseName: "app"
+      upgradeArgs: ["--timeout", "10m"]
       chart:
         name: cl-cluster
         path: .
