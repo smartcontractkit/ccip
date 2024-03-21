@@ -131,7 +131,7 @@ func (s *TokenDataReader) ReadTokenData(ctx context.Context, msg cciptypes.EVM2E
 		return nil, tokendata.ErrRequestsBlocked
 	}
 
-	messageBody, err := s.getUSDCMessageBody(ctx, msg)
+	messageBody, err := s.getUSDCMessageBody(ctx, msg, tokenIndex)
 	if err != nil {
 		return []byte{}, errors.Wrap(err, "failed getting the USDC message body")
 	}
@@ -173,8 +173,12 @@ func encodeMessageAndAttestation(messageBody []byte, attestation string) ([]byte
 	})
 }
 
-func (s *TokenDataReader) getUSDCMessageBody(ctx context.Context, msg cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta) ([]byte, error) {
-	parsedMsgBody, err := s.usdcReader.GetLastUSDCMessagePriorToLogIndexInTx(ctx, int64(msg.LogIndex), msg.TxHash)
+func (s *TokenDataReader) getUSDCMessageBody(
+	ctx context.Context,
+	msg cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta,
+	tokenIndex int,
+) ([]byte, error) {
+	parsedMsgBody, err := s.usdcReader.GetUSDCMessagePriorToLogIndexInTx(ctx, int64(msg.LogIndex), 0, msg.TxHash)
 	if err != nil {
 		return []byte{}, err
 	}

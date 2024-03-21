@@ -19,11 +19,14 @@ const (
 	MESSAGE_SENT_FILTER_NAME = "USDC message sent"
 )
 
+var _ USDCReader = &USDCReaderImpl{}
+
 //go:generate mockery --quiet --name USDCReader --filename usdc_reader_mock.go --case=underscore
 type USDCReader interface {
-	// GetLastUSDCMessagePriorToLogIndexInTx returns the last USDC message that was sent
-	// before the provided log index in the given transaction.
-	GetLastUSDCMessagePriorToLogIndexInTx(ctx context.Context, logIndex int64, txHash string) ([]byte, error)
+	// GetUSDCMessagePriorToLogIndexInTx returns USDC message at the position specified by
+	// offset from last, e.g. if offsetFromLast is 0 it returns the last one.
+	// The message logs are found using the provided transaction hash.
+	GetUSDCMessagePriorToLogIndexInTx(ctx context.Context, logIndex int64, offsetFromLast int, txHash string) ([]byte, error)
 }
 
 type USDCReaderImpl struct {
@@ -64,7 +67,7 @@ func parseUSDCMessageSent(logData []byte) ([]byte, error) {
 	return decodeAbiStruct, nil
 }
 
-func (u *USDCReaderImpl) GetLastUSDCMessagePriorToLogIndexInTx(ctx context.Context, logIndex int64, txHash string) ([]byte, error) {
+func (u *USDCReaderImpl) GetUSDCMessagePriorToLogIndexInTx(ctx context.Context, logIndex int64, offsetFromFinal int, txHash string) ([]byte, error) {
 	logs, err := u.lp.IndexedLogsByTxHash(
 		u.usdcMessageSent,
 		u.transmitterAddress,

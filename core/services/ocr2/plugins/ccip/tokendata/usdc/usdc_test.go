@@ -224,15 +224,15 @@ func getMockUSDCEndpoint(t *testing.T, response attestationResponse) *httptest.S
 func TestGetUSDCMessageBody(t *testing.T) {
 	expectedBody := []byte("0x0000000000000001000000020000000000048d71000000000000000000000000eb08f243e5d3fcff26a9e38ae5520a669f4019d000000000000000000000000023a04d5935ed8bc8e3eb78db3541f0abfb001c6e0000000000000000000000006cb3ed9b441eb674b58495c8b3324b59faff5243000000000000000000000000000000005425890298aed601595a70ab815c96711a31bc65000000000000000000000000ab4f961939bfe6a93567cc57c59eed7084ce2131000000000000000000000000000000000000000000000000000000000000271000000000000000000000000035e08285cfed1ef159236728f843286c55fc0861")
 	usdcReader := ccipdatamocks.USDCReader{}
-	usdcReader.On("GetLastUSDCMessagePriorToLogIndexInTx", mock.Anything, mock.Anything, mock.Anything).Return(expectedBody, nil)
+	usdcReader.On("GetUSDCMessagePriorToLogIndexInTx", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(expectedBody, nil)
 
 	lggr := logger.TestLogger(t)
 	usdcService := NewUSDCTokenDataReader(lggr, &usdcReader, nil, 0)
 
 	// Make the first call and assert the underlying function is called
-	body, err := usdcService.getUSDCMessageBody(context.Background(), cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta{})
+	body, err := usdcService.getUSDCMessageBody(context.Background(), cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta{}, 0)
 	require.NoError(t, err)
 	require.Equal(t, body, expectedBody)
 
-	usdcReader.AssertNumberOfCalls(t, "GetLastUSDCMessagePriorToLogIndexInTx", 1)
+	usdcReader.AssertNumberOfCalls(t, "GetUSDCMessagePriorToLogIndexInTx", 1)
 }

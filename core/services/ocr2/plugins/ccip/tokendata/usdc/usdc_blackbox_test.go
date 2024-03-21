@@ -87,9 +87,10 @@ func TestUSDCReader_ReadTokenData(t *testing.T) {
 			logIndex := int64(4)
 
 			usdcReader := ccipdatamocks.USDCReader{}
-			usdcReader.On("GetLastUSDCMessagePriorToLogIndexInTx",
+			usdcReader.On("GetUSDCMessagePriorToLogIndexInTx",
 				mock.Anything,
 				logIndex,
+				0,
 				common.Hash(txHash).String(),
 			).Return(hexutil.MustDecode(message), nil)
 			attestationURI, err := url.ParseRequestURI(ts.URL)

@@ -80,7 +80,7 @@ func testMonitoring(t *testing.T, name string, server *httptest.Server, requests
 	// Mock USDC reader.
 	usdcReader := mocks.NewUSDCReader(t)
 	msgBody := []byte{0xb0, 0xd1}
-	usdcReader.On("GetLastUSDCMessagePriorToLogIndexInTx", mock.Anything, mock.Anything, mock.Anything).Return(msgBody, nil)
+	usdcReader.On("GetUSDCMessagePriorToLogIndexInTx", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(msgBody, nil)
 
 	// Service with monitored http client.
 	observedHttpClient := http2.NewObservedIHttpClientWithMetric(&http2.HttpClient{}, histogram)

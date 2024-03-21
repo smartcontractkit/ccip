@@ -23,7 +23,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 )
 
-func TestLogPollerClient_GetLastUSDCMessagePriorToLogIndexInTx(t *testing.T) {
+func TestLogPollerClient_GetUSDCMessagePriorToLogIndexInTx(t *testing.T) {
 	addr := utils.RandomAddress()
 	txHash := common.BytesToHash(addr[:])
 	ccipLogIndex := int64(100)
@@ -47,7 +47,7 @@ func TestLogPollerClient_GetLastUSDCMessagePriorToLogIndexInTx(t *testing.T) {
 			{LogIndex: ccipLogIndex + 1, Data: []byte("1")},
 		}, nil)
 
-		usdcMessageData, err := u.GetLastUSDCMessagePriorToLogIndexInTx(context.Background(), ccipLogIndex, txHash.String())
+		usdcMessageData, err := u.GetUSDCMessagePriorToLogIndexInTx(context.Background(), ccipLogIndex, 0, txHash.String())
 		assert.NoError(t, err)
 		assert.Equal(t, expectedPostParse, hexutil.Encode(usdcMessageData))
 		lp.AssertExpectations(t)
@@ -63,7 +63,7 @@ func TestLogPollerClient_GetLastUSDCMessagePriorToLogIndexInTx(t *testing.T) {
 			mock.Anything,
 		).Return([]logpoller.Log{}, nil)
 
-		usdcMessageData, err := u.GetLastUSDCMessagePriorToLogIndexInTx(context.Background(), ccipLogIndex, txHash.String())
+		usdcMessageData, err := u.GetUSDCMessagePriorToLogIndexInTx(context.Background(), ccipLogIndex, 0, txHash.String())
 		assert.Errorf(t, err, fmt.Sprintf("no USDC message found prior to log index %d in tx %s", ccipLogIndex, txHash.Hex()))
 		assert.Nil(t, usdcMessageData)
 
