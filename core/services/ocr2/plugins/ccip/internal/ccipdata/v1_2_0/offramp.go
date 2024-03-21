@@ -13,6 +13,8 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
 
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
+
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
@@ -20,7 +22,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/cciptypes"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
@@ -147,7 +148,7 @@ func (o *OffRamp) GetRouter(ctx context.Context) (cciptypes.Address, error) {
 	return ccipcalc.EvmAddrToGeneric(dynamicConfig.Router), nil
 }
 
-func (o *OffRamp) ChangeConfig(onchainConfigBytes []byte, offchainConfigBytes []byte) (cciptypes.Address, cciptypes.Address, error) {
+func (o *OffRamp) ChangeConfig(ctx context.Context, onchainConfigBytes []byte, offchainConfigBytes []byte) (cciptypes.Address, cciptypes.Address, error) {
 	// Same as the v1.0.0 method, except for the ExecOnchainConfig type.
 	onchainConfigParsed, err := abihelpers.DecodeAbiStruct[ExecOnchainConfig](onchainConfigBytes)
 	if err != nil {
@@ -188,7 +189,7 @@ func (o *OffRamp) ChangeConfig(onchainConfigBytes []byte, offchainConfigBytes []
 		cciptypes.Address(destWrappedNative.String()), nil
 }
 
-func EncodeExecutionReport(args abi.Arguments, report cciptypes.ExecReport) ([]byte, error) {
+func EncodeExecutionReport(ctx context.Context, args abi.Arguments, report cciptypes.ExecReport) ([]byte, error) {
 	var msgs []evm_2_evm_offramp.InternalEVM2EVMMessage
 	for _, msg := range report.Messages {
 		var ta []evm_2_evm_offramp.ClientEVMTokenAmount
@@ -235,11 +236,11 @@ func EncodeExecutionReport(args abi.Arguments, report cciptypes.ExecReport) ([]b
 	return args.PackValues([]interface{}{&rep})
 }
 
-func (o *OffRamp) EncodeExecutionReport(report cciptypes.ExecReport) ([]byte, error) {
-	return EncodeExecutionReport(o.ExecutionReportArgs, report)
+func (o *OffRamp) EncodeExecutionReport(ctx context.Context, report cciptypes.ExecReport) ([]byte, error) {
+	return EncodeExecutionReport(ctx, o.ExecutionReportArgs, report)
 }
 
-func DecodeExecReport(args abi.Arguments, report []byte) (cciptypes.ExecReport, error) {
+func DecodeExecReport(ctx context.Context, args abi.Arguments, report []byte) (cciptypes.ExecReport, error) {
 	unpacked, err := args.Unpack(report)
 	if err != nil {
 		return cciptypes.ExecReport{}, err
@@ -314,8 +315,8 @@ func DecodeExecReport(args abi.Arguments, report []byte) (cciptypes.ExecReport, 
 
 }
 
-func (o *OffRamp) DecodeExecutionReport(report []byte) (cciptypes.ExecReport, error) {
-	return DecodeExecReport(o.ExecutionReportArgs, report)
+func (o *OffRamp) DecodeExecutionReport(ctx context.Context, report []byte) (cciptypes.ExecReport, error) {
+	return DecodeExecReport(ctx, o.ExecutionReportArgs, report)
 }
 
 func NewOffRamp(lggr logger.Logger, addr common.Address, ec client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator, destMaxGasPrice *big.Int) (*OffRamp, error) {

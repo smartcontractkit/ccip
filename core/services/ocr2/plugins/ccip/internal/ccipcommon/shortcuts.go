@@ -9,8 +9,9 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
+
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/cciptypes"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 )
 
@@ -63,7 +64,7 @@ func getSortedChainTokensWithBatchLimit(ctx context.Context, offRamps []ccipdata
 		eg.Go(func() error {
 			tokens, err := offRamp.GetTokens(ctx)
 			if err != nil {
-				return fmt.Errorf("get dest bridgeable tokens from offramp %s: %w", offRamp.Address(), err)
+				return fmt.Errorf("get dest bridgeable tokens: %w", err)
 			}
 			lock.Lock()
 			destBridgeableTokens = append(destBridgeableTokens, tokens.DestinationTokens...)
