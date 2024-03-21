@@ -586,11 +586,11 @@ func (ccipModule *CCIPCommon) SyncUSDCDomain(destTransmitter *contracts.TokenTra
 	if err != nil {
 		return fmt.Errorf("invalid chain id %w", err)
 	}
+
 	// sync USDC domain
-	for i, usdcpool := range destPoolAddr {
-		pool, err := ccipModule.Deployer.NewUSDCTokenPoolContract(usdcpool)
-		if err != nil {
-			return err
+	for i, pool := range ccipModule.BridgeTokenPools {
+		if pool.USDCPool == nil {
+			continue
 		}
 		err = pool.SyncUSDCDomain(destTransmitter, destPoolAddr[i], destChainSelector)
 		if err != nil {
