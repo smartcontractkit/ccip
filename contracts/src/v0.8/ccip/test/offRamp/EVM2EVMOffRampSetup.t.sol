@@ -141,6 +141,18 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSetup {
       feeTokenAmount: uint256(0),
       messageId: ""
     });
+
+    // Correctly set the TokenDataPayload for each token. Tokens have to be set up in the TokenSetup.
+    for (uint256 i = 0; i < tokenAmounts.length; ++i) {
+      message.sourceTokenData[i] = abi.encode(
+        Internal.TokenDataPayload({
+          sourcePoolAddress: s_sourcePoolByToken[tokenAmounts[i].token],
+          destPoolAddress: s_destPoolBySourceToken[tokenAmounts[i].token],
+          extraData: ""
+        })
+      );
+    }
+
     message.messageId = Internal._hash(
       message,
       keccak256(

@@ -26,8 +26,9 @@ contract TokenSetup is RouterSetup {
 
   TokenAdminRegistry internal s_tokenAdminRegistry;
 
-  mapping(address token => address sourcePool) internal s_sourcePoolByToken;
-  mapping(address token => address destPool) internal s_destPoolByToken;
+  mapping(address sourceToken => address sourcePool) internal s_sourcePoolByToken;
+  mapping(address sourceToken => address destPool) internal s_destPoolBySourceToken;
+  mapping(address destToken => address destPool) internal s_destPoolByToken;
 
   function _deploySourceToken(string memory tokenName, uint256 dealAmount) internal returns (address) {
     BurnMintERC677 token = new BurnMintERC677(tokenName, tokenName, 18, 0);
@@ -44,35 +45,42 @@ contract TokenSetup is RouterSetup {
   }
 
   function _deployLockReleasePool(address token, bool isSourcePool) internal {
+    address router = address(s_sourceRouter);
+    if (!isSourcePool) {
+      router = address(s_destRouter);
+    }
+
     LockReleaseTokenPool pool = new LockReleaseTokenPool(
       IERC20(token),
       new address[](0),
       address(s_mockARM),
       true,
-      address(s_sourceRouter)
+      router
     );
 
     if (isSourcePool) {
       s_sourcePoolByToken[address(token)] = address(pool);
     } else {
       s_destPoolByToken[address(token)] = address(pool);
+      s_destPoolBySourceToken[s_sourceTokens[s_destTokens.length - 1]] = address(pool);
       s_destPools.push(address(pool));
     }
   }
 
   function _deployTokenAndBurnMintPool(address token, bool isSourcePool) internal {
-    BurnMintTokenPool pool = new BurnMintTokenPool(
-      BurnMintERC677(token),
-      new address[](0),
-      address(s_mockARM),
-      address(s_sourceRouter)
-    );
+    address router = address(s_sourceRouter);
+    if (!isSourcePool) {
+      router = address(s_destRouter);
+    }
+
+    BurnMintTokenPool pool = new BurnMintTokenPool(BurnMintERC677(token), new address[](0), address(s_mockARM), router);
     BurnMintERC677(token).grantMintAndBurnRoles(address(pool));
 
     if (isSourcePool) {
       s_sourcePoolByToken[address(token)] = address(pool);
     } else {
       s_destPoolByToken[address(token)] = address(pool);
+      s_destPoolBySourceToken[s_sourceTokens[s_destTokens.length - 1]] = address(pool);
       s_destPools.push(address(pool));
     }
   }
