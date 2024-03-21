@@ -365,7 +365,8 @@ func Test_testBridge_toPendingTransfers(t *testing.T) {
 				sourceAdapter:  tt.fields.sourceAdapter,
 				lggr:           tt.fields.lggr,
 			}
-			got := tr.toPendingTransfers(tt.args.localToken, tt.args.remoteToken, tt.args.readyToProve, tt.args.readyToFinalize, tt.args.parsedToLP)
+			got, err := tr.toPendingTransfers(tt.args.localToken, tt.args.remoteToken, tt.args.readyToProve, tt.args.readyToFinalize, tt.args.parsedToLP)
+			require.NoError(t, err)
 			require.Equal(t, tt.want, got)
 		})
 	}
