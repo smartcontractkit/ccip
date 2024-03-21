@@ -146,7 +146,7 @@ abstract contract TokenPool is IPool, OwnerIsCreator, IERC165 {
   function _validateSourceCaller(
     uint64 remoteChainSelector,
     bytes memory extraData
-  ) internal view returns (bytes memory tokenDatPayload, bytes memory offchnTokenData) {
+  ) internal view returns (bytes memory tokenDataPayload, bytes memory offchnTokenData) {
     (bytes memory sourceDataBytes, bytes memory offchainTokenData) = abi.decode(extraData, (bytes, bytes));
     Internal.TokenDataPayload memory sourceData = abi.decode(sourceDataBytes, (Internal.TokenDataPayload));
     // Validate is the sending pool is allowed

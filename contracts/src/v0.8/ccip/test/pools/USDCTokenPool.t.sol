@@ -9,6 +9,7 @@ import {MockUSDCTransmitter} from "../mocks/MockUSDCTransmitter.sol";
 import {TokenPool} from "../../pools/TokenPool.sol";
 import {Router} from "../../Router.sol";
 import {RateLimiter} from "../../libraries/RateLimiter.sol";
+import {Internal} from "../../libraries/Internal.sol";
 import {USDCTokenPool} from "../../pools/USDC/USDCTokenPool.sol";
 import {BurnMintERC677} from "../../../shared/token/ERC677/BurnMintERC677.sol";
 import {MockUSDCTokenMessenger} from "../mocks/MockUSDCTokenMessenger.sol";
@@ -36,7 +37,8 @@ contract USDCTokenPoolSetup is BaseTest {
   uint32 internal constant DEST_DOMAIN_IDENTIFIER = 0;
 
   bytes32 internal constant SOURCE_CHAIN_TOKEN_SENDER = bytes32(uint256(uint160(0x01111111221)));
-  bytes32 internal constant SOURCE_CHAIN_USDC_TOKEN = bytes32(uint256(uint160(0x000000232355)));
+  address internal constant SOURCE_CHAIN_USDC_POOL = address(0x23789765456789);
+  address internal constant DEST_CHAIN_USDC_POOL = address(0x987384873458734);
 
   address internal s_routerAllowedOnRamp = address(3456);
   address internal s_routerAllowedOffRamp = address(234);
@@ -77,14 +79,14 @@ contract USDCTokenPoolSetup is BaseTest {
     TokenPool.ChainUpdate[] memory chainUpdates = new TokenPool.ChainUpdate[](2);
     chainUpdates[0] = TokenPool.ChainUpdate({
       remoteChainSelector: SOURCE_CHAIN_SELECTOR,
-      remotePoolAddress: address(1),
+      remotePoolAddress: SOURCE_CHAIN_USDC_POOL,
       allowed: true,
       outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
       inboundRateLimiterConfig: getInboundRateLimiterConfig()
     });
     chainUpdates[1] = TokenPool.ChainUpdate({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
-      remotePoolAddress: address(1),
+      remotePoolAddress: DEST_CHAIN_USDC_POOL,
       allowed: true,
       outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
       inboundRateLimiterConfig: getInboundRateLimiterConfig()
@@ -176,14 +178,15 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
     vm.expectEmit();
     emit Burned(s_routerAllowedOnRamp, amount);
 
-    bytes memory encodedNonce = s_usdcTokenPool.lockOrBurn(
+    bytes memory tokenDataPayload = s_usdcTokenPool.lockOrBurn(
       OWNER,
       abi.encodePacked(receiver),
       amount,
       DEST_CHAIN_SELECTOR,
       bytes("")
     );
-    uint64 nonce = abi.decode(encodedNonce, (uint64));
+    Internal.TokenDataPayload memory encodedNonce = abi.decode(tokenDataPayload, (Internal.TokenDataPayload));
+    uint64 nonce = abi.decode(encodedNonce.extraData, (uint64));
     assertEq(s_mockUSDC.s_nonce() - 1, nonce);
   }
 
@@ -213,15 +216,21 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
     vm.expectEmit();
     emit Burned(s_routerAllowedOnRamp, amount);
 
-    bytes memory encodedNonce = s_usdcTokenPool.lockOrBurn(
+    bytes memory encodedTokenDataPayload = s_usdcTokenPool.lockOrBurn(
       OWNER,
       abi.encodePacked(destinationReceiver),
       amount,
       DEST_CHAIN_SELECTOR,
       bytes("")
     );
-    uint64 nonce = abi.decode(encodedNonce, (uint64));
+    Internal.TokenDataPayload memory tokenDataPayload = abi.decode(
+      encodedTokenDataPayload,
+      (Internal.TokenDataPayload)
+    );
+    uint64 nonce = abi.decode(tokenDataPayload.extraData, (uint64));
     assertEq(s_mockUSDC.s_nonce() - 1, nonce);
+    assertEq(tokenDataPayload.sourcePoolAddress, address(s_usdcTokenPool));
+    assertEq(tokenDataPayload.destPoolAddress, DEST_CHAIN_USDC_POOL);
   }
 
   function testFuzz_LockOrBurnWithAllowListSuccess(bytes32 destinationReceiver, uint256 amount) public {
@@ -248,15 +257,21 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
     vm.expectEmit();
     emit Burned(s_routerAllowedOnRamp, amount);
 
-    bytes memory encodedNonce = s_usdcTokenPoolWithAllowList.lockOrBurn(
+    bytes memory encodedTokenDataPayload = s_usdcTokenPoolWithAllowList.lockOrBurn(
       s_allowedList[0],
       abi.encodePacked(destinationReceiver),
       amount,
       DEST_CHAIN_SELECTOR,
       bytes("")
     );
-    uint64 nonce = abi.decode(encodedNonce, (uint64));
+    Internal.TokenDataPayload memory tokenDataPayload = abi.decode(
+      encodedTokenDataPayload,
+      (Internal.TokenDataPayload)
+    );
+    uint64 nonce = abi.decode(tokenDataPayload.extraData, (uint64));
     assertEq(s_mockUSDC.s_nonce() - 1, nonce);
+    assertEq(tokenDataPayload.sourcePoolAddress, address(s_usdcTokenPoolWithAllowList));
+    assertEq(tokenDataPayload.destPoolAddress, DEST_CHAIN_USDC_POOL);
   }
 
   // Reverts
@@ -331,7 +346,13 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
 
     bytes memory extraData = abi.encode(
       abi.encode(
-        USDCTokenPool.SourceTokenDataPayload({nonce: usdcMessage.nonce, sourceDomain: SOURCE_DOMAIN_IDENTIFIER})
+        Internal.TokenDataPayload({
+          sourcePoolAddress: SOURCE_CHAIN_USDC_POOL,
+          destPoolAddress: address(s_usdcTokenPool),
+          extraData: abi.encode(
+            USDCTokenPool.SourceTokenDataPayload({nonce: usdcMessage.nonce, sourceDomain: SOURCE_DOMAIN_IDENTIFIER})
+          )
+        })
       ),
       abi.encode(USDCTokenPool.MessageAndAttestation({message: message, attestation: attestation}))
     );
@@ -358,7 +379,13 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
     uint32 sourceDomain = 3;
 
     bytes memory extraData = abi.encode(
-      abi.encode(USDCTokenPool.SourceTokenDataPayload({nonce: nonce, sourceDomain: sourceDomain})),
+      abi.encode(
+        Internal.TokenDataPayload({
+          sourcePoolAddress: SOURCE_CHAIN_USDC_POOL,
+          destPoolAddress: address(s_usdcTokenPool),
+          extraData: abi.encode(USDCTokenPool.SourceTokenDataPayload({nonce: nonce, sourceDomain: sourceDomain}))
+        })
+      ),
       abi.encode(USDCTokenPool.MessageAndAttestation({message: encodedUsdcMessage, attestation: attestation}))
     );
 
@@ -391,7 +418,13 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
 
     bytes memory extraData = abi.encode(
       abi.encode(
-        USDCTokenPool.SourceTokenDataPayload({nonce: usdcMessage.nonce, sourceDomain: SOURCE_DOMAIN_IDENTIFIER})
+        Internal.TokenDataPayload({
+          sourcePoolAddress: SOURCE_CHAIN_USDC_POOL,
+          destPoolAddress: address(s_usdcTokenPool),
+          extraData: abi.encode(
+            USDCTokenPool.SourceTokenDataPayload({nonce: usdcMessage.nonce, sourceDomain: SOURCE_DOMAIN_IDENTIFIER})
+          )
+        })
       ),
       abi.encode(
         USDCTokenPool.MessageAndAttestation({message: _generateUSDCMessage(usdcMessage), attestation: bytes("")})
