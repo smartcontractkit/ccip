@@ -159,6 +159,7 @@ func (ccipModule *CCIPCommon) FreeUpUnusedSpace() {
 	ccipModule.gasUpdateWatcher = nil
 	ccipModule.gasUpdateWatcherMu = nil
 	ccipModule.TokenMessenger = nil
+	ccipModule.TokenTransmitter = nil
 	ccipModule.PriceRegistry = nil
 	runtime.GC()
 }
@@ -1358,6 +1359,7 @@ func (sourceCCIP *SourceCCIPModule) AssertEventCCIPSendRequested(
 				}
 				resetTimer++
 				timer.Reset(timeout)
+				lggr.Info().Int("count of reset", resetTimer).Msg("Resetting timer to validate CCIPSendRequested event")
 				continue
 			}
 			for _, stat := range reqStat {
@@ -1864,6 +1866,7 @@ func (destCCIP *DestCCIPModule) AssertEventExecutionStateChanged(
 				}
 				timer.Reset(timeout)
 				resetTimer++
+				lggr.Info().Int("count of reset", resetTimer).Msg("Resetting timer to validate ExecutionStateChanged event")
 				continue
 			}
 			reqStat.UpdateState(lggr, seqNum, testreporters.ExecStateChanged, time.Since(timeNow), testreporters.Failure)
@@ -1942,6 +1945,7 @@ func (destCCIP *DestCCIPModule) AssertEventReportAccepted(
 				}
 				timer.Reset(timeout)
 				resetTimerCount++
+				lggr.Info().Int("count of reset", resetTimerCount).Msg("Resetting timer to validate ReportAccepted event")
 				continue
 			}
 			reqStat.UpdateState(lggr, seqNum, testreporters.Commit, time.Since(prevEventAt), testreporters.Failure)
@@ -2027,6 +2031,7 @@ func (destCCIP *DestCCIPModule) AssertReportBlessed(
 				}
 				timer.Reset(timeout)
 				resetTimerCount++
+				lggr.Info().Int("count of reset", resetTimerCount).Msg("Resetting timer to validate ReportBlessed event")
 				continue
 			}
 			reqStat.UpdateState(lggr, seqNum, testreporters.ReportBlessed, time.Since(prevEventAt), testreporters.Failure)
@@ -2043,7 +2048,7 @@ func (destCCIP *DestCCIPModule) AssertSeqNumberExecuted(
 	timeNow time.Time,
 	reqStat *testreporters.RequestStat,
 ) error {
-	lggr.Info().Int64("seqNum", int64(seqNumberBefore)).Msg("Waiting to be executed")
+	lggr.Info().Int64("seqNum", int64(seqNumberBefore)).Msg("Waiting to be processed by commit store")
 	timer := time.NewTimer(timeout)
 	defer timer.Stop()
 	resetTimerCount := 0
@@ -2074,6 +2079,7 @@ func (destCCIP *DestCCIPModule) AssertSeqNumberExecuted(
 				}
 				timer.Reset(timeout)
 				resetTimerCount++
+				lggr.Info().Int("count of reset", resetTimerCount).Msg("Resetting timer to validate seqnumber increase in commit store")
 				continue
 			}
 			reqStat.UpdateState(lggr, seqNumberBefore, testreporters.Commit, time.Since(timeNow), testreporters.Failure)

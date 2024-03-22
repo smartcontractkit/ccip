@@ -121,6 +121,7 @@ jobs:
             run: ^TestLoadCCIPStableRPSAfterARMCurseAndUncurse$
             config_path: ./integration-tests/ccip-tests/testconfig/tomls/load-with-arm-curse-uncurse.toml
             os: ubuntu-latest
+            remote-runner : false
     runs-on: ${{ matrix.type.os }}
     steps:
       - name: Collect Metrics
@@ -151,6 +152,9 @@ jobs:
               echo "BASE64_CCIP_CONFIG_OVERRIDE=$BASE64_CCIP_CONFIG_OVERRIDE" >> $GITHUB_ENV
               echo "TEST_BASE64_CCIP_CONFIG_OVERRIDE=$BASE64_CCIP_CONFIG_OVERRIDE" >> $GITHUB_ENV
             fi
+          fi
+          if [ "${{ matrix.type.remote-runner }}" == "false" ]; then
+              echo "ENV_JOB_IMAGE_BASE=" >> $GITHUB_ENV
           fi
       - name: step summary
         shell: bash
