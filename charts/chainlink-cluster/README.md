@@ -122,7 +122,7 @@ Install
 ```
 helm install -f values.yaml cl-cluster . \
     --set=ingress.baseDomain="$DEVSPACE_INGRESS_BASE_DOMAIN" \
-    --set=ccip.ccipScriptsImage=$DEVSPACE_CCIP_SCRIPTS_IMAGE
+    --set=ccip.ccipScriptsImage="$DEVSPACE_CCIP_SCRIPTS_IMAGE"
 ```
 
 
