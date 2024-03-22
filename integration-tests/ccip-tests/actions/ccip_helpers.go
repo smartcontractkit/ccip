@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"math/big"
 	"net/http"
 	"runtime"
@@ -558,10 +559,17 @@ func (ccipModule *CCIPCommon) WatchForPriceUpdates(ctx context.Context) error {
 					Msgf("UsdPerUnitGasUpdated event received for dest chain %d source chain %s",
 						destChain, ccipModule.ChainClient.GetNetworkName())
 			case err := <-sub.Err():
-				log.Error().Err(err).Msg("error on UsdPerUnitGasUpdated subscription attempting to resubscribe")
-				sub, err = ccipModule.PriceRegistry.Instance.WatchUsdPerUnitGasUpdated(nil, gasUpdateEvent, nil)
+				backoff := 5 * time.Second
 				if err != nil {
-					log.Fatal().Msg("Error in resubscribing to UsdPerUnitGasUpdated event subscription")
+					log.Warn().
+						Err(err).
+						Str("Backoff", backoff.String()).
+						Msg("error on UsdPerUnitGasUpdated subscription, attempting to resubscribe")
+					sub, err = ccipModule.PriceRegistry.Instance.WatchUsdPerUnitGasUpdated(nil, gasUpdateEvent, nil)
+					if err != nil {
+						time.Sleep(backoff)
+						backoff = time.Duration(math.Min(float64(backoff)*2, float64(30*time.Second)))
+					}
 				}
 			case <-ctx.Done():
 				return
@@ -2660,6 +2668,7 @@ func (lane *CCIPLane) StartEventWatchers() error {
 	}
 	go func(sub event.Subscription) {
 		defer sub.Unsubscribe()
+		resubscribed := false
 		for {
 			select {
 			case e := <-sendReqEvent:
@@ -2674,8 +2683,12 @@ func (lane *CCIPLane) StartEventWatchers() error {
 				lane.Source.CCIPSendRequestedWatcher = testutils.DeleteNilEntriesFromMap(lane.Source.CCIPSendRequestedWatcher)
 				// check every second if connection is restored
 			case <-time.After(1 * time.Second):
-				// if connection is restored re-subscribe
-				if lane.Source.Common.IsConnectionRestoredRecently != nil && lane.Source.Common.IsConnectionRestoredRecently.Load() {
+				// if there is a connection issue, set resubscribed to false
+				if lane.Source.Common.IsConnectionRestoredRecently != nil && !lane.Source.Common.IsConnectionRestoredRecently.Load() {
+					resubscribed = false
+				}
+				// if connection is restored re-subscribe, if not already resubscribed
+				if lane.Source.Common.IsConnectionRestoredRecently != nil && lane.Source.Common.IsConnectionRestoredRecently.Load() && !resubscribed {
 					lane.Logger.Info().Msg("source connection restored restarting subscription")
 					if sub != nil {
 						sub.Unsubscribe()
@@ -2684,7 +2697,10 @@ func (lane *CCIPLane) StartEventWatchers() error {
 						Start: pointer.ToUint64(lane.Source.SrcStartBlock),
 					}, sendReqEvent)
 					if err != nil {
+						resubscribed = false
 						lane.Logger.Error().Err(err).Msg("error in resubscribing to CCIPSendRequested after restoring connection")
+					} else {
+						resubscribed = true
 					}
 				}
 			case <-lane.Context.Done():
@@ -2701,6 +2717,7 @@ func (lane *CCIPLane) StartEventWatchers() error {
 
 	go func(sub event.Subscription) {
 		defer sub.Unsubscribe()
+		resubscribed := false
 		for {
 			select {
 			case e := <-reportAcceptedEvent:
@@ -2710,8 +2727,12 @@ func (lane *CCIPLane) StartEventWatchers() error {
 				lane.Dest.ReportAcceptedWatcher = testutils.DeleteNilEntriesFromMap(lane.Dest.ReportAcceptedWatcher)
 				// check every second if connection is restored
 			case <-time.After(1 * time.Second):
-				// if connection is restored re-subscribe
-				if lane.Dest.Common.IsConnectionRestoredRecently != nil && lane.Dest.Common.IsConnectionRestoredRecently.Load() {
+				// if there is a connection issue, set resubscribed to false
+				if lane.Dest.Common.IsConnectionRestoredRecently != nil && !lane.Dest.Common.IsConnectionRestoredRecently.Load() {
+					resubscribed = false
+				}
+				// if connection is restored re-subscribe, if not already resubscribed
+				if lane.Dest.Common.IsConnectionRestoredRecently != nil && lane.Dest.Common.IsConnectionRestoredRecently.Load() && !resubscribed {
 					lane.Logger.Info().Msg("dest connection restored restarting ReportAccepted subscription")
 					if sub != nil {
 						sub.Unsubscribe()
@@ -2720,7 +2741,10 @@ func (lane *CCIPLane) StartEventWatchers() error {
 						Start: pointer.ToUint64(lane.Dest.DestStartBlock),
 					}, reportAcceptedEvent)
 					if err != nil {
+						resubscribed = false
 						lane.Logger.Error().Err(err).Msg("error in resubscribing to ReportAccepted after restoring connection")
+					} else {
+						resubscribed = true
 					}
 				}
 			case <-lane.Context.Done():
@@ -2738,6 +2762,7 @@ func (lane *CCIPLane) StartEventWatchers() error {
 
 		go func(sub event.Subscription) {
 			defer sub.Unsubscribe()
+			resubscribed := false
 			for {
 				select {
 				case e := <-reportBlessedEvent:
@@ -2748,8 +2773,12 @@ func (lane *CCIPLane) StartEventWatchers() error {
 					lane.Dest.ReportBlessedWatcher = testutils.DeleteNilEntriesFromMap(lane.Dest.ReportBlessedWatcher)
 					// check every second if connection is restored
 				case <-time.After(1 * time.Second):
-					// if connection is restored re-subscribe
-					if lane.Dest.Common.IsConnectionRestoredRecently != nil && lane.Dest.Common.IsConnectionRestoredRecently.Load() {
+					// if there is a connection issue, set resubscribed to false
+					if lane.Dest.Common.IsConnectionRestoredRecently != nil && !lane.Dest.Common.IsConnectionRestoredRecently.Load() {
+						resubscribed = false
+					}
+					// if connection is restored re-subscribe, if not already resubscribed
+					if lane.Dest.Common.IsConnectionRestoredRecently != nil && lane.Dest.Common.IsConnectionRestoredRecently.Load() && !resubscribed {
 						lane.Logger.Info().Msg("dest connection restored restarting TaggedRootBlessed subscription")
 						if sub != nil {
 							sub.Unsubscribe()
@@ -2758,7 +2787,10 @@ func (lane *CCIPLane) StartEventWatchers() error {
 							Start: pointer.ToUint64(lane.Dest.DestStartBlock),
 						}, reportBlessedEvent, nil)
 						if err != nil {
+							resubscribed = false
 							lane.Logger.Error().Err(err).Msg("error in resubscribing to TaggedRootBlessed after restoring connection")
+						} else {
+							resubscribed = true
 						}
 					}
 				case <-lane.Context.Done():
@@ -2776,6 +2808,7 @@ func (lane *CCIPLane) StartEventWatchers() error {
 
 	go func(sub event.Subscription) {
 		defer sub.Unsubscribe()
+		resubscribed := false
 		for {
 			select {
 			case e := <-execStateChangedEvent:
@@ -2784,8 +2817,12 @@ func (lane *CCIPLane) StartEventWatchers() error {
 				lane.Dest.ExecStateChangedWatcher = testutils.DeleteNilEntriesFromMap(lane.Dest.ExecStateChangedWatcher)
 				// check every second if connection is restored
 			case <-time.After(1 * time.Second):
-				// if connection is restored re-subscribe
-				if lane.Dest.Common.IsConnectionRestoredRecently != nil && lane.Dest.Common.IsConnectionRestoredRecently.Load() {
+				// if there is a connection issue, set resubscribed to false
+				if lane.Dest.Common.IsConnectionRestoredRecently != nil && !lane.Dest.Common.IsConnectionRestoredRecently.Load() {
+					resubscribed = false
+				}
+				// if connection is restored re-subscribe, if not already resubscribed
+				if lane.Dest.Common.IsConnectionRestoredRecently != nil && lane.Dest.Common.IsConnectionRestoredRecently.Load() && !resubscribed {
 					lane.Logger.Info().Msg("dest connection restored restarting ExecutionStateChanged subscription")
 					if sub != nil {
 						sub.Unsubscribe()
@@ -2794,7 +2831,10 @@ func (lane *CCIPLane) StartEventWatchers() error {
 						Start: pointer.ToUint64(lane.Dest.DestStartBlock),
 					}, execStateChangedEvent, nil, nil)
 					if err != nil {
+						resubscribed = false
 						lane.Logger.Error().Err(err).Msg("error in resubscribing to ExecutionStateChanged after restoring connection")
+					} else {
+						resubscribed = true
 					}
 				}
 			case <-lane.Context.Done():

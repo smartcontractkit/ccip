@@ -198,7 +198,7 @@ func (l *LoadArgs) ValidateCurseFollowedByUncurse() {
 
 	// verify that even after uncursing the lane should not function for 30 more minutes,
 	// i.e no execution state changed or commit report accepted event is generated
-	errGrp, _ := errgroup.WithContext(testcontext.Get(l.t))
+	errGrp := &errgroup.Group{}
 	for _, lane := range lanes {
 		lane := lane
 		curseTimeStamp, exists := curseTimeStamps[lane.SourceNetworkName]
