@@ -1326,9 +1326,9 @@ func (sourceCCIP *SourceCCIPModule) AssertEventCCIPSendRequested(
 	lggr.Info().Msg("Waiting for CCIPSendRequested event")
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+	resetTimer := 0
 	for {
 		select {
 		case <-ticker.C:
@@ -1347,11 +1347,17 @@ func (sourceCCIP *SourceCCIPModule) AssertEventCCIPSendRequested(
 					return sendRequestedEvents, prevEventAt, nil
 				}
 			}
-		case <-ctx.Done():
-			// if there is connection issue reset the context :
+		case <-timer.C:
+			// if there is connection issue reset the timer :
 			if sourceCCIP.Common.IsConnectionRestoredRecently != nil && !sourceCCIP.Common.IsConnectionRestoredRecently.Load() {
-				ctx, cancel = context.WithTimeout(context.Background(), timeout)
-				defer cancel()
+				if resetTimer > 2 {
+					for _, stat := range reqStat {
+						stat.UpdateState(lggr, 0, testreporters.CCIPSendRe, time.Since(prevEventAt), testreporters.Failure)
+					}
+					return nil, time.Now(), fmt.Errorf("possible RPC issue - CCIPSendRequested event is not found for tx %s", txHash)
+				}
+				resetTimer++
+				timer.Reset(timeout)
 				continue
 			}
 			for _, stat := range reqStat {
@@ -1804,10 +1810,11 @@ func (destCCIP *DestCCIPModule) AssertEventExecutionStateChanged(
 	execState testhelpers.MessageExecutionState,
 ) (uint8, error) {
 	lggr.Info().Int64("seqNum", int64(seqNum)).Msg("Waiting for ExecutionStateChanged event")
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
+	resetTimer := 0
 	for {
 		select {
 		case <-ticker.C:
@@ -1819,7 +1826,7 @@ func (destCCIP *DestCCIPModule) AssertEventExecutionStateChanged(
 					destCCIP.ExecStateChangedWatcher.Delete(seqNum)
 					vLogs := e.Raw
 					receivedAt := time.Now().UTC()
-					hdr, err := destCCIP.Common.ChainClient.HeaderByNumber(ctx, big.NewInt(int64(vLogs.BlockNumber)))
+					hdr, err := destCCIP.Common.ChainClient.HeaderByNumber(context.Background(), big.NewInt(int64(vLogs.BlockNumber)))
 					if err == nil {
 						receivedAt = hdr.Timestamp
 					}
@@ -1846,11 +1853,17 @@ func (destCCIP *DestCCIPModule) AssertEventExecutionStateChanged(
 						execState, testhelpers.MessageExecutionState(e.State), e.ReturnData, seqNum, destCCIP.SourceChainId, destCCIP.Common.ChainClient.GetChainID())
 				}
 			}
-		case <-ctx.Done():
+		case <-timer.C:
 			// if there is connection issue reset the context :
 			if destCCIP.Common.IsConnectionRestoredRecently != nil && !destCCIP.Common.IsConnectionRestoredRecently.Load() {
-				ctx, cancel = context.WithTimeout(context.Background(), timeout)
-				defer cancel()
+				// if timer already has been reset 2 times we fail with warning
+				if resetTimer > 2 {
+					reqStat.UpdateState(lggr, seqNum, testreporters.ExecStateChanged, time.Since(timeNow), testreporters.Failure)
+					return 0, fmt.Errorf("possible RPC issues - ExecutionStateChanged event not found for seq num %d for lane %d-->%d",
+						seqNum, destCCIP.SourceChainId, destCCIP.Common.ChainClient.GetChainID())
+				}
+				timer.Reset(timeout)
+				resetTimer++
 				continue
 			}
 			reqStat.UpdateState(lggr, seqNum, testreporters.ExecStateChanged, time.Since(timeNow), testreporters.Failure)
@@ -1868,8 +1881,9 @@ func (destCCIP *DestCCIPModule) AssertEventReportAccepted(
 	reqStat *testreporters.RequestStat,
 ) (*commit_store.CommitStoreCommitReport, time.Time, error) {
 	lggr.Info().Int64("seqNum", int64(seqNum)).Msg("Waiting for ReportAccepted event")
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+	resetTimerCount := 0
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
 	for {
@@ -1882,7 +1896,7 @@ func (destCCIP *DestCCIPModule) AssertEventReportAccepted(
 					// if the value is processed, delete it from the map
 					destCCIP.ReportAcceptedWatcher.Delete(seqNum)
 					receivedAt := time.Now().UTC()
-					hdr, err := destCCIP.Common.ChainClient.HeaderByNumber(ctx, big.NewInt(int64(reportAccepted.Raw.BlockNumber)))
+					hdr, err := destCCIP.Common.ChainClient.HeaderByNumber(context.Background(), big.NewInt(int64(reportAccepted.Raw.BlockNumber)))
 					if err == nil {
 						receivedAt = hdr.Timestamp
 					}
@@ -1918,11 +1932,16 @@ func (destCCIP *DestCCIPModule) AssertEventReportAccepted(
 					return &reportAccepted.Report, receivedAt, nil
 				}
 			}
-		case <-ctx.Done():
+		case <-timer.C:
 			// if there is connection issue reset the context :
 			if destCCIP.Common.IsConnectionRestoredRecently != nil && !destCCIP.Common.IsConnectionRestoredRecently.Load() {
-				ctx, cancel = context.WithTimeout(context.Background(), timeout)
-				defer cancel()
+				if resetTimerCount > 2 {
+					reqStat.UpdateState(lggr, seqNum, testreporters.Commit, time.Since(prevEventAt), testreporters.Failure)
+					return nil, time.Now().UTC(), fmt.Errorf("possible RPC issue - ReportAccepted is not found for seq num %d lane %d-->%d",
+						seqNum, destCCIP.SourceChainId, destCCIP.Common.ChainClient.GetChainID())
+				}
+				timer.Reset(timeout)
+				resetTimerCount++
 				continue
 			}
 			reqStat.UpdateState(lggr, seqNum, testreporters.Commit, time.Since(prevEventAt), testreporters.Failure)
@@ -1945,8 +1964,9 @@ func (destCCIP *DestCCIPModule) AssertReportBlessed(
 		return prevEventAt, nil
 	}
 	lggr.Info().Interface("commit store interval", CommitReport.Interval).Msg("Waiting for Report To be blessed")
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+	resetTimerCount := 0
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
 	for {
@@ -1976,7 +1996,7 @@ func (destCCIP *DestCCIPModule) AssertReportBlessed(
 						// if the value is processed, delete it from the map
 						destCCIP.ReportBlessedBySeqNum.Delete(seqNum)
 					}
-					hdr, err := destCCIP.Common.ChainClient.HeaderByNumber(ctx, big.NewInt(int64(vLogs.BlockNumber)))
+					hdr, err := destCCIP.Common.ChainClient.HeaderByNumber(context.Background(), big.NewInt(int64(vLogs.BlockNumber)))
 					if err == nil {
 						receivedAt = hdr.Timestamp
 					}
@@ -1997,11 +2017,16 @@ func (destCCIP *DestCCIPModule) AssertReportBlessed(
 					return receivedAt, nil
 				}
 			}
-		case <-ctx.Done():
+		case <-timer.C:
 			// if there is connection issue reset the context :
 			if destCCIP.Common.IsConnectionRestoredRecently != nil && !destCCIP.Common.IsConnectionRestoredRecently.Load() {
-				ctx, cancel = context.WithTimeout(context.Background(), timeout)
-				defer cancel()
+				if resetTimerCount > 2 {
+					reqStat.UpdateState(lggr, seqNum, testreporters.ReportBlessed, time.Since(prevEventAt), testreporters.Failure)
+					return time.Now().UTC(), fmt.Errorf("possible RPC issue - ReportBlessed is not found for interval %+v lane %d-->%d",
+						CommitReport.Interval, destCCIP.SourceChainId, destCCIP.Common.ChainClient.GetChainID())
+				}
+				timer.Reset(timeout)
+				resetTimerCount++
 				continue
 			}
 			reqStat.UpdateState(lggr, seqNum, testreporters.ReportBlessed, time.Since(prevEventAt), testreporters.Failure)
@@ -2019,8 +2044,9 @@ func (destCCIP *DestCCIPModule) AssertSeqNumberExecuted(
 	reqStat *testreporters.RequestStat,
 ) error {
 	lggr.Info().Int64("seqNum", int64(seqNumberBefore)).Msg("Waiting to be executed")
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+	resetTimerCount := 0
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
 	for {
@@ -2038,11 +2064,16 @@ func (destCCIP *DestCCIPModule) AssertSeqNumberExecuted(
 				destCCIP.NextSeqNumToCommit.Store(seqNumberAfter)
 				return nil
 			}
-		case <-ctx.Done():
+		case <-timer.C:
 			// if there is connection issue reset the context :
 			if destCCIP.Common.IsConnectionRestoredRecently != nil && !destCCIP.Common.IsConnectionRestoredRecently.Load() {
-				ctx, cancel = context.WithTimeout(context.Background(), timeout)
-				defer cancel()
+				if resetTimerCount > 2 {
+					reqStat.UpdateState(lggr, seqNumberBefore, testreporters.Commit, time.Since(timeNow), testreporters.Failure)
+					return fmt.Errorf("possible RPC issue - sequence number is not increased for seq num %d lane %d-->%d",
+						seqNumberBefore, destCCIP.SourceChainId, destCCIP.Common.ChainClient.GetChainID())
+				}
+				timer.Reset(timeout)
+				resetTimerCount++
 				continue
 			}
 			reqStat.UpdateState(lggr, seqNumberBefore, testreporters.Commit, time.Since(timeNow), testreporters.Failure)
