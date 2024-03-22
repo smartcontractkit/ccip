@@ -2,7 +2,7 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: ccip-scripts-deploy
+  name: ccip-scripts-deployer
   labels:
     app: ccip-scripts-deployer
     helm.sh/chart: "{{ .Chart.Name }}-{{ .Chart.Version }}"

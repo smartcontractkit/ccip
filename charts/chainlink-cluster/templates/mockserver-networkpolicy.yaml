@@ -15,10 +15,6 @@ spec:
         - podSelector:
             matchLabels:
               app: {{ $.Release.Name }}
-        # Allow traffic from ccip-scripts-deployer
-        - podSelector:
-            matchLabels:
-              app: ccip-scripts-deployer
       ports:
         - protocol: TCP
           port: 1080
