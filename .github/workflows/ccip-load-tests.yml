@@ -158,7 +158,7 @@ jobs:
               echo "lokiEndpoint=${{ secrets.LOKI_URL_CI }}" >> $GITHUB_OUTPUT
               echo "lokiBasicAuth=${{ secrets.LOKI_BASIC_AUTH }}" >> $GITHUB_OUTPUT
           else
-              echo "lokiEndpoint=${{ secrets.LOKI_URL }" >> $GITHUB_OUTPUT
+              echo "lokiEndpoint=${{ secrets.LOKI_URL }}" >> $GITHUB_OUTPUT
           fi
       - name: step summary
         shell: bash
