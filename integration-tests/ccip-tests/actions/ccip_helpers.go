@@ -140,7 +140,7 @@ type CCIPCommon struct {
 	MulticallEnabled   bool
 	MulticallContract  common.Address
 	ExistingDeployment bool
-	USDCDeployment     bool
+	NoOfUSDCTokens     *int
 	TokenMessenger     *common.Address
 	TokenTransmitter   *contracts.TokenTransmitter
 	poolFunds          *big.Int
@@ -279,7 +279,8 @@ func (ccipModule *CCIPCommon) Copy(logger zerolog.Logger, chainClient blockchain
 	}
 	var pools []*contracts.TokenPool
 	for i := range ccipModule.BridgeTokenPools {
-		if ccipModule.USDCDeployment {
+		// if there are usdc tokens, the corresponding pools will always be added as first elements in the slice
+		if ccipModule.NoOfUSDCTokens != nil && i+1 <= *ccipModule.NoOfUSDCTokens {
 			pool, err := newCD.NewUSDCTokenPoolContract(common.HexToAddress(ccipModule.BridgeTokenPools[i].Address()))
 			if err != nil {
 				return nil, err
@@ -323,7 +324,7 @@ func (ccipModule *CCIPCommon) Copy(logger zerolog.Logger, chainClient blockchain
 		MulticallContract:  ccipModule.MulticallContract,
 		ExistingDeployment: ccipModule.ExistingDeployment,
 		MulticallEnabled:   ccipModule.MulticallEnabled,
-		USDCDeployment:     ccipModule.USDCDeployment,
+		NoOfUSDCTokens:     ccipModule.NoOfUSDCTokens,
 		TokenMessenger:     ccipModule.TokenMessenger,
 		poolFunds:          ccipModule.poolFunds,
 		gasUpdateWatcherMu: &sync.Mutex{},
@@ -575,7 +576,7 @@ func (ccipModule *CCIPCommon) WatchForPriceUpdates() error {
 func (ccipModule *CCIPCommon) SyncUSDCDomain(destTransmitter *contracts.TokenTransmitter, destPoolAddr []common.Address, destChainID uint64) error {
 	// if not USDC new deployment, return
 	// if existing deployment, consider that no syncing is required and return
-	if ccipModule.ExistingDeployment || !ccipModule.USDCDeployment {
+	if ccipModule.ExistingDeployment || ccipModule.NoOfUSDCTokens == nil {
 		return nil
 	}
 	if destTransmitter == nil || len(destPoolAddr) == 0 {
@@ -585,15 +586,13 @@ func (ccipModule *CCIPCommon) SyncUSDCDomain(destTransmitter *contracts.TokenTra
 	if err != nil {
 		return fmt.Errorf("invalid chain id %w", err)
 	}
-	if len(destPoolAddr) != len(ccipModule.BridgeTokenPools) {
-		return fmt.Errorf("invalid pool address")
-	}
+
 	// sync USDC domain
 	for i, pool := range ccipModule.BridgeTokenPools {
 		if pool.USDCPool == nil {
 			continue
 		}
-		err := pool.SyncUSDCDomain(destTransmitter, destPoolAddr[i], destChainSelector)
+		err = pool.SyncUSDCDomain(destTransmitter, destPoolAddr[i], destChainSelector)
 		if err != nil {
 			return err
 		}
@@ -672,7 +671,7 @@ func (ccipModule *CCIPCommon) DeployContracts(noOfTokens int,
 		ccipModule.Router = r
 	}
 	// if usdc deployment ,look for token transmitter and token messenger
-	if ccipModule.USDCDeployment {
+	if ccipModule.NoOfUSDCTokens != nil {
 		// if existing deployment, no need to deploy new USDC contracts, it should be considered as a generic erc20 token
 		if ccipModule.ExistingDeployment {
 			return fmt.Errorf("existing deployment and new USDC deployment cannot be done together")
@@ -738,7 +737,7 @@ func (ccipModule *CCIPCommon) DeployContracts(noOfTokens int,
 				var token *contracts.ERC20Token
 				var err error
 				if len(tokenDeployerFns) != noOfTokens {
-					if ccipModule.USDCDeployment {
+					if ccipModule.NoOfUSDCTokens != nil && i+1 <= *ccipModule.NoOfUSDCTokens {
 						// if it's USDC deployment, we deploy the burn mint token 677 with decimal 6 and cast it to ERC20Token
 						erc677Token, err := cd.DeployBurnMintERC677(new(big.Int).Mul(big.NewInt(1e6), big.NewInt(1e18)))
 						if err != nil {
@@ -808,7 +807,8 @@ func (ccipModule *CCIPCommon) DeployContracts(noOfTokens int,
 		// deploy native token pool
 		for i := len(ccipModule.BridgeTokenPools); i < len(ccipModule.BridgeTokens); i++ {
 			token := ccipModule.BridgeTokens[i]
-			if ccipModule.USDCDeployment {
+			// usdc pools need to be the first ones in the slice
+			if ccipModule.NoOfUSDCTokens != nil && i+1 <= *ccipModule.NoOfUSDCTokens {
 				// deploy usdc token pool in case of usdc deployment
 				if ccipModule.TokenMessenger == nil {
 					return fmt.Errorf("TokenMessenger contract address is not provided")
@@ -955,7 +955,7 @@ type StaticPriceConfig struct {
 	Price   *big.Int `json:"price"`
 }
 
-func DefaultCCIPModule(logger zerolog.Logger, chainClient blockchain.EVMClient, existingDeployment, multiCall, usdc bool) (*CCIPCommon, error) {
+func DefaultCCIPModule(logger zerolog.Logger, chainClient blockchain.EVMClient, existingDeployment, multiCall bool, NoOfUSDCToken *int) (*CCIPCommon, error) {
 	cd, err := contracts.NewCCIPContractsDeployer(logger, chainClient)
 	if err != nil {
 		return nil, err
@@ -970,7 +970,7 @@ func DefaultCCIPModule(logger zerolog.Logger, chainClient blockchain.EVMClient, 
 		ExistingDeployment: existingDeployment,
 		RemoteChains:       &sync.Map{},
 		MulticallEnabled:   multiCall,
-		USDCDeployment:     usdc,
+		NoOfUSDCTokens:     NoOfUSDCToken,
 		poolFunds:          testhelpers.Link(5),
 		gasUpdateWatcherMu: &sync.Mutex{},
 		gasUpdateWatcher:   make(map[uint64]*big.Int),
@@ -2666,6 +2666,9 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 	// if it's a new USDC deployment, sync the USDC domain
 	var destPools []common.Address
 	for _, pool := range lane.Dest.Common.BridgeTokenPools {
+		if pool.USDCPool == nil {
+			continue
+		}
 		destPools = append(destPools, pool.EthAddress)
 	}
 	err = lane.Source.Common.SyncUSDCDomain(lane.Dest.Common.TokenTransmitter, destPools, lane.Source.DestinationChainId)
@@ -2753,7 +2756,7 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 		PriceGetterConfig:      tokenPricesConfigJson,
 		DestStartBlock:         currentBlockOnDest,
 	}
-	if !lane.Source.Common.ExistingDeployment && lane.Source.Common.USDCDeployment {
+	if !lane.Source.Common.ExistingDeployment && lane.Source.Common.NoOfUSDCTokens != nil {
 		api := ""
 		if killgrave != nil {
 			api = killgrave.InternalEndpoint
@@ -2764,6 +2767,8 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 		if lane.Source.Common.TokenTransmitter == nil {
 			return lane.SrcNetworkLaneCfg, lane.DstNetworkLaneCfg, fmt.Errorf("token transmitter address not set")
 		}
+		// TODO: Need to know if there can be more than one USDC token per chain
+		// currently the jobspec supports only one. Need to update this if more than two is supported
 		jobParams.USDCConfig = &config.USDCConfig{
 			SourceTokenAddress:              common.HexToAddress(lane.Source.Common.BridgeTokens[0].Address()),
 			SourceMessageTransmitterAddress: lane.Source.Common.TokenTransmitter.ContractAddress,
