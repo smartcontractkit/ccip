@@ -241,7 +241,7 @@ func (l *LoadArgs) TriggerLoadByLane() {
 		}
 		labels["source_chain"] = lane.SourceNetworkName
 		labels["dest_chain"] = lane.DestNetworkName
-		loadRunner, err := wasp.NewGenerator(&wasp.Config{
+		waspCfg := &wasp.Config{
 			T:                     l.TestCfg.Test,
 			GenName:               fmt.Sprintf("lane %s-> %s", lane.SourceNetworkName, lane.DestNetworkName),
 			Schedule:              l.schedules,
@@ -255,7 +255,9 @@ func (l *LoadArgs) TriggerLoadByLane() {
 			LokiConfig:            wasp.NewLokiConfig(lokiConfig.Endpoint, lokiConfig.TenantId, nil, nil),
 			Labels:                labels,
 			FailOnErr:             pointer.GetBool(l.TestCfg.TestGroupInput.FailOnFirstErrorInLoad),
-		})
+		}
+		waspCfg.LokiConfig.Timeout = time.Minute
+		loadRunner, err := wasp.NewGenerator(waspCfg)
 		require.NoError(l.TestCfg.Test, err, "initiating loadgen for lane %s --> %s",
 			lane.SourceNetworkName, lane.DestNetworkName)
 		loadRunner.Run(false)
