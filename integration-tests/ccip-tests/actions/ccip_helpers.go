@@ -630,7 +630,7 @@ func (ccipModule *CCIPCommon) SyncUSDCDomain(destTransmitter *contracts.TokenTra
 	return ccipModule.ChainClient.WaitForEvents()
 }
 
-func (ccipModule *CCIPCommon) PollRPCConnection(lggr zerolog.Logger, ctx context.Context) {
+func (ccipModule *CCIPCommon) PollRPCConnection(ctx context.Context, lggr zerolog.Logger) {
 	for {
 		select {
 		case reconnectTime := <-ccipModule.ChainClient.ConnectionRestored():
@@ -2644,8 +2644,8 @@ func (lane *CCIPLane) StartEventWatchers() error {
 		}
 	}
 
-	go lane.Source.Common.PollRPCConnection(lane.Logger, lane.Context)
-	go lane.Dest.Common.PollRPCConnection(lane.Logger, lane.Context)
+	go lane.Source.Common.PollRPCConnection(lane.Context, lane.Logger)
+	go lane.Dest.Common.PollRPCConnection(lane.Context, lane.Logger)
 
 	sendReqEvent := make(chan *evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested)
 	sub, err := lane.Source.OnRamp.Instance.WatchCCIPSendRequested(nil, sendReqEvent)
