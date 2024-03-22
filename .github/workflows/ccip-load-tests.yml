@@ -157,7 +157,7 @@ jobs:
               echo "ENV_JOB_IMAGE=" >> $GITHUB_ENV
               echo "lokiEndpoint=${{ secrets.LOKI_URL_CI }}" >> $GITHUB_OUTPUT
               echo "lokiBasicAuth=${{ secrets.LOKI_BASIC_AUTH }}" >> $GITHUB_OUTPUT
-          elif
+          else
               echo "lokiEndpoint=${{ secrets.LOKI_URL }" >> $GITHUB_OUTPUT
           fi
       - name: step summary
