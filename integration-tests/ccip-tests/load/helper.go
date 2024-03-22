@@ -164,7 +164,7 @@ func (l *LoadArgs) ValidateCurseFollowedByUncurse() {
 		// try to send requests on lanes on which curse is applied on source RMN and the request should revert
 		failedTx, _, _, err := lane.Source.SendRequest(
 			lane.Dest.ReceiverDapp.EthAddress,
-			actions.TokenTransfer, "msg sent when ARM is cursed",
+			actions.DataOnlyTransfer, "msg sent when ARM is cursed",
 			big.NewInt(600_000), // gas limit
 		)
 		if lane.Source.Common.ChainClient.GetNetworkConfig().MinimumConfirmations > 0 {
