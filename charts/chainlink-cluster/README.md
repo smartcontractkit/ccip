@@ -14,21 +14,27 @@ nix develop
 
 # Develop
 
-## New cluster
+## Deploying New cluster
 We are using [devspace](https://www.devspace.sh/docs/getting-started/installation?x0=3)
 
-Configure the cluster, see `deployments.app.helm.values` and [values.yaml](./values.yaml) comments for more details
+1) Configure the cluster, see `deployments.app.helm.values` and [values.yaml](./values.yaml) comments for more details
 
-Set up your K8s access
-```
-export DEVSPACE_IMAGE="..."
-./setup.sh ${my-personal-namespace-name-crib}
-```
+2) Set up env variables required in devspace.yaml:
+    ```
+    export DEVSPACE_IMAGE=...
+    export DEVSPACE_INGRESS_CIDRS="0.0.0.0/0"
+    export DEVSPACE_INGRESS_BASE_DOMAIN=...
+    export DEVSPACE_INGRESS_CERT_ARN=...
+    export DEVSPACE_CCIP_SCRIPTS_IMAGE=...
+    ```
+3) Configure access to your kubernetes cluster
 
-Build and deploy current commit
+4) Build and deploy current commit
 ```
 devspace deploy
 ```
+
+### Additional Configuration options
 
 Default `ttl` is `72h`, use `ttl` command to update if you need more time
 
@@ -63,6 +69,12 @@ Destroy the cluster
 ```
 devspace purge
 ```
+
+## CCIP Contracts and Jobs Deployment
+By default, the helm chart includes a post install hook defined in the ccip-scripts-deploy job. 
+It will deploy contracts and jobs to make the CCIP enabled cluster operational.
+
+`ccip-scripts-deploy` job usually takes around 6 minutes to complete.
 
 ## Running load tests
 Check this [doc](../../integration-tests/load/ocr/README.md)
@@ -108,8 +120,11 @@ kubectl config set-context --current --namespace cl-cluster
 
 Install
 ```
-helm install -f values.yaml cl-cluster .
+helm install -f values.yaml cl-cluster . \
+    --set=ingress.baseDomain="$DEVSPACE_INGRESS_BASE_DOMAIN" \
+    --set=ccip.ccipScriptsImage="$DEVSPACE_CCIP_SCRIPTS_IMAGE"
 ```
+
 
 ## Create a new release
 Bump version in `Chart.yml` add your changes and add `helm_release` label to any PR to trigger a release
@@ -131,17 +146,14 @@ You can select `PANELS_INCLUDED`, options are `core`, `wasp`, comma separated
 
 You can also select dashboard platform in `INFRA_PLATFORM` either `kubernetes` or `docker`
 ```
-export LOKI_TENANT_ID=promtail
-export LOKI_URL=...
 export GRAFANA_URL=...
 export GRAFANA_TOKEN=...
 export PROMETHEUS_DATA_SOURCE_NAME=Thanos
 export LOKI_DATA_SOURCE_NAME=Loki
-export PANELS_INCLUDED=core,wasp
-export INFRA_PLATFORM=kubernetes|docker
-export GRAFANA_FOLDER=DashboardCoreDebug
-export DASHBOARD_NAME=ChainlinkClusterDebug
+export INFRA_PLATFORM=kubernetes
+export GRAFANA_FOLDER=CRIB
+export DASHBOARD_NAME=CCIP-Cluster-Load
 
-go run dashboard/cmd/dashboard_deploy.go
+go run dashboard/cmd/deploy.go
 ```
-Open Grafana folder `DashboardCoreDebug` and find dashboard `ChainlinkClusterDebug`
+Open Grafana folder `CRIB` and find dashboard `CCIP-Cluster-Load`
