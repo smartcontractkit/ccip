@@ -541,6 +541,7 @@ func (ccipModule *CCIPCommon) WatchForPriceUpdates(ctx context.Context) error {
 
 	go func() {
 		defer sub.Unsubscribe()
+		backoff := 5 * time.Second
 		for {
 			select {
 			case e := <-gasUpdateEvent:
@@ -559,7 +560,6 @@ func (ccipModule *CCIPCommon) WatchForPriceUpdates(ctx context.Context) error {
 					Msgf("UsdPerUnitGasUpdated event received for dest chain %d source chain %s",
 						destChain, ccipModule.ChainClient.GetNetworkName())
 			case err := <-sub.Err():
-				backoff := 5 * time.Second
 				if err != nil {
 					log.Warn().
 						Err(err).
