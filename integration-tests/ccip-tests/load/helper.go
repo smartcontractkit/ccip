@@ -118,7 +118,7 @@ func (l *LoadArgs) SanityCheck() {
 // It assumes requests in both direction are in flight when this is called.
 // It assumes the ARM is not already cursed, it will fail the test if it is in cursed state.
 // It curses source ARM for forward lanes so that destination curse is also validated for reverse lanes.
-// It waits for 5 minutes for curse to be seen by ccip plugins and contracts.
+// It waits for 2 minutes for curse to be seen by ccip plugins and contracts.
 // It captures the curse timestamp to verify no execution state changed event is emitted after the cure is applied.
 // It uncurses the source ARM at the end so that it can be verified that rest of the requests are processed as expected.
 // Validates that even after uncursing the lane should not function for 30 more minutes.
