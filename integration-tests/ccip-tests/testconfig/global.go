@@ -152,6 +152,7 @@ func NewConfig() (*Config, error) {
 // It contains generic DON and networks config which can be applied to all product based tests.
 type Common struct {
 	EnvUser                 string                               `toml:",omitempty"`
+	EnvName                 *string                              `toml:",omitempty"`
 	TTL                     *config.Duration                     `toml:",omitempty"`
 	ExistingCLCluster       *CLCluster                           `toml:",omitempty"` // ExistingCLCluster is the existing chainlink cluster to use, if specified it will be used instead of creating a new one
 	Mockserver              *string                              `toml:",omitempty"`
@@ -354,11 +355,9 @@ func (c *ChainlinkDeployment) Validate() error {
 	return nil
 }
 
-type CRIBNode struct {
-}
-
 type Node struct {
 	Name                   string                          `toml:",omitempty"`
+	NeedsUpgrade           *bool                           `toml:",omitempty"`
 	ChainlinkImage         *ctfconfig.ChainlinkImageConfig `toml:"ChainlinkImage"`
 	ChainlinkUpgradeImage  *ctfconfig.ChainlinkImageConfig `toml:"ChainlinkUpgradeImage"`
 	BaseConfigTOML         string                          `toml:",omitempty"`
@@ -368,6 +367,7 @@ type Node struct {
 	DBTag                  string                          `toml:",omitempty"`
 }
 
+// Merge merges non-empty values
 func (n *Node) Merge(from *Node) {
 	if from == nil || n == nil {
 		return
@@ -390,20 +390,22 @@ func (n *Node) Merge(from *Node) {
 			n.ChainlinkImage.Version = from.ChainlinkImage.Version
 		}
 	}
-
-	if n.ChainlinkUpgradeImage == nil {
-		if from.ChainlinkUpgradeImage != nil {
-			n.ChainlinkUpgradeImage = &ctfconfig.ChainlinkImageConfig{
-				Image:   from.ChainlinkUpgradeImage.Image,
-				Version: from.ChainlinkUpgradeImage.Version,
+	// merge upgrade image only if the nodes is marked as NeedsUpgrade to true
+	if pointer.GetBool(n.NeedsUpgrade) {
+		if n.ChainlinkUpgradeImage == nil {
+			if from.ChainlinkUpgradeImage != nil {
+				n.ChainlinkUpgradeImage = &ctfconfig.ChainlinkImageConfig{
+					Image:   from.ChainlinkUpgradeImage.Image,
+					Version: from.ChainlinkUpgradeImage.Version,
+				}
 			}
-		}
-	} else {
-		if n.ChainlinkUpgradeImage.Image == nil && from.ChainlinkUpgradeImage != nil {
-			n.ChainlinkUpgradeImage.Image = from.ChainlinkUpgradeImage.Image
-		}
-		if n.ChainlinkUpgradeImage.Version == nil && from.ChainlinkUpgradeImage != nil {
-			n.ChainlinkUpgradeImage.Version = from.ChainlinkUpgradeImage.Version
+		} else {
+			if n.ChainlinkUpgradeImage.Image == nil && from.ChainlinkUpgradeImage != nil {
+				n.ChainlinkUpgradeImage.Image = from.ChainlinkUpgradeImage.Image
+			}
+			if n.ChainlinkUpgradeImage.Version == nil && from.ChainlinkUpgradeImage != nil {
+				n.ChainlinkUpgradeImage.Version = from.ChainlinkUpgradeImage.Version
+			}
 		}
 	}
 

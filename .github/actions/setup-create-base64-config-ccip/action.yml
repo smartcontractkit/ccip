@@ -37,6 +37,7 @@ runs:
       id: base64-config-override
       env:
         RUN_ID: ${{ inputs.runId }}
+        EXISTING_NAMESPACE: ${{ inputs.existingNamespace }}
         TEST_LOG_COLLECT: ${{ inputs.testLogCollect }}
         CHAINLINK_IMAGE: ${{ inputs.chainlinkImage }}
         CHAINLINK_VERSION: ${{ inputs.chainlinkVersion }}
@@ -116,6 +117,7 @@ runs:
         cat << EOF > config.toml
         [CCIP]
         [CCIP.Env]
+        EnvName="$EXISTING_NAMESPACE"
         [CCIP.Env.NewCLCluster]
         [CCIP.Env.NewCLCluster.Common]
         [CCIP.Env.NewCLCluster.Common.ChainlinkImage]

@@ -86,6 +86,21 @@ func (c *CCIPTestConfig) ExistingCLCluster() bool {
 	return c.EnvInput.ExistingCLCluster != nil
 }
 
+func (c *CCIPTestConfig) CLClusterNeedsUpgrade() bool {
+	if c.EnvInput.NewCLCluster == nil {
+		return false
+	}
+	if c.EnvInput.NewCLCluster.Common != nil && c.EnvInput.NewCLCluster.Common.ChainlinkUpgradeImage != nil {
+		return true
+	}
+	for _, node := range c.EnvInput.NewCLCluster.Nodes {
+		if node.ChainlinkUpgradeImage != nil {
+			return true
+		}
+	}
+	return false
+}
+
 func (c *CCIPTestConfig) AddPairToNetworkList(networkA, networkB blockchain.EVMNetwork) {
 	if c.AllNetworks == nil {
 		c.AllNetworks = make(map[string]blockchain.EVMNetwork)
@@ -1030,6 +1045,13 @@ func createEnvironmentConfig(t *testing.T, envName string, testConfig *CCIPTestC
 		NamespacePrefix:    envName,
 		Test:               t,
 		PreventPodEviction: true,
+	}
+	// if there is aready existing namespace, no need to update any manifest there, we just connect to it
+	existingEnv := pointer.GetString(testConfig.EnvInput.EnvName)
+	if existingEnv != "" {
+		envConfig.Namespace = existingEnv
+		envConfig.NamespacePrefix = ""
+		envConfig.NoManifestUpdate = true
 	}
 	if testConfig.EnvInput.TTL != nil {
 		envConfig.TTL = testConfig.EnvInput.TTL.Duration()
