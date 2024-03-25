@@ -92,15 +92,15 @@ jobs:
           AWS_REGION: ${{ secrets.QA_AWS_REGION }}
           AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
 
-  build-test-image:
-    if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'schedule' || contains(join(github.event.pull_request.labels.*.name, ' '), 'build-test-image')
+  build-test-image-current-sha:
+    if: needs.changes.outputs.src == 'true' || github.event_name == 'workflow_dispatch'
+    needs: [ changes ]
     environment: integration
     permissions:
       id-token: write
       contents: read
     name: Build Test Image
     runs-on: ubuntu20.04-16cores-64GB
-    needs: [ changes ]
     steps:
       - name: Collect Metrics
         if: needs.changes.outputs.src == 'true' || github.event_name == 'workflow_dispatch'
@@ -131,7 +131,6 @@ jobs:
           QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
           QA_AWS_ACCOUNT_NUMBER: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}
           other_tags: ${{ steps.tags.outputs.other_tags }},${{steps.tags.outputs.release_tag}}
-
   # End Build Test Dependencies
 
 # run test with previous image
@@ -215,7 +214,7 @@ jobs:
           RR_CPU: 4
           TEST_TRIGGERED_BY: ccip-version-upgrade-test-ci-${{ matrix.product.name }}
         with:
-          test_command_to_run: cd ./integration-tests/ccip-tests && go test -timeout 30m -count=1 -json -run ${{ matrix.type.run }} ./smoke 2>&1 | tee /tmp/gotest.log | gotestfmt
+          test_command_to_run: cd ./integration-tests/ccip-tests && go test -timeout 30m -count=1 -json -run ${{ matrix.product.run }} ./smoke 2>&1 | tee /tmp/gotest.log | gotestfmt
           test_download_vendor_packages_command: cd ./integration-tests && go mod download
           cl_repo: ${{ env.AWS_ECR_REPO_PUBLIC_REGISTRY }}/w0i8p0z9/chainlink-ccip # releases are published to public registry
           cl_image_tag: ${{ steps.fetch_last_release.outputs.release_tag_name }}
@@ -259,7 +258,7 @@ jobs:
       pull-requests: write
       id-token: write
       contents: read
-    needs: [ build-chainlink, changes, build-test-image, run-test-with-last-release ]
+    needs: [ build-chainlink, changes, build-test-image-current-sha, run-test-with-last-release ]
     strategy:
       fail-fast: false
       matrix:
