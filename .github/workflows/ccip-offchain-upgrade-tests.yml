@@ -116,13 +116,7 @@ jobs:
         uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
         with:
           repository: smartcontractkit/ccip
-          ref: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
-      - name: Setup Other Tags If Not Workflow Dispatch
-        id: tags
-        if: github.event_name != 'workflow_dispatch'
-        run: |
-          echo "other_tags=${ECR_TAG}" >> $GITHUB_OUTPUT
-          echo 'release_tag="${{ format('{0}.dkr.ecr.{1}.amazonaws.com/chainlink-ccip-tests:{2}', secrets.QA_AWS_ACCOUNT_NUMBER, secrets.QA_AWS_REGION, github.ref_name) }}"' >> $GITHUB_OUTPUT
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Build Test Image
         if: needs.changes.outputs.src == 'true' || github.event_name == 'workflow_dispatch'
         uses: ./.github/actions/build-test-image
@@ -130,7 +124,6 @@ jobs:
           QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
           QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
           QA_AWS_ACCOUNT_NUMBER: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}
-          other_tags: ${{ steps.tags.outputs.other_tags }},${{steps.tags.outputs.release_tag}}
 
   build-test-image-for-previous-release:
     if: needs.changes.outputs.src == 'true' || github.event_name == 'workflow_dispatch'
@@ -139,7 +132,7 @@ jobs:
     permissions:
       id-token: write
       contents: read
-    name: Build Test Image with current sha
+    name: Build Test Image for previous release
     runs-on: ubuntu20.04-16cores-64GB
     steps:
       - name: Collect Metrics
@@ -174,6 +167,7 @@ jobs:
           QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
           QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
           QA_AWS_ACCOUNT_NUMBER: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}
+          tag: ${{ steps.fetch_last_release.outputs.sha_ref }}
           other_tags: ${{ env.ECR_TAG }},${{ env.RELEASE_TAG }}
   # End Build Test Dependencies
 
