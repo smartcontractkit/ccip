@@ -3,9 +3,13 @@ on:
   merge_group:
   pull_request:
   push:
-   # tags:
-   #   - "*"
+    tags:
+      - "*"
   workflow_dispatch:
+
+concurrency:
+  group: upgrade-tests-ccip-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   # for run-test variables and environment
