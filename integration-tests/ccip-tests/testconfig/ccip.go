@@ -3,7 +3,9 @@ package testconfig
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
+	"github.com/AlekSi/pointer"
 	"github.com/pelletier/go-toml/v2"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
@@ -13,6 +15,8 @@ import (
 	ctfconfig "github.com/smartcontractkit/chainlink-testing-framework/config"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
+
+	"github.com/smartcontractkit/ccip/integration-tests/ccip-tests/utils"
 )
 
 type CCIPTestConfig struct {
@@ -102,14 +106,25 @@ func (c *CCIPTestConfig) Validate() error {
 }
 
 type CCIPContractConfig struct {
-	Data string `toml:",omitempty"`
+	DataFile *string `toml:",omitempty"`
+	Data     string  `toml:",omitempty"`
 }
 
-func (c *CCIPContractConfig) ContractsData() []byte {
-	if c == nil || c.Data == "" {
-		return nil
+func (c *CCIPContractConfig) ContractsData() ([]byte, error) {
+	if c == nil {
+		return nil, nil
 	}
-	return []byte(c.Data)
+	if c.Data != "" {
+		return []byte(c.Data), nil
+	}
+	filePath := pointer.GetString(c.DataFile)
+	if filePath != "" {
+		if !filepath.IsAbs(filePath) {
+			filePath = fmt.Sprintf("%s/%s", utils.ProjectRoot(), filePath)
+		}
+		return os.ReadFile(filePath)
+	}
+	return nil, nil
 }
 
 type CCIP struct {

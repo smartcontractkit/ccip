@@ -1,0 +1,4 @@
+[CCIP]
+[CCIP.Groups]
+[CCIP.Groups.smoke]
+LocalCluster = false

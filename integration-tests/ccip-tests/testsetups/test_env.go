@@ -297,33 +297,30 @@ func DeployLocalCluster(
 // startIndex and endIndex are inclusive
 func UpgradeNodes(
 	lggr zerolog.Logger,
-	startIndex int,
-	endIndex int,
 	testInputs *CCIPTestConfig,
 	ccipEnv *actions.CCIPTestEnv,
 ) error {
 	lggr.Info().
-		Int("Start Index", startIndex).
-		Int("End Index", endIndex).
 		Msg("Upgrading node version")
 	// if the test is running on local docker
 	if pointer.GetBool(testInputs.TestGroupInput.LocalCluster) {
 		env := ccipEnv.LocalCluster
 		for i, clNode := range env.ClCluster.Nodes {
-			if i <= startIndex || i >= endIndex {
-				upgradeImage := pointer.GetString(testInputs.EnvInput.NewCLCluster.Common.ChainlinkUpgradeImage.Image)
-				upgradeTag := pointer.GetString(testInputs.EnvInput.NewCLCluster.Common.ChainlinkUpgradeImage.Version)
-				// if individual node upgrade image is provided, use that
-				if len(testInputs.EnvInput.NewCLCluster.Nodes) > 0 {
-					if i < len(testInputs.EnvInput.NewCLCluster.Nodes) {
-						upgradeImage = pointer.GetString(testInputs.EnvInput.NewCLCluster.Nodes[i].ChainlinkUpgradeImage.Image)
-						upgradeTag = pointer.GetString(testInputs.EnvInput.NewCLCluster.Nodes[i].ChainlinkUpgradeImage.Version)
-					}
+			upgradeImage := pointer.GetString(testInputs.EnvInput.NewCLCluster.Common.ChainlinkUpgradeImage.Image)
+			upgradeTag := pointer.GetString(testInputs.EnvInput.NewCLCluster.Common.ChainlinkUpgradeImage.Version)
+			// if individual node upgrade image is provided, use that
+			if len(testInputs.EnvInput.NewCLCluster.Nodes) > 0 {
+				if i < len(testInputs.EnvInput.NewCLCluster.Nodes) {
+					upgradeImage = pointer.GetString(testInputs.EnvInput.NewCLCluster.Nodes[i].ChainlinkUpgradeImage.Image)
+					upgradeTag = pointer.GetString(testInputs.EnvInput.NewCLCluster.Nodes[i].ChainlinkUpgradeImage.Version)
 				}
-				err := clNode.UpgradeVersion(upgradeImage, upgradeTag)
-				if err != nil {
-					return err
-				}
+			}
+			if upgradeImage == "" || upgradeTag == "" {
+				continue
+			}
+			err := clNode.UpgradeVersion(upgradeImage, upgradeTag)
+			if err != nil {
+				return err
 			}
 		}
 	} else {
@@ -338,21 +335,22 @@ func UpgradeNodes(
 		}
 		var clientsToUpgrade []*integrationclient.ChainlinkK8sClient
 		for i, clNode := range nodeClients {
-			if i <= startIndex || i >= endIndex {
-				upgradeImage := testInputs.EnvInput.NewCLCluster.Common.ChainlinkUpgradeImage.Image
-				upgradeTag := testInputs.EnvInput.NewCLCluster.Common.ChainlinkUpgradeImage.Version
-				// if individual node upgrade image is provided, use that
-				if len(testInputs.EnvInput.NewCLCluster.Nodes) > 0 {
-					if i < len(testInputs.EnvInput.NewCLCluster.Nodes) {
-						upgradeImage = testInputs.EnvInput.NewCLCluster.Nodes[i].ChainlinkUpgradeImage.Image
-						upgradeTag = testInputs.EnvInput.NewCLCluster.Nodes[i].ChainlinkUpgradeImage.Version
-					}
+			upgradeImage := pointer.GetString(testInputs.EnvInput.NewCLCluster.Common.ChainlinkUpgradeImage.Image)
+			upgradeTag := pointer.GetString(testInputs.EnvInput.NewCLCluster.Common.ChainlinkUpgradeImage.Version)
+			// if individual node upgrade image is provided, use that
+			if len(testInputs.EnvInput.NewCLCluster.Nodes) > 0 {
+				if i < len(testInputs.EnvInput.NewCLCluster.Nodes) {
+					upgradeImage = pointer.GetString(testInputs.EnvInput.NewCLCluster.Nodes[i].ChainlinkUpgradeImage.Image)
+					upgradeTag = pointer.GetString(testInputs.EnvInput.NewCLCluster.Nodes[i].ChainlinkUpgradeImage.Version)
 				}
-				clientsToUpgrade = append(clientsToUpgrade, clNode)
-				err := clNode.UpgradeVersion(k8Env, pointer.GetString(upgradeImage), pointer.GetString(upgradeTag))
-				if err != nil {
-					return err
-				}
+			}
+			if upgradeImage == "" || upgradeTag == "" {
+				continue
+			}
+			clientsToUpgrade = append(clientsToUpgrade, clNode)
+			err := clNode.UpgradeVersion(k8Env, upgradeImage, upgradeTag)
+			if err != nil {
+				return err
 			}
 		}
 		err := k8Env.RunUpdated(len(clientsToUpgrade))

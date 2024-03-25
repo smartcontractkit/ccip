@@ -727,18 +727,19 @@ func CCIPDefaultTestSetUp(
 			return setUpArgs
 		}
 	}
+	contractsData, err := setUpArgs.Cfg.ContractsInput.ContractsData()
+	require.NoError(t, err, "error reading existing lane config")
+	setUpArgs.LaneConfig, err = laneconfig.ReadLanesFromExistingDeployment(contractsData)
+	require.NoError(t, err)
+
+	if setUpArgs.LaneConfig == nil {
+		setUpArgs.LaneConfig = &laneconfig.Lanes{LaneConfigs: make(map[string]*laneconfig.LaneConfig)}
+	}
 	_, err = os.Stat(setUpArgs.LaneConfigFile)
 	if err == nil {
 		// remove the existing lane config file
 		err = os.Remove(setUpArgs.LaneConfigFile)
 		require.NoError(t, err, "error while removing existing lane config file - %s", setUpArgs.LaneConfigFile)
-	}
-
-	setUpArgs.LaneConfig, err = laneconfig.ReadLanesFromExistingDeployment(setUpArgs.Cfg.ContractsInput.ContractsData())
-	require.NoError(t, err)
-
-	if setUpArgs.LaneConfig == nil {
-		setUpArgs.LaneConfig = &laneconfig.Lanes{LaneConfigs: make(map[string]*laneconfig.LaneConfig)}
 	}
 	configureCLNode := !testConfig.useExistingDeployment()
 
