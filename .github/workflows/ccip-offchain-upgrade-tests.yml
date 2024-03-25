@@ -238,7 +238,8 @@ jobs:
           for ((i=0;i<${COUNT};i++)); do
             name=$(echo "${ITEMS}" | jq -r ".[${i}].metadata.name")
             echo "setting env var with namespace: ${name}"
-            echo "EXISTING_NAMESPACE=${{ name }}" >> $GITHUB_ENV
+            echo "EXISTING_NAMESPACE=${name}" >> $GITHUB_ENV
+            break
           done
           echo "completed env var set up"
 
