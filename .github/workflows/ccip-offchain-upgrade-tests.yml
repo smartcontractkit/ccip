@@ -172,6 +172,7 @@ jobs:
           untrimmed_ver=$(curl --header "Authorization: token ${{ secrets.GITHUB_TOKEN }}" --request GET https://api.github.com/repos/${{ github.repository }}/releases | jq -r --arg SUFFIX "release" '.[] | select(.tag_name | endswith("release"))  | .tag_name' | sort -V | tail -n 1)
           release_name="${untrimmed_ver:1}"
           echo "release_name=${release_name}" >> $GITHUB_OUTPUT
+          echo "${release_name}"
           untrimmed_sha=$(curl -s --header "Authorization: token ${{ secrets.GITHUB_TOKEN }}" --request GET https://api.github.com/repos/${{ github.repository }}/git/refs/tags/${release_name} | jq -r '.object.sha' | sort -V | tail -n 1)
           sha_ref="${untrimmed_sha:1}"
           echo "sha_ref=${sha_ref}" >> $GITHUB_OUTPUT
