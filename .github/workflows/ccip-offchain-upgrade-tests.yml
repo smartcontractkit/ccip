@@ -1,4 +1,4 @@
-name: Client Compatibility Tests
+name: CCIP Offchain Upgrade Compatibility Tests
 on:
   merge_group:
   pull_request:
