@@ -70,7 +70,7 @@ func NewEstimator(lggr logger.Logger, ethClient evmclient.Client, cfg Config, ge
 	var l1Oracle rollups.L1Oracle
 	lggr.Infow("Checking if chain type is roll up", "chainType", cfg.ChainType(), "isRollUp", rollups.IsRollupWithL1Support(cfg.ChainType()))
 	if rollups.IsRollupWithL1Support(cfg.ChainType()) {
-		l1Oracle = rollups.NewL1GasPriceOracle(lggr, ethClient, cfg.ChainType())
+		l1Oracle = rollups.NewL1GasOracle(lggr, ethClient, cfg.ChainType())
 	}
 	var newEstimator func(logger.Logger) EvmEstimator
 	switch s {
