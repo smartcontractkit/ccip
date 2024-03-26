@@ -99,7 +99,7 @@ jobs:
     permissions:
       id-token: write
       contents: read
-    name: Build Test Image with current sha
+    name: Build Test Image with Current Sha
     runs-on: ubuntu20.04-16cores-64GB
     steps:
       - name: Collect Metrics
@@ -125,14 +125,14 @@ jobs:
           QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
           QA_AWS_ACCOUNT_NUMBER: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}
 
-  build-test-image-for-previous-release:
+  build-test-image-for-last-release:
     if: needs.changes.outputs.src == 'true' || github.event_name == 'workflow_dispatch'
     needs: [ changes ]
     environment: integration
     permissions:
       id-token: write
       contents: read
-    name: Build Test Image for previous release
+    name: Build Test Image for Last Release
     runs-on: ubuntu20.04-16cores-64GB
     outputs:
       release_name: ${{ steps.fetch_last_release.outputs.release_name }}
@@ -225,7 +225,7 @@ jobs:
           testLogCollect: ${{ vars.TEST_LOG_COLLECT }}
           selectedNetworks: SIMULATED_1,SIMULATED_2
           chainlinkImage: ${{ env.AWS_ECR_REPO_PUBLIC_REGISTRY }}/w0i8p0z9/chainlink-ccip
-          chainlinkVersion: ${{ needs.build-test-image-for-previous-release.steps.outputs.release_tag }}
+          chainlinkVersion: ${{ needs.build-test-image-for-last-release.outputs.release_tag }}
           lokiEndpoint: ${{ secrets.LOKI_URL_CI }}
           lokiTenantId: ${{ vars.LOKI_TENANT_ID }}
           lokiBasicAuth: ${{ secrets.LOKI_BASIC_AUTH }}
@@ -238,8 +238,8 @@ jobs:
         env:
           BASE64_CCIP_CONFIG_OVERRIDE: ${{ steps.set_override_config.outputs.base_64_override }}
           TEST_BASE64_CCIP_CONFIG_OVERRIDE: ${{ steps.set_override_config.outputs.base_64_override }}
-          ENV_JOB_IMAGE: ${{ env.ENV_JOB_IMAGE_BASE }}:${{ needs.build-test-image-for-previous-release.steps.outputs.release_sha }}
-          RELEASE_TAG : ${{ needs.build-test-image-for-previous-release.steps.outputs.release_sha }}
+          ENV_JOB_IMAGE: ${{ env.ENV_JOB_IMAGE_BASE }}:${{ needs.build-test-image-for-last-release.outputs.release_sha }}
+          RELEASE_TAG : ${{ needs.build-test-image-for-last-release.outputs.release_sha }}
           TEST_SUITE: smoke
           TEST_ARGS: -test.timeout 30m
           DATABASE_URL: postgresql://postgres:node@localhost:5432/chainlink_test?sslmode=disable
