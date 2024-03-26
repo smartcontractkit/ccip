@@ -1,6 +1,9 @@
 package factory
 
 import (
+	"fmt"
+
+	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
@@ -17,17 +20,22 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 )
 
-// NewOnRampReader determines the appropriate version of the onramp and returns a reader for it
-func NewOnRampReader(lggr logger.Logger, versionFinder VersionFinder, sourceSelector, destSelector uint64, onRampAddress cciptypes.Address, sourceLP logpoller.LogPoller, source client.Client, pgOpts ...pg.QOpt) (ccipdata.OnRampReader, error) {
-	return initOrCloseOnRampReader(lggr, versionFinder, sourceSelector, destSelector, onRampAddress, sourceLP, source, false, pgOpts...)
+type DbCfg struct {
+	DB      *sqlx.DB
+	Qconfig pg.QConfig
 }
 
-func CloseOnRampReader(lggr logger.Logger, versionFinder VersionFinder, sourceSelector, destSelector uint64, onRampAddress cciptypes.Address, sourceLP logpoller.LogPoller, source client.Client, pgOpts ...pg.QOpt) error {
-	_, err := initOrCloseOnRampReader(lggr, versionFinder, sourceSelector, destSelector, onRampAddress, sourceLP, source, true, pgOpts...)
+// NewOnRampReader determines the appropriate version of the onramp and returns a reader for it
+func NewOnRampReader(lggr logger.Logger, versionFinder VersionFinder, sourceSelector, destSelector uint64, onRampAddress cciptypes.Address, sourceLP logpoller.LogPoller, source client.Client, dbCfg DbCfg) (ccipdata.OnRampReader, error) {
+	return initOrCloseOnRampReader(lggr, versionFinder, sourceSelector, destSelector, onRampAddress, sourceLP, source, false, dbCfg)
+}
+
+func CloseOnRampReader(lggr logger.Logger, versionFinder VersionFinder, sourceSelector, destSelector uint64, onRampAddress cciptypes.Address, sourceLP logpoller.LogPoller, source client.Client, dbCfg DbCfg) error {
+	_, err := initOrCloseOnRampReader(lggr, versionFinder, sourceSelector, destSelector, onRampAddress, sourceLP, source, true, dbCfg)
 	return err
 }
 
-func initOrCloseOnRampReader(lggr logger.Logger, versionFinder VersionFinder, sourceSelector, destSelector uint64, onRampAddress cciptypes.Address, sourceLP logpoller.LogPoller, source client.Client, closeReader bool, pgOpts ...pg.QOpt) (ccipdata.OnRampReader, error) {
+func initOrCloseOnRampReader(lggr logger.Logger, versionFinder VersionFinder, sourceSelector, destSelector uint64, onRampAddress cciptypes.Address, sourceLP logpoller.LogPoller, source client.Client, closeReader bool, dbCfg DbCfg) (ccipdata.OnRampReader, error) {
 	contractType, version, err := versionFinder.TypeAndVersion(onRampAddress, source)
 	if err != nil {
 		return nil, errors.Wrapf(err, "unable to read type and version")
@@ -41,44 +49,58 @@ func initOrCloseOnRampReader(lggr logger.Logger, versionFinder VersionFinder, so
 		return nil, err
 	}
 
-	switch version.String() {
-	case ccipdata.V1_0_0:
-		onRamp, err := v1_0_0.NewOnRamp(lggr, sourceSelector, destSelector, onRampAddrEvm, sourceLP, source)
-		if err != nil {
-			return nil, err
+	//create a transaction so the the logpoller register/unregister filters are coherent
+	q := pg.NewQ(dbCfg.DB, lggr, dbCfg.Qconfig)
+	var (
+		onRamp ccipdata.OnRampReader
+	)
+	err = q.Transaction(func(tx pg.Queryer) error {
+		var txErr error
+		pgOpts := pg.WithQueryer(tx)
+
+		switch version.String() {
+		case ccipdata.V1_0_0:
+			onRamp, txErr = v1_0_0.NewOnRamp(lggr, sourceSelector, destSelector, onRampAddrEvm, sourceLP, source)
+			if txErr != nil {
+				return txErr
+			}
+			if closeReader {
+				return onRamp.UnregisterFilters(pgOpts)
+			}
+			return onRamp.RegisterFilters(pgOpts)
+		case ccipdata.V1_1_0:
+			onRamp, txErr = v1_1_0.NewOnRamp(lggr, sourceSelector, destSelector, onRampAddrEvm, sourceLP, source)
+			if txErr != nil {
+				return txErr
+			}
+			if closeReader {
+				return onRamp.UnregisterFilters(pgOpts)
+			}
+			return onRamp.RegisterFilters(pgOpts)
+		case ccipdata.V1_2_0:
+			onRamp, txErr = v1_2_0.NewOnRamp(lggr, sourceSelector, destSelector, onRampAddrEvm, sourceLP, source)
+			if txErr != nil {
+				return txErr
+			}
+			if closeReader {
+				return onRamp.UnregisterFilters(pgOpts)
+			}
+			return onRamp.RegisterFilters(pgOpts)
+		case ccipdata.V1_5_0:
+			onRamp, txErr = v1_5_0.NewOnRamp(lggr, sourceSelector, destSelector, onRampAddrEvm, sourceLP, source)
+			if txErr != nil {
+				return err
+			}
+			if closeReader {
+				return onRamp.UnregisterFilters(pgOpts)
+			}
+			return onRamp.RegisterFilters(pgOpts)
+		default:
+			return errors.Errorf("unsupported onramp version %v", version.String())
 		}
-		if closeReader {
-			return nil, onRamp.Close(pgOpts...)
-		}
-		return onRamp, onRamp.RegisterFilters(pgOpts...)
-	case ccipdata.V1_1_0:
-		onRamp, err := v1_1_0.NewOnRamp(lggr, sourceSelector, destSelector, onRampAddrEvm, sourceLP, source)
-		if err != nil {
-			return nil, err
-		}
-		if closeReader {
-			return nil, onRamp.Close(pgOpts...)
-		}
-		return onRamp, onRamp.RegisterFilters(pgOpts...)
-	case ccipdata.V1_2_0:
-		onRamp, err := v1_2_0.NewOnRamp(lggr, sourceSelector, destSelector, onRampAddrEvm, sourceLP, source)
-		if err != nil {
-			return nil, err
-		}
-		if closeReader {
-			return nil, onRamp.Close(pgOpts...)
-		}
-		return onRamp, onRamp.RegisterFilters(pgOpts...)
-	case ccipdata.V1_5_0:
-		onRamp, err := v1_5_0.NewOnRamp(lggr, sourceSelector, destSelector, onRampAddrEvm, sourceLP, source)
-		if err != nil {
-			return nil, err
-		}
-		if closeReader {
-			return nil, onRamp.Close(pgOpts...)
-		}
-		return onRamp, onRamp.RegisterFilters(pgOpts...)
-	default:
-		return nil, errors.Errorf("unsupported onramp version %v", version.String())
+	}) // end transaction
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize onramp reader: %w", err)
 	}
+	return onRamp, nil
 }

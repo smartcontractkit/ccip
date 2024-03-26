@@ -210,6 +210,10 @@ func (o *OnRamp) Close(qopts ...pg.QOpt) error {
 	return logpollerutil.UnregisterLpFilters(o.lp, o.filters, qopts...)
 }
 
+func (o *OnRamp) UnregisterFilters(qopts ...pg.QOpt) error {
+	return logpollerutil.UnregisterLpFilters(o.lp, o.filters, qopts...)
+}
+
 func (o *OnRamp) RegisterFilters(qopts ...pg.QOpt) error {
 	return logpollerutil.RegisterLpFilters(o.lp, o.filters, qopts...)
 }
