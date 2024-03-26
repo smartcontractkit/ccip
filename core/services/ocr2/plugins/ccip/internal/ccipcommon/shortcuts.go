@@ -58,7 +58,7 @@ func getSortedChainTokensWithBatchLimit(ctx context.Context, offRamps []ccipdata
 		return nil
 	})
 
-	var batchCounter uint = 0
+	var batchCounter uint
 	for _, o := range offRamps {
 		offRamp := o
 		eg.Go(func() error {
