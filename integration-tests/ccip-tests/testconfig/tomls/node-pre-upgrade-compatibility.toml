@@ -2,3 +2,4 @@
 [CCIP.Groups]
 [CCIP.Groups.smoke]
 LocalCluster = false
+KeepEnvAlive = true

@@ -272,7 +272,7 @@ jobs:
       - name : fetch namespace
         run: |
           echo "looking for namespaces"
-          ITEMS=$(kubectl get ns -l=triggered-by=${{ inputs.triggered_by }}-${{ github.event.pull_request.number || github.run_id }} -o jsonpath='{.items}')
+          ITEMS=$(kubectl get ns -l=triggered-by=${{ env.TEST_TRIGGERED_BY }}-${{ github.event.pull_request.number || github.run_id }} -o jsonpath='{.items}')
           COUNT=$(echo "${ITEMS}" | jq '. | length')
           echo "found ${COUNT} namespaces. will set the env var with first one"
           for ((i=0;i<${COUNT};i++)); do
