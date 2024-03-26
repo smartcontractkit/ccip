@@ -4,6 +4,8 @@ description: A composite action that creates a base64-encoded config to be used 
 inputs:
   runId:
     description: The run id
+  existingNamespace:
+    description: If test needs to run against already deployed namespace
   testLogCollect:
     description: Whether to always collect logs, even for passing tests
     default: "false"
@@ -152,6 +154,15 @@ runs:
         [CCIP.Env.Logging.Grafana]
         base_url="$GRAFANA_URL"
         dashboard_url="$GRAFANA_DASHBOARD_URL"
+        
+        [CCIP.Groups]
+        [CCIP.Groups.load]
+        TestRunName = '$EXISTING_NAMESPACE'
+        
+        [CCIP.Groups]
+        [CCIP.Groups.smoke]
+        TestRunName = '$EXISTING_NAMESPACE'
+        
         EOF
 
         BASE64_CCIP_SECRETS_CONFIG=$(cat config.toml | base64 -w 0)

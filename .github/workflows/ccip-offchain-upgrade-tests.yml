@@ -61,7 +61,7 @@ jobs:
 
   build-chainlink:
     if: needs.changes.outputs.src == 'true' || github.event_name == 'workflow_dispatch'
-    needs: [changes]
+    needs: [ changes ]
     environment: integration
     permissions:
       id-token: write
@@ -175,7 +175,7 @@ jobs:
           other_tags: ${{ steps.fetch_last_release.outputs.release_name }}
   # End Build Test Dependencies
 
-# run test with previous image
+  # run test with previous image
   run-test-with-last-release:
     environment: integration
     permissions:
@@ -185,6 +185,8 @@ jobs:
       id-token: write
       contents: read
     needs: [ changes, build-test-image-for-last-release ]
+    outputs:
+      existing_namespace: ${{ steps.fetch_namespace.outputs.existing_namespace }}
     strategy:
       fail-fast: false
       matrix:
@@ -196,8 +198,8 @@ jobs:
     runs-on: ubuntu-latest
     name: CCIP Deployment with ${{ needs.build-test-image-for-last-release.outputs.release_tag }} - ${{ matrix.product.name }}
     env:
-      RELEASE_TAG : ${{ needs.build-test-image-for-last-release.outputs.release_tag }}
-      RELEASE_SHA : ${{ needs.build-test-image-for-last-release.outputs.release_sha }}
+      RELEASE_TAG: ${{ needs.build-test-image-for-last-release.outputs.release_tag }}
+      RELEASE_SHA: ${{ needs.build-test-image-for-last-release.outputs.release_sha }}
       TEST_TRIGGERED_BY: ccip-version-upgrade-test-ci-${{ matrix.product.name }}
     steps:
       - name: Collect Metrics
@@ -271,7 +273,8 @@ jobs:
           should_tidy: "false"
           should_cleanup: "false"
 
-      - name : fetch namespace
+      - name: fetch namespace
+        id: fetch_namespace
         run: |
           echo "looking for namespaces"
           ITEMS=$(kubectl get ns -l=triggered-by=${{ env.TEST_TRIGGERED_BY }}-${{ github.event.pull_request.number || github.run_id }} -o jsonpath='{.items}')
@@ -279,8 +282,8 @@ jobs:
           echo "found ${COUNT} namespaces. will set the env var with first one"
           for ((i=0;i<${COUNT};i++)); do
             name=$(echo "${ITEMS}" | jq -r ".[${i}].metadata.name")
-            echo "setting env var with namespace: ${name}"
-            echo "EXISTING_NAMESPACE=${name}" >> $GITHUB_ENV
+            echo "setting output var with namespace: ${name}"
+            echo "existing_namespace=${name}" >> $GITHUB_OUTPUT
             break
           done
           echo "completed env var set up"
@@ -332,10 +335,10 @@ jobs:
         uses: ./.github/actions/setup-create-base64-config-ccip
         with:
           runId: ${{ github.run_id }}
-          existingNamespace: ${{ env.EXISTING_NAMESPACE }}
+          existingNamespace: ${{ needs.run-test-with-last-release.outputs.existing_namespace }}
           testLogCollect: ${{ vars.TEST_LOG_COLLECT }}
           selectedNetworks: SIMULATED_1,SIMULATED_2
-          chainlinkImage:  ${{ env.CHAINLINK_IMAGE }}
+          chainlinkImage: ${{ env.CHAINLINK_IMAGE }}
           chainlinkVersion: ${{ github.sha }}
           upgradeImage: ${{ env.CHAINLINK_IMAGE }}
           upgradeVersion: ${{ github.sha }}
