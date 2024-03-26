@@ -1047,7 +1047,7 @@ func createEnvironmentConfig(t *testing.T, envName string, testConfig *CCIPTestC
 		Test:               t,
 		PreventPodEviction: true,
 	}
-	// if there is aready existing namespace, no need to update any manifest there, we just connect to it
+	// if there is already existing namespace, no need to update any manifest there, we just connect to it
 	existingEnv := pointer.GetString(testConfig.EnvInput.EnvName)
 	if existingEnv != "" {
 		envConfig.Namespace = existingEnv

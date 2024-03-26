@@ -194,7 +194,10 @@ jobs:
             run: ^TestSmokeCCIPForBidirectionalLane$
             config_path: ./integration-tests/ccip-tests/testconfig/tomls/node-pre-upgrade-compatibility.toml
     runs-on: ubuntu-latest
-    name: Offchain upgrade compatibility- ${{ matrix.product.name }}
+    name: CCIP Deployment with Release ${{ needs.build-test-image-for-last-release.outputs.release_tag }} - ${{ matrix.product.name }}
+    env:
+      RELEASE_TAG : ${{ needs.build-test-image-for-last-release.outputs.release_tag }}
+      RELEASE_SHA : ${{ needs.build-test-image-for-last-release.outputs.release_sha }}
     steps:
       - name: Collect Metrics
         if: needs.changes.outputs.src == 'true' || github.event_name == 'workflow_dispatch'
@@ -225,7 +228,7 @@ jobs:
           testLogCollect: ${{ vars.TEST_LOG_COLLECT }}
           selectedNetworks: SIMULATED_1,SIMULATED_2
           chainlinkImage: ${{ env.AWS_ECR_REPO_PUBLIC_REGISTRY }}/w0i8p0z9/chainlink-ccip
-          chainlinkVersion: ${{ needs.build-test-image-for-last-release.outputs.release_tag }}
+          chainlinkVersion: ${{ env.RELEASE_TAG }}
           lokiEndpoint: ${{ secrets.LOKI_URL_CI }}
           lokiTenantId: ${{ vars.LOKI_TENANT_ID }}
           lokiBasicAuth: ${{ secrets.LOKI_BASIC_AUTH }}
@@ -238,8 +241,7 @@ jobs:
         env:
           BASE64_CCIP_CONFIG_OVERRIDE: ${{ steps.set_override_config.outputs.base_64_override }}
           TEST_BASE64_CCIP_CONFIG_OVERRIDE: ${{ steps.set_override_config.outputs.base_64_override }}
-          ENV_JOB_IMAGE: ${{ env.ENV_JOB_IMAGE_BASE }}:${{ needs.build-test-image-for-last-release.outputs.release_sha }}
-          RELEASE_TAG : ${{ needs.build-test-image-for-last-release.outputs.release_tag }}
+          ENV_JOB_IMAGE: ${{ env.ENV_JOB_IMAGE_BASE }}:${{ env.RELEASE_SHA }}
           TEST_SUITE: smoke
           TEST_ARGS: -test.timeout 30m
           TEST_LOG_LEVEL: info
@@ -312,7 +314,7 @@ jobs:
           org-id: ${{ secrets.GRAFANA_INTERNAL_TENANT_ID }}
           basic-auth: ${{ secrets.GRAFANA_INTERNAL_BASIC_AUTH }}
           hostname: ${{ secrets.GRAFANA_INTERNAL_HOST }}
-          this-job-name: Offchain upgrade compatibility- run test with current sha ${{ matrix.product.name }}
+          this-job-name: Upgrade Nodes with Current SHA and Run ${{ matrix.product.name }}
           test-results-file: '{"testType":"go","filePath":"/tmp/gotest.log"}'
       - name: Checkout the repo
         uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
