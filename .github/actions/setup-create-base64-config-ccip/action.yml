@@ -16,7 +16,7 @@ inputs:
     description: The git commit sha to use for the image tag
   upgradeImage:
     description: The chainlink image to upgrade to
-    default: "public.ecr.aws/chainlink/chainlink"
+    default: ""
   upgradeVersion:
     description: The git commit sha to use for the image tag
   lokiEndpoint:
