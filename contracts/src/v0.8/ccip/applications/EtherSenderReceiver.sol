@@ -19,6 +19,14 @@ interface CCIPRouter {
 /// Since CCIP only supports ERC-20 token transfers, this contract accepts
 /// normal ether, wraps it, and uses CCIP to send it cross-chain.
 /// On the receiving side, the wrapped ether is unwrapped and sent to the final receiver.
+/// @notice This contract only supports chains where the wrapped native contract
+/// is the WETH contract (i.e not WMATIC, or WAVAX, etc.). This is because the
+/// receiving contract will always unwrap the ether using it's local wrapped native contract.
+/// @dev This contract is both a sender and a receiver. This same contract can be
+/// deployed on source and destination chains to facilitate cross-chain ether transfers
+/// and act as a sender and a receiver.
+/// @dev This contract is intentionally ownerless and permissionless. This contract
+/// will never hold any excess funds, native or otherwise.
 contract EtherSenderReceiver is CCIPReceiver, ITypeAndVersion {
   using SafeERC20 for IERC20;
 
@@ -33,13 +41,16 @@ contract EtherSenderReceiver is CCIPReceiver, ITypeAndVersion {
   error AllowanceTooHigh();
 
   /// @notice The WETH contract address.
+  /// This matches the wrapped ether contract set on the CCIP router by construction.
   IWrappedNative public immutable i_weth;
 
   /// @notice the gas limit for the message call on the destination chain, 500,000 should be plenty.
+  /// @dev This won't vary on L2's, callbacks are always provided so-called "L2 gas".
   uint256 public constant MESSAGE_GAS_LIMIT = 500_000;
 
   string public constant override typeAndVersion = "EtherSenderReceiver 1.0.0-dev";
 
+  /// @param router The CCIP router address.
   constructor(address router) CCIPReceiver(router) {
     i_weth = IWrappedNative(CCIPRouter(router).getWrappedNative());
   }
@@ -47,6 +58,9 @@ contract EtherSenderReceiver is CCIPReceiver, ITypeAndVersion {
   /// @notice Need this in order to unwrap correctly.
   receive() external payable {}
 
+  /// @notice Get the fee for sending a message to a destination chain.
+  /// This is mirrored from the router for convenience, construct the appropriate
+  /// message and get it's fee.
   /// @param destinationChainSelector The destination chainSelector
   /// @param message The cross-chain CCIP message including data and/or tokens
   /// @return fee returns execution fee for the message
@@ -109,7 +123,7 @@ contract EtherSenderReceiver is CCIPReceiver, ITypeAndVersion {
 
       return IRouterClient(getRouter()).ccipSend(destinationChainSelector, message);
     } else {
-      // We've already checked that msg.value > tokenAmounts[0].amount, so we can use the difference as the fee.
+      // We've already checked that msg.value > tokenAmounts[0].amount, so there is no overflow/underflow risk.
       // We don't want to keep any excess ether in this contract, so we send over the entire diff as the fee.
       uint256 diff = msg.value - message.tokenAmounts[0].amount;
       if (diff < fee) {
@@ -153,6 +167,8 @@ contract EtherSenderReceiver is CCIPReceiver, ITypeAndVersion {
         revert InsufficientMsgValue(tokenAmount.amount, msgValue);
       }
     }
+
+    // If fee token is not native, there's no relationship between msgValue and tokenAmount.amount.
   }
 
   /// @notice Receive the wrapped ether, unwrap it, and send it to the specified EOA in the data field.
