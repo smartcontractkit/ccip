@@ -10,6 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/shopspring/decimal"
 	chainsel "github.com/smartcontractkit/chain-selectors"
 
@@ -17,11 +18,55 @@ import (
 	helpers "github.com/smartcontractkit/chainlink/core/scripts/common"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/ether_sender_receiver"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/lock_release_token_pool"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/weth9"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/erc20"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
+)
+
+var (
+	senderABI = abihelpers.MustParseABI(ether_sender_receiver.EtherSenderReceiverABI)
 )
 
 func main() {
 	switch os.Args[1] {
+	case "inject-eth-liquidity":
+		cmd := flag.NewFlagSet("inject-eth-liquidity", flag.ExitOnError)
+		chainID := cmd.Uint64("chain-id", 0, "Chain ID")
+		lrtpAddress := cmd.String("lrtp-address", "", "Lock/Release token pool address")
+		amount := cmd.String("amount", "", "Amount to inject in wei")
+
+		helpers.ParseArgs(cmd, os.Args[2:], "chain-id", "lrtp-address", "amount")
+
+		env := multienv.New(false, false)
+		lrtp, err := lock_release_token_pool.NewLockReleaseTokenPool(common.HexToAddress(*lrtpAddress), env.Clients[*chainID])
+		helpers.PanicErr(err)
+
+		balance, err := env.Clients[*chainID].BalanceAt(context.Background(), env.Transactors[*chainID].From, nil)
+		helpers.PanicErr(err)
+
+		if balance.Cmp(decimal.RequireFromString(*amount).BigInt()) < 0 {
+			panic(fmt.Sprintf("Insufficient balance to inject: %s < %s, please get more ETH", balance, *amount))
+		}
+
+		wethAddress, err := lrtp.GetToken(nil)
+		helpers.PanicErr(err)
+
+		weth, err := weth9.NewWETH9(wethAddress, env.Clients[*chainID])
+		helpers.PanicErr(err)
+
+		tx, err := weth.Deposit(&bind.TransactOpts{
+			From:   env.Transactors[*chainID].From,
+			Signer: env.Transactors[*chainID].Signer,
+			Value:  decimal.RequireFromString(*amount).BigInt(),
+		})
+		helpers.PanicErr(err)
+		helpers.ConfirmTXMined(context.Background(), env.Clients[*chainID], tx, int64(*chainID), "depositing ETH to get WETH, amount:", *amount, "wei")
+
+		// token.Transfer the weth into the pool since we're not the owner
+		tx, err = weth.Transfer(env.Transactors[*chainID], common.HexToAddress(*lrtpAddress), decimal.RequireFromString(*amount).BigInt())
+		helpers.PanicErr(err)
+		helpers.ConfirmTXMined(context.Background(), env.Clients[*chainID], tx, int64(*chainID), "transferring WETH to LRTP, amount:", *amount, "wei")
 	case "deploy":
 		cmd := flag.NewFlagSet("deploy", flag.ExitOnError)
 		chainID := cmd.Uint64("chain-id", 0, "Chain ID")
@@ -154,15 +199,35 @@ func main() {
 			}
 
 			fmt.Println("Sending with value:", totalValue.String(), "total balance:", ethBalance.String())
-			// native is the fee token, so send with value.
-			tx, err := senderReceiver.CcipSend(&bind.TransactOpts{
-				From:   env.Transactors[*chainID].From,
-				Signer: env.Transactors[*chainID].Signer,
-				Value:  totalValue,
-			}, destChain.Selector, msg)
+			packed, err := senderABI.Pack("ccipSend", destChain.Selector, msg)
 			helpers.PanicErr(err)
-			helpers.ConfirmTXMined(context.Background(), env.Clients[*chainID], tx, int64(*chainID),
-				"ccip send native, msg value:", totalValue.String(), "fee:", fee.String())
+			nonce, err := env.Clients[*chainID].PendingNonceAt(context.Background(), env.Transactors[*chainID].From)
+			helpers.PanicErr(err)
+			gasPrice, err := env.Clients[*chainID].SuggestGasPrice(context.Background())
+			helpers.PanicErr(err)
+			toAddr := common.HexToAddress(*senderReceiverAddress)
+			rawTx := types.NewTx(&types.LegacyTx{
+				Nonce:    nonce,
+				GasPrice: gasPrice,
+				Gas:      500_000,
+				To:       &toAddr,
+				Value:    totalValue,
+				Data:     packed,
+			})
+			signedTx, err := env.Transactors[*chainID].Signer(env.Transactors[*chainID].From, rawTx)
+			helpers.PanicErr(err)
+			err = env.Clients[*chainID].SendTransaction(context.Background(), signedTx)
+			helpers.PanicErr(err)
+			helpers.ConfirmTXMined(context.Background(), env.Clients[*chainID], signedTx, int64(*chainID), "ccip send native, msg value:", totalValue.String(), "fee:", fee.String())
+			// native is the fee token, so send with value.
+			// tx, err := senderReceiver.CcipSend(&bind.TransactOpts{
+			// 	From:   env.Transactors[*chainID].From,
+			// 	Signer: env.Transactors[*chainID].Signer,
+			// 	Value:  totalValue,
+			// }, destChain.Selector, msg)
+			// helpers.PanicErr(err)
+			// helpers.ConfirmTXMined(context.Background(), env.Clients[*chainID], tx, int64(*chainID),
+			// 	"ccip send native, msg value:", totalValue.String(), "fee:", fee.String())
 		} else {
 			// non-native fee token, so approve first then send.
 			erc20Token, err := erc20.NewERC20(feeTok, env.Clients[*chainID])

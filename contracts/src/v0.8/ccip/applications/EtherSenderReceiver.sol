@@ -146,7 +146,7 @@ contract EtherSenderReceiver is CCIPReceiver, ITypeAndVersion {
 
     if (message.feeToken == address(0)) {
       // If the fee token is native, the fee must be included in msgValue.
-      if (msgValue > tokenAmount.amount) {
+      if (msgValue <= tokenAmount.amount) {
         revert InsufficientMsgValue(tokenAmount.amount, msgValue);
       }
     }
