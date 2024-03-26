@@ -276,7 +276,7 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
             name: lane-config
-            path: ./integration-tests/ccip-tests/smoke/tmp_*.json
+            path: ./integration-tests/ccip-tests/smoke/tmp_TestSmokeCCIPForBidirectionalLane.json
             if-no-files-found: error
 
       - name: fetch namespace
