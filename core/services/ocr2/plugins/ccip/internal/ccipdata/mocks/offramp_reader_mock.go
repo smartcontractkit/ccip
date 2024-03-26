@@ -271,22 +271,22 @@ func (_m *OffRampReader) GetExecutionStateChangesBetweenSeqNums(ctx context.Cont
 }
 
 // GetRouter provides a mock function with given fields: ctx
-func (_m *OffRampReader) GetRouter(ctx context.Context) (cciptypes.Address, error) {
+func (_m *OffRampReader) GetRouter(ctx context.Context) (ccip.Address, error) {
 	ret := _m.Called(ctx)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetRouter")
 	}
 
-	var r0 cciptypes.Address
+	var r0 ccip.Address
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context) (cciptypes.Address, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context) (ccip.Address, error)); ok {
 		return rf(ctx)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context) cciptypes.Address); ok {
+	if rf, ok := ret.Get(0).(func(context.Context) ccip.Address); ok {
 		r0 = rf(ctx)
 	} else {
-		r0 = ret.Get(0).(cciptypes.Address)
+		r0 = ret.Get(0).(ccip.Address)
 	}
 
 	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
