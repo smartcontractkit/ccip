@@ -44,6 +44,9 @@ contract EtherSenderReceiver is CCIPReceiver, ITypeAndVersion {
     i_weth = IWrappedNative(CCIPRouter(router).getWrappedNative());
   }
 
+  /// @notice Need this in order to unwrap correctly.
+  receive() external payable {}
+
   /// @param destinationChainSelector The destination chainSelector
   /// @param message The cross-chain CCIP message including data and/or tokens
   /// @return fee returns execution fee for the message
