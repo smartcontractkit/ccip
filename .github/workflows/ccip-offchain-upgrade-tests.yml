@@ -260,7 +260,6 @@ jobs:
           aws_registries: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}
           artifacts_name: ${{ matrix.product.name }}${{ matrix.product.tag_suffix }}-test-logs
           artifacts_location: |
-            ./integration-tests/ccip-tests/smoke/tmp_*.json
             ./integration-tests/ccip-tests/smoke/logs/*
           token: ${{ secrets.GITHUB_TOKEN }}
           go_mod_path: ./integration-tests/go.mod
@@ -272,6 +271,13 @@ jobs:
           triggered_by: ${{ env.TEST_TRIGGERED_BY }}
           should_tidy: "false"
           should_cleanup: "false"
+
+      - name: store laneconfig in artifacts
+        uses: actions/upload-artifact@v3
+        with:
+            name: lane-config
+            path: ./integration-tests/ccip-tests/smoke/tmp_*.json
+            if-no-files-found: error
 
       - name: fetch namespace
         id: fetch_namespace
@@ -324,6 +330,12 @@ jobs:
         with:
           repository: smartcontractkit/ccip
           ref: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
+      - name: Download LaneConfig From Last Release
+        uses: actions/download-artifact@v3
+        with:
+            name: lane-config
+            path: ./integration-tests/ccip-tests/load/lane-config.json
+
       - name: Set Override Config
         id: set_override_config
         run: |
