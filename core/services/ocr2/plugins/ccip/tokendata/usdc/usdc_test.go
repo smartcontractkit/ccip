@@ -3,6 +3,8 @@ package usdc
 import (
 	"context"
 	"encoding/json"
+	"math/big"
+	"math/rand"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -18,6 +20,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	ccipdatamocks "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/tokendata"
@@ -34,7 +37,7 @@ func TestUSDCReader_callAttestationApi(t *testing.T) {
 	require.NoError(t, err)
 	lggr := logger.TestLogger(t)
 	usdcReader, _ := ccipdata.NewUSDCReader(lggr, "job_123", mockMsgTransmitter, nil, false)
-	usdcService := NewUSDCTokenDataReader(lggr, usdcReader, attestationURI, 0)
+	usdcService := NewUSDCTokenDataReader(lggr, usdcReader, attestationURI, 0, common.Address{})
 
 	attestation, err := usdcService.callAttestationApi(context.Background(), [32]byte(common.FromHex(usdcMessageHash)))
 	require.NoError(t, err)
@@ -57,7 +60,7 @@ func TestUSDCReader_callAttestationApiMock(t *testing.T) {
 	lggr := logger.TestLogger(t)
 	lp := mocks.NewLogPoller(t)
 	usdcReader, _ := ccipdata.NewUSDCReader(lggr, "job_123", mockMsgTransmitter, lp, false)
-	usdcService := NewUSDCTokenDataReader(lggr, usdcReader, attestationURI, 0)
+	usdcService := NewUSDCTokenDataReader(lggr, usdcReader, attestationURI, 0, common.Address{})
 	attestation, err := usdcService.callAttestationApi(context.Background(), utils.RandomBytes32())
 	require.NoError(t, err)
 
@@ -192,7 +195,7 @@ func TestUSDCReader_callAttestationApiMockError(t *testing.T) {
 			lggr := logger.TestLogger(t)
 			lp := mocks.NewLogPoller(t)
 			usdcReader, _ := ccipdata.NewUSDCReader(lggr, "job_123", mockMsgTransmitter, lp, false)
-			usdcService := NewUSDCTokenDataReader(lggr, usdcReader, attestationURI, test.customTimeoutSeconds)
+			usdcService := NewUSDCTokenDataReader(lggr, usdcReader, attestationURI, test.customTimeoutSeconds, common.Address{})
 			lp.On("RegisterFilter", mock.Anything).Return(nil)
 			require.NoError(t, usdcReader.RegisterFilters())
 
@@ -226,11 +229,21 @@ func TestGetUSDCMessageBody(t *testing.T) {
 	usdcReader := ccipdatamocks.USDCReader{}
 	usdcReader.On("GetUSDCMessagePriorToLogIndexInTx", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(expectedBody, nil)
 
+	usdcTokenAddr := utils.RandomAddress()
 	lggr := logger.TestLogger(t)
-	usdcService := NewUSDCTokenDataReader(lggr, &usdcReader, nil, 0)
+	usdcService := NewUSDCTokenDataReader(lggr, &usdcReader, nil, 0, usdcTokenAddr)
 
 	// Make the first call and assert the underlying function is called
-	body, err := usdcService.getUSDCMessageBody(context.Background(), cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta{}, 0)
+	body, err := usdcService.getUSDCMessageBody(context.Background(), cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta{
+		EVM2EVMMessage: cciptypes.EVM2EVMMessage{
+			TokenAmounts: []cciptypes.TokenAmount{
+				{
+					Token:  ccipcalc.EvmAddrToGeneric(usdcTokenAddr),
+					Amount: big.NewInt(rand.Int63()),
+				},
+			},
+		},
+	}, 0)
 	require.NoError(t, err)
 	require.Equal(t, body, expectedBody)
 

@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/pkg/errors"
 
@@ -18,6 +19,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/tokendata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/tokendata/http"
@@ -81,6 +83,7 @@ type TokenDataReader struct {
 	httpClient            http.IHttpClient
 	attestationApi        *url.URL
 	attestationApiTimeout time.Duration
+	usdcTokenAddress      common.Address
 
 	// coolDownUntil defines whether requests are blocked or not.
 	coolDownUntil time.Time
@@ -95,7 +98,13 @@ type attestationResponse struct {
 
 var _ tokendata.Reader = &TokenDataReader{}
 
-func NewUSDCTokenDataReader(lggr logger.Logger, usdcReader ccipdata.USDCReader, usdcAttestationApi *url.URL, usdcAttestationApiTimeoutSeconds int) *TokenDataReader {
+func NewUSDCTokenDataReader(
+	lggr logger.Logger,
+	usdcReader ccipdata.USDCReader,
+	usdcAttestationApi *url.URL,
+	usdcAttestationApiTimeoutSeconds int,
+	usdcTokenAddress common.Address,
+) *TokenDataReader {
 	timeout := time.Duration(usdcAttestationApiTimeoutSeconds) * time.Second
 	if usdcAttestationApiTimeoutSeconds == 0 {
 		timeout = defaultAttestationTimeout
@@ -106,11 +115,16 @@ func NewUSDCTokenDataReader(lggr logger.Logger, usdcReader ccipdata.USDCReader, 
 		httpClient:            http.NewObservedIHttpClient(&http.HttpClient{}),
 		attestationApi:        usdcAttestationApi,
 		attestationApiTimeout: timeout,
+		usdcTokenAddress:      usdcTokenAddress,
 		coolDownMu:            &sync.RWMutex{},
 	}
 }
 
-func NewUSDCTokenDataReaderWithHttpClient(origin TokenDataReader, httpClient http.IHttpClient) *TokenDataReader {
+func NewUSDCTokenDataReaderWithHttpClient(
+	origin TokenDataReader,
+	httpClient http.IHttpClient,
+	usdcTokenAddress common.Address,
+) *TokenDataReader {
 	return &TokenDataReader{
 		lggr:                  origin.lggr,
 		usdcReader:            origin.usdcReader,
@@ -118,6 +132,7 @@ func NewUSDCTokenDataReaderWithHttpClient(origin TokenDataReader, httpClient htt
 		attestationApi:        origin.attestationApi,
 		attestationApiTimeout: origin.attestationApiTimeout,
 		coolDownMu:            origin.coolDownMu,
+		usdcTokenAddress:      usdcTokenAddress,
 	}
 }
 
@@ -178,7 +193,24 @@ func (s *TokenDataReader) getUSDCMessageBody(
 	msg cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta,
 	tokenIndex int,
 ) ([]byte, error) {
-	parsedMsgBody, err := s.usdcReader.GetUSDCMessagePriorToLogIndexInTx(ctx, int64(msg.LogIndex), 0, msg.TxHash)
+	usdcTokenIdx := -1
+	for i, tk := range msg.TokenAmounts {
+		evmTokenAddr, err := ccipcalc.GenericAddrToEvm(tk.Token)
+		if err != nil {
+			continue
+		}
+		if evmTokenAddr == s.usdcTokenAddress {
+			usdcTokenIdx = i
+		}
+		if i == tokenIndex {
+			break
+		}
+	}
+	if usdcTokenIdx == -1 {
+		return nil, fmt.Errorf("internal error usdc token index is not found, the provided tokenIndex is not a usdc token")
+	}
+
+	parsedMsgBody, err := s.usdcReader.GetUSDCMessagePriorToLogIndexInTx(ctx, int64(msg.LogIndex), tokenIndex, msg.TxHash)
 	if err != nil {
 		return []byte{}, err
 	}

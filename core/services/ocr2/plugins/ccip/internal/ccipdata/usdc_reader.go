@@ -78,14 +78,21 @@ func (u *USDCReaderImpl) GetUSDCMessagePriorToLogIndexInTx(ctx context.Context, 
 		return nil, err
 	}
 
+	all := make([][]byte, 0)
 	for i := range logs {
 		current := logs[len(logs)-i-1]
 		if current.LogIndex < logIndex {
 			u.lggr.Infow("Found USDC message", "logIndex", current.LogIndex, "txHash", current.TxHash.Hex(), "data", hexutil.Encode(current.Data))
-			return parseUSDCMessageSent(current.Data)
+			all = append(all, current.Data)
 		}
 	}
-	return nil, errors.Errorf("no USDC message found prior to log index %d in tx %s", logIndex, txHash)
+
+	if offsetFromFinal < 0 || offsetFromFinal >= len(all) {
+		return nil, errors.Errorf("no USDC message found prior to log index %d, usdc token:%d in tx %s",
+			logIndex, offsetFromFinal, txHash)
+	}
+
+	return parseUSDCMessageSent(all[offsetFromFinal])
 }
 
 func NewUSDCReader(lggr logger.Logger, jobID string, transmitter common.Address, lp logpoller.LogPoller, registerFilters bool, qopts ...pg.QOpt) (*USDCReaderImpl, error) {
