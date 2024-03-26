@@ -155,11 +155,9 @@ runs:
         base_url="$GRAFANA_URL"
         dashboard_url="$GRAFANA_DASHBOARD_URL"
         
-        [CCIP.Groups]
         [CCIP.Groups.load]
         TestRunName = '$EXISTING_NAMESPACE'
         
-        [CCIP.Groups]
         [CCIP.Groups.smoke]
         TestRunName = '$EXISTING_NAMESPACE'
         
