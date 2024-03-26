@@ -147,7 +147,6 @@ type CCIPCommon struct {
 	poolFunds                    *big.Int
 	gasUpdateWatcherMu           *sync.Mutex
 	gasUpdateWatcher             map[uint64]*big.Int // key - destchain id; value - timestamp of update
-	priceUpdateSubs              []event.Subscription
 	IsConnectionRestoredRecently *atomic.Bool
 }
 
