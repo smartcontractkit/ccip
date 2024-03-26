@@ -14,6 +14,7 @@ import (
 
 	"github.com/AlekSi/pointer"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
@@ -1059,6 +1060,7 @@ func createEnvironmentConfig(t *testing.T, envName string, testConfig *CCIPTestC
 		envConfig.Namespace = existingEnv
 		envConfig.NamespacePrefix = ""
 		envConfig.NoManifestUpdate = true
+		envConfig.RunnerName = fmt.Sprintf("%s-%s", environment.REMOTE_RUNNER_NAME, uuid.NewString()[0:5])
 	}
 	if testConfig.EnvInput.TTL != nil {
 		envConfig.TTL = testConfig.EnvInput.TTL.Duration()
