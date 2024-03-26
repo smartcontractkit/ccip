@@ -290,7 +290,9 @@ func NewCCIPTestConfig(t *testing.T, lggr zerolog.Logger, tType string) *CCIPTes
 	}
 	if pointer.GetBool(groupCfg.KeepEnvAlive) {
 		err := os.Setenv(config.EnvVarKeepEnvironments, "ALWAYS")
-		t.Fatal(err)
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
 	ccipTestConfig := &CCIPTestConfig{
 		Test:                t,
