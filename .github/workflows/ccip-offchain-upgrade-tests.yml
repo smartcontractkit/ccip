@@ -134,6 +134,10 @@ jobs:
       contents: read
     name: Build Test Image for previous release
     runs-on: ubuntu20.04-16cores-64GB
+    outputs:
+      release_name: ${{ steps.fetch_last_release.outputs.release_name }}
+      release_sha: ${{ steps.fetch_last_release.outputs.sha_ref }}
+      release_tag: ${{ steps.fetch_last_release.outputs.release_tag_name }}
     steps:
       - name: Collect Metrics
         if: needs.changes.outputs.src == 'true' || github.event_name == 'workflow_dispatch'
@@ -151,8 +155,8 @@ jobs:
         run: |
           release_name=$(curl --header "Authorization: token ${{ secrets.GITHUB_TOKEN }}" --request GET https://api.github.com/repos/${{ github.repository }}/releases | jq -r --arg SUFFIX "release" '.[] | select(.tag_name | endswith("release"))  | .tag_name' | sort -V | tail -n 1)
           release_tag_name="${release_name:1}"
-          echo "RELEASE_TAG=${release_tag_name}" >> $GITHUB_ENV
-          echo "RELEASE_NAME=${release_name}" >> $GITHUB_ENV
+          echo "release_tag_name=${release_tag_name}" >> $GITHUB_OUTPUT
+          echo "release_name=${release_name}" >> $GITHUB_OUTPUT
           sha_ref=$(curl -s --header "Authorization: token ${{ secrets.GITHUB_TOKEN }}" --request GET https://api.github.com/repos/${{ github.repository }}/git/refs/tags/${release_name} | jq -r '.object.sha' | sort -V | tail -n 1)
           echo "sha_ref=${sha_ref}" >> $GITHUB_OUTPUT
       - name: Checkout the repo
@@ -168,7 +172,7 @@ jobs:
           QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
           QA_AWS_ACCOUNT_NUMBER: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}
           tag: ${{ steps.fetch_last_release.outputs.sha_ref }}
-          other_tags: ${{ env.ECR_TAG }},${{ env.RELEASE_TAG }}
+          other_tags: ${{ steps.fetch_last_release.outputs.release_name }}
   # End Build Test Dependencies
 
 # run test with previous image
@@ -200,7 +204,7 @@ jobs:
           org-id: ${{ secrets.GRAFANA_INTERNAL_TENANT_ID }}
           basic-auth: ${{ secrets.GRAFANA_INTERNAL_BASIC_AUTH }}
           hostname: ${{ secrets.GRAFANA_INTERNAL_HOST }}
-          this-job-name: Offchain upgrade compatibility- run test with previous release ${{ matrix.product.name }}
+          this-job-name: Offchain upgrade compatibility- run test with last release ${{ matrix.product.name }}
           test-results-file: '{"testType":"go","filePath":"/tmp/gotest.log"}'
       - name: Checkout the repo
         uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
@@ -221,7 +225,7 @@ jobs:
           testLogCollect: ${{ vars.TEST_LOG_COLLECT }}
           selectedNetworks: SIMULATED_1,SIMULATED_2
           chainlinkImage: ${{ env.AWS_ECR_REPO_PUBLIC_REGISTRY }}/w0i8p0z9/chainlink-ccip
-          chainlinkVersion: ${{ env.RELEASE_TAG }}
+          chainlinkVersion: ${{ needs.build-test-image-for-previous-release.steps.outputs.release_tag }}
           lokiEndpoint: ${{ secrets.LOKI_URL_CI }}
           lokiTenantId: ${{ vars.LOKI_TENANT_ID }}
           lokiBasicAuth: ${{ secrets.LOKI_BASIC_AUTH }}
@@ -234,7 +238,8 @@ jobs:
         env:
           BASE64_CCIP_CONFIG_OVERRIDE: ${{ steps.set_override_config.outputs.base_64_override }}
           TEST_BASE64_CCIP_CONFIG_OVERRIDE: ${{ steps.set_override_config.outputs.base_64_override }}
-          ENV_JOB_IMAGE: ${{ env.ENV_JOB_IMAGE_BASE }}:${{ env.RELEASE_TAG }}
+          ENV_JOB_IMAGE: ${{ env.ENV_JOB_IMAGE_BASE }}:${{ needs.build-test-image-for-previous-release.steps.outputs.release_sha }}
+          RELEASE_TAG : ${{ needs.build-test-image-for-previous-release.steps.outputs.release_sha }}
           TEST_SUITE: smoke
           TEST_ARGS: -test.timeout 30m
           DATABASE_URL: postgresql://postgres:node@localhost:5432/chainlink_test?sslmode=disable
@@ -245,7 +250,7 @@ jobs:
           test_command_to_run: cd ./integration-tests/ccip-tests && go test -timeout 30m -count=1 -json -run ${{ matrix.product.run }} ./smoke 2>&1 | tee /tmp/gotest.log | gotestfmt
           test_download_vendor_packages_command: cd ./integration-tests && go mod download
           cl_repo: ${{ env.AWS_ECR_REPO_PUBLIC_REGISTRY }}/w0i8p0z9/chainlink-ccip # releases are published to public registry
-          cl_image_tag: ${{ steps.fetch_last_release.outputs.release_tag_name }}
+          cl_image_tag: ${{ env.RELEASE_TAG }}
           aws_registries: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}
           artifacts_name: ${{ matrix.product.name }}${{ matrix.product.tag_suffix }}-test-logs
           artifacts_location: |
