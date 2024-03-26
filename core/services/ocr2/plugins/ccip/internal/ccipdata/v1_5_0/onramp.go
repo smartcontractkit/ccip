@@ -11,7 +11,6 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
-
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/arm_contract"
@@ -110,11 +109,11 @@ func NewOnRamp(lggr logger.Logger, sourceSelector, destSelector uint64, onRampAd
 	}, nil
 }
 
-func (o *OnRamp) Address(ctx context.Context) (cciptypes.Address, error) {
+func (o *OnRamp) Address() (cciptypes.Address, error) {
 	return ccipcalc.EvmAddrToGeneric(o.onRamp.Address()), nil
 }
 
-func (o *OnRamp) GetDynamicConfig(ctx context.Context) (cciptypes.OnRampDynamicConfig, error) {
+func (o *OnRamp) GetDynamicConfig() (cciptypes.OnRampDynamicConfig, error) {
 	if o.onRamp == nil {
 		return cciptypes.OnRampDynamicConfig{}, fmt.Errorf("onramp not initialized")
 	}
@@ -138,7 +137,7 @@ func (o *OnRamp) GetDynamicConfig(ctx context.Context) (cciptypes.OnRampDynamicC
 
 func (o *OnRamp) SourcePriceRegistryAddress(ctx context.Context) (cciptypes.Address, error) {
 	return o.cachedSourcePriceRegistryAddress.Get(ctx, func(ctx context.Context) (cciptypes.Address, error) {
-		c, err := o.GetDynamicConfig(ctx)
+		c, err := o.GetDynamicConfig()
 		if err != nil {
 			return "", err
 		}
@@ -174,7 +173,7 @@ func (o *OnRamp) GetSendRequestsBetweenSeqNums(ctx context.Context, seqNumMin, s
 	return res, nil
 }
 
-func (o *OnRamp) RouterAddress(ctx context.Context) (cciptypes.Address, error) {
+func (o *OnRamp) RouterAddress() (cciptypes.Address, error) {
 	config, err := o.onRamp.GetDynamicConfig(nil)
 	if err != nil {
 		return "", err
