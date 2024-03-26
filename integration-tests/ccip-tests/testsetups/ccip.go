@@ -288,6 +288,10 @@ func NewCCIPTestConfig(t *testing.T, lggr zerolog.Logger, tType string) *CCIPTes
 			t.Fatal("grafana config is required for load test")
 		}
 	}
+	if pointer.GetBool(groupCfg.KeepEnvAlive) {
+		err := os.Setenv(config.EnvVarKeepEnvironments, "ALWAYS")
+		t.Fatal(err)
+	}
 	ccipTestConfig := &CCIPTestConfig{
 		Test:                t,
 		EnvInput:            testCfg.CCIP.Env,
