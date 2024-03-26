@@ -1,6 +1,6 @@
 [CCIP]
 [CCIP.Deployments]
-DataFile = 'smoke/tmp_TestSmokeCCIPForBidirectionalLane.json'
+DataFile = 'lane-config.json'
 
 [CCIP.Env]
 [CCIP.Env.NewCLCluster]
