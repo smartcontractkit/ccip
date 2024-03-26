@@ -184,7 +184,7 @@ jobs:
       pull-requests: write
       id-token: write
       contents: read
-    needs: [ changes, build-test-image-for-previous-release ]
+    needs: [ changes, build-test-image-for-last-release ]
     strategy:
       fail-fast: false
       matrix:
