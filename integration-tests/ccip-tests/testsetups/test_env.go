@@ -227,7 +227,10 @@ func DeployLocalCluster(
 		require.NoError(t, err, "Error getting rpc provider")
 		selectedNetworks[i].URLs = rpcProvider.PrivateWsUrsl()
 		selectedNetworks[i].HTTPURLs = rpcProvider.PrivateHttpUrls()
-		env.EVMNetworks = append(env.EVMNetworks, &selectedNetworks[i])
+		newNetwork := networkCfg
+		newNetwork.URLs = rpcProvider.PublicWsUrls()
+		newNetwork.HTTPURLs = rpcProvider.PublicHttpUrls()
+		env.EVMNetworks = append(env.EVMNetworks, &newNetwork)
 	}
 	testInputs.SelectedNetworks = selectedNetworks
 
