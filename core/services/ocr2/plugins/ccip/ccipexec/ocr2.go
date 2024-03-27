@@ -17,6 +17,7 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
+
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache"
@@ -243,6 +244,15 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 	return []ccip.ObservedMessage{}, nil
 }
 
+func (r *ExecutionReportingPlugin) fetchSendersNonce(ctx context.Context, report commitReportWithSendRequests) (map[cciptypes.Address]uint64, error) {
+	uniqueSenderAddresses := mapset.NewSet[cciptypes.Address]()
+	for _, msg := range report.sendRequestsWithMeta {
+		uniqueSenderAddresses.Add(msg.Sender)
+	}
+
+	return r.offRampReader.GetSendersNonce(ctx, uniqueSenderAddresses.ToSlice())
+}
+
 // destPoolRateLimits returns a map that consists of the rate limits of each destination token of the provided reports.
 // If a token is missing from the returned map it either means that token was not found or token pool is disabled for this token.
 func (r *ExecutionReportingPlugin) destPoolRateLimits(ctx context.Context, commitReports []commitReportWithSendRequests, sourceToDestToken map[cciptypes.Address]cciptypes.Address) (map[cciptypes.Address]*big.Int, error) {
@@ -343,11 +353,17 @@ func (r *ExecutionReportingPlugin) buildBatch(
 	sourceToDestToken map[cciptypes.Address]cciptypes.Address,
 	destTokenPoolRateLimits map[cciptypes.Address]*big.Int,
 ) (executableMessages []ccip.ObservedMessage) {
-	inflightSeqNrs, inflightAggregateValue, maxInflightSenderNonces, inflightTokenAmounts, err := inflightAggregates(inflight, destTokenPricesUSD, sourceToDestToken)
+	inflightAggregateValue, inflightTokenAmounts, err := inflightAggregates(inflight, destTokenPricesUSD, sourceToDestToken)
 	if err != nil {
 		lggr.Errorw("Unexpected error computing inflight values", "err", err)
 		return []ccip.ObservedMessage{}
 	}
+	sendersNonce, err := r.fetchSendersNonce(ctx, report)
+	if err != nil {
+		lggr.Errorw("fetching senders nonce", "err", err)
+		return []ccip.ObservedMessage{}
+	}
+
 	availableGas := uint64(r.offchainConfig.BatchGasLimit)
 	expectedNonces := make(map[cciptypes.Address]uint64)
 	availableDataLen := MaxDataLenPerBatch
@@ -358,26 +374,16 @@ func (r *ExecutionReportingPlugin) buildBatch(
 			msgLggr.Infow("Skipping message already executed", "seqNr", msg.SequenceNumber)
 			continue
 		}
-		if inflightSeqNrs.Contains(msg.SequenceNumber) {
-			msgLggr.Infow("Skipping message already inflight", "seqNr", msg.SequenceNumber)
-			continue
-		}
+
 		if _, ok := expectedNonces[msg.Sender]; !ok {
-			// First message in batch, need to populate expected nonce
-			if maxInflight, ok := maxInflightSenderNonces[msg.Sender]; ok {
-				// Sender already has inflight nonce, populate from there
-				expectedNonces[msg.Sender] = maxInflight + 1
+			if latestNonce, ok := sendersNonce[msg.Sender]; ok {
+				expectedNonces[msg.Sender] = latestNonce + 1
 			} else {
-				// Nothing inflight take from chain.
-				// Chain holds existing nonce.
-				nonce, err := r.offRampReader.GetSenderNonce(ctx, msg.Sender)
-				if err != nil {
-					msgLggr.Errorw("unable to get sender nonce", "err", err, "seqNr", msg.SequenceNumber)
-					continue
-				}
-				expectedNonces[msg.Sender] = nonce + 1
+				msgLggr.Errorw("unable to get sender nonce", "err", err, "seqNr", msg.SequenceNumber)
+				continue
 			}
 		}
+
 		// Check expected nonce is valid
 		if msg.Nonce != expectedNonces[msg.Sender] {
 			msgLggr.Warnw("Skipping message invalid nonce", "have", msg.Nonce, "want", expectedNonces[msg.Sender])
@@ -941,24 +947,17 @@ func inflightAggregates(
 	inflight []InflightInternalExecutionReport,
 	destTokenPrices map[cciptypes.Address]*big.Int,
 	sourceToDest map[cciptypes.Address]cciptypes.Address,
-) (mapset.Set[uint64], *big.Int, map[cciptypes.Address]uint64, map[cciptypes.Address]*big.Int, error) {
-	inflightSeqNrs := mapset.NewSet[uint64]()
+) (*big.Int, map[cciptypes.Address]*big.Int, error) {
 	inflightAggregateValue := big.NewInt(0)
-	maxInflightSenderNonces := make(map[cciptypes.Address]uint64)
 	inflightTokenAmounts := make(map[cciptypes.Address]*big.Int)
 
 	for _, rep := range inflight {
 		for _, message := range rep.messages {
-			inflightSeqNrs.Add(message.SequenceNumber)
 			msgValue, err := aggregateTokenValue(destTokenPrices, sourceToDest, message.TokenAmounts)
 			if err != nil {
-				return nil, nil, nil, nil, err
+				return nil, nil, err
 			}
 			inflightAggregateValue.Add(inflightAggregateValue, msgValue)
-			maxInflightSenderNonce, ok := maxInflightSenderNonces[message.Sender]
-			if !ok || message.Nonce > maxInflightSenderNonce {
-				maxInflightSenderNonces[message.Sender] = message.Nonce
-			}
 
 			for _, tk := range message.TokenAmounts {
 				if rl, exists := inflightTokenAmounts[tk.Token]; exists {
@@ -969,7 +968,7 @@ func inflightAggregates(
 			}
 		}
 	}
-	return inflightSeqNrs, inflightAggregateValue, maxInflightSenderNonces, inflightTokenAmounts, nil
+	return inflightAggregateValue, inflightTokenAmounts, nil
 }
 
 // getTokensPrices returns token prices of the given price registry,
