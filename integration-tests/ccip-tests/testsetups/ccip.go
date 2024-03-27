@@ -735,23 +735,17 @@ func CCIPDefaultTestSetUp(
 			if setUpArgs.Env != nil && setUpArgs.Env.K8Env != nil {
 				filpath := strings.Split(setUpArgs.LaneConfigFile, "/")[len(strings.Split(setUpArgs.LaneConfigFile, "/"))-1]
 				lggr.Info().Msg("copying lane config")
-				ctx := testcontext.Get(t)
 				for {
 					select {
 					case <-time.After(1 * time.Minute):
 						err := setUpArgs.Env.K8Env.CopyFromPod("job-name=remote-test-runner",
 							"remote-test-runner-node", filpath, ".")
 						if err != nil {
+							lggr.Warn().Err(err).Msg("haven't found laneconfig, still waiting")
 							continue
 						}
-						fileInfo, err := os.Stat(filpath)
-						if err != nil {
-							continue
-						}
-						if fileInfo.Size() > 0 {
-							return nil
-						}
-					case <-ctx.Done():
+						return nil
+					case <-parent.Done():
 						return fmt.Errorf("no lane config found")
 					}
 				}

@@ -100,7 +100,7 @@ jobs:
       id-token: write
       contents: read
     name: Build Test Image with Current Sha
-    runs-on: ubuntu20.04-16cores-64GB
+    runs-on: ubuntu-latest
     steps:
       - name: Collect Metrics
         if: needs.changes.outputs.src == 'true' || github.event_name == 'workflow_dispatch'
@@ -121,6 +121,8 @@ jobs:
         if: needs.changes.outputs.src == 'true' || github.event_name == 'workflow_dispatch'
         uses: ./.github/actions/build-test-image
         with:
+          # we just want to build the load tests
+          suites: ccip-tests/load
           QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
           QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
           QA_AWS_ACCOUNT_NUMBER: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}
