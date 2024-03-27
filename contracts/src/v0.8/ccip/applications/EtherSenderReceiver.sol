@@ -1,11 +1,10 @@
-// SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+// SPDX-License-Identifier: BUSL-1.1
+pragma solidity 0.8.19;
 
+import {CCIPReceiver} from "./CCIPReceiver.sol";
+import {Client} from "./../libraries/Client.sol";
 import {IRouterClient} from "../interfaces/IRouterClient.sol";
 import {ITypeAndVersion} from "../../shared/interfaces/ITypeAndVersion.sol";
-
-import {Client} from "./../libraries/Client.sol";
-import {CCIPReceiver} from "./CCIPReceiver.sol";
 import {IWrappedNative} from "../interfaces/IWrappedNative.sol";
 
 import {IERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
@@ -40,15 +39,15 @@ contract EtherSenderReceiver is CCIPReceiver, ITypeAndVersion {
   error InsufficientFee(uint256 gotFee, uint256 fee);
   error AllowanceTooHigh();
 
+  string public constant override typeAndVersion = "EtherSenderReceiver 1.0.0-dev";
+
   /// @notice The WETH contract address.
   /// This matches the wrapped ether contract set on the CCIP router by construction.
   IWrappedNative public immutable i_weth;
 
   /// @notice the gas limit for the message call on the destination chain, 500,000 should be plenty.
   /// @dev This won't vary on L2's, callbacks are always provided so-called "L2 gas".
-  uint256 public constant MESSAGE_GAS_LIMIT = 500_000;
-
-  string public constant override typeAndVersion = "EtherSenderReceiver 1.0.0-dev";
+  uint256 public constant MESSAGE_GAS_LIMIT = 250_000;
 
   /// @param router The CCIP router address.
   constructor(address router) CCIPReceiver(router) {
@@ -72,9 +71,7 @@ contract EtherSenderReceiver is CCIPReceiver, ITypeAndVersion {
   ) external view returns (uint256 fee) {
     _validateMessage(message);
 
-    // set the gas limit for the call on destination.
-    bytes memory extraArgs = Client._argsToBytes(Client.EVMExtraArgsV1(MESSAGE_GAS_LIMIT));
-    message.extraArgs = extraArgs;
+    message.extraArgs = Client._argsToBytes(Client.EVMExtraArgsV1(MESSAGE_GAS_LIMIT));
 
     return IRouterClient(getRouter()).getFee(destinationChainSelector, message);
   }
@@ -101,11 +98,9 @@ contract EtherSenderReceiver is CCIPReceiver, ITypeAndVersion {
     Client.EVM2AnyMessage memory message
   ) external payable returns (bytes32) {
     _validateMessage(message);
-    _validateFeeToken(message, msg.value);
+    _validateFeeToken(message);
 
-    // set the gas limit for the call on destination.
-    bytes memory extraArgs = Client._argsToBytes(Client.EVMExtraArgsV1(MESSAGE_GAS_LIMIT));
-    message.extraArgs = extraArgs;
+    message.extraArgs = Client._argsToBytes(Client.EVMExtraArgsV1(MESSAGE_GAS_LIMIT));
 
     // deposit the ether into the weth contract to get the wrapped ether.
     // approve the router to spend the wrapped ether.
@@ -135,13 +130,9 @@ contract EtherSenderReceiver is CCIPReceiver, ITypeAndVersion {
   }
 
   function _validateMessage(Client.EVM2AnyMessage memory message) private view {
-    // receiver and destination EOA addresses must be correctly specified.
+    // receiver is already checked by ccip, so don't need to duplicate that check.
+    // destination EOA address must be correctly specified in message.data.
     // abi.decode will revert if the bytes in receiver do not decode to an address.
-    address receiver = abi.decode(message.receiver, (address));
-    if (receiver == address(0)) {
-      revert InvalidReceiver(message.receiver);
-    }
-
     address destEOA = abi.decode(message.data, (address));
     if (destEOA == address(0)) {
       revert InvalidDestinationEOA(message.data);
@@ -158,19 +149,19 @@ contract EtherSenderReceiver is CCIPReceiver, ITypeAndVersion {
     }
   }
 
-  function _validateFeeToken(Client.EVM2AnyMessage memory message, uint256 msgValue) private pure {
-    Client.EVMTokenAmount memory tokenAmount = message.tokenAmounts[0];
+  function _validateFeeToken(Client.EVM2AnyMessage memory message) private view {
+    uint256 tokenAmount = message.tokenAmounts[0].amount;
 
     if (message.feeToken == address(0)) {
-      // If the fee token is native, the fee must be included in msgValue.
-      if (msgValue <= tokenAmount.amount) {
-        revert InsufficientMsgValue(tokenAmount.amount, msgValue);
+      // If the fee token is native, the fee must be included in msg.value.
+      if (msg.value <= tokenAmount) {
+        revert InsufficientMsgValue(tokenAmount, msg.value);
       }
     } else {
-      // If the fee token is NOT native, then the token amount must be equal to msgValue.
+      // If the fee token is NOT native, then the token amount must be equal to msg.value.
       // This is done to ensure that there is no leftover ether in this contract.
-      if (msgValue != tokenAmount.amount) {
-        revert TokenAmountNotEqualToMsgValue(tokenAmount.amount, msgValue);
+      if (msg.value != tokenAmount) {
+        revert TokenAmountNotEqualToMsgValue(tokenAmount, msg.value);
       }
     }
   }
@@ -182,25 +173,26 @@ contract EtherSenderReceiver is CCIPReceiver, ITypeAndVersion {
     // The code below should never revert if the message being is valid according
     // to the above _validateMessage and _validateFeeToken functions.
 
-    // decode the EOA receiver from the message data.
-    address eoaReceiver = abi.decode(message.data, (address));
+    // decode the receiver from the message data.
+    address receiver = abi.decode(message.data, (address));
 
     // withdraw the WETH received from the token pool.
-    i_weth.withdraw(message.destTokenAmounts[0].amount);
+    uint256 tokenAmount = message.destTokenAmounts[0].amount;
+    i_weth.withdraw(tokenAmount);
 
-    // it is possible that the below call may fail if eoaReceiver.code.length > 0 and the contract
+    // it is possible that the below call may fail if receiver.code.length > 0 and the contract
     // doesn't e.g have a receive() or a fallback() function.
-    (bool success, ) = payable(eoaReceiver).call{value: message.destTokenAmounts[0].amount}("");
+    (bool success, ) = payable(receiver).call{value: tokenAmount}("");
     if (!success) {
       // We have a few options here:
       // 1. Revert: this is bad generally because it may mean that these tokens are stuck.
       // 2. Store the tokens in a mapping and allow the user to withdraw them with another tx.
-      // 3. Send weth to the eoaReceiver address.
-      // We opt for (3) here because at least the eoaReceiver will have the funds and can unwrap them if needed.
-      // However it is worth noting that if eoaReceiver is actually a contract and the contract _cannot_ withdraw
+      // 3. Send weth to the receiver address.
+      // We opt for (3) here because at least the receiver will have the funds and can unwrap them if needed.
+      // However it is worth noting that if receiver is actually a contract AND the contract _cannot_ withdraw
       // the WETH, then the WETH will be stuck in this contract.
-      i_weth.deposit{value: message.destTokenAmounts[0].amount}();
-      i_weth.transfer(eoaReceiver, message.destTokenAmounts[0].amount);
+      i_weth.deposit{value: tokenAmount}();
+      i_weth.transfer(receiver, tokenAmount);
     }
   }
 }
