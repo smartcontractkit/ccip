@@ -766,7 +766,7 @@ func CCIPDefaultTestSetUp(
 		t.Cleanup(func() {
 			if setUpArgs.Env != nil && setUpArgs.Env.K8Env != nil {
 				filpath := strings.Split(setUpArgs.LaneConfigFile, "/")[len(strings.Split(setUpArgs.LaneConfigFile, "/"))-1]
-				filpath = fmt.Sprintf("integration-tests/%s", filpath)
+				filpath = fmt.Sprintf("reports/%s", filpath)
 				lggr.Info().Str("Path", filpath).Msg("copying lane config")
 				err := setUpArgs.Env.K8Env.CopyFromPod("job-name=remote-test-runner",
 					"remote-test-runner-data-files", filpath, ".")
