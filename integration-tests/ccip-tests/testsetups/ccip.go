@@ -763,31 +763,15 @@ func CCIPDefaultTestSetUp(
 	chainByChainID := setUpArgs.CreateEnvironment(lggr, envName)
 	// if test is run in remote runner, register a clean-up to copy the laneconfig file
 	if value, set := os.LookupEnv(config.EnvVarJobImage); set && value != "" {
-		grp := &errgroup.Group{}
-		grp.Go(func() error {
+		t.Cleanup(func() {
 			if setUpArgs.Env != nil && setUpArgs.Env.K8Env != nil {
 				filpath := strings.Split(setUpArgs.LaneConfigFile, "/")[len(strings.Split(setUpArgs.LaneConfigFile, "/"))-1]
 				filpath = fmt.Sprintf("integration-tests/%s", filpath)
 				lggr.Info().Str("Path", filpath).Msg("copying lane config")
-				for {
-					select {
-					case <-time.After(1 * time.Minute):
-						err := setUpArgs.Env.K8Env.CopyFromPod("job-name=remote-test-runner",
-							"remote-test-runner-node", filpath, ".")
-						if err != nil {
-							lggr.Warn().Err(err).Msg("haven't found laneconfig, still waiting")
-							continue
-						}
-						return nil
-					case <-parent.Done():
-						return fmt.Errorf("no lane config found")
-					}
-				}
+				err := setUpArgs.Env.K8Env.CopyFromPod("job-name=remote-test-runner",
+					"remote-test-runner-data-files", filpath, ".")
+				require.NoError(t, err, "error getting lane config")
 			}
-			return nil
-		})
-		t.Cleanup(func() {
-			require.NoError(t, grp.Wait(), "error getting lane config")
 		})
 	}
 	if setUpArgs.Env != nil {
