@@ -41,18 +41,12 @@ contract EtherSenderReceiver is CCIPReceiver, ITypeAndVersion {
 
   string public constant override typeAndVersion = "EtherSenderReceiver 1.0.0-dev";
 
-  /// @notice The WETH contract address.
-  /// This matches the wrapped ether contract set on the CCIP router by construction.
-  IWrappedNative public immutable i_weth;
-
   /// @notice the gas limit for the message call on the destination chain, 500,000 should be plenty.
   /// @dev This won't vary on L2's, callbacks are always provided so-called "L2 gas".
   uint256 public constant MESSAGE_GAS_LIMIT = 250_000;
 
   /// @param router The CCIP router address.
-  constructor(address router) CCIPReceiver(router) {
-    i_weth = IWrappedNative(CCIPRouter(router).getWrappedNative());
-  }
+  constructor(address router) CCIPReceiver(router) {}
 
   /// @notice Need this in order to unwrap correctly.
   receive() external payable {}
@@ -69,7 +63,7 @@ contract EtherSenderReceiver is CCIPReceiver, ITypeAndVersion {
     uint64 destinationChainSelector,
     Client.EVM2AnyMessage memory message
   ) external view returns (uint256 fee) {
-    _validateMessage(message);
+    _validateMessage(message, CCIPRouter(getRouter()).getWrappedNative());
 
     message.extraArgs = Client._argsToBytes(Client.EVMExtraArgsV1(MESSAGE_GAS_LIMIT));
 
@@ -97,15 +91,17 @@ contract EtherSenderReceiver is CCIPReceiver, ITypeAndVersion {
     uint64 destinationChainSelector,
     Client.EVM2AnyMessage memory message
   ) external payable returns (bytes32) {
-    _validateMessage(message);
+    IWrappedNative weth = IWrappedNative(CCIPRouter(getRouter()).getWrappedNative());
+
+    _validateMessage(message, address(weth));
     _validateFeeToken(message);
 
     message.extraArgs = Client._argsToBytes(Client.EVMExtraArgsV1(MESSAGE_GAS_LIMIT));
 
     // deposit the ether into the weth contract to get the wrapped ether.
     // approve the router to spend the wrapped ether.
-    i_weth.deposit{value: message.tokenAmounts[0].amount}();
-    i_weth.approve(getRouter(), message.tokenAmounts[0].amount);
+    weth.deposit{value: message.tokenAmounts[0].amount}();
+    weth.approve(getRouter(), message.tokenAmounts[0].amount);
 
     // get the fee from the router now that we have the full message data.
     // if the fee token is not native, we need to transfer the fee to this contract and re-approve it to the router.
@@ -113,6 +109,7 @@ contract EtherSenderReceiver is CCIPReceiver, ITypeAndVersion {
     if (message.feeToken != address(0)) {
       // Note: its not possible to have any leftover tokens in this path because we transferFrom the exact fee that CCIP
       // requires from the caller.
+      // TODO: check this makes sense in the case where feeToken == WETH.
       IERC20(message.feeToken).safeTransferFrom(msg.sender, address(this), fee);
       IERC20(message.feeToken).safeIncreaseAllowance(getRouter(), fee);
 
@@ -129,7 +126,7 @@ contract EtherSenderReceiver is CCIPReceiver, ITypeAndVersion {
     }
   }
 
-  function _validateMessage(Client.EVM2AnyMessage memory message) private view {
+  function _validateMessage(Client.EVM2AnyMessage memory message, address weth) private pure {
     // receiver is already checked by ccip, so don't need to duplicate that check.
     // destination EOA address must be correctly specified in message.data.
     // abi.decode will revert if the bytes in receiver do not decode to an address.
@@ -144,8 +141,8 @@ contract EtherSenderReceiver is CCIPReceiver, ITypeAndVersion {
     }
 
     Client.EVMTokenAmount memory tokenAmount = message.tokenAmounts[0];
-    if (tokenAmount.token != address(i_weth)) {
-      revert InvalidWethAddress(address(i_weth), tokenAmount.token);
+    if (tokenAmount.token != weth) {
+      revert InvalidWethAddress(weth, tokenAmount.token);
     }
   }
 
@@ -172,13 +169,14 @@ contract EtherSenderReceiver is CCIPReceiver, ITypeAndVersion {
     // we receive WETH, unwrap it and send it to the final receiver.
     // The code below should never revert if the message being is valid according
     // to the above _validateMessage and _validateFeeToken functions.
+    IWrappedNative weth = IWrappedNative(CCIPRouter(getRouter()).getWrappedNative());
 
     // decode the receiver from the message data.
     address receiver = abi.decode(message.data, (address));
 
     // withdraw the WETH received from the token pool.
     uint256 tokenAmount = message.destTokenAmounts[0].amount;
-    i_weth.withdraw(tokenAmount);
+    weth.withdraw(tokenAmount);
 
     // it is possible that the below call may fail if receiver.code.length > 0 and the contract
     // doesn't e.g have a receive() or a fallback() function.
@@ -191,8 +189,8 @@ contract EtherSenderReceiver is CCIPReceiver, ITypeAndVersion {
       // We opt for (3) here because at least the receiver will have the funds and can unwrap them if needed.
       // However it is worth noting that if receiver is actually a contract AND the contract _cannot_ withdraw
       // the WETH, then the WETH will be stuck in this contract.
-      i_weth.deposit{value: tokenAmount}();
-      i_weth.transfer(receiver, tokenAmount);
+      weth.deposit{value: tokenAmount}();
+      weth.transfer(receiver, tokenAmount);
     }
   }
 }
