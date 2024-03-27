@@ -728,6 +728,16 @@ func CCIPDefaultTestSetUp(
 	}
 
 	chainByChainID := setUpArgs.CreateEnvironment(lggr, envName)
+	// if test is run in remote runner, register a clean-up to copy the laneconfig file
+	if value, set := os.LookupEnv(config.EnvVarJobImage); set && value != "" {
+		t.Cleanup(func() {
+			if setUpArgs.Env != nil && setUpArgs.Env.K8Env != nil {
+				lggr.Info().Msg("copying lane config")
+				err := setUpArgs.Env.K8Env.CopyFromPod("job-name=remote-test-runner", setUpArgs.LaneConfigFile, setUpArgs.LaneConfigFile)
+				require.NoError(t, err, "error copying lane config")
+			}
+		})
+	}
 	if setUpArgs.Env != nil {
 		ccipEnv := setUpArgs.Env
 		if ccipEnv.K8Env != nil && ccipEnv.K8Env.WillUseRemoteRunner() {
@@ -834,13 +844,7 @@ func CCIPDefaultTestSetUp(
 	require.NoError(t, laneAddGrp.Wait())
 	err = laneconfig.WriteLanesToJSON(setUpArgs.LaneConfigFile, setUpArgs.LaneConfig)
 	require.NoError(t, err)
-	// if test is run in remote runner, register a clean-up to copy the laneconfig file
-	if value, set := os.LookupEnv(config.EnvVarInsideK8s); set && value != "" {
-		if setUpArgs.Env != nil && setUpArgs.Env.K8Env != nil {
-			err := setUpArgs.Env.K8Env.CopyFromPod("job-name=remote-test-runner", setUpArgs.LaneConfigFile, setUpArgs.LaneConfigFile)
-			require.NoError(t, err, "error copying lane config")
-		}
-	}
+
 	require.Equal(t, len(setUpArgs.Lanes), len(testConfig.NetworkPairs),
 		"Number of bi-directional lanes should be equal to number of network pairs")
 
