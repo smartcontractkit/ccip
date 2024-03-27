@@ -6,6 +6,7 @@ import (
 	"math/big"
 	"math/rand"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"sync"
@@ -733,7 +734,9 @@ func CCIPDefaultTestSetUp(
 		t.Cleanup(func() {
 			if setUpArgs.Env != nil && setUpArgs.Env.K8Env != nil {
 				lggr.Info().Msg("copying lane config")
-				err := setUpArgs.Env.K8Env.CopyFromPod("job-name=remote-test-runner", setUpArgs.LaneConfigFile, setUpArgs.LaneConfigFile)
+				filpath, err := filepath.Abs(setUpArgs.LaneConfigFile)
+				require.NoError(t, err, "error getting absolute path")
+				err = setUpArgs.Env.K8Env.CopyFromPod("job-name=remote-test-runner", filpath, ".")
 				require.NoError(t, err, "error copying lane config")
 			}
 		})
