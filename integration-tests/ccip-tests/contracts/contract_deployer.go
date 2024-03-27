@@ -15,8 +15,9 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	"github.com/smartcontractkit/chainlink-common/pkg/config"
 	"golang.org/x/crypto/curve25519"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/config"
 
 	ocrconfighelper2 "github.com/smartcontractkit/libocr/offchainreporting2/confighelper"
 	ocrtypes2 "github.com/smartcontractkit/libocr/offchainreporting2/types"
