@@ -961,10 +961,7 @@ func (o *CCIPTestSetUpOutputs) CreateEnvironment(
 	if pointer.GetBool(testConfig.TestGroupInput.LocalCluster) {
 		require.NotNil(t, ccipEnv.LocalCluster, "Local cluster shouldn't be nil")
 		for _, n := range ccipEnv.LocalCluster.EVMNetworks {
-			if evmClient, err := ccipEnv.LocalCluster.GetEVMClient(n.ChainID); err == nil {
-				chainByChainID[evmClient.GetChainID().Int64()] = evmClient
-				chains = append(chains, evmClient)
-			} else {
+			if chainByChainID[n.ChainID], err = blockchain.NewEVMClientFromNetwork(*n, lggr); err != nil {
 				lggr.Error().Msgf("EVMClient for chainID %d not found", n.ChainID)
 			}
 		}
