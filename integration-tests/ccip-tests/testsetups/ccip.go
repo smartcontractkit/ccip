@@ -736,7 +736,8 @@ func CCIPDefaultTestSetUp(
 				lggr.Info().Msg("copying lane config")
 				filpath, err := filepath.Abs(setUpArgs.LaneConfigFile)
 				require.NoError(t, err, "error getting absolute path")
-				err = setUpArgs.Env.K8Env.CopyFromPod("job-name=remote-test-runner", filpath, ".")
+				err = setUpArgs.Env.K8Env.CopyFromPod("job-name=remote-test-runner",
+					"remote-test-runner-node", filpath, ".")
 				require.NoError(t, err, "error copying lane config")
 			}
 		})
