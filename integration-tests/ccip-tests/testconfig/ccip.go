@@ -14,7 +14,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
 
-	"github.com/smartcontractkit/ccip/integration-tests/contracts"
+	"github.com/smartcontractkit/chainlink/integration-tests/contracts"
 )
 
 type CCIPTestConfig struct {

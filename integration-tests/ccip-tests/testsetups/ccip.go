@@ -267,13 +267,13 @@ func (c *CCIPTestConfig) FormNetworkPairCombinations() {
 
 func (c *CCIPTestConfig) SetOCRParams() error {
 	if c.TestGroupInput.CommitOCRParams != nil {
-		err := mergo.Merge(contracts.OCR2ParamsForCommit, c.TestGroupInput.CommitOCRParams, mergo.WithOverride)
+		err := mergo.Merge(&contracts.OCR2ParamsForCommit, c.TestGroupInput.CommitOCRParams, mergo.WithOverride)
 		if err != nil {
 			return err
 		}
 	}
 	if c.TestGroupInput.ExecOCRParams != nil {
-		err := mergo.Merge(contracts.OCR2ParamsForExec, c.TestGroupInput.ExecOCRParams, mergo.WithOverride)
+		err := mergo.Merge(&contracts.OCR2ParamsForExec, c.TestGroupInput.ExecOCRParams, mergo.WithOverride)
 		if err != nil {
 			return err
 		}
