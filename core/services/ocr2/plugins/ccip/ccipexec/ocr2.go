@@ -376,12 +376,7 @@ func (r *ExecutionReportingPlugin) buildBatch(
 		}
 
 		if _, ok := expectedNonces[msg.Sender]; !ok {
-			if latestNonce, ok := sendersNonce[msg.Sender]; ok {
-				expectedNonces[msg.Sender] = latestNonce + 1
-			} else {
-				lggr.Errorw("unable to get sender nonce", "err", err, "seqNr", msg.SequenceNumber)
-				continue
-			}
+			expectedNonces[msg.Sender] = sendersNonce[msg.Sender] + 1
 		}
 
 		// Check expected nonce is valid

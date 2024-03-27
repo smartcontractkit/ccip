@@ -195,6 +195,10 @@ func (o *OffRamp) GetSenderNonce(ctx context.Context, sender cciptypes.Address) 
 }
 
 func (o *OffRamp) GetSendersNonce(ctx context.Context, senders []cciptypes.Address) (map[cciptypes.Address]uint64, error) {
+	if len(senders) == 0 {
+		return make(map[cciptypes.Address]uint64), nil
+	}
+
 	evmSenders, err := ccipcalc.GenericAddrsToEvm(senders...)
 	if err != nil {
 		return nil, err
@@ -204,7 +208,8 @@ func (o *OffRamp) GetSendersNonce(ctx context.Context, senders []cciptypes.Addre
 	for _, evmAddr := range evmSenders {
 		evmCalls = append(evmCalls, rpclib.NewEvmCall(
 			abiOffRamp,
-			"GetSenderNonce",
+			"getSenderNonce",
+			o.addr,
 			evmAddr,
 		))
 	}
