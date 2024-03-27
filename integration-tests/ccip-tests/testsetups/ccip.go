@@ -748,6 +748,7 @@ func CCIPDefaultTestSetUp(
 		err = os.Remove(setUpArgs.LaneConfigFile)
 		require.NoError(t, err, "error while removing existing lane config file - %s", setUpArgs.LaneConfigFile)
 	}
+
 	configureCLNode := !testConfig.useExistingDeployment()
 
 	// if no of lanes per pair is greater than 1, copy common contracts from the same network
@@ -833,6 +834,13 @@ func CCIPDefaultTestSetUp(
 	require.NoError(t, laneAddGrp.Wait())
 	err = laneconfig.WriteLanesToJSON(setUpArgs.LaneConfigFile, setUpArgs.LaneConfig)
 	require.NoError(t, err)
+	// if test is run in remote runner, register a clean-up to copy the laneconfig file
+	if value, set := os.LookupEnv(config.EnvVarInsideK8s); set && value != "" {
+		if setUpArgs.Env != nil && setUpArgs.Env.K8Env != nil {
+			err := setUpArgs.Env.K8Env.CopyFromPod("job-name=remote-test-runner", setUpArgs.LaneConfigFile, setUpArgs.LaneConfigFile)
+			require.NoError(t, err, "error copying lane config")
+		}
+	}
 	require.Equal(t, len(setUpArgs.Lanes), len(testConfig.NetworkPairs),
 		"Number of bi-directional lanes should be equal to number of network pairs")
 
