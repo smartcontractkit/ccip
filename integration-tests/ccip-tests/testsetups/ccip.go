@@ -15,6 +15,7 @@ import (
 	"dario.cat/mergo"
 	"github.com/AlekSi/pointer"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
@@ -87,6 +88,21 @@ func (c *CCIPTestConfig) localCluster() bool {
 
 func (c *CCIPTestConfig) ExistingCLCluster() bool {
 	return c.EnvInput.ExistingCLCluster != nil
+}
+
+func (c *CCIPTestConfig) CLClusterNeedsUpgrade() bool {
+	if c.EnvInput.NewCLCluster == nil {
+		return false
+	}
+	if c.EnvInput.NewCLCluster.Common != nil && c.EnvInput.NewCLCluster.Common.ChainlinkUpgradeImage != nil {
+		return true
+	}
+	for _, node := range c.EnvInput.NewCLCluster.Nodes {
+		if node.ChainlinkUpgradeImage != nil {
+			return true
+		}
+	}
+	return false
 }
 
 func (c *CCIPTestConfig) AddPairToNetworkList(networkA, networkB blockchain.EVMNetwork) {
@@ -300,6 +316,12 @@ func NewCCIPTestConfig(t *testing.T, lggr zerolog.Logger, tType string) *CCIPTes
 		}
 		if testCfg.CCIP.Env.Logging == nil || testCfg.CCIP.Env.Logging.Grafana == nil {
 			t.Fatal("grafana config is required for load test")
+		}
+	}
+	if pointer.GetBool(groupCfg.KeepEnvAlive) {
+		err := os.Setenv(config.EnvVarKeepEnvironments, "ALWAYS")
+		if err != nil {
+			t.Fatal(err)
 		}
 	}
 	ccipTestConfig := &CCIPTestConfig{
@@ -739,11 +761,32 @@ func CCIPDefaultTestSetUp(
 	}
 
 	chainByChainID := setUpArgs.CreateEnvironment(lggr, envName)
+	// if test is run in remote runner, register a clean-up to copy the laneconfig file
+	if value, set := os.LookupEnv(config.EnvVarJobImage); set && value != "" {
+		t.Cleanup(func() {
+			if setUpArgs.Env != nil && setUpArgs.Env.K8Env != nil {
+				filpath := strings.Split(setUpArgs.LaneConfigFile, "/")[len(strings.Split(setUpArgs.LaneConfigFile, "/"))-1]
+				filpath = fmt.Sprintf("reports/%s", filpath)
+				lggr.Info().Str("Path", filpath).Msg("copying lane config")
+				err := setUpArgs.Env.K8Env.CopyFromPod("job-name=remote-test-runner",
+					"remote-test-runner-data-files", filpath, ".")
+				require.NoError(t, err, "error getting lane config")
+			}
+		})
+	}
 	if setUpArgs.Env != nil {
 		ccipEnv := setUpArgs.Env
 		if ccipEnv.K8Env != nil && ccipEnv.K8Env.WillUseRemoteRunner() {
 			return setUpArgs
 		}
+	}
+	contractsData, err := setUpArgs.Cfg.ContractsInput.ContractsData()
+	require.NoError(t, err, "error reading existing lane config")
+	setUpArgs.LaneConfig, err = laneconfig.ReadLanesFromExistingDeployment(contractsData)
+	require.NoError(t, err)
+
+	if setUpArgs.LaneConfig == nil {
+		setUpArgs.LaneConfig = &laneconfig.Lanes{LaneConfigs: make(map[string]*laneconfig.LaneConfig)}
 	}
 	_, err = os.Stat(setUpArgs.LaneConfigFile)
 	if err == nil {
@@ -752,12 +795,6 @@ func CCIPDefaultTestSetUp(
 		require.NoError(t, err, "error while removing existing lane config file - %s", setUpArgs.LaneConfigFile)
 	}
 
-	setUpArgs.LaneConfig, err = laneconfig.ReadLanesFromExistingDeployment(setUpArgs.Cfg.ContractsInput.ContractsData())
-	require.NoError(t, err)
-
-	if setUpArgs.LaneConfig == nil {
-		setUpArgs.LaneConfig = &laneconfig.Lanes{LaneConfigs: make(map[string]*laneconfig.LaneConfig)}
-	}
 	configureCLNode := !testConfig.useExistingDeployment()
 
 	// if no of lanes per pair is greater than 1, copy common contracts from the same network
@@ -843,6 +880,7 @@ func CCIPDefaultTestSetUp(
 	require.NoError(t, laneAddGrp.Wait())
 	err = laneconfig.WriteLanesToJSON(setUpArgs.LaneConfigFile, setUpArgs.LaneConfig)
 	require.NoError(t, err)
+
 	require.Equal(t, len(setUpArgs.Lanes), len(testConfig.NetworkPairs),
 		"Number of bi-directional lanes should be equal to number of network pairs")
 
@@ -1063,6 +1101,14 @@ func createEnvironmentConfig(t *testing.T, envName string, testConfig *CCIPTestC
 		NamespacePrefix:    envName,
 		Test:               t,
 		PreventPodEviction: true,
+	}
+	// if there is already existing namespace, no need to update any manifest there, we just connect to it
+	existingEnv := pointer.GetString(testConfig.EnvInput.EnvName)
+	if existingEnv != "" {
+		envConfig.Namespace = existingEnv
+		envConfig.NamespacePrefix = ""
+		envConfig.NoManifestUpdate = true
+		envConfig.RunnerName = fmt.Sprintf("%s-%s", environment.REMOTE_RUNNER_NAME, uuid.NewString()[0:5])
 	}
 	if testConfig.EnvInput.TTL != nil {
 		envConfig.TTL = testConfig.EnvInput.TTL.Duration()
