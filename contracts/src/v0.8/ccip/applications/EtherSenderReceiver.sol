@@ -179,11 +179,28 @@ contract EtherSenderReceiver is CCIPReceiver, ITypeAndVersion {
   /// @param message The CCIP message containing the wrapped ether amount and the final receiver.
   function _ccipReceive(Client.Any2EVMMessage memory message) internal override {
     // we receive WETH, unwrap it and send it to the final receiver.
-    address receiver = abi.decode(message.data, (address));
+    // The code below should never revert if the message being is valid according
+    // to the above _validateMessage and _validateFeeToken functions.
+
+    // decode the EOA receiver from the message data.
+    address eoaReceiver = abi.decode(message.data, (address));
+
+    // withdraw the WETH received from the token pool.
     i_weth.withdraw(message.destTokenAmounts[0].amount);
-    (bool success, ) = payable(receiver).call{value: message.destTokenAmounts[0].amount}("");
+
+    // it is possible that the below call may fail if eoaReceiver.code.length > 0 and the contract
+    // doesn't e.g have a receive() or a fallback() function.
+    (bool success, ) = payable(eoaReceiver).call{value: message.destTokenAmounts[0].amount}("");
     if (!success) {
-      revert CCIPReceiveFailed();
+      // We have a few options here:
+      // 1. Revert: this is bad generally because it may mean that these tokens are stuck.
+      // 2. Store the tokens in a mapping and allow the user to withdraw them with another tx.
+      // 3. Send weth to the eoaReceiver address.
+      // We opt for (3) here because at least the eoaReceiver will have the funds and can unwrap them if needed.
+      // However it is worth noting that if eoaReceiver is actually a contract and the contract _cannot_ withdraw
+      // the WETH, then the WETH will be stuck in this contract.
+      i_weth.deposit{value: message.destTokenAmounts[0].amount}();
+      i_weth.transfer(eoaReceiver, message.destTokenAmounts[0].amount);
     }
   }
 }
