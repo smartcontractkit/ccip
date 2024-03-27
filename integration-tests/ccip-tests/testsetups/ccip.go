@@ -734,7 +734,8 @@ func CCIPDefaultTestSetUp(
 		grp.Go(func() error {
 			if setUpArgs.Env != nil && setUpArgs.Env.K8Env != nil {
 				filpath := strings.Split(setUpArgs.LaneConfigFile, "/")[len(strings.Split(setUpArgs.LaneConfigFile, "/"))-1]
-				lggr.Info().Msg("copying lane config")
+				filpath = fmt.Sprintf("integration-tests/%s", filpath)
+				lggr.Info().Str("Path", filpath).Msg("copying lane config")
 				for {
 					select {
 					case <-time.After(1 * time.Minute):
