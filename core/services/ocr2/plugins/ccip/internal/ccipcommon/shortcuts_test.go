@@ -155,7 +155,7 @@ func TestGetChainTokensWithBatchLimit(t *testing.T) {
 
 	testCases := []struct {
 		name        string
-		batchSize   uint
+		batchSize   int
 		numOffRamps uint
 		expectError bool
 	}{

@@ -18,6 +18,7 @@ import (
 	commonlogger "github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
+
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/ccipdataprovider"
@@ -207,7 +208,17 @@ func jobSpecToCommitPluginConfig(ctx context.Context, lggr logger.Logger, jb job
 	var destOffRampReaders []ccipdata.OffRampReader
 	for _, o := range destRouterOffRamps {
 		destOffRampAddr := cciptypes.Address(o.OffRamp.String())
-		destOffRampReader, err2 := factory.NewOffRampReader(commitLggr, versionFinder, destOffRampAddr, params.destChain.Client(), params.destChain.LogPoller(), params.destChain.GasEstimator(), params.destChain.Config().EVM().GasEstimator().PriceMax().ToInt(), true, qopts...)
+		destOffRampReader, err2 := factory.NewOffRampReader(
+			commitLggr,
+			versionFinder,
+			destOffRampAddr,
+			params.destChain.Client(),
+			params.destChain.LogPoller(),
+			params.destChain.GasEstimator(),
+			params.destChain.Config().EVM().GasEstimator().PriceMax().ToInt(),
+			true,
+			qopts...,
+		)
 		if err2 != nil {
 			return nil, nil, nil, err2
 		}
