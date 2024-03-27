@@ -193,24 +193,21 @@ func (s *TokenDataReader) getUSDCMessageBody(
 	msg cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta,
 	tokenIndex int,
 ) ([]byte, error) {
-	usdcTokenIdx := -1
-	for i, tk := range msg.TokenAmounts {
-		evmTokenAddr, err := ccipcalc.GenericAddrToEvm(tk.Token)
+	if tokenIndex >= len(msg.TokenAmounts) || tokenIndex < 0 {
+		return nil, fmt.Errorf("invalid token index %d for msg with %d tokens", tokenIndex, len(msg.TokenAmounts))
+	}
+
+	offsetFromLastUsdcToken := 0
+	for i := tokenIndex + 1; i < len(msg.TokenAmounts); i++ {
+		evmTokenAddr, err := ccipcalc.GenericAddrToEvm(msg.TokenAmounts[i].Token)
 		if err != nil {
 			continue
 		}
 		if evmTokenAddr == s.usdcTokenAddress {
-			usdcTokenIdx = i
-		}
-		if i == tokenIndex {
-			break
+			offsetFromLastUsdcToken++
 		}
 	}
-	if usdcTokenIdx == -1 {
-		return nil, fmt.Errorf("internal error usdc token index is not found, the provided tokenIndex is not a usdc token")
-	}
-
-	parsedMsgBody, err := s.usdcReader.GetUSDCMessagePriorToLogIndexInTx(ctx, int64(msg.LogIndex), tokenIndex, msg.TxHash)
+	parsedMsgBody, err := s.usdcReader.GetUSDCMessagePriorToLogIndexInTx(ctx, int64(msg.LogIndex), offsetFromLastUsdcToken, msg.TxHash)
 	if err != nil {
 		return []byte{}, err
 	}
