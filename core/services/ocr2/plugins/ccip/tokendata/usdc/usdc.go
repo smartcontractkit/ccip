@@ -232,7 +232,6 @@ func (s *TokenDataReader) getUsdcTokenEndOffset(msg cciptypes.EVM2EVMOnRampCCIPS
 }
 
 // callAttestationApi calls the USDC attestation API with the given USDC message hash.
-```suggestion
 // The attestation service rate limit is 10 requests per second. If you exceed 10 requests 
 // per second, the service blocks all API requests for the next 5 minutes and returns an
 // HTTP 429 response.
