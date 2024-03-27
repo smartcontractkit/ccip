@@ -8,6 +8,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/libocr/gethwrappers/offchainaggregator"
 	"github.com/smartcontractkit/libocr/gethwrappers2/ocr2aggregator"
 	ocrConfigHelper "github.com/smartcontractkit/libocr/offchainreporting/confighelper"
@@ -112,22 +113,22 @@ type OffChainAggregatorConfig struct {
 }
 
 type OffChainAggregatorV2Config struct {
-	DeltaProgress                           time.Duration
-	DeltaResend                             time.Duration
-	DeltaRound                              time.Duration
-	DeltaGrace                              time.Duration
-	DeltaStage                              time.Duration
-	RMax                                    uint8
-	S                                       []int
-	Oracles                                 []ocrConfigHelper2.OracleIdentityExtra
-	ReportingPluginConfig                   []byte
-	MaxDurationQuery                        time.Duration
-	MaxDurationObservation                  time.Duration
-	MaxDurationReport                       time.Duration
-	MaxDurationShouldAcceptFinalizedReport  time.Duration
-	MaxDurationShouldTransmitAcceptedReport time.Duration
-	F                                       int
-	OnchainConfig                           []byte
+	DeltaProgress                           *config.Duration                       `toml:",omitempty"`
+	DeltaResend                             *config.Duration                       `toml:",omitempty"`
+	DeltaRound                              *config.Duration                       `toml:",omitempty"`
+	DeltaGrace                              *config.Duration                       `toml:",omitempty"`
+	DeltaStage                              *config.Duration                       `toml:",omitempty"`
+	RMax                                    uint8                                  `toml:"-"`
+	S                                       []int                                  `toml:"-"`
+	Oracles                                 []ocrConfigHelper2.OracleIdentityExtra `toml:"-"`
+	ReportingPluginConfig                   []byte                                 `toml:"-"`
+	MaxDurationQuery                        *config.Duration                       `toml:",omitempty"`
+	MaxDurationObservation                  *config.Duration                       `toml:",omitempty"`
+	MaxDurationReport                       *config.Duration                       `toml:",omitempty"`
+	MaxDurationShouldAcceptFinalizedReport  *config.Duration                       `toml:",omitempty"`
+	MaxDurationShouldTransmitAcceptedReport *config.Duration                       `toml:",omitempty"`
+	F                                       int                                    `toml:"-"`
+	OnchainConfig                           []byte                                 `toml:"-"`
 }
 
 type OffchainAggregatorData struct {
