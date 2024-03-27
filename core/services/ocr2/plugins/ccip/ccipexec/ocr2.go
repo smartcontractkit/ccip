@@ -358,6 +358,11 @@ func (r *ExecutionReportingPlugin) buildBatch(
 		lggr.Errorw("Unexpected error computing inflight values", "err", err)
 		return []ccip.ObservedMessage{}
 	}
+	// We assume that next observation will start after previous epoch transmission so nonces should be already updated onchain.
+	// Worst case scenario we will try to process the same message again, and it will be skipped but protocol would progress anyway.
+	// We don't use inflightCache here to avoid cases in which inflight cache keeps progressing but due to transmission failures
+	// previous reports are not included onchain. That can lead to issues with IncorrectNonce skips,
+	// because we enforce sequential processing per sender (per sender's nonce ordering is enforced by Offramp contract)
 	sendersNonce, err := r.fetchSendersNonce(ctx, report)
 	if err != nil {
 		lggr.Errorw("fetching senders nonce", "err", err)
@@ -376,12 +381,12 @@ func (r *ExecutionReportingPlugin) buildBatch(
 		}
 
 		if _, ok := expectedNonces[msg.Sender]; !ok {
-			if latestNonce, ok := sendersNonce[msg.Sender]; ok {
-				expectedNonces[msg.Sender] = latestNonce + 1
-			} else {
-				msgLggr.Errorw("unable to get sender nonce", "err", err, "seqNr", msg.SequenceNumber)
+			nonce, ok1 := sendersNonce[msg.Sender]
+			if !ok1 {
+				msgLggr.Errorw("Skipping message nonce not found", "sender", msg.Sender)
 				continue
 			}
+			expectedNonces[msg.Sender] = nonce + 1
 		}
 
 		// Check expected nonce is valid
