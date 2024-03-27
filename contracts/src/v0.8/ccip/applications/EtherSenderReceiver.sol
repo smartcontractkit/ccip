@@ -166,9 +166,13 @@ contract EtherSenderReceiver is CCIPReceiver, ITypeAndVersion {
       if (msgValue <= tokenAmount.amount) {
         revert InsufficientMsgValue(tokenAmount.amount, msgValue);
       }
+    } else {
+      // If the fee token is NOT native, then the token amount must be equal to msgValue.
+      // This is done to ensure that there is no leftover ether in this contract.
+      if (msgValue != tokenAmount.amount) {
+        revert TokenAmountNotEqualToMsgValue(tokenAmount.amount, msgValue);
+      }
     }
-
-    // If fee token is not native, there's no relationship between msgValue and tokenAmount.amount.
   }
 
   /// @notice Receive the wrapped ether, unwrap it, and send it to the specified EOA in the data field.
