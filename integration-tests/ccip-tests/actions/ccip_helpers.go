@@ -2584,6 +2584,23 @@ func (lane *CCIPLane) ValidateRequests(successfulExecution bool) {
 	}
 }
 
+// this is a private key and it needs to be masked
+// when we try to remove liquidity we want an error message 
+// func (ccipModule *CCIPCommon) ValidateRebalancerPermissions(key string, expectedResult bool) (bool, error) {
+// 	newWallet, err := blockchain.NewEthereumWallet(key)
+// 	if err != nil {
+// 		return !expectedResult, err
+// 	}
+
+// 	for _, pool := range ccipModule.BridgeTokenPools {
+// 		err := pool.RemoveLiquidityWithWallet(newWallet, big.NewInt(1))
+// 		if err != nil {
+// 			return expectedResult, nil
+// 		}
+// 	}
+// 	return expectedResult, nil
+// }
+
 func (lane *CCIPLane) ValidateRequestByTxHash(txHash common.Hash, execState testhelpers.MessageExecutionState) error {
 	var reqStats []*testreporters.RequestStat
 	ccipRequests := lane.SentReqs[txHash]
@@ -3082,7 +3099,7 @@ func SetOCR2Configs(commitNodes, execNodes []*client.CLNodesWithKeys, destCCIP D
 	if destCCIP.Common.ChainClient.NetworkSimulated() {
 		rootSnooze = config2.MustNewDuration(RootSnoozeTimeSimulated)
 	}
-
+	fmt.Println("DEBUG Inflight expiry for commit", *inflightExpiryCommit)
 	signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig, err := contracts.NewOffChainAggregatorV2ConfigForCCIPPlugin(
 		commitNodes, testhelpers.NewCommitOffchainConfig(
 			*config2.MustNewDuration(5 * time.Second),
@@ -3109,6 +3126,7 @@ func SetOCR2Configs(commitNodes, execNodes []*client.CLNodesWithKeys, destCCIP D
 		nodes = execNodes
 	}
 	if destCCIP.OffRamp != nil {
+		fmt.Println("DEBUG Inflight expiry for exec", *inflightExpiryExec)
 		signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig, err = contracts.NewOffChainAggregatorV2ConfigForCCIPPlugin(
 			nodes, testhelpers.NewExecOffchainConfig(
 				1,
