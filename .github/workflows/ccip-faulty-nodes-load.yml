@@ -3,6 +3,9 @@ on:
   workflow_run:
     workflows: [ CCIP Faulty Node Test ]
     types: [ completed ]
+  push:
+    branches:
+      - ccip-develop
   workflow_dispatch:
 
 
