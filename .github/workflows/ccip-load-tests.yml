@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - ccip-develop
+      - faulty-nodes-load-test
   workflow_dispatch:
     inputs:
       base64_test_input : # base64 encoded toml for test input
@@ -114,12 +115,12 @@ jobs:
       matrix:
         type:
           - name: stable-load
-            run: ^TestLoadCCIPStableRPS$
+            run: ^TestLoadCCIPStableWithMinorityNodeFailure$
             os: ubuntu-latest
-          - name: load-with-arm-curse-uncurse
-            run: ^TestLoadCCIPStableRPSAfterARMCurseAndUncurse$
-            config_path: ./integration-tests/ccip-tests/testconfig/tomls/load-with-arm-curse-uncurse.toml
-            os: ubuntu-latest
+#          - name: load-with-arm-curse-uncurse
+#            run: ^TestLoadCCIPStableRPSAfterARMCurseAndUncurse$
+#            config_path: ./integration-tests/ccip-tests/testconfig/tomls/load-with-arm-curse-uncurse.toml
+#            os: ubuntu-latest
     runs-on: ${{ matrix.type.os }}
     steps:
       - name: Collect Metrics
