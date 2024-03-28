@@ -193,26 +193,42 @@ func (s *TokenDataReader) getUSDCMessageBody(
 	msg cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta,
 	tokenIndex int,
 ) ([]byte, error) {
-	if tokenIndex >= len(msg.TokenAmounts) || tokenIndex < 0 {
-		return nil, fmt.Errorf("invalid token index %d for msg with %d tokens", tokenIndex, len(msg.TokenAmounts))
+	usdcTokenEndOffset, err := s.getUsdcTokenEndOffset(msg, tokenIndex)
+	if err != nil {
+		return nil, fmt.Errorf("get usdc token %d end offset: %w", tokenIndex, err)
 	}
 
-	offsetFromLastUsdcToken := 0
+	parsedMsgBody, err := s.usdcReader.GetUSDCMessagePriorToLogIndexInTx(ctx, int64(msg.LogIndex), usdcTokenEndOffset, msg.TxHash)
+	if err != nil {
+		return []byte{}, err
+	}
+
+	s.lggr.Infow("Got USDC message body", "messageBody", hexutil.Encode(parsedMsgBody), "messageID", hexutil.Encode(msg.MessageID[:]))
+	return parsedMsgBody, nil
+}
+
+func (s *TokenDataReader) getUsdcTokenEndOffset(msg cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta, tokenIndex int) (int, error) {
+	if tokenIndex >= len(msg.TokenAmounts) || tokenIndex < 0 {
+		return 0, fmt.Errorf("invalid token index %d for msg with %d tokens", tokenIndex, len(msg.TokenAmounts))
+	}
+
+	if msg.TokenAmounts[tokenIndex].Token != ccipcalc.EvmAddrToGeneric(s.usdcTokenAddress) {
+		return 0, fmt.Errorf("the specified token index %d is not a usdc token", tokenIndex)
+	}
+
+	usdcTokenEndOffset := 0
 	for i := tokenIndex + 1; i < len(msg.TokenAmounts); i++ {
 		evmTokenAddr, err := ccipcalc.GenericAddrToEvm(msg.TokenAmounts[i].Token)
 		if err != nil {
 			continue
 		}
+
 		if evmTokenAddr == s.usdcTokenAddress {
-			offsetFromLastUsdcToken++
+			usdcTokenEndOffset++
 		}
 	}
-	parsedMsgBody, err := s.usdcReader.GetUSDCMessagePriorToLogIndexInTx(ctx, int64(msg.LogIndex), offsetFromLastUsdcToken, msg.TxHash)
-	if err != nil {
-		return []byte{}, err
-	}
-	s.lggr.Infow("Got USDC message body", "messageBody", hexutil.Encode(parsedMsgBody), "messageID", hexutil.Encode(msg.MessageID[:]))
-	return parsedMsgBody, nil
+
+	return usdcTokenEndOffset, nil
 }
 
 func (s *TokenDataReader) callAttestationApi(ctx context.Context, usdcMessageHash [32]byte) (attestationResponse, error) {

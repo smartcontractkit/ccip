@@ -93,8 +93,13 @@ func (u *USDCReaderImpl) GetUSDCMessagePriorToLogIndexInTx(ctx context.Context, 
 	usdcTokenIndex := (len(allUsdcTokensData) - 1) - usdcTokenIndexOffset
 
 	if usdcTokenIndex < 0 || usdcTokenIndex >= len(allUsdcTokensData) {
-		return nil, errors.Errorf("no USDC message found prior to log index %d, usdc token:%d in tx %s, usdcTokenIndex=%d",
-			logIndex, allUsdcTokensData, txHash, usdcTokenIndex)
+		u.lggr.Errorw("usdc message not found",
+			"logIndex", logIndex,
+			"allUsdcTokenData", len(allUsdcTokensData),
+			"txHash", txHash,
+			"usdcTokenIndex", usdcTokenIndex,
+		)
+		return nil, errors.Errorf("usdc token index %d is not valid", usdcTokenIndex)
 	}
 	return parseUSDCMessageSent(allUsdcTokensData[usdcTokenIndex])
 }

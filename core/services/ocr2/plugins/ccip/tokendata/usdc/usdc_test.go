@@ -13,6 +13,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
@@ -248,4 +249,56 @@ func TestGetUSDCMessageBody(t *testing.T) {
 	require.Equal(t, body, expectedBody)
 
 	usdcReader.AssertNumberOfCalls(t, "GetUSDCMessagePriorToLogIndexInTx", 1)
+}
+
+func TestTokenDataReader_getUsdcTokenEndOffset(t *testing.T) {
+	usdcToken := utils.RandomAddress()
+	nonUsdcToken := utils.RandomAddress()
+
+	multipleTokens := []common.Address{
+		usdcToken, // 2
+		nonUsdcToken,
+		nonUsdcToken,
+		usdcToken, // 1
+		usdcToken, // 0
+		nonUsdcToken,
+	}
+
+	testCases := []struct {
+		name       string
+		tokens     []common.Address
+		tokenIndex int
+		expOffset  int
+		expErr     bool
+	}{
+		{name: "one non usdc token", tokens: []common.Address{nonUsdcToken}, tokenIndex: 0, expOffset: 0, expErr: true},
+		{name: "one usdc token", tokens: []common.Address{usdcToken}, tokenIndex: 0, expOffset: 0, expErr: false},
+		{name: "one usdc token wrong index", tokens: []common.Address{usdcToken}, tokenIndex: 1, expOffset: 0, expErr: true},
+		{name: "multiple tokens 1", tokens: multipleTokens, tokenIndex: 0, expOffset: 2},
+		{name: "multiple tokens - non usdc selected", tokens: multipleTokens, tokenIndex: 2, expErr: true},
+		{name: "multiple tokens 2", tokens: multipleTokens, tokenIndex: 3, expOffset: 1},
+		{name: "multiple tokens 3", tokens: multipleTokens, tokenIndex: 4, expOffset: 0},
+		{name: "multiple tokens not found", tokens: multipleTokens, tokenIndex: 5, expErr: true},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			r := &TokenDataReader{usdcTokenAddress: usdcToken}
+			tokenAmounts := make([]cciptypes.TokenAmount, len(tc.tokens))
+			for i := range tokenAmounts {
+				tokenAmounts[i] = cciptypes.TokenAmount{
+					Token:  ccipcalc.EvmAddrToGeneric(tc.tokens[i]),
+					Amount: big.NewInt(rand.Int63()),
+				}
+			}
+			msg := cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta{EVM2EVMMessage: cciptypes.EVM2EVMMessage{TokenAmounts: tokenAmounts}}
+			offset, err := r.getUsdcTokenEndOffset(msg, tc.tokenIndex)
+			if tc.expErr {
+				assert.Error(t, err)
+				return
+			}
+			assert.NoError(t, err)
+			assert.Equal(t, tc.expOffset, offset)
+		})
+	}
 }
