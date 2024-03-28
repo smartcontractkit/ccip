@@ -86,6 +86,9 @@ type ExecutionReportingPlugin struct {
 	onchainConfig          cciptypes.ExecOnchainConfig
 	offRampReader          ccipdata.OffRampReader
 	tokenPoolBatchedReader batchreader.TokenPoolBatchedReader
+	execSimulator          interface {
+		SimulateExec(msg cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta, offchainTokenData [][]byte) (gasUsed uint64, err error)
+	}
 
 	// State
 	inflightReports  *inflightExecReportsContainer
@@ -349,6 +352,7 @@ func (r *ExecutionReportingPlugin) buildBatch(
 		return []ccip.ObservedMessage{}
 	}
 	availableGas := uint64(r.offchainConfig.BatchGasLimit)
+	var maxBatchSize int = 1 // fetch from offchain config, will be 1 for zk chains
 	expectedNonces := make(map[cciptypes.Address]uint64)
 	availableDataLen := MaxDataLenPerBatch
 	tokenDataRemainingDuration := MaximumAllowedTokenDataWaitTimePerBatch
@@ -361,6 +365,10 @@ func (r *ExecutionReportingPlugin) buildBatch(
 		if inflightSeqNrs.Contains(msg.SequenceNumber) {
 			msgLggr.Infow("Skipping message already inflight", "seqNr", msg.SequenceNumber)
 			continue
+		}
+		if len(executableMessages) >= maxBatchSize {
+			msgLggr.Infow("Breaking, batch size limit reached", "maxBatchSize", maxBatchSize)
+			break
 		}
 		if _, ok := expectedNonces[msg.Sender]; !ok {
 			// First message in batch, need to populate expected nonce
@@ -478,6 +486,13 @@ func (r *ExecutionReportingPlugin) buildBatch(
 			if rl, exists := destTokenPoolRateLimits[dstToken]; exists {
 				destTokenPoolRateLimits[dstToken] = rl.Sub(rl, tk.Amount)
 			}
+		}
+
+		_, err = r.execSimulator.SimulateExec(msg, tokenData)
+		if err != nil {
+			// If the message is not executable, we should mark it as fatally errored to avoid retrying it.
+			// In addition, we should "mute" all messages after this message from the same sender.
+			continue
 		}
 
 		msgLggr.Infow("Adding msg to batch", "seqNr", msg.SequenceNumber, "nonce", msg.Nonce,
