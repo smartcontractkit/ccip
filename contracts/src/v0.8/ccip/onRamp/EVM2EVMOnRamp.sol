@@ -8,13 +8,13 @@ import {IPriceRegistry} from "../interfaces/IPriceRegistry.sol";
 import {IEVM2AnyOnRamp} from "../interfaces/IEVM2AnyOnRamp.sol";
 import {IEVM2AnyOnRampClient} from "../interfaces/IEVM2AnyOnRampClient.sol";
 import {ILinkAvailable} from "../interfaces/automation/ILinkAvailable.sol";
+import {ITokenAdminRegistry} from "../interfaces/ITokenAdminRegistry.sol";
 
 import {AggregateRateLimiter} from "../AggregateRateLimiter.sol";
 import {Client} from "../libraries/Client.sol";
 import {Internal} from "../libraries/Internal.sol";
 import {RateLimiter} from "../libraries/RateLimiter.sol";
 import {USDPriceWith18Decimals} from "../libraries/USDPriceWith18Decimals.sol";
-import {EnumerableMapAddresses} from "../../shared/enumerable/EnumerableMapAddresses.sol";
 
 import {SafeERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
@@ -27,7 +27,6 @@ import {EnumerableMap} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts
 contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, ITypeAndVersion {
   using SafeERC20 for IERC20;
   using EnumerableMap for EnumerableMap.AddressToUintMap;
-  using EnumerableMapAddresses for EnumerableMapAddresses.AddressToAddressMap;
   using USDPriceWith18Decimals for uint224;
 
   error InvalidExtraArgsTag();
@@ -93,6 +92,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     address priceRegistry; //                    │ Price registry address
     uint32 maxDataBytes; //                      │ Maximum payload data size in bytes
     uint32 maxPerMsgGasLimit; // ────────────────╯ Maximum gas limit for messages targeting EVMs
+    address tokenAdminRegistry; //                 Token admin registry address
   }
 
   /// @dev Struct to hold the execution fee configuration for a fee token
@@ -171,8 +171,6 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   DynamicConfig internal s_dynamicConfig;
   /// @dev (address nop => uint256 weight)
   EnumerableMap.AddressToUintMap internal s_nops;
-  /// @dev source token => token pool
-  EnumerableMapAddresses.AddressToAddressMap private s_poolsBySourceToken;
 
   /// @dev The execution fee token config that can be set by the owner or fee admin
   mapping(address token => FeeTokenConfig feeTokenConfig) internal s_feeTokenConfig;
@@ -196,7 +194,6 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   constructor(
     StaticConfig memory staticConfig,
     DynamicConfig memory dynamicConfig,
-    Internal.PoolUpdate[] memory tokensAndPools,
     RateLimiter.Config memory rateLimiterConfig,
     FeeTokenConfigArgs[] memory feeTokenConfigs,
     TokenTransferFeeConfigArgs[] memory tokenTransferFeeConfigArgs,
@@ -230,9 +227,6 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     _setFeeTokenConfig(feeTokenConfigs);
     _setTokenTransferFeeConfig(tokenTransferFeeConfigArgs);
     _setNops(nopsAndWeights);
-
-    // Set new tokens and pools
-    _applyPoolUpdates(new Internal.PoolUpdate[](0), tokensAndPools);
   }
 
   // ================================================================
@@ -340,7 +334,9 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
       // This prevents gas bomb attacks on the NOPs. We use destBytesOverhead as a proxy to cap the number of bytes we accept.
       // As destBytesOverhead accounts for tokenData + offchainData, this caps the worst case abuse to the number of bytes reserved for offchainData.
       // It therefore fully mitigates gas bombs for most tokens, as most tokens don't use offchainData.
-      if (tokenData.length > s_tokenTransferFeeConfig[tokenAndAmount.token].destBytesOverhead)
+
+      // TODO hack: +500 to account for the addresses sent
+      if (tokenData.length > s_tokenTransferFeeConfig[tokenAndAmount.token].destBytesOverhead + 500)
         revert SourceTokenDataTooLarge(tokenAndAmount.token);
 
       newMessage.sourceTokenData[i] = tokenData;
@@ -441,55 +437,13 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   // ================================================================
 
   /// @inheritdoc IEVM2AnyOnRampClient
-  function getSupportedTokens(uint64 /*destChainSelector*/) external view returns (address[] memory) {
-    address[] memory sourceTokens = new address[](s_poolsBySourceToken.length());
-    for (uint256 i = 0; i < sourceTokens.length; ++i) {
-      (sourceTokens[i], ) = s_poolsBySourceToken.at(i);
-    }
-    return sourceTokens;
-  }
-
-  /// @inheritdoc IEVM2AnyOnRampClient
   function getPoolBySourceToken(uint64 /*destChainSelector*/, IERC20 sourceToken) public view returns (IPool) {
-    if (!s_poolsBySourceToken.contains(address(sourceToken))) revert UnsupportedToken(sourceToken);
-    return IPool(s_poolsBySourceToken.get(address(sourceToken)));
+    return IPool(ITokenAdminRegistry(s_dynamicConfig.tokenAdminRegistry).getPool(address(sourceToken)));
   }
 
-  /// @inheritdoc IEVM2AnyOnRamp
-  /// @dev This method can only be called by the owner of the contract.
-  function applyPoolUpdates(
-    Internal.PoolUpdate[] memory removes,
-    Internal.PoolUpdate[] memory adds
-  ) external onlyOwner {
-    _applyPoolUpdates(removes, adds);
-  }
-
-  function _applyPoolUpdates(Internal.PoolUpdate[] memory removes, Internal.PoolUpdate[] memory adds) internal {
-    for (uint256 i = 0; i < removes.length; ++i) {
-      address token = removes[i].token;
-      address pool = removes[i].pool;
-
-      if (!s_poolsBySourceToken.contains(token)) revert PoolDoesNotExist(token);
-      if (s_poolsBySourceToken.get(token) != pool) revert TokenPoolMismatch();
-
-      if (s_poolsBySourceToken.remove(token)) {
-        emit PoolRemoved(token, pool);
-      }
-    }
-
-    for (uint256 i = 0; i < adds.length; ++i) {
-      address token = adds[i].token;
-      address pool = adds[i].pool;
-
-      if (token == address(0) || pool == address(0)) revert InvalidTokenPoolConfig();
-      if (token != address(IPool(pool).getToken())) revert TokenPoolMismatch();
-
-      if (s_poolsBySourceToken.set(token, pool)) {
-        emit PoolAdded(token, pool);
-      } else {
-        revert PoolAlreadyAdded();
-      }
-    }
+  /// Not sure if this function still makes sense with 100+ tokens, but we need to keep it because the Router expects it
+  function getSupportedTokens(uint64 /*destChainSelector*/) external pure returns (address[] memory) {
+    return new address[](0);
   }
 
   // ================================================================
@@ -627,7 +581,8 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
       TokenTransferFeeConfig memory transferFeeConfig = s_tokenTransferFeeConfig[tokenAmount.token];
 
       // Validate if the token is supported, do not calculate fee for unsupported tokens.
-      if (!s_poolsBySourceToken.contains(tokenAmount.token)) revert UnsupportedToken(IERC20(tokenAmount.token));
+      if (address(getPoolBySourceToken(i_destChainSelector, IERC20(tokenAmount.token))) == address(0))
+        revert UnsupportedToken(IERC20(tokenAmount.token));
 
       uint256 bpsFeeUSDWei = 0;
       // Only calculate bps fee if ratio is greater than 0. Ratio of 0 means no bps fee for a token.

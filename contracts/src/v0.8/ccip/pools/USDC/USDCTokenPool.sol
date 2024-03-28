@@ -6,6 +6,7 @@ import {ITokenMessenger} from "./ITokenMessenger.sol";
 import {IMessageTransmitter} from "./IMessageTransmitter.sol";
 
 import {TokenPool} from "../TokenPool.sol";
+import {Internal} from "../../libraries/Internal.sol";
 
 import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -133,7 +134,11 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
       domain.allowedCaller
     );
     emit Burned(msg.sender, amount);
-    return abi.encode(SourceTokenDataPayload({nonce: nonce, sourceDomain: i_localDomainIdentifier}));
+    return
+      _getLockOrBurnReturnData(
+        remoteChainSelector,
+        abi.encode(SourceTokenDataPayload({nonce: nonce, sourceDomain: i_localDomainIdentifier}))
+      );
   }
 
   /// @notice Mint tokens from the pool to the recipient
@@ -158,7 +163,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
     bytes memory extraData
   ) external override onlyOffRamp(remoteChainSelector) {
     _consumeInboundRateLimit(remoteChainSelector, amount);
-    (bytes memory sourceData, bytes memory offchainTokenData) = abi.decode(extraData, (bytes, bytes));
+    (bytes memory sourceData, bytes memory offchainTokenData) = _validateSourceCaller(remoteChainSelector, extraData);
     SourceTokenDataPayload memory sourceTokenData = abi.decode(sourceData, (SourceTokenDataPayload));
     MessageAndAttestation memory msgAndAttestation = abi.decode(offchainTokenData, (MessageAndAttestation));
 

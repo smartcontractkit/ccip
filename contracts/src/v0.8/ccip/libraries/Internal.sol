@@ -52,6 +52,13 @@ library Internal {
     address pool; // The token pool address
   }
 
+  // TODO should be bytes or bytes32, for non-evm compatibility
+  struct TokenDataPayload {
+    address sourcePoolAddress;
+    address destPoolAddress;
+    bytes extraData;
+  }
+
   /// @notice Report that is submitted by the execution DON at the execution phase.
   /// @dev RMN depends on this struct, if changing, please notify the RMN maintainers.
   struct ExecutionReport {

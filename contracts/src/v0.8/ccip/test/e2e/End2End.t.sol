@@ -108,7 +108,7 @@ contract E2E is EVM2EVMOnRampSetup, CommitStoreSetup, EVM2EVMOffRampSetup {
     IERC20(s_sourceTokens[1]).approve(address(s_sourceRouter), i_tokenAmount1);
 
     message.receiver = abi.encode(address(s_receiver));
-    Internal.EVM2EVMMessage memory geEvent = _messageToEvent(
+    Internal.EVM2EVMMessage memory msgEvent = _messageToEvent(
       message,
       expectedSeqNum,
       expectedSeqNum,
@@ -117,12 +117,12 @@ contract E2E is EVM2EVMOnRampSetup, CommitStoreSetup, EVM2EVMOffRampSetup {
     );
 
     vm.expectEmit();
-    emit CCIPSendRequested(geEvent);
+    emit CCIPSendRequested(msgEvent);
 
     vm.resumeGasMetering();
     s_sourceRouter.ccipSend(DEST_CHAIN_SELECTOR, message);
     vm.pauseGasMetering();
 
-    return geEvent;
+    return msgEvent;
   }
 }

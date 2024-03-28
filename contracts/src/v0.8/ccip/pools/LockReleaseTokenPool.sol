@@ -68,7 +68,7 @@ contract LockReleaseTokenPool is TokenPool, ILiquidityContainer, ITypeAndVersion
   {
     _consumeOutboundRateLimit(remoteChainSelector, amount);
     emit Locked(msg.sender, amount);
-    return "";
+    return _getLockOrBurnReturnData(remoteChainSelector, "");
   }
 
   /// @notice Release tokens from the pool to the recipient
@@ -81,8 +81,9 @@ contract LockReleaseTokenPool is TokenPool, ILiquidityContainer, ITypeAndVersion
     address receiver,
     uint256 amount,
     uint64 remoteChainSelector,
-    bytes memory
+    bytes memory extraData
   ) external virtual override onlyOffRamp(remoteChainSelector) whenHealthy {
+    _validateSourceCaller(remoteChainSelector, extraData);
     _consumeInboundRateLimit(remoteChainSelector, amount);
     getToken().safeTransfer(receiver, amount);
     emit Released(msg.sender, receiver, amount);

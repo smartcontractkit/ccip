@@ -33,7 +33,7 @@ abstract contract BurnMintTokenPoolAbstract is TokenPool {
     _consumeOutboundRateLimit(remoteChainSelector, amount);
     _burn(amount);
     emit Burned(msg.sender, amount);
-    return "";
+    return _getLockOrBurnReturnData(remoteChainSelector, "");
   }
 
   /// @notice Mint tokens from the pool to the recipient
@@ -46,8 +46,9 @@ abstract contract BurnMintTokenPoolAbstract is TokenPool {
     address receiver,
     uint256 amount,
     uint64 remoteChainSelector,
-    bytes memory
+    bytes memory extraData
   ) external virtual override whenHealthy onlyOffRamp(remoteChainSelector) {
+    _validateSourceCaller(remoteChainSelector, extraData);
     _consumeInboundRateLimit(remoteChainSelector, amount);
     IBurnMintERC20(address(i_token)).mint(receiver, amount);
     emit Minted(msg.sender, receiver, amount);

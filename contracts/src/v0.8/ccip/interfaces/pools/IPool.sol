@@ -43,4 +43,6 @@ interface IPool {
   /// @notice Gets the IERC20 token that this pool can lock or burn.
   /// @return token The IERC20 token representation.
   function getToken() external view returns (IERC20 token);
+
+  //function getRemotePool(uint64 remoteChainSelector) external view returns (bytes memory);
 }

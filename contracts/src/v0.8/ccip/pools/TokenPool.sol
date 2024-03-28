@@ -7,6 +7,7 @@ import {IRouter} from "../interfaces/IRouter.sol";
 
 import {OwnerIsCreator} from "../../shared/access/OwnerIsCreator.sol";
 import {RateLimiter} from "../libraries/RateLimiter.sol";
+import {Internal} from "../libraries/Internal.sol";
 
 import {IERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {IERC165} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/introspection/IERC165.sol";
@@ -28,6 +29,7 @@ abstract contract TokenPool is IPool, OwnerIsCreator, IERC165 {
   error ChainNotAllowed(uint64 remoteChainSelector);
   error BadARMSignal();
   error ChainAlreadyExists(uint64 chainSelector);
+  error InvalidSourcePoolAddress(address sourcePoolAddress);
 
   event Locked(address indexed sender, uint256 amount);
   event Burned(address indexed sender, uint256 amount);
@@ -50,9 +52,17 @@ abstract contract TokenPool is IPool, OwnerIsCreator, IERC165 {
 
   struct ChainUpdate {
     uint64 remoteChainSelector; // ──╮ Remote chain selector
+    address remotePoolAddress; //    │ Address of the remote pool
     bool allowed; // ────────────────╯ Whether the chain is allowed
     RateLimiter.Config outboundRateLimiterConfig; // Outbound rate limited config, meaning the rate limits for all of the onRamps for the given chain
     RateLimiter.Config inboundRateLimiterConfig; // Inbound rate limited config, meaning the rate limits for all of the offRamps for the given chain
+  }
+
+  struct RemoteChainConfig {
+    RateLimiter.TokenBucket outboundRateLimiterConfig; // Outbound rate limited config, meaning the rate limits for all of the onRamps for the given chain
+    RateLimiter.TokenBucket inboundRateLimiterConfig; // Inbound rate limited config, meaning the rate limits for all of the offRamps for the given chain
+    address remotePoolAddress; // ──╮ Address of the remote pool
+    bool allowed; // ───────────────╯ Whether the chain is allowed
   }
 
   /// @dev The bridgeable token that is managed by this pool.
@@ -72,13 +82,7 @@ abstract contract TokenPool is IPool, OwnerIsCreator, IERC165 {
   /// be able to quickly determine (without parsing logs) who can access the pool.
   /// @dev The chain selectors are in uin256 format because of the EnumerableSet implementation.
   EnumerableSet.UintSet internal s_remoteChainSelectors;
-  /// @dev Outbound rate limits. Corresponds to the inbound rate limit for the pool
-  /// on the remote chain.
-  mapping(uint64 remoteChainSelector => RateLimiter.TokenBucket) internal s_outboundRateLimits;
-  /// @dev Inbound rate limits. This allows per destination chain
-  /// token issuer specified rate limiting (e.g. issuers may trust chains to varying
-  /// degrees and prefer different limits)
-  mapping(uint64 remoteChainSelector => RateLimiter.TokenBucket) internal s_inboundRateLimits;
+  mapping(uint64 remoteChainSelector => RemoteChainConfig) internal s_remoteChainConfigs;
 
   constructor(IERC20 token, address[] memory allowlist, address armProxy, address router) {
     if (address(token) == address(0) || router == address(0)) revert ZeroAddressNotAllowed();
@@ -125,6 +129,34 @@ abstract contract TokenPool is IPool, OwnerIsCreator, IERC165 {
     return interfaceId == type(IPool).interfaceId || interfaceId == type(IERC165).interfaceId;
   }
 
+  function _getLockOrBurnReturnData(
+    uint64 destChainSelector,
+    bytes memory arbitraryPayload
+  ) internal view returns (bytes memory) {
+    return
+      abi.encode(
+        Internal.TokenDataPayload({
+          sourcePoolAddress: address(this),
+          destPoolAddress: s_remoteChainConfigs[destChainSelector].remotePoolAddress,
+          extraData: arbitraryPayload
+        })
+      );
+  }
+
+  function _validateSourceCaller(
+    uint64 remoteChainSelector,
+    bytes memory extraData
+  ) internal view returns (bytes memory tokenDataPayload, bytes memory offchnTokenData) {
+    (bytes memory sourceDataBytes, bytes memory offchainTokenData) = abi.decode(extraData, (bytes, bytes));
+    Internal.TokenDataPayload memory sourceData = abi.decode(sourceDataBytes, (Internal.TokenDataPayload));
+    // Validate is the sending pool is allowed
+    if (sourceData.sourcePoolAddress != s_remoteChainConfigs[remoteChainSelector].remotePoolAddress) {
+      revert InvalidSourcePoolAddress(sourceData.sourcePoolAddress);
+    }
+
+    return (sourceData.extraData, offchainTokenData);
+  }
+
   // ================================================================
   // │                     Chain permissions                        │
   // ================================================================
@@ -164,21 +196,25 @@ abstract contract TokenPool is IPool, OwnerIsCreator, IERC165 {
           revert ChainAlreadyExists(update.remoteChainSelector);
         }
 
-        s_outboundRateLimits[update.remoteChainSelector] = RateLimiter.TokenBucket({
-          rate: update.outboundRateLimiterConfig.rate,
-          capacity: update.outboundRateLimiterConfig.capacity,
-          tokens: update.outboundRateLimiterConfig.capacity,
-          lastUpdated: uint32(block.timestamp),
-          isEnabled: update.outboundRateLimiterConfig.isEnabled
+        s_remoteChainConfigs[update.remoteChainSelector] = RemoteChainConfig({
+          outboundRateLimiterConfig: RateLimiter.TokenBucket({
+            rate: update.outboundRateLimiterConfig.rate,
+            capacity: update.outboundRateLimiterConfig.capacity,
+            tokens: update.outboundRateLimiterConfig.capacity,
+            lastUpdated: uint32(block.timestamp),
+            isEnabled: update.outboundRateLimiterConfig.isEnabled
+          }),
+          inboundRateLimiterConfig: RateLimiter.TokenBucket({
+            rate: update.inboundRateLimiterConfig.rate,
+            capacity: update.inboundRateLimiterConfig.capacity,
+            tokens: update.inboundRateLimiterConfig.capacity,
+            lastUpdated: uint32(block.timestamp),
+            isEnabled: update.inboundRateLimiterConfig.isEnabled
+          }),
+          remotePoolAddress: update.remotePoolAddress,
+          allowed: update.allowed
         });
 
-        s_inboundRateLimits[update.remoteChainSelector] = RateLimiter.TokenBucket({
-          rate: update.inboundRateLimiterConfig.rate,
-          capacity: update.inboundRateLimiterConfig.capacity,
-          tokens: update.inboundRateLimiterConfig.capacity,
-          lastUpdated: uint32(block.timestamp),
-          isEnabled: update.inboundRateLimiterConfig.isEnabled
-        });
         emit ChainAdded(update.remoteChainSelector, update.outboundRateLimiterConfig, update.inboundRateLimiterConfig);
       } else {
         // If the chain doesn't exist, revert
@@ -186,11 +222,16 @@ abstract contract TokenPool is IPool, OwnerIsCreator, IERC165 {
           revert NonExistentChain(update.remoteChainSelector);
         }
 
-        delete s_inboundRateLimits[update.remoteChainSelector];
-        delete s_outboundRateLimits[update.remoteChainSelector];
+        delete s_remoteChainConfigs[update.remoteChainSelector];
+
         emit ChainRemoved(update.remoteChainSelector);
       }
     }
+  }
+
+  function setRemotePool(uint64 remoteChainSelector, address remotePoolAddress) external onlyOwner {
+    if (!isSupportedChain(remoteChainSelector)) revert NonExistentChain(remoteChainSelector);
+    s_remoteChainConfigs[remoteChainSelector].remotePoolAddress = remotePoolAddress;
   }
 
   // ================================================================
@@ -199,12 +240,12 @@ abstract contract TokenPool is IPool, OwnerIsCreator, IERC165 {
 
   /// @notice Consumes outbound rate limiting capacity in this pool
   function _consumeOutboundRateLimit(uint64 remoteChainSelector, uint256 amount) internal {
-    s_outboundRateLimits[remoteChainSelector]._consume(amount, address(i_token));
+    s_remoteChainConfigs[remoteChainSelector].outboundRateLimiterConfig._consume(amount, address(i_token));
   }
 
   /// @notice Consumes inbound rate limiting capacity in this pool
   function _consumeInboundRateLimit(uint64 remoteChainSelector, uint256 amount) internal {
-    s_inboundRateLimits[remoteChainSelector]._consume(amount, address(i_token));
+    s_remoteChainConfigs[remoteChainSelector].inboundRateLimiterConfig._consume(amount, address(i_token));
   }
 
   /// @notice Gets the token bucket with its values for the block it was requested at.
@@ -212,7 +253,7 @@ abstract contract TokenPool is IPool, OwnerIsCreator, IERC165 {
   function getCurrentOutboundRateLimiterState(
     uint64 remoteChainSelector
   ) external view returns (RateLimiter.TokenBucket memory) {
-    return s_outboundRateLimits[remoteChainSelector]._currentTokenBucketState();
+    return s_remoteChainConfigs[remoteChainSelector].outboundRateLimiterConfig._currentTokenBucketState();
   }
 
   /// @notice Gets the token bucket with its values for the block it was requested at.
@@ -220,7 +261,7 @@ abstract contract TokenPool is IPool, OwnerIsCreator, IERC165 {
   function getCurrentInboundRateLimiterState(
     uint64 remoteChainSelector
   ) external view returns (RateLimiter.TokenBucket memory) {
-    return s_inboundRateLimits[remoteChainSelector]._currentTokenBucketState();
+    return s_remoteChainConfigs[remoteChainSelector].inboundRateLimiterConfig._currentTokenBucketState();
   }
 
   /// @notice Sets the chain rate limiter config.
@@ -242,9 +283,9 @@ abstract contract TokenPool is IPool, OwnerIsCreator, IERC165 {
   ) internal {
     if (!isSupportedChain(remoteChainSelector)) revert NonExistentChain(remoteChainSelector);
     RateLimiter._validateTokenBucketConfig(outboundConfig, false);
-    s_outboundRateLimits[remoteChainSelector]._setTokenBucketConfig(outboundConfig);
+    s_remoteChainConfigs[remoteChainSelector].outboundRateLimiterConfig._setTokenBucketConfig(outboundConfig);
     RateLimiter._validateTokenBucketConfig(inboundConfig, false);
-    s_inboundRateLimits[remoteChainSelector]._setTokenBucketConfig(inboundConfig);
+    s_remoteChainConfigs[remoteChainSelector].inboundRateLimiterConfig._setTokenBucketConfig(inboundConfig);
     emit ChainConfigured(remoteChainSelector, outboundConfig, inboundConfig);
   }
 
