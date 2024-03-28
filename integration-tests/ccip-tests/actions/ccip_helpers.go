@@ -3108,12 +3108,15 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 // nil value in execNodes denotes commit and execution jobs are to be set up in same DON
 func SetOCR2Configs(commitNodes, execNodes []*client.CLNodesWithKeys, destCCIP DestCCIPModule) error {
 	rootSnooze := config2.MustNewDuration(7 * time.Minute)
-	inflightExpiryExec := config2.MustNewDuration(InflightExpiryExec)
-	inflightExpiryCommit := config2.MustNewDuration(InflightExpiryCommit)
+	//inflightExpiryExec := config2.MustNewDuration(InflightExpiryExec)
+	//inflightExpiryCommit := config2.MustNewDuration(InflightExpiryCommit)
+	inflightExpiryExec := config2.MustNewDuration(1 * time.Second)
+	inflightExpiryCommit := config2.MustNewDuration(1 * time.Second)
 	if destCCIP.Common.ChainClient.NetworkSimulated() {
 		rootSnooze = config2.MustNewDuration(RootSnoozeTimeSimulated)
 	}
 
+	fmt.Println("CONNOR:", *inflightExpiryExec, *inflightExpiryCommit)
 	signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig, err := contracts.NewOffChainAggregatorV2ConfigForCCIPPlugin(
 		commitNodes, testhelpers.NewCommitOffchainConfig(
 			*config2.MustNewDuration(5 * time.Second),
