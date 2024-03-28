@@ -381,7 +381,12 @@ func (r *ExecutionReportingPlugin) buildBatch(
 		}
 
 		if _, ok := expectedNonces[msg.Sender]; !ok {
-			expectedNonces[msg.Sender] = sendersNonce[msg.Sender] + 1
+			nonce, ok1 := sendersNonce[msg.Sender]
+			if !ok1 {
+				msgLggr.Errorw("Skipping message nonce not found", "sender", msg.Sender)
+				continue
+			}
+			expectedNonces[msg.Sender] = nonce + 1
 		}
 
 		// Check expected nonce is valid
