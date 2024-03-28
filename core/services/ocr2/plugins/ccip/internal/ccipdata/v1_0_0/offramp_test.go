@@ -14,6 +14,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
+	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/rpclib"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/rpclib/rpclibmocks"
@@ -188,7 +189,7 @@ func Test_GetSendersNonce(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			offramp := OffRamp{evmBatchCaller: test.batchCaller}
+			offramp := OffRamp{evmBatchCaller: test.batchCaller, Logger: logger.TestLogger(t)}
 			nonce, err := offramp.GetSendersNonce(testutils.Context(t), test.addresses)
 
 			if test.expectedError {

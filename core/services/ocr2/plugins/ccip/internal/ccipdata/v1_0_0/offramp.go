@@ -201,7 +201,7 @@ func (o *OffRamp) GetSendersNonce(ctx context.Context, senders []cciptypes.Addre
 
 	evmSenders, err := ccipcalc.GenericAddrsToEvm(senders...)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "failed to convert generic addresses to evm addresses")
 	}
 
 	evmCalls := make([]rpclib.EvmCall, 0, len(evmSenders))
@@ -216,6 +216,7 @@ func (o *OffRamp) GetSendersNonce(ctx context.Context, senders []cciptypes.Addre
 
 	results, err := o.evmBatchCaller.BatchCall(ctx, 0, evmCalls)
 	if err != nil {
+		o.Logger.Errorw("error while batch fetching sender nonces", "err", err, "senders", evmSenders)
 		return nil, err
 	}
 
@@ -223,6 +224,7 @@ func (o *OffRamp) GetSendersNonce(ctx context.Context, senders []cciptypes.Addre
 		return rpclib.ParseOutput[uint64](d, 0)
 	})
 	if err != nil {
+		o.Logger.Errorw("error while parsing sender nonces", "err", err, "senders", evmSenders)
 		return nil, err
 	}
 
