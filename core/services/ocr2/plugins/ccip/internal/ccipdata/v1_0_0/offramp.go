@@ -228,6 +228,11 @@ func (o *OffRamp) GetSendersNonce(ctx context.Context, senders []cciptypes.Addre
 		return nil, err
 	}
 
+	if len(senders) != len(nonces) {
+		o.Logger.Errorw("unexpected number of nonces returned", "senders", evmSenders, "nonces", nonces)
+		return nil, errors.New("unexpected number of nonces returned")
+	}
+
 	senderNonce := make(map[cciptypes.Address]uint64, len(senders))
 	for i, sender := range senders {
 		senderNonce[sender] = nonces[i]

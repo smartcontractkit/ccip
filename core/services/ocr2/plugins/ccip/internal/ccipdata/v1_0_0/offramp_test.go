@@ -141,6 +141,23 @@ func Test_GetSendersNonce(t *testing.T) {
 			expectedError: true,
 		},
 		{
+			name:      "return error when nonces dont match senders",
+			addresses: []cciptypes.Address{sender1, sender2},
+			batchCaller: func() *rpclibmocks.EvmBatchCaller {
+				mockBatchCaller := rpclibmocks.NewEvmBatchCaller(t)
+				results := []rpclib.DataAndErr{
+					{
+						Outputs: []any{uint64(1)},
+						Err:     nil,
+					},
+				}
+				mockBatchCaller.On("BatchCall", mock.Anything, mock.Anything, mock.Anything).
+					Return(results, nil)
+				return mockBatchCaller
+			}(),
+			expectedError: true,
+		},
+		{
 			name:      "return error when single request from batch fails",
 			addresses: []cciptypes.Address{sender1, sender2},
 			batchCaller: func() *rpclibmocks.EvmBatchCaller {
