@@ -75,7 +75,6 @@ const (
 	ChaosGroupNetworkACCIPGeth        = "CCIPNetworkAGeth"
 	ChaosGroupNetworkBCCIPGeth        = "CCIPNetworkBGeth"
 	RootSnoozeTimeSimulated           = 3 * time.Minute
-	InflightExpirySimulated           = 3 * time.Minute
 	// The higher the load/throughput, the higher value we might need here to guarantee that nonces are not blocked
 	// 1 day should be enough for most of the cases
 	PermissionlessExecThreshold = 60 * 60 * 24 // 1 day
@@ -94,8 +93,9 @@ var (
 	NetworkName = func(name string) string {
 		return strings.ReplaceAll(strings.ToLower(name), " ", "-")
 	}
-
-	GethLabel = func(name string) string {
+	InflightExpiryExec   = 3 * time.Minute
+	InflightExpiryCommit = 3 * time.Minute
+	GethLabel            = func(name string) string {
 		return fmt.Sprintf("%s-ethereum-geth", name)
 	}
 	// ApprovedAmountToRouter is the default amount which gets approved for router so that it can transfer token and use the fee token for fee payment
@@ -275,8 +275,8 @@ func (ccipModule *CCIPCommon) Copy(logger zerolog.Logger, chainClient blockchain
 	}
 	var pools []*contracts.TokenPool
 	for i := range ccipModule.BridgeTokenPools {
-		// if there are usdc tokens, the corresponding pools will always be added as first elements in the slice
-		if ccipModule.NoOfUSDCTokens != nil && i+1 <= *ccipModule.NoOfUSDCTokens {
+		// if there is usdc token, the corresponding pool will always be added as first one in the slice
+		if ccipModule.IsUSDCDeployment() && i == 0 {
 			pool, err := newCD.NewUSDCTokenPoolContract(common.HexToAddress(ccipModule.BridgeTokenPools[i].Address()))
 			if err != nil {
 				return nil, err
@@ -614,7 +614,7 @@ func (ccipModule *CCIPCommon) UpdateTokenPricesAtRegularInterval(ctx context.Con
 func (ccipModule *CCIPCommon) SyncUSDCDomain(destTransmitter *contracts.TokenTransmitter, destPoolAddr []common.Address, destChainID uint64) error {
 	// if not USDC new deployment, return
 	// if existing deployment, consider that no syncing is required and return
-	if ccipModule.ExistingDeployment || ccipModule.NoOfUSDCTokens == nil {
+	if ccipModule.ExistingDeployment || !ccipModule.IsUSDCDeployment() {
 		return nil
 	}
 	if destTransmitter == nil || len(destPoolAddr) == 0 {
@@ -659,6 +659,10 @@ func (ccipModule *CCIPCommon) PollRPCConnection(ctx context.Context, lggr zerolo
 			return
 		}
 	}
+}
+
+func (ccipModule *CCIPCommon) IsUSDCDeployment() bool {
+	return pointer.GetInt(ccipModule.NoOfUSDCTokens) > 0
 }
 
 // DeployContracts deploys the contracts which are necessary in both source and dest chain
@@ -732,7 +736,7 @@ func (ccipModule *CCIPCommon) DeployContracts(noOfTokens int,
 		ccipModule.Router = r
 	}
 	// if usdc deployment ,look for token transmitter and token messenger
-	if ccipModule.NoOfUSDCTokens != nil {
+	if ccipModule.IsUSDCDeployment() {
 		// if existing deployment, no need to deploy new USDC contracts, it should be considered as a generic erc20 token
 		if ccipModule.ExistingDeployment {
 			return fmt.Errorf("existing deployment and new USDC deployment cannot be done together")
@@ -798,7 +802,7 @@ func (ccipModule *CCIPCommon) DeployContracts(noOfTokens int,
 				var token *contracts.ERC20Token
 				var err error
 				if len(tokenDeployerFns) != noOfTokens {
-					if ccipModule.NoOfUSDCTokens != nil && i+1 <= *ccipModule.NoOfUSDCTokens {
+					if ccipModule.IsUSDCDeployment() && i == 0 {
 						// if it's USDC deployment, we deploy the burn mint token 677 with decimal 6 and cast it to ERC20Token
 						erc677Token, err := cd.DeployBurnMintERC677(new(big.Int).Mul(big.NewInt(1e6), big.NewInt(1e18)))
 						if err != nil {
@@ -868,8 +872,8 @@ func (ccipModule *CCIPCommon) DeployContracts(noOfTokens int,
 		// deploy native token pool
 		for i := len(ccipModule.BridgeTokenPools); i < len(ccipModule.BridgeTokens); i++ {
 			token := ccipModule.BridgeTokens[i]
-			// usdc pools need to be the first ones in the slice
-			if ccipModule.NoOfUSDCTokens != nil && i+1 <= *ccipModule.NoOfUSDCTokens {
+			// usdc pool need to be the first one in the slice
+			if ccipModule.IsUSDCDeployment() && i == 0 {
 				// deploy usdc token pool in case of usdc deployment
 				if ccipModule.TokenMessenger == nil {
 					return fmt.Errorf("TokenMessenger contract address is not provided")
@@ -1251,7 +1255,11 @@ func (sourceCCIP *SourceCCIPModule) UpdateBalance(
 ) {
 	if len(sourceCCIP.TransferAmount) > 0 {
 		for i := range sourceCCIP.TransferAmount {
-			token := sourceCCIP.Common.BridgeTokens[i]
+			// if length of sourceCCIP.TransferAmount is more than available bridge token use first bridge token
+			token := sourceCCIP.Common.BridgeTokens[0]
+			if i < len(sourceCCIP.Common.BridgeTokens) {
+				token = sourceCCIP.Common.BridgeTokens[i]
+			}
 			name := fmt.Sprintf("BridgeToken-%s-Address-%s", token.Address(), sourceCCIP.Sender.Hex())
 			balances.Update(name, BalanceItem{
 				Address:  sourceCCIP.Sender,
@@ -1260,11 +1268,18 @@ func (sourceCCIP *SourceCCIPModule) UpdateBalance(
 			})
 		}
 		for i := range sourceCCIP.TransferAmount {
-			pool := sourceCCIP.Common.BridgeTokenPools[i]
-			name := fmt.Sprintf("BridgeToken-%s-TokenPool-%s", sourceCCIP.Common.BridgeTokens[i].Address(), pool.Address())
+			// if length of sourceCCIP.TransferAmount is more than available bridge token use first bridge token
+			pool := sourceCCIP.Common.BridgeTokenPools[0]
+			index := 0
+			if i < len(sourceCCIP.Common.BridgeTokenPools) {
+				pool = sourceCCIP.Common.BridgeTokenPools[i]
+				index = i
+			}
+
+			name := fmt.Sprintf("BridgeToken-%s-TokenPool-%s", sourceCCIP.Common.BridgeTokens[index].Address(), pool.Address())
 			balances.Update(name, BalanceItem{
 				Address:  pool.EthAddress,
-				Getter:   GetterForLinkToken(sourceCCIP.Common.BridgeTokens[i].BalanceOf, pool.Address()),
+				Getter:   GetterForLinkToken(sourceCCIP.Common.BridgeTokens[index].BalanceOf, pool.Address()),
 				AmtToAdd: bigmath.Mul(big.NewInt(noOfReq), sourceCCIP.TransferAmount[i]),
 			})
 		}
@@ -1382,7 +1397,11 @@ func (sourceCCIP *SourceCCIPModule) CCIPMsg(
 	tokenAndAmounts := []router.ClientEVMTokenAmount{}
 	if msgType == TokenTransfer {
 		for i, amount := range sourceCCIP.TransferAmount {
-			token := sourceCCIP.Common.BridgeTokens[i]
+			// if length of sourceCCIP.TransferAmount is more than available bridge token use first bridge token
+			token := sourceCCIP.Common.BridgeTokens[0]
+			if i < len(sourceCCIP.Common.BridgeTokens) {
+				token = sourceCCIP.Common.BridgeTokens[i]
+			}
 			tokenAndAmounts = append(tokenAndAmounts, router.ClientEVMTokenAmount{
 				Token: common.HexToAddress(token.Address()), Amount: amount,
 			})
@@ -1470,11 +1489,6 @@ func DefaultSourceCCIPModule(logger zerolog.Logger, chainClient blockchain.EVMCl
 	cmn, err := ccipCommon.Copy(logger, chainClient)
 	if err != nil {
 		return nil, err
-	}
-	// if transfer amounts are provided for number of tokens greater than the number of supported bridge tokens, then update the transfer amount to be
-	// equivalent to the number of tokens supported by the bridge
-	if len(transferAmount) > 0 && len(transferAmount) > len(cmn.BridgeTokens) {
-		transferAmount = transferAmount[:len(cmn.BridgeTokens)]
 	}
 
 	destChainSelector, err := chainselectors.SelectorFromChainId(destChainId)
@@ -1703,7 +1717,10 @@ func (destCCIP *DestCCIPModule) UpdateBalance(
 ) {
 	if len(transferAmount) > 0 {
 		for i := range transferAmount {
-			token := destCCIP.Common.BridgeTokens[i]
+			token := destCCIP.Common.BridgeTokens[0]
+			if i < len(destCCIP.Common.BridgeTokens) {
+				token = destCCIP.Common.BridgeTokens[i]
+			}
 			name := fmt.Sprintf("BridgeToken-%s-Address-%s", token.Address(), destCCIP.ReceiverDapp.Address())
 			balance.Update(name, BalanceItem{
 				Address:  destCCIP.ReceiverDapp.EthAddress,
@@ -1712,11 +1729,16 @@ func (destCCIP *DestCCIPModule) UpdateBalance(
 			})
 		}
 		for i := range transferAmount {
-			pool := destCCIP.Common.BridgeTokenPools[i]
-			name := fmt.Sprintf("BridgeToken-%s-TokenPool-%s", destCCIP.Common.BridgeTokens[i].Address(), pool.Address())
+			pool := destCCIP.Common.BridgeTokenPools[0]
+			index := 0
+			if i < len(destCCIP.Common.BridgeTokenPools) {
+				pool = destCCIP.Common.BridgeTokenPools[i]
+				index = i
+			}
+			name := fmt.Sprintf("BridgeToken-%s-TokenPool-%s", destCCIP.Common.BridgeTokens[index].Address(), pool.Address())
 			balance.Update(name, BalanceItem{
 				Address:  pool.EthAddress,
-				Getter:   GetterForLinkToken(destCCIP.Common.BridgeTokens[i].BalanceOf, pool.Address()),
+				Getter:   GetterForLinkToken(destCCIP.Common.BridgeTokens[index].BalanceOf, pool.Address()),
 				AmtToSub: bigmath.Mul(big.NewInt(noOfReq), transferAmount[i]),
 			})
 		}
@@ -2371,7 +2393,11 @@ func (lane *CCIPLane) Multicall(noOfRequests int, msgType string, multiSendAddr 
 		// if token transfer is required, transfer the token amount to multisend
 		if msgType == TokenTransfer {
 			for i, amount := range lane.Source.TransferAmount {
-				token := lane.Source.Common.BridgeTokens[i]
+				// if length of sourceCCIP.TransferAmount is more than available bridge token use first bridge token
+				token := lane.Source.Common.BridgeTokens[0]
+				if i < len(lane.Source.Common.BridgeTokens) {
+					token = lane.Source.Common.BridgeTokens[i]
+				}
 				err := token.Transfer(multiSendAddr.Hex(), amount)
 				if err != nil {
 					return err
@@ -3009,7 +3035,7 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 		PriceGetterConfig:      tokenPricesConfigJson,
 		DestStartBlock:         currentBlockOnDest,
 	}
-	if !lane.Source.Common.ExistingDeployment && lane.Source.Common.NoOfUSDCTokens != nil {
+	if !lane.Source.Common.ExistingDeployment && lane.Source.Common.IsUSDCDeployment() {
 		api := ""
 		if killgrave != nil {
 			api = killgrave.InternalEndpoint
@@ -3082,10 +3108,10 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 // nil value in execNodes denotes commit and execution jobs are to be set up in same DON
 func SetOCR2Configs(commitNodes, execNodes []*client.CLNodesWithKeys, destCCIP DestCCIPModule) error {
 	rootSnooze := config2.MustNewDuration(7 * time.Minute)
-	inflightExpiry := config2.MustNewDuration(3 * time.Minute)
+	inflightExpiryExec := config2.MustNewDuration(InflightExpiryExec)
+	inflightExpiryCommit := config2.MustNewDuration(InflightExpiryCommit)
 	if destCCIP.Common.ChainClient.NetworkSimulated() {
 		rootSnooze = config2.MustNewDuration(RootSnoozeTimeSimulated)
-		inflightExpiry = config2.MustNewDuration(InflightExpirySimulated)
 	}
 
 	signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig, err := contracts.NewOffChainAggregatorV2ConfigForCCIPPlugin(
@@ -3095,7 +3121,7 @@ func SetOCR2Configs(commitNodes, execNodes []*client.CLNodesWithKeys, destCCIP D
 			1e6,
 			*config2.MustNewDuration(5 * time.Second),
 			1e6,
-			*inflightExpiry,
+			*inflightExpiryCommit,
 		), testhelpers.NewCommitOnchainConfig(
 			destCCIP.Common.PriceRegistry.EthAddress,
 		), contracts.OCR2ParamsForCommit, 3*time.Minute)
@@ -3119,7 +3145,7 @@ func SetOCR2Configs(commitNodes, execNodes []*client.CLNodesWithKeys, destCCIP D
 				1,
 				7_000_000,
 				0.7,
-				*inflightExpiry,
+				*inflightExpiryExec,
 				*rootSnooze,
 			), testhelpers.NewExecOnchainConfig(
 				PermissionlessExecThreshold,
