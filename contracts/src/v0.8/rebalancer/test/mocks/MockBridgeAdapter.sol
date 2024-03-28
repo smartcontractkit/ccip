@@ -8,17 +8,51 @@ import {ILiquidityContainer} from "../../interfaces/ILiquidityContainer.sol";
 import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
 
-/// @notice Mock L1 Bridge adapter
-/// @dev Sends the L1 tokens from the msg sender to address(this)
+/// @notice Mock multiple-stage finalization bridge adapter implementation.
+/// @dev Funds are only made available after both the prove and finalization steps are completed.
+/// Sends the L1 tokens from the msg sender to address(this).
 contract MockL1BridgeAdapter is IBridgeAdapter, ILiquidityContainer {
   using SafeERC20 for IERC20;
 
   error InsufficientLiquidity();
   error NonceAlreadyUsed(uint256 nonce);
+  error InvalidFinalizationAction();
+  error NonceNotProven(uint256 nonce);
+
+  /// @notice Payload to "prove" the withdrawal.
+  /// @dev This is just a mock setup, there's no real proving. This is so that
+  /// we can test the multi-step finalization code path.
+  /// @param nonce the nonce emitted on the remote chain.
+  struct ProvePayload {
+    uint256 nonce;
+  }
+
+  /// @notice Payload to "finalize" the withdrawal.
+  /// @dev This is just a mock setup, there's no real finalization. This is so that
+  /// we can test the multi-step finalization code path.
+  /// @param nonce the nonce emitted on the remote chain.
+  struct FinalizePayload {
+    uint256 nonce;
+    uint256 amount;
+  }
+
+  /// @notice The finalization action to take.
+  /// @dev This emulates Optimism's two-step withdrawal process.
+  enum FinalizationAction {
+    ProveWithdrawal,
+    FinalizeWithdrawal
+  }
+
+  /// @notice The payload to use for the bridgeSpecificPayload in the finalizeWithdrawERC20 function.
+  struct Payload {
+    FinalizationAction action;
+    bytes data;
+  }
 
   IERC20 internal immutable i_token;
   uint256 internal s_nonce = 1;
-  mapping(uint256 => bool) internal s_nonceUsed;
+  mapping(uint256 => bool) internal s_nonceProven;
+  mapping(uint256 => bool) internal s_nonceFinalized;
 
   constructor(IERC20 token) {
     i_token = token;
@@ -52,20 +86,39 @@ contract MockL1BridgeAdapter is IBridgeAdapter, ILiquidityContainer {
     emit LiquidityRemoved(msg.sender, amount);
   }
 
+  /// @dev for easy encoding offchain
+  function encodeProvePayload(ProvePayload memory payload) external pure {}
+  function encodeFinalizePayload(FinalizePayload memory payload) external pure {}
+  function encodePayload(Payload memory payload) external pure {}
+
   /// @dev Test setup is trusted, so just transfer the tokens to the localReceiver,
-  /// @dev which should be the local rebalancer.
-  /// @dev Infer the amount from the bridgeSpecificPayload
-  /// @dev Note that this means that this bridge adapter will need to have some tokens,
-  /// @dev however this is ok in a test environment since we will have infinite tokens.
+  /// which should be the local rebalancer. Infer the amount from the bridgeSpecificPayload.
+  /// Note that this means that this bridge adapter will need to have some tokens,
+  /// however this is ok in a test environment since we will have infinite tokens.
+  /// @param localReceiver the address to transfer the tokens to.
+  /// @param bridgeSpecificPayload the payload to use for the finalization or proving.
+  /// @return true if the transfer was successful, revert otherwise.
   function finalizeWithdrawERC20(
     address /* remoteSender */,
     address localReceiver,
     bytes calldata bridgeSpecificPayload
-  ) external {
-    (uint256 amount, uint256 nonce) = abi.decode(bridgeSpecificPayload, (uint256, uint256));
-    if (s_nonceUsed[nonce]) revert NonceAlreadyUsed(nonce);
-    s_nonceUsed[nonce] = true;
-    i_token.safeTransfer(localReceiver, amount);
+  ) external override returns (bool) {
+    Payload memory payload = abi.decode(bridgeSpecificPayload, (Payload));
+    if (payload.action == FinalizationAction.ProveWithdrawal) {
+      ProvePayload memory provePayload = abi.decode(payload.data, (ProvePayload));
+      if (s_nonceProven[provePayload.nonce]) revert NonceAlreadyUsed(provePayload.nonce);
+      s_nonceProven[provePayload.nonce] = true;
+      return false;
+    } else if (payload.action == FinalizationAction.FinalizeWithdrawal) {
+      FinalizePayload memory finalizePayload = abi.decode(payload.data, (FinalizePayload));
+      if (!s_nonceProven[finalizePayload.nonce]) revert NonceNotProven(finalizePayload.nonce);
+      if (s_nonceFinalized[finalizePayload.nonce]) revert NonceAlreadyUsed(finalizePayload.nonce);
+      s_nonceFinalized[finalizePayload.nonce] = true;
+      i_token.safeTransfer(localReceiver, finalizePayload.amount);
+      return true;
+    } else {
+      revert InvalidFinalizationAction();
+    }
   }
 }
 
@@ -93,5 +146,7 @@ contract MockL2BridgeAdapter is IBridgeAdapter {
     address /* remoteSender */,
     address /* localReceiver */,
     bytes calldata /* bridgeSpecificData */
-  ) external override {}
+  ) external override returns (bool) {
+    return true;
+  }
 }
