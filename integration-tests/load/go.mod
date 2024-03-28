@@ -16,7 +16,7 @@ require (
 	github.com/slack-go/slack v0.12.2
 	github.com/smartcontractkit/chainlink-automation v1.0.2-0.20240311111125-22812a072c35
 	github.com/smartcontractkit/chainlink-common v0.1.7-0.20240319231131-2d0d99220a04
-	github.com/smartcontractkit/chainlink-testing-framework v1.27.9-0.20240327230123-ff4f65442adf
+	github.com/smartcontractkit/chainlink-testing-framework v1.27.9-0.20240327234320-59e66c8f2f22
 	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20240214231432-4ad5eb95178c
 	github.com/smartcontractkit/chainlink/v2 v2.9.0-beta0.0.20240216210048-da02459ddad8
 	github.com/smartcontractkit/libocr v0.0.0-20240229181116-bfb2432a7a66
@@ -495,6 +495,7 @@ replace (
 
 	// type func(a Label, b Label) bool of func(a, b Label) bool {…} does not match inferred type func(a Label, b Label) int for func(a E, b E) int
 	github.com/prometheus/prometheus => github.com/prometheus/prometheus v0.47.2-0.20231010075449-4b9c19fe5510
+	github.com/smartcontractkit/chainlink-testing-framework => ../../../chainlink-testing-framework
 
 	// Pin K8s versions as their updates are highly disruptive and go mod keeps wanting to update them
 	k8s.io/api => k8s.io/api v0.25.11

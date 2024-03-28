@@ -740,7 +740,8 @@ func CCIPDefaultTestSetUp(
 	var (
 		err error
 	)
-	filename := fmt.Sprintf("./tmp_%s.json", strings.ReplaceAll(t.Name(), "/", "_"))
+	filepath := fmt.Sprintf("./tmp_%s.json", strings.ReplaceAll(t.Name(), "/", "_"))
+	filename := strings.Split(filepath, "/")[len(strings.Split(filepath, "/"))-1]
 	var transferAmounts []*big.Int
 	if testConfig.TestGroupInput.MsgType == actions.TokenTransfer {
 		for i := 0; i < testConfig.TestGroupInput.NoOfTokensInMsg; i++ {
@@ -753,23 +754,22 @@ func CCIPDefaultTestSetUp(
 		SetUpContext:   parent,
 		Cfg:            testConfig,
 		Reporter:       testreporters.NewCCIPTestReporter(t, lggr),
-		LaneConfigFile: filename,
+		LaneConfigFile: filepath,
 		Balance:        actions.NewBalanceSheet(),
 		BootstrapAdded: atomic.NewBool(false),
 		JobAddGrp:      &errgroup.Group{},
 		laneMutex:      &sync.Mutex{},
 	}
 
-	chainByChainID := setUpArgs.CreateEnvironment(lggr, envName)
+	chainByChainID := setUpArgs.CreateEnvironment(lggr, envName, filename)
 	// if test is run in remote runner, register a clean-up to copy the laneconfig file
 	if value, set := os.LookupEnv(config.EnvVarJobImage); set && value != "" {
 		t.Cleanup(func() {
 			if setUpArgs.Env != nil && setUpArgs.Env.K8Env != nil {
-				filpath := strings.Split(setUpArgs.LaneConfigFile, "/")[len(strings.Split(setUpArgs.LaneConfigFile, "/"))-1]
-				filpath = fmt.Sprintf("reports/%s", filpath)
-				lggr.Info().Str("Path", filpath).Msg("copying lane config")
+				filename = fmt.Sprintf("reports/%s", filename)
+				lggr.Info().Str("Path", filename).Msg("copying lane config")
 				err := setUpArgs.Env.K8Env.CopyFromPod("job-name=remote-test-runner",
-					"remote-test-runner-data-files", filpath, ".")
+					"remote-test-runner-data-files", filename, ".")
 				require.NoError(t, err, "error getting lane config")
 			}
 		})
@@ -788,8 +788,8 @@ func CCIPDefaultTestSetUp(
 	if setUpArgs.LaneConfig == nil {
 		setUpArgs.LaneConfig = &laneconfig.Lanes{LaneConfigs: make(map[string]*laneconfig.LaneConfig)}
 	}
-	_, err = os.Stat(setUpArgs.LaneConfigFile)
-	if err == nil {
+	fileInfo, err := os.Stat(setUpArgs.LaneConfigFile)
+	if err == nil && fileInfo.Size() > 0 {
 		// remove the existing lane config file
 		err = os.Remove(setUpArgs.LaneConfigFile)
 		require.NoError(t, err, "error while removing existing lane config file - %s", setUpArgs.LaneConfigFile)
@@ -928,6 +928,7 @@ func CCIPDefaultTestSetUp(
 func (o *CCIPTestSetUpOutputs) CreateEnvironment(
 	lggr zerolog.Logger,
 	envName string,
+	reportPath string,
 ) map[int64]blockchain.EVMClient {
 	t := o.Cfg.Test
 	testConfig := o.Cfg
@@ -940,7 +941,7 @@ func (o *CCIPTestSetUpOutputs) CreateEnvironment(
 		deployCL func() error
 	)
 
-	envConfig := createEnvironmentConfig(t, envName, testConfig)
+	envConfig := createEnvironmentConfig(t, envName, testConfig, reportPath)
 
 	configureCLNode := !testConfig.useExistingDeployment()
 	namespace := o.Cfg.TestGroupInput.TestRunName
@@ -1096,11 +1097,12 @@ func (o *CCIPTestSetUpOutputs) CreateEnvironment(
 	return chainByChainID
 }
 
-func createEnvironmentConfig(t *testing.T, envName string, testConfig *CCIPTestConfig) *environment.Config {
+func createEnvironmentConfig(t *testing.T, envName string, testConfig *CCIPTestConfig, reportPath string) *environment.Config {
 	envConfig := &environment.Config{
 		NamespacePrefix:    envName,
 		Test:               t,
 		PreventPodEviction: true,
+		ReportPath:         reportPath,
 	}
 	// if there is already existing namespace, no need to update any manifest there, we just connect to it
 	existingEnv := pointer.GetString(testConfig.EnvInput.EnvName)

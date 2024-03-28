@@ -28,7 +28,7 @@ require (
 	github.com/smartcontractkit/chain-selectors v1.0.12
 	github.com/smartcontractkit/chainlink-automation v1.0.2-0.20240311111125-22812a072c35
 	github.com/smartcontractkit/chainlink-common v0.1.7-0.20240319231131-2d0d99220a04
-	github.com/smartcontractkit/chainlink-testing-framework v1.27.9-0.20240327230123-ff4f65442adf
+	github.com/smartcontractkit/chainlink-testing-framework v1.27.9-0.20240327234320-59e66c8f2f22
 	github.com/smartcontractkit/chainlink-vrf v0.0.0-20231120191722-fef03814f868
 	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-00010101000000-000000000000
 	github.com/smartcontractkit/chainlink/v2 v2.0.0-00010101000000-000000000000
@@ -499,6 +499,7 @@ replace (
 	github.com/mwitkow/grpc-proxy => github.com/smartcontractkit/grpc-proxy v0.0.0-20230731113816-f1be6620749f
 	// type func(a Label, b Label) bool of func(a, b Label) bool {…} does not match inferred type func(a Label, b Label) int for func(a E, b E) int
 	github.com/prometheus/prometheus => github.com/prometheus/prometheus v0.47.2-0.20231010075449-4b9c19fe5510
+	github.com/smartcontractkit/chainlink-testing-framework => ../../chainlink-testing-framework
 
 	github.com/smartcontractkit/chainlink/integration-tests => ../integration-tests
 
