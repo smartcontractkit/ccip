@@ -86,6 +86,11 @@ type ExecutionReportingPlugin struct {
 	onchainConfig          cciptypes.ExecOnchainConfig
 	offRampReader          ccipdata.OffRampReader
 	tokenPoolBatchedReader batchreader.TokenPoolBatchedReader
+	execSimulator          interface {
+		// SimulateReport will simulate the execution of the provided report.
+		// An error is returned if the simulation is unsuccessful.
+		SimulateReport(ctx context.Context, report cciptypes.ExecReport) error
+	}
 
 	// State
 	inflightReports  *inflightExecReportsContainer
@@ -726,6 +731,14 @@ func (r *ExecutionReportingPlugin) buildReport(ctx context.Context, lggr logger.
 			r.lggr.Errorw("build execution report", "err", err2)
 			return false
 		}
+
+		// NEW code start
+		err2 = r.execSimulator.SimulateReport(ctx, report)
+		if err2 != nil {
+			r.lggr.Errorw("simulate execs", "err", err2)
+			return false
+		}
+		// NEW code stop
 
 		encoded, err2 := r.offRampReader.EncodeExecutionReport(ctx, report)
 		if err2 != nil {
