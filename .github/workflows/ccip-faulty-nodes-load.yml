@@ -6,6 +6,7 @@ on:
   push:
     branches:
       - ccip-develop
+      - faulty-nodes-load-test
   workflow_dispatch:
 
 
