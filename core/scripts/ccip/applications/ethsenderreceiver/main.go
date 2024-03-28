@@ -219,15 +219,6 @@ func main() {
 			err = env.Clients[*chainID].SendTransaction(context.Background(), signedTx)
 			helpers.PanicErr(err)
 			helpers.ConfirmTXMined(context.Background(), env.Clients[*chainID], signedTx, int64(*chainID), "ccip send native, msg value:", totalValue.String(), "fee:", fee.String())
-			// native is the fee token, so send with value.
-			// tx, err := senderReceiver.CcipSend(&bind.TransactOpts{
-			// 	From:   env.Transactors[*chainID].From,
-			// 	Signer: env.Transactors[*chainID].Signer,
-			// 	Value:  totalValue,
-			// }, destChain.Selector, msg)
-			// helpers.PanicErr(err)
-			// helpers.ConfirmTXMined(context.Background(), env.Clients[*chainID], tx, int64(*chainID),
-			// 	"ccip send native, msg value:", totalValue.String(), "fee:", fee.String())
 		} else {
 			// non-native fee token, so approve first then send.
 			erc20Token, err := erc20.NewERC20(feeTok, env.Clients[*chainID])
@@ -244,7 +235,7 @@ func main() {
 			tx, err := erc20Token.Approve(env.Transactors[*chainID], common.HexToAddress(*senderReceiverAddress), fee)
 			helpers.PanicErr(err)
 			helpers.ConfirmTXMined(context.Background(), env.Clients[*chainID], tx, int64(*chainID),
-				"approving sender receiver to spend fee token, amount:", *amount)
+				"approving sender receiver to spend fee token, approval amount:", fee.String())
 
 			// send message cross chain
 			tx, err = senderReceiver.CcipSend(&bind.TransactOpts{
