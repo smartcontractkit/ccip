@@ -192,12 +192,12 @@ func (o *OnRamp) GetLastUSDCMessagePriorToLogIndexInTx(ctx context.Context, logI
 	return nil, errors.New("USDC not supported in < 1.2.0")
 }
 
-func (o *OnRamp) Close(qopts ...pg.QOpt) error {
-	return logpollerutil.UnregisterLpFilters(o.lp, o.filters, qopts...)
+func (o *OnRamp) Close() error {
+	return logpollerutil.UnregisterLpFilters(o.lp, o.filters)
 }
 
-func (o *OnRamp) RegisterFilters(qopts ...pg.QOpt) error {
-	return logpollerutil.RegisterLpFilters(o.lp, o.filters, qopts...)
+func (o *OnRamp) RegisterFilters() error {
+	return logpollerutil.RegisterLpFilters(o.lp, o.filters)
 }
 
 func (o *OnRamp) logToMessage(log types.Log) (*cciptypes.EVM2EVMMessage, error) {
