@@ -99,10 +99,11 @@ func ChainlinkChart(
 		}
 	}
 	clProps["db"] = map[string]interface{}{
-		"resources":      SetResourceProfile(testInputs.EnvInput.NewCLCluster.DBCPU, testInputs.EnvInput.NewCLCluster.DBMemory),
-		"additionalArgs": formattedArgs,
-		"stateful":       pointer.GetBool(testInputs.EnvInput.NewCLCluster.IsStateful),
-		"capacity":       testInputs.EnvInput.NewCLCluster.DBCapacity,
+		"resources":        SetResourceProfile(testInputs.EnvInput.NewCLCluster.DBCPU, testInputs.EnvInput.NewCLCluster.DBMemory),
+		"additionalArgs":   formattedArgs,
+		"stateful":         pointer.GetBool(testInputs.EnvInput.NewCLCluster.IsStateful),
+		"capacity":         testInputs.EnvInput.NewCLCluster.DBCapacity,
+		"storageClassName": "gp3",
 		"image": map[string]any{
 			"image":   testInputs.EnvInput.NewCLCluster.Common.DBImage,
 			"version": testInputs.EnvInput.NewCLCluster.Common.DBTag,
@@ -149,6 +150,7 @@ func ChainlinkChart(
 						"image":   clNode.DBImage,
 						"version": clNode.DBTag,
 					},
+					"storageClassName": "gp3",
 				},
 				"toml": tomlStr,
 			})
@@ -173,25 +175,66 @@ func DeployLocalCluster(
 	testInputs *CCIPTestConfig,
 ) (*test_env.CLClusterTestEnv, func() error) {
 	selectedNetworks := testInputs.SelectedNetworks
+
+	privateEthereumNetworks := []*ctftestenv.EthereumNetwork{}
+	for _, network := range testInputs.EnvInput.PrivateEthereumNetworks {
+		privateEthereumNetworks = append(privateEthereumNetworks, network)
+	}
+
+	if len(selectedNetworks) > len(privateEthereumNetworks) {
+		seen := make(map[int64]bool)
+		missing := []blockchain.EVMNetwork{}
+
+		for _, network := range privateEthereumNetworks {
+			seen[int64(network.EthereumChainConfig.ChainID)] = true
+		}
+
+		for _, network := range selectedNetworks {
+			if !seen[network.ChainID] {
+				missing = append(missing, network)
+			}
+		}
+
+		for _, network := range missing {
+			chainConfig := &ctftestenv.EthereumChainConfig{}
+			err := chainConfig.Default()
+			if err != nil {
+				require.NoError(t, err, "failed to get default chain config: %w", err)
+			} else {
+				chainConfig.ChainID = int(network.ChainID)
+				eth1 := ctftestenv.EthereumVersion_Eth1
+				geth := ctftestenv.ExecutionLayer_Geth
+
+				privateEthereumNetworks = append(privateEthereumNetworks, &ctftestenv.EthereumNetwork{
+					EthereumVersion:     &eth1,
+					ExecutionLayer:      &geth,
+					EthereumChainConfig: chainConfig,
+				})
+			}
+		}
+
+		require.Equal(t, len(selectedNetworks), len(privateEthereumNetworks), "failed to create undefined selected networks. Maybe some of them had the same chain ids?")
+	}
+
 	env, err := test_env.NewCLTestEnvBuilder().
 		WithTestConfig(testInputs.EnvInput).
 		WithTestInstance(t).
-		WithPrivateGethChains(selectedNetworks).
+		WithPrivateEthereumNetworks(privateEthereumNetworks).
 		WithMockAdapter().
 		WithoutCleanup().
 		Build()
 	require.NoError(t, err)
-	for _, n := range env.PrivateChain {
-		primaryNode := n.GetPrimaryNode()
-		require.NotNil(t, primaryNode, "Primary node is nil in PrivateChain interface")
-		for i, networkCfg := range selectedNetworks {
-			if networkCfg.ChainID == n.GetNetworkConfig().ChainID {
-				selectedNetworks[i].URLs = []string{primaryNode.GetInternalWsUrl()}
-				selectedNetworks[i].HTTPURLs = []string{primaryNode.GetInternalHttpUrl()}
-			}
-		}
-		testInputs.SelectedNetworks = selectedNetworks
+	for i, networkCfg := range selectedNetworks {
+		rpcProvider, err := env.GetRpcProvider(networkCfg.ChainID)
+		require.NoError(t, err, "Error getting rpc provider")
+		selectedNetworks[i].URLs = rpcProvider.PrivateWsUrsl()
+		selectedNetworks[i].HTTPURLs = rpcProvider.PrivateHttpUrls()
+		newNetwork := networkCfg
+		newNetwork.URLs = rpcProvider.PublicWsUrls()
+		newNetwork.HTTPURLs = rpcProvider.PublicHttpUrls()
+		env.EVMNetworks = append(env.EVMNetworks, &newNetwork)
 	}
+	testInputs.SelectedNetworks = selectedNetworks
 
 	// a func to start the CL nodes asynchronously
 	deployCL := func() error {
