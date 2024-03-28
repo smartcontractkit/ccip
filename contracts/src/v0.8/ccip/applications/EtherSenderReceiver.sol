@@ -30,8 +30,7 @@ contract EtherSenderReceiver is CCIPReceiver, ITypeAndVersion {
   using SafeERC20 for IERC20;
 
   error CCIPReceiveFailed();
-  error InvalidReceiver(bytes receiver);
-  error InvalidDestinationEOA(bytes destEOA);
+  error InvalidDestinationReceiver(bytes destReceiver);
   error InvalidTokenAmounts(uint256 gotAmounts);
   error InvalidWethAddress(address want, address got);
   error TokenAmountNotEqualToMsgValue(uint256 gotAmount, uint256 msgValue);
@@ -46,8 +45,15 @@ contract EtherSenderReceiver is CCIPReceiver, ITypeAndVersion {
   /// @dev This won't vary on L2's, callbacks are always provided so-called "L2 gas".
   uint256 public constant MIN_MESSAGE_GAS_LIMIT = 200_000;
 
+  /// @notice The wrapped native token address.
+  /// At construction time this matches the wrapped native token address on the router.
+  /// If the wrapped native token address changes on the router, this contract will need to be redeployed.
+  IWrappedNative public immutable i_weth;
+
   /// @param router The CCIP router address.
-  constructor(address router) CCIPReceiver(router) {}
+  constructor(address router) CCIPReceiver(router) {
+    i_weth = IWrappedNative(CCIPRouter(router).getWrappedNative());
+  }
 
   /// @notice Need this in order to unwrap correctly.
   receive() external payable {}
@@ -64,7 +70,7 @@ contract EtherSenderReceiver is CCIPReceiver, ITypeAndVersion {
     uint64 destinationChainSelector,
     Client.EVM2AnyMessage calldata message
   ) external view returns (uint256 fee) {
-    _validateMessage(message, CCIPRouter(getRouter()).getWrappedNative());
+    _validateMessage(message);
 
     return IRouterClient(getRouter()).getFee(destinationChainSelector, message);
   }
@@ -90,15 +96,17 @@ contract EtherSenderReceiver is CCIPReceiver, ITypeAndVersion {
     uint64 destinationChainSelector,
     Client.EVM2AnyMessage calldata message
   ) external payable returns (bytes32) {
-    IWrappedNative weth = IWrappedNative(CCIPRouter(getRouter()).getWrappedNative());
-
-    _validateMessage(message, address(weth));
+    _validateMessage(message);
     _validateFeeToken(message);
 
+    return _ccipSend(destinationChainSelector, message);
+  }
+
+  function _ccipSend(uint64 destinationChainSelector, Client.EVM2AnyMessage calldata message) internal returns (bytes32) {
     // deposit the ether into the weth contract to get the wrapped ether.
     // approve the router to spend the wrapped ether.
-    weth.deposit{value: message.tokenAmounts[0].amount}();
-    weth.approve(getRouter(), message.tokenAmounts[0].amount);
+    i_weth.deposit{value: message.tokenAmounts[0].amount}();
+    i_weth.approve(getRouter(), message.tokenAmounts[0].amount);
 
     // get the fee from the router now that we have the full message data.
     // if the fee token is not native, we need to transfer the fee to this contract and re-approve it to the router.
@@ -123,13 +131,14 @@ contract EtherSenderReceiver is CCIPReceiver, ITypeAndVersion {
     }
   }
 
-  function _validateMessage(Client.EVM2AnyMessage calldata message, address weth) private pure {
+  function _validateMessage(Client.EVM2AnyMessage calldata message) internal view {
     // receiver is already checked by ccip, so don't need to duplicate that check.
     // destination EOA address must be correctly specified in message.data.
-    // abi.decode will revert if the bytes in receiver do not decode to an address.
+    // abi.decode will revert if the bytes in receiver do not decode to an address
+    // i.e abi.encodePacked is used.
     address destEOA = abi.decode(message.data, (address));
     if (destEOA == address(0)) {
-      revert InvalidDestinationEOA(message.data);
+      revert InvalidDestinationReceiver(message.data);
     }
 
     // Only one tokenAmount is allowed, which is the weth token and amount.
@@ -138,8 +147,8 @@ contract EtherSenderReceiver is CCIPReceiver, ITypeAndVersion {
     }
 
     Client.EVMTokenAmount memory tokenAmount = message.tokenAmounts[0];
-    if (tokenAmount.token != weth) {
-      revert InvalidWethAddress(weth, tokenAmount.token);
+    if (tokenAmount.token != address(i_weth)) {
+      revert InvalidWethAddress(address(i_weth), tokenAmount.token);
     }
 
     // As of time of writing we only have extra args v1, so we can check that here.
@@ -156,7 +165,7 @@ contract EtherSenderReceiver is CCIPReceiver, ITypeAndVersion {
     }
   }
 
-  function _validateFeeToken(Client.EVM2AnyMessage calldata message) private view {
+  function _validateFeeToken(Client.EVM2AnyMessage calldata message) internal view {
     uint256 tokenAmount = message.tokenAmounts[0].amount;
 
     if (message.feeToken == address(0)) {
@@ -181,14 +190,13 @@ contract EtherSenderReceiver is CCIPReceiver, ITypeAndVersion {
     // we receive WETH, unwrap it and send it to the final receiver.
     // The code below should never revert if the message being is valid according
     // to the above _validateMessage and _validateFeeToken functions.
-    IWrappedNative weth = IWrappedNative(CCIPRouter(getRouter()).getWrappedNative());
 
     // decode the receiver from the message data.
     address receiver = abi.decode(message.data, (address));
 
     // withdraw the WETH received from the token pool.
     uint256 tokenAmount = message.destTokenAmounts[0].amount;
-    weth.withdraw(tokenAmount);
+    i_weth.withdraw(tokenAmount);
 
     // it is possible that the below call may fail if receiver.code.length > 0 and the contract
     // doesn't e.g have a receive() or a fallback() function.
@@ -197,12 +205,12 @@ contract EtherSenderReceiver is CCIPReceiver, ITypeAndVersion {
       // We have a few options here:
       // 1. Revert: this is bad generally because it may mean that these tokens are stuck.
       // 2. Store the tokens in a mapping and allow the user to withdraw them with another tx.
-      // 3. Send weth to the receiver address.
+      // 3. Send WETH to the receiver address.
       // We opt for (3) here because at least the receiver will have the funds and can unwrap them if needed.
       // However it is worth noting that if receiver is actually a contract AND the contract _cannot_ withdraw
       // the WETH, then the WETH will be stuck in this contract.
-      weth.deposit{value: tokenAmount}();
-      weth.transfer(receiver, tokenAmount);
+      i_weth.deposit{value: tokenAmount}();
+      i_weth.transfer(receiver, tokenAmount);
     }
   }
 }
