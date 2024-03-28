@@ -1,0 +1,14 @@
+[CCIP]
+[CCIP.Env]
+TTL = '15h'
+
+[CCIP.Groups]
+[CCIP.Groups.load]
+KeepEnvAlive = true
+MsgType = 'WithToken'
+PhaseTimeout = '50m'
+TestDuration = '30m'
+NodeFunding = 1000.0
+RequestPerUnitTime = [2]
+TimeUnit = '1m'
+SendMaxDataInEveryMsgCount = 0

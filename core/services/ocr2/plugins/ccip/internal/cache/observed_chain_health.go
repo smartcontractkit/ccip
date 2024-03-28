@@ -7,7 +7,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/cciptypes"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
 )
 
 var (
@@ -46,8 +46,8 @@ func NewObservedChainHealthCheck(
 	}
 }
 
-func (o *ObservedChainHealthcheck) IsHealthy(ctx context.Context, forceFetch bool) (bool, error) {
-	healthy, err := o.ChainHealthcheck.IsHealthy(ctx, forceFetch)
+func (o *ObservedChainHealthcheck) IsHealthy(ctx context.Context) (bool, error) {
+	healthy, err := o.ChainHealthcheck.IsHealthy(ctx)
 	o.trackState(healthy, err)
 	return healthy, err
 }

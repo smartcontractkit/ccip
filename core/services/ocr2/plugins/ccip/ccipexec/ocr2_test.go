@@ -23,11 +23,11 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
 	lpMocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/cciptypes"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache"
 	ccipcachemocks "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
@@ -139,7 +139,7 @@ func TestExecutionReportingPlugin_Observation(t *testing.T) {
 			p.inflightReports.reports = tc.inflightReports
 			p.lggr = logger.TestLogger(t)
 			p.tokenDataWorker = tokendata.NewBackgroundWorker(
-				ctx, make(map[cciptypes.Address]tokendata.Reader), 10, 5*time.Second, time.Hour)
+				make(map[cciptypes.Address]tokendata.Reader), 10, 5*time.Second, time.Hour)
 			p.metricsCollector = ccip.NoopMetricsCollector
 
 			commitStoreReader := ccipdatamocks.NewCommitStoreReader(t)
@@ -171,7 +171,7 @@ func TestExecutionReportingPlugin_Observation(t *testing.T) {
 			mockOffRampReader.On("GetExecutionStateChangesBetweenSeqNums", ctx, mock.Anything, mock.Anything, 0).
 				Return(executionEvents, nil).Maybe()
 			mockOffRampReader.On("CurrentRateLimiterState", mock.Anything).Return(tc.rateLimiterState, nil).Maybe()
-			mockOffRampReader.On("Address").Return(cciptypes.Address(offRamp.Address().String())).Maybe()
+			mockOffRampReader.On("Address", ctx).Return(cciptypes.Address(offRamp.Address().String()), nil).Maybe()
 			mockOffRampReader.On("GetSenderNonce", mock.Anything, mock.Anything).Return(offRamp.GetSenderNonce(nil, utils.RandomAddress())).Maybe()
 			mockOffRampReader.On("GetTokenPoolsRateLimits", ctx, []ccipdata.TokenPoolReader{}).
 				Return([]cciptypes.TokenBucketRateLimit{}, nil).Maybe()
@@ -199,10 +199,10 @@ func TestExecutionReportingPlugin_Observation(t *testing.T) {
 			destPriceRegReader := ccipdatamocks.NewPriceRegistryReader(t)
 			destPriceRegReader.On("GetTokenPrices", ctx, mock.Anything).Return(
 				[]cciptypes.TokenPriceUpdate{{TokenPrice: cciptypes.TokenPrice{Token: ccipcalc.HexToAddress("0x1"), Value: big.NewInt(123)}, TimestampUnixSec: big.NewInt(time.Now().Unix())}}, nil).Maybe()
-			destPriceRegReader.On("Address").Return(cciptypes.Address(utils.RandomAddress().String())).Maybe()
+			destPriceRegReader.On("Address", ctx).Return(cciptypes.Address(utils.RandomAddress().String()), nil).Maybe()
 			destPriceRegReader.On("GetFeeTokens", ctx).Return([]cciptypes.Address{}, nil).Maybe()
 			sourcePriceRegReader := ccipdatamocks.NewPriceRegistryReader(t)
-			sourcePriceRegReader.On("Address").Return(sourcePriceRegistryAddress).Maybe()
+			sourcePriceRegReader.On("Address", ctx).Return(sourcePriceRegistryAddress, nil).Maybe()
 			sourcePriceRegReader.On("GetFeeTokens", ctx).Return([]cciptypes.Address{}, nil).Maybe()
 			sourcePriceRegReader.On("GetTokenPrices", ctx, mock.Anything).Return(
 				[]cciptypes.TokenPriceUpdate{{TokenPrice: cciptypes.TokenPrice{Token: ccipcalc.HexToAddress("0x1"), Value: big.NewInt(123)}, TimestampUnixSec: big.NewInt(time.Now().Unix())}}, nil).Maybe()
@@ -266,7 +266,7 @@ func TestExecutionReportingPlugin_Report(t *testing.T) {
 
 			p.commitStoreReader = ccipdatamocks.NewCommitStoreReader(t)
 			chainHealthcheck := ccipcachemocks.NewChainHealthcheck(t)
-			chainHealthcheck.On("IsHealthy", ctx, false).Return(true, nil)
+			chainHealthcheck.On("IsHealthy", ctx).Return(true, nil)
 			p.chainHealthcheck = chainHealthcheck
 
 			observations := make([]types.AttributedObservation, len(tc.observations))
@@ -310,10 +310,10 @@ func TestExecutionReportingPlugin_ShouldAcceptFinalizedReport(t *testing.T) {
 
 	encodedReport := encodeExecutionReport(t, report)
 	mockOffRampReader := ccipdatamocks.NewOffRampReader(t)
-	mockOffRampReader.On("DecodeExecutionReport", encodedReport).Return(report, nil)
+	mockOffRampReader.On("DecodeExecutionReport", mock.Anything, encodedReport).Return(report, nil)
 
 	chainHealthcheck := ccipcachemocks.NewChainHealthcheck(t)
-	chainHealthcheck.On("IsHealthy", mock.Anything, false).Return(true, nil)
+	chainHealthcheck.On("IsHealthy", mock.Anything).Return(true, nil)
 
 	plugin := ExecutionReportingPlugin{
 		offRampReader:    mockOffRampReader,
@@ -359,11 +359,11 @@ func TestExecutionReportingPlugin_ShouldTransmitAcceptedReport(t *testing.T) {
 
 	mockCommitStoreReader := ccipdatamocks.NewCommitStoreReader(t)
 	mockOffRampReader := ccipdatamocks.NewOffRampReader(t)
-	mockOffRampReader.On("DecodeExecutionReport", encodedReport).Return(report, nil)
+	mockOffRampReader.On("DecodeExecutionReport", mock.Anything, encodedReport).Return(report, nil)
 	mockedExecState := mockOffRampReader.On("GetExecutionState", mock.Anything, uint64(12)).Return(uint8(cciptypes.ExecutionStateUntouched), nil).Once()
 
 	chainHealthcheck := ccipcachemocks.NewChainHealthcheck(t)
-	chainHealthcheck.On("IsHealthy", mock.Anything, true).Return(true, nil)
+	chainHealthcheck.On("IsHealthy", mock.Anything).Return(true, nil)
 
 	plugin := ExecutionReportingPlugin{
 		commitStoreReader: mockCommitStoreReader,
@@ -423,7 +423,7 @@ func TestExecutionReportingPlugin_buildReport(t *testing.T) {
 	p.commitStoreReader = commitStore
 
 	lp := lpMocks.NewLogPoller(t)
-	offRampReader, err := v1_0_0.NewOffRamp(logger.TestLogger(t), utils.RandomAddress(), nil, lp, nil)
+	offRampReader, err := v1_0_0.NewOffRamp(logger.TestLogger(t), utils.RandomAddress(), nil, lp, nil, nil)
 	assert.NoError(t, err)
 	p.offRampReader = offRampReader
 
@@ -668,8 +668,6 @@ func TestExecutionReportingPlugin_buildBatch(t *testing.T) {
 		},
 	}
 
-	ctx := testutils.Context(t)
-
 	for _, tc := range tt {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
@@ -685,7 +683,7 @@ func TestExecutionReportingPlugin_buildBatch(t *testing.T) {
 			mockOffRampReader.On("GetSenderNonce", mock.Anything, sender1).Return(uint64(0), nil).Maybe()
 
 			plugin := ExecutionReportingPlugin{
-				tokenDataWorker:   tokendata.NewBackgroundWorker(ctx, map[cciptypes.Address]tokendata.Reader{}, 10, 5*time.Second, time.Hour),
+				tokenDataWorker:   tokendata.NewBackgroundWorker(map[cciptypes.Address]tokendata.Reader{}, 10, 5*time.Second, time.Hour),
 				offRampReader:     mockOffRampReader,
 				destWrappedNative: destNative,
 				offchainConfig: cciptypes.ExecOffchainConfig{
@@ -1347,7 +1345,7 @@ func Test_getTokensPrices(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			priceReg := ccipdatamocks.NewPriceRegistryReader(t)
 			priceReg.On("GetTokenPrices", mock.Anything, mock.Anything).Return(tc.retPrices, nil)
-			priceReg.On("Address").Return(cciptypes.Address(utils.RandomAddress().String()), nil).Maybe()
+			priceReg.On("Address", mock.Anything).Return(cciptypes.Address(utils.RandomAddress().String()), nil).Maybe()
 
 			tokenPrices, err := getTokensPrices(context.Background(), priceReg, append(tc.feeTokens, tc.tokens...))
 			if tc.expErr {
@@ -1883,7 +1881,7 @@ func Test_prepareTokenExecData(t *testing.T) {
 			gasPriceEstimator.On("GetGasPrice", ctx).Return(big.NewInt(1e9), nil).Maybe()
 
 			offrampReader.On("GetTokens", ctx).Return(cciptypes.OffRampTokens{DestinationTokens: tt.destTokens}, tt.destTokensErr).Maybe()
-			sourcePriceRegistry.On("Address").Return(sourcePriceRegistryAddress, nil).Maybe()
+			sourcePriceRegistry.On("Address", mock.Anything).Return(sourcePriceRegistryAddress, nil).Maybe()
 			sourcePriceRegistry.On("GetFeeTokens", ctx).Return(tt.sourceFeeTokens, tt.sourceFeeTokensErr).Maybe()
 			sourcePriceRegistry.On("GetTokenPrices", ctx, mock.Anything).Return(tt.sourcePrices, nil).Maybe()
 			destPriceRegistry.On("GetFeeTokens", ctx).Return(tt.destFeeTokens, tt.destFeeTokensErr).Maybe()
@@ -1924,9 +1922,10 @@ func Test_prepareTokenExecData(t *testing.T) {
 }
 
 func encodeExecutionReport(t *testing.T, report cciptypes.ExecReport) []byte {
-	reader, err := v1_2_0.NewOffRamp(logger.TestLogger(t), utils.RandomAddress(), nil, nil, nil)
+	reader, err := v1_2_0.NewOffRamp(logger.TestLogger(t), utils.RandomAddress(), nil, nil, nil, nil)
 	require.NoError(t, err)
-	encodedReport, err := reader.EncodeExecutionReport(report)
+	ctx := testutils.Context(t)
+	encodedReport, err := reader.EncodeExecutionReport(ctx, report)
 	require.NoError(t, err)
 	return encodedReport
 }
@@ -1942,10 +1941,10 @@ func TestExecutionReportingPlugin_ensurePriceRegistrySynchronization(t *testing.
 
 	mockPriceRegistryReader1 := ccipdatamocks.NewPriceRegistryReader(t)
 	mockPriceRegistryReader2 := ccipdatamocks.NewPriceRegistryReader(t)
-	mockPriceRegistryReader1.On("Address").Return(sourcePriceRegistryAddress1, nil)
-	mockPriceRegistryReader2.On("Address").Return(sourcePriceRegistryAddress2, nil).Maybe()
-	mockPriceRegistryReader1.On("Close").Return(nil)
-	mockPriceRegistryReader2.On("Close").Return(nil).Maybe()
+	mockPriceRegistryReader1.On("Address", mock.Anything).Return(sourcePriceRegistryAddress1, nil)
+	mockPriceRegistryReader2.On("Address", mock.Anything).Return(sourcePriceRegistryAddress2, nil).Maybe()
+	mockPriceRegistryReader1.On("Close", mock.Anything).Return(nil)
+	mockPriceRegistryReader2.On("Close", mock.Anything).Return(nil).Maybe()
 
 	mockSourcePriceRegistryProvider := ccipdataprovidermocks.NewPriceRegistry(t)
 	mockSourcePriceRegistryProvider.On("NewPriceRegistryReader", mock.Anything, sourcePriceRegistryAddress1).Return(mockPriceRegistryReader1, nil)

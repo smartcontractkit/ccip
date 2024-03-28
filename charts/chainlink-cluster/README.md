@@ -14,29 +14,41 @@ nix develop
 
 # Develop
 
-## New cluster
+## Deploying New cluster
 We are using [devspace](https://www.devspace.sh/docs/getting-started/installation?x0=3)
 
-Configure the cluster, see `deployments.app.helm.values` and [values.yaml](./values.yaml) comments for more details
+1) Configure the cluster, see `deployments.app.helm.values` and [values.yaml](./values.yaml) comments for more details
 
-Configure your `cluster` setup (one time setup, internal usage only)
-```
-export DEVSPACE_IMAGE="..."
-cd charts/chainlink-cluster
-./setup.sh ${my-personal-namespace-name-crib}
-```
+2) Set up env variables required in devspace.yaml:
+    ```
+    export DEVSPACE_IMAGE=...
+    export DEVSPACE_INGRESS_CIDRS="0.0.0.0/0"
+    export DEVSPACE_INGRESS_BASE_DOMAIN=...
+    export DEVSPACE_INGRESS_CERT_ARN=...
+    export DEVSPACE_CCIP_SCRIPTS_IMAGE=...
+    ```
+3) Configure access to your kubernetes cluster
 
-Build and deploy current commit
+4) Build and deploy current commit
 ```
 devspace deploy
 ```
 
-If you don't need a build use
+### Additional Configuration options
+
+Default `ttl` is `72h`, use `ttl` command to update if you need more time
+
+Valid values are `1h`, `2m`, `3s`, etc. Go time format is invalid `1h2m3s`
+```
+devspace run ttl ${namespace} 120h
+```
+
+If you don't need to build use
 ```
 devspace deploy --skip-build
 ```
 
-To deploy particular commit (must be in registry) use
+To deploy particular commit (must be in the registry) use
 ```
 devspace deploy --skip-build ${short_sha_of_image}
 ```
@@ -46,27 +58,23 @@ Forward ports to check UI or run tests
 devspace run connect ${my-personal-namespace-name-crib}
 ```
 
-Connect to your environment, by replacing container with label `node-1` with your local repository files
+Update some Go code of Chainlink node and quickly sync your cluster
 ```
-devspace dev -p node
-make chainlink
-make chainlink-local-start
-```
-Fix something in the code locally, it'd automatically sync, rebuild it inside container and run again
-```
-make chainlink
-make chainlink-local-start
+devspace dev
 ```
 
-Reset the pod to original image
-```
-devspace reset pods
-```
+To reset pods to original image just checkout needed commit and do `devspace deploy` again
 
 Destroy the cluster
 ```
 devspace purge
 ```
+
+## CCIP Contracts and Jobs Deployment
+By default, the helm chart includes a post install hook defined in the ccip-scripts-deploy job. 
+It will deploy contracts and jobs to make the CCIP enabled cluster operational.
+
+`ccip-scripts-deploy` job usually takes around 6 minutes to complete.
 
 ## Running load tests
 Check this [doc](../../integration-tests/load/ocr/README.md)
@@ -112,8 +120,11 @@ kubectl config set-context --current --namespace cl-cluster
 
 Install
 ```
-helm install -f values.yaml cl-cluster .
+helm install -f values.yaml cl-cluster . \
+    --set=ingress.baseDomain="$DEVSPACE_INGRESS_BASE_DOMAIN" \
+    --set=ccip.ccipScriptsImage="$DEVSPACE_CCIP_SCRIPTS_IMAGE"
 ```
+
 
 ## Create a new release
 Bump version in `Chart.yml` add your changes and add `helm_release` label to any PR to trigger a release
@@ -129,15 +140,20 @@ helm uninstall cl-cluster
 ```
 
 # Grafana dashboard
-We are using [Grabana]() lib to create dashboards programmatically
+We are using [Grabana](https://github.com/K-Phoen/grabana) lib to create dashboards programmatically
+
+You can select `PANELS_INCLUDED`, options are `core`, `wasp`, comma separated
+
+You can also select dashboard platform in `INFRA_PLATFORM` either `kubernetes` or `docker`
 ```
 export GRAFANA_URL=...
 export GRAFANA_TOKEN=...
-export LOKI_DATA_SOURCE_NAME=Loki
 export PROMETHEUS_DATA_SOURCE_NAME=Thanos
-export DASHBOARD_FOLDER=CRIB
-export DASHBOARD_NAME=ChainlinkCluster
+export LOKI_DATA_SOURCE_NAME=Loki
+export INFRA_PLATFORM=kubernetes
+export GRAFANA_FOLDER=CRIB
+export DASHBOARD_NAME=CCIP-Cluster-Load
 
-cd dashboard/cmd && go run dashboard_deploy.go
+go run dashboard/cmd/deploy.go
 ```
-Open Grafana folder `CRIB` and find dashboard `ChainlinkCluster`
+Open Grafana folder `CRIB` and find dashboard `CCIP-Cluster-Load`

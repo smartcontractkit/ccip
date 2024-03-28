@@ -77,6 +77,7 @@ func TestL1Oracle_GasPrice(t *testing.T) {
 		priceReader.On("GetDAGasPrice", mock.Anything).Return(l1BaseFee, nil)
 
 		oracle := newL1GasOracle(logger.Test(t), nil, config.ChainKroma, priceReader)
+
 		servicetest.RunHealthy(t, oracle)
 
 		gasPrice, err := oracle.GasPrice(testutils.Context(t))
@@ -92,6 +93,7 @@ func TestL1Oracle_GasPrice(t *testing.T) {
 		priceReader.On("GetDAGasPrice", mock.Anything).Return(l1BaseFee, nil)
 
 		oracle := newL1GasOracle(logger.Test(t), nil, config.ChainOptimismBedrock, priceReader)
+
 		servicetest.RunHealthy(t, oracle)
 
 		gasPrice, err := oracle.GasPrice(testutils.Context(t))

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/AlekSi/pointer"
@@ -16,7 +17,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
 	ctftestenv "github.com/smartcontractkit/chainlink-testing-framework/docker/test_env"
-	"github.com/smartcontractkit/chainlink-testing-framework/k8s/client"
 	"github.com/smartcontractkit/chainlink-testing-framework/k8s/environment"
 	"github.com/smartcontractkit/chainlink-testing-framework/k8s/pkg/cdk8s/blockscout"
 	"github.com/smartcontractkit/chainlink-testing-framework/k8s/pkg/helm/chainlink"
@@ -99,10 +99,11 @@ func ChainlinkChart(
 		}
 	}
 	clProps["db"] = map[string]interface{}{
-		"resources":      SetResourceProfile(testInputs.EnvInput.NewCLCluster.DBCPU, testInputs.EnvInput.NewCLCluster.DBMemory),
-		"additionalArgs": formattedArgs,
-		"stateful":       pointer.GetBool(testInputs.EnvInput.NewCLCluster.IsStateful),
-		"capacity":       testInputs.EnvInput.NewCLCluster.DBCapacity,
+		"resources":        SetResourceProfile(testInputs.EnvInput.NewCLCluster.DBCPU, testInputs.EnvInput.NewCLCluster.DBMemory),
+		"additionalArgs":   formattedArgs,
+		"stateful":         pointer.GetBool(testInputs.EnvInput.NewCLCluster.IsStateful),
+		"capacity":         testInputs.EnvInput.NewCLCluster.DBCapacity,
+		"storageClassName": "gp3",
 		"image": map[string]any{
 			"image":   testInputs.EnvInput.NewCLCluster.Common.DBImage,
 			"version": testInputs.EnvInput.NewCLCluster.Common.DBTag,
@@ -149,6 +150,7 @@ func ChainlinkChart(
 						"image":   clNode.DBImage,
 						"version": clNode.DBTag,
 					},
+					"storageClassName": "gp3",
 				},
 				"toml": tomlStr,
 			})
@@ -173,25 +175,66 @@ func DeployLocalCluster(
 	testInputs *CCIPTestConfig,
 ) (*test_env.CLClusterTestEnv, func() error) {
 	selectedNetworks := testInputs.SelectedNetworks
+
+	privateEthereumNetworks := []*ctftestenv.EthereumNetwork{}
+	for _, network := range testInputs.EnvInput.PrivateEthereumNetworks {
+		privateEthereumNetworks = append(privateEthereumNetworks, network)
+	}
+
+	if len(selectedNetworks) > len(privateEthereumNetworks) {
+		seen := make(map[int64]bool)
+		missing := []blockchain.EVMNetwork{}
+
+		for _, network := range privateEthereumNetworks {
+			seen[int64(network.EthereumChainConfig.ChainID)] = true
+		}
+
+		for _, network := range selectedNetworks {
+			if !seen[network.ChainID] {
+				missing = append(missing, network)
+			}
+		}
+
+		for _, network := range missing {
+			chainConfig := &ctftestenv.EthereumChainConfig{}
+			err := chainConfig.Default()
+			if err != nil {
+				require.NoError(t, err, "failed to get default chain config: %w", err)
+			} else {
+				chainConfig.ChainID = int(network.ChainID)
+				eth1 := ctftestenv.EthereumVersion_Eth1
+				geth := ctftestenv.ExecutionLayer_Geth
+
+				privateEthereumNetworks = append(privateEthereumNetworks, &ctftestenv.EthereumNetwork{
+					EthereumVersion:     &eth1,
+					ExecutionLayer:      &geth,
+					EthereumChainConfig: chainConfig,
+				})
+			}
+		}
+
+		require.Equal(t, len(selectedNetworks), len(privateEthereumNetworks), "failed to create undefined selected networks. Maybe some of them had the same chain ids?")
+	}
+
 	env, err := test_env.NewCLTestEnvBuilder().
 		WithTestConfig(testInputs.EnvInput).
 		WithTestInstance(t).
-		WithPrivateGethChains(selectedNetworks).
+		WithPrivateEthereumNetworks(privateEthereumNetworks).
 		WithMockAdapter().
 		WithoutCleanup().
 		Build()
 	require.NoError(t, err)
-	for _, n := range env.PrivateChain {
-		primaryNode := n.GetPrimaryNode()
-		require.NotNil(t, primaryNode, "Primary node is nil in PrivateChain interface")
-		for i, networkCfg := range selectedNetworks {
-			if networkCfg.ChainID == n.GetNetworkConfig().ChainID {
-				selectedNetworks[i].URLs = []string{primaryNode.GetInternalWsUrl()}
-				selectedNetworks[i].HTTPURLs = []string{primaryNode.GetInternalHttpUrl()}
-			}
-		}
-		testInputs.SelectedNetworks = selectedNetworks
+	for i, networkCfg := range selectedNetworks {
+		rpcProvider, err := env.GetRpcProvider(networkCfg.ChainID)
+		require.NoError(t, err, "Error getting rpc provider")
+		selectedNetworks[i].URLs = rpcProvider.PrivateWsUrsl()
+		selectedNetworks[i].HTTPURLs = rpcProvider.PrivateHttpUrls()
+		newNetwork := networkCfg
+		newNetwork.URLs = rpcProvider.PublicWsUrls()
+		newNetwork.HTTPURLs = rpcProvider.PublicHttpUrls()
+		env.EVMNetworks = append(env.EVMNetworks, &newNetwork)
 	}
+	testInputs.SelectedNetworks = selectedNetworks
 
 	// a func to start the CL nodes asynchronously
 	deployCL := func() error {
@@ -209,7 +252,7 @@ func DeployLocalCluster(
 					return err
 				}
 				ccipNode, err := test_env.NewClNode(
-					[]string{env.Network.Name},
+					[]string{env.DockerNetwork.Name},
 					pointer.GetString(clNode.ChainlinkImage.Image),
 					pointer.GetString(clNode.ChainlinkImage.Version), toml,
 					test_env.WithPgDBOptions(
@@ -236,7 +279,7 @@ func DeployLocalCluster(
 					return err
 				}
 				ccipNode, err := test_env.NewClNode(
-					[]string{env.Network.Name},
+					[]string{env.DockerNetwork.Name},
 					pointer.GetString(testInputs.EnvInput.NewCLCluster.Common.ChainlinkImage.Image),
 					pointer.GetString(testInputs.EnvInput.NewCLCluster.Common.ChainlinkImage.Version),
 					toml, test_env.WithPgDBOptions(
@@ -382,16 +425,11 @@ func DeployEnvironments(
 		if !network.Simulated {
 			return network.URLs, network.HTTPURLs
 		}
-		networkName := network.Name
+		networkName := strings.ReplaceAll(strings.ToLower(network.Name), " ", "-")
 		var internalWsURLs, internalHttpURLs []string
 		for i := 0; i < numOfTxNodes; i++ {
-			podName := fmt.Sprintf("%s-ethereum-geth:%d", networkName, i)
-			txNodeInternalWs, err := testEnvironment.Fwd.FindPort(podName, "geth", "ws-rpc").As(client.RemoteConnection, client.WS)
-			require.NoError(t, err, "Error finding WS ports")
-			internalWsURLs = append(internalWsURLs, txNodeInternalWs)
-			txNodeInternalHttp, err := testEnvironment.Fwd.FindPort(podName, "geth", "http-rpc").As(client.RemoteConnection, client.HTTP)
-			require.NoError(t, err, "Error finding HTTP ports")
-			internalHttpURLs = append(internalHttpURLs, txNodeInternalHttp)
+			internalWsURLs = append(internalWsURLs, fmt.Sprintf("ws://%s-ethereum-geth:8546", networkName))
+			internalHttpURLs = append(internalHttpURLs, fmt.Sprintf("http://%s-ethereum-geth:8544", networkName))
 		}
 		return internalWsURLs, internalHttpURLs
 	}

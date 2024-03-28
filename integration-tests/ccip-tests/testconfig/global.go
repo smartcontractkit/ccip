@@ -11,6 +11,7 @@ import (
 	"github.com/pelletier/go-toml/v2"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
+	"github.com/smartcontractkit/seth"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/docker/test_env"
 	"github.com/smartcontractkit/chainlink-testing-framework/networks"
@@ -150,13 +151,18 @@ func NewConfig() (*Config, error) {
 // Common is the generic config struct which can be used with product specific configs.
 // It contains generic DON and networks config which can be applied to all product based tests.
 type Common struct {
-	EnvUser           string                   `toml:",omitempty"`
-	TTL               *config.Duration         `toml:",omitempty"`
-	ExistingCLCluster *CLCluster               `toml:",omitempty"` // ExistingCLCluster is the existing chainlink cluster to use, if specified it will be used instead of creating a new one
-	Mockserver        *string                  `toml:",omitempty"`
-	NewCLCluster      *ChainlinkDeployment     `toml:",omitempty"` // NewCLCluster is the new chainlink cluster to create, if specified along with ExistingCLCluster this will be ignored
-	Network           *ctfconfig.NetworkConfig `toml:",omitempty"`
-	Logging           *ctfconfig.LoggingConfig `toml:"Logging"`
+	EnvUser                 string                               `toml:",omitempty"`
+	TTL                     *config.Duration                     `toml:",omitempty"`
+	ExistingCLCluster       *CLCluster                           `toml:",omitempty"` // ExistingCLCluster is the existing chainlink cluster to use, if specified it will be used instead of creating a new one
+	Mockserver              *string                              `toml:",omitempty"`
+	NewCLCluster            *ChainlinkDeployment                 `toml:",omitempty"` // NewCLCluster is the new chainlink cluster to create, if specified along with ExistingCLCluster this will be ignored
+	Network                 *ctfconfig.NetworkConfig             `toml:",omitempty"`
+	PrivateEthereumNetworks map[string]*test_env.EthereumNetwork `toml:",omitempty"`
+	Logging                 *ctfconfig.LoggingConfig             `toml:"Logging"`
+}
+
+func (p *Common) GetSethConfig() *seth.Config {
+	return nil
 }
 
 func (p *Common) Validate() error {
@@ -178,6 +184,21 @@ func (p *Common) Validate() error {
 	}
 	if p.NewCLCluster == nil && p.ExistingCLCluster == nil {
 		return errors.New("no chainlink or existing cluster specified")
+	}
+
+	for k, v := range p.PrivateEthereumNetworks {
+		// this is the only value we need to generate dynamically before starting a new simulated chain
+		if v.EthereumChainConfig != nil {
+			p.PrivateEthereumNetworks[k].EthereumChainConfig.GenerateGenesisTimestamp()
+		}
+
+		builder := test_env.NewEthereumNetworkBuilder()
+		config, err := builder.WithExistingConfig(*v).Build()
+		if err != nil {
+			return fmt.Errorf("error building private ethereum network config %w", err)
+		}
+
+		p.PrivateEthereumNetworks[k] = &config
 	}
 
 	if p.ExistingCLCluster != nil {

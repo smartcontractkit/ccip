@@ -11,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/rs/zerolog/log"
+	"golang.org/x/exp/rand"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
 
@@ -376,30 +377,26 @@ func (pool *TokenPool) AddLiquidity(approveFn tokenApproveFn, tokenAddr string, 
 	return pool.client.ProcessTransaction(tx)
 }
 
-func (pool *TokenPool) SetRemoteChainOnPool(remoteChainSelector uint64) error {
+func (pool *TokenPool) SetRemoteChainOnPool(remoteChainSelectors []uint64) error {
 	log.Info().
 		Str("Token Pool", pool.Address()).
 		Msg("Setting remote chain on pool")
-	isSupported, err := pool.PoolInterface.IsSupportedChain(nil, remoteChainSelector)
-	if err != nil {
-		return fmt.Errorf("failed to get if chain is supported: %w", err)
-	}
-	// Check if remote chain is already supported , if yes return
-	if isSupported {
-		log.Info().
-			Str("Token Pool", pool.Address()).
-			Str(Network, pool.client.GetNetworkName()).
-			Uint64("Remote Chain Selector", remoteChainSelector).
-			Msg("Remote chain is already supported")
-		return nil
-	}
-	// If remote chain is not supported , add it
-	opts, err := pool.client.TransactionOpts(pool.client.GetDefaultWallet())
-	if err != nil {
-		return fmt.Errorf("failed to get transaction opts: %w", err)
-	}
-	tx, err := pool.PoolInterface.ApplyChainUpdates(opts, []token_pool.TokenPoolChainUpdate{
-		{
+	var selectorsToUpdate []token_pool.TokenPoolChainUpdate
+	for _, remoteChainSelector := range remoteChainSelectors {
+		isSupported, err := pool.PoolInterface.IsSupportedChain(nil, remoteChainSelector)
+		if err != nil {
+			return fmt.Errorf("failed to get if chain is supported: %w", err)
+		}
+		// Check if remote chain is already supported , if yes continue
+		if isSupported {
+			log.Info().
+				Str("Token Pool", pool.Address()).
+				Str(Network, pool.client.GetNetworkName()).
+				Uint64("Remote Chain Selector", remoteChainSelector).
+				Msg("Remote chain is already supported")
+			continue
+		}
+		selectorsToUpdate = append(selectorsToUpdate, token_pool.TokenPoolChainUpdate{
 			RemoteChainSelector: remoteChainSelector,
 			Allowed:             true,
 			InboundRateLimiterConfig: token_pool.RateLimiterConfig{
@@ -412,8 +409,18 @@ func (pool *TokenPool) SetRemoteChainOnPool(remoteChainSelector uint64) error {
 				Capacity:  new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e9)),
 				Rate:      new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e5)),
 			},
-		},
-	})
+		})
+	}
+	// if none to update return
+	if len(selectorsToUpdate) == 0 {
+		return nil
+	}
+	// If remote chain is not supported , add it
+	opts, err := pool.client.TransactionOpts(pool.client.GetDefaultWallet())
+	if err != nil {
+		return fmt.Errorf("failed to get transaction opts: %w", err)
+	}
+	tx, err := pool.PoolInterface.ApplyChainUpdates(opts, selectorsToUpdate)
 
 	if err != nil {
 		return fmt.Errorf("failed to set chain updates on token pool: %w", err)
@@ -421,9 +428,9 @@ func (pool *TokenPool) SetRemoteChainOnPool(remoteChainSelector uint64) error {
 
 	log.Info().
 		Str("Token Pool", pool.Address()).
-		Str("Chain selector", strconv.FormatUint(remoteChainSelector, 10)).
+		Uints64("Chain selectors", remoteChainSelectors).
 		Str(Network, pool.client.GetNetworkConfig().Name).
-		Msg("Remote chain set on token pool")
+		Msg("Remote chains set on token pool")
 	return pool.client.ProcessTransaction(tx)
 }
 
@@ -905,13 +912,29 @@ func (a *MockAggregator) UpdateRoundData(answer *big.Int) error {
 		Str("Contract Address", a.ContractAddress.Hex()).
 		Str("Network Name", a.client.GetNetworkConfig().Name).
 		Msg("Updating Round Data")
-	tx, err := a.Instance.UpdateRoundData(opts, big.NewInt(50), answer, big.NewInt(time.Now().UTC().UnixNano()), big.NewInt(time.Now().UTC().UnixNano()))
+	// we get the round from latest round data
+	// if there is any error in fetching the round , we set the round with a random number
+	// otherwise increase the latest round by 1 and set the value for the next round
+	round, err := a.Instance.LatestRound(nil)
+	if err != nil {
+		rand.Seed(uint64(time.Now().UnixNano()))
+		round = big.NewInt(int64(rand.Uint64()))
+	}
+	round = new(big.Int).Add(round, big.NewInt(1))
+	tx, err := a.Instance.UpdateRoundData(opts, round, answer, big.NewInt(time.Now().UTC().UnixNano()), big.NewInt(time.Now().UTC().UnixNano()))
 	if err != nil {
 		return fmt.Errorf("unable to update round data: %w", err)
 	}
-	return a.client.ProcessTransaction(tx)
-}
+	log.Info().
+		Str("Contract Address", a.ContractAddress.Hex()).
+		Str("Network Name", a.client.GetNetworkConfig().Name).
+		Str("Round", round.String()).
+		Str("Answer", answer.String()).
+		Msg("Updated Round Data")
+	_, err = bind.WaitMined(context.Background(), a.client.DeployBackend(), tx)
+	if err != nil {
+		return fmt.Errorf("error waiting for tx %s to be mined", tx.Hash().Hex())
+	}
 
-func (a *MockAggregator) WaitForTxConfirmations() error {
-	return a.client.WaitForEvents()
+	return a.client.MarkTxAsSentOnL2(tx)
 }
