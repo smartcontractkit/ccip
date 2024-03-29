@@ -13,12 +13,8 @@ contract BurnWithFromMintTokenPoolSetup is BurnMintSetup {
   function setUp() public virtual override {
     BurnMintSetup.setUp();
 
-    s_pool = new BurnWithFromMintTokenPool(
-      s_burnMintERC677,
-      new address[](0),
-      address(s_mockARM),
-      address(s_sourceRouter)
-    );
+    s_pool =
+      new BurnWithFromMintTokenPool(s_burnMintERC677, new address[](0), address(s_mockARM), address(s_sourceRouter));
     s_burnMintERC677.grantMintAndBurnRoles(address(s_pool));
 
     _applyChainUpdates(address(s_pool));

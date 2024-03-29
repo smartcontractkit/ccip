@@ -144,14 +144,13 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
     Client.EVMTokenAmount[] memory tokenAmounts = getCastedSourceEVMTokenAmountsWithZeroAmounts();
     tokenAmounts[0].amount = i_tokenAmount0;
     tokenAmounts[1].amount = i_tokenAmount1;
-    return
-      Client.EVM2AnyMessage({
-        receiver: abi.encode(OWNER),
-        data: "",
-        tokenAmounts: tokenAmounts,
-        feeToken: s_sourceFeeToken,
-        extraArgs: Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: GAS_LIMIT}))
-      });
+    return Client.EVM2AnyMessage({
+      receiver: abi.encode(OWNER),
+      data: "",
+      tokenAmounts: tokenAmounts,
+      feeToken: s_sourceFeeToken,
+      extraArgs: Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: GAS_LIMIT}))
+    });
   }
 
   function _generateSingleTokenMessage(
@@ -161,25 +160,23 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
     Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
     tokenAmounts[0] = Client.EVMTokenAmount({token: token, amount: amount});
 
-    return
-      Client.EVM2AnyMessage({
-        receiver: abi.encode(OWNER),
-        data: "",
-        tokenAmounts: tokenAmounts,
-        feeToken: s_sourceFeeToken,
-        extraArgs: Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: GAS_LIMIT}))
-      });
+    return Client.EVM2AnyMessage({
+      receiver: abi.encode(OWNER),
+      data: "",
+      tokenAmounts: tokenAmounts,
+      feeToken: s_sourceFeeToken,
+      extraArgs: Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: GAS_LIMIT}))
+    });
   }
 
   function _generateEmptyMessage() public view returns (Client.EVM2AnyMessage memory) {
-    return
-      Client.EVM2AnyMessage({
-        receiver: abi.encode(OWNER),
-        data: "",
-        tokenAmounts: new Client.EVMTokenAmount[](0),
-        feeToken: s_sourceFeeToken,
-        extraArgs: Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: GAS_LIMIT}))
-      });
+    return Client.EVM2AnyMessage({
+      receiver: abi.encode(OWNER),
+      data: "",
+      tokenAmounts: new Client.EVMTokenAmount[](0),
+      feeToken: s_sourceFeeToken,
+      extraArgs: Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: GAS_LIMIT}))
+    });
   }
 
   function _messageToEvent(

@@ -164,11 +164,7 @@ contract Router is IRouter, IRouterClient, ITypeAndVersion, OwnerIsCreator {
     bytes memory data = abi.encodeWithSelector(IAny2EVMMessageReceiver.ccipReceive.selector, message);
 
     (success, retData, gasUsed) = CallWithExactGas._callWithExactGasSafeReturnData(
-      data,
-      receiver,
-      gasLimit,
-      gasForCallExactCheck,
-      Internal.MAX_RET_BYTES
+      data, receiver, gasLimit, gasForCallExactCheck, Internal.MAX_RET_BYTES
     );
 
     emit MessageExecuted(message.messageId, message.sourceChainSelector, msg.sender, keccak256(data));
@@ -216,10 +212,8 @@ contract Router is IRouter, IRouterClient, ITypeAndVersion, OwnerIsCreator {
     OffRamp[] memory offRamps = new OffRamp[](encodedOffRamps.length);
     for (uint256 i = 0; i < encodedOffRamps.length; ++i) {
       uint256 encodedOffRamp = encodedOffRamps[i];
-      offRamps[i] = OffRamp({
-        sourceChainSelector: uint64(encodedOffRamp >> 160),
-        offRamp: address(uint160(encodedOffRamp))
-      });
+      offRamps[i] =
+        OffRamp({sourceChainSelector: uint64(encodedOffRamp >> 160), offRamp: address(uint160(encodedOffRamp))});
     }
     return offRamps;
   }
@@ -251,8 +245,9 @@ contract Router is IRouter, IRouterClient, ITypeAndVersion, OwnerIsCreator {
       address offRampAddress = offRampRemoves[i].offRamp;
 
       // If the selector-offRamp pair does not exist, revert.
-      if (!s_chainSelectorAndOffRamps.remove(_mergeChainSelectorAndOffRamp(sourceChainSelector, offRampAddress)))
+      if (!s_chainSelectorAndOffRamps.remove(_mergeChainSelectorAndOffRamp(sourceChainSelector, offRampAddress))) {
         revert OffRampMismatch(sourceChainSelector, offRampAddress);
+      }
 
       emit OffRampRemoved(sourceChainSelector, offRampAddress);
     }
@@ -276,7 +271,7 @@ contract Router is IRouter, IRouterClient, ITypeAndVersion, OwnerIsCreator {
     if (to == address(0)) revert InvalidRecipientAddress(to);
 
     if (tokenAddress == address(0)) {
-      (bool success, ) = to.call{value: amount}("");
+      (bool success,) = to.call{value: amount}("");
       if (!success) revert FailedToSendValue();
       return;
     }

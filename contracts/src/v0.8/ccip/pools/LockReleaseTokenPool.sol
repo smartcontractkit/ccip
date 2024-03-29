@@ -95,10 +95,8 @@ contract LockReleaseTokenPool is TokenPool, ILiquidityContainer, ITypeAndVersion
 
   // @inheritdoc IERC165
   function supportsInterface(bytes4 interfaceId) public pure virtual override returns (bool) {
-    return
-      interfaceId == LOCK_RELEASE_INTERFACE_ID ||
-      interfaceId == type(ILiquidityContainer).interfaceId ||
-      super.supportsInterface(interfaceId);
+    return interfaceId == LOCK_RELEASE_INTERFACE_ID || interfaceId == type(ILiquidityContainer).interfaceId
+      || super.supportsInterface(interfaceId);
   }
 
   /// @notice Gets Rebalancer, can be address(0) if none is configured.

@@ -74,7 +74,7 @@ contract ARMProxyStandaloneTest is Test {
     s_armProxy.setARM(EMPTY_ADDRESS); // No code at address 1, should revert.
     vm.expectRevert();
     bytes memory b = new bytes(0);
-    (bool success, ) = address(s_armProxy).call(b);
+    (bool success,) = address(s_armProxy).call(b);
     success;
   }
 }

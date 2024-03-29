@@ -30,16 +30,10 @@ contract CommitStoreSetup is PriceRegistrySetup, OCR2BaseSetup {
         armProxy: address(s_mockARM)
       })
     );
-    CommitStore.DynamicConfig memory dynamicConfig = CommitStore.DynamicConfig({
-      priceRegistry: address(s_priceRegistry)
-    });
+    CommitStore.DynamicConfig memory dynamicConfig =
+      CommitStore.DynamicConfig({priceRegistry: address(s_priceRegistry)});
     s_commitStore.setOCR2Config(
-      s_valid_signers,
-      s_valid_transmitters,
-      s_f,
-      abi.encode(dynamicConfig),
-      s_offchainConfigVersion,
-      abi.encode("")
+      s_valid_signers, s_valid_transmitters, s_f, abi.encode(dynamicConfig), s_offchainConfigVersion, abi.encode("")
     );
 
     address[] memory priceUpdaters = new address[](1);
@@ -77,16 +71,10 @@ contract CommitStoreRealARMSetup is PriceRegistrySetup, OCR2BaseSetup {
         armProxy: address(s_arm)
       })
     );
-    CommitStore.DynamicConfig memory dynamicConfig = CommitStore.DynamicConfig({
-      priceRegistry: address(s_priceRegistry)
-    });
+    CommitStore.DynamicConfig memory dynamicConfig =
+      CommitStore.DynamicConfig({priceRegistry: address(s_priceRegistry)});
     s_commitStore.setOCR2Config(
-      s_valid_signers,
-      s_valid_transmitters,
-      s_f,
-      abi.encode(dynamicConfig),
-      s_offchainConfigVersion,
-      abi.encode("")
+      s_valid_signers, s_valid_transmitters, s_f, abi.encode(dynamicConfig), s_offchainConfigVersion, abi.encode("")
     );
   }
 }
@@ -107,21 +95,15 @@ contract CommitStore_constructor is PriceRegistrySetup, OCR2BaseSetup {
       onRamp: 0x2C44CDDdB6a900Fa2B585dd299E03D12Fa4293Bc,
       armProxy: address(s_mockARM)
     });
-    CommitStore.DynamicConfig memory dynamicConfig = CommitStore.DynamicConfig({
-      priceRegistry: address(s_priceRegistry)
-    });
+    CommitStore.DynamicConfig memory dynamicConfig =
+      CommitStore.DynamicConfig({priceRegistry: address(s_priceRegistry)});
 
     vm.expectEmit();
     emit ConfigSet(staticConfig, dynamicConfig);
 
     CommitStore commitStore = new CommitStore(staticConfig);
     commitStore.setOCR2Config(
-      s_valid_signers,
-      s_valid_transmitters,
-      s_f,
-      abi.encode(dynamicConfig),
-      s_offchainConfigVersion,
-      abi.encode("")
+      s_valid_signers, s_valid_transmitters, s_f, abi.encode(dynamicConfig), s_offchainConfigVersion, abi.encode("")
     );
 
     CommitStore.StaticConfig memory gotStaticConfig = commitStore.getStaticConfig();
@@ -187,12 +169,7 @@ contract CommitStore_setDynamicConfig is CommitStoreSetup {
     );
 
     s_commitStore.setOCR2Config(
-      s_valid_signers,
-      s_valid_transmitters,
-      s_f,
-      onchainConfig,
-      s_offchainConfigVersion,
-      abi.encode("")
+      s_valid_signers, s_valid_transmitters, s_f, onchainConfig, s_offchainConfigVersion, abi.encode("")
     );
 
     CommitStore.DynamicConfig memory gotDynamicConfig = s_commitStore.getDynamicConfig();
@@ -208,12 +185,7 @@ contract CommitStore_setDynamicConfig is CommitStoreSetup {
     CommitStore.DynamicConfig memory dynamicConfig = CommitStore.DynamicConfig({priceRegistry: address(1)});
     // New config should clear it.
     s_commitStore.setOCR2Config(
-      s_valid_signers,
-      s_valid_transmitters,
-      s_f,
-      abi.encode(dynamicConfig),
-      s_offchainConfigVersion,
-      abi.encode("")
+      s_valid_signers, s_valid_transmitters, s_f, abi.encode(dynamicConfig), s_offchainConfigVersion, abi.encode("")
     );
     // Assert cleared.
     assertEq(0, s_commitStore.getLatestPriceEpochAndRound());
@@ -226,12 +198,7 @@ contract CommitStore_setDynamicConfig is CommitStoreSetup {
     vm.stopPrank();
     vm.expectRevert("Only callable by owner");
     s_commitStore.setOCR2Config(
-      s_valid_signers,
-      s_valid_transmitters,
-      s_f,
-      abi.encode(dynamicConfig),
-      s_offchainConfigVersion,
-      abi.encode("")
+      s_valid_signers, s_valid_transmitters, s_f, abi.encode(dynamicConfig), s_offchainConfigVersion, abi.encode("")
     );
   }
 
@@ -240,12 +207,7 @@ contract CommitStore_setDynamicConfig is CommitStoreSetup {
 
     vm.expectRevert(CommitStore.InvalidCommitStoreConfig.selector);
     s_commitStore.setOCR2Config(
-      s_valid_signers,
-      s_valid_transmitters,
-      s_f,
-      abi.encode(dynamicConfig),
-      s_offchainConfigVersion,
-      abi.encode("")
+      s_valid_signers, s_valid_transmitters, s_f, abi.encode(dynamicConfig), s_offchainConfigVersion, abi.encode("")
     );
   }
 }
@@ -363,9 +325,8 @@ contract CommitStore_report is CommitStoreSetup {
 
   function testStaleReportWithRootSuccess() public {
     uint64 maxSeq = 12;
-    uint224 tokenStartPrice = IPriceRegistry(s_commitStore.getDynamicConfig().priceRegistry)
-      .getTokenPrice(s_sourceFeeToken)
-      .value;
+    uint224 tokenStartPrice =
+      IPriceRegistry(s_commitStore.getDynamicConfig().priceRegistry).getTokenPrice(s_sourceFeeToken).value;
 
     CommitStore.CommitReport memory report = CommitStore.CommitReport({
       priceUpdates: getSingleTokenPriceUpdateStruct(s_sourceFeeToken, 4e18),
@@ -456,8 +417,7 @@ contract CommitStore_report is CommitStoreSetup {
 
     assertEq(maxSeq + 1, s_commitStore.getExpectedNextSequenceNumber());
     assertEq(
-      tokenPrice1,
-      IPriceRegistry(s_commitStore.getDynamicConfig().priceRegistry).getTokenPrice(s_sourceFeeToken).value
+      tokenPrice1, IPriceRegistry(s_commitStore.getDynamicConfig().priceRegistry).getTokenPrice(s_sourceFeeToken).value
     );
     assertEq(s_latestEpochAndRound, s_commitStore.getLatestPriceEpochAndRound());
   }
@@ -491,11 +451,8 @@ contract CommitStore_report is CommitStoreSetup {
 
   function testInvalidIntervalReverts() public {
     CommitStore.Interval memory interval = CommitStore.Interval(2, 2);
-    CommitStore.CommitReport memory report = CommitStore.CommitReport({
-      priceUpdates: getEmptyPriceUpdates(),
-      interval: interval,
-      merkleRoot: bytes32(0)
-    });
+    CommitStore.CommitReport memory report =
+      CommitStore.CommitReport({priceUpdates: getEmptyPriceUpdates(), interval: interval, merkleRoot: bytes32(0)});
 
     vm.expectRevert(abi.encodeWithSelector(CommitStore.InvalidInterval.selector, interval));
 
@@ -504,11 +461,8 @@ contract CommitStore_report is CommitStoreSetup {
 
   function testInvalidIntervalMinLargerThanMaxReverts() public {
     CommitStore.Interval memory interval = CommitStore.Interval(1, 0);
-    CommitStore.CommitReport memory report = CommitStore.CommitReport({
-      priceUpdates: getEmptyPriceUpdates(),
-      interval: interval,
-      merkleRoot: bytes32(0)
-    });
+    CommitStore.CommitReport memory report =
+      CommitStore.CommitReport({priceUpdates: getEmptyPriceUpdates(), interval: interval, merkleRoot: bytes32(0)});
 
     vm.expectRevert(abi.encodeWithSelector(CommitStore.InvalidInterval.selector, interval));
 
