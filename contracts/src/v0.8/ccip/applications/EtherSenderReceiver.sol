@@ -96,33 +96,32 @@ contract EtherSenderReceiver is CCIPReceiver, ITypeAndVersion {
     Client.EVM2AnyMessage memory validatedMessage = _validatedMessage(message);
 
     // deposit the ether into the weth contract to get the wrapped ether.
-    // Note: we gave an infinite approval to the router in the constructor.
+    // we gave an infinite approval to the router in the constructor.
     i_weth.deposit{value: validatedMessage.tokenAmounts[0].amount}();
 
     // if the fee token is not native, we need to transfer the fee to this contract and re-approve it to the router.
     uint256 fee = IRouterClient(getRouter()).getFee(destinationChainSelector, validatedMessage);
     if (validatedMessage.feeToken != address(0)) {
-      // Note: its not possible to have any leftover tokens in this path because we transferFrom the exact fee that CCIP
+      // its not possible to have any leftover tokens in this path because we transferFrom the exact fee that CCIP
       // requires from the caller.
-      // Note: this will fail if the caller didn't approve at least `fee` tokens to this contract.
+      // this will fail if the caller didn't approve at least `fee` tokens to this contract.
       IERC20(validatedMessage.feeToken).safeTransferFrom(msg.sender, address(this), fee);
 
-      // Note: we gave an infinite approval to the router in the constructor.
+      // we gave an infinite approval to the router in the constructor.
       if (validatedMessage.feeToken != address(i_weth)) {
         IERC20(validatedMessage.feeToken).approve(getRouter(), fee);
       }
 
       return IRouterClient(getRouter()).ccipSend(destinationChainSelector, validatedMessage);
-    } else {
-      // We've already checked that msg.value > tokenAmounts[0].amount, so there is no overflow/underflow risk.
-      // We don't want to keep any excess ether in this contract, so we send over the entire diff as the fee.
-      uint256 diff = msg.value - validatedMessage.tokenAmounts[0].amount;
-      if (diff < fee) {
-        revert InsufficientFee(diff, fee);
-      }
-
-      return IRouterClient(getRouter()).ccipSend{value: diff}(destinationChainSelector, validatedMessage);
     }
+
+    // We don't want to keep any excess ether in this contract, so we send over the entire diff as the fee.
+    // Its possible that msg.value < tokenAmounts[0].amount, in which case there will be a revert because
+    // of SafeMath. This makes sense because there's not enough for the fees anyway.
+    uint256 diff = msg.value - validatedMessage.tokenAmounts[0].amount;
+
+    // ccip will revert if the fee is insufficient, so we don't need to check here.
+    return IRouterClient(getRouter()).ccipSend{value: diff}(destinationChainSelector, validatedMessage);
   }
 
   function _validatedMessage(
@@ -157,13 +156,7 @@ contract EtherSenderReceiver is CCIPReceiver, ITypeAndVersion {
   function _validateFeeToken(Client.EVM2AnyMessage calldata message) internal view {
     uint256 tokenAmount = message.tokenAmounts[0].amount;
 
-    if (message.feeToken == address(0)) {
-      // If the fee token is native, the fee must be included in msg.value.
-      // TODO: is there a world where fee is zero?
-      if (msg.value <= tokenAmount) {
-        revert InsufficientMsgValue(tokenAmount, msg.value);
-      }
-    } else {
+    if (message.feeToken != address(0)) {
       // If the fee token is NOT native, then the token amount must be equal to msg.value.
       // This is done to ensure that there is no leftover ether in this contract.
       if (msg.value != tokenAmount) {
