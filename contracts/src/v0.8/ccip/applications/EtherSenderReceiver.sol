@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.19;
 
-import {CCIPReceiver} from "./CCIPReceiver.sol";
-import {Client} from "./../libraries/Client.sol";
-import {IRouterClient} from "../interfaces/IRouterClient.sol";
 import {ITypeAndVersion} from "../../shared/interfaces/ITypeAndVersion.sol";
 import {IWrappedNative} from "../interfaces/IWrappedNative.sol";
+import {IRouterClient} from "../interfaces/IRouterClient.sol";
+
+import {CCIPReceiver} from "./CCIPReceiver.sol";
+import {Client} from "./../libraries/Client.sol";
 
 import {IERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -127,34 +128,28 @@ contract EtherSenderReceiver is CCIPReceiver, ITypeAndVersion {
   function _validatedMessage(
     Client.EVM2AnyMessage calldata message
   ) internal view returns (Client.EVM2AnyMessage memory) {
-    Client.EVM2AnyMessage memory validatedMessage = message;
+    // As of time of writing we only have extra args v1, so we can check that here.
+    // If we add more extra args in the future, the signature will no longer match.
+    bytes calldata extraArgs = message.extraArgs;
+    if (extraArgs.length > 0) {
+      if (bytes4(extraArgs[:4]) == Client.EVM_EXTRA_ARGS_V1_TAG) {
+        uint256 gasLimit = abi.decode(extraArgs[4:], (Client.EVMExtraArgsV1)).gasLimit;
+        if (gasLimit < MIN_MESSAGE_GAS_LIMIT) {
+          revert GasLimitTooLow(MIN_MESSAGE_GAS_LIMIT, gasLimit);
+        }
+      }
+    }
 
-    // Ensure that the receiver on the destination chain is always msg.sender.
-    validatedMessage.data = abi.encode(msg.sender);
+    Client.EVM2AnyMessage memory validatedMessage = message;
 
     // Only one tokenAmount is allowed, which is the weth token and amount.
     if (validatedMessage.tokenAmounts.length != 1) {
       revert InvalidTokenAmounts(validatedMessage.tokenAmounts.length);
     }
 
-    Client.EVMTokenAmount memory tokenAmount = validatedMessage.tokenAmounts[0];
-    if (tokenAmount.token != address(i_weth)) {
-      tokenAmount.token = address(i_weth);
-      validatedMessage.tokenAmounts[0] = tokenAmount;
-    }
-
-    // As of time of writing we only have extra args v1, so we can check that here.
-    // If we add more extra args in the future, the signature will no longer match.
-    bytes calldata extraArgs = message.extraArgs;
-    if (extraArgs.length > 0) {
-      bytes4 extraArgsSig = bytes4(extraArgs[:4]);
-      if (extraArgsSig == Client.EVM_EXTRA_ARGS_V1_TAG) {
-        Client.EVMExtraArgsV1 memory args = abi.decode(extraArgs[4:], (Client.EVMExtraArgsV1));
-        if (args.gasLimit < MIN_MESSAGE_GAS_LIMIT) {
-          revert GasLimitTooLow(MIN_MESSAGE_GAS_LIMIT, args.gasLimit);
-        }
-      }
-    }
+    // Ensure that the receiver on the destination chain is always msg.sender.
+    validatedMessage.data = abi.encode(msg.sender);
+    validatedMessage.tokenAmounts[0].token = address(i_weth);
 
     return validatedMessage;
   }
