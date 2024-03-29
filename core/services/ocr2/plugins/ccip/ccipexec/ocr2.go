@@ -9,7 +9,6 @@ import (
 	"sync"
 	"time"
 
-	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
@@ -244,15 +243,6 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 	return []ccip.ObservedMessage{}, nil
 }
 
-func (r *ExecutionReportingPlugin) fetchSendersNonce(ctx context.Context, report commitReportWithSendRequests) (map[cciptypes.Address]uint64, error) {
-	uniqueSenderAddresses := mapset.NewSet[cciptypes.Address]()
-	for _, msg := range report.sendRequestsWithMeta {
-		uniqueSenderAddresses.Add(msg.Sender)
-	}
-
-	return r.offRampReader.GetSendersNonce(ctx, uniqueSenderAddresses.ToSlice())
-}
-
 // destPoolRateLimits returns a map that consists of the rate limits of each destination token of the provided reports.
 // If a token is missing from the returned map it either means that token was not found or token pool is disabled for this token.
 func (r *ExecutionReportingPlugin) destPoolRateLimits(ctx context.Context, commitReports []commitReportWithSendRequests, sourceToDestToken map[cciptypes.Address]cciptypes.Address) (map[cciptypes.Address]*big.Int, error) {
@@ -363,7 +353,7 @@ func (r *ExecutionReportingPlugin) buildBatch(
 	// We don't use inflightCache here to avoid cases in which inflight cache keeps progressing but due to transmission failures
 	// previous reports are not included onchain. That can lead to issues with IncorrectNonce skips,
 	// because we enforce sequential processing per sender (per sender's nonce ordering is enforced by Offramp contract)
-	sendersNonce, err := r.fetchSendersNonce(ctx, report)
+	sendersNonce, err := r.offRampReader.GetSendersNonce(ctx, report.uniqueSenders())
 	if err != nil {
 		lggr.Errorw("fetching senders nonce", "err", err)
 		return []ccip.ObservedMessage{}
@@ -585,37 +575,6 @@ func calculateMessageMaxGas(gasLimit *big.Int, numRequests, dataLen, numTokens i
 	}
 
 	return messageMaxGas, nil
-}
-
-// helper struct to hold the commitReport and the related send requests
-type commitReportWithSendRequests struct {
-	commitReport         cciptypes.CommitStoreReport
-	sendRequestsWithMeta []cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta
-}
-
-func (r *commitReportWithSendRequests) validate() error {
-	// make sure that number of messages is the expected
-	if exp := int(r.commitReport.Interval.Max - r.commitReport.Interval.Min + 1); len(r.sendRequestsWithMeta) != exp {
-		return errors.Errorf(
-			"unexpected missing sendRequestsWithMeta in committed root %x have %d want %d", r.commitReport.MerkleRoot, len(r.sendRequestsWithMeta), exp)
-	}
-
-	return nil
-}
-
-func (r *commitReportWithSendRequests) allRequestsAreExecutedAndFinalized() bool {
-	for _, req := range r.sendRequestsWithMeta {
-		if !req.Executed || !req.Finalized {
-			return false
-		}
-	}
-	return true
-}
-
-// checks if the send request fits the commit report interval
-func (r *commitReportWithSendRequests) sendReqFits(sendReq cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta) bool {
-	return sendReq.SequenceNumber >= r.commitReport.Interval.Min &&
-		sendReq.SequenceNumber <= r.commitReport.Interval.Max
 }
 
 // getReportsWithSendRequests returns the target reports with populated send requests.
