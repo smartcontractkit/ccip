@@ -172,7 +172,10 @@ func TestExecutionReportingPlugin_Observation(t *testing.T) {
 				Return(executionEvents, nil).Maybe()
 			mockOffRampReader.On("CurrentRateLimiterState", mock.Anything).Return(tc.rateLimiterState, nil).Maybe()
 			mockOffRampReader.On("Address").Return(cciptypes.Address(offRamp.Address().String())).Maybe()
-			mockOffRampReader.On("GetSenderNonce", mock.Anything, mock.Anything).Return(offRamp.GetSenderNonce(nil, utils.RandomAddress())).Maybe()
+			senderNonces := map[cciptypes.Address]uint64{
+				cciptypes.Address(utils.RandomAddress().String()): tc.senderNonce,
+			}
+			mockOffRampReader.On("GetSendersNonce", mock.Anything, mock.Anything).Return(senderNonces, nil).Maybe()
 			mockOffRampReader.On("GetTokenPoolsRateLimits", ctx, []ccipdata.TokenPoolReader{}).
 				Return([]cciptypes.TokenBucketRateLimit{}, nil).Maybe()
 
@@ -682,7 +685,7 @@ func TestExecutionReportingPlugin_buildBatch(t *testing.T) {
 
 			// Mock calls to reader.
 			mockOffRampReader := ccipdatamocks.NewOffRampReader(t)
-			mockOffRampReader.On("GetSenderNonce", mock.Anything, sender1).Return(uint64(0), nil).Maybe()
+			mockOffRampReader.On("GetSendersNonce", mock.Anything, mock.Anything).Return(tc.offRampNoncesBySender, nil).Maybe()
 
 			plugin := ExecutionReportingPlugin{
 				tokenDataWorker:   tokendata.NewBackgroundWorker(ctx, map[cciptypes.Address]tokendata.Reader{}, 10, 5*time.Second, time.Hour),
@@ -1513,7 +1516,7 @@ func Test_inflightAggregates(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			inflightSeqNrs, inflightAggrVal, maxInflightSenderNonces, inflightTokenAmounts, err := inflightAggregates(
+			inflightAggrVal, inflightTokenAmounts, err := inflightAggregates(
 				tc.inflight, tc.destTokenPrices, tc.sourceToDest)
 
 			if tc.expErr {
@@ -1521,9 +1524,7 @@ func Test_inflightAggregates(t *testing.T) {
 				return
 			}
 			assert.NoError(t, err)
-			assert.True(t, tc.expInflightSeqNrs.Equal(inflightSeqNrs))
 			assert.True(t, reflect.DeepEqual(tc.expInflightAggrVal, inflightAggrVal))
-			assert.True(t, reflect.DeepEqual(tc.expMaxInflightSenderNonces, maxInflightSenderNonces))
 			assert.True(t, reflect.DeepEqual(tc.expInflightTokenAmounts, inflightTokenAmounts))
 		})
 	}
