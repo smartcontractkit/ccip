@@ -49,10 +49,13 @@ contract EtherSenderReceiverTest_constructor is EtherSenderReceiverTest {
 }
 
 contract EtherSenderReceiverTest_validateFeeToken is EtherSenderReceiverTest {
-  function test_validateFeeToken_valid() public {
-    uint256 amount = 100;
+  uint256 internal constant amount = 100;
+
+  error InsufficientMsgValue(uint256 gotAmount, uint256 msgValue);
+  error TokenAmountNotEqualToMsgValue(uint256 gotAmount, uint256 msgValue);
+
+  function test_validateFeeToken_valid_native() public {
     {
-      // Case 1: feeToken is address(0), i.e native.
       Client.EVMTokenAmount[] memory tokenAmount = new Client.EVMTokenAmount[](1);
       tokenAmount[0] = Client.EVMTokenAmount({token: address(s_weth), amount: amount});
       Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
@@ -65,8 +68,10 @@ contract EtherSenderReceiverTest_validateFeeToken is EtherSenderReceiverTest {
 
       s_etherSenderReceiver.validateFeeToken{value: amount + 1}(message);
     }
+  }
+
+  function test_validateFeeToken_valid_feeToken() public {
     {
-      // Case 2: feeToken is a nonzero address.
       Client.EVMTokenAmount[] memory tokenAmount = new Client.EVMTokenAmount[](1);
       tokenAmount[0] = Client.EVMTokenAmount({token: address(s_weth), amount: amount});
       Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
@@ -78,6 +83,46 @@ contract EtherSenderReceiverTest_validateFeeToken is EtherSenderReceiverTest {
       });
 
       s_etherSenderReceiver.validateFeeToken{value: amount}(message);
+    }
+  }
+
+  function test_validateFeeToken_reverts_native_insufficientMsgValue() public {
+    {
+      // Case 1: feeToken is address(0), i.e native.
+      Client.EVMTokenAmount[] memory tokenAmount = new Client.EVMTokenAmount[](1);
+      tokenAmount[0] = Client.EVMTokenAmount({token: address(s_weth), amount: amount});
+      Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
+        receiver: abi.encode(XCHAIN_RECEIVER),
+        data: "",
+        tokenAmounts: tokenAmount,
+        feeToken: address(0),
+        extraArgs: ""
+      });
+
+      vm.expectRevert(
+        abi.encodeWithSelector(InsufficientMsgValue.selector, amount, amount - 1)
+      );
+      s_etherSenderReceiver.validateFeeToken{value: amount - 1}(message);
+    }
+  }
+
+  function test_validateFeeToken_reverts_feeToken_tokenAmountNotEqualToMsgValue() public {
+    {
+      // Case 1: feeToken is address(0), i.e native.
+      Client.EVMTokenAmount[] memory tokenAmount = new Client.EVMTokenAmount[](1);
+      tokenAmount[0] = Client.EVMTokenAmount({token: address(s_weth), amount: amount});
+      Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
+        receiver: abi.encode(XCHAIN_RECEIVER),
+        data: "",
+        tokenAmounts: tokenAmount,
+        feeToken: address(s_weth),
+        extraArgs: ""
+      });
+
+      vm.expectRevert(
+        abi.encodeWithSelector(TokenAmountNotEqualToMsgValue.selector, amount, amount + 1)
+      );
+      s_etherSenderReceiver.validateFeeToken{value: amount + 1}(message);
     }
   }
 }

@@ -29,7 +29,6 @@ interface CCIPRouter {
 contract EtherSenderReceiver is CCIPReceiver, ITypeAndVersion {
   using SafeERC20 for IERC20;
 
-  error CCIPReceiveFailed();
   error InvalidTokenAmounts(uint256 gotAmounts);
   error TokenAmountNotEqualToMsgValue(uint256 gotAmount, uint256 msgValue);
   error InsufficientMsgValue(uint256 gotAmount, uint256 msgValue);
@@ -165,6 +164,7 @@ contract EtherSenderReceiver is CCIPReceiver, ITypeAndVersion {
 
     if (message.feeToken == address(0)) {
       // If the fee token is native, the fee must be included in msg.value.
+      // TODO: is there a world where fee is zero?
       if (msg.value <= tokenAmount) {
         revert InsufficientMsgValue(tokenAmount, msg.value);
       }
