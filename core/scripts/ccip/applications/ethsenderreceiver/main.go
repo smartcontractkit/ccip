@@ -143,8 +143,6 @@ func main() {
 		senderReceiverAddress := cmd.String("sender-receiver-address", "", "Sender receiver address")
 		// message data
 		destReceiver := cmd.String("dest-receiver-address", "", "Destination receiver address")
-		destEOA := cmd.String("dest-eoa-address", "", "Destination EOA address")
-		tokenAddress := cmd.String("token-address", "", "Token address")
 		feeToken := cmd.String("fee-token", "", "Fee token address")
 		amount := cmd.String("amount", "", "Amount")
 
@@ -153,8 +151,6 @@ func main() {
 			"dest-chain-id",
 			"sender-receiver-address",
 			"dest-receiver-address",
-			"dest-eoa-address",
-			"token-address",
 			"fee-token",
 			"amount",
 		)
@@ -170,20 +166,18 @@ func main() {
 
 		receiverBytes, err := utils.ABIEncode(`[{"type": "address"}]`, common.HexToAddress(*destReceiver))
 		helpers.PanicErr(err)
-		destEOABytes, err := utils.ABIEncode(`[{"type": "address"}]`, common.HexToAddress(*destEOA))
-		helpers.PanicErr(err)
 		feeTok := common.HexToAddress(*feeToken)
 		msg := ether_sender_receiver.ClientEVM2AnyMessage{
 			Receiver: receiverBytes,
-			Data:     destEOABytes,
+			// Data: , // will be filled in by the contract
 			TokenAmounts: []ether_sender_receiver.ClientEVMTokenAmount{
 				{
-					Token:  common.HexToAddress(*tokenAddress),
+					// Token: , // will be filled in by the contract
 					Amount: decimal.RequireFromString(*amount).BigInt(),
 				},
 			},
 			FeeToken: feeTok,
-			// ExtraArgs: nil, // will be filled in by the contract
+			// ExtraArgs: , // will be filled in by the contract
 		}
 		fee, err := senderReceiver.GetFee(nil, destChain.Selector, msg)
 		helpers.PanicErr(err)
