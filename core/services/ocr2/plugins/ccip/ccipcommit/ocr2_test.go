@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/Masterminds/semver/v3"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/leanovate/gopter"
 	"github.com/leanovate/gopter/gen"
 	"github.com/leanovate/gopter/prop"
@@ -672,7 +671,7 @@ func TestCommitReportingPlugin_ShouldAcceptFinalizedReport(t *testing.T) {
 		assert.False(t, shouldAccept)
 	})
 
-	t.Run("non-stale report should be accepted and added inflight", func(t *testing.T) {
+	t.Run("non-stale report should be accepted", func(t *testing.T) {
 		onChainSeqNum := uint64(100)
 
 		p := newPlugin()
@@ -1459,59 +1458,6 @@ func TestCommitReportingPlugin_generatePriceUpdates(t *testing.T) {
 	}
 }
 
-func TestCommitReportingPlugin_nextMinSeqNum(t *testing.T) {
-	root1 := utils.Keccak256Fixed(hexutil.MustDecode("0xaa"))
-
-	var tt = []struct {
-		onChainMin          uint64
-		inflight            []cciptypes.CommitStoreReport
-		expectedOnChainMin  uint64
-		expectedInflightMin uint64
-	}{
-		{
-			onChainMin:          uint64(1),
-			inflight:            nil,
-			expectedInflightMin: uint64(1),
-			expectedOnChainMin:  uint64(1),
-		},
-		{
-			onChainMin: uint64(1),
-			inflight: []cciptypes.CommitStoreReport{
-				{Interval: cciptypes.CommitStoreInterval{Min: uint64(1), Max: uint64(2)}, MerkleRoot: root1}},
-			expectedInflightMin: uint64(3),
-			expectedOnChainMin:  uint64(1),
-		},
-		{
-			onChainMin: uint64(1),
-			inflight: []cciptypes.CommitStoreReport{
-				{Interval: cciptypes.CommitStoreInterval{Min: uint64(3), Max: uint64(4)}, MerkleRoot: root1}},
-			expectedInflightMin: uint64(5),
-			expectedOnChainMin:  uint64(1),
-		},
-		{
-			onChainMin: uint64(1),
-			inflight: []cciptypes.CommitStoreReport{
-				{Interval: cciptypes.CommitStoreInterval{Min: uint64(1), Max: uint64(MaxInflightSeqNumGap + 2)}, MerkleRoot: root1}},
-			expectedInflightMin: uint64(1),
-			expectedOnChainMin:  uint64(1),
-		},
-	}
-	for _, tc := range tt {
-		commitStoreReader := ccipdatamocks.NewCommitStoreReader(t)
-		commitStoreReader.On("GetExpectedNextSequenceNumber", mock.Anything).Return(tc.onChainMin, nil).Maybe()
-		cp := CommitReportingPlugin{commitStoreReader: commitStoreReader}
-		epochAndRound := uint64(1)
-		for _, rep := range tc.inflight {
-			rc := rep
-			rc.GasPrices = []cciptypes.GasPrice{{}}
-			epochAndRound++
-		}
-		nextSeqNum, err := cp.commitStoreReader.GetExpectedNextSequenceNumber(context.Background())
-		require.NoError(t, err)
-		assert.Equal(t, tc.expectedOnChainMin, nextSeqNum)
-	}
-}
-
 func TestCommitReportingPlugin_isStaleReport(t *testing.T) {
 	ctx := context.Background()
 	lggr := logger.TestLogger(t)
@@ -1539,11 +1485,6 @@ func TestCommitReportingPlugin_isStaleReport(t *testing.T) {
 		}, types.ReportTimestamp{}))
 
 		assert.True(t, r.isStaleReport(ctx, lggr, cciptypes.CommitStoreReport{
-			MerkleRoot: merkleRoot1,
-			Interval:   cciptypes.CommitStoreInterval{Min: expNextSeqNum + 1, Max: expNextSeqNum + 10},
-		}, types.ReportTimestamp{}))
-
-		assert.True(t, r.isStaleReport(ctx, lggr, cciptypes.CommitStoreReport{
 			MerkleRoot: merkleRoot1}, types.ReportTimestamp{}))
 	})
 }
@@ -1552,7 +1493,6 @@ func TestCommitReportingPlugin_calculateMinMaxSequenceNumbers(t *testing.T) {
 	testCases := []struct {
 		name              string
 		commitStoreSeqNum uint64
-		inflightSeqNum    uint64
 		msgSeqNums        []uint64
 
 		expQueryMin uint64 // starting seq num that is used in the query to get messages
@@ -1561,17 +1501,16 @@ func TestCommitReportingPlugin_calculateMinMaxSequenceNumbers(t *testing.T) {
 		expErr      bool
 	}{
 		{
-			name:              "happy flow inflight",
+			name:              "happy flow",
 			commitStoreSeqNum: 9,
-			inflightSeqNum:    10,
 			msgSeqNums:        []uint64{11, 12, 13, 14},
-			expQueryMin:       11, // inflight+1
+			expQueryMin:       9,
 			expMin:            11,
 			expMax:            14,
 			expErr:            false,
 		},
 		{
-			name:              "happy flow no inflight",
+			name:              "happy flow 2",
 			commitStoreSeqNum: 9,
 			msgSeqNums:        []uint64{11, 12, 13, 14},
 			expQueryMin:       9, // from commit store
@@ -1582,7 +1521,6 @@ func TestCommitReportingPlugin_calculateMinMaxSequenceNumbers(t *testing.T) {
 		{
 			name:              "gap in msg seq nums",
 			commitStoreSeqNum: 10,
-			inflightSeqNum:    9,
 			expQueryMin:       10,
 			msgSeqNums:        []uint64{11, 12, 14},
 			expErr:            true,
@@ -1644,35 +1582,21 @@ func TestCommitReportingPlugin_getLatestGasPriceUpdate(t *testing.T) {
 	chainSelector := uint64(1234)
 
 	testCases := []struct {
-		name                   string
-		checkInflight          bool
-		inflightGasPriceUpdate *update
-		destGasPriceUpdates    []update
-		expUpdate              update
-		expErr                 bool
+		name                string
+		destGasPriceUpdates []update
+		expUpdate           update
+		expErr              bool
 	}{
 		{
-			name:                   "only inflight gas price",
-			checkInflight:          true,
-			inflightGasPriceUpdate: &update{timestamp: now, value: big.NewInt(1000)},
-			expUpdate:              update{timestamp: now, value: big.NewInt(1000)},
-			expErr:                 false,
-		},
-		{
-			name:                   "inflight price is nil",
-			checkInflight:          true,
-			inflightGasPriceUpdate: nil,
+			name: "happy path",
 			destGasPriceUpdates: []update{
-				{timestamp: now.Add(time.Minute), value: big.NewInt(2000)},
-				{timestamp: now.Add(2 * time.Minute), value: big.NewInt(3000)},
+				{timestamp: now, value: big.NewInt(1000)},
 			},
-			expUpdate: update{timestamp: now.Add(2 * time.Minute), value: big.NewInt(3000)},
+			expUpdate: update{timestamp: now, value: big.NewInt(1000)},
 			expErr:    false,
 		},
 		{
-			name:                   "inflight updates are skipped",
-			checkInflight:          false,
-			inflightGasPriceUpdate: &update{timestamp: now, value: big.NewInt(1000)},
+			name: "happy path two updates",
 			destGasPriceUpdates: []update{
 				{timestamp: now.Add(time.Minute), value: big.NewInt(2000)},
 				{timestamp: now.Add(2 * time.Minute), value: big.NewInt(3000)},
@@ -1728,13 +1652,11 @@ func TestCommitReportingPlugin_getLatestTokenPriceUpdates(t *testing.T) {
 	testCases := []struct {
 		name                 string
 		priceRegistryUpdates []cciptypes.TokenPriceUpdate
-		checkInflight        bool
-		inflightUpdates      map[cciptypes.Address]update
 		expUpdates           map[cciptypes.Address]update
 		expErr               bool
 	}{
 		{
-			name: "ignore inflight updates",
+			name: "happy path",
 			priceRegistryUpdates: []cciptypes.TokenPriceUpdate{
 				{
 					TokenPrice: cciptypes.TokenPrice{
@@ -1751,39 +1673,9 @@ func TestCommitReportingPlugin_getLatestTokenPriceUpdates(t *testing.T) {
 					TimestampUnixSec: big.NewInt(now.Add(2 * time.Minute).Unix()),
 				},
 			},
-			checkInflight: false,
 			expUpdates: map[cciptypes.Address]update{
 				tk1: {timestamp: now.Add(1 * time.Minute), value: big.NewInt(1000)},
 				tk2: {timestamp: now.Add(2 * time.Minute), value: big.NewInt(2000)},
-			},
-			expErr: false,
-		},
-		{
-			name: "consider inflight updates",
-			priceRegistryUpdates: []cciptypes.TokenPriceUpdate{
-				{
-					TokenPrice: cciptypes.TokenPrice{
-						Token: tk1,
-						Value: big.NewInt(1000),
-					},
-					TimestampUnixSec: big.NewInt(now.Add(1 * time.Minute).Unix()),
-				},
-				{
-					TokenPrice: cciptypes.TokenPrice{
-						Token: tk2,
-						Value: big.NewInt(2000),
-					},
-					TimestampUnixSec: big.NewInt(now.Add(2 * time.Minute).Unix()),
-				},
-			},
-			checkInflight: true,
-			inflightUpdates: map[cciptypes.Address]update{
-				tk1: {timestamp: now, value: big.NewInt(500)}, // inflight but older
-				tk2: {timestamp: now.Add(4 * time.Minute), value: big.NewInt(4000)},
-			},
-			expUpdates: map[cciptypes.Address]update{
-				tk1: {timestamp: now.Add(1 * time.Minute), value: big.NewInt(1000)},
-				tk2: {timestamp: now.Add(4 * time.Minute), value: big.NewInt(4000)},
 			},
 			expErr: false,
 		},
