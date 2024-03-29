@@ -850,6 +850,9 @@ func (r *ExecutionReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Conte
 	if err = r.inflightReports.add(lggr, execReport.Messages); err != nil {
 		return false, err
 	}
+	if len(execReport.Messages) > 0 {
+		r.metricsCollector.SequenceNumber(execReport.Messages[len(execReport.Messages)-1].SequenceNumber)
+	}
 	lggr.Info("Accepting finalized report")
 	return true, nil
 }
