@@ -7,8 +7,8 @@ import {Client} from "../../libraries/Client.sol";
 contract EtherSenderReceiverHelper is EtherSenderReceiver {
   constructor(address router) EtherSenderReceiver(router) {}
 
-  function validateMessage(Client.EVM2AnyMessage calldata message) public view {
-    _validateMessage(message);
+  function validatedMessage(Client.EVM2AnyMessage calldata message) public view returns (Client.EVM2AnyMessage memory) {
+    return _validatedMessage(message);
   }
 
   function validateFeeToken(Client.EVM2AnyMessage calldata message) public payable {
@@ -17,9 +17,5 @@ contract EtherSenderReceiverHelper is EtherSenderReceiver {
 
   function publicCcipReceive(Client.Any2EVMMessage memory message) public {
     _ccipReceive(message);
-  }
-
-  function publicCcipSend(uint64 destinationChainSelector, Client.EVM2AnyMessage calldata message) public {
-    _ccipSend(destinationChainSelector, message);
   }
 }
