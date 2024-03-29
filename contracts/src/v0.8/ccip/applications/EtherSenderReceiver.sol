@@ -129,18 +129,9 @@ contract EtherSenderReceiver is CCIPReceiver, ITypeAndVersion {
   ) internal view returns (Client.EVM2AnyMessage memory) {
     Client.EVM2AnyMessage memory validatedMessage = message;
 
-    // Ensure that the receiver on the destination chain is always msg.sender.
-    validatedMessage.data = abi.encode(msg.sender);
-
     // Only one tokenAmount is allowed, which is the weth token and amount.
     if (validatedMessage.tokenAmounts.length != 1) {
       revert InvalidTokenAmounts(validatedMessage.tokenAmounts.length);
-    }
-
-    Client.EVMTokenAmount memory tokenAmount = validatedMessage.tokenAmounts[0];
-    if (tokenAmount.token != address(i_weth)) {
-      tokenAmount.token = address(i_weth);
-      validatedMessage.tokenAmounts[0] = tokenAmount;
     }
 
     // As of time of writing we only have extra args v1, so we can check that here.
@@ -155,6 +146,10 @@ contract EtherSenderReceiver is CCIPReceiver, ITypeAndVersion {
         }
       }
     }
+
+    // Ensure that the receiver on the destination chain is always msg.sender.
+    validatedMessage.data = abi.encode(msg.sender);
+    validatedMessage.tokenAmounts[0].token = address(i_weth);
 
     return validatedMessage;
   }
