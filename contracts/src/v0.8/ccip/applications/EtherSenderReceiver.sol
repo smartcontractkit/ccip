@@ -78,17 +78,15 @@ contract EtherSenderReceiver is CCIPReceiver, ITypeAndVersion {
   /// @param message The CCIP message with the following fields correctly set:
   /// - bytes receiver: The _contract_ address on the destination chain that will receive the wrapped ether.
   /// The caller must ensure that this contract address is correct, otherwise funds may be lost forever.
-  /// - bytes data: The abi-encoded EOA that will receive the unwrapped ether on the destination chain.
   /// - address feeToken: The fee token address. Must be address(0) for native tokens, or a supported CCIP fee token otherwise (i.e, LINK token).
   /// In the event a feeToken is set, we will transferFrom the caller the fee amount before sending the message, in order to forward
   /// - EVMTokenAmount[] tokenAmounts: The tokenAmounts array must contain a single element with the following fields:
-  ///   - address token: The WETH token address.
   ///   - uint256 amount: The amount of ether to send.
   /// There are a couple of cases here that depend on the fee token specified:
   /// 1. If feeToken == address(0), the fee must be included in msg.value. Therefore tokenAmounts[0].amount must be less than msg.value,
   ///    and the difference will be used as the fee.
   /// 2. If feeToken != address(0), the fee is not included in msg.value, and tokenAmounts[0].amount must be equal to msg.value.
-  // these fees to the CCIP router.
+  ///    these fees to the CCIP router.
   /// @return messageId The CCIP message ID.
   function ccipSend(
     uint64 destinationChainSelector,

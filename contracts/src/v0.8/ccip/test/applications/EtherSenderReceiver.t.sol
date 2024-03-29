@@ -90,6 +90,56 @@ contract EtherSenderReceiverTest_validatedMessage is EtherSenderReceiverTest {
 
   uint256 internal constant amount = 100;
 
+  function testFuzz_validatedMessage_msgSenderOverwrite(bytes memory data) public {
+    {
+      Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
+      tokenAmounts[0] = Client.EVMTokenAmount({
+        token: address(0), // callers may not specify this.
+        amount: amount
+      });
+      Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
+        receiver: abi.encode(XCHAIN_RECEIVER),
+        data: data,
+        tokenAmounts: tokenAmounts,
+        feeToken: address(0),
+        extraArgs: ""
+      });
+
+      Client.EVM2AnyMessage memory validatedMessage = s_etherSenderReceiver.validatedMessage(message);
+      assertEq(validatedMessage.receiver, abi.encode(XCHAIN_RECEIVER), "receiver must be XCHAIN_RECEIVER");
+      assertEq(validatedMessage.data, abi.encode(OWNER), "data must be msg.sender");
+      assertEq(validatedMessage.tokenAmounts[0].token, address(s_weth), "token must be weth");
+      assertEq(validatedMessage.tokenAmounts[0].amount, amount, "amount must be correct");
+      assertEq(validatedMessage.feeToken, address(0), "feeToken must be 0");
+      assertEq(validatedMessage.extraArgs, bytes(""), "extraArgs must be empty");
+    }
+  }
+
+  function testFuzz_validatedMessage_tokenAddressOverwrite(address token) public {
+    {
+      Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
+      tokenAmounts[0] = Client.EVMTokenAmount({
+        token: token,
+        amount: amount
+      });
+      Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
+        receiver: abi.encode(XCHAIN_RECEIVER),
+        data: "",
+        tokenAmounts: tokenAmounts,
+        feeToken: address(0),
+        extraArgs: ""
+      });
+
+      Client.EVM2AnyMessage memory validatedMessage = s_etherSenderReceiver.validatedMessage(message);
+      assertEq(validatedMessage.receiver, abi.encode(XCHAIN_RECEIVER), "receiver must be XCHAIN_RECEIVER");
+      assertEq(validatedMessage.data, abi.encode(OWNER), "data must be msg.sender");
+      assertEq(validatedMessage.tokenAmounts[0].token, address(s_weth), "token must be weth");
+      assertEq(validatedMessage.tokenAmounts[0].amount, amount, "amount must be correct");
+      assertEq(validatedMessage.feeToken, address(0), "feeToken must be 0");
+      assertEq(validatedMessage.extraArgs, bytes(""), "extraArgs must be empty");
+    }
+  }
+
   function test_validatedMessage_emptyDataOverwrittenToMsgSender() public {
     {
       Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
