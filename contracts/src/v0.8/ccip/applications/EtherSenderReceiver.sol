@@ -127,24 +127,23 @@ contract EtherSenderReceiver is CCIPReceiver, ITypeAndVersion {
   function _validatedMessage(
     Client.EVM2AnyMessage calldata message
   ) internal view returns (Client.EVM2AnyMessage memory) {
+    // As of time of writing we only have extra args v1, so we can check that here.
+    // If we add more extra args in the future, the signature will no longer match.
+    bytes calldata extraArgs = message.extraArgs;
+    if (extraArgs.length > 0) {
+      if (bytes4(extraArgs[:4]) == Client.EVM_EXTRA_ARGS_V1_TAG) {
+        uint256 gasLimit = abi.decode(extraArgs[4:], (Client.EVMExtraArgsV1)).gasLimit;
+        if (gasLimit < MIN_MESSAGE_GAS_LIMIT) {
+          revert GasLimitTooLow(MIN_MESSAGE_GAS_LIMIT, gasLimit);
+        }
+      }
+    }
+
     Client.EVM2AnyMessage memory validatedMessage = message;
 
     // Only one tokenAmount is allowed, which is the weth token and amount.
     if (validatedMessage.tokenAmounts.length != 1) {
       revert InvalidTokenAmounts(validatedMessage.tokenAmounts.length);
-    }
-
-    // As of time of writing we only have extra args v1, so we can check that here.
-    // If we add more extra args in the future, the signature will no longer match.
-    bytes calldata extraArgs = message.extraArgs;
-    if (extraArgs.length > 0) {
-      bytes4 extraArgsSig = bytes4(extraArgs[:4]);
-      if (extraArgsSig == Client.EVM_EXTRA_ARGS_V1_TAG) {
-        Client.EVMExtraArgsV1 memory args = abi.decode(extraArgs[4:], (Client.EVMExtraArgsV1));
-        if (args.gasLimit < MIN_MESSAGE_GAS_LIMIT) {
-          revert GasLimitTooLow(MIN_MESSAGE_GAS_LIMIT, args.gasLimit);
-        }
-      }
     }
 
     // Ensure that the receiver on the destination chain is always msg.sender.
