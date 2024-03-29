@@ -247,7 +247,6 @@ func TestCommitReportingPlugin_Observation(t *testing.T) {
 
 			p := &CommitReportingPlugin{}
 			p.lggr = logger.TestLogger(t)
-			p.inflightReports = newInflightCommitReportsContainer(time.Hour)
 			p.commitStoreReader = commitStoreReader
 			p.onRampReader = onRampReader
 			p.offRampReaders = offRampReaders
@@ -562,7 +561,6 @@ func TestCommitReportingPlugin_Report(t *testing.T) {
 
 			p := &CommitReportingPlugin{}
 			p.lggr = logger.TestLogger(t)
-			p.inflightReports = newInflightCommitReportsContainer(time.Minute)
 			p.destPriceRegistryReader = destPriceRegistryReader
 			p.onRampReader = onRampReader
 			p.sourceChainSelector = sourceChainSelector
@@ -606,7 +604,6 @@ func TestCommitReportingPlugin_ShouldAcceptFinalizedReport(t *testing.T) {
 	newPlugin := func() *CommitReportingPlugin {
 		p := &CommitReportingPlugin{}
 		p.lggr = logger.TestLogger(t)
-		p.inflightReports = newInflightCommitReportsContainer(time.Minute)
 		p.metricsCollector = ccip.NoopMetricsCollector
 		return p
 	}
@@ -647,8 +644,6 @@ func TestCommitReportingPlugin_ShouldAcceptFinalizedReport(t *testing.T) {
 
 	t.Run("stale report should not be accepted", func(t *testing.T) {
 		onChainSeqNum := uint64(100)
-
-		//_, _ := testhelpers.NewFakeCommitStore(t, onChainSeqNum)
 
 		commitStoreReader := ccipdatamocks.NewCommitStoreReader(t)
 		p := newPlugin()
@@ -723,11 +718,6 @@ func TestCommitReportingPlugin_ShouldAcceptFinalizedReport(t *testing.T) {
 		shouldAccept, err := p.ShouldAcceptFinalizedReport(ctx, types.ReportTimestamp{}, encodedReport)
 		assert.NoError(t, err)
 		assert.True(t, shouldAccept)
-
-		// make sure that the report was added inflight
-		tokenPriceUpdates := p.inflightReports.latestInflightTokenPriceUpdates()
-		priceUpdate := tokenPriceUpdates[report.TokenPrices[0].Token]
-		assert.Equal(t, report.TokenPrices[0].Value.Uint64(), priceUpdate.value.Uint64())
 	})
 }
 
@@ -752,7 +742,6 @@ func TestCommitReportingPlugin_ShouldTransmitAcceptedReport(t *testing.T) {
 	onChainSeqNum := uint64(100)
 	commitStoreReader.On("GetExpectedNextSequenceNumber", mock.Anything).Return(onChainSeqNum, nil)
 	p.commitStoreReader = commitStoreReader
-	p.inflightReports = newInflightCommitReportsContainer(time.Minute)
 	p.lggr = logger.TestLogger(t)
 
 	chainHealthCheck := ccipcachemocks.NewChainHealthcheck(t)
@@ -1471,7 +1460,6 @@ func TestCommitReportingPlugin_generatePriceUpdates(t *testing.T) {
 }
 
 func TestCommitReportingPlugin_nextMinSeqNum(t *testing.T) {
-	lggr := logger.TestLogger(t)
 	root1 := utils.Keccak256Fixed(hexutil.MustDecode("0xaa"))
 
 	var tt = []struct {
@@ -1511,20 +1499,16 @@ func TestCommitReportingPlugin_nextMinSeqNum(t *testing.T) {
 	for _, tc := range tt {
 		commitStoreReader := ccipdatamocks.NewCommitStoreReader(t)
 		commitStoreReader.On("GetExpectedNextSequenceNumber", mock.Anything).Return(tc.onChainMin, nil).Maybe()
-		cp := CommitReportingPlugin{commitStoreReader: commitStoreReader, inflightReports: newInflightCommitReportsContainer(time.Hour)}
+		cp := CommitReportingPlugin{commitStoreReader: commitStoreReader}
 		epochAndRound := uint64(1)
 		for _, rep := range tc.inflight {
 			rc := rep
 			rc.GasPrices = []cciptypes.GasPrice{{}}
-			require.NoError(t, cp.inflightReports.add(lggr, rc, epochAndRound))
 			epochAndRound++
 		}
-		t.Log("inflight", cp.inflightReports.maxInflightSeqNr())
-		inflightMin, onchainMin, err := cp.nextMinSeqNum(context.Background(), lggr)
+		nextSeqNum, err := cp.commitStoreReader.GetExpectedNextSequenceNumber(context.Background())
 		require.NoError(t, err)
-		assert.Equal(t, tc.expectedInflightMin, inflightMin)
-		assert.Equal(t, tc.expectedOnChainMin, onchainMin)
-		cp.inflightReports.reset(lggr)
+		assert.Equal(t, tc.expectedOnChainMin, nextSeqNum)
 	}
 }
 
@@ -1532,12 +1516,11 @@ func TestCommitReportingPlugin_isStaleReport(t *testing.T) {
 	ctx := context.Background()
 	lggr := logger.TestLogger(t)
 	merkleRoot1 := utils.Keccak256Fixed([]byte("some merkle root 1"))
-	merkleRoot2 := utils.Keccak256Fixed([]byte("some merkle root 2"))
 
 	t.Run("empty report", func(t *testing.T) {
 		commitStoreReader := ccipdatamocks.NewCommitStoreReader(t)
 		r := &CommitReportingPlugin{commitStoreReader: commitStoreReader}
-		isStale := r.isStaleReport(ctx, lggr, cciptypes.CommitStoreReport{}, false, types.ReportTimestamp{})
+		isStale := r.isStaleReport(ctx, lggr, cciptypes.CommitStoreReport{}, types.ReportTimestamp{})
 		assert.True(t, isStale)
 	})
 
@@ -1548,29 +1531,20 @@ func TestCommitReportingPlugin_isStaleReport(t *testing.T) {
 
 		r := &CommitReportingPlugin{
 			commitStoreReader: commitStoreReader,
-			inflightReports: &inflightCommitReportsContainer{
-				inFlight: map[[32]byte]InflightCommitReport{
-					merkleRoot2: {
-						report: cciptypes.CommitStoreReport{
-							Interval: cciptypes.CommitStoreInterval{Min: expNextSeqNum + 1, Max: expNextSeqNum + 10},
-						},
-					},
-				},
-			},
 		}
 
 		assert.False(t, r.isStaleReport(ctx, lggr, cciptypes.CommitStoreReport{
 			MerkleRoot: merkleRoot1,
 			Interval:   cciptypes.CommitStoreInterval{Min: expNextSeqNum + 1, Max: expNextSeqNum + 10},
-		}, false, types.ReportTimestamp{}))
+		}, types.ReportTimestamp{}))
 
 		assert.True(t, r.isStaleReport(ctx, lggr, cciptypes.CommitStoreReport{
 			MerkleRoot: merkleRoot1,
 			Interval:   cciptypes.CommitStoreInterval{Min: expNextSeqNum + 1, Max: expNextSeqNum + 10},
-		}, true, types.ReportTimestamp{}))
+		}, types.ReportTimestamp{}))
 
 		assert.True(t, r.isStaleReport(ctx, lggr, cciptypes.CommitStoreReport{
-			MerkleRoot: merkleRoot1}, false, types.ReportTimestamp{}))
+			MerkleRoot: merkleRoot1}, types.ReportTimestamp{}))
 	})
 }
 
@@ -1640,18 +1614,6 @@ func TestCommitReportingPlugin_calculateMinMaxSequenceNumbers(t *testing.T) {
 			commitStoreReader := ccipdatamocks.NewCommitStoreReader(t)
 			commitStoreReader.On("GetExpectedNextSequenceNumber", mock.Anything).Return(tc.commitStoreSeqNum, nil)
 			p.commitStoreReader = commitStoreReader
-
-			p.inflightReports = newInflightCommitReportsContainer(time.Minute)
-			if tc.inflightSeqNum > 0 {
-				p.inflightReports.inFlight[[32]byte{}] = InflightCommitReport{
-					report: cciptypes.CommitStoreReport{
-						Interval: cciptypes.CommitStoreInterval{
-							Min: tc.inflightSeqNum,
-							Max: tc.inflightSeqNum,
-						},
-					},
-				}
-			}
 
 			onRampReader := ccipdatamocks.NewOnRampReader(t)
 			var sendReqs []cciptypes.EVM2EVMMessageWithTxMeta
@@ -1726,23 +1688,9 @@ func TestCommitReportingPlugin_getLatestGasPriceUpdate(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			p := &CommitReportingPlugin{}
 			p.sourceChainSelector = chainSelector
-			p.inflightReports = newInflightCommitReportsContainer(time.Minute)
 			p.lggr = lggr
 			destPriceRegistry := ccipdatamocks.NewPriceRegistryReader(t)
 			p.destPriceRegistryReader = destPriceRegistry
-
-			if tc.inflightGasPriceUpdate != nil {
-				p.inflightReports.inFlightPriceUpdates = append(
-					p.inflightReports.inFlightPriceUpdates,
-					InflightPriceUpdate{
-						createdAt: tc.inflightGasPriceUpdate.timestamp,
-						gasPrices: []cciptypes.GasPrice{{
-							DestChainSelector: chainSelector,
-							Value:             tc.inflightGasPriceUpdate.value,
-						}},
-					},
-				)
-			}
 
 			if len(tc.destGasPriceUpdates) > 0 {
 				var events []cciptypes.GasPriceUpdateWithTxMeta
@@ -1759,7 +1707,7 @@ func TestCommitReportingPlugin_getLatestGasPriceUpdate(t *testing.T) {
 				p.destPriceRegistryReader = destReader
 			}
 
-			priceUpdate, err := p.getLatestGasPriceUpdate(ctx, time.Now(), tc.checkInflight)
+			priceUpdate, err := p.getLatestGasPriceUpdate(ctx, time.Now())
 			if tc.expErr {
 				assert.Error(t, err)
 				return
@@ -1846,33 +1794,19 @@ func TestCommitReportingPlugin_getLatestTokenPriceUpdates(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			p := &CommitReportingPlugin{}
 
-			//_, priceRegAddr := testhelpers.NewFakePriceRegistry(t)
 			priceReg := ccipdatamocks.NewPriceRegistryReader(t)
 			p.destPriceRegistryReader = priceReg
 
-			//destReader := ccipdata.NewMockReader(t)
 			var events []cciptypes.TokenPriceUpdateWithTxMeta
 			for _, up := range tc.priceRegistryUpdates {
 				events = append(events, cciptypes.TokenPriceUpdateWithTxMeta{
 					TokenPriceUpdate: up,
 				})
 			}
-			//destReader.On("GetTokenPriceUpdatesCreatedAfter", ctx, priceRegAddr, mock.Anything, 0).Return(events, nil)
+
 			priceReg.On("GetTokenPriceUpdatesCreatedAfter", ctx, mock.Anything, 0).Return(events, nil)
 
-			p.inflightReports = newInflightCommitReportsContainer(time.Minute)
-			if len(tc.inflightUpdates) > 0 {
-				for tk, upd := range tc.inflightUpdates {
-					p.inflightReports.inFlightPriceUpdates = append(p.inflightReports.inFlightPriceUpdates, InflightPriceUpdate{
-						createdAt: upd.timestamp,
-						tokenPrices: []cciptypes.TokenPrice{
-							{Token: tk, Value: upd.value},
-						},
-					})
-				}
-			}
-
-			updates, err := p.getLatestTokenPriceUpdates(ctx, now, tc.checkInflight)
+			updates, err := p.getLatestTokenPriceUpdates(ctx, now)
 			if tc.expErr {
 				assert.Error(t, err)
 				return
