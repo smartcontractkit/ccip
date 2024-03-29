@@ -82,16 +82,16 @@ contract EtherSenderReceiverTest_validateFeeToken is EtherSenderReceiverTest {
   }
 }
 
-contract EtherSenderReceiverTest_validateMessage is EtherSenderReceiverTest {
+contract EtherSenderReceiverTest_validatedMessage is EtherSenderReceiverTest {
   error InvalidDestinationReceiver(bytes destReceiver);
   error InvalidTokenAmounts(uint256 gotAmounts);
   error InvalidWethAddress(address want, address got);
   error GasLimitTooLow(uint256 minLimit, uint256 gotLimit);
 
-  function test_validatedMessage_validMessage() public {
-    uint256 amount = 100;
+  uint256 internal constant amount = 100;
+
+  function test_validatedMessage_emptyDataOverwrittenToMsgSender() public {
     {
-      // Case 1: data not specified, is overwritten to be msg.sender.
       Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
       tokenAmounts[0] = Client.EVMTokenAmount({
         token: address(0), // callers may not specify this.
@@ -113,8 +113,10 @@ contract EtherSenderReceiverTest_validateMessage is EtherSenderReceiverTest {
       assertEq(validatedMessage.feeToken, address(0), "feeToken must be 0");
       assertEq(validatedMessage.extraArgs, bytes(""), "extraArgs must be empty");
     }
+  }
+
+  function test_validatedMessage_dataOverwrittenToMsgSender() public {
     {
-      // Case 2: data specified, is still overwritten to be msg.sender.
       Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
       tokenAmounts[0] = Client.EVMTokenAmount({
         token: address(0), // callers may not specify this.
@@ -136,8 +138,10 @@ contract EtherSenderReceiverTest_validateMessage is EtherSenderReceiverTest {
       assertEq(validatedMessage.feeToken, address(0), "feeToken must be 0");
       assertEq(validatedMessage.extraArgs, bytes(""), "extraArgs must be empty");
     }
+  }
+
+  function test_validatedMessage_tokenOverwrittenToWeth() public {
     {
-      // Case 3: token specified incorrectly, is overwritten to be weth.
       Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
       tokenAmounts[0] = Client.EVMTokenAmount({
         token: address(42), // incorrect token.
@@ -159,8 +163,10 @@ contract EtherSenderReceiverTest_validateMessage is EtherSenderReceiverTest {
       assertEq(validatedMessage.feeToken, address(0), "feeToken must be 0");
       assertEq(validatedMessage.extraArgs, bytes(""), "extraArgs must be empty");
     }
+  }
+
+  function test_validatedMessage_validMessage_extraArgs() public {
     {
-      // Case 4: extraArgs specified.
       Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
       tokenAmounts[0] = Client.EVMTokenAmount({
         token: address(0), // callers may not specify this.
@@ -188,10 +194,8 @@ contract EtherSenderReceiverTest_validateMessage is EtherSenderReceiverTest {
     }
   }
 
-  function test_validatedMessage_invalid() public {
-    uint256 amount = 100;
+  function test_validatedMessage_invalidTokenAmounts() public {
     {
-      // Case 1: incorrect token amounts.
       Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](2);
       tokenAmounts[0] = Client.EVMTokenAmount({token: address(0), amount: amount});
       tokenAmounts[1] = Client.EVMTokenAmount({token: address(0), amount: amount});
@@ -206,8 +210,10 @@ contract EtherSenderReceiverTest_validateMessage is EtherSenderReceiverTest {
       vm.expectRevert(abi.encodeWithSelector(InvalidTokenAmounts.selector, uint256(2)));
       s_etherSenderReceiver.validatedMessage(message);
     }
+  }
+
+  function test_validatedMessage_gasLimitTooLow() public {
     {
-      // Case 2: gas specified in extra args is too low.
       Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
       tokenAmounts[0] = Client.EVMTokenAmount({token: address(0), amount: amount});
       Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
@@ -224,9 +230,86 @@ contract EtherSenderReceiverTest_validateMessage is EtherSenderReceiverTest {
   }
 }
 
-contract EtherSenderReceiverTest_getFee is EtherSenderReceiverTest {}
+contract EtherSenderReceiverTest_getFee is EtherSenderReceiverTest {
+  uint64 internal constant destinationChainSelector = 424242;
+  uint256 internal constant feeWei = 121212;
+  uint256 internal constant amount = 100;
 
-contract EtherSenderReceiverTest_ccipReceive is EtherSenderReceiverTest {}
+  function test_getFee() public {
+    {
+      Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
+      tokenAmounts[0] = Client.EVMTokenAmount({token: address(0), amount: amount});
+      Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
+        receiver: abi.encode(XCHAIN_RECEIVER),
+        data: "",
+        tokenAmounts: tokenAmounts,
+        feeToken: address(0),
+        extraArgs: ""
+      });
+
+      Client.EVM2AnyMessage memory validatedMessage = s_etherSenderReceiver.validatedMessage(message);
+
+      vm.mockCall(
+        ROUTER,
+        abi.encodeWithSelector(IRouterClient.getFee.selector, destinationChainSelector, validatedMessage),
+        abi.encode(feeWei)
+      );
+
+      uint256 fee = s_etherSenderReceiver.getFee(destinationChainSelector, message);
+      assertEq(fee, feeWei, "fee must be feeWei");
+    }
+  }
+}
+
+contract EtherSenderReceiverTest_ccipReceive is EtherSenderReceiverTest {
+  uint256 internal constant amount = 100;
+  uint256 internal constant sourceChainSelector = 424242;
+  address internal constant XCHAIN_SENDER = 0x9951529C13B01E542f7eE3b6D6665D292e9BA2E0;
+
+  function test_ccipReceive_happyPath() public {
+    {
+      Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](1);
+      destTokenAmounts[0] = Client.EVMTokenAmount({token: address(s_weth), amount: amount});
+      Client.Any2EVMMessage memory message = Client.Any2EVMMessage({
+        messageId: keccak256(abi.encode("ccip send")),
+        sourceChainSelector: 424242,
+        sender: abi.encode(XCHAIN_SENDER),
+        data: abi.encode(OWNER),
+        destTokenAmounts: destTokenAmounts
+      });
+
+      // simulate a cross-chain token transfer, just transfer the weth to s_etherSenderReceiver.
+      s_weth.transfer(address(s_etherSenderReceiver), amount);
+
+      uint256 balanceBefore = OWNER.balance;
+      s_etherSenderReceiver.publicCcipReceive(message);
+      uint256 balanceAfter = OWNER.balance;
+      assertEq(balanceAfter, balanceBefore + amount, "balance must be correct");
+    }
+  }
+
+  function test_ccipReceive_fallbackToWethTransfer() public {
+    Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](1);
+      destTokenAmounts[0] = Client.EVMTokenAmount({token: address(s_weth), amount: amount});
+      Client.Any2EVMMessage memory message = Client.Any2EVMMessage({
+        messageId: keccak256(abi.encode("ccip send")),
+        sourceChainSelector: 424242,
+        sender: abi.encode(XCHAIN_SENDER),
+        data: abi.encode(address(s_linkToken)), // ERC20 cannot receive() ether.
+        destTokenAmounts: destTokenAmounts
+      });
+
+      // simulate a cross-chain token transfer, just transfer the weth to s_etherSenderReceiver.
+      s_weth.transfer(address(s_etherSenderReceiver), amount);
+
+      uint256 balanceBefore = address(s_linkToken).balance;
+      s_etherSenderReceiver.publicCcipReceive(message);
+      uint256 balanceAfter = address(s_linkToken).balance;
+      assertEq(balanceAfter, balanceBefore, "balance must be unchanged");
+      uint256 wethBalance = s_weth.balanceOf(address(s_linkToken));
+      assertEq(wethBalance, amount, "weth balance must be correct");
+  }
+}
 
 contract EtherSenderReceiverTest_ccipSend is EtherSenderReceiverTest {
   error InsufficientFee(uint256 gotFee, uint256 fee);
