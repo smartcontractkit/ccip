@@ -3,9 +3,9 @@ pragma solidity 0.8.19;
 
 import {IARM} from "../../interfaces/IARM.sol";
 
-import {Test} from "forge-std/Test.sol";
-import {ARMSetup} from "./ARMSetup.t.sol";
 import {ARM} from "../../ARM.sol";
+import {ARMSetup} from "./ARMSetup.t.sol";
+import {Test} from "forge-std/Test.sol";
 
 contract ConfigCompare is Test {
   function assertConfigEq(ARM.Config memory actualConfig, ARM.Config memory expectedConfig) public {

@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.19;
 
+import {PriceRegistry} from "../../PriceRegistry.sol";
 import {Internal} from "../../libraries/Internal.sol";
 import {TokenSetup} from "../TokenSetup.t.sol";
-import {PriceRegistry} from "../../PriceRegistry.sol";
 
 contract PriceRegistrySetup is TokenSetup {
   uint112 internal constant USD_PER_GAS = 1e6; // 0.001 gwei

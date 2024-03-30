@@ -3,9 +3,9 @@ pragma solidity ^0.8.0;
 
 import {IRouterClient} from "../interfaces/IRouterClient.sol";
 
+import {OwnerIsCreator} from "../../shared/access/OwnerIsCreator.sol";
 import {Client} from "../libraries/Client.sol";
 import {CCIPReceiver} from "./CCIPReceiver.sol";
-import {OwnerIsCreator} from "../../shared/access/OwnerIsCreator.sol";
 
 import {IERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.19;
 
-import {IARM} from "../../interfaces/IARM.sol";
 import {ARM} from "../../ARM.sol";
+import {IARM} from "../../interfaces/IARM.sol";
 import {OwnerIsCreator} from "./../../../shared/access/OwnerIsCreator.sol";
 
 contract MockARM is IARM, OwnerIsCreator {

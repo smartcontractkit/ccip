@@ -4,14 +4,13 @@ pragma solidity 0.8.19;
 import {IARM} from "../../interfaces/IARM.sol";
 import {IPriceRegistry} from "../../interfaces/IPriceRegistry.sol";
 
+import {ARM} from "../../ARM.sol";
 import {CommitStore} from "../../CommitStore.sol";
 import {PriceRegistry} from "../../PriceRegistry.sol";
-import {ARM} from "../../ARM.sol";
 import {MerkleMultiProof} from "../../libraries/MerkleMultiProof.sol";
-
 import {CommitStoreHelper} from "../helpers/CommitStoreHelper.sol";
-import {PriceRegistrySetup} from "../priceRegistry/PriceRegistry.t.sol";
 import {OCR2BaseSetup} from "../ocr/OCR2Base.t.sol";
+import {PriceRegistrySetup} from "../priceRegistry/PriceRegistry.t.sol";
 
 contract CommitStoreSetup is PriceRegistrySetup, OCR2BaseSetup {
   event ConfigSet(CommitStore.StaticConfig, CommitStore.DynamicConfig);

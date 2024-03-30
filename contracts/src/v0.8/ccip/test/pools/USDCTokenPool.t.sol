@@ -4,15 +4,15 @@ pragma solidity 0.8.19;
 import {IBurnMintERC20} from "../../../shared/token/ERC20/IBurnMintERC20.sol";
 import {IPool} from "../../interfaces/pools/IPool.sol";
 
-import {BaseTest} from "../BaseTest.t.sol";
-import {MockUSDCTransmitter} from "../mocks/MockUSDCTransmitter.sol";
-import {TokenPool} from "../../pools/TokenPool.sol";
+import {BurnMintERC677} from "../../../shared/token/ERC677/BurnMintERC677.sol";
 import {Router} from "../../Router.sol";
 import {RateLimiter} from "../../libraries/RateLimiter.sol";
+import {TokenPool} from "../../pools/TokenPool.sol";
 import {USDCTokenPool} from "../../pools/USDC/USDCTokenPool.sol";
-import {BurnMintERC677} from "../../../shared/token/ERC677/BurnMintERC677.sol";
-import {MockUSDCTokenMessenger} from "../mocks/MockUSDCTokenMessenger.sol";
+import {BaseTest} from "../BaseTest.t.sol";
 import {USDCTokenPoolHelper} from "../helpers/USDCTokenPoolHelper.sol";
+import {MockUSDCTokenMessenger} from "../mocks/MockUSDCTokenMessenger.sol";
+import {MockUSDCTransmitter} from "../mocks/MockUSDCTransmitter.sol";
 
 import {IERC165} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/introspection/IERC165.sol";
 

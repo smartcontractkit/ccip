@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.19;
 
-import {OCR2Setup} from "./OCR2Setup.t.sol";
 import {OCR2BaseNoChecks} from "../../ocr/OCR2BaseNoChecks.sol";
 import {OCR2NoChecksHelper} from "../helpers/OCR2NoChecksHelper.sol";
+import {OCR2Setup} from "./OCR2Setup.t.sol";
 
 contract OCR2BaseNoChecksSetup is OCR2Setup {
   OCR2NoChecksHelper internal s_OCR2Base;

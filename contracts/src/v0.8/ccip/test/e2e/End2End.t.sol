@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.19;
 
-import "../helpers/MerkleHelper.sol";
 import "../commitStore/CommitStore.t.sol";
-import "../onRamp/EVM2EVMOnRampSetup.t.sol";
+import "../helpers/MerkleHelper.sol";
 import "../offRamp/EVM2EVMOffRampSetup.t.sol";
+import "../onRamp/EVM2EVMOnRampSetup.t.sol";
 
 contract E2E is EVM2EVMOnRampSetup, CommitStoreSetup, EVM2EVMOffRampSetup {
   using Internal for Internal.EVM2EVMMessage;

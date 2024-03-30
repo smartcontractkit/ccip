@@ -19,7 +19,7 @@ block_number = 12345
 [fmt]
 tab_width = 2
 multiline_func_header = "params_first"
-sort_imports = false
+sort_imports = true
 single_line_statement_blocks = "preserve"
 
 [profile.ccip]

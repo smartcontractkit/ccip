@@ -4,10 +4,10 @@ pragma solidity 0.8.19;
 import {IPool} from "../interfaces/pools/IPool.sol";
 
 import {ARM} from "../ARM.sol";
+import {Internal} from "../libraries/Internal.sol";
+import {RateLimiter} from "../libraries/RateLimiter.sol";
 import {EVM2EVMOffRamp} from "../offRamp/EVM2EVMOffRamp.sol";
 import {EVM2EVMOnRamp} from "../onRamp/EVM2EVMOnRamp.sol";
-import {RateLimiter} from "../libraries/RateLimiter.sol";
-import {Internal} from "../libraries/Internal.sol";
 
 contract StructFactory {
   // Addresses

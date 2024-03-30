@@ -2,8 +2,8 @@
 pragma solidity 0.8.19;
 
 import {ITypeAndVersion} from "../../../shared/interfaces/ITypeAndVersion.sol";
-import {ITokenMessenger} from "./ITokenMessenger.sol";
 import {IMessageTransmitter} from "./IMessageTransmitter.sol";
+import {ITokenMessenger} from "./ITokenMessenger.sol";
 
 import {TokenPool} from "../TokenPool.sol";
 

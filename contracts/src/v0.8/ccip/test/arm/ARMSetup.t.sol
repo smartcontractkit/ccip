@@ -3,8 +3,8 @@ pragma solidity 0.8.19;
 
 import {IARM} from "../../interfaces/IARM.sol";
 
-import {BaseTest} from "../BaseTest.t.sol";
 import {ARM} from "../../ARM.sol";
+import {BaseTest} from "../BaseTest.t.sol";
 
 contract ARMSetup is BaseTest {
   function makeTaggedRootsInclusive(uint256 from, uint256 to) internal pure returns (IARM.TaggedRoot[] memory) {

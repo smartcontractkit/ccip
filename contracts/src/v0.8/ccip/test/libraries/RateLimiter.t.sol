@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.19;
 
+import {RateLimiter} from "../../libraries/RateLimiter.sol";
 import {BaseTest} from "../BaseTest.t.sol";
 import {RateLimiterHelper} from "../helpers/RateLimiterHelper.sol";
-import {RateLimiter} from "../../libraries/RateLimiter.sol";
 
 contract RateLimiterSetup is BaseTest {
   RateLimiterHelper internal s_helper;
