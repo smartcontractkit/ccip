@@ -95,8 +95,7 @@ contract ArbitrumL1BridgeAdapter is IBridgeAdapter {
 
     // The router will route the call to the gateway that we approved
     // above. The gateway will then transfer the tokens to the L2.
-    // outboundTransferCustomRefund will return the abi encoded inbox sequence number
-    // which is 256 bits, so we can cap the return data to 256 bits.
+    // outboundTransferCustomRefund will return the abi encoded inbox sequence number.
     bytes memory inboxSequenceNumber = i_l1GatewayRouter.outboundTransferCustomRefund{value: msg.value}(
       localToken,
       recipient,
