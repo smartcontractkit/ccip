@@ -103,7 +103,7 @@ func ChainlinkChart(
 		"additionalArgs":   formattedArgs,
 		"stateful":         pointer.GetBool(testInputs.EnvInput.NewCLCluster.IsStateful),
 		"capacity":         testInputs.EnvInput.NewCLCluster.DBCapacity,
-		"storageClassName": "gp3",
+		"storageClassName": pointer.GetString(testInputs.EnvInput.NewCLCluster.DBStorageClass),
 		"image": map[string]any{
 			"image":   testInputs.EnvInput.NewCLCluster.Common.DBImage,
 			"version": testInputs.EnvInput.NewCLCluster.Common.DBTag,
