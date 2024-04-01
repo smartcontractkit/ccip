@@ -145,6 +145,7 @@ func main() {
 		destReceiver := cmd.String("dest-receiver-address", "", "Destination receiver address")
 		feeToken := cmd.String("fee-token", "", "Fee token address")
 		amount := cmd.String("amount", "", "Amount")
+		gasLimit := cmd.Int64("gas-limit", 25_000, "Gas limit for the ccipReceive on destination chain")
 
 		helpers.ParseArgs(cmd, os.Args[2:],
 			"chain-id",
@@ -168,7 +169,7 @@ func main() {
 		helpers.PanicErr(err)
 		feeTok := common.HexToAddress(*feeToken)
 		extraArgsV1Selector := hexutil.MustDecode("0x97a657c9")
-		extraArgsV1, err := utils.ABIEncode(`[{"type": "uint256"}]`, big.NewInt(20_000))
+		extraArgsV1, err := utils.ABIEncode(`[{"type": "uint256"}]`, big.NewInt(*gasLimit))
 		helpers.PanicErr(err)
 		extraArgsV1 = append(extraArgsV1Selector, extraArgsV1...)
 		fmt.Println("extra args v1:", hexutil.Encode(extraArgsV1))
