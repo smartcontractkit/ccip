@@ -38,13 +38,8 @@ contract EtherSenderReceiver is CCIPReceiver, ITypeAndVersion {
 
   string public constant override typeAndVersion = "EtherSenderReceiver 1.0.0-dev";
 
-  /// @notice the minimum gas limit for the message call on the destination chain, 200,000 should be plenty.
-  /// @dev This won't vary on L2's, callbacks are always provided so-called "L2 gas".
-  uint256 public constant MIN_MESSAGE_GAS_LIMIT = 200_000;
-
   /// @notice The wrapped native token address.
-  /// At construction time this matches the wrapped native token address on the router.
-  /// If the wrapped native token address changes on the router, this contract will need to be redeployed.
+  /// @dev If the wrapped native token address changes on the router, this contract will need to be redeployed.
   IWrappedNative public immutable i_weth;
 
   /// @param router The CCIP router address.
@@ -79,7 +74,7 @@ contract EtherSenderReceiver is CCIPReceiver, ITypeAndVersion {
   /// - bytes receiver: The _contract_ address on the destination chain that will receive the wrapped ether.
   /// The caller must ensure that this contract address is correct, otherwise funds may be lost forever.
   /// - address feeToken: The fee token address. Must be address(0) for native tokens, or a supported CCIP fee token otherwise (i.e, LINK token).
-  /// In the event a feeToken is set, we will transferFrom the caller the fee amount before sending the message, in order to forward
+  /// In the event a feeToken is set, we will transferFrom the caller the fee amount before sending the message, in order to forward them to the router.
   /// - EVMTokenAmount[] tokenAmounts: The tokenAmounts array must contain a single element with the following fields:
   ///   - uint256 amount: The amount of ether to send.
   /// There are a couple of cases here that depend on the fee token specified:
@@ -95,19 +90,16 @@ contract EtherSenderReceiver is CCIPReceiver, ITypeAndVersion {
     _validateFeeToken(message);
     Client.EVM2AnyMessage memory validatedMessage = _validatedMessage(message);
 
-    // deposit the ether into the weth contract to get the wrapped ether.
-    // we gave an infinite approval to the router in the constructor.
     i_weth.deposit{value: validatedMessage.tokenAmounts[0].amount}();
 
-    // if the fee token is not native, we need to transfer the fee to this contract and re-approve it to the router.
     uint256 fee = IRouterClient(getRouter()).getFee(destinationChainSelector, validatedMessage);
     if (validatedMessage.feeToken != address(0)) {
+      // if the fee token is not native, we need to transfer the fee to this contract and re-approve it to the router.
       // its not possible to have any leftover tokens in this path because we transferFrom the exact fee that CCIP
       // requires from the caller.
-      // this will fail if the caller didn't approve at least `fee` tokens to this contract.
       IERC20(validatedMessage.feeToken).safeTransferFrom(msg.sender, address(this), fee);
 
-      // we gave an infinite approval to the router in the constructor.
+      // we gave an infinite approval of weth to the router in the constructor.
       if (validatedMessage.feeToken != address(i_weth)) {
         IERC20(validatedMessage.feeToken).approve(getRouter(), fee);
       }
@@ -124,29 +116,18 @@ contract EtherSenderReceiver is CCIPReceiver, ITypeAndVersion {
     return IRouterClient(getRouter()).ccipSend{value: diff}(destinationChainSelector, validatedMessage);
   }
 
+  /// @notice Validate the message content.
+  /// @dev Only allows a single token to be sent. Always overwritten to be address(i_weth)
+  /// and receiver is always msg.sender.
   function _validatedMessage(
     Client.EVM2AnyMessage calldata message
   ) internal view returns (Client.EVM2AnyMessage memory) {
-    // As of time of writing we only have extra args v1, so we can check that here.
-    // If we add more extra args in the future, the signature will no longer match.
-    bytes calldata extraArgs = message.extraArgs;
-    if (extraArgs.length > 0) {
-      if (bytes4(extraArgs[:4]) == Client.EVM_EXTRA_ARGS_V1_TAG) {
-        uint256 gasLimit = abi.decode(extraArgs[4:], (Client.EVMExtraArgsV1)).gasLimit;
-        if (gasLimit < MIN_MESSAGE_GAS_LIMIT) {
-          revert GasLimitTooLow(MIN_MESSAGE_GAS_LIMIT, gasLimit);
-        }
-      }
-    }
-
     Client.EVM2AnyMessage memory validatedMessage = message;
 
-    // Only one tokenAmount is allowed, which is the weth token and amount.
     if (validatedMessage.tokenAmounts.length != 1) {
       revert InvalidTokenAmounts(validatedMessage.tokenAmounts.length);
     }
 
-    // Ensure that the receiver on the destination chain is always msg.sender.
     validatedMessage.data = abi.encode(msg.sender);
     validatedMessage.tokenAmounts[0].token = address(i_weth);
 
@@ -167,17 +148,11 @@ contract EtherSenderReceiver is CCIPReceiver, ITypeAndVersion {
 
   /// @notice Receive the wrapped ether, unwrap it, and send it to the specified EOA in the data field.
   /// @param message The CCIP message containing the wrapped ether amount and the final receiver.
-  /// @dev This function must never revert. In the event that the inputs are incorrect (i.e wrong receiver),
-  /// there is not much we can do here.
+  /// @dev The code below should never revert if the message being is valid according
+  /// to the above _validatedMessage and _validateFeeToken functions.
   function _ccipReceive(Client.Any2EVMMessage memory message) internal override {
-    // we receive WETH, unwrap it and send it to the final receiver.
-    // The code below should never revert if the message being is valid according
-    // to the above _validatedMessage and _validateFeeToken functions.
-
-    // decode the receiver from the message data.
     address receiver = abi.decode(message.data, (address));
 
-    // withdraw the WETH received from the token pool.
     uint256 tokenAmount = message.destTokenAmounts[0].amount;
     i_weth.withdraw(tokenAmount);
 
