@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/smartcontractkit/havoc"
+
 	"github.com/AlekSi/pointer"
 	"github.com/rs/zerolog"
 	"github.com/smartcontractkit/wasp"
@@ -433,4 +435,15 @@ func NewLoadArgs(t *testing.T, lggr zerolog.Logger, chaosExps ...ChaosConfig) *L
 		LoadStarterWg: &sync.WaitGroup{},
 		pauseLoad:     atomic.NewBool(false),
 	}
+}
+
+func createMonkey(t *testing.T, l zerolog.Logger, namespace string) *havoc.Controller {
+	havoc.SetGlobalLogger(l)
+	cfg, err := havoc.ReadConfig("../chaos/havoc.toml")
+	require.NoError(t, err)
+	c, err := havoc.NewController(cfg)
+	require.NoError(t, err)
+	err = c.GenerateSpecs(namespace)
+	require.NoError(t, err)
+	return c
 }

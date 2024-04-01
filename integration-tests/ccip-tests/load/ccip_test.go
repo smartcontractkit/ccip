@@ -33,6 +33,31 @@ func TestLoadCCIPStableRPS(t *testing.T) {
 	testArgs.Wait()
 }
 
+func TestLoadCCIPStableRPSWithChaos(t *testing.T) {
+	t.Parallel()
+	lggr := logging.GetTestLogger(t)
+
+	monkey := createMonkey(t, lggr, "my namespace, get it from config")
+	//nolint
+	go monkey.Run()
+
+	testArgs := NewLoadArgs(t, lggr)
+	testArgs.Setup()
+	// if the test runs on remote runner
+	if len(testArgs.TestSetupArgs.Lanes) == 0 {
+		return
+	}
+	t.Cleanup(func() {
+		log.Info().Msg("Tearing down the environment")
+		require.NoError(t, testArgs.TestSetupArgs.TearDown())
+	})
+	testArgs.TriggerLoadByLane()
+	testArgs.Wait()
+
+	errs := monkey.Stop()
+	require.Len(t, errs, 0)
+}
+
 // TestLoadCCIPWithUpgradeNodeVersion starts all nodes with a specific version, triggers load and then upgrades the node version as the load is running
 func TestLoadCCIPWithUpgradeNodeVersion(t *testing.T) {
 	t.Parallel()
