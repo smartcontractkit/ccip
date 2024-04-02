@@ -168,7 +168,7 @@ func jobSpecToCommitPluginConfig(ctx context.Context, lggr logger.Logger, jb job
 				chain.Client(),
 				rpclib.DefaultRpcBatchSizeLimit,
 				rpclib.DefaultRpcBatchBackOffMultiplier,
-				rpclib.DefaultParallelRpcCallsLimit,
+				rpclib.DefaultMaxParallelRpcCalls,
 			)
 			priceGetterClients[chainID] = pricegetter.NewDynamicPriceGetterClient(caller)
 		}

@@ -37,8 +37,8 @@ const (
 	// 3. 5/4  = 1
 	DefaultRpcBatchBackOffMultiplier = 5
 
-	// DefaultParallelRpcCallsLimit defines the default maximum number of individual in-parallel rpc calls.
-	DefaultParallelRpcCallsLimit = 10
+	// DefaultMaxParallelRpcCalls defines the default maximum number of individual in-parallel rpc calls.
+	DefaultMaxParallelRpcCalls = 10
 )
 
 // DynamicLimitedBatchCaller makes batched rpc calls and perform retries by reducing the batch size on each retry.
@@ -82,7 +82,7 @@ func newDefaultEvmBatchCaller(
 		multiplier = backOffMultiplier
 	}
 
-	parallelRpcCalls := uint(DefaultParallelRpcCallsLimit)
+	parallelRpcCalls := uint(DefaultMaxParallelRpcCalls)
 	if parallelRpcCallsLimit > 0 {
 		parallelRpcCalls = parallelRpcCallsLimit
 	}

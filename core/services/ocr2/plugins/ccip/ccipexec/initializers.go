@@ -247,7 +247,7 @@ func jobSpecToExecPluginConfig(ctx context.Context, lggr logger.Logger, jb job.J
 		params.destChain.Client(),
 		rpclib.DefaultRpcBatchSizeLimit,
 		rpclib.DefaultRpcBatchBackOffMultiplier,
-		rpclib.DefaultParallelRpcCallsLimit,
+		rpclib.DefaultMaxParallelRpcCalls,
 	)
 
 	offrampAddress, err := offRampReader.Address(ctx)
