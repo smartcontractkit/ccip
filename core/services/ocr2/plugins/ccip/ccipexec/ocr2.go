@@ -181,8 +181,8 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 				"maxSeqNr", rep.commitReport.Interval.Max,
 			)
 
-			if err := rep.validate(); err != nil {
-				rootLggr.Errorw("Skipping invalid report", "err", err)
+			if err2 := rep.validate(); err2 != nil {
+				rootLggr.Errorw("Skipping invalid report", "err", err2)
 				continue
 			}
 
