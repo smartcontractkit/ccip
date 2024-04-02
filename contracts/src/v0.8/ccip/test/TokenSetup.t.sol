@@ -19,8 +19,6 @@ contract TokenSetup is RouterSetup {
   address[] internal s_sourceTokens;
   address[] internal s_destTokens;
 
-  address[] internal s_destPools;
-
   address internal s_sourceFeeToken;
   address internal s_destFeeToken;
 
@@ -63,7 +61,6 @@ contract TokenSetup is RouterSetup {
     } else {
       s_destPoolByToken[address(token)] = address(pool);
       s_destPoolBySourceToken[s_sourceTokens[s_destTokens.length - 1]] = address(pool);
-      s_destPools.push(address(pool));
     }
   }
 
@@ -73,7 +70,12 @@ contract TokenSetup is RouterSetup {
       router = address(s_destRouter);
     }
 
-    BurnMintTokenPool pool = new BurnMintTokenPool(BurnMintERC677(token), new address[](0), address(s_mockARM), router);
+    BurnMintTokenPool pool = new MaybeRevertingBurnMintTokenPool(
+      BurnMintERC677(token),
+      new address[](0),
+      address(s_mockARM),
+      router
+    );
     BurnMintERC677(token).grantMintAndBurnRoles(address(pool));
 
     if (isSourcePool) {
@@ -81,7 +83,6 @@ contract TokenSetup is RouterSetup {
     } else {
       s_destPoolByToken[address(token)] = address(pool);
       s_destPoolBySourceToken[s_sourceTokens[s_destTokens.length - 1]] = address(pool);
-      s_destPools.push(address(pool));
     }
   }
 

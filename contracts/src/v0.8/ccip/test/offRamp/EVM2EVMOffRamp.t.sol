@@ -14,7 +14,6 @@ import {Internal} from "../../libraries/Internal.sol";
 import {Client} from "../../libraries/Client.sol";
 import {EVM2EVMOffRamp} from "../../offRamp/EVM2EVMOffRamp.sol";
 import {LockReleaseTokenPool} from "../../pools/LockReleaseTokenPool.sol";
-
 import {MockCommitStore} from "../mocks/MockCommitStore.sol";
 import {CallWithExactGas} from "../../../shared/call/CallWithExactGas.sol";
 import {ConformingReceiver} from "../helpers/receivers/ConformingReceiver.sol";
@@ -795,7 +794,7 @@ contract EVM2EVMOffRamp_executeSingleMessage is EVM2EVMOffRampSetup {
     bytes memory errorMessage = "Random token pool issue";
 
     Internal.EVM2EVMMessage memory message = _generateAny2EVMMessageWithTokens(1, amounts);
-    MaybeRevertingBurnMintTokenPool(s_destPools[1]).setShouldRevert(errorMessage);
+    s_maybeRevertingPool.setShouldRevert(errorMessage);
 
     vm.expectRevert(abi.encodeWithSelector(EVM2EVMOffRamp.TokenHandlingError.selector, errorMessage));
 
@@ -1126,7 +1125,7 @@ contract EVM2EVMOffRamp__trialExecute is EVM2EVMOffRampSetup {
     bytes memory errorMessage = "Random token pool issue";
 
     Internal.EVM2EVMMessage memory message = _generateAny2EVMMessageWithTokens(1, amounts);
-    MaybeRevertingBurnMintTokenPool(s_destPools[1]).setShouldRevert(errorMessage);
+    s_maybeRevertingPool.setShouldRevert(errorMessage);
 
     (Internal.MessageExecutionState newState, bytes memory err) = s_offRamp.trialExecute(
       message,
@@ -1147,7 +1146,7 @@ contract EVM2EVMOffRamp__trialExecute is EVM2EVMOffRampSetup {
     bytes memory errorMessage = abi.encodeWithSelector(RateLimiter.BucketOverfilled.selector);
 
     Internal.EVM2EVMMessage memory message = _generateAny2EVMMessageWithTokens(1, amounts);
-    MaybeRevertingBurnMintTokenPool(s_destPools[1]).setShouldRevert(errorMessage);
+    s_maybeRevertingPool.setShouldRevert(errorMessage);
 
     (Internal.MessageExecutionState newState, bytes memory err) = s_offRamp.trialExecute(
       message,
@@ -1161,7 +1160,7 @@ contract EVM2EVMOffRamp__trialExecute is EVM2EVMOffRampSetup {
 contract EVM2EVMOffRamp__releaseOrMintTokens is EVM2EVMOffRampSetup {
   function test_releaseOrMintTokensSuccess() public {
     Client.EVMTokenAmount[] memory srcTokenAmounts = getCastedSourceEVMTokenAmountsWithZeroAmounts();
-    IERC20 dstToken1 = IERC20(s_destTokens[0]);
+    IERC20 dstToken1 = IERC20(s_destFeeToken);
     uint256 startingBalance = dstToken1.balanceOf(OWNER);
     uint256 amount1 = 100;
     srcTokenAmounts[0].amount = amount1;
@@ -1175,7 +1174,7 @@ contract EVM2EVMOffRamp__releaseOrMintTokens is EVM2EVMOffRampSetup {
     sourceTokenData[0] = abi.encode(0x87654321);
 
     vm.expectCall(
-      s_destPools[0],
+      s_destFeeToken,
       abi.encodeWithSelector(
         LockReleaseTokenPool.releaseOrMint.selector,
         originalSender,
@@ -1197,7 +1196,7 @@ contract EVM2EVMOffRamp__releaseOrMintTokens is EVM2EVMOffRampSetup {
     Client.EVMTokenAmount[] memory srcTokenAmounts = getCastedSourceEVMTokenAmountsWithZeroAmounts();
 
     bytes memory unknownError = bytes("unknown error");
-    MaybeRevertingBurnMintTokenPool(s_destPools[1]).setShouldRevert(unknownError);
+    s_maybeRevertingPool.setShouldRevert(unknownError);
 
     vm.expectRevert(abi.encodeWithSelector(EVM2EVMOffRamp.TokenHandlingError.selector, unknownError));
 
@@ -1240,7 +1239,7 @@ contract EVM2EVMOffRamp__releaseOrMintTokens is EVM2EVMOffRampSetup {
     );
 
     for (uint256 i = 0; i < rateLimitErrors.length; ++i) {
-      MaybeRevertingBurnMintTokenPool(s_destPools[1]).setShouldRevert(rateLimitErrors[i]);
+      s_maybeRevertingPool.setShouldRevert(rateLimitErrors[i]);
 
       vm.expectRevert(abi.encodeWithSelector(EVM2EVMOffRamp.TokenHandlingError.selector, rateLimitErrors[i]));
 
