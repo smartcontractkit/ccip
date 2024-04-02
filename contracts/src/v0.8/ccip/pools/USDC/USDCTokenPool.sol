@@ -2,11 +2,11 @@
 pragma solidity 0.8.19;
 
 import {ITypeAndVersion} from "../../../shared/interfaces/ITypeAndVersion.sol";
-import {ITokenMessenger} from "./ITokenMessenger.sol";
 import {IMessageTransmitter} from "./IMessageTransmitter.sol";
+import {ITokenMessenger} from "./ITokenMessenger.sol";
 
-import {TokenPool} from "../TokenPool.sol";
 import {Internal} from "../../libraries/Internal.sol";
+import {TokenPool} from "../TokenPool.sol";
 
 import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -127,18 +127,12 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
     // is able to call replaceDepositForBurn. Since this contract does not implement
     // replaceDepositForBurn, the tokens cannot be maliciously re-routed to another address.
     uint64 nonce = i_tokenMessenger.depositForBurnWithCaller(
-      amount,
-      domain.domainIdentifier,
-      receiver,
-      address(i_token),
-      domain.allowedCaller
+      amount, domain.domainIdentifier, receiver, address(i_token), domain.allowedCaller
     );
     emit Burned(msg.sender, amount);
-    return
-      _getLockOrBurnReturnData(
-        remoteChainSelector,
-        abi.encode(SourceTokenDataPayload({nonce: nonce, sourceDomain: i_localDomainIdentifier}))
-      );
+    return _getLockOrBurnReturnData(
+      remoteChainSelector, abi.encode(SourceTokenDataPayload({nonce: nonce, sourceDomain: i_localDomainIdentifier}))
+    );
   }
 
   /// @notice Mint tokens from the pool to the recipient
@@ -169,8 +163,9 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
 
     _validateMessage(msgAndAttestation.message, sourceTokenData);
 
-    if (!i_messageTransmitter.receiveMessage(msgAndAttestation.message, msgAndAttestation.attestation))
+    if (!i_messageTransmitter.receiveMessage(msgAndAttestation.message, msgAndAttestation.attestation)) {
       revert UnlockingUSDCFailed();
+    }
     emit Minted(msg.sender, receiver, amount);
   }
 
@@ -212,10 +207,12 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
       nonce := mload(add(usdcMessage, 20)) // 12 + 8 = 20
     }
 
-    if (sourceDomain != sourceTokenData.sourceDomain)
+    if (sourceDomain != sourceTokenData.sourceDomain) {
       revert InvalidSourceDomain(sourceTokenData.sourceDomain, sourceDomain);
-    if (destinationDomain != i_localDomainIdentifier)
+    }
+    if (destinationDomain != i_localDomainIdentifier) {
       revert InvalidDestinationDomain(i_localDomainIdentifier, destinationDomain);
+    }
     if (nonce != sourceTokenData.nonce) revert InvalidNonce(sourceTokenData.nonce, nonce);
   }
 

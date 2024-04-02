@@ -3,18 +3,18 @@ pragma solidity 0.8.19;
 
 import {IPool} from "../../interfaces/pools/IPool.sol";
 
-import {BaseTest} from "../BaseTest.t.sol";
-import {LockReleaseTokenPool} from "../../pools/LockReleaseTokenPool.sol";
-import {TokenPool} from "../../pools/TokenPool.sol";
-import {EVM2EVMOnRamp} from "../../onRamp/EVM2EVMOnRamp.sol";
-import {EVM2EVMOffRamp} from "../../offRamp/EVM2EVMOffRamp.sol";
-import {RateLimiter} from "../../libraries/RateLimiter.sol";
-import {Internal} from "../../libraries/Internal.sol";
 import {BurnMintERC677} from "../../../shared/token/ERC677/BurnMintERC677.sol";
 import {Router} from "../../Router.sol";
+import {Internal} from "../../libraries/Internal.sol";
+import {RateLimiter} from "../../libraries/RateLimiter.sol";
+import {EVM2EVMOffRamp} from "../../offRamp/EVM2EVMOffRamp.sol";
+import {EVM2EVMOnRamp} from "../../onRamp/EVM2EVMOnRamp.sol";
+import {LockReleaseTokenPool} from "../../pools/LockReleaseTokenPool.sol";
+import {TokenPool} from "../../pools/TokenPool.sol";
+import {BaseTest} from "../BaseTest.t.sol";
 
-import {IERC165} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/introspection/IERC165.sol";
 import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
+import {IERC165} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/introspection/IERC165.sol";
 import {RouterSetup} from "../router/RouterSetup.t.sol";
 
 contract LockReleaseTokenPoolSetup is RouterSetup {
@@ -33,23 +33,13 @@ contract LockReleaseTokenPoolSetup is RouterSetup {
     RouterSetup.setUp();
     s_token = new BurnMintERC677("LINK", "LNK", 18, 0);
     deal(address(s_token), OWNER, type(uint256).max);
-    s_lockReleaseTokenPool = new LockReleaseTokenPool(
-      s_token,
-      new address[](0),
-      address(s_mockARM),
-      true,
-      address(s_sourceRouter)
-    );
+    s_lockReleaseTokenPool =
+      new LockReleaseTokenPool(s_token, new address[](0), address(s_mockARM), true, address(s_sourceRouter));
 
     s_allowedList.push(USER_1);
     s_allowedList.push(DUMMY_CONTRACT_ADDRESS);
-    s_lockReleaseTokenPoolWithAllowList = new LockReleaseTokenPool(
-      s_token,
-      s_allowedList,
-      address(s_mockARM),
-      true,
-      address(s_sourceRouter)
-    );
+    s_lockReleaseTokenPoolWithAllowList =
+      new LockReleaseTokenPool(s_token, s_allowedList, address(s_mockARM), true, address(s_sourceRouter));
 
     TokenPool.ChainUpdate[] memory chainUpdate = new TokenPool.ChainUpdate[](1);
     chainUpdate[0] = TokenPool.ChainUpdate({
@@ -262,13 +252,8 @@ contract LockReleaseTokenPool_canAcceptLiquidity is LockReleaseTokenPoolSetup {
   function test_CanAcceptLiquiditySuccess() public {
     assertEq(true, s_lockReleaseTokenPool.canAcceptLiquidity());
 
-    s_lockReleaseTokenPool = new LockReleaseTokenPool(
-      s_token,
-      new address[](0),
-      address(s_mockARM),
-      false,
-      address(s_sourceRouter)
-    );
+    s_lockReleaseTokenPool =
+      new LockReleaseTokenPool(s_token, new address[](0), address(s_mockARM), false, address(s_sourceRouter));
     assertEq(false, s_lockReleaseTokenPool.canAcceptLiquidity());
   }
 }
@@ -300,13 +285,8 @@ contract LockReleaseTokenPool_provideLiquidity is LockReleaseTokenPoolSetup {
   }
 
   function testLiquidityNotAcceptedReverts() public {
-    s_lockReleaseTokenPool = new LockReleaseTokenPool(
-      s_token,
-      new address[](0),
-      address(s_mockARM),
-      false,
-      address(s_sourceRouter)
-    );
+    s_lockReleaseTokenPool =
+      new LockReleaseTokenPool(s_token, new address[](0), address(s_mockARM), false, address(s_sourceRouter));
 
     vm.expectRevert(LockReleaseTokenPool.LiquidityNotAccepted.selector);
     s_lockReleaseTokenPool.provideLiquidity(1);
@@ -358,9 +338,7 @@ contract LockReleaseTokenPool_supportsInterface is LockReleaseTokenPoolSetup {
 contract LockReleaseTokenPool_setChainRateLimiterConfig is LockReleaseTokenPoolSetup {
   event ConfigChanged(RateLimiter.Config);
   event ChainConfigured(
-    uint64 chainSelector,
-    RateLimiter.Config outboundRateLimiterConfig,
-    RateLimiter.Config inboundRateLimiterConfig
+    uint64 chainSelector, RateLimiter.Config outboundRateLimiterConfig, RateLimiter.Config inboundRateLimiterConfig
   );
 
   uint64 internal s_remoteChainSelector;
@@ -392,11 +370,8 @@ contract LockReleaseTokenPool_setChainRateLimiterConfig is LockReleaseTokenPoolS
     uint256 oldInboundTokens = s_lockReleaseTokenPool.getCurrentInboundRateLimiterState(s_remoteChainSelector).tokens;
 
     RateLimiter.Config memory newOutboundConfig = RateLimiter.Config({isEnabled: true, capacity: capacity, rate: rate});
-    RateLimiter.Config memory newInboundConfig = RateLimiter.Config({
-      isEnabled: true,
-      capacity: capacity / 2,
-      rate: rate / 2
-    });
+    RateLimiter.Config memory newInboundConfig =
+      RateLimiter.Config({isEnabled: true, capacity: capacity / 2, rate: rate / 2});
 
     vm.expectEmit();
     emit ConfigChanged(newOutboundConfig);
@@ -409,9 +384,8 @@ contract LockReleaseTokenPool_setChainRateLimiterConfig is LockReleaseTokenPoolS
 
     uint256 expectedTokens = RateLimiter._min(newOutboundConfig.capacity, oldOutboundTokens);
 
-    RateLimiter.TokenBucket memory bucket = s_lockReleaseTokenPool.getCurrentOutboundRateLimiterState(
-      s_remoteChainSelector
-    );
+    RateLimiter.TokenBucket memory bucket =
+      s_lockReleaseTokenPool.getCurrentOutboundRateLimiterState(s_remoteChainSelector);
     assertEq(bucket.capacity, newOutboundConfig.capacity);
     assertEq(bucket.rate, newOutboundConfig.rate);
     assertEq(bucket.tokens, expectedTokens);
@@ -434,17 +408,13 @@ contract LockReleaseTokenPool_setChainRateLimiterConfig is LockReleaseTokenPoolS
     vm.startPrank(rateLimiterAdmin);
 
     s_lockReleaseTokenPool.setChainRateLimiterConfig(
-      s_remoteChainSelector,
-      getOutboundRateLimiterConfig(),
-      getInboundRateLimiterConfig()
+      s_remoteChainSelector, getOutboundRateLimiterConfig(), getInboundRateLimiterConfig()
     );
 
     vm.startPrank(OWNER);
 
     s_lockReleaseTokenPool.setChainRateLimiterConfig(
-      s_remoteChainSelector,
-      getOutboundRateLimiterConfig(),
-      getInboundRateLimiterConfig()
+      s_remoteChainSelector, getOutboundRateLimiterConfig(), getInboundRateLimiterConfig()
     );
   }
 
@@ -455,9 +425,7 @@ contract LockReleaseTokenPool_setChainRateLimiterConfig is LockReleaseTokenPoolS
 
     vm.expectRevert(abi.encodeWithSelector(LockReleaseTokenPool.Unauthorized.selector, STRANGER));
     s_lockReleaseTokenPool.setChainRateLimiterConfig(
-      s_remoteChainSelector,
-      getOutboundRateLimiterConfig(),
-      getInboundRateLimiterConfig()
+      s_remoteChainSelector, getOutboundRateLimiterConfig(), getInboundRateLimiterConfig()
     );
   }
 
@@ -466,9 +434,7 @@ contract LockReleaseTokenPool_setChainRateLimiterConfig is LockReleaseTokenPoolS
 
     vm.expectRevert(abi.encodeWithSelector(TokenPool.NonExistentChain.selector, wrongChainSelector));
     s_lockReleaseTokenPool.setChainRateLimiterConfig(
-      wrongChainSelector,
-      getOutboundRateLimiterConfig(),
-      getInboundRateLimiterConfig()
+      wrongChainSelector, getOutboundRateLimiterConfig(), getInboundRateLimiterConfig()
     );
   }
 }

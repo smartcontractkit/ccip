@@ -3,15 +3,15 @@ pragma solidity 0.8.19;
 
 import {IPool} from "../interfaces/pools/IPool.sol";
 
-import {BurnMintTokenPool} from "../pools/BurnMintTokenPool.sol";
-import {TokenPool} from "../pools/TokenPool.sol";
-import {LockReleaseTokenPool} from "../pools/LockReleaseTokenPool.sol";
-import {RateLimiter} from "../libraries/RateLimiter.sol";
-import {Client} from "../libraries/Client.sol";
 import {BurnMintERC677} from "../../shared/token/ERC677/BurnMintERC677.sol";
+import {Client} from "../libraries/Client.sol";
+import {RateLimiter} from "../libraries/RateLimiter.sol";
+import {BurnMintTokenPool} from "../pools/BurnMintTokenPool.sol";
+import {LockReleaseTokenPool} from "../pools/LockReleaseTokenPool.sol";
+import {TokenAdminRegistry} from "../pools/TokenAdminRegistry.sol";
+import {TokenPool} from "../pools/TokenPool.sol";
 import {MaybeRevertingBurnMintTokenPool} from "./helpers/MaybeRevertingBurnMintTokenPool.sol";
 import {RouterSetup} from "./router/RouterSetup.t.sol";
-import {TokenAdminRegistry} from "../pools/TokenAdminRegistry.sol";
 
 import {IERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 
@@ -48,13 +48,8 @@ contract TokenSetup is RouterSetup {
       router = address(s_destRouter);
     }
 
-    LockReleaseTokenPool pool = new LockReleaseTokenPool(
-      IERC20(token),
-      new address[](0),
-      address(s_mockARM),
-      true,
-      router
-    );
+    LockReleaseTokenPool pool =
+      new LockReleaseTokenPool(IERC20(token), new address[](0), address(s_mockARM), true, router);
 
     if (isSourcePool) {
       s_sourcePoolByToken[address(token)] = address(pool);
@@ -70,12 +65,8 @@ contract TokenSetup is RouterSetup {
       router = address(s_destRouter);
     }
 
-    BurnMintTokenPool pool = new MaybeRevertingBurnMintTokenPool(
-      BurnMintERC677(token),
-      new address[](0),
-      address(s_mockARM),
-      router
-    );
+    BurnMintTokenPool pool =
+      new MaybeRevertingBurnMintTokenPool(BurnMintERC677(token), new address[](0), address(s_mockARM), router);
     BurnMintERC677(token).grantMintAndBurnRoles(address(pool));
 
     if (isSourcePool) {
