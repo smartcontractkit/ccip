@@ -220,6 +220,10 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 		}
 
 		areBlessed, err := r.commitStoreReader.AreBlessed(ctx, merkleRootsToCheck)
+		if err != nil {
+			return nil, fmt.Errorf("are blessed: %w", err)
+		}
+
 		for i, merkleRoot := range merkleRootsToCheck {
 			merkleRootString := hex.EncodeToString(merkleRoot[:])
 			isBlessed := areBlessed[i]
