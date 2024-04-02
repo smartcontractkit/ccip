@@ -400,14 +400,30 @@ func (o *CCIPTestSetUpOutputs) DeployChainContracts(
 	}
 	ccipCommon.WriteLaneConfig(cfg)
 	o.LaneContractsByNetwork.Store(networkCfg.Name, cfg)
-	// if dynamic price update is required
-	if o.Cfg.TestGroupInput.DynamicPriceUpdateInterval != nil {
-		ccipCommon.UpdateTokenPricesAtRegularInterval(
-			testcontext.Get(o.Cfg.Test),
-			o.Cfg.TestGroupInput.DynamicPriceUpdateInterval.Duration(),
-		)
-	}
 
+	return nil
+}
+
+func (o *CCIPTestSetUpOutputs) SetupDynamicTokenPriceUpdates() error {
+	interval := o.Cfg.TestGroupInput.DynamicPriceUpdateInterval.Duration()
+	covered := make(map[string]struct{})
+	for _, lanes := range o.ReadLanes() {
+		lane := lanes.ForwardLane
+		if _, exists := covered[lane.SourceNetworkName]; !exists {
+			covered[lane.SourceNetworkName] = struct{}{}
+			err := lane.Source.Common.UpdateTokenPricesAtRegularInterval(lane.Context, interval, o.LaneConfig.ReadLaneConfig(lane.SourceNetworkName))
+			if err != nil {
+				return err
+			}
+		}
+		if _, exists := covered[lane.DestNetworkName]; !exists {
+			covered[lane.DestNetworkName] = struct{}{}
+			err := lane.Dest.Common.UpdateTokenPricesAtRegularInterval(lane.Context, interval, o.LaneConfig.ReadLaneConfig(lane.SourceNetworkName))
+			if err != nil {
+				return err
+			}
+		}
+	}
 	return nil
 }
 
@@ -843,6 +859,10 @@ func CCIPDefaultTestSetUp(
 		require.NoError(t, setUpArgs.JobAddGrp.Wait(), "Creating jobs shouldn't fail")
 		// wait for price updates to be available
 		setUpArgs.WaitForPriceUpdates()
+		// if dynamic price update is required
+		if setUpArgs.Cfg.TestGroupInput.DynamicPriceUpdateInterval != nil {
+			require.NoError(t, setUpArgs.SetupDynamicTokenPriceUpdates(), "setting up dynamic price update shoud not fail")
+		}
 	}
 
 	// start event watchers for all lanes

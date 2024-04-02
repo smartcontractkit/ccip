@@ -501,24 +501,27 @@ func (ccipModule *CCIPCommon) WatchForPriceUpdates(ctx context.Context) error {
 
 // UpdateTokenPricesAtRegularInterval updates aggregator contract with updated answer at regular interval.
 // At each iteration of ticker it chooses one of the aggregator contracts and updates its round answer.
-func (ccipModule *CCIPCommon) UpdateTokenPricesAtRegularInterval(ctx context.Context, interval time.Duration) {
+func (ccipModule *CCIPCommon) UpdateTokenPricesAtRegularInterval(ctx context.Context, interval time.Duration, conf *laneconfig.LaneConfig) error {
 	if ccipModule.ExistingDeployment {
-		return
+		return nil
 	}
-	var aggregators []contracts.MockAggregator
-	for _, aggregatorContract := range ccipModule.PriceAggregators {
-		contract := *aggregatorContract
+	var aggregators []*contracts.MockAggregator
+	for _, aggregatorContract := range conf.PriceAggregators {
+		contract, err := ccipModule.Deployer.NewMockAggregator(common.HexToAddress(aggregatorContract))
+		if err != nil {
+			return err
+		}
 		aggregators = append(aggregators, contract)
 	}
 	go func() {
-		rand.Seed(uint64(time.Now().UnixNano()))
+		rand.NewSource(new(big.Int).Mul(big.NewInt(1e18), big.NewInt(10)).Uint64())
 		ticker := time.NewTicker(interval)
 		for {
 			select {
 			case <-ticker.C:
 				// randomly choose an aggregator contract from slice of aggregators
 				randomIndex := rand.Intn(len(aggregators))
-				err := aggregators[randomIndex].UpdateRoundData(big.NewInt(time.Now().UnixNano()))
+				err := aggregators[randomIndex].UpdateRoundData(big.NewInt(int64(rand.Uint64())))
 				if err != nil {
 					continue
 				}
@@ -527,6 +530,7 @@ func (ccipModule *CCIPCommon) UpdateTokenPricesAtRegularInterval(ctx context.Con
 			}
 		}
 	}()
+	return nil
 }
 
 // SyncUSDCDomain makes domain updates to Source usdc pool domain with -
