@@ -17,6 +17,36 @@ type CommitStoreReader struct {
 	mock.Mock
 }
 
+// AreBlessed provides a mock function with given fields: ctx, roots
+func (_m *CommitStoreReader) AreBlessed(ctx context.Context, roots [][32]byte) ([]bool, error) {
+	ret := _m.Called(ctx, roots)
+
+	if len(ret) == 0 {
+		panic("no return value specified for AreBlessed")
+	}
+
+	var r0 []bool
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, [][32]byte) ([]bool, error)); ok {
+		return rf(ctx, roots)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, [][32]byte) []bool); ok {
+		r0 = rf(ctx, roots)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]bool)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, [][32]byte) error); ok {
+		r1 = rf(ctx, roots)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // ChangeConfig provides a mock function with given fields: onchainConfig, offchainConfig
 func (_m *CommitStoreReader) ChangeConfig(onchainConfig []byte, offchainConfig []byte) (ccip.Address, error) {
 	ret := _m.Called(onchainConfig, offchainConfig)

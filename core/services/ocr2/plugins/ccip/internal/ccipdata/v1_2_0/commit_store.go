@@ -14,6 +14,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/rpclib"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
@@ -31,13 +32,17 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 )
 
-var _ ccipdata.CommitStoreReader = &CommitStore{}
+var (
+	_              ccipdata.CommitStoreReader = &CommitStore{}
+	commitStoreABI                            = abihelpers.MustParseABI(commit_store.CommitStoreABI)
+)
 
 type CommitStore struct {
 	// Static config
 	commitStore               *commit_store.CommitStore
 	lggr                      logger.Logger
 	lp                        logpoller.LogPoller
+	batchCaller               rpclib.EvmBatchCaller
 	address                   common.Address
 	estimator                 gas.EvmFeeEstimator
 	sourceMaxGasPrice         *big.Int
@@ -165,6 +170,32 @@ func (c *CommitStore) DecodeCommitReport(report []byte) (cciptypes.CommitStoreRe
 
 func (c *CommitStore) IsBlessed(ctx context.Context, root [32]byte) (bool, error) {
 	return c.commitStore.IsBlessed(&bind.CallOpts{Context: ctx}, root)
+}
+
+func (c *CommitStore) AreBlessed(ctx context.Context, roots [][32]byte) ([]bool, error) {
+	evmCalls := make([]rpclib.EvmCall, 0, len(roots))
+	for _, root := range roots {
+		evmCalls = append(evmCalls, rpclib.NewEvmCall(commitStoreABI, "isBlessed", c.address, root))
+	}
+
+	results, err := c.batchCaller.BatchCall(ctx, 0, evmCalls)
+	if err != nil {
+		return nil, fmt.Errorf("batch fetch blessings: %w", err)
+	}
+
+	areBlessed, err := rpclib.ParseOutputs[bool](results, func(d rpclib.DataAndErr) (bool, error) {
+		return rpclib.ParseOutput[bool](d, 0)
+	})
+	if err != nil {
+		return nil, fmt.Errorf("parse batch blessings: %w", err)
+	}
+
+	if len(roots) != len(areBlessed) {
+		c.lggr.Errorw("unexpected number of blessings returned", "roots", len(roots), "blessings", len(areBlessed))
+		return nil, errors.New("unexpected number of blessings returned")
+	}
+
+	return areBlessed, nil
 }
 
 func (c *CommitStore) OffchainConfig() cciptypes.CommitOffchainConfig {
@@ -397,7 +428,6 @@ func NewCommitStore(lggr logger.Logger, addr common.Address, ec client.Client, l
 	if err != nil {
 		return nil, err
 	}
-	commitStoreABI := abihelpers.MustParseABI(commit_store.CommitStoreABI)
 	eventSig := abihelpers.MustGetEventID(v1_0_0.ReportAccepted, commitStoreABI)
 	commitReportArgs := abihelpers.MustGetEventInputs(v1_0_0.ReportAccepted, commitStoreABI)
 	filters := []logpoller.Filter{
@@ -410,10 +440,17 @@ func NewCommitStore(lggr logger.Logger, addr common.Address, ec client.Client, l
 	}
 
 	return &CommitStore{
-		commitStore:       commitStore,
-		address:           addr,
-		lggr:              lggr,
-		lp:                lp,
+		commitStore: commitStore,
+		address:     addr,
+		lggr:        lggr,
+		lp:          lp,
+		batchCaller: rpclib.NewDynamicLimitedBatchCaller(
+			lggr,
+			ec,
+			rpclib.DefaultRpcBatchSizeLimit,
+			rpclib.DefaultRpcBatchBackOffMultiplier,
+			rpclib.DefaultMaxParallelRpcCalls,
+		),
 		estimator:         estimator,
 		sourceMaxGasPrice: sourceMaxGasPrice,
 		filters:           filters,

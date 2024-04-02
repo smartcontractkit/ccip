@@ -1,6 +1,7 @@
 package ccipdata
 
 import (
+	"context"
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -56,6 +57,11 @@ func NewCommitOffchainConfig(
 //go:generate mockery --quiet --name CommitStoreReader --filename commit_store_reader_mock.go --case=underscore
 type CommitStoreReader interface {
 	cciptypes.CommitStoreReader
+
+	// AreBlessed checks if the provided roots are blessed.
+	//
+	// todo: use chainlink-common latest version
+	AreBlessed(ctx context.Context, roots [][32]byte) ([]bool, error)
 }
 
 // FetchCommitStoreStaticConfig provides access to a commitStore's static config, which is required to access the source chain ID.

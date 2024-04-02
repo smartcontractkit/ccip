@@ -15,6 +15,7 @@ import (
 	"github.com/cometbft/cometbft/libs/rand"
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/ethereum/go-ethereum/common"
+	gocache "github.com/patrickmn/go-cache"
 	"github.com/pkg/errors"
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
@@ -138,6 +139,7 @@ func TestExecutionReportingPlugin_Observation(t *testing.T) {
 			p := &ExecutionReportingPlugin{}
 			p.inflightReports = newInflightExecReportsContainer(time.Minute)
 			p.inflightReports.reports = tc.inflightReports
+			p.blessedRootsCache = gocache.New(time.Minute, time.Minute)
 			p.lggr = logger.TestLogger(t)
 			p.tokenDataWorker = tokendata.NewBackgroundWorker(
 				make(map[cciptypes.Address]tokendata.Reader), 10, 5*time.Second, time.Hour)
@@ -148,7 +150,7 @@ func TestExecutionReportingPlugin_Observation(t *testing.T) {
 			commitStoreReader.On("IsDestChainHealthy", mock.Anything).Return(tc.destChainHealthy, nil).Maybe()
 			// Blessed roots return true
 			for root, blessed := range tc.blessedRoots {
-				commitStoreReader.On("IsBlessed", mock.Anything, root).Return(blessed, nil).Maybe()
+				commitStoreReader.On("AreBlessed", mock.Anything, [][32]byte{root}).Return([]bool{blessed}, nil).Maybe()
 			}
 			commitStoreReader.On("GetAcceptedCommitReportsGteTimestamp", ctx, mock.Anything, 0).
 				Return(tc.unexpiredReports, nil).Maybe()

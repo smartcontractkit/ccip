@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sync"
 
+	gocache "github.com/patrickmn/go-cache"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
@@ -107,6 +108,7 @@ func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.Repor
 			snoozedRoots:                cache.NewSnoozedRoots(onchainConfig.PermissionLessExecutionThresholdSeconds, offchainConfig.RootSnoozeTime.Duration()),
 			metricsCollector:            rf.config.metricsCollector,
 			chainHealthcheck:            rf.config.chainHealthcheck,
+			blessedRootsCache:           gocache.New(onchainConfig.PermissionLessExecutionThresholdSeconds, onchainConfig.PermissionLessExecutionThresholdSeconds),
 		}, types.ReportingPluginInfo{
 			Name: "CCIPExecution",
 			// Setting this to false saves on calldata since OffRamp doesn't require agreement between NOPs

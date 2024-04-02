@@ -9,7 +9,9 @@ import (
 	"sync"
 	"time"
 
+	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	gocache "github.com/patrickmn/go-cache"
 	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
 
@@ -88,9 +90,10 @@ type ExecutionReportingPlugin struct {
 	tokenPoolBatchedReader batchreader.TokenPoolBatchedReader
 
 	// State
-	inflightReports  *inflightExecReportsContainer
-	snoozedRoots     cache.SnoozedRoots
-	chainHealthcheck cache.ChainHealthcheck
+	inflightReports   *inflightExecReportsContainer
+	snoozedRoots      cache.SnoozedRoots
+	chainHealthcheck  cache.ChainHealthcheck
+	blessedRootsCache *gocache.Cache
 }
 
 func (r *ExecutionReportingPlugin) Query(context.Context, types.ReportTimestamp) (types.Query, error) {
@@ -161,32 +164,19 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 		unexpiredReportsPart, step := selectReportsToFillBatch(unexpiredReports[j:], MessagesIterationStep)
 		j += step
 
-		unexpiredReportsWithSendReqs, err := r.getReportsWithSendRequests(ctx, unexpiredReportsPart)
+		allUnexpiredReportsWithSendReqs, err := r.getReportsWithSendRequests(ctx, unexpiredReportsPart)
 		if err != nil {
 			return nil, err
 		}
 
-		getDestPoolRateLimits := cache.LazyFetch(func() (map[cciptypes.Address]*big.Int, error) {
-			tokenExecData, err1 := getExecTokenData()
-			if err1 != nil {
-				return nil, err1
-			}
-			return r.destPoolRateLimits(ctx, unexpiredReportsWithSendReqs, tokenExecData.sourceToDestTokens)
-		})
-
-		for _, unexpiredReport := range unexpiredReportsWithSendReqs {
-			r.tokenDataWorker.AddJobsFromMsgs(ctx, unexpiredReport.sendRequestsWithMeta)
-		}
-
-		for _, rep := range unexpiredReportsWithSendReqs {
-			if ctx.Err() != nil {
-				lggr.Warn("Processing of roots killed by context")
-				break
-			}
-
+		// filter out invalid and already executed reports
+		unexpiredReportsWithSendReqs := make([]commitReportWithSendRequests, 0, len(allUnexpiredReportsWithSendReqs))
+		merkleRootsSet := mapset.NewSet[[32]byte]()
+		for _, rep := range allUnexpiredReportsWithSendReqs {
 			merkleRoot := rep.commitReport.MerkleRoot
 
-			rootLggr := lggr.With("root", hexutil.Encode(merkleRoot[:]),
+			rootLggr := lggr.With(
+				"root", hexutil.Encode(merkleRoot[:]),
 				"minSeqNr", rep.commitReport.Interval.Min,
 				"maxSeqNr", rep.commitReport.Interval.Max,
 			)
@@ -204,9 +194,59 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 				continue
 			}
 
-			blessed, err := r.commitStoreReader.IsBlessed(ctx, merkleRoot)
-			if err != nil {
-				return nil, err
+			unexpiredReportsWithSendReqs = append(unexpiredReportsWithSendReqs, rep)
+			merkleRootsSet.Add(merkleRoot)
+		}
+
+		getDestPoolRateLimits := cache.LazyFetch(func() (map[cciptypes.Address]*big.Int, error) {
+			tokenExecData, err1 := getExecTokenData()
+			if err1 != nil {
+				return nil, err1
+			}
+			return r.destPoolRateLimits(ctx, unexpiredReportsWithSendReqs, tokenExecData.sourceToDestTokens)
+		})
+
+		for _, unexpiredReport := range unexpiredReportsWithSendReqs {
+			r.tokenDataWorker.AddJobsFromMsgs(ctx, unexpiredReport.sendRequestsWithMeta)
+		}
+
+		merkleRoots := merkleRootsSet.ToSlice()
+		merkleRootsToCheck := make([][32]byte, 0, len(merkleRoots))
+		for _, merkleRoot := range merkleRoots {
+			merkleRootString := hex.EncodeToString(merkleRoot[:])
+			if _, exists := r.blessedRootsCache.Get(merkleRootString); !exists {
+				merkleRootsToCheck = append(merkleRootsToCheck, merkleRoot)
+			}
+		}
+
+		areBlessed, err := r.commitStoreReader.AreBlessed(ctx, merkleRootsToCheck)
+		for i, merkleRoot := range merkleRootsToCheck {
+			merkleRootString := hex.EncodeToString(merkleRoot[:])
+			isBlessed := areBlessed[i]
+			if isBlessed {
+				r.blessedRootsCache.Set(merkleRootString, true, 0)
+			}
+		}
+
+		for _, rep := range unexpiredReportsWithSendReqs {
+			if ctx.Err() != nil {
+				lggr.Warn("Processing of roots killed by context")
+				break
+			}
+
+			merkleRoot := rep.commitReport.MerkleRoot
+
+			rootLggr := lggr.With(
+				"root", hexutil.Encode(merkleRoot[:]),
+				"minSeqNr", rep.commitReport.Interval.Min,
+				"maxSeqNr", rep.commitReport.Interval.Max,
+			)
+
+			merkleRootString := hex.EncodeToString(merkleRoot[:])
+			isBlessedRaw, _ := r.blessedRootsCache.Get(merkleRootString)
+			blessed, isBool := isBlessedRaw.(bool)
+			if !isBool {
+				rootLggr.Criticalw("internal error blessed roots cache contains non-bool type: %T", isBlessedRaw)
 			}
 			if !blessed {
 				rootLggr.Infow("Report is accepted but not blessed")
