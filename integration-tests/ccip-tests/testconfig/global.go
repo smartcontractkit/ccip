@@ -310,6 +310,7 @@ type ChainlinkDeployment struct {
 	DBCPU          string   `toml:",omitempty"`
 	DBCapacity     string   `toml:",omitempty"`
 	DBStorageClass *string  `toml:",omitempty"`
+	PromPgExporter *bool    `toml:",omitempty"`
 	IsStateful     *bool    `toml:",omitempty"`
 	DBArgs         []string `toml:",omitempty"`
 	NoOfNodes      *int     `toml:",omitempty"`
