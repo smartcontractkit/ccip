@@ -60,8 +60,7 @@ func NewCCIPLoad(t *testing.T, lane *actions.CCIPLane, timeout time.Duration, no
 		Dest:              lane.Dest,
 		Reports:           lane.Reports,
 	}
-	// This is to optimize memory space for load tests with high number of networks, lanes, tokens
-	lane.OptimizeStorage()
+
 	return &CCIPE2ELoad{
 		t:                                   t,
 		Lane:                                loadLane,
