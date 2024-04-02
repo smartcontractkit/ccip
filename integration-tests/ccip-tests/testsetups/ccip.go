@@ -804,6 +804,8 @@ func CCIPDefaultTestSetUp(
 	// deploy all lane specific contracts
 	lggr.Info().Msg("Deploying chain specific contracts")
 	laneAddGrp, _ := errgroup.WithContext(setUpArgs.SetUpContext)
+	// for memory management add only 5 lanes in parallel
+	laneAddGrp.SetLimit(5)
 	for _, networkPair := range testConfig.NetworkPairs {
 		n := networkPair
 		var ok bool
