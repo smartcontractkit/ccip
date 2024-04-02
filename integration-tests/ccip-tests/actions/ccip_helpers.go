@@ -157,11 +157,8 @@ func (ccipModule *CCIPCommon) FreeUpUnusedSpace() {
 	ccipModule.PriceAggregators = nil
 	ccipModule.BridgeTokenPools = []*contracts.TokenPool{}
 	ccipModule.RemoteChains = nil
-	ccipModule.gasUpdateWatcher = nil
-	ccipModule.gasUpdateWatcherMu = nil
 	ccipModule.TokenMessenger = nil
 	ccipModule.TokenTransmitter = nil
-	ccipModule.PriceRegistry = nil
 	runtime.GC()
 }
 
