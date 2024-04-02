@@ -47,7 +47,7 @@ contract MaybeRevertingBurnMintTokenPool is BurnMintTokenPool {
     _consumeOutboundRateLimit(remoteChainSelector, amount);
     IBurnMintERC20(address(i_token)).burn(amount);
     emit Burned(msg.sender, amount);
-    return s_sourceTokenData;
+    return _getLockOrBurnReturnData(remoteChainSelector, s_sourceTokenData);
   }
 
   /// @notice Reverts depending on the value of `s_revertReason`

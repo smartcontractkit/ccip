@@ -335,8 +335,8 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
       // As destBytesOverhead accounts for tokenData + offchainData, this caps the worst case abuse to the number of bytes reserved for offchainData.
       // It therefore fully mitigates gas bombs for most tokens, as most tokens don't use offchainData.
 
-      // TODO hack: +500 to account for the addresses sent
-      if (tokenData.length > s_tokenTransferFeeConfig[tokenAndAmount.token].destBytesOverhead + 500)
+      // TODO hack: +256 to account for the addresses sent
+      if (tokenData.length > s_tokenTransferFeeConfig[tokenAndAmount.token].destBytesOverhead + 256)
         revert SourceTokenDataTooLarge(tokenAndAmount.token);
 
       newMessage.sourceTokenData[i] = tokenData;
