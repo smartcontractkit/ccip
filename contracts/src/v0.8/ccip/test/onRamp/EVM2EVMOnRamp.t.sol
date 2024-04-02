@@ -572,7 +572,7 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
     // Pool will be burning its own balance
     deal(address(sourceETH), address(newPool), type(uint256).max);
 
-    // Set destBytesOverhead to 0, and let tokenPool return 256 bytes
+    // Set destBytesOverhead to 0, and let tokenPool return 64 bytes
     EVM2EVMOnRamp.TokenTransferFeeConfigArgs[]
       memory tokenTransferFeeConfigArgs = new EVM2EVMOnRamp.TokenTransferFeeConfigArgs[](1);
     tokenTransferFeeConfigArgs[0] = EVM2EVMOnRamp.TokenTransferFeeConfigArgs({
@@ -584,7 +584,7 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
       destBytesOverhead: 0
     });
     s_onRamp.setTokenTransferFeeConfig(tokenTransferFeeConfigArgs);
-    newPool.setSourceTokenData(new bytes(256));
+    newPool.setSourceTokenData(new bytes(64));
 
     // Add TokenPool to OnRamp
     s_tokenAdminRegistry.setPool(sourceETH, address(newPool));

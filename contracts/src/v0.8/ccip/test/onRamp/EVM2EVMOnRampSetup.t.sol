@@ -184,22 +184,30 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
     for (uint256 i = 4; i < message.extraArgs.length; ++i) {
       args[i - 4] = message.extraArgs[i];
     }
-    Client.EVMExtraArgsV1 memory extraArgs = abi.decode(args, (Client.EVMExtraArgsV1));
+    uint256 numberOfTokens = message.tokenAmounts.length;
     Internal.EVM2EVMMessage memory messageEvent = Internal.EVM2EVMMessage({
       sequenceNumber: seqNum,
       feeTokenAmount: feeTokenAmount,
       sender: originalSender,
       nonce: nonce,
-      gasLimit: extraArgs.gasLimit,
+      gasLimit: abi.decode(args, (Client.EVMExtraArgsV1)).gasLimit,
       strict: false,
       sourceChainSelector: SOURCE_CHAIN_SELECTOR,
       receiver: abi.decode(message.receiver, (address)),
       data: message.data,
       tokenAmounts: message.tokenAmounts,
-      sourceTokenData: new bytes[](message.tokenAmounts.length),
+      sourceTokenData: new bytes[](numberOfTokens),
       feeToken: message.feeToken,
       messageId: ""
     });
+
+    for (uint256 i = 0; i < numberOfTokens; ++i) {
+      address sourcePool = s_sourcePoolByToken[message.tokenAmounts[i].token];
+      address destPool = s_destPoolBySourceToken[message.tokenAmounts[i].token];
+      messageEvent.sourceTokenData[i] = abi.encode(
+        Internal.TokenDataPayload({sourcePoolAddress: sourcePool, destPoolAddress: destPool, extraData: ""})
+      );
+    }
 
     messageEvent.messageId = Internal._hash(messageEvent, s_metadataHash);
     return messageEvent;
