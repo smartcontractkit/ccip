@@ -4,9 +4,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pkg/errors"
-
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
+
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 )
 
@@ -54,7 +53,12 @@ func (container *inflightExecReportsContainer) expire(lggr logger.Logger) {
 		if time.Since(report.createdAt) > container.cacheExpiry {
 			// Happy path: inflight report was successfully transmitted onchain, we remove it from inflight and onchain state reflects inflight.
 			// Sad path: inflight report reverts onchain, we remove it from inflight, onchain state does not reflect the change so we retry.
-			lggr.Infow("Inflight report expired", "messages", report.messages)
+			lggr.Infow(
+				"Inflight report expired",
+				"minSeqNr", report.messages[0].SequenceNumber,
+				"maxSeqNr", report.messages[len(report.messages)-1].SequenceNumber,
+				"messages", report.messages,
+			)
 		} else {
 			stillInFlight = append(stillInFlight, report)
 		}
@@ -62,21 +66,37 @@ func (container *inflightExecReportsContainer) expire(lggr logger.Logger) {
 	container.reports = stillInFlight
 }
 
-func (container *inflightExecReportsContainer) add(lggr logger.Logger, messages []cciptypes.EVM2EVMMessage) error {
+func (container *inflightExecReportsContainer) add(lggr logger.Logger, messages []cciptypes.EVM2EVMMessage) {
 	container.locker.Lock()
 	defer container.locker.Unlock()
 
+	tmpReports := container.reports[:0]
 	for _, report := range container.reports {
 		if (len(report.messages) > 0) && (report.messages[0].SequenceNumber == messages[0].SequenceNumber) {
-			return errors.Errorf("report is already in flight")
+			// This should be very rare case, happening only when transmitters are not reliable enough
+			// and were not able to publish report in a previous attempt. Skip that report and re-add it later with
+			// bumped createdAt timestamp.
+			lggr.Warnw(
+				"Report is already inflight",
+				"minSeqNr", messages[0].SequenceNumber,
+				"maxSeqNr", messages[len(messages)-1].SequenceNumber,
+				"inflightReportsCount", len(container.reports),
+			)
+		} else {
+			tmpReports = append(tmpReports, report)
 		}
 	}
+	container.reports = tmpReports
 
 	// Otherwise not already in flight, add it.
-	lggr.Info("Inflight report added")
+	lggr.Warnw(
+		"Inflight report added",
+		"minSeqNr", messages[0].SequenceNumber,
+		"maxSeqNr", messages[len(messages)-1].SequenceNumber,
+		"inflightReportsCount", len(container.reports),
+	)
 	container.reports = append(container.reports, InflightInternalExecutionReport{
 		createdAt: time.Now(),
 		messages:  messages,
 	})
-	return nil
 }

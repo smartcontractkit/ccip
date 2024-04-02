@@ -849,13 +849,10 @@ func (r *ExecutionReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Conte
 		lggr.Info("Execution report is stale")
 		return false, nil
 	}
-	// Else just assume in flight
-	if err = r.inflightReports.add(lggr, execReport.Messages); err != nil {
-		return false, err
-	}
 	if len(execReport.Messages) > 0 {
 		r.metricsCollector.SequenceNumber(ccip.ShouldAccept, execReport.Messages[len(execReport.Messages)-1].SequenceNumber)
 	}
+	r.inflightReports.add(lggr, execReport.Messages)
 	lggr.Info("Accepting finalized report")
 	return true, nil
 }
