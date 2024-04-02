@@ -6,6 +6,7 @@ go 1.21.7
 replace github.com/smartcontractkit/chainlink/v2 => ../
 
 require (
+	dario.cat/mergo v1.0.0
 	github.com/AlekSi/pointer v1.1.0
 	github.com/barkimedes/go-deepcopy v0.0.0-20220514131651-17c30cfc62df
 	github.com/cli/go-gh/v2 v2.0.0
@@ -24,9 +25,9 @@ require (
 	github.com/scylladb/go-reflectx v1.0.1
 	github.com/segmentio/ksuid v1.0.4
 	github.com/slack-go/slack v0.12.2
-	github.com/smartcontractkit/chain-selectors v1.0.12
+	github.com/smartcontractkit/chain-selectors v1.0.13
 	github.com/smartcontractkit/chainlink-automation v1.0.2-0.20240311111125-22812a072c35
-	github.com/smartcontractkit/chainlink-common v0.1.7-0.20240319231131-2d0d99220a04
+	github.com/smartcontractkit/chainlink-common v0.1.7-0.20240326183122-8012c0f08116
 	github.com/smartcontractkit/chainlink-testing-framework v1.27.5
 	github.com/smartcontractkit/chainlink-vrf v0.0.0-20231120191722-fef03814f868
 	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-00010101000000-000000000000
@@ -67,7 +68,6 @@ require (
 	cosmossdk.io/depinject v1.0.0-alpha.3 // indirect
 	cosmossdk.io/errors v1.0.0 // indirect
 	cosmossdk.io/math v1.0.1 // indirect
-	dario.cat/mergo v1.0.0 // indirect
 	filippo.io/edwards25519 v1.0.0 // indirect
 	github.com/99designs/go-keychain v0.0.0-20191008050251-8e49817e8af4 // indirect
 	github.com/99designs/keyring v1.2.1 // indirect
