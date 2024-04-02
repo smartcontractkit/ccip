@@ -57,7 +57,6 @@ func (container *inflightExecReportsContainer) expire(lggr logger.Logger) {
 				"Inflight report expired",
 				"minSeqNr", report.messages[0].SequenceNumber,
 				"maxSeqNr", report.messages[len(report.messages)-1].SequenceNumber,
-				"messages", report.messages,
 			)
 		} else {
 			stillInFlight = append(stillInFlight, report)
@@ -70,7 +69,7 @@ func (container *inflightExecReportsContainer) add(lggr logger.Logger, messages 
 	container.locker.Lock()
 	defer container.locker.Unlock()
 
-	tmpReports := container.reports[:0]
+	tmpReports := make([]InflightInternalExecutionReport, 0, len(container.reports))
 	for _, report := range container.reports {
 		if (len(report.messages) > 0) && (report.messages[0].SequenceNumber == messages[0].SequenceNumber) {
 			// This should be very rare case, happening only when transmitters are not reliable enough
