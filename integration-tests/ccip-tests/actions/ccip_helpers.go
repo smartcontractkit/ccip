@@ -2343,13 +2343,13 @@ func (lane *CCIPLane) AddToSentReqs(txHash common.Hash, reqStats []*testreporter
 	for _, stat := range reqStats {
 		allRequests = append(allRequests, CCIPRequest{
 			ReqNo:                   stat.ReqNo,
-			txHash:                  request.txHash,
+			txHash:                  rcpt.TxHash.Hex(),
 			txConfirmationTimestamp: request.txConfirmationTimestamp,
 			RequestStat:             stat,
 		})
 		lane.NumberOfReq++
 	}
-	lane.SentReqs[txHash] = allRequests
+	lane.SentReqs[rcpt.TxHash] = allRequests
 	return rcpt, nil
 }
 
@@ -2489,7 +2489,7 @@ func (lane *CCIPLane) SendRequests(noOfRequests int, msgType string, gasLimit *b
 			testreporters.TX, txConfirmationDur, testreporters.Success, testreporters.TransactionStats{
 				Fee:                fee.String(),
 				GasUsed:            gasUsed,
-				TxHash:             txHash.Hex(),
+				TxHash:             rcpt.TxHash.Hex(),
 				NoOfTokensSent:     noOfTokens,
 				MessageBytesLength: len([]byte(msg)),
 			})
