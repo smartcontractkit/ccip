@@ -81,6 +81,10 @@ func (c *CCIPTestConfig) useExistingDeployment() bool {
 	return pointer.GetBool(c.TestGroupInput.ExistingDeployment)
 }
 
+func (c *CCIPTestConfig) MultiCallEnabled() bool {
+	return pointer.GetBool(c.TestGroupInput.MulticallInOneTx)
+}
+
 func (c *CCIPTestConfig) localCluster() bool {
 	return pointer.GetBool(c.TestGroupInput.LocalCluster)
 }
@@ -328,20 +332,19 @@ type BiDirectionalLaneConfig struct {
 }
 
 type CCIPTestSetUpOutputs struct {
-	SetUpContext             context.Context
-	Cfg                      *CCIPTestConfig
-	LaneContractsByNetwork   sync.Map
-	laneMutex                *sync.Mutex
-	Lanes                    []*BiDirectionalLaneConfig
-	CommonContractsByNetwork sync.Map
-	Reporter                 *testreporters.CCIPTestReporter
-	LaneConfigFile           string
-	LaneConfig               *laneconfig.Lanes
-	TearDown                 func() error
-	Env                      *actions.CCIPTestEnv
-	Balance                  *actions.BalanceSheet
-	BootstrapAdded           *atomic.Bool
-	JobAddGrp                *errgroup.Group
+	SetUpContext           context.Context
+	Cfg                    *CCIPTestConfig
+	LaneContractsByNetwork sync.Map
+	laneMutex              *sync.Mutex
+	Lanes                  []*BiDirectionalLaneConfig
+	Reporter               *testreporters.CCIPTestReporter
+	LaneConfigFile         string
+	LaneConfig             *laneconfig.Lanes
+	TearDown               func() error
+	Env                    *actions.CCIPTestEnv
+	Balance                *actions.BalanceSheet
+	BootstrapAdded         *atomic.Bool
+	JobAddGrp              *errgroup.Group
 }
 
 func (o *CCIPTestSetUpOutputs) AddToLanes(lane *BiDirectionalLaneConfig) {
@@ -381,8 +384,8 @@ func (o *CCIPTestSetUpOutputs) DeployChainContracts(
 	defer chain.Close()
 	ccipCommon, err := actions.DefaultCCIPModule(
 		lggr, chain,
-		pointer.GetBool(o.Cfg.TestGroupInput.ExistingDeployment),
-		pointer.GetBool(o.Cfg.TestGroupInput.MulticallInOneTx),
+		o.Cfg.useExistingDeployment(),
+		o.Cfg.MultiCallEnabled(),
 		o.Cfg.TestGroupInput.NoOfUSDCMockTokens)
 	if err != nil {
 		return errors.WithStack(fmt.Errorf("failed to create ccip common module for %s: %w", networkCfg.Name, err))
@@ -394,8 +397,8 @@ func (o *CCIPTestSetUpOutputs) DeployChainContracts(
 	if err != nil {
 		return errors.WithStack(fmt.Errorf("failed to deploy common ccip contracts for %s: %w", networkCfg.Name, err))
 	}
+	ccipCommon.WriteLaneConfig(cfg)
 	o.LaneContractsByNetwork.Store(networkCfg.Name, cfg)
-	o.CommonContractsByNetwork.Store(networkCfg.Name, ccipCommon)
 	return nil
 }
 
@@ -511,42 +514,34 @@ func (o *CCIPTestSetUpOutputs) AddLanesForNetworkPair(
 	}
 	o.AddToLanes(bidirectionalLane)
 
-	c1, ok := o.CommonContractsByNetwork.Load(networkA.Name)
-	var networkACmn *actions.CCIPCommon
-	if ok {
-		networkACmn = c1.(*actions.CCIPCommon)
-	}
-	if networkACmn == nil {
-		return errors.WithStack(fmt.Errorf("chain contracts for network %s not found", networkA.Name))
-	}
-	c2, ok := o.CommonContractsByNetwork.Load(networkB.Name)
-	var networkBCmn *actions.CCIPCommon
-	if ok {
-		networkBCmn = c2.(*actions.CCIPCommon)
-	}
-	if networkBCmn == nil {
-		return errors.WithStack(fmt.Errorf("chain contracts for network %s not found", networkB.Name))
-	}
 	staticPrice := o.Cfg.TestGroupInput.DynamicPriceUpdateInterval == nil
 	setUpFuncs.Go(func() error {
 		lggr.Info().Msgf("Setting up lane %s to %s", networkA.Name, networkB.Name)
-		srcConfig, destConfig, err := ccipLaneA2B.DeployNewCCIPLane(o.SetUpContext, o.Env, commitAndExecOnSameDON, networkACmn, networkBCmn,
-			transferAmounts, o.BootstrapAdded, configureCLNode, o.JobAddGrp, withPipeline, staticPrice)
+		err := ccipLaneA2B.DeployNewCCIPLane(o.SetUpContext, o.Env, commitAndExecOnSameDON,
+			transferAmounts, o.BootstrapAdded, configureCLNode, o.JobAddGrp,
+			withPipeline, staticPrice,
+			o.Cfg.useExistingDeployment(),
+			o.Cfg.MultiCallEnabled(),
+			o.Cfg.TestGroupInput.NoOfUSDCMockTokens,
+		)
 		if err != nil {
 			allErrors.Store(multierr.Append(allErrors.Load(), fmt.Errorf("deploying lane %s to %s; err - %w", networkA.Name, networkB.Name, errors.WithStack(err))))
 			return err
 		}
-		err = o.LaneConfig.WriteLaneConfig(networkA.Name, srcConfig)
+		err = o.LaneConfig.WriteLaneConfig(networkA.Name, ccipLaneA2B.SrcNetworkLaneCfg)
 		if err != nil {
 			lggr.Error().Err(err).Msgf("error deploying lane %s to %s", networkA.Name, networkB.Name)
 			allErrors.Store(multierr.Append(allErrors.Load(), fmt.Errorf("writing lane config for %s; err - %w", networkA.Name, errors.WithStack(err))))
 			return err
 		}
-		err = o.LaneConfig.WriteLaneConfig(networkB.Name, destConfig)
+		err = o.LaneConfig.WriteLaneConfig(networkB.Name, ccipLaneA2B.DstNetworkLaneCfg)
 		if err != nil {
 			allErrors.Store(multierr.Append(allErrors.Load(), fmt.Errorf("writing lane config for %s; err - %w", networkB.Name, errors.WithStack(err))))
 			return err
 		}
+		// no need for this anymore we copied it to CCIPTestSetUpOutputs' laneconfig
+		ccipLaneA2B.DstNetworkLaneCfg = nil
+		ccipLaneA2B.SrcNetworkLaneCfg = nil
 		lggr.Info().Msgf("done setting up lane %s to %s", networkA.Name, networkB.Name)
 		return nil
 	})
@@ -554,24 +549,32 @@ func (o *CCIPTestSetUpOutputs) AddLanesForNetworkPair(
 	setUpFuncs.Go(func() error {
 		if bidirectional {
 			lggr.Info().Msgf("Setting up lane %s to %s", networkB.Name, networkA.Name)
-			srcConfig, destConfig, err := ccipLaneB2A.DeployNewCCIPLane(o.SetUpContext, o.Env, commitAndExecOnSameDON, networkBCmn, networkACmn,
-				transferAmounts, o.BootstrapAdded, configureCLNode, o.JobAddGrp, withPipeline, staticPrice)
+			err := ccipLaneB2A.DeployNewCCIPLane(o.SetUpContext, o.Env, commitAndExecOnSameDON,
+				transferAmounts, o.BootstrapAdded, configureCLNode, o.JobAddGrp,
+				withPipeline, staticPrice,
+				o.Cfg.useExistingDeployment(),
+				o.Cfg.MultiCallEnabled(),
+				o.Cfg.TestGroupInput.NoOfUSDCMockTokens,
+			)
 			if err != nil {
 				lggr.Error().Err(err).Msgf("error deploying lane %s to %s", networkB.Name, networkA.Name)
 				allErrors.Store(multierr.Append(allErrors.Load(), fmt.Errorf("deploying lane %s to %s; err -  %w", networkB.Name, networkA.Name, errors.WithStack(err))))
 				return err
 			}
 
-			err = o.LaneConfig.WriteLaneConfig(networkB.Name, srcConfig)
+			err = o.LaneConfig.WriteLaneConfig(networkB.Name, ccipLaneB2A.SrcNetworkLaneCfg)
 			if err != nil {
 				allErrors.Store(multierr.Append(allErrors.Load(), fmt.Errorf("writing lane config for %s; err - %w", networkA.Name, errors.WithStack(err))))
 				return err
 			}
-			err = o.LaneConfig.WriteLaneConfig(networkA.Name, destConfig)
+			err = o.LaneConfig.WriteLaneConfig(networkA.Name, ccipLaneB2A.DstNetworkLaneCfg)
 			if err != nil {
 				allErrors.Store(multierr.Append(allErrors.Load(), fmt.Errorf("writing lane config for %s; err - %w", networkB.Name, errors.WithStack(err))))
 				return err
 			}
+			// no need for this anymore we copied it to CCIPTestSetUpOutputs' laneconfig
+			ccipLaneB2A.DstNetworkLaneCfg = nil
+			ccipLaneB2A.SrcNetworkLaneCfg = nil
 			lggr.Info().Msgf("done setting up lane %s to %s", networkB.Name, networkA.Name)
 			return nil
 		}
