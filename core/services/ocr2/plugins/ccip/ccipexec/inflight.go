@@ -89,7 +89,7 @@ func (container *inflightExecReportsContainer) add(lggr logger.Logger, messages 
 	container.reports = tmpReports
 
 	// Otherwise not already in flight, add it.
-	lggr.Warnw(
+	lggr.Infow(
 		"Inflight report added",
 		"minSeqNr", messages[0].SequenceNumber,
 		"maxSeqNr", messages[len(messages)-1].SequenceNumber,
