@@ -43,7 +43,7 @@ func main() {
 	//fmt.Println("Resolved fee token address:", strings.ToLower(resolvedFeeToken))
 	url := GenerateQueryString(args.Sender, args.Receiver, args.Source, args.Dest, args.MessageId, resolvedFeeToken, args.First, args.Offset )
 	fmt.Println("Querying API with URL:", url)
-	apiResponse, nil := QueryTransactionsAPI(url)
+	apiResponse, _ := QueryTransactionsAPI(url)
 
 	file, err := os.Create("transactions.csv")
 	if err != nil {   
