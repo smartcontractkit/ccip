@@ -1478,7 +1478,7 @@ func (sourceCCIP *SourceCCIPModule) SendRequest(
 	timeNow := time.Now()
 	feeToken := common.HexToAddress(sourceCCIP.Common.FeeToken.Address())
 	// initiate the transfer
-	// if the token address is 0x0 it will use Native as fee token and the fee amount should be mentioned in bind.TransactOpts's value
+	// if the fee token address is 0x0 it will use Native as fee token and the fee amount should be mentioned in bind.TransactOpts's value
 	if feeToken != (common.Address{}) {
 		sendTx, err = sourceCCIP.Common.Router.CCIPSendAndProcessTx(destChainSelector, msg, nil)
 		if err != nil {

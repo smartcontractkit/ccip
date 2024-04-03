@@ -205,7 +205,8 @@ func (c *CCIPE2ELoad) Call(_ *wasp.Generator) *wasp.Response {
 	if feeToken != common.HexToAddress("0x0") {
 		sendTx, err = sourceCCIP.Common.Router.CCIPSend(destChainSelector, msg, nil)
 	} else {
-		sendTx, err = sourceCCIP.Common.Router.CCIPSend(destChainSelector, msg, fee)
+		// add a bit buffer to fee
+		sendTx, err = sourceCCIP.Common.Router.CCIPSend(destChainSelector, msg, new(big.Int).Add(big.NewInt(1e2), fee))
 	}
 	if err != nil {
 		stats.UpdateState(lggr, 0, testreporters.TX, time.Since(startTime), testreporters.Failure)

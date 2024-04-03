@@ -861,7 +861,7 @@ func CCIPDefaultTestSetUp(
 		setUpArgs.WaitForPriceUpdates()
 		// if dynamic price update is required
 		if setUpArgs.Cfg.TestGroupInput.DynamicPriceUpdateInterval != nil {
-			require.NoError(t, setUpArgs.SetupDynamicTokenPriceUpdates(), "setting up dynamic price update shoud not fail")
+			require.NoError(t, setUpArgs.SetupDynamicTokenPriceUpdates(), "setting up dynamic price update should not fail")
 		}
 	}
 
