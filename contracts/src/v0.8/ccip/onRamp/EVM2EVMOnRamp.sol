@@ -308,7 +308,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
       feeTokenAmount: feeTokenAmount,
       data: message.data,
       tokenAmounts: message.tokenAmounts,
-      sourceTokenData: new bytes[](numberOfTokens), // will be filled in later
+      sourceTokenData: new IPool.SourceTokenData[](numberOfTokens), // will be populated below
       messageId: ""
     });
 
@@ -316,7 +316,8 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     // There should be no state changes after external call to TokenPools.
     for (uint256 i = 0; i < numberOfTokens; ++i) {
       Client.EVMTokenAmount memory tokenAndAmount = message.tokenAmounts[i];
-      bytes memory tokenData = getPoolBySourceToken(destChainSelector, IERC20(tokenAndAmount.token)).lockOrBurn(
+      IPool sourcePool = getPoolBySourceToken(destChainSelector, IERC20(tokenAndAmount.token));
+      (bytes memory destPoolAddress, bytes memory extraData) = sourcePool.lockOrBurn(
         originalSender,
         message.receiver,
         tokenAndAmount.amount,
@@ -328,13 +329,17 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
       // This prevents gas bomb attacks on the NOPs. We use destBytesOverhead as a proxy to cap the number of bytes we accept.
       // As destBytesOverhead accounts for tokenData + offchainData, this caps the worst case abuse to the number of bytes reserved for offchainData.
       // It therefore fully mitigates gas bombs for most tokens, as most tokens don't use offchainData.
-
-      // TODO hack: +160 to account for the addresses sent
-      if (tokenData.length > s_tokenTransferFeeConfig[tokenAndAmount.token].destBytesOverhead + 160) {
+      if (extraData.length > s_tokenTransferFeeConfig[tokenAndAmount.token].destBytesOverhead) {
         revert SourceTokenDataTooLarge(tokenAndAmount.token);
       }
+      // Since this is an EVM2EVM message, the pool address should be exactly 32 bytes
+      if (destPoolAddress.length != 32) revert InvalidAddress(destPoolAddress);
 
-      newMessage.sourceTokenData[i] = tokenData;
+      newMessage.sourceTokenData[i] = IPool.SourceTokenData({
+        sourcePoolAddress: abi.encode(sourcePool),
+        destPoolAddress: destPoolAddress,
+        extraData: extraData
+      });
     }
 
     // Hash only after the sourceTokenData has been set

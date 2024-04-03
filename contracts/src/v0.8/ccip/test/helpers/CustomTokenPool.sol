@@ -20,9 +20,9 @@ contract CustomTokenPool is TokenPool {
     uint256 amount,
     uint64 remoteChainSelector,
     bytes calldata
-  ) external override whenHealthy onlyOnRamp(remoteChainSelector) returns (bytes memory) {
+  ) external override whenHealthy onlyOnRamp(remoteChainSelector) returns (bytes memory, bytes memory) {
     emit SynthBurned(amount);
-    return "";
+    return ("", "");
   }
 
   /// @notice Release tokens from the pool to the recipient
@@ -32,6 +32,7 @@ contract CustomTokenPool is TokenPool {
     address,
     uint256 amount,
     uint64 remoteChainSelector,
+    SourceTokenData memory,
     bytes memory
   ) external override whenHealthy onlyOffRamp(remoteChainSelector) {
     emit SynthMinted(amount);

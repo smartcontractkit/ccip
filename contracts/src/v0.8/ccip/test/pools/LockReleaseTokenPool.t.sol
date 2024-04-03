@@ -164,18 +164,18 @@ contract LockReleaseTokenPool_releaseOrMint is LockReleaseTokenPoolSetup {
     vm.expectEmit();
     emit Released(s_allowedOffRamp, OWNER, amount);
 
-    bytes memory extraData = abi.encode(
-      abi.encode(
-        Internal.TokenDataPayload({
-          sourcePoolAddress: s_sourcePoolAddress,
-          destPoolAddress: address(s_lockReleaseTokenPool),
-          extraData: ""
-        })
-      ),
+    s_lockReleaseTokenPool.releaseOrMint(
+      bytes(""),
+      OWNER,
+      amount,
+      SOURCE_CHAIN_SELECTOR,
+      IPool.SourceTokenData({
+        sourcePoolAddress: abi.encode(s_sourcePoolAddress),
+        destPoolAddress: abi.encode(address(s_lockReleaseTokenPool)),
+        extraData: ""
+      }),
       ""
     );
-
-    s_lockReleaseTokenPool.releaseOrMint(bytes(""), OWNER, amount, SOURCE_CHAIN_SELECTOR, extraData);
   }
 
   function testFuzz_ReleaseOrMintSuccess(address recipient, uint256 amount) public {
@@ -205,25 +205,27 @@ contract LockReleaseTokenPool_releaseOrMint is LockReleaseTokenPoolSetup {
       emit Released(s_allowedOffRamp, recipient, amount);
     }
 
-    bytes memory extraData = abi.encode(
-      abi.encode(
-        Internal.TokenDataPayload({
-          sourcePoolAddress: s_sourcePoolAddress,
-          destPoolAddress: address(s_lockReleaseTokenPool),
-          extraData: ""
-        })
-      ),
+    s_lockReleaseTokenPool.releaseOrMint(
+      bytes(""),
+      recipient,
+      amount,
+      SOURCE_CHAIN_SELECTOR,
+      IPool.SourceTokenData({
+        sourcePoolAddress: abi.encode(s_sourcePoolAddress),
+        destPoolAddress: abi.encode(address(s_lockReleaseTokenPool)),
+        extraData: ""
+      }),
       ""
     );
-
-    s_lockReleaseTokenPool.releaseOrMint(bytes(""), recipient, amount, SOURCE_CHAIN_SELECTOR, extraData);
   }
 
   function testChainNotAllowedReverts() public {
+    address notAllowedRemotePoolAddress = address(1);
+
     TokenPool.ChainUpdate[] memory chainUpdate = new TokenPool.ChainUpdate[](1);
     chainUpdate[0] = TokenPool.ChainUpdate({
       remoteChainSelector: SOURCE_CHAIN_SELECTOR,
-      remotePoolAddress: address(1),
+      remotePoolAddress: notAllowedRemotePoolAddress,
       allowed: false,
       outboundRateLimiterConfig: RateLimiter.Config({isEnabled: false, capacity: 0, rate: 0}),
       inboundRateLimiterConfig: RateLimiter.Config({isEnabled: false, capacity: 0, rate: 0})
@@ -234,7 +236,18 @@ contract LockReleaseTokenPool_releaseOrMint is LockReleaseTokenPoolSetup {
     vm.startPrank(s_allowedOffRamp);
 
     vm.expectRevert(abi.encodeWithSelector(TokenPool.ChainNotAllowed.selector, SOURCE_CHAIN_SELECTOR));
-    s_lockReleaseTokenPool.releaseOrMint(bytes(""), OWNER, 1e5, SOURCE_CHAIN_SELECTOR, bytes(""));
+    s_lockReleaseTokenPool.releaseOrMint(
+      bytes(""),
+      OWNER,
+      1e5,
+      SOURCE_CHAIN_SELECTOR,
+      IPool.SourceTokenData({
+        sourcePoolAddress: abi.encode(s_sourcePoolAddress),
+        destPoolAddress: abi.encode(address(s_lockReleaseTokenPool)),
+        extraData: ""
+      }),
+      bytes("")
+    );
   }
 
   function testPoolMintNotHealthyReverts() public {
@@ -243,7 +256,9 @@ contract LockReleaseTokenPool_releaseOrMint is LockReleaseTokenPoolSetup {
     uint256 before = s_token.balanceOf(OWNER);
     vm.startPrank(s_allowedOffRamp);
     vm.expectRevert(EVM2EVMOffRamp.BadARMSignal.selector);
-    s_lockReleaseTokenPool.releaseOrMint(bytes(""), OWNER, 1e5, SOURCE_CHAIN_SELECTOR, bytes(""));
+    s_lockReleaseTokenPool.releaseOrMint(
+      bytes(""), OWNER, 1e5, SOURCE_CHAIN_SELECTOR, generateSourceTokenData(), bytes("")
+    );
     assertEq(s_token.balanceOf(OWNER), before);
   }
 }

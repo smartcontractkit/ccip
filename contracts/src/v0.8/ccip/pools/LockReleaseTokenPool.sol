@@ -3,6 +3,7 @@ pragma solidity 0.8.19;
 
 import {ILiquidityContainer} from "../../rebalancer/interfaces/ILiquidityContainer.sol";
 import {ITypeAndVersion} from "../../shared/interfaces/ITypeAndVersion.sol";
+import {IPool} from "../interfaces/pools/IPool.sol";
 
 import {RateLimiter} from "../libraries/RateLimiter.sol";
 import {TokenPool} from "./TokenPool.sol";
@@ -64,11 +65,11 @@ contract LockReleaseTokenPool is TokenPool, ILiquidityContainer, ITypeAndVersion
     onlyOnRamp(remoteChainSelector)
     checkAllowList(originalSender)
     whenHealthy
-    returns (bytes memory)
+    returns (bytes memory, bytes memory)
   {
     _consumeOutboundRateLimit(remoteChainSelector, amount);
     emit Locked(msg.sender, amount);
-    return _getLockOrBurnReturnData(remoteChainSelector, "");
+    return (getRemotePool(remoteChainSelector), "");
   }
 
   /// @notice Release tokens from the pool to the recipient
@@ -81,9 +82,10 @@ contract LockReleaseTokenPool is TokenPool, ILiquidityContainer, ITypeAndVersion
     address receiver,
     uint256 amount,
     uint64 remoteChainSelector,
-    bytes memory extraData
+    IPool.SourceTokenData memory sourceTokenData,
+    bytes memory
   ) external virtual override onlyOffRamp(remoteChainSelector) whenHealthy {
-    _validateSourceCaller(remoteChainSelector, extraData);
+    _validateSourceCaller(remoteChainSelector, sourceTokenData.sourcePoolAddress);
     _consumeInboundRateLimit(remoteChainSelector, amount);
     getToken().safeTransfer(receiver, amount);
     emit Released(msg.sender, receiver, amount);

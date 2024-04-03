@@ -6,7 +6,6 @@ import {IRouter} from "../interfaces/IRouter.sol";
 import {IPool} from "../interfaces/pools/IPool.sol";
 
 import {OwnerIsCreator} from "../../shared/access/OwnerIsCreator.sol";
-import {Internal} from "../libraries/Internal.sol";
 import {RateLimiter} from "../libraries/RateLimiter.sol";
 
 import {IERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
@@ -29,7 +28,7 @@ abstract contract TokenPool is IPool, OwnerIsCreator, IERC165 {
   error ChainNotAllowed(uint64 remoteChainSelector);
   error BadARMSignal();
   error ChainAlreadyExists(uint64 chainSelector);
-  error InvalidSourcePoolAddress(address sourcePoolAddress);
+  error InvalidSourcePoolAddress(bytes sourcePoolAddress);
 
   event Locked(address indexed sender, uint256 amount);
   event Burned(address indexed sender, uint256 amount);
@@ -129,31 +128,11 @@ abstract contract TokenPool is IPool, OwnerIsCreator, IERC165 {
     return interfaceId == type(IPool).interfaceId || interfaceId == type(IERC165).interfaceId;
   }
 
-  function _getLockOrBurnReturnData(
-    uint64 destChainSelector,
-    bytes memory arbitraryPayload
-  ) internal view returns (bytes memory) {
-    return abi.encode(
-      Internal.TokenDataPayload({
-        sourcePoolAddress: address(this),
-        destPoolAddress: s_remoteChainConfigs[destChainSelector].remotePoolAddress,
-        extraData: arbitraryPayload
-      })
-    );
-  }
-
-  function _validateSourceCaller(
-    uint64 remoteChainSelector,
-    bytes memory extraData
-  ) internal view returns (bytes memory tokenDataPayload, bytes memory offchnTokenData) {
-    (bytes memory sourceDataBytes, bytes memory offchainTokenData) = abi.decode(extraData, (bytes, bytes));
-    Internal.TokenDataPayload memory sourceData = abi.decode(sourceDataBytes, (Internal.TokenDataPayload));
-    // Validate is the sending pool is allowed
-    if (sourceData.sourcePoolAddress != s_remoteChainConfigs[remoteChainSelector].remotePoolAddress) {
-      revert InvalidSourcePoolAddress(sourceData.sourcePoolAddress);
+  // Validate if the sending pool is allowed
+  function _validateSourceCaller(uint64 remoteChainSelector, bytes memory sourcePoolAddress) internal view {
+    if (keccak256(sourcePoolAddress) != keccak256(getRemotePool(remoteChainSelector))) {
+      revert InvalidSourcePoolAddress(sourcePoolAddress);
     }
-
-    return (sourceData.extraData, offchainTokenData);
   }
 
   // ================================================================
@@ -226,6 +205,11 @@ abstract contract TokenPool is IPool, OwnerIsCreator, IERC165 {
         emit ChainRemoved(update.remoteChainSelector);
       }
     }
+  }
+
+  // TODO change the type upstream
+  function getRemotePool(uint64 remoteChainSelector) public view returns (bytes memory) {
+    return abi.encode(s_remoteChainConfigs[remoteChainSelector].remotePoolAddress);
   }
 
   function setRemotePool(uint64 remoteChainSelector, address remotePoolAddress) external onlyOwner {

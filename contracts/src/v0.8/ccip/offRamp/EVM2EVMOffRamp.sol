@@ -496,13 +496,12 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
     Client.EVMTokenAmount[] memory sourceTokenAmounts,
     bytes memory originalSender,
     address receiver,
-    bytes[] memory sourceTokenData,
+    IPool.SourceTokenData[] memory sourceTokenData,
     bytes[] memory offchainTokenData
   ) internal returns (Client.EVMTokenAmount[] memory) {
     Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](sourceTokenAmounts.length);
     for (uint256 i = 0; i < sourceTokenAmounts.length; ++i) {
-      Internal.TokenDataPayload memory extraTokenData = abi.decode(sourceTokenData[i], (Internal.TokenDataPayload));
-      IPool pool = IPool(extraTokenData.destPoolAddress);
+      IPool pool = IPool(abi.decode(sourceTokenData[i].destPoolAddress, (address)));
       uint256 sourceTokenAmount = sourceTokenAmounts[i].amount;
 
       // Call the pool with exact gas to increase resistance against malicious tokens or token pools.
@@ -515,7 +514,8 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
           receiver,
           sourceTokenAmount,
           i_sourceChainSelector,
-          abi.encode(sourceTokenData[i], offchainTokenData[i])
+          sourceTokenData[i],
+          offchainTokenData[i]
         ),
         address(pool),
         s_dynamicConfig.maxPoolReleaseOrMintGas,

@@ -21,12 +21,19 @@ contract TokenPoolHelper is TokenPool {
     uint256 amount,
     uint64,
     bytes calldata
-  ) external override returns (bytes memory) {
+  ) external override returns (bytes memory, bytes memory) {
     emit LockOrBurn(amount);
-    return "";
+    return ("", "");
   }
 
-  function releaseOrMint(bytes memory, address receiver, uint256 amount, uint64, bytes memory) external override {
+  function releaseOrMint(
+    bytes memory,
+    address receiver,
+    uint256 amount,
+    uint64,
+    IPool.SourceTokenData memory,
+    bytes memory
+  ) external override {
     emit ReleaseOrMint(receiver, amount);
   }
 

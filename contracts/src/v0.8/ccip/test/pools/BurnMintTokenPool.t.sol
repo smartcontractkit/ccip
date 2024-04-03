@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.19;
 
+import {IPool} from "../../interfaces/pools/IPool.sol";
+
 import {Internal} from "../../libraries/Internal.sol";
 import {EVM2EVMOffRamp} from "../../offRamp/EVM2EVMOffRamp.sol";
 import {EVM2EVMOnRamp} from "../../onRamp/EVM2EVMOnRamp.sol";
@@ -79,22 +81,22 @@ contract BurnMintTokenPool_releaseOrMint is BurnMintTokenPoolSetup {
   function testPoolMintSuccess() public {
     uint256 amount = 1e19;
 
-    bytes memory extraData = abi.encode(
-      abi.encode(
-        Internal.TokenDataPayload({
-          sourcePoolAddress: s_remoteBurnMintPool,
-          destPoolAddress: address(s_pool),
-          extraData: ""
-        })
-      ),
-      ""
-    );
-
     vm.startPrank(s_burnMintOffRamp);
 
     vm.expectEmit();
     emit Transfer(address(0), OWNER, amount);
-    s_pool.releaseOrMint(bytes(""), OWNER, amount, DEST_CHAIN_SELECTOR, extraData);
+    s_pool.releaseOrMint(
+      bytes(""),
+      OWNER,
+      amount,
+      DEST_CHAIN_SELECTOR,
+      IPool.SourceTokenData({
+        sourcePoolAddress: abi.encode(s_remoteBurnMintPool),
+        destPoolAddress: abi.encode(address(s_pool)),
+        extraData: ""
+      }),
+      ""
+    );
 
     assertEq(s_burnMintERC677.balanceOf(OWNER), amount);
   }
@@ -106,7 +108,7 @@ contract BurnMintTokenPool_releaseOrMint is BurnMintTokenPoolSetup {
     vm.startPrank(s_burnMintOffRamp);
 
     vm.expectRevert(EVM2EVMOffRamp.BadARMSignal.selector);
-    s_pool.releaseOrMint(bytes(""), OWNER, 1e5, DEST_CHAIN_SELECTOR, bytes(""));
+    s_pool.releaseOrMint(bytes(""), OWNER, 1e5, DEST_CHAIN_SELECTOR, generateSourceTokenData(), bytes(""));
 
     assertEq(s_burnMintERC677.balanceOf(OWNER), before);
   }
@@ -115,6 +117,6 @@ contract BurnMintTokenPool_releaseOrMint is BurnMintTokenPoolSetup {
     uint64 wrongChainSelector = 8838833;
 
     vm.expectRevert(abi.encodeWithSelector(TokenPool.ChainNotAllowed.selector, wrongChainSelector));
-    s_pool.releaseOrMint(bytes(""), OWNER, 1, wrongChainSelector, bytes(""));
+    s_pool.releaseOrMint(bytes(""), OWNER, 1, wrongChainSelector, generateSourceTokenData(), bytes(""));
   }
 }
