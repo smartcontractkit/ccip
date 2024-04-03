@@ -7,6 +7,8 @@ import {OwnerIsCreator} from "../../shared/access/OwnerIsCreator.sol";
 
 import {EnumerableSet} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/structs/EnumerableSet.sol";
 
+// This contract has minimal functionality and minimal test coverage. It will be
+// improved upon in future tickets.
 contract TokenAdminRegistry is ITokenAdminRegistry, OwnerIsCreator {
   using EnumerableSet for EnumerableSet.AddressSet;
 
@@ -100,5 +102,13 @@ contract TokenAdminRegistry is ITokenAdminRegistry, OwnerIsCreator {
     config.isPermissionedAdmin = true;
 
     emit AdministratorRegistered(localToken, administrator);
+  }
+
+  // ================================================================
+  // │                      Registry Modules                        │
+  // ================================================================
+
+  function addRegistryModule(address module) external onlyOwner {
+    s_RegistryModules.add(module);
   }
 }

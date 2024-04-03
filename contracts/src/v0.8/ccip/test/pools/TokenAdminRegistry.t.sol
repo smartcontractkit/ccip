@@ -8,8 +8,12 @@ contract TokenAdminRegistrySetup is TokenSetup {
   event AdministratorRegistered(address indexed token, address indexed administrator);
   event PoolSet(address indexed token, address indexed pool);
 
+  address internal s_registryModule = makeAddr("registryModule");
+
   function setUp() public virtual override {
     TokenSetup.setUp();
+
+    s_tokenAdminRegistry.addRegistryModule(s_registryModule);
   }
 }
 
@@ -42,7 +46,7 @@ contract TokenAdminRegistry_getPool is TokenAdminRegistrySetup {
     assertEq(got, s_sourcePoolByToken[s_sourceTokens[0]]);
   }
 
-  function test_getPool_UnsupportedToken_Reverts() public {
+  function test_getPool_UnsupportedToken_Revert() public {
     address doesNotExist = makeAddr("doesNotExist");
     vm.expectRevert(abi.encodeWithSelector(TokenAdminRegistry.UnsupportedToken.selector, doesNotExist));
     s_tokenAdminRegistry.getPool(doesNotExist);
@@ -68,5 +72,54 @@ contract TokenAdminRegistry_setPool is TokenAdminRegistrySetup {
       abi.encodeWithSelector(TokenAdminRegistry.OnlyAdministrator.selector, address(this), s_sourceTokens[0])
     );
     s_tokenAdminRegistry.setPool(s_sourceTokens[0], makeAddr("pool"));
+  }
+}
+
+contract TokenAdminRegistry_isAdministrator is TokenAdminRegistrySetup {
+  function test_isAdministrator_Success() public {
+    assert(s_tokenAdminRegistry.isAdministrator(s_sourceTokens[0], OWNER));
+
+    address newOwner = makeAddr("newOwner");
+    address newToken = makeAddr("newToken");
+    assert(!s_tokenAdminRegistry.isAdministrator(newToken, newOwner));
+    assert(!s_tokenAdminRegistry.isAdministrator(newToken, OWNER));
+
+    s_tokenAdminRegistry.registerAdministratorPermissioned(s_sourceTokens[0], newOwner);
+
+    assert(s_tokenAdminRegistry.isAdministrator(s_sourceTokens[0], newOwner));
+    assert(!s_tokenAdminRegistry.isAdministrator(s_sourceTokens[0], OWNER));
+  }
+}
+
+contract TokenAdminRegistry_registerAdministrator is TokenAdminRegistrySetup {
+  function test_registerAdministrator_Success() public {
+    vm.startPrank(s_registryModule);
+    address newOwner = makeAddr("newOwner");
+    address newToken = makeAddr("newToken");
+
+    vm.expectEmit();
+    emit AdministratorRegistered(newToken, newOwner);
+
+    s_tokenAdminRegistry.registerAdministrator(newToken, newOwner);
+
+    assert(s_tokenAdminRegistry.isAdministrator(newToken, newOwner));
+  }
+
+  function test_registerAdministrator_OnlyRegistryModule_Revert() public {
+    address newToken = makeAddr("newToken");
+    vm.stopPrank();
+
+    vm.expectRevert(abi.encodeWithSelector(TokenAdminRegistry.OnlyRegistryModule.selector, address(this)));
+    s_tokenAdminRegistry.registerAdministrator(newToken, OWNER);
+  }
+
+  function test_registerAdministrator_AlreadyRegistered_Revert() public {
+    address newToken = makeAddr("newToken");
+    vm.startPrank(s_registryModule);
+
+    s_tokenAdminRegistry.registerAdministrator(newToken, OWNER);
+
+    vm.expectRevert(abi.encodeWithSelector(TokenAdminRegistry.AlreadyRegistered.selector, newToken, OWNER));
+    s_tokenAdminRegistry.registerAdministrator(newToken, OWNER);
   }
 }
