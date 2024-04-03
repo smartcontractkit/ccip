@@ -19,6 +19,7 @@ import (
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
 
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/ccipdataprovider"
@@ -44,8 +45,8 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/pipeline"
 )
 
-func NewCommitServices(ctx context.Context, lggr logger.Logger, jb job.Job, chainSet legacyevm.LegacyChainContainer, new bool, pr pipeline.Runner, argsNoPlugin libocr2.OCR2OracleArgs, logError func(string), qopts ...pg.QOpt) ([]job.ServiceCtx, error) {
-	pluginConfig, backfillArgs, chainHealthcheck, err := jobSpecToCommitPluginConfig(ctx, lggr, jb, pr, chainSet, qopts...)
+func NewCommitServices(ctx context.Context, lggr logger.Logger, jb job.Job, jobCache *ocr2.SharedJobCache, chainSet legacyevm.LegacyChainContainer, new bool, pr pipeline.Runner, argsNoPlugin libocr2.OCR2OracleArgs, logError func(string), qopts ...pg.QOpt) ([]job.ServiceCtx, error) {
+	pluginConfig, backfillArgs, chainHealthcheck, err := jobSpecToCommitPluginConfig(ctx, lggr, jb, jobCache, pr, chainSet, qopts...)
 	if err != nil {
 		return nil, err
 	}
@@ -118,7 +119,7 @@ func UnregisterCommitPluginLpFilters(ctx context.Context, lggr logger.Logger, jb
 	return multiErr
 }
 
-func jobSpecToCommitPluginConfig(ctx context.Context, lggr logger.Logger, jb job.Job, pr pipeline.Runner, chainSet legacyevm.LegacyChainContainer, qopts ...pg.QOpt) (*CommitPluginStaticConfig, *ccipcommon.BackfillArgs, *cache.ObservedChainHealthcheck, error) {
+func jobSpecToCommitPluginConfig(ctx context.Context, lggr logger.Logger, jb job.Job, jobCache *ocr2.SharedJobCache, pr pipeline.Runner, chainSet legacyevm.LegacyChainContainer, qopts ...pg.QOpt) (*CommitPluginStaticConfig, *ccipcommon.BackfillArgs, *cache.ObservedChainHealthcheck, error) {
 	params, err := extractJobSpecParams(jb, chainSet)
 	if err != nil {
 		return nil, nil, nil, err
@@ -143,46 +144,55 @@ func jobSpecToCommitPluginConfig(ctx context.Context, lggr logger.Logger, jb job
 	}
 	commitLggr := lggr.Named("CCIPCommit").With("sourceChain", sourceChainName, "destChain", destChainName)
 
-	var priceGetter pricegetter.PriceGetter
-	// Matt TODO
-	// Does any job use non-pipeline price getter?
-	// How does pipeline runner work under the hood
-	withPipeline := strings.Trim(params.pluginConfig.TokenPricesUSDPipeline, "\n\t ") != ""
-	if withPipeline {
-		priceGetter, err = pricegetter.NewPipelineGetter(params.pluginConfig.TokenPricesUSDPipeline, pr, jb.ID, jb.ExternalJobID, jb.Name.ValueOrZero(), lggr)
+	jobs := jobCache.Get() //map[int32]job.Job
+	priceGetters := make(map[cciptypes.Address]pricegetter.PriceGetter)
+	for _, cjob := range jobs {
+		cParams, err := extractJobSpecParams(cjob, chainSet)
 		if err != nil {
-			return nil, nil, nil, fmt.Errorf("creating pipeline price getter: %w", err)
-		}
-	} else {
-		// Use dynamic price getter.
-		if params.pluginConfig.PriceGetterConfig == nil {
-			return nil, nil, nil, fmt.Errorf("priceGetterConfig is nil")
+			return nil, nil, nil, err
 		}
 
-		// Build price getter clients for all chains specified in the aggregator configurations.
-		// Some lanes (e.g. Wemix/Kroma) requires other clients than source and destination, since they use feeds from other chains.
-		priceGetterClients := map[uint64]pricegetter.DynamicPriceGetterClient{}
-		for _, aggCfg := range params.pluginConfig.PriceGetterConfig.AggregatorPrices {
-			chainID := aggCfg.ChainID
-			// Retrieve the chain.
-			chain, _, err2 := ccipconfig.GetChainByChainID(chainSet, chainID)
-			if err2 != nil {
-				return nil, nil, nil, fmt.Errorf("retrieving chain for chainID %d: %w", chainID, err2)
+		cOffRamp := cParams.pluginConfig.OffRamp
+		var priceGetter pricegetter.PriceGetter
+		withPipeline := strings.Trim(cParams.pluginConfig.TokenPricesUSDPipeline, "\n\t ") != ""
+		if withPipeline {
+			priceGetter, err = pricegetter.NewPipelineGetter(cParams.pluginConfig.TokenPricesUSDPipeline, pr, cjob.ID, cjob.ExternalJobID, cjob.Name.ValueOrZero(), lggr)
+			if err != nil {
+				return nil, nil, nil, fmt.Errorf("creating pipeline price getter: %w", err)
 			}
-			caller := rpclib.NewDynamicLimitedBatchCaller(
-				lggr,
-				chain.Client(),
-				rpclib.DefaultRpcBatchSizeLimit,
-				rpclib.DefaultRpcBatchBackOffMultiplier,
-				rpclib.DefaultMaxParallelRpcCalls,
-			)
-			priceGetterClients[chainID] = pricegetter.NewDynamicPriceGetterClient(caller)
+		} else {
+			// Use dynamic price getter.
+			if cParams.pluginConfig.PriceGetterConfig == nil {
+				return nil, nil, nil, fmt.Errorf("priceGetterConfig is nil")
+			}
+
+			// Build price getter clients for all chains specified in the aggregator configurations.
+			// Some lanes (e.g. Wemix/Kroma) requires other clients than source and destination, since they use feeds from other chains.
+			priceGetterClients := map[uint64]pricegetter.DynamicPriceGetterClient{}
+			for _, aggCfg := range cParams.pluginConfig.PriceGetterConfig.AggregatorPrices {
+				chainID := aggCfg.ChainID
+				// Retrieve the chain.
+				chain, _, err2 := ccipconfig.GetChainByChainID(chainSet, chainID)
+				if err2 != nil {
+					return nil, nil, nil, fmt.Errorf("retrieving chain for chainID %d: %w", chainID, err2)
+				}
+				caller := rpclib.NewDynamicLimitedBatchCaller(
+					lggr,
+					chain.Client(),
+					rpclib.DefaultRpcBatchSizeLimit,
+					rpclib.DefaultRpcBatchBackOffMultiplier,
+					rpclib.DefaultMaxParallelRpcCalls,
+				)
+				priceGetterClients[chainID] = pricegetter.NewDynamicPriceGetterClient(caller)
+			}
+
+			priceGetter, err = pricegetter.NewDynamicPriceGetter(*params.pluginConfig.PriceGetterConfig, priceGetterClients)
+			if err != nil {
+				return nil, nil, nil, fmt.Errorf("creating dynamic price getter: %w", err)
+			}
 		}
 
-		priceGetter, err = pricegetter.NewDynamicPriceGetter(*params.pluginConfig.PriceGetterConfig, priceGetterClients)
-		if err != nil {
-			return nil, nil, nil, fmt.Errorf("creating dynamic price getter: %w", err)
-		}
+		priceGetters[cOffRamp] = priceGetter
 	}
 
 	// Load all the readers relevant for this plugin.
@@ -290,7 +300,7 @@ func jobSpecToCommitPluginConfig(ctx context.Context, lggr logger.Logger, jb job
 			onRampReader:          onRampReader,
 			offRamps:              destOffRampReaders,
 			sourceNative:          ccipcalc.EvmAddrToGeneric(sourceNative),
-			priceGetter:           priceGetter,
+			priceGetters:          priceGetters,
 			sourceChainSelector:   params.commitStoreStaticCfg.SourceChainSelector,
 			destChainSelector:     params.commitStoreStaticCfg.ChainSelector,
 			commitStore:           commitStoreReader,
