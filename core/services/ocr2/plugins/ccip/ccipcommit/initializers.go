@@ -54,6 +54,8 @@ func NewCommitServices(ctx context.Context, lggr logger.Logger, jb job.Job, chai
 	if err != nil {
 		return nil, err
 	}
+	// Matt TODO
+	// Does factory produce a new Oracle instance in a new thread?
 	argsNoPlugin.ReportingPluginFactory = promwrapper.NewPromFactory(wrappedPluginFactory, "CCIPCommit", jb.OCR2OracleSpec.Relay, big.NewInt(0).SetUint64(destChainID))
 	argsNoPlugin.Logger = commonlogger.NewOCRWrapper(pluginConfig.lggr, true, logError)
 	oracle, err := libocr2.NewOracle(argsNoPlugin)
@@ -142,6 +144,9 @@ func jobSpecToCommitPluginConfig(ctx context.Context, lggr logger.Logger, jb job
 	commitLggr := lggr.Named("CCIPCommit").With("sourceChain", sourceChainName, "destChain", destChainName)
 
 	var priceGetter pricegetter.PriceGetter
+	// Matt TODO
+	// Does any job use non-pipeline price getter?
+	// How does pipeline runner work under the hood
 	withPipeline := strings.Trim(params.pluginConfig.TokenPricesUSDPipeline, "\n\t ") != ""
 	if withPipeline {
 		priceGetter, err = pricegetter.NewPipelineGetter(params.pluginConfig.TokenPricesUSDPipeline, pr, jb.ID, jb.ExternalJobID, jb.Name.ValueOrZero(), lggr)
@@ -199,6 +204,8 @@ func jobSpecToCommitPluginConfig(ctx context.Context, lggr logger.Logger, jb job
 	if err != nil {
 		return nil, nil, nil, err
 	}
+	// Matt TODO
+	// Router needs to monitor for OffRamp changes, once detected, reflect that in list of OffRamps
 	destRouter, err := router.NewRouter(destRouterEvmAddr, params.destChain.Client())
 	if err != nil {
 		return nil, nil, nil, err
