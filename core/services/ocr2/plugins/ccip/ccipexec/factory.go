@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 
 	gocache "github.com/patrickmn/go-cache"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
@@ -12,6 +13,10 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
+)
+
+var (
+	BlessedRootsCacheExpiry = 4 * time.Hour
 )
 
 type ExecutionReportingPluginFactory struct {
@@ -108,7 +113,7 @@ func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.Repor
 			snoozedRoots:                cache.NewSnoozedRoots(onchainConfig.PermissionLessExecutionThresholdSeconds, offchainConfig.RootSnoozeTime.Duration()),
 			metricsCollector:            rf.config.metricsCollector,
 			chainHealthcheck:            rf.config.chainHealthcheck,
-			blessedRootsCache:           gocache.New(onchainConfig.PermissionLessExecutionThresholdSeconds, onchainConfig.PermissionLessExecutionThresholdSeconds),
+			blessedRootsCache:           gocache.New(BlessedRootsCacheExpiry, 2*BlessedRootsCacheExpiry),
 		}, types.ReportingPluginInfo{
 			Name: "CCIPExecution",
 			// Setting this to false saves on calldata since OffRamp doesn't require agreement between NOPs

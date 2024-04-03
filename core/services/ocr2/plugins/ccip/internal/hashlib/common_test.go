@@ -87,3 +87,20 @@ func TestBytesOfBytesEncoding(t *testing.T) {
 		})
 	}
 }
+
+func TestMerkleRootToString(t *testing.T) {
+	tests := []struct {
+		name string
+		root [32]byte
+		want string
+	}{
+		{name: "empty", root: [32]byte{}, want: "0000000000000000000000000000000000000000000000000000000000000000"},
+		{name: "one", root: [32]byte{1}, want: "0100000000000000000000000000000000000000000000000000000000000000"},
+		{name: "three-five", root: [32]byte{1: 3, 31: 5}, want: "0003000000000000000000000000000000000000000000000000000000000005"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equalf(t, tt.want, MerkleRootToString(tt.root), "MerkleRootToString(%v)", tt.root)
+		})
+	}
+}

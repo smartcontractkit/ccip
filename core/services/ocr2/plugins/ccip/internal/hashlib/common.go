@@ -3,9 +3,14 @@ package hashlib
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/hex"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 )
+
+func MerkleRootToString(root [32]byte) string {
+	return hex.EncodeToString(root[:])
+}
 
 // BytesOfBytesKeccak will compute a keccak256 hash of the provided bytes of bytes slice
 func BytesOfBytesKeccak(b [][]byte) ([32]byte, error) {

@@ -4,6 +4,8 @@ import (
 	"time"
 
 	"github.com/patrickmn/go-cache"
+
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/hashlib"
 )
 
 const (
@@ -48,18 +50,14 @@ func NewSnoozedRoots(permissionLessExecutionThresholdDuration time.Duration, roo
 }
 
 func (s *snoozedRoots) IsSnoozed(merkleRoot [32]byte) bool {
-	rawValue, found := s.cache.Get(merkleRootToString(merkleRoot))
+	rawValue, found := s.cache.Get(hashlib.MerkleRootToString(merkleRoot))
 	return found && time.Now().Before(rawValue.(time.Time))
 }
 
 func (s *snoozedRoots) MarkAsExecuted(merkleRoot [32]byte) {
-	s.cache.SetDefault(merkleRootToString(merkleRoot), time.Now().Add(s.permissionLessExecutionThresholdDuration))
+	s.cache.SetDefault(hashlib.MerkleRootToString(merkleRoot), time.Now().Add(s.permissionLessExecutionThresholdDuration))
 }
 
 func (s *snoozedRoots) Snooze(merkleRoot [32]byte) {
-	s.cache.SetDefault(merkleRootToString(merkleRoot), time.Now().Add(s.rootSnoozedTime))
-}
-
-func merkleRootToString(merkleRoot [32]byte) string {
-	return string(merkleRoot[:])
+	s.cache.SetDefault(hashlib.MerkleRootToString(merkleRoot), time.Now().Add(s.rootSnoozedTime))
 }

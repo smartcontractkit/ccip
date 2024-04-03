@@ -25,6 +25,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/hashlib"
 
 	lpMocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
@@ -1156,6 +1157,51 @@ func TestExecutionReportingPlugin_getTokenDataWithCappedLatency(t *testing.T) {
 			assert.NoError(t, err)
 		})
 	}
+}
+
+func TestExecutionReportingPlugin_syncBlessedRoots(t *testing.T) {
+	ctx := testutils.Context(t)
+
+	root1 := [32]byte{1}
+	root2 := [32]byte{2}
+	root3 := [32]byte{3}
+
+	commitStoreReader := ccipdatamocks.NewCommitStoreReader(t)
+
+	r := &ExecutionReportingPlugin{
+		blessedRootsCache: gocache.New(time.Minute, time.Minute),
+		commitStoreReader: commitStoreReader,
+	}
+
+	r.blessedRootsCache.Set(hashlib.MerkleRootToString(root1), true, 0)
+	r.blessedRootsCache.Set(hashlib.MerkleRootToString(root2), true, 0)
+
+	// both roots are already blessed, no call will be made
+	err := r.syncBlessedRoots(ctx, mapset.NewSet[[32]byte](root1, root2))
+	assert.NoError(t, err)
+
+	// a call will be made only for root3 since it's not cached
+	commitStoreReader.On("AreBlessed", ctx, [][32]byte{root3}).Return([]bool{false}, nil)
+	err = r.syncBlessedRoots(ctx, mapset.NewSet[[32]byte](root1, root2, root3))
+	assert.NoError(t, err)
+
+	// root1 expires from cache
+	r.blessedRootsCache.Delete(hashlib.MerkleRootToString(root1))
+	// a call will now be made for both root1 and root3 (call is made for root 3 because it wasn't blessed in the prev call)
+	commitStoreReader.On("AreBlessed", ctx, [][32]byte{root1, root3}).Return([]bool{false, true}, nil)
+	err = r.syncBlessedRoots(ctx, mapset.NewSet[[32]byte](root1, root2, root3))
+	assert.NoError(t, err)
+
+	// a call will be made only for root1 now since root3 was blessed and cached in the prev call
+	commitStoreReader.On("AreBlessed", ctx, [][32]byte{root1}).Return([]bool{true}, nil)
+	err = r.syncBlessedRoots(ctx, mapset.NewSet[[32]byte](root1, root2, root3))
+	assert.NoError(t, err)
+
+	// all of them are blessed, no call will be made
+	err = r.syncBlessedRoots(ctx, mapset.NewSet[[32]byte](root1, root2, root3))
+	assert.NoError(t, err)
+
+	commitStoreReader.AssertExpectations(t)
 }
 
 func Test_calculateObservedMessagesConsensus(t *testing.T) {

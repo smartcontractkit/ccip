@@ -176,7 +176,7 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 			merkleRoot := rep.commitReport.MerkleRoot
 
 			rootLggr := lggr.With(
-				"root", hexutil.Encode(merkleRoot[:]),
+				"root", hashlib.MerkleRootToString(merkleRoot),
 				"minSeqNr", rep.commitReport.Interval.Min,
 				"maxSeqNr", rep.commitReport.Interval.Max,
 			)
@@ -210,26 +210,8 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 			r.tokenDataWorker.AddJobsFromMsgs(ctx, unexpiredReport.sendRequestsWithMeta)
 		}
 
-		merkleRoots := merkleRootsSet.ToSlice()
-		merkleRootsToCheck := make([][32]byte, 0, len(merkleRoots))
-		for _, merkleRoot := range merkleRoots {
-			merkleRootString := hex.EncodeToString(merkleRoot[:])
-			if _, exists := r.blessedRootsCache.Get(merkleRootString); !exists {
-				merkleRootsToCheck = append(merkleRootsToCheck, merkleRoot)
-			}
-		}
-
-		areBlessed, err := r.commitStoreReader.AreBlessed(ctx, merkleRootsToCheck)
-		if err != nil {
-			return nil, fmt.Errorf("are blessed: %w", err)
-		}
-
-		for i, merkleRoot := range merkleRootsToCheck {
-			merkleRootString := hex.EncodeToString(merkleRoot[:])
-			isBlessed := areBlessed[i]
-			if isBlessed {
-				r.blessedRootsCache.Set(merkleRootString, true, 0)
-			}
+		if err := r.syncBlessedRoots(ctx, merkleRootsSet); err != nil {
+			return nil, fmt.Errorf("sync blessed roots: %w", err)
 		}
 
 		for _, rep := range unexpiredReportsWithSendReqs {
@@ -246,12 +228,7 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 				"maxSeqNr", rep.commitReport.Interval.Max,
 			)
 
-			merkleRootString := hex.EncodeToString(merkleRoot[:])
-			isBlessedRaw, _ := r.blessedRootsCache.Get(merkleRootString)
-			blessed, isBool := isBlessedRaw.(bool)
-			if !isBool {
-				rootLggr.Criticalw("internal error blessed roots cache contains non-bool type: %T", isBlessedRaw)
-			}
+			_, blessed := r.blessedRootsCache.Get(hashlib.MerkleRootToString(merkleRoot))
 			if !blessed {
 				rootLggr.Infow("Report is accepted but not blessed")
 				continue
@@ -285,6 +262,40 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 		}
 	}
 	return []ccip.ObservedMessage{}, nil
+}
+
+func (r *ExecutionReportingPlugin) syncBlessedRoots(ctx context.Context, roots mapset.Set[[32]byte]) error {
+	merkleRootsToCheck := make([][32]byte, 0, roots.Cardinality())
+	for _, merkleRoot := range roots.ToSlice() {
+		if _, exists := r.blessedRootsCache.Get(hashlib.MerkleRootToString(merkleRoot)); !exists {
+			merkleRootsToCheck = append(merkleRootsToCheck, merkleRoot)
+		}
+	}
+	if len(merkleRootsToCheck) == 0 {
+		return nil
+	}
+	// deterministic call to commit store reader
+	sort.Slice(merkleRootsToCheck, func(i, j int) bool {
+		return hashlib.MerkleRootToString(merkleRootsToCheck[i]) < hashlib.MerkleRootToString(merkleRootsToCheck[j])
+	})
+
+	areBlessed, err := r.commitStoreReader.AreBlessed(ctx, merkleRootsToCheck)
+	if err != nil {
+		return fmt.Errorf("are blessed: %w", err)
+	}
+
+	if len(areBlessed) != len(merkleRootsToCheck) {
+		return fmt.Errorf("internal critical error blessings length %d is not equal to merkle roots %d",
+			len(areBlessed), len(merkleRootsToCheck))
+	}
+
+	for i, merkleRoot := range merkleRootsToCheck {
+		if areBlessed[i] {
+			r.blessedRootsCache.Set(hashlib.MerkleRootToString(merkleRoot), true, 0)
+		}
+	}
+
+	return nil
 }
 
 // destPoolRateLimits returns a map that consists of the rate limits of each destination token of the provided reports.
