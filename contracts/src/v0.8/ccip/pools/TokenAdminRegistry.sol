@@ -62,14 +62,14 @@ contract TokenAdminRegistry is ITokenAdminRegistry, OwnerIsCreator {
     emit PoolSet(token, pool);
   }
 
+  // ================================================================
+  // │                    Administrator config                      │
+  // ================================================================
+
   /// @notice Public getter to check for permissions of an administrator
   function isAdministrator(address localToken, address administrator) public view returns (bool) {
     return s_tokenConfig[localToken].administrator == administrator;
   }
-
-  // ================================================================
-  // │                    Administrator config                      │
-  // ================================================================
 
   /// @notice Resisters a new local administrator for a token.
   function registerAdministrator(address localToken, address administrator) external {
