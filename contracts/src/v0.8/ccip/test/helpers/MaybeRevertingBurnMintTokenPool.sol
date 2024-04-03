@@ -56,8 +56,9 @@ contract MaybeRevertingBurnMintTokenPool is BurnMintTokenPool {
     address receiver,
     uint256 amount,
     uint64 remoteChainSelector,
-    bytes memory
+    bytes memory extraData
   ) external virtual override whenHealthy onlyOffRamp(remoteChainSelector) {
+    _validateSourceCaller(remoteChainSelector, extraData);
     bytes memory revertReason = s_revertReason;
     if (revertReason.length != 0) {
       assembly {

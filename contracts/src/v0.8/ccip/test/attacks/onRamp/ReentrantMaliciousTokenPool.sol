@@ -26,18 +26,18 @@ contract ReentrantMaliciousTokenPool is TokenPool {
     address,
     bytes calldata,
     uint256 amount,
-    uint64,
+    uint64 remoteChainSelector,
     bytes calldata
   ) external override returns (bytes memory) {
     if (s_attacked) {
-      return "";
+      return _getLockOrBurnReturnData(remoteChainSelector, "");
     }
 
     s_attacked = true;
 
     FacadeClient(i_facade).send(amount);
     emit Burned(msg.sender, amount);
-    return "";
+    return _getLockOrBurnReturnData(remoteChainSelector, "");
   }
 
   function releaseOrMint(bytes memory, address receiver, uint256 amount, uint64, bytes memory) external override {}

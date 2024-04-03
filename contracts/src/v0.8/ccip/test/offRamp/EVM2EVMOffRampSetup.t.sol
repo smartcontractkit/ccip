@@ -179,6 +179,7 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSetup {
     tokenAmounts[1].amount = 5e18;
     messages[0] = _generateAny2EVMMessage(1, tokenAmounts);
     messages[1] = _generateAny2EVMMessage(2, tokenAmounts);
+
     return messages;
   }
 
@@ -221,5 +222,23 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSetup {
     assertEq(a.maxNumberOfTokensPerMsg, b.maxNumberOfTokensPerMsg);
     assertEq(a.maxDataBytes, b.maxDataBytes);
     assertEq(a.maxPoolReleaseOrMintGas, b.maxPoolReleaseOrMintGas);
+  }
+
+  function _getDefaultSourceTokenData(Client.EVMTokenAmount[] memory srcTokenAmounts)
+    internal
+    view
+    returns (bytes[] memory)
+  {
+    bytes[] memory sourceTokenData = new bytes[](srcTokenAmounts.length);
+    for (uint256 i = 0; i < srcTokenAmounts.length; ++i) {
+      sourceTokenData[i] = abi.encode(
+        Internal.TokenDataPayload({
+          sourcePoolAddress: s_sourcePoolByToken[srcTokenAmounts[i].token],
+          destPoolAddress: s_destPoolBySourceToken[srcTokenAmounts[i].token],
+          extraData: ""
+        })
+      );
+    }
+    return sourceTokenData;
   }
 }

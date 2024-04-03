@@ -3,8 +3,6 @@ pragma solidity ^0.8.0;
 
 import {IEVM2AnyOnRampClient} from "./IEVM2AnyOnRampClient.sol";
 
-import {Internal} from "../libraries/Internal.sol";
-
 interface IEVM2AnyOnRamp is IEVM2AnyOnRampClient {
   /// @notice Gets the next sequence number to be used in the onRamp
   /// @return the next sequence number to be used
