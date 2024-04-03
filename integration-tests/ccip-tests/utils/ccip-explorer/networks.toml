@@ -1,0 +1,78 @@
+[networks]
+[networks."polygon-mainnet"]
+url = "https://polygonscan.com/tx/"
+tokens = { "0x0d500b1d8e8ef31e21c99d1db9a6444d3adf1270" = "WMATIC", "0xb0897686c545045afc77cf20ec7a532e3120e0f1" = "LINK" }
+
+[networks."gnosis-mainnet"]
+url = "https://gnosisscan.io/tx/"
+tokens = { "0xE2e73A1c69ecF83F464EFCE6A5be353a37cA09b2" = "LINK", "0xe91D153E0b41518A2Ce8Dd3D7944Fa863463a97d" = "DAI" }
+
+[networks."binance_smart_chain-mainnet"]
+url = "https://bscscan.com/tx/"
+tokens = { "0x404460C6A5EdE2D891e8297795264fDe62ADBB75" = "LINK", "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c" = "WBNB" }
+
+[networks."ethereum-mainnet"]
+url = "https://etherscan.io/tx/"
+tokens = { "0x514910771AF9Ca656af840dff83E8264EcF986CA" = "LINK", "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2" = "WETH" }
+
+[networks."avalanche-mainnet"]
+url = "https://snowtrace.io/tx/"
+tokens = { "0x5947BB275c521040051D82396192181b413227A3" = "LINK", "0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7" = "WAVAX" }
+
+[networks."ethereum-mainnet-optimism-1"]
+url = "https://optimistic.etherscan.io/tx/"
+tokens = { "0x350a791Bfc2C21F9Ed5d10980Dad2e2638ffa7f6" = "LINK", "0x4200000000000000000000000000000000000006" = "WETH" }
+
+[networks."wemix-mainnet"]
+url = "https://explorer.wemix.com/tx/"
+tokens = { "0x80f1FcdC96B55e459BF52b998aBBE2c364935d69" = "LINK", "0x7D72b22a74A216Af4a002a1095C8C707d6eC1C5f" = "WWEMIX" }
+
+[networks."ethereum-mainnet-kroma-1"]
+url = "https://kromascan.com/tx/"
+tokens = { "0xC1F6f7622ad37C3f46cDF6F8AA0344ADE80BF450" = "LINK", "0x4200000000000000000000000000000000000001" = "WETH" }
+
+[networks."ethereum-mainnet-base-1"]
+url = "https://basescan.org/tx/"
+tokens = { "0x88Fb150BDc53A65fe94Dea0c9BA0a6dAf8C6e196" = "LINK", "0x4200000000000000000000000000000000000006" = "WETH" }
+
+[networks."ethereum-mainnet-arbitrum-1"]
+url = "https://arbiscan.io/tx/"
+tokens = { "0xf97f4df75117a78c1A5a0DBb814Af92458539FB4" = "LINK", "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1" = "WETH" }
+
+[networks."polygon-testnet-mumbai"]
+url = "https://mumbai.polygonscan.com/tx/"
+tokens = { "0x1" = "WMATIC", "0x2" = "LINK" }
+
+[networks."ethereum-testnet-sepolia-optimism-1"]
+url = "https://optimistic-sepolia.etherscan.io/tx/"
+tokens = { "0x1" = "LINK", "0x2" = "WETH" }
+
+[networks."avalanche-testnet-fuji"]
+url = "https://testnet.snowtrace.io/tx/"
+tokens = { "0x1" = "LINK", "0x2" = "WAVAX" }
+
+[networks."ethereum-testnet-sepolia-arbitrum-1"]
+url = "https://testnet.arbiscan.io/tx/"
+tokens = { "0x1" = "LINK", "0x2" = "WETH" }
+
+[networks."ethereum-testnet-sepolia"]
+url = "https://sepoliascan.com/tx/"
+tokens = { "0x1" = "LINK", "0x2" = "WETH" }
+
+[networks."ethereum-testnet-sepolia-base-1"]
+url = "https://basescan.org/tx/"
+tokens = { "0x1" = "LINK", "0x2" = "WETH" }
+
+[networks."binance_smart_chain-testnet"]
+url = "https://testnet.bscscan.com/tx/"
+tokens = { "0x1" = "LINK", "0x2" = "WBNB" }
+
+[networks."wemix-testnet"]
+url = "https://testnet-explorer.wemix.com/tx/"
+tokens = { "0x1" = "LINK", "0x2" = "WWEMIX" }
+
+
+
+
+
+

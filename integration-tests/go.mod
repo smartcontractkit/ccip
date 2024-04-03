@@ -8,6 +8,7 @@ replace github.com/smartcontractkit/chainlink/v2 => ../
 require (
 	dario.cat/mergo v1.0.0
 	github.com/AlekSi/pointer v1.1.0
+	github.com/BurntSushi/toml v1.2.1
 	github.com/barkimedes/go-deepcopy v0.0.0-20220514131651-17c30cfc62df
 	github.com/cli/go-gh/v2 v2.0.0
 	github.com/ethereum/go-ethereum v1.13.8

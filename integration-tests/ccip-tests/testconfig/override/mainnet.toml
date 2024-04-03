@@ -702,8 +702,8 @@ FailOnFirstErrorInLoad = true
 MsgType = 'WithoutToken'
 # these are all the valid network pairs
 NetworkPairs = [
-  'ETHEREUM_MAINNET,OPTIMISM_MAINNET', 
-  'ETHEREUM_MAINNET,AVALANCHE_MAINNET',
+  # 'ETHEREUM_MAINNET,OPTIMISM_MAINNET', Running on secondary toml
+  # 'ETHEREUM_MAINNET,AVALANCHE_MAINNET', Running on secondary toml
   'ETHEREUM_MAINNET,POLYGON_MAINNET',
   'ETHEREUM_MAINNET,BSC_MAINNET',
   'ETHEREUM_MAINNET,ARBITRUM_MAINNET', 
@@ -718,7 +718,7 @@ NetworkPairs = [
   'BASE_MAINNET,BSC_MAINNET',
   'POLYGON_MAINNET,ARBITRUM_MAINNET', # added as batch 1
   'ARBITRUM_MAINNET,BSC_MAINNET', # added as batch 1
-  'ARBITRUM_MAINNET,OPTIMISM_MAINNET', # added as batch 1 
+  # 'ARBITRUM_MAINNET,OPTIMISM_MAINNET', Running on secondary toml
   'AVALANCHE_MAINNET,OPTIMISM_MAINNET', # added as batch 2
   'AVALANCHE_MAINNET,ARBITRUM_MAINNET', # added as batch 2
   'BASE_MAINNET,POLYGON_MAINNET', # added as batch 2

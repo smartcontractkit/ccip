@@ -1,0 +1,54 @@
+[CCIP]
+[CCIP.Env]
+TTL = '15h'
+[CCIP.Env.NewCLCluster]
+NoOfNodes = 17
+NodeMemory = '8Gi'
+NodeCPU = '4'
+DBMemory = '6Gi'
+DBCPU = '2'
+DBCapacity = '29Gi'
+IsStateful = true
+DBArgs = ['shared_buffers=1536MB', 'effective_cache_size=4096MB', 'work_mem=64MB']
+
+[CCIP.Groups]
+[CCIP.Groups.load]
+ChaosDuration = '20m'
+WaitBetweenChaosDuringLoad = '2m'  
+KeepEnvAlive = true
+NoOfCommitNodes = 16
+MsgType = 'WithToken'
+PhaseTimeout = '50m'
+TestDuration = '2h'
+NodeFunding = 1000.0
+RequestPerUnitTime = [1]
+TimeUnit = '10s'
+SendMaxDataInEveryMsgCount = 1000
+DynamicPriceUpdateInterval ='15s'
+
+CommitInflightExpiry = '1s'
+ExecInflightExpiry = '3m'
+
+[CCIP.Groups.load.CommitOCRParams]
+DeltaProgress = '2m'
+DeltaResend = '5s'
+DeltaRound = '20s'
+DeltaGrace = '5s'
+DeltaStage = '10s'
+MaxDurationQuery = '100ms'
+MaxDurationObservation = '35s'
+MaxDurationReport = '10s'
+MaxDurationShouldAcceptFinalizedReport = '5s'
+MaxDurationShouldTransmitAcceptedReport = '10s'
+
+[CCIP.Groups.load.ExecOCRParams]
+DeltaProgress = '100s'
+DeltaResend = '5s'
+DeltaRound = '24s'
+DeltaGrace = '90s'
+DeltaStage = '12s'
+MaxDurationQuery = '100ms'
+MaxDurationObservation = '20s'
+MaxDurationReport = '8s'
+MaxDurationShouldAcceptFinalizedReport = '5s'
+MaxDurationShouldTransmitAcceptedReport = '8s'
