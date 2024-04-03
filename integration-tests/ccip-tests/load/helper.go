@@ -213,7 +213,7 @@ func (l *LoadArgs) ValidateCurseFollowedByUncurse() {
 			return lane.Dest.AssertNoReportAcceptedEventReceived(lane.Logger, 25*time.Minute, curseTimeStamp.Add(1*time.Minute))
 		})
 		errGrp.Go(func() error {
-			lane.Logger.Info().Msg("Validating no ExecutionStateChanged event is received for 29 minutes")
+			lane.Logger.Info().Msg("Validating no ExecutionStateChanged event is received for 25 minutes")
 			// we allow additional 1 minute after curse timestamp for curse to be visible by plugin
 			return lane.Dest.AssertNoExecutionStateChangedEventReceived(lane.Logger, 25*time.Minute, curseTimeStamp.Add(1*time.Minute))
 		})
