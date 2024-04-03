@@ -64,7 +64,7 @@ type CommitPluginStaticConfig struct {
 	destChainSelector     uint64
 	priceRegistryProvider ccipdataprovider.PriceRegistry
 	// Offchain
-	priceGetters     map[cciptypes.Address]pricegetter.PriceGetter
+	priceGetter      pricegetter.PriceGetter
 	metricsCollector ccip.PluginMetricsCollector
 	chainHealthcheck cache.ChainHealthcheck
 }
@@ -83,7 +83,7 @@ type CommitReportingPlugin struct {
 	offRampReaders          []ccipdata.OffRampReader
 	F                       int
 	// Offchain
-	priceGetters     map[cciptypes.Address]pricegetter.PriceGetter
+	priceGetter      pricegetter.PriceGetter
 	metricsCollector ccip.PluginMetricsCollector
 	// State
 	chainHealthcheck cache.ChainHealthcheck
