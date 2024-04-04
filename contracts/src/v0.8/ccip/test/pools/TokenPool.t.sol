@@ -40,6 +40,73 @@ contract TokenPool_constructor is TokenPoolSetup {
   }
 }
 
+contract TokenPool_getRemotePool is TokenPoolSetup {
+  function test_getRemotePool_Success() public {
+    uint64 chainSelector = 123124;
+    address remotePool = makeAddr("remotePool");
+
+    // Zero indicates nothing is set
+    assertEq(0, s_tokenPool.getRemotePool(chainSelector).length);
+
+    TokenPool.ChainUpdate[] memory chainUpdates = new TokenPool.ChainUpdate[](1);
+    chainUpdates[0] = TokenPool.ChainUpdate({
+      remoteChainSelector: chainSelector,
+      remotePoolAddress: abi.encode(remotePool),
+      allowed: true,
+      outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
+      inboundRateLimiterConfig: getInboundRateLimiterConfig()
+    });
+    s_tokenPool.applyChainUpdates(chainUpdates);
+
+    assertEq(remotePool, abi.decode(s_tokenPool.getRemotePool(chainSelector), (address)));
+  }
+}
+
+contract TokenPool_setRemotePool is TokenPoolSetup {
+  event RemotePoolSet(uint64 indexed remoteChainSelector, bytes previousPoolAddress, bytes remotePoolAddress);
+
+  function test_setRemotePool_Success() public {
+    uint64 chainSelector = DEST_CHAIN_SELECTOR;
+    address initialPool = makeAddr("remotePool");
+    // The new pool is a non-evm pool, as it doesn't fit in the normal 160 bits
+    bytes memory newPool = abi.encode(type(uint256).max);
+
+    TokenPool.ChainUpdate[] memory chainUpdates = new TokenPool.ChainUpdate[](1);
+    chainUpdates[0] = TokenPool.ChainUpdate({
+      remoteChainSelector: chainSelector,
+      remotePoolAddress: abi.encode(initialPool),
+      allowed: true,
+      outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
+      inboundRateLimiterConfig: getInboundRateLimiterConfig()
+    });
+    s_tokenPool.applyChainUpdates(chainUpdates);
+
+    vm.expectEmit();
+    emit RemotePoolSet(chainSelector, abi.encode(initialPool), newPool);
+
+    s_tokenPool.setRemotePool(chainSelector, newPool);
+
+    assertEq(keccak256(newPool), keccak256(s_tokenPool.getRemotePool(chainSelector)));
+  }
+
+  // Reverts
+
+  function test_setRemotePool_NonExistentChain_Reverts() public {
+    uint64 chainSelector = 123124;
+    bytes memory remotePool = abi.encode(makeAddr("remotePool"));
+
+    vm.expectRevert(abi.encodeWithSelector(TokenPool.NonExistentChain.selector, chainSelector));
+    s_tokenPool.setRemotePool(chainSelector, remotePool);
+  }
+
+  function test_setRemotePool_OnlyOwner_Reverts() public {
+    vm.startPrank(STRANGER);
+
+    vm.expectRevert("Only callable by owner");
+    s_tokenPool.setRemotePool(123124, abi.encode(makeAddr("remotePool")));
+  }
+}
+
 contract TokenPool_applyChainUpdates is TokenPoolSetup {
   event ChainAdded(
     uint64 chainSelector, RateLimiter.Config outboundRateLimiterConfig, RateLimiter.Config inboundRateLimiterConfig
@@ -538,7 +605,6 @@ contract TokenPoolWithAllowListSetup is TokenPoolSetup {
   }
 }
 
-/// @notice #getAllowListEnabled
 contract TokenPoolWithAllowList_getAllowListEnabled is TokenPoolWithAllowListSetup {
   function testGetAllowListEnabledSuccess() public {
     assertTrue(s_tokenPool.getAllowListEnabled());
@@ -562,7 +628,6 @@ contract TokenPoolWithAllowList_setRouter is TokenPoolWithAllowListSetup {
   }
 }
 
-/// @notice #getAllowList
 contract TokenPoolWithAllowList_getAllowList is TokenPoolWithAllowListSetup {
   function testGetAllowListSuccess() public {
     address[] memory setAddresses = s_tokenPool.getAllowList();
@@ -572,7 +637,6 @@ contract TokenPoolWithAllowList_getAllowList is TokenPoolWithAllowListSetup {
   }
 }
 
-/// @notice #setAllowList
 contract TokenPoolWithAllowList_applyAllowListUpdates is TokenPoolWithAllowListSetup {
   event AllowListAdd(address sender);
   event AllowListRemove(address sender);

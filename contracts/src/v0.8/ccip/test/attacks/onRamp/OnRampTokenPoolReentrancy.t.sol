@@ -47,7 +47,7 @@ contract OnRampTokenPoolReentrancy is EVM2EVMOnRampSetup {
     Internal.PoolUpdate[] memory adds = new Internal.PoolUpdate[](1);
     adds[0].token = address(s_sourceToken);
     adds[0].pool = address(s_maliciousTokenPool);
-    
+
     s_tokenAdminRegistry.setPool(address(s_sourceToken), address(s_maliciousTokenPool));
 
     s_sourceToken.transfer(address(s_facadeClient), 1e18);

@@ -325,9 +325,9 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
         bytes("") // any future extraArgs component would be added here
       );
 
-      // Since the DON has to pay for the tokenData to be included on the destination chain, we cap the length of the tokenData.
+      // Since the DON has to pay for the extraData to be included on the destination chain, we cap the length of the extraData.
       // This prevents gas bomb attacks on the NOPs. We use destBytesOverhead as a proxy to cap the number of bytes we accept.
-      // As destBytesOverhead accounts for tokenData + offchainData, this caps the worst case abuse to the number of bytes reserved for offchainData.
+      // As destBytesOverhead accounts for extraData + offchainData, this caps the worst case abuse to the number of bytes reserved for offchainData.
       // It therefore fully mitigates gas bombs for most tokens, as most tokens don't use offchainData.
       if (extraData.length > s_tokenTransferFeeConfig[tokenAndAmount.token].destBytesOverhead) {
         revert SourceTokenDataTooLarge(tokenAndAmount.token);
@@ -440,7 +440,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     return IPool(ITokenAdminRegistry(s_dynamicConfig.tokenAdminRegistry).getPool(address(sourceToken)));
   }
 
-  /// Not sure if this function still makes sense with 100+ tokens, but we need to keep it because the Router expects it
+  /// TODO Not sure if this function still makes sense with 100+ tokens, but we need to keep it because the Router expects it
   function getSupportedTokens(uint64 /*destChainSelector*/ ) external pure returns (address[] memory) {
     return new address[](0);
   }

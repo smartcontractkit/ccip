@@ -45,6 +45,7 @@ abstract contract TokenPool is IPool, OwnerIsCreator, IERC165 {
     RateLimiter.Config inboundRateLimiterConfig
   );
   event ChainRemoved(uint64 remoteChainSelector);
+  event RemotePoolSet(uint64 indexed remoteChainSelector, bytes previousPoolAddress, bytes remotePoolAddress);
   event AllowListAdd(address sender);
   event AllowListRemove(address sender);
   event RouterUpdated(address oldRouter, address newRouter);
@@ -149,7 +150,11 @@ abstract contract TokenPool is IPool, OwnerIsCreator, IERC165 {
   /// @param remotePoolAddress The address of the remote pool.
   function setRemotePool(uint64 remoteChainSelector, bytes calldata remotePoolAddress) external onlyOwner {
     if (!isSupportedChain(remoteChainSelector)) revert NonExistentChain(remoteChainSelector);
+
+    bytes memory prevAddress = s_remoteChainConfigs[remoteChainSelector].remotePoolAddress;
     s_remoteChainConfigs[remoteChainSelector].remotePoolAddress = remotePoolAddress;
+
+    emit RemotePoolSet(remoteChainSelector, prevAddress, remotePoolAddress);
   }
 
   /// @notice Checks whether a chain selector is permissioned on this contract.
