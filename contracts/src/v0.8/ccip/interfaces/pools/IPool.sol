@@ -53,5 +53,7 @@ interface IPool {
   /// @return token The IERC20 token representation.
   function getToken() external view returns (IERC20 token);
 
-  //function getRemotePool(uint64 remoteChainSelector) external view returns (bytes memory);
+  /// @notice Gets the pool address on the remote chain.
+  /// @param remoteChainSelector Destination chain selector.
+  function getRemotePool(uint64 remoteChainSelector) external view returns (bytes memory);
 }

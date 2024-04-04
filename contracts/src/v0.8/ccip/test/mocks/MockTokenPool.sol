@@ -34,4 +34,8 @@ contract MockTokenPool is IPool {
   function getToken() public view override returns (IERC20 token) {
     return IERC20(i_token);
   }
+
+  function getRemotePool(uint64) public pure override returns (bytes memory) {
+    return abi.encode(address(1));
+  }
 }

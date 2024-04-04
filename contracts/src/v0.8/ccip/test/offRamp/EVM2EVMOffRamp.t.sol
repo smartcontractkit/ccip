@@ -1161,19 +1161,69 @@ contract EVM2EVMOffRamp__releaseOrMintTokens is EVM2EVMOffRampSetup {
     }
   }
 
-  // TODO
-  //  function testUnsupportedTokenReverts() public {
-  //    address fakePoolAddress = address(0x0000000000333333);
-  //
-  //    bytes memory sourceTokenData = abi.encode(
-  //      IPool.SourceTokenData({
-  //        sourcePoolAddress: s_sourcePoolByToken[messages[0].tokenAmounts[0].token],
-  //        destPoolAddress: fakePoolAddress,
-  //        extraData: ""
-  //      })
-  //    );
-  //
-  //    vm.expectRevert(abi.encodeWithSelector(TokenPool.InvalidSourcePoolAddress.selector, fakePoolAddress));
-  //    s_offRamp.releaseOrMintTokens(new Client.EVMTokenAmount[](1), bytes(""), OWNER, new bytes[](0), new bytes[](0));
-  //  }
+  function test__releaseOrMintTokens_PoolIsNotAPool_Reverts() public {
+    address fakePoolAddress = makeAddr("Doesn't exist");
+
+    IPool.SourceTokenData[] memory sourceTokenData = new IPool.SourceTokenData[](1);
+    sourceTokenData[0] = IPool.SourceTokenData({
+      sourcePoolAddress: abi.encode(fakePoolAddress),
+      destPoolAddress: abi.encode(s_offRamp),
+      extraData: ""
+    });
+
+    vm.expectRevert(abi.encodeWithSelector(EVM2EVMOffRamp.TokenHandlingError.selector, bytes("")));
+    s_offRamp.releaseOrMintTokens(
+      new Client.EVMTokenAmount[](1), abi.encode(makeAddr("original_sender")), OWNER, sourceTokenData, new bytes[](1)
+    );
+  }
+
+  function test__releaseOrMintTokens_PoolIsNotAContract_Reverts() public {
+    address fakePoolAddress = makeAddr("Doesn't exist");
+
+    IPool.SourceTokenData[] memory sourceTokenData = new IPool.SourceTokenData[](1);
+    sourceTokenData[0] = IPool.SourceTokenData({
+      sourcePoolAddress: abi.encode(fakePoolAddress),
+      destPoolAddress: abi.encode(fakePoolAddress),
+      extraData: ""
+    });
+
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        EVM2EVMOffRamp.TokenHandlingError.selector, abi.encodeWithSelector(EVM2EVMOffRamp.PoolDoesNotExist.selector)
+      )
+    );
+    s_offRamp.releaseOrMintTokens(
+      new Client.EVMTokenAmount[](1), abi.encode(makeAddr("original_sender")), OWNER, sourceTokenData, new bytes[](1)
+    );
+  }
+
+  function test_fuzz__releaseOrMintTokens_AnyRevertIsTokenHandlingError_Success(uint256 destPool) public {
+    bytes memory unusedVar = abi.encode(makeAddr("unused"));
+    // Uint256 gives a good range of values to test, both inside and outside of the eth address space.
+    bytes memory destPoolAddress = abi.encode(destPool);
+    IPool.SourceTokenData[] memory sourceTokenData = new IPool.SourceTokenData[](1);
+    sourceTokenData[0] =
+      IPool.SourceTokenData({sourcePoolAddress: unusedVar, destPoolAddress: destPoolAddress, extraData: unusedVar});
+
+    try s_offRamp.releaseOrMintTokens(new Client.EVMTokenAmount[](1), unusedVar, OWNER, sourceTokenData, new bytes[](1))
+    {} catch (bytes memory reason) {
+      bytes4 selector;
+      assembly {
+        selector := mload(add(reason, 0x20))
+      }
+      // Any revert should be a token handling error
+      assertEq(selector, EVM2EVMOffRamp.TokenHandlingError.selector, "Expected TokenHandlingError");
+
+      if (destPool > type(uint160).max) {
+        // If the destPool is not a valid eth address, the inner error should be PoolDoesNotExist
+        assertEq(
+          reason,
+          abi.encodeWithSelector(
+            EVM2EVMOffRamp.TokenHandlingError.selector,
+            abi.encodeWithSelector(EVM2EVMOffRamp.InvalidTokenPoolConfig.selector)
+          )
+        );
+      }
+    }
+  }
 }

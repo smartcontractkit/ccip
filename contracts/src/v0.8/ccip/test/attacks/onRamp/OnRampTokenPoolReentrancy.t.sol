@@ -33,7 +33,7 @@ contract OnRampTokenPoolReentrancy is EVM2EVMOnRampSetup {
     TokenPool.ChainUpdate[] memory chainUpdates = new TokenPool.ChainUpdate[](1);
     chainUpdates[0] = TokenPool.ChainUpdate({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
-      remotePoolAddress: s_destPoolBySourceToken[s_sourceTokens[0]],
+      remotePoolAddress: abi.encode(s_destPoolBySourceToken[s_sourceTokens[0]]),
       allowed: true,
       outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
       inboundRateLimiterConfig: getInboundRateLimiterConfig()
@@ -47,8 +47,7 @@ contract OnRampTokenPoolReentrancy is EVM2EVMOnRampSetup {
     Internal.PoolUpdate[] memory adds = new Internal.PoolUpdate[](1);
     adds[0].token = address(s_sourceToken);
     adds[0].pool = address(s_maliciousTokenPool);
-
-    //    s_onRamp.applyPoolUpdates(removes, adds);
+    
     s_tokenAdminRegistry.setPool(address(s_sourceToken), address(s_maliciousTokenPool));
 
     s_sourceToken.transfer(address(s_facadeClient), 1e18);

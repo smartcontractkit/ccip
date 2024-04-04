@@ -51,7 +51,7 @@ abstract contract TokenPool is IPool, OwnerIsCreator, IERC165 {
 
   struct ChainUpdate {
     uint64 remoteChainSelector; // ──╮ Remote chain selector
-    address remotePoolAddress; //    │ Address of the remote pool
+    bytes remotePoolAddress; //      │ Address of the remote pool
     bool allowed; // ────────────────╯ Whether the chain is allowed
     RateLimiter.Config outboundRateLimiterConfig; // Outbound rate limited config, meaning the rate limits for all of the onRamps for the given chain
     RateLimiter.Config inboundRateLimiterConfig; // Inbound rate limited config, meaning the rate limits for all of the offRamps for the given chain
@@ -60,7 +60,7 @@ abstract contract TokenPool is IPool, OwnerIsCreator, IERC165 {
   struct RemoteChainConfig {
     RateLimiter.TokenBucket outboundRateLimiterConfig; // Outbound rate limited config, meaning the rate limits for all of the onRamps for the given chain
     RateLimiter.TokenBucket inboundRateLimiterConfig; // Inbound rate limited config, meaning the rate limits for all of the offRamps for the given chain
-    address remotePoolAddress; // ──╮ Address of the remote pool
+    bytes remotePoolAddress; // ────╮ Address of the remote pool
     bool allowed; // ───────────────╯ Whether the chain is allowed
   }
 
@@ -139,6 +139,19 @@ abstract contract TokenPool is IPool, OwnerIsCreator, IERC165 {
   // │                     Chain permissions                        │
   // ================================================================
 
+  /// @inheritdoc IPool
+  function getRemotePool(uint64 remoteChainSelector) public view returns (bytes memory) {
+    return s_remoteChainConfigs[remoteChainSelector].remotePoolAddress;
+  }
+
+  /// @notice Sets the remote pool address for a given chain selector.
+  /// @param remoteChainSelector The remote chain selector for which the remote pool address is being set.
+  /// @param remotePoolAddress The address of the remote pool.
+  function setRemotePool(uint64 remoteChainSelector, bytes calldata remotePoolAddress) external onlyOwner {
+    if (!isSupportedChain(remoteChainSelector)) revert NonExistentChain(remoteChainSelector);
+    s_remoteChainConfigs[remoteChainSelector].remotePoolAddress = remotePoolAddress;
+  }
+
   /// @notice Checks whether a chain selector is permissioned on this contract.
   /// @return true if the given chain selector is a permissioned remote chain.
   function isSupportedChain(uint64 remoteChainSelector) public view returns (bool) {
@@ -205,16 +218,6 @@ abstract contract TokenPool is IPool, OwnerIsCreator, IERC165 {
         emit ChainRemoved(update.remoteChainSelector);
       }
     }
-  }
-
-  // TODO change the type upstream
-  function getRemotePool(uint64 remoteChainSelector) public view returns (bytes memory) {
-    return abi.encode(s_remoteChainConfigs[remoteChainSelector].remotePoolAddress);
-  }
-
-  function setRemotePool(uint64 remoteChainSelector, address remotePoolAddress) external onlyOwner {
-    if (!isSupportedChain(remoteChainSelector)) revert NonExistentChain(remoteChainSelector);
-    s_remoteChainConfigs[remoteChainSelector].remotePoolAddress = remotePoolAddress;
   }
 
   // ================================================================

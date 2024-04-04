@@ -501,8 +501,21 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
   ) internal returns (Client.EVMTokenAmount[] memory) {
     Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](sourceTokenAmounts.length);
     for (uint256 i = 0; i < sourceTokenAmounts.length; ++i) {
-      IPool pool = IPool(abi.decode(sourceTokenData[i].destPoolAddress, (address)));
-      uint256 sourceTokenAmount = sourceTokenAmounts[i].amount;
+      // TODO change error
+      if (sourceTokenData[i].destPoolAddress.length != 32) {
+        revert TokenHandlingError(abi.encodeWithSelector(InvalidTokenPoolConfig.selector));
+      }
+      uint256 decodedDestPool = uint256(abi.decode(sourceTokenData[i].destPoolAddress, (uint256)));
+      if (decodedDestPool > type(uint160).max || decodedDestPool < 10) {
+        revert TokenHandlingError(abi.encodeWithSelector(InvalidTokenPoolConfig.selector));
+      }
+      IPool pool = IPool(address(uint160(decodedDestPool)));
+
+      if (address(pool).code.length == 0) {
+        revert TokenHandlingError(abi.encodeWithSelector(PoolDoesNotExist.selector));
+      }
+
+      uint256 amount = sourceTokenAmounts[i].amount;
 
       // Call the pool with exact gas to increase resistance against malicious tokens or token pools.
       // _callWithExactGas also protects against return data bombs by capping the return data size
@@ -512,7 +525,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
           pool.releaseOrMint.selector,
           originalSender,
           receiver,
-          sourceTokenAmount,
+          amount,
           i_sourceChainSelector,
           sourceTokenData[i],
           offchainTokenData[i]
@@ -526,8 +539,9 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
       // wrap and rethrow the error so we can catch it lower in the stack
       if (!success) revert TokenHandlingError(returnData);
 
+      // TODO make this call non-revertable
       destTokenAmounts[i].token = address(pool.getToken());
-      destTokenAmounts[i].amount = sourceTokenAmount;
+      destTokenAmounts[i].amount = amount;
     }
     _rateLimitValue(destTokenAmounts, IPriceRegistry(s_dynamicConfig.priceRegistry));
     return destTokenAmounts;
