@@ -11,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
+
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/arm_contract"
@@ -48,8 +49,6 @@ func init() {
 
 var _ ccipdata.OnRampReader = &OnRamp{}
 
-// Significant change in 1.2:
-// - CCIPSendRequested event signature has changed
 type OnRamp struct {
 	onRamp                           *evm_2_evm_onramp.EVM2EVMOnRamp
 	address                          common.Address
@@ -61,6 +60,7 @@ type OnRamp struct {
 	sendRequestedSeqNumberWord       int
 	filters                          []logpoller.Filter
 	cachedSourcePriceRegistryAddress cache.AutoSync[cciptypes.Address]
+	cachedTokenAdminRegistryAddress  cache.AutoSync[cciptypes.Address]
 	// Static config can be cached, because it's never expected to change.
 	// The only way to change that is through the contract's constructor (redeployment)
 	cachedStaticConfig cache.OnceCtxFunction[evm_2_evm_onramp.EVM2EVMOnRampStaticConfig]
@@ -105,6 +105,11 @@ func NewOnRamp(lggr logger.Logger, sourceSelector, destSelector uint64, onRampAd
 			[]common.Hash{ConfigSetEventSig},
 			onRampAddress,
 		),
+		cachedTokenAdminRegistryAddress: cache.NewLogpollerEventsBased[cciptypes.Address](
+			sourceLP,
+			[]common.Hash{ConfigSetEventSig},
+			onRampAddress,
+		),
 		cachedStaticConfig: cachedStaticConfig,
 	}, nil
 }
@@ -135,12 +140,31 @@ func (o *OnRamp) GetDynamicConfig() (cciptypes.OnRampDynamicConfig, error) {
 	}, nil
 }
 
+func (o *OnRamp) RouterAddress() (cciptypes.Address, error) {
+	config, err := o.onRamp.GetDynamicConfig(nil)
+	if err != nil {
+		return "", err
+	}
+	return ccipcalc.EvmAddrToGeneric(config.Router), nil
+}
+
 func (o *OnRamp) SourcePriceRegistryAddress(ctx context.Context) (cciptypes.Address, error) {
 	return o.cachedSourcePriceRegistryAddress.Get(ctx, func(ctx context.Context) (cciptypes.Address, error) {
 		c, err := o.GetDynamicConfig()
 		if err != nil {
 			return "", err
 		}
+		return c.PriceRegistry, nil
+	})
+}
+
+func (o *OnRamp) SourceTokenAdminRegistryAddress(ctx context.Context) (cciptypes.Address, error) {
+	return o.cachedTokenAdminRegistryAddress.Get(ctx, func(ctx context.Context) (cciptypes.Address, error) {
+		c, err := o.GetDynamicConfig()
+		if err != nil {
+			return "", err
+		}
+		// TODO replace after we update chainlink-common
 		return c.PriceRegistry, nil
 	})
 }
@@ -171,14 +195,6 @@ func (o *OnRamp) GetSendRequestsBetweenSeqNums(ctx context.Context, seqNumMin, s
 		})
 	}
 	return res, nil
-}
-
-func (o *OnRamp) RouterAddress() (cciptypes.Address, error) {
-	config, err := o.onRamp.GetDynamicConfig(nil)
-	if err != nil {
-		return "", err
-	}
-	return ccipcalc.EvmAddrToGeneric(config.Router), nil
 }
 
 func (o *OnRamp) IsSourceChainHealthy(context.Context) (bool, error) {
