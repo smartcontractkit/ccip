@@ -16,6 +16,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/google/uuid"
+	"github.com/smartcontractkit/chainlink-common/pkg/utils/jsonserializable"
 	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
 	"github.com/stretchr/testify/require"
 	"github.com/urfave/cli"
@@ -454,14 +455,14 @@ func MustInsertPipelineRun(t *testing.T, db *sqlx.DB) (run pipeline.Run) {
 
 func MustInsertPipelineRunWithStatus(t *testing.T, db *sqlx.DB, pipelineSpecID int32, status pipeline.RunStatus) (run pipeline.Run) {
 	var finishedAt *time.Time
-	var outputs pipeline.JSONSerializable
+	var outputs jsonserializable.JSONSerializable
 	var allErrors pipeline.RunErrors
 	var fatalErrors pipeline.RunErrors
 	now := time.Now()
 	switch status {
 	case pipeline.RunStatusCompleted:
 		finishedAt = &now
-		outputs = pipeline.JSONSerializable{
+		outputs = jsonserializable.JSONSerializable{
 			Val:   "foo",
 			Valid: true,
 		}
