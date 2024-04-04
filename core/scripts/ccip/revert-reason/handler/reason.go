@@ -14,7 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/pkg/errors"
 
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/lock_release_token_pool"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/lock_release_token_pool_1_4_0"
 
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/arm_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/burn_mint_token_pool_1_2_0"
@@ -23,7 +23,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/price_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/usdc_token_pool"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/usdc_token_pool_1_4_0"
 )
 
 // RevertReasonFromErrorCodeString attempts to decode an error code string
@@ -126,9 +126,9 @@ func DecodeErrorStringFromABI(errorString string) (string, error) {
 func getAllABIs() []string {
 	return []string{
 		arm_contract.ARMContractABI,
-		lock_release_token_pool.LockReleaseTokenPoolABI,
+		lock_release_token_pool_1_4_0.LockReleaseTokenPoolABI,
 		burn_mint_token_pool_1_2_0.BurnMintTokenPoolABI,
-		usdc_token_pool.USDCTokenPoolABI,
+		usdc_token_pool_1_4_0.USDCTokenPoolABI,
 		commit_store.CommitStoreABI,
 		price_registry.PriceRegistryABI,
 		evm_2_evm_onramp.EVM2EVMOnRampABI,

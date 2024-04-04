@@ -19,15 +19,15 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/lock_release_token_pool"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/lock_release_token_pool_1_4_0"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/maybe_revert_message_receiver"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_arm_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_usdc_token_transmitter"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_v3_aggregator_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/price_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/token_pool"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/usdc_token_pool"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/token_pool_1_4_0"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/usdc_token_pool_1_4_0"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/link_token_interface"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/burn_mint_erc677"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/erc20"
@@ -258,9 +258,9 @@ func (l *LinkToken) Transfer(to string, amount *big.Int) error {
 // TokenPool represents a TokenPool address
 type TokenPool struct {
 	client          blockchain.EVMClient
-	PoolInterface   *token_pool.TokenPool
-	LockReleasePool *lock_release_token_pool.LockReleaseTokenPool
-	USDCPool        *usdc_token_pool.USDCTokenPool
+	PoolInterface   *token_pool_1_4_0.TokenPool
+	LockReleasePool *lock_release_token_pool_1_4_0.LockReleaseTokenPool
+	USDCPool        *usdc_token_pool_1_4_0.USDCTokenPool
 	EthAddress      common.Address
 }
 
@@ -294,7 +294,7 @@ func (pool *TokenPool) SyncUSDCDomain(destTokenTransmitter *TokenTransmitter, de
 		Str("Allowed Caller", destPoolAddr.Hex()).
 		Str("Dest Chain Selector", fmt.Sprintf("%d", destChainSelector)).
 		Msg("Syncing USDC Domain")
-	tx, err := pool.USDCPool.SetDomains(opts, []usdc_token_pool.USDCTokenPoolDomainUpdate{
+	tx, err := pool.USDCPool.SetDomains(opts, []usdc_token_pool_1_4_0.USDCTokenPoolDomainUpdate{
 		{
 			AllowedCaller:     allowedCallerBytes,
 			DomainIdentifier:  domain,
@@ -381,7 +381,7 @@ func (pool *TokenPool) SetRemoteChainOnPool(remoteChainSelectors []uint64) error
 	log.Info().
 		Str("Token Pool", pool.Address()).
 		Msg("Setting remote chain on pool")
-	var selectorsToUpdate []token_pool.TokenPoolChainUpdate
+	var selectorsToUpdate []token_pool_1_4_0.TokenPoolChainUpdate
 	for _, remoteChainSelector := range remoteChainSelectors {
 		isSupported, err := pool.PoolInterface.IsSupportedChain(nil, remoteChainSelector)
 		if err != nil {
@@ -396,15 +396,15 @@ func (pool *TokenPool) SetRemoteChainOnPool(remoteChainSelectors []uint64) error
 				Msg("Remote chain is already supported")
 			continue
 		}
-		selectorsToUpdate = append(selectorsToUpdate, token_pool.TokenPoolChainUpdate{
+		selectorsToUpdate = append(selectorsToUpdate, token_pool_1_4_0.TokenPoolChainUpdate{
 			RemoteChainSelector: remoteChainSelector,
 			Allowed:             true,
-			InboundRateLimiterConfig: token_pool.RateLimiterConfig{
+			InboundRateLimiterConfig: token_pool_1_4_0.RateLimiterConfig{
 				IsEnabled: true,
 				Capacity:  new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e9)),
 				Rate:      new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e5)),
 			},
-			OutboundRateLimiterConfig: token_pool.RateLimiterConfig{
+			OutboundRateLimiterConfig: token_pool_1_4_0.RateLimiterConfig{
 				IsEnabled: true,
 				Capacity:  new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e9)),
 				Rate:      new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e5)),
@@ -434,7 +434,7 @@ func (pool *TokenPool) SetRemoteChainOnPool(remoteChainSelectors []uint64) error
 	return pool.client.ProcessTransaction(tx)
 }
 
-func (pool *TokenPool) SetRemoteChainRateLimits(remoteChainSelector uint64, rl token_pool.RateLimiterConfig) error {
+func (pool *TokenPool) SetRemoteChainRateLimits(remoteChainSelector uint64, rl token_pool_1_4_0.RateLimiterConfig) error {
 	opts, err := pool.client.TransactionOpts(pool.client.GetDefaultWallet())
 	if err != nil {
 		return fmt.Errorf("error getting transaction opts: %w", err)
