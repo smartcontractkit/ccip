@@ -493,7 +493,7 @@ func (d *Delegate) ServicesForSpec(ctx context.Context, jb job.Job, qopts ...pg.
 		return d.newServicesOCR2Functions(ctx, lggr, jb, bootstrapPeers, kb, ocrDB, thresholdPluginDB, s4PluginDB, lc, ocrLogger)
 
 	case types.GenericPlugin:
-		return d.newServicesGenericPlugin(ctx, lggr, jb, bootstrapPeers, kb, ocrDB, lc, ocrLogger, d.capabilitiesRegistry)
+		return d.newServicesGenericPlugin(ctx, lggr, jb, bootstrapPeers, kb, ocrDB, lc, ocrLogger, d.capabilitiesRegistry, kvStore)
 
 	case types.CCIPCommit:
 		return d.newServicesCCIPCommit(ctx, lggr, jb, bootstrapPeers, kb, ocrDB, lc, transmitterID, qopts...)
@@ -559,6 +559,7 @@ func (d *Delegate) newServicesGenericPlugin(
 	lc ocrtypes.LocalConfig,
 	ocrLogger commontypes.Logger,
 	capabilitiesRegistry types.CapabilitiesRegistry,
+	keyValueStore types.KeyValueStore,
 ) (srvs []job.ServiceCtx, err error) {
 	spec := jb.OCR2OracleSpec
 
@@ -677,7 +678,8 @@ func (d *Delegate) newServicesGenericPlugin(
 
 	switch pCfg.OCRVersion {
 	case 2:
-		plugin := reportingplugins.NewLOOPPService(pluginLggr, grpcOpts, cmdFn, pluginConfig, providerClientConn, pr, ta, errorLog)
+		plugin := reportingplugins.NewLOOPPService(pluginLggr, grpcOpts, cmdFn, pluginConfig, providerClientConn, pr, ta,
+			errorLog, keyValueStore)
 		oracleArgs := libocr2.OCR2OracleArgs{
 			BinaryNetworkEndpointFactory: d.peerWrapper.Peer2,
 			V2Bootstrappers:              bootstrapPeers,
@@ -702,7 +704,8 @@ func (d *Delegate) newServicesGenericPlugin(
 
 	case 3:
 		//OCR3 with OCR2 OnchainKeyring and ContractTransmitter
-		plugin := ocr3.NewLOOPPService(pluginLggr, grpcOpts, cmdFn, pluginConfig, providerClientConn, pr, ta, errorLog, capabilitiesRegistry)
+		plugin := ocr3.NewLOOPPService(pluginLggr, grpcOpts, cmdFn, pluginConfig, providerClientConn, pr, ta, errorLog,
+			capabilitiesRegistry, keyValueStore)
 		contractTransmitter := ocrcommon.NewOCR3ContractTransmitterAdapter(provider.ContractTransmitter())
 		oracleArgs := libocr2.OCR3OracleArgs[[]byte]{
 			BinaryNetworkEndpointFactory: d.peerWrapper.Peer2,
