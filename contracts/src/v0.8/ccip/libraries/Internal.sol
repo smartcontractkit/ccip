@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {IPool} from "../interfaces/pools/IPool.sol";
 import {MerkleMultiProof} from "../libraries/MerkleMultiProof.sol";
 import {Client} from "./Client.sol";
 

@@ -30,6 +30,7 @@ contract TokenAdminRegistry is ITokenAdminRegistry, OwnerIsCreator {
   }
 
   mapping(address token => TokenConfig) internal s_tokenConfig;
+  EnumerableSet.AddressSet internal s_tokens;
 
   EnumerableSet.AddressSet internal s_RegistryModules;
 
@@ -64,6 +65,10 @@ contract TokenAdminRegistry is ITokenAdminRegistry, OwnerIsCreator {
     emit PoolSet(token, pool);
   }
 
+  function getAllConfiguredTokens() external view returns (address[] memory) {
+    return s_tokens.values();
+  }
+
   // ================================================================
   // │                    Administrator config                      │
   // ================================================================
@@ -89,6 +94,8 @@ contract TokenAdminRegistry is ITokenAdminRegistry, OwnerIsCreator {
     config.administrator = administrator;
     config.isRegistered = true;
 
+    s_tokens.add(localToken);
+
     emit AdministratorRegistered(localToken, administrator);
   }
 
@@ -100,6 +107,8 @@ contract TokenAdminRegistry is ITokenAdminRegistry, OwnerIsCreator {
     config.administrator = administrator;
     config.isRegistered = true;
     config.isPermissionedAdmin = true;
+
+    s_tokens.add(localToken);
 
     emit AdministratorRegistered(localToken, administrator);
   }

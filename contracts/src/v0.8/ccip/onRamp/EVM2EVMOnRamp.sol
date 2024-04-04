@@ -442,9 +442,9 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     return IPool(ITokenAdminRegistry(s_dynamicConfig.tokenAdminRegistry).getPool(address(sourceToken)));
   }
 
-  /// TODO Not sure if this function still makes sense with 100+ tokens, but we need to keep it because the Router expects it
-  function getSupportedTokens(uint64 /*destChainSelector*/ ) external pure returns (address[] memory) {
-    return new address[](0);
+  /// @inheritdoc IEVM2AnyOnRampClient
+  function getSupportedTokens(uint64 /*destChainSelector*/ ) external view returns (address[] memory) {
+    return ITokenAdminRegistry(s_dynamicConfig.tokenAdminRegistry).getAllConfiguredTokens();
   }
 
   // ================================================================
