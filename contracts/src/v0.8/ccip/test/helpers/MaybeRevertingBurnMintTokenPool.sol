@@ -60,7 +60,7 @@ contract MaybeRevertingBurnMintTokenPool is BurnMintTokenPool {
     uint64 remoteChainSelector,
     IPool.SourceTokenData memory sourceTokenData,
     bytes memory
-  ) external virtual override whenHealthy onlyOffRamp(remoteChainSelector) {
+  ) external virtual override whenHealthy onlyOffRamp(remoteChainSelector) returns (address) {
     _validateSourceCaller(remoteChainSelector, sourceTokenData.sourcePoolAddress);
     bytes memory revertReason = s_revertReason;
     if (revertReason.length != 0) {
@@ -71,5 +71,6 @@ contract MaybeRevertingBurnMintTokenPool is BurnMintTokenPool {
     _consumeInboundRateLimit(remoteChainSelector, amount);
     IBurnMintERC20(address(i_token)).mint(receiver, amount);
     emit Minted(msg.sender, receiver, amount);
+    return address(i_token);
   }
 }

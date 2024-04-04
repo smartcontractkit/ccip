@@ -40,6 +40,7 @@ interface IPool {
   /// custom pools on dest chain. This could be an attestation that was retrieved through a
   /// third party API.
   /// @dev offchainData can come from any untrusted source.
+  /// @return localToken The address of the local token.
   function releaseOrMint(
     bytes memory originalSender,
     address receiver,
@@ -47,7 +48,7 @@ interface IPool {
     uint64 remoteChainSelector,
     SourceTokenData memory sourceTokenData,
     bytes memory offchainTokenData
-  ) external;
+  ) external returns (address localToken);
 
   /// @notice Gets the IERC20 token that this pool can lock or burn.
   /// @return token The IERC20 token representation.

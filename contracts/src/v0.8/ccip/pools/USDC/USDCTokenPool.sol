@@ -162,7 +162,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
     uint64 remoteChainSelector,
     IPool.SourceTokenData memory sourceTokenData,
     bytes memory offchainTokenData
-  ) external override onlyOffRamp(remoteChainSelector) {
+  ) external override onlyOffRamp(remoteChainSelector) returns (address) {
     _consumeInboundRateLimit(remoteChainSelector, amount);
     _validateSourceCaller(remoteChainSelector, sourceTokenData.sourcePoolAddress);
     SourceTokenDataPayload memory sourceTokenDataPayload =
@@ -175,6 +175,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
       revert UnlockingUSDCFailed();
     }
     emit Minted(msg.sender, receiver, amount);
+    return address(i_token);
   }
 
   /// @notice Validates the USDC encoded message against the given parameters.

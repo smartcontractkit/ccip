@@ -29,7 +29,9 @@ contract MockTokenPool is IPool {
     uint64,
     IPool.SourceTokenData memory,
     bytes memory
-  ) external override {}
+  ) external view override returns (address) {
+    return address(i_token);
+  }
 
   function getToken() public view override returns (IERC20 token) {
     return IERC20(i_token);

@@ -49,10 +49,11 @@ abstract contract BurnMintTokenPoolAbstract is TokenPool {
     uint64 remoteChainSelector,
     IPool.SourceTokenData memory sourceTokenData,
     bytes memory
-  ) external virtual override whenHealthy onlyOffRamp(remoteChainSelector) {
+  ) external virtual override whenHealthy onlyOffRamp(remoteChainSelector) returns (address) {
     _validateSourceCaller(remoteChainSelector, sourceTokenData.sourcePoolAddress);
     _consumeInboundRateLimit(remoteChainSelector, amount);
     IBurnMintERC20(address(i_token)).mint(receiver, amount);
     emit Minted(msg.sender, receiver, amount);
+    return address(i_token);
   }
 }

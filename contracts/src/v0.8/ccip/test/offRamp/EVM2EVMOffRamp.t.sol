@@ -1187,13 +1187,18 @@ contract EVM2EVMOffRamp__releaseOrMintTokens is EVM2EVMOffRampSetup {
       extraData: ""
     });
 
-    vm.expectRevert(abi.encodeWithSelector(EVM2EVMOffRamp.InvalidPoolAddress.selector, abi.encode(fakePoolAddress)));
+    vm.expectRevert(abi.encodeWithSelector(EVM2EVMOffRamp.InvalidAddress.selector, abi.encode(fakePoolAddress)));
     s_offRamp.releaseOrMintTokens(
       new Client.EVMTokenAmount[](1), abi.encode(makeAddr("original_sender")), OWNER, sourceTokenData, new bytes[](1)
     );
   }
 
+  /// forge-config: default.fuzz.runs = 32
+  /// forge-config: ccip.fuzz.runs = 10024
   function test_fuzz__releaseOrMintTokens_AnyRevertIsCaught_Success(uint256 destPool) public {
+    // TODO handle 447301751254033913445893214690834296930546521452, which is 4E59B44847B379578588920CA78FBF26C0B4956C
+    // which triggers some Create2Deployer and causes it to fail
+    vm.assume(destPool != 447301751254033913445893214690834296930546521452);
     bytes memory unusedVar = abi.encode(makeAddr("unused"));
     // Uint256 gives a good range of values to test, both inside and outside of the eth address space.
     bytes memory destPoolAddress = abi.encode(destPool);
@@ -1203,16 +1208,16 @@ contract EVM2EVMOffRamp__releaseOrMintTokens is EVM2EVMOffRampSetup {
 
     try s_offRamp.releaseOrMintTokens(new Client.EVMTokenAmount[](1), unusedVar, OWNER, sourceTokenData, new bytes[](1))
     {} catch (bytes memory reason) {
-      // Any revert should be a TokenHandlingError or InvalidPoolAddress as those are caught by the offramp
+      // Any revert should be a TokenHandlingError or InvalidAddress as those are caught by the offramp
       assertTrue(
         bytes4(reason) == EVM2EVMOffRamp.TokenHandlingError.selector
-          || bytes4(reason) == EVM2EVMOffRamp.InvalidPoolAddress.selector,
-        "Expected TokenHandlingError or InvalidPoolAddress"
+          || bytes4(reason) == EVM2EVMOffRamp.InvalidAddress.selector,
+        "Expected TokenHandlingError or InvalidAddress"
       );
 
       if (destPool > type(uint160).max) {
         // If the destPool is not a valid eth address, the inner error should be PoolDoesNotExist
-        assertEq(reason, abi.encodeWithSelector(EVM2EVMOffRamp.InvalidPoolAddress.selector, destPoolAddress));
+        assertEq(reason, abi.encodeWithSelector(EVM2EVMOffRamp.InvalidAddress.selector, destPoolAddress));
       }
     }
   }

@@ -55,7 +55,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
   error PoolAlreadyAdded();
   error PoolDoesNotExist();
   error TokenPoolMismatch();
-  error InvalidPoolAddress(bytes poolAddress);
+  error InvalidAddress(bytes encodedAddress);
   error InvalidNewState(uint64 sequenceNumber, Internal.MessageExecutionState newState);
 
   event PoolAdded(address token, address pool);
@@ -388,7 +388,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
     catch (bytes memory err) {
       if (
         ReceiverError.selector == bytes4(err) || TokenHandlingError.selector == bytes4(err)
-          || InvalidPoolAddress.selector == bytes4(err)
+          || InvalidAddress.selector == bytes4(err)
       ) {
         // If CCIP receiver execution is not successful, bubble up receiver revert data,
         // prepended by the 4 bytes of ReceiverError.selector, TokenHandlingError.selector or InvalidPoolAddress.selector.
@@ -507,20 +507,12 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
     for (uint256 i = 0; i < sourceTokenAmounts.length; ++i) {
       // We need to safely decode the pool address from the sourceTokenData, as it could be wrong,
       // in which case it doesn't have to be a valid EVM address.
-      if (sourceTokenData[i].destPoolAddress.length != 32) {
-        revert InvalidPoolAddress(sourceTokenData[i].destPoolAddress);
-      }
-      uint256 decodedDestPool = uint256(abi.decode(sourceTokenData[i].destPoolAddress, (uint256)));
-      if (decodedDestPool > type(uint160).max || decodedDestPool < 10) {
-        revert InvalidPoolAddress(sourceTokenData[i].destPoolAddress);
-      }
+      address pool = _validateEVMAddress(sourceTokenData[i].destPoolAddress);
 
-      // We determined that the pool address is valid, so we can safely cast it to an address.
-      // This does not mean the code at this address is actually a (compatible) pool contract.
-      address pool = address(uint160(decodedDestPool));
-      // If there is no contract it could not possibly be a pool.
+      // We determined that the pool address is a valid EVM address, but that does not mean the code at this
+      // address is actually a (compatible) pool contract. If there is no contract it could not possibly be a pool.
       if (pool.code.length == 0) {
-        revert InvalidPoolAddress(sourceTokenData[i].destPoolAddress);
+        revert InvalidAddress(sourceTokenData[i].destPoolAddress);
       }
 
       uint256 amount = sourceTokenAmounts[i].amount;
@@ -547,12 +539,19 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
       // wrap and rethrow the error so we can catch it lower in the stack
       if (!success) revert TokenHandlingError(returnData);
 
-      // TODO make this call non-revertable
-      destTokenAmounts[i].token = address(IPool(pool).getToken());
+      // If the call was successful, the returnData should be the local token address.
+      destTokenAmounts[i].token = _validateEVMAddress(returnData);
       destTokenAmounts[i].amount = amount;
     }
     _rateLimitValue(destTokenAmounts, IPriceRegistry(s_dynamicConfig.priceRegistry));
     return destTokenAmounts;
+  }
+
+  function _validateEVMAddress(bytes memory encodedAddress) internal pure returns (address) {
+    if (encodedAddress.length != 32) revert InvalidAddress(encodedAddress);
+    uint256 decodedAddress = uint256(abi.decode(encodedAddress, (uint256)));
+    if (decodedAddress > type(uint160).max || decodedAddress < 10) revert InvalidAddress(encodedAddress);
+    return address(uint160(decodedAddress));
   }
 
   // ================================================================

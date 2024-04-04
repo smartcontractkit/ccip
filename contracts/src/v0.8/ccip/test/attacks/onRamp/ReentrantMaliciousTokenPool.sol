@@ -49,5 +49,7 @@ contract ReentrantMaliciousTokenPool is TokenPool {
     uint64,
     IPool.SourceTokenData memory,
     bytes memory
-  ) external override {}
+  ) external view override returns (address) {
+    return address(i_token);
+  }
 }
