@@ -269,7 +269,9 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     // We want to disallow sending to address(0) and to precompiles, which exist on address(1) through address(9).
     if (decodedReceiver > type(uint160).max || decodedReceiver < 10) revert InvalidAddress(message.receiver);
 
-    uint256 gasLimit = _fromBytes(message.extraArgs).gasLimit;
+    Client.EVMExtraArgsV2 memory extraArgsV2 = _fromBytes(message.extraArgs);
+    uint256 gasLimit = extraArgsV2.gasLimit;
+    bool sequenced = extraArgsV2.sequenced;
     // Validate the message with various checks
     uint256 numberOfTokens = message.tokenAmounts.length;
     _validateMessage(message.data.length, gasLimit, numberOfTokens);
@@ -308,7 +310,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
       receiver: address(uint160(decodedReceiver)),
       sequenceNumber: ++s_sequenceNumber,
       gasLimit: gasLimit,
-      strict: false,
+      strict: sequenced,
       nonce: ++s_senderNonce[originalSender],
       feeToken: message.feeToken,
       feeTokenAmount: feeTokenAmount,
@@ -354,14 +356,24 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   /// @dev Convert the extra args bytes into a struct
   /// @param extraArgs The extra args bytes
   /// @return The extra args struct
-  function _fromBytes(bytes calldata extraArgs) internal view returns (Client.EVMExtraArgsV1 memory) {
+  function _fromBytes(bytes calldata extraArgs) internal view returns (Client.EVMExtraArgsV2 memory) {
     if (extraArgs.length == 0) {
-      return Client.EVMExtraArgsV1({gasLimit: i_defaultTxGasLimit});
+      return Client.EVMExtraArgsV2({gasLimit: i_defaultTxGasLimit, sequenced: true});
     }
-    if (bytes4(extraArgs) != Client.EVM_EXTRA_ARGS_V1_TAG) revert InvalidExtraArgsTag();
-    // EVMExtraArgsV1 originally included a second boolean (strict) field which we have deprecated entirely.
-    // Clients may still send that version but it will be ignored.
-    return abi.decode(extraArgs[4:], (Client.EVMExtraArgsV1));
+
+    bytes4 extraArgsTag = bytes4(extraArgs);
+    if (extraArgsTag == Client.EVM_EXTRA_ARGS_V1_TAG) {
+      // EVMExtraArgsV1 originally included a second boolean (strict) field which we have deprecated entirely.
+      // Clients may still send that version but it will be ignored.
+      Client.EVMExtraArgsV1 memory extraArgsV1 = abi.decode(extraArgs[4:], (Client.EVMExtraArgsV1));
+
+      // Backwards compatibility: sequenced set to true by default.
+      return Client.EVMExtraArgsV2({gasLimit: extraArgsV1.gasLimit, sequenced: true});
+    } else if (extraArgsTag == Client.EVM_EXTRA_ARGS_V2_TAG) {
+      return abi.decode(extraArgs[4:], (Client.EVMExtraArgsV2));
+    } else {
+      revert InvalidExtraArgsTag();
+    }
   }
 
   /// @notice Validate the forwarded message with various checks.
@@ -498,6 +510,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   ) external view returns (uint256 feeTokenAmount) {
     if (destChainSelector != i_destChainSelector) revert InvalidChainSelector(destChainSelector);
 
+    // XXX: strict does not incur an different fee.
     uint256 gasLimit = _fromBytes(message.extraArgs).gasLimit;
     // Validate the message with various checks
     _validateMessage(message.data.length, gasLimit, message.tokenAmounts.length);
