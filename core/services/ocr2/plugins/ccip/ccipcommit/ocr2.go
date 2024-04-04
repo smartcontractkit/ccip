@@ -192,7 +192,7 @@ func (r *CommitReportingPlugin) observePriceUpdates(
 	return r.generatePriceUpdates(ctx, lggr, sortedChainTokens)
 }
 
-// All prices are USD ($1=1e18) denominated. All prices must be not nil.
+// All prices are USD ($1=1e18) denominated.
 // Return token prices should contain the exact same tokens as in tokenDecimals.
 func (r *CommitReportingPlugin) generatePriceUpdates(
 	ctx context.Context,
@@ -212,7 +212,10 @@ func (r *CommitReportingPlugin) generatePriceUpdates(
 	// make sure that we got prices for all the tokens of our query
 	for _, token := range queryTokens {
 		if rawTokenPricesUSD[token] == nil {
-			return nil, nil, errors.Errorf("missing token price: %+v", token)
+			// CommitJobSpec is the source of truth for which tokens to report prices on
+			// Self-serviced TransferTokens will not have a price getter
+			// TODO: restore on-chain source of truth for TransferTokens that have BPS or AggRateLimit
+			r.lggr.Warnw("generatePriceUpdates: missing token price: %+v", token)
 		}
 	}
 
@@ -228,7 +231,9 @@ func (r *CommitReportingPlugin) generatePriceUpdates(
 
 	tokenPricesUSD = make(map[cciptypes.Address]*big.Int, len(rawTokenPricesUSD))
 	for i, token := range sortedChainTokens {
-		tokenPricesUSD[token] = calculateUsdPer1e18TokenAmount(rawTokenPricesUSD[token], destTokensDecimals[i])
+		if rawTokenPricesUSD[token] != nil {
+			tokenPricesUSD[token] = calculateUsdPer1e18TokenAmount(rawTokenPricesUSD[token], destTokensDecimals[i])
+		}
 	}
 
 	sourceGasPrice, err := r.gasPriceEstimator.GetGasPrice(ctx)
@@ -399,8 +404,7 @@ func validateObservations(ctx context.Context, lggr logger.Logger, destTokens []
 
 		// If observed number of token prices does not match number of supported tokens on dest chain, skip the observation.
 		if len(destTokens) != len(obs.TokenPricesUSD) {
-			lggr.Warnw("Skipping observation due to token count mismatch", "expecting", len(destTokens), "got", len(obs.TokenPricesUSD))
-			continue
+			lggr.Warnw("Observation due to token count mismatch", "expecting", len(destTokens), "got", len(obs.TokenPricesUSD))
 		}
 
 		destTokensSet := mapset.NewSet[cciptypes.Address](destTokens...)

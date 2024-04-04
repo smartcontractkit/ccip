@@ -55,17 +55,20 @@ func TestCommitReportingPlugin_Observation(t *testing.T) {
 	bridgedTokens := []cciptypes.Address{
 		ccipcalc.HexToAddress("2000"),
 		ccipcalc.HexToAddress("3000"),
+		ccipcalc.HexToAddress("4000"),
 	}
 
 	// Token price in 1e18 USD precision
 	bridgedTokenPrices := map[cciptypes.Address]*big.Int{
 		bridgedTokens[0]: big.NewInt(1),
 		bridgedTokens[1]: big.NewInt(2e18),
+		bridgedTokens[2]: big.NewInt(45),
 	}
 
 	bridgedTokenDecimals := map[cciptypes.Address]uint8{
 		bridgedTokens[0]: 8,
 		bridgedTokens[1]: 18,
+		bridgedTokens[2]: 18,
 	}
 
 	// Token price of 1e18 token amount in 1e18 USD precision
