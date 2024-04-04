@@ -1,7 +1,6 @@
 package ccipdata_test
 
 import (
-	"context"
 	"math/big"
 	"reflect"
 	"testing"
@@ -140,6 +139,7 @@ func TestCommitOnchainConfig(t *testing.T) {
 func TestCommitStoreReaders(t *testing.T) {
 	user, ec := newSim(t)
 	lggr := logger.TestLogger(t)
+	ctx := testutils.Context(t)
 	lpOpts := logpoller.Opts{
 		PollPeriod:               100 * time.Millisecond,
 		FinalityDepth:            2,
@@ -242,18 +242,18 @@ func TestCommitStoreReaders(t *testing.T) {
 	commitAndGetBlockTs(ec)
 
 	// Apply report
-	b, err := c10r.EncodeCommitReport(rep)
+	b, err := c10r.EncodeCommitReport(ctx, rep)
 	require.NoError(t, err)
 	_, err = ch.Report(user, b, er)
 	require.NoError(t, err)
-	b, err = c12r.EncodeCommitReport(rep)
+	b, err = c12r.EncodeCommitReport(ctx, rep)
 	require.NoError(t, err)
 	_, err = ch2.Report(user, b, er)
 	require.NoError(t, err)
 	commitAndGetBlockTs(ec)
 
 	// Capture all logs.
-	lp.PollAndSaveLogs(context.Background(), 1)
+	lp.PollAndSaveLogs(ctx, 1)
 
 	configs := map[string][][]byte{
 		ccipdata.V1_0_0: {onchainConfig, offchainConfig},
@@ -277,45 +277,45 @@ func TestCommitStoreReaders(t *testing.T) {
 		t.Run("CommitStoreReader "+v, func(t *testing.T) {
 
 			// Static config.
-			cfg, err := cr.GetCommitStoreStaticConfig(context.Background())
+			cfg, err := cr.GetCommitStoreStaticConfig(ctx)
 			require.NoError(t, err)
 			require.NotNil(t, cfg)
 
 			// Assert encoding
-			b, err := cr.EncodeCommitReport(rep)
+			b, err := cr.EncodeCommitReport(ctx, rep)
 			require.NoError(t, err)
-			d, err := cr.DecodeCommitReport(b)
+			d, err := cr.DecodeCommitReport(ctx, b)
 			require.NoError(t, err)
 			assert.Equal(t, d, rep)
 
 			// Assert reading
-			latest, err := cr.GetLatestPriceEpochAndRound(context.Background())
+			latest, err := cr.GetLatestPriceEpochAndRound(ctx)
 			require.NoError(t, err)
 			assert.Equal(t, er.Uint64(), latest)
 
 			// Assert cursing
-			down, err := cr.IsDown(context.Background())
+			down, err := cr.IsDown(ctx)
 			require.NoError(t, err)
 			assert.False(t, down)
 			_, err = arm.VoteToCurse(user, [32]byte{})
 			require.NoError(t, err)
 			ec.Commit()
-			down, err = cr.IsDown(context.Background())
+			down, err = cr.IsDown(ctx)
 			require.NoError(t, err)
 			assert.True(t, down)
 			_, err = arm.OwnerUnvoteToCurse(user, nil)
 			require.NoError(t, err)
 			ec.Commit()
 
-			seqNr, err := cr.GetExpectedNextSequenceNumber(context.Background())
+			seqNr, err := cr.GetExpectedNextSequenceNumber(ctx)
 			require.NoError(t, err)
 			assert.Equal(t, rep.Interval.Max+1, seqNr)
 
-			reps, err := cr.GetCommitReportMatchingSeqNum(context.Background(), rep.Interval.Max+1, 0)
+			reps, err := cr.GetCommitReportMatchingSeqNum(ctx, rep.Interval.Max+1, 0)
 			require.NoError(t, err)
 			assert.Len(t, reps, 0)
 
-			reps, err = cr.GetCommitReportMatchingSeqNum(context.Background(), rep.Interval.Max, 0)
+			reps, err = cr.GetCommitReportMatchingSeqNum(ctx, rep.Interval.Max, 0)
 			require.NoError(t, err)
 			require.Len(t, reps, 1)
 			assert.Equal(t, reps[0].Interval, rep.Interval)
@@ -323,7 +323,7 @@ func TestCommitStoreReaders(t *testing.T) {
 			assert.Equal(t, reps[0].GasPrices, rep.GasPrices)
 			assert.Equal(t, reps[0].TokenPrices, rep.TokenPrices)
 
-			reps, err = cr.GetCommitReportMatchingSeqNum(context.Background(), rep.Interval.Min, 0)
+			reps, err = cr.GetCommitReportMatchingSeqNum(ctx, rep.Interval.Min, 0)
 			require.NoError(t, err)
 			require.Len(t, reps, 1)
 			assert.Equal(t, reps[0].Interval, rep.Interval)
@@ -331,12 +331,12 @@ func TestCommitStoreReaders(t *testing.T) {
 			assert.Equal(t, reps[0].GasPrices, rep.GasPrices)
 			assert.Equal(t, reps[0].TokenPrices, rep.TokenPrices)
 
-			reps, err = cr.GetCommitReportMatchingSeqNum(context.Background(), rep.Interval.Min-1, 0)
+			reps, err = cr.GetCommitReportMatchingSeqNum(ctx, rep.Interval.Min-1, 0)
 			require.NoError(t, err)
 			require.Len(t, reps, 0)
 
 			// Sanity
-			reps, err = cr.GetAcceptedCommitReportsGteTimestamp(context.Background(), time.Unix(0, 0), 0)
+			reps, err = cr.GetAcceptedCommitReportsGteTimestamp(ctx, time.Unix(0, 0), 0)
 			require.NoError(t, err)
 			require.Len(t, reps, 1)
 			assert.Equal(t, reps[0].Interval, rep.Interval)
@@ -345,13 +345,19 @@ func TestCommitStoreReaders(t *testing.T) {
 			assert.Equal(t, reps[0].TokenPrices, rep.TokenPrices)
 
 			// Until we detect the config, we'll have empty offchain config
-			assert.Equal(t, cr.OffchainConfig(), cciptypes.CommitOffchainConfig{})
-			newPr, err := cr.ChangeConfig(configs[v][0], configs[v][1])
+			offchainConfig, err := cr.OffchainConfig(ctx)
+			require.NoError(t, err)
+			assert.Equal(t, offchainConfig, cciptypes.CommitOffchainConfig{})
+			newPr, err := cr.ChangeConfig(ctx, configs[v][0], configs[v][1])
 			require.NoError(t, err)
 			assert.Equal(t, ccipcalc.EvmAddrToGeneric(prs[v]), newPr)
-			assert.Equal(t, commonOffchain, cr.OffchainConfig())
+			offchainConfig, err = cr.OffchainConfig(ctx)
+			require.NoError(t, err)
+			assert.Equal(t, commonOffchain, offchainConfig)
 			// We should be able to query for gas prices now.
-			gp, err := cr.GasPriceEstimator().GetGasPrice(context.Background())
+			gasEstimator, err := cr.GasPriceEstimator(ctx)
+			require.NoError(t, err)
+			gp, err := gasEstimator.GetGasPrice(ctx)
 			require.NoError(t, err)
 			assert.True(t, gp.Cmp(big.NewInt(0)) > 0)
 		})

@@ -409,7 +409,7 @@ func testVersionSpecificOnRampReader(t *testing.T, th onRampReaderTH, version st
 
 func testOnRampReader(t *testing.T, th onRampReaderTH, expectedRouterAddress common.Address) {
 	ctx := th.user.Context
-	res, err := th.reader.RouterAddress()
+	res, err := th.reader.RouterAddress(ctx)
 	require.NoError(t, err)
 	require.Equal(t, ccipcalc.EvmAddrToGeneric(expectedRouterAddress), res)
 
@@ -418,11 +418,11 @@ func testOnRampReader(t *testing.T, th onRampReaderTH, expectedRouterAddress com
 	require.NotNil(t, msg)
 	require.Equal(t, []cciptypes.EVM2EVMMessageWithTxMeta{}, msg)
 
-	address, err := th.reader.Address()
+	address, err := th.reader.Address(ctx)
 	require.NoError(t, err)
 	require.NotNil(t, address)
 
-	cfg, err := th.reader.GetDynamicConfig()
+	cfg, err := th.reader.GetDynamicConfig(ctx)
 	require.NoError(t, err)
 	require.NotNil(t, cfg)
 	require.Equal(t, ccipcalc.EvmAddrToGeneric(expectedRouterAddress), cfg.Router)

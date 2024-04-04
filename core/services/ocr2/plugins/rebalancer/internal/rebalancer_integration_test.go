@@ -223,6 +223,7 @@ func setupNodeOCR3(
 }
 
 func newTestUniverse(t *testing.T, numChains int) {
+	ctx := testutils.Context(t)
 	// create chains and deploy contracts
 	owner, chains := createChains(t, numChains)
 	universes := deployContracts(t, owner, chains)
@@ -388,9 +389,11 @@ type = "ping-pong"
 			mainChain.Selector)
 		t.Log("Creating rebalancer job with spec:\n", jobSpec)
 		ocrJob2, err2 := validate.ValidatedOracleSpecToml(
+			ctx,
 			apps[i].GetConfig().OCR2(),
 			apps[i].GetConfig().Insecure(),
-			jobSpec)
+			jobSpec,
+			nil)
 		require.NoError(t, err2, "failed to validate rebalancer job")
 		err2 = apps[i].AddJobV2(testutils.Context(t), &ocrJob2)
 		require.NoError(t, err2, "failed to add rebalancer job")

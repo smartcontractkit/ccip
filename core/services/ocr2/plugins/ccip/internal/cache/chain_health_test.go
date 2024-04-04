@@ -297,3 +297,7 @@ func (f *fakeStatusWrapper) set(healthy bool, err error) {
 	f.healthy = healthy
 	f.err = err
 }
+
+func (f *fakeStatusWrapper) Close() error {
+	return nil
+}
