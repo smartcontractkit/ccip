@@ -9,6 +9,7 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
+
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
@@ -88,7 +89,7 @@ func (rf *CommitReportingPluginFactory) NewReportingPlugin(config types.Reportin
 			sourceNative:            rf.config.sourceNative,
 			onRampReader:            rf.config.onRampReader,
 			commitStoreReader:       rf.config.commitStore,
-			priceGetter:             rf.config.priceGetter,
+			multiLanePriceGetter:    rf.config.multiLanePriceGetter,
 			F:                       config.F,
 			lggr:                    lggr,
 			destPriceRegistryReader: rf.destPriceRegReader,

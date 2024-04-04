@@ -1,6 +1,7 @@
 package ocr2
 
 import (
+	"maps"
 	"sync"
 
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
@@ -37,8 +38,7 @@ func (s *SharedJobCache) Get() map[int32]job.Job {
 
 	// deep copy the map
 	copyJobs := make(map[int32]job.Job, len(s.jobs))
-	for key, value := range s.jobs {
-		copyJobs[key] = value
-	}
+	maps.Copy(copyJobs, s.jobs)
+	
 	return copyJobs
 }

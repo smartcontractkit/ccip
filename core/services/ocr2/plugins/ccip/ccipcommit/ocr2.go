@@ -26,7 +26,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/ccipdataprovider"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/hashlib"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/merklemulti"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/pricegetter"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/prices"
 )
 
@@ -64,9 +63,9 @@ type CommitPluginStaticConfig struct {
 	destChainSelector     uint64
 	priceRegistryProvider ccipdataprovider.PriceRegistry
 	// Offchain
-	priceGetters     map[cciptypes.Address]pricegetter.PriceGetter
-	metricsCollector ccip.PluginMetricsCollector
-	chainHealthcheck cache.ChainHealthcheck
+	multiLanePriceGetter MultiLanePriceGetter
+	metricsCollector     ccip.PluginMetricsCollector
+	chainHealthcheck     cache.ChainHealthcheck
 }
 
 type CommitReportingPlugin struct {
@@ -83,8 +82,8 @@ type CommitReportingPlugin struct {
 	offRampReaders          []ccipdata.OffRampReader
 	F                       int
 	// Offchain
-	priceGetters     map[cciptypes.Address]pricegetter.PriceGetter
-	metricsCollector ccip.PluginMetricsCollector
+	multiLanePriceGetter MultiLanePriceGetter
+	metricsCollector     ccip.PluginMetricsCollector
 	// State
 	chainHealthcheck cache.ChainHealthcheck
 }
