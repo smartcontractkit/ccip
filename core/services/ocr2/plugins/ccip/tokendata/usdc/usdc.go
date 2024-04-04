@@ -291,3 +291,7 @@ func (s *TokenDataReader) inCoolDownPeriod() bool {
 	defer s.coolDownMu.RUnlock()
 	return time.Now().Before(s.coolDownUntil)
 }
+
+func (s *TokenDataReader) Close() error {
+	return nil
+}

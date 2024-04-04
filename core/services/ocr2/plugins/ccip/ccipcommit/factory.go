@@ -67,7 +67,7 @@ func (rf *CommitReportingPluginFactory) UpdateDynamicReaders(ctx context.Context
 func (rf *CommitReportingPluginFactory) NewReportingPlugin(config types.ReportingPluginConfig) (types.ReportingPlugin, types.ReportingPluginInfo, error) {
 	ctx := context.Background() // todo: consider adding some timeout
 
-	destPriceReg, err := rf.config.commitStore.ChangeConfig(config.OnchainConfig, config.OffchainConfig)
+	destPriceReg, err := rf.config.commitStore.ChangeConfig(ctx, config.OnchainConfig, config.OffchainConfig)
 	if err != nil {
 		return nil, types.ReportingPluginInfo{}, err
 	}
@@ -80,9 +80,16 @@ func (rf *CommitReportingPluginFactory) NewReportingPlugin(config types.Reportin
 		return nil, types.ReportingPluginInfo{}, err
 	}
 
-	pluginOffChainConfig := rf.config.commitStore.OffchainConfig()
+	pluginOffChainConfig, err := rf.config.commitStore.OffchainConfig(ctx)
+	if err != nil {
+		return nil, types.ReportingPluginInfo{}, fmt.Errorf("failed to get commit store offchain config: %w", err)
+	}
 
 	lggr := rf.config.lggr.Named("CommitReportingPlugin")
+	gasPriceEstimator, err := rf.config.commitStore.GasPriceEstimator(ctx)
+	if err != nil {
+		return nil, types.ReportingPluginInfo{}, fmt.Errorf("failed to get commit store gas price estimator: %w", err)
+	}
 	return &CommitReportingPlugin{
 			sourceChainSelector:     rf.config.sourceChainSelector,
 			sourceNative:            rf.config.sourceNative,
@@ -93,7 +100,7 @@ func (rf *CommitReportingPluginFactory) NewReportingPlugin(config types.Reportin
 			lggr:                    lggr,
 			destPriceRegistryReader: rf.destPriceRegReader,
 			offRampReaders:          rf.config.offRamps,
-			gasPriceEstimator:       rf.config.commitStore.GasPriceEstimator(),
+			gasPriceEstimator:       gasPriceEstimator,
 			offchainConfig:          pluginOffChainConfig,
 			metricsCollector:        rf.config.metricsCollector,
 			chainHealthcheck:        rf.config.chainHealthcheck,

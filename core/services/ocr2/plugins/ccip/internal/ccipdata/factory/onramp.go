@@ -1,6 +1,8 @@
 package factory
 
 import (
+	"fmt"
+
 	"github.com/pkg/errors"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
@@ -48,7 +50,11 @@ func initOrCloseOnRampReader(lggr logger.Logger, versionFinder VersionFinder, so
 			return nil, err
 		}
 		if closeReader {
-			return nil, onRamp.Close(pgOpts...)
+			err := onRamp.UnregisterFilters(pgOpts...)
+			if err != nil {
+				return nil, fmt.Errorf("failed to unregister filters: %v", err)
+			}
+			return nil, onRamp.Close()
 		}
 		return onRamp, onRamp.RegisterFilters(pgOpts...)
 	case ccipdata.V1_1_0:
@@ -57,7 +63,11 @@ func initOrCloseOnRampReader(lggr logger.Logger, versionFinder VersionFinder, so
 			return nil, err
 		}
 		if closeReader {
-			return nil, onRamp.Close(pgOpts...)
+			err := onRamp.UnregisterFilters(pgOpts...)
+			if err != nil {
+				return nil, fmt.Errorf("failed to unregister filters: %v", err)
+			}
+			return nil, onRamp.Close()
 		}
 		return onRamp, onRamp.RegisterFilters(pgOpts...)
 	case ccipdata.V1_2_0:
@@ -66,7 +76,11 @@ func initOrCloseOnRampReader(lggr logger.Logger, versionFinder VersionFinder, so
 			return nil, err
 		}
 		if closeReader {
-			return nil, onRamp.Close(pgOpts...)
+			err := onRamp.UnregisterFilters(pgOpts...)
+			if err != nil {
+				return nil, fmt.Errorf("failed to unregister filters: %v", err)
+			}
+			return nil, onRamp.Close()
 		}
 		return onRamp, onRamp.RegisterFilters(pgOpts...)
 	case ccipdata.V1_5_0:
@@ -75,7 +89,11 @@ func initOrCloseOnRampReader(lggr logger.Logger, versionFinder VersionFinder, so
 			return nil, err
 		}
 		if closeReader {
-			return nil, onRamp.Close(pgOpts...)
+			err := onRamp.UnregisterFilters(pgOpts...)
+			if err != nil {
+				return nil, fmt.Errorf("failed to unregister filters: %v", err)
+			}
+			return nil, onRamp.Close()
 		}
 		return onRamp, onRamp.RegisterFilters(pgOpts...)
 	default:

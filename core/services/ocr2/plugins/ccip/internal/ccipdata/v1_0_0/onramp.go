@@ -92,11 +92,11 @@ func NewOnRamp(lggr logger.Logger, sourceSelector, destSelector uint64, onRampAd
 	}, nil
 }
 
-func (o *OnRamp) Address() (cciptypes.Address, error) {
+func (o *OnRamp) Address(ctx context.Context) (cciptypes.Address, error) {
 	return cciptypes.Address(o.onRamp.Address().String()), nil
 }
 
-func (o *OnRamp) GetDynamicConfig() (cciptypes.OnRampDynamicConfig, error) {
+func (o *OnRamp) GetDynamicConfig(ctx context.Context) (cciptypes.OnRampDynamicConfig, error) {
 	if o.onRamp == nil {
 		return cciptypes.OnRampDynamicConfig{}, fmt.Errorf("onramp not initialized")
 	}
@@ -120,7 +120,7 @@ func (o *OnRamp) GetDynamicConfig() (cciptypes.OnRampDynamicConfig, error) {
 
 func (o *OnRamp) SourcePriceRegistryAddress(ctx context.Context) (cciptypes.Address, error) {
 	return o.cachedSourcePriceRegistryAddress.Get(ctx, func(ctx context.Context) (cciptypes.Address, error) {
-		c, err := o.GetDynamicConfig()
+		c, err := o.GetDynamicConfig(ctx)
 		if err != nil {
 			return "", err
 		}
@@ -156,7 +156,7 @@ func (o *OnRamp) GetSendRequestsBetweenSeqNums(ctx context.Context, seqNumMin, s
 	return res, nil
 }
 
-func (o *OnRamp) RouterAddress() (cciptypes.Address, error) {
+func (o *OnRamp) RouterAddress(ctx context.Context) (cciptypes.Address, error) {
 	config, err := o.onRamp.GetDynamicConfig(nil)
 	if err != nil {
 		return "", err
@@ -193,8 +193,13 @@ func (o *OnRamp) GetUSDCMessagePriorToLogIndexInTx(ctx context.Context, logIndex
 	return nil, errors.New("USDC not supported in < 1.2.0")
 }
 
-func (o *OnRamp) Close(qopts ...pg.QOpt) error {
+// TODO: remove pg.Opts dependency
+func (o *OnRamp) UnregisterFilters(qopts ...pg.QOpt) error {
 	return logpollerutil.UnregisterLpFilters(o.lp, o.filters, qopts...)
+}
+
+func (o *OnRamp) Close() error {
+	return nil
 }
 
 func (o *OnRamp) RegisterFilters(qopts ...pg.QOpt) error {

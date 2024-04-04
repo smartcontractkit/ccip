@@ -135,3 +135,7 @@ func (d *DynamicPriceGetter) TokenPricesUSD(ctx context.Context, tokens []ccipty
 
 	return prices, nil
 }
+
+func (d *DynamicPriceGetter) Close() error {
+	return nil
+}

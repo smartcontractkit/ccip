@@ -1,6 +1,7 @@
 package factory
 
 import (
+	"fmt"
 	"math/big"
 
 	"github.com/Masterminds/semver/v3"
@@ -55,7 +56,11 @@ func initOrCloseCommitStoreReader(lggr logger.Logger, versionFinder VersionFinde
 			return nil, err
 		}
 		if closeReader {
-			return nil, cs.Close(pgOpts...)
+			err := cs.UnregisterFilters(pgOpts...)
+			if err != nil {
+				return nil, fmt.Errorf("failed to unregister filters: %w", err)
+			}
+			return nil, cs.Close()
 		}
 		return cs, cs.RegisterFilters(pgOpts...)
 	case ccipdata.V1_2_0:
@@ -64,7 +69,11 @@ func initOrCloseCommitStoreReader(lggr logger.Logger, versionFinder VersionFinde
 			return nil, err
 		}
 		if closeReader {
-			return nil, cs.Close(pgOpts...)
+			err := cs.UnregisterFilters(pgOpts...)
+			if err != nil {
+				return nil, fmt.Errorf("failed to unregister filters: %w", err)
+			}
+			return nil, cs.Close()
 		}
 		return cs, cs.RegisterFilters(pgOpts...)
 	default:

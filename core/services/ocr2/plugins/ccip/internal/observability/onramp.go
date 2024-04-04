@@ -13,6 +13,8 @@ type ObservedOnRampReader struct {
 	metric metricDetails
 }
 
+var _ ccipdata.OnRampReader = (*ObservedOnRampReader)(nil)
+
 func NewObservedOnRampReader(origin ccipdata.OnRampReader, chainID int64, pluginName string) *ObservedOnRampReader {
 	return &ObservedOnRampReader{
 		OnRampReader: origin,
@@ -32,15 +34,15 @@ func (o ObservedOnRampReader) GetSendRequestsBetweenSeqNums(ctx context.Context,
 	})
 }
 
-func (o ObservedOnRampReader) RouterAddress() (cciptypes.Address, error) {
+func (o ObservedOnRampReader) RouterAddress(ctx context.Context) (cciptypes.Address, error) {
 	return withObservedInteraction(o.metric, "RouterAddress", func() (cciptypes.Address, error) {
-		return o.OnRampReader.RouterAddress()
+		return o.OnRampReader.RouterAddress(ctx)
 	})
 }
 
-func (o ObservedOnRampReader) GetDynamicConfig() (cciptypes.OnRampDynamicConfig, error) {
+func (o ObservedOnRampReader) GetDynamicConfig(ctx context.Context) (cciptypes.OnRampDynamicConfig, error) {
 	return withObservedInteraction(o.metric, "GetDynamicConfig", func() (cciptypes.OnRampDynamicConfig, error) {
-		return o.OnRampReader.GetDynamicConfig()
+		return o.OnRampReader.GetDynamicConfig(ctx)
 	})
 }
 

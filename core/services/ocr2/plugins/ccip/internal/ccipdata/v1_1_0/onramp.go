@@ -1,6 +1,7 @@
 package v1_1_0
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -37,7 +38,7 @@ func NewOnRamp(lggr logger.Logger, sourceSelector, destSelector uint64, onRampAd
 	}, nil
 }
 
-func (o *OnRamp) RouterAddress() (cciptypes.Address, error) {
+func (o *OnRamp) RouterAddress(ctx context.Context) (cciptypes.Address, error) {
 	config, err := o.onRamp.GetDynamicConfig(nil)
 	if err != nil {
 		return "", err
@@ -45,7 +46,7 @@ func (o *OnRamp) RouterAddress() (cciptypes.Address, error) {
 	return cciptypes.Address(config.Router.String()), nil
 }
 
-func (o *OnRamp) GetDynamicConfig() (cciptypes.OnRampDynamicConfig, error) {
+func (o *OnRamp) GetDynamicConfig(ctx context.Context) (cciptypes.OnRampDynamicConfig, error) {
 	if o.onRamp == nil {
 		return cciptypes.OnRampDynamicConfig{}, fmt.Errorf("onramp not initialized")
 	}

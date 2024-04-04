@@ -65,7 +65,7 @@ func (c *CommitStore) GetCommitStoreStaticConfig(ctx context.Context) (cciptypes
 	}, nil
 }
 
-func (c *CommitStore) EncodeCommitReport(report cciptypes.CommitStoreReport) ([]byte, error) {
+func (c *CommitStore) EncodeCommitReport(ctx context.Context, report cciptypes.CommitStoreReport) ([]byte, error) {
 	return EncodeCommitReport(c.commitReportArgs, report)
 }
 
@@ -159,7 +159,7 @@ func DecodeCommitReport(commitReportArgs abi.Arguments, report []byte) (cciptype
 	}, nil
 }
 
-func (c *CommitStore) DecodeCommitReport(report []byte) (cciptypes.CommitStoreReport, error) {
+func (c *CommitStore) DecodeCommitReport(ctx context.Context, report []byte) (cciptypes.CommitStoreReport, error) {
 	return DecodeCommitReport(c.commitReportArgs, report)
 }
 
@@ -167,16 +167,16 @@ func (c *CommitStore) IsBlessed(ctx context.Context, root [32]byte) (bool, error
 	return c.commitStore.IsBlessed(&bind.CallOpts{Context: ctx}, root)
 }
 
-func (c *CommitStore) OffchainConfig() cciptypes.CommitOffchainConfig {
+func (c *CommitStore) OffchainConfig(ctx context.Context) (cciptypes.CommitOffchainConfig, error) {
 	c.configMu.RLock()
 	defer c.configMu.RUnlock()
-	return c.offchainConfig
+	return c.offchainConfig, nil
 }
 
-func (c *CommitStore) GasPriceEstimator() cciptypes.GasPriceEstimatorCommit {
+func (c *CommitStore) GasPriceEstimator(ctx context.Context) (cciptypes.GasPriceEstimatorCommit, error) {
 	c.configMu.RLock()
 	defer c.configMu.RUnlock()
-	return c.gasPriceEstimator
+	return c.gasPriceEstimator, nil
 }
 
 // Do not change the JSON format of this struct without consulting with
@@ -214,7 +214,7 @@ func (c JSONCommitOffchainConfig) Validate() error {
 	return nil
 }
 
-func (c *CommitStore) ChangeConfig(onchainConfig []byte, offchainConfig []byte) (cciptypes.Address, error) {
+func (c *CommitStore) ChangeConfig(ctx context.Context, onchainConfig []byte, offchainConfig []byte) (cciptypes.Address, error) {
 	onchainConfigParsed, err := abihelpers.DecodeAbiStruct[ccipdata.CommitOnchainConfig](onchainConfig)
 	if err != nil {
 		return "", err
@@ -249,7 +249,12 @@ func (c *CommitStore) ChangeConfig(onchainConfig []byte, offchainConfig []byte) 
 	return cciptypes.Address(onchainConfigParsed.PriceRegistry.String()), nil
 }
 
-func (c *CommitStore) Close(qopts ...pg.QOpt) error {
+func (c *CommitStore) Close() error {
+	return nil
+}
+
+// TODO: remove pg.Opts dependency
+func (c *CommitStore) UnregisterFilters(qopts ...pg.QOpt) error {
 	return logpollerutil.UnregisterLpFilters(c.lp, c.filters, qopts...)
 }
 

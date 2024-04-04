@@ -330,7 +330,7 @@ func (node *Node) ConsistentlySeqNumHasNotBeenExecuted(t *testing.T, ccipContrac
 func (node *Node) AddJob(t *testing.T, spec *OCR2TaskJobSpec) {
 	specString, err := spec.String()
 	require.NoError(t, err)
-	ccipJob, err := validate.ValidatedOracleSpecToml(node.App.GetConfig().OCR2(), node.App.GetConfig().Insecure(), specString)
+	ccipJob, err := validate.ValidatedOracleSpecToml(testutils.Context(t), node.App.GetConfig().OCR2(), node.App.GetConfig().Insecure(), specString, nil)
 	require.NoError(t, err)
 	err = node.App.AddJobV2(context.Background(), &ccipJob)
 	require.NoError(t, err)

@@ -91,3 +91,7 @@ func (d *PipelineGetter) TokenPricesUSD(ctx context.Context, tokens []cciptypes.
 
 	return tokenPrices, nil
 }
+
+func (d *PipelineGetter) Close() error {
+	return nil
+}

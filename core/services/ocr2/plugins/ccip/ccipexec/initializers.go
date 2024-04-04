@@ -192,7 +192,7 @@ func jobSpecToExecPluginConfig(ctx context.Context, lggr logger.Logger, jb job.J
 	if err != nil {
 		return nil, nil, nil, nil, errors.Wrap(err, "create onramp reader")
 	}
-	dynamicOnRampConfig, err := onRampReader.GetDynamicConfig()
+	dynamicOnRampConfig, err := onRampReader.GetDynamicConfig(ctx)
 	if err != nil {
 		return nil, nil, nil, nil, errors.Wrap(err, "get onramp dynamic config")
 	}
