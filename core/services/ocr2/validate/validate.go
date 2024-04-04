@@ -249,7 +249,6 @@ func validateGenericPluginSpec(ctx context.Context, spec *job.OCR2OracleSpec, rc
 	defer plugin.Close()
 
 	return plugin.ValidateConfig(ctx, spec.PluginConfig)
-	return nil
 }
 
 func validateRebalancerSpec(jsonConfig job.JSONConfig) error {

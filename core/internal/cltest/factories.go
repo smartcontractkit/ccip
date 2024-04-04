@@ -16,13 +16,14 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/google/uuid"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/jsonserializable"
 	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
 	"github.com/stretchr/testify/require"
 	"github.com/urfave/cli"
 	"gopkg.in/guregu/null.v4"
 
 	"github.com/jmoiron/sqlx"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/utils/jsonserializable"
 
 	txmgrcommon "github.com/smartcontractkit/chainlink/v2/common/txmgr"
 	txmgrtypes "github.com/smartcontractkit/chainlink/v2/common/txmgr/types"
