@@ -1080,7 +1080,7 @@ contract EVM2EVMOffRamp__trialExecute is EVM2EVMOffRampSetup {
 }
 
 contract EVM2EVMOffRamp__releaseOrMintTokens is EVM2EVMOffRampSetup {
-  function test_releaseOrMintTokensSuccess() public {
+  function test_releaseOrMintTokens_Success() public {
     Client.EVMTokenAmount[] memory srcTokenAmounts = getCastedSourceEVMTokenAmountsWithZeroAmounts();
     IERC20 dstToken1 = IERC20(s_destFeeToken);
     uint256 startingBalance = dstToken1.balanceOf(OWNER);
@@ -1114,7 +1114,7 @@ contract EVM2EVMOffRamp__releaseOrMintTokens is EVM2EVMOffRampSetup {
 
   // Revert
 
-  function testTokenHandlingErrorReverts() public {
+  function test_TokenHandlingError_Reverts() public {
     Client.EVMTokenAmount[] memory srcTokenAmounts = getCastedSourceEVMTokenAmountsWithZeroAmounts();
 
     bytes memory unknownError = bytes("unknown error");
@@ -1131,7 +1131,7 @@ contract EVM2EVMOffRamp__releaseOrMintTokens is EVM2EVMOffRampSetup {
     );
   }
 
-  function testRateLimitErrorsReverts() public {
+  function test_RateLimitErrors_Reverts() public {
     Client.EVMTokenAmount[] memory srcTokenAmounts = getCastedSourceEVMTokenAmountsWithZeroAmounts();
 
     bytes[] memory rateLimitErrors = new bytes[](5);
@@ -1187,17 +1187,13 @@ contract EVM2EVMOffRamp__releaseOrMintTokens is EVM2EVMOffRampSetup {
       extraData: ""
     });
 
-    vm.expectRevert(
-      abi.encodeWithSelector(
-        EVM2EVMOffRamp.TokenHandlingError.selector, abi.encodeWithSelector(EVM2EVMOffRamp.PoolDoesNotExist.selector)
-      )
-    );
+    vm.expectRevert(abi.encodeWithSelector(EVM2EVMOffRamp.InvalidPoolAddress.selector, abi.encode(fakePoolAddress)));
     s_offRamp.releaseOrMintTokens(
       new Client.EVMTokenAmount[](1), abi.encode(makeAddr("original_sender")), OWNER, sourceTokenData, new bytes[](1)
     );
   }
 
-  function test_fuzz__releaseOrMintTokens_AnyRevertIsTokenHandlingError_Success(uint256 destPool) public {
+  function test_fuzz__releaseOrMintTokens_AnyRevertIsCaught_Success(uint256 destPool) public {
     bytes memory unusedVar = abi.encode(makeAddr("unused"));
     // Uint256 gives a good range of values to test, both inside and outside of the eth address space.
     bytes memory destPoolAddress = abi.encode(destPool);
@@ -1207,22 +1203,16 @@ contract EVM2EVMOffRamp__releaseOrMintTokens is EVM2EVMOffRampSetup {
 
     try s_offRamp.releaseOrMintTokens(new Client.EVMTokenAmount[](1), unusedVar, OWNER, sourceTokenData, new bytes[](1))
     {} catch (bytes memory reason) {
-      bytes4 selector;
-      assembly {
-        selector := mload(add(reason, 0x20))
-      }
-      // Any revert should be a token handling error
-      assertEq(selector, EVM2EVMOffRamp.TokenHandlingError.selector, "Expected TokenHandlingError");
+      // Any revert should be a TokenHandlingError or InvalidPoolAddress as those are caught by the offramp
+      assertTrue(
+        bytes4(reason) == EVM2EVMOffRamp.TokenHandlingError.selector
+          || bytes4(reason) == EVM2EVMOffRamp.InvalidPoolAddress.selector,
+        "Expected TokenHandlingError or InvalidPoolAddress"
+      );
 
       if (destPool > type(uint160).max) {
         // If the destPool is not a valid eth address, the inner error should be PoolDoesNotExist
-        assertEq(
-          reason,
-          abi.encodeWithSelector(
-            EVM2EVMOffRamp.TokenHandlingError.selector,
-            abi.encodeWithSelector(EVM2EVMOffRamp.InvalidTokenPoolConfig.selector)
-          )
-        );
+        assertEq(reason, abi.encodeWithSelector(EVM2EVMOffRamp.InvalidPoolAddress.selector, destPoolAddress));
       }
     }
   }

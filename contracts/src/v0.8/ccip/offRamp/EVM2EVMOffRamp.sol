@@ -55,6 +55,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
   error PoolAlreadyAdded();
   error PoolDoesNotExist();
   error TokenPoolMismatch();
+  error InvalidPoolAddress(bytes poolAddress);
   error InvalidNewState(uint64 sequenceNumber, Internal.MessageExecutionState newState);
 
   event PoolAdded(address token, address pool);
@@ -385,9 +386,12 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
   ) internal returns (Internal.MessageExecutionState, bytes memory) {
     try this.executeSingleMessage(message, offchainTokenData) {}
     catch (bytes memory err) {
-      if (ReceiverError.selector == bytes4(err) || TokenHandlingError.selector == bytes4(err)) {
+      if (
+        ReceiverError.selector == bytes4(err) || TokenHandlingError.selector == bytes4(err)
+          || InvalidPoolAddress.selector == bytes4(err)
+      ) {
         // If CCIP receiver execution is not successful, bubble up receiver revert data,
-        // prepended by the 4 bytes of ReceiverError.selector or TokenHandlingError.selector
+        // prepended by the 4 bytes of ReceiverError.selector, TokenHandlingError.selector or InvalidPoolAddress.selector.
         // Max length of revert data is Router.MAX_RET_BYTES, max length of err is 4 + Router.MAX_RET_BYTES
         return (Internal.MessageExecutionState.FAILURE, err);
       } else {
@@ -501,18 +505,22 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
   ) internal returns (Client.EVMTokenAmount[] memory) {
     Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](sourceTokenAmounts.length);
     for (uint256 i = 0; i < sourceTokenAmounts.length; ++i) {
-      // TODO change error
+      // We need to safely decode the pool address from the sourceTokenData, as it could be wrong,
+      // in which case it doesn't have to be a valid EVM address.
       if (sourceTokenData[i].destPoolAddress.length != 32) {
-        revert TokenHandlingError(abi.encodeWithSelector(InvalidTokenPoolConfig.selector));
+        revert InvalidPoolAddress(sourceTokenData[i].destPoolAddress);
       }
       uint256 decodedDestPool = uint256(abi.decode(sourceTokenData[i].destPoolAddress, (uint256)));
       if (decodedDestPool > type(uint160).max || decodedDestPool < 10) {
-        revert TokenHandlingError(abi.encodeWithSelector(InvalidTokenPoolConfig.selector));
+        revert InvalidPoolAddress(sourceTokenData[i].destPoolAddress);
       }
-      IPool pool = IPool(address(uint160(decodedDestPool)));
 
-      if (address(pool).code.length == 0) {
-        revert TokenHandlingError(abi.encodeWithSelector(PoolDoesNotExist.selector));
+      // We determined that the pool address is valid, so we can safely cast it to an address.
+      // This does not mean the code at this address is actually a (compatible) pool contract.
+      address pool = address(uint160(decodedDestPool));
+      // If there is no contract it could not possibly be a pool.
+      if (pool.code.length == 0) {
+        revert InvalidPoolAddress(sourceTokenData[i].destPoolAddress);
       }
 
       uint256 amount = sourceTokenAmounts[i].amount;
@@ -522,7 +530,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
       // at MAX_RET_BYTES.
       (bool success, bytes memory returnData,) = CallWithExactGas._callWithExactGasSafeReturnData(
         abi.encodeWithSelector(
-          pool.releaseOrMint.selector,
+          IPool.releaseOrMint.selector,
           originalSender,
           receiver,
           amount,
@@ -530,7 +538,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
           sourceTokenData[i],
           offchainTokenData[i]
         ),
-        address(pool),
+        pool,
         s_dynamicConfig.maxPoolReleaseOrMintGas,
         Internal.GAS_FOR_CALL_EXACT_CHECK,
         Internal.MAX_RET_BYTES
@@ -540,7 +548,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
       if (!success) revert TokenHandlingError(returnData);
 
       // TODO make this call non-revertable
-      destTokenAmounts[i].token = address(pool.getToken());
+      destTokenAmounts[i].token = address(IPool(pool).getToken());
       destTokenAmounts[i].amount = amount;
     }
     _rateLimitValue(destTokenAmounts, IPriceRegistry(s_dynamicConfig.priceRegistry));
