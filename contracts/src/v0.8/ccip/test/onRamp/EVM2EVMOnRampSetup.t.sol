@@ -195,7 +195,7 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
       receiver: abi.decode(message.receiver, (address)),
       data: message.data,
       tokenAmounts: message.tokenAmounts,
-      sourceTokenData: new IPool.SourceTokenData[](numberOfTokens),
+      sourceTokenData: new bytes[](numberOfTokens),
       feeToken: message.feeToken,
       messageId: ""
     });
@@ -203,11 +203,13 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
     for (uint256 i = 0; i < numberOfTokens; ++i) {
       address sourcePool = s_sourcePoolByToken[message.tokenAmounts[i].token];
       address destPool = s_destPoolBySourceToken[message.tokenAmounts[i].token];
-      messageEvent.sourceTokenData[i] = IPool.SourceTokenData({
-        sourcePoolAddress: abi.encode(sourcePool),
-        destPoolAddress: abi.encode(destPool),
-        extraData: ""
-      });
+      messageEvent.sourceTokenData[i] = abi.encode(
+        IPool.SourceTokenData({
+          sourcePoolAddress: abi.encode(sourcePool),
+          destPoolAddress: abi.encode(destPool),
+          extraData: ""
+        })
+      );
     }
 
     messageEvent.messageId = Internal._hash(messageEvent, s_metadataHash);

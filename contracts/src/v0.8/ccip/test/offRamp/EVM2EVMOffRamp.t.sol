@@ -361,11 +361,13 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     address fakePoolAddress = address(0x0000000000333333);
 
     Internal.EVM2EVMMessage[] memory messages = _generateMessagesWithTokens();
-    messages[0].sourceTokenData[0] = IPool.SourceTokenData({
-      sourcePoolAddress: abi.encode(fakePoolAddress),
-      destPoolAddress: abi.encode(s_destPoolBySourceToken[messages[0].tokenAmounts[0].token]),
-      extraData: ""
-    });
+    messages[0].sourceTokenData[0] = abi.encode(
+      IPool.SourceTokenData({
+        sourcePoolAddress: abi.encode(fakePoolAddress),
+        destPoolAddress: abi.encode(s_destPoolBySourceToken[messages[0].tokenAmounts[0].token]),
+        extraData: ""
+      })
+    );
 
     messages[0].messageId = Internal._hash(messages[0], s_offRamp.metadataHash());
     messages[1].messageId = Internal._hash(messages[1], s_offRamp.metadataHash());
@@ -678,12 +680,12 @@ contract EVM2EVMOffRamp_executeSingleMessage is EVM2EVMOffRampSetup {
     vm.startPrank(address(s_offRamp));
   }
 
-  function testNoTokensSuccess() public {
+  function test_executeSingleMessage_NoTokens_Success() public {
     Internal.EVM2EVMMessage memory message = _generateAny2EVMMessageNoTokens(1);
     s_offRamp.executeSingleMessage(message, new bytes[](message.tokenAmounts.length));
   }
 
-  function testTokensSuccess() public {
+  function test_executeSingleMessage_WithTokens_Success() public {
     Internal.EVM2EVMMessage memory message = _generateMessagesWithTokens()[0];
     bytes[] memory offchainTokenData = new bytes[](message.tokenAmounts.length);
     vm.expectCall(
@@ -694,7 +696,7 @@ contract EVM2EVMOffRamp_executeSingleMessage is EVM2EVMOffRampSetup {
         message.receiver,
         message.tokenAmounts[0].amount,
         SOURCE_CHAIN_SELECTOR,
-        message.sourceTokenData[0],
+        abi.decode(message.sourceTokenData[0], (IPool.SourceTokenData)),
         offchainTokenData[0]
       )
     );
@@ -909,12 +911,14 @@ contract EVM2EVMOffRamp_manuallyExecute is EVM2EVMOffRampSetup {
     messages[0].tokenAmounts = new Client.EVMTokenAmount[](1);
     messages[0].tokenAmounts[0] = Client.EVMTokenAmount({token: s_sourceFeeToken, amount: tokenAmount});
     messages[0].receiver = address(receiver);
-    messages[0].sourceTokenData = new IPool.SourceTokenData[](1);
-    messages[0].sourceTokenData[0] = IPool.SourceTokenData({
-      sourcePoolAddress: abi.encode(s_sourcePoolByToken[s_sourceFeeToken]),
-      destPoolAddress: abi.encode(s_destPoolBySourceToken[s_sourceFeeToken]),
-      extraData: ""
-    });
+    messages[0].sourceTokenData = new bytes[](1);
+    messages[0].sourceTokenData[0] = abi.encode(
+      IPool.SourceTokenData({
+        sourcePoolAddress: abi.encode(s_sourcePoolByToken[s_sourceFeeToken]),
+        destPoolAddress: abi.encode(s_destPoolBySourceToken[s_sourceFeeToken]),
+        extraData: ""
+      })
+    );
 
     messages[0].messageId = Internal._hash(messages[0], s_offRamp.metadataHash());
 
@@ -1092,7 +1096,7 @@ contract EVM2EVMOffRamp__releaseOrMintTokens is EVM2EVMOffRampSetup {
     bytes[] memory offchainTokenData = new bytes[](srcTokenAmounts.length);
     offchainTokenData[0] = abi.encode(0x12345678);
 
-    IPool.SourceTokenData[] memory sourceTokenData = _getDefaultSourceTokenData(srcTokenAmounts);
+    bytes[] memory sourceTokenData = _getDefaultSourceTokenData(srcTokenAmounts);
 
     vm.expectCall(
       s_destPoolBySourceToken[srcTokenAmounts[0].token],
@@ -1102,7 +1106,7 @@ contract EVM2EVMOffRamp__releaseOrMintTokens is EVM2EVMOffRampSetup {
         OWNER,
         srcTokenAmounts[0].amount,
         SOURCE_CHAIN_SELECTOR,
-        sourceTokenData[0],
+        abi.decode(sourceTokenData[0], (IPool.SourceTokenData)),
         offchainTokenData[0]
       )
     );
@@ -1164,12 +1168,14 @@ contract EVM2EVMOffRamp__releaseOrMintTokens is EVM2EVMOffRampSetup {
   function test__releaseOrMintTokens_PoolIsNotAPool_Reverts() public {
     address fakePoolAddress = makeAddr("Doesn't exist");
 
-    IPool.SourceTokenData[] memory sourceTokenData = new IPool.SourceTokenData[](1);
-    sourceTokenData[0] = IPool.SourceTokenData({
-      sourcePoolAddress: abi.encode(fakePoolAddress),
-      destPoolAddress: abi.encode(s_offRamp),
-      extraData: ""
-    });
+    bytes[] memory sourceTokenData = new bytes[](1);
+    sourceTokenData[0] = abi.encode(
+      IPool.SourceTokenData({
+        sourcePoolAddress: abi.encode(fakePoolAddress),
+        destPoolAddress: abi.encode(s_offRamp),
+        extraData: ""
+      })
+    );
 
     vm.expectRevert(abi.encodeWithSelector(EVM2EVMOffRamp.TokenHandlingError.selector, bytes("")));
     s_offRamp.releaseOrMintTokens(
@@ -1180,12 +1186,14 @@ contract EVM2EVMOffRamp__releaseOrMintTokens is EVM2EVMOffRampSetup {
   function test__releaseOrMintTokens_PoolIsNotAContract_Reverts() public {
     address fakePoolAddress = makeAddr("Doesn't exist");
 
-    IPool.SourceTokenData[] memory sourceTokenData = new IPool.SourceTokenData[](1);
-    sourceTokenData[0] = IPool.SourceTokenData({
-      sourcePoolAddress: abi.encode(fakePoolAddress),
-      destPoolAddress: abi.encode(fakePoolAddress),
-      extraData: ""
-    });
+    bytes[] memory sourceTokenData = new bytes[](1);
+    sourceTokenData[0] = abi.encode(
+      IPool.SourceTokenData({
+        sourcePoolAddress: abi.encode(fakePoolAddress),
+        destPoolAddress: abi.encode(fakePoolAddress),
+        extraData: ""
+      })
+    );
 
     vm.expectRevert(abi.encodeWithSelector(EVM2EVMOffRamp.InvalidAddress.selector, abi.encode(fakePoolAddress)));
     s_offRamp.releaseOrMintTokens(
@@ -1202,9 +1210,10 @@ contract EVM2EVMOffRamp__releaseOrMintTokens is EVM2EVMOffRampSetup {
     bytes memory unusedVar = abi.encode(makeAddr("unused"));
     // Uint256 gives a good range of values to test, both inside and outside of the eth address space.
     bytes memory destPoolAddress = abi.encode(destPool);
-    IPool.SourceTokenData[] memory sourceTokenData = new IPool.SourceTokenData[](1);
-    sourceTokenData[0] =
-      IPool.SourceTokenData({sourcePoolAddress: unusedVar, destPoolAddress: destPoolAddress, extraData: unusedVar});
+    bytes[] memory sourceTokenData = new bytes[](1);
+    sourceTokenData[0] = abi.encode(
+      IPool.SourceTokenData({sourcePoolAddress: unusedVar, destPoolAddress: destPoolAddress, extraData: unusedVar})
+    );
 
     try s_offRamp.releaseOrMintTokens(new Client.EVMTokenAmount[](1), unusedVar, OWNER, sourceTokenData, new bytes[](1))
     {} catch (bytes memory reason) {

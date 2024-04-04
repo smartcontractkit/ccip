@@ -77,7 +77,7 @@ library Internal {
     uint256 feeTokenAmount; //                  fee token amount
     bytes data; //                              arbitrary data payload supplied by the message sender
     Client.EVMTokenAmount[] tokenAmounts; //    array of tokens and amounts to transfer
-    IPool.SourceTokenData[] sourceTokenData; // array of token data, one per token
+    bytes[] sourceTokenData; //                 array of token data, one per token
     bytes32 messageId; //                       a hash of the message data
   }
 

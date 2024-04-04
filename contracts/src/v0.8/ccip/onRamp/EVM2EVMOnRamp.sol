@@ -308,7 +308,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
       feeTokenAmount: feeTokenAmount,
       data: message.data,
       tokenAmounts: message.tokenAmounts,
-      sourceTokenData: new IPool.SourceTokenData[](numberOfTokens), // will be populated below
+      sourceTokenData: new bytes[](numberOfTokens), // will be populated below
       messageId: ""
     });
 
@@ -335,11 +335,13 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
       // Since this is an EVM2EVM message, the pool address should be exactly 32 bytes
       if (destPoolAddress.length != 32) revert InvalidAddress(destPoolAddress);
 
-      newMessage.sourceTokenData[i] = IPool.SourceTokenData({
-        sourcePoolAddress: abi.encode(sourcePool),
-        destPoolAddress: destPoolAddress,
-        extraData: extraData
-      });
+      newMessage.sourceTokenData[i] = abi.encode(
+        IPool.SourceTokenData({
+          sourcePoolAddress: abi.encode(sourcePool),
+          destPoolAddress: destPoolAddress,
+          extraData: extraData
+        })
+      );
     }
 
     // Hash only after the sourceTokenData has been set

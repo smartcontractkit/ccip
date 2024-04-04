@@ -491,7 +491,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
   /// @param sourceTokenAmounts List of tokens and amount values to be released/minted.
   /// @param originalSender The message sender.
   /// @param receiver The address that will receive the tokens.
-  /// @param sourceTokenData Array of token data returned by token pools on the source chain.
+  /// @param encodedSourceTokenData Array of token data returned by token pools on the source chain.
   /// @param offchainTokenData Array of token data fetched offchain by the DON.
   /// @dev This function wrappes the token pool call in a try catch block to gracefully handle
   /// any non-rate limiting errors that may occur. If we encounter a rate limiting related error
@@ -500,19 +500,20 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
     Client.EVMTokenAmount[] memory sourceTokenAmounts,
     bytes memory originalSender,
     address receiver,
-    IPool.SourceTokenData[] memory sourceTokenData,
+    bytes[] memory encodedSourceTokenData,
     bytes[] memory offchainTokenData
   ) internal returns (Client.EVMTokenAmount[] memory) {
     Client.EVMTokenAmount[] memory destTokenAmounts = sourceTokenAmounts;
     for (uint256 i = 0; i < sourceTokenAmounts.length; ++i) {
+      IPool.SourceTokenData memory sourceTokenData = abi.decode(encodedSourceTokenData[i], (IPool.SourceTokenData));
       // We need to safely decode the pool address from the sourceTokenData, as it could be wrong,
       // in which case it doesn't have to be a valid EVM address.
-      address pool = _validateEVMAddress(sourceTokenData[i].destPoolAddress);
+      address pool = _validateEVMAddress(sourceTokenData.destPoolAddress);
 
       // We determined that the pool address is a valid EVM address, but that does not mean the code at this
       // address is actually a (compatible) pool contract. If there is no contract it could not possibly be a pool.
       if (pool.code.length == 0) {
-        revert InvalidAddress(sourceTokenData[i].destPoolAddress);
+        revert InvalidAddress(sourceTokenData.destPoolAddress);
       }
 
       // Call the pool with exact gas to increase resistance against malicious tokens or token pools.
@@ -525,7 +526,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
           receiver,
           sourceTokenAmounts[i].amount,
           i_sourceChainSelector,
-          sourceTokenData[i],
+          sourceTokenData,
           offchainTokenData[i]
         ),
         pool,
