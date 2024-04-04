@@ -85,6 +85,7 @@ type Application interface {
 	GetExternalInitiatorManager() webhook.ExternalInitiatorManager
 	GetRelayers() RelayerChainInteroperators
 	GetLoopRegistry() *plugins.LoopRegistry
+	GetLoopRegistrarConfig() plugins.RegistrarConfig
 
 	// V2 Jobs (TOML specified)
 	JobSpawner() job.Spawner
@@ -145,6 +146,7 @@ type ChainlinkApplication struct {
 	secretGenerator          SecretGenerator
 	profiler                 *pyroscope.Profiler
 	loopRegistry             *plugins.LoopRegistry
+	loopRegistrarConfig      plugins.RegistrarConfig
 
 	started     bool
 	startStopMu sync.Mutex
@@ -408,10 +410,11 @@ func NewApplication(opts ApplicationOpts) (Application, error) {
 	} else {
 		globalLogger.Debug("Off-chain reporting disabled")
 	}
+
+	loopRegistrarConfig := plugins.NewRegistrarConfig(opts.GRPCOpts, opts.LoopRegistry.Register, opts.LoopRegistry.Unregister)
 	if cfg.OCR2().Enabled() {
 		globalLogger.Debug("Off-chain reporting v2 enabled")
-		registrarConfig := plugins.NewRegistrarConfig(opts.GRPCOpts, opts.LoopRegistry.Register)
-		ocr2DelegateConfig := ocr2.NewDelegateConfig(cfg.OCR2(), cfg.Mercury(), cfg.Threshold(), cfg.Insecure(), cfg.JobPipeline(), cfg.Database(), registrarConfig)
+		ocr2DelegateConfig := ocr2.NewDelegateConfig(cfg.OCR2(), cfg.Mercury(), cfg.Threshold(), cfg.Insecure(), cfg.JobPipeline(), cfg.Database(), loopRegistrarConfig)
 		delegates[job.OffchainReporting2] = ocr2.NewDelegate(
 			db,
 			jobORM,
@@ -479,6 +482,7 @@ func NewApplication(opts ApplicationOpts) (Application, error) {
 			legacyEVMChains,
 			globalLogger,
 			opts.Version,
+			loopRegistrarConfig,
 		)
 	} else {
 		feedsService = &feeds.NullService{}
@@ -517,6 +521,7 @@ func NewApplication(opts ApplicationOpts) (Application, error) {
 		secretGenerator:          opts.SecretGenerator,
 		profiler:                 profiler,
 		loopRegistry:             loopRegistry,
+		loopRegistrarConfig:      loopRegistrarConfig,
 
 		sqlxDB: opts.SqlxDB,
 
@@ -585,6 +590,9 @@ func (app *ChainlinkApplication) StopIfStarted() error {
 
 func (app *ChainlinkApplication) GetLoopRegistry() *plugins.LoopRegistry {
 	return app.loopRegistry
+}
+func (app *ChainlinkApplication) GetLoopRegistrarConfig() plugins.RegistrarConfig {
+	return app.loopRegistrarConfig
 }
 
 // Stop allows the application to exit by halting schedules, closing
