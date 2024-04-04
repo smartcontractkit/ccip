@@ -319,6 +319,7 @@ NoOfNetworks = 2   # same as above
 Blockscout = false   # same as above
 WithPipeline = false
 TimeoutForPriceUpdate = '15m' # time to wait for price update
+OptimizeSpace = true
 
 # uncomment the following if you want to run your tests with specific number of lanes;
 # in this case out of all the possible lane combinations, only the ones with the specified number of lanes will be considered
