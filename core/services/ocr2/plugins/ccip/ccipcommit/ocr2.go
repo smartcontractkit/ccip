@@ -58,7 +58,8 @@ type CommitPluginStaticConfig struct {
 	sourceChainSelector uint64
 	sourceNative        cciptypes.Address
 	// Dest
-	offRamps              []ccipdata.OffRampReader
+	curOffRampAddr        cciptypes.Address
+	allOffRampReaders     []ccipdata.OffRampReader
 	commitStore           ccipdata.CommitStoreReader
 	destChainSelector     uint64
 	priceRegistryProvider ccipdataprovider.PriceRegistry
@@ -79,7 +80,8 @@ type CommitReportingPlugin struct {
 	commitStoreReader       ccipdata.CommitStoreReader
 	destPriceRegistryReader ccipdata.PriceRegistryReader
 	offchainConfig          cciptypes.CommitOffchainConfig
-	offRampReaders          []ccipdata.OffRampReader
+	curOffRampAddr          cciptypes.Address
+	allOffRampReaders       []ccipdata.OffRampReader
 	F                       int
 	// Offchain
 	multiLanePriceGetter MultiLanePriceGetter
@@ -183,12 +185,12 @@ func (r *CommitReportingPlugin) observePriceUpdates(
 		return nil, nil, nil
 	}
 
-	sortedChainTokens, err := ccipcommon.GetSortedChainTokens(ctx, r.offRampReaders, r.destPriceRegistryReader)
+	feeTokens, tokensPerOffRamp, err := ccipcommon.GetTokensPerOffRamp(ctx, r.allOffRampReaders, r.destPriceRegistryReader)
 	if err != nil {
 		return nil, nil, fmt.Errorf("get destination tokens: %w", err)
 	}
 
-	return r.generatePriceUpdates(ctx, lggr, sortedChainTokens)
+	return r.generatePriceUpdates(ctx, lggr, feeTokens, tokensPerOffRamp)
 }
 
 // All prices are USD ($1=1e18) denominated. All prices must be not nil.
@@ -196,22 +198,29 @@ func (r *CommitReportingPlugin) observePriceUpdates(
 func (r *CommitReportingPlugin) generatePriceUpdates(
 	ctx context.Context,
 	lggr logger.Logger,
-	sortedChainTokens []cciptypes.Address,
+	feeTokens []cciptypes.Address,
+	tokensPerOffRamp map[cciptypes.Address][]cciptypes.Address,
 ) (sourceGasPriceUSD *big.Int, tokenPricesUSD map[cciptypes.Address]*big.Int, err error) {
 	// Include wrapped native in our token query as way to identify the source native USD price.
 	// notice USD is in 1e18 scale, i.e. $1 = 1e18
-	queryTokens := ccipcommon.FlattenUniqueSlice([]cciptypes.Address{r.sourceNative}, sortedChainTokens)
+	curOffRampTokens := ccipcommon.FlattenUniqueSlice([]cciptypes.Address{r.sourceNative}, feeTokens)
 
-	rawTokenPricesUSD, err := r.priceGetter.TokenPricesUSD(ctx, queryTokens)
+	// Read sourceNative and fee tokens from PriceGetter belonging to current lane
+	tokensPerOffRamp[r.curOffRampAddr] = append(tokensPerOffRamp[r.curOffRampAddr], curOffRampTokens...)
+
+	uniqueTokensPerOffRamp := ccipcommon.DedupTokensPerOffRamp(r.curOffRampAddr, tokensPerOffRamp)
+	rawTokenPricesUSD, err := r.multiLanePriceGetter.GetTokenPrices(ctx, uniqueTokensPerOffRamp)
 	if err != nil {
 		return nil, nil, err
 	}
 	lggr.Infow("Raw token prices", "rawTokenPrices", rawTokenPricesUSD)
 
 	// make sure that we got prices for all the tokens of our query
-	for _, token := range queryTokens {
-		if rawTokenPricesUSD[token] == nil {
-			return nil, nil, errors.Errorf("missing token price: %+v", token)
+	for _, laneTokens := range tokensPerOffRamp {
+		for _, token := range laneTokens {
+			if rawTokenPricesUSD[token] == nil {
+				return nil, nil, errors.Errorf("missing token price: %+v", token)
+			}
 		}
 	}
 
@@ -220,6 +229,7 @@ func (r *CommitReportingPlugin) generatePriceUpdates(
 		return nil, nil, fmt.Errorf("missing source native (%s) price", r.sourceNative)
 	}
 
+	sortedChainTokens := ccipcommon.AggregateChainTokens(feeTokens, tokensPerOffRamp)
 	destTokensDecimals, err := r.destPriceRegistryReader.GetTokensDecimals(ctx, sortedChainTokens)
 	if err != nil {
 		return nil, nil, fmt.Errorf("get tokens decimals: %w", err)
@@ -323,7 +333,7 @@ func (r *CommitReportingPlugin) Report(ctx context.Context, epochAndRound types.
 
 	parsableObservations := ccip.GetParsableObservations[ccip.CommitObservation](lggr, observations)
 
-	sortedChainTokens, err := ccipcommon.GetSortedChainTokens(ctx, r.offRampReaders, r.destPriceRegistryReader)
+	sortedChainTokens, err := ccipcommon.GetSortedChainTokens(ctx, r.allOffRampReaders, r.destPriceRegistryReader)
 	if err != nil {
 		return false, nil, fmt.Errorf("get destination tokens: %w", err)
 	}

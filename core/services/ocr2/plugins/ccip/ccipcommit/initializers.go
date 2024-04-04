@@ -169,7 +169,7 @@ func jobSpecToCommitPluginConfig(ctx context.Context, lggr logger.Logger, jb job
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	var destOffRampReaders []ccipdata.OffRampReader
+	var allOffRampReaders []ccipdata.OffRampReader
 	for _, o := range destRouterOffRamps {
 		destOffRampAddr := cciptypes.Address(o.OffRamp.String())
 		destOffRampReader, err2 := factory.NewOffRampReader(
@@ -187,7 +187,7 @@ func jobSpecToCommitPluginConfig(ctx context.Context, lggr logger.Logger, jb job
 			return nil, nil, nil, err2
 		}
 
-		destOffRampReaders = append(destOffRampReaders, destOffRampReader)
+		allOffRampReaders = append(allOffRampReaders, destOffRampReader)
 	}
 
 	onRampRouterAddr, err := onRampReader.RouterAddress()
@@ -211,8 +211,8 @@ func jobSpecToCommitPluginConfig(ctx context.Context, lggr logger.Logger, jb job
 	onRampReader = observability.NewObservedOnRampReader(onRampReader, params.sourceChain.ID().Int64(), ccip.CommitPluginLabel)
 	commitStoreReader = observability.NewObservedCommitStoreReader(commitStoreReader, params.destChain.ID().Int64(), ccip.CommitPluginLabel)
 	metricsCollector := ccip.NewPluginMetricsCollector(ccip.CommitPluginLabel, params.sourceChain.ID().Int64(), params.destChain.ID().Int64())
-	for i, o := range destOffRampReaders {
-		destOffRampReaders[i] = observability.NewObservedOffRampReader(o, params.destChain.ID().Int64(), ccip.CommitPluginLabel)
+	for i, o := range allOffRampReaders {
+		allOffRampReaders[i] = observability.NewObservedOffRampReader(o, params.destChain.ID().Int64(), ccip.CommitPluginLabel)
 	}
 
 	chainHealthcheck := cache.NewObservedChainHealthCheck(
@@ -243,7 +243,8 @@ func jobSpecToCommitPluginConfig(ctx context.Context, lggr logger.Logger, jb job
 	return &CommitPluginStaticConfig{
 			lggr:                  commitLggr,
 			onRampReader:          onRampReader,
-			offRamps:              destOffRampReaders,
+			curOffRampAddr:        params.pluginConfig.OffRamp,
+			allOffRampReaders:     allOffRampReaders,
 			sourceNative:          ccipcalc.EvmAddrToGeneric(sourceNative),
 			multiLanePriceGetter:  multiLanePriceGetter,
 			sourceChainSelector:   params.commitStoreStaticCfg.SourceChainSelector,

@@ -132,13 +132,17 @@ func extractPluginConfig(jb job.Job) (*ccipconfig.CommitPluginJobSpecConfig, err
 
 // GetTokenPrices looks up token prices from OffRamp's corresponding price getters.
 // Matt TODO parallelize this
-func (s *multiLanePriceGetter) GetTokenPrices(ctx context.Context, tokens map[cciptypes.Address][]cciptypes.Address) (map[cciptypes.Address]*big.Int, error) {
+func (s *multiLanePriceGetter) GetTokenPrices(ctx context.Context, tokensPerOffRamp map[cciptypes.Address][]cciptypes.Address) (map[cciptypes.Address]*big.Int, error) {
 	if err := s.syncPriceGetters(); err != nil {
 		return nil, err
 	}
 
 	combinedPrices := make(map[cciptypes.Address]*big.Int)
-	for offRamp, tokens := range tokens {
+	for offRamp, tokens := range tokensPerOffRamp {
+		// short circuit if there are no tokens to get prices for on a lane
+		if len(tokens) == 0 {
+			continue
+		}
 		priceGetter, exists := s.priceGetters[offRamp]
 		if !exists {
 			return nil, fmt.Errorf("priceGetter for OffRamp %s does not exist", offRamp)

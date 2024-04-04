@@ -34,21 +34,26 @@ type BackfillArgs struct {
 }
 
 func GetSortedChainTokens(ctx context.Context, offRamps []ccipdata.OffRampReader, priceRegistry cciptypes.PriceRegistryReader) (chainTokens []cciptypes.Address, err error) {
-	return getSortedChainTokensWithBatchLimit(ctx, offRamps, priceRegistry, offRampBatchSizeLimit)
+	feeTokens, tokensPerOffRamp, err := getTokensPerOffRamp(ctx, offRamps, priceRegistry, offRampBatchSizeLimit)
+	if err != nil {
+		return nil, err
+	}
+
+	return AggregateChainTokens(feeTokens, tokensPerOffRamp), nil
 }
 
-// GetChainTokens returns union of all tokens supported on the destination chain, including fee tokens from the provided price registry
-// and the bridgeable tokens from all the offRamps living on the chain.
-func getSortedChainTokensWithBatchLimit(ctx context.Context, offRamps []ccipdata.OffRampReader, priceRegistry cciptypes.PriceRegistryReader, batchSize int) (chainTokens []cciptypes.Address, err error) {
+func GetTokensPerOffRamp(ctx context.Context, offRamps []ccipdata.OffRampReader, priceRegistry cciptypes.PriceRegistryReader) (feeTokens []cciptypes.Address, tokensPerOffRamp map[cciptypes.Address][]cciptypes.Address, err error) {
+	return getTokensPerOffRamp(ctx, offRamps, priceRegistry, offRampBatchSizeLimit)
+}
+
+func getTokensPerOffRamp(ctx context.Context, offRamps []ccipdata.OffRampReader, priceRegistry cciptypes.PriceRegistryReader, batchSize int) (feeTokens []cciptypes.Address, tokensPerOffRamp map[cciptypes.Address][]cciptypes.Address, err error) {
 	if batchSize == 0 {
-		return nil, fmt.Errorf("batch size must be greater than 0")
+		return nil, nil, fmt.Errorf("batch size must be greater than 0")
 	}
 
 	eg := new(errgroup.Group)
 	eg.SetLimit(batchSize)
 
-	var destFeeTokens []cciptypes.Address
-	var destBridgeableTokens []cciptypes.Address
 	mu := &sync.RWMutex{}
 
 	eg.Go(func() error {
@@ -56,9 +61,11 @@ func getSortedChainTokensWithBatchLimit(ctx context.Context, offRamps []ccipdata
 		if err != nil {
 			return fmt.Errorf("get dest fee tokens: %w", err)
 		}
-		destFeeTokens = tokens
+		feeTokens = tokens
 		return nil
 	})
+
+	tokensPerOffRamp = make(map[cciptypes.Address][]cciptypes.Address)
 
 	for _, o := range offRamps {
 		offRamp := o
@@ -67,27 +74,73 @@ func getSortedChainTokensWithBatchLimit(ctx context.Context, offRamps []ccipdata
 			if err != nil {
 				return fmt.Errorf("get dest bridgeable tokens: %w", err)
 			}
+
+			offRampAddr, err := offRamp.Address(ctx)
+			if err != nil {
+				return fmt.Errorf("get offramp address: %w", err)
+			}
+
 			mu.Lock()
-			destBridgeableTokens = append(destBridgeableTokens, tokens.DestinationTokens...)
+			tokensPerOffRamp[offRampAddr] = tokens.DestinationTokens
 			mu.Unlock()
 			return nil
 		})
 	}
 
 	if err := eg.Wait(); err != nil {
-		return nil, err
+		return nil, nil, err
+	}
+
+	return feeTokens, tokensPerOffRamp, nil
+}
+
+func AggregateChainTokens(feeTokens []cciptypes.Address, tokensPerOffRamp map[cciptypes.Address][]cciptypes.Address) []cciptypes.Address {
+	var destBridgeableTokens []cciptypes.Address
+	for _, tokens := range tokensPerOffRamp {
+		destBridgeableTokens = append(destBridgeableTokens, tokens...)
 	}
 
 	// same token can be returned by multiple offRamps, and fee token can overlap with bridgeable tokens,
 	// we need to dedup them to arrive at chain token set
-	chainTokens = FlattenUniqueSlice(destFeeTokens, destBridgeableTokens)
+	chainTokens := FlattenUniqueSlice(feeTokens, destBridgeableTokens)
 
 	// return the tokens in deterministic order to aid with testing and debugging
 	sort.Slice(chainTokens, func(i, j int) bool {
 		return chainTokens[i] < chainTokens[j]
 	})
 
-	return chainTokens, nil
+	return chainTokens
+}
+
+// DedupTokensPerOffRamp dedups tokens in the provided tokensPerOffRamp, and returns it.
+// If a token exists in leader Offramp, it will be removed from the other OffRamps.
+// If a token exists in multiple non-leader OffRamps, it will be removed from all but one of the OffRamps, no ordering is guaranteed.
+func DedupTokensPerOffRamp(leaderOffRampAddr cciptypes.Address, tokensPerOffRamp map[cciptypes.Address][]cciptypes.Address) map[cciptypes.Address][]cciptypes.Address {
+	tokenExists := make(map[cciptypes.Address]bool)
+	for _, tokens := range tokensPerOffRamp[leaderOffRampAddr] {
+		tokenExists[tokens] = true
+	}
+
+	// dedup leader lane tokens
+	tokensPerOffRamp[leaderOffRampAddr] = FlattenUniqueSlice(tokensPerOffRamp[leaderOffRampAddr])
+
+	// dedup non-leader lane tokens
+	for offRampAddr, laneTokens := range tokensPerOffRamp {
+		var dedupedTokens []cciptypes.Address
+		for _, token := range laneTokens {
+			if !tokenExists[token] {
+				dedupedTokens = append(dedupedTokens, token)
+				tokenExists[token] = true
+			}
+		}
+		if len(dedupedTokens) == 0 {
+			delete(tokensPerOffRamp, offRampAddr)
+		} else {
+			tokensPerOffRamp[offRampAddr] = dedupedTokens
+		}
+	}
+
+	return tokensPerOffRamp
 }
 
 // GetDestinationTokens returns the destination chain fee tokens from the provided price registry
