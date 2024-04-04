@@ -503,7 +503,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
     IPool.SourceTokenData[] memory sourceTokenData,
     bytes[] memory offchainTokenData
   ) internal returns (Client.EVMTokenAmount[] memory) {
-    Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](sourceTokenAmounts.length);
+    Client.EVMTokenAmount[] memory destTokenAmounts = sourceTokenAmounts;
     for (uint256 i = 0; i < sourceTokenAmounts.length; ++i) {
       // We need to safely decode the pool address from the sourceTokenData, as it could be wrong,
       // in which case it doesn't have to be a valid EVM address.
@@ -515,8 +515,6 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
         revert InvalidAddress(sourceTokenData[i].destPoolAddress);
       }
 
-      uint256 amount = sourceTokenAmounts[i].amount;
-
       // Call the pool with exact gas to increase resistance against malicious tokens or token pools.
       // _callWithExactGas also protects against return data bombs by capping the return data size
       // at MAX_RET_BYTES.
@@ -525,7 +523,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
           IPool.releaseOrMint.selector,
           originalSender,
           receiver,
-          amount,
+          sourceTokenAmounts[i].amount,
           i_sourceChainSelector,
           sourceTokenData[i],
           offchainTokenData[i]
@@ -541,7 +539,6 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
 
       // If the call was successful, the returnData should be the local token address.
       destTokenAmounts[i].token = _validateEVMAddress(returnData);
-      destTokenAmounts[i].amount = amount;
     }
     _rateLimitValue(destTokenAmounts, IPriceRegistry(s_dynamicConfig.priceRegistry));
     return destTokenAmounts;
