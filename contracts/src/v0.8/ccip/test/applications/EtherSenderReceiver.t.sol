@@ -4,10 +4,11 @@ pragma solidity ^0.8.0;
 import {Test} from "forge-std/Test.sol";
 
 import {CCIPRouter} from "../../applications/EtherSenderReceiver.sol";
-import {EtherSenderReceiverHelper} from "./../helpers/EtherSenderReceiverHelper.sol";
-import {Client} from "../../libraries/Client.sol";
+
 import {IRouterClient} from "../../interfaces/IRouterClient.sol";
+import {Client} from "../../libraries/Client.sol";
 import {WETH9} from "../WETH9.sol";
+import {EtherSenderReceiverHelper} from "./../helpers/EtherSenderReceiverHelper.sol";
 
 import {ERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/ERC20.sol";
 
@@ -378,9 +379,7 @@ contract EtherSenderReceiverTest_ccipReceive is EtherSenderReceiverTest {
       destTokenAmounts: destTokenAmounts
     });
 
-    vm.expectRevert(
-      abi.encodeWithSelector(InvalidTokenAmounts.selector, uint256(2))
-    );
+    vm.expectRevert(abi.encodeWithSelector(InvalidTokenAmounts.selector, uint256(2)));
     s_etherSenderReceiver.publicCcipReceive(message);
   }
 
@@ -395,9 +394,7 @@ contract EtherSenderReceiverTest_ccipReceive is EtherSenderReceiverTest {
       destTokenAmounts: destTokenAmounts
     });
 
-    vm.expectRevert(
-      abi.encodeWithSelector(InvalidToken.selector, address(s_someOtherWeth), address(s_weth))
-    );
+    vm.expectRevert(abi.encodeWithSelector(InvalidToken.selector, address(s_someOtherWeth), address(s_weth)));
     s_etherSenderReceiver.publicCcipReceive(message);
   }
 }
@@ -447,10 +444,8 @@ contract EtherSenderReceiverTest_ccipSend is EtherSenderReceiverTest {
         abi.encode(expectedMsgId)
       );
 
-      bytes32 actualMsgId = s_etherSenderReceiver.ccipSend{value: amount + feeSupplied}(
-        destinationChainSelector,
-        message
-      );
+      bytes32 actualMsgId =
+        s_etherSenderReceiver.ccipSend{value: amount + feeSupplied}(destinationChainSelector, message);
       assertEq(actualMsgId, expectedMsgId, "message id must be correct");
     }
   }

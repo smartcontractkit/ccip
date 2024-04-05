@@ -2,11 +2,12 @@
 pragma solidity 0.8.19;
 
 import {ITypeAndVersion} from "../../shared/interfaces/ITypeAndVersion.sol";
-import {IWrappedNative} from "../interfaces/IWrappedNative.sol";
-import {IRouterClient} from "../interfaces/IRouterClient.sol";
 
-import {CCIPReceiver} from "./CCIPReceiver.sol";
+import {IRouterClient} from "../interfaces/IRouterClient.sol";
+import {IWrappedNative} from "../interfaces/IWrappedNative.sol";
+
 import {Client} from "./../libraries/Client.sol";
+import {CCIPReceiver} from "./CCIPReceiver.sol";
 
 import {IERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -116,9 +117,11 @@ contract EtherSenderReceiver is CCIPReceiver, ITypeAndVersion {
   /// @notice Validate the message content.
   /// @dev Only allows a single token to be sent. Always overwritten to be address(i_weth)
   /// and receiver is always msg.sender.
-  function _validatedMessage(
-    Client.EVM2AnyMessage calldata message
-  ) internal view returns (Client.EVM2AnyMessage memory) {
+  function _validatedMessage(Client.EVM2AnyMessage calldata message)
+    internal
+    view
+    returns (Client.EVM2AnyMessage memory)
+  {
     Client.EVM2AnyMessage memory validatedMessage = message;
 
     if (validatedMessage.tokenAmounts.length != 1) {
@@ -163,7 +166,7 @@ contract EtherSenderReceiver is CCIPReceiver, ITypeAndVersion {
 
     // it is possible that the below call may fail if receiver.code.length > 0 and the contract
     // doesn't e.g have a receive() or a fallback() function.
-    (bool success, ) = payable(receiver).call{value: tokenAmount}("");
+    (bool success,) = payable(receiver).call{value: tokenAmount}("");
     if (!success) {
       // We have a few options here:
       // 1. Revert: this is bad generally because it may mean that these tokens are stuck.
