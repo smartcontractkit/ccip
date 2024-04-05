@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 
 	"github.com/VictoriaMetrics/fastcache"
+	"github.com/rs/zerolog/log"
 	"go.uber.org/atomic"
 )
 
@@ -67,10 +68,11 @@ func (c *Cache) Load(key []byte, value any) (bool, error) {
 			filePath := fmt.Sprintf("%s_%d", c.filePath, i)
 			c1, err := fastcache.LoadFromFile(filePath)
 			if err != nil {
-				return false, fmt.Errorf("error %w loading cache from file %s", err, filePath)
+				return false, fmt.Errorf("error %w loading cache from back up file %s", err, filePath)
 			}
 			dstBytes, exists = c1.HasGet(dstBytes, key)
 			if exists {
+				log.Info().Msgf("found key in back up %s", filePath)
 				break
 			}
 		}
