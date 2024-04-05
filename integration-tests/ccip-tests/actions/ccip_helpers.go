@@ -1565,7 +1565,7 @@ func DefaultSourceCCIPModule(
 		DestChainSelector:        destChainSelector,
 		DestNetworkName:          destChain,
 		Sender:                   common.HexToAddress(chainClient.GetDefaultWallet().Address()),
-		CCIPSendRequestedWatcher: testutils.NewCache(1, fmt.Sprintf("CCIPSendRequested_%s_%d", chainClient.GetChainID().String(), uuid.NewString()[0:5])),
+		CCIPSendRequestedWatcher: testutils.NewCache(1, fmt.Sprintf("CCIPSendRequested_%s_%s", chainClient.GetChainID().String(), uuid.NewString()[0:5])),
 	}
 
 	return source, nil
@@ -2205,8 +2205,8 @@ func DefaultDestinationCCIPModule(
 		NextSeqNumToCommit:      atomic.NewUint64(1),
 		ReportBlessedWatcher:    &sync.Map{},
 		ReportBlessedBySeqNum:   &sync.Map{},
-		ExecStateChangedWatcher: testutils.NewCache(1, fmt.Sprintf("ExecStateChanged_%s_%d", chainClient.GetChainID().String(), uuid.NewString()[0:5])),
-		ReportAcceptedWatcher:   testutils.NewCache(1, fmt.Sprintf("ReportAccepted_%s_%d", chainClient.GetChainID().String(), uuid.NewString()[0:5])),
+		ExecStateChangedWatcher: testutils.NewCache(1, fmt.Sprintf("ExecStateChanged_%s_%s", chainClient.GetChainID().String(), uuid.NewString()[0:5])),
+		ReportAcceptedWatcher:   testutils.NewCache(1, fmt.Sprintf("ReportAccepted_%s_%s", chainClient.GetChainID().String(), uuid.NewString()[0:5])),
 	}, nil
 }
 
