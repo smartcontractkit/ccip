@@ -2,7 +2,7 @@
 "ccip": patch
 ---
 
-Implementing batched blessing checks.
+Implementing batched blessing checks (performance optimization).
 
 Exec plugin has a new field, a cache that expires every 4 hours.
 On each round we make a batch call to the commit store for all the commit roots that are not present in the cache.
