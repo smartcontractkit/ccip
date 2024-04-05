@@ -95,12 +95,12 @@ contract EtherSenderReceiver is CCIPReceiver, ITypeAndVersion {
 
     uint256 fee = IRouterClient(getRouter()).getFee(destinationChainSelector, validatedMessage);
     if (validatedMessage.feeToken != address(0)) {
-      // if the fee token is not native, we need to transfer the fee to this contract and re-approve it to the router.
-      // its not possible to have any leftover tokens in this path because we transferFrom the exact fee that CCIP
+      // If the fee token is not native, we need to transfer the fee to this contract and re-approve it to the router.
+      // Its not possible to have any leftover tokens in this path because we transferFrom the exact fee that CCIP
       // requires from the caller.
       IERC20(validatedMessage.feeToken).safeTransferFrom(msg.sender, address(this), fee);
 
-      // we gave an infinite approval of weth to the router in the constructor.
+      // We gave an infinite approval of weth to the router in the constructor.
       if (validatedMessage.feeToken != address(i_weth)) {
         IERC20(validatedMessage.feeToken).approve(getRouter(), fee);
       }
@@ -108,13 +108,9 @@ contract EtherSenderReceiver is CCIPReceiver, ITypeAndVersion {
       return IRouterClient(getRouter()).ccipSend(destinationChainSelector, validatedMessage);
     }
 
-    // We don't want to keep any excess ether in this contract, so we send over the entire diff as the fee.
-    // Its possible that msg.value < tokenAmounts[0].amount, in which case there will be a revert because
-    // of SafeMath. This makes sense because there's not enough for the fees anyway.
-    uint256 diff = msg.value - validatedMessage.tokenAmounts[0].amount;
-
-    // ccip will revert if the fee is insufficient, so we don't need to check here.
-    return IRouterClient(getRouter()).ccipSend{value: diff}(destinationChainSelector, validatedMessage);
+    // We don't want to keep any excess ether in this contract, so we send over the entire address(this).balance as the fee.
+    // CCIP will revert if the fee is insufficient, so we don't need to check here.
+    return IRouterClient(getRouter()).ccipSend{value: address(this).balance}(destinationChainSelector, validatedMessage);
   }
 
   /// @notice Validate the message content.
