@@ -74,36 +74,6 @@ func (_m *EVM2EVMOffRampInterface) Address() common.Address {
 	return r0
 }
 
-// ApplyPoolUpdates provides a mock function with given fields: opts, removes, adds
-func (_m *EVM2EVMOffRampInterface) ApplyPoolUpdates(opts *bind.TransactOpts, removes []evm_2_evm_offramp.InternalPoolUpdate, adds []evm_2_evm_offramp.InternalPoolUpdate) (*types.Transaction, error) {
-	ret := _m.Called(opts, removes, adds)
-
-	if len(ret) == 0 {
-		panic("no return value specified for ApplyPoolUpdates")
-	}
-
-	var r0 *types.Transaction
-	var r1 error
-	if rf, ok := ret.Get(0).(func(*bind.TransactOpts, []evm_2_evm_offramp.InternalPoolUpdate, []evm_2_evm_offramp.InternalPoolUpdate) (*types.Transaction, error)); ok {
-		return rf(opts, removes, adds)
-	}
-	if rf, ok := ret.Get(0).(func(*bind.TransactOpts, []evm_2_evm_offramp.InternalPoolUpdate, []evm_2_evm_offramp.InternalPoolUpdate) *types.Transaction); ok {
-		r0 = rf(opts, removes, adds)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*types.Transaction)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(*bind.TransactOpts, []evm_2_evm_offramp.InternalPoolUpdate, []evm_2_evm_offramp.InternalPoolUpdate) error); ok {
-		r1 = rf(opts, removes, adds)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
 // CcipReceive provides a mock function with given fields: opts, arg0
 func (_m *EVM2EVMOffRampInterface) CcipReceive(opts *bind.CallOpts, arg0 evm_2_evm_offramp.ClientAny2EVMMessage) error {
 	ret := _m.Called(opts, arg0)
@@ -510,66 +480,6 @@ func (_m *EVM2EVMOffRampInterface) FilterTransmitted(opts *bind.FilterOpts) (*ev
 	return r0, r1
 }
 
-// GetDestinationToken provides a mock function with given fields: opts, sourceToken
-func (_m *EVM2EVMOffRampInterface) GetDestinationToken(opts *bind.CallOpts, sourceToken common.Address) (common.Address, error) {
-	ret := _m.Called(opts, sourceToken)
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetDestinationToken")
-	}
-
-	var r0 common.Address
-	var r1 error
-	if rf, ok := ret.Get(0).(func(*bind.CallOpts, common.Address) (common.Address, error)); ok {
-		return rf(opts, sourceToken)
-	}
-	if rf, ok := ret.Get(0).(func(*bind.CallOpts, common.Address) common.Address); ok {
-		r0 = rf(opts, sourceToken)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(common.Address)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(*bind.CallOpts, common.Address) error); ok {
-		r1 = rf(opts, sourceToken)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// GetDestinationTokens provides a mock function with given fields: opts
-func (_m *EVM2EVMOffRampInterface) GetDestinationTokens(opts *bind.CallOpts) ([]common.Address, error) {
-	ret := _m.Called(opts)
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetDestinationTokens")
-	}
-
-	var r0 []common.Address
-	var r1 error
-	if rf, ok := ret.Get(0).(func(*bind.CallOpts) ([]common.Address, error)); ok {
-		return rf(opts)
-	}
-	if rf, ok := ret.Get(0).(func(*bind.CallOpts) []common.Address); ok {
-		r0 = rf(opts)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]common.Address)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(*bind.CallOpts) error); ok {
-		r1 = rf(opts)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
 // GetDynamicConfig provides a mock function with given fields: opts
 func (_m *EVM2EVMOffRampInterface) GetDynamicConfig(opts *bind.CallOpts) (evm_2_evm_offramp.EVM2EVMOffRampDynamicConfig, error) {
 	ret := _m.Called(opts)
@@ -626,66 +536,6 @@ func (_m *EVM2EVMOffRampInterface) GetExecutionState(opts *bind.CallOpts, sequen
 	return r0, r1
 }
 
-// GetPoolByDestToken provides a mock function with given fields: opts, destToken
-func (_m *EVM2EVMOffRampInterface) GetPoolByDestToken(opts *bind.CallOpts, destToken common.Address) (common.Address, error) {
-	ret := _m.Called(opts, destToken)
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetPoolByDestToken")
-	}
-
-	var r0 common.Address
-	var r1 error
-	if rf, ok := ret.Get(0).(func(*bind.CallOpts, common.Address) (common.Address, error)); ok {
-		return rf(opts, destToken)
-	}
-	if rf, ok := ret.Get(0).(func(*bind.CallOpts, common.Address) common.Address); ok {
-		r0 = rf(opts, destToken)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(common.Address)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(*bind.CallOpts, common.Address) error); ok {
-		r1 = rf(opts, destToken)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// GetPoolBySourceToken provides a mock function with given fields: opts, sourceToken
-func (_m *EVM2EVMOffRampInterface) GetPoolBySourceToken(opts *bind.CallOpts, sourceToken common.Address) (common.Address, error) {
-	ret := _m.Called(opts, sourceToken)
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetPoolBySourceToken")
-	}
-
-	var r0 common.Address
-	var r1 error
-	if rf, ok := ret.Get(0).(func(*bind.CallOpts, common.Address) (common.Address, error)); ok {
-		return rf(opts, sourceToken)
-	}
-	if rf, ok := ret.Get(0).(func(*bind.CallOpts, common.Address) common.Address); ok {
-		r0 = rf(opts, sourceToken)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(common.Address)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(*bind.CallOpts, common.Address) error); ok {
-		r1 = rf(opts, sourceToken)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
 // GetSenderNonce provides a mock function with given fields: opts, sender
 func (_m *EVM2EVMOffRampInterface) GetSenderNonce(opts *bind.CallOpts, sender common.Address) (uint64, error) {
 	ret := _m.Called(opts, sender)
@@ -731,36 +581,6 @@ func (_m *EVM2EVMOffRampInterface) GetStaticConfig(opts *bind.CallOpts) (evm_2_e
 		r0 = rf(opts)
 	} else {
 		r0 = ret.Get(0).(evm_2_evm_offramp.EVM2EVMOffRampStaticConfig)
-	}
-
-	if rf, ok := ret.Get(1).(func(*bind.CallOpts) error); ok {
-		r1 = rf(opts)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// GetSupportedTokens provides a mock function with given fields: opts
-func (_m *EVM2EVMOffRampInterface) GetSupportedTokens(opts *bind.CallOpts) ([]common.Address, error) {
-	ret := _m.Called(opts)
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetSupportedTokens")
-	}
-
-	var r0 []common.Address
-	var r1 error
-	if rf, ok := ret.Get(0).(func(*bind.CallOpts) ([]common.Address, error)); ok {
-		return rf(opts)
-	}
-	if rf, ok := ret.Get(0).(func(*bind.CallOpts) []common.Address); ok {
-		r0 = rf(opts)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]common.Address)
-		}
 	}
 
 	if rf, ok := ret.Get(1).(func(*bind.CallOpts) error); ok {
