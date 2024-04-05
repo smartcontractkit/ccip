@@ -412,9 +412,7 @@ contract EtherSenderReceiverTest_ccipSend is EtherSenderReceiverTest {
 
   function testFuzz_ccipSend(uint256 feeFromRouter, uint256 feeSupplied) public {
     // cap the fuzzer because OWNER only has a million ether.
-    if (feeSupplied > 1_000_000 ether) {
-      return;
-    }
+    vm.assume(feeSupplied < 1_000_000 ether - amount);
 
     Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
     tokenAmounts[0] = Client.EVMTokenAmount({
@@ -459,9 +457,7 @@ contract EtherSenderReceiverTest_ccipSend is EtherSenderReceiverTest {
 
   function testFuzz_ccipSend_feeToken(uint256 feeFromRouter, uint256 feeSupplied) public {
     // cap the fuzzer because OWNER only has a million LINK.
-    if (feeSupplied > 1_000_000 ether) {
-      return;
-    }
+    vm.assume(feeSupplied < 1_000_000 ether - amount);
 
     Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
     tokenAmounts[0] = Client.EVMTokenAmount({
