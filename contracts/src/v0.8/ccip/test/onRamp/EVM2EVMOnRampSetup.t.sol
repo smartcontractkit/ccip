@@ -191,14 +191,14 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
     for (uint256 i = 4; i < message.extraArgs.length; ++i) {
       args[i - 4] = message.extraArgs[i];
     }
-    Client.EVMExtraArgsV1 memory extraArgs = abi.decode(args, (Client.EVMExtraArgsV1));
+    Client.EVMExtraArgsV2 memory extraArgs = _extraArgsFromBytes(bytes4(message.extraArgs), args);
     Internal.EVM2EVMMessage memory messageEvent = Internal.EVM2EVMMessage({
       sequenceNumber: seqNum,
       feeTokenAmount: feeTokenAmount,
       sender: originalSender,
       nonce: nonce,
       gasLimit: extraArgs.gasLimit,
-      strict: false,
+      strict: extraArgs.sequenced,
       sourceChainSelector: SOURCE_CHAIN_SELECTOR,
       receiver: abi.decode(message.receiver, (address)),
       data: message.data,
@@ -210,5 +210,16 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
 
     messageEvent.messageId = Internal._hash(messageEvent, s_metadataHash);
     return messageEvent;
+  }
+
+  function _extraArgsFromBytes(bytes4 sig, bytes memory extraArgData) public pure returns (Client.EVMExtraArgsV2 memory) {
+    if (sig == Client.EVM_EXTRA_ARGS_V1_TAG) {
+      Client.EVMExtraArgsV1 memory extraArgsV1 = abi.decode(extraArgData, (Client.EVMExtraArgsV1));
+      return Client.EVMExtraArgsV2({gasLimit: extraArgsV1.gasLimit, sequenced: true});
+    } else if (sig == Client.EVM_EXTRA_ARGS_V2_TAG) {
+      return abi.decode(extraArgData, (Client.EVMExtraArgsV2));
+    } else {
+      revert("Invalid extraArgs tag");
+    }
   }
 }
