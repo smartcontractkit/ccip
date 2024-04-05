@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.19;
 
+import {Pool} from "../../libraries/Pool.sol";
 import "../../pools/TokenPool.sol";
 
 contract TokenPoolHelper is TokenPool {
@@ -19,11 +20,11 @@ contract TokenPoolHelper is TokenPool {
     address,
     bytes calldata,
     uint256 amount,
-    uint64,
+    uint64 remoteChainSelector,
     bytes calldata
-  ) external override returns (bytes memory, bytes memory) {
+  ) external override returns (bytes memory) {
     emit LockOrBurn(amount);
-    return ("", "");
+    return Pool._generatePoolReturnDataV1(getRemotePool(remoteChainSelector), "");
   }
 
   function releaseOrMint(

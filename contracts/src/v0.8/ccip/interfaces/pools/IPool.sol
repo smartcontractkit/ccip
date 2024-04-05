@@ -19,15 +19,15 @@ interface IPool {
   /// @param remoteChainSelector Destination chain Id.
   /// @param extraArgs Additional data passed in by sender for lockOrBurn processing
   /// in custom pools on source chain.
-  /// @return destPoolAddress The address of the destination pool, abi encoded.
-  /// @return extraData Additional data to be passed to the destination pool.
+  /// @return poolReturnData Versioned, encoded data fields for the processing of tokens
+  /// on the destination chain.
   function lockOrBurn(
     address originalSender,
     bytes calldata receiver,
     uint256 amount,
     uint64 remoteChainSelector,
     bytes calldata extraArgs
-  ) external returns (bytes memory destPoolAddress, bytes memory extraData);
+  ) external returns (bytes memory poolReturnData);
 
   /// @notice Releases or mints tokens to the receiver address.
   /// @param originalSender Original sender of the tokens.

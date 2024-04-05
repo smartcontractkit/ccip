@@ -13,6 +13,7 @@ import {IPool} from "../interfaces/pools/IPool.sol";
 import {AggregateRateLimiter} from "../AggregateRateLimiter.sol";
 import {Client} from "../libraries/Client.sol";
 import {Internal} from "../libraries/Internal.sol";
+import {Pool} from "../libraries/Pool.sol";
 import {RateLimiter} from "../libraries/RateLimiter.sol";
 import {USDPriceWith18Decimals} from "../libraries/USDPriceWith18Decimals.sol";
 
@@ -317,7 +318,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     for (uint256 i = 0; i < numberOfTokens; ++i) {
       Client.EVMTokenAmount memory tokenAndAmount = message.tokenAmounts[i];
       IPool sourcePool = getPoolBySourceToken(destChainSelector, IERC20(tokenAndAmount.token));
-      (bytes memory destPoolAddress, bytes memory extraData) = sourcePool.lockOrBurn(
+      bytes memory encodedReturnData = sourcePool.lockOrBurn(
         originalSender,
         message.receiver,
         tokenAndAmount.amount,
@@ -325,21 +326,25 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
         bytes("") // any future extraArgs component would be added here
       );
 
+      //      bytes4 tag = bytes4(encodedReturnData);
+      //      if (tag != Pool.POOL_RETURN_DATA_V1_TAG) revert InvalidTokenPoolConfig();
+
+      Pool.PoolReturnDataV1 memory poolReturnData = abi.decode(encodedReturnData, (Pool.PoolReturnDataV1));
       // Since the DON has to pay for the extraData to be included on the destination chain, we cap the length of the extraData.
       // This prevents gas bomb attacks on the NOPs. We use destBytesOverhead as a proxy to cap the number of bytes we accept.
       // As destBytesOverhead accounts for extraData + offchainData, this caps the worst case abuse to the number of bytes reserved for offchainData.
       // It therefore fully mitigates gas bombs for most tokens, as most tokens don't use offchainData.
-      if (extraData.length > s_tokenTransferFeeConfig[tokenAndAmount.token].destBytesOverhead) {
+      if (poolReturnData.destPoolData.length > s_tokenTransferFeeConfig[tokenAndAmount.token].destBytesOverhead) {
         revert SourceTokenDataTooLarge(tokenAndAmount.token);
       }
       // Since this is an EVM2EVM message, the pool address should be exactly 32 bytes
-      if (destPoolAddress.length != 32) revert InvalidAddress(destPoolAddress);
+      if (poolReturnData.destPoolAddress.length != 32) revert InvalidAddress(poolReturnData.destPoolAddress);
 
       newMessage.sourceTokenData[i] = abi.encode(
         IPool.SourceTokenData({
           sourcePoolAddress: abi.encode(sourcePool),
-          destPoolAddress: destPoolAddress,
-          extraData: extraData
+          destPoolAddress: poolReturnData.destPoolAddress,
+          extraData: poolReturnData.destPoolData
         })
       );
     }

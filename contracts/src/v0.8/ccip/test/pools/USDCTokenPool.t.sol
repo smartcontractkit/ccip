@@ -7,6 +7,7 @@ import {IPool} from "../../interfaces/pools/IPool.sol";
 import {BurnMintERC677} from "../../../shared/token/ERC677/BurnMintERC677.sol";
 import {Router} from "../../Router.sol";
 import {Internal} from "../../libraries/Internal.sol";
+import {Pool} from "../../libraries/Pool.sol";
 import {RateLimiter} from "../../libraries/RateLimiter.sol";
 import {TokenPool} from "../../pools/TokenPool.sol";
 import {USDCTokenPool} from "../../pools/USDC/USDCTokenPool.sol";
@@ -167,10 +168,11 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
     vm.expectEmit();
     emit Burned(s_routerAllowedOnRamp, amount);
 
-    (, bytes memory encodedTokenDataPayload) =
+    bytes memory poolReturnData =
       s_usdcTokenPool.lockOrBurn(OWNER, abi.encodePacked(receiver), amount, DEST_CHAIN_SELECTOR, bytes(""));
+    Pool.PoolReturnDataV1 memory poolReturnDataV1 = abi.decode(poolReturnData, (Pool.PoolReturnDataV1));
 
-    uint64 nonce = abi.decode(encodedTokenDataPayload, (uint64));
+    uint64 nonce = abi.decode(poolReturnDataV1.destPoolData, (uint64));
     assertEq(s_mockUSDC.s_nonce() - 1, nonce);
   }
 
@@ -200,12 +202,13 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
     vm.expectEmit();
     emit Burned(s_routerAllowedOnRamp, amount);
 
-    (bytes memory destChainAddress, bytes memory encodedTokenDataPayload) =
+    bytes memory poolReturnData =
       s_usdcTokenPool.lockOrBurn(OWNER, abi.encodePacked(destinationReceiver), amount, DEST_CHAIN_SELECTOR, bytes(""));
+    Pool.PoolReturnDataV1 memory poolReturnDataV1 = abi.decode(poolReturnData, (Pool.PoolReturnDataV1));
 
-    uint64 nonce = abi.decode(encodedTokenDataPayload, (uint64));
+    uint64 nonce = abi.decode(poolReturnDataV1.destPoolData, (uint64));
     assertEq(s_mockUSDC.s_nonce() - 1, nonce);
-    assertEq(destChainAddress, abi.encode(DEST_CHAIN_USDC_POOL));
+    assertEq(poolReturnDataV1.destPoolAddress, abi.encode(DEST_CHAIN_USDC_POOL));
   }
 
   function testFuzz_LockOrBurnWithAllowListSuccess(bytes32 destinationReceiver, uint256 amount) public {
@@ -232,12 +235,13 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
     vm.expectEmit();
     emit Burned(s_routerAllowedOnRamp, amount);
 
-    (bytes memory destChainAddress, bytes memory encodedTokenDataPayload) = s_usdcTokenPoolWithAllowList.lockOrBurn(
+    (bytes memory poolReturnData) = s_usdcTokenPoolWithAllowList.lockOrBurn(
       s_allowedList[0], abi.encodePacked(destinationReceiver), amount, DEST_CHAIN_SELECTOR, bytes("")
     );
-    uint64 nonce = abi.decode(encodedTokenDataPayload, (uint64));
+    Pool.PoolReturnDataV1 memory poolReturnDataV1 = abi.decode(poolReturnData, (Pool.PoolReturnDataV1));
+    uint64 nonce = abi.decode(poolReturnDataV1.destPoolData, (uint64));
     assertEq(s_mockUSDC.s_nonce() - 1, nonce);
-    assertEq(destChainAddress, abi.encode(DEST_CHAIN_USDC_POOL));
+    assertEq(poolReturnDataV1.destPoolAddress, abi.encode(DEST_CHAIN_USDC_POOL));
   }
 
   // Reverts

@@ -332,6 +332,10 @@ contract Router_ccipSend is EVM2EVMOnRampSetup {
     for (uint256 i = 0; i < s_sourceTokens.length; ++i) {
       vm.assume(address(s_sourceTokens[i]) != wrongToken);
     }
+
+    for (uint256 i = 0; i < s_destTokens.length; ++i) {
+      vm.assume(address(s_destTokens[i]) != wrongToken);
+    }
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
     Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
     tokenAmounts[0] = Client.EVMTokenAmount({token: wrongToken, amount: 1});

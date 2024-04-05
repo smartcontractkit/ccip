@@ -5,6 +5,7 @@ import {ILiquidityContainer} from "../../rebalancer/interfaces/ILiquidityContain
 import {ITypeAndVersion} from "../../shared/interfaces/ITypeAndVersion.sol";
 import {IPool} from "../interfaces/pools/IPool.sol";
 
+import {Pool} from "../libraries/Pool.sol";
 import {RateLimiter} from "../libraries/RateLimiter.sol";
 import {TokenPool} from "./TokenPool.sol";
 
@@ -65,11 +66,11 @@ contract LockReleaseTokenPool is TokenPool, ILiquidityContainer, ITypeAndVersion
     onlyOnRamp(remoteChainSelector)
     checkAllowList(originalSender)
     whenHealthy
-    returns (bytes memory, bytes memory)
+    returns (bytes memory)
   {
     _consumeOutboundRateLimit(remoteChainSelector, amount);
     emit Locked(msg.sender, amount);
-    return (getRemotePool(remoteChainSelector), "");
+    return Pool._generatePoolReturnDataV1(getRemotePool(remoteChainSelector), "");
   }
 
   /// @notice Release tokens from the pool to the recipient

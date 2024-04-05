@@ -3,6 +3,7 @@ pragma solidity 0.8.19;
 
 import {IPool} from "../../../interfaces/pools/IPool.sol";
 
+import {Pool} from "../../../libraries/Pool.sol";
 import {RateLimiter} from "../../../libraries/RateLimiter.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
 import {FacadeClient} from "./FacadeClient.sol";
@@ -30,16 +31,16 @@ contract ReentrantMaliciousTokenPool is TokenPool {
     uint256 amount,
     uint64 remoteChainSelector,
     bytes calldata
-  ) external override returns (bytes memory, bytes memory) {
+  ) external override returns (bytes memory) {
     if (s_attacked) {
-      return (getRemotePool(remoteChainSelector), bytes(""));
+      return Pool._generatePoolReturnDataV1(getRemotePool(remoteChainSelector), "");
     }
 
     s_attacked = true;
 
     FacadeClient(i_facade).send(amount);
     emit Burned(msg.sender, amount);
-    return (getRemotePool(remoteChainSelector), bytes(""));
+    return Pool._generatePoolReturnDataV1(getRemotePool(remoteChainSelector), "");
   }
 
   function releaseOrMint(

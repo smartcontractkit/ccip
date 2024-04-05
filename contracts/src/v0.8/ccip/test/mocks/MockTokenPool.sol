@@ -18,8 +18,8 @@ contract MockTokenPool is IPool {
     uint256,
     uint64,
     bytes calldata
-  ) external pure override returns (bytes memory, bytes memory) {
-    return ("", "");
+  ) external pure override returns (bytes memory) {
+    return bytes("");
   }
 
   function releaseOrMint(

@@ -4,6 +4,7 @@ pragma solidity 0.8.19;
 import {IBurnMintERC20} from "../../shared/token/ERC20/IBurnMintERC20.sol";
 import {IPool} from "../interfaces/pools/IPool.sol";
 
+import {Pool} from "../libraries/Pool.sol";
 import {TokenPool} from "./TokenPool.sol";
 
 abstract contract BurnMintTokenPoolAbstract is TokenPool {
@@ -29,12 +30,12 @@ abstract contract BurnMintTokenPoolAbstract is TokenPool {
     onlyOnRamp(remoteChainSelector)
     checkAllowList(originalSender)
     whenHealthy
-    returns (bytes memory, bytes memory)
+    returns (bytes memory)
   {
     _consumeOutboundRateLimit(remoteChainSelector, amount);
     _burn(amount);
     emit Burned(msg.sender, amount);
-    return (getRemotePool(remoteChainSelector), "");
+    return Pool._generatePoolReturnDataV1(getRemotePool(remoteChainSelector), "");
   }
 
   /// @notice Mint tokens from the pool to the recipient

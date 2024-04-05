@@ -6,6 +6,7 @@ import {IPool} from "../../interfaces/pools/IPool.sol";
 import {IMessageTransmitter} from "./IMessageTransmitter.sol";
 import {ITokenMessenger} from "./ITokenMessenger.sol";
 
+import {Pool} from "../../libraries/Pool.sol";
 import {TokenPool} from "../TokenPool.sol";
 
 import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
@@ -118,13 +119,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
     uint256 amount,
     uint64 remoteChainSelector,
     bytes calldata
-  )
-    external
-    override
-    onlyOnRamp(remoteChainSelector)
-    checkAllowList(originalSender)
-    returns (bytes memory, bytes memory)
-  {
+  ) external override onlyOnRamp(remoteChainSelector) checkAllowList(originalSender) returns (bytes memory) {
     Domain memory domain = s_chainToDomain[remoteChainSelector];
     if (!domain.enabled) revert UnknownDomain(remoteChainSelector);
     _consumeOutboundRateLimit(remoteChainSelector, amount);
@@ -136,7 +131,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
       amount, domain.domainIdentifier, receiver, address(i_token), domain.allowedCaller
     );
     emit Burned(msg.sender, amount);
-    return (
+    return Pool._generatePoolReturnDataV1(
       getRemotePool(remoteChainSelector),
       abi.encode(SourceTokenDataPayload({nonce: nonce, sourceDomain: i_localDomainIdentifier}))
     );

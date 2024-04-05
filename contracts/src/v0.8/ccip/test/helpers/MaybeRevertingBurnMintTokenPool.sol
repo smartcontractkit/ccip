@@ -4,6 +4,7 @@ pragma solidity ^0.8.0;
 import {IBurnMintERC20} from "../../../shared/token/ERC20/IBurnMintERC20.sol";
 import {IPool} from "../../interfaces/pools/IPool.sol";
 
+import {Pool} from "../../libraries/Pool.sol";
 import {BurnMintTokenPool} from "../../pools/BurnMintTokenPool.sol";
 
 contract MaybeRevertingBurnMintTokenPool is BurnMintTokenPool {
@@ -38,7 +39,7 @@ contract MaybeRevertingBurnMintTokenPool is BurnMintTokenPool {
     onlyOnRamp(remoteChainSelector)
     checkAllowList(originalSender)
     whenHealthy
-    returns (bytes memory, bytes memory)
+    returns (bytes memory)
   {
     bytes memory revertReason = s_revertReason;
     if (revertReason.length != 0) {
@@ -49,7 +50,7 @@ contract MaybeRevertingBurnMintTokenPool is BurnMintTokenPool {
     _consumeOutboundRateLimit(remoteChainSelector, amount);
     IBurnMintERC20(address(i_token)).burn(amount);
     emit Burned(msg.sender, amount);
-    return (getRemotePool(remoteChainSelector), s_sourceTokenData);
+    return Pool._generatePoolReturnDataV1(getRemotePool(remoteChainSelector), s_sourceTokenData);
   }
 
   /// @notice Reverts depending on the value of `s_revertReason`
