@@ -99,11 +99,12 @@ func ChainlinkChart(
 		}
 	}
 	clProps["db"] = map[string]interface{}{
-		"resources":        SetResourceProfile(testInputs.EnvInput.NewCLCluster.DBCPU, testInputs.EnvInput.NewCLCluster.DBMemory),
-		"additionalArgs":   formattedArgs,
-		"stateful":         pointer.GetBool(testInputs.EnvInput.NewCLCluster.IsStateful),
-		"capacity":         testInputs.EnvInput.NewCLCluster.DBCapacity,
-		"storageClassName": "gp3",
+		"resources":                        SetResourceProfile(testInputs.EnvInput.NewCLCluster.DBCPU, testInputs.EnvInput.NewCLCluster.DBMemory),
+		"additionalArgs":                   formattedArgs,
+		"stateful":                         pointer.GetBool(testInputs.EnvInput.NewCLCluster.IsStateful),
+		"capacity":                         testInputs.EnvInput.NewCLCluster.DBCapacity,
+		"storageClassName":                 pointer.GetString(testInputs.EnvInput.NewCLCluster.DBStorageClass),
+		"enablePrometheusPostgresExporter": pointer.GetBool(testInputs.EnvInput.NewCLCluster.PromPgExporter),
 		"image": map[string]any{
 			"image":   testInputs.EnvInput.NewCLCluster.Common.DBImage,
 			"version": testInputs.EnvInput.NewCLCluster.Common.DBTag,
@@ -229,6 +230,10 @@ func DeployLocalCluster(
 		require.NoError(t, err, "Error getting rpc provider")
 		selectedNetworks[i].URLs = rpcProvider.PrivateWsUrsl()
 		selectedNetworks[i].HTTPURLs = rpcProvider.PrivateHttpUrls()
+		newNetwork := networkCfg
+		newNetwork.URLs = rpcProvider.PublicWsUrls()
+		newNetwork.HTTPURLs = rpcProvider.PublicHttpUrls()
+		env.EVMNetworks = append(env.EVMNetworks, &newNetwork)
 	}
 	testInputs.SelectedNetworks = selectedNetworks
 
