@@ -2,6 +2,7 @@ package actions
 
 import (
 	"context"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"math/big"
@@ -19,8 +20,10 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
+	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"github.com/smartcontractkit/chainlink-testing-framework/utils/ptr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
@@ -1073,7 +1076,8 @@ type SourceCCIPModule struct {
 	DestNetworkName            string
 	OnRamp                     *contracts.OnRamp
 	SrcStartBlock              uint64
-	CCIPSendRequestedWatcher   *sync.Map // map[string]*evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested
+	CCIPSendRequestedWatcher   *testutils.Cache // map[string]*evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested
+	LatestSendReqEvntBlockNum  uint64
 	NewFinalizedBlockNum       atomic.Uint64
 	NewFinalizedBlockTimestamp atomic.Time
 }
@@ -1363,21 +1367,17 @@ func (sourceCCIP *SourceCCIPModule) IsRequestTriggeredWithinTimeframe(timeframe 
 	}
 	var foundAt *time.Time
 	lastSeenTimestamp := time.Now().UTC().Add(-timeframe.Duration())
-	sourceCCIP.CCIPSendRequestedWatcher.Range(func(key, value any) bool {
-		if sendRequestedEvents, exists := value.([]*evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested); exists {
-			for _, sendRequestedEvent := range sendRequestedEvents {
-				raw := sendRequestedEvent.Raw
-				hdr, err := sourceCCIP.Common.ChainClient.HeaderByNumber(context.Background(), big.NewInt(int64(raw.BlockNumber)))
-				if err == nil {
-					if hdr.Timestamp.After(lastSeenTimestamp) {
-						foundAt = pointer.ToTime(hdr.Timestamp)
-						return false
-					}
-				}
+	latestEventBlock := sourceCCIP.LatestSendReqEvntBlockNum
+	if latestEventBlock > 0 {
+		hdr, err := sourceCCIP.Common.ChainClient.HeaderByNumber(context.Background(), big.NewInt(int64(latestEventBlock)))
+		if err == nil {
+			if hdr.Timestamp.After(lastSeenTimestamp) {
+				foundAt = pointer.ToTime(hdr.Timestamp)
+				return foundAt
 			}
 		}
-		return true
-	})
+	}
+
 	return foundAt
 }
 
@@ -1397,19 +1397,26 @@ func (sourceCCIP *SourceCCIPModule) AssertEventCCIPSendRequested(
 	for {
 		select {
 		case <-ticker.C:
-			value, ok := sourceCCIP.CCIPSendRequestedWatcher.Load(txHash)
+			var sendReqEvents []*evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested
+			ok, err := sourceCCIP.CCIPSendRequestedWatcher.Load(common.FromHex(txHash), &sendReqEvents)
+			if err != nil {
+				for _, stat := range reqStat {
+					stat.UpdateState(lggr, 0, testreporters.CCIPSendRe, time.Since(prevEventAt), testreporters.Failure)
+				}
+				return nil, time.Now(), fmt.Errorf("error %w in fetching CCIPSendRequested event for tx %s", err, txHash)
+			}
 			if ok {
 				// if sendrequested events are found, check if the number of events are same as the number of requests
-				if sendRequestedEvents, exists := value.([]*evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested); exists && len(sendRequestedEvents) == len(reqStat) {
+				if len(sendReqEvents) == len(reqStat) {
 					// if the value is processed, delete it from the map
-					sourceCCIP.CCIPSendRequestedWatcher.Delete(txHash)
-					for i, sendRequestedEvent := range sendRequestedEvents {
+					sourceCCIP.CCIPSendRequestedWatcher.Delete(common.FromHex(txHash))
+					for i, sendRequestedEvent := range sendReqEvents {
 						sentMsg := sendRequestedEvent.Message
 						seqNum := sentMsg.SequenceNumber
 						// prevEventAt is the time when the message was successful, this should be same as the time when the event was emitted
 						reqStat[i].UpdateState(lggr, seqNum, testreporters.CCIPSendRe, 0, testreporters.Success)
 					}
-					return sendRequestedEvents, prevEventAt, nil
+					return sendReqEvents, prevEventAt, nil
 				}
 			}
 		case <-timer.C:
@@ -1558,26 +1565,28 @@ func DefaultSourceCCIPModule(
 		DestChainSelector:        destChainSelector,
 		DestNetworkName:          destChain,
 		Sender:                   common.HexToAddress(chainClient.GetDefaultWallet().Address()),
-		CCIPSendRequestedWatcher: &sync.Map{},
+		CCIPSendRequestedWatcher: testutils.NewCache(1, fmt.Sprintf("CCIPSendRequested_%s_%d", chainClient.GetChainID().String(), uuid.NewString()[0:5])),
 	}
 
 	return source, nil
 }
 
 type DestCCIPModule struct {
-	Common                  *CCIPCommon
-	SourceChainId           uint64
-	SourceChainSelector     uint64
-	SourceNetworkName       string
-	CommitStore             *contracts.CommitStore
-	ReceiverDapp            *contracts.ReceiverDapp
-	OffRamp                 *contracts.OffRamp
-	ReportAcceptedWatcher   *sync.Map
-	ExecStateChangedWatcher *sync.Map
-	ReportBlessedWatcher    *sync.Map
-	ReportBlessedBySeqNum   *sync.Map
-	NextSeqNumToCommit      *atomic.Uint64
-	DestStartBlock          uint64
+	Common                         *CCIPCommon
+	SourceChainId                  uint64
+	SourceChainSelector            uint64
+	SourceNetworkName              string
+	CommitStore                    *contracts.CommitStore
+	ReceiverDapp                   *contracts.ReceiverDapp
+	OffRamp                        *contracts.OffRamp
+	ReportAcceptedWatcher          *testutils.Cache
+	LatestReportAcceptedBlockNum   uint64
+	ExecStateChangedWatcher        *testutils.Cache
+	LatestExecStateChangedBlockNum uint64
+	ReportBlessedWatcher           *sync.Map
+	ReportBlessedBySeqNum          *sync.Map
+	NextSeqNumToCommit             *atomic.Uint64
+	DestStartBlock                 uint64
 }
 
 func (destCCIP *DestCCIPModule) LoadContracts(conf *laneconfig.LaneConfig) {
@@ -1814,30 +1823,20 @@ func (destCCIP *DestCCIPModule) UpdateBalance(
 func (destCCIP *DestCCIPModule) AssertNoReportAcceptedEventReceived(lggr zerolog.Logger, timeRange time.Duration, lastSeenTimestamp time.Time) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeRange)
 	defer cancel()
-	ticker := time.NewTicker(time.Second)
+	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
 	for {
 		select {
 		case <-ticker.C:
 			var eventFoundAfterCursing *time.Time
 			// verify if CommitReportAccepted is received, it's not generated after provided lastSeenTimestamp
-			destCCIP.ReportAcceptedWatcher.Range(func(key, value any) bool {
-				e, exists := value.(*evm_2_evm_offramp.EVM2EVMOffRampExecutionStateChanged)
-				if exists {
-					vLogs := e.Raw
-					hdr, err := destCCIP.Common.ChainClient.HeaderByNumber(ctx, big.NewInt(int64(vLogs.BlockNumber)))
-					if err != nil {
-						return true
-					}
-					if hdr.Timestamp.After(lastSeenTimestamp) {
-						eventFoundAfterCursing = pointer.ToTime(hdr.Timestamp)
-						return false
-					}
+			if destCCIP.LatestReportAcceptedBlockNum > 0 {
+				blockNum := destCCIP.LatestReportAcceptedBlockNum
+				hdr, err := destCCIP.Common.ChainClient.HeaderByNumber(ctx, big.NewInt(int64(blockNum)))
+				if err == nil && hdr.Timestamp.After(lastSeenTimestamp) {
+					eventFoundAfterCursing = pointer.ToTime(hdr.Timestamp)
+					return fmt.Errorf("CommitReportAccepted Event detected at %s after %s", lastSeenTimestamp, eventFoundAfterCursing.String())
 				}
-				return true
-			})
-			if eventFoundAfterCursing != nil {
-				return fmt.Errorf("CommitReportAccepted Event detected at %s after %s", lastSeenTimestamp, eventFoundAfterCursing.String())
 			}
 		case <-ctx.Done():
 			lggr.Info().Msgf("successfully validated that no CommitReportAccepted detected after %s for %s", lastSeenTimestamp, timeRange)
@@ -1850,30 +1849,20 @@ func (destCCIP *DestCCIPModule) AssertNoReportAcceptedEventReceived(lggr zerolog
 func (destCCIP *DestCCIPModule) AssertNoExecutionStateChangedEventReceived(lggr zerolog.Logger, timeRange time.Duration, lastSeenTimestamp time.Time) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeRange)
 	defer cancel()
-	ticker := time.NewTicker(time.Second)
+	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
 	for {
 		select {
 		case <-ticker.C:
 			var eventFoundAfterCursing *time.Time
 			// verify if executionstate changed is received, it's not generated after provided lastSeenTimestamp
-			destCCIP.ExecStateChangedWatcher.Range(func(key, value any) bool {
-				e, exists := value.(*evm_2_evm_offramp.EVM2EVMOffRampExecutionStateChanged)
-				if exists {
-					vLogs := e.Raw
-					hdr, err := destCCIP.Common.ChainClient.HeaderByNumber(ctx, big.NewInt(int64(vLogs.BlockNumber)))
-					if err != nil {
-						return true
-					}
-					if hdr.Timestamp.After(lastSeenTimestamp) {
-						eventFoundAfterCursing = pointer.ToTime(hdr.Timestamp)
-						return false
-					}
+			if destCCIP.LatestExecStateChangedBlockNum > 0 {
+				blockNum := destCCIP.LatestExecStateChangedBlockNum
+				hdr, err := destCCIP.Common.ChainClient.HeaderByNumber(ctx, big.NewInt(int64(blockNum)))
+				if err == nil && hdr.Timestamp.After(lastSeenTimestamp) {
+					eventFoundAfterCursing = pointer.ToTime(hdr.Timestamp)
+					return fmt.Errorf("ExecutionStateChanged Event detected at %s after %s", lastSeenTimestamp, eventFoundAfterCursing.String())
 				}
-				return true
-			})
-			if eventFoundAfterCursing != nil {
-				return fmt.Errorf("ExecutionStateChanged Event detected at %s after %s", lastSeenTimestamp, eventFoundAfterCursing.String())
 			}
 		case <-ctx.Done():
 			lggr.Info().Msgf("successfully validated that no ExecutionStateChanged detected after %s for %s", lastSeenTimestamp, timeRange)
@@ -1896,43 +1885,53 @@ func (destCCIP *DestCCIPModule) AssertEventExecutionStateChanged(
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
 	resetTimer := 0
+	seqNumBytes := make([]byte, 8)
+	binary.LittleEndian.PutUint64(seqNumBytes, seqNum)
 	for {
 		select {
 		case <-ticker.C:
-			value, ok := destCCIP.ExecStateChangedWatcher.Load(seqNum)
-			if ok && value != nil {
-				e, exists := value.(*evm_2_evm_offramp.EVM2EVMOffRampExecutionStateChanged)
-				if exists {
-					// if the value is processed, delete it from the map
-					destCCIP.ExecStateChangedWatcher.Delete(seqNum)
-					vLogs := e.Raw
-					receivedAt := time.Now().UTC()
-					hdr, err := destCCIP.Common.ChainClient.HeaderByNumber(context.Background(), big.NewInt(int64(vLogs.BlockNumber)))
-					if err == nil {
-						receivedAt = hdr.Timestamp
-					}
-					receipt, err := destCCIP.Common.ChainClient.GetTxReceipt(vLogs.TxHash)
-					if err != nil {
-						lggr.Warn().Msg("Failed to get receipt for ExecStateChanged event")
-					}
-					var gasUsed uint64
-					if receipt != nil {
-						gasUsed = receipt.GasUsed
-					}
-					if testhelpers.MessageExecutionState(e.State) == execState {
-						lggr.Info().Int64("seqNum", int64(seqNum)).Uint8("ExecutionState", e.State).Msg("ExecutionStateChanged event received")
-						reqStat.UpdateState(lggr, seqNum, testreporters.ExecStateChanged, receivedAt.Sub(timeNow),
-							testreporters.Success,
-							testreporters.TransactionStats{
-								TxHash:  vLogs.TxHash.Hex(),
-								GasUsed: gasUsed,
-							})
-						return e.State, nil
-					}
+			var execEvent *evm_2_evm_offramp.EVM2EVMOffRampExecutionStateChanged
+			ok, err := destCCIP.ExecStateChangedWatcher.Load(seqNumBytes, &execEvent)
+			if err != nil {
+				reqStat.UpdateState(lggr, seqNum, testreporters.ExecStateChanged, time.Since(timeNow), testreporters.Failure)
+				return 0, fmt.Errorf("%w ExecutionStateChanged event could not be validated %d for lane %d-->%d",
+					err, seqNum, destCCIP.SourceChainId, destCCIP.Common.ChainClient.GetChainID())
+			}
+			if ok {
+				if execEvent == nil {
 					reqStat.UpdateState(lggr, seqNum, testreporters.ExecStateChanged, time.Since(timeNow), testreporters.Failure)
-					return e.State, fmt.Errorf("ExecutionStateChanged event state - expected %d actual - %d with data %x for seq num %v for lane %d-->%d",
-						execState, testhelpers.MessageExecutionState(e.State), e.ReturnData, seqNum, destCCIP.SourceChainId, destCCIP.Common.ChainClient.GetChainID())
+					return 0, fmt.Errorf("nil ExecutionStateChanged found in cache. ExecutionStateChanged event could not be validated %d for lane %d-->%d",
+						seqNum, destCCIP.SourceChainId, destCCIP.Common.ChainClient.GetChainID())
 				}
+				// if the value is processed, delete it from the map
+				destCCIP.ExecStateChangedWatcher.Delete(seqNumBytes)
+				vLogs := execEvent.Raw
+				receivedAt := time.Now().UTC()
+				hdr, err := destCCIP.Common.ChainClient.HeaderByNumber(context.Background(), big.NewInt(int64(vLogs.BlockNumber)))
+				if err == nil {
+					receivedAt = hdr.Timestamp
+				}
+				receipt, err := destCCIP.Common.ChainClient.GetTxReceipt(vLogs.TxHash)
+				if err != nil {
+					lggr.Warn().Msg("Failed to get receipt for ExecStateChanged event")
+				}
+				var gasUsed uint64
+				if receipt != nil {
+					gasUsed = receipt.GasUsed
+				}
+				if testhelpers.MessageExecutionState(execEvent.State) == execState {
+					lggr.Info().Int64("seqNum", int64(seqNum)).Uint8("ExecutionState", execEvent.State).Msg("ExecutionStateChanged event received")
+					reqStat.UpdateState(lggr, seqNum, testreporters.ExecStateChanged, receivedAt.Sub(timeNow),
+						testreporters.Success,
+						testreporters.TransactionStats{
+							TxHash:  vLogs.TxHash.Hex(),
+							GasUsed: gasUsed,
+						})
+					return execEvent.State, nil
+				}
+				reqStat.UpdateState(lggr, seqNum, testreporters.ExecStateChanged, time.Since(timeNow), testreporters.Failure)
+				return execEvent.State, fmt.Errorf("ExecutionStateChanged event state - expected %d actual - %d with data %x for seq num %v for lane %d-->%d",
+					execState, testhelpers.MessageExecutionState(execEvent.State), execEvent.ReturnData, seqNum, destCCIP.SourceChainId, destCCIP.Common.ChainClient.GetChainID())
 			}
 		case <-timer.C:
 			// if there is connection issue reset the context :
@@ -1968,51 +1967,62 @@ func (destCCIP *DestCCIPModule) AssertEventReportAccepted(
 	resetTimerCount := 0
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
+	seqNumBytes := make([]byte, 8)
+	binary.LittleEndian.PutUint64(seqNumBytes, seqNum)
 	for {
 		select {
 		case <-ticker.C:
-			value, ok := destCCIP.ReportAcceptedWatcher.Load(seqNum)
-			if ok && value != nil {
-				reportAccepted, exists := value.(*commit_store.CommitStoreReportAccepted)
-				if exists {
-					// if the value is processed, delete it from the map
-					destCCIP.ReportAcceptedWatcher.Delete(seqNum)
-					receivedAt := time.Now().UTC()
-					hdr, err := destCCIP.Common.ChainClient.HeaderByNumber(context.Background(), big.NewInt(int64(reportAccepted.Raw.BlockNumber)))
-					if err == nil {
-						receivedAt = hdr.Timestamp
-					}
+			var reportAccepted *commit_store.CommitStoreReportAccepted
+			exists, err := destCCIP.ReportAcceptedWatcher.Load(seqNumBytes, &reportAccepted)
+			if err != nil {
+				reqStat.UpdateState(lggr, seqNum, testreporters.Commit, time.Since(prevEventAt), testreporters.Failure)
+				return nil, time.Now().UTC(), fmt.Errorf("%w ReportAccepted could not be validated for seq num %d lane %d-->%d",
+					err, seqNum, destCCIP.SourceChainId, destCCIP.Common.ChainClient.GetChainID())
 
-					totalTime := receivedAt.Sub(prevEventAt)
-					// we cannot calculate the exact time at which block was finalized
-					// as a result sometimes we get a time which is slightly after the block was marked as finalized
-					// in such cases we get a negative time difference between finalized and report accepted if the commit
-					// has happened almost immediately after block being finalized
-					// in such cases we set the time difference to 1 second
-					if totalTime < 0 {
-						lggr.Warn().
-							Uint64("seqNum", seqNum).
-							Time("finalized at", prevEventAt).
-							Time("ReportAccepted at", receivedAt).
-							Msg("ReportAccepted event received before finalized timestamp")
-						totalTime = time.Second
-					}
-					receipt, err := destCCIP.Common.ChainClient.GetTxReceipt(reportAccepted.Raw.TxHash)
-					if err != nil {
-						lggr.Warn().Msg("Failed to get receipt for ReportAccepted event")
-					}
-					var gasUsed uint64
-					if receipt != nil {
-						gasUsed = receipt.GasUsed
-					}
-					reqStat.UpdateState(lggr, seqNum, testreporters.Commit, totalTime, testreporters.Success,
-						testreporters.TransactionStats{
-							GasUsed:    gasUsed,
-							TxHash:     reportAccepted.Raw.TxHash.String(),
-							CommitRoot: fmt.Sprintf("%x", reportAccepted.Report.MerkleRoot),
-						})
-					return &reportAccepted.Report, receivedAt, nil
+			}
+			if exists {
+				if reportAccepted == nil {
+					reqStat.UpdateState(lggr, seqNum, testreporters.Commit, time.Since(prevEventAt), testreporters.Failure)
+					return nil, time.Now().UTC(), fmt.Errorf("nil ReportAccepted event found in cache.ReportAccepted could not be validated for seq num %d lane %d-->%d",
+						seqNum, destCCIP.SourceChainId, destCCIP.Common.ChainClient.GetChainID())
 				}
+				// if the value is processed, delete it from the map
+				destCCIP.ReportAcceptedWatcher.Delete(seqNumBytes)
+				receivedAt := time.Now().UTC()
+				hdr, err := destCCIP.Common.ChainClient.HeaderByNumber(context.Background(), big.NewInt(int64(reportAccepted.Raw.BlockNumber)))
+				if err == nil {
+					receivedAt = hdr.Timestamp
+				}
+
+				totalTime := receivedAt.Sub(prevEventAt)
+				// we cannot calculate the exact time at which block was finalized
+				// as a result sometimes we get a time which is slightly after the block was marked as finalized
+				// in such cases we get a negative time difference between finalized and report accepted if the commit
+				// has happened almost immediately after block being finalized
+				// in such cases we set the time difference to 1 second
+				if totalTime < 0 {
+					lggr.Warn().
+						Uint64("seqNum", seqNum).
+						Time("finalized at", prevEventAt).
+						Time("ReportAccepted at", receivedAt).
+						Msg("ReportAccepted event received before finalized timestamp")
+					totalTime = time.Second
+				}
+				receipt, err := destCCIP.Common.ChainClient.GetTxReceipt(reportAccepted.Raw.TxHash)
+				if err != nil {
+					lggr.Warn().Msg("Failed to get receipt for ReportAccepted event")
+				}
+				var gasUsed uint64
+				if receipt != nil {
+					gasUsed = receipt.GasUsed
+				}
+				reqStat.UpdateState(lggr, seqNum, testreporters.Commit, totalTime, testreporters.Success,
+					testreporters.TransactionStats{
+						GasUsed:    gasUsed,
+						TxHash:     reportAccepted.Raw.TxHash.String(),
+						CommitRoot: fmt.Sprintf("%x", reportAccepted.Report.MerkleRoot),
+					})
+				return &reportAccepted.Report, receivedAt, nil
 			}
 		case <-timer.C:
 			// if there is connection issue reset the context :
@@ -2195,8 +2205,8 @@ func DefaultDestinationCCIPModule(
 		NextSeqNumToCommit:      atomic.NewUint64(1),
 		ReportBlessedWatcher:    &sync.Map{},
 		ReportBlessedBySeqNum:   &sync.Map{},
-		ExecStateChangedWatcher: &sync.Map{},
-		ReportAcceptedWatcher:   &sync.Map{},
+		ExecStateChangedWatcher: testutils.NewCache(1, fmt.Sprintf("ExecStateChanged_%s_%d", chainClient.GetChainID().String(), uuid.NewString()[0:5])),
+		ReportAcceptedWatcher:   testutils.NewCache(1, fmt.Sprintf("ReportAccepted_%s_%d", chainClient.GetChainID().String(), uuid.NewString()[0:5])),
 	}, nil
 }
 
@@ -2709,14 +2719,27 @@ func (lane *CCIPLane) StartEventWatchers() error {
 			select {
 			case e := <-sendReqEvent:
 				lane.Logger.Info().Msgf("CCIPSendRequested event received for seq number %d", e.Message.SequenceNumber)
-				eventsForTx, ok := lane.Source.CCIPSendRequestedWatcher.Load(e.Raw.TxHash.Hex())
+				if lane.Source.LatestSendReqEvntBlockNum < e.Raw.BlockNumber {
+					lane.Source.LatestSendReqEvntBlockNum = e.Raw.BlockNumber
+				}
+				var eventsForTx []*evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested
+				ok, err := lane.Source.CCIPSendRequestedWatcher.Load(e.Raw.TxHash.Bytes(), &eventsForTx)
+				if err != nil {
+					panic(err)
+				}
 				if ok {
-					lane.Source.CCIPSendRequestedWatcher.Store(e.Raw.TxHash.Hex(), append(eventsForTx.([]*evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested), e))
+					eventsForTx = append(eventsForTx, e)
+					err := lane.Source.CCIPSendRequestedWatcher.Store(e.Raw.TxHash.Bytes(), &eventsForTx)
+					if err != nil {
+						panic(err)
+					}
 				} else {
-					lane.Source.CCIPSendRequestedWatcher.Store(e.Raw.TxHash.Hex(), []*evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested{e})
+					err := lane.Source.CCIPSendRequestedWatcher.Store(e.Raw.TxHash.Bytes(), ptr.Ptr([]*evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested{e}))
+					if err != nil {
+						panic(err)
+					}
 				}
 
-				lane.Source.CCIPSendRequestedWatcher = testutils.DeleteNilEntriesFromMap(lane.Source.CCIPSendRequestedWatcher)
 				// check every second if connection is restored
 			case <-time.After(1 * time.Second):
 				// if there is a connection issue, set resubscribed to false
@@ -2757,10 +2780,17 @@ func (lane *CCIPLane) StartEventWatchers() error {
 		for {
 			select {
 			case e := <-reportAcceptedEvent:
-				for i := e.Report.Interval.Min; i <= e.Report.Interval.Max; i++ {
-					lane.Dest.ReportAcceptedWatcher.Store(i, e)
+				if lane.Dest.LatestReportAcceptedBlockNum < e.Raw.BlockNumber {
+					lane.Dest.LatestReportAcceptedBlockNum = e.Raw.BlockNumber
 				}
-				lane.Dest.ReportAcceptedWatcher = testutils.DeleteNilEntriesFromMap(lane.Dest.ReportAcceptedWatcher)
+				for i := e.Report.Interval.Min; i <= e.Report.Interval.Max; i++ {
+					b := make([]byte, 8)
+					binary.LittleEndian.PutUint64(b, i)
+					err := lane.Dest.ReportAcceptedWatcher.Store(b, e)
+					if err != nil {
+						panic(err)
+					}
+				}
 				// check every second if connection is restored
 			case <-time.After(1 * time.Second):
 				// if there is a connection issue, set resubscribed to false
@@ -2848,9 +2878,16 @@ func (lane *CCIPLane) StartEventWatchers() error {
 		for {
 			select {
 			case e := <-execStateChangedEvent:
+				if lane.Dest.LatestExecStateChangedBlockNum < e.Raw.BlockNumber {
+					lane.Dest.LatestExecStateChangedBlockNum = e.Raw.BlockNumber
+				}
 				lane.Logger.Info().Msgf("Execution state changed event received for seq number %d", e.SequenceNumber)
-				lane.Dest.ExecStateChangedWatcher.Store(e.SequenceNumber, e)
-				lane.Dest.ExecStateChangedWatcher = testutils.DeleteNilEntriesFromMap(lane.Dest.ExecStateChangedWatcher)
+				b := make([]byte, 8)
+				binary.LittleEndian.PutUint64(b, e.SequenceNumber)
+				err := lane.Dest.ExecStateChangedWatcher.Store(b, e)
+				if err != nil {
+					panic(err)
+				}
 				// check every second if connection is restored
 			case <-time.After(1 * time.Second):
 				// if there is a connection issue, set resubscribed to false
