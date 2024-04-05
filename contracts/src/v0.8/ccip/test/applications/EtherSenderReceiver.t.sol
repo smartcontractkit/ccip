@@ -296,6 +296,9 @@ contract EtherSenderReceiverTest_ccipReceive is EtherSenderReceiverTest {
   uint64 internal constant sourceChainSelector = 424242;
   address internal constant XCHAIN_SENDER = 0x9951529C13B01E542f7eE3b6D6665D292e9BA2E0;
 
+  error InvalidTokenAmounts(uint256 gotAmounts);
+  error InvalidToken(address gotToken, address expectedToken);
+
   function testFuzz_ccipReceive(uint256 tokenAmount) public {
     // cap to 10 ether because OWNER only has 10 ether.
     if (tokenAmount > 10 ether) {
@@ -341,27 +344,62 @@ contract EtherSenderReceiverTest_ccipReceive is EtherSenderReceiverTest {
     assertEq(balanceAfter, balanceBefore + amount, "balance must be correct");
   }
 
-  // function test_ccipReceive_fallbackToWethTransfer() public {
-  //   Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](1);
-  //   destTokenAmounts[0] = Client.EVMTokenAmount({token: address(s_weth), amount: amount});
-  //   Client.Any2EVMMessage memory message = Client.Any2EVMMessage({
-  //     messageId: keccak256(abi.encode("ccip send")),
-  //     sourceChainSelector: 424242,
-  //     sender: abi.encode(XCHAIN_SENDER),
-  //     data: abi.encode(address(s_linkToken)), // ERC20 cannot receive() ether.
-  //     destTokenAmounts: destTokenAmounts
-  //   });
+  function test_ccipReceive_fallbackToWethTransfer() public {
+    Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](1);
+    destTokenAmounts[0] = Client.EVMTokenAmount({token: address(s_weth), amount: amount});
+    Client.Any2EVMMessage memory message = Client.Any2EVMMessage({
+      messageId: keccak256(abi.encode("ccip send")),
+      sourceChainSelector: 424242,
+      sender: abi.encode(XCHAIN_SENDER),
+      data: abi.encode(address(s_linkToken)), // ERC20 cannot receive() ether.
+      destTokenAmounts: destTokenAmounts
+    });
 
-  //   // simulate a cross-chain token transfer, just transfer the weth to s_etherSenderReceiver.
-  //   s_weth.transfer(address(s_etherSenderReceiver), amount);
+    // simulate a cross-chain token transfer, just transfer the weth to s_etherSenderReceiver.
+    s_weth.transfer(address(s_etherSenderReceiver), amount);
 
-  //   uint256 balanceBefore = address(s_linkToken).balance;
-  //   s_etherSenderReceiver.publicCcipReceive(message);
-  //   uint256 balanceAfter = address(s_linkToken).balance;
-  //   assertEq(balanceAfter, balanceBefore, "balance must be unchanged");
-  //   uint256 wethBalance = s_weth.balanceOf(address(s_linkToken));
-  //   assertEq(wethBalance, amount, "weth balance must be correct");
-  // }
+    uint256 balanceBefore = address(s_linkToken).balance;
+    s_etherSenderReceiver.publicCcipReceive(message);
+    uint256 balanceAfter = address(s_linkToken).balance;
+    assertEq(balanceAfter, balanceBefore, "balance must be unchanged");
+    uint256 wethBalance = s_weth.balanceOf(address(s_linkToken));
+    assertEq(wethBalance, amount, "weth balance must be correct");
+  }
+
+  function test_ccipReceive_wrongTokenAmount() public {
+    Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](2);
+    destTokenAmounts[0] = Client.EVMTokenAmount({token: address(s_weth), amount: amount});
+    destTokenAmounts[1] = Client.EVMTokenAmount({token: address(s_weth), amount: amount});
+    Client.Any2EVMMessage memory message = Client.Any2EVMMessage({
+      messageId: keccak256(abi.encode("ccip send")),
+      sourceChainSelector: 424242,
+      sender: abi.encode(XCHAIN_SENDER),
+      data: abi.encode(OWNER),
+      destTokenAmounts: destTokenAmounts
+    });
+
+    vm.expectRevert(
+      abi.encodeWithSelector(InvalidTokenAmounts.selector, uint256(2))
+    );
+    s_etherSenderReceiver.publicCcipReceive(message);
+  }
+
+  function test_ccipReceive_wrongToken() public {
+    Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](1);
+    destTokenAmounts[0] = Client.EVMTokenAmount({token: address(s_someOtherWeth), amount: amount});
+    Client.Any2EVMMessage memory message = Client.Any2EVMMessage({
+      messageId: keccak256(abi.encode("ccip send")),
+      sourceChainSelector: 424242,
+      sender: abi.encode(XCHAIN_SENDER),
+      data: abi.encode(OWNER),
+      destTokenAmounts: destTokenAmounts
+    });
+
+    vm.expectRevert(
+      abi.encodeWithSelector(InvalidToken.selector, address(s_someOtherWeth), address(s_weth))
+    );
+    s_etherSenderReceiver.publicCcipReceive(message);
+  }
 }
 
 contract EtherSenderReceiverTest_ccipSend is EtherSenderReceiverTest {

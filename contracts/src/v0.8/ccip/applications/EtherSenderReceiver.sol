@@ -31,6 +31,7 @@ contract EtherSenderReceiver is CCIPReceiver, ITypeAndVersion {
   using SafeERC20 for IERC20;
 
   error InvalidTokenAmounts(uint256 gotAmounts);
+  error InvalidToken(address gotToken, address expectedToken);
   error TokenAmountNotEqualToMsgValue(uint256 gotAmount, uint256 msgValue);
   error InsufficientMsgValue(uint256 gotAmount, uint256 msgValue);
   error InsufficientFee(uint256 gotFee, uint256 fee);
@@ -152,6 +153,14 @@ contract EtherSenderReceiver is CCIPReceiver, ITypeAndVersion {
   /// to the above _validatedMessage and _validateFeeToken functions.
   function _ccipReceive(Client.Any2EVMMessage memory message) internal override {
     address receiver = abi.decode(message.data, (address));
+
+    if (message.destTokenAmounts.length != 1) {
+      revert InvalidTokenAmounts(message.destTokenAmounts.length);
+    }
+
+    if (message.destTokenAmounts[0].token != address(i_weth)) {
+      revert InvalidToken(message.destTokenAmounts[0].token, address(i_weth));
+    }
 
     uint256 tokenAmount = message.destTokenAmounts[0].amount;
     i_weth.withdraw(tokenAmount);
