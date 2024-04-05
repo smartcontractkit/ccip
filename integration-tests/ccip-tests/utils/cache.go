@@ -12,14 +12,25 @@ import (
 	"go.uber.org/atomic"
 )
 
+const DEFAULTMAXSIZE = 1000000
+
 type Cache struct {
+	maxSize    int64
 	filePath   string
 	resetCount *atomic.Int64
 	cache      *fastcache.Cache
 }
 
+func (c *Cache) SetMaxSize(size int64) {
+	c.maxSize = size
+}
+
 func (c *Cache) SaveCurrentStateAndReset() error {
 	filePath := fmt.Sprintf("%s_%d", c.filePath, c.resetCount.Load())
+	log.Info().
+		Int64("Reset Count", c.resetCount.Load()).
+		Str("filepath", c.filePath).
+		Msgf("Resetting cache, dumping to back up")
 	err := c.cache.SaveToFile(c.filePath)
 	if err != nil {
 		return fmt.Errorf("error %w saving the cache into file %s", err, filePath)
@@ -43,7 +54,7 @@ func (c *Cache) Store(key []byte, value any) error {
 	// if yes, store the cache into file and reset the cache
 	var s fastcache.Stats
 	newC.UpdateStats(&s)
-	if s.BytesSize+uint64(binary.Size(vBytes)) >= s.MaxBytesSize {
+	if s.BytesSize+uint64(binary.Size(vBytes)) >= uint64(c.maxSize) {
 		err := c.SaveCurrentStateAndReset()
 		if err != nil {
 			return err
@@ -94,6 +105,7 @@ func NewCache(maxBytes int, cacheName string) *Cache {
 	}
 	filePath := filepath.Join(tmpDir, fmt.Sprintf("%s.fastcache", cacheName))
 	return &Cache{
+		maxSize:    DEFAULTMAXSIZE,
 		filePath:   filePath,
 		resetCount: atomic.NewInt64(0),
 		cache:      fastcache.New(maxBytes),
