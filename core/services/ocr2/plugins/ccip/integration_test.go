@@ -152,6 +152,14 @@ func TestIntegration_CCIP(t *testing.T) {
 					FeeToken:  ccipTH.Source.LinkToken.Address(),
 					ExtraArgs: extraArgs,
 				}
+				pool, err := ccipTH.Source.TokenAdminRegistry.GetPool(nil, ccipTH.Source.LinkToken.Address())
+				require.NoError(t, err)
+				t.Logf("link pool: %v", pool)
+
+				poolWrapped, err := ccipTH.Source.TokenAdminRegistry.GetPool(nil, ccipTH.Source.WrappedNative.Address())
+				require.NoError(t, err)
+				t.Logf("wrapped pool: %v", poolWrapped)
+
 				fee, err2 := ccipTH.Source.Router.GetFee(nil, testhelpers.DestChainSelector, msg)
 				require.NoError(t, err2)
 				// Currently no overhead and 10gwei dest gas price. So fee is simply (gasLimit * gasPrice)* link/native
