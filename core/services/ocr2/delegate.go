@@ -138,7 +138,7 @@ type Delegate struct {
 	legacyChains         legacyevm.LegacyChainContainer // legacy: use relayers instead
 	capabilitiesRegistry types.CapabilitiesRegistry
 
-	ccipCommitJobCache *SharedJobCache // share job specs across ReportingPlugins
+	ccipJobCache *SharedJobCache // share job specs across ReportingPlugins
 }
 
 type DelegateConfig interface {
@@ -271,7 +271,7 @@ func NewDelegate(
 		isNewlyCreatedJob:     false,
 		mailMon:               mailMon,
 		capabilitiesRegistry:  capabilitiesRegistry,
-		ccipCommitJobCache:    NewSharedJobCache(),
+		ccipJobCache:          NewSharedJobCache(),
 	}
 }
 
@@ -334,17 +334,11 @@ func (d *Delegate) cleanupEVM(jb job.Job, q pg.Queryer, relayID relay.ID) error 
 		if err != nil {
 			d.lggr.Errorw("failed to derive ocr2keeper filter names from spec", "err", err, "spec", spec)
 		}
-	case types.CCIPCommit:
-		err = ccipcommit.UnregisterCommitPluginLpFilters(context.Background(), d.lggr, jb, d.legacyChains, pg.WithQueryer(q))
+	case types.CCIPCommit, types.CCIPExecution:
+		// Matt TODO subscriber must unsubscribe from the cache
+		err := d.ccipJobCache.deleteJob(context.Background(), jb)
 		if err != nil {
-			d.lggr.Errorw("failed to unregister ccip commit plugin filters", "err", err, "spec", spec)
-		}
-		d.ccipCommitJobCache.delete(jb)
-		return nil
-	case types.CCIPExecution:
-		err = ccipexec.UnregisterExecPluginLpFilters(context.Background(), d.lggr, jb, d.legacyChains, pg.WithQueryer(q))
-		if err != nil {
-			d.lggr.Errorw("failed to unregister ccip exec plugin filters", "err", err, "spec", spec)
+			d.lggr.Errorw(fmt.Sprintf("failed to invoke ccip subscriber on %s job deletion", string(types.CCIPCommit)), "err", err, "spec", spec)
 		}
 		return nil
 	default:
@@ -500,7 +494,6 @@ func (d *Delegate) ServicesForSpec(ctx context.Context, jb job.Job, qopts ...pg.
 		return d.newServicesGenericPlugin(ctx, lggr, jb, bootstrapPeers, kb, ocrDB, lc, ocrLogger, d.capabilitiesRegistry)
 
 	case types.CCIPCommit:
-		d.ccipCommitJobCache.set(jb)
 		return d.newServicesCCIPCommit(ctx, lggr, jb, bootstrapPeers, kb, ocrDB, lc, transmitterID, qopts...)
 	case types.CCIPExecution:
 		return d.newServicesCCIPExecution(ctx, lggr, jb, bootstrapPeers, kb, ocrDB, lc, transmitterID, qopts...)
@@ -1758,7 +1751,7 @@ func (d *Delegate) newServicesCCIPCommit(ctx context.Context, lggr logger.Sugare
 	logError := func(msg string) {
 		lggr.ErrorIf(d.jobORM.RecordError(jb.ID, msg), "unable to record error")
 	}
-	return ccipcommit.NewCommitServices(ctx, lggr, jb, d.ccipCommitJobCache, d.legacyChains, d.isNewlyCreatedJob, d.pipelineRunner, oracleArgsNoPlugin, logError, qopts...)
+	return ccipcommit.NewCommitServices(ctx, lggr, jb, d.ccipJobCache, d.legacyChains, d.isNewlyCreatedJob, d.pipelineRunner, oracleArgsNoPlugin, logError, qopts...)
 }
 
 func (d *Delegate) newServicesCCIPExecution(ctx context.Context, lggr logger.SugaredLogger, jb job.Job, bootstrapPeers []commontypes.BootstrapperLocator, kb ocr2key.KeyBundle, ocrDB *db, lc ocrtypes.LocalConfig, transmitterID string, qopts ...pg.QOpt) ([]job.ServiceCtx, error) {
@@ -1811,7 +1804,7 @@ func (d *Delegate) newServicesCCIPExecution(ctx context.Context, lggr logger.Sug
 	logError := func(msg string) {
 		lggr.ErrorIf(d.jobORM.RecordError(jb.ID, msg), "unable to record error")
 	}
-	return ccipexec.NewExecutionServices(ctx, lggr, jb, d.legacyChains, d.isNewlyCreatedJob, oracleArgsNoPlugin, logError, qopts...)
+	return ccipexec.NewExecutionServices(ctx, lggr, jb, d.ccipJobCache, d.legacyChains, d.isNewlyCreatedJob, oracleArgsNoPlugin, logError, qopts...)
 }
 
 func (d *Delegate) newServicesRebalancer(ctx context.Context, lggr logger.SugaredLogger, jb job.Job, bootstrapPeers []commontypes.BootstrapperLocator, kb ocr2key.KeyBundle, ocrDB *db, lc ocrtypes.LocalConfig) ([]job.ServiceCtx, error) {

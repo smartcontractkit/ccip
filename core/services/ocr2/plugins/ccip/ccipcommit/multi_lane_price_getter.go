@@ -145,7 +145,9 @@ func (s *multiLanePriceGetter) GetTokenPrices(ctx context.Context, tokensPerOffR
 		}
 		priceGetter, exists := s.priceGetters[offRamp]
 		if !exists {
-			return nil, fmt.Errorf("priceGetter for OffRamp %s does not exist", offRamp)
+			// Matt TODO
+			// missing offramp means the
+			continue
 		}
 
 		prices, err := priceGetter.TokenPricesUSD(ctx, tokens)

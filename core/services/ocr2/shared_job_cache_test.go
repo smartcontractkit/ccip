@@ -8,14 +8,15 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 )
 
-func TestSharedJobCache_SetAndGet(t *testing.T) {
+func TestSharedJobCache_AddJobs(t *testing.T) {
 	cache := NewSharedJobCache()
 
 	require.Equal(t, 0, len(cache.Get()))
 
 	numJobs := 100
 	for i := 0; i < numJobs; i++ {
-		cache.set(job.Job{ID: int32(i)})
+		err := cache.addJob(job.Job{ID: int32(i)})
+		require.NoError(t, err)
 	}
 
 	cachedJobs := cache.Get()
@@ -26,7 +27,8 @@ func TestSharedJobCache_SetAndGet(t *testing.T) {
 
 	// set duplicate jobs
 	for i := 0; i < numJobs; i++ {
-		cache.set(job.Job{ID: int32(i)})
+		err := cache.addJob(job.Job{ID: int32(i)})
+		require.NoError(t, err)
 	}
 
 	cachedJobs = cache.Get()
@@ -40,16 +42,18 @@ func TestSharedJobCache_SetAndGet(t *testing.T) {
 	require.Equal(t, numJobs, len(cache.Get()))
 }
 
-func TestSharedJobCache_Delete(t *testing.T) {
+func TestSharedJobCache_DeleteJobs(t *testing.T) {
 	cache := NewSharedJobCache()
 
 	numJobs := 100
 	for i := 0; i < numJobs; i++ {
-		cache.set(job.Job{ID: int32(i)})
+		err := cache.addJob(job.Job{ID: int32(i)})
+		require.NoError(t, err)
 	}
 
 	for i := 0; i < numJobs/2; i++ {
-		cache.delete(job.Job{ID: int32(i)})
+		err := cache.deleteJob(job.Job{ID: int32(i)})
+		require.NoError(t, err)
 	}
 
 	cachedJobs := cache.Get()
@@ -59,17 +63,22 @@ func TestSharedJobCache_Delete(t *testing.T) {
 	}
 
 	// can delete non-existent job when cache is empty
-	cache.delete(job.Job{ID: int32(numJobs + 1)})
+	err := cache.deleteJob(job.Job{ID: int32(numJobs + 1)})
+	require.NoError(t, err)
 	require.Equal(t, cachedJobs, cache.Get())
 
 	// can remove all jobs
 	for i := numJobs / 2; i < numJobs; i++ {
-		cache.delete(job.Job{ID: int32(i)})
+		err = cache.deleteJob(job.Job{ID: int32(i)})
+		require.NoError(t, err)
 	}
 
 	cachedJobs = cache.Get()
 	require.Equal(t, 0, len(cachedJobs))
 
 	// can delete non-existent job when cache is empty
-	cache.delete(job.Job{ID: int32(0)})
+	err = cache.deleteJob(job.Job{ID: int32(0)})
+	require.NoError(t, err)
 }
+
+// TODO add test for pubsub
