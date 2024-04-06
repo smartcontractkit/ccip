@@ -28,7 +28,8 @@ func (c *Cache) SetMaxSize(size int64) {
 
 func (c *Cache) SaveCurrentStateAndReset() error {
 	resetCount := c.resetCount.Load() + 1
-	filePath := fmt.Sprintf("%s_%d", c.filePath, resetCount)
+
+	filePath := fmt.Sprintf("%s_%d.fastcache", c.filePath, resetCount)
 	err := c.cache.SaveToFile(filePath)
 	if err != nil {
 		return fmt.Errorf("error %w saving the cache into file %s", err, filePath)
@@ -77,8 +78,8 @@ func (c *Cache) Load(key []byte, value any) (bool, error) {
 	dstBytes, exists = cache.HasGet(dstBytes, key)
 	// if the cache has already been reset, check if the key exists in previous versions
 	if !exists && c.resetCount.Load() > 0 {
-		for i := int64(0); i < c.resetCount.Load(); i++ {
-			filePath := fmt.Sprintf("%s_%d", c.filePath, i)
+		for i := int64(1); i < c.resetCount.Load(); i++ {
+			filePath := fmt.Sprintf("%s_%d.fastcache", c.filePath, i)
 			c1, err := fastcache.LoadFromFile(filePath)
 			if err != nil {
 				return false, fmt.Errorf("error %w loading cache from back up file %s", err, filePath)
@@ -105,7 +106,7 @@ func NewCache(maxBytes int, cacheName string) *Cache {
 	if err != nil {
 		panic(err)
 	}
-	filePath := filepath.Join(tmpDir, fmt.Sprintf("%s.fastcache", cacheName))
+	filePath := filepath.Join(tmpDir, cacheName)
 	return &Cache{
 		maxSize:    DEFAULTMAXSIZE,
 		filePath:   filePath,
