@@ -15,10 +15,11 @@ import (
 const DEFAULTMAXSIZE = 1000000
 
 type Cache struct {
-	maxSize    int64
-	filePath   string
-	resetCount *atomic.Int64
-	cache      *fastcache.Cache
+	maxSize     int64
+	filePath    string
+	resetCount  *atomic.Int64
+	cache       *fastcache.Cache
+	isResetting *atomic.Bool
 }
 
 func (c *Cache) SetMaxSize(size int64) {
@@ -26,16 +27,17 @@ func (c *Cache) SetMaxSize(size int64) {
 }
 
 func (c *Cache) SaveCurrentStateAndReset() error {
-	filePath := fmt.Sprintf("%s_%d", c.filePath, c.resetCount.Load())
-	log.Info().
-		Int64("Reset Count", c.resetCount.Load()).
-		Str("filepath", c.filePath).
-		Msgf("Resetting cache, dumping to back up")
-	err := c.cache.SaveToFile(c.filePath)
+	resetCount := c.resetCount.Load() + 1
+	filePath := fmt.Sprintf("%s_%d", c.filePath, resetCount)
+	err := c.cache.SaveToFile(filePath)
 	if err != nil {
 		return fmt.Errorf("error %w saving the cache into file %s", err, filePath)
 	}
 	c.cache.Reset()
+	log.Info().
+		Int64("Reset Count", resetCount).
+		Str("filepath", filePath).
+		Msgf("Resetting cache, current version backed up")
 	c.resetCount.Inc()
 	return nil
 }
@@ -75,7 +77,7 @@ func (c *Cache) Load(key []byte, value any) (bool, error) {
 	dstBytes, exists = cache.HasGet(dstBytes, key)
 	// if the cache has already been reset, check if the key exists in previous versions
 	if !exists && c.resetCount.Load() > 0 {
-		for i := int64(1); i < c.resetCount.Load(); i++ {
+		for i := int64(0); i < c.resetCount.Load(); i++ {
 			filePath := fmt.Sprintf("%s_%d", c.filePath, i)
 			c1, err := fastcache.LoadFromFile(filePath)
 			if err != nil {
