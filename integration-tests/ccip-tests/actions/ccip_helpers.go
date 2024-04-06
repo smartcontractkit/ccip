@@ -511,7 +511,7 @@ func (ccipModule *CCIPCommon) UpdateTokenPricesAtRegularInterval(ctx context.Con
 			case <-ticker.C:
 				// randomly choose an aggregator contract from slice of aggregators
 				randomIndex := rand.Intn(len(aggregators))
-				err := aggregators[randomIndex].UpdateRoundData(big.NewInt(int64(rand.Uint64())))
+				err := aggregators[randomIndex].UpdateRoundData(new(big.Int).Add(big.NewInt(1e18), big.NewInt(rand.Int63n(6e1000))))
 				if err != nil {
 					continue
 				}
