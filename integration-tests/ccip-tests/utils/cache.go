@@ -78,7 +78,7 @@ func (c *Cache) Load(key []byte, value any) (bool, error) {
 	dstBytes, exists = cache.HasGet(dstBytes, key)
 	// if the cache has already been reset, check if the key exists in previous versions
 	if !exists && c.resetCount.Load() > 0 {
-		for i := int64(1); i < c.resetCount.Load(); i++ {
+		for i := c.resetCount.Load() - 1; i >= 1; i-- {
 			filePath := fmt.Sprintf("%s_%d.fastcache", c.filePath, i)
 			c1, err := fastcache.LoadFromFile(filePath)
 			if err != nil {

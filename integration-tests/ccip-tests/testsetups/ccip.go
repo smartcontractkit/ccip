@@ -647,6 +647,7 @@ func (o *CCIPTestSetUpOutputs) WaitForPriceUpdates() {
 		reverseLane := lanes.ReverseLane
 		waitForUpdate := func(lane *actions.CCIPLane) error {
 			defer func() {
+
 				lane.Logger.Info().
 					Str("source_chain", lane.Source.Common.ChainClient.GetNetworkName()).
 					Uint64("dest_chain", lane.Source.DestinationChainId).

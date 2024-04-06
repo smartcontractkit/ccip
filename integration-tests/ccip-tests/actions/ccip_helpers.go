@@ -458,7 +458,11 @@ func (ccipModule *CCIPCommon) WatchForPriceUpdates(ctx context.Context) error {
 	})
 
 	go func() {
-		defer sub.Unsubscribe()
+		defer func() {
+			sub.Unsubscribe()
+			ccipModule.gasUpdateWatcher = nil
+			ccipModule.gasUpdateWatcherMu = nil
+		}()
 		for {
 			select {
 			case e := <-gasUpdateEvent:
