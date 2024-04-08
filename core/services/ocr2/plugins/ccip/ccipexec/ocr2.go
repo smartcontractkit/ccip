@@ -263,7 +263,7 @@ func (r *ExecutionReportingPlugin) buildBatch(
 	gasPrice *big.Int,
 	sourceToDestToken map[cciptypes.Address]cciptypes.Address,
 ) (executableMessages []ccip.ObservedMessage) {
-	inflightAggregateValue, _, err := inflightAggregates(inflight, destTokenPricesUSD, sourceToDestToken)
+	inflightAggregateValue, err := inflightAggregates(inflight, destTokenPricesUSD, sourceToDestToken)
 	if err != nil {
 		lggr.Errorw("Unexpected error computing inflight values", "err", err)
 		return []ccip.ObservedMessage{}
@@ -416,49 +416,6 @@ func (r *ExecutionReportingPlugin) getTokenDataWithTimeout(
 	tokenData, err := r.tokenDataWorker.GetMsgTokenData(ctxTimeout, msg)
 	tDur := time.Since(tStart)
 	return tokenData, tDur, err
-}
-
-func (r *ExecutionReportingPlugin) isRateLimitEnoughForTokenPool(
-	destTokenPoolRateLimits map[cciptypes.Address]*big.Int,
-	sourceTokenAmounts []cciptypes.TokenAmount,
-	inflightTokenAmounts map[cciptypes.Address]*big.Int,
-	sourceToDestToken map[cciptypes.Address]cciptypes.Address,
-) bool {
-	rateLimitsCopy := make(map[cciptypes.Address]*big.Int)
-	for destToken, rl := range destTokenPoolRateLimits {
-		rateLimitsCopy[destToken] = new(big.Int).Set(rl)
-	}
-
-	for sourceToken, amount := range inflightTokenAmounts {
-		if destToken, exists := sourceToDestToken[sourceToken]; exists {
-			if rl, exists := rateLimitsCopy[destToken]; exists {
-				rateLimitsCopy[destToken] = rl.Sub(rl, amount)
-			}
-		}
-	}
-
-	for _, sourceToken := range sourceTokenAmounts {
-		destToken, exists := sourceToDestToken[sourceToken.Token]
-		if !exists {
-			r.lggr.Warnw("dest token not found", "sourceToken", sourceToken.Token)
-			continue
-		}
-
-		rl, exists := rateLimitsCopy[destToken]
-		if !exists {
-			r.lggr.Debugw("rate limit not applied to token", "token", destToken)
-			continue
-		}
-
-		if rl.Cmp(sourceToken.Amount) < 0 {
-			r.lggr.Warnw("token pool rate limit reached",
-				"token", sourceToken.Token, "destToken", destToken, "amount", sourceToken.Amount, "rateLimit", rl)
-			return false
-		}
-		rateLimitsCopy[destToken] = rl.Sub(rl, sourceToken.Amount)
-	}
-
-	return true
 }
 
 func hasEnoughTokens(tokenLimit *big.Int, msgValue *big.Int, inflightValue *big.Int) (*big.Int, bool) {
@@ -822,28 +779,19 @@ func inflightAggregates(
 	inflight []InflightInternalExecutionReport,
 	destTokenPrices map[cciptypes.Address]*big.Int,
 	sourceToDest map[cciptypes.Address]cciptypes.Address,
-) (*big.Int, map[cciptypes.Address]*big.Int, error) {
+) (*big.Int, error) {
 	inflightAggregateValue := big.NewInt(0)
-	inflightTokenAmounts := make(map[cciptypes.Address]*big.Int)
 
 	for _, rep := range inflight {
 		for _, message := range rep.messages {
 			msgValue, err := aggregateTokenValue(destTokenPrices, sourceToDest, message.TokenAmounts)
 			if err != nil {
-				return nil, nil, err
+				return nil, err
 			}
 			inflightAggregateValue.Add(inflightAggregateValue, msgValue)
-
-			for _, tk := range message.TokenAmounts {
-				if rl, exists := inflightTokenAmounts[tk.Token]; exists {
-					inflightTokenAmounts[tk.Token] = rl.Add(rl, tk.Amount)
-				} else {
-					inflightTokenAmounts[tk.Token] = new(big.Int).Set(tk.Amount)
-				}
-			}
 		}
 	}
-	return inflightAggregateValue, inflightTokenAmounts, nil
+	return inflightAggregateValue, nil
 }
 
 // getTokensPrices returns token prices of the given price registry,

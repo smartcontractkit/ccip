@@ -698,98 +698,6 @@ func TestExecutionReportingPlugin_buildBatch(t *testing.T) {
 	}
 }
 
-func TestExecutionReportingPlugin_isRateLimitEnoughForTokenPool(t *testing.T) {
-	testCases := []struct {
-		name                    string
-		destTokenPoolRateLimits map[cciptypes.Address]*big.Int
-		tokenAmounts            []cciptypes.TokenAmount
-		inflightTokenAmounts    map[cciptypes.Address]*big.Int
-		srcToDestToken          map[cciptypes.Address]cciptypes.Address
-		exp                     bool
-	}{
-		{
-			name: "base",
-			destTokenPoolRateLimits: map[cciptypes.Address]*big.Int{
-				cciptypes.Address("10"): big.NewInt(100),
-				cciptypes.Address("20"): big.NewInt(50),
-			},
-			tokenAmounts: []cciptypes.TokenAmount{
-				{Token: ccipcalc.HexToAddress("1"), Amount: big.NewInt(50)},
-				{Token: ccipcalc.HexToAddress("2"), Amount: big.NewInt(20)},
-			},
-			srcToDestToken: map[cciptypes.Address]cciptypes.Address{
-				cciptypes.Address("1"): cciptypes.Address("10"),
-				cciptypes.Address("2"): cciptypes.Address("20"),
-			},
-			inflightTokenAmounts: map[cciptypes.Address]*big.Int{
-				cciptypes.Address("1"): big.NewInt(20),
-				cciptypes.Address("2"): big.NewInt(30),
-			},
-			exp: true,
-		},
-		{
-			name: "rate limit hit",
-			destTokenPoolRateLimits: map[cciptypes.Address]*big.Int{
-				cciptypes.Address("10"): big.NewInt(100),
-				cciptypes.Address("20"): big.NewInt(50),
-			},
-			srcToDestToken: map[cciptypes.Address]cciptypes.Address{
-				cciptypes.Address("1"): cciptypes.Address("10"),
-				cciptypes.Address("2"): cciptypes.Address("20"),
-			},
-			tokenAmounts: []cciptypes.TokenAmount{
-				{Token: cciptypes.Address("1"), Amount: big.NewInt(50)},
-				{Token: cciptypes.Address("2"), Amount: big.NewInt(51)},
-			},
-			exp: true,
-		},
-		{
-			name: "rate limit hit, inflight included",
-			destTokenPoolRateLimits: map[cciptypes.Address]*big.Int{
-				cciptypes.Address("10"): big.NewInt(100),
-				cciptypes.Address("20"): big.NewInt(50),
-			},
-			srcToDestToken: map[cciptypes.Address]cciptypes.Address{
-				cciptypes.Address("1"): cciptypes.Address("10"),
-				cciptypes.Address("2"): cciptypes.Address("20"),
-			},
-			tokenAmounts: []cciptypes.TokenAmount{
-				{Token: cciptypes.Address("1"), Amount: big.NewInt(50)},
-				{Token: cciptypes.Address("2"), Amount: big.NewInt(20)},
-			},
-			inflightTokenAmounts: map[cciptypes.Address]*big.Int{
-				cciptypes.Address("1"): big.NewInt(51),
-				cciptypes.Address("2"): big.NewInt(30),
-			},
-			exp: true,
-		},
-		{
-			destTokenPoolRateLimits: map[cciptypes.Address]*big.Int{},
-			tokenAmounts: []cciptypes.TokenAmount{
-				{Token: cciptypes.Address("1"), Amount: big.NewInt(50)},
-				{Token: cciptypes.Address("2"), Amount: big.NewInt(20)},
-			},
-			srcToDestToken: map[cciptypes.Address]cciptypes.Address{
-				cciptypes.Address("1"): cciptypes.Address("10"),
-				cciptypes.Address("2"): cciptypes.Address("20"),
-			},
-			inflightTokenAmounts: map[cciptypes.Address]*big.Int{
-				cciptypes.Address("1"): big.NewInt(20),
-				cciptypes.Address("2"): big.NewInt(30),
-			},
-			name: "rate limit not applied to token",
-			exp:  false,
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			p := &ExecutionReportingPlugin{lggr: logger.TestLogger(t)}
-			p.isRateLimitEnoughForTokenPool(tc.destTokenPoolRateLimits, tc.tokenAmounts, tc.inflightTokenAmounts, tc.srcToDestToken)
-		})
-	}
-}
-
 func TestExecutionReportingPlugin_getReportsWithSendRequests(t *testing.T) {
 	testCases := []struct {
 		name                string
@@ -1329,7 +1237,7 @@ func Test_inflightAggregates(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			inflightAggrVal, inflightTokenAmounts, err := inflightAggregates(
+			inflightAggrVal, err := inflightAggregates(
 				tc.inflight, tc.destTokenPrices, tc.sourceToDest)
 
 			if tc.expErr {
@@ -1338,7 +1246,6 @@ func Test_inflightAggregates(t *testing.T) {
 			}
 			assert.NoError(t, err)
 			assert.True(t, reflect.DeepEqual(tc.expInflightAggrVal, inflightAggrVal))
-			assert.True(t, reflect.DeepEqual(tc.expInflightTokenAmounts, inflightTokenAmounts))
 		})
 	}
 }
