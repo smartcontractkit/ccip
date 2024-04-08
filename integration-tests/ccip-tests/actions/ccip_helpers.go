@@ -136,6 +136,7 @@ type CCIPCommon struct {
 	ARM                          *contracts.ARM // populate only if the ARM contracts is not a mock and can be used to verify various ARM events; keep this nil for mock ARM
 	Router                       *contracts.Router
 	PriceRegistry                *contracts.PriceRegistry
+	TokenAdminRegistry           *contracts.TokenAdminRegistry
 	WrappedNative                common.Address
 	MulticallEnabled             bool
 	MulticallContract            common.Address
@@ -893,6 +894,26 @@ func (ccipModule *CCIPCommon) DeployContracts(noOfTokens int,
 		}
 	}
 
+	if ccipModule.TokenAdminRegistry == nil {
+		if ccipModule.ExistingDeployment {
+			return fmt.Errorf("token admin registry contract address is not provided in lane config")
+		}
+		// deploy token admin registry
+		ccipModule.TokenAdminRegistry, err = cd.DeployTokenAdminRegistry()
+		if err != nil {
+			return fmt.Errorf("deploying token admin registry shouldn't fail %w", err)
+		}
+		err = ccipModule.ChainClient.WaitForEvents()
+		if err != nil {
+			return fmt.Errorf("error in waiting for token admin registry deployment %w", err)
+		}
+	} else {
+		ccipModule.TokenAdminRegistry, err = cd.NewTokenAdminRegistry(ccipModule.TokenAdminRegistry.EthAddress)
+		if err != nil {
+			return fmt.Errorf("getting new token admin registry contract shouldn't fail %w", err)
+		}
+	}
+
 	log.Info().Msg("finished deploying common contracts")
 	err = ccipModule.SetRemoteChainsOnPools()
 	if err != nil {
@@ -1114,6 +1135,7 @@ func (sourceCCIP *SourceCCIPModule) LoadContracts(conf *laneconfig.LaneConfig) {
 	}
 }
 
+// TODO token pool updating
 func (sourceCCIP *SourceCCIPModule) SyncPoolsAndTokens() error {
 	var tokensAndPools []evm_2_evm_onramp.InternalPoolUpdate
 	var tokenTransferFeeConfig []evm_2_evm_onramp.EVM2EVMOnRampTokenTransferFeeConfigArgs
@@ -1164,7 +1186,6 @@ func (sourceCCIP *SourceCCIPModule) DeployContracts(lane *laneconfig.LaneConfig)
 		if sourceCCIP.Common.ExistingDeployment {
 			return fmt.Errorf("existing deployment is set to true but no onramp address is provided")
 		}
-		var tokensAndPools []evm_2_evm_onramp.InternalPoolUpdate
 		var tokenTransferFeeConfig []evm_2_evm_onramp.EVM2EVMOnRampTokenTransferFeeConfigArgs
 
 		sourceCCIP.SrcStartBlock, err = sourceCCIP.Common.ChainClient.LatestBlockNumber(context.Background())
@@ -1174,10 +1195,10 @@ func (sourceCCIP *SourceCCIPModule) DeployContracts(lane *laneconfig.LaneConfig)
 		sourceCCIP.OnRamp, err = contractDeployer.DeployOnRamp(
 			sourceChainSelector,
 			sourceCCIP.DestChainSelector,
-			tokensAndPools,
 			*sourceCCIP.Common.ARMContract,
 			sourceCCIP.Common.Router.EthAddress,
 			sourceCCIP.Common.PriceRegistry.EthAddress,
+			sourceCCIP.TokenAdminRegistry,
 			sourceCCIP.Common.RateLimiterConfig,
 			[]evm_2_evm_onramp.EVM2EVMOnRampFeeTokenConfigArgs{
 				{
@@ -1194,10 +1215,7 @@ func (sourceCCIP *SourceCCIPModule) DeployContracts(lane *laneconfig.LaneConfig)
 					PremiumMultiplierWeiPerEth: 1e18,
 					Enabled:                    true,
 				},
-			},
-			tokenTransferFeeConfig,
-			sourceCCIP.Common.FeeToken.EthAddress,
-		)
+			}, tokenTransferFeeConfig, sourceCCIP.Common.FeeToken.EthAddress)
 
 		if err != nil {
 			return fmt.Errorf("onRamp deployment shouldn't fail %w", err)

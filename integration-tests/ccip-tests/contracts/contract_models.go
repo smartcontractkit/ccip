@@ -26,6 +26,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_v3_aggregator_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/price_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/token_admin_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/token_pool_1_4_0"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/usdc_token_pool_1_4_0"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/link_token_interface"
@@ -612,6 +613,12 @@ func (c *PriceRegistry) UpdatePrices(priceUpdates price_registry.InternalPriceUp
 		Interface("PriceUpdates", priceUpdates).
 		Msg("Prices updated")
 	return c.client.ProcessTransaction(tx)
+}
+
+type TokenAdminRegistry struct {
+	client     blockchain.EVMClient
+	Instance   *token_admin_registry.TokenAdminRegistry
+	EthAddress common.Address
 }
 
 type Router struct {

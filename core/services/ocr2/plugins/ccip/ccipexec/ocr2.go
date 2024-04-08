@@ -821,6 +821,7 @@ func getTokensPrices(ctx context.Context, priceRegistry ccipdata.PriceRegistryRe
 			if err != nil {
 				return nil, fmt.Errorf("get price registry address: %w", err)
 			}
+			continue
 			return nil, fmt.Errorf("price of token %s is zero (price registry=%s)", token, priceRegistryAddress)
 		}
 

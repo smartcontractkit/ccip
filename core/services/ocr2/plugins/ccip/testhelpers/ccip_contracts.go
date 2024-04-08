@@ -318,6 +318,7 @@ func (c *CCIPContracts) DeployNewOnRamp(t *testing.T) {
 			PriceRegistry:                     c.Source.PriceRegistry.Address(),
 			MaxDataBytes:                      1e5,
 			MaxPerMsgGasLimit:                 4_000_000,
+			TokenAdminRegistry:                c.Source.TokenAdminRegistry.Address(),
 		},
 		evm_2_evm_onramp.RateLimiterConfig{
 			IsEnabled: true,
@@ -1215,15 +1216,15 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 	require.NoError(t, err)
 	sourceChain.Commit()
 
-	destPricesAddress, _, _, err := price_registry.DeployPriceRegistry(
+	destPriceRegistryAddress, _, _, err := price_registry.DeployPriceRegistry(
 		destUser,
 		destChain,
 		nil,
-		[]common.Address{destLinkTokenAddress},
+		[]common.Address{destLinkTokenAddress, destWeth9addr},
 		60*60*24*14, // two weeks
 	)
 	require.NoError(t, err)
-	destPriceRegistry, err := price_registry.NewPriceRegistry(destPricesAddress, destChain)
+	destPriceRegistry, err := price_registry.NewPriceRegistry(destPriceRegistryAddress, destChain)
 	require.NoError(t, err)
 
 	// Deploy commit store.
