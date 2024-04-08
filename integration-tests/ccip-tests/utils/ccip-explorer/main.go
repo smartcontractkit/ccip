@@ -28,10 +28,10 @@ func main() {
 	// Parse the command-line flags
 	args := ParseFlags()
 	fmt.Println("Parsed command-line arguments:", args)
-	if args.Sender == "" {
-		fmt.Println("The -sender flag is required.")
-		os.Exit(1)
-	}
+	// if args.Sender == "" {
+	// 	fmt.Println("The -sender flag is required.")
+	// 	os.Exit(1)
+	// }
 
 	config, err := LoadConfig("networks.toml")
 	if err != nil {
@@ -71,7 +71,7 @@ func main() {
 	}
 
 	// Updated header to include destination fields
-	header := []string{	"Source Network Name",  "Dest Network Name", "Fee Token", "Message URL", "Source Scan URL", 
+	header := []string{	"Source Network Name",  "Dest Network Name", "Block Timestamp", "Fee Token", "Message URL", "Source Scan URL", 
 						"Dest Scan URL", "Message ID", "Source Transaction Hash", "Dest Transaction Hash"}
 	if err := writer.Write(header); err != nil {
 		fmt.Println("Error writing header to CSV file:", err)
@@ -81,6 +81,7 @@ func main() {
 	for _, node := range apiResponse.Data.AllCcipTransactionsFlats.Nodes {
 		networkName := node.SourceNetworkName
 		tokenAddress := node.FeeToken
+		blockTimestamp := node.BlockTimestamp
 
 		networkConfig, exists := config.Networks[networkName]
 		if !exists {
@@ -90,8 +91,6 @@ func main() {
 
 		tokenName, exists := findTokenNameByAddressInsensitive(networkConfig.Tokens, tokenAddress)
 		if !exists {
-			// fmt.Println("Token not found in network config")
-			// return
 			tokenName = tokenAddress
 		}
 	
@@ -101,6 +100,7 @@ func main() {
 		record := []string{
 			reversedNetworkNameMapping[node.SourceNetworkName],
 			reversedNetworkNameMapping[node.DestNetworkName],
+			blockTimestamp,
 			tokenName,
 			sourceScanURL,
 			destScanURL,
@@ -108,17 +108,17 @@ func main() {
 			node.TransactionHash,
 			node.DestTransactionHash,
 			node.MessageID,
+
 		}
 		if err := writer.Write(record); err != nil {
 			fmt.Println("Error writing record to CSV file:", err)
 			return
 		}
 		fmt.Println("-----")
+		fmt.Printf("Timestamp: %s\n", blockTimestamp)
 		fmt.Printf("[msg](%s)\n", messageURL)
 		fmt.Printf("[%s](%s)\n", reversedNetworkNameMapping[node.SourceNetworkName], sourceScanURL)
-		fmt.Printf("[%s](%s)\n", reversedNetworkNameMapping[node.DestNetworkName], destScanURL)
-		
-		
+		fmt.Printf("[%s](%s)\n", reversedNetworkNameMapping[node.DestNetworkName], destScanURL)		
 	}
 
 	fmt.Println("-----")

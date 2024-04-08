@@ -3,8 +3,7 @@ This tool facilitates querying CCIP transactions and generating a CSV report and
 
 ## Command Line Flags
 
-The sender's address is required:
-* -sender: Sender's address (required)
+* -sender: Sender's address
 * -receiver: Receiver's address
 * -source: Source network shortcode
 * -dest: Destination network shortcode

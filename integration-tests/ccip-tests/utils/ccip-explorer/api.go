@@ -19,6 +19,7 @@ type ApiTransactionsResponse struct {
 				SourceNetworkName   string `json:"sourceNetworkName"`
 				DestNetworkName     string `json:"destNetworkName"`
 				MessageID           string `json:"messageId"`
+				BlockTimestamp      string `json:"blockTimestamp"`
 			} `json:"nodes"`
 		} `json:"allCcipTransactionsFlats"`
 	} `json:"data"`
@@ -37,6 +38,7 @@ type Node struct {
     BlessBlockNumber      int           `json:"blessBlockNumber"`
     BlessBlockTimestamp   string        `json:"blessBlockTimestamp"`
     BlessLogIndex         int           `json:"blessLogIndex"`
+    BlockTimestamp        string        `json:"blockTimestamp"`
     CommitBlockNumber     int           `json:"commitBlockNumber"`
     BlessTransactionHash  string        `json:"blessTransactionHash"`
     CommitBlockTimestamp  string        `json:"commitBlockTimestamp"`
@@ -111,24 +113,38 @@ func GenerateQueryString(sender string, receiver string, sourceNetworkName strin
 	//queryParams.Add("query", "LATEST_TRANSACTIONS_QUERY")
 
 	// Construct the condition map dynamically based on provided arguments
-	condition := map[string]interface{}{
-		"sender": sender,
-	}
-	if receiver != "" {
-		condition["receiver"] = receiver
-	}
-	if sourceNetworkName != "" {
-		condition["sourceNetworkName"] = sourceNetworkName
-	}
-	if destNetworkName != "" {
-		condition["destNetworkName"] = destNetworkName
-	}
-	if messageId != "" {
-		condition["messageId"] = messageId
-	}
-	if feeToken != "" {
-		condition["feeToken"] = feeToken
-	}
+	// Construct the condition map dynamically based on provided arguments
+condition := make(map[string]interface{})
+
+// Add sender to the condition map if it's not empty
+if sender != "" {
+    condition["sender"] = sender
+}
+
+// Add receiver to the condition map if it's not empty
+if receiver != "" {
+    condition["receiver"] = receiver
+}
+
+// Add sourceNetworkName to the condition map if it's not empty
+if sourceNetworkName != "" {
+    condition["sourceNetworkName"] = sourceNetworkName
+}
+
+// Add destNetworkName to the condition map if it's not empty
+if destNetworkName != "" {
+    condition["destNetworkName"] = destNetworkName
+}
+
+// Add messageId to the condition map if it's not empty
+if messageId != "" {
+    condition["messageId"] = messageId
+}
+
+// Add feeToken to the condition map if it's not empty
+if feeToken != "" {
+    condition["feeToken"] = feeToken
+}
 
 	// Convert the condition map and other variables into a JSON string
 	variables := map[string]interface{}{
