@@ -210,11 +210,24 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 				return nil, err
 			}
 
+			inflightAggregateValue := big.NewInt(0)
+
+			for _, rep := range inflight {
+				for _, message := range rep.messages {
+					msgValue, err := aggregateTokenValue(tokenExecData.destTokenPrices, tokenExecData.sourceToDestTokens, message.TokenAmounts)
+					if err != nil {
+						lggr.Errorw("Unexpected error computing inflight values", "err", err)
+						return []ccip.ObservedMessage{}, nil
+					}
+					inflightAggregateValue.Add(inflightAggregateValue, msgValue)
+				}
+			}
+
 			batch := r.buildBatch(
 				ctx,
 				rootLggr,
 				rep,
-				inflight,
+				inflightAggregateValue,
 				tokenExecData.rateLimiterTokenBucket.Tokens,
 				tokenExecData.sourceTokenPrices,
 				tokenExecData.destTokenPrices,
@@ -256,18 +269,13 @@ func (r *ExecutionReportingPlugin) buildBatch(
 	ctx context.Context,
 	lggr logger.Logger,
 	report commitReportWithSendRequests,
-	inflight []InflightInternalExecutionReport,
+	inflightAggregateValue *big.Int,
 	aggregateTokenLimit *big.Int,
 	sourceTokenPricesUSD map[cciptypes.Address]*big.Int,
 	destTokenPricesUSD map[cciptypes.Address]*big.Int,
 	gasPrice *big.Int,
 	sourceToDestToken map[cciptypes.Address]cciptypes.Address,
 ) (executableMessages []ccip.ObservedMessage) {
-	inflightAggregateValue, err := inflightAggregates(inflight, destTokenPricesUSD, sourceToDestToken)
-	if err != nil {
-		lggr.Errorw("Unexpected error computing inflight values", "err", err)
-		return []ccip.ObservedMessage{}
-	}
 	// We assume that next observation will start after previous epoch transmission so nonces should be already updated onchain.
 	// Worst case scenario we will try to process the same message again, and it will be skipped but protocol would progress anyway.
 	// We don't use inflightCache here to avoid cases in which inflight cache keeps progressing but due to transmission failures
@@ -527,7 +535,8 @@ func aggregateTokenValue(destTokenPricesUSD map[cciptypes.Address]*big.Int, sour
 	for i := 0; i < len(tokensAndAmount); i++ {
 		price, ok := destTokenPricesUSD[sourceToDest[tokensAndAmount[i].Token]]
 		if !ok {
-			return nil, errors.Errorf("do not have price for source token %v", tokensAndAmount[i].Token)
+			// If we don't have a price for the token, we will assume it's worth 0.
+			continue
 		}
 		sum.Add(sum, new(big.Int).Quo(new(big.Int).Mul(price, tokensAndAmount[i].Amount), big.NewInt(1e18)))
 	}
@@ -773,25 +782,6 @@ func (r *ExecutionReportingPlugin) isStaleReport(ctx context.Context, messages [
 
 func (r *ExecutionReportingPlugin) Close() error {
 	return nil
-}
-
-func inflightAggregates(
-	inflight []InflightInternalExecutionReport,
-	destTokenPrices map[cciptypes.Address]*big.Int,
-	sourceToDest map[cciptypes.Address]cciptypes.Address,
-) (*big.Int, error) {
-	inflightAggregateValue := big.NewInt(0)
-
-	for _, rep := range inflight {
-		for _, message := range rep.messages {
-			msgValue, err := aggregateTokenValue(destTokenPrices, sourceToDest, message.TokenAmounts)
-			if err != nil {
-				return nil, err
-			}
-			inflightAggregateValue.Add(inflightAggregateValue, msgValue)
-		}
-	}
-	return inflightAggregateValue, nil
 }
 
 // getTokensPrices returns token prices of the given price registry,
