@@ -210,17 +210,10 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 				return nil, err
 			}
 
-			inflightAggregateValue := big.NewInt(0)
-
-			for _, rep := range inflight {
-				for _, message := range rep.messages {
-					msgValue, err := aggregateTokenValue(tokenExecData.destTokenPrices, tokenExecData.sourceToDestTokens, message.TokenAmounts)
-					if err != nil {
-						lggr.Errorw("Unexpected error computing inflight values", "err", err)
-						return []ccip.ObservedMessage{}, nil
-					}
-					inflightAggregateValue.Add(inflightAggregateValue, msgValue)
-				}
+			inflightAggregateValue, err := getInflightAggregateRateLimit(lggr, inflight, tokenExecData.destTokenPrices, tokenExecData.sourceToDestTokens)
+			if err != nil {
+				lggr.Errorw("Unexpected error computing inflight values", "err", err)
+				return []ccip.ObservedMessage{}, nil
 			}
 
 			batch := r.buildBatch(
@@ -313,7 +306,7 @@ func (r *ExecutionReportingPlugin) buildBatch(
 			continue
 		}
 
-		msgValue, err := aggregateTokenValue(destTokenPricesUSD, sourceToDestToken, msg.TokenAmounts)
+		msgValue, err := aggregateTokenValue(lggr, destTokenPricesUSD, sourceToDestToken, msg.TokenAmounts)
 		if err != nil {
 			msgLggr.Errorw("Skipping message unable to compute aggregate value", "err", err)
 			continue
@@ -530,12 +523,13 @@ func (r *ExecutionReportingPlugin) getReportsWithSendRequests(
 	return reportsWithSendReqs, nil
 }
 
-func aggregateTokenValue(destTokenPricesUSD map[cciptypes.Address]*big.Int, sourceToDest map[cciptypes.Address]cciptypes.Address, tokensAndAmount []cciptypes.TokenAmount) (*big.Int, error) {
+func aggregateTokenValue(lggr logger.Logger, destTokenPricesUSD map[cciptypes.Address]*big.Int, sourceToDest map[cciptypes.Address]cciptypes.Address, tokensAndAmount []cciptypes.TokenAmount) (*big.Int, error) {
 	sum := big.NewInt(0)
 	for i := 0; i < len(tokensAndAmount); i++ {
 		price, ok := destTokenPricesUSD[sourceToDest[tokensAndAmount[i].Token]]
 		if !ok {
 			// If we don't have a price for the token, we will assume it's worth 0.
+			lggr.Infof("No price for token %s, assuming 0", tokensAndAmount[i].Token)
 			continue
 		}
 		sum.Add(sum, new(big.Int).Quo(new(big.Int).Mul(price, tokensAndAmount[i].Amount), big.NewInt(1e18)))
@@ -782,6 +776,26 @@ func (r *ExecutionReportingPlugin) isStaleReport(ctx context.Context, messages [
 
 func (r *ExecutionReportingPlugin) Close() error {
 	return nil
+}
+
+func getInflightAggregateRateLimit(
+	lggr logger.Logger,
+	inflight []InflightInternalExecutionReport,
+	destTokenPrices map[cciptypes.Address]*big.Int,
+	sourceToDest map[cciptypes.Address]cciptypes.Address,
+) (*big.Int, error) {
+	inflightAggregateValue := big.NewInt(0)
+
+	for _, rep := range inflight {
+		for _, message := range rep.messages {
+			msgValue, err := aggregateTokenValue(lggr, destTokenPrices, sourceToDest, message.TokenAmounts)
+			if err != nil {
+				return nil, err
+			}
+			inflightAggregateValue.Add(inflightAggregateValue, msgValue)
+		}
+	}
+	return inflightAggregateValue, nil
 }
 
 // getTokensPrices returns token prices of the given price registry,

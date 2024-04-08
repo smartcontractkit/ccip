@@ -6,12 +6,14 @@ import (
 	"encoding/json"
 	"math"
 	"math/big"
+	"reflect"
 	"sort"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/cometbft/cometbft/libs/rand"
+	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
 	"github.com/smartcontractkit/libocr/commontypes"
@@ -1122,6 +1124,129 @@ func Test_calculateMessageMaxGas(t *testing.T) {
 			}
 			assert.NoError(t, err)
 			assert.Equalf(t, tt.want, got, "calculateMessageMaxGas(%v, %v, %v, %v)", tt.args.gasLimit, tt.args.numRequests, tt.args.dataLen, tt.args.numTokens)
+		})
+	}
+}
+
+func Test_inflightAggregates(t *testing.T) {
+	const n = 10
+	addrs := make([]cciptypes.Address, n)
+	tokenAddrs := make([]cciptypes.Address, n)
+	for i := range addrs {
+		addrs[i] = cciptypes.Address(utils.RandomAddress().String())
+		tokenAddrs[i] = cciptypes.Address(utils.RandomAddress().String())
+	}
+	lggr := logger.TestLogger(t)
+
+	testCases := []struct {
+		name            string
+		inflight        []InflightInternalExecutionReport
+		destTokenPrices map[cciptypes.Address]*big.Int
+		sourceToDest    map[cciptypes.Address]cciptypes.Address
+
+		expInflightSeqNrs          mapset.Set[uint64]
+		expInflightAggrVal         *big.Int
+		expMaxInflightSenderNonces map[cciptypes.Address]uint64
+		expInflightTokenAmounts    map[cciptypes.Address]*big.Int
+		expErr                     bool
+	}{
+		{
+			name: "base",
+			inflight: []InflightInternalExecutionReport{
+				{
+					messages: []cciptypes.EVM2EVMMessage{
+						{
+							Sender:         addrs[0],
+							SequenceNumber: 100,
+							Nonce:          2,
+							TokenAmounts: []cciptypes.TokenAmount{
+								{Token: tokenAddrs[0], Amount: big.NewInt(1e18)},
+								{Token: tokenAddrs[0], Amount: big.NewInt(2e18)},
+							},
+						},
+						{
+							Sender:         addrs[0],
+							SequenceNumber: 106,
+							Nonce:          4,
+							TokenAmounts: []cciptypes.TokenAmount{
+								{Token: tokenAddrs[0], Amount: big.NewInt(1e18)},
+								{Token: tokenAddrs[0], Amount: big.NewInt(5e18)},
+								{Token: tokenAddrs[2], Amount: big.NewInt(5e18)},
+							},
+						},
+					},
+				},
+			},
+			destTokenPrices: map[cciptypes.Address]*big.Int{
+				tokenAddrs[1]: big.NewInt(1000),
+				tokenAddrs[3]: big.NewInt(500),
+			},
+			sourceToDest: map[cciptypes.Address]cciptypes.Address{
+				tokenAddrs[0]: tokenAddrs[1],
+				tokenAddrs[2]: tokenAddrs[3],
+			},
+			expInflightSeqNrs:  mapset.NewSet[uint64](100, 106),
+			expInflightAggrVal: big.NewInt(9*1000 + 5*500),
+			expMaxInflightSenderNonces: map[cciptypes.Address]uint64{
+				addrs[0]: 4,
+			},
+			expInflightTokenAmounts: map[cciptypes.Address]*big.Int{
+				tokenAddrs[0]: big.NewInt(9e18),
+				tokenAddrs[2]: big.NewInt(5e18),
+			},
+			expErr: false,
+		},
+		{
+			name: "missing price should be 0",
+			inflight: []InflightInternalExecutionReport{
+				{
+					messages: []cciptypes.EVM2EVMMessage{
+						{
+							Sender:         addrs[0],
+							SequenceNumber: 100,
+							Nonce:          2,
+							TokenAmounts: []cciptypes.TokenAmount{
+								{Token: tokenAddrs[0], Amount: big.NewInt(1e18)},
+							},
+						},
+					},
+				},
+			},
+			destTokenPrices: map[cciptypes.Address]*big.Int{
+				tokenAddrs[3]: big.NewInt(500),
+			},
+			sourceToDest: map[cciptypes.Address]cciptypes.Address{
+				tokenAddrs[2]: tokenAddrs[3],
+			},
+			expInflightAggrVal: big.NewInt(0),
+			expErr:             false,
+		},
+		{
+			name:                       "nothing inflight",
+			inflight:                   []InflightInternalExecutionReport{},
+			expInflightSeqNrs:          mapset.NewSet[uint64](),
+			expInflightAggrVal:         big.NewInt(0),
+			expMaxInflightSenderNonces: map[cciptypes.Address]uint64{},
+			expInflightTokenAmounts:    map[cciptypes.Address]*big.Int{},
+			expErr:                     false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			inflightAggrVal, err := getInflightAggregateRateLimit(
+				lggr,
+				tc.inflight,
+				tc.destTokenPrices,
+				tc.sourceToDest,
+			)
+
+			if tc.expErr {
+				assert.Error(t, err)
+				return
+			}
+			assert.NoError(t, err)
+			assert.True(t, reflect.DeepEqual(tc.expInflightAggrVal, inflightAggrVal))
 		})
 	}
 }
