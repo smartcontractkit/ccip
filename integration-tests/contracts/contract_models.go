@@ -13,6 +13,8 @@ import (
 	ocrConfigHelper "github.com/smartcontractkit/libocr/offchainreporting/confighelper"
 	ocrConfigHelper2 "github.com/smartcontractkit/libocr/offchainreporting2plus/confighelper"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/config"
+
 	"github.com/smartcontractkit/chainlink/integration-tests/client"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/flux_aggregator_wrapper"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/functions_billing_registry_events_mock"
@@ -112,34 +114,44 @@ type OffChainAggregatorConfig struct {
 }
 
 type OffChainAggregatorV2Config struct {
-	DeltaProgress                           time.Duration
-	DeltaResend                             time.Duration
-	DeltaRound                              time.Duration
-	DeltaGrace                              time.Duration
-	DeltaStage                              time.Duration
-	RMax                                    uint8
-	S                                       []int
-	Oracles                                 []ocrConfigHelper2.OracleIdentityExtra
-	ReportingPluginConfig                   []byte
-	MaxDurationQuery                        time.Duration
-	MaxDurationObservation                  time.Duration
-	MaxDurationReport                       time.Duration
-	MaxDurationShouldAcceptFinalizedReport  time.Duration
-	MaxDurationShouldTransmitAcceptedReport time.Duration
-	F                                       int
-	OnchainConfig                           []byte
+	DeltaProgress                           *config.Duration                       `toml:",omitempty"`
+	DeltaResend                             *config.Duration                       `toml:",omitempty"`
+	DeltaRound                              *config.Duration                       `toml:",omitempty"`
+	DeltaGrace                              *config.Duration                       `toml:",omitempty"`
+	DeltaStage                              *config.Duration                       `toml:",omitempty"`
+	RMax                                    uint8                                  `toml:"-"`
+	S                                       []int                                  `toml:"-"`
+	Oracles                                 []ocrConfigHelper2.OracleIdentityExtra `toml:"-"`
+	ReportingPluginConfig                   []byte                                 `toml:"-"`
+	MaxDurationQuery                        *config.Duration                       `toml:",omitempty"`
+	MaxDurationObservation                  *config.Duration                       `toml:",omitempty"`
+	MaxDurationReport                       *config.Duration                       `toml:",omitempty"`
+	MaxDurationShouldAcceptFinalizedReport  *config.Duration                       `toml:",omitempty"`
+	MaxDurationShouldTransmitAcceptedReport *config.Duration                       `toml:",omitempty"`
+	F                                       int                                    `toml:"-"`
+	OnchainConfig                           []byte                                 `toml:"-"`
 }
 
 type OffchainAggregatorData struct {
 	LatestRoundData RoundData // Data about the latest round
 }
 
+type ChainlinkNodeWithKeysAndAddress interface {
+	MustReadOCRKeys() (*client.OCRKeys, error)
+	MustReadP2PKeys() (*client.P2PKeys, error)
+	ExportEVMKeysForChain(string) ([]*client.ExportedEVMKey, error)
+	PrimaryEthAddress() (string, error)
+}
+
+type OffChainAggregatorWithRounds interface {
+	Address() string
+	GetLatestRound(ctx context.Context) (*RoundData, error)
+	RequestNewRound() error
+}
+
 type OffchainAggregator interface {
 	Address() string
-	Fund(nativeAmount *big.Float) error
-	GetContractData(ctx context.Context) (*OffchainAggregatorData, error)
-	SetConfig(chainlinkNodes []*client.ChainlinkK8sClient, ocrConfig OffChainAggregatorConfig, transmitters []common.Address) error
-	SetConfigLocal(chainlinkNodes []*client.ChainlinkClient, ocrConfig OffChainAggregatorConfig, transmitters []common.Address) error
+	SetConfig(chainlinkNodes []ChainlinkNodeWithKeysAndAddress, ocrConfig OffChainAggregatorConfig, transmitters []common.Address) error
 	SetPayees([]string, []string) error
 	RequestNewRound() error
 	GetLatestAnswer(ctx context.Context) (*big.Int, error)
@@ -151,10 +163,8 @@ type OffchainAggregator interface {
 
 type OffchainAggregatorV2 interface {
 	Address() string
-	Fund(nativeAmount *big.Float) error
 	RequestNewRound() error
 	SetConfig(ocrConfig *OCRv2Config) error
-	GetConfig(ctx context.Context) ([32]byte, uint32, error)
 	SetPayees(transmitters, payees []string) error
 	GetLatestAnswer(ctx context.Context) (*big.Int, error)
 	GetLatestRound(ctx context.Context) (*RoundData, error)
@@ -210,6 +220,7 @@ type MockGasFeed interface {
 
 type BlockHashStore interface {
 	Address() string
+	GetBlockHash(ctx context.Context, blockNumber *big.Int) ([32]byte, error)
 }
 
 type Staking interface {
@@ -386,6 +397,7 @@ type MercuryVerifierProxy interface {
 
 type MercuryFeeManager interface {
 	Address() common.Address
+	UpdateSubscriberDiscount(subscriber common.Address, feedId [32]byte, token common.Address, discount uint64) (*types.Transaction, error)
 }
 
 type MercuryRewardManager interface {

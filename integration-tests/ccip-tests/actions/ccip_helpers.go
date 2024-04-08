@@ -3134,7 +3134,6 @@ func SetOCR2Configs(commitNodes, execNodes []*client.CLNodesWithKeys, destCCIP D
 			1e6,
 			*config2.MustNewDuration(5 * time.Second),
 			1e6,
-			200e9,
 			*inflightExpiryCommit,
 		), testhelpers.NewCommitOnchainConfig(
 			destCCIP.Common.PriceRegistry.EthAddress,
@@ -3159,7 +3158,6 @@ func SetOCR2Configs(commitNodes, execNodes []*client.CLNodesWithKeys, destCCIP D
 				1,
 				7_000_000,
 				0.7,
-				200e9,
 				*inflightExpiryExec,
 				*rootSnooze,
 			), testhelpers.NewExecOnchainConfig(

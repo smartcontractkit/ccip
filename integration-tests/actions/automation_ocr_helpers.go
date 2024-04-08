@@ -20,17 +20,15 @@ import (
 
 	ocr2keepers20config "github.com/smartcontractkit/chainlink-automation/pkg/v2/config"
 	ocr2keepers30config "github.com/smartcontractkit/chainlink-automation/pkg/v3/config"
-
 	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
 	"github.com/smartcontractkit/chainlink-testing-framework/logging"
-
-	"github.com/smartcontractkit/chainlink/v2/core/services/job"
-	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/chaintype"
-	"github.com/smartcontractkit/chainlink/v2/core/store/models"
 
 	"github.com/smartcontractkit/chainlink/integration-tests/client"
 	"github.com/smartcontractkit/chainlink/integration-tests/contracts"
 	"github.com/smartcontractkit/chainlink/integration-tests/contracts/ethereum"
+	"github.com/smartcontractkit/chainlink/v2/core/services/job"
+	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/chaintype"
+	"github.com/smartcontractkit/chainlink/v2/core/store/models"
 )
 
 func BuildAutoOCR2ConfigVars(
@@ -65,7 +63,7 @@ func BuildAutoOCR2ConfigVarsWithKeyIndex(
 	var offchainConfigVersion uint64
 	var offchainConfig []byte
 
-	if registryConfig.RegistryVersion == ethereum.RegistryVersion_2_1 {
+	if registryConfig.RegistryVersion == ethereum.RegistryVersion_2_1 || registryConfig.RegistryVersion == ethereum.RegistryVersion_2_2 {
 		offC, err = json.Marshal(ocr2keepers30config.OffchainConfig{
 			TargetProbability:    "0.999",
 			TargetInRounds:       1,
@@ -183,12 +181,12 @@ func CreateOCRKeeperJobs(
 	bootstrapP2PId := bootstrapP2PIds.Data[0].Attributes.PeerID
 
 	var contractVersion string
-	if registryVersion == ethereum.RegistryVersion_2_1 {
+	if registryVersion == ethereum.RegistryVersion_2_2 {
+		contractVersion = "v2.1+"
+	} else if registryVersion == ethereum.RegistryVersion_2_1 {
 		contractVersion = "v2.1"
-	} else if registryVersion == ethereum.RegistryVersion_2_0 {
-		contractVersion = "v2.0"
 	} else {
-		require.FailNow(t, "v2.0 and v2.1 are the only supported versions")
+		require.FailNow(t, "v2.0, v2.1, and v2.2 are the only supported versions")
 	}
 
 	bootstrapSpec := &client.OCR2TaskJobSpec{
