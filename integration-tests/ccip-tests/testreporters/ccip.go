@@ -31,6 +31,7 @@ const (
 	ReportBlessed      Phase  = "ReportBlessedByARM"
 	Success            Status = "✅"
 	Failure            Status = "❌"
+	Unsure                    = "⚠️"
 	slackFile          string = "payload_ccip.json"
 )
 
@@ -84,15 +85,15 @@ func (stat *RequestStat) UpdateState(lggr zerolog.Logger, seqNum uint64, step Ph
 		event.Uint64("seq num", seqNum)
 	}
 	// if any of the phase fails mark the E2E as failed
-	if state == Failure {
+	if state == Failure || state == Unsure {
 		stat.StatusByPhase[E2E] = PhaseStat{
 			SeqNum: seqNum,
 			Status: state,
 		}
 		lggr.Info().
-			Str(fmt.Sprint(E2E), string(Failure)).
+			Str(fmt.Sprint(E2E), string(state)).
 			Msgf("reqNo %d", stat.ReqNo)
-		event.Str(string(step), string(Failure)).Msgf("reqNo %d", stat.ReqNo)
+		event.Str(string(step), string(state)).Msgf("reqNo %d", stat.ReqNo)
 	} else {
 		event.Str(string(step), string(Success)).Msgf("reqNo %d", stat.ReqNo)
 		if step == Commit || step == ReportBlessed || step == ExecStateChanged {
@@ -175,7 +176,10 @@ func (testStats *CCIPLaneStats) Finalize(lane string) {
 		}
 		return true
 	})
-
+	// if no phase stats are found return
+	if testStats.TotalRequests <= 0 {
+		return
+	}
 	testStats.lggr.Info().Int64("Total Requests Triggerred", testStats.TotalRequests).Msg("Test Run Completed")
 	for _, phase := range phases {
 		events[phase] = testStats.lggr.Info().Str("Phase", string(phase))

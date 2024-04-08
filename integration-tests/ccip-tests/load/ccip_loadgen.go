@@ -19,7 +19,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
 
-	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
+	"github.com/smartcontractkit/chainlink-common/pkg/config"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
@@ -29,27 +29,56 @@ import (
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/testreporters"
 )
 
-type CCIPE2ELoad struct {
-	t                         *testing.T
-	Lane                      *actions.CCIPLane
-	NoOfReq                   int64         // approx no of Request fired
-	CurrentMsgSerialNo        *atomic.Int64 // current msg serial number in the load sequence
-	CallTimeOut               time.Duration // max time to wait for various on-chain events
-	msg                       router.ClientEVM2AnyMessage
-	MaxDataBytes              uint32
-	SendMaxDataIntermittently bool
-	LastFinalizedTxBlock      atomic.Uint64
-	LastFinalizedTimestamp    atomic.Time
+// CCIPLaneOptimized is a light-weight version of CCIPLane, It only contains elements which are used during load triggering and validation
+type CCIPLaneOptimized struct {
+	Logger            zerolog.Logger
+	SourceNetworkName string
+	DestNetworkName   string
+	Source            *actions.SourceCCIPModule
+	Dest              *actions.DestCCIPModule
+	Reports           *testreporters.CCIPLaneStats
 }
 
-func NewCCIPLoad(t *testing.T, lane *actions.CCIPLane, timeout time.Duration, noOfReq int64) *CCIPE2ELoad {
+type CCIPE2ELoad struct {
+	t                                          *testing.T
+	Lane                                       *CCIPLaneOptimized
+	NoOfReq                                    int64         // approx no of Request fired
+	CurrentMsgSerialNo                         *atomic.Int64 // current msg serial number in the load sequence
+	CallTimeOut                                time.Duration // max time to wait for various on-chain events
+	msg                                        router.ClientEVM2AnyMessage
+	MaxDataBytes                               uint32
+	SendMaxDataIntermittentlyInMsgCount        int64
+	SkipRequestIfAnotherRequestTriggeredWithin *config.Duration
+	LastFinalizedTxBlock                       atomic.Uint64
+	LastFinalizedTimestamp                     atomic.Time
+}
+
+func NewCCIPLoad(
+	t *testing.T,
+	lane *actions.CCIPLane,
+	timeout time.Duration,
+	noOfReq int64,
+	sendMaxDataIntermittentlyInEveryMsgCount int64,
+	SkipRequestIfAnotherRequestTriggeredWithin *config.Duration,
+) *CCIPE2ELoad {
+	// to avoid holding extra data
+	loadLane := &CCIPLaneOptimized{
+		Logger:            lane.Logger,
+		SourceNetworkName: lane.SourceNetworkName,
+		DestNetworkName:   lane.DestNetworkName,
+		Source:            lane.Source,
+		Dest:              lane.Dest,
+		Reports:           lane.Reports,
+	}
+
 	return &CCIPE2ELoad{
-		t:                         t,
-		Lane:                      lane,
-		CurrentMsgSerialNo:        atomic.NewInt64(1),
-		CallTimeOut:               timeout,
-		NoOfReq:                   noOfReq,
-		SendMaxDataIntermittently: true,
+		t:                                   t,
+		Lane:                                loadLane,
+		CurrentMsgSerialNo:                  atomic.NewInt64(1),
+		CallTimeOut:                         timeout,
+		NoOfReq:                             noOfReq,
+		SendMaxDataIntermittentlyInMsgCount: sendMaxDataIntermittentlyInEveryMsgCount,
+		SkipRequestIfAnotherRequestTriggeredWithin: SkipRequestIfAnotherRequestTriggeredWithin,
 	}
 }
 
@@ -61,7 +90,11 @@ func (c *CCIPE2ELoad) BeforeAllCall(msgType string, gasLimit *big.Int) {
 	destCCIP := c.Lane.Dest
 	var tokenAndAmounts []router.ClientEVMTokenAmount
 	for i := range c.Lane.Source.TransferAmount {
-		token := sourceCCIP.Common.BridgeTokens[i]
+		// if length of sourceCCIP.TransferAmount is more than available bridge token use first bridge token
+		token := sourceCCIP.Common.BridgeTokens[0]
+		if i < len(sourceCCIP.Common.BridgeTokens) {
+			token = sourceCCIP.Common.BridgeTokens[i]
+		}
 		tokenAndAmounts = append(tokenAndAmounts, router.ClientEVMTokenAmount{
 			Token: common.HexToAddress(token.Address()), Amount: c.Lane.Source.TransferAmount[i],
 		})
@@ -84,7 +117,7 @@ func (c *CCIPE2ELoad) BeforeAllCall(msgType string, gasLimit *big.Int) {
 	if msgType == actions.TokenTransfer {
 		c.msg.TokenAmounts = tokenAndAmounts
 	}
-	if c.SendMaxDataIntermittently {
+	if c.SendMaxDataIntermittentlyInMsgCount > 0 {
 		dCfg, err := sourceCCIP.OnRamp.Instance.GetDynamicConfig(nil)
 		require.NoError(c.t, err, "failed to fetch dynamic config")
 		c.MaxDataBytes = dCfg.MaxDataBytes
@@ -92,7 +125,11 @@ func (c *CCIPE2ELoad) BeforeAllCall(msgType string, gasLimit *big.Int) {
 	// if the msg is sent via multicall, transfer the token transfer amount to multicall contract
 	if sourceCCIP.Common.MulticallEnabled && sourceCCIP.Common.MulticallContract != (common.Address{}) {
 		for i, amount := range sourceCCIP.TransferAmount {
-			token := sourceCCIP.Common.BridgeTokens[i]
+			// if length of sourceCCIP.TransferAmount is more than available bridge token use first bridge token
+			token := sourceCCIP.Common.BridgeTokens[0]
+			if i < len(sourceCCIP.Common.BridgeTokens) {
+				token = sourceCCIP.Common.BridgeTokens[i]
+			}
 			amountToApprove := new(big.Int).Mul(amount, big.NewInt(c.NoOfReq))
 			bal, err := token.BalanceOf(context.Background(), sourceCCIP.Common.MulticallContract.Hex())
 			require.NoError(c.t, err, "Failed to get token balance")
@@ -101,6 +138,13 @@ func (c *CCIPE2ELoad) BeforeAllCall(msgType string, gasLimit *big.Int) {
 				require.NoError(c.t, err, "Failed to approve token transfer amount")
 			}
 		}
+	}
+	// if it's not multicall set the tokens to nil to free up some space,
+	// we have already formed the msg to be sent in load, there is no need to store the bridge tokens anymore
+	// In case of multicall we still need the BridgeTokens to transfer amount from mutlicall to owner
+	if !sourceCCIP.Common.MulticallEnabled {
+		sourceCCIP.Common.BridgeTokens = nil
+		destCCIP.Common.BridgeTokens = nil
 	}
 	// wait for any pending txs before moving on
 	err = sourceCCIP.Common.ChainClient.WaitForEvents()
@@ -112,19 +156,6 @@ func (c *CCIPE2ELoad) BeforeAllCall(msgType string, gasLimit *big.Int) {
 
 	sourceCCIP.Common.ChainClient.ParallelTransactions(false)
 	destCCIP.Common.ChainClient.ParallelTransactions(false)
-	// close all header subscriptions for dest chains
-	queuedEvents := destCCIP.Common.ChainClient.GetHeaderSubscriptions()
-	for subName := range queuedEvents {
-		destCCIP.Common.ChainClient.DeleteHeaderEventSubscription(subName)
-	}
-	// close all header subscriptions for source chains except for finalized header
-	queuedEvents = sourceCCIP.Common.ChainClient.GetHeaderSubscriptions()
-	for subName := range queuedEvents {
-		if subName == blockchain.FinalizedHeaderKey {
-			continue
-		}
-		sourceCCIP.Common.ChainClient.DeleteHeaderEventSubscription(subName)
-	}
 }
 
 func (c *CCIPE2ELoad) CCIPMsg() (router.ClientEVM2AnyMessage, *testreporters.RequestStat) {
@@ -134,9 +165,9 @@ func (c *CCIPE2ELoad) CCIPMsg() (router.ClientEVM2AnyMessage, *testreporters.Req
 	stats := testreporters.NewCCIPRequestStats(msgSerialNo, c.Lane.SourceNetworkName, c.Lane.DestNetworkName)
 	// form the message for transfer
 	msgStr := fmt.Sprintf("new message with Id %d", msgSerialNo)
-	if c.SendMaxDataIntermittently {
-		// every 100th message will have extra data with almost MaxDataBytes
-		if msgSerialNo%100 == 0 {
+	if c.SendMaxDataIntermittentlyInMsgCount > 0 {
+		// every SendMaxDataIntermittentlyInMsgCount message will have extra data with almost MaxDataBytes
+		if msgSerialNo%c.SendMaxDataIntermittentlyInMsgCount == 0 {
 			length := c.MaxDataBytes - 1
 			b := make([]byte, c.MaxDataBytes-1)
 			_, err := crypto_rand.Read(b)
@@ -155,12 +186,18 @@ func (c *CCIPE2ELoad) CCIPMsg() (router.ClientEVM2AnyMessage, *testreporters.Req
 func (c *CCIPE2ELoad) Call(_ *wasp.Generator) *wasp.Response {
 	res := &wasp.Response{}
 	sourceCCIP := c.Lane.Source
-
+	recentRequestFoundAt := sourceCCIP.IsRequestTriggeredWithinTimeframe(c.SkipRequestIfAnotherRequestTriggeredWithin)
+	if recentRequestFoundAt != nil {
+		c.Lane.Logger.
+			Info().
+			Str("Found At=", recentRequestFoundAt.String()).
+			Msgf("Skipping ...Another Request found within given timeframe %s", c.SkipRequestIfAnotherRequestTriggeredWithin.String())
+		return res
+	}
 	msg, stats := c.CCIPMsg()
 	msgSerialNo := stats.ReqNo
 	lggr := c.Lane.Logger.With().Int64("msg Number", stats.ReqNo).Logger()
 
-	defer c.Lane.Reports.UpdatePhaseStatsForReq(stats)
 	feeToken := sourceCCIP.Common.FeeToken.EthAddress
 	// initiate the transfer
 	lggr.Debug().Str("triggeredAt", time.Now().GoString()).Msg("triggering transfer")
@@ -186,7 +223,8 @@ func (c *CCIPE2ELoad) Call(_ *wasp.Generator) *wasp.Response {
 	if feeToken != common.HexToAddress("0x0") {
 		sendTx, err = sourceCCIP.Common.Router.CCIPSend(destChainSelector, msg, nil)
 	} else {
-		sendTx, err = sourceCCIP.Common.Router.CCIPSend(destChainSelector, msg, fee)
+		// add a bit buffer to fee
+		sendTx, err = sourceCCIP.Common.Router.CCIPSend(destChainSelector, msg, new(big.Int).Add(big.NewInt(1e2), fee))
 	}
 	if err != nil {
 		stats.UpdateState(lggr, 0, testreporters.TX, time.Since(startTime), testreporters.Failure)

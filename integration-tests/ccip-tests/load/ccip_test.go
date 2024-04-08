@@ -295,3 +295,30 @@ func TestLoadCCIPStableWithPodChaosDiffCommitAndExec(t *testing.T) {
 		})
 	}
 }
+
+// TestLoadCCIPStableRPSAfterARMCurseAndUncurse validates that after ARM curse is lifted
+// all pending requests get delivered.
+// The test pauses loadgen while ARM is cursed and resumes it when curse is lifted.
+// There is a known limitation of this test - if the test is run on remote-runner with high frequency
+// the remote-runner pod gets evicted after the loadgen is resumed.
+// The recommended frequency for this test 2req/min
+func TestLoadCCIPStableRPSAfterARMCurseAndUncurse(t *testing.T) {
+	t.Parallel()
+	lggr := logging.GetTestLogger(t)
+	testArgs := NewLoadArgs(t, lggr)
+	testArgs.Setup()
+	// if the test runs on remote runner
+	if len(testArgs.TestSetupArgs.Lanes) == 0 {
+		return
+	}
+	t.Cleanup(func() {
+		log.Info().Msg("Tearing down the environment")
+		require.NoError(t, testArgs.TestSetupArgs.TearDown())
+	})
+	testArgs.TriggerLoadByLane()
+	// wait for certain time so that few messages are sent
+	time.Sleep(2 * time.Minute)
+	// now validate the curse
+	testArgs.ValidateCurseFollowedByUncurse()
+	testArgs.Wait()
+}
