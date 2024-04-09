@@ -6,6 +6,10 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/burn_mint_token_pool"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/lock_release_token_pool"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/token_admin_registry"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/usdc_token_pool"
 	"strings"
 
 	"github.com/ethereum/go-ethereum"
@@ -129,7 +133,11 @@ func getAllABIs() []string {
 		lock_release_token_pool_1_4_0.LockReleaseTokenPoolABI,
 		burn_mint_token_pool_1_2_0.BurnMintTokenPoolABI,
 		usdc_token_pool_1_4_0.USDCTokenPoolABI,
+		lock_release_token_pool.LockReleaseTokenPoolABI,
+		burn_mint_token_pool.BurnMintTokenPoolABI,
+		usdc_token_pool.USDCTokenPoolABI,
 		commit_store.CommitStoreABI,
+		token_admin_registry.TokenAdminRegistryABI,
 		price_registry.PriceRegistryABI,
 		evm_2_evm_onramp.EVM2EVMOnRampABI,
 		evm_2_evm_offramp.EVM2EVMOffRampABI,

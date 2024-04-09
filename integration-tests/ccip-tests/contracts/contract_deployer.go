@@ -5,9 +5,6 @@ import (
 	"crypto/ed25519"
 	"encoding/hex"
 	"fmt"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/lock_release_token_pool"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/token_pool"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/usdc_token_pool"
 	"math/big"
 	"strings"
 	"time"
@@ -27,7 +24,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
 
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/lock_release_token_pool_1_4_0"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/token_admin_registry"
 
 	"github.com/smartcontractkit/chainlink/integration-tests/client"
@@ -37,6 +33,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/maybe_revert_message_receiver"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_arm_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_usdc_token_messenger"
@@ -44,7 +41,8 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_v3_aggregator_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/price_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/usdc_token_pool_1_4_0"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/token_pool"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/usdc_token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/weth9"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/link_token_interface"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/burn_mint_erc677"
@@ -320,7 +318,7 @@ func (e *CCIPContractsDeployer) DeployUSDCTokenPoolContract(tokenAddr string, to
 		auth *bind.TransactOpts,
 		backend bind.ContractBackend,
 	) (common.Address, *types.Transaction, interface{}, error) {
-		return usdc_token_pool_1_4_0.DeployUSDCTokenPool(
+		return usdc_token_pool.DeployUSDCTokenPool(
 			auth,
 			wrappers.MustNewWrappedContractBackend(e.evmClient, nil),
 			tokenMessenger,
@@ -347,7 +345,7 @@ func (e *CCIPContractsDeployer) DeployLockReleaseTokenPoolContract(tokenAddr str
 		auth *bind.TransactOpts,
 		backend bind.ContractBackend,
 	) (common.Address, *types.Transaction, interface{}, error) {
-		return lock_release_token_pool_1_4_0.DeployLockReleaseTokenPool(
+		return lock_release_token_pool.DeployLockReleaseTokenPool(
 			auth,
 			wrappers.MustNewWrappedContractBackend(e.evmClient, nil),
 			token,

@@ -379,28 +379,6 @@ func (pool *TokenPool) AddLiquidity(approveFn tokenApproveFn, tokenAddr string, 
 	return pool.client.ProcessTransaction(tx)
 }
 
-/*func (pool *TokenPool) ApplyChainUpdates() {
-
-	_, err = sourceLinkPool.ApplyChainUpdates(
-		sourceUser,
-		[]lock_release_token_pool.TokenPoolChainUpdate{{
-			RemoteChainSelector: DestChainSelector,
-			RemotePoolAddress:   abiEncodedDestLinkPool,
-			Allowed:             true,
-			OutboundRateLimiterConfig: lock_release_token_pool.RateLimiterConfig{
-				IsEnabled: true,
-				Capacity:  HundredLink,
-				Rate:      big.NewInt(1e18),
-			},
-			InboundRateLimiterConfig: lock_release_token_pool.RateLimiterConfig{
-				IsEnabled: true,
-				Capacity:  HundredLink,
-				Rate:      big.NewInt(1e18),
-			},
-		}},
-	)
-}*/
-
 func (pool *TokenPool) SetRemotePool(remoteChainSelector uint64, remotePool common.Address) error {
 	log.Info().
 		Str("Token Pool", pool.Address()).
@@ -673,6 +651,48 @@ type TokenAdminRegistry struct {
 
 func (r *TokenAdminRegistry) Address() string {
 	return r.EthAddress.Hex()
+}
+
+func (r *TokenAdminRegistry) SetAdminAndRegisterPool(tokenAddr, poolAddr common.Address) error {
+	opts, err := r.client.TransactionOpts(r.client.GetDefaultWallet())
+	if err != nil {
+		return fmt.Errorf("error getting transaction opts: %w", err)
+	}
+	tx, err := r.Instance.RegisterAdministratorPermissioned(opts, tokenAddr, opts.From)
+	if err != nil {
+		return fmt.Errorf("error setting admin for token %s : %w", tokenAddr.Hex(), err)
+	}
+	err = r.client.ProcessTransaction(tx)
+	if err != nil {
+		return fmt.Errorf("error processing tx for setting admin on token %w", err)
+	}
+	log.Info().
+		Str("Admin", opts.From.Hex()).
+		Str("Token", tokenAddr.Hex()).
+		Str("TokenAdminRegistry", r.Address()).
+		Msg("Admin is set for token on TokenAdminRegistry")
+	err = r.client.WaitForEvents()
+	if err != nil {
+		return fmt.Errorf("error waiting for tx for setting admin on pool %w", err)
+	}
+	opts, err = r.client.TransactionOpts(r.client.GetDefaultWallet())
+	if err != nil {
+		return fmt.Errorf("error getting transaction opts: %w", err)
+	}
+	tx, err = r.Instance.SetPool(opts, tokenAddr, poolAddr)
+	if err != nil {
+		return fmt.Errorf("error setting token %s and pool %s : %w", tokenAddr.Hex(), poolAddr.Hex(), err)
+	}
+	log.Info().
+		Str("token", tokenAddr.Hex()).
+		Str("Pool", poolAddr.Hex()).
+		Str("TokenAdminRegistry", r.Address()).
+		Msg("token and pool are set on TokenAdminRegistry")
+	err = r.client.ProcessTransaction(tx)
+	if err != nil {
+		return fmt.Errorf("error processing tx for setting token %s and pool %s : %w", tokenAddr.Hex(), poolAddr.Hex(), err)
+	}
+	return nil
 }
 
 type Router struct {

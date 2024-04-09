@@ -101,7 +101,7 @@ var (
 	ApprovedAmountToRouter           = new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1))
 	ApprovedFeeAmountToRouter        = new(big.Int).Mul(big.NewInt(int64(GasFeeMultiplier)), big.NewInt(1e5))
 	GasFeeMultiplier          uint64 = 12e17
-	LinkToUSD                        = big.NewInt(6e18)
+	LinkToUSD                        = new(big.Int).Mul(big.NewInt(1e18), big.NewInt(20))
 	WrappedNativeToUSD               = new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1.7e3))
 )
 
@@ -913,13 +913,28 @@ func (ccipModule *CCIPCommon) DeployContracts(noOfTokens int,
 		if err != nil {
 			return fmt.Errorf("error in waiting for token admin registry deployment %w", err)
 		}
+
+		if len(ccipModule.BridgeTokens) != len(ccipModule.BridgeTokenPools) {
+			return fmt.Errorf("tokens number %d and pools number %d do not match", len(ccipModule.BridgeTokens), len(ccipModule.BridgeTokenPools))
+		}
+		// add all pools to registry
+		for i, pool := range ccipModule.BridgeTokenPools {
+			token := ccipModule.BridgeTokens[i]
+			err := ccipModule.TokenAdminRegistry.SetAdminAndRegisterPool(token.ContractAddress, pool.EthAddress)
+			if err != nil {
+				return fmt.Errorf("error setting up token %s and pool %s on TokenAdminRegistry : %w", token.Address(), pool.Address(), err)
+			}
+		}
+		err = ccipModule.ChainClient.WaitForEvents()
+		if err != nil {
+			return fmt.Errorf("error in waiting for token admin registry set up with tokens and pools %w", err)
+		}
 	} else {
 		ccipModule.TokenAdminRegistry, err = cd.NewTokenAdminRegistry(ccipModule.TokenAdminRegistry.EthAddress)
 		if err != nil {
 			return fmt.Errorf("getting new token admin registry contract shouldn't fail %w", err)
 		}
 	}
-
 	log.Info().Msg("finished deploying common contracts")
 	err = ccipModule.SetRemoteChainsOnPools()
 	if err != nil {
@@ -1180,6 +1195,35 @@ func (sourceCCIP *SourceCCIPModule) DeployContracts(lane *laneconfig.LaneConfig)
 		return fmt.Errorf("getting chain selector shouldn't fail %w", err)
 	}
 
+	// update prices for price registry. It might be omitted in future
+	if !sourceCCIP.Common.ExistingDeployment {
+		var tokenUpdates []price_registry.InternalTokenPriceUpdate
+		for _, token := range sourceCCIP.Common.BridgeTokens {
+			tokenUpdates = append(tokenUpdates, price_registry.InternalTokenPriceUpdate{
+				SourceToken: token.ContractAddress,
+				UsdPerToken: LinkToUSD,
+			})
+		}
+		tokenUpdates = append(tokenUpdates, price_registry.InternalTokenPriceUpdate{
+			SourceToken: sourceCCIP.Common.WrappedNative,
+			UsdPerToken: WrappedNativeToUSD,
+		}, price_registry.InternalTokenPriceUpdate{
+			SourceToken: sourceCCIP.Common.FeeToken.EthAddress,
+			UsdPerToken: LinkToUSD,
+		})
+		err := sourceCCIP.Common.PriceRegistry.UpdatePrices(price_registry.InternalPriceUpdates{
+			TokenPriceUpdates: tokenUpdates,
+			GasPriceUpdates: []price_registry.InternalGasPriceUpdate{
+				{
+					DestChainSelector: sourceCCIP.DestChainSelector,
+					UsdPerUnitGas:     big.NewInt(20000e9),
+				},
+			},
+		})
+		if err != nil {
+			return fmt.Errorf("error updating prices %w in price registry", err)
+		}
+	}
 	if sourceCCIP.OnRamp == nil {
 		if sourceCCIP.Common.ExistingDeployment {
 			return fmt.Errorf("existing deployment is set to true but no onramp address is provided")
@@ -1506,6 +1550,7 @@ func (sourceCCIP *SourceCCIPModule) SendRequest(
 	}
 	fee, err := sourceCCIP.Common.Router.GetFee(destChainSelector, msg)
 	if err != nil {
+		log.Info().Interface("Msg", msg).Msg("Ccip msg")
 		reason, _ := blockchain.RPCErrorFromError(err)
 		if reason != "" {
 			return common.Hash{}, d, nil, fmt.Errorf("failed getting the fee: %s", reason)
@@ -1646,6 +1691,10 @@ func (destCCIP *DestCCIPModule) DeployContracts(
 			if err != nil {
 				return fmt.Errorf("error setting remote pools %w", err)
 			}
+		}
+		err = sourceCCIP.Common.ChainClient.WaitForEvents()
+		if err != nil {
+			return fmt.Errorf("waiting for setting remote pools shouldn't fail %w", err)
 		}
 	}
 
