@@ -4,9 +4,12 @@ import (
 	"context"
 	"fmt"
 
+	mapset "github.com/deckarep/golang-set/v2"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/pkg/errors"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
+
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
@@ -131,4 +134,54 @@ func getCommitReportForSeqNum(ctx context.Context, commitStoreReader ccipdata.Co
 	}
 
 	return acceptedReports[0].CommitStoreReport, nil
+}
+
+type messageExecState struct {
+	SeqNr     uint64
+	MessageId string
+	State     string
+}
+
+func newMessageExecState(seqNr uint64, messageId cciptypes.Hash, state string) messageExecState {
+	return messageExecState{
+		SeqNr:     seqNr,
+		MessageId: hexutil.Encode(messageId[:]),
+		State:     state,
+	}
+}
+
+type batchBuildContainer struct {
+	batch          []ccip.ObservedMessage
+	states         []messageExecState
+	skippedSenders mapset.Set[cciptypes.Address]
+}
+
+func newBatchBuildContainer(capacity int) *batchBuildContainer {
+	return &batchBuildContainer{
+		batch:          make([]ccip.ObservedMessage, 0, capacity),
+		states:         make([]messageExecState, 0, capacity),
+		skippedSenders: mapset.NewThreadUnsafeSetWithSize[cciptypes.Address](capacity),
+	}
+}
+
+func (m *batchBuildContainer) isSenderSkipped(sender cciptypes.Address) bool {
+	return m.skippedSenders.Contains(sender)
+}
+
+func (m *batchBuildContainer) skip(msg cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta, state string) {
+	m.addState(msg, state)
+	m.skippedSenders.Add(msg.Sender)
+}
+
+func (m *batchBuildContainer) skipAlreadyExecuted(msg cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta) {
+	m.addState(msg, "already_executed")
+}
+
+func (m *batchBuildContainer) add(msg cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta, tokenData [][]byte) {
+	m.addState(msg, "executed")
+	m.batch = append(m.batch, ccip.NewObservedMessage(msg.SequenceNumber, tokenData))
+}
+
+func (m *batchBuildContainer) addState(msg cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta, state string) {
+	m.states = append(m.states, newMessageExecState(msg.SequenceNumber, msg.MessageID, state))
 }
