@@ -19,7 +19,7 @@ jobs:
       GRAFANA_FOLDER: ${{ secrets.GRAFANA_FOLDER }}
       DASHBOARD_NAME: ${{ secrets.DASHBOARD_NAME }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
