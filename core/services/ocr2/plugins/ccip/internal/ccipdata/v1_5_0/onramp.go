@@ -139,7 +139,7 @@ func (o *OnRamp) GetDynamicConfig(context.Context) (cciptypes.OnRampDynamicConfi
 	}, nil
 }
 
-func (o *OnRamp) RouterAddress() (cciptypes.Address, error) {
+func (o *OnRamp) RouterAddress(context.Context) (cciptypes.Address, error) {
 	config, err := o.onRamp.GetDynamicConfig(nil)
 	if err != nil {
 		return "", err
@@ -153,17 +153,6 @@ func (o *OnRamp) SourcePriceRegistryAddress(ctx context.Context) (cciptypes.Addr
 		if err != nil {
 			return "", err
 		}
-		return c.PriceRegistry, nil
-	})
-}
-
-func (o *OnRamp) SourceTokenAdminRegistryAddress(ctx context.Context) (cciptypes.Address, error) {
-	return o.cachedTokenAdminRegistryAddress.Get(ctx, func(ctx context.Context) (cciptypes.Address, error) {
-		c, err := o.GetDynamicConfig()
-		if err != nil {
-			return "", err
-		}
-		// TODO replace after we update chainlink-common
 		return c.PriceRegistry, nil
 	})
 }
@@ -195,14 +184,6 @@ func (o *OnRamp) GetSendRequestsBetweenSeqNums(ctx context.Context, seqNumMin, s
 		})
 	}
 	return res, nil
-}
-
-func (o *OnRamp) RouterAddress(context.Context) (cciptypes.Address, error) {
-	config, err := o.onRamp.GetDynamicConfig(nil)
-	if err != nil {
-		return "", err
-	}
-	return ccipcalc.EvmAddrToGeneric(config.Router), nil
 }
 
 func (o *OnRamp) IsSourceChainHealthy(context.Context) (bool, error) {

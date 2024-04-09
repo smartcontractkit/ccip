@@ -5,8 +5,6 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/pkg/errors"
-
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
@@ -38,11 +36,6 @@ func (o *OffRamp) GetTokens(ctx context.Context) (cciptypes.OffRampTokens, error
 		DestinationTokens: []cciptypes.Address{},
 		DestinationPool:   make(map[cciptypes.Address]cciptypes.Address),
 	}, nil
-}
-
-// GetDestinationToken Returns no data as the offRamps no longer have this information.
-func (o *OffRamp) GetDestinationToken(ctx context.Context, address common.Address) (common.Address, error) {
-	return common.Address{}, errors.New("not implemented")
 }
 
 func (o *OffRamp) GetSourceToDestTokensMapping(ctx context.Context) (map[cciptypes.Address]cciptypes.Address, error) {
