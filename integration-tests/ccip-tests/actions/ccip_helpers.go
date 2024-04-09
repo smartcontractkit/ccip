@@ -19,6 +19,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
+	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
@@ -543,25 +544,47 @@ func SetPoolsAndConfigurePoolLanes(source, dest *CCIPCommon) error {
 }
 
 func SetPoolAndConfigurePoolLane(local, remote *CCIPCommon) error {
+	if local.TokenAdminRegistry == nil {
+		return fmt.Errorf("token admin registry is not set")
+	}
+
 	for i, token := range local.BridgeTokens {
+		localPool := local.BridgeTokenPools[i]
+		remotePool := remote.BridgeTokenPools[i]
+
+		log.Info().
+			Str("local token", token.ContractAddress.Hex()).
+			Str("local pool", localPool.EthAddress.Hex()).
+			Str("remote pool", remotePool.EthAddress.Hex()).
+			Msg("Setting remote pool on pool")
+
 		// If not in the token admin registry, add it
-		poolInAdminRegistry, err := local.TokenAdminRegistry.Instance.GetPool(nil, token.ContractAddress)
+		poolInAdminRegistry, err := local.TokenAdminRegistry.Instance.GetPool(&bind.CallOpts{}, token.ContractAddress)
 		if err != nil {
 			return fmt.Errorf("getting pool shouldn't fail %w", err)
 		}
-		localPool := local.BridgeTokenPools[i]
 
 		if poolInAdminRegistry != localPool.EthAddress {
+			log.Info().
+				Str("local token", token.ContractAddress.Hex()).
+				Str("local pool", localPool.EthAddress.Hex()).
+				Str("current pool", poolInAdminRegistry.Hex()).
+				Msg("Setting pool in token admin registry")
 			err := local.TokenAdminRegistry.ApplyPoolUpdates(token.ContractAddress, localPool.EthAddress)
 			if err != nil {
-				return err
+				return errors.Wrap(err, "applying pool updates")
 			}
 		}
-
+		log.Info().
+			Str("local token", token.ContractAddress.Hex()).
+			Str("remote chain id", remote.ChainClient.GetChainID().String()).
+			Str("local pool", localPool.EthAddress.Hex()).
+			Str("remote pool", remotePool.EthAddress.Hex()).
+			Msg("Setting SetRemoteChainOnPool")
 		// Set the remote pool on the local pool
-		err = localPool.SetRemoteChainOnPool([]uint64{remote.ChainClient.GetChainID().Uint64()}, []common.Address{remote.BridgeTokenPools[i].EthAddress})
+		err = localPool.SetRemoteChainOnPool([]uint64{remote.ChainClient.GetChainID().Uint64()}, []common.Address{remotePool.EthAddress})
 		if err != nil {
-			return err
+			return errors.Wrap(err, "setting remote chain on pool")
 		}
 	}
 	return nil
@@ -1077,6 +1100,10 @@ func NewCCIPCommonFromConfig(logger zerolog.Logger, chainClient blockchain.EVMCl
 			return nil, err
 		}
 	}
+	newCCIPModule.TokenAdminRegistry, err = newCCIPModule.Deployer.NewTokenAdminRegistry(newCCIPModule.TokenAdminRegistry.EthAddress)
+	if err != nil {
+		return nil, err
+	}
 	return newCCIPModule, nil
 }
 
@@ -1152,7 +1179,6 @@ func (sourceCCIP *SourceCCIPModule) LoadContracts(conf *laneconfig.LaneConfig) {
 	}
 }
 
-// TODO token pool updating
 func (sourceCCIP *SourceCCIPModule) SetTokenTransferFeeConfigOnOnramp() error {
 	tokenTransferFeeConfig := make([]evm_2_evm_onramp.EVM2EVMOnRampTokenTransferFeeConfigArgs, 0)
 	for i, token := range sourceCCIP.Common.BridgeTokens {
@@ -1477,7 +1503,7 @@ func (sourceCCIP *SourceCCIPModule) CCIPMsg(
 	data string,
 	gasLimit *big.Int,
 ) (router.ClientEVM2AnyMessage, error) {
-	tokenAndAmounts := []router.ClientEVMTokenAmount{}
+	var tokenAndAmounts []router.ClientEVMTokenAmount
 	if msgType == TokenTransfer {
 		for i, amount := range sourceCCIP.TransferAmount {
 			// if length of sourceCCIP.TransferAmount is more than available bridge token use first bridge token

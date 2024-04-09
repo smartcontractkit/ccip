@@ -816,13 +816,14 @@ func getTokensPrices(ctx context.Context, priceRegistry ccipdata.PriceRegistryRe
 
 	for i, token := range tokens {
 		// price of a token can never be zero
+		// TODO or can it?
 		if fetchedPrices[i].Value.BitLen() == 0 {
-			priceRegistryAddress, err := priceRegistry.Address(ctx)
-			if err != nil {
-				return nil, fmt.Errorf("get price registry address: %w", err)
-			}
 			continue
-			return nil, fmt.Errorf("price of token %s is zero (price registry=%s)", token, priceRegistryAddress)
+			//priceRegistryAddress, err := priceRegistry.Address(ctx)
+			//if err != nil {
+			//	return nil, fmt.Errorf("get price registry address: %w", err)
+			//}
+			//return nil, fmt.Errorf("price of token %s is zero (price registry=%s)", token, priceRegistryAddress)
 		}
 
 		// price registry should not report different price for the same token
