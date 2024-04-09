@@ -2,6 +2,7 @@ package smoke
 
 import (
 	"fmt"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/token_pool"
 	"math/big"
 	"testing"
 	"time"
@@ -16,8 +17,7 @@ import (
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/testconfig"
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/testsetups"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/lock_release_token_pool"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/token_pool"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/lock_release_token_pool_1_4_0"
 )
 
 type testDefinition struct {
@@ -323,7 +323,7 @@ func TestSmokeCCIPRateLimit(t *testing.T) {
 			)
 			require.NoError(t, err)
 			require.Error(t, tc.lane.Source.Common.ChainClient.WaitForEvents())
-			errReason, v, err = tc.lane.Source.Common.ChainClient.RevertReasonFromTx(failedTx, lock_release_token_pool.LockReleaseTokenPoolABI)
+			errReason, v, err = tc.lane.Source.Common.ChainClient.RevertReasonFromTx(failedTx, lock_release_token_pool_1_4_0.LockReleaseTokenPoolABI)
 			require.NoError(t, err)
 			tc.lane.Logger.Info().
 				Str("Revert Reason", errReason).
@@ -357,7 +357,7 @@ func TestSmokeCCIPRateLimit(t *testing.T) {
 			)
 			require.NoError(t, err)
 			require.Error(t, tc.lane.Source.Common.ChainClient.WaitForEvents())
-			errReason, v, err = tc.lane.Source.Common.ChainClient.RevertReasonFromTx(failedTx, lock_release_token_pool.LockReleaseTokenPoolABI)
+			errReason, v, err = tc.lane.Source.Common.ChainClient.RevertReasonFromTx(failedTx, lock_release_token_pool_1_4_0.LockReleaseTokenPoolABI)
 			require.NoError(t, err)
 			tc.lane.Logger.Info().
 				Str("Revert Reason", errReason).
