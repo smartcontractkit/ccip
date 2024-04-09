@@ -19,7 +19,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/lock_release_token_pool_1_4_0"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/maybe_revert_message_receiver"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_arm_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_usdc_token_transmitter"
@@ -27,11 +27,12 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/price_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/token_admin_registry"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/token_pool_1_4_0"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/usdc_token_pool_1_4_0"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/token_pool"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/usdc_token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/link_token_interface"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/burn_mint_erc677"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/erc20"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 )
 
 var (
@@ -259,9 +260,9 @@ func (l *LinkToken) Transfer(to string, amount *big.Int) error {
 // TokenPool represents a TokenPool address
 type TokenPool struct {
 	client          blockchain.EVMClient
-	PoolInterface   *token_pool_1_4_0.TokenPool
-	LockReleasePool *lock_release_token_pool_1_4_0.LockReleaseTokenPool
-	USDCPool        *usdc_token_pool_1_4_0.USDCTokenPool
+	PoolInterface   *token_pool.TokenPool
+	LockReleasePool *lock_release_token_pool.LockReleaseTokenPool
+	USDCPool        *usdc_token_pool.USDCTokenPool
 	EthAddress      common.Address
 }
 
@@ -295,7 +296,7 @@ func (pool *TokenPool) SyncUSDCDomain(destTokenTransmitter *TokenTransmitter, de
 		Str("Allowed Caller", destPoolAddr.Hex()).
 		Str("Dest Chain Selector", fmt.Sprintf("%d", destChainSelector)).
 		Msg("Syncing USDC Domain")
-	tx, err := pool.USDCPool.SetDomains(opts, []usdc_token_pool_1_4_0.USDCTokenPoolDomainUpdate{
+	tx, err := pool.USDCPool.SetDomains(opts, []usdc_token_pool.USDCTokenPoolDomainUpdate{
 		{
 			AllowedCaller:     allowedCallerBytes,
 			DomainIdentifier:  domain,
@@ -378,12 +379,12 @@ func (pool *TokenPool) AddLiquidity(approveFn tokenApproveFn, tokenAddr string, 
 	return pool.client.ProcessTransaction(tx)
 }
 
-func (pool *TokenPool) SetRemoteChainOnPool(remoteChainSelectors []uint64) error {
+func (pool *TokenPool) SetRemoteChainOnPool(remoteChainSelectors []uint64, remotePoolAddresses []common.Address) error {
 	log.Info().
 		Str("Token Pool", pool.Address()).
 		Msg("Setting remote chain on pool")
-	var selectorsToUpdate []token_pool_1_4_0.TokenPoolChainUpdate
-	for _, remoteChainSelector := range remoteChainSelectors {
+	var selectorsToUpdate []token_pool.TokenPoolChainUpdate
+	for i, remoteChainSelector := range remoteChainSelectors {
 		isSupported, err := pool.PoolInterface.IsSupportedChain(nil, remoteChainSelector)
 		if err != nil {
 			return fmt.Errorf("failed to get if chain is supported: %w", err)
@@ -397,15 +398,20 @@ func (pool *TokenPool) SetRemoteChainOnPool(remoteChainSelectors []uint64) error
 				Msg("Remote chain is already supported")
 			continue
 		}
-		selectorsToUpdate = append(selectorsToUpdate, token_pool_1_4_0.TokenPoolChainUpdate{
+		remotePoolAddress, err := abihelpers.EncodeAddress(remotePoolAddresses[i])
+		if err != nil {
+			return fmt.Errorf("failed to encode remote pool address: %w", err)
+		}
+		selectorsToUpdate = append(selectorsToUpdate, token_pool.TokenPoolChainUpdate{
 			RemoteChainSelector: remoteChainSelector,
+			RemotePoolAddress:   remotePoolAddress,
 			Allowed:             true,
-			InboundRateLimiterConfig: token_pool_1_4_0.RateLimiterConfig{
+			InboundRateLimiterConfig: token_pool.RateLimiterConfig{
 				IsEnabled: true,
 				Capacity:  new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e9)),
 				Rate:      new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e5)),
 			},
-			OutboundRateLimiterConfig: token_pool_1_4_0.RateLimiterConfig{
+			OutboundRateLimiterConfig: token_pool.RateLimiterConfig{
 				IsEnabled: true,
 				Capacity:  new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e9)),
 				Rate:      new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e5)),
@@ -435,7 +441,7 @@ func (pool *TokenPool) SetRemoteChainOnPool(remoteChainSelectors []uint64) error
 	return pool.client.ProcessTransaction(tx)
 }
 
-func (pool *TokenPool) SetRemoteChainRateLimits(remoteChainSelector uint64, rl token_pool_1_4_0.RateLimiterConfig) error {
+func (pool *TokenPool) SetRemoteChainRateLimits(remoteChainSelector uint64, rl token_pool.RateLimiterConfig) error {
 	opts, err := pool.client.TransactionOpts(pool.client.GetDefaultWallet())
 	if err != nil {
 		return fmt.Errorf("error getting transaction opts: %w", err)
@@ -621,6 +627,42 @@ type TokenAdminRegistry struct {
 	EthAddress common.Address
 }
 
+func (tokenAdminRegistry *TokenAdminRegistry) ApplyPoolUpdates(token, pool common.Address) error {
+	opts, err := tokenAdminRegistry.client.TransactionOpts(tokenAdminRegistry.client.GetDefaultWallet())
+	if err != nil {
+		return fmt.Errorf("failed to get transaction opts: %w", err)
+	}
+
+	isAlreadyAdmin, err := tokenAdminRegistry.Instance.IsAdministrator(nil, opts.From, token)
+	if err != nil {
+		return fmt.Errorf("failed to check if already admin: %w", err)
+	}
+
+	if !isAlreadyAdmin {
+		tx, err := tokenAdminRegistry.Instance.RegisterAdministratorPermissioned(opts, token, opts.From)
+		if err != nil {
+			return err
+		}
+		err = tokenAdminRegistry.client.ProcessTransaction(tx)
+		if err != nil {
+			return err
+		}
+	}
+
+	tx, err := tokenAdminRegistry.Instance.SetPool(opts, token, pool)
+	if err != nil {
+		return fmt.Errorf("failed to set pool: %w", err)
+	}
+	log.Info().
+		Str("token", token.Hex()).
+		Str("pool", pool.Hex()).
+		Str("tokenAdminRegistry", tokenAdminRegistry.EthAddress.Hex()).
+		Str(Network, tokenAdminRegistry.client.GetNetworkConfig().Name).
+		Msg("Token set in Registry")
+	return tokenAdminRegistry.client.ProcessTransaction(tx)
+
+}
+
 type Router struct {
 	client     blockchain.EVMClient
 	Instance   *router.Router
@@ -769,23 +811,6 @@ func (onRamp *OnRamp) SetTokenTransferFeeConfig(tokenTransferFeeConfig []evm_2_e
 	return onRamp.client.ProcessTransaction(tx)
 }
 
-func (onRamp *OnRamp) ApplyPoolUpdates(poolUpdates []evm_2_evm_onramp.InternalPoolUpdate) error {
-	opts, err := onRamp.client.TransactionOpts(onRamp.client.GetDefaultWallet())
-	if err != nil {
-		return fmt.Errorf("failed to get transaction opts: %w", err)
-	}
-	tx, err := onRamp.Instance.ApplyPoolUpdates(opts, []evm_2_evm_onramp.InternalPoolUpdate{}, poolUpdates)
-	if err != nil {
-		return fmt.Errorf("failed to apply pool updates: %w", err)
-	}
-	log.Info().
-		Interface("poolUpdates", poolUpdates).
-		Str("onRamp", onRamp.Address()).
-		Str(Network, onRamp.client.GetNetworkConfig().Name).
-		Msg("poolUpdates set in OnRamp")
-	return onRamp.client.ProcessTransaction(tx)
-}
-
 func (onRamp *OnRamp) PayNops() error {
 	opts, err := onRamp.client.TransactionOpts(onRamp.client.GetDefaultWallet())
 	if err != nil {
@@ -873,30 +898,6 @@ func (offRamp *OffRamp) SetOCR2Config(
 	if err != nil {
 		return fmt.Errorf("failed to set OCR2 config: %w", err)
 	}
-	return offRamp.client.ProcessTransaction(tx)
-}
-
-func (offRamp *OffRamp) SyncTokensAndPools(sourceTokens, pools []common.Address) error {
-	opts, err := offRamp.client.TransactionOpts(offRamp.client.GetDefaultWallet())
-	if err != nil {
-		return fmt.Errorf("failed to get transaction opts: %w", err)
-	}
-	var tokenUpdates []evm_2_evm_offramp.InternalPoolUpdate
-	for i, srcToken := range sourceTokens {
-		tokenUpdates = append(tokenUpdates, evm_2_evm_offramp.InternalPoolUpdate{
-			Token: srcToken,
-			Pool:  pools[i],
-		})
-	}
-	tx, err := offRamp.Instance.ApplyPoolUpdates(opts, []evm_2_evm_offramp.InternalPoolUpdate{}, tokenUpdates)
-	if err != nil {
-		return fmt.Errorf("failed to apply pool updates: %w", err)
-	}
-	log.Info().
-		Interface("tokenUpdates", tokenUpdates).
-		Str("offRamp", offRamp.Address()).
-		Str(Network, offRamp.client.GetNetworkConfig().Name).
-		Msg("tokenUpdates set in OffRamp")
 	return offRamp.client.ProcessTransaction(tx)
 }
 
