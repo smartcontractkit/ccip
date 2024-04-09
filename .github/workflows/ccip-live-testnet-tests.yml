@@ -44,7 +44,7 @@ jobs:
         uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab # v3.5.2
       - name: Check if image exists
         id: check-image
-        uses: smartcontractkit/chainlink-github-actions/docker/image-exists@e865e376b8c2d594028c8d645dd6c47169b72974 # v2.2.16
+        uses: smartcontractkit/chainlink-github-actions/docker/image-exists@5dd916d08c03cb5f9a97304f4f174820421bb946 # v2.3.11
         with:
           repository: chainlink
           tag: ${{ env.CHAINLINK_VERSION }}
