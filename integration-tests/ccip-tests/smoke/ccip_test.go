@@ -2,10 +2,11 @@ package smoke
 
 import (
 	"fmt"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/token_pool"
 	"math/big"
 	"testing"
 	"time"
+
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/token_pool"
 
 	"github.com/AlekSi/pointer"
 	"github.com/stretchr/testify/require"
