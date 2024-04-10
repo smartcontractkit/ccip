@@ -7,6 +7,11 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/lock_release_token_pool"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/token_pool"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/usdc_token_pool"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
+
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -19,7 +24,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/maybe_revert_message_receiver"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_arm_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_usdc_token_transmitter"
@@ -27,12 +31,9 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/price_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/token_admin_registry"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/token_pool"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/usdc_token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/link_token_interface"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/burn_mint_erc677"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/erc20"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 )
 
 var (
@@ -379,12 +380,39 @@ func (pool *TokenPool) AddLiquidity(approveFn tokenApproveFn, tokenAddr string, 
 	return pool.client.ProcessTransaction(tx)
 }
 
-func (pool *TokenPool) SetRemoteChainOnPool(remoteChainSelectors []uint64, remotePoolAddresses []common.Address) error {
+func (pool *TokenPool) SetRemotePool(remoteChainSelector uint64, remotePool common.Address) error {
+	log.Info().
+		Str("Token Pool", pool.Address()).
+		Str("Dest Pool", remotePool.Hex()).
+		Uint64("RemoteChain", remoteChainSelector).
+		Msg("Setting remote pool")
+	abiEncodedRemotePool, err := abihelpers.EncodeAddress(remotePool)
+	if err != nil {
+		return fmt.Errorf("error getting abiEncodedRemotePool %s : %w", remotePool.Hex(), err)
+	}
+	opts, err := pool.client.TransactionOpts(pool.client.GetDefaultWallet())
+	if err != nil {
+		return fmt.Errorf("failed to get transaction opts: %w", err)
+	}
+	tx, err := pool.PoolInterface.SetRemotePool(opts, remoteChainSelector, abiEncodedRemotePool)
+
+	if err != nil {
+		return fmt.Errorf("failed to set remote pool %s on token pool: %w", remotePool.Hex(), err)
+	}
+	log.Info().
+		Str("Token Pool", pool.Address()).
+		Str("Dest Pool", remotePool.Hex()).
+		Uint64("RemoteChain", remoteChainSelector).
+		Msg("Done setting remote pool")
+	return pool.client.ProcessTransaction(tx)
+}
+
+func (pool *TokenPool) SetRemoteChainOnPool(remoteChainSelectors []uint64) error {
 	log.Info().
 		Str("Token Pool", pool.Address()).
 		Msg("Setting remote chain on pool")
 	var selectorsToUpdate []token_pool.TokenPoolChainUpdate
-	for i, remoteChainSelector := range remoteChainSelectors {
+	for _, remoteChainSelector := range remoteChainSelectors {
 		isSupported, err := pool.PoolInterface.IsSupportedChain(nil, remoteChainSelector)
 		if err != nil {
 			return fmt.Errorf("failed to get if chain is supported: %w", err)
@@ -398,13 +426,8 @@ func (pool *TokenPool) SetRemoteChainOnPool(remoteChainSelectors []uint64, remot
 				Msg("Remote chain is already supported")
 			continue
 		}
-		remotePoolAddress, err := abihelpers.EncodeAddress(remotePoolAddresses[i])
-		if err != nil {
-			return fmt.Errorf("failed to encode remote pool address: %w", err)
-		}
 		selectorsToUpdate = append(selectorsToUpdate, token_pool.TokenPoolChainUpdate{
 			RemoteChainSelector: remoteChainSelector,
-			RemotePoolAddress:   remotePoolAddress,
 			Allowed:             true,
 			InboundRateLimiterConfig: token_pool.RateLimiterConfig{
 				IsEnabled: true,
@@ -627,40 +650,50 @@ type TokenAdminRegistry struct {
 	EthAddress common.Address
 }
 
-func (tokenAdminRegistry *TokenAdminRegistry) ApplyPoolUpdates(token, pool common.Address) error {
-	opts, err := tokenAdminRegistry.client.TransactionOpts(tokenAdminRegistry.client.GetDefaultWallet())
-	if err != nil {
-		return fmt.Errorf("failed to get transaction opts: %w", err)
-	}
+func (r *TokenAdminRegistry) Address() string {
+	return r.EthAddress.Hex()
+}
 
-	isAlreadyAdmin, err := tokenAdminRegistry.Instance.IsAdministrator(nil, opts.From, token)
+func (r *TokenAdminRegistry) SetAdminAndRegisterPool(tokenAddr, poolAddr common.Address) error {
+	opts, err := r.client.TransactionOpts(r.client.GetDefaultWallet())
 	if err != nil {
-		return fmt.Errorf("failed to check if already admin: %w", err)
+		return fmt.Errorf("error getting transaction opts: %w", err)
 	}
-
-	if !isAlreadyAdmin {
-		tx, err := tokenAdminRegistry.Instance.RegisterAdministratorPermissioned(opts, token, opts.From)
-		if err != nil {
-			return err
-		}
-		err = tokenAdminRegistry.client.ProcessTransaction(tx)
-		if err != nil {
-			return err
-		}
-	}
-
-	tx, err := tokenAdminRegistry.Instance.SetPool(opts, token, pool)
+	tx, err := r.Instance.RegisterAdministratorPermissioned(opts, tokenAddr, opts.From)
 	if err != nil {
-		return fmt.Errorf("failed to set pool: %w", err)
+		return fmt.Errorf("error setting admin for token %s : %w", tokenAddr.Hex(), err)
+	}
+	err = r.client.ProcessTransaction(tx)
+	if err != nil {
+		return fmt.Errorf("error processing tx for setting admin on token %w", err)
 	}
 	log.Info().
-		Str("token", token.Hex()).
-		Str("pool", pool.Hex()).
-		Str("tokenAdminRegistry", tokenAdminRegistry.EthAddress.Hex()).
-		Str(Network, tokenAdminRegistry.client.GetNetworkConfig().Name).
-		Msg("Token set in Registry")
-	return tokenAdminRegistry.client.ProcessTransaction(tx)
-
+		Str("Admin", opts.From.Hex()).
+		Str("Token", tokenAddr.Hex()).
+		Str("TokenAdminRegistry", r.Address()).
+		Msg("Admin is set for token on TokenAdminRegistry")
+	err = r.client.WaitForEvents()
+	if err != nil {
+		return fmt.Errorf("error waiting for tx for setting admin on pool %w", err)
+	}
+	opts, err = r.client.TransactionOpts(r.client.GetDefaultWallet())
+	if err != nil {
+		return fmt.Errorf("error getting transaction opts: %w", err)
+	}
+	tx, err = r.Instance.SetPool(opts, tokenAddr, poolAddr)
+	if err != nil {
+		return fmt.Errorf("error setting token %s and pool %s : %w", tokenAddr.Hex(), poolAddr.Hex(), err)
+	}
+	log.Info().
+		Str("token", tokenAddr.Hex()).
+		Str("Pool", poolAddr.Hex()).
+		Str("TokenAdminRegistry", r.Address()).
+		Msg("token and pool are set on TokenAdminRegistry")
+	err = r.client.ProcessTransaction(tx)
+	if err != nil {
+		return fmt.Errorf("error processing tx for setting token %s and pool %s : %w", tokenAddr.Hex(), poolAddr.Hex(), err)
+	}
+	return nil
 }
 
 type Router struct {
@@ -926,7 +959,7 @@ func (a *MockAggregator) UpdateRoundData(answer *big.Int) error {
 	round, err := a.Instance.LatestRound(nil)
 	if err != nil {
 		rand.Seed(uint64(time.Now().UnixNano()))
-		round = big.NewInt(rand.Int63n(2000))
+		round = big.NewInt(int64(rand.Uint64()))
 	}
 	round = new(big.Int).Add(round, big.NewInt(1))
 	tx, err := a.Instance.UpdateRoundData(opts, round, answer, big.NewInt(time.Now().UTC().UnixNano()), big.NewInt(time.Now().UTC().UnixNano()))

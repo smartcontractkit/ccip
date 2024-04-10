@@ -24,10 +24,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
 
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/token_admin_registry"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/token_pool"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/usdc_token_pool"
 
 	"github.com/smartcontractkit/chainlink/integration-tests/client"
 	"github.com/smartcontractkit/chainlink/integration-tests/contracts"
@@ -36,6 +33,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/maybe_revert_message_receiver"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_arm_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_usdc_token_messenger"
@@ -43,6 +41,8 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_v3_aggregator_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/price_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/token_pool"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/usdc_token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/weth9"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/link_token_interface"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/burn_mint_erc677"
@@ -549,7 +549,7 @@ func (e *CCIPContractsDeployer) DeployPriceRegistry(tokens []common.Address) (*P
 }
 
 func (e *CCIPContractsDeployer) DeployTokenAdminRegistry() (*TokenAdminRegistry, error) {
-	address, _, instance, err := e.evmClient.DeployContract("TokenAdminRegistry", func(
+	address, _, instance, err := e.evmClient.DeployContract("PriceRegistry", func(
 		auth *bind.TransactOpts,
 		backend bind.ContractBackend,
 	) (common.Address, *types.Transaction, interface{}, error) {
@@ -761,9 +761,8 @@ func (e *CCIPContractsDeployer) NewMockAggregator(addr common.Address) (*MockAgg
 var OCR2ParamsForCommit = contracts.OffChainAggregatorV2Config{
 	DeltaProgress:                           config.MustNewDuration(2 * time.Minute),
 	DeltaResend:                             config.MustNewDuration(5 * time.Second),
-	DeltaRound:                              config.MustNewDuration(60 * time.Second),
+	DeltaRound:                              config.MustNewDuration(75 * time.Second),
 	DeltaGrace:                              config.MustNewDuration(5 * time.Second),
-	DeltaStage:                              config.MustNewDuration(25 * time.Second),
 	MaxDurationQuery:                        config.MustNewDuration(100 * time.Millisecond),
 	MaxDurationObservation:                  config.MustNewDuration(35 * time.Second),
 	MaxDurationReport:                       config.MustNewDuration(10 * time.Second),
@@ -774,9 +773,8 @@ var OCR2ParamsForCommit = contracts.OffChainAggregatorV2Config{
 var OCR2ParamsForExec = contracts.OffChainAggregatorV2Config{
 	DeltaProgress:                           config.MustNewDuration(100 * time.Second),
 	DeltaResend:                             config.MustNewDuration(5 * time.Second),
-	DeltaRound:                              config.MustNewDuration(30 * time.Second),
+	DeltaRound:                              config.MustNewDuration(40 * time.Second),
 	DeltaGrace:                              config.MustNewDuration(5 * time.Second),
-	DeltaStage:                              config.MustNewDuration(10 * time.Second),
 	MaxDurationQuery:                        config.MustNewDuration(100 * time.Millisecond),
 	MaxDurationObservation:                  config.MustNewDuration(20 * time.Second),
 	MaxDurationReport:                       config.MustNewDuration(8 * time.Second),
