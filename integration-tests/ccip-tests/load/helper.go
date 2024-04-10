@@ -210,12 +210,12 @@ func (l *LoadArgs) ValidateCurseFollowedByUncurse() {
 		errGrp.Go(func() error {
 			lane.Logger.Info().Msg("Validating no CommitReportAccepted event is received for 29 minutes")
 			// we allow additional 1 minute after curse timestamp for curse to be visible by plugin
-			return lane.Dest.AssertNoReportAcceptedEventReceived(lane.Logger, 29*time.Minute, curseTimeStamp.Add(1*time.Minute))
+			return lane.Dest.AssertNoReportAcceptedEventReceived(lane.Logger, 25*time.Minute, curseTimeStamp.Add(1*time.Minute))
 		})
 		errGrp.Go(func() error {
-			lane.Logger.Info().Msg("Validating no ExecutionStateChanged event is received for 29 minutes")
+			lane.Logger.Info().Msg("Validating no ExecutionStateChanged event is received for 25 minutes")
 			// we allow additional 1 minute after curse timestamp for curse to be visible by plugin
-			return lane.Dest.AssertNoExecutionStateChangedEventReceived(lane.Logger, 29*time.Minute, curseTimeStamp.Add(1*time.Minute))
+			return lane.Dest.AssertNoExecutionStateChangedEventReceived(lane.Logger, 25*time.Minute, curseTimeStamp.Add(1*time.Minute))
 		})
 	}
 	l.lggr.Info().Msg("waiting for no commit/execution validation")
@@ -234,7 +234,11 @@ func (l *LoadArgs) TriggerLoadByLane() {
 			Str("Destination Network", lane.DestNetworkName).
 			Msg("Starting load for lane")
 		sendMaxData := pointer.GetInt64(l.TestCfg.TestGroupInput.SendMaxDataInEveryMsgCount)
-		ccipLoad := NewCCIPLoad(l.TestCfg.Test, lane, l.TestCfg.TestGroupInput.PhaseTimeout.Duration(), 100000, sendMaxData)
+		ccipLoad := NewCCIPLoad(
+			l.TestCfg.Test, lane, l.TestCfg.TestGroupInput.PhaseTimeout.Duration(),
+			100000, sendMaxData,
+			l.TestCfg.TestGroupInput.SkipRequestIfAnotherRequestTriggeredWithin,
+		)
 		ccipLoad.BeforeAllCall(l.TestCfg.TestGroupInput.MsgType, big.NewInt(*l.TestCfg.TestGroupInput.DestGasLimit))
 		lokiConfig := l.TestCfg.EnvInput.Logging.Loki
 		labels := make(map[string]string)

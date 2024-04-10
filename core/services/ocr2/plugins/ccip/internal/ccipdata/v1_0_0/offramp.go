@@ -17,6 +17,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
+
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/logpollerutil"
 
@@ -193,6 +194,52 @@ func (o *OffRamp) GetSenderNonce(ctx context.Context, sender cciptypes.Address) 
 	return o.offRampV100.GetSenderNonce(&bind.CallOpts{Context: ctx}, evmAddr)
 }
 
+func (o *OffRamp) GetSendersNonce(ctx context.Context, senders []cciptypes.Address) (map[cciptypes.Address]uint64, error) {
+	if len(senders) == 0 {
+		return make(map[cciptypes.Address]uint64), nil
+	}
+
+	evmSenders, err := ccipcalc.GenericAddrsToEvm(senders...)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to convert generic addresses to evm addresses")
+	}
+
+	evmCalls := make([]rpclib.EvmCall, 0, len(evmSenders))
+	for _, evmAddr := range evmSenders {
+		evmCalls = append(evmCalls, rpclib.NewEvmCall(
+			abiOffRamp,
+			"getSenderNonce",
+			o.addr,
+			evmAddr,
+		))
+	}
+
+	results, err := o.evmBatchCaller.BatchCall(ctx, 0, evmCalls)
+	if err != nil {
+		o.Logger.Errorw("error while batch fetching sender nonces", "err", err, "senders", evmSenders)
+		return nil, err
+	}
+
+	nonces, err := rpclib.ParseOutputs[uint64](results, func(d rpclib.DataAndErr) (uint64, error) {
+		return rpclib.ParseOutput[uint64](d, 0)
+	})
+	if err != nil {
+		o.Logger.Errorw("error while parsing sender nonces", "err", err, "senders", evmSenders)
+		return nil, err
+	}
+
+	if len(senders) != len(nonces) {
+		o.Logger.Errorw("unexpected number of nonces returned", "senders", evmSenders, "nonces", nonces)
+		return nil, errors.New("unexpected number of nonces returned")
+	}
+
+	senderNonce := make(map[cciptypes.Address]uint64, len(senders))
+	for i, sender := range senders {
+		senderNonce[sender] = nonces[i]
+	}
+	return senderNonce, nil
+}
+
 func (o *OffRamp) CurrentRateLimiterState(ctx context.Context) (cciptypes.TokenBucketRateLimit, error) {
 	state, err := o.offRampV100.CurrentRateLimiterState(&bind.CallOpts{Context: ctx})
 	if err != nil {
@@ -205,10 +252,6 @@ func (o *OffRamp) CurrentRateLimiterState(ctx context.Context) (cciptypes.TokenB
 		Capacity:    state.Capacity,
 		Rate:        state.Rate,
 	}, nil
-}
-
-func (o *OffRamp) GetDestinationToken(ctx context.Context, address common.Address) (common.Address, error) {
-	return o.offRampV100.GetDestinationToken(&bind.CallOpts{Context: ctx}, address)
 }
 
 func (o *OffRamp) getDestinationTokensFromSourceTokens(ctx context.Context, tokenAddresses []cciptypes.Address) ([]cciptypes.Address, error) {
@@ -320,6 +363,14 @@ func (o *OffRamp) GetTokens(ctx context.Context) (cciptypes.OffRampTokens, error
 	})
 }
 
+func (o *OffRamp) GetRouter(ctx context.Context) (cciptypes.Address, error) {
+	dynamicConfig, err := o.offRampV100.GetDynamicConfig(&bind.CallOpts{Context: ctx})
+	if err != nil {
+		return "", err
+	}
+	return ccipcalc.EvmAddrToGeneric(dynamicConfig.Router), nil
+}
+
 func (o *OffRamp) getPoolsByDestTokens(ctx context.Context, tokenAddrs []common.Address) ([]common.Address, error) {
 	evmCalls := make([]rpclib.EvmCall, 0, len(tokenAddrs))
 	for _, tk := range tokenAddrs {
@@ -402,7 +453,10 @@ func (o *OffRamp) ChangeConfig(ctx context.Context, onchainConfigBytes []byte, o
 		InflightCacheExpiry:         offchainConfigParsed.InflightCacheExpiry,
 		RootSnoozeTime:              offchainConfigParsed.RootSnoozeTime,
 	}
-	onchainConfig := cciptypes.ExecOnchainConfig{PermissionLessExecutionThresholdSeconds: time.Second * time.Duration(onchainConfigParsed.PermissionLessExecutionThresholdSeconds)}
+	onchainConfig := cciptypes.ExecOnchainConfig{
+		PermissionLessExecutionThresholdSeconds: time.Second * time.Duration(onchainConfigParsed.PermissionLessExecutionThresholdSeconds),
+		Router:                                  cciptypes.Address(onchainConfigParsed.Router.String()),
+	}
 	gasPriceEstimator := prices.NewExecGasPriceEstimator(o.Estimator, o.DestMaxGasPrice, 0)
 	o.UpdateDynamicConfig(onchainConfig, offchainConfig, gasPriceEstimator)
 
@@ -418,19 +472,19 @@ func (o *OffRamp) Close() error {
 }
 
 func (o *OffRamp) GetExecutionStateChangesBetweenSeqNums(ctx context.Context, seqNumMin, seqNumMax uint64, confs int) ([]cciptypes.ExecutionStateChangedWithTxMeta, error) {
-	latestBlock, err := o.lp.LatestBlock(pg.WithParentCtx(ctx))
+	latestBlock, err := o.lp.LatestBlock(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("get lp latest block: %w", err)
 	}
 
 	logs, err := o.lp.IndexedLogsTopicRange(
+		ctx,
 		o.eventSig,
 		o.addr,
 		o.eventIndex,
 		logpoller.EvmWord(seqNumMin),
 		logpoller.EvmWord(seqNumMax),
 		logpoller.Confirmations(confs),
-		pg.WithParentCtx(ctx),
 	)
 	if err != nil {
 		return nil, err
@@ -604,7 +658,7 @@ func (o *OffRamp) DecodeExecutionReport(ctx context.Context, report []byte) (cci
 }
 
 func (o *OffRamp) RegisterFilters(qopts ...pg.QOpt) error {
-	return logpollerutil.RegisterLpFilters(o.lp, o.filters, qopts...)
+	return logpollerutil.RegisterLpFilters(o.lp, o.filters)
 }
 
 func NewOffRamp(lggr logger.Logger, addr common.Address, ec client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator, destMaxGasPrice *big.Int) (*OffRamp, error) {
@@ -654,6 +708,7 @@ func NewOffRamp(lggr logger.Logger, addr common.Address, ec client.Client, lp lo
 			ec,
 			rpclib.DefaultRpcBatchSizeLimit,
 			rpclib.DefaultRpcBatchBackOffMultiplier,
+			rpclib.DefaultMaxParallelRpcCalls,
 		),
 		cachedOffRampTokens: cache.NewLogpollerEventsBased[cciptypes.OffRampTokens](
 			lp,

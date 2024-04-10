@@ -12,14 +12,17 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
+
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
+	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 )
 
 func TestCommitReportEncoding(t *testing.T) {
 	t.Parallel()
+	ctx := testutils.Context(t)
 	report := cciptypes.CommitStoreReport{
 		TokenPrices: []cciptypes.TokenPrice{
 			{
@@ -48,11 +51,11 @@ func TestCommitReportEncoding(t *testing.T) {
 	c, err := NewCommitStore(logger.TestLogger(t), utils.RandomAddress(), nil, mocks.NewLogPoller(t), nil, nil)
 	assert.NoError(t, err)
 
-	encodedReport, err := c.EncodeCommitReport(report)
+	encodedReport, err := c.EncodeCommitReport(ctx, report)
 	require.NoError(t, err)
 	assert.Greater(t, len(encodedReport), 0)
 
-	decodedReport, err := c.DecodeCommitReport(encodedReport)
+	decodedReport, err := c.DecodeCommitReport(ctx, encodedReport)
 	require.NoError(t, err)
 	require.Equal(t, report, decodedReport)
 }
@@ -151,9 +154,9 @@ func TestCommitStoreV120ffchainConfigDecodingCompatibility(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name           string
-		config         []byte
-		priceReporting bool
+		name                   string
+		config                 []byte
+		priceReportingDisabled bool
 	}{
 		{
 			name: "with MaxGasPrice",
@@ -169,7 +172,7 @@ func TestCommitStoreV120ffchainConfigDecodingCompatibility(t *testing.T) {
 				"SourceMaxGasPrice": 100000000,
 				"InflightCacheExpiry": "180s"
 			}`),
-			priceReporting: false,
+			priceReportingDisabled: false,
 		},
 		{
 			name: "without MaxGasPrice",
@@ -183,7 +186,7 @@ func TestCommitStoreV120ffchainConfigDecodingCompatibility(t *testing.T) {
 				"TokenPriceDeviationPPB": 12,
 				"InflightCacheExpiry": "180s"
 			}`),
-			priceReporting: false,
+			priceReportingDisabled: false,
 		},
 		{
 			name: "with PriceReportingDisabled",
@@ -198,7 +201,7 @@ func TestCommitStoreV120ffchainConfigDecodingCompatibility(t *testing.T) {
 				"InflightCacheExpiry": "180s",
 				"PriceReportingDisabled": true
 			}`),
-			priceReporting: true,
+			priceReportingDisabled: true,
 		},
 	}
 	for _, tc := range tests {
@@ -214,7 +217,7 @@ func TestCommitStoreV120ffchainConfigDecodingCompatibility(t *testing.T) {
 				TokenPriceHeartBeat:      *config.MustNewDuration(2 * time.Minute),
 				TokenPriceDeviationPPB:   12,
 				InflightCacheExpiry:      *config.MustNewDuration(3 * time.Minute),
-				PriceReportingDisabled:   tc.priceReporting,
+				PriceReportingDisabled:   tc.priceReportingDisabled,
 			}, decoded)
 		})
 	}

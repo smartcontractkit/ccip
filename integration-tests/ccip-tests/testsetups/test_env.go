@@ -99,11 +99,12 @@ func ChainlinkChart(
 		}
 	}
 	clProps["db"] = map[string]interface{}{
-		"resources":        SetResourceProfile(testInputs.EnvInput.NewCLCluster.DBCPU, testInputs.EnvInput.NewCLCluster.DBMemory),
-		"additionalArgs":   formattedArgs,
-		"stateful":         pointer.GetBool(testInputs.EnvInput.NewCLCluster.IsStateful),
-		"capacity":         testInputs.EnvInput.NewCLCluster.DBCapacity,
-		"storageClassName": "gp3",
+		"resources":                        SetResourceProfile(testInputs.EnvInput.NewCLCluster.DBCPU, testInputs.EnvInput.NewCLCluster.DBMemory),
+		"additionalArgs":                   formattedArgs,
+		"stateful":                         pointer.GetBool(testInputs.EnvInput.NewCLCluster.IsStateful),
+		"capacity":                         testInputs.EnvInput.NewCLCluster.DBCapacity,
+		"storageClassName":                 pointer.GetString(testInputs.EnvInput.NewCLCluster.DBStorageClass),
+		"enablePrometheusPostgresExporter": pointer.GetBool(testInputs.EnvInput.NewCLCluster.PromPgExporter),
 		"image": map[string]any{
 			"image":   testInputs.EnvInput.NewCLCluster.Common.DBImage,
 			"version": testInputs.EnvInput.NewCLCluster.Common.DBTag,
@@ -224,6 +225,8 @@ func DeployLocalCluster(
 		WithoutCleanup().
 		Build()
 	require.NoError(t, err)
+	// the builder builds network with a static network config, we don't want that.
+	env.EVMNetworks = []*blockchain.EVMNetwork{}
 	for i, networkCfg := range selectedNetworks {
 		rpcProvider, err := env.GetRpcProvider(networkCfg.ChainID)
 		require.NoError(t, err, "Error getting rpc provider")

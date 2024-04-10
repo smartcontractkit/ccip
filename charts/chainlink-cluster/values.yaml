@@ -35,43 +35,281 @@ chainlink:
         limits:
           cpu: 2000m
           memory: 2048Mi
-    # override default config per node
-    # for example, use OCRv2 P2P setup, the whole config
-    #      toml: |
-    #        RootDir = './clroot'
-    #        [Log]
-    #        JSONConsole = true
-    #        Level = 'debug'
-    #        [WebServer]
-    #        AllowOrigins = '*'
-    #        SecureCookies = false
-    #        SessionTimeout = '999h0m0s'
-    #        [OCR2]
-    #        Enabled = true
-    #        [P2P]
-    #        [P2P.V2]
-    #        Enabled = false
-    #        AnnounceAddresses = []
-    #        DefaultBootstrappers = []
-    #        DeltaDial = '15s'
-    #        DeltaReconcile = '1m0s'
-    #        ListenAddresses = []
-    #        [[EVM]]
-    #        ChainID = '1337'
-    #        MinContractPayment = '0'
-    #        [[EVM.Nodes]]
-    #        Name = 'node-0'
-    #        WSURL = 'ws://geth:8546'
-    #        HTTPURL = 'http://geth:8544'
-    #        [WebServer.TLS]
-    #        HTTPSPort = 0
-    # or use overridesToml to override some part of configuration
-    #      overridesToml: |
+      overridesToml: |
+        [Feature]
+        LogPoller = true
+        CCIP = true
+
+        [Log]
+        Level = 'debug'
+        JSONConsole = true
+
+        [Log.File]
+        MaxSize = '0b'
+
+        [WebServer]
+        AllowOrigins = '*'
+        HTTPPort = 6688
+        SecureCookies = false
+        HTTPWriteTimeout = '1m'
+
+        [WebServer.RateLimit]
+        Authenticated = 2000
+        Unauthenticated = 1000
+
+        [WebServer.TLS]
+        HTTPSPort = 0
+
+        [Database]
+        MaxIdleConns = 50
+        MaxOpenConns = 50
+        MigrateOnStartup = true
+
+        [OCR2]
+        Enabled = true
+        DefaultTransactionQueueDepth = 0
+
+        [OCR]
+        Enabled = false
+        DefaultTransactionQueueDepth = 0
+
+        [P2P]
+        [P2P.V2]
+        Enabled = true
+        ListenAddresses = ['0.0.0.0:6690']
+        AnnounceAddresses = ['0.0.0.0:6690']
+        DeltaDial = '500ms'
+        DeltaReconcile = '5s'
     - name: node-2
+      overridesToml: |
+        [Feature]
+        LogPoller = true
+        CCIP = true
+
+        [Log]
+        Level = 'debug'
+        JSONConsole = true
+
+        [Log.File]
+        MaxSize = '0b'
+
+        [WebServer]
+        AllowOrigins = '*'
+        HTTPPort = 6688
+        SecureCookies = false
+        HTTPWriteTimeout = '1m'
+
+        [WebServer.RateLimit]
+        Authenticated = 2000
+        Unauthenticated = 1000
+
+        [WebServer.TLS]
+        HTTPSPort = 0
+
+        [Database]
+        MaxIdleConns = 50
+        MaxOpenConns = 50
+        MigrateOnStartup = true
+
+        [OCR2]
+        Enabled = true
+        DefaultTransactionQueueDepth = 0
+
+        [OCR]
+        Enabled = false
+        DefaultTransactionQueueDepth = 0
+
+        [P2P]
+        [P2P.V2]
+        Enabled = true
+        ListenAddresses = ['0.0.0.0:6690']
+        AnnounceAddresses = ['0.0.0.0:6690']
+        DeltaDial = '500ms'
+        DeltaReconcile = '5s'
     - name: node-3
+      overridesToml: |
+        [Feature]
+        LogPoller = true
+        CCIP = true
+
+        [Log]
+        Level = 'debug'
+        JSONConsole = true
+
+        [Log.File]
+        MaxSize = '0b'
+
+        [WebServer]
+        AllowOrigins = '*'
+        HTTPPort = 6688
+        SecureCookies = false
+        HTTPWriteTimeout = '1m'
+
+        [WebServer.RateLimit]
+        Authenticated = 2000
+        Unauthenticated = 1000
+
+        [WebServer.TLS]
+        HTTPSPort = 0
+
+        [Database]
+        MaxIdleConns = 50
+        MaxOpenConns = 50
+        MigrateOnStartup = true
+
+        [OCR2]
+        Enabled = true
+        DefaultTransactionQueueDepth = 0
+
+        [OCR]
+        Enabled = false
+        DefaultTransactionQueueDepth = 0
+
+        [P2P]
+        [P2P.V2]
+        Enabled = true
+        ListenAddresses = ['0.0.0.0:6690']
+        AnnounceAddresses = ['0.0.0.0:6690']
+        DeltaDial = '500ms'
+        DeltaReconcile = '5s'
     - name: node-4
+      overridesToml: |
+        [Feature]
+        LogPoller = true
+        CCIP = true
+
+        [Log]
+        Level = 'debug'
+        JSONConsole = true
+
+        [Log.File]
+        MaxSize = '0b'
+
+        [WebServer]
+        AllowOrigins = '*'
+        HTTPPort = 6688
+        SecureCookies = false
+        HTTPWriteTimeout = '1m'
+
+        [WebServer.RateLimit]
+        Authenticated = 2000
+        Unauthenticated = 1000
+
+        [WebServer.TLS]
+        HTTPSPort = 0
+
+        [Database]
+        MaxIdleConns = 50
+        MaxOpenConns = 50
+        MigrateOnStartup = true
+
+        [OCR2]
+        Enabled = true
+        DefaultTransactionQueueDepth = 0
+
+        [OCR]
+        Enabled = false
+        DefaultTransactionQueueDepth = 0
+
+        [P2P]
+        [P2P.V2]
+        Enabled = true
+        ListenAddresses = ['0.0.0.0:6690']
+        AnnounceAddresses = ['0.0.0.0:6690']
+        DeltaDial = '500ms'
+        DeltaReconcile = '5s'
     - name: node-5
+      overridesToml: |
+        [Feature]
+        LogPoller = true
+        CCIP = true
+
+        [Log]
+        Level = 'debug'
+        JSONConsole = true
+
+        [Log.File]
+        MaxSize = '0b'
+
+        [WebServer]
+        AllowOrigins = '*'
+        HTTPPort = 6688
+        SecureCookies = false
+        HTTPWriteTimeout = '1m'
+
+        [WebServer.RateLimit]
+        Authenticated = 2000
+        Unauthenticated = 1000
+
+        [WebServer.TLS]
+        HTTPSPort = 0
+
+        [Database]
+        MaxIdleConns = 50
+        MaxOpenConns = 50
+        MigrateOnStartup = true
+
+        [OCR2]
+        Enabled = true
+        DefaultTransactionQueueDepth = 0
+
+        [OCR]
+        Enabled = false
+        DefaultTransactionQueueDepth = 0
+
+        [P2P]
+        [P2P.V2]
+        Enabled = true
+        ListenAddresses = ['0.0.0.0:6690']
+        AnnounceAddresses = ['0.0.0.0:6690']
+        DeltaDial = '500ms'
+        DeltaReconcile = '5s'
     - name: node-6
+      overridesToml: |
+        [Feature]
+        LogPoller = true
+        CCIP = true
+
+        [Log]
+        Level = 'debug'
+        JSONConsole = true
+
+        [Log.File]
+        MaxSize = '0b'
+
+        [WebServer]
+        AllowOrigins = '*'
+        HTTPPort = 6688
+        SecureCookies = false
+        HTTPWriteTimeout = '1m'
+
+        [WebServer.RateLimit]
+        Authenticated = 2000
+        Unauthenticated = 1000
+
+        [WebServer.TLS]
+        HTTPSPort = 0
+
+        [Database]
+        MaxIdleConns = 50
+        MaxOpenConns = 50
+        MigrateOnStartup = true
+
+        [OCR2]
+        Enabled = true
+        DefaultTransactionQueueDepth = 0
+
+        [OCR]
+        Enabled = false
+        DefaultTransactionQueueDepth = 0
+
+        [P2P]
+        [P2P.V2]
+        Enabled = true
+        ListenAddresses = ['0.0.0.0:6690']
+        AnnounceAddresses = ['0.0.0.0:6690']
+        DeltaDial = '500ms'
+        DeltaReconcile = '5s'
   resources:
     requests:
       cpu: 350m
@@ -125,16 +363,18 @@ geth:
   blocktime: 1
   chains:
     - networkId: 1337
-    # use to inject custom configuration for each chain, e.g. GasEstimator
-    # - customEVMConfigToml: |
-    #     [EVM.GasEstimator]
-    #     PriceMax = '200 gwei'
-    #     LimitDefault = 6000000
-    #     FeeCapDefault = '200 gwei'
-    #     [EVM.GasEstimator.BlockHistory]
-    #     BlockHistorySize = 200
-    #     EIP1559FeeCapBufferBlocks = 0
+      # use to inject custom configuration for each chain, e.g. GasEstimator
+      customEVMConfigToml: |
+        [EVM.GasEstimator]
+        PriceMax = '200 gwei'
+        LimitDefault = 6000000
+        FeeCapDefault = '200 gwei'
     - networkId: 2337
+      customEVMConfigToml: |
+        [EVM.GasEstimator]
+        PriceMax = '200 gwei'
+        LimitDefault = 6000000
+        FeeCapDefault = '200 gwei'
   resources:
     requests:
       cpu: 1
@@ -227,6 +467,14 @@ mockserver:
     limits:
       cpu: 1
       memory: 1024Mi
+  securityContext:
+    capabilities:
+      drop:
+        - ALL
+    readOnlyRootFilesystem: false
+    runAsNonRoot: true
+    runAsUser: 999
+    runAsGroup: 999
 opentelemetry-collector:
   enabled: true
   mode: deployment
@@ -252,14 +500,12 @@ opentelemetry-collector:
       otlp:
         protocols:
           grpc:
-            endpoint: "0.0.0.0:4317"
+            endpoint: ${env:MY_POD_IP}:4317
           http:
-            endpoint: "0.0.0.0:3100"
+            endpoint: ${env:MY_POD_IP}:4318
     exporters:
-      file:
-        path: /tracing/trace-data.json
       otlp:
-        endpoint: tempo:4317
+        endpoint: app-tempo:4317
         tls:
           insecure: true
     service:
@@ -269,27 +515,13 @@ opentelemetry-collector:
       pipelines:
         traces:
           receivers: [otlp]
-          exporters: [file, otlp]
+          exporters: [otlp]
 
 tempo:
   enabled: true
   image:
     tag: "1.7.2"
-  server:
-    http_listen_port: 3200
   # default storage path: /var/tempo/
-  readinessProbe:
-    httpGet:
-      path: /ready
-      port: 3200
-    initialDelaySeconds: 10
-    periodSeconds: 5
-  livenessProbe:
-    httpGet:
-      path: /ready
-      port: 3200
-    initialDelaySeconds: 20
-    periodSeconds: 10
   securityContext:
     runAsNonRoot: true
     runAsUser: 10001
@@ -299,14 +531,14 @@ tempo:
       trace:
         backend: local # backend configuration to use
         wal:
-          path: /tmp/tempo/wal # where to store the the wal locally
+          path: /tmp/tempo/wal # where to store the wal locally
         local:
           path: /tmp/tempo/blocks
 
 grafana:
   enabled: true
   image:
-    tag: 7.3.2
+    tag: 10.4.1
   rbac:
     namespaced: true
   datasources:
@@ -317,7 +549,7 @@ grafana:
           type: tempo
           access: proxy
           orgId: 1
-          url: http://tempo:3200
+          url: http://app-tempo:3100
           basicAuth: false
           isDefault: true
           version: 1
@@ -331,7 +563,7 @@ grafana:
     GF_AUTH_ANONYMOUS_ENABLED: "true"
     GF_AUTH_ANONYMOUS_ORG_ROLE: "Admin"
     GF_AUTH_DISABLE_LOGIN_FORM: "true"
-    GF_FEATURE_TOGGLES_ENABLE: "traceqlEditor"
+    GF_FEATURE_TOGGLES_ENABLE: "traceqlEditor tempoSearch tempoServiceGraph"
 
 ingress:
   enabled: false
@@ -429,6 +661,16 @@ ingress:
                 name: mockserver
                 port:
                   number: 1080
+    - host: chainlink-grafana.local
+      http:
+        paths:
+          - path: /
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: grafana
+                port:
+                  number: 80
 # monitoring.coreos.com/v1 PodMonitor for each node
 prometheusMonitor: true
 
@@ -488,7 +730,7 @@ networkPolicies:
                   app: tempo
           ports:
             - protocol: TCP
-              port: 3100
+              port: 4317
 
 # Configure the default network policy.
 networkPolicyDefault:
