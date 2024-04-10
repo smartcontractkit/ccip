@@ -51,15 +51,9 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
   error EmptyReport();
   error BadARMSignal();
   error InvalidMessageId();
-  error InvalidTokenPoolConfig();
-  error PoolAlreadyAdded();
-  error PoolDoesNotExist();
-  error TokenPoolMismatch();
   error InvalidAddress(bytes encodedAddress);
   error InvalidNewState(uint64 sequenceNumber, Internal.MessageExecutionState newState);
 
-  event PoolAdded(address token, address pool);
-  event PoolRemoved(address token, address pool);
   /// @dev Atlas depends on this event, if changing, please notify Atlas.
   event ConfigSet(StaticConfig staticConfig, DynamicConfig dynamicConfig);
   event SkippedIncorrectNonce(uint64 indexed nonce, address indexed sender);
