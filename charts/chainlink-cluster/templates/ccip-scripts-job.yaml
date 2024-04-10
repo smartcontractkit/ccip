@@ -23,6 +23,7 @@ spec:
         "prometheus.io/scrape": 'true'
         "eks.amazonaws.com/role-arn": {{$.Values.ccip.ccipScriptsDeployment.oidcRoleARN}}
     spec:
+      serviceAccountName: ccip-scripts-deployer
       initContainers:
         - name: wait-for-nodes
           image: {{.Values.ccip.ccipScriptsDeployment.image}}
