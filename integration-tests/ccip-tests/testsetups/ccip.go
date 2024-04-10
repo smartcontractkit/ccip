@@ -757,7 +757,7 @@ func CCIPDefaultTestSetUp(
 	if value, set := os.LookupEnv(config.EnvVarJobImage); set && value != "" {
 		t.Cleanup(func() {
 			if setUpArgs.Env != nil && setUpArgs.Env.K8Env != nil {
-				path := fmt.Sprintf("reports/reports/%s/%s", folderName, filename)
+				path := fmt.Sprintf("reports/%s/%s", folderName, filename)
 				dir, err := os.Getwd()
 				require.NoError(t, err)
 				destPath := fmt.Sprintf("%s/%s", dir, filename)
