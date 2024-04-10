@@ -729,7 +729,8 @@ func CCIPDefaultTestSetUp(
 	var (
 		err error
 	)
-	filepath := fmt.Sprintf("./reports/tmp_%s.json", strings.ReplaceAll(t.Name(), "/", "_"))
+	folderName := "tmp_laneconfig"
+	filepath := fmt.Sprintf("./%s/tmp_%s.json", folderName, strings.ReplaceAll(t.Name(), "/", "_"))
 	filename := strings.Split(filepath, "/")[len(strings.Split(filepath, "/"))-1]
 	var transferAmounts []*big.Int
 	if testConfig.TestGroupInput.MsgType == actions.TokenTransfer {
@@ -743,7 +744,7 @@ func CCIPDefaultTestSetUp(
 		SetUpContext:           parent,
 		Cfg:                    testConfig,
 		Reporter:               testreporters.NewCCIPTestReporter(t, lggr),
-		LaneConfigFile:         filename,
+		LaneConfigFile:         filepath,
 		LaneContractsByNetwork: &sync.Map{},
 		Balance:                actions.NewBalanceSheet(),
 		BootstrapAdded:         atomic.NewBool(false),
@@ -751,15 +752,18 @@ func CCIPDefaultTestSetUp(
 		laneMutex:              &sync.Mutex{},
 	}
 
-	chainByChainID := setUpArgs.CreateEnvironment(lggr, envName, "reports")
+	chainByChainID := setUpArgs.CreateEnvironment(lggr, envName, "tmp_laneconfig")
 	// if test is run in remote runner, register a clean-up to copy the laneconfig file
 	if value, set := os.LookupEnv(config.EnvVarJobImage); set && value != "" {
 		t.Cleanup(func() {
 			if setUpArgs.Env != nil && setUpArgs.Env.K8Env != nil {
-				filename = fmt.Sprintf("reports/%s", filename)
-				lggr.Info().Str("Path", filename).Msg("copying lane config")
-				err := setUpArgs.Env.K8Env.CopyFromPod("job-name=remote-test-runner",
-					"remote-test-runner-data-files", filename, ".")
+				path := fmt.Sprintf("reports/reports/%s/%s", folderName, filename)
+				dir, err := os.Getwd()
+				require.NoError(t, err)
+				destPath := fmt.Sprintf("%s/%s", dir, filename)
+				lggr.Info().Str("srcPath", path).Str("dstPath", destPath).Msg("copying lane config")
+				err = setUpArgs.Env.K8Env.CopyFromPod("job-name=remote-test-runner",
+					"remote-test-runner-data-files", path, destPath)
 				require.NoError(t, err, "error getting lane config")
 			}
 		})
