@@ -729,7 +729,7 @@ func CCIPDefaultTestSetUp(
 	var (
 		err error
 	)
-	filepath := fmt.Sprintf("./tmp_%s.json", strings.ReplaceAll(t.Name(), "/", "_"))
+	filepath := fmt.Sprintf("./reports/tmp_%s.json", strings.ReplaceAll(t.Name(), "/", "_"))
 	filename := strings.Split(filepath, "/")[len(strings.Split(filepath, "/"))-1]
 	var transferAmounts []*big.Int
 	if testConfig.TestGroupInput.MsgType == actions.TokenTransfer {
@@ -751,7 +751,7 @@ func CCIPDefaultTestSetUp(
 		laneMutex:              &sync.Mutex{},
 	}
 
-	chainByChainID := setUpArgs.CreateEnvironment(lggr, envName, filename)
+	chainByChainID := setUpArgs.CreateEnvironment(lggr, envName, "reports")
 	// if test is run in remote runner, register a clean-up to copy the laneconfig file
 	if value, set := os.LookupEnv(config.EnvVarJobImage); set && value != "" {
 		t.Cleanup(func() {
