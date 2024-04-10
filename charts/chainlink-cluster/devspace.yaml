@@ -498,9 +498,11 @@ deployments:
         # monitoring.coreos.com/v1 PodMonitor for each node
         prometheusMonitor: true
         ccip:
-          deployContractsAndJobs: true
-          ccipScriptsImage: ${DEVSPACE_CCIP_SCRIPTS_IMAGE}
-
+          ccipScriptsDeployment:
+            enabled: true
+            image: ${DEVSPACE_CCIP_SCRIPTS_IMAGE}
+            oidcRoleARN: ${DEVSPACE_CCIP_SCRIPTS_OIDC_ROLE_ARN}
+            outputBucketName: ${DEVSPACE_CCIP_SCRIPTS_OUTPUT_BUCKET_NAME}
         # These ingresses create AWS ALB resources and Route 53 Records.
         ingress:
           enabled: true
