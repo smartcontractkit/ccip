@@ -303,6 +303,8 @@ func (b *CLTestEnvBuilder) Build() (*CLClusterTestEnv, error) {
 	// in this case we will use the builder only to start chains, not the cluster, because currently we support only 1 network config per cluster
 	if len(b.privateEthereumNetworks) > 1 {
 		b.te.rpcProviders = make(map[int64]*test_env.RpcProvider)
+		b.te.EVMNetworks = make([]*blockchain.EVMNetwork, 0)
+		b.te.evmClients = make(map[int64]blockchain.EVMClient)
 		for _, en := range b.privateEthereumNetworks {
 			en.DockerNetworkNames = []string{b.te.DockerNetwork.Name}
 			networkConfig, rpcProvider, err := b.te.StartEthereumNetwork(en)
@@ -335,7 +337,6 @@ func (b *CLTestEnvBuilder) Build() (*CLClusterTestEnv, error) {
 
 			b.te.rpcProviders[networkConfig.ChainID] = &rpcProvider
 			b.te.EVMNetworks = append(b.te.EVMNetworks, &networkConfig)
-
 		}
 		err = b.te.StartClCluster(b.clNodeConfig, b.clNodesCount, b.secretsConfig, b.testConfig, b.clNodesOpts...)
 		if err != nil {
