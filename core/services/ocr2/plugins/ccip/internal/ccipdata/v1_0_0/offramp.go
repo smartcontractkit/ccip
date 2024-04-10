@@ -254,10 +254,6 @@ func (o *OffRamp) CurrentRateLimiterState(ctx context.Context) (cciptypes.TokenB
 	}, nil
 }
 
-func (o *OffRamp) GetDestinationToken(ctx context.Context, address common.Address) (common.Address, error) {
-	return o.offRampV100.GetDestinationToken(&bind.CallOpts{Context: ctx}, address)
-}
-
 func (o *OffRamp) getDestinationTokensFromSourceTokens(ctx context.Context, tokenAddresses []cciptypes.Address) ([]cciptypes.Address, error) {
 	destTokens := make([]cciptypes.Address, len(tokenAddresses))
 	found := make(map[cciptypes.Address]bool)
@@ -476,19 +472,19 @@ func (o *OffRamp) Close() error {
 }
 
 func (o *OffRamp) GetExecutionStateChangesBetweenSeqNums(ctx context.Context, seqNumMin, seqNumMax uint64, confs int) ([]cciptypes.ExecutionStateChangedWithTxMeta, error) {
-	latestBlock, err := o.lp.LatestBlock(pg.WithParentCtx(ctx))
+	latestBlock, err := o.lp.LatestBlock(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("get lp latest block: %w", err)
 	}
 
 	logs, err := o.lp.IndexedLogsTopicRange(
+		ctx,
 		o.eventSig,
 		o.addr,
 		o.eventIndex,
 		logpoller.EvmWord(seqNumMin),
 		logpoller.EvmWord(seqNumMax),
 		logpoller.Confirmations(confs),
-		pg.WithParentCtx(ctx),
 	)
 	if err != nil {
 		return nil, err
@@ -662,7 +658,7 @@ func (o *OffRamp) DecodeExecutionReport(ctx context.Context, report []byte) (cci
 }
 
 func (o *OffRamp) RegisterFilters(qopts ...pg.QOpt) error {
-	return logpollerutil.RegisterLpFilters(o.lp, o.filters, qopts...)
+	return logpollerutil.RegisterLpFilters(o.lp, o.filters)
 }
 
 func NewOffRamp(lggr logger.Logger, addr common.Address, ec client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator, destMaxGasPrice *big.Int) (*OffRamp, error) {

@@ -1,4 +1,4 @@
-name: Client Compatibility Tests
+name: CCIP Client Compatibility Tests
 on:
   merge_group:
   pull_request:
@@ -54,7 +54,7 @@ jobs:
 
   build-chainlink:
     if: needs.changes.outputs.src == 'true' || github.event_name == 'workflow_dispatch'
-    needs: [changes]
+    needs: [ changes ]
     environment: integration
     permissions:
       id-token: write
@@ -64,15 +64,16 @@ jobs:
     steps:
       - name: Collect Metrics
         id: collect-gha-metrics
-        uses: smartcontractkit/push-gha-metrics-action@0281b09807758be1dcc41651e44e62b353808c47 # v2.1.0
+        uses: smartcontractkit/push-gha-metrics-action@dea9b546553cb4ca936607c2267a09c004e4ab3f # v3.0.0
         with:
+          id: client-compatablility-build-chainlink
           org-id: ${{ secrets.GRAFANA_INTERNAL_TENANT_ID }}
           basic-auth: ${{ secrets.GRAFANA_INTERNAL_BASIC_AUTH }}
           hostname: ${{ secrets.GRAFANA_INTERNAL_HOST }}
           this-job-name: Build Chainlink Image
         continue-on-error: true
       - name: Checkout the repo
-        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+        uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
         with:
           repository: smartcontractkit/ccip
           ref: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
@@ -85,9 +86,44 @@ jobs:
           AWS_REGION: ${{ secrets.QA_AWS_REGION }}
           AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
 
+  build-tests:
+    if: needs.changes.outputs.src == 'true' || github.event_name == 'workflow_dispatch'
+    needs: [ changes ]
+    environment: integration
+    permissions:
+      id-token: write
+      contents: read
+    name: Build Tests Binary
+    runs-on: ubuntu-latest
+    steps:
+      - name: Collect Metrics
+        id: collect-gha-metrics
+        uses: smartcontractkit/push-gha-metrics-action@dea9b546553cb4ca936607c2267a09c004e4ab3f # v3.0.0
+        with:
+          id: ccip-build-tests
+          org-id: ${{ secrets.GRAFANA_INTERNAL_TENANT_ID }}
+          basic-auth: ${{ secrets.GRAFANA_INTERNAL_BASIC_AUTH }}
+          hostname: ${{ secrets.GRAFANA_INTERNAL_HOST }}
+          this-job-name: Build Tests Binary
+        continue-on-error: true
+      - name: Checkout the repo
+        uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
+      - name: Build Tests
+        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/build-tests@7882cf348cd6a1f6bcf1ee8280185584ebba96e9 # v2.3.10
+        with:
+          test_download_vendor_packages_command: cd ./integration-tests && go mod download
+          token: ${{ secrets.GITHUB_TOKEN }}
+          go_mod_path: ./integration-tests/go.mod
+          go_tags: embed
+          cache_key_id: core-e2e-${{ env.MOD_CACHE_VERSION }}
+          cache_restore_only: "true"
+          binary_name: tests
+
   get-latest-available-images:
     if: needs.changes.outputs.src == 'true' || github.event_name == 'workflow_dispatch'
-    needs: [changes]
+    needs: [ changes ]
     environment: integration
     runs-on: ubuntu-latest
     permissions:
@@ -138,7 +174,7 @@ jobs:
       pull-requests: write
       id-token: write
       contents: read
-    needs: [build-chainlink, changes, get-latest-available-images]
+    needs: [ build-chainlink, changes, get-latest-available-images ]
     if: needs.changes.outputs.src == 'true' || github.event_name == 'workflow_dispatch'
     env:
       SELECTED_NETWORKS: SIMULATED_1,SIMULATED_2
@@ -156,12 +192,13 @@ jobs:
             timeout: 30m
             pyroscope_env: ci-ccip-bidirectionallane-geth
             chainConfig: "1337=ethereum/client-go:${{ needs.get-latest-available-images.outputs.geth_tag }},2337=ethereum/client-go:${{ needs.get-latest-available-images.outputs.geth_tag }}"
-          - name: bidirectionallane-nethermind
-            test: TestSmokeCCIPForBidirectionalLane
-            client: nethermind
-            timeout: 30m
-            pyroscope_env: ci-ccip-bidirectionallane-nethermind
-            chainConfig: "1337=nethermind/nethermind:${{ needs.get-latest-available-images.outputs.nethermind_tag }},2337=nethermind/nethermind:${{ needs.get-latest-available-images.outputs.nethermind_tag }}"
+          # uncomment when nethermind flake reason is addressed
+          # - name: bidirectionallane-nethermind
+          #            test: TestSmokeCCIPForBidirectionalLane
+          #            client: nethermind
+          #            timeout: 30m
+          #            pyroscope_env: ci-ccip-bidirectionallane-nethermind
+          #         chainConfig: "1337=nethermind/nethermind:${{ needs.get-latest-available-images.outputs.nethermind_tag }},2337=nethermind/nethermind:${{ needs.get-latest-available-images.outputs.nethermind_tag }}"
           # uncomment when 24.4.0  is released with our data/input fix
           # - name: bidirectionallane-besu
           #   test: TestSmokeCCIPForBidirectionalLane
@@ -225,7 +262,7 @@ jobs:
           grafanaDashboardUrl: "/d/ddf75041-1e39-42af-aa46-361fe4c36e9e/ci-e2e-tests-logs"
           customEvmNodes: ${{ matrix.chainConfig }}
       - name: Run Tests
-        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@c67a09566412d153ff7640d99f96b43aa03abc04 # v2.3.6
+        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@7882cf348cd6a1f6bcf1ee8280185584ebba96e9 # v2.3.10
         with:
           test_command_to_run: cd ./integration-tests && go test -timeout 30m -count=1 -json -test.parallel=2 ${{ steps.build-go-test-command.outputs.run_command }} 2>&1 | tee /tmp/gotest.log | gotestfmt
           test_download_vendor_packages_command: cd ./integration-tests && go mod download
@@ -263,7 +300,7 @@ jobs:
       id-token: write
       contents: read
     runs-on: ubuntu-latest
-    needs: [evm-compatibility-matrix, changes]
+    needs: [ evm-compatibility-matrix, changes ]
     steps:
       - name: Debug Result
         run: echo ${{ join(needs.*.result, ',') }}
@@ -320,10 +357,10 @@ jobs:
       id-token: write
       contents: read
     runs-on: ubuntu-latest
-    needs: [start-slack-thread]
+    needs: [ start-slack-thread ]
     steps:
       - name: Checkout the repo
-        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+        uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
         with:
           ref: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
       - name: Post Test Results to Slack
