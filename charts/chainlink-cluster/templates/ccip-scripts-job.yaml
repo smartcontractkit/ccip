@@ -49,7 +49,7 @@ spec:
           env:
             - name: CONFIG_JSON_PATH
               value: /data/config.json
-          command: [ "./run.sh", "{{.Values.ccip.ccipScriptsDeployment.outputBucketName}}" ]
+          command: [ "./run.sh", "{{.Values.ccip.ccipScriptsDeployment.outputBucketName}}", "{{.Release.Namespace}}" ]
           volumeMounts:
             - name: config-volume
               mountPath: /data
