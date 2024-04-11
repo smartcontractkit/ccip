@@ -7,8 +7,9 @@ import {IgnoreContractSize} from "./IgnoreContractSize.sol";
 contract EVM2EVMOffRampHelper is EVM2EVMOffRamp, IgnoreContractSize {
   constructor(
     StaticConfig memory staticConfig,
-    RateLimiter.Config memory rateLimiterConfig
-  ) EVM2EVMOffRamp(staticConfig, rateLimiterConfig) {}
+    RateLimiter.Config memory rateLimiterConfig,
+    address[] memory rateLimitedTokens
+  ) EVM2EVMOffRamp(staticConfig, rateLimiterConfig, rateLimitedTokens) {}
 
   function setExecutionStateHelper(uint64 sequenceNumber, Internal.MessageExecutionState state) public {
     _setExecutionState(sequenceNumber, state);

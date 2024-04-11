@@ -482,14 +482,19 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
   }
 
   function testPriceNotFoundForTokenReverts() public {
-    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
+    // Set token price to 0
+    vm.stopPrank();
+    vm.startPrank(OWNER);
+    s_priceRegistry.updatePrices(getSingleTokenPriceUpdateStruct(CUSTOM_TOKEN, 0));
 
-    address fakeToken = address(1);
+    vm.startPrank(address(s_sourceRouter));
+
+    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
     message.tokenAmounts = new Client.EVMTokenAmount[](1);
-    message.tokenAmounts[0].token = fakeToken;
+    message.tokenAmounts[0].token = CUSTOM_TOKEN;
     message.tokenAmounts[0].amount = 1;
 
-    vm.expectRevert(abi.encodeWithSelector(AggregateRateLimiter.PriceNotFoundForToken.selector, fakeToken));
+    vm.expectRevert(abi.encodeWithSelector(EVM2EVMOnRamp.PriceNotFoundForToken.selector, CUSTOM_TOKEN));
 
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 0, OWNER);
   }
@@ -572,7 +577,8 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
       maxFeeUSDCents: 0,
       deciBps: 0,
       destGasOverhead: 0,
-      destBytesOverhead: 0
+      destBytesOverhead: 0,
+      aggregateRateLimitEnabled: true
     });
     s_onRamp.setTokenTransferFeeConfig(tokenTransferFeeConfigArgs);
     newPool.setSourceTokenData(new bytes(64));
@@ -957,7 +963,8 @@ contract EVM2EVMOnRamp_getTokenTransferCost is EVM2EVMOnRamp_getFeeSetup {
       maxFeeUSDCents: 0,
       deciBps: 0,
       destGasOverhead: 0,
-      destBytesOverhead: 0
+      destBytesOverhead: 0,
+      aggregateRateLimitEnabled: true
     });
     s_onRamp.setTokenTransferFeeConfig(tokenTransferFeeConfigArgs);
 
@@ -1553,7 +1560,8 @@ contract EVM2EVMOnRamp_setTokenTransferFeeConfig is EVM2EVMOnRampSetup {
       maxFeeUSDCents: 0,
       deciBps: 0,
       destGasOverhead: 0,
-      destBytesOverhead: 0
+      destBytesOverhead: 0,
+      aggregateRateLimitEnabled: true
     });
     tokenTransferFeeConfigArgs[1] = EVM2EVMOnRamp.TokenTransferFeeConfigArgs({
       token: address(1),
@@ -1561,7 +1569,8 @@ contract EVM2EVMOnRamp_setTokenTransferFeeConfig is EVM2EVMOnRampSetup {
       maxFeeUSDCents: 1,
       deciBps: 1,
       destGasOverhead: 1,
-      destBytesOverhead: 1
+      destBytesOverhead: 1,
+      aggregateRateLimitEnabled: true
     });
 
     vm.expectEmit();

@@ -255,6 +255,7 @@ func (c *CCIPContracts) DeployNewOffRamp(t *testing.T) {
 			Capacity:  LinkUSDValue(100),
 			Rate:      LinkUSDValue(1),
 		},
+		[]common.Address{c.Source.LinkToken.Address()},
 	)
 	require.NoError(t, err)
 	c.Dest.Chain.Commit()
@@ -343,12 +344,13 @@ func (c *CCIPContracts) DeployNewOnRamp(t *testing.T) {
 		},
 		[]evm_2_evm_onramp.EVM2EVMOnRampTokenTransferFeeConfigArgs{
 			{
-				Token:             c.Source.LinkToken.Address(),
-				MinFeeUSDCents:    50,           // $0.5
-				MaxFeeUSDCents:    1_000_000_00, // $ 1 million
-				DeciBps:           5_0,          // 5 bps
-				DestGasOverhead:   34_000,
-				DestBytesOverhead: 0,
+				Token:                     c.Source.LinkToken.Address(),
+				MinFeeUSDCents:            50,           // $0.5
+				MaxFeeUSDCents:            1_000_000_00, // $ 1 million
+				DeciBps:                   5_0,          // 5 bps
+				DestGasOverhead:           34_000,
+				DestBytesOverhead:         0,
+				AggregateRateLimitEnabled: true,
 			},
 		},
 		[]evm_2_evm_onramp.EVM2EVMOnRampNopAndWeight{},
@@ -1198,12 +1200,13 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 		},
 		[]evm_2_evm_onramp.EVM2EVMOnRampTokenTransferFeeConfigArgs{
 			{
-				Token:             sourceLinkTokenAddress,
-				MinFeeUSDCents:    50,           // $0.5
-				MaxFeeUSDCents:    1_000_000_00, // $ 1 million
-				DeciBps:           5_0,          // 5 bps
-				DestGasOverhead:   34_000,
-				DestBytesOverhead: 0,
+				Token:                     sourceLinkTokenAddress,
+				MinFeeUSDCents:            50,           // $0.5
+				MaxFeeUSDCents:            1_000_000_00, // $ 1 million
+				DeciBps:                   5_0,          // 5 bps
+				DestGasOverhead:           34_000,
+				DestBytesOverhead:         0,
+				AggregateRateLimitEnabled: true,
 			},
 		},
 		[]evm_2_evm_onramp.EVM2EVMOnRampNopAndWeight{},
@@ -1261,6 +1264,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 			Capacity:  LinkUSDValue(100),
 			Rate:      LinkUSDValue(1),
 		},
+		[]common.Address{destLinkTokenAddress},
 	)
 	require.NoError(t, err)
 	offRamp, err := evm_2_evm_offramp.NewEVM2EVMOffRamp(offRampAddress, destChain)

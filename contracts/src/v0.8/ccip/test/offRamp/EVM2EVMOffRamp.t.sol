@@ -42,7 +42,7 @@ contract EVM2EVMOffRamp_constructor is EVM2EVMOffRampSetup {
     EVM2EVMOffRamp.DynamicConfig memory dynamicConfig =
       generateDynamicOffRampConfig(address(s_destRouter), address(s_priceRegistry));
 
-    s_offRamp = new EVM2EVMOffRampHelper(staticConfig, getInboundRateLimiterConfig());
+    s_offRamp = new EVM2EVMOffRampHelper(staticConfig, getInboundRateLimiterConfig(), s_destTokens);
 
     s_offRamp.setOCR2Config(
       s_valid_signers, s_valid_transmitters, s_f, abi.encode(dynamicConfig), s_offchainConfigVersion, abi.encode("")
@@ -82,7 +82,8 @@ contract EVM2EVMOffRamp_constructor is EVM2EVMOffRampSetup {
         prevOffRamp: address(0),
         armProxy: address(s_mockARM)
       }),
-      RateLimiter.Config({isEnabled: true, rate: 1e20, capacity: 1e20})
+      RateLimiter.Config({isEnabled: true, rate: 1e20, capacity: 1e20}),
+      s_destTokens
     );
   }
 
@@ -100,7 +101,8 @@ contract EVM2EVMOffRamp_constructor is EVM2EVMOffRampSetup {
         prevOffRamp: address(0),
         armProxy: address(s_mockARM)
       }),
-      getInboundRateLimiterConfig()
+      getInboundRateLimiterConfig(),
+      s_destTokens
     );
   }
 }

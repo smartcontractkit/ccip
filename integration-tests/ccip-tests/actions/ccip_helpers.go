@@ -1171,12 +1171,13 @@ func (sourceCCIP *SourceCCIPModule) SetTokenTransferFeeConfig() error {
 			destGasOverhead = 120_000
 		}
 		tokenTransferFeeConfig = append(tokenTransferFeeConfig, evm_2_evm_onramp.EVM2EVMOnRampTokenTransferFeeConfigArgs{
-			Token:             token.ContractAddress,
-			MinFeeUSDCents:    50,           // $0.5
-			MaxFeeUSDCents:    1_000_000_00, // $ 1 million
-			DeciBps:           5_0,          // 5 bps
-			DestGasOverhead:   destGasOverhead,
-			DestBytesOverhead: destByteOverhead,
+			Token:                     token.ContractAddress,
+			MinFeeUSDCents:            50,           // $0.5
+			MaxFeeUSDCents:            1_000_000_00, // $ 1 million
+			DeciBps:                   5_0,          // 5 bps
+			DestGasOverhead:           destGasOverhead,
+			DestBytesOverhead:         destByteOverhead,
+			AggregateRateLimitEnabled: true,
 		})
 	}
 	err := sourceCCIP.OnRamp.SetTokenTransferFeeConfig(tokenTransferFeeConfig)
@@ -1252,6 +1253,7 @@ func (sourceCCIP *SourceCCIPModule) DeployContracts(lane *laneconfig.LaneConfig)
 					NetworkFeeUSDCents:         1_00,
 					GasMultiplierWeiPerEth:     GasFeeMultiplier,
 					PremiumMultiplierWeiPerEth: 1e18,
+					AggregateRateLimitEnabled:  true,
 					Enabled:                    true,
 				},
 				{
@@ -1259,6 +1261,7 @@ func (sourceCCIP *SourceCCIPModule) DeployContracts(lane *laneconfig.LaneConfig)
 					NetworkFeeUSDCents:         1_00,
 					GasMultiplierWeiPerEth:     GasFeeMultiplier,
 					PremiumMultiplierWeiPerEth: 1e18,
+					AggregateRateLimitEnabled:  true,
 					Enabled:                    true,
 				},
 			}, tokenTransferFeeConfig, sourceCCIP.Common.FeeToken.EthAddress)
