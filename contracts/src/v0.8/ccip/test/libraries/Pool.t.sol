@@ -56,4 +56,21 @@ contract Pool__removeFirstFourBytes is BaseTest {
     bytes memory result = Pool._removeFirstFourBytes(data);
     assertEq(result, data[4:]);
   }
+
+  function test__removeFirstFourBytes_EmptyData_Success() public {
+    bytes memory input = abi.encodePacked(bytes4(0x00112233));
+
+    assertEq(input.length, 4);
+    bytes memory result = Pool._removeFirstFourBytes(input);
+
+    assertEq(result.length, 0);
+    assertEq(bytes(""), result);
+  }
+
+  function test__removeFirstFourBytes_MalformedPoolReturnData_Revert() public {
+    bytes memory input = abi.encodePacked(bytes1(0x84));
+
+    vm.expectRevert(abi.encodeWithSelector(Pool.MalformedPoolReturnData.selector, input));
+    Pool._removeFirstFourBytes(input);
+  }
 }
