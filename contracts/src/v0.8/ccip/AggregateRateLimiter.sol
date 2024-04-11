@@ -1,14 +1,21 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.19;
 
+import {IPriceRegistry} from "./interfaces/IPriceRegistry.sol";
+
 import {OwnerIsCreator} from "./../shared/access/OwnerIsCreator.sol";
+import {Client} from "./libraries/Client.sol";
 import {RateLimiter} from "./libraries/RateLimiter.sol";
+import {USDPriceWith18Decimals} from "./libraries/USDPriceWith18Decimals.sol";
 
 /// @notice The aggregate rate limiter is a wrapper of the token bucket rate limiter
 /// which permits rate limiting based on the aggregate value of a group of
 /// token transfers, using a price registry to convert to a numeraire asset (e.g. USD).
 contract AggregateRateLimiter is OwnerIsCreator {
   using RateLimiter for RateLimiter.TokenBucket;
+  using USDPriceWith18Decimals for uint224;
+
+  error PriceNotFoundForToken(address token);
 
   event AdminSet(address newAdmin);
 
@@ -33,6 +40,17 @@ contract AggregateRateLimiter is OwnerIsCreator {
   /// @notice Consumes value from the rate limiter bucket based on the token value given.
   function _rateLimitValue(uint256 value) internal {
     s_rateLimiter._consume(value, address(0));
+  }
+
+  function _getTokenValue(
+    Client.EVMTokenAmount memory tokenAmount,
+    IPriceRegistry priceRegistry
+  ) internal view returns (uint256) {
+    // not fetching validated price, as price staleness is not important for value-based rate limiting
+    // we only need to verify the price is not 0
+    uint224 pricePerToken = priceRegistry.getTokenPrice(tokenAmount.token).value;
+    if (pricePerToken == 0) revert PriceNotFoundForToken(tokenAmount.token);
+    return pricePerToken._calcUSDValueFromTokenAmount(tokenAmount.amount);
   }
 
   /// @notice Gets the token bucket with its values for the block it was requested at.

@@ -375,6 +375,53 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
     assertEq(feeTokenAmount, s_onRamp.getNopFeesJuels());
   }
 
+  function testHighCapacityARLOffSuccess() public {
+    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
+    message.tokenAmounts = new Client.EVMTokenAmount[](1);
+    message.tokenAmounts[0].amount = 10;
+    message.tokenAmounts[0].token = s_sourceTokens[0];
+
+    IERC20(s_sourceTokens[0]).approve(address(s_onRamp), 10);
+
+    vm.startPrank(OWNER);
+    // Set a high price to trip the ARL
+    uint224 tokenPrice = 3 ** 128;
+    Internal.PriceUpdates memory priceUpdates = getSingleTokenPriceUpdateStruct(s_sourceTokens[0], tokenPrice);
+    s_priceRegistry.updatePrices(priceUpdates);
+    vm.startPrank(address(s_sourceRouter));
+
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        RateLimiter.AggregateValueMaxCapacityExceeded.selector,
+        getOutboundRateLimiterConfig().capacity,
+        (message.tokenAmounts[0].amount * tokenPrice) / 1e18
+      )
+    );
+    // Expect to fail from ARL
+    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 0, OWNER);
+
+    // Configure ARL off for token
+    EVM2EVMOnRamp.TokenTransferFeeConfig memory tokenTransferFeeConfig =
+      s_onRamp.getTokenTransferFeeConfig(s_sourceTokens[0]);
+    EVM2EVMOnRamp.TokenTransferFeeConfigArgs[] memory tokenTransferFeeConfigArgs =
+      new EVM2EVMOnRamp.TokenTransferFeeConfigArgs[](1);
+    tokenTransferFeeConfigArgs[0] = EVM2EVMOnRamp.TokenTransferFeeConfigArgs({
+      token: s_sourceTokens[0],
+      minFeeUSDCents: tokenTransferFeeConfig.minFeeUSDCents,
+      maxFeeUSDCents: tokenTransferFeeConfig.maxFeeUSDCents,
+      deciBps: tokenTransferFeeConfig.deciBps,
+      destGasOverhead: tokenTransferFeeConfig.destGasOverhead,
+      destBytesOverhead: tokenTransferFeeConfig.destBytesOverhead,
+      aggregateRateLimitEnabled: false
+    });
+    vm.startPrank(OWNER);
+    s_onRamp.setTokenTransferFeeConfig(tokenTransferFeeConfigArgs);
+
+    vm.startPrank(address(s_sourceRouter));
+    // Expect the call now succeeds
+    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 0, OWNER);
+  }
+
   // Reverts
 
   function testPausedReverts() public {
@@ -494,7 +541,7 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
     message.tokenAmounts[0].token = CUSTOM_TOKEN;
     message.tokenAmounts[0].amount = 1;
 
-    vm.expectRevert(abi.encodeWithSelector(EVM2EVMOnRamp.PriceNotFoundForToken.selector, CUSTOM_TOKEN));
+    vm.expectRevert(abi.encodeWithSelector(AggregateRateLimiter.PriceNotFoundForToken.selector, CUSTOM_TOKEN));
 
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 0, OWNER);
   }
@@ -1570,7 +1617,7 @@ contract EVM2EVMOnRamp_setTokenTransferFeeConfig is EVM2EVMOnRampSetup {
       deciBps: 1,
       destGasOverhead: 1,
       destBytesOverhead: 1,
-      aggregateRateLimitEnabled: true
+      aggregateRateLimitEnabled: false
     });
 
     vm.expectEmit();
@@ -1584,6 +1631,7 @@ contract EVM2EVMOnRamp_setTokenTransferFeeConfig is EVM2EVMOnRampSetup {
     assertEq(0, tokenTransferFeeConfig0.deciBps);
     assertEq(0, tokenTransferFeeConfig0.destGasOverhead);
     assertEq(0, tokenTransferFeeConfig0.destBytesOverhead);
+    assertEq(true, tokenTransferFeeConfig0.aggregateRateLimitEnabled);
 
     EVM2EVMOnRamp.TokenTransferFeeConfig memory tokenTransferFeeConfig1 = s_onRamp.getTokenTransferFeeConfig(address(1));
     assertEq(1, tokenTransferFeeConfig1.minFeeUSDCents);
@@ -1591,6 +1639,7 @@ contract EVM2EVMOnRamp_setTokenTransferFeeConfig is EVM2EVMOnRampSetup {
     assertEq(1, tokenTransferFeeConfig1.deciBps);
     assertEq(1, tokenTransferFeeConfig1.destGasOverhead);
     assertEq(1, tokenTransferFeeConfig1.destBytesOverhead);
+    assertEq(false, tokenTransferFeeConfig1.aggregateRateLimitEnabled);
   }
 
   function testSetFeeTokenConfigByAdminSuccess() public {

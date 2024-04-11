@@ -58,7 +58,6 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   error CannotSendZeroTokens();
   error SourceTokenDataTooLarge(address token);
   error InvalidChainSelector(uint64 chainSelector);
-  error PriceNotFoundForToken(address token);
 
   event ConfigSet(StaticConfig staticConfig, DynamicConfig dynamicConfig);
   event NopPaid(address indexed nop, uint256 amount);
@@ -457,17 +456,6 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   /// @inheritdoc IEVM2AnyOnRampClient
   function getSupportedTokens(uint64 /*destChainSelector*/ ) external view returns (address[] memory) {
     return ITokenAdminRegistry(s_dynamicConfig.tokenAdminRegistry).getAllConfiguredTokens();
-  }
-
-  function _getTokenValue(
-    Client.EVMTokenAmount memory tokenAmount,
-    IPriceRegistry priceRegistry
-  ) internal view returns (uint256) {
-    // not fetching validated price, as price staleness is not important for value-based rate limiting
-    // we only need to verify the price is not 0
-    uint224 pricePerToken = priceRegistry.getTokenPrice(tokenAmount.token).value;
-    if (pricePerToken == 0) revert PriceNotFoundForToken(tokenAmount.token);
-    return pricePerToken._calcUSDValueFromTokenAmount(tokenAmount.amount);
   }
 
   // ================================================================

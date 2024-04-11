@@ -226,3 +226,22 @@ contract AggregateTokenLimiter__rateLimitValue is AggregateTokenLimiterSetup {
     s_rateLimiter.rateLimitValue(value);
   }
 }
+
+/// @notice #_getTokenValue
+contract AggregateTokenLimiter__getTokenValue is AggregateTokenLimiterSetup {
+  function testGetTokenValueSuccess() public {
+    uint256 numberOfTokens = 10;
+    Client.EVMTokenAmount memory tokenAmount = Client.EVMTokenAmount({token: TOKEN, amount: 10});
+    uint256 value = s_rateLimiter.getTokenValue(tokenAmount, s_priceRegistry);
+    assertEq(value, (numberOfTokens * TOKEN_PRICE) / 1e18);
+  }
+
+  // Reverts
+  function testNoTokenPriceReverts() public {
+    address tokenWithNoPrice = makeAddr("Token with no price");
+    Client.EVMTokenAmount memory tokenAmount = Client.EVMTokenAmount({token: tokenWithNoPrice, amount: 10});
+
+    vm.expectRevert(abi.encodeWithSelector(AggregateRateLimiter.PriceNotFoundForToken.selector, tokenWithNoPrice));
+    s_rateLimiter.getTokenValue(tokenAmount, s_priceRegistry);
+  }
+}

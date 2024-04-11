@@ -54,36 +54,6 @@ func (_m *EVM2EVMOffRampInterface) AcceptOwnership(opts *bind.TransactOpts) (*ty
 	return r0, r1
 }
 
-// AddRateLimitedTokens provides a mock function with given fields: opts, adds
-func (_m *EVM2EVMOffRampInterface) AddRateLimitedTokens(opts *bind.TransactOpts, adds []common.Address) (*types.Transaction, error) {
-	ret := _m.Called(opts, adds)
-
-	if len(ret) == 0 {
-		panic("no return value specified for AddRateLimitedTokens")
-	}
-
-	var r0 *types.Transaction
-	var r1 error
-	if rf, ok := ret.Get(0).(func(*bind.TransactOpts, []common.Address) (*types.Transaction, error)); ok {
-		return rf(opts, adds)
-	}
-	if rf, ok := ret.Get(0).(func(*bind.TransactOpts, []common.Address) *types.Transaction); ok {
-		r0 = rf(opts, adds)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*types.Transaction)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(*bind.TransactOpts, []common.Address) error); ok {
-		r1 = rf(opts, adds)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
 // Address provides a mock function with given fields:
 func (_m *EVM2EVMOffRampInterface) Address() common.Address {
 	ret := _m.Called()
@@ -510,12 +480,12 @@ func (_m *EVM2EVMOffRampInterface) FilterTransmitted(opts *bind.FilterOpts) (*ev
 	return r0, r1
 }
 
-// GetAllRateLimitedTokens provides a mock function with given fields: opts
-func (_m *EVM2EVMOffRampInterface) GetAllRateLimitedTokens(opts *bind.CallOpts) ([]common.Address, error) {
+// GetAllRateLimitTokens provides a mock function with given fields: opts
+func (_m *EVM2EVMOffRampInterface) GetAllRateLimitTokens(opts *bind.CallOpts) ([]common.Address, error) {
 	ret := _m.Called(opts)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetAllRateLimitedTokens")
+		panic("no return value specified for GetAllRateLimitTokens")
 	}
 
 	var r0 []common.Address
@@ -1188,36 +1158,6 @@ func (_m *EVM2EVMOffRampInterface) ParseTransmitted(log types.Log) (*evm_2_evm_o
 	return r0, r1
 }
 
-// RemoveRateLimitedTokens provides a mock function with given fields: opts, removes
-func (_m *EVM2EVMOffRampInterface) RemoveRateLimitedTokens(opts *bind.TransactOpts, removes []common.Address) (*types.Transaction, error) {
-	ret := _m.Called(opts, removes)
-
-	if len(ret) == 0 {
-		panic("no return value specified for RemoveRateLimitedTokens")
-	}
-
-	var r0 *types.Transaction
-	var r1 error
-	if rf, ok := ret.Get(0).(func(*bind.TransactOpts, []common.Address) (*types.Transaction, error)); ok {
-		return rf(opts, removes)
-	}
-	if rf, ok := ret.Get(0).(func(*bind.TransactOpts, []common.Address) *types.Transaction); ok {
-		r0 = rf(opts, removes)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*types.Transaction)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(*bind.TransactOpts, []common.Address) error); ok {
-		r1 = rf(opts, removes)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
 // SetAdmin provides a mock function with given fields: opts, newAdmin
 func (_m *EVM2EVMOffRampInterface) SetAdmin(opts *bind.TransactOpts, newAdmin common.Address) (*types.Transaction, error) {
 	ret := _m.Called(opts, newAdmin)
@@ -1389,6 +1329,36 @@ func (_m *EVM2EVMOffRampInterface) TypeAndVersion(opts *bind.CallOpts) (string, 
 
 	if rf, ok := ret.Get(1).(func(*bind.CallOpts) error); ok {
 		r1 = rf(opts)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// UpdateRateLimitTokens provides a mock function with given fields: opts, removes, adds
+func (_m *EVM2EVMOffRampInterface) UpdateRateLimitTokens(opts *bind.TransactOpts, removes []common.Address, adds []common.Address) (*types.Transaction, error) {
+	ret := _m.Called(opts, removes, adds)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpdateRateLimitTokens")
+	}
+
+	var r0 *types.Transaction
+	var r1 error
+	if rf, ok := ret.Get(0).(func(*bind.TransactOpts, []common.Address, []common.Address) (*types.Transaction, error)); ok {
+		return rf(opts, removes, adds)
+	}
+	if rf, ok := ret.Get(0).(func(*bind.TransactOpts, []common.Address, []common.Address) *types.Transaction); ok {
+		r0 = rf(opts, removes, adds)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*types.Transaction)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(*bind.TransactOpts, []common.Address, []common.Address) error); ok {
+		r1 = rf(opts, removes, adds)
 	} else {
 		r1 = ret.Error(1)
 	}

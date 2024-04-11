@@ -356,7 +356,6 @@ func setupOnRampV1_5_0(t *testing.T, user *bind.TransactOpts, bc *client.Simulat
 			NetworkFeeUSDCents:         0,
 			GasMultiplierWeiPerEth:     0,
 			PremiumMultiplierWeiPerEth: 0,
-			AggregateRateLimitEnabled:  true,
 			Enabled:                    false,
 		},
 	}

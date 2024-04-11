@@ -1177,7 +1177,7 @@ func (sourceCCIP *SourceCCIPModule) SetTokenTransferFeeConfig() error {
 			DeciBps:                   5_0,          // 5 bps
 			DestGasOverhead:           destGasOverhead,
 			DestBytesOverhead:         destByteOverhead,
-			AggregateRateLimitEnabled: true,
+			AggregateRateLimitEnabled: rand.Intn(2) == 1, // Randomly turn on ARL for ~50% of tokens
 		})
 	}
 	err := sourceCCIP.OnRamp.SetTokenTransferFeeConfig(tokenTransferFeeConfig)
@@ -1253,7 +1253,6 @@ func (sourceCCIP *SourceCCIPModule) DeployContracts(lane *laneconfig.LaneConfig)
 					NetworkFeeUSDCents:         1_00,
 					GasMultiplierWeiPerEth:     GasFeeMultiplier,
 					PremiumMultiplierWeiPerEth: 1e18,
-					AggregateRateLimitEnabled:  true,
 					Enabled:                    true,
 				},
 				{
@@ -1261,7 +1260,6 @@ func (sourceCCIP *SourceCCIPModule) DeployContracts(lane *laneconfig.LaneConfig)
 					NetworkFeeUSDCents:         1_00,
 					GasMultiplierWeiPerEth:     GasFeeMultiplier,
 					PremiumMultiplierWeiPerEth: 1e18,
-					AggregateRateLimitEnabled:  true,
 					Enabled:                    true,
 				},
 			}, tokenTransferFeeConfig, sourceCCIP.Common.FeeToken.EthAddress)
@@ -1671,6 +1669,16 @@ func (destCCIP *DestCCIPModule) LoadContracts(conf *laneconfig.LaneConfig) {
 	}
 }
 
+func (destCCIP *DestCCIPModule) UpdateRateLimitTokens(srcTokens []*contracts.ERC20Token) error {
+	var sourceTokens []common.Address
+
+	for _, token := range srcTokens {
+		sourceTokens = append(sourceTokens, common.HexToAddress(token.Address()))
+	}
+
+	return destCCIP.OffRamp.UpdateRateLimitTokens(sourceTokens)
+}
+
 // DeployContracts deploys all CCIP contracts specific to the destination chain
 func (destCCIP *DestCCIPModule) DeployContracts(
 	sourceCCIP SourceCCIPModule,
@@ -1749,6 +1757,7 @@ func (destCCIP *DestCCIPModule) DeployContracts(
 			destChainSelector,
 			destCCIP.CommitStore.EthAddress,
 			sourceCCIP.OnRamp.EthAddress,
+			[]common.Address{},
 			destCCIP.Common.RateLimiterConfig, *destCCIP.Common.ARMContract)
 		if err != nil {
 			return fmt.Errorf("deploying offramp shouldn't fail %w", err)
@@ -1762,6 +1771,15 @@ func (destCCIP *DestCCIPModule) DeployContracts(
 		_, err = destCCIP.Common.Router.AddOffRamp(destCCIP.OffRamp.EthAddress, destCCIP.SourceChainSelector)
 		if err != nil {
 			return fmt.Errorf("setting offramp as fee updater shouldn't fail %w", err)
+		}
+
+		err = destCCIP.UpdateRateLimitTokens(sourceCCIP.Common.BridgeTokens)
+		if err != nil {
+			return fmt.Errorf("setting rate limited tokens shouldn't fail %w", err)
+		}
+		err = destCCIP.Common.ChainClient.WaitForEvents()
+		if err != nil {
+			return fmt.Errorf("waiting for events on destination contract shouldn't fail %w", err)
 		}
 
 		err = destCCIP.Common.ChainClient.WaitForEvents()

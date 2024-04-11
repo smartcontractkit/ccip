@@ -9,4 +9,11 @@ contract AggregateRateLimiterHelper is AggregateRateLimiter {
   function rateLimitValue(uint256 value) public {
     _rateLimitValue(value);
   }
+
+  function getTokenValue(
+    Client.EVMTokenAmount memory tokenAmount,
+    IPriceRegistry priceRegistry
+  ) public view returns (uint256) {
+    return _getTokenValue(tokenAmount, priceRegistry);
+  }
 }
