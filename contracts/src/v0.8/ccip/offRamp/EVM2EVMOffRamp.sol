@@ -11,7 +11,6 @@ import {IRouter} from "../interfaces/IRouter.sol";
 import {IPool} from "../interfaces/pools/IPool.sol";
 
 import {CallWithExactGas} from "../../shared/call/CallWithExactGas.sol";
-import {EnumerableMapAddresses} from "../../shared/enumerable/EnumerableMapAddresses.sol";
 import {AggregateRateLimiter} from "../AggregateRateLimiter.sol";
 import {Client} from "../libraries/Client.sol";
 import {Internal} from "../libraries/Internal.sol";
@@ -19,6 +18,7 @@ import {RateLimiter} from "../libraries/RateLimiter.sol";
 import {OCR2BaseNoChecks} from "../ocr/OCR2BaseNoChecks.sol";
 
 import {ERC165Checker} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/introspection/ERC165Checker.sol";
+import {EnumerableSet} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/structs/EnumerableSet.sol";
 
 /// @notice EVM2EVMOffRamp enables OCR networks to execute multiple messages
 /// in an OffRamp in a single transaction.
@@ -29,7 +29,7 @@ import {ERC165Checker} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts
 /// and turn-taking mechanism.
 contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersion, OCR2BaseNoChecks {
   using ERC165Checker for address;
-  using EnumerableMapAddresses for EnumerableMapAddresses.AddressToAddressMap;
+  using EnumerableSet for EnumerableSet.AddressSet;
 
   error AlreadyAttempted(uint64 sequenceNumber);
   error AlreadyExecuted(uint64 sequenceNumber);
@@ -62,6 +62,8 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
   event ExecutionStateChanged(
     uint64 indexed sequenceNumber, bytes32 indexed messageId, Internal.MessageExecutionState state, bytes returnData
   );
+  event TokenAggregateRateLimitAdded(address token);
+  event TokenAggregateRateLimitRemoved(address token);
 
   /// @notice Static offRamp config
   /// @dev RMN depends on this struct, if changing, please notify the RMN maintainers.
@@ -108,6 +110,8 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
 
   // DYNAMIC CONFIG
   DynamicConfig internal s_dynamicConfig;
+  /// @dev Tokens that should be included in Aggregate Rate Limiting
+  EnumerableSet.AddressSet internal s_rateLimitedTokens;
 
   // STATE
   /// @dev The expected nonce for a given sender.
@@ -122,7 +126,8 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
 
   constructor(
     StaticConfig memory staticConfig,
-    RateLimiter.Config memory rateLimiterConfig
+    RateLimiter.Config memory rateLimiterConfig,
+    address[] memory rateLimitedTokens
   ) OCR2BaseNoChecks() AggregateRateLimiter(rateLimiterConfig) {
     if (staticConfig.onRamp == address(0) || staticConfig.commitStore == address(0)) revert ZeroAddressNotAllowed();
     // Ensures we can never deploy a new offRamp that points to a commitStore that
@@ -137,6 +142,11 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
     i_armProxy = staticConfig.armProxy;
 
     i_metadataHash = _metadataHash(Internal.EVM_2_EVM_MESSAGE_HASH);
+
+    for (uint256 i = 0; i < rateLimitedTokens.length; ++i) {
+      bool success = s_rateLimitedTokens.add(rateLimitedTokens[i]);
+      if (success) emit TokenAggregateRateLimitAdded(rateLimitedTokens[i]);
+    }
   }
 
   // ================================================================
@@ -477,6 +487,26 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
     );
   }
 
+  /// @notice Get all tokens which are included in Aggregate Rate Limiting.
+  /// @return rateLimitedTokens Array of Aggregate Rate Limited tokens.
+  function getAllRateLimitTokens() external view returns (address[] memory) {
+    return s_rateLimitedTokens.values();
+  }
+
+  /// @notice Adds or removes tokens from being used in Aggregate Rate Limiting.
+  /// @param adds - A list of one or more tokens to be added.
+  /// @param removes - A list of one or more tokens to be removed.
+  function updateRateLimitTokens(address[] memory removes, address[] memory adds) external onlyOwner {
+    for (uint256 i = 0; i < adds.length; ++i) {
+      bool success = s_rateLimitedTokens.add(adds[i]);
+      if (success) emit TokenAggregateRateLimitAdded(adds[i]);
+    }
+    for (uint256 i = 0; i < removes.length; ++i) {
+      bool success = s_rateLimitedTokens.remove(removes[i]);
+      if (success) emit TokenAggregateRateLimitRemoved(removes[i]);
+    }
+  }
+
   // ================================================================
   // │                      Tokens and pools                        │
   // ================================================================
@@ -496,8 +526,9 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
     address receiver,
     bytes[] memory encodedSourceTokenData,
     bytes[] memory offchainTokenData
-  ) internal returns (Client.EVMTokenAmount[] memory) {
-    Client.EVMTokenAmount[] memory destTokenAmounts = sourceTokenAmounts;
+  ) internal returns (Client.EVMTokenAmount[] memory destTokenAmounts) {
+    destTokenAmounts = sourceTokenAmounts;
+    uint256 value = 0;
     for (uint256 i = 0; i < sourceTokenAmounts.length; ++i) {
       IPool.SourceTokenData memory sourceTokenData = abi.decode(encodedSourceTokenData[i], (IPool.SourceTokenData));
       // We need to safely decode the pool address from the sourceTokenData, as it could be wrong,
@@ -508,6 +539,10 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
       // address is actually a (compatible) pool contract. If there is no contract it could not possibly be a pool.
       if (pool.code.length == 0) {
         revert InvalidAddress(sourceTokenData.destPoolAddress);
+      }
+
+      if (s_rateLimitedTokens.contains(destTokenAmounts[i].token)) {
+        value += _getTokenValue(destTokenAmounts[i], IPriceRegistry(s_dynamicConfig.priceRegistry));
       }
 
       // Call the pool with exact gas to increase resistance against malicious tokens or token pools.
@@ -535,7 +570,9 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
       // If the call was successful, the returnData should be the local token address.
       destTokenAmounts[i].token = _validateEVMAddress(returnData);
     }
-    _rateLimitValue(destTokenAmounts, IPriceRegistry(s_dynamicConfig.priceRegistry));
+
+    if (value > 0) _rateLimitValue(value);
+
     return destTokenAmounts;
   }
 

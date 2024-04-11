@@ -677,7 +677,7 @@ func (e *CCIPContractsDeployer) NewOffRamp(addr common.Address) (
 	}, err
 }
 
-func (e *CCIPContractsDeployer) DeployOffRamp(sourceChainSelector, destChainSelector uint64, commitStore, onRamp common.Address, opts RateLimiterConfig, armProxy common.Address) (*OffRamp, error) {
+func (e *CCIPContractsDeployer) DeployOffRamp(sourceChainSelector, destChainSelector uint64, commitStore, onRamp common.Address, rateLimitTokens []common.Address, opts RateLimiterConfig, armProxy common.Address) (*OffRamp, error) {
 	address, _, instance, err := e.evmClient.DeployContract("OffRamp Contract", func(
 		auth *bind.TransactOpts,
 		backend bind.ContractBackend,
@@ -698,6 +698,7 @@ func (e *CCIPContractsDeployer) DeployOffRamp(sourceChainSelector, destChainSele
 				Capacity:  opts.Capacity,
 				Rate:      opts.Rate,
 			},
+			rateLimitTokens,
 		)
 	})
 	if err != nil {

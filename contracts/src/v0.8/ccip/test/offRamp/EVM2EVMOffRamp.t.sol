@@ -28,7 +28,7 @@ import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/tok
 
 contract EVM2EVMOffRamp_constructor is EVM2EVMOffRampSetup {
   event ConfigSet(EVM2EVMOffRamp.StaticConfig staticConfig, EVM2EVMOffRamp.DynamicConfig dynamicConfig);
-  event PoolAdded(address token, address pool);
+  event TokenAggregateRateLimitAdded(address token);
 
   function testConstructorSuccess() public {
     EVM2EVMOffRamp.StaticConfig memory staticConfig = EVM2EVMOffRamp.StaticConfig({
@@ -42,7 +42,12 @@ contract EVM2EVMOffRamp_constructor is EVM2EVMOffRampSetup {
     EVM2EVMOffRamp.DynamicConfig memory dynamicConfig =
       generateDynamicOffRampConfig(address(s_destRouter), address(s_priceRegistry));
 
-    s_offRamp = new EVM2EVMOffRampHelper(staticConfig, getInboundRateLimiterConfig());
+    for (uint256 i = 0; i < s_destTokens.length; ++i) {
+      vm.expectEmit();
+      emit TokenAggregateRateLimitAdded(s_destTokens[i]);
+    }
+
+    s_offRamp = new EVM2EVMOffRampHelper(staticConfig, getInboundRateLimiterConfig(), s_destTokens);
 
     s_offRamp.setOCR2Config(
       s_valid_signers, s_valid_transmitters, s_f, abi.encode(dynamicConfig), s_offchainConfigVersion, abi.encode("")
@@ -67,6 +72,7 @@ contract EVM2EVMOffRamp_constructor is EVM2EVMOffRampSetup {
     // OffRamp initial values
     assertEq("EVM2EVMOffRamp 1.5.0-dev", s_offRamp.typeAndVersion());
     assertEq(OWNER, s_offRamp.owner());
+    assertEq(s_destTokens, s_offRamp.getAllRateLimitTokens());
   }
 
   // Revert
@@ -82,7 +88,8 @@ contract EVM2EVMOffRamp_constructor is EVM2EVMOffRampSetup {
         prevOffRamp: address(0),
         armProxy: address(s_mockARM)
       }),
-      RateLimiter.Config({isEnabled: true, rate: 1e20, capacity: 1e20})
+      RateLimiter.Config({isEnabled: true, rate: 1e20, capacity: 1e20}),
+      s_destTokens
     );
   }
 
@@ -100,7 +107,8 @@ contract EVM2EVMOffRamp_constructor is EVM2EVMOffRampSetup {
         prevOffRamp: address(0),
         armProxy: address(s_mockARM)
       }),
-      getInboundRateLimiterConfig()
+      getInboundRateLimiterConfig(),
+      s_destTokens
     );
   }
 }
@@ -1229,5 +1237,51 @@ contract EVM2EVMOffRamp__releaseOrMintTokens is EVM2EVMOffRampSetup {
         assertEq(reason, abi.encodeWithSelector(EVM2EVMOffRamp.InvalidAddress.selector, destPoolAddress));
       }
     }
+  }
+}
+
+contract EVM2EVMOffRamp__updateRateLimitTokens is EVM2EVMOffRampSetup {
+  event TokenAggregateRateLimitAdded(address token);
+  event TokenAggregateRateLimitRemoved(address token);
+
+  function test_updateRateLimitTokensSuccess() public {
+    assertEq(s_destTokens, s_offRamp.getAllRateLimitTokens());
+
+    address token1 = makeAddr("Some token 1");
+    address token2 = makeAddr("Some token 2");
+    address token3 = makeAddr("Some token 3");
+
+    address[] memory addsAndRemoves = new address[](4);
+    addsAndRemoves[0] = token1;
+    addsAndRemoves[1] = token2;
+    addsAndRemoves[2] = token3;
+    // Add/removes token twice, expect no event on second add/remove
+    addsAndRemoves[3] = token3;
+
+    for (uint256 i = 0; i < addsAndRemoves.length - 1; ++i) {
+      vm.expectEmit();
+      emit TokenAggregateRateLimitAdded(addsAndRemoves[i]);
+    }
+    for (uint256 i = 0; i < addsAndRemoves.length - 1; ++i) {
+      vm.expectEmit();
+      emit TokenAggregateRateLimitRemoved(addsAndRemoves[i]);
+    }
+
+    s_offRamp.updateRateLimitTokens(addsAndRemoves, addsAndRemoves);
+
+    assertEq(s_destTokens, s_offRamp.getAllRateLimitTokens());
+  }
+
+  // Reverts
+
+  function testNonOwnerReverts() public {
+    address[] memory adds;
+    address[] memory removes;
+
+    vm.startPrank(STRANGER);
+
+    vm.expectRevert("Only callable by owner");
+
+    s_offRamp.updateRateLimitTokens(adds, removes);
   }
 }
