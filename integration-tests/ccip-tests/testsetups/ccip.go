@@ -752,6 +752,9 @@ func CCIPDefaultTestSetUp(
 		laneMutex:              &sync.Mutex{},
 	}
 
+	contractsData, err := setUpArgs.Cfg.ContractsInput.ContractsData()
+	require.NoError(t, err, "error reading existing lane config")
+
 	chainByChainID := setUpArgs.CreateEnvironment(lggr, envName, reportPath)
 	// if test is run in remote runner, register a clean-up to copy the laneconfig file
 	if value, set := os.LookupEnv(config.EnvVarJobImage); set && value != "" &&
@@ -774,8 +777,6 @@ func CCIPDefaultTestSetUp(
 		}
 	}
 
-	contractsData, err := setUpArgs.Cfg.ContractsInput.ContractsData()
-	require.NoError(t, err, "error reading existing lane config")
 	setUpArgs.LaneConfig, err = laneconfig.ReadLanesFromExistingDeployment(contractsData)
 	require.NoError(t, err)
 

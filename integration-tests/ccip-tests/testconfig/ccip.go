@@ -20,6 +20,10 @@ import (
 	"github.com/smartcontractkit/chainlink/integration-tests/contracts"
 )
 
+const (
+	CONTRACTS_OVERRIDE_CONFIG = "BASE64_CCIP_CONFIG_OVERRIDE_CONTRACTS"
+)
+
 type CCIPTestConfig struct {
 	KeepEnvAlive                               *bool                                 `toml:",omitempty"`
 	BiDirectionalLane                          *bool                                 `toml:",omitempty"`
@@ -121,19 +125,43 @@ func (c *CCIPContractConfig) DataFilePath() string {
 	return pointer.GetString(c.DataFile)
 }
 
+// ContractsData reads the contract config passed in TOML
+// CCIPContractConfig can accept contract config in string mentioned in Data field
+// It also accepts DataFile. Data takes precedence over DataFile
+// If you are providing contract config in DataFile, this will read the content of the file
+// and set it to CONTRACTS_OVERRIDE_CONFIG env var in base 64 encoded format.
+// This comes handy while running tests in remote runner. It ensures that you won't have to deal with copying the
+// DataFile to remote runner pod. Instead, you can pass the base64ed content of the file with the help of
+// an env var.
 func (c *CCIPContractConfig) ContractsData() ([]byte, error) {
+	// check if CONTRACTS_OVERRIDE_CONFIG is provided
+	// load config from env var if specified for contracts
+	rawConfig := os.Getenv(CONTRACTS_OVERRIDE_CONFIG)
+	if rawConfig != "" {
+		err := DecodeConfig(rawConfig, c)
+		if err != nil {
+			return nil, err
+		}
+	}
 	if c == nil {
 		return nil, nil
 	}
 	if c.Data != "" {
 		return []byte(c.Data), nil
 	}
+	// if DataFilePath is given, update c.Data with the content of file so that we can set CONTRACTS_OVERRIDE_CONFIG
+	// to pass the file content to remote runner with override config var
 	filePath := c.DataFilePath()
 	if filePath != "" {
 		if !filepath.IsAbs(filePath) {
 			filePath = fmt.Sprintf("%s/%s", utils.ProjectRoot(), filePath)
 		}
-		return os.ReadFile(filePath)
+		dataContent, err := os.ReadFile(filePath)
+		c.Data = string(dataContent)
+		// encode it to base64 and set to CONTRACTS_OVERRIDE_CONFIG so that the same content can be passed to remote runner
+		// we add TEST_ prefix to CONTRACTS_OVERRIDE_CONFIG to ensure the env var is ported to remote runner.
+		_, err = EncodeConfigAndSetEnv(c, fmt.Sprintf("TEST_%s", CONTRACTS_OVERRIDE_CONFIG))
+		return dataContent, err
 	}
 	return nil, nil
 }
