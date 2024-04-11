@@ -18,7 +18,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip/rebalancer/multienv"
 	helpers "github.com/smartcontractkit/chainlink/core/scripts/common"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/arm_proxy_contract"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/lock_release_token_pool_1_4_0"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_arm_contract"
 	router2 "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/arbitrum_l1_bridge_adapter"
@@ -188,8 +188,8 @@ func deployTokenPoolAndRebalancer(
 	armProxyAddress common.Address,
 	chainID uint64,
 	router common.Address,
-) (*lock_release_token_pool_1_4_0.LockReleaseTokenPool, *rebalancer.Rebalancer) {
-	_, tx, _, err := lock_release_token_pool_1_4_0.DeployLockReleaseTokenPool(
+) (*lock_release_token_pool.LockReleaseTokenPool, *rebalancer.Rebalancer) {
+	_, tx, _, err := lock_release_token_pool.DeployLockReleaseTokenPool(
 		transactor,
 		client,
 		tokenAddress,
@@ -200,7 +200,7 @@ func deployTokenPoolAndRebalancer(
 	)
 	helpers.PanicErr(err)
 	tokenPoolAddress := helpers.ConfirmContractDeployed(context.Background(), client, tx, int64(chainID))
-	tokenPool, err := lock_release_token_pool_1_4_0.NewLockReleaseTokenPool(tokenPoolAddress, client)
+	tokenPool, err := lock_release_token_pool.NewLockReleaseTokenPool(tokenPoolAddress, client)
 	helpers.PanicErr(err)
 
 	_, tx, _, err = rebalancer.DeployRebalancer(

@@ -36,7 +36,7 @@ import (
 	evmutils "github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils/big"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/legacyevm"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/arm_proxy_contract"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/lock_release_token_pool_1_4_0"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_arm_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/weth9"
@@ -77,7 +77,7 @@ type onchainUniverse struct {
 	backend         *backends.SimulatedBackend
 	chainID         uint64
 	wethToken       *weth9.WETH9
-	lockReleasePool *lock_release_token_pool_1_4_0.LockReleaseTokenPool
+	lockReleasePool *lock_release_token_pool.LockReleaseTokenPool
 	rebalancer      *rebalancer.Rebalancer
 	bridgeAdapter   *mock_l1_bridge_adapter.MockL1BridgeAdapter
 }
@@ -668,11 +668,11 @@ func deployContracts(
 		backend.Commit()
 
 		// deploy lock/release pool targeting the weth9 contract
-		lockReleasePoolAddress, _, _, err := lock_release_token_pool_1_4_0.DeployLockReleaseTokenPool(
+		lockReleasePoolAddress, _, _, err := lock_release_token_pool.DeployLockReleaseTokenPool(
 			owner, backend, wethAddress, []common.Address{}, armProxyAddress, true, routerAddress)
 		require.NoError(t, err, "failed to deploy LockReleaseTokenPool contract")
 		backend.Commit()
-		lockReleasePool, err := lock_release_token_pool_1_4_0.NewLockReleaseTokenPool(lockReleasePoolAddress, backend)
+		lockReleasePool, err := lock_release_token_pool.NewLockReleaseTokenPool(lockReleasePoolAddress, backend)
 		require.NoError(t, err)
 
 		// deploy the rebalancer and set the liquidity container to be the lock release pool

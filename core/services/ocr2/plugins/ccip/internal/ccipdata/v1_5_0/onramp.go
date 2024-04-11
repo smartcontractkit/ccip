@@ -59,7 +59,6 @@ type OnRamp struct {
 	sendRequestedSeqNumberWord       int
 	filters                          []logpoller.Filter
 	cachedSourcePriceRegistryAddress cache.AutoSync[cciptypes.Address]
-	cachedTokenAdminRegistryAddress  cache.AutoSync[cciptypes.Address]
 	// Static config can be cached, because it's never expected to change.
 	// The only way to change that is through the contract's constructor (redeployment)
 	cachedStaticConfig cache.OnceCtxFunction[evm_2_evm_onramp.EVM2EVMOnRampStaticConfig]
@@ -104,11 +103,6 @@ func NewOnRamp(lggr logger.Logger, sourceSelector, destSelector uint64, onRampAd
 			[]common.Hash{ConfigSetEventSig},
 			onRampAddress,
 		),
-		cachedTokenAdminRegistryAddress: cache.NewLogpollerEventsBased[cciptypes.Address](
-			sourceLP,
-			[]common.Hash{ConfigSetEventSig},
-			onRampAddress,
-		),
 		cachedStaticConfig: cachedStaticConfig,
 	}, nil
 }
@@ -137,14 +131,6 @@ func (o *OnRamp) GetDynamicConfig(context.Context) (cciptypes.OnRampDynamicConfi
 		MaxDataBytes:                      config.MaxDataBytes,
 		MaxPerMsgGasLimit:                 config.MaxPerMsgGasLimit,
 	}, nil
-}
-
-func (o *OnRamp) RouterAddress(context.Context) (cciptypes.Address, error) {
-	config, err := o.onRamp.GetDynamicConfig(nil)
-	if err != nil {
-		return "", err
-	}
-	return ccipcalc.EvmAddrToGeneric(config.Router), nil
 }
 
 func (o *OnRamp) SourcePriceRegistryAddress(ctx context.Context) (cciptypes.Address, error) {
@@ -184,6 +170,14 @@ func (o *OnRamp) GetSendRequestsBetweenSeqNums(ctx context.Context, seqNumMin, s
 		})
 	}
 	return res, nil
+}
+
+func (o *OnRamp) RouterAddress(context.Context) (cciptypes.Address, error) {
+	config, err := o.onRamp.GetDynamicConfig(nil)
+	if err != nil {
+		return "", err
+	}
+	return ccipcalc.EvmAddrToGeneric(config.Router), nil
 }
 
 func (o *OnRamp) IsSourceChainHealthy(context.Context) (bool, error) {

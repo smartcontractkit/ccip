@@ -1160,7 +1160,6 @@ func (sourceCCIP *SourceCCIPModule) LoadContracts(conf *laneconfig.LaneConfig) {
 	}
 }
 
-// TODO token pool updating
 func (sourceCCIP *SourceCCIPModule) SetTokenTransferFeeConfig() error {
 	var tokenTransferFeeConfig []evm_2_evm_onramp.EVM2EVMOnRampTokenTransferFeeConfigArgs
 	for i, token := range sourceCCIP.Common.BridgeTokens {

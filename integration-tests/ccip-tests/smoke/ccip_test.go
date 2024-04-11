@@ -6,20 +6,17 @@ import (
 	"testing"
 	"time"
 
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/lock_release_token_pool"
-
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/token_pool"
-
 	"github.com/AlekSi/pointer"
-	"github.com/stretchr/testify/require"
-
 	"github.com/smartcontractkit/chainlink-testing-framework/logging"
 	"github.com/smartcontractkit/chainlink-testing-framework/utils/ptr"
+	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/actions"
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/testconfig"
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/testsetups"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/lock_release_token_pool"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/token_pool"
 )
 
 type testDefinition struct {
