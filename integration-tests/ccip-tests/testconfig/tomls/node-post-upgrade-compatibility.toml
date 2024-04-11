@@ -1,6 +1,6 @@
 [CCIP]
 [CCIP.Deployments]
-DataFile = 'lane-config.json'
+DataFile = 'lane-config/*.json'
 
 [CCIP.Env]
 [CCIP.Env.NewCLCluster]

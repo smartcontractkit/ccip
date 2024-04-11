@@ -3,6 +3,7 @@ package testsetups
 import (
 	"context"
 	"fmt"
+	testutils "github.com/smartcontractkit/ccip/integration-tests/ccip-tests/utils"
 	"math/big"
 	"math/rand"
 	"os"
@@ -731,7 +732,7 @@ func CCIPDefaultTestSetUp(
 	)
 	reportPath := "tmp_laneconfig"
 	filepath := fmt.Sprintf("./%s/tmp_%s.json", reportPath, strings.ReplaceAll(t.Name(), "/", "_"))
-	reportFile := strings.Split(filepath, "/")[len(strings.Split(filepath, "/"))-1]
+	reportFile := testutils.FileNameFromPath(filepath)
 	var transferAmounts []*big.Int
 	if testConfig.TestGroupInput.MsgType == actions.TokenTransfer {
 		for i := 0; i < testConfig.TestGroupInput.NoOfTokensInMsg; i++ {

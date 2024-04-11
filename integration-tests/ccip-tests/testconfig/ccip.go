@@ -2,21 +2,17 @@ package testconfig
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
-
 	"github.com/AlekSi/pointer"
 	"github.com/pelletier/go-toml/v2"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
-
-	ctfK8config "github.com/smartcontractkit/chainlink-testing-framework/k8s/config"
-
+	testutils "github.com/smartcontractkit/ccip/integration-tests/ccip-tests/utils"
 	ctfconfig "github.com/smartcontractkit/chainlink-testing-framework/config"
+	ctfK8config "github.com/smartcontractkit/chainlink-testing-framework/k8s/config"
+	"os"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
 
-	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/utils"
 	"github.com/smartcontractkit/chainlink/integration-tests/contracts"
 )
 
@@ -153,12 +149,14 @@ func (c *CCIPContractConfig) ContractsData() ([]byte, error) {
 	// to pass the file content to remote runner with override config var
 	filePath := c.DataFilePath()
 	if filePath != "" {
-		if !filepath.IsAbs(filePath) {
-			filePath = fmt.Sprintf("%s/%s", utils.ProjectRoot(), filePath)
+		// if there is regex provided in filepath, reformat the filepath with actual filepath matching the regex
+		filePath, err := testutils.FirstFileFromMatchingPath(filePath)
+		if err != nil {
+			return nil, fmt.Errorf("error finding contract config file %s: %w", c.DataFilePath(), err)
 		}
 		dataContent, err := os.ReadFile(filePath)
 		if err != nil {
-			return dataContent, fmt.Errorf("error reading contract config file %w", err)
+			return dataContent, fmt.Errorf("error reading contract config file %s : %w", filePath, err)
 		}
 		c.Data = string(dataContent)
 		// encode it to base64 and set to CONTRACTS_OVERRIDE_CONFIG so that the same content can be passed to remote runner
