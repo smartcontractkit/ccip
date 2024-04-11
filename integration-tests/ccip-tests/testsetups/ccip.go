@@ -754,18 +754,17 @@ func CCIPDefaultTestSetUp(
 
 	chainByChainID := setUpArgs.CreateEnvironment(lggr, envName, reportPath)
 	// if test is run in remote runner, register a clean-up to copy the laneconfig file
-	if value, set := os.LookupEnv(config.EnvVarJobImage); set && value != "" {
+	if value, set := os.LookupEnv(config.EnvVarJobImage); set && value != "" &&
+		(setUpArgs.Env != nil && setUpArgs.Env.K8Env != nil) {
 		t.Cleanup(func() {
-			if setUpArgs.Env != nil && setUpArgs.Env.K8Env != nil {
-				path := fmt.Sprintf("reports/%s/%s", reportPath, reportFile)
-				dir, err := os.Getwd()
-				require.NoError(t, err)
-				destPath := fmt.Sprintf("%s/%s", dir, reportFile)
-				lggr.Info().Str("srcPath", path).Str("dstPath", destPath).Msg("copying lane config")
-				err = setUpArgs.Env.K8Env.CopyFromPod("app=runner-data",
-					"remote-test-runner-data-files", path, destPath)
-				require.NoError(t, err, "error getting lane config")
-			}
+			path := fmt.Sprintf("reports/%s/%s", reportPath, reportFile)
+			dir, err := os.Getwd()
+			require.NoError(t, err)
+			destPath := fmt.Sprintf("%s/%s", dir, reportFile)
+			lggr.Info().Str("srcPath", path).Str("dstPath", destPath).Msg("copying lane config")
+			err = setUpArgs.Env.K8Env.CopyFromPod("app=runner-data",
+				"remote-test-runner-data-files", path, destPath)
+			require.NoError(t, err, "error getting lane config")
 		})
 	}
 	if setUpArgs.Env != nil {

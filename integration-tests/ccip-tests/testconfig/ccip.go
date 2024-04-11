@@ -117,6 +117,10 @@ type CCIPContractConfig struct {
 	Data     string  `toml:",omitempty"`
 }
 
+func (c *CCIPContractConfig) DataFilePath() string {
+	return pointer.GetString(c.DataFile)
+}
+
 func (c *CCIPContractConfig) ContractsData() ([]byte, error) {
 	if c == nil {
 		return nil, nil
@@ -124,7 +128,7 @@ func (c *CCIPContractConfig) ContractsData() ([]byte, error) {
 	if c.Data != "" {
 		return []byte(c.Data), nil
 	}
-	filePath := pointer.GetString(c.DataFile)
+	filePath := c.DataFilePath()
 	if filePath != "" {
 		if !filepath.IsAbs(filePath) {
 			filePath = fmt.Sprintf("%s/%s", utils.ProjectRoot(), filePath)
