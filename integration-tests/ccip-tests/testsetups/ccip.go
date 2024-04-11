@@ -729,9 +729,9 @@ func CCIPDefaultTestSetUp(
 	var (
 		err error
 	)
-	folderName := "tmp_laneconfig"
-	filepath := fmt.Sprintf("./%s/tmp_%s.json", folderName, strings.ReplaceAll(t.Name(), "/", "_"))
-	filename := strings.Split(filepath, "/")[len(strings.Split(filepath, "/"))-1]
+	reportPath := "tmp_laneconfig"
+	filepath := fmt.Sprintf("./%s/tmp_%s.json", reportPath, strings.ReplaceAll(t.Name(), "/", "_"))
+	reportFile := strings.Split(filepath, "/")[len(strings.Split(filepath, "/"))-1]
 	var transferAmounts []*big.Int
 	if testConfig.TestGroupInput.MsgType == actions.TokenTransfer {
 		for i := 0; i < testConfig.TestGroupInput.NoOfTokensInMsg; i++ {
@@ -752,15 +752,15 @@ func CCIPDefaultTestSetUp(
 		laneMutex:              &sync.Mutex{},
 	}
 
-	chainByChainID := setUpArgs.CreateEnvironment(lggr, envName, "tmp_laneconfig")
+	chainByChainID := setUpArgs.CreateEnvironment(lggr, envName, reportPath)
 	// if test is run in remote runner, register a clean-up to copy the laneconfig file
 	if value, set := os.LookupEnv(config.EnvVarJobImage); set && value != "" {
 		t.Cleanup(func() {
 			if setUpArgs.Env != nil && setUpArgs.Env.K8Env != nil {
-				path := fmt.Sprintf("reports/%s/%s", folderName, filename)
+				path := fmt.Sprintf("reports/%s/%s", reportPath, reportFile)
 				dir, err := os.Getwd()
 				require.NoError(t, err)
-				destPath := fmt.Sprintf("%s/%s", dir, filename)
+				destPath := fmt.Sprintf("%s/%s", dir, reportFile)
 				lggr.Info().Str("srcPath", path).Str("dstPath", destPath).Msg("copying lane config")
 				err = setUpArgs.Env.K8Env.CopyFromPod("job-name=remote-test-runner",
 					"remote-test-runner-data-files", path, destPath)

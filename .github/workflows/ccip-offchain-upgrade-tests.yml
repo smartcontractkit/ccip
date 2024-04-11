@@ -202,6 +202,7 @@ jobs:
     env:
       RELEASE_TAG: ${{ needs.build-test-image-for-last-release.outputs.release_tag }}
       RELEASE_SHA: ${{ needs.build-test-image-for-last-release.outputs.release_sha }}
+      RELEASE_NAME: ${{ needs.build-test-image-for-last-release.outputs.release_name }}
       TEST_TRIGGERED_BY: ccip-version-upgrade-test-ci-${{ matrix.product.name }}
     steps:
       - name: Collect Metrics
@@ -246,7 +247,10 @@ jobs:
         env:
           BASE64_CCIP_CONFIG_OVERRIDE: ${{ steps.set_override_config.outputs.base_64_override }}
           TEST_BASE64_CCIP_CONFIG_OVERRIDE: ${{ steps.set_override_config.outputs.base_64_override }}
-          ENV_JOB_IMAGE: ${{ env.ENV_JOB_IMAGE_BASE }}:${{ env.RELEASE_SHA }}
+          # uncomment this later for next release
+          # ENV_JOB_IMAGE: ${{ env.ENV_JOB_IMAGE_BASE }}:${{ env.RELEASE_SHA }}
+          # for now we run test with a specific test image pertaining to previous release with some added fixes
+          ENV_JOB_IMAGE: ${{ env.ENV_JOB_IMAGE_BASE }}:test-updates-v2.9.1-ccip-1.4.0
           TEST_SUITE: smoke
           TEST_ARGS: -test.timeout 30m
           TEST_LOG_LEVEL: info
@@ -278,7 +282,7 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
             name: lane-config
-            path: ./integration-tests/ccip-tests/smoke/tmp_*.json
+            path: tmp_*.json
             if-no-files-found: error
 
       - name: fetch namespace
