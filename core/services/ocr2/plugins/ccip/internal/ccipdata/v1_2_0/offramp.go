@@ -14,7 +14,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
-
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
@@ -123,7 +122,7 @@ func (c JSONExecOffchainConfig) Validate() error {
 // OffRamp In 1.2 we have a different estimator impl
 type OffRamp struct {
 	*v1_0_0.OffRamp
-	offRampV120 evm_2_evm_offramp.EVM2EVMOffRampInterface
+	offRampV120 *evm_2_evm_offramp.EVM2EVMOffRamp
 }
 
 func (o *OffRamp) CurrentRateLimiterState(ctx context.Context) (cciptypes.TokenBucketRateLimit, error) {
@@ -138,14 +137,6 @@ func (o *OffRamp) CurrentRateLimiterState(ctx context.Context) (cciptypes.TokenB
 		Capacity:    bucket.Capacity,
 		Rate:        bucket.Rate,
 	}, nil
-}
-
-func (o *OffRamp) GetRouter(ctx context.Context) (cciptypes.Address, error) {
-	dynamicConfig, err := o.offRampV120.GetDynamicConfig(&bind.CallOpts{Context: ctx})
-	if err != nil {
-		return "", err
-	}
-	return ccipcalc.EvmAddrToGeneric(dynamicConfig.Router), nil
 }
 
 func (o *OffRamp) ChangeConfig(ctx context.Context, onchainConfigBytes []byte, offchainConfigBytes []byte) (cciptypes.Address, cciptypes.Address, error) {
@@ -174,10 +165,7 @@ func (o *OffRamp) ChangeConfig(ctx context.Context, onchainConfigBytes []byte, o
 		InflightCacheExpiry:         offchainConfigParsed.InflightCacheExpiry,
 		RootSnoozeTime:              offchainConfigParsed.RootSnoozeTime,
 	}
-	onchainConfig := cciptypes.ExecOnchainConfig{
-		PermissionLessExecutionThresholdSeconds: time.Second * time.Duration(onchainConfigParsed.PermissionLessExecutionThresholdSeconds),
-		Router:                                  cciptypes.Address(onchainConfigParsed.Router.String()),
-	}
+	onchainConfig := cciptypes.ExecOnchainConfig{PermissionLessExecutionThresholdSeconds: time.Second * time.Duration(onchainConfigParsed.PermissionLessExecutionThresholdSeconds)}
 	priceEstimator := prices.NewDAGasPriceEstimator(o.Estimator, o.DestMaxGasPrice, 0, 0)
 
 	o.UpdateDynamicConfig(onchainConfig, offchainConfig, priceEstimator)
