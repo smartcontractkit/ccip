@@ -138,7 +138,7 @@ func (c *CCIPContractConfig) ContractsData() ([]byte, error) {
 	// load config from env var if specified for contracts
 	rawConfig := os.Getenv(CONTRACTS_OVERRIDE_CONFIG)
 	if rawConfig != "" {
-		err := DecodeConfig(rawConfig, c)
+		err := DecodeConfig(rawConfig, &c)
 		if err != nil {
 			return nil, err
 		}

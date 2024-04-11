@@ -115,7 +115,7 @@ func NewConfig() (*Config, error) {
 	// load config from env var if specified
 	rawConfig, _ := osutil.GetEnv(OVERIDECONFIG)
 	if rawConfig != "" {
-		err = DecodeConfig(rawConfig, override)
+		err = DecodeConfig(rawConfig, &override)
 		if err != nil {
 			return nil, fmt.Errorf("failed to decode override config: %w", err)
 		}
@@ -138,7 +138,7 @@ func NewConfig() (*Config, error) {
 		// load config from env var if specified for secrets
 		secretRawConfig, _ := osutil.GetEnv(SECRETSCONFIG)
 		if secretRawConfig != "" {
-			err = DecodeConfig(secretRawConfig, secrets)
+			err = DecodeConfig(secretRawConfig, &secrets)
 			if err != nil {
 				return nil, fmt.Errorf("failed to decode secrets config: %w", err)
 			}
