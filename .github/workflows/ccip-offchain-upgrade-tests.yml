@@ -342,7 +342,7 @@ jobs:
         uses: actions/download-artifact@v3
         with:
             name: lane-config
-            path: ./integration-tests/ccip-tests/lane-config.json
+            path: ./integration-tests/ccip-tests/load/lane-config
 
       - name: Set Override Config
         id: set_override_config
