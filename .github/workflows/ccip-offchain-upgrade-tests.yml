@@ -203,7 +203,7 @@ jobs:
       RELEASE_TAG: ${{ needs.build-test-image-for-last-release.outputs.release_tag }}
       RELEASE_SHA: ${{ needs.build-test-image-for-last-release.outputs.release_sha }}
       RELEASE_NAME: ${{ needs.build-test-image-for-last-release.outputs.release_name }}
-      TEST_TRIGGERED_BY: ccip-version-upgrade-test-ci-${{ matrix.product.name }}-${{ github.run_id }}
+      TEST_TRIGGERED_BY: ccip-version-upgrade-test-ci-${{ matrix.product.name }}
     steps:
       - name: Collect Metrics
         if: needs.changes.outputs.src == 'true' || github.event_name == 'workflow_dispatch'
@@ -378,7 +378,7 @@ jobs:
           DATABASE_URL: postgresql://postgres:node@localhost:5432/chainlink_test?sslmode=disable
           RR_MEM: 8Gi
           RR_CPU: 4
-          TEST_TRIGGERED_BY: ccip-version-upgrade-test-ci-${{ matrix.product.name }}-${{ github.run_id }}
+          TEST_TRIGGERED_BY: ccip-version-upgrade-test-ci-${{ matrix.product.name }}
         with:
           test_command_to_run: cd ./integration-tests/ccip-tests && go test -timeout 1h -count=1 -json -run ${{ matrix.product.run }} ./load 2>&1 | tee /tmp/gotest.log | gotestfmt
           test_download_vendor_packages_command: cd ./integration-tests && go mod download
