@@ -151,9 +151,9 @@ func TestCommitStoreV120ffchainConfigDecodingCompatibility(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name                   string
-		config                 []byte
-		priceReportingDisabled bool
+		name           string
+		config         []byte
+		priceReporting bool
 	}{
 		{
 			name: "with MaxGasPrice",
@@ -169,7 +169,7 @@ func TestCommitStoreV120ffchainConfigDecodingCompatibility(t *testing.T) {
 				"SourceMaxGasPrice": 100000000,
 				"InflightCacheExpiry": "180s"
 			}`),
-			priceReportingDisabled: false,
+			priceReporting: false,
 		},
 		{
 			name: "without MaxGasPrice",
@@ -183,7 +183,7 @@ func TestCommitStoreV120ffchainConfigDecodingCompatibility(t *testing.T) {
 				"TokenPriceDeviationPPB": 12,
 				"InflightCacheExpiry": "180s"
 			}`),
-			priceReportingDisabled: false,
+			priceReporting: false,
 		},
 		{
 			name: "with PriceReportingDisabled",
@@ -198,7 +198,7 @@ func TestCommitStoreV120ffchainConfigDecodingCompatibility(t *testing.T) {
 				"InflightCacheExpiry": "180s",
 				"PriceReportingDisabled": true
 			}`),
-			priceReportingDisabled: true,
+			priceReporting: true,
 		},
 	}
 	for _, tc := range tests {
@@ -214,7 +214,7 @@ func TestCommitStoreV120ffchainConfigDecodingCompatibility(t *testing.T) {
 				TokenPriceHeartBeat:      *config.MustNewDuration(2 * time.Minute),
 				TokenPriceDeviationPPB:   12,
 				InflightCacheExpiry:      *config.MustNewDuration(3 * time.Minute),
-				PriceReportingDisabled:   tc.priceReportingDisabled,
+				PriceReportingDisabled:   tc.priceReporting,
 			}, decoded)
 		})
 	}

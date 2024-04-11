@@ -367,14 +367,6 @@ func (o *OffRamp) GetTokens(ctx context.Context) (cciptypes.OffRampTokens, error
 	})
 }
 
-func (o *OffRamp) GetRouter(ctx context.Context) (cciptypes.Address, error) {
-	dynamicConfig, err := o.offRampV100.GetDynamicConfig(&bind.CallOpts{Context: ctx})
-	if err != nil {
-		return "", err
-	}
-	return ccipcalc.EvmAddrToGeneric(dynamicConfig.Router), nil
-}
-
 func (o *OffRamp) getPoolsByDestTokens(ctx context.Context, tokenAddrs []common.Address) ([]common.Address, error) {
 	evmCalls := make([]rpclib.EvmCall, 0, len(tokenAddrs))
 	for _, tk := range tokenAddrs {
@@ -457,10 +449,7 @@ func (o *OffRamp) ChangeConfig(ctx context.Context, onchainConfigBytes []byte, o
 		InflightCacheExpiry:         offchainConfigParsed.InflightCacheExpiry,
 		RootSnoozeTime:              offchainConfigParsed.RootSnoozeTime,
 	}
-	onchainConfig := cciptypes.ExecOnchainConfig{
-		PermissionLessExecutionThresholdSeconds: time.Second * time.Duration(onchainConfigParsed.PermissionLessExecutionThresholdSeconds),
-		Router:                                  cciptypes.Address(onchainConfigParsed.Router.String()),
-	}
+	onchainConfig := cciptypes.ExecOnchainConfig{PermissionLessExecutionThresholdSeconds: time.Second * time.Duration(onchainConfigParsed.PermissionLessExecutionThresholdSeconds)}
 	gasPriceEstimator := prices.NewExecGasPriceEstimator(o.Estimator, o.DestMaxGasPrice, 0)
 	o.UpdateDynamicConfig(onchainConfig, offchainConfig, gasPriceEstimator)
 

@@ -92,7 +92,7 @@ func (rf *CommitReportingPluginFactory) NewReportingPlugin(config types.Reportin
 			F:                       config.F,
 			lggr:                    lggr,
 			destPriceRegistryReader: rf.destPriceRegReader,
-			offRampReaders:          rf.config.offRamps,
+			offRampReader:           rf.config.offRamp,
 			gasPriceEstimator:       rf.config.commitStore.GasPriceEstimator(),
 			offchainConfig:          pluginOffChainConfig,
 			metricsCollector:        rf.config.metricsCollector,
