@@ -157,6 +157,9 @@ func (c *CCIPContractConfig) ContractsData() ([]byte, error) {
 			filePath = fmt.Sprintf("%s/%s", utils.ProjectRoot(), filePath)
 		}
 		dataContent, err := os.ReadFile(filePath)
+		if err != nil {
+			return dataContent, fmt.Errorf("error reading contract config file %w", err)
+		}
 		c.Data = string(dataContent)
 		// encode it to base64 and set to CONTRACTS_OVERRIDE_CONFIG so that the same content can be passed to remote runner
 		// we add TEST_ prefix to CONTRACTS_OVERRIDE_CONFIG to ensure the env var is ported to remote runner.
