@@ -349,6 +349,9 @@ func UpgradeNodes(
 			// if individual node upgrade image is provided, use that
 			if len(testInputs.EnvInput.NewCLCluster.Nodes) > 0 {
 				if i < len(testInputs.EnvInput.NewCLCluster.Nodes) {
+					if !pointer.GetBool(testInputs.EnvInput.NewCLCluster.Nodes[i].NeedsUpgrade) {
+						continue
+					}
 					upgradeImage = pointer.GetString(testInputs.EnvInput.NewCLCluster.Nodes[i].ChainlinkUpgradeImage.Image)
 					upgradeTag = pointer.GetString(testInputs.EnvInput.NewCLCluster.Nodes[i].ChainlinkUpgradeImage.Version)
 				}
