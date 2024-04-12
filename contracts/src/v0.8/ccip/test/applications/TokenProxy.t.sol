@@ -33,7 +33,7 @@ contract TokenProxy_constructor is TokenProxySetup {
 }
 
 contract TokenProxy_getFee is TokenProxySetup {
-  function test_GetFeeSuccess() public {
+  function test_GetFee_Success() public {
     Client.EVMTokenAmount[] memory tokens = new Client.EVMTokenAmount[](1);
     tokens[0] = Client.EVMTokenAmount({token: address(s_transferToken), amount: 1e18});
 
@@ -102,7 +102,7 @@ contract TokenProxy_getFee is TokenProxySetup {
 }
 
 contract TokenProxy_ccipSend is TokenProxySetup {
-  function test_CcipSendSuccess() public {
+  function test_CcipSend_Success() public {
     vm.pauseGasMetering();
     Client.EVMTokenAmount[] memory tokens = new Client.EVMTokenAmount[](1);
     tokens[0] = Client.EVMTokenAmount({token: address(s_transferToken), amount: 1e18});
@@ -126,7 +126,7 @@ contract TokenProxy_ccipSend is TokenProxySetup {
     s_tokenProxy.ccipSend(DEST_CHAIN_SELECTOR, message);
   }
 
-  function test_CcipSendNativeSuccess() public {
+  function test_CcipSendNative_Success() public {
     vm.pauseGasMetering();
     Client.EVMTokenAmount[] memory tokens = new Client.EVMTokenAmount[](1);
     tokens[0] = Client.EVMTokenAmount({token: address(s_transferToken), amount: 1e18});

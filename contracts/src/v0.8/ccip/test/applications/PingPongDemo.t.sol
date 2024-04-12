@@ -33,7 +33,7 @@ contract PingPongDappSetup is EVM2EVMOnRampSetup {
 contract PingPong_startPingPong is PingPongDappSetup {
   event ConfigPropagated(uint64 chainSelector, address contractAddress);
 
-  function test_StartPingPongSuccess() public {
+  function test_StartPingPong_Success() public {
     uint256 pingPongNumber = 1;
     bytes memory data = abi.encode(pingPongNumber);
 
@@ -76,7 +76,7 @@ contract PingPong_startPingPong is PingPongDappSetup {
 
 /// @notice #ccipReceive
 contract PingPong_ccipReceive is PingPongDappSetup {
-  function test_CcipReceiveSuccess() public {
+  function test_CcipReceive_Success() public {
     Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](0);
 
     uint256 pingPongNumber = 5;
@@ -118,7 +118,7 @@ contract PingPong_plumbing is PingPongDappSetup {
     assertEq(s_pingPong.getCounterpartChainSelector(), chainSelector);
   }
 
-  function test_PausingSuccess() public {
+  function test_Pausing_Success() public {
     assertFalse(s_pingPong.isPaused());
 
     s_pingPong.setPaused(true);

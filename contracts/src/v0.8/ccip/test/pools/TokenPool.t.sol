@@ -25,7 +25,7 @@ contract TokenPoolSetup is RouterSetup {
 }
 
 contract TokenPool_constructor is TokenPoolSetup {
-  function test_immutableFieldsSuccess() public {
+  function test_immutableFields_Success() public {
     assertEq(address(s_token), address(s_tokenPool.getToken()));
     assertEq(address(s_mockARM), s_tokenPool.getArmProxy());
     assertEq(false, s_tokenPool.getAllowListEnabled());
@@ -409,7 +409,7 @@ contract TokenPool_setChainRateLimiterConfig is TokenPoolSetup {
 }
 
 contract TokenPool_onlyOnRamp is TokenPoolSetup {
-  function test_onlyOnRampSuccess() public {
+  function test_onlyOnRamp_Success() public {
     uint64 chainSelector = 13377;
     address onRamp = makeAddr("onRamp");
 
@@ -501,7 +501,7 @@ contract TokenPool_onlyOnRamp is TokenPoolSetup {
 }
 
 contract TokenPool_onlyOffRamp is TokenPoolSetup {
-  function test_onlyOffRampSuccess() public {
+  function test_onlyOffRamp_Success() public {
     uint64 chainSelector = 13377;
     address offRamp = makeAddr("onRamp");
 
@@ -606,7 +606,7 @@ contract TokenPoolWithAllowListSetup is TokenPoolSetup {
 }
 
 contract TokenPoolWithAllowList_getAllowListEnabled is TokenPoolWithAllowListSetup {
-  function test_GetAllowListEnabledSuccess() public {
+  function test_GetAllowListEnabled_Success() public {
     assertTrue(s_tokenPool.getAllowListEnabled());
   }
 }
@@ -614,7 +614,7 @@ contract TokenPoolWithAllowList_getAllowListEnabled is TokenPoolWithAllowListSet
 contract TokenPoolWithAllowList_setRouter is TokenPoolWithAllowListSetup {
   event RouterUpdated(address oldRouter, address newRouter);
 
-  function test_SetRouterSuccess() public {
+  function test_SetRouter_Success() public {
     assertEq(address(s_sourceRouter), s_tokenPool.getRouter());
 
     address newRouter = makeAddr("newRouter");
@@ -629,7 +629,7 @@ contract TokenPoolWithAllowList_setRouter is TokenPoolWithAllowListSetup {
 }
 
 contract TokenPoolWithAllowList_getAllowList is TokenPoolWithAllowListSetup {
-  function test_GetAllowListSuccess() public {
+  function test_GetAllowList_Success() public {
     address[] memory setAddresses = s_tokenPool.getAllowList();
     assertEq(2, setAddresses.length);
     assertEq(s_allowedSenders[0], setAddresses[0]);
@@ -641,7 +641,7 @@ contract TokenPoolWithAllowList_applyAllowListUpdates is TokenPoolWithAllowListS
   event AllowListAdd(address sender);
   event AllowListRemove(address sender);
 
-  function test_SetAllowListSuccess() public {
+  function test_SetAllowList_Success() public {
     address[] memory newAddresses = new address[](2);
     newAddresses[0] = address(1);
     newAddresses[1] = address(2);
@@ -693,7 +693,7 @@ contract TokenPoolWithAllowList_applyAllowListUpdates is TokenPoolWithAllowListS
     assertEq(0, setAddresses.length);
   }
 
-  function test_SetAllowListSkipsZeroSuccess() public {
+  function test_SetAllowListSkipsZero_Success() public {
     uint256 setAddressesLength = s_tokenPool.getAllowList().length;
 
     address[] memory newAddresses = new address[](1);

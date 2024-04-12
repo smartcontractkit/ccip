@@ -68,7 +68,7 @@ contract DefensiveExampleTest is EVM2EVMOnRampSetup {
     assertEq(IERC20(token).balanceOf(address(s_receiver)), receiverBalancePre - amount);
   }
 
-  function test_HappyPathSuccess() public {
+  function test_HappyPath_Success() public {
     bytes32 messageId = keccak256("messageId");
     address token = address(s_destFeeToken);
     uint256 amount = 111333333777;

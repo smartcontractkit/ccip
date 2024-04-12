@@ -18,14 +18,14 @@ contract ARMProxyTest is ARMSetup {
     s_armProxy = new ARMProxy(address(s_arm));
   }
 
-  function test_ARMIsCursedSuccess() public {
+  function test_ARMIsCursed_Success() public {
     s_armProxy.setARM(address(s_mockARM));
     assertFalse(IARM(address(s_armProxy)).isCursed());
     ARM(address(s_armProxy)).voteToCurse(bytes32(0));
     assertTrue(IARM(address(s_armProxy)).isCursed());
   }
 
-  function test_ARMIsBlessedSuccess() public {
+  function test_ARMIsBlessed_Success() public {
     s_armProxy.setARM(address(s_mockARM));
     assertTrue(IARM(address(s_armProxy)).isBlessed(IARM.TaggedRoot({commitStore: address(0), root: bytes32(0)})));
     ARM(address(s_armProxy)).voteToCurse(bytes32(0));

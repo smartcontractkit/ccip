@@ -87,7 +87,7 @@ contract CommitStore_constructor is PriceRegistrySetup, OCR2BaseSetup {
     OCR2BaseSetup.setUp();
   }
 
-  function test_ConstructorSuccess() public {
+  function test_Constructor_Success() public {
     CommitStore.StaticConfig memory staticConfig = CommitStore.StaticConfig({
       chainSelector: DEST_CHAIN_SELECTOR,
       sourceChainSelector: SOURCE_CHAIN_SELECTOR,
@@ -175,7 +175,7 @@ contract CommitStore_setDynamicConfig is CommitStoreSetup {
     assertEq(gotDynamicConfig.priceRegistry, dynamicConfig.priceRegistry);
   }
 
-  function test_PriceEpochClearedSuccess() public {
+  function test_PriceEpochCleared_Success() public {
     // Set latest price epoch and round to non-zero.
     uint40 latestEpochAndRound = 1782155;
     s_commitStore.setLatestPriceEpochAndRound(latestEpochAndRound);
@@ -215,7 +215,7 @@ contract CommitStore_setDynamicConfig is CommitStoreSetup {
 contract CommitStore_resetUnblessedRoots is CommitStoreRealARMSetup {
   event RootRemoved(bytes32 root);
 
-  function test_ResetUnblessedRootsSuccess() public {
+  function test_ResetUnblessedRoots_Success() public {
     bytes32[] memory rootsToReset = new bytes32[](3);
     rootsToReset[0] = "1";
     rootsToReset[1] = "2";
@@ -304,7 +304,7 @@ contract CommitStore_report is CommitStoreSetup {
     vm.resumeGasMetering();
   }
 
-  function test_ReportAndPriceUpdateSuccess() public {
+  function test_ReportAndPriceUpdate_Success() public {
     uint64 max1 = 12;
 
     CommitStore.CommitReport memory report = CommitStore.CommitReport({
@@ -322,7 +322,7 @@ contract CommitStore_report is CommitStoreSetup {
     assertEq(s_latestEpochAndRound, s_commitStore.getLatestPriceEpochAndRound());
   }
 
-  function test_StaleReportWithRootSuccess() public {
+  function test_StaleReportWithRoot_Success() public {
     uint64 maxSeq = 12;
     uint224 tokenStartPrice =
       IPriceRegistry(s_commitStore.getDynamicConfig().priceRegistry).getTokenPrice(s_sourceFeeToken).value;
@@ -358,7 +358,7 @@ contract CommitStore_report is CommitStoreSetup {
     );
   }
 
-  function test_OnlyTokenPriceUpdatesSuccess() public {
+  function test_OnlyTokenPriceUpdates_Success() public {
     CommitStore.CommitReport memory report = CommitStore.CommitReport({
       priceUpdates: getSingleTokenPriceUpdateStruct(s_sourceFeeToken, 4e18),
       interval: CommitStore.Interval(0, 0),
@@ -372,7 +372,7 @@ contract CommitStore_report is CommitStoreSetup {
     assertEq(s_latestEpochAndRound, s_commitStore.getLatestPriceEpochAndRound());
   }
 
-  function test_OnlyGasPriceUpdatesSuccess() public {
+  function test_OnlyGasPriceUpdates_Success() public {
     CommitStore.CommitReport memory report = CommitStore.CommitReport({
       priceUpdates: getSingleTokenPriceUpdateStruct(s_sourceFeeToken, 4e18),
       interval: CommitStore.Interval(0, 0),
@@ -386,7 +386,7 @@ contract CommitStore_report is CommitStoreSetup {
     assertEq(s_latestEpochAndRound, s_commitStore.getLatestPriceEpochAndRound());
   }
 
-  function test_ValidPriceUpdateThenStaleReportWithRootSuccess() public {
+  function test_ValidPriceUpdateThenStaleReportWithRoot_Success() public {
     uint64 maxSeq = 12;
     uint224 tokenPrice1 = 4e18;
     uint224 tokenPrice2 = 5e18;
@@ -517,7 +517,7 @@ contract CommitStore_report is CommitStoreSetup {
 
 /// @notice #verify
 contract CommitStore_verify is CommitStoreRealARMSetup {
-  function test_NotBlessedSuccess() public {
+  function test_NotBlessed_Success() public {
     bytes32[] memory leaves = new bytes32[](1);
     leaves[0] = "root";
     s_commitStore.report(
@@ -536,7 +536,7 @@ contract CommitStore_verify is CommitStoreRealARMSetup {
     assertEq(uint256(0), timestamp);
   }
 
-  function test_BlessedSuccess() public {
+  function test_Blessed_Success() public {
     bytes32[] memory leaves = new bytes32[](1);
     leaves[0] = "root";
     s_commitStore.report(
@@ -583,7 +583,7 @@ contract CommitStore_verify is CommitStoreRealARMSetup {
 }
 
 contract CommitStore_isUnpausedAndARMHealthy is CommitStoreSetup {
-  function test_ARMSuccess() public {
+  function test_ARM_Success() public {
     // Test pausing
     assertFalse(s_commitStore.paused());
     assertTrue(s_commitStore.isUnpausedAndARMHealthy());
@@ -613,7 +613,7 @@ contract CommitStore_isUnpausedAndARMHealthy is CommitStoreSetup {
 
 /// @notice #setLatestPriceEpochAndRound
 contract CommitStore_setLatestPriceEpochAndRound is CommitStoreSetup {
-  function test_SetLatestPriceEpochAndRoundSuccess() public {
+  function test_SetLatestPriceEpochAndRound_Success() public {
     uint40 latestRoundAndEpoch = 1782155;
     s_commitStore.setLatestPriceEpochAndRound(latestRoundAndEpoch);
 

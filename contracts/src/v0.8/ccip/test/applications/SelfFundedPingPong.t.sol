@@ -42,7 +42,7 @@ contract SelfFundedPingPongDappSetup is EVM2EVMOnRampSetup {
 contract SelfFundedPingPong_ccipReceive is SelfFundedPingPongDappSetup {
   event Funded();
 
-  function test_FundingSuccess() public {
+  function test_Funding_Success() public {
     Client.Any2EVMMessage memory message = Client.Any2EVMMessage({
       messageId: bytes32("a"),
       sourceChainSelector: DEST_CHAIN_SELECTOR,

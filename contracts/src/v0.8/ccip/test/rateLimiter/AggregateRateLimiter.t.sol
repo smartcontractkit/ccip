@@ -32,7 +32,7 @@ contract AggregateTokenLimiterSetup is BaseTest, PriceRegistrySetup {
 
 /// @notice #constructor
 contract AggregateTokenLimiter_constructor is AggregateTokenLimiterSetup {
-  function test_ConstructorSuccess() public {
+  function test_Constructor_Success() public {
     assertEq(ADMIN, s_rateLimiter.getTokenLimitAdmin());
     assertEq(OWNER, s_rateLimiter.owner());
 
@@ -47,7 +47,7 @@ contract AggregateTokenLimiter_constructor is AggregateTokenLimiterSetup {
 
 /// @notice #getTokenLimitAdmin
 contract AggregateTokenLimiter_getTokenLimitAdmin is AggregateTokenLimiterSetup {
-  function test_GetTokenLimitAdminSuccess() public {
+  function test_GetTokenLimitAdmin_Success() public {
     assertEq(ADMIN, s_rateLimiter.getTokenLimitAdmin());
   }
 }
@@ -56,7 +56,7 @@ contract AggregateTokenLimiter_getTokenLimitAdmin is AggregateTokenLimiterSetup 
 contract AggregateTokenLimiter_setAdmin is AggregateTokenLimiterSetup {
   event AdminSet(address newAdmin);
 
-  function test_OwnerSuccess() public {
+  function test_Owner_Success() public {
     vm.expectEmit();
     emit AdminSet(STRANGER);
 
@@ -76,7 +76,7 @@ contract AggregateTokenLimiter_setAdmin is AggregateTokenLimiterSetup {
 
 /// @notice #getTokenBucket
 contract AggregateTokenLimiter_getTokenBucket is AggregateTokenLimiterSetup {
-  function test_GetTokenBucketSuccess() public {
+  function test_GetTokenBucket_Success() public {
     RateLimiter.TokenBucket memory bucket = s_rateLimiter.currentRateLimiterState();
     assertEq(s_config.rate, bucket.rate);
     assertEq(s_config.capacity, bucket.capacity);
@@ -84,7 +84,7 @@ contract AggregateTokenLimiter_getTokenBucket is AggregateTokenLimiterSetup {
     assertEq(BLOCK_TIME, bucket.lastUpdated);
   }
 
-  function test_RefillSuccess() public {
+  function test_Refill_Success() public {
     s_config.capacity = s_config.capacity * 2;
     s_rateLimiter.setRateLimiterConfig(s_config);
 
@@ -126,11 +126,11 @@ contract AggregateTokenLimiter_getTokenBucket is AggregateTokenLimiterSetup {
 contract AggregateTokenLimiter_setRateLimiterConfig is AggregateTokenLimiterSetup {
   event ConfigChanged(RateLimiter.Config config);
 
-  function test_OwnerSuccess() public {
+  function test_Owner_Success() public {
     setConfig();
   }
 
-  function test_TokenLimitAdminSuccess() public {
+  function test_TokenLimitAdmin_Success() public {
     vm.startPrank(ADMIN);
     setConfig();
   }

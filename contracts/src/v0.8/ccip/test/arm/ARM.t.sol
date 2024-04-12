@@ -24,7 +24,7 @@ contract ConfigCompare is Test {
 }
 
 contract ARM_constructor is ConfigCompare, ARMSetup {
-  function test_ConstructorSuccess() public {
+  function test_Constructor_Success() public {
     ARM.Config memory expectedConfig = armConstructorArgs();
     (uint32 actualVersion,, ARM.Config memory actualConfig) = s_arm.getConfigDetails();
     assertEq(actualVersion, 1);
@@ -104,7 +104,7 @@ contract ARM_voteToBlessRoots is ARMSetup {
     vm.resumeGasMetering();
   }
 
-  function test_IsAlreadyBlessedIgnoredSuccess() public {
+  function test_IsAlreadyBlessedIgnored_Success() public {
     ARM.Config memory cfg = armConstructorArgs();
 
     // Bless voters 2,3,4 vote to bless
@@ -119,7 +119,7 @@ contract ARM_voteToBlessRoots is ARMSetup {
     assertEq(votesToBlessBefore, getWeightOfVotesToBlessRoot(makeTaggedRoot(1)));
   }
 
-  function test_SenderAlreadyVotedIgnoredSuccess() public {
+  function test_SenderAlreadyVotedIgnored_Success() public {
     (address voter,) = _getFirstBlessVoterAndWeight();
 
     vm.startPrank(voter);
@@ -154,7 +154,7 @@ contract ARM_voteToBlessRoots is ARMSetup {
 }
 
 contract ARM_ownerUnbless is ARMSetup {
-  function test_UnblessSuccess() public {
+  function test_Unbless_Success() public {
     ARM.Config memory cfg = armConstructorArgs();
     for (uint256 i = 0; i < cfg.voters.length; ++i) {
       vm.startPrank(cfg.voters[i].blessVoteAddr);
@@ -323,7 +323,7 @@ contract ARM_voteToCurse is ARMSetup {
     vm.resumeGasMetering();
   }
 
-  function test_EmitCurseSuccess() public {
+  function test_EmitCurse_Success() public {
     ARM.Config memory cfg = armConstructorArgs();
     for (uint256 i = 0; i < cfg.voters.length - 1; ++i) {
       vm.startPrank(cfg.voters[i].curseVoteAddr);
@@ -337,7 +337,7 @@ contract ARM_voteToCurse is ARMSetup {
     s_arm.voteToCurse(makeCurseId(1));
   }
 
-  function test_EvenIfAlreadyCursedSuccess() public {
+  function test_EvenIfAlreadyCursed_Success() public {
     ARM.Config memory cfg = armConstructorArgs();
     uint16 weightSum = 0;
     for (uint256 i = 0; i < cfg.voters.length; ++i) {

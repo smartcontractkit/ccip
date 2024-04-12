@@ -19,7 +19,7 @@ import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/tok
 
 /// @notice #constructor
 contract Router_constructor is EVM2EVMOnRampSetup {
-  function test_ConstructorSuccess() public {
+  function test_Constructor_Success() public {
     assertEq("Router 1.2.0", s_sourceRouter.typeAndVersion());
     // owner
     assertEq(OWNER, s_sourceRouter.owner());
@@ -28,7 +28,7 @@ contract Router_constructor is EVM2EVMOnRampSetup {
 
 /// @notice #recoverTokens
 contract Router_recoverTokens is EVM2EVMOnRampSetup {
-  function test_RecoverTokensSuccess() public {
+  function test_RecoverTokens_Success() public {
     // Assert we can recover sourceToken
     IERC20 token = IERC20(s_sourceTokens[0]);
     uint256 balanceBefore = token.balanceOf(OWNER);
@@ -201,7 +201,7 @@ contract Router_ccipSend is EVM2EVMOnRampSetup {
     vm.resumeGasMetering();
   }
 
-  function test_NonLinkFeeTokenSuccess() public {
+  function test_NonLinkFeeToken_Success() public {
     EVM2EVMOnRamp.FeeTokenConfigArgs[] memory feeTokenConfigArgs = new EVM2EVMOnRamp.FeeTokenConfigArgs[](1);
     feeTokenConfigArgs[0] = EVM2EVMOnRamp.FeeTokenConfigArgs({
       token: s_sourceTokens[1],
@@ -222,7 +222,7 @@ contract Router_ccipSend is EVM2EVMOnRampSetup {
     s_sourceRouter.ccipSend(DEST_CHAIN_SELECTOR, message);
   }
 
-  function test_NativeFeeTokenSuccess() public {
+  function test_NativeFeeToken_Success() public {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
     message.feeToken = address(0); // Raw native
     uint256 nativeQuote = s_sourceRouter.getFee(DEST_CHAIN_SELECTOR, message);
@@ -231,7 +231,7 @@ contract Router_ccipSend is EVM2EVMOnRampSetup {
     s_sourceRouter.ccipSend{value: nativeQuote}(DEST_CHAIN_SELECTOR, message);
   }
 
-  function test_NativeFeeTokenOverpaySuccess() public {
+  function test_NativeFeeTokenOverpay_Success() public {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
     message.feeToken = address(0); // Raw native
     uint256 nativeQuote = s_sourceRouter.getFee(DEST_CHAIN_SELECTOR, message);
@@ -243,7 +243,7 @@ contract Router_ccipSend is EVM2EVMOnRampSetup {
     assertEq(address(s_sourceRouter).balance, 0);
   }
 
-  function test_WrappedNativeFeeTokenSuccess() public {
+  function test_WrappedNativeFeeToken_Success() public {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
     message.feeToken = s_sourceRouter.getWrappedNative();
     uint256 nativeQuote = s_sourceRouter.getFee(DEST_CHAIN_SELECTOR, message);
@@ -258,7 +258,7 @@ contract Router_ccipSend is EVM2EVMOnRampSetup {
   // Since sending with zero fees is a legitimate use case for some destination
   // chains, e.g. private chains, we want to make sure that we can still send even
   // when the configured fee is 0.
-  function test_ZeroFeeAndGasPriceSuccess() public {
+  function test_ZeroFeeAndGasPrice_Success() public {
     // Configure a new fee token that has zero gas and zero fees but is still
     // enabled and valid to pay with.
     address feeTokenWithZeroFeeAndGas = s_sourceTokens[1];
@@ -680,7 +680,7 @@ contract Router_setWrappedNative is EVM2EVMOnRampSetup {
 
 /// @notice #getSupportedTokens
 contract Router_getSupportedTokens is EVM2EVMOnRampSetup {
-  function test_GetSupportedTokensSuccess() public {
+  function test_GetSupportedTokens_Success() public {
     address[] memory supportedTokens = s_sourceRouter.getSupportedTokens(DEST_CHAIN_SELECTOR);
     assertEq(s_sourceTokens[0], supportedTokens[0]);
     assertEq(s_sourceTokens[1], supportedTokens[1]);
@@ -702,7 +702,7 @@ contract Router_routeMessage is EVM2EVMOffRampSetup {
     vm.startPrank(address(s_offRamp));
   }
 
-  function test_ManualExecSuccess() public {
+  function test_ManualExec_Success() public {
     Client.Any2EVMMessage memory message = generateReceiverMessage(SOURCE_CHAIN_SELECTOR);
     // Manuel execution cannot run out of gas
 
@@ -717,7 +717,7 @@ contract Router_routeMessage is EVM2EVMOffRampSetup {
     assertGt(gasUsed, 3_000);
   }
 
-  function test_ExecutionEventSuccess() public {
+  function test_ExecutionEvent_Success() public {
     Client.Any2EVMMessage memory message = generateReceiverMessage(SOURCE_CHAIN_SELECTOR);
     // Should revert with reason
     bytes memory realError1 = new bytes(2);
@@ -844,7 +844,7 @@ contract Router_routeMessage is EVM2EVMOffRampSetup {
     assertEq(expectedRetData, retData);
   }
 
-  function test_AutoExecSuccess() public {
+  function test_AutoExec_Success() public {
     (bool success,,) = s_destRouter.routeMessage(
       generateReceiverMessage(SOURCE_CHAIN_SELECTOR), GAS_FOR_CALL_EXACT_CHECK, 100_000, address(s_receiver)
     );
@@ -881,7 +881,7 @@ contract Router_routeMessage is EVM2EVMOffRampSetup {
 
 /// @notice #getFee
 contract Router_getFee is EVM2EVMOnRampSetup {
-  function test_GetFeeSupportedChainSuccess() public {
+  function test_GetFeeSupportedChain_Success() public {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
     uint256 expectedFee = s_sourceRouter.getFee(DEST_CHAIN_SELECTOR, message);
     assertGt(expectedFee, 10e9);

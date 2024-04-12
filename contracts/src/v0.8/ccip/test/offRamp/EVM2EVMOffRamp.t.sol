@@ -30,7 +30,7 @@ contract EVM2EVMOffRamp_constructor is EVM2EVMOffRampSetup {
   event ConfigSet(EVM2EVMOffRamp.StaticConfig staticConfig, EVM2EVMOffRamp.DynamicConfig dynamicConfig);
   event PoolAdded(address token, address pool);
 
-  function test_ConstructorSuccess() public {
+  function test_Constructor_Success() public {
     EVM2EVMOffRamp.StaticConfig memory staticConfig = EVM2EVMOffRamp.StaticConfig({
       commitStore: address(s_mockCommitStore),
       chainSelector: DEST_CHAIN_SELECTOR,
@@ -109,7 +109,7 @@ contract EVM2EVMOffRamp_setDynamicConfig is EVM2EVMOffRampSetup {
   // OffRamp event
   event ConfigSet(EVM2EVMOffRamp.StaticConfig staticConfig, EVM2EVMOffRamp.DynamicConfig dynamicConfig);
 
-  function test_SetDynamicConfigSuccess() public {
+  function test_SetDynamicConfig_Success() public {
     EVM2EVMOffRamp.StaticConfig memory staticConfig = s_offRamp.getStaticConfig();
     EVM2EVMOffRamp.DynamicConfig memory dynamicConfig = generateDynamicOffRampConfig(USER_3, address(s_priceRegistry));
     bytes memory onchainConfig = abi.encode(dynamicConfig);
@@ -162,7 +162,7 @@ contract EVM2EVMOffRamp_setDynamicConfig is EVM2EVMOffRampSetup {
 }
 
 contract EVM2EVMOffRamp_metadataHash is EVM2EVMOffRampSetup {
-  function test_MetadataHashSuccess() public {
+  function test_MetadataHash_Success() public {
     bytes32 h = s_offRamp.metadataHash();
     assertEq(
       h,
@@ -186,7 +186,7 @@ contract EVM2EVMOffRamp_ccipReceive is EVM2EVMOffRampSetup {
 contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
   error PausedError();
 
-  function test_SingleMessageNoTokensSuccess() public {
+  function test_SingleMessageNoTokens_Success() public {
     Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages();
     vm.expectEmit();
     emit ExecutionStateChanged(
@@ -209,7 +209,7 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     assertGt(s_offRamp.getSenderNonce(messages[0].sender), nonceBefore);
   }
 
-  function test_ReceiverErrorSuccess() public {
+  function test_ReceiverError_Success() public {
     Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages();
 
     bytes memory realError1 = new bytes(2);
@@ -236,7 +236,7 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     assertEq(uint64(1), s_offRamp.getSenderNonce(address(OWNER)));
   }
 
-  function test_StrictUntouchedToSuccessSuccess() public {
+  function test_StrictUntouchedToSuccess_Success() public {
     Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages();
 
     messages[0].strict = true;
@@ -253,7 +253,7 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     assertEq(uint64(1), s_offRamp.getSenderNonce(address(OWNER)));
   }
 
-  function test_SkippedIncorrectNonceSuccess() public {
+  function test_SkippedIncorrectNonce_Success() public {
     Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages();
 
     messages[0].nonce++;
@@ -265,7 +265,7 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     s_offRamp.execute(_generateReportFromMessages(messages), new uint256[](0));
   }
 
-  function test_SkippedIncorrectNonceStillExecutesSuccess() public {
+  function test_SkippedIncorrectNonceStillExecutes_Success() public {
     Internal.EVM2EVMMessage[] memory messages = _generateMessagesWithTokens();
 
     messages[1].nonce++;
@@ -284,7 +284,7 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
 
   // Send a message to a contract that does not implement the CCIPReceiver interface
   // This should execute successfully.
-  function test_SingleMessageToNonCCIPReceiverSuccess() public {
+  function test_SingleMessageToNonCCIPReceiver_Success() public {
     Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages();
     MaybeRevertMessageReceiverNo165 newReceiver = new MaybeRevertMessageReceiverNo165(true);
     messages[0].receiver = address(newReceiver);
@@ -336,7 +336,7 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     s_offRamp.execute(report, new uint256[](0));
   }
 
-  function test_TwoMessagesWithTokensAndGESuccess() public {
+  function test_TwoMessagesWithTokensAndGE_Success() public {
     Internal.EVM2EVMMessage[] memory messages = _generateMessagesWithTokens();
     // Set message 1 to use another receiver to simulate more fair gas costs
     messages[1].receiver = address(s_secondary_receiver);
@@ -357,7 +357,7 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     assertEq(uint64(2), s_offRamp.getSenderNonce(OWNER));
   }
 
-  function test_InvalidSourcePoolAddressSuccess() public {
+  function test_InvalidSourcePoolAddress_Success() public {
     address fakePoolAddress = address(0x0000000000333333);
 
     Internal.EVM2EVMMessage[] memory messages = _generateMessagesWithTokens();
@@ -542,7 +542,7 @@ contract EVM2EVMOffRamp_execute_upgrade is EVM2EVMOffRampSetup {
     deployOffRamp(s_mockCommitStore, s_destRouter, address(s_prevOffRamp));
   }
 
-  function test_V2Success() public {
+  function test_V2_Success() public {
     Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages();
     vm.expectEmit();
     emit ExecutionStateChanged(
@@ -552,7 +552,7 @@ contract EVM2EVMOffRamp_execute_upgrade is EVM2EVMOffRampSetup {
     s_offRamp.execute(_generateReportFromMessages(messages), new uint256[](0));
   }
 
-  function test_V2SenderNoncesReadsPreviousRampSuccess() public {
+  function test_V2SenderNoncesReadsPreviousRamp_Success() public {
     Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages();
     uint64 startNonce = s_offRamp.getSenderNonce(messages[0].sender);
 
@@ -567,7 +567,7 @@ contract EVM2EVMOffRamp_execute_upgrade is EVM2EVMOffRampSetup {
     }
   }
 
-  function test_V2NonceStartsAtV1NonceSuccess() public {
+  function test_V2NonceStartsAtV1Nonce_Success() public {
     Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages();
     vm.expectEmit();
     emit ExecutionStateChanged(
@@ -604,7 +604,7 @@ contract EVM2EVMOffRamp_execute_upgrade is EVM2EVMOffRampSetup {
     assertEq(startNonce + 3, s_offRamp.getSenderNonce(messages[0].sender));
   }
 
-  function test_V2NonceNewSenderStartsAtZeroSuccess() public {
+  function test_V2NonceNewSenderStartsAtZero_Success() public {
     Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages();
     vm.expectEmit();
     emit ExecutionStateChanged(
@@ -628,7 +628,7 @@ contract EVM2EVMOffRamp_execute_upgrade is EVM2EVMOffRampSetup {
     assertEq(s_offRamp.getSenderNonce(newSender), 1);
   }
 
-  function test_V2OffRampNonceSkipsIfMsgInFlightSuccess() public {
+  function test_V2OffRampNonceSkipsIfMsgInFlight_Success() public {
     Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages();
 
     address newSender = address(1234567);
@@ -704,13 +704,13 @@ contract EVM2EVMOffRamp_executeSingleMessage is EVM2EVMOffRampSetup {
     s_offRamp.executeSingleMessage(message, offchainTokenData);
   }
 
-  function test_NonContractSuccess() public {
+  function test_NonContract_Success() public {
     Internal.EVM2EVMMessage memory message = _generateAny2EVMMessageNoTokens(1);
     message.receiver = STRANGER;
     s_offRamp.executeSingleMessage(message, new bytes[](message.tokenAmounts.length));
   }
 
-  function test_NonContractWithTokensSuccess() public {
+  function test_NonContractWithTokens_Success() public {
     uint256[] memory amounts = new uint256[](2);
     amounts[0] = 1000;
     amounts[1] = 50;
@@ -759,7 +759,7 @@ contract EVM2EVMOffRamp_executeSingleMessage is EVM2EVMOffRampSetup {
 
 contract EVM2EVMOffRamp__report is EVM2EVMOffRampSetup {
   // Asserts that execute completes
-  function test_ReportSuccess() public {
+  function test_Report_Success() public {
     Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages();
     Internal.ExecutionReport memory report = _generateReportFromMessages(messages);
 
@@ -774,7 +774,7 @@ contract EVM2EVMOffRamp__report is EVM2EVMOffRampSetup {
 contract EVM2EVMOffRamp_manuallyExecute is EVM2EVMOffRampSetup {
   event ReentrancySucceeded();
 
-  function test_ManualExecSuccess() public {
+  function test_ManualExec_Success() public {
     Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages();
     messages[0].receiver = address(s_reverting_receiver);
     messages[0].messageId = Internal._hash(messages[0], s_offRamp.metadataHash());
@@ -789,7 +789,7 @@ contract EVM2EVMOffRamp_manuallyExecute is EVM2EVMOffRampSetup {
     s_offRamp.manuallyExecute(_generateReportFromMessages(messages), new uint256[](messages.length));
   }
 
-  function test_ManualExecWithGasOverrideSuccess() public {
+  function test_ManualExecWithGasOverride_Success() public {
     Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages();
     messages[0].receiver = address(s_reverting_receiver);
     messages[0].messageId = Internal._hash(messages[0], s_offRamp.metadataHash());
@@ -810,7 +810,7 @@ contract EVM2EVMOffRamp_manuallyExecute is EVM2EVMOffRampSetup {
 
   event MessageReceived();
 
-  function test_LowGasLimitManualExecSuccess() public {
+  function test_LowGasLimitManualExec_Success() public {
     Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages();
     messages[0].gasLimit = 1;
     messages[0].receiver = address(new ConformingReceiver(address(s_destRouter), s_destFeeToken));
@@ -970,7 +970,7 @@ contract EVM2EVMOffRamp_getExecutionState is EVM2EVMOffRampSetup {
     }
   }
 
-  function test_GetExecutionStateSuccess() public {
+  function test_GetExecutionState_Success() public {
     s_offRamp.setExecutionStateHelper(0, Internal.MessageExecutionState.FAILURE);
     assertEq(s_offRamp.getExecutionStateBitMap(0), 3);
 
@@ -997,7 +997,7 @@ contract EVM2EVMOffRamp_getExecutionState is EVM2EVMOffRampSetup {
     assertEq(uint256(Internal.MessageExecutionState.SUCCESS), uint256(s_offRamp.getExecutionState(128)));
   }
 
-  function test_FillExecutionStateSuccess() public {
+  function test_FillExecutionState_Success() public {
     for (uint64 i = 0; i < 384; ++i) {
       s_offRamp.setExecutionStateHelper(i, Internal.MessageExecutionState.FAILURE);
     }
@@ -1026,7 +1026,7 @@ contract EVM2EVMOffRamp_getExecutionState is EVM2EVMOffRampSetup {
 }
 
 contract EVM2EVMOffRamp__trialExecute is EVM2EVMOffRampSetup {
-  function test_trialExecuteSuccess() public {
+  function test_trialExecute_Success() public {
     uint256[] memory amounts = new uint256[](2);
     amounts[0] = 1000;
     amounts[1] = 50;
@@ -1044,7 +1044,7 @@ contract EVM2EVMOffRamp__trialExecute is EVM2EVMOffRampSetup {
     assertEq(startingBalance + amounts[0], dstToken0.balanceOf(message.receiver));
   }
 
-  function test_TokenHandlingErrorIsCaughtSuccess() public {
+  function test_TokenHandlingErrorIsCaught_Success() public {
     uint256[] memory amounts = new uint256[](2);
     amounts[0] = 1000;
     amounts[1] = 50;
@@ -1066,7 +1066,7 @@ contract EVM2EVMOffRamp__trialExecute is EVM2EVMOffRampSetup {
     assertEq(startingBalance, dstToken0.balanceOf(OWNER));
   }
 
-  function test_RateLimitErrorSuccess() public {
+  function test_RateLimitError_Success() public {
     uint256[] memory amounts = new uint256[](2);
     amounts[0] = 1000;
     amounts[1] = 50;

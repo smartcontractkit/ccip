@@ -63,7 +63,7 @@ contract LockReleaseTokenPoolSetup is RouterSetup {
 }
 
 contract LockReleaseTokenPool_setRebalancer is LockReleaseTokenPoolSetup {
-  function test_SetRebalancerSuccess() public {
+  function test_SetRebalancer_Success() public {
     assertEq(address(s_lockReleaseTokenPool.getRebalancer()), OWNER);
     s_lockReleaseTokenPool.setRebalancer(STRANGER);
     assertEq(address(s_lockReleaseTokenPool.getRebalancer()), STRANGER);
@@ -95,7 +95,7 @@ contract LockReleaseTokenPool_lockOrBurn is LockReleaseTokenPoolSetup {
     s_lockReleaseTokenPool.lockOrBurn(STRANGER, bytes(""), amount, DEST_CHAIN_SELECTOR, bytes(""));
   }
 
-  function test_LockOrBurnWithAllowListSuccess() public {
+  function test_LockOrBurnWithAllowList_Success() public {
     uint256 amount = 100;
     vm.startPrank(s_allowedOnRamp);
 
@@ -153,7 +153,7 @@ contract LockReleaseTokenPool_releaseOrMint is LockReleaseTokenPoolSetup {
     s_lockReleaseTokenPoolWithAllowList.applyChainUpdates(chainUpdate);
   }
 
-  function test_ReleaseOrMintSuccess() public {
+  function test_ReleaseOrMint_Success() public {
     vm.startPrank(s_allowedOffRamp);
 
     uint256 amount = 100;
@@ -264,7 +264,7 @@ contract LockReleaseTokenPool_releaseOrMint is LockReleaseTokenPoolSetup {
 }
 
 contract LockReleaseTokenPool_canAcceptLiquidity is LockReleaseTokenPoolSetup {
-  function test_CanAcceptLiquiditySuccess() public {
+  function test_CanAcceptLiquidity_Success() public {
     assertEq(true, s_lockReleaseTokenPool.canAcceptLiquidity());
 
     s_lockReleaseTokenPool =
@@ -343,7 +343,7 @@ contract LockReleaseTokenPool_withdrawalLiquidity is LockReleaseTokenPoolSetup {
 }
 
 contract LockReleaseTokenPool_supportsInterface is LockReleaseTokenPoolSetup {
-  function test_SupportsInterfaceSuccess() public {
+  function test_SupportsInterface_Success() public {
     assertTrue(s_lockReleaseTokenPool.supportsInterface(s_lockReleaseTokenPool.getLockReleaseInterfaceId()));
     assertTrue(s_lockReleaseTokenPool.supportsInterface(type(IPool).interfaceId));
     assertTrue(s_lockReleaseTokenPool.supportsInterface(type(IERC165).interfaceId));
@@ -455,7 +455,7 @@ contract LockReleaseTokenPool_setChainRateLimiterConfig is LockReleaseTokenPoolS
 }
 
 contract LockReleaseTokenPool_setRateLimitAdmin is LockReleaseTokenPoolSetup {
-  function test_SetRateLimitAdminSuccess() public {
+  function test_SetRateLimitAdmin_Success() public {
     assertEq(address(0), s_lockReleaseTokenPool.getRateLimitAdmin());
     s_lockReleaseTokenPool.setRateLimitAdmin(OWNER);
     assertEq(OWNER, s_lockReleaseTokenPool.getRateLimitAdmin());
