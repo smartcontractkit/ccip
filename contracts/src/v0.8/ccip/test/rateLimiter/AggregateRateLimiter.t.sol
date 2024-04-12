@@ -32,7 +32,7 @@ contract AggregateTokenLimiterSetup is BaseTest, PriceRegistrySetup {
 
 /// @notice #constructor
 contract AggregateTokenLimiter_constructor is AggregateTokenLimiterSetup {
-  function testConstructorSuccess() public {
+  function test_ConstructorSuccess() public {
     assertEq(ADMIN, s_rateLimiter.getTokenLimitAdmin());
     assertEq(OWNER, s_rateLimiter.owner());
 
@@ -47,7 +47,7 @@ contract AggregateTokenLimiter_constructor is AggregateTokenLimiterSetup {
 
 /// @notice #getTokenLimitAdmin
 contract AggregateTokenLimiter_getTokenLimitAdmin is AggregateTokenLimiterSetup {
-  function testGetTokenLimitAdminSuccess() public {
+  function test_GetTokenLimitAdminSuccess() public {
     assertEq(ADMIN, s_rateLimiter.getTokenLimitAdmin());
   }
 }
@@ -56,7 +56,7 @@ contract AggregateTokenLimiter_getTokenLimitAdmin is AggregateTokenLimiterSetup 
 contract AggregateTokenLimiter_setAdmin is AggregateTokenLimiterSetup {
   event AdminSet(address newAdmin);
 
-  function testOwnerSuccess() public {
+  function test_OwnerSuccess() public {
     vm.expectEmit();
     emit AdminSet(STRANGER);
 
@@ -66,7 +66,7 @@ contract AggregateTokenLimiter_setAdmin is AggregateTokenLimiterSetup {
 
   // Reverts
 
-  function testOnlyOwnerOrAdminReverts() public {
+  function test_OnlyOwnerOrAdminReverts() public {
     vm.startPrank(STRANGER);
     vm.expectRevert(RateLimiter.OnlyCallableByAdminOrOwner.selector);
 
@@ -76,7 +76,7 @@ contract AggregateTokenLimiter_setAdmin is AggregateTokenLimiterSetup {
 
 /// @notice #getTokenBucket
 contract AggregateTokenLimiter_getTokenBucket is AggregateTokenLimiterSetup {
-  function testGetTokenBucketSuccess() public {
+  function test_GetTokenBucketSuccess() public {
     RateLimiter.TokenBucket memory bucket = s_rateLimiter.currentRateLimiterState();
     assertEq(s_config.rate, bucket.rate);
     assertEq(s_config.capacity, bucket.capacity);
@@ -84,7 +84,7 @@ contract AggregateTokenLimiter_getTokenBucket is AggregateTokenLimiterSetup {
     assertEq(BLOCK_TIME, bucket.lastUpdated);
   }
 
-  function testRefillSuccess() public {
+  function test_RefillSuccess() public {
     s_config.capacity = s_config.capacity * 2;
     s_rateLimiter.setRateLimiterConfig(s_config);
 
@@ -114,7 +114,7 @@ contract AggregateTokenLimiter_getTokenBucket is AggregateTokenLimiterSetup {
 
   // Reverts
 
-  function testTimeUnderflowReverts() public {
+  function test_TimeUnderflowReverts() public {
     vm.warp(BLOCK_TIME - 1);
 
     vm.expectRevert(stdError.arithmeticError);
@@ -126,11 +126,11 @@ contract AggregateTokenLimiter_getTokenBucket is AggregateTokenLimiterSetup {
 contract AggregateTokenLimiter_setRateLimiterConfig is AggregateTokenLimiterSetup {
   event ConfigChanged(RateLimiter.Config config);
 
-  function testOwnerSuccess() public {
+  function test_OwnerSuccess() public {
     setConfig();
   }
 
-  function testTokenLimitAdminSuccess() public {
+  function test_TokenLimitAdminSuccess() public {
     vm.startPrank(ADMIN);
     setConfig();
   }
@@ -159,7 +159,7 @@ contract AggregateTokenLimiter_setRateLimiterConfig is AggregateTokenLimiterSetu
 
   // Reverts
 
-  function testOnlyOnlyCallableByAdminOrOwnerReverts() public {
+  function test_OnlyOnlyCallableByAdminOrOwnerReverts() public {
     vm.startPrank(STRANGER);
 
     vm.expectRevert(RateLimiter.OnlyCallableByAdminOrOwner.selector);
@@ -172,7 +172,7 @@ contract AggregateTokenLimiter_setRateLimiterConfig is AggregateTokenLimiterSetu
 contract AggregateTokenLimiter__rateLimitValue is AggregateTokenLimiterSetup {
   event TokensConsumed(uint256 tokens);
 
-  function testRateLimitValueSuccess_gas() public {
+  function test_RateLimitValueSuccess_gas() public {
     vm.pauseGasMetering();
     // start from blocktime that does not equal rate limiter init timestamp
     vm.warp(BLOCK_TIME + 1);
@@ -217,12 +217,12 @@ contract AggregateTokenLimiter__rateLimitValue is AggregateTokenLimiterSetup {
 
   // Reverts
 
-  function testUnknownTokenReverts() public {
+  function test_UnknownTokenReverts() public {
     vm.expectRevert(abi.encodeWithSelector(AggregateRateLimiter.PriceNotFoundForToken.selector, address(0)));
     s_rateLimiter.rateLimitValue(new Client.EVMTokenAmount[](1), s_priceRegistry);
   }
 
-  function testAggregateValueMaxCapacityExceededReverts() public {
+  function test_AggregateValueMaxCapacityExceededReverts() public {
     RateLimiter.TokenBucket memory bucket = s_rateLimiter.currentRateLimiterState();
 
     Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);

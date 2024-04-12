@@ -33,7 +33,7 @@ contract PingPongDappSetup is EVM2EVMOnRampSetup {
 contract PingPong_startPingPong is PingPongDappSetup {
   event ConfigPropagated(uint64 chainSelector, address contractAddress);
 
-  function testStartPingPongSuccess() public {
+  function test_StartPingPongSuccess() public {
     uint256 pingPongNumber = 1;
     bytes memory data = abi.encode(pingPongNumber);
 
@@ -76,7 +76,7 @@ contract PingPong_startPingPong is PingPongDappSetup {
 
 /// @notice #ccipReceive
 contract PingPong_ccipReceive is PingPongDappSetup {
-  function testCcipReceiveSuccess() public {
+  function test_CcipReceiveSuccess() public {
     Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](0);
 
     uint256 pingPongNumber = 5;
@@ -99,26 +99,26 @@ contract PingPong_ccipReceive is PingPongDappSetup {
 }
 
 contract PingPong_plumbing is PingPongDappSetup {
-  function testFuzz_CounterPartChainSelectorSuccess(uint64 chainSelector) public {
+  function test_Fuzz_CounterPartChainSelectorSuccess(uint64 chainSelector) public {
     s_pingPong.setCounterpartChainSelector(chainSelector);
 
     assertEq(s_pingPong.getCounterpartChainSelector(), chainSelector);
   }
 
-  function testFuzz_CounterPartAddressSuccess(address counterpartAddress) public {
+  function test_Fuzz_CounterPartAddressSuccess(address counterpartAddress) public {
     s_pingPong.setCounterpartAddress(counterpartAddress);
 
     assertEq(s_pingPong.getCounterpartAddress(), counterpartAddress);
   }
 
-  function testFuzz_CounterPartAddressSuccess(uint64 chainSelector, address counterpartAddress) public {
+  function test_Fuzz_CounterPartAddressSuccess(uint64 chainSelector, address counterpartAddress) public {
     s_pingPong.setCounterpart(chainSelector, counterpartAddress);
 
     assertEq(s_pingPong.getCounterpartAddress(), counterpartAddress);
     assertEq(s_pingPong.getCounterpartChainSelector(), chainSelector);
   }
 
-  function testPausingSuccess() public {
+  function test_PausingSuccess() public {
     assertFalse(s_pingPong.isPaused());
 
     s_pingPong.setPaused(true);

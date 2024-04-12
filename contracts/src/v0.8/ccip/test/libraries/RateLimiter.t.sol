@@ -18,7 +18,7 @@ contract RateLimiterSetup is BaseTest {
 }
 
 contract RateLimiter_constructor is RateLimiterSetup {
-  function testConstructorSuccess() public {
+  function test_ConstructorSuccess() public {
     RateLimiter.TokenBucket memory rateLimiter = s_helper.getRateLimiter();
     assertEq(s_config.rate, rateLimiter.rate);
     assertEq(s_config.capacity, rateLimiter.capacity);
@@ -32,7 +32,7 @@ contract RateLimiter_constructor is RateLimiterSetup {
 contract RateLimiter_setTokenBucketConfig is RateLimiterSetup {
   event ConfigChanged(RateLimiter.Config config);
 
-  function testSetRateLimiterConfigSuccess() public {
+  function test_SetRateLimiterConfigSuccess() public {
     RateLimiter.TokenBucket memory rateLimiter = s_helper.getRateLimiter();
     assertEq(s_config.rate, rateLimiter.rate);
     assertEq(s_config.capacity, rateLimiter.capacity);
@@ -56,7 +56,7 @@ contract RateLimiter_setTokenBucketConfig is RateLimiterSetup {
 
 /// @notice #currentTokenBucketState
 contract RateLimiter_currentTokenBucketState is RateLimiterSetup {
-  function testCurrentTokenBucketStateSuccess() public {
+  function test_CurrentTokenBucketStateSuccess() public {
     RateLimiter.TokenBucket memory bucket = s_helper.currentTokenBucketState();
     assertEq(s_config.rate, bucket.rate);
     assertEq(s_config.capacity, bucket.capacity);
@@ -76,7 +76,7 @@ contract RateLimiter_currentTokenBucketState is RateLimiterSetup {
     assertEq(BLOCK_TIME, bucket.lastUpdated);
   }
 
-  function testRefillSuccess() public {
+  function test_RefillSuccess() public {
     RateLimiter.TokenBucket memory bucket = s_helper.currentTokenBucketState();
     assertEq(s_config.rate, bucket.rate);
     assertEq(s_config.capacity, bucket.capacity);
@@ -116,7 +116,7 @@ contract RateLimiter_consume is RateLimiterSetup {
 
   address internal s_token = address(100);
 
-  function testConsumeAggregateValueSuccess() public {
+  function test_ConsumeAggregateValueSuccess() public {
     RateLimiter.TokenBucket memory rateLimiter = s_helper.getRateLimiter();
     assertEq(s_config.rate, rateLimiter.rate);
     assertEq(s_config.capacity, rateLimiter.capacity);
@@ -139,7 +139,7 @@ contract RateLimiter_consume is RateLimiterSetup {
     assertEq(BLOCK_TIME, rateLimiter.lastUpdated);
   }
 
-  function testConsumeTokensSuccess() public {
+  function test_ConsumeTokensSuccess() public {
     uint256 requestTokens = 50;
 
     vm.expectEmit();
@@ -148,7 +148,7 @@ contract RateLimiter_consume is RateLimiterSetup {
     s_helper.consume(requestTokens, s_token);
   }
 
-  function testRefillSuccess() public {
+  function test_RefillSuccess() public {
     uint256 requestTokens = 50;
 
     vm.expectEmit();
@@ -179,7 +179,7 @@ contract RateLimiter_consume is RateLimiterSetup {
     assertEq(BLOCK_TIME + warpTime, rateLimiter.lastUpdated);
   }
 
-  function testConsumeUnlimitedSuccess() public {
+  function test_ConsumeUnlimitedSuccess() public {
     s_helper.consume(0, address(0));
 
     RateLimiter.TokenBucket memory rateLimiter = s_helper.getRateLimiter();
@@ -211,7 +211,7 @@ contract RateLimiter_consume is RateLimiterSetup {
 
   // Reverts
 
-  function testAggregateValueMaxCapacityExceededReverts() public {
+  function test_AggregateValueMaxCapacityExceededReverts() public {
     RateLimiter.TokenBucket memory rateLimiter = s_helper.getRateLimiter();
 
     vm.expectRevert(
@@ -222,7 +222,7 @@ contract RateLimiter_consume is RateLimiterSetup {
     s_helper.consume(rateLimiter.capacity + 1, address(0));
   }
 
-  function testTokenMaxCapacityExceededReverts() public {
+  function test_TokenMaxCapacityExceededReverts() public {
     RateLimiter.TokenBucket memory rateLimiter = s_helper.getRateLimiter();
 
     vm.expectRevert(
@@ -233,7 +233,7 @@ contract RateLimiter_consume is RateLimiterSetup {
     s_helper.consume(rateLimiter.capacity + 1, s_token);
   }
 
-  function testConsumingMoreThanUint128Reverts() public {
+  function test_ConsumingMoreThanUint128Reverts() public {
     RateLimiter.TokenBucket memory rateLimiter = s_helper.getRateLimiter();
 
     uint256 request = uint256(type(uint128).max) + 1;
@@ -244,7 +244,7 @@ contract RateLimiter_consume is RateLimiterSetup {
     s_helper.consume(request, address(0));
   }
 
-  function testAggregateValueRateLimitReachedReverts() public {
+  function test_AggregateValueRateLimitReachedReverts() public {
     RateLimiter.TokenBucket memory rateLimiter = s_helper.getRateLimiter();
 
     uint256 overLimit = 20;
@@ -263,7 +263,7 @@ contract RateLimiter_consume is RateLimiterSetup {
     s_helper.consume(requestTokens2, address(0));
   }
 
-  function testTokenRateLimitReachedReverts() public {
+  function test_TokenRateLimitReachedReverts() public {
     RateLimiter.TokenBucket memory rateLimiter = s_helper.getRateLimiter();
 
     uint256 overLimit = 20;
@@ -282,7 +282,7 @@ contract RateLimiter_consume is RateLimiterSetup {
     s_helper.consume(requestTokens2, s_token);
   }
 
-  function testRateLimitReachedOverConsecutiveBlocksReverts() public {
+  function test_RateLimitReachedOverConsecutiveBlocksReverts() public {
     uint256 initBlockTime = BLOCK_TIME + 10000;
     vm.warp(initBlockTime);
 

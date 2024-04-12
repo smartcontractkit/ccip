@@ -81,7 +81,7 @@ contract PriceRegistrySetup is TokenSetup {
 }
 
 contract PriceRegistry_constructor is PriceRegistrySetup {
-  function testSetupSuccess() public virtual {
+  function test_SetupSuccess() public virtual {
     address[] memory priceUpdaters = new address[](2);
     priceUpdaters[0] = STRANGER;
     priceUpdaters[1] = OWNER;
@@ -97,14 +97,14 @@ contract PriceRegistry_constructor is PriceRegistrySetup {
     assertEq(s_priceRegistry.typeAndVersion(), "PriceRegistry 1.2.0");
   }
 
-  function testInvalidStalenessThresholdReverts() public {
+  function test_InvalidStalenessThresholdReverts() public {
     vm.expectRevert(PriceRegistry.InvalidStalenessThreshold.selector);
     s_priceRegistry = new PriceRegistry(new address[](0), new address[](0), 0);
   }
 }
 
 contract PriceRegistry_getTokenPrices is PriceRegistrySetup {
-  function testGetTokenPricesSuccess() public {
+  function test_GetTokenPricesSuccess() public {
     Internal.PriceUpdates memory priceUpdates = abi.decode(s_encodedInitialPriceUpdates, (Internal.PriceUpdates));
 
     address[] memory tokens = new address[](3);
@@ -122,7 +122,7 @@ contract PriceRegistry_getTokenPrices is PriceRegistrySetup {
 }
 
 contract PriceRegistry_getValidatedTokenPrice is PriceRegistrySetup {
-  function testGetValidatedTokenPriceSuccess() public {
+  function test_GetValidatedTokenPriceSuccess() public {
     Internal.PriceUpdates memory priceUpdates = abi.decode(s_encodedInitialPriceUpdates, (Internal.PriceUpdates));
     address token = priceUpdates.tokenPriceUpdates[0].sourceToken;
 
@@ -131,7 +131,7 @@ contract PriceRegistry_getValidatedTokenPrice is PriceRegistrySetup {
     assertEq(priceUpdates.tokenPriceUpdates[0].usdPerToken, tokenPrice);
   }
 
-  function testStaleFeeTokenReverts() public {
+  function test_StaleFeeTokenReverts() public {
     vm.warp(block.timestamp + TWELVE_HOURS + 1);
 
     vm.expectRevert(
@@ -140,7 +140,7 @@ contract PriceRegistry_getValidatedTokenPrice is PriceRegistrySetup {
     s_priceRegistry.getValidatedTokenPrice(s_sourceTokens[0]);
   }
 
-  function testTokenNotSupportedReverts() public {
+  function test_TokenNotSupportedReverts() public {
     vm.expectRevert(abi.encodeWithSelector(PriceRegistry.TokenNotSupported.selector, DUMMY_CONTRACT_ADDRESS));
     s_priceRegistry.getValidatedTokenPrice(DUMMY_CONTRACT_ADDRESS);
   }
@@ -150,7 +150,7 @@ contract PriceRegistry_applyPriceUpdatersUpdates is PriceRegistrySetup {
   event PriceUpdaterSet(address indexed priceUpdater);
   event PriceUpdaterRemoved(address indexed priceUpdater);
 
-  function testApplyPriceUpdaterUpdatesSuccess() public {
+  function test_ApplyPriceUpdaterUpdatesSuccess() public {
     address[] memory priceUpdaters = new address[](1);
     priceUpdaters[0] = STRANGER;
 
@@ -177,7 +177,7 @@ contract PriceRegistry_applyPriceUpdatersUpdates is PriceRegistrySetup {
     assertEq(s_priceRegistry.getPriceUpdaters().length, 0);
   }
 
-  function testOnlyCallableByOwnerReverts() public {
+  function test_OnlyCallableByOwnerReverts() public {
     address[] memory priceUpdaters = new address[](1);
     priceUpdaters[0] = STRANGER;
     vm.startPrank(STRANGER);
@@ -190,7 +190,7 @@ contract PriceRegistry_applyFeeTokensUpdates is PriceRegistrySetup {
   event FeeTokenAdded(address indexed feeToken);
   event FeeTokenRemoved(address indexed feeToken);
 
-  function testApplyFeeTokensUpdatesSuccess() public {
+  function test_ApplyFeeTokensUpdatesSuccess() public {
     address[] memory feeTokens = new address[](1);
     feeTokens[0] = s_sourceTokens[1];
 
@@ -217,7 +217,7 @@ contract PriceRegistry_applyFeeTokensUpdates is PriceRegistrySetup {
     assertEq(s_priceRegistry.getFeeTokens().length, 2);
   }
 
-  function testOnlyCallableByOwnerReverts() public {
+  function test_OnlyCallableByOwnerReverts() public {
     address[] memory feeTokens = new address[](1);
     feeTokens[0] = STRANGER;
     vm.startPrank(STRANGER);
@@ -230,7 +230,7 @@ contract PriceRegistry_updatePrices is PriceRegistrySetup {
   event UsdPerTokenUpdated(address indexed token, uint256 value, uint256 timestamp);
   event UsdPerUnitGasUpdated(uint64 indexed destChain, uint256 value, uint256 timestamp);
 
-  function testOnlyTokenPriceSuccess() public {
+  function test_OnlyTokenPriceSuccess() public {
     Internal.PriceUpdates memory update = Internal.PriceUpdates({
       tokenPriceUpdates: new Internal.TokenPriceUpdate[](1),
       gasPriceUpdates: new Internal.GasPriceUpdate[](0)
@@ -247,7 +247,7 @@ contract PriceRegistry_updatePrices is PriceRegistrySetup {
     assertEq(s_priceRegistry.getTokenPrice(s_sourceTokens[0]).value, update.tokenPriceUpdates[0].usdPerToken);
   }
 
-  function testOnlyGasPriceSuccess() public {
+  function test_OnlyGasPriceSuccess() public {
     Internal.PriceUpdates memory update = Internal.PriceUpdates({
       tokenPriceUpdates: new Internal.TokenPriceUpdate[](0),
       gasPriceUpdates: new Internal.GasPriceUpdate[](1)
@@ -267,7 +267,7 @@ contract PriceRegistry_updatePrices is PriceRegistrySetup {
     );
   }
 
-  function testUpdateMultiplePricesSuccess() public {
+  function test_UpdateMultiplePricesSuccess() public {
     Internal.TokenPriceUpdate[] memory tokenPriceUpdates = new Internal.TokenPriceUpdate[](3);
     tokenPriceUpdates[0] = Internal.TokenPriceUpdate({sourceToken: s_sourceTokens[0], usdPerToken: 4e18});
     tokenPriceUpdates[1] = Internal.TokenPriceUpdate({sourceToken: s_sourceTokens[1], usdPerToken: 1800e18});
@@ -311,7 +311,7 @@ contract PriceRegistry_updatePrices is PriceRegistrySetup {
 
   // Reverts
 
-  function testOnlyCallableByUpdaterOrOwnerReverts() public {
+  function test_OnlyCallableByUpdaterOrOwnerReverts() public {
     Internal.PriceUpdates memory priceUpdates = Internal.PriceUpdates({
       tokenPriceUpdates: new Internal.TokenPriceUpdate[](0),
       gasPriceUpdates: new Internal.GasPriceUpdate[](0)
@@ -324,7 +324,7 @@ contract PriceRegistry_updatePrices is PriceRegistrySetup {
 }
 
 contract PriceRegistry_convertTokenAmount is PriceRegistrySetup {
-  function testConvertTokenAmountSuccess() public {
+  function test_ConvertTokenAmountSuccess() public {
     Internal.PriceUpdates memory initialPriceUpdates = abi.decode(s_encodedInitialPriceUpdates, (Internal.PriceUpdates));
     uint256 amount = 3e16;
     uint256 conversionRate = (uint256(initialPriceUpdates.tokenPriceUpdates[2].usdPerToken) * 1e18)
@@ -333,7 +333,7 @@ contract PriceRegistry_convertTokenAmount is PriceRegistrySetup {
     assertEq(s_priceRegistry.convertTokenAmount(s_weth, amount, s_sourceTokens[0]), expected);
   }
 
-  function testFuzz_ConvertTokenAmountSuccess(
+  function test_Fuzz_ConvertTokenAmountSuccess(
     uint256 feeTokenAmount,
     uint224 usdPerFeeToken,
     uint160 usdPerLinkToken,
@@ -368,7 +368,7 @@ contract PriceRegistry_convertTokenAmount is PriceRegistrySetup {
 
   // Reverts
 
-  function testStaleFeeTokenReverts() public {
+  function test_StaleFeeTokenReverts() public {
     vm.warp(block.timestamp + TWELVE_HOURS + 1);
 
     Internal.TokenPriceUpdate[] memory tokenPriceUpdates = new Internal.TokenPriceUpdate[](1);
@@ -385,7 +385,7 @@ contract PriceRegistry_convertTokenAmount is PriceRegistrySetup {
     s_priceRegistry.convertTokenAmount(s_weth, 3e16, s_sourceTokens[0]);
   }
 
-  function testLinkTokenNotSupportedReverts() public {
+  function test_LinkTokenNotSupportedReverts() public {
     vm.expectRevert(abi.encodeWithSelector(PriceRegistry.TokenNotSupported.selector, DUMMY_CONTRACT_ADDRESS));
     s_priceRegistry.convertTokenAmount(DUMMY_CONTRACT_ADDRESS, 3e16, s_sourceTokens[0]);
 
@@ -393,7 +393,7 @@ contract PriceRegistry_convertTokenAmount is PriceRegistrySetup {
     s_priceRegistry.convertTokenAmount(s_sourceTokens[0], 3e16, DUMMY_CONTRACT_ADDRESS);
   }
 
-  function testStaleLinkTokenReverts() public {
+  function test_StaleLinkTokenReverts() public {
     vm.warp(block.timestamp + TWELVE_HOURS + 1);
 
     Internal.TokenPriceUpdate[] memory tokenPriceUpdates = new Internal.TokenPriceUpdate[](1);
@@ -412,7 +412,7 @@ contract PriceRegistry_convertTokenAmount is PriceRegistrySetup {
 }
 
 contract PriceRegistry_getTokenAndGasPrices is PriceRegistrySetup {
-  function testGetFeeTokenAndGasPricesSuccess() public {
+  function test_GetFeeTokenAndGasPricesSuccess() public {
     (uint224 feeTokenPrice, uint224 gasPrice) =
       s_priceRegistry.getTokenAndGasPrices(s_sourceFeeToken, DEST_CHAIN_SELECTOR);
 
@@ -422,7 +422,7 @@ contract PriceRegistry_getTokenAndGasPrices is PriceRegistrySetup {
     assertEq(gasPrice, priceUpdates.gasPriceUpdates[0].usdPerUnitGas);
   }
 
-  function testZeroGasPriceSuccess() public {
+  function test_ZeroGasPriceSuccess() public {
     uint64 zeroGasDestChainSelector = 345678;
     Internal.GasPriceUpdate[] memory gasPriceUpdates = new Internal.GasPriceUpdate[](1);
     gasPriceUpdates[0] = Internal.GasPriceUpdate({destChainSelector: zeroGasDestChainSelector, usdPerUnitGas: 0});
@@ -436,12 +436,12 @@ contract PriceRegistry_getTokenAndGasPrices is PriceRegistrySetup {
     assertEq(gasPrice, priceUpdates.gasPriceUpdates[0].usdPerUnitGas);
   }
 
-  function testUnsupportedChainReverts() public {
+  function test_UnsupportedChainReverts() public {
     vm.expectRevert(abi.encodeWithSelector(PriceRegistry.ChainNotSupported.selector, DEST_CHAIN_SELECTOR + 1));
     s_priceRegistry.getTokenAndGasPrices(s_sourceTokens[0], DEST_CHAIN_SELECTOR + 1);
   }
 
-  function testStaleGasPriceReverts() public {
+  function test_StaleGasPriceReverts() public {
     uint256 diff = TWELVE_HOURS + 1;
     vm.warp(block.timestamp + diff);
     vm.expectRevert(
@@ -450,7 +450,7 @@ contract PriceRegistry_getTokenAndGasPrices is PriceRegistrySetup {
     s_priceRegistry.getTokenAndGasPrices(s_sourceTokens[0], DEST_CHAIN_SELECTOR);
   }
 
-  function testStaleTokenPriceReverts() public {
+  function test_StaleTokenPriceReverts() public {
     uint256 diff = TWELVE_HOURS + 1;
     vm.warp(block.timestamp + diff);
 
