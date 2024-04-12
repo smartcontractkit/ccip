@@ -2,14 +2,16 @@ package testconfig
 
 import (
 	"fmt"
+	"os"
+
 	"github.com/AlekSi/pointer"
 	"github.com/pelletier/go-toml/v2"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	testutils "github.com/smartcontractkit/ccip/integration-tests/ccip-tests/utils"
+
 	ctfconfig "github.com/smartcontractkit/chainlink-testing-framework/config"
 	ctfK8config "github.com/smartcontractkit/chainlink-testing-framework/k8s/config"
-	"os"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
 
@@ -148,10 +150,9 @@ func (c *CCIPContractConfig) ContractsData() ([]byte, error) {
 	}
 	// if DataFilePath is given, update c.Data with the content of file so that we can set CONTRACTS_OVERRIDE_CONFIG
 	// to pass the file content to remote runner with override config var
-	filePath := c.DataFilePath()
-	if filePath != "" {
+	if c.DataFilePath() != "" {
 		// if there is regex provided in filepath, reformat the filepath with actual filepath matching the regex
-		filePath, err := testutils.FirstFileFromMatchingPath(filePath)
+		filePath, err := testutils.FirstFileFromMatchingPath(c.DataFilePath())
 		if err != nil {
 			return nil, fmt.Errorf("error finding contract config file %s: %w", c.DataFilePath(), err)
 		}

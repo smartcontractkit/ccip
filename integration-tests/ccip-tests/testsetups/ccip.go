@@ -3,7 +3,7 @@ package testsetups
 import (
 	"context"
 	"fmt"
-	testutils "github.com/smartcontractkit/ccip/integration-tests/ccip-tests/utils"
+	"github.com/rs/zerolog/log"
 	"math/big"
 	"math/rand"
 	"os"
@@ -12,6 +12,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	testutils "github.com/smartcontractkit/ccip/integration-tests/ccip-tests/utils"
 
 	"dario.cat/mergo"
 	"github.com/AlekSi/pointer"
@@ -1028,6 +1030,7 @@ func (o *CCIPTestSetUpOutputs) CreateEnvironment(
 			if k8Env == nil {
 				ec, err = blockchain.ConnectEVMClient(n, lggr)
 			} else {
+				log.Info().Interface("urls", k8Env.URLs).Msg("URLs")
 				ec, err = blockchain.NewEVMClient(n, k8Env, lggr)
 			}
 			require.NoError(t, err, "Connecting to blockchain nodes shouldn't fail")

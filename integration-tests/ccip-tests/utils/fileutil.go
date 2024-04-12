@@ -2,11 +2,12 @@ package utils
 
 import (
 	"fmt"
-	"github.com/rs/zerolog/log"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/rs/zerolog/log"
 )
 
 // FilesWithRegex returns all filepaths under root folder matching with regex pattern
