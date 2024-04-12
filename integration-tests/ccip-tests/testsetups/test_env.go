@@ -19,7 +19,6 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
 	ctftestenv "github.com/smartcontractkit/chainlink-testing-framework/docker/test_env"
 	"github.com/smartcontractkit/chainlink-testing-framework/k8s/environment"
-	"github.com/smartcontractkit/chainlink-testing-framework/k8s/pkg/cdk8s/blockscout"
 	"github.com/smartcontractkit/chainlink-testing-framework/k8s/pkg/helm/chainlink"
 	"github.com/smartcontractkit/chainlink-testing-framework/k8s/pkg/helm/reorg"
 
@@ -85,6 +84,7 @@ func setNodeConfig(nets []blockchain.EVMNetwork, nodeConfig, commonChain string,
 }
 
 func ChainlinkPropsForUpdate(
+	t *testing.T,
 	testInputs *CCIPTestConfig,
 ) (map[string]any, int) {
 	updateProps := make(map[string]any)
@@ -102,6 +102,24 @@ func ChainlinkPropsForUpdate(
 			if upgradeImage == "" || upgradeTag == "" {
 				continue
 			}
+			nodeConfig := clNode.BaseConfigTOML
+			commonChainConfig := clNode.CommonChainConfigTOML
+			chainConfigByChain := clNode.ChainConfigTOMLByChain
+			if nodeConfig == "" {
+				nodeConfig = testInputs.EnvInput.NewCLCluster.Common.BaseConfigTOML
+			}
+			if commonChainConfig == "" {
+				commonChainConfig = testInputs.EnvInput.NewCLCluster.Common.CommonChainConfigTOML
+			}
+			if chainConfigByChain == nil {
+				chainConfigByChain = testInputs.EnvInput.NewCLCluster.Common.ChainConfigTOMLByChain
+			}
+
+			_, tomlStr, err := setNodeConfig(
+				networksWithInternalURLs(testInputs.SelectedNetworks),
+				nodeConfig, commonChainConfig, chainConfigByChain,
+			)
+			require.NoError(t, err)
 			nodesMap = append(nodesMap, map[string]any{
 				"name": clNode.Name,
 				"chainlink": map[string]any{
@@ -110,6 +128,7 @@ func ChainlinkPropsForUpdate(
 						"version": pointer.GetString(clNode.ChainlinkImage.Version),
 					},
 				},
+				"toml": tomlStr,
 			})
 			noOfNodesToUpgrade++
 		}
@@ -124,6 +143,14 @@ func ChainlinkPropsForUpdate(
 				"version": upgradeTag,
 			},
 		}
+		_, tomlStr, err := setNodeConfig(
+			networksWithInternalURLs(testInputs.SelectedNetworks),
+			testInputs.EnvInput.NewCLCluster.Common.BaseConfigTOML,
+			testInputs.EnvInput.NewCLCluster.Common.CommonChainConfigTOML,
+			testInputs.EnvInput.NewCLCluster.Common.ChainConfigTOMLByChain,
+		)
+		require.NoError(t, err)
+		updateProps["toml"] = tomlStr
 		noOfNodesToUpgrade = pointer.GetInt(testInputs.EnvInput.NewCLCluster.NoOfNodes)
 	}
 	return updateProps, noOfNodesToUpgrade
@@ -351,6 +378,7 @@ func DeployLocalCluster(
 // UpgradeNodes restarts chainlink nodes in the given range with upgrade image
 // startIndex and endIndex are inclusive
 func UpgradeNodes(
+	t *testing.T,
 	lggr zerolog.Logger,
 	testInputs *CCIPTestConfig,
 	ccipEnv *actions.CCIPTestEnv,
@@ -384,7 +412,7 @@ func UpgradeNodes(
 		if k8Env == nil {
 			return errors.New("k8s environment is nil, cannot restart nodes")
 		}
-		props, noOfNodesToUpgrade := ChainlinkPropsForUpdate(testInputs)
+		props, noOfNodesToUpgrade := ChainlinkPropsForUpdate(t, testInputs)
 		chartName := ccipEnv.CLNodes[0].ChartName
 		// explicitly set the env var into false to allow manifest update
 		// if tests are run in remote runner, it might be set to true to disable manifest update
@@ -419,7 +447,6 @@ func DeployEnvironments(
 	envconfig *environment.Config,
 	testInputs *CCIPTestConfig,
 ) *environment.Environment {
-	useBlockscout := testInputs.TestGroupInput.Blockscout
 	selectedNetworks := testInputs.SelectedNetworks
 	testEnvironment := environment.New(envconfig)
 	numOfTxNodes := 1
@@ -461,34 +488,28 @@ func DeployEnvironments(
 	if testEnvironment.WillUseRemoteRunner() {
 		return testEnvironment
 	}
+
+	err = testEnvironment.
+		AddHelm(ChainlinkChart(t, testInputs, networksWithInternalURLs(selectedNetworks))).
+		Run()
+	require.NoError(t, err)
+	return testEnvironment
+}
+
+func networksWithInternalURLs(networks []blockchain.EVMNetwork) []blockchain.EVMNetwork {
 	urlFinder := func(network blockchain.EVMNetwork) ([]string, []string) {
 		if !network.Simulated {
 			return network.URLs, network.HTTPURLs
 		}
 		networkName := strings.ReplaceAll(strings.ToLower(network.Name), " ", "-")
-		var internalWsURLs, internalHttpURLs []string
-		for i := 0; i < numOfTxNodes; i++ {
-			internalWsURLs = append(internalWsURLs, fmt.Sprintf("ws://%s-ethereum-geth:8546", networkName))
-			internalHttpURLs = append(internalHttpURLs, fmt.Sprintf("http://%s-ethereum-geth:8544", networkName))
-		}
+		internalWsURLs := []string{fmt.Sprintf("ws://%s-ethereum-geth:8546", networkName)}
+		internalHttpURLs := []string{fmt.Sprintf("http://%s-ethereum-geth:8544", networkName)}
 		return internalWsURLs, internalHttpURLs
 	}
 	var nets []blockchain.EVMNetwork
-	for i := range selectedNetworks {
-		nets = append(nets, selectedNetworks[i])
-		nets[i].URLs, nets[i].HTTPURLs = urlFinder(selectedNetworks[i])
-		if useBlockscout {
-			testEnvironment.AddChart(blockscout.New(&blockscout.Props{
-				Name:    fmt.Sprintf("%s-blockscout", selectedNetworks[i].Name),
-				WsURL:   selectedNetworks[i].URLs[0],
-				HttpURL: selectedNetworks[i].HTTPURLs[0],
-			}))
-		}
+	for i := range networks {
+		nets = append(nets, networks[i])
+		nets[i].URLs, nets[i].HTTPURLs = urlFinder(networks[i])
 	}
-
-	err = testEnvironment.
-		AddHelm(ChainlinkChart(t, testInputs, nets)).
-		Run()
-	require.NoError(t, err)
-	return testEnvironment
+	return nets
 }
