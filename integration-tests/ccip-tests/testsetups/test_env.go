@@ -365,6 +365,7 @@ func UpgradeNodes(
 				return err
 			}
 		}
+		k8Env.Cfg.NoManifestUpdate = false
 		err := k8Env.RunUpdated(len(clientsToUpgrade))
 		// Run the new environment and wait for changes to show
 		if err != nil {
