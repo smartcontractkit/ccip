@@ -481,24 +481,22 @@ func (_m *EVM2EVMOffRampInterface) FilterTransmitted(opts *bind.FilterOpts) (*ev
 }
 
 // GetAllRateLimitTokens provides a mock function with given fields: opts
-func (_m *EVM2EVMOffRampInterface) GetAllRateLimitTokens(opts *bind.CallOpts) ([]common.Address, error) {
+func (_m *EVM2EVMOffRampInterface) GetAllRateLimitTokens(opts *bind.CallOpts) (evm_2_evm_offramp.GetAllRateLimitTokens, error) {
 	ret := _m.Called(opts)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetAllRateLimitTokens")
 	}
 
-	var r0 []common.Address
+	var r0 evm_2_evm_offramp.GetAllRateLimitTokens
 	var r1 error
-	if rf, ok := ret.Get(0).(func(*bind.CallOpts) ([]common.Address, error)); ok {
+	if rf, ok := ret.Get(0).(func(*bind.CallOpts) (evm_2_evm_offramp.GetAllRateLimitTokens, error)); ok {
 		return rf(opts)
 	}
-	if rf, ok := ret.Get(0).(func(*bind.CallOpts) []common.Address); ok {
+	if rf, ok := ret.Get(0).(func(*bind.CallOpts) evm_2_evm_offramp.GetAllRateLimitTokens); ok {
 		r0 = rf(opts)
 	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]common.Address)
-		}
+		r0 = ret.Get(0).(evm_2_evm_offramp.GetAllRateLimitTokens)
 	}
 
 	if rf, ok := ret.Get(1).(func(*bind.CallOpts) error); ok {
@@ -1337,7 +1335,7 @@ func (_m *EVM2EVMOffRampInterface) TypeAndVersion(opts *bind.CallOpts) (string, 
 }
 
 // UpdateRateLimitTokens provides a mock function with given fields: opts, removes, adds
-func (_m *EVM2EVMOffRampInterface) UpdateRateLimitTokens(opts *bind.TransactOpts, removes []common.Address, adds []common.Address) (*types.Transaction, error) {
+func (_m *EVM2EVMOffRampInterface) UpdateRateLimitTokens(opts *bind.TransactOpts, removes []evm_2_evm_offramp.EVM2EVMOffRampRateLimitToken, adds []evm_2_evm_offramp.EVM2EVMOffRampRateLimitToken) (*types.Transaction, error) {
 	ret := _m.Called(opts, removes, adds)
 
 	if len(ret) == 0 {
@@ -1346,10 +1344,10 @@ func (_m *EVM2EVMOffRampInterface) UpdateRateLimitTokens(opts *bind.TransactOpts
 
 	var r0 *types.Transaction
 	var r1 error
-	if rf, ok := ret.Get(0).(func(*bind.TransactOpts, []common.Address, []common.Address) (*types.Transaction, error)); ok {
+	if rf, ok := ret.Get(0).(func(*bind.TransactOpts, []evm_2_evm_offramp.EVM2EVMOffRampRateLimitToken, []evm_2_evm_offramp.EVM2EVMOffRampRateLimitToken) (*types.Transaction, error)); ok {
 		return rf(opts, removes, adds)
 	}
-	if rf, ok := ret.Get(0).(func(*bind.TransactOpts, []common.Address, []common.Address) *types.Transaction); ok {
+	if rf, ok := ret.Get(0).(func(*bind.TransactOpts, []evm_2_evm_offramp.EVM2EVMOffRampRateLimitToken, []evm_2_evm_offramp.EVM2EVMOffRampRateLimitToken) *types.Transaction); ok {
 		r0 = rf(opts, removes, adds)
 	} else {
 		if ret.Get(0) != nil {
@@ -1357,7 +1355,7 @@ func (_m *EVM2EVMOffRampInterface) UpdateRateLimitTokens(opts *bind.TransactOpts
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(*bind.TransactOpts, []common.Address, []common.Address) error); ok {
+	if rf, ok := ret.Get(1).(func(*bind.TransactOpts, []evm_2_evm_offramp.EVM2EVMOffRampRateLimitToken, []evm_2_evm_offramp.EVM2EVMOffRampRateLimitToken) error); ok {
 		r1 = rf(opts, removes, adds)
 	} else {
 		r1 = ret.Error(1)

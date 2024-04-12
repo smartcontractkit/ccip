@@ -11,6 +11,7 @@ import {IRouter} from "../interfaces/IRouter.sol";
 import {IPool} from "../interfaces/pools/IPool.sol";
 
 import {CallWithExactGas} from "../../shared/call/CallWithExactGas.sol";
+import {EnumerableMapAddresses} from "../../shared/enumerable/EnumerableMapAddresses.sol";
 import {AggregateRateLimiter} from "../AggregateRateLimiter.sol";
 import {Client} from "../libraries/Client.sol";
 import {Internal} from "../libraries/Internal.sol";
@@ -29,7 +30,7 @@ import {EnumerableSet} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts
 /// and turn-taking mechanism.
 contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersion, OCR2BaseNoChecks {
   using ERC165Checker for address;
-  using EnumerableSet for EnumerableSet.AddressSet;
+  using EnumerableMapAddresses for EnumerableMapAddresses.AddressToAddressMap;
 
   error AlreadyAttempted(uint64 sequenceNumber);
   error AlreadyExecuted(uint64 sequenceNumber);
@@ -62,8 +63,8 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
   event ExecutionStateChanged(
     uint64 indexed sequenceNumber, bytes32 indexed messageId, Internal.MessageExecutionState state, bytes returnData
   );
-  event TokenAggregateRateLimitAdded(address token);
-  event TokenAggregateRateLimitRemoved(address token);
+  event TokenAggregateRateLimitAdded(address sourceToken, address destToken);
+  event TokenAggregateRateLimitRemoved(address sourceToken, address destToken);
 
   /// @notice Static offRamp config
   /// @dev RMN depends on this struct, if changing, please notify the RMN maintainers.
@@ -85,6 +86,12 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
     uint16 maxNumberOfTokensPerMsg; //  │ Maximum number of ERC20 token transfers that can be included per message
     uint32 maxDataBytes; //             │ Maximum payload data size in bytes
     uint32 maxPoolReleaseOrMintGas; // ─╯ Maximum amount of gas passed on to token pool when calling releaseOrMint
+  }
+
+  /// @notice RateLimitToken struct containing both the source and destination token addresses
+  struct RateLimitToken {
+    address sourceToken;
+    address destToken;
   }
 
   // STATIC CONFIG
@@ -111,7 +118,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
   // DYNAMIC CONFIG
   DynamicConfig internal s_dynamicConfig;
   /// @dev Tokens that should be included in Aggregate Rate Limiting
-  EnumerableSet.AddressSet internal s_rateLimitedTokens;
+  EnumerableMapAddresses.AddressToAddressMap internal s_rateLimitedTokensDestToSource;
 
   // STATE
   /// @dev The expected nonce for a given sender.
@@ -126,8 +133,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
 
   constructor(
     StaticConfig memory staticConfig,
-    RateLimiter.Config memory rateLimiterConfig,
-    address[] memory rateLimitedTokens
+    RateLimiter.Config memory rateLimiterConfig
   ) OCR2BaseNoChecks() AggregateRateLimiter(rateLimiterConfig) {
     if (staticConfig.onRamp == address(0) || staticConfig.commitStore == address(0)) revert ZeroAddressNotAllowed();
     // Ensures we can never deploy a new offRamp that points to a commitStore that
@@ -142,11 +148,6 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
     i_armProxy = staticConfig.armProxy;
 
     i_metadataHash = _metadataHash(Internal.EVM_2_EVM_MESSAGE_HASH);
-
-    for (uint256 i = 0; i < rateLimitedTokens.length; ++i) {
-      bool success = s_rateLimitedTokens.add(rateLimitedTokens[i]);
-      if (success) emit TokenAggregateRateLimitAdded(rateLimitedTokens[i]);
-    }
   }
 
   // ================================================================
@@ -488,22 +489,35 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
   }
 
   /// @notice Get all tokens which are included in Aggregate Rate Limiting.
-  /// @return rateLimitedTokens Array of Aggregate Rate Limited tokens.
-  function getAllRateLimitTokens() external view returns (address[] memory) {
-    return s_rateLimitedTokens.values();
+  /// @return sourceTokens The source representation of the tokens that are rate limited.
+  /// @return destTokens The destination representation of the tokens that are rate limited.
+  function getAllRateLimitTokens() external view returns (address[] memory sourceTokens, address[] memory destTokens) {
+    uint256 length = s_rateLimitedTokensDestToSource.length();
+    sourceTokens = new address[](length);
+    destTokens = new address[](length);
+    for (uint256 i = 0; i < length; ++i) {
+      (address destToken, address sourceToken) = s_rateLimitedTokensDestToSource.at(i);
+      sourceTokens[i] = sourceToken;
+      destTokens[i] = destToken;
+    }
+
+    return (sourceTokens, destTokens);
   }
 
   /// @notice Adds or removes tokens from being used in Aggregate Rate Limiting.
-  /// @param adds - A list of one or more tokens to be added.
   /// @param removes - A list of one or more tokens to be removed.
-  function updateRateLimitTokens(address[] memory removes, address[] memory adds) external onlyOwner {
-    for (uint256 i = 0; i < adds.length; ++i) {
-      bool success = s_rateLimitedTokens.add(adds[i]);
-      if (success) emit TokenAggregateRateLimitAdded(adds[i]);
-    }
+  /// @param adds - A list of one or more tokens to be added.
+  function updateRateLimitTokens(RateLimitToken[] memory removes, RateLimitToken[] memory adds) external onlyOwner {
     for (uint256 i = 0; i < removes.length; ++i) {
-      bool success = s_rateLimitedTokens.remove(removes[i]);
-      if (success) emit TokenAggregateRateLimitRemoved(removes[i]);
+      if (s_rateLimitedTokensDestToSource.remove(removes[i].destToken)) {
+        emit TokenAggregateRateLimitRemoved(removes[i].sourceToken, removes[i].destToken);
+      }
+    }
+
+    for (uint256 i = 0; i < adds.length; ++i) {
+      if (s_rateLimitedTokensDestToSource.set(adds[i].destToken, adds[i].sourceToken)) {
+        emit TokenAggregateRateLimitAdded(adds[i].sourceToken, adds[i].destToken);
+      }
     }
   }
 
@@ -541,7 +555,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
         revert InvalidAddress(sourceTokenData.destPoolAddress);
       }
 
-      if (s_rateLimitedTokens.contains(destTokenAmounts[i].token)) {
+      if (s_rateLimitedTokensDestToSource.contains(destTokenAmounts[i].token)) {
         value += _getTokenValue(destTokenAmounts[i], IPriceRegistry(s_dynamicConfig.priceRegistry));
       }
 
