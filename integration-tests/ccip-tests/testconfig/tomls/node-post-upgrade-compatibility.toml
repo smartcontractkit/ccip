@@ -25,7 +25,7 @@ Name = 'node-5'
 
 [[CCIP.Env.NewCLCluster.Nodes]]
 Name = 'node-6'
-
+NeedsUpgrade = true
 
 [CCIP.Groups]
 [CCIP.Groups.load]
