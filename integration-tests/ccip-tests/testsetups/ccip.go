@@ -992,8 +992,11 @@ func (o *CCIPTestSetUpOutputs) CreateEnvironment(
 			return nil
 		}
 	} else {
-		// if configureCLNode is false it means we don't need to deploy any additional pods, use a placeholder env to create just the remote runner
-		if value, set := os.LookupEnv(config.EnvVarJobImage); set && value != "" {
+		// if configureCLNode is false it means we don't need to deploy any additional pods,
+		// use a placeholder env to either create just the remote runner in it or to use previously deployed env for upgrade tests.
+		// If envConfig is generated with NoManifestUpdate it means the test will connect to a previously deployed environment.
+		// The upgrade test is generally run on previously deployed environment to upgrade few nodes in DON as part of test.
+		if value, set := os.LookupEnv(config.EnvVarJobImage); set && value != "" || envConfig.NoManifestUpdate {
 			k8Env = environment.New(envConfig)
 			err = k8Env.Run()
 			require.NoErrorf(t, err, "error creating environment remote runner")
