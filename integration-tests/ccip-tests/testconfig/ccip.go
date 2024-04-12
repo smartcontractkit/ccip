@@ -61,6 +61,7 @@ type CCIPTestConfig struct {
 	ExecInflightExpiry                         *config.Duration                      `toml:",omitempty"`
 	OptimizeSpace                              *bool                                 `toml:",omitempty"`
 	SkipRequestIfAnotherRequestTriggeredWithin *config.Duration                      `toml:",omitempty"`
+	StoreLaneConfig                            *bool                                 `toml:",omitempty"`
 }
 
 func (c *CCIPTestConfig) SetTestRunName(name string) {

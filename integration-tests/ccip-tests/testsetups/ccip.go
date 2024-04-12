@@ -1113,7 +1113,9 @@ func createEnvironmentConfig(t *testing.T, envName string, testConfig *CCIPTestC
 		NamespacePrefix:    envName,
 		Test:               t,
 		PreventPodEviction: true,
-		ReportPath:         reportPath,
+	}
+	if pointer.GetBool(testConfig.TestGroupInput.StoreLaneConfig) {
+		envConfig.ReportPath = reportPath
 	}
 	// if there is already existing namespace, no need to update any manifest there, we just connect to it
 	existingEnv := pointer.GetString(testConfig.EnvInput.EnvName)
