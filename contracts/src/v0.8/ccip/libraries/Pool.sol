@@ -39,16 +39,18 @@ library Pool {
     return abi.decode(_removeFirstFourBytes(encodedData), (PoolReturnDataV1));
   }
 
+  uint256 private constant SELECTOR_LENGTH = 4;
+
   /// @notice Removes the first four bytes from the given bytes. This can be used to undo `encodeWithSelector`.
   /// @param _bytes The bytes to remove the first four bytes from.
   /// @dev Can revert if the given bytes are less than four bytes long.
   /// @return trimmedBytes The bytes with the first four bytes removed.
   function _removeFirstFourBytes(bytes memory _bytes) internal pure returns (bytes memory trimmedBytes) {
-    if (_bytes.length < 4) {
+    if (_bytes.length < SELECTOR_LENGTH) {
       revert MalformedPoolReturnData(_bytes);
     }
 
-    uint256 newSliceLength = _bytes.length - 4;
+    uint256 newSliceLength = _bytes.length - SELECTOR_LENGTH;
     assembly {
       // Get a location of some free memory and store it in trimmedBytes as Solidity does for memory variables.
       trimmedBytes := mload(0x40)
@@ -66,7 +68,7 @@ library Pool {
 
       for {
         // Same logic as for mc is applied and additionally the start offset specified for the method is added
-        let cc := add(add(add(_bytes, lengthmod), mul(0x20, iszero(lengthmod))), 0x4)
+        let cc := add(add(add(_bytes, lengthmod), mul(0x20, iszero(lengthmod))), SELECTOR_LENGTH)
       } lt(mc, end) {
         // increase `mc` and `cc` to read the next word from memory
         mc := add(mc, 0x20)
