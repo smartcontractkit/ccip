@@ -125,8 +125,8 @@ func ChainlinkPropsForUpdate(
 				"name": clNode.Name,
 				"chainlink": map[string]any{
 					"image": map[string]any{
-						"image":   pointer.GetString(clNode.ChainlinkImage.Image),
-						"version": pointer.GetString(clNode.ChainlinkImage.Version),
+						"image":   upgradeImage,
+						"version": upgradeTag,
 					},
 				},
 				"toml": tomlStr,
