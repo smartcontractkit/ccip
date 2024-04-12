@@ -14,6 +14,10 @@ library Pool {
     bytes destPoolData;
   }
 
+  ///  @notice Generates the return dataV1 for the burnOrMint pool call.
+  ///  @param remotePoolAddress The address of the remote pool.
+  ///  @param destPoolData The data to send to the remote pool.
+  ///  @return The return data for the burnOrMint pool call.
   function _generatePoolReturnDataV1(
     bytes memory remotePoolAddress,
     bytes memory destPoolData
@@ -38,27 +42,26 @@ library Pool {
   /// @notice Removes the first four bytes from the given bytes. This can be used to undo `encodeWithSelector`.
   /// @param _bytes The bytes to remove the first four bytes from.
   /// @dev Can revert if the given bytes are less than four bytes long.
-  /// @return The bytes with the first four bytes removed.
-  function _removeFirstFourBytes(bytes memory _bytes) internal pure returns (bytes memory) {
+  /// @return trimmedBytes The bytes with the first four bytes removed.
+  function _removeFirstFourBytes(bytes memory _bytes) internal pure returns (bytes memory trimmedBytes) {
     if (_bytes.length < 4) {
       revert MalformedPoolReturnData(_bytes);
     }
 
     uint256 newSliceLength = _bytes.length - 4;
-    bytes memory tempBytes;
     assembly {
-      // Get a location of some free memory and store it in tempBytes as Solidity does for memory variables.
-      tempBytes := mload(0x40)
+      // Get a location of some free memory and store it in trimmedBytes as Solidity does for memory variables.
+      trimmedBytes := mload(0x40)
 
       // Calculate length mod 32 to handle slices that are not a multiple of 32 in size.
       let lengthmod := and(newSliceLength, 31)
 
-      // tempBytes will have the following format in memory: <length><data>
+      // trimmedBytes will have the following format in memory: <length><data>
       // When copying data we will offset the start forward to avoid allocating additional memory
       // Therefore part of the length area will be written, but this will be overwritten later anyways.
-      // In case no offset is require, the start is set to the data region (0x20 from the tempBytes)
+      // In case no offset is require, the start is set to the data region (0x20 from the trimmedBytes)
       // mc will be used to keep track where to copy the data to.
-      let mc := add(add(tempBytes, lengthmod), mul(0x20, iszero(lengthmod)))
+      let mc := add(add(trimmedBytes, lengthmod), mul(0x20, iszero(lengthmod)))
       let end := add(mc, newSliceLength)
 
       for {
@@ -75,7 +78,7 @@ library Pool {
 
       // Store the length of the slice. This will overwrite any partial data that
       // was copied when having slices that are not a multiple of 32.
-      mstore(tempBytes, newSliceLength)
+      mstore(trimmedBytes, newSliceLength)
 
       // update free-memory pointer
       // allocating the array padded to 32 bytes like the compiler does now
@@ -84,6 +87,6 @@ library Pool {
       mstore(0x40, and(add(mc, 31), not(31)))
     }
 
-    return tempBytes;
+    return trimmedBytes;
   }
 }
