@@ -126,7 +126,7 @@ runs:
         cat << EOF > config.toml
         [CCIP]
         [CCIP.Env]
-        EnvName="$EXISTING_NAMESPACE"
+        EnvToConnect="$EXISTING_NAMESPACE"
         [CCIP.Env.NewCLCluster]
         [CCIP.Env.NewCLCluster.Common]
         [CCIP.Env.NewCLCluster.Common.ChainlinkImage]

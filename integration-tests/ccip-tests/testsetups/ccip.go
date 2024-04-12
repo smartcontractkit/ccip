@@ -3,7 +3,6 @@ package testsetups
 import (
 	"context"
 	"fmt"
-	"github.com/rs/zerolog/log"
 	"math/big"
 	"math/rand"
 	"os"
@@ -12,6 +11,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/rs/zerolog/log"
 
 	testutils "github.com/smartcontractkit/ccip/integration-tests/ccip-tests/utils"
 
@@ -956,12 +957,13 @@ func (o *CCIPTestSetUpOutputs) CreateEnvironment(
 
 	envConfig := createEnvironmentConfig(t, envName, testConfig, reportPath)
 
-	configureCLNode := !testConfig.useExistingDeployment()
+	configureCLNode := !testConfig.useExistingDeployment() || pointer.GetString(testConfig.EnvInput.EnvToConnect) != ""
 	namespace := o.Cfg.TestGroupInput.TestRunName
 	require.False(t, testConfig.localCluster() && testConfig.ExistingCLCluster(),
 		"local cluster and existing cluster cannot be true at the same time")
+	// if it's a new deployment, deploy the env
+	// Or if EnvToConnect is given connect to that k8 environment
 	if configureCLNode {
-		// if it's a new deployment, deploy the env
 		if !testConfig.ExistingCLCluster() {
 			// if it's a local cluster, deploy the local cluster in docker
 			if testConfig.localCluster() {
@@ -995,10 +997,8 @@ func (o *CCIPTestSetUpOutputs) CreateEnvironment(
 		}
 	} else {
 		// if configureCLNode is false it means we don't need to deploy any additional pods,
-		// use a placeholder env to either create just the remote runner in it or to use previously deployed env for upgrade tests.
-		// If envConfig is generated with NoManifestUpdate it means the test will connect to a previously deployed environment.
-		// The upgrade test is generally run on previously deployed environment to upgrade few nodes in DON as part of test.
-		if value, set := os.LookupEnv(config.EnvVarJobImage); set && value != "" || envConfig.NoManifestUpdate {
+		// use a placeholder env to create just the remote runner in it.
+		if value, set := os.LookupEnv(config.EnvVarJobImage); set && value != "" {
 			k8Env = environment.New(envConfig)
 			err = k8Env.Run()
 			require.NoErrorf(t, err, "error creating environment remote runner")
@@ -1124,7 +1124,7 @@ func createEnvironmentConfig(t *testing.T, envName string, testConfig *CCIPTestC
 		envConfig.ReportPath = reportPath
 	}
 	// if there is already existing namespace, no need to update any manifest there, we just connect to it
-	existingEnv := pointer.GetString(testConfig.EnvInput.EnvName)
+	existingEnv := pointer.GetString(testConfig.EnvInput.EnvToConnect)
 	if existingEnv != "" {
 		envConfig.Namespace = existingEnv
 		envConfig.NamespacePrefix = ""

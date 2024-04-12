@@ -166,7 +166,7 @@ func NewConfig() (*Config, error) {
 // It contains generic DON and networks config which can be applied to all product based tests.
 type Common struct {
 	EnvUser                 string                               `toml:",omitempty"`
-	EnvName                 *string                              `toml:",omitempty"`
+	EnvToConnect            *string                              `toml:",omitempty"`
 	TTL                     *config.Duration                     `toml:",omitempty"`
 	ExistingCLCluster       *CLCluster                           `toml:",omitempty"` // ExistingCLCluster is the existing chainlink cluster to use, if specified it will be used instead of creating a new one
 	Mockserver              *string                              `toml:",omitempty"`
