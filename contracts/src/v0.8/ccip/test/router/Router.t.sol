@@ -47,25 +47,25 @@ contract Router_recoverTokens is EVM2EVMOnRampSetup {
     assertEq(address(s_sourceRouter).balance, 0);
   }
 
-  function test_RecoverTokensNonOwnerReverts() public {
+  function test_RecoverTokensNonOwner_Revert() public {
     // Reverts if not owner
     vm.startPrank(STRANGER);
     vm.expectRevert("Only callable by owner");
     s_sourceRouter.recoverTokens(address(0), STRANGER, 1);
   }
 
-  function test_RecoverTokensInvalidRecipientReverts() public {
+  function test_RecoverTokensInvalidRecipient_Revert() public {
     vm.expectRevert(abi.encodeWithSelector(Router.InvalidRecipientAddress.selector, address(0)));
     s_sourceRouter.recoverTokens(address(0), address(0), 1);
   }
 
-  function test_RecoverTokensNoFundsReverts() public {
+  function test_RecoverTokensNoFunds_Revert() public {
     // Reverts if no funds present
     vm.expectRevert();
     s_sourceRouter.recoverTokens(address(0), OWNER, 10);
   }
 
-  function test_RecoverTokensValueReceiverReverts() public {
+  function test_RecoverTokensValueReceiver_Revert() public {
     MaybeRevertMessageReceiver revertingValueReceiver = new MaybeRevertMessageReceiver(true);
     deal(address(s_sourceRouter), 10);
 
@@ -298,14 +298,14 @@ contract Router_ccipSend is EVM2EVMOnRampSetup {
 
   // Reverts
 
-  function test_WhenNotHealthyReverts() public {
+  function test_WhenNotHealthy_Revert() public {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
     s_mockARM.voteToCurse(bytes32(0));
     vm.expectRevert(Router.BadARMSignal.selector);
     s_sourceRouter.ccipSend(DEST_CHAIN_SELECTOR, message);
   }
 
-  function test_UnsupportedDestinationChainReverts() public {
+  function test_UnsupportedDestinationChain_Revert() public {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
     uint64 wrongChain = DEST_CHAIN_SELECTOR + 1;
 
@@ -346,7 +346,7 @@ contract Router_ccipSend is EVM2EVMOnRampSetup {
     s_sourceRouter.ccipSend(DEST_CHAIN_SELECTOR, message);
   }
 
-  function test_FeeTokenAmountTooLowReverts() public {
+  function test_FeeTokenAmountTooLow_Revert() public {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
     IERC20(s_sourceTokens[0]).approve(address(s_sourceRouter), 0);
 
@@ -637,7 +637,7 @@ contract Router_applyRampUpdates is RouterSetup {
     assertTrue(s_sourceRouter.isChainSupported(DEST_CHAIN_SELECTOR));
   }
 
-  function test_OnlyOwnerReverts() public {
+  function test_OnlyOwner_Revert() public {
     vm.stopPrank();
     vm.expectRevert("Only callable by owner");
     Router.OnRamp[] memory onRampUpdates = new Router.OnRamp[](0);
@@ -645,7 +645,7 @@ contract Router_applyRampUpdates is RouterSetup {
     s_sourceRouter.applyRampUpdates(onRampUpdates, offRampUpdates, offRampUpdates);
   }
 
-  function test_OffRampMismatchReverts() public {
+  function test_OffRampMismatch_Revert() public {
     address offRamp = address(uint160(2));
 
     Router.OnRamp[] memory onRampUpdates = new Router.OnRamp[](0);
@@ -671,7 +671,7 @@ contract Router_setWrappedNative is EVM2EVMOnRampSetup {
   }
 
   // Reverts
-  function test_OnlyOwnerReverts() public {
+  function test_OnlyOwner_Revert() public {
     vm.stopPrank();
     vm.expectRevert("Only callable by owner");
     s_sourceRouter.setWrappedNative(address(1));
@@ -860,7 +860,7 @@ contract Router_routeMessage is EVM2EVMOffRampSetup {
   }
 
   // Reverts
-  function test_OnlyOffRampReverts() public {
+  function test_OnlyOffRamp_Revert() public {
     vm.stopPrank();
     vm.startPrank(STRANGER);
 
@@ -870,7 +870,7 @@ contract Router_routeMessage is EVM2EVMOffRampSetup {
     );
   }
 
-  function test_WhenNotHealthyReverts() public {
+  function test_WhenNotHealthy_Revert() public {
     s_mockARM.voteToCurse(bytes32(0));
     vm.expectRevert(Router.BadARMSignal.selector);
     s_destRouter.routeMessage(
@@ -888,7 +888,7 @@ contract Router_getFee is EVM2EVMOnRampSetup {
   }
 
   // Reverts
-  function test_UnsupportedDestinationChainReverts() public {
+  function test_UnsupportedDestinationChain_Revert() public {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
 
     vm.expectRevert(abi.encodeWithSelector(IRouterClient.UnsupportedDestinationChain.selector, 999));

@@ -133,7 +133,7 @@ contract ARM_voteToBlessRoots is ARMSetup {
 
   // Reverts
 
-  function test_CurseReverts() public {
+  function test_Curse_Revert() public {
     ARM.Config memory cfg = armConstructorArgs();
 
     for (uint256 i = 0; i < cfg.voters.length; i++) {
@@ -146,7 +146,7 @@ contract ARM_voteToBlessRoots is ARMSetup {
     s_arm.voteToBless(makeTaggedRootSingleton(12903));
   }
 
-  function test_InvalidVoterReverts() public {
+  function test_InvalidVoter_Revert() public {
     vm.startPrank(STRANGER);
     vm.expectRevert(abi.encodeWithSelector(ARM.InvalidVoter.selector, STRANGER));
     s_arm.voteToBless(makeTaggedRootSingleton(12321));
@@ -270,7 +270,7 @@ contract ARM_unvoteToCurse is ARMSetup {
     s_arm.ownerUnvoteToCurse(records);
   }
 
-  function test_InvalidCurseStateReverts() public {
+  function test_InvalidCurseState_Revert() public {
     ARM.Config memory cfg = armConstructorArgs();
     vm.startPrank(cfg.voters[1].curseUnvoteAddr);
 
@@ -411,14 +411,14 @@ contract ARM_voteToCurse is ARMSetup {
 
   // Reverts
 
-  function test_InvalidVoterReverts() public {
+  function test_InvalidVoter_Revert() public {
     vm.startPrank(STRANGER);
 
     vm.expectRevert(abi.encodeWithSelector(ARM.InvalidVoter.selector, STRANGER));
     s_arm.voteToCurse(makeCurseId(12312));
   }
 
-  function test_AlreadyVotedReverts() public {
+  function test_AlreadyVoted_Revert() public {
     (address voter,) = _getFirstCurseVoterAndWeight();
     vm.startPrank(voter);
     s_arm.voteToCurse(makeCurseId(1));
@@ -532,7 +532,7 @@ contract ARM_ownerUnvoteToCurse is ARMSetup {
 
   // Reverts
 
-  function test_NonOwnerReverts() public {
+  function test_NonOwner_Revert() public {
     vm.startPrank(STRANGER);
     vm.expectRevert("Only callable by owner");
     ownerUnvoteToCurse();
@@ -581,7 +581,7 @@ contract ARM_setConfig is ConfigCompare, ARMSetup {
 
   event ConfigSet(uint32 indexed configVersion, ARM.Config config);
 
-  function test_VoteToBlessByEjectedVoterReverts() public {
+  function test_VoteToBlessByEjectedVoter_Revert() public {
     // Previous config included BLESS_VOTER_4. Change to new config that doesn't.
     ARM.Config memory cfg = getDifferentConfigArgs();
     vm.startPrank(OWNER);
@@ -630,7 +630,7 @@ contract ARM_setConfig is ConfigCompare, ARMSetup {
 
   // Reverts
 
-  function test_NonOwnerReverts() public {
+  function test_NonOwner_Revert() public {
     ARM.Config memory cfg = getDifferentConfigArgs();
 
     vm.startPrank(STRANGER);
@@ -638,13 +638,13 @@ contract ARM_setConfig is ConfigCompare, ARMSetup {
     s_arm.setConfig(cfg);
   }
 
-  function test_VotersLengthIsZeroReverts() public {
+  function test_VotersLengthIsZero_Revert() public {
     vm.startPrank(OWNER);
     vm.expectRevert(ARM.InvalidConfig.selector);
     s_arm.setConfig(ARM.Config({voters: new ARM.Voter[](0), blessWeightThreshold: 1, curseWeightThreshold: 1}));
   }
 
-  function test_EitherThresholdIsZeroReverts() public {
+  function test_EitherThresholdIsZero_Revert() public {
     ARM.Config memory cfg = getDifferentConfigArgs();
 
     vm.startPrank(OWNER);
@@ -658,7 +658,7 @@ contract ARM_setConfig is ConfigCompare, ARMSetup {
     );
   }
 
-  function test_BlessVoterIsZeroAddressReverts() public {
+  function test_BlessVoterIsZeroAddress_Revert() public {
     ARM.Config memory cfg = getDifferentConfigArgs();
 
     vm.startPrank(OWNER);
@@ -667,7 +667,7 @@ contract ARM_setConfig is ConfigCompare, ARMSetup {
     s_arm.setConfig(cfg);
   }
 
-  function test_WeightIsZeroAddressReverts() public {
+  function test_WeightIsZeroAddress_Revert() public {
     ARM.Config memory cfg = getDifferentConfigArgs();
 
     vm.startPrank(OWNER);
@@ -677,7 +677,7 @@ contract ARM_setConfig is ConfigCompare, ARMSetup {
     s_arm.setConfig(cfg);
   }
 
-  function test_TotalWeightsSmallerThanEachThresholdReverts() public {
+  function test_TotalWeightsSmallerThanEachThreshold_Revert() public {
     ARM.Config memory cfg = getDifferentConfigArgs();
 
     vm.startPrank(OWNER);
@@ -691,7 +691,7 @@ contract ARM_setConfig is ConfigCompare, ARMSetup {
     );
   }
 
-  function test_RepeatedAddressReverts() public {
+  function test_RepeatedAddress_Revert() public {
     ARM.Config memory cfg = getDifferentConfigArgs();
 
     vm.startPrank(OWNER);

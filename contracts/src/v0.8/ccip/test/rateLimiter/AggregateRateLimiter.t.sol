@@ -66,7 +66,7 @@ contract AggregateTokenLimiter_setAdmin is AggregateTokenLimiterSetup {
 
   // Reverts
 
-  function test_OnlyOwnerOrAdminReverts() public {
+  function test_OnlyOwnerOrAdmin_Revert() public {
     vm.startPrank(STRANGER);
     vm.expectRevert(RateLimiter.OnlyCallableByAdminOrOwner.selector);
 
@@ -114,7 +114,7 @@ contract AggregateTokenLimiter_getTokenBucket is AggregateTokenLimiterSetup {
 
   // Reverts
 
-  function test_TimeUnderflowReverts() public {
+  function test_TimeUnderflow_Revert() public {
     vm.warp(BLOCK_TIME - 1);
 
     vm.expectRevert(stdError.arithmeticError);
@@ -159,7 +159,7 @@ contract AggregateTokenLimiter_setRateLimiterConfig is AggregateTokenLimiterSetu
 
   // Reverts
 
-  function test_OnlyOnlyCallableByAdminOrOwnerReverts() public {
+  function test_OnlyOnlyCallableByAdminOrOwner_Revert() public {
     vm.startPrank(STRANGER);
 
     vm.expectRevert(RateLimiter.OnlyCallableByAdminOrOwner.selector);
@@ -217,12 +217,12 @@ contract AggregateTokenLimiter__rateLimitValue is AggregateTokenLimiterSetup {
 
   // Reverts
 
-  function test_UnknownTokenReverts() public {
+  function test_UnknownToken_Revert() public {
     vm.expectRevert(abi.encodeWithSelector(AggregateRateLimiter.PriceNotFoundForToken.selector, address(0)));
     s_rateLimiter.rateLimitValue(new Client.EVMTokenAmount[](1), s_priceRegistry);
   }
 
-  function test_AggregateValueMaxCapacityExceededReverts() public {
+  function test_AggregateValueMaxCapacityExceeded_Revert() public {
     RateLimiter.TokenBucket memory bucket = s_rateLimiter.currentRateLimiterState();
 
     Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);

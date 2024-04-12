@@ -69,7 +69,7 @@ contract LockReleaseTokenPool_setRebalancer is LockReleaseTokenPoolSetup {
     assertEq(address(s_lockReleaseTokenPool.getRebalancer()), STRANGER);
   }
 
-  function test_SetRebalancerReverts() public {
+  function test_SetRebalancer_Revert() public {
     vm.startPrank(STRANGER);
 
     vm.expectRevert("Only callable by owner");
@@ -112,7 +112,7 @@ contract LockReleaseTokenPool_lockOrBurn is LockReleaseTokenPoolSetup {
     s_lockReleaseTokenPoolWithAllowList.lockOrBurn(s_allowedList[1], bytes(""), amount, DEST_CHAIN_SELECTOR, bytes(""));
   }
 
-  function test_LockOrBurnWithAllowListReverts() public {
+  function test_LockOrBurnWithAllowList_Revert() public {
     vm.startPrank(s_allowedOnRamp);
 
     vm.expectRevert(abi.encodeWithSelector(SenderNotAllowed.selector, STRANGER));
@@ -120,7 +120,7 @@ contract LockReleaseTokenPool_lockOrBurn is LockReleaseTokenPoolSetup {
     s_lockReleaseTokenPoolWithAllowList.lockOrBurn(STRANGER, bytes(""), 100, DEST_CHAIN_SELECTOR, bytes(""));
   }
 
-  function test_PoolBurnRevertNotHealthyReverts() public {
+  function test_PoolBurnRevertNotHealthy_Revert() public {
     // Should not burn tokens if cursed.
     s_mockARM.voteToCurse(bytes32(0));
     uint256 before = s_token.balanceOf(address(s_lockReleaseTokenPoolWithAllowList));
@@ -219,7 +219,7 @@ contract LockReleaseTokenPool_releaseOrMint is LockReleaseTokenPoolSetup {
     );
   }
 
-  function test_ChainNotAllowedReverts() public {
+  function test_ChainNotAllowed_Revert() public {
     address notAllowedRemotePoolAddress = address(1);
 
     TokenPool.ChainUpdate[] memory chainUpdate = new TokenPool.ChainUpdate[](1);
@@ -250,7 +250,7 @@ contract LockReleaseTokenPool_releaseOrMint is LockReleaseTokenPoolSetup {
     );
   }
 
-  function test_PoolMintNotHealthyReverts() public {
+  function test_PoolMintNotHealthy_Revert() public {
     // Should not mint tokens if cursed.
     s_mockARM.voteToCurse(bytes32(0));
     uint256 before = s_token.balanceOf(OWNER);
@@ -286,7 +286,7 @@ contract LockReleaseTokenPool_provideLiquidity is LockReleaseTokenPoolSetup {
 
   // Reverts
 
-  function test_UnauthorizedReverts() public {
+  function test_Unauthorized_Revert() public {
     vm.startPrank(STRANGER);
     vm.expectRevert(abi.encodeWithSelector(LockReleaseTokenPool.Unauthorized.selector, STRANGER));
 
@@ -299,7 +299,7 @@ contract LockReleaseTokenPool_provideLiquidity is LockReleaseTokenPoolSetup {
     s_lockReleaseTokenPool.provideLiquidity(amount);
   }
 
-  function test_LiquidityNotAcceptedReverts() public {
+  function test_LiquidityNotAccepted_Revert() public {
     s_lockReleaseTokenPool =
       new LockReleaseTokenPool(s_token, new address[](0), address(s_mockARM), false, address(s_sourceRouter));
 
@@ -321,14 +321,14 @@ contract LockReleaseTokenPool_withdrawalLiquidity is LockReleaseTokenPoolSetup {
 
   // Reverts
 
-  function test_UnauthorizedReverts() public {
+  function test_Unauthorized_Revert() public {
     vm.startPrank(STRANGER);
     vm.expectRevert(abi.encodeWithSelector(LockReleaseTokenPool.Unauthorized.selector, STRANGER));
 
     s_lockReleaseTokenPool.withdrawLiquidity(1);
   }
 
-  function test_InsufficientLiquidityReverts() public {
+  function test_InsufficientLiquidity_Revert() public {
     uint256 maxUint256 = 2 ** 256 - 1;
     s_token.approve(address(s_lockReleaseTokenPool), maxUint256);
     s_lockReleaseTokenPool.provideLiquidity(maxUint256);
@@ -415,7 +415,7 @@ contract LockReleaseTokenPool_setChainRateLimiterConfig is LockReleaseTokenPoolS
     assertEq(bucket.lastUpdated, newTime);
   }
 
-  function test_OnlyOwnerOrRateLimitAdminReverts() public {
+  function test_OnlyOwnerOrRateLimitAdmin_Revert() public {
     address rateLimiterAdmin = address(28973509103597907);
 
     s_lockReleaseTokenPool.setRateLimitAdmin(rateLimiterAdmin);
@@ -435,7 +435,7 @@ contract LockReleaseTokenPool_setChainRateLimiterConfig is LockReleaseTokenPoolS
 
   // Reverts
 
-  function test_OnlyOwnerReverts() public {
+  function test_OnlyOwner_Revert() public {
     vm.startPrank(STRANGER);
 
     vm.expectRevert(abi.encodeWithSelector(LockReleaseTokenPool.Unauthorized.selector, STRANGER));
@@ -444,7 +444,7 @@ contract LockReleaseTokenPool_setChainRateLimiterConfig is LockReleaseTokenPoolS
     );
   }
 
-  function test_NonExistentChainReverts() public {
+  function test_NonExistentChain_Revert() public {
     uint64 wrongChainSelector = 9084102894;
 
     vm.expectRevert(abi.encodeWithSelector(TokenPool.NonExistentChain.selector, wrongChainSelector));
@@ -463,7 +463,7 @@ contract LockReleaseTokenPool_setRateLimitAdmin is LockReleaseTokenPoolSetup {
 
   // Reverts
 
-  function test_SetRateLimitAdminReverts() public {
+  function test_SetRateLimitAdmin_Revert() public {
     vm.startPrank(STRANGER);
 
     vm.expectRevert("Only callable by owner");

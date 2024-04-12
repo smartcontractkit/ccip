@@ -211,7 +211,7 @@ contract RateLimiter_consume is RateLimiterSetup {
 
   // Reverts
 
-  function test_AggregateValueMaxCapacityExceededReverts() public {
+  function test_AggregateValueMaxCapacityExceeded_Revert() public {
     RateLimiter.TokenBucket memory rateLimiter = s_helper.getRateLimiter();
 
     vm.expectRevert(
@@ -222,7 +222,7 @@ contract RateLimiter_consume is RateLimiterSetup {
     s_helper.consume(rateLimiter.capacity + 1, address(0));
   }
 
-  function test_TokenMaxCapacityExceededReverts() public {
+  function test_TokenMaxCapacityExceeded_Revert() public {
     RateLimiter.TokenBucket memory rateLimiter = s_helper.getRateLimiter();
 
     vm.expectRevert(
@@ -233,7 +233,7 @@ contract RateLimiter_consume is RateLimiterSetup {
     s_helper.consume(rateLimiter.capacity + 1, s_token);
   }
 
-  function test_ConsumingMoreThanUint128Reverts() public {
+  function test_ConsumingMoreThanUint128_Revert() public {
     RateLimiter.TokenBucket memory rateLimiter = s_helper.getRateLimiter();
 
     uint256 request = uint256(type(uint128).max) + 1;
@@ -244,7 +244,7 @@ contract RateLimiter_consume is RateLimiterSetup {
     s_helper.consume(request, address(0));
   }
 
-  function test_AggregateValueRateLimitReachedReverts() public {
+  function test_AggregateValueRateLimitReached_Revert() public {
     RateLimiter.TokenBucket memory rateLimiter = s_helper.getRateLimiter();
 
     uint256 overLimit = 20;
@@ -263,7 +263,7 @@ contract RateLimiter_consume is RateLimiterSetup {
     s_helper.consume(requestTokens2, address(0));
   }
 
-  function test_TokenRateLimitReachedReverts() public {
+  function test_TokenRateLimitReached_Revert() public {
     RateLimiter.TokenBucket memory rateLimiter = s_helper.getRateLimiter();
 
     uint256 overLimit = 20;
@@ -282,7 +282,7 @@ contract RateLimiter_consume is RateLimiterSetup {
     s_helper.consume(requestTokens2, s_token);
   }
 
-  function test_RateLimitReachedOverConsecutiveBlocksReverts() public {
+  function test_RateLimitReachedOverConsecutiveBlocks_Revert() public {
     uint256 initBlockTime = BLOCK_TIME + 10000;
     vm.warp(initBlockTime);
 

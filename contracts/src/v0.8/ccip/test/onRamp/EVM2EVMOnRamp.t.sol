@@ -178,7 +178,7 @@ contract EVM2EVMOnRamp_payNops is EVM2EVMNopsFeeSetup {
 
   // Reverts
 
-  function test_InsufficientBalanceReverts() public {
+  function test_InsufficientBalance_Revert() public {
     vm.startPrank(address(s_onRamp));
     IERC20(s_sourceFeeToken).transfer(OWNER, IERC20(s_sourceFeeToken).balanceOf(address(s_onRamp)));
     vm.startPrank(OWNER);
@@ -186,21 +186,21 @@ contract EVM2EVMOnRamp_payNops is EVM2EVMNopsFeeSetup {
     s_onRamp.payNops();
   }
 
-  function test_WrongPermissionsReverts() public {
+  function test_WrongPermissions_Revert() public {
     vm.startPrank(STRANGER);
 
     vm.expectRevert(EVM2EVMOnRamp.OnlyCallableByOwnerOrAdminOrNop.selector);
     s_onRamp.payNops();
   }
 
-  function test_NoFeesToPayReverts() public {
+  function test_NoFeesToPay_Revert() public {
     vm.startPrank(OWNER);
     s_onRamp.payNops();
     vm.expectRevert(EVM2EVMOnRamp.NoFeesToPay.selector);
     s_onRamp.payNops();
   }
 
-  function test_NoNopsToPayReverts() public {
+  function test_NoNopsToPay_Revert() public {
     vm.startPrank(OWNER);
     EVM2EVMOnRamp.NopAndWeight[] memory nopsAndWeights = new EVM2EVMOnRamp.NopAndWeight[](0);
     s_onRamp.setNops(nopsAndWeights);
@@ -377,7 +377,7 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
 
   // Reverts
 
-  function test_PausedReverts() public {
+  function test_Paused_Revert() public {
     // We pause by disabling the whitelist
     vm.stopPrank();
     vm.startPrank(OWNER);
@@ -387,7 +387,7 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, _generateEmptyMessage(), 0, OWNER);
   }
 
-  function test_InvalidExtraArgsTagReverts() public {
+  function test_InvalidExtraArgsTag_Revert() public {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
     message.extraArgs = bytes("bad args");
 
@@ -396,25 +396,25 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 0, OWNER);
   }
 
-  function test_UnhealthyReverts() public {
+  function test_Unhealthy_Revert() public {
     s_mockARM.voteToCurse(0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff);
     vm.expectRevert(EVM2EVMOnRamp.BadARMSignal.selector);
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, _generateEmptyMessage(), 0, OWNER);
   }
 
-  function test_PermissionsReverts() public {
+  function test_Permissions_Revert() public {
     vm.stopPrank();
     vm.startPrank(OWNER);
     vm.expectRevert(EVM2EVMOnRamp.MustBeCalledByRouter.selector);
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, _generateEmptyMessage(), 0, OWNER);
   }
 
-  function test_OriginalSenderReverts() public {
+  function test_OriginalSender_Revert() public {
     vm.expectRevert(EVM2EVMOnRamp.RouterMustSetOriginalSender.selector);
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, _generateEmptyMessage(), 0, address(0));
   }
 
-  function test_MessageTooLargeReverts() public {
+  function test_MessageTooLarge_Revert() public {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
     message.data = new bytes(MAX_DATA_SIZE + 1);
     vm.expectRevert(abi.encodeWithSelector(EVM2EVMOnRamp.MessageTooLarge.selector, MAX_DATA_SIZE, message.data.length));
@@ -422,7 +422,7 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 0, STRANGER);
   }
 
-  function test_TooManyTokensReverts() public {
+  function test_TooManyTokens_Revert() public {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
     uint256 tooMany = MAX_TOKENS_LENGTH + 1;
     message.tokenAmounts = new Client.EVMTokenAmount[](tooMany);
@@ -430,7 +430,7 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 0, STRANGER);
   }
 
-  function test_CannotSendZeroTokensReverts() public {
+  function test_CannotSendZeroTokens_Revert() public {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
     message.tokenAmounts = new Client.EVMTokenAmount[](1);
     message.tokenAmounts[0].amount = 0;
@@ -439,7 +439,7 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 0, STRANGER);
   }
 
-  function test_UnsupportedTokenReverts() public {
+  function test_UnsupportedToken_Revert() public {
     address wrongToken = address(1);
 
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
@@ -462,7 +462,7 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 0, OWNER);
   }
 
-  function test_MaxCapacityExceededReverts() public {
+  function test_MaxCapacityExceeded_Revert() public {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
     message.tokenAmounts = new Client.EVMTokenAmount[](1);
     message.tokenAmounts[0].amount = 2 ** 128;
@@ -481,7 +481,7 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 0, OWNER);
   }
 
-  function test_PriceNotFoundForTokenReverts() public {
+  function test_PriceNotFoundForToken_Revert() public {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
 
     address fakeToken = address(1);
@@ -495,14 +495,14 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
   }
 
   // Asserts gasLimit must be <=maxGasLimit
-  function test_MessageGasLimitTooHighReverts() public {
+  function test_MessageGasLimitTooHigh_Revert() public {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
     message.extraArgs = Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: MAX_GAS_LIMIT + 1}));
     vm.expectRevert(abi.encodeWithSelector(EVM2EVMOnRamp.MessageGasLimitTooHigh.selector));
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 0, OWNER);
   }
 
-  function test_InvalidAddressEncodePackedReverts() public {
+  function test_InvalidAddressEncodePacked_Revert() public {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
     message.receiver = abi.encodePacked(address(234));
 
@@ -511,7 +511,7 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 1, OWNER);
   }
 
-  function test_InvalidAddressReverts() public {
+  function test_InvalidAddress_Revert() public {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
     message.receiver = abi.encode(type(uint208).max);
 
@@ -521,7 +521,7 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
   }
 
   // We disallow sending to addresses 0-9.
-  function test_ZeroAddressReceiverReverts() public {
+  function test_ZeroAddressReceiver_Revert() public {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
 
     for (uint160 i = 0; i < 10; ++i) {
@@ -533,7 +533,7 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
     }
   }
 
-  function test_MaxFeeBalanceReachedReverts() public {
+  function test_MaxFeeBalanceReached_Revert() public {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
 
     vm.expectRevert(EVM2EVMOnRamp.MaxFeeBalanceReached.selector);
@@ -541,7 +541,7 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, MAX_NOP_FEES_JUELS + 1, OWNER);
   }
 
-  function test_InvalidChainSelectorReverts() public {
+  function test_InvalidChainSelector_Revert() public {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
 
     uint64 wrongChainSelector = DEST_CHAIN_SELECTOR + 1;
@@ -550,7 +550,7 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
     s_onRamp.forwardFromRouter(wrongChainSelector, message, 1, OWNER);
   }
 
-  function test_SourceTokenDataTooLargeReverts() public {
+  function test_SourceTokenDataTooLarge_Revert() public {
     address sourceETH = s_sourceTokens[1];
     vm.stopPrank();
     vm.startPrank(OWNER);
@@ -1071,7 +1071,7 @@ contract EVM2EVMOnRamp_getTokenTransferCost is EVM2EVMOnRamp_getFeeSetup {
 
   // reverts
 
-  function test_UnsupportedTokenReverts() public {
+  function test_UnsupportedToken_Revert() public {
     address NOT_SUPPORTED_TOKEN = address(123);
     Client.EVM2AnyMessage memory message = _generateSingleTokenMessage(NOT_SUPPORTED_TOKEN, 200000e18);
 
@@ -1080,7 +1080,7 @@ contract EVM2EVMOnRamp_getTokenTransferCost is EVM2EVMOnRamp_getFeeSetup {
     s_onRamp.getTokenTransferCost(message.feeToken, s_feeTokenPrice, message.tokenAmounts);
   }
 
-  function test_ValidatedPriceStalenessReverts() public {
+  function test_ValidatedPriceStaleness_Revert() public {
     vm.warp(block.timestamp + TWELVE_HOURS + 1);
 
     Client.EVM2AnyMessage memory message = _generateSingleTokenMessage(s_sourceFeeToken, 1e36);
@@ -1252,7 +1252,7 @@ contract EVM2EVMOnRamp_getFee is EVM2EVMOnRamp_getFeeSetup {
 
   // Reverts
 
-  function test_NotAFeeTokenReverts() public {
+  function test_NotAFeeToken_Revert() public {
     address notAFeeToken = address(0x111111);
     Client.EVM2AnyMessage memory message = _generateSingleTokenMessage(notAFeeToken, 1);
     message.feeToken = notAFeeToken;
@@ -1262,7 +1262,7 @@ contract EVM2EVMOnRamp_getFee is EVM2EVMOnRamp_getFeeSetup {
     s_onRamp.getFee(DEST_CHAIN_SELECTOR, message);
   }
 
-  function test_MessageTooLargeReverts() public {
+  function test_MessageTooLarge_Revert() public {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
     message.data = new bytes(MAX_DATA_SIZE + 1);
     vm.expectRevert(abi.encodeWithSelector(EVM2EVMOnRamp.MessageTooLarge.selector, MAX_DATA_SIZE, message.data.length));
@@ -1270,7 +1270,7 @@ contract EVM2EVMOnRamp_getFee is EVM2EVMOnRamp_getFeeSetup {
     s_onRamp.getFee(DEST_CHAIN_SELECTOR, message);
   }
 
-  function test_TooManyTokensReverts() public {
+  function test_TooManyTokens_Revert() public {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
     uint256 tooMany = MAX_TOKENS_LENGTH + 1;
     message.tokenAmounts = new Client.EVMTokenAmount[](tooMany);
@@ -1279,7 +1279,7 @@ contract EVM2EVMOnRamp_getFee is EVM2EVMOnRamp_getFeeSetup {
   }
 
   // Asserts gasLimit must be <=maxGasLimit
-  function test_MessageGasLimitTooHighReverts() public {
+  function test_MessageGasLimitTooHigh_Revert() public {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
     message.extraArgs = Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: MAX_GAS_LIMIT + 1}));
     vm.expectRevert(abi.encodeWithSelector(EVM2EVMOnRamp.MessageGasLimitTooHigh.selector));
@@ -1368,7 +1368,7 @@ contract EVM2EVMOnRamp_setNops is EVM2EVMOnRampSetup {
 
   // Reverts
 
-  function test_NotEnoughFundsForPayoutReverts() public {
+  function test_NotEnoughFundsForPayout_Revert() public {
     uint96 nopFeesJuels = MAX_NOP_FEES_JUELS;
     // Set Nop fee juels but don't transfer LINK. This can happen when users
     // pay in non-link tokens.
@@ -1381,14 +1381,14 @@ contract EVM2EVMOnRamp_setNops is EVM2EVMOnRampSetup {
     s_onRamp.setNops(getNopsAndWeights());
   }
 
-  function test_NonOwnerOrAdminReverts() public {
+  function test_NonOwnerOrAdmin_Revert() public {
     EVM2EVMOnRamp.NopAndWeight[] memory nopsAndWeights = getNopsAndWeights();
     vm.startPrank(STRANGER);
     vm.expectRevert(EVM2EVMOnRamp.OnlyCallableByOwnerOrAdmin.selector);
     s_onRamp.setNops(nopsAndWeights);
   }
 
-  function test_LinkTokenCannotBeNopReverts() public {
+  function test_LinkTokenCannotBeNop_Revert() public {
     EVM2EVMOnRamp.NopAndWeight[] memory nopsAndWeights = getNopsAndWeights();
     nopsAndWeights[0].nop = address(s_sourceTokens[0]);
 
@@ -1397,7 +1397,7 @@ contract EVM2EVMOnRamp_setNops is EVM2EVMOnRampSetup {
     s_onRamp.setNops(nopsAndWeights);
   }
 
-  function test_ZeroAddressCannotBeNopReverts() public {
+  function test_ZeroAddressCannotBeNop_Revert() public {
     EVM2EVMOnRamp.NopAndWeight[] memory nopsAndWeights = getNopsAndWeights();
     nopsAndWeights[0].nop = address(0);
 
@@ -1406,7 +1406,7 @@ contract EVM2EVMOnRamp_setNops is EVM2EVMOnRampSetup {
     s_onRamp.setNops(nopsAndWeights);
   }
 
-  function test_TooManyNopsReverts() public {
+  function test_TooManyNops_Revert() public {
     EVM2EVMOnRamp.NopAndWeight[] memory nopsAndWeights = new EVM2EVMOnRamp.NopAndWeight[](257);
 
     vm.expectRevert(EVM2EVMOnRamp.TooManyNops.selector);
@@ -1479,7 +1479,7 @@ contract EVM2EVMOnRamp_withdrawNonLinkFees is EVM2EVMOnRampSetup {
 
   // Reverts
 
-  function test_LinkBalanceNotSettledReverts() public {
+  function test_LinkBalanceNotSettled_Revert() public {
     // Set Nop fee juels
     uint96 nopFeesJuels = 10000000;
     vm.startPrank(address(s_sourceRouter));
@@ -1491,14 +1491,14 @@ contract EVM2EVMOnRamp_withdrawNonLinkFees is EVM2EVMOnRampSetup {
     s_onRamp.withdrawNonLinkFees(address(s_token), address(this));
   }
 
-  function test_NonOwnerOrAdminReverts() public {
+  function test_NonOwnerOrAdmin_Revert() public {
     vm.startPrank(STRANGER);
 
     vm.expectRevert(EVM2EVMOnRamp.OnlyCallableByOwnerOrAdmin.selector);
     s_onRamp.withdrawNonLinkFees(address(s_token), address(this));
   }
 
-  function test_WithdrawToZeroAddressReverts() public {
+  function test_WithdrawToZeroAddress_Revert() public {
     vm.expectRevert(EVM2EVMOnRamp.InvalidWithdrawParams.selector);
     s_onRamp.withdrawNonLinkFees(address(s_token), address(0));
   }
@@ -1530,7 +1530,7 @@ contract EVM2EVMOnRamp_setFeeTokenConfig is EVM2EVMOnRampSetup {
 
   // Reverts
 
-  function test_OnlyCallableByOwnerOrAdminReverts() public {
+  function test_OnlyCallableByOwnerOrAdmin_Revert() public {
     EVM2EVMOnRamp.FeeTokenConfigArgs[] memory feeConfig;
     vm.startPrank(STRANGER);
 
@@ -1596,7 +1596,7 @@ contract EVM2EVMOnRamp_setTokenTransferFeeConfig is EVM2EVMOnRampSetup {
 
   // Reverts
 
-  function test_OnlyCallableByOwnerOrAdminReverts() public {
+  function test_OnlyCallableByOwnerOrAdmin_Revert() public {
     EVM2EVMOnRamp.TokenTransferFeeConfigArgs[] memory transferFeeConfig;
     vm.startPrank(STRANGER);
 
@@ -1661,7 +1661,7 @@ contract EVM2EVMOnRamp_setDynamicConfig is EVM2EVMOnRampSetup {
 
   // Reverts
 
-  function test_SetConfigInvalidConfigReverts() public {
+  function test_SetConfigInvalidConfig_Revert() public {
     EVM2EVMOnRamp.DynamicConfig memory newConfig = EVM2EVMOnRamp.DynamicConfig({
       router: address(1),
       maxNumberOfTokensPerMsg: 14,
@@ -1686,7 +1686,7 @@ contract EVM2EVMOnRamp_setDynamicConfig is EVM2EVMOnRampSetup {
     s_onRamp.setDynamicConfig(newConfig);
   }
 
-  function test_SetConfigOnlyOwnerReverts() public {
+  function test_SetConfigOnlyOwner_Revert() public {
     vm.startPrank(STRANGER);
     vm.expectRevert("Only callable by owner");
     s_onRamp.setDynamicConfig(generateDynamicOnRampConfig(address(1), address(2), address(3)));

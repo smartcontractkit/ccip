@@ -168,7 +168,7 @@ contract MerkleMultiProofTest is BaseTest {
     assertEq(MerkleMultiProof.merkleRoot(leaves, proofs, 0), leaves[0]);
   }
 
-  function test_EmptyLeafReverts() public {
+  function test_EmptyLeaf_Revert() public {
     bytes32[] memory leaves = new bytes32[](0);
     bytes32[] memory proofs = new bytes32[](0);
 

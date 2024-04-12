@@ -57,7 +57,7 @@ contract OCR2BaseNoChecks_transmit is OCR2BaseNoChecksSetup {
 
   // Reverts
 
-  function test_ForkedChainReverts() public {
+  function test_ForkedChain_Revert() public {
     bytes32[3] memory reportContext = [s_configDigest, s_configDigest, s_configDigest];
 
     uint256 chain1 = block.chainid;
@@ -68,7 +68,7 @@ contract OCR2BaseNoChecks_transmit is OCR2BaseNoChecksSetup {
     s_OCR2Base.transmit(reportContext, REPORT, s_rs, s_ss, s_rawVs);
   }
 
-  function test_ConfigDigestMismatchReverts() public {
+  function test_ConfigDigestMismatch_Revert() public {
     bytes32 configDigest;
 
     bytes32[3] memory reportContext = [configDigest, configDigest, configDigest];
@@ -79,7 +79,7 @@ contract OCR2BaseNoChecks_transmit is OCR2BaseNoChecksSetup {
     s_OCR2Base.transmit(reportContext, REPORT, new bytes32[](0), new bytes32[](0), s_rawVs);
   }
 
-  function test_UnAuthorizedTransmitterReverts() public {
+  function test_UnAuthorizedTransmitter_Revert() public {
     bytes32[3] memory reportContext = [s_configDigest, s_configDigest, s_configDigest];
     bytes32[] memory rs = new bytes32[](3);
     bytes32[] memory ss = new bytes32[](3);
@@ -153,7 +153,7 @@ contract OCR2BaseNoChecks_setOCR2Config is OCR2BaseNoChecksSetup {
   }
 
   // Reverts
-  function test_RepeatAddressReverts() public {
+  function test_RepeatAddress_Revert() public {
     address[] memory signers = new address[](4);
     address[] memory transmitters = new address[](4);
     transmitters[0] = address(1245678);
@@ -165,14 +165,14 @@ contract OCR2BaseNoChecks_setOCR2Config is OCR2BaseNoChecksSetup {
     s_OCR2Base.setOCR2Config(signers, transmitters, 1, abi.encode(""), 100, abi.encode(""));
   }
 
-  function test_FMustBePositiveReverts() public {
+  function test_FMustBePositive_Revert() public {
     uint8 f = 0;
 
     vm.expectRevert(abi.encodeWithSelector(OCR2BaseNoChecks.InvalidConfig.selector, "f must be positive"));
     s_OCR2Base.setOCR2Config(new address[](0), new address[](0), f, abi.encode(""), 100, abi.encode(""));
   }
 
-  function test_TransmitterCannotBeZeroAddressReverts() public {
+  function test_TransmitterCannotBeZeroAddress_Revert() public {
     uint256 f = 1;
     address[] memory signers = new address[](3 * f + 1);
     address[] memory transmitters = new address[](3 * f + 1);
@@ -187,7 +187,7 @@ contract OCR2BaseNoChecks_setOCR2Config is OCR2BaseNoChecksSetup {
     s_OCR2Base.setOCR2Config(signers, transmitters, uint8(f), abi.encode(""), 100, abi.encode(""));
   }
 
-  function test_TooManyTransmitterReverts() public {
+  function test_TooManyTransmitter_Revert() public {
     address[] memory transmitters = new address[](100);
 
     vm.expectRevert(abi.encodeWithSelector(OCR2BaseNoChecks.InvalidConfig.selector, "too many transmitters"));

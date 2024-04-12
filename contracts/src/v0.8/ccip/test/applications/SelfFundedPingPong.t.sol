@@ -70,7 +70,7 @@ contract SelfFundedPingPong_ccipReceive is SelfFundedPingPongDappSetup {
     }
   }
 
-  function test_FundingIfNotANopReverts() public {
+  function test_FundingIfNotANop_Revert() public {
     EVM2EVMOnRamp.NopAndWeight[] memory nopsAndWeights = new EVM2EVMOnRamp.NopAndWeight[](0);
     s_onRamp.setNops(nopsAndWeights);
 

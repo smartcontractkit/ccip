@@ -33,7 +33,7 @@ contract TokenPool_constructor is TokenPoolSetup {
   }
 
   // Reverts
-  function test_ZeroAddressNotAllowedReverts() public {
+  function test_ZeroAddressNotAllowed_Revert() public {
     vm.expectRevert(TokenPool.ZeroAddressNotAllowed.selector);
 
     s_tokenPool = new TokenPoolHelper(IERC20(address(0)), new address[](0), address(s_mockARM), address(s_sourceRouter));
@@ -209,13 +209,13 @@ contract TokenPool_applyChainUpdates is TokenPoolSetup {
 
   // Reverts
 
-  function test_OnlyCallableByOwnerReverts() public {
+  function test_OnlyCallableByOwner_Revert() public {
     vm.startPrank(STRANGER);
     vm.expectRevert("Only callable by owner");
     s_tokenPool.applyChainUpdates(new TokenPool.ChainUpdate[](0));
   }
 
-  function test_DisabledNonZeroRateLimitReverts() public {
+  function test_DisabledNonZeroRateLimit_Revert() public {
     RateLimiter.Config memory outboundRateLimit = RateLimiter.Config({isEnabled: true, capacity: 100e28, rate: 1e18});
     RateLimiter.Config memory inboundRateLimit = RateLimiter.Config({isEnabled: true, capacity: 100e22, rate: 1e12});
     TokenPool.ChainUpdate[] memory chainUpdates = new TokenPool.ChainUpdate[](1);
@@ -239,7 +239,7 @@ contract TokenPool_applyChainUpdates is TokenPoolSetup {
     s_tokenPool.applyChainUpdates(chainUpdates);
   }
 
-  function test_NonExistentChainReverts() public {
+  function test_NonExistentChain_Revert() public {
     RateLimiter.Config memory outboundRateLimit = RateLimiter.Config({isEnabled: false, capacity: 0, rate: 0});
     RateLimiter.Config memory inboundRateLimit = RateLimiter.Config({isEnabled: false, capacity: 0, rate: 0});
     TokenPool.ChainUpdate[] memory chainUpdates = new TokenPool.ChainUpdate[](1);
@@ -255,7 +255,7 @@ contract TokenPool_applyChainUpdates is TokenPoolSetup {
     s_tokenPool.applyChainUpdates(chainUpdates);
   }
 
-  function test_InvalidRatelimitRateReverts() public {
+  function test_InvalidRatelimitRate_Revert() public {
     TokenPool.ChainUpdate[] memory chainUpdates = new TokenPool.ChainUpdate[](1);
     chainUpdates[0] = TokenPool.ChainUpdate({
       remoteChainSelector: 1,
@@ -389,7 +389,7 @@ contract TokenPool_setChainRateLimiterConfig is TokenPoolSetup {
 
   // Reverts
 
-  function test_OnlyOwnerReverts() public {
+  function test_OnlyOwner_Revert() public {
     vm.startPrank(STRANGER);
 
     vm.expectRevert("Only callable by owner");
@@ -398,7 +398,7 @@ contract TokenPool_setChainRateLimiterConfig is TokenPoolSetup {
     );
   }
 
-  function test_NonExistentChainReverts() public {
+  function test_NonExistentChain_Revert() public {
     uint64 wrongChainSelector = 9084102894;
 
     vm.expectRevert(abi.encodeWithSelector(TokenPool.NonExistentChain.selector, wrongChainSelector));
@@ -432,7 +432,7 @@ contract TokenPool_onlyOnRamp is TokenPoolSetup {
     s_tokenPool.onlyOnRampModifier(chainSelector);
   }
 
-  function test_ChainNotAllowedReverts() public {
+  function test_ChainNotAllowed_Revert() public {
     uint64 chainSelector = 13377;
     address onRamp = makeAddr("onRamp");
 
@@ -478,7 +478,7 @@ contract TokenPool_onlyOnRamp is TokenPoolSetup {
     s_tokenPool.onlyOffRampModifier(chainSelector);
   }
 
-  function test_CallerIsNotARampOnRouterReverts() public {
+  function test_CallerIsNotARampOnRouter_Revert() public {
     uint64 chainSelector = 13377;
     address onRamp = makeAddr("onRamp");
 
@@ -524,7 +524,7 @@ contract TokenPool_onlyOffRamp is TokenPoolSetup {
     s_tokenPool.onlyOffRampModifier(chainSelector);
   }
 
-  function test_ChainNotAllowedReverts() public {
+  function test_ChainNotAllowed_Revert() public {
     uint64 chainSelector = 13377;
     address offRamp = makeAddr("onRamp");
 
@@ -570,7 +570,7 @@ contract TokenPool_onlyOffRamp is TokenPoolSetup {
     s_tokenPool.onlyOffRampModifier(chainSelector);
   }
 
-  function test_CallerIsNotARampOnRouterReverts() public {
+  function test_CallerIsNotARampOnRouter_Revert() public {
     uint64 chainSelector = 13377;
     address offRamp = makeAddr("offRamp");
 
@@ -707,14 +707,14 @@ contract TokenPoolWithAllowList_applyAllowListUpdates is TokenPoolWithAllowListS
 
   // Reverts
 
-  function test_OnlyOwnerReverts() public {
+  function test_OnlyOwner_Revert() public {
     vm.stopPrank();
     vm.expectRevert("Only callable by owner");
     address[] memory newAddresses = new address[](2);
     s_tokenPool.applyAllowListUpdates(new address[](0), newAddresses);
   }
 
-  function test_AllowListNotEnabledReverts() public {
+  function test_AllowListNotEnabled_Revert() public {
     s_tokenPool = new TokenPoolHelper(s_token, new address[](0), address(s_mockARM), address(s_sourceRouter));
 
     vm.expectRevert(TokenPool.AllowListNotEnabled.selector);

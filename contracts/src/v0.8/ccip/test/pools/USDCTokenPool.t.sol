@@ -245,7 +245,7 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
   }
 
   // Reverts
-  function test_UnknownDomainReverts() public {
+  function test_UnknownDomain_Revert() public {
     uint64 wrongDomain = DEST_CHAIN_SELECTOR + 1;
     // We need to setup the wrong chainSelector so it reaches the domain check
     Router.OnRamp[] memory onRampUpdates = new Router.OnRamp[](1);
@@ -273,13 +273,13 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
     s_usdcTokenPool.lockOrBurn(OWNER, abi.encodePacked(address(0)), amount, wrongDomain, bytes(""));
   }
 
-  function test_CallerIsNotARampOnRouterReverts() public {
+  function test_CallerIsNotARampOnRouter_Revert() public {
     vm.expectRevert(abi.encodeWithSelector(TokenPool.CallerIsNotARampOnRouter.selector, OWNER));
 
     s_usdcTokenPool.lockOrBurn(OWNER, abi.encodePacked(address(0)), 0, DEST_CHAIN_SELECTOR, bytes(""));
   }
 
-  function test_LockOrBurnWithAllowListReverts() public {
+  function test_LockOrBurnWithAllowList_Revert() public {
     vm.startPrank(s_routerAllowedOnRamp);
 
     vm.expectRevert(abi.encodeWithSelector(SenderNotAllowed.selector, STRANGER));
@@ -365,7 +365,7 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
   }
 
   // Reverts
-  function test_UnlockingUSDCFailedReverts() public {
+  function test_UnlockingUSDCFailed_Revert() public {
     vm.startPrank(s_routerAllowedOffRamp);
     s_mockUSDCTransmitter.setShouldSucceed(false);
 
@@ -401,7 +401,7 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
     );
   }
 
-  function test_TokenMaxCapacityExceededReverts() public {
+  function test_TokenMaxCapacityExceeded_Revert() public {
     uint256 capacity = getInboundRateLimiterConfig().capacity;
     uint256 amount = 10 * capacity;
     address recipient = address(1);
@@ -478,7 +478,7 @@ contract USDCTokenPool_setDomains is USDCTokenPoolSetup {
 
   // Reverts
 
-  function test_OnlyOwnerReverts() public {
+  function test_OnlyOwner_Revert() public {
     USDCTokenPool.DomainUpdate[] memory domainUpdates = new USDCTokenPool.DomainUpdate[](0);
 
     vm.startPrank(STRANGER);
@@ -487,7 +487,7 @@ contract USDCTokenPool_setDomains is USDCTokenPoolSetup {
     s_usdcTokenPool.setDomains(domainUpdates);
   }
 
-  function test_InvalidDomainReverts() public {
+  function test_InvalidDomain_Revert() public {
     bytes32 validCaller = bytes32(uint256(25));
     // Ensure valid domain works
     USDCTokenPool.DomainUpdate[] memory domainUpdates = new USDCTokenPool.DomainUpdate[](1);
@@ -541,7 +541,7 @@ contract USDCTokenPool__validateMessage is USDCTokenPoolSetup {
 
   // Reverts
 
-  function test_ValidateInvalidMessageReverts() public {
+  function test_ValidateInvalidMessage_Revert() public {
     USDCMessage memory usdcMessage = USDCMessage({
       version: 0,
       sourceDomain: 1553252,
