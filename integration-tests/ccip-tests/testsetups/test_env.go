@@ -3,6 +3,7 @@ package testsetups
 import (
 	"bytes"
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 	"testing"
@@ -23,6 +24,7 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/k8s/pkg/helm/reorg"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
+	k8config "github.com/smartcontractkit/chainlink-testing-framework/k8s/config"
 
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/actions"
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/types/config/node"
@@ -365,8 +367,14 @@ func UpgradeNodes(
 				return err
 			}
 		}
+		// explicitly set the env var to false to allow manifest update
+		// if tests are run in remote runner, it might be set to true to disable manifest update
+		err := os.Setenv(k8config.EnvVarNoManifestUpdate, "false")
+		if err != nil {
+			return err
+		}
 		k8Env.Cfg.NoManifestUpdate = false
-		err := k8Env.RunUpdated(len(clientsToUpgrade))
+		err = k8Env.RunUpdated(len(clientsToUpgrade))
 		// Run the new environment and wait for changes to show
 		if err != nil {
 			return err
