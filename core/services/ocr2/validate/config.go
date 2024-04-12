@@ -1,5 +1,6 @@
 package validate
 
+// TBD: rename package to "config"
 import (
 	"fmt"
 	"sync"
