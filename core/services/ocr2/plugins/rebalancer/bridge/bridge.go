@@ -33,6 +33,7 @@ type Bridge interface {
 	// GetTransfers returns all of the pending transfers from the source chain to the destination chain
 	// for the given local and remote token addresses.
 	// Pending transfers that are ready to finalize have the appropriate bridge data set.
+	// TBD: rename to GetPendingTransfers
 	GetTransfers(ctx context.Context, localToken, remoteToken models.Address) ([]models.PendingTransfer, error)
 
 	// GetBridgePayloadAndFee returns the bridge specific payload for the given transfer.
@@ -51,6 +52,7 @@ type Bridge interface {
 	// For example, if the bridge payload is a cost parameter, one implementation of this method
 	// could either produce the median of all the costs, or take the maximum cost, or the minimum
 	// cost. The choice of implementation is up to the bridge.
+	// TBD: rename to AggregatePayloads
 	QuorumizedBridgePayload(payloads [][]byte, f int) ([]byte, error)
 
 	Close(ctx context.Context) error
