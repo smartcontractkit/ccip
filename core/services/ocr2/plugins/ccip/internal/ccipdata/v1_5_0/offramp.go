@@ -2,8 +2,10 @@ package v1_5_0
 
 import (
 	"context"
+	"errors"
 	"math/big"
 
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
@@ -14,6 +16,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_2_0"
 )
@@ -40,6 +43,24 @@ func (o *OffRamp) GetTokens(ctx context.Context) (cciptypes.OffRampTokens, error
 }
 
 func (o *OffRamp) GetSourceToDestTokensMapping(ctx context.Context) (map[cciptypes.Address]cciptypes.Address, error) {
+	// TODO caching this value
+	tokens, err := o.offRampV150.GetAllRateLimitTokens(&bind.CallOpts{Context: ctx})
+	if err != nil {
+		return nil, err
+	}
+
+	sourceTokens := ccipcalc.EvmAddrsToGeneric(tokens.SourceTokens...)
+	destTokens := ccipcalc.EvmAddrsToGeneric(tokens.DestTokens...)
+
+	if len(sourceTokens) != len(destTokens) {
+		return nil, errors.New("source and destination tokens are not the same length")
+	}
+
+	mapping := make(map[cciptypes.Address]cciptypes.Address)
+	for i, sourceToken := range sourceTokens {
+		mapping[sourceToken] = destTokens[i]
+
+	}
 	return map[cciptypes.Address]cciptypes.Address{}, nil
 }
 

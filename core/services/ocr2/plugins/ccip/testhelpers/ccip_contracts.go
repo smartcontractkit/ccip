@@ -255,7 +255,6 @@ func (c *CCIPContracts) DeployNewOffRamp(t *testing.T) {
 			Capacity:  LinkUSDValue(100),
 			Rate:      LinkUSDValue(1),
 		},
-		[]common.Address{c.Source.LinkToken.Address()},
 	)
 	require.NoError(t, err)
 	c.Dest.Chain.Commit()
@@ -1118,7 +1117,6 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 			Capacity:  LinkUSDValue(100),
 			Rate:      LinkUSDValue(1),
 		},
-		[]common.Address{destLinkTokenAddress},
 	)
 	require.NoError(t, err)
 	offRamp, err := evm_2_evm_offramp.NewEVM2EVMOffRamp(offRampAddress, destChain)

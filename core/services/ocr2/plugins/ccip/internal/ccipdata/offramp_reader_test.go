@@ -295,7 +295,7 @@ func setupOffRampV1_5_0(t *testing.T, user *bind.TransactOpts, bc *client.Simula
 		Rate:      big.NewInt(0),
 	}
 
-	offRampAddr, tx, offRamp, err := evm_2_evm_offramp.DeployEVM2EVMOffRamp(user, bc, staticConfig, rateLimiterConfig, []common.Address{})
+	offRampAddr, tx, offRamp, err := evm_2_evm_offramp.DeployEVM2EVMOffRamp(user, bc, staticConfig, rateLimiterConfig)
 	bc.Commit()
 	require.NoError(t, err)
 	ccipdata.AssertNonRevert(t, tx, bc, user)
