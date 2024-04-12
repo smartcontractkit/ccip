@@ -1256,6 +1256,37 @@ contract EVM2EVMOffRamp__updateRateLimitTokens is EVM2EVMOffRampSetup {
     }
   }
 
+  function test_updateRateLimitTokens_AddsAndRemoves_Success() public {
+    EVM2EVMOffRamp.RateLimitToken[] memory adds = new EVM2EVMOffRamp.RateLimitToken[](2);
+    adds[0] = EVM2EVMOffRamp.RateLimitToken({sourceToken: s_sourceTokens[0], destToken: s_destTokens[0]});
+    adds[1] = EVM2EVMOffRamp.RateLimitToken({sourceToken: s_sourceTokens[1], destToken: s_destTokens[1]});
+
+    EVM2EVMOffRamp.RateLimitToken[] memory removes = new EVM2EVMOffRamp.RateLimitToken[](1);
+    removes[0] = adds[0];
+
+    for (uint256 i = 0; i < adds.length; ++i) {
+      vm.expectEmit();
+      emit TokenAggregateRateLimitAdded(adds[i].sourceToken, adds[i].destToken);
+    }
+
+    s_offRamp.updateRateLimitTokens(removes, adds);
+
+    for (uint256 i = 0; i < removes.length; ++i) {
+      vm.expectEmit();
+      emit TokenAggregateRateLimitRemoved(removes[i].sourceToken, removes[i].destToken);
+    }
+
+    s_offRamp.updateRateLimitTokens(removes, new EVM2EVMOffRamp.RateLimitToken[](0));
+
+    (address[] memory sourceTokens, address[] memory destTokens) = s_offRamp.getAllRateLimitTokens();
+
+    assertEq(1, sourceTokens.length);
+    assertEq(adds[1].sourceToken, sourceTokens[0]);
+
+    assertEq(1, destTokens.length);
+    assertEq(adds[1].destToken, destTokens[0]);
+  }
+
   // Reverts
 
   function test_NonOwner_Revert() public {
