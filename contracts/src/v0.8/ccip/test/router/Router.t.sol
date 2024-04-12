@@ -314,7 +314,7 @@ contract Router_ccipSend is EVM2EVMOnRampSetup {
     s_sourceRouter.ccipSend(wrongChain, message);
   }
 
-  function test_Fuzz_UnsupportedFeeTokenReverts(address wrongFeeToken) public {
+  function test_Fuzz_UnsupportedFeeToken_Reverts(address wrongFeeToken) public {
     // We have three fee tokens set, all others should revert.
     vm.assume(address(s_sourceFeeToken) != wrongFeeToken);
     vm.assume(address(s_sourceRouter.getWrappedNative()) != wrongFeeToken);
@@ -328,7 +328,7 @@ contract Router_ccipSend is EVM2EVMOnRampSetup {
     s_sourceRouter.ccipSend(DEST_CHAIN_SELECTOR, message);
   }
 
-  function test_Fuzz_UnsupportedTokenReverts(address wrongToken) public {
+  function test_Fuzz_UnsupportedToken_Reverts(address wrongToken) public {
     for (uint256 i = 0; i < s_sourceTokens.length; ++i) {
       vm.assume(address(s_sourceTokens[i]) != wrongToken);
     }
@@ -418,7 +418,12 @@ contract Router_applyRampUpdates is RouterSetup {
 
   /// forge-config: default.fuzz.runs = 32
   /// forge-config: ccip.fuzz.runs = 32
-  function test_Fuzz_OffRampUpdates(Router.OffRamp[] memory offRamps) public {
+  function test_Fuzz_OffRampUpdates(Router.OffRamp[20] memory offRampsInput) public {
+    Router.OffRamp[] memory offRamps = new Router.OffRamp[](offRampsInput.length);
+    for (uint256 i = 0; i < offRampsInput.length; ++i) {
+      offRamps[i] = offRampsInput[i];
+    }
+
     // Test adding offRamps
     s_sourceRouter.applyRampUpdates(new Router.OnRamp[](0), new Router.OffRamp[](0), offRamps);
 
@@ -665,7 +670,7 @@ contract Router_applyRampUpdates is RouterSetup {
 
 /// @notice #setWrappedNative
 contract Router_setWrappedNative is EVM2EVMOnRampSetup {
-  function test_Fuzz_SetWrappedNativeSuccess(address wrappedNative) public {
+  function test_Fuzz_SetWrappedNative_Success(address wrappedNative) public {
     s_sourceRouter.setWrappedNative(wrappedNative);
     assertEq(wrappedNative, s_sourceRouter.getWrappedNative());
   }
@@ -800,7 +805,7 @@ contract Router_routeMessage is EVM2EVMOffRampSetup {
     assertGt(gasUsed, 3_000);
   }
 
-  function test_Fuzz_ExecutionEventSuccess(bytes calldata error) public {
+  function test_Fuzz_ExecutionEvent_Success(bytes calldata error) public {
     Client.Any2EVMMessage memory message = generateReceiverMessage(SOURCE_CHAIN_SELECTOR);
     s_reverting_receiver.setErr(error);
 

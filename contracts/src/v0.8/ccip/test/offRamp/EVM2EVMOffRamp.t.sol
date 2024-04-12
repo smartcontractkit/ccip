@@ -952,7 +952,7 @@ contract EVM2EVMOffRamp_getExecutionState is EVM2EVMOffRampSetup {
 
   /// forge-config: default.fuzz.runs = 32
   /// forge-config: ccip.fuzz.runs = 32
-  function test_Fuzz_DifferentialSuccess(uint16[500] memory seqNums, uint8[500] memory values) public {
+  function test_Fuzz_Differential_Success(uint16[500] memory seqNums, uint8[500] memory values) public {
     for (uint256 i = 0; i < seqNums.length; ++i) {
       // Only use the first three slots. This makes sure existing slots get overwritten
       // as the tests uses 500 sequence numbers.

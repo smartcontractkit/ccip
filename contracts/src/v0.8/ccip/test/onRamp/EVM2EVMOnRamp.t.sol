@@ -67,7 +67,7 @@ contract EVM2EVMOnRamp_constructor is EVM2EVMOnRampSetup {
 }
 
 contract EVM2EVMOnRamp_payNops_fuzz is EVM2EVMOnRampSetup {
-  function test_Fuzz_NopPayNopsSuccess(uint96 nopFeesJuels) public {
+  function test_Fuzz_NopPayNops_Success(uint96 nopFeesJuels) public {
     (EVM2EVMOnRamp.NopAndWeight[] memory nopsAndWeights, uint256 weightsTotal) = s_onRamp.getNops();
     // To avoid NoFeesToPay
     vm.assume(nopFeesJuels > weightsTotal);
@@ -350,7 +350,7 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
   // https://github.com/foundry-rs/foundry/issues/5689
   /// forge-config: default.fuzz.runs = 32
   /// forge-config: ccip.fuzz.runs = 32
-  function test_Fuzz_ForwardFromRouterSuccess(address originalSender, address receiver, uint96 feeTokenAmount) public {
+  function test_Fuzz_ForwardFromRouter_Success(address originalSender, address receiver, uint96 feeTokenAmount) public {
     // To avoid RouterMustSetOriginalSender
     vm.assume(originalSender != address(0));
     vm.assume(uint160(receiver) >= 10);
@@ -783,7 +783,7 @@ contract EVM2EVMOnRamp_getDataAvailabilityCost is EVM2EVMOnRamp_getFeeSetup {
     assertEq(expectedDataAvailabilityCostUSD, dataAvailabilityCostUSD);
   }
 
-  function test_Fuzz_ZeroDataAvailabilityGasPriceAlwaysCalculatesZeroDataAvailabilityCostSuccess(
+  function test_Fuzz_ZeroDataAvailabilityGasPriceAlwaysCalculatesZeroDataAvailabilityCost_Success(
     uint64 messageDataLength,
     uint32 numberOfTokens,
     uint32 tokenTransferBytesOverhead
@@ -794,7 +794,7 @@ contract EVM2EVMOnRamp_getDataAvailabilityCost is EVM2EVMOnRamp_getFeeSetup {
     assertEq(0, dataAvailabilityCostUSD);
   }
 
-  function test_Fuzz_CalculateDataAvailabilityCostSuccess(
+  function test_Fuzz_CalculateDataAvailabilityCost_Success(
     uint32 destDataAvailabilityOverheadGas,
     uint16 destGasPerDataAvailabilityByte,
     uint16 destDataAvailabilityMultiplierBps,
@@ -1451,7 +1451,7 @@ contract EVM2EVMOnRamp_withdrawNonLinkFees is EVM2EVMOnRampSetup {
     s_onRamp.withdrawNonLinkFees(address(s_token), address(this));
   }
 
-  function test_Fuzz_FuzzWithdrawalOnlyLeftoverLinkSuccess(uint96 nopFeeJuels, uint64 extraJuels) public {
+  function test_Fuzz_FuzzWithdrawalOnlyLeftoverLink_Success(uint96 nopFeeJuels, uint64 extraJuels) public {
     nopFeeJuels = uint96(bound(nopFeeJuels, 1, MAX_NOP_FEES_JUELS));
 
     // Set Nop fee juels

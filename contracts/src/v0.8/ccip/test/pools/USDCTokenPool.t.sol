@@ -176,7 +176,7 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
     assertEq(s_mockUSDC.s_nonce() - 1, nonce);
   }
 
-  function test_Fuzz_LockOrBurnSuccess(bytes32 destinationReceiver, uint256 amount) public {
+  function test_Fuzz_LockOrBurn_Success(bytes32 destinationReceiver, uint256 amount) public {
     vm.assume(destinationReceiver != bytes32(0));
     amount = bound(amount, 1, getOutboundRateLimiterConfig().capacity);
     s_token.transfer(address(s_usdcTokenPool), amount);
@@ -211,7 +211,7 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
     assertEq(poolReturnDataV1.destPoolAddress, abi.encode(DEST_CHAIN_USDC_POOL));
   }
 
-  function test_Fuzz_LockOrBurnWithAllowListSuccess(bytes32 destinationReceiver, uint256 amount) public {
+  function test_Fuzz_LockOrBurnWithAllowList_Success(bytes32 destinationReceiver, uint256 amount) public {
     vm.assume(destinationReceiver != bytes32(0));
     amount = bound(amount, 1, getOutboundRateLimiterConfig().capacity);
     s_token.transfer(address(s_usdcTokenPoolWithAllowList), amount);
@@ -293,7 +293,7 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
 contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
   event Minted(address indexed sender, address indexed recipient, uint256 amount);
 
-  function test_Fuzz_ReleaseOrMintSuccess(address recipient, uint256 amount) public {
+  function test_Fuzz_ReleaseOrMint_Success(address recipient, uint256 amount) public {
     amount = bound(amount, 0, getInboundRateLimiterConfig().capacity);
 
     USDCMessage memory usdcMessage = USDCMessage({
@@ -442,7 +442,7 @@ contract USDCTokenPool_setDomains is USDCTokenPoolSetup {
   // Setting lower fuzz run as 256 runs was causing differing gas results in snapshot.
   /// forge-config: default.fuzz.runs = 32
   /// forge-config: ccip.fuzz.runs = 32
-  function test_Fuzz_SetDomainsSuccess(
+  function test_Fuzz_SetDomains_Success(
     bytes32[5] calldata allowedCallers,
     uint32[5] calldata domainIdentifiers,
     uint64[5] calldata destChainSelectors
@@ -518,7 +518,7 @@ contract USDCTokenPool_setDomains is USDCTokenPoolSetup {
 }
 
 contract USDCTokenPool__validateMessage is USDCTokenPoolSetup {
-  function test_Fuzz_ValidateMessageSuccess(uint32 sourceDomain, uint64 nonce) public {
+  function test_Fuzz_ValidateMessage_Success(uint32 sourceDomain, uint64 nonce) public {
     vm.pauseGasMetering();
     USDCMessage memory usdcMessage = USDCMessage({
       version: 0,

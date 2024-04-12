@@ -83,7 +83,7 @@ contract LockReleaseTokenPool_lockOrBurn is LockReleaseTokenPoolSetup {
   event Locked(address indexed sender, uint256 amount);
   event TokensConsumed(uint256 tokens);
 
-  function test_Fuzz_LockOrBurnNoAllowListSuccess(uint256 amount) public {
+  function test_Fuzz_LockOrBurnNoAllowList_Success(uint256 amount) public {
     amount = bound(amount, 1, getOutboundRateLimiterConfig().capacity);
     vm.startPrank(s_allowedOnRamp);
 
@@ -178,7 +178,7 @@ contract LockReleaseTokenPool_releaseOrMint is LockReleaseTokenPoolSetup {
     );
   }
 
-  function test_Fuzz_ReleaseOrMintSuccess(address recipient, uint256 amount) public {
+  function test_Fuzz_ReleaseOrMint_Success(address recipient, uint256 amount) public {
     // Since the owner already has tokens this would break the checks
     vm.assume(recipient != OWNER);
     vm.assume(recipient != address(0));
@@ -274,7 +274,7 @@ contract LockReleaseTokenPool_canAcceptLiquidity is LockReleaseTokenPoolSetup {
 }
 
 contract LockReleaseTokenPool_provideLiquidity is LockReleaseTokenPoolSetup {
-  function test_Fuzz_ProvideLiquiditySuccess(uint256 amount) public {
+  function test_Fuzz_ProvideLiquidity_Success(uint256 amount) public {
     uint256 balancePre = s_token.balanceOf(OWNER);
     s_token.approve(address(s_lockReleaseTokenPool), amount);
 
@@ -309,7 +309,7 @@ contract LockReleaseTokenPool_provideLiquidity is LockReleaseTokenPoolSetup {
 }
 
 contract LockReleaseTokenPool_withdrawalLiquidity is LockReleaseTokenPoolSetup {
-  function test_Fuzz_WithdrawalLiquiditySuccess(uint256 amount) public {
+  function test_Fuzz_WithdrawalLiquidity_Success(uint256 amount) public {
     uint256 balancePre = s_token.balanceOf(OWNER);
     s_token.approve(address(s_lockReleaseTokenPool), amount);
     s_lockReleaseTokenPool.provideLiquidity(amount);
@@ -372,7 +372,7 @@ contract LockReleaseTokenPool_setChainRateLimiterConfig is LockReleaseTokenPoolS
     s_lockReleaseTokenPool.applyChainUpdates(chainUpdates);
   }
 
-  function test_Fuzz_SetChainRateLimiterConfigSuccess(uint128 capacity, uint128 rate, uint32 newTime) public {
+  function test_Fuzz_SetChainRateLimiterConfig_Success(uint128 capacity, uint128 rate, uint32 newTime) public {
     // Cap the lower bound to 4 so 4/2 is still >= 2
     vm.assume(capacity >= 4);
     // Cap the lower bound to 2 so 2/2 is still >= 1
