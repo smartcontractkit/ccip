@@ -10,6 +10,14 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/models"
 )
 
+// TODO:
+// - Cleanup the interface, keep external methods only.
+// - In multiple functions, we acquire the lock multiple times instead of once,
+// 	 which is inefficient and can lead to inconsistencies.
+// - in several cases, we can change the interface in a way that we don't need to
+// 	 expose as many methods as we do now. e.g. using a Walker interface to traverse
+// 	 the graph.
+
 // Graph contains graphs functionality for networks and liquidity.
 // Graph operations of the implementations should be thread-safe.
 type Graph interface {
