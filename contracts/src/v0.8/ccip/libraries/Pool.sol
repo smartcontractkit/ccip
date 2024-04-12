@@ -45,10 +45,6 @@ library Pool {
     }
 
     uint256 newSliceLength = _bytes.length - 4;
-    if (newSliceLength == 0) {
-      return "";
-    }
-
     bytes memory tempBytes;
     assembly {
       // Get a location of some free memory and store it in tempBytes as Solidity does for memory variables.
