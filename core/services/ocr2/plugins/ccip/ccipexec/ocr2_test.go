@@ -670,7 +670,7 @@ func TestExecutionReportingPlugin_buildBatch(t *testing.T) {
 			expectedStates: []messageExecStatus{
 				newMessageExecState(10, [32]byte{}, AddedToBatch),
 				newMessageExecState(11, [32]byte{}, InsufficientRemainingBatchGas),
-				newMessageExecState(12, [32]byte{}, SenderAlreadySkipped),
+				newMessageExecState(12, [32]byte{}, InvalidNonce),
 			},
 		},
 		{
@@ -726,7 +726,7 @@ func TestExecutionReportingPlugin_buildBatch(t *testing.T) {
 			expectedStates: []messageExecStatus{
 				newMessageExecState(10, [32]byte{}, AddedToBatch),
 				newMessageExecState(11, [32]byte{}, InsufficientRemainingBatchDataLength),
-				newMessageExecState(12, [32]byte{}, SenderAlreadySkipped),
+				newMessageExecState(12, [32]byte{}, InvalidNonce),
 			},
 		},
 	}

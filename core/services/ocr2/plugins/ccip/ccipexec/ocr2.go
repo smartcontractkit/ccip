@@ -292,15 +292,7 @@ func (r *ExecutionReportingPlugin) buildBatch(
 
 		if msg.Executed {
 			msgLggr.Infow("Skipping message - already executed")
-			batchBuilder.skipAlreadyExecuted(msg)
-			continue
-		}
-
-		// We enforce that the same sender's messages are processed in order of their nonces.
-		// If any message is skipped, we skip all messages from that sender.
-		if batchBuilder.isSenderSkipped(msg.Sender) {
-			msgLggr.Infow("Skipping message - sender already skipped", "sender", msg.Sender)
-			batchBuilder.skip(msg, SenderAlreadySkipped)
+			batchBuilder.skip(msg, AlreadyExecuted)
 			continue
 		}
 

@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/pkg/errors"
 
@@ -171,30 +170,19 @@ func newMessageExecState(seqNr uint64, messageId cciptypes.Hash, status messageS
 }
 
 type batchBuildContainer struct {
-	batch          []ccip.ObservedMessage
-	statuses       []messageExecStatus
-	skippedSenders mapset.Set[cciptypes.Address]
+	batch    []ccip.ObservedMessage
+	statuses []messageExecStatus
 }
 
 func newBatchBuildContainer(capacity int) *batchBuildContainer {
 	return &batchBuildContainer{
-		batch:          make([]ccip.ObservedMessage, 0, capacity),
-		statuses:       make([]messageExecStatus, 0, capacity),
-		skippedSenders: mapset.NewThreadUnsafeSetWithSize[cciptypes.Address](capacity),
+		batch:    make([]ccip.ObservedMessage, 0, capacity),
+		statuses: make([]messageExecStatus, 0, capacity),
 	}
-}
-
-func (m *batchBuildContainer) isSenderSkipped(sender cciptypes.Address) bool {
-	return m.skippedSenders.Contains(sender)
 }
 
 func (m *batchBuildContainer) skip(msg cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta, status messageStatus) {
 	m.addState(msg, status)
-	m.skippedSenders.Add(msg.Sender)
-}
-
-func (m *batchBuildContainer) skipAlreadyExecuted(msg cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta) {
-	m.addState(msg, AlreadyExecuted)
 }
 
 func (m *batchBuildContainer) addToBatch(msg cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta, tokenData [][]byte) {
