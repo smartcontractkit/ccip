@@ -19,7 +19,7 @@ import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/tok
 
 /// @notice #constructor
 contract Router_constructor is EVM2EVMOnRampSetup {
-  function test_Constructor_Success() public {
+  function test_Constructor_Success() public view {
     assertEq("Router 1.2.0", s_sourceRouter.typeAndVersion());
     // owner
     assertEq(OWNER, s_sourceRouter.owner());
@@ -680,7 +680,7 @@ contract Router_setWrappedNative is EVM2EVMOnRampSetup {
 
 /// @notice #getSupportedTokens
 contract Router_getSupportedTokens is EVM2EVMOnRampSetup {
-  function test_GetSupportedTokens_Success() public {
+  function test_GetSupportedTokens_Success() public view {
     address[] memory supportedTokens = s_sourceRouter.getSupportedTokens(DEST_CHAIN_SELECTOR);
     assertEq(s_sourceTokens[0], supportedTokens[0]);
     assertEq(s_sourceTokens[1], supportedTokens[1]);
@@ -881,7 +881,7 @@ contract Router_routeMessage is EVM2EVMOffRampSetup {
 
 /// @notice #getFee
 contract Router_getFee is EVM2EVMOnRampSetup {
-  function test_GetFeeSupportedChain_Success() public {
+  function test_GetFeeSupportedChain_Success() public view {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
     uint256 expectedFee = s_sourceRouter.getFee(DEST_CHAIN_SELECTOR, message);
     assertGt(expectedFee, 10e9);

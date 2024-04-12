@@ -8,7 +8,7 @@ import {ARMSetup} from "./ARMSetup.t.sol";
 import {Test} from "forge-std/Test.sol";
 
 contract ConfigCompare is Test {
-  function assertConfigEq(ARM.Config memory actualConfig, ARM.Config memory expectedConfig) public {
+  function assertConfigEq(ARM.Config memory actualConfig, ARM.Config memory expectedConfig) public pure {
     assertEq(actualConfig.voters.length, expectedConfig.voters.length);
     for (uint256 i = 0; i < expectedConfig.voters.length; ++i) {
       ARM.Voter memory expectedVoter = expectedConfig.voters[i];

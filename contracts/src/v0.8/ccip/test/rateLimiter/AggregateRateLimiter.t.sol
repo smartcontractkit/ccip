@@ -32,7 +32,7 @@ contract AggregateTokenLimiterSetup is BaseTest, PriceRegistrySetup {
 
 /// @notice #constructor
 contract AggregateTokenLimiter_constructor is AggregateTokenLimiterSetup {
-  function test_Constructor_Success() public {
+  function test_Constructor_Success() public view {
     assertEq(ADMIN, s_rateLimiter.getTokenLimitAdmin());
     assertEq(OWNER, s_rateLimiter.owner());
 
@@ -47,7 +47,7 @@ contract AggregateTokenLimiter_constructor is AggregateTokenLimiterSetup {
 
 /// @notice #getTokenLimitAdmin
 contract AggregateTokenLimiter_getTokenLimitAdmin is AggregateTokenLimiterSetup {
-  function test_GetTokenLimitAdmin_Success() public {
+  function test_GetTokenLimitAdmin_Success() public view {
     assertEq(ADMIN, s_rateLimiter.getTokenLimitAdmin());
   }
 }
@@ -76,7 +76,7 @@ contract AggregateTokenLimiter_setAdmin is AggregateTokenLimiterSetup {
 
 /// @notice #getTokenBucket
 contract AggregateTokenLimiter_getTokenBucket is AggregateTokenLimiterSetup {
-  function test_GetTokenBucket_Success() public {
+  function test_GetTokenBucket_Success() public view {
     RateLimiter.TokenBucket memory bucket = s_rateLimiter.currentRateLimiterState();
     assertEq(s_config.rate, bucket.rate);
     assertEq(s_config.capacity, bucket.capacity);

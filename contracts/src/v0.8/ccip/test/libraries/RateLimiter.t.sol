@@ -18,7 +18,7 @@ contract RateLimiterSetup is BaseTest {
 }
 
 contract RateLimiter_constructor is RateLimiterSetup {
-  function test_Constructor_Success() public {
+  function test_Constructor_Success() public view {
     RateLimiter.TokenBucket memory rateLimiter = s_helper.getRateLimiter();
     assertEq(s_config.rate, rateLimiter.rate);
     assertEq(s_config.capacity, rateLimiter.capacity);

@@ -25,7 +25,7 @@ contract BurnMintTokenPoolSetup is BurnMintSetup {
 }
 
 contract BurnMintTokenPool_lockOrBurn is BurnMintTokenPoolSetup {
-  function test_Setup_Success() public {
+  function test_Setup_Success() public view {
     assertEq(address(s_burnMintERC677), address(s_pool.getToken()));
     assertEq(address(s_mockARM), s_pool.getArmProxy());
     assertEq(false, s_pool.getAllowListEnabled());

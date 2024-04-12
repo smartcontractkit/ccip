@@ -104,7 +104,7 @@ contract PriceRegistry_constructor is PriceRegistrySetup {
 }
 
 contract PriceRegistry_getTokenPrices is PriceRegistrySetup {
-  function test_GetTokenPrices_Success() public {
+  function test_GetTokenPrices_Success() public view {
     Internal.PriceUpdates memory priceUpdates = abi.decode(s_encodedInitialPriceUpdates, (Internal.PriceUpdates));
 
     address[] memory tokens = new address[](3);
@@ -122,7 +122,7 @@ contract PriceRegistry_getTokenPrices is PriceRegistrySetup {
 }
 
 contract PriceRegistry_getValidatedTokenPrice is PriceRegistrySetup {
-  function test_GetValidatedTokenPrice_Success() public {
+  function test_GetValidatedTokenPrice_Success() public view {
     Internal.PriceUpdates memory priceUpdates = abi.decode(s_encodedInitialPriceUpdates, (Internal.PriceUpdates));
     address token = priceUpdates.tokenPriceUpdates[0].sourceToken;
 
@@ -324,7 +324,7 @@ contract PriceRegistry_updatePrices is PriceRegistrySetup {
 }
 
 contract PriceRegistry_convertTokenAmount is PriceRegistrySetup {
-  function test_ConvertTokenAmount_Success() public {
+  function test_ConvertTokenAmount_Success() public view {
     Internal.PriceUpdates memory initialPriceUpdates = abi.decode(s_encodedInitialPriceUpdates, (Internal.PriceUpdates));
     uint256 amount = 3e16;
     uint256 conversionRate = (uint256(initialPriceUpdates.tokenPriceUpdates[2].usdPerToken) * 1e18)
@@ -412,7 +412,7 @@ contract PriceRegistry_convertTokenAmount is PriceRegistrySetup {
 }
 
 contract PriceRegistry_getTokenAndGasPrices is PriceRegistrySetup {
-  function test_GetFeeTokenAndGasPrices_Success() public {
+  function test_GetFeeTokenAndGasPrices_Success() public view {
     (uint224 feeTokenPrice, uint224 gasPrice) =
       s_priceRegistry.getTokenAndGasPrices(s_sourceFeeToken, DEST_CHAIN_SELECTOR);
 

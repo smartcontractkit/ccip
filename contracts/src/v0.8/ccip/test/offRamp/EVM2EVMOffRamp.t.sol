@@ -162,7 +162,7 @@ contract EVM2EVMOffRamp_setDynamicConfig is EVM2EVMOffRampSetup {
 }
 
 contract EVM2EVMOffRamp_metadataHash is EVM2EVMOffRampSetup {
-  function test_MetadataHash_Success() public {
+  function test_MetadataHash_Success() public view {
     bytes32 h = s_offRamp.metadataHash();
     assertEq(
       h,

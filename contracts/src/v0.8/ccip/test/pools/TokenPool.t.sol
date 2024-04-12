@@ -25,7 +25,7 @@ contract TokenPoolSetup is RouterSetup {
 }
 
 contract TokenPool_constructor is TokenPoolSetup {
-  function test_immutableFields_Success() public {
+  function test_immutableFields_Success() public view {
     assertEq(address(s_token), address(s_tokenPool.getToken()));
     assertEq(address(s_mockARM), s_tokenPool.getArmProxy());
     assertEq(false, s_tokenPool.getAllowListEnabled());
@@ -113,7 +113,7 @@ contract TokenPool_applyChainUpdates is TokenPoolSetup {
   );
   event ChainRemoved(uint64 chainSelector);
 
-  function assertState(TokenPool.ChainUpdate[] memory chainUpdates) public {
+  function assertState(TokenPool.ChainUpdate[] memory chainUpdates) public view {
     uint64[] memory chainSelectors = s_tokenPool.getSupportedChains();
     for (uint256 i = 0; i < chainUpdates.length; i++) {
       assertEq(chainUpdates[i].remoteChainSelector, chainSelectors[i]);
@@ -606,7 +606,7 @@ contract TokenPoolWithAllowListSetup is TokenPoolSetup {
 }
 
 contract TokenPoolWithAllowList_getAllowListEnabled is TokenPoolWithAllowListSetup {
-  function test_GetAllowListEnabled_Success() public {
+  function test_GetAllowListEnabled_Success() public view {
     assertTrue(s_tokenPool.getAllowListEnabled());
   }
 }
@@ -629,7 +629,7 @@ contract TokenPoolWithAllowList_setRouter is TokenPoolWithAllowListSetup {
 }
 
 contract TokenPoolWithAllowList_getAllowList is TokenPoolWithAllowListSetup {
-  function test_GetAllowList_Success() public {
+  function test_GetAllowList_Success() public view {
     address[] memory setAddresses = s_tokenPool.getAllowList();
     assertEq(2, setAddresses.length);
     assertEq(s_allowedSenders[0], setAddresses[0]);
