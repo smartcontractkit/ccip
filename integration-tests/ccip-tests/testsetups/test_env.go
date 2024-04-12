@@ -11,6 +11,7 @@ import (
 	"github.com/AlekSi/pointer"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
+	"github.com/smartcontractkit/chainlink-testing-framework/k8s/pkg/cdk8s/blockscout"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/k8s/pkg/helm/mockserver"
@@ -116,7 +117,7 @@ func ChainlinkPropsForUpdate(
 			}
 
 			_, tomlStr, err := setNodeConfig(
-				networksWithInternalURLs(testInputs.SelectedNetworks),
+				testInputs.SelectedNetworks,
 				nodeConfig, commonChainConfig, chainConfigByChain,
 			)
 			require.NoError(t, err)
@@ -144,7 +145,7 @@ func ChainlinkPropsForUpdate(
 			},
 		}
 		_, tomlStr, err := setNodeConfig(
-			networksWithInternalURLs(testInputs.SelectedNetworks),
+			testInputs.SelectedNetworks,
 			testInputs.EnvInput.NewCLCluster.Common.BaseConfigTOML,
 			testInputs.EnvInput.NewCLCluster.Common.CommonChainConfigTOML,
 			testInputs.EnvInput.NewCLCluster.Common.ChainConfigTOMLByChain,
@@ -447,6 +448,7 @@ func DeployEnvironments(
 	envconfig *environment.Config,
 	testInputs *CCIPTestConfig,
 ) *environment.Environment {
+	useBlockscout := testInputs.TestGroupInput.Blockscout
 	selectedNetworks := testInputs.SelectedNetworks
 	testEnvironment := environment.New(envconfig)
 	numOfTxNodes := 1
@@ -488,28 +490,34 @@ func DeployEnvironments(
 	if testEnvironment.WillUseRemoteRunner() {
 		return testEnvironment
 	}
-
-	err = testEnvironment.
-		AddHelm(ChainlinkChart(t, testInputs, networksWithInternalURLs(selectedNetworks))).
-		Run()
-	require.NoError(t, err)
-	return testEnvironment
-}
-
-func networksWithInternalURLs(networks []blockchain.EVMNetwork) []blockchain.EVMNetwork {
 	urlFinder := func(network blockchain.EVMNetwork) ([]string, []string) {
 		if !network.Simulated {
 			return network.URLs, network.HTTPURLs
 		}
 		networkName := strings.ReplaceAll(strings.ToLower(network.Name), " ", "-")
-		internalWsURLs := []string{fmt.Sprintf("ws://%s-ethereum-geth:8546", networkName)}
-		internalHttpURLs := []string{fmt.Sprintf("http://%s-ethereum-geth:8544", networkName)}
+		var internalWsURLs, internalHttpURLs []string
+		for i := 0; i < numOfTxNodes; i++ {
+			internalWsURLs = append(internalWsURLs, fmt.Sprintf("ws://%s-ethereum-geth:8546", networkName))
+			internalHttpURLs = append(internalHttpURLs, fmt.Sprintf("http://%s-ethereum-geth:8544", networkName))
+		}
 		return internalWsURLs, internalHttpURLs
 	}
 	var nets []blockchain.EVMNetwork
-	for i := range networks {
-		nets = append(nets, networks[i])
-		nets[i].URLs, nets[i].HTTPURLs = urlFinder(networks[i])
+	for i := range selectedNetworks {
+		nets = append(nets, selectedNetworks[i])
+		nets[i].URLs, nets[i].HTTPURLs = urlFinder(selectedNetworks[i])
+		if useBlockscout {
+			testEnvironment.AddChart(blockscout.New(&blockscout.Props{
+				Name:    fmt.Sprintf("%s-blockscout", selectedNetworks[i].Name),
+				WsURL:   selectedNetworks[i].URLs[0],
+				HttpURL: selectedNetworks[i].HTTPURLs[0],
+			}))
+		}
 	}
-	return nets
+
+	err = testEnvironment.
+		AddHelm(ChainlinkChart(t, testInputs, nets)).
+		Run()
+	require.NoError(t, err)
+	return testEnvironment
 }
