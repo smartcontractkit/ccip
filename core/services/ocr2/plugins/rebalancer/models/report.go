@@ -26,6 +26,7 @@ func (c *ConfigDigest) UnmarshalJSON(b []byte) error {
 	if err != nil {
 		return fmt.Errorf("decoding config digest hex string: %w", err)
 	}
+	// TODO: check len(b) at the beginning of the function
 	if len(b) != 32 {
 		return fmt.Errorf("config digest must be 32 bytes, got %d bytes", len(b))
 	}
