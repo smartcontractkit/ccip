@@ -136,30 +136,50 @@ func getCommitReportForSeqNum(ctx context.Context, commitStoreReader ccipdata.Co
 	return acceptedReports[0].CommitStoreReport, nil
 }
 
-type messageExecState struct {
+type messageStatus string
+
+const (
+	AlreadyExecuted                      messageStatus = "already_executed"
+	SenderAlreadySkipped                 messageStatus = "sender_already_skipped"
+	MessageMaxGasCalcError               messageStatus = "message_max_gas_calc_error"
+	InsufficientRemainingBatchDataLength messageStatus = "insufficient_remaining_batch_data_length"
+	InsufficientRemainingBatchGas        messageStatus = "insufficient_remaining_batch_gas"
+	MissingNonce                         messageStatus = "missing_nonce"
+	InvalidNonce                         messageStatus = "invalid_nonce"
+	AggregateTokenValueComputeError      messageStatus = "aggregate_token_value_compute_error"
+	AggregateTokenLimitExceeded          messageStatus = "aggregate_token_limit_exceeded"
+	TokenDataNotReady                    messageStatus = "token_data_not_ready"
+	TokenDataFetchError                  messageStatus = "token_data_fetch_error"
+	TokenNotInDestTokenPrices            messageStatus = "token_not_in_dest_token_prices"
+	TokenNotInSrcTokenPrices             messageStatus = "token_not_in_src_token_prices"
+	InsufficientRemainingFee             messageStatus = "insufficient_remaining_fee"
+	AddedToBatch                         messageStatus = "added_to_batch"
+)
+
+type messageExecStatus struct {
 	SeqNr     uint64
 	MessageId string
-	State     string
+	Status    messageStatus
 }
 
-func newMessageExecState(seqNr uint64, messageId cciptypes.Hash, state string) messageExecState {
-	return messageExecState{
+func newMessageExecState(seqNr uint64, messageId cciptypes.Hash, status messageStatus) messageExecStatus {
+	return messageExecStatus{
 		SeqNr:     seqNr,
 		MessageId: hexutil.Encode(messageId[:]),
-		State:     state,
+		Status:    status,
 	}
 }
 
 type batchBuildContainer struct {
 	batch          []ccip.ObservedMessage
-	states         []messageExecState
+	statuses       []messageExecStatus
 	skippedSenders mapset.Set[cciptypes.Address]
 }
 
 func newBatchBuildContainer(capacity int) *batchBuildContainer {
 	return &batchBuildContainer{
 		batch:          make([]ccip.ObservedMessage, 0, capacity),
-		states:         make([]messageExecState, 0, capacity),
+		statuses:       make([]messageExecStatus, 0, capacity),
 		skippedSenders: mapset.NewThreadUnsafeSetWithSize[cciptypes.Address](capacity),
 	}
 }
@@ -168,20 +188,20 @@ func (m *batchBuildContainer) isSenderSkipped(sender cciptypes.Address) bool {
 	return m.skippedSenders.Contains(sender)
 }
 
-func (m *batchBuildContainer) skip(msg cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta, state string) {
-	m.addState(msg, state)
+func (m *batchBuildContainer) skip(msg cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta, status messageStatus) {
+	m.addState(msg, status)
 	m.skippedSenders.Add(msg.Sender)
 }
 
 func (m *batchBuildContainer) skipAlreadyExecuted(msg cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta) {
-	m.addState(msg, "already_executed")
+	m.addState(msg, AlreadyExecuted)
 }
 
-func (m *batchBuildContainer) add(msg cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta, tokenData [][]byte) {
-	m.addState(msg, "executed")
+func (m *batchBuildContainer) addToBatch(msg cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta, tokenData [][]byte) {
+	m.addState(msg, AddedToBatch)
 	m.batch = append(m.batch, ccip.NewObservedMessage(msg.SequenceNumber, tokenData))
 }
 
-func (m *batchBuildContainer) addState(msg cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta, state string) {
-	m.states = append(m.states, newMessageExecState(msg.SequenceNumber, msg.MessageID, state))
+func (m *batchBuildContainer) addState(msg cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta, state messageStatus) {
+	m.statuses = append(m.statuses, newMessageExecState(msg.SequenceNumber, msg.MessageID, state))
 }

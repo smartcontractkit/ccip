@@ -509,7 +509,7 @@ func TestExecutionReportingPlugin_buildBatch(t *testing.T) {
 		offRampNoncesBySender    map[cciptypes.Address]uint64
 		srcToDestTokens          map[cciptypes.Address]cciptypes.Address
 		expectedSeqNrs           []ccip.ObservedMessage
-		expectedStates           []messageExecState
+		expectedStates           []messageExecStatus
 	}{
 		{
 			name:                  "single message no tokens",
@@ -521,7 +521,7 @@ func TestExecutionReportingPlugin_buildBatch(t *testing.T) {
 			dstPrices:             map[cciptypes.Address]*big.Int{destNative: big.NewInt(1)},
 			offRampNoncesBySender: map[cciptypes.Address]uint64{sender1: 0},
 			expectedSeqNrs:        []ccip.ObservedMessage{{SeqNr: uint64(1)}},
-			expectedStates:        []messageExecState{newMessageExecState(msg1.SequenceNumber, msg1.MessageID, "executed")},
+			expectedStates:        []messageExecStatus{newMessageExecState(msg1.SequenceNumber, msg1.MessageID, AddedToBatch)},
 		},
 		{
 			name:                  "executed non finalized messages should be skipped",
@@ -532,7 +532,7 @@ func TestExecutionReportingPlugin_buildBatch(t *testing.T) {
 			srcPrices:             map[cciptypes.Address]*big.Int{srcNative: big.NewInt(1)},
 			dstPrices:             map[cciptypes.Address]*big.Int{destNative: big.NewInt(1)},
 			offRampNoncesBySender: map[cciptypes.Address]uint64{sender1: 0},
-			expectedStates:        []messageExecState{newMessageExecState(msg2.SequenceNumber, msg2.MessageID, "already_executed")},
+			expectedStates:        []messageExecStatus{newMessageExecState(msg2.SequenceNumber, msg2.MessageID, AlreadyExecuted)},
 		},
 		{
 			name:                  "finalized executed log",
@@ -543,7 +543,7 @@ func TestExecutionReportingPlugin_buildBatch(t *testing.T) {
 			srcPrices:             map[cciptypes.Address]*big.Int{srcNative: big.NewInt(1)},
 			dstPrices:             map[cciptypes.Address]*big.Int{destNative: big.NewInt(1)},
 			offRampNoncesBySender: map[cciptypes.Address]uint64{sender1: 0},
-			expectedStates:        []messageExecState{newMessageExecState(msg3.SequenceNumber, msg3.MessageID, "already_executed")},
+			expectedStates:        []messageExecStatus{newMessageExecState(msg3.SequenceNumber, msg3.MessageID, AlreadyExecuted)},
 		},
 		{
 			name:                  "dst token price does not exist",
@@ -554,7 +554,7 @@ func TestExecutionReportingPlugin_buildBatch(t *testing.T) {
 			srcPrices:             map[cciptypes.Address]*big.Int{srcNative: big.NewInt(1)},
 			dstPrices:             map[cciptypes.Address]*big.Int{},
 			offRampNoncesBySender: map[cciptypes.Address]uint64{sender1: 0},
-			expectedStates:        []messageExecState{newMessageExecState(msg1.SequenceNumber, msg1.MessageID, "token_not_in_dest_token_prices")},
+			expectedStates:        []messageExecStatus{newMessageExecState(msg1.SequenceNumber, msg1.MessageID, TokenNotInDestTokenPrices)},
 		},
 		{
 			name:                  "src token price does not exist",
@@ -565,7 +565,7 @@ func TestExecutionReportingPlugin_buildBatch(t *testing.T) {
 			srcPrices:             map[cciptypes.Address]*big.Int{},
 			dstPrices:             map[cciptypes.Address]*big.Int{destNative: big.NewInt(1)},
 			offRampNoncesBySender: map[cciptypes.Address]uint64{sender1: 0},
-			expectedStates:        []messageExecState{newMessageExecState(msg1.SequenceNumber, msg1.MessageID, "token_not_in_src_token_prices")},
+			expectedStates:        []messageExecStatus{newMessageExecState(msg1.SequenceNumber, msg1.MessageID, TokenNotInSrcTokenPrices)},
 		},
 		{
 			name:         "message with tokens is not executed if limit is reached",
@@ -579,7 +579,7 @@ func TestExecutionReportingPlugin_buildBatch(t *testing.T) {
 				srcNative: destNative,
 			},
 			offRampNoncesBySender: map[cciptypes.Address]uint64{sender1: 0},
-			expectedStates:        []messageExecState{newMessageExecState(msg4.SequenceNumber, msg4.MessageID, "aggregate_token_limit_exceeded")},
+			expectedStates:        []messageExecStatus{newMessageExecState(msg4.SequenceNumber, msg4.MessageID, AggregateTokenLimitExceeded)},
 		},
 		{
 			name:         "message with tokens is not executed if limit is reached when inflight is full",
@@ -593,7 +593,7 @@ func TestExecutionReportingPlugin_buildBatch(t *testing.T) {
 				srcNative: destNative,
 			},
 			offRampNoncesBySender: map[cciptypes.Address]uint64{sender1: 1},
-			expectedStates:        []messageExecState{newMessageExecState(msg5.SequenceNumber, msg5.MessageID, "aggregate_token_limit_exceeded")},
+			expectedStates:        []messageExecStatus{newMessageExecState(msg5.SequenceNumber, msg5.MessageID, AggregateTokenLimitExceeded)},
 		},
 		{
 			name:                  "skip when nonce doesn't match chain value",
@@ -604,7 +604,7 @@ func TestExecutionReportingPlugin_buildBatch(t *testing.T) {
 			srcPrices:             map[cciptypes.Address]*big.Int{srcNative: big.NewInt(1)},
 			dstPrices:             map[cciptypes.Address]*big.Int{destNative: big.NewInt(1)},
 			offRampNoncesBySender: map[cciptypes.Address]uint64{sender1: 123},
-			expectedStates:        []messageExecState{newMessageExecState(msg1.SequenceNumber, msg1.MessageID, "nonce_invalid")},
+			expectedStates:        []messageExecStatus{newMessageExecState(msg1.SequenceNumber, msg1.MessageID, InvalidNonce)},
 		},
 		{
 			name:                  "skip when nonce not found",
@@ -615,7 +615,7 @@ func TestExecutionReportingPlugin_buildBatch(t *testing.T) {
 			srcPrices:             map[cciptypes.Address]*big.Int{srcNative: big.NewInt(1)},
 			dstPrices:             map[cciptypes.Address]*big.Int{destNative: big.NewInt(1)},
 			offRampNoncesBySender: map[cciptypes.Address]uint64{},
-			expectedStates:        []messageExecState{newMessageExecState(msg1.SequenceNumber, msg1.MessageID, "nonce_not_found")},
+			expectedStates:        []messageExecStatus{newMessageExecState(msg1.SequenceNumber, msg1.MessageID, MissingNonce)},
 		},
 		{
 			name: "skip when batch gas limit is reached",
@@ -667,10 +667,10 @@ func TestExecutionReportingPlugin_buildBatch(t *testing.T) {
 			dstPrices:             map[cciptypes.Address]*big.Int{destNative: big.NewInt(1)},
 			offRampNoncesBySender: map[cciptypes.Address]uint64{sender1: 0},
 			expectedSeqNrs:        []ccip.ObservedMessage{{SeqNr: uint64(10)}},
-			expectedStates: []messageExecState{
-				newMessageExecState(10, [32]byte{}, "executed"),
-				newMessageExecState(11, [32]byte{}, "batch_gas_limit_exceeded"),
-				newMessageExecState(12, [32]byte{}, "sender_skipped"),
+			expectedStates: []messageExecStatus{
+				newMessageExecState(10, [32]byte{}, AddedToBatch),
+				newMessageExecState(11, [32]byte{}, InsufficientRemainingBatchGas),
+				newMessageExecState(12, [32]byte{}, SenderAlreadySkipped),
 			},
 		},
 		{
@@ -723,10 +723,10 @@ func TestExecutionReportingPlugin_buildBatch(t *testing.T) {
 			dstPrices:             map[cciptypes.Address]*big.Int{destNative: big.NewInt(1)},
 			offRampNoncesBySender: map[cciptypes.Address]uint64{sender1: 0},
 			expectedSeqNrs:        []ccip.ObservedMessage{{SeqNr: uint64(10)}},
-			expectedStates: []messageExecState{
-				newMessageExecState(10, [32]byte{}, "executed"),
-				newMessageExecState(11, [32]byte{}, "batch_data_length_exceeded"),
-				newMessageExecState(12, [32]byte{}, "sender_skipped"),
+			expectedStates: []messageExecStatus{
+				newMessageExecState(10, [32]byte{}, AddedToBatch),
+				newMessageExecState(11, [32]byte{}, InsufficientRemainingBatchDataLength),
+				newMessageExecState(12, [32]byte{}, SenderAlreadySkipped),
 			},
 		},
 	}
