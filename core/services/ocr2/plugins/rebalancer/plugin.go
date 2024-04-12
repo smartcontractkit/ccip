@@ -239,6 +239,7 @@ func combinedUnexecutedTransfers(
 	inflightTransfers []models.Transfer,
 ) []liquidityrebalancer.UnexecutedTransfer {
 	unexecuted := make([]liquidityrebalancer.UnexecutedTransfer, 0, len(pendingTransfers)+len(resolvedTransfersQuorum)+len(inflightTransfers))
+	// TODO: reduce for loops: unexecuted = append(unexecuted, pendingTransfers...)
 	for _, pendingTransfer := range pendingTransfers {
 		unexecuted = append(unexecuted, pendingTransfer)
 	}
