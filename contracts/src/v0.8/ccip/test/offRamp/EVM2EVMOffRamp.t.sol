@@ -28,7 +28,6 @@ import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/tok
 
 contract EVM2EVMOffRamp_constructor is EVM2EVMOffRampSetup {
   event ConfigSet(EVM2EVMOffRamp.StaticConfig staticConfig, EVM2EVMOffRamp.DynamicConfig dynamicConfig);
-  event TokenAggregateRateLimitAdded(address token);
 
   function testConstructorSuccess() public {
     EVM2EVMOffRamp.StaticConfig memory staticConfig = EVM2EVMOffRamp.StaticConfig({

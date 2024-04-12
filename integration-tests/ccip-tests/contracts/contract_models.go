@@ -933,17 +933,25 @@ func (offRamp *OffRamp) SetOCR2Config(
 	return offRamp.client.ProcessTransaction(tx)
 }
 
-func (offRamp *OffRamp) UpdateRateLimitTokens(tokens []common.Address) error {
+func (offRamp *OffRamp) UpdateRateLimitTokens(sourceTokens, destTokens []common.Address) error {
 	opts, err := offRamp.client.TransactionOpts(offRamp.client.GetDefaultWallet())
 	if err != nil {
 		return fmt.Errorf("failed to get transaction opts: %w", err)
 	}
-	tx, err := offRamp.Instance.UpdateRateLimitTokens(opts, tokens, []common.Address{})
+	rateLimitTokens := make([]evm_2_evm_offramp.EVM2EVMOffRampRateLimitToken, len(sourceTokens))
+	for i, sourceToken := range sourceTokens {
+		rateLimitTokens[i] = evm_2_evm_offramp.EVM2EVMOffRampRateLimitToken{
+			SourceToken: sourceToken,
+			DestToken:   destTokens[i],
+		}
+	}
+
+	tx, err := offRamp.Instance.UpdateRateLimitTokens(opts, []evm_2_evm_offramp.EVM2EVMOffRampRateLimitToken{}, rateLimitTokens)
 	if err != nil {
 		return fmt.Errorf("failed to apply rate limit tokens updates: %w", err)
 	}
 	log.Info().
-		Interface("rateLimitToken adds", tokens).
+		Interface("rateLimitToken adds", rateLimitTokens).
 		Str("offRamp", offRamp.Address()).
 		Str(Network, offRamp.client.GetNetworkConfig().Name).
 		Msg("rateLimitTokens set in OffRamp")
