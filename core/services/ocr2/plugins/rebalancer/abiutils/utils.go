@@ -1,5 +1,7 @@
 package abiutils
 
+// TBD: rename package to "abi" or "encoding"
+// and move all Pack/Unpack functions here (e.g. UnpackL1ToL2SendBridgePayload)
 import (
 	"fmt"
 	"math/big"
