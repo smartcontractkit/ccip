@@ -555,10 +555,6 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
         revert InvalidAddress(sourceTokenData.destPoolAddress);
       }
 
-      if (s_rateLimitedTokensDestToSource.contains(destTokenAmounts[i].token)) {
-        value += _getTokenValue(destTokenAmounts[i], IPriceRegistry(s_dynamicConfig.priceRegistry));
-      }
-
       // Call the pool with exact gas to increase resistance against malicious tokens or token pools.
       // _callWithExactGas also protects against return data bombs by capping the return data size
       // at MAX_RET_BYTES.
@@ -583,6 +579,10 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
 
       // If the call was successful, the returnData should be the local token address.
       destTokenAmounts[i].token = _validateEVMAddress(returnData);
+
+      if (s_rateLimitedTokensDestToSource.contains(destTokenAmounts[i].token)) {
+        value += _getTokenValue(destTokenAmounts[i], IPriceRegistry(s_dynamicConfig.priceRegistry));
+      }
     }
 
     if (value > 0) _rateLimitValue(value);

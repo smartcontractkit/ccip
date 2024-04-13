@@ -2,4 +2,4 @@
 "ccip": minor
 ---
 
-Support opt-in AggregateRateLimiter 
+Support optional AggregateRateLimiter 

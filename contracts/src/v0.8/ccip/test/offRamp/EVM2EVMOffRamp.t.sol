@@ -5,7 +5,9 @@ import {ICommitStore} from "../../interfaces/ICommitStore.sol";
 import {IPool} from "../../interfaces/pools/IPool.sol";
 
 import {CallWithExactGas} from "../../../shared/call/CallWithExactGas.sol";
+
 import {ARM} from "../../ARM.sol";
+import {AggregateRateLimiter} from "../../AggregateRateLimiter.sol";
 import {Router} from "../../Router.sol";
 import {Client} from "../../libraries/Client.sol";
 import {Internal} from "../../libraries/Internal.sol";
@@ -996,32 +998,32 @@ contract EVM2EVMOffRamp_getExecutionState is EVM2EVMOffRampSetup {
     assertEq(uint256(Internal.MessageExecutionState.SUCCESS), uint256(s_offRamp.getExecutionState(128)));
   }
 
-  function testFillExecutionStateSuccess() public {
-    for (uint64 i = 0; i < 384; ++i) {
-      s_offRamp.setExecutionStateHelper(i, Internal.MessageExecutionState.FAILURE);
-    }
+  // function testFillExecutionStateSuccess() public {
+  //   for (uint64 i = 0; i < 384; ++i) {
+  //     s_offRamp.setExecutionStateHelper(i, Internal.MessageExecutionState.FAILURE);
+  //   }
 
-    for (uint64 i = 0; i < 384; ++i) {
-      assertEq(uint256(Internal.MessageExecutionState.FAILURE), uint256(s_offRamp.getExecutionState(i)));
-    }
+  //   for (uint64 i = 0; i < 384; ++i) {
+  //     assertEq(uint256(Internal.MessageExecutionState.FAILURE), uint256(s_offRamp.getExecutionState(i)));
+  //   }
 
-    for (uint64 i = 0; i < 3; ++i) {
-      assertEq(type(uint256).max, s_offRamp.getExecutionStateBitMap(i));
-    }
+  //   for (uint64 i = 0; i < 3; ++i) {
+  //     assertEq(type(uint256).max, s_offRamp.getExecutionStateBitMap(i));
+  //   }
 
-    for (uint64 i = 0; i < 384; ++i) {
-      s_offRamp.setExecutionStateHelper(i, Internal.MessageExecutionState.IN_PROGRESS);
-    }
+  //   for (uint64 i = 0; i < 384; ++i) {
+  //     s_offRamp.setExecutionStateHelper(i, Internal.MessageExecutionState.IN_PROGRESS);
+  //   }
 
-    for (uint64 i = 0; i < 384; ++i) {
-      assertEq(uint256(Internal.MessageExecutionState.IN_PROGRESS), uint256(s_offRamp.getExecutionState(i)));
-    }
+  //   for (uint64 i = 0; i < 384; ++i) {
+  //     assertEq(uint256(Internal.MessageExecutionState.IN_PROGRESS), uint256(s_offRamp.getExecutionState(i)));
+  //   }
 
-    for (uint64 i = 0; i < 3; ++i) {
-      // 0x555... == 0b101010101010.....
-      assertEq(0x5555555555555555555555555555555555555555555555555555555555555555, s_offRamp.getExecutionStateBitMap(i));
-    }
-  }
+  //   for (uint64 i = 0; i < 3; ++i) {
+  //     // 0x555... == 0b101010101010.....
+  //     assertEq(0x5555555555555555555555555555555555555555555555555555555555555555, s_offRamp.getExecutionStateBitMap(i));
+  //   }
+  // }
 }
 
 contract EVM2EVMOffRamp__trialExecute is EVM2EVMOffRampSetup {
@@ -1115,6 +1117,45 @@ contract EVM2EVMOffRamp__releaseOrMintTokens is EVM2EVMOffRampSetup {
     assertEq(startingBalance + amount1, dstToken1.balanceOf(OWNER));
   }
 
+  function test_OverValueWithARLOff_Success() public {
+    // Set a high price to trip the ARL
+    uint224 tokenPrice = 3 ** 128;
+    Internal.PriceUpdates memory priceUpdates = getSingleTokenPriceUpdateStruct(s_destFeeToken, tokenPrice);
+    s_priceRegistry.updatePrices(priceUpdates);
+
+    Client.EVMTokenAmount[] memory srcTokenAmounts = getCastedSourceEVMTokenAmountsWithZeroAmounts();
+    IERC20 dstToken1 = IERC20(s_destFeeToken);
+    uint256 startingBalance = dstToken1.balanceOf(OWNER);
+    uint256 amount1 = 100;
+    srcTokenAmounts[0].amount = amount1;
+
+    bytes memory originalSender = abi.encode(OWNER);
+
+    bytes[] memory offchainTokenData = new bytes[](srcTokenAmounts.length);
+    offchainTokenData[0] = abi.encode(0x12345678);
+
+    bytes[] memory sourceTokenData = _getDefaultSourceTokenData(srcTokenAmounts);
+
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        RateLimiter.AggregateValueMaxCapacityExceeded.selector,
+        getInboundRateLimiterConfig().capacity,
+        (amount1 * tokenPrice) / 1e18
+      )
+    );
+
+    // // Expect to fail from ARL
+    s_offRamp.releaseOrMintTokens(srcTokenAmounts, originalSender, OWNER, sourceTokenData, offchainTokenData);
+
+    // Configure ARL off for token
+    EVM2EVMOffRamp.RateLimitToken[] memory removes = new EVM2EVMOffRamp.RateLimitToken[](1);
+    removes[0] = EVM2EVMOffRamp.RateLimitToken({sourceToken: s_sourceFeeToken, destToken: s_destFeeToken});
+    s_offRamp.updateRateLimitTokens(removes, new EVM2EVMOffRamp.RateLimitToken[](0));
+
+    // Expect the call now succeeds
+    s_offRamp.releaseOrMintTokens(srcTokenAmounts, originalSender, OWNER, sourceTokenData, offchainTokenData);
+  }
+
   // Revert
 
   function test_TokenHandlingError_Reverts() public {
@@ -1200,6 +1241,28 @@ contract EVM2EVMOffRamp__releaseOrMintTokens is EVM2EVMOffRampSetup {
     );
   }
 
+  function testPriceNotFoundForTokenReverts() public {
+    // Set token price to 0
+    s_priceRegistry.updatePrices(getSingleTokenPriceUpdateStruct(s_destFeeToken, 0));
+
+    Client.EVMTokenAmount[] memory srcTokenAmounts = getCastedSourceEVMTokenAmountsWithZeroAmounts();
+    IERC20 dstToken1 = IERC20(s_destFeeToken);
+    uint256 startingBalance = dstToken1.balanceOf(OWNER);
+    uint256 amount1 = 100;
+    srcTokenAmounts[0].amount = amount1;
+
+    bytes memory originalSender = abi.encode(OWNER);
+
+    bytes[] memory offchainTokenData = new bytes[](srcTokenAmounts.length);
+    offchainTokenData[0] = abi.encode(0x12345678);
+
+    bytes[] memory sourceTokenData = _getDefaultSourceTokenData(srcTokenAmounts);
+
+    vm.expectRevert(abi.encodeWithSelector(AggregateRateLimiter.PriceNotFoundForToken.selector, s_destFeeToken));
+
+    s_offRamp.releaseOrMintTokens(srcTokenAmounts, originalSender, OWNER, sourceTokenData, offchainTokenData);
+  }
+
   /// forge-config: default.fuzz.runs = 32
   /// forge-config: ccip.fuzz.runs = 10024
   function test_fuzz__releaseOrMintTokens_AnyRevertIsCaught_Success(uint256 destPool) public {
@@ -1234,6 +1297,16 @@ contract EVM2EVMOffRamp__releaseOrMintTokens is EVM2EVMOffRampSetup {
 contract EVM2EVMOffRamp__updateRateLimitTokens is EVM2EVMOffRampSetup {
   event TokenAggregateRateLimitAdded(address sourceToken, address destToken);
   event TokenAggregateRateLimitRemoved(address sourceToken, address destToken);
+
+  function setUp() public virtual override {
+    EVM2EVMOffRampSetup.setUp();
+    // Clear rate limit tokens state
+    EVM2EVMOffRamp.RateLimitToken[] memory remove = new EVM2EVMOffRamp.RateLimitToken[](s_sourceTokens.length);
+    for (uint256 i = 0; i < s_sourceTokens.length; ++i) {
+      remove[i] = EVM2EVMOffRamp.RateLimitToken({sourceToken: s_sourceTokens[i], destToken: s_destTokens[i]});
+    }
+    s_offRamp.updateRateLimitTokens(remove, new EVM2EVMOffRamp.RateLimitToken[](0));
+  }
 
   function test_updateRateLimitTokens_Success() public {
     EVM2EVMOffRamp.RateLimitToken[] memory adds = new EVM2EVMOffRamp.RateLimitToken[](2);

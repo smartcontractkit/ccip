@@ -375,7 +375,7 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
     assertEq(feeTokenAmount, s_onRamp.getNopFeesJuels());
   }
 
-  function testHighCapacityARLOffSuccess() public {
+  function test_OverValueWithARLOff_Success() public {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
     message.tokenAmounts = new Client.EVMTokenAmount[](1);
     message.tokenAmounts[0].amount = 10;
