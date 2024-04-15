@@ -311,7 +311,9 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
       sequenceNumber: ++s_sequenceNumber,
       gasLimit: gasLimit,
       strict: sequenced,
-      nonce: ++s_senderNonce[originalSender],
+      // Only bump nonce for sequenced messages, otherwise unsequenced message nonces
+      // may block sequenced message nonces, which is not what we want.
+      nonce: sequenced ? ++s_senderNonce[originalSender] : 0,
       feeToken: message.feeToken,
       feeTokenAmount: feeTokenAmount,
       data: message.data,

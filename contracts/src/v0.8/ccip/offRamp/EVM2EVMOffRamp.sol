@@ -340,7 +340,8 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
     Internal.EVM2EVMMessage memory message,
     bytes[] memory offchainTokenData,
     bool manualExecution,
-    Internal.MessageExecutionState originalState) internal returns (Internal.MessageExecutionState newState, bytes memory returnData) {
+    Internal.MessageExecutionState originalState
+  ) internal returns (Internal.MessageExecutionState newState, bytes memory returnData) {
     // Although we expect only valid messages will be committed, we check again
     // when executing as a defense in depth measure.
     _isWellFormed(
@@ -374,7 +375,8 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
     // UNTOUCHED -> SUCCESS  nonce bump
     // FAILURE   -> FAILURE  no nonce bump
     // FAILURE   -> SUCCESS  no nonce bump
-    if (originalState == Internal.MessageExecutionState.UNTOUCHED) {
+    // Nonce bumping only occurs for messages where message.strict == true.
+    if (message.strict && originalState == Internal.MessageExecutionState.UNTOUCHED) {
       s_senderNonce[message.sender]++;
     }
 
