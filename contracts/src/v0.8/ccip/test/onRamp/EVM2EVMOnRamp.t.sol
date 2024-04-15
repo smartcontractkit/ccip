@@ -574,7 +574,7 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
       destGasOverhead: 0,
       destBytesOverhead: 0
     });
-    s_onRamp.setTokenTransferFeeConfig(tokenTransferFeeConfigArgs);
+    s_onRamp.setTokenTransferFeeConfig(tokenTransferFeeConfigArgs, new address[](0));
     newPool.setSourceTokenData(new bytes(64));
 
     // Add TokenPool to OnRamp
@@ -959,7 +959,7 @@ contract EVM2EVMOnRamp_getTokenTransferCost is EVM2EVMOnRamp_getFeeSetup {
       destGasOverhead: 0,
       destBytesOverhead: 0
     });
-    s_onRamp.setTokenTransferFeeConfig(tokenTransferFeeConfigArgs);
+    s_onRamp.setTokenTransferFeeConfig(tokenTransferFeeConfigArgs, new address[](0));
 
     Client.EVM2AnyMessage memory message = _generateSingleTokenMessage(s_sourceFeeToken, 1e36);
     (uint256 feeUSDWei, uint32 destGasOverhead, uint32 destBytesOverhead) =
@@ -1543,45 +1543,79 @@ contract EVM2EVMOnRamp_setFeeTokenConfig is EVM2EVMOnRampSetup {
 /// @notice #setTokenTransferFeeConfig
 contract EVM2EVMOnRamp_setTokenTransferFeeConfig is EVM2EVMOnRampSetup {
   event TokenTransferFeeConfigSet(EVM2EVMOnRamp.TokenTransferFeeConfigArgs[] transferFeeConfig);
+  event TokenTransferFeeConfigDeleted(address[] tokens);
 
   function test_SetTokenTransferFee_Success() public {
-    EVM2EVMOnRamp.TokenTransferFeeConfigArgs[] memory tokenTransferFeeConfigArgs =
+    EVM2EVMOnRamp.TokenTransferFeeConfigArgs[] memory tokenTransferFeeArgs =
       new EVM2EVMOnRamp.TokenTransferFeeConfigArgs[](2);
-    tokenTransferFeeConfigArgs[0] = EVM2EVMOnRamp.TokenTransferFeeConfigArgs({
-      token: address(0),
-      minFeeUSDCents: 0,
-      maxFeeUSDCents: 0,
-      deciBps: 0,
-      destGasOverhead: 0,
-      destBytesOverhead: 0
+    tokenTransferFeeArgs[0] = EVM2EVMOnRamp.TokenTransferFeeConfigArgs({
+      token: address(5),
+      minFeeUSDCents: 6,
+      maxFeeUSDCents: 7,
+      deciBps: 8,
+      destGasOverhead: 9,
+      destBytesOverhead: 10
     });
-    tokenTransferFeeConfigArgs[1] = EVM2EVMOnRamp.TokenTransferFeeConfigArgs({
-      token: address(1),
-      minFeeUSDCents: 1,
-      maxFeeUSDCents: 1,
-      deciBps: 1,
-      destGasOverhead: 1,
-      destBytesOverhead: 1
+    tokenTransferFeeArgs[1] = EVM2EVMOnRamp.TokenTransferFeeConfigArgs({
+      token: address(11),
+      minFeeUSDCents: 12,
+      maxFeeUSDCents: 13,
+      deciBps: 14,
+      destGasOverhead: 15,
+      destBytesOverhead: 16
     });
 
     vm.expectEmit();
-    emit TokenTransferFeeConfigSet(tokenTransferFeeConfigArgs);
+    emit TokenTransferFeeConfigSet(tokenTransferFeeArgs);
 
-    s_onRamp.setTokenTransferFeeConfig(tokenTransferFeeConfigArgs);
+    s_onRamp.setTokenTransferFeeConfig(tokenTransferFeeArgs, new address[](0));
 
-    EVM2EVMOnRamp.TokenTransferFeeConfig memory tokenTransferFeeConfig0 = s_onRamp.getTokenTransferFeeConfig(address(0));
-    assertEq(0, tokenTransferFeeConfig0.minFeeUSDCents);
-    assertEq(0, tokenTransferFeeConfig0.maxFeeUSDCents);
-    assertEq(0, tokenTransferFeeConfig0.deciBps);
-    assertEq(0, tokenTransferFeeConfig0.destGasOverhead);
-    assertEq(0, tokenTransferFeeConfig0.destBytesOverhead);
+    EVM2EVMOnRamp.TokenTransferFeeConfig memory config0 =
+      s_onRamp.getTokenTransferFeeConfig(tokenTransferFeeArgs[0].token);
 
-    EVM2EVMOnRamp.TokenTransferFeeConfig memory tokenTransferFeeConfig1 = s_onRamp.getTokenTransferFeeConfig(address(1));
-    assertEq(1, tokenTransferFeeConfig1.minFeeUSDCents);
-    assertEq(1, tokenTransferFeeConfig1.maxFeeUSDCents);
-    assertEq(1, tokenTransferFeeConfig1.deciBps);
-    assertEq(1, tokenTransferFeeConfig1.destGasOverhead);
-    assertEq(1, tokenTransferFeeConfig1.destBytesOverhead);
+    assertEq(tokenTransferFeeArgs[0].minFeeUSDCents, config0.minFeeUSDCents);
+    assertEq(tokenTransferFeeArgs[0].maxFeeUSDCents, config0.maxFeeUSDCents);
+    assertEq(tokenTransferFeeArgs[0].deciBps, config0.deciBps);
+    assertEq(tokenTransferFeeArgs[0].destGasOverhead, config0.destGasOverhead);
+    assertEq(tokenTransferFeeArgs[0].destBytesOverhead, config0.destBytesOverhead);
+    assertTrue(config0.isEnabled);
+
+    EVM2EVMOnRamp.TokenTransferFeeConfig memory config1 =
+      s_onRamp.getTokenTransferFeeConfig(tokenTransferFeeArgs[1].token);
+
+    assertEq(tokenTransferFeeArgs[1].minFeeUSDCents, config1.minFeeUSDCents);
+    assertEq(tokenTransferFeeArgs[1].maxFeeUSDCents, config1.maxFeeUSDCents);
+    assertEq(tokenTransferFeeArgs[1].deciBps, config1.deciBps);
+    assertEq(tokenTransferFeeArgs[1].destGasOverhead, config1.destGasOverhead);
+    assertEq(tokenTransferFeeArgs[1].destBytesOverhead, config1.destBytesOverhead);
+    assertTrue(config0.isEnabled);
+
+    // Remove only the first token and validate only the first token is removed
+    address[] memory tokensToRemove = new address[](1);
+    tokensToRemove[0] = tokenTransferFeeArgs[0].token;
+
+    vm.expectEmit();
+    emit TokenTransferFeeConfigDeleted(tokensToRemove);
+
+    s_onRamp.setTokenTransferFeeConfig(new EVM2EVMOnRamp.TokenTransferFeeConfigArgs[](0), tokensToRemove);
+
+    config0 = s_onRamp.getTokenTransferFeeConfig(tokenTransferFeeArgs[0].token);
+
+    assertEq(0, config0.minFeeUSDCents);
+    assertEq(0, config0.maxFeeUSDCents);
+    assertEq(0, config0.deciBps);
+    assertEq(0, config0.destGasOverhead);
+    assertEq(0, config0.destBytesOverhead);
+    assertFalse(config0.isEnabled);
+
+    config1 = s_onRamp.getTokenTransferFeeConfig(tokenTransferFeeArgs[1].token);
+
+    assertEq(tokenTransferFeeArgs[1].minFeeUSDCents, config1.minFeeUSDCents);
+    assertEq(tokenTransferFeeArgs[1].maxFeeUSDCents, config1.maxFeeUSDCents);
+    assertEq(tokenTransferFeeArgs[1].deciBps, config1.deciBps);
+    assertEq(tokenTransferFeeArgs[1].destGasOverhead, config1.destGasOverhead);
+    assertEq(tokenTransferFeeArgs[1].destBytesOverhead, config1.destBytesOverhead);
+    assertTrue(config1.isEnabled);
   }
 
   function test_SetFeeTokenConfigByAdmin_Success() public {
@@ -1591,7 +1625,7 @@ contract EVM2EVMOnRamp_setTokenTransferFeeConfig is EVM2EVMOnRampSetup {
     vm.expectEmit();
     emit TokenTransferFeeConfigSet(transferFeeConfig);
 
-    s_onRamp.setTokenTransferFeeConfig(transferFeeConfig);
+    s_onRamp.setTokenTransferFeeConfig(transferFeeConfig, new address[](0));
   }
 
   // Reverts
@@ -1602,7 +1636,7 @@ contract EVM2EVMOnRamp_setTokenTransferFeeConfig is EVM2EVMOnRampSetup {
 
     vm.expectRevert(EVM2EVMOnRamp.OnlyCallableByOwnerOrAdmin.selector);
 
-    s_onRamp.setTokenTransferFeeConfig(transferFeeConfig);
+    s_onRamp.setTokenTransferFeeConfig(transferFeeConfig, new address[](0));
   }
 }
 

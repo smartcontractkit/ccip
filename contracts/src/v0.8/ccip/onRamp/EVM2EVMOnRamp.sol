@@ -63,6 +63,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   event NopPaid(address indexed nop, uint256 amount);
   event FeeConfigSet(FeeTokenConfigArgs[] feeConfig);
   event TokenTransferFeeConfigSet(TokenTransferFeeConfigArgs[] transferFeeConfig);
+  event TokenTransferFeeConfigDeleted(address[] tokens);
   /// RMN depends on this event, if changing, please notify the RMN maintainers.
   event CCIPSendRequested(Internal.EVM2EVMMessage message);
   event NopsSet(uint256 nopWeightsTotal, NopAndWeight[] nopsAndWeights);
@@ -120,7 +121,8 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     uint32 maxFeeUSDCents; //     │ Maximum fee to charge per token transfer, multiples of 0.01 USD
     uint16 deciBps; //            │ Basis points charged on token transfers, multiples of 0.1bps, or 1e-5
     uint32 destGasOverhead; //    │ Gas charged to execute the token transfer on the destination chain
-    uint32 destBytesOverhead; // ─╯ Extra data availability bytes on top of fixed transfer data, including sourceTokenData and offchainData
+    uint32 destBytesOverhead; //  │ Extra data availability bytes on top of fixed transfer data, including sourceTokenData and offchainData
+    bool isEnabled; // ────────────╯ Whether this token has custom transfer fees
   }
 
   /// @dev Same as TokenTransferFeeConfig
@@ -220,7 +222,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
 
     _setDynamicConfig(dynamicConfig);
     _setFeeTokenConfig(feeTokenConfigs);
-    _setTokenTransferFeeConfig(tokenTransferFeeConfigArgs);
+    _setTokenTransferFeeConfig(tokenTransferFeeConfigArgs, new address[](0));
     _setNops(nopsAndWeights);
   }
 
@@ -574,12 +576,13 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
 
     for (uint256 i = 0; i < numberOfTokens; ++i) {
       Client.EVMTokenAmount memory tokenAmount = tokenAmounts[i];
-      TokenTransferFeeConfig memory transferFeeConfig = s_tokenTransferFeeConfig[tokenAmount.token];
 
       // Validate if the token is supported, do not calculate fee for unsupported tokens.
       if (address(getPoolBySourceToken(i_destChainSelector, IERC20(tokenAmount.token))) == address(0)) {
         revert UnsupportedToken(IERC20(tokenAmount.token));
       }
+
+      TokenTransferFeeConfig memory transferFeeConfig = s_tokenTransferFeeConfig[tokenAmount.token];
 
       uint256 bpsFeeUSDWei = 0;
       // Only calculate bps fee if ratio is greater than 0. Ratio of 0 means no bps fee for a token.
@@ -660,15 +663,18 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
 
   /// @notice Sets the transfer fee config.
   /// @dev only callable by the owner or admin.
-  function setTokenTransferFeeConfig(TokenTransferFeeConfigArgs[] memory tokenTransferFeeConfigArgs)
-    external
-    onlyOwnerOrAdmin
-  {
-    _setTokenTransferFeeConfig(tokenTransferFeeConfigArgs);
+  function setTokenTransferFeeConfig(
+    TokenTransferFeeConfigArgs[] memory tokenTransferFeeConfigArgs,
+    address[] memory tokensToUseDefaultFeeConfigs
+  ) external onlyOwnerOrAdmin {
+    _setTokenTransferFeeConfig(tokenTransferFeeConfigArgs, tokensToUseDefaultFeeConfigs);
   }
 
   /// @notice internal helper to set the token transfer fee config.
-  function _setTokenTransferFeeConfig(TokenTransferFeeConfigArgs[] memory tokenTransferFeeConfigArgs) internal {
+  function _setTokenTransferFeeConfig(
+    TokenTransferFeeConfigArgs[] memory tokenTransferFeeConfigArgs,
+    address[] memory tokensToUseDefaultFeeConfigs
+  ) internal {
     for (uint256 i = 0; i < tokenTransferFeeConfigArgs.length; ++i) {
       TokenTransferFeeConfigArgs memory configArg = tokenTransferFeeConfigArgs[i];
 
@@ -677,10 +683,19 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
         maxFeeUSDCents: configArg.maxFeeUSDCents,
         deciBps: configArg.deciBps,
         destGasOverhead: configArg.destGasOverhead,
-        destBytesOverhead: configArg.destBytesOverhead
+        destBytesOverhead: configArg.destBytesOverhead,
+        isEnabled: true
       });
     }
     emit TokenTransferFeeConfigSet(tokenTransferFeeConfigArgs);
+
+    // Remove the custom fee configs for the tokens that are in the tokensToUseDefaultFeeConfigs array
+    for (uint256 i = 0; i < tokensToUseDefaultFeeConfigs.length; ++i) {
+      delete s_tokenTransferFeeConfig[tokensToUseDefaultFeeConfigs[i]];
+    }
+    if (tokensToUseDefaultFeeConfigs.length > 0) {
+      emit TokenTransferFeeConfigDeleted(tokensToUseDefaultFeeConfigs);
+    }
   }
 
   // ================================================================
