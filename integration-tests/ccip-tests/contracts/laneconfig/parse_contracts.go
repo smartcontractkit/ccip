@@ -83,9 +83,6 @@ func (l *LaneConfig) Validate() error {
 	if l.PriceRegistry == "" || !common.IsHexAddress(l.PriceRegistry) {
 		laneConfigError = multierr.Append(laneConfigError, errors.New("must set proper address for price_registry"))
 	}
-	if l.TokenAdminRegistry == "" || !common.IsHexAddress(l.TokenAdminRegistry) {
-		laneConfigError = multierr.Append(laneConfigError, errors.New("must set proper address for token_admin_registry"))
-	}
 	if l.WrappedNative == "" || !common.IsHexAddress(l.WrappedNative) {
 		laneConfigError = multierr.Append(laneConfigError, errors.New("must set proper address for wrapped_native"))
 	}
