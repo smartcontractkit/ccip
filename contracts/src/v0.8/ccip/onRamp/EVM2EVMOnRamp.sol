@@ -94,7 +94,12 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     address priceRegistry; //                    │ Price registry address
     uint32 maxDataBytes; //                      │ Maximum payload data size in bytes
     uint32 maxPerMsgGasLimit; // ────────────────╯ Maximum gas limit for messages targeting EVMs
-    address tokenAdminRegistry; //                 Token admin registry address
+    address tokenAdminRegistry; // ──────────────╮ Token admin registry address
+    //                                           │
+    // The following three properties are defaults, they can be overridden by setting the TokenTransferFeeConfig for a token
+    uint16 defaultTokenFeeUSDCents; //           │ Default token fee charged per token transfer
+    uint32 defaultTokenDestGasOverhead; //       │ Default gas charged to execute the token transfer on the destination chain
+    uint32 defaultTokenDestBytesOverhead; // ────╯ Default extra data availability bytes charged per token transfer
   }
 
   /// @dev Struct to hold the execution fee configuration for a fee token
@@ -122,7 +127,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     uint16 deciBps; //            │ Basis points charged on token transfers, multiples of 0.1bps, or 1e-5
     uint32 destGasOverhead; //    │ Gas charged to execute the token transfer on the destination chain
     uint32 destBytesOverhead; //  │ Extra data availability bytes on top of fixed transfer data, including sourceTokenData and offchainData
-    bool isEnabled; // ────────────╯ Whether this token has custom transfer fees
+    bool isEnabled; // ───────────╯ Whether this token has custom transfer fees
   }
 
   /// @dev Same as TokenTransferFeeConfig
@@ -583,6 +588,14 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
       }
 
       TokenTransferFeeConfig memory transferFeeConfig = s_tokenTransferFeeConfig[tokenAmount.token];
+
+      // If the token has no specific overrides configured, we use the global defaults.
+      if (!transferFeeConfig.isEnabled) {
+        tokenTransferFeeUSDWei += uint256(s_dynamicConfig.defaultTokenFeeUSDCents) * 1e16;
+        tokenTransferGas += s_dynamicConfig.defaultTokenDestGasOverhead;
+        tokenTransferBytesOverhead += s_dynamicConfig.defaultTokenDestBytesOverhead;
+        continue;
+      }
 
       uint256 bpsFeeUSDWei = 0;
       // Only calculate bps fee if ratio is greater than 0. Ratio of 0 means no bps fee for a token.

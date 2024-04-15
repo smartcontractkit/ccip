@@ -1675,7 +1675,10 @@ contract EVM2EVMOnRamp_setDynamicConfig is EVM2EVMOnRampSetup {
       priceRegistry: address(23423),
       maxDataBytes: 400,
       maxPerMsgGasLimit: MAX_GAS_LIMIT / 2,
-      tokenAdminRegistry: address(s_tokenAdminRegistry)
+      tokenAdminRegistry: address(s_tokenAdminRegistry),
+      defaultTokenFeeUSDCents: DEFAULT_TOKEN_FEE_USD_CENTS,
+      defaultTokenDestGasOverhead: DEFAULT_TOKEN_DEST_GAS_OVERHEAD,
+      defaultTokenDestBytesOverhead: DEFAULT_TOKEN_BYTES_OVERHEAD
     });
 
     vm.expectEmit();
@@ -1707,7 +1710,10 @@ contract EVM2EVMOnRamp_setDynamicConfig is EVM2EVMOnRampSetup {
       priceRegistry: address(23423),
       maxDataBytes: 400,
       maxPerMsgGasLimit: MAX_GAS_LIMIT / 2,
-      tokenAdminRegistry: address(s_tokenAdminRegistry)
+      tokenAdminRegistry: address(s_tokenAdminRegistry),
+      defaultTokenFeeUSDCents: DEFAULT_TOKEN_FEE_USD_CENTS,
+      defaultTokenDestGasOverhead: DEFAULT_TOKEN_DEST_GAS_OVERHEAD,
+      defaultTokenDestBytesOverhead: DEFAULT_TOKEN_BYTES_OVERHEAD
     });
 
     // Invalid price reg reverts.
