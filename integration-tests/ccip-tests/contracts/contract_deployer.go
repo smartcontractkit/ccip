@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -772,7 +773,15 @@ func (e *CCIPContractsDeployer) TypeAndVersion(addr common.Address) (string, err
 		Str("Contract Address", addr.Hex()).
 		Msg("TypeAndVersion")
 
-	return tvStr, nil
+	_, versionStr, err := ccipconfig.ParseTypeAndVersion(tvStr)
+	if err != nil {
+		return versionStr, err
+	}
+	v, err := semver.NewVersion(versionStr)
+	if err != nil {
+		return "", fmt.Errorf("failed parsing version %s: %w", versionStr, err)
+	}
+	return v.String(), nil
 }
 
 var OCR2ParamsForCommit = contracts.OffChainAggregatorV2Config{
