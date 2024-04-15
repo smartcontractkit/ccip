@@ -416,12 +416,11 @@ contract Router_applyRampUpdates is RouterSetup {
     );
   }
 
-  /// forge-config: default.fuzz.runs = 32
-  /// forge-config: ccip.fuzz.runs = 32
-  function test_Fuzz_OffRampUpdates(Router.OffRamp[20] memory offRampsInput) public {
-    Router.OffRamp[] memory offRamps = new Router.OffRamp[](offRampsInput.length);
+  function test_Fuzz_OffRampUpdates(address[20] memory offRampsInput) public {
+    Router.OffRamp[] memory offRamps = new Router.OffRamp[](20);
+
     for (uint256 i = 0; i < offRampsInput.length; ++i) {
-      offRamps[i] = offRampsInput[i];
+      offRamps[i] = Router.OffRamp({sourceChainSelector: uint64(i), offRamp: offRampsInput[i]});
     }
 
     // Test adding offRamps
