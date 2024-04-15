@@ -1176,7 +1176,7 @@ func (sourceCCIP *SourceCCIPModule) SetTokenTransferFeeConfig() error {
 			DeciBps:                   5_0,          // 5 bps
 			DestGasOverhead:           destGasOverhead,
 			DestBytesOverhead:         destByteOverhead,
-			AggregateRateLimitEnabled: rand.Intn(2) == 1, // Randomly turn on ARL for ~50% of tokens
+			AggregateRateLimitEnabled: true,
 		})
 	}
 	err := sourceCCIP.OnRamp.SetTokenTransferFeeConfig(tokenTransferFeeConfig)
