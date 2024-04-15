@@ -44,6 +44,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/usdc_token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/weth9"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/link_token_interface"
+	type_and_version "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/type_and_version_interface_wrapper"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/burn_mint_erc677"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/erc20"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
@@ -755,6 +756,23 @@ func (e *CCIPContractsDeployer) NewMockAggregator(addr common.Address) (*MockAgg
 		Instance:        ins,
 		ContractAddress: addr,
 	}, nil
+}
+
+func (e *CCIPContractsDeployer) TypeAndVersion(addr common.Address) (string, error) {
+	tv, err := type_and_version.NewTypeAndVersionInterface(addr, wrappers.MustNewWrappedContractBackend(e.evmClient, nil))
+	if err != nil {
+		return "", err
+	}
+	tvStr, err := tv.TypeAndVersion(nil)
+	if err != nil {
+		return "", fmt.Errorf("error calling typeAndVersion on addr: %s %w", addr.Hex(), err)
+	}
+	log.Info().
+		Str("TypeAndVersion", tvStr).
+		Str("Contract Address", addr.Hex()).
+		Msg("TypeAndVersion")
+
+	return tvStr, nil
 }
 
 var OCR2ParamsForCommit = contracts.OffChainAggregatorV2Config{

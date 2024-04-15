@@ -907,12 +907,12 @@ func (ccipModule *CCIPCommon) DeployContracts(noOfTokens int,
 	}
 	// find out the pool version
 	// We assume all pools are of the same version as the first pool , if test is
-	_, version, err := config.TypeAndVersion(ccipModule.BridgeTokenPools[0].EthAddress, ccipModule.ChainClient.Backend())
+	version, err := cd.TypeAndVersion(ccipModule.BridgeTokenPools[0].EthAddress)
 	if err != nil {
 		return err
 	}
 	// if the version is for LockReleaseTokenPool 1.4.0, we need to deploy TokenAdminRegistry
-	if version.String() == "LockReleaseTokenPool 1.4.0" {
+	if version == "LockReleaseTokenPool 1.4.0" {
 		if ccipModule.TokenAdminRegistry == nil {
 			if ccipModule.ExistingDeployment {
 				return fmt.Errorf("token admin registry contract address is not provided in lane config")
