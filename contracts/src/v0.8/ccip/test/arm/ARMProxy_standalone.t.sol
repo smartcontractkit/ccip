@@ -43,7 +43,7 @@ contract ARMProxyStandaloneTest is Test {
   }
 
   /*
-  function test_ARMCall_fuzz(bool expectedSuccess, bytes memory call, bytes memory ret) public {
+  function test_Fuzz_ARMCall(bool expectedSuccess, bytes memory call, bytes memory ret) public {
     // filter out calls to functions that will be handled on the ARMProxy instead
     // of the underlying ARM contract
     vm.assume(
