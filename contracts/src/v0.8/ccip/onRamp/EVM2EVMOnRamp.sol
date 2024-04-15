@@ -45,10 +45,6 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   error UnsupportedToken(IERC20 token);
   error MustBeCalledByRouter();
   error RouterMustSetOriginalSender();
-  error InvalidTokenPoolConfig();
-  error PoolAlreadyAdded();
-  error PoolDoesNotExist(address token);
-  error TokenPoolMismatch();
   error InvalidConfig();
   error InvalidAddress(bytes encodedAddress);
   error BadARMSignal();
@@ -67,8 +63,6 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   /// RMN depends on this event, if changing, please notify the RMN maintainers.
   event CCIPSendRequested(Internal.EVM2EVMMessage message);
   event NopsSet(uint256 nopWeightsTotal, NopAndWeight[] nopsAndWeights);
-  event PoolAdded(address token, address pool);
-  event PoolRemoved(address token, address pool);
 
   /// @dev Struct that contains the static configuration
   /// RMN depends on this struct, if changing, please notify the RMN maintainers.
