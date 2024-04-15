@@ -5,9 +5,12 @@ import {ITypeAndVersion} from "../shared/interfaces/ITypeAndVersion.sol";
 import {IPriceRegistry} from "./interfaces/IPriceRegistry.sol";
 
 import {OwnerIsCreator} from "./../shared/access/OwnerIsCreator.sol";
+import {AggregatorV3Interface} from "./../shared/interfaces/AggregatorV3Interface.sol";
 import {Internal} from "./libraries/Internal.sol";
 import {USDPriceWith18Decimals} from "./libraries/USDPriceWith18Decimals.sol";
 
+import {IERC20Metadata} from
+  "../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {EnumerableSet} from "../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/structs/EnumerableSet.sol";
 
 /// @notice The PriceRegistry contract responsibility is to store the current gas price in USD for a given destination chain,
@@ -22,6 +25,7 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator, ITypeAndVersion {
   error StaleGasPrice(uint64 destChainSelector, uint256 threshold, uint256 timePassed);
   error StaleTokenPrice(address token, uint256 threshold, uint256 timePassed);
   error InvalidStalenessThreshold();
+  error DataFeedPerTokenNotUpdated(address token);
 
   event PriceUpdaterSet(address indexed priceUpdater);
   event PriceUpdaterRemoved(address indexed priceUpdater);
@@ -29,8 +33,9 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator, ITypeAndVersion {
   event FeeTokenRemoved(address indexed feeToken);
   event UsdPerUnitGasUpdated(uint64 indexed destChain, uint256 value, uint256 timestamp);
   event UsdPerTokenUpdated(address indexed token, uint256 value, uint256 timestamp);
+  event DataFeedPerTokenUpdated(address indexed token, address dataFeedAddress);
 
-  string public constant override typeAndVersion = "PriceRegistry 1.2.0";
+  string public constant override typeAndVersion = "PriceRegistry 1.6.0-dev";
 
   /// @dev The gas price per unit of gas for a given destination chain, in USD with 18 decimals.
   /// Multiple gas prices can be encoded into the same value. Each price takes {Internal.GAS_PRICE_BITS} bits.
@@ -50,6 +55,10 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator, ITypeAndVersion {
   ///     1 LINK = 5.00 USD per full token, each full token is 1e18 units -> 5 * 1e18 * 1e18 / 1e18 = 5e18
   mapping(address token => Internal.TimestampedPackedUint224 price) private s_usdPerToken;
 
+  /// @dev Stores the price data feed addresses per token.
+  /// @dev The data feed address must be an AggregatorV3Interface contract.
+  mapping(address token => address dataFeedAddress) private s_usdDataFeedsPerToken;
+
   // Price updaters are allowed to update the prices.
   EnumerableSet.AddressSet private s_priceUpdaters;
   // Subset of tokens which prices tracked by this registry which are fee tokens.
@@ -57,9 +66,15 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator, ITypeAndVersion {
   // The amount of time a price can be stale before it is considered invalid.
   uint32 private immutable i_stalenessThreshold;
 
-  constructor(address[] memory priceUpdaters, address[] memory feeTokens, uint32 stalenessThreshold) {
+  constructor(
+    address[] memory priceUpdaters,
+    address[] memory feeTokens,
+    uint32 stalenessThreshold,
+    Internal.TokenPriceFeedUpdate[] memory tokenPriceFeeds
+  ) {
     _applyPriceUpdatersUpdates(priceUpdaters, new address[](0));
     _applyFeeTokensUpdates(feeTokens, new address[](0));
+    _updateTokenPriceFeeds(tokenPriceFeeds);
     if (stalenessThreshold == 0) revert InvalidStalenessThreshold();
     i_stalenessThreshold = stalenessThreshold;
   }
@@ -70,7 +85,13 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator, ITypeAndVersion {
 
   // @inheritdoc IPriceRegistry
   function getTokenPrice(address token) public view override returns (Internal.TimestampedPackedUint224 memory) {
-    return s_usdPerToken[token];
+    address dataFeedAddress = s_usdDataFeedsPerToken[token];
+    if (dataFeedAddress == address(0)) {
+      return s_usdPerToken[token];
+    }
+
+    (uint224 price, uint32 timestamp) = _getTokenPriceFromDataFeed(dataFeedAddress, token);
+    return Internal.TimestampedPackedUint224({value: price, timestamp: timestamp});
   }
 
   // @inheritdoc IPriceRegistry
@@ -91,6 +112,11 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator, ITypeAndVersion {
       tokenPrices[i] = getTokenPrice(tokens[i]);
     }
     return tokenPrices;
+  }
+
+  // @inheritdoc IPriceRegistry
+  function getTokenPriceFeed(address token) external view override returns (address) {
+    return s_usdDataFeedsPerToken[token];
   }
 
   /// @notice Get the staleness threshold.
@@ -144,11 +170,50 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator, ITypeAndVersion {
   /// @param token The address of the token to get the price for
   /// @return the token price
   function _getValidatedTokenPrice(address token) internal view returns (uint224) {
-    Internal.TimestampedPackedUint224 memory tokenPrice = s_usdPerToken[token];
+    Internal.TimestampedPackedUint224 memory tokenPrice = getTokenPrice(token);
     if (tokenPrice.timestamp == 0 || tokenPrice.value == 0) revert TokenNotSupported(token);
     uint256 timePassed = block.timestamp - tokenPrice.timestamp;
     if (timePassed > i_stalenessThreshold) revert StaleTokenPrice(token, i_stalenessThreshold, timePassed);
     return tokenPrice.value;
+  }
+
+  /// @notice Gets the token price from a data feed address, rebased to the same units as s_usdPerToken
+  /// @param dataFeedAddress non-zero data feed address representing the token (used to retrieve price & timestamp)
+  /// @param token token (used for decimals)
+  /// @return value data feed answer value (rebased to s_usdPerToken units)
+  /// @return timestamp data feed last updated timestamp
+  function _getTokenPriceFromDataFeed(
+    address dataFeedAddress,
+    address token
+  ) internal view returns (uint224 value, uint32 timestamp) {
+    AggregatorV3Interface dataFeedContract = AggregatorV3Interface(dataFeedAddress);
+    (
+      /* uint80 roundID */
+      ,
+      int256 dataFeedAnswer,
+      /* uint startedAt */
+      ,
+      uint256 updatedAt,
+      /* uint80 answeredInRound */
+    ) = dataFeedContract.latestRoundData();
+
+    uint224 rebasedValue = uint224(uint256(dataFeedAnswer));
+
+    // Rebase formula for units: usdValue * (1e18 * 1e18) / 1eTokenDecimals
+    // feedValue * (10 ** (18 - feedDecimals)) * (10 ** (18 - erc20Decimals))
+    // feedValue * (10 ** ((18 - feedDecimals) + (18 - erc20Decimals)))
+    // feedValue * (10 ** (36 - feedDecimals - erc20Decimals))
+    // If (feedDecimals - erc20Decimals) > 36 => flip it to feedValue / (10 ** (feedDecimals + erc20Decimals - 36))
+
+    uint8 excessDecimals = dataFeedContract.decimals() + IERC20Metadata(token).decimals();
+
+    if (excessDecimals > 36) {
+      rebasedValue /= uint224(10 ** (excessDecimals - 36));
+    } else {
+      rebasedValue *= uint224(10 ** (36 - excessDecimals));
+    }
+
+    return (rebasedValue, uint32(updatedAt));
   }
 
   // ================================================================
@@ -211,6 +276,39 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator, ITypeAndVersion {
       s_usdPerUnitGasByDestChainSelector[update.destChainSelector] =
         Internal.TimestampedPackedUint224({value: update.usdPerUnitGas, timestamp: uint32(block.timestamp)});
       emit UsdPerUnitGasUpdated(update.destChainSelector, update.usdPerUnitGas, block.timestamp);
+    }
+  }
+
+  // @inheritdoc IPriceRegistry
+  function updateTokenPriceFeeds(Internal.TokenPriceFeedUpdate[] memory tokenPriceFeedUpdates)
+    external
+    override
+    onlyOwner
+  {
+    _updateTokenPriceFeeds(tokenPriceFeedUpdates);
+  }
+
+  /// @notice Updates the USD token price feeds for given tokens
+  /// @param tokenPriceFeedUpdates Token price feed updates to apply
+  function _updateTokenPriceFeeds(Internal.TokenPriceFeedUpdate[] memory tokenPriceFeedUpdates) private {
+    for (uint256 i; i < tokenPriceFeedUpdates.length; ++i) {
+      Internal.TokenPriceFeedUpdate memory update = tokenPriceFeedUpdates[i];
+      address sourceToken = update.sourceToken;
+      address dataFeedAddress = update.dataFeedAddress;
+
+      if (s_usdDataFeedsPerToken[sourceToken] == dataFeedAddress) {
+        revert DataFeedPerTokenNotUpdated(sourceToken);
+      }
+
+      s_usdDataFeedsPerToken[sourceToken] = dataFeedAddress;
+      emit DataFeedPerTokenUpdated(sourceToken, dataFeedAddress);
+
+      Internal.TimestampedPackedUint224 storage currentPrice = s_usdPerToken[sourceToken];
+      if (currentPrice.value != 0) {
+        // Gas refunds for clearing token price
+        delete s_usdPerToken[sourceToken];
+        emit UsdPerTokenUpdated(update.sourceToken, 0, block.timestamp);
+      }
     }
   }
 

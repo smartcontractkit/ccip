@@ -36,6 +36,12 @@ library Internal {
     uint224 usdPerUnitGas; // 1e18 USD per smallest unit (e.g. wei) of destination chain gas
   }
 
+  /// @notice Token price data feed update for a token
+  struct TokenPriceFeedUpdate {
+    address sourceToken; // Source token
+    address dataFeedAddress; // AggregatorV3Interface contract (0 - unset feed)
+  }
+
   /// @notice A timestamped uint224 value that can contain several tightly packed fields.
   struct TimestampedPackedUint224 {
     uint224 value; // ───────╮ Value in uint224, packed.

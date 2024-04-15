@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.19;
 
+import {MockV3Aggregator} from "../../../tests/MockV3Aggregator.sol";
 import {PriceRegistry} from "../../PriceRegistry.sol";
 import {Internal} from "../../libraries/Internal.sol";
 import {TokenSetup} from "../TokenSetup.t.sol";
+import {Vm} from "forge-std/Vm.sol";
 
 contract PriceRegistrySetup is TokenSetup {
   uint112 internal constant USD_PER_GAS = 1e6; // 0.001 gwei
@@ -71,12 +73,23 @@ contract PriceRegistrySetup is TokenSetup {
       getSingleGasPriceUpdateStruct(DEST_CHAIN_SELECTOR, PACKED_USD_PER_GAS).gasPriceUpdates;
 
     s_encodedInitialPriceUpdates = abi.encode(priceUpdates);
+
     address[] memory priceUpdaters = new address[](0);
     address[] memory feeTokens = new address[](2);
     feeTokens[0] = s_sourceTokens[0];
     feeTokens[1] = s_weth;
-    s_priceRegistry = new PriceRegistry(priceUpdaters, feeTokens, uint32(TWELVE_HOURS));
+    Internal.TokenPriceFeedUpdate[] memory tokenPriceFeedUpdates = new Internal.TokenPriceFeedUpdate[](0);
+
+    s_priceRegistry = new PriceRegistry(priceUpdaters, feeTokens, uint32(TWELVE_HOURS), tokenPriceFeedUpdates);
     s_priceRegistry.updatePrices(priceUpdates);
+  }
+
+  function _initialiseSingleTokenPriceFeed() internal returns (address) {
+    Internal.TokenPriceFeedUpdate[] memory tokenPriceFeedUpdates = new Internal.TokenPriceFeedUpdate[](1);
+    tokenPriceFeedUpdates[0] =
+      getSingleTokenPriceFeedUpdateStruct(s_sourceTokens[0], s_dataFeedByToken[s_sourceTokens[0]]);
+    s_priceRegistry.updateTokenPriceFeeds(tokenPriceFeedUpdates);
+    return s_sourceTokens[0];
   }
 }
 
@@ -87,19 +100,26 @@ contract PriceRegistry_constructor is PriceRegistrySetup {
     priceUpdaters[1] = OWNER;
     address[] memory feeTokens = new address[](2);
     feeTokens[0] = s_sourceTokens[0];
-    feeTokens[1] = s_weth;
+    feeTokens[1] = s_sourceTokens[1];
+    Internal.TokenPriceFeedUpdate[] memory tokenPriceFeedUpdates = new Internal.TokenPriceFeedUpdate[](2);
+    tokenPriceFeedUpdates[0] =
+      getSingleTokenPriceFeedUpdateStruct(s_sourceTokens[0], s_dataFeedByToken[s_sourceTokens[0]]);
+    tokenPriceFeedUpdates[1] =
+      getSingleTokenPriceFeedUpdateStruct(s_sourceTokens[1], s_dataFeedByToken[s_sourceTokens[1]]);
 
-    s_priceRegistry = new PriceRegistry(priceUpdaters, feeTokens, uint32(TWELVE_HOURS));
+    s_priceRegistry = new PriceRegistry(priceUpdaters, feeTokens, uint32(TWELVE_HOURS), tokenPriceFeedUpdates);
 
     assertEq(feeTokens, s_priceRegistry.getFeeTokens());
     assertEq(uint32(TWELVE_HOURS), s_priceRegistry.getStalenessThreshold());
     assertEq(priceUpdaters, s_priceRegistry.getPriceUpdaters());
-    assertEq(s_priceRegistry.typeAndVersion(), "PriceRegistry 1.2.0");
+    assertEq(s_priceRegistry.typeAndVersion(), "PriceRegistry 1.6.0-dev");
+    assertEq(tokenPriceFeedUpdates[0].dataFeedAddress, s_priceRegistry.getTokenPriceFeed(s_sourceTokens[0]));
+    assertEq(tokenPriceFeedUpdates[1].dataFeedAddress, s_priceRegistry.getTokenPriceFeed(s_sourceTokens[1]));
   }
 
   function test_InvalidStalenessThreshold_Revert() public {
     vm.expectRevert(PriceRegistry.InvalidStalenessThreshold.selector);
-    s_priceRegistry = new PriceRegistry(new address[](0), new address[](0), 0);
+    s_priceRegistry = new PriceRegistry(new address[](0), new address[](0), 0, new Internal.TokenPriceFeedUpdate[](0));
   }
 }
 
@@ -121,6 +141,22 @@ contract PriceRegistry_getTokenPrices is PriceRegistrySetup {
   }
 }
 
+contract PriceRegistry_getTokenPrice is PriceRegistrySetup {
+  function test_GetTokenPriceFromFeed_Success() public {
+    uint256 originalTimestampValue = block.timestamp;
+
+    // Below staleness threshold
+    vm.warp(originalTimestampValue + 1 hours);
+
+    address sourceToken = _initialiseSingleTokenPriceFeed();
+    Internal.TimestampedPackedUint224 memory tokenPriceAnswer = s_priceRegistry.getTokenPrice(sourceToken);
+
+    // Price answer is 1e8 (18 decimal token) - unit is (1e18 * 1e18 / 1e18) -> expected 1e18
+    assertEq(tokenPriceAnswer.value, uint224(1e18));
+    assertEq(tokenPriceAnswer.timestamp, uint32(originalTimestampValue));
+  }
+}
+
 contract PriceRegistry_getValidatedTokenPrice is PriceRegistrySetup {
   function test_GetValidatedTokenPrice_Success() public view {
     Internal.PriceUpdates memory priceUpdates = abi.decode(s_encodedInitialPriceUpdates, (Internal.PriceUpdates));
@@ -129,6 +165,101 @@ contract PriceRegistry_getValidatedTokenPrice is PriceRegistrySetup {
     uint224 tokenPrice = s_priceRegistry.getValidatedTokenPrice(token);
 
     assertEq(priceUpdates.tokenPriceUpdates[0].usdPerToken, tokenPrice);
+  }
+
+  function test_GetValidatedTokenPriceFromFeed_Success() public {
+    uint256 originalTimestampValue = block.timestamp;
+
+    // Right below staleness threshold
+    vm.warp(originalTimestampValue + TWELVE_HOURS);
+
+    address sourceToken = _initialiseSingleTokenPriceFeed();
+    uint224 tokenPriceAnswer = s_priceRegistry.getValidatedTokenPrice(sourceToken);
+
+    // Price answer is 1e8 (18 decimal token) - unit is (1e18 * 1e18 / 1e18) -> expected 1e18
+    assertEq(tokenPriceAnswer, uint224(1e18));
+  }
+
+  function test_GetValidatedTokenPriceFromFeedMaxInt224Value_Success() public {
+    address tokenAddress = _deploySourceToken("testToken", 0, 18);
+    address feedAddress = _deployTokenPriceDataFeed(tokenAddress, 18, int256(uint256(type(uint224).max)));
+
+    Internal.TokenPriceFeedUpdate[] memory tokenPriceFeedUpdates = new Internal.TokenPriceFeedUpdate[](1);
+    tokenPriceFeedUpdates[0] = getSingleTokenPriceFeedUpdateStruct(tokenAddress, feedAddress);
+    s_priceRegistry.updateTokenPriceFeeds(tokenPriceFeedUpdates);
+
+    uint224 tokenPriceAnswer = s_priceRegistry.getValidatedTokenPrice(tokenAddress);
+
+    // Price answer is: uint224.MAX_VALUE * (10 ** (36 - 18 - 18))
+    assertEq(tokenPriceAnswer, uint224(type(uint224).max));
+  }
+
+  function test_GetValidatedTokenPriceFromFeedErc20Below18Decimals_Success() public {
+    address tokenAddress = _deploySourceToken("testToken", 0, 6);
+    address feedAddress = _deployTokenPriceDataFeed(tokenAddress, 8, 1e8);
+
+    Internal.TokenPriceFeedUpdate[] memory tokenPriceFeedUpdates = new Internal.TokenPriceFeedUpdate[](1);
+    tokenPriceFeedUpdates[0] = getSingleTokenPriceFeedUpdateStruct(tokenAddress, feedAddress);
+    s_priceRegistry.updateTokenPriceFeeds(tokenPriceFeedUpdates);
+
+    uint224 tokenPriceAnswer = s_priceRegistry.getValidatedTokenPrice(tokenAddress);
+
+    // Price answer is 1e8 (6 decimal token) - unit is (1e18 * 1e18 / 1e6) -> expected 1e30
+    assertEq(tokenPriceAnswer, uint224(1e30));
+  }
+
+  function test_GetValidatedTokenPriceFromFeedErc20Above18Decimals_Success() public {
+    address tokenAddress = _deploySourceToken("testToken", 0, 24);
+    address feedAddress = _deployTokenPriceDataFeed(tokenAddress, 8, 1e8);
+
+    Internal.TokenPriceFeedUpdate[] memory tokenPriceFeedUpdates = new Internal.TokenPriceFeedUpdate[](1);
+    tokenPriceFeedUpdates[0] = getSingleTokenPriceFeedUpdateStruct(tokenAddress, feedAddress);
+    s_priceRegistry.updateTokenPriceFeeds(tokenPriceFeedUpdates);
+
+    uint224 tokenPriceAnswer = s_priceRegistry.getValidatedTokenPrice(tokenAddress);
+
+    // Price answer is 1e8 (6 decimal token) - unit is (1e18 * 1e18 / 1e24) -> expected 1e12
+    assertEq(tokenPriceAnswer, uint224(1e12));
+  }
+
+  function test_GetValidatedTokenPriceFromFeedFeedAt18Decimals_Success() public {
+    address tokenAddress = _deploySourceToken("testToken", 0, 18);
+    address feedAddress = _deployTokenPriceDataFeed(tokenAddress, 18, 1e18);
+
+    Internal.TokenPriceFeedUpdate[] memory tokenPriceFeedUpdates = new Internal.TokenPriceFeedUpdate[](1);
+    tokenPriceFeedUpdates[0] = getSingleTokenPriceFeedUpdateStruct(tokenAddress, feedAddress);
+    s_priceRegistry.updateTokenPriceFeeds(tokenPriceFeedUpdates);
+
+    uint224 tokenPriceAnswer = s_priceRegistry.getValidatedTokenPrice(tokenAddress);
+
+    // Price answer is 1e8 (6 decimal token) - unit is (1e18 * 1e18 / 1e18) -> expected 1e18
+    assertEq(tokenPriceAnswer, uint224(1e18));
+  }
+
+  function test_GetValidatedTokenPriceFromFeedFlippedDecimals_Success() public {
+    address tokenAddress = _deploySourceToken("testToken", 0, 20);
+    address feedAddress = _deployTokenPriceDataFeed(tokenAddress, 20, 1e18);
+
+    Internal.TokenPriceFeedUpdate[] memory tokenPriceFeedUpdates = new Internal.TokenPriceFeedUpdate[](1);
+    tokenPriceFeedUpdates[0] = getSingleTokenPriceFeedUpdateStruct(tokenAddress, feedAddress);
+    s_priceRegistry.updateTokenPriceFeeds(tokenPriceFeedUpdates);
+
+    uint224 tokenPriceAnswer = s_priceRegistry.getValidatedTokenPrice(tokenAddress);
+
+    // Price answer is 1e8 (6 decimal token) - unit is (1e18 * 1e18 / 1e20) -> expected 1e14
+    assertEq(tokenPriceAnswer, uint224(1e14));
+  }
+
+  function test_StaleFeedPrice_Revert() public {
+    // Right above staleness threshold
+    vm.warp(block.timestamp + TWELVE_HOURS + 1);
+
+    address sourceToken = _initialiseSingleTokenPriceFeed();
+
+    vm.expectRevert(
+      abi.encodeWithSelector(PriceRegistry.StaleTokenPrice.selector, sourceToken, TWELVE_HOURS, TWELVE_HOURS + 1)
+    );
+    s_priceRegistry.getValidatedTokenPrice(sourceToken);
   }
 
   function test_StaleFeeToken_Revert() public {
@@ -143,6 +274,14 @@ contract PriceRegistry_getValidatedTokenPrice is PriceRegistrySetup {
   function test_TokenNotSupported_Revert() public {
     vm.expectRevert(abi.encodeWithSelector(PriceRegistry.TokenNotSupported.selector, DUMMY_CONTRACT_ADDRESS));
     s_priceRegistry.getValidatedTokenPrice(DUMMY_CONTRACT_ADDRESS);
+  }
+
+  function test_TokenNotSupportedFeed_Revert() public {
+    address sourceToken = _initialiseSingleTokenPriceFeed();
+    MockV3Aggregator(s_dataFeedByToken[sourceToken]).updateAnswer(0);
+
+    vm.expectRevert(abi.encodeWithSelector(PriceRegistry.TokenNotSupported.selector, sourceToken));
+    s_priceRegistry.getValidatedTokenPrice(sourceToken);
   }
 }
 
@@ -466,5 +605,130 @@ contract PriceRegistry_getTokenAndGasPrices is PriceRegistrySetup {
       abi.encodeWithSelector(PriceRegistry.StaleTokenPrice.selector, s_sourceTokens[0], TWELVE_HOURS, diff)
     );
     s_priceRegistry.getTokenAndGasPrices(s_sourceTokens[0], DEST_CHAIN_SELECTOR);
+  }
+}
+
+contract PriceRegistry_updateTokenPriceFeeds is PriceRegistrySetup {
+  event DataFeedPerTokenUpdated(address indexed token, address dataFeedAddress);
+  event UsdPerTokenUpdated(address indexed token, uint256 value, uint256 timestamp);
+
+  function test_ZeroFeeds_Success() public {
+    Vm.Log[] memory logEntries = vm.getRecordedLogs();
+
+    Internal.TokenPriceFeedUpdate[] memory tokenPriceFeedUpdates = new Internal.TokenPriceFeedUpdate[](0);
+    vm.recordLogs();
+    s_priceRegistry.updateTokenPriceFeeds(tokenPriceFeedUpdates);
+
+    // Verify no log emissions
+    assertEq(logEntries.length, 0);
+  }
+
+  function test_SingleFeedUpdate_Success() public {
+    Internal.TokenPriceFeedUpdate[] memory tokenPriceFeedUpdates = new Internal.TokenPriceFeedUpdate[](1);
+    tokenPriceFeedUpdates[0] =
+      getSingleTokenPriceFeedUpdateStruct(s_sourceTokens[0], s_dataFeedByToken[s_sourceTokens[0]]);
+
+    assertEq(s_priceRegistry.getTokenPriceFeed(tokenPriceFeedUpdates[0].sourceToken), address(0));
+
+    vm.expectEmit();
+    emit DataFeedPerTokenUpdated(tokenPriceFeedUpdates[0].sourceToken, tokenPriceFeedUpdates[0].dataFeedAddress);
+
+    s_priceRegistry.updateTokenPriceFeeds(tokenPriceFeedUpdates);
+
+    assertEq(
+      s_priceRegistry.getTokenPriceFeed(tokenPriceFeedUpdates[0].sourceToken), tokenPriceFeedUpdates[0].dataFeedAddress
+    );
+  }
+
+  function test_MultipleFeedUpdate_Success() public {
+    Internal.TokenPriceFeedUpdate[] memory tokenPriceFeedUpdates = new Internal.TokenPriceFeedUpdate[](2);
+
+    for (uint256 i = 0; i < 2; ++i) {
+      tokenPriceFeedUpdates[i] =
+        getSingleTokenPriceFeedUpdateStruct(s_sourceTokens[i], s_dataFeedByToken[s_sourceTokens[i]]);
+
+      assertEq(s_priceRegistry.getTokenPriceFeed(tokenPriceFeedUpdates[i].sourceToken), address(0));
+
+      vm.expectEmit();
+      emit DataFeedPerTokenUpdated(tokenPriceFeedUpdates[i].sourceToken, tokenPriceFeedUpdates[i].dataFeedAddress);
+    }
+
+    s_priceRegistry.updateTokenPriceFeeds(tokenPriceFeedUpdates);
+
+    assertEq(
+      s_priceRegistry.getTokenPriceFeed(tokenPriceFeedUpdates[0].sourceToken), tokenPriceFeedUpdates[0].dataFeedAddress
+    );
+    assertEq(
+      s_priceRegistry.getTokenPriceFeed(tokenPriceFeedUpdates[1].sourceToken), tokenPriceFeedUpdates[1].dataFeedAddress
+    );
+  }
+
+  function test_FeedUnset_Success() public {
+    Internal.TimestampedPackedUint224 memory priceQueryInitial = s_priceRegistry.getTokenPrice(s_sourceTokens[0]);
+    assertFalse(priceQueryInitial.value == 0);
+    assertFalse(priceQueryInitial.timestamp == 0);
+
+    Internal.TokenPriceFeedUpdate[] memory tokenPriceFeedUpdates = new Internal.TokenPriceFeedUpdate[](1);
+    tokenPriceFeedUpdates[0] =
+      getSingleTokenPriceFeedUpdateStruct(s_sourceTokens[0], s_dataFeedByToken[s_sourceTokens[0]]);
+
+    vm.expectEmit();
+    emit UsdPerTokenUpdated(s_sourceTokens[0], 0, block.timestamp);
+
+    s_priceRegistry.updateTokenPriceFeeds(tokenPriceFeedUpdates);
+    assertEq(
+      s_priceRegistry.getTokenPriceFeed(tokenPriceFeedUpdates[0].sourceToken), tokenPriceFeedUpdates[0].dataFeedAddress
+    );
+
+    tokenPriceFeedUpdates[0].dataFeedAddress = address(0);
+    vm.expectEmit();
+    emit DataFeedPerTokenUpdated(tokenPriceFeedUpdates[0].sourceToken, address(0));
+
+    s_priceRegistry.updateTokenPriceFeeds(tokenPriceFeedUpdates);
+    assertEq(s_priceRegistry.getTokenPriceFeed(tokenPriceFeedUpdates[0].sourceToken), address(0));
+
+    Internal.TimestampedPackedUint224 memory priceQueryPostUnsetFeed = s_priceRegistry.getTokenPrice(s_sourceTokens[0]);
+    assertEq(priceQueryPostUnsetFeed.value, 0);
+    assertEq(priceQueryPostUnsetFeed.timestamp, 0);
+  }
+
+  function test_SingleFeedUpdateSkipTokenPriceUnset_Success() public {
+    address tokenAddress = address(42);
+    Internal.TokenPriceFeedUpdate[] memory tokenPriceFeedUpdates = new Internal.TokenPriceFeedUpdate[](1);
+    tokenPriceFeedUpdates[0] = getSingleTokenPriceFeedUpdateStruct(tokenAddress, s_dataFeedByToken[s_sourceTokens[0]]);
+
+    vm.expectEmit();
+    emit DataFeedPerTokenUpdated(tokenAddress, tokenPriceFeedUpdates[0].dataFeedAddress);
+
+    vm.recordLogs();
+    s_priceRegistry.updateTokenPriceFeeds(tokenPriceFeedUpdates);
+
+    // Only 1 event for feed update
+    Vm.Log[] memory logEntries = vm.getRecordedLogs();
+    assertEq(logEntries.length, 1);
+  }
+
+  // Reverts
+
+  function test_FeedNotUpdated_Revert() public {
+    Internal.TokenPriceFeedUpdate[] memory tokenPriceFeedUpdates = new Internal.TokenPriceFeedUpdate[](1);
+    tokenPriceFeedUpdates[0] =
+      getSingleTokenPriceFeedUpdateStruct(s_sourceTokens[0], s_dataFeedByToken[s_sourceTokens[0]]);
+
+    s_priceRegistry.updateTokenPriceFeeds(tokenPriceFeedUpdates);
+
+    vm.expectRevert(abi.encodeWithSelector(PriceRegistry.DataFeedPerTokenNotUpdated.selector, s_sourceTokens[0]));
+    s_priceRegistry.updateTokenPriceFeeds(tokenPriceFeedUpdates);
+  }
+
+  function test_FeedUpdatedByNonOwner_Revert() public {
+    Internal.TokenPriceFeedUpdate[] memory tokenPriceFeedUpdates = new Internal.TokenPriceFeedUpdate[](1);
+    tokenPriceFeedUpdates[0] =
+      getSingleTokenPriceFeedUpdateStruct(s_sourceTokens[0], s_dataFeedByToken[s_sourceTokens[0]]);
+
+    vm.startPrank(STRANGER);
+    vm.expectRevert("Only callable by owner");
+
+    s_priceRegistry.updateTokenPriceFeeds(tokenPriceFeedUpdates);
   }
 }

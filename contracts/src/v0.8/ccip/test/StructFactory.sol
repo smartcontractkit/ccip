@@ -245,6 +245,13 @@ contract StructFactory {
     return priceUpdates;
   }
 
+  function getSingleTokenPriceFeedUpdateStruct(
+    address sourceToken,
+    address dataFeedAddress
+  ) internal pure returns (Internal.TokenPriceFeedUpdate memory) {
+    return Internal.TokenPriceFeedUpdate({sourceToken: sourceToken, dataFeedAddress: dataFeedAddress});
+  }
+
   // OffRamp
   function getEmptyPriceUpdates() internal pure returns (Internal.PriceUpdates memory priceUpdates) {
     return Internal.PriceUpdates({

@@ -8,6 +8,10 @@ interface IPriceRegistry {
   /// @param priceUpdates The price updates to apply.
   function updatePrices(Internal.PriceUpdates memory priceUpdates) external;
 
+  /// @notice Updates the USD token price feeds for given tokens
+  /// @param tokenPriceFeedUpdates Token price feed updates to apply
+  function updateTokenPriceFeeds(Internal.TokenPriceFeedUpdate[] memory tokenPriceFeedUpdates) external;
+
   /// @notice Get the `tokenPrice` for a given token.
   /// @param token The token to get the price for.
   /// @return tokenPrice The tokenPrice for the given token.
@@ -22,6 +26,11 @@ interface IPriceRegistry {
   /// @param tokens The tokens to get prices for.
   /// @return tokenPrices The tokenPrices for the given tokens.
   function getTokenPrices(address[] calldata tokens) external view returns (Internal.TimestampedPackedUint224[] memory);
+
+  /// @notice Returns the configured token price data feed address
+  /// @param token The token to retrieve the feed for
+  /// @return dataFeedAddress The token price data feed address (0 if unset)
+  function getTokenPriceFeed(address token) external view returns (address);
 
   /// @notice Get an encoded `gasPrice` for a given destination chain ID.
   /// The 224-bit result encodes necessary gas price components.
