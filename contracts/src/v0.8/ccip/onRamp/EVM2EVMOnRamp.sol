@@ -270,11 +270,9 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     if (decodedReceiver > type(uint160).max || decodedReceiver < 10) revert InvalidAddress(message.receiver);
 
     Client.EVMExtraArgsV2 memory extraArgsV2 = _fromBytes(message.extraArgs);
-    uint256 gasLimit = extraArgsV2.gasLimit;
-    bool sequenced = extraArgsV2.sequenced;
     // Validate the message with various checks
     uint256 numberOfTokens = message.tokenAmounts.length;
-    _validateMessage(message.data.length, gasLimit, numberOfTokens);
+    _validateMessage(message.data.length, extraArgsV2.gasLimit, numberOfTokens);
 
     // Only check token value if there are tokens
     if (numberOfTokens > 0) {
@@ -309,11 +307,11 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
       sender: originalSender,
       receiver: address(uint160(decodedReceiver)),
       sequenceNumber: ++s_sequenceNumber,
-      gasLimit: gasLimit,
-      strict: sequenced,
+      gasLimit: extraArgsV2.gasLimit,
+      strict: extraArgsV2.sequenced,
       // Only bump nonce for sequenced messages, otherwise unsequenced message nonces
       // may block sequenced message nonces, which is not what we want.
-      nonce: sequenced ? ++s_senderNonce[originalSender] : 0,
+      nonce: extraArgsV2.sequenced ? ++s_senderNonce[originalSender] : 0,
       feeToken: message.feeToken,
       feeTokenAmount: feeTokenAmount,
       data: message.data,
