@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
+
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	evmclientmocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/client/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
@@ -77,7 +78,7 @@ func TestOnRampReaderInit(t *testing.T) {
 func setupOnRampReaderTH(t *testing.T, version string) onRampReaderTH {
 	user, bc := ccipdata.NewSimulation(t)
 	log := logger.TestLogger(t)
-	orm := logpoller.NewORM(testutils.SimulatedChainID, pgtest.NewSqlxDB(t), log, pgtest.NewQConfig(true))
+	orm := logpoller.NewORM(testutils.SimulatedChainID, pgtest.NewSqlxDB(t), log)
 	lpOpts := logpoller.Opts{
 		PollPeriod:               100 * time.Millisecond,
 		FinalityDepth:            2,
@@ -374,13 +375,11 @@ func setupOnRampV1_5_0(t *testing.T, user *bind.TransactOpts, bc *client.Simulat
 			Weight: 1,
 		},
 	}
-	var tokenAndPool []evm_2_evm_onramp.InternalPoolUpdate
 	onRampAddress, transaction, _, err := evm_2_evm_onramp.DeployEVM2EVMOnRamp(
 		user,
 		bc,
 		staticConfig,
 		dynamicConfig,
-		tokenAndPool,
 		rateLimiterConfig,
 		feeTokenConfigs,
 		tokenTransferConfigArgs,
@@ -409,7 +408,7 @@ func testVersionSpecificOnRampReader(t *testing.T, th onRampReaderTH, version st
 
 func testOnRampReader(t *testing.T, th onRampReaderTH, expectedRouterAddress common.Address) {
 	ctx := th.user.Context
-	res, err := th.reader.RouterAddress()
+	res, err := th.reader.RouterAddress(ctx)
 	require.NoError(t, err)
 	require.Equal(t, ccipcalc.EvmAddrToGeneric(expectedRouterAddress), res)
 
@@ -418,11 +417,11 @@ func testOnRampReader(t *testing.T, th onRampReaderTH, expectedRouterAddress com
 	require.NotNil(t, msg)
 	require.Equal(t, []cciptypes.EVM2EVMMessageWithTxMeta{}, msg)
 
-	address, err := th.reader.Address()
+	address, err := th.reader.Address(ctx)
 	require.NoError(t, err)
 	require.NotNil(t, address)
 
-	cfg, err := th.reader.GetDynamicConfig()
+	cfg, err := th.reader.GetDynamicConfig(ctx)
 	require.NoError(t, err)
 	require.NotNil(t, cfg)
 	require.Equal(t, ccipcalc.EvmAddrToGeneric(expectedRouterAddress), cfg.Router)
@@ -458,7 +457,7 @@ func TestNewOnRampReader(t *testing.T) {
 			c.On("CallContract", mock.Anything, mock.Anything, mock.Anything).Return(b, nil)
 			addr := ccipcalc.EvmAddrToGeneric(utils.RandomAddress())
 			lp := lpmocks.NewLogPoller(t)
-			lp.On("RegisterFilter", mock.Anything).Return(nil).Maybe()
+			lp.On("RegisterFilter", mock.Anything, mock.Anything).Return(nil).Maybe()
 			_, err = factory.NewOnRampReader(logger.TestLogger(t), factory.NewEvmVersionFinder(), 1, 2, addr, lp, c)
 			if tc.expectedErr != "" {
 				require.EqualError(t, err, tc.expectedErr)

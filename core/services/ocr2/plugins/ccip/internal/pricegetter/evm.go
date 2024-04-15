@@ -11,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
+
 	"github.com/smartcontractkit/chainlink/v2/core/internal/gethwrappers2/generated/offchainaggregator"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
@@ -71,6 +72,28 @@ func NewDynamicPriceGetter(cfg config.DynamicPriceGetterConfig, evmClients map[u
 	}
 	priceGetter := DynamicPriceGetter{cfg, evmClients, aggregatorAbi}
 	return &priceGetter, nil
+}
+
+// FilterForConfiguredTokens implements the PriceGetter interface.
+// It filters a list of token addresses for only those that have a price resolution rule configured on the PriceGetterConfig
+func (d *DynamicPriceGetter) FilterConfiguredTokens(ctx context.Context, tokens []cciptypes.Address) (configured []cciptypes.Address, unconfigured []cciptypes.Address, err error) {
+	configured = []cciptypes.Address{}
+	unconfigured = []cciptypes.Address{}
+	for _, tk := range tokens {
+		evmAddr, err := ccipcalc.GenericAddrToEvm(tk)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		if _, isAgg := d.cfg.AggregatorPrices[evmAddr]; isAgg {
+			configured = append(configured, tk)
+		} else if _, isStatic := d.cfg.StaticPrices[evmAddr]; isStatic {
+			configured = append(configured, tk)
+		} else {
+			unconfigured = append(unconfigured, tk)
+		}
+	}
+	return configured, unconfigured, nil
 }
 
 // TokenPricesUSD implements the PriceGetter interface.
@@ -134,4 +157,8 @@ func (d *DynamicPriceGetter) TokenPricesUSD(ctx context.Context, tokens []ccipty
 	}
 
 	return prices, nil
+}
+
+func (d *DynamicPriceGetter) Close() error {
+	return nil
 }
