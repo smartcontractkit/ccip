@@ -491,8 +491,20 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
       premiumFee = uint256(feeTokenConfig.networkFeeUSDCents) * 1e16;
     }
 
-    // Apply a feeToken-specific multiplier with 18 decimals, raising the premiumFee to 36 decimals
-    premiumFee = premiumFee * feeTokenConfig.premiumMultiplierWeiPerEth;
+    // Calculate data availability cost in USD with 36 decimals. Data availability cost exists on rollups that need to post
+    // transaction calldata onto another storage layer, e.g. Eth mainnet, incurring additional storage gas costs.
+    uint256 dataAvailabilityCost = 0;
+    // Only calculate data availability cost if data availability multiplier is non-zero.
+    // The multiplier should be set to 0 if destination chain does not charge data availability cost.
+    if (s_dynamicConfig.destDataAvailabilityMultiplierBps > 0) {
+      dataAvailabilityCost = _getDataAvailabilityCost(
+        // Parse the data availability gas price stored in the higher-order 112 bits of the encoded gas price.
+        uint112(packedGasPrice >> Internal.GAS_PRICE_BITS),
+        message.data.length,
+        message.tokenAmounts.length,
+        tokenTransferBytesOverhead
+      );
+    }
 
     // Calculate execution gas fee on destination chain in USD with 36 decimals.
     // We add the message gas limit, the overhead gas, the gas of passing message data to receiver, and token transfer gas together.
@@ -500,30 +512,15 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     // uint112(packedGasPrice) = executionGasPrice
     uint256 executionCost = uint112(packedGasPrice)
       * (
-        (
-          gasLimit + s_dynamicConfig.destGasOverhead + (message.data.length * s_dynamicConfig.destGasPerPayloadByte)
-            + tokenTransferGas
-        ) * feeTokenConfig.gasMultiplierWeiPerEth
-      );
-
-    // Calculate data availability cost in USD with 36 decimals. Data availability cost exists on rollups that need to post
-    // transaction calldata onto another storage layer, e.g. Eth mainnet, incurring additional storage gas costs.
-    uint256 dataAvailabilityCost = 0;
-    // Only calculate data availability cost if data availability multiplier is non-zero.
-    // The multiplier should be set to 0 if destination chain does not charge data availability cost.
-    if (s_dynamicConfig.destDataAvailabilityMultiplierBps > 0) {
-      // Parse the data availability gas price stored in the higher-order 112 bits of the encoded gas price.
-      uint112 dataAvailabilityGasPrice = uint112(packedGasPrice >> Internal.GAS_PRICE_BITS);
-
-      dataAvailabilityCost = _getDataAvailabilityCost(
-        dataAvailabilityGasPrice, message.data.length, message.tokenAmounts.length, tokenTransferBytesOverhead
-      );
-    }
+        gasLimit + s_dynamicConfig.destGasOverhead + (message.data.length * s_dynamicConfig.destGasPerPayloadByte)
+          + tokenTransferGas
+      ) * feeTokenConfig.gasMultiplierWeiPerEth;
 
     // Calculate number of fee tokens to charge.
     // Total USD fee is in 36 decimals, feeTokenPrice is in 18 decimals USD for 1e18 smallest token denominations.
     // Result of the division is the number of smallest token denominations.
-    return (premiumFee + executionCost + dataAvailabilityCost) / feeTokenPrice;
+    return
+      ((premiumFee * feeTokenConfig.premiumMultiplierWeiPerEth) + executionCost + dataAvailabilityCost) / feeTokenPrice;
   }
 
   /// @notice Returns the estimated data availability cost of the message.
