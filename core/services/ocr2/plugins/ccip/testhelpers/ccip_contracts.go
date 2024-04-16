@@ -402,6 +402,7 @@ func (c *CCIPContracts) DeployNewPriceRegistry(t *testing.T) {
 		[]common.Address{c.Dest.CommitStore.Address()},
 		[]common.Address{c.Dest.LinkToken.Address()},
 		60*60*24*14, // two weeks
+		nil,
 	)
 	require.NoError(t, err)
 	c.Source.Chain.Commit()
@@ -977,6 +978,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 		nil,
 		[]common.Address{sourceLinkTokenAddress, sourceWeth9addr},
 		60*60*24*14, // two weeks
+		nil,
 	)
 	require.NoError(t, err)
 
@@ -1082,6 +1084,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 		nil,
 		[]common.Address{destLinkTokenAddress, destWeth9addr},
 		60*60*24*14, // two weeks
+		nil,
 	)
 	require.NoError(t, err)
 	destPriceRegistry, err := price_registry.NewPriceRegistry(destPriceRegistryAddress, destChain)
