@@ -15,9 +15,9 @@ import (
 )
 
 type txDetails struct {
-	sequenceNumber uint64
-	txHash         string
-	messageId      string
+	SequenceNumber uint64
+	TxHash         string
+	MessageId      string
 }
 
 func main() {
@@ -76,9 +76,9 @@ func main() {
 		if _, exist := seqNumbers[sendRequested.Event.Message.SequenceNumber]; exist {
 			log.Printf("Found sequence number %d in tx %s\n", sendRequested.Event.Message.SequenceNumber, sendRequested.Event.Raw.TxHash.String())
 			seqNumbers[sendRequested.Event.Message.SequenceNumber] = txDetails{
-				sequenceNumber: sendRequested.Event.Message.SequenceNumber,
-				txHash:         sendRequested.Event.Raw.TxHash.String(),
-				messageId:      string(sendRequested.Event.Message.MessageId[:]),
+				SequenceNumber: sendRequested.Event.Message.SequenceNumber,
+				TxHash:         sendRequested.Event.Raw.TxHash.String(),
+				MessageId:      string(sendRequested.Event.Message.MessageId[:]),
 			}
 		}
 	}
