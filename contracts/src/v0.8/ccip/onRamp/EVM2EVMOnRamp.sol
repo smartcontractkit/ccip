@@ -251,7 +251,8 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     Client.EVM2AnyMessage calldata message,
     uint256 feeTokenAmount,
     address originalSender
-  ) external whenHealthy returns (bytes32) {
+  ) external returns (bytes32) {
+    if (IARM(i_armProxy).isCursed()) revert BadARMSignal();
     // Validate message sender is set and allowed. Not validated in `getFee` since it is not user-driven.
     if (originalSender == address(0)) revert RouterMustSetOriginalSender();
     // Router address may be zero intentionally to pause.
@@ -474,7 +475,6 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
 
     (uint224 feeTokenPrice, uint224 packedGasPrice) =
       IPriceRegistry(s_dynamicConfig.priceRegistry).getTokenAndGasPrices(message.feeToken, destChainSelector);
-    uint112 executionGasPrice = uint112(packedGasPrice);
 
     // Calculate premiumFee in USD with 18 decimals precision first.
     // If message-only and no token transfers, a flat network fee is charged.
@@ -497,7 +497,8 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     // Calculate execution gas fee on destination chain in USD with 36 decimals.
     // We add the message gas limit, the overhead gas, the gas of passing message data to receiver, and token transfer gas together.
     // We then multiply this gas total with the gas multiplier and gas price, converting it into USD with 36 decimals.
-    uint256 executionCost = executionGasPrice
+    // uint112(packedGasPrice) = executionGasPrice
+    uint256 executionCost = uint112(packedGasPrice)
       * (
         (
           gasLimit + s_dynamicConfig.destGasOverhead + (message.data.length * s_dynamicConfig.destGasPerPayloadByte)
@@ -779,13 +780,16 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   /// @dev some balance can remain after payments are done. This is at most the sum
   /// of the weight of all nops. Since nop weights are uint16s and we can have at
   /// most MAX_NUMBER_OF_NOPS NOPs, the highest possible value is 2**22 or 0.04 gjuels.
-  function payNops() public onlyOwnerOrAdminOrNop {
+  function payNops() public {
+    if (msg.sender != owner() && msg.sender != s_admin && !s_nops.contains(msg.sender)) {
+      revert OnlyCallableByOwnerOrAdminOrNop();
+    }
     uint256 weightsTotal = s_nopWeightsTotal;
     if (weightsTotal == 0) revert NoNopsToPay();
 
     uint96 totalFeesToPay = s_nopFeesJuels;
     if (totalFeesToPay < weightsTotal) revert NoFeesToPay();
-    if (_linkLeftAfterNopFees() < 0) revert InsufficientBalance();
+    if (linkAvailableForPayment() < 0) revert InsufficientBalance();
 
     uint96 fundsLeft = totalFeesToPay;
     uint256 numberOfNops = s_nops.length();
@@ -810,7 +814,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     if (to == address(0)) revert InvalidWithdrawParams();
 
     // We require the link balance to be settled before allowing withdrawal of non-link fees.
-    int256 linkAfterNopFees = _linkLeftAfterNopFees();
+    int256 linkAfterNopFees = linkAvailableForPayment();
     if (linkAfterNopFees < 0) revert LinkBalanceNotSettled();
 
     if (feeToken == i_linkToken) {
@@ -827,38 +831,20 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   // ================================================================
 
   /// @notice Calculate remaining LINK balance after paying nops
+  /// @dev Allow keeper to monitor funds available for paying nops
   /// @return balance if nops were to be paid
-  function _linkLeftAfterNopFees() private view returns (int256) {
+  function linkAvailableForPayment() public view returns (int256) {
     // Since LINK caps at uint96, casting to int256 is safe
     return int256(IERC20(i_linkToken).balanceOf(address(this))) - int256(uint256(s_nopFeesJuels));
-  }
-
-  /// @notice Allow keeper to monitor funds available for paying nops
-  function linkAvailableForPayment() external view returns (int256) {
-    return _linkLeftAfterNopFees();
   }
 
   // ================================================================
   // │                        Access and ARM                        │
   // ================================================================
 
-  /// @dev Require that the sender is the owner or the fee admin or a nop
-  modifier onlyOwnerOrAdminOrNop() {
-    if (msg.sender != owner() && msg.sender != s_admin && !s_nops.contains(msg.sender)) {
-      revert OnlyCallableByOwnerOrAdminOrNop();
-    }
-    _;
-  }
-
   /// @dev Require that the sender is the owner or the fee admin
   modifier onlyOwnerOrAdmin() {
     if (msg.sender != owner() && msg.sender != s_admin) revert OnlyCallableByOwnerOrAdmin();
-    _;
-  }
-
-  /// @notice Ensure that the ARM has not emitted a bad signal, and that the latest heartbeat is not stale.
-  modifier whenHealthy() {
-    if (IARM(i_armProxy).isCursed()) revert BadARMSignal();
     _;
   }
 }
