@@ -852,7 +852,7 @@ func CCIPDefaultTestSetUp(
 			// regex to match the path for all tokens across all lanes
 			actions.SetMockserverWithTokenPriceValue(killgrave, setUpArgs.Env.MockServer)
 		}
-		if setUpArgs.Cfg.TestGroupInput.USDCMockDeployment != nil {
+		if pointer.GetBool(setUpArgs.Cfg.TestGroupInput.USDCMockDeployment) {
 			// if it's a new USDC deployment, set up mock server for attestation,
 			// we need to set it only once for all the lanes as the attestation path uses regex to match the path for
 			// all messages across all lanes
