@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.19;
 
+import {ITokenAdminRegistry} from "../../interfaces/ITokenAdminRegistry.sol";
+
 import {BurnMintERC677} from "../../../shared/token/ERC677/BurnMintERC677.sol";
 import {AggregateRateLimiter} from "../../AggregateRateLimiter.sol";
 import {RateLimiter} from "../../libraries/RateLimiter.sol";
@@ -699,6 +701,8 @@ contract EVM2EVMOnRamp_getFeeSetup is EVM2EVMOnRampSetup {
   uint224 internal s_wrappedTokenPrice;
   uint224 internal s_customTokenPrice;
 
+  address internal s_selfServeTokenDefaultPricing = makeAddr("self-serve-token-default-pricing");
+
   function setUp() public virtual override {
     EVM2EVMOnRampSetup.setUp();
 
@@ -738,6 +742,13 @@ contract EVM2EVMOnRamp_getFeeSetup is EVM2EVMOnRampSetup {
     s_feeTokenPrice = s_sourceTokenPrices[0];
     s_wrappedTokenPrice = s_sourceTokenPrices[2];
     s_customTokenPrice = CUSTOM_TOKEN_PRICE;
+
+    // Ensure the self-serve token is set up on the admin registry
+    vm.mockCall(
+      address(s_tokenAdminRegistry),
+      abi.encodeWithSelector(ITokenAdminRegistry.getPool.selector, s_selfServeTokenDefaultPricing),
+      abi.encode(makeAddr("self-serve-pool"))
+    );
   }
 
   function calcUSDValueFromTokenAmount(uint224 tokenPrice, uint256 tokenAmount) internal pure returns (uint256) {
@@ -753,7 +764,6 @@ contract EVM2EVMOnRamp_getFeeSetup is EVM2EVMOnRampSetup {
   }
 }
 
-/// @notice #getDataAvailabilityCost
 contract EVM2EVMOnRamp_getDataAvailabilityCost is EVM2EVMOnRamp_getFeeSetup {
   function test_EmptyMessageCalculatesDataAvailabilityCost_Success() public view {
     uint256 dataAvailabilityCostUSD = s_onRamp.getDataAvailabilityCost(USD_PER_DATA_AVAILABILITY_GAS, 0, 0, 0);
@@ -825,7 +835,6 @@ contract EVM2EVMOnRamp_getDataAvailabilityCost is EVM2EVMOnRamp_getFeeSetup {
   }
 }
 
-/// @notice #getTokenTransferFee
 contract EVM2EVMOnRamp_getTokenTransferCost is EVM2EVMOnRamp_getFeeSetup {
   using USDPriceWith18Decimals for uint224;
 
@@ -837,6 +846,24 @@ contract EVM2EVMOnRamp_getTokenTransferCost is EVM2EVMOnRamp_getFeeSetup {
     assertEq(0, feeUSDWei);
     assertEq(0, destGasOverhead);
     assertEq(0, destBytesOverhead);
+  }
+
+  function test__getTokenTransferCost_selfServeUsesDefaults_Success() public view {
+    Client.EVM2AnyMessage memory message = _generateSingleTokenMessage(s_selfServeTokenDefaultPricing, 1000);
+
+    // Get config to assert it isn't set
+    EVM2EVMOnRamp.TokenTransferFeeConfig memory transferFeeConfig =
+      s_onRamp.getTokenTransferFeeConfig(message.tokenAmounts[0].token);
+
+    assertFalse(transferFeeConfig.isEnabled);
+
+    (uint256 feeUSDWei, uint32 destGasOverhead, uint32 destBytesOverhead) =
+      s_onRamp.getTokenTransferCost(message.feeToken, s_feeTokenPrice, message.tokenAmounts);
+
+    // Assert that the default values are used
+    assertEq(uint256(DEFAULT_TOKEN_FEE_USD_CENTS) * 1e16, feeUSDWei);
+    assertEq(DEFAULT_TOKEN_DEST_GAS_OVERHEAD, destGasOverhead);
+    assertEq(DEFAULT_TOKEN_BYTES_OVERHEAD, destBytesOverhead);
   }
 
   function test_SmallTokenTransferChargesMinFeeAndGas_Success() public view {
@@ -971,9 +998,6 @@ contract EVM2EVMOnRamp_getTokenTransferCost is EVM2EVMOnRamp_getFeeSetup {
     assertEq(0, destBytesOverhead);
   }
 
-  // Temporarily setting lower fuzz run as 256 triggers snapshot gas off by 1 error.
-  /// forge-config: default.fuzz.runs = 16
-  /// forge-config: ccip.fuzz.runs = 16
   function test_Fuzz_TokenTransferFeeDuplicateTokens_Success(uint256 transfers, uint256 amount) public view {
     // It shouldn't be possible to pay materially lower fees by splitting up the transfers.
     // Note it is possible to pay higher fees since the minimum fees are added.
@@ -1073,7 +1097,7 @@ contract EVM2EVMOnRamp_getTokenTransferCost is EVM2EVMOnRamp_getFeeSetup {
 
   function test_UnsupportedToken_Revert() public {
     address NOT_SUPPORTED_TOKEN = address(123);
-    Client.EVM2AnyMessage memory message = _generateSingleTokenMessage(NOT_SUPPORTED_TOKEN, 200000e18);
+    Client.EVM2AnyMessage memory message = _generateSingleTokenMessage(NOT_SUPPORTED_TOKEN, 200);
 
     vm.expectRevert(abi.encodeWithSelector(EVM2EVMOnRamp.UnsupportedToken.selector, NOT_SUPPORTED_TOKEN));
 
@@ -1099,7 +1123,6 @@ contract EVM2EVMOnRamp_getTokenTransferCost is EVM2EVMOnRamp_getFeeSetup {
   }
 }
 
-/// @notice #getFee
 contract EVM2EVMOnRamp_getFee is EVM2EVMOnRamp_getFeeSetup {
   using USDPriceWith18Decimals for uint224;
 
@@ -1415,7 +1438,6 @@ contract EVM2EVMOnRamp_setNops is EVM2EVMOnRampSetup {
   }
 }
 
-/// @notice #withdrawNonLinkFees
 contract EVM2EVMOnRamp_withdrawNonLinkFees is EVM2EVMOnRampSetup {
   IERC20 internal s_token;
 
@@ -1504,7 +1526,6 @@ contract EVM2EVMOnRamp_withdrawNonLinkFees is EVM2EVMOnRampSetup {
   }
 }
 
-/// @notice #setFeeTokenConfig
 contract EVM2EVMOnRamp_setFeeTokenConfig is EVM2EVMOnRampSetup {
   event FeeConfigSet(EVM2EVMOnRamp.FeeTokenConfigArgs[] feeConfig);
 
@@ -1540,7 +1561,6 @@ contract EVM2EVMOnRamp_setFeeTokenConfig is EVM2EVMOnRampSetup {
   }
 }
 
-/// @notice #setTokenTransferFeeConfig
 contract EVM2EVMOnRamp_setTokenTransferFeeConfig is EVM2EVMOnRampSetup {
   event TokenTransferFeeConfigSet(EVM2EVMOnRamp.TokenTransferFeeConfigArgs[] transferFeeConfig);
   event TokenTransferFeeConfigDeleted(address[] tokens);
@@ -1640,7 +1660,6 @@ contract EVM2EVMOnRamp_setTokenTransferFeeConfig is EVM2EVMOnRampSetup {
   }
 }
 
-// #getTokenPool
 contract EVM2EVMOnRamp_getTokenPool is EVM2EVMOnRampSetup {
   function test_GetTokenPool_Success() public {
     assertEq(
@@ -1658,7 +1677,6 @@ contract EVM2EVMOnRamp_getTokenPool is EVM2EVMOnRampSetup {
   }
 }
 
-// #setDynamicConfig
 contract EVM2EVMOnRamp_setDynamicConfig is EVM2EVMOnRampSetup {
   event ConfigSet(EVM2EVMOnRamp.StaticConfig staticConfig, EVM2EVMOnRamp.DynamicConfig dynamicConfig);
 
