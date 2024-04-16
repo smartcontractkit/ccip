@@ -116,7 +116,7 @@ func setupPriceRegistryReaderTH(t *testing.T) priceRegReaderTH {
 	ctx := testutils.Context(t)
 	addr, _, _, err := price_registry_1_0_0.DeployPriceRegistry(user, ec, nil, feeTokens, 1000)
 	require.NoError(t, err)
-	addr2, _, _, err := price_registry.DeployPriceRegistry(user, ec, nil, feeTokens, 1000)
+	addr2, _, _, err := price_registry.DeployPriceRegistry(user, ec, nil, feeTokens, 1000, nil)
 	require.NoError(t, err)
 	commitAndGetBlockTs(ec) // Deploy these
 	pr10r, err := factory.NewPriceRegistryReader(ctx, lggr, factory.NewEvmVersionFinder(), ccipcalc.EvmAddrToGeneric(addr), lp, ec)

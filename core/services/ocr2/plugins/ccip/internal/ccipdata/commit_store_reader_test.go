@@ -181,7 +181,7 @@ func TestCommitStoreReaders(t *testing.T) {
 	commitAndGetBlockTs(ec) // Deploy these
 	pr, _, _, err := price_registry_1_0_0.DeployPriceRegistry(user, ec, []common.Address{addr}, nil, 1e6)
 	require.NoError(t, err)
-	pr2, _, _, err := price_registry.DeployPriceRegistry(user, ec, []common.Address{addr2}, nil, 1e6)
+	pr2, _, _, err := price_registry.DeployPriceRegistry(user, ec, []common.Address{addr2}, nil, 1e6, nil)
 	require.NoError(t, err)
 	commitAndGetBlockTs(ec) // Deploy these
 	ge := new(gasmocks.EvmFeeEstimator)
