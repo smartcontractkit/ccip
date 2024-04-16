@@ -26,6 +26,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	chainselectors "github.com/smartcontractkit/chain-selectors"
+
 	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
 	ctfClient "github.com/smartcontractkit/chainlink-testing-framework/client"
 	ctftestenv "github.com/smartcontractkit/chainlink-testing-framework/docker/test_env"
@@ -36,6 +37,7 @@ import (
 	integrationactions "github.com/smartcontractkit/chainlink/integration-tests/actions"
 
 	testutils "github.com/smartcontractkit/ccip/integration-tests/ccip-tests/utils"
+
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/actions"
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/contracts"
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/contracts/laneconfig"
