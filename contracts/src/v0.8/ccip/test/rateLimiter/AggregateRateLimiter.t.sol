@@ -230,7 +230,7 @@ contract AggregateTokenLimiter__rateLimitValue is AggregateTokenLimiterSetup {
 
 /// @notice #_getTokenValue
 contract AggregateTokenLimiter__getTokenValue is AggregateTokenLimiterSetup {
-  function testGetTokenValueSuccess() public {
+  function test_GetTokenValue_Success() public view {
     uint256 numberOfTokens = 10;
     Client.EVMTokenAmount memory tokenAmount = Client.EVMTokenAmount({token: TOKEN, amount: 10});
     uint256 value = s_rateLimiter.getTokenValue(tokenAmount, s_priceRegistry);
@@ -238,7 +238,7 @@ contract AggregateTokenLimiter__getTokenValue is AggregateTokenLimiterSetup {
   }
 
   // Reverts
-  function testNoTokenPriceReverts() public {
+  function test_NoTokenPrice_Reverts() public {
     address tokenWithNoPrice = makeAddr("Token with no price");
     Client.EVMTokenAmount memory tokenAmount = Client.EVMTokenAmount({token: tokenWithNoPrice, amount: 10});
 

@@ -54,6 +54,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
   error InvalidMessageId();
   error InvalidAddress(bytes encodedAddress);
   error InvalidNewState(uint64 sequenceNumber, Internal.MessageExecutionState newState);
+  error IndexOutOfRange();
 
   /// @dev Atlas depends on this event, if changing, please notify Atlas.
   event ConfigSet(StaticConfig staticConfig, DynamicConfig dynamicConfig);
@@ -118,6 +119,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
   // DYNAMIC CONFIG
   DynamicConfig internal s_dynamicConfig;
   /// @dev Tokens that should be included in Aggregate Rate Limiting
+  /// An (address => address) map is used for backwards compatability of offchain code
   EnumerableMapAddresses.AddressToAddressMap internal s_rateLimitedTokensDestToSource;
 
   // STATE
@@ -489,14 +491,24 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
   }
 
   /// @notice Get all tokens which are included in Aggregate Rate Limiting.
+  /// @param startIndex starting index in list
+  /// @param maxCount max count to retrieve (0 = unlimited)
   /// @return sourceTokens The source representation of the tokens that are rate limited.
   /// @return destTokens The destination representation of the tokens that are rate limited.
-  function getAllRateLimitTokens() external view returns (address[] memory sourceTokens, address[] memory destTokens) {
+  /// @dev the order of IDs in the list is **not guaranteed**, therefore, if making successive calls, one
+  /// should consider keeping the blockheight constant to ensure a holistic picture of the contract state
+  function getAllRateLimitTokens(
+    uint256 startIndex,
+    uint256 maxCount
+  ) external view returns (address[] memory sourceTokens, address[] memory destTokens) {
     uint256 length = s_rateLimitedTokensDestToSource.length();
-    sourceTokens = new address[](length);
-    destTokens = new address[](length);
-    for (uint256 i = 0; i < length; ++i) {
-      (address destToken, address sourceToken) = s_rateLimitedTokensDestToSource.at(i);
+    if (startIndex >= length) revert IndexOutOfRange();
+    uint256 endIndex = startIndex + maxCount;
+    endIndex = endIndex > length || maxCount == 0 ? length : endIndex;
+    sourceTokens = new address[](endIndex - startIndex);
+    destTokens = new address[](endIndex - startIndex);
+    for (uint256 i = 0; i < sourceTokens.length; ++i) {
+      (address destToken, address sourceToken) = s_rateLimitedTokensDestToSource.at(i + startIndex);
       sourceTokens[i] = sourceToken;
       destTokens[i] = destToken;
     }

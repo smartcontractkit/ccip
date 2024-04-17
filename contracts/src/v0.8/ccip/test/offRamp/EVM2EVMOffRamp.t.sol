@@ -1160,7 +1160,6 @@ contract EVM2EVMOffRamp__releaseOrMintTokens is EVM2EVMOffRampSetup {
 
     Client.EVMTokenAmount[] memory srcTokenAmounts = getCastedSourceEVMTokenAmountsWithZeroAmounts();
     IERC20 dstToken1 = IERC20(s_destFeeToken);
-    uint256 startingBalance = dstToken1.balanceOf(OWNER);
     uint256 amount1 = 100;
     srcTokenAmounts[0].amount = amount1;
 
@@ -1276,13 +1275,12 @@ contract EVM2EVMOffRamp__releaseOrMintTokens is EVM2EVMOffRampSetup {
     );
   }
 
-  function testPriceNotFoundForTokenReverts() public {
+  function test_PriceNotFoundForToken_Reverts() public {
     // Set token price to 0
     s_priceRegistry.updatePrices(getSingleTokenPriceUpdateStruct(s_destFeeToken, 0));
 
     Client.EVMTokenAmount[] memory srcTokenAmounts = getCastedSourceEVMTokenAmountsWithZeroAmounts();
     IERC20 dstToken1 = IERC20(s_destFeeToken);
-    uint256 startingBalance = dstToken1.balanceOf(OWNER);
     uint256 amount1 = 100;
     srcTokenAmounts[0].amount = amount1;
 
@@ -1329,7 +1327,54 @@ contract EVM2EVMOffRamp__releaseOrMintTokens is EVM2EVMOffRampSetup {
   }
 }
 
-contract EVM2EVMOffRamp__updateRateLimitTokens is EVM2EVMOffRampSetup {
+contract EVM2EVMOffRamp_getAllRateLimitTokens is EVM2EVMOffRampSetup {
+  function test_GetAllRateLimitTokens_Success() public view {
+    // Gets all when maxCount is 0
+    (address[] memory sourceTokens, address[] memory destTokens) = s_offRamp.getAllRateLimitTokens(0, 0);
+
+    for (uint256 i = 0; i < s_sourceTokens.length; ++i) {
+      assertEq(s_sourceTokens[i], sourceTokens[i]);
+      assertEq(s_destTokens[i], destTokens[i]);
+    }
+
+    // Gets batches
+    uint256 batchSize = 1;
+    bool continueQuery = true;
+    uint256 lastIndex = 0;
+    address[] memory sourceTokens2 = new address[](s_sourceTokens.length);
+    address[] memory destTokens2 = new address[](s_sourceTokens.length);
+    while (continueQuery) {
+      try s_offRamp.getAllRateLimitTokens(lastIndex, batchSize) returns (
+        address[] memory sourceTokensBatch, address[] memory destTokensBatch
+      ) {
+        for (uint256 i = 0; i < sourceTokensBatch.length; ++i) {
+          sourceTokens2[i + lastIndex] = sourceTokensBatch[i];
+          destTokens2[i + lastIndex] = destTokensBatch[i];
+        }
+        lastIndex += sourceTokensBatch.length;
+      } catch {
+        continueQuery = false;
+      }
+    }
+
+    for (uint256 i = 0; i < s_sourceTokens.length; ++i) {
+      assertEq(s_sourceTokens[i], sourceTokens2[i]);
+      assertEq(s_destTokens[i], destTokens2[i]);
+    }
+  }
+
+  // Reverts
+
+  function test_IndexOutOfRange_Revert() public {
+    vm.startPrank(STRANGER);
+
+    vm.expectRevert(abi.encodeWithSelector(EVM2EVMOffRamp.IndexOutOfRange.selector));
+
+    s_offRamp.getAllRateLimitTokens(s_sourceTokens.length, 10);
+  }
+}
+
+contract EVM2EVMOffRamp_updateRateLimitTokens is EVM2EVMOffRampSetup {
   event TokenAggregateRateLimitAdded(address sourceToken, address destToken);
   event TokenAggregateRateLimitRemoved(address sourceToken, address destToken);
 
@@ -1343,7 +1388,7 @@ contract EVM2EVMOffRamp__updateRateLimitTokens is EVM2EVMOffRampSetup {
     s_offRamp.updateRateLimitTokens(remove, new EVM2EVMOffRamp.RateLimitToken[](0));
   }
 
-  function test_updateRateLimitTokens_Success() public {
+  function test_UpdateRateLimitTokens_Success() public {
     EVM2EVMOffRamp.RateLimitToken[] memory adds = new EVM2EVMOffRamp.RateLimitToken[](2);
     adds[0] = EVM2EVMOffRamp.RateLimitToken({sourceToken: s_sourceTokens[0], destToken: s_destTokens[0]});
     adds[1] = EVM2EVMOffRamp.RateLimitToken({sourceToken: s_sourceTokens[1], destToken: s_destTokens[1]});
@@ -1355,7 +1400,7 @@ contract EVM2EVMOffRamp__updateRateLimitTokens is EVM2EVMOffRampSetup {
 
     s_offRamp.updateRateLimitTokens(new EVM2EVMOffRamp.RateLimitToken[](0), adds);
 
-    (address[] memory sourceTokens, address[] memory destTokens) = s_offRamp.getAllRateLimitTokens();
+    (address[] memory sourceTokens, address[] memory destTokens) = s_offRamp.getAllRateLimitTokens(0, 0);
 
     for (uint256 i = 0; i < adds.length; ++i) {
       assertEq(adds[i].sourceToken, sourceTokens[i]);
@@ -1363,7 +1408,7 @@ contract EVM2EVMOffRamp__updateRateLimitTokens is EVM2EVMOffRampSetup {
     }
   }
 
-  function test_updateRateLimitTokens_AddsAndRemoves_Success() public {
+  function test_UpdateRateLimitTokens_AddsAndRemoves_Success() public {
     EVM2EVMOffRamp.RateLimitToken[] memory adds = new EVM2EVMOffRamp.RateLimitToken[](2);
     adds[0] = EVM2EVMOffRamp.RateLimitToken({sourceToken: s_sourceTokens[0], destToken: s_destTokens[0]});
     adds[1] = EVM2EVMOffRamp.RateLimitToken({sourceToken: s_sourceTokens[1], destToken: s_destTokens[1]});
@@ -1385,7 +1430,7 @@ contract EVM2EVMOffRamp__updateRateLimitTokens is EVM2EVMOffRampSetup {
 
     s_offRamp.updateRateLimitTokens(removes, new EVM2EVMOffRamp.RateLimitToken[](0));
 
-    (address[] memory sourceTokens, address[] memory destTokens) = s_offRamp.getAllRateLimitTokens();
+    (address[] memory sourceTokens, address[] memory destTokens) = s_offRamp.getAllRateLimitTokens(0, 0);
 
     assertEq(1, sourceTokens.length);
     assertEq(adds[1].sourceToken, sourceTokens[0]);
