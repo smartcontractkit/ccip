@@ -190,7 +190,7 @@ func setupOffRampReaderTH(t *testing.T, version string) offRampReaderTH {
 	}
 
 	// Create the version-specific reader.
-	reader, err := factory.NewOffRampReader(log, factory.NewEvmVersionFinder(), ccipcalc.EvmAddrToGeneric(offRampAddress), bc, lp, nil, nil, true)
+	reader, err := factory.NewOffRampReader(ctx, log, factory.NewEvmVersionFinder(), ccipcalc.EvmAddrToGeneric(offRampAddress), bc, lp, nil, nil, true)
 	require.NoError(t, err)
 	addr, err := reader.Address(ctx)
 	require.NoError(t, err)
@@ -391,6 +391,7 @@ func TestNewOffRampReader(t *testing.T) {
 			expectedErr:    "unsupported offramp version 2.0.0",
 		},
 	}
+	ctx := testutils.Context(t)
 	for _, tc := range tt {
 		t.Run(tc.typeAndVersion, func(t *testing.T) {
 			b, err := utils.ABIEncode(`[{"type":"string"}]`, tc.typeAndVersion)
@@ -400,7 +401,7 @@ func TestNewOffRampReader(t *testing.T) {
 			addr := ccipcalc.EvmAddrToGeneric(utils.RandomAddress())
 			lp := lpmocks.NewLogPoller(t)
 			lp.On("RegisterFilter", mock.Anything, mock.Anything).Return(nil).Maybe()
-			_, err = factory.NewOffRampReader(logger.TestLogger(t), factory.NewEvmVersionFinder(), addr, c, lp, nil, nil, true)
+			_, err = factory.NewOffRampReader(ctx, logger.TestLogger(t), factory.NewEvmVersionFinder(), addr, c, lp, nil, nil, true)
 			if tc.expectedErr != "" {
 				assert.EqualError(t, err, tc.expectedErr)
 			} else {

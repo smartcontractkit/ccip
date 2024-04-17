@@ -20,6 +20,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
+	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
@@ -35,12 +36,13 @@ var (
 )
 
 func TestUSDCReader_callAttestationApi(t *testing.T) {
+	ctx := testutils.Context(t)
 	t.Skipf("Skipping test because it uses the real USDC attestation API")
 	usdcMessageHash := "912f22a13e9ccb979b621500f6952b2afd6e75be7eadaed93fc2625fe11c52a2"
 	attestationURI, err := url.ParseRequestURI("https://iris-api-sandbox.circle.com")
 	require.NoError(t, err)
 	lggr := logger.TestLogger(t)
-	usdcReader, _ := ccipdata.NewUSDCReader(lggr, "job_123", mockMsgTransmitter, nil, false)
+	usdcReader, _ := ccipdata.NewUSDCReader(ctx, lggr, "job_123", mockMsgTransmitter, nil, false)
 	usdcService := NewUSDCTokenDataReader(lggr, usdcReader, attestationURI, 0, common.Address{}, APIIntervalRateLimitDisabled)
 
 	attestation, err := usdcService.callAttestationApi(context.Background(), [32]byte(common.FromHex(usdcMessageHash)))
@@ -60,10 +62,10 @@ func TestUSDCReader_callAttestationApiMock(t *testing.T) {
 	defer ts.Close()
 	attestationURI, err := url.ParseRequestURI(ts.URL)
 	require.NoError(t, err)
-
+	ctx := testutils.Context(t)
 	lggr := logger.TestLogger(t)
 	lp := mocks.NewLogPoller(t)
-	usdcReader, _ := ccipdata.NewUSDCReader(lggr, "job_123", mockMsgTransmitter, lp, false)
+	usdcReader, _ := ccipdata.NewUSDCReader(ctx, lggr, "job_123", mockMsgTransmitter, lp, false)
 	usdcService := NewUSDCTokenDataReader(lggr, usdcReader, attestationURI, 0, common.Address{}, APIIntervalRateLimitDisabled)
 	attestation, err := usdcService.callAttestationApi(context.Background(), utils.RandomBytes32())
 	require.NoError(t, err)
@@ -187,7 +189,7 @@ func TestUSDCReader_callAttestationApiMockError(t *testing.T) {
 			expectedError:        nil,
 		},
 	}
-
+	ctx := testutils.Context(t)
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			ts := test.getTs()
@@ -198,10 +200,10 @@ func TestUSDCReader_callAttestationApiMockError(t *testing.T) {
 
 			lggr := logger.TestLogger(t)
 			lp := mocks.NewLogPoller(t)
-			usdcReader, _ := ccipdata.NewUSDCReader(lggr, "job_123", mockMsgTransmitter, lp, false)
+			usdcReader, _ := ccipdata.NewUSDCReader(ctx, lggr, "job_123", mockMsgTransmitter, lp, false)
 			usdcService := NewUSDCTokenDataReader(lggr, usdcReader, attestationURI, test.customTimeoutSeconds, common.Address{}, APIIntervalRateLimitDisabled)
 			lp.On("RegisterFilter", mock.Anything, mock.Anything).Return(nil)
-			require.NoError(t, usdcReader.RegisterFilters())
+			require.NoError(t, usdcReader.RegisterFilters(ctx))
 
 			parentCtx, cancel := context.WithTimeout(context.Background(), time.Duration(test.parentTimeoutSeconds)*time.Second)
 			defer cancel()
@@ -213,7 +215,7 @@ func TestUSDCReader_callAttestationApiMockError(t *testing.T) {
 				require.True(t, errors.Is(err, test.expectedError))
 			}
 			lp.On("UnregisterFilter", mock.Anything, mock.Anything).Return(nil)
-			require.NoError(t, usdcReader.Close())
+			require.NoError(t, usdcReader.Close(ctx))
 		})
 	}
 }
@@ -350,7 +352,7 @@ func TestUSDCReader_rateLimiting(t *testing.T) {
 			err:          "usdc rate limiting error: rate: Wait(n=1) would exceed context deadline",
 		},
 	}
-
+	ctx := testutils.Context(t)
 	for _, tc := range testCases {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
@@ -368,7 +370,7 @@ func TestUSDCReader_rateLimiting(t *testing.T) {
 
 			lggr := logger.TestLogger(t)
 			lp := mocks.NewLogPoller(t)
-			usdcReader, _ := ccipdata.NewUSDCReader(lggr, "job_123", mockMsgTransmitter, lp, false)
+			usdcReader, _ := ccipdata.NewUSDCReader(ctx, lggr, "job_123", mockMsgTransmitter, lp, false)
 			usdcService := NewUSDCTokenDataReader(lggr, usdcReader, attestationURI, 0, utils.RandomAddress(), tc.rateConfig)
 
 			ctx := context.Background()

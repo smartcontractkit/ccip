@@ -38,8 +38,9 @@ type onRampReaderTH struct {
 
 func TestNewOnRampReader_noContractAtAddress(t *testing.T) {
 	_, bc := ccipdata.NewSimulation(t)
+	ctx := testutils.Context(t)
 	addr := ccipcalc.EvmAddrToGeneric(utils.RandomAddress())
-	_, err := factory.NewOnRampReader(logger.TestLogger(t), factory.NewEvmVersionFinder(), testutils.SimulatedChainID.Uint64(), testutils.SimulatedChainID.Uint64(), addr, lpmocks.NewLogPoller(t), bc)
+	_, err := factory.NewOnRampReader(ctx, logger.TestLogger(t), factory.NewEvmVersionFinder(), testutils.SimulatedChainID.Uint64(), testutils.SimulatedChainID.Uint64(), addr, lpmocks.NewLogPoller(t), bc)
 	assert.EqualError(t, err, fmt.Sprintf("unable to read type and version: error calling typeAndVersion on addr: %s no contract code at given address", addr))
 }
 
@@ -107,8 +108,9 @@ func setupOnRampReaderTH(t *testing.T, version string) onRampReaderTH {
 		require.Fail(t, "Unknown version: ", version)
 	}
 
+	ctx := testutils.Context(t)
 	// Create the version-specific reader.
-	reader, err := factory.NewOnRampReader(log, factory.NewEvmVersionFinder(), testutils.SimulatedChainID.Uint64(), testutils.SimulatedChainID.Uint64(), ccipcalc.EvmAddrToGeneric(onRampAddress), lp, bc)
+	reader, err := factory.NewOnRampReader(ctx, log, factory.NewEvmVersionFinder(), testutils.SimulatedChainID.Uint64(), testutils.SimulatedChainID.Uint64(), ccipcalc.EvmAddrToGeneric(onRampAddress), lp, bc)
 	require.NoError(t, err)
 
 	return onRampReaderTH{
@@ -449,6 +451,7 @@ func TestNewOnRampReader(t *testing.T) {
 			expectedErr:    "unsupported onramp version 2.0.0",
 		},
 	}
+	ctx := testutils.Context(t)
 	for _, tc := range tt {
 		t.Run(tc.typeAndVersion, func(t *testing.T) {
 			b, err := utils.ABIEncode(`[{"type":"string"}]`, tc.typeAndVersion)
@@ -458,7 +461,7 @@ func TestNewOnRampReader(t *testing.T) {
 			addr := ccipcalc.EvmAddrToGeneric(utils.RandomAddress())
 			lp := lpmocks.NewLogPoller(t)
 			lp.On("RegisterFilter", mock.Anything, mock.Anything).Return(nil).Maybe()
-			_, err = factory.NewOnRampReader(logger.TestLogger(t), factory.NewEvmVersionFinder(), 1, 2, addr, lp, c)
+			_, err = factory.NewOnRampReader(ctx, logger.TestLogger(t), factory.NewEvmVersionFinder(), 1, 2, addr, lp, c)
 			if tc.expectedErr != "" {
 				require.EqualError(t, err, tc.expectedErr)
 			} else {

@@ -189,10 +189,10 @@ func TestCommitStoreReaders(t *testing.T) {
 	ge.On("L1Oracle").Return(lm)
 
 	maxGasPrice := big.NewInt(1e8)
-	c10r, err := factory.NewCommitStoreReader(lggr, factory.NewEvmVersionFinder(), ccipcalc.EvmAddrToGeneric(addr), ec, lp, ge, maxGasPrice)
+	c10r, err := factory.NewCommitStoreReader(ctx, lggr, factory.NewEvmVersionFinder(), ccipcalc.EvmAddrToGeneric(addr), ec, lp, ge, maxGasPrice)
 	require.NoError(t, err)
 	assert.Equal(t, reflect.TypeOf(c10r).String(), reflect.TypeOf(&v1_0_0.CommitStore{}).String())
-	c12r, err := factory.NewCommitStoreReader(lggr, factory.NewEvmVersionFinder(), ccipcalc.EvmAddrToGeneric(addr2), ec, lp, ge, maxGasPrice)
+	c12r, err := factory.NewCommitStoreReader(ctx, lggr, factory.NewEvmVersionFinder(), ccipcalc.EvmAddrToGeneric(addr2), ec, lp, ge, maxGasPrice)
 	require.NoError(t, err)
 	assert.Equal(t, reflect.TypeOf(c12r).String(), reflect.TypeOf(&v1_2_0.CommitStore{}).String())
 
@@ -389,6 +389,9 @@ func TestNewCommitStoreReader(t *testing.T) {
 			expectedErr:    "unsupported commit store version 2.0.0",
 		},
 	}
+
+	ctx := testutils.Context(t)
+
 	for _, tc := range tt {
 		t.Run(tc.typeAndVersion, func(t *testing.T) {
 			b, err := utils.ABIEncode(`[{"type":"string"}]`, tc.typeAndVersion)
@@ -400,7 +403,7 @@ func TestNewCommitStoreReader(t *testing.T) {
 			if tc.expectedErr == "" {
 				lp.On("RegisterFilter", mock.Anything, mock.Anything).Return(nil)
 			}
-			_, err = factory.NewCommitStoreReader(logger.TestLogger(t), factory.NewEvmVersionFinder(), addr, c, lp, nil, nil)
+			_, err = factory.NewCommitStoreReader(ctx, logger.TestLogger(t), factory.NewEvmVersionFinder(), addr, c, lp, nil, nil)
 			if tc.expectedErr != "" {
 				require.EqualError(t, err, tc.expectedErr)
 			} else {

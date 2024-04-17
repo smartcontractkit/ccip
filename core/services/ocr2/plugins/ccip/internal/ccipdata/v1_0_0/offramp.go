@@ -33,7 +33,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/rpclib"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/prices"
-	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 )
 
 const (
@@ -468,7 +467,7 @@ func (o *OffRamp) ChangeConfig(ctx context.Context, onchainConfigBytes []byte, o
 }
 
 func (o *OffRamp) Close() error {
-	return logpollerutil.UnregisterLpFilters(o.lp, o.filters)
+	return logpollerutil.UnregisterLpFilters(context.TODO(), o.lp, o.filters)
 }
 
 func (o *OffRamp) GetExecutionStateChangesBetweenSeqNums(ctx context.Context, seqNumMin, seqNumMax uint64, confs int) ([]cciptypes.ExecutionStateChangedWithTxMeta, error) {
@@ -657,8 +656,8 @@ func (o *OffRamp) DecodeExecutionReport(ctx context.Context, report []byte) (cci
 	return DecodeExecReport(ctx, o.ExecutionReportArgs, report)
 }
 
-func (o *OffRamp) RegisterFilters(qopts ...pg.QOpt) error {
-	return logpollerutil.RegisterLpFilters(o.lp, o.filters)
+func (o *OffRamp) RegisterFilters(ctx context.Context) error {
+	return logpollerutil.RegisterLpFilters(ctx, o.lp, o.filters)
 }
 
 func NewOffRamp(lggr logger.Logger, addr common.Address, ec client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator, destMaxGasPrice *big.Int) (*OffRamp, error) {

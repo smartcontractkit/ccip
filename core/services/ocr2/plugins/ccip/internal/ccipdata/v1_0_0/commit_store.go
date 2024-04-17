@@ -28,7 +28,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/logpollerutil"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/prices"
-	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 )
 
 const (
@@ -244,7 +243,7 @@ func (c *CommitStore) ChangeConfig(_ context.Context, onchainConfig []byte, offc
 }
 
 func (c *CommitStore) Close() error {
-	return logpollerutil.UnregisterLpFilters(c.lp, c.filters)
+	return logpollerutil.UnregisterLpFilters(context.TODO(), c.lp, c.filters)
 }
 
 func (c *CommitStore) parseReport(log types.Log) (*cciptypes.CommitStoreReport, error) {
@@ -375,8 +374,8 @@ func (c *CommitStore) VerifyExecutionReport(ctx context.Context, report cciptype
 	return true, nil
 }
 
-func (c *CommitStore) RegisterFilters(qopts ...pg.QOpt) error {
-	return logpollerutil.RegisterLpFilters(c.lp, c.filters)
+func (c *CommitStore) RegisterFilters(ctx context.Context) error {
+	return logpollerutil.RegisterLpFilters(ctx, c.lp, c.filters)
 }
 
 func NewCommitStore(lggr logger.Logger, addr common.Address, ec client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator, sourceMaxGasPrice *big.Int) (*CommitStore, error) {

@@ -41,7 +41,7 @@ func initOrClosePriceRegistryReader(ctx context.Context, lggr logger.Logger, ver
 	if isV1_0_0 {
 		lggr.Infof("Assuming %v is 1.0.0 price registry, got %v", priceRegistryEvmAddr, err)
 		// Unfortunately the v1 price registry doesn't have a method to get the version so assume if it reverts its v1.
-		pr, err2 := v1_0_0.NewPriceRegistry(lggr, priceRegistryEvmAddr, lp, cl, registerFilters)
+		pr, err2 := v1_0_0.NewPriceRegistry(ctx, lggr, priceRegistryEvmAddr, lp, cl, registerFilters)
 		if err2 != nil {
 			return nil, err2
 		}
@@ -59,7 +59,7 @@ func initOrClosePriceRegistryReader(ctx context.Context, lggr logger.Logger, ver
 	}
 	switch version.String() {
 	case ccipdata.V1_2_0:
-		pr, err := v1_2_0.NewPriceRegistry(lggr, priceRegistryEvmAddr, lp, cl, registerFilters)
+		pr, err := v1_2_0.NewPriceRegistry(ctx, lggr, priceRegistryEvmAddr, lp, cl, registerFilters)
 		if err != nil {
 			return nil, err
 		}

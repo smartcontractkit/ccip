@@ -26,8 +26,8 @@ type PriceRegistry struct {
 	pr *price_registry.PriceRegistry
 }
 
-func NewPriceRegistry(lggr logger.Logger, priceRegistryAddr common.Address, lp logpoller.LogPoller, ec client.Client, registerFilters bool) (*PriceRegistry, error) {
-	v100, err := v1_0_0.NewPriceRegistry(lggr, priceRegistryAddr, lp, ec, registerFilters)
+func NewPriceRegistry(ctx context.Context, lggr logger.Logger, priceRegistryAddr common.Address, lp logpoller.LogPoller, ec client.Client, registerFilters bool) (*PriceRegistry, error) {
+	v100, err := v1_0_0.NewPriceRegistry(ctx, lggr, priceRegistryAddr, lp, ec, registerFilters)
 	if err != nil {
 		return nil, err
 	}
