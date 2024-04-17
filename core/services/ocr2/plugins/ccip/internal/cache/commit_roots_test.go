@@ -8,7 +8,7 @@ import (
 )
 
 func TestSnoozedRoots(t *testing.T) {
-	c := NewSnoozedRoots(1*time.Minute, 1*time.Minute)
+	c := NewCommitRootsCache(1*time.Minute, 1*time.Minute)
 
 	k1 := [32]byte{1}
 	k2 := [32]byte{2}

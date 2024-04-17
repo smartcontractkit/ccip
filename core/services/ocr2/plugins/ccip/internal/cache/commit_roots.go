@@ -71,7 +71,7 @@ func newCommitRootsCache(
 	}
 }
 
-func NewSnoozedRoots(permissionLessExecutionThresholdDuration time.Duration, rootSnoozeTime time.Duration) *commitRootsCache {
+func NewCommitRootsCache(permissionLessExecutionThresholdDuration time.Duration, rootSnoozeTime time.Duration) *commitRootsCache {
 	return newCommitRootsCache(permissionLessExecutionThresholdDuration, rootSnoozeTime, EvictionGracePeriod, CleanupInterval)
 }
 
