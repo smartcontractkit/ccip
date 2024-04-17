@@ -80,5 +80,5 @@ func main() {
 			}
 		}
 	}
-	log.Println("Tx Details found for Sequence numbers:", seqNumbers)
+	log.Printf("Tx Details found for Sequence numbers: %+v", seqNumbers)
 }
