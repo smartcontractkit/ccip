@@ -1,0 +1,9 @@
+dependencies:
+- name: chainlink-cluster
+  repository: file://../chainlink-cluster
+  version: 0.4.1
+- name: ccip-scripts
+  repository: file://../ccip-scripts
+  version: 0.1.0
+digest: sha256:31f440fca0900a091f93874e0733dde9754f22be33a78f988dd8b07d6635e74e
+generated: "2024-04-17T11:43:26.049726+02:00"

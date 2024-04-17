@@ -99,8 +99,8 @@ deployments:
       upgradeArgs: ["--timeout", "10m"]
       displayOutput: true
       chart:
-        name: cl-cluster
-        path: ../charts/chainlink-cluster
+        name: root
+        path: ../charts/root
       # for simplicity, we define all the values here
       # they can be defined the same way in values.yml
       # devspace merges these "values" with the "values.yaml" before deploy
@@ -108,518 +108,521 @@ deployments:
         podSecurityContext:
           fsGroup: 999
 
-        chainlink:
-          securityContext:
-            capabilities:
-              drop:
-                - ALL
-            readOnlyRootFilesystem: false
-            runAsNonRoot: true
-            runAsUser: 14933
-            runAsGroup: 999
-          web_port: 6688
-          p2p_port: 6690
-          # extraEnvVars:
-            # "CL_MEDIAN_CMD": "chainlink-feeds"
-          nodes:
-            - name: node-1
-              image: ${runtime.images.app}
-              # override default config per node
-              # for example, use OCRv2 P2P setup, the whole config
-              #      toml: |
-              #        RootDir = './clroot'
-              #        [Log]
-              #        JSONConsole = true
-              #        Level = 'debug'
-              #        [WebServer]
-              #        AllowOrigins = '*'
-              #        SecureCookies = false
-              #        SessionTimeout = '999h0m0s'
-              #        [OCR2]
-              #        Enabled = true
-              #        [P2P]
-              #        [P2P.V2]
-              #        Enabled = false
-              #        AnnounceAddresses = []
-              #        DefaultBootstrappers = []
-              #        DeltaDial = '15s'
-              #        DeltaReconcile = '1m0s'
-              #        ListenAddresses = []
-              #        [[EVM]]
-              #        ChainID = '1337'
-              #        MinContractPayment = '0'
-              #        [[EVM.Nodes]]
-              #        Name = 'node-0'
-              #        WSURL = 'ws://geth:8546'
-              #        HTTPURL = 'http://geth:8544'
-              #        [WebServer.TLS]
-              #        HTTPSPort = 0
-              # or use overridesToml to override some part of configuration
-              overridesToml: |
-                [Feature]
-                LogPoller = true
-                CCIP = true
+        chainlink-cluster:
+          chainlink:
+            securityContext:
+              capabilities:
+                drop:
+                  - ALL
+              readOnlyRootFilesystem: false
+              runAsNonRoot: true
+              runAsUser: 14933
+              runAsGroup: 999
+            web_port: 6688
+            p2p_port: 6690
+            # extraEnvVars:
+              # "CL_MEDIAN_CMD": "chainlink-feeds"
+            nodes:
+              - name: node-1
+                image: ${runtime.images.app}
+                # override default config per node
+                # for example, use OCRv2 P2P setup, the whole config
+                #      toml: |
+                #        RootDir = './clroot'
+                #        [Log]
+                #        JSONConsole = true
+                #        Level = 'debug'
+                #        [WebServer]
+                #        AllowOrigins = '*'
+                #        SecureCookies = false
+                #        SessionTimeout = '999h0m0s'
+                #        [OCR2]
+                #        Enabled = true
+                #        [P2P]
+                #        [P2P.V2]
+                #        Enabled = false
+                #        AnnounceAddresses = []
+                #        DefaultBootstrappers = []
+                #        DeltaDial = '15s'
+                #        DeltaReconcile = '1m0s'
+                #        ListenAddresses = []
+                #        [[EVM]]
+                #        ChainID = '1337'
+                #        MinContractPayment = '0'
+                #        [[EVM.Nodes]]
+                #        Name = 'node-0'
+                #        WSURL = 'ws://geth:8546'
+                #        HTTPURL = 'http://geth:8544'
+                #        [WebServer.TLS]
+                #        HTTPSPort = 0
+                # or use overridesToml to override some part of configuration
+                overridesToml: |
+                  [Feature]
+                  LogPoller = true
+                  CCIP = true
+  
+                  [Log]
+                  Level = 'debug'
+                  JSONConsole = true
+  
+                  [Log.File]
+                  MaxSize = '0b'
+  
+                  [WebServer]
+                  AllowOrigins = '*'
+                  HTTPPort = 6688
+                  SecureCookies = false
+                  HTTPWriteTimeout = '1m'
+  
+                  [WebServer.RateLimit]
+                  Authenticated = 2000
+                  Unauthenticated = 1000
+  
+                  [WebServer.TLS]
+                  HTTPSPort = 0
+  
+                  [Database]
+                  MaxIdleConns = 50
+                  MaxOpenConns = 50
+                  MigrateOnStartup = true
+  
+                  [OCR2]
+                  Enabled = true
+                  DefaultTransactionQueueDepth = 0
+  
+                  [OCR]
+                  Enabled = false
+                  DefaultTransactionQueueDepth = 0
+  
+                  [P2P]
+                  [P2P.V2]
+                  Enabled = true
+                  ListenAddresses = ['0.0.0.0:6690']
+                  AnnounceAddresses = ['0.0.0.0:6690']
+                  DeltaDial = '500ms'
+                  DeltaReconcile = '5s'
+              - name: node-2
+                image: ${runtime.images.app}
+                overridesToml: |
+                  [Feature]
+                  LogPoller = true
+                  CCIP = true
+  
+                  [Log]
+                  Level = 'debug'
+                  JSONConsole = true
+  
+                  [Log.File]
+                  MaxSize = '0b'
+  
+                  [WebServer]
+                  AllowOrigins = '*'
+                  HTTPPort = 6688
+                  SecureCookies = false
+                  HTTPWriteTimeout = '1m'
+  
+                  [WebServer.RateLimit]
+                  Authenticated = 2000
+                  Unauthenticated = 1000
+  
+                  [WebServer.TLS]
+                  HTTPSPort = 0
+  
+                  [Database]
+                  MaxIdleConns = 50
+                  MaxOpenConns = 50
+                  MigrateOnStartup = true
+  
+                  [OCR2]
+                  Enabled = true
+                  DefaultTransactionQueueDepth = 0
+  
+                  [OCR]
+                  Enabled = false
+                  DefaultTransactionQueueDepth = 0
+  
+                  [P2P]
+                  [P2P.V2]
+                  Enabled = true
+                  ListenAddresses = ['0.0.0.0:6690']
+                  AnnounceAddresses = ['0.0.0.0:6690']
+                  DeltaDial = '500ms'
+                  DeltaReconcile = '5s'
+              - name: node-3
+                image: ${runtime.images.app}
+                overridesToml: |
+                  [Feature]
+                  LogPoller = true
+                  CCIP = true
+  
+                  [Log]
+                  Level = 'debug'
+                  JSONConsole = true
+  
+                  [Log.File]
+                  MaxSize = '0b'
+  
+                  [WebServer]
+                  AllowOrigins = '*'
+                  HTTPPort = 6688
+                  SecureCookies = false
+                  HTTPWriteTimeout = '1m'
+  
+                  [WebServer.RateLimit]
+                  Authenticated = 2000
+                  Unauthenticated = 1000
+  
+                  [WebServer.TLS]
+                  HTTPSPort = 0
+  
+                  [Database]
+                  MaxIdleConns = 50
+                  MaxOpenConns = 50
+                  MigrateOnStartup = true
+  
+                  [OCR2]
+                  Enabled = true
+                  DefaultTransactionQueueDepth = 0
+  
+                  [OCR]
+                  Enabled = false
+                  DefaultTransactionQueueDepth = 0
+  
+                  [P2P]
+                  [P2P.V2]
+                  Enabled = true
+                  ListenAddresses = ['0.0.0.0:6690']
+                  AnnounceAddresses = ['0.0.0.0:6690']
+                  DeltaDial = '500ms'
+                  DeltaReconcile = '5s'
+              - name: node-4
+                image: ${runtime.images.app}
+                overridesToml: |
+                  [Feature]
+                  LogPoller = true
+                  CCIP = true
+  
+                  [Log]
+                  Level = 'debug'
+                  JSONConsole = true
+  
+                  [Log.File]
+                  MaxSize = '0b'
+  
+                  [WebServer]
+                  AllowOrigins = '*'
+                  HTTPPort = 6688
+                  SecureCookies = false
+                  HTTPWriteTimeout = '1m'
+  
+                  [WebServer.RateLimit]
+                  Authenticated = 2000
+                  Unauthenticated = 1000
+  
+                  [WebServer.TLS]
+                  HTTPSPort = 0
+  
+                  [Database]
+                  MaxIdleConns = 50
+                  MaxOpenConns = 50
+                  MigrateOnStartup = true
+  
+                  [OCR2]
+                  Enabled = true
+                  DefaultTransactionQueueDepth = 0
+  
+                  [OCR]
+                  Enabled = false
+                  DefaultTransactionQueueDepth = 0
+  
+                  [P2P]
+                  [P2P.V2]
+                  Enabled = true
+                  ListenAddresses = ['0.0.0.0:6690']
+                  AnnounceAddresses = ['0.0.0.0:6690']
+                  DeltaDial = '500ms'
+                  DeltaReconcile = '5s'
+              - name: node-5
+                image: ${runtime.images.app}
+                overridesToml: |
+                  [Feature]
+                  LogPoller = true
+                  CCIP = true
+  
+                  [Log]
+                  Level = 'debug'
+                  JSONConsole = true
+  
+                  [Log.File]
+                  MaxSize = '0b'
+  
+                  [WebServer]
+                  AllowOrigins = '*'
+                  HTTPPort = 6688
+                  SecureCookies = false
+                  HTTPWriteTimeout = '1m'
+  
+                  [WebServer.RateLimit]
+                  Authenticated = 2000
+                  Unauthenticated = 1000
+  
+                  [WebServer.TLS]
+                  HTTPSPort = 0
+  
+                  [Database]
+                  MaxIdleConns = 50
+                  MaxOpenConns = 50
+                  MigrateOnStartup = true
+  
+                  [OCR2]
+                  Enabled = true
+                  DefaultTransactionQueueDepth = 0
+  
+                  [OCR]
+                  Enabled = false
+                  DefaultTransactionQueueDepth = 0
+  
+                  [P2P]
+                  [P2P.V2]
+                  Enabled = true
+                  ListenAddresses = ['0.0.0.0:6690']
+                  AnnounceAddresses = ['0.0.0.0:6690']
+                  DeltaDial = '500ms'
+                  DeltaReconcile = '5s'
+              - name: node-6
+                image: ${runtime.images.app}
+                overridesToml: |
+                  [Feature]
+                  LogPoller = true
+                  CCIP = true
+  
+                  [Log]
+                  Level = 'debug'
+                  JSONConsole = true
+  
+                  [Log.File]
+                  MaxSize = '0b'
+  
+                  [WebServer]
+                  AllowOrigins = '*'
+                  HTTPPort = 6688
+                  SecureCookies = false
+                  HTTPWriteTimeout = '1m'
+  
+                  [WebServer.RateLimit]
+                  Authenticated = 2000
+                  Unauthenticated = 1000
+  
+                  [WebServer.TLS]
+                  HTTPSPort = 0
+  
+                  [Database]
+                  MaxIdleConns = 50
+                  MaxOpenConns = 50
+                  MigrateOnStartup = true
+  
+                  [OCR2]
+                  Enabled = true
+                  DefaultTransactionQueueDepth = 0
+  
+                  [OCR]
+                  Enabled = false
+                  DefaultTransactionQueueDepth = 0
+  
+                  [P2P]
+                  [P2P.V2]
+                  Enabled = true
+                  ListenAddresses = ['0.0.0.0:6690']
+                  AnnounceAddresses = ['0.0.0.0:6690']
+                  DeltaDial = '500ms'
+                  DeltaReconcile = '5s'
 
-                [Log]
-                Level = 'debug'
-                JSONConsole = true
+          # each CL node have a dedicated PostgreSQL 11.15
+          # use StatefulSet by setting:
+          #
+          # stateful: true
+          # capacity 10Gi
+          #
+          # if you are running long tests
+          db:
+            stateful: false
+          # default cluster shipped with latest Geth ( dev mode by default )
+          geth:
+            securityContext:
+              capabilities:
+                drop:
+                  - ALL
+              readOnlyRootFilesystem: false
+              runAsNonRoot: true
+              runAsUser: 999
+              runAsGroup: 999
+            version: v1.12.0
+            wsRpcPort: 8546
+            httpRpcPort: 8544
+            chains:
+              - networkId: 1337
+              - networkId: 2337
+            blocktime: 1
+            resources:
+              requests:
+                cpu: 1
+                memory: 1024Mi
+              limits:
+                cpu: 1
+                memory: 1024Mi
+          # mockserver is https://www.mock-server.com/where/kubernetes.html
+          # used to stub External Adapters
+          mockserver:
+            #  image: "mockserver/mockserver"
+            #  version: "mockserver-5.15.0"
+            securityContext:
+              capabilities:
+                drop:
+                  - ALL
+              readOnlyRootFilesystem: false
+              runAsNonRoot: true
+              runAsUser: 999
+              runAsGroup: 999
+            enabled: true
+            releasenameOverride: mockserver
+            app:
+              runAsUser: 999
+              readOnlyRootFilesystem: false
+            port: 1080
+            resources:
+              requests:
+                cpu: 1
+                memory: 1024Mi
+              limits:
+                cpu: 1
+                memory: 1024Mi
+          # monitoring.coreos.com/v1 PodMonitor for each node
+          prometheusMonitor: true
 
-                [Log.File]
-                MaxSize = '0b'
 
-                [WebServer]
-                AllowOrigins = '*'
-                HTTPPort = 6688
-                SecureCookies = false
-                HTTPWriteTimeout = '1m'
-
-                [WebServer.RateLimit]
-                Authenticated = 2000
-                Unauthenticated = 1000
-
-                [WebServer.TLS]
-                HTTPSPort = 0
-
-                [Database]
-                MaxIdleConns = 50
-                MaxOpenConns = 50
-                MigrateOnStartup = true
-
-                [OCR2]
-                Enabled = true
-                DefaultTransactionQueueDepth = 0
-
-                [OCR]
-                Enabled = false
-                DefaultTransactionQueueDepth = 0
-
-                [P2P]
-                [P2P.V2]
-                Enabled = true
-                ListenAddresses = ['0.0.0.0:6690']
-                AnnounceAddresses = ['0.0.0.0:6690']
-                DeltaDial = '500ms'
-                DeltaReconcile = '5s'
-            - name: node-2
-              image: ${runtime.images.app}
-              overridesToml: |
-                [Feature]
-                LogPoller = true
-                CCIP = true
-
-                [Log]
-                Level = 'debug'
-                JSONConsole = true
-
-                [Log.File]
-                MaxSize = '0b'
-
-                [WebServer]
-                AllowOrigins = '*'
-                HTTPPort = 6688
-                SecureCookies = false
-                HTTPWriteTimeout = '1m'
-
-                [WebServer.RateLimit]
-                Authenticated = 2000
-                Unauthenticated = 1000
-
-                [WebServer.TLS]
-                HTTPSPort = 0
-
-                [Database]
-                MaxIdleConns = 50
-                MaxOpenConns = 50
-                MigrateOnStartup = true
-
-                [OCR2]
-                Enabled = true
-                DefaultTransactionQueueDepth = 0
-
-                [OCR]
-                Enabled = false
-                DefaultTransactionQueueDepth = 0
-
-                [P2P]
-                [P2P.V2]
-                Enabled = true
-                ListenAddresses = ['0.0.0.0:6690']
-                AnnounceAddresses = ['0.0.0.0:6690']
-                DeltaDial = '500ms'
-                DeltaReconcile = '5s'
-            - name: node-3
-              image: ${runtime.images.app}
-              overridesToml: |
-                [Feature]
-                LogPoller = true
-                CCIP = true
-
-                [Log]
-                Level = 'debug'
-                JSONConsole = true
-
-                [Log.File]
-                MaxSize = '0b'
-
-                [WebServer]
-                AllowOrigins = '*'
-                HTTPPort = 6688
-                SecureCookies = false
-                HTTPWriteTimeout = '1m'
-
-                [WebServer.RateLimit]
-                Authenticated = 2000
-                Unauthenticated = 1000
-
-                [WebServer.TLS]
-                HTTPSPort = 0
-
-                [Database]
-                MaxIdleConns = 50
-                MaxOpenConns = 50
-                MigrateOnStartup = true
-
-                [OCR2]
-                Enabled = true
-                DefaultTransactionQueueDepth = 0
-
-                [OCR]
-                Enabled = false
-                DefaultTransactionQueueDepth = 0
-
-                [P2P]
-                [P2P.V2]
-                Enabled = true
-                ListenAddresses = ['0.0.0.0:6690']
-                AnnounceAddresses = ['0.0.0.0:6690']
-                DeltaDial = '500ms'
-                DeltaReconcile = '5s'
-            - name: node-4
-              image: ${runtime.images.app}
-              overridesToml: |
-                [Feature]
-                LogPoller = true
-                CCIP = true
-
-                [Log]
-                Level = 'debug'
-                JSONConsole = true
-
-                [Log.File]
-                MaxSize = '0b'
-
-                [WebServer]
-                AllowOrigins = '*'
-                HTTPPort = 6688
-                SecureCookies = false
-                HTTPWriteTimeout = '1m'
-
-                [WebServer.RateLimit]
-                Authenticated = 2000
-                Unauthenticated = 1000
-
-                [WebServer.TLS]
-                HTTPSPort = 0
-
-                [Database]
-                MaxIdleConns = 50
-                MaxOpenConns = 50
-                MigrateOnStartup = true
-
-                [OCR2]
-                Enabled = true
-                DefaultTransactionQueueDepth = 0
-
-                [OCR]
-                Enabled = false
-                DefaultTransactionQueueDepth = 0
-
-                [P2P]
-                [P2P.V2]
-                Enabled = true
-                ListenAddresses = ['0.0.0.0:6690']
-                AnnounceAddresses = ['0.0.0.0:6690']
-                DeltaDial = '500ms'
-                DeltaReconcile = '5s'
-            - name: node-5
-              image: ${runtime.images.app}
-              overridesToml: |
-                [Feature]
-                LogPoller = true
-                CCIP = true
-
-                [Log]
-                Level = 'debug'
-                JSONConsole = true
-
-                [Log.File]
-                MaxSize = '0b'
-
-                [WebServer]
-                AllowOrigins = '*'
-                HTTPPort = 6688
-                SecureCookies = false
-                HTTPWriteTimeout = '1m'
-
-                [WebServer.RateLimit]
-                Authenticated = 2000
-                Unauthenticated = 1000
-
-                [WebServer.TLS]
-                HTTPSPort = 0
-
-                [Database]
-                MaxIdleConns = 50
-                MaxOpenConns = 50
-                MigrateOnStartup = true
-
-                [OCR2]
-                Enabled = true
-                DefaultTransactionQueueDepth = 0
-
-                [OCR]
-                Enabled = false
-                DefaultTransactionQueueDepth = 0
-
-                [P2P]
-                [P2P.V2]
-                Enabled = true
-                ListenAddresses = ['0.0.0.0:6690']
-                AnnounceAddresses = ['0.0.0.0:6690']
-                DeltaDial = '500ms'
-                DeltaReconcile = '5s'
-            - name: node-6
-              image: ${runtime.images.app}
-              overridesToml: |
-                [Feature]
-                LogPoller = true
-                CCIP = true
-
-                [Log]
-                Level = 'debug'
-                JSONConsole = true
-
-                [Log.File]
-                MaxSize = '0b'
-
-                [WebServer]
-                AllowOrigins = '*'
-                HTTPPort = 6688
-                SecureCookies = false
-                HTTPWriteTimeout = '1m'
-
-                [WebServer.RateLimit]
-                Authenticated = 2000
-                Unauthenticated = 1000
-
-                [WebServer.TLS]
-                HTTPSPort = 0
-
-                [Database]
-                MaxIdleConns = 50
-                MaxOpenConns = 50
-                MigrateOnStartup = true
-
-                [OCR2]
-                Enabled = true
-                DefaultTransactionQueueDepth = 0
-
-                [OCR]
-                Enabled = false
-                DefaultTransactionQueueDepth = 0
-
-                [P2P]
-                [P2P.V2]
-                Enabled = true
-                ListenAddresses = ['0.0.0.0:6690']
-                AnnounceAddresses = ['0.0.0.0:6690']
-                DeltaDial = '500ms'
-                DeltaReconcile = '5s'
-
-        # each CL node have a dedicated PostgreSQL 11.15
-        # use StatefulSet by setting:
-        #
-        # stateful: true
-        # capacity 10Gi
-        #
-        # if you are running long tests
-        db:
-          stateful: false
-        # default cluster shipped with latest Geth ( dev mode by default )
-        geth:
-          securityContext:
-            capabilities:
-              drop:
-                - ALL
-            readOnlyRootFilesystem: false
-            runAsNonRoot: true
-            runAsUser: 999
-            runAsGroup: 999
-          version: v1.12.0
-          wsRpcPort: 8546
-          httpRpcPort: 8544
-          chains:
-            - networkId: 1337
-            - networkId: 2337
-          blocktime: 1
-          resources:
-            requests:
-              cpu: 1
-              memory: 1024Mi
-            limits:
-              cpu: 1
-              memory: 1024Mi
-        # mockserver is https://www.mock-server.com/where/kubernetes.html
-        # used to stub External Adapters
-        mockserver:
-          #  image: "mockserver/mockserver"
-          #  version: "mockserver-5.15.0"
-          securityContext:
-            capabilities:
-              drop:
-                - ALL
-            readOnlyRootFilesystem: false
-            runAsNonRoot: true
-            runAsUser: 999
-            runAsGroup: 999
-          enabled: true
-          releasenameOverride: mockserver
-          app:
-            runAsUser: 999
-            readOnlyRootFilesystem: false
-          port: 1080
-          resources:
-            requests:
-              cpu: 1
-              memory: 1024Mi
-            limits:
-              cpu: 1
-              memory: 1024Mi
-        # monitoring.coreos.com/v1 PodMonitor for each node
-        prometheusMonitor: true
-        ccip:
-          deployContractsAndJobs: true
-          ccipScriptsImage: ${DEVSPACE_CCIP_SCRIPTS_IMAGE}
-
-        # These ingresses create AWS ALB resources and Route 53 Records.
-        ingress:
-          enabled: true
-          baseDomain: ${DEVSPACE_INGRESS_BASE_DOMAIN}
-          annotation_certificate_arn: ${DEVSPACE_INGRESS_CERT_ARN}
-          annotation_group_name: ${DEVSPACE_NAMESPACE}
-          hosts:
-            - host: ${DEVSPACE_NAMESPACE}-node1.${DEVSPACE_INGRESS_BASE_DOMAIN}
-              http:
-                paths:
-                  - path: /
-                    backend:
-                      service:
-                        name: app-node-1
-                        port:
-                          number: 6688
-            - host: ${DEVSPACE_NAMESPACE}-node2.${DEVSPACE_INGRESS_BASE_DOMAIN}
-              http:
-                paths:
-                  - path: /
-                    backend:
-                      service:
-                        name: app-node-2
-                        port:
-                          number: 6688
-            - host: ${DEVSPACE_NAMESPACE}-node3.${DEVSPACE_INGRESS_BASE_DOMAIN}
-              http:
-                paths:
-                  - path: /
-                    backend:
-                      service:
-                        name: app-node-3
-                        port:
-                          number: 6688
-            - host: ${DEVSPACE_NAMESPACE}-node4.${DEVSPACE_INGRESS_BASE_DOMAIN}
-              http:
-                paths:
-                  - path: /
-                    backend:
-                      service:
-                        name: app-node-4
-                        port:
-                          number: 6688
-            - host: ${DEVSPACE_NAMESPACE}-node5.${DEVSPACE_INGRESS_BASE_DOMAIN}
-              http:
-                paths:
-                  - path: /
-                    backend:
-                      service:
-                        name: app-node-5
-                        port:
-                          number: 6688
-            - host: ${DEVSPACE_NAMESPACE}-node6.${DEVSPACE_INGRESS_BASE_DOMAIN}
-              http:
-                paths:
-                  - path: /
-                    backend:
-                      service:
-                        name: app-node-6
-                        port:
-                          number: 6688
-            - host: ${DEVSPACE_NAMESPACE}-geth-1337-http.${DEVSPACE_INGRESS_BASE_DOMAIN}
-              http:
-                paths:
-                  - path: /
-                    backend:
-                      service:
-                        name: geth-1337
-                        port:
-                          number: 8544
-            - host: ${DEVSPACE_NAMESPACE}-geth-1337-ws.${DEVSPACE_INGRESS_BASE_DOMAIN}
-              http:
-                paths:
-                  - path: /
-                    backend:
-                      service:
-                        name: geth-1337
-                        port:
-                          number: 8546
-            - host: ${DEVSPACE_NAMESPACE}-geth-2337-http.${DEVSPACE_INGRESS_BASE_DOMAIN}
-              http:
-                paths:
-                  - path: /
-                    backend:
-                      service:
-                        name: geth-2337
-                        port:
-                          number: 8544
-            - host: ${DEVSPACE_NAMESPACE}-geth-2337-ws.${DEVSPACE_INGRESS_BASE_DOMAIN}
-              http:
-                paths:
-                  - path: /
-                    backend:
-                      service:
-                        name: geth-2337
-                        port:
-                          number: 8546
-            - host: ${DEVSPACE_NAMESPACE}-mockserver.${DEVSPACE_INGRESS_BASE_DOMAIN}
-              http:
-                paths:
-                  - path: /
-                    backend:
-                      service:
-                        name: mockserver
-                        port:
-                          number: 1080
-            - host: ${DEVSPACE_NAMESPACE}-grafana.${DEVSPACE_INGRESS_BASE_DOMAIN}
-              http:
-                paths:
-                  - path: /
-                    backend:
-                      service:
-                        name: app-grafana
-                        port:
-                          number: 80
-        networkPolicyDefault:
+          # These ingresses create AWS ALB resources and Route 53 Records.
           ingress:
-            allowCustomCidrs: true
-            # Should be a comma separated list of CIDR blocks. To include
-            # AWS ALB private CIDRs and optionally other custom CIDRs.
-            # Example format: 10.0.0.0/16,192.168.0.1/24
-            customCidrs: ${DEVSPACE_INGRESS_CIDRS}
+            enabled: true
+            baseDomain: ${DEVSPACE_INGRESS_BASE_DOMAIN}
+            annotation_certificate_arn: ${DEVSPACE_INGRESS_CERT_ARN}
+            annotation_group_name: ${DEVSPACE_NAMESPACE}
+            hosts:
+              - host: ${DEVSPACE_NAMESPACE}-node1.${DEVSPACE_INGRESS_BASE_DOMAIN}
+                http:
+                  paths:
+                    - path: /
+                      backend:
+                        service:
+                          name: app-node-1
+                          port:
+                            number: 6688
+              - host: ${DEVSPACE_NAMESPACE}-node2.${DEVSPACE_INGRESS_BASE_DOMAIN}
+                http:
+                  paths:
+                    - path: /
+                      backend:
+                        service:
+                          name: app-node-2
+                          port:
+                            number: 6688
+              - host: ${DEVSPACE_NAMESPACE}-node3.${DEVSPACE_INGRESS_BASE_DOMAIN}
+                http:
+                  paths:
+                    - path: /
+                      backend:
+                        service:
+                          name: app-node-3
+                          port:
+                            number: 6688
+              - host: ${DEVSPACE_NAMESPACE}-node4.${DEVSPACE_INGRESS_BASE_DOMAIN}
+                http:
+                  paths:
+                    - path: /
+                      backend:
+                        service:
+                          name: app-node-4
+                          port:
+                            number: 6688
+              - host: ${DEVSPACE_NAMESPACE}-node5.${DEVSPACE_INGRESS_BASE_DOMAIN}
+                http:
+                  paths:
+                    - path: /
+                      backend:
+                        service:
+                          name: app-node-5
+                          port:
+                            number: 6688
+              - host: ${DEVSPACE_NAMESPACE}-node6.${DEVSPACE_INGRESS_BASE_DOMAIN}
+                http:
+                  paths:
+                    - path: /
+                      backend:
+                        service:
+                          name: app-node-6
+                          port:
+                            number: 6688
+              - host: ${DEVSPACE_NAMESPACE}-geth-1337-http.${DEVSPACE_INGRESS_BASE_DOMAIN}
+                http:
+                  paths:
+                    - path: /
+                      backend:
+                        service:
+                          name: geth-1337
+                          port:
+                            number: 8544
+              - host: ${DEVSPACE_NAMESPACE}-geth-1337-ws.${DEVSPACE_INGRESS_BASE_DOMAIN}
+                http:
+                  paths:
+                    - path: /
+                      backend:
+                        service:
+                          name: geth-1337
+                          port:
+                            number: 8546
+              - host: ${DEVSPACE_NAMESPACE}-geth-2337-http.${DEVSPACE_INGRESS_BASE_DOMAIN}
+                http:
+                  paths:
+                    - path: /
+                      backend:
+                        service:
+                          name: geth-2337
+                          port:
+                            number: 8544
+              - host: ${DEVSPACE_NAMESPACE}-geth-2337-ws.${DEVSPACE_INGRESS_BASE_DOMAIN}
+                http:
+                  paths:
+                    - path: /
+                      backend:
+                        service:
+                          name: geth-2337
+                          port:
+                            number: 8546
+              - host: ${DEVSPACE_NAMESPACE}-mockserver.${DEVSPACE_INGRESS_BASE_DOMAIN}
+                http:
+                  paths:
+                    - path: /
+                      backend:
+                        service:
+                          name: mockserver
+                          port:
+                            number: 1080
+              - host: ${DEVSPACE_NAMESPACE}-grafana.${DEVSPACE_INGRESS_BASE_DOMAIN}
+                http:
+                  paths:
+                    - path: /
+                      backend:
+                        service:
+                          name: app-grafana
+                          port:
+                            number: 80
+          networkPolicyDefault:
+            ingress:
+              allowCustomCidrs: true
+              # Should be a comma separated list of CIDR blocks. To include
+              # AWS ALB private CIDRs and optionally other custom CIDRs.
+              # Example format: 10.0.0.0/16,192.168.0.1/24
+              customCidrs: ${DEVSPACE_INGRESS_CIDRS}
+        ccip-scripts:
+          ccip:
+            deployContractsAndJobs: true
+            ccipScriptsImage: ${DEVSPACE_CCIP_SCRIPTS_IMAGE}
