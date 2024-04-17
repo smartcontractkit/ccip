@@ -247,6 +247,10 @@ func TestNewPriceRegistryReader(t *testing.T) {
 			expectedErr:    "",
 		},
 		{
+			typeAndVersion: "PriceRegistry 1.6.0-dev",
+			expectedErr:    "",
+		},
+		{
 			typeAndVersion: "PriceRegistry 2.0.0",
 			expectedErr:    "unsupported price registry version 2.0.0",
 		},

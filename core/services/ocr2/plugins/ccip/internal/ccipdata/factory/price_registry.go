@@ -16,6 +16,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_0_0"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_2_0"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_6_0"
 )
 
 // NewPriceRegistryReader determines the appropriate version of the price registry and returns a reader for it.
@@ -60,6 +61,15 @@ func initOrClosePriceRegistryReader(ctx context.Context, lggr logger.Logger, ver
 	switch version.String() {
 	case ccipdata.V1_2_0:
 		pr, err := v1_2_0.NewPriceRegistry(lggr, priceRegistryEvmAddr, lp, cl, registerFilters)
+		if err != nil {
+			return nil, err
+		}
+		if closeReader {
+			return nil, pr.Close()
+		}
+		return pr, nil
+	case ccipdata.V1_6_0:
+		pr, err := v1_6_0.NewPriceRegistry(lggr, priceRegistryEvmAddr, lp, cl, registerFilters)
 		if err != nil {
 			return nil, err
 		}
