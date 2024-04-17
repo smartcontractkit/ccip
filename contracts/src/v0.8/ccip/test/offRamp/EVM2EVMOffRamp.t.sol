@@ -997,32 +997,32 @@ contract EVM2EVMOffRamp_getExecutionState is EVM2EVMOffRampSetup {
     assertEq(uint256(Internal.MessageExecutionState.SUCCESS), uint256(s_offRamp.getExecutionState(128)));
   }
 
-  // function test_FillExecutionState_Success() public {
-  //   for (uint64 i = 0; i < 384; ++i) {
-  //     s_offRamp.setExecutionStateHelper(i, Internal.MessageExecutionState.FAILURE);
-  //   }
+  function test_FillExecutionState_Success() public {
+    for (uint64 i = 0; i < 384; ++i) {
+      s_offRamp.setExecutionStateHelper(i, Internal.MessageExecutionState.FAILURE);
+    }
 
-  //   for (uint64 i = 0; i < 384; ++i) {
-  //     assertEq(uint256(Internal.MessageExecutionState.FAILURE), uint256(s_offRamp.getExecutionState(i)));
-  //   }
+    for (uint64 i = 0; i < 384; ++i) {
+      assertEq(uint256(Internal.MessageExecutionState.FAILURE), uint256(s_offRamp.getExecutionState(i)));
+    }
 
-  //   for (uint64 i = 0; i < 3; ++i) {
-  //     assertEq(type(uint256).max, s_offRamp.getExecutionStateBitMap(i));
-  //   }
+    for (uint64 i = 0; i < 3; ++i) {
+      assertEq(type(uint256).max, s_offRamp.getExecutionStateBitMap(i));
+    }
 
-  //   for (uint64 i = 0; i < 384; ++i) {
-  //     s_offRamp.setExecutionStateHelper(i, Internal.MessageExecutionState.IN_PROGRESS);
-  //   }
+    for (uint64 i = 0; i < 384; ++i) {
+      s_offRamp.setExecutionStateHelper(i, Internal.MessageExecutionState.IN_PROGRESS);
+    }
 
-  //   for (uint64 i = 0; i < 384; ++i) {
-  //     assertEq(uint256(Internal.MessageExecutionState.IN_PROGRESS), uint256(s_offRamp.getExecutionState(i)));
-  //   }
+    for (uint64 i = 0; i < 384; ++i) {
+      assertEq(uint256(Internal.MessageExecutionState.IN_PROGRESS), uint256(s_offRamp.getExecutionState(i)));
+    }
 
-  //   for (uint64 i = 0; i < 3; ++i) {
-  //     // 0x555... == 0b101010101010.....
-  //     assertEq(0x5555555555555555555555555555555555555555555555555555555555555555, s_offRamp.getExecutionStateBitMap(i));
-  //   }
-  // }
+    for (uint64 i = 0; i < 3; ++i) {
+      // 0x555... == 0b101010101010.....
+      assertEq(0x5555555555555555555555555555555555555555555555555555555555555555, s_offRamp.getExecutionStateBitMap(i));
+    }
+  }
 }
 
 contract EVM2EVMOffRamp__trialExecute is EVM2EVMOffRampSetup {
