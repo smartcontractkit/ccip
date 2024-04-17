@@ -83,6 +83,8 @@ func (s *commitRootsCache) IsSnoozed(merkleRoot [32]byte) bool {
 func (s *commitRootsCache) MarkAsExecuted(merkleRoot [32]byte) {
 	s.snoozedRoots.SetDefault(merkleRootToString(merkleRoot), time.Now().Add(s.permissionLessExecutionThresholdDuration))
 
+	s.rootsQueueMu.Lock()
+	defer s.rootsQueueMu.Unlock()
 	// if there is only one root in the queue, we put it as a search filter
 	if s.unexecutedRootsQueue.Len() == 1 {
 		s.rootSearchFilter = s.unexecutedRootsQueue.Oldest().Value

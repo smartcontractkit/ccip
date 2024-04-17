@@ -39,7 +39,120 @@ func TestEvictingElements(t *testing.T) {
 	assert.False(t, c.IsSnoozed(k1))
 }
 
-func Test_UnexecutedRootsTracking(t *testing.T) {
+func Test_UnexecutedRoots(t *testing.T) {
+	type rootWithTs struct {
+		root [32]byte
+		ts   time.Time
+	}
+
+	r1 := [32]byte{1}
+	r2 := [32]byte{2}
+	r3 := [32]byte{3}
+
+	t1 := time.Now().Add(-4 * time.Hour)
+	t2 := time.Now().Add(-3 * time.Hour)
+	t3 := time.Now().Add(-2 * time.Hour)
+
+	tests := []struct {
+		name                    string
+		roots                   []rootWithTs
+		executedRoots           [][32]byte
+		permissionLessThreshold time.Duration
+		expectedTimestamp       time.Time
+	}{
+		{
+			name:                    "empty",
+			roots:                   []rootWithTs{},
+			permissionLessThreshold: 1 * time.Hour,
+		},
+		{
+			name: "returns first root when all are not executed",
+			roots: []rootWithTs{
+				{r1, t1},
+				{r2, t2},
+				{r3, t3},
+			},
+			permissionLessThreshold: 10 * time.Hour,
+			expectedTimestamp:       t1,
+		},
+		{
+			name: "returns first root when tail of queue is executed",
+			roots: []rootWithTs{
+				{r1, t1},
+				{r2, t2},
+				{r3, t3},
+			},
+			executedRoots:           [][32]byte{r2, r3},
+			permissionLessThreshold: 10 * time.Hour,
+			expectedTimestamp:       t1,
+		},
+		{
+			name: "returns first not executed root",
+			roots: []rootWithTs{
+				{r1, t1},
+				{r2, t2},
+				{r3, t3},
+			},
+			executedRoots:           [][32]byte{r1, r2},
+			permissionLessThreshold: 10 * time.Hour,
+			expectedTimestamp:       t3,
+		},
+		{
+			name: "returns r2 timestamp when r1 and r3 are executed",
+			roots: []rootWithTs{
+				{r1, t1},
+				{r2, t2},
+				{r3, t3},
+			},
+			executedRoots:           [][32]byte{r1, r3},
+			permissionLessThreshold: 10 * time.Hour,
+			expectedTimestamp:       t2,
+		},
+		{
+			name: "returns oldest root even when all are executed",
+			roots: []rootWithTs{
+				{r1, t1},
+				{r2, t2},
+				{r3, t3},
+			},
+			executedRoots:           [][32]byte{r1, r2, r3},
+			permissionLessThreshold: 10 * time.Hour,
+			expectedTimestamp:       t3,
+		},
+		{
+			name: "returns permissionLessThreshold when all roots ale older that threshold",
+			roots: []rootWithTs{
+				{r1, t1},
+				{r2, t2},
+				{r3, t3},
+			},
+			permissionLessThreshold: 1 * time.Minute,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := newCommitRootsCache(tt.permissionLessThreshold, 1*time.Hour, 1*time.Millisecond, 1*time.Millisecond)
+
+			for _, r := range tt.roots {
+				c.AppendUnexecutedRoot(r.root, r.ts)
+			}
+
+			for _, r := range tt.executedRoots {
+				c.MarkAsExecuted(r)
+			}
+
+			commitTs := c.CommitSearchTimestamp()
+			if tt.expectedTimestamp.IsZero() {
+				assert.True(t, commitTs.Before(time.Now().Add(-tt.permissionLessThreshold)))
+			} else {
+				assert.Equal(t, tt.expectedTimestamp.Add(-time.Second), commitTs)
+			}
+		})
+	}
+}
+
+func Test_UnexecutedRootsCrawling(t *testing.T) {
 	permissionLessThreshold := 10 * time.Hour
 	c := newCommitRootsCache(permissionLessThreshold, 1*time.Hour, 1*time.Millisecond, 1*time.Millisecond)
 

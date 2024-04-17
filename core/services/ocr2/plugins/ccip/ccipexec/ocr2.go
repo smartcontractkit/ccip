@@ -861,6 +861,7 @@ func (r *ExecutionReportingPlugin) getUnexpiredCommitReports(
 	lggr logger.Logger,
 ) ([]cciptypes.CommitStoreReport, error) {
 	createdAfterTimestamp := r.snoozedRoots.CommitSearchTimestamp()
+	lggr.Infow("Fetching unexpired commit roots from database", "createdAfterTimestamp", createdAfterTimestamp)
 	acceptedReports, err := commitStoreReader.GetAcceptedCommitReportsGteTimestamp(
 		ctx,
 		createdAfterTimestamp,
