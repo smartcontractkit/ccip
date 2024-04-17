@@ -154,6 +154,7 @@ EVM2EVMOffRamp_execute_upgrade:test_V2SenderNoncesReadsPreviousRamp_Success() (g
 EVM2EVMOffRamp_execute_upgrade:test_V2_Success() (gas: 131515)
 EVM2EVMOffRamp_getAllRateLimitTokens:test_GetAllRateLimitTokens_Success() (gas: 55709)
 EVM2EVMOffRamp_getAllRateLimitTokens:test_IndexOutOfRange_Revert() (gas: 16095)
+EVM2EVMOffRamp_getExecutionState:test_FillExecutionState_Success() (gas: 3336182)
 EVM2EVMOffRamp_getExecutionState:test_GetExecutionState_Success() (gas: 83091)
 EVM2EVMOffRamp_manuallyExecute:test_LowGasLimitManualExec_Success() (gas: 497190)
 EVM2EVMOffRamp_manuallyExecute:test_ManualExecFailedTx_Revert() (gas: 188142)
