@@ -89,7 +89,7 @@ type ExecutionReportingPlugin struct {
 
 	// State
 	inflightReports  *inflightExecReportsContainer
-	snoozedRoots     cache.SnoozedRoots
+	snoozedRoots     cache.CommitsRootsCache
 	chainHealthcheck cache.ChainHealthcheck
 }
 
@@ -139,12 +139,7 @@ func (r *ExecutionReportingPlugin) Observation(ctx context.Context, timestamp ty
 }
 
 func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context, lggr logger.Logger, inflight []InflightInternalExecutionReport) ([]ccip.ObservedMessage, error) {
-	unexpiredReports, err := r.getUnexpiredCommitReports(
-		ctx,
-		r.commitStoreReader,
-		r.onchainConfig.PermissionLessExecutionThresholdSeconds,
-		lggr,
-	)
+	unexpiredReports, err := r.getUnexpiredCommitReports(ctx, r.commitStoreReader, lggr)
 	if err != nil {
 		return nil, err
 	}
@@ -863,12 +858,12 @@ func getTokensPrices(ctx context.Context, priceRegistry ccipdata.PriceRegistryRe
 func (r *ExecutionReportingPlugin) getUnexpiredCommitReports(
 	ctx context.Context,
 	commitStoreReader ccipdata.CommitStoreReader,
-	permissionExecutionThreshold time.Duration,
 	lggr logger.Logger,
 ) ([]cciptypes.CommitStoreReport, error) {
+	createdAfterTimestamp := r.snoozedRoots.CommitSearchTimestamp()
 	acceptedReports, err := commitStoreReader.GetAcceptedCommitReportsGteTimestamp(
 		ctx,
-		time.Now().Add(-permissionExecutionThreshold),
+		createdAfterTimestamp,
 		0,
 	)
 	if err != nil {
@@ -878,6 +873,7 @@ func (r *ExecutionReportingPlugin) getUnexpiredCommitReports(
 	var reports []cciptypes.CommitStoreReport
 	for _, acceptedReport := range acceptedReports {
 		reports = append(reports, acceptedReport.CommitStoreReport)
+		r.snoozedRoots.AppendUnexecutedRoot(acceptedReport.MerkleRoot, time.UnixMilli(acceptedReport.TxMeta.BlockTimestampUnixMilli))
 	}
 
 	notSnoozedReports := make([]cciptypes.CommitStoreReport, 0)
