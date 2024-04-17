@@ -373,7 +373,6 @@ func TestUSDCReader_rateLimiting(t *testing.T) {
 			usdcReader, _ := ccipdata.NewUSDCReader(ctx, lggr, "job_123", mockMsgTransmitter, lp, false)
 			usdcService := NewUSDCTokenDataReader(lggr, usdcReader, attestationURI, 0, utils.RandomAddress(), tc.rateConfig)
 
-			ctx := context.Background()
 			if tc.timeout > 0 {
 				var cf context.CancelFunc
 				ctx, cf = context.WithTimeout(ctx, tc.timeout)
