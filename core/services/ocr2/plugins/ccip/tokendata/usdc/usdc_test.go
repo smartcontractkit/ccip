@@ -352,11 +352,11 @@ func TestUSDCReader_rateLimiting(t *testing.T) {
 			err:          "usdc rate limiting error: rate: Wait(n=1) would exceed context deadline",
 		},
 	}
-	ctx := testutils.Context(t)
 	for _, tc := range testCases {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
+			ctx := testutils.Context(t)
 
 			response := attestationResponse{
 				Status:      attestationStatusSuccess,
@@ -370,7 +370,8 @@ func TestUSDCReader_rateLimiting(t *testing.T) {
 
 			lggr := logger.TestLogger(t)
 			lp := mocks.NewLogPoller(t)
-			usdcReader, _ := ccipdata.NewUSDCReader(ctx, lggr, "job_123", mockMsgTransmitter, lp, false)
+			usdcReader, err := ccipdata.NewUSDCReader(ctx, lggr, "job_123", mockMsgTransmitter, lp, false)
+			assert.NoError(t, err)
 			usdcService := NewUSDCTokenDataReader(lggr, usdcReader, attestationURI, 0, utils.RandomAddress(), tc.rateConfig)
 
 			if tc.timeout > 0 {
