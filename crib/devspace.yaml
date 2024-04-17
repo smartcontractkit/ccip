@@ -623,6 +623,5 @@ deployments:
               # Example format: 10.0.0.0/16,192.168.0.1/24
               customCidrs: ${DEVSPACE_INGRESS_CIDRS}
         ccip-scripts:
-          ccip:
-            deployContractsAndJobs: true
-            ccipScriptsImage: ${DEVSPACE_CCIP_SCRIPTS_IMAGE}
+          deployContractsAndJobs: true
+          ccipScriptsImage: ${DEVSPACE_CCIP_SCRIPTS_IMAGE}

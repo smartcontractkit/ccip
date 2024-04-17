@@ -680,8 +680,7 @@ chainlink-cluster:
       # Example:
       # customCidrs: "10.0.0.0/16,192.168.0.1/24"
 ccip-scripts:
-  ccip:
-    deployContractsAndJobs: true
+  deployContractsAndJobs: true
   chainlink:
     nodes:
       - name: node-1

@@ -150,7 +150,7 @@ devspace run dashboard_test
 
 # Local Testing
 
-Go to [dashboard-lib](../../dashboard) and link the modules locally
+Go to [dashboard-lib](../dashboard-lib) and link the modules locally
 
 ```
 cd dashboard
