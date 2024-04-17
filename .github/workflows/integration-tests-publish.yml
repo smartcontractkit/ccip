@@ -38,7 +38,9 @@ jobs:
         id: tags
         run: |
           echo "other_tags=${ECR_TAG}" >> $GITHUB_OUTPUT
-          echo 'release_tag="${{ format('{0}.dkr.ecr.{1}.amazonaws.com/chainlink-ccip-tests:{2}', secrets.QA_AWS_ACCOUNT_NUMBER, secrets.QA_AWS_REGION, github.ref_name) }}"' >> $GITHUB_OUTPUT
+          REF_NAME="${{ github.ref_name }}"
+          FORMATTED_REF_NAME=$(echo "$REF_NAME" | sed 's/\//-/g')
+          echo "release_tag=${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink-ccip-tests:$FORMATTED_REF_NAME"  >> $GITHUB_OUTPUT
       - name: Build Image
         uses: ./.github/actions/build-test-image
         with:
