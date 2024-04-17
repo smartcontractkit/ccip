@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"os"
 	"strconv"
 	"strings"
 
@@ -22,27 +23,24 @@ type txDetails struct {
 
 func main() {
 	seqNumsInput := flag.String("seqnums", "", "Enter sequence numbers separated by comma (e.g., 1,2,3)")
-	onRampAddress := flag.String("string", "", "Enter on-ramp address")
-	startBlock := flag.String("startblock", "", "Enter start block as starting block num to look for txs")
+	onRampAddress := flag.String("onRamp", "", "Enter on-ramp address")
+	startBlock := flag.Uint64("startblock", 0, "Enter start block as starting block num to look for txs")
 	rpcURL := flag.String("rpc", "", "Enter RPC endpoint")
 
 	// Parse the flags
 	flag.Parse()
 	seqNumbers := make(map[uint64]txDetails)
-	if seqNumsInput == nil {
+	log.SetOutput(os.Stdout)
+	if *seqNumsInput == "" {
 		log.Fatalf("Please provide sequence numbers")
 	}
-	if onRampAddress == nil || !common.IsHexAddress(*onRampAddress) {
+	if !common.IsHexAddress(*onRampAddress) {
 		log.Fatalf("Please provide valid on-ramp address")
 	}
-	if startBlock == nil || *startBlock == "" {
+	if *startBlock == 0 {
 		log.Fatalf("Please provide start block")
 	}
-	srcStartBlock, err := strconv.ParseUint(*startBlock, 10, 64)
-	if err != nil {
-		log.Fatalf("Error parsing start block: %v", err)
-	}
-	if rpcURL == nil || *rpcURL == "" {
+	if *rpcURL == "" {
 		log.Fatalf("Please provide RPC URL")
 	}
 
@@ -66,7 +64,7 @@ func main() {
 		log.Fatalf("Failed to instantiate the on-ramp contract: %v", err)
 	}
 	sendRequested, err := onRamp.FilterCCIPSendRequested(&bind.FilterOpts{
-		Start: srcStartBlock,
+		Start: *startBlock,
 	})
 	if err != nil {
 		log.Fatalf("Failed to filter CCIPSendRequested events: %v", err)
@@ -78,7 +76,7 @@ func main() {
 			seqNumbers[sendRequested.Event.Message.SequenceNumber] = txDetails{
 				SequenceNumber: sendRequested.Event.Message.SequenceNumber,
 				TxHash:         sendRequested.Event.Raw.TxHash.String(),
-				MessageId:      string(sendRequested.Event.Message.MessageId[:]),
+				MessageId:      fmt.Sprintf("%x", sendRequested.Event.Message.MessageId[:]),
 			}
 		}
 	}
