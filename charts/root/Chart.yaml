@@ -29,4 +29,4 @@ dependencies:
   - name: ccip-scripts
     version: 0.1.0
     repository: "file://../ccip-scripts"
-#    condition: ccip.deployContractsAndJobs
+    condition: ccip-scripts.ccip.deployContractsAndJobs
