@@ -25,15 +25,16 @@ type CommitsRootsCache interface {
 }
 
 type commitRootsCache struct {
-	// snoozedRoots is used to keep track of the roots that are snoozed. Roots that are executed and finalized are considered
-	// marked kept in the cache for permissionLessExecutionThresholdDuration + EvictionGracePeriod
+	// snoozedRoots is used to keep track of the roots that are snoozed. Roots that are executed and finalized are snoozed forever
+	// and kept in the cache for permissionLessExecutionThresholdDuration + EvictionGracePeriod
 	snoozedRoots *cache.Cache
 	// unexecutedRootsQueue is used to keep track of the unexecuted roots in the order they are fetched from database (should be ordered by block_number, log_index)
 	// First run of Exec will fill the queue with all the roots that are not executed yet within the [now-permissionlessExecThreshold, now] window.
-	// When a root is executed, it is removed from the fifo and its timestamp is stored under rootsSearchFilter. Next database query instead of using entire permissionlessExecWindow
-	// will use rootsSearchFilter as the lower bound filter. This way we can reduce the number of database rows fetched with every OCR round.
-	// We can do that because roots for most of the cases are executed in sequentially. Instead of skipping snoozed roots after we fetch them from the database,
-	// we do that on the db level by narrowing the search window.
+	// When a root is executed, it is removed from the queue. Next database query instead of using entire permissionlessExecThrehsold window
+	// will use rootSearchFilter as the lower bound filter for block_timestamp.
+	// This way we can reduce the number of database rows fetched with every OCR round.
+	// We do it this way because roots for most of the cases are executed sequentially.
+	// Instead of skipping snoozed roots after we fetch them from the database, we do that on the db level by narrowing the search window.
 	//
 	// Example
 	// permissionLessExecThresholds - 10 days, now - 2010-10-15
@@ -41,7 +42,7 @@ type commitRootsCache struct {
 	// [0xA - 2010-10-10, 0xB - 2010-10-11, 0xC - 2010-10-12] -> 0xA is the oldest root
 	// We executed 0xA and a couple of rounds later, we mark 0xA as executed and snoozed that forever which removes it from the queue.
 	// [0xB - 2010-10-11, 0xC - 2010-10-12]
-	// Now the search filter wil be 0xA timestamp -> [2010-10-10, 20-10-15]
+	// Now the search filter wil be 0xA timestamp -> [2010-10-11, 20-10-15]
 	// If roots are executed out of order, it's not going to change anything. However, for most of the cases we have sequential root execution and that is
 	// a huge improvement because we don't need to fetch all the roots from the database in every round.
 	unexecutedRootsQueue *orderedmap.OrderedMap[[32]byte, time.Time]
@@ -85,7 +86,7 @@ func (s *commitRootsCache) MarkAsExecuted(merkleRoot [32]byte) {
 
 	s.rootsQueueMu.Lock()
 	defer s.rootsQueueMu.Unlock()
-	// if there is only one root in the queue, we put it as a search filter
+	// if there is only one root in the queue, we put its block_timestamp as rootSearchFilter
 	if s.unexecutedRootsQueue.Len() == 1 {
 		s.rootSearchFilter = s.unexecutedRootsQueue.Oldest().Value
 	}
@@ -126,8 +127,8 @@ func (s *commitRootsCache) CommitSearchTimestamp() time.Time {
 	s.rootsQueueMu.Lock()
 	defer s.rootsQueueMu.Unlock()
 
-	// If rootsSearchFilter is before permissionlessExecWindow, it means that we have roots that are stuck and will never be executed
-	// In that case, we wipe out the queue. Next round should start from the permissionlessExecThreshold and rebuild that cache from scratch.
+	// If rootsSearchFilter is before permissionlessExecWindow, it means that we have roots that are stuck forever and will never be executed
+	// In that case, we wipe out the entire queue. Next round should start from the permissionlessExecThreshold and rebuild cache from the scratch.
 	s.unexecutedRootsQueue = orderedmap.New[[32]byte, time.Time]()
 	return permissionlessExecWindow
 }
