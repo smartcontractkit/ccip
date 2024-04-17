@@ -304,7 +304,7 @@ func (args *execArgs) execute() error {
 	for i := range offRampProof.Messages {
 		gasLimitOverrides[i] = big.NewInt(int64(args.cfg.GasLimitOverride))
 	}
-
+	args.destUser.GasPrice = big.NewInt(200e9)
 	tx, err := helpers.ManuallyExecute(args.destChain, args.destUser, args.cfg.OffRamp, offRampProof, gasLimitOverrides)
 	if err != nil {
 		return err
