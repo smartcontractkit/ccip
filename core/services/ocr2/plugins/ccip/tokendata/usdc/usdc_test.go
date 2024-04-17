@@ -36,12 +36,12 @@ var (
 )
 
 func TestUSDCReader_callAttestationApi(t *testing.T) {
-	ctx := testutils.Context(t)
 	t.Skipf("Skipping test because it uses the real USDC attestation API")
 	usdcMessageHash := "912f22a13e9ccb979b621500f6952b2afd6e75be7eadaed93fc2625fe11c52a2"
 	attestationURI, err := url.ParseRequestURI("https://iris-api-sandbox.circle.com")
 	require.NoError(t, err)
 	lggr := logger.TestLogger(t)
+	ctx := testutils.Context(t)
 	usdcReader, _ := ccipdata.NewUSDCReader(ctx, lggr, "job_123", mockMsgTransmitter, nil, false)
 	usdcService := NewUSDCTokenDataReader(lggr, usdcReader, attestationURI, 0, common.Address{}, APIIntervalRateLimitDisabled)
 
