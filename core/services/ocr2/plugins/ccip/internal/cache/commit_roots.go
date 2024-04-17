@@ -1,6 +1,7 @@
 package cache
 
 import (
+	"sync"
 	"time"
 
 	"github.com/patrickmn/go-cache"
@@ -17,7 +18,6 @@ const (
 type CommitsRootsCache interface {
 	IsSnoozed(merkleRoot [32]byte) bool
 	MarkAsExecuted(merkleRoot [32]byte)
-	// Snooze marks the root as snoozed for
 	Snooze(merkleRoot [32]byte)
 
 	CommitSearchTimestamp() time.Time
@@ -46,7 +46,7 @@ type commitRootsCache struct {
 	// a huge improvement because we don't need to fetch all the roots from the database in every round.
 	unexecutedRootsQueue *orderedmap.OrderedMap[[32]byte, time.Time]
 	rootSearchFilter     time.Time
-	//rootsQueueMu         sync.RWMutex
+	rootsQueueMu         sync.RWMutex
 
 	// Both rootSnoozedTime and permissionLessExecutionThresholdDuration can be kept in the commitRootsCache without need to be updated.
 	// Those config properties are populates via onchain/offchain config. When changed, OCR plugin will be restarted and cache initialized with new config.
@@ -83,12 +83,12 @@ func (s *commitRootsCache) IsSnoozed(merkleRoot [32]byte) bool {
 func (s *commitRootsCache) MarkAsExecuted(merkleRoot [32]byte) {
 	s.snoozedRoots.SetDefault(merkleRootToString(merkleRoot), time.Now().Add(s.permissionLessExecutionThresholdDuration))
 
+	// if there is only one root in the queue, we put it as a search filter
 	if s.unexecutedRootsQueue.Len() == 1 {
 		s.rootSearchFilter = s.unexecutedRootsQueue.Oldest().Value
 	}
 	s.unexecutedRootsQueue.Delete(merkleRoot)
-	head := s.unexecutedRootsQueue.Oldest()
-	if head != nil {
+	if head := s.unexecutedRootsQueue.Oldest(); head != nil {
 		s.rootSearchFilter = head.Value
 	}
 }
@@ -100,22 +100,39 @@ func (s *commitRootsCache) Snooze(merkleRoot [32]byte) {
 func (s *commitRootsCache) CommitSearchTimestamp() time.Time {
 	permissionlessExecWindow := time.Now().Add(-s.permissionLessExecutionThresholdDuration)
 
-	// If there are no roots in the queue, we can return the permissionlessExecWindow
-	if s.rootSearchFilter.IsZero() {
-		return permissionlessExecWindow
+	timestamp, ok := func() (time.Time, bool) {
+		s.rootsQueueMu.RLock()
+		defer s.rootsQueueMu.RUnlock()
+
+		// If there are no roots in the queue, we can return the permissionlessExecWindow
+		if s.rootSearchFilter.IsZero() {
+			return permissionlessExecWindow, true
+		}
+
+		if s.rootSearchFilter.After(permissionlessExecWindow) {
+			// Query used for fetching roots from the database is exclusive (block_timestamp > :timestamp)
+			// so we need to subtract 1 second from the head timestamp to make sure that this root is included in the results
+			return s.rootSearchFilter.Add(-time.Second), true
+		}
+		return time.Time{}, false
+	}()
+
+	if ok {
+		return timestamp
 	}
+
+	s.rootsQueueMu.Lock()
+	defer s.rootsQueueMu.Unlock()
 
 	// If rootsSearchFilter is before permissionlessExecWindow, it means that we have roots that are stuck and will never be executed
 	// In that case, we wipe out the queue. Next round should start from the permissionlessExecThreshold and rebuild that cache from scratch.
-	if s.rootSearchFilter.Before(permissionlessExecWindow) {
-		s.unexecutedRootsQueue = orderedmap.New[[32]byte, time.Time]()
-		return permissionlessExecWindow
-	}
-	// Query used for fetching roots from the database is exclusive (block_timestamp > :timestamp)
-	// so we need to subtract 1 second from the head timestamp to make sure that this root is included in the results
-	return s.rootSearchFilter.Add(-time.Second)
+	s.unexecutedRootsQueue = orderedmap.New[[32]byte, time.Time]()
+	return permissionlessExecWindow
 }
 func (s *commitRootsCache) AppendUnexecutedRoot(merkleRoot [32]byte, blockTimestamp time.Time) {
+	s.rootsQueueMu.Lock()
+	defer s.rootsQueueMu.Unlock()
+
 	// If the root is already in the queue, we don't need to add it again
 	if _, found := s.unexecutedRootsQueue.Get(merkleRoot); found {
 		return
