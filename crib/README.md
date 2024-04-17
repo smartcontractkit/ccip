@@ -1,6 +1,6 @@
 # Crib Devspace Setup
 
-Crib is a devspace configuration to launch CCIP enabled chainlink cluster 
+CRIB is a devspace configuration to launch CCIP enabled chainlink cluster 
 
  CL nodes cluster for system level tests
 
