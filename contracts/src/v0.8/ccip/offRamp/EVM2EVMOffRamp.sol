@@ -273,76 +273,93 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
         if (originalState != Internal.MessageExecutionState.UNTOUCHED) revert AlreadyAttempted(message.sequenceNumber);
       }
 
-      // In the scenario where we upgrade offRamps, we still want to have sequential nonces.
-      // Referencing the old offRamp to check the expected nonce if none is set for a
-      // given sender allows us to skip the current message if it would not be the next according
-      // to the old offRamp. This preserves sequencing between updates.
-      uint64 prevNonce = s_senderNonce[message.sender];
-      if (prevNonce == 0 && i_prevOffRamp != address(0)) {
-        prevNonce = IAny2EVMOffRamp(i_prevOffRamp).getSenderNonce(message.sender);
-        if (prevNonce + 1 != message.nonce) {
-          // the starting v2 onramp nonce, i.e. the 1st message nonce v2 offramp is expected to receive,
-          // is guaranteed to equal (largest v1 onramp nonce + 1).
-          // if this message's nonce isn't (v1 offramp nonce + 1), then v1 offramp nonce != largest v1 onramp nonce,
-          // it tells us there are still messages inflight for v1 offramp
-          emit SkippedSenderWithPreviousRampMessageInflight(message.nonce, message.sender);
-          continue;
+      Internal.MessageExecutionState newState;
+      bytes memory returnData;
+      if (message.strict) {
+        // In the scenario where we upgrade offRamps, we still want to have sequential nonces.
+        // Referencing the old offRamp to check the expected nonce if none is set for a
+        // given sender allows us to skip the current message if it would not be the next according
+        // to the old offRamp. This preserves sequencing between updates.
+        uint64 prevNonce = s_senderNonce[message.sender];
+        if (prevNonce == 0 && i_prevOffRamp != address(0)) {
+          prevNonce = IAny2EVMOffRamp(i_prevOffRamp).getSenderNonce(message.sender);
+          if (prevNonce + 1 != message.nonce) {
+            // the starting v2 onramp nonce, i.e. the 1st message nonce v2 offramp is expected to receive,
+            // is guaranteed to equal (largest v1 onramp nonce + 1).
+            // if this message's nonce isn't (v1 offramp nonce + 1), then v1 offramp nonce != largest v1 onramp nonce,
+            // it tells us there are still messages inflight for v1 offramp
+            emit SkippedSenderWithPreviousRampMessageInflight(message.nonce, message.sender);
+            continue;
+          }
+          // Otherwise this nonce is indeed the "transitional nonce", that is
+          // all messages sent to v1 ramp have been executed by the DON and the sequence can resume in V2.
+          // Note if first time user in V2, then prevNonce will be 0, and message.nonce = 1, so this will be a no-op.
+          s_senderNonce[message.sender] = prevNonce;
         }
-        // Otherwise this nonce is indeed the "transitional nonce", that is
-        // all messages sent to v1 ramp have been executed by the DON and the sequence can resume in V2.
-        // Note if first time user in V2, then prevNonce will be 0, and message.nonce = 1, so this will be a no-op.
-        s_senderNonce[message.sender] = prevNonce;
-      }
 
-      // UNTOUCHED messages MUST be executed in order always
-      if (originalState == Internal.MessageExecutionState.UNTOUCHED) {
-        if (prevNonce + 1 != message.nonce) {
-          // We skip the message if the nonce is incorrect
-          emit SkippedIncorrectNonce(message.nonce, message.sender);
-          continue;
+        // UNTOUCHED messages MUST be executed in order always IF sequenced == true.
+        if (originalState == Internal.MessageExecutionState.UNTOUCHED) {
+          if (prevNonce + 1 != message.nonce) {
+            // We skip the message if the nonce is incorrect, since sequenced is true.
+            emit SkippedIncorrectNonce(message.nonce, message.sender);
+            continue;
+          }
         }
-      }
 
-      // Although we expect only valid messages will be committed, we check again
-      // when executing as a defense in depth measure.
-      bytes[] memory offchainTokenData = report.offchainTokenData[i];
-      _isWellFormed(
-        message.sequenceNumber,
-        message.sourceChainSelector,
-        message.tokenAmounts.length,
-        message.data.length,
-        offchainTokenData.length
-      );
-
-      _setExecutionState(message.sequenceNumber, Internal.MessageExecutionState.IN_PROGRESS);
-      (Internal.MessageExecutionState newState, bytes memory returnData) = _trialExecute(message, offchainTokenData);
-      _setExecutionState(message.sequenceNumber, newState);
-
-      // Since it's hard to estimate whether manual execution will succeed, we
-      // revert the entire transaction if it fails. This will show the user if
-      // their manual exec will fail before they submit it.
-      if (manualExecution && newState == Internal.MessageExecutionState.FAILURE) {
-        // If manual execution fails, we revert the entire transaction.
-        revert ExecutionError(returnData);
-      }
-
-      // The only valid prior states are UNTOUCHED and FAILURE (checked above)
-      // The only valid post states are FAILURE and SUCCESS (checked below)
-      if (newState != Internal.MessageExecutionState.FAILURE && newState != Internal.MessageExecutionState.SUCCESS) {
-        revert InvalidNewState(message.sequenceNumber, newState);
-      }
-
-      // Nonce changes per state transition
-      // UNTOUCHED -> FAILURE  nonce bump
-      // UNTOUCHED -> SUCCESS  nonce bump
-      // FAILURE   -> FAILURE  no nonce bump
-      // FAILURE   -> SUCCESS  no nonce bump
-      if (originalState == Internal.MessageExecutionState.UNTOUCHED) {
-        s_senderNonce[message.sender]++;
+        (newState, returnData) = _doExecute(message, report.offchainTokenData[i], manualExecution, originalState);
+      } else {
+        (newState, returnData) = _doExecute(message, report.offchainTokenData[i], manualExecution, originalState);
       }
 
       emit ExecutionStateChanged(message.sequenceNumber, message.messageId, newState, returnData);
     }
+  }
+
+  function _doExecute(
+    Internal.EVM2EVMMessage memory message,
+    bytes[] memory offchainTokenData,
+    bool manualExecution,
+    Internal.MessageExecutionState originalState
+  ) internal returns (Internal.MessageExecutionState newState, bytes memory returnData) {
+    // Although we expect only valid messages will be committed, we check again
+    // when executing as a defense in depth measure.
+    _isWellFormed(
+      message.sequenceNumber,
+      message.sourceChainSelector,
+      message.tokenAmounts.length,
+      message.data.length,
+      offchainTokenData.length
+    );
+
+    _setExecutionState(message.sequenceNumber, Internal.MessageExecutionState.IN_PROGRESS);
+    (newState, returnData) = _trialExecute(message, offchainTokenData);
+    _setExecutionState(message.sequenceNumber, newState);
+
+    // Since it's hard to estimate whether manual execution will succeed, we
+    // revert the entire transaction if it fails. This will show the user if
+    // their manual exec will fail before they submit it.
+    if (manualExecution && newState == Internal.MessageExecutionState.FAILURE) {
+      // If manual execution fails, we revert the entire transaction.
+      revert ExecutionError(returnData);
+    }
+
+    // The only valid prior states are UNTOUCHED and FAILURE (checked above)
+    // The only valid post states are FAILURE and SUCCESS (checked below)
+    if (newState != Internal.MessageExecutionState.FAILURE && newState != Internal.MessageExecutionState.SUCCESS) {
+      revert InvalidNewState(message.sequenceNumber, newState);
+    }
+
+    // Nonce changes per state transition
+    // UNTOUCHED -> FAILURE  nonce bump
+    // UNTOUCHED -> SUCCESS  nonce bump
+    // FAILURE   -> FAILURE  no nonce bump
+    // FAILURE   -> SUCCESS  no nonce bump
+    // Nonce bumping only occurs for messages where message.strict == true.
+    if (message.strict && originalState == Internal.MessageExecutionState.UNTOUCHED) {
+      s_senderNonce[message.sender]++;
+    }
+
+    return (newState, returnData);
   }
 
   /// @notice Does basic message validation. Should never fail.

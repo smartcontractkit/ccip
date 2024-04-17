@@ -295,11 +295,42 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, feeAmount, OWNER);
   }
 
+  function test_ForwardFromRouterExtraArgsV2_Success() public {
+    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
+    message.extraArgs = abi.encodeWithSelector(
+      Client.EVM_EXTRA_ARGS_V2_TAG, Client.EVMExtraArgsV2({gasLimit: GAS_LIMIT * 2, sequenced: true})
+    );
+    uint256 feeAmount = 1234567890;
+    IERC20(s_sourceFeeToken).transferFrom(OWNER, address(s_onRamp), feeAmount);
+
+    vm.expectEmit();
+    // We expect the message to be emitted with strict = true.
+    emit CCIPSendRequested(_messageToEvent(message, 1, 1, feeAmount, OWNER));
+
+    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, feeAmount, OWNER);
+  }
+
+  function test_ForwardFromRouterExtraArgsV2SequencedFalse_Success() public {
+    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
+    message.extraArgs = abi.encodeWithSelector(
+      Client.EVM_EXTRA_ARGS_V2_TAG, Client.EVMExtraArgsV2({gasLimit: GAS_LIMIT * 2, sequenced: false})
+    );
+    uint256 feeAmount = 1234567890;
+    IERC20(s_sourceFeeToken).transferFrom(OWNER, address(s_onRamp), feeAmount);
+
+    vm.expectEmit();
+    // We expect the message to be emitted with strict = false.
+    emit CCIPSendRequested(_messageToEvent(message, 1, 1, feeAmount, OWNER));
+
+    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, feeAmount, OWNER);
+  }
+
   function test_ShouldIncrementSeqNumAndNonce_Success() public {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
 
     for (uint64 i = 1; i < 4; ++i) {
       uint64 nonceBefore = s_onRamp.getSenderNonce(OWNER);
+      uint64 sequenceNumberBefore = s_onRamp.getSequenceNumber();
 
       vm.expectEmit();
       emit CCIPSendRequested(_messageToEvent(message, i, i, 0, OWNER));
@@ -307,7 +338,31 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
       s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 0, OWNER);
 
       uint64 nonceAfter = s_onRamp.getSenderNonce(OWNER);
+      uint64 sequenceNumberAfter = s_onRamp.getSequenceNumber();
       assertEq(nonceAfter, nonceBefore + 1);
+      assertEq(sequenceNumberAfter, sequenceNumberBefore + 1);
+    }
+  }
+
+  function test_ShouldIncrementNonceOnlyOnSequenced_Success() public {
+    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
+    message.extraArgs = abi.encodeWithSelector(
+      Client.EVM_EXTRA_ARGS_V2_TAG, Client.EVMExtraArgsV2({gasLimit: GAS_LIMIT * 2, sequenced: false})
+    );
+
+    for (uint64 i = 1; i < 4; ++i) {
+      uint64 nonceBefore = s_onRamp.getSenderNonce(OWNER);
+      uint64 sequenceNumberBefore = s_onRamp.getSequenceNumber();
+
+      vm.expectEmit();
+      emit CCIPSendRequested(_messageToEvent(message, i, i, 0, OWNER));
+
+      s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 0, OWNER);
+
+      uint64 nonceAfter = s_onRamp.getSenderNonce(OWNER);
+      uint64 sequenceNumberAfter = s_onRamp.getSequenceNumber();
+      assertEq(nonceAfter, nonceBefore);
+      assertEq(sequenceNumberAfter, sequenceNumberBefore + 1);
     }
   }
 
