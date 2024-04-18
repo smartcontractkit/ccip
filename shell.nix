@@ -37,6 +37,9 @@ mkShell {
     kubectl
     kubernetes-helm
 
+    # build
+    zig
+
     # gofuzz
   ] ++ lib.optionals stdenv.isLinux [
     # some dependencies needed for node-gyp on pnpm install
