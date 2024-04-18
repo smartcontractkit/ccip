@@ -15,22 +15,22 @@ pipelines:
     run: |-
       tagOverride=$(get_flag "override-image-tag")
       run_dependencies --all
-
+      
       if [[ -n "${tagOverride}" ]]; then
         image=${DEVSPACE_IMAGE}:${tagOverride}
         echo "Using user provided image: $image" 
-
+      
         args=""
         for i in {0..5}; do
           args+="--set=helm.values.chainlink.nodes[$i].image=$image "
         done
-
+      
         create_deployments app $args
       else
         build_images --all
         create_deployments app 
       fi
-
+      
       echo
       echo "Namespace ${DEVSPACE_NAMESPACE} will be deleted in ${NS_TTL}"
       echo "To extend the TTL for e.g. 72 hours, run:"
