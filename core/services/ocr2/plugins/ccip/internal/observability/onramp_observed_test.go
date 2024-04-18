@@ -24,14 +24,15 @@ type MethodCall struct {
 	Returns    []interface{}
 }
 
+// The class expected to override the observed methods.
+const expectedWrapper = "core/services/ocr2/plugins/ccip/internal/observability.ObservedOnRampReader"
+
 // TestOnRampObservedMethods tests that all methods of OnRampReader are observed by a wrapper.
 // It uses the runtime to detect if the call stack contains the wrapper class.
 func TestOnRampObservedMethods(t *testing.T) {
 
-	// The class expected to override the observed methods.
-	expectedWrapper := "core/services/ocr2/plugins/ccip/internal/observability.ObservedOnRampReader"
-
 	// Methods not expected to be observed.
+	// Add a method name here to exclude it from the test.
 	excludedMethods := []string{
 		"Address",
 		"Close",
@@ -71,7 +72,67 @@ func TestOnRampObservedMethods(t *testing.T) {
 		Returns:    []interface{}{cciptypes.Address("0x0"), nil},
 	}
 
-	// Build actual observed object.
+	// Test each method defined in the embedded type.
+	observed, reader := buildReader(t)
+	observedType := reflect.TypeOf(observed)
+	for i := 0; i < observedType.NumMethod(); i++ {
+		method := observedType.Method(i)
+		testMethod(t, method, methodCalls, excludedMethods, reader, observed)
+	}
+}
+
+func testMethod(t *testing.T, method reflect.Method, methodCalls map[string]MethodCall, excludedMethods []string, reader *mocks.OnRampReader, observed ObservedOnRampReader) {
+	t.Run(fmt.Sprintf("observability_wrapper_%s", method.Name), func(t *testing.T) {
+
+		// Skip excluded methods.
+		for _, em := range excludedMethods {
+			if method.Name == em {
+				// Skipping ignore method (not an error).
+				return
+			}
+		}
+
+		// Retrieve method call from definition (fail if not present).
+		mc := methodCalls[method.Name]
+		if mc.MethodName == "" {
+			assert.Fail(t, fmt.Sprintf("method %s not defined in methodCalls, please define it or exclude it.", method.Name))
+			return
+		}
+
+		assertCallByWrapper(t, reader, mc)
+
+		// Perform call on observed object.
+		callParams := buildCallParams(mc)
+		methodc := reflect.ValueOf(&observed).MethodByName(mc.MethodName)
+		methodc.Call(callParams)
+	})
+}
+
+// Set the mock to fail if not called by the wrapper.
+func assertCallByWrapper(t *testing.T, reader *mocks.OnRampReader, mc MethodCall) {
+	reader.On(mc.MethodName, mc.Arguments...).Maybe().Return(mc.Returns...).Run(func(args mock.Arguments) {
+		for i := 0; i < 8; i++ {
+			pc, _, _, _ := runtime.Caller(i)
+			f := runtime.FuncForPC(pc)
+			if strings.Contains(f.Name(), expectedWrapper) {
+				// Found the expected wrapper in the call stack.
+				return
+			}
+		}
+		assert.Fail(t, fmt.Sprintf("method %s not observed by wrapper. Please implement the method or add it to the excluded list.", mc.MethodName))
+	})
+}
+
+func buildCallParams(mc MethodCall) []reflect.Value {
+	callParams := make([]reflect.Value, len(mc.Arguments))
+	for i, arg := range mc.Arguments {
+		callParams[i] = reflect.ValueOf(arg)
+	}
+	return callParams
+}
+
+// Build a mock reader and an observed wrapper to be used in the tests.
+func buildReader(t *testing.T) (ObservedOnRampReader, *mocks.OnRampReader) {
 	labels = []string{"evmChainID", "plugin", "reader", "function", "success"}
 	ph := promauto.NewHistogramVec(prometheus.HistogramOpts{
 		Name: "test_histogram",
@@ -88,63 +149,5 @@ func TestOnRampObservedMethods(t *testing.T) {
 	}
 	reader := mocks.NewOnRampReader(t)
 	observed := ObservedOnRampReader{reader, metric}
-
-	// Test each method defined in the embedded type.
-	observedType := reflect.TypeOf(observed)
-	for i := 0; i < observedType.NumMethod(); i++ {
-
-		method := observedType.Method(i)
-		t.Run(fmt.Sprintf("observability_wrapper_%s", method.Name), func(t *testing.T) {
-
-			fmt.Printf("Testing method %s\n", method.Name)
-
-			// Skip excluded methods.
-			for _, em := range excludedMethods {
-				if method.Name == em {
-					fmt.Printf("skipping ignored method %s\n", method.Name)
-					return
-				}
-			}
-
-			// Retrieve method call from definition (fail if not present).
-			mc := methodCalls[method.Name]
-			if mc.MethodName == "" {
-				assert.Fail(t, fmt.Sprintf("method %s not defined in methodCalls, please define it or exclude it.", method.Name))
-				return
-			}
-
-			// Defines mocked wrapped method behavior.
-			reader.On(mc.MethodName, mc.Arguments...).Maybe().Return(mc.Returns...).Run(func(args mock.Arguments) {
-				var observed = false
-				for i := 0; i < 8; i++ {
-					pc, _, line, _ := runtime.Caller(i)
-					f := runtime.FuncForPC(pc)
-					//fmt.Printf("caller %d is %s file %v, line %d\n", i, f.Name(), file, line)
-					if strings.Contains(f.Name(), expectedWrapper) {
-						fmt.Printf("Method observed by wrapper at line %d\n", line)
-						observed = true
-						break
-					}
-				}
-				assert.True(t, observed, fmt.Sprintf("method %s not observed by wrapper. Please implement or add to excluded list.", mc.MethodName))
-			})
-
-			// Perform call on observed object.
-			fmt.Printf("will call %s (%d parameters)\n", mc.MethodName, len(mc.Arguments))
-			_, found := reflect.TypeOf(&observed).MethodByName(mc.MethodName)
-			if !found {
-				assert.Fail(t, fmt.Sprintf("method %s not found", mc.MethodName))
-				return
-			}
-			methodc := reflect.ValueOf(&observed).MethodByName(mc.MethodName)
-
-			// Build call arguments from mc.Arguments.
-			callParams := make([]reflect.Value, len(mc.Arguments))
-			for i, arg := range mc.Arguments {
-				callParams[i] = reflect.ValueOf(arg)
-			}
-			methodc.Call(callParams)
-		})
-
-	}
+	return observed, reader
 }
