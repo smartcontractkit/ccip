@@ -5,10 +5,12 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+
+	"github.com/smartcontractkit/chainlink/v2/core/logger"
 )
 
 func TestSnoozedRoots(t *testing.T) {
-	c := NewCommitRootsCache(1*time.Minute, 1*time.Minute)
+	c := NewCommitRootsCache(logger.TestLogger(t), 1*time.Minute, 1*time.Minute)
 
 	k1 := [32]byte{1}
 	k2 := [32]byte{2}
@@ -29,7 +31,7 @@ func TestSnoozedRoots(t *testing.T) {
 }
 
 func TestEvictingElements(t *testing.T) {
-	c := newCommitRootsCache(1*time.Millisecond, 1*time.Hour, 1*time.Millisecond, 1*time.Millisecond)
+	c := newCommitRootsCache(logger.TestLogger(t), 1*time.Hour, 1*time.Millisecond, 1*time.Millisecond, 1*time.Millisecond)
 
 	k1 := [32]byte{1}
 	c.Snooze(k1)
@@ -132,7 +134,7 @@ func Test_UnexecutedRoots(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c := newCommitRootsCache(tt.permissionLessThreshold, 1*time.Hour, 1*time.Millisecond, 1*time.Millisecond)
+			c := newCommitRootsCache(logger.TestLogger(t), tt.permissionLessThreshold, 1*time.Hour, 1*time.Millisecond, 1*time.Millisecond)
 
 			for _, r := range tt.roots {
 				c.AppendUnexecutedRoot(r.root, r.ts)
@@ -152,9 +154,9 @@ func Test_UnexecutedRoots(t *testing.T) {
 	}
 }
 
-func Test_UnexecutedRootsCrawling(t *testing.T) {
+func Test_UnexecutedRootsScenario(t *testing.T) {
 	permissionLessThreshold := 10 * time.Hour
-	c := newCommitRootsCache(permissionLessThreshold, 1*time.Hour, 1*time.Millisecond, 1*time.Millisecond)
+	c := newCommitRootsCache(logger.TestLogger(t), permissionLessThreshold, 1*time.Hour, 1*time.Millisecond, 1*time.Millisecond)
 
 	k1 := [32]byte{1}
 	k2 := [32]byte{2}
@@ -201,11 +203,17 @@ func Test_UnexecutedRootsCrawling(t *testing.T) {
 	c.MarkAsExecuted(k4)
 	commitTs = c.CommitSearchTimestamp()
 	assert.Equal(t, t4.Add(-time.Second), commitTs)
+
+	// Appending already executed roots should be ignored
+	c.AppendUnexecutedRoot(k1, t1)
+	c.AppendUnexecutedRoot(k2, t2)
+	commitTs = c.CommitSearchTimestamp()
+	assert.Equal(t, t4.Add(-time.Second), commitTs)
 }
 
 func Test_UnexecutedRootsStaleQueue(t *testing.T) {
 	permissionLessThreshold := 5 * time.Hour
-	c := newCommitRootsCache(permissionLessThreshold, 1*time.Hour, 1*time.Millisecond, 1*time.Millisecond)
+	c := newCommitRootsCache(logger.TestLogger(t), permissionLessThreshold, 1*time.Hour, 1*time.Millisecond, 1*time.Millisecond)
 
 	k1 := [32]byte{1}
 	k2 := [32]byte{2}

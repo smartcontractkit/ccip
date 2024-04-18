@@ -1,17 +1,20 @@
 package cache
 
 import (
+	"encoding/hex"
 	"sync"
 	"time"
 
 	"github.com/patrickmn/go-cache"
 	orderedmap "github.com/wk8/go-ordered-map/v2"
+
+	"github.com/smartcontractkit/chainlink/v2/core/logger"
 )
 
 const (
 	// EvictionGracePeriod defines how long after the permissionless execution threshold a root is still kept in the cache
 	EvictionGracePeriod = 1 * time.Hour
-	// CleanupInterval defines how often roots have to be evicted
+	// CleanupInterval defines how often roots cache is scanned to evict stale roots
 	CleanupInterval = 30 * time.Minute
 )
 
@@ -25,8 +28,11 @@ type CommitsRootsCache interface {
 }
 
 type commitRootsCache struct {
-	// snoozedRoots is used to keep track of the roots that are snoozed. Roots that are executed and finalized are snoozed forever
-	// and kept in the cache for permissionLessExecutionThresholdDuration + EvictionGracePeriod
+	lggr logger.Logger
+	// executedRoots is used to keep track of the roots that are executed. Roots that are considered as executed
+	// when all messages are executed on the dest and matching execution state change logs are finalized
+	executedRoots *cache.Cache
+	// snoozedRoots is used to keep track of the roots that are temporary snoozed
 	snoozedRoots *cache.Cache
 	// unexecutedRootsQueue is used to keep track of the unexecuted roots in the order they are fetched from database (should be ordered by block_number, log_index)
 	// First run of Exec will fill the queue with all the roots that are not executed yet within the [now-permissionlessExecThreshold, now] window.
@@ -45,7 +51,7 @@ type commitRootsCache struct {
 	// Now the search filter wil be 0xA timestamp -> [2010-10-11, 20-10-15]
 	// If roots are executed out of order, it's not going to change anything. However, for most of the cases we have sequential root execution and that is
 	// a huge improvement because we don't need to fetch all the roots from the database in every round.
-	unexecutedRootsQueue *orderedmap.OrderedMap[[32]byte, time.Time]
+	unexecutedRootsQueue *orderedmap.OrderedMap[string, time.Time]
 	rootSearchFilter     time.Time
 	rootsQueueMu         sync.RWMutex
 
@@ -56,33 +62,48 @@ type commitRootsCache struct {
 }
 
 func newCommitRootsCache(
+	lggr logger.Logger,
 	permissionLessExecutionThresholdDuration time.Duration,
 	rootSnoozeTime time.Duration,
 	evictionGracePeriod time.Duration,
 	cleanupInterval time.Duration,
 ) *commitRootsCache {
-	evictionTime := permissionLessExecutionThresholdDuration + evictionGracePeriod
-	internalCache := cache.New(evictionTime, cleanupInterval)
+	executedRoots := cache.New(permissionLessExecutionThresholdDuration+evictionGracePeriod, cleanupInterval)
+	snoozedRoots := cache.New(rootSnoozeTime, cleanupInterval)
 
 	return &commitRootsCache{
-		snoozedRoots:                             internalCache,
-		unexecutedRootsQueue:                     orderedmap.New[[32]byte, time.Time](),
+		lggr:                                     lggr,
+		executedRoots:                            executedRoots,
+		snoozedRoots:                             snoozedRoots,
+		unexecutedRootsQueue:                     orderedmap.New[string, time.Time](),
 		rootSnoozedTime:                          rootSnoozeTime,
 		permissionLessExecutionThresholdDuration: permissionLessExecutionThresholdDuration,
 	}
 }
 
-func NewCommitRootsCache(permissionLessExecutionThresholdDuration time.Duration, rootSnoozeTime time.Duration) *commitRootsCache {
-	return newCommitRootsCache(permissionLessExecutionThresholdDuration, rootSnoozeTime, EvictionGracePeriod, CleanupInterval)
+func NewCommitRootsCache(
+	lggr logger.Logger,
+	permissionLessExecutionThresholdDuration time.Duration,
+	rootSnoozeTime time.Duration,
+) *commitRootsCache {
+	return newCommitRootsCache(
+		lggr,
+		permissionLessExecutionThresholdDuration,
+		rootSnoozeTime,
+		EvictionGracePeriod,
+		CleanupInterval,
+	)
 }
 
 func (s *commitRootsCache) IsSnoozed(merkleRoot [32]byte) bool {
-	rawValue, found := s.snoozedRoots.Get(merkleRootToString(merkleRoot))
-	return found && time.Now().Before(rawValue.(time.Time))
+	_, snoozed := s.snoozedRoots.Get(merkleRootToString(merkleRoot))
+	_, executed := s.executedRoots.Get(merkleRootToString(merkleRoot))
+	return snoozed || executed
 }
 
 func (s *commitRootsCache) MarkAsExecuted(merkleRoot [32]byte) {
-	s.snoozedRoots.SetDefault(merkleRootToString(merkleRoot), time.Now().Add(s.permissionLessExecutionThresholdDuration))
+	prettyMerkleRoot := merkleRootToString(merkleRoot)
+	s.executedRoots.SetDefault(prettyMerkleRoot, struct{}{})
 
 	s.rootsQueueMu.Lock()
 	defer s.rootsQueueMu.Unlock()
@@ -90,14 +111,18 @@ func (s *commitRootsCache) MarkAsExecuted(merkleRoot [32]byte) {
 	if s.unexecutedRootsQueue.Len() == 1 {
 		s.rootSearchFilter = s.unexecutedRootsQueue.Oldest().Value
 	}
-	s.unexecutedRootsQueue.Delete(merkleRoot)
+	s.unexecutedRootsQueue.Delete(prettyMerkleRoot)
 	if head := s.unexecutedRootsQueue.Oldest(); head != nil {
 		s.rootSearchFilter = head.Value
 	}
+	s.lggr.Debugw("Deleting executed root from the queue",
+		"merkleRoot", prettyMerkleRoot,
+		"rootSearchFilter", s.rootSearchFilter,
+	)
 }
 
 func (s *commitRootsCache) Snooze(merkleRoot [32]byte) {
-	s.snoozedRoots.SetDefault(merkleRootToString(merkleRoot), time.Now().Add(s.rootSnoozedTime))
+	s.snoozedRoots.SetDefault(merkleRootToString(merkleRoot), struct{}{})
 }
 
 func (s *commitRootsCache) CommitSearchTimestamp() time.Time {
@@ -129,24 +154,35 @@ func (s *commitRootsCache) CommitSearchTimestamp() time.Time {
 
 	// If rootsSearchFilter is before permissionlessExecWindow, it means that we have roots that are stuck forever and will never be executed
 	// In that case, we wipe out the entire queue. Next round should start from the permissionlessExecThreshold and rebuild cache from the scratch.
-	s.unexecutedRootsQueue = orderedmap.New[[32]byte, time.Time]()
+	s.unexecutedRootsQueue = orderedmap.New[string, time.Time]()
 	return permissionlessExecWindow
 }
 func (s *commitRootsCache) AppendUnexecutedRoot(merkleRoot [32]byte, blockTimestamp time.Time) {
+	prettyMerkleRoot := merkleRootToString(merkleRoot)
+
 	s.rootsQueueMu.Lock()
 	defer s.rootsQueueMu.Unlock()
 
-	// If the root is already in the queue, we don't need to add it again
-	if _, found := s.unexecutedRootsQueue.Get(merkleRoot); found {
+	// If the root is already in the queue, we must not add it to the queue
+	if _, found := s.unexecutedRootsQueue.Get(prettyMerkleRoot); found {
+		return
+	}
+	// If the root is already executed, we must not add it to the queue
+	if _, executed := s.executedRoots.Get(prettyMerkleRoot); executed {
 		return
 	}
 	// Initialize the search filter with the first root that is added to the queue
 	if s.unexecutedRootsQueue.Len() == 0 {
 		s.rootSearchFilter = blockTimestamp
 	}
-	s.unexecutedRootsQueue.Set(merkleRoot, blockTimestamp)
+	s.unexecutedRootsQueue.Set(prettyMerkleRoot, blockTimestamp)
+	s.lggr.Debugw("Adding unexecuted root to the queue",
+		"merkleRoot", prettyMerkleRoot,
+		"blockTimestamp", blockTimestamp,
+		"rootSearchFilter", s.rootSearchFilter,
+	)
 }
 
 func merkleRootToString(merkleRoot [32]byte) string {
-	return string(merkleRoot[:])
+	return hex.EncodeToString(merkleRoot[:])
 }
