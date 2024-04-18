@@ -37,7 +37,7 @@ mkShell {
     kubectl
     kubernetes-helm
 
-    # build
+    # cross-compiling, used in CRIB
     zig
 
     # gofuzz
