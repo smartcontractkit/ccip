@@ -63,7 +63,7 @@ func (o *OffRamp) GetSourceToDestTokensMapping(ctx context.Context) (map[cciptyp
 		}, nil
 	})
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to get rate limit tokens")
+		return nil, errors.Wrap(err, "failed to get rate limit tokens, if token set is large (~400k) batching may be needed")
 	}
 
 	if cachedTokens.SourceTokens == nil || cachedTokens.DestinationTokens == nil {

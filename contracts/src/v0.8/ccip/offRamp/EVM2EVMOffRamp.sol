@@ -502,6 +502,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
     uint256 maxCount
   ) external view returns (address[] memory sourceTokens, address[] memory destTokens) {
     uint256 length = s_rateLimitedTokensDestToSource.length();
+    if (length == 0) return (sourceTokens, destTokens);
     if (startIndex >= length) revert IndexOutOfRange();
     uint256 endIndex = startIndex + maxCount;
     endIndex = endIndex > length || maxCount == 0 ? length : endIndex;
