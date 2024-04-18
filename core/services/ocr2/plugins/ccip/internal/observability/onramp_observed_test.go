@@ -111,13 +111,17 @@ func testMethod(t *testing.T, method reflect.Method, methodCalls map[string]Meth
 // Set the mock to fail if not called by the wrapper.
 func assertCallByWrapper(t *testing.T, reader *mocks.OnRampReader, mc MethodCall) {
 	reader.On(mc.MethodName, mc.Arguments...).Maybe().Return(mc.Returns...).Run(func(args mock.Arguments) {
-		for i := 0; i < 8; i++ {
-			pc, _, _, _ := runtime.Caller(i)
+		var i = 0
+		var pc uintptr
+		var ok = true
+		for ok {
+			pc, _, _, ok = runtime.Caller(i)
 			f := runtime.FuncForPC(pc)
 			if strings.Contains(f.Name(), expectedWrapper) {
 				// Found the expected wrapper in the call stack.
 				return
 			}
+			i++
 		}
 		assert.Fail(t, fmt.Sprintf("method %s not observed by wrapper. Please implement the method or add it to the excluded list.", mc.MethodName))
 	})
