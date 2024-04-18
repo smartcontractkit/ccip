@@ -251,9 +251,6 @@ func TestIntegration_CCIP(t *testing.T) {
 				}
 			})
 
-			// TODO.
-			t.Run("interleaved sequenced and not sequenced", func(t *testing.T) {})
-
 			t.Run("multiple batches", func(t *testing.T) {
 				tokenAmount := big.NewInt(500000003)
 				gasLimit := big.NewInt(250_000)
@@ -266,7 +263,13 @@ func TestIntegration_CCIP(t *testing.T) {
 				n := 15
 				for i := 0; i < n; i++ {
 					txGasLimit := new(big.Int).Mul(gasLimit, big.NewInt(int64(i+1)))
-					extraArgs, err2 := testhelpers.GetEVMExtraArgsV2(txGasLimit, test.sequenced)
+
+					// interleave sequenced and non-sequenced messages.
+					sequenced := false
+					if i%2 == 0 {
+						sequenced = true
+					}
+					extraArgs, err2 := testhelpers.GetEVMExtraArgsV2(txGasLimit, sequenced)
 					require.NoError(t, err2)
 					msg := router.ClientEVM2AnyMessage{
 						Receiver: testhelpers.MustEncodeAddress(t, ccipTH.Dest.Receivers[0].Receiver.Address()),
@@ -290,6 +293,9 @@ func TestIntegration_CCIP(t *testing.T) {
 					tx, err2 := ccipTH.Source.Router.CcipSend(ccipTH.Source.User, ccipTH.Dest.ChainSelector, msg)
 					require.NoError(t, err2)
 					txs = append(txs, tx)
+					if sequenced {
+						currentNonce++
+					}
 				}
 
 				// Send a batch of requests in a single block
@@ -306,9 +312,6 @@ func TestIntegration_CCIP(t *testing.T) {
 				}
 
 				currentSeqNum += n
-				if test.sequenced {
-					currentNonce = uint64(currentSeqNum)
-				}
 			})
 
 			// Deploy new on ramp,Commit store,off ramp
