@@ -8,6 +8,7 @@ replace github.com/smartcontractkit/chainlink/v2 => ../
 require (
 	dario.cat/mergo v1.0.0
 	github.com/AlekSi/pointer v1.1.0
+	github.com/Masterminds/semver/v3 v3.2.1
 	github.com/barkimedes/go-deepcopy v0.0.0-20220514131651-17c30cfc62df
 	github.com/cli/go-gh/v2 v2.0.0
 	github.com/ethereum/go-ethereum v1.13.8
@@ -29,7 +30,7 @@ require (
 	github.com/smartcontractkit/chain-selectors v1.0.13
 	github.com/smartcontractkit/chainlink-automation v1.0.2
 	github.com/smartcontractkit/chainlink-common v0.1.7-0.20240410191726-b8a7349cd5d3
-	github.com/smartcontractkit/chainlink-testing-framework v1.28.1
+	github.com/smartcontractkit/chainlink-testing-framework v1.28.3-0.20240412053124-1007b45edb92
 	github.com/smartcontractkit/chainlink-vrf v0.0.0-20231120191722-fef03814f868
 	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-00010101000000-000000000000
 	github.com/smartcontractkit/chainlink/v2 v2.0.0-00010101000000-000000000000
@@ -86,7 +87,6 @@ require (
 	github.com/K-Phoen/sdk v0.12.4 // indirect
 	github.com/MakeNowJust/heredoc v1.0.0 // indirect
 	github.com/Masterminds/goutils v1.1.1 // indirect
-	github.com/Masterminds/semver/v3 v3.2.1 // indirect
 	github.com/Masterminds/sprig/v3 v3.2.3 // indirect
 	github.com/Microsoft/go-winio v0.6.1 // indirect
 	github.com/Microsoft/hcsshim v0.11.4 // indirect

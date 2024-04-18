@@ -6,6 +6,8 @@ import {IPool} from "../../interfaces/pools/IPool.sol";
 
 import {BurnMintERC677} from "../../../shared/token/ERC677/BurnMintERC677.sol";
 import {Router} from "../../Router.sol";
+import {Internal} from "../../libraries/Internal.sol";
+import {Pool} from "../../libraries/Pool.sol";
 import {RateLimiter} from "../../libraries/RateLimiter.sol";
 import {TokenPool} from "../../pools/TokenPool.sol";
 import {USDCTokenPool} from "../../pools/USDC/USDCTokenPool.sol";
@@ -36,7 +38,8 @@ contract USDCTokenPoolSetup is BaseTest {
   uint32 internal constant DEST_DOMAIN_IDENTIFIER = 0;
 
   bytes32 internal constant SOURCE_CHAIN_TOKEN_SENDER = bytes32(uint256(uint160(0x01111111221)));
-  bytes32 internal constant SOURCE_CHAIN_USDC_TOKEN = bytes32(uint256(uint160(0x000000232355)));
+  address internal constant SOURCE_CHAIN_USDC_POOL = address(0x23789765456789);
+  address internal constant DEST_CHAIN_USDC_POOL = address(0x987384873458734);
 
   address internal s_routerAllowedOnRamp = address(3456);
   address internal s_routerAllowedOffRamp = address(234);
@@ -67,12 +70,14 @@ contract USDCTokenPoolSetup is BaseTest {
     TokenPool.ChainUpdate[] memory chainUpdates = new TokenPool.ChainUpdate[](2);
     chainUpdates[0] = TokenPool.ChainUpdate({
       remoteChainSelector: SOURCE_CHAIN_SELECTOR,
+      remotePoolAddress: abi.encode(SOURCE_CHAIN_USDC_POOL),
       allowed: true,
       outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
       inboundRateLimiterConfig: getInboundRateLimiterConfig()
     });
     chainUpdates[1] = TokenPool.ChainUpdate({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
+      remotePoolAddress: abi.encode(DEST_CHAIN_USDC_POOL),
       allowed: true,
       outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
       inboundRateLimiterConfig: getInboundRateLimiterConfig()
@@ -137,7 +142,7 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
   event TokensConsumed(uint256 tokens);
 
   // Base test case, included for PR gas comparisons as fuzz tests are excluded from forge snapshot due to being flaky.
-  function testLockOrBurnSuccess() public {
+  function test_LockOrBurn_Success() public {
     bytes32 receiver = bytes32(uint256(uint160(STRANGER)));
     uint256 amount = 1;
     s_token.transfer(address(s_usdcTokenPool), amount);
@@ -163,13 +168,16 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
     vm.expectEmit();
     emit Burned(s_routerAllowedOnRamp, amount);
 
-    bytes memory encodedNonce =
+    bytes memory poolReturnData =
       s_usdcTokenPool.lockOrBurn(OWNER, abi.encodePacked(receiver), amount, DEST_CHAIN_SELECTOR, bytes(""));
-    uint64 nonce = abi.decode(encodedNonce, (uint64));
+
+    Pool.PoolReturnDataV1 memory poolReturnDataV1 = Pool._decodePoolReturnDataV1(poolReturnData);
+
+    uint64 nonce = abi.decode(poolReturnDataV1.destPoolData, (uint64));
     assertEq(s_mockUSDC.s_nonce() - 1, nonce);
   }
 
-  function testFuzz_LockOrBurnSuccess(bytes32 destinationReceiver, uint256 amount) public {
+  function test_Fuzz_LockOrBurn_Success(bytes32 destinationReceiver, uint256 amount) public {
     vm.assume(destinationReceiver != bytes32(0));
     amount = bound(amount, 1, getOutboundRateLimiterConfig().capacity);
     s_token.transfer(address(s_usdcTokenPool), amount);
@@ -195,13 +203,16 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
     vm.expectEmit();
     emit Burned(s_routerAllowedOnRamp, amount);
 
-    bytes memory encodedNonce =
+    bytes memory poolReturnData =
       s_usdcTokenPool.lockOrBurn(OWNER, abi.encodePacked(destinationReceiver), amount, DEST_CHAIN_SELECTOR, bytes(""));
-    uint64 nonce = abi.decode(encodedNonce, (uint64));
+    Pool.PoolReturnDataV1 memory poolReturnDataV1 = Pool._decodePoolReturnDataV1(poolReturnData);
+
+    uint64 nonce = abi.decode(poolReturnDataV1.destPoolData, (uint64));
     assertEq(s_mockUSDC.s_nonce() - 1, nonce);
+    assertEq(poolReturnDataV1.destPoolAddress, abi.encode(DEST_CHAIN_USDC_POOL));
   }
 
-  function testFuzz_LockOrBurnWithAllowListSuccess(bytes32 destinationReceiver, uint256 amount) public {
+  function test_Fuzz_LockOrBurnWithAllowList_Success(bytes32 destinationReceiver, uint256 amount) public {
     vm.assume(destinationReceiver != bytes32(0));
     amount = bound(amount, 1, getOutboundRateLimiterConfig().capacity);
     s_token.transfer(address(s_usdcTokenPoolWithAllowList), amount);
@@ -225,15 +236,17 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
     vm.expectEmit();
     emit Burned(s_routerAllowedOnRamp, amount);
 
-    bytes memory encodedNonce = s_usdcTokenPoolWithAllowList.lockOrBurn(
+    (bytes memory poolReturnData) = s_usdcTokenPoolWithAllowList.lockOrBurn(
       s_allowedList[0], abi.encodePacked(destinationReceiver), amount, DEST_CHAIN_SELECTOR, bytes("")
     );
-    uint64 nonce = abi.decode(encodedNonce, (uint64));
+    Pool.PoolReturnDataV1 memory poolReturnDataV1 = Pool._decodePoolReturnDataV1(poolReturnData);
+    uint64 nonce = abi.decode(poolReturnDataV1.destPoolData, (uint64));
     assertEq(s_mockUSDC.s_nonce() - 1, nonce);
+    assertEq(poolReturnDataV1.destPoolAddress, abi.encode(DEST_CHAIN_USDC_POOL));
   }
 
   // Reverts
-  function testUnknownDomainReverts() public {
+  function test_UnknownDomain_Revert() public {
     uint64 wrongDomain = DEST_CHAIN_SELECTOR + 1;
     // We need to setup the wrong chainSelector so it reaches the domain check
     Router.OnRamp[] memory onRampUpdates = new Router.OnRamp[](1);
@@ -243,6 +256,7 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
     TokenPool.ChainUpdate[] memory chainUpdates = new TokenPool.ChainUpdate[](1);
     chainUpdates[0] = TokenPool.ChainUpdate({
       remoteChainSelector: wrongDomain,
+      remotePoolAddress: abi.encode(address(1)),
       allowed: true,
       outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
       inboundRateLimiterConfig: getInboundRateLimiterConfig()
@@ -260,13 +274,13 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
     s_usdcTokenPool.lockOrBurn(OWNER, abi.encodePacked(address(0)), amount, wrongDomain, bytes(""));
   }
 
-  function testCallerIsNotARampOnRouterReverts() public {
+  function test_CallerIsNotARampOnRouter_Revert() public {
     vm.expectRevert(abi.encodeWithSelector(TokenPool.CallerIsNotARampOnRouter.selector, OWNER));
 
     s_usdcTokenPool.lockOrBurn(OWNER, abi.encodePacked(address(0)), 0, DEST_CHAIN_SELECTOR, bytes(""));
   }
 
-  function testLockOrBurnWithAllowListReverts() public {
+  function test_LockOrBurnWithAllowList_Revert() public {
     vm.startPrank(s_routerAllowedOnRamp);
 
     vm.expectRevert(abi.encodeWithSelector(SenderNotAllowed.selector, STRANGER));
@@ -280,7 +294,7 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
 contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
   event Minted(address indexed sender, address indexed recipient, uint256 amount);
 
-  function testFuzz_ReleaseOrMintSuccess(address recipient, uint256 amount) public {
+  function test_Fuzz_ReleaseOrMint_Success(address recipient, uint256 amount) public {
     amount = bound(amount, 0, getInboundRateLimiterConfig().capacity);
 
     USDCMessage memory usdcMessage = USDCMessage({
@@ -297,12 +311,16 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
     bytes memory message = _generateUSDCMessage(usdcMessage);
     bytes memory attestation = bytes("attestation bytes");
 
-    bytes memory extraData = abi.encode(
-      abi.encode(
+    IPool.SourceTokenData memory sourceTokenData = IPool.SourceTokenData({
+      sourcePoolAddress: abi.encode(SOURCE_CHAIN_USDC_POOL),
+      destPoolAddress: abi.encode(address(s_usdcTokenPool)),
+      extraData: abi.encode(
         USDCTokenPool.SourceTokenDataPayload({nonce: usdcMessage.nonce, sourceDomain: SOURCE_DOMAIN_IDENTIFIER})
-      ),
-      abi.encode(USDCTokenPool.MessageAndAttestation({message: message, attestation: attestation}))
-    );
+        )
+    });
+
+    bytes memory offchainTokenData =
+      abi.encode(USDCTokenPool.MessageAndAttestation({message: message, attestation: attestation}));
 
     vm.expectEmit();
     emit Minted(s_routerAllowedOffRamp, recipient, amount);
@@ -313,11 +331,13 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
     );
 
     vm.startPrank(s_routerAllowedOffRamp);
-    s_usdcTokenPool.releaseOrMint(abi.encode(OWNER), recipient, amount, SOURCE_CHAIN_SELECTOR, extraData);
+    s_usdcTokenPool.releaseOrMint(
+      abi.encode(OWNER), recipient, amount, SOURCE_CHAIN_SELECTOR, sourceTokenData, offchainTokenData
+    );
   }
 
   // https://etherscan.io/tx/0xac9f501fe0b76df1f07a22e1db30929fd12524bc7068d74012dff948632f0883
-  function testReleaseOrMintRealTxSuccess() public {
+  function test_ReleaseOrMintRealTx_Success() public {
     bytes memory encodedUsdcMessage =
       hex"000000000000000300000000000000000000127a00000000000000000000000019330d10d9cc8751218eaf51e8885d058642e08a000000000000000000000000bd3fa81b58ba92a82136038b25adec7066af3155000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000af88d065e77c8cc2239327c5edb3a432268e58310000000000000000000000004af08f56978be7dce2d1be3c65c005b41e79401c000000000000000000000000000000000000000000000000000000002057ff7a0000000000000000000000003a23f943181408eac424116af7b7790c94cb97a50000000000000000000000000000000000000000000000000000000000000000000000000000008274119237535fd659626b090f87e365ff89ebc7096bb32e8b0e85f155626b73ae7c4bb2485c184b7cc3cf7909045487890b104efb62ae74a73e32901bdcec91df1bb9ee08ccb014fcbcfe77b74d1263fd4e0b0e8de05d6c9a5913554364abfd5ea768b222f50c715908183905d74044bb2b97527c7e70ae7983c443a603557cac3b1c000000000000000000000000000000000000000000000000000000000000";
     bytes memory attestation = bytes("attestation bytes");
@@ -325,10 +345,14 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
     uint32 nonce = 4730;
     uint32 sourceDomain = 3;
 
-    bytes memory extraData = abi.encode(
-      abi.encode(USDCTokenPool.SourceTokenDataPayload({nonce: nonce, sourceDomain: sourceDomain})),
-      abi.encode(USDCTokenPool.MessageAndAttestation({message: encodedUsdcMessage, attestation: attestation}))
-    );
+    IPool.SourceTokenData memory sourceTokenData = IPool.SourceTokenData({
+      sourcePoolAddress: abi.encode(SOURCE_CHAIN_USDC_POOL),
+      destPoolAddress: abi.encode(address(s_usdcTokenPool)),
+      extraData: abi.encode(USDCTokenPool.SourceTokenDataPayload({nonce: nonce, sourceDomain: sourceDomain}))
+    });
+
+    bytes memory offchainTokenData =
+      abi.encode(USDCTokenPool.MessageAndAttestation({message: encodedUsdcMessage, attestation: attestation}));
 
     vm.expectCall(
       address(s_mockUSDCTransmitter),
@@ -336,11 +360,13 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
     );
 
     vm.startPrank(s_routerAllowedOffRamp);
-    s_usdcTokenPool.releaseOrMint(abi.encode(OWNER), OWNER, 100, SOURCE_CHAIN_SELECTOR, extraData);
+    s_usdcTokenPool.releaseOrMint(
+      abi.encode(OWNER), OWNER, 100, SOURCE_CHAIN_SELECTOR, sourceTokenData, offchainTokenData
+    );
   }
 
   // Reverts
-  function testUnlockingUSDCFailedReverts() public {
+  function test_UnlockingUSDCFailed_Revert() public {
     vm.startPrank(s_routerAllowedOffRamp);
     s_mockUSDCTransmitter.setShouldSucceed(false);
 
@@ -357,39 +383,52 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
       messageBody: bytes("")
     });
 
-    bytes memory extraData = abi.encode(
-      abi.encode(
+    IPool.SourceTokenData memory sourceTokenData = IPool.SourceTokenData({
+      sourcePoolAddress: abi.encode(SOURCE_CHAIN_USDC_POOL),
+      destPoolAddress: abi.encode(address(s_usdcTokenPool)),
+      extraData: abi.encode(
         USDCTokenPool.SourceTokenDataPayload({nonce: usdcMessage.nonce, sourceDomain: SOURCE_DOMAIN_IDENTIFIER})
-      ),
-      abi.encode(
-        USDCTokenPool.MessageAndAttestation({message: _generateUSDCMessage(usdcMessage), attestation: bytes("")})
-      )
+        )
+    });
+
+    bytes memory offchainTokenData = abi.encode(
+      USDCTokenPool.MessageAndAttestation({message: _generateUSDCMessage(usdcMessage), attestation: bytes("")})
     );
 
     vm.expectRevert(USDCTokenPool.UnlockingUSDCFailed.selector);
 
-    s_usdcTokenPool.releaseOrMint(abi.encode(OWNER), OWNER, amount, SOURCE_CHAIN_SELECTOR, extraData);
+    s_usdcTokenPool.releaseOrMint(
+      abi.encode(OWNER), OWNER, amount, SOURCE_CHAIN_SELECTOR, sourceTokenData, offchainTokenData
+    );
   }
 
-  function testTokenMaxCapacityExceededReverts() public {
+  function test_TokenMaxCapacityExceeded_Revert() public {
     uint256 capacity = getInboundRateLimiterConfig().capacity;
     uint256 amount = 10 * capacity;
     address recipient = address(1);
     vm.startPrank(s_routerAllowedOffRamp);
 
-    bytes memory extraData =
+    IPool.SourceTokenData memory sourceTokenData = IPool.SourceTokenData({
+      sourcePoolAddress: abi.encode(SOURCE_CHAIN_USDC_POOL),
+      destPoolAddress: abi.encode(address(s_usdcTokenPool)),
+      extraData: abi.encode(USDCTokenPool.SourceTokenDataPayload({nonce: 1, sourceDomain: SOURCE_DOMAIN_IDENTIFIER}))
+    });
+
+    bytes memory offchainTokenData =
       abi.encode(USDCTokenPool.MessageAndAttestation({message: bytes(""), attestation: bytes("")}));
 
     vm.expectRevert(
       abi.encodeWithSelector(RateLimiter.TokenMaxCapacityExceeded.selector, capacity, amount, address(s_token))
     );
 
-    s_usdcTokenPool.releaseOrMint(abi.encode(OWNER), recipient, amount, SOURCE_CHAIN_SELECTOR, extraData);
+    s_usdcTokenPool.releaseOrMint(
+      abi.encode(OWNER), recipient, amount, SOURCE_CHAIN_SELECTOR, sourceTokenData, offchainTokenData
+    );
   }
 }
 
 contract USDCTokenPool_supportsInterface is USDCTokenPoolSetup {
-  function testSupportsInterfaceSuccess() public {
+  function test_SupportsInterface_Success() public view {
     assertTrue(s_usdcTokenPool.supportsInterface(s_usdcTokenPool.getUSDCInterfaceId()));
     assertTrue(s_usdcTokenPool.supportsInterface(type(IPool).interfaceId));
     assertTrue(s_usdcTokenPool.supportsInterface(type(IERC165).interfaceId));
@@ -404,7 +443,7 @@ contract USDCTokenPool_setDomains is USDCTokenPoolSetup {
   // Setting lower fuzz run as 256 runs was causing differing gas results in snapshot.
   /// forge-config: default.fuzz.runs = 32
   /// forge-config: ccip.fuzz.runs = 32
-  function testFuzz_SetDomainsSuccess(
+  function test_Fuzz_SetDomains_Success(
     bytes32[5] calldata allowedCallers,
     uint32[5] calldata domainIdentifiers,
     uint64[5] calldata destChainSelectors
@@ -440,7 +479,7 @@ contract USDCTokenPool_setDomains is USDCTokenPoolSetup {
 
   // Reverts
 
-  function testOnlyOwnerReverts() public {
+  function test_OnlyOwner_Revert() public {
     USDCTokenPool.DomainUpdate[] memory domainUpdates = new USDCTokenPool.DomainUpdate[](0);
 
     vm.startPrank(STRANGER);
@@ -449,7 +488,7 @@ contract USDCTokenPool_setDomains is USDCTokenPoolSetup {
     s_usdcTokenPool.setDomains(domainUpdates);
   }
 
-  function testInvalidDomainReverts() public {
+  function test_InvalidDomain_Revert() public {
     bytes32 validCaller = bytes32(uint256(25));
     // Ensure valid domain works
     USDCTokenPool.DomainUpdate[] memory domainUpdates = new USDCTokenPool.DomainUpdate[](1);
@@ -480,7 +519,7 @@ contract USDCTokenPool_setDomains is USDCTokenPoolSetup {
 }
 
 contract USDCTokenPool__validateMessage is USDCTokenPoolSetup {
-  function testFuzz_ValidateMessageSuccess(uint32 sourceDomain, uint64 nonce) public {
+  function test_Fuzz_ValidateMessage_Success(uint32 sourceDomain, uint64 nonce) public {
     vm.pauseGasMetering();
     USDCMessage memory usdcMessage = USDCMessage({
       version: 0,
@@ -503,7 +542,7 @@ contract USDCTokenPool__validateMessage is USDCTokenPoolSetup {
 
   // Reverts
 
-  function testValidateInvalidMessageReverts() public {
+  function test_ValidateInvalidMessage_Revert() public {
     USDCMessage memory usdcMessage = USDCMessage({
       version: 0,
       sourceDomain: 1553252,

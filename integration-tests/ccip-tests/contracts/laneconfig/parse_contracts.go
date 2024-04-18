@@ -4,7 +4,9 @@ import (
 	_ "embed"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
+	"path/filepath"
 	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -18,19 +20,21 @@ var (
 )
 
 type CommonContracts struct {
-	IsNativeFeeToken bool              `json:"is_native_fee_token,omitempty"`
-	IsMockARM        bool              `json:"is_mock_arm,omitempty"`
-	FeeToken         string            `json:"fee_token"`
-	BridgeTokens     []string          `json:"bridge_tokens"`
-	BridgeTokenPools []string          `json:"bridge_tokens_pools"`
-	PriceAggregators map[string]string `json:"price_aggregators"`
-	ARM              string            `json:"arm"`
-	Router           string            `json:"router"`
-	PriceRegistry    string            `json:"price_registry"`
-	WrappedNative    string            `json:"wrapped_native"`
-	Multicall        string            `json:"multicall,omitempty"`
-	TokenTransmitter string            `json:"token_transmitter,omitempty"`
-	TokenMessenger   string            `json:"token_messenger,omitempty"`
+	IsNativeFeeToken   bool              `json:"is_native_fee_token,omitempty"`
+	IsMockARM          bool              `json:"is_mock_arm,omitempty"`
+	FeeToken           string            `json:"fee_token"`
+	BridgeTokens       []string          `json:"bridge_tokens"`
+	BridgeTokenPools   []string          `json:"bridge_tokens_pools"`
+	PriceAggregators   map[string]string `json:"price_aggregators"`
+	ARM                string            `json:"arm"`
+	Router             string            `json:"router"`
+	PriceRegistry      string            `json:"price_registry"`
+	WrappedNative      string            `json:"wrapped_native"`
+	Multicall          string            `json:"multicall,omitempty"`
+	TokenTransmitter   string            `json:"token_transmitter,omitempty"`
+	TokenMessenger     string            `json:"token_messenger,omitempty"`
+	TokenAdminRegistry string            `json:"token_admin_registry,omitempty"`
+	Version            string            `json:"version,omitempty"`
 }
 
 type SourceContracts struct {
@@ -79,6 +83,9 @@ func (l *LaneConfig) Validate() error {
 	}
 	if l.PriceRegistry == "" || !common.IsHexAddress(l.PriceRegistry) {
 		laneConfigError = multierr.Append(laneConfigError, errors.New("must set proper address for price_registry"))
+	}
+	if l.Version != "" && (l.TokenAdminRegistry == "" || !common.IsHexAddress(l.TokenAdminRegistry)) {
+		laneConfigError = multierr.Append(laneConfigError, errors.New("must set proper address for token_admin_registry"))
 	}
 	if l.WrappedNative == "" || !common.IsHexAddress(l.WrappedNative) {
 		laneConfigError = multierr.Append(laneConfigError, errors.New("must set proper address for wrapped_native"))
@@ -149,6 +156,8 @@ func (l *Lanes) CopyCommonContracts(fromNetwork, toNetwork string, reuse, isToke
 	if reuse {
 		cfg.CommonContracts.FeeToken = existing.FeeToken
 		cfg.CommonContracts.PriceRegistry = existing.PriceRegistry
+		cfg.CommonContracts.TokenAdminRegistry = existing.TokenAdminRegistry
+		cfg.CommonContracts.PriceAggregators = existing.PriceAggregators
 		cfg.CommonContracts.ARM = existing.ARM
 		cfg.CommonContracts.IsMockARM = existing.IsMockARM
 		cfg.CommonContracts.Multicall = existing.Multicall
@@ -202,6 +211,16 @@ func WriteLanesToJSON(path string, lanes *Lanes) error {
 	if err != nil {
 		return err
 	}
+	// Get the directory part of the file path.
+	dir := filepath.Dir(path)
+	// Check if the directory exists.
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		// The directory does not exist, create it.
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			return fmt.Errorf("failed to create directory: %w", err)
+		}
+	}
+
 	f, err := os.Create(path)
 	if err != nil {
 		return err
