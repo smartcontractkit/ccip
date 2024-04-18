@@ -353,7 +353,7 @@ jobs:
 
   post-test-results-to-slack:
     name: Post Test Results for ${{matrix.client}}
-    if: ${{ always() && needs.*.result != 'skipped' && needs.*.result != 'cancelled' }}
+    if: ${{ always() && needs.changes.outputs.src == 'true' && needs.*.result != 'skipped' && needs.*.result != 'cancelled' }}
     environment: integration
     permissions:
       checks: write
