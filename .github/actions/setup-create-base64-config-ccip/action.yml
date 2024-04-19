@@ -101,6 +101,7 @@ runs:
           else
             for i in "${!networks_array[@]}"; do
               IFS='=' read -r chain_id docker_image <<< "${nodes_array[i]}"
+              echo "Adding custom node for network ${networks_array[i]} with chain id ${chain_id} and docker image ${docker_image}"
               custom_nodes_toml+="
         [CCIP.Env.PrivateEthereumNetworks.${networks_array[i]}]
         ethereum_version=\"\"
@@ -123,6 +124,8 @@ runs:
             done
           fi
         fi
+
+        echo "Custom nodes toml: $custom_nodes_toml"
 
         cat << EOF > config.toml
         [CCIP]
