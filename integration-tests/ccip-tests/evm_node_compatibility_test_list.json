@@ -1,0 +1,39 @@
+{
+    "tests": [
+      {
+        "product": "ccip",
+        "name": "TestSmokeCCIPForBidirectionalLane",
+        "eth_client": "geth",
+        "docker_image": "ethereum/client-go:latest_stable",
+        "label": "ubuntu-latest"
+      },
+      {
+        "product": "ccip",
+        "name": "TestSmokeCCIPForBidirectionalLane",
+        "eth_client": "geth",
+        "docker_image": "ethereum/client-go:v1.13.0",
+        "label": "ubuntu-latest"
+      },
+      {
+        "product": "ccip",
+        "name": "TestSmokeCCIPForBidirectionalLane",
+        "eth_client": "geth",
+        "docker_image": "ethereum/client-go:v1.12.0",
+        "label": "ubuntu-latest"
+      },
+      {
+        "product": "ccip",
+        "name": "TestSmokeCCIPForBidirectionalLane",
+        "eth_client": "geth",
+        "docker_image": "ethereum/client-go:v1.11.0",
+        "label": "ubuntu-latest"
+      },
+      {
+        "product": "ccip",
+        "name": "TestSmokeCCIPForBidirectionalLane",
+        "eth_client": "geth",
+        "docker_image": "ethereum/client-go:v1.10.0",
+        "label": "ubuntu-latest"
+      }
+    ]
+}

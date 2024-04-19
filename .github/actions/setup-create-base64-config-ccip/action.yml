@@ -136,7 +136,7 @@ runs:
         [CCIP.Env.NewCLCluster.Common.ChainlinkUpgradeImage]
         image="$UPGRADE_IMAGE"
         version="$UPGRADE_VERSION"
-        
+
         $custom_nodes_toml
 
         [CCIP.Env.Logging]
@@ -154,13 +154,13 @@ runs:
         [CCIP.Env.Logging.Grafana]
         base_url="$GRAFANA_URL"
         dashboard_url="$GRAFANA_DASHBOARD_URL"
-        
+
         [CCIP.Groups.load]
         TestRunName = '$EXISTING_NAMESPACE'
-        
+
         [CCIP.Groups.smoke]
         TestRunName = '$EXISTING_NAMESPACE'
-        
+
         EOF
 
         BASE64_CCIP_SECRETS_CONFIG=$(cat config.toml | base64 -w 0)
