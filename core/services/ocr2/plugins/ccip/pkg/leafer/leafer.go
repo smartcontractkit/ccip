@@ -31,7 +31,7 @@ const (
 )
 
 // MakeLeafHasher is a factory function to construct the onramp implementing the HashLeaf function for a given version.
-func MakeLeafHasher(ctx hashlib.Ctx[[32]byte], ver HasherVersion, cl bind.ContractBackend, onRampId common.Address, sourceChainSelector uint64, destChainSelector uint64) (LeafHasher, error) {
+func MakeLeafHasher(ver HasherVersion, cl bind.ContractBackend, sourceChainSelector uint64, destChainSelector uint64, onRampId common.Address, ctx hashlib.Ctx[[32]byte]) (LeafHasher, error) {
 	switch ver {
 	case V1_0_0:
 		or, err := evm_2_evm_onramp_1_0_0.NewEVM2EVMOnRamp(onRampId, cl)
