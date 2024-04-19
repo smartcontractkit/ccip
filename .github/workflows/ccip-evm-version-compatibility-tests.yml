@@ -236,8 +236,7 @@ jobs:
           logstreamLogTargets: ${{ vars.LOGSTREAM_LOG_TARGETS }}
           grafanaUrl: ${{ vars.GRAFANA_URL }}
           grafanaDashboardUrl: "/d/ddf75041-1e39-42af-aa46-361fe4c36e9e/ci-e2e-tests-logs"
-          chainConfig: "1337=${{ matrix.docker_image }},2337=${{ matrix.docker_image }}"
-
+          customEvmNodes: "1337=${{ matrix.docker_image }},2337=${{ matrix.docker_image }}"
       - name: Run Tests
         uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@7882cf348cd6a1f6bcf1ee8280185584ebba96e9 # v2.3.10
         with:

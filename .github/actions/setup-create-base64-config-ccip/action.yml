@@ -34,7 +34,7 @@ inputs:
   grafanaDashboardUrl:
     description: Grafana dashboard URL
   customEvmNodes:
-    description: Custom EVM nodes to use  in key=value format, where key is chain id and value is docker image to use. If they are provided the number of networksSelected must be equal to the number of customEvmNodes
+    description: Custom EVM nodes to use in key=value format, where key is chain id and value is docker image to use. If they are provided the number of networksSelected must be equal to the number of customEvmNodes
 
 runs:
   using: composite
