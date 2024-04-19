@@ -173,7 +173,6 @@ jobs:
     needs:
       [check-dependency-bump, build-chainlink-ccip, build-tests, build-test-matrix]
     env:
-      SELECTED_NETWORKS: SIMULATED
       CHAINLINK_COMMIT_SHA: ${{ github.sha }}
       CHAINLINK_ENV_USER: ${{ github.actor }}
       TEST_LOG_LEVEL: debug
@@ -214,7 +213,7 @@ jobs:
         with:
           runId: ${{ github.run_id }}
           testLogCollect: ${{ vars.TEST_LOG_COLLECT }}
-          selectedNetworks: ${{ env.SELECTED_NETWORKS }}
+          selectedNetworks: SIMULATED_1,SIMULATED_2
           chainlinkImage: ${{ env.CHAINLINK_IMAGE }}
           chainlinkVersion: ${{ github.sha }}
           lokiEndpoint: ${{ secrets.LOKI_URL }}
@@ -223,8 +222,6 @@ jobs:
           logstreamLogTargets: ${{ vars.LOGSTREAM_LOG_TARGETS }}
           grafanaUrl: ${{ vars.GRAFANA_URL }}
           grafanaDashboardUrl: "/d/ddf75041-1e39-42af-aa46-361fe4c36e9e/ci-e2e-tests-logs"
-          ethExecutionClient: ${{ matrix.evm_node.eth_client }}
-          customEthClientDockerImage: ${{ matrix.evm_node.docker_image }}
       - name: Prepare Base64 TOML override for CCIP secrets
         uses: ./.github/actions/setup-create-base64-config-ccip
         with:
