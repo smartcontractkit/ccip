@@ -1125,7 +1125,7 @@ func createEnvironmentConfig(t *testing.T, envName string, testConfig *CCIPTestC
 	if existingEnv != "" {
 		envConfig.Namespace = existingEnv
 		envConfig.NamespacePrefix = ""
-		envConfig.NoManifestUpdate = true
+		// envConfig.NoManifestUpdate = true
 		envConfig.RunnerName = fmt.Sprintf("%s-%s", environment.REMOTE_RUNNER_NAME, uuid.NewString()[0:5])
 	}
 	if testConfig.EnvInput.TTL != nil {

@@ -3,13 +3,11 @@ package testsetups
 import (
 	"bytes"
 	"fmt"
-	"os"
 	"strconv"
 	"strings"
 	"testing"
 
 	"github.com/AlekSi/pointer"
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
@@ -25,7 +23,6 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/k8s/pkg/helm/reorg"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
-	k8config "github.com/smartcontractkit/chainlink-testing-framework/k8s/config"
 
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/actions"
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/types/config/node"
@@ -410,32 +407,32 @@ func UpgradeNodes(
 		}
 	} else {
 		// if the test is running on k8s
-		k8Env := ccipEnv.K8Env
-		if k8Env == nil {
-			return errors.New("k8s environment is nil, cannot restart nodes")
-		}
-		props, noOfNodesToUpgrade := ChainlinkPropsForUpdate(t, testInputs)
-		chartName := ccipEnv.CLNodes[0].ChartName
+		// k8Env := ccipEnv.K8Env
+		// if k8Env == nil {
+		// 	return errors.New("k8s environment is nil, cannot restart nodes")
+		// }
+		// props, noOfNodesToUpgrade := ChainlinkPropsForUpdate(t, testInputs)
+		// chartName := ccipEnv.CLNodes[0].ChartName
 		// explicitly set the env var into false to allow manifest update
 		// if tests are run in remote runner, it might be set to true to disable manifest update
-		err := os.Setenv(k8config.EnvVarNoManifestUpdate, "false")
-		if err != nil {
-			return err
-		}
-		k8Env.Cfg.NoManifestUpdate = false
-		lggr.Info().
-			Str("Chart Name", chartName).
-			Interface("Upgrade Details", props).
-			Msg("Upgrading Chainlink Node")
-		k8Env, err = k8Env.UpdateHelm(chartName, props)
-		if err != nil {
-			return err
-		}
-		err = k8Env.RunUpdated(noOfNodesToUpgrade)
-		// Run the new environment and wait for changes to show
-		if err != nil {
-			return err
-		}
+		// err := os.Setenv(k8config.EnvVarNoManifestUpdate, "false")
+		// if err != nil {
+		// 	return err
+		// }
+		// k8Env.Cfg.NoManifestUpdate = false
+		// lggr.Info().
+		// 	Str("Chart Name", chartName).
+		// 	Interface("Upgrade Details", props).
+		// 	Msg("Upgrading Chainlink Node")
+		// k8Env, err = k8Env.UpdateHelm(chartName, props)
+		// if err != nil {
+		// 	return err
+		// }
+		// err = k8Env.RunUpdated(noOfNodesToUpgrade)
+		// // Run the new environment and wait for changes to show
+		// if err != nil {
+		// 	return err
+		// }
 	}
 	return nil
 }

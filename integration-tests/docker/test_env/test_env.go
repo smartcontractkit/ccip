@@ -201,7 +201,7 @@ func (te *CLClusterTestEnv) Terminate() error {
 func (te *CLClusterTestEnv) Cleanup() error {
 	te.l.Info().Msg("Cleaning up test environment")
 
-	runIdErr := runid.RemoveLocalRunId()
+	runIdErr := runid.RemoveLocalRunId(nil)
 	if runIdErr != nil {
 		te.l.Warn().Msgf("Failed to remove .run.id file due to: %s (not a big deal, you can still remove it manually)", runIdErr.Error())
 	}
