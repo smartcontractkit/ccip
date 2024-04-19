@@ -125,8 +125,6 @@ runs:
           fi
         fi
 
-        echo "Custom nodes toml: $custom_nodes_toml"
-
         cat << EOF > config.toml
         [CCIP]
         [CCIP.Env]
