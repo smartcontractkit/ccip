@@ -44,6 +44,7 @@ runs:
       id: base64-config-override
       env:
         RUN_ID: ${{ inputs.runId }}
+        SELECTED_NETWORKS: ${{ inputs.selectedNetworks }}
         EXISTING_NAMESPACE: ${{ inputs.existingNamespace }}
         TEST_LOG_COLLECT: ${{ inputs.testLogCollect }}
         CHAINLINK_IMAGE: ${{ inputs.chainlinkImage }}

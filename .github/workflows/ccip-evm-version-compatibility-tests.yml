@@ -173,6 +173,7 @@ jobs:
     needs:
       [check-dependency-bump, build-chainlink-ccip, build-tests, build-test-matrix]
     env:
+      SELECTED_NETWORKS: SIMULATED_1,SIMULATED_2
       CHAINLINK_COMMIT_SHA: ${{ github.sha }}
       CHAINLINK_ENV_USER: ${{ github.actor }}
       TEST_LOG_LEVEL: debug
