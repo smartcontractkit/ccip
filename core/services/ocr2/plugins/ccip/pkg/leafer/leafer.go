@@ -31,28 +31,28 @@ const (
 )
 
 // MakeLeafHasher is a factory function to construct the onramp implementing the HashLeaf function for a given version.
-func MakeLeafHasher(ver HasherVersion, cl bind.ContractBackend, sourceChainSelector uint64, destChainSelector uint64, onRampId common.Address) (LeafHasher, error) {
+func MakeLeafHasher(ctx hashlib.Ctx[[32]byte], ver HasherVersion, cl bind.ContractBackend, onRampId common.Address, sourceChainSelector uint64, destChainSelector uint64) (LeafHasher, error) {
 	switch ver {
 	case V1_0_0:
 		or, err := evm_2_evm_onramp_1_0_0.NewEVM2EVMOnRamp(onRampId, cl)
 		if err != nil {
 			return nil, err
 		}
-		h := v1_0_0.NewLeafHasher(sourceChainSelector, destChainSelector, onRampId, hashlib.NewKeccakCtx(), or)
+		h := v1_0_0.NewLeafHasher(sourceChainSelector, destChainSelector, onRampId, ctx, or)
 		return h, nil
 	case V1_2_0:
 		or, err := evm_2_evm_onramp_1_2_0.NewEVM2EVMOnRamp(onRampId, cl)
 		if err != nil {
 			return nil, err
 		}
-		h := v1_2_0.NewLeafHasher(sourceChainSelector, destChainSelector, onRampId, hashlib.NewKeccakCtx(), or)
+		h := v1_2_0.NewLeafHasher(sourceChainSelector, destChainSelector, onRampId, ctx, or)
 		return h, nil
 	case V1_5_0:
 		or, err := evm_2_evm_onramp.NewEVM2EVMOnRamp(onRampId, cl)
 		if err != nil {
 			return nil, err
 		}
-		h := v1_5_0.NewLeafHasher(sourceChainSelector, destChainSelector, onRampId, hashlib.NewKeccakCtx(), or)
+		h := v1_5_0.NewLeafHasher(sourceChainSelector, destChainSelector, onRampId, ctx, or)
 		return h, nil
 	default:
 		return nil, fmt.Errorf("unknown version %q", ver)
