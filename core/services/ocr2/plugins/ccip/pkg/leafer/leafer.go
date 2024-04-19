@@ -21,17 +21,17 @@ type LeafHasher interface {
 	HashLeaf(log types.Log) ([32]byte, error)
 }
 
-// HasherVersion maps to the contract versions.
-type HasherVersion string
+// Version is the contract to use.
+type Version string
 
 const (
-	V1_0_0 HasherVersion = "v1_0_0"
-	V1_2_0 HasherVersion = "v1_2_0"
-	V1_5_0 HasherVersion = "v1_5_0"
+	V1_0_0 Version = "v1_0_0"
+	V1_2_0 Version = "v1_2_0"
+	V1_5_0 Version = "v1_5_0"
 )
 
 // MakeLeafHasher is a factory function to construct the onramp implementing the HashLeaf function for a given version.
-func MakeLeafHasher(ver HasherVersion, cl bind.ContractBackend, sourceChainSelector uint64, destChainSelector uint64, onRampId common.Address, ctx hashlib.Ctx[[32]byte]) (LeafHasher, error) {
+func MakeLeafHasher(ver Version, cl bind.ContractBackend, sourceChainSelector uint64, destChainSelector uint64, onRampId common.Address, ctx hashlib.Ctx[[32]byte]) (LeafHasher, error) {
 	switch ver {
 	case V1_0_0:
 		or, err := evm_2_evm_onramp_1_0_0.NewEVM2EVMOnRamp(onRampId, cl)
