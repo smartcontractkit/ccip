@@ -208,7 +208,7 @@ jobs:
           echo "run_command=${{ matrix.evm_node.run }} ./ccip-tests/smoke/ccip_test.go" >> "$GITHUB_OUTPUT"
           # else
           #   echo "run_command=./smoke/${{ matrix.evm_node.product }}_test.go" >> "$GITHUB_OUTPUT"
-          fi
+          # fi
       - name: Prepare Base64 TOML override
         uses: ./.github/actions/setup-create-base64-config
         with:
