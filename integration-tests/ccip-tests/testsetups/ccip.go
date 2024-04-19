@@ -15,31 +15,31 @@ import (
 	"dario.cat/mergo"
 	"github.com/AlekSi/pointer"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
 	"go.uber.org/multierr"
 	"go.uber.org/zap/zapcore"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/smartcontractkit/chainlink-testing-framework/utils/testcontext"
-
-	ctfClient "github.com/smartcontractkit/chainlink-testing-framework/client"
-
-	ctftestenv "github.com/smartcontractkit/chainlink-testing-framework/docker/test_env"
-
 	chainselectors "github.com/smartcontractkit/chain-selectors"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
+	ctfClient "github.com/smartcontractkit/chainlink-testing-framework/client"
+	ctftestenv "github.com/smartcontractkit/chainlink-testing-framework/docker/test_env"
 	"github.com/smartcontractkit/chainlink-testing-framework/k8s/config"
 	"github.com/smartcontractkit/chainlink-testing-framework/k8s/environment"
 	"github.com/smartcontractkit/chainlink-testing-framework/networks"
-
-	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/contracts"
-
+	"github.com/smartcontractkit/chainlink-testing-framework/utils/testcontext"
 	integrationactions "github.com/smartcontractkit/chainlink/integration-tests/actions"
+
+	testutils "github.com/smartcontractkit/ccip/integration-tests/ccip-tests/utils"
+
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/actions"
+	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/contracts"
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/contracts/laneconfig"
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/testconfig"
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/testreporters"
@@ -91,6 +91,21 @@ func (c *CCIPTestConfig) localCluster() bool {
 
 func (c *CCIPTestConfig) ExistingCLCluster() bool {
 	return c.EnvInput.ExistingCLCluster != nil
+}
+
+func (c *CCIPTestConfig) CLClusterNeedsUpgrade() bool {
+	if c.EnvInput.NewCLCluster == nil {
+		return false
+	}
+	if c.EnvInput.NewCLCluster.Common != nil && c.EnvInput.NewCLCluster.Common.ChainlinkUpgradeImage != nil {
+		return true
+	}
+	for _, node := range c.EnvInput.NewCLCluster.Nodes {
+		if node.ChainlinkUpgradeImage != nil {
+			return true
+		}
+	}
+	return false
 }
 
 func (c *CCIPTestConfig) AddPairToNetworkList(networkA, networkB blockchain.EVMNetwork) {
@@ -306,6 +321,12 @@ func NewCCIPTestConfig(t *testing.T, lggr zerolog.Logger, tType string) *CCIPTes
 			t.Fatal("grafana config is required for load test")
 		}
 	}
+	if pointer.GetBool(groupCfg.KeepEnvAlive) {
+		err := os.Setenv(config.EnvVarKeepEnvironments, "ALWAYS")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
 	ccipTestConfig := &CCIPTestConfig{
 		Test:                t,
 		EnvInput:            testCfg.CCIP.Env,
@@ -387,7 +408,8 @@ func (o *CCIPTestSetUpOutputs) DeployChainContracts(
 		lggr, chain,
 		o.Cfg.useExistingDeployment(),
 		o.Cfg.MultiCallEnabled(),
-		o.Cfg.TestGroupInput.NoOfUSDCMockTokens)
+		o.Cfg.TestGroupInput.USDCMockDeployment,
+	)
 	if err != nil {
 		return errors.WithStack(fmt.Errorf("failed to create ccip common module for %s: %w", networkCfg.Name, err))
 	}
@@ -547,7 +569,7 @@ func (o *CCIPTestSetUpOutputs) AddLanesForNetworkPair(
 			withPipeline, staticPrice,
 			o.Cfg.useExistingDeployment(),
 			o.Cfg.MultiCallEnabled(),
-			o.Cfg.TestGroupInput.NoOfUSDCMockTokens,
+			o.Cfg.TestGroupInput.USDCMockDeployment,
 		)
 		if err != nil {
 			allErrors.Store(multierr.Append(allErrors.Load(), fmt.Errorf("deploying lane %s to %s; err - %w", networkA.Name, networkB.Name, errors.WithStack(err))))
@@ -580,7 +602,7 @@ func (o *CCIPTestSetUpOutputs) AddLanesForNetworkPair(
 				withPipeline, staticPrice,
 				o.Cfg.useExistingDeployment(),
 				o.Cfg.MultiCallEnabled(),
-				o.Cfg.TestGroupInput.NoOfUSDCMockTokens,
+				o.Cfg.TestGroupInput.USDCMockDeployment,
 			)
 			if err != nil {
 				lggr.Error().Err(err).Msgf("error deploying lane %s to %s", networkB.Name, networkA.Name)
@@ -707,7 +729,9 @@ func CCIPDefaultTestSetUp(
 	var (
 		err error
 	)
-	filename := fmt.Sprintf("./tmp_%s.json", strings.ReplaceAll(t.Name(), "/", "_"))
+	reportPath := "tmp_laneconfig"
+	filepath := fmt.Sprintf("./%s/tmp_%s.json", reportPath, strings.ReplaceAll(t.Name(), "/", "_"))
+	reportFile := testutils.FileNameFromPath(filepath)
 	var transferAmounts []*big.Int
 	if testConfig.TestGroupInput.MsgType == actions.TokenTransfer {
 		for i := 0; i < testConfig.TestGroupInput.NoOfTokensInMsg; i++ {
@@ -720,7 +744,7 @@ func CCIPDefaultTestSetUp(
 		SetUpContext:           parent,
 		Cfg:                    testConfig,
 		Reporter:               testreporters.NewCCIPTestReporter(t, lggr),
-		LaneConfigFile:         filename,
+		LaneConfigFile:         filepath,
 		LaneContractsByNetwork: &sync.Map{},
 		Balance:                actions.NewBalanceSheet(),
 		BootstrapAdded:         atomic.NewBool(false),
@@ -728,26 +752,45 @@ func CCIPDefaultTestSetUp(
 		laneMutex:              &sync.Mutex{},
 	}
 
-	chainByChainID := setUpArgs.CreateEnvironment(lggr, envName)
+	contractsData, err := setUpArgs.Cfg.ContractsInput.ContractsData()
+	require.NoError(t, err, "error reading existing lane config")
+
+	chainByChainID := setUpArgs.CreateEnvironment(lggr, envName, reportPath)
+	// if test is run in remote runner, register a clean-up to copy the laneconfig file
+	if value, set := os.LookupEnv(config.EnvVarJobImage); set && value != "" &&
+		(setUpArgs.Env != nil && setUpArgs.Env.K8Env != nil) &&
+		pointer.GetBool(setUpArgs.Cfg.TestGroupInput.StoreLaneConfig) {
+		t.Cleanup(func() {
+			path := fmt.Sprintf("reports/%s/%s", reportPath, reportFile)
+			dir, err := os.Getwd()
+			require.NoError(t, err)
+			destPath := fmt.Sprintf("%s/%s", dir, reportFile)
+			lggr.Info().Str("srcPath", path).Str("dstPath", destPath).Msg("copying lane config")
+			err = setUpArgs.Env.K8Env.CopyFromPod("app=runner-data",
+				"remote-test-runner-data-files", path, destPath)
+			require.NoError(t, err, "error getting lane config")
+		})
+	}
 	if setUpArgs.Env != nil {
 		ccipEnv := setUpArgs.Env
 		if ccipEnv.K8Env != nil && ccipEnv.K8Env.WillUseRemoteRunner() {
 			return setUpArgs
 		}
 	}
-	laneCfgFile, err := os.Stat(setUpArgs.LaneConfigFile)
-	if err == nil && laneCfgFile.Size() > 1 {
-		// remove the existing lane config file
-		err = os.Remove(setUpArgs.LaneConfigFile)
-		require.NoError(t, err, "error while removing existing lane config file - %s", setUpArgs.LaneConfigFile)
-	}
 
-	setUpArgs.LaneConfig, err = laneconfig.ReadLanesFromExistingDeployment(setUpArgs.Cfg.ContractsInput.ContractsData())
+	setUpArgs.LaneConfig, err = laneconfig.ReadLanesFromExistingDeployment(contractsData)
 	require.NoError(t, err)
 
 	if setUpArgs.LaneConfig == nil {
 		setUpArgs.LaneConfig = &laneconfig.Lanes{LaneConfigs: make(map[string]*laneconfig.LaneConfig)}
 	}
+	laneCfgFile, err := os.Stat(setUpArgs.LaneConfigFile)
+	if err == nil && laneCfgFile.Size() > 0 {
+		// remove the existing lane config file
+		err = os.Remove(setUpArgs.LaneConfigFile)
+		require.NoError(t, err, "error while removing existing lane config file - %s", setUpArgs.LaneConfigFile)
+	}
+
 	configureCLNode := !testConfig.useExistingDeployment()
 
 	// if no of lanes per pair is greater than 1, copy common contracts from the same network
@@ -809,7 +852,7 @@ func CCIPDefaultTestSetUp(
 			// regex to match the path for all tokens across all lanes
 			actions.SetMockserverWithTokenPriceValue(killgrave, setUpArgs.Env.MockServer)
 		}
-		if setUpArgs.Cfg.TestGroupInput.NoOfUSDCMockTokens != nil {
+		if pointer.GetBool(setUpArgs.Cfg.TestGroupInput.USDCMockDeployment) {
 			// if it's a new USDC deployment, set up mock server for attestation,
 			// we need to set it only once for all the lanes as the attestation path uses regex to match the path for
 			// all messages across all lanes
@@ -848,6 +891,7 @@ func CCIPDefaultTestSetUp(
 	require.NoError(t, laneAddGrp.Wait())
 	err = laneconfig.WriteLanesToJSON(setUpArgs.LaneConfigFile, setUpArgs.LaneConfig)
 	require.NoError(t, err)
+
 	require.Equal(t, len(setUpArgs.Lanes), len(testConfig.NetworkPairs),
 		"Number of bi-directional lanes should be equal to number of network pairs")
 	// only required for env set up
@@ -895,6 +939,7 @@ func CCIPDefaultTestSetUp(
 func (o *CCIPTestSetUpOutputs) CreateEnvironment(
 	lggr zerolog.Logger,
 	envName string,
+	reportPath string,
 ) map[int64]blockchain.EVMClient {
 	t := o.Cfg.Test
 	testConfig := o.Cfg
@@ -907,14 +952,15 @@ func (o *CCIPTestSetUpOutputs) CreateEnvironment(
 		deployCL func() error
 	)
 
-	envConfig := createEnvironmentConfig(t, envName, testConfig)
+	envConfig := createEnvironmentConfig(t, envName, testConfig, reportPath)
 
-	configureCLNode := !testConfig.useExistingDeployment()
+	configureCLNode := !testConfig.useExistingDeployment() || pointer.GetString(testConfig.EnvInput.EnvToConnect) != ""
 	namespace := o.Cfg.TestGroupInput.TestRunName
 	require.False(t, testConfig.localCluster() && testConfig.ExistingCLCluster(),
 		"local cluster and existing cluster cannot be true at the same time")
+	// if it's a new deployment, deploy the env
+	// Or if EnvToConnect is given connect to that k8 environment
 	if configureCLNode {
-		// if it's a new deployment, deploy the env
 		if !testConfig.ExistingCLCluster() {
 			// if it's a local cluster, deploy the local cluster in docker
 			if testConfig.localCluster() {
@@ -947,7 +993,8 @@ func (o *CCIPTestSetUpOutputs) CreateEnvironment(
 			return nil
 		}
 	} else {
-		// if configureCLNode is false it means we don't need to deploy any additional pods, use a placeholder env to create just the remote runner
+		// if configureCLNode is false it means we don't need to deploy any additional pods,
+		// use a placeholder env to create just the remote runner in it.
 		if value, set := os.LookupEnv(config.EnvVarJobImage); set && value != "" {
 			k8Env = environment.New(envConfig)
 			err = k8Env.Run()
@@ -980,6 +1027,7 @@ func (o *CCIPTestSetUpOutputs) CreateEnvironment(
 			if k8Env == nil {
 				ec, err = blockchain.ConnectEVMClient(n, lggr)
 			} else {
+				log.Info().Interface("urls", k8Env.URLs).Msg("URLs")
 				ec, err = blockchain.NewEVMClient(n, k8Env, lggr)
 			}
 			require.NoError(t, err, "Connecting to blockchain nodes shouldn't fail")
@@ -1063,11 +1111,22 @@ func (o *CCIPTestSetUpOutputs) CreateEnvironment(
 	return chainByChainID
 }
 
-func createEnvironmentConfig(t *testing.T, envName string, testConfig *CCIPTestConfig) *environment.Config {
+func createEnvironmentConfig(t *testing.T, envName string, testConfig *CCIPTestConfig, reportPath string) *environment.Config {
 	envConfig := &environment.Config{
 		NamespacePrefix:    envName,
 		Test:               t,
 		PreventPodEviction: true,
+	}
+	if pointer.GetBool(testConfig.TestGroupInput.StoreLaneConfig) {
+		envConfig.ReportPath = reportPath
+	}
+	// if there is already existing namespace, no need to update any manifest there, we just connect to it
+	existingEnv := pointer.GetString(testConfig.EnvInput.EnvToConnect)
+	if existingEnv != "" {
+		envConfig.Namespace = existingEnv
+		envConfig.NamespacePrefix = ""
+		envConfig.NoManifestUpdate = true
+		envConfig.RunnerName = fmt.Sprintf("%s-%s", environment.REMOTE_RUNNER_NAME, uuid.NewString()[0:5])
 	}
 	if testConfig.EnvInput.TTL != nil {
 		envConfig.TTL = testConfig.EnvInput.TTL.Duration()

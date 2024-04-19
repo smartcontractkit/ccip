@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.19;
 
+import {IPool} from "../../interfaces/pools/IPool.sol";
+
 import {PriceRegistry} from "../../PriceRegistry.sol";
 import {Router} from "../../Router.sol";
 import {Client} from "../../libraries/Client.sol";
@@ -28,6 +30,8 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
 
   EVM2EVMOnRampHelper internal s_onRamp;
   address[] internal s_offRamps;
+
+  address internal s_destTokenPool = makeAddr("destTokenPool");
 
   EVM2EVMOnRamp.FeeTokenConfigArgs[] internal s_feeTokenConfigArgs;
   EVM2EVMOnRamp.TokenTransferFeeConfigArgs[] internal s_tokenTransferFeeConfigArgs;
@@ -66,7 +70,8 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
         maxFeeUSDCents: 1000_00, // 1,000 USD
         deciBps: 2_5, // 2.5 bps, or 0.025%
         destGasOverhead: 40_000,
-        destBytesOverhead: 0
+        destBytesOverhead: 0,
+        aggregateRateLimitEnabled: true
       })
     );
     s_tokenTransferFeeConfigArgs.push(
@@ -76,7 +81,8 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
         maxFeeUSDCents: 500_00, // 500 USD
         deciBps: 5_0, // 5 bps, or 0.05%
         destGasOverhead: 10_000,
-        destBytesOverhead: 100
+        destBytesOverhead: 100,
+        aggregateRateLimitEnabled: true
       })
     );
     s_tokenTransferFeeConfigArgs.push(
@@ -86,7 +92,8 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
         maxFeeUSDCents: 2000_00, // 1,000 USD
         deciBps: 10_0, // 10 bps, or 0.1%
         destGasOverhead: 1,
-        destBytesOverhead: 200
+        destBytesOverhead: 200,
+        aggregateRateLimitEnabled: true
       })
     );
 
@@ -100,8 +107,7 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
         prevOnRamp: address(0),
         armProxy: address(s_mockARM)
       }),
-      generateDynamicOnRampConfig(address(s_sourceRouter), address(s_priceRegistry)),
-      getTokensAndPools(s_sourceTokens, getCastedSourcePools()),
+      generateDynamicOnRampConfig(address(s_sourceRouter), address(s_priceRegistry), address(s_tokenAdminRegistry)),
       getOutboundRateLimiterConfig(),
       s_feeTokenConfigArgs,
       s_tokenTransferFeeConfigArgs,
@@ -112,17 +118,6 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
     s_metadataHash = keccak256(
       abi.encode(Internal.EVM_2_EVM_MESSAGE_HASH, SOURCE_CHAIN_SELECTOR, DEST_CHAIN_SELECTOR, address(s_onRamp))
     );
-
-    TokenPool.ChainUpdate[] memory chainUpdates = new TokenPool.ChainUpdate[](1);
-    chainUpdates[0] = TokenPool.ChainUpdate({
-      remoteChainSelector: DEST_CHAIN_SELECTOR,
-      allowed: true,
-      outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
-      inboundRateLimiterConfig: getInboundRateLimiterConfig()
-    });
-
-    LockReleaseTokenPool(address(s_sourcePools[0])).applyChainUpdates(chainUpdates);
-    LockReleaseTokenPool(address(s_sourcePools[1])).applyChainUpdates(chainUpdates);
 
     s_offRamps = new address[](2);
     s_offRamps[0] = address(10);
@@ -191,22 +186,34 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
     for (uint256 i = 4; i < message.extraArgs.length; ++i) {
       args[i - 4] = message.extraArgs[i];
     }
-    Client.EVMExtraArgsV1 memory extraArgs = abi.decode(args, (Client.EVMExtraArgsV1));
+    uint256 numberOfTokens = message.tokenAmounts.length;
     Internal.EVM2EVMMessage memory messageEvent = Internal.EVM2EVMMessage({
       sequenceNumber: seqNum,
       feeTokenAmount: feeTokenAmount,
       sender: originalSender,
       nonce: nonce,
-      gasLimit: extraArgs.gasLimit,
+      gasLimit: abi.decode(args, (Client.EVMExtraArgsV1)).gasLimit,
       strict: false,
       sourceChainSelector: SOURCE_CHAIN_SELECTOR,
       receiver: abi.decode(message.receiver, (address)),
       data: message.data,
       tokenAmounts: message.tokenAmounts,
-      sourceTokenData: new bytes[](message.tokenAmounts.length),
+      sourceTokenData: new bytes[](numberOfTokens),
       feeToken: message.feeToken,
       messageId: ""
     });
+
+    for (uint256 i = 0; i < numberOfTokens; ++i) {
+      address sourcePool = s_sourcePoolByToken[message.tokenAmounts[i].token];
+      address destPool = s_destPoolBySourceToken[message.tokenAmounts[i].token];
+      messageEvent.sourceTokenData[i] = abi.encode(
+        IPool.SourceTokenData({
+          sourcePoolAddress: abi.encode(sourcePool),
+          destPoolAddress: abi.encode(destPool),
+          extraData: ""
+        })
+      );
+    }
 
     messageEvent.messageId = Internal._hash(messageEvent, s_metadataHash);
     return messageEvent;

@@ -26,11 +26,13 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_v3_aggregator_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/price_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/token_admin_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/usdc_token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/link_token_interface"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/burn_mint_erc677"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/erc20"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 )
 
 var (
@@ -377,6 +379,33 @@ func (pool *TokenPool) AddLiquidity(approveFn tokenApproveFn, tokenAddr string, 
 	return pool.client.ProcessTransaction(tx)
 }
 
+func (pool *TokenPool) SetRemotePool(remoteChainSelector uint64, remotePool common.Address) error {
+	log.Info().
+		Str("Token Pool", pool.Address()).
+		Str("Dest Pool", remotePool.Hex()).
+		Uint64("RemoteChain", remoteChainSelector).
+		Msg("Setting remote pool")
+	abiEncodedRemotePool, err := abihelpers.EncodeAddress(remotePool)
+	if err != nil {
+		return fmt.Errorf("error getting abiEncodedRemotePool %s : %w", remotePool.Hex(), err)
+	}
+	opts, err := pool.client.TransactionOpts(pool.client.GetDefaultWallet())
+	if err != nil {
+		return fmt.Errorf("failed to get transaction opts: %w", err)
+	}
+	tx, err := pool.PoolInterface.SetRemotePool(opts, remoteChainSelector, abiEncodedRemotePool)
+
+	if err != nil {
+		return fmt.Errorf("failed to set remote pool %s on token pool: %w", remotePool.Hex(), err)
+	}
+	log.Info().
+		Str("Token Pool", pool.Address()).
+		Str("Dest Pool", remotePool.Hex()).
+		Uint64("RemoteChain", remoteChainSelector).
+		Msg("Done setting remote pool")
+	return pool.client.ProcessTransaction(tx)
+}
+
 func (pool *TokenPool) SetRemoteChainOnPool(remoteChainSelectors []uint64) error {
 	log.Info().
 		Str("Token Pool", pool.Address()).
@@ -614,6 +643,58 @@ func (c *PriceRegistry) UpdatePrices(priceUpdates price_registry.InternalPriceUp
 	return c.client.ProcessTransaction(tx)
 }
 
+type TokenAdminRegistry struct {
+	client     blockchain.EVMClient
+	Instance   *token_admin_registry.TokenAdminRegistry
+	EthAddress common.Address
+}
+
+func (r *TokenAdminRegistry) Address() string {
+	return r.EthAddress.Hex()
+}
+
+func (r *TokenAdminRegistry) SetAdminAndRegisterPool(tokenAddr, poolAddr common.Address) error {
+	opts, err := r.client.TransactionOpts(r.client.GetDefaultWallet())
+	if err != nil {
+		return fmt.Errorf("error getting transaction opts: %w", err)
+	}
+	tx, err := r.Instance.RegisterAdministratorPermissioned(opts, tokenAddr, opts.From)
+	if err != nil {
+		return fmt.Errorf("error setting admin for token %s : %w", tokenAddr.Hex(), err)
+	}
+	err = r.client.ProcessTransaction(tx)
+	if err != nil {
+		return fmt.Errorf("error processing tx for setting admin on token %w", err)
+	}
+	log.Info().
+		Str("Admin", opts.From.Hex()).
+		Str("Token", tokenAddr.Hex()).
+		Str("TokenAdminRegistry", r.Address()).
+		Msg("Admin is set for token on TokenAdminRegistry")
+	err = r.client.WaitForEvents()
+	if err != nil {
+		return fmt.Errorf("error waiting for tx for setting admin on pool %w", err)
+	}
+	opts, err = r.client.TransactionOpts(r.client.GetDefaultWallet())
+	if err != nil {
+		return fmt.Errorf("error getting transaction opts: %w", err)
+	}
+	tx, err = r.Instance.SetPool(opts, tokenAddr, poolAddr)
+	if err != nil {
+		return fmt.Errorf("error setting token %s and pool %s : %w", tokenAddr.Hex(), poolAddr.Hex(), err)
+	}
+	log.Info().
+		Str("token", tokenAddr.Hex()).
+		Str("Pool", poolAddr.Hex()).
+		Str("TokenAdminRegistry", r.Address()).
+		Msg("token and pool are set on TokenAdminRegistry")
+	err = r.client.ProcessTransaction(tx)
+	if err != nil {
+		return fmt.Errorf("error processing tx for setting token %s and pool %s : %w", tokenAddr.Hex(), poolAddr.Hex(), err)
+	}
+	return nil
+}
+
 type Router struct {
 	client     blockchain.EVMClient
 	Instance   *router.Router
@@ -750,7 +831,7 @@ func (onRamp *OnRamp) SetTokenTransferFeeConfig(tokenTransferFeeConfig []evm_2_e
 	if err != nil {
 		return fmt.Errorf("failed to get transaction opts: %w", err)
 	}
-	tx, err := onRamp.Instance.SetTokenTransferFeeConfig(opts, tokenTransferFeeConfig)
+	tx, err := onRamp.Instance.SetTokenTransferFeeConfig(opts, tokenTransferFeeConfig, []common.Address{})
 	if err != nil {
 		return fmt.Errorf("failed to set token transfer fee config: %w", err)
 	}
@@ -759,23 +840,6 @@ func (onRamp *OnRamp) SetTokenTransferFeeConfig(tokenTransferFeeConfig []evm_2_e
 		Str("onRamp", onRamp.Address()).
 		Str(Network, onRamp.client.GetNetworkConfig().Name).
 		Msg("TokenTransferFeeConfig set in OnRamp")
-	return onRamp.client.ProcessTransaction(tx)
-}
-
-func (onRamp *OnRamp) ApplyPoolUpdates(poolUpdates []evm_2_evm_onramp.InternalPoolUpdate) error {
-	opts, err := onRamp.client.TransactionOpts(onRamp.client.GetDefaultWallet())
-	if err != nil {
-		return fmt.Errorf("failed to get transaction opts: %w", err)
-	}
-	tx, err := onRamp.Instance.ApplyPoolUpdates(opts, []evm_2_evm_onramp.InternalPoolUpdate{}, poolUpdates)
-	if err != nil {
-		return fmt.Errorf("failed to apply pool updates: %w", err)
-	}
-	log.Info().
-		Interface("poolUpdates", poolUpdates).
-		Str("onRamp", onRamp.Address()).
-		Str(Network, onRamp.client.GetNetworkConfig().Name).
-		Msg("poolUpdates set in OnRamp")
 	return onRamp.client.ProcessTransaction(tx)
 }
 
@@ -869,27 +933,28 @@ func (offRamp *OffRamp) SetOCR2Config(
 	return offRamp.client.ProcessTransaction(tx)
 }
 
-func (offRamp *OffRamp) SyncTokensAndPools(sourceTokens, pools []common.Address) error {
+func (offRamp *OffRamp) UpdateRateLimitTokens(sourceTokens, destTokens []common.Address) error {
 	opts, err := offRamp.client.TransactionOpts(offRamp.client.GetDefaultWallet())
 	if err != nil {
 		return fmt.Errorf("failed to get transaction opts: %w", err)
 	}
-	var tokenUpdates []evm_2_evm_offramp.InternalPoolUpdate
-	for i, srcToken := range sourceTokens {
-		tokenUpdates = append(tokenUpdates, evm_2_evm_offramp.InternalPoolUpdate{
-			Token: srcToken,
-			Pool:  pools[i],
-		})
+	rateLimitTokens := make([]evm_2_evm_offramp.EVM2EVMOffRampRateLimitToken, len(sourceTokens))
+	for i, sourceToken := range sourceTokens {
+		rateLimitTokens[i] = evm_2_evm_offramp.EVM2EVMOffRampRateLimitToken{
+			SourceToken: sourceToken,
+			DestToken:   destTokens[i],
+		}
 	}
-	tx, err := offRamp.Instance.ApplyPoolUpdates(opts, []evm_2_evm_offramp.InternalPoolUpdate{}, tokenUpdates)
+
+	tx, err := offRamp.Instance.UpdateRateLimitTokens(opts, []evm_2_evm_offramp.EVM2EVMOffRampRateLimitToken{}, rateLimitTokens)
 	if err != nil {
-		return fmt.Errorf("failed to apply pool updates: %w", err)
+		return fmt.Errorf("failed to apply rate limit tokens updates: %w", err)
 	}
 	log.Info().
-		Interface("tokenUpdates", tokenUpdates).
+		Interface("rateLimitToken adds", rateLimitTokens).
 		Str("offRamp", offRamp.Address()).
 		Str(Network, offRamp.client.GetNetworkConfig().Name).
-		Msg("tokenUpdates set in OffRamp")
+		Msg("rateLimitTokens set in OffRamp")
 	return offRamp.client.ProcessTransaction(tx)
 }
 
@@ -918,7 +983,7 @@ func (a *MockAggregator) UpdateRoundData(answer *big.Int) error {
 	round, err := a.Instance.LatestRound(nil)
 	if err != nil {
 		rand.Seed(uint64(time.Now().UnixNano()))
-		round = big.NewInt(rand.Int63n(2000))
+		round = big.NewInt(int64(rand.Uint64()))
 	}
 	round = new(big.Int).Add(round, big.NewInt(1))
 	tx, err := a.Instance.UpdateRoundData(opts, round, answer, big.NewInt(time.Now().UTC().UnixNano()), big.NewInt(time.Now().UTC().UnixNano()))

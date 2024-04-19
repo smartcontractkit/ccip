@@ -25,7 +25,7 @@ contract TokenPoolSetup is RouterSetup {
 }
 
 contract TokenPool_constructor is TokenPoolSetup {
-  function test_immutableFieldsSuccess() public {
+  function test_immutableFields_Success() public view {
     assertEq(address(s_token), address(s_tokenPool.getToken()));
     assertEq(address(s_mockARM), s_tokenPool.getArmProxy());
     assertEq(false, s_tokenPool.getAllowListEnabled());
@@ -33,10 +33,77 @@ contract TokenPool_constructor is TokenPoolSetup {
   }
 
   // Reverts
-  function testZeroAddressNotAllowedReverts() public {
+  function test_ZeroAddressNotAllowed_Revert() public {
     vm.expectRevert(TokenPool.ZeroAddressNotAllowed.selector);
 
     s_tokenPool = new TokenPoolHelper(IERC20(address(0)), new address[](0), address(s_mockARM), address(s_sourceRouter));
+  }
+}
+
+contract TokenPool_getRemotePool is TokenPoolSetup {
+  function test_getRemotePool_Success() public {
+    uint64 chainSelector = 123124;
+    address remotePool = makeAddr("remotePool");
+
+    // Zero indicates nothing is set
+    assertEq(0, s_tokenPool.getRemotePool(chainSelector).length);
+
+    TokenPool.ChainUpdate[] memory chainUpdates = new TokenPool.ChainUpdate[](1);
+    chainUpdates[0] = TokenPool.ChainUpdate({
+      remoteChainSelector: chainSelector,
+      remotePoolAddress: abi.encode(remotePool),
+      allowed: true,
+      outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
+      inboundRateLimiterConfig: getInboundRateLimiterConfig()
+    });
+    s_tokenPool.applyChainUpdates(chainUpdates);
+
+    assertEq(remotePool, abi.decode(s_tokenPool.getRemotePool(chainSelector), (address)));
+  }
+}
+
+contract TokenPool_setRemotePool is TokenPoolSetup {
+  event RemotePoolSet(uint64 indexed remoteChainSelector, bytes previousPoolAddress, bytes remotePoolAddress);
+
+  function test_setRemotePool_Success() public {
+    uint64 chainSelector = DEST_CHAIN_SELECTOR;
+    address initialPool = makeAddr("remotePool");
+    // The new pool is a non-evm pool, as it doesn't fit in the normal 160 bits
+    bytes memory newPool = abi.encode(type(uint256).max);
+
+    TokenPool.ChainUpdate[] memory chainUpdates = new TokenPool.ChainUpdate[](1);
+    chainUpdates[0] = TokenPool.ChainUpdate({
+      remoteChainSelector: chainSelector,
+      remotePoolAddress: abi.encode(initialPool),
+      allowed: true,
+      outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
+      inboundRateLimiterConfig: getInboundRateLimiterConfig()
+    });
+    s_tokenPool.applyChainUpdates(chainUpdates);
+
+    vm.expectEmit();
+    emit RemotePoolSet(chainSelector, abi.encode(initialPool), newPool);
+
+    s_tokenPool.setRemotePool(chainSelector, newPool);
+
+    assertEq(keccak256(newPool), keccak256(s_tokenPool.getRemotePool(chainSelector)));
+  }
+
+  // Reverts
+
+  function test_setRemotePool_NonExistentChain_Reverts() public {
+    uint64 chainSelector = 123124;
+    bytes memory remotePool = abi.encode(makeAddr("remotePool"));
+
+    vm.expectRevert(abi.encodeWithSelector(TokenPool.NonExistentChain.selector, chainSelector));
+    s_tokenPool.setRemotePool(chainSelector, remotePool);
+  }
+
+  function test_setRemotePool_OnlyOwner_Reverts() public {
+    vm.startPrank(STRANGER);
+
+    vm.expectRevert("Only callable by owner");
+    s_tokenPool.setRemotePool(123124, abi.encode(makeAddr("remotePool")));
   }
 }
 
@@ -46,7 +113,7 @@ contract TokenPool_applyChainUpdates is TokenPoolSetup {
   );
   event ChainRemoved(uint64 chainSelector);
 
-  function assertState(TokenPool.ChainUpdate[] memory chainUpdates) public {
+  function assertState(TokenPool.ChainUpdate[] memory chainUpdates) public view {
     uint64[] memory chainSelectors = s_tokenPool.getSupportedChains();
     for (uint256 i = 0; i < chainUpdates.length; i++) {
       assertEq(chainUpdates[i].remoteChainSelector, chainSelectors[i]);
@@ -67,7 +134,7 @@ contract TokenPool_applyChainUpdates is TokenPoolSetup {
     }
   }
 
-  function testSuccess() public {
+  function test_Success() public {
     RateLimiter.Config memory outboundRateLimit1 = RateLimiter.Config({isEnabled: true, capacity: 100e28, rate: 1e18});
     RateLimiter.Config memory inboundRateLimit1 = RateLimiter.Config({isEnabled: true, capacity: 100e29, rate: 1e19});
     RateLimiter.Config memory outboundRateLimit2 = RateLimiter.Config({isEnabled: true, capacity: 100e26, rate: 1e16});
@@ -75,12 +142,14 @@ contract TokenPool_applyChainUpdates is TokenPoolSetup {
     TokenPool.ChainUpdate[] memory chainUpdates = new TokenPool.ChainUpdate[](2);
     chainUpdates[0] = TokenPool.ChainUpdate({
       remoteChainSelector: 1,
+      remotePoolAddress: abi.encode(address(1)),
       allowed: true,
       outboundRateLimiterConfig: outboundRateLimit1,
       inboundRateLimiterConfig: inboundRateLimit1
     });
     chainUpdates[1] = TokenPool.ChainUpdate({
       remoteChainSelector: 2,
+      remotePoolAddress: abi.encode(address(1)),
       allowed: true,
       outboundRateLimiterConfig: outboundRateLimit2,
       inboundRateLimiterConfig: inboundRateLimit2
@@ -108,6 +177,7 @@ contract TokenPool_applyChainUpdates is TokenPoolSetup {
     uint64 strangerChainSelector = 120938;
     chainRemoves[0] = TokenPool.ChainUpdate({
       remoteChainSelector: strangerChainSelector,
+      remotePoolAddress: abi.encode(address(1)),
       allowed: false,
       outboundRateLimiterConfig: RateLimiter.Config({isEnabled: false, capacity: 0, rate: 0}),
       inboundRateLimiterConfig: RateLimiter.Config({isEnabled: false, capacity: 0, rate: 0})
@@ -139,18 +209,19 @@ contract TokenPool_applyChainUpdates is TokenPoolSetup {
 
   // Reverts
 
-  function testOnlyCallableByOwnerReverts() public {
+  function test_OnlyCallableByOwner_Revert() public {
     vm.startPrank(STRANGER);
     vm.expectRevert("Only callable by owner");
     s_tokenPool.applyChainUpdates(new TokenPool.ChainUpdate[](0));
   }
 
-  function testDisabledNonZeroRateLimitReverts() public {
+  function test_DisabledNonZeroRateLimit_Revert() public {
     RateLimiter.Config memory outboundRateLimit = RateLimiter.Config({isEnabled: true, capacity: 100e28, rate: 1e18});
     RateLimiter.Config memory inboundRateLimit = RateLimiter.Config({isEnabled: true, capacity: 100e22, rate: 1e12});
     TokenPool.ChainUpdate[] memory chainUpdates = new TokenPool.ChainUpdate[](1);
     chainUpdates[0] = TokenPool.ChainUpdate({
       remoteChainSelector: 1,
+      remotePoolAddress: abi.encode(address(1)),
       allowed: true,
       outboundRateLimiterConfig: outboundRateLimit,
       inboundRateLimiterConfig: inboundRateLimit
@@ -168,12 +239,13 @@ contract TokenPool_applyChainUpdates is TokenPoolSetup {
     s_tokenPool.applyChainUpdates(chainUpdates);
   }
 
-  function testNonExistentChainReverts() public {
+  function test_NonExistentChain_Revert() public {
     RateLimiter.Config memory outboundRateLimit = RateLimiter.Config({isEnabled: false, capacity: 0, rate: 0});
     RateLimiter.Config memory inboundRateLimit = RateLimiter.Config({isEnabled: false, capacity: 0, rate: 0});
     TokenPool.ChainUpdate[] memory chainUpdates = new TokenPool.ChainUpdate[](1);
     chainUpdates[0] = TokenPool.ChainUpdate({
       remoteChainSelector: 1,
+      remotePoolAddress: abi.encode(address(1)),
       allowed: false,
       outboundRateLimiterConfig: outboundRateLimit,
       inboundRateLimiterConfig: inboundRateLimit
@@ -183,10 +255,11 @@ contract TokenPool_applyChainUpdates is TokenPoolSetup {
     s_tokenPool.applyChainUpdates(chainUpdates);
   }
 
-  function testInvalidRatelimitRateReverts() public {
+  function test_InvalidRatelimitRate_Revert() public {
     TokenPool.ChainUpdate[] memory chainUpdates = new TokenPool.ChainUpdate[](1);
     chainUpdates[0] = TokenPool.ChainUpdate({
       remoteChainSelector: 1,
+      remotePoolAddress: abi.encode(address(1)),
       allowed: true,
       outboundRateLimiterConfig: RateLimiter.Config({isEnabled: true, capacity: 0, rate: 0}),
       inboundRateLimiterConfig: RateLimiter.Config({isEnabled: true, capacity: 100e22, rate: 1e12})
@@ -264,6 +337,7 @@ contract TokenPool_setChainRateLimiterConfig is TokenPoolSetup {
     s_remoteChainSelector = 123124;
     chainUpdates[0] = TokenPool.ChainUpdate({
       remoteChainSelector: s_remoteChainSelector,
+      remotePoolAddress: abi.encode(address(2)),
       allowed: true,
       outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
       inboundRateLimiterConfig: getInboundRateLimiterConfig()
@@ -271,7 +345,7 @@ contract TokenPool_setChainRateLimiterConfig is TokenPoolSetup {
     s_tokenPool.applyChainUpdates(chainUpdates);
   }
 
-  function testFuzz_SetChainRateLimiterConfigSuccess(uint128 capacity, uint128 rate, uint32 newTime) public {
+  function test_Fuzz_SetChainRateLimiterConfig_Success(uint128 capacity, uint128 rate, uint32 newTime) public {
     // Cap the lower bound to 4 so 4/2 is still >= 2
     vm.assume(capacity >= 4);
     // Cap the lower bound to 2 so 2/2 is still >= 1
@@ -315,7 +389,7 @@ contract TokenPool_setChainRateLimiterConfig is TokenPoolSetup {
 
   // Reverts
 
-  function testOnlyOwnerReverts() public {
+  function test_OnlyOwner_Revert() public {
     vm.startPrank(STRANGER);
 
     vm.expectRevert("Only callable by owner");
@@ -324,7 +398,7 @@ contract TokenPool_setChainRateLimiterConfig is TokenPoolSetup {
     );
   }
 
-  function testNonExistentChainReverts() public {
+  function test_NonExistentChain_Revert() public {
     uint64 wrongChainSelector = 9084102894;
 
     vm.expectRevert(abi.encodeWithSelector(TokenPool.NonExistentChain.selector, wrongChainSelector));
@@ -335,13 +409,14 @@ contract TokenPool_setChainRateLimiterConfig is TokenPoolSetup {
 }
 
 contract TokenPool_onlyOnRamp is TokenPoolSetup {
-  function test_onlyOnRampSuccess() public {
+  function test_onlyOnRamp_Success() public {
     uint64 chainSelector = 13377;
     address onRamp = makeAddr("onRamp");
 
     TokenPool.ChainUpdate[] memory chainUpdate = new TokenPool.ChainUpdate[](1);
     chainUpdate[0] = TokenPool.ChainUpdate({
       remoteChainSelector: chainSelector,
+      remotePoolAddress: abi.encode(address(1)),
       allowed: true,
       outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
       inboundRateLimiterConfig: getInboundRateLimiterConfig()
@@ -357,7 +432,7 @@ contract TokenPool_onlyOnRamp is TokenPoolSetup {
     s_tokenPool.onlyOnRampModifier(chainSelector);
   }
 
-  function test_ChainNotAllowedReverts() public {
+  function test_ChainNotAllowed_Revert() public {
     uint64 chainSelector = 13377;
     address onRamp = makeAddr("onRamp");
 
@@ -371,6 +446,7 @@ contract TokenPool_onlyOnRamp is TokenPoolSetup {
     TokenPool.ChainUpdate[] memory chainUpdate = new TokenPool.ChainUpdate[](1);
     chainUpdate[0] = TokenPool.ChainUpdate({
       remoteChainSelector: chainSelector,
+      remotePoolAddress: abi.encode(address(1)),
       allowed: true,
       outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
       inboundRateLimiterConfig: getInboundRateLimiterConfig()
@@ -387,6 +463,7 @@ contract TokenPool_onlyOnRamp is TokenPoolSetup {
 
     chainUpdate[0] = TokenPool.ChainUpdate({
       remoteChainSelector: chainSelector,
+      remotePoolAddress: abi.encode(address(1)),
       allowed: false,
       outboundRateLimiterConfig: RateLimiter.Config({isEnabled: false, capacity: 0, rate: 0}),
       inboundRateLimiterConfig: RateLimiter.Config({isEnabled: false, capacity: 0, rate: 0})
@@ -401,13 +478,14 @@ contract TokenPool_onlyOnRamp is TokenPoolSetup {
     s_tokenPool.onlyOffRampModifier(chainSelector);
   }
 
-  function test_CallerIsNotARampOnRouterReverts() public {
+  function test_CallerIsNotARampOnRouter_Revert() public {
     uint64 chainSelector = 13377;
     address onRamp = makeAddr("onRamp");
 
     TokenPool.ChainUpdate[] memory chainUpdate = new TokenPool.ChainUpdate[](1);
     chainUpdate[0] = TokenPool.ChainUpdate({
       remoteChainSelector: chainSelector,
+      remotePoolAddress: abi.encode(address(1)),
       allowed: true,
       outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
       inboundRateLimiterConfig: getInboundRateLimiterConfig()
@@ -423,13 +501,14 @@ contract TokenPool_onlyOnRamp is TokenPoolSetup {
 }
 
 contract TokenPool_onlyOffRamp is TokenPoolSetup {
-  function test_onlyOffRampSuccess() public {
+  function test_onlyOffRamp_Success() public {
     uint64 chainSelector = 13377;
     address offRamp = makeAddr("onRamp");
 
     TokenPool.ChainUpdate[] memory chainUpdate = new TokenPool.ChainUpdate[](1);
     chainUpdate[0] = TokenPool.ChainUpdate({
       remoteChainSelector: chainSelector,
+      remotePoolAddress: abi.encode(address(1)),
       allowed: true,
       outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
       inboundRateLimiterConfig: getInboundRateLimiterConfig()
@@ -445,7 +524,7 @@ contract TokenPool_onlyOffRamp is TokenPoolSetup {
     s_tokenPool.onlyOffRampModifier(chainSelector);
   }
 
-  function test_ChainNotAllowedReverts() public {
+  function test_ChainNotAllowed_Revert() public {
     uint64 chainSelector = 13377;
     address offRamp = makeAddr("onRamp");
 
@@ -459,6 +538,7 @@ contract TokenPool_onlyOffRamp is TokenPoolSetup {
     TokenPool.ChainUpdate[] memory chainUpdate = new TokenPool.ChainUpdate[](1);
     chainUpdate[0] = TokenPool.ChainUpdate({
       remoteChainSelector: chainSelector,
+      remotePoolAddress: abi.encode(address(1)),
       allowed: true,
       outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
       inboundRateLimiterConfig: getInboundRateLimiterConfig()
@@ -475,6 +555,7 @@ contract TokenPool_onlyOffRamp is TokenPoolSetup {
 
     chainUpdate[0] = TokenPool.ChainUpdate({
       remoteChainSelector: chainSelector,
+      remotePoolAddress: abi.encode(address(1)),
       allowed: false,
       outboundRateLimiterConfig: RateLimiter.Config({isEnabled: false, capacity: 0, rate: 0}),
       inboundRateLimiterConfig: RateLimiter.Config({isEnabled: false, capacity: 0, rate: 0})
@@ -489,13 +570,14 @@ contract TokenPool_onlyOffRamp is TokenPoolSetup {
     s_tokenPool.onlyOffRampModifier(chainSelector);
   }
 
-  function test_CallerIsNotARampOnRouterReverts() public {
+  function test_CallerIsNotARampOnRouter_Revert() public {
     uint64 chainSelector = 13377;
     address offRamp = makeAddr("offRamp");
 
     TokenPool.ChainUpdate[] memory chainUpdate = new TokenPool.ChainUpdate[](1);
     chainUpdate[0] = TokenPool.ChainUpdate({
       remoteChainSelector: chainSelector,
+      remotePoolAddress: abi.encode(address(1)),
       allowed: true,
       outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
       inboundRateLimiterConfig: getInboundRateLimiterConfig()
@@ -523,9 +605,8 @@ contract TokenPoolWithAllowListSetup is TokenPoolSetup {
   }
 }
 
-/// @notice #getAllowListEnabled
 contract TokenPoolWithAllowList_getAllowListEnabled is TokenPoolWithAllowListSetup {
-  function testGetAllowListEnabledSuccess() public {
+  function test_GetAllowListEnabled_Success() public view {
     assertTrue(s_tokenPool.getAllowListEnabled());
   }
 }
@@ -533,7 +614,7 @@ contract TokenPoolWithAllowList_getAllowListEnabled is TokenPoolWithAllowListSet
 contract TokenPoolWithAllowList_setRouter is TokenPoolWithAllowListSetup {
   event RouterUpdated(address oldRouter, address newRouter);
 
-  function testSetRouterSuccess() public {
+  function test_SetRouter_Success() public {
     assertEq(address(s_sourceRouter), s_tokenPool.getRouter());
 
     address newRouter = makeAddr("newRouter");
@@ -547,9 +628,8 @@ contract TokenPoolWithAllowList_setRouter is TokenPoolWithAllowListSetup {
   }
 }
 
-/// @notice #getAllowList
 contract TokenPoolWithAllowList_getAllowList is TokenPoolWithAllowListSetup {
-  function testGetAllowListSuccess() public {
+  function test_GetAllowList_Success() public view {
     address[] memory setAddresses = s_tokenPool.getAllowList();
     assertEq(2, setAddresses.length);
     assertEq(s_allowedSenders[0], setAddresses[0]);
@@ -557,12 +637,11 @@ contract TokenPoolWithAllowList_getAllowList is TokenPoolWithAllowListSetup {
   }
 }
 
-/// @notice #setAllowList
 contract TokenPoolWithAllowList_applyAllowListUpdates is TokenPoolWithAllowListSetup {
   event AllowListAdd(address sender);
   event AllowListRemove(address sender);
 
-  function testSetAllowListSuccess() public {
+  function test_SetAllowList_Success() public {
     address[] memory newAddresses = new address[](2);
     newAddresses[0] = address(1);
     newAddresses[1] = address(2);
@@ -614,7 +693,7 @@ contract TokenPoolWithAllowList_applyAllowListUpdates is TokenPoolWithAllowListS
     assertEq(0, setAddresses.length);
   }
 
-  function testSetAllowListSkipsZeroSuccess() public {
+  function test_SetAllowListSkipsZero_Success() public {
     uint256 setAddressesLength = s_tokenPool.getAllowList().length;
 
     address[] memory newAddresses = new address[](1);
@@ -628,14 +707,14 @@ contract TokenPoolWithAllowList_applyAllowListUpdates is TokenPoolWithAllowListS
 
   // Reverts
 
-  function testOnlyOwnerReverts() public {
+  function test_OnlyOwner_Revert() public {
     vm.stopPrank();
     vm.expectRevert("Only callable by owner");
     address[] memory newAddresses = new address[](2);
     s_tokenPool.applyAllowListUpdates(new address[](0), newAddresses);
   }
 
-  function test_AllowListNotEnabledReverts() public {
+  function test_AllowListNotEnabled_Revert() public {
     s_tokenPool = new TokenPoolHelper(s_token, new address[](0), address(s_mockARM), address(s_sourceRouter));
 
     vm.expectRevert(TokenPool.AllowListNotEnabled.selector);

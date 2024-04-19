@@ -1,4 +1,6 @@
-# Chainlink cluster
+# Chainlink cluster (Depracated)
+
+**This copy of the chart is deprecated, it will be replaced with the dependency reference to the chart defined in the chainlink repo** 
 
 Example CL nodes cluster for system level tests
 

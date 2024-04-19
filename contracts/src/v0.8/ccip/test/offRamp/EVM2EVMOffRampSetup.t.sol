@@ -13,6 +13,7 @@ import {LockReleaseTokenPool} from "../../pools/LockReleaseTokenPool.sol";
 import {TokenPool} from "../../pools/TokenPool.sol";
 import {TokenSetup} from "../TokenSetup.t.sol";
 import {EVM2EVMOffRampHelper} from "../helpers/EVM2EVMOffRampHelper.sol";
+import {MaybeRevertingBurnMintTokenPool} from "../helpers/MaybeRevertingBurnMintTokenPool.sol";
 import {MaybeRevertMessageReceiver} from "../helpers/receivers/MaybeRevertMessageReceiver.sol";
 import {MockCommitStore} from "../mocks/MockCommitStore.sol";
 import {OCR2BaseSetup} from "../ocr/OCR2Base.t.sol";
@@ -26,7 +27,10 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSetup {
   IAny2EVMMessageReceiver internal s_secondary_receiver;
   MaybeRevertMessageReceiver internal s_reverting_receiver;
 
+  MaybeRevertingBurnMintTokenPool internal s_maybeRevertingPool;
+
   EVM2EVMOffRampHelper internal s_offRamp;
+  address internal s_sourceTokenPool = makeAddr("sourceTokenPool");
 
   event ExecutionStateChanged(
     uint64 indexed sequenceNumber, bytes32 indexed messageId, Internal.MessageExecutionState state, bytes returnData
@@ -43,18 +47,9 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSetup {
     s_secondary_receiver = new MaybeRevertMessageReceiver(false);
     s_reverting_receiver = new MaybeRevertMessageReceiver(true);
 
+    s_maybeRevertingPool = MaybeRevertingBurnMintTokenPool(s_destPoolByToken[s_destTokens[1]]);
+
     deployOffRamp(s_mockCommitStore, s_destRouter, address(0));
-
-    TokenPool.ChainUpdate[] memory offRamps = new TokenPool.ChainUpdate[](1);
-    offRamps[0] = TokenPool.ChainUpdate({
-      remoteChainSelector: SOURCE_CHAIN_SELECTOR,
-      allowed: true,
-      outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
-      inboundRateLimiterConfig: getInboundRateLimiterConfig()
-    });
-
-    LockReleaseTokenPool(address(s_destPools[0])).applyChainUpdates(offRamps);
-    LockReleaseTokenPool(address(s_destPools[1])).applyChainUpdates(offRamps);
   }
 
   function deployOffRamp(ICommitStore commitStore, Router router, address prevOffRamp) internal {
@@ -67,8 +62,6 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSetup {
         prevOffRamp: prevOffRamp,
         armProxy: address(s_mockARM)
       }),
-      getCastedSourceTokens(),
-      getCastedDestinationPools(),
       getInboundRateLimiterConfig()
     );
     s_offRamp.setOCR2Config(
@@ -85,6 +78,11 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSetup {
     offRampUpdates[0] = Router.OffRamp({sourceChainSelector: SOURCE_CHAIN_SELECTOR, offRamp: address(s_offRamp)});
     offRampUpdates[1] = Router.OffRamp({sourceChainSelector: SOURCE_CHAIN_SELECTOR, offRamp: address(prevOffRamp)});
     s_destRouter.applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), offRampUpdates);
+    EVM2EVMOffRamp.RateLimitToken[] memory tokensToAdd = new EVM2EVMOffRamp.RateLimitToken[](s_sourceTokens.length);
+    for (uint256 i = 0; i < s_sourceTokens.length; ++i) {
+      tokensToAdd[i] = EVM2EVMOffRamp.RateLimitToken({sourceToken: s_sourceTokens[i], destToken: s_destTokens[i]});
+    }
+    s_offRamp.updateRateLimitTokens(new EVM2EVMOffRamp.RateLimitToken[](0), tokensToAdd);
   }
 
   function _convertToGeneralMessage(Internal.EVM2EVMMessage memory original)
@@ -96,7 +94,10 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSetup {
     Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](numberOfTokens);
 
     for (uint256 i = 0; i < numberOfTokens; ++i) {
-      IPool pool = s_offRamp.getPoolBySourceToken(IERC20(original.tokenAmounts[i].token));
+      IPool.SourceTokenData memory sourceTokenData = abi.decode(original.sourceTokenData[i], (IPool.SourceTokenData));
+
+      address destPoolAddress = abi.decode(sourceTokenData.destPoolAddress, (address));
+      IPool pool = IPool(destPoolAddress);
       destTokenAmounts[i].token = address(pool.getToken());
       destTokenAmounts[i].amount = original.tokenAmounts[i].amount;
     }
@@ -149,6 +150,18 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSetup {
       feeTokenAmount: uint256(0),
       messageId: ""
     });
+
+    // Correctly set the TokenDataPayload for each token. Tokens have to be set up in the TokenSetup.
+    for (uint256 i = 0; i < tokenAmounts.length; ++i) {
+      message.sourceTokenData[i] = abi.encode(
+        IPool.SourceTokenData({
+          sourcePoolAddress: abi.encode(s_sourcePoolByToken[tokenAmounts[i].token]),
+          destPoolAddress: abi.encode(s_destPoolBySourceToken[tokenAmounts[i].token]),
+          extraData: ""
+        })
+      );
+    }
+
     message.messageId = Internal._hash(
       message,
       keccak256(
@@ -172,6 +185,7 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSetup {
     tokenAmounts[1].amount = 5e18;
     messages[0] = _generateAny2EVMMessage(1, tokenAmounts);
     messages[1] = _generateAny2EVMMessage(2, tokenAmounts);
+
     return messages;
   }
 
@@ -207,12 +221,30 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSetup {
     return gasLimits;
   }
 
-  function _assertSameConfig(EVM2EVMOffRamp.DynamicConfig memory a, EVM2EVMOffRamp.DynamicConfig memory b) public {
+  function _assertSameConfig(EVM2EVMOffRamp.DynamicConfig memory a, EVM2EVMOffRamp.DynamicConfig memory b) public pure {
     assertEq(a.permissionLessExecutionThresholdSeconds, b.permissionLessExecutionThresholdSeconds);
     assertEq(a.router, b.router);
     assertEq(a.priceRegistry, b.priceRegistry);
     assertEq(a.maxNumberOfTokensPerMsg, b.maxNumberOfTokensPerMsg);
     assertEq(a.maxDataBytes, b.maxDataBytes);
     assertEq(a.maxPoolReleaseOrMintGas, b.maxPoolReleaseOrMintGas);
+  }
+
+  function _getDefaultSourceTokenData(Client.EVMTokenAmount[] memory srcTokenAmounts)
+    internal
+    view
+    returns (bytes[] memory)
+  {
+    bytes[] memory sourceTokenData = new bytes[](srcTokenAmounts.length);
+    for (uint256 i = 0; i < srcTokenAmounts.length; ++i) {
+      sourceTokenData[i] = abi.encode(
+        IPool.SourceTokenData({
+          sourcePoolAddress: abi.encode(s_sourcePoolByToken[srcTokenAmounts[i].token]),
+          destPoolAddress: abi.encode(s_destPoolBySourceToken[srcTokenAmounts[i].token]),
+          extraData: ""
+        })
+      );
+    }
+    return sourceTokenData;
   }
 }

@@ -1,4 +1,4 @@
-{{- if $.Values.ccip.ccipScriptsDeployment.enabled }}
+{{- if $.Values.ccipScriptsDeployment.enabled }}
 apiVersion: v1
 kind: ConfigMap
 metadata:

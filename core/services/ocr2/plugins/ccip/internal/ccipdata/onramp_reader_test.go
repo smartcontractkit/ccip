@@ -344,6 +344,9 @@ func setupOnRampV1_5_0(t *testing.T, user *bind.TransactOpts, bc *client.Simulat
 		PriceRegistry:                     utils.RandomAddress(),
 		MaxDataBytes:                      0,
 		MaxPerMsgGasLimit:                 0,
+		DefaultTokenFeeUSDCents:           50,
+		DefaultTokenDestGasOverhead:       34_000,
+		DefaultTokenDestBytesOverhead:     500,
 	}
 	rateLimiterConfig := evm_2_evm_onramp.RateLimiterConfig{
 		IsEnabled: false,
@@ -361,12 +364,13 @@ func setupOnRampV1_5_0(t *testing.T, user *bind.TransactOpts, bc *client.Simulat
 	}
 	tokenTransferConfigArgs := []evm_2_evm_onramp.EVM2EVMOnRampTokenTransferFeeConfigArgs{
 		{
-			Token:             linkTokenAddress,
-			MinFeeUSDCents:    0,
-			MaxFeeUSDCents:    0,
-			DeciBps:           0,
-			DestGasOverhead:   0,
-			DestBytesOverhead: 0,
+			Token:                     linkTokenAddress,
+			MinFeeUSDCents:            0,
+			MaxFeeUSDCents:            0,
+			DeciBps:                   0,
+			DestGasOverhead:           0,
+			DestBytesOverhead:         0,
+			AggregateRateLimitEnabled: true,
 		},
 	}
 	nopsAndWeights := []evm_2_evm_onramp.EVM2EVMOnRampNopAndWeight{
@@ -375,13 +379,11 @@ func setupOnRampV1_5_0(t *testing.T, user *bind.TransactOpts, bc *client.Simulat
 			Weight: 1,
 		},
 	}
-	var tokenAndPool []evm_2_evm_onramp.InternalPoolUpdate
 	onRampAddress, transaction, _, err := evm_2_evm_onramp.DeployEVM2EVMOnRamp(
 		user,
 		bc,
 		staticConfig,
 		dynamicConfig,
-		tokenAndPool,
 		rateLimiterConfig,
 		feeTokenConfigs,
 		tokenTransferConfigArgs,

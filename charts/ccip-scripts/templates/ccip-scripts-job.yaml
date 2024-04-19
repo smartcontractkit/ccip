@@ -1,4 +1,4 @@
-{{- if $.Values.ccip.ccipScriptsDeployment.enabled }}
+{{- if $.Values.ccipScriptsDeployment.enabled }}
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -21,12 +21,12 @@ spec:
         "helm.sh/chart": "{{ .Chart.Name }}-{{ .Chart.Version }}"
       annotations:
         "prometheus.io/scrape": 'true'
-        "eks.amazonaws.com/role-arn": {{$.Values.ccip.ccipScriptsDeployment.oidcRoleARN}}
+        "eks.amazonaws.com/role-arn": {{$.Values.ccipScriptsDeployment.oidcRoleARN}}
     spec:
       serviceAccountName: ccip-scripts-deployer
       initContainers:
         - name: wait-for-nodes
-          image: {{.Values.ccip.ccipScriptsDeployment.image}}
+          image: {{.Values.ccipScriptsDeployment.image}}
           volumeMounts:
             - name: scripts-volume
               mountPath: /scripts
@@ -45,11 +45,11 @@ spec:
             {{- end }}
       containers:
         - name: ccip-scripts
-          image: {{.Values.ccip.ccipScriptsDeployment.image}}
+          image: {{.Values.ccipScriptsDeployment.image}}
           env:
             - name: CONFIG_JSON_PATH
               value: /data/config.json
-          command: [ "./run.sh", "{{.Values.ccip.ccipScriptsDeployment.outputBucketName}}", "{{.Release.Namespace}}" ]
+          command: [ "./run.sh", "{{.Values.ccipScriptsDeployment.outputBucketName}}", "{{.Release.Namespace}}" ]
           volumeMounts:
             - name: config-volume
               mountPath: /data
