@@ -77,3 +77,5 @@ chainlink:
     - name: node-6
 geth:
   wsRpcPort: 8546
+networkPolicies:
+  enabled: true
