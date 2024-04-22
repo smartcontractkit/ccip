@@ -109,7 +109,7 @@ deployments:
         chainlink-cluster:
           chainlink:
             global:
-              overridesToml: |
+              overridesToml: |-
                 [Feature]
                 LogPoller = true
                 CCIP = true

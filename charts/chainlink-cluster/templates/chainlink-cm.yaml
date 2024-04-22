@@ -16,9 +16,11 @@ data:
     CREATE
     EXTENSION pg_stat_statements;
   default.toml: |
-  {{ if (hasKey $cfg "toml") }}
+  {{- if (hasKey $cfg "toml") }}
     {{ $cfg.toml | nindent 4 }}
-  {{ else }}
+  {{- else if (hasKey $.Values.chainlink.global "toml") }}
+  {{- $.Values.chainlink.global.toml | nindent 4 }}
+  {{- else }}
     RootDir = './clroot'
     [Log]
     JSONConsole = true
@@ -57,7 +59,7 @@ data:
     {{- end }}
     [WebServer.TLS]
     HTTPSPort = 0
-    {{ end }}
+    {{- end }}
   overrides.toml: |-
   {{- if (hasKey $cfg "overridesToml") }}
   {{- $cfg.overridesToml | nindent 4 }}
