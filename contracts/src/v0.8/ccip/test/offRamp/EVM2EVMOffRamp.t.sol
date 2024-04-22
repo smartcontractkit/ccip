@@ -2,7 +2,7 @@
 pragma solidity 0.8.19;
 
 import {ICommitStore} from "../../interfaces/ICommitStore.sol";
-import {IPool} from "../../interfaces/pools/IPool.sol";
+import {IPool} from "../../interfaces/IPool.sol";
 
 import {CallWithExactGas} from "../../../shared/call/CallWithExactGas.sol";
 

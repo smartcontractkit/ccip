@@ -5,10 +5,10 @@ import {ITypeAndVersion} from "../../shared/interfaces/ITypeAndVersion.sol";
 import {IARM} from "../interfaces/IARM.sol";
 import {IEVM2AnyOnRamp} from "../interfaces/IEVM2AnyOnRamp.sol";
 import {IEVM2AnyOnRampClient} from "../interfaces/IEVM2AnyOnRampClient.sol";
+import {IPool} from "../interfaces/IPool.sol";
 import {IPriceRegistry} from "../interfaces/IPriceRegistry.sol";
 import {ITokenAdminRegistry} from "../interfaces/ITokenAdminRegistry.sol";
 import {ILinkAvailable} from "../interfaces/automation/ILinkAvailable.sol";
-import {IPool} from "../interfaces/pools/IPool.sol";
 
 import {AggregateRateLimiter} from "../AggregateRateLimiter.sol";
 import {Client} from "../libraries/Client.sol";

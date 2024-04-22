@@ -6,9 +6,9 @@ import {IARM} from "../interfaces/IARM.sol";
 import {IAny2EVMMessageReceiver} from "../interfaces/IAny2EVMMessageReceiver.sol";
 import {IAny2EVMOffRamp} from "../interfaces/IAny2EVMOffRamp.sol";
 import {ICommitStore} from "../interfaces/ICommitStore.sol";
+import {IPool} from "../interfaces/IPool.sol";
 import {IPriceRegistry} from "../interfaces/IPriceRegistry.sol";
 import {IRouter} from "../interfaces/IRouter.sol";
-import {IPool} from "../interfaces/pools/IPool.sol";
 
 import {CallWithExactGas} from "../../shared/call/CallWithExactGas.sol";
 import {EnumerableMapAddresses} from "../../shared/enumerable/EnumerableMapAddresses.sol";
