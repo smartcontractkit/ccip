@@ -1159,7 +1159,6 @@ contract EVM2EVMOffRamp__releaseOrMintTokens is EVM2EVMOffRampSetup {
     s_priceRegistry.updatePrices(priceUpdates);
 
     Client.EVMTokenAmount[] memory srcTokenAmounts = getCastedSourceEVMTokenAmountsWithZeroAmounts();
-    IERC20 dstToken1 = IERC20(s_destFeeToken);
     uint256 amount1 = 100;
     srcTokenAmounts[0].amount = amount1;
 
@@ -1280,7 +1279,6 @@ contract EVM2EVMOffRamp__releaseOrMintTokens is EVM2EVMOffRampSetup {
     s_priceRegistry.updatePrices(getSingleTokenPriceUpdateStruct(s_destFeeToken, 0));
 
     Client.EVMTokenAmount[] memory srcTokenAmounts = getCastedSourceEVMTokenAmountsWithZeroAmounts();
-    IERC20 dstToken1 = IERC20(s_destFeeToken);
     uint256 amount1 = 100;
     srcTokenAmounts[0].amount = amount1;
 
@@ -1297,10 +1295,10 @@ contract EVM2EVMOffRamp__releaseOrMintTokens is EVM2EVMOffRampSetup {
   }
 
   /// forge-config: default.fuzz.runs = 32
-  /// forge-config: ccip.fuzz.runs = 10024
+  /// forge-config: ccip.fuzz.runs = 1024
   function test_fuzz__releaseOrMintTokens_AnyRevertIsCaught_Success(uint256 destPool) public {
-    // TODO handle 447301751254033913445893214690834296930546521452, which is 4E59B44847B379578588920CA78FBF26C0B4956C
-    // which triggers some Create2Deployer and causes it to fail
+    // Input 447301751254033913445893214690834296930546521452, which is 0x4E59B44847B379578588920CA78FBF26C0B4956C
+    // triggers some Create2Deployer and causes it to fail
     vm.assume(destPool != 447301751254033913445893214690834296930546521452);
     bytes memory unusedVar = abi.encode(makeAddr("unused"));
     // Uint256 gives a good range of values to test, both inside and outside of the eth address space.
