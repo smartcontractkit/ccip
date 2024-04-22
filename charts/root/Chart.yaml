@@ -24,7 +24,7 @@ version: 0.1.1
 appVersion: "0.1.0"
 dependencies:
   - name: chainlink-cluster
-    version: 0.4.1
+    version: 0.4.2
     repository: "file://../chainlink-cluster"
   - name: ccip-scripts
     version: 0.1.0
