@@ -213,3 +213,27 @@ contract TokenAdminRegistry_registerAdministrator is TokenAdminRegistrySetup {
     s_tokenAdminRegistry.registerAdministrator(newToken, OWNER);
   }
 }
+
+contract TokenAdminRegistry_addRegistryModule is TokenAdminRegistrySetup {
+  function test_addRegistryModule_Success() public {
+    address newModule = makeAddr("newModule");
+
+    s_tokenAdminRegistry.addRegistryModule(newModule);
+
+    assertTrue(s_tokenAdminRegistry.isRegistryModule(newModule));
+
+    // Assert the event is not emitted if the module is already added.
+    vm.recordLogs();
+    s_tokenAdminRegistry.addRegistryModule(newModule);
+
+    vm.assertEq(vm.getRecordedLogs().length, 0);
+  }
+
+  function test_addRegistryModule_OnlyOwner_Revert() public {
+    address newModule = makeAddr("newModule");
+    vm.stopPrank();
+
+    vm.expectRevert("Only callable by owner");
+    s_tokenAdminRegistry.addRegistryModule(newModule);
+  }
+}

@@ -1,15 +1,14 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.19;
 
+import {ITypeAndVersion} from "../../shared/interfaces/ITypeAndVersion.sol";
 import {ITokenAdminRegistry} from "../interfaces/ITokenAdminRegistry.sol";
 
 import {OwnerIsCreator} from "../../shared/access/OwnerIsCreator.sol";
 
 import {EnumerableSet} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/structs/EnumerableSet.sol";
 
-// This contract has minimal functionality and minimal test coverage. It will be
-// improved upon in future tickets.
-contract TokenAdminRegistry is ITokenAdminRegistry, OwnerIsCreator {
+contract TokenAdminRegistry is ITokenAdminRegistry, ITypeAndVersion, OwnerIsCreator {
   using EnumerableSet for EnumerableSet.AddressSet;
 
   error OnlyRegistryModule(address sender);
@@ -22,20 +21,29 @@ contract TokenAdminRegistry is ITokenAdminRegistry, OwnerIsCreator {
   event PoolSet(address indexed token, address indexed previousPool, address indexed newPool);
   event AdministratorTransferRequested(address indexed token, address indexed currentAdmin, address indexed newAdmin);
   event AdministratorTransferred(address indexed token, address indexed newAdmin);
+  event RegistryModuleAdded(address indexed module);
 
+  // The struct is packed in a way that optimizes the attributes that are accessed together.
+  // solhint-disable-next-line gas-struct-packing
   struct TokenConfig {
-    address pendingAdministrator; //            the address that is pending to become the new owner
-    address administrator; // ────────────────╮ the current administrator of the token
-    bool isPermissionedAdmin; //              │ if true, this administrator has been configured by the CCIP owner
+    bool isPermissionedAdmin; // ─────────────╮ if true, this administrator has been configured by the CCIP owner
     //                                        │ and it could have elevated permissions.
     bool allowPermissionlessReRegistration; //│ if true, the token can be re-registered without the administrator's signature
-    bool isRegistered; // ────────────────────╯ if true, the token is registered in the registry
+    bool isRegistered; //                     │ if true, the token is registered in the registry
+    address administrator; // ────────────────╯ the current administrator of the token
+    address pendingAdministrator; //            the address that is pending to become the new owner
     address tokenPool; // the token pool for this token. Can be address(0) if not deployed or not configured.
   }
 
+  string public constant override typeAndVersion = "TokenAdminRegistry 1.5.0-dev";
+
+  // Mapping of token address to token configuration
   mapping(address token => TokenConfig) internal s_tokenConfig;
+
+  // All tokens that have been configured
   EnumerableSet.AddressSet internal s_tokens;
 
+  // Registry modules are allowed to register administrators for tokens
   EnumerableSet.AddressSet internal s_RegistryModules;
 
   /// @notice Returns all pools for the given tokens.
@@ -126,7 +134,7 @@ contract TokenAdminRegistry is ITokenAdminRegistry, OwnerIsCreator {
   /// @dev Can only be called by a registry module.
   function registerAdministrator(address localToken, address administrator) external {
     // Only allow permissioned registry modules to register administrators
-    if (!s_RegistryModules.contains(msg.sender)) {
+    if (!isRegistryModule(msg.sender)) {
       revert OnlyRegistryModule(msg.sender);
     }
     TokenConfig storage config = s_tokenConfig[localToken];
@@ -147,6 +155,9 @@ contract TokenAdminRegistry is ITokenAdminRegistry, OwnerIsCreator {
 
   /// @notice Registers a local administrator for a token. This will overwrite any potential current administrator
   /// and set the permissionedAdmin to true.
+  /// @param localToken The token to register the administrator for.
+  /// @param administrator The address of the new administrator.
+  /// @dev Can only be called by the owner.
   function registerAdministratorPermissioned(address localToken, address administrator) external onlyOwner {
     TokenConfig storage config = s_tokenConfig[localToken];
 
@@ -163,10 +174,34 @@ contract TokenAdminRegistry is ITokenAdminRegistry, OwnerIsCreator {
   // │                      Registry Modules                        │
   // ================================================================
 
-  function addRegistryModule(address module) external onlyOwner {
-    s_RegistryModules.add(module);
+  /// @notice Checks if an address is a registry module.
+  /// @param module The address to check.
+  /// @return True if the address is a registry module, false otherwise.
+  function isRegistryModule(address module) public view returns (bool) {
+    return s_RegistryModules.contains(module);
   }
 
+  /// @notice Adds a new registry module to the list of allowed modules.
+  /// @param module The module to add.
+  function addRegistryModule(address module) external onlyOwner {
+    if (s_RegistryModules.add(module)) {
+      emit RegistryModuleAdded(module);
+    }
+  }
+
+  /// @notice Removes a registry module from the list of allowed modules.
+  /// @param module The module to remove.
+  function removeRegistryModule(address module) external onlyOwner {
+    if (s_RegistryModules.remove(module)) {
+      emit RegistryModuleAdded(module);
+    }
+  }
+
+  // ================================================================
+  // │                           Access                             │
+  // ================================================================
+
+  /// @notice Checks if an address is the administrator of the given token.
   modifier onlyTokenAdmin(address token) {
     if (s_tokenConfig[token].administrator != msg.sender) {
       revert OnlyAdministrator(msg.sender, token);
