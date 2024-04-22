@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.19;
 
+import {ITypeAndVersion} from "../../../shared/interfaces/ITypeAndVersion.sol";
 import {IGetCCIPAdmin} from "./IGetCCIPAdmin.sol";
 import {IOwner} from "./IOwner.sol";
 
 import {OwnerIsCreator} from "../../../shared/access/OwnerIsCreator.sol";
 import {TokenAdminRegistry} from "../TokenAdminRegistry.sol";
 
-contract AdminRegistryModuleOwnerCustom is OwnerIsCreator {
+contract AdminRegistryModuleOwnerCustom is ITypeAndVersion, OwnerIsCreator {
   error CanOnlySelfRegister(address admin, address token);
 
   event AdministratorRegistered(address indexed token, address indexed administrator);

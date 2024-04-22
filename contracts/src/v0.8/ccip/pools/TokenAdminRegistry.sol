@@ -14,7 +14,6 @@ contract TokenAdminRegistry is ITokenAdminRegistry, ITypeAndVersion, OwnerIsCrea
   error OnlyRegistryModule(address sender);
   error OnlyAdministrator(address sender, address token);
   error OnlyPendingAdministrator(address sender, address token);
-  error AlreadyRegistered(address token, address currentAdministrator);
   error UnsupportedToken(address token);
 
   event AdministratorRegistered(address indexed token, address indexed administrator);
@@ -28,7 +27,6 @@ contract TokenAdminRegistry is ITokenAdminRegistry, ITypeAndVersion, OwnerIsCrea
   struct TokenConfig {
     bool isPermissionedAdmin; // ─────────────╮ if true, this administrator has been configured by the CCIP owner
     //                                        │ and it could have elevated permissions.
-    bool allowPermissionlessReRegistration; //│ if true, the token can be re-registered without the administrator's signature
     bool isRegistered; //                     │ if true, the token is registered in the registry
     address administrator; // ────────────────╯ the current administrator of the token
     address pendingAdministrator; //            the address that is pending to become the new owner
@@ -139,11 +137,6 @@ contract TokenAdminRegistry is ITokenAdminRegistry, ITypeAndVersion, OwnerIsCrea
     }
     TokenConfig storage config = s_tokenConfig[localToken];
 
-    if (config.isRegistered && !config.allowPermissionlessReRegistration) {
-      revert AlreadyRegistered(localToken, config.administrator);
-    }
-
-    // If the token is not registered yet, or if re-registration is permitted, register the new administrator
     config.administrator = administrator;
     config.isRegistered = true;
     config.isPermissionedAdmin = false;

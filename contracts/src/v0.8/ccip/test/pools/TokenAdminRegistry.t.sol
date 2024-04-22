@@ -202,16 +202,6 @@ contract TokenAdminRegistry_registerAdministrator is TokenAdminRegistrySetup {
     vm.expectRevert(abi.encodeWithSelector(TokenAdminRegistry.OnlyRegistryModule.selector, address(this)));
     s_tokenAdminRegistry.registerAdministrator(newToken, OWNER);
   }
-
-  function test_registerAdministrator_AlreadyRegistered_Revert() public {
-    address newToken = makeAddr("newToken");
-    vm.startPrank(s_registryModule);
-
-    s_tokenAdminRegistry.registerAdministrator(newToken, OWNER);
-
-    vm.expectRevert(abi.encodeWithSelector(TokenAdminRegistry.AlreadyRegistered.selector, newToken, OWNER));
-    s_tokenAdminRegistry.registerAdministrator(newToken, OWNER);
-  }
 }
 
 contract TokenAdminRegistry_addRegistryModule is TokenAdminRegistrySetup {
