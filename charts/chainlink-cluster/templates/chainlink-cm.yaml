@@ -61,6 +61,8 @@ data:
   overrides.toml: |
   {{ if (hasKey $cfg "overridesToml") }}
     {{ $cfg.overridesToml | nindent 4 }}
+  {{ else if (hasKey $.Values.chainlink.global "overridesToml") }}
+    {{ $.Values.chainlink.global.overridesToml | nindent 4 }}
   {{ else }}
   {{ end }}
   secrets.toml: |
