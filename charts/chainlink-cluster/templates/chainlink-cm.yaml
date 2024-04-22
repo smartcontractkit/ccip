@@ -17,9 +17,9 @@ data:
     EXTENSION pg_stat_statements;
   default.toml: |
   {{- if (hasKey $cfg "toml") }}
-    {{ $cfg.toml | nindent 4 }}
-  {{- else if (hasKey $.Values.chainlink.global "toml") }}
-  {{- $.Values.chainlink.global.toml | nindent 4 }}
+  {{ $cfg.toml | nindent 4 }}
+  {{- else if and (hasKey $.Values.chainlink.global "toml") $.Values.chainlink.global.toml }}
+  {{ $.Values.chainlink.global.toml | nindent 4 }}
   {{- else }}
     RootDir = './clroot'
     [Log]
@@ -63,7 +63,7 @@ data:
   overrides.toml: |-
   {{- if (hasKey $cfg "overridesToml") }}
   {{- $cfg.overridesToml | nindent 4 }}
-  {{- else if (hasKey $.Values.chainlink.global "overridesToml") }}
+  {{- else if and (hasKey $.Values.chainlink.global "overridesToml") $.Values.chainlink.global.overridesToml }}
   {{- $.Values.chainlink.global.overridesToml | nindent 4 }}
   {{ else }}
   {{- end }}
