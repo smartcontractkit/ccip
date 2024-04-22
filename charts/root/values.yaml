@@ -42,13 +42,6 @@ chainlink-cluster:
       - name: node-4
       - name: node-5
       - name: node-6
-    resources:
-      requests:
-        cpu: 350m
-        memory: 1024Mi
-      limits:
-        cpu: 350m
-        memory: 1024Mi
 
   # each CL node have a dedicated PostgreSQL 11.15
   # use StatefulSet by setting:
