@@ -89,7 +89,7 @@ type ExecutionReportingPlugin struct {
 
 	// State
 	inflightReports  *inflightExecReportsContainer
-	snoozedRoots     cache.SnoozedRoots
+	commitRootsCache cache.CommitsRootsCache
 	chainHealthcheck cache.ChainHealthcheck
 }
 
@@ -139,12 +139,7 @@ func (r *ExecutionReportingPlugin) Observation(ctx context.Context, timestamp ty
 }
 
 func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context, lggr logger.Logger, timestamp types.ReportTimestamp, inflight []InflightInternalExecutionReport) ([]ccip.ObservedMessage, error) {
-	unexpiredReports, err := r.getUnexpiredCommitReports(
-		ctx,
-		r.commitStoreReader,
-		r.onchainConfig.PermissionLessExecutionThresholdSeconds,
-		lggr,
-	)
+	unexpiredReports, err := r.getUnexpiredCommitReports(ctx, r.commitStoreReader, lggr)
 	if err != nil {
 		return nil, err
 	}
@@ -200,7 +195,7 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 			// config.PermissionLessExecutionThresholdSeconds so it will never be considered again.
 			if allMsgsExecutedAndFinalized := rep.allRequestsAreExecutedAndFinalized(); allMsgsExecutedAndFinalized {
 				rootLggr.Infow("Snoozing root forever since there are no executable txs anymore", "root", hex.EncodeToString(merkleRoot[:]))
-				r.snoozedRoots.MarkAsExecuted(merkleRoot)
+				r.commitRootsCache.MarkAsExecuted(merkleRoot)
 				continue
 			}
 
@@ -237,7 +232,7 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 			if len(batch) != 0 {
 				return batch, nil
 			}
-			r.snoozedRoots.Snooze(merkleRoot)
+			r.commitRootsCache.Snooze(merkleRoot)
 		}
 	}
 	return []ccip.ObservedMessage{}, nil
@@ -983,12 +978,13 @@ func getTokensPrices(ctx context.Context, priceRegistry ccipdata.PriceRegistryRe
 func (r *ExecutionReportingPlugin) getUnexpiredCommitReports(
 	ctx context.Context,
 	commitStoreReader ccipdata.CommitStoreReader,
-	permissionExecutionThreshold time.Duration,
 	lggr logger.Logger,
 ) ([]cciptypes.CommitStoreReport, error) {
+	createdAfterTimestamp := r.commitRootsCache.OldestRootTimestamp()
+	lggr.Infow("Fetching unexpired commit roots from database", "createdAfterTimestamp", createdAfterTimestamp)
 	acceptedReports, err := commitStoreReader.GetAcceptedCommitReportsGteTimestamp(
 		ctx,
-		time.Now().Add(-permissionExecutionThreshold),
+		createdAfterTimestamp,
 		0,
 	)
 	if err != nil {
@@ -998,11 +994,12 @@ func (r *ExecutionReportingPlugin) getUnexpiredCommitReports(
 	var reports []cciptypes.CommitStoreReport
 	for _, acceptedReport := range acceptedReports {
 		reports = append(reports, acceptedReport.CommitStoreReport)
+		r.commitRootsCache.AppendUnexecutedRoot(acceptedReport.MerkleRoot, time.UnixMilli(acceptedReport.TxMeta.BlockTimestampUnixMilli))
 	}
 
 	notSnoozedReports := make([]cciptypes.CommitStoreReport, 0)
 	for _, report := range reports {
-		if r.snoozedRoots.IsSnoozed(report.MerkleRoot) {
+		if r.commitRootsCache.IsSkipped(report.MerkleRoot) {
 			lggr.Debugw("Skipping snoozed root",
 				"minSeqNr", report.Interval.Min,
 				"maxSeqNr", report.Interval.Max,
