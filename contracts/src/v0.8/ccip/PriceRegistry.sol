@@ -11,8 +11,9 @@ import {USDPriceWith18Decimals} from "./libraries/USDPriceWith18Decimals.sol";
 
 import {IERC20Metadata} from
   "../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-import {EnumerableSet} from "../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/structs/EnumerableSet.sol";
+
 import {SafeCast} from "../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/math/SafeCast.sol";
+import {EnumerableSet} from "../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/structs/EnumerableSet.sol";
 
 /// @notice The PriceRegistry contract responsibility is to store the current gas price in USD for a given destination chain,
 /// and the price of a token in USD allowing the owner or priceUpdater to update this value.
@@ -198,7 +199,7 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator, ITypeAndVersion {
       /* uint80 answeredInRound */
     ) = dataFeedContract.latestRoundData();
 
-    uint224 rebasedValue = SafeCast.toUint224(uint256(dataFeedAnswer));
+    uint224 rebasedValue = SafeCast.toUint224(SafeCast.toUint256(dataFeedAnswer));
 
     // Rebase formula for units: usdValue * (1e18 * 1e18) / 1eTokenDecimals
     // feedValue * (10 ** (18 - feedDecimals)) * (10 ** (18 - erc20Decimals))

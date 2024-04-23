@@ -250,6 +250,30 @@ contract PriceRegistry_getValidatedTokenPrice is PriceRegistrySetup {
     assertEq(tokenPriceAnswer, uint224(1e14));
   }
 
+  function test_OverflowFeedPrice_Revert() public {
+    address tokenAddress = _deploySourceToken("testToken", 0, 18);
+    address feedAddress = _deployTokenPriceDataFeed(tokenAddress, 18, int256(uint256(type(uint224).max) + 1));
+
+    Internal.TokenPriceFeedUpdate[] memory tokenPriceFeedUpdates = new Internal.TokenPriceFeedUpdate[](1);
+    tokenPriceFeedUpdates[0] = getSingleTokenPriceFeedUpdateStruct(tokenAddress, feedAddress);
+    s_priceRegistry.updateTokenPriceFeeds(tokenPriceFeedUpdates);
+
+    vm.expectRevert("SafeCast: value doesn't fit in 224 bits");
+    s_priceRegistry.getValidatedTokenPrice(tokenAddress);
+  }
+
+  function test_UnderflowFeedPrice_Revert() public {
+    address tokenAddress = _deploySourceToken("testToken", 0, 18);
+    address feedAddress = _deployTokenPriceDataFeed(tokenAddress, 18, -1);
+
+    Internal.TokenPriceFeedUpdate[] memory tokenPriceFeedUpdates = new Internal.TokenPriceFeedUpdate[](1);
+    tokenPriceFeedUpdates[0] = getSingleTokenPriceFeedUpdateStruct(tokenAddress, feedAddress);
+    s_priceRegistry.updateTokenPriceFeeds(tokenPriceFeedUpdates);
+
+    vm.expectRevert("SafeCast: value must be positive");
+    s_priceRegistry.getValidatedTokenPrice(tokenAddress);
+  }
+
   function test_StaleFeedPrice_Revert() public {
     // Right above staleness threshold
     vm.warp(block.timestamp + TWELVE_HOURS + 1);
