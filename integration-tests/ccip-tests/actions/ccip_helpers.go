@@ -1199,7 +1199,9 @@ func (sourceCCIP *SourceCCIPModule) LoadContracts(conf *laneconfig.LaneConfig) {
 	}
 }
 
-func (sourceCCIP *SourceCCIPModule) SetTokenTransferFeeConfig() error {
+// SetTokenTransferFeeConfig sets the transfer fee config for all BridgeTokens on the CCIP source chain
+// enableAggregateRateLimit is used to enable/disable aggregate rate limit for all BridgeTokens, a good default is true
+func (sourceCCIP *SourceCCIPModule) SetTokenTransferFeeConfig(enableAggregateRateLimit bool) error {
 	var tokenTransferFeeConfig []evm_2_evm_onramp.EVM2EVMOnRampTokenTransferFeeConfigArgs
 	for i, token := range sourceCCIP.Common.BridgeTokens {
 		destByteOverhead := uint32(0)
@@ -1215,7 +1217,7 @@ func (sourceCCIP *SourceCCIPModule) SetTokenTransferFeeConfig() error {
 			DeciBps:                   5_0,          // 5 bps
 			DestGasOverhead:           destGasOverhead,
 			DestBytesOverhead:         destByteOverhead,
-			AggregateRateLimitEnabled: true,
+			AggregateRateLimitEnabled: enableAggregateRateLimit,
 		})
 	}
 	err := sourceCCIP.OnRamp.SetTokenTransferFeeConfig(tokenTransferFeeConfig)
@@ -1318,7 +1320,7 @@ func (sourceCCIP *SourceCCIPModule) DeployContracts(lane *laneconfig.LaneConfig)
 		}
 
 		// now sync the pools and tokens
-		err := sourceCCIP.SetTokenTransferFeeConfig()
+		err := sourceCCIP.SetTokenTransferFeeConfig(true)
 		if err != nil {
 			return err
 		}
@@ -3172,8 +3174,7 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 		if lane.Source.Common.TokenTransmitter == nil {
 			return fmt.Errorf("token transmitter address not set")
 		}
-		// TODO: Need to know if there can be more than one USDC token per chain
-		// currently the jobspec supports only one. Need to update this if more than two is supported
+		// Only one USDC allowed per chain
 		jobParams.USDCConfig = &config.USDCConfig{
 			SourceTokenAddress:              common.HexToAddress(lane.Source.Common.BridgeTokens[0].Address()),
 			SourceMessageTransmitterAddress: lane.Source.Common.TokenTransmitter.ContractAddress,

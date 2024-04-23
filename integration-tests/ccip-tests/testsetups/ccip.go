@@ -41,7 +41,7 @@ import (
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/actions"
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/contracts"
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/contracts/laneconfig"
-	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/testconfig"
+	tsconfig "github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/testconfig"
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/testreporters"
 	"github.com/smartcontractkit/chainlink/integration-tests/docker/test_env"
 )
@@ -68,9 +68,9 @@ type NetworkPair struct {
 
 type CCIPTestConfig struct {
 	Test                *testing.T
-	EnvInput            *testconfig.Common
-	TestGroupInput      *testconfig.CCIPTestConfig
-	ContractsInput      *testconfig.CCIPContractConfig
+	EnvInput            *tsconfig.Common
+	TestGroupInput      *tsconfig.CCIPTestConfig
+	ContractsInput      *tsconfig.CCIPContractConfig
 	AllNetworks         map[string]blockchain.EVMNetwork
 	SelectedNetworks    []blockchain.EVMNetwork
 	NetworkPairs        []NetworkPair
@@ -308,12 +308,12 @@ func (c *CCIPTestConfig) SetOCRParams() error {
 }
 
 func NewCCIPTestConfig(t *testing.T, lggr zerolog.Logger, tType string) *CCIPTestConfig {
-	testCfg := testconfig.GlobalTestConfig()
+	testCfg := tsconfig.GlobalTestConfig()
 	groupCfg, exists := testCfg.CCIP.Groups[tType]
 	if !exists {
 		t.Fatalf("group config for %s does not exist", tType)
 	}
-	if tType == testconfig.Load {
+	if tType == tsconfig.Load {
 		if testCfg.CCIP.Env.Logging == nil || testCfg.CCIP.Env.Logging.Loki == nil {
 			t.Fatal("loki config is required to be set for load test")
 		}
@@ -617,7 +617,12 @@ func (o *CCIPTestSetUpOutputs) AddLanesForNetworkPair(
 			}
 			err = o.LaneConfig.WriteLaneConfig(networkA.Name, ccipLaneB2A.DstNetworkLaneCfg)
 			if err != nil {
-				allErrors.Store(multierr.Append(allErrors.Load(), fmt.Errorf("writing lane config for %s; err - %w", networkB.Name, errors.WithStack(err))))
+				allErrors.Store(
+					multierr.Append(
+						allErrors.Load(),
+						fmt.Errorf("writing lane config for %s; err - %w", networkB.Name, errors.WithStack(err)),
+					),
+				)
 				return err
 			}
 			lggr.Info().Msgf("done setting up lane %s to %s", networkB.Name, networkA.Name)
@@ -727,12 +732,12 @@ func CCIPDefaultTestSetUp(
 	testConfig *CCIPTestConfig,
 ) *CCIPTestSetUpOutputs {
 	var (
-		err error
+		err             error
+		transferAmounts []*big.Int
 	)
 	reportPath := "tmp_laneconfig"
 	filepath := fmt.Sprintf("./%s/tmp_%s.json", reportPath, strings.ReplaceAll(t.Name(), "/", "_"))
 	reportFile := testutils.FileNameFromPath(filepath)
-	var transferAmounts []*big.Int
 	if testConfig.TestGroupInput.MsgType == actions.TokenTransfer {
 		for i := 0; i < testConfig.TestGroupInput.NoOfTokensInMsg; i++ {
 			transferAmounts = append(transferAmounts, big.NewInt(testConfig.TestGroupInput.AmountPerToken))

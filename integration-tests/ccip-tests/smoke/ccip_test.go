@@ -12,13 +12,14 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/logging"
 	"github.com/smartcontractkit/chainlink-testing-framework/utils/ptr"
 
-	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/actions"
-	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/testconfig"
-	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/testsetups"
-
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/token_pool"
+
+	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/actions"
+	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/contracts"
+	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/testconfig"
+	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/testsetups"
 )
 
 type testDefinition struct {
@@ -86,6 +87,7 @@ func TestSmokeCCIPForBidirectionalLane(t *testing.T) {
 
 func TestSmokeCCIPRateLimit(t *testing.T) {
 	t.Parallel()
+
 	log := logging.GetTestLogger(t)
 	TestCfg := testsetups.NewCCIPTestConfig(t, log, testconfig.Smoke)
 	require.Equal(t, actions.TokenTransfer, TestCfg.TestGroupInput.MsgType, "Test config should have token transfer message type")
@@ -108,7 +110,7 @@ func TestSmokeCCIPRateLimit(t *testing.T) {
 
 	// if we are running in simulated or in testnet mode, we can set the rate limit to test friendly values
 	// For mainnet, we need to set this as false to avoid changing the deployed contract config
-	SetRateLimit := true
+	setRateLimit := true
 	AggregatedRateLimitCapacity := new(big.Int).Mul(big.NewInt(1e18), big.NewInt(30))
 	AggregatedRateLimitRate := big.NewInt(1e17)
 
@@ -142,7 +144,9 @@ func TestSmokeCCIPRateLimit(t *testing.T) {
 			require.NoError(t, err)
 			tc.lane.Logger.Info().Interface("rate limit", prevRLOnRamp).Msg("Initial OnRamp rate limiter state")
 
-			prevOnRampRLTokenPool, err := src.Common.BridgeTokenPools[0].PoolInterface.GetCurrentOutboundRateLimiterState(nil, tc.lane.Source.DestinationChainId) // TODO RENS maybe?
+			prevOnRampRLTokenPool, err := src.Common.BridgeTokenPools[0].PoolInterface.GetCurrentOutboundRateLimiterState(
+				nil, tc.lane.Source.DestinationChainId,
+			) // TODO RENS maybe?
 			require.NoError(t, err)
 			tc.lane.Logger.Info().
 				Interface("rate limit", prevOnRampRLTokenPool).
@@ -155,10 +159,14 @@ func TestSmokeCCIPRateLimit(t *testing.T) {
 			require.NoError(t, err)
 			tc.lane.Logger.Info().Interface("rate limit", rlOffRamp).Msg("Initial OffRamp rate limiter state")
 			if rlOffRamp.IsEnabled {
-				require.GreaterOrEqual(t, rlOffRamp.Capacity.Cmp(prevRLOnRamp.Capacity), 0, "OffRamp Aggregated capacity should be greater than or equal to OnRamp Aggregated capacity")
+				require.GreaterOrEqual(t, rlOffRamp.Capacity.Cmp(prevRLOnRamp.Capacity), 0,
+					"OffRamp Aggregated capacity should be greater than or equal to OnRamp Aggregated capacity",
+				)
 			}
 
-			prevOffRampRLTokenPool, err := tc.lane.Dest.Common.BridgeTokenPools[0].PoolInterface.GetCurrentInboundRateLimiterState(nil, tc.lane.Dest.SourceChainId) // TODO RENS maybe?
+			prevOffRampRLTokenPool, err := tc.lane.Dest.Common.BridgeTokenPools[0].PoolInterface.GetCurrentInboundRateLimiterState(
+				nil, tc.lane.Dest.SourceChainId,
+			) // TODO RENS maybe?
 			require.NoError(t, err)
 			tc.lane.Logger.Info().
 				Interface("rate limit", prevOffRampRLTokenPool).
@@ -166,7 +174,9 @@ func TestSmokeCCIPRateLimit(t *testing.T) {
 				Str("offRamp", tc.lane.Dest.OffRamp.Address()).
 				Msg("Initial tokenpool rate limiter state")
 			if prevOffRampRLTokenPool.IsEnabled {
-				require.GreaterOrEqual(t, prevOffRampRLTokenPool.Capacity.Cmp(prevOnRampRLTokenPool.Capacity), 0, "OffRamp Token Pool capacity should be greater than or equal to OnRamp Token Pool capacity")
+				require.GreaterOrEqual(t, prevOffRampRLTokenPool.Capacity.Cmp(prevOnRampRLTokenPool.Capacity), 0,
+					"OffRamp Token Pool capacity should be greater than or equal to OnRamp Token Pool capacity",
+				)
 			}
 
 			AggregatedRateLimitChanged := false
@@ -193,7 +203,7 @@ func TestSmokeCCIPRateLimit(t *testing.T) {
 				}
 			})
 
-			if SetRateLimit {
+			if setRateLimit {
 				if prevRLOnRamp.Capacity.Cmp(AggregatedRateLimitCapacity) != 0 ||
 					prevRLOnRamp.Rate.Cmp(AggregatedRateLimitRate) != 0 ||
 					!prevRLOnRamp.IsEnabled {
@@ -201,8 +211,7 @@ func TestSmokeCCIPRateLimit(t *testing.T) {
 						IsEnabled: true,
 						Capacity:  AggregatedRateLimitCapacity,
 						Rate:      AggregatedRateLimitRate,
-					}),
-						"setting rate limit on onramp")
+					}), "setting rate limit on onramp")
 					require.NoError(t, src.Common.ChainClient.WaitForEvents(), "waiting for events")
 					AggregatedRateLimitChanged = true
 				}
@@ -222,7 +231,8 @@ func TestSmokeCCIPRateLimit(t *testing.T) {
 
 			totalTokensForOnRampCapacity := new(big.Int).Mul(
 				big.NewInt(1e18),
-				new(big.Int).Div(rlOnRamp.Capacity, tokenPrice.Value))
+				new(big.Int).Div(rlOnRamp.Capacity, tokenPrice.Value),
+			)
 
 			tc.lane.Source.Common.ChainClient.ParallelTransactions(true)
 
@@ -284,7 +294,7 @@ func TestSmokeCCIPRateLimit(t *testing.T) {
 			tc.lane.ValidateRequests(true)
 
 			// now set the token pool rate limit
-			if SetRateLimit {
+			if setRateLimit {
 				if prevOnRampRLTokenPool.Capacity.Cmp(TokenPoolRateLimitCapacity) != 0 ||
 					prevOnRampRLTokenPool.Rate.Cmp(TokenPoolRateLimitRate) != 0 ||
 					!prevOnRampRLTokenPool.IsEnabled {
@@ -294,8 +304,7 @@ func TestSmokeCCIPRateLimit(t *testing.T) {
 							IsEnabled: true,
 							Capacity:  TokenPoolRateLimitCapacity,
 							Rate:      TokenPoolRateLimitRate,
-						}),
-						"setting rate limit on token pool")
+						}), "error setting rate limit on token pool")
 					require.NoError(t, src.Common.ChainClient.WaitForEvents(), "waiting for events")
 					TokenPoolRateLimitChanged = true
 				}
@@ -384,6 +393,145 @@ func TestSmokeCCIPRateLimit(t *testing.T) {
 
 			// validate that the successful transfers are reflected in destination
 			tc.lane.ValidateRequests(true)
+		})
+	}
+}
+
+func TestSmokeCCIPSelfServeRateLimit(t *testing.T) {
+	t.Parallel()
+
+	log := logging.GetTestLogger(t)
+	TestCfg := testsetups.NewCCIPTestConfig(t, log, testconfig.Smoke)
+	require.Equal(t, actions.TokenTransfer, TestCfg.TestGroupInput.MsgType, "Test config should have token transfer message type")
+	setUpOutput := testsetups.CCIPDefaultTestSetUp(t, log, "smoke-ccip", nil, TestCfg)
+	if len(setUpOutput.Lanes) == 0 {
+		return
+	}
+	t.Cleanup(func() {
+		require.NoError(t, setUpOutput.TearDown())
+	})
+
+	var tests []testDefinition
+	for _, lane := range setUpOutput.Lanes {
+		tests = append(tests, testDefinition{
+			testName: fmt.Sprintf("Network %s to network %s",
+				lane.ForwardLane.SourceNetworkName, lane.ForwardLane.DestNetworkName),
+			lane: lane.ForwardLane,
+		})
+	}
+
+	aggregateRateLimit := big.NewInt(1e16)
+
+	for _, tc := range tests {
+		t.Run(fmt.Sprintf("%s - Self Serve Rate Limit", tc.testName), func(t *testing.T) {
+			tc.lane.Test = t
+			src := tc.lane.Source
+			dest := tc.lane.Dest
+			require.GreaterOrEqual(t, len(src.Common.BridgeTokens), 2, "At least two bridge tokens needed for test")
+			require.GreaterOrEqual(t, len(src.Common.BridgeTokenPools), 2, "At least two bridge token pools needed for test")
+			require.GreaterOrEqual(t, len(dest.Common.BridgeTokens), 2, "At least two bridge tokens needed for test")
+			require.GreaterOrEqual(t, len(dest.Common.BridgeTokenPools), 2, "At least two bridge token pools needed for test")
+			// add liquidity to pools on both networks
+			if !pointer.GetBool(TestCfg.TestGroupInput.ExistingDeployment) {
+				addFund := func(ccipCommon *actions.CCIPCommon) {
+					for i, btp := range ccipCommon.BridgeTokenPools {
+						token := ccipCommon.BridgeTokens[i]
+						err := btp.AddLiquidity(token.Approve, token.Address(), big.NewInt(1e18))
+						require.NoError(t, err)
+					}
+				}
+				addFund(src.Common)
+				addFund(tc.lane.Dest.Common)
+			}
+
+			limitedSrcToken := src.Common.BridgeTokens[0]
+			limitedDestToken := dest.Common.BridgeTokens[0]
+
+			freeSrcToken := src.Common.BridgeTokens[1]
+
+			// First turn off any rate limiting and ensure we can send both tokens without issue
+			err := src.SetTokenTransferFeeConfig(false)
+			require.NoError(t, err, "Error disabling aggregate rate limit")
+			for i, tokenPool := range src.Common.BridgeTokenPools {
+				err = tokenPool.SetRemoteChainRateLimits(src.DestChainSelector, token_pool.RateLimiterConfig{
+					IsEnabled: false,
+					Capacity:  big.NewInt(0),
+					Rate:      big.NewInt(0),
+				})
+				require.NoError(t, err, "Error disabling token pool %d rate limit", i)
+			}
+			err = src.Common.ChainClient.WaitForEvents()
+			require.NoError(t, err, "Error waiting for events")
+			tokensTobeSent := new(big.Int).Add(aggregateRateLimit, big.NewInt(1))
+			src.TransferAmount[0] = tokensTobeSent
+			src.TransferAmount[1] = tokensTobeSent
+			tc.lane.Logger.Info().Str("tokensTobeSent", tokensTobeSent.String()).Msg("Sending tokens without rate limit")
+			tc.lane.RecordStateBeforeTransfer()
+			err = tc.lane.SendRequests(2, TestCfg.TestGroupInput.MsgType, big.NewInt(600_000)) // I need to send 2 requests right?
+			require.NoError(t, err)
+			err = src.Common.ChainClient.WaitForEvents()
+			require.NoError(t, err, "Error waiting for events")
+
+			// Enable aggregate rate limiting on the destination chain for the limited token
+			err = dest.AddRateLimitTokens([]*contracts.ERC20Token{limitedSrcToken}, []*contracts.ERC20Token{limitedDestToken})
+			require.NoError(t, err, "Error setting destination rate limits")
+			err = dest.Common.ChainClient.WaitForEvents()
+			require.NoError(t, err, "Error waiting for events")
+			tc.lane.Logger.Debug().Str("Token", limitedSrcToken.ContractAddress.Hex()).Msg("Enabled aggregate rate limit on destination chain")
+
+			// Send free token without rate limit
+			goodTx, _, _, err := tc.lane.Source.SendRequest(
+				tc.lane.Dest.ReceiverDapp.EthAddress,
+				actions.TokenTransfer, "msg with token more than aggregated rate limit",
+				big.NewInt(600_000),
+			)
+			require.NoError(t, err)
+			err = src.Common.ChainClient.WaitForEvents()
+			require.NoError(t, err, "Unlimited token transfer failed")
+			tc.lane.Logger.Info().Str("Token", freeSrcToken.ContractAddress.Hex()).Str("Tx", goodTx.Hex()).Msg("Unlimited token transfer succeeded")
+
+			// Send limited token with rate limit
+			failedTx, _, _, err := tc.lane.Source.SendRequest(
+				tc.lane.Dest.ReceiverDapp.EthAddress,
+				actions.TokenTransfer, "msg with token more than aggregated rate limit",
+				big.NewInt(600_000),
+			)
+			require.NoError(t, err)
+			err = src.Common.ChainClient.WaitForEvents()
+			require.Error(t, err, "Limited token transfer should not succeed")
+			tc.lane.Logger.Info().Str("Token", limitedSrcToken.ContractAddress.Hex()).Str("Tx", failedTx.Hex()).Msg("Limited token transfer failed (good)")
+			errReason, v, err := tc.lane.Source.Common.ChainClient.RevertReasonFromTx(failedTx, lock_release_token_pool.LockReleaseTokenPoolABI)
+			require.NoError(t, err, "Error getting revert reason")
+			tc.lane.Logger.Info().
+				Str("Revert Reason", errReason).
+				Interface("Args", v).
+				Str("TokensSent", src.TransferAmount[0].String()).
+				Str("Token", tc.lane.Source.Common.BridgeTokens[0].Address()).
+				Str("FailedTx", failedTx.Hex()).
+				Msg("Msg sent with tokens more than token pool capacity")
+
+			// Enable aggregate rate limiting on the source chain for the limited token
+			err = src.OnRamp.SetTokenTransferFeeConfig([]evm_2_evm_onramp.EVM2EVMOnRampTokenTransferFeeConfigArgs{{
+				Token:                     limitedSrcToken.ContractAddress,
+				MinFeeUSDCents:            50,           // $0.5
+				MaxFeeUSDCents:            1_000_000_00, // $ 1 million
+				DeciBps:                   5_0,          // 5 bps
+				DestGasOverhead:           0,            // Easy default
+				DestBytesOverhead:         29_000,       // Easy default
+				AggregateRateLimitEnabled: true,
+			}})
+			require.NoError(t, err, "Error setting source rate limits")
+			err = src.Common.ChainClient.WaitForEvents()
+			require.NoError(t, err, "Error waiting for events")
+			tc.lane.Logger.Debug().Str("Token", limitedSrcToken.ContractAddress.Hex()).Msg("Enabled aggregate rate limit")
+			failedTx, _, _, err = tc.lane.Source.SendRequest(
+				tc.lane.Dest.ReceiverDapp.EthAddress,
+				actions.TokenTransfer, "msg with token more than aggregated rate limit",
+				big.NewInt(600_000),
+			)
+			require.NoError(t, err)
+			err = src.Common.ChainClient.WaitForEvents()
+			require.Error(t, err, "Limited token transfer should not succeed")
 		})
 	}
 }
