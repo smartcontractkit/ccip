@@ -8,8 +8,8 @@ import {Client} from "../libraries/Client.sol";
 import {RateLimiter} from "../libraries/RateLimiter.sol";
 import {BurnMintTokenPool} from "../pools/BurnMintTokenPool.sol";
 import {LockReleaseTokenPool} from "../pools/LockReleaseTokenPool.sol";
-import {TokenAdminRegistry} from "../pools/TokenAdminRegistry.sol";
 import {TokenPool} from "../pools/TokenPool.sol";
+import {TokenAdminRegistry} from "../tokenAdminRegistry/TokenAdminRegistry.sol";
 import {MaybeRevertingBurnMintTokenPool} from "./helpers/MaybeRevertingBurnMintTokenPool.sol";
 import {RouterSetup} from "./router/RouterSetup.t.sol";
 

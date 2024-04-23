@@ -1,19 +1,19 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.19;
 
-import {ITypeAndVersion} from "../../../shared/interfaces/ITypeAndVersion.sol";
-import {IGetCCIPAdmin} from "./IGetCCIPAdmin.sol";
-import {IOwner} from "./IOwner.sol";
+import {ITypeAndVersion} from "../../shared/interfaces/ITypeAndVersion.sol";
+import {IGetCCIPAdmin} from "../interfaces/IGetCCIPAdmin.sol";
+import {IOwner} from "../interfaces/IOwner.sol";
 
-import {OwnerIsCreator} from "../../../shared/access/OwnerIsCreator.sol";
-import {TokenAdminRegistry} from "../TokenAdminRegistry.sol";
+import {OwnerIsCreator} from "../../shared/access/OwnerIsCreator.sol";
+import {TokenAdminRegistry} from "./TokenAdminRegistry.sol";
 
-contract AdminRegistryModuleOwnerCustom is ITypeAndVersion, OwnerIsCreator {
+contract RegistryModuleOwnerCustom is ITypeAndVersion, OwnerIsCreator {
   error CanOnlySelfRegister(address admin, address token);
 
   event AdministratorRegistered(address indexed token, address indexed administrator);
 
-  string public constant override typeAndVersion = "AdminRegistryModuleOwnerCustom 1.5.0-dev";
+  string public constant override typeAndVersion = "RegistryModuleOwnerCustom 1.5.0-dev";
 
   // The TokenAdminRegistry contract
   TokenAdminRegistry internal s_tokenAdminRegistry;
@@ -48,9 +48,5 @@ contract AdminRegistryModuleOwnerCustom is ITypeAndVersion, OwnerIsCreator {
     s_tokenAdminRegistry.registerAdministrator(token, admin);
 
     emit AdministratorRegistered(token, admin);
-  }
-
-  function getCCIPAdmin() external view returns (address) {
-    return owner();
   }
 }

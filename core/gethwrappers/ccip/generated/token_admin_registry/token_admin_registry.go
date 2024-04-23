@@ -31,16 +31,17 @@ var (
 )
 
 type TokenAdminRegistryTokenConfig struct {
-	IsPermissionedAdmin  bool
-	IsRegistered         bool
-	Administrator        common.Address
-	PendingAdministrator common.Address
-	TokenPool            common.Address
+	IsPermissionedAdmin   bool
+	IsRegistered          bool
+	DisableReRegistration bool
+	Administrator         common.Address
+	PendingAdministrator  common.Address
+	TokenPool             common.Address
 }
 
 var TokenAdminRegistryMetaData = &bind.MetaData{
-	ABI: "[{\"inputs\":[{\"internalType\":\"address\",\"name\":\"sender\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\"}],\"name\":\"OnlyAdministrator\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"sender\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\"}],\"name\":\"OnlyPendingAdministrator\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"sender\",\"type\":\"address\"}],\"name\":\"OnlyRegistryModule\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\"}],\"name\":\"UnsupportedToken\",\"type\":\"error\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"administrator\",\"type\":\"address\"}],\"name\":\"AdministratorRegistered\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"currentAdmin\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"newAdmin\",\"type\":\"address\"}],\"name\":\"AdministratorTransferRequested\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"newAdmin\",\"type\":\"address\"}],\"name\":\"AdministratorTransferred\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"from\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"}],\"name\":\"OwnershipTransferRequested\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"from\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"}],\"name\":\"OwnershipTransferred\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"previousPool\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"newPool\",\"type\":\"address\"}],\"name\":\"PoolSet\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"module\",\"type\":\"address\"}],\"name\":\"RegistryModuleAdded\",\"type\":\"event\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\"}],\"name\":\"acceptAdminRole\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"acceptOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"module\",\"type\":\"address\"}],\"name\":\"addRegistryModule\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getAllConfiguredTokens\",\"outputs\":[{\"internalType\":\"address[]\",\"name\":\"\",\"type\":\"address[]\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\"}],\"name\":\"getPool\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address[]\",\"name\":\"tokens\",\"type\":\"address[]\"}],\"name\":\"getPools\",\"outputs\":[{\"internalType\":\"address[]\",\"name\":\"\",\"type\":\"address[]\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\"}],\"name\":\"getTokenConfig\",\"outputs\":[{\"components\":[{\"internalType\":\"bool\",\"name\":\"isPermissionedAdmin\",\"type\":\"bool\"},{\"internalType\":\"bool\",\"name\":\"isRegistered\",\"type\":\"bool\"},{\"internalType\":\"address\",\"name\":\"administrator\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"pendingAdministrator\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"tokenPool\",\"type\":\"address\"}],\"internalType\":\"structTokenAdminRegistry.TokenConfig\",\"name\":\"\",\"type\":\"tuple\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"localToken\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"administrator\",\"type\":\"address\"}],\"name\":\"isAdministrator\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"module\",\"type\":\"address\"}],\"name\":\"isRegistryModule\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"owner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"localToken\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"administrator\",\"type\":\"address\"}],\"name\":\"registerAdministrator\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"localToken\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"administrator\",\"type\":\"address\"}],\"name\":\"registerAdministratorPermissioned\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"module\",\"type\":\"address\"}],\"name\":\"removeRegistryModule\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"pool\",\"type\":\"address\"}],\"name\":\"setPool\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"transferAdminRole\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"}],\"name\":\"transferOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"typeAndVersion\",\"outputs\":[{\"internalType\":\"string\",\"name\":\"\",\"type\":\"string\"}],\"stateMutability\":\"view\",\"type\":\"function\"}]",
-	Bin: "0x608060405234801561001057600080fd5b5033806000816100675760405162461bcd60e51b815260206004820152601860248201527f43616e6e6f7420736574206f776e657220746f207a65726f000000000000000060448201526064015b60405180910390fd5b600080546001600160a01b0319166001600160a01b0384811691909117909155811615610097576100978161009f565b505050610148565b336001600160a01b038216036100f75760405162461bcd60e51b815260206004820152601760248201527f43616e6e6f74207472616e7366657220746f2073656c66000000000000000000604482015260640161005e565b600180546001600160a01b0319166001600160a01b0383811691821790925560008054604051929316917fed8889f560326eb138920d842192f0eb3dd22b4f139c87a2c57538e05bae12789190a350565b611329806101576000396000f3fe608060405234801561001057600080fd5b506004361061011b5760003560e01c806379ba5097116100b2578063c1af6e0311610081578063d45ef15711610066578063d45ef157146103c8578063ddadfa8e146103db578063f2fde38b146103ee57600080fd5b8063c1af6e0314610278578063cb67e3b1146102bb57600080fd5b806379ba5097146101fb5780637d3f2552146102035780638da5cb5b14610226578063bbe4f6db1461026557600080fd5b80634e847fc7116100ee5780634e847fc7146101ad5780635c182033146101c05780635e63547a146101d35780636b67d01b146101f357600080fd5b806310cbcf1814610120578063156194da14610135578063181f5a77146101485780633dc457721461019a575b600080fd5b61013361012e36600461108c565b610401565b005b61013361014336600461108c565b61045e565b6101846040518060400160405280601c81526020017f546f6b656e41646d696e526567697374727920312e352e302d6465760000000081525081565b60405161019191906110a7565b60405180910390f35b6101336101a836600461108c565b610587565b6101336101bb366004611113565b61059a565b6101336101ce366004611113565b610700565b6101e66101e1366004611146565b61081b565b60405161019191906111bb565b6101e661091c565b61013361092d565b61021661021136600461108c565b610a2a565b6040519015158152602001610191565b60005473ffffffffffffffffffffffffffffffffffffffff165b60405173ffffffffffffffffffffffffffffffffffffffff9091168152602001610191565b61024061027336600461108c565b610a37565b610216610286366004611113565b73ffffffffffffffffffffffffffffffffffffffff918216600090815260026020526040902054620100009004821691161490565b61036b6102c936600461108c565b6040805160a0810182526000808252602082018190529181018290526060810182905260808101919091525073ffffffffffffffffffffffffffffffffffffffff908116600090815260026020818152604092839020835160a081018552815460ff8082161515835261010082041615159382019390935262010000909204851693820193909352600183015484166060820152910154909116608082015290565b604080518251151581526020808401511515908201528282015173ffffffffffffffffffffffffffffffffffffffff908116928201929092526060808401518316908201526080928301519091169181019190915260a001610191565b6101336103d6366004611113565b610ab3565b6101336103e9366004611113565b610ba4565b6101336103fc36600461108c565b610cb5565b610409610cc6565b610414600582610d49565b1561045b5760405173ffffffffffffffffffffffffffffffffffffffff8216907f3cabf004338366bfeaeb610ad827cb58d16b588017c509501f2c97c83caae7b290600090a25b50565b73ffffffffffffffffffffffffffffffffffffffff8082166000908152600260205260409020600181015490911633146104e7576040517f3edffe7500000000000000000000000000000000000000000000000000000000815233600482015273ffffffffffffffffffffffffffffffffffffffff831660248201526044015b60405180910390fd5b80547fffffffffffffffffffff0000000000000000000000000000000000000000ffff16336201000081029190911782556001820180547fffffffffffffffffffffffff000000000000000000000000000000000000000016905560405173ffffffffffffffffffffffffffffffffffffffff8416907f399b55200f7f639a63d76efe3dcfa9156ce367058d6b673041b84a628885f5a790600090a35050565b61058f610cc6565b610414600582610d72565b73ffffffffffffffffffffffffffffffffffffffff808316600090815260026020526040902054839162010000909104163314610621576040517fed5d85b500000000000000000000000000000000000000000000000000000000815233600482015273ffffffffffffffffffffffffffffffffffffffff821660248201526044016104de565b73ffffffffffffffffffffffffffffffffffffffff808416600090815260026020819052604090912090810180548584167fffffffffffffffffffffffff0000000000000000000000000000000000000000821681179092559192919091169081146106f9578373ffffffffffffffffffffffffffffffffffffffff168173ffffffffffffffffffffffffffffffffffffffff168673ffffffffffffffffffffffffffffffffffffffff167f754449ec3aff3bd528bfce43ae9319c4a381b67fcd1d20097b3b24dacaecc35d60405160405180910390a45b5050505050565b610708610cc6565b73ffffffffffffffffffffffffffffffffffffffff808316600090815260026020526040902080547fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff007fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00ff9385166201000002939093167fffffffffffffffffffff000000000000000000000000000000000000000000ff90911617610100179190911660011781556107bb600384610d72565b508173ffffffffffffffffffffffffffffffffffffffff168373ffffffffffffffffffffffffffffffffffffffff167f09590fb70af4b833346363965e043a9339e8c7d378b8a2b903c75c277faec4f960405160405180910390a3505050565b606060008267ffffffffffffffff81111561083857610838611215565b604051908082528060200260200182016040528015610861578160200160208202803683370190505b50905060005b83811015610912576002600086868481811061088557610885611244565b905060200201602081019061089a919061108c565b73ffffffffffffffffffffffffffffffffffffffff908116825260208201929092526040016000206002015483519116908390839081106108dd576108dd611244565b73ffffffffffffffffffffffffffffffffffffffff9092166020928302919091019091015261090b816112a2565b9050610867565b5090505b92915050565b60606109286003610d94565b905090565b60015473ffffffffffffffffffffffffffffffffffffffff1633146109ae576040517f08c379a000000000000000000000000000000000000000000000000000000000815260206004820152601660248201527f4d7573742062652070726f706f736564206f776e65720000000000000000000060448201526064016104de565b60008054337fffffffffffffffffffffffff00000000000000000000000000000000000000008083168217845560018054909116905560405173ffffffffffffffffffffffffffffffffffffffff90921692909183917f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e091a350565b6000610916600583610da1565b73ffffffffffffffffffffffffffffffffffffffff80821660009081526002602081905260408220015490911680610916576040517fbf16aab600000000000000000000000000000000000000000000000000000000815273ffffffffffffffffffffffffffffffffffffffff841660048201526024016104de565b610abc33610a2a565b610af4576040517fef5749ef0000000000000000000000000000000000000000000000000000000081523360048201526024016104de565b73ffffffffffffffffffffffffffffffffffffffff808316600090815260026020526040902080547fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff007fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00ff9385166201000002939093167fffffffffffffffffffff000000000000000000000000000000000000000000ff90911617610100179190911681556107bb600384610d72565b73ffffffffffffffffffffffffffffffffffffffff808316600090815260026020526040902054839162010000909104163314610c2b576040517fed5d85b500000000000000000000000000000000000000000000000000000000815233600482015273ffffffffffffffffffffffffffffffffffffffff821660248201526044016104de565b73ffffffffffffffffffffffffffffffffffffffff8381166000818152600260205260408082206001810180547fffffffffffffffffffffffff00000000000000000000000000000000000000001695881695861790559051909392339290917fc54c3051ff16e63bb9203214432372aca006c589e3653619b577a3265675b7169190a450505050565b610cbd610cc6565b61045b81610dd0565b60005473ffffffffffffffffffffffffffffffffffffffff163314610d47576040517f08c379a000000000000000000000000000000000000000000000000000000000815260206004820152601660248201527f4f6e6c792063616c6c61626c65206279206f776e65720000000000000000000060448201526064016104de565b565b6000610d6b8373ffffffffffffffffffffffffffffffffffffffff8416610ec5565b9392505050565b6000610d6b8373ffffffffffffffffffffffffffffffffffffffff8416610fb8565b60606000610d6b83611007565b73ffffffffffffffffffffffffffffffffffffffff811660009081526001830160205260408120541515610d6b565b3373ffffffffffffffffffffffffffffffffffffffff821603610e4f576040517f08c379a000000000000000000000000000000000000000000000000000000000815260206004820152601760248201527f43616e6e6f74207472616e7366657220746f2073656c6600000000000000000060448201526064016104de565b600180547fffffffffffffffffffffffff00000000000000000000000000000000000000001673ffffffffffffffffffffffffffffffffffffffff83811691821790925560008054604051929316917fed8889f560326eb138920d842192f0eb3dd22b4f139c87a2c57538e05bae12789190a350565b60008181526001830160205260408120548015610fae576000610ee96001836112da565b8554909150600090610efd906001906112da565b9050818114610f62576000866000018281548110610f1d57610f1d611244565b9060005260206000200154905080876000018481548110610f4057610f40611244565b6000918252602080832090910192909255918252600188019052604090208390555b8554869080610f7357610f736112ed565b600190038181906000526020600020016000905590558560010160008681526020019081526020016000206000905560019350505050610916565b6000915050610916565b6000818152600183016020526040812054610fff57508154600181810184556000848152602080822090930184905584548482528286019093526040902091909155610916565b506000610916565b60608160000180548060200260200160405190810160405280929190818152602001828054801561105757602002820191906000526020600020905b815481526020019060010190808311611043575b50505050509050919050565b803573ffffffffffffffffffffffffffffffffffffffff8116811461108757600080fd5b919050565b60006020828403121561109e57600080fd5b610d6b82611063565b600060208083528351808285015260005b818110156110d4578581018301518582016040015282016110b8565b5060006040828601015260407fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe0601f8301168501019250505092915050565b6000806040838503121561112657600080fd5b61112f83611063565b915061113d60208401611063565b90509250929050565b6000806020838503121561115957600080fd5b823567ffffffffffffffff8082111561117157600080fd5b818501915085601f83011261118557600080fd5b81358181111561119457600080fd5b8660208260051b85010111156111a957600080fd5b60209290920196919550909350505050565b6020808252825182820181905260009190848201906040850190845b8181101561120957835173ffffffffffffffffffffffffffffffffffffffff16835292840192918401916001016111d7565b50909695505050505050565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052604160045260246000fd5b7f4e487b7100000000000000000000000000000000000000000000000000000000600052603260045260246000fd5b7f4e487b7100000000000000000000000000000000000000000000000000000000600052601160045260246000fd5b60007fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff82036112d3576112d3611273565b5060010190565b8181038181111561091657610916611273565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052603160045260246000fdfea164736f6c6343000813000a",
+	ABI: "[{\"inputs\":[{\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\"}],\"name\":\"AlreadyRegistered\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"sender\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\"}],\"name\":\"OnlyAdministrator\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"sender\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\"}],\"name\":\"OnlyPendingAdministrator\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"sender\",\"type\":\"address\"}],\"name\":\"OnlyRegistryModule\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\"}],\"name\":\"UnsupportedToken\",\"type\":\"error\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"administrator\",\"type\":\"address\"}],\"name\":\"AdministratorRegistered\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"currentAdmin\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"newAdmin\",\"type\":\"address\"}],\"name\":\"AdministratorTransferRequested\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"newAdmin\",\"type\":\"address\"}],\"name\":\"AdministratorTransferred\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"bool\",\"name\":\"disabled\",\"type\":\"bool\"}],\"name\":\"DisableReRegistrationSet\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"from\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"}],\"name\":\"OwnershipTransferRequested\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"from\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"}],\"name\":\"OwnershipTransferred\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"previousPool\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"newPool\",\"type\":\"address\"}],\"name\":\"PoolSet\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"module\",\"type\":\"address\"}],\"name\":\"RegistryModuleAdded\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"module\",\"type\":\"address\"}],\"name\":\"RegistryModuleRemoved\",\"type\":\"event\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\"}],\"name\":\"acceptAdminRole\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"acceptOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"module\",\"type\":\"address\"}],\"name\":\"addRegistryModule\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getAllConfiguredTokens\",\"outputs\":[{\"internalType\":\"address[]\",\"name\":\"\",\"type\":\"address[]\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\"}],\"name\":\"getPool\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address[]\",\"name\":\"tokens\",\"type\":\"address[]\"}],\"name\":\"getPools\",\"outputs\":[{\"internalType\":\"address[]\",\"name\":\"\",\"type\":\"address[]\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\"}],\"name\":\"getTokenConfig\",\"outputs\":[{\"components\":[{\"internalType\":\"bool\",\"name\":\"isPermissionedAdmin\",\"type\":\"bool\"},{\"internalType\":\"bool\",\"name\":\"isRegistered\",\"type\":\"bool\"},{\"internalType\":\"bool\",\"name\":\"disableReRegistration\",\"type\":\"bool\"},{\"internalType\":\"address\",\"name\":\"administrator\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"pendingAdministrator\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"tokenPool\",\"type\":\"address\"}],\"internalType\":\"structTokenAdminRegistry.TokenConfig\",\"name\":\"\",\"type\":\"tuple\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"localToken\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"administrator\",\"type\":\"address\"}],\"name\":\"isAdministrator\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"module\",\"type\":\"address\"}],\"name\":\"isRegistryModule\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"owner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"localToken\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"administrator\",\"type\":\"address\"}],\"name\":\"registerAdministrator\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"localToken\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"administrator\",\"type\":\"address\"}],\"name\":\"registerAdministratorPermissioned\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"module\",\"type\":\"address\"}],\"name\":\"removeRegistryModule\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\"},{\"internalType\":\"bool\",\"name\":\"disabled\",\"type\":\"bool\"}],\"name\":\"setDisableReRegistration\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"pool\",\"type\":\"address\"}],\"name\":\"setPool\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"transferAdminRole\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"}],\"name\":\"transferOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"typeAndVersion\",\"outputs\":[{\"internalType\":\"string\",\"name\":\"\",\"type\":\"string\"}],\"stateMutability\":\"view\",\"type\":\"function\"}]",
+	Bin: "0x608060405234801561001057600080fd5b5033806000816100675760405162461bcd60e51b815260206004820152601860248201527f43616e6e6f7420736574206f776e657220746f207a65726f000000000000000060448201526064015b60405180910390fd5b600080546001600160a01b0319166001600160a01b0384811691909117909155811615610097576100978161009f565b505050610148565b336001600160a01b038216036100f75760405162461bcd60e51b815260206004820152601760248201527f43616e6e6f74207472616e7366657220746f2073656c66000000000000000000604482015260640161005e565b600180546001600160a01b0319166001600160a01b0383811691821790925560008054604051929316917fed8889f560326eb138920d842192f0eb3dd22b4f139c87a2c57538e05bae12789190a350565b6115a5806101576000396000f3fe608060405234801561001057600080fd5b50600436106101365760003560e01c80637d3f2552116100b2578063c1af6e0311610081578063d45ef15711610066578063d45ef15714610422578063ddadfa8e14610435578063f2fde38b1461044857600080fd5b8063c1af6e03146102a6578063cb67e3b1146102ea57600080fd5b80637d3f25521461021e5780638da5cb5b14610241578063942a77fd14610280578063bbe4f6db1461029357600080fd5b80634e847fc7116101095780635e63547a116100ee5780635e63547a146101ee5780636b67d01b1461020e57806379ba50971461021657600080fd5b80634e847fc7146101c85780635c182033146101db57600080fd5b806310cbcf181461013b578063156194da14610150578063181f5a77146101635780633dc45772146101b5575b600080fd5b61014e6101493660046112cc565b61045b565b005b61014e61015e3660046112cc565b6104b8565b61019f6040518060400160405280601c81526020017f546f6b656e41646d696e526567697374727920312e352e302d6465760000000081525081565b6040516101ac91906112e7565b60405180910390f35b61014e6101c33660046112cc565b6105e2565b61014e6101d6366004611353565b61063e565b61014e6101e9366004611353565b6107a5565b6102016101fc366004611386565b6108c1565b6040516101ac91906113fb565b6102016109c2565b61014e6109d3565b61023161022c3660046112cc565b610ad0565b60405190151581526020016101ac565b60005473ffffffffffffffffffffffffffffffffffffffff165b60405173ffffffffffffffffffffffffffffffffffffffff90911681526020016101ac565b61014e61028e366004611455565b610add565b61025b6102a13660046112cc565b610bfc565b6102316102b4366004611353565b73ffffffffffffffffffffffffffffffffffffffff91821660009081526002602052604090205463010000009004821691161490565b6103b26102f83660046112cc565b6040805160c081018252600080825260208201819052918101829052606081018290526080810182905260a08101919091525073ffffffffffffffffffffffffffffffffffffffff908116600090815260026020818152604092839020835160c081018552815460ff8082161515835261010082048116151594830194909452620100008104909316151594810194909452630100000090910484166060840152600181015484166080840152015490911660a082015290565b6040516101ac9190600060c082019050825115158252602083015115156020830152604083015115156040830152606083015173ffffffffffffffffffffffffffffffffffffffff80821660608501528060808601511660808501528060a08601511660a0850152505092915050565b61014e610430366004611353565b610c78565b61014e610443366004611353565b610de3565b61014e6104563660046112cc565b610ef5565b610463610f06565b61046e600582610f89565b156104b55760405173ffffffffffffffffffffffffffffffffffffffff8216907f93eaa26dcb9275e56bacb1d33fdbf402262da6f0f4baf2a6e2cd154b73f387f890600090a25b50565b73ffffffffffffffffffffffffffffffffffffffff808216600090815260026020526040902060018101549091163314610541576040517f3edffe7500000000000000000000000000000000000000000000000000000000815233600482015273ffffffffffffffffffffffffffffffffffffffff831660248201526044015b60405180910390fd5b80547fffffffffffffffffff0000000000000000000000000000000000000000ffffff1633630100000081029190911782556001820180547fffffffffffffffffffffffff000000000000000000000000000000000000000016905560405173ffffffffffffffffffffffffffffffffffffffff8416907f399b55200f7f639a63d76efe3dcfa9156ce367058d6b673041b84a628885f5a790600090a35050565b6105ea610f06565b6105f5600582610fb2565b156104b55760405173ffffffffffffffffffffffffffffffffffffffff8216907f3cabf004338366bfeaeb610ad827cb58d16b588017c509501f2c97c83caae7b290600090a250565b73ffffffffffffffffffffffffffffffffffffffff808316600090815260026020526040902054839163010000009091041633146106c6576040517fed5d85b500000000000000000000000000000000000000000000000000000000815233600482015273ffffffffffffffffffffffffffffffffffffffff82166024820152604401610538565b73ffffffffffffffffffffffffffffffffffffffff808416600090815260026020819052604090912090810180548584167fffffffffffffffffffffffff00000000000000000000000000000000000000008216811790925591929190911690811461079e578373ffffffffffffffffffffffffffffffffffffffff168173ffffffffffffffffffffffffffffffffffffffff168673ffffffffffffffffffffffffffffffffffffffff167f754449ec3aff3bd528bfce43ae9319c4a381b67fcd1d20097b3b24dacaecc35d60405160405180910390a45b5050505050565b6107ad610f06565b73ffffffffffffffffffffffffffffffffffffffff808316600090815260026020526040902080547fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff007fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00ff938516630100000002939093167fffffffffffffffffff0000000000000000000000000000000000000000ff00ff9091161761010017919091166001178155610861600384610fb2565b508173ffffffffffffffffffffffffffffffffffffffff168373ffffffffffffffffffffffffffffffffffffffff167f09590fb70af4b833346363965e043a9339e8c7d378b8a2b903c75c277faec4f960405160405180910390a3505050565b606060008267ffffffffffffffff8111156108de576108de611491565b604051908082528060200260200182016040528015610907578160200160208202803683370190505b50905060005b838110156109b8576002600086868481811061092b5761092b6114c0565b905060200201602081019061094091906112cc565b73ffffffffffffffffffffffffffffffffffffffff90811682526020820192909252604001600020600201548351911690839083908110610983576109836114c0565b73ffffffffffffffffffffffffffffffffffffffff909216602092830291909101909101526109b18161151e565b905061090d565b5090505b92915050565b60606109ce6003610fd4565b905090565b60015473ffffffffffffffffffffffffffffffffffffffff163314610a54576040517f08c379a000000000000000000000000000000000000000000000000000000000815260206004820152601660248201527f4d7573742062652070726f706f736564206f776e6572000000000000000000006044820152606401610538565b60008054337fffffffffffffffffffffffff00000000000000000000000000000000000000008083168217845560018054909116905560405173ffffffffffffffffffffffffffffffffffffffff90921692909183917f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e091a350565b60006109bc600583610fe1565b73ffffffffffffffffffffffffffffffffffffffff80831660009081526002602052604090205483916301000000909104163314610b65576040517fed5d85b500000000000000000000000000000000000000000000000000000000815233600482015273ffffffffffffffffffffffffffffffffffffffff82166024820152604401610538565b73ffffffffffffffffffffffffffffffffffffffff831660008181526002602052604090819020805485151562010000027fffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00ffff909116179055517f4f1ce406d38233729d1052ad9f0c2b56bd742cd4fb59781573b51fa1f268a92e90610bef90851515815260200190565b60405180910390a2505050565b73ffffffffffffffffffffffffffffffffffffffff808216600090815260026020819052604082200154909116806109bc576040517fbf16aab600000000000000000000000000000000000000000000000000000000815273ffffffffffffffffffffffffffffffffffffffff84166004820152602401610538565b610c8133610ad0565b610cb9576040517fef5749ef000000000000000000000000000000000000000000000000000000008152336004820152602401610538565b73ffffffffffffffffffffffffffffffffffffffff82166000908152600260205260409020805462010000900460ff168015610cfb57508054610100900460ff165b15610d4a576040517f45ed80e900000000000000000000000000000000000000000000000000000000815273ffffffffffffffffffffffffffffffffffffffff84166004820152602401610538565b80546101007fffffffffffffffffff0000000000000000000000000000000000000000ff00ff909116630100000073ffffffffffffffffffffffffffffffffffffffff8516027fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00ff1617177fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00168155610861600384610fb2565b73ffffffffffffffffffffffffffffffffffffffff80831660009081526002602052604090205483916301000000909104163314610e6b576040517fed5d85b500000000000000000000000000000000000000000000000000000000815233600482015273ffffffffffffffffffffffffffffffffffffffff82166024820152604401610538565b73ffffffffffffffffffffffffffffffffffffffff8381166000818152600260205260408082206001810180547fffffffffffffffffffffffff00000000000000000000000000000000000000001695881695861790559051909392339290917fc54c3051ff16e63bb9203214432372aca006c589e3653619b577a3265675b7169190a450505050565b610efd610f06565b6104b581611010565b60005473ffffffffffffffffffffffffffffffffffffffff163314610f87576040517f08c379a000000000000000000000000000000000000000000000000000000000815260206004820152601660248201527f4f6e6c792063616c6c61626c65206279206f776e6572000000000000000000006044820152606401610538565b565b6000610fab8373ffffffffffffffffffffffffffffffffffffffff8416611105565b9392505050565b6000610fab8373ffffffffffffffffffffffffffffffffffffffff84166111f8565b60606000610fab83611247565b73ffffffffffffffffffffffffffffffffffffffff811660009081526001830160205260408120541515610fab565b3373ffffffffffffffffffffffffffffffffffffffff82160361108f576040517f08c379a000000000000000000000000000000000000000000000000000000000815260206004820152601760248201527f43616e6e6f74207472616e7366657220746f2073656c660000000000000000006044820152606401610538565b600180547fffffffffffffffffffffffff00000000000000000000000000000000000000001673ffffffffffffffffffffffffffffffffffffffff83811691821790925560008054604051929316917fed8889f560326eb138920d842192f0eb3dd22b4f139c87a2c57538e05bae12789190a350565b600081815260018301602052604081205480156111ee576000611129600183611556565b855490915060009061113d90600190611556565b90508181146111a257600086600001828154811061115d5761115d6114c0565b9060005260206000200154905080876000018481548110611180576111806114c0565b6000918252602080832090910192909255918252600188019052604090208390555b85548690806111b3576111b3611569565b6001900381819060005260206000200160009055905585600101600086815260200190815260200160002060009055600193505050506109bc565b60009150506109bc565b600081815260018301602052604081205461123f575081546001818101845560008481526020808220909301849055845484825282860190935260409020919091556109bc565b5060006109bc565b60608160000180548060200260200160405190810160405280929190818152602001828054801561129757602002820191906000526020600020905b815481526020019060010190808311611283575b50505050509050919050565b803573ffffffffffffffffffffffffffffffffffffffff811681146112c757600080fd5b919050565b6000602082840312156112de57600080fd5b610fab826112a3565b600060208083528351808285015260005b81811015611314578581018301518582016040015282016112f8565b5060006040828601015260407fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe0601f8301168501019250505092915050565b6000806040838503121561136657600080fd5b61136f836112a3565b915061137d602084016112a3565b90509250929050565b6000806020838503121561139957600080fd5b823567ffffffffffffffff808211156113b157600080fd5b818501915085601f8301126113c557600080fd5b8135818111156113d457600080fd5b8660208260051b85010111156113e957600080fd5b60209290920196919550909350505050565b6020808252825182820181905260009190848201906040850190845b8181101561144957835173ffffffffffffffffffffffffffffffffffffffff1683529284019291840191600101611417565b50909695505050505050565b6000806040838503121561146857600080fd5b611471836112a3565b91506020830135801515811461148657600080fd5b809150509250929050565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052604160045260246000fd5b7f4e487b7100000000000000000000000000000000000000000000000000000000600052603260045260246000fd5b7f4e487b7100000000000000000000000000000000000000000000000000000000600052601160045260246000fd5b60007fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff820361154f5761154f6114ef565b5060010190565b818103818111156109bc576109bc6114ef565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052603160045260246000fdfea164736f6c6343000813000a",
 }
 
 var TokenAdminRegistryABI = TokenAdminRegistryMetaData.ABI
@@ -425,6 +426,18 @@ func (_TokenAdminRegistry *TokenAdminRegistrySession) RemoveRegistryModule(modul
 
 func (_TokenAdminRegistry *TokenAdminRegistryTransactorSession) RemoveRegistryModule(module common.Address) (*types.Transaction, error) {
 	return _TokenAdminRegistry.Contract.RemoveRegistryModule(&_TokenAdminRegistry.TransactOpts, module)
+}
+
+func (_TokenAdminRegistry *TokenAdminRegistryTransactor) SetDisableReRegistration(opts *bind.TransactOpts, token common.Address, disabled bool) (*types.Transaction, error) {
+	return _TokenAdminRegistry.contract.Transact(opts, "setDisableReRegistration", token, disabled)
+}
+
+func (_TokenAdminRegistry *TokenAdminRegistrySession) SetDisableReRegistration(token common.Address, disabled bool) (*types.Transaction, error) {
+	return _TokenAdminRegistry.Contract.SetDisableReRegistration(&_TokenAdminRegistry.TransactOpts, token, disabled)
+}
+
+func (_TokenAdminRegistry *TokenAdminRegistryTransactorSession) SetDisableReRegistration(token common.Address, disabled bool) (*types.Transaction, error) {
+	return _TokenAdminRegistry.Contract.SetDisableReRegistration(&_TokenAdminRegistry.TransactOpts, token, disabled)
 }
 
 func (_TokenAdminRegistry *TokenAdminRegistryTransactor) SetPool(opts *bind.TransactOpts, token common.Address, pool common.Address) (*types.Transaction, error) {
@@ -874,6 +887,134 @@ func (_TokenAdminRegistry *TokenAdminRegistryFilterer) WatchAdministratorTransfe
 func (_TokenAdminRegistry *TokenAdminRegistryFilterer) ParseAdministratorTransferred(log types.Log) (*TokenAdminRegistryAdministratorTransferred, error) {
 	event := new(TokenAdminRegistryAdministratorTransferred)
 	if err := _TokenAdminRegistry.contract.UnpackLog(event, "AdministratorTransferred", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+type TokenAdminRegistryDisableReRegistrationSetIterator struct {
+	Event *TokenAdminRegistryDisableReRegistrationSet
+
+	contract *bind.BoundContract
+	event    string
+
+	logs chan types.Log
+	sub  ethereum.Subscription
+	done bool
+	fail error
+}
+
+func (it *TokenAdminRegistryDisableReRegistrationSetIterator) Next() bool {
+
+	if it.fail != nil {
+		return false
+	}
+
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(TokenAdminRegistryDisableReRegistrationSet)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+
+	select {
+	case log := <-it.logs:
+		it.Event = new(TokenAdminRegistryDisableReRegistrationSet)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+func (it *TokenAdminRegistryDisableReRegistrationSetIterator) Error() error {
+	return it.fail
+}
+
+func (it *TokenAdminRegistryDisableReRegistrationSetIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+type TokenAdminRegistryDisableReRegistrationSet struct {
+	Token    common.Address
+	Disabled bool
+	Raw      types.Log
+}
+
+func (_TokenAdminRegistry *TokenAdminRegistryFilterer) FilterDisableReRegistrationSet(opts *bind.FilterOpts, token []common.Address) (*TokenAdminRegistryDisableReRegistrationSetIterator, error) {
+
+	var tokenRule []interface{}
+	for _, tokenItem := range token {
+		tokenRule = append(tokenRule, tokenItem)
+	}
+
+	logs, sub, err := _TokenAdminRegistry.contract.FilterLogs(opts, "DisableReRegistrationSet", tokenRule)
+	if err != nil {
+		return nil, err
+	}
+	return &TokenAdminRegistryDisableReRegistrationSetIterator{contract: _TokenAdminRegistry.contract, event: "DisableReRegistrationSet", logs: logs, sub: sub}, nil
+}
+
+func (_TokenAdminRegistry *TokenAdminRegistryFilterer) WatchDisableReRegistrationSet(opts *bind.WatchOpts, sink chan<- *TokenAdminRegistryDisableReRegistrationSet, token []common.Address) (event.Subscription, error) {
+
+	var tokenRule []interface{}
+	for _, tokenItem := range token {
+		tokenRule = append(tokenRule, tokenItem)
+	}
+
+	logs, sub, err := _TokenAdminRegistry.contract.WatchLogs(opts, "DisableReRegistrationSet", tokenRule)
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+
+				event := new(TokenAdminRegistryDisableReRegistrationSet)
+				if err := _TokenAdminRegistry.contract.UnpackLog(event, "DisableReRegistrationSet", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+func (_TokenAdminRegistry *TokenAdminRegistryFilterer) ParseDisableReRegistrationSet(log types.Log) (*TokenAdminRegistryDisableReRegistrationSet, error) {
+	event := new(TokenAdminRegistryDisableReRegistrationSet)
+	if err := _TokenAdminRegistry.contract.UnpackLog(event, "DisableReRegistrationSet", log); err != nil {
 		return nil, err
 	}
 	event.Raw = log
@@ -1424,6 +1565,133 @@ func (_TokenAdminRegistry *TokenAdminRegistryFilterer) ParseRegistryModuleAdded(
 	return event, nil
 }
 
+type TokenAdminRegistryRegistryModuleRemovedIterator struct {
+	Event *TokenAdminRegistryRegistryModuleRemoved
+
+	contract *bind.BoundContract
+	event    string
+
+	logs chan types.Log
+	sub  ethereum.Subscription
+	done bool
+	fail error
+}
+
+func (it *TokenAdminRegistryRegistryModuleRemovedIterator) Next() bool {
+
+	if it.fail != nil {
+		return false
+	}
+
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(TokenAdminRegistryRegistryModuleRemoved)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+
+	select {
+	case log := <-it.logs:
+		it.Event = new(TokenAdminRegistryRegistryModuleRemoved)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+func (it *TokenAdminRegistryRegistryModuleRemovedIterator) Error() error {
+	return it.fail
+}
+
+func (it *TokenAdminRegistryRegistryModuleRemovedIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+type TokenAdminRegistryRegistryModuleRemoved struct {
+	Module common.Address
+	Raw    types.Log
+}
+
+func (_TokenAdminRegistry *TokenAdminRegistryFilterer) FilterRegistryModuleRemoved(opts *bind.FilterOpts, module []common.Address) (*TokenAdminRegistryRegistryModuleRemovedIterator, error) {
+
+	var moduleRule []interface{}
+	for _, moduleItem := range module {
+		moduleRule = append(moduleRule, moduleItem)
+	}
+
+	logs, sub, err := _TokenAdminRegistry.contract.FilterLogs(opts, "RegistryModuleRemoved", moduleRule)
+	if err != nil {
+		return nil, err
+	}
+	return &TokenAdminRegistryRegistryModuleRemovedIterator{contract: _TokenAdminRegistry.contract, event: "RegistryModuleRemoved", logs: logs, sub: sub}, nil
+}
+
+func (_TokenAdminRegistry *TokenAdminRegistryFilterer) WatchRegistryModuleRemoved(opts *bind.WatchOpts, sink chan<- *TokenAdminRegistryRegistryModuleRemoved, module []common.Address) (event.Subscription, error) {
+
+	var moduleRule []interface{}
+	for _, moduleItem := range module {
+		moduleRule = append(moduleRule, moduleItem)
+	}
+
+	logs, sub, err := _TokenAdminRegistry.contract.WatchLogs(opts, "RegistryModuleRemoved", moduleRule)
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+
+				event := new(TokenAdminRegistryRegistryModuleRemoved)
+				if err := _TokenAdminRegistry.contract.UnpackLog(event, "RegistryModuleRemoved", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+func (_TokenAdminRegistry *TokenAdminRegistryFilterer) ParseRegistryModuleRemoved(log types.Log) (*TokenAdminRegistryRegistryModuleRemoved, error) {
+	event := new(TokenAdminRegistryRegistryModuleRemoved)
+	if err := _TokenAdminRegistry.contract.UnpackLog(event, "RegistryModuleRemoved", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
 func (_TokenAdminRegistry *TokenAdminRegistry) ParseLog(log types.Log) (generated.AbigenLog, error) {
 	switch log.Topics[0] {
 	case _TokenAdminRegistry.abi.Events["AdministratorRegistered"].ID:
@@ -1432,6 +1700,8 @@ func (_TokenAdminRegistry *TokenAdminRegistry) ParseLog(log types.Log) (generate
 		return _TokenAdminRegistry.ParseAdministratorTransferRequested(log)
 	case _TokenAdminRegistry.abi.Events["AdministratorTransferred"].ID:
 		return _TokenAdminRegistry.ParseAdministratorTransferred(log)
+	case _TokenAdminRegistry.abi.Events["DisableReRegistrationSet"].ID:
+		return _TokenAdminRegistry.ParseDisableReRegistrationSet(log)
 	case _TokenAdminRegistry.abi.Events["OwnershipTransferRequested"].ID:
 		return _TokenAdminRegistry.ParseOwnershipTransferRequested(log)
 	case _TokenAdminRegistry.abi.Events["OwnershipTransferred"].ID:
@@ -1440,6 +1710,8 @@ func (_TokenAdminRegistry *TokenAdminRegistry) ParseLog(log types.Log) (generate
 		return _TokenAdminRegistry.ParsePoolSet(log)
 	case _TokenAdminRegistry.abi.Events["RegistryModuleAdded"].ID:
 		return _TokenAdminRegistry.ParseRegistryModuleAdded(log)
+	case _TokenAdminRegistry.abi.Events["RegistryModuleRemoved"].ID:
+		return _TokenAdminRegistry.ParseRegistryModuleRemoved(log)
 
 	default:
 		return nil, fmt.Errorf("abigen wrapper received unknown log topic: %v", log.Topics[0])
@@ -1458,6 +1730,10 @@ func (TokenAdminRegistryAdministratorTransferred) Topic() common.Hash {
 	return common.HexToHash("0x399b55200f7f639a63d76efe3dcfa9156ce367058d6b673041b84a628885f5a7")
 }
 
+func (TokenAdminRegistryDisableReRegistrationSet) Topic() common.Hash {
+	return common.HexToHash("0x4f1ce406d38233729d1052ad9f0c2b56bd742cd4fb59781573b51fa1f268a92e")
+}
+
 func (TokenAdminRegistryOwnershipTransferRequested) Topic() common.Hash {
 	return common.HexToHash("0xed8889f560326eb138920d842192f0eb3dd22b4f139c87a2c57538e05bae1278")
 }
@@ -1472,6 +1748,10 @@ func (TokenAdminRegistryPoolSet) Topic() common.Hash {
 
 func (TokenAdminRegistryRegistryModuleAdded) Topic() common.Hash {
 	return common.HexToHash("0x3cabf004338366bfeaeb610ad827cb58d16b588017c509501f2c97c83caae7b2")
+}
+
+func (TokenAdminRegistryRegistryModuleRemoved) Topic() common.Hash {
+	return common.HexToHash("0x93eaa26dcb9275e56bacb1d33fdbf402262da6f0f4baf2a6e2cd154b73f387f8")
 }
 
 func (_TokenAdminRegistry *TokenAdminRegistry) Address() common.Address {
@@ -1507,6 +1787,8 @@ type TokenAdminRegistryInterface interface {
 
 	RemoveRegistryModule(opts *bind.TransactOpts, module common.Address) (*types.Transaction, error)
 
+	SetDisableReRegistration(opts *bind.TransactOpts, token common.Address, disabled bool) (*types.Transaction, error)
+
 	SetPool(opts *bind.TransactOpts, token common.Address, pool common.Address) (*types.Transaction, error)
 
 	TransferAdminRole(opts *bind.TransactOpts, token common.Address, newOwner common.Address) (*types.Transaction, error)
@@ -1531,6 +1813,12 @@ type TokenAdminRegistryInterface interface {
 
 	ParseAdministratorTransferred(log types.Log) (*TokenAdminRegistryAdministratorTransferred, error)
 
+	FilterDisableReRegistrationSet(opts *bind.FilterOpts, token []common.Address) (*TokenAdminRegistryDisableReRegistrationSetIterator, error)
+
+	WatchDisableReRegistrationSet(opts *bind.WatchOpts, sink chan<- *TokenAdminRegistryDisableReRegistrationSet, token []common.Address) (event.Subscription, error)
+
+	ParseDisableReRegistrationSet(log types.Log) (*TokenAdminRegistryDisableReRegistrationSet, error)
+
 	FilterOwnershipTransferRequested(opts *bind.FilterOpts, from []common.Address, to []common.Address) (*TokenAdminRegistryOwnershipTransferRequestedIterator, error)
 
 	WatchOwnershipTransferRequested(opts *bind.WatchOpts, sink chan<- *TokenAdminRegistryOwnershipTransferRequested, from []common.Address, to []common.Address) (event.Subscription, error)
@@ -1554,6 +1842,12 @@ type TokenAdminRegistryInterface interface {
 	WatchRegistryModuleAdded(opts *bind.WatchOpts, sink chan<- *TokenAdminRegistryRegistryModuleAdded, module []common.Address) (event.Subscription, error)
 
 	ParseRegistryModuleAdded(log types.Log) (*TokenAdminRegistryRegistryModuleAdded, error)
+
+	FilterRegistryModuleRemoved(opts *bind.FilterOpts, module []common.Address) (*TokenAdminRegistryRegistryModuleRemovedIterator, error)
+
+	WatchRegistryModuleRemoved(opts *bind.WatchOpts, sink chan<- *TokenAdminRegistryRegistryModuleRemoved, module []common.Address) (event.Subscription, error)
+
+	ParseRegistryModuleRemoved(log types.Log) (*TokenAdminRegistryRegistryModuleRemoved, error)
 
 	ParseLog(log types.Log) (generated.AbigenLog, error)
 

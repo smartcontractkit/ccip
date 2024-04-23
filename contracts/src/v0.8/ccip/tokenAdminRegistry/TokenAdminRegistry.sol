@@ -15,12 +15,15 @@ contract TokenAdminRegistry is ITokenAdminRegistry, ITypeAndVersion, OwnerIsCrea
   error OnlyAdministrator(address sender, address token);
   error OnlyPendingAdministrator(address sender, address token);
   error UnsupportedToken(address token);
+  error AlreadyRegistered(address token);
 
   event AdministratorRegistered(address indexed token, address indexed administrator);
   event PoolSet(address indexed token, address indexed previousPool, address indexed newPool);
   event AdministratorTransferRequested(address indexed token, address indexed currentAdmin, address indexed newAdmin);
   event AdministratorTransferred(address indexed token, address indexed newAdmin);
+  event DisableReRegistrationSet(address indexed token, bool disabled);
   event RegistryModuleAdded(address indexed module);
+  event RegistryModuleRemoved(address indexed module);
 
   // The struct is packed in a way that optimizes the attributes that are accessed together.
   // solhint-disable-next-line gas-struct-packing
@@ -28,6 +31,7 @@ contract TokenAdminRegistry is ITokenAdminRegistry, ITypeAndVersion, OwnerIsCrea
     bool isPermissionedAdmin; // ─────────────╮ if true, this administrator has been configured by the CCIP owner
     //                                        │ and it could have elevated permissions.
     bool isRegistered; //                     │ if true, the token is registered in the registry
+    bool disableReRegistration; //            │ if true, the token cannot be permissionlessly re-registered
     address administrator; // ────────────────╯ the current administrator of the token
     address pendingAdministrator; //            the address that is pending to become the new owner
     address tokenPool; // the token pool for this token. Can be address(0) if not deployed or not configured.
@@ -44,6 +48,7 @@ contract TokenAdminRegistry is ITokenAdminRegistry, ITypeAndVersion, OwnerIsCrea
   // Registry modules are allowed to register administrators for tokens
   EnumerableSet.AddressSet internal s_RegistryModules;
 
+  // TODO pagination?
   /// @notice Returns all pools for the given tokens.
   /// @dev Will return address(0) for tokens that do not have a pool.
   function getPools(address[] calldata tokens) external view returns (address[] memory) {
@@ -117,6 +122,15 @@ contract TokenAdminRegistry is ITokenAdminRegistry, ITypeAndVersion, OwnerIsCrea
     emit AdministratorTransferred(token, msg.sender);
   }
 
+  /// @notice Disables the re-registration of a token.
+  /// @param token The token to disable re-registration for.
+  /// @param disabled True to disable re-registration, false to enable it.
+  function setDisableReRegistration(address token, bool disabled) external onlyTokenAdmin(token) {
+    s_tokenConfig[token].disableReRegistration = disabled;
+
+    emit DisableReRegistrationSet(token, disabled);
+  }
+
   // ================================================================
   // │                    Administrator config                      │
   // ================================================================
@@ -136,6 +150,10 @@ contract TokenAdminRegistry is ITokenAdminRegistry, ITypeAndVersion, OwnerIsCrea
       revert OnlyRegistryModule(msg.sender);
     }
     TokenConfig storage config = s_tokenConfig[localToken];
+
+    if (config.disableReRegistration && config.isRegistered) {
+      revert AlreadyRegistered(localToken);
+    }
 
     config.administrator = administrator;
     config.isRegistered = true;
@@ -186,7 +204,7 @@ contract TokenAdminRegistry is ITokenAdminRegistry, ITypeAndVersion, OwnerIsCrea
   /// @param module The module to remove.
   function removeRegistryModule(address module) external onlyOwner {
     if (s_RegistryModules.remove(module)) {
-      emit RegistryModuleAdded(module);
+      emit RegistryModuleRemoved(module);
     }
   }
 

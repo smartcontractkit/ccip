@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.0;
 
-import {TokenAdminRegistry} from "../../pools/TokenAdminRegistry.sol";
+import {TokenAdminRegistry} from "../../tokenAdminRegistry/TokenAdminRegistry.sol";
 import {TokenSetup} from "../TokenSetup.t.sol";
 
 contract TokenAdminRegistrySetup is TokenSetup {
@@ -9,6 +9,9 @@ contract TokenAdminRegistrySetup is TokenSetup {
   event PoolSet(address indexed token, address indexed previousPool, address indexed newPool);
   event AdministratorTransferRequested(address indexed token, address indexed currentAdmin, address indexed newAdmin);
   event AdministratorTransferred(address indexed token, address indexed newAdmin);
+  event DisableReRegistrationSet(address indexed token, bool disabled);
+  event RegistryModuleAdded(address indexed module);
+  event RegistryModuleRemoved(address indexed module);
 
   address internal s_registryModule = makeAddr("registryModule");
 
@@ -130,7 +133,7 @@ contract TokenAdminRegistry_acceptAdminRole is TokenAdminRegistrySetup {
     assertEq(config.pendingAdministrator, newAdmin);
     assertEq(config.administrator, currentAdmin);
 
-    changePrank(newAdmin);
+    vm.startPrank(newAdmin);
 
     vm.expectEmit();
     emit AdministratorTransferred(token, newAdmin);
@@ -158,10 +161,28 @@ contract TokenAdminRegistry_acceptAdminRole is TokenAdminRegistrySetup {
     assertEq(config.administrator, currentAdmin);
 
     address notNewAdmin = makeAddr("notNewAdmin");
-    changePrank(notNewAdmin);
+    vm.startPrank(notNewAdmin);
 
     vm.expectRevert(abi.encodeWithSelector(TokenAdminRegistry.OnlyPendingAdministrator.selector, notNewAdmin, token));
     s_tokenAdminRegistry.acceptAdminRole(token);
+  }
+}
+
+contract TokenAdminRegistry_setDisableReRegistration is TokenAdminRegistrySetup {
+  function test_setDisableReRegistration_Success() public {
+    vm.expectEmit();
+    emit DisableReRegistrationSet(s_sourceTokens[0], true);
+
+    s_tokenAdminRegistry.setDisableReRegistration(s_sourceTokens[0], true);
+
+    assertTrue(s_tokenAdminRegistry.getTokenConfig(s_sourceTokens[0]).disableReRegistration);
+
+    vm.expectEmit();
+    emit DisableReRegistrationSet(s_sourceTokens[0], false);
+
+    s_tokenAdminRegistry.setDisableReRegistration(s_sourceTokens[0], false);
+
+    assertFalse(s_tokenAdminRegistry.getTokenConfig(s_sourceTokens[0]).disableReRegistration);
   }
 }
 
@@ -195,6 +216,23 @@ contract TokenAdminRegistry_registerAdministrator is TokenAdminRegistrySetup {
     assert(s_tokenAdminRegistry.isAdministrator(newToken, newOwner));
   }
 
+  function test_registerAdministrator__disableReRegistration_Revert() public {
+    vm.startPrank(s_registryModule);
+    address newOwner = makeAddr("newOwner");
+    address newToken = makeAddr("newToken");
+
+    s_tokenAdminRegistry.registerAdministrator(newToken, newOwner);
+
+    vm.startPrank(newOwner);
+
+    s_tokenAdminRegistry.setDisableReRegistration(newToken, true);
+
+    vm.startPrank(s_registryModule);
+    vm.expectRevert(abi.encodeWithSelector(TokenAdminRegistry.AlreadyRegistered.selector, newToken));
+
+    s_tokenAdminRegistry.registerAdministrator(newToken, newOwner);
+  }
+
   function test_registerAdministrator_OnlyRegistryModule_Revert() public {
     address newToken = makeAddr("newToken");
     vm.stopPrank();
@@ -225,5 +263,36 @@ contract TokenAdminRegistry_addRegistryModule is TokenAdminRegistrySetup {
 
     vm.expectRevert("Only callable by owner");
     s_tokenAdminRegistry.addRegistryModule(newModule);
+  }
+}
+
+contract TokenAdminRegistry_removeRegistryModule is TokenAdminRegistrySetup {
+  function test_removeRegistryModule_Success() public {
+    address newModule = makeAddr("newModule");
+
+    s_tokenAdminRegistry.addRegistryModule(newModule);
+
+    assertTrue(s_tokenAdminRegistry.isRegistryModule(newModule));
+
+    vm.expectEmit();
+    emit RegistryModuleRemoved(newModule);
+
+    s_tokenAdminRegistry.removeRegistryModule(newModule);
+
+    assertFalse(s_tokenAdminRegistry.isRegistryModule(newModule));
+
+    // Assert the event is not emitted if the module is already removed.
+    vm.recordLogs();
+    s_tokenAdminRegistry.removeRegistryModule(newModule);
+
+    vm.assertEq(vm.getRecordedLogs().length, 0);
+  }
+
+  function test_removeRegistryModule_OnlyOwner_Revert() public {
+    address newModule = makeAddr("newModule");
+    vm.stopPrank();
+
+    vm.expectRevert("Only callable by owner");
+    s_tokenAdminRegistry.removeRegistryModule(newModule);
   }
 }
