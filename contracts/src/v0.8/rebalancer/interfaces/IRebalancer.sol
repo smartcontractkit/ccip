@@ -26,8 +26,8 @@ interface IRebalancer {
   struct ReceiveLiquidityParams {
     uint256 amount;
     uint64 remoteChainSelector;
-    bytes bridgeData;
     bool shouldWrapNative;
+    bytes bridgeData;
   }
 
   struct LiquidityInstructions {
