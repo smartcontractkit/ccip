@@ -860,7 +860,7 @@ func (r *ExecutionReportingPlugin) getUnexpiredCommitReports(
 	commitStoreReader ccipdata.CommitStoreReader,
 	lggr logger.Logger,
 ) ([]cciptypes.CommitStoreReport, error) {
-	createdAfterTimestamp := r.commitRootsCache.CommitSearchTimestamp()
+	createdAfterTimestamp := r.commitRootsCache.OldestRootTimestamp()
 	lggr.Infow("Fetching unexpired commit roots from database", "createdAfterTimestamp", createdAfterTimestamp)
 	acceptedReports, err := commitStoreReader.GetAcceptedCommitReportsGteTimestamp(
 		ctx,
@@ -879,7 +879,7 @@ func (r *ExecutionReportingPlugin) getUnexpiredCommitReports(
 
 	notSnoozedReports := make([]cciptypes.CommitStoreReport, 0)
 	for _, report := range reports {
-		if r.commitRootsCache.IsSnoozed(report.MerkleRoot) {
+		if r.commitRootsCache.IsSkipped(report.MerkleRoot) {
 			lggr.Debugw("Skipping snoozed root",
 				"minSeqNr", report.Interval.Min,
 				"maxSeqNr", report.Interval.Max,

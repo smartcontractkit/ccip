@@ -16,17 +16,17 @@ func TestSnoozedRoots(t *testing.T) {
 	k2 := [32]byte{2}
 
 	// return false for non existing element
-	snoozed := c.IsSnoozed(k1)
+	snoozed := c.IsSkipped(k1)
 	assert.False(t, snoozed)
 
 	// after an element is marked as executed it should be snoozed
 	c.MarkAsExecuted(k1)
-	snoozed = c.IsSnoozed(k1)
+	snoozed = c.IsSkipped(k1)
 	assert.True(t, snoozed)
 
 	// after snoozing an element it should be snoozed
 	c.Snooze(k2)
-	snoozed = c.IsSnoozed(k2)
+	snoozed = c.IsSkipped(k2)
 	assert.True(t, snoozed)
 }
 
@@ -38,7 +38,7 @@ func TestEvictingElements(t *testing.T) {
 
 	time.Sleep(10 * time.Millisecond)
 
-	assert.False(t, c.IsSnoozed(k1))
+	assert.False(t, c.IsSkipped(k1))
 }
 
 func Test_UnexecutedRoots(t *testing.T) {
@@ -144,7 +144,7 @@ func Test_UnexecutedRoots(t *testing.T) {
 				c.MarkAsExecuted(r)
 			}
 
-			commitTs := c.CommitSearchTimestamp()
+			commitTs := c.OldestRootTimestamp()
 			if tt.expectedTimestamp.IsZero() {
 				assert.True(t, commitTs.Before(time.Now().Add(-tt.permissionLessThreshold)))
 			} else {
@@ -169,7 +169,7 @@ func Test_UnexecutedRootsScenario(t *testing.T) {
 	t4 := time.Now().Add(-1 * time.Hour)
 
 	// First check should return permissionLessThreshold window
-	commitTs := c.CommitSearchTimestamp()
+	commitTs := c.OldestRootTimestamp()
 	assert.True(t, commitTs.Before(time.Now().Add(-permissionLessThreshold)))
 
 	c.AppendUnexecutedRoot(k1, t1)
@@ -177,37 +177,37 @@ func Test_UnexecutedRootsScenario(t *testing.T) {
 	c.AppendUnexecutedRoot(k3, t3)
 
 	// After loading roots it should return the first one
-	commitTs = c.CommitSearchTimestamp()
+	commitTs = c.OldestRootTimestamp()
 	assert.Equal(t, t1.Add(-time.Second), commitTs)
 
 	// Marking root in the middle as executed shouldn't change the commitTs
 	c.MarkAsExecuted(k2)
-	commitTs = c.CommitSearchTimestamp()
+	commitTs = c.OldestRootTimestamp()
 	assert.Equal(t, t1.Add(-time.Second), commitTs)
 
 	// Marking k1 as executed when k2 is already executed should return timestamp of k3
 	c.MarkAsExecuted(k1)
-	commitTs = c.CommitSearchTimestamp()
+	commitTs = c.OldestRootTimestamp()
 	assert.Equal(t, t3.Add(-time.Second), commitTs)
 
 	// Marking all as executed should return timestamp of the latest
 	c.MarkAsExecuted(k3)
-	commitTs = c.CommitSearchTimestamp()
+	commitTs = c.OldestRootTimestamp()
 	assert.Equal(t, t3.Add(-time.Second), commitTs)
 
 	// Adding k4 should return timestamp of k4
 	c.AppendUnexecutedRoot(k4, t4)
-	commitTs = c.CommitSearchTimestamp()
+	commitTs = c.OldestRootTimestamp()
 	assert.Equal(t, t4.Add(-time.Second), commitTs)
 
 	c.MarkAsExecuted(k4)
-	commitTs = c.CommitSearchTimestamp()
+	commitTs = c.OldestRootTimestamp()
 	assert.Equal(t, t4.Add(-time.Second), commitTs)
 
 	// Appending already executed roots should be ignored
 	c.AppendUnexecutedRoot(k1, t1)
 	c.AppendUnexecutedRoot(k2, t2)
-	commitTs = c.CommitSearchTimestamp()
+	commitTs = c.OldestRootTimestamp()
 	assert.Equal(t, t4.Add(-time.Second), commitTs)
 }
 
@@ -228,13 +228,13 @@ func Test_UnexecutedRootsStaleQueue(t *testing.T) {
 	c.AppendUnexecutedRoot(k3, t3)
 
 	// First check should return permissionLessThreshold window
-	commitTs := c.CommitSearchTimestamp()
+	commitTs := c.OldestRootTimestamp()
 	assert.Equal(t, t1.Add(-time.Second), commitTs)
 
 	// Reducing permissionLessExecutionThreshold works as speeding the clock
 	c.permissionLessExecutionThresholdDuration = 1 * time.Hour
 
-	commitTs = c.CommitSearchTimestamp()
+	commitTs = c.OldestRootTimestamp()
 	assert.True(t, commitTs.Before(time.Now().Add(-1*time.Hour)))
 	assert.True(t, commitTs.After(t1))
 	assert.True(t, commitTs.After(t2))
