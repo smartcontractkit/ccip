@@ -698,7 +698,7 @@ func TestNew(t *testing.T) {
 				lggr:                    logger.TestLogger(t),
 			},
 			func(t *testing.T, args args) {
-				args.sourceLogPoller.On("RegisterFilter", mock.MatchedBy(func(f logpoller.Filter) bool {
+				args.sourceLogPoller.On("RegisterFilter", mock.Anything, mock.MatchedBy(func(f logpoller.Filter) bool {
 					ok := len(f.Addresses) == 1
 					ok = ok && f.Addresses[0] == common.Address(args.sourceRebalancerAddress)
 					ok = ok && len(f.EventSigs) == 2
@@ -707,7 +707,7 @@ func TestNew(t *testing.T) {
 					ok = ok && strings.HasPrefix(f.Name, "Local-LiquidityTransferred-FinalizationCompleted")
 					return ok
 				})).Return(nil)
-				args.destLogPoller.On("RegisterFilter", mock.MatchedBy(func(f logpoller.Filter) bool {
+				args.destLogPoller.On("RegisterFilter", mock.Anything, mock.MatchedBy(func(f logpoller.Filter) bool {
 					ok := len(f.Addresses) == 1
 					ok = ok && f.Addresses[0] == common.Address(args.destRebalancerAddress)
 					ok = ok && len(f.EventSigs) == 2
