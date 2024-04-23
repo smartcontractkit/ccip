@@ -1,6 +1,6 @@
 # ALL_FOUNDRY_PRODUCTS contains a list of all products that have a foundry
 # profile defined and use the Foundry snapshots.
-ALL_FOUNDRY_PRODUCTS = l2ep llo-feeds functions keystone shared ccip rebalancer
+ALL_FOUNDRY_PRODUCTS = l2ep llo-feeds functions keystone shared ccip rebalancer transmission
 
 # To make a snapshot for a specific product, either set the `FOUNDRY_PROFILE` env var
 # or call the target with `FOUNDRY_PROFILE=product`
@@ -16,11 +16,11 @@ ALL_FOUNDRY_PRODUCTS = l2ep llo-feeds functions keystone shared ccip rebalancer
 # a static fuzz seed by default, flaky gas results per platform are still observed.
 .PHONY: snapshot
 snapshot: ## Make a snapshot for a specific product.
-	export FOUNDRY_PROFILE=$(FOUNDRY_PROFILE) && forge snapshot --nmt "testFuzz_\w{1,}?" --snap gas-snapshots/$(FOUNDRY_PROFILE).gas-snapshot
+	export FOUNDRY_PROFILE=$(FOUNDRY_PROFILE) && forge snapshot --nmt "test_?Fuzz_\w{1,}?" --snap gas-snapshots/$(FOUNDRY_PROFILE).gas-snapshot
 
 .PHONY: snapshot-diff
 snapshot-diff: ## Make a snapshot for a specific product.
-	export FOUNDRY_PROFILE=$(FOUNDRY_PROFILE) && forge snapshot --nmt "testFuzz_\w{1,}?" --diff gas-snapshots/$(FOUNDRY_PROFILE).gas-snapshot
+	export FOUNDRY_PROFILE=$(FOUNDRY_PROFILE) && forge snapshot --nmt "test_?Fuzz_\w{1,}?" --diff gas-snapshots/$(FOUNDRY_PROFILE).gas-snapshot
 
 
 .PHONY: snapshot-all
@@ -43,7 +43,7 @@ mockery: $(mockery) ## Install mockery.
 
 .PHONY: foundry
 foundry: ## Install foundry.
-	foundryup --version nightly-2cb875799419c907cc3709e586ece2559e6b340e
+	foundryup --version nightly-de33b6af53005037b463318d2628b5cfcaf39916
 
 .PHONY: foundry-refresh
 foundry-refresh: foundry

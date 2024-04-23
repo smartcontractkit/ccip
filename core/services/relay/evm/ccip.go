@@ -1,10 +1,13 @@
 package evm
 
 import (
+	"bytes"
 	"context"
+	"crypto/sha256"
+	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
-
+	"github.com/google/uuid"
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2/types"
 
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
@@ -33,9 +36,21 @@ type ccipCommitProvider struct {
 	contractTransmitter *contractTransmitter
 }
 
+func chainToUUID(chainID *big.Int) uuid.UUID {
+	// See https://www.rfc-editor.org/rfc/rfc4122.html#section-4.1.3 for the list of supported versions.
+	const VersionSHA1 = 5
+	var buf bytes.Buffer
+	buf.WriteString("CCIP:")
+	buf.Write(chainID.Bytes())
+	// We use SHA-256 instead of SHA-1 because the former has better collision resistance.
+	// The UUID will contain only the first 16 bytes of the hash.
+	// You can't say which algorithms was used just by looking at the UUID bytes.
+	return uuid.NewHash(sha256.New(), uuid.NameSpaceOID, buf.Bytes(), VersionSHA1)
+}
+
 func NewCCIPCommitProvider(ctx context.Context, lggr logger.Logger, chainSet legacyevm.Chain, rargs commontypes.RelayArgs, transmitterID string, ks keystore.Eth) (CCIPCommitProvider, error) {
 	relayOpts := types.NewRelayOpts(rargs)
-	configWatcher, err := newStandardConfigProvider(lggr, chainSet, relayOpts)
+	configWatcher, err := newStandardConfigProvider(ctx, lggr, chainSet, relayOpts)
 	if err != nil {
 		return nil, err
 	}
@@ -48,7 +63,10 @@ func NewCCIPCommitProvider(ctx context.Context, lggr logger.Logger, chainSet leg
 	if err != nil {
 		return nil, err
 	}
-	contractTransmitter, err := newOnChainContractTransmitter(ctx, lggr, rargs, transmitterID, ks, configWatcher, configTransmitterOpts{}, OCR2AggregatorTransmissionContractABI, fn)
+	subjectID := chainToUUID(configWatcher.chain.ID())
+	contractTransmitter, err := newOnChainContractTransmitter(ctx, lggr, rargs, transmitterID, ks, configWatcher, configTransmitterOpts{
+		subjectID: &subjectID,
+	}, OCR2AggregatorTransmissionContractABI, fn)
 	if err != nil {
 		return nil, err
 	}
@@ -80,7 +98,7 @@ var _ commontypes.Plugin = (*ccipExecutionProvider)(nil)
 func NewCCIPExecutionProvider(ctx context.Context, lggr logger.Logger, chainSet legacyevm.Chain, rargs commontypes.RelayArgs, transmitterID string, ks keystore.Eth) (CCIPExecutionProvider, error) {
 	relayOpts := types.NewRelayOpts(rargs)
 
-	configWatcher, err := newStandardConfigProvider(lggr, chainSet, relayOpts)
+	configWatcher, err := newStandardConfigProvider(ctx, lggr, chainSet, relayOpts)
 	if err != nil {
 		return nil, err
 	}
@@ -93,7 +111,10 @@ func NewCCIPExecutionProvider(ctx context.Context, lggr logger.Logger, chainSet 
 	if err != nil {
 		return nil, err
 	}
-	contractTransmitter, err := newOnChainContractTransmitter(ctx, lggr, rargs, transmitterID, ks, configWatcher, configTransmitterOpts{}, OCR2AggregatorTransmissionContractABI, fn)
+	subjectID := chainToUUID(configWatcher.chain.ID())
+	contractTransmitter, err := newOnChainContractTransmitter(ctx, lggr, rargs, transmitterID, ks, configWatcher, configTransmitterOpts{
+		subjectID: &subjectID,
+	}, OCR2AggregatorTransmissionContractABI, fn)
 	if err != nil {
 		return nil, err
 	}

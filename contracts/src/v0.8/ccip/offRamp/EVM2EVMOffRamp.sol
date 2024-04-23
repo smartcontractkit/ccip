@@ -2,24 +2,24 @@
 pragma solidity 0.8.19;
 
 import {ITypeAndVersion} from "../../shared/interfaces/ITypeAndVersion.sol";
-import {ICommitStore} from "../interfaces/ICommitStore.sol";
 import {IARM} from "../interfaces/IARM.sol";
-import {IPool} from "../interfaces/pools/IPool.sol";
-import {IRouter} from "../interfaces/IRouter.sol";
-import {IPriceRegistry} from "../interfaces/IPriceRegistry.sol";
 import {IAny2EVMMessageReceiver} from "../interfaces/IAny2EVMMessageReceiver.sol";
 import {IAny2EVMOffRamp} from "../interfaces/IAny2EVMOffRamp.sol";
+import {ICommitStore} from "../interfaces/ICommitStore.sol";
+import {IPriceRegistry} from "../interfaces/IPriceRegistry.sol";
+import {IRouter} from "../interfaces/IRouter.sol";
+import {IPool} from "../interfaces/pools/IPool.sol";
 
+import {CallWithExactGas} from "../../shared/call/CallWithExactGas.sol";
+import {EnumerableMapAddresses} from "../../shared/enumerable/EnumerableMapAddresses.sol";
+import {AggregateRateLimiter} from "../AggregateRateLimiter.sol";
 import {Client} from "../libraries/Client.sol";
 import {Internal} from "../libraries/Internal.sol";
 import {RateLimiter} from "../libraries/RateLimiter.sol";
-import {CallWithExactGas} from "../../shared/call/CallWithExactGas.sol";
 import {OCR2BaseNoChecks} from "../ocr/OCR2BaseNoChecks.sol";
-import {AggregateRateLimiter} from "../AggregateRateLimiter.sol";
-import {EnumerableMapAddresses} from "../../shared/enumerable/EnumerableMapAddresses.sol";
 
-import {IERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {ERC165Checker} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/introspection/ERC165Checker.sol";
+import {EnumerableSet} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/structs/EnumerableSet.sol";
 
 /// @notice EVM2EVMOffRamp enables OCR networks to execute multiple messages
 /// in an OffRamp in a single transaction.
@@ -46,32 +46,26 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
   error ManualExecutionGasLimitMismatch();
   error InvalidManualExecutionGasLimit(uint256 index, uint256 newLimit);
   error RootNotCommitted();
-  error UnsupportedToken(IERC20 token);
   error CanOnlySelfCall();
   error ReceiverError(bytes error);
   error TokenHandlingError(bytes error);
   error EmptyReport();
   error BadARMSignal();
   error InvalidMessageId();
-  error InvalidTokenPoolConfig();
-  error PoolAlreadyAdded();
-  error PoolDoesNotExist();
-  error TokenPoolMismatch();
+  error InvalidAddress(bytes encodedAddress);
   error InvalidNewState(uint64 sequenceNumber, Internal.MessageExecutionState newState);
+  error IndexOutOfRange();
 
-  event PoolAdded(address token, address pool);
-  event PoolRemoved(address token, address pool);
   /// @dev Atlas depends on this event, if changing, please notify Atlas.
   event ConfigSet(StaticConfig staticConfig, DynamicConfig dynamicConfig);
   event SkippedIncorrectNonce(uint64 indexed nonce, address indexed sender);
   event SkippedSenderWithPreviousRampMessageInflight(uint64 indexed nonce, address indexed sender);
   /// @dev RMN depends on this event, if changing, please notify the RMN maintainers.
   event ExecutionStateChanged(
-    uint64 indexed sequenceNumber,
-    bytes32 indexed messageId,
-    Internal.MessageExecutionState state,
-    bytes returnData
+    uint64 indexed sequenceNumber, bytes32 indexed messageId, Internal.MessageExecutionState state, bytes returnData
   );
+  event TokenAggregateRateLimitAdded(address sourceToken, address destToken);
+  event TokenAggregateRateLimitRemoved(address sourceToken, address destToken);
 
   /// @notice Static offRamp config
   /// @dev RMN depends on this struct, if changing, please notify the RMN maintainers.
@@ -93,6 +87,12 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
     uint16 maxNumberOfTokensPerMsg; //  │ Maximum number of ERC20 token transfers that can be included per message
     uint32 maxDataBytes; //             │ Maximum payload data size in bytes
     uint32 maxPoolReleaseOrMintGas; // ─╯ Maximum amount of gas passed on to token pool when calling releaseOrMint
+  }
+
+  /// @notice RateLimitToken struct containing both the source and destination token addresses
+  struct RateLimitToken {
+    address sourceToken;
+    address destToken;
   }
 
   // STATIC CONFIG
@@ -118,10 +118,9 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
 
   // DYNAMIC CONFIG
   DynamicConfig internal s_dynamicConfig;
-  /// @dev source token => token pool
-  EnumerableMapAddresses.AddressToAddressMap private s_poolsBySourceToken;
-  /// @dev dest token => token pool
-  EnumerableMapAddresses.AddressToAddressMap private s_poolsByDestToken;
+  /// @dev Tokens that should be included in Aggregate Rate Limiting
+  /// An (address => address) map is used for backwards compatability of offchain code
+  EnumerableMapAddresses.AddressToAddressMap internal s_rateLimitedTokensDestToSource;
 
   // STATE
   /// @dev The expected nonce for a given sender.
@@ -136,11 +135,8 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
 
   constructor(
     StaticConfig memory staticConfig,
-    IERC20[] memory sourceTokens,
-    IPool[] memory pools,
     RateLimiter.Config memory rateLimiterConfig
   ) OCR2BaseNoChecks() AggregateRateLimiter(rateLimiterConfig) {
-    if (sourceTokens.length != pools.length) revert InvalidTokenPoolConfig();
     if (staticConfig.onRamp == address(0) || staticConfig.commitStore == address(0)) revert ZeroAddressNotAllowed();
     // Ensures we can never deploy a new offRamp that points to a commitStore that
     // already has roots committed.
@@ -154,13 +150,6 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
     i_armProxy = staticConfig.armProxy;
 
     i_metadataHash = _metadataHash(Internal.EVM_2_EVM_MESSAGE_HASH);
-
-    // Set new tokens and pools
-    for (uint256 i = 0; i < sourceTokens.length; ++i) {
-      s_poolsBySourceToken.set(address(sourceTokens[i]), address(pools[i]));
-      s_poolsByDestToken.set(address(pools[i].getToken()), address(pools[i]));
-      emit PoolAdded(address(sourceTokens[i]), address(pools[i]));
-    }
   }
 
   // ================================================================
@@ -177,11 +166,10 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
   /// @return The current execution state of the message.
   /// @dev we use the literal number 128 because using a constant increased gas usage.
   function getExecutionState(uint64 sequenceNumber) public view returns (Internal.MessageExecutionState) {
-    return
-      Internal.MessageExecutionState(
-        (s_executionStates[sequenceNumber / 128] >> ((sequenceNumber % 128) * MESSAGE_EXECUTION_STATE_BIT_WIDTH)) &
-          MESSAGE_EXECUTION_STATE_MASK
-      );
+    return Internal.MessageExecutionState(
+      (s_executionStates[sequenceNumber / 128] >> ((sequenceNumber % 128) * MESSAGE_EXECUTION_STATE_BIT_WIDTH))
+        & MESSAGE_EXECUTION_STATE_MASK
+    );
   }
 
   /// @notice Sets a new execution state for a given sequence number. It will overwrite any existing state.
@@ -273,17 +261,20 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
       // and failed. This check protects against reentry and re-execution because the other states are
       // IN_PROGRESS and SUCCESS, both should not be allowed to execute.
       if (
-        !(originalState == Internal.MessageExecutionState.UNTOUCHED ||
-          originalState == Internal.MessageExecutionState.FAILURE)
+        !(
+          originalState == Internal.MessageExecutionState.UNTOUCHED
+            || originalState == Internal.MessageExecutionState.FAILURE
+        )
       ) revert AlreadyExecuted(message.sequenceNumber);
 
       if (manualExecution) {
-        bool isOldCommitReport = (block.timestamp - timestampCommitted) >
-          s_dynamicConfig.permissionLessExecutionThresholdSeconds;
+        bool isOldCommitReport =
+          (block.timestamp - timestampCommitted) > s_dynamicConfig.permissionLessExecutionThresholdSeconds;
         // Manually execution is fine if we previously failed or if the commit report is just too old
         // Acceptable state transitions: FAILURE->SUCCESS, UNTOUCHED->SUCCESS, FAILURE->FAILURE
-        if (!(isOldCommitReport || originalState == Internal.MessageExecutionState.FAILURE))
+        if (!(isOldCommitReport || originalState == Internal.MessageExecutionState.FAILURE)) {
           revert ManualExecutionNotYetEnabled();
+        }
 
         // Manual execution gas limit can override gas limit specified in the message. Value of 0 indicates no override.
         if (manualExecGasLimits[i] != 0) {
@@ -350,8 +341,9 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
 
       // The only valid prior states are UNTOUCHED and FAILURE (checked above)
       // The only valid post states are FAILURE and SUCCESS (checked below)
-      if (newState != Internal.MessageExecutionState.FAILURE && newState != Internal.MessageExecutionState.SUCCESS)
+      if (newState != Internal.MessageExecutionState.FAILURE && newState != Internal.MessageExecutionState.SUCCESS) {
         revert InvalidNewState(message.sequenceNumber, newState);
+      }
 
       // Nonce changes per state transition
       // UNTOUCHED -> FAILURE  nonce bump
@@ -381,11 +373,13 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
     uint256 offchainTokenDataLength
   ) private view {
     if (sourceChainSelector != i_sourceChainSelector) revert InvalidSourceChain(sourceChainSelector);
-    if (numberOfTokens > uint256(s_dynamicConfig.maxNumberOfTokensPerMsg))
+    if (numberOfTokens > uint256(s_dynamicConfig.maxNumberOfTokensPerMsg)) {
       revert UnsupportedNumberOfTokens(sequenceNumber);
+    }
     if (numberOfTokens != offchainTokenDataLength) revert TokenDataMismatch(sequenceNumber);
-    if (dataLength > uint256(s_dynamicConfig.maxDataBytes))
+    if (dataLength > uint256(s_dynamicConfig.maxDataBytes)) {
       revert MessageTooLarge(uint256(s_dynamicConfig.maxDataBytes), dataLength);
+    }
   }
 
   /// @notice Try executing a message.
@@ -397,10 +391,14 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
     Internal.EVM2EVMMessage memory message,
     bytes[] memory offchainTokenData
   ) internal returns (Internal.MessageExecutionState, bytes memory) {
-    try this.executeSingleMessage(message, offchainTokenData) {} catch (bytes memory err) {
-      if (ReceiverError.selector == bytes4(err) || TokenHandlingError.selector == bytes4(err)) {
+    try this.executeSingleMessage(message, offchainTokenData) {}
+    catch (bytes memory err) {
+      if (
+        ReceiverError.selector == bytes4(err) || TokenHandlingError.selector == bytes4(err)
+          || InvalidAddress.selector == bytes4(err)
+      ) {
         // If CCIP receiver execution is not successful, bubble up receiver revert data,
-        // prepended by the 4 bytes of ReceiverError.selector or TokenHandlingError.selector
+        // prepended by the 4 bytes of ReceiverError.selector, TokenHandlingError.selector or InvalidPoolAddress.selector.
         // Max length of revert data is Router.MAX_RET_BYTES, max length of err is 4 + Router.MAX_RET_BYTES
         return (Internal.MessageExecutionState.FAILURE, err);
       } else {
@@ -424,19 +422,15 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
     Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](0);
     if (message.tokenAmounts.length > 0) {
       destTokenAmounts = _releaseOrMintTokens(
-        message.tokenAmounts,
-        abi.encode(message.sender),
-        message.receiver,
-        message.sourceTokenData,
-        offchainTokenData
+        message.tokenAmounts, abi.encode(message.sender), message.receiver, message.sourceTokenData, offchainTokenData
       );
     }
     if (
-      message.receiver.code.length == 0 ||
-      !message.receiver.supportsInterface(type(IAny2EVMMessageReceiver).interfaceId)
+      message.receiver.code.length == 0
+        || !message.receiver.supportsInterface(type(IAny2EVMMessageReceiver).interfaceId)
     ) return;
 
-    (bool success, bytes memory returnData, ) = IRouter(s_dynamicConfig.router).routeMessage(
+    (bool success, bytes memory returnData,) = IRouter(s_dynamicConfig.router).routeMessage(
       Internal._toAny2EVMMessage(message, destTokenAmounts),
       Internal.GAS_FOR_CALL_EXACT_CHECK,
       message.gasLimit,
@@ -459,15 +453,14 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
   /// @dev This function will always return the same struct as the contents is static and can never change.
   /// RMN depends on this function, if changing, please notify the RMN maintainers.
   function getStaticConfig() external view returns (StaticConfig memory) {
-    return
-      StaticConfig({
-        commitStore: i_commitStore,
-        chainSelector: i_chainSelector,
-        sourceChainSelector: i_sourceChainSelector,
-        onRamp: i_onRamp,
-        prevOffRamp: i_prevOffRamp,
-        armProxy: i_armProxy
-      });
+    return StaticConfig({
+      commitStore: i_commitStore,
+      chainSelector: i_chainSelector,
+      sourceChainSelector: i_sourceChainSelector,
+      onRamp: i_onRamp,
+      prevOffRamp: i_prevOffRamp,
+      armProxy: i_armProxy
+    });
   }
 
   /// @notice Returns the current dynamic config.
@@ -497,100 +490,59 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
     );
   }
 
-  // ================================================================
-  // │                      Tokens and pools                        │
-  // ================================================================
-
-  /// @notice Get all supported source tokens
-  /// @return sourceTokens of supported source tokens
-  function getSupportedTokens() external view returns (IERC20[] memory sourceTokens) {
-    sourceTokens = new IERC20[](s_poolsBySourceToken.length());
+  /// @notice Get all tokens which are included in Aggregate Rate Limiting.
+  /// @param startIndex starting index in list
+  /// @param maxCount max count to retrieve (0 = unlimited)
+  /// @return sourceTokens The source representation of the tokens that are rate limited.
+  /// @return destTokens The destination representation of the tokens that are rate limited.
+  /// @dev the order of IDs in the list is **not guaranteed**, therefore, if making successive calls, one
+  /// should consider keeping the blockheight constant to ensure a holistic picture of the contract state
+  function getAllRateLimitTokens(
+    uint256 startIndex,
+    uint256 maxCount
+  ) external view returns (address[] memory sourceTokens, address[] memory destTokens) {
+    uint256 length = s_rateLimitedTokensDestToSource.length();
+    if (length == 0) return (sourceTokens, destTokens);
+    if (startIndex >= length) revert IndexOutOfRange();
+    uint256 endIndex = startIndex + maxCount;
+    endIndex = endIndex > length || maxCount == 0 ? length : endIndex;
+    sourceTokens = new address[](endIndex - startIndex);
+    destTokens = new address[](endIndex - startIndex);
     for (uint256 i = 0; i < sourceTokens.length; ++i) {
-      (address token, ) = s_poolsBySourceToken.at(i);
-      sourceTokens[i] = IERC20(token);
+      (address destToken, address sourceToken) = s_rateLimitedTokensDestToSource.at(i + startIndex);
+      sourceTokens[i] = sourceToken;
+      destTokens[i] = destToken;
     }
-    return sourceTokens;
+
+    return (sourceTokens, destTokens);
   }
 
-  /// @notice Get a token pool by its source token
-  /// @param sourceToken token
-  /// @return Token Pool
-  function getPoolBySourceToken(IERC20 sourceToken) public view returns (IPool) {
-    (bool success, address pool) = s_poolsBySourceToken.tryGet(address(sourceToken));
-    if (!success) revert UnsupportedToken(sourceToken);
-    return IPool(pool);
-  }
-
-  /// @notice Get the destination token from the pool based on a given source token.
-  /// @param sourceToken The source token
-  /// @return the destination token
-  function getDestinationToken(IERC20 sourceToken) external view returns (IERC20) {
-    return getPoolBySourceToken(sourceToken).getToken();
-  }
-
-  /// @notice Get a token pool by its dest token
-  /// @param destToken token
-  /// @return Token Pool
-  function getPoolByDestToken(IERC20 destToken) external view returns (IPool) {
-    (bool success, address pool) = s_poolsByDestToken.tryGet(address(destToken));
-    if (!success) revert UnsupportedToken(destToken);
-    return IPool(pool);
-  }
-
-  /// @notice Get all configured destination tokens
-  /// @return destTokens Array of configured destination tokens
-  function getDestinationTokens() external view returns (IERC20[] memory destTokens) {
-    destTokens = new IERC20[](s_poolsByDestToken.length());
-    for (uint256 i = 0; i < destTokens.length; ++i) {
-      (address token, ) = s_poolsByDestToken.at(i);
-      destTokens[i] = IERC20(token);
-    }
-    return destTokens;
-  }
-
-  /// @notice Adds and removed token pools.
-  /// @param removes The tokens and pools to be removed
-  /// @param adds The tokens and pools to be added.
-  function applyPoolUpdates(
-    Internal.PoolUpdate[] calldata removes,
-    Internal.PoolUpdate[] calldata adds
-  ) external onlyOwner {
+  /// @notice Adds or removes tokens from being used in Aggregate Rate Limiting.
+  /// @param removes - A list of one or more tokens to be removed.
+  /// @param adds - A list of one or more tokens to be added.
+  function updateRateLimitTokens(RateLimitToken[] memory removes, RateLimitToken[] memory adds) external onlyOwner {
     for (uint256 i = 0; i < removes.length; ++i) {
-      address token = removes[i].token;
-      address pool = removes[i].pool;
-
-      // Check if the pool exists
-      if (!s_poolsBySourceToken.contains(token)) revert PoolDoesNotExist();
-      // Sanity check
-      if (s_poolsBySourceToken.get(token) != pool) revert TokenPoolMismatch();
-
-      s_poolsBySourceToken.remove(token);
-      s_poolsByDestToken.remove(address(IPool(pool).getToken()));
-
-      emit PoolRemoved(token, pool);
+      if (s_rateLimitedTokensDestToSource.remove(removes[i].destToken)) {
+        emit TokenAggregateRateLimitRemoved(removes[i].sourceToken, removes[i].destToken);
+      }
     }
 
     for (uint256 i = 0; i < adds.length; ++i) {
-      address token = adds[i].token;
-      address pool = adds[i].pool;
-
-      if (token == address(0) || pool == address(0)) revert InvalidTokenPoolConfig();
-      // Check if the pool is already set
-      if (s_poolsBySourceToken.contains(token)) revert PoolAlreadyAdded();
-
-      // Set the s_pools with new config values
-      s_poolsBySourceToken.set(token, pool);
-      s_poolsByDestToken.set(address(IPool(pool).getToken()), pool);
-
-      emit PoolAdded(token, pool);
+      if (s_rateLimitedTokensDestToSource.set(adds[i].destToken, adds[i].sourceToken)) {
+        emit TokenAggregateRateLimitAdded(adds[i].sourceToken, adds[i].destToken);
+      }
     }
   }
+
+  // ================================================================
+  // │                      Tokens and pools                        │
+  // ================================================================
 
   /// @notice Uses pools to release or mint a number of different tokens to a receiver address.
   /// @param sourceTokenAmounts List of tokens and amount values to be released/minted.
   /// @param originalSender The message sender.
   /// @param receiver The address that will receive the tokens.
-  /// @param sourceTokenData Array of token data returned by token pools on the source chain.
+  /// @param encodedSourceTokenData Array of token data returned by token pools on the source chain.
   /// @param offchainTokenData Array of token data fetched offchain by the DON.
   /// @dev This function wrappes the token pool call in a try catch block to gracefully handle
   /// any non-rate limiting errors that may occur. If we encounter a rate limiting related error
@@ -599,27 +551,39 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
     Client.EVMTokenAmount[] memory sourceTokenAmounts,
     bytes memory originalSender,
     address receiver,
-    bytes[] memory sourceTokenData,
+    bytes[] memory encodedSourceTokenData,
     bytes[] memory offchainTokenData
-  ) internal returns (Client.EVMTokenAmount[] memory) {
-    Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](sourceTokenAmounts.length);
+  ) internal returns (Client.EVMTokenAmount[] memory destTokenAmounts) {
+    destTokenAmounts = sourceTokenAmounts;
+    uint256 value = 0;
     for (uint256 i = 0; i < sourceTokenAmounts.length; ++i) {
-      IPool pool = getPoolBySourceToken(IERC20(sourceTokenAmounts[i].token));
-      uint256 sourceTokenAmount = sourceTokenAmounts[i].amount;
+      // This should never revert as the onRamp creates the sourceTokenData. Only the inner components from
+      // this struct come from untrusted sources.
+      IPool.SourceTokenData memory sourceTokenData = abi.decode(encodedSourceTokenData[i], (IPool.SourceTokenData));
+      // We need to safely decode the pool address from the sourceTokenData, as it could be wrong,
+      // in which case it doesn't have to be a valid EVM address.
+      address pool = _validateEVMAddress(sourceTokenData.destPoolAddress);
+
+      // We determined that the pool address is a valid EVM address, but that does not mean the code at this
+      // address is actually a (compatible) pool contract. If there is no contract it could not possibly be a pool.
+      if (pool.code.length == 0) {
+        revert InvalidAddress(sourceTokenData.destPoolAddress);
+      }
 
       // Call the pool with exact gas to increase resistance against malicious tokens or token pools.
       // _callWithExactGas also protects against return data bombs by capping the return data size
       // at MAX_RET_BYTES.
-      (bool success, bytes memory returnData, ) = CallWithExactGas._callWithExactGasSafeReturnData(
+      (bool success, bytes memory returnData,) = CallWithExactGas._callWithExactGasSafeReturnData(
         abi.encodeWithSelector(
-          pool.releaseOrMint.selector,
+          IPool.releaseOrMint.selector,
           originalSender,
           receiver,
-          sourceTokenAmount,
+          sourceTokenAmounts[i].amount,
           i_sourceChainSelector,
-          abi.encode(sourceTokenData[i], offchainTokenData[i])
+          sourceTokenData,
+          offchainTokenData[i]
         ),
-        address(pool),
+        pool,
         s_dynamicConfig.maxPoolReleaseOrMintGas,
         Internal.GAS_FOR_CALL_EXACT_CHECK,
         Internal.MAX_RET_BYTES
@@ -628,11 +592,24 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
       // wrap and rethrow the error so we can catch it lower in the stack
       if (!success) revert TokenHandlingError(returnData);
 
-      destTokenAmounts[i].token = address(pool.getToken());
-      destTokenAmounts[i].amount = sourceTokenAmount;
+      // If the call was successful, the returnData should be the local token address.
+      destTokenAmounts[i].token = _validateEVMAddress(returnData);
+
+      if (s_rateLimitedTokensDestToSource.contains(destTokenAmounts[i].token)) {
+        value += _getTokenValue(destTokenAmounts[i], IPriceRegistry(s_dynamicConfig.priceRegistry));
+      }
     }
-    _rateLimitValue(destTokenAmounts, IPriceRegistry(s_dynamicConfig.priceRegistry));
+
+    if (value > 0) _rateLimitValue(value);
+
     return destTokenAmounts;
+  }
+
+  function _validateEVMAddress(bytes memory encodedAddress) internal pure returns (address) {
+    if (encodedAddress.length != 32) revert InvalidAddress(encodedAddress);
+    uint256 decodedAddress = uint256(abi.decode(encodedAddress, (uint256)));
+    if (decodedAddress > type(uint160).max || decodedAddress < 10) revert InvalidAddress(encodedAddress);
+    return address(uint160(decodedAddress));
   }
 
   // ================================================================

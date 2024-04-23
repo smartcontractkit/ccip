@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {EVM2EVMOnRampSetup} from "../onRamp/EVM2EVMOnRampSetup.t.sol";
 import {DefensiveExample} from "../../applications/DefensiveExample.sol";
 import {Client} from "../../libraries/Client.sol";
+import {EVM2EVMOnRampSetup} from "../onRamp/EVM2EVMOnRampSetup.t.sol";
 
 import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 
@@ -22,7 +22,7 @@ contract DefensiveExampleTest is EVM2EVMOnRampSetup {
     s_receiver.enableChain(sourceChainSelector, abi.encode(""));
   }
 
-  function testRecovery() public {
+  function test_Recovery() public {
     bytes32 messageId = keccak256("messageId");
     address token = address(s_destFeeToken);
     uint256 amount = 111333333777;
@@ -68,7 +68,7 @@ contract DefensiveExampleTest is EVM2EVMOnRampSetup {
     assertEq(IERC20(token).balanceOf(address(s_receiver)), receiverBalancePre - amount);
   }
 
-  function testHappyPathSuccess() public {
+  function test_HappyPath_Success() public {
     bytes32 messageId = keccak256("messageId");
     address token = address(s_destFeeToken);
     uint256 amount = 111333333777;

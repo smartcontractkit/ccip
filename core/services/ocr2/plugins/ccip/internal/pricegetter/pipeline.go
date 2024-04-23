@@ -3,6 +3,7 @@ package pricegetter
 import (
 	"context"
 	"math/big"
+	"strings"
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
@@ -10,6 +11,7 @@ import (
 	"github.com/pkg/errors"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
+
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/parseutil"
@@ -41,6 +43,21 @@ func NewPipelineGetter(source string, runner pipeline.Runner, jobID int32, exter
 		name:          name,
 		lggr:          lggr,
 	}, nil
+}
+
+// FilterForConfiguredTokens implements the PriceGetter interface.
+// It filters a list of token addresses for only those that have a pipeline job configured on the TokenPricesUSDPipeline
+func (d *PipelineGetter) FilterConfiguredTokens(ctx context.Context, tokens []cciptypes.Address) (configured []cciptypes.Address, unconfigured []cciptypes.Address, err error) {
+	lcSource := strings.ToLower(d.source)
+	for _, tk := range tokens {
+		lcToken := strings.ToLower(string(tk))
+		if strings.Contains(lcSource, lcToken) {
+			configured = append(configured, tk)
+		} else {
+			unconfigured = append(unconfigured, tk)
+		}
+	}
+	return configured, unconfigured, nil
 }
 
 func (d *PipelineGetter) TokenPricesUSD(ctx context.Context, tokens []cciptypes.Address) (map[cciptypes.Address]*big.Int, error) {
@@ -90,4 +107,8 @@ func (d *PipelineGetter) TokenPricesUSD(ctx context.Context, tokens []cciptypes.
 	}
 
 	return tokenPrices, nil
+}
+
+func (d *PipelineGetter) Close() error {
+	return d.runner.Close()
 }

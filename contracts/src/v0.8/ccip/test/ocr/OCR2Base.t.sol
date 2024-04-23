@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.19;
 
-import {OCR2Setup} from "./OCR2Setup.t.sol";
 import {OCR2Base} from "../../ocr/OCR2Base.sol";
 import {OCR2Helper} from "../helpers/OCR2Helper.sol";
+import {OCR2Setup} from "./OCR2Setup.t.sol";
 
 contract OCR2BaseSetup is OCR2Setup {
   event ConfigSet(
@@ -47,18 +47,17 @@ contract OCR2BaseSetup is OCR2Setup {
 
   function getBasicConfigDigest(uint8 f, uint64 currentConfigCount) internal view returns (bytes32) {
     bytes memory configBytes = abi.encode("");
-    return
-      s_OCR2Base.configDigestFromConfigData(
-        block.chainid,
-        address(s_OCR2Base),
-        currentConfigCount + 1,
-        s_valid_signers,
-        s_valid_transmitters,
-        f,
-        configBytes,
-        s_offchainConfigVersion,
-        configBytes
-      );
+    return s_OCR2Base.configDigestFromConfigData(
+      block.chainid,
+      address(s_OCR2Base),
+      currentConfigCount + 1,
+      s_valid_signers,
+      s_valid_transmitters,
+      f,
+      configBytes,
+      s_offchainConfigVersion,
+      configBytes
+    );
   }
 
   function getTestReportDigest() internal view returns (bytes32) {
@@ -73,18 +72,17 @@ contract OCR2BaseSetup is OCR2Setup {
     uint64 currentConfigCount,
     bytes memory onchainConfig
   ) internal view returns (bytes32) {
-    return
-      s_OCR2Base.configDigestFromConfigData(
-        block.chainid,
-        contractAddress,
-        currentConfigCount + 1,
-        s_valid_signers,
-        s_valid_transmitters,
-        f,
-        onchainConfig,
-        s_offchainConfigVersion,
-        abi.encode("")
-      );
+    return s_OCR2Base.configDigestFromConfigData(
+      block.chainid,
+      contractAddress,
+      currentConfigCount + 1,
+      s_valid_signers,
+      s_valid_transmitters,
+      f,
+      onchainConfig,
+      s_offchainConfigVersion,
+      abi.encode("")
+    );
   }
 }
 
@@ -97,16 +95,11 @@ contract OCR2Base_transmit is OCR2BaseSetup {
 
     s_configDigest = getBasicConfigDigest(s_f, 0);
     s_OCR2Base.setOCR2Config(
-      s_valid_signers,
-      s_valid_transmitters,
-      s_f,
-      configBytes,
-      s_offchainConfigVersion,
-      configBytes
+      s_valid_signers, s_valid_transmitters, s_f, configBytes, s_offchainConfigVersion, configBytes
     );
   }
 
-  function testTransmit2SignersSuccess_gas() public {
+  function test_Transmit2SignersSuccess_gas() public {
     vm.pauseGasMetering();
     bytes32[3] memory reportContext = [s_configDigest, s_configDigest, s_configDigest];
 
@@ -117,7 +110,7 @@ contract OCR2Base_transmit is OCR2BaseSetup {
 
   // Reverts
 
-  function testForkedChainReverts() public {
+  function test_ForkedChain_Revert() public {
     bytes32[3] memory reportContext = [s_configDigest, s_configDigest, s_configDigest];
 
     uint256 chain1 = block.chainid;
@@ -128,14 +121,14 @@ contract OCR2Base_transmit is OCR2BaseSetup {
     s_OCR2Base.transmit(reportContext, REPORT, s_rs, s_ss, s_rawVs);
   }
 
-  function testWrongNumberOfSignaturesReverts() public {
+  function test_WrongNumberOfSignatures_Revert() public {
     bytes32[3] memory reportContext = [s_configDigest, s_configDigest, s_configDigest];
 
     vm.expectRevert(OCR2Base.WrongNumberOfSignatures.selector);
     s_OCR2Base.transmit(reportContext, REPORT, new bytes32[](0), new bytes32[](0), s_rawVs);
   }
 
-  function testConfigDigestMismatchReverts() public {
+  function test_ConfigDigestMismatch_Revert() public {
     bytes32 configDigest;
     bytes32[3] memory reportContext = [configDigest, configDigest, configDigest];
 
@@ -143,7 +136,7 @@ contract OCR2Base_transmit is OCR2BaseSetup {
     s_OCR2Base.transmit(reportContext, REPORT, new bytes32[](0), new bytes32[](0), s_rawVs);
   }
 
-  function testSignatureOutOfRegistrationReverts() public {
+  function test_SignatureOutOfRegistration_Revert() public {
     bytes32[3] memory reportContext = [s_configDigest, s_configDigest, s_configDigest];
 
     bytes32[] memory rs = new bytes32[](2);
@@ -153,7 +146,7 @@ contract OCR2Base_transmit is OCR2BaseSetup {
     s_OCR2Base.transmit(reportContext, REPORT, rs, ss, s_rawVs);
   }
 
-  function testUnAuthorizedTransmitterReverts() public {
+  function test_UnAuthorizedTransmitter_Revert() public {
     bytes32[3] memory reportContext = [s_configDigest, s_configDigest, s_configDigest];
     bytes32[] memory rs = new bytes32[](2);
     bytes32[] memory ss = new bytes32[](2);
@@ -162,7 +155,7 @@ contract OCR2Base_transmit is OCR2BaseSetup {
     s_OCR2Base.transmit(reportContext, REPORT, rs, ss, s_rawVs);
   }
 
-  function testNonUniqueSignatureReverts() public {
+  function test_NonUniqueSignature_Revert() public {
     bytes32[3] memory reportContext = [s_configDigest, s_configDigest, s_configDigest];
     bytes32[] memory rs = s_rs;
     bytes32[] memory ss = s_ss;
@@ -177,7 +170,7 @@ contract OCR2Base_transmit is OCR2BaseSetup {
     s_OCR2Base.transmit(reportContext, REPORT, rs, ss, rawVs);
   }
 
-  function testUnauthorizedSignerReverts() public {
+  function test_UnauthorizedSigner_Revert() public {
     bytes32[3] memory reportContext = [s_configDigest, s_configDigest, s_configDigest];
     bytes32[] memory rs = new bytes32[](2);
     rs[0] = s_configDigest;
@@ -190,7 +183,7 @@ contract OCR2Base_transmit is OCR2BaseSetup {
 }
 
 contract OCR2Base_setOCR2Config is OCR2BaseSetup {
-  function testSetConfigSuccess_gas() public {
+  function test_SetConfigSuccess_gas() public {
     vm.pauseGasMetering();
     bytes memory configBytes = abi.encode("");
     uint32 configCount = 0;
@@ -214,12 +207,7 @@ contract OCR2Base_setOCR2Config is OCR2BaseSetup {
     );
 
     s_OCR2Base.setOCR2Config(
-      s_valid_signers,
-      s_valid_transmitters,
-      s_f,
-      configBytes,
-      s_offchainConfigVersion,
-      configBytes
+      s_valid_signers, s_valid_transmitters, s_f, configBytes, s_offchainConfigVersion, configBytes
     );
 
     transmitters = s_OCR2Base.getTransmitters();
@@ -241,17 +229,12 @@ contract OCR2Base_setOCR2Config is OCR2BaseSetup {
     );
     vm.resumeGasMetering();
     s_OCR2Base.setOCR2Config(
-      s_valid_signers,
-      s_valid_transmitters,
-      s_f,
-      configBytes,
-      s_offchainConfigVersion,
-      configBytes
+      s_valid_signers, s_valid_transmitters, s_f, configBytes, s_offchainConfigVersion, configBytes
     );
   }
 
   // Reverts
-  function testRepeatAddressReverts() public {
+  function test_RepeatAddress_Revert() public {
     address[] memory signers = new address[](10);
     signers[0] = address(1245678);
     address[] memory transmitters = new address[](10);
@@ -261,7 +244,7 @@ contract OCR2Base_setOCR2Config is OCR2BaseSetup {
     s_OCR2Base.setOCR2Config(signers, transmitters, 2, abi.encode(""), 100, abi.encode(""));
   }
 
-  function testSingerCannotBeZeroAddressReverts() public {
+  function test_SingerCannotBeZeroAddress_Revert() public {
     uint256 f = 1;
     address[] memory signers = new address[](3 * f + 1);
     address[] memory transmitters = new address[](3 * f + 1);
@@ -276,7 +259,7 @@ contract OCR2Base_setOCR2Config is OCR2BaseSetup {
     s_OCR2Base.setOCR2Config(signers, transmitters, uint8(f), abi.encode(""), 100, abi.encode(""));
   }
 
-  function testTransmitterCannotBeZeroAddressReverts() public {
+  function test_TransmitterCannotBeZeroAddress_Revert() public {
     uint256 f = 1;
     address[] memory signers = new address[](3 * f + 1);
     address[] memory transmitters = new address[](3 * f + 1);
@@ -291,7 +274,7 @@ contract OCR2Base_setOCR2Config is OCR2BaseSetup {
     s_OCR2Base.setOCR2Config(signers, transmitters, uint8(f), abi.encode(""), 100, abi.encode(""));
   }
 
-  function testOracleOutOfRegisterReverts() public {
+  function test_OracleOutOfRegister_Revert() public {
     address[] memory signers = new address[](10);
     address[] memory transmitters = new address[](0);
 
@@ -299,7 +282,7 @@ contract OCR2Base_setOCR2Config is OCR2BaseSetup {
     s_OCR2Base.setOCR2Config(signers, transmitters, 2, abi.encode(""), 100, abi.encode(""));
   }
 
-  function testFTooHighReverts() public {
+  function test_FTooHigh_Revert() public {
     address[] memory signers = new address[](0);
     uint8 f = 1;
 
@@ -307,14 +290,14 @@ contract OCR2Base_setOCR2Config is OCR2BaseSetup {
     s_OCR2Base.setOCR2Config(signers, new address[](0), f, abi.encode(""), 100, abi.encode(""));
   }
 
-  function testFMustBePositiveReverts() public {
+  function test_FMustBePositive_Revert() public {
     uint8 f = 0;
 
     vm.expectRevert(abi.encodeWithSelector(OCR2Base.InvalidConfig.selector, "f must be positive"));
     s_OCR2Base.setOCR2Config(new address[](0), new address[](0), f, abi.encode(""), 100, abi.encode(""));
   }
 
-  function testTooManySignersReverts() public {
+  function test_TooManySigners_Revert() public {
     address[] memory signers = new address[](32);
 
     vm.expectRevert(abi.encodeWithSelector(OCR2Base.InvalidConfig.selector, "too many signers"));

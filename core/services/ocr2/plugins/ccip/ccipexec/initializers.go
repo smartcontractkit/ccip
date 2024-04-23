@@ -12,13 +12,15 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/pkg/errors"
+	"go.uber.org/multierr"
+
 	chainselectors "github.com/smartcontractkit/chain-selectors"
 	libocr2 "github.com/smartcontractkit/libocr/offchainreporting2plus"
-	"go.uber.org/multierr"
 
 	commonlogger "github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
+
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
 
@@ -158,7 +160,9 @@ func initTokenDataProviders(lggr logger.Logger, jobID string, pluginConfig ccipc
 				lggr,
 				usdcReader,
 				attestationURI,
-				pluginConfig.USDCConfig.AttestationAPITimeoutSeconds,
+				int(pluginConfig.USDCConfig.AttestationAPITimeoutSeconds),
+				pluginConfig.USDCConfig.SourceTokenAddress,
+				time.Duration(pluginConfig.USDCConfig.AttestationAPIIntervalMilliseconds)*time.Millisecond,
 			)
 	}
 
@@ -191,7 +195,7 @@ func jobSpecToExecPluginConfig(ctx context.Context, lggr logger.Logger, jb job.J
 	if err != nil {
 		return nil, nil, nil, nil, errors.Wrap(err, "create onramp reader")
 	}
-	dynamicOnRampConfig, err := onRampReader.GetDynamicConfig()
+	dynamicOnRampConfig, err := onRampReader.GetDynamicConfig(ctx)
 	if err != nil {
 		return nil, nil, nil, nil, errors.Wrap(err, "get onramp dynamic config")
 	}
@@ -241,7 +245,13 @@ func jobSpecToExecPluginConfig(ctx context.Context, lggr logger.Logger, jb job.J
 		"sourceNative", sourceWrappedNative,
 		"sourceRouter", sourceRouter.Address())
 
-	batchCaller := rpclib.NewDynamicLimitedBatchCaller(lggr, params.destChain.Client(), rpclib.DefaultRpcBatchSizeLimit, rpclib.DefaultRpcBatchBackOffMultiplier)
+	batchCaller := rpclib.NewDynamicLimitedBatchCaller(
+		lggr,
+		params.destChain.Client(),
+		rpclib.DefaultRpcBatchSizeLimit,
+		rpclib.DefaultRpcBatchBackOffMultiplier,
+		rpclib.DefaultMaxParallelRpcCalls,
+	)
 
 	offrampAddress, err := offRampReader.Address(ctx)
 	if err != nil {

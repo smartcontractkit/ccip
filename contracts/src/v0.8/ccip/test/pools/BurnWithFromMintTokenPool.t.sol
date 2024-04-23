@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.19;
 
-import {BaseTest} from "../BaseTest.t.sol";
-import {TokenPool} from "../../pools/TokenPool.sol";
 import {EVM2EVMOnRamp} from "../../onRamp/EVM2EVMOnRamp.sol";
-import {BurnMintSetup} from "./BurnMintSetup.t.sol";
 import {BurnWithFromMintTokenPool} from "../../pools/BurnWithFromMintTokenPool.sol";
+import {TokenPool} from "../../pools/TokenPool.sol";
+import {BaseTest} from "../BaseTest.t.sol";
+import {BurnMintSetup} from "./BurnMintSetup.t.sol";
 
 contract BurnWithFromMintTokenPoolSetup is BurnMintSetup {
   BurnWithFromMintTokenPool internal s_pool;
@@ -13,12 +13,8 @@ contract BurnWithFromMintTokenPoolSetup is BurnMintSetup {
   function setUp() public virtual override {
     BurnMintSetup.setUp();
 
-    s_pool = new BurnWithFromMintTokenPool(
-      s_burnMintERC677,
-      new address[](0),
-      address(s_mockARM),
-      address(s_sourceRouter)
-    );
+    s_pool =
+      new BurnWithFromMintTokenPool(s_burnMintERC677, new address[](0), address(s_mockARM), address(s_sourceRouter));
     s_burnMintERC677.grantMintAndBurnRoles(address(s_pool));
 
     _applyChainUpdates(address(s_pool));
@@ -26,7 +22,7 @@ contract BurnWithFromMintTokenPoolSetup is BurnMintSetup {
 }
 
 contract BurnWithFromMintTokenPool_lockOrBurn is BurnWithFromMintTokenPoolSetup {
-  function testSetupSuccess() public {
+  function test_Setup_Success() public view {
     assertEq(address(s_burnMintERC677), address(s_pool.getToken()));
     assertEq(address(s_mockARM), s_pool.getArmProxy());
     assertEq(false, s_pool.getAllowListEnabled());
@@ -34,7 +30,7 @@ contract BurnWithFromMintTokenPool_lockOrBurn is BurnWithFromMintTokenPoolSetup 
     assertEq("BurnWithFromMintTokenPool 1.4.0", s_pool.typeAndVersion());
   }
 
-  function testPoolBurnSuccess() public {
+  function test_PoolBurn_Success() public {
     uint256 burnAmount = 20_000e18;
 
     deal(address(s_burnMintERC677), address(s_pool), burnAmount);
@@ -60,7 +56,7 @@ contract BurnWithFromMintTokenPool_lockOrBurn is BurnWithFromMintTokenPoolSetup 
   }
 
   // Should not burn tokens if cursed.
-  function testPoolBurnRevertNotHealthyReverts() public {
+  function test_PoolBurnRevertNotHealthy_Revert() public {
     s_mockARM.voteToCurse(bytes32(0));
     uint256 before = s_burnMintERC677.balanceOf(address(s_pool));
     vm.startPrank(s_burnMintOnRamp);
@@ -71,9 +67,9 @@ contract BurnWithFromMintTokenPool_lockOrBurn is BurnWithFromMintTokenPoolSetup 
     assertEq(s_burnMintERC677.balanceOf(address(s_pool)), before);
   }
 
-  function testChainNotAllowedReverts() public {
+  function test_ChainNotAllowed_Revert() public {
     uint64 wrongChainSelector = 8838833;
     vm.expectRevert(abi.encodeWithSelector(TokenPool.ChainNotAllowed.selector, wrongChainSelector));
-    s_pool.releaseOrMint(bytes(""), OWNER, 1, wrongChainSelector, bytes(""));
+    s_pool.releaseOrMint(bytes(""), OWNER, 1, wrongChainSelector, generateSourceTokenData(), bytes(""));
   }
 }

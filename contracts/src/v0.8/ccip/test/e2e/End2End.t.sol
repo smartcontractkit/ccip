@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.19;
 
-import "../helpers/MerkleHelper.sol";
 import "../commitStore/CommitStore.t.sol";
-import "../onRamp/EVM2EVMOnRampSetup.t.sol";
+import "../helpers/MerkleHelper.sol";
 import "../offRamp/EVM2EVMOffRampSetup.t.sol";
+import "../onRamp/EVM2EVMOnRampSetup.t.sol";
 
 contract E2E is EVM2EVMOnRampSetup, CommitStoreSetup, EVM2EVMOffRampSetup {
   using Internal for Internal.EVM2EVMMessage;
@@ -17,7 +17,7 @@ contract E2E is EVM2EVMOnRampSetup, CommitStoreSetup, EVM2EVMOffRampSetup {
     deployOffRamp(s_commitStore, s_destRouter, address(0));
   }
 
-  function testE2E_3MessagesSuccess_gas() public {
+  function test_E2E_3MessagesSuccess_gas() public {
     vm.pauseGasMetering();
     IERC20 token0 = IERC20(s_sourceTokens[0]);
     IERC20 token1 = IERC20(s_sourceTokens[1]);
@@ -73,26 +73,17 @@ contract E2E is EVM2EVMOnRampSetup, CommitStoreSetup, EVM2EVMOffRampSetup {
 
     vm.expectEmit();
     emit ExecutionStateChanged(
-      messages[0].sequenceNumber,
-      messages[0].messageId,
-      Internal.MessageExecutionState.SUCCESS,
-      ""
+      messages[0].sequenceNumber, messages[0].messageId, Internal.MessageExecutionState.SUCCESS, ""
     );
 
     vm.expectEmit();
     emit ExecutionStateChanged(
-      messages[1].sequenceNumber,
-      messages[1].messageId,
-      Internal.MessageExecutionState.SUCCESS,
-      ""
+      messages[1].sequenceNumber, messages[1].messageId, Internal.MessageExecutionState.SUCCESS, ""
     );
 
     vm.expectEmit();
     emit ExecutionStateChanged(
-      messages[2].sequenceNumber,
-      messages[2].messageId,
-      Internal.MessageExecutionState.SUCCESS,
-      ""
+      messages[2].sequenceNumber, messages[2].messageId, Internal.MessageExecutionState.SUCCESS, ""
     );
 
     Internal.ExecutionReport memory execReport = _generateReportFromMessages(messages);
@@ -108,21 +99,16 @@ contract E2E is EVM2EVMOnRampSetup, CommitStoreSetup, EVM2EVMOffRampSetup {
     IERC20(s_sourceTokens[1]).approve(address(s_sourceRouter), i_tokenAmount1);
 
     message.receiver = abi.encode(address(s_receiver));
-    Internal.EVM2EVMMessage memory geEvent = _messageToEvent(
-      message,
-      expectedSeqNum,
-      expectedSeqNum,
-      expectedFee,
-      OWNER
-    );
+    Internal.EVM2EVMMessage memory msgEvent =
+      _messageToEvent(message, expectedSeqNum, expectedSeqNum, expectedFee, OWNER);
 
     vm.expectEmit();
-    emit CCIPSendRequested(geEvent);
+    emit CCIPSendRequested(msgEvent);
 
     vm.resumeGasMetering();
     s_sourceRouter.ccipSend(DEST_CHAIN_SELECTOR, message);
     vm.pauseGasMetering();
 
-    return geEvent;
+    return msgEvent;
   }
 }

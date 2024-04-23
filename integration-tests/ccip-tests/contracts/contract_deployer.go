@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -20,16 +21,16 @@ import (
 	ocrconfighelper2 "github.com/smartcontractkit/libocr/offchainreporting2/confighelper"
 	ocrtypes2 "github.com/smartcontractkit/libocr/offchainreporting2/types"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
-
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/lock_release_token_pool"
-
 	"github.com/smartcontractkit/chainlink/integration-tests/client"
 	"github.com/smartcontractkit/chainlink/integration-tests/contracts"
+	"github.com/smartcontractkit/chainlink/integration-tests/wrappers"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/arm_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/maybe_revert_message_receiver"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_arm_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_usdc_token_messenger"
@@ -37,10 +38,12 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_v3_aggregator_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/price_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/token_admin_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/usdc_token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/weth9"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/link_token_interface"
+	type_and_version "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/type_and_version_interface_wrapper"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/burn_mint_erc677"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/erc20"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
@@ -73,9 +76,9 @@ func (e *CCIPContractsDeployer) DeployMultiCallContract() (common.Address, error
 	}
 	address, tx, _, err := e.evmClient.DeployContract("MultiCall Contract", func(
 		auth *bind.TransactOpts,
-		backend bind.ContractBackend,
+		_ bind.ContractBackend,
 	) (common.Address, *types.Transaction, interface{}, error) {
-		address, tx, contract, err := bind.DeployContract(auth, multiCallABI, common.FromHex(MultiCallBIN), backend)
+		address, tx, contract, err := bind.DeployContract(auth, multiCallABI, common.FromHex(MultiCallBIN), wrappers.MustNewWrappedContractBackend(e.evmClient, nil))
 		if err != nil {
 			return common.Address{}, nil, nil, err
 		}
@@ -97,9 +100,9 @@ func (e *CCIPContractsDeployer) DeployMultiCallContract() (common.Address, error
 func (e *CCIPContractsDeployer) DeployTokenMessenger(tokenTransmitter common.Address) (*common.Address, error) {
 	address, _, _, err := e.evmClient.DeployContract("Mock Token Messenger", func(
 		auth *bind.TransactOpts,
-		backend bind.ContractBackend,
+		_ bind.ContractBackend,
 	) (common.Address, *types.Transaction, interface{}, error) {
-		address, tx, contract, err := mock_usdc_token_messenger.DeployMockE2EUSDCTokenMessenger(auth, backend, 0, tokenTransmitter)
+		address, tx, contract, err := mock_usdc_token_messenger.DeployMockE2EUSDCTokenMessenger(auth, wrappers.MustNewWrappedContractBackend(e.evmClient, nil), 0, tokenTransmitter)
 		if err != nil {
 			return common.Address{}, nil, nil, err
 		}
@@ -110,7 +113,7 @@ func (e *CCIPContractsDeployer) DeployTokenMessenger(tokenTransmitter common.Add
 }
 
 func (e *CCIPContractsDeployer) NewTokenTransmitter(addr common.Address) (*TokenTransmitter, error) {
-	transmitter, err := mock_usdc_token_transmitter.NewMockE2EUSDCTransmitter(addr, e.evmClient.Backend())
+	transmitter, err := mock_usdc_token_transmitter.NewMockE2EUSDCTransmitter(addr, wrappers.MustNewWrappedContractBackend(e.evmClient, nil))
 
 	if err != nil {
 		return nil, err
@@ -131,9 +134,9 @@ func (e *CCIPContractsDeployer) NewTokenTransmitter(addr common.Address) (*Token
 func (e *CCIPContractsDeployer) DeployTokenTransmitter(domain uint32) (*TokenTransmitter, error) {
 	address, _, instance, err := e.evmClient.DeployContract("Mock Token Transmitter", func(
 		auth *bind.TransactOpts,
-		backend bind.ContractBackend,
+		_ bind.ContractBackend,
 	) (common.Address, *types.Transaction, interface{}, error) {
-		address, tx, contract, err := mock_usdc_token_transmitter.DeployMockE2EUSDCTransmitter(auth, backend, 0, domain)
+		address, tx, contract, err := mock_usdc_token_transmitter.DeployMockE2EUSDCTransmitter(auth, wrappers.MustNewWrappedContractBackend(e.evmClient, nil), 0, domain)
 		if err != nil {
 			return common.Address{}, nil, nil, err
 		}
@@ -150,9 +153,9 @@ func (e *CCIPContractsDeployer) DeployTokenTransmitter(domain uint32) (*TokenTra
 func (e *CCIPContractsDeployer) DeployLinkTokenContract() (*LinkToken, error) {
 	address, _, instance, err := e.evmClient.DeployContract("Link Token", func(
 		auth *bind.TransactOpts,
-		backend bind.ContractBackend,
+		_ bind.ContractBackend,
 	) (common.Address, *types.Transaction, interface{}, error) {
-		return link_token_interface.DeployLinkToken(auth, backend)
+		return link_token_interface.DeployLinkToken(auth, wrappers.MustNewWrappedContractBackend(e.evmClient, nil))
 	})
 
 	if err != nil {
@@ -169,9 +172,9 @@ func (e *CCIPContractsDeployer) DeployLinkTokenContract() (*LinkToken, error) {
 func (e *CCIPContractsDeployer) DeployBurnMintERC677(ownerMintingAmount *big.Int) (*ERC677Token, error) {
 	address, _, instance, err := e.evmClient.DeployContract("Burn Mint ERC 677", func(
 		auth *bind.TransactOpts,
-		backend bind.ContractBackend,
+		_ bind.ContractBackend,
 	) (common.Address, *types.Transaction, interface{}, error) {
-		return burn_mint_erc677.DeployBurnMintERC677(auth, backend, "Test Token ERC677", "TERC677", 6, new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e9)))
+		return burn_mint_erc677.DeployBurnMintERC677(auth, wrappers.MustNewWrappedContractBackend(e.evmClient, nil), "Test Token ERC677", "TERC677", 6, new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e9)))
 	})
 	if err != nil {
 		return nil, err
@@ -213,7 +216,7 @@ func (e *CCIPContractsDeployer) DeployERC20TokenContract(deployerFn blockchain.C
 }
 
 func (e *CCIPContractsDeployer) NewLinkTokenContract(addr common.Address) (*LinkToken, error) {
-	token, err := link_token_interface.NewLinkToken(addr, e.evmClient.Backend())
+	token, err := link_token_interface.NewLinkToken(addr, wrappers.MustNewWrappedContractBackend(e.evmClient, nil))
 
 	if err != nil {
 		return nil, err
@@ -232,7 +235,7 @@ func (e *CCIPContractsDeployer) NewLinkTokenContract(addr common.Address) (*Link
 }
 
 func (e *CCIPContractsDeployer) NewERC20TokenContract(addr common.Address) (*ERC20Token, error) {
-	token, err := erc20.NewERC20(addr, e.evmClient.Backend())
+	token, err := erc20.NewERC20(addr, wrappers.MustNewWrappedContractBackend(e.evmClient, nil))
 
 	if err != nil {
 		return nil, err
@@ -254,7 +257,7 @@ func (e *CCIPContractsDeployer) NewLockReleaseTokenPoolContract(addr common.Addr
 	*TokenPool,
 	error,
 ) {
-	pool, err := lock_release_token_pool.NewLockReleaseTokenPool(addr, e.evmClient.Backend())
+	pool, err := lock_release_token_pool.NewLockReleaseTokenPool(addr, wrappers.MustNewWrappedContractBackend(e.evmClient, nil))
 
 	if err != nil {
 		return nil, err
@@ -265,7 +268,7 @@ func (e *CCIPContractsDeployer) NewLockReleaseTokenPoolContract(addr common.Addr
 		Str("From", e.evmClient.GetDefaultWallet().Address()).
 		Str("Network Name", e.evmClient.GetNetworkConfig().Name).
 		Msg("New contract")
-	poolInstance, err := token_pool.NewTokenPool(addr, e.evmClient.Backend())
+	poolInstance, err := token_pool.NewTokenPool(addr, wrappers.MustNewWrappedContractBackend(e.evmClient, nil))
 	if err != nil {
 		return nil, err
 	}
@@ -281,7 +284,7 @@ func (e *CCIPContractsDeployer) NewUSDCTokenPoolContract(addr common.Address) (
 	*TokenPool,
 	error,
 ) {
-	pool, err := usdc_token_pool.NewUSDCTokenPool(addr, e.evmClient.Backend())
+	pool, err := usdc_token_pool.NewUSDCTokenPool(addr, wrappers.MustNewWrappedContractBackend(e.evmClient, nil))
 
 	if err != nil {
 		return nil, err
@@ -292,7 +295,7 @@ func (e *CCIPContractsDeployer) NewUSDCTokenPoolContract(addr common.Address) (
 		Str("From", e.evmClient.GetDefaultWallet().Address()).
 		Str("Network Name", e.evmClient.GetNetworkConfig().Name).
 		Msg("New contract")
-	poolInterface, err := token_pool.NewTokenPool(addr, e.evmClient.Backend())
+	poolInterface, err := token_pool.NewTokenPool(addr, wrappers.MustNewWrappedContractBackend(e.evmClient, nil))
 	if err != nil {
 		return nil, err
 	}
@@ -312,11 +315,11 @@ func (e *CCIPContractsDeployer) DeployUSDCTokenPoolContract(tokenAddr string, to
 	token := common.HexToAddress(tokenAddr)
 	address, _, _, err := e.evmClient.DeployContract("USDC Token Pool", func(
 		auth *bind.TransactOpts,
-		backend bind.ContractBackend,
+		_ bind.ContractBackend,
 	) (common.Address, *types.Transaction, interface{}, error) {
 		return usdc_token_pool.DeployUSDCTokenPool(
 			auth,
-			backend,
+			wrappers.MustNewWrappedContractBackend(e.evmClient, nil),
 			tokenMessenger,
 			token,
 			[]common.Address{},
@@ -339,11 +342,11 @@ func (e *CCIPContractsDeployer) DeployLockReleaseTokenPoolContract(tokenAddr str
 	token := common.HexToAddress(tokenAddr)
 	address, _, _, err := e.evmClient.DeployContract("LockRelease Token Pool", func(
 		auth *bind.TransactOpts,
-		backend bind.ContractBackend,
+		_ bind.ContractBackend,
 	) (common.Address, *types.Transaction, interface{}, error) {
 		return lock_release_token_pool.DeployLockReleaseTokenPool(
 			auth,
-			backend,
+			wrappers.MustNewWrappedContractBackend(e.evmClient, nil),
 			token,
 			[]common.Address{},
 			armProxy,
@@ -360,15 +363,15 @@ func (e *CCIPContractsDeployer) DeployLockReleaseTokenPoolContract(tokenAddr str
 func (e *CCIPContractsDeployer) DeployMockARMContract() (*common.Address, error) {
 	address, _, _, err := e.evmClient.DeployContract("Mock ARM Contract", func(
 		auth *bind.TransactOpts,
-		backend bind.ContractBackend,
+		_ bind.ContractBackend,
 	) (common.Address, *types.Transaction, interface{}, error) {
-		return mock_arm_contract.DeployMockARMContract(auth, backend)
+		return mock_arm_contract.DeployMockARMContract(auth, wrappers.MustNewWrappedContractBackend(e.evmClient, nil))
 	})
 	return address, err
 }
 
 func (e *CCIPContractsDeployer) NewARMContract(addr common.Address) (*ARM, error) {
-	arm, err := arm_contract.NewARMContract(addr, e.evmClient.Backend())
+	arm, err := arm_contract.NewARMContract(addr, wrappers.MustNewWrappedContractBackend(e.evmClient, nil))
 	if err != nil {
 		return nil, err
 	}
@@ -390,7 +393,7 @@ func (e *CCIPContractsDeployer) NewCommitStore(addr common.Address) (
 	*CommitStore,
 	error,
 ) {
-	ins, err := commit_store.NewCommitStore(addr, e.evmClient.Backend())
+	ins, err := commit_store.NewCommitStore(addr, wrappers.MustNewWrappedContractBackend(e.evmClient, nil))
 	log.Info().
 		Str("Contract Address", addr.Hex()).
 		Str("Contract Name", "CommitStore").
@@ -407,11 +410,11 @@ func (e *CCIPContractsDeployer) NewCommitStore(addr common.Address) (
 func (e *CCIPContractsDeployer) DeployCommitStore(sourceChainSelector, destChainSelector uint64, onRamp common.Address, armProxy common.Address) (*CommitStore, error) {
 	address, _, instance, err := e.evmClient.DeployContract("CommitStore Contract", func(
 		auth *bind.TransactOpts,
-		backend bind.ContractBackend,
+		_ bind.ContractBackend,
 	) (common.Address, *types.Transaction, interface{}, error) {
 		return commit_store.DeployCommitStore(
 			auth,
-			backend,
+			wrappers.MustNewWrappedContractBackend(e.evmClient, nil),
 			commit_store.CommitStoreStaticConfig{
 				ChainSelector:       destChainSelector,
 				SourceChainSelector: sourceChainSelector,
@@ -436,9 +439,9 @@ func (e *CCIPContractsDeployer) DeployReceiverDapp(revert bool) (
 ) {
 	address, _, instance, err := e.evmClient.DeployContract("ReceiverDapp", func(
 		auth *bind.TransactOpts,
-		backend bind.ContractBackend,
+		_ bind.ContractBackend,
 	) (common.Address, *types.Transaction, interface{}, error) {
-		return maybe_revert_message_receiver.DeployMaybeRevertMessageReceiver(auth, backend, revert)
+		return maybe_revert_message_receiver.DeployMaybeRevertMessageReceiver(auth, wrappers.MustNewWrappedContractBackend(e.evmClient, nil), revert)
 	})
 	if err != nil {
 		return nil, err
@@ -454,7 +457,7 @@ func (e *CCIPContractsDeployer) NewReceiverDapp(addr common.Address) (
 	*ReceiverDapp,
 	error,
 ) {
-	ins, err := maybe_revert_message_receiver.NewMaybeRevertMessageReceiver(addr, e.evmClient.Backend())
+	ins, err := maybe_revert_message_receiver.NewMaybeRevertMessageReceiver(addr, wrappers.MustNewWrappedContractBackend(e.evmClient, nil))
 	log.Info().
 		Str("Contract Address", addr.Hex()).
 		Str("Contract Name", "ReceiverDapp").
@@ -474,9 +477,9 @@ func (e *CCIPContractsDeployer) DeployRouter(wrappedNative common.Address, armAd
 ) {
 	address, _, instance, err := e.evmClient.DeployContract("Router", func(
 		auth *bind.TransactOpts,
-		backend bind.ContractBackend,
+		_ bind.ContractBackend,
 	) (common.Address, *types.Transaction, interface{}, error) {
-		return router.DeployRouter(auth, backend, wrappedNative, armAddress)
+		return router.DeployRouter(auth, wrappers.MustNewWrappedContractBackend(e.evmClient, nil), wrappedNative, armAddress)
 	})
 	if err != nil {
 		return nil, err
@@ -492,7 +495,7 @@ func (e *CCIPContractsDeployer) NewRouter(addr common.Address) (
 	*Router,
 	error,
 ) {
-	r, err := router.NewRouter(addr, e.evmClient.Backend())
+	r, err := router.NewRouter(addr, wrappers.MustNewWrappedContractBackend(e.evmClient, nil))
 	log.Info().
 		Str("Contract Address", addr.Hex()).
 		Str("Contract Name", "Router").
@@ -513,7 +516,7 @@ func (e *CCIPContractsDeployer) NewPriceRegistry(addr common.Address) (
 	*PriceRegistry,
 	error,
 ) {
-	ins, err := price_registry.NewPriceRegistry(addr, e.evmClient.Backend())
+	ins, err := price_registry.NewPriceRegistry(addr, wrappers.MustNewWrappedContractBackend(e.evmClient, nil))
 	log.Info().
 		Str("Contract Address", addr.Hex()).
 		Str("Contract Name", "PriceRegistry").
@@ -530,9 +533,9 @@ func (e *CCIPContractsDeployer) NewPriceRegistry(addr common.Address) (
 func (e *CCIPContractsDeployer) DeployPriceRegistry(tokens []common.Address) (*PriceRegistry, error) {
 	address, _, instance, err := e.evmClient.DeployContract("PriceRegistry", func(
 		auth *bind.TransactOpts,
-		backend bind.ContractBackend,
+		_ bind.ContractBackend,
 	) (common.Address, *types.Transaction, interface{}, error) {
-		return price_registry.DeployPriceRegistry(auth, backend, nil, tokens, 60*60*24*14)
+		return price_registry.DeployPriceRegistry(auth, wrappers.MustNewWrappedContractBackend(e.evmClient, nil), nil, tokens, 60*60*24*14)
 	})
 	if err != nil {
 		return nil, err
@@ -544,11 +547,46 @@ func (e *CCIPContractsDeployer) DeployPriceRegistry(tokens []common.Address) (*P
 	}, err
 }
 
+func (e *CCIPContractsDeployer) DeployTokenAdminRegistry() (*TokenAdminRegistry, error) {
+	address, _, instance, err := e.evmClient.DeployContract("TokenAdminRegistry", func(
+		auth *bind.TransactOpts,
+		_ bind.ContractBackend,
+	) (common.Address, *types.Transaction, interface{}, error) {
+		return token_admin_registry.DeployTokenAdminRegistry(auth, wrappers.MustNewWrappedContractBackend(e.evmClient, nil))
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &TokenAdminRegistry{
+		client:     e.evmClient,
+		Instance:   instance.(*token_admin_registry.TokenAdminRegistry),
+		EthAddress: *address,
+	}, err
+}
+
+func (e *CCIPContractsDeployer) NewTokenAdminRegistry(addr common.Address) (
+	*TokenAdminRegistry,
+	error,
+) {
+	ins, err := token_admin_registry.NewTokenAdminRegistry(addr, wrappers.MustNewWrappedContractBackend(e.evmClient, nil))
+	log.Info().
+		Str("Contract Address", addr.Hex()).
+		Str("Contract Name", "TokenAdminRegistry").
+		Str("From", e.evmClient.GetDefaultWallet().Address()).
+		Str("Network Name", e.evmClient.GetNetworkConfig().Name).
+		Msg("New contract")
+	return &TokenAdminRegistry{
+		client:     e.evmClient,
+		Instance:   ins,
+		EthAddress: addr,
+	}, err
+}
+
 func (e *CCIPContractsDeployer) NewOnRamp(addr common.Address) (
 	*OnRamp,
 	error,
 ) {
-	ins, err := evm_2_evm_onramp.NewEVM2EVMOnRamp(addr, e.evmClient.Backend())
+	ins, err := evm_2_evm_onramp.NewEVM2EVMOnRamp(addr, wrappers.MustNewWrappedContractBackend(e.evmClient, nil))
 	log.Info().
 		Str("Contract Address", addr.Hex()).
 		Str("Contract Name", "OnRamp").
@@ -564,23 +602,22 @@ func (e *CCIPContractsDeployer) NewOnRamp(addr common.Address) (
 
 func (e *CCIPContractsDeployer) DeployOnRamp(
 	sourceChainSelector, destChainSelector uint64,
-	tokensAndPools []evm_2_evm_onramp.InternalPoolUpdate,
-	arm, router, priceRegistry common.Address,
+	arm,
+	router,
+	priceRegistry,
+	tokenAdminRegistry common.Address,
 	opts RateLimiterConfig,
 	feeTokenConfig []evm_2_evm_onramp.EVM2EVMOnRampFeeTokenConfigArgs,
 	tokenTransferFeeConfig []evm_2_evm_onramp.EVM2EVMOnRampTokenTransferFeeConfigArgs,
 	linkTokenAddress common.Address,
-) (
-	*OnRamp,
-	error,
-) {
+) (*OnRamp, error) {
 	address, _, instance, err := e.evmClient.DeployContract("OnRamp", func(
 		auth *bind.TransactOpts,
-		backend bind.ContractBackend,
+		_ bind.ContractBackend,
 	) (common.Address, *types.Transaction, interface{}, error) {
 		return evm_2_evm_onramp.DeployEVM2EVMOnRamp(
 			auth,
-			backend,
+			wrappers.MustNewWrappedContractBackend(e.evmClient, nil),
 			evm_2_evm_onramp.EVM2EVMOnRampStaticConfig{
 				LinkToken:         linkTokenAddress,
 				ChainSelector:     sourceChainSelector, // source chain id
@@ -601,8 +638,11 @@ func (e *CCIPContractsDeployer) DeployOnRamp(
 				PriceRegistry:                     priceRegistry,
 				MaxDataBytes:                      50000,
 				MaxPerMsgGasLimit:                 4_000_000,
+				TokenAdminRegistry:                tokenAdminRegistry,
+				DefaultTokenFeeUSDCents:           50,
+				DefaultTokenDestGasOverhead:       34_000,
+				DefaultTokenDestBytesOverhead:     500,
 			},
-			tokensAndPools,
 			evm_2_evm_onramp.RateLimiterConfig{
 				Capacity: opts.Capacity,
 				Rate:     opts.Rate,
@@ -626,7 +666,7 @@ func (e *CCIPContractsDeployer) NewOffRamp(addr common.Address) (
 	*OffRamp,
 	error,
 ) {
-	ins, err := evm_2_evm_offramp.NewEVM2EVMOffRamp(addr, e.evmClient.Backend())
+	ins, err := evm_2_evm_offramp.NewEVM2EVMOffRamp(addr, wrappers.MustNewWrappedContractBackend(e.evmClient, nil))
 	log.Info().
 		Str("Contract Address", addr.Hex()).
 		Str("Contract Name", "OffRamp").
@@ -640,14 +680,14 @@ func (e *CCIPContractsDeployer) NewOffRamp(addr common.Address) (
 	}, err
 }
 
-func (e *CCIPContractsDeployer) DeployOffRamp(sourceChainSelector, destChainSelector uint64, commitStore, onRamp common.Address, sourceToken, pools []common.Address, opts RateLimiterConfig, armProxy common.Address) (*OffRamp, error) {
+func (e *CCIPContractsDeployer) DeployOffRamp(sourceChainSelector, destChainSelector uint64, commitStore, onRamp common.Address, opts RateLimiterConfig, armProxy common.Address) (*OffRamp, error) {
 	address, _, instance, err := e.evmClient.DeployContract("OffRamp Contract", func(
 		auth *bind.TransactOpts,
-		backend bind.ContractBackend,
+		_ bind.ContractBackend,
 	) (common.Address, *types.Transaction, interface{}, error) {
 		return evm_2_evm_offramp.DeployEVM2EVMOffRamp(
 			auth,
-			backend,
+			wrappers.MustNewWrappedContractBackend(e.evmClient, nil),
 			evm_2_evm_offramp.EVM2EVMOffRampStaticConfig{
 				CommitStore:         commitStore,
 				ChainSelector:       destChainSelector,
@@ -656,8 +696,6 @@ func (e *CCIPContractsDeployer) DeployOffRamp(sourceChainSelector, destChainSele
 				PrevOffRamp:         common.Address{},
 				ArmProxy:            armProxy,
 			},
-			sourceToken,
-			pools,
 			evm_2_evm_offramp.RateLimiterConfig{
 				IsEnabled: true,
 				Capacity:  opts.Capacity,
@@ -678,9 +716,9 @@ func (e *CCIPContractsDeployer) DeployOffRamp(sourceChainSelector, destChainSele
 func (e *CCIPContractsDeployer) DeployWrappedNative() (*common.Address, error) {
 	address, _, _, err := e.evmClient.DeployContract("WrappedNative", func(
 		auth *bind.TransactOpts,
-		backend bind.ContractBackend,
+		_ bind.ContractBackend,
 	) (common.Address, *types.Transaction, interface{}, error) {
-		return weth9.DeployWETH9(auth, backend)
+		return weth9.DeployWETH9(auth, wrappers.MustNewWrappedContractBackend(e.evmClient, nil))
 	})
 	if err != nil {
 		return nil, err
@@ -691,9 +729,9 @@ func (e *CCIPContractsDeployer) DeployWrappedNative() (*common.Address, error) {
 func (e *CCIPContractsDeployer) DeployMockAggregator(decimals uint8, initialAns *big.Int) (*MockAggregator, error) {
 	address, _, instance, err := e.evmClient.DeployContract("MockAggregator", func(
 		auth *bind.TransactOpts,
-		backend bind.ContractBackend,
+		_ bind.ContractBackend,
 	) (common.Address, *types.Transaction, interface{}, error) {
-		return mock_v3_aggregator_contract.DeployMockV3Aggregator(auth, backend, decimals, initialAns)
+		return mock_v3_aggregator_contract.DeployMockV3Aggregator(auth, wrappers.MustNewWrappedContractBackend(e.evmClient, nil), decimals, initialAns)
 	})
 	if err != nil {
 		return nil, fmt.Errorf("deploying mock aggregator: %w", err)
@@ -712,7 +750,7 @@ func (e *CCIPContractsDeployer) DeployMockAggregator(decimals uint8, initialAns 
 }
 
 func (e *CCIPContractsDeployer) NewMockAggregator(addr common.Address) (*MockAggregator, error) {
-	ins, err := mock_v3_aggregator_contract.NewMockV3Aggregator(addr, e.evmClient.Backend())
+	ins, err := mock_v3_aggregator_contract.NewMockV3Aggregator(addr, wrappers.MustNewWrappedContractBackend(e.evmClient, nil))
 	if err != nil {
 		return nil, fmt.Errorf("creating mock aggregator: %w", err)
 	}
@@ -723,28 +761,53 @@ func (e *CCIPContractsDeployer) NewMockAggregator(addr common.Address) (*MockAgg
 	}, nil
 }
 
+func (e *CCIPContractsDeployer) TypeAndVersion(addr common.Address) (string, error) {
+	tv, err := type_and_version.NewTypeAndVersionInterface(addr, wrappers.MustNewWrappedContractBackend(e.evmClient, nil))
+	if err != nil {
+		return "", err
+	}
+	tvStr, err := tv.TypeAndVersion(nil)
+	if err != nil {
+		return "", fmt.Errorf("error calling typeAndVersion on addr: %s %w", addr.Hex(), err)
+	}
+	log.Info().
+		Str("TypeAndVersion", tvStr).
+		Str("Contract Address", addr.Hex()).
+		Msg("TypeAndVersion")
+
+	_, versionStr, err := ccipconfig.ParseTypeAndVersion(tvStr)
+	if err != nil {
+		return versionStr, err
+	}
+	v, err := semver.NewVersion(versionStr)
+	if err != nil {
+		return "", fmt.Errorf("failed parsing version %s: %w", versionStr, err)
+	}
+	return v.String(), nil
+}
+
 var OCR2ParamsForCommit = contracts.OffChainAggregatorV2Config{
-	DeltaProgress:                           2 * time.Minute,
-	DeltaResend:                             5 * time.Second,
-	DeltaRound:                              75 * time.Second,
-	DeltaGrace:                              5 * time.Second,
-	MaxDurationQuery:                        100 * time.Millisecond,
-	MaxDurationObservation:                  35 * time.Second,
-	MaxDurationReport:                       10 * time.Second,
-	MaxDurationShouldAcceptFinalizedReport:  5 * time.Second,
-	MaxDurationShouldTransmitAcceptedReport: 10 * time.Second,
+	DeltaProgress:                           config.MustNewDuration(2 * time.Minute),
+	DeltaResend:                             config.MustNewDuration(5 * time.Second),
+	DeltaRound:                              config.MustNewDuration(75 * time.Second),
+	DeltaGrace:                              config.MustNewDuration(5 * time.Second),
+	MaxDurationQuery:                        config.MustNewDuration(100 * time.Millisecond),
+	MaxDurationObservation:                  config.MustNewDuration(35 * time.Second),
+	MaxDurationReport:                       config.MustNewDuration(10 * time.Second),
+	MaxDurationShouldAcceptFinalizedReport:  config.MustNewDuration(5 * time.Second),
+	MaxDurationShouldTransmitAcceptedReport: config.MustNewDuration(10 * time.Second),
 }
 
 var OCR2ParamsForExec = contracts.OffChainAggregatorV2Config{
-	DeltaProgress:                           100 * time.Second,
-	DeltaResend:                             5 * time.Second,
-	DeltaRound:                              40 * time.Second,
-	DeltaGrace:                              5 * time.Second,
-	MaxDurationQuery:                        100 * time.Millisecond,
-	MaxDurationObservation:                  20 * time.Second,
-	MaxDurationReport:                       8 * time.Second,
-	MaxDurationShouldAcceptFinalizedReport:  5 * time.Second,
-	MaxDurationShouldTransmitAcceptedReport: 8 * time.Second,
+	DeltaProgress:                           config.MustNewDuration(100 * time.Second),
+	DeltaResend:                             config.MustNewDuration(5 * time.Second),
+	DeltaRound:                              config.MustNewDuration(40 * time.Second),
+	DeltaGrace:                              config.MustNewDuration(5 * time.Second),
+	MaxDurationQuery:                        config.MustNewDuration(100 * time.Millisecond),
+	MaxDurationObservation:                  config.MustNewDuration(20 * time.Second),
+	MaxDurationReport:                       config.MustNewDuration(8 * time.Second),
+	MaxDurationShouldAcceptFinalizedReport:  config.MustNewDuration(5 * time.Second),
+	MaxDurationShouldTransmitAcceptedReport: config.MustNewDuration(8 * time.Second),
 }
 
 func OffChainAggregatorV2ConfigWithNodes(numberNodes int, inflightExpiry time.Duration, cfg contracts.OffChainAggregatorV2Config) contracts.OffChainAggregatorV2Config {
@@ -764,12 +827,15 @@ func OffChainAggregatorV2ConfigWithNodes(numberNodes int, inflightExpiry time.Du
 	if faultyNodes == 0 {
 		faultyNodes = 1
 	}
+	if cfg.DeltaStage == nil {
+		cfg.DeltaStage = config.MustNewDuration(inflightExpiry)
+	}
 	return contracts.OffChainAggregatorV2Config{
 		DeltaProgress:                           cfg.DeltaProgress,
 		DeltaResend:                             cfg.DeltaResend,
 		DeltaRound:                              cfg.DeltaRound,
 		DeltaGrace:                              cfg.DeltaGrace,
-		DeltaStage:                              inflightExpiry,
+		DeltaStage:                              cfg.DeltaStage,
 		RMax:                                    3,
 		S:                                       s,
 		F:                                       faultyNodes,
@@ -854,20 +920,20 @@ func NewOffChainAggregatorV2ConfigForCCIPPlugin[T ccipconfig.OffchainConfig](
 	}
 
 	_, _, f_, onchainConfig_, offchainConfigVersion, offchainConfig, err = ocrconfighelper2.ContractSetConfigArgsForTests(
-		ocrConfig.DeltaProgress,
-		ocrConfig.DeltaResend,
-		ocrConfig.DeltaRound,
-		ocrConfig.DeltaGrace,
-		ocrConfig.DeltaStage,
+		ocrConfig.DeltaProgress.Duration(),
+		ocrConfig.DeltaResend.Duration(),
+		ocrConfig.DeltaRound.Duration(),
+		ocrConfig.DeltaGrace.Duration(),
+		ocrConfig.DeltaStage.Duration(),
 		ocrConfig.RMax,
 		ocrConfig.S,
 		ocrConfig.Oracles,
 		ocrConfig.ReportingPluginConfig,
-		ocrConfig.MaxDurationQuery,
-		ocrConfig.MaxDurationObservation,
-		ocrConfig.MaxDurationReport,
-		ocrConfig.MaxDurationShouldAcceptFinalizedReport,
-		ocrConfig.MaxDurationShouldTransmitAcceptedReport,
+		ocrConfig.MaxDurationQuery.Duration(),
+		ocrConfig.MaxDurationObservation.Duration(),
+		ocrConfig.MaxDurationReport.Duration(),
+		ocrConfig.MaxDurationShouldAcceptFinalizedReport.Duration(),
+		ocrConfig.MaxDurationShouldTransmitAcceptedReport.Duration(),
 		ocrConfig.F,
 		ocrConfig.OnchainConfig,
 	)

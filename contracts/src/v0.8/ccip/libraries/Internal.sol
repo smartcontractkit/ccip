@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {Client} from "./Client.sol";
 import {MerkleMultiProof} from "../libraries/MerkleMultiProof.sol";
+import {Client} from "./Client.sol";
 
 // Library for CCIP internal definitions common to multiple contracts.
 library Internal {
@@ -65,19 +65,19 @@ library Internal {
   /// @notice The cross chain message that gets committed to EVM chains.
   /// @dev RMN depends on this struct, if changing, please notify the RMN maintainers.
   struct EVM2EVMMessage {
-    uint64 sourceChainSelector; // ─────────╮ the chain selector of the source chain, note: not chainId
-    address sender; // ─────────────────────╯ sender address on the source chain
-    address receiver; // ───────────────────╮ receiver address on the destination chain
-    uint64 sequenceNumber; // ──────────────╯ sequence number, not unique across lanes
-    uint256 gasLimit; //                      user supplied maximum gas amount available for dest chain execution
-    bool strict; // ────────────────────────╮ DEPRECATED
-    uint64 nonce; //                        │ nonce for this lane for this sender, not unique across senders/lanes
-    address feeToken; // ───────────────────╯ fee token
-    uint256 feeTokenAmount; //                fee token amount
-    bytes data; //                            arbitrary data payload supplied by the message sender
-    Client.EVMTokenAmount[] tokenAmounts; //  array of tokens and amounts to transfer
-    bytes[] sourceTokenData; //               array of token pool return values, one per token
-    bytes32 messageId; //                     a hash of the message data
+    uint64 sourceChainSelector; // ───────────╮ the chain selector of the source chain, note: not chainId
+    address sender; // ───────────────────────╯ sender address on the source chain
+    address receiver; // ─────────────────────╮ receiver address on the destination chain
+    uint64 sequenceNumber; // ────────────────╯ sequence number, not unique across lanes
+    uint256 gasLimit; //                        user supplied maximum gas amount available for dest chain execution
+    bool strict; // ──────────────────────────╮ DEPRECATED
+    uint64 nonce; //                          │ nonce for this lane for this sender, not unique across senders/lanes
+    address feeToken; // ─────────────────────╯ fee token
+    uint256 feeTokenAmount; //                  fee token amount
+    bytes data; //                              arbitrary data payload supplied by the message sender
+    Client.EVMTokenAmount[] tokenAmounts; //    array of tokens and amounts to transfer
+    bytes[] sourceTokenData; //                 array of token data, one per token
+    bytes32 messageId; //                       a hash of the message data
   }
 
   /// @dev EVM2EVMMessage struct has 13 fields, including 3 variable arrays.
@@ -95,14 +95,13 @@ library Internal {
     EVM2EVMMessage memory original,
     Client.EVMTokenAmount[] memory destTokenAmounts
   ) internal pure returns (Client.Any2EVMMessage memory message) {
-    return
-      Client.Any2EVMMessage({
-        messageId: original.messageId,
-        sourceChainSelector: original.sourceChainSelector,
-        sender: abi.encode(original.sender),
-        data: original.data,
-        destTokenAmounts: destTokenAmounts
-      });
+    return Client.Any2EVMMessage({
+      messageId: original.messageId,
+      sourceChainSelector: original.sourceChainSelector,
+      sender: abi.encode(original.sender),
+      data: original.data,
+      destTokenAmounts: destTokenAmounts
+    });
   }
 
   bytes32 internal constant EVM_2_EVM_MESSAGE_HASH = keccak256("EVM2EVMMessageHashV2");
@@ -110,28 +109,27 @@ library Internal {
   function _hash(EVM2EVMMessage memory original, bytes32 metadataHash) internal pure returns (bytes32) {
     // Fixed-size message fields are included in nested hash to reduce stack pressure.
     // This hashing scheme is also used by RMN. If changing it, please notify the RMN maintainers.
-    return
-      keccak256(
-        abi.encode(
-          MerkleMultiProof.LEAF_DOMAIN_SEPARATOR,
-          metadataHash,
-          keccak256(
-            abi.encode(
-              original.sender,
-              original.receiver,
-              original.sequenceNumber,
-              original.gasLimit,
-              original.strict,
-              original.nonce,
-              original.feeToken,
-              original.feeTokenAmount
-            )
-          ),
-          keccak256(original.data),
-          keccak256(abi.encode(original.tokenAmounts)),
-          keccak256(abi.encode(original.sourceTokenData))
-        )
-      );
+    return keccak256(
+      abi.encode(
+        MerkleMultiProof.LEAF_DOMAIN_SEPARATOR,
+        metadataHash,
+        keccak256(
+          abi.encode(
+            original.sender,
+            original.receiver,
+            original.sequenceNumber,
+            original.gasLimit,
+            original.strict,
+            original.nonce,
+            original.feeToken,
+            original.feeTokenAmount
+          )
+        ),
+        keccak256(original.data),
+        keccak256(abi.encode(original.tokenAmounts)),
+        keccak256(abi.encode(original.sourceTokenData))
+      )
+    );
   }
 
   /// @notice Enum listing the possible message execution states within

@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
+
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	evmclientmocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/client/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
@@ -158,7 +159,7 @@ func setupOffRampReaderTH(t *testing.T, version string) offRampReaderTH {
 	ctx := testutils.Context(t)
 	user, bc := ccipdata.NewSimulation(t)
 	log := logger.TestLogger(t)
-	orm := logpoller.NewORM(testutils.SimulatedChainID, pgtest.NewSqlxDB(t), log, pgtest.NewQConfig(true))
+	orm := logpoller.NewORM(testutils.SimulatedChainID, pgtest.NewSqlxDB(t), log)
 	lpOpts := logpoller.Opts{
 		PollPeriod:               100 * time.Millisecond,
 		FinalityDepth:            2,
@@ -171,7 +172,7 @@ func setupOffRampReaderTH(t *testing.T, version string) offRampReaderTH {
 		bc,
 		log,
 		lpOpts)
-	assert.NoError(t, orm.InsertBlock(common.Hash{}, 1, time.Now(), 1))
+	assert.NoError(t, orm.InsertBlock(ctx, common.Hash{}, 1, time.Now(), 1))
 	// Setup offRamp.
 	var offRampAddress common.Address
 	switch version {
@@ -275,7 +276,6 @@ func setupOffRampV1_2_0(t *testing.T, user *bind.TransactOpts, bc *client.Simula
 }
 
 func setupOffRampV1_5_0(t *testing.T, user *bind.TransactOpts, bc *client.SimulatedBackendClient) common.Address {
-
 	onRampAddr := utils.RandomAddress()
 	armAddr := deployMockArm(t, user, bc)
 	csAddr := deployCommitStore(t, user, bc, onRampAddr, armAddr)
@@ -289,15 +289,13 @@ func setupOffRampV1_5_0(t *testing.T, user *bind.TransactOpts, bc *client.Simula
 		PrevOffRamp:         common.Address{},
 		ArmProxy:            armAddr,
 	}
-	sourceTokens := []common.Address{}
-	pools := []common.Address{}
 	rateLimiterConfig := evm_2_evm_offramp.RateLimiterConfig{
 		IsEnabled: false,
 		Capacity:  big.NewInt(0),
 		Rate:      big.NewInt(0),
 	}
 
-	offRampAddr, tx, offRamp, err := evm_2_evm_offramp.DeployEVM2EVMOffRamp(user, bc, staticConfig, sourceTokens, pools, rateLimiterConfig)
+	offRampAddr, tx, offRamp, err := evm_2_evm_offramp.DeployEVM2EVMOffRamp(user, bc, staticConfig, rateLimiterConfig)
 	bc.Commit()
 	require.NoError(t, err)
 	ccipdata.AssertNonRevert(t, tx, bc, user)
@@ -401,7 +399,7 @@ func TestNewOffRampReader(t *testing.T) {
 			c.On("CallContract", mock.Anything, mock.Anything, mock.Anything).Return(b, nil)
 			addr := ccipcalc.EvmAddrToGeneric(utils.RandomAddress())
 			lp := lpmocks.NewLogPoller(t)
-			lp.On("RegisterFilter", mock.Anything).Return(nil).Maybe()
+			lp.On("RegisterFilter", mock.Anything, mock.Anything).Return(nil).Maybe()
 			_, err = factory.NewOffRampReader(logger.TestLogger(t), factory.NewEvmVersionFinder(), addr, c, lp, nil, nil, true)
 			if tc.expectedErr != "" {
 				assert.EqualError(t, err, tc.expectedErr)

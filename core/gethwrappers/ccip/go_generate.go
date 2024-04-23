@@ -13,6 +13,7 @@ package ccip
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.19/ARM/ARM.abi ../../../contracts/solc/v0.8.19/ARM/ARM.bin ARMContract arm_contract
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.19/ARMProxy/ARMProxy.abi ../../../contracts/solc/v0.8.19/ARMProxy/ARMProxy.bin ARMProxyContract arm_proxy_contract
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.19/MockARM/MockARM.abi ../../../contracts/solc/v0.8.19/MockARM/MockARM.bin MockARMContract mock_arm_contract
+//go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.19/TokenAdminRegistry/TokenAdminRegistry.abi ../../../contracts/solc/v0.8.19/TokenAdminRegistry/TokenAdminRegistry.bin TokenAdminRegistry token_admin_registry
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.19/MockE2EUSDCTokenMessenger/MockE2EUSDCTokenMessenger.abi ../../../contracts/solc/v0.8.19/MockE2EUSDCTokenMessenger/MockE2EUSDCTokenMessenger.bin MockE2EUSDCTokenMessenger mock_usdc_token_messenger
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.19/MockE2EUSDCTransmitter/MockE2EUSDCTransmitter.abi ../../../contracts/solc/v0.8.19/MockE2EUSDCTransmitter/MockE2EUSDCTransmitter.bin MockE2EUSDCTransmitter mock_usdc_token_transmitter
 
@@ -26,6 +27,7 @@ package ccip
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.19/MaybeRevertMessageReceiver/MaybeRevertMessageReceiver.abi ../../../contracts/solc/v0.8.19/MaybeRevertMessageReceiver/MaybeRevertMessageReceiver.bin MaybeRevertMessageReceiver maybe_revert_message_receiver
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.19/PingPongDemo/PingPongDemo.abi ../../../contracts/solc/v0.8.19/PingPongDemo/PingPongDemo.bin PingPongDemo ping_pong_demo
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.19/SelfFundedPingPong/SelfFundedPingPong.abi ../../../contracts/solc/v0.8.19/SelfFundedPingPong/SelfFundedPingPong.bin SelfFundedPingPong self_funded_ping_pong
+//go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.19/EtherSenderReceiver/EtherSenderReceiver.abi ../../../contracts/solc/v0.8.19/EtherSenderReceiver/EtherSenderReceiver.bin EtherSenderReceiver ether_sender_receiver
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.19/WETH9/WETH9.abi ../../../contracts/solc/v0.8.19/WETH9/WETH9.bin WETH9 weth9
 
 // Customer contracts
