@@ -436,7 +436,7 @@ func TestSmokeCCIPSelfServeRateLimit(t *testing.T) {
 				addFund := func(ccipCommon *actions.CCIPCommon) {
 					for i, btp := range ccipCommon.BridgeTokenPools {
 						token := ccipCommon.BridgeTokens[i]
-						err := btp.AddLiquidity(token.Approve, token.Address(), big.NewInt(1e18))
+						err := btp.AddLiquidity(token.Approve, token.Address(), new(big.Int).Mul(aggregateRateLimit, big.NewInt(20)))
 						require.NoError(t, err)
 					}
 				}
@@ -444,11 +444,14 @@ func TestSmokeCCIPSelfServeRateLimit(t *testing.T) {
 				addFund(tc.lane.Dest.Common)
 			}
 
-			freeTokenIndex := 0
-			limitedTokenIndex := 1
-			freeSrcToken := src.Common.BridgeTokens[freeTokenIndex]
-			limitedSrcToken := src.Common.BridgeTokens[limitedTokenIndex]
-			limitedDestToken := dest.Common.BridgeTokens[limitedTokenIndex]
+			var (
+				freeTokenIndex    = 0
+				limitedTokenIndex = 1
+
+				freeSrcToken     = src.Common.BridgeTokens[freeTokenIndex]
+				limitedSrcToken  = src.Common.BridgeTokens[limitedTokenIndex]
+				limitedDestToken = dest.Common.BridgeTokens[limitedTokenIndex]
+			)
 
 			// First turn off any rate limiting and ensure we can send both tokens without issue
 			err := src.SetTokenTransferFeeConfig(false)
@@ -480,7 +483,7 @@ func TestSmokeCCIPSelfServeRateLimit(t *testing.T) {
 			require.NoError(t, err, "Error waiting for events")
 			tc.lane.Logger.Debug().Str("Token", limitedSrcToken.ContractAddress.Hex()).Msg("Enabled aggregate rate limit on destination chain")
 
-			// Send free token that should not have a rate limit
+			// Send free token that should not have a rate limit and should succeed
 			src.TransferAmount[freeTokenIndex] = overLimitAmount
 			src.TransferAmount[limitedTokenIndex] = big.NewInt(0)
 			err = tc.lane.SendRequests(1, TestCfg.TestGroupInput.MsgType, big.NewInt(600_000))
@@ -490,7 +493,7 @@ func TestSmokeCCIPSelfServeRateLimit(t *testing.T) {
 			tc.lane.Logger.Info().Str("Token", freeSrcToken.ContractAddress.Hex()).Msg("Unlimited token transfer succeeded on source chain")
 			tc.lane.ValidateRequests(true)
 
-			// Send limited token with rate limit on destination chain
+			// Send limited token with rate limit that should fail on the destination chain
 			src.TransferAmount[freeTokenIndex] = big.NewInt(0)
 			src.TransferAmount[limitedTokenIndex] = overLimitAmount
 			tc.lane.RecordStateBeforeTransfer()

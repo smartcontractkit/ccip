@@ -1548,10 +1548,14 @@ func (sourceCCIP *SourceCCIPModule) CCIPMsg(
 	tokenAndAmounts := []router.ClientEVMTokenAmount{}
 	if msgType == TokenTransfer {
 		for i, amount := range sourceCCIP.TransferAmount {
-			// if length of sourceCCIP.TransferAmount is more than available bridge token use first bridge token
 			token := sourceCCIP.Common.BridgeTokens[0]
+			// if length of sourceCCIP.TransferAmount is more than available bridge token use first bridge token
 			if i < len(sourceCCIP.Common.BridgeTokens) {
 				token = sourceCCIP.Common.BridgeTokens[i]
+			}
+			if amount == nil || amount.Cmp(big.NewInt(0)) == 0 {
+				log.Warn().Str("Token Address", token.Address()).Int("Token Index", i).Msg("Not sending a request for token transfer as the amount is 0 or nil")
+				continue
 			}
 			tokenAndAmounts = append(tokenAndAmounts, router.ClientEVMTokenAmount{
 				Token: common.HexToAddress(token.Address()), Amount: amount,
@@ -1577,6 +1581,7 @@ func (sourceCCIP *SourceCCIPModule) CCIPMsg(
 	}, nil
 }
 
+// SendRequest sends a CCIP request to the source chain's router contract
 func (sourceCCIP *SourceCCIPModule) SendRequest(
 	receiver common.Address,
 	msgType,
@@ -1595,14 +1600,14 @@ func (sourceCCIP *SourceCCIPModule) SendRequest(
 	}
 	fee, err := sourceCCIP.Common.Router.GetFee(destChainSelector, msg)
 	if err != nil {
-		log.Info().Interface("Msg", msg).Msg("Ccip msg")
+		log.Info().Interface("Msg", msg).Msg("CCIP msg")
 		reason, _ := blockchain.RPCErrorFromError(err)
 		if reason != "" {
 			return common.Hash{}, d, nil, fmt.Errorf("failed getting the fee: %s", reason)
 		}
 		return common.Hash{}, d, nil, fmt.Errorf("failed getting the fee: %w", err)
 	}
-	log.Info().Str("fee", fee.String()).Msg("calculated fee")
+	log.Info().Str("Fee", fee.String()).Msg("Calculated fee")
 
 	var sendTx *types.Transaction
 	timeNow := time.Now()

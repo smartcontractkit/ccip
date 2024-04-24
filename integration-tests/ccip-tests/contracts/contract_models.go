@@ -754,11 +754,11 @@ func (r *Router) CCIPSendAndProcessTx(destChainSelector uint64, msg router.Clien
 		return nil, fmt.Errorf("failed to send msg: %w", err)
 	}
 	log.Info().
-		Str("router", r.Address()).
+		Str("Router", r.Address()).
 		Str("txHash", tx.Hash().Hex()).
 		Str(Network, r.client.GetNetworkConfig().Name).
-		Str("chain selector", strconv.FormatUint(destChainSelector, 10)).
-		Msg("msg is sent")
+		Str("Chain Selector", strconv.FormatUint(destChainSelector, 10)).
+		Msg("Message Sent")
 	return tx, r.client.ProcessTransaction(tx)
 }
 
