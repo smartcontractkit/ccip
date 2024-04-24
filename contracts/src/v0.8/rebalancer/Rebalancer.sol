@@ -5,6 +5,7 @@ import {IBridgeAdapter} from "./interfaces/IBridge.sol";
 import {IRebalancer} from "./interfaces/IRebalancer.sol";
 import {ILiquidityContainer} from "./interfaces/ILiquidityContainer.sol";
 import {IWrappedNative} from "../ccip/interfaces/IWrappedNative.sol";
+
 import {OCR3Base} from "./ocr/OCR3Base.sol";
 
 import {IERC20} from "../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
@@ -281,7 +282,7 @@ contract Rebalancer is IRebalancer, OCR3Base {
     // In such a case we need to re-wrap the native in order to inject it into the liquidity container.
     // TODO: escape hatch in case of bug?
     if (shouldWrapNative) {
-      _wrapNative(amount);
+      IWrappedNative(address(i_localToken)).deposit{value: amount}();
     }
 
     i_localToken.safeIncreaseAllowance(address(s_localLiquidityContainer), amount);
@@ -296,11 +297,6 @@ contract Rebalancer is IRebalancer, OCR3Base {
       bridgeSpecificPayload,
       bytes("") // no bridge return data when receiving
     );
-  }
-
-  function _wrapNative(uint256 amount) private {
-    IWrappedNative weth = IWrappedNative(address(i_localToken));
-    weth.deposit{value: amount}();
   }
 
   function _report(bytes calldata report, uint64 ocrSeqNum) internal override {

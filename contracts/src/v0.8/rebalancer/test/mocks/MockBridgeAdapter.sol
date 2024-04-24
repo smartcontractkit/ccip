@@ -128,9 +128,8 @@ contract MockL1BridgeAdapter is IBridgeAdapter, ILiquidityContainer {
       return _proveWithdrawal(payload);
     } else if (payload.action == FinalizationAction.FinalizeWithdrawal) {
       return _finalizeWithdrawal(payload, localReceiver);
-    } else {
-      revert InvalidFinalizationAction();
     }
+    revert InvalidFinalizationAction();
   }
 
   function _proveWithdrawal(Payload memory payload) internal returns (bool) {
