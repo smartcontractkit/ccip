@@ -45,6 +45,9 @@ contract TokenAdminRegistry is ITokenAdminRegistry, ITypeAndVersion, OwnerIsCrea
   // All tokens that have been configured
   EnumerableSet.AddressSet internal s_tokens;
 
+  // All permissioned tokens
+  EnumerableSet.AddressSet internal s_permissionedTokens;
+
   // Registry modules are allowed to register administrators for tokens
   EnumerableSet.AddressSet internal s_RegistryModules;
 
@@ -94,6 +97,14 @@ contract TokenAdminRegistry is ITokenAdminRegistry, ITypeAndVersion, OwnerIsCrea
     return tokens;
   }
 
+  /// @inheritdoc ITokenAdminRegistry
+  function getPermissionedTokens() external view returns (address[] memory tokens) {
+    return s_permissionedTokens.values();
+  }
+
+  /// @notice Returns the configuration for a token.
+  /// @param token The token to get the configuration for.
+  /// @return config The configuration for the token.
   function getTokenConfig(address token) external view returns (TokenConfig memory) {
     return s_tokenConfig[token];
   }
@@ -120,7 +131,7 @@ contract TokenAdminRegistry is ITokenAdminRegistry, ITypeAndVersion, OwnerIsCrea
   /// @notice Transfers the administrator role for a token to a new address with a 2-step process.
   /// @param token The token to transfer the administrator role for.
   /// @param newAdmin The address to transfer the administrator role to. Can be address(0) to cancel
-  /// a pending tranfer.
+  /// a pending transfer.
   /// @dev The new admin must call `acceptAdminRole` to accept the role.
   function transferAdminRole(address token, address newAdmin) external onlyTokenAdmin(token) {
     TokenConfig storage config = s_tokenConfig[token];
@@ -179,7 +190,6 @@ contract TokenAdminRegistry is ITokenAdminRegistry, ITypeAndVersion, OwnerIsCrea
 
     config.administrator = administrator;
     config.isRegistered = true;
-    config.isPermissionedAdmin = false;
 
     s_tokens.add(localToken);
 
@@ -199,6 +209,7 @@ contract TokenAdminRegistry is ITokenAdminRegistry, ITypeAndVersion, OwnerIsCrea
     config.isPermissionedAdmin = true;
 
     s_tokens.add(localToken);
+    s_permissionedTokens.add(localToken);
 
     emit AdministratorRegistered(localToken, administrator);
   }

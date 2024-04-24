@@ -109,6 +109,34 @@ contract TokenAdminRegistry_getAllConfiguredTokens is TokenAdminRegistrySetup {
   }
 }
 
+contract TokenAdminRegistry_getPermissionedTokens is TokenAdminRegistrySetup {
+  function test_getPermissionedTokens_Success() public {
+    TokenAdminRegistry cleanTokenAdminRegistry = new TokenAdminRegistry();
+    cleanTokenAdminRegistry.addRegistryModule(s_registryModule);
+
+    address[] memory got = cleanTokenAdminRegistry.getPermissionedTokens();
+    assertEq(got.length, 0);
+
+    for (uint256 i = 0; i < s_sourceTokens.length; i++) {
+      cleanTokenAdminRegistry.registerAdministratorPermissioned(s_sourceTokens[i], OWNER);
+    }
+
+    got = cleanTokenAdminRegistry.getPermissionedTokens();
+    assertEq(got.length, s_sourceTokens.length);
+    assertEq(got, s_sourceTokens);
+
+    vm.startPrank(s_registryModule);
+
+    for (uint256 i = 0; i < s_destTokens.length; i++) {
+      cleanTokenAdminRegistry.registerAdministrator(s_destTokens[i], OWNER);
+    }
+
+    got = cleanTokenAdminRegistry.getPermissionedTokens();
+    assertEq(got.length, s_sourceTokens.length);
+    assertEq(got, s_sourceTokens);
+  }
+}
+
 contract TokenAdminRegistry_transferAdminRole is TokenAdminRegistrySetup {
   function test_transferAdminRole_Success() public {
     address token = s_sourceTokens[0];

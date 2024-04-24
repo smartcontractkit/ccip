@@ -454,8 +454,8 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   }
 
   /// @inheritdoc IEVM2AnyOnRampClient
-  function getSupportedTokens(uint64 /*destChainSelector*/ ) external pure returns (address[] memory) {
-    revert GetSupportedTokensFunctionalityRemoved();
+  function getSupportedTokens(uint64 /*destChainSelector*/ ) external view returns (address[] memory) {
+    return ITokenAdminRegistry(s_dynamicConfig.tokenAdminRegistry).getPermissionedTokens();
   }
 
   // ================================================================

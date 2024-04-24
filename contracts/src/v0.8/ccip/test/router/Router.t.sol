@@ -684,9 +684,15 @@ contract Router_setWrappedNative is EVM2EVMOnRampSetup {
 
 /// @notice #getSupportedTokens
 contract Router_getSupportedTokens is EVM2EVMOnRampSetup {
-  function test_GetSupportedTokens_Revert() public {
-    vm.expectRevert(EVM2EVMOnRamp.GetSupportedTokensFunctionalityRemoved.selector);
-    s_sourceRouter.getSupportedTokens(DEST_CHAIN_SELECTOR);
+  function test_GetSupportedTokens_Success() public {
+    address[] memory tokens = s_sourceRouter.getSupportedTokens(DEST_CHAIN_SELECTOR);
+
+    address[] memory expected = new address[](4);
+    expected[0] = s_sourceTokens[0];
+    expected[1] = s_sourceTokens[1];
+    expected[2] = s_destTokens[0];
+    expected[3] = s_destTokens[1];
+    assertEq(expected, tokens);
   }
 }
 

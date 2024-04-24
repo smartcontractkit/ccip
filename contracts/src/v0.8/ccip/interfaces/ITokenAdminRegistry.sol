@@ -5,7 +5,6 @@ interface ITokenAdminRegistry {
   /// @notice Returns the pool for the given token.
   function getPool(address token) external view returns (address);
 
-  /// @notice Returns every token that has ever been configured. This includes tokens
-  /// that are no longer configured or do not have a pool configured.
-  function getAllConfiguredTokens(uint64 startIndex, uint64 maxCount) external view returns (address[] memory);
+  /// @notice Returns every token that has been configured through a permissoned method.
+  function getPermissionedTokens() external view returns (address[] memory);
 }
