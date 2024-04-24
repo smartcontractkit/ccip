@@ -58,7 +58,7 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator, ITypeAndVersion {
   mapping(address token => Internal.TimestampedPackedUint224 price) private s_usdPerToken;
 
   /// @dev Stores the price data feed addresses per token.
-  /// @dev The data feed address must be an AggregatorV3Interface contract.
+  ///      The data feed address must be an AggregatorV3Interface contract.
   mapping(address token => address dataFeedAddress) private s_usdDataFeedsPerToken;
 
   // Price updaters are allowed to update the prices.
@@ -205,7 +205,9 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator, ITypeAndVersion {
     // feedValue * (10 ** (18 - feedDecimals)) * (10 ** (18 - erc20Decimals))
     // feedValue * (10 ** ((18 - feedDecimals) + (18 - erc20Decimals)))
     // feedValue * (10 ** (36 - feedDecimals - erc20Decimals))
-    // If (feedDecimals - erc20Decimals) > 36 => flip it to feedValue / (10 ** (feedDecimals + erc20Decimals - 36))
+    // feedValue * (10 ** (36 - (feedDecimals + erc20Decimals)))
+    // feedValue * (10 ** (36 - excessDecimals))
+    // If excessDecimals > 36 => flip it to feedValue / (10 ** (excessDecimals - 36))
 
     uint8 excessDecimals = dataFeedContract.decimals() + IERC20Metadata(token).decimals();
 
