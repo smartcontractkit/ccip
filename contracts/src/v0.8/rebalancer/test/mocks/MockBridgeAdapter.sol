@@ -125,32 +125,32 @@ contract MockL1BridgeAdapter is IBridgeAdapter, ILiquidityContainer {
   ) external override returns (bool) {
     Payload memory payload = abi.decode(bridgeSpecificPayload, (Payload));
     if (payload.action == FinalizationAction.ProveWithdrawal) {
-      return proveWithdrawal(payload);
+      return _proveWithdrawal(payload);
     } else if (payload.action == FinalizationAction.FinalizeWithdrawal) {
-      return finalizeWithdrawal(payload, localReceiver);
+      return _finalizeWithdrawal(payload, localReceiver);
     } else {
       revert InvalidFinalizationAction();
     }
   }
 
-  function proveWithdrawal(Payload memory payload) internal returns (bool) {
+  function _proveWithdrawal(Payload memory payload) internal returns (bool) {
     ProvePayload memory provePayload = abi.decode(payload.data, (ProvePayload));
     if (s_nonceProven[provePayload.nonce]) revert NonceAlreadyUsed(provePayload.nonce);
     s_nonceProven[provePayload.nonce] = true;
     return false;
   }
 
-  function finalizeWithdrawal(Payload memory payload, address localReceiver) internal returns (bool) {
+  function _finalizeWithdrawal(Payload memory payload, address localReceiver) internal returns (bool) {
     FinalizePayload memory finalizePayload = abi.decode(payload.data, (FinalizePayload));
     if (!s_nonceProven[finalizePayload.nonce]) revert NonceNotProven(finalizePayload.nonce);
     if (s_nonceFinalized[finalizePayload.nonce]) revert NonceAlreadyUsed(finalizePayload.nonce);
     s_nonceFinalized[finalizePayload.nonce] = true;
     // re-entrancy prevented by nonce checks above.
-    transferTokens(finalizePayload.amount, localReceiver);
+    _transferTokens(finalizePayload.amount, localReceiver);
     return true;
   }
 
-  function transferTokens(uint256 amount, address localReceiver) internal {
+  function _transferTokens(uint256 amount, address localReceiver) internal {
     if (i_holdNative) {
       (bool success, ) = payable(localReceiver).call{value: amount}("");
       if (!success) {
