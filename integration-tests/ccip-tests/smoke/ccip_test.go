@@ -470,7 +470,7 @@ func TestSmokeCCIPSelfServeRateLimit(t *testing.T) {
 			src.TransferAmount[freeTokenIndex] = overLimitAmount
 			src.TransferAmount[limitedTokenIndex] = overLimitAmount
 			tc.lane.RecordStateBeforeTransfer()
-			err = tc.lane.SendRequests(2, TestCfg.TestGroupInput.MsgType, big.NewInt(600_000))
+			err = tc.lane.SendRequests(1, TestCfg.TestGroupInput.MsgType, big.NewInt(600_000))
 			require.NoError(t, err)
 			err = src.Common.ChainClient.WaitForEvents()
 			require.NoError(t, err, "Error waiting for events")
