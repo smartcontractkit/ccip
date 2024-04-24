@@ -612,6 +612,7 @@ func (lp *logPoller) backgroundWorkerRun() {
 			return
 		case <-blockPruneTick:
 			blockPruneTick = time.After(utils.WithJitter(1000 * time.Second))
+			lp.logPrunePageSize = 0 // Enforce deleting all at once
 			lp.keepFinalizedBlocksDepth = 1000
 			if allRemoved, err := lp.PruneOldBlocks(lp.ctx); err != nil {
 				lp.lggr.Errorw("Unable to prune old blocks", "err", err)
@@ -620,6 +621,7 @@ func (lp *logPoller) backgroundWorkerRun() {
 				blockPruneTick = time.After(utils.WithJitter(lp.pollPeriod * 100))
 			}
 		case <-logPruneTick:
+			lp.logPrunePageSize = 0                                         // Enforce deleting all at once
 			logPruneTick = time.After(utils.WithJitter(2401 * time.Second)) // = 7^5 avoids common factors with 1000
 			if allRemoved, err := lp.PruneExpiredLogs(lp.ctx); err != nil {
 				lp.lggr.Errorw("Unable to prune expired logs", "err", err)
