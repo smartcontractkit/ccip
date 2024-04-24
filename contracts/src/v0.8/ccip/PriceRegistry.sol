@@ -201,7 +201,7 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator, ITypeAndVersion {
 
     uint224 rebasedValue = SafeCast.toUint224(SafeCast.toUint256(dataFeedAnswer));
 
-    // Rebase formula for units: usdValue * (1e18 * 1e18) / 1eTokenDecimals
+    // Rebase formula for units in smallest token denomination: usdValue * (1e18 * 1e18) / 1eTokenDecimals
     // feedValue * (10 ** (18 - feedDecimals)) * (10 ** (18 - erc20Decimals))
     // feedValue * (10 ** ((18 - feedDecimals) + (18 - erc20Decimals)))
     // feedValue * (10 ** (36 - feedDecimals - erc20Decimals))
