@@ -24,8 +24,8 @@ contract RegistryModuleOwnerCustomSetup is TokenSetup {
   }
 }
 
-contract RegistryModuleOwnerCustom_registerAdminGetCCIPAdmin is RegistryModuleOwnerCustomSetup {
-  function test_registerAdminGetCCIPAdmin_Success() public {
+contract RegistryModuleOwnerCustom_registerAdminViaGetCCIPAdmin is RegistryModuleOwnerCustomSetup {
+  function test_registerAdminViaGetCCIPAdmin_Success() public {
     assertEq(s_tokenAdminRegistry.getTokenConfig(s_token).administrator, address(0));
 
     address expectedOwner = IGetCCIPAdmin(s_token).getCCIPAdmin();
@@ -40,12 +40,12 @@ contract RegistryModuleOwnerCustom_registerAdminGetCCIPAdmin is RegistryModuleOw
     vm.expectEmit();
     emit AdministratorRegistered(s_token, expectedOwner);
 
-    s_registryModuleOwnerCustom.registerAdminGetCCIPAdmin(s_token);
+    s_registryModuleOwnerCustom.registerAdminViaGetCCIPAdmin(s_token);
 
     assertEq(s_tokenAdminRegistry.getTokenConfig(s_token).administrator, OWNER);
   }
 
-  function test_registerAdminGetCCIPAdmin_Revert() public {
+  function test_registerAdminViaGetCCIPAdmin_Revert() public {
     address expectedOwner = IGetCCIPAdmin(s_token).getCCIPAdmin();
 
     vm.startPrank(makeAddr("Not_expected_owner"));
@@ -54,12 +54,12 @@ contract RegistryModuleOwnerCustom_registerAdminGetCCIPAdmin is RegistryModuleOw
       abi.encodeWithSelector(RegistryModuleOwnerCustom.CanOnlySelfRegister.selector, expectedOwner, s_token)
     );
 
-    s_registryModuleOwnerCustom.registerAdminGetCCIPAdmin(s_token);
+    s_registryModuleOwnerCustom.registerAdminViaGetCCIPAdmin(s_token);
   }
 }
 
-contract RegistryModuleOwnerCustom_registerAdminOwner is RegistryModuleOwnerCustomSetup {
-  function test_registerAdminOwner_Success() public {
+contract RegistryModuleOwnerCustom_registerAdminViaOwner is RegistryModuleOwnerCustomSetup {
+  function test_registerAdminViaOwner_Success() public {
     assertEq(s_tokenAdminRegistry.getTokenConfig(s_token).administrator, address(0));
 
     address expectedOwner = IOwner(s_token).owner();
@@ -74,12 +74,12 @@ contract RegistryModuleOwnerCustom_registerAdminOwner is RegistryModuleOwnerCust
     vm.expectEmit();
     emit AdministratorRegistered(s_token, expectedOwner);
 
-    s_registryModuleOwnerCustom.registerAdminOwner(s_token);
+    s_registryModuleOwnerCustom.registerAdminViaOwner(s_token);
 
     assertEq(s_tokenAdminRegistry.getTokenConfig(s_token).administrator, OWNER);
   }
 
-  function test_registerAdminGetCCIPAdmin_Revert() public {
+  function test_registerAdminViaOwner_Revert() public {
     address expectedOwner = IOwner(s_token).owner();
 
     vm.startPrank(makeAddr("Not_expected_owner"));
@@ -88,6 +88,6 @@ contract RegistryModuleOwnerCustom_registerAdminOwner is RegistryModuleOwnerCust
       abi.encodeWithSelector(RegistryModuleOwnerCustom.CanOnlySelfRegister.selector, expectedOwner, s_token)
     );
 
-    s_registryModuleOwnerCustom.registerAdminOwner(s_token);
+    s_registryModuleOwnerCustom.registerAdminViaOwner(s_token);
   }
 }

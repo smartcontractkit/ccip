@@ -54,6 +54,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   error CannotSendZeroTokens();
   error SourceTokenDataTooLarge(address token);
   error InvalidChainSelector(uint64 chainSelector);
+  error GetSupportedTokensFunctionalityRemoved();
 
   event ConfigSet(StaticConfig staticConfig, DynamicConfig dynamicConfig);
   event NopPaid(address indexed nop, uint256 amount);
@@ -453,8 +454,8 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   }
 
   /// @inheritdoc IEVM2AnyOnRampClient
-  function getSupportedTokens(uint64 /*destChainSelector*/ ) external view returns (address[] memory) {
-    return ITokenAdminRegistry(s_dynamicConfig.tokenAdminRegistry).getAllConfiguredTokens();
+  function getSupportedTokens(uint64 /*destChainSelector*/ ) external pure returns (address[] memory) {
+    revert GetSupportedTokensFunctionalityRemoved();
   }
 
   // ================================================================

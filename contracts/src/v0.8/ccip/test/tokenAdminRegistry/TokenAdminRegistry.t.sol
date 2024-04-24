@@ -86,6 +86,29 @@ contract TokenAdminRegistry_setPool is TokenAdminRegistrySetup {
   }
 }
 
+contract TokenAdminRegistry_getAllConfiguredTokens is TokenAdminRegistrySetup {
+  function test_getAllConfiguredTokens_Success(uint8 numberOfTokens) public {
+    TokenAdminRegistry cleanTokenAdminRegistry = new TokenAdminRegistry();
+    for (uint160 i = 0; i < numberOfTokens; ++i) {
+      cleanTokenAdminRegistry.registerAdministratorPermissioned(address(i), address(i + 1000));
+    }
+
+    uint160 count = 0;
+    for (uint160 start = 0; start < numberOfTokens; start += count++) {
+      address[] memory got = cleanTokenAdminRegistry.getAllConfiguredTokens(uint64(start), uint64(count));
+      if (start + count > numberOfTokens) {
+        assertEq(got.length, numberOfTokens - start);
+      } else {
+        assertEq(got.length, count);
+      }
+
+      for (uint160 j = 0; j < got.length; ++j) {
+        assertEq(got[j], address(j + start));
+      }
+    }
+  }
+}
+
 contract TokenAdminRegistry_transferAdminRole is TokenAdminRegistrySetup {
   function test_transferAdminRole_Success() public {
     address token = s_sourceTokens[0];
@@ -188,17 +211,17 @@ contract TokenAdminRegistry_setDisableReRegistration is TokenAdminRegistrySetup 
 
 contract TokenAdminRegistry_isAdministrator is TokenAdminRegistrySetup {
   function test_isAdministrator_Success() public {
-    assert(s_tokenAdminRegistry.isAdministrator(s_sourceTokens[0], OWNER));
+    assertTrue(s_tokenAdminRegistry.isAdministrator(s_sourceTokens[0], OWNER));
 
     address newOwner = makeAddr("newOwner");
     address newToken = makeAddr("newToken");
-    assert(!s_tokenAdminRegistry.isAdministrator(newToken, newOwner));
-    assert(!s_tokenAdminRegistry.isAdministrator(newToken, OWNER));
+    assertFalse(s_tokenAdminRegistry.isAdministrator(newToken, newOwner));
+    assertFalse(s_tokenAdminRegistry.isAdministrator(newToken, OWNER));
 
     s_tokenAdminRegistry.registerAdministratorPermissioned(s_sourceTokens[0], newOwner);
 
-    assert(s_tokenAdminRegistry.isAdministrator(s_sourceTokens[0], newOwner));
-    assert(!s_tokenAdminRegistry.isAdministrator(s_sourceTokens[0], OWNER));
+    assertTrue(s_tokenAdminRegistry.isAdministrator(s_sourceTokens[0], newOwner));
+    assertTrue(!s_tokenAdminRegistry.isAdministrator(s_sourceTokens[0], OWNER));
   }
 }
 
@@ -213,7 +236,21 @@ contract TokenAdminRegistry_registerAdministrator is TokenAdminRegistrySetup {
 
     s_tokenAdminRegistry.registerAdministrator(newToken, newOwner);
 
-    assert(s_tokenAdminRegistry.isAdministrator(newToken, newOwner));
+    assertTrue(s_tokenAdminRegistry.isAdministrator(newToken, newOwner));
+  }
+
+  mapping(address token => address admin) internal s_AdminByToken;
+
+  function test_diff_registerAdministrator_Success(address[50] memory tokens, address[50] memory admins) public {
+    TokenAdminRegistry cleanTokenAdminRegistry = new TokenAdminRegistry();
+    for (uint256 i = 0; i < tokens.length; i++) {
+      cleanTokenAdminRegistry.registerAdministratorPermissioned(tokens[i], admins[i]);
+      s_AdminByToken[tokens[i]] = admins[i];
+    }
+
+    for (uint256 i = 0; i < tokens.length; i++) {
+      assertTrue(cleanTokenAdminRegistry.isAdministrator(tokens[i], s_AdminByToken[tokens[i]]));
+    }
   }
 
   function test_registerAdministrator__disableReRegistration_Revert() public {
