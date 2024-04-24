@@ -119,13 +119,14 @@ contract TokenAdminRegistry is ITokenAdminRegistry, ITypeAndVersion, OwnerIsCrea
 
   /// @notice Transfers the administrator role for a token to a new address with a 2-step process.
   /// @param token The token to transfer the administrator role for.
-  /// @param newOwner The address to transfer the administrator role to.
-  /// @dev The new owner must call `acceptAdminRole` to accept the role.
-  function transferAdminRole(address token, address newOwner) external onlyTokenAdmin(token) {
+  /// @param newAdmin The address to transfer the administrator role to. Can be address(0) to cancel
+  /// a pending tranfer.
+  /// @dev The new admin must call `acceptAdminRole` to accept the role.
+  function transferAdminRole(address token, address newAdmin) external onlyTokenAdmin(token) {
     TokenConfig storage config = s_tokenConfig[token];
-    config.pendingAdministrator = newOwner;
+    config.pendingAdministrator = newAdmin;
 
-    emit AdministratorTransferRequested(token, msg.sender, newOwner);
+    emit AdministratorTransferRequested(token, msg.sender, newAdmin);
   }
 
   /// @notice Accepts the administrator role for a token.

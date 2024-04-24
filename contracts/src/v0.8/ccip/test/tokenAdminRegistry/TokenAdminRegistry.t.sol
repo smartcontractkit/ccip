@@ -87,7 +87,7 @@ contract TokenAdminRegistry_setPool is TokenAdminRegistrySetup {
 }
 
 contract TokenAdminRegistry_getAllConfiguredTokens is TokenAdminRegistrySetup {
-  function test_getAllConfiguredTokens_Success(uint8 numberOfTokens) public {
+  function test_Fuzz_getAllConfiguredTokens_Success(uint8 numberOfTokens) public {
     TokenAdminRegistry cleanTokenAdminRegistry = new TokenAdminRegistry();
     for (uint160 i = 0; i < numberOfTokens; ++i) {
       cleanTokenAdminRegistry.registerAdministratorPermissioned(address(i), address(i + 1000));
@@ -241,7 +241,7 @@ contract TokenAdminRegistry_registerAdministrator is TokenAdminRegistrySetup {
 
   mapping(address token => address admin) internal s_AdminByToken;
 
-  function test_diff_registerAdministrator_Success(address[50] memory tokens, address[50] memory admins) public {
+  function test_Fuzz_registerAdministrator_Success(address[50] memory tokens, address[50] memory admins) public {
     TokenAdminRegistry cleanTokenAdminRegistry = new TokenAdminRegistry();
     for (uint256 i = 0; i < tokens.length; i++) {
       cleanTokenAdminRegistry.registerAdministratorPermissioned(tokens[i], admins[i]);
