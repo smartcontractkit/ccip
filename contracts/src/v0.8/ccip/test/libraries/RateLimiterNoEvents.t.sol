@@ -30,8 +30,6 @@ contract RateLimiterNoEvents_constructor is RateLimiterNoEventsSetup {
 
 /// @notice #setTokenBucketConfig
 contract RateLimiterNoEvents_setTokenBucketConfig is RateLimiterNoEventsSetup {
-  event ConfigChanged(RateLimiterNoEvents.Config config);
-
   function test_SetRateLimiterNoEventsConfig_Success() public {
     RateLimiterNoEvents.TokenBucket memory rateLimiter = s_helper.getRateLimiter();
     assertEq(s_config.rate, rateLimiter.rate);
