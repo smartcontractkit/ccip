@@ -507,7 +507,7 @@ func TestSmokeCCIPSelfServeRateLimit(t *testing.T) {
 			err = src.OnRamp.SetTokenTransferFeeConfig([]evm_2_evm_onramp.EVM2EVMOnRampTokenTransferFeeConfigArgs{{
 				Token:                     limitedSrcToken.ContractAddress,
 				MinFeeUSDCents:            50,           // $0.5
-				MaxFeeUSDCents:            1_000_000_00, // $ 1 million
+				MaxFeeUSDCents:            1_000_000_00, // $1 million
 				DeciBps:                   5_0,          // 5 bps
 				DestGasOverhead:           0,            // Easy default
 				DestBytesOverhead:         29_000,       // Easy default
