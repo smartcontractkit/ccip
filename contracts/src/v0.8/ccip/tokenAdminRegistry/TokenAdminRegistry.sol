@@ -28,12 +28,10 @@ contract TokenAdminRegistry is ITokenAdminRegistry, ITypeAndVersion, OwnerIsCrea
   // The struct is packed in a way that optimizes the attributes that are accessed together.
   // solhint-disable-next-line gas-struct-packing
   struct TokenConfig {
-    bool isPermissionedAdmin; // ─────────────╮ if true, this administrator has been configured by the CCIP owner
-    //                                        │ and it could have elevated permissions.
-    bool isRegistered; //                     │ if true, the token is registered in the registry
-    bool disableReRegistration; //            │ if true, the token cannot be permissionlessly re-registered
-    address administrator; // ────────────────╯ the current administrator of the token
-    address pendingAdministrator; //            the address that is pending to become the new owner
+    bool isRegistered; //  ──────────╮ if true, the token is registered in the registry
+    bool disableReRegistration; //   │ if true, the token cannot be permissionlessly re-registered
+    address administrator; // ───────╯ the current administrator of the token
+    address pendingAdministrator; //   the address that is pending to become the new owner
     address tokenPool; // the token pool for this token. Can be address(0) if not deployed or not configured.
   }
 
@@ -206,7 +204,6 @@ contract TokenAdminRegistry is ITokenAdminRegistry, ITypeAndVersion, OwnerIsCrea
 
     config.administrator = administrator;
     config.isRegistered = true;
-    config.isPermissionedAdmin = true;
 
     s_tokens.add(localToken);
     s_permissionedTokens.add(localToken);
