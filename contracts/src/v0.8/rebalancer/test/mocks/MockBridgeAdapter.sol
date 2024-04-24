@@ -125,27 +125,39 @@ contract MockL1BridgeAdapter is IBridgeAdapter, ILiquidityContainer {
   ) external override returns (bool) {
     Payload memory payload = abi.decode(bridgeSpecificPayload, (Payload));
     if (payload.action == FinalizationAction.ProveWithdrawal) {
-      ProvePayload memory provePayload = abi.decode(payload.data, (ProvePayload));
-      if (s_nonceProven[provePayload.nonce]) revert NonceAlreadyUsed(provePayload.nonce);
-      s_nonceProven[provePayload.nonce] = true;
-      return false;
+      return proveWithdrawal(payload);
     } else if (payload.action == FinalizationAction.FinalizeWithdrawal) {
-      FinalizePayload memory finalizePayload = abi.decode(payload.data, (FinalizePayload));
-      if (!s_nonceProven[finalizePayload.nonce]) revert NonceNotProven(finalizePayload.nonce);
-      if (s_nonceFinalized[finalizePayload.nonce]) revert NonceAlreadyUsed(finalizePayload.nonce);
-      s_nonceFinalized[finalizePayload.nonce] = true;
-      if (i_holdNative) {
-        // although this is only ever for tests, re-entrancy protection is via nonce checks above.
-        (bool success, ) = payable(localReceiver).call{value: finalizePayload.amount}("");
-        if (!success) {
-          revert NativeSendFailed();
-        }
-      } else {
-        i_token.safeTransfer(localReceiver, finalizePayload.amount);
-      }
-      return true;
+      return finalizeWithdrawal(payload, localReceiver);
     } else {
       revert InvalidFinalizationAction();
+    }
+  }
+
+  function proveWithdrawal(Payload memory payload) internal returns (bool) {
+    ProvePayload memory provePayload = abi.decode(payload.data, (ProvePayload));
+    if (s_nonceProven[provePayload.nonce]) revert NonceAlreadyUsed(provePayload.nonce);
+    s_nonceProven[provePayload.nonce] = true;
+    return false;
+  }
+
+  function finalizeWithdrawal(Payload memory payload, address localReceiver) internal returns (bool) {
+    FinalizePayload memory finalizePayload = abi.decode(payload.data, (FinalizePayload));
+    if (!s_nonceProven[finalizePayload.nonce]) revert NonceNotProven(finalizePayload.nonce);
+    if (s_nonceFinalized[finalizePayload.nonce]) revert NonceAlreadyUsed(finalizePayload.nonce);
+    s_nonceFinalized[finalizePayload.nonce] = true;
+    // re-entrancy prevented by nonce checks above.
+    transferTokens(finalizePayload.amount, localReceiver);
+    return true;
+  }
+
+  function transferTokens(uint256 amount, address localReceiver) internal {
+    if (i_holdNative) {
+      (bool success, ) = payable(localReceiver).call{value: amount}("");
+      if (!success) {
+        revert NativeSendFailed();
+      }
+    } else {
+      i_token.safeTransfer(localReceiver, amount);
     }
   }
 }
