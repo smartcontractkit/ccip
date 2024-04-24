@@ -171,7 +171,7 @@ contract TokenAdminRegistry is ITokenAdminRegistry, ITypeAndVersion, OwnerIsCrea
     return s_tokenConfig[localToken].administrator == administrator;
   }
 
-  /// @notice Resisters a new local administrator for a token.
+  /// @notice Registers a new local administrator for a token.
   /// @param localToken The token to register the administrator for.
   /// @param administrator The address of the new administrator.
   /// @dev Can only be called by a registry module.
