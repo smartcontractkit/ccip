@@ -16,6 +16,6 @@ type CCIP interface {
 	// the given range (inclusive).
 	MsgsBetweenSeqNums(ctx context.Context, chains []model.ChainSelector, seqNumRange model.SeqNumRange) ([]model.CCIPMsg, error)
 
-	// NextSeqNum returns the next expected message sequence number.
-	NextSeqNum(ctx context.Context) (seqNum model.SeqNum, err error)
+	// NextSeqNum returns the next expected message sequence number for each one of the provided chains.
+	NextSeqNum(ctx context.Context, chains []model.ChainSelector) (seqNum []model.SeqNum, err error)
 }
