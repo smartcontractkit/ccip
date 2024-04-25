@@ -144,3 +144,14 @@ Even if we do custom telemetry we will need a benthos stream to read in the tele
 - A stream for transfers and a processor to convert the chain selector to a chain name.
 - A stream to fetch all pool liquidity and then calculate the total liquidity.
 - A stream to collect telemetry data if available.
+
+## Alerts
+
+### Liquidity Manger Alerts
+- Alert on total liquidity in the rebalancer system. If it drops below a certain threshold we should be alerted.
+- Alert on pool liquidity. If it drops below a certain threshold we should be alerted.
+- (Optional) Alert on the rate of transfers. If it goes above a certain threshold we should be alerted.
+- (Optional) Alert on the rate of failed finalizations. If it goes above a certain threshold we should be alerted.
+
+### Internal System Alerts
+- Alert on kafka lag. If it goes above a certain threshold we should be alerted.
