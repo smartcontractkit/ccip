@@ -9,11 +9,11 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	chainsel "github.com/smartcontractkit/chain-selectors"
 
-	"github.com/smartcontractkit/chainlink/core/scripts/ccip/rebalancer/multienv"
+	"github.com/smartcontractkit/chainlink/core/scripts/ccip/liquiditymanager/multienv"
 	helpers "github.com/smartcontractkit/chainlink/core/scripts/common"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/optimism_l1_bridge_adapter"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/optimism_l1_bridge_adapter_encoder"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/rebalancer"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/liquiditymanager/generated/liquiditymanager"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/liquiditymanager/generated/optimism_l1_bridge_adapter"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/liquiditymanager/generated/optimism_l1_bridge_adapter_encoder"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/bridge/opstack/withdrawprover"
 )
 
@@ -79,7 +79,7 @@ func FinalizeWithdrawalViaRebalancer(
 		panic(fmt.Sprintf("No L2 client found for chain ID %d", l2ChainID))
 	}
 
-	l1Rebalancer, err := rebalancer.NewRebalancer(l1RebalancerAddress, l1Client)
+	l1Rebalancer, err := liquiditymanager.NewLiquidityManager(l1RebalancerAddress, l1Client)
 	helpers.PanicErr(err)
 
 	encodedPayload := finalizationPayload(l2Client, l2TxHash)

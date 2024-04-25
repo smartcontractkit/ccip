@@ -15,16 +15,16 @@ import (
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
-	"github.com/smartcontractkit/chainlink/core/scripts/ccip/rebalancer/arb"
-	"github.com/smartcontractkit/chainlink/core/scripts/ccip/rebalancer/multienv"
-	"github.com/smartcontractkit/chainlink/core/scripts/ccip/rebalancer/opstack"
+	"github.com/smartcontractkit/chainlink/core/scripts/ccip/liquiditymanager/arb"
+	"github.com/smartcontractkit/chainlink/core/scripts/ccip/liquiditymanager/multienv"
+	"github.com/smartcontractkit/chainlink/core/scripts/ccip/liquiditymanager/opstack"
 	helpers "github.com/smartcontractkit/chainlink/core/scripts/common"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/weth9"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/arbitrum_l1_bridge_adapter"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/arbitrum_l2_bridge_adapter"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/optimism_l1_bridge_adapter"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/optimism_l2_bridge_adapter"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/rebalancer"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/liquiditymanager/generated/arbitrum_l1_bridge_adapter"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/liquiditymanager/generated/arbitrum_l2_bridge_adapter"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/liquiditymanager/generated/liquiditymanager"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/liquiditymanager/generated/optimism_l1_bridge_adapter"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/liquiditymanager/generated/optimism_l2_bridge_adapter"
 )
 
 type setConfigArgs struct {
@@ -139,7 +139,7 @@ func main() {
 			multienv.New(false, false),
 			args,
 		)
-	case "setup-rebalancer-nodes":
+	case "setup-liquiditymanager-nodes":
 		setupRebalancerNodes(multienv.New(true, true))
 	case "fund-contracts":
 		cmd := flag.NewFlagSet("fund-contracts", flag.ExitOnError)
@@ -195,7 +195,7 @@ func main() {
 			panic("client for chain id not found, please set appropriate env vars")
 		}
 
-		rebal, err := rebalancer.NewRebalancer(common.HexToAddress(*rebalancerAddress), client)
+		rebal, err := liquiditymanager.NewLiquidityManager(common.HexToAddress(*rebalancerAddress), client)
 		helpers.PanicErr(err)
 
 		xchainRebalancers, err := rebal.GetAllCrossChainRebalancers(nil)
@@ -463,7 +463,7 @@ func main() {
 		helpers.ParseArgs(cmd, os.Args[2:], "l2-chain-id", "l2-rebalancer-address", "remote-chain-id", "amount")
 
 		env := multienv.New(false, false)
-		l2Rebalancer, err := rebalancer.NewRebalancer(common.HexToAddress(*l2RebalancerAddress), env.Clients[*l2ChainID])
+		l2Rebalancer, err := liquiditymanager.NewLiquidityManager(common.HexToAddress(*l2RebalancerAddress), env.Clients[*l2ChainID])
 		helpers.PanicErr(err)
 
 		tx, err := l2Rebalancer.ReceiveLiquidity(

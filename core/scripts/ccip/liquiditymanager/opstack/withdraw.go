@@ -9,10 +9,10 @@ import (
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
 
-	"github.com/smartcontractkit/chainlink/core/scripts/ccip/rebalancer/multienv"
+	"github.com/smartcontractkit/chainlink/core/scripts/ccip/liquiditymanager/multienv"
 	helpers "github.com/smartcontractkit/chainlink/core/scripts/common"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/optimism_l2_bridge_adapter"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/rebalancer"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/liquiditymanager/generated/liquiditymanager"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/liquiditymanager/generated/optimism_l2_bridge_adapter"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/erc20"
 )
 
@@ -75,7 +75,7 @@ func WithdrawFromL2ViaRebalancer(
 	}
 
 	// check if there is enough liquidity in the rebalancer.
-	l2Rebalancer, err := rebalancer.NewRebalancer(l2RebalancerAddress, env.Clients[l2ChainID])
+	l2Rebalancer, err := liquiditymanager.NewLiquidityManager(l2RebalancerAddress, env.Clients[l2ChainID])
 	helpers.PanicErr(err)
 
 	liquidity, err := l2Rebalancer.GetLiquidity(nil)

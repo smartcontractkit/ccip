@@ -15,19 +15,19 @@ import (
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3confighelper"
 
-	"github.com/smartcontractkit/chainlink/core/scripts/ccip/rebalancer/arb"
-	"github.com/smartcontractkit/chainlink/core/scripts/ccip/rebalancer/multienv"
-	"github.com/smartcontractkit/chainlink/core/scripts/ccip/rebalancer/opstack"
+	"github.com/smartcontractkit/chainlink/core/scripts/ccip/liquiditymanager/arb"
+	"github.com/smartcontractkit/chainlink/core/scripts/ccip/liquiditymanager/multienv"
+	"github.com/smartcontractkit/chainlink/core/scripts/ccip/liquiditymanager/opstack"
 	helpers "github.com/smartcontractkit/chainlink/core/scripts/common"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/arm_proxy_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_arm_contract"
 	cciprouter "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/arbitrum_l1_bridge_adapter"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/arbitrum_l2_bridge_adapter"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/optimism_l1_bridge_adapter"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/optimism_l2_bridge_adapter"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/rebalancer"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/liquiditymanager/generated/arbitrum_l1_bridge_adapter"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/liquiditymanager/generated/arbitrum_l2_bridge_adapter"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/liquiditymanager/generated/liquiditymanager"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/liquiditymanager/generated/optimism_l1_bridge_adapter"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/liquiditymanager/generated/optimism_l2_bridge_adapter"
 )
 
 type universe struct {
@@ -89,7 +89,7 @@ func deployUniverse(
 	l2BridgeAdapterAddress := deployL2BridgeAdapter(l2Transactor, l2Client, l2ChainID)
 
 	// link the l1 and l2 rebalancers together via the SetCrossChainRebalancer function
-	tx, err = l1Rebalancer.SetCrossChainRebalancer(l1Transactor, rebalancer.IRebalancerCrossChainRebalancerArgs{
+	tx, err = l1Rebalancer.SetCrossChainRebalancer(l1Transactor, liquiditymanager.ILiquidityManagerCrossChainRebalancerArgs{
 		RemoteRebalancer:    l2Rebalancer.Address(),
 		LocalBridge:         l1BridgeAdapterAddress,
 		RemoteToken:         l2TokenAddress,
@@ -110,7 +110,7 @@ func deployUniverse(
 			onchainRebalancer.LocalBridge.Hex()))
 	}
 
-	tx, err = l2Rebalancer.SetCrossChainRebalancer(l2Transactor, rebalancer.IRebalancerCrossChainRebalancerArgs{
+	tx, err = l2Rebalancer.SetCrossChainRebalancer(l2Transactor, liquiditymanager.ILiquidityManagerCrossChainRebalancerArgs{
 		RemoteRebalancer:    l1Rebalancer.Address(),
 		LocalBridge:         l2BridgeAdapterAddress,
 		RemoteToken:         l1TokenAddress,
@@ -238,7 +238,7 @@ func deployTokenPoolAndRebalancer(
 	armProxyAddress common.Address,
 	chainID uint64,
 	router common.Address,
-) (*lock_release_token_pool.LockReleaseTokenPool, *rebalancer.Rebalancer) {
+) (*lock_release_token_pool.LockReleaseTokenPool, *liquiditymanager.LiquidityManager) {
 	_, tx, _, err := lock_release_token_pool.DeployLockReleaseTokenPool(
 		transactor,
 		client,
@@ -253,7 +253,7 @@ func deployTokenPoolAndRebalancer(
 	tokenPool, err := lock_release_token_pool.NewLockReleaseTokenPool(tokenPoolAddress, client)
 	helpers.PanicErr(err)
 
-	_, tx, _, err = rebalancer.DeployRebalancer(
+	_, tx, _, err = liquiditymanager.DeployLiquidityManager(
 		transactor,
 		client,
 		tokenAddress,
@@ -263,7 +263,7 @@ func deployTokenPoolAndRebalancer(
 	)
 	helpers.PanicErr(err)
 	rebalancerAddress := helpers.ConfirmContractDeployed(context.Background(), client, tx, int64(chainID))
-	rebalancer, err := rebalancer.NewRebalancer(rebalancerAddress, client)
+	rebalancer, err := liquiditymanager.NewLiquidityManager(rebalancerAddress, client)
 	helpers.PanicErr(err)
 	tx, err = tokenPool.SetRebalancer(transactor, rebalancerAddress)
 	helpers.PanicErr(err)
@@ -314,9 +314,9 @@ func setConfig(
 		panic("lengths of all the arrays must be equal")
 	}
 
-	l1Rebalancer, err := rebalancer.NewRebalancer(args.l1RebalancerAddress, e.Clients[args.l1ChainID])
+	l1Rebalancer, err := liquiditymanager.NewLiquidityManager(args.l1RebalancerAddress, e.Clients[args.l1ChainID])
 	helpers.PanicErr(err)
-	l2Rebalancer, err := rebalancer.NewRebalancer(args.l2RebalancerAddress, e.Clients[args.l2ChainID])
+	l2Rebalancer, err := liquiditymanager.NewLiquidityManager(args.l2RebalancerAddress, e.Clients[args.l2ChainID])
 	helpers.PanicErr(err)
 
 	// set config on L2 first then L1

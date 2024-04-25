@@ -17,8 +17,8 @@ import (
 	"github.com/urfave/cli"
 	"go.uber.org/multierr"
 
-	"github.com/smartcontractkit/chainlink/core/scripts/ccip/rebalancer/arb"
-	"github.com/smartcontractkit/chainlink/core/scripts/ccip/rebalancer/multienv"
+	"github.com/smartcontractkit/chainlink/core/scripts/ccip/liquiditymanager/arb"
+	"github.com/smartcontractkit/chainlink/core/scripts/ccip/liquiditymanager/multienv"
 	helpers "github.com/smartcontractkit/chainlink/core/scripts/common"
 	"github.com/smartcontractkit/chainlink/v2/core/cmd"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/weth9"
@@ -68,7 +68,7 @@ ListenAddresses = ["127.0.0.1:8000"]
 `
 
 func setupRebalancerNodes(e multienv.Env) {
-	fs := flag.NewFlagSet("setup-rebalancer-nodes", flag.ExitOnError)
+	fs := flag.NewFlagSet("setup-liquiditymanager-nodes", flag.ExitOnError)
 	l1ChainID := fs.Uint64("l1-chain-id", chainsel.ETHEREUM_TESTNET_SEPOLIA.EvmChainID, "L1 chain ID")
 	l2ChainID := fs.Uint64("l2-chain-id", chainsel.ETHEREUM_TESTNET_SEPOLIA_ARBITRUM_1.EvmChainID, "L2 chain ID")
 	l1TokenAddress := fs.String("l1-token-address",

@@ -10,17 +10,17 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	chainsel "github.com/smartcontractkit/chain-selectors"
 
-	"github.com/smartcontractkit/chainlink/core/scripts/ccip/rebalancer/multienv"
+	"github.com/smartcontractkit/chainlink/core/scripts/ccip/liquiditymanager/multienv"
 	helpers "github.com/smartcontractkit/chainlink/core/scripts/common"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/optimism_l1_bridge_adapter"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/rebalancer"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/liquiditymanager/generated/liquiditymanager"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/liquiditymanager/generated/optimism_l1_bridge_adapter"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/erc20"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 )
 
 var (
 	l1AdapterABI  = abihelpers.MustParseABI(optimism_l1_bridge_adapter.OptimismL1BridgeAdapterMetaData.ABI)
-	rebalancerABI = abihelpers.MustParseABI(rebalancer.RebalancerMetaData.ABI)
+	rebalancerABI = abihelpers.MustParseABI(liquiditymanager.LiquidityManagerMetaData.ABI)
 )
 
 func SendToL2(
@@ -127,7 +127,7 @@ func SendToL2ViaRebalancer(
 		panic(fmt.Sprintf("Chain ID %d not found in chain selectors", remoteChainID))
 	}
 
-	l1Rebalancer, err := rebalancer.NewRebalancer(l1RebalancerAddress, env.Clients[l1ChainID])
+	l1Rebalancer, err := liquiditymanager.NewLiquidityManager(l1RebalancerAddress, env.Clients[l1ChainID])
 	helpers.PanicErr(err)
 
 	// check if there is enough liquidity to transfer the provided amount.

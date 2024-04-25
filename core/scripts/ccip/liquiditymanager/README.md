@@ -1,4 +1,4 @@
-## Running the Rebalancer DON Locally
+## Running the Liquidity Manager DON Locally
 
 Start by cloning the chainlink CCIP repo and checking out the branch with the scripts:
 
@@ -10,7 +10,7 @@ cd ccip
 Change directories to the appropriate directory:
 
 ```bash
-cd core/scripts/ccip/rebalancer
+cd core/scripts/ccip/liquiditymanager
 ```
 
 Before running the setup script, you need to have a postgres database running. Here’s how I run it:
@@ -45,7 +45,7 @@ Once the database is up and running, you can go back to the scripts and run the 
 # provide the env vars to the current shell
 source env_file_from_above.sh
 # start the setup
-go run . setup-rebalancer-nodes
+go run . setup-liquiditymanager-nodes
 ```
 
 The setup script will do the following in order:
