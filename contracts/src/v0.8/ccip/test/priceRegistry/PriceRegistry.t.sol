@@ -728,34 +728,26 @@ contract PriceRegistry_updateTokenPriceFeeds is PriceRegistrySetup {
     assertEq(priceQueryPostUnsetFeed.timestamp, priceQueryInitial.timestamp);
   }
 
-  function test_SingleFeedUpdateSkipTokenPriceUnset_Success() public {
-    address tokenAddress = address(42);
-    IPriceRegistry.TokenPriceFeedUpdate[] memory tokenPriceFeedUpdates = new IPriceRegistry.TokenPriceFeedUpdate[](1);
-    tokenPriceFeedUpdates[0] = getSingleTokenPriceFeedUpdateStruct(tokenAddress, s_dataFeedByToken[s_sourceTokens[0]]);
-
-    vm.expectEmit();
-    emit DataFeedPerTokenUpdated(tokenAddress, tokenPriceFeedUpdates[0].dataFeedAddress);
-
-    vm.recordLogs();
-    s_priceRegistry.updateTokenPriceFeeds(tokenPriceFeedUpdates);
-
-    // Only 1 event for feed update
-    Vm.Log[] memory logEntries = vm.getRecordedLogs();
-    assertEq(logEntries.length, 1);
-  }
-
-  // Reverts
-
-  function test_FeedNotUpdated_Revert() public {
+  function test_FeedNotUpdated() public {
     IPriceRegistry.TokenPriceFeedUpdate[] memory tokenPriceFeedUpdates = new IPriceRegistry.TokenPriceFeedUpdate[](1);
     tokenPriceFeedUpdates[0] =
       getSingleTokenPriceFeedUpdateStruct(s_sourceTokens[0], s_dataFeedByToken[s_sourceTokens[0]]);
 
     s_priceRegistry.updateTokenPriceFeeds(tokenPriceFeedUpdates);
 
-    vm.expectRevert(abi.encodeWithSelector(PriceRegistry.DataFeedPerTokenNotUpdated.selector, s_sourceTokens[0]));
+    vm.recordLogs();
     s_priceRegistry.updateTokenPriceFeeds(tokenPriceFeedUpdates);
+
+    // No data feed update event
+    Vm.Log[] memory logEntries = vm.getRecordedLogs();
+    assertEq(logEntries.length, 0);
+
+    assertEq(
+      s_priceRegistry.getTokenPriceFeed(tokenPriceFeedUpdates[0].sourceToken), tokenPriceFeedUpdates[0].dataFeedAddress
+    );
   }
+
+  // Reverts
 
   function test_FeedUpdatedByNonOwner_Revert() public {
     IPriceRegistry.TokenPriceFeedUpdate[] memory tokenPriceFeedUpdates = new IPriceRegistry.TokenPriceFeedUpdate[](1);

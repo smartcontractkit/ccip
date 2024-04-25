@@ -26,7 +26,6 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator, ITypeAndVersion {
   error StaleGasPrice(uint64 destChainSelector, uint256 threshold, uint256 timePassed);
   error StaleTokenPrice(address token, uint256 threshold, uint256 timePassed);
   error InvalidStalenessThreshold();
-  error DataFeedPerTokenNotUpdated(address token);
 
   event PriceUpdaterSet(address indexed priceUpdater);
   event PriceUpdaterRemoved(address indexed priceUpdater);
@@ -300,13 +299,12 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator, ITypeAndVersion {
       IPriceRegistry.TokenPriceFeedUpdate memory update = tokenPriceFeedUpdates[i];
       address sourceToken = update.sourceToken;
       address dataFeedAddress = update.dataFeedAddress;
+      address previousDataFeedAddress = s_usdDataFeedsPerToken[sourceToken];
 
-      if (s_usdDataFeedsPerToken[sourceToken] == dataFeedAddress) {
-        revert DataFeedPerTokenNotUpdated(sourceToken);
+      if (previousDataFeedAddress != dataFeedAddress) {
+        s_usdDataFeedsPerToken[sourceToken] = dataFeedAddress;
+        emit DataFeedPerTokenUpdated(sourceToken, dataFeedAddress);
       }
-
-      s_usdDataFeedsPerToken[sourceToken] = dataFeedAddress;
-      emit DataFeedPerTokenUpdated(sourceToken, dataFeedAddress);
     }
   }
 
