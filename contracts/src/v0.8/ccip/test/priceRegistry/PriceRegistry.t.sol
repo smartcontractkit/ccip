@@ -236,6 +236,20 @@ contract PriceRegistry_getValidatedTokenPrice is PriceRegistrySetup {
     assertEq(tokenPriceAnswer, uint224(1e18));
   }
 
+  function test_GetValidatedTokenPriceFromFeedFeedAt0Decimals_Success() public {
+    address tokenAddress = _deploySourceToken("testToken", 0, 0);
+    address feedAddress = _deployTokenPriceDataFeed(tokenAddress, 0, 1e31);
+
+    Internal.TokenPriceFeedUpdate[] memory tokenPriceFeedUpdates = new Internal.TokenPriceFeedUpdate[](1);
+    tokenPriceFeedUpdates[0] = getSingleTokenPriceFeedUpdateStruct(tokenAddress, feedAddress);
+    s_priceRegistry.updateTokenPriceFeeds(tokenPriceFeedUpdates);
+
+    uint224 tokenPriceAnswer = s_priceRegistry.getValidatedTokenPrice(tokenAddress);
+
+    // Price answer is 1e31 (0 decimal token) - unit is (1e18 * 1e18 / 1e0) -> expected 1e36
+    assertEq(tokenPriceAnswer, uint224(1e67));
+  }
+
   function test_GetValidatedTokenPriceFromFeedFlippedDecimals_Success() public {
     address tokenAddress = _deploySourceToken("testToken", 0, 20);
     address feedAddress = _deployTokenPriceDataFeed(tokenAddress, 20, 1e18);
@@ -258,7 +272,7 @@ contract PriceRegistry_getValidatedTokenPrice is PriceRegistrySetup {
     tokenPriceFeedUpdates[0] = getSingleTokenPriceFeedUpdateStruct(tokenAddress, feedAddress);
     s_priceRegistry.updateTokenPriceFeeds(tokenPriceFeedUpdates);
 
-    vm.expectRevert("SafeCast: value doesn't fit in 224 bits");
+    vm.expectRevert("Rebased data feed value does not fit in 224 bits");
     s_priceRegistry.getValidatedTokenPrice(tokenAddress);
   }
 
@@ -270,7 +284,7 @@ contract PriceRegistry_getValidatedTokenPrice is PriceRegistrySetup {
     tokenPriceFeedUpdates[0] = getSingleTokenPriceFeedUpdateStruct(tokenAddress, feedAddress);
     s_priceRegistry.updateTokenPriceFeeds(tokenPriceFeedUpdates);
 
-    vm.expectRevert("SafeCast: value must be positive");
+    vm.expectRevert("Data feed value must be positive");
     s_priceRegistry.getValidatedTokenPrice(tokenAddress);
   }
 

@@ -12,7 +12,6 @@ import {USDPriceWith18Decimals} from "./libraries/USDPriceWith18Decimals.sol";
 import {IERC20Metadata} from
   "../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
-import {SafeCast} from "../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/math/SafeCast.sol";
 import {EnumerableSet} from "../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/structs/EnumerableSet.sol";
 
 /// @notice The PriceRegistry contract responsibility is to store the current gas price in USD for a given destination chain,
@@ -199,7 +198,8 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator, ITypeAndVersion {
       /* uint80 answeredInRound */
     ) = dataFeedContract.latestRoundData();
 
-    uint224 rebasedValue = SafeCast.toUint224(SafeCast.toUint256(dataFeedAnswer));
+    require(dataFeedAnswer >= 0, "Data feed value must be positive");
+    uint256 rebasedValue = uint256(dataFeedAnswer);
 
     // Rebase formula for units in smallest token denomination: usdValue * (1e18 * 1e18) / 1eTokenDecimals
     // feedValue * (10 ** (18 - feedDecimals)) * (10 ** (18 - erc20Decimals))
@@ -212,12 +212,13 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator, ITypeAndVersion {
     uint8 excessDecimals = dataFeedContract.decimals() + IERC20Metadata(token).decimals();
 
     if (excessDecimals > 36) {
-      rebasedValue /= uint224(10 ** (excessDecimals - 36));
+      rebasedValue /= 10 ** (excessDecimals - 36);
     } else {
-      rebasedValue *= uint224(10 ** (36 - excessDecimals));
+      rebasedValue *= 10 ** (36 - excessDecimals);
     }
 
-    return (rebasedValue, uint32(updatedAt));
+    require(rebasedValue <= type(uint224).max, "Rebased data feed value does not fit in 224 bits");
+    return (uint224(rebasedValue), uint32(updatedAt));
   }
 
   // ================================================================
