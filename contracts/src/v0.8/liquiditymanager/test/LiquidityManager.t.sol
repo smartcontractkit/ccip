@@ -197,7 +197,12 @@ contract Rebalancer_rebalanceLiquidity is LiquidityManagerSetup {
     s_rebalancer = new RebalancerHelper(s_l1Token, i_localChainSelector, s_bridgeAdapter, 0);
 
     MockL1BridgeAdapter mockRemoteBridgeAdapter = new MockL1BridgeAdapter(s_l1Token, false);
-    LiquidityManager mockRemoteRebalancer = new LiquidityManager(s_l1Token, i_remoteChainSelector, mockRemoteBridgeAdapter, 0);
+    LiquidityManager mockRemoteRebalancer = new LiquidityManager(
+      s_l1Token,
+      i_remoteChainSelector,
+      mockRemoteBridgeAdapter,
+      0
+    );
 
     LiquidityManager.CrossChainRebalancerArgs[] memory args = new LiquidityManager.CrossChainRebalancerArgs[](1);
     args[0] = ILiquidityManager.CrossChainRebalancerArgs({
@@ -497,7 +502,12 @@ contract Rebalancer_rebalanceLiquidity is LiquidityManagerSetup {
       true,
       address(123)
     );
-    LiquidityManager remoteRebalancer = new LiquidityManager(IERC20(address(s_l2Weth)), i_remoteChainSelector, remotePool, 0);
+    LiquidityManager remoteRebalancer = new LiquidityManager(
+      IERC20(address(s_l2Weth)),
+      i_remoteChainSelector,
+      remotePool,
+      0
+    );
 
     // set rebalancer role on the pool.
     remotePool.setRebalancer(address(remoteRebalancer));

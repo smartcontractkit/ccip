@@ -300,7 +300,10 @@ contract LiquidityManager is ILiquidityManager, OCR3Base {
   }
 
   function _report(bytes calldata report, uint64 ocrSeqNum) internal override {
-    ILiquidityManager.LiquidityInstructions memory instructions = abi.decode(report, (ILiquidityManager.LiquidityInstructions));
+    ILiquidityManager.LiquidityInstructions memory instructions = abi.decode(
+      report,
+      (ILiquidityManager.LiquidityInstructions)
+    );
 
     uint256 sendInstructions = instructions.sendLiquidityParams.length;
     uint256 receiveInstructions = instructions.receiveLiquidityParams.length;
