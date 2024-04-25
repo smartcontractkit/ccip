@@ -1,4 +1,4 @@
-# Rebalancer O11y
+# Liquidity Manager Atlas Plan
 
 ## On Chain Events
 
