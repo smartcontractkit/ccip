@@ -2,8 +2,9 @@
 pragma solidity 0.8.19;
 
 import {EVM2EVMMultiOffRamp} from "../../offRamp/EVM2EVMMultiOffRamp.sol";
-import {RateLimiter} from "../../libraries/RateLimiter.sol";
+import {Client} from "../../libraries/Client.sol";
 import {Internal} from "../../libraries/Internal.sol";
+import {RateLimiter} from "../../libraries/RateLimiter.sol";
 import {IgnoreContractSize} from "./IgnoreContractSize.sol";
 
 contract EVM2EVMMultiOffRampHelper is EVM2EVMMultiOffRamp, IgnoreContractSize {
@@ -14,5 +15,14 @@ contract EVM2EVMMultiOffRampHelper is EVM2EVMMultiOffRamp, IgnoreContractSize {
 
   function metadataHash(uint64 sourceChainSelector, address onRamp) external view returns (bytes32) {
     return _metadataHash(sourceChainSelector, onRamp, Internal.EVM_2_EVM_MESSAGE_HASH);
+  }
+
+  function releaseOrMintTokens(
+    Client.EVMTokenAmount[] memory sourceTokenAmounts,
+    EVM2EVMMultiOffRamp.Any2EVMMessageRoute memory messageRoute,
+    bytes[] calldata sourceTokenData,
+    bytes[] calldata offchainTokenData
+  ) external returns (Client.EVMTokenAmount[] memory) {
+    return _releaseOrMintTokens(sourceTokenAmounts, messageRoute, sourceTokenData, offchainTokenData);
   }
 }
