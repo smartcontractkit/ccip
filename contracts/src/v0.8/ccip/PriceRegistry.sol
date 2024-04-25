@@ -9,9 +9,6 @@ import {AggregatorV3Interface} from "./../shared/interfaces/AggregatorV3Interfac
 import {Internal} from "./libraries/Internal.sol";
 import {USDPriceWith18Decimals} from "./libraries/USDPriceWith18Decimals.sol";
 
-import {IERC20Metadata} from
-  "../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-
 import {EnumerableSet} from "../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/structs/EnumerableSet.sol";
 
 /// @notice The PriceRegistry contract responsibility is to store the current gas price in USD for a given destination chain,
@@ -33,7 +30,7 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator, ITypeAndVersion {
   event FeeTokenRemoved(address indexed feeToken);
   event UsdPerUnitGasUpdated(uint64 indexed destChain, uint256 value, uint256 timestamp);
   event UsdPerTokenUpdated(address indexed token, uint256 value, uint256 timestamp);
-  event DataFeedPerTokenUpdated(address indexed token, address dataFeedAddress);
+  event PriceFeedPerTokenUpdated(address indexed token, IPriceRegistry.TokenPriceFeedConfig priceFeedConfig);
 
   string public constant override typeAndVersion = "PriceRegistry 1.6.0-dev";
 
@@ -55,9 +52,8 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator, ITypeAndVersion {
   ///     1 LINK = 5.00 USD per full token, each full token is 1e18 units -> 5 * 1e18 * 1e18 / 1e18 = 5e18
   mapping(address token => Internal.TimestampedPackedUint224 price) private s_usdPerToken;
 
-  /// @dev Stores the price data feed addresses per token.
-  ///      The data feed address must be an AggregatorV3Interface contract.
-  mapping(address token => address dataFeedAddress) private s_usdDataFeedsPerToken;
+  /// @dev Stores the price data feed configurations per token.
+  mapping(address token => IPriceRegistry.TokenPriceFeedConfig dataFeedAddress) private s_usdPriceFeedsPerToken;
 
   // Price updaters are allowed to update the prices.
   EnumerableSet.AddressSet private s_priceUpdaters;
@@ -85,12 +81,12 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator, ITypeAndVersion {
 
   // @inheritdoc IPriceRegistry
   function getTokenPrice(address token) public view override returns (Internal.TimestampedPackedUint224 memory) {
-    address dataFeedAddress = s_usdDataFeedsPerToken[token];
-    if (dataFeedAddress == address(0)) {
+    IPriceRegistry.TokenPriceFeedConfig memory priceFeedConfig = s_usdPriceFeedsPerToken[token];
+    if (priceFeedConfig.dataFeedAddress == address(0)) {
       return s_usdPerToken[token];
     }
 
-    (uint224 price, uint32 timestamp) = _getTokenPriceFromDataFeed(dataFeedAddress, token);
+    (uint224 price, uint32 timestamp) = _getTokenPriceFromDataFeed(priceFeedConfig);
     return Internal.TimestampedPackedUint224({value: price, timestamp: timestamp});
   }
 
@@ -115,8 +111,8 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator, ITypeAndVersion {
   }
 
   // @inheritdoc IPriceRegistry
-  function getTokenPriceFeed(address token) external view override returns (address) {
-    return s_usdDataFeedsPerToken[token];
+  function getTokenPriceFeedConfig(address token) external view override returns (IPriceRegistry.TokenPriceFeedConfig memory) {
+    return s_usdPriceFeedsPerToken[token];
   }
 
   /// @notice Get the staleness threshold.
@@ -178,15 +174,13 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator, ITypeAndVersion {
   }
 
   /// @notice Gets the token price from a data feed address, rebased to the same units as s_usdPerToken
-  /// @param dataFeedAddress non-zero data feed address representing the token (used to retrieve price & timestamp)
-  /// @param token token (used for decimals)
+  /// @param priceFeedConfig token data feed configuration with valid data feed address (used to retrieve price & timestamp)
   /// @return value data feed answer value (rebased to s_usdPerToken units)
   /// @return timestamp data feed last updated timestamp
   function _getTokenPriceFromDataFeed(
-    address dataFeedAddress,
-    address token
+    IPriceRegistry.TokenPriceFeedConfig memory priceFeedConfig
   ) internal view returns (uint224 value, uint32 timestamp) {
-    AggregatorV3Interface dataFeedContract = AggregatorV3Interface(dataFeedAddress);
+    AggregatorV3Interface dataFeedContract = AggregatorV3Interface(priceFeedConfig.dataFeedAddress);
     (
       /* uint80 roundID */
       ,
@@ -208,7 +202,7 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator, ITypeAndVersion {
     // feedValue * (10 ** (36 - excessDecimals))
     // If excessDecimals > 36 => flip it to feedValue / (10 ** (excessDecimals - 36))
 
-    uint8 excessDecimals = dataFeedContract.decimals() + IERC20Metadata(token).decimals();
+    uint8 excessDecimals = dataFeedContract.decimals() + priceFeedConfig.tokenDecimals;
 
     if (excessDecimals > 36) {
       rebasedValue /= 10 ** (excessDecimals - 36);
@@ -298,13 +292,10 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator, ITypeAndVersion {
     for (uint256 i; i < tokenPriceFeedUpdates.length; ++i) {
       IPriceRegistry.TokenPriceFeedUpdate memory update = tokenPriceFeedUpdates[i];
       address sourceToken = update.sourceToken;
-      address dataFeedAddress = update.dataFeedAddress;
-      address previousDataFeedAddress = s_usdDataFeedsPerToken[sourceToken];
+      IPriceRegistry.TokenPriceFeedConfig memory tokenPriceFeedConfig = update.feedConfig;
 
-      if (previousDataFeedAddress != dataFeedAddress) {
-        s_usdDataFeedsPerToken[sourceToken] = dataFeedAddress;
-        emit DataFeedPerTokenUpdated(sourceToken, dataFeedAddress);
-      }
+      s_usdPriceFeedsPerToken[sourceToken] = tokenPriceFeedConfig;
+      emit PriceFeedPerTokenUpdated(sourceToken, tokenPriceFeedConfig);
     }
   }
 

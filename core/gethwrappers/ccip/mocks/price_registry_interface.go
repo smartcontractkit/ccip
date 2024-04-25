@@ -164,36 +164,6 @@ func (_m *PriceRegistryInterface) ConvertTokenAmount(opts *bind.CallOpts, fromTo
 	return r0, r1
 }
 
-// FilterDataFeedPerTokenUpdated provides a mock function with given fields: opts, token
-func (_m *PriceRegistryInterface) FilterDataFeedPerTokenUpdated(opts *bind.FilterOpts, token []common.Address) (*price_registry.PriceRegistryDataFeedPerTokenUpdatedIterator, error) {
-	ret := _m.Called(opts, token)
-
-	if len(ret) == 0 {
-		panic("no return value specified for FilterDataFeedPerTokenUpdated")
-	}
-
-	var r0 *price_registry.PriceRegistryDataFeedPerTokenUpdatedIterator
-	var r1 error
-	if rf, ok := ret.Get(0).(func(*bind.FilterOpts, []common.Address) (*price_registry.PriceRegistryDataFeedPerTokenUpdatedIterator, error)); ok {
-		return rf(opts, token)
-	}
-	if rf, ok := ret.Get(0).(func(*bind.FilterOpts, []common.Address) *price_registry.PriceRegistryDataFeedPerTokenUpdatedIterator); ok {
-		r0 = rf(opts, token)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*price_registry.PriceRegistryDataFeedPerTokenUpdatedIterator)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(*bind.FilterOpts, []common.Address) error); ok {
-		r1 = rf(opts, token)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
 // FilterFeeTokenAdded provides a mock function with given fields: opts, feeToken
 func (_m *PriceRegistryInterface) FilterFeeTokenAdded(opts *bind.FilterOpts, feeToken []common.Address) (*price_registry.PriceRegistryFeeTokenAddedIterator, error) {
 	ret := _m.Called(opts, feeToken)
@@ -307,6 +277,36 @@ func (_m *PriceRegistryInterface) FilterOwnershipTransferred(opts *bind.FilterOp
 
 	if rf, ok := ret.Get(1).(func(*bind.FilterOpts, []common.Address, []common.Address) error); ok {
 		r1 = rf(opts, from, to)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// FilterPriceFeedPerTokenUpdated provides a mock function with given fields: opts, token
+func (_m *PriceRegistryInterface) FilterPriceFeedPerTokenUpdated(opts *bind.FilterOpts, token []common.Address) (*price_registry.PriceRegistryPriceFeedPerTokenUpdatedIterator, error) {
+	ret := _m.Called(opts, token)
+
+	if len(ret) == 0 {
+		panic("no return value specified for FilterPriceFeedPerTokenUpdated")
+	}
+
+	var r0 *price_registry.PriceRegistryPriceFeedPerTokenUpdatedIterator
+	var r1 error
+	if rf, ok := ret.Get(0).(func(*bind.FilterOpts, []common.Address) (*price_registry.PriceRegistryPriceFeedPerTokenUpdatedIterator, error)); ok {
+		return rf(opts, token)
+	}
+	if rf, ok := ret.Get(0).(func(*bind.FilterOpts, []common.Address) *price_registry.PriceRegistryPriceFeedPerTokenUpdatedIterator); ok {
+		r0 = rf(opts, token)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*price_registry.PriceRegistryPriceFeedPerTokenUpdatedIterator)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(*bind.FilterOpts, []common.Address) error); ok {
+		r1 = rf(opts, token)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -608,25 +608,23 @@ func (_m *PriceRegistryInterface) GetTokenPrice(opts *bind.CallOpts, token commo
 	return r0, r1
 }
 
-// GetTokenPriceFeed provides a mock function with given fields: opts, token
-func (_m *PriceRegistryInterface) GetTokenPriceFeed(opts *bind.CallOpts, token common.Address) (common.Address, error) {
+// GetTokenPriceFeedConfig provides a mock function with given fields: opts, token
+func (_m *PriceRegistryInterface) GetTokenPriceFeedConfig(opts *bind.CallOpts, token common.Address) (price_registry.IPriceRegistryTokenPriceFeedConfig, error) {
 	ret := _m.Called(opts, token)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetTokenPriceFeed")
+		panic("no return value specified for GetTokenPriceFeedConfig")
 	}
 
-	var r0 common.Address
+	var r0 price_registry.IPriceRegistryTokenPriceFeedConfig
 	var r1 error
-	if rf, ok := ret.Get(0).(func(*bind.CallOpts, common.Address) (common.Address, error)); ok {
+	if rf, ok := ret.Get(0).(func(*bind.CallOpts, common.Address) (price_registry.IPriceRegistryTokenPriceFeedConfig, error)); ok {
 		return rf(opts, token)
 	}
-	if rf, ok := ret.Get(0).(func(*bind.CallOpts, common.Address) common.Address); ok {
+	if rf, ok := ret.Get(0).(func(*bind.CallOpts, common.Address) price_registry.IPriceRegistryTokenPriceFeedConfig); ok {
 		r0 = rf(opts, token)
 	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(common.Address)
-		}
+		r0 = ret.Get(0).(price_registry.IPriceRegistryTokenPriceFeedConfig)
 	}
 
 	if rf, ok := ret.Get(1).(func(*bind.CallOpts, common.Address) error); ok {
@@ -721,36 +719,6 @@ func (_m *PriceRegistryInterface) Owner(opts *bind.CallOpts) (common.Address, er
 
 	if rf, ok := ret.Get(1).(func(*bind.CallOpts) error); ok {
 		r1 = rf(opts)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// ParseDataFeedPerTokenUpdated provides a mock function with given fields: log
-func (_m *PriceRegistryInterface) ParseDataFeedPerTokenUpdated(log types.Log) (*price_registry.PriceRegistryDataFeedPerTokenUpdated, error) {
-	ret := _m.Called(log)
-
-	if len(ret) == 0 {
-		panic("no return value specified for ParseDataFeedPerTokenUpdated")
-	}
-
-	var r0 *price_registry.PriceRegistryDataFeedPerTokenUpdated
-	var r1 error
-	if rf, ok := ret.Get(0).(func(types.Log) (*price_registry.PriceRegistryDataFeedPerTokenUpdated, error)); ok {
-		return rf(log)
-	}
-	if rf, ok := ret.Get(0).(func(types.Log) *price_registry.PriceRegistryDataFeedPerTokenUpdated); ok {
-		r0 = rf(log)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*price_registry.PriceRegistryDataFeedPerTokenUpdated)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(types.Log) error); ok {
-		r1 = rf(log)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -896,6 +864,36 @@ func (_m *PriceRegistryInterface) ParseOwnershipTransferred(log types.Log) (*pri
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*price_registry.PriceRegistryOwnershipTransferred)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(types.Log) error); ok {
+		r1 = rf(log)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// ParsePriceFeedPerTokenUpdated provides a mock function with given fields: log
+func (_m *PriceRegistryInterface) ParsePriceFeedPerTokenUpdated(log types.Log) (*price_registry.PriceRegistryPriceFeedPerTokenUpdated, error) {
+	ret := _m.Called(log)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ParsePriceFeedPerTokenUpdated")
+	}
+
+	var r0 *price_registry.PriceRegistryPriceFeedPerTokenUpdated
+	var r1 error
+	if rf, ok := ret.Get(0).(func(types.Log) (*price_registry.PriceRegistryPriceFeedPerTokenUpdated, error)); ok {
+		return rf(log)
+	}
+	if rf, ok := ret.Get(0).(func(types.Log) *price_registry.PriceRegistryPriceFeedPerTokenUpdated); ok {
+		r0 = rf(log)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*price_registry.PriceRegistryPriceFeedPerTokenUpdated)
 		}
 	}
 
@@ -1146,36 +1144,6 @@ func (_m *PriceRegistryInterface) UpdateTokenPriceFeeds(opts *bind.TransactOpts,
 	return r0, r1
 }
 
-// WatchDataFeedPerTokenUpdated provides a mock function with given fields: opts, sink, token
-func (_m *PriceRegistryInterface) WatchDataFeedPerTokenUpdated(opts *bind.WatchOpts, sink chan<- *price_registry.PriceRegistryDataFeedPerTokenUpdated, token []common.Address) (event.Subscription, error) {
-	ret := _m.Called(opts, sink, token)
-
-	if len(ret) == 0 {
-		panic("no return value specified for WatchDataFeedPerTokenUpdated")
-	}
-
-	var r0 event.Subscription
-	var r1 error
-	if rf, ok := ret.Get(0).(func(*bind.WatchOpts, chan<- *price_registry.PriceRegistryDataFeedPerTokenUpdated, []common.Address) (event.Subscription, error)); ok {
-		return rf(opts, sink, token)
-	}
-	if rf, ok := ret.Get(0).(func(*bind.WatchOpts, chan<- *price_registry.PriceRegistryDataFeedPerTokenUpdated, []common.Address) event.Subscription); ok {
-		r0 = rf(opts, sink, token)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(event.Subscription)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(*bind.WatchOpts, chan<- *price_registry.PriceRegistryDataFeedPerTokenUpdated, []common.Address) error); ok {
-		r1 = rf(opts, sink, token)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
 // WatchFeeTokenAdded provides a mock function with given fields: opts, sink, feeToken
 func (_m *PriceRegistryInterface) WatchFeeTokenAdded(opts *bind.WatchOpts, sink chan<- *price_registry.PriceRegistryFeeTokenAdded, feeToken []common.Address) (event.Subscription, error) {
 	ret := _m.Called(opts, sink, feeToken)
@@ -1289,6 +1257,36 @@ func (_m *PriceRegistryInterface) WatchOwnershipTransferred(opts *bind.WatchOpts
 
 	if rf, ok := ret.Get(1).(func(*bind.WatchOpts, chan<- *price_registry.PriceRegistryOwnershipTransferred, []common.Address, []common.Address) error); ok {
 		r1 = rf(opts, sink, from, to)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// WatchPriceFeedPerTokenUpdated provides a mock function with given fields: opts, sink, token
+func (_m *PriceRegistryInterface) WatchPriceFeedPerTokenUpdated(opts *bind.WatchOpts, sink chan<- *price_registry.PriceRegistryPriceFeedPerTokenUpdated, token []common.Address) (event.Subscription, error) {
+	ret := _m.Called(opts, sink, token)
+
+	if len(ret) == 0 {
+		panic("no return value specified for WatchPriceFeedPerTokenUpdated")
+	}
+
+	var r0 event.Subscription
+	var r1 error
+	if rf, ok := ret.Get(0).(func(*bind.WatchOpts, chan<- *price_registry.PriceRegistryPriceFeedPerTokenUpdated, []common.Address) (event.Subscription, error)); ok {
+		return rf(opts, sink, token)
+	}
+	if rf, ok := ret.Get(0).(func(*bind.WatchOpts, chan<- *price_registry.PriceRegistryPriceFeedPerTokenUpdated, []common.Address) event.Subscription); ok {
+		r0 = rf(opts, sink, token)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(event.Subscription)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(*bind.WatchOpts, chan<- *price_registry.PriceRegistryPriceFeedPerTokenUpdated, []common.Address) error); ok {
+		r1 = rf(opts, sink, token)
 	} else {
 		r1 = ret.Error(1)
 	}

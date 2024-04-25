@@ -4,10 +4,16 @@ pragma solidity ^0.8.0;
 import {Internal} from "../libraries/Internal.sol";
 
 interface IPriceRegistry {
-  /// @notice Token price data feed update for a token
+  /// @notice Token price data feed configuration
+  struct TokenPriceFeedConfig {
+    address dataFeedAddress; // ──╮ AggregatorV3Interface contract (0 - feed is unset)
+    uint8 tokenDecimals; // ──────╯ Decimals of the token that the feed represents
+  }
+
+  /// @notice Token price data feed update
   struct TokenPriceFeedUpdate {
-    address sourceToken; // Source token
-    address dataFeedAddress; // AggregatorV3Interface contract (0 - unset feed)
+    address sourceToken; // Source token to update feed for
+    TokenPriceFeedConfig feedConfig; // Feed config update data
   }
 
   /// @notice Update the price for given tokens and gas prices for given chains.
@@ -33,10 +39,10 @@ interface IPriceRegistry {
   /// @return tokenPrices The tokenPrices for the given tokens.
   function getTokenPrices(address[] calldata tokens) external view returns (Internal.TimestampedPackedUint224[] memory);
 
-  /// @notice Returns the configured token price data feed address
-  /// @param token The token to retrieve the feed for
-  /// @return dataFeedAddress The token price data feed address (0 if unset)
-  function getTokenPriceFeed(address token) external view returns (address);
+  /// @notice Returns the token price data feed configuration
+  /// @param token The token to retrieve the feed config for
+  /// @return dataFeedAddress The token price data feed config (if feed address is 0, the feed config is disabled)
+  function getTokenPriceFeedConfig(address token) external view returns (TokenPriceFeedConfig memory);
 
   /// @notice Get an encoded `gasPrice` for a given destination chain ID.
   /// The 224-bit result encodes necessary gas price components.

@@ -248,9 +248,13 @@ contract StructFactory {
 
   function getSingleTokenPriceFeedUpdateStruct(
     address sourceToken,
-    address dataFeedAddress
+    address dataFeedAddress,
+    uint8 tokenDecimals
   ) internal pure returns (IPriceRegistry.TokenPriceFeedUpdate memory) {
-    return IPriceRegistry.TokenPriceFeedUpdate({sourceToken: sourceToken, dataFeedAddress: dataFeedAddress});
+    return IPriceRegistry.TokenPriceFeedUpdate({sourceToken: sourceToken, feedConfig: IPriceRegistry.TokenPriceFeedConfig({
+      dataFeedAddress: dataFeedAddress,
+      tokenDecimals: tokenDecimals
+    })});
   }
 
   // OffRamp
