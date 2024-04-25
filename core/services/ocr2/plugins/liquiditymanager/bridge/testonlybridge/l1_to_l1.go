@@ -14,8 +14,8 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	ubig "github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils/big"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/mock_l1_bridge_adapter"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/rebalancer"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/liquiditymanager/generated/liquiditymanager"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/liquiditymanager/generated/mock_l1_bridge_adapter"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/abiutils"
@@ -32,15 +32,15 @@ var (
 	adapterABI = abihelpers.MustParseABI(mock_l1_bridge_adapter.MockL1BridgeAdapterABI)
 
 	// Emitted on both source and destination
-	LiquidityTransferredTopic      = rebalancer.RebalancerLiquidityTransferred{}.Topic()
-	FinalizationStepCompletedTopic = rebalancer.RebalancerFinalizationStepCompleted{}.Topic()
+	LiquidityTransferredTopic      = liquiditymanager.LiquidityManagerLiquidityTransferred{}.Topic()
+	FinalizationStepCompletedTopic = liquiditymanager.LiquidityManagerFinalizationStepCompleted{}.Topic()
 )
 
 type testBridge struct {
 	sourceSelector   models.NetworkSelector
 	destSelector     models.NetworkSelector
-	sourceRebalancer rebalancer.RebalancerInterface
-	destRebalancer   rebalancer.RebalancerInterface
+	sourceRebalancer liquiditymanager.LiquidityManagerInterface
+	destRebalancer   liquiditymanager.LiquidityManagerInterface
 	sourceAdapter    mock_l1_bridge_adapter.MockL1BridgeAdapterInterface
 	destAdapter      mock_l1_bridge_adapter.MockL1BridgeAdapterInterface
 	sourceLogPoller  logpoller.LogPoller
@@ -112,12 +112,12 @@ func New(
 		return nil, fmt.Errorf("create dest adapter wrapper: %w", err)
 	}
 
-	sourceRebalancer, err := rebalancer.NewRebalancer(common.Address(sourceRebalancerAddress), sourceClient)
+	sourceRebalancer, err := liquiditymanager.NewLiquidityManager(common.Address(sourceRebalancerAddress), sourceClient)
 	if err != nil {
 		return nil, fmt.Errorf("create source rebalancer: %w", err)
 	}
 
-	destRebalancer, err := rebalancer.NewRebalancer(common.Address(destRebalancerAddress), destClient)
+	destRebalancer, err := liquiditymanager.NewLiquidityManager(common.Address(destRebalancerAddress), destClient)
 	if err != nil {
 		return nil, fmt.Errorf("create dest rebalancer: %w", err)
 	}
@@ -211,7 +211,7 @@ func (t *testBridge) GetTransfers(ctx context.Context, localToken models.Address
 func (t *testBridge) toPendingTransfers(
 	localToken, remoteToken models.Address,
 	readyToProve,
-	readyToFinalize []*rebalancer.RebalancerLiquidityTransferred,
+	readyToFinalize []*liquiditymanager.LiquidityManagerLiquidityTransferred,
 	parsedToLP map[logKey]logpoller.Log,
 ) ([]models.PendingTransfer, error) {
 	var transfers []models.PendingTransfer
@@ -283,10 +283,10 @@ func (t *testBridge) toPendingTransfers(
 // and groups the remaining sends into ready to prove and ready to finalize slices.
 func filterAndGroupByStage(
 	lggr logger.Logger,
-	sends []*rebalancer.RebalancerLiquidityTransferred,
-	finalizes []*rebalancer.RebalancerLiquidityTransferred,
-	stepsCompleted []*rebalancer.RebalancerFinalizationStepCompleted,
-) (readyToProve, readyToFinalize []*rebalancer.RebalancerLiquidityTransferred, err error) {
+	sends []*liquiditymanager.LiquidityManagerLiquidityTransferred,
+	finalizes []*liquiditymanager.LiquidityManagerLiquidityTransferred,
+	stepsCompleted []*liquiditymanager.LiquidityManagerFinalizationStepCompleted,
+) (readyToProve, readyToFinalize []*liquiditymanager.LiquidityManagerLiquidityTransferred, err error) {
 	lggr = lggr.With(
 		"sendsLen", len(sends),
 		"finalizesLen", len(finalizes),
@@ -330,11 +330,11 @@ func filterAndGroupByStage(
 
 // groupByStage groups the unfinalized transfers into two categories: ready to prove and ready to finalize.
 func groupByStage(
-	unfinalized []*rebalancer.RebalancerLiquidityTransferred,
-	stepsCompleted []*rebalancer.RebalancerFinalizationStepCompleted,
+	unfinalized []*liquiditymanager.LiquidityManagerLiquidityTransferred,
+	stepsCompleted []*liquiditymanager.LiquidityManagerFinalizationStepCompleted,
 ) (
 	readyToProve,
-	readyToFinalize []*rebalancer.RebalancerLiquidityTransferred,
+	readyToFinalize []*liquiditymanager.LiquidityManagerLiquidityTransferred,
 	err error,
 ) {
 	for _, candidate := range unfinalized {
@@ -356,7 +356,7 @@ func groupByStage(
 // it does this by checking if the candidate's nonce matches any of the nonces in the
 // stepsCompleted logs.
 // see contracts/src/v0.8/rebalancer/test/mocks/MockBridgeAdapter.sol for details on this.
-func isCandidateProven(candidate *rebalancer.RebalancerLiquidityTransferred, stepsCompleted []*rebalancer.RebalancerFinalizationStepCompleted) (bool, error) {
+func isCandidateProven(candidate *liquiditymanager.LiquidityManagerLiquidityTransferred, stepsCompleted []*liquiditymanager.LiquidityManagerFinalizationStepCompleted) (bool, error) {
 	for _, stepCompleted := range stepsCompleted {
 		sendNonce, err := UnpackBridgeSendReturnData(candidate.BridgeReturnData)
 		if err != nil {
@@ -374,12 +374,12 @@ func isCandidateProven(candidate *rebalancer.RebalancerLiquidityTransferred, ste
 }
 
 func filterFinalized(
-	sends []*rebalancer.RebalancerLiquidityTransferred,
-	finalizes []*rebalancer.RebalancerLiquidityTransferred) (
-	[]*rebalancer.RebalancerLiquidityTransferred,
+	sends []*liquiditymanager.LiquidityManagerLiquidityTransferred,
+	finalizes []*liquiditymanager.LiquidityManagerLiquidityTransferred) (
+	[]*liquiditymanager.LiquidityManagerLiquidityTransferred,
 	error,
 ) {
-	var unfinalized []*rebalancer.RebalancerLiquidityTransferred
+	var unfinalized []*liquiditymanager.LiquidityManagerLiquidityTransferred
 	for _, send := range sends {
 		var finalized bool
 		for _, finalize := range finalizes {
@@ -513,8 +513,8 @@ type logKey struct {
 	logIndex int64
 }
 
-func parseLiquidityTransferred(parseFunc func(gethtypes.Log) (*rebalancer.RebalancerLiquidityTransferred, error), lgs []logpoller.Log) ([]*rebalancer.RebalancerLiquidityTransferred, map[logKey]logpoller.Log, error) {
-	transferred := make([]*rebalancer.RebalancerLiquidityTransferred, len(lgs))
+func parseLiquidityTransferred(parseFunc func(gethtypes.Log) (*liquiditymanager.LiquidityManagerLiquidityTransferred, error), lgs []logpoller.Log) ([]*liquiditymanager.LiquidityManagerLiquidityTransferred, map[logKey]logpoller.Log, error) {
+	transferred := make([]*liquiditymanager.LiquidityManagerLiquidityTransferred, len(lgs))
 	toLP := make(map[logKey]logpoller.Log)
 	for i, lg := range lgs {
 		parsed, err := parseFunc(lg.ToGethLog())
@@ -532,15 +532,15 @@ func parseLiquidityTransferred(parseFunc func(gethtypes.Log) (*rebalancer.Rebala
 }
 
 func parseLiquidityTransferredAndFinalizationStepCompleted(
-	transferredParse func(gethtypes.Log) (*rebalancer.RebalancerLiquidityTransferred, error),
-	finalizeParse func(gethtypes.Log) (*rebalancer.RebalancerFinalizationStepCompleted, error),
+	transferredParse func(gethtypes.Log) (*liquiditymanager.LiquidityManagerLiquidityTransferred, error),
+	finalizeParse func(gethtypes.Log) (*liquiditymanager.LiquidityManagerFinalizationStepCompleted, error),
 	lgs []logpoller.Log) (
-	[]*rebalancer.RebalancerFinalizationStepCompleted,
-	[]*rebalancer.RebalancerLiquidityTransferred,
+	[]*liquiditymanager.LiquidityManagerFinalizationStepCompleted,
+	[]*liquiditymanager.LiquidityManagerLiquidityTransferred,
 	error,
 ) {
-	var finalizationStepCompletedLogs []*rebalancer.RebalancerFinalizationStepCompleted
-	var liquidityTransferredLogs []*rebalancer.RebalancerLiquidityTransferred
+	var finalizationStepCompletedLogs []*liquiditymanager.LiquidityManagerFinalizationStepCompleted
+	var liquidityTransferredLogs []*liquiditymanager.LiquidityManagerLiquidityTransferred
 	for _, lg := range lgs {
 		if bytes.Equal(lg.Topics[0], LiquidityTransferredTopic.Bytes()) {
 			parsed, err := transferredParse(lg.ToGethLog())

@@ -3,7 +3,7 @@ package withdrawprover
 import (
 	"math/big"
 
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/optimism_l2_to_l1_message_passer"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/liquiditymanager/generated/optimism_l2_to_l1_message_passer"
 )
 
 var (

@@ -17,8 +17,8 @@ import (
 	lp_mocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	ubig "github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils/big"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/mock_l1_bridge_adapter"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/rebalancer"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/liquiditymanager/generated/liquiditymanager"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/liquiditymanager/generated/mock_l1_bridge_adapter"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/models"
@@ -35,20 +35,20 @@ func Test_testBridge_toPendingTransfers(t *testing.T) {
 	)
 	sourceAdapter, err := mock_l1_bridge_adapter.NewMockL1BridgeAdapter(common.Address(sourceAdapterAddress), nil)
 	require.NoError(t, err)
-	destRebalancer, err := rebalancer.NewRebalancer(common.Address(destRebalancerAddress), nil)
+	destRebalancer, err := liquiditymanager.NewLiquidityManager(common.Address(destRebalancerAddress), nil)
 	require.NoError(t, err)
 	type fields struct {
 		sourceSelector models.NetworkSelector
 		destSelector   models.NetworkSelector
-		destRebalancer rebalancer.RebalancerInterface
+		destRebalancer liquiditymanager.LiquidityManagerInterface
 		sourceAdapter  mock_l1_bridge_adapter.MockL1BridgeAdapterInterface
 		lggr           logger.Logger
 	}
 	type args struct {
 		localToken      models.Address
 		remoteToken     models.Address
-		readyToProve    []*rebalancer.RebalancerLiquidityTransferred
-		readyToFinalize []*rebalancer.RebalancerLiquidityTransferred
+		readyToProve    []*liquiditymanager.LiquidityManagerLiquidityTransferred
+		readyToFinalize []*liquiditymanager.LiquidityManagerLiquidityTransferred
 		parsedToLP      map[logKey]logpoller.Log
 	}
 	tests := []struct {
@@ -69,8 +69,8 @@ func Test_testBridge_toPendingTransfers(t *testing.T) {
 			args{
 				localToken:      localToken,
 				remoteToken:     remoteToken,
-				readyToProve:    []*rebalancer.RebalancerLiquidityTransferred{},
-				readyToFinalize: []*rebalancer.RebalancerLiquidityTransferred{},
+				readyToProve:    []*liquiditymanager.LiquidityManagerLiquidityTransferred{},
+				readyToFinalize: []*liquiditymanager.LiquidityManagerLiquidityTransferred{},
 				parsedToLP:      map[logKey]logpoller.Log{},
 			},
 			nil,
@@ -87,7 +87,7 @@ func Test_testBridge_toPendingTransfers(t *testing.T) {
 			args{
 				localToken:  localToken,
 				remoteToken: remoteToken,
-				readyToProve: []*rebalancer.RebalancerLiquidityTransferred{
+				readyToProve: []*liquiditymanager.LiquidityManagerLiquidityTransferred{
 					{
 						Amount:           big.NewInt(1),
 						BridgeReturnData: mustPackSendReturnData(t, big.NewInt(1)),
@@ -105,7 +105,7 @@ func Test_testBridge_toPendingTransfers(t *testing.T) {
 						},
 					},
 				},
-				readyToFinalize: []*rebalancer.RebalancerLiquidityTransferred{},
+				readyToFinalize: []*liquiditymanager.LiquidityManagerLiquidityTransferred{},
 				parsedToLP: map[logKey]logpoller.Log{
 					{txHash: common.HexToHash("0x1"), logIndex: 1}: {
 						BlockTimestamp: mustParseTime(t, "2021-01-01T00:00:00Z"),
@@ -162,8 +162,8 @@ func Test_testBridge_toPendingTransfers(t *testing.T) {
 			args{
 				localToken:   localToken,
 				remoteToken:  remoteToken,
-				readyToProve: []*rebalancer.RebalancerLiquidityTransferred{},
-				readyToFinalize: []*rebalancer.RebalancerLiquidityTransferred{
+				readyToProve: []*liquiditymanager.LiquidityManagerLiquidityTransferred{},
+				readyToFinalize: []*liquiditymanager.LiquidityManagerLiquidityTransferred{
 					{
 						Amount:           big.NewInt(1),
 						BridgeReturnData: mustPackSendReturnData(t, big.NewInt(1)),
@@ -237,7 +237,7 @@ func Test_testBridge_toPendingTransfers(t *testing.T) {
 			args{
 				localToken:  localToken,
 				remoteToken: remoteToken,
-				readyToProve: []*rebalancer.RebalancerLiquidityTransferred{
+				readyToProve: []*liquiditymanager.LiquidityManagerLiquidityTransferred{
 					{
 						Amount:           big.NewInt(3),
 						BridgeReturnData: mustPackSendReturnData(t, big.NewInt(3)),
@@ -255,7 +255,7 @@ func Test_testBridge_toPendingTransfers(t *testing.T) {
 						},
 					},
 				},
-				readyToFinalize: []*rebalancer.RebalancerLiquidityTransferred{
+				readyToFinalize: []*liquiditymanager.LiquidityManagerLiquidityTransferred{
 					{
 						Amount:           big.NewInt(1),
 						BridgeReturnData: mustPackSendReturnData(t, big.NewInt(1)),
@@ -380,19 +380,19 @@ func mustParseTime(t *testing.T, s string) time.Time {
 
 func Test_filterFinalized(t *testing.T) {
 	type args struct {
-		sends     []*rebalancer.RebalancerLiquidityTransferred
-		finalizes []*rebalancer.RebalancerLiquidityTransferred
+		sends     []*liquiditymanager.LiquidityManagerLiquidityTransferred
+		finalizes []*liquiditymanager.LiquidityManagerLiquidityTransferred
 	}
 	tests := []struct {
 		name    string
 		args    args
-		want    []*rebalancer.RebalancerLiquidityTransferred
+		want    []*liquiditymanager.LiquidityManagerLiquidityTransferred
 		wantErr bool
 	}{
 		{
 			"no finalizes",
 			args{
-				[]*rebalancer.RebalancerLiquidityTransferred{
+				[]*liquiditymanager.LiquidityManagerLiquidityTransferred{
 					{
 						Amount:           big.NewInt(1),
 						BridgeReturnData: mustPackSendReturnData(t, big.NewInt(1)),
@@ -406,9 +406,9 @@ func Test_filterFinalized(t *testing.T) {
 						BridgeReturnData: mustPackSendReturnData(t, big.NewInt(3)),
 					},
 				},
-				[]*rebalancer.RebalancerLiquidityTransferred{},
+				[]*liquiditymanager.LiquidityManagerLiquidityTransferred{},
 			},
-			[]*rebalancer.RebalancerLiquidityTransferred{
+			[]*liquiditymanager.LiquidityManagerLiquidityTransferred{
 				{
 					Amount:           big.NewInt(1),
 					BridgeReturnData: mustPackSendReturnData(t, big.NewInt(1)),
@@ -427,7 +427,7 @@ func Test_filterFinalized(t *testing.T) {
 		{
 			"some finalizes",
 			args{
-				[]*rebalancer.RebalancerLiquidityTransferred{
+				[]*liquiditymanager.LiquidityManagerLiquidityTransferred{
 					{
 						Amount:           big.NewInt(1),
 						BridgeReturnData: mustPackSendReturnData(t, big.NewInt(1)),
@@ -441,14 +441,14 @@ func Test_filterFinalized(t *testing.T) {
 						BridgeReturnData: mustPackSendReturnData(t, big.NewInt(3)),
 					},
 				},
-				[]*rebalancer.RebalancerLiquidityTransferred{
+				[]*liquiditymanager.LiquidityManagerLiquidityTransferred{
 					{
 						Amount:             big.NewInt(2),
 						BridgeSpecificData: mustPackFinalizePayload(t, big.NewInt(2), big.NewInt(2)),
 					},
 				},
 			},
-			[]*rebalancer.RebalancerLiquidityTransferred{
+			[]*liquiditymanager.LiquidityManagerLiquidityTransferred{
 				{
 					Amount:           big.NewInt(1),
 					BridgeReturnData: mustPackSendReturnData(t, big.NewInt(1)),
@@ -476,20 +476,20 @@ func Test_filterFinalized(t *testing.T) {
 
 func Test_groupByStage(t *testing.T) {
 	type args struct {
-		unfinalized    []*rebalancer.RebalancerLiquidityTransferred
-		stepsCompleted []*rebalancer.RebalancerFinalizationStepCompleted
+		unfinalized    []*liquiditymanager.LiquidityManagerLiquidityTransferred
+		stepsCompleted []*liquiditymanager.LiquidityManagerFinalizationStepCompleted
 	}
 	tests := []struct {
 		name                string
 		args                args
-		wantReadyToProve    []*rebalancer.RebalancerLiquidityTransferred
-		wantReadyToFinalize []*rebalancer.RebalancerLiquidityTransferred
+		wantReadyToProve    []*liquiditymanager.LiquidityManagerLiquidityTransferred
+		wantReadyToFinalize []*liquiditymanager.LiquidityManagerLiquidityTransferred
 		wantErr             bool
 	}{
 		{
 			"all ready to prove",
 			args{
-				[]*rebalancer.RebalancerLiquidityTransferred{
+				[]*liquiditymanager.LiquidityManagerLiquidityTransferred{
 					{
 						Amount:           big.NewInt(1),
 						BridgeReturnData: mustPackSendReturnData(t, big.NewInt(1)),
@@ -503,9 +503,9 @@ func Test_groupByStage(t *testing.T) {
 						BridgeReturnData: mustPackSendReturnData(t, big.NewInt(3)),
 					},
 				},
-				[]*rebalancer.RebalancerFinalizationStepCompleted{}, // none proven
+				[]*liquiditymanager.LiquidityManagerFinalizationStepCompleted{}, // none proven
 			},
-			[]*rebalancer.RebalancerLiquidityTransferred{
+			[]*liquiditymanager.LiquidityManagerLiquidityTransferred{
 				{
 					Amount:           big.NewInt(1),
 					BridgeReturnData: mustPackSendReturnData(t, big.NewInt(1)),
@@ -525,7 +525,7 @@ func Test_groupByStage(t *testing.T) {
 		{
 			"all ready to finalize",
 			args{
-				[]*rebalancer.RebalancerLiquidityTransferred{
+				[]*liquiditymanager.LiquidityManagerLiquidityTransferred{
 					{
 						Amount:           big.NewInt(1),
 						BridgeReturnData: mustPackSendReturnData(t, big.NewInt(1)),
@@ -539,7 +539,7 @@ func Test_groupByStage(t *testing.T) {
 						BridgeReturnData: mustPackSendReturnData(t, big.NewInt(3)),
 					},
 				},
-				[]*rebalancer.RebalancerFinalizationStepCompleted{ // all proven
+				[]*liquiditymanager.LiquidityManagerFinalizationStepCompleted{ // all proven
 					{
 						BridgeSpecificData: mustPackProvePayload(t, big.NewInt(1)),
 					},
@@ -552,7 +552,7 @@ func Test_groupByStage(t *testing.T) {
 				},
 			},
 			nil,
-			[]*rebalancer.RebalancerLiquidityTransferred{
+			[]*liquiditymanager.LiquidityManagerLiquidityTransferred{
 				{
 					Amount:           big.NewInt(1),
 					BridgeReturnData: mustPackSendReturnData(t, big.NewInt(1)),
@@ -571,7 +571,7 @@ func Test_groupByStage(t *testing.T) {
 		{
 			"mix of ready to prove and ready to finalize",
 			args{
-				[]*rebalancer.RebalancerLiquidityTransferred{
+				[]*liquiditymanager.LiquidityManagerLiquidityTransferred{
 					{
 						Amount:           big.NewInt(1),
 						BridgeReturnData: mustPackSendReturnData(t, big.NewInt(1)),
@@ -589,7 +589,7 @@ func Test_groupByStage(t *testing.T) {
 						BridgeReturnData: mustPackSendReturnData(t, big.NewInt(4)),
 					},
 				},
-				[]*rebalancer.RebalancerFinalizationStepCompleted{ // 1 and 3 already proven, ready to finalize
+				[]*liquiditymanager.LiquidityManagerFinalizationStepCompleted{ // 1 and 3 already proven, ready to finalize
 					{
 						BridgeSpecificData: mustPackProvePayload(t, big.NewInt(1)),
 					},
@@ -598,7 +598,7 @@ func Test_groupByStage(t *testing.T) {
 					},
 				},
 			},
-			[]*rebalancer.RebalancerLiquidityTransferred{
+			[]*liquiditymanager.LiquidityManagerLiquidityTransferred{
 				{
 					Amount:           big.NewInt(2),
 					BridgeReturnData: mustPackSendReturnData(t, big.NewInt(2)),
@@ -608,7 +608,7 @@ func Test_groupByStage(t *testing.T) {
 					BridgeReturnData: mustPackSendReturnData(t, big.NewInt(4)),
 				},
 			},
-			[]*rebalancer.RebalancerLiquidityTransferred{
+			[]*liquiditymanager.LiquidityManagerLiquidityTransferred{
 				{
 					Amount:           big.NewInt(1),
 					BridgeReturnData: mustPackSendReturnData(t, big.NewInt(1)),

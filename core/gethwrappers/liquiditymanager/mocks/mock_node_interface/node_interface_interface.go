@@ -5,7 +5,7 @@ package mock_node_interface
 import (
 	big "math/big"
 
-	arb_node_interface "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/arb_node_interface"
+	arb_node_interface "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/liquiditymanager/generated/arb_node_interface"
 
 	bind "github.com/ethereum/go-ethereum/accounts/abi/bind"
 

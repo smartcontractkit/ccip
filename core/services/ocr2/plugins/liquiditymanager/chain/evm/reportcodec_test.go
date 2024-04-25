@@ -10,7 +10,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets"
 	ubig "github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils/big"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/rebalancer_report_encoder"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/liquiditymanager/generated/report_encoder"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/bridge/testonlybridge"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/models"
@@ -80,8 +80,8 @@ func TestEvmReportCodec(t *testing.T) {
 		// should consist of 1 send operation from 909606746561742123 to 3379446385462418246
 		packedBridgeData, err := testonlybridge.PackBridgeSendReturnData(big.NewInt(1))
 		require.NoError(t, err)
-		encodedReport, err := evmEncoder.onchainReportArguments.Pack(rebalancer_report_encoder.IRebalancerLiquidityInstructions{
-			SendLiquidityParams: []rebalancer_report_encoder.IRebalancerSendLiquidityParams{
+		encodedReport, err := evmEncoder.onchainReportArguments.Pack(report_encoder.ILiquidityManagerLiquidityInstructions{
+			SendLiquidityParams: []report_encoder.ILiquidityManagerSendLiquidityParams{
 				{
 					Amount:              assets.Ether(5).ToInt(),
 					NativeBridgeFee:     big.NewInt(0),
@@ -89,7 +89,7 @@ func TestEvmReportCodec(t *testing.T) {
 					BridgeData:          packedBridgeData,
 				},
 			},
-			ReceiveLiquidityParams: []rebalancer_report_encoder.IRebalancerReceiveLiquidityParams{},
+			ReceiveLiquidityParams: []report_encoder.ILiquidityManagerReceiveLiquidityParams{},
 		})
 		require.NoError(t, err)
 		_, instructions, err := evmEncoder.Decode(
@@ -109,9 +109,9 @@ func TestEvmReportCodec(t *testing.T) {
 		// should consist of 1 receive instruction from 909606746561742123 to 3379446385462418246
 		packedBridgeData, err = testonlybridge.PackFinalizeBridgePayload(assets.Ether(5).ToInt(), big.NewInt(1))
 		require.NoError(t, err)
-		encodedReport, err = evmEncoder.onchainReportArguments.Pack(rebalancer_report_encoder.IRebalancerLiquidityInstructions{
-			SendLiquidityParams: []rebalancer_report_encoder.IRebalancerSendLiquidityParams{},
-			ReceiveLiquidityParams: []rebalancer_report_encoder.IRebalancerReceiveLiquidityParams{
+		encodedReport, err = evmEncoder.onchainReportArguments.Pack(report_encoder.ILiquidityManagerLiquidityInstructions{
+			SendLiquidityParams: []report_encoder.ILiquidityManagerSendLiquidityParams{},
+			ReceiveLiquidityParams: []report_encoder.ILiquidityManagerReceiveLiquidityParams{
 				{
 					Amount:              assets.Ether(5).ToInt(),
 					RemoteChainSelector: 909606746561742123,

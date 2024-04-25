@@ -22,7 +22,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	ubig "github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils/big"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/rebalancer_report_encoder"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/liquiditymanager/generated/report_encoder"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/bridge"
@@ -1732,11 +1732,11 @@ func (j JsonReportCodec) Encode(report models.Report) ([]byte, error) {
 	return json.Marshal(instructions)
 }
 
-func (j JsonReportCodec) Decode(networkID models.NetworkSelector, rebalancerAddress models.Address, binaryReport []byte) (models.Report, rebalancer_report_encoder.IRebalancerLiquidityInstructions, error) {
-	var instructions rebalancer_report_encoder.IRebalancerLiquidityInstructions
+func (j JsonReportCodec) Decode(networkID models.NetworkSelector, rebalancerAddress models.Address, binaryReport []byte) (models.Report, report_encoder.ILiquidityManagerLiquidityInstructions, error) {
+	var instructions report_encoder.ILiquidityManagerLiquidityInstructions
 	err := json.Unmarshal(binaryReport, &instructions)
 	if err != nil {
-		return models.Report{}, rebalancer_report_encoder.IRebalancerLiquidityInstructions{}, err
+		return models.Report{}, report_encoder.ILiquidityManagerLiquidityInstructions{}, err
 	}
 	var r models.Report
 	for _, sendInstruction := range instructions.SendLiquidityParams {

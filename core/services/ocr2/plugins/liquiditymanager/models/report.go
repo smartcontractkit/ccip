@@ -8,7 +8,7 @@ import (
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/rebalancer_report_encoder"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/liquiditymanager/generated/report_encoder"
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay"
 )
 
@@ -67,29 +67,29 @@ func NewReport(transfers []Transfer, lmAddr Address, networkID NetworkSelector, 
 	}
 }
 
-func (r Report) ToLiquidityInstructions() (rebalancer_report_encoder.IRebalancerLiquidityInstructions, error) {
-	var sendInstructions []rebalancer_report_encoder.IRebalancerSendLiquidityParams
-	var receiveInstructions []rebalancer_report_encoder.IRebalancerReceiveLiquidityParams
+func (r Report) ToLiquidityInstructions() (report_encoder.ILiquidityManagerLiquidityInstructions, error) {
+	var sendInstructions []report_encoder.ILiquidityManagerSendLiquidityParams
+	var receiveInstructions []report_encoder.ILiquidityManagerReceiveLiquidityParams
 	for _, tr := range r.Transfers {
 		if r.NetworkID == tr.From {
-			sendInstructions = append(sendInstructions, rebalancer_report_encoder.IRebalancerSendLiquidityParams{
+			sendInstructions = append(sendInstructions, report_encoder.ILiquidityManagerSendLiquidityParams{
 				Amount:              tr.Amount.ToInt(),
 				RemoteChainSelector: uint64(tr.To),
 				BridgeData:          tr.BridgeData,
 				NativeBridgeFee:     tr.NativeBridgeFee.ToInt(),
 			})
 		} else if r.NetworkID == tr.To {
-			receiveInstructions = append(receiveInstructions, rebalancer_report_encoder.IRebalancerReceiveLiquidityParams{
+			receiveInstructions = append(receiveInstructions, report_encoder.ILiquidityManagerReceiveLiquidityParams{
 				Amount:              tr.Amount.ToInt(),
 				RemoteChainSelector: uint64(tr.From),
 				BridgeData:          tr.BridgeData,
 			})
 		} else {
-			return rebalancer_report_encoder.IRebalancerLiquidityInstructions{},
+			return report_encoder.ILiquidityManagerLiquidityInstructions{},
 				fmt.Errorf("transfer %+v is not related to network %d", tr, r.NetworkID)
 		}
 	}
-	return rebalancer_report_encoder.IRebalancerLiquidityInstructions{
+	return report_encoder.ILiquidityManagerLiquidityInstructions{
 		SendLiquidityParams:    sendInstructions,
 		ReceiveLiquidityParams: receiveInstructions,
 	}, nil

@@ -8,7 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/rebalancer"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/liquiditymanager/generated/liquiditymanager"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/graph"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/models"
 )
@@ -25,9 +25,9 @@ func (e *evmDiscoverer) Discover(ctx context.Context) (graph.Graph, error) {
 		if !ok {
 			return graph.Data{}, nil, fmt.Errorf("no client for master chain %+v", selector)
 		}
-		rebal, err := rebalancer.NewRebalancer(common.Address(rebalancerAddress), dep.ethClient)
+		rebal, err := liquiditymanager.NewLiquidityManager(common.Address(rebalancerAddress), dep.ethClient)
 		if err != nil {
-			return graph.Data{}, nil, fmt.Errorf("new rebalancer: %w", err)
+			return graph.Data{}, nil, fmt.Errorf("new liquiditymanager: %w", err)
 		}
 		liquidity, err := rebal.GetLiquidity(&bind.CallOpts{
 			Context: ctx,

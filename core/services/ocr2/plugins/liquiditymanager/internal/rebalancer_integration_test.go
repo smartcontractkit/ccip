@@ -40,8 +40,8 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_arm_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/weth9"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/mock_l1_bridge_adapter"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/rebalancer"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/liquiditymanager/generated/liquiditymanager"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/liquiditymanager/generated/mock_l1_bridge_adapter"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/cltest/heavyweight"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
@@ -78,7 +78,7 @@ type onchainUniverse struct {
 	chainID         uint64
 	wethToken       *weth9.WETH9
 	lockReleasePool *lock_release_token_pool.LockReleaseTokenPool
-	rebalancer      *rebalancer.Rebalancer
+	rebalancer      *liquiditymanager.LiquidityManager
 	bridgeAdapter   *mock_l1_bridge_adapter.MockL1BridgeAdapter
 }
 
@@ -409,8 +409,8 @@ func waitForTransmissions(
 	universes map[int64]onchainUniverse,
 ) {
 	start := uint64(1)
-	liquidityTransferredSink := make(chan *rebalancer.RebalancerLiquidityTransferred)
-	finalizationStepSink := make(chan *rebalancer.RebalancerFinalizationStepCompleted)
+	liquidityTransferredSink := make(chan *liquiditymanager.LiquidityManagerLiquidityTransferred)
+	finalizationStepSink := make(chan *liquiditymanager.LiquidityManagerFinalizationStepCompleted)
 	var subs []event.Subscription
 	for _, uni := range universes {
 		sub, err := uni.rebalancer.WatchLiquidityTransferred(&bind.WatchOpts{
@@ -470,7 +470,7 @@ func waitForTransmissions(
 func setRebalancerConfig(
 	t *testing.T,
 	owner *bind.TransactOpts,
-	wrapper *rebalancer.Rebalancer,
+	wrapper *liquiditymanager.LiquidityManager,
 	chain *backends.SimulatedBackend,
 	onchainPubKeys []common.Address,
 	transmitters []common.Address,
@@ -690,9 +690,9 @@ func deployContracts(
 
 		// deploy the rebalancer and set the liquidity container to be the lock release pool
 		ch := mustGetChainByEvmID(t, chainID)
-		rebalancerAddr, _, _, err := rebalancer.DeployRebalancer(owner, backend, wethAddress, ch.Selector, lockReleasePoolAddress, big.NewInt(0))
+		rebalancerAddr, _, _, err := liquiditymanager.DeployLiquidityManager(owner, backend, wethAddress, ch.Selector, lockReleasePoolAddress, big.NewInt(0))
 		require.NoError(t, err, "failed to deploy Rebalancer contract")
-		rebalancer, err := rebalancer.NewRebalancer(rebalancerAddr, backend)
+		rebalancer, err := liquiditymanager.NewLiquidityManager(rebalancerAddr, backend)
 		require.NoError(t, err, "failed to create Rebalancer wrapper")
 
 		// set the rebalancer of the lock release pool to be the just deployed rebalancer
@@ -795,7 +795,7 @@ func createConnectedNetwork(
 
 		_, err := uni.rebalancer.SetCrossChainRebalancer(
 			owner,
-			rebalancer.IRebalancerCrossChainRebalancerArgs{
+			liquiditymanager.ILiquidityManagerCrossChainRebalancerArgs{
 				RemoteRebalancer:    universes[mainChainID].rebalancer.Address(),
 				RemoteChainSelector: remoteChain.Selector,
 				Enabled:             true,
@@ -817,7 +817,7 @@ func createConnectedNetwork(
 
 		_, err = universes[mainChainID].rebalancer.SetCrossChainRebalancer(
 			owner,
-			rebalancer.IRebalancerCrossChainRebalancerArgs{
+			liquiditymanager.ILiquidityManagerCrossChainRebalancerArgs{
 				RemoteRebalancer:    uni.rebalancer.Address(),
 				RemoteChainSelector: remoteChain.Selector,
 				Enabled:             true,

@@ -20,13 +20,13 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	ubig "github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils/big"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/arb_node_interface"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/arbitrum_l1_bridge_adapter"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/arbitrum_rollup_core"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/arbsys"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/l2_arbitrum_gateway"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/l2_arbitrum_messenger"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/rebalancer"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/liquiditymanager/generated/arb_node_interface"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/liquiditymanager/generated/arbitrum_l1_bridge_adapter"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/liquiditymanager/generated/arbitrum_rollup_core"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/liquiditymanager/generated/arbsys"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/liquiditymanager/generated/l2_arbitrum_gateway"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/liquiditymanager/generated/l2_arbitrum_messenger"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/liquiditymanager/generated/liquiditymanager"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/abiutils"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/models"
@@ -35,8 +35,8 @@ import (
 type l2ToL1Bridge struct {
 	localSelector  models.NetworkSelector
 	remoteSelector models.NetworkSelector
-	l1Rebalancer   rebalancer.RebalancerInterface
-	l2Rebalancer   rebalancer.RebalancerInterface
+	l1Rebalancer   liquiditymanager.LiquidityManagerInterface
+	l2Rebalancer   liquiditymanager.LiquidityManagerInterface
 	l2LogPoller    logpoller.LogPoller
 	l1LogPoller    logpoller.LogPoller
 	l2FilterName   string
@@ -108,7 +108,7 @@ func NewL2ToL1Bridge(
 		return nil, fmt.Errorf("register filter for Arbitrum L1 to L2 bridge: %w", err)
 	}
 
-	l1Rebalancer, err := rebalancer.NewRebalancer(l1RebalancerAddress, l1Client)
+	l1Rebalancer, err := liquiditymanager.NewLiquidityManager(l1RebalancerAddress, l1Client)
 	if err != nil {
 		return nil, fmt.Errorf("instantiate L1 rebalancer: %w", err)
 	}
@@ -118,7 +118,7 @@ func NewL2ToL1Bridge(
 		return nil, fmt.Errorf("get L1->L2 bridge adapter address: %w", err)
 	}
 
-	l2Rebalancer, err := rebalancer.NewRebalancer(l2RebalancerAddress, l2Client)
+	l2Rebalancer, err := liquiditymanager.NewLiquidityManager(l2RebalancerAddress, l2Client)
 	if err != nil {
 		return nil, fmt.Errorf("instantiate L2 rebalancer: %w", err)
 	}
@@ -281,9 +281,9 @@ func (l *l2ToL1Bridge) GetTransfers(ctx context.Context, localToken models.Addre
 
 func (l *l2ToL1Bridge) toPendingTransfers(
 	localToken, remoteToken models.Address,
-	ready []*rebalancer.RebalancerLiquidityTransferred,
+	ready []*liquiditymanager.LiquidityManagerLiquidityTransferred,
 	readyData [][]byte,
-	notReady []*rebalancer.RebalancerLiquidityTransferred,
+	notReady []*liquiditymanager.LiquidityManagerLiquidityTransferred,
 	parsedToLP map[logKey]logpoller.Log,
 ) ([]models.PendingTransfer, error) {
 	if len(ready) != len(readyData) {
@@ -341,11 +341,11 @@ func (l *l2ToL1Bridge) toPendingTransfers(
 func (l *l2ToL1Bridge) partitionReadyTransfers(
 	ctx context.Context,
 	sentLogs,
-	receivedLogs []*rebalancer.RebalancerLiquidityTransferred,
+	receivedLogs []*liquiditymanager.LiquidityManagerLiquidityTransferred,
 ) (
-	ready []*rebalancer.RebalancerLiquidityTransferred,
+	ready []*liquiditymanager.LiquidityManagerLiquidityTransferred,
 	readyDatas [][]byte,
-	notReady []*rebalancer.RebalancerLiquidityTransferred,
+	notReady []*liquiditymanager.LiquidityManagerLiquidityTransferred,
 	err error,
 ) {
 	unfinalized, err := filterUnfinalizedTransfers(sentLogs, receivedLogs)
@@ -377,8 +377,8 @@ func (l *l2ToL1Bridge) partitionReadyTransfers(
 	return
 }
 
-func filterUnfinalizedTransfers(sentLogs, receivedLogs []*rebalancer.RebalancerLiquidityTransferred) ([]*rebalancer.RebalancerLiquidityTransferred, error) {
-	var unfinalized []*rebalancer.RebalancerLiquidityTransferred
+func filterUnfinalizedTransfers(sentLogs, receivedLogs []*liquiditymanager.LiquidityManagerLiquidityTransferred) ([]*liquiditymanager.LiquidityManagerLiquidityTransferred, error) {
+	var unfinalized []*liquiditymanager.LiquidityManagerLiquidityTransferred
 	for _, sent := range sentLogs {
 		var found bool
 		for _, recv := range receivedLogs {
@@ -404,7 +404,7 @@ func filterUnfinalizedTransfers(sentLogs, receivedLogs []*rebalancer.RebalancerL
 
 func (l *l2ToL1Bridge) getFinalizationData(
 	ctx context.Context,
-	transfer *rebalancer.RebalancerLiquidityTransferred,
+	transfer *liquiditymanager.LiquidityManagerLiquidityTransferred,
 ) (
 	[]byte,
 	bool,

@@ -5,7 +5,7 @@ package mock_arbitrum_gateway_router
 import (
 	big "math/big"
 
-	arbitrum_gateway_router "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/arbitrum_gateway_router"
+	arbitrum_gateway_router "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/liquiditymanager/generated/arbitrum_gateway_router"
 
 	bind "github.com/ethereum/go-ethereum/accounts/abi/bind"
 

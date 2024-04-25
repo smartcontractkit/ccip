@@ -11,7 +11,7 @@ import (
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/rebalancer"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/liquiditymanager/generated/liquiditymanager"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/models"
 )
@@ -19,7 +19,7 @@ import (
 var _ LiquidityManager = &EvmRebalancer{}
 
 type EvmRebalancer struct {
-	rebalancer rebalancer.RebalancerInterface
+	rebalancer liquiditymanager.LiquidityManagerInterface
 	addr       common.Address
 	networkSel models.NetworkSelector
 	lggr       logger.Logger
@@ -31,9 +31,9 @@ func NewEvmRebalancer(
 	ec client.Client,
 	lggr logger.Logger,
 ) (*EvmRebalancer, error) {
-	rebal, err := rebalancer.NewRebalancer(common.Address(address), ec)
+	rebal, err := liquiditymanager.NewLiquidityManager(common.Address(address), ec)
 	if err != nil {
-		return nil, fmt.Errorf("unable to instantiate rebalancer wrapper: %w", err)
+		return nil, fmt.Errorf("unable to instantiate liquidity manager wrapper: %w", err)
 	}
 
 	return &EvmRebalancer{

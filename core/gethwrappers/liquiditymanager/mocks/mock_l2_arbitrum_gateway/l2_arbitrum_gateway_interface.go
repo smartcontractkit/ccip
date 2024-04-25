@@ -12,7 +12,7 @@ import (
 
 	generated "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated"
 
-	l2_arbitrum_gateway "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/l2_arbitrum_gateway"
+	l2_arbitrum_gateway "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/liquiditymanager/generated/l2_arbitrum_gateway"
 
 	mock "github.com/stretchr/testify/mock"
 

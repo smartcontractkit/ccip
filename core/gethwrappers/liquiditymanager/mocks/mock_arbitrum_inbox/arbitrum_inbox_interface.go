@@ -5,7 +5,7 @@ package mock_arbitrum_inbox
 import (
 	big "math/big"
 
-	arbitrum_inbox "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/arbitrum_inbox"
+	arbitrum_inbox "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/liquiditymanager/generated/arbitrum_inbox"
 
 	bind "github.com/ethereum/go-ethereum/accounts/abi/bind"
 

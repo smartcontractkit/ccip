@@ -20,9 +20,9 @@ import (
 	lpmocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	ubig "github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils/big"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/l2_arbitrum_gateway"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/rebalancer"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/mocks/mock_arbitrum_inbox"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/liquiditymanager/generated/l2_arbitrum_gateway"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/liquiditymanager/generated/liquiditymanager"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/liquiditymanager/mocks/mock_arbitrum_inbox"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/models"
 )
@@ -461,8 +461,8 @@ func Test_l1ToL2Bridge_estimateMaxSubmissionFee(t *testing.T) {
 
 func Test_matchingExecutionExists(t *testing.T) {
 	type args struct {
-		readyCandidate *rebalancer.RebalancerLiquidityTransferred
-		receivedLogs   []*rebalancer.RebalancerLiquidityTransferred
+		readyCandidate *liquiditymanager.LiquidityManagerLiquidityTransferred
+		receivedLogs   []*liquiditymanager.LiquidityManagerLiquidityTransferred
 	}
 	var (
 		l2Rebalancer = testutils.NewAddress()
@@ -476,7 +476,7 @@ func Test_matchingExecutionExists(t *testing.T) {
 		{
 			"matching execution exists",
 			args{
-				readyCandidate: &rebalancer.RebalancerLiquidityTransferred{
+				readyCandidate: &liquiditymanager.LiquidityManagerLiquidityTransferred{
 					OcrSeqNum:          1,
 					FromChainSelector:  10,
 					ToChainSelector:    20,
@@ -485,7 +485,7 @@ func Test_matchingExecutionExists(t *testing.T) {
 					BridgeSpecificData: mustPackSendPayload(t, big.NewInt(100_000), big.NewInt(250_000), assets.GWei(3).ToInt()),
 					BridgeReturnData:   mustPackReturnData(t, big.NewInt(10)),
 				},
-				receivedLogs: []*rebalancer.RebalancerLiquidityTransferred{
+				receivedLogs: []*liquiditymanager.LiquidityManagerLiquidityTransferred{
 					{
 						OcrSeqNum:          2,
 						FromChainSelector:  10,
@@ -521,7 +521,7 @@ func Test_matchingExecutionExists(t *testing.T) {
 		{
 			"no matching execution exists",
 			args{
-				readyCandidate: &rebalancer.RebalancerLiquidityTransferred{
+				readyCandidate: &liquiditymanager.LiquidityManagerLiquidityTransferred{
 					OcrSeqNum:          1,
 					FromChainSelector:  10,
 					ToChainSelector:    20,
@@ -530,7 +530,7 @@ func Test_matchingExecutionExists(t *testing.T) {
 					BridgeSpecificData: mustPackSendPayload(t, big.NewInt(100_000), big.NewInt(250_000), assets.GWei(3).ToInt()),
 					BridgeReturnData:   mustPackReturnData(t, big.NewInt(10)),
 				},
-				receivedLogs: []*rebalancer.RebalancerLiquidityTransferred{
+				receivedLogs: []*liquiditymanager.LiquidityManagerLiquidityTransferred{
 					{
 						OcrSeqNum:          2,
 						FromChainSelector:  10,
@@ -566,10 +566,10 @@ func Test_matchingExecutionExists(t *testing.T) {
 		{
 			"bad bridge return data",
 			args{
-				readyCandidate: &rebalancer.RebalancerLiquidityTransferred{
+				readyCandidate: &liquiditymanager.LiquidityManagerLiquidityTransferred{
 					BridgeReturnData: []byte{1, 2, 3},
 				},
-				receivedLogs: []*rebalancer.RebalancerLiquidityTransferred{},
+				receivedLogs: []*liquiditymanager.LiquidityManagerLiquidityTransferred{},
 			},
 			false,
 			true,
@@ -577,10 +577,10 @@ func Test_matchingExecutionExists(t *testing.T) {
 		{
 			"bad bridge specific data",
 			args{
-				readyCandidate: &rebalancer.RebalancerLiquidityTransferred{
+				readyCandidate: &liquiditymanager.LiquidityManagerLiquidityTransferred{
 					BridgeReturnData: mustPackReturnData(t, big.NewInt(10)),
 				},
-				receivedLogs: []*rebalancer.RebalancerLiquidityTransferred{
+				receivedLogs: []*liquiditymanager.LiquidityManagerLiquidityTransferred{
 					{
 						BridgeSpecificData: []byte{1, 2, 3},
 					},
@@ -611,8 +611,8 @@ func mustPackReturnData(t *testing.T, l1ToL2Id *big.Int) []byte {
 
 func Test_filterExecuted(t *testing.T) {
 	type args struct {
-		readyCandidates []*rebalancer.RebalancerLiquidityTransferred
-		receivedLogs    []*rebalancer.RebalancerLiquidityTransferred
+		readyCandidates []*liquiditymanager.LiquidityManagerLiquidityTransferred
+		receivedLogs    []*liquiditymanager.LiquidityManagerLiquidityTransferred
 	}
 	var (
 		l2Rebalancer = testutils.NewAddress()
@@ -620,13 +620,13 @@ func Test_filterExecuted(t *testing.T) {
 	tests := []struct {
 		name      string
 		args      args
-		wantReady []*rebalancer.RebalancerLiquidityTransferred
+		wantReady []*liquiditymanager.LiquidityManagerLiquidityTransferred
 		wantErr   bool
 	}{
 		{
 			"empty received list",
 			args{
-				readyCandidates: []*rebalancer.RebalancerLiquidityTransferred{
+				readyCandidates: []*liquiditymanager.LiquidityManagerLiquidityTransferred{
 					{
 						OcrSeqNum:          1,
 						FromChainSelector:  10,
@@ -646,9 +646,9 @@ func Test_filterExecuted(t *testing.T) {
 						BridgeReturnData:   mustPackReturnData(t, big.NewInt(11)),
 					},
 				},
-				receivedLogs: []*rebalancer.RebalancerLiquidityTransferred{},
+				receivedLogs: []*liquiditymanager.LiquidityManagerLiquidityTransferred{},
 			},
-			[]*rebalancer.RebalancerLiquidityTransferred{
+			[]*liquiditymanager.LiquidityManagerLiquidityTransferred{
 				{
 					OcrSeqNum:          1,
 					FromChainSelector:  10,
@@ -673,7 +673,7 @@ func Test_filterExecuted(t *testing.T) {
 		{
 			"non-empty received list, some executed",
 			args{
-				readyCandidates: []*rebalancer.RebalancerLiquidityTransferred{
+				readyCandidates: []*liquiditymanager.LiquidityManagerLiquidityTransferred{
 					{
 						OcrSeqNum:          1,
 						FromChainSelector:  10,
@@ -702,7 +702,7 @@ func Test_filterExecuted(t *testing.T) {
 						BridgeReturnData:   mustPackReturnData(t, big.NewInt(12)),
 					},
 				},
-				receivedLogs: []*rebalancer.RebalancerLiquidityTransferred{
+				receivedLogs: []*liquiditymanager.LiquidityManagerLiquidityTransferred{
 					{
 						OcrSeqNum:          2,
 						FromChainSelector:  10,
@@ -714,7 +714,7 @@ func Test_filterExecuted(t *testing.T) {
 					},
 				},
 			},
-			[]*rebalancer.RebalancerLiquidityTransferred{
+			[]*liquiditymanager.LiquidityManagerLiquidityTransferred{
 				{
 					OcrSeqNum:          2,
 					FromChainSelector:  10,
@@ -755,15 +755,15 @@ func Test_partitionTransfers(t *testing.T) {
 		localToken             models.Address
 		l1BridgeAdapterAddress common.Address
 		l2RebalancerAddress    common.Address
-		sentLogs               []*rebalancer.RebalancerLiquidityTransferred
+		sentLogs               []*liquiditymanager.LiquidityManagerLiquidityTransferred
 		depositFinalizedLogs   []*l2_arbitrum_gateway.L2ArbitrumGatewayDepositFinalized
-		receivedLogs           []*rebalancer.RebalancerLiquidityTransferred
+		receivedLogs           []*liquiditymanager.LiquidityManagerLiquidityTransferred
 	}
 	tests := []struct {
 		name          string
 		args          args
-		wantNotReady  []*rebalancer.RebalancerLiquidityTransferred
-		wantReady     []*rebalancer.RebalancerLiquidityTransferred
+		wantNotReady  []*liquiditymanager.LiquidityManagerLiquidityTransferred
+		wantReady     []*liquiditymanager.LiquidityManagerLiquidityTransferred
 		wantReadyData [][]byte
 		wantErr       bool
 	}{}
@@ -988,7 +988,7 @@ func Test_l1ToL2Bridge_toPendingTransfers(t *testing.T) {
 	type fields struct {
 		localSelector       models.NetworkSelector
 		remoteSelector      models.NetworkSelector
-		l1Rebalancer        rebalancer.RebalancerInterface
+		l1Rebalancer        liquiditymanager.LiquidityManagerInterface
 		l2RebalancerAddress common.Address
 	}
 	var (
@@ -998,14 +998,14 @@ func Test_l1ToL2Bridge_toPendingTransfers(t *testing.T) {
 		localToken          = models.Address(testutils.NewAddress())
 		remoteToken         = models.Address(testutils.NewAddress())
 		l1RebalancerAddress = testutils.NewAddress()
-		l1Rebalancer, err   = rebalancer.NewRebalancer(l1RebalancerAddress, nil)
+		l1Rebalancer, err   = liquiditymanager.NewLiquidityManager(l1RebalancerAddress, nil)
 	)
 	require.NoError(t, err)
 	type args struct {
 		localToken  models.Address
 		remoteToken models.Address
-		notReady    []*rebalancer.RebalancerLiquidityTransferred
-		ready       []*rebalancer.RebalancerLiquidityTransferred
+		notReady    []*liquiditymanager.LiquidityManagerLiquidityTransferred
+		ready       []*liquiditymanager.LiquidityManagerLiquidityTransferred
 		readyData   [][]byte
 		parsedToLP  map[logKey]logpoller.Log
 	}
@@ -1028,7 +1028,7 @@ func Test_l1ToL2Bridge_toPendingTransfers(t *testing.T) {
 				localToken:  localToken,
 				remoteToken: remoteToken,
 				notReady:    nil,
-				ready: []*rebalancer.RebalancerLiquidityTransferred{
+				ready: []*liquiditymanager.LiquidityManagerLiquidityTransferred{
 					{},
 					{},
 				},
@@ -1051,7 +1051,7 @@ func Test_l1ToL2Bridge_toPendingTransfers(t *testing.T) {
 			args{
 				localToken:  localToken,
 				remoteToken: remoteToken,
-				notReady: []*rebalancer.RebalancerLiquidityTransferred{
+				notReady: []*liquiditymanager.LiquidityManagerLiquidityTransferred{
 					{
 						Amount: big.NewInt(100),
 						Raw: types.Log{
@@ -1060,7 +1060,7 @@ func Test_l1ToL2Bridge_toPendingTransfers(t *testing.T) {
 						},
 					},
 				},
-				ready: []*rebalancer.RebalancerLiquidityTransferred{
+				ready: []*liquiditymanager.LiquidityManagerLiquidityTransferred{
 					{
 						Amount: big.NewInt(300),
 						Raw: types.Log{
@@ -1134,7 +1134,7 @@ func Test_l1ToL2Bridge_getLogs(t *testing.T) {
 	type fields struct {
 		localSelector       models.NetworkSelector
 		remoteSelector      models.NetworkSelector
-		l1Rebalancer        rebalancer.RebalancerInterface
+		l1Rebalancer        liquiditymanager.LiquidityManagerInterface
 		l2RebalancerAddress common.Address
 		l2Gateway           l2_arbitrum_gateway.L2ArbitrumGatewayInterface
 		l1LogPoller         *lpmocks.LogPoller
@@ -1151,7 +1151,7 @@ func Test_l1ToL2Bridge_getLogs(t *testing.T) {
 		l2GatewayAddress    = testutils.NewAddress()
 		l1RebalancerAddress = testutils.NewAddress()
 	)
-	l1Rebalancer, err := rebalancer.NewRebalancer(l1RebalancerAddress, nil)
+	l1Rebalancer, err := liquiditymanager.NewLiquidityManager(l1RebalancerAddress, nil)
 	require.NoError(t, err)
 	l2Gateway, err := l2_arbitrum_gateway.NewL2ArbitrumGateway(l2GatewayAddress, nil)
 	require.NoError(t, err)

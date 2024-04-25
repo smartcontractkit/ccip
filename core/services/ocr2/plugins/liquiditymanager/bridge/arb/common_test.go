@@ -6,15 +6,15 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/l2_arbitrum_gateway"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/rebalancer"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/liquiditymanager/generated/l2_arbitrum_gateway"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/liquiditymanager/generated/liquiditymanager"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/bridge/arb"
 )
 
 func Test_TopicIndexes(t *testing.T) {
 	var (
-		rebalancerABI = abihelpers.MustParseABI(rebalancer.RebalancerMetaData.ABI)
+		rebalancerABI = abihelpers.MustParseABI(liquiditymanager.LiquidityManagerMetaData.ABI)
 		l2GatewayABI  = abihelpers.MustParseABI(l2_arbitrum_gateway.L2ArbitrumGatewayMetaData.ABI)
 	)
 	t.Run("liquidity transferred to chain selector idx", func(t *testing.T) {

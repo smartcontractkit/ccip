@@ -12,9 +12,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	evmclientmocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/client/mocks"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/optimism_l2_output_oracle"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/mocks/mock_optimism_l2_output_oracle"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/mocks/mock_optimism_portal"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/liquiditymanager/generated/optimism_l2_output_oracle"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/liquiditymanager/mocks/mock_optimism_l2_output_oracle"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/liquiditymanager/mocks/mock_optimism_portal"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 )
 

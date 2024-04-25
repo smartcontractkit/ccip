@@ -14,10 +14,10 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	lpmocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/arbitrum_l1_bridge_adapter"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/arbitrum_rollup_core"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/rebalancer"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/mocks/mock_arbitrum_rollup_core"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/liquiditymanager/generated/arbitrum_l1_bridge_adapter"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/liquiditymanager/generated/arbitrum_rollup_core"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/liquiditymanager/generated/liquiditymanager"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/liquiditymanager/mocks/mock_arbitrum_rollup_core"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/models"
 )
@@ -239,8 +239,8 @@ func Test_unpackFinalizationPayload(t *testing.T) {
 
 func Test_filterUnfinalizedTransfers(t *testing.T) {
 	type args struct {
-		sentLogs     []*rebalancer.RebalancerLiquidityTransferred
-		receivedLogs []*rebalancer.RebalancerLiquidityTransferred
+		sentLogs     []*liquiditymanager.LiquidityManagerLiquidityTransferred
+		receivedLogs []*liquiditymanager.LiquidityManagerLiquidityTransferred
 	}
 	var (
 		l1Rebalancer = testutils.NewAddress()
@@ -248,7 +248,7 @@ func Test_filterUnfinalizedTransfers(t *testing.T) {
 	tests := []struct {
 		name    string
 		args    args
-		want    []*rebalancer.RebalancerLiquidityTransferred
+		want    []*liquiditymanager.LiquidityManagerLiquidityTransferred
 		wantErr bool
 	}{
 		{
@@ -263,7 +263,7 @@ func Test_filterUnfinalizedTransfers(t *testing.T) {
 		{
 			"some sent no received",
 			args{
-				sentLogs: []*rebalancer.RebalancerLiquidityTransferred{
+				sentLogs: []*liquiditymanager.LiquidityManagerLiquidityTransferred{
 					{
 						OcrSeqNum:          1,
 						FromChainSelector:  10,
@@ -285,7 +285,7 @@ func Test_filterUnfinalizedTransfers(t *testing.T) {
 				},
 				receivedLogs: nil,
 			},
-			[]*rebalancer.RebalancerLiquidityTransferred{
+			[]*liquiditymanager.LiquidityManagerLiquidityTransferred{
 				{
 					OcrSeqNum:          1,
 					FromChainSelector:  10,
@@ -310,7 +310,7 @@ func Test_filterUnfinalizedTransfers(t *testing.T) {
 		{
 			"some sent some received don't match",
 			args{
-				sentLogs: []*rebalancer.RebalancerLiquidityTransferred{
+				sentLogs: []*liquiditymanager.LiquidityManagerLiquidityTransferred{
 					{
 						OcrSeqNum:          1,
 						FromChainSelector:  10,
@@ -330,7 +330,7 @@ func Test_filterUnfinalizedTransfers(t *testing.T) {
 						BridgeReturnData:   mustPackReturnData(t, big.NewInt(4)),
 					},
 				},
-				receivedLogs: []*rebalancer.RebalancerLiquidityTransferred{
+				receivedLogs: []*liquiditymanager.LiquidityManagerLiquidityTransferred{
 					{
 						OcrSeqNum:          1,
 						FromChainSelector:  10,
@@ -351,7 +351,7 @@ func Test_filterUnfinalizedTransfers(t *testing.T) {
 					},
 				},
 			},
-			[]*rebalancer.RebalancerLiquidityTransferred{
+			[]*liquiditymanager.LiquidityManagerLiquidityTransferred{
 				{
 					OcrSeqNum:          1,
 					FromChainSelector:  10,
@@ -376,7 +376,7 @@ func Test_filterUnfinalizedTransfers(t *testing.T) {
 		{
 			"some sent some received match",
 			args{
-				sentLogs: []*rebalancer.RebalancerLiquidityTransferred{
+				sentLogs: []*liquiditymanager.LiquidityManagerLiquidityTransferred{
 					{
 						OcrSeqNum:          1,
 						FromChainSelector:  10,
@@ -405,7 +405,7 @@ func Test_filterUnfinalizedTransfers(t *testing.T) {
 						BridgeReturnData:   mustPackReturnData(t, big.NewInt(5)),
 					},
 				},
-				receivedLogs: []*rebalancer.RebalancerLiquidityTransferred{
+				receivedLogs: []*liquiditymanager.LiquidityManagerLiquidityTransferred{
 					{
 						OcrSeqNum:          1,
 						FromChainSelector:  10,
@@ -435,7 +435,7 @@ func Test_filterUnfinalizedTransfers(t *testing.T) {
 					},
 				},
 			},
-			[]*rebalancer.RebalancerLiquidityTransferred{
+			[]*liquiditymanager.LiquidityManagerLiquidityTransferred{
 				{
 					OcrSeqNum:          2,
 					FromChainSelector:  10,

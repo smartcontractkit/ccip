@@ -10,7 +10,7 @@ import (
 
 	mock "github.com/stretchr/testify/mock"
 
-	optimism_portal "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/optimism_portal"
+	optimism_portal "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/liquiditymanager/generated/optimism_portal"
 
 	types "github.com/ethereum/go-ethereum/core/types"
 )

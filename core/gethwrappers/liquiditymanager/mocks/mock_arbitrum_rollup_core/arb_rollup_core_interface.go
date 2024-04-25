@@ -5,7 +5,7 @@ package mock_arbitrum_rollup_core
 import (
 	big "math/big"
 
-	arbitrum_rollup_core "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/arbitrum_rollup_core"
+	arbitrum_rollup_core "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/liquiditymanager/generated/arbitrum_rollup_core"
 
 	bind "github.com/ethereum/go-ethereum/accounts/abi/bind"
 

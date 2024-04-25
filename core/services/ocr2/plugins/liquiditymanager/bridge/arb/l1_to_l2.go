@@ -22,13 +22,13 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	ubig "github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils/big"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/abstract_arbitrum_token_gateway"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/arbitrum_gateway_router"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/arbitrum_inbox"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/arbitrum_l1_bridge_adapter"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/arbitrum_token_gateway"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/l2_arbitrum_gateway"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/rebalancer"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/liquiditymanager/generated/abstract_arbitrum_token_gateway"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/liquiditymanager/generated/arbitrum_gateway_router"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/liquiditymanager/generated/arbitrum_inbox"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/liquiditymanager/generated/arbitrum_l1_bridge_adapter"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/liquiditymanager/generated/arbitrum_token_gateway"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/liquiditymanager/generated/l2_arbitrum_gateway"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/liquiditymanager/generated/liquiditymanager"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/abiutils"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/models"
@@ -37,7 +37,7 @@ import (
 type l1ToL2Bridge struct {
 	localSelector       models.NetworkSelector
 	remoteSelector      models.NetworkSelector
-	l1Rebalancer        rebalancer.RebalancerInterface
+	l1Rebalancer        liquiditymanager.LiquidityManagerInterface
 	l2RebalancerAddress common.Address
 	l1BridgeAdapter     arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterInterface
 	l1GatewayRouter     arbitrum_gateway_router.ArbitrumGatewayRouterInterface
@@ -101,7 +101,7 @@ func NewL1ToL2Bridge(
 	}
 
 	// figure out which gateway to watch for the token on L2
-	l1Rebalancer, err := rebalancer.NewRebalancer(l1RebalancerAddress, l1Client)
+	l1Rebalancer, err := liquiditymanager.NewLiquidityManager(l1RebalancerAddress, l1Client)
 	if err != nil {
 		return nil, fmt.Errorf("instantiate rebalancer at %s: %w", l1RebalancerAddress, err)
 	}
@@ -329,7 +329,7 @@ func (l *l1ToL2Bridge) getLogs(ctx context.Context, fromTs time.Time) (sendLogs 
 func (l *l1ToL2Bridge) toPendingTransfers(
 	localToken, remoteToken models.Address,
 	notReady,
-	ready []*rebalancer.RebalancerLiquidityTransferred,
+	ready []*liquiditymanager.LiquidityManagerLiquidityTransferred,
 	readyData [][]byte,
 	parsedToLP map[logKey]logpoller.Log,
 ) ([]models.PendingTransfer, error) {
@@ -390,12 +390,12 @@ func partitionTransfers(
 	localToken models.Address,
 	l1BridgeAdapterAddress common.Address,
 	l2RebalancerAddress common.Address,
-	sentLogs []*rebalancer.RebalancerLiquidityTransferred,
+	sentLogs []*liquiditymanager.LiquidityManagerLiquidityTransferred,
 	depositFinalizedLogs []*l2_arbitrum_gateway.L2ArbitrumGatewayDepositFinalized,
-	receivedLogs []*rebalancer.RebalancerLiquidityTransferred,
+	receivedLogs []*liquiditymanager.LiquidityManagerLiquidityTransferred,
 ) (
 	notReady,
-	ready []*rebalancer.RebalancerLiquidityTransferred,
+	ready []*liquiditymanager.LiquidityManagerLiquidityTransferred,
 	readyData [][]byte,
 	err error,
 ) {
@@ -430,10 +430,10 @@ func partitionTransfers(
 }
 
 func filterExecuted(
-	readyCandidates []*rebalancer.RebalancerLiquidityTransferred,
-	receivedLogs []*rebalancer.RebalancerLiquidityTransferred,
+	readyCandidates []*liquiditymanager.LiquidityManagerLiquidityTransferred,
+	receivedLogs []*liquiditymanager.LiquidityManagerLiquidityTransferred,
 ) (
-	ready []*rebalancer.RebalancerLiquidityTransferred,
+	ready []*liquiditymanager.LiquidityManagerLiquidityTransferred,
 	err error,
 ) {
 	for _, readyCandidate := range readyCandidates {
@@ -449,8 +449,8 @@ func filterExecuted(
 }
 
 func matchingExecutionExists(
-	readyCandidate *rebalancer.RebalancerLiquidityTransferred,
-	receivedLogs []*rebalancer.RebalancerLiquidityTransferred,
+	readyCandidate *liquiditymanager.LiquidityManagerLiquidityTransferred,
+	receivedLogs []*liquiditymanager.LiquidityManagerLiquidityTransferred,
 ) (bool, error) {
 	// decode the send log's bridgeReturnData, which should be the l1 -> l2 tx id when using arbitrum.
 	// The LiquidityTransferred logs on L2 will have the same l1 -> l2 tx id

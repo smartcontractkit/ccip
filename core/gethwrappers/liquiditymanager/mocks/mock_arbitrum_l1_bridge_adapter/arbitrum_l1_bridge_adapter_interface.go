@@ -5,7 +5,7 @@ package mock_arbitrum_l1_bridge_adapter
 import (
 	big "math/big"
 
-	arbitrum_l1_bridge_adapter "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/arbitrum_l1_bridge_adapter"
+	arbitrum_l1_bridge_adapter "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/liquiditymanager/generated/arbitrum_l1_bridge_adapter"
 
 	bind "github.com/ethereum/go-ethereum/accounts/abi/bind"
 

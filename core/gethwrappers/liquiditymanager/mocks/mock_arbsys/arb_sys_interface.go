@@ -5,7 +5,7 @@ package mock_arbsys
 import (
 	big "math/big"
 
-	arbsys "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/arbsys"
+	arbsys "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/liquiditymanager/generated/arbsys"
 
 	bind "github.com/ethereum/go-ethereum/accounts/abi/bind"
 
