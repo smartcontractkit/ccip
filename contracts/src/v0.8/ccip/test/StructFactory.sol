@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.19;
 
-import {IPool} from "../interfaces/pools/IPool.sol";
 import {IPriceRegistry} from "../interfaces/IPriceRegistry.sol";
+import {IPool} from "../interfaces/pools/IPool.sol";
 
 import {ARM} from "../ARM.sol";
 import {Internal} from "../libraries/Internal.sol";
@@ -251,10 +251,10 @@ contract StructFactory {
     address dataFeedAddress,
     uint8 tokenDecimals
   ) internal pure returns (IPriceRegistry.TokenPriceFeedUpdate memory) {
-    return IPriceRegistry.TokenPriceFeedUpdate({sourceToken: sourceToken, feedConfig: IPriceRegistry.TokenPriceFeedConfig({
-      dataFeedAddress: dataFeedAddress,
-      tokenDecimals: tokenDecimals
-    })});
+    return IPriceRegistry.TokenPriceFeedUpdate({
+      sourceToken: sourceToken,
+      feedConfig: IPriceRegistry.TokenPriceFeedConfig({dataFeedAddress: dataFeedAddress, tokenDecimals: tokenDecimals})
+    });
   }
 
   // OffRamp

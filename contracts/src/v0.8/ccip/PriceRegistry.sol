@@ -111,7 +111,12 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator, ITypeAndVersion {
   }
 
   // @inheritdoc IPriceRegistry
-  function getTokenPriceFeedConfig(address token) external view override returns (IPriceRegistry.TokenPriceFeedConfig memory) {
+  function getTokenPriceFeedConfig(address token)
+    external
+    view
+    override
+    returns (IPriceRegistry.TokenPriceFeedConfig memory)
+  {
     return s_usdPriceFeedsPerToken[token];
   }
 
@@ -177,9 +182,11 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator, ITypeAndVersion {
   /// @param priceFeedConfig token data feed configuration with valid data feed address (used to retrieve price & timestamp)
   /// @return value data feed answer value (rebased to s_usdPerToken units)
   /// @return timestamp data feed last updated timestamp
-  function _getTokenPriceFromDataFeed(
-    IPriceRegistry.TokenPriceFeedConfig memory priceFeedConfig
-  ) internal view returns (uint224 value, uint32 timestamp) {
+  function _getTokenPriceFromDataFeed(IPriceRegistry.TokenPriceFeedConfig memory priceFeedConfig)
+    internal
+    view
+    returns (uint224 value, uint32 timestamp)
+  {
     AggregatorV3Interface dataFeedContract = AggregatorV3Interface(priceFeedConfig.dataFeedAddress);
     (
       /* uint80 roundID */

@@ -101,15 +101,13 @@ contract PriceRegistrySetup is TokenSetup {
     assertEq(config1.tokenDecimals, config2.tokenDecimals);
   }
 
-  function _assertTokenPriceFeedConfigUnconfigured(
-      IPriceRegistry.TokenPriceFeedConfig memory config
-  ) internal pure virtual {
+  function _assertTokenPriceFeedConfigUnconfigured(IPriceRegistry.TokenPriceFeedConfig memory config)
+    internal
+    pure
+    virtual
+  {
     _assertTokenPriceFeedConfigEquality(
-      config,
-      IPriceRegistry.TokenPriceFeedConfig({
-        dataFeedAddress: address(0),
-        tokenDecimals: 0
-      })
+      config, IPriceRegistry.TokenPriceFeedConfig({dataFeedAddress: address(0), tokenDecimals: 0})
     );
   }
 }
@@ -136,19 +134,18 @@ contract PriceRegistry_constructor is PriceRegistrySetup {
     assertEq(s_priceRegistry.typeAndVersion(), "PriceRegistry 1.6.0-dev");
 
     _assertTokenPriceFeedConfigEquality(
-      tokenPriceFeedUpdates[0].feedConfig,
-      s_priceRegistry.getTokenPriceFeedConfig(s_sourceTokens[0])
+      tokenPriceFeedUpdates[0].feedConfig, s_priceRegistry.getTokenPriceFeedConfig(s_sourceTokens[0])
     );
 
     _assertTokenPriceFeedConfigEquality(
-      tokenPriceFeedUpdates[1].feedConfig,
-      s_priceRegistry.getTokenPriceFeedConfig(s_sourceTokens[1])
+      tokenPriceFeedUpdates[1].feedConfig, s_priceRegistry.getTokenPriceFeedConfig(s_sourceTokens[1])
     );
   }
 
   function test_InvalidStalenessThreshold_Revert() public {
     vm.expectRevert(PriceRegistry.InvalidStalenessThreshold.selector);
-    s_priceRegistry = new PriceRegistry(new address[](0), new address[](0), 0, new IPriceRegistry.TokenPriceFeedUpdate[](0));
+    s_priceRegistry =
+      new PriceRegistry(new address[](0), new address[](0), 0, new IPriceRegistry.TokenPriceFeedUpdate[](0));
   }
 }
 
@@ -704,8 +701,7 @@ contract PriceRegistry_updateTokenPriceFeeds is PriceRegistrySetup {
     s_priceRegistry.updateTokenPriceFeeds(tokenPriceFeedUpdates);
 
     _assertTokenPriceFeedConfigEquality(
-      s_priceRegistry.getTokenPriceFeedConfig(tokenPriceFeedUpdates[0].sourceToken),
-      tokenPriceFeedUpdates[0].feedConfig
+      s_priceRegistry.getTokenPriceFeedConfig(tokenPriceFeedUpdates[0].sourceToken), tokenPriceFeedUpdates[0].feedConfig
     );
   }
 
@@ -727,12 +723,10 @@ contract PriceRegistry_updateTokenPriceFeeds is PriceRegistrySetup {
     s_priceRegistry.updateTokenPriceFeeds(tokenPriceFeedUpdates);
 
     _assertTokenPriceFeedConfigEquality(
-      s_priceRegistry.getTokenPriceFeedConfig(tokenPriceFeedUpdates[0].sourceToken),
-      tokenPriceFeedUpdates[0].feedConfig
+      s_priceRegistry.getTokenPriceFeedConfig(tokenPriceFeedUpdates[0].sourceToken), tokenPriceFeedUpdates[0].feedConfig
     );
     _assertTokenPriceFeedConfigEquality(
-      s_priceRegistry.getTokenPriceFeedConfig(tokenPriceFeedUpdates[1].sourceToken),
-      tokenPriceFeedUpdates[1].feedConfig
+      s_priceRegistry.getTokenPriceFeedConfig(tokenPriceFeedUpdates[1].sourceToken), tokenPriceFeedUpdates[1].feedConfig
     );
   }
 
@@ -747,8 +741,7 @@ contract PriceRegistry_updateTokenPriceFeeds is PriceRegistrySetup {
 
     s_priceRegistry.updateTokenPriceFeeds(tokenPriceFeedUpdates);
     _assertTokenPriceFeedConfigEquality(
-      s_priceRegistry.getTokenPriceFeedConfig(tokenPriceFeedUpdates[0].sourceToken),
-      tokenPriceFeedUpdates[0].feedConfig
+      s_priceRegistry.getTokenPriceFeedConfig(tokenPriceFeedUpdates[0].sourceToken), tokenPriceFeedUpdates[0].feedConfig
     );
 
     tokenPriceFeedUpdates[0].feedConfig.dataFeedAddress = address(0);
@@ -757,8 +750,7 @@ contract PriceRegistry_updateTokenPriceFeeds is PriceRegistrySetup {
 
     s_priceRegistry.updateTokenPriceFeeds(tokenPriceFeedUpdates);
     _assertTokenPriceFeedConfigEquality(
-      s_priceRegistry.getTokenPriceFeedConfig(tokenPriceFeedUpdates[0].sourceToken),
-      tokenPriceFeedUpdates[0].feedConfig
+      s_priceRegistry.getTokenPriceFeedConfig(tokenPriceFeedUpdates[0].sourceToken), tokenPriceFeedUpdates[0].feedConfig
     );
 
     // Price data should remain after a feed has been set->unset
@@ -776,8 +768,7 @@ contract PriceRegistry_updateTokenPriceFeeds is PriceRegistrySetup {
     s_priceRegistry.updateTokenPriceFeeds(tokenPriceFeedUpdates);
 
     _assertTokenPriceFeedConfigEquality(
-      s_priceRegistry.getTokenPriceFeedConfig(tokenPriceFeedUpdates[0].sourceToken),
-      tokenPriceFeedUpdates[0].feedConfig
+      s_priceRegistry.getTokenPriceFeedConfig(tokenPriceFeedUpdates[0].sourceToken), tokenPriceFeedUpdates[0].feedConfig
     );
   }
 
