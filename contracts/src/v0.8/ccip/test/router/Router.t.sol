@@ -684,7 +684,7 @@ contract Router_setWrappedNative is EVM2EVMOnRampSetup {
 
 /// @notice #getSupportedTokens
 contract Router_getSupportedTokens is EVM2EVMOnRampSetup {
-  function test_GetSupportedTokens_Success() public {
+  function test_GetSupportedTokens_Success() public view {
     address[] memory tokens = s_sourceRouter.getSupportedTokens(DEST_CHAIN_SELECTOR);
 
     address[] memory expected = new address[](4);

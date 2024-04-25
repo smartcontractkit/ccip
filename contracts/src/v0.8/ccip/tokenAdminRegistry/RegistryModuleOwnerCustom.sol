@@ -4,9 +4,9 @@ pragma solidity 0.8.19;
 import {ITypeAndVersion} from "../../shared/interfaces/ITypeAndVersion.sol";
 import {IGetCCIPAdmin} from "../interfaces/IGetCCIPAdmin.sol";
 import {IOwner} from "../interfaces/IOwner.sol";
+import {ITokenAdminRegistry} from "../interfaces/ITokenAdminRegistry.sol";
 
 import {OwnerIsCreator} from "../../shared/access/OwnerIsCreator.sol";
-import {TokenAdminRegistry} from "./TokenAdminRegistry.sol";
 
 contract RegistryModuleOwnerCustom is ITypeAndVersion, OwnerIsCreator {
   error CanOnlySelfRegister(address admin, address token);
@@ -16,10 +16,10 @@ contract RegistryModuleOwnerCustom is ITypeAndVersion, OwnerIsCreator {
   string public constant override typeAndVersion = "RegistryModuleOwnerCustom 1.5.0-dev";
 
   // The TokenAdminRegistry contract
-  TokenAdminRegistry internal s_tokenAdminRegistry;
+  ITokenAdminRegistry internal s_tokenAdminRegistry;
 
   constructor(address tokenAdminRegistry) {
-    s_tokenAdminRegistry = TokenAdminRegistry(tokenAdminRegistry);
+    s_tokenAdminRegistry = ITokenAdminRegistry(tokenAdminRegistry);
   }
 
   /// @notice Registers the admin of the token using the `getCCIPAdmin` method.

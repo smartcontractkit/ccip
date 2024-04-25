@@ -107,6 +107,11 @@ contract TokenAdminRegistry_getAllConfiguredTokens is TokenAdminRegistrySetup {
       }
     }
   }
+
+  function test_getAllConfiguredTokens_outOfBounds_Success() public view {
+    address[] memory tokens = s_tokenAdminRegistry.getAllConfiguredTokens(type(uint64).max, 10);
+    assertEq(tokens.length, 0);
+  }
 }
 
 contract TokenAdminRegistry_getPermissionedTokens is TokenAdminRegistrySetup {
@@ -267,20 +272,6 @@ contract TokenAdminRegistry_registerAdministrator is TokenAdminRegistrySetup {
     assertTrue(s_tokenAdminRegistry.isAdministrator(newToken, newOwner));
   }
 
-  mapping(address token => address admin) internal s_AdminByToken;
-
-  function test_Fuzz_registerAdministrator_Success(address[50] memory tokens, address[50] memory admins) public {
-    TokenAdminRegistry cleanTokenAdminRegistry = new TokenAdminRegistry();
-    for (uint256 i = 0; i < tokens.length; i++) {
-      cleanTokenAdminRegistry.registerAdministratorPermissioned(tokens[i], admins[i]);
-      s_AdminByToken[tokens[i]] = admins[i];
-    }
-
-    for (uint256 i = 0; i < tokens.length; i++) {
-      assertTrue(cleanTokenAdminRegistry.isAdministrator(tokens[i], s_AdminByToken[tokens[i]]));
-    }
-  }
-
   function test_registerAdministrator__disableReRegistration_Revert() public {
     vm.startPrank(s_registryModule);
     address newOwner = makeAddr("newOwner");
@@ -304,6 +295,81 @@ contract TokenAdminRegistry_registerAdministrator is TokenAdminRegistrySetup {
 
     vm.expectRevert(abi.encodeWithSelector(TokenAdminRegistry.OnlyRegistryModule.selector, address(this)));
     s_tokenAdminRegistry.registerAdministrator(newToken, OWNER);
+  }
+}
+
+contract TokenAdminRegistry_registerAdministratorPermissioned is TokenAdminRegistrySetup {
+  function test_registerAdministratorPermissioned_Success() public {
+    address newOwner = makeAddr("newOwner");
+    address newToken = makeAddr("newToken");
+
+    vm.expectEmit();
+    emit AdministratorRegistered(newToken, newOwner);
+
+    s_tokenAdminRegistry.registerAdministratorPermissioned(newToken, newOwner);
+
+    assertTrue(s_tokenAdminRegistry.isAdministrator(newToken, newOwner));
+  }
+
+  mapping(address token => address admin) internal s_AdminByToken;
+
+  function test_Fuzz_registerAdministratorPermissioned_Success(
+    address[50] memory tokens,
+    address[50] memory admins
+  ) public {
+    TokenAdminRegistry cleanTokenAdminRegistry = new TokenAdminRegistry();
+    for (uint256 i = 0; i < tokens.length; i++) {
+      cleanTokenAdminRegistry.registerAdministratorPermissioned(tokens[i], admins[i]);
+      s_AdminByToken[tokens[i]] = admins[i];
+    }
+
+    for (uint256 i = 0; i < tokens.length; i++) {
+      assertTrue(cleanTokenAdminRegistry.isAdministrator(tokens[i], s_AdminByToken[tokens[i]]));
+    }
+  }
+
+  function test_registerAdministratorPermissioned_OnlyOwner_Revert() public {
+    address newOwner = makeAddr("newOwner");
+    address newToken = makeAddr("newToken");
+    vm.stopPrank();
+
+    vm.expectRevert("Only callable by owner");
+    s_tokenAdminRegistry.registerAdministratorPermissioned(newToken, newOwner);
+  }
+}
+
+contract TokenAdminRegistry_removeAdministratorPermissioned is TokenAdminRegistrySetup {
+  event RemovedAdministrator(address token);
+
+  function test_removeAdministratorPermissioned_Success() public {
+    address newOwner = makeAddr("newOwner");
+    address newToken = makeAddr("newToken");
+
+    s_tokenAdminRegistry.registerAdministratorPermissioned(newToken, newOwner);
+
+    assertTrue(s_tokenAdminRegistry.isAdministrator(newToken, newOwner));
+
+    vm.expectEmit();
+    emit RemovedAdministrator(newToken);
+
+    s_tokenAdminRegistry.removeAdministratorPermissioned(newToken);
+
+    assertFalse(s_tokenAdminRegistry.isAdministrator(newToken, newOwner));
+
+    TokenAdminRegistry.TokenConfig memory config = s_tokenAdminRegistry.getTokenConfig(newToken);
+    assertEq(config.administrator, address(0));
+    assertEq(config.pendingAdministrator, address(0));
+    assertTrue(config.disableReRegistration);
+    assertTrue(config.isRegistered);
+    assertEq(config.tokenPool, address(0));
+  }
+
+  function test_removeAdministratorPermissioned_OnlyOwner_Revert() public {
+    address newToken = makeAddr("newToken");
+    vm.stopPrank();
+
+    vm.expectRevert("Only callable by owner");
+    s_tokenAdminRegistry.removeAdministratorPermissioned(newToken);
   }
 }
 
