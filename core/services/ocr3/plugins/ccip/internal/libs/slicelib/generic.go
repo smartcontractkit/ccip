@@ -13,3 +13,25 @@ func GroupBy[T any, K comparable](items []T, prop func(T) K) ([]K, map[K][]T) {
 	}
 	return groups, grouped
 }
+
+// CountUnique counts the unique items of the provided slice.
+func CountUnique[T comparable](items []T) int {
+	if len(items) == 0 {
+		return 0
+	}
+
+	m := make(map[T]struct{})
+	for _, item := range items {
+		m[item] = struct{}{}
+	}
+	return len(m)
+}
+
+// Flatten flattens a slice of slices into a single slice.
+func Flatten[T any](slices [][]T) []T {
+	var res []T
+	for _, s := range slices {
+		res = append(res, s...)
+	}
+	return res
+}

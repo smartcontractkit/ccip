@@ -2,8 +2,6 @@ package model
 
 import "time"
 
-type HomeChainConfig struct{}
-
 type CommitPluginConfig struct {
 	// Writer indicates that the node can contribute by sending reports to the destination chain.
 	// Being a Writer guarantees that the node can also read from the destination chain.
