@@ -7,6 +7,7 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr3/plugins/ccip/internal/model"
 )
 
 // PluginFactoryConstructor implements common OCR3ReportingPluginClient and is used for initializing a plugin factory
@@ -41,7 +42,7 @@ func NewPluginFactory() *PluginFactory {
 }
 
 func (p PluginFactory) NewReportingPlugin(config ocr3types.ReportingPluginConfig) (ocr3types.ReportingPlugin[[]byte], ocr3types.ReportingPluginInfo, error) {
-	return NewPlugin(), ocr3types.ReportingPluginInfo{}, nil
+	return NewPlugin(nil, "", model.CommitPluginConfig{}, nil), ocr3types.ReportingPluginInfo{}, nil
 }
 
 func (p PluginFactory) Name() string {
