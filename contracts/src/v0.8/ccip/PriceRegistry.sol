@@ -307,13 +307,6 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator, ITypeAndVersion {
 
       s_usdDataFeedsPerToken[sourceToken] = dataFeedAddress;
       emit DataFeedPerTokenUpdated(sourceToken, dataFeedAddress);
-
-      Internal.TimestampedPackedUint224 storage currentPrice = s_usdPerToken[sourceToken];
-      if (currentPrice.value != 0) {
-        // Gas refunds for clearing token price
-        delete s_usdPerToken[sourceToken];
-        emit UsdPerTokenUpdated(sourceToken, 0, block.timestamp);
-      }
     }
   }
 

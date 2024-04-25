@@ -649,7 +649,6 @@ contract PriceRegistry_getTokenAndGasPrices is PriceRegistrySetup {
 
 contract PriceRegistry_updateTokenPriceFeeds is PriceRegistrySetup {
   event DataFeedPerTokenUpdated(address indexed token, address dataFeedAddress);
-  event UsdPerTokenUpdated(address indexed token, uint256 value, uint256 timestamp);
 
   function test_ZeroFeeds_Success() public {
     Vm.Log[] memory logEntries = vm.getRecordedLogs();
@@ -711,9 +710,6 @@ contract PriceRegistry_updateTokenPriceFeeds is PriceRegistrySetup {
     tokenPriceFeedUpdates[0] =
       getSingleTokenPriceFeedUpdateStruct(s_sourceTokens[0], s_dataFeedByToken[s_sourceTokens[0]]);
 
-    vm.expectEmit();
-    emit UsdPerTokenUpdated(s_sourceTokens[0], 0, block.timestamp);
-
     s_priceRegistry.updateTokenPriceFeeds(tokenPriceFeedUpdates);
     assertEq(
       s_priceRegistry.getTokenPriceFeed(tokenPriceFeedUpdates[0].sourceToken), tokenPriceFeedUpdates[0].dataFeedAddress
@@ -726,9 +722,10 @@ contract PriceRegistry_updateTokenPriceFeeds is PriceRegistrySetup {
     s_priceRegistry.updateTokenPriceFeeds(tokenPriceFeedUpdates);
     assertEq(s_priceRegistry.getTokenPriceFeed(tokenPriceFeedUpdates[0].sourceToken), address(0));
 
+    // Price data should remain after a feed has been set->unset
     Internal.TimestampedPackedUint224 memory priceQueryPostUnsetFeed = s_priceRegistry.getTokenPrice(s_sourceTokens[0]);
-    assertEq(priceQueryPostUnsetFeed.value, 0);
-    assertEq(priceQueryPostUnsetFeed.timestamp, 0);
+    assertEq(priceQueryPostUnsetFeed.value, priceQueryInitial.value);
+    assertEq(priceQueryPostUnsetFeed.timestamp, priceQueryInitial.timestamp);
   }
 
   function test_SingleFeedUpdateSkipTokenPriceUnset_Success() public {
