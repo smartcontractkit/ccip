@@ -11,6 +11,14 @@ type SeqNum uint64
 
 type SeqNumRange [2]SeqNum
 
+func (s SeqNumRange) Start() SeqNum {
+	return s[0]
+}
+
+func (s SeqNumRange) End() SeqNum {
+	return s[1]
+}
+
 func (s SeqNumRange) String() string {
 	return fmt.Sprintf("[%d -> %d]", s[0], s[1])
 }

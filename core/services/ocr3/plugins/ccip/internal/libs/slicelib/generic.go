@@ -16,10 +16,6 @@ func GroupBy[T any, K comparable](items []T, prop func(T) K) ([]K, map[K][]T) {
 
 // CountUnique counts the unique items of the provided slice.
 func CountUnique[T comparable](items []T) int {
-	if len(items) == 0 {
-		return 0
-	}
-
 	m := make(map[T]struct{})
 	for _, item := range items {
 		m[item] = struct{}{}

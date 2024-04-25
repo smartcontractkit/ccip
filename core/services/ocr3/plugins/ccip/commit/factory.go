@@ -3,11 +3,11 @@ package commit
 import (
 	"context"
 
+	"github.com/smartcontractkit/ccipocr3/internal/model"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"google.golang.org/grpc"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr3/plugins/ccip/internal/model"
 )
 
 // PluginFactoryConstructor implements common OCR3ReportingPluginClient and is used for initializing a plugin factory
@@ -42,7 +42,7 @@ func NewPluginFactory() *PluginFactory {
 }
 
 func (p PluginFactory) NewReportingPlugin(config ocr3types.ReportingPluginConfig) (ocr3types.ReportingPlugin[[]byte], ocr3types.ReportingPluginInfo, error) {
-	return NewPlugin(nil, "", model.CommitPluginConfig{}, nil), ocr3types.ReportingPluginInfo{}, nil
+	return NewPlugin(context.TODO(), "todo", model.CommitPluginConfig{}, nil), ocr3types.ReportingPluginInfo{}, nil
 }
 
 func (p PluginFactory) Name() string {

@@ -8,11 +8,10 @@ import (
 	"math/rand"
 
 	"github.com/pkg/errors"
+	"github.com/smartcontractkit/ccipocr3/internal/libs/slicelib"
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
-
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr3/plugins/ccip/internal/libs/slicelib"
 )
 
 var (
@@ -25,6 +24,9 @@ var (
 	ErrShouldTransmitAcceptedReport = errors.New("error in should transmit accepted report phase")
 )
 
+// OCR3Runner is a simple runner for OCR3.
+//
+// TODO: move to a shared repository.
 type OCR3Runner[RI any] struct {
 	nodes           []ocr3types.ReportingPlugin[RI]
 	round           int

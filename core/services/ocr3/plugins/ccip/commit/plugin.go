@@ -5,13 +5,13 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/smartcontractkit/ccipocr3/internal/libs/slicelib"
+	"github.com/smartcontractkit/ccipocr3/internal/model"
+	"github.com/smartcontractkit/ccipocr3/internal/reader"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr3/plugins/ccip/internal/libs/slicelib"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr3/plugins/ccip/internal/model"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr3/plugins/ccip/internal/reader"
 )
 
 // Plugin implements the main ocr3 plugin logic.
@@ -75,9 +75,7 @@ func (p *Plugin) Outcome(outctx ocr3types.OutcomeContext, query types.Query, aos
 			p.lggr.Errorw("decode commit plugin observation", "err", err)
 			return ocr3types.Outcome{}, err
 		}
-		for _, msg := range parsedObservation.NewMsgs {
-			msgsFromObservations = append(msgsFromObservations, msg)
-		}
+		msgsFromObservations = append(msgsFromObservations, parsedObservation.NewMsgs...)
 	}
 
 	sourceChains, groupedMsgs := slicelib.GroupBy(

@@ -3,7 +3,7 @@ package codec
 import (
 	"context"
 
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr3/plugins/ccip/internal/model"
+	"github.com/smartcontractkit/ccipocr3/internal/model"
 )
 
 type Commit interface {

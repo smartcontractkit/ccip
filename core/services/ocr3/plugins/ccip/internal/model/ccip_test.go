@@ -59,3 +59,13 @@ func TestCCIPMsg_String(t *testing.T) {
 		})
 	}
 }
+
+func TestSeqNumRange_StartEnd(t *testing.T) {
+	s := SeqNumRange{1, 2}
+	assert.Equal(t, SeqNum(1), s.Start())
+	assert.Equal(t, SeqNum(2), s.End())
+
+	s = SeqNumRange{}
+	assert.Equal(t, SeqNum(0), s.Start())
+	assert.Equal(t, SeqNum(0), s.End())
+}
