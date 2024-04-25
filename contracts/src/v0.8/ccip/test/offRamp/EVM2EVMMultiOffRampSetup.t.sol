@@ -65,7 +65,7 @@ contract EVM2EVMMultiOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSet
       s_valid_signers,
       s_valid_transmitters,
       s_f,
-      abi.encode(generateDynamicOffRampConfig(address(router), address(s_priceRegistry))),
+      abi.encode(generateDynamicMultiOffRampConfig(address(router), address(s_priceRegistry))),
       s_offchainConfigVersion,
       abi.encode("")
     );
