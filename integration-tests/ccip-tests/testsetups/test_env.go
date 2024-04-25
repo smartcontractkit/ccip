@@ -455,7 +455,7 @@ func DeployEnvironments(
 	for i, network := range selectedNetworks {
 		if testInputs.EnvInput.Network.AnvilConfigs != nil {
 			// if forkconfig is specified for a network addhelm for anvil
-			if anvilConfig, exists := testInputs.EnvInput.Network.AnvilConfigs[network.Name]; exists {
+			if anvilConfig, exists := testInputs.EnvInput.Network.AnvilConfigs[strings.ToUpper(network.Name)]; exists {
 				charts = append(charts, foundry.ChartName)
 				testEnvironment.
 					AddHelm(foundry.New(&foundry.Props{
