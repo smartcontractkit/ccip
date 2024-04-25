@@ -71,7 +71,7 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator, ITypeAndVersion {
     address[] memory priceUpdaters,
     address[] memory feeTokens,
     uint32 stalenessThreshold,
-    Internal.TokenPriceFeedUpdate[] memory tokenPriceFeeds
+    IPriceRegistry.TokenPriceFeedUpdate[] memory tokenPriceFeeds
   ) {
     _applyPriceUpdatersUpdates(priceUpdaters, new address[](0));
     _applyFeeTokensUpdates(feeTokens, new address[](0));
@@ -285,7 +285,7 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator, ITypeAndVersion {
   }
 
   // @inheritdoc IPriceRegistry
-  function updateTokenPriceFeeds(Internal.TokenPriceFeedUpdate[] memory tokenPriceFeedUpdates)
+  function updateTokenPriceFeeds(IPriceRegistry.TokenPriceFeedUpdate[] memory tokenPriceFeedUpdates)
     external
     override
     onlyOwner
@@ -295,9 +295,9 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator, ITypeAndVersion {
 
   /// @notice Updates the USD token price feeds for given tokens
   /// @param tokenPriceFeedUpdates Token price feed updates to apply
-  function _updateTokenPriceFeeds(Internal.TokenPriceFeedUpdate[] memory tokenPriceFeedUpdates) private {
+  function _updateTokenPriceFeeds(IPriceRegistry.TokenPriceFeedUpdate[] memory tokenPriceFeedUpdates) private {
     for (uint256 i; i < tokenPriceFeedUpdates.length; ++i) {
-      Internal.TokenPriceFeedUpdate memory update = tokenPriceFeedUpdates[i];
+      IPriceRegistry.TokenPriceFeedUpdate memory update = tokenPriceFeedUpdates[i];
       address sourceToken = update.sourceToken;
       address dataFeedAddress = update.dataFeedAddress;
 

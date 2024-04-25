@@ -4,13 +4,19 @@ pragma solidity ^0.8.0;
 import {Internal} from "../libraries/Internal.sol";
 
 interface IPriceRegistry {
+  /// @notice Token price data feed update for a token
+  struct TokenPriceFeedUpdate {
+    address sourceToken; // Source token
+    address dataFeedAddress; // AggregatorV3Interface contract (0 - unset feed)
+  }
+
   /// @notice Update the price for given tokens and gas prices for given chains.
   /// @param priceUpdates The price updates to apply.
   function updatePrices(Internal.PriceUpdates memory priceUpdates) external;
 
   /// @notice Updates the USD token price feeds for given tokens
   /// @param tokenPriceFeedUpdates Token price feed updates to apply
-  function updateTokenPriceFeeds(Internal.TokenPriceFeedUpdate[] memory tokenPriceFeedUpdates) external;
+  function updateTokenPriceFeeds(TokenPriceFeedUpdate[] memory tokenPriceFeedUpdates) external;
 
   /// @notice Get the `tokenPrice` for a given token.
   /// @param token The token to get the price for.
