@@ -3,7 +3,6 @@ module github.com/smartcontractkit/ccipocr3
 go 1.21.7
 
 require (
-	github.com/pkg/errors v0.9.1
 	github.com/smartcontractkit/chain-selectors v1.0.14
 	github.com/smartcontractkit/chainlink-common v0.1.7-0.20240410191726-b8a7349cd5d3
 	github.com/smartcontractkit/libocr v0.0.0-20240326191951-2bbe9382d052
@@ -23,6 +22,7 @@ require (
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/mr-tron/base58 v1.2.0 // indirect
 	github.com/pelletier/go-toml/v2 v2.1.1 // indirect
+	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/prometheus/client_golang v1.17.0 // indirect
 	github.com/prometheus/client_model v0.5.0 // indirect
