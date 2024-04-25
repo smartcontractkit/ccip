@@ -1,4 +1,4 @@
-package rebalancer
+package liquiditymanager
 
 import (
 	"encoding/json"

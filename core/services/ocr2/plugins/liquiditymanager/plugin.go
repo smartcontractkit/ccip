@@ -1,4 +1,4 @@
-package rebalancer
+package liquiditymanager
 
 import (
 	"context"
@@ -16,7 +16,7 @@ import (
 	ubig "github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils/big"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/bridge"
-	liquiditymanager "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/chain/evm"
+	evmliquiditymanager "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/chain/evm"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/discoverer"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/graph"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/inflight"
@@ -30,7 +30,7 @@ type Plugin struct {
 	rootNetwork             models.NetworkSelector
 	rootAddress             models.Address
 	closePluginTimeout      time.Duration
-	liquidityManagerFactory liquiditymanager.Factory
+	liquidityManagerFactory evmliquiditymanager.Factory
 	discovererFactory       discoverer.Factory
 	bridgeFactory           bridge.Factory
 	mu                      sync.RWMutex
@@ -38,7 +38,7 @@ type Plugin struct {
 	liquidityRebalancer     liquidityrebalancer.Rebalancer
 	inflight                inflight.Container
 	lggr                    logger.Logger
-	reportCodec             liquiditymanager.OnchainReportCodec
+	reportCodec             evmliquiditymanager.OnchainReportCodec
 }
 
 func NewPlugin(
@@ -46,11 +46,11 @@ func NewPlugin(
 	closePluginTimeout time.Duration,
 	rootNetwork models.NetworkSelector,
 	rootAddress models.Address,
-	liquidityManagerFactory liquiditymanager.Factory,
+	liquidityManagerFactory evmliquiditymanager.Factory,
 	discovererFactory discoverer.Factory,
 	bridgeFactory bridge.Factory,
 	liquidityRebalancer liquidityrebalancer.Rebalancer,
-	reportCodec liquiditymanager.OnchainReportCodec,
+	reportCodec evmliquiditymanager.OnchainReportCodec,
 	lggr logger.Logger,
 ) *Plugin {
 	return &Plugin{
