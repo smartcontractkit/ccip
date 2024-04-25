@@ -1,18 +1,18 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.19;
 
-import {IRebalancer} from "../interfaces/IRebalancer.sol";
+import {ILiquidityManager} from "../interfaces/ILiquidityManager.sol";
 import {IBridgeAdapter} from "../interfaces/IBridge.sol";
 
 import {LockReleaseTokenPool} from "../../ccip/pools/LockReleaseTokenPool.sol";
-import {Rebalancer} from "../Rebalancer.sol";
+import {LiquidityManager} from "../LiquidityManager.sol";
 import {MockL1BridgeAdapter} from "./mocks/MockBridgeAdapter.sol";
-import {RebalancerBaseTest} from "./RebalancerBaseTest.t.sol";
+import {LiquidityManagerBaseTest} from "./LiquidityManagerBaseTest.t.sol";
 import {RebalancerHelper} from "./helpers/RebalancerHelper.sol";
 
 import {IERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 
-contract RebalancerSetup is RebalancerBaseTest {
+contract LiquidityManagerSetup is LiquidityManagerBaseTest {
   event FinalizationStepCompleted(
     uint64 indexed ocrSeqNum,
     uint64 indexed remoteChainSelector,
@@ -45,13 +45,13 @@ contract RebalancerSetup is RebalancerBaseTest {
   LockReleaseTokenPool internal s_lockReleaseTokenPool;
   MockL1BridgeAdapter internal s_bridgeAdapter;
 
-  // Rebalancer that rebalances weth.
+  // LiquidityManager that rebalances weth.
   RebalancerHelper internal s_wethRebalancer;
   LockReleaseTokenPool internal s_wethLockReleaseTokenPool;
   MockL1BridgeAdapter internal s_wethBridgeAdapter;
 
   function setUp() public override {
-    RebalancerBaseTest.setUp();
+    LiquidityManagerBaseTest.setUp();
 
     s_bridgeAdapter = new MockL1BridgeAdapter(s_l1Token, false);
     s_lockReleaseTokenPool = new LockReleaseTokenPool(s_l1Token, new address[](0), address(1), true, address(123));
@@ -78,7 +78,7 @@ contract RebalancerSetup is RebalancerBaseTest {
   }
 }
 
-contract Rebalancer_addLiquidity is RebalancerSetup {
+contract Rebalancer_addLiquidity is LiquidityManagerSetup {
   function test_addLiquiditySuccess() external {
     address caller = STRANGER;
     vm.startPrank(caller);
@@ -97,7 +97,7 @@ contract Rebalancer_addLiquidity is RebalancerSetup {
   }
 }
 
-contract Rebalancer_removeLiquidity is RebalancerSetup {
+contract Rebalancer_removeLiquidity is LiquidityManagerSetup {
   function test_removeLiquiditySuccess() external {
     uint256 amount = 12345679;
     deal(address(s_l1Token), address(s_lockReleaseTokenPool), amount);
@@ -116,7 +116,7 @@ contract Rebalancer_removeLiquidity is RebalancerSetup {
 
     deal(address(s_l1Token), address(s_lockReleaseTokenPool), balance);
 
-    vm.expectRevert(abi.encodeWithSelector(Rebalancer.InsufficientLiquidity.selector, requested, balance));
+    vm.expectRevert(abi.encodeWithSelector(LiquidityManager.InsufficientLiquidity.selector, requested, balance));
 
     s_rebalancer.removeLiquidity(requested);
   }
@@ -130,27 +130,27 @@ contract Rebalancer_removeLiquidity is RebalancerSetup {
   }
 }
 
-contract Rebalancer__report is RebalancerSetup {
+contract Rebalancer__report is LiquidityManagerSetup {
   function test_EmptyReportReverts() external {
-    IRebalancer.LiquidityInstructions memory instructions = IRebalancer.LiquidityInstructions({
-      sendLiquidityParams: new IRebalancer.SendLiquidityParams[](0),
-      receiveLiquidityParams: new IRebalancer.ReceiveLiquidityParams[](0)
+    ILiquidityManager.LiquidityInstructions memory instructions = ILiquidityManager.LiquidityInstructions({
+      sendLiquidityParams: new ILiquidityManager.SendLiquidityParams[](0),
+      receiveLiquidityParams: new ILiquidityManager.ReceiveLiquidityParams[](0)
     });
 
-    vm.expectRevert(Rebalancer.EmptyReport.selector);
+    vm.expectRevert(LiquidityManager.EmptyReport.selector);
 
     s_rebalancer.report(abi.encode(instructions), 123);
   }
 }
 
-contract Rebalancer_rebalanceLiquidity is RebalancerSetup {
+contract Rebalancer_rebalanceLiquidity is LiquidityManagerSetup {
   uint256 internal constant AMOUNT = 12345679;
 
   function test_rebalanceLiquiditySuccess() external {
     deal(address(s_l1Token), address(s_lockReleaseTokenPool), AMOUNT);
 
-    Rebalancer.CrossChainRebalancerArgs[] memory args = new Rebalancer.CrossChainRebalancerArgs[](1);
-    args[0] = IRebalancer.CrossChainRebalancerArgs({
+    LiquidityManager.CrossChainRebalancerArgs[] memory args = new LiquidityManager.CrossChainRebalancerArgs[](1);
+    args[0] = ILiquidityManager.CrossChainRebalancerArgs({
       remoteRebalancer: address(s_rebalancer),
       localBridge: s_bridgeAdapter,
       remoteToken: address(s_l2Token),
@@ -197,10 +197,10 @@ contract Rebalancer_rebalanceLiquidity is RebalancerSetup {
     s_rebalancer = new RebalancerHelper(s_l1Token, i_localChainSelector, s_bridgeAdapter, 0);
 
     MockL1BridgeAdapter mockRemoteBridgeAdapter = new MockL1BridgeAdapter(s_l1Token, false);
-    Rebalancer mockRemoteRebalancer = new Rebalancer(s_l1Token, i_remoteChainSelector, mockRemoteBridgeAdapter, 0);
+    LiquidityManager mockRemoteRebalancer = new LiquidityManager(s_l1Token, i_remoteChainSelector, mockRemoteBridgeAdapter, 0);
 
-    Rebalancer.CrossChainRebalancerArgs[] memory args = new Rebalancer.CrossChainRebalancerArgs[](1);
-    args[0] = IRebalancer.CrossChainRebalancerArgs({
+    LiquidityManager.CrossChainRebalancerArgs[] memory args = new LiquidityManager.CrossChainRebalancerArgs[](1);
+    args[0] = ILiquidityManager.CrossChainRebalancerArgs({
       remoteRebalancer: address(mockRemoteRebalancer),
       localBridge: mockRemoteBridgeAdapter,
       remoteToken: address(s_l1Token),
@@ -210,7 +210,7 @@ contract Rebalancer_rebalanceLiquidity is RebalancerSetup {
 
     s_rebalancer.setCrossChainRebalancers(args);
 
-    args[0] = IRebalancer.CrossChainRebalancerArgs({
+    args[0] = ILiquidityManager.CrossChainRebalancerArgs({
       remoteRebalancer: address(s_rebalancer),
       localBridge: s_bridgeAdapter,
       remoteToken: address(s_l1Token),
@@ -257,14 +257,14 @@ contract Rebalancer_rebalanceLiquidity is RebalancerSetup {
       true,
       address(123)
     );
-    Rebalancer remoteRebalancer = new Rebalancer(s_l2Token, i_remoteChainSelector, remotePool, 0);
+    LiquidityManager remoteRebalancer = new LiquidityManager(s_l2Token, i_remoteChainSelector, remotePool, 0);
 
     // set rebalancer role on the pool.
     remotePool.setRebalancer(address(remoteRebalancer));
 
     // set up the cross chain rebalancer on "L1".
-    Rebalancer.CrossChainRebalancerArgs[] memory args = new Rebalancer.CrossChainRebalancerArgs[](1);
-    args[0] = IRebalancer.CrossChainRebalancerArgs({
+    LiquidityManager.CrossChainRebalancerArgs[] memory args = new LiquidityManager.CrossChainRebalancerArgs[](1);
+    args[0] = ILiquidityManager.CrossChainRebalancerArgs({
       remoteRebalancer: address(remoteRebalancer),
       localBridge: s_bridgeAdapter,
       remoteToken: address(s_l2Token),
@@ -275,7 +275,7 @@ contract Rebalancer_rebalanceLiquidity is RebalancerSetup {
     s_rebalancer.setCrossChainRebalancers(args);
 
     // set up the cross chain rebalancer on "L2".
-    args[0] = IRebalancer.CrossChainRebalancerArgs({
+    args[0] = ILiquidityManager.CrossChainRebalancerArgs({
       remoteRebalancer: address(s_rebalancer),
       localBridge: remoteBridgeAdapter,
       remoteToken: address(s_l1Token),
@@ -377,14 +377,14 @@ contract Rebalancer_rebalanceLiquidity is RebalancerSetup {
       true,
       address(123)
     );
-    Rebalancer remoteRebalancer = new Rebalancer(s_l2Token, i_remoteChainSelector, remotePool, 0);
+    LiquidityManager remoteRebalancer = new LiquidityManager(s_l2Token, i_remoteChainSelector, remotePool, 0);
 
     // set rebalancer role on the pool.
     remotePool.setRebalancer(address(remoteRebalancer));
 
     // set up the cross chain rebalancer on "L1".
-    Rebalancer.CrossChainRebalancerArgs[] memory args = new Rebalancer.CrossChainRebalancerArgs[](1);
-    args[0] = IRebalancer.CrossChainRebalancerArgs({
+    LiquidityManager.CrossChainRebalancerArgs[] memory args = new LiquidityManager.CrossChainRebalancerArgs[](1);
+    args[0] = ILiquidityManager.CrossChainRebalancerArgs({
       remoteRebalancer: address(remoteRebalancer),
       localBridge: s_bridgeAdapter,
       remoteToken: address(s_l2Token),
@@ -395,7 +395,7 @@ contract Rebalancer_rebalanceLiquidity is RebalancerSetup {
     s_rebalancer.setCrossChainRebalancers(args);
 
     // set up the cross chain rebalancer on "L2".
-    args[0] = IRebalancer.CrossChainRebalancerArgs({
+    args[0] = ILiquidityManager.CrossChainRebalancerArgs({
       remoteRebalancer: address(s_rebalancer),
       localBridge: remoteBridgeAdapter,
       remoteToken: address(s_l1Token),
@@ -497,14 +497,14 @@ contract Rebalancer_rebalanceLiquidity is RebalancerSetup {
       true,
       address(123)
     );
-    Rebalancer remoteRebalancer = new Rebalancer(IERC20(address(s_l2Weth)), i_remoteChainSelector, remotePool, 0);
+    LiquidityManager remoteRebalancer = new LiquidityManager(IERC20(address(s_l2Weth)), i_remoteChainSelector, remotePool, 0);
 
     // set rebalancer role on the pool.
     remotePool.setRebalancer(address(remoteRebalancer));
 
     // set up the cross chain rebalancer on "L1".
-    Rebalancer.CrossChainRebalancerArgs[] memory args = new Rebalancer.CrossChainRebalancerArgs[](1);
-    args[0] = IRebalancer.CrossChainRebalancerArgs({
+    LiquidityManager.CrossChainRebalancerArgs[] memory args = new LiquidityManager.CrossChainRebalancerArgs[](1);
+    args[0] = ILiquidityManager.CrossChainRebalancerArgs({
       remoteRebalancer: address(remoteRebalancer),
       localBridge: s_wethBridgeAdapter,
       remoteToken: address(s_l2Weth),
@@ -515,7 +515,7 @@ contract Rebalancer_rebalanceLiquidity is RebalancerSetup {
     s_wethRebalancer.setCrossChainRebalancers(args);
 
     // set up the cross chain rebalancer on "L2".
-    args[0] = IRebalancer.CrossChainRebalancerArgs({
+    args[0] = ILiquidityManager.CrossChainRebalancerArgs({
       remoteRebalancer: address(s_wethRebalancer),
       localBridge: remoteBridgeAdapter,
       remoteToken: address(s_l1Weth),
@@ -621,7 +621,7 @@ contract Rebalancer_rebalanceLiquidity is RebalancerSetup {
   // Reverts
 
   function test_InsufficientLiquidityReverts() external {
-    vm.expectRevert(abi.encodeWithSelector(Rebalancer.InsufficientLiquidity.selector, AMOUNT, 0));
+    vm.expectRevert(abi.encodeWithSelector(LiquidityManager.InsufficientLiquidity.selector, AMOUNT, 0));
 
     s_rebalancer.rebalanceLiquidity(0, AMOUNT, 0, bytes(""));
   }
@@ -629,13 +629,13 @@ contract Rebalancer_rebalanceLiquidity is RebalancerSetup {
   function test_InvalidRemoteChainReverts() external {
     deal(address(s_l1Token), address(s_lockReleaseTokenPool), AMOUNT);
 
-    vm.expectRevert(abi.encodeWithSelector(Rebalancer.InvalidRemoteChain.selector, i_remoteChainSelector));
+    vm.expectRevert(abi.encodeWithSelector(LiquidityManager.InvalidRemoteChain.selector, i_remoteChainSelector));
 
     s_rebalancer.rebalanceLiquidity(i_remoteChainSelector, AMOUNT, 0, bytes(""));
   }
 }
 
-contract Rebalancer_setCrossChainRebalancer is RebalancerSetup {
+contract Rebalancer_setCrossChainRebalancer is LiquidityManagerSetup {
   event CrossChainRebalancerSet(
     uint64 indexed remoteChainSelector,
     IBridgeAdapter localBridge,
@@ -651,8 +651,8 @@ contract Rebalancer_setCrossChainRebalancer is RebalancerSetup {
     uint64[] memory supportedChains = s_rebalancer.getSupportedDestChains();
     assertEq(supportedChains.length, 0);
 
-    Rebalancer.CrossChainRebalancerArgs[] memory args = new Rebalancer.CrossChainRebalancerArgs[](1);
-    args[0] = IRebalancer.CrossChainRebalancerArgs({
+    LiquidityManager.CrossChainRebalancerArgs[] memory args = new LiquidityManager.CrossChainRebalancerArgs[](1);
+    args[0] = ILiquidityManager.CrossChainRebalancerArgs({
       remoteRebalancer: newRebalancer,
       localBridge: s_bridgeAdapter,
       remoteToken: address(190490124908),
@@ -673,7 +673,7 @@ contract Rebalancer_setCrossChainRebalancer is RebalancerSetup {
 
     assertEq(s_rebalancer.getCrossChainRebalancer(remoteChainSelector).remoteRebalancer, newRebalancer);
 
-    Rebalancer.CrossChainRebalancerArgs[] memory got = s_rebalancer.getAllCrossChainRebalancers();
+    LiquidityManager.CrossChainRebalancerArgs[] memory got = s_rebalancer.getAllCrossChainRebalancers();
     assertEq(got.length, 1);
     assertEq(got[0].remoteRebalancer, args[0].remoteRebalancer);
     assertEq(address(got[0].localBridge), address(args[0].localBridge));
@@ -707,7 +707,7 @@ contract Rebalancer_setCrossChainRebalancer is RebalancerSetup {
   }
 
   function test_ZeroChainSelectorReverts() external {
-    Rebalancer.CrossChainRebalancerArgs memory arg = IRebalancer.CrossChainRebalancerArgs({
+    LiquidityManager.CrossChainRebalancerArgs memory arg = ILiquidityManager.CrossChainRebalancerArgs({
       remoteRebalancer: address(9),
       localBridge: s_bridgeAdapter,
       remoteToken: address(190490124908),
@@ -715,13 +715,13 @@ contract Rebalancer_setCrossChainRebalancer is RebalancerSetup {
       enabled: true
     });
 
-    vm.expectRevert(Rebalancer.ZeroChainSelector.selector);
+    vm.expectRevert(LiquidityManager.ZeroChainSelector.selector);
 
     s_rebalancer.setCrossChainRebalancer(arg);
   }
 
   function test_ZeroAddressReverts() external {
-    Rebalancer.CrossChainRebalancerArgs memory arg = IRebalancer.CrossChainRebalancerArgs({
+    LiquidityManager.CrossChainRebalancerArgs memory arg = ILiquidityManager.CrossChainRebalancerArgs({
       remoteRebalancer: address(0),
       localBridge: s_bridgeAdapter,
       remoteToken: address(190490124908),
@@ -729,21 +729,21 @@ contract Rebalancer_setCrossChainRebalancer is RebalancerSetup {
       enabled: true
     });
 
-    vm.expectRevert(Rebalancer.ZeroAddress.selector);
+    vm.expectRevert(LiquidityManager.ZeroAddress.selector);
 
     s_rebalancer.setCrossChainRebalancer(arg);
 
     arg.remoteRebalancer = address(9);
     arg.localBridge = IBridgeAdapter(address(0));
 
-    vm.expectRevert(Rebalancer.ZeroAddress.selector);
+    vm.expectRevert(LiquidityManager.ZeroAddress.selector);
 
     s_rebalancer.setCrossChainRebalancer(arg);
 
     arg.localBridge = s_bridgeAdapter;
     arg.remoteToken = address(0);
 
-    vm.expectRevert(Rebalancer.ZeroAddress.selector);
+    vm.expectRevert(LiquidityManager.ZeroAddress.selector);
 
     s_rebalancer.setCrossChainRebalancer(arg);
   }
@@ -754,13 +754,13 @@ contract Rebalancer_setCrossChainRebalancer is RebalancerSetup {
     vm.expectRevert("Only callable by owner");
 
     // Test the entrypoint that takes a list
-    s_rebalancer.setCrossChainRebalancers(new Rebalancer.CrossChainRebalancerArgs[](0));
+    s_rebalancer.setCrossChainRebalancers(new LiquidityManager.CrossChainRebalancerArgs[](0));
 
     vm.expectRevert("Only callable by owner");
 
     // Test the entrypoint that takes a single item
     s_rebalancer.setCrossChainRebalancer(
-      IRebalancer.CrossChainRebalancerArgs({
+      ILiquidityManager.CrossChainRebalancerArgs({
         remoteRebalancer: address(9),
         localBridge: s_bridgeAdapter,
         remoteToken: address(190490124908),
@@ -771,7 +771,7 @@ contract Rebalancer_setCrossChainRebalancer is RebalancerSetup {
   }
 }
 
-contract Rebalancer_setLocalLiquidityContainer is RebalancerSetup {
+contract Rebalancer_setLocalLiquidityContainer is LiquidityManagerSetup {
   event LiquidityContainerSet(address indexed newLiquidityContainer);
 
   function test_setLocalLiquidityContainerSuccess() external {
@@ -800,7 +800,7 @@ contract Rebalancer_setLocalLiquidityContainer is RebalancerSetup {
   }
 }
 
-contract Rebalancer_setMinimumLiquidity is RebalancerSetup {
+contract Rebalancer_setMinimumLiquidity is LiquidityManagerSetup {
   event MinimumLiquiditySet(uint256 oldBalance, uint256 newBalance);
 
   function test_setMinimumLiquiditySuccess() external {

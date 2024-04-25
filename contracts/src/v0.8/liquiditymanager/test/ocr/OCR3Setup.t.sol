@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.0;
 
-import {RebalancerBaseTest} from "../RebalancerBaseTest.t.sol";
+import {LiquidityManagerBaseTest} from "../LiquidityManagerBaseTest.t.sol";
 
-contract OCR3Setup is RebalancerBaseTest {
+contract OCR3Setup is LiquidityManagerBaseTest {
   // Signer private keys used for these test
   uint256 internal constant PRIVATE0 = 0x7b2e97fe057e6de99d6872a2ef2abf52c9b4469bc848c2465ac3fcd8d336e81d;
   uint256 internal constant PRIVATE1 = 0xab56160806b05ef1796789248e1d7f34a6465c5280899159d645218cd216cee6;
@@ -18,7 +18,7 @@ contract OCR3Setup is RebalancerBaseTest {
   bytes internal constant REPORT = abi.encode("testReport");
 
   function setUp() public virtual override {
-    RebalancerBaseTest.setUp();
+    LiquidityManagerBaseTest.setUp();
 
     s_valid_transmitters = new address[](4);
     for (uint160 i = 0; i < 4; ++i) {

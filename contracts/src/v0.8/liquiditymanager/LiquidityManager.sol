@@ -2,7 +2,7 @@
 pragma solidity 0.8.19;
 
 import {IBridgeAdapter} from "./interfaces/IBridge.sol";
-import {IRebalancer} from "./interfaces/IRebalancer.sol";
+import {ILiquidityManager} from "./interfaces/ILiquidityManager.sol";
 import {ILiquidityContainer} from "./interfaces/ILiquidityContainer.sol";
 import {IWrappedNative} from "../ccip/interfaces/IWrappedNative.sol";
 
@@ -11,7 +11,7 @@ import {OCR3Base} from "./ocr/OCR3Base.sol";
 import {IERC20} from "../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
 
-/// @notice Rebalancer for a single token over multiple chains.
+/// @notice LiquidityManager for a single token over multiple chains.
 /// @dev This contract is designed to be used with the LockReleaseTokenPool contract but
 /// isn't constrained to it. It can be used with any contract that implements the ILiquidityContainer
 /// interface.
@@ -22,7 +22,7 @@ import {SafeERC20} from "../vendor/openzeppelin-solidity/v4.8.3/contracts/token/
 /// bridges, but it can't steal them.
 /// @dev References to local mean logic on the same chain as this contract is deployed on.
 /// References to remote mean logic on other chains.
-contract Rebalancer is IRebalancer, OCR3Base {
+contract LiquidityManager is ILiquidityManager, OCR3Base {
   using SafeERC20 for IERC20;
 
   error ZeroAddress();
@@ -71,7 +71,7 @@ contract Rebalancer is IRebalancer, OCR3Base {
     bool enabled;
   }
 
-  string public constant override typeAndVersion = "Rebalancer 1.0.0-dev";
+  string public constant override typeAndVersion = "LiquidityManager 1.0.0-dev";
 
   /// @notice The token that this pool manages liquidity for.
   IERC20 public immutable i_localToken;
@@ -117,7 +117,7 @@ contract Rebalancer is IRebalancer, OCR3Base {
   // │                    Liquidity management                      │
   // ================================================================
 
-  /// @inheritdoc IRebalancer
+  /// @inheritdoc ILiquidityManager
   function getLiquidity() public view returns (uint256 currentLiquidity) {
     return i_localToken.balanceOf(address(s_localLiquidityContainer));
   }
@@ -300,7 +300,7 @@ contract Rebalancer is IRebalancer, OCR3Base {
   }
 
   function _report(bytes calldata report, uint64 ocrSeqNum) internal override {
-    IRebalancer.LiquidityInstructions memory instructions = abi.decode(report, (IRebalancer.LiquidityInstructions));
+    ILiquidityManager.LiquidityInstructions memory instructions = abi.decode(report, (ILiquidityManager.LiquidityInstructions));
 
     uint256 sendInstructions = instructions.sendLiquidityParams.length;
     uint256 receiveInstructions = instructions.receiveLiquidityParams.length;

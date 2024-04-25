@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 
 import {IBridgeAdapter} from "./IBridge.sol";
 
-interface IRebalancer {
+interface ILiquidityManager {
   /// @notice Parameters for sending liquidity to a remote chain.
   /// @param amount The amount of tokens to be sent to the remote chain.
   /// @param nativeBridgeFee The amount of native that should be sent by the rebalancer in the sendERC20 call.
