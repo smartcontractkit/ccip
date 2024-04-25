@@ -29,7 +29,7 @@ func CountUnique[T comparable](items []T) int {
 
 // Flatten flattens a slice of slices into a single slice.
 func Flatten[T any](slices [][]T) []T {
-	var res []T
+	res := make([]T, 0)
 	for _, s := range slices {
 		res = append(res, s...)
 	}

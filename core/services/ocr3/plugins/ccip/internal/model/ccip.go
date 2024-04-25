@@ -1,6 +1,7 @@
 package model
 
 import (
+	"encoding/json"
 	"fmt"
 
 	chainselectors "github.com/smartcontractkit/chain-selectors"
@@ -31,10 +32,11 @@ type CCIPMsg struct {
 }
 
 func (c CCIPMsg) String() string {
-	return fmt.Sprintf("%#v", c)
+	js, _ := json.Marshal(c)
+	return fmt.Sprintf("%s", js)
 }
 
 type CCIPMsgBaseDetails struct {
-	SourceChain ChainSelector
-	SeqNum      SeqNum
+	SourceChain ChainSelector `json:"sourceChain,string"`
+	SeqNum      SeqNum        `json:"seqNum,string"`
 }

@@ -6,8 +6,8 @@ import "encoding/json"
 type CommitPluginReport struct{}
 
 type CommitPluginObservation struct {
-	NodeID  NodeID
-	NewMsgs []CCIPMsgBaseDetails
+	NodeID  NodeID               `json:"nodeID"`
+	NewMsgs []CCIPMsgBaseDetails `json:"newMsgs"`
 }
 
 func NewCommitPluginObservation(nodeID NodeID, newMsgs []CCIPMsgBaseDetails) CommitPluginObservation {
