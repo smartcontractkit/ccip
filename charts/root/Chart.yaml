@@ -23,10 +23,10 @@ version: 0.1.1
 # It is recommended to use it with quotes.
 appVersion: "0.1.0"
 dependencies:
-  - name: chainlink-cluster
-    version: 0.4.2
-    repository: "file://../chainlink-cluster"
+  - name: crib-chainlink-cluster
+    version: 0.5.1
+    repository: "file://../../../infra-charts/crib-chainlink-cluster"
   - name: ccip-scripts
     version: 0.1.0
-    repository: "file://../ccip-scripts"
-    condition: ccip-scripts.deployContractsAndJobs
+    repository: "@crib-chainlink-cluster"
+    condition: ccip-scripts.ccipScriptsDeployment.enabled
