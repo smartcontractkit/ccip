@@ -51,7 +51,8 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
   error EmptyReport();
   error BadARMSignal();
   error InvalidMessageId();
-  error InvalidAddress(bytes encodedAddress);
+  error InvalidEVMAddress(uint256 encodedAddress);
+  error InvalidDataLength(uint256 expected, uint256 got);
   error InvalidNewState(uint64 sequenceNumber, Internal.MessageExecutionState newState);
   error IndexOutOfRange();
 
@@ -394,7 +395,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
     catch (bytes memory err) {
       if (
         ReceiverError.selector == bytes4(err) || TokenHandlingError.selector == bytes4(err)
-          || InvalidAddress.selector == bytes4(err)
+          || InvalidEVMAddress.selector == bytes4(err) || InvalidDataLength.selector == bytes4(err)
       ) {
         // If CCIP receiver execution is not successful, bubble up receiver revert data,
         // prepended by the 4 bytes of ReceiverError.selector, TokenHandlingError.selector or InvalidPoolAddress.selector.
@@ -551,12 +552,15 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
       IPool.SourceTokenData memory sourceTokenData = abi.decode(encodedSourceTokenData[i], (IPool.SourceTokenData));
       // We need to safely decode the pool address from the sourceTokenData, as it could be wrong,
       // in which case it doesn't have to be a valid EVM address.
-      address pool = _validateEVMAddress(sourceTokenData.destPoolAddress);
+      if (sourceTokenData.destPoolAddress.length != 32) {
+        revert InvalidDataLength(32, sourceTokenData.destPoolAddress.length);
+      }
+      address pool = _validateEVMAddress(abi.decode(sourceTokenData.destPoolAddress, (uint256)));
 
       // We determined that the pool address is a valid EVM address, but that does not mean the code at this
       // address is actually a (compatible) pool contract. If there is no contract it could not possibly be a pool.
       if (pool.code.length == 0) {
-        revert InvalidAddress(sourceTokenData.destPoolAddress);
+        revert InvalidEVMAddress(uint256(uint160(pool)));
       }
 
       // Call the pool with exact gas to increase resistance against malicious tokens or token pools.
@@ -582,7 +586,10 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
       if (!success) revert TokenHandlingError(returnData);
 
       // If the call was successful, the returnData should be the local token address.
-      destTokenAmounts[i].token = _validateEVMAddress(returnData);
+      if (returnData.length != 64) revert InvalidDataLength(64, returnData.length);
+      (uint256 decodedAddress, uint256 amount) = abi.decode(returnData, (uint256, uint256));
+      destTokenAmounts[i].token = _validateEVMAddress(decodedAddress);
+      destTokenAmounts[i].amount = amount;
 
       if (s_rateLimitedTokensDestToSource.contains(destTokenAmounts[i].token)) {
         value += _getTokenValue(destTokenAmounts[i], IPriceRegistry(s_dynamicConfig.priceRegistry));
@@ -594,10 +601,8 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
     return destTokenAmounts;
   }
 
-  function _validateEVMAddress(bytes memory encodedAddress) internal pure returns (address) {
-    if (encodedAddress.length != 32) revert InvalidAddress(encodedAddress);
-    uint256 decodedAddress = uint256(abi.decode(encodedAddress, (uint256)));
-    if (decodedAddress > type(uint160).max || decodedAddress < 10) revert InvalidAddress(encodedAddress);
+  function _validateEVMAddress(uint256 decodedAddress) internal pure returns (address) {
+    if (decodedAddress > type(uint160).max || decodedAddress < 10) revert InvalidEVMAddress(decodedAddress);
     return address(uint160(decodedAddress));
   }
 

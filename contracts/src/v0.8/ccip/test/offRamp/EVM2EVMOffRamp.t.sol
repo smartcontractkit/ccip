@@ -1115,7 +1115,7 @@ contract EVM2EVMOffRamp__trialExecute is EVM2EVMOffRampSetup {
     (newState, err) = s_offRamp.trialExecute(message, new bytes[](message.tokenAmounts.length));
 
     assertEq(uint256(Internal.MessageExecutionState.FAILURE), uint256(newState));
-    assertEq(abi.encodeWithSelector(EVM2EVMOffRamp.InvalidAddress.selector, abi.encode(address(0))), err);
+    assertEq(abi.encodeWithSelector(EVM2EVMOffRamp.InvalidEVMAddress.selector, 0), err);
   }
 }
 
@@ -1268,7 +1268,9 @@ contract EVM2EVMOffRamp__releaseOrMintTokens is EVM2EVMOffRampSetup {
       })
     );
 
-    vm.expectRevert(abi.encodeWithSelector(EVM2EVMOffRamp.InvalidAddress.selector, abi.encode(fakePoolAddress)));
+    vm.expectRevert(
+      abi.encodeWithSelector(EVM2EVMOffRamp.InvalidEVMAddress.selector, uint256(uint160(fakePoolAddress)))
+    );
     s_offRamp.releaseOrMintTokens(
       new Client.EVMTokenAmount[](1), abi.encode(makeAddr("original_sender")), OWNER, sourceTokenData, new bytes[](1)
     );
@@ -1310,16 +1312,16 @@ contract EVM2EVMOffRamp__releaseOrMintTokens is EVM2EVMOffRampSetup {
 
     try s_offRamp.releaseOrMintTokens(new Client.EVMTokenAmount[](1), unusedVar, OWNER, sourceTokenData, new bytes[](1))
     {} catch (bytes memory reason) {
-      // Any revert should be a TokenHandlingError or InvalidAddress as those are caught by the offramp
+      // Any revert should be a TokenHandlingError or InvalidEVMAddress as those are caught by the offramp
       assertTrue(
         bytes4(reason) == EVM2EVMOffRamp.TokenHandlingError.selector
-          || bytes4(reason) == EVM2EVMOffRamp.InvalidAddress.selector,
-        "Expected TokenHandlingError or InvalidAddress"
+          || bytes4(reason) == EVM2EVMOffRamp.InvalidEVMAddress.selector,
+        "Expected TokenHandlingError or InvalidEVMAddress"
       );
 
       if (destPool > type(uint160).max) {
         // If the destPool is not a valid eth address, the inner error should be PoolDoesNotExist
-        assertEq(reason, abi.encodeWithSelector(EVM2EVMOffRamp.InvalidAddress.selector, destPoolAddress));
+        assertEq(reason, abi.encodeWithSelector(EVM2EVMOffRamp.InvalidEVMAddress.selector, uint256(uint160(destPool))));
       }
     }
   }

@@ -85,12 +85,12 @@ contract LockReleaseTokenPool is TokenPool, ILiquidityContainer, ITypeAndVersion
     uint64 remoteChainSelector,
     IPool.SourceTokenData memory sourceTokenData,
     bytes memory
-  ) external virtual override onlyOffRamp(remoteChainSelector) whenHealthy returns (address) {
+  ) external virtual override onlyOffRamp(remoteChainSelector) whenHealthy returns (address, uint256) {
     _validateSourceCaller(remoteChainSelector, sourceTokenData.sourcePoolAddress);
     _consumeInboundRateLimit(remoteChainSelector, amount);
     getToken().safeTransfer(receiver, amount);
     emit Released(msg.sender, receiver, amount);
-    return address(i_token);
+    return (address(i_token), amount);
   }
 
   /// @notice returns the lock release interface flag used for EIP165 identification.
