@@ -79,7 +79,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndV
 
   /// @notice Per-chain source config (defining a lane from a Source Chain -> Dest OffRamp)
   struct SourceChainConfig {
-    bool isEnabled;  // ────────╮  Flag whether the source chain is enabled or not
+    bool isEnabled; // ────────╮  Flag whether the source chain is enabled or not
     address prevOffRamp; // ────╯  Address of previous-version per-lane OffRamp. Used to be able to provide seequencing continuity during a zero downtime upgrade.
     address onRamp; //             OnRamp address on the source chain
     /// @dev Ensures that 2 identical messages sent to 2 different lanes will have a distinct hash.
@@ -466,11 +466,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndV
   /// @dev This function will always return the same struct as the contents is static and can never change.
   /// RMN depends on this function, if changing, please notify the RMN maintainers.
   function getStaticConfig() external view returns (StaticConfig memory) {
-    return StaticConfig({
-      commitStore: i_commitStore,
-      chainSelector: i_chainSelector,
-      armProxy: i_armProxy
-    });
+    return StaticConfig({commitStore: i_commitStore, chainSelector: i_chainSelector, armProxy: i_armProxy});
   }
 
   /// @notice Returns the current dynamic config.
@@ -509,7 +505,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndV
       SourceChainConfig memory sourceConfig = sourceConfigs[i];
 
       if (sourceConfig.onRamp == address(0)) {
-         revert ZeroAddressNotAllowed();
+        revert ZeroAddressNotAllowed();
       }
 
       // OnRamp can never be zero - if it is, then the source chain has been added for the first time
@@ -526,7 +522,8 @@ contract EVM2EVMMultiOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndV
       // TODO: confirm if re-updating is allowed
       //       If it can happen - reset nonces
       //       If it cannot - validate and restrict
-      sourceConfig.metadataHash = _metadataHash(sourceChainSelector, sourceConfig.onRamp, Internal.EVM_2_EVM_MESSAGE_HASH);
+      sourceConfig.metadataHash =
+        _metadataHash(sourceChainSelector, sourceConfig.onRamp, Internal.EVM_2_EVM_MESSAGE_HASH);
       s_sourceChainConfigs[sourceChainSelector] = sourceConfig;
 
       emit SourceChainConfigSet(sourceChainSelector, sourceConfig);
@@ -542,12 +539,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndV
     s_dynamicConfig = dynamicConfig;
 
     emit ConfigSet(
-      StaticConfig({
-        commitStore: i_commitStore,
-        chainSelector: i_chainSelector,
-        armProxy: i_armProxy
-      }),
-      dynamicConfig
+      StaticConfig({commitStore: i_commitStore, chainSelector: i_chainSelector, armProxy: i_armProxy}), dynamicConfig
     );
   }
 

@@ -75,7 +75,8 @@ contract EVM2EVMMultiOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSet
     offRampUpdates[0] = Router.OffRamp({sourceChainSelector: SOURCE_CHAIN_SELECTOR, offRamp: address(s_offRamp)});
     offRampUpdates[1] = Router.OffRamp({sourceChainSelector: SOURCE_CHAIN_SELECTOR, offRamp: address(prevOffRamp)});
     s_destRouter.applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), offRampUpdates);
-    EVM2EVMMultiOffRamp.RateLimitToken[] memory tokensToAdd = new EVM2EVMMultiOffRamp.RateLimitToken[](s_sourceTokens.length);
+    EVM2EVMMultiOffRamp.RateLimitToken[] memory tokensToAdd =
+      new EVM2EVMMultiOffRamp.RateLimitToken[](s_sourceTokens.length);
     for (uint256 i = 0; i < s_sourceTokens.length; ++i) {
       tokensToAdd[i] = EVM2EVMMultiOffRamp.RateLimitToken({sourceToken: s_sourceTokens[i], destToken: s_destTokens[i]});
     }
@@ -218,7 +219,10 @@ contract EVM2EVMMultiOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSet
     return gasLimits;
   }
 
-  function _assertSameConfig(EVM2EVMMultiOffRamp.DynamicConfig memory a, EVM2EVMMultiOffRamp.DynamicConfig memory b) public pure {
+  function _assertSameConfig(
+    EVM2EVMMultiOffRamp.DynamicConfig memory a,
+    EVM2EVMMultiOffRamp.DynamicConfig memory b
+  ) public pure {
     assertEq(a.permissionLessExecutionThresholdSeconds, b.permissionLessExecutionThresholdSeconds);
     assertEq(a.router, b.router);
     assertEq(a.priceRegistry, b.priceRegistry);

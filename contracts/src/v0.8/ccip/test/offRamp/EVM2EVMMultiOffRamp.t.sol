@@ -50,7 +50,8 @@ contract EVM2EVMMultiOffRamp_setDynamicConfig is EVM2EVMMultiOffRampSetup {
 
   function test_SetDynamicConfig_Success() public {
     EVM2EVMMultiOffRamp.StaticConfig memory staticConfig = s_offRamp.getStaticConfig();
-    EVM2EVMMultiOffRamp.DynamicConfig memory dynamicConfig = generateDynamicMultiOffRampConfig(USER_3, address(s_priceRegistry));
+    EVM2EVMMultiOffRamp.DynamicConfig memory dynamicConfig =
+      generateDynamicMultiOffRampConfig(USER_3, address(s_priceRegistry));
     bytes memory onchainConfig = abi.encode(dynamicConfig);
 
     vm.expectEmit();
@@ -80,7 +81,8 @@ contract EVM2EVMMultiOffRamp_setDynamicConfig is EVM2EVMMultiOffRampSetup {
 
   function test_NonOwner_Revert() public {
     vm.startPrank(STRANGER);
-    EVM2EVMMultiOffRamp.DynamicConfig memory dynamicConfig = generateDynamicMultiOffRampConfig(USER_3, address(s_priceRegistry));
+    EVM2EVMMultiOffRamp.DynamicConfig memory dynamicConfig =
+      generateDynamicMultiOffRampConfig(USER_3, address(s_priceRegistry));
 
     vm.expectRevert("Only callable by owner");
 
@@ -90,7 +92,8 @@ contract EVM2EVMMultiOffRamp_setDynamicConfig is EVM2EVMMultiOffRampSetup {
   }
 
   function test_RouterZeroAddress_Revert() public {
-    EVM2EVMMultiOffRamp.DynamicConfig memory dynamicConfig = generateDynamicMultiOffRampConfig(ZERO_ADDRESS, ZERO_ADDRESS);
+    EVM2EVMMultiOffRamp.DynamicConfig memory dynamicConfig =
+      generateDynamicMultiOffRampConfig(ZERO_ADDRESS, ZERO_ADDRESS);
 
     vm.expectRevert(EVM2EVMMultiOffRamp.ZeroAddressNotAllowed.selector);
 
@@ -119,9 +122,7 @@ contract EVM2EVMMultiOffRamp_metadataHash is EVM2EVMMultiOffRampSetup {
         abi.encode(Internal.EVM_2_EVM_MESSAGE_HASH, SOURCE_CHAIN_SELECTOR + 1, DEST_CHAIN_SELECTOR, ON_RAMP_ADDRESS)
       )
     );
-    assertTrue(
-      h != s_offRamp.metadataHash(SOURCE_CHAIN_SELECTOR, ON_RAMP_ADDRESS)
-    );
+    assertTrue(h != s_offRamp.metadataHash(SOURCE_CHAIN_SELECTOR, ON_RAMP_ADDRESS));
   }
 
   function test_MetadataHashChangesOnOnRampAddress_Success() public view {
@@ -133,9 +134,7 @@ contract EVM2EVMMultiOffRamp_metadataHash is EVM2EVMMultiOffRampSetup {
         abi.encode(Internal.EVM_2_EVM_MESSAGE_HASH, SOURCE_CHAIN_SELECTOR, DEST_CHAIN_SELECTOR, mockOnRampAddress)
       )
     );
-    assertTrue(
-      h != s_offRamp.metadataHash(SOURCE_CHAIN_SELECTOR, ON_RAMP_ADDRESS)
-    );
+    assertTrue(h != s_offRamp.metadataHash(SOURCE_CHAIN_SELECTOR, ON_RAMP_ADDRESS));
   }
 }
 
@@ -145,9 +144,9 @@ contract EVM2EVMMultiOffRamp__releaseOrMintTokens is EVM2EVMMultiOffRampSetup {
   function setUp() public virtual override {
     super.setUp();
     MESSAGE_ROUTE = EVM2EVMMultiOffRamp.Any2EVMMessageRoute({
-        sender: abi.encode(OWNER),
-        sourceChainSelector: SOURCE_CHAIN_SELECTOR,
-        receiver: OWNER
+      sender: abi.encode(OWNER),
+      sourceChainSelector: SOURCE_CHAIN_SELECTOR,
+      receiver: OWNER
     });
   }
 
@@ -231,10 +230,7 @@ contract EVM2EVMMultiOffRamp__releaseOrMintTokens is EVM2EVMMultiOffRampSetup {
     vm.expectRevert(abi.encodeWithSelector(EVM2EVMMultiOffRamp.TokenHandlingError.selector, unknownError));
 
     s_offRamp.releaseOrMintTokens(
-      srcTokenAmounts,
-      MESSAGE_ROUTE,
-      _getDefaultSourceTokenData(srcTokenAmounts),
-      new bytes[](srcTokenAmounts.length)
+      srcTokenAmounts, MESSAGE_ROUTE, _getDefaultSourceTokenData(srcTokenAmounts), new bytes[](srcTokenAmounts.length)
     );
   }
 
@@ -283,9 +279,7 @@ contract EVM2EVMMultiOffRamp__releaseOrMintTokens is EVM2EVMMultiOffRampSetup {
 
     MESSAGE_ROUTE.sender = abi.encode(makeAddr("original_sender"));
     vm.expectRevert(abi.encodeWithSelector(EVM2EVMMultiOffRamp.TokenHandlingError.selector, bytes("")));
-    s_offRamp.releaseOrMintTokens(
-      new Client.EVMTokenAmount[](1), MESSAGE_ROUTE, sourceTokenData, new bytes[](1)
-    );
+    s_offRamp.releaseOrMintTokens(new Client.EVMTokenAmount[](1), MESSAGE_ROUTE, sourceTokenData, new bytes[](1));
   }
 
   function test__releaseOrMintTokens_PoolIsNotAContract_Reverts() public {
@@ -302,9 +296,7 @@ contract EVM2EVMMultiOffRamp__releaseOrMintTokens is EVM2EVMMultiOffRampSetup {
 
     MESSAGE_ROUTE.sender = abi.encode(makeAddr("original_sender"));
     vm.expectRevert(abi.encodeWithSelector(EVM2EVMMultiOffRamp.InvalidAddress.selector, abi.encode(fakePoolAddress)));
-    s_offRamp.releaseOrMintTokens(
-      new Client.EVMTokenAmount[](1), MESSAGE_ROUTE, sourceTokenData, new bytes[](1)
-    );
+    s_offRamp.releaseOrMintTokens(new Client.EVMTokenAmount[](1), MESSAGE_ROUTE, sourceTokenData, new bytes[](1));
   }
 
   function test_PriceNotFoundForToken_Reverts() public {
@@ -340,8 +332,8 @@ contract EVM2EVMMultiOffRamp__releaseOrMintTokens is EVM2EVMMultiOffRampSetup {
       IPool.SourceTokenData({sourcePoolAddress: unusedVar, destPoolAddress: destPoolAddress, extraData: unusedVar})
     );
 
-    try s_offRamp.releaseOrMintTokens(new Client.EVMTokenAmount[](1), MESSAGE_ROUTE, sourceTokenData, new bytes[](1))
-    {} catch (bytes memory reason) {
+    try s_offRamp.releaseOrMintTokens(new Client.EVMTokenAmount[](1), MESSAGE_ROUTE, sourceTokenData, new bytes[](1)) {}
+    catch (bytes memory reason) {
       // Any revert should be a TokenHandlingError or InvalidAddress as those are caught by the offramp
       assertTrue(
         bytes4(reason) == EVM2EVMMultiOffRamp.TokenHandlingError.selector
@@ -390,10 +382,10 @@ contract EVM2EVMMultiOffRamp_applySoureConfigUpdates is EVM2EVMMultiOffRampSetup
     });
 
     EVM2EVMMultiOffRamp.SourceChainConfig memory expectedSourceChainConfig = EVM2EVMMultiOffRamp.SourceChainConfig({
-        isEnabled: true,
-        prevOffRamp: address(0),
-        onRamp: ON_RAMP_ADDRESS,
-        metadataHash: s_offRamp.metadataHash(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS)
+      isEnabled: true,
+      prevOffRamp: address(0),
+      onRamp: ON_RAMP_ADDRESS,
+      metadataHash: s_offRamp.metadataHash(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS)
     });
 
     vm.expectEmit();
@@ -404,10 +396,7 @@ contract EVM2EVMMultiOffRamp_applySoureConfigUpdates is EVM2EVMMultiOffRampSetup
 
     s_offRamp.applySourceConfigUpdates(sourceChainSelectors, sourceChainConfigs);
 
-    _assertSourceChainConfigEquality(
-      s_offRamp.getSourceChainConfig(SOURCE_CHAIN_SELECTOR_1),
-      expectedSourceChainConfig
-    );
+    _assertSourceChainConfigEquality(s_offRamp.getSourceChainConfig(SOURCE_CHAIN_SELECTOR_1), expectedSourceChainConfig);
 
     uint64[] memory resultSourceChainSelectors = s_offRamp.getSourceChainSelectors();
     assertEq(resultSourceChainSelectors.length, 1);
@@ -430,10 +419,10 @@ contract EVM2EVMMultiOffRamp_applySoureConfigUpdates is EVM2EVMMultiOffRampSetup
 
     sourceChainConfigs[0].onRamp = address(uint160(ON_RAMP_ADDRESS) + 1);
     EVM2EVMMultiOffRamp.SourceChainConfig memory expectedSourceChainConfig = EVM2EVMMultiOffRamp.SourceChainConfig({
-        isEnabled: true,
-        prevOffRamp: address(0),
-        onRamp: sourceChainConfigs[0].onRamp,
-        metadataHash: s_offRamp.metadataHash(SOURCE_CHAIN_SELECTOR_1, sourceChainConfigs[0].onRamp)
+      isEnabled: true,
+      prevOffRamp: address(0),
+      onRamp: sourceChainConfigs[0].onRamp,
+      metadataHash: s_offRamp.metadataHash(SOURCE_CHAIN_SELECTOR_1, sourceChainConfigs[0].onRamp)
     });
 
     vm.expectEmit();
@@ -446,10 +435,7 @@ contract EVM2EVMMultiOffRamp_applySoureConfigUpdates is EVM2EVMMultiOffRampSetup
     Vm.Log[] memory logEntries = vm.getRecordedLogs();
     assertEq(logEntries.length, 1);
 
-    _assertSourceChainConfigEquality(
-      s_offRamp.getSourceChainConfig(SOURCE_CHAIN_SELECTOR_1),
-      expectedSourceChainConfig
-    );
+    _assertSourceChainConfigEquality(s_offRamp.getSourceChainConfig(SOURCE_CHAIN_SELECTOR_1), expectedSourceChainConfig);
 
     uint64[] memory resultSourceChainSelectors = s_offRamp.getSourceChainSelectors();
     assertEq(resultSourceChainSelectors.length, 1);
@@ -482,7 +468,8 @@ contract EVM2EVMMultiOffRamp_applySoureConfigUpdates is EVM2EVMMultiOffRampSetup
       metadataHash: ""
     });
 
-    EVM2EVMMultiOffRamp.SourceChainConfig[] memory expectedSourceChainConfigs = new EVM2EVMMultiOffRamp.SourceChainConfig[](3);
+    EVM2EVMMultiOffRamp.SourceChainConfig[] memory expectedSourceChainConfigs =
+      new EVM2EVMMultiOffRamp.SourceChainConfig[](3);
     for (uint256 i = 0; i < 3; ++i) {
       expectedSourceChainConfigs[i] = EVM2EVMMultiOffRamp.SourceChainConfig({
         isEnabled: sourceChainConfigs[i].isEnabled,
@@ -505,8 +492,7 @@ contract EVM2EVMMultiOffRamp_applySoureConfigUpdates is EVM2EVMMultiOffRampSetup
 
     for (uint256 i = 0; i < 3; ++i) {
       _assertSourceChainConfigEquality(
-        s_offRamp.getSourceChainConfig(sourceChainSelectors[i]),
-        expectedSourceChainConfigs[i]
+        s_offRamp.getSourceChainConfig(sourceChainSelectors[i]), expectedSourceChainConfigs[i]
       );
 
       assertEq(resultSourceChainSelectors[i], sourceChainSelectors[i]);
@@ -526,9 +512,7 @@ contract EVM2EVMMultiOffRamp_applySoureConfigUpdates is EVM2EVMMultiOffRampSetup
       metadataHash: ""
     });
 
-    vm.expectRevert(
-      EVM2EVMMultiOffRamp.SourceConfigUpdateLengthMismatch.selector
-    );
+    vm.expectRevert(EVM2EVMMultiOffRamp.SourceConfigUpdateLengthMismatch.selector);
     s_offRamp.applySourceConfigUpdates(sourceChainSelectors, sourceChainConfigs);
   }
 
@@ -544,9 +528,7 @@ contract EVM2EVMMultiOffRamp_applySoureConfigUpdates is EVM2EVMMultiOffRampSetup
       metadataHash: ""
     });
 
-    vm.expectRevert(
-      EVM2EVMMultiOffRamp.ZeroAddressNotAllowed.selector
-    );
+    vm.expectRevert(EVM2EVMMultiOffRamp.ZeroAddressNotAllowed.selector);
     s_offRamp.applySourceConfigUpdates(sourceChainSelectors, sourceChainConfigs);
   }
 
