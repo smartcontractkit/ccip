@@ -30,7 +30,7 @@ jobs:
     if: github.actor != 'dependabot[bot]'
     steps:
       - name: Checkout the repo
-        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+        uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b # v4.1.4
         with:
           repository: smartcontractkit/ccip
           ref: ${{ inputs.cl_ref }}
@@ -81,7 +81,7 @@ jobs:
           this-job-name: Build Chainlink Image
         continue-on-error: true
       - name: Checkout the repo
-        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+        uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b # v4.1.4
         with:
           repository: smartcontractkit/ccip
           ref: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
@@ -116,7 +116,7 @@ jobs:
           this-job-name: Build Test Image with Current Sha
         continue-on-error: true
       - name: Checkout the repo
-        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+        uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b # v4.1.4
         with:
           repository: smartcontractkit/ccip
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
@@ -166,7 +166,7 @@ jobs:
           sha_ref=$(curl -s --header "Authorization: token ${{ secrets.GITHUB_TOKEN }}" --request GET https://api.github.com/repos/${{ github.repository }}/git/refs/tags/${release_name} | jq -r '.object.sha' | sort -V | tail -n 1)
           echo "sha_ref=${sha_ref}" >> $GITHUB_OUTPUT
       - name: Checkout the repo
-        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+        uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b # v4.1.4
         with:
           repository: smartcontractkit/ccip
           ref: ${{ steps.fetch_last_release.outputs.sha_ref }}
@@ -222,7 +222,7 @@ jobs:
           this-job-name: CCIP Deployment with ${{ needs.build-test-image-for-last-release.outputs.release_tag }} - ${{ matrix.product.name }}
           test-results-file: '{"testType":"go","filePath":"/tmp/gotest.log"}'
       - name: Checkout the repo
-        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+        uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b # v4.1.4
         with:
           repository: smartcontractkit/ccip
           ref: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
@@ -341,7 +341,7 @@ jobs:
           this-job-name: Upgrade Nodes with Current SHA and Run ${{ matrix.product.name }}
           test-results-file: '{"testType":"go","filePath":"/tmp/gotest.log"}'
       - name: Checkout the repo
-        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+        uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b # v4.1.4
         with:
           repository: smartcontractkit/ccip
           ref: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha }}

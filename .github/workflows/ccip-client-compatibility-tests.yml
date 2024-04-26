@@ -26,7 +26,7 @@ jobs:
     if: github.actor != 'dependabot[bot]'
     steps:
       - name: Checkout the repo
-        uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
+        uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b # v4.1.4
         with:
           repository: smartcontractkit/ccip
           ref: ${{ inputs.cl_ref }}
@@ -77,7 +77,7 @@ jobs:
           this-job-name: Build Chainlink Image
         continue-on-error: true
       - name: Checkout the repo
-        uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
+        uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b # v4.1.4
         with:
           repository: smartcontractkit/ccip
           ref: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
@@ -111,7 +111,7 @@ jobs:
           this-job-name: Build Tests Binary
         continue-on-error: true
       - name: Checkout the repo
-        uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
+        uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b # v4.1.4
         with:
           ref: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
       - name: Build Tests
@@ -220,7 +220,7 @@ jobs:
     name: CCIP Latest EVM Node Compatibility Test with ${{ matrix.client }}
     steps:
       - name: Checkout the repo
-        uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
+        uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b # v4.1.4
         with:
           repository: smartcontractkit/ccip
           ref: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
@@ -364,7 +364,7 @@ jobs:
     needs: [changes, start-slack-thread]
     steps:
       - name: Checkout the repo
-        uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
+        uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b # v4.1.4
         with:
           ref: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
       - name: Post Test Results to Slack

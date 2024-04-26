@@ -27,7 +27,7 @@ jobs:
     runs-on: ubuntu20.04-16cores-64GB
     steps:
       - name: Checkout the repo
-        uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
+        uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b # v4.1.4
       - name: Check if image exists
         id: check-image
         uses: smartcontractkit/chainlink-github-actions/docker/image-exists@5dd916d08c03cb5f9a97304f4f174820421bb946 # v2.3.11
@@ -78,7 +78,7 @@ jobs:
           this-job-name: Build Test Image
         continue-on-error: true
       - name: Checkout the repo
-        uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
+        uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b # v4.1.4
       - name: Build Test Image
         uses: ./.github/actions/build-test-image
         with:
@@ -118,7 +118,7 @@ jobs:
           this-job-name: CCIP chaos Test
         continue-on-error: true
       - name: Checkout the repo
-        uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
+        uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b # v4.1.4
       - name: Prepare Base64 TOML override for CCIP secrets
         uses: ./.github/actions/setup-create-base64-config-ccip
         with:
@@ -191,7 +191,7 @@ jobs:
           this-job-name: CCIP load with chaos test
         continue-on-error: true
       - name: Checkout the repo
-        uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
+        uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b # v4.1.4
       - name: Prepare Base64 TOML override for CCIP secrests
         uses: ./.github/actions/setup-create-base64-config-ccip
         with:
