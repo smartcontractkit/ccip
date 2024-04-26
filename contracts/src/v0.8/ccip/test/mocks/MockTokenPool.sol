@@ -32,12 +32,4 @@ contract MockTokenPool is IPool {
   ) external view override returns (address, uint256) {
     return (address(i_token), amount);
   }
-
-  function getToken() public view override returns (IERC20 token) {
-    return IERC20(i_token);
-  }
-
-  function getRemotePool(uint64) public pure override returns (bytes memory) {
-    return abi.encode(address(1));
-  }
 }
