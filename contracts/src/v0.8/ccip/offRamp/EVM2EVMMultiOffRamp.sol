@@ -113,7 +113,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndV
   }
 
   // STATIC CONFIG
-  string public constant override typeAndVersion = "EVM2EVMOffRamp 1.5.0-dev";
+  string public constant override typeAndVersion = "EVM2EVMOffRamp 1.6.0-dev";
   /// @dev Commit store address on the destination chain
   address internal immutable i_commitStore;
   /// @dev ChainSelector of this chain
@@ -145,6 +145,9 @@ contract EVM2EVMMultiOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndV
 
   constructor(
     StaticConfig memory staticConfig,
+    uint64[] memory chainSelectors,
+    SourceChainConfig[] memory sourceConfigs,
+    // TODO: convert to array (per-chain)
     RateLimiter.Config memory rateLimiterConfig
   ) OCR2BaseNoChecks() AggregateRateLimiter(rateLimiterConfig) {
     if (staticConfig.commitStore == address(0)) revert ZeroAddressNotAllowed();
@@ -152,6 +155,8 @@ contract EVM2EVMMultiOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndV
     i_commitStore = staticConfig.commitStore;
     i_chainSelector = staticConfig.chainSelector;
     i_armProxy = staticConfig.armProxy;
+
+    _applySourceConfigUpdates(chainSelectors, sourceConfigs);
   }
 
   // ================================================================
@@ -496,6 +501,17 @@ contract EVM2EVMMultiOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndV
     uint64[] memory sourceChainSelectors,
     SourceChainConfig[] memory sourceConfigs
   ) external onlyOwner {
+    _applySourceConfigUpdates(sourceChainSelectors, sourceConfigs);
+  }
+
+  /// @notice Updates source configs
+  /// @param sourceChainSelectors Source chain selectors to update configs for
+  /// @param sourceConfigs Source chain configs (matching source chain selectors array)
+  ///        Note: metadataHash is unused from the input
+  function _applySourceConfigUpdates(
+    uint64[] memory sourceChainSelectors,
+    SourceChainConfig[] memory sourceConfigs
+  ) internal {
     if (sourceChainSelectors.length != sourceConfigs.length) {
       revert SourceConfigUpdateLengthMismatch();
     }

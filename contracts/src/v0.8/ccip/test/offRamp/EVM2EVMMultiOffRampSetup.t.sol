@@ -53,12 +53,17 @@ contract EVM2EVMMultiOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSet
   }
 
   function deployOffRamp(ICommitStore commitStore, Router router, address prevOffRamp) internal {
+    uint64[] memory sourceChainSelectors = new uint64[](0);
+    EVM2EVMMultiOffRamp.SourceChainConfig[] memory sourceChainConfigs = new EVM2EVMMultiOffRamp.SourceChainConfig[](0);
+
     s_offRamp = new EVM2EVMMultiOffRampHelper(
       EVM2EVMMultiOffRamp.StaticConfig({
         commitStore: address(commitStore),
         chainSelector: DEST_CHAIN_SELECTOR,
         armProxy: address(s_mockARM)
       }),
+      sourceChainSelectors,
+      sourceChainConfigs,
       getInboundRateLimiterConfig()
     );
     s_offRamp.setOCR2Config(
@@ -229,6 +234,16 @@ contract EVM2EVMMultiOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSet
     assertEq(a.maxNumberOfTokensPerMsg, b.maxNumberOfTokensPerMsg);
     assertEq(a.maxDataBytes, b.maxDataBytes);
     assertEq(a.maxPoolReleaseOrMintGas, b.maxPoolReleaseOrMintGas);
+  }
+
+  function _assertSourceChainConfigEquality(
+    EVM2EVMMultiOffRamp.SourceChainConfig memory config1,
+    EVM2EVMMultiOffRamp.SourceChainConfig memory config2
+  ) internal pure {
+    assertEq(config1.isEnabled, config2.isEnabled);
+    assertEq(config1.prevOffRamp, config2.prevOffRamp);
+    assertEq(config1.onRamp, config2.onRamp);
+    assertEq(config1.metadataHash, config2.metadataHash);
   }
 
   function _getDefaultSourceTokenData(Client.EVMTokenAmount[] memory srcTokenAmounts)

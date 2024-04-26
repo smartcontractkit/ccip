@@ -32,7 +32,6 @@ import {EVM2EVMMultiOffRampSetup} from "./EVM2EVMMultiOffRampSetup.t.sol";
 import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 
 // TODO: re-add tests:
-//       - constructor
 //       - ccipReceive
 //       - execute
 //       - execute_upgrade
@@ -43,6 +42,149 @@ import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/tok
 //       - trialExecute
 //       - getAllRateLimitTokens
 //       - updateRateLimitTokens
+
+contract EVM2EVMMultiOffRamp_constructor is EVM2EVMMultiOffRampSetup {
+  event ConfigSet(EVM2EVMMultiOffRamp.StaticConfig staticConfig, EVM2EVMMultiOffRamp.DynamicConfig dynamicConfig);
+  event SourceChainSelectorAdded(uint64 sourceChainSelector);
+  event SourceChainConfigSet(uint64 indexed sourceChainSelector, EVM2EVMMultiOffRamp.SourceChainConfig sourceConfig);
+
+  function test_Constructor_Success() public {
+    EVM2EVMMultiOffRamp.StaticConfig memory staticConfig = EVM2EVMMultiOffRamp.StaticConfig({
+      commitStore: address(s_mockCommitStore),
+      chainSelector: DEST_CHAIN_SELECTOR,
+      armProxy: address(s_mockARM)
+    });
+    EVM2EVMMultiOffRamp.DynamicConfig memory dynamicConfig =
+      generateDynamicMultiOffRampConfig(address(s_destRouter), address(s_priceRegistry));
+
+    uint64[] memory sourceChainSelectors = new uint64[](2);
+    sourceChainSelectors[0] = SOURCE_CHAIN_SELECTOR;
+    sourceChainSelectors[1] = SOURCE_CHAIN_SELECTOR + 1;
+
+    EVM2EVMMultiOffRamp.SourceChainConfig[] memory sourceChainConfigs = new EVM2EVMMultiOffRamp.SourceChainConfig[](2);
+    sourceChainConfigs[0] = EVM2EVMMultiOffRamp.SourceChainConfig({
+      isEnabled: true,
+      prevOffRamp: address(0),
+      onRamp: ON_RAMP_ADDRESS,
+      metadataHash: ""
+    });
+    sourceChainConfigs[1] = EVM2EVMMultiOffRamp.SourceChainConfig({
+      isEnabled: true,
+      prevOffRamp: address(0),
+      onRamp: address(uint160(ON_RAMP_ADDRESS) + 1),
+      metadataHash: ""
+    });
+
+    EVM2EVMMultiOffRamp.SourceChainConfig memory expectedSourceChainConfig1 = EVM2EVMMultiOffRamp.SourceChainConfig({
+      isEnabled: true,
+      prevOffRamp: address(0),
+      onRamp: sourceChainConfigs[0].onRamp,
+      metadataHash: s_offRamp.metadataHash(SOURCE_CHAIN_SELECTOR, sourceChainConfigs[0].onRamp)
+    });
+
+    EVM2EVMMultiOffRamp.SourceChainConfig memory expectedSourceChainConfig2 = EVM2EVMMultiOffRamp.SourceChainConfig({
+      isEnabled: true,
+      prevOffRamp: address(0),
+      onRamp: sourceChainConfigs[1].onRamp,
+      metadataHash: s_offRamp.metadataHash(SOURCE_CHAIN_SELECTOR + 1, sourceChainConfigs[1].onRamp)
+    });
+
+    vm.expectEmit();
+    emit SourceChainSelectorAdded(SOURCE_CHAIN_SELECTOR);
+
+    vm.expectEmit();
+    emit SourceChainConfigSet(SOURCE_CHAIN_SELECTOR, expectedSourceChainConfig1);
+
+    vm.expectEmit();
+    emit SourceChainSelectorAdded(SOURCE_CHAIN_SELECTOR + 1);
+
+    vm.expectEmit();
+    emit SourceChainConfigSet(SOURCE_CHAIN_SELECTOR + 1, expectedSourceChainConfig2);
+
+    s_offRamp = new EVM2EVMMultiOffRampHelper(
+      staticConfig, sourceChainSelectors, sourceChainConfigs, getInboundRateLimiterConfig()
+    );
+
+    s_offRamp.setOCR2Config(
+      s_valid_signers, s_valid_transmitters, s_f, abi.encode(dynamicConfig), s_offchainConfigVersion, abi.encode("")
+    );
+
+    // Static config
+    EVM2EVMMultiOffRamp.StaticConfig memory gotStaticConfig = s_offRamp.getStaticConfig();
+    assertEq(staticConfig.commitStore, gotStaticConfig.commitStore);
+    assertEq(staticConfig.chainSelector, gotStaticConfig.chainSelector);
+
+    // Dynamic config
+    EVM2EVMMultiOffRamp.DynamicConfig memory gotDynamicConfig = s_offRamp.getDynamicConfig();
+    _assertSameConfig(dynamicConfig, gotDynamicConfig);
+
+    (uint32 configCount, uint32 blockNumber,) = s_offRamp.latestConfigDetails();
+    assertEq(1, configCount);
+    assertEq(block.number, blockNumber);
+
+    // Source config
+    s_offRamp.applySourceConfigUpdates(sourceChainSelectors, sourceChainConfigs);
+
+    uint64[] memory resultSourceChainSelectors = s_offRamp.getSourceChainSelectors();
+    assertEq(resultSourceChainSelectors.length, 2);
+    assertEq(resultSourceChainSelectors[0], SOURCE_CHAIN_SELECTOR);
+    assertEq(resultSourceChainSelectors[1], SOURCE_CHAIN_SELECTOR + 1);
+    _assertSourceChainConfigEquality(s_offRamp.getSourceChainConfig(SOURCE_CHAIN_SELECTOR), expectedSourceChainConfig1);
+    _assertSourceChainConfigEquality(
+      s_offRamp.getSourceChainConfig(SOURCE_CHAIN_SELECTOR + 1), expectedSourceChainConfig2
+    );
+
+    // OffRamp initial values
+    assertEq("EVM2EVMOffRamp 1.6.0-dev", s_offRamp.typeAndVersion());
+    assertEq(OWNER, s_offRamp.owner());
+  }
+
+  // Revert
+  function test_ZeroOnRampAddress_Revert() public {
+    uint64[] memory sourceChainSelectors = new uint64[](1);
+    sourceChainSelectors[0] = SOURCE_CHAIN_SELECTOR;
+
+    EVM2EVMMultiOffRamp.SourceChainConfig[] memory sourceChainConfigs = new EVM2EVMMultiOffRamp.SourceChainConfig[](1);
+    sourceChainConfigs[0] = EVM2EVMMultiOffRamp.SourceChainConfig({
+      isEnabled: true,
+      prevOffRamp: address(0),
+      onRamp: address(0),
+      metadataHash: ""
+    });
+
+    vm.expectRevert(EVM2EVMMultiOffRamp.ZeroAddressNotAllowed.selector);
+
+    s_offRamp = new EVM2EVMMultiOffRampHelper(
+      EVM2EVMMultiOffRamp.StaticConfig({
+        commitStore: address(s_mockCommitStore),
+        chainSelector: DEST_CHAIN_SELECTOR,
+        armProxy: address(s_mockARM)
+      }),
+      sourceChainSelectors,
+      sourceChainConfigs,
+      RateLimiter.Config({isEnabled: true, rate: 1e20, capacity: 1e20})
+    );
+  }
+
+  // TODO: revisit in applySourceChainConfigUpdates after MultiCommitStore integration
+  // function test_CommitStoreAlreadyInUse_Revert() public {
+  //   s_mockCommitStore.setExpectedNextSequenceNumber(2);
+
+  //   vm.expectRevert(EVM2EVMMultiOffRamp.CommitStoreAlreadyInUse.selector);
+
+  //   s_offRamp = new EVM2EVMMultiOffRampHelper(
+  //     EVM2EVMMultiOffRamp.StaticConfig({
+  //       commitStore: address(s_mockCommitStore),
+  //       chainSelector: DEST_CHAIN_SELECTOR,
+  //       sourceChainSelector: SOURCE_CHAIN_SELECTOR,
+  //       onRamp: ON_RAMP_ADDRESS,
+  //       prevOffRamp: address(0),
+  //       armProxy: address(s_mockARM)
+  //     }),
+  //     getInboundRateLimiterConfig()
+  //   );
+  // }
+}
 
 contract EVM2EVMMultiOffRamp_setDynamicConfig is EVM2EVMMultiOffRampSetup {
   // OffRamp event
@@ -530,15 +672,5 @@ contract EVM2EVMMultiOffRamp_applySoureConfigUpdates is EVM2EVMMultiOffRampSetup
 
     vm.expectRevert(EVM2EVMMultiOffRamp.ZeroAddressNotAllowed.selector);
     s_offRamp.applySourceConfigUpdates(sourceChainSelectors, sourceChainConfigs);
-  }
-
-  function _assertSourceChainConfigEquality(
-    EVM2EVMMultiOffRamp.SourceChainConfig memory config1,
-    EVM2EVMMultiOffRamp.SourceChainConfig memory config2
-  ) internal pure {
-    assertEq(config1.isEnabled, config2.isEnabled);
-    assertEq(config1.prevOffRamp, config2.prevOffRamp);
-    assertEq(config1.onRamp, config2.onRamp);
-    assertEq(config1.metadataHash, config2.metadataHash);
   }
 }
