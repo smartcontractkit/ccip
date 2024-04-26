@@ -36,6 +36,7 @@ import (
 	ctftestenv "github.com/smartcontractkit/chainlink-testing-framework/docker/test_env"
 	"github.com/smartcontractkit/chainlink-testing-framework/k8s/environment"
 	"github.com/smartcontractkit/chainlink-testing-framework/networks"
+
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/contracts"
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/contracts/laneconfig"
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/testconfig"
@@ -70,7 +71,6 @@ const (
 	ChaosGroupCCIPGeth                = "CCIPGeth"                        // both source and destination simulated geth networks
 	ChaosGroupNetworkACCIPGeth        = "CCIPNetworkAGeth"
 	ChaosGroupNetworkBCCIPGeth        = "CCIPNetworkBGeth"
-	RootSnoozeTimeSimulated           = 3 * time.Minute
 	// The higher the load/throughput, the higher value we might need here to guarantee that nonces are not blocked
 	// 1 day should be enough for most of the cases
 	PermissionlessExecThreshold = 60 * 60 * 24 // 1 day
@@ -92,7 +92,12 @@ var (
 	}
 	InflightExpiryExec   = 3 * time.Minute
 	InflightExpiryCommit = 3 * time.Minute
-	GethLabel            = func(name string) string {
+	BatchGasLimit        = uint32(7_000_000)
+
+	MaxDataBytes = uint32(50_000)
+
+	RootSnoozeTime = 3 * time.Minute
+	GethLabel      = func(name string) string {
 		return fmt.Sprintf("%s-ethereum-geth", name)
 	}
 	// ApprovedAmountToRouter is the default amount which gets approved for router so that it can transfer token and use the fee token for fee payment
@@ -1209,12 +1214,13 @@ func (sourceCCIP *SourceCCIPModule) SetTokenTransferFeeConfig() error {
 			destGasOverhead = 120_000
 		}
 		tokenTransferFeeConfig = append(tokenTransferFeeConfig, evm_2_evm_onramp.EVM2EVMOnRampTokenTransferFeeConfigArgs{
-			Token:             token.ContractAddress,
-			MinFeeUSDCents:    50,           // $0.5
-			MaxFeeUSDCents:    1_000_000_00, // $ 1 million
-			DeciBps:           5_0,          // 5 bps
-			DestGasOverhead:   destGasOverhead,
-			DestBytesOverhead: destByteOverhead,
+			Token:                     token.ContractAddress,
+			MinFeeUSDCents:            50,           // $0.5
+			MaxFeeUSDCents:            1_000_000_00, // $ 1 million
+			DeciBps:                   5_0,          // 5 bps
+			DestGasOverhead:           destGasOverhead,
+			DestBytesOverhead:         destByteOverhead,
+			AggregateRateLimitEnabled: true,
 		})
 	}
 	err := sourceCCIP.OnRamp.SetTokenTransferFeeConfig(tokenTransferFeeConfig)
@@ -1706,6 +1712,25 @@ func (destCCIP *DestCCIPModule) LoadContracts(conf *laneconfig.LaneConfig) {
 	}
 }
 
+func (destCCIP *DestCCIPModule) AddRateLimitTokens(srcTokens, destTokens []*contracts.ERC20Token) error {
+	if srcTokens == nil || destTokens == nil {
+		return fmt.Errorf("source or destination tokens are nil")
+	}
+
+	if len(srcTokens) != len(destTokens) {
+		return fmt.Errorf("source and destination token length mismatch")
+	}
+
+	var sourceTokenAddresses, destTokenAddresses []common.Address
+
+	for i, token := range srcTokens {
+		sourceTokenAddresses = append(sourceTokenAddresses, common.HexToAddress(token.Address()))
+		destTokenAddresses = append(destTokenAddresses, common.HexToAddress(destTokens[i].Address()))
+	}
+
+	return destCCIP.OffRamp.UpdateRateLimitTokens(sourceTokenAddresses, destTokenAddresses)
+}
+
 // DeployContracts deploys all CCIP contracts specific to the destination chain
 func (destCCIP *DestCCIPModule) DeployContracts(
 	sourceCCIP SourceCCIPModule,
@@ -1779,12 +1804,7 @@ func (destCCIP *DestCCIPModule) DeployContracts(
 		if destCCIP.Common.ExistingDeployment {
 			return fmt.Errorf("offramp address not provided in lane config")
 		}
-		destCCIP.OffRamp, err = contractDeployer.DeployOffRamp(
-			destCCIP.SourceChainSelector,
-			destChainSelector,
-			destCCIP.CommitStore.EthAddress,
-			sourceCCIP.OnRamp.EthAddress,
-			destCCIP.Common.RateLimiterConfig, *destCCIP.Common.ARMContract)
+		destCCIP.OffRamp, err = contractDeployer.DeployOffRamp(destCCIP.SourceChainSelector, destChainSelector, destCCIP.CommitStore.EthAddress, sourceCCIP.OnRamp.EthAddress, destCCIP.Common.RateLimiterConfig, *destCCIP.Common.ARMContract)
 		if err != nil {
 			return fmt.Errorf("deploying offramp shouldn't fail %w", err)
 		}
@@ -1797,6 +1817,15 @@ func (destCCIP *DestCCIPModule) DeployContracts(
 		_, err = destCCIP.Common.Router.AddOffRamp(destCCIP.OffRamp.EthAddress, destCCIP.SourceChainSelector)
 		if err != nil {
 			return fmt.Errorf("setting offramp as fee updater shouldn't fail %w", err)
+		}
+
+		err = destCCIP.AddRateLimitTokens(sourceCCIP.Common.BridgeTokens, destCCIP.Common.BridgeTokens)
+		if err != nil {
+			return fmt.Errorf("setting rate limited tokens shouldn't fail %w", err)
+		}
+		err = destCCIP.Common.ChainClient.WaitForEvents()
+		if err != nil {
+			return fmt.Errorf("waiting for events on destination contract shouldn't fail %w", err)
 		}
 
 		err = destCCIP.Common.ChainClient.WaitForEvents()
@@ -3209,12 +3238,8 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 // SetOCR2Configs sets the oracle config in ocr2 contracts
 // nil value in execNodes denotes commit and execution jobs are to be set up in same DON
 func SetOCR2Configs(commitNodes, execNodes []*client.CLNodesWithKeys, destCCIP DestCCIPModule) error {
-	rootSnooze := commonconfig.MustNewDuration(7 * time.Minute)
 	inflightExpiryExec := commonconfig.MustNewDuration(InflightExpiryExec)
 	inflightExpiryCommit := commonconfig.MustNewDuration(InflightExpiryCommit)
-	if destCCIP.Common.ChainClient.NetworkSimulated() {
-		rootSnooze = commonconfig.MustNewDuration(RootSnoozeTimeSimulated)
-	}
 
 	signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig, err := contracts.NewOffChainAggregatorV2ConfigForCCIPPlugin(
 		commitNodes, testhelpers.NewCommitOffchainConfig(
@@ -3245,16 +3270,16 @@ func SetOCR2Configs(commitNodes, execNodes []*client.CLNodesWithKeys, destCCIP D
 		signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig, err = contracts.NewOffChainAggregatorV2ConfigForCCIPPlugin(
 			nodes, testhelpers.NewExecOffchainConfig(
 				1,
-				7_000_000,
+				BatchGasLimit,
 				0.7,
 				*inflightExpiryExec,
-				*rootSnooze,
+				*commonconfig.MustNewDuration(RootSnoozeTime),
 			), testhelpers.NewExecOnchainConfig(
 				PermissionlessExecThreshold,
 				destCCIP.Common.Router.EthAddress,
 				destCCIP.Common.PriceRegistry.EthAddress,
 				MaxNoOfTokensInMsg,
-				50000,
+				MaxDataBytes,
 				200_000,
 			), contracts.OCR2ParamsForExec, 3*time.Minute)
 		if err != nil {

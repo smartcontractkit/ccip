@@ -1,8 +1,8 @@
 # Crib Devspace Setup
 
-CRIB is a devspace configuration to launch CCIP enabled chainlink cluster 
+CRIB is a devspace configuration to launch CCIP enabled chainlink cluster
 
- CL nodes cluster for system level tests
+CL nodes cluster for system level tests
 
 Install `kubefwd` (no nixpkg for it yet, planned)
 
@@ -28,16 +28,17 @@ Configure the cluster, see `deployments.app.helm.values` and [values.yaml](./val
 
 Set up your K8s access
 
-```
-export DEVSPACE_IMAGE="..."
-./setup.sh ${my-personal-namespace-name-crib}
-```
-
-Create a .env file based on the .env.sample file
+Copy the `.env.example` file to `.env` and fill in the required values
 
 ```sh
-cp .env.sample .env
-# Fill in the required values in .env
+cp crib/.env.example crib/.env
+```
+
+```
+cd crib/
+nix develop
+# Pro tip: use `crib-` as a prefix for your namespace.
+cribbit.sh <your crib namespace>
 ```
 
 Build and deploy the current state of your repository
@@ -86,7 +87,8 @@ devspace purge
 ```
 
 ## CCIP Contracts and Jobs Deployment
-By default, the root helm chart includes a post install hook defined in the ccip-scripts-deploy job. 
+
+By default, the root helm chart includes a post install hook defined in the ccip-scripts-deploy job.
 It will deploy contracts and jobs to make the CCIP enabled cluster operational.
 
 `ccip-scripts-deploy` job usually takes around 6 minutes to complete.
@@ -123,40 +125,15 @@ We are using [Grabana](https://github.com/K-Phoen/grabana) lib to create dashboa
 You can also select dashboard platform in `INFRA_PLATFORM` either `kubernetes` or `docker`
 
 ```
-export LOKI_TENANT_ID=promtail
-export LOKI_URL=...
 export GRAFANA_URL=...
 export GRAFANA_TOKEN=...
 export PROMETHEUS_DATA_SOURCE_NAME=Thanos
 export LOKI_DATA_SOURCE_NAME=Loki
 export INFRA_PLATFORM=kubernetes
 export GRAFANA_FOLDER=CRIB
-export DASHBOARD_NAME=CCIP-Cluster-Load
+export DASHBOARD_NAME=CCIP-Cluster-Load-Test
 
 devspace run dashboard_deploy
 ```
 
-Open Grafana folder `DashboardCoreDebug` and find dashboard `ChainlinkClusterDebug`
-
-# Testing
-
-Deploy your dashboard and run soak/load [tests](../../integration-tests/load/), check [README](../../integration-tests/README.md) for further explanations
-
-```
-devspace run dashboard_deploy
-devspace run workload
-devspace run dashboard_test
-```
-
-# Local Testing
-
-Go to [dashboard-lib](../dashboard-lib) and link the modules locally
-
-```
-cd dashboard
-pnpm link --global
-cd charts/chainlink-cluster/dashboard/tests
-pnpm link --global dashboard-tests
-```
-
-Then run the tests with commands mentioned above
+Open Grafana folder `CRIB` and find dashboard `CCIP-Cluster-Load-Test`

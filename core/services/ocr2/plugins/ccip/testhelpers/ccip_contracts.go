@@ -15,10 +15,11 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
+	"github.com/stretchr/testify/require"
+
 	"github.com/smartcontractkit/libocr/offchainreporting2/confighelper"
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2/types"
 	ocr2types "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
-	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
 
@@ -46,8 +47,8 @@ import (
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_2_0"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/hashlib"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/merklemulti"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/pkg/hashlib"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/pkg/merklemulti"
 )
 
 var (
@@ -346,12 +347,13 @@ func (c *CCIPContracts) DeployNewOnRamp(t *testing.T) {
 		},
 		[]evm_2_evm_onramp.EVM2EVMOnRampTokenTransferFeeConfigArgs{
 			{
-				Token:             c.Source.LinkToken.Address(),
-				MinFeeUSDCents:    50,           // $0.5
-				MaxFeeUSDCents:    1_000_000_00, // $ 1 million
-				DeciBps:           5_0,          // 5 bps
-				DestGasOverhead:   34_000,
-				DestBytesOverhead: 0,
+				Token:                     c.Source.LinkToken.Address(),
+				MinFeeUSDCents:            50,           // $0.5
+				MaxFeeUSDCents:            1_000_000_00, // $ 1 million
+				DeciBps:                   5_0,          // 5 bps
+				DestGasOverhead:           34_000,
+				DestBytesOverhead:         0,
+				AggregateRateLimitEnabled: true,
 			},
 		},
 		[]evm_2_evm_onramp.EVM2EVMOnRampNopAndWeight{},
@@ -1060,12 +1062,13 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 		},
 		[]evm_2_evm_onramp.EVM2EVMOnRampTokenTransferFeeConfigArgs{
 			{
-				Token:             sourceLinkTokenAddress,
-				MinFeeUSDCents:    50,           // $0.5
-				MaxFeeUSDCents:    1_000_000_00, // $ 1 million
-				DeciBps:           5_0,          // 5 bps
-				DestGasOverhead:   34_000,
-				DestBytesOverhead: 0,
+				Token:                     sourceLinkTokenAddress,
+				MinFeeUSDCents:            50,           // $0.5
+				MaxFeeUSDCents:            1_000_000_00, // $ 1 million
+				DeciBps:                   5_0,          // 5 bps
+				DestGasOverhead:           34_000,
+				DestBytesOverhead:         0,
+				AggregateRateLimitEnabled: true,
 			},
 		},
 		[]evm_2_evm_onramp.EVM2EVMOnRampNopAndWeight{},
