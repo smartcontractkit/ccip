@@ -268,7 +268,7 @@ jobs:
           wsEndpoints: ${{ secrets.QA_SEPOLIA_URLS }}
           fundingKeys: ${{ secrets.QA_EVM_KEYS }}
       - name: Download Tests Binary
-        uses: actions/download-artifact@c850b930e6ba138125429b7e5c93fc707a7f8427 # v4.1.4
+        uses: actions/download-artifact@65a9edc5881444af0b9093a5e628f2fe47ea3b2e # v4.1.7
         with:
           name: tests
       - name: Run Tests
@@ -341,7 +341,7 @@ jobs:
           wsEndpoints: ${{ secrets.QA_BSC_TESTNET_URLS }}
           fundingKeys: ${{ secrets.QA_EVM_KEYS }}
       - name: Download Tests Binary
-        uses: actions/download-artifact@c850b930e6ba138125429b7e5c93fc707a7f8427 # v4.1.4
+        uses: actions/download-artifact@65a9edc5881444af0b9093a5e628f2fe47ea3b2e # v4.1.7
         with:
           name: tests
       - name: Run Tests
@@ -414,7 +414,7 @@ jobs:
           wsEndpoints: ${{ secrets.QA_OPTIMISM_SEPOLIA_URLS }}
           fundingKeys: ${{ secrets.QA_EVM_KEYS }}
       - name: Download Tests Binary
-        uses: actions/download-artifact@c850b930e6ba138125429b7e5c93fc707a7f8427 # v4.1.4
+        uses: actions/download-artifact@65a9edc5881444af0b9093a5e628f2fe47ea3b2e # v4.1.7
         with:
           name: tests
       - name: Run Tests
@@ -487,7 +487,7 @@ jobs:
           wsEndpoints: ${{ secrets.QA_ARBITRUM_SEPOLIA_URLS }}
           fundingKeys: ${{ secrets.QA_EVM_KEYS }}
       - name: Download Tests Binary
-        uses: actions/download-artifact@c850b930e6ba138125429b7e5c93fc707a7f8427 # v4.1.4
+        uses: actions/download-artifact@65a9edc5881444af0b9093a5e628f2fe47ea3b2e # v4.1.7
         with:
           name: tests
       - name: Run Tests
@@ -556,7 +556,7 @@ jobs:
           wsEndpoints: ${{ secrets.QA_BASE_SEPOLIA_URLS }}
           fundingKeys: ${{ secrets.QA_EVM_KEYS }}
       - name: Download Tests Binary
-        uses: actions/download-artifact@c850b930e6ba138125429b7e5c93fc707a7f8427 # v4.1.4
+        uses: actions/download-artifact@65a9edc5881444af0b9093a5e628f2fe47ea3b2e # v4.1.7
         with:
           name: tests
       - name: Run Tests
@@ -629,7 +629,7 @@ jobs:
           wsEndpoints: ${{ secrets.QA_POLYGON_MUMBAI_URLS }}
           fundingKeys: ${{ secrets.QA_EVM_KEYS }}
       - name: Download Tests Binary
-        uses: actions/download-artifact@c850b930e6ba138125429b7e5c93fc707a7f8427 # v4.1.4
+        uses: actions/download-artifact@65a9edc5881444af0b9093a5e628f2fe47ea3b2e # v4.1.7
         with:
           name: tests
       - name: Run Tests
@@ -702,7 +702,7 @@ jobs:
           wsEndpoints: ${{ secrets.QA_AVALANCHE_FUJI_URLS }}
           fundingKeys: ${{ secrets.QA_EVM_KEYS }}
       - name: Download Tests Binary
-        uses: actions/download-artifact@c850b930e6ba138125429b7e5c93fc707a7f8427 # v4.1.4
+        uses: actions/download-artifact@65a9edc5881444af0b9093a5e628f2fe47ea3b2e # v4.1.7
         with:
           name: tests
       - name: Run Tests
@@ -775,7 +775,7 @@ jobs:
           wsEndpoints: ${{ secrets.QA_FANTOM_TESTNET_URLS }}
           fundingKeys: ${{ secrets.QA_EVM_KEYS }}
       - name: Download Tests Binary
-        uses: actions/download-artifact@c850b930e6ba138125429b7e5c93fc707a7f8427 # v4.1.4
+        uses: actions/download-artifact@65a9edc5881444af0b9093a5e628f2fe47ea3b2e # v4.1.7
         with:
           name: tests
       - name: Run Tests
@@ -844,7 +844,7 @@ jobs:
           wsEndpoints: ${{ secrets.QA_CELO_ALFAJORES_URLS }}
           fundingKeys: ${{ secrets.QA_EVM_KEYS }}
       - name: Download Tests Binary
-        uses: actions/download-artifact@c850b930e6ba138125429b7e5c93fc707a7f8427 # v4.1.4
+        uses: actions/download-artifact@65a9edc5881444af0b9093a5e628f2fe47ea3b2e # v4.1.7
         with:
           name: tests
       - name: Run Tests
@@ -913,7 +913,7 @@ jobs:
           wsEndpoints: ${{ secrets.QA_SCROLL_SEPOLIA_URLS }}
           fundingKeys: ${{ secrets.QA_EVM_KEYS }}
       - name: Download Tests Binary
-        uses: actions/download-artifact@c850b930e6ba138125429b7e5c93fc707a7f8427 # v4.1.4
+        uses: actions/download-artifact@65a9edc5881444af0b9093a5e628f2fe47ea3b2e # v4.1.7
         with:
           name: tests
       - name: Run Tests
@@ -982,7 +982,7 @@ jobs:
           wsEndpoints: ${{ secrets.QA_LINEA_GOERLI_URLS }}
           fundingKeys: ${{ secrets.QA_EVM_KEYS }}
       - name: Download Tests Binary
-        uses: actions/download-artifact@c850b930e6ba138125429b7e5c93fc707a7f8427 # v4.1.4
+        uses: actions/download-artifact@65a9edc5881444af0b9093a5e628f2fe47ea3b2e # v4.1.7
         with:
           name: tests
       - name: Run Tests
