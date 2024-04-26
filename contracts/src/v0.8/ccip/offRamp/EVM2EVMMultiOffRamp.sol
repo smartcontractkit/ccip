@@ -495,6 +495,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndV
   /// @notice Updates source configs
   /// @param sourceChainSelectors Source chain selectors to update configs for
   /// @param sourceConfigs Source chain configs (matching source chain selectors array)
+  ///        Note: metadataHash is unused from the input
   function applySourceConfigUpdates(
     uint64[] memory sourceChainSelectors,
     SourceChainConfig[] memory sourceConfigs
@@ -511,6 +512,12 @@ contract EVM2EVMMultiOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndV
          revert ZeroAddressNotAllowed();
       }
 
+      // OnRamp can never be zero - if it is, then the source chain has been added for the first time
+      if (s_sourceChainConfigs[sourceChainSelector].onRamp == address(0)) {
+        s_sourceChainSelectors.push(sourceChainSelector);
+        emit SourceChainSelectorAdded(sourceChainSelector);
+      }
+
       // TODO: re-introduce check when MultiCommitStore is ready
       // Ensures we can never deploy a new offRamp that points to a commitStore that
       // already has roots committed.
@@ -521,12 +528,6 @@ contract EVM2EVMMultiOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndV
       //       If it cannot - validate and restrict
       sourceConfig.metadataHash = _metadataHash(sourceChainSelector, sourceConfig.onRamp, Internal.EVM_2_EVM_MESSAGE_HASH);
       s_sourceChainConfigs[sourceChainSelector] = sourceConfig;
-
-      // OnRamp can never be zero - if it is, then the source chain has been added for the first time
-      if (s_sourceChainConfigs[sourceChainSelector].onRamp == address(0)) {
-        s_sourceChainSelectors.push(sourceChainSelector);
-        emit SourceChainSelectorAdded(sourceChainSelector);
-      }
 
       emit SourceChainConfigSet(sourceChainSelector, sourceConfig);
     }
