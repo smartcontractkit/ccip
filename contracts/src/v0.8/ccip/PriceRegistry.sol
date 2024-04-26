@@ -198,6 +198,7 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator, ITypeAndVersion {
       /* uint80 answeredInRound */
     ) = dataFeedContract.latestRoundData();
 
+    // solhint-disable-next-line gas-custom-errors
     require(dataFeedAnswer >= 0, "Data feed value must be positive");
     uint256 rebasedValue = uint256(dataFeedAnswer);
 
@@ -217,6 +218,7 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator, ITypeAndVersion {
       rebasedValue *= 10 ** (36 - excessDecimals);
     }
 
+    // solhint-disable-next-line gas-custom-errors
     require(rebasedValue <= type(uint224).max, "Rebased data feed value does not fit in 224 bits");
     return (uint224(rebasedValue), uint32(updatedAt));
   }
