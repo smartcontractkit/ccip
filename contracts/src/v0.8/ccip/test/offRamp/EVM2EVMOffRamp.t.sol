@@ -1240,6 +1240,54 @@ contract EVM2EVMOffRamp__releaseOrMintTokens is EVM2EVMOffRampSetup {
     );
   }
 
+  function test_releaseOrMintTokens_InvalidDataLengthReturnData_Revert() public {
+    uint256 amount = 100;
+    Client.EVMTokenAmount[] memory srcTokenAmounts = getCastedSourceEVMTokenAmountsWithZeroAmounts();
+    srcTokenAmounts[0].amount = amount;
+
+    bytes memory originalSender = abi.encode(OWNER);
+    bytes[] memory offchainTokenData = new bytes[](srcTokenAmounts.length);
+    bytes[] memory sourceTokenData = _getDefaultSourceTokenData(srcTokenAmounts);
+
+    vm.mockCall(
+      s_destPoolBySourceToken[srcTokenAmounts[0].token],
+      abi.encodeWithSelector(
+        LockReleaseTokenPool.releaseOrMint.selector,
+        originalSender,
+        OWNER,
+        amount,
+        SOURCE_CHAIN_SELECTOR,
+        abi.decode(sourceTokenData[0], (IPool.SourceTokenData)),
+        offchainTokenData[0]
+      ),
+      // Includes the token twice, this will revert due to the return data being to long
+      abi.encode(s_destFeeToken, s_destFeeToken, amount)
+    );
+
+    vm.expectRevert(abi.encodeWithSelector(EVM2EVMOffRamp.InvalidDataLength.selector, 64, 96));
+
+    s_offRamp.releaseOrMintTokens(srcTokenAmounts, originalSender, OWNER, sourceTokenData, offchainTokenData);
+  }
+
+  function test_releaseOrMintTokens_InvalidDataLengthPoolAddress_Revert() public {
+    Client.EVMTokenAmount[] memory srcTokenAmounts = getCastedSourceEVMTokenAmountsWithZeroAmounts();
+
+    bytes memory originalSender = abi.encode(OWNER);
+    bytes[] memory offchainTokenData = new bytes[](srcTokenAmounts.length);
+    bytes[] memory sourceTokenData = _getDefaultSourceTokenData(srcTokenAmounts);
+    sourceTokenData[0] = abi.encode(
+      IPool.SourceTokenData({
+        sourcePoolAddress: abi.encode(s_sourcePoolByToken[srcTokenAmounts[0].token]),
+        destPoolAddress: abi.encode(address(1000), address(10000), address(10000)),
+        extraData: ""
+      })
+    );
+
+    vm.expectRevert(abi.encodeWithSelector(EVM2EVMOffRamp.InvalidDataLength.selector, 32, 96));
+
+    s_offRamp.releaseOrMintTokens(srcTokenAmounts, originalSender, OWNER, sourceTokenData, offchainTokenData);
+  }
+
   function test_RateLimitErrors_Reverts() public {
     Client.EVMTokenAmount[] memory srcTokenAmounts = getCastedSourceEVMTokenAmountsWithZeroAmounts();
 
