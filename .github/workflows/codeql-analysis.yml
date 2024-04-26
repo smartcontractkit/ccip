@@ -40,7 +40,7 @@ jobs:
           languages: ${{ matrix.language }}
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@65c74964a9ed8c44ed9f19d4bbc5757a6a8e9ab9 # codeql-bundle-v2.16.1
+        uses: github/codeql-action/analyze@d39d31e687223d841ef683f52467bd88e9b21c14 # v3.25.3
 
       - name: Collect Metrics
         if: always()
