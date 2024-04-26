@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.19;
 
-import {IPriceRegistry} from "../interfaces/IPriceRegistry.sol";
 import {IPool} from "../interfaces/IPool.sol";
+import {IPriceRegistry} from "../interfaces/IPriceRegistry.sol";
 
 import {ARM} from "../ARM.sol";
 import {Internal} from "../libraries/Internal.sol";
