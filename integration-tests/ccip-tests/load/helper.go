@@ -115,7 +115,7 @@ func (l *LoadArgs) SanityCheck() {
 			l.TestCfg.TestGroupInput.PhaseTimeout.Duration(),
 			1, 0, nil,
 		)
-		ccipLoad.BeforeAllCall(l.TestCfg.TestGroupInput.MsgDetails.IsTokenTransfer(), big.NewInt(*l.TestCfg.TestGroupInput.MsgDetails.DestGasLimit))
+		ccipLoad.BeforeAllCall(false, big.NewInt(*l.TestCfg.TestGroupInput.MsgDetails.DestGasLimit))
 		resp := ccipLoad.Call(nil)
 		require.False(l.t, resp.Failed, "request failed in sanity check")
 	}

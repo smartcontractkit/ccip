@@ -1002,6 +1002,19 @@ type DynamicPriceGetterConfig struct {
 	StaticPrices     map[common.Address]StaticPriceConfig     `json:"staticPrices"`
 }
 
+func (d *DynamicPriceGetterConfig) AddPriceConfig(
+	tokenAddr string,
+	aggregatorMap map[common.Address]*contracts.MockAggregator,
+	price *big.Int,
+	chainID uint64,
+) error {
+	aggregatorContract, ok := aggregatorMap[common.HexToAddress(tokenAddr)]
+	if !ok || aggregatorContract == nil {
+		return d.AddStaticPriceConfig(tokenAddr, chainID, price)
+	}
+	return d.AddAggregatorPriceConfig(tokenAddr, aggregatorMap, price)
+}
+
 func (d *DynamicPriceGetterConfig) AddAggregatorPriceConfig(
 	tokenAddr string,
 	aggregatorMap map[common.Address]*contracts.MockAggregator,
@@ -2394,46 +2407,30 @@ type CCIPLane struct {
 	DstNetworkLaneCfg *laneconfig.LaneConfig
 }
 
-func (lane *CCIPLane) TokenPricesConfig(static bool) (string, error) {
+func (lane *CCIPLane) TokenPricesConfig() (string, error) {
 	d := DynamicPriceGetterConfig{
 		AggregatorPrices: make(map[common.Address]AggregatorPriceConfig),
 		StaticPrices:     make(map[common.Address]StaticPriceConfig),
 	}
-	if static {
-		for _, token := range lane.Dest.Common.BridgeTokens {
-			err := d.AddStaticPriceConfig(token.Address(), lane.DestChain.GetChainID().Uint64(), LinkToUSD)
-			if err != nil {
-				return "", fmt.Errorf("error in AddStaticPriceConfig for bridge token %s: %w", token.Address(), err)
-			}
-		}
-		err := d.AddStaticPriceConfig(lane.Dest.Common.FeeToken.Address(), lane.DestChain.GetChainID().Uint64(), LinkToUSD)
-		if err != nil {
-			return "", fmt.Errorf("error in AddStaticPriceConfig for Fee token %s: %w", lane.Dest.Common.FeeToken.Address(), err)
-		}
-		err = d.AddStaticPriceConfig(lane.Dest.Common.WrappedNative.Hex(), lane.DestChain.GetChainID().Uint64(), WrappedNativeToUSD)
-		if err != nil {
-			return "", fmt.Errorf("error in AddStaticPriceConfig for WrappedNative token %s: %w", lane.Dest.Common.WrappedNative.Hex(), err)
-		}
-		err = d.AddStaticPriceConfig(lane.Source.Common.WrappedNative.Hex(), lane.SourceChain.GetChainID().Uint64(), WrappedNativeToUSD)
-		if err != nil {
-			return "", fmt.Errorf("error in AddStaticPriceConfig for WrappedNative token %s: %w", lane.Source.Common.WrappedNative.Hex(), err)
-		}
-		return d.String()
-	}
+	// for each token if there is a price aggregator, add it to the aggregator prices
+	// else add it to the static prices
 	for _, token := range lane.Dest.Common.BridgeTokens {
-		err := d.AddAggregatorPriceConfig(token.Address(), lane.Dest.Common.PriceAggregators, LinkToUSD)
+		err := d.AddPriceConfig(token.Address(), lane.Dest.Common.PriceAggregators, LinkToUSD, lane.DestChain.GetChainID().Uint64())
 		if err != nil {
-			return "", fmt.Errorf("error in AddAggregatorPriceConfig for bridge token %s: %w", token.Address(), err)
+			return "", fmt.Errorf("error in adding PriceConfig for dest bridge token %s: %w", token.Address(), err)
 		}
 	}
-	if err := d.AddAggregatorPriceConfig(lane.Dest.Common.FeeToken.Address(), lane.Dest.Common.PriceAggregators, LinkToUSD); err != nil {
-		return "", fmt.Errorf("error in AddAggregatorPriceConfig for fee token %s: %w", lane.Dest.Common.FeeToken.Address(), err)
+	err := d.AddPriceConfig(lane.Dest.Common.FeeToken.Address(), lane.Dest.Common.PriceAggregators, LinkToUSD, lane.DestChain.GetChainID().Uint64())
+	if err != nil {
+		return "", fmt.Errorf("error adding PriceConfig for dest Fee token %s: %w", lane.Dest.Common.FeeToken.Address(), err)
 	}
-	if err := d.AddAggregatorPriceConfig(lane.Dest.Common.WrappedNative.Hex(), lane.Dest.Common.PriceAggregators, WrappedNativeToUSD); err != nil {
-		return "", fmt.Errorf("error in AddAggregatorPriceConfig for wrapped native on dest %s: %w", lane.Dest.Common.WrappedNative.Hex(), err)
+	err = d.AddPriceConfig(lane.Dest.Common.WrappedNative.Hex(), lane.Dest.Common.PriceAggregators, WrappedNativeToUSD, lane.DestChain.GetChainID().Uint64())
+	if err != nil {
+		return "", fmt.Errorf("error in adding PriceConfig for dest WrappedNative token %s: %w", lane.Dest.Common.WrappedNative.Hex(), err)
 	}
-	if err := d.AddAggregatorPriceConfig(lane.Source.Common.WrappedNative.Hex(), lane.Source.Common.PriceAggregators, WrappedNativeToUSD); err != nil {
-		return "", fmt.Errorf("error in AddAggregatorPriceConfig for wrapped native on source %s: %w", lane.Source.Common.WrappedNative.Hex(), err)
+	err = d.AddPriceConfig(lane.Source.Common.WrappedNative.Hex(), lane.Source.Common.PriceAggregators, WrappedNativeToUSD, lane.SourceChain.GetChainID().Uint64())
+	if err != nil {
+		return "", fmt.Errorf("error in adding PriceConfig for source WrappedNative token %s: %w", lane.Source.Common.WrappedNative.Hex(), err)
 	}
 	return d.String()
 }
@@ -3055,7 +3052,6 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 	destConf := lane.DstNetworkLaneCfg
 	commitAndExecOnSameDON := pointer.GetBool(testConf.CommitAndExecuteOnSameDON)
 	withPipeline := pointer.GetBool(testConf.TokenConfig.WithPipeline)
-	staticPrice := !testConf.TokenConfig.IsDynamicPriceUpdate()
 	transferAmounts := testConf.MsgDetails.TransferAmounts()
 	msgByteLength := pointer.GetInt64(testConf.MsgDetails.DataLength)
 	existingDeployment := pointer.GetBool(testConf.ExistingDeployment)
@@ -3167,7 +3163,7 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 		tokensUSDUrl := TokenPricePipelineURLs(tokenAddresses, killgrave, env.MockServer)
 		tokenPricesUSDPipeline = TokenFeeForMultipleTokenAddr(tokensUSDUrl)
 	} else {
-		tokenPricesConfigJson, err = lane.TokenPricesConfig(staticPrice)
+		tokenPricesConfigJson, err = lane.TokenPricesConfig()
 		if err != nil {
 			return fmt.Errorf("error getting token prices config %w", err)
 		}

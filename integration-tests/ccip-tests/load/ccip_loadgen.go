@@ -101,17 +101,19 @@ func (c *CCIPE2ELoad) BeforeAllCall(isTokenTranfer bool, gasLimit *big.Int) {
 		Data:      []byte("message with Id 1"),
 	}
 	var tokenAndAmounts []router.ClientEVMTokenAmount
-	for i := range c.Lane.Source.TransferAmount {
-		// if length of sourceCCIP.TransferAmount is more than available bridge token use first bridge token
-		token := sourceCCIP.Common.BridgeTokens[0]
-		if i < len(sourceCCIP.Common.BridgeTokens) {
-			token = sourceCCIP.Common.BridgeTokens[i]
+	if isTokenTranfer && len(c.Lane.Source.Common.BridgeTokens) > 0 {
+		for i := range c.Lane.Source.TransferAmount {
+			// if length of sourceCCIP.TransferAmount is more than available bridge token use first bridge token
+			token := sourceCCIP.Common.BridgeTokens[0]
+			if i < len(sourceCCIP.Common.BridgeTokens) {
+				token = sourceCCIP.Common.BridgeTokens[i]
+			}
+			tokenAndAmounts = append(tokenAndAmounts, router.ClientEVMTokenAmount{
+				Token: common.HexToAddress(token.Address()), Amount: c.Lane.Source.TransferAmount[i],
+			})
 		}
-		tokenAndAmounts = append(tokenAndAmounts, router.ClientEVMTokenAmount{
-			Token: common.HexToAddress(token.Address()), Amount: c.Lane.Source.TransferAmount[i],
-		})
+		c.msg.TokenAmounts = tokenAndAmounts
 	}
-	c.msg.TokenAmounts = tokenAndAmounts
 
 	if c.SendMaxDataIntermittentlyInMsgCount > 0 {
 		dCfg, err := sourceCCIP.OnRamp.Instance.GetDynamicConfig(nil)
