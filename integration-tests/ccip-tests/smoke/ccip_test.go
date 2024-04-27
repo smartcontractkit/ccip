@@ -234,7 +234,6 @@ func TestSmokeCCIPRateLimit(t *testing.T) {
 			require.NoError(t, tc.lane.Source.Common.ChainClient.WaitForEvents())
 			failedTx, _, _, err := tc.lane.Source.SendRequest(
 				tc.lane.Dest.ReceiverDapp.EthAddress,
-				"msg with token more than aggregated capacity",
 				big.NewInt(600_000), // gas limit
 			)
 			require.NoError(t, err)
@@ -263,7 +262,6 @@ func TestSmokeCCIPRateLimit(t *testing.T) {
 			src.TransferAmount[0] = new(big.Int).Mul(AggregatedRateLimitRate, big.NewInt(10))
 			failedTx, _, _, err = tc.lane.Source.SendRequest(
 				tc.lane.Dest.ReceiverDapp.EthAddress,
-				"msg with token more than aggregated rate",
 				big.NewInt(600_000), // gas limit
 			)
 			tc.lane.Logger.Info().Str("tokensTobeSent", src.TransferAmount[0].String()).Msg("More than Aggregated Rate")
@@ -332,7 +330,6 @@ func TestSmokeCCIPRateLimit(t *testing.T) {
 
 			failedTx, _, _, err = tc.lane.Source.SendRequest(
 				tc.lane.Dest.ReceiverDapp.EthAddress,
-				"msg with token more than token pool capacity",
 				big.NewInt(600_000), // gas limit
 			)
 			require.NoError(t, err)
@@ -366,7 +363,6 @@ func TestSmokeCCIPRateLimit(t *testing.T) {
 			require.NoError(t, tc.lane.Source.Common.ChainClient.WaitForEvents())
 			failedTx, _, _, err = tc.lane.Source.SendRequest(
 				tc.lane.Dest.ReceiverDapp.EthAddress,
-				"msg with token more than token pool rate",
 				big.NewInt(600_000),
 			)
 			require.NoError(t, err)
