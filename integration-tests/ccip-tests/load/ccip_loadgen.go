@@ -163,7 +163,7 @@ func (c *CCIPE2ELoad) CCIPMsg() (router.ClientEVM2AnyMessage, *testreporters.Req
 		b := make([]byte, msgLength)
 		_, err := crypto_rand.Read(b)
 		if err != nil {
-			return router.ClientEVM2AnyMessage{}, stats, fmt.Errorf("failed to generate random string %v", err)
+			return router.ClientEVM2AnyMessage{}, stats, fmt.Errorf("failed to generate random string %w", err)
 		}
 		randomString := base64.URLEncoding.EncodeToString(b)
 		msg.Data = []byte(randomString[:msgLength])
