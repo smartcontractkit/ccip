@@ -467,20 +467,20 @@ func (o *CCIPTestSetUpOutputs) AddLanesForNetworkPair(
 	lggr zerolog.Logger,
 	networkA, networkB blockchain.EVMNetwork,
 	chainClientA, chainClientB blockchain.EVMClient,
-	commitAndExecOnSameDON, bidirectional bool,
 ) error {
 	var allErrors atomic.Error
 	t := o.Cfg.Test
 	var k8Env *environment.Environment
 	ccipEnv := o.Env
 	namespace := o.Cfg.TestGroupInput.TestRunName
+	bidirectional := pointer.GetBool(o.Cfg.TestGroupInput.BiDirectionalLane)
 	if ccipEnv != nil {
 		k8Env = ccipEnv.K8Env
 		if k8Env != nil {
 			namespace = k8Env.Cfg.Namespace
 		}
 	}
-	configureCLNode := !pointer.GetBool(o.Cfg.TestGroupInput.ExistingDeployment)
+
 	setUpFuncs, ctx := errgroup.WithContext(testcontext.Get(t))
 
 	// Use new set of clients(sourceChainClient,destChainClient)
@@ -576,15 +576,9 @@ func (o *CCIPTestSetUpOutputs) AddLanesForNetworkPair(
 
 	setUpFuncs.Go(func() error {
 		lggr.Info().Msgf("Setting up lane %s to %s", networkA.Name, networkB.Name)
-		err := ccipLaneA2B.DeployNewCCIPLane(o.SetUpContext, o.Env, commitAndExecOnSameDON,
-			o.Cfg.TestGroupInput.MsgDetails.TransferAmounts(),
-			pointer.GetInt64(o.Cfg.TestGroupInput.MsgDetails.DataLength),
-			o.BootstrapAdded, configureCLNode, o.JobAddGrp,
-			o.Cfg.TestGroupInput.TokenConfig.IsPipelineSpec(),
-			!o.Cfg.TestGroupInput.TokenConfig.IsDynamicPriceUpdate(),
-			o.Cfg.useExistingDeployment(),
-			o.Cfg.MultiCallEnabled(),
-			o.Cfg.TestGroupInput.USDCMockDeployment,
+		err := ccipLaneA2B.DeployNewCCIPLane(
+			o.SetUpContext, o.Env,
+			o.Cfg.TestGroupInput, o.BootstrapAdded, o.JobAddGrp,
 		)
 		if err != nil {
 			allErrors.Store(multierr.Append(allErrors.Load(), fmt.Errorf("deploying lane %s to %s; err - %w", networkA.Name, networkB.Name, errors.WithStack(err))))
@@ -612,15 +606,9 @@ func (o *CCIPTestSetUpOutputs) AddLanesForNetworkPair(
 	setUpFuncs.Go(func() error {
 		if bidirectional {
 			lggr.Info().Msgf("Setting up lane %s to %s", networkB.Name, networkA.Name)
-			err := ccipLaneB2A.DeployNewCCIPLane(o.SetUpContext, o.Env, commitAndExecOnSameDON,
-				o.Cfg.TestGroupInput.MsgDetails.TransferAmounts(),
-				pointer.GetInt64(o.Cfg.TestGroupInput.MsgDetails.DataLength),
-				o.BootstrapAdded, configureCLNode, o.JobAddGrp,
-				o.Cfg.TestGroupInput.TokenConfig.IsPipelineSpec(),
-				!o.Cfg.TestGroupInput.TokenConfig.IsDynamicPriceUpdate(),
-				o.Cfg.useExistingDeployment(),
-				o.Cfg.MultiCallEnabled(),
-				o.Cfg.TestGroupInput.USDCMockDeployment,
+			err := ccipLaneB2A.DeployNewCCIPLane(
+				o.SetUpContext, o.Env,
+				o.Cfg.TestGroupInput, o.BootstrapAdded, o.JobAddGrp,
 			)
 			if err != nil {
 				lggr.Error().Err(err).Msgf("error deploying lane %s to %s", networkB.Name, networkA.Name)
@@ -897,8 +885,6 @@ func CCIPDefaultTestSetUp(
 			return setUpArgs.AddLanesForNetworkPair(
 				lggr, n.NetworkA, n.NetworkB,
 				chainByChainID[n.NetworkA.ChainID], chainByChainID[n.NetworkB.ChainID],
-				pointer.GetBool(testConfig.TestGroupInput.CommitAndExecuteOnSameDON),
-				pointer.GetBool(testConfig.TestGroupInput.BiDirectionalLane),
 			)
 		})
 	}

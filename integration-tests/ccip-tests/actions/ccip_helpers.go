@@ -3044,23 +3044,24 @@ func (lane *CCIPLane) CleanUp(clearFees bool) error {
 func (lane *CCIPLane) DeployNewCCIPLane(
 	setUpCtx context.Context,
 	env *CCIPTestEnv,
-	commitAndExecOnSameDON bool,
-	transferAmounts []*big.Int,
-	msgByteLength int64,
+	testConf *testconfig.CCIPTestConfig,
 	bootstrapAdded *atomic.Bool,
-	configureCLNodes bool,
 	jobErrGroup *errgroup.Group,
-	withPipeline bool,
-	staticPrice bool,
-	existingDeployment bool,
-	multiCall bool,
-	USDCMockDeployment *bool,
 ) error {
 	var err error
 	sourceChainClient := lane.SourceChain
 	destChainClient := lane.DestChain
 	srcConf := lane.SrcNetworkLaneCfg
 	destConf := lane.DstNetworkLaneCfg
+	commitAndExecOnSameDON := pointer.GetBool(testConf.CommitAndExecuteOnSameDON)
+	withPipeline := pointer.GetBool(testConf.TokenConfig.WithPipeline)
+	staticPrice := !testConf.TokenConfig.IsDynamicPriceUpdate()
+	transferAmounts := testConf.MsgDetails.TransferAmounts()
+	msgByteLength := pointer.GetInt64(testConf.MsgDetails.DataLength)
+	existingDeployment := pointer.GetBool(testConf.ExistingDeployment)
+	configureCLNodes := !existingDeployment
+	USDCMockDeployment := testConf.USDCMockDeployment
+	multiCall := pointer.GetBool(testConf.MulticallInOneTx)
 	lane.Source, err = DefaultSourceCCIPModule(
 		lane.Logger,
 		sourceChainClient, destChainClient.GetChainID().Uint64(),

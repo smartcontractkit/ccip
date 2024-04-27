@@ -118,7 +118,7 @@ func (tc *TokenConfig) Validate() error {
 	if tc.TimeoutForPriceUpdate == nil || tc.TimeoutForPriceUpdate.Duration().Minutes() == 0 {
 		return fmt.Errorf("timeout for price update should be set")
 	}
-	if tc.NoOfTokensWithDynamicPrice != nil || *tc.NoOfTokensWithDynamicPrice > 0 {
+	if tc.NoOfTokensWithDynamicPrice != nil && *tc.NoOfTokensWithDynamicPrice > 0 {
 		if tc.DynamicPriceUpdateInterval == nil || tc.DynamicPriceUpdateInterval.Duration().Minutes() == 0 {
 			return fmt.Errorf("dynamic price update interval should be set if NoOfTokensWithDynamicPrice is greater than 0")
 		}
