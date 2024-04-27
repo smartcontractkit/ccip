@@ -2,6 +2,8 @@ package actions
 
 import (
 	"context"
+	crypto_rand "crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"math/big"
@@ -75,13 +77,9 @@ const (
 	ChaosGroupNetworkBCCIPGeth        = "CCIPNetworkBGeth"
 	// The higher the load/throughput, the higher value we might need here to guarantee that nonces are not blocked
 	// 1 day should be enough for most of the cases
-	PermissionlessExecThreshold = 60 * 60 * 24 // 1 day
-
-	MaxNoOfTokensInMsg        = 50
-	TokenTransfer      string = "WithToken"
-
-	DataOnlyTransfer string = "WithoutToken"
-	CurrentVersion   string = "1.5.0-dev"
+	PermissionlessExecThreshold        = 60 * 60 * 24 // 1 day
+	MaxNoOfTokensInMsg                 = 50
+	CurrentVersion              string = "1.5.0-dev"
 )
 
 type CCIPTOMLEnv struct {
@@ -256,7 +254,7 @@ func (ccipModule *CCIPCommon) CurseARM() (*types.Transaction, error) {
 	return tx, ccipModule.ChainClient.WaitForEvents()
 }
 
-func (ccipModule *CCIPCommon) LoadContractAddresses(conf *laneconfig.LaneConfig) {
+func (ccipModule *CCIPCommon) LoadContractAddresses(conf *laneconfig.LaneConfig, noOfTokens *int) {
 	if conf != nil {
 		if common.IsHexAddress(conf.FeeToken) {
 			ccipModule.FeeToken = &contracts.LinkToken{
@@ -312,6 +310,13 @@ func (ccipModule *CCIPCommon) LoadContractAddresses(conf *laneconfig.LaneConfig)
 			}
 		}
 		if len(conf.BridgeTokens) > 0 {
+			// if noOfTokens is set, then only take that many tokens from the list
+			// the lane config can have more tokens than required for the test
+			if noOfTokens != nil {
+				if len(conf.BridgeTokens) > *noOfTokens {
+					conf.BridgeTokens = conf.BridgeTokens[:*noOfTokens]
+				}
+			}
 			var tokens []*contracts.ERC20Token
 			for _, token := range conf.BridgeTokens {
 				if common.IsHexAddress(token) {
@@ -323,6 +328,13 @@ func (ccipModule *CCIPCommon) LoadContractAddresses(conf *laneconfig.LaneConfig)
 			ccipModule.BridgeTokens = tokens
 		}
 		if len(conf.BridgeTokenPools) > 0 {
+			// if noOfTokens is set, then only take that many tokenpools from the list
+			// the lane config can have more tokenpools than required for the test
+			if noOfTokens != nil {
+				if len(conf.BridgeTokenPools) > *noOfTokens {
+					conf.BridgeTokenPools = conf.BridgeTokenPools[:*noOfTokens]
+				}
+			}
 			var pools []*contracts.TokenPool
 			for _, pool := range conf.BridgeTokenPools {
 				if common.IsHexAddress(pool) {
@@ -671,7 +683,7 @@ func (ccipModule *CCIPCommon) DeployContracts(noOfTokens int,
 	var err error
 	cd := ccipModule.Deployer
 
-	ccipModule.LoadContractAddresses(conf)
+	ccipModule.LoadContractAddresses(conf, &noOfTokens)
 	if ccipModule.ARM != nil {
 		arm, err := cd.NewARMContract(ccipModule.ARM.EthAddress)
 		if err != nil {
@@ -1068,7 +1080,7 @@ func NewCCIPCommonFromConfig(
 		return nil, err
 	}
 	newCD := newCCIPModule.Deployer
-	newCCIPModule.LoadContractAddresses(laneConfig)
+	newCCIPModule.LoadContractAddresses(laneConfig, nil)
 	var arm *contracts.ARM
 	if newCCIPModule.ARM != nil {
 		arm, err = newCD.NewARMContract(*newCCIPModule.ARMContract)
@@ -1160,6 +1172,7 @@ type SourceCCIPModule struct {
 	Common                     *CCIPCommon
 	Sender                     common.Address
 	TransferAmount             []*big.Int
+	MsgDataLength              int64
 	DestinationChainId         uint64
 	DestChainSelector          uint64
 	DestNetworkName            string
@@ -1546,22 +1559,30 @@ func (sourceCCIP *SourceCCIPModule) AssertEventCCIPSendRequested(
 
 func (sourceCCIP *SourceCCIPModule) CCIPMsg(
 	receiver common.Address,
-	msgType,
-	data string,
 	gasLimit *big.Int,
 ) (router.ClientEVM2AnyMessage, error) {
-	tokenAndAmounts := []router.ClientEVMTokenAmount{}
-	if msgType == TokenTransfer {
-		for i, amount := range sourceCCIP.TransferAmount {
-			// if length of sourceCCIP.TransferAmount is more than available bridge token use first bridge token
-			token := sourceCCIP.Common.BridgeTokens[0]
-			if i < len(sourceCCIP.Common.BridgeTokens) {
-				token = sourceCCIP.Common.BridgeTokens[i]
-			}
-			tokenAndAmounts = append(tokenAndAmounts, router.ClientEVMTokenAmount{
-				Token: common.HexToAddress(token.Address()), Amount: amount,
-			})
+	length := sourceCCIP.MsgDataLength
+	var data string
+	if length > 0 {
+		b := make([]byte, length)
+		_, err := crypto_rand.Read(b)
+		if err != nil {
+			return router.ClientEVM2AnyMessage{}, fmt.Errorf("failed generating random string: %w", err)
 		}
+		randomString := base64.URLEncoding.EncodeToString(b)
+		data = randomString[:length]
+	}
+
+	tokenAndAmounts := []router.ClientEVMTokenAmount{}
+	for i, amount := range sourceCCIP.TransferAmount {
+		// if length of sourceCCIP.TransferAmount is more than available bridge token use first bridge token
+		token := sourceCCIP.Common.BridgeTokens[0]
+		if i < len(sourceCCIP.Common.BridgeTokens) {
+			token = sourceCCIP.Common.BridgeTokens[i]
+		}
+		tokenAndAmounts = append(tokenAndAmounts, router.ClientEVMTokenAmount{
+			Token: common.HexToAddress(token.Address()), Amount: amount,
+		})
 	}
 	receiverAddr, err := utils.ABIEncode(`[{"type":"address"}]`, receiver)
 	if err != nil {
@@ -1584,8 +1605,6 @@ func (sourceCCIP *SourceCCIPModule) CCIPMsg(
 
 func (sourceCCIP *SourceCCIPModule) SendRequest(
 	receiver common.Address,
-	msgType,
-	data string,
 	gasLimit *big.Int,
 ) (common.Hash, time.Duration, *big.Int, error) {
 	var d time.Duration
@@ -1594,7 +1613,7 @@ func (sourceCCIP *SourceCCIPModule) SendRequest(
 		return common.Hash{}, d, nil, fmt.Errorf("failed getting the chain selector: %w", err)
 	}
 	// form the message for transfer
-	msg, err := sourceCCIP.CCIPMsg(receiver, msgType, data, gasLimit)
+	msg, err := sourceCCIP.CCIPMsg(receiver, gasLimit)
 	if err != nil {
 		return common.Hash{}, d, nil, fmt.Errorf("failed forming the ccip msg: %w", err)
 	}
@@ -1648,6 +1667,7 @@ func DefaultSourceCCIPModule(
 	destChainId uint64,
 	destChain string,
 	transferAmount []*big.Int,
+	MsgByteLength int64,
 	existingDeployment bool,
 	multiCall bool,
 	USDCMockDeployment *bool,
@@ -1665,6 +1685,7 @@ func DefaultSourceCCIPModule(
 	source := &SourceCCIPModule{
 		Common:                   cmn,
 		TransferAmount:           transferAmount,
+		MsgDataLength:            MsgByteLength,
 		DestinationChainId:       destChainId,
 		DestChainSelector:        destChainSelector,
 		DestNetworkName:          destChain,
@@ -2498,10 +2519,10 @@ func (lane *CCIPLane) AddToSentReqs(txHash common.Hash, reqStats []*testreporter
 
 // Multicall sends multiple ccip-send requests in a single transaction
 // It will create one transaction for all the requests and will wait for the confirmation
-func (lane *CCIPLane) Multicall(noOfRequests int, msgType string, multiSendAddr common.Address) error {
+func (lane *CCIPLane) Multicall(noOfRequests int, multiSendAddr common.Address) error {
 	var ccipMultipleMsg []contracts.CCIPMsgData
 	feeToken := common.HexToAddress(lane.Source.Common.FeeToken.Address())
-	genericMsg, err := lane.Source.CCIPMsg(lane.Dest.ReceiverDapp.EthAddress, msgType, "testMsg", big.NewInt(600_000))
+	genericMsg, err := lane.Source.CCIPMsg(lane.Dest.ReceiverDapp.EthAddress, big.NewInt(600_000))
 	if err != nil {
 		return fmt.Errorf("failed to form the ccip message: %w", err)
 	}
@@ -2534,24 +2555,22 @@ func (lane *CCIPLane) Multicall(noOfRequests int, msgType string, multiSendAddr 
 		lane.TotalFee = new(big.Int).Add(lane.TotalFee, fee)
 		ccipMultipleMsg = append(ccipMultipleMsg, sendData)
 		// if token transfer is required, transfer the token amount to multisend
-		if msgType == TokenTransfer {
-			for i, amount := range lane.Source.TransferAmount {
-				// if length of sourceCCIP.TransferAmount is more than available bridge token use first bridge token
-				token := lane.Source.Common.BridgeTokens[0]
-				if i < len(lane.Source.Common.BridgeTokens) {
-					token = lane.Source.Common.BridgeTokens[i]
-				}
-				err := token.Transfer(multiSendAddr.Hex(), amount)
-				if err != nil {
-					return err
-				}
+		for i, amount := range lane.Source.TransferAmount {
+			// if length of sourceCCIP.TransferAmount is more than available bridge token use first bridge token
+			token := lane.Source.Common.BridgeTokens[0]
+			if i < len(lane.Source.Common.BridgeTokens) {
+				token = lane.Source.Common.BridgeTokens[i]
+			}
+			err := token.Transfer(multiSendAddr.Hex(), amount)
+			if err != nil {
+				return err
 			}
 		}
 		stat := testreporters.NewCCIPRequestStats(int64(lane.NumberOfReq+i), lane.SourceNetworkName, lane.DestNetworkName)
 		txstats = append(txstats, testreporters.TransactionStats{
 			Fee:                fee.String(),
 			NoOfTokensSent:     len(msg.TokenAmounts),
-			MessageBytesLength: len(msg.Data),
+			MessageBytesLength: int64(len(msg.Data)),
 		})
 		reqStats = append(reqStats, stat)
 	}
@@ -2592,13 +2611,12 @@ func (lane *CCIPLane) Multicall(noOfRequests int, msgType string, multiSendAddr 
 
 // SendRequests sends individual ccip-send requests in different transactions
 // It will create noOfRequests transactions
-func (lane *CCIPLane) SendRequests(noOfRequests int, msgType string, gasLimit *big.Int) error {
+func (lane *CCIPLane) SendRequests(noOfRequests int, gasLimit *big.Int) error {
 	for i := 1; i <= noOfRequests; i++ {
-		msg := fmt.Sprintf("msg %d", i)
 		stat := testreporters.NewCCIPRequestStats(int64(lane.NumberOfReq+i), lane.SourceNetworkName, lane.DestNetworkName)
 		txHash, txConfirmationDur, fee, err := lane.Source.SendRequest(
 			lane.Dest.ReceiverDapp.EthAddress,
-			msgType, msg, gasLimit,
+			gasLimit,
 		)
 		if err != nil {
 			stat.UpdateState(lane.Logger, 0,
@@ -2613,9 +2631,6 @@ func (lane *CCIPLane) SendRequests(noOfRequests int, msgType string, gasLimit *b
 		}
 
 		noOfTokens := len(lane.Source.TransferAmount)
-		if msgType == DataOnlyTransfer {
-			noOfTokens = 0
-		}
 		rcpt, err := lane.AddToSentReqs(txHash, []*testreporters.RequestStat{stat})
 		if err != nil {
 			return err
@@ -2630,7 +2645,7 @@ func (lane *CCIPLane) SendRequests(noOfRequests int, msgType string, gasLimit *b
 				GasUsed:            gasUsed,
 				TxHash:             rcpt.TxHash.Hex(),
 				NoOfTokensSent:     noOfTokens,
-				MessageBytesLength: len([]byte(msg)),
+				MessageBytesLength: lane.Source.MsgDataLength,
 			})
 		lane.TotalFee = bigmath.Add(lane.TotalFee, fee)
 	}
@@ -3031,6 +3046,7 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 	env *CCIPTestEnv,
 	commitAndExecOnSameDON bool,
 	transferAmounts []*big.Int,
+	msgByteLength int64,
 	bootstrapAdded *atomic.Bool,
 	configureCLNodes bool,
 	jobErrGroup *errgroup.Group,
@@ -3048,7 +3064,7 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 	lane.Source, err = DefaultSourceCCIPModule(
 		lane.Logger,
 		sourceChainClient, destChainClient.GetChainID().Uint64(),
-		destChainClient.GetNetworkName(), transferAmounts,
+		destChainClient.GetNetworkName(), transferAmounts, msgByteLength,
 		existingDeployment, multiCall, USDCMockDeployment, srcConf,
 	)
 	if err != nil {

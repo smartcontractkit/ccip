@@ -441,7 +441,7 @@ func (o *CCIPTestSetUpOutputs) DeployChainContracts(
 }
 
 func (o *CCIPTestSetUpOutputs) SetupDynamicTokenPriceUpdates() error {
-	interval := o.Cfg.TestGroupInput.DynamicPriceUpdateInterval.Duration()
+	interval := o.Cfg.TestGroupInput.TokenConfig.DynamicPriceUpdateInterval.Duration()
 	covered := make(map[string]struct{})
 	for _, lanes := range o.ReadLanes() {
 		lane := lanes.ForwardLane
@@ -467,8 +467,7 @@ func (o *CCIPTestSetUpOutputs) AddLanesForNetworkPair(
 	lggr zerolog.Logger,
 	networkA, networkB blockchain.EVMNetwork,
 	chainClientA, chainClientB blockchain.EVMClient,
-	transferAmounts []*big.Int,
-	commitAndExecOnSameDON, bidirectional, withPipeline bool,
+	commitAndExecOnSameDON, bidirectional bool,
 ) error {
 	var allErrors atomic.Error
 	t := o.Cfg.Test
@@ -575,12 +574,14 @@ func (o *CCIPTestSetUpOutputs) AddLanesForNetworkPair(
 	}
 	o.AddToLanes(bidirectionalLane)
 
-	staticPrice := o.Cfg.TestGroupInput.DynamicPriceUpdateInterval == nil
 	setUpFuncs.Go(func() error {
 		lggr.Info().Msgf("Setting up lane %s to %s", networkA.Name, networkB.Name)
 		err := ccipLaneA2B.DeployNewCCIPLane(o.SetUpContext, o.Env, commitAndExecOnSameDON,
-			transferAmounts, o.BootstrapAdded, configureCLNode, o.JobAddGrp,
-			withPipeline, staticPrice,
+			o.Cfg.TestGroupInput.MsgDetails.TransferAmounts(),
+			pointer.GetInt64(o.Cfg.TestGroupInput.MsgDetails.DataLength),
+			o.BootstrapAdded, configureCLNode, o.JobAddGrp,
+			o.Cfg.TestGroupInput.TokenConfig.IsPipelineSpec(),
+			!o.Cfg.TestGroupInput.TokenConfig.IsDynamicPriceUpdate(),
 			o.Cfg.useExistingDeployment(),
 			o.Cfg.MultiCallEnabled(),
 			o.Cfg.TestGroupInput.USDCMockDeployment,
@@ -612,8 +613,11 @@ func (o *CCIPTestSetUpOutputs) AddLanesForNetworkPair(
 		if bidirectional {
 			lggr.Info().Msgf("Setting up lane %s to %s", networkB.Name, networkA.Name)
 			err := ccipLaneB2A.DeployNewCCIPLane(o.SetUpContext, o.Env, commitAndExecOnSameDON,
-				transferAmounts, o.BootstrapAdded, configureCLNode, o.JobAddGrp,
-				withPipeline, staticPrice,
+				o.Cfg.TestGroupInput.MsgDetails.TransferAmounts(),
+				pointer.GetInt64(o.Cfg.TestGroupInput.MsgDetails.DataLength),
+				o.BootstrapAdded, configureCLNode, o.JobAddGrp,
+				o.Cfg.TestGroupInput.TokenConfig.IsPipelineSpec(),
+				!o.Cfg.TestGroupInput.TokenConfig.IsDynamicPriceUpdate(),
 				o.Cfg.useExistingDeployment(),
 				o.Cfg.MultiCallEnabled(),
 				o.Cfg.TestGroupInput.USDCMockDeployment,
@@ -697,7 +701,7 @@ func (o *CCIPTestSetUpOutputs) WaitForPriceUpdates() {
 				Msgf("Waiting for price update")
 			err := lane.Source.Common.WaitForPriceUpdates(
 				o.SetUpContext, lane.Logger,
-				o.Cfg.TestGroupInput.TimeoutForPriceUpdate.Duration(),
+				o.Cfg.TestGroupInput.TokenConfig.TimeoutForPriceUpdate.Duration(),
 				lane.Source.DestinationChainId,
 			)
 			if err != nil {
@@ -746,12 +750,6 @@ func CCIPDefaultTestSetUp(
 	reportPath := "tmp_laneconfig"
 	filepath := fmt.Sprintf("./%s/tmp_%s.json", reportPath, strings.ReplaceAll(t.Name(), "/", "_"))
 	reportFile := testutils.FileNameFromPath(filepath)
-	var transferAmounts []*big.Int
-	if testConfig.TestGroupInput.MsgType == actions.TokenTransfer {
-		for i := 0; i < testConfig.TestGroupInput.NoOfTokensInMsg; i++ {
-			transferAmounts = append(transferAmounts, big.NewInt(testConfig.TestGroupInput.AmountPerToken))
-		}
-	}
 	parent, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	setUpArgs := &CCIPTestSetUpOutputs{
@@ -822,7 +820,8 @@ func CCIPDefaultTestSetUp(
 			// if reuse contracts is true, copy common contracts from the same network except the router contract
 			setUpArgs.LaneConfig.CopyCommonContracts(
 				networkNameToReadCfg, n,
-				reuse, testConfig.TestGroupInput.MsgType == actions.TokenTransfer)
+				reuse, testConfig.TestGroupInput.MsgDetails.IsTokenTransfer(),
+			)
 		}
 	}
 
@@ -848,12 +847,14 @@ func CCIPDefaultTestSetUp(
 			}
 		}
 		chainAddGrp.Go(func() error {
-			return setUpArgs.DeployChainContracts(lggr, chain, net, testConfig.TestGroupInput.NoOfTokensPerChain, tokenDeployerFns, selectors)
+			return setUpArgs.DeployChainContracts(
+				lggr, chain, net,
+				pointer.GetInt(testConfig.TestGroupInput.TokenConfig.NoOfTokensPerChain),
+				tokenDeployerFns, selectors,
+			)
 		})
 	}
 	require.NoError(t, chainAddGrp.Wait(), "Deploying common contracts shouldn't fail")
-
-	withPipeline := pointer.GetBool(setUpArgs.Cfg.TestGroupInput.WithPipeline)
 
 	// set up mock server for price pipeline and usdc attestation if not using existing deployment
 	if !pointer.GetBool(setUpArgs.Cfg.TestGroupInput.ExistingDeployment) {
@@ -861,7 +862,7 @@ func CCIPDefaultTestSetUp(
 		if setUpArgs.Env.LocalCluster != nil {
 			killgrave = setUpArgs.Env.LocalCluster.MockAdapter
 		}
-		if withPipeline {
+		if setUpArgs.Cfg.TestGroupInput.TokenConfig.IsPipelineSpec() {
 			// set up mock server for price pipeline. need to set it once for all the lanes as the price pipeline path uses
 			// regex to match the path for all tokens across all lanes
 			actions.SetMockserverWithTokenPriceValue(killgrave, setUpArgs.Env.MockServer)
@@ -895,10 +896,9 @@ func CCIPDefaultTestSetUp(
 		laneAddGrp.Go(func() error {
 			return setUpArgs.AddLanesForNetworkPair(
 				lggr, n.NetworkA, n.NetworkB,
-				chainByChainID[n.NetworkA.ChainID], chainByChainID[n.NetworkB.ChainID], transferAmounts,
+				chainByChainID[n.NetworkA.ChainID], chainByChainID[n.NetworkB.ChainID],
 				pointer.GetBool(testConfig.TestGroupInput.CommitAndExecuteOnSameDON),
 				pointer.GetBool(testConfig.TestGroupInput.BiDirectionalLane),
-				withPipeline,
 			)
 		})
 	}
@@ -918,7 +918,7 @@ func CCIPDefaultTestSetUp(
 		// wait for price updates to be available
 		setUpArgs.WaitForPriceUpdates()
 		// if dynamic price update is required
-		if setUpArgs.Cfg.TestGroupInput.DynamicPriceUpdateInterval != nil {
+		if setUpArgs.Cfg.TestGroupInput.TokenConfig.IsDynamicPriceUpdate() {
 			require.NoError(t, setUpArgs.SetupDynamicTokenPriceUpdates(), "setting up dynamic price update should not fail")
 		}
 	}
