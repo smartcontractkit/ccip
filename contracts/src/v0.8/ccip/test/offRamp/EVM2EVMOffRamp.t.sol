@@ -458,11 +458,10 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     vm.clearMockedCalls();
   }
 
-  function test_AlreadyExecuted_Revert() public {
+  function test_AlreadyExecutedMessagesAreIgnored() public {
     Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages();
     Internal.ExecutionReport memory executionReport = _generateReportFromMessages(messages);
     s_offRamp.execute(executionReport, new uint256[](0));
-    vm.expectRevert(abi.encodeWithSelector(EVM2EVMOffRamp.AlreadyExecuted.selector, messages[0].sequenceNumber));
     s_offRamp.execute(executionReport, new uint256[](0));
   }
 

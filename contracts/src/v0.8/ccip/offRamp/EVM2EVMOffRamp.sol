@@ -256,6 +256,12 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
     for (uint256 i = 0; i < numMsgs; ++i) {
       Internal.EVM2EVMMessage memory message = report.messages[i];
       Internal.MessageExecutionState originalState = getExecutionState(message.sequenceNumber);
+
+      if (originalState == Internal.MessageExecutionState.SUCCESS) {
+        // If the message has already been manually executed, we skip it.
+        continue;
+      }
+
       // Two valid cases here, we either have never touched this message before, or we tried to execute
       // and failed. This check protects against reentry and re-execution because the other states are
       // IN_PROGRESS and SUCCESS, both should not be allowed to execute.

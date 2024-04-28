@@ -46,7 +46,11 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 )
 
-const numTokenDataWorkers = 5
+var (
+	tokenDataWorkerTimeout       = 5 * time.Second
+	tokenDataWorkerCacheEviction = time.Hour
+	tokenDataWorkerNumWorkers    = 5
+)
 
 func NewExecutionServices(ctx context.Context, lggr logger.Logger, jb job.Job, chainSet legacyevm.LegacyChainContainer, new bool, argsNoPlugin libocr2.OCR2OracleArgs, logError func(string), qopts ...pg.QOpt) ([]job.ServiceCtx, error) {
 	execPluginConfig, backfillArgs, chainHealthcheck, tokenWorker, err := jobSpecToExecPluginConfig(ctx, lggr, jb, chainSet, qopts...)
@@ -281,16 +285,11 @@ func jobSpecToExecPluginConfig(ctx context.Context, lggr logger.Logger, jb job.J
 		params.offRampConfig.OnRamp,
 	)
 
-	onchainConfig, err := offRampReader.OnchainConfig(ctx)
-	if err != nil {
-		return nil, nil, nil, nil, fmt.Errorf("get onchain config from offramp reader: %w", err)
-	}
-
 	tokenBackgroundWorker := tokendata.NewBackgroundWorker(
 		tokenDataProviders,
-		numTokenDataWorkers,
-		5*time.Second,
-		onchainConfig.PermissionLessExecutionThresholdSeconds,
+		tokenDataWorkerNumWorkers,
+		tokenDataWorkerTimeout,
+		tokenDataWorkerCacheEviction,
 	)
 	return &ExecutionPluginStaticConfig{
 			lggr:                        execLggr,

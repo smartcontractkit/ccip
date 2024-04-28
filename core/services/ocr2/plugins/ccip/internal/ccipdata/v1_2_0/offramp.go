@@ -173,6 +173,7 @@ func (o *OffRamp) ChangeConfig(ctx context.Context, onchainConfigBytes []byte, o
 		RelativeBoostPerWaitHour:    offchainConfigParsed.RelativeBoostPerWaitHour,
 		InflightCacheExpiry:         offchainConfigParsed.InflightCacheExpiry,
 		RootSnoozeTime:              offchainConfigParsed.RootSnoozeTime,
+		//MessageVisibilityInterval:   offchainConfigParsed.MessageVisibilityInterval, /* @@@TODO include field in cl-common */
 	}
 	onchainConfig := cciptypes.ExecOnchainConfig{
 		PermissionLessExecutionThresholdSeconds: time.Second * time.Duration(onchainConfigParsed.PermissionLessExecutionThresholdSeconds),
