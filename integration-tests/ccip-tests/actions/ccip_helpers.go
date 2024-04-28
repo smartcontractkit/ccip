@@ -127,30 +127,31 @@ func GetUSDCDomain(networkName string, simulated bool) (uint32, error) {
 }
 
 type CCIPCommon struct {
-	ChainClient                  blockchain.EVMClient
-	Deployer                     *contracts.CCIPContractsDeployer
-	FeeToken                     *contracts.LinkToken
-	BridgeTokens                 []*contracts.ERC20Token
-	PriceAggregators             map[common.Address]*contracts.MockAggregator
-	RemoteChains                 []uint64
-	BridgeTokenPools             []*contracts.TokenPool
-	RateLimiterConfig            contracts.RateLimiterConfig
-	ARMContract                  *common.Address
-	ARM                          *contracts.ARM // populate only if the ARM contracts is not a mock and can be used to verify various ARM events; keep this nil for mock ARM
-	Router                       *contracts.Router
-	PriceRegistry                *contracts.PriceRegistry
-	TokenAdminRegistry           *contracts.TokenAdminRegistry
-	WrappedNative                common.Address
-	MulticallEnabled             bool
-	MulticallContract            common.Address
-	ExistingDeployment           bool
-	USDCMockDeployment           *bool
-	TokenMessenger               *common.Address
-	TokenTransmitter             *contracts.TokenTransmitter
-	poolFunds                    *big.Int
-	gasUpdateWatcherMu           *sync.Mutex
-	gasUpdateWatcher             map[uint64]*big.Int // key - destchain id; value - timestamp of update
-	IsConnectionRestoredRecently *atomic.Bool
+	ChainClient                   blockchain.EVMClient
+	Deployer                      *contracts.CCIPContractsDeployer
+	FeeToken                      *contracts.LinkToken
+	BridgeTokens                  []*contracts.ERC20Token
+	PriceAggregators              map[common.Address]*contracts.MockAggregator
+	NoOfTokensNeedingDynamicPrice int
+	RemoteChains                  []uint64
+	BridgeTokenPools              []*contracts.TokenPool
+	RateLimiterConfig             contracts.RateLimiterConfig
+	ARMContract                   *common.Address
+	ARM                           *contracts.ARM // populate only if the ARM contracts is not a mock and can be used to verify various ARM events; keep this nil for mock ARM
+	Router                        *contracts.Router
+	PriceRegistry                 *contracts.PriceRegistry
+	TokenAdminRegistry            *contracts.TokenAdminRegistry
+	WrappedNative                 common.Address
+	MulticallEnabled              bool
+	MulticallContract             common.Address
+	ExistingDeployment            bool
+	USDCMockDeployment            *bool
+	TokenMessenger                *common.Address
+	TokenTransmitter              *contracts.TokenTransmitter
+	poolFunds                     *big.Int
+	gasUpdateWatcherMu            *sync.Mutex
+	gasUpdateWatcher              map[uint64]*big.Int // key - destchain id; value - timestamp of update
+	IsConnectionRestoredRecently  *atomic.Bool
 }
 
 // FreeUpUnusedSpace sets nil to various elements of ccipModule which are only used
@@ -644,6 +645,10 @@ func (ccipModule *CCIPCommon) WriteLaneConfig(conf *laneconfig.LaneConfig) {
 }
 
 func (ccipModule *CCIPCommon) AddPriceAggregatorToken(token common.Address, initialAns *big.Int) error {
+	// check if dynamic price update is enabled
+	if ccipModule.NoOfTokensNeedingDynamicPrice <= 0 {
+		return nil
+	}
 	var err error
 	if aggregator, ok := ccipModule.PriceAggregators[token]; !ok {
 		ccipModule.PriceAggregators[token], err = ccipModule.Deployer.DeployMockAggregator(18, initialAns)
@@ -656,6 +661,7 @@ func (ccipModule *CCIPCommon) AddPriceAggregatorToken(token common.Address, init
 			return fmt.Errorf("error instantiating price aggregator for token %s", token.Hex())
 		}
 	}
+	ccipModule.NoOfTokensNeedingDynamicPrice--
 	return nil
 }
 
