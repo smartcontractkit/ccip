@@ -1089,12 +1089,13 @@ type StaticPriceConfig struct {
 func NewCCIPCommonFromConfig(
 	logger zerolog.Logger,
 	chainClient blockchain.EVMClient,
+	noOfTokensWithDynamicPrice int,
 	existingDeployment,
 	multiCall bool,
 	USDCMockDeployment *bool,
 	laneConfig *laneconfig.LaneConfig,
 ) (*CCIPCommon, error) {
-	newCCIPModule, err := DefaultCCIPModule(logger, chainClient, existingDeployment, multiCall, USDCMockDeployment)
+	newCCIPModule, err := DefaultCCIPModule(logger, chainClient, noOfTokensWithDynamicPrice, existingDeployment, multiCall, USDCMockDeployment)
 	if err != nil {
 		return nil, err
 	}
@@ -1165,7 +1166,7 @@ func NewCCIPCommonFromConfig(
 	return newCCIPModule, nil
 }
 
-func DefaultCCIPModule(logger zerolog.Logger, chainClient blockchain.EVMClient, existingDeployment, multiCall bool, USDCMockDeployment *bool) (*CCIPCommon, error) {
+func DefaultCCIPModule(logger zerolog.Logger, chainClient blockchain.EVMClient, noOfTokensWithDynamicPrice int, existingDeployment, multiCall bool, USDCMockDeployment *bool) (*CCIPCommon, error) {
 	cd, err := contracts.NewCCIPContractsDeployer(logger, chainClient)
 	if err != nil {
 		return nil, err
@@ -1177,13 +1178,14 @@ func DefaultCCIPModule(logger zerolog.Logger, chainClient blockchain.EVMClient, 
 			Rate:     contracts.FiftyCoins,
 			Capacity: contracts.HundredCoins,
 		},
-		ExistingDeployment: existingDeployment,
-		MulticallEnabled:   multiCall,
-		USDCMockDeployment: USDCMockDeployment,
-		poolFunds:          testhelpers.Link(5),
-		gasUpdateWatcherMu: &sync.Mutex{},
-		gasUpdateWatcher:   make(map[uint64]*big.Int),
-		PriceAggregators:   make(map[common.Address]*contracts.MockAggregator),
+		ExistingDeployment:            existingDeployment,
+		MulticallEnabled:              multiCall,
+		USDCMockDeployment:            USDCMockDeployment,
+		NoOfTokensNeedingDynamicPrice: noOfTokensWithDynamicPrice,
+		poolFunds:                     testhelpers.Link(5),
+		gasUpdateWatcherMu:            &sync.Mutex{},
+		gasUpdateWatcher:              make(map[uint64]*big.Int),
+		PriceAggregators:              make(map[common.Address]*contracts.MockAggregator),
 	}, nil
 }
 
@@ -1685,6 +1687,7 @@ func DefaultSourceCCIPModule(
 	chainClient blockchain.EVMClient,
 	destChainId uint64,
 	destChain string,
+	noOfTokensWithDynamicPrice int,
 	transferAmount []*big.Int,
 	MsgByteLength int64,
 	existingDeployment bool,
@@ -1692,7 +1695,7 @@ func DefaultSourceCCIPModule(
 	USDCMockDeployment *bool,
 	laneConf *laneconfig.LaneConfig,
 ) (*SourceCCIPModule, error) {
-	cmn, err := NewCCIPCommonFromConfig(logger, chainClient, existingDeployment, multiCall, USDCMockDeployment, laneConf)
+	cmn, err := NewCCIPCommonFromConfig(logger, chainClient, noOfTokensWithDynamicPrice, existingDeployment, multiCall, USDCMockDeployment, laneConf)
 	if err != nil {
 		return nil, err
 	}
@@ -2341,12 +2344,13 @@ func DefaultDestinationCCIPModule(
 	chainClient blockchain.EVMClient,
 	sourceChainId uint64,
 	sourceChain string,
+	noOfTokensWithDynamicPrice int,
 	existingDeployment bool,
 	multiCall bool,
 	USDCMockDeployment *bool,
 	laneConf *laneconfig.LaneConfig,
 ) (*DestCCIPModule, error) {
-	cmn, err := NewCCIPCommonFromConfig(logger, chainClient, existingDeployment, multiCall, USDCMockDeployment, laneConf)
+	cmn, err := NewCCIPCommonFromConfig(logger, chainClient, noOfTokensWithDynamicPrice, existingDeployment, multiCall, USDCMockDeployment, laneConf)
 	if err != nil {
 		return nil, err
 	}
@@ -3067,7 +3071,9 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 	lane.Source, err = DefaultSourceCCIPModule(
 		lane.Logger,
 		sourceChainClient, destChainClient.GetChainID().Uint64(),
-		destChainClient.GetNetworkName(), transferAmounts, msgByteLength,
+		destChainClient.GetNetworkName(),
+		pointer.GetInt(testConf.TokenConfig.NoOfTokensWithDynamicPrice),
+		transferAmounts, msgByteLength,
 		existingDeployment, multiCall, USDCMockDeployment, srcConf,
 	)
 	if err != nil {
@@ -3077,6 +3083,7 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 		lane.Logger,
 		destChainClient, sourceChainClient.GetChainID().Uint64(),
 		sourceChainClient.GetNetworkName(),
+		pointer.GetInt(testConf.TokenConfig.NoOfTokensWithDynamicPrice),
 		existingDeployment, multiCall, USDCMockDeployment, destConf,
 	)
 	if err != nil {

@@ -420,6 +420,7 @@ func (o *CCIPTestSetUpOutputs) DeployChainContracts(
 	defer chain.Close()
 	ccipCommon, err := actions.DefaultCCIPModule(
 		lggr, chain,
+		pointer.GetInt(o.Cfg.TestGroupInput.TokenConfig.NoOfTokensWithDynamicPrice),
 		o.Cfg.useExistingDeployment(),
 		o.Cfg.MultiCallEnabled(),
 		o.Cfg.TestGroupInput.USDCMockDeployment,
