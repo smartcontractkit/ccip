@@ -7,6 +7,7 @@ library Pool {
   // bytes4(keccak256("CCIP_POOL_V1"))
   bytes4 public constant CCIP_POOL_V1 = 0xaff2afbf;
 
+  // TODO pack
   struct LockOrBurnInV1 {
     address originalSender;
     bytes receiver;
@@ -19,6 +20,7 @@ library Pool {
     bytes destPoolData;
   }
 
+  // TODO pack
   struct ReleaseOrMintInV1 {
     bytes originalSender;
     address receiver;

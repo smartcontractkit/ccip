@@ -2,7 +2,6 @@
 pragma solidity 0.8.19;
 
 import {ITypeAndVersion} from "../../../shared/interfaces/ITypeAndVersion.sol";
-import {IPool} from "../../interfaces/IPool.sol";
 import {IMessageTransmitter} from "./IMessageTransmitter.sol";
 import {ITokenMessenger} from "./ITokenMessenger.sol";
 
@@ -30,6 +29,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
   error InvalidNonce(uint64 expected, uint64 got);
   error InvalidSourceDomain(uint32 expected, uint32 got);
   error InvalidDestinationDomain(uint32 expected, uint32 got);
+  error InvalidReceiver(bytes receiver);
 
   // This data is supplied from offchain and contains everything needed
   // to receive the USDC tokens.
@@ -126,7 +126,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
     Domain memory domain = s_chainToDomain[lockOrBurnIn.remoteChainSelector];
     if (!domain.enabled) revert UnknownDomain(lockOrBurnIn.remoteChainSelector);
     if (lockOrBurnIn.receiver.length != 32) {
-      revert(); // TODO add error message
+      revert InvalidReceiver(lockOrBurnIn.receiver);
     }
 
     bytes32 receiver = abi.decode(lockOrBurnIn.receiver, (bytes32));
