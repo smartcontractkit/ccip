@@ -1,6 +1,7 @@
 import '@nomicfoundation/hardhat-ethers'
 import '@nomicfoundation/hardhat-verify'
 import '@nomicfoundation/hardhat-chai-matchers'
+import "@matterlabs/hardhat-zksync-solc";
 import '@typechain/hardhat'
 import 'hardhat-abi-exporter'
 import { subtask } from 'hardhat/config'
@@ -36,7 +37,7 @@ let config = {
     artifacts: './artifacts',
     cache: './cache',
     // Only use sources relevant to CCIP, revert this when merging CCIP into the main repo.
-    sources: './src/v0.8',
+    sources: './src/v0.8/ccip',
     // Only test CCIP, revert this when merging CCIP into the main repo.
     tests: './test/v0.8/ccip',
   },
@@ -44,6 +45,7 @@ let config = {
     outDir: './typechain',
     target: 'ethers-v5',
   },
+  defaultNetwork: "zkSync",
   networks: {
     env: {
       url: process.env.NODE_HTTP_URL || '',
@@ -53,6 +55,11 @@ let config = {
         process.env.ALLOW_UNLIMITED_CONTRACT_SIZE,
       ),
       hardfork: 'merge',
+    },
+    zkSync: {
+      url: "https://sepolia.era.zksync.dev", // The testnet RPC URL of zkSync Era network.
+      ethNetwork: "sepolia", // The Ethereum Web3 RPC URL, or the identifier of the network (e.g. `mainnet` or `sepolia`)
+      zksync: true, // enables zksolc compiler
     },
   },
   solidity: {
@@ -96,6 +103,20 @@ let config = {
         },
       },
     },
+  },
+  zksolc: {
+    settings: {
+      compilerPath: "zksolc",  // optional. Ignored for compilerSource "docker". Can be used if compiler is located in a specific folder
+      optimizer: {
+        enabled: true, // optional. True by default
+        mode: '3', // optional. 3 by default, z to optimize bytecode size
+        fallback_to_optimizing_for_size: false, // optional. Try to recompile with optimizer mode "z" if the bytecode is too large
+      },
+      experimental: {
+        dockerImage: '', // deprecated
+        tag: ''   // deprecated
+      },
+    }
   },
   mocha: {
     timeout: 150000,

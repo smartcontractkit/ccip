@@ -8,6 +8,9 @@ coverage
 coverage.json
 typechain
 
+# zkSync
+artifacts-zk
+cache-zk
 
 # Foundry
 foundry-cache
