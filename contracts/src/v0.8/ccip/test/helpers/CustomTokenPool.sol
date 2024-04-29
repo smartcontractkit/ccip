@@ -23,7 +23,7 @@ contract CustomTokenPool is TokenPool {
     bytes calldata
   ) external override whenHealthy onlyOnRamp(remoteChainSelector) returns (bytes memory) {
     emit SynthBurned(amount);
-    return Pool._generatePoolReturnDataV1(getRemotePool(remoteChainSelector), "");
+    return Pool._encodeLockOrBurnOutV1(getRemotePool(remoteChainSelector), "");
   }
 
   /// @notice Release tokens from the pool to the recipient

@@ -131,7 +131,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
       amount, domain.domainIdentifier, receiver, address(i_token), domain.allowedCaller
     );
     emit Burned(msg.sender, amount);
-    return Pool._generatePoolReturnDataV1(
+    return Pool._encodeLockOrBurnOutV1(
       getRemotePool(remoteChainSelector),
       abi.encode(SourceTokenDataPayload({nonce: nonce, sourceDomain: i_localDomainIdentifier}))
     );

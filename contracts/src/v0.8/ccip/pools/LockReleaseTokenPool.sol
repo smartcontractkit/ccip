@@ -70,7 +70,7 @@ contract LockReleaseTokenPool is TokenPool, ILiquidityContainer, ITypeAndVersion
   {
     _consumeOutboundRateLimit(remoteChainSelector, amount);
     emit Locked(msg.sender, amount);
-    return Pool._generatePoolReturnDataV1(getRemotePool(remoteChainSelector), "");
+    return Pool._encodeLockOrBurnOutV1(getRemotePool(remoteChainSelector), "");
   }
 
   /// @notice Release tokens from the pool to the recipient

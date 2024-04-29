@@ -24,7 +24,7 @@ contract TokenPoolHelper is TokenPool {
     bytes calldata
   ) external override returns (bytes memory) {
     emit LockOrBurn(amount);
-    return Pool._generatePoolReturnDataV1(getRemotePool(remoteChainSelector), "");
+    return Pool._encodeLockOrBurnOutV1(getRemotePool(remoteChainSelector), "");
   }
 
   function releaseOrMint(

@@ -171,7 +171,7 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
     bytes memory poolReturnData =
       s_usdcTokenPool.lockOrBurn(OWNER, abi.encodePacked(receiver), amount, DEST_CHAIN_SELECTOR, bytes(""));
 
-    Pool.PoolReturnDataV1 memory poolReturnDataV1 = Pool._decodePoolReturnDataV1(poolReturnData);
+    Pool.LockOrBurnOutV1 memory poolReturnDataV1 = Pool._decodeLockOrBurnOutV1(poolReturnData);
 
     uint64 nonce = abi.decode(poolReturnDataV1.destPoolData, (uint64));
     assertEq(s_mockUSDC.s_nonce() - 1, nonce);
@@ -205,7 +205,7 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
 
     bytes memory poolReturnData =
       s_usdcTokenPool.lockOrBurn(OWNER, abi.encodePacked(destinationReceiver), amount, DEST_CHAIN_SELECTOR, bytes(""));
-    Pool.PoolReturnDataV1 memory poolReturnDataV1 = Pool._decodePoolReturnDataV1(poolReturnData);
+    Pool.LockOrBurnOutV1 memory poolReturnDataV1 = Pool._decodeLockOrBurnOutV1(poolReturnData);
 
     uint64 nonce = abi.decode(poolReturnDataV1.destPoolData, (uint64));
     assertEq(s_mockUSDC.s_nonce() - 1, nonce);
@@ -239,7 +239,7 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
     (bytes memory poolReturnData) = s_usdcTokenPoolWithAllowList.lockOrBurn(
       s_allowedList[0], abi.encodePacked(destinationReceiver), amount, DEST_CHAIN_SELECTOR, bytes("")
     );
-    Pool.PoolReturnDataV1 memory poolReturnDataV1 = Pool._decodePoolReturnDataV1(poolReturnData);
+    Pool.LockOrBurnOutV1 memory poolReturnDataV1 = Pool._decodeLockOrBurnOutV1(poolReturnData);
     uint64 nonce = abi.decode(poolReturnDataV1.destPoolData, (uint64));
     assertEq(s_mockUSDC.s_nonce() - 1, nonce);
     assertEq(poolReturnDataV1.destPoolAddress, abi.encode(DEST_CHAIN_USDC_POOL));
