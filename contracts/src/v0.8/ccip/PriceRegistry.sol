@@ -17,12 +17,19 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator, ITypeAndVersion {
   using EnumerableSet for EnumerableSet.AddressSet;
   using USDPriceWith18Decimals for uint224;
 
+  /// @notice Token price data feed update
+  struct TokenPriceFeedUpdate {
+    address sourceToken; // Source token to update feed for
+    IPriceRegistry.TokenPriceFeedConfig feedConfig; // Feed config update data
+  }
+
   error TokenNotSupported(address token);
   error ChainNotSupported(uint64 chain);
   error OnlyCallableByUpdaterOrOwner();
   error StaleGasPrice(uint64 destChainSelector, uint256 threshold, uint256 timePassed);
   error StaleTokenPrice(address token, uint256 threshold, uint256 timePassed);
   error InvalidStalenessThreshold();
+  error DataFeedValueOutOfUint224Range();
 
   event PriceUpdaterSet(address indexed priceUpdater);
   event PriceUpdaterRemoved(address indexed priceUpdater);
@@ -66,7 +73,7 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator, ITypeAndVersion {
     address[] memory priceUpdaters,
     address[] memory feeTokens,
     uint32 stalenessThreshold,
-    IPriceRegistry.TokenPriceFeedUpdate[] memory tokenPriceFeeds
+    TokenPriceFeedUpdate[] memory tokenPriceFeeds
   ) {
     _applyPriceUpdatersUpdates(priceUpdaters, new address[](0));
     _applyFeeTokensUpdates(feeTokens, new address[](0));
@@ -198,8 +205,9 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator, ITypeAndVersion {
       /* uint80 answeredInRound */
     ) = dataFeedContract.latestRoundData();
 
-    // solhint-disable-next-line gas-custom-errors
-    require(dataFeedAnswer >= 0, "Data feed value must be positive");
+    if (dataFeedAnswer < 0) {
+      revert DataFeedValueOutOfUint224Range();
+    }
     uint256 rebasedValue = uint256(dataFeedAnswer);
 
     // Rebase formula for units in smallest token denomination: usdValue * (1e18 * 1e18) / 1eTokenDecimals
@@ -218,8 +226,9 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator, ITypeAndVersion {
       rebasedValue *= 10 ** (36 - excessDecimals);
     }
 
-    // solhint-disable-next-line gas-custom-errors
-    require(rebasedValue <= type(uint224).max, "Rebased data feed value does not fit in 224 bits");
+    if (rebasedValue > type(uint224).max) {
+      revert DataFeedValueOutOfUint224Range();
+    }
     return (uint224(rebasedValue), uint32(updatedAt));
   }
 
@@ -286,20 +295,17 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator, ITypeAndVersion {
     }
   }
 
-  // @inheritdoc IPriceRegistry
-  function updateTokenPriceFeeds(IPriceRegistry.TokenPriceFeedUpdate[] memory tokenPriceFeedUpdates)
-    external
-    override
-    onlyOwner
-  {
+  /// @notice Updates the USD token price feeds for given tokens
+  /// @param tokenPriceFeedUpdates Token price feed updates to apply
+  function updateTokenPriceFeeds(TokenPriceFeedUpdate[] memory tokenPriceFeedUpdates) external onlyOwner {
     _updateTokenPriceFeeds(tokenPriceFeedUpdates);
   }
 
   /// @notice Updates the USD token price feeds for given tokens
   /// @param tokenPriceFeedUpdates Token price feed updates to apply
-  function _updateTokenPriceFeeds(IPriceRegistry.TokenPriceFeedUpdate[] memory tokenPriceFeedUpdates) private {
+  function _updateTokenPriceFeeds(TokenPriceFeedUpdate[] memory tokenPriceFeedUpdates) private {
     for (uint256 i; i < tokenPriceFeedUpdates.length; ++i) {
-      IPriceRegistry.TokenPriceFeedUpdate memory update = tokenPriceFeedUpdates[i];
+      TokenPriceFeedUpdate memory update = tokenPriceFeedUpdates[i];
       address sourceToken = update.sourceToken;
       IPriceRegistry.TokenPriceFeedConfig memory tokenPriceFeedConfig = update.feedConfig;
 

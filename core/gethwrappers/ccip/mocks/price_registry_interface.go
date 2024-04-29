@@ -1115,7 +1115,7 @@ func (_m *PriceRegistryInterface) UpdatePrices(opts *bind.TransactOpts, priceUpd
 }
 
 // UpdateTokenPriceFeeds provides a mock function with given fields: opts, tokenPriceFeedUpdates
-func (_m *PriceRegistryInterface) UpdateTokenPriceFeeds(opts *bind.TransactOpts, tokenPriceFeedUpdates []price_registry.IPriceRegistryTokenPriceFeedUpdate) (*types.Transaction, error) {
+func (_m *PriceRegistryInterface) UpdateTokenPriceFeeds(opts *bind.TransactOpts, tokenPriceFeedUpdates []price_registry.PriceRegistryTokenPriceFeedUpdate) (*types.Transaction, error) {
 	ret := _m.Called(opts, tokenPriceFeedUpdates)
 
 	if len(ret) == 0 {
@@ -1124,10 +1124,10 @@ func (_m *PriceRegistryInterface) UpdateTokenPriceFeeds(opts *bind.TransactOpts,
 
 	var r0 *types.Transaction
 	var r1 error
-	if rf, ok := ret.Get(0).(func(*bind.TransactOpts, []price_registry.IPriceRegistryTokenPriceFeedUpdate) (*types.Transaction, error)); ok {
+	if rf, ok := ret.Get(0).(func(*bind.TransactOpts, []price_registry.PriceRegistryTokenPriceFeedUpdate) (*types.Transaction, error)); ok {
 		return rf(opts, tokenPriceFeedUpdates)
 	}
-	if rf, ok := ret.Get(0).(func(*bind.TransactOpts, []price_registry.IPriceRegistryTokenPriceFeedUpdate) *types.Transaction); ok {
+	if rf, ok := ret.Get(0).(func(*bind.TransactOpts, []price_registry.PriceRegistryTokenPriceFeedUpdate) *types.Transaction); ok {
 		r0 = rf(opts, tokenPriceFeedUpdates)
 	} else {
 		if ret.Get(0) != nil {
@@ -1135,7 +1135,7 @@ func (_m *PriceRegistryInterface) UpdateTokenPriceFeeds(opts *bind.TransactOpts,
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(*bind.TransactOpts, []price_registry.IPriceRegistryTokenPriceFeedUpdate) error); ok {
+	if rf, ok := ret.Get(1).(func(*bind.TransactOpts, []price_registry.PriceRegistryTokenPriceFeedUpdate) error); ok {
 		r1 = rf(opts, tokenPriceFeedUpdates)
 	} else {
 		r1 = ret.Error(1)

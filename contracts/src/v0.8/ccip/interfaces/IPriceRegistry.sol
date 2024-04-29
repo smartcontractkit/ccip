@@ -10,19 +10,9 @@ interface IPriceRegistry {
     uint8 tokenDecimals; // ──────╯ Decimals of the token that the feed represents
   }
 
-  /// @notice Token price data feed update
-  struct TokenPriceFeedUpdate {
-    address sourceToken; // Source token to update feed for
-    TokenPriceFeedConfig feedConfig; // Feed config update data
-  }
-
   /// @notice Update the price for given tokens and gas prices for given chains.
   /// @param priceUpdates The price updates to apply.
   function updatePrices(Internal.PriceUpdates memory priceUpdates) external;
-
-  /// @notice Updates the USD token price feeds for given tokens
-  /// @param tokenPriceFeedUpdates Token price feed updates to apply
-  function updateTokenPriceFeeds(TokenPriceFeedUpdate[] memory tokenPriceFeedUpdates) external;
 
   /// @notice Get the `tokenPrice` for a given token.
   /// @param token The token to get the price for.

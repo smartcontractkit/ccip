@@ -79,14 +79,14 @@ contract PriceRegistrySetup is TokenSetup {
     address[] memory feeTokens = new address[](2);
     feeTokens[0] = s_sourceTokens[0];
     feeTokens[1] = s_weth;
-    IPriceRegistry.TokenPriceFeedUpdate[] memory tokenPriceFeedUpdates = new IPriceRegistry.TokenPriceFeedUpdate[](0);
+    PriceRegistry.TokenPriceFeedUpdate[] memory tokenPriceFeedUpdates = new PriceRegistry.TokenPriceFeedUpdate[](0);
 
     s_priceRegistry = new PriceRegistry(priceUpdaters, feeTokens, uint32(TWELVE_HOURS), tokenPriceFeedUpdates);
     s_priceRegistry.updatePrices(priceUpdates);
   }
 
   function _initialiseSingleTokenPriceFeed() internal returns (address) {
-    IPriceRegistry.TokenPriceFeedUpdate[] memory tokenPriceFeedUpdates = new IPriceRegistry.TokenPriceFeedUpdate[](1);
+    PriceRegistry.TokenPriceFeedUpdate[] memory tokenPriceFeedUpdates = new PriceRegistry.TokenPriceFeedUpdate[](1);
     tokenPriceFeedUpdates[0] =
       getSingleTokenPriceFeedUpdateStruct(s_sourceTokens[0], s_dataFeedByToken[s_sourceTokens[0]], 18);
     s_priceRegistry.updateTokenPriceFeeds(tokenPriceFeedUpdates);
@@ -120,7 +120,7 @@ contract PriceRegistry_constructor is PriceRegistrySetup {
     address[] memory feeTokens = new address[](2);
     feeTokens[0] = s_sourceTokens[0];
     feeTokens[1] = s_sourceTokens[1];
-    IPriceRegistry.TokenPriceFeedUpdate[] memory tokenPriceFeedUpdates = new IPriceRegistry.TokenPriceFeedUpdate[](2);
+    PriceRegistry.TokenPriceFeedUpdate[] memory tokenPriceFeedUpdates = new PriceRegistry.TokenPriceFeedUpdate[](2);
     tokenPriceFeedUpdates[0] =
       getSingleTokenPriceFeedUpdateStruct(s_sourceTokens[0], s_dataFeedByToken[s_sourceTokens[0]], 18);
     tokenPriceFeedUpdates[1] =
@@ -145,7 +145,7 @@ contract PriceRegistry_constructor is PriceRegistrySetup {
   function test_InvalidStalenessThreshold_Revert() public {
     vm.expectRevert(PriceRegistry.InvalidStalenessThreshold.selector);
     s_priceRegistry =
-      new PriceRegistry(new address[](0), new address[](0), 0, new IPriceRegistry.TokenPriceFeedUpdate[](0));
+      new PriceRegistry(new address[](0), new address[](0), 0, new PriceRegistry.TokenPriceFeedUpdate[](0));
   }
 }
 
@@ -210,7 +210,7 @@ contract PriceRegistry_getValidatedTokenPrice is PriceRegistrySetup {
     address tokenAddress = _deploySourceToken("testToken", 0, 18);
     address feedAddress = _deployTokenPriceDataFeed(tokenAddress, 18, int256(uint256(type(uint224).max)));
 
-    IPriceRegistry.TokenPriceFeedUpdate[] memory tokenPriceFeedUpdates = new IPriceRegistry.TokenPriceFeedUpdate[](1);
+    PriceRegistry.TokenPriceFeedUpdate[] memory tokenPriceFeedUpdates = new PriceRegistry.TokenPriceFeedUpdate[](1);
     tokenPriceFeedUpdates[0] = getSingleTokenPriceFeedUpdateStruct(tokenAddress, feedAddress, 18);
     s_priceRegistry.updateTokenPriceFeeds(tokenPriceFeedUpdates);
 
@@ -224,7 +224,7 @@ contract PriceRegistry_getValidatedTokenPrice is PriceRegistrySetup {
     address tokenAddress = _deploySourceToken("testToken", 0, 6);
     address feedAddress = _deployTokenPriceDataFeed(tokenAddress, 8, 1e8);
 
-    IPriceRegistry.TokenPriceFeedUpdate[] memory tokenPriceFeedUpdates = new IPriceRegistry.TokenPriceFeedUpdate[](1);
+    PriceRegistry.TokenPriceFeedUpdate[] memory tokenPriceFeedUpdates = new PriceRegistry.TokenPriceFeedUpdate[](1);
     tokenPriceFeedUpdates[0] = getSingleTokenPriceFeedUpdateStruct(tokenAddress, feedAddress, 6);
     s_priceRegistry.updateTokenPriceFeeds(tokenPriceFeedUpdates);
 
@@ -238,7 +238,7 @@ contract PriceRegistry_getValidatedTokenPrice is PriceRegistrySetup {
     address tokenAddress = _deploySourceToken("testToken", 0, 24);
     address feedAddress = _deployTokenPriceDataFeed(tokenAddress, 8, 1e8);
 
-    IPriceRegistry.TokenPriceFeedUpdate[] memory tokenPriceFeedUpdates = new IPriceRegistry.TokenPriceFeedUpdate[](1);
+    PriceRegistry.TokenPriceFeedUpdate[] memory tokenPriceFeedUpdates = new PriceRegistry.TokenPriceFeedUpdate[](1);
     tokenPriceFeedUpdates[0] = getSingleTokenPriceFeedUpdateStruct(tokenAddress, feedAddress, 24);
     s_priceRegistry.updateTokenPriceFeeds(tokenPriceFeedUpdates);
 
@@ -252,7 +252,7 @@ contract PriceRegistry_getValidatedTokenPrice is PriceRegistrySetup {
     address tokenAddress = _deploySourceToken("testToken", 0, 18);
     address feedAddress = _deployTokenPriceDataFeed(tokenAddress, 18, 1e18);
 
-    IPriceRegistry.TokenPriceFeedUpdate[] memory tokenPriceFeedUpdates = new IPriceRegistry.TokenPriceFeedUpdate[](1);
+    PriceRegistry.TokenPriceFeedUpdate[] memory tokenPriceFeedUpdates = new PriceRegistry.TokenPriceFeedUpdate[](1);
     tokenPriceFeedUpdates[0] = getSingleTokenPriceFeedUpdateStruct(tokenAddress, feedAddress, 18);
     s_priceRegistry.updateTokenPriceFeeds(tokenPriceFeedUpdates);
 
@@ -266,7 +266,7 @@ contract PriceRegistry_getValidatedTokenPrice is PriceRegistrySetup {
     address tokenAddress = _deploySourceToken("testToken", 0, 0);
     address feedAddress = _deployTokenPriceDataFeed(tokenAddress, 0, 1e31);
 
-    IPriceRegistry.TokenPriceFeedUpdate[] memory tokenPriceFeedUpdates = new IPriceRegistry.TokenPriceFeedUpdate[](1);
+    PriceRegistry.TokenPriceFeedUpdate[] memory tokenPriceFeedUpdates = new PriceRegistry.TokenPriceFeedUpdate[](1);
     tokenPriceFeedUpdates[0] = getSingleTokenPriceFeedUpdateStruct(tokenAddress, feedAddress, 0);
     s_priceRegistry.updateTokenPriceFeeds(tokenPriceFeedUpdates);
 
@@ -280,7 +280,7 @@ contract PriceRegistry_getValidatedTokenPrice is PriceRegistrySetup {
     address tokenAddress = _deploySourceToken("testToken", 0, 20);
     address feedAddress = _deployTokenPriceDataFeed(tokenAddress, 20, 1e18);
 
-    IPriceRegistry.TokenPriceFeedUpdate[] memory tokenPriceFeedUpdates = new IPriceRegistry.TokenPriceFeedUpdate[](1);
+    PriceRegistry.TokenPriceFeedUpdate[] memory tokenPriceFeedUpdates = new PriceRegistry.TokenPriceFeedUpdate[](1);
     tokenPriceFeedUpdates[0] = getSingleTokenPriceFeedUpdateStruct(tokenAddress, feedAddress, 20);
     s_priceRegistry.updateTokenPriceFeeds(tokenPriceFeedUpdates);
 
@@ -294,11 +294,11 @@ contract PriceRegistry_getValidatedTokenPrice is PriceRegistrySetup {
     address tokenAddress = _deploySourceToken("testToken", 0, 18);
     address feedAddress = _deployTokenPriceDataFeed(tokenAddress, 18, int256(uint256(type(uint224).max) + 1));
 
-    IPriceRegistry.TokenPriceFeedUpdate[] memory tokenPriceFeedUpdates = new IPriceRegistry.TokenPriceFeedUpdate[](1);
+    PriceRegistry.TokenPriceFeedUpdate[] memory tokenPriceFeedUpdates = new PriceRegistry.TokenPriceFeedUpdate[](1);
     tokenPriceFeedUpdates[0] = getSingleTokenPriceFeedUpdateStruct(tokenAddress, feedAddress, 18);
     s_priceRegistry.updateTokenPriceFeeds(tokenPriceFeedUpdates);
 
-    vm.expectRevert("Rebased data feed value does not fit in 224 bits");
+    vm.expectRevert(PriceRegistry.DataFeedValueOutOfUint224Range.selector);
     s_priceRegistry.getValidatedTokenPrice(tokenAddress);
   }
 
@@ -306,11 +306,11 @@ contract PriceRegistry_getValidatedTokenPrice is PriceRegistrySetup {
     address tokenAddress = _deploySourceToken("testToken", 0, 18);
     address feedAddress = _deployTokenPriceDataFeed(tokenAddress, 18, -1);
 
-    IPriceRegistry.TokenPriceFeedUpdate[] memory tokenPriceFeedUpdates = new IPriceRegistry.TokenPriceFeedUpdate[](1);
+    PriceRegistry.TokenPriceFeedUpdate[] memory tokenPriceFeedUpdates = new PriceRegistry.TokenPriceFeedUpdate[](1);
     tokenPriceFeedUpdates[0] = getSingleTokenPriceFeedUpdateStruct(tokenAddress, feedAddress, 18);
     s_priceRegistry.updateTokenPriceFeeds(tokenPriceFeedUpdates);
 
-    vm.expectRevert("Data feed value must be positive");
+    vm.expectRevert(PriceRegistry.DataFeedValueOutOfUint224Range.selector);
     s_priceRegistry.getValidatedTokenPrice(tokenAddress);
   }
 
@@ -678,7 +678,7 @@ contract PriceRegistry_updateTokenPriceFeeds is PriceRegistrySetup {
   function test_ZeroFeeds_Success() public {
     Vm.Log[] memory logEntries = vm.getRecordedLogs();
 
-    IPriceRegistry.TokenPriceFeedUpdate[] memory tokenPriceFeedUpdates = new IPriceRegistry.TokenPriceFeedUpdate[](0);
+    PriceRegistry.TokenPriceFeedUpdate[] memory tokenPriceFeedUpdates = new PriceRegistry.TokenPriceFeedUpdate[](0);
     vm.recordLogs();
     s_priceRegistry.updateTokenPriceFeeds(tokenPriceFeedUpdates);
 
@@ -687,7 +687,7 @@ contract PriceRegistry_updateTokenPriceFeeds is PriceRegistrySetup {
   }
 
   function test_SingleFeedUpdate_Success() public {
-    IPriceRegistry.TokenPriceFeedUpdate[] memory tokenPriceFeedUpdates = new IPriceRegistry.TokenPriceFeedUpdate[](1);
+    PriceRegistry.TokenPriceFeedUpdate[] memory tokenPriceFeedUpdates = new PriceRegistry.TokenPriceFeedUpdate[](1);
     tokenPriceFeedUpdates[0] =
       getSingleTokenPriceFeedUpdateStruct(s_sourceTokens[0], s_dataFeedByToken[s_sourceTokens[0]], 18);
 
@@ -706,7 +706,7 @@ contract PriceRegistry_updateTokenPriceFeeds is PriceRegistrySetup {
   }
 
   function test_MultipleFeedUpdate_Success() public {
-    IPriceRegistry.TokenPriceFeedUpdate[] memory tokenPriceFeedUpdates = new IPriceRegistry.TokenPriceFeedUpdate[](2);
+    PriceRegistry.TokenPriceFeedUpdate[] memory tokenPriceFeedUpdates = new PriceRegistry.TokenPriceFeedUpdate[](2);
 
     for (uint256 i = 0; i < 2; ++i) {
       tokenPriceFeedUpdates[i] =
@@ -735,7 +735,7 @@ contract PriceRegistry_updateTokenPriceFeeds is PriceRegistrySetup {
     assertFalse(priceQueryInitial.value == 0);
     assertFalse(priceQueryInitial.timestamp == 0);
 
-    IPriceRegistry.TokenPriceFeedUpdate[] memory tokenPriceFeedUpdates = new IPriceRegistry.TokenPriceFeedUpdate[](1);
+    PriceRegistry.TokenPriceFeedUpdate[] memory tokenPriceFeedUpdates = new PriceRegistry.TokenPriceFeedUpdate[](1);
     tokenPriceFeedUpdates[0] =
       getSingleTokenPriceFeedUpdateStruct(s_sourceTokens[0], s_dataFeedByToken[s_sourceTokens[0]], 18);
 
@@ -760,7 +760,7 @@ contract PriceRegistry_updateTokenPriceFeeds is PriceRegistrySetup {
   }
 
   function test_FeedNotUpdated() public {
-    IPriceRegistry.TokenPriceFeedUpdate[] memory tokenPriceFeedUpdates = new IPriceRegistry.TokenPriceFeedUpdate[](1);
+    PriceRegistry.TokenPriceFeedUpdate[] memory tokenPriceFeedUpdates = new PriceRegistry.TokenPriceFeedUpdate[](1);
     tokenPriceFeedUpdates[0] =
       getSingleTokenPriceFeedUpdateStruct(s_sourceTokens[0], s_dataFeedByToken[s_sourceTokens[0]], 18);
 
@@ -775,7 +775,7 @@ contract PriceRegistry_updateTokenPriceFeeds is PriceRegistrySetup {
   // Reverts
 
   function test_FeedUpdatedByNonOwner_Revert() public {
-    IPriceRegistry.TokenPriceFeedUpdate[] memory tokenPriceFeedUpdates = new IPriceRegistry.TokenPriceFeedUpdate[](1);
+    PriceRegistry.TokenPriceFeedUpdate[] memory tokenPriceFeedUpdates = new PriceRegistry.TokenPriceFeedUpdate[](1);
     tokenPriceFeedUpdates[0] =
       getSingleTokenPriceFeedUpdateStruct(s_sourceTokens[0], s_dataFeedByToken[s_sourceTokens[0]], 18);
 
