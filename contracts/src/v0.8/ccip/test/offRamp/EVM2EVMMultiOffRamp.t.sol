@@ -273,6 +273,34 @@ contract EVM2EVMMultiOffRamp_metadataHash is EVM2EVMMultiOffRampSetup {
     );
     assertTrue(h != s_offRamp.metadataHash(SOURCE_CHAIN_SELECTOR, ON_RAMP_ADDRESS));
   }
+
+  // NOTE: to get a reliable result, set fuzz runs to at least 1mil
+  /// forge-config: default.fuzz.runs = 32
+  /// forge-config: ccip.fuzz.runs = 10000
+  function test_fuzz__MetadataHash_NoCollisions(
+    uint64 destChainSelector,
+    uint64 sourceChainSelector1,
+    uint64 sourceChainSelector2,
+    address onRamp1,
+    address onRamp2
+  ) public {
+    // Edge case: metadata hash should be the same when values match
+    if (sourceChainSelector1 == sourceChainSelector2 && onRamp1 == onRamp2) {
+      return;
+    }
+
+    EVM2EVMMultiOffRamp.StaticConfig memory staticConfig = s_offRamp.getStaticConfig();
+    EVM2EVMMultiOffRamp.SourceChainConfigUpdateArgs[] memory sourceChainConfigs =
+      new EVM2EVMMultiOffRamp.SourceChainConfigUpdateArgs[](0);
+
+    staticConfig.chainSelector = destChainSelector;
+    s_offRamp = new EVM2EVMMultiOffRampHelper(staticConfig, sourceChainConfigs, getInboundRateLimiterConfig());
+
+    bytes32 h1 = s_offRamp.metadataHash(sourceChainSelector1, onRamp1);
+    bytes32 h2 = s_offRamp.metadataHash(sourceChainSelector2, onRamp2);
+
+    assertTrue(h1 != h2);
+  }
 }
 
 contract EVM2EVMMultiOffRamp__releaseOrMintTokens is EVM2EVMMultiOffRampSetup {
