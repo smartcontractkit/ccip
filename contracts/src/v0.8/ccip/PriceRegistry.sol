@@ -201,7 +201,8 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator, ITypeAndVersion {
       int256 dataFeedAnswer,
       /* uint startedAt */
       ,
-      uint256 updatedAt,
+      /* uint256 updatedAt */
+      ,
       /* uint80 answeredInRound */
     ) = dataFeedContract.latestRoundData();
 
@@ -229,7 +230,7 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator, ITypeAndVersion {
     if (rebasedValue > type(uint224).max) {
       revert DataFeedValueOutOfUint224Range();
     }
-    return (uint224(rebasedValue), uint32(updatedAt));
+    return (uint224(rebasedValue), uint32(block.timestamp));
   }
 
   // ================================================================

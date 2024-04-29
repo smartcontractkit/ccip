@@ -179,7 +179,7 @@ contract PriceRegistry_getTokenPrice is PriceRegistrySetup {
 
     // Price answer is 1e8 (18 decimal token) - unit is (1e18 * 1e18 / 1e18) -> expected 1e18
     assertEq(tokenPriceAnswer.value, uint224(1e18));
-    assertEq(tokenPriceAnswer.timestamp, uint32(originalTimestampValue));
+    assertEq(tokenPriceAnswer.timestamp, uint32(block.timestamp));
   }
 }
 
@@ -198,6 +198,19 @@ contract PriceRegistry_getValidatedTokenPrice is PriceRegistrySetup {
 
     // Right below staleness threshold
     vm.warp(originalTimestampValue + TWELVE_HOURS);
+
+    address sourceToken = _initialiseSingleTokenPriceFeed();
+    uint224 tokenPriceAnswer = s_priceRegistry.getValidatedTokenPrice(sourceToken);
+
+    // Price answer is 1e8 (18 decimal token) - unit is (1e18 * 1e18 / 1e18) -> expected 1e18
+    assertEq(tokenPriceAnswer, uint224(1e18));
+  }
+
+  function test_GetValidatedTokenPriceFromFeedOverStalenessPeriod_Success() public {
+    uint256 originalTimestampValue = block.timestamp;
+
+    // Right above staleness threshold
+    vm.warp(originalTimestampValue + TWELVE_HOURS + 1);
 
     address sourceToken = _initialiseSingleTokenPriceFeed();
     uint224 tokenPriceAnswer = s_priceRegistry.getValidatedTokenPrice(sourceToken);
@@ -312,18 +325,6 @@ contract PriceRegistry_getValidatedTokenPrice is PriceRegistrySetup {
 
     vm.expectRevert(PriceRegistry.DataFeedValueOutOfUint224Range.selector);
     s_priceRegistry.getValidatedTokenPrice(tokenAddress);
-  }
-
-  function test_StaleFeedPrice_Revert() public {
-    // Right above staleness threshold
-    vm.warp(block.timestamp + TWELVE_HOURS + 1);
-
-    address sourceToken = _initialiseSingleTokenPriceFeed();
-
-    vm.expectRevert(
-      abi.encodeWithSelector(PriceRegistry.StaleTokenPrice.selector, sourceToken, TWELVE_HOURS, TWELVE_HOURS + 1)
-    );
-    s_priceRegistry.getValidatedTokenPrice(sourceToken);
   }
 
   function test_StaleFeeToken_Revert() public {
