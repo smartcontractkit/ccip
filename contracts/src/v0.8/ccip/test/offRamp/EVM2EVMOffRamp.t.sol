@@ -1319,7 +1319,8 @@ contract EVM2EVMOffRamp__releaseOrMintTokens is EVM2EVMOffRampSetup {
   }
 
   function test__releaseOrMintTokens_PoolIsNotAPool_Reverts() public {
-    address fakePoolAddress = makeAddr("Doesn't exist");
+    // The offRamp is a contract, but not a pool
+    address fakePoolAddress = address(s_offRamp);
 
     bytes[] memory sourceTokenData = new bytes[](1);
     sourceTokenData[0] = abi.encode(
@@ -1330,7 +1331,7 @@ contract EVM2EVMOffRamp__releaseOrMintTokens is EVM2EVMOffRampSetup {
       })
     );
 
-    vm.expectRevert(abi.encodeWithSelector(EVM2EVMOffRamp.TokenHandlingError.selector, bytes("")));
+    vm.expectRevert(abi.encodeWithSelector(EVM2EVMOffRamp.NotACompatiblePool.selector, fakePoolAddress));
     s_offRamp.releaseOrMintTokens(
       new Client.EVMTokenAmount[](1), abi.encode(makeAddr("original_sender")), OWNER, sourceTokenData, new bytes[](1)
     );
@@ -1348,7 +1349,7 @@ contract EVM2EVMOffRamp__releaseOrMintTokens is EVM2EVMOffRampSetup {
       })
     );
 
-    vm.expectRevert(abi.encodeWithSelector(CallWithExactGas.NoContract.selector));
+    vm.expectRevert(abi.encodeWithSelector(EVM2EVMOffRamp.NotACompatiblePool.selector, fakePoolAddress));
     s_offRamp.releaseOrMintTokens(
       new Client.EVMTokenAmount[](1), abi.encode(makeAddr("original_sender")), OWNER, sourceTokenData, new bytes[](1)
     );

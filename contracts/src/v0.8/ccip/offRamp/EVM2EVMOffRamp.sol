@@ -15,6 +15,7 @@ import {EnumerableMapAddresses} from "../../shared/enumerable/EnumerableMapAddre
 import {AggregateRateLimiter} from "../AggregateRateLimiter.sol";
 import {Client} from "../libraries/Client.sol";
 import {Internal} from "../libraries/Internal.sol";
+import {Pool} from "../libraries/Pool.sol";
 import {RateLimiter} from "../libraries/RateLimiter.sol";
 import {OCR2BaseNoChecks} from "../ocr/OCR2BaseNoChecks.sol";
 
@@ -52,6 +53,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
   error BadARMSignal();
   error InvalidMessageId();
   error InvalidEVMAddress(uint256 encodedAddress);
+  error NotACompatiblePool(address notPool);
   error InvalidDataLength(uint256 expected, uint256 got);
   error InvalidNewState(uint64 sequenceNumber, Internal.MessageExecutionState newState);
   error IndexOutOfRange();
@@ -561,6 +563,15 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
         revert InvalidDataLength(32, sourceTokenData.destPoolAddress.length);
       }
 
+      address localPoolAddress = _validateEVMAddress(abi.decode(sourceTokenData.destPoolAddress, (uint256)));
+      // This will call the supportsInterface through the ERC165Checker, and not directly on the pool address.
+      // This is done to prevent a pool from reverting the entire transaction if it doesn't support the interface.
+      // The call gets a max or 30k gas per instance, of which there are three. This means gas estimations should
+      // account for 90k gas overhead due to the interface check.
+      if (!localPoolAddress.supportsInterface(Pool.CCIP_POOL_V1)) {
+        revert NotACompatiblePool(localPoolAddress);
+      }
+
       // We determined that the pool address is a valid EVM address, but that does not mean the code at this
       // address is a (compatible) pool contract. _callWithExactGasSafeReturnData will check if the location
       // contains a contract. If it doesn't it reverts with a known error, which we catch gracefully.
@@ -576,7 +587,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
           sourceTokenData,
           offchainTokenData[i]
         ),
-        _validateEVMAddress(abi.decode(sourceTokenData.destPoolAddress, (uint256))),
+        localPoolAddress,
         s_dynamicConfig.maxPoolReleaseOrMintGas,
         Internal.GAS_FOR_CALL_EXACT_CHECK,
         Internal.MAX_RET_BYTES
