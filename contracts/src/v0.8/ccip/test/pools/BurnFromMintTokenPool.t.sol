@@ -50,7 +50,14 @@ contract BurnFromMintTokenPool_lockOrBurn is BurnFromMintTokenPoolSetup {
     bytes4 expectedSignature = bytes4(keccak256("burnFrom(address,uint256)"));
     vm.expectCall(address(s_burnMintERC677), abi.encodeWithSelector(expectedSignature, address(s_pool), burnAmount));
 
-    s_pool.lockOrBurn(Pool._encodeLockOrBurnInV1(OWNER, bytes(""), burnAmount, DEST_CHAIN_SELECTOR));
+    s_pool.lockOrBurn(
+      Pool.LockOrBurnInV1({
+        originalSender: OWNER,
+        receiver: bytes(""),
+        amount: burnAmount,
+        remoteChainSelector: DEST_CHAIN_SELECTOR
+      })
+    );
 
     assertEq(s_burnMintERC677.balanceOf(address(s_pool)), 0);
   }
@@ -62,7 +69,14 @@ contract BurnFromMintTokenPool_lockOrBurn is BurnFromMintTokenPoolSetup {
     vm.startPrank(s_burnMintOnRamp);
 
     vm.expectRevert(EVM2EVMOnRamp.BadARMSignal.selector);
-    s_pool.lockOrBurn(Pool._encodeLockOrBurnInV1(OWNER, bytes(""), 1e5, DEST_CHAIN_SELECTOR));
+    s_pool.lockOrBurn(
+      Pool.LockOrBurnInV1({
+        originalSender: OWNER,
+        receiver: bytes(""),
+        amount: 1e5,
+        remoteChainSelector: DEST_CHAIN_SELECTOR
+      })
+    );
 
     assertEq(s_burnMintERC677.balanceOf(address(s_pool)), before);
   }

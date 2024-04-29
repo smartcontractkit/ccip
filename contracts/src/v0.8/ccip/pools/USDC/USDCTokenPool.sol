@@ -136,11 +136,13 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
     uint64 nonce = i_tokenMessenger.depositForBurnWithCaller(
       lockOrBurnIn.amount, domain.domainIdentifier, receiver, address(i_token), domain.allowedCaller
     );
+
     emit Burned(msg.sender, lockOrBurnIn.amount);
-    return Pool._encodeLockOrBurnOutV1(
-      getRemotePool(lockOrBurnIn.remoteChainSelector),
-      abi.encode(SourceTokenDataPayload({nonce: nonce, sourceDomain: i_localDomainIdentifier}))
-    );
+
+    return Pool.LockOrBurnOutV1({
+      destPoolAddress: getRemotePool(lockOrBurnIn.remoteChainSelector),
+      destPoolData: abi.encode(SourceTokenDataPayload({nonce: nonce, sourceDomain: i_localDomainIdentifier}))
+    });
   }
 
   /// @notice Mint tokens from the pool to the recipient

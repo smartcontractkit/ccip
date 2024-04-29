@@ -7,12 +7,11 @@ library Pool {
   // bytes4(keccak256("CCIP_POOL_V1"))
   bytes4 public constant CCIP_POOL_V1 = 0xaff2afbf;
 
-  // TODO pack
   struct LockOrBurnInV1 {
-    address originalSender;
-    bytes receiver;
-    uint256 amount;
-    uint64 remoteChainSelector;
+    bytes receiver; //  The recipient of the tokens on the destination chain, abi encoded
+    uint256 amount; //  The amount of tokens to lock or burn, denominated in the source token's decimals
+    address originalSender; // ─────╮ The original sender of the tx on the source chain
+    uint64 remoteChainSelector; // ─╯ The chain ID of the destination chain
   }
 
   struct LockOrBurnOutV1 {
@@ -20,71 +19,21 @@ library Pool {
     bytes destPoolData;
   }
 
-  // TODO pack
   struct ReleaseOrMintInV1 {
-    bytes originalSender;
-    address receiver;
-    uint256 amount;
-    uint64 remoteChainSelector;
-    bytes sourcePoolAddress;
-    bytes sourcePoolData;
-    bytes offchainTokenData;
+    bytes originalSender; //          The original sender of the tx on the source chain
+    address receiver; // ───────────╮ The recipient of the tokens on the destination chain
+    uint64 remoteChainSelector; // ─╯ The chain ID of the source chain
+    uint256 amount; //                The amount of tokens to release or mint, denominated in the source token's decimals
+    bytes sourcePoolAddress; //       The address of the source pool, abi encoded in the case of EVM chains
+    bytes sourcePoolData; //          The data received from the source pool to process the release or mint
+    bytes offchainTokenData; //       The offchain data to process the release or mint
   }
 
   struct ReleaseOrMintOutV1 {
-    address localToken;
+    address localToken; // The address of the local token
+    // The number of tokens released or minted on the destination chain, denominated in  the local token's  decimals.
+    // This value is expected to be equal to the ReleaseOrMintInV1.amount in  the case where the source and destination
+    // chain have the same number of decimals
     uint256 destinationAmount;
-  }
-
-  function _encodeLockOrBurnInV1(
-    address originalSender,
-    bytes memory receiver,
-    uint256 amount,
-    uint64 remoteChainSelector
-  ) internal pure returns (LockOrBurnInV1 memory) {
-    return LockOrBurnInV1({
-      originalSender: originalSender,
-      receiver: receiver,
-      amount: amount,
-      remoteChainSelector: remoteChainSelector
-    });
-  }
-
-  ///  @notice Generates the return dataV1 for the lockOrBurn pool call.
-  ///  @param remotePoolAddress The address of the remote pool.
-  ///  @param destPoolData The data to send to the remote pool.
-  ///  @return The return data for the burnOrMint pool call.
-  function _encodeLockOrBurnOutV1(
-    bytes memory remotePoolAddress,
-    bytes memory destPoolData
-  ) internal pure returns (LockOrBurnOutV1 memory) {
-    return LockOrBurnOutV1({destPoolAddress: remotePoolAddress, destPoolData: destPoolData});
-  }
-
-  function _encodeReleaseOrMintInV1(
-    bytes memory originalSender,
-    address receiver,
-    uint256 amount,
-    uint64 remoteChainSelector,
-    bytes memory sourcePoolAddress,
-    bytes memory sourcePoolData,
-    bytes memory offchainTokenData
-  ) internal pure returns (ReleaseOrMintInV1 memory) {
-    return ReleaseOrMintInV1({
-      originalSender: originalSender,
-      receiver: receiver,
-      amount: amount,
-      remoteChainSelector: remoteChainSelector,
-      sourcePoolAddress: sourcePoolAddress,
-      sourcePoolData: sourcePoolData,
-      offchainTokenData: offchainTokenData
-    });
-  }
-
-  function _encodeReleaseOrMintOutV1(
-    address localToken,
-    uint256 destinationAmount
-  ) internal pure returns (ReleaseOrMintOutV1 memory) {
-    return ReleaseOrMintOutV1({localToken: localToken, destinationAmount: destinationAmount});
   }
 }

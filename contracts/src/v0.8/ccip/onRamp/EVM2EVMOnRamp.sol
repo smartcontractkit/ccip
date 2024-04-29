@@ -334,7 +334,12 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
       }
 
       Pool.LockOrBurnOutV1 memory poolReturnData = sourcePool.lockOrBurn(
-        Pool._encodeLockOrBurnInV1(originalSender, message.receiver, tokenAndAmount.amount, i_destChainSelector)
+        Pool.LockOrBurnInV1({
+          originalSender: originalSender,
+          receiver: message.receiver,
+          amount: tokenAndAmount.amount,
+          remoteChainSelector: i_destChainSelector
+        })
       );
 
       // Since the DON has to pay for the extraData to be included on the destination chain, we cap the length of the extraData.

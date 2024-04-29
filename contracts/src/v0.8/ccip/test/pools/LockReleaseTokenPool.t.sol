@@ -93,7 +93,14 @@ contract LockReleaseTokenPool_lockOrBurn is LockReleaseTokenPoolSetup {
     vm.expectEmit();
     emit Locked(s_allowedOnRamp, amount);
 
-    s_lockReleaseTokenPool.lockOrBurn(Pool._encodeLockOrBurnInV1(STRANGER, bytes(""), amount, DEST_CHAIN_SELECTOR));
+    s_lockReleaseTokenPool.lockOrBurn(
+      Pool.LockOrBurnInV1({
+        originalSender: STRANGER,
+        receiver: bytes(""),
+        amount: amount,
+        remoteChainSelector: DEST_CHAIN_SELECTOR
+      })
+    );
   }
 
   function test_LockOrBurnWithAllowList_Success() public {
@@ -106,14 +113,24 @@ contract LockReleaseTokenPool_lockOrBurn is LockReleaseTokenPoolSetup {
     emit Locked(s_allowedOnRamp, amount);
 
     s_lockReleaseTokenPoolWithAllowList.lockOrBurn(
-      Pool._encodeLockOrBurnInV1(s_allowedList[0], bytes(""), amount, DEST_CHAIN_SELECTOR)
+      Pool.LockOrBurnInV1({
+        originalSender: s_allowedList[0],
+        receiver: bytes(""),
+        amount: amount,
+        remoteChainSelector: DEST_CHAIN_SELECTOR
+      })
     );
 
     vm.expectEmit();
     emit Locked(s_allowedOnRamp, amount);
 
     s_lockReleaseTokenPoolWithAllowList.lockOrBurn(
-      Pool._encodeLockOrBurnInV1(s_allowedList[1], bytes(""), amount, DEST_CHAIN_SELECTOR)
+      Pool.LockOrBurnInV1({
+        originalSender: s_allowedList[1],
+        receiver: bytes(""),
+        amount: amount,
+        remoteChainSelector: DEST_CHAIN_SELECTOR
+      })
     );
   }
 
@@ -123,7 +140,12 @@ contract LockReleaseTokenPool_lockOrBurn is LockReleaseTokenPoolSetup {
     vm.expectRevert(abi.encodeWithSelector(SenderNotAllowed.selector, STRANGER));
 
     s_lockReleaseTokenPoolWithAllowList.lockOrBurn(
-      Pool._encodeLockOrBurnInV1(STRANGER, bytes(""), 100, DEST_CHAIN_SELECTOR)
+      Pool.LockOrBurnInV1({
+        originalSender: STRANGER,
+        receiver: bytes(""),
+        amount: 100,
+        remoteChainSelector: DEST_CHAIN_SELECTOR
+      })
     );
   }
 
@@ -136,7 +158,12 @@ contract LockReleaseTokenPool_lockOrBurn is LockReleaseTokenPoolSetup {
     vm.expectRevert(EVM2EVMOnRamp.BadARMSignal.selector);
 
     s_lockReleaseTokenPoolWithAllowList.lockOrBurn(
-      Pool._encodeLockOrBurnInV1(s_allowedList[0], bytes(""), 1e5, DEST_CHAIN_SELECTOR)
+      Pool.LockOrBurnInV1({
+        originalSender: s_allowedList[0],
+        receiver: bytes(""),
+        amount: 1e5,
+        remoteChainSelector: DEST_CHAIN_SELECTOR
+      })
     );
 
     assertEq(s_token.balanceOf(address(s_lockReleaseTokenPoolWithAllowList)), before);

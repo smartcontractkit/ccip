@@ -22,7 +22,7 @@ contract TokenPoolHelper is TokenPool {
     returns (Pool.LockOrBurnOutV1 memory)
   {
     emit LockOrBurn(lockOrBurnIn.amount);
-    return Pool._encodeLockOrBurnOutV1(getRemotePool(lockOrBurnIn.remoteChainSelector), "");
+    return Pool.LockOrBurnOutV1({destPoolAddress: getRemotePool(lockOrBurnIn.remoteChainSelector), destPoolData: ""});
   }
 
   function releaseOrMint(Pool.ReleaseOrMintInV1 calldata releaseOrMintIn)

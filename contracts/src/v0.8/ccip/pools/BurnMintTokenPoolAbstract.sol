@@ -30,7 +30,7 @@ abstract contract BurnMintTokenPoolAbstract is TokenPool {
 
     emit Burned(msg.sender, lockOrBurnIn.amount);
 
-    return Pool._encodeLockOrBurnOutV1(getRemotePool(lockOrBurnIn.remoteChainSelector), "");
+    return Pool.LockOrBurnOutV1({destPoolAddress: getRemotePool(lockOrBurnIn.remoteChainSelector), destPoolData: ""});
   }
 
   /// @notice Mint tokens from the pool to the recipient
