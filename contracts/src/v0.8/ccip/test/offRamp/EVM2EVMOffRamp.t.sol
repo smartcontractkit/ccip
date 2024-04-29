@@ -1121,6 +1121,28 @@ contract EVM2EVMOffRamp__trialExecute is EVM2EVMOffRampSetup {
 
     assertEq(uint256(Internal.MessageExecutionState.FAILURE), uint256(newState));
     assertEq(abi.encodeWithSelector(EVM2EVMOffRamp.InvalidEVMAddress.selector, 0), err);
+
+    address notAContract = makeAddr("not_a_contract");
+
+    message.sourceTokenData[0] = abi.encode(
+      IPool.SourceTokenData({
+        sourcePoolAddress: abi.encode(address(0)),
+        destPoolAddress: abi.encode(notAContract),
+        extraData: ""
+      })
+    );
+
+    message.messageId = Internal._hash(
+      message,
+      keccak256(
+        abi.encode(Internal.EVM_2_EVM_MESSAGE_HASH, SOURCE_CHAIN_SELECTOR, DEST_CHAIN_SELECTOR, ON_RAMP_ADDRESS)
+      )
+    );
+
+    (newState, err) = s_offRamp.trialExecute(message, new bytes[](message.tokenAmounts.length));
+
+    assertEq(uint256(Internal.MessageExecutionState.FAILURE), uint256(newState));
+    assertEq(abi.encodeWithSelector(EVM2EVMOffRamp.NotACompatiblePool.selector, notAContract), err);
   }
 }
 

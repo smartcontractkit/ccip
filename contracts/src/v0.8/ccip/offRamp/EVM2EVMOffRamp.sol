@@ -401,7 +401,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
       if (
         ReceiverError.selector == bytes4(err) || TokenHandlingError.selector == bytes4(err)
           || InvalidEVMAddress.selector == bytes4(err) || InvalidDataLength.selector == bytes4(err)
-          || CallWithExactGas.NoContract.selector == bytes4(err)
+          || CallWithExactGas.NoContract.selector == bytes4(err) || NotACompatiblePool.selector == bytes4(err)
       ) {
         // If CCIP receiver execution is not successful, bubble up receiver revert data,
         // prepended by the 4 bytes of ReceiverError.selector, TokenHandlingError.selector or InvalidPoolAddress.selector.
