@@ -1,4 +1,4 @@
-package arb_test
+package opstack
 
 import (
 	"testing"
@@ -6,17 +6,16 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/liquiditymanager/generated/l2_arbitrum_gateway"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/liquiditymanager/generated/liquiditymanager"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/liquiditymanager/generated/optimism_standard_bridge"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/bridge/arb"
 	bridgecommon "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/bridge/common"
 )
 
 func Test_TopicIndexes(t *testing.T) {
 	var (
-		rebalancerABI = abihelpers.MustParseABI(liquiditymanager.LiquidityManagerMetaData.ABI)
-		l2GatewayABI  = abihelpers.MustParseABI(l2_arbitrum_gateway.L2ArbitrumGatewayMetaData.ABI)
+		rebalancerABI     = abihelpers.MustParseABI(liquiditymanager.LiquidityManagerMetaData.ABI)
+		standardBridgeABI = abihelpers.MustParseABI(optimism_standard_bridge.OptimismStandardBridgeMetaData.ABI)
 	)
 	t.Run("liquidity transferred to chain selector idx", func(t *testing.T) {
 		ltEvent, ok := rebalancerABI.Events["LiquidityTransferred"]
@@ -58,23 +57,23 @@ func Test_TopicIndexes(t *testing.T) {
 		require.Equal(t, bridgecommon.LiquidityTransferredFromChainSelectorTopicIndex, topicIndex)
 	})
 
-	t.Run("deposit finalized to address idx", func(t *testing.T) {
-		dfEvent, ok := l2GatewayABI.Events["DepositFinalized"]
+	t.Run("ERC20 bridge finalized to address idx", func(t *testing.T) {
+		bfEvent, ok := standardBridgeABI.Events["ERC20BridgeFinalized"]
 		require.True(t, ok)
 
-		var toAddressArg abi.Argument
+		var fromAddressArg abi.Argument
 		var topicIndex = 0
-		for _, arg := range dfEvent.Inputs {
+		for _, arg := range bfEvent.Inputs {
 			if arg.Indexed {
 				topicIndex++
 			}
-			if arg.Name == "_to" {
-				toAddressArg = arg
+			if arg.Name == "from" {
+				fromAddressArg = arg
 				break
 			}
 		}
 
-		require.True(t, toAddressArg.Indexed)
-		require.Equal(t, arb.DepositFinalizedToAddressTopicIndex, topicIndex)
+		require.True(t, fromAddressArg.Indexed)
+		require.Equal(t, ERC20BridgeFinalizedFromAddressTopicIndex, topicIndex)
 	})
 }
