@@ -76,7 +76,7 @@ contract LockReleaseTokenPool is TokenPool, ILiquidityContainer, ITypeAndVersion
     virtual
     override
     whenHealthy
-    returns (address, uint256)
+    returns (Pool.ReleaseOrMintOutV1 memory)
   {
     _onlyOffRamp(releaseOrMintIn.remoteChainSelector);
     _validateSourceCaller(releaseOrMintIn.remoteChainSelector, releaseOrMintIn.sourcePoolAddress);
@@ -86,7 +86,7 @@ contract LockReleaseTokenPool is TokenPool, ILiquidityContainer, ITypeAndVersion
 
     emit Released(msg.sender, releaseOrMintIn.receiver, releaseOrMintIn.amount);
 
-    return (address(i_token), releaseOrMintIn.amount);
+    return Pool.ReleaseOrMintOutV1({localToken: address(i_token), destinationAmount: releaseOrMintIn.amount});
   }
 
   /// @notice returns the lock release interface flag used for EIP165 identification.

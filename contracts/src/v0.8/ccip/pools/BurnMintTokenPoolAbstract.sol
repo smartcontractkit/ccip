@@ -42,7 +42,7 @@ abstract contract BurnMintTokenPoolAbstract is TokenPool {
     virtual
     override
     whenHealthy
-    returns (address, uint256)
+    returns (Pool.ReleaseOrMintOutV1 memory)
   {
     _onlyOffRamp(releaseOrMintIn.remoteChainSelector);
     _validateSourceCaller(releaseOrMintIn.remoteChainSelector, releaseOrMintIn.sourcePoolAddress);
@@ -52,6 +52,6 @@ abstract contract BurnMintTokenPoolAbstract is TokenPool {
 
     emit Minted(msg.sender, releaseOrMintIn.receiver, releaseOrMintIn.amount);
 
-    return (address(i_token), releaseOrMintIn.amount);
+    return Pool.ReleaseOrMintOutV1({localToken: address(i_token), destinationAmount: releaseOrMintIn.amount});
   }
 }

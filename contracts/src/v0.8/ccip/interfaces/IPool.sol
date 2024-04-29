@@ -23,10 +23,10 @@ interface IPool is IERC165 {
     returns (Pool.LockOrBurnOutV1 memory lockOrBurnOut);
 
   /// @notice Releases or mints tokens to the receiver address.
-  /// @return localToken The address of the local token.
-  /// @return destinationAmount The amount of tokens released or minted on the destination chain,
+  /// * localToken The address of the local token.
+  /// * destinationAmount The amount of tokens released or minted on the destination chain,
   /// denominated in the local token's decimals.
   function releaseOrMint(Pool.ReleaseOrMintInV1 calldata releaseOrMintIn)
     external
-    returns (address localToken, uint256 destinationAmount);
+    returns (Pool.ReleaseOrMintOutV1 memory);
 }

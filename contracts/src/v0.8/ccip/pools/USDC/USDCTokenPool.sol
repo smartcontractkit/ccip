@@ -154,7 +154,11 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
   /// for that message, including its (nonce, sourceDomain). This way, the only
   /// non-reverting offchainTokenData that can be supplied is a valid attestation for the
   /// specific message that was sent on source.
-  function releaseOrMint(Pool.ReleaseOrMintInV1 calldata releaseOrMintIn) external override returns (address, uint256) {
+  function releaseOrMint(Pool.ReleaseOrMintInV1 calldata releaseOrMintIn)
+    external
+    override
+    returns (Pool.ReleaseOrMintOutV1 memory)
+  {
     _onlyOffRamp(releaseOrMintIn.remoteChainSelector);
     _consumeInboundRateLimit(releaseOrMintIn.remoteChainSelector, releaseOrMintIn.amount);
     _validateSourceCaller(releaseOrMintIn.remoteChainSelector, releaseOrMintIn.sourcePoolAddress);
@@ -169,7 +173,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
       revert UnlockingUSDCFailed();
     }
     emit Minted(msg.sender, releaseOrMintIn.receiver, releaseOrMintIn.amount);
-    return (address(i_token), releaseOrMintIn.amount);
+    return Pool.ReleaseOrMintOutV1({localToken: address(i_token), destinationAmount: releaseOrMintIn.amount});
   }
 
   /// @notice Validates the USDC encoded message against the given parameters.

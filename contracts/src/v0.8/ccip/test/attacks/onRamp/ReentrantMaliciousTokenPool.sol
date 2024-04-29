@@ -45,8 +45,8 @@ contract ReentrantMaliciousTokenPool is TokenPool {
     external
     view
     override
-    returns (address, uint256)
+    returns (Pool.ReleaseOrMintOutV1 memory)
   {
-    return (address(i_token), releaseOrMintIn.amount);
+    return Pool.ReleaseOrMintOutV1({localToken: address(i_token), destinationAmount: releaseOrMintIn.amount});
   }
 }
