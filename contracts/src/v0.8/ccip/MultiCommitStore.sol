@@ -10,7 +10,7 @@ import {Internal} from "./libraries/Internal.sol";
 import {MerkleMultiProof} from "./libraries/MerkleMultiProof.sol";
 import {OCR2Base} from "./ocr/OCR2Base.sol";
 
-contract CommitStore is ICommitStore, ITypeAndVersion, OCR2Base {
+contract MultiCommitStore is ICommitStore, ITypeAndVersion, OCR2Base {
   error StaleReport();
   error PausedError();
   error InvalidInterval(Interval interval);
