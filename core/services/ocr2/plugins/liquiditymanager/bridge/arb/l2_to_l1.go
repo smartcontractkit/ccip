@@ -340,7 +340,7 @@ func (l *l2ToL1Bridge) toPendingTransfers(
 					LogIndex: int64(transfer.Raw.Index),
 				}].BlockTimestamp,
 				BridgeData: readyData[i], // finalization data for withdrawals that are ready
-				Stage:      StageFinalizeReady,
+				Stage:      bridgecommon.StageFinalizeReady,
 			},
 			Status: models.TransferStatusReady,
 			ID:     fmt.Sprintf("%s-%d", transfer.Raw.TxHash.Hex(), transfer.Raw.Index),
@@ -361,7 +361,7 @@ func (l *l2ToL1Bridge) toPendingTransfers(
 					LogIndex: int64(transfer.Raw.Index),
 				}].BlockTimestamp,
 				BridgeData: []byte{}, // No data since its not ready
-				Stage:      StageRebalanceConfirmed,
+				Stage:      bridgecommon.StageRebalanceConfirmed,
 			},
 			Status: models.TransferStatusNotReady,
 			ID:     fmt.Sprintf("%s-%d", transfer.Raw.TxHash.Hex(), transfer.Raw.Index),

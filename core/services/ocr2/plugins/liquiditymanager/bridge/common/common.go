@@ -26,11 +26,24 @@ const (
 	// DepositFinalizedToAddressTopicIndex is the index of the topic in the DepositFinalized event
 	// that contains the "to" address.
 	DepositFinalizedToAddressTopicIndex = 3
+	// FinalizationStepCompletedRemoteChainSelectorTopicIndex is the index of the topic in the FinalizationStepCompleted
+	// event that contains the "remote" chain selector.
+	FinalizationStepCompletedRemoteChainSelectorTopicIndex = 2
+
+	// StageRebalanceConfirmed is set as the transfer stage when the rebalanceLiquidity tx is confirmed onchain, but
+	// when it has not yet been finalized.
+	StageRebalanceConfirmed = 1
+	// StageFinalizeReady is set as the transfer stage when the finalization is ready to execute onchain.
+	StageFinalizeReady = 2
+	// StageFinalizeConfirmed is set as the transfer stage when the finalization is confirmed onchain.
+	// This is a terminal stage.
+	StageFinalizeConfirmed = 3
 )
 
 var (
 	// LiquidityManager event - emitted on both L1 and L2
-	LiquidityTransferredTopic = liquiditymanager.LiquidityManagerLiquidityTransferred{}.Topic()
+	LiquidityTransferredTopic      = liquiditymanager.LiquidityManagerLiquidityTransferred{}.Topic()
+	FinalizationStepCompletedTopic = liquiditymanager.LiquidityManagerFinalizationStepCompleted{}.Topic()
 )
 
 func NetworkSelectorToHash(selector models.NetworkSelector) common.Hash {
@@ -59,6 +72,18 @@ func ParseLiquidityTransferred(parseFunc func(gethtypes.Log) (*liquiditymanager.
 		}] = lg
 	}
 	return transferred, toLP, nil
+}
+
+func ParseFinalizationStepCompleted(parseFunc func(gethtypes.Log) (*liquiditymanager.LiquidityManagerFinalizationStepCompleted, error), lgs []logpoller.Log) ([]*liquiditymanager.LiquidityManagerFinalizationStepCompleted, error) {
+	completed := make([]*liquiditymanager.LiquidityManagerFinalizationStepCompleted, len(lgs))
+	for i, lg := range lgs {
+		parsed, err := parseFunc(lg.ToGethLog())
+		if err != nil {
+			return nil, fmt.Errorf("parse FinalizationStepCompleted log: %w", err)
+		}
+		completed[i] = parsed
+	}
+	return completed, nil
 }
 
 func GetBridgeFilterName(bridgeName, filterLayer string, liquidityManagerAddress common.Address, localChain, remoteChain, extra string) string {

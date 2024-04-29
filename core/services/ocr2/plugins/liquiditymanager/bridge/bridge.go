@@ -133,11 +133,11 @@ func (f *factory) initBridge(source, dest models.NetworkSelector) (Bridge, error
 		// only dest that is supported is eth sepolia if source == arb sepolia
 		if source == models.NetworkSelector(chainsel.ETHEREUM_MAINNET_ARBITRUM_1.Selector) &&
 			dest != models.NetworkSelector(chainsel.ETHEREUM_MAINNET.Selector) {
-			return nil, fmt.Errorf("unsupported destination for arbitrum mainnet l1 -> l2 bridge: %d, must be eth mainnet", dest)
+			return nil, fmt.Errorf("unsupported destination for arbitrum mainnet L2 -> L1 bridge: %d, must be eth mainnet", dest)
 		}
 		if source == models.NetworkSelector(chainsel.ETHEREUM_TESTNET_SEPOLIA_ARBITRUM_1.Selector) &&
 			dest != models.NetworkSelector(chainsel.ETHEREUM_TESTNET_SEPOLIA.Selector) {
-			return nil, fmt.Errorf("unsupported destination for arbitrum sepolia l1 -> l2 bridge: %d, must be eth sepolia", dest)
+			return nil, fmt.Errorf("unsupported destination for arbitrum sepolia L2 -> L1 bridge: %d, must be eth sepolia", dest)
 		}
 		l2Deps, ok := f.evmDeps[source]
 		if !ok {
@@ -172,6 +172,56 @@ func (f *factory) initBridge(source, dest models.NetworkSelector) (Bridge, error
 			l1Deps.lp,        // l1 log poller
 			l2Deps.ethClient, // l2 eth client
 			l1Deps.ethClient, // l1 eth client
+		)
+
+	// Optimism L2 --> Ethereum L1 bridge
+	case models.NetworkSelector(chainsel.ETHEREUM_MAINNET_OPTIMISM_1.Selector),
+		models.NetworkSelector(chainsel.ETHEREUM_TESTNET_SEPOLIA_OPTIMISM_1.Selector):
+		// source: optimism l2 -> dest: ethereum l1
+		// only dest that is supported is eth mainnet if source == OP mainnet
+		// only dest that is supported is eth sepolia if source == OP sepolia
+		if source == models.NetworkSelector(chainsel.ETHEREUM_MAINNET_OPTIMISM_1.Selector) &&
+			dest != models.NetworkSelector(chainsel.ETHEREUM_MAINNET.Selector) {
+			return nil, fmt.Errorf("unsupported destination for optimism mainnet L2 -> L1 bridge: %d, must be eth mainnet", dest)
+		}
+		if source == models.NetworkSelector(chainsel.ETHEREUM_TESTNET_SEPOLIA_OPTIMISM_1.Selector) &&
+			dest != models.NetworkSelector(chainsel.ETHEREUM_TESTNET_SEPOLIA.Selector) {
+			return nil, fmt.Errorf("unsupported destination for optimism sepolia L2 -> L1 bridge: %d, must be eth sepolia", dest)
+		}
+		l2Deps, ok := f.evmDeps[source]
+		if !ok {
+			return nil, fmt.Errorf("evm dependencies not found for source selector %d", source)
+		}
+		l1Deps, ok := f.evmDeps[dest]
+		if !ok {
+			return nil, fmt.Errorf("evm dependencies not found for dest selector %d", dest)
+		}
+		l1BridgeAdapter, ok := l1Deps.bridgeAdapters[source]
+		if !ok {
+			return nil, fmt.Errorf("bridge adapter not found for source selector %d in deps for dest selector %d", dest, source)
+		}
+		l2BridgeAdapter, ok := l2Deps.bridgeAdapters[dest]
+		if !ok {
+			return nil, fmt.Errorf("bridge adapter not found for dest selector %d in deps for source selector %d", source, dest)
+		}
+		f.lggr.Infow("addresses check",
+			"l1StandardBridgeProxyAddress", opstack.OptimismContracts[uint64(dest)]["L1StandardBridgeProxy"],
+			"l2StandardBridgeAddress", opstack.OptimismContracts[uint64(source)]["L2StandardBridge"],
+			"l1liquidityManagerAddress", l1Deps.liquidityManagerAddress,
+			"l2liquidityManagerAddress", l2Deps.liquidityManagerAddress,
+			"l1BridgeAdapter", l1BridgeAdapter,
+			"l2BridgeAdapter", l2BridgeAdapter,
+		)
+		bridge, err = opstack.NewL2ToL1Bridge(
+			f.lggr,
+			source,
+			dest,
+			common.Address(l1Deps.liquidityManagerAddress), // l1 liquidityManager address
+			common.Address(l2Deps.liquidityManagerAddress), // l2 liquidityManager address
+			l1Deps.ethClient, // l1 eth client
+			l2Deps.ethClient, // l2 eth client
+			l1Deps.lp,        // l1 log poller
+			l2Deps.lp,        // l2 log poller
 		)
 	// Ethereum L1 --> Arbitrum L2 bridge OR
 	// Ethereum L1 --> Optimism L2 bridge
@@ -234,8 +284,8 @@ func (f *factory) initBridge(source, dest models.NetworkSelector) (Bridge, error
 		case models.NetworkSelector(chainsel.ETHEREUM_MAINNET_OPTIMISM_1.Selector),
 			models.NetworkSelector(chainsel.ETHEREUM_TESTNET_SEPOLIA_OPTIMISM_1.Selector):
 			f.lggr.Infow("dest OP addresses check",
-				"L1StandardBridgeProxyAddress", opstack.AllContracts[uint64(source)]["L1StandardBridgeProxy"],
-				"L2StandardBridgeAddress", opstack.AllContracts[uint64(dest)]["L2StandardBridge"],
+				"L1StandardBridgeProxyAddress", opstack.OptimismContracts[uint64(source)]["L1StandardBridgeProxy"],
+				"L2StandardBridgeAddress", opstack.OptimismContracts[uint64(dest)]["L2StandardBridge"],
 				"l1liquidityManagerAddress", l1Deps.liquidityManagerAddress,
 				"l2liquidityManagerAddress", l2Deps.liquidityManagerAddress,
 				"l1BridgeAdapter", l1BridgeAdapter,
@@ -244,10 +294,10 @@ func (f *factory) initBridge(source, dest models.NetworkSelector) (Bridge, error
 				f.lggr,
 				source,
 				dest,
-				common.Address(l1Deps.liquidityManagerAddress),                // l1 liquidityManager address
-				common.Address(l2Deps.liquidityManagerAddress),                // l2 liquidityManager address
-				opstack.AllContracts[uint64(source)]["L1StandardBridgeProxy"], // l1 standard bridge proxy address
-				opstack.AllContracts[uint64(dest)]["L2StandardBridge"],        // l2 standard bridge address
+				common.Address(l1Deps.liquidityManagerAddress),                     // l1 liquidityManager address
+				common.Address(l2Deps.liquidityManagerAddress),                     // l2 liquidityManager address
+				opstack.OptimismContracts[uint64(source)]["L1StandardBridgeProxy"], // l1 standard bridge proxy address
+				opstack.OptimismContracts[uint64(dest)]["L2StandardBridge"],        // l2 standard bridge address
 				l1Deps.ethClient, // l1 eth client
 				l2Deps.ethClient, // l2 eth client
 				l1Deps.lp,        // l1 log poller
