@@ -103,10 +103,39 @@ SELECT * FROM "{{ network }}".rebalancer_events WHERE to_chain = 'ethereum-mainn
 SELECT * FROM "{{ network }}".rebalancer_events WHERE from_chain = 'ethereum-mainnet-arbitrum-1' AND to_chain = 'ethereum-mainnet';
 ```
 
-## Custom Telemetry Metrics (Maybe?)
+## Benthos
+Even if we do custom telemetry we will need a benthos stream to read in the telemetry. Or we can just do it via Benthos without telemetry. Or do both and have redundancy in our liquidity data. Either way we will need at least 2 benthos stream to collect the event data.
+
+### Metrics
+- rebalancer_total_liquidity
+  - We could have a stream calculating the total liquidity in the rebalancer system across all chains in view.
+  - same as custom telemetry metric above. this could be as backup in case nodes don't report or DON goes down or just as an extra data point
+- rebalancer_pool_liquidity
+  - We could have a stream calculating the liquidity in a specific chains pool.
+  - same as custom telemetry metric above. this could be as backup in case nodes don't report or DON goes down or just as an extra data point
+- rebalancer_events
+  - Description: All events from the rebalancer contract. Used to visualize the sequence/rate of events.
+  - Type: Counter
+  - Additional Labels: event_name
+- rebalancer_transfers
+  - Description: All transfers from the rebalancer contract. Used to visualize the rate of transfers.
+  - Type: Counter
+  - Additional Labels: from_chain, to_chain
+- ~~sent/received liquidity?~~
+  - ~~would this be graphable? since the metric may change multiple times quickly we may not get an accurate representation of the data.~~
+  - ~~use to/from as labels to see the direction of the liquidity.~~
+  - ~~need to think on this one more.~~
+
+### Streams
+- A stream to handle all the event counting. Will also be used to output the data to postgres.
+- A stream for transfers and a processor to convert the chain selector to a chain name.
+- A stream to fetch all pool liquidity and then calculate the total liquidity.
+- A stream to collect telemetry data if available.
+
+### [Optional] Custom Telemetry Metrics
 Especially since all nodes will be run by us, we know telemetry will be turned on.
 
-### Plugin Metrics
+#### Plugin Metrics
 - rebalancer_total_liquidity
   - Description: The total liquidity in the rebalancer system across all chains in view.
   - Type: Gauge
@@ -115,35 +144,6 @@ Especially since all nodes will be run by us, we know telemetry will be turned o
   - Description: The liquidity in a specific chains pool.
   - Type: Gauge
   - Additional Labels: network_name, token
-
-## Benthos
-Even if we do custom telemetry we will need a benthos stream to read in the telemetry. Or we can just do it via Benthos without telemetry. Or do both and have redundancy in our liquidity data. Either way we will need at least 2 benthos stream to collect the event data.
-
-### Metrics
-- rebalancer_total_liquidity
-  - We could have a stream calculating the total liquidity in the rebalancer system across all chains in view.
-  - same as custom telemetry metric above. this could be as backup in case nodes don't report or DON goes down or just as an extra data point
-- rebalancer_pool_liquidity (same as custom telemetry metric above)
-  - We could have a stream calculating the liquidity in a specific chains pool.
-  - same as custom telemetry metric above. this could be as backup in case nodes don't report or DON goes down or just as an extra data point
-- rebalancer_events
-  - Description: All events from the rebalancer contract. Used to visualize the sequence/rate of events.
-  - Type: Counter
-  - Additional Labels: event_name
-~~- sent/received liquidity?
-  - would this be graphable? since the metric may change multiple times quickly we may not get an accurate representation of the data.
-  - use to/from as labels to see the direction of the liquidity.
-  - need to think on this one more.~~
-- rebalancer_transfers
-  - Description: All transfers from the rebalancer contract. Used to visualize the rate of transfers.
-  - Type: Counter
-  - Additional Labels: from_chain, to_chain
-
-### Streams
-- A stream to handle all the event counting. Will also be used to output the data to postgres.
-- A stream for transfers and a processor to convert the chain selector to a chain name.
-- A stream to fetch all pool liquidity and then calculate the total liquidity.
-- A stream to collect telemetry data if available.
 
 ## Alerts
 
