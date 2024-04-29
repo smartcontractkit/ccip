@@ -1,0 +1,7 @@
+#!/bin/bash
+set -e
+
+cd contracts
+
+# Run lint steps
+pnpm lint-staged -v

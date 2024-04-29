@@ -1,0 +1,26 @@
+#!/bin/bash
+set -e
+
+cd contracts
+
+forge build
+forge test
+pnpm solhint
+
+read -n1 -p "Re-generate snapshots & wrappers? (Y/n)" snapshot_answer < /dev/tty
+
+if [ "$snapshot_answer" != "${snapshot_answer#[Yy]}" ] ;then
+    # Create gas snapshot & commit gas snapshot
+    make snapshot
+    make wrappers
+
+    git add ./gas-snapshots
+    git add ../core/gethwrappers
+
+    # Check if commit is successful (non-empty)
+    if git commit -m "chore: update gas snapshots and wrappers"; then
+        # The commit is not included - need to push again (https://stackoverflow.com/questions/21334493/git-commit-in-pre-push-hook)
+        printf "\033[0;31m Snapshot commit created - run git push again \033[1;33m(skip snapshot, or use the --no-verify push option)\n"
+        exit 1
+    fi
+fi
