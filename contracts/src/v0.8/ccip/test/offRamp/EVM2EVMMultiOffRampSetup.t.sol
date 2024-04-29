@@ -53,8 +53,8 @@ contract EVM2EVMMultiOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSet
   }
 
   function deployOffRamp(ICommitStore commitStore, Router router, address prevOffRamp) internal {
-    uint64[] memory sourceChainSelectors = new uint64[](0);
-    EVM2EVMMultiOffRamp.SourceChainConfig[] memory sourceChainConfigs = new EVM2EVMMultiOffRamp.SourceChainConfig[](0);
+    EVM2EVMMultiOffRamp.SourceChainConfigUpdateArgs[] memory sourceChainConfigs =
+      new EVM2EVMMultiOffRamp.SourceChainConfigUpdateArgs[](0);
 
     s_offRamp = new EVM2EVMMultiOffRampHelper(
       EVM2EVMMultiOffRamp.StaticConfig({
@@ -62,7 +62,6 @@ contract EVM2EVMMultiOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSet
         chainSelector: DEST_CHAIN_SELECTOR,
         armProxy: address(s_mockARM)
       }),
-      sourceChainSelectors,
       sourceChainConfigs,
       getInboundRateLimiterConfig()
     );

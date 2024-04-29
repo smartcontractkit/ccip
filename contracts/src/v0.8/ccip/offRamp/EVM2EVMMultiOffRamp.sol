@@ -54,7 +54,6 @@ contract EVM2EVMMultiOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndV
   error InvalidAddress(bytes encodedAddress);
   error InvalidNewState(uint64 sequenceNumber, Internal.MessageExecutionState newState);
   error IndexOutOfRange();
-  error SourceConfigUpdateLengthMismatch();
 
   /// @dev Atlas depends on this event, if changing, please notify Atlas.
   event ConfigSet(StaticConfig staticConfig, DynamicConfig dynamicConfig);
@@ -79,7 +78,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndV
 
   /// @notice Per-chain source config (defining a lane from a Source Chain -> Dest OffRamp)
   struct SourceChainConfig {
-    bool isEnabled; // ────────╮  Flag whether the source chain is enabled or not
+    bool isEnabled; // ─────────╮  Flag whether the source chain is enabled or not
     address prevOffRamp; // ────╯  Address of previous-version per-lane OffRamp. Used to be able to provide seequencing continuity during a zero downtime upgrade.
     address onRamp; //             OnRamp address on the source chain
     /// @dev Ensures that 2 identical messages sent to 2 different lanes will have a distinct hash.
@@ -112,8 +111,16 @@ contract EVM2EVMMultiOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndV
     address receiver; // ─────────────╯ Address that receives the message
   }
 
+  /// @notice SourceChainConfig update args scoped to one source chain
+  struct SourceChainConfigUpdateArgs {
+    uint64 sourceChainSelector; //  ───╮  Source chain selector of the config to update
+    bool isEnabled; //                 │  Flag whether the source chain is enabled or not
+    address prevOffRamp; // ───────────╯  Address of previous-version per-lane OffRamp. Used to be able to provide seequencing continuity during a zero downtime upgrade.
+    address onRamp; //                    OnRamp address on the source chain
+  }
+
   // STATIC CONFIG
-  string public constant override typeAndVersion = "EVM2EVMOffRamp 1.6.0-dev";
+  string public constant override typeAndVersion = "EVM2EVMMultiOffRamp 1.6.0-dev";
   /// @dev Commit store address on the destination chain
   address internal immutable i_commitStore;
   /// @dev ChainSelector of this chain
@@ -145,8 +152,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndV
 
   constructor(
     StaticConfig memory staticConfig,
-    uint64[] memory chainSelectors,
-    SourceChainConfig[] memory sourceConfigs,
+    SourceChainConfigUpdateArgs[] memory sourceChainConfigs,
     // TODO: convert to array (per-chain)
     RateLimiter.Config memory rateLimiterConfig
   ) OCR2BaseNoChecks() AggregateRateLimiter(rateLimiterConfig) {
@@ -156,7 +162,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndV
     i_chainSelector = staticConfig.chainSelector;
     i_armProxy = staticConfig.armProxy;
 
-    _applySourceConfigUpdates(chainSelectors, sourceConfigs);
+    _applySourceConfigUpdates(sourceChainConfigs);
   }
 
   // ================================================================
@@ -494,33 +500,19 @@ contract EVM2EVMMultiOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndV
   }
 
   /// @notice Updates source configs
-  /// @param sourceChainSelectors Source chain selectors to update configs for
-  /// @param sourceConfigs Source chain configs (matching source chain selectors array)
-  ///        Note: metadataHash is unused from the input
-  function applySourceConfigUpdates(
-    uint64[] memory sourceChainSelectors,
-    SourceChainConfig[] memory sourceConfigs
-  ) external onlyOwner {
-    _applySourceConfigUpdates(sourceChainSelectors, sourceConfigs);
+  /// @param sourceChainConfigUpdates Source chain configs
+  function applySourceConfigUpdates(SourceChainConfigUpdateArgs[] memory sourceChainConfigUpdates) external onlyOwner {
+    _applySourceConfigUpdates(sourceChainConfigUpdates);
   }
 
   /// @notice Updates source configs
-  /// @param sourceChainSelectors Source chain selectors to update configs for
-  /// @param sourceConfigs Source chain configs (matching source chain selectors array)
-  ///        Note: metadataHash is unused from the input
-  function _applySourceConfigUpdates(
-    uint64[] memory sourceChainSelectors,
-    SourceChainConfig[] memory sourceConfigs
-  ) internal {
-    if (sourceChainSelectors.length != sourceConfigs.length) {
-      revert SourceConfigUpdateLengthMismatch();
-    }
+  /// @param sourceChainConfigUpdates Source chain configs
+  function _applySourceConfigUpdates(SourceChainConfigUpdateArgs[] memory sourceChainConfigUpdates) internal {
+    for (uint256 i = 0; i < sourceChainConfigUpdates.length; ++i) {
+      SourceChainConfigUpdateArgs memory sourceConfigUpdate = sourceChainConfigUpdates[i];
+      uint64 sourceChainSelector = sourceConfigUpdate.sourceChainSelector;
 
-    for (uint256 i = 0; i < sourceChainSelectors.length; ++i) {
-      uint64 sourceChainSelector = sourceChainSelectors[i];
-      SourceChainConfig memory sourceConfig = sourceConfigs[i];
-
-      if (sourceConfig.onRamp == address(0)) {
+      if (sourceConfigUpdate.onRamp == address(0)) {
         revert ZeroAddressNotAllowed();
       }
 
@@ -535,14 +527,18 @@ contract EVM2EVMMultiOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndV
       // already has roots committed.
       // if (ICommitStore(staticConfig.commitStore).getExpectedNextSequenceNumber() != 1) revert CommitStoreAlreadyInUse();
 
+      SourceChainConfig memory sourceChainConfig = SourceChainConfig({
+        isEnabled: sourceConfigUpdate.isEnabled,
+        prevOffRamp: sourceConfigUpdate.prevOffRamp,
+        onRamp: sourceConfigUpdate.onRamp,
+        metadataHash: _metadataHash(sourceChainSelector, sourceConfigUpdate.onRamp, Internal.EVM_2_EVM_MESSAGE_HASH)
+      });
       // TODO: confirm if re-updating is allowed
       //       If it can happen - reset nonces
       //       If it cannot - validate and restrict
-      sourceConfig.metadataHash =
-        _metadataHash(sourceChainSelector, sourceConfig.onRamp, Internal.EVM_2_EVM_MESSAGE_HASH);
-      s_sourceChainConfigs[sourceChainSelector] = sourceConfig;
+      s_sourceChainConfigs[sourceChainSelector] = sourceChainConfig;
 
-      emit SourceChainConfigSet(sourceChainSelector, sourceConfig);
+      emit SourceChainConfigSet(sourceChainSelector, sourceChainConfig);
     }
   }
 

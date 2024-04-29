@@ -10,10 +10,9 @@ import {IgnoreContractSize} from "./IgnoreContractSize.sol";
 contract EVM2EVMMultiOffRampHelper is EVM2EVMMultiOffRamp, IgnoreContractSize {
   constructor(
     StaticConfig memory staticConfig,
-    uint64[] memory chainSelectors,
-    SourceChainConfig[] memory sourceConfigs,
+    SourceChainConfigUpdateArgs[] memory sourceChainConfigs,
     RateLimiter.Config memory rateLimiterConfig
-  ) EVM2EVMMultiOffRamp(staticConfig, chainSelectors, sourceConfigs, rateLimiterConfig) {}
+  ) EVM2EVMMultiOffRamp(staticConfig, sourceChainConfigs, rateLimiterConfig) {}
 
   function metadataHash(uint64 sourceChainSelector, address onRamp) external view returns (bytes32) {
     return _metadataHash(sourceChainSelector, onRamp, Internal.EVM_2_EVM_MESSAGE_HASH);
