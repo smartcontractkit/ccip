@@ -1598,7 +1598,23 @@ func (sourceCCIP *SourceCCIPModule) SendRequest(
 	if err != nil {
 		return common.Hash{}, d, nil, fmt.Errorf("failed forming the ccip msg: %w", err)
 	}
-	fee, err := sourceCCIP.Common.Router.GetFee(destChainSelector, msg)
+
+	// DEBUG:
+	amounts := []evm_2_evm_onramp.ClientEVMTokenAmount{}
+	for i := range msg.TokenAmounts {
+		amounts = append(amounts, evm_2_evm_onramp.ClientEVMTokenAmount{
+			Token:  msg.TokenAmounts[i].Token,
+			Amount: msg.TokenAmounts[i].Amount,
+		})
+	}
+	newMsg := evm_2_evm_onramp.ClientEVM2AnyMessage{
+		Receiver:     msg.Receiver,
+		Data:         msg.Data,
+		TokenAmounts: amounts,
+		FeeToken:     msg.FeeToken,
+		ExtraArgs:    msg.ExtraArgs,
+	}
+	fee, err := sourceCCIP.OnRamp.Instance.GetFee(nil, destChainSelector, newMsg)
 	if err != nil {
 		log.Info().Interface("Msg", msg).Msg("CCIP msg")
 		reason, _ := blockchain.RPCErrorFromError(err)
