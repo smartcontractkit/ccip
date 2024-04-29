@@ -25,18 +25,20 @@ contract ReentrantMaliciousTokenPool is TokenPool {
   }
 
   /// @dev Calls into Facade to reenter Router exactly 1 time
-  function lockOrBurn(bytes calldata lockOrBurnIn) external override returns (Pool.LockOrBurnOutV1 memory) {
-    Pool.LockOrBurnInV1 memory lockOrBurnData = Pool._decodeLockOrBurnInV1(lockOrBurnIn);
-
+  function lockOrBurn(Pool.LockOrBurnInV1 calldata lockOrBurnIn)
+    external
+    override
+    returns (Pool.LockOrBurnOutV1 memory)
+  {
     if (s_attacked) {
-      return Pool._encodeLockOrBurnOutV1(getRemotePool(lockOrBurnData.remoteChainSelector), "");
+      return Pool._encodeLockOrBurnOutV1(getRemotePool(lockOrBurnIn.remoteChainSelector), "");
     }
 
     s_attacked = true;
 
-    FacadeClient(i_facade).send(lockOrBurnData.amount);
-    emit Burned(msg.sender, lockOrBurnData.amount);
-    return Pool._encodeLockOrBurnOutV1(getRemotePool(lockOrBurnData.remoteChainSelector), "");
+    FacadeClient(i_facade).send(lockOrBurnIn.amount);
+    emit Burned(msg.sender, lockOrBurnIn.amount);
+    return Pool._encodeLockOrBurnOutV1(getRemotePool(lockOrBurnIn.remoteChainSelector), "");
   }
 
   function releaseOrMint(

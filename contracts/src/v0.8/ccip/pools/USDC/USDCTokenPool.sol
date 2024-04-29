@@ -112,34 +112,33 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
   /// Benefits of rate limiting here does not justify the extra gas cost.
   /// @dev emits ITokenMessenger.DepositForBurn
   /// @dev Assumes caller has validated destinationReceiver
-  function lockOrBurn(bytes calldata lockOrBurnIn)
+  function lockOrBurn(Pool.LockOrBurnInV1 calldata lockOrBurnIn)
     external
     virtual
     override
     whenHealthy
     returns (Pool.LockOrBurnOutV1 memory)
   {
-    Pool.LockOrBurnInV1 memory lockOrBurnData = Pool._decodeLockOrBurnInV1(lockOrBurnIn);
-    _checkAllowList(lockOrBurnData.originalSender);
-    _onlyOnRamp(lockOrBurnData.remoteChainSelector);
-    _consumeOutboundRateLimit(lockOrBurnData.remoteChainSelector, lockOrBurnData.amount);
+    _checkAllowList(lockOrBurnIn.originalSender);
+    _onlyOnRamp(lockOrBurnIn.remoteChainSelector);
+    _consumeOutboundRateLimit(lockOrBurnIn.remoteChainSelector, lockOrBurnIn.amount);
 
-    Domain memory domain = s_chainToDomain[lockOrBurnData.remoteChainSelector];
-    if (!domain.enabled) revert UnknownDomain(lockOrBurnData.remoteChainSelector);
-    if (lockOrBurnData.receiver.length != 32) {
+    Domain memory domain = s_chainToDomain[lockOrBurnIn.remoteChainSelector];
+    if (!domain.enabled) revert UnknownDomain(lockOrBurnIn.remoteChainSelector);
+    if (lockOrBurnIn.receiver.length != 32) {
       revert(); // TODO add error message
     }
 
-    bytes32 receiver = abi.decode(lockOrBurnData.receiver, (bytes32));
+    bytes32 receiver = abi.decode(lockOrBurnIn.receiver, (bytes32));
     // Since this pool is the msg sender of the CCTP transaction, only this contract
     // is able to call replaceDepositForBurn. Since this contract does not implement
     // replaceDepositForBurn, the tokens cannot be maliciously re-routed to another address.
     uint64 nonce = i_tokenMessenger.depositForBurnWithCaller(
-      lockOrBurnData.amount, domain.domainIdentifier, receiver, address(i_token), domain.allowedCaller
+      lockOrBurnIn.amount, domain.domainIdentifier, receiver, address(i_token), domain.allowedCaller
     );
-    emit Burned(msg.sender, lockOrBurnData.amount);
+    emit Burned(msg.sender, lockOrBurnIn.amount);
     return Pool._encodeLockOrBurnOutV1(
-      getRemotePool(lockOrBurnData.remoteChainSelector),
+      getRemotePool(lockOrBurnIn.remoteChainSelector),
       abi.encode(SourceTokenDataPayload({nonce: nonce, sourceDomain: i_localDomainIdentifier}))
     );
   }

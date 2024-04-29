@@ -39,19 +39,13 @@ library Pool {
     bytes memory receiver,
     uint256 amount,
     uint64 remoteChainSelector
-  ) internal pure returns (bytes memory) {
-    return abi.encode(
-      LockOrBurnInV1({
-        originalSender: originalSender,
-        receiver: receiver,
-        amount: amount,
-        remoteChainSelector: remoteChainSelector
-      })
-    );
-  }
-
-  function _decodeLockOrBurnInV1(bytes memory encodedData) internal pure returns (LockOrBurnInV1 memory) {
-    return abi.decode(encodedData, (LockOrBurnInV1));
+  ) internal pure returns (LockOrBurnInV1 memory) {
+    return LockOrBurnInV1({
+      originalSender: originalSender,
+      receiver: receiver,
+      amount: amount,
+      remoteChainSelector: remoteChainSelector
+    });
   }
 
   ///  @notice Generates the return dataV1 for the lockOrBurn pool call.
@@ -65,14 +59,6 @@ library Pool {
     return LockOrBurnOutV1({destPoolAddress: remotePoolAddress, destPoolData: destPoolData});
   }
 
-  /// @notice Decodes the PoolReturnDataV1 struct from the given data. Also checks if the tag is correct.
-  /// @param encodedData The data to decode.
-  /// @dev Can revert. Since this is only used on the sending side, this is acceptable.
-  /// @return The decoded LockOrBurnOutV1 struct.
-  function _decodeLockOrBurnOutV1(LockOrBurnOutV1 memory encodedData) internal pure returns (LockOrBurnOutV1 memory) {
-    return encodedData;
-  }
-
   function _encodeReleaseOrMintInV1(
     bytes memory originalSender,
     address receiver,
@@ -81,32 +67,22 @@ library Pool {
     bytes memory sourcePoolAddress,
     bytes memory sourcePoolData,
     bytes memory offchainTokenData
-  ) internal pure returns (bytes memory) {
-    return abi.encode(
-      ReleaseOrMintInV1({
-        originalSender: originalSender,
-        receiver: receiver,
-        amount: amount,
-        remoteChainSelector: remoteChainSelector,
-        sourcePoolAddress: sourcePoolAddress,
-        sourcePoolData: sourcePoolData,
-        offchainTokenData: offchainTokenData
-      })
-    );
-  }
-
-  function _decodeReleaseOrMintInV1(bytes memory encodedData) internal pure returns (ReleaseOrMintInV1 memory) {
-    return abi.decode(encodedData, (ReleaseOrMintInV1));
+  ) internal pure returns (ReleaseOrMintInV1 memory) {
+    return ReleaseOrMintInV1({
+      originalSender: originalSender,
+      receiver: receiver,
+      amount: amount,
+      remoteChainSelector: remoteChainSelector,
+      sourcePoolAddress: sourcePoolAddress,
+      sourcePoolData: sourcePoolData,
+      offchainTokenData: offchainTokenData
+    });
   }
 
   function _encodeReleaseOrMintOutV1(
     address localToken,
     uint256 destinationAmount
-  ) internal pure returns (bytes memory) {
-    return abi.encode(ReleaseOrMintOutV1({localToken: localToken, destinationAmount: destinationAmount}));
-  }
-
-  function _decodeReleaseOrMintOutV1(bytes memory encodedData) internal pure returns (ReleaseOrMintOutV1 memory) {
-    return abi.decode(encodedData, (ReleaseOrMintOutV1));
+  ) internal pure returns (ReleaseOrMintOutV1 memory) {
+    return ReleaseOrMintOutV1({localToken: localToken, destinationAmount: destinationAmount});
   }
 }

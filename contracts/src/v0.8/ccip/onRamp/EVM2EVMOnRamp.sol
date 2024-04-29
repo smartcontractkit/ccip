@@ -333,11 +333,10 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
         revert UnsupportedToken(IERC20(tokenAndAmount.token));
       }
 
-      Pool.LockOrBurnOutV1 memory encodedReturnData = sourcePool.lockOrBurn(
+      Pool.LockOrBurnOutV1 memory poolReturnData = sourcePool.lockOrBurn(
         Pool._encodeLockOrBurnInV1(originalSender, message.receiver, tokenAndAmount.amount, i_destChainSelector)
       );
 
-      Pool.LockOrBurnOutV1 memory poolReturnData = Pool._decodeLockOrBurnOutV1(encodedReturnData);
       // Since the DON has to pay for the extraData to be included on the destination chain, we cap the length of the extraData.
       // This prevents gas bomb attacks on the NOPs. We use destBytesOverhead as a proxy to cap the number of bytes we accept.
       // As destBytesOverhead accounts for extraData + offchainData, this caps the worst case abuse to the number of bytes reserved for offchainData.

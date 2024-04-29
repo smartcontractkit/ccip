@@ -14,17 +14,16 @@ contract CustomTokenPool is TokenPool {
   constructor(IERC20 token, address armProxy, address router) TokenPool(token, new address[](0), armProxy, router) {}
 
   /// @notice Locks the token in the pool
-  function lockOrBurn(bytes calldata lockOrBurnIn)
+  function lockOrBurn(Pool.LockOrBurnInV1 calldata lockOrBurnIn)
     external
     virtual
     override
     whenHealthy
     returns (Pool.LockOrBurnOutV1 memory)
   {
-    Pool.LockOrBurnInV1 memory lockOrBurnData = Pool._decodeLockOrBurnInV1(lockOrBurnIn);
-    _onlyOnRamp(lockOrBurnData.remoteChainSelector);
-    emit SynthBurned(lockOrBurnData.amount);
-    return Pool._encodeLockOrBurnOutV1(getRemotePool(lockOrBurnData.remoteChainSelector), "");
+    _onlyOnRamp(lockOrBurnIn.remoteChainSelector);
+    emit SynthBurned(lockOrBurnIn.amount);
+    return Pool._encodeLockOrBurnOutV1(getRemotePool(lockOrBurnIn.remoteChainSelector), "");
   }
 
   /// @notice Release tokens from the pool to the recipient

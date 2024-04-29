@@ -26,17 +26,16 @@ contract MaybeRevertingBurnMintTokenPool is BurnMintTokenPool {
     s_sourceTokenData = sourceTokenData;
   }
 
-  function lockOrBurn(bytes calldata lockOrBurnIn)
+  function lockOrBurn(Pool.LockOrBurnInV1 calldata lockOrBurnIn)
     external
     virtual
     override
     whenHealthy
     returns (Pool.LockOrBurnOutV1 memory)
   {
-    Pool.LockOrBurnInV1 memory lockOrBurnData = Pool._decodeLockOrBurnInV1(lockOrBurnIn);
-    _checkAllowList(lockOrBurnData.originalSender);
-    _onlyOnRamp(lockOrBurnData.remoteChainSelector);
-    _consumeOutboundRateLimit(lockOrBurnData.remoteChainSelector, lockOrBurnData.amount);
+    _checkAllowList(lockOrBurnIn.originalSender);
+    _onlyOnRamp(lockOrBurnIn.remoteChainSelector);
+    _consumeOutboundRateLimit(lockOrBurnIn.remoteChainSelector, lockOrBurnIn.amount);
 
     bytes memory revertReason = s_revertReason;
     if (revertReason.length != 0) {
@@ -45,9 +44,9 @@ contract MaybeRevertingBurnMintTokenPool is BurnMintTokenPool {
       }
     }
 
-    IBurnMintERC20(address(i_token)).burn(lockOrBurnData.amount);
-    emit Burned(msg.sender, lockOrBurnData.amount);
-    return Pool._encodeLockOrBurnOutV1(getRemotePool(lockOrBurnData.remoteChainSelector), s_sourceTokenData);
+    IBurnMintERC20(address(i_token)).burn(lockOrBurnIn.amount);
+    emit Burned(msg.sender, lockOrBurnIn.amount);
+    return Pool._encodeLockOrBurnOutV1(getRemotePool(lockOrBurnIn.remoteChainSelector), s_sourceTokenData);
   }
 
   /// @notice Reverts depending on the value of `s_revertReason`
