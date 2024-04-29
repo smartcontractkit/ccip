@@ -25,7 +25,7 @@ contract ReentrantMaliciousTokenPool is TokenPool {
   }
 
   /// @dev Calls into Facade to reenter Router exactly 1 time
-  function lockOrBurn(bytes calldata lockOrBurnIn) external override returns (bytes memory) {
+  function lockOrBurn(bytes calldata lockOrBurnIn) external override returns (Pool.LockOrBurnOutV1 memory) {
     Pool.LockOrBurnInV1 memory lockOrBurnData = Pool._decodeLockOrBurnInV1(lockOrBurnIn);
 
     if (s_attacked) {

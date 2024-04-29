@@ -168,7 +168,7 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
     vm.expectEmit();
     emit Burned(s_routerAllowedOnRamp, amount);
 
-    bytes memory poolReturnData = s_usdcTokenPool.lockOrBurn(
+    Pool.LockOrBurnOutV1 memory poolReturnData = s_usdcTokenPool.lockOrBurn(
       Pool._encodeLockOrBurnInV1(OWNER, abi.encodePacked(receiver), amount, DEST_CHAIN_SELECTOR)
     );
 
@@ -204,7 +204,7 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
     vm.expectEmit();
     emit Burned(s_routerAllowedOnRamp, amount);
 
-    bytes memory poolReturnData = s_usdcTokenPool.lockOrBurn(
+    Pool.LockOrBurnOutV1 memory poolReturnData = s_usdcTokenPool.lockOrBurn(
       Pool._encodeLockOrBurnInV1(OWNER, abi.encodePacked(destinationReceiver), amount, DEST_CHAIN_SELECTOR)
     );
     Pool.LockOrBurnOutV1 memory poolReturnDataV1 = Pool._decodeLockOrBurnOutV1(poolReturnData);
@@ -238,7 +238,7 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
     vm.expectEmit();
     emit Burned(s_routerAllowedOnRamp, amount);
 
-    (bytes memory poolReturnData) = s_usdcTokenPoolWithAllowList.lockOrBurn(
+    Pool.LockOrBurnOutV1 memory poolReturnData = s_usdcTokenPoolWithAllowList.lockOrBurn(
       Pool._encodeLockOrBurnInV1(s_allowedList[0], abi.encodePacked(destinationReceiver), amount, DEST_CHAIN_SELECTOR)
     );
     Pool.LockOrBurnOutV1 memory poolReturnDataV1 = Pool._decodeLockOrBurnOutV1(poolReturnData);

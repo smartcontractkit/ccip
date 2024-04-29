@@ -26,7 +26,13 @@ contract MaybeRevertingBurnMintTokenPool is BurnMintTokenPool {
     s_sourceTokenData = sourceTokenData;
   }
 
-  function lockOrBurn(bytes calldata lockOrBurnIn) external virtual override whenHealthy returns (bytes memory) {
+  function lockOrBurn(bytes calldata lockOrBurnIn)
+    external
+    virtual
+    override
+    whenHealthy
+    returns (Pool.LockOrBurnOutV1 memory)
+  {
     Pool.LockOrBurnInV1 memory lockOrBurnData = Pool._decodeLockOrBurnInV1(lockOrBurnIn);
     _checkAllowList(lockOrBurnData.originalSender);
     _onlyOnRamp(lockOrBurnData.remoteChainSelector);

@@ -10,7 +10,7 @@ contract Pool__generatePoolReturnDataV1 is BaseTest {
     bytes memory remotePoolAddress = abi.encode(makeAddr("remotePoolAddress"));
     bytes memory destPoolData = abi.encode(makeAddr("destPoolData"));
 
-    bytes memory generatedReturnData = Pool._encodeLockOrBurnOutV1(remotePoolAddress, destPoolData);
+    Pool.LockOrBurnOutV1 memory generatedReturnData = Pool._encodeLockOrBurnOutV1(remotePoolAddress, destPoolData);
 
     Pool.LockOrBurnOutV1 memory poolReturnDataV1 = Pool._decodeLockOrBurnOutV1(generatedReturnData);
 
@@ -22,7 +22,7 @@ contract Pool__generatePoolReturnDataV1 is BaseTest {
     bytes memory destPoolData,
     bytes memory remotePoolAddress
   ) public pure {
-    bytes memory generatedReturnData = Pool._encodeLockOrBurnOutV1(remotePoolAddress, destPoolData);
+    Pool.LockOrBurnOutV1 memory generatedReturnData = Pool._encodeLockOrBurnOutV1(remotePoolAddress, destPoolData);
 
     Pool.LockOrBurnOutV1 memory poolReturnDataV1 = Pool._decodeLockOrBurnOutV1(generatedReturnData);
 

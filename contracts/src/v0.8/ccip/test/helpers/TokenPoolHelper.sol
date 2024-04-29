@@ -16,7 +16,7 @@ contract TokenPoolHelper is TokenPool {
     address router
   ) TokenPool(token, allowlist, armProxy, router) {}
 
-  function lockOrBurn(bytes calldata lockOrBurnIn) external override returns (bytes memory) {
+  function lockOrBurn(bytes calldata lockOrBurnIn) external override returns (Pool.LockOrBurnOutV1 memory) {
     Pool.LockOrBurnInV1 memory lockOrBurnData = Pool._decodeLockOrBurnInV1(lockOrBurnIn);
     emit LockOrBurn(lockOrBurnData.amount);
     return Pool._encodeLockOrBurnOutV1(getRemotePool(lockOrBurnData.remoteChainSelector), "");

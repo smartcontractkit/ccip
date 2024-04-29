@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
+import {Pool} from "../libraries/Pool.sol";
+
 import {IERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {IERC165} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/introspection/IERC165.sol";
 
@@ -16,7 +18,7 @@ interface IPool is IERC165 {
   /// @notice Lock tokens into the pool or burn the tokens.
   /// @param lockOrBurnIn Encoded data fields for the processing of tokens on the source chain.
   /// @return lockOrBurnOut Encoded data fields for the processing of tokens on the destination chain.
-  function lockOrBurn(bytes calldata lockOrBurnIn) external returns (bytes memory lockOrBurnOut);
+  function lockOrBurn(bytes calldata lockOrBurnIn) external returns (Pool.LockOrBurnOutV1 memory lockOrBurnOut);
 
   /// @notice Releases or mints tokens to the receiver address.
   /// @param originalSender Original sender of the tokens.

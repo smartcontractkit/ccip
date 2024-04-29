@@ -16,7 +16,13 @@ abstract contract BurnMintTokenPoolAbstract is TokenPool {
   /// @notice Burn the token in the pool
   /// @dev The whenHealthy check is important to ensure that even if a ramp is compromised
   /// we're able to stop token movement via ARM.
-  function lockOrBurn(bytes calldata lockOrBurnIn) external virtual override whenHealthy returns (bytes memory) {
+  function lockOrBurn(bytes calldata lockOrBurnIn)
+    external
+    virtual
+    override
+    whenHealthy
+    returns (Pool.LockOrBurnOutV1 memory)
+  {
     Pool.LockOrBurnInV1 memory lockOrBurnData = Pool._decodeLockOrBurnInV1(lockOrBurnIn);
     _checkAllowList(lockOrBurnData.originalSender);
     _onlyOnRamp(lockOrBurnData.remoteChainSelector);

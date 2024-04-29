@@ -333,7 +333,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
         revert UnsupportedToken(IERC20(tokenAndAmount.token));
       }
 
-      bytes memory encodedReturnData = sourcePool.lockOrBurn(
+      Pool.LockOrBurnOutV1 memory encodedReturnData = sourcePool.lockOrBurn(
         Pool._encodeLockOrBurnInV1(originalSender, message.receiver, tokenAndAmount.amount, i_destChainSelector)
       );
 

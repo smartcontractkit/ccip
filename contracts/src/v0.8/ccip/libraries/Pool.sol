@@ -61,16 +61,16 @@ library Pool {
   function _encodeLockOrBurnOutV1(
     bytes memory remotePoolAddress,
     bytes memory destPoolData
-  ) internal pure returns (bytes memory) {
-    return abi.encode(LockOrBurnOutV1({destPoolAddress: remotePoolAddress, destPoolData: destPoolData}));
+  ) internal pure returns (LockOrBurnOutV1 memory) {
+    return LockOrBurnOutV1({destPoolAddress: remotePoolAddress, destPoolData: destPoolData});
   }
 
   /// @notice Decodes the PoolReturnDataV1 struct from the given data. Also checks if the tag is correct.
   /// @param encodedData The data to decode.
   /// @dev Can revert. Since this is only used on the sending side, this is acceptable.
   /// @return The decoded LockOrBurnOutV1 struct.
-  function _decodeLockOrBurnOutV1(bytes memory encodedData) internal pure returns (LockOrBurnOutV1 memory) {
-    return abi.decode(encodedData, (LockOrBurnOutV1));
+  function _decodeLockOrBurnOutV1(LockOrBurnOutV1 memory encodedData) internal pure returns (LockOrBurnOutV1 memory) {
+    return encodedData;
   }
 
   function _encodeReleaseOrMintInV1(
