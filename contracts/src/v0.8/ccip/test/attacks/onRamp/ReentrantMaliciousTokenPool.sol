@@ -41,14 +41,12 @@ contract ReentrantMaliciousTokenPool is TokenPool {
     return Pool._encodeLockOrBurnOutV1(getRemotePool(lockOrBurnIn.remoteChainSelector), "");
   }
 
-  function releaseOrMint(
-    bytes memory,
-    address,
-    uint256 amount,
-    uint64,
-    IPool.SourceTokenData memory,
-    bytes memory
-  ) external view override returns (address, uint256) {
-    return (address(i_token), amount);
+  function releaseOrMint(Pool.ReleaseOrMintInV1 calldata releaseOrMintIn)
+    external
+    view
+    override
+    returns (address, uint256)
+  {
+    return (address(i_token), releaseOrMintIn.amount);
   }
 }

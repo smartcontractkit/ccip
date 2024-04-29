@@ -25,16 +25,9 @@ contract TokenPoolHelper is TokenPool {
     return Pool._encodeLockOrBurnOutV1(getRemotePool(lockOrBurnIn.remoteChainSelector), "");
   }
 
-  function releaseOrMint(
-    bytes memory,
-    address receiver,
-    uint256 amount,
-    uint64,
-    IPool.SourceTokenData memory,
-    bytes memory
-  ) external override returns (address, uint256) {
-    emit ReleaseOrMint(receiver, amount);
-    return (address(i_token), amount);
+  function releaseOrMint(Pool.ReleaseOrMintInV1 calldata releaseOrMintIn) external override returns (address, uint256) {
+    emit ReleaseOrMint(releaseOrMintIn.receiver, releaseOrMintIn.amount);
+    return (address(i_token), releaseOrMintIn.amount);
   }
 
   function onlyOnRampModifier(uint64 remoteChainSelector) external view {

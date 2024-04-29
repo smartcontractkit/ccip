@@ -35,26 +35,23 @@ abstract contract BurnMintTokenPoolAbstract is TokenPool {
   }
 
   /// @notice Mint tokens from the pool to the recipient
-  /// @param receiver Recipient address
-  /// @param amount Amount to mint
   /// @dev The whenHealthy check is important to ensure that even if a ramp is compromised
   /// we're able to stop token movement via ARM.
-  function releaseOrMint(
-    bytes memory,
-    address receiver,
-    uint256 amount,
-    uint64 remoteChainSelector,
-    IPool.SourceTokenData memory sourceTokenData,
-    bytes memory
-  ) external virtual override whenHealthy returns (address, uint256) {
-    _onlyOffRamp(remoteChainSelector);
-    _validateSourceCaller(remoteChainSelector, sourceTokenData.sourcePoolAddress);
-    _consumeInboundRateLimit(remoteChainSelector, amount);
+  function releaseOrMint(Pool.ReleaseOrMintInV1 calldata releaseOrMintIn)
+    external
+    virtual
+    override
+    whenHealthy
+    returns (address, uint256)
+  {
+    _onlyOffRamp(releaseOrMintIn.remoteChainSelector);
+    _validateSourceCaller(releaseOrMintIn.remoteChainSelector, releaseOrMintIn.sourcePoolAddress);
+    _consumeInboundRateLimit(releaseOrMintIn.remoteChainSelector, releaseOrMintIn.amount);
 
-    IBurnMintERC20(address(i_token)).mint(receiver, amount);
+    IBurnMintERC20(address(i_token)).mint(releaseOrMintIn.receiver, releaseOrMintIn.amount);
 
-    emit Minted(msg.sender, receiver, amount);
+    emit Minted(msg.sender, releaseOrMintIn.receiver, releaseOrMintIn.amount);
 
-    return (address(i_token), amount);
+    return (address(i_token), releaseOrMintIn.amount);
   }
 }

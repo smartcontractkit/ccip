@@ -580,12 +580,15 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
       (bool success, bytes memory returnData,) = CallWithExactGas._callWithExactGasSafeReturnData(
         abi.encodeWithSelector(
           IPool.releaseOrMint.selector,
-          originalSender,
-          receiver,
-          sourceTokenAmounts[i].amount,
-          i_sourceChainSelector,
-          sourceTokenData,
-          offchainTokenData[i]
+          Pool.ReleaseOrMintInV1({
+            originalSender: originalSender,
+            receiver: receiver,
+            amount: sourceTokenAmounts[i].amount,
+            remoteChainSelector: i_sourceChainSelector,
+            sourcePoolAddress: sourceTokenData.sourcePoolAddress,
+            sourcePoolData: sourceTokenData.extraData,
+            offchainTokenData: offchainTokenData[i]
+          })
         ),
         localPoolAddress,
         s_dynamicConfig.maxPoolReleaseOrMintGas,

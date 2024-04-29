@@ -50,25 +50,24 @@ contract MaybeRevertingBurnMintTokenPool is BurnMintTokenPool {
   }
 
   /// @notice Reverts depending on the value of `s_revertReason`
-  function releaseOrMint(
-    bytes memory,
-    address receiver,
-    uint256 amount,
-    uint64 remoteChainSelector,
-    IPool.SourceTokenData memory sourceTokenData,
-    bytes memory
-  ) external virtual override whenHealthy returns (address, uint256) {
-    _onlyOffRamp(remoteChainSelector);
-    _validateSourceCaller(remoteChainSelector, sourceTokenData.sourcePoolAddress);
+  function releaseOrMint(Pool.ReleaseOrMintInV1 calldata releaseOrMintIn)
+    external
+    virtual
+    override
+    whenHealthy
+    returns (address, uint256)
+  {
+    _onlyOffRamp(releaseOrMintIn.remoteChainSelector);
+    _validateSourceCaller(releaseOrMintIn.remoteChainSelector, releaseOrMintIn.sourcePoolAddress);
     bytes memory revertReason = s_revertReason;
     if (revertReason.length != 0) {
       assembly {
         revert(add(32, revertReason), mload(revertReason))
       }
     }
-    _consumeInboundRateLimit(remoteChainSelector, amount);
-    IBurnMintERC20(address(i_token)).mint(receiver, amount);
-    emit Minted(msg.sender, receiver, amount);
-    return (address(i_token), amount);
+    _consumeInboundRateLimit(releaseOrMintIn.remoteChainSelector, releaseOrMintIn.amount);
+    IBurnMintERC20(address(i_token)).mint(releaseOrMintIn.receiver, releaseOrMintIn.amount);
+    emit Minted(msg.sender, releaseOrMintIn.receiver, releaseOrMintIn.amount);
+    return (address(i_token), releaseOrMintIn.amount);
   }
 }

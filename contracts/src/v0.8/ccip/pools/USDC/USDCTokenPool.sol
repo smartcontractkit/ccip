@@ -144,40 +144,32 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
   }
 
   /// @notice Mint tokens from the pool to the recipient
-  /// @param receiver Recipient address
-  /// @param amount Amount to mint
-  /// @param sourceTokenData is part of the verified message and passed directly from
+  /// * sourceTokenData is part of the verified message and passed directly from
   /// the offramp so it is guaranteed to be what the lockOrBurn pool released on the
   /// source chain. It contains (nonce, sourceDomain) which is guaranteed by CCTP
   /// to be unique.
-  /// @param offchainTokenData is untrusted (can be supplied by manual execution), but we assert
+  /// * offchainTokenData is untrusted (can be supplied by manual execution), but we assert
   /// that (nonce, sourceDomain) is equal to the message's (nonce, sourceDomain) and
   /// receiveMessage will assert that Attestation contains a valid attestation signature
   /// for that message, including its (nonce, sourceDomain). This way, the only
   /// non-reverting offchainTokenData that can be supplied is a valid attestation for the
   /// specific message that was sent on source.
-  function releaseOrMint(
-    bytes memory,
-    address receiver,
-    uint256 amount,
-    uint64 remoteChainSelector,
-    IPool.SourceTokenData memory sourceTokenData,
-    bytes memory offchainTokenData
-  ) external override returns (address, uint256) {
-    _onlyOffRamp(remoteChainSelector);
-    _consumeInboundRateLimit(remoteChainSelector, amount);
-    _validateSourceCaller(remoteChainSelector, sourceTokenData.sourcePoolAddress);
+  function releaseOrMint(Pool.ReleaseOrMintInV1 calldata releaseOrMintIn) external override returns (address, uint256) {
+    _onlyOffRamp(releaseOrMintIn.remoteChainSelector);
+    _consumeInboundRateLimit(releaseOrMintIn.remoteChainSelector, releaseOrMintIn.amount);
+    _validateSourceCaller(releaseOrMintIn.remoteChainSelector, releaseOrMintIn.sourcePoolAddress);
     SourceTokenDataPayload memory sourceTokenDataPayload =
-      abi.decode(sourceTokenData.extraData, (SourceTokenDataPayload));
-    MessageAndAttestation memory msgAndAttestation = abi.decode(offchainTokenData, (MessageAndAttestation));
+      abi.decode(releaseOrMintIn.sourcePoolData, (SourceTokenDataPayload));
+    MessageAndAttestation memory msgAndAttestation =
+      abi.decode(releaseOrMintIn.offchainTokenData, (MessageAndAttestation));
 
     _validateMessage(msgAndAttestation.message, sourceTokenDataPayload);
 
     if (!i_messageTransmitter.receiveMessage(msgAndAttestation.message, msgAndAttestation.attestation)) {
       revert UnlockingUSDCFailed();
     }
-    emit Minted(msg.sender, receiver, amount);
-    return (address(i_token), amount);
+    emit Minted(msg.sender, releaseOrMintIn.receiver, releaseOrMintIn.amount);
+    return (address(i_token), releaseOrMintIn.amount);
   }
 
   /// @notice Validates the USDC encoded message against the given parameters.

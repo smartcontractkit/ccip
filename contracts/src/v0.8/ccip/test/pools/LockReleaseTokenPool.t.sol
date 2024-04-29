@@ -174,16 +174,15 @@ contract LockReleaseTokenPool_releaseOrMint is LockReleaseTokenPoolSetup {
     emit Released(s_allowedOffRamp, OWNER, amount);
 
     s_lockReleaseTokenPool.releaseOrMint(
-      bytes(""),
-      OWNER,
-      amount,
-      SOURCE_CHAIN_SELECTOR,
-      IPool.SourceTokenData({
+      Pool.ReleaseOrMintInV1({
+        originalSender: bytes(""),
+        receiver: OWNER,
+        amount: amount,
+        remoteChainSelector: SOURCE_CHAIN_SELECTOR,
         sourcePoolAddress: abi.encode(s_sourcePoolAddress),
-        destPoolAddress: abi.encode(address(s_lockReleaseTokenPool)),
-        extraData: ""
-      }),
-      ""
+        sourcePoolData: "",
+        offchainTokenData: ""
+      })
     );
   }
 
@@ -215,16 +214,15 @@ contract LockReleaseTokenPool_releaseOrMint is LockReleaseTokenPoolSetup {
     }
 
     s_lockReleaseTokenPool.releaseOrMint(
-      bytes(""),
-      recipient,
-      amount,
-      SOURCE_CHAIN_SELECTOR,
-      IPool.SourceTokenData({
+      Pool.ReleaseOrMintInV1({
+        originalSender: bytes(""),
+        receiver: recipient,
+        amount: amount,
+        remoteChainSelector: SOURCE_CHAIN_SELECTOR,
         sourcePoolAddress: abi.encode(s_sourcePoolAddress),
-        destPoolAddress: abi.encode(address(s_lockReleaseTokenPool)),
-        extraData: ""
-      }),
-      ""
+        sourcePoolData: "",
+        offchainTokenData: ""
+      })
     );
   }
 
@@ -246,16 +244,15 @@ contract LockReleaseTokenPool_releaseOrMint is LockReleaseTokenPoolSetup {
 
     vm.expectRevert(abi.encodeWithSelector(TokenPool.ChainNotAllowed.selector, SOURCE_CHAIN_SELECTOR));
     s_lockReleaseTokenPool.releaseOrMint(
-      bytes(""),
-      OWNER,
-      1e5,
-      SOURCE_CHAIN_SELECTOR,
-      IPool.SourceTokenData({
+      Pool.ReleaseOrMintInV1({
+        originalSender: bytes(""),
+        receiver: OWNER,
+        amount: 1e5,
+        remoteChainSelector: SOURCE_CHAIN_SELECTOR,
         sourcePoolAddress: abi.encode(s_sourcePoolAddress),
-        destPoolAddress: abi.encode(address(s_lockReleaseTokenPool)),
-        extraData: ""
-      }),
-      bytes("")
+        sourcePoolData: "",
+        offchainTokenData: ""
+      })
     );
   }
 
@@ -266,8 +263,17 @@ contract LockReleaseTokenPool_releaseOrMint is LockReleaseTokenPoolSetup {
     vm.startPrank(s_allowedOffRamp);
     vm.expectRevert(EVM2EVMOffRamp.BadARMSignal.selector);
     s_lockReleaseTokenPool.releaseOrMint(
-      bytes(""), OWNER, 1e5, SOURCE_CHAIN_SELECTOR, generateSourceTokenData(), bytes("")
+      Pool.ReleaseOrMintInV1({
+        originalSender: bytes(""),
+        receiver: OWNER,
+        amount: 1e5,
+        remoteChainSelector: SOURCE_CHAIN_SELECTOR,
+        sourcePoolAddress: generateSourceTokenData().sourcePoolAddress,
+        sourcePoolData: generateSourceTokenData().extraData,
+        offchainTokenData: ""
+      })
     );
+
     assertEq(s_token.balanceOf(OWNER), before);
   }
 }

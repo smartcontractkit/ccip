@@ -330,7 +330,15 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
 
     vm.startPrank(s_routerAllowedOffRamp);
     s_usdcTokenPool.releaseOrMint(
-      abi.encode(OWNER), recipient, amount, SOURCE_CHAIN_SELECTOR, sourceTokenData, offchainTokenData
+      Pool.ReleaseOrMintInV1({
+        originalSender: abi.encode(OWNER),
+        receiver: recipient,
+        amount: amount,
+        remoteChainSelector: SOURCE_CHAIN_SELECTOR,
+        sourcePoolAddress: sourceTokenData.sourcePoolAddress,
+        sourcePoolData: sourceTokenData.extraData,
+        offchainTokenData: offchainTokenData
+      })
     );
   }
 
@@ -359,7 +367,15 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
 
     vm.startPrank(s_routerAllowedOffRamp);
     s_usdcTokenPool.releaseOrMint(
-      abi.encode(OWNER), OWNER, 100, SOURCE_CHAIN_SELECTOR, sourceTokenData, offchainTokenData
+      Pool.ReleaseOrMintInV1({
+        originalSender: abi.encode(OWNER),
+        receiver: OWNER,
+        amount: 100,
+        remoteChainSelector: SOURCE_CHAIN_SELECTOR,
+        sourcePoolAddress: sourceTokenData.sourcePoolAddress,
+        sourcePoolData: sourceTokenData.extraData,
+        offchainTokenData: offchainTokenData
+      })
     );
   }
 
@@ -396,7 +412,15 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
     vm.expectRevert(USDCTokenPool.UnlockingUSDCFailed.selector);
 
     s_usdcTokenPool.releaseOrMint(
-      abi.encode(OWNER), OWNER, amount, SOURCE_CHAIN_SELECTOR, sourceTokenData, offchainTokenData
+      Pool.ReleaseOrMintInV1({
+        originalSender: abi.encode(OWNER),
+        receiver: OWNER,
+        amount: amount,
+        remoteChainSelector: SOURCE_CHAIN_SELECTOR,
+        sourcePoolAddress: sourceTokenData.sourcePoolAddress,
+        sourcePoolData: sourceTokenData.extraData,
+        offchainTokenData: offchainTokenData
+      })
     );
   }
 
@@ -420,7 +444,15 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
     );
 
     s_usdcTokenPool.releaseOrMint(
-      abi.encode(OWNER), recipient, amount, SOURCE_CHAIN_SELECTOR, sourceTokenData, offchainTokenData
+      Pool.ReleaseOrMintInV1({
+        originalSender: abi.encode(OWNER),
+        receiver: recipient,
+        amount: amount,
+        remoteChainSelector: SOURCE_CHAIN_SELECTOR,
+        sourcePoolAddress: sourceTokenData.sourcePoolAddress,
+        sourcePoolData: sourceTokenData.extraData,
+        offchainTokenData: offchainTokenData
+      })
     );
   }
 }

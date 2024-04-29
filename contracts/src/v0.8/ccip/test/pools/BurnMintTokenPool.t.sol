@@ -87,16 +87,15 @@ contract BurnMintTokenPool_releaseOrMint is BurnMintTokenPoolSetup {
     vm.expectEmit();
     emit Transfer(address(0), OWNER, amount);
     s_pool.releaseOrMint(
-      bytes(""),
-      OWNER,
-      amount,
-      DEST_CHAIN_SELECTOR,
-      IPool.SourceTokenData({
+      Pool.ReleaseOrMintInV1({
+        originalSender: bytes(""),
+        receiver: OWNER,
+        amount: amount,
+        remoteChainSelector: DEST_CHAIN_SELECTOR,
         sourcePoolAddress: abi.encode(s_remoteBurnMintPool),
-        destPoolAddress: abi.encode(address(s_pool)),
-        extraData: ""
-      }),
-      ""
+        sourcePoolData: "",
+        offchainTokenData: ""
+      })
     );
 
     assertEq(s_burnMintERC677.balanceOf(OWNER), amount);
@@ -109,7 +108,17 @@ contract BurnMintTokenPool_releaseOrMint is BurnMintTokenPoolSetup {
     vm.startPrank(s_burnMintOffRamp);
 
     vm.expectRevert(EVM2EVMOffRamp.BadARMSignal.selector);
-    s_pool.releaseOrMint(bytes(""), OWNER, 1e5, DEST_CHAIN_SELECTOR, generateSourceTokenData(), bytes(""));
+    s_pool.releaseOrMint(
+      Pool.ReleaseOrMintInV1({
+        originalSender: bytes(""),
+        receiver: OWNER,
+        amount: 1e5,
+        remoteChainSelector: DEST_CHAIN_SELECTOR,
+        sourcePoolAddress: generateSourceTokenData().sourcePoolAddress,
+        sourcePoolData: generateSourceTokenData().extraData,
+        offchainTokenData: ""
+      })
+    );
 
     assertEq(s_burnMintERC677.balanceOf(OWNER), before);
   }
@@ -118,6 +127,16 @@ contract BurnMintTokenPool_releaseOrMint is BurnMintTokenPoolSetup {
     uint64 wrongChainSelector = 8838833;
 
     vm.expectRevert(abi.encodeWithSelector(TokenPool.ChainNotAllowed.selector, wrongChainSelector));
-    s_pool.releaseOrMint(bytes(""), OWNER, 1, wrongChainSelector, generateSourceTokenData(), bytes(""));
+    s_pool.releaseOrMint(
+      Pool.ReleaseOrMintInV1({
+        originalSender: bytes(""),
+        receiver: OWNER,
+        amount: 1,
+        remoteChainSelector: wrongChainSelector,
+        sourcePoolAddress: generateSourceTokenData().sourcePoolAddress,
+        sourcePoolData: generateSourceTokenData().extraData,
+        offchainTokenData: ""
+      })
+    );
   }
 }

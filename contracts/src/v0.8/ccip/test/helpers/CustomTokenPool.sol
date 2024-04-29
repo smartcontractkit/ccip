@@ -27,17 +27,14 @@ contract CustomTokenPool is TokenPool {
   }
 
   /// @notice Release tokens from the pool to the recipient
-  /// @param amount Amount to release
-  function releaseOrMint(
-    bytes memory,
-    address,
-    uint256 amount,
-    uint64 remoteChainSelector,
-    SourceTokenData memory,
-    bytes memory
-  ) external override whenHealthy returns (address, uint256) {
-    _onlyOffRamp(remoteChainSelector);
-    emit SynthMinted(amount);
-    return (address(i_token), amount);
+  function releaseOrMint(Pool.ReleaseOrMintInV1 calldata releaseOrMintIn)
+    external
+    override
+    whenHealthy
+    returns (address, uint256)
+  {
+    _onlyOffRamp(releaseOrMintIn.remoteChainSelector);
+    emit SynthMinted(releaseOrMintIn.amount);
+    return (address(i_token), releaseOrMintIn.amount);
   }
 }
