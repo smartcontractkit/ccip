@@ -460,6 +460,7 @@ func main() {
 		remoteChainID := cmd.Uint64("remote-chain-id", 0, "Remote Chain ID")
 		amount := cmd.String("amount", "1", "Amount")
 		shouldWrapNative := cmd.Bool("should-wrap-native", false, "Should wrap native")
+		bridgeSpecificPayloadStr := cmd.String("bridge-specific-payload", "", "Bridge specific payload in hex format")
 		helpers.ParseArgs(cmd, os.Args[2:], "l2-chain-id", "l2-liquiditymanager-address", "remote-chain-id", "amount")
 
 		env := multienv.New(false, false)
@@ -471,7 +472,9 @@ func main() {
 			mustGetChainByEvmID(*remoteChainID).Selector,
 			decimal.RequireFromString(*amount).BigInt(),
 			*shouldWrapNative,
-			[]byte{}, // no bridge specific payload for receiving liquidity on OP L2
+			// No bridge specific payload required for receiving liquidity on OP L2, though we can optionally encode
+			// information here if needed. For example: the nonce used for matching bridge events in the bridge interface.
+			common.FromHex(*bridgeSpecificPayloadStr),
 		)
 		helpers.PanicErr(err)
 		helpers.ConfirmTXMined(context.Background(), env.Clients[*l2ChainID], tx, int64(*l2ChainID),
