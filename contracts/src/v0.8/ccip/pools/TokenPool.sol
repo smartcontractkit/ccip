@@ -6,6 +6,7 @@ import {IPool} from "../interfaces/IPool.sol";
 import {IRouter} from "../interfaces/IRouter.sol";
 
 import {OwnerIsCreator} from "../../shared/access/OwnerIsCreator.sol";
+import {Pool} from "../libraries/Pool.sol";
 import {RateLimiter} from "../libraries/RateLimiter.sol";
 
 import {IERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
@@ -15,7 +16,7 @@ import {EnumerableSet} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts
 /// @notice Base abstract class with common functions for all token pools.
 /// A token pool serves as isolated place for holding tokens and token specific logic
 /// that may execute as tokens move across the bridge.
-abstract contract TokenPool is IPool, OwnerIsCreator, IERC165 {
+abstract contract TokenPool is IPool, OwnerIsCreator {
   using EnumerableSet for EnumerableSet.AddressSet;
   using EnumerableSet for EnumerableSet.UintSet;
   using RateLimiter for RateLimiter.TokenBucket;
@@ -125,9 +126,10 @@ abstract contract TokenPool is IPool, OwnerIsCreator, IERC165 {
     emit RouterUpdated(oldRouter, newRouter);
   }
 
-  /// @inheritdoc IERC165
+  /// @notice Signals which version of the pool interface is supported
   function supportsInterface(bytes4 interfaceId) public pure virtual override returns (bool) {
-    return interfaceId == type(IPool).interfaceId || interfaceId == type(IERC165).interfaceId;
+    return interfaceId == Pool.CCIP_POOL_V1 || interfaceId == type(IPool).interfaceId
+      || interfaceId == type(IERC165).interfaceId;
   }
 
   // Validate if the sending pool is allowed

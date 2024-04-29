@@ -2,10 +2,11 @@
 pragma solidity ^0.8.0;
 
 import {IERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
+import {IERC165} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/introspection/IERC165.sol";
 
 // Shared public interface for multiple pool types.
 // Each pool type handles a different child token model (lock/unlock, mint/burn.)
-interface IPool {
+interface IPool is IERC165 {
   struct SourceTokenData {
     bytes sourcePoolAddress;
     bytes destPoolAddress;

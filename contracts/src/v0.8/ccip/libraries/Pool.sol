@@ -3,6 +3,39 @@ pragma solidity ^0.8.0;
 
 /// @notice This library contains various token pool functions to aid constructing the return data.
 library Pool {
+  // The tag used to signal support for the pool v1 standard
+  // bytes4(keccak256("CCIP_POOL_V1"))
+  bytes4 public constant CCIP_POOL_V1 = 0xaff2afbf;
+
+  struct LockOrBurnInV1 {
+    address originalSender;
+    bytes receiver;
+    uint256 amount;
+    uint64 remoteChainSelector;
+  }
+
+  struct LockOrBurnOutV1 {
+    bytes destPoolAddress;
+    bytes destPoolData;
+  }
+
+  struct ReleaseOrMintInV1 {
+    bytes originalSender;
+    address receiver;
+    uint256 amount;
+    uint64 remoteChainSelector;
+    bytes sourcePoolAddress;
+    bytes sourcePoolData;
+    bytes offchainTokenData;
+  }
+
+  struct ReleaseOrMintOutV1 {
+    address localToken;
+    uint256 destinationAmount;
+  }
+
+  /////
+
   error InvalidTag(bytes4 tag);
   error MalformedPoolReturnData(bytes data);
 

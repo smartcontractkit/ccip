@@ -327,6 +327,12 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     for (uint256 i = 0; i < numberOfTokens; ++i) {
       Client.EVMTokenAmount memory tokenAndAmount = message.tokenAmounts[i];
       IPool sourcePool = getPoolBySourceToken(destChainSelector, IERC20(tokenAndAmount.token));
+      // We don't have to check if it supports the pool version in a non-reverting way here because
+      // if we revert here, there is no effect on CCIP.
+      if (!sourcePool.supportsInterface(Pool.CCIP_POOL_V1)) {
+        revert UnsupportedToken(IERC20(tokenAndAmount.token));
+      }
+
       bytes memory encodedReturnData = sourcePool.lockOrBurn(
         originalSender,
         message.receiver,
