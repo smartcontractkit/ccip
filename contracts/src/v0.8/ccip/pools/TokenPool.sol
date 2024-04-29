@@ -294,10 +294,9 @@ abstract contract TokenPool is IPool, OwnerIsCreator {
 
   /// @notice Checks whether remote chain selector is configured on this contract, and if the msg.sender
   /// is a permissioned onRamp for the given chain on the Router.
-  modifier onlyOnRamp(uint64 remoteChainSelector) {
+  function _onlyOnRamp(uint64 remoteChainSelector) internal view {
     if (!isSupportedChain(remoteChainSelector)) revert ChainNotAllowed(remoteChainSelector);
     if (!(msg.sender == s_router.getOnRamp(remoteChainSelector))) revert CallerIsNotARampOnRouter(msg.sender);
-    _;
   }
 
   /// @notice Checks whether remote chain selector is configured on this contract, and if the msg.sender
@@ -312,9 +311,8 @@ abstract contract TokenPool is IPool, OwnerIsCreator {
   // │                          Allowlist                           │
   // ================================================================
 
-  modifier checkAllowList(address sender) {
+  function _checkAllowList(address sender) internal view {
     if (i_allowlistEnabled && !s_allowList.contains(sender)) revert SenderNotAllowed(sender);
-    _;
   }
 
   /// @notice Gets whether the allowList functionality is enabled.

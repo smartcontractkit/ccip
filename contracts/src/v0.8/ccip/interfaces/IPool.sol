@@ -14,21 +14,9 @@ interface IPool is IERC165 {
   }
 
   /// @notice Lock tokens into the pool or burn the tokens.
-  /// @param originalSender Original sender of the tokens.
-  /// @param receiver Receiver of the tokens on destination chain.
-  /// @param amount Amount to lock or burn.
-  /// @param remoteChainSelector Destination chain Id.
-  /// @param extraArgs Additional data passed in by sender for lockOrBurn processing
-  /// in custom pools on source chain.
-  /// @return poolReturnData Versioned, encoded data fields for the processing of tokens
-  /// on the destination chain.
-  function lockOrBurn(
-    address originalSender,
-    bytes calldata receiver,
-    uint256 amount,
-    uint64 remoteChainSelector,
-    bytes calldata extraArgs
-  ) external returns (bytes memory poolReturnData);
+  /// @param lockOrBurnIn Encoded data fields for the processing of tokens on the source chain.
+  /// @return lockOrBurnOut Encoded data fields for the processing of tokens on the destination chain.
+  function lockOrBurn(bytes calldata lockOrBurnIn) external returns (bytes memory lockOrBurnOut);
 
   /// @notice Releases or mints tokens to the receiver address.
   /// @param originalSender Original sender of the tokens.

@@ -16,15 +16,10 @@ contract TokenPoolHelper is TokenPool {
     address router
   ) TokenPool(token, allowlist, armProxy, router) {}
 
-  function lockOrBurn(
-    address,
-    bytes calldata,
-    uint256 amount,
-    uint64 remoteChainSelector,
-    bytes calldata
-  ) external override returns (bytes memory) {
-    emit LockOrBurn(amount);
-    return Pool._encodeLockOrBurnOutV1(getRemotePool(remoteChainSelector), "");
+  function lockOrBurn(bytes calldata lockOrBurnIn) external override returns (bytes memory) {
+    Pool.LockOrBurnInV1 memory lockOrBurnData = Pool._decodeLockOrBurnInV1(lockOrBurnIn);
+    emit LockOrBurn(lockOrBurnData.amount);
+    return Pool._encodeLockOrBurnOutV1(getRemotePool(lockOrBurnData.remoteChainSelector), "");
   }
 
   function releaseOrMint(
@@ -39,7 +34,9 @@ contract TokenPoolHelper is TokenPool {
     return (address(i_token), amount);
   }
 
-  function onlyOnRampModifier(uint64 remoteChainSelector) external onlyOnRamp(remoteChainSelector) {}
+  function onlyOnRampModifier(uint64 remoteChainSelector) external view {
+    _onlyOnRamp(remoteChainSelector);
+  }
 
   function onlyOffRampModifier(uint64 remoteChainSelector) external onlyOffRamp(remoteChainSelector) {}
 }

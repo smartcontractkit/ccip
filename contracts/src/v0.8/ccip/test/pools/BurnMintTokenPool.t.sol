@@ -4,6 +4,7 @@ pragma solidity 0.8.19;
 import {IPool} from "../../interfaces/IPool.sol";
 
 import {Internal} from "../../libraries/Internal.sol";
+import {Pool} from "../../libraries/Pool.sol";
 import {EVM2EVMOffRamp} from "../../offRamp/EVM2EVMOffRamp.sol";
 import {EVM2EVMOnRamp} from "../../onRamp/EVM2EVMOnRamp.sol";
 import {BurnMintTokenPool} from "../../pools/BurnMintTokenPool.sol";
@@ -52,7 +53,7 @@ contract BurnMintTokenPool_lockOrBurn is BurnMintTokenPoolSetup {
     bytes4 expectedSignature = bytes4(keccak256("burn(uint256)"));
     vm.expectCall(address(s_burnMintERC677), abi.encodeWithSelector(expectedSignature, burnAmount));
 
-    s_pool.lockOrBurn(OWNER, bytes(""), burnAmount, DEST_CHAIN_SELECTOR, bytes(""));
+    s_pool.lockOrBurn(Pool._encodeLockOrBurnInV1(OWNER, bytes(""), burnAmount, DEST_CHAIN_SELECTOR));
 
     assertEq(s_burnMintERC677.balanceOf(address(s_pool)), 0);
   }
@@ -64,7 +65,7 @@ contract BurnMintTokenPool_lockOrBurn is BurnMintTokenPoolSetup {
     vm.startPrank(s_burnMintOnRamp);
 
     vm.expectRevert(EVM2EVMOnRamp.BadARMSignal.selector);
-    s_pool.lockOrBurn(OWNER, bytes(""), 1e5, DEST_CHAIN_SELECTOR, bytes(""));
+    s_pool.lockOrBurn(Pool._encodeLockOrBurnInV1(OWNER, bytes(""), 1e5, DEST_CHAIN_SELECTOR));
 
     assertEq(s_burnMintERC677.balanceOf(address(s_pool)), before);
   }
@@ -73,7 +74,7 @@ contract BurnMintTokenPool_lockOrBurn is BurnMintTokenPoolSetup {
     uint64 wrongChainSelector = 8838833;
 
     vm.expectRevert(abi.encodeWithSelector(TokenPool.ChainNotAllowed.selector, wrongChainSelector));
-    s_pool.lockOrBurn(OWNER, bytes(""), 1, wrongChainSelector, bytes(""));
+    s_pool.lockOrBurn(Pool._encodeLockOrBurnInV1(OWNER, bytes(""), 1, wrongChainSelector));
   }
 }
 

@@ -168,8 +168,9 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
     vm.expectEmit();
     emit Burned(s_routerAllowedOnRamp, amount);
 
-    bytes memory poolReturnData =
-      s_usdcTokenPool.lockOrBurn(OWNER, abi.encodePacked(receiver), amount, DEST_CHAIN_SELECTOR, bytes(""));
+    bytes memory poolReturnData = s_usdcTokenPool.lockOrBurn(
+      Pool._encodeLockOrBurnInV1(OWNER, abi.encodePacked(receiver), amount, DEST_CHAIN_SELECTOR)
+    );
 
     Pool.LockOrBurnOutV1 memory poolReturnDataV1 = Pool._decodeLockOrBurnOutV1(poolReturnData);
 
@@ -203,8 +204,9 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
     vm.expectEmit();
     emit Burned(s_routerAllowedOnRamp, amount);
 
-    bytes memory poolReturnData =
-      s_usdcTokenPool.lockOrBurn(OWNER, abi.encodePacked(destinationReceiver), amount, DEST_CHAIN_SELECTOR, bytes(""));
+    bytes memory poolReturnData = s_usdcTokenPool.lockOrBurn(
+      Pool._encodeLockOrBurnInV1(OWNER, abi.encodePacked(destinationReceiver), amount, DEST_CHAIN_SELECTOR)
+    );
     Pool.LockOrBurnOutV1 memory poolReturnDataV1 = Pool._decodeLockOrBurnOutV1(poolReturnData);
 
     uint64 nonce = abi.decode(poolReturnDataV1.destPoolData, (uint64));
@@ -237,7 +239,7 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
     emit Burned(s_routerAllowedOnRamp, amount);
 
     (bytes memory poolReturnData) = s_usdcTokenPoolWithAllowList.lockOrBurn(
-      s_allowedList[0], abi.encodePacked(destinationReceiver), amount, DEST_CHAIN_SELECTOR, bytes("")
+      Pool._encodeLockOrBurnInV1(s_allowedList[0], abi.encodePacked(destinationReceiver), amount, DEST_CHAIN_SELECTOR)
     );
     Pool.LockOrBurnOutV1 memory poolReturnDataV1 = Pool._decodeLockOrBurnOutV1(poolReturnData);
     uint64 nonce = abi.decode(poolReturnDataV1.destPoolData, (uint64));
@@ -271,13 +273,13 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
 
     vm.expectRevert(abi.encodeWithSelector(USDCTokenPool.UnknownDomain.selector, wrongDomain));
 
-    s_usdcTokenPool.lockOrBurn(OWNER, abi.encodePacked(address(0)), amount, wrongDomain, bytes(""));
+    s_usdcTokenPool.lockOrBurn(Pool._encodeLockOrBurnInV1(OWNER, abi.encodePacked(address(0)), amount, wrongDomain));
   }
 
   function test_CallerIsNotARampOnRouter_Revert() public {
     vm.expectRevert(abi.encodeWithSelector(TokenPool.CallerIsNotARampOnRouter.selector, OWNER));
 
-    s_usdcTokenPool.lockOrBurn(OWNER, abi.encodePacked(address(0)), 0, DEST_CHAIN_SELECTOR, bytes(""));
+    s_usdcTokenPool.lockOrBurn(Pool._encodeLockOrBurnInV1(OWNER, abi.encodePacked(address(0)), 0, DEST_CHAIN_SELECTOR));
   }
 
   function test_LockOrBurnWithAllowList_Revert() public {
@@ -286,7 +288,7 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
     vm.expectRevert(abi.encodeWithSelector(SenderNotAllowed.selector, STRANGER));
 
     s_usdcTokenPoolWithAllowList.lockOrBurn(
-      STRANGER, abi.encodePacked(address(0)), 1000, DEST_CHAIN_SELECTOR, bytes("")
+      Pool._encodeLockOrBurnInV1(STRANGER, abi.encodePacked(address(0)), 1000, DEST_CHAIN_SELECTOR)
     );
   }
 }

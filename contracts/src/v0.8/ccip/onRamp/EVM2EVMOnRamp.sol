@@ -334,11 +334,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
       }
 
       bytes memory encodedReturnData = sourcePool.lockOrBurn(
-        originalSender,
-        message.receiver,
-        tokenAndAmount.amount,
-        i_destChainSelector,
-        bytes("") // any future extraArgs component would be added here
+        Pool._encodeLockOrBurnInV1(originalSender, message.receiver, tokenAndAmount.amount, i_destChainSelector)
       );
 
       Pool.LockOrBurnOutV1 memory poolReturnData = Pool._decodeLockOrBurnOutV1(encodedReturnData);

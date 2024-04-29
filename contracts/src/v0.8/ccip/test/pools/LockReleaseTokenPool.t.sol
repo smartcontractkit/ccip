@@ -6,6 +6,7 @@ import {IPool} from "../../interfaces/IPool.sol";
 import {BurnMintERC677} from "../../../shared/token/ERC677/BurnMintERC677.sol";
 import {Router} from "../../Router.sol";
 import {Internal} from "../../libraries/Internal.sol";
+import {Pool} from "../../libraries/Pool.sol";
 import {RateLimiter} from "../../libraries/RateLimiter.sol";
 import {EVM2EVMOffRamp} from "../../offRamp/EVM2EVMOffRamp.sol";
 import {EVM2EVMOnRamp} from "../../onRamp/EVM2EVMOnRamp.sol";
@@ -92,7 +93,7 @@ contract LockReleaseTokenPool_lockOrBurn is LockReleaseTokenPoolSetup {
     vm.expectEmit();
     emit Locked(s_allowedOnRamp, amount);
 
-    s_lockReleaseTokenPool.lockOrBurn(STRANGER, bytes(""), amount, DEST_CHAIN_SELECTOR, bytes(""));
+    s_lockReleaseTokenPool.lockOrBurn(Pool._encodeLockOrBurnInV1(STRANGER, bytes(""), amount, DEST_CHAIN_SELECTOR));
   }
 
   function test_LockOrBurnWithAllowList_Success() public {
@@ -104,12 +105,16 @@ contract LockReleaseTokenPool_lockOrBurn is LockReleaseTokenPoolSetup {
     vm.expectEmit();
     emit Locked(s_allowedOnRamp, amount);
 
-    s_lockReleaseTokenPoolWithAllowList.lockOrBurn(s_allowedList[0], bytes(""), amount, DEST_CHAIN_SELECTOR, bytes(""));
+    s_lockReleaseTokenPoolWithAllowList.lockOrBurn(
+      Pool._encodeLockOrBurnInV1(s_allowedList[0], bytes(""), amount, DEST_CHAIN_SELECTOR)
+    );
 
     vm.expectEmit();
     emit Locked(s_allowedOnRamp, amount);
 
-    s_lockReleaseTokenPoolWithAllowList.lockOrBurn(s_allowedList[1], bytes(""), amount, DEST_CHAIN_SELECTOR, bytes(""));
+    s_lockReleaseTokenPoolWithAllowList.lockOrBurn(
+      Pool._encodeLockOrBurnInV1(s_allowedList[1], bytes(""), amount, DEST_CHAIN_SELECTOR)
+    );
   }
 
   function test_LockOrBurnWithAllowList_Revert() public {
@@ -117,7 +122,9 @@ contract LockReleaseTokenPool_lockOrBurn is LockReleaseTokenPoolSetup {
 
     vm.expectRevert(abi.encodeWithSelector(SenderNotAllowed.selector, STRANGER));
 
-    s_lockReleaseTokenPoolWithAllowList.lockOrBurn(STRANGER, bytes(""), 100, DEST_CHAIN_SELECTOR, bytes(""));
+    s_lockReleaseTokenPoolWithAllowList.lockOrBurn(
+      Pool._encodeLockOrBurnInV1(STRANGER, bytes(""), 100, DEST_CHAIN_SELECTOR)
+    );
   }
 
   function test_PoolBurnRevertNotHealthy_Revert() public {
@@ -128,7 +135,9 @@ contract LockReleaseTokenPool_lockOrBurn is LockReleaseTokenPoolSetup {
     vm.startPrank(s_allowedOnRamp);
     vm.expectRevert(EVM2EVMOnRamp.BadARMSignal.selector);
 
-    s_lockReleaseTokenPoolWithAllowList.lockOrBurn(s_allowedList[0], bytes(""), 1e5, DEST_CHAIN_SELECTOR, bytes(""));
+    s_lockReleaseTokenPoolWithAllowList.lockOrBurn(
+      Pool._encodeLockOrBurnInV1(s_allowedList[0], bytes(""), 1e5, DEST_CHAIN_SELECTOR)
+    );
 
     assertEq(s_token.balanceOf(address(s_lockReleaseTokenPoolWithAllowList)), before);
   }

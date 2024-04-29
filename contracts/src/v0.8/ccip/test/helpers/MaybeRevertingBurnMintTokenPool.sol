@@ -26,31 +26,22 @@ contract MaybeRevertingBurnMintTokenPool is BurnMintTokenPool {
     s_sourceTokenData = sourceTokenData;
   }
 
-  function lockOrBurn(
-    address originalSender,
-    bytes calldata,
-    uint256 amount,
-    uint64 remoteChainSelector,
-    bytes calldata
-  )
-    external
-    virtual
-    override
-    onlyOnRamp(remoteChainSelector)
-    checkAllowList(originalSender)
-    whenHealthy
-    returns (bytes memory)
-  {
+  function lockOrBurn(bytes calldata lockOrBurnIn) external virtual override whenHealthy returns (bytes memory) {
+    Pool.LockOrBurnInV1 memory lockOrBurnData = Pool._decodeLockOrBurnInV1(lockOrBurnIn);
+    _checkAllowList(lockOrBurnData.originalSender);
+    _onlyOnRamp(lockOrBurnData.remoteChainSelector);
+    _consumeOutboundRateLimit(lockOrBurnData.remoteChainSelector, lockOrBurnData.amount);
+
     bytes memory revertReason = s_revertReason;
     if (revertReason.length != 0) {
       assembly {
         revert(add(32, revertReason), mload(revertReason))
       }
     }
-    _consumeOutboundRateLimit(remoteChainSelector, amount);
-    IBurnMintERC20(address(i_token)).burn(amount);
-    emit Burned(msg.sender, amount);
-    return Pool._encodeLockOrBurnOutV1(getRemotePool(remoteChainSelector), s_sourceTokenData);
+
+    IBurnMintERC20(address(i_token)).burn(lockOrBurnData.amount);
+    emit Burned(msg.sender, lockOrBurnData.amount);
+    return Pool._encodeLockOrBurnOutV1(getRemotePool(lockOrBurnData.remoteChainSelector), s_sourceTokenData);
   }
 
   /// @notice Reverts depending on the value of `s_revertReason`

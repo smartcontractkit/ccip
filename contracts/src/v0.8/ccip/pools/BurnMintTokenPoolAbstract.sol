@@ -14,28 +14,19 @@ abstract contract BurnMintTokenPoolAbstract is TokenPool {
   function _burn(uint256 amount) internal virtual;
 
   /// @notice Burn the token in the pool
-  /// @param amount Amount to burn
   /// @dev The whenHealthy check is important to ensure that even if a ramp is compromised
   /// we're able to stop token movement via ARM.
-  function lockOrBurn(
-    address originalSender,
-    bytes calldata,
-    uint256 amount,
-    uint64 remoteChainSelector,
-    bytes calldata
-  )
-    external
-    virtual
-    override
-    onlyOnRamp(remoteChainSelector)
-    checkAllowList(originalSender)
-    whenHealthy
-    returns (bytes memory)
-  {
-    _consumeOutboundRateLimit(remoteChainSelector, amount);
-    _burn(amount);
-    emit Burned(msg.sender, amount);
-    return Pool._encodeLockOrBurnOutV1(getRemotePool(remoteChainSelector), "");
+  function lockOrBurn(bytes calldata lockOrBurnIn) external virtual override whenHealthy returns (bytes memory) {
+    Pool.LockOrBurnInV1 memory lockOrBurnData = Pool._decodeLockOrBurnInV1(lockOrBurnIn);
+    _checkAllowList(lockOrBurnData.originalSender);
+    _onlyOnRamp(lockOrBurnData.remoteChainSelector);
+    _consumeOutboundRateLimit(lockOrBurnData.remoteChainSelector, lockOrBurnData.amount);
+
+    _burn(lockOrBurnData.amount);
+
+    emit Burned(msg.sender, lockOrBurnData.amount);
+
+    return Pool._encodeLockOrBurnOutV1(getRemotePool(lockOrBurnData.remoteChainSelector), "");
   }
 
   /// @notice Mint tokens from the pool to the recipient
@@ -53,8 +44,11 @@ abstract contract BurnMintTokenPoolAbstract is TokenPool {
   ) external virtual override whenHealthy onlyOffRamp(remoteChainSelector) returns (address, uint256) {
     _validateSourceCaller(remoteChainSelector, sourceTokenData.sourcePoolAddress);
     _consumeInboundRateLimit(remoteChainSelector, amount);
+
     IBurnMintERC20(address(i_token)).mint(receiver, amount);
+
     emit Minted(msg.sender, receiver, amount);
+
     return (address(i_token), amount);
   }
 }
