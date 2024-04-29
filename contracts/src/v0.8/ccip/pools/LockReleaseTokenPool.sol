@@ -3,7 +3,7 @@ pragma solidity 0.8.19;
 
 import {ILiquidityContainer} from "../../rebalancer/interfaces/ILiquidityContainer.sol";
 import {ITypeAndVersion} from "../../shared/interfaces/ITypeAndVersion.sol";
-import {IPool} from "../interfaces/pools/IPool.sol";
+import {IPool} from "../interfaces/IPool.sol";
 
 import {Pool} from "../libraries/Pool.sol";
 import {RateLimiter} from "../libraries/RateLimiter.sol";
@@ -23,7 +23,7 @@ contract LockReleaseTokenPool is TokenPool, ILiquidityContainer, ITypeAndVersion
   error LiquidityNotAccepted();
   error Unauthorized(address caller);
 
-  string public constant override typeAndVersion = "LockReleaseTokenPool 1.4.0";
+  string public constant override typeAndVersion = "LockReleaseTokenPool 1.5.0-dev";
 
   /// @dev The unique lock release pool flag to signal through EIP 165.
   bytes4 private constant LOCK_RELEASE_INTERFACE_ID = bytes4(keccak256("LockReleaseTokenPool"));
@@ -85,12 +85,12 @@ contract LockReleaseTokenPool is TokenPool, ILiquidityContainer, ITypeAndVersion
     uint64 remoteChainSelector,
     IPool.SourceTokenData memory sourceTokenData,
     bytes memory
-  ) external virtual override onlyOffRamp(remoteChainSelector) whenHealthy returns (address) {
+  ) external virtual override onlyOffRamp(remoteChainSelector) whenHealthy returns (address, uint256) {
     _validateSourceCaller(remoteChainSelector, sourceTokenData.sourcePoolAddress);
     _consumeInboundRateLimit(remoteChainSelector, amount);
     getToken().safeTransfer(receiver, amount);
     emit Released(msg.sender, receiver, amount);
-    return address(i_token);
+    return (address(i_token), amount);
   }
 
   /// @notice returns the lock release interface flag used for EIP165 identification.
