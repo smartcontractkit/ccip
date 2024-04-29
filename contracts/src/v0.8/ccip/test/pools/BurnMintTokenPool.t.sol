@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.19;
 
-import {IPool} from "../../interfaces/pools/IPool.sol";
+import {IPool} from "../../interfaces/IPool.sol";
 
 import {Internal} from "../../libraries/Internal.sol";
 import {EVM2EVMOffRamp} from "../../offRamp/EVM2EVMOffRamp.sol";
@@ -29,7 +29,7 @@ contract BurnMintTokenPool_lockOrBurn is BurnMintTokenPoolSetup {
     assertEq(address(s_burnMintERC677), address(s_pool.getToken()));
     assertEq(address(s_mockARM), s_pool.getArmProxy());
     assertEq(false, s_pool.getAllowListEnabled());
-    assertEq("BurnMintTokenPool 1.4.0", s_pool.typeAndVersion());
+    assertEq("BurnMintTokenPool 1.5.0-dev", s_pool.typeAndVersion());
   }
 
   function test_PoolBurn_Success() public {

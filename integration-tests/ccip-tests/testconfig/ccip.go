@@ -8,6 +8,7 @@ import (
 	"github.com/pelletier/go-toml/v2"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
+
 	testutils "github.com/smartcontractkit/ccip/integration-tests/ccip-tests/utils"
 
 	ctfconfig "github.com/smartcontractkit/chainlink-testing-framework/config"
@@ -21,6 +22,13 @@ import (
 const (
 	CONTRACTS_OVERRIDE_CONFIG = "BASE64_CCIP_CONFIG_OVERRIDE_CONTRACTS"
 )
+
+type OffRampConfig struct {
+	MaxDataBytes   *uint32          `toml:",omitempty"`
+	BatchGasLimit  *uint32          `toml:",omitempty"`
+	InflightExpiry *config.Duration `toml:",omitempty"`
+	RootSnooze     *config.Duration `toml:",omitempty"`
+}
 
 type CCIPTestConfig struct {
 	KeepEnvAlive                               *bool                                 `toml:",omitempty"`
@@ -45,7 +53,6 @@ type CCIPTestConfig struct {
 	NetworkPairs                               []string                              `toml:",omitempty"`
 	NoOfNetworks                               int                                   `toml:",omitempty"`
 	NoOfRoutersPerPair                         int                                   `toml:",omitempty"`
-	Blockscout                                 bool                                  `toml:",omitempty"`
 	NoOfTokensPerChain                         int                                   `toml:",omitempty"`
 	NoOfTokensInMsg                            int                                   `toml:",omitempty"`
 	AmountPerToken                             int64                                 `toml:",omitempty"`
@@ -59,8 +66,8 @@ type CCIPTestConfig struct {
 	SendMaxDataInEveryMsgCount                 *int64                                `toml:",omitempty"`
 	CommitOCRParams                            *contracts.OffChainAggregatorV2Config `toml:",omitempty"`
 	ExecOCRParams                              *contracts.OffChainAggregatorV2Config `toml:",omitempty"`
+	OffRampConfig                              *OffRampConfig                        `toml:",omitempty"`
 	CommitInflightExpiry                       *config.Duration                      `toml:",omitempty"`
-	ExecInflightExpiry                         *config.Duration                      `toml:",omitempty"`
 	OptimizeSpace                              *bool                                 `toml:",omitempty"`
 	SkipRequestIfAnotherRequestTriggeredWithin *config.Duration                      `toml:",omitempty"`
 	StoreLaneConfig                            *bool                                 `toml:",omitempty"`

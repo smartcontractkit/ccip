@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.19;
 
-import {IPool} from "../../../interfaces/pools/IPool.sol";
+import {IPool} from "../../../interfaces/IPool.sol";
 
 import {Pool} from "../../../libraries/Pool.sol";
 import {RateLimiter} from "../../../libraries/RateLimiter.sol";
@@ -46,11 +46,11 @@ contract ReentrantMaliciousTokenPool is TokenPool {
   function releaseOrMint(
     bytes memory,
     address,
-    uint256,
+    uint256 amount,
     uint64,
     IPool.SourceTokenData memory,
     bytes memory
-  ) external view override returns (address) {
-    return address(i_token);
+  ) external view override returns (address, uint256) {
+    return (address(i_token), amount);
   }
 }
