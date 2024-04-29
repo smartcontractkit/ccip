@@ -75,7 +75,8 @@ contract LockReleaseTokenPool is TokenPool, ILiquidityContainer, ITypeAndVersion
     uint64 remoteChainSelector,
     IPool.SourceTokenData memory sourceTokenData,
     bytes memory
-  ) external virtual override onlyOffRamp(remoteChainSelector) whenHealthy returns (address, uint256) {
+  ) external virtual override whenHealthy returns (address, uint256) {
+    _onlyOffRamp(remoteChainSelector);
     _validateSourceCaller(remoteChainSelector, sourceTokenData.sourcePoolAddress);
     _consumeInboundRateLimit(remoteChainSelector, amount);
 

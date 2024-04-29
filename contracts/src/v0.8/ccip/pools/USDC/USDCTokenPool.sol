@@ -158,7 +158,8 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
     uint64 remoteChainSelector,
     IPool.SourceTokenData memory sourceTokenData,
     bytes memory offchainTokenData
-  ) external override onlyOffRamp(remoteChainSelector) returns (address, uint256) {
+  ) external override returns (address, uint256) {
+    _onlyOffRamp(remoteChainSelector);
     _consumeInboundRateLimit(remoteChainSelector, amount);
     _validateSourceCaller(remoteChainSelector, sourceTokenData.sourcePoolAddress);
     SourceTokenDataPayload memory sourceTokenDataPayload =

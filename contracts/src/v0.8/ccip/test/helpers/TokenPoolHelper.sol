@@ -38,5 +38,7 @@ contract TokenPoolHelper is TokenPool {
     _onlyOnRamp(remoteChainSelector);
   }
 
-  function onlyOffRampModifier(uint64 remoteChainSelector) external onlyOffRamp(remoteChainSelector) {}
+  function onlyOffRampModifier(uint64 remoteChainSelector) external view {
+    _onlyOffRamp(remoteChainSelector);
+  }
 }

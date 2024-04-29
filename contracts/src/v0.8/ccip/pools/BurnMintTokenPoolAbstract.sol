@@ -41,7 +41,8 @@ abstract contract BurnMintTokenPoolAbstract is TokenPool {
     uint64 remoteChainSelector,
     IPool.SourceTokenData memory sourceTokenData,
     bytes memory
-  ) external virtual override whenHealthy onlyOffRamp(remoteChainSelector) returns (address, uint256) {
+  ) external virtual override whenHealthy returns (address, uint256) {
+    _onlyOffRamp(remoteChainSelector);
     _validateSourceCaller(remoteChainSelector, sourceTokenData.sourcePoolAddress);
     _consumeInboundRateLimit(remoteChainSelector, amount);
 
