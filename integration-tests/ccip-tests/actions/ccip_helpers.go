@@ -808,13 +808,8 @@ func (ccipModule *CCIPCommon) DeployContracts(noOfTokens int,
 	}
 
 	// number of deployed bridge tokens does not match noOfTokens; deploy rest of the tokens in case ExistingDeployment is false
-	// otherwise throw error
+	// In case of ExistingDeployment as true use whatever is provided in laneconfig
 	if len(ccipModule.BridgeTokens) < noOfTokens {
-		if ccipModule.ExistingDeployment {
-			return fmt.Errorf("no of bridgeTokens (%d) does not match no of tokens (%d) provided in testconfig,"+
-				"provide the rest of the tokens in laneconfig or update TokenConfig in testconfig",
-				len(ccipModule.BridgeTokens), noOfTokens)
-		}
 		// deploy bridge token.
 		for i := len(ccipModule.BridgeTokens); i < noOfTokens; i++ {
 			// if it's an existing deployment, we don't deploy the token
