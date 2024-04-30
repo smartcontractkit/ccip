@@ -19,10 +19,10 @@ import (
 var _ LiquidityManager = &EvmLiquidityManager{}
 
 type EvmLiquidityManager struct {
-	rebalancer liquiditymanager.LiquidityManagerInterface
-	addr       common.Address
-	networkSel models.NetworkSelector
-	lggr       logger.Logger
+	liquiditymanager liquiditymanager.LiquidityManagerInterface
+	addr             common.Address
+	networkSel       models.NetworkSelector
+	lggr             logger.Logger
 }
 
 func NewEvmLiquidityManager(
@@ -37,17 +37,17 @@ func NewEvmLiquidityManager(
 	}
 
 	return &EvmLiquidityManager{
-		rebalancer: rebal,
-		addr:       common.Address(address),
-		networkSel: net,
-		lggr:       lggr.Named("EvmRebalancer"),
+		liquiditymanager: rebal,
+		addr:             common.Address(address),
+		networkSel:       net,
+		lggr:             lggr.Named("EvmLiquiditymanager"),
 	}, nil
 }
 
 func (e *EvmLiquidityManager) GetRebalancers(ctx context.Context) (map[models.NetworkSelector]models.Address, error) {
-	lms, err := e.rebalancer.GetAllCrossChainRebalancers(&bind.CallOpts{Context: ctx})
+	lms, err := e.liquiditymanager.GetAllCrossChainRebalancers(&bind.CallOpts{Context: ctx})
 	if err != nil {
-		return nil, fmt.Errorf("get all cross chain rebalancers: %w", err)
+		return nil, fmt.Errorf("get all cross chain liquiditymanagers: %w", err)
 	}
 	ret := make(map[models.NetworkSelector]models.Address)
 	for _, lm := range lms {
@@ -57,16 +57,16 @@ func (e *EvmLiquidityManager) GetRebalancers(ctx context.Context) (map[models.Ne
 }
 
 func (e *EvmLiquidityManager) GetBalance(ctx context.Context) (*big.Int, error) {
-	return e.rebalancer.GetLiquidity(&bind.CallOpts{Context: ctx})
+	return e.liquiditymanager.GetLiquidity(&bind.CallOpts{Context: ctx})
 }
 
 func (e *EvmLiquidityManager) Close(ctx context.Context) error {
 	return nil
 }
 
-// ConfigDigest implements Rebalancer.
+// ConfigDigest implements Liquiditymanager.
 func (e *EvmLiquidityManager) ConfigDigest(ctx context.Context) (types.ConfigDigest, error) {
-	cdae, err := e.rebalancer.LatestConfigDigestAndEpoch(&bind.CallOpts{Context: ctx})
+	cdae, err := e.liquiditymanager.LatestConfigDigestAndEpoch(&bind.CallOpts{Context: ctx})
 	if err != nil {
 		return ocrtypes.ConfigDigest{}, fmt.Errorf("latest config digest and epoch: %w", err)
 	}
@@ -74,13 +74,13 @@ func (e *EvmLiquidityManager) ConfigDigest(ctx context.Context) (types.ConfigDig
 }
 
 func (e *EvmLiquidityManager) GetTokenAddress(ctx context.Context) (models.Address, error) {
-	tokenAddress, err := e.rebalancer.ILocalToken(&bind.CallOpts{
+	tokenAddress, err := e.liquiditymanager.ILocalToken(&bind.CallOpts{
 		Context: ctx,
 	})
 	return models.Address(tokenAddress), err
 }
 
 func (e *EvmLiquidityManager) GetLatestSequenceNumber(ctx context.Context) (uint64, error) {
-	cdae, err := e.rebalancer.LatestConfigDigestAndEpoch(&bind.CallOpts{Context: ctx})
+	cdae, err := e.liquiditymanager.LatestConfigDigestAndEpoch(&bind.CallOpts{Context: ctx})
 	return cdae.SequenceNumber, err
 }

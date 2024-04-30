@@ -22,7 +22,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	dkgconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/dkg/config"
-	rebalancermodels "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/models"
+	liquiditymanagermodels "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/models"
 	lloconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/llo/config"
 	mercuryconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/mercury/config"
 	ocr2vrfconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ocr2vrf/config"
@@ -255,7 +255,7 @@ func validateRebalancerSpec(jsonConfig job.JSONConfig) error {
 	if jsonConfig == nil {
 		return errors.New("pluginConfig is empty")
 	}
-	var pluginConfig rebalancermodels.PluginConfig
+	var pluginConfig liquiditymanagermodels.PluginConfig
 	err := json.Unmarshal(jsonConfig.Bytes(), &pluginConfig)
 	if err != nil {
 		return pkgerrors.Wrap(err, "error while unmarshalling plugin config")
@@ -266,7 +266,7 @@ func validateRebalancerSpec(jsonConfig job.JSONConfig) error {
 	if pluginConfig.ClosePluginTimeoutSec <= 0 {
 		return errors.New("closePluginTimeoutSec must be positive")
 	}
-	if err := rebalancermodels.ValidateRebalancerConfig(pluginConfig.RebalancerConfig); err != nil {
+	if err := liquiditymanagermodels.ValidateRebalancerConfig(pluginConfig.RebalancerConfig); err != nil {
 		return fmt.Errorf("rebalancer config invalid: %w", err)
 	}
 	return nil

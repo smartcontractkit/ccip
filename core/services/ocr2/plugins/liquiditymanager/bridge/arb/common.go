@@ -65,7 +65,7 @@ var (
 	l2BaseFeeMultiplier     = big.NewInt(3)
 	submissionFeeMultiplier = big.NewInt(4)
 
-	// Rebalancer event - emitted on both L1 and L2
+	// liquidityManager event - emitted on both L1 and L2
 	LiquidityTransferredTopic = liquiditymanager.LiquidityManagerLiquidityTransferred{}.Topic()
 
 	nodeInterfaceABI = abihelpers.MustParseABI(arb_node_interface.NodeInterfaceMetaData.ABI)
