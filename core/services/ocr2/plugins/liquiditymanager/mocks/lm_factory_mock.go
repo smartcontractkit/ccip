@@ -3,7 +3,7 @@
 package mocks
 
 import (
-	liquiditymanager "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/chain/evm"
+	evmliquiditymanager "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/chain/evm"
 	mock "github.com/stretchr/testify/mock"
 
 	models "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/models"
@@ -14,24 +14,24 @@ type Factory struct {
 	mock.Mock
 }
 
-// GetRebalancer provides a mock function with given fields: networkID, address
-func (_m *Factory) GetRebalancer(networkID models.NetworkSelector, address models.Address) (liquiditymanager.LiquidityManager, error) {
+// GetLiquidityManager provides a mock function with given fields: networkID, address
+func (_m *Factory) GetLiquidityManager(networkID models.NetworkSelector, address models.Address) (evmliquiditymanager.LiquidityManager, error) {
 	ret := _m.Called(networkID, address)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetRebalancer")
+		panic("no return value specified for GetLiquidityManager")
 	}
 
-	var r0 liquiditymanager.LiquidityManager
+	var r0 evmliquiditymanager.LiquidityManager
 	var r1 error
-	if rf, ok := ret.Get(0).(func(models.NetworkSelector, models.Address) (liquiditymanager.LiquidityManager, error)); ok {
+	if rf, ok := ret.Get(0).(func(models.NetworkSelector, models.Address) (evmliquiditymanager.LiquidityManager, error)); ok {
 		return rf(networkID, address)
 	}
-	if rf, ok := ret.Get(0).(func(models.NetworkSelector, models.Address) liquiditymanager.LiquidityManager); ok {
+	if rf, ok := ret.Get(0).(func(models.NetworkSelector, models.Address) evmliquiditymanager.LiquidityManager); ok {
 		r0 = rf(networkID, address)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(liquiditymanager.LiquidityManager)
+			r0 = ret.Get(0).(evmliquiditymanager.LiquidityManager)
 		}
 	}
 
@@ -44,24 +44,24 @@ func (_m *Factory) GetRebalancer(networkID models.NetworkSelector, address model
 	return r0, r1
 }
 
-// NewRebalancer provides a mock function with given fields: networkID, address
-func (_m *Factory) NewRebalancer(networkID models.NetworkSelector, address models.Address) (liquiditymanager.LiquidityManager, error) {
+// NewLiquidityManager provides a mock function with given fields: networkID, address
+func (_m *Factory) NewLiquidityManager(networkID models.NetworkSelector, address models.Address) (evmliquiditymanager.LiquidityManager, error) {
 	ret := _m.Called(networkID, address)
 
 	if len(ret) == 0 {
-		panic("no return value specified for NewRebalancer")
+		panic("no return value specified for NewLiquidityManager")
 	}
 
-	var r0 liquiditymanager.LiquidityManager
+	var r0 evmliquiditymanager.LiquidityManager
 	var r1 error
-	if rf, ok := ret.Get(0).(func(models.NetworkSelector, models.Address) (liquiditymanager.LiquidityManager, error)); ok {
+	if rf, ok := ret.Get(0).(func(models.NetworkSelector, models.Address) (evmliquiditymanager.LiquidityManager, error)); ok {
 		return rf(networkID, address)
 	}
-	if rf, ok := ret.Get(0).(func(models.NetworkSelector, models.Address) liquiditymanager.LiquidityManager); ok {
+	if rf, ok := ret.Get(0).(func(models.NetworkSelector, models.Address) evmliquiditymanager.LiquidityManager); ok {
 		r0 = rf(networkID, address)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(liquiditymanager.LiquidityManager)
+			r0 = ret.Get(0).(evmliquiditymanager.LiquidityManager)
 		}
 	}
 

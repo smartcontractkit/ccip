@@ -406,12 +406,12 @@ func (p *Plugin) stalenessValidation(
 	report models.Report,
 ) error {
 	// check sequence number to see if its already transmitted onchain.
-	rebalancer, err := p.liquidityManagerFactory.NewRebalancer(report.NetworkID, report.LiquidityManagerAddress)
+	liquidityManager, err := p.liquidityManagerFactory.NewLiquidityManager(report.NetworkID, report.LiquidityManagerAddress)
 	if err != nil {
-		return fmt.Errorf("get rebalancer: %w", err)
+		return fmt.Errorf("get liquidityManager: %w", err)
 	}
 
-	onchainSeqNr, err := rebalancer.GetLatestSequenceNumber(ctx)
+	onchainSeqNr, err := liquidityManager.GetLatestSequenceNumber(ctx)
 	if err != nil {
 		return fmt.Errorf("get latest sequence number: %w", err)
 	}
@@ -424,10 +424,10 @@ func (p *Plugin) stalenessValidation(
 
 	// check that the instructions will not cause failures onchain.
 	// e.g send instructions when there is not enough liquidity.
-	currentBalance, err := rebalancer.GetBalance(ctx)
+	currentBalance, err := liquidityManager.GetBalance(ctx)
 	if err != nil {
 		lggr.Warnw("failed to get balance", "err", err)
-		return fmt.Errorf("get rebalancer liquidity: %w", err)
+		return fmt.Errorf("get liquidityManager liquidity: %w", err)
 	}
 
 	lggr.Debugw("checking if there is enough balance onchain to send", "currentBalance", currentBalance.String())
@@ -459,26 +459,26 @@ func (p *Plugin) Close() error {
 
 	var errs []error
 	for _, networkID := range p.rebalancerGraph.GetNetworks() {
-		p.lggr.Infow("closing rebalancer network", "network", networkID)
+		p.lggr.Infow("closing liquidityManager network", "network", networkID)
 
-		rebalancerAddress, err := p.rebalancerGraph.GetRebalancerAddress(networkID)
+		liquidityManagerAddress, err := p.rebalancerGraph.GetRebalancerAddress(networkID)
 		if err != nil {
-			errs = append(errs, fmt.Errorf("get rebalancer address for %d: %w", networkID, err))
+			errs = append(errs, fmt.Errorf("get liquidityManager address for %d: %w", networkID, err))
 			continue
 		}
 
-		rb, err := p.liquidityManagerFactory.GetRebalancer(networkID, rebalancerAddress)
+		rb, err := p.liquidityManagerFactory.GetLiquidityManager(networkID, liquidityManagerAddress)
 		if err != nil {
-			errs = append(errs, fmt.Errorf("get rebalancer (%d, %s): %w", networkID, rebalancerAddress.String(), err))
+			errs = append(errs, fmt.Errorf("get liquidityManager (%d, %s): %w", networkID, liquidityManagerAddress.String(), err))
 			continue
 		}
 
 		if err := rb.Close(ctx); err != nil {
-			errs = append(errs, fmt.Errorf("close rebalancer (%d, %s): %w", networkID, rebalancerAddress.String(), err))
+			errs = append(errs, fmt.Errorf("close liquidityManager (%d, %s): %w", networkID, liquidityManagerAddress.String(), err))
 			continue
 		}
 
-		p.lggr.Infow("finished closing rebalancer network", "network", networkID, "rebalancer", rebalancerAddress.String())
+		p.lggr.Infow("finished closing liquidityManager network", "network", networkID, "liquidityManager", liquidityManagerAddress.String())
 	}
 
 	return multierr.Combine(errs...)
@@ -671,7 +671,7 @@ func (p *Plugin) resolveProposedTransfers(ctx context.Context, lggr logger.Logge
 
 		fromNetRebalancer, err := p.rebalancerGraph.GetRebalancerAddress(proposedTransfer.From)
 		if err != nil {
-			return nil, fmt.Errorf("get rebalancer address for %v: %w", proposedTransfer.From, err)
+			return nil, fmt.Errorf("get liquidityManager address for %v: %w", proposedTransfer.From, err)
 		}
 
 		fromNetToken, err := p.rebalancerGraph.GetTokenAddress(proposedTransfer.From)
@@ -681,7 +681,7 @@ func (p *Plugin) resolveProposedTransfers(ctx context.Context, lggr logger.Logge
 
 		toNetRebalancer, err := p.rebalancerGraph.GetRebalancerAddress(proposedTransfer.To)
 		if err != nil {
-			return nil, fmt.Errorf("get rebalancer address for %v: %w", proposedTransfer.To, err)
+			return nil, fmt.Errorf("get liquidityManager address for %v: %w", proposedTransfer.To, err)
 		}
 
 		toNetToken, err := p.rebalancerGraph.GetTokenAddress(proposedTransfer.To)

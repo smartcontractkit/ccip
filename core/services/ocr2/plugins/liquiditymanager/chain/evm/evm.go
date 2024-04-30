@@ -16,27 +16,27 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/models"
 )
 
-var _ LiquidityManager = &EvmRebalancer{}
+var _ LiquidityManager = &EvmLiquidityManager{}
 
-type EvmRebalancer struct {
+type EvmLiquidityManager struct {
 	rebalancer liquiditymanager.LiquidityManagerInterface
 	addr       common.Address
 	networkSel models.NetworkSelector
 	lggr       logger.Logger
 }
 
-func NewEvmRebalancer(
+func NewEvmLiquidityManager(
 	address models.Address,
 	net models.NetworkSelector,
 	ec client.Client,
 	lggr logger.Logger,
-) (*EvmRebalancer, error) {
+) (*EvmLiquidityManager, error) {
 	rebal, err := liquiditymanager.NewLiquidityManager(common.Address(address), ec)
 	if err != nil {
 		return nil, fmt.Errorf("unable to instantiate liquidity manager wrapper: %w", err)
 	}
 
-	return &EvmRebalancer{
+	return &EvmLiquidityManager{
 		rebalancer: rebal,
 		addr:       common.Address(address),
 		networkSel: net,
@@ -44,7 +44,7 @@ func NewEvmRebalancer(
 	}, nil
 }
 
-func (e *EvmRebalancer) GetRebalancers(ctx context.Context) (map[models.NetworkSelector]models.Address, error) {
+func (e *EvmLiquidityManager) GetRebalancers(ctx context.Context) (map[models.NetworkSelector]models.Address, error) {
 	lms, err := e.rebalancer.GetAllCrossChainRebalancers(&bind.CallOpts{Context: ctx})
 	if err != nil {
 		return nil, fmt.Errorf("get all cross chain rebalancers: %w", err)
@@ -56,16 +56,16 @@ func (e *EvmRebalancer) GetRebalancers(ctx context.Context) (map[models.NetworkS
 	return ret, nil
 }
 
-func (e *EvmRebalancer) GetBalance(ctx context.Context) (*big.Int, error) {
+func (e *EvmLiquidityManager) GetBalance(ctx context.Context) (*big.Int, error) {
 	return e.rebalancer.GetLiquidity(&bind.CallOpts{Context: ctx})
 }
 
-func (e *EvmRebalancer) Close(ctx context.Context) error {
+func (e *EvmLiquidityManager) Close(ctx context.Context) error {
 	return nil
 }
 
 // ConfigDigest implements Rebalancer.
-func (e *EvmRebalancer) ConfigDigest(ctx context.Context) (types.ConfigDigest, error) {
+func (e *EvmLiquidityManager) ConfigDigest(ctx context.Context) (types.ConfigDigest, error) {
 	cdae, err := e.rebalancer.LatestConfigDigestAndEpoch(&bind.CallOpts{Context: ctx})
 	if err != nil {
 		return ocrtypes.ConfigDigest{}, fmt.Errorf("latest config digest and epoch: %w", err)
@@ -73,14 +73,14 @@ func (e *EvmRebalancer) ConfigDigest(ctx context.Context) (types.ConfigDigest, e
 	return ocrtypes.ConfigDigest(cdae.ConfigDigest), nil
 }
 
-func (e *EvmRebalancer) GetTokenAddress(ctx context.Context) (models.Address, error) {
+func (e *EvmLiquidityManager) GetTokenAddress(ctx context.Context) (models.Address, error) {
 	tokenAddress, err := e.rebalancer.ILocalToken(&bind.CallOpts{
 		Context: ctx,
 	})
 	return models.Address(tokenAddress), err
 }
 
-func (e *EvmRebalancer) GetLatestSequenceNumber(ctx context.Context) (uint64, error) {
+func (e *EvmLiquidityManager) GetLatestSequenceNumber(ctx context.Context) (uint64, error) {
 	cdae, err := e.rebalancer.LatestConfigDigestAndEpoch(&bind.CallOpts{Context: ctx})
 	return cdae.SequenceNumber, err
 }

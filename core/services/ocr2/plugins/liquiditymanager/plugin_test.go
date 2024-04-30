@@ -31,8 +31,8 @@ import (
 	discoverermocks "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/discoverer/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/graph"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/liquidityrebalancer"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/models"
-	rebalancermocks "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/rebalancermocks"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/testhelpers"
 )
 
@@ -898,10 +898,10 @@ func TestPlugin_ShouldAcceptAttestedReport(t *testing.T) {
 			before: func(t *testing.T, p *pluginWithMocks) {
 				// onchain sequence number < report sequence number
 				// enough balance onchain
-				mockRebalancer := liquiditymanagermocks.NewRebalancer(t)
+				mockRebalancer := liquiditymanagermocks.NewLiquidityManager(t)
 				mockRebalancer.On("GetLatestSequenceNumber", mock.Anything).Return(uint64(122), nil)
 				mockRebalancer.On("GetBalance", mock.Anything).Return(big.NewInt(1000), nil)
-				p.lmFactory.On("NewRebalancer", networkA, rebalancerA).Return(mockRebalancer, nil).Once()
+				p.lmFactory.On("NewLiquidityManager", networkA, rebalancerA).Return(mockRebalancer, nil).Once()
 			},
 			assertions: func(t *testing.T, p *pluginWithMocks) {
 				p.lmFactory.AssertExpectations(t)
@@ -931,9 +931,9 @@ func TestPlugin_ShouldAcceptAttestedReport(t *testing.T) {
 			},
 			before: func(t *testing.T, p *pluginWithMocks) {
 				// onchain sequence number == report sequence number
-				mockRebalancer := liquiditymanagermocks.NewRebalancer(t)
+				mockRebalancer := liquiditymanagermocks.NewLiquidityManager(t)
 				mockRebalancer.On("GetLatestSequenceNumber", mock.Anything).Return(uint64(123), nil)
-				p.lmFactory.On("NewRebalancer", networkA, rebalancerA).Return(mockRebalancer, nil).Once()
+				p.lmFactory.On("NewLiquidityManager", networkA, rebalancerA).Return(mockRebalancer, nil).Once()
 			},
 			assertions: func(t *testing.T, p *pluginWithMocks) {
 				p.lmFactory.AssertExpectations(t)
@@ -964,10 +964,10 @@ func TestPlugin_ShouldAcceptAttestedReport(t *testing.T) {
 			before: func(t *testing.T, p *pluginWithMocks) {
 				// onchain sequence number < report sequence number
 				// not enough balance onchain
-				mockRebalancer := liquiditymanagermocks.NewRebalancer(t)
+				mockRebalancer := liquiditymanagermocks.NewLiquidityManager(t)
 				mockRebalancer.On("GetLatestSequenceNumber", mock.Anything).Return(uint64(122), nil)
 				mockRebalancer.On("GetBalance", mock.Anything).Return(big.NewInt(900), nil)
-				p.lmFactory.On("NewRebalancer", networkA, rebalancerA).Return(mockRebalancer, nil).Once()
+				p.lmFactory.On("NewLiquidityManager", networkA, rebalancerA).Return(mockRebalancer, nil).Once()
 			},
 			assertions: func(t *testing.T, p *pluginWithMocks) {
 				p.lmFactory.AssertExpectations(t)
@@ -1064,10 +1064,10 @@ func TestPlugin_ShouldTransmitAcceptedReport(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			p := newPluginWithMocksAndDefaults(t)
-			rb := liquiditymanagermocks.NewRebalancer(t)
+			rb := liquiditymanagermocks.NewLiquidityManager(t)
 
 			p.lmFactory.
-				On("NewRebalancer", tc.report.NetworkID, tc.report.LiquidityManagerAddress).
+				On("NewLiquidityManager", tc.report.NetworkID, tc.report.LiquidityManagerAddress).
 				Return(rb, nil)
 
 			rb.
@@ -1110,9 +1110,9 @@ func TestPlugin_Close(t *testing.T) {
 	g.AddNetwork(networkC, graph.Data{RebalancerAddress: rebalancerC})
 	p.plugin.rebalancerGraph = g
 
-	rbA := liquiditymanagermocks.NewRebalancer(t)
-	rbB := liquiditymanagermocks.NewRebalancer(t)
-	rbC := liquiditymanagermocks.NewRebalancer(t)
+	rbA := liquiditymanagermocks.NewLiquidityManager(t)
+	rbB := liquiditymanagermocks.NewLiquidityManager(t)
+	rbC := liquiditymanagermocks.NewLiquidityManager(t)
 
 	p.lmFactory.On("GetRebalancer", networkA, rebalancerA).Return(rbA, errSomethingWentWrong) //  networkA errors while getting the rebalancer
 	p.lmFactory.On("GetRebalancer", networkB, rebalancerB).Return(rbB, nil)
@@ -1205,7 +1205,7 @@ func TestPlugin_E2EWithMocks(t *testing.T) {
 						rb.On("GetBalance", mock.Anything).Return(func(context.Context) (*big.Int, error) {
 							return new(big.Int).Set(data.liquidity), nil
 						}).Maybe()
-						n.rbFactory.On("NewRebalancer", net, mock.Anything).Return(rb, nil).Maybe()
+						n.rbFactory.On("NewLiquidityManager", net, mock.Anything).Return(rb, nil).Maybe()
 					}
 				}
 
@@ -1561,15 +1561,15 @@ type roundData struct {
 
 type node struct {
 	plugin            *Plugin
-	rbFactory         *rebalancermocks.Factory
+	rbFactory         *mocks.Factory
 	discovererFactory *discoverermocks.Factory
 	bridgeFactory     *bridgemocks.Factory
-	rebalancers       map[models.NetworkSelector]*liquiditymanagermocks.Rebalancer
+	rebalancers       map[models.NetworkSelector]*liquiditymanagermocks.LiquidityManager
 	bridges           map[[2]models.NetworkSelector]*bridgemocks.Bridge
 }
 
 func (n *node) resetMocks(t *testing.T) {
-	lmFactory := rebalancermocks.NewFactory(t)
+	lmFactory := mocks.NewFactory(t)
 	discovererFactory := discoverermocks.NewFactory(t)
 	bridgeFactory := bridgemocks.NewFactory(t)
 	bridgeMocks := make(map[[2]models.NetworkSelector]*bridgemocks.Bridge)
@@ -1588,7 +1588,7 @@ func (n *node) resetMocks(t *testing.T) {
 }
 
 func newNode(t *testing.T, lggr logger.Logger, f int) node {
-	lmFactory := rebalancermocks.NewFactory(t)
+	lmFactory := mocks.NewFactory(t)
 	discovererFactory := discoverermocks.NewFactory(t)
 	bridgeFactory := bridgemocks.NewFactory(t)
 	rebalancerAlg := liquidityrebalancer.NewPingPong()
@@ -1617,18 +1617,18 @@ func newNode(t *testing.T, lggr logger.Logger, f int) node {
 		discovererFactory: discovererFactory,
 		bridgeFactory:     bridgeFactory,
 		bridges:           bridgeMocks,
-		rebalancers: map[models.NetworkSelector]*liquiditymanagermocks.Rebalancer{
-			networkA: liquiditymanagermocks.NewRebalancer(t),
-			networkB: liquiditymanagermocks.NewRebalancer(t),
-			networkC: liquiditymanagermocks.NewRebalancer(t),
-			networkD: liquiditymanagermocks.NewRebalancer(t), // todo: loop
+		rebalancers: map[models.NetworkSelector]*liquiditymanagermocks.LiquidityManager{
+			networkA: liquiditymanagermocks.NewLiquidityManager(t),
+			networkB: liquiditymanagermocks.NewLiquidityManager(t),
+			networkC: liquiditymanagermocks.NewLiquidityManager(t),
+			networkD: liquiditymanagermocks.NewLiquidityManager(t), // todo: loop
 		},
 	}
 }
 
 type pluginWithMocks struct {
 	plugin            *Plugin
-	lmFactory         *rebalancermocks.Factory
+	lmFactory         *mocks.Factory
 	discovererFactory *discoverermocks.Factory
 	bridgeFactory     *bridgemocks.Factory
 	rebalancerAlg     *liquidityrebalancer.PingPong
@@ -1648,7 +1648,7 @@ func newPluginWithMocks(
 	rootAddress models.Address,
 	lggr logger.Logger,
 ) *pluginWithMocks {
-	lmFactory := rebalancermocks.NewFactory(t)
+	lmFactory := mocks.NewFactory(t)
 	discovererFactory := discoverermocks.NewFactory(t)
 	bridgeFactory := bridgemocks.NewFactory(t)
 	rebalancerAlg := liquidityrebalancer.NewPingPong()

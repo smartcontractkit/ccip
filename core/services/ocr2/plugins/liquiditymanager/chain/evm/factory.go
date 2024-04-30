@@ -18,30 +18,30 @@ var (
 
 // Factory initializes a new liquidity manager instance.
 //
-//go:generate mockery --quiet --name Factory --output ../rebalancermocks --filename lm_factory_mock.go --case=underscore
+//go:generate mockery --quiet --name Factory --output ../../mocks --filename lm_factory_mock.go --case=underscore
 type Factory interface {
-	// NewRebalancer will initialize a new rebalancer instance based on the provided params.
-	NewRebalancer(networkID models.NetworkSelector, address models.Address) (LiquidityManager, error)
+	// NewLiquidityManager will initialize a new rebalancer instance based on the provided params.
+	NewLiquidityManager(networkID models.NetworkSelector, address models.Address) (LiquidityManager, error)
 
-	// GetRebalancer returns an already initialized (via NewRebalancer) rebalancer instance.
+	// GetLiquidityManager returns an already initialized (via NewLiquidityManager) liquidity manager instance.
 	// If it does not exist returns ErrNotFound.
-	GetRebalancer(networkID models.NetworkSelector, address models.Address) (LiquidityManager, error)
+	GetLiquidityManager(networkID models.NetworkSelector, address models.Address) (LiquidityManager, error)
 }
 
 type evmDep struct {
 	ethClient client.Client
 }
 
-type BaseRebalancerFactory struct {
-	evmDeps           map[models.NetworkSelector]evmDep
-	cachedRebalancers sync.Map
-	lggr              logger.Logger
+type BaseLiquidityManagerFactory struct {
+	evmDeps map[models.NetworkSelector]evmDep
+	cache   sync.Map
+	lggr    logger.Logger
 }
 
-type Opt func(f *BaseRebalancerFactory)
+type Opt func(f *BaseLiquidityManagerFactory)
 
-func NewBaseRebalancerFactory(lggr logger.Logger, opts ...Opt) *BaseRebalancerFactory {
-	f := &BaseRebalancerFactory{
+func NewBaseLiquidityManagerFactory(lggr logger.Logger, opts ...Opt) *BaseLiquidityManagerFactory {
+	f := &BaseLiquidityManagerFactory{
 		evmDeps: make(map[models.NetworkSelector]evmDep),
 		lggr:    lggr,
 	}
@@ -52,22 +52,22 @@ func NewBaseRebalancerFactory(lggr logger.Logger, opts ...Opt) *BaseRebalancerFa
 }
 
 func WithEvmDep(networkID models.NetworkSelector, ethClient client.Client) Opt {
-	return func(f *BaseRebalancerFactory) {
+	return func(f *BaseLiquidityManagerFactory) {
 		f.evmDeps[networkID] = evmDep{
 			ethClient: ethClient,
 		}
 	}
 }
 
-func (b *BaseRebalancerFactory) NewRebalancer(networkSel models.NetworkSelector, address models.Address) (LiquidityManager, error) {
-	rb, err := b.GetRebalancer(networkSel, address)
+func (b *BaseLiquidityManagerFactory) NewLiquidityManager(networkSel models.NetworkSelector, address models.Address) (LiquidityManager, error) {
+	rb, err := b.GetLiquidityManager(networkSel, address)
 	if errors.Is(err, ErrNotFound) {
-		return b.initRebalancer(networkSel, address)
+		return b.initLiquidityManager(networkSel, address)
 	}
 	return rb, err
 }
 
-func (b *BaseRebalancerFactory) initRebalancer(networkSel models.NetworkSelector, address models.Address) (LiquidityManager, error) {
+func (b *BaseLiquidityManagerFactory) initLiquidityManager(networkSel models.NetworkSelector, address models.Address) (LiquidityManager, error) {
 	var rb LiquidityManager
 	var err error
 
@@ -78,7 +78,7 @@ func (b *BaseRebalancerFactory) initRebalancer(networkSel models.NetworkSelector
 			return nil, fmt.Errorf("evm dependencies not found for selector %d", networkSel)
 		}
 
-		rb, err = NewEvmRebalancer(address, networkSel, evmDeps.ethClient, b.lggr)
+		rb, err = NewEvmLiquidityManager(address, networkSel, evmDeps.ethClient, b.lggr)
 		if err != nil {
 			return nil, err
 		}
@@ -86,14 +86,14 @@ func (b *BaseRebalancerFactory) initRebalancer(networkSel models.NetworkSelector
 		return nil, fmt.Errorf("liquidity manager of type %v (network selector: %d) is not supported", typ, networkSel)
 	}
 
-	b.cachedRebalancers.Store(b.cacheKey(networkSel, address), rb)
+	b.cache.Store(b.cacheKey(networkSel, address), rb)
 	return rb, nil
 }
 
-func (b *BaseRebalancerFactory) GetRebalancer(networkSel models.NetworkSelector, address models.Address) (LiquidityManager, error) {
+func (b *BaseLiquidityManagerFactory) GetLiquidityManager(networkSel models.NetworkSelector, address models.Address) (LiquidityManager, error) {
 	k := b.cacheKey(networkSel, address)
 
-	rawVal, exists := b.cachedRebalancers.Load(k)
+	rawVal, exists := b.cache.Load(k)
 	if !exists {
 		return nil, ErrNotFound
 	}
@@ -106,6 +106,6 @@ func (b *BaseRebalancerFactory) GetRebalancer(networkSel models.NetworkSelector,
 	return rb, nil
 }
 
-func (b *BaseRebalancerFactory) cacheKey(networkSel models.NetworkSelector, address models.Address) string {
+func (b *BaseLiquidityManagerFactory) cacheKey(networkSel models.NetworkSelector, address models.Address) string {
 	return fmt.Sprintf("rebalancer-%d-%s", networkSel, address.String())
 }
