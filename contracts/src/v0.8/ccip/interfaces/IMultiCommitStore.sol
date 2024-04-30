@@ -20,6 +20,6 @@ interface IMultiCommitStore {
     uint256 proofFlagBits
   ) external view returns (uint256 timestamp);
 
-  /// @notice Returns the expected next sequence number
+  /// @notice Returns the source chain config for a given source chain selector.
   function getSourceConfig(uint64 sourceChainSelector) external view returns (SourceConfig memory);
 }
