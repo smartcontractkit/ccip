@@ -1114,9 +1114,9 @@ func TestPlugin_Close(t *testing.T) {
 	rbB := liquiditymanagermocks.NewLiquidityManager(t)
 	rbC := liquiditymanagermocks.NewLiquidityManager(t)
 
-	p.lmFactory.On("GetRebalancer", networkA, rebalancerA).Return(rbA, errSomethingWentWrong) //  networkA errors while getting the rebalancer
-	p.lmFactory.On("GetRebalancer", networkB, rebalancerB).Return(rbB, nil)
-	p.lmFactory.On("GetRebalancer", networkC, rebalancerC).Return(rbC, nil)
+	p.lmFactory.On("GetLiquidityManager", networkA, rebalancerA).Return(rbA, errSomethingWentWrong) //  networkA errors while getting the rebalancer
+	p.lmFactory.On("GetLiquidityManager", networkB, rebalancerB).Return(rbB, nil)
+	p.lmFactory.On("GetLiquidityManager", networkC, rebalancerC).Return(rbC, nil)
 
 	rbB.On("Close", mock.Anything).Return(errSomethingWentWrong) // networkB errors while closing
 	rbC.On("Close", mock.Anything).Return(nil)                   // networkC is still closed
