@@ -46,7 +46,7 @@ type Bridge interface {
 	GetBridgePayloadAndFee(ctx context.Context, transfer models.Transfer) ([]byte, *big.Int, error)
 
 	// QuorumizedBridgePayload returns a single bridge payload given the slice of bridge payloads.
-	// The rebalancer oracles all generate bridge payloads separately, and this function is used to
+	// The liquidityManager oracles all generate bridge payloads separately, and this function is used to
 	// "collapse" all of them into a single payload in a pure way.
 	// For example, if the bridge payload is a cost parameter, one implementation of this method
 	// could either produce the median of all the costs, or take the maximum cost, or the minimum
@@ -64,10 +64,10 @@ type Factory interface {
 type Opt func(c *factory)
 
 type evmDep struct {
-	lp                logpoller.LogPoller
-	ethClient         client.Client
-	rebalancerAddress models.Address
-	bridgeAdapters    map[models.NetworkSelector]models.Address
+	lp                      logpoller.LogPoller
+	ethClient               client.Client
+	liquidityManagerAddress models.Address
+	bridgeAdapters          map[models.NetworkSelector]models.Address
 }
 
 type factory struct {
@@ -91,15 +91,15 @@ func WithEvmDep(
 	networkID models.NetworkSelector,
 	lp logpoller.LogPoller,
 	ethClient client.Client,
-	rebalancerAddress models.Address,
+	liquidityManagerAddress models.Address,
 	bridgeAdapters map[models.NetworkSelector]models.Address,
 ) Opt {
 	return func(f *factory) {
 		f.evmDeps[networkID] = evmDep{
-			lp:                lp,
-			ethClient:         ethClient,
-			rebalancerAddress: rebalancerAddress,
-			bridgeAdapters:    bridgeAdapters,
+			lp:                      lp,
+			ethClient:               ethClient,
+			liquidityManagerAddress: liquidityManagerAddress,
+			bridgeAdapters:          bridgeAdapters,
 		}
 	}
 }
@@ -155,7 +155,7 @@ func (f *factory) initBridge(source, dest models.NetworkSelector) (Bridge, error
 		}
 		f.lggr.Infow("addresses check",
 			"l1RollupAddress", arb.AllContracts[uint64(dest)]["Rollup"],
-			"l1RebalancerAddress", l1Deps.rebalancerAddress,
+			"l1liquidityManagerAddress", l1Deps.liquidityManagerAddress,
 			"l1BridgeAdapter", l1BridgeAdapter,
 			"l2BridgeAdapter", l2BridgeAdapter,
 		)
@@ -164,12 +164,12 @@ func (f *factory) initBridge(source, dest models.NetworkSelector) (Bridge, error
 			source,
 			dest,
 			arb.AllContracts[uint64(dest)]["Rollup"], // l1 rollup address
-			common.Address(l1Deps.rebalancerAddress), // l1 rebalancer address
-			common.Address(l2Deps.rebalancerAddress), // l2 rebalancer address
-			l2Deps.lp,                                // l2 log poller
-			l1Deps.lp,                                // l1 log poller
-			l2Deps.ethClient,                         // l2 eth client
-			l1Deps.ethClient,                         // l1 eth client
+			common.Address(l1Deps.liquidityManagerAddress), // l1 liquidityManager address
+			common.Address(l2Deps.liquidityManagerAddress), // l2 liquidityManager address
+			l2Deps.lp,        // l2 log poller
+			l1Deps.lp,        // l1 log poller
+			l2Deps.ethClient, // l2 eth client
+			l1Deps.ethClient, // l1 eth client
 		)
 	case models.NetworkSelector(chainsel.ETHEREUM_MAINNET.Selector),
 		models.NetworkSelector(chainsel.ETHEREUM_TESTNET_SEPOLIA.Selector):
@@ -199,16 +199,16 @@ func (f *factory) initBridge(source, dest models.NetworkSelector) (Bridge, error
 		f.lggr.Infow("addresses check",
 			"l1GatewayRouterAddress", arb.AllContracts[uint64(source)]["L1GatewayRouter"],
 			"inboxAddress", arb.AllContracts[uint64(source)]["L1Inbox"],
-			"l1RebalancerAddress", l1Deps.rebalancerAddress,
-			"l2RebalancerAddress", l2Deps.rebalancerAddress,
+			"l1liquidityManagerAddress", l1Deps.liquidityManagerAddress,
+			"l2liquidityManagerAddress", l2Deps.liquidityManagerAddress,
 			"l1BridgeAdapter", l1BridgeAdapter,
 		)
 		bridge, err = arb.NewL1ToL2Bridge(
 			f.lggr,
 			source,
 			dest,
-			common.Address(l1Deps.rebalancerAddress), // l1 rebalancer address
-			common.Address(l2Deps.rebalancerAddress), // l2 rebalancer address
+			common.Address(l1Deps.liquidityManagerAddress),      // l1 liquidityManager address
+			common.Address(l2Deps.liquidityManagerAddress),      // l2 liquidityManager address
 			arb.AllContracts[uint64(source)]["L1GatewayRouter"], // l1 gateway router address
 			arb.AllContracts[uint64(source)]["L1Inbox"],         // l1 inbox address
 			l1Deps.ethClient, // l1 eth client
@@ -245,8 +245,8 @@ func (f *factory) initBridge(source, dest models.NetworkSelector) (Bridge, error
 		bridge, err = testonlybridge.New(
 			source,
 			dest,
-			sourceDeps.rebalancerAddress,
-			destDeps.rebalancerAddress,
+			sourceDeps.liquidityManagerAddress,
+			destDeps.liquidityManagerAddress,
 			sourceAdapter,
 			destAdapter,
 			sourceDeps.lp,

@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	PluginName = "Rebalancer"
+	PluginName = "LiquidityManager"
 )
 
 type PluginFactory struct {
