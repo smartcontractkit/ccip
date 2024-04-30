@@ -1,0 +1,318 @@
+// SPDX-License-Identifier: BUSL-1.1
+pragma solidity ^0.8.0;
+
+import {IPoolPriorTo1_5} from "../../interfaces/IPoolPriorTo1_5.sol";
+
+import {BurnMintERC677} from "../../../shared/token/ERC677/BurnMintERC677.sol";
+import {PriceRegistry} from "../../PriceRegistry.sol";
+import {Client} from "../../libraries/Client.sol";
+import {Pool} from "../../libraries/Pool.sol";
+import {RateLimiter} from "../../libraries/RateLimiter.sol";
+import {BurnMintTokenPoolAndProxy} from "../../pools/BurnMintTokenPoolAndProxy.sol";
+import {TokenPool} from "../../pools/TokenPool.sol";
+import {TokenSetup} from "../TokenSetup.t.sol";
+import {EVM2EVMOnRampHelper} from "../helpers/EVM2EVMOnRampHelper.sol";
+import {EVM2EVMOnRampSetup} from "../onRamp/EVM2EVMOnRampSetup.t.sol";
+import {BurnMintTokenPool1_2, TokenPool1_2} from "./BurnMintTokenPool1_2.sol";
+import {BurnMintTokenPool1_4, TokenPool1_4} from "./BurnMintTokenPool1_4.sol";
+
+import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
+
+contract BurnMintTokenPoolAndProxySetup is EVM2EVMOnRampSetup {
+  BurnMintTokenPoolAndProxy internal s_newPool;
+  IPoolPriorTo1_5 internal s_legacyPool;
+  BurnMintERC677 internal s_token;
+
+  address internal s_offRamp;
+  address internal s_sourcePool = makeAddr("source_pool");
+  address internal s_destPool = makeAddr("dest_pool");
+  uint256 internal constant AMOUNT = 1;
+
+  function setUp() public virtual override {
+    super.setUp();
+    // Create a system with a token and a legacy pool
+    s_token = new BurnMintERC677("Test", "TEST", 18, type(uint256).max);
+    // dealing doesn't update the total supply, meaning the first time we burn a token we underflow, which isn't
+    // guarded against. Then, when we mint a token, we overflow, which is guarded against and will revert.
+    s_token.grantMintAndBurnRoles(OWNER);
+    s_token.mint(OWNER, 1e18);
+
+    s_offRamp = s_offRamps[0];
+    // Approve enough for a few calls
+    s_token.approve(address(s_sourceRouter), AMOUNT * 100);
+
+    // Approve infinite fee tokens
+    IERC20(s_sourceFeeToken).approve(address(s_sourceRouter), type(uint256).max);
+  }
+
+  /// @notice This test covers the entire migration plan for 1.0-1.2 pools to 1.5 pools. For simplicity
+  /// we will refer to the 1.0/1.2 pools as 1.2 pools, as they are functionally the same.
+  function test_tokenPoolMigration_Success_1_2() public {
+    // ================================================================
+    // |          1          1.2 prior to upgrade                     |
+    // ================================================================
+    _deployPool1_2();
+
+    // Ensure everything works on the 1.2 pool
+    _ccipSend_OLD();
+    _fakeReleaseOrMintFromOffRamp_OLD();
+
+    // ================================================================
+    // |          2           Deploy self serve                       |
+    // ================================================================
+    _deploySelfServe();
+
+    // This doesn't impact the 1.2 pool, so it should still be functional
+    _ccipSend_OLD();
+    _fakeReleaseOrMintFromOffRamp_OLD();
+
+    // ================================================================
+    // |          3     Configure new pool on old pool                |
+    // ================================================================
+    // In the 1.2 case, everything keeps working on both the 1.2 and 1.5 pools. This config can be
+    // done in advance of the actual swap to 1.5 lanes.
+    vm.startPrank(OWNER);
+    TokenPool1_2.RampUpdate[] memory rampUpdates = new TokenPool1_2.RampUpdate[](1);
+    rampUpdates[0] = TokenPool1_2.RampUpdate({
+      ramp: address(s_newPool),
+      allowed: true,
+      // The rate limits should be turned off for this fake ramp, as the 1.5 pool will handle all the
+      // rate limiting for us.
+      rateLimiterConfig: RateLimiter.Config({isEnabled: false, capacity: 0, rate: 0})
+    });
+    // Since this call doesn't impact the usability of the old pool, we can do it whenever we want
+    BurnMintTokenPool1_2(address(s_legacyPool)).applyRampUpdates(rampUpdates, rampUpdates);
+
+    // Assert the 1.2 lanes still work
+    _ccipSend_OLD();
+    _fakeReleaseOrMintFromOffRamp_OLD();
+
+    // ================================================================
+    // |          4     Update the router with to 1.5                 |
+    // ================================================================
+
+    // This will stop any new messages entering the old lanes, and will direct all traffic to the
+    // new 1.5 lanes, and therefore to the 1.5 pools. Note that the old pools will still receive
+    // inflight messages, and will need to continue functioning until all of those are processed.
+    _fakeReleaseOrMintFromOffRamp_OLD();
+
+    // Everything is configured, we can now send a ccip tx to the new pool
+    _ccipSend1_5();
+    _fakeReleaseOrMintFromOffRamp1_5();
+
+    // ================================================================
+    // |          5      Migrate to using 1.5 the pool                |
+    // ================================================================
+    // Turn off the legacy pool, this enabled the 1.5 pool logic. This should be done AFTER the new pool
+    // has gotten permissions to mint/burn. We see the case where that isn't done below.
+    vm.startPrank(OWNER);
+    s_newPool.setPreviousPool(IPoolPriorTo1_5(address(0)));
+
+    // The new pool is now active, but is has not been given permissions to burn/mint yet
+    vm.expectRevert(abi.encodeWithSelector(BurnMintERC677.SenderNotBurner.selector, address(s_newPool)));
+    _ccipSend1_5();
+    vm.expectRevert(abi.encodeWithSelector(BurnMintERC677.SenderNotMinter.selector, address(s_newPool)));
+    _fakeReleaseOrMintFromOffRamp1_5();
+
+    // When we do give burn/mint, the new pool is fully active
+    vm.startPrank(OWNER);
+    s_token.grantMintAndBurnRoles(address(s_newPool));
+    _ccipSend1_5();
+    _fakeReleaseOrMintFromOffRamp1_5();
+
+    // Even after the pool has taken over as primary, the old pool can still process messages from the old lane
+    _fakeReleaseOrMintFromOffRamp_OLD();
+  }
+
+  function test_tokenPoolMigration_Success_1_4() public {
+    // ================================================================
+    // |          1          1.4 prior to upgrade                     |
+    // ================================================================
+    _deployPool1_4();
+
+    // Ensure everything works on the 1.4 pool
+    _ccipSend_OLD();
+    _fakeReleaseOrMintFromOffRamp_OLD();
+
+    // ================================================================
+    // |          2           Deploy self serve                       |
+    // ================================================================
+    _deploySelfServe();
+
+    // This doesn't impact the 1.4 pool, so it should still be functional
+    _ccipSend_OLD();
+    _fakeReleaseOrMintFromOffRamp_OLD();
+
+    // ================================================================
+    // |          3     Configure new pool on old pool                |
+    // |                           AND                                |
+    // |                Update the router with to 1.5                 |
+    // ================================================================
+    // NOTE: when this call is made, the SENDING SIDE of old lanes stop working.
+    vm.startPrank(OWNER);
+    BurnMintTokenPool1_4(address(s_legacyPool)).setRouter(address(s_newPool));
+
+    // This will stop any new messages entering the old lanes, and will direct all traffic to the
+    // new 1.5 lanes, and therefore to the 1.5 pools. Note that the old pools will still receive
+    // inflight messages, and will need to continue functioning until all of those are processed.
+    _fakeReleaseOrMintFromOffRamp_OLD();
+
+    // Sending to the old 1.4 pool no longer works
+    _ccipSend_OLD_Reverts();
+
+    // Everything is configured, we can now send a ccip tx
+    _ccipSend1_5();
+    _fakeReleaseOrMintFromOffRamp1_5();
+
+    // ================================================================
+    // |          4      Migrate to using 1.5 the pool                |
+    // ================================================================
+    // Turn off the legacy pool, this enabled the 1.5 pool logic. This should be done AFTER the new pool
+    // has gotten permissions to mint/burn. We see the case where that isn't done below.
+    vm.startPrank(OWNER);
+    s_newPool.setPreviousPool(IPoolPriorTo1_5(address(0)));
+
+    // The new pool is now active, but is has not been given permissions to burn/mint yet
+    vm.expectRevert(abi.encodeWithSelector(BurnMintERC677.SenderNotBurner.selector, address(s_newPool)));
+    _ccipSend1_5();
+    vm.expectRevert(abi.encodeWithSelector(BurnMintERC677.SenderNotMinter.selector, address(s_newPool)));
+    _fakeReleaseOrMintFromOffRamp1_5();
+
+    // When we do give burn/mint, the new pool is fully active
+    vm.startPrank(OWNER);
+    s_token.grantMintAndBurnRoles(address(s_newPool));
+    _ccipSend1_5();
+    _fakeReleaseOrMintFromOffRamp1_5();
+
+    // Even after the pool has taken over as primary, the old pool can still process messages from the old lane
+    _fakeReleaseOrMintFromOffRamp_OLD();
+  }
+
+  function _ccipSend_OLD() internal {
+    // We send the funds to the pool manually, as the ramp normally does that
+    deal(address(s_token), address(s_legacyPool), AMOUNT);
+    vm.startPrank(address(s_onRamp));
+    s_legacyPool.lockOrBurn(OWNER, abi.encode(OWNER), AMOUNT, DEST_CHAIN_SELECTOR, "");
+  }
+
+  function _ccipSend_OLD_Reverts() internal {
+    // We send the funds to the pool manually, as the ramp normally does that
+    deal(address(s_token), address(s_legacyPool), AMOUNT);
+    vm.startPrank(address(s_onRamp));
+
+    vm.expectRevert(abi.encodeWithSelector(TokenPool1_4.CallerIsNotARampOnRouter.selector, address(s_onRamp)));
+
+    s_legacyPool.lockOrBurn(OWNER, abi.encode(OWNER), AMOUNT, DEST_CHAIN_SELECTOR, "");
+  }
+
+  function _ccipSend1_5() internal {
+    vm.startPrank(address(OWNER));
+    Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
+    tokenAmounts[0] = Client.EVMTokenAmount({token: address(s_token), amount: AMOUNT});
+
+    s_sourceRouter.ccipSend(
+      DEST_CHAIN_SELECTOR,
+      Client.EVM2AnyMessage({
+        receiver: abi.encode(OWNER),
+        data: "",
+        tokenAmounts: tokenAmounts,
+        feeToken: s_sourceFeeToken,
+        extraArgs: ""
+      })
+    );
+  }
+
+  function _fakeReleaseOrMintFromOffRamp1_5() internal {
+    // This is a fake call to simulate the release or mint from the "offRamp"
+    vm.startPrank(s_offRamp);
+    s_newPool.releaseOrMint(
+      Pool.ReleaseOrMintInV1({
+        originalSender: abi.encode(OWNER),
+        remoteChainSelector: SOURCE_CHAIN_SELECTOR,
+        receiver: OWNER,
+        amount: AMOUNT,
+        sourcePoolAddress: abi.encode(s_sourcePool),
+        sourcePoolData: "",
+        offchainTokenData: ""
+      })
+    );
+  }
+
+  function _fakeReleaseOrMintFromOffRamp_OLD() internal {
+    // This is a fake call to simulate the release or mint from the "offRamp"
+    vm.startPrank(s_offRamp);
+    s_legacyPool.releaseOrMint(abi.encode(OWNER), OWNER, AMOUNT, SOURCE_CHAIN_SELECTOR, "");
+  }
+
+  function _deployPool1_2() internal {
+    vm.startPrank(OWNER);
+    s_legacyPool = new BurnMintTokenPool1_2(s_token, new address[](0), address(s_mockARM));
+    s_token.grantMintAndBurnRoles(address(s_legacyPool));
+
+    TokenPool1_2.RampUpdate[] memory onRampUpdates = new TokenPool1_2.RampUpdate[](1);
+    onRampUpdates[0] = TokenPool1_2.RampUpdate({
+      ramp: address(s_onRamp),
+      allowed: true,
+      rateLimiterConfig: getInboundRateLimiterConfig()
+    });
+    TokenPool1_2.RampUpdate[] memory offRampUpdates = new TokenPool1_2.RampUpdate[](1);
+    offRampUpdates[0] = TokenPool1_2.RampUpdate({
+      ramp: address(s_offRamp),
+      allowed: true,
+      rateLimiterConfig: getInboundRateLimiterConfig()
+    });
+    BurnMintTokenPool1_2(address(s_legacyPool)).applyRampUpdates(onRampUpdates, offRampUpdates);
+  }
+
+  function _deployPool1_4() internal {
+    vm.startPrank(OWNER);
+    s_legacyPool = new BurnMintTokenPool1_4(s_token, new address[](0), address(s_mockARM), address(s_sourceRouter));
+    s_token.grantMintAndBurnRoles(address(s_legacyPool));
+
+    TokenPool1_4.ChainUpdate[] memory legacyChainUpdates = new TokenPool1_4.ChainUpdate[](2);
+    legacyChainUpdates[0] = TokenPool1_4.ChainUpdate({
+      remoteChainSelector: DEST_CHAIN_SELECTOR,
+      allowed: true,
+      outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
+      inboundRateLimiterConfig: getInboundRateLimiterConfig()
+    });
+    legacyChainUpdates[1] = TokenPool1_4.ChainUpdate({
+      remoteChainSelector: SOURCE_CHAIN_SELECTOR,
+      allowed: true,
+      outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
+      inboundRateLimiterConfig: getInboundRateLimiterConfig()
+    });
+    BurnMintTokenPool1_4(address(s_legacyPool)).applyChainUpdates(legacyChainUpdates);
+  }
+
+  function _deploySelfServe() internal {
+    vm.startPrank(OWNER);
+    // Deploy the new pool
+    s_newPool = new BurnMintTokenPoolAndProxy(s_token, new address[](0), address(s_mockARM), address(s_sourceRouter));
+    // Set the previous pool on the new pool
+    s_newPool.setPreviousPool(s_legacyPool);
+
+    // Configure the lanes just like the legacy pool
+    TokenPool.ChainUpdate[] memory chainUpdates = new TokenPool.ChainUpdate[](2);
+    chainUpdates[0] = TokenPool.ChainUpdate({
+      remoteChainSelector: DEST_CHAIN_SELECTOR,
+      remotePoolAddress: abi.encode(s_destPool),
+      allowed: true,
+      outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
+      inboundRateLimiterConfig: getInboundRateLimiterConfig()
+    });
+    chainUpdates[1] = TokenPool.ChainUpdate({
+      remoteChainSelector: SOURCE_CHAIN_SELECTOR,
+      remotePoolAddress: abi.encode(s_sourcePool),
+      allowed: true,
+      outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
+      inboundRateLimiterConfig: getInboundRateLimiterConfig()
+    });
+    s_newPool.applyChainUpdates(chainUpdates);
+
+    // Register the token on the token admin registry
+    s_tokenAdminRegistry.registerAdministratorPermissioned(address(s_token), OWNER);
+    // Set the pool on the admin registry
+    s_tokenAdminRegistry.setPool(address(s_token), address(s_newPool));
+  }
+}
