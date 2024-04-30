@@ -67,7 +67,7 @@ Enabled = false
 ListenAddresses = ["127.0.0.1:8000"]
 `
 
-func setupRebalancerNodes(e multienv.Env) {
+func setupLiquidityManagerNodes(e multienv.Env) {
 	fs := flag.NewFlagSet("setup-liquiditymanager-nodes", flag.ExitOnError)
 	l1ChainID := fs.Uint64("l1-chain-id", chainsel.ETHEREUM_TESTNET_SEPOLIA.EvmChainID, "L1 chain ID")
 	l2ChainID := fs.Uint64("l2-chain-id", chainsel.ETHEREUM_TESTNET_SEPOLIA_ARBITRUM_1.EvmChainID, "L2 chain ID")
@@ -82,7 +82,7 @@ func setupRebalancerNodes(e multienv.Env) {
 	passwordFile := fs.String("password",
 		"../../../../tools/secrets/password.txt", "password file")
 	databasePrefix := fs.String("database-prefix",
-		"postgres://postgres:postgres_password_padded_for_security@localhost:5432/rebalancer-test", "database prefix")
+		"postgres://postgres:postgres_password_padded_for_security@localhost:5432/liquiditymanager-test", "database prefix")
 	databaseSuffixes := fs.String("database-suffixes",
 		"sslmode=disable", "database parameters to be added")
 	nodeCount := fs.Int("node-count", 5, "number of nodes")
@@ -101,7 +101,7 @@ func setupRebalancerNodes(e multienv.Env) {
 		common.HexToAddress(*l1TokenAddress),
 		common.HexToAddress(*l2TokenAddress))
 
-	fmt.Println("Configuring nodes with rebalancer jobs...")
+	fmt.Println("Configuring nodes with liquidityManager jobs...")
 	var (
 		onChainPublicKeys  []string
 		offChainPublicKeys []string
@@ -110,7 +110,7 @@ func setupRebalancerNodes(e multienv.Env) {
 		transmitters       = make(map[string][]string)
 	)
 	for i := 0; i < *nodeCount; i++ {
-		flagSet := flag.NewFlagSet("run-rebalancer-job-creation", flag.ExitOnError)
+		flagSet := flag.NewFlagSet("run-liquidityManager-job-creation", flag.ExitOnError)
 		flagSet.String("api", *apiFile, "api file")
 		flagSet.String("password", *passwordFile, "password file")
 		flagSet.String("vrfpassword", *passwordFile, "vrf password file")
@@ -120,7 +120,7 @@ func setupRebalancerNodes(e multienv.Env) {
 		flagSet.Bool("applyInitServerConfig", true, "override for using initServerConfig in App.Before")
 
 		flagSet.String("job-type", "liquiditymanager", "the job type")
-		flagSet.String("job-name", fmt.Sprintf("rebalancer-%d", i+1), "the job name")
+		flagSet.String("job-name", fmt.Sprintf("liquiditymanager-%d", i+1), "the job name")
 
 		flagSet.String("liquidityManagerAddress", uni.L1.LiquidityManager.Hex(), "the liquidity manager address")
 		flagSet.Uint64("liquidityManagerNetwork", mustGetChainByEvmID(*l1ChainID).Selector, "the liquidity manager network")
@@ -172,9 +172,9 @@ func fundPoolAndLiquidityManager(
 	chainID uint64,
 	tokenAddress,
 	tokenPoolAddress,
-	rebalancerAddress common.Address,
+	liquidityManagerAddress common.Address,
 	tokenPoolFunding *big.Int,
-	rebalancerFunding *big.Int) {
+	liquidityManagerFunding *big.Int) {
 	token, err := erc20.NewERC20(tokenAddress, e.Clients[chainID])
 	helpers.PanicErr(err)
 
@@ -229,9 +229,9 @@ func fundPoolAndLiquidityManager(
 		int64(chainID),
 		"Transferring", tokenPoolFunding.String(), "to token pool at", tokenPoolAddress.Hex())
 
-	fmt.Println("Funding rebalancer on", chainID, "with", rebalancerFunding, "wei...")
-	if err := FundNode(e, chainID, rebalancerAddress, rebalancerFunding); err != nil {
-		fmt.Println("Failed to fund rebalancer on", chainID, "with", rebalancerFunding, "wei:", err)
+	fmt.Println("Funding liquidityManager on", chainID, "with", liquidityManagerFunding, "wei...")
+	if err := FundNode(e, chainID, liquidityManagerAddress, liquidityManagerFunding); err != nil {
+		fmt.Println("Failed to fund liquidityManager on", chainID, "with", liquidityManagerFunding, "wei:", err)
 	}
 }
 
@@ -250,12 +250,12 @@ func printStandardCommands(
 		"L1 Arm:", uni.L1.Arm.Hex(), "\n",
 		"L1 Arm Proxy:", uni.L1.ArmProxy.Hex(), "\n",
 		"L1 Token Pool:", uni.L1.TokenPool.Hex(), "\n",
-		"L1 Rebalancer:", uni.L1.LiquidityManager.Hex(), "\n",
+		"L1 LiquidityManager:", uni.L1.LiquidityManager.Hex(), "\n",
 		"L1 Bridge Adapter:", uni.L1.BridgeAdapterAddress.Hex(), "\n",
 		"L2 Arm:", uni.L2.Arm.Hex(), "\n",
 		"L2 Arm Proxy:", uni.L2.ArmProxy.Hex(), "\n",
 		"L2 Token Pool:", uni.L2.TokenPool.Hex(), "\n",
-		"L2 Rebalancer:", uni.L2.LiquidityManager.Hex(), "\n",
+		"L2 LiquidityManager:", uni.L2.LiquidityManager.Hex(), "\n",
 		"L2 Bridge Adapter:", uni.L2.BridgeAdapterAddress.Hex(), "\n",
 		"Node launches complete\n",
 		"OnChainPublicKeys:", strings.Join(onChainPublicKeys, ","), "\n",
@@ -299,7 +299,7 @@ func SetupNode(
 	databasePrefix,
 	databaseSuffixes string,
 	resetDB bool,
-) *cmd.SetupRebalancerNodePayload {
+) *cmd.SetupLiquidityManagerNodePayload {
 	configureEnvironmentVariables(e, l1ChainID, l2ChainID, nodeIdx, databasePrefix, databaseSuffixes)
 
 	client := newSetupClient()
@@ -318,7 +318,7 @@ func SetupNode(
 		resetDatabase(client, ctx)
 	}
 
-	return setupRebalancerNodeFromClient(client, ctx)
+	return setupLiquidityManagerNodeFromClient(client, ctx)
 }
 
 func configureEnvironmentVariables(
@@ -362,9 +362,9 @@ func resetDatabase(client *cmd.Shell, context *cli.Context) {
 	helpers.PanicErr(client.ResetDatabase(context))
 }
 
-func setupRebalancerNodeFromClient(
+func setupLiquidityManagerNodeFromClient(
 	client *cmd.Shell,
-	context *cli.Context) *cmd.SetupRebalancerNodePayload {
+	context *cli.Context) *cmd.SetupLiquidityManagerNodePayload {
 	payload, err := client.ConfigureRebalancerNode(context)
 	helpers.PanicErr(err)
 

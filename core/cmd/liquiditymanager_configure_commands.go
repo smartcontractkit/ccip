@@ -21,7 +21,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
 
-type SetupRebalancerNodePayload struct {
+type SetupLiquidityManagerNodePayload struct {
 	OnChainPublicKey  string
 	OffChainPublicKey string
 	ConfigPublicKey   string
@@ -44,7 +44,7 @@ type rebalancerTemplateArgs struct {
 
 func (s *Shell) ConfigureRebalancerNode(
 	c *cli.Context,
-) (*SetupRebalancerNodePayload, error) {
+) (*SetupLiquidityManagerNodePayload, error) {
 	const (
 		passwordArg                = "password"
 		vrfPasswordArg             = "vrfpassword"
@@ -184,7 +184,7 @@ func (s *Shell) ConfigureRebalancerNode(
 		return nil, err
 	}
 
-	return &SetupRebalancerNodePayload{
+	return &SetupLiquidityManagerNodePayload{
 		OnChainPublicKey:  ocr2.OnChainPublicKey(),
 		OffChainPublicKey: hex.EncodeToString(offChainPublicKey[:]),
 		ConfigPublicKey:   hex.EncodeToString(configPublicKey[:]),

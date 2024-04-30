@@ -314,9 +314,9 @@ func setConfig(
 		panic("lengths of all the arrays must be equal")
 	}
 
-	l1Rebalancer, err := liquiditymanager.NewLiquidityManager(args.l1RebalancerAddress, e.Clients[args.l1ChainID])
+	l1Rebalancer, err := liquiditymanager.NewLiquidityManager(args.l1LiquidityManagerAddress, e.Clients[args.l1ChainID])
 	helpers.PanicErr(err)
-	l2Rebalancer, err := liquiditymanager.NewLiquidityManager(args.l2RebalancerAddress, e.Clients[args.l2ChainID])
+	l2Rebalancer, err := liquiditymanager.NewLiquidityManager(args.l2LiquidityManagerAddress, e.Clients[args.l2ChainID])
 	helpers.PanicErr(err)
 
 	// set config on L2 first then L1
