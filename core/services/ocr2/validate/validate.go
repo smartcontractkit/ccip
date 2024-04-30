@@ -133,8 +133,8 @@ func validateSpec(ctx context.Context, tree *toml.Tree, spec job.Job, rc plugins
 		return validateOCR2LLOSpec(spec.OCR2OracleSpec.PluginConfig)
 	case types.GenericPlugin:
 		return validateGenericPluginSpec(ctx, spec.OCR2OracleSpec, rc)
-	case "rebalancer":
-		return validateRebalancerSpec(spec.OCR2OracleSpec.PluginConfig)
+	case "liquiditymanager":
+		return validateLiquidityManagerSpec(spec.OCR2OracleSpec.PluginConfig)
 	case "":
 		return errors.New("no plugin specified")
 	default:
@@ -251,7 +251,7 @@ func validateGenericPluginSpec(ctx context.Context, spec *job.OCR2OracleSpec, rc
 	return plugin.ValidateConfig(ctx, spec.PluginConfig)
 }
 
-func validateRebalancerSpec(jsonConfig job.JSONConfig) error {
+func validateLiquidityManagerSpec(jsonConfig job.JSONConfig) error {
 	if jsonConfig == nil {
 		return errors.New("pluginConfig is empty")
 	}

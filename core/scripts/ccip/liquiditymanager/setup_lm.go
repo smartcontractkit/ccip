@@ -119,14 +119,14 @@ func setupRebalancerNodes(e multienv.Env) {
 		flagSet.Int64("l2ChainID", int64(*l2ChainID), "the L2 chain ID")
 		flagSet.Bool("applyInitServerConfig", true, "override for using initServerConfig in App.Before")
 
-		flagSet.String("job-type", "rebalancer", "the job type")
+		flagSet.String("job-type", "liquiditymanager", "the job type")
 		flagSet.String("job-name", fmt.Sprintf("rebalancer-%d", i+1), "the job name")
 
-		flagSet.String("liquidityManagerAddress", uni.L1.Rebalancer.Hex(), "the liquidity manager address")
+		flagSet.String("liquidityManagerAddress", uni.L1.LiquidityManager.Hex(), "the liquidity manager address")
 		flagSet.Uint64("liquidityManagerNetwork", mustGetChainByEvmID(*l1ChainID).Selector, "the liquidity manager network")
 
 		// used by bootstrap template instantiation
-		flagSet.String("contractID", uni.L1.Rebalancer.Hex(), "the contract to get peers from")
+		flagSet.String("contractID", uni.L1.LiquidityManager.Hex(), "the contract to get peers from")
 
 		flagSet.Bool("dangerWillRobinson", *resetDatabase, "for resetting databases")
 		flagSet.Bool("isBootstrapper", i == 0, "is first node")
@@ -167,7 +167,7 @@ func setupRebalancerNodes(e multienv.Env) {
 	fmt.Println()
 }
 
-func fundPoolAndRebalancer(
+func fundPoolAndLiquidityManager(
 	e multienv.Env,
 	chainID uint64,
 	tokenAddress,
@@ -250,12 +250,12 @@ func printStandardCommands(
 		"L1 Arm:", uni.L1.Arm.Hex(), "\n",
 		"L1 Arm Proxy:", uni.L1.ArmProxy.Hex(), "\n",
 		"L1 Token Pool:", uni.L1.TokenPool.Hex(), "\n",
-		"L1 Rebalancer:", uni.L1.Rebalancer.Hex(), "\n",
+		"L1 Rebalancer:", uni.L1.LiquidityManager.Hex(), "\n",
 		"L1 Bridge Adapter:", uni.L1.BridgeAdapterAddress.Hex(), "\n",
 		"L2 Arm:", uni.L2.Arm.Hex(), "\n",
 		"L2 Arm Proxy:", uni.L2.ArmProxy.Hex(), "\n",
 		"L2 Token Pool:", uni.L2.TokenPool.Hex(), "\n",
-		"L2 Rebalancer:", uni.L2.Rebalancer.Hex(), "\n",
+		"L2 Rebalancer:", uni.L2.LiquidityManager.Hex(), "\n",
 		"L2 Bridge Adapter:", uni.L2.BridgeAdapterAddress.Hex(), "\n",
 		"Node launches complete\n",
 		"OnChainPublicKeys:", strings.Join(onChainPublicKeys, ","), "\n",
@@ -269,8 +269,8 @@ func printStandardCommands(
 	fmt.Println("Set config command:", "\n",
 		"go run . set-config -l1-chain-id", l1ChainID,
 		"-l2-chain-id", l2ChainID,
-		"-l1-rebalancer-address", uni.L1.Rebalancer.Hex(),
-		"-l2-rebalancer-address", uni.L2.Rebalancer.Hex(),
+		"-l1-liquiditymanager-address", uni.L1.LiquidityManager.Hex(),
+		"-l2-liquiditymanager-address", uni.L2.LiquidityManager.Hex(),
 		"-signers", strings.Join(onChainPublicKeys, ","),
 		"-offchain-pubkeys", strings.Join(offchainPublicKeys, ","),
 		"-config-pubkeys", strings.Join(configPublicKeys, ","),
@@ -282,8 +282,8 @@ func printStandardCommands(
 	fmt.Println("Funding command:", "\n",
 		"go run . fund-contracts -l1-chain-id", l1ChainID,
 		"-l2-chain-id", l2ChainID,
-		"-l1-rebalancer-address", uni.L1.Rebalancer.Hex(),
-		"-l2-rebalancer-address", uni.L2.Rebalancer.Hex(),
+		"-l1-liquiditymanager-address", uni.L1.LiquidityManager.Hex(),
+		"-l2-liquiditymanager-address", uni.L2.LiquidityManager.Hex(),
 		"-l1-token-address", l1TokenAddress,
 		"-l2-token-address", l2TokenAddress,
 		"-l1-token-pool-address", uni.L1.TokenPool.Hex(),

@@ -74,8 +74,8 @@ func main() {
 		cmd := flag.NewFlagSet("set-config", flag.ExitOnError)
 		l1ChainID := cmd.Uint64("l1-chain-id", 0, "L1 Chain ID")
 		l2ChainID := cmd.Uint64("l2-chain-id", 0, "L2 Chain ID")
-		l1RebalancerAddress := cmd.String("l1-rebalancer-address", "", "L1 Rebalancer Address")
-		l2RebalancerAddress := cmd.String("l2-rebalancer-address", "", "L2 Rebalancer Address")
+		l1LiquidityManagerAddress := cmd.String("l1-liquiditymanager-address", "", "L1 LiquidityManager Address")
+		l2LiquidityManagerAddress := cmd.String("l2-liquiditymanager-address", "", "L2 LiquidityManager Address")
 		// OCR information
 		signers := cmd.String("signers", "", "comma separated list of OCR signers (onchain public keys)")
 		offchainPubKeys := cmd.String("offchain-pubkeys", "", "comma separated list of OCR3 offchain pubkeys")
@@ -100,8 +100,8 @@ func main() {
 		helpers.ParseArgs(cmd, os.Args[2:],
 			"l1-chain-id",
 			"l2-chain-id",
-			"l1-rebalancer-address",
-			"l2-rebalancer-address",
+			"l1-liquiditymanager-address",
+			"l2-liquiditymanager-address",
 			"signers",
 			"offchain-pubkeys",
 			"config-pubkeys",
@@ -112,8 +112,8 @@ func main() {
 		args := setConfigArgs{
 			l1ChainID:                               *l1ChainID,
 			l2ChainID:                               *l2ChainID,
-			l1RebalancerAddress:                     common.HexToAddress(*l1RebalancerAddress),
-			l2RebalancerAddress:                     common.HexToAddress(*l2RebalancerAddress),
+			l1RebalancerAddress:                     common.HexToAddress(*l1LiquidityManagerAddress),
+			l2RebalancerAddress:                     common.HexToAddress(*l2LiquidityManagerAddress),
 			signers:                                 parseOnchainPubKeys(*signers),
 			offchainPubKeys:                         parseOffchainPubKeys(*offchainPubKeys),
 			configPubKeys:                           parseConfigPubKeys(*configPubKeys),
@@ -145,49 +145,49 @@ func main() {
 		cmd := flag.NewFlagSet("fund-contracts", flag.ExitOnError)
 		l1ChainID := cmd.Uint64("l1-chain-id", 0, "L1 Chain ID")
 		l2ChainID := cmd.Uint64("l2-chain-id", 0, "L2 Chain ID")
-		l1RebalancerAddress := cmd.String("l1-rebalancer-address", "", "L1 Rebalancer Address")
-		l2RebalancerAddress := cmd.String("l2-rebalancer-address", "", "L2 Rebalancer Address")
+		l1LiquidityManagerAddress := cmd.String("l1-liquiditymanager-address", "", "L1 LiquidityManager Address")
+		l2LiquidityManagerAddress := cmd.String("l2-LiquidityManager-address", "", "L2 LiquidityManager Address")
 		l1TokenAddress := cmd.String("l1-token-address", "", "L1 Token Address")
 		l2TokenAddress := cmd.String("l2-token-address", "", "L2 Token Address")
 		l1TokenPoolAddress := cmd.String("l1-token-pool-address", "", "L1 Token Pool Address")
 		l2TokenPoolAddress := cmd.String("l2-token-pool-address", "", "L2 Token Pool Address")
-		l1TokenPoolAmount := cmd.String("l1-token-pool-amount", "1000000000", "L1 Token Pool Amount")      // 1 Gwei
-		l2TokenPoolAmount := cmd.String("l2-token-pool-amount", "1000000000", "L2 Token Pool Amount")      // 1 Gwei
-		l1RebalancerAmount := cmd.String("l1-rebalancer-amount", "70000000000000000", "Rebalancer Amount") // 0.07 ETH
-		l2RebalancerAmount := cmd.String("l2-rebalancer-amount", "0", "Rebalancer Amount")
+		l1TokenPoolAmount := cmd.String("l1-token-pool-amount", "1000000000", "L1 Token Pool Amount")                        // 1 Gwei
+		l2TokenPoolAmount := cmd.String("l2-token-pool-amount", "1000000000", "L2 Token Pool Amount")                        // 1 Gwei
+		l1LiquidityManagerAmount := cmd.String("l1-liquiditymanager-amount", "70000000000000000", "LiquidityManager Amount") // 0.07 ETH
+		l2LiquidityManagerAmount := cmd.String("l2-liquiditymanager-amount", "0", "LiquidityManager Amount")
 
 		helpers.ParseArgs(cmd, os.Args[2:],
 			"l2-chain-id",
-			"l2-rebalancer-address",
+			"l2-liquiditymanager-address",
 			"l2-token-address",
 			"l2-token-pool-address",
 		)
 
 		env := multienv.New(false, false)
-		fundPoolAndRebalancer(
+		fundPoolAndLiquidityManager(
 			env,
 			*l1ChainID,
 			common.HexToAddress(*l1TokenAddress),
 			common.HexToAddress(*l1TokenPoolAddress),
-			common.HexToAddress(*l1RebalancerAddress),
+			common.HexToAddress(*l1LiquidityManagerAddress),
 			decimal.RequireFromString(*l1TokenPoolAmount).BigInt(),
-			decimal.RequireFromString(*l1RebalancerAmount).BigInt(),
+			decimal.RequireFromString(*l1LiquidityManagerAmount).BigInt(),
 		)
-		fundPoolAndRebalancer(
+		fundPoolAndLiquidityManager(
 			env,
 			*l2ChainID,
 			common.HexToAddress(*l2TokenAddress),
 			common.HexToAddress(*l2TokenPoolAddress),
-			common.HexToAddress(*l2RebalancerAddress),
+			common.HexToAddress(*l2LiquidityManagerAddress),
 			decimal.RequireFromString(*l2TokenPoolAmount).BigInt(),
-			decimal.RequireFromString(*l2RebalancerAmount).BigInt(),
+			decimal.RequireFromString(*l2LiquidityManagerAmount).BigInt(),
 		)
 	case "get-cross-chain-rebalancers":
 		cmd := flag.NewFlagSet("get-cross-chain-rebalancers", flag.ExitOnError)
 		chainID := cmd.Uint64("chain-id", 0, "Chain ID")
-		rebalancerAddress := cmd.String("rebalancer-address", "", "Rebalancer Address")
+		liquidityManagerAddress := cmd.String("liquiditymanager-address", "", "LiquidityManager Address")
 
-		helpers.ParseArgs(cmd, os.Args[2:], "chain-id", "rebalancer-address")
+		helpers.ParseArgs(cmd, os.Args[2:], "chain-id", "liquiditymanager-address")
 
 		env := multienv.New(false, false)
 		client, ok := env.Clients[*chainID]
@@ -195,7 +195,7 @@ func main() {
 			panic("client for chain id not found, please set appropriate env vars")
 		}
 
-		rebal, err := liquiditymanager.NewLiquidityManager(common.HexToAddress(*rebalancerAddress), client)
+		rebal, err := liquiditymanager.NewLiquidityManager(common.HexToAddress(*liquidityManagerAddress), client)
 		helpers.PanicErr(err)
 
 		xchainRebalancers, err := rebal.GetAllCrossChainRebalancers(nil)
@@ -440,10 +440,10 @@ func main() {
 	case "op-send-to-l2-via-rebalancer":
 		cmd := flag.NewFlagSet("op-send-to-l2-via-rebalancer", flag.ExitOnError)
 		l1ChainID := cmd.Uint64("l1-chain-id", 0, "L1 Chain ID")
-		l1RebalancerAddress := cmd.String("l1-rebalancer-address", "", "L1 Rebalancer Address")
+		l1RebalancerAddress := cmd.String("l1-liquiditymanager-address", "", "L1 LiquidityManager Address")
 		remoteChainID := cmd.Uint64("remote-chain-id", 0, "Remote Chain ID")
 		amount := cmd.String("amount", "1", "Amount")
-		helpers.ParseArgs(cmd, os.Args[2:], "l1-chain-id", "l1-rebalancer-address", "remote-chain-id")
+		helpers.ParseArgs(cmd, os.Args[2:], "l1-chain-id", "l1-liquiditymanager-address", "remote-chain-id")
 
 		env := multienv.New(false, false)
 		opstack.SendToL2ViaRebalancer(
@@ -456,11 +456,11 @@ func main() {
 	case "op-receive-on-l2-via-rebalancer":
 		cmd := flag.NewFlagSet("op-receive-on-l2-via-rebalancer", flag.ExitOnError)
 		l2ChainID := cmd.Uint64("l2-chain-id", 0, "L2 Chain ID")
-		l2RebalancerAddress := cmd.String("l2-rebalancer-address", "", "L2 Rebalancer Address")
+		l2RebalancerAddress := cmd.String("l2-liquiditymanager-address", "", "L2 LiquidityManager Address")
 		remoteChainID := cmd.Uint64("remote-chain-id", 0, "Remote Chain ID")
 		amount := cmd.String("amount", "1", "Amount")
 		shouldWrapNative := cmd.Bool("should-wrap-native", false, "Should wrap native")
-		helpers.ParseArgs(cmd, os.Args[2:], "l2-chain-id", "l2-rebalancer-address", "remote-chain-id", "amount")
+		helpers.ParseArgs(cmd, os.Args[2:], "l2-chain-id", "l2-liquiditymanager-address", "remote-chain-id", "amount")
 
 		env := multienv.New(false, false)
 		l2Rebalancer, err := liquiditymanager.NewLiquidityManager(common.HexToAddress(*l2RebalancerAddress), env.Clients[*l2ChainID])
@@ -479,10 +479,10 @@ func main() {
 	case "op-withdraw-to-l1-via-rebalancer":
 		cmd := flag.NewFlagSet("op-withdraw-to-l1-via-rebalancer", flag.ExitOnError)
 		l2ChainID := cmd.Uint64("l2-chain-id", 0, "L2 Chain ID")
-		l2RebalancerAddress := cmd.String("l2-rebalancer-address", "", "L2 Rebalancer Address")
+		l2RebalancerAddress := cmd.String("l2-liquiditymanager-address", "", "L2 LiquidityManager Address")
 		remoteChainID := cmd.Uint64("remote-chain-id", 0, "Remote Chain ID")
 		amount := cmd.String("amount", "1", "Amount")
-		helpers.ParseArgs(cmd, os.Args[2:], "l2-chain-id", "l2-rebalancer-address", "remote-chain-id", "amount")
+		helpers.ParseArgs(cmd, os.Args[2:], "l2-chain-id", "l2-liquiditymanager-address", "remote-chain-id", "amount")
 
 		env := multienv.New(false, false)
 		opstack.WithdrawFromL2ViaRebalancer(
@@ -497,10 +497,10 @@ func main() {
 		l1ChainID := cmd.Uint64("l1-chain-id", 0, "L1 Chain ID")
 		l2ChainID := cmd.Uint64("l2-chain-id", 0, "L2 Chain ID")
 		l2TxHash := cmd.String("l2-tx-hash", "", "L2 Tx Hash")
-		l1RebalancerAddress := cmd.String("l1-rebalancer-address", "", "L1 Rebalancer Address")
+		l1RebalancerAddress := cmd.String("l1-liquiditymanager-address", "", "L1 LiquidityManager Address")
 		remoteChainID := cmd.Uint64("remote-chain-id", 0, "Remote Chain ID")
 		amount := cmd.String("amount", "1", "Amount")
-		helpers.ParseArgs(cmd, os.Args[2:], "l1-chain-id", "l2-chain-id", "l2-tx-hash", "l1-rebalancer-address", "remote-chain-id", "amount")
+		helpers.ParseArgs(cmd, os.Args[2:], "l1-chain-id", "l2-chain-id", "l2-tx-hash", "l1-liquiditymanager-address", "remote-chain-id", "amount")
 
 		env := multienv.New(false, false)
 		opstack.ProveWithdrawalViaRebalancer(
@@ -519,10 +519,10 @@ func main() {
 		l1ChainID := cmd.Uint64("l1-chain-id", 0, "L1 Chain ID")
 		l2ChainID := cmd.Uint64("l2-chain-id", 0, "L2 Chain ID")
 		l2TxHash := cmd.String("l2-tx-hash", "", "L2 Tx Hash")
-		l1RebalancerAddress := cmd.String("l1-rebalancer-address", "", "L1 Rebalancer Address")
+		l1RebalancerAddress := cmd.String("l1-liquiditymanager-address", "", "L1 LiquidityManager Address")
 		remoteChainID := cmd.Uint64("remote-chain-id", 0, "Remote Chain ID")
 		amount := cmd.String("amount", "1", "Amount")
-		helpers.ParseArgs(cmd, os.Args[2:], "l1-chain-id", "l2-chain-id", "l2-tx-hash", "l1-rebalancer-address", "remote-chain-id", "amount")
+		helpers.ParseArgs(cmd, os.Args[2:], "l1-chain-id", "l2-chain-id", "l2-tx-hash", "l1-liquiditymanager-address", "remote-chain-id", "amount")
 
 		env := multienv.New(false, false)
 		opstack.FinalizeWithdrawalViaRebalancer(

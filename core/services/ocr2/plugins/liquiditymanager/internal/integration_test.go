@@ -355,12 +355,12 @@ fromBlock = %d
 			`
 type                 	= "offchainreporting2"
 schemaVersion        	= 1
-name                 	= "rebalancer-integration-test"
+name                 	= "liquiditymanager-integration-test"
 maxTaskDuration      	= "30s"
 contractID           	= "%s"
 ocrKeyBundleID       	= "%s"
 relay                	= "evm"
-pluginType           	= "rebalancer"
+pluginType           	= "liquiditymanager"
 transmitterID        	= "%s"
 forwardingAllowed       = false
 contractConfigTrackerPollInterval = "5s"

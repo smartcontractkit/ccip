@@ -163,8 +163,8 @@ func (s *Shell) ConfigureRebalancerNode(
 	if c.Bool(isBootstrapperArg) {
 		// Set up bootstrapper job if bootstrapper.
 		err = createRebalancerBootstrapperJob(ctx, lggr, chainID, c.String(contractIDArg), app)
-	} else if c.String(jobTypeArg) == "rebalancer" {
-		// Set up rebalancer job.
+	} else if c.String(jobTypeArg) == "liquiditymanager" {
+		// Set up liquiditymanager job.
 		err = createRebalancerJob(ctx, lggr, app, rebalancerTemplateArgs{
 			Name:                    c.String(jobNameArg),
 			ContractID:              c.String(contractIDArg),
@@ -207,7 +207,7 @@ maxTaskDuration      	= "30s"
 contractID           	= "%s"
 ocrKeyBundleID       	= "%s"
 relay                	= "evm"
-pluginType           	= "rebalancer"
+pluginType           	= "liquiditymanager"
 transmitterID        	= "%s"
 forwardingAllowed       = false
 contractConfigTrackerPollInterval = "15s"
@@ -258,7 +258,7 @@ type = "ping-pong"
 	if err != nil {
 		return errors.Wrap(err, "failed to add job")
 	}
-	lggr.Info("rebalancer spec:", sp)
+	lggr.Info("liquiditymanager spec:", sp)
 
 	return nil
 }
@@ -291,7 +291,7 @@ func createRebalancerBootstrapperJob(
 	if err != nil {
 		return errors.Wrap(err, "failed to add job")
 	}
-	lggr.Info("rebalancer bootstrap spec:", sp)
+	lggr.Info("liquiditymanager bootstrap spec:", sp)
 
 	// Give a cooldown
 	time.Sleep(time.Second)

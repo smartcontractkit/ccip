@@ -35,14 +35,14 @@ type universe struct {
 		Arm                  common.Address
 		ArmProxy             common.Address
 		TokenPool            common.Address
-		Rebalancer           common.Address
+		LiquidityManager     common.Address
 		BridgeAdapterAddress common.Address
 	}
 	L2 struct {
 		Arm                  common.Address
 		ArmProxy             common.Address
 		TokenPool            common.Address
-		Rebalancer           common.Address
+		LiquidityManager     common.Address
 		BridgeAdapterAddress common.Address
 	}
 }
@@ -97,13 +97,13 @@ func deployUniverse(
 		Enabled:             true,
 	})
 	helpers.PanicErr(err)
-	helpers.ConfirmTXMined(context.Background(), l1Client, tx, int64(l1ChainID), "setting cross chain rebalancer on L1 rebalancer")
+	helpers.ConfirmTXMined(context.Background(), l1Client, tx, int64(l1ChainID), "setting cross chain liquidityManager on L1 liquidityManager")
 	// assertion
 	onchainRebalancer, err := l1Rebalancer.GetCrossChainRebalancer(nil, l2ChainSelector)
 	helpers.PanicErr(err)
 	if onchainRebalancer.RemoteRebalancer != l2Rebalancer.Address() ||
 		onchainRebalancer.LocalBridge != l1BridgeAdapterAddress {
-		panic(fmt.Sprintf("onchain rebalancer address does not match, expected %s got %s, or local bridge does not match, expected %s got %s",
+		panic(fmt.Sprintf("onchain liquidityManager address does not match, expected %s got %s, or local bridge does not match, expected %s got %s",
 			l2Rebalancer.Address().Hex(),
 			onchainRebalancer.RemoteRebalancer.Hex(),
 			l1BridgeAdapterAddress.Hex(),
@@ -118,13 +118,13 @@ func deployUniverse(
 		Enabled:             true,
 	})
 	helpers.PanicErr(err)
-	helpers.ConfirmTXMined(context.Background(), l2Client, tx, int64(l2ChainID), "setting cross chain rebalancer on L2 rebalancer")
+	helpers.ConfirmTXMined(context.Background(), l2Client, tx, int64(l2ChainID), "setting cross chain liquidityManager on L2 liquidityManager")
 	// assertion
 	onchainRebalancer, err = l2Rebalancer.GetCrossChainRebalancer(nil, l1ChainSelector)
 	helpers.PanicErr(err)
 	if onchainRebalancer.RemoteRebalancer != l1Rebalancer.Address() ||
 		onchainRebalancer.LocalBridge != l2BridgeAdapterAddress {
-		panic(fmt.Sprintf("onchain rebalancer address does not match, expected %s got %s, or local bridge does not match, expected %s got %s",
+		panic(fmt.Sprintf("onchain liquidityManager address does not match, expected %s got %s, or local bridge does not match, expected %s got %s",
 			l1Rebalancer.Address().Hex(),
 			onchainRebalancer.RemoteRebalancer.Hex(),
 			l2BridgeAdapterAddress.Hex(),
@@ -137,14 +137,14 @@ func deployUniverse(
 		"L1 Arm:", helpers.ContractExplorerLink(int64(l1ChainID), l1Arm.Address()), "(", l1Arm.Address().Hex(), ")\n",
 		"L1 Arm Proxy:", helpers.ContractExplorerLink(int64(l1ChainID), l1ArmProxy.Address()), "(", l1ArmProxy.Address().Hex(), ")\n",
 		"L1 Token Pool:", helpers.ContractExplorerLink(int64(l1ChainID), l1TokenPool.Address()), "(", l1TokenPool.Address().Hex(), ")\n",
-		"L1 Rebalancer:", helpers.ContractExplorerLink(int64(l1ChainID), l1Rebalancer.Address()), "(", l1Rebalancer.Address().Hex(), ")\n",
+		"L1 LiquidityManager:", helpers.ContractExplorerLink(int64(l1ChainID), l1Rebalancer.Address()), "(", l1Rebalancer.Address().Hex(), ")\n",
 		"L1 Bridge Adapter:", helpers.ContractExplorerLink(int64(l1ChainID), l1BridgeAdapterAddress), "(", l1BridgeAdapterAddress.Hex(), ")\n",
 		"L2 Chain ID:", l2ChainID, "\n",
 		"L2 Chain Selector:", l2ChainSelector, "\n",
 		"L2 Arm:", helpers.ContractExplorerLink(int64(l2ChainID), l2Arm.Address()), "(", l2Arm.Address().Hex(), ")\n",
 		"L2 Arm Proxy:", helpers.ContractExplorerLink(int64(l2ChainID), l2ArmProxy.Address()), "(", l2ArmProxy.Address().Hex(), ")\n",
 		"L2 Token Pool:", helpers.ContractExplorerLink(int64(l2ChainID), l2TokenPool.Address()), "(", l2TokenPool.Address().Hex(), ")\n",
-		"L2 Rebalancer:", helpers.ContractExplorerLink(int64(l2ChainID), l2Rebalancer.Address()), "(", l2Rebalancer.Address().Hex(), ")\n",
+		"L2 LiquidityManager:", helpers.ContractExplorerLink(int64(l2ChainID), l2Rebalancer.Address()), "(", l2Rebalancer.Address().Hex(), ")\n",
 		"L2 Bridge Adapter:", helpers.ContractExplorerLink(int64(l2ChainID), l2BridgeAdapterAddress), "(", l2BridgeAdapterAddress.Hex(), ")",
 	)
 
@@ -153,26 +153,26 @@ func deployUniverse(
 			Arm                  common.Address
 			ArmProxy             common.Address
 			TokenPool            common.Address
-			Rebalancer           common.Address
+			LiquidityManager     common.Address
 			BridgeAdapterAddress common.Address
 		}{
 			Arm:                  l1Arm.Address(),
 			ArmProxy:             l1ArmProxy.Address(),
 			TokenPool:            l1TokenPool.Address(),
-			Rebalancer:           l1Rebalancer.Address(),
+			LiquidityManager:     l1Rebalancer.Address(),
 			BridgeAdapterAddress: l1BridgeAdapterAddress,
 		},
 		L2: struct {
 			Arm                  common.Address
 			ArmProxy             common.Address
 			TokenPool            common.Address
-			Rebalancer           common.Address
+			LiquidityManager     common.Address
 			BridgeAdapterAddress common.Address
 		}{
 			Arm:                  l2Arm.Address(),
 			ArmProxy:             l2ArmProxy.Address(),
 			TokenPool:            l2TokenPool.Address(),
-			Rebalancer:           l2Rebalancer.Address(),
+			LiquidityManager:     l2Rebalancer.Address(),
 			BridgeAdapterAddress: l2BridgeAdapterAddress,
 		},
 	}
@@ -263,19 +263,19 @@ func deployTokenPoolAndRebalancer(
 	)
 	helpers.PanicErr(err)
 	rebalancerAddress := helpers.ConfirmContractDeployed(context.Background(), client, tx, int64(chainID))
-	rebalancer, err := liquiditymanager.NewLiquidityManager(rebalancerAddress, client)
+	liquidityManager, err := liquiditymanager.NewLiquidityManager(rebalancerAddress, client)
 	helpers.PanicErr(err)
 	tx, err = tokenPool.SetRebalancer(transactor, rebalancerAddress)
 	helpers.PanicErr(err)
 	helpers.ConfirmTXMined(context.Background(), client, tx, int64(chainID),
-		"setting rebalancer on token pool")
+		"setting liquidityManager on token pool")
 	onchainRebalancer, err := tokenPool.GetRebalancer(nil)
 	helpers.PanicErr(err)
 	if onchainRebalancer != rebalancerAddress {
-		panic(fmt.Sprintf("onchain rebalancer address does not match, expected %s got %s",
+		panic(fmt.Sprintf("onchain liquidityManager address does not match, expected %s got %s",
 			rebalancerAddress.Hex(), onchainRebalancer.Hex()))
 	}
-	return tokenPool, rebalancer
+	return tokenPool, liquidityManager
 }
 
 func deployArm(
@@ -371,7 +371,7 @@ func setConfig(
 	helpers.PanicErr(err)
 	tx, err := l2Rebalancer.SetOCR3Config(l2Transactor, args.signers, args.l2Transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig)
 	helpers.PanicErr(err)
-	helpers.ConfirmTXMined(context.Background(), e.Clients[args.l2ChainID], tx, int64(args.l2ChainID), "setting OCR3 config on L2 rebalancer")
+	helpers.ConfirmTXMined(context.Background(), e.Clients[args.l2ChainID], tx, int64(args.l2ChainID), "setting OCR3 config on L2 liquidityManager")
 
 	fmt.Println("sleeping a bit before setting config on L1")
 	time.Sleep(1 * time.Minute)
@@ -399,7 +399,7 @@ func setConfig(
 	helpers.PanicErr(err)
 	tx, err = l1Rebalancer.SetOCR3Config(l1Transactor, args.signers, args.l1Transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig)
 	helpers.PanicErr(err)
-	helpers.ConfirmTXMined(context.Background(), e.Clients[args.l1ChainID], tx, int64(args.l1ChainID), "setting OCR3 config on L1 rebalancer")
+	helpers.ConfirmTXMined(context.Background(), e.Clients[args.l1ChainID], tx, int64(args.l1ChainID), "setting OCR3 config on L1 liquidityManager")
 }
 
 func validateEnv(env multienv.Env, l1ChainID, l2ChainID uint64, websocket bool) {
