@@ -1206,8 +1206,8 @@ func (sourceCCIP *SourceCCIPModule) LoadContracts(conf *laneconfig.LaneConfig) {
 	}
 }
 
-// SetTokenTransferFeeConfig sets the transfer fee config for all BridgeTokens on the CCIP source chain
-// enableAggregateRateLimit is used to enable/disable aggregate rate limit for all BridgeTokens, a good default is true
+// SetTokenTransferFeeConfig sets the transfer fee config for all BridgeTokens on the CCIP source chain.
+// enableAggregateRateLimit is used to enable/disable aggregate rate limit for all BridgeTokens.
 func (sourceCCIP *SourceCCIPModule) SetTokenTransferFeeConfig(enableAggregateRateLimit bool) error {
 	var tokenTransferFeeConfig []evm_2_evm_onramp.EVM2EVMOnRampTokenTransferFeeConfigArgs
 	for i, token := range sourceCCIP.Common.BridgeTokens {
@@ -2743,8 +2743,7 @@ func (lane *CCIPLane) ValidateRequests(successfulExecution bool) {
 		if !successfulExecution {
 			execState = testhelpers.ExecutionStateFailure
 		}
-		require.NoError(lane.Test, lane.ValidateRequestByTxHash(txHash, execState),
-			"validating request events by tx hash")
+		require.NoError(lane.Test, lane.ValidateRequestByTxHash(txHash, execState), "validating request events by tx hash")
 	}
 	if !successfulExecution {
 		return

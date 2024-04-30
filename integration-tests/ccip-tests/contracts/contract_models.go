@@ -463,6 +463,7 @@ func (pool *TokenPool) SetRemoteChainOnPool(remoteChainSelectors []uint64) error
 	return pool.client.ProcessTransaction(tx)
 }
 
+// SetRemoteChainRateLimits is an offchain function that sets the RateLimiterConfig on the token pool, which controls the Token Pool's rate limit.
 func (pool *TokenPool) SetRemoteChainRateLimits(remoteChainSelector uint64, rl token_pool.RateLimiterConfig) error {
 	opts, err := pool.client.TransactionOpts(pool.client.GetDefaultWallet())
 	if err != nil {
@@ -868,6 +869,7 @@ func (onRamp *OnRamp) WithdrawNonLinkFees(wrappedNative common.Address) error {
 	return onRamp.client.ProcessTransaction(tx)
 }
 
+// SetRateLimit sets the Aggregate Rate Limit (ARL) values for the OnRamp
 func (onRamp *OnRamp) SetRateLimit(rlConfig evm_2_evm_onramp.RateLimiterConfig) error {
 	opts, err := onRamp.client.TransactionOpts(onRamp.client.GetDefaultWallet())
 	if err != nil {
@@ -951,10 +953,30 @@ func (offRamp *OffRamp) UpdateRateLimitTokens(sourceTokens, destTokens []common.
 		return fmt.Errorf("failed to apply rate limit tokens updates: %w", err)
 	}
 	log.Info().
-		Interface("rateLimitToken adds", rateLimitTokens).
-		Str("offRamp", offRamp.Address()).
+		Interface("RateLimitToken adds", rateLimitTokens).
+		Str("OffRamp", offRamp.Address()).
 		Str(Network, offRamp.client.GetNetworkConfig().Name).
-		Msg("rateLimitTokens set in OffRamp")
+		Msg("RateLimitTokens set in OffRamp")
+	return offRamp.client.ProcessTransaction(tx)
+}
+
+// SetRateLimit sets the Aggregate Rate Limit (ARL) values for the OffRamp
+func (offRamp *OffRamp) SetRateLimit(rlConfig evm_2_evm_offramp.RateLimiterConfig) error {
+	opts, err := offRamp.client.TransactionOpts(offRamp.client.GetDefaultWallet())
+	if err != nil {
+		return err
+	}
+	tx, err := offRamp.Instance.SetRateLimiterConfig(opts, rlConfig)
+	if err != nil {
+		return fmt.Errorf("failed to set rate limit: %w", err)
+	}
+	log.Info().
+		Bool("Enabled", rlConfig.IsEnabled).
+		Str("Capacity", rlConfig.Capacity.String()).
+		Str("Rate", rlConfig.Rate.String()).
+		Str("OffRamp", offRamp.Address()).
+		Str(Network, offRamp.client.GetNetworkConfig().Name).
+		Msg("Setting Rate limit on OffRamp")
 	return offRamp.client.ProcessTransaction(tx)
 }
 

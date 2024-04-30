@@ -12,6 +12,7 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/logging"
 	"github.com/smartcontractkit/chainlink-testing-framework/utils/ptr"
 
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/token_pool"
@@ -453,9 +454,23 @@ func TestSmokeCCIPSelfServeRateLimit(t *testing.T) {
 				limitedDestToken = dest.Common.BridgeTokens[limitedTokenIndex]
 			)
 
-			// First turn off any rate limiting and ensure we can send both tokens without issue
-			err := src.SetTokenTransferFeeConfig(false)
+			// Disable all rate limiting
+			err := src.SetTokenTransferFeeConfig(false) // Tell OnRamp to not include any tokens in ARL
 			require.NoError(t, err, "Error disabling aggregate rate limit")
+			// Disable ARL for OnRamp and OffRamp
+			err = src.OnRamp.SetRateLimit(evm_2_evm_onramp.RateLimiterConfig{
+				IsEnabled: false,
+				Capacity:  big.NewInt(0),
+				Rate:      big.NewInt(0),
+			})
+			require.NoError(t, err, "Error disabling rate limit for source onramp")
+			err = dest.OffRamp.SetRateLimit(evm_2_evm_offramp.RateLimiterConfig{
+				IsEnabled: false,
+				Capacity:  big.NewInt(0),
+				Rate:      big.NewInt(0),
+			})
+			require.NoError(t, err, "Error disabling rate limit for destination offramp")
+			// Disable individual token pool rate limits
 			for i, tokenPool := range src.Common.BridgeTokenPools {
 				err = tokenPool.SetRemoteChainRateLimits(src.DestChainSelector, token_pool.RateLimiterConfig{
 					IsEnabled: false,
@@ -476,19 +491,24 @@ func TestSmokeCCIPSelfServeRateLimit(t *testing.T) {
 			require.NoError(t, err, "Error waiting for source chain events")
 			err = dest.Common.ChainClient.WaitForEvents()
 			require.NoError(t, err, "Error waiting for destination chain events")
+
+			// Send both tokens with no rate limits and ensure they succeed
 			overLimitAmount := new(big.Int).Add(aggregateRateLimit, big.NewInt(1))
 			src.TransferAmount[freeTokenIndex] = overLimitAmount
 			src.TransferAmount[limitedTokenIndex] = overLimitAmount
 			tc.lane.RecordStateBeforeTransfer()
 			err = tc.lane.SendRequests(1, TestCfg.TestGroupInput.MsgType, big.NewInt(600_000))
 			require.NoError(t, err)
-			err = src.Common.ChainClient.WaitForEvents()
-			require.NoError(t, err, "Error waiting for events")
 			tc.lane.ValidateRequests(true)
 
-			// The test works fine when I comment out this section as part of the debug
 			// Enable aggregate rate limiting on the destination chain for the limited token
 			err = dest.AddRateLimitTokens([]*contracts.ERC20Token{limitedSrcToken}, []*contracts.ERC20Token{limitedDestToken})
+			require.NoError(t, err, "Error setting destination rate limits")
+			err = dest.OffRamp.SetRateLimit(evm_2_evm_offramp.RateLimiterConfig{
+				IsEnabled: true,
+				Capacity:  aggregateRateLimit,
+				Rate:      aggregateRateLimit,
+			})
 			require.NoError(t, err, "Error setting destination rate limits")
 			err = dest.Common.ChainClient.WaitForEvents()
 			require.NoError(t, err, "Error waiting for events")
@@ -525,6 +545,12 @@ func TestSmokeCCIPSelfServeRateLimit(t *testing.T) {
 				DestBytesOverhead:         29_000,       // Easy default
 				AggregateRateLimitEnabled: true,
 			}})
+			require.NoError(t, err, "Error setting source rate limits")
+			err = src.OnRamp.SetRateLimit(evm_2_evm_onramp.RateLimiterConfig{
+				IsEnabled: true,
+				Capacity:  aggregateRateLimit,
+				Rate:      aggregateRateLimit,
+			})
 			require.NoError(t, err, "Error setting source rate limits")
 			err = src.Common.ChainClient.WaitForEvents()
 			require.NoError(t, err, "Error waiting for events")
