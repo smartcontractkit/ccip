@@ -1125,7 +1125,7 @@ func TestPlugin_Close(t *testing.T) {
 	assert.Error(t, err)
 	assert.Equal(t, "get liquidityManager (1, 0x000000000000000000000000000000000000000A): "+
 		"some error that indicates something went wrong; "+
-		"close rebalancer (2, 0x000000000000000000000000000000000000000b): "+
+		"close liquidityManager (2, 0x000000000000000000000000000000000000000b): "+
 		"some error that indicates something went wrong", err.Error())
 }
 
