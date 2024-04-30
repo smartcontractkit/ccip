@@ -62,7 +62,7 @@ var (
 	mainChainID = int64(chainsel.GETH_TESTNET.EvmChainID)
 )
 
-func TestRebalancer_Integration(t *testing.T) {
+func TestLiquidityManager_Integration(t *testing.T) {
 	newTestUniverse(t, 2, false)
 }
 
@@ -74,12 +74,12 @@ type ocr3Node struct {
 }
 
 type onchainUniverse struct {
-	backend         *backends.SimulatedBackend
-	chainID         uint64
-	wethToken       *weth9.WETH9
-	lockReleasePool *lock_release_token_pool.LockReleaseTokenPool
-	rebalancer      *liquiditymanager.LiquidityManager
-	bridgeAdapter   *mock_l1_bridge_adapter.MockL1BridgeAdapter
+	backend          *backends.SimulatedBackend
+	chainID          uint64
+	wethToken        *weth9.WETH9
+	lockReleasePool  *lock_release_token_pool.LockReleaseTokenPool
+	liquidityManager *liquiditymanager.LiquidityManager
+	bridgeAdapter    *mock_l1_bridge_adapter.MockL1BridgeAdapter
 }
 
 func setupNodeOCR3(
@@ -139,7 +139,7 @@ func setupNodeOCR3(
 		},
 		csa: master.CSA(),
 	}
-	mailMon := mailbox.NewMonitor("Rebalancer", lggr.Named("mailbox"))
+	mailMon := mailbox.NewMonitor("LiquidityManager", lggr.Named("mailbox"))
 	evmOpts := chainlink.EVMFactoryConfig{
 		ChainOpts: legacyevm.ChainOpts{
 			AppConfig: config,
@@ -229,7 +229,7 @@ func newTestUniverse(t *testing.T, numChains int, adapterHoldNative bool) {
 	universes := deployContracts(t, owner, chains, adapterHoldNative)
 	createConnectedNetwork(t, owner, chains, universes)
 	transferBalances(t, owner, universes)
-	mainContract := universes[mainChainID].rebalancer.Address()
+	mainContract := universes[mainChainID].liquidityManager.Address()
 
 	t.Log("Creating bootstrap node")
 	bootstrapNodePort := freeport.GetOne(t)
@@ -302,7 +302,7 @@ func newTestUniverse(t *testing.T, numChains int, adapterHoldNative bool) {
 	})
 
 	t.Log("setting config")
-	blocksBeforeConfig := setRebalancerConfigs(
+	blocksBeforeConfig := setLiquidityManagerConfigs(
 		t,
 		owner,
 		universes,
@@ -387,7 +387,7 @@ type = "ping-pong"
 			buildFollowerChainsFromBlocksToml(blocksBeforeConfig),
 			mainContract.Hex(),
 			mainChain.Selector)
-		t.Log("Creating rebalancer job with spec:\n", jobSpec)
+		t.Log("Creating liquidityManager job with spec:\n", jobSpec)
 		ocrJob2, err2 := validate.ValidatedOracleSpecToml(
 			testutils.Context(t),
 			apps[i].GetConfig().OCR2(),
@@ -395,9 +395,9 @@ type = "ping-pong"
 			jobSpec,
 			nil,
 		)
-		require.NoError(t, err2, "failed to validate rebalancer job")
+		require.NoError(t, err2, "failed to validate liquidityManager job")
 		err2 = apps[i].AddJobV2(testutils.Context(t), &ocrJob2)
-		require.NoError(t, err2, "failed to add rebalancer job")
+		require.NoError(t, err2, "failed to add liquidityManager job")
 	}
 
 	t.Log("waiting for a transmission")
@@ -413,13 +413,13 @@ func waitForTransmissions(
 	finalizationStepSink := make(chan *liquiditymanager.LiquidityManagerFinalizationStepCompleted)
 	var subs []event.Subscription
 	for _, uni := range universes {
-		sub, err := uni.rebalancer.WatchLiquidityTransferred(&bind.WatchOpts{
+		sub, err := uni.liquidityManager.WatchLiquidityTransferred(&bind.WatchOpts{
 			Start: &start,
 		}, liquidityTransferredSink, nil, nil, nil)
 		require.NoError(t, err, "failed to create subscription")
 		subs = append(subs, sub)
 
-		sub, err = uni.rebalancer.WatchFinalizationStepCompleted(&bind.WatchOpts{
+		sub, err = uni.liquidityManager.WatchFinalizationStepCompleted(&bind.WatchOpts{
 			Start: &start,
 		}, finalizationStepSink, nil, nil)
 		require.NoError(t, err, "failed to create subscription")
@@ -467,7 +467,7 @@ func waitForTransmissions(
 	}
 }
 
-func setRebalancerConfig(
+func setLiquidityManagerConfig(
 	t *testing.T,
 	owner *bind.TransactOpts,
 	wrapper *liquiditymanager.LiquidityManager,
@@ -525,12 +525,12 @@ func setRebalancerConfig(
 	e := iter.Event
 	require.Equal(t, onchainPubKeys, e.Signers, "signers do not match")
 	require.Equal(t, transmitters, e.Transmitters, "transmitters do not match")
-	t.Log("config digest for rebalancer at address: ", wrapper.Address(), ", is:", hexutil.Encode(e.ConfigDigest[:]))
+	t.Log("config digest for liquidityManager at address: ", wrapper.Address(), ", is:", hexutil.Encode(e.ConfigDigest[:]))
 
 	return beforeConfig.Number().Int64()
 }
 
-func setRebalancerConfigs(
+func setLiquidityManagerConfigs(
 	t *testing.T,
 	owner *bind.TransactOpts,
 	universes map[int64]onchainUniverse,
@@ -540,10 +540,10 @@ func setRebalancerConfigs(
 	oracles map[int64][]confighelper2.OracleIdentityExtra) (blocksBeforeConfig map[int64]int64) {
 	blocksBeforeConfig = make(map[int64]int64)
 	for chainID, uni := range universes {
-		blocksBeforeConfig[chainID] = setRebalancerConfig(
+		blocksBeforeConfig[chainID] = setLiquidityManagerConfig(
 			t,
 			owner,
-			uni.rebalancer,
+			uni.liquidityManager,
 			chains[chainID],
 			onchainPubKeys,
 			transmitters[chainID],
@@ -688,20 +688,20 @@ func deployContracts(
 		lockReleasePool, err := lock_release_token_pool.NewLockReleaseTokenPool(lockReleasePoolAddress, backend)
 		require.NoError(t, err)
 
-		// deploy the rebalancer and set the liquidity container to be the lock release pool
+		// deploy the liquidityManager and set the liquidity container to be the lock release pool
 		ch := mustGetChainByEvmID(t, chainID)
-		rebalancerAddr, _, _, err := liquiditymanager.DeployLiquidityManager(owner, backend, wethAddress, ch.Selector, lockReleasePoolAddress, big.NewInt(0))
-		require.NoError(t, err, "failed to deploy Rebalancer contract")
-		rebalancer, err := liquiditymanager.NewLiquidityManager(rebalancerAddr, backend)
-		require.NoError(t, err, "failed to create Rebalancer wrapper")
+		liquidityManagerAddr, _, _, err := liquiditymanager.DeployLiquidityManager(owner, backend, wethAddress, ch.Selector, lockReleasePoolAddress, big.NewInt(0))
+		require.NoError(t, err, "failed to deploy LiquidityManager contract")
+		liquidityManager, err := liquiditymanager.NewLiquidityManager(liquidityManagerAddr, backend)
+		require.NoError(t, err, "failed to create LiquidityManager wrapper")
 
-		// set the rebalancer of the lock release pool to be the just deployed rebalancer
-		_, err = lockReleasePool.SetRebalancer(owner, rebalancerAddr)
-		require.NoError(t, err, "failed to set rebalancer on lock/release pool")
+		// set the liquidityManager of the lock release pool to be the just deployed liquidityManager
+		_, err = lockReleasePool.SetRebalancer(owner, liquidityManagerAddr)
+		require.NoError(t, err, "failed to set liquidityManager on lock/release pool")
 		backend.Commit()
-		actualRebalancer, err := lockReleasePool.GetRebalancer(&bind.CallOpts{Context: testutils.Context(t)})
+		actualLiquidityManager, err := lockReleasePool.GetRebalancer(&bind.CallOpts{Context: testutils.Context(t)})
 		require.NoError(t, err)
-		require.Equal(t, rebalancerAddr, actualRebalancer)
+		require.Equal(t, liquidityManagerAddr, actualLiquidityManager)
 
 		// deploy the bridge adapter to point to the weth contract address
 		bridgeAdapterAddress, _, _, err := mock_l1_bridge_adapter.DeployMockL1BridgeAdapter(owner, backend, wethAddress, adapterHoldNative)
@@ -711,18 +711,18 @@ func deployContracts(
 		require.NoError(t, err)
 
 		universes[chainID] = onchainUniverse{
-			backend:         backend,
-			chainID:         uint64(chainID),
-			wethToken:       wethToken,
-			lockReleasePool: lockReleasePool,
-			rebalancer:      rebalancer,
-			bridgeAdapter:   bridgeAdapter,
+			backend:          backend,
+			chainID:          uint64(chainID),
+			wethToken:        wethToken,
+			lockReleasePool:  lockReleasePool,
+			liquidityManager: liquidityManager,
+			bridgeAdapter:    bridgeAdapter,
 		}
 
 		t.Log("deployed contracts for chain:", chainID,
 			"weth:", wethAddress.Hex(),
 			"lockReleasePool:", lockReleasePool.Address().Hex(),
-			"rebalancer:", rebalancerAddr.Hex(),
+			"rebalancer:", liquidityManagerAddr.Hex(),
 			"bridgeAdapter:", bridgeAdapterAddress.Hex(),
 		)
 	}
@@ -770,7 +770,7 @@ func transferBalances(
 		// check the balance of the token pool through the rebalancer,
 		// should be the same as the balance of the lock/release pool
 		// retrieved above.
-		bal, err = uni.rebalancer.GetLiquidity(&bind.CallOpts{Context: testutils.Context(t)})
+		bal, err = uni.liquidityManager.GetLiquidity(&bind.CallOpts{Context: testutils.Context(t)})
 		require.NoError(t, err)
 		require.Equal(t, assets.Ether(5).ToInt(), bal)
 	}
@@ -793,10 +793,10 @@ func createConnectedNetwork(
 		// follower -> main connection
 		remoteChain := mustGetChainByEvmID(t, mainChainID)
 
-		_, err := uni.rebalancer.SetCrossChainRebalancer(
+		_, err := uni.liquidityManager.SetCrossChainRebalancer(
 			owner,
 			liquiditymanager.ILiquidityManagerCrossChainRebalancerArgs{
-				RemoteRebalancer:    universes[mainChainID].rebalancer.Address(),
+				RemoteRebalancer:    universes[mainChainID].liquidityManager.Address(),
 				RemoteChainSelector: remoteChain.Selector,
 				Enabled:             true,
 				LocalBridge:         uni.bridgeAdapter.Address(),
@@ -805,9 +805,9 @@ func createConnectedNetwork(
 		require.NoError(t, err, "failed to SetCrossChainRebalancer from follower to main chain")
 		chains[chainID].Commit()
 
-		mgr, err := uni.rebalancer.GetCrossChainRebalancer(&bind.CallOpts{Context: testutils.Context(t)}, remoteChain.Selector)
+		mgr, err := uni.liquidityManager.GetCrossChainRebalancer(&bind.CallOpts{Context: testutils.Context(t)}, remoteChain.Selector)
 		require.NoError(t, err)
-		require.Equal(t, universes[mainChainID].rebalancer.Address(), mgr.RemoteRebalancer)
+		require.Equal(t, universes[mainChainID].liquidityManager.Address(), mgr.RemoteRebalancer)
 		require.Equal(t, uni.bridgeAdapter.Address(), mgr.LocalBridge)
 		require.Equal(t, universes[mainChainID].wethToken.Address(), mgr.RemoteToken)
 		require.True(t, mgr.Enabled)
@@ -815,10 +815,10 @@ func createConnectedNetwork(
 		// main -> follower connection
 		remoteChain = mustGetChainByEvmID(t, chainID)
 
-		_, err = universes[mainChainID].rebalancer.SetCrossChainRebalancer(
+		_, err = universes[mainChainID].liquidityManager.SetCrossChainRebalancer(
 			owner,
 			liquiditymanager.ILiquidityManagerCrossChainRebalancerArgs{
-				RemoteRebalancer:    uni.rebalancer.Address(),
+				RemoteRebalancer:    uni.liquidityManager.Address(),
 				RemoteChainSelector: remoteChain.Selector,
 				Enabled:             true,
 				LocalBridge:         universes[mainChainID].bridgeAdapter.Address(),
@@ -827,10 +827,10 @@ func createConnectedNetwork(
 		require.NoError(t, err, "failed to add neighbor from main to follower chain")
 		chains[mainChainID].Commit()
 
-		mgr, err = universes[mainChainID].rebalancer.GetCrossChainRebalancer(
+		mgr, err = universes[mainChainID].liquidityManager.GetCrossChainRebalancer(
 			&bind.CallOpts{Context: testutils.Context(t)}, remoteChain.Selector)
 		require.NoError(t, err)
-		require.Equal(t, uni.rebalancer.Address(), mgr.RemoteRebalancer)
+		require.Equal(t, uni.liquidityManager.Address(), mgr.RemoteRebalancer)
 		require.Equal(t, universes[mainChainID].bridgeAdapter.Address(), mgr.LocalBridge)
 		require.Equal(t, uni.wethToken.Address(), mgr.RemoteToken)
 		require.True(t, mgr.Enabled)
@@ -838,7 +838,7 @@ func createConnectedNetwork(
 
 	// sanity check connections
 	for chainID, uni := range universes {
-		destChains, err := uni.rebalancer.GetSupportedDestChains(&bind.CallOpts{Context: testutils.Context(t)})
+		destChains, err := uni.liquidityManager.GetSupportedDestChains(&bind.CallOpts{Context: testutils.Context(t)})
 		require.NoError(t, err, "couldn't get supported dest chains")
 		t.Log("num dest chains:", len(destChains), "dest chains:", destChains)
 		if chainID == mainChainID {
@@ -846,7 +846,7 @@ func createConnectedNetwork(
 		} else {
 			require.Len(t, destChains, 1)
 		}
-		mgrs, err := uni.rebalancer.GetAllCrossChainRebalancers(&bind.CallOpts{
+		mgrs, err := uni.liquidityManager.GetAllCrossChainRebalancers(&bind.CallOpts{
 			Context: testutils.Context(t),
 		})
 		require.NoError(t, err, "couldn't get all cross-chain liquidity managers")
