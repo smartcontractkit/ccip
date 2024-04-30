@@ -29,6 +29,6 @@ func (r PluginsResolver) Mercury() bool {
 }
 
 // LiquidityManager returns the the status of the liquidity manager plugin.
-func (r PluginsResolver) LiquidityManager() bool {
+func (r PluginsResolver) Rebalancer() bool {
 	return r.plugins.LiquidityManager
 }
