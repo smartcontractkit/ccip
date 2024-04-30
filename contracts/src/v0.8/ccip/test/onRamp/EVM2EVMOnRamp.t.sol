@@ -505,7 +505,7 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
 
     // Change back to the router
     vm.startPrank(address(s_sourceRouter));
-    vm.expectRevert(abi.encodeWithSelector(TokenAdminRegistry.UnsupportedToken.selector, wrongToken));
+    vm.expectRevert(abi.encodeWithSelector(EVM2EVMOnRamp.UnsupportedToken.selector, wrongToken));
 
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 0, OWNER);
   }
@@ -651,6 +651,17 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
     vm.startPrank(address(s_sourceRouter));
 
     vm.expectRevert(abi.encodeWithSelector(EVM2EVMOnRamp.SourceTokenDataTooLarge.selector, sourceETH));
+    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 0, OWNER);
+  }
+
+  function test_forwardFromRouter_UnsupportedToken_Revert() public {
+    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
+    message.tokenAmounts = new Client.EVMTokenAmount[](1);
+    message.tokenAmounts[0].amount = 1;
+    message.tokenAmounts[0].token = address(1);
+
+    vm.expectRevert(abi.encodeWithSelector(EVM2EVMOnRamp.UnsupportedToken.selector, message.tokenAmounts[0].token));
+
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 0, OWNER);
   }
 }
@@ -1744,8 +1755,9 @@ contract EVM2EVMOnRamp_getTokenPool is EVM2EVMOnRampSetup {
     );
 
     address wrongToken = address(123);
-    vm.expectRevert(abi.encodeWithSelector(EVM2EVMOnRamp.UnsupportedToken.selector, IERC20(wrongToken)));
-    s_onRamp.getPoolBySourceToken(DEST_CHAIN_SELECTOR, IERC20(wrongToken));
+    address nonExistentPool = address(s_onRamp.getPoolBySourceToken(DEST_CHAIN_SELECTOR, IERC20(wrongToken)));
+
+    assertEq(address(0), nonExistentPool);
   }
 }
 

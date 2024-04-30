@@ -42,7 +42,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   error MessageTooLarge(uint256 maxSize, uint256 actualSize);
   error MessageGasLimitTooHigh();
   error UnsupportedNumberOfTokens();
-  error UnsupportedToken(IERC20 token);
+  error UnsupportedToken(address token);
   error MustBeCalledByRouter();
   error RouterMustSetOriginalSender();
   error InvalidConfig();
@@ -328,9 +328,10 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
       Client.EVMTokenAmount memory tokenAndAmount = message.tokenAmounts[i];
       IPool sourcePool = getPoolBySourceToken(destChainSelector, IERC20(tokenAndAmount.token));
       // We don't have to check if it supports the pool version in a non-reverting way here because
-      // if we revert here, there is no effect on CCIP.
-      if (!sourcePool.supportsInterface(Pool.CCIP_POOL_V1)) {
-        revert UnsupportedToken(IERC20(tokenAndAmount.token));
+      // if we revert here, there is no effect on CCIP. Therefore we directly call the supportsInterface
+      // function and not through the ERC165Checker.
+      if (address(sourcePool) == address(0) || !sourcePool.supportsInterface(Pool.CCIP_POOL_V1)) {
+        revert UnsupportedToken(tokenAndAmount.token);
       }
 
       Pool.LockOrBurnOutV1 memory poolReturnData = sourcePool.lockOrBurn(
@@ -589,7 +590,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
 
       // Validate if the token is supported, do not calculate fee for unsupported tokens.
       if (address(getPoolBySourceToken(i_destChainSelector, IERC20(tokenAmount.token))) == address(0)) {
-        revert UnsupportedToken(IERC20(tokenAmount.token));
+        revert UnsupportedToken(tokenAmount.token);
       }
 
       TokenTransferFeeConfig memory transferFeeConfig = s_tokenTransferFeeConfig[tokenAmount.token];

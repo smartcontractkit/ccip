@@ -1434,7 +1434,8 @@ contract EVM2EVMOffRamp__releaseOrMintTokens is EVM2EVMOffRampSetup {
         bytes4(reason) == EVM2EVMOffRamp.TokenHandlingError.selector
           || bytes4(reason) == EVM2EVMOffRamp.InvalidEVMAddress.selector
           || bytes4(reason) == EVM2EVMOffRamp.InvalidDataLength.selector
-          || bytes4(reason) == CallWithExactGas.NoContract.selector,
+          || bytes4(reason) == CallWithExactGas.NoContract.selector
+          || bytes4(reason) == EVM2EVMOffRamp.NotACompatiblePool.selector,
         "Expected TokenHandlingError or InvalidEVMAddress"
       );
 
