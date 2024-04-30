@@ -204,7 +204,9 @@ func (o *DbORM) SelectLatestLogByEventSigWithConfs(eventSig common.Hash, address
 			AND event_sig = :event_sig
 			AND address = :address
 			AND block_number <= %s
-			ORDER BY (block_number, log_index) DESC LIMIT 1`, nestedBlockNumberQuery(confs))
+			ORDER BY block_number desc, log_index DESC 
+			LIMIT 1
+		`, nestedBlockNumberQuery(confs))
 	var l Log
 	if err := o.q.WithOpts(qopts...).GetNamed(query, &l, args); err != nil {
 		return nil, err
@@ -397,7 +399,7 @@ func (o *DbORM) SelectLogsByBlockRange(start, end int64) ([]Log, error) {
         	WHERE evm_chain_id = :evm_chain_id
         	AND block_number >= :start_block 
         	AND block_number <= :end_block 
-        	ORDER BY (block_number, log_index)`, args)
+        	ORDER BY block_number, log_index`, args)
 	if err != nil {
 		return nil, err
 	}
@@ -421,7 +423,7 @@ func (o *DbORM) SelectLogs(start, end int64, address common.Address, eventSig co
 			AND event_sig = :event_sig  
 			AND block_number >= :start_block 
 			AND block_number <= :end_block
-			ORDER BY (block_number, log_index)`, args)
+			ORDER BY block_number, log_index`, args)
 	if err != nil {
 		return nil, err
 	}
@@ -445,7 +447,7 @@ func (o *DbORM) SelectLogsCreatedAfter(address common.Address, eventSig common.H
 				AND event_sig = :event_sig
 				AND block_timestamp > :block_timestamp_after
 				AND block_number <= %s
-				ORDER BY (block_number, log_index)`, nestedBlockNumberQuery(confs))
+				ORDER BY block_number, log_index`, nestedBlockNumberQuery(confs))
 
 	var logs []Log
 	if err = o.q.WithOpts(qopts...).SelectNamed(&logs, query, args); err != nil {
@@ -474,7 +476,7 @@ func (o *DbORM) SelectLogsWithSigs(start, end int64, address common.Address, eve
 				AND address = :address
 				AND event_sig = ANY(:event_sig_array)
 				AND block_number BETWEEN :start_block AND :end_block
-				ORDER BY (block_number, log_index)`, args)
+				ORDER BY block_number, log_index`, args)
 	if pkgerrors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
@@ -573,7 +575,7 @@ func (o *DbORM) SelectLogsDataWordRange(address common.Address, eventSig common.
 			AND substring(data from 32*:word_index+1 for 32) >= :word_value_min
 			AND substring(data from 32*:word_index+1 for 32) <= :word_value_max
 			AND block_number <= %s
-			ORDER BY (block_number, log_index)`, nestedBlockNumberQuery(confs))
+			ORDER BY block_number, log_index`, nestedBlockNumberQuery(confs))
 	var logs []Log
 	if err := o.q.WithOpts(qopts...).SelectNamed(&logs, query, args); err != nil {
 		return nil, err
@@ -597,7 +599,7 @@ func (o *DbORM) SelectLogsDataWordGreaterThan(address common.Address, eventSig c
 			AND event_sig = :event_sig
 			AND substring(data from 32*:word_index+1 for 32) >= :word_value_min
 			AND block_number <= %s
-			ORDER BY (block_number, log_index)`, nestedBlockNumberQuery(confs))
+			ORDER BY block_number, log_index`, nestedBlockNumberQuery(confs))
 	var logs []Log
 	if err = o.q.WithOpts(qopts...).SelectNamed(&logs, query, args); err != nil {
 		return nil, err
@@ -623,7 +625,7 @@ func (o *DbORM) SelectLogsDataWordBetween(address common.Address, eventSig commo
 			AND substring(data from 32*:word_index_min+1 for 32) <= :word_value
 			AND substring(data from 32*:word_index_max+1 for 32) >= :word_value
 			AND block_number <= %s
-			ORDER BY (block_number, log_index)`, nestedBlockNumberQuery(confs))
+			ORDER BY block_number, log_index`, nestedBlockNumberQuery(confs))
 	var logs []Log
 	if err = o.q.WithOpts(qopts...).SelectNamed(&logs, query, args); err != nil {
 		return nil, err
@@ -647,7 +649,7 @@ func (o *DbORM) SelectIndexedLogsTopicGreaterThan(address common.Address, eventS
 			AND event_sig = :event_sig
 			AND topics[:topic_index] >= :topic_value_min
 			AND block_number <= %s
-			ORDER BY (block_number, log_index)`, nestedBlockNumberQuery(confs))
+			ORDER BY block_number, log_index`, nestedBlockNumberQuery(confs))
 	var logs []Log
 	if err = o.q.WithOpts(qopts...).SelectNamed(&logs, query, args); err != nil {
 		return nil, err
@@ -673,7 +675,7 @@ func (o *DbORM) SelectIndexedLogsTopicRange(address common.Address, eventSig com
 				AND topics[:topic_index] >= :topic_value_min
 				AND topics[:topic_index] <= :topic_value_max
 				AND block_number <= %s
-			ORDER BY (evm.logs.block_number, evm.logs.log_index)`, nestedBlockNumberQuery(confs))
+			ORDER BY block_number, log_index`, nestedBlockNumberQuery(confs))
 	var logs []Log
 	if err := o.q.WithOpts(qopts...).SelectNamed(&logs, query, args); err != nil {
 		return nil, err
@@ -697,7 +699,7 @@ func (o *DbORM) SelectIndexedLogs(address common.Address, eventSig common.Hash, 
 			AND event_sig = :event_sig
 			AND topics[:topic_index] = ANY(:topic_values)
 			AND block_number <= %s
-			ORDER BY (block_number, log_index)`, nestedBlockNumberQuery(confs))
+			ORDER BY block_number, log_index`, nestedBlockNumberQuery(confs))
 	var logs []Log
 	if err := o.q.WithOpts(qopts...).SelectNamed(&logs, query, args); err != nil {
 		return nil, err
@@ -725,7 +727,7 @@ func (o *DbORM) SelectIndexedLogsByBlockRange(start, end int64, address common.A
 				AND topics[:topic_index] = ANY(:topic_values)
 				AND block_number >= :start_block
 				AND block_number <= :end_block
-				ORDER BY (block_number, log_index)`, args)
+				ORDER BY block_number, log_index`, args)
 	if err != nil {
 		return nil, err
 	}
@@ -751,7 +753,8 @@ func (o *DbORM) SelectIndexedLogsCreatedAfter(address common.Address, eventSig c
 			AND topics[:topic_index] = ANY(:topic_values)
 			AND block_timestamp > :block_timestamp_after
 			AND block_number <= %s
-			ORDER BY (block_number, log_index)`, nestedBlockNumberQuery(confs))
+			ORDER BY block_number, log_index
+		`, nestedBlockNumberQuery(confs))
 
 	var logs []Log
 	if err = o.q.WithOpts(qopts...).SelectNamed(&logs, query, args); err != nil {
@@ -776,7 +779,7 @@ func (o *DbORM) SelectIndexedLogsByTxHash(address common.Address, eventSig commo
 			AND address = :address
 			AND event_sig = :event_sig			  
 			AND tx_hash = :tx_hash
-			ORDER BY (block_number, log_index)`, args)
+			ORDER BY block_number, log_index`, args)
 	if err != nil {
 		return nil, err
 	}
@@ -816,7 +819,7 @@ func (o *DbORM) SelectIndexedLogsWithSigsExcluding(sigA, sigB common.Hash, topic
 		AND        b.event_sig = :sigB
 	    AND 	   b.block_number BETWEEN :start_block AND :end_block
 		AND		   b.block_number <= %s
-		ORDER BY block_number,log_index ASC`, nestedQuery, nestedQuery)
+		ORDER BY block_number, log_index`, nestedQuery, nestedQuery)
 	var logs []Log
 	if err := o.q.WithOpts(qopts...).SelectNamed(&logs, query, args); err != nil {
 		return nil, err
