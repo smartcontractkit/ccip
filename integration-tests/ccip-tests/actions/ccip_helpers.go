@@ -1606,7 +1606,6 @@ func (sourceCCIP *SourceCCIPModule) SendRequest(
 		return common.Hash{}, d, nil, fmt.Errorf("failed forming the ccip msg: %w", err)
 	}
 
-	// DEBUG:
 	amounts := []evm_2_evm_onramp.ClientEVMTokenAmount{}
 	for i := range msg.TokenAmounts {
 		amounts = append(amounts, evm_2_evm_onramp.ClientEVMTokenAmount{
@@ -2787,7 +2786,8 @@ func (lane *CCIPLane) ValidateRequestByTxHash(txHash common.Hash, execState test
 	}
 
 	msgLogs, ccipSendReqGenAt, err := lane.Source.AssertEventCCIPSendRequested(
-		lane.Logger, txHash.Hex(), lane.ValidationTimeout, txConfirmation, reqStats)
+		lane.Logger, txHash.Hex(), lane.ValidationTimeout, txConfirmation, reqStats,
+	)
 	if err != nil || msgLogs == nil {
 		return fmt.Errorf("could not validate CCIPSendRequested event: %w", err)
 	}

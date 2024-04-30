@@ -476,6 +476,7 @@ func TestSmokeCCIPSelfServeRateLimit(t *testing.T) {
 			require.NoError(t, err, "Error waiting for events")
 			tc.lane.ValidateRequests(true)
 
+			// The test works fine when I comment out this section as part of the debug
 			// Enable aggregate rate limiting on the destination chain for the limited token
 			err = dest.AddRateLimitTokens([]*contracts.ERC20Token{limitedSrcToken}, []*contracts.ERC20Token{limitedDestToken})
 			require.NoError(t, err, "Error setting destination rate limits")
@@ -486,12 +487,13 @@ func TestSmokeCCIPSelfServeRateLimit(t *testing.T) {
 			// Send free token that should not have a rate limit and should succeed
 			src.TransferAmount[freeTokenIndex] = overLimitAmount
 			src.TransferAmount[limitedTokenIndex] = big.NewInt(0)
+			tc.lane.RecordStateBeforeTransfer()
 			err = tc.lane.SendRequests(1, TestCfg.TestGroupInput.MsgType, big.NewInt(600_000))
 			require.NoError(t, err, "Error sending unlimited token")
 			err = src.Common.ChainClient.WaitForEvents()
 			require.NoError(t, err, "Unlimited token transfer failed")
-			tc.lane.Logger.Info().Str("Token", freeSrcToken.ContractAddress.Hex()).Msg("Unlimited token transfer succeeded on source chain")
 			tc.lane.ValidateRequests(true)
+			tc.lane.Logger.Info().Str("Token", freeSrcToken.ContractAddress.Hex()).Msg("Unlimited token transfer succeeded")
 
 			// Send limited token with rate limit that should fail on the destination chain
 			src.TransferAmount[freeTokenIndex] = big.NewInt(0)
