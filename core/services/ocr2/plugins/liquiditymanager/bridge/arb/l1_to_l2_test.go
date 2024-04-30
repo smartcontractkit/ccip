@@ -465,7 +465,7 @@ func Test_matchingExecutionExists(t *testing.T) {
 		receivedLogs   []*liquiditymanager.LiquidityManagerLiquidityTransferred
 	}
 	var (
-		l2Rebalancer = testutils.NewAddress()
+		l2LiquidityManager = testutils.NewAddress()
 	)
 	tests := []struct {
 		name    string
@@ -480,7 +480,7 @@ func Test_matchingExecutionExists(t *testing.T) {
 					OcrSeqNum:          1,
 					FromChainSelector:  10,
 					ToChainSelector:    20,
-					To:                 l2Rebalancer,
+					To:                 l2LiquidityManager,
 					Amount:             big.NewInt(100),
 					BridgeSpecificData: mustPackSendPayload(t, big.NewInt(100_000), big.NewInt(250_000), assets.GWei(3).ToInt()),
 					BridgeReturnData:   mustPackReturnData(t, big.NewInt(10)),
@@ -490,7 +490,7 @@ func Test_matchingExecutionExists(t *testing.T) {
 						OcrSeqNum:          2,
 						FromChainSelector:  10,
 						ToChainSelector:    20,
-						To:                 l2Rebalancer,
+						To:                 l2LiquidityManager,
 						Amount:             big.NewInt(100),
 						BridgeSpecificData: mustPackReturnData(t, big.NewInt(9)),
 						BridgeReturnData:   []byte{},
@@ -499,7 +499,7 @@ func Test_matchingExecutionExists(t *testing.T) {
 						OcrSeqNum:          3,
 						FromChainSelector:  10,
 						ToChainSelector:    20,
-						To:                 l2Rebalancer,
+						To:                 l2LiquidityManager,
 						Amount:             big.NewInt(100),
 						BridgeSpecificData: mustPackReturnData(t, big.NewInt(11)),
 						BridgeReturnData:   []byte{},
@@ -508,7 +508,7 @@ func Test_matchingExecutionExists(t *testing.T) {
 						OcrSeqNum:          4,
 						FromChainSelector:  10,
 						ToChainSelector:    20,
-						To:                 l2Rebalancer,
+						To:                 l2LiquidityManager,
 						Amount:             big.NewInt(100),
 						BridgeSpecificData: mustPackReturnData(t, big.NewInt(10)),
 						BridgeReturnData:   []byte{},
@@ -525,7 +525,7 @@ func Test_matchingExecutionExists(t *testing.T) {
 					OcrSeqNum:          1,
 					FromChainSelector:  10,
 					ToChainSelector:    20,
-					To:                 l2Rebalancer,
+					To:                 l2LiquidityManager,
 					Amount:             big.NewInt(100),
 					BridgeSpecificData: mustPackSendPayload(t, big.NewInt(100_000), big.NewInt(250_000), assets.GWei(3).ToInt()),
 					BridgeReturnData:   mustPackReturnData(t, big.NewInt(10)),
@@ -535,7 +535,7 @@ func Test_matchingExecutionExists(t *testing.T) {
 						OcrSeqNum:          2,
 						FromChainSelector:  10,
 						ToChainSelector:    20,
-						To:                 l2Rebalancer,
+						To:                 l2LiquidityManager,
 						Amount:             big.NewInt(100),
 						BridgeSpecificData: mustPackReturnData(t, big.NewInt(9)),
 						BridgeReturnData:   []byte{},
@@ -544,7 +544,7 @@ func Test_matchingExecutionExists(t *testing.T) {
 						OcrSeqNum:          3,
 						FromChainSelector:  10,
 						ToChainSelector:    20,
-						To:                 l2Rebalancer,
+						To:                 l2LiquidityManager,
 						Amount:             big.NewInt(100),
 						BridgeSpecificData: mustPackReturnData(t, big.NewInt(11)),
 						BridgeReturnData:   []byte{},
@@ -553,7 +553,7 @@ func Test_matchingExecutionExists(t *testing.T) {
 						OcrSeqNum:          1,
 						FromChainSelector:  10,
 						ToChainSelector:    20,
-						To:                 l2Rebalancer,
+						To:                 l2LiquidityManager,
 						Amount:             big.NewInt(100),
 						BridgeSpecificData: mustPackReturnData(t, big.NewInt(8)),
 						BridgeReturnData:   []byte{},
@@ -615,7 +615,7 @@ func Test_filterExecuted(t *testing.T) {
 		receivedLogs    []*liquiditymanager.LiquidityManagerLiquidityTransferred
 	}
 	var (
-		l2Rebalancer = testutils.NewAddress()
+		l2LiquidityManager = testutils.NewAddress()
 	)
 	tests := []struct {
 		name      string
@@ -631,7 +631,7 @@ func Test_filterExecuted(t *testing.T) {
 						OcrSeqNum:          1,
 						FromChainSelector:  10,
 						ToChainSelector:    20,
-						To:                 l2Rebalancer,
+						To:                 l2LiquidityManager,
 						Amount:             big.NewInt(100),
 						BridgeSpecificData: mustPackSendPayload(t, big.NewInt(100_000), big.NewInt(250_000), assets.GWei(3).ToInt()),
 						BridgeReturnData:   mustPackReturnData(t, big.NewInt(10)),
@@ -640,7 +640,7 @@ func Test_filterExecuted(t *testing.T) {
 						OcrSeqNum:          2,
 						FromChainSelector:  10,
 						ToChainSelector:    20,
-						To:                 l2Rebalancer,
+						To:                 l2LiquidityManager,
 						Amount:             big.NewInt(100),
 						BridgeSpecificData: mustPackSendPayload(t, big.NewInt(100_000), big.NewInt(250_000), assets.GWei(3).ToInt()),
 						BridgeReturnData:   mustPackReturnData(t, big.NewInt(11)),
@@ -653,7 +653,7 @@ func Test_filterExecuted(t *testing.T) {
 					OcrSeqNum:          1,
 					FromChainSelector:  10,
 					ToChainSelector:    20,
-					To:                 l2Rebalancer,
+					To:                 l2LiquidityManager,
 					Amount:             big.NewInt(100),
 					BridgeSpecificData: mustPackSendPayload(t, big.NewInt(100_000), big.NewInt(250_000), assets.GWei(3).ToInt()),
 					BridgeReturnData:   mustPackReturnData(t, big.NewInt(10)),
@@ -662,7 +662,7 @@ func Test_filterExecuted(t *testing.T) {
 					OcrSeqNum:          2,
 					FromChainSelector:  10,
 					ToChainSelector:    20,
-					To:                 l2Rebalancer,
+					To:                 l2LiquidityManager,
 					Amount:             big.NewInt(100),
 					BridgeSpecificData: mustPackSendPayload(t, big.NewInt(100_000), big.NewInt(250_000), assets.GWei(3).ToInt()),
 					BridgeReturnData:   mustPackReturnData(t, big.NewInt(11)),
@@ -678,7 +678,7 @@ func Test_filterExecuted(t *testing.T) {
 						OcrSeqNum:          1,
 						FromChainSelector:  10,
 						ToChainSelector:    20,
-						To:                 l2Rebalancer,
+						To:                 l2LiquidityManager,
 						Amount:             big.NewInt(100),
 						BridgeSpecificData: mustPackSendPayload(t, big.NewInt(100_000), big.NewInt(250_000), assets.GWei(3).ToInt()),
 						BridgeReturnData:   mustPackReturnData(t, big.NewInt(10)),
@@ -687,7 +687,7 @@ func Test_filterExecuted(t *testing.T) {
 						OcrSeqNum:          2,
 						FromChainSelector:  10,
 						ToChainSelector:    20,
-						To:                 l2Rebalancer,
+						To:                 l2LiquidityManager,
 						Amount:             big.NewInt(100),
 						BridgeSpecificData: mustPackSendPayload(t, big.NewInt(100_000), big.NewInt(250_000), assets.GWei(3).ToInt()),
 						BridgeReturnData:   mustPackReturnData(t, big.NewInt(11)),
@@ -696,7 +696,7 @@ func Test_filterExecuted(t *testing.T) {
 						OcrSeqNum:          3,
 						FromChainSelector:  10,
 						ToChainSelector:    20,
-						To:                 l2Rebalancer,
+						To:                 l2LiquidityManager,
 						Amount:             big.NewInt(100),
 						BridgeSpecificData: mustPackSendPayload(t, big.NewInt(100_000), big.NewInt(250_000), assets.GWei(3).ToInt()),
 						BridgeReturnData:   mustPackReturnData(t, big.NewInt(12)),
@@ -707,7 +707,7 @@ func Test_filterExecuted(t *testing.T) {
 						OcrSeqNum:          2,
 						FromChainSelector:  10,
 						ToChainSelector:    20,
-						To:                 l2Rebalancer,
+						To:                 l2LiquidityManager,
 						Amount:             big.NewInt(100),
 						BridgeSpecificData: mustPackReturnData(t, big.NewInt(10)),
 						BridgeReturnData:   []byte{},
@@ -719,7 +719,7 @@ func Test_filterExecuted(t *testing.T) {
 					OcrSeqNum:          2,
 					FromChainSelector:  10,
 					ToChainSelector:    20,
-					To:                 l2Rebalancer,
+					To:                 l2LiquidityManager,
 					Amount:             big.NewInt(100),
 					BridgeSpecificData: mustPackSendPayload(t, big.NewInt(100_000), big.NewInt(250_000), assets.GWei(3).ToInt()),
 					BridgeReturnData:   mustPackReturnData(t, big.NewInt(11)),
@@ -728,7 +728,7 @@ func Test_filterExecuted(t *testing.T) {
 					OcrSeqNum:          3,
 					FromChainSelector:  10,
 					ToChainSelector:    20,
-					To:                 l2Rebalancer,
+					To:                 l2LiquidityManager,
 					Amount:             big.NewInt(100),
 					BridgeSpecificData: mustPackSendPayload(t, big.NewInt(100_000), big.NewInt(250_000), assets.GWei(3).ToInt()),
 					BridgeReturnData:   mustPackReturnData(t, big.NewInt(12)),
@@ -752,12 +752,12 @@ func Test_filterExecuted(t *testing.T) {
 
 func Test_partitionTransfers(t *testing.T) {
 	type args struct {
-		localToken             models.Address
-		l1BridgeAdapterAddress common.Address
-		l2RebalancerAddress    common.Address
-		sentLogs               []*liquiditymanager.LiquidityManagerLiquidityTransferred
-		depositFinalizedLogs   []*l2_arbitrum_gateway.L2ArbitrumGatewayDepositFinalized
-		receivedLogs           []*liquiditymanager.LiquidityManagerLiquidityTransferred
+		localToken                models.Address
+		l1BridgeAdapterAddress    common.Address
+		l2LiquidityManagerAddress common.Address
+		sentLogs                  []*liquiditymanager.LiquidityManagerLiquidityTransferred
+		depositFinalizedLogs      []*l2_arbitrum_gateway.L2ArbitrumGatewayDepositFinalized
+		receivedLogs              []*liquiditymanager.LiquidityManagerLiquidityTransferred
 	}
 	tests := []struct {
 		name          string
@@ -769,7 +769,7 @@ func Test_partitionTransfers(t *testing.T) {
 	}{}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotNotReady, gotReady, gotReadyData, err := partitionTransfers(tt.args.localToken, tt.args.l1BridgeAdapterAddress, tt.args.l2RebalancerAddress, tt.args.sentLogs, tt.args.depositFinalizedLogs, tt.args.receivedLogs)
+			gotNotReady, gotReady, gotReadyData, err := partitionTransfers(tt.args.localToken, tt.args.l1BridgeAdapterAddress, tt.args.l2LiquidityManagerAddress, tt.args.sentLogs, tt.args.depositFinalizedLogs, tt.args.receivedLogs)
 			if tt.wantErr {
 				require.Error(t, err)
 			} else {
@@ -784,15 +784,15 @@ func Test_partitionTransfers(t *testing.T) {
 
 func Test_getEffectiveEvents(t *testing.T) {
 	type args struct {
-		localToken             models.Address
-		l1BridgeAdapterAddress common.Address
-		l2RebalancerAddress    common.Address
-		depositFinalizedLogs   []*l2_arbitrum_gateway.L2ArbitrumGatewayDepositFinalized
+		localToken                models.Address
+		l1BridgeAdapterAddress    common.Address
+		l2LiquidityManagerAddress common.Address
+		depositFinalizedLogs      []*l2_arbitrum_gateway.L2ArbitrumGatewayDepositFinalized
 	}
 	var (
-		localToken             = testutils.NewAddress()
-		l1BridgeAdapterAddress = testutils.NewAddress()
-		l2RebalancerAddress    = testutils.NewAddress()
+		localToken                = testutils.NewAddress()
+		l1BridgeAdapterAddress    = testutils.NewAddress()
+		l2LiquidityManagerAddress = testutils.NewAddress()
 	)
 	tests := []struct {
 		name                          string
@@ -802,19 +802,19 @@ func Test_getEffectiveEvents(t *testing.T) {
 		{
 			"empty deposit finalized list",
 			args{
-				localToken:             models.Address(testutils.NewAddress()),
-				l1BridgeAdapterAddress: testutils.NewAddress(),
-				l2RebalancerAddress:    testutils.NewAddress(),
-				depositFinalizedLogs:   []*l2_arbitrum_gateway.L2ArbitrumGatewayDepositFinalized{},
+				localToken:                models.Address(testutils.NewAddress()),
+				l1BridgeAdapterAddress:    testutils.NewAddress(),
+				l2LiquidityManagerAddress: testutils.NewAddress(),
+				depositFinalizedLogs:      []*l2_arbitrum_gateway.L2ArbitrumGatewayDepositFinalized{},
 			},
 			nil,
 		},
 		{
 			"none applicable",
 			args{
-				localToken:             models.Address(testutils.NewAddress()),
-				l1BridgeAdapterAddress: testutils.NewAddress(),
-				l2RebalancerAddress:    testutils.NewAddress(),
+				localToken:                models.Address(testutils.NewAddress()),
+				l1BridgeAdapterAddress:    testutils.NewAddress(),
+				l2LiquidityManagerAddress: testutils.NewAddress(),
 				depositFinalizedLogs: []*l2_arbitrum_gateway.L2ArbitrumGatewayDepositFinalized{
 					{
 						L1Token: testutils.NewAddress(),
@@ -835,9 +835,9 @@ func Test_getEffectiveEvents(t *testing.T) {
 		{
 			"some exactly applicable",
 			args{
-				localToken:             models.Address(localToken),
-				l1BridgeAdapterAddress: l1BridgeAdapterAddress,
-				l2RebalancerAddress:    l2RebalancerAddress,
+				localToken:                models.Address(localToken),
+				l1BridgeAdapterAddress:    l1BridgeAdapterAddress,
+				l2LiquidityManagerAddress: l2LiquidityManagerAddress,
 				depositFinalizedLogs: []*l2_arbitrum_gateway.L2ArbitrumGatewayDepositFinalized{
 					{
 						L1Token: testutils.NewAddress(),
@@ -854,13 +854,13 @@ func Test_getEffectiveEvents(t *testing.T) {
 					{
 						L1Token: localToken,
 						From:    l1BridgeAdapterAddress,
-						To:      l2RebalancerAddress,
+						To:      l2LiquidityManagerAddress,
 						Amount:  big.NewInt(100),
 					},
 					{
 						L1Token: localToken,
 						From:    l1BridgeAdapterAddress,
-						To:      l2RebalancerAddress,
+						To:      l2LiquidityManagerAddress,
 						Amount:  big.NewInt(200),
 					},
 				},
@@ -869,13 +869,13 @@ func Test_getEffectiveEvents(t *testing.T) {
 				{
 					L1Token: localToken,
 					From:    l1BridgeAdapterAddress,
-					To:      l2RebalancerAddress,
+					To:      l2LiquidityManagerAddress,
 					Amount:  big.NewInt(100),
 				},
 				{
 					L1Token: localToken,
 					From:    l1BridgeAdapterAddress,
-					To:      l2RebalancerAddress,
+					To:      l2LiquidityManagerAddress,
 					Amount:  big.NewInt(200),
 				},
 			},
@@ -883,9 +883,9 @@ func Test_getEffectiveEvents(t *testing.T) {
 		{
 			"some partially applicable but still not included",
 			args{
-				localToken:             models.Address(localToken),
-				l1BridgeAdapterAddress: l1BridgeAdapterAddress,
-				l2RebalancerAddress:    l2RebalancerAddress,
+				localToken:                models.Address(localToken),
+				l1BridgeAdapterAddress:    l1BridgeAdapterAddress,
+				l2LiquidityManagerAddress: l2LiquidityManagerAddress,
 				depositFinalizedLogs: []*l2_arbitrum_gateway.L2ArbitrumGatewayDepositFinalized{
 					{
 						L1Token: testutils.NewAddress(),
@@ -902,13 +902,13 @@ func Test_getEffectiveEvents(t *testing.T) {
 					{
 						L1Token: localToken,
 						From:    testutils.NewAddress(), // not from bridge adapter
-						To:      l2RebalancerAddress,
+						To:      l2LiquidityManagerAddress,
 						Amount:  big.NewInt(100),
 					},
 					{
 						L1Token: localToken,
 						From:    l1BridgeAdapterAddress,
-						To:      testutils.NewAddress(), // not to rebalancer
+						To:      testutils.NewAddress(), // not to liquidityManager
 						Amount:  big.NewInt(200),
 					},
 				},
@@ -918,9 +918,9 @@ func Test_getEffectiveEvents(t *testing.T) {
 		{
 			"some fully applicable and some partially applicable but still not included",
 			args{
-				localToken:             models.Address(localToken),
-				l1BridgeAdapterAddress: l1BridgeAdapterAddress,
-				l2RebalancerAddress:    l2RebalancerAddress,
+				localToken:                models.Address(localToken),
+				l1BridgeAdapterAddress:    l1BridgeAdapterAddress,
+				l2LiquidityManagerAddress: l2LiquidityManagerAddress,
 				depositFinalizedLogs: []*l2_arbitrum_gateway.L2ArbitrumGatewayDepositFinalized{
 					{
 						L1Token: testutils.NewAddress(),
@@ -937,25 +937,25 @@ func Test_getEffectiveEvents(t *testing.T) {
 					{
 						L1Token: localToken,
 						From:    testutils.NewAddress(), // not from bridge adapter
-						To:      l2RebalancerAddress,
+						To:      l2LiquidityManagerAddress,
 						Amount:  big.NewInt(100),
 					},
 					{
 						L1Token: localToken,
 						From:    l1BridgeAdapterAddress,
-						To:      testutils.NewAddress(), // not to rebalancer
+						To:      testutils.NewAddress(), // not to liquidityManager
 						Amount:  big.NewInt(200),
 					},
 					{
 						L1Token: localToken,
 						From:    l1BridgeAdapterAddress,
-						To:      l2RebalancerAddress,
+						To:      l2LiquidityManagerAddress,
 						Amount:  big.NewInt(100),
 					},
 					{
 						L1Token: localToken,
 						From:    l1BridgeAdapterAddress,
-						To:      l2RebalancerAddress,
+						To:      l2LiquidityManagerAddress,
 						Amount:  big.NewInt(200),
 					},
 				},
@@ -964,13 +964,13 @@ func Test_getEffectiveEvents(t *testing.T) {
 				{
 					L1Token: localToken,
 					From:    l1BridgeAdapterAddress,
-					To:      l2RebalancerAddress,
+					To:      l2LiquidityManagerAddress,
 					Amount:  big.NewInt(100),
 				},
 				{
 					L1Token: localToken,
 					From:    l1BridgeAdapterAddress,
-					To:      l2RebalancerAddress,
+					To:      l2LiquidityManagerAddress,
 					Amount:  big.NewInt(200),
 				},
 			},
@@ -978,7 +978,7 @@ func Test_getEffectiveEvents(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotEffectiveDepositFinalized := getEffectiveEvents(tt.args.localToken, tt.args.l1BridgeAdapterAddress, tt.args.l2RebalancerAddress, tt.args.depositFinalizedLogs)
+			gotEffectiveDepositFinalized := getEffectiveEvents(tt.args.localToken, tt.args.l1BridgeAdapterAddress, tt.args.l2LiquidityManagerAddress, tt.args.depositFinalizedLogs)
 			require.Equal(t, tt.wantEffectiveDepositFinalized, gotEffectiveDepositFinalized)
 		})
 	}
@@ -986,19 +986,19 @@ func Test_getEffectiveEvents(t *testing.T) {
 
 func Test_l1ToL2Bridge_toPendingTransfers(t *testing.T) {
 	type fields struct {
-		localSelector       models.NetworkSelector
-		remoteSelector      models.NetworkSelector
-		l1Rebalancer        liquiditymanager.LiquidityManagerInterface
-		l2RebalancerAddress common.Address
+		localSelector             models.NetworkSelector
+		remoteSelector            models.NetworkSelector
+		l1LiquidityManager        liquiditymanager.LiquidityManagerInterface
+		l2LiquidityManagerAddress common.Address
 	}
 	var (
-		localSelector       = models.NetworkSelector(1)
-		remoteSelector      = models.NetworkSelector(2)
-		l2Rebalancer        = testutils.NewAddress()
-		localToken          = models.Address(testutils.NewAddress())
-		remoteToken         = models.Address(testutils.NewAddress())
-		l1RebalancerAddress = testutils.NewAddress()
-		l1Rebalancer, err   = liquiditymanager.NewLiquidityManager(l1RebalancerAddress, nil)
+		localSelector             = models.NetworkSelector(1)
+		remoteSelector            = models.NetworkSelector(2)
+		l2LiquidityManager        = testutils.NewAddress()
+		localToken                = models.Address(testutils.NewAddress())
+		remoteToken               = models.Address(testutils.NewAddress())
+		l1LiquidityManagerAddress = testutils.NewAddress()
+		l1LiquidityManager, err   = liquiditymanager.NewLiquidityManager(l1LiquidityManagerAddress, nil)
 	)
 	require.NoError(t, err)
 	type args struct {
@@ -1019,10 +1019,10 @@ func Test_l1ToL2Bridge_toPendingTransfers(t *testing.T) {
 		{
 			"len(ready) not equal to len(readyData)",
 			fields{
-				localSelector:       localSelector,
-				remoteSelector:      remoteSelector,
-				l1Rebalancer:        l1Rebalancer,
-				l2RebalancerAddress: l2Rebalancer,
+				localSelector:             localSelector,
+				remoteSelector:            remoteSelector,
+				l1LiquidityManager:        l1LiquidityManager,
+				l2LiquidityManagerAddress: l2LiquidityManager,
 			},
 			args{
 				localToken:  localToken,
@@ -1043,10 +1043,10 @@ func Test_l1ToL2Bridge_toPendingTransfers(t *testing.T) {
 		{
 			"not ready and ready",
 			fields{
-				localSelector:       localSelector,
-				remoteSelector:      remoteSelector,
-				l1Rebalancer:        l1Rebalancer,
-				l2RebalancerAddress: l2Rebalancer,
+				localSelector:             localSelector,
+				remoteSelector:            remoteSelector,
+				l1LiquidityManager:        l1LiquidityManager,
+				l2LiquidityManagerAddress: l2LiquidityManager,
 			},
 			args{
 				localToken:  localToken,
@@ -1079,8 +1079,8 @@ func Test_l1ToL2Bridge_toPendingTransfers(t *testing.T) {
 					Transfer: models.Transfer{
 						From:               localSelector,
 						To:                 remoteSelector,
-						Sender:             models.Address(l1RebalancerAddress),
-						Receiver:           models.Address(l2Rebalancer),
+						Sender:             models.Address(l1LiquidityManagerAddress),
+						Receiver:           models.Address(l2LiquidityManager),
 						LocalTokenAddress:  localToken,
 						RemoteTokenAddress: remoteToken,
 						Amount:             ubig.NewI(100),
@@ -1095,8 +1095,8 @@ func Test_l1ToL2Bridge_toPendingTransfers(t *testing.T) {
 					Transfer: models.Transfer{
 						From:               localSelector,
 						To:                 remoteSelector,
-						Sender:             models.Address(l1RebalancerAddress),
-						Receiver:           models.Address(l2Rebalancer),
+						Sender:             models.Address(l1LiquidityManagerAddress),
+						Receiver:           models.Address(l2LiquidityManager),
 						LocalTokenAddress:  localToken,
 						RemoteTokenAddress: remoteToken,
 						Amount:             ubig.NewI(300),
@@ -1114,10 +1114,10 @@ func Test_l1ToL2Bridge_toPendingTransfers(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			l := &l1ToL2Bridge{
-				localSelector:       tt.fields.localSelector,
-				remoteSelector:      tt.fields.remoteSelector,
-				l1Rebalancer:        tt.fields.l1Rebalancer,
-				l2RebalancerAddress: tt.fields.l2RebalancerAddress,
+				localSelector:             tt.fields.localSelector,
+				remoteSelector:            tt.fields.remoteSelector,
+				l1LiquidityManager:        tt.fields.l1LiquidityManager,
+				l2LiquidityManagerAddress: tt.fields.l2LiquidityManagerAddress,
 			}
 			got, err := l.toPendingTransfers(tt.args.localToken, tt.args.remoteToken, tt.args.notReady, tt.args.ready, tt.args.readyData, tt.args.parsedToLP)
 			if tt.wantErr {
@@ -1132,26 +1132,26 @@ func Test_l1ToL2Bridge_toPendingTransfers(t *testing.T) {
 
 func Test_l1ToL2Bridge_getLogs(t *testing.T) {
 	type fields struct {
-		localSelector       models.NetworkSelector
-		remoteSelector      models.NetworkSelector
-		l1Rebalancer        liquiditymanager.LiquidityManagerInterface
-		l2RebalancerAddress common.Address
-		l2Gateway           l2_arbitrum_gateway.L2ArbitrumGatewayInterface
-		l1LogPoller         *lpmocks.LogPoller
-		l2LogPoller         *lpmocks.LogPoller
+		localSelector             models.NetworkSelector
+		remoteSelector            models.NetworkSelector
+		l1LiquidityManager        liquiditymanager.LiquidityManagerInterface
+		l2LiquidityManagerAddress common.Address
+		l2Gateway                 l2_arbitrum_gateway.L2ArbitrumGatewayInterface
+		l1LogPoller               *lpmocks.LogPoller
+		l2LogPoller               *lpmocks.LogPoller
 	}
 	type args struct {
 		ctx    context.Context
 		fromTs time.Time
 	}
 	var (
-		localSelector       = models.NetworkSelector(1)
-		remoteSelector      = models.NetworkSelector(2)
-		l2RebalancerAddress = testutils.NewAddress()
-		l2GatewayAddress    = testutils.NewAddress()
-		l1RebalancerAddress = testutils.NewAddress()
+		localSelector             = models.NetworkSelector(1)
+		remoteSelector            = models.NetworkSelector(2)
+		l2LiquidityManagerAddress = testutils.NewAddress()
+		l2GatewayAddress          = testutils.NewAddress()
+		l1LiquidityManagerAddress = testutils.NewAddress()
 	)
-	l1Rebalancer, err := liquiditymanager.NewLiquidityManager(l1RebalancerAddress, nil)
+	l1LiquidityManager, err := liquiditymanager.NewLiquidityManager(l1LiquidityManagerAddress, nil)
 	require.NoError(t, err)
 	l2Gateway, err := l2_arbitrum_gateway.NewL2ArbitrumGateway(l2GatewayAddress, nil)
 	require.NoError(t, err)
@@ -1169,13 +1169,13 @@ func Test_l1ToL2Bridge_getLogs(t *testing.T) {
 		{
 			"error getting l1 liquidity transferred events",
 			fields{
-				localSelector:       localSelector,
-				remoteSelector:      remoteSelector,
-				l1Rebalancer:        l1Rebalancer,
-				l2RebalancerAddress: l2RebalancerAddress,
-				l2Gateway:           l2Gateway,
-				l1LogPoller:         lpmocks.NewLogPoller(t),
-				l2LogPoller:         lpmocks.NewLogPoller(t),
+				localSelector:             localSelector,
+				remoteSelector:            remoteSelector,
+				l1LiquidityManager:        l1LiquidityManager,
+				l2LiquidityManagerAddress: l2LiquidityManagerAddress,
+				l2Gateway:                 l2Gateway,
+				l1LogPoller:               lpmocks.NewLogPoller(t),
+				l2LogPoller:               lpmocks.NewLogPoller(t),
 			},
 			args{
 				ctx:    testutils.Context(t),
@@ -1185,7 +1185,7 @@ func Test_l1ToL2Bridge_getLogs(t *testing.T) {
 				f.l1LogPoller.On("IndexedLogsCreatedAfter",
 					mock.Anything,
 					LiquidityTransferredTopic,
-					l1Rebalancer.Address(),
+					l1LiquidityManager.Address(),
 					LiquidityTransferredToChainSelectorTopicIndex,
 					[]common.Hash{toHash(remoteSelector)},
 					a.fromTs,
@@ -1203,13 +1203,13 @@ func Test_l1ToL2Bridge_getLogs(t *testing.T) {
 		{
 			"error getting l2 deposit finalized events",
 			fields{
-				localSelector:       localSelector,
-				remoteSelector:      remoteSelector,
-				l1Rebalancer:        l1Rebalancer,
-				l2RebalancerAddress: l2RebalancerAddress,
-				l2Gateway:           l2Gateway,
-				l1LogPoller:         lpmocks.NewLogPoller(t),
-				l2LogPoller:         lpmocks.NewLogPoller(t),
+				localSelector:             localSelector,
+				remoteSelector:            remoteSelector,
+				l1LiquidityManager:        l1LiquidityManager,
+				l2LiquidityManagerAddress: l2LiquidityManagerAddress,
+				l2Gateway:                 l2Gateway,
+				l1LogPoller:               lpmocks.NewLogPoller(t),
+				l2LogPoller:               lpmocks.NewLogPoller(t),
 			},
 			args{
 				ctx:    testutils.Context(t),
@@ -1219,7 +1219,7 @@ func Test_l1ToL2Bridge_getLogs(t *testing.T) {
 				f.l1LogPoller.On("IndexedLogsCreatedAfter",
 					mock.Anything,
 					LiquidityTransferredTopic,
-					l1Rebalancer.Address(),
+					l1LiquidityManager.Address(),
 					LiquidityTransferredToChainSelectorTopicIndex,
 					[]common.Hash{toHash(remoteSelector)},
 					a.fromTs,
@@ -1230,7 +1230,7 @@ func Test_l1ToL2Bridge_getLogs(t *testing.T) {
 					DepositFinalizedTopic,
 					l2Gateway.Address(),
 					DepositFinalizedToAddressTopicIndex,
-					[]common.Hash{common.HexToHash(l2RebalancerAddress.Hex())},
+					[]common.Hash{common.HexToHash(l2LiquidityManagerAddress.Hex())},
 					a.fromTs,
 					logpoller.Finalized,
 				).Return(nil, errors.New("error"))
@@ -1247,13 +1247,13 @@ func Test_l1ToL2Bridge_getLogs(t *testing.T) {
 		{
 			"error getting l2 liquidity transferred events",
 			fields{
-				localSelector:       localSelector,
-				remoteSelector:      remoteSelector,
-				l1Rebalancer:        l1Rebalancer,
-				l2RebalancerAddress: l2RebalancerAddress,
-				l2Gateway:           l2Gateway,
-				l1LogPoller:         lpmocks.NewLogPoller(t),
-				l2LogPoller:         lpmocks.NewLogPoller(t),
+				localSelector:             localSelector,
+				remoteSelector:            remoteSelector,
+				l1LiquidityManager:        l1LiquidityManager,
+				l2LiquidityManagerAddress: l2LiquidityManagerAddress,
+				l2Gateway:                 l2Gateway,
+				l1LogPoller:               lpmocks.NewLogPoller(t),
+				l2LogPoller:               lpmocks.NewLogPoller(t),
 			},
 			args{
 				ctx:    testutils.Context(t),
@@ -1263,7 +1263,7 @@ func Test_l1ToL2Bridge_getLogs(t *testing.T) {
 				f.l1LogPoller.On("IndexedLogsCreatedAfter",
 					mock.Anything,
 					LiquidityTransferredTopic,
-					l1Rebalancer.Address(),
+					l1LiquidityManager.Address(),
 					LiquidityTransferredToChainSelectorTopicIndex,
 					[]common.Hash{toHash(remoteSelector)},
 					a.fromTs,
@@ -1274,14 +1274,14 @@ func Test_l1ToL2Bridge_getLogs(t *testing.T) {
 					DepositFinalizedTopic,
 					l2Gateway.Address(),
 					DepositFinalizedToAddressTopicIndex,
-					[]common.Hash{common.HexToHash(l2RebalancerAddress.Hex())},
+					[]common.Hash{common.HexToHash(l2LiquidityManagerAddress.Hex())},
 					a.fromTs,
 					logpoller.Finalized,
 				).Return([]logpoller.Log{{}, {}}, nil)
 				f.l2LogPoller.On("IndexedLogsCreatedAfter",
 					mock.Anything,
 					LiquidityTransferredTopic,
-					l2RebalancerAddress,
+					l2LiquidityManagerAddress,
 					LiquidityTransferredFromChainSelectorTopicIndex,
 					[]common.Hash{toHash(localSelector)},
 					a.fromTs,
@@ -1300,13 +1300,13 @@ func Test_l1ToL2Bridge_getLogs(t *testing.T) {
 		{
 			"happy path",
 			fields{
-				localSelector:       localSelector,
-				remoteSelector:      remoteSelector,
-				l1Rebalancer:        l1Rebalancer,
-				l2RebalancerAddress: l2RebalancerAddress,
-				l2Gateway:           l2Gateway,
-				l1LogPoller:         lpmocks.NewLogPoller(t),
-				l2LogPoller:         lpmocks.NewLogPoller(t),
+				localSelector:             localSelector,
+				remoteSelector:            remoteSelector,
+				l1LiquidityManager:        l1LiquidityManager,
+				l2LiquidityManagerAddress: l2LiquidityManagerAddress,
+				l2Gateway:                 l2Gateway,
+				l1LogPoller:               lpmocks.NewLogPoller(t),
+				l2LogPoller:               lpmocks.NewLogPoller(t),
 			},
 			args{
 				ctx:    testutils.Context(t),
@@ -1316,7 +1316,7 @@ func Test_l1ToL2Bridge_getLogs(t *testing.T) {
 				f.l1LogPoller.On("IndexedLogsCreatedAfter",
 					mock.Anything,
 					LiquidityTransferredTopic,
-					l1Rebalancer.Address(),
+					l1LiquidityManager.Address(),
 					LiquidityTransferredToChainSelectorTopicIndex,
 					[]common.Hash{toHash(remoteSelector)},
 					a.fromTs,
@@ -1330,7 +1330,7 @@ func Test_l1ToL2Bridge_getLogs(t *testing.T) {
 					DepositFinalizedTopic,
 					l2Gateway.Address(),
 					DepositFinalizedToAddressTopicIndex,
-					[]common.Hash{common.HexToHash(l2RebalancerAddress.Hex())},
+					[]common.Hash{common.HexToHash(l2LiquidityManagerAddress.Hex())},
 					a.fromTs,
 					logpoller.Finalized,
 				).Return([]logpoller.Log{
@@ -1340,7 +1340,7 @@ func Test_l1ToL2Bridge_getLogs(t *testing.T) {
 				f.l2LogPoller.On("IndexedLogsCreatedAfter",
 					mock.Anything,
 					LiquidityTransferredTopic,
-					l2RebalancerAddress,
+					l2LiquidityManagerAddress,
 					LiquidityTransferredFromChainSelectorTopicIndex,
 					[]common.Hash{toHash(localSelector)},
 					a.fromTs,
@@ -1372,13 +1372,13 @@ func Test_l1ToL2Bridge_getLogs(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			l := &l1ToL2Bridge{
-				localSelector:       tt.fields.localSelector,
-				remoteSelector:      tt.fields.remoteSelector,
-				l1Rebalancer:        tt.fields.l1Rebalancer,
-				l2RebalancerAddress: tt.fields.l2RebalancerAddress,
-				l2Gateway:           tt.fields.l2Gateway,
-				l1LogPoller:         tt.fields.l1LogPoller,
-				l2LogPoller:         tt.fields.l2LogPoller,
+				localSelector:             tt.fields.localSelector,
+				remoteSelector:            tt.fields.remoteSelector,
+				l1LiquidityManager:        tt.fields.l1LiquidityManager,
+				l2LiquidityManagerAddress: tt.fields.l2LiquidityManagerAddress,
+				l2Gateway:                 tt.fields.l2Gateway,
+				l1LogPoller:               tt.fields.l1LogPoller,
+				l2LogPoller:               tt.fields.l2LogPoller,
 			}
 			tt.before(t, tt.fields, tt.args)
 			defer tt.assertions(t, tt.fields)

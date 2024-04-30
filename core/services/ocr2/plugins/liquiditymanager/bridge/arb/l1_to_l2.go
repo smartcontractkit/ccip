@@ -35,29 +35,29 @@ import (
 )
 
 type l1ToL2Bridge struct {
-	localSelector       models.NetworkSelector
-	remoteSelector      models.NetworkSelector
-	l1Rebalancer        liquiditymanager.LiquidityManagerInterface
-	l2RebalancerAddress common.Address
-	l1BridgeAdapter     arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterInterface
-	l1GatewayRouter     arbitrum_gateway_router.ArbitrumGatewayRouterInterface
-	l1Inbox             arbitrum_inbox.ArbitrumInboxInterface
-	l2Gateway           l2_arbitrum_gateway.L2ArbitrumGatewayInterface
-	l1Client            client.Client
-	l2Client            client.Client
-	l1LogPoller         logpoller.LogPoller
-	l2LogPoller         logpoller.LogPoller
-	l1FilterName        string
-	l2FilterName        string
-	lggr                logger.Logger
+	localSelector             models.NetworkSelector
+	remoteSelector            models.NetworkSelector
+	l1LiquidityManager        liquiditymanager.LiquidityManagerInterface
+	l2LiquidityManagerAddress common.Address
+	l1BridgeAdapter           arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterInterface
+	l1GatewayRouter           arbitrum_gateway_router.ArbitrumGatewayRouterInterface
+	l1Inbox                   arbitrum_inbox.ArbitrumInboxInterface
+	l2Gateway                 l2_arbitrum_gateway.L2ArbitrumGatewayInterface
+	l1Client                  client.Client
+	l2Client                  client.Client
+	l1LogPoller               logpoller.LogPoller
+	l2LogPoller               logpoller.LogPoller
+	l1FilterName              string
+	l2FilterName              string
+	lggr                      logger.Logger
 }
 
 func NewL1ToL2Bridge(
 	lggr logger.Logger,
 	localSelector,
 	remoteSelector models.NetworkSelector,
-	l1RebalancerAddress,
-	l2RebalancerAddress,
+	l1LiquidityManagerAddress,
+	l2LiquidityManagerAddress,
 	l1GatewayRouterAddress,
 	l1InboxAddress common.Address,
 	l1Client,
@@ -84,12 +84,12 @@ func NewL1ToL2Bridge(
 		return nil, fmt.Errorf("instantiate L1 inbox at %s: %w", l1InboxAddress, err)
 	}
 
-	l1FilterName := fmt.Sprintf("ArbitrumL2ToL1Bridge-L1-Rebalancer:%s-Local:%s-Remote:%s",
-		l1RebalancerAddress.String(), localChain.Name, remoteChain.Name)
+	l1FilterName := fmt.Sprintf("ArbitrumL2ToL1Bridge-L1-LiquidityManager:%s-Local:%s-Remote:%s",
+		l1LiquidityManagerAddress.String(), localChain.Name, remoteChain.Name)
 	// FIXME Makram please pass the valid context
 	ctx := context.Background()
 	err = l1LogPoller.RegisterFilter(ctx, logpoller.Filter{
-		Addresses: []common.Address{l1RebalancerAddress},
+		Addresses: []common.Address{l1LiquidityManagerAddress},
 		Name:      l1FilterName,
 		EventSigs: []common.Hash{
 			LiquidityTransferredTopic,
@@ -101,14 +101,14 @@ func NewL1ToL2Bridge(
 	}
 
 	// figure out which gateway to watch for the token on L2
-	l1Rebalancer, err := liquiditymanager.NewLiquidityManager(l1RebalancerAddress, l1Client)
+	l1LiquidityManager, err := liquiditymanager.NewLiquidityManager(l1LiquidityManagerAddress, l1Client)
 	if err != nil {
-		return nil, fmt.Errorf("instantiate rebalancer at %s: %w", l1RebalancerAddress, err)
+		return nil, fmt.Errorf("instantiate liquidityManager at %s: %w", l1LiquidityManagerAddress, err)
 	}
 
-	xchainRebal, err := l1Rebalancer.GetCrossChainRebalancer(nil, uint64(remoteSelector))
+	xchainRebal, err := l1LiquidityManager.GetCrossChainRebalancer(nil, uint64(remoteSelector))
 	if err != nil {
-		return nil, fmt.Errorf("get cross chain rebalancer for remote chain %s: %w", remoteChain.Name, err)
+		return nil, fmt.Errorf("get cross chain liquidityManager for remote chain %s: %w", remoteChain.Name, err)
 	}
 
 	l1BridgeAdapter, err := arbitrum_l1_bridge_adapter.NewArbitrumL1BridgeAdapter(xchainRebal.LocalBridge, l1Client)
@@ -116,9 +116,9 @@ func NewL1ToL2Bridge(
 		return nil, fmt.Errorf("instantiate L1 bridge adapter at %s: %w", xchainRebal.LocalBridge, err)
 	}
 
-	l1Token, err := l1Rebalancer.ILocalToken(nil)
+	l1Token, err := l1LiquidityManager.ILocalToken(nil)
 	if err != nil {
-		return nil, fmt.Errorf("get local token from rebalancer: %w", err)
+		return nil, fmt.Errorf("get local token from liquidityManager: %w", err)
 	}
 
 	// get the gateway on L1 and then it's counterpart gateway on L2
@@ -138,17 +138,17 @@ func NewL1ToL2Bridge(
 		return nil, fmt.Errorf("get counterpart gateway for gateway %s: %w", l1TokenGateway, err)
 	}
 
-	l2FilterName := fmt.Sprintf("ArbitrumL2ToL1Bridge-L2-L2Gateway:%s-Rebalancer:%s-Local:%s-Remote:%s",
-		l2Gateway.Hex(), l2RebalancerAddress.Hex(), localChain.Name, remoteChain.Name)
+	l2FilterName := fmt.Sprintf("ArbitrumL2ToL1Bridge-L2-L2Gateway:%s-LiquidityManager:%s-Local:%s-Remote:%s",
+		l2Gateway.Hex(), l2LiquidityManagerAddress.Hex(), localChain.Name, remoteChain.Name)
 	err = l2LogPoller.RegisterFilter(ctx, logpoller.Filter{
 		Addresses: []common.Address{
-			l2Gateway,           // emits DepositFinalized
-			l2RebalancerAddress, // emits LiquidityTransferred
+			l2Gateway,                 // emits DepositFinalized
+			l2LiquidityManagerAddress, // emits LiquidityTransferred
 		},
 		Name: l2FilterName,
 		EventSigs: []common.Hash{
 			DepositFinalizedTopic,     // emitted by the gateways
-			LiquidityTransferredTopic, // emitted by the rebalancers
+			LiquidityTransferredTopic, // emitted by the liquidityManagers
 		},
 		Retention: DurationMonth,
 	})
@@ -166,8 +166,8 @@ func NewL1ToL2Bridge(
 		"remoteSelector", remoteSelector,
 		"localChainID", localChain.EvmChainID,
 		"remoteChainID", remoteChain.EvmChainID,
-		"l1Rebalancer", l1Rebalancer.Address(),
-		"l2Rebalancer", l2RebalancerAddress,
+		"l1LiquidityManager", l1LiquidityManager.Address(),
+		"l2LiquidityManager", l2LiquidityManagerAddress,
 		"l1BridgeAdapter", l1BridgeAdapter.Address(),
 		"l1GatewayRouter", l1GatewayRouter.Address(),
 		"l1Inbox", l1Inbox.Address(),
@@ -176,21 +176,21 @@ func NewL1ToL2Bridge(
 	lggr.Infow("successfully initialized arbitrum L1 -> L2 bridge")
 
 	return &l1ToL2Bridge{
-		localSelector:       localSelector,
-		remoteSelector:      remoteSelector,
-		l1Rebalancer:        l1Rebalancer,
-		l2RebalancerAddress: l2RebalancerAddress,
-		l1BridgeAdapter:     l1BridgeAdapter,
-		l1GatewayRouter:     l1GatewayRouter,
-		l1Inbox:             l1Inbox,
-		l2Gateway:           l2GatewayWrapper,
-		l1Client:            l1Client,
-		l2Client:            l2Client,
-		l1LogPoller:         l1LogPoller,
-		l2LogPoller:         l2LogPoller,
-		l1FilterName:        l1FilterName,
-		l2FilterName:        l2FilterName,
-		lggr:                lggr,
+		localSelector:             localSelector,
+		remoteSelector:            remoteSelector,
+		l1LiquidityManager:        l1LiquidityManager,
+		l2LiquidityManagerAddress: l2LiquidityManagerAddress,
+		l1BridgeAdapter:           l1BridgeAdapter,
+		l1GatewayRouter:           l1GatewayRouter,
+		l1Inbox:                   l1Inbox,
+		l2Gateway:                 l2GatewayWrapper,
+		l1Client:                  l1Client,
+		l2Client:                  l2Client,
+		l1LogPoller:               l1LogPoller,
+		l2LogPoller:               l2LogPoller,
+		l1FilterName:              l1FilterName,
+		l2FilterName:              l2FilterName,
+		lggr:                      lggr,
 	}, nil
 }
 
@@ -205,8 +205,8 @@ func (l *l1ToL2Bridge) GetTransfers(
 	)
 	lggr.Info("getting transfers from L1 -> L2")
 
-	// TODO: check that l1Rebalancer token matches localToken
-	// TODO: check that l2Rebalancer token matches remoteToken
+	// TODO: check that l1LiquidityManager token matches localToken
+	// TODO: check that l2LiquidityManager token matches remoteToken
 	// TODO: this should not be hardcoded here
 	// TODO: heavy query warning
 	fromTs := time.Now().Add(-24 * time.Hour) // last day
@@ -232,7 +232,7 @@ func (l *l1ToL2Bridge) GetTransfers(
 		"receiveLogs", len(receiveLogs),
 	)
 
-	parsedSent, parsedToLP, err := parseLiquidityTransferred(l.l1Rebalancer.ParseLiquidityTransferred, sendLogs)
+	parsedSent, parsedToLP, err := parseLiquidityTransferred(l.l1LiquidityManager.ParseLiquidityTransferred, sendLogs)
 	if err != nil {
 		return nil, fmt.Errorf("parse L1 -> L2 transfers: %w", err)
 	}
@@ -242,7 +242,7 @@ func (l *l1ToL2Bridge) GetTransfers(
 		return nil, fmt.Errorf("parse DepositFinalized logs: %w", err)
 	}
 
-	parsedReceived, _, err := parseLiquidityTransferred(l.l1Rebalancer.ParseLiquidityTransferred, receiveLogs)
+	parsedReceived, _, err := parseLiquidityTransferred(l.l1LiquidityManager.ParseLiquidityTransferred, receiveLogs)
 	if err != nil {
 		return nil, fmt.Errorf("parse LiquidityTransferred logs: %w", err)
 	}
@@ -259,14 +259,14 @@ func (l *l1ToL2Bridge) GetTransfers(
 	// submitRetryable on the ArbRetryableTx precompile.
 	// e.g https://sepolia.arbiscan.io/tx/0xce0d0d7e74f184fa8cb264b6d9aab5ced159faf3d0d9ae54b67fd40ba9d965a7
 	// therefore we're kind of relegated here to doing a simple count check - filter out all of the
-	// LiquidityTransferred logs destined for the rebalancer on L2 and all the DepositFinalized logs that
-	// pay out to the rebalancer on L2.
+	// LiquidityTransferred logs destined for the liquidityManager on L2 and all the DepositFinalized logs that
+	// pay out to the liquidityManager on L2.
 	// We can _probably_ assume that the earlier LiquidityTransferred logs on L1
 	// are more likely to be finalizedNotExecuted than later ones.
 	notReady, ready, readyData, err := partitionTransfers(
 		localToken,
 		l.l1BridgeAdapter.Address(),
-		l.l2RebalancerAddress,
+		l.l2LiquidityManagerAddress,
 		parsedSent,
 		parsedDepositFinalized,
 		parsedReceived)
@@ -281,7 +281,7 @@ func (l *l1ToL2Bridge) getLogs(ctx context.Context, fromTs time.Time) (sendLogs 
 	sendLogs, err = l.l1LogPoller.IndexedLogsCreatedAfter(
 		ctx,
 		LiquidityTransferredTopic,
-		l.l1Rebalancer.Address(),
+		l.l1LiquidityManager.Address(),
 		LiquidityTransferredToChainSelectorTopicIndex,
 		[]common.Hash{
 			toHash(l.remoteSelector),
@@ -290,7 +290,7 @@ func (l *l1ToL2Bridge) getLogs(ctx context.Context, fromTs time.Time) (sendLogs 
 		1,
 	)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return nil, nil, nil, fmt.Errorf("get LiquidityTransferred events from L1 rebalancer: %w", err)
+		return nil, nil, nil, fmt.Errorf("get LiquidityTransferred events from L1 liquidityManager: %w", err)
 	}
 
 	depositFinalizedLogs, err = l.l2LogPoller.IndexedLogsCreatedAfter(
@@ -299,7 +299,7 @@ func (l *l1ToL2Bridge) getLogs(ctx context.Context, fromTs time.Time) (sendLogs 
 		l.l2Gateway.Address(),
 		DepositFinalizedToAddressTopicIndex,
 		[]common.Hash{
-			common.HexToHash(l.l2RebalancerAddress.Hex()),
+			common.HexToHash(l.l2LiquidityManagerAddress.Hex()),
 		},
 		fromTs,
 		logpoller.Finalized,
@@ -311,7 +311,7 @@ func (l *l1ToL2Bridge) getLogs(ctx context.Context, fromTs time.Time) (sendLogs 
 	receiveLogs, err = l.l2LogPoller.IndexedLogsCreatedAfter(
 		ctx,
 		LiquidityTransferredTopic,
-		l.l2RebalancerAddress,
+		l.l2LiquidityManagerAddress,
 		LiquidityTransferredFromChainSelectorTopicIndex,
 		[]common.Hash{
 			toHash(l.localSelector),
@@ -320,7 +320,7 @@ func (l *l1ToL2Bridge) getLogs(ctx context.Context, fromTs time.Time) (sendLogs 
 		1,
 	)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return nil, nil, nil, fmt.Errorf("get LiquidityTransferred events from L2 rebalancer: %w", err)
+		return nil, nil, nil, fmt.Errorf("get LiquidityTransferred events from L2 liquidityManager: %w", err)
 	}
 
 	return sendLogs, depositFinalizedLogs, receiveLogs, nil
@@ -343,8 +343,8 @@ func (l *l1ToL2Bridge) toPendingTransfers(
 			Transfer: models.Transfer{
 				From:               l.localSelector,
 				To:                 l.remoteSelector,
-				Sender:             models.Address(l.l1Rebalancer.Address()),
-				Receiver:           models.Address(l.l2RebalancerAddress),
+				Sender:             models.Address(l.l1LiquidityManager.Address()),
+				Receiver:           models.Address(l.l2LiquidityManagerAddress),
 				LocalTokenAddress:  localToken,
 				RemoteTokenAddress: remoteToken,
 				Amount:             ubig.New(transfer.Amount),
@@ -364,8 +364,8 @@ func (l *l1ToL2Bridge) toPendingTransfers(
 			Transfer: models.Transfer{
 				From:               l.localSelector,
 				To:                 l.remoteSelector,
-				Sender:             models.Address(l.l1Rebalancer.Address()),
-				Receiver:           models.Address(l.l2RebalancerAddress),
+				Sender:             models.Address(l.l1LiquidityManager.Address()),
+				Receiver:           models.Address(l.l2LiquidityManagerAddress),
 				LocalTokenAddress:  localToken,
 				RemoteTokenAddress: remoteToken,
 				Amount:             ubig.New(transfer.Amount),
@@ -389,7 +389,7 @@ func (l *l1ToL2Bridge) toPendingTransfers(
 func partitionTransfers(
 	localToken models.Address,
 	l1BridgeAdapterAddress common.Address,
-	l2RebalancerAddress common.Address,
+	l2LiquidityManagerAddress common.Address,
 	sentLogs []*liquiditymanager.LiquidityManagerLiquidityTransferred,
 	depositFinalizedLogs []*l2_arbitrum_gateway.L2ArbitrumGatewayDepositFinalized,
 	receivedLogs []*liquiditymanager.LiquidityManagerLiquidityTransferred,
@@ -399,7 +399,7 @@ func partitionTransfers(
 	readyData [][]byte,
 	err error,
 ) {
-	effectiveDepositFinalized := getEffectiveEvents(localToken, l1BridgeAdapterAddress, l2RebalancerAddress, depositFinalizedLogs)
+	effectiveDepositFinalized := getEffectiveEvents(localToken, l1BridgeAdapterAddress, l2LiquidityManagerAddress, depositFinalizedLogs)
 	// determine ready and not ready first
 	if len(sentLogs) > len(effectiveDepositFinalized) {
 		// more sent than have been finalized
@@ -476,7 +476,7 @@ func matchingExecutionExists(
 // getEffectiveEvents returns DepositFinalized logs that:
 // * are coming from the given L1 bridge adapter
 // * have L1Token matching the provided localToken
-// * have the To field matching the provided l2RebalancerAddress
+// * have the To field matching the provided l2LiquidityManagerAddress
 // DepositFinalized are emitted for all deposits, so filtering out the irrelevant events
 // is necessary.
 // TODO: ideally this would be done in the log poller query but no such query exists
@@ -486,7 +486,7 @@ func matchingExecutionExists(
 func getEffectiveEvents(
 	localToken models.Address,
 	l1BridgeAdapterAddress common.Address,
-	l2RebalancerAddress common.Address,
+	l2LiquidityManagerAddress common.Address,
 	depositFinalizedLogs []*l2_arbitrum_gateway.L2ArbitrumGatewayDepositFinalized,
 ) (
 	effectiveDepositFinalized []*l2_arbitrum_gateway.L2ArbitrumGatewayDepositFinalized,
@@ -494,7 +494,7 @@ func getEffectiveEvents(
 	for _, depFinalized := range depositFinalizedLogs {
 		if depFinalized.From == l1BridgeAdapterAddress &&
 			depFinalized.L1Token == common.Address(localToken) &&
-			depFinalized.To == l2RebalancerAddress {
+			depFinalized.To == l2LiquidityManagerAddress {
 			effectiveDepositFinalized = append(effectiveDepositFinalized, depFinalized)
 		}
 	}
