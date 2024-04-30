@@ -462,10 +462,20 @@ func TestSmokeCCIPSelfServeRateLimit(t *testing.T) {
 					Capacity:  big.NewInt(0),
 					Rate:      big.NewInt(0),
 				})
-				require.NoError(t, err, "Error disabling token pool %d rate limit", i)
+				require.NoError(t, err, "Error disabling rate limit for token pool %d", i)
+			}
+			for i, tokenPool := range dest.Common.BridgeTokenPools {
+				err = tokenPool.SetRemoteChainRateLimits(dest.SourceChainSelector, token_pool.RateLimiterConfig{
+					IsEnabled: false,
+					Capacity:  big.NewInt(0),
+					Rate:      big.NewInt(0),
+				})
+				require.NoError(t, err, "Error disabling rate limit for token pool %d", i)
 			}
 			err = src.Common.ChainClient.WaitForEvents()
-			require.NoError(t, err, "Error waiting for events")
+			require.NoError(t, err, "Error waiting for source chain events")
+			err = dest.Common.ChainClient.WaitForEvents()
+			require.NoError(t, err, "Error waiting for destination chain events")
 			overLimitAmount := new(big.Int).Add(aggregateRateLimit, big.NewInt(1))
 			src.TransferAmount[freeTokenIndex] = overLimitAmount
 			src.TransferAmount[limitedTokenIndex] = overLimitAmount
