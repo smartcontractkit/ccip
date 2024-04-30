@@ -1758,7 +1758,26 @@ func (d *Delegate) newServicesCCIPCommit(ctx context.Context, lggr logger.Sugare
 	logError := func(msg string) {
 		lggr.ErrorIf(d.jobORM.RecordError(jb.ID, msg), "unable to record error")
 	}
-	return ccipcommit.NewCommitServices(ctx, lggr, jb, d.legacyChains, d.isNewlyCreatedJob, d.pipelineRunner, oracleArgsNoPlugin, logError, qopts...)
+
+	dummyRelayer := evmrelay.Relayer{}
+	ccipCommitProvider, err := dummyRelayer.NewCCIPCommitProvider(
+		types.RelayArgs{
+			ExternalJobID: jb.ExternalJobID,
+			JobID:         spec.ID,
+			ContractID:    spec.ContractID,
+			RelayConfig:   spec.RelayConfig.Bytes(),
+			New:           d.isNewlyCreatedJob,
+		},
+		types.PluginArgs{},
+		d.legacyChains,
+		d.pipelineRunner,
+		jb.Name.ValueOrZero(),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return ccipcommit.NewCommitServices(ctx, ccipCommitProvider, lggr, jb, d.legacyChains, d.isNewlyCreatedJob, d.pipelineRunner, oracleArgsNoPlugin, logError, qopts...)
 }
 
 func (d *Delegate) newServicesCCIPExecution(ctx context.Context, lggr logger.SugaredLogger, jb job.Job, bootstrapPeers []commontypes.BootstrapperLocator, kb ocr2key.KeyBundle, ocrDB *db, lc ocrtypes.LocalConfig, transmitterID string, qopts ...pg.QOpt) ([]job.ServiceCtx, error) {

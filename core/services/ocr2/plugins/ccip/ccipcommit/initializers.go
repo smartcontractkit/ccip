@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"math/big"
 	"strings"
 
@@ -19,14 +20,14 @@ import (
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
 
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/ccipdataprovider"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/x_internal/cache"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/x_internal/ccipcalc"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/x_internal/ccipdata/ccipdataprovider"
 
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcommon"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/rpclib"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/x_internal/ccipcommon"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/x_internal/rpclib"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/txmgr"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/legacyevm"
@@ -34,28 +35,28 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/factory"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/observability"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/oraclelib"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/pricegetter"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/x_internal/ccipdata"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/x_internal/ccipdata/factory"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/x_internal/observability"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/x_internal/oraclelib"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/x_internal/pricegetter"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/promwrapper"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pipeline"
 )
 
-func NewCommitServices(ctx context.Context, lggr logger.Logger, jb job.Job, chainSet legacyevm.LegacyChainContainer, new bool, pr pipeline.Runner, argsNoPlugin libocr2.OCR2OracleArgs, logError func(string), qopts ...pg.QOpt) ([]job.ServiceCtx, error) {
+func NewCommitServices(ctx context.Context, types.CCIPCommitProvider, lggr logger.Logger, jb job.Job, chainSet legacyevm.LegacyChainContainer, new bool, pr pipeline.Runner, argsNoPlugin libocr2.OCR2OracleArgs, logError func(string), qopts ...pg.QOpt) ([]job.ServiceCtx, error) {
 	pluginConfig, backfillArgs, chainHealthcheck, err := jobSpecToCommitPluginConfig(ctx, lggr, jb, pr, chainSet, qopts...)
 	if err != nil {
 		return nil, err
 	}
 	wrappedPluginFactory := NewCommitReportingPluginFactory(*pluginConfig)
-	destChainID, err := chainselectors.ChainIdFromSelector(pluginConfig.destChainSelector)
+	destChainID, err := chainselectors.ChainIdFromSelector(pluginConfig.DestChainSelector)
 	if err != nil {
 		return nil, err
 	}
 	argsNoPlugin.ReportingPluginFactory = promwrapper.NewPromFactory(wrappedPluginFactory, "CCIPCommit", jb.OCR2OracleSpec.Relay, big.NewInt(0).SetUint64(destChainID))
-	argsNoPlugin.Logger = commonlogger.NewOCRWrapper(pluginConfig.lggr, true, logError)
+	argsNoPlugin.Logger = commonlogger.NewOCRWrapper(pluginConfig.Lggr, true, logError)
 	oracle, err := libocr2.NewOracle(argsNoPlugin)
 	if err != nil {
 		return nil, err
@@ -64,7 +65,7 @@ func NewCommitServices(ctx context.Context, lggr logger.Logger, jb job.Job, chai
 	if new {
 		return []job.ServiceCtx{
 			oraclelib.NewBackfilledOracle(
-				pluginConfig.lggr,
+				pluginConfig.Lggr,
 				backfillArgs.SourceLP,
 				backfillArgs.DestLP,
 				backfillArgs.SourceStartBlock,
@@ -279,17 +280,17 @@ func jobSpecToCommitPluginConfig(ctx context.Context, lggr logger.Logger, jb job
 		"sourceNative", sourceNative,
 		"sourceRouter", sourceRouter.Address())
 	return &CommitPluginStaticConfig{
-			lggr:                  commitLggr,
-			onRampReader:          onRampReader,
-			offRamps:              destOffRampReaders,
-			sourceNative:          ccipcalc.EvmAddrToGeneric(sourceNative),
-			priceGetter:           priceGetter,
-			sourceChainSelector:   params.commitStoreStaticCfg.SourceChainSelector,
-			destChainSelector:     params.commitStoreStaticCfg.ChainSelector,
-			commitStore:           commitStoreReader,
-			priceRegistryProvider: ccipdataprovider.NewEvmPriceRegistry(params.destChain.LogPoller(), params.destChain.Client(), commitLggr, ccip.CommitPluginLabel),
-			metricsCollector:      metricsCollector,
-			chainHealthcheck:      chainHealthcheck,
+			Lggr:                  commitLggr,
+			OnRampReader:          onRampReader,
+			OffRamps:              destOffRampReaders,
+			SourceNative:          ccipcalc.EvmAddrToGeneric(sourceNative),
+			PriceGetter:           priceGetter,
+			SourceChainSelector:   params.commitStoreStaticCfg.SourceChainSelector,
+			DestChainSelector:     params.commitStoreStaticCfg.ChainSelector,
+			CommitStore:           commitStoreReader,
+			PriceRegistryProvider: ccipdataprovider.NewEvmPriceRegistry(params.destChain.LogPoller(), params.destChain.Client(), commitLggr, ccip.CommitPluginLabel),
+			MetricsCollector:      metricsCollector,
+			ChainHealthcheck:      chainHealthcheck,
 		}, &ccipcommon.BackfillArgs{
 			SourceLP:         params.sourceChain.LogPoller(),
 			DestLP:           params.destChain.LogPoller(),

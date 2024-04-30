@@ -18,15 +18,15 @@ import (
 
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcommon"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/ccipdataprovider"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/pricegetter"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/pkg/hashlib"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/pkg/merklemulti"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/prices"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/x_internal/cache"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/x_internal/ccipcalc"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/x_internal/ccipcommon"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/x_internal/ccipdata"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/x_internal/ccipdata/ccipdataprovider"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/x_internal/pricegetter"
 )
 
 const (
@@ -52,20 +52,20 @@ type update struct {
 }
 
 type CommitPluginStaticConfig struct {
-	lggr logger.Logger
+	Lggr logger.Logger
 	// Source
-	onRampReader        ccipdata.OnRampReader
-	sourceChainSelector uint64
-	sourceNative        cciptypes.Address
+	OnRampReader        ccipdata.OnRampReader
+	SourceChainSelector uint64
+	SourceNative        cciptypes.Address
 	// Dest
-	offRamps              []ccipdata.OffRampReader
-	commitStore           ccipdata.CommitStoreReader
-	destChainSelector     uint64
-	priceRegistryProvider ccipdataprovider.PriceRegistry
+	OffRamps              []ccipdata.OffRampReader
+	CommitStore           ccipdata.CommitStoreReader
+	DestChainSelector     uint64
+	PriceRegistryProvider ccipdataprovider.PriceRegistry
 	// Offchain
-	priceGetter      pricegetter.PriceGetter
-	metricsCollector ccip.PluginMetricsCollector
-	chainHealthcheck cache.ChainHealthcheck
+	PriceGetter      pricegetter.PriceGetter
+	MetricsCollector ccip.PluginMetricsCollector
+	ChainHealthcheck cache.ChainHealthcheck
 }
 
 type CommitReportingPlugin struct {

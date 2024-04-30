@@ -5,6 +5,22 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/ccipcommit"
+	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/x_internal/cache"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/x_internal/ccipcalc"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/x_internal/ccipcommon"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/x_internal/ccipdata"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/x_internal/ccipdata/ccipdataprovider"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/x_internal/ccipdata/factory"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/x_internal/observability"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/x_internal/pricegetter"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/x_internal/rpclib"
+	"github.com/smartcontractkit/chainlink/v2/core/services/pipeline"
 	"strings"
 	"sync"
 
@@ -327,6 +343,354 @@ func (r *Relayer) NewFunctionsProvider(rargs commontypes.RelayArgs, pargs common
 	lggr := r.lggr.Named("FunctionsProvider").Named(rargs.ExternalJobID.String())
 	// TODO(FUN-668): Not ready yet (doesn't implement FunctionsEvents() properly)
 	return NewFunctionsProvider(ctx, r.chain, rargs, pargs, lggr, r.ks.Eth(), functions.FunctionsPlugin)
+}
+
+// huiepatr TODO: chainSet likely means we need two relayers, one for source chain and one for dest chain
+// pipeline runner needs to go
+// jobname needs to go
+// qopts need to go (should replace with context anyways)
+func (r *Relayer) NewCCIPCommitProvider(rargs commontypes.RelayArgs, pargs commontypes.PluginArgs, chainSet legacyevm.LegacyChainContainer, pr pipeline.Runner, jobName string, qopts ...pg.QOpt) (commontypes.CCIPCommitProvider, error) {
+	// TODO https://smartcontract-it.atlassian.net/browse/BCF-2887
+	ctx := context.Background()
+
+	// huiepatr TODO: this validation will probably happen before we convert job/spec to rargs + pargs
+	//if jb.OCR2OracleSpec == nil {
+	//	return nil, errors.New("spec is nil")
+	//}
+	//spec := jb.OCR2OracleSpec
+
+	var pluginConfig ccipconfig.CommitPluginJobSpecConfig
+	err := json.Unmarshal(pargs.PluginConfig, &pluginConfig)
+	if err != nil {
+		return nil, err
+	}
+	// ensure addresses are formatted properly - (lowercase to eip55 for evm)
+	pluginConfig.OffRamp = cciptypes.Address(common.HexToAddress(string(pluginConfig.OffRamp)).String())
+
+	destChain := r.chain
+
+	gethCommitStoreAddress := common.HexToAddress(rargs.ContractID) // TODO: is this the right contract ID?
+
+	// huiepatr TODO: figure out how we get FetchCommitStoreStaticConfig in here
+	staticConfig, err := ccipdata.FetchCommitStoreStaticConfig(gethCommitStoreAddress, destChain.Client())
+	if err != nil {
+		return nil, fmt.Errorf("get commit store static config: %w", err)
+	}
+
+	sourceChain, _, err := ccipconfig.GetChainByChainSelector(chainSet, staticConfig.SourceChainSelector)
+	if err != nil {
+		return nil, err
+	}
+
+	// return value of extractJobSpecParams
+	//return &jobSpecParams{
+	//	pluginConfig:         pluginConfig,
+	//	commitStoreAddress:   cciptypes.Address(commitStoreAddress.String()),
+	//	commitStoreStaticCfg: staticConfig,
+	//	sourceChain:          sourceChain,
+	//	destChain:            destChain,
+	//}, nil
+
+	commitStoreAddress := cciptypes.Address(gethCommitStoreAddress.String())
+	commitStoreStaticCfg := staticConfig
+
+	lggr := r.lggr
+
+	lggr.Infow("Initializing commit plugin",
+		"CommitStore", commitStoreAddress,
+		"OffRamp", pluginConfig.OffRamp,
+		"OnRamp", commitStoreStaticCfg.OnRamp,
+		"ArmProxy", commitStoreStaticCfg.ArmProxy,
+		"SourceChainSelector", commitStoreStaticCfg.SourceChainSelector,
+		"DestChainSelector", commitStoreStaticCfg.ChainSelector)
+
+	versionFinder := factory.NewEvmVersionFinder()
+	commitStoreReader, err := factory.NewCommitStoreReader(lggr, versionFinder, commitStoreAddress, destChain.Client(), destChain.LogPoller(), sourceChain.GasEstimator(), sourceChain.Config().EVM().GasEstimator().PriceMax().ToInt(), qopts...)
+	if err != nil {
+		return nil, fmt.Errorf("could not create commitStore reader: %w", err)
+	}
+	sourceChainName, destChainName, err := ccipconfig.ResolveChainNames(sourceChain.ID().Int64(), destChain.ID().Int64())
+	if err != nil {
+		return nil, err
+	}
+	commitLggr := r.lggr.Named("CCIPCommit").With("sourceChain", sourceChainName, "destChain", destChainName)
+
+	var priceGetter pricegetter.PriceGetter
+	withPipeline := strings.Trim(pluginConfig.TokenPricesUSDPipeline, "\n\t ") != ""
+	if withPipeline {
+		priceGetter, err = pricegetter.NewPipelineGetter(pluginConfig.TokenPricesUSDPipeline, pr, rargs.JobID, rargs.ExternalJobID, jobName, r.lggr)
+		if err != nil {
+			return nil, fmt.Errorf("creating pipeline price getter: %w", err)
+		}
+	} else {
+		// Use dynamic price getter.
+		if pluginConfig.PriceGetterConfig == nil {
+			return nil, fmt.Errorf("priceGetterConfig is nil")
+		}
+
+		// Build price getter clients for all chains specified in the aggregator configurations.
+		// Some lanes (e.g. Wemix/Kroma) requires other clients than source and destination, since they use feeds from other chains.
+		priceGetterClients := map[uint64]pricegetter.DynamicPriceGetterClient{}
+		for _, aggCfg := range pluginConfig.PriceGetterConfig.AggregatorPrices {
+			chainID := aggCfg.ChainID
+			// Retrieve the chain.
+			chain, _, err2 := ccipconfig.GetChainByChainID(chainSet, chainID)
+			if err2 != nil {
+				return nil, fmt.Errorf("retrieving chain for chainID %d: %w", chainID, err2)
+			}
+			caller := rpclib.NewDynamicLimitedBatchCaller(
+				lggr,
+				chain.Client(),
+				rpclib.DefaultRpcBatchSizeLimit,
+				rpclib.DefaultRpcBatchBackOffMultiplier,
+				rpclib.DefaultMaxParallelRpcCalls,
+			)
+			priceGetterClients[chainID] = pricegetter.NewDynamicPriceGetterClient(caller)
+		}
+
+		priceGetter, err = pricegetter.NewDynamicPriceGetter(*pluginConfig.PriceGetterConfig, priceGetterClients)
+		if err != nil {
+			return nil, fmt.Errorf("creating dynamic price getter: %w", err)
+		}
+	}
+
+	// Load all the readers relevant for this plugin.
+	onrampAddress := cciptypes.Address(commitStoreStaticCfg.OnRamp.String())
+	onRampReader, err := factory.NewOnRampReader(commitLggr, versionFinder, commitStoreStaticCfg.SourceChainSelector, commitStoreStaticCfg.ChainSelector, onrampAddress, sourceChain.LogPoller(), sourceChain.Client(), qopts...)
+	if err != nil {
+		return nil, pkgerrors.Wrap(err, "failed onramp reader")
+	}
+	offRampReader, err := factory.NewOffRampReader(commitLggr, versionFinder, pluginConfig.OffRamp, destChain.Client(), destChain.LogPoller(), destChain.GasEstimator(), destChain.Config().EVM().GasEstimator().PriceMax().ToInt(), true, qopts...)
+	if err != nil {
+		return nil, pkgerrors.Wrap(err, "failed offramp reader")
+	}
+	// Look up all destination offRamps connected to the same router
+	destRouterAddr, err := offRampReader.GetRouter(ctx)
+	if err != nil {
+		return nil, err
+	}
+	destRouterEvmAddr, err := ccipcalc.GenericAddrToEvm(destRouterAddr)
+	if err != nil {
+		return nil, err
+	}
+	destRouter, err := router.NewRouter(destRouterEvmAddr, destChain.Client())
+	if err != nil {
+		return nil, err
+	}
+	destRouterOffRamps, err := destRouter.GetOffRamps(&bind.CallOpts{Context: ctx})
+	if err != nil {
+		return nil, err
+	}
+	var destOffRampReaders []ccipdata.OffRampReader
+	for _, o := range destRouterOffRamps {
+		destOffRampAddr := cciptypes.Address(o.OffRamp.String())
+		destOffRampReader, err2 := factory.NewOffRampReader(
+			commitLggr,
+			versionFinder,
+			destOffRampAddr,
+			destChain.Client(),
+			destChain.LogPoller(),
+			destChain.GasEstimator(),
+			destChain.Config().EVM().GasEstimator().PriceMax().ToInt(),
+			true,
+			// qopts..., huiepatr TODO
+		)
+		if err2 != nil {
+			return nil, err2
+		}
+
+		destOffRampReaders = append(destOffRampReaders, destOffRampReader)
+	}
+
+	onRampRouterAddr, err := onRampReader.RouterAddress(ctx)
+	if err != nil {
+		return nil, err
+	}
+	sourceRouterAddr, err := ccipcalc.GenericAddrToEvm(onRampRouterAddr)
+	if err != nil {
+		return nil, err
+	}
+	sourceRouter, err := router.NewRouter(sourceRouterAddr, sourceChain.Client())
+	if err != nil {
+		return nil, err
+	}
+	sourceNative, err := sourceRouter.GetWrappedNative(&bind.CallOpts{Context: ctx})
+	if err != nil {
+		return nil, err
+	}
+
+	// Prom wrappers
+	onRampReader = observability.NewObservedOnRampReader(onRampReader, sourceChain.ID().Int64(), ccip.CommitPluginLabel)
+	commitStoreReader = observability.NewObservedCommitStoreReader(commitStoreReader, destChain.ID().Int64(), ccip.CommitPluginLabel)
+	metricsCollector := ccip.NewPluginMetricsCollector(ccip.CommitPluginLabel, sourceChain.ID().Int64(), destChain.ID().Int64())
+	for i, o := range destOffRampReaders {
+		destOffRampReaders[i] = observability.NewObservedOffRampReader(o, destChain.ID().Int64(), ccip.CommitPluginLabel)
+	}
+
+	chainHealthcheck := cache.NewObservedChainHealthCheck(
+		cache.NewChainHealthcheck(
+			// Adding more details to Logger to make healthcheck logs more informative
+			// It's safe because healthcheck logs only in case of unhealthy state
+			lggr.With(
+				"onramp", onrampAddress,
+				"commitStore", commitStoreAddress,
+				"offramp", pluginConfig.OffRamp,
+			),
+			onRampReader,
+			commitStoreReader,
+		),
+		ccip.CommitPluginLabel,
+		sourceChain.ID().Int64(),
+		destChain.ID().Int64(),
+		onrampAddress,
+	)
+
+	commitLggr.Infow("NewCommitServices",
+		"pluginConfig", pluginConfig,
+		"staticConfig", commitStoreStaticCfg,
+		// TODO bring back
+		//"dynamicOnRampConfig", dynamicOnRampConfig,
+		"sourceNative", sourceNative,
+		"sourceRouter", sourceRouter.Address())
+
+	// jobSpecToCommitPluginConfig
+	//return &CommitPluginStaticConfig{
+	//		lggr:                  commitLggr,
+	//		onRampReader:          onRampReader,
+	//		offRamps:              destOffRampReaders,
+	//		sourceNative:          ccipcalc.EvmAddrToGeneric(sourceNative),
+	//		priceGetter:           priceGetter,
+	//		sourceChainSelector:   commitStoreStaticCfg.SourceChainSelector,
+	//		destChainSelector:     commitStoreStaticCfg.ChainSelector,
+	//		commitStore:           commitStoreReader,
+	//		priceRegistryProvider: ccipdataprovider.NewEvmPriceRegistry(destChain.LogPoller(), destChain.Client(), commitLggr, ccip.CommitPluginLabel),
+	//		metricsCollector:      metricsCollector,
+	//		chainHealthcheck:      chainHealthcheck,
+	//	}, &ccipcommon.BackfillArgs{
+	//		SourceLP:         sourceChain.LogPoller(),
+	//		DestLP:           destChain.LogPoller(),
+	//		SourceStartBlock: pluginConfig.SourceStartBlock,
+	//		DestStartBlock:   pluginConfig.DestStartBlock,
+	//	},
+	//	chainHealthcheck,
+	//	nil
+
+	ccipPluginConfig := ccipcommit.CommitPluginStaticConfig{
+		Lggr:                  commitLggr,
+		OnRampReader:          onRampReader,
+		OffRamps:              destOffRampReaders,
+		SourceNative:          ccipcalc.EvmAddrToGeneric(sourceNative),
+		PriceGetter:           priceGetter,
+		SourceChainSelector:   commitStoreStaticCfg.SourceChainSelector,
+		DestChainSelector:     commitStoreStaticCfg.ChainSelector,
+		CommitStore:           commitStoreReader,
+		PriceRegistryProvider: ccipdataprovider.NewEvmPriceRegistry(destChain.LogPoller(), destChain.Client(), commitLggr, ccip.CommitPluginLabel),
+		MetricsCollector:      metricsCollector,
+		ChainHealthcheck:      chainHealthcheck,
+	}
+
+	backfillArgs := ccipcommon.BackfillArgs{
+		SourceLP:         sourceChain.LogPoller(),
+		DestLP:           destChain.LogPoller(),
+		SourceStartBlock: pluginConfig.SourceStartBlock,
+		DestStartBlock:   pluginConfig.DestStartBlock,
+	}
+
+	return XXXCreateEVMCCIPCommitProvider(ccipPluginConfig, backfillArgs, chainHealthcheck), nil
+
+}
+
+type EVMCCIPCommitProviderImpl struct{}
+
+func XXXCreateEVMCCIPCommitProvider(cpsc ccipcommit.CommitPluginStaticConfig, backfillArgs ccipcommon.BackfillArgs, chainHealthcheck *cache.ObservedChainHealthcheck) EVMCCIPCommitProviderImpl {
+	// huiepatr TODO: do something sensible
+	return EVMCCIPCommitProviderImpl{}
+}
+
+func (E EVMCCIPCommitProviderImpl) Name() string {
+	return "EVMCCIPCommitProvider"
+}
+
+func (E EVMCCIPCommitProviderImpl) Start(ctx context.Context) error {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (E EVMCCIPCommitProviderImpl) Close() error {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (E EVMCCIPCommitProviderImpl) Ready() error {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (E EVMCCIPCommitProviderImpl) HealthReport() map[string]error {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (E EVMCCIPCommitProviderImpl) OffchainConfigDigester() ocrtypes.OffchainConfigDigester {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (E EVMCCIPCommitProviderImpl) ContractConfigTracker() ocrtypes.ContractConfigTracker {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (E EVMCCIPCommitProviderImpl) ContractTransmitter() ocrtypes.ContractTransmitter {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (E EVMCCIPCommitProviderImpl) ChainReader() commontypes.ChainReader {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (E EVMCCIPCommitProviderImpl) Codec() commontypes.Codec {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (E EVMCCIPCommitProviderImpl) NewCommitStoreReader(ctx context.Context, addr cciptypes.Address) (cciptypes.CommitStoreReader, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (E EVMCCIPCommitProviderImpl) NewOffRampReader(ctx context.Context, addr cciptypes.Address) (cciptypes.OffRampReader, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (E EVMCCIPCommitProviderImpl) NewOnRampReader(ctx context.Context, addr cciptypes.Address) (cciptypes.OnRampReader, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (E EVMCCIPCommitProviderImpl) NewPriceGetter(ctx context.Context) (cciptypes.PriceGetter, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (E EVMCCIPCommitProviderImpl) NewPriceRegistryReader(ctx context.Context, addr cciptypes.Address) (cciptypes.PriceRegistryReader, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (E EVMCCIPCommitProviderImpl) SourceNativeToken(ctx context.Context) (cciptypes.Address, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+type CommitStoreStaticConfig struct {
+	ChainSelector       uint64
+	SourceChainSelector uint64
+	OnRamp              common.Address
+	ArmProxy            common.Address
 }
 
 // NewConfigProvider is called by bootstrap jobs
