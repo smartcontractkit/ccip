@@ -11,6 +11,7 @@ package ccip
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.19/CustomTokenPool/CustomTokenPool.abi ../../../contracts/solc/v0.8.19/CustomTokenPool/CustomTokenPool.bin CustomTokenPool custom_token_pool
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.19/TokenPool/TokenPool.abi ../../../contracts/solc/v0.8.19/TokenPool/TokenPool.bin TokenPool token_pool
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.19/ARM/ARM.abi ../../../contracts/solc/v0.8.19/ARM/ARM.bin ARMContract arm_contract
+//go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.19/MultiCommitStore/MultiCommitStore.abi ../../../contracts/solc/v0.8.19/MultiCommitStore/MultiCommitStore.bin MultiCommitStore multi_commit_store
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.19/ARMProxy/ARMProxy.abi ../../../contracts/solc/v0.8.19/ARMProxy/ARMProxy.bin ARMProxyContract arm_proxy_contract
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.19/MockARM/MockARM.abi ../../../contracts/solc/v0.8.19/MockARM/MockARM.bin MockARMContract mock_arm_contract
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.19/TokenAdminRegistry/TokenAdminRegistry.abi ../../../contracts/solc/v0.8.19/TokenAdminRegistry/TokenAdminRegistry.bin TokenAdminRegistry token_admin_registry
