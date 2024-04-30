@@ -37,22 +37,22 @@ var (
 )
 
 type testBridge struct {
-	sourceSelector   models.NetworkSelector
-	destSelector     models.NetworkSelector
-	sourceRebalancer liquiditymanager.LiquidityManagerInterface
-	destRebalancer   liquiditymanager.LiquidityManagerInterface
-	sourceAdapter    mock_l1_bridge_adapter.MockL1BridgeAdapterInterface
-	destAdapter      mock_l1_bridge_adapter.MockL1BridgeAdapterInterface
-	sourceLogPoller  logpoller.LogPoller
-	destLogPoller    logpoller.LogPoller
-	sourceClient     client.Client
-	destClient       client.Client
-	lggr             logger.Logger
+	sourceSelector         models.NetworkSelector
+	destSelector           models.NetworkSelector
+	sourceLiquidityManager liquiditymanager.LiquidityManagerInterface
+	destLiquidityManager   liquiditymanager.LiquidityManagerInterface
+	sourceAdapter          mock_l1_bridge_adapter.MockL1BridgeAdapterInterface
+	destAdapter            mock_l1_bridge_adapter.MockL1BridgeAdapterInterface
+	sourceLogPoller        logpoller.LogPoller
+	destLogPoller          logpoller.LogPoller
+	sourceClient           client.Client
+	destClient             client.Client
+	lggr                   logger.Logger
 }
 
 func New(
 	sourceSelector, destSelector models.NetworkSelector,
-	sourceRebalancerAddress, destRebalancerAddress, sourceAdapter, destAdapter models.Address,
+	sourceLiquidityManagerAddress, destLiquidityManagerAddress, sourceAdapter, destAdapter models.Address,
 	sourceLogPoller, destLogPoller logpoller.LogPoller,
 	sourceClient, destClient client.Client,
 	lggr logger.Logger,
@@ -62,13 +62,13 @@ func New(
 		ctx,
 		logpoller.Filter{
 			Name: logpoller.FilterName("Local-LiquidityTransferred-FinalizationCompleted",
-				sourceSelector, sourceRebalancerAddress.String()),
+				sourceSelector, sourceLiquidityManagerAddress.String()),
 			EventSigs: []common.Hash{
 				LiquidityTransferredTopic,
 				FinalizationStepCompletedTopic,
 			},
 			Addresses: []common.Address{
-				common.Address(sourceRebalancerAddress),
+				common.Address(sourceLiquidityManagerAddress),
 			},
 		})
 	if err != nil {
@@ -79,13 +79,13 @@ func New(
 		ctx,
 		logpoller.Filter{
 			Name: logpoller.FilterName("Remote-LiquidityTransferred-FinalizationCompleted",
-				destSelector, destRebalancerAddress.String()),
+				destSelector, destLiquidityManagerAddress.String()),
 			EventSigs: []common.Hash{
 				LiquidityTransferredTopic,
 				FinalizationStepCompletedTopic,
 			},
 			Addresses: []common.Address{
-				common.Address(destRebalancerAddress),
+				common.Address(destLiquidityManagerAddress),
 			},
 		})
 	if err != nil {
@@ -95,8 +95,8 @@ func New(
 	lggr = lggr.Named("TestBridge").With(
 		"sourceSelector", sourceSelector,
 		"destSelector", destSelector,
-		"sourceRebalancer", sourceRebalancerAddress,
-		"destRebalancer", destRebalancerAddress,
+		"sourceLiquidityManager", sourceLiquidityManagerAddress,
+		"destLiquidityManager", destLiquidityManagerAddress,
 		"sourceAdapter", sourceAdapter,
 		"destAdapter", destAdapter,
 	)
@@ -112,28 +112,28 @@ func New(
 		return nil, fmt.Errorf("create dest adapter wrapper: %w", err)
 	}
 
-	sourceRebalancer, err := liquiditymanager.NewLiquidityManager(common.Address(sourceRebalancerAddress), sourceClient)
+	sourceLiquidityManager, err := liquiditymanager.NewLiquidityManager(common.Address(sourceLiquidityManagerAddress), sourceClient)
 	if err != nil {
-		return nil, fmt.Errorf("create source rebalancer: %w", err)
+		return nil, fmt.Errorf("create source liquidityManager: %w", err)
 	}
 
-	destRebalancer, err := liquiditymanager.NewLiquidityManager(common.Address(destRebalancerAddress), destClient)
+	destLiquidityManager, err := liquiditymanager.NewLiquidityManager(common.Address(destLiquidityManagerAddress), destClient)
 	if err != nil {
-		return nil, fmt.Errorf("create dest rebalancer: %w", err)
+		return nil, fmt.Errorf("create dest liquidityManager: %w", err)
 	}
 
 	return &testBridge{
-		sourceSelector:   sourceSelector,
-		destSelector:     destSelector,
-		sourceRebalancer: sourceRebalancer,
-		destRebalancer:   destRebalancer,
-		sourceAdapter:    sourceAdapterWrapper,
-		destAdapter:      destAdapterWrapper,
-		sourceLogPoller:  sourceLogPoller,
-		destLogPoller:    destLogPoller,
-		sourceClient:     sourceClient,
-		destClient:       destClient,
-		lggr:             lggr,
+		sourceSelector:         sourceSelector,
+		destSelector:           destSelector,
+		sourceLiquidityManager: sourceLiquidityManager,
+		destLiquidityManager:   destLiquidityManager,
+		sourceAdapter:          sourceAdapterWrapper,
+		destAdapter:            destAdapterWrapper,
+		sourceLogPoller:        sourceLogPoller,
+		destLogPoller:          destLogPoller,
+		sourceClient:           sourceClient,
+		destClient:             destClient,
+		lggr:                   lggr,
 	}, nil
 }
 
@@ -170,7 +170,7 @@ func (t *testBridge) GetTransfers(ctx context.Context, localToken models.Address
 		1,
 		latestSourceBlock.BlockNumber,
 		[]common.Hash{LiquidityTransferredTopic},
-		t.sourceRebalancer.Address(),
+		t.sourceLiquidityManager.Address(),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("get source LiquidityTransferred logs: %w", err)
@@ -181,20 +181,20 @@ func (t *testBridge) GetTransfers(ctx context.Context, localToken models.Address
 		1,
 		latestDestBlock.BlockNumber,
 		[]common.Hash{LiquidityTransferredTopic, FinalizationStepCompletedTopic},
-		t.destRebalancer.Address(),
+		t.destLiquidityManager.Address(),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("get dest LiquidityTransferred logs: %w", err)
 	}
 
-	parsedSendLogs, parsedToLP, err := parseLiquidityTransferred(t.sourceRebalancer.ParseLiquidityTransferred, sendLogs)
+	parsedSendLogs, parsedToLP, err := parseLiquidityTransferred(t.sourceLiquidityManager.ParseLiquidityTransferred, sendLogs)
 	if err != nil {
 		return nil, fmt.Errorf("parse source send logs: %w", err)
 	}
 
 	parsedStepCompleted, parsedFinalizeLogs, err := parseLiquidityTransferredAndFinalizationStepCompleted(
-		t.destRebalancer.ParseLiquidityTransferred,
-		t.destRebalancer.ParseFinalizationStepCompleted,
+		t.destLiquidityManager.ParseLiquidityTransferred,
+		t.destLiquidityManager.ParseFinalizationStepCompleted,
 		receiveLogs)
 	if err != nil {
 		return nil, fmt.Errorf("parse dest finalize logs: %w", err)
@@ -231,7 +231,7 @@ func (t *testBridge) toPendingTransfers(
 				From:               t.sourceSelector,
 				To:                 t.destSelector,
 				Sender:             models.Address(t.sourceAdapter.Address()),
-				Receiver:           models.Address(t.destRebalancer.Address()),
+				Receiver:           models.Address(t.destLiquidityManager.Address()),
 				Amount:             ubig.New(send.Amount),
 				LocalTokenAddress:  localToken,
 				RemoteTokenAddress: remoteToken,
@@ -259,7 +259,7 @@ func (t *testBridge) toPendingTransfers(
 				From:               t.sourceSelector,
 				To:                 t.destSelector,
 				Sender:             models.Address(t.sourceAdapter.Address()),
-				Receiver:           models.Address(t.destRebalancer.Address()),
+				Receiver:           models.Address(t.destLiquidityManager.Address()),
 				Amount:             ubig.New(send.Amount),
 				LocalTokenAddress:  localToken,
 				RemoteTokenAddress: remoteToken,
@@ -355,7 +355,7 @@ func groupByStage(
 // isCandidateProven returns true if the candidate transfer has already been proven.
 // it does this by checking if the candidate's nonce matches any of the nonces in the
 // stepsCompleted logs.
-// see contracts/src/v0.8/rebalancer/test/mocks/MockBridgeAdapter.sol for details on this.
+// see contracts/src/v0.8/liquiditymanager/test/mocks/MockBridgeAdapter.sol for details on this.
 func isCandidateProven(candidate *liquiditymanager.LiquidityManagerLiquidityTransferred, stepsCompleted []*liquiditymanager.LiquidityManagerFinalizationStepCompleted) (bool, error) {
 	for _, stepCompleted := range stepsCompleted {
 		sendNonce, err := UnpackBridgeSendReturnData(candidate.BridgeReturnData)

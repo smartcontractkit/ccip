@@ -26,23 +26,23 @@ import (
 
 func Test_testBridge_toPendingTransfers(t *testing.T) {
 	var (
-		sourceSelector        = models.NetworkSelector(1)
-		destSelector          = models.NetworkSelector(2)
-		localToken            = models.Address(testutils.NewAddress())
-		remoteToken           = models.Address(testutils.NewAddress())
-		sourceAdapterAddress  = models.Address(testutils.NewAddress())
-		destRebalancerAddress = models.Address(testutils.NewAddress())
+		sourceSelector              = models.NetworkSelector(1)
+		destSelector                = models.NetworkSelector(2)
+		localToken                  = models.Address(testutils.NewAddress())
+		remoteToken                 = models.Address(testutils.NewAddress())
+		sourceAdapterAddress        = models.Address(testutils.NewAddress())
+		destLiquidityManagerAddress = models.Address(testutils.NewAddress())
 	)
 	sourceAdapter, err := mock_l1_bridge_adapter.NewMockL1BridgeAdapter(common.Address(sourceAdapterAddress), nil)
 	require.NoError(t, err)
-	destRebalancer, err := liquiditymanager.NewLiquidityManager(common.Address(destRebalancerAddress), nil)
+	destLiquidityManager, err := liquiditymanager.NewLiquidityManager(common.Address(destLiquidityManagerAddress), nil)
 	require.NoError(t, err)
 	type fields struct {
-		sourceSelector models.NetworkSelector
-		destSelector   models.NetworkSelector
-		destRebalancer liquiditymanager.LiquidityManagerInterface
-		sourceAdapter  mock_l1_bridge_adapter.MockL1BridgeAdapterInterface
-		lggr           logger.Logger
+		sourceSelector       models.NetworkSelector
+		destSelector         models.NetworkSelector
+		destLiquidityManager liquiditymanager.LiquidityManagerInterface
+		sourceAdapter        mock_l1_bridge_adapter.MockL1BridgeAdapterInterface
+		lggr                 logger.Logger
 	}
 	type args struct {
 		localToken      models.Address
@@ -60,11 +60,11 @@ func Test_testBridge_toPendingTransfers(t *testing.T) {
 		{
 			"no pending transfers",
 			fields{
-				sourceSelector: sourceSelector,
-				destSelector:   destSelector,
-				destRebalancer: destRebalancer,
-				sourceAdapter:  sourceAdapter,
-				lggr:           logger.TestLogger(t),
+				sourceSelector:       sourceSelector,
+				destSelector:         destSelector,
+				destLiquidityManager: destLiquidityManager,
+				sourceAdapter:        sourceAdapter,
+				lggr:                 logger.TestLogger(t),
 			},
 			args{
 				localToken:      localToken,
@@ -78,11 +78,11 @@ func Test_testBridge_toPendingTransfers(t *testing.T) {
 		{
 			"some pending transfers, all ready to prove",
 			fields{
-				sourceSelector: sourceSelector,
-				destSelector:   destSelector,
-				destRebalancer: destRebalancer,
-				sourceAdapter:  sourceAdapter,
-				lggr:           logger.TestLogger(t),
+				sourceSelector:       sourceSelector,
+				destSelector:         destSelector,
+				destLiquidityManager: destLiquidityManager,
+				sourceAdapter:        sourceAdapter,
+				lggr:                 logger.TestLogger(t),
 			},
 			args{
 				localToken:  localToken,
@@ -121,7 +121,7 @@ func Test_testBridge_toPendingTransfers(t *testing.T) {
 						From:               sourceSelector,
 						To:                 destSelector,
 						Sender:             sourceAdapterAddress,
-						Receiver:           destRebalancerAddress,
+						Receiver:           destLiquidityManagerAddress,
 						LocalTokenAddress:  localToken,
 						RemoteTokenAddress: remoteToken,
 						Date:               mustParseTime(t, "2021-01-01T00:00:00Z"),
@@ -137,7 +137,7 @@ func Test_testBridge_toPendingTransfers(t *testing.T) {
 						From:               sourceSelector,
 						To:                 destSelector,
 						Sender:             sourceAdapterAddress,
-						Receiver:           destRebalancerAddress,
+						Receiver:           destLiquidityManagerAddress,
 						LocalTokenAddress:  localToken,
 						RemoteTokenAddress: remoteToken,
 						Date:               mustParseTime(t, "2021-01-02T00:00:00Z"),
@@ -153,11 +153,11 @@ func Test_testBridge_toPendingTransfers(t *testing.T) {
 		{
 			"some pending transfers, all ready to finalize",
 			fields{
-				sourceSelector: sourceSelector,
-				destSelector:   destSelector,
-				destRebalancer: destRebalancer,
-				sourceAdapter:  sourceAdapter,
-				lggr:           logger.TestLogger(t),
+				sourceSelector:       sourceSelector,
+				destSelector:         destSelector,
+				destLiquidityManager: destLiquidityManager,
+				sourceAdapter:        sourceAdapter,
+				lggr:                 logger.TestLogger(t),
 			},
 			args{
 				localToken:   localToken,
@@ -196,7 +196,7 @@ func Test_testBridge_toPendingTransfers(t *testing.T) {
 						From:               sourceSelector,
 						To:                 destSelector,
 						Sender:             sourceAdapterAddress,
-						Receiver:           destRebalancerAddress,
+						Receiver:           destLiquidityManagerAddress,
 						LocalTokenAddress:  localToken,
 						RemoteTokenAddress: remoteToken,
 						Date:               mustParseTime(t, "2021-01-01T00:00:00Z"),
@@ -212,7 +212,7 @@ func Test_testBridge_toPendingTransfers(t *testing.T) {
 						From:               sourceSelector,
 						To:                 destSelector,
 						Sender:             sourceAdapterAddress,
-						Receiver:           destRebalancerAddress,
+						Receiver:           destLiquidityManagerAddress,
 						LocalTokenAddress:  localToken,
 						RemoteTokenAddress: remoteToken,
 						Date:               mustParseTime(t, "2021-01-02T00:00:00Z"),
@@ -228,11 +228,11 @@ func Test_testBridge_toPendingTransfers(t *testing.T) {
 		{
 			"some pending transfers, someready to finalize, some ready to prove",
 			fields{
-				sourceSelector: sourceSelector,
-				destSelector:   destSelector,
-				destRebalancer: destRebalancer,
-				sourceAdapter:  sourceAdapter,
-				lggr:           logger.TestLogger(t),
+				sourceSelector:       sourceSelector,
+				destSelector:         destSelector,
+				destLiquidityManager: destLiquidityManager,
+				sourceAdapter:        sourceAdapter,
+				lggr:                 logger.TestLogger(t),
 			},
 			args{
 				localToken:  localToken,
@@ -294,7 +294,7 @@ func Test_testBridge_toPendingTransfers(t *testing.T) {
 						From:               sourceSelector,
 						To:                 destSelector,
 						Sender:             sourceAdapterAddress,
-						Receiver:           destRebalancerAddress,
+						Receiver:           destLiquidityManagerAddress,
 						LocalTokenAddress:  localToken,
 						RemoteTokenAddress: remoteToken,
 						Date:               mustParseTime(t, "2021-01-03T00:00:00Z"),
@@ -310,7 +310,7 @@ func Test_testBridge_toPendingTransfers(t *testing.T) {
 						From:               sourceSelector,
 						To:                 destSelector,
 						Sender:             sourceAdapterAddress,
-						Receiver:           destRebalancerAddress,
+						Receiver:           destLiquidityManagerAddress,
 						LocalTokenAddress:  localToken,
 						RemoteTokenAddress: remoteToken,
 						Date:               mustParseTime(t, "2021-01-04T00:00:00Z"),
@@ -326,7 +326,7 @@ func Test_testBridge_toPendingTransfers(t *testing.T) {
 						From:               sourceSelector,
 						To:                 destSelector,
 						Sender:             sourceAdapterAddress,
-						Receiver:           destRebalancerAddress,
+						Receiver:           destLiquidityManagerAddress,
 						LocalTokenAddress:  localToken,
 						RemoteTokenAddress: remoteToken,
 						Date:               mustParseTime(t, "2021-01-01T00:00:00Z"),
@@ -342,7 +342,7 @@ func Test_testBridge_toPendingTransfers(t *testing.T) {
 						From:               sourceSelector,
 						To:                 destSelector,
 						Sender:             sourceAdapterAddress,
-						Receiver:           destRebalancerAddress,
+						Receiver:           destLiquidityManagerAddress,
 						LocalTokenAddress:  localToken,
 						RemoteTokenAddress: remoteToken,
 						Date:               mustParseTime(t, "2021-01-02T00:00:00Z"),
@@ -359,11 +359,11 @@ func Test_testBridge_toPendingTransfers(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tr := &testBridge{
-				sourceSelector: tt.fields.sourceSelector,
-				destSelector:   tt.fields.destSelector,
-				destRebalancer: tt.fields.destRebalancer,
-				sourceAdapter:  tt.fields.sourceAdapter,
-				lggr:           tt.fields.lggr,
+				sourceSelector:       tt.fields.sourceSelector,
+				destSelector:         tt.fields.destSelector,
+				destLiquidityManager: tt.fields.destLiquidityManager,
+				sourceAdapter:        tt.fields.sourceAdapter,
+				lggr:                 tt.fields.lggr,
 			}
 			got, err := tr.toPendingTransfers(tt.args.localToken, tt.args.remoteToken, tt.args.readyToProve, tt.args.readyToFinalize, tt.args.parsedToLP)
 			require.NoError(t, err)
@@ -655,25 +655,25 @@ func mustPackProvePayload(t *testing.T, nonce *big.Int) []byte {
 
 func TestNew(t *testing.T) {
 	var (
-		sourceSelector          = models.NetworkSelector(1)
-		destSelector            = models.NetworkSelector(2)
-		sourceRebalancerAddress = models.Address(testutils.NewAddress())
-		destRebalancerAddress   = models.Address(testutils.NewAddress())
-		sourceAdapterAddress    = models.Address(testutils.NewAddress())
-		destAdapterAddress      = models.Address(testutils.NewAddress())
+		sourceSelector                = models.NetworkSelector(1)
+		destSelector                  = models.NetworkSelector(2)
+		sourceLiquidityManagerAddress = models.Address(testutils.NewAddress())
+		destLiquidityManagerAddress   = models.Address(testutils.NewAddress())
+		sourceAdapterAddress          = models.Address(testutils.NewAddress())
+		destAdapterAddress            = models.Address(testutils.NewAddress())
 	)
 	type args struct {
-		sourceSelector          models.NetworkSelector
-		destSelector            models.NetworkSelector
-		sourceRebalancerAddress models.Address
-		destRebalancerAddress   models.Address
-		sourceAdapter           models.Address
-		destAdapter             models.Address
-		sourceLogPoller         *lp_mocks.LogPoller
-		destLogPoller           *lp_mocks.LogPoller
-		sourceClient            *evmclient_mocks.Client
-		destClient              *evmclient_mocks.Client
-		lggr                    logger.Logger
+		sourceSelector                models.NetworkSelector
+		destSelector                  models.NetworkSelector
+		sourceLiquidityManagerAddress models.Address
+		destLiquidityManagerAddress   models.Address
+		sourceAdapter                 models.Address
+		destAdapter                   models.Address
+		sourceLogPoller               *lp_mocks.LogPoller
+		destLogPoller                 *lp_mocks.LogPoller
+		sourceClient                  *evmclient_mocks.Client
+		destClient                    *evmclient_mocks.Client
+		lggr                          logger.Logger
 	}
 	tests := []struct {
 		name    string
@@ -685,22 +685,22 @@ func TestNew(t *testing.T) {
 		{
 			"happy path",
 			args{
-				sourceSelector:          sourceSelector,
-				destSelector:            destSelector,
-				sourceRebalancerAddress: sourceRebalancerAddress,
-				destRebalancerAddress:   destRebalancerAddress,
-				sourceAdapter:           sourceAdapterAddress,
-				destAdapter:             destAdapterAddress,
-				sourceLogPoller:         lp_mocks.NewLogPoller(t),
-				destLogPoller:           lp_mocks.NewLogPoller(t),
-				sourceClient:            evmclient_mocks.NewClient(t),
-				destClient:              evmclient_mocks.NewClient(t),
-				lggr:                    logger.TestLogger(t),
+				sourceSelector:                sourceSelector,
+				destSelector:                  destSelector,
+				sourceLiquidityManagerAddress: sourceLiquidityManagerAddress,
+				destLiquidityManagerAddress:   destLiquidityManagerAddress,
+				sourceAdapter:                 sourceAdapterAddress,
+				destAdapter:                   destAdapterAddress,
+				sourceLogPoller:               lp_mocks.NewLogPoller(t),
+				destLogPoller:                 lp_mocks.NewLogPoller(t),
+				sourceClient:                  evmclient_mocks.NewClient(t),
+				destClient:                    evmclient_mocks.NewClient(t),
+				lggr:                          logger.TestLogger(t),
 			},
 			func(t *testing.T, args args) {
 				args.sourceLogPoller.On("RegisterFilter", mock.Anything, mock.MatchedBy(func(f logpoller.Filter) bool {
 					ok := len(f.Addresses) == 1
-					ok = ok && f.Addresses[0] == common.Address(args.sourceRebalancerAddress)
+					ok = ok && f.Addresses[0] == common.Address(args.sourceLiquidityManagerAddress)
 					ok = ok && len(f.EventSigs) == 2
 					ok = ok && f.EventSigs[0] == LiquidityTransferredTopic
 					ok = ok && f.EventSigs[1] == FinalizationStepCompletedTopic
@@ -709,7 +709,7 @@ func TestNew(t *testing.T) {
 				})).Return(nil)
 				args.destLogPoller.On("RegisterFilter", mock.Anything, mock.MatchedBy(func(f logpoller.Filter) bool {
 					ok := len(f.Addresses) == 1
-					ok = ok && f.Addresses[0] == common.Address(args.destRebalancerAddress)
+					ok = ok && f.Addresses[0] == common.Address(args.destLiquidityManagerAddress)
 					ok = ok && len(f.EventSigs) == 2
 					ok = ok && f.EventSigs[0] == LiquidityTransferredTopic
 					ok = ok && f.EventSigs[1] == FinalizationStepCompletedTopic
@@ -728,7 +728,7 @@ func TestNew(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.expect(t, tt.args)
 			defer tt.assert(t, tt.args)
-			got, err := New(tt.args.sourceSelector, tt.args.destSelector, tt.args.sourceRebalancerAddress, tt.args.destRebalancerAddress, tt.args.sourceAdapter, tt.args.destAdapter, tt.args.sourceLogPoller, tt.args.destLogPoller, tt.args.sourceClient, tt.args.destClient, tt.args.lggr)
+			got, err := New(tt.args.sourceSelector, tt.args.destSelector, tt.args.sourceLiquidityManagerAddress, tt.args.destLiquidityManagerAddress, tt.args.sourceAdapter, tt.args.destAdapter, tt.args.sourceLogPoller, tt.args.destLogPoller, tt.args.sourceClient, tt.args.destClient, tt.args.lggr)
 			if tt.wantErr {
 				require.Error(t, err)
 			} else {
