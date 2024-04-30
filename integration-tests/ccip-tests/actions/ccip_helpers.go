@@ -77,7 +77,7 @@ const (
 	ChaosGroupNetworkBCCIPGeth        = "CCIPNetworkBGeth"
 	// The higher the load/throughput, the higher value we might need here to guarantee that nonces are not blocked
 	// 1 day should be enough for most of the cases
-	PermissionlessExecThreshold        = 60 * 60 * 24 // 1 day
+	PermissionlessExecThreshold        = 60 * 60 * 8 // 8 hr
 	MaxNoOfTokensInMsg                 = 50
 	CurrentVersion              string = "1.5.0-dev"
 )
@@ -807,8 +807,14 @@ func (ccipModule *CCIPCommon) DeployContracts(noOfTokens int,
 		ccipModule.FeeToken = token
 	}
 
-	// number of deployed bridge tokens does not match noOfTokens; deploy rest of the tokens
+	// number of deployed bridge tokens does not match noOfTokens; deploy rest of the tokens in case ExistingDeployment is false
+	// otherwise throw error
 	if len(ccipModule.BridgeTokens) < noOfTokens {
+		if ccipModule.ExistingDeployment {
+			return fmt.Errorf("no of bridgeTokens (%d) does not match no of tokens (%d) provided in testconfig,"+
+				"provide the rest of the tokens in laneconfig or update TokenConfig in testconfig",
+				len(ccipModule.BridgeTokens), noOfTokens)
+		}
 		// deploy bridge token.
 		for i := len(ccipModule.BridgeTokens); i < noOfTokens; i++ {
 			// if it's an existing deployment, we don't deploy the token
@@ -1089,6 +1095,7 @@ type StaticPriceConfig struct {
 func NewCCIPCommonFromConfig(
 	logger zerolog.Logger,
 	chainClient blockchain.EVMClient,
+	noOfTokensPerChain,
 	noOfTokensWithDynamicPrice int,
 	existingDeployment,
 	multiCall bool,
@@ -1100,7 +1107,7 @@ func NewCCIPCommonFromConfig(
 		return nil, err
 	}
 	newCD := newCCIPModule.Deployer
-	newCCIPModule.LoadContractAddresses(laneConfig, nil)
+	newCCIPModule.LoadContractAddresses(laneConfig, &noOfTokensPerChain)
 	var arm *contracts.ARM
 	if newCCIPModule.ARM != nil {
 		arm, err = newCD.NewARMContract(*newCCIPModule.ARMContract)
@@ -1687,7 +1694,7 @@ func DefaultSourceCCIPModule(
 	chainClient blockchain.EVMClient,
 	destChainId uint64,
 	destChain string,
-	noOfTokensWithDynamicPrice int,
+	noOfTokensPerChain, noOfTokensWithDynamicPrice int,
 	transferAmount []*big.Int,
 	MsgByteLength int64,
 	existingDeployment bool,
@@ -1695,7 +1702,7 @@ func DefaultSourceCCIPModule(
 	USDCMockDeployment *bool,
 	laneConf *laneconfig.LaneConfig,
 ) (*SourceCCIPModule, error) {
-	cmn, err := NewCCIPCommonFromConfig(logger, chainClient, noOfTokensWithDynamicPrice, existingDeployment, multiCall, USDCMockDeployment, laneConf)
+	cmn, err := NewCCIPCommonFromConfig(logger, chainClient, noOfTokensPerChain, noOfTokensWithDynamicPrice, existingDeployment, multiCall, USDCMockDeployment, laneConf)
 	if err != nil {
 		return nil, err
 	}
@@ -2344,13 +2351,12 @@ func DefaultDestinationCCIPModule(
 	chainClient blockchain.EVMClient,
 	sourceChainId uint64,
 	sourceChain string,
-	noOfTokensWithDynamicPrice int,
-	existingDeployment bool,
-	multiCall bool,
+	noOfTokensPerChain, noOfTokensWithDynamicPrice int,
+	existingDeployment, multiCall bool,
 	USDCMockDeployment *bool,
 	laneConf *laneconfig.LaneConfig,
 ) (*DestCCIPModule, error) {
-	cmn, err := NewCCIPCommonFromConfig(logger, chainClient, noOfTokensWithDynamicPrice, existingDeployment, multiCall, USDCMockDeployment, laneConf)
+	cmn, err := NewCCIPCommonFromConfig(logger, chainClient, noOfTokensPerChain, noOfTokensWithDynamicPrice, existingDeployment, multiCall, USDCMockDeployment, laneConf)
 	if err != nil {
 		return nil, err
 	}
@@ -3072,6 +3078,7 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 		lane.Logger,
 		sourceChainClient, destChainClient.GetChainID().Uint64(),
 		destChainClient.GetNetworkName(),
+		pointer.GetInt(testConf.TokenConfig.NoOfTokensPerChain),
 		pointer.GetInt(testConf.TokenConfig.NoOfTokensWithDynamicPrice),
 		transferAmounts, msgByteLength,
 		existingDeployment, multiCall, USDCMockDeployment, srcConf,
@@ -3083,6 +3090,7 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 		lane.Logger,
 		destChainClient, sourceChainClient.GetChainID().Uint64(),
 		sourceChainClient.GetNetworkName(),
+		pointer.GetInt(testConf.TokenConfig.NoOfTokensPerChain),
 		pointer.GetInt(testConf.TokenConfig.NoOfTokensWithDynamicPrice),
 		existingDeployment, multiCall, USDCMockDeployment, destConf,
 	)
