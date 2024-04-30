@@ -6,7 +6,7 @@ import {IBridgeAdapter} from "./IBridge.sol";
 interface ILiquidityManager {
   /// @notice Parameters for sending liquidity to a remote chain.
   /// @param amount The amount of tokens to be sent to the remote chain.
-  /// @param nativeBridgeFee The amount of native that should be sent by the rebalancer in the sendERC20 call.
+  /// @param nativeBridgeFee The amount of native that should be sent by the liquiditymanager in the sendERC20 call.
   ///        Used to pay for the bridge fees.
   /// @param remoteChainSelector The selector of the remote chain.
   /// @param bridgeData The bridge data that should be passed to the sendERC20 call.

@@ -8,7 +8,7 @@ import {LockReleaseTokenPool} from "../../ccip/pools/LockReleaseTokenPool.sol";
 import {LiquidityManager} from "../LiquidityManager.sol";
 import {MockL1BridgeAdapter} from "./mocks/MockBridgeAdapter.sol";
 import {LiquidityManagerBaseTest} from "./LiquidityManagerBaseTest.t.sol";
-import {RebalancerHelper} from "./helpers/RebalancerHelper.sol";
+import {LiquidityManagerHelper} from "./helpers/LiquidityManagerHelper.sol";
 
 import {IERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 
@@ -41,12 +41,12 @@ contract LiquidityManagerSetup is LiquidityManagerBaseTest {
 
   error NonceAlreadyUsed(uint256 nonce);
 
-  RebalancerHelper internal s_rebalancer;
+  LiquidityManagerHelper internal s_rebalancer;
   LockReleaseTokenPool internal s_lockReleaseTokenPool;
   MockL1BridgeAdapter internal s_bridgeAdapter;
 
   // LiquidityManager that rebalances weth.
-  RebalancerHelper internal s_wethRebalancer;
+  LiquidityManagerHelper internal s_wethRebalancer;
   LockReleaseTokenPool internal s_wethLockReleaseTokenPool;
   MockL1BridgeAdapter internal s_wethBridgeAdapter;
 
@@ -55,7 +55,7 @@ contract LiquidityManagerSetup is LiquidityManagerBaseTest {
 
     s_bridgeAdapter = new MockL1BridgeAdapter(s_l1Token, false);
     s_lockReleaseTokenPool = new LockReleaseTokenPool(s_l1Token, new address[](0), address(1), true, address(123));
-    s_rebalancer = new RebalancerHelper(s_l1Token, i_localChainSelector, s_lockReleaseTokenPool, 0);
+    s_rebalancer = new LiquidityManagerHelper(s_l1Token, i_localChainSelector, s_lockReleaseTokenPool, 0);
 
     s_lockReleaseTokenPool.setRebalancer(address(s_rebalancer));
 
@@ -67,7 +67,7 @@ contract LiquidityManagerSetup is LiquidityManagerBaseTest {
       true,
       address(123)
     );
-    s_wethRebalancer = new RebalancerHelper(
+    s_wethRebalancer = new LiquidityManagerHelper(
       IERC20(address(s_l1Weth)),
       i_localChainSelector,
       s_wethLockReleaseTokenPool,
@@ -194,7 +194,7 @@ contract Rebalancer_rebalanceLiquidity is LiquidityManagerSetup {
   function test_rebalanceBetweenPoolsSuccess() external {
     uint256 amount = 12345670;
 
-    s_rebalancer = new RebalancerHelper(s_l1Token, i_localChainSelector, s_bridgeAdapter, 0);
+    s_rebalancer = new LiquidityManagerHelper(s_l1Token, i_localChainSelector, s_bridgeAdapter, 0);
 
     MockL1BridgeAdapter mockRemoteBridgeAdapter = new MockL1BridgeAdapter(s_l1Token, false);
     LiquidityManager mockRemoteRebalancer = new LiquidityManager(
