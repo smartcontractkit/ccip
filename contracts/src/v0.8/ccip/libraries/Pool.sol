@@ -7,6 +7,10 @@ library Pool {
   // bytes4(keccak256("CCIP_POOL_V1"))
   bytes4 public constant CCIP_POOL_V1 = 0xaff2afbf;
 
+  // The number of bytes in the return data for a pool v1 releaseOrMint call.
+  // This should match the size of the ReleaseOrMintOutV1 struct.
+  uint16 public constant CCIP_POOL_V1_RET_BYTES = 2 * 32;
+
   struct LockOrBurnInV1 {
     bytes receiver; //  The recipient of the tokens on the destination chain, abi encoded
     uint256 amount; //  The amount of tokens to lock or burn, denominated in the source token's decimals
