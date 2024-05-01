@@ -354,7 +354,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
       if (poolReturnData.destPoolAddress.length != 32) revert InvalidAddress(poolReturnData.destPoolAddress);
 
       newMessage.sourceTokenData[i] = abi.encode(
-        IPool.SourceTokenData({
+        Internal.SourceTokenData({
           sourcePoolAddress: abi.encode(sourcePool),
           destPoolAddress: poolReturnData.destPoolAddress,
           extraData: poolReturnData.destPoolData

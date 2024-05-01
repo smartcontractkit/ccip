@@ -2,7 +2,6 @@
 pragma solidity ^0.8.0;
 
 import {IBurnMintERC20} from "../../../shared/token/ERC20/IBurnMintERC20.sol";
-import {IPool} from "../../interfaces/IPool.sol";
 
 import {Pool} from "../../libraries/Pool.sol";
 import {BurnMintTokenPool} from "../../pools/BurnMintTokenPool.sol";

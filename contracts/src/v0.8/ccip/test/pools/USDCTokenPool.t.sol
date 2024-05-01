@@ -360,7 +360,7 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
     bytes memory message = _generateUSDCMessage(usdcMessage);
     bytes memory attestation = bytes("attestation bytes");
 
-    IPool.SourceTokenData memory sourceTokenData = IPool.SourceTokenData({
+    Internal.SourceTokenData memory sourceTokenData = Internal.SourceTokenData({
       sourcePoolAddress: abi.encode(SOURCE_CHAIN_USDC_POOL),
       destPoolAddress: abi.encode(address(s_usdcTokenPool)),
       extraData: abi.encode(
@@ -402,7 +402,7 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
     uint32 nonce = 4730;
     uint32 sourceDomain = 3;
 
-    IPool.SourceTokenData memory sourceTokenData = IPool.SourceTokenData({
+    Internal.SourceTokenData memory sourceTokenData = Internal.SourceTokenData({
       sourcePoolAddress: abi.encode(SOURCE_CHAIN_USDC_POOL),
       destPoolAddress: abi.encode(address(s_usdcTokenPool)),
       extraData: abi.encode(USDCTokenPool.SourceTokenDataPayload({nonce: nonce, sourceDomain: sourceDomain}))
@@ -448,7 +448,7 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
       messageBody: bytes("")
     });
 
-    IPool.SourceTokenData memory sourceTokenData = IPool.SourceTokenData({
+    Internal.SourceTokenData memory sourceTokenData = Internal.SourceTokenData({
       sourcePoolAddress: abi.encode(SOURCE_CHAIN_USDC_POOL),
       destPoolAddress: abi.encode(address(s_usdcTokenPool)),
       extraData: abi.encode(
@@ -481,7 +481,7 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
     address recipient = address(1);
     vm.startPrank(s_routerAllowedOffRamp);
 
-    IPool.SourceTokenData memory sourceTokenData = IPool.SourceTokenData({
+    Internal.SourceTokenData memory sourceTokenData = Internal.SourceTokenData({
       sourcePoolAddress: abi.encode(SOURCE_CHAIN_USDC_POOL),
       destPoolAddress: abi.encode(address(s_usdcTokenPool)),
       extraData: abi.encode(USDCTokenPool.SourceTokenDataPayload({nonce: 1, sourceDomain: SOURCE_DOMAIN_IDENTIFIER}))
