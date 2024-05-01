@@ -191,7 +191,7 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
       sender: originalSender,
       nonce: extraArgs.sequenced ? nonce : 0,
       gasLimit: extraArgs.gasLimit,
-      strict: extraArgs.sequenced,
+      strict: false,
       sourceChainSelector: SOURCE_CHAIN_SELECTOR,
       receiver: abi.decode(message.receiver, (address)),
       data: message.data,

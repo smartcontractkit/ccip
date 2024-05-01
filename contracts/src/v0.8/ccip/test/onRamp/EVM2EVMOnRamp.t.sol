@@ -304,7 +304,6 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
     IERC20(s_sourceFeeToken).transferFrom(OWNER, address(s_onRamp), feeAmount);
 
     vm.expectEmit();
-    // We expect the message to be emitted with strict = true.
     emit CCIPSendRequested(_messageToEvent(message, 1, 1, feeAmount, OWNER));
 
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, feeAmount, OWNER);
@@ -319,7 +318,6 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
     IERC20(s_sourceFeeToken).transferFrom(OWNER, address(s_onRamp), feeAmount);
 
     vm.expectEmit();
-    // We expect the message to be emitted with strict = false.
     emit CCIPSendRequested(_messageToEvent(message, 1, 1, feeAmount, OWNER));
 
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, feeAmount, OWNER);

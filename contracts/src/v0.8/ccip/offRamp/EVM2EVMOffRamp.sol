@@ -275,7 +275,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
 
       Internal.MessageExecutionState newState;
       bytes memory returnData;
-      if (message.strict) {
+      if (message.nonce > 0) {
         // In the scenario where we upgrade offRamps, we still want to have sequential nonces.
         // Referencing the old offRamp to check the expected nonce if none is set for a
         // given sender allows us to skip the current message if it would not be the next according
@@ -297,10 +297,10 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
           s_senderNonce[message.sender] = prevNonce;
         }
 
-        // UNTOUCHED messages MUST be executed in order always IF sequenced == true.
+        // UNTOUCHED messages MUST be executed in order always IF message.nonce > 0.
         if (originalState == Internal.MessageExecutionState.UNTOUCHED) {
           if (prevNonce + 1 != message.nonce) {
-            // We skip the message if the nonce is incorrect, since sequenced is true.
+            // We skip the message if the nonce is incorrect, since message.nonce > 0.
             emit SkippedIncorrectNonce(message.nonce, message.sender);
             continue;
           }
@@ -354,8 +354,8 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
     // UNTOUCHED -> SUCCESS  nonce bump
     // FAILURE   -> FAILURE  no nonce bump
     // FAILURE   -> SUCCESS  no nonce bump
-    // Nonce bumping only occurs for messages where message.strict == true.
-    if (message.strict && originalState == Internal.MessageExecutionState.UNTOUCHED) {
+    // Nonce bumping only occurs for messages where message.nonce > 0.
+    if (message.nonce > 0 && originalState == Internal.MessageExecutionState.UNTOUCHED) {
       s_senderNonce[message.sender]++;
     }
 

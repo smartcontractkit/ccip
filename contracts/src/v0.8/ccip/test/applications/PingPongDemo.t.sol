@@ -59,7 +59,7 @@ contract PingPong_startPingPong is PingPongDappSetup {
       sourceTokenData: new bytes[](sentMessage.tokenAmounts.length),
       gasLimit: 2e5,
       feeToken: sentMessage.feeToken,
-      strict: true,
+      strict: false,
       messageId: ""
     });
     message.messageId = Internal._hash(message, s_metadataHash);

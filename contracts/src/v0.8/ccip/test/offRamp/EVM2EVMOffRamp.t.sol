@@ -231,9 +231,10 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
       )
     );
     // Nonce should increment on non-strict
-    assertEq(uint64(0), s_offRamp.getSenderNonce(address(OWNER)));
+    assertEq(uint64(0), s_offRamp.getSenderNonce(address(OWNER)), "nonce before exec should be 0");
+    assertEq(uint64(1), messages[0].nonce, "nonce of message should be 1");
     s_offRamp.execute(_generateReportFromMessages(messages), new uint256[](0));
-    assertEq(uint64(1), s_offRamp.getSenderNonce(address(OWNER)));
+    assertEq(uint64(1), s_offRamp.getSenderNonce(address(OWNER)), "nonce after exec should be 1");
   }
 
   function test_StrictUntouchedToSuccess_Success() public {

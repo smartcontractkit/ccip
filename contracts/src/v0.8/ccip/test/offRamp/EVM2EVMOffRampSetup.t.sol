@@ -134,9 +134,9 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSetup {
     Internal.EVM2EVMMessage memory message = Internal.EVM2EVMMessage({
       sequenceNumber: sequenceNumber,
       sender: OWNER,
-      nonce: sequenceNumber,
+      nonce: sequenced ? sequenceNumber : 0,
       gasLimit: GAS_LIMIT,
-      strict: sequenced,
+      strict: false,
       sourceChainSelector: SOURCE_CHAIN_SELECTOR,
       receiver: address(s_receiver),
       data: data,

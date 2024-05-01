@@ -332,7 +332,8 @@ func (r *ExecutionReportingPlugin) buildBatch(
 		}
 
 		// Check expected nonce is valid for sequenced messages.
-		if msg.Strict && msg.Nonce != expectedNonces[msg.Sender] {
+		// Sequenced messages have non-zero nonces.
+		if msg.Nonce > 0 && msg.Nonce != expectedNonces[msg.Sender] {
 			msgLggr.Warnw("Skipping message - invalid nonce", "have", msg.Nonce, "want", expectedNonces[msg.Sender])
 			batchBuilder.skip(msg, InvalidNonce)
 			continue

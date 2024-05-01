@@ -303,7 +303,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
       receiver: address(uint160(decodedReceiver)),
       sequenceNumber: ++s_sequenceNumber,
       gasLimit: extraArgsV2.gasLimit,
-      strict: extraArgsV2.sequenced,
+      strict: false,
       // Only bump nonce for sequenced messages, otherwise unsequenced message nonces
       // may block sequenced message nonces, which is not what we want.
       nonce: extraArgsV2.sequenced ? ++s_senderNonce[originalSender] : 0,
