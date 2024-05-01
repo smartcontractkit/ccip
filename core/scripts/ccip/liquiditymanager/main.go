@@ -146,7 +146,7 @@ func main() {
 		l1ChainID := cmd.Uint64("l1-chain-id", 0, "L1 Chain ID")
 		l2ChainID := cmd.Uint64("l2-chain-id", 0, "L2 Chain ID")
 		l1LiquidityManagerAddress := cmd.String("l1-liquiditymanager-address", "", "L1 LiquidityManager Address")
-		l2LiquidityManagerAddress := cmd.String("l2-LiquidityManager-address", "", "L2 LiquidityManager Address")
+		l2LiquidityManagerAddress := cmd.String("l2-liquiditymanager-address", "", "L2 LiquidityManager Address")
 		l1TokenAddress := cmd.String("l1-token-address", "", "L1 Token Address")
 		l2TokenAddress := cmd.String("l2-token-address", "", "L2 Token Address")
 		l1TokenPoolAddress := cmd.String("l1-token-pool-address", "", "L1 Token Pool Address")
