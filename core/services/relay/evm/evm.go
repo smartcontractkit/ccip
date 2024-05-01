@@ -353,12 +353,6 @@ func (r *Relayer) NewCCIPCommitProvider(rargs commontypes.RelayArgs, pargs commo
 	// TODO https://smartcontract-it.atlassian.net/browse/BCF-2887
 	ctx := context.Background()
 
-	// huiepatr TODO: this validation will probably happen before we convert job/spec to rargs + pargs
-	//if jb.OCR2OracleSpec == nil {
-	//	return nil, errors.New("spec is nil")
-	//}
-	//spec := jb.OCR2OracleSpec
-
 	var pluginConfig ccipconfig.CommitPluginJobSpecConfig
 	err := json.Unmarshal(pargs.PluginConfig, &pluginConfig)
 	if err != nil {
@@ -493,7 +487,7 @@ func (r *Relayer) NewCCIPCommitProvider(rargs commontypes.RelayArgs, pargs commo
 			destChain.GasEstimator(),
 			destChain.Config().EVM().GasEstimator().PriceMax().ToInt(),
 			true,
-			// qopts..., huiepatr TODO
+			qopts...,
 		)
 		if err2 != nil {
 			return nil, err2
@@ -597,6 +591,18 @@ func (r *Relayer) NewCCIPCommitProvider(rargs commontypes.RelayArgs, pargs commo
 	}
 
 	return XXXCreateEVMCCIPCommitProvider(ccipPluginConfig, backfillArgs, chainHealthcheck), nil
+
+}
+
+func (r *Relayer) NewCCIPCommitProviderSource(rargs commontypes.RelayArgs, pargs commontypes.PluginArgs) (commontypes.CCIPCommitProvider, error) {
+	// TODO https://smartcontract-it.atlassian.net/browse/BCF-2887
+	ctx := context.Background()
+
+}
+
+func (r *Relayer) NewCCIPCommitProviderDest(rargs commontypes.RelayArgs, pargs commontypes.PluginArgs) (commontypes.CCIPCommitProvider, error) {
+	// TODO https://smartcontract-it.atlassian.net/browse/BCF-2887
+	ctx := context.Background()
 
 }
 

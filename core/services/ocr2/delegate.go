@@ -1759,7 +1759,11 @@ func (d *Delegate) newServicesCCIPCommit(ctx context.Context, lggr logger.Sugare
 		lggr.ErrorIf(d.jobORM.RecordError(jb.ID, msg), "unable to record error")
 	}
 
-	dummyRelayer := evmrelay.Relayer{}
+	dummyRelayer, err := d.RelayGetter.Get(rid)
+	if err != nil {
+		return nil, err
+	}
+
 	ccipCommitProvider, err := dummyRelayer.NewCCIPCommitProvider(
 		types.RelayArgs{
 			ExternalJobID: jb.ExternalJobID,

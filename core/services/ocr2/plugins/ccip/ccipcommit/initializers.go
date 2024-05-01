@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/smartcontractkit/chainlink-common/pkg/types"
+	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	"math/big"
 	"strings"
 
@@ -45,7 +45,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/pipeline"
 )
 
-func NewCommitServices(ctx context.Context, types.CCIPCommitProvider, lggr logger.Logger, jb job.Job, chainSet legacyevm.LegacyChainContainer, new bool, pr pipeline.Runner, argsNoPlugin libocr2.OCR2OracleArgs, logError func(string), qopts ...pg.QOpt) ([]job.ServiceCtx, error) {
+func NewCommitServices(ctx context.Context, lggr logger.Logger, jb job.Job, chainSet legacyevm.LegacyChainContainer, new bool, pr pipeline.Runner, argsNoPlugin libocr2.OCR2OracleArgs, logError func(string), qopts ...pg.QOpt) ([]job.ServiceCtx, error) {
 	pluginConfig, backfillArgs, chainHealthcheck, err := jobSpecToCommitPluginConfig(ctx, lggr, jb, pr, chainSet, qopts...)
 	if err != nil {
 		return nil, err
@@ -79,6 +79,102 @@ func NewCommitServices(ctx context.Context, types.CCIPCommitProvider, lggr logge
 		job.NewServiceAdapter(oracle),
 		chainHealthcheck,
 	}, nil
+}
+
+func NewCommitServices2(ctx context.Context, srcProvider commontypes.CCIPCommitProvider, destProvider commontypes.CCIPCommitProvider, jb job.Job, lggr logger.Logger, pr pipeline.Runner, argsNoPlugin libocr2.OCR2OracleArgs, new bool) ([]job.ServiceCtx, error) {
+	spec := jb.OCR2OracleSpec
+
+	var pluginConfig ccipconfig.CommitPluginJobSpecConfig
+	err := json.Unmarshal(spec.PluginConfig.Bytes(), &pluginConfig) // TODO: is this chain-agnostic
+	if err != nil {
+		return nil, err
+	}
+
+	commitStoreAddress := common.HexToAddress(spec.ContractID)
+	commitStoreReader, err := srcProvider.NewCommitStoreReader(ctx, ccipcalc.EvmAddrToGeneric(commitStoreAddress))
+	if err != nil {
+		return nil, err
+	}
+
+	commitLggr := lggr.Named("CCIPCommit").With("sourceChain", sourceChainName, "destChain", destChainName)
+
+	priceGetter, err = srcProvider.NewPriceGetter(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("creating dynamic price getter: %w", err)
+	}
+
+	onRampAddress := srcProvider.OnRampAddress(ctx) // implement in provider? Or can it be in plugin config?
+	onRampReader, err := srcProvider.NewOnRampReader(ctx, ccipcalc.EvmAddrToGeneric(onRampAddress))
+	if err != nil {
+		return nil, err
+	}
+
+	offRampReader, err := destProvider.NewOffRampReader(ctx, pluginConfig.OffRamp)
+	if err != nil {
+		return nil, err
+	}
+
+	destOffRampReaders, err := destProvider.NewDestOffRampReaders(ctx) // implement in provider
+
+	sourceNative, err := srcProvider.SourceNativeToken(ctx)
+
+	// Prom wrappers
+	onRampReader = observability.NewObservedOnRampReader(onRampReader, params.sourceChain.ID().Int64(), ccip.CommitPluginLabel)
+	commitStoreReader = observability.NewObservedCommitStoreReader(commitStoreReader, params.destChain.ID().Int64(), ccip.CommitPluginLabel)
+	metricsCollector := ccip.NewPluginMetricsCollector(ccip.CommitPluginLabel, params.sourceChain.ID().Int64(), params.destChain.ID().Int64())
+	for i, o := range destOffRampReaders {
+		destOffRampReaders[i] = observability.NewObservedOffRampReader(o, params.destChain.ID().Int64(), ccip.CommitPluginLabel)
+	}
+
+	onrampAddress := common.HexToAddress(spec.ContractID)
+
+	chainHealthcheck := cache.NewObservedChainHealthCheck(
+		cache.NewChainHealthcheck(
+			// Adding more details to Logger to make healthcheck logs more informative
+			// It's safe because healthcheck logs only in case of unhealthy state
+			lggr.With(
+				"onramp", onrampAddress,
+				"commitStore", commitStoreAddress,
+				"offramp", pluginConfig.OffRamp,
+			),
+			onRampReader,
+			commitStoreReader,
+		),
+		ccip.CommitPluginLabel,
+		sourceChain,
+		destChain,
+		onrampAddress,
+	)
+
+	argsNoPlugin.ReportingPluginFactory = promwrapper.NewPromFactory(wrappedPluginFactory, "CCIPCommit", jb.OCR2OracleSpec.Relay, big.NewInt(0).SetUint64(destChainID))
+	argsNoPlugin.Logger = commonlogger.NewOCRWrapper(pluginConfig.Lggr, true, logError)
+	oracle, err := libocr2.NewOracle(argsNoPlugin)
+	if err != nil {
+		return nil, err
+	}
+	// If this is a brand-new job, then we make use of the start blocks. If not then we're rebooting and log poller will pick up where we left off.
+	if new {
+		return []job.ServiceCtx{
+			oraclelib.NewBackfilledOracle(
+				lggr,
+				backfillArgs.SourceLP,
+				backfillArgs.DestLP,
+				backfillArgs.SourceStartBlock,
+				backfillArgs.DestStartBlock,
+				job.NewServiceAdapter(oracle),
+			),
+			chainHealthcheck,
+		}, nil
+	}
+	return []job.ServiceCtx{
+		job.NewServiceAdapter(oracle),
+		chainHealthcheck,
+	}, nil
+
+}
+
+func NewCommitServices3(ctx context.Context, sourceProvider commontypes.CCIPCommitProvider, destProvider commontypes.CCIPCommitProvider, new bool, pr pipeline.Runner, argsNoPlugin libocr2.OCR2OracleArgs, logError func(string), qopts ...pg.QOpt) ([]job.ServiceCtx, error) {
+
 }
 
 func CommitReportToEthTxMeta(typ ccipconfig.ContractType, ver semver.Version) (func(report []byte) (*txmgr.TxMeta, error), error) {
