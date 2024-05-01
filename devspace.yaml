@@ -1,0 +1,7 @@
+version: v2beta1
+
+dev:
+  app:
+    imageSelector: image
+    ports:
+      - port: 2345
