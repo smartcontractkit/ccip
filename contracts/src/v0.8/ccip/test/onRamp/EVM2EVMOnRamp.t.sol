@@ -1744,7 +1744,7 @@ contract EVM2EVMOnRamp_setTokenTransferFeeConfig is EVM2EVMOnRampSetup {
 }
 
 contract EVM2EVMOnRamp_getTokenPool is EVM2EVMOnRampSetup {
-  function test_GetTokenPool_Success() public {
+  function test_GetTokenPool_Success() public view {
     assertEq(
       s_sourcePoolByToken[s_sourceTokens[0]],
       address(s_onRamp.getPoolBySourceToken(DEST_CHAIN_SELECTOR, IERC20(s_sourceTokens[0])))
