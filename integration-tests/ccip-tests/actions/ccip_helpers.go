@@ -1722,6 +1722,7 @@ func (destCCIP *DestCCIPModule) LoadContracts(conf *laneconfig.LaneConfig) {
 	}
 }
 
+// AddRateLimitTokens adds token pairs to the OffRamp's rate limiting
 func (destCCIP *DestCCIPModule) AddRateLimitTokens(srcTokens, destTokens []*contracts.ERC20Token) error {
 	if srcTokens == nil || destTokens == nil {
 		return fmt.Errorf("source or destination tokens are nil")
@@ -1738,7 +1739,33 @@ func (destCCIP *DestCCIPModule) AddRateLimitTokens(srcTokens, destTokens []*cont
 		destTokenAddresses = append(destTokenAddresses, common.HexToAddress(destTokens[i].Address()))
 	}
 
-	return destCCIP.OffRamp.UpdateRateLimitTokens(sourceTokenAddresses, destTokenAddresses)
+	return destCCIP.OffRamp.AddRateLimitTokens(sourceTokenAddresses, destTokenAddresses)
+}
+
+// RemoveRateLimitTokens removes token pairs form the OffRamp's rate limiting.
+// If you ask to remove a token pair that doesn't exist, it will return an error.
+func (destCCIP *DestCCIPModule) RemoveRateLimitTokens(ctx context.Context, srcTokens, destTokens []*contracts.ERC20Token) error {
+	if srcTokens == nil || destTokens == nil {
+		return fmt.Errorf("source or destination tokens are nil")
+	}
+
+	if len(srcTokens) != len(destTokens) {
+		return fmt.Errorf("source and destination token length mismatch")
+	}
+
+	var sourceTokenAddresses, destTokenAddresses []common.Address
+
+	for i, token := range srcTokens {
+		sourceTokenAddresses = append(sourceTokenAddresses, common.HexToAddress(token.Address()))
+		destTokenAddresses = append(destTokenAddresses, common.HexToAddress(destTokens[i].Address()))
+	}
+
+	return destCCIP.OffRamp.RemoveRateLimitTokens(ctx, sourceTokenAddresses, destTokenAddresses)
+}
+
+// RemoveAllRateLimitTokens removes all token pairs from the OffRamp's rate limiting.
+func (destCCIP *DestCCIPModule) RemoveAllRateLimitTokens(ctx context.Context) error {
+	return destCCIP.OffRamp.RemoveAllRateLimitTokens(ctx)
 }
 
 // DeployContracts deploys all CCIP contracts specific to the destination chain
@@ -2609,18 +2636,24 @@ func (lane *CCIPLane) SendRequests(noOfRequests int, msgType string, gasLimit *b
 			msgType, msg, gasLimit,
 		)
 		if err != nil {
-			stat.UpdateState(lane.Logger, 0,
-				testreporters.TX, txConfirmationDur, testreporters.Failure)
+			stat.UpdateState(lane.Logger, 0, testreporters.TX, txConfirmationDur, testreporters.Failure)
 			return fmt.Errorf("could not send request: %w", err)
 		}
 		err = lane.Source.Common.ChainClient.WaitForEvents()
 		if err != nil {
-			stat.UpdateState(lane.Logger, 0,
-				testreporters.TX, txConfirmationDur, testreporters.Failure)
+			stat.UpdateState(lane.Logger, 0, testreporters.TX, txConfirmationDur, testreporters.Failure)
 			return fmt.Errorf("could not send request: %w", err)
 		}
 
-		noOfTokens := len(lane.Source.TransferAmount)
+		noOfTokens := 0
+		for _, tokenAmount := range lane.Source.TransferAmount { // Only count tokens that are actually sent
+			if tokenAmount == nil {
+				continue
+			}
+			if tokenAmount.Cmp(big.NewInt(0)) > 0 {
+				noOfTokens++
+			}
+		}
 		if msgType == DataOnlyTransfer {
 			noOfTokens = 0
 		}

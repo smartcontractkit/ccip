@@ -1,6 +1,7 @@
 package smoke
 
 import (
+	"context"
 	"fmt"
 	"math/big"
 	"testing"
@@ -455,8 +456,12 @@ func TestSmokeCCIPSelfServeRateLimit(t *testing.T) {
 			)
 
 			// Disable all rate limiting
-			err := src.SetTokenTransferFeeConfig(false) // Tell OnRamp to not include any tokens in ARL
-			require.NoError(t, err, "Error disabling aggregate rate limit")
+
+			// Tell OnRamp to not include any tokens in ARL
+			err := src.SetTokenTransferFeeConfig(false)
+			require.NoError(t, err, "Error disabling aggregate rate limit for OnRamp")
+			err = dest.RemoveAllRateLimitTokens(context.Background())
+			require.NoError(t, err, "Error removing rate limited tokens for OffRamp")
 			// Disable ARL for OnRamp and OffRamp
 			err = src.OnRamp.SetRateLimit(evm_2_evm_onramp.RateLimiterConfig{
 				IsEnabled: false,
@@ -519,8 +524,6 @@ func TestSmokeCCIPSelfServeRateLimit(t *testing.T) {
 			src.TransferAmount[limitedTokenIndex] = big.NewInt(0)
 			tc.lane.RecordStateBeforeTransfer()
 			err = tc.lane.SendRequests(1, TestCfg.TestGroupInput.MsgType, big.NewInt(600_000))
-			require.NoError(t, err, "Error sending unlimited token")
-			err = src.Common.ChainClient.WaitForEvents()
 			require.NoError(t, err, "Unlimited token transfer failed")
 			tc.lane.ValidateRequests(true)
 			tc.lane.Logger.Info().Str("Token", freeSrcToken.ContractAddress.Hex()).Msg("Unlimited token transfer succeeded")
@@ -531,30 +534,20 @@ func TestSmokeCCIPSelfServeRateLimit(t *testing.T) {
 			tc.lane.RecordStateBeforeTransfer()
 			err = tc.lane.SendRequests(1, TestCfg.TestGroupInput.MsgType, big.NewInt(600_000))
 			require.NoError(t, err)
-			err = src.Common.ChainClient.WaitForEvents()
-			require.NoError(t, err, "Limited token transfer should succeed on source chain")
-			tc.lane.ValidateRequests(false)
+			tc.lane.ValidateRequests(false) // <--- Now fails here. TX gets through, but fails at `CommitAndExecute`
 
 			// Enable aggregate rate limiting on the source chain for the limited token
-			err = src.OnRamp.SetTokenTransferFeeConfig([]evm_2_evm_onramp.EVM2EVMOnRampTokenTransferFeeConfigArgs{{
-				Token:                     limitedSrcToken.ContractAddress,
-				MinFeeUSDCents:            50,           // $0.5
-				MaxFeeUSDCents:            1_000_000_00, // $1 million
-				DeciBps:                   5_0,          // 5 bps
-				DestGasOverhead:           0,            // Easy default
-				DestBytesOverhead:         29_000,       // Easy default
-				AggregateRateLimitEnabled: true,
-			}})
-			require.NoError(t, err, "Error setting source rate limits")
+			err = src.SetTokenTransferFeeConfig(true)
+			require.NoError(t, err, "Error setting OnRamp rate limits")
 			err = src.OnRamp.SetRateLimit(evm_2_evm_onramp.RateLimiterConfig{
 				IsEnabled: true,
 				Capacity:  aggregateRateLimit,
 				Rate:      aggregateRateLimit,
 			})
-			require.NoError(t, err, "Error setting source rate limits")
+			require.NoError(t, err, "Error setting OnRamp rate limits")
 			err = src.Common.ChainClient.WaitForEvents()
 			require.NoError(t, err, "Error waiting for events")
-			tc.lane.Logger.Debug().Str("Token", limitedSrcToken.ContractAddress.Hex()).Msg("Enabled aggregate rate limit")
+			tc.lane.Logger.Debug().Str("Token", limitedSrcToken.ContractAddress.Hex()).Msg("Enabled aggregate rate limit on OnRamp")
 			failedTx, _, _, err := tc.lane.Source.SendRequest(
 				tc.lane.Dest.ReceiverDapp.EthAddress,
 				actions.TokenTransfer, "msg with token more than aggregated rate limit",

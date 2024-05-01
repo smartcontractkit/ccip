@@ -935,7 +935,12 @@ func (offRamp *OffRamp) SetOCR2Config(
 	return offRamp.client.ProcessTransaction(tx)
 }
 
-func (offRamp *OffRamp) UpdateRateLimitTokens(sourceTokens, destTokens []common.Address) error {
+// AddRateLimitTokens adds token pairs to the OffRamp's rate limit
+func (offRamp *OffRamp) AddRateLimitTokens(sourceTokens, destTokens []common.Address) error {
+	if len(sourceTokens) != len(destTokens) {
+		return fmt.Errorf("source and dest tokens must be of the same length")
+	}
+
 	opts, err := offRamp.client.TransactionOpts(offRamp.client.GetDefaultWallet())
 	if err != nil {
 		return fmt.Errorf("failed to get transaction opts: %w", err)
@@ -953,10 +958,106 @@ func (offRamp *OffRamp) UpdateRateLimitTokens(sourceTokens, destTokens []common.
 		return fmt.Errorf("failed to apply rate limit tokens updates: %w", err)
 	}
 	log.Info().
-		Interface("RateLimitToken adds", rateLimitTokens).
+		Interface("RateLimitToken Additions", rateLimitTokens).
 		Str("OffRamp", offRamp.Address()).
 		Str(Network, offRamp.client.GetNetworkConfig().Name).
 		Msg("RateLimitTokens set in OffRamp")
+	return offRamp.client.ProcessTransaction(tx)
+}
+
+// RemoveRateLimitTokens removes token pairs to the OffRamp's rate limit.
+// If you ask to remove a token pair that doesn't exist, it will return an error.
+func (offRamp *OffRamp) RemoveRateLimitTokens(ctx context.Context, sourceTokens, destTokens []common.Address) error {
+	if len(sourceTokens) != len(destTokens) {
+		return fmt.Errorf("source and dest tokens must be of the same length")
+	}
+
+	callOpts := &bind.CallOpts{
+		From:    common.HexToAddress(offRamp.client.GetDefaultWallet().Address()),
+		Context: ctx,
+	}
+	existingRateLimitTokens, err := offRamp.Instance.GetAllRateLimitTokens(callOpts)
+	if err != nil {
+		return fmt.Errorf("failed to get all rate limit tokens: %w", err)
+	}
+
+	rateLimitTokens := make([]evm_2_evm_offramp.EVM2EVMOffRampRateLimitToken, len(sourceTokens))
+	for i, sourceToken := range sourceTokens {
+		destToken := destTokens[i]
+		// Check if the source rate limit token exists
+		foundIndex := -1
+		for j, existingSourceToken := range existingRateLimitTokens.SourceTokens {
+			if existingSourceToken == sourceToken {
+				foundIndex = j
+				break
+			}
+		}
+		if foundIndex == -1 {
+			return fmt.Errorf("source rate limit token not found for pair: %s -> %s", sourceTokens[i].Hex(), destTokens[i].Hex())
+		}
+		// Check if the matching dest rate limit token exists
+		if existingRateLimitTokens.DestTokens[foundIndex] != destToken {
+			return fmt.Errorf("dest rate limit token not found for pair: %s -> %s", sourceTokens[i].Hex(), destTokens[i].Hex())
+		}
+		// Update the existing rate limit tokens to remove the pair for visibility
+		existingRateLimitTokens.SourceTokens = append(existingRateLimitTokens.SourceTokens[:foundIndex], existingRateLimitTokens.SourceTokens[foundIndex+1:]...)
+		existingRateLimitTokens.DestTokens = append(existingRateLimitTokens.DestTokens[:foundIndex], existingRateLimitTokens.DestTokens[foundIndex+1:]...)
+
+		rateLimitTokens[i] = evm_2_evm_offramp.EVM2EVMOffRampRateLimitToken{
+			SourceToken: sourceToken,
+			DestToken:   destToken,
+		}
+	}
+
+	opts, err := offRamp.client.TransactionOpts(offRamp.client.GetDefaultWallet())
+	if err != nil {
+		return fmt.Errorf("failed to get transaction opts: %w", err)
+	}
+	tx, err := offRamp.Instance.UpdateRateLimitTokens(opts, rateLimitTokens, []evm_2_evm_offramp.EVM2EVMOffRampRateLimitToken{})
+	if err != nil {
+		return fmt.Errorf("failed to apply rate limit tokens removes: %w", err)
+	}
+	log.Info().
+		Interface("RateLimitTokens Remaining", existingRateLimitTokens).
+		Interface("RateLimitTokens Removed", rateLimitTokens).
+		Str("OffRamp", offRamp.Address()).
+		Str(Network, offRamp.client.GetNetworkConfig().Name).
+		Msg("RateLimitTokens Removed from OffRamp")
+	return offRamp.client.ProcessTransaction(tx)
+}
+
+// RemoveAllRateLimitTokens removes all token pairs from the OffRamp's rate limit.
+func (offRamp *OffRamp) RemoveAllRateLimitTokens(ctx context.Context) error {
+	callOpts := &bind.CallOpts{
+		From:    common.HexToAddress(offRamp.client.GetDefaultWallet().Address()),
+		Context: ctx,
+	}
+	allRateLimitTokens, err := offRamp.Instance.GetAllRateLimitTokens(callOpts)
+	if err != nil {
+		return fmt.Errorf("failed to get all rate limit tokens: %w", err)
+	}
+
+	rateLimitTokens := make([]evm_2_evm_offramp.EVM2EVMOffRampRateLimitToken, len(allRateLimitTokens.SourceTokens))
+	for i, sourceToken := range allRateLimitTokens.SourceTokens {
+		rateLimitTokens[i] = evm_2_evm_offramp.EVM2EVMOffRampRateLimitToken{
+			SourceToken: sourceToken,
+			DestToken:   allRateLimitTokens.DestTokens[i],
+		}
+	}
+
+	opts, err := offRamp.client.TransactionOpts(offRamp.client.GetDefaultWallet())
+	if err != nil {
+		return fmt.Errorf("failed to get transaction opts: %w", err)
+	}
+	tx, err := offRamp.Instance.UpdateRateLimitTokens(opts, rateLimitTokens, []evm_2_evm_offramp.EVM2EVMOffRampRateLimitToken{})
+	if err != nil {
+		return fmt.Errorf("failed to apply rate limit tokens removes: %w", err)
+	}
+	log.Info().
+		Interface("RateLimitTokens Removed", rateLimitTokens).
+		Str("OffRamp", offRamp.Address()).
+		Str(Network, offRamp.client.GetNetworkConfig().Name).
+		Msg("Removed all RateLimitTokens from OffRamp")
 	return offRamp.client.ProcessTransaction(tx)
 }
 
