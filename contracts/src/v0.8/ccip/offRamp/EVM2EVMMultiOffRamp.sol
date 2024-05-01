@@ -133,8 +133,9 @@ contract EVM2EVMMultiOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndV
   /// @dev Tokens that should be included in Aggregate Rate Limiting
   /// An (address => address) map is used for backwards compatability of offchain code
   EnumerableMapAddresses.AddressToAddressMap internal s_rateLimitedTokensDestToSource;
+  // TODO: evaluate whether this should be pulled in (since this can be inferred from SourceChainSelectorAdded events instead)
   /// @notice all source chains available in s_sourceChainConfigs
-  uint64[] internal s_sourceChainSelectors;
+  // uint64[] internal s_sourceChainSelectors;
   /// @notice SourceConfig per chain
   /// (forms lane configurations from sourceChainSelector => StaticConfig.chainSelector)
   mapping(uint64 sourceChainSelector => SourceChainConfig) internal s_sourceChainConfigs;
@@ -153,7 +154,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndV
   constructor(
     StaticConfig memory staticConfig,
     SourceChainConfigUpdateArgs[] memory sourceChainConfigs,
-    // TODO: convert to array (per-chain)
+    // TODO: convert to array to support per-chain config once multi-ARL is ready
     RateLimiter.Config memory rateLimiterConfig
   ) OCR2BaseNoChecks() AggregateRateLimiter(rateLimiterConfig) {
     if (staticConfig.commitStore == address(0)) revert ZeroAddressNotAllowed();
@@ -307,7 +308,8 @@ contract EVM2EVMMultiOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndV
       uint64 prevNonce = s_senderNonce[message.sender];
       address prevOffRamp = s_sourceChainConfigs[message.sourceChainSelector].prevOffRamp;
       if (prevNonce == 0 && prevOffRamp != address(0)) {
-        // NOTE: assuming prevOffRamp is always a lane-specific off ramp
+        // TODO: assuming prevOffRamp is always a lane-specific off ramp
+        //       Update to additionally support IAny2EVMMultiOffRamp backwards compatibility
         prevNonce = IAny2EVMOffRamp(prevOffRamp).getSenderNonce(message.sender);
         if (prevNonce + 1 != message.nonce) {
           // the starting v2 onramp nonce, i.e. the 1st message nonce v2 offramp is expected to receive,
@@ -495,9 +497,9 @@ contract EVM2EVMMultiOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndV
 
   /// @notice Returns all configured source chain selectors
   /// @return sourceChainSelectors source chain selectors
-  function getSourceChainSelectors() external view returns (uint64[] memory) {
-    return s_sourceChainSelectors;
-  }
+  // function getSourceChainSelectors() external view returns (uint64[] memory) {
+  //   return s_sourceChainSelectors;
+  // }
 
   /// @notice Updates source configs
   /// @param sourceChainConfigUpdates Source chain configs
@@ -518,7 +520,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndV
 
       // OnRamp can never be zero - if it is, then the source chain has been added for the first time
       if (s_sourceChainConfigs[sourceChainSelector].onRamp == address(0)) {
-        s_sourceChainSelectors.push(sourceChainSelector);
+        // s_sourceChainSelectors.push(sourceChainSelector);
         emit SourceChainSelectorAdded(sourceChainSelector);
       }
 
@@ -613,6 +615,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndV
   /// we bubble it up. If we encounter a non-rate limiting error we wrap it in a TokenHandlingError.
   function _releaseOrMintTokens(
     Client.EVMTokenAmount[] memory sourceTokenAmounts,
+    // TODO: revisit stack-depth after pulling in pool interface changes
     Any2EVMMessageRoute memory messageRoute,
     bytes[] memory encodedSourceTokenData,
     bytes[] memory offchainTokenData
