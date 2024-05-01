@@ -146,9 +146,15 @@ library Internal {
   /// @return The address if it is valid, the function will revert otherwise.
   function _validateEVMAddress(bytes memory encodedAddress) internal pure returns (address) {
     if (encodedAddress.length != 32) revert InvalidEVMAddress(encodedAddress);
-    uint256 decodedAddress = abi.decode(encodedAddress, (uint256));
-    if (decodedAddress > type(uint160).max || decodedAddress < 10) revert InvalidEVMAddress(encodedAddress);
-    return address(uint160(decodedAddress));
+    return _validateEVMAddressFromUint256(abi.decode(encodedAddress, (uint256)));
+  }
+
+  /// @notice This method provides a safe way to convert a uint256 to an address.
+  /// It will revert if the uint256 is not a valid EVM address, or a precompile address.
+  /// @return The address if it is valid, the function will revert otherwise.
+  function _validateEVMAddressFromUint256(uint256 encodedAddress) internal pure returns (address) {
+    if (encodedAddress > type(uint160).max || encodedAddress < 10) revert InvalidEVMAddress(abi.encode(encodedAddress));
+    return address(uint160(encodedAddress));
   }
 
   /// @notice Enum listing the possible message execution states within

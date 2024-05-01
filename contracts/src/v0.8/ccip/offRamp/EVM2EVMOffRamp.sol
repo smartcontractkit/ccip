@@ -598,11 +598,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
         revert InvalidDataLength(Pool.CCIP_POOL_V1_RET_BYTES, returnData.length);
       }
       (uint256 decodedAddress, uint256 amount) = abi.decode(returnData, (uint256, uint256));
-      if (decodedAddress > type(uint160).max || decodedAddress < 10) {
-        revert Internal.InvalidEVMAddress(abi.encode(decodedAddress));
-      }
-
-      destTokenAmounts[i].token = address(uint160(decodedAddress));
+      destTokenAmounts[i].token = Internal._validateEVMAddressFromUint256(decodedAddress);
       destTokenAmounts[i].amount = amount;
 
       if (s_rateLimitedTokensDestToSource.contains(destTokenAmounts[i].token)) {
