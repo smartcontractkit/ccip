@@ -52,7 +52,6 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
   error EmptyReport();
   error BadARMSignal();
   error InvalidMessageId();
-  error InvalidEVMAddress(uint256 encodedAddress);
   error NotACompatiblePool(address notPool);
   error InvalidDataLength(uint256 expected, uint256 got);
   error InvalidNewState(uint64 sequenceNumber, Internal.MessageExecutionState newState);
@@ -398,7 +397,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
     catch (bytes memory err) {
       if (
         ReceiverError.selector == bytes4(err) || TokenHandlingError.selector == bytes4(err)
-          || InvalidEVMAddress.selector == bytes4(err) || InvalidDataLength.selector == bytes4(err)
+          || Internal.InvalidEVMAddress.selector == bytes4(err) || InvalidDataLength.selector == bytes4(err)
           || CallWithExactGas.NoContract.selector == bytes4(err) || NotACompatiblePool.selector == bytes4(err)
       ) {
         // If CCIP receiver execution is not successful, bubble up receiver revert data,
@@ -558,11 +557,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
         abi.decode(encodedSourceTokenData[i], (Internal.SourceTokenData));
       // We need to safely decode the pool address from the sourceTokenData, as it could be wrong,
       // in which case it doesn't have to be a valid EVM address.
-      if (sourceTokenData.destPoolAddress.length != 32) {
-        revert InvalidDataLength(32, sourceTokenData.destPoolAddress.length);
-      }
-
-      address localPoolAddress = _validateEVMAddress(abi.decode(sourceTokenData.destPoolAddress, (uint256)));
+      address localPoolAddress = Internal._validateEVMAddress(sourceTokenData.destPoolAddress);
       // This will call the supportsInterface through the ERC165Checker, and not directly on the pool address.
       // This is done to prevent a pool from reverting the entire transaction if it doesn't support the interface.
       // The call gets a max or 30k gas per instance, of which there are three. This means gas estimations should
@@ -603,7 +598,11 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
         revert InvalidDataLength(Pool.CCIP_POOL_V1_RET_BYTES, returnData.length);
       }
       (uint256 decodedAddress, uint256 amount) = abi.decode(returnData, (uint256, uint256));
-      destTokenAmounts[i].token = _validateEVMAddress(decodedAddress);
+      if (decodedAddress > type(uint160).max || decodedAddress < 10) {
+        revert Internal.InvalidEVMAddress(abi.encode(decodedAddress));
+      }
+
+      destTokenAmounts[i].token = address(uint160(decodedAddress));
       destTokenAmounts[i].amount = amount;
 
       if (s_rateLimitedTokensDestToSource.contains(destTokenAmounts[i].token)) {
@@ -614,16 +613,6 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
     if (value > 0) _rateLimitValue(value);
 
     return destTokenAmounts;
-  }
-
-  /// @notice This methods provides validation for parsing abi encoded addresses by ensuring the
-  /// address is within the EVM address space. If it isn't it will revert with an InvalidEVMAddress error, which
-  /// we can catch and handle more gracefully than a revert from abi.decode.
-  /// @param decodedAddress The address to validate, decoded into a uint256.
-  /// @return The address if it is valid, the function will revert otherwise.
-  function _validateEVMAddress(uint256 decodedAddress) internal pure returns (address) {
-    if (decodedAddress > type(uint160).max || decodedAddress < 10) revert InvalidEVMAddress(decodedAddress);
-    return address(uint160(decodedAddress));
   }
 
   // ================================================================

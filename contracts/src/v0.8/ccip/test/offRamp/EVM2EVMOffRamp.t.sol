@@ -1120,7 +1120,7 @@ contract EVM2EVMOffRamp__trialExecute is EVM2EVMOffRampSetup {
     (newState, err) = s_offRamp.trialExecute(message, new bytes[](message.tokenAmounts.length));
 
     assertEq(uint256(Internal.MessageExecutionState.FAILURE), uint256(newState));
-    assertEq(abi.encodeWithSelector(EVM2EVMOffRamp.InvalidEVMAddress.selector, 0), err);
+    assertEq(abi.encodeWithSelector(Internal.InvalidEVMAddress.selector, abi.encode(address(0))), err);
 
     address notAContract = makeAddr("not_a_contract");
 
@@ -1308,21 +1308,23 @@ contract EVM2EVMOffRamp__releaseOrMintTokens is EVM2EVMOffRampSetup {
     s_offRamp.releaseOrMintTokens(srcTokenAmounts, originalSender, OWNER, encodedSourceTokenData, offchainTokenData);
   }
 
-  function test_releaseOrMintTokens_InvalidDataLengthPoolAddress_Revert() public {
+  function test_releaseOrMintTokens_InvalidEVMAddress_Revert() public {
     Client.EVMTokenAmount[] memory srcTokenAmounts = getCastedSourceEVMTokenAmountsWithZeroAmounts();
 
     bytes memory originalSender = abi.encode(OWNER);
     bytes[] memory offchainTokenData = new bytes[](srcTokenAmounts.length);
     bytes[] memory sourceTokenData = _getDefaultSourceTokenData(srcTokenAmounts);
+    bytes memory wrongAddress = abi.encode(address(1000), address(10000), address(10000));
+
     sourceTokenData[0] = abi.encode(
       Internal.SourceTokenData({
         sourcePoolAddress: abi.encode(s_sourcePoolByToken[srcTokenAmounts[0].token]),
-        destPoolAddress: abi.encode(address(1000), address(10000), address(10000)),
+        destPoolAddress: wrongAddress,
         extraData: ""
       })
     );
 
-    vm.expectRevert(abi.encodeWithSelector(EVM2EVMOffRamp.InvalidDataLength.selector, 32, 96));
+    vm.expectRevert(abi.encodeWithSelector(Internal.InvalidEVMAddress.selector, wrongAddress));
 
     s_offRamp.releaseOrMintTokens(srcTokenAmounts, originalSender, OWNER, sourceTokenData, offchainTokenData);
   }
@@ -1436,7 +1438,7 @@ contract EVM2EVMOffRamp__releaseOrMintTokens is EVM2EVMOffRampSetup {
       // Any revert should be a TokenHandlingError, InvalidEVMAddress, InvalidDataLength or NoContract as those are caught by the offramp
       assertTrue(
         bytes4(reason) == EVM2EVMOffRamp.TokenHandlingError.selector
-          || bytes4(reason) == EVM2EVMOffRamp.InvalidEVMAddress.selector
+          || bytes4(reason) == Internal.InvalidEVMAddress.selector
           || bytes4(reason) == EVM2EVMOffRamp.InvalidDataLength.selector
           || bytes4(reason) == CallWithExactGas.NoContract.selector
           || bytes4(reason) == EVM2EVMOffRamp.NotACompatiblePool.selector,
@@ -1444,7 +1446,7 @@ contract EVM2EVMOffRamp__releaseOrMintTokens is EVM2EVMOffRampSetup {
       );
 
       if (destPool > type(uint160).max) {
-        assertEq(reason, abi.encodeWithSelector(EVM2EVMOffRamp.InvalidEVMAddress.selector, destPool));
+        assertEq(reason, abi.encodeWithSelector(Internal.InvalidEVMAddress.selector, destPool));
       }
     }
   }

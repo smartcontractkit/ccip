@@ -6,6 +6,8 @@ import {Client} from "./Client.sol";
 
 // Library for CCIP internal definitions common to multiple contracts.
 library Internal {
+  error InvalidEVMAddress(bytes encodedAddress);
+
   /// @dev The minimum amount of gas to perform the call with exact gas.
   /// We include this in the offramp so that we can redeploy to adjust it
   /// should a hardfork change the gas costs of relevant opcodes in callWithExactGas.
@@ -136,6 +138,17 @@ library Internal {
         keccak256(abi.encode(original.sourceTokenData))
       )
     );
+  }
+
+  /// @notice This methods provides validation for parsing abi encoded addresses by ensuring the
+  /// address is within the EVM address space. If it isn't it will revert with an InvalidEVMAddress error, which
+  /// we can catch and handle more gracefully than a revert from abi.decode.
+  /// @return The address if it is valid, the function will revert otherwise.
+  function _validateEVMAddress(bytes memory encodedAddress) internal pure returns (address) {
+    if (encodedAddress.length != 32) revert InvalidEVMAddress(encodedAddress);
+    uint256 decodedAddress = abi.decode(encodedAddress, (uint256));
+    if (decodedAddress > type(uint160).max || decodedAddress < 10) revert InvalidEVMAddress(encodedAddress);
+    return address(uint160(decodedAddress));
   }
 
   /// @notice Enum listing the possible message execution states within

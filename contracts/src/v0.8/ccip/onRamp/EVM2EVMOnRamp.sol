@@ -262,13 +262,6 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     if (msg.sender != s_dynamicConfig.router) revert MustBeCalledByRouter();
     if (destChainSelector != i_destChainSelector) revert InvalidChainSelector(destChainSelector);
 
-    // EVM destination addresses should be abi encoded and therefore always 32 bytes long
-    // Not duplicately validated in `getFee`. Invalid address is uncommon, gas cost outweighs UX gain.
-    if (message.receiver.length != 32) revert InvalidAddress(message.receiver);
-    uint256 decodedReceiver = abi.decode(message.receiver, (uint256));
-    // We want to disallow sending to address(0) and to precompiles, which exist on address(1) through address(9).
-    if (decodedReceiver > type(uint160).max || decodedReceiver < 10) revert InvalidAddress(message.receiver);
-
     uint256 gasLimit = _fromBytes(message.extraArgs).gasLimit;
     // Validate the message with various checks
     uint256 numberOfTokens = message.tokenAmounts.length;
@@ -309,7 +302,9 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     Internal.EVM2EVMMessage memory newMessage = Internal.EVM2EVMMessage({
       sourceChainSelector: i_chainSelector,
       sender: originalSender,
-      receiver: address(uint160(decodedReceiver)),
+      // EVM destination addresses should be abi encoded and therefore always 32 bytes long
+      // Not duplicately validated in `getFee`. Invalid address is uncommon, gas cost outweighs UX gain.
+      receiver: Internal._validateEVMAddress(message.receiver),
       sequenceNumber: ++s_sequenceNumber,
       gasLimit: gasLimit,
       strict: false,
@@ -350,8 +345,8 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
       if (poolReturnData.destPoolData.length > s_tokenTransferFeeConfig[tokenAndAmount.token].destBytesOverhead) {
         revert SourceTokenDataTooLarge(tokenAndAmount.token);
       }
-      // Since this is an EVM2EVM message, the pool address should be exactly 32 bytes
-      if (poolReturnData.destPoolAddress.length != 32) revert InvalidAddress(poolReturnData.destPoolAddress);
+      // We validate the pool address to ensure it is a valid EVM address
+      Internal._validateEVMAddress(poolReturnData.destPoolAddress);
 
       newMessage.sourceTokenData[i] = abi.encode(
         Internal.SourceTokenData({

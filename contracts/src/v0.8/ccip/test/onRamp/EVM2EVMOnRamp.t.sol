@@ -559,7 +559,7 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
     message.receiver = abi.encodePacked(address(234));
 
-    vm.expectRevert(abi.encodeWithSelector(EVM2EVMOnRamp.InvalidAddress.selector, message.receiver));
+    vm.expectRevert(abi.encodeWithSelector(Internal.InvalidEVMAddress.selector, message.receiver));
 
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 1, OWNER);
   }
@@ -568,7 +568,7 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
     message.receiver = abi.encode(type(uint208).max);
 
-    vm.expectRevert(abi.encodeWithSelector(EVM2EVMOnRamp.InvalidAddress.selector, message.receiver));
+    vm.expectRevert(abi.encodeWithSelector(Internal.InvalidEVMAddress.selector, message.receiver));
 
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 1, OWNER);
   }
@@ -580,7 +580,7 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
     for (uint160 i = 0; i < 10; ++i) {
       message.receiver = abi.encode(address(i));
 
-      vm.expectRevert(abi.encodeWithSelector(EVM2EVMOnRamp.InvalidAddress.selector, message.receiver));
+      vm.expectRevert(abi.encodeWithSelector(Internal.InvalidEVMAddress.selector, message.receiver));
 
       s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 1, OWNER);
     }
