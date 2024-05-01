@@ -8,12 +8,6 @@ import {IERC165} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/utils
 // Shared public interface for multiple pool types.
 // Each pool type handles a different child token model (lock/unlock, mint/burn.)
 interface IPool is IERC165 {
-  struct SourceTokenData {
-    bytes sourcePoolAddress;
-    bytes destPoolAddress;
-    bytes extraData;
-  }
-
   /// @notice Lock tokens into the pool or burn the tokens.
   /// @param lockOrBurnIn Encoded data fields for the processing of tokens on the source chain.
   /// @return lockOrBurnOut Encoded data fields for the processing of tokens on the destination chain.

@@ -2,7 +2,9 @@
 pragma solidity 0.8.19;
 
 import {Pool} from "../../libraries/Pool.sol";
-import "../../pools/TokenPool.sol";
+import {TokenPool} from "../../pools/TokenPool.sol";
+
+import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 
 contract TokenPoolHelper is TokenPool {
   event LockOrBurn(uint256 amount);

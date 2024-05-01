@@ -54,9 +54,10 @@ contract BurnMintTokenPoolAndProxySetup is EVM2EVMOnRampSetup {
   function test_success1_4() public {
     _deployPool1_4();
     _migrateToSelfServe();
+
+    // NOTE
+    // when this call is made, the SENDING SIDE of old lanes stop working.
     // Set the Router of the old pool to the new pool
-    // TODO: when this call is made, the SENDING SIDE of old lanes stop working.
-    // Is it OK to do this atomically?
     BurnMintTokenPool1_4(address(s_legacyPool)).setRouter(address(s_newPool));
 
     // Approve enough for a few calls
