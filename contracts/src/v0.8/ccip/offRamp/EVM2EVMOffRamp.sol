@@ -99,8 +99,6 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
 
   // STATIC CONFIG
   string public constant override typeAndVersion = "EVM2EVMOffRamp 1.5.0-dev";
-  /// @dev The expected length of the return data from a pool release or mint call.
-  uint256 internal constant EXPECTED_POOL_RETURN_DATA_LENGTH = 64;
 
   /// @dev Commit store address on the destination chain
   address internal immutable i_commitStore;
@@ -601,8 +599,8 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
       if (!success) revert TokenHandlingError(returnData);
 
       // If the call was successful, the returnData should be the local token address.
-      if (returnData.length != EXPECTED_POOL_RETURN_DATA_LENGTH) {
-        revert InvalidDataLength(EXPECTED_POOL_RETURN_DATA_LENGTH, returnData.length);
+      if (returnData.length != Pool.CCIP_POOL_V1_RET_BYTES) {
+        revert InvalidDataLength(Pool.CCIP_POOL_V1_RET_BYTES, returnData.length);
       }
       (uint256 decodedAddress, uint256 amount) = abi.decode(returnData, (uint256, uint256));
       destTokenAmounts[i].token = _validateEVMAddress(decodedAddress);
