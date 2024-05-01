@@ -72,7 +72,7 @@ contract MultiCommitStore is IMultiCommitStore, ITypeAndVersion, OCR2Base {
   }
 
   // STATIC CONFIG
-  string public constant override typeAndVersion = "MultiCommitStore 1.6.0";
+  string public constant override typeAndVersion = "MultiCommitStore 1.6.0-dev";
   // Chain ID of this chain
   uint64 internal immutable i_chainSelector;
   // The address of the arm proxy
