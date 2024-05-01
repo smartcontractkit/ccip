@@ -1446,7 +1446,7 @@ contract EVM2EVMOffRamp__releaseOrMintTokens is EVM2EVMOffRampSetup {
       );
 
       if (destPool > type(uint160).max) {
-        assertEq(reason, abi.encodeWithSelector(Internal.InvalidEVMAddress.selector, destPool));
+        assertEq(reason, abi.encodeWithSelector(Internal.InvalidEVMAddress.selector, abi.encode(destPool)));
       }
     }
   }
