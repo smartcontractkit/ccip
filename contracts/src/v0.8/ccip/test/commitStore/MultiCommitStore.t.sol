@@ -140,8 +140,6 @@ contract MultiCommitStore_constructor is PriceRegistrySetup, OCR2BaseSetup {
     srcConfigs[0].onRamp = ON_RAMP_ADDRESS;
     MultiCommitStore.StaticConfig memory staticConfig =
       MultiCommitStore.StaticConfig({chainSelector: 0, armProxy: address(s_mockARM)});
-    MultiCommitStore.DynamicConfig memory dynamicConfig =
-      MultiCommitStore.DynamicConfig({priceRegistry: address(s_priceRegistry)});
 
     vm.expectRevert(MultiCommitStore.InvalidCommitStoreConfig.selector);
     new MultiCommitStore(staticConfig, srcConfigs);
@@ -313,10 +311,10 @@ contract MultiCommitStore_resetUnblessedRoots is MultiCommitStoreRealARMSetup {
   event RootRemoved(bytes32 root);
 
   function test_ResetUnblessedRoots_Success() public {
-    MultiCommitStore.UblessedRoot[] memory rootsToReset = new MultiCommitStore.UblessedRoot[](3);
-    rootsToReset[0] = MultiCommitStore.UblessedRoot({sourceChainSelector: SOURCE_CHAIN_SELECTOR, merkleRoot: "1"});
-    rootsToReset[1] = MultiCommitStore.UblessedRoot({sourceChainSelector: SOURCE_CHAIN_SELECTOR, merkleRoot: "2"});
-    rootsToReset[2] = MultiCommitStore.UblessedRoot({sourceChainSelector: SOURCE_CHAIN_SELECTOR, merkleRoot: "3"});
+    MultiCommitStore.UnblessedRoot[] memory rootsToReset = new MultiCommitStore.UnblessedRoot[](3);
+    rootsToReset[0] = MultiCommitStore.UnblessedRoot({sourceChainSelector: SOURCE_CHAIN_SELECTOR, merkleRoot: "1"});
+    rootsToReset[1] = MultiCommitStore.UnblessedRoot({sourceChainSelector: SOURCE_CHAIN_SELECTOR, merkleRoot: "2"});
+    rootsToReset[2] = MultiCommitStore.UnblessedRoot({sourceChainSelector: SOURCE_CHAIN_SELECTOR, merkleRoot: "3"});
 
     MultiCommitStore.MerkleRoot[] memory roots = new MultiCommitStore.MerkleRoot[](3);
     roots[0] = MultiCommitStore.MerkleRoot({
@@ -366,7 +364,7 @@ contract MultiCommitStore_resetUnblessedRoots is MultiCommitStoreRealARMSetup {
   function test_OnlyOwner_Revert() public {
     vm.stopPrank();
     vm.expectRevert("Only callable by owner");
-    MultiCommitStore.UblessedRoot[] memory rootsToReset = new MultiCommitStore.UblessedRoot[](0);
+    MultiCommitStore.UnblessedRoot[] memory rootsToReset = new MultiCommitStore.UnblessedRoot[](0);
     s_multiCommitStore.resetUnblessedRoots(rootsToReset);
   }
 }

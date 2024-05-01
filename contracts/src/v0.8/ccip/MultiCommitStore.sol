@@ -183,7 +183,7 @@ contract MultiCommitStore is IMultiCommitStore, ITypeAndVersion, OCR2Base {
   }
 
   /// @dev Struct to hold a merkle root for a source chain so that an array of these can be passed in the resetUblessedRoots function.
-  struct UblessedRoot {
+  struct UnblessedRoot {
     uint64 sourceChainSelector;
     bytes32 merkleRoot;
   }
@@ -192,9 +192,9 @@ contract MultiCommitStore is IMultiCommitStore, ITypeAndVersion, OCR2Base {
   /// posted and needs to be removed. The interval in the report is trusted.
   /// @param rootToReset The roots that will be reset. This function will only
   /// reset roots that are not blessed.
-  function resetUnblessedRoots(UblessedRoot[] calldata rootToReset) external onlyOwner {
+  function resetUnblessedRoots(UnblessedRoot[] calldata rootToReset) external onlyOwner {
     for (uint256 i = 0; i < rootToReset.length; ++i) {
-      UblessedRoot memory root = rootToReset[i];
+      UnblessedRoot memory root = rootToReset[i];
       if (!isBlessed(root.merkleRoot)) {
         delete s_roots[root.sourceChainSelector][root.merkleRoot];
         emit RootRemoved(root.merkleRoot);
