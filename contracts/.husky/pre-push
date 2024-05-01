@@ -1,6 +1,7 @@
 #!/bin/bash
 set -e
 
+./contracts/.husky/verify-changeset.sh
 cd contracts
 
 forge build

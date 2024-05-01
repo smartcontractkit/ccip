@@ -15,7 +15,7 @@
     "compile:native": "./scripts/native_solc_compile_all",
     "compile": "hardhat compile --no-typechain",
     "coverage": "hardhat coverage",
-    "prepare": "cd ../ && husky ./contracts/.husky",
+    "prepare": "cd ../ && chmod +x ./contracts/.husky/*.sh && pnpm husky ./contracts/.husky",
     "prepublishOnly": "pnpm compile && ./scripts/prepublish_generate_abi_folder",
     "publish-beta": "pnpm publish --tag beta",
     "publish-prod": "npm dist-tag add @chainlink/contracts-ccip@1.2.1 latest",
