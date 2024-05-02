@@ -554,6 +554,14 @@ func TestSmokeCCIPSelfServeRateLimit(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, "AggregateValueMaxCapacityExceeded", errReason, "Expected rate limit reached error")
 			tc.lane.Logger.Info().Str("Token", limitedSrcToken.ContractAddress.Hex()).Msg("Limited token transfer failed on source chain")
+
+			// Ensure that the free token is still able to transfer freely
+			src.TransferAmount[freeTokenIndex] = overLimitAmount
+			src.TransferAmount[limitedTokenIndex] = big.NewInt(0)
+			tc.lane.RecordStateBeforeTransfer()
+			err = tc.lane.SendRequests(1, big.NewInt(600_000))
+			require.NoError(t, err)
+			tc.lane.ValidateRequests(true)
 		})
 	}
 }
