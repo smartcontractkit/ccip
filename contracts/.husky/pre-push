@@ -1,11 +1,18 @@
 #!/bin/bash
 set -e
 
+source contracts/.husky/.env
+
+# Only run hook on enabled
+if ! [[ -n $HUSKY_ENABLE_PUSH_HOOKS ]]; then
+    exit 0
+fi
+
 ./contracts/.husky/verify-changeset.sh
 cd contracts
 
-forge build
-forge test
+FOUNDRY_PROFILE=$FOUNDRY_PROFILE forge build
+FOUNDRY_PROFILE=$FOUNDRY_PROFILE forge test
 pnpm solhint
 
 # Skip interactive commands if interactive mode (/dev/tty) is unavailable

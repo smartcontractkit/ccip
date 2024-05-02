@@ -2,6 +2,10 @@
 set -e
 
 cd contracts
+source .husky/.env
 
-# Run lint steps
-pnpm lint-staged -v
+# Only run hook on enabled
+if [[ -n $HUSKY_ENABLE_COMMIT_HOOKS ]]; then
+    # Run lint steps
+    pnpm lint-staged -v
+fi

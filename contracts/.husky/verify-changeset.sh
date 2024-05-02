@@ -1,8 +1,6 @@
 #!/bin/bash
 set -e
 
-TARGET_DIRECTORY=".changeset"
-
 # Determine the current branch
 current_branch=$(git branch --show-current)
 upstream_branch="origin/ccip-develop"
