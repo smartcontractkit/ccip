@@ -4,16 +4,16 @@ set -e
 source contracts/.husky/.env
 
 # Only run hook on enabled
-if ! [[ -n $HUSKY_ENABLE_PUSH_HOOKS ]]; then
+if ! [[ -n $HUSKY_ENABLE_PUSH_HOOKS && -n $UPSTREAM_BRANCH ]]; then
     exit 0
 fi
 
 # Skip on no changes
 current_branch=$(git branch --show-current)
-upstream_branch="origin/ccip-develop"
-changes_root=$(git diff --name-only $upstream_branch...$current_branch -- "contracts/")
+changes_root=$(git diff --name-only $UPSTREAM_BRANCH...$current_branch -- "contracts/")
 
 if ! [[ -n $changes_root ]]; then
+    echo "Pre-push hook for contracts skipped - no changes detected"
     exit 0
 fi
 

@@ -1,11 +1,14 @@
 #!/bin/bash
 set -e
 
-cd contracts
-source .husky/.env
+source contracts/.husky/.env
 
 # Only run hook on enabled
-if [[ -n $HUSKY_ENABLE_COMMIT_HOOKS ]]; then
-    # Run lint steps
-    pnpm lint-staged -v
+if ! [[ -n $HUSKY_ENABLE_COMMIT_HOOKS && -n $UPSTREAM_BRANCH ]]; then
+    exit 0
 fi
+
+cd contracts
+
+# Run lint steps
+pnpm lint-staged -v
