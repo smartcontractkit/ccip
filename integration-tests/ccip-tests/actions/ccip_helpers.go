@@ -1788,7 +1788,7 @@ func (destCCIP *DestCCIPModule) AddRateLimitTokens(srcTokens, destTokens []*cont
 	return destCCIP.OffRamp.AddRateLimitTokens(sourceTokenAddresses, destTokenAddresses)
 }
 
-// RemoveRateLimitTokens removes token pairs form the OffRamp's rate limiting.
+// RemoveRateLimitTokens removes token pairs from the OffRamp's rate limiting.
 // If you ask to remove a token pair that doesn't exist, it will return an error.
 func (destCCIP *DestCCIPModule) RemoveRateLimitTokens(ctx context.Context, srcTokens, destTokens []*contracts.ERC20Token) error {
 	if srcTokens == nil || destTokens == nil {

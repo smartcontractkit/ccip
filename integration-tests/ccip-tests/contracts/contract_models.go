@@ -1015,7 +1015,7 @@ func (offRamp *OffRamp) RemoveRateLimitTokens(ctx context.Context, sourceTokens,
 	}
 	tx, err := offRamp.Instance.UpdateRateLimitTokens(opts, rateLimitTokens, []evm_2_evm_offramp.EVM2EVMOffRampRateLimitToken{})
 	if err != nil {
-		return fmt.Errorf("failed to apply rate limit tokens removes: %w", err)
+		return fmt.Errorf("failed to remove rate limit tokens: %w", err)
 	}
 	log.Info().
 		Interface("RateLimitTokens Remaining", existingRateLimitTokens).
@@ -1051,7 +1051,7 @@ func (offRamp *OffRamp) RemoveAllRateLimitTokens(ctx context.Context) error {
 	}
 	tx, err := offRamp.Instance.UpdateRateLimitTokens(opts, rateLimitTokens, []evm_2_evm_offramp.EVM2EVMOffRampRateLimitToken{})
 	if err != nil {
-		return fmt.Errorf("failed to apply rate limit tokens removes: %w", err)
+		return fmt.Errorf("failed to remove rate limit tokens: %w", err)
 	}
 	log.Info().
 		Interface("RateLimitTokens Removed", rateLimitTokens).
