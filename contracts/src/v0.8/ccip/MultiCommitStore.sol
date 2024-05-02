@@ -28,7 +28,7 @@ contract MultiCommitStore is IMultiCommitStore, ITypeAndVersion, OCR2Base {
   event ReportAccepted(CommitReport report);
   event ConfigSet(StaticConfig staticConfig, DynamicConfig dynamicConfig);
   event RootRemoved(bytes32 root);
-  event SourceConfigUpdated(uint64 indexed sourceChainSelector, SourceChainConfig sourceChainConfig);
+  event SourceChainConfigUpdated(uint64 indexed sourceChainSelector, SourceChainConfig sourceChainConfig);
 
   /// @notice Static commit store config
   /// @dev RMN depends on this struct, if changing, please notify the RMN maintainers.
@@ -317,7 +317,7 @@ contract MultiCommitStore is IMultiCommitStore, ITypeAndVersion, OCR2Base {
 
       s_sourceChainConfigs[sourceChainConfig.sourceChainSelector] = newSourceChainConfig;
 
-      emit SourceConfigUpdated(sourceChainConfig.sourceChainSelector, newSourceChainConfig);
+      emit SourceChainConfigUpdated(sourceChainConfig.sourceChainSelector, newSourceChainConfig);
     }
   }
 

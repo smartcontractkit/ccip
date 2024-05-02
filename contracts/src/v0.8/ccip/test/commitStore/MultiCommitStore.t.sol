@@ -16,7 +16,9 @@ import {PriceRegistrySetup} from "../priceRegistry/PriceRegistry.t.sol";
 
 contract MultiCommitStoreSetup is PriceRegistrySetup, OCR2BaseSetup {
   event ConfigSet(MultiCommitStore.StaticConfig, MultiCommitStore.DynamicConfig);
-  event SourceConfigUpdated(uint64 indexed sourceChainSelector, IMultiCommitStore.SourceChainConfig sourceChainConfig);
+  event SourceChainConfigUpdated(
+    uint64 indexed sourceChainSelector, IMultiCommitStore.SourceChainConfig sourceChainConfig
+  );
 
   MultiCommitStoreHelper internal s_multiCommitStore;
 
@@ -92,7 +94,9 @@ contract MultiCommitStoreRealARMSetup is PriceRegistrySetup, OCR2BaseSetup {
 /// @notice #constructor
 contract MultiCommitStore_constructor is PriceRegistrySetup, OCR2BaseSetup {
   event ConfigSet(MultiCommitStore.StaticConfig, MultiCommitStore.DynamicConfig);
-  event SourceConfigUpdated(uint64 indexed sourceChainSelector, IMultiCommitStore.SourceChainConfig sourceChainConfig);
+  event SourceChainConfigUpdated(
+    uint64 indexed sourceChainSelector, IMultiCommitStore.SourceChainConfig sourceChainConfig
+  );
 
   function setUp() public virtual override(PriceRegistrySetup, OCR2BaseSetup) {
     PriceRegistrySetup.setUp();
@@ -113,7 +117,7 @@ contract MultiCommitStore_constructor is PriceRegistrySetup, OCR2BaseSetup {
       MultiCommitStore.DynamicConfig({priceRegistry: address(s_priceRegistry)});
 
     vm.expectEmit();
-    emit SourceConfigUpdated(
+    emit SourceChainConfigUpdated(
       sourceChainConfigs[0].sourceChainSelector,
       IMultiCommitStore.SourceChainConfig({isEnabled: true, minSeqNr: 1, onRamp: sourceChainConfigs[0].onRamp})
     );
@@ -236,7 +240,7 @@ contract MultiCommitStore_applySourceConfigUpdates is MultiCommitStoreSetup {
       s_multiCommitStore.applySourceConfigUpdates(sourceChainConfigs);
     } else {
       vm.expectEmit();
-      emit SourceConfigUpdated(
+      emit SourceChainConfigUpdated(
         sourceChainConfig.sourceChainSelector,
         IMultiCommitStore.SourceChainConfig({
           isEnabled: sourceChainConfig.isEnabled,
