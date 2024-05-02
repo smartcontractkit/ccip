@@ -39,7 +39,7 @@ contract MultiCommitStore is IMultiCommitStore, ITypeAndVersion, OCR2Base {
 
   /// @notice Dynamic commit store config
   struct DynamicConfig {
-    address priceRegistry; // Price registry address on the destination chain
+    address priceRegistry; // Price registry address on the local chain
   }
 
   /// @dev Struct to hold the configs for a source chain, same as SourceChainConfig but with the sourceChainSelector
