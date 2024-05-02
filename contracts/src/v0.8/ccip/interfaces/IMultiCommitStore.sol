@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 
 interface IMultiCommitStore {
   /// @notice Source chain specific config
-  struct SourceConfig {
+  struct SourceChainConfig {
     bool isEnabled; // ────╮ Whether the source chain is enabled
     uint64 minSeqNr; //    | The min sequence number expected for future messages
     address onRamp; // ────╯ The onRamp address on the source chain
@@ -21,5 +21,5 @@ interface IMultiCommitStore {
   ) external view returns (uint256 timestamp);
 
   /// @notice Returns the source chain config for a given source chain selector.
-  function getSourceConfig(uint64 sourceChainSelector) external view returns (SourceConfig memory);
+  function getSourceChainConfig(uint64 sourceChainSelector) external view returns (SourceChainConfig memory);
 }

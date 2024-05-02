@@ -6,7 +6,7 @@ import "../../MultiCommitStore.sol";
 contract MultiCommitStoreHelper is MultiCommitStore {
   constructor(
     StaticConfig memory staticConfig,
-    SourceConfigArgs[] memory srcConfigs
+    SourceChainConfigArgs[] memory srcConfigs
   ) MultiCommitStore(staticConfig, srcConfigs) {}
 
   /// @dev Expose _report for tests
