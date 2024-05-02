@@ -526,10 +526,13 @@ func TestSmokeCCIPSelfServeRateLimit(t *testing.T) {
 			// Send limited token with rate limit that should fail on the destination chain
 			src.TransferAmount[freeTokenIndex] = big.NewInt(0)
 			src.TransferAmount[limitedTokenIndex] = overLimitAmount
+			lastSeen := time.Now()
 			tc.lane.RecordStateBeforeTransfer()
 			err = tc.lane.SendRequests(1, big.NewInt(600_000))
-			require.NoError(t, err)
-			tc.lane.ValidateRequests(false) // <--- Now fails here. TX gets through, but fails at `CommitAndExecute`
+			require.NoError(t, err, "Failed to send rate limited token transfer")
+			err = tc.lane.Dest.AssertNoExecutionStateChangedEventReceived(tc.lane.Logger, time.Minute*5, lastSeen)
+			require.NoError(t, err, "Rate limited token transfer should not get to ExecutionStateChanged")
+			tc.lane.Logger.Info().Str("Token", limitedSrcToken.ContractAddress.Hex()).Msg("Limited token transfer failed on destination chain")
 
 			// Enable aggregate rate limiting on the source chain for the limited token
 			err = src.SetTokenTransferFeeConfig(true)
@@ -544,12 +547,10 @@ func TestSmokeCCIPSelfServeRateLimit(t *testing.T) {
 			require.NoError(t, err, "Error waiting for events")
 			tc.lane.Logger.Debug().Str("Token", limitedSrcToken.ContractAddress.Hex()).Msg("Enabled aggregate rate limit on OnRamp")
 			failedTx, _, _, err := tc.lane.Source.SendRequest(tc.lane.Dest.ReceiverDapp.EthAddress, big.NewInt(600_000))
-			require.NoError(t, err)
-			err = src.Common.ChainClient.WaitForEvents()
-			require.Error(t, err, "Limited token transfer should not succeed")
+			require.Error(t, err, "Limited token transfer should immediately revert")
 			errReason, _, err := src.Common.ChainClient.RevertReasonFromTx(failedTx, evm_2_evm_onramp.EVM2EVMOnRampABI)
 			require.NoError(t, err)
-			require.Equal(t, "AggregateValueRateLimitReached", errReason, "Expected rate limit reached error")
+			require.Equal(t, "AggregateValueMaxCapacityExceeded", errReason, "Expected rate limit reached error")
 			tc.lane.Logger.Info().Str("Token", limitedSrcToken.ContractAddress.Hex()).Msg("Limited token transfer failed on source chain")
 		})
 	}

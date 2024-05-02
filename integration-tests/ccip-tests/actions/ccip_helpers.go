@@ -2061,6 +2061,7 @@ func (destCCIP *DestCCIPModule) AssertNoExecutionStateChangedEventReceived(lggr 
 	defer cancel()
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
+	lggr.Info().Dur("Wait Time", timeRange).Time("Since", lastSeenTimestamp).Msg("Waiting to ensure no ExecutionStateChanged event")
 	for {
 		select {
 		case <-ticker.C:
@@ -2085,7 +2086,7 @@ func (destCCIP *DestCCIPModule) AssertNoExecutionStateChangedEventReceived(lggr 
 				return fmt.Errorf("ExecutionStateChanged Event detected at %s after %s", lastSeenTimestamp, eventFoundAfterCursing.String())
 			}
 		case <-ctx.Done():
-			lggr.Info().Msgf("successfully validated that no ExecutionStateChanged detected after %s for %s", lastSeenTimestamp, timeRange)
+			lggr.Info().Msgf("Successfully validated that no ExecutionStateChanged detected after %s for %s", lastSeenTimestamp, timeRange)
 			return nil
 		}
 	}
@@ -2813,6 +2814,7 @@ func (lane *CCIPLane) ValidateRequests(successfulExecution bool) {
 	}
 }
 
+// ValidateRequestByTxHash validates a CCIP transaction through every single CCIP phase.
 func (lane *CCIPLane) ValidateRequestByTxHash(txHash common.Hash, execState testhelpers.MessageExecutionState) error {
 	var reqStats []*testreporters.RequestStat
 	ccipRequests := lane.SentReqs[txHash]
