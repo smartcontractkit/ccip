@@ -17,6 +17,7 @@ contract MultiCommitStore is IMultiCommitStore, ITypeAndVersion, OCR2Base {
   error InvalidInterval(Interval interval);
   error InvalidRoot();
   error InvalidCommitStoreConfig();
+  error InvalidSourceChainConfig(uint64 sourceChainSelector);
   error BadARMSignal();
   error RootAlreadyCommitted();
   error SourceChainNotEnabled(uint64 chainSelector);
@@ -107,12 +108,7 @@ contract MultiCommitStore is IMultiCommitStore, ITypeAndVersion, OCR2Base {
     i_chainSelector = staticConfig.chainSelector;
     i_armProxy = staticConfig.armProxy;
 
-    for (uint256 i; i < srcConfigs.length; ++i) {
-      SourceConfigArgs memory srcConfig = srcConfigs[i];
-      srcConfig.minSeqNr = 1;
-      srcConfig.isEnabled = true;
-      _applySourceConfigUpdates(srcConfig);
-    }
+    _applySourceConfigUpdates(srcConfigs);
   }
 
   // ================================================================
@@ -127,23 +123,35 @@ contract MultiCommitStore is IMultiCommitStore, ITypeAndVersion, OCR2Base {
 
   /// @notice Updates the source chain specific config.
   /// @param srcConfigs The source chain specific config updates.
-  function applySourceConfigUpdates(SourceConfigArgs[] calldata srcConfigs) external onlyOwner {
-    for (uint256 i; i < srcConfigs.length; ++i) {
-      _applySourceConfigUpdates(srcConfigs[i]);
-    }
+  function applySourceConfigUpdates(SourceConfigArgs[] memory srcConfigs) external onlyOwner {
+    _applySourceConfigUpdates(srcConfigs);
   }
 
-  /// @notice Internal version applySourceConfigUpdates taking in a single config instead of an array to allow for reuse in the constructor.
-  function _applySourceConfigUpdates(SourceConfigArgs memory srcConfig) internal onlyOwner {
-    if (srcConfig.onRamp == address(0) || srcConfig.sourceChainSelector == 0) revert InvalidCommitStoreConfig();
+  /// @notice Internal version applySourceConfigUpdates.
+  function _applySourceConfigUpdates(SourceConfigArgs[] memory srcConfigs) internal onlyOwner {
+    for (uint256 i; i < srcConfigs.length; ++i) {
+      SourceConfigArgs memory srcConfig = srcConfigs[i];
+      if (srcConfig.onRamp == address(0) || srcConfig.sourceChainSelector == 0) {
+        revert InvalidSourceChainConfig(srcConfig.sourceChainSelector);
+      }
 
-    s_srcConfigs[srcConfig.sourceChainSelector] =
-      SourceConfig({isEnabled: srcConfig.isEnabled, minSeqNr: srcConfig.minSeqNr, onRamp: srcConfig.onRamp});
+      address onRamp = s_srcConfigs[srcConfig.sourceChainSelector].onRamp;
 
-    emit SourceConfigUpdated(
-      srcConfig.sourceChainSelector,
-      SourceConfig({isEnabled: srcConfig.isEnabled, minSeqNr: srcConfig.minSeqNr, onRamp: srcConfig.onRamp})
-    );
+      if (onRamp == address(0)) {
+        // If onRamp is not set, then minSeqNr should be 1.
+        if (srcConfig.minSeqNr != 1) revert InvalidSourceChainConfig(srcConfig.sourceChainSelector);
+      } else {
+        // If onRamp is already set, it should not be updated.
+        if (srcConfig.onRamp != onRamp) revert InvalidSourceChainConfig(srcConfig.sourceChainSelector);
+      }
+
+      SourceConfig memory newSrcConfig =
+        SourceConfig({isEnabled: srcConfig.isEnabled, minSeqNr: srcConfig.minSeqNr, onRamp: srcConfig.onRamp});
+
+      s_srcConfigs[srcConfig.sourceChainSelector] = newSrcConfig;
+
+      emit SourceConfigUpdated(srcConfig.sourceChainSelector, newSrcConfig);
+    }
   }
 
   /// @notice Returns the onRamp address for a given source chain selector.

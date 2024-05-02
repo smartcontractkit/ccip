@@ -25,8 +25,12 @@ contract MultiCommitStoreSetup is PriceRegistrySetup, OCR2BaseSetup {
     OCR2BaseSetup.setUp();
 
     MultiCommitStore.SourceConfigArgs[] memory srcConfigs = new MultiCommitStore.SourceConfigArgs[](1);
-    srcConfigs[0].sourceChainSelector = SOURCE_CHAIN_SELECTOR;
-    srcConfigs[0].onRamp = ON_RAMP_ADDRESS;
+    srcConfigs[0] = MultiCommitStore.SourceConfigArgs({
+      sourceChainSelector: SOURCE_CHAIN_SELECTOR,
+      isEnabled: true,
+      minSeqNr: 1,
+      onRamp: ON_RAMP_ADDRESS
+    });
 
     s_multiCommitStore = new MultiCommitStoreHelper(
       MultiCommitStore.StaticConfig({chainSelector: DEST_CHAIN_SELECTOR, armProxy: address(s_mockARM)}), srcConfigs
@@ -66,8 +70,12 @@ contract MultiCommitStoreRealARMSetup is PriceRegistrySetup, OCR2BaseSetup {
     s_arm = new ARM(ARM.Config({voters: voters, blessWeightThreshold: 1, curseWeightThreshold: 1}));
 
     MultiCommitStore.SourceConfigArgs[] memory srcConfigs = new MultiCommitStore.SourceConfigArgs[](1);
-    srcConfigs[0].sourceChainSelector = SOURCE_CHAIN_SELECTOR;
-    srcConfigs[0].onRamp = ON_RAMP_ADDRESS;
+    srcConfigs[0] = MultiCommitStore.SourceConfigArgs({
+      sourceChainSelector: SOURCE_CHAIN_SELECTOR,
+      isEnabled: true,
+      minSeqNr: 1,
+      onRamp: ON_RAMP_ADDRESS
+    });
 
     s_multiCommitStore = new MultiCommitStoreHelper(
       MultiCommitStore.StaticConfig({chainSelector: DEST_CHAIN_SELECTOR, armProxy: address(s_arm)}), srcConfigs
@@ -92,8 +100,12 @@ contract MultiCommitStore_constructor is PriceRegistrySetup, OCR2BaseSetup {
 
   function test_Constructor_Success() public {
     MultiCommitStore.SourceConfigArgs[] memory srcConfigs = new MultiCommitStore.SourceConfigArgs[](1);
-    srcConfigs[0].sourceChainSelector = SOURCE_CHAIN_SELECTOR;
-    srcConfigs[0].onRamp = 0x2C44CDDdB6a900Fa2B585dd299E03D12Fa4293Bc;
+    srcConfigs[0] = MultiCommitStore.SourceConfigArgs({
+      sourceChainSelector: SOURCE_CHAIN_SELECTOR,
+      isEnabled: true,
+      minSeqNr: 1,
+      onRamp: 0x2C44CDDdB6a900Fa2B585dd299E03D12Fa4293Bc
+    });
     MultiCommitStore.StaticConfig memory staticConfig =
       MultiCommitStore.StaticConfig({chainSelector: DEST_CHAIN_SELECTOR, armProxy: address(s_mockARM)});
     MultiCommitStore.DynamicConfig memory dynamicConfig =
@@ -129,73 +141,103 @@ contract MultiCommitStore_constructor is PriceRegistrySetup, OCR2BaseSetup {
     assertTrue(srcConfig.isEnabled);
     assertEq(srcConfigs[0].onRamp, srcConfig.onRamp);
     assertEq(1, srcConfig.minSeqNr);
-    assertEq(multiCommitStore.typeAndVersion(), "MultiCommitStore 1.6.0");
+    assertEq(multiCommitStore.typeAndVersion(), "MultiCommitStore 1.6.0-dev");
     assertEq(OWNER, multiCommitStore.owner());
     assertTrue(multiCommitStore.isUnpausedAndARMHealthy());
   }
 
   function test_Constructor_Failure() public {
     MultiCommitStore.SourceConfigArgs[] memory srcConfigs = new MultiCommitStore.SourceConfigArgs[](1);
-    srcConfigs[0].sourceChainSelector = SOURCE_CHAIN_SELECTOR;
-    srcConfigs[0].onRamp = ON_RAMP_ADDRESS;
+
+    // Invalid chain selector
+    srcConfigs[0] = MultiCommitStore.SourceConfigArgs({
+      sourceChainSelector: SOURCE_CHAIN_SELECTOR + 1,
+      isEnabled: true,
+      minSeqNr: 1,
+      onRamp: ON_RAMP_ADDRESS
+    });
     MultiCommitStore.StaticConfig memory staticConfig =
       MultiCommitStore.StaticConfig({chainSelector: 0, armProxy: address(s_mockARM)});
 
     vm.expectRevert(MultiCommitStore.InvalidCommitStoreConfig.selector);
     new MultiCommitStore(staticConfig, srcConfigs);
 
+    // Invalid arm proxy
     staticConfig.chainSelector = DEST_CHAIN_SELECTOR;
     staticConfig.armProxy = address(0);
 
     vm.expectRevert(MultiCommitStore.InvalidCommitStoreConfig.selector);
     new MultiCommitStore(staticConfig, srcConfigs);
 
+    // Invalid source chain selector
     staticConfig.armProxy = address(s_mockARM);
     srcConfigs[0].sourceChainSelector = 0;
 
-    vm.expectRevert(MultiCommitStore.InvalidCommitStoreConfig.selector);
+    vm.expectRevert(
+      abi.encodeWithSelector(MultiCommitStore.InvalidSourceChainConfig.selector, srcConfigs[0].sourceChainSelector)
+    );
     new MultiCommitStore(staticConfig, srcConfigs);
 
-    srcConfigs[0].sourceChainSelector = SOURCE_CHAIN_SELECTOR;
+    // Invalid onRamp
+    srcConfigs[0].sourceChainSelector = SOURCE_CHAIN_SELECTOR + 1;
     srcConfigs[0].onRamp = address(0);
 
-    vm.expectRevert(MultiCommitStore.InvalidCommitStoreConfig.selector);
+    vm.expectRevert(
+      abi.encodeWithSelector(MultiCommitStore.InvalidSourceChainConfig.selector, srcConfigs[0].sourceChainSelector)
+    );
+    new MultiCommitStore(staticConfig, srcConfigs);
+
+    // Invalid minSeqNr
+    srcConfigs[0].sourceChainSelector = SOURCE_CHAIN_SELECTOR + 1;
+    srcConfigs[0].onRamp = ON_RAMP_ADDRESS;
+    srcConfigs[0].minSeqNr = 2;
+    vm.expectRevert(
+      abi.encodeWithSelector(MultiCommitStore.InvalidSourceChainConfig.selector, srcConfigs[0].sourceChainSelector)
+    );
     new MultiCommitStore(staticConfig, srcConfigs);
   }
 }
 
 /// @notice #setMinSeqNr
 contract MultiCommitStore_applySourceConfigUpdates is MultiCommitStoreSetup {
-  function test_Fuzz_SetMinSeqNr_Success(MultiCommitStore.SourceConfig[2] memory configs) public {
-    MultiCommitStore.SourceConfigArgs[] memory srcConfigs = new MultiCommitStore.SourceConfigArgs[](configs.length);
+  function test_Fuzz_ApplySourceConfigUpdates_Success(MultiCommitStore.SourceConfigArgs memory srcConfig) public {
+    MultiCommitStore.SourceConfigArgs[] memory srcConfigs = new MultiCommitStore.SourceConfigArgs[](1);
+    srcConfigs[0] = srcConfig;
+    bool shouldRevert;
 
-    for (uint256 i; i < configs.length; ++i) {
-      srcConfigs[i] = MultiCommitStore.SourceConfigArgs({
-        sourceChainSelector: SOURCE_CHAIN_SELECTOR + uint64(i),
-        isEnabled: configs[i].isEnabled,
-        minSeqNr: uint64(bound(configs[i].minSeqNr, 1, type(uint64).max)),
-        onRamp: configs[i].onRamp == address(0) ? address(1) : configs[i].onRamp
-      });
-      vm.expectEmit(address(s_multiCommitStore));
-      emit SourceConfigUpdated(
-        srcConfigs[i].sourceChainSelector,
-        IMultiCommitStore.SourceConfig({
-          isEnabled: srcConfigs[i].isEnabled,
-          minSeqNr: srcConfigs[i].minSeqNr,
-          onRamp: srcConfigs[i].onRamp
-        })
-      );
+    if (srcConfig.onRamp == address(0) || srcConfig.sourceChainSelector == 0) {
+      shouldRevert = true;
+    } else {
+      address currentOnRamp = s_multiCommitStore.getSrcConfig(srcConfig.sourceChainSelector).onRamp;
+
+      if (currentOnRamp == address(0)) {
+        if (srcConfig.minSeqNr != 1) shouldRevert = true;
+      } else {
+        if (currentOnRamp != srcConfig.onRamp) shouldRevert = true;
+      }
     }
 
-    s_multiCommitStore.applySourceConfigUpdates(srcConfigs);
+    if (shouldRevert) {
+      vm.expectRevert(
+        abi.encodeWithSelector(MultiCommitStore.InvalidSourceChainConfig.selector, srcConfig.sourceChainSelector)
+      );
+      s_multiCommitStore.applySourceConfigUpdates(srcConfigs);
+    } else {
+      vm.expectEmit();
+      emit SourceConfigUpdated(
+        srcConfig.sourceChainSelector,
+        IMultiCommitStore.SourceConfig({
+          isEnabled: srcConfig.isEnabled,
+          minSeqNr: srcConfig.minSeqNr,
+          onRamp: srcConfig.onRamp
+        })
+      );
+      s_multiCommitStore.applySourceConfigUpdates(srcConfigs);
 
-    for (uint256 i; i < configs.length; i++) {
-      MultiCommitStore.SourceConfigArgs memory expectedConfig = srcConfigs[i];
-      MultiCommitStore.SourceConfig memory srcConfig =
-        s_multiCommitStore.getSourceConfig(expectedConfig.sourceChainSelector);
-      assertEq(srcConfig.isEnabled, expectedConfig.isEnabled);
-      assertEq(srcConfig.minSeqNr, expectedConfig.minSeqNr);
-      assertEq(srcConfig.onRamp, expectedConfig.onRamp);
+      MultiCommitStore.SourceConfig memory setSrcConfig = s_multiCommitStore.getSrcConfig(srcConfig.sourceChainSelector);
+      assertEq(srcConfig.isEnabled, setSrcConfig.isEnabled);
+      assertEq(srcConfig.minSeqNr, setSrcConfig.minSeqNr);
+      assertEq(srcConfig.onRamp, setSrcConfig.onRamp);
     }
   }
 
@@ -213,24 +255,42 @@ contract MultiCommitStore_applySourceConfigUpdates is MultiCommitStoreSetup {
     s_multiCommitStore.applySourceConfigUpdates(srcConfigUpdate);
   }
 
-  function test_InvalidCommitStoreConfig_Revert() public {
+  function test_InvalidSourceChainConfig_Revert() public {
     MultiCommitStore.SourceConfigArgs[] memory srcConfigUpdate = new MultiCommitStore.SourceConfigArgs[](1);
+    // Set new source chain onRamp to address 0
     srcConfigUpdate[0] = MultiCommitStore.SourceConfigArgs({
-      sourceChainSelector: 0,
-      isEnabled: true,
-      minSeqNr: 1,
-      onRamp: DUMMY_CONTRACT_ADDRESS
-    });
-    vm.expectRevert(MultiCommitStore.InvalidCommitStoreConfig.selector);
-    s_multiCommitStore.applySourceConfigUpdates(srcConfigUpdate);
-
-    srcConfigUpdate[0] = MultiCommitStore.SourceConfigArgs({
-      sourceChainSelector: SOURCE_CHAIN_SELECTOR,
+      sourceChainSelector: SOURCE_CHAIN_SELECTOR + 1,
       isEnabled: true,
       minSeqNr: 1,
       onRamp: address(0)
     });
-    vm.expectRevert(MultiCommitStore.InvalidCommitStoreConfig.selector);
+    vm.expectRevert(
+      abi.encodeWithSelector(MultiCommitStore.InvalidSourceChainConfig.selector, srcConfigUpdate[0].sourceChainSelector)
+    );
+    s_multiCommitStore.applySourceConfigUpdates(srcConfigUpdate);
+
+    // Set new source chain minSeqNr to other than 1
+    srcConfigUpdate[0] = MultiCommitStore.SourceConfigArgs({
+      sourceChainSelector: SOURCE_CHAIN_SELECTOR + 1,
+      isEnabled: true,
+      minSeqNr: 2,
+      onRamp: DUMMY_CONTRACT_ADDRESS
+    });
+    vm.expectRevert(
+      abi.encodeWithSelector(MultiCommitStore.InvalidSourceChainConfig.selector, srcConfigUpdate[0].sourceChainSelector)
+    );
+    s_multiCommitStore.applySourceConfigUpdates(srcConfigUpdate);
+
+    // Update already set onRamp
+    srcConfigUpdate[0] = MultiCommitStore.SourceConfigArgs({
+      sourceChainSelector: SOURCE_CHAIN_SELECTOR,
+      isEnabled: true,
+      minSeqNr: 1,
+      onRamp: DUMMY_CONTRACT_ADDRESS
+    });
+    vm.expectRevert(
+      abi.encodeWithSelector(MultiCommitStore.InvalidSourceChainConfig.selector, srcConfigUpdate[0].sourceChainSelector)
+    );
     s_multiCommitStore.applySourceConfigUpdates(srcConfigUpdate);
   }
 }
