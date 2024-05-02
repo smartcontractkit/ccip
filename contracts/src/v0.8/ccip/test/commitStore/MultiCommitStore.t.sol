@@ -598,6 +598,21 @@ contract MultiCommitStore_report is MultiCommitStoreSetup {
     s_multiCommitStore.report(abi.encode(report), s_latestEpochAndRound);
   }
 
+  function test_SourceChainNotEnabled_Revert() public {
+    MultiCommitStore.MerkleRoot[] memory roots = new MultiCommitStore.MerkleRoot[](1);
+    roots[0] = MultiCommitStore.MerkleRoot({
+      sourceChainSelector: 0,
+      interval: MultiCommitStore.Interval(1, 2),
+      merkleRoot: "Only a single root"
+    });
+
+    MultiCommitStore.CommitReport memory report =
+      MultiCommitStore.CommitReport({priceUpdates: getEmptyPriceUpdates(), merkleRoots: roots});
+
+    vm.expectRevert(abi.encodeWithSelector(MultiCommitStore.SourceChainNotEnabled.selector, 0));
+    s_multiCommitStore.report(abi.encode(report), ++s_latestEpochAndRound);
+  }
+
   function test_RootAlreadyCommitted_Revert() public {
     MultiCommitStore.MerkleRoot[] memory roots = new MultiCommitStore.MerkleRoot[](1);
     roots[0] = MultiCommitStore.MerkleRoot({

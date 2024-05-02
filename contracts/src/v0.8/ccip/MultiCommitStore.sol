@@ -19,7 +19,7 @@ contract MultiCommitStore is IMultiCommitStore, ITypeAndVersion, OCR2Base {
   error InvalidCommitStoreConfig();
   error BadARMSignal();
   error RootAlreadyCommitted();
-  error InvalidChainSelector(uint64 chainSelector);
+  error SourceChainNotEnabled(uint64 chainSelector);
 
   event Paused(address account);
   event Unpaused(address account);
@@ -256,7 +256,7 @@ contract MultiCommitStore is IMultiCommitStore, ITypeAndVersion, OCR2Base {
       // If we reached this section, the report should contain a valid root
       SourceConfig storage srcConfig = s_srcConfigs[root.sourceChainSelector];
 
-      if (!srcConfig.isEnabled) revert InvalidChainSelector(root.sourceChainSelector);
+      if (!srcConfig.isEnabled) revert SourceChainNotEnabled(root.sourceChainSelector);
 
       if (srcConfig.minSeqNr != root.interval.min || root.interval.min > root.interval.max) {
         revert InvalidInterval(root.interval);
