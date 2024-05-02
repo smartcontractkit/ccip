@@ -14,12 +14,12 @@ import {OCR2Base} from "./ocr/OCR2Base.sol";
 contract MultiCommitStore is IMultiCommitStore, ITypeAndVersion, OCR2Base {
   error StaleReport();
   error PausedError();
-  error InvalidInterval(Interval interval);
+  error InvalidInterval(uint64 sourceChainSelector, Interval interval);
   error InvalidRoot();
   error InvalidCommitStoreConfig();
   error InvalidSourceChainConfig(uint64 sourceChainSelector);
   error BadARMSignal();
-  error RootAlreadyCommitted();
+  error RootAlreadyCommitted(uint64 sourceChainSelector, bytes32 merkleRoot);
   error SourceChainNotEnabled(uint64 chainSelector);
 
   event Paused(address account);
@@ -267,13 +267,15 @@ contract MultiCommitStore is IMultiCommitStore, ITypeAndVersion, OCR2Base {
       if (!srcConfig.isEnabled) revert SourceChainNotEnabled(root.sourceChainSelector);
 
       if (srcConfig.minSeqNr != root.interval.min || root.interval.min > root.interval.max) {
-        revert InvalidInterval(root.interval);
+        revert InvalidInterval(root.sourceChainSelector, root.interval);
       }
 
       if (root.merkleRoot == bytes32(0)) revert InvalidRoot();
       // Disallow duplicate roots as that would reset the timestamp and
       // delay potential manual execution.
-      if (s_roots[root.sourceChainSelector][root.merkleRoot] != 0) revert RootAlreadyCommitted();
+      if (s_roots[root.sourceChainSelector][root.merkleRoot] != 0) {
+        revert RootAlreadyCommitted(root.sourceChainSelector, root.merkleRoot);
+      }
 
       srcConfig.minSeqNr = root.interval.max + 1;
       s_roots[root.sourceChainSelector][root.merkleRoot] = block.timestamp;

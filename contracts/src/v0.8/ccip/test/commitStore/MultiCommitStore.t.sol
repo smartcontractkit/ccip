@@ -616,7 +616,9 @@ contract MultiCommitStore_report is MultiCommitStoreSetup {
     });
     MultiCommitStore.CommitReport memory report =
       MultiCommitStore.CommitReport({priceUpdates: getEmptyPriceUpdates(), merkleRoots: roots});
-    vm.expectRevert(abi.encodeWithSelector(MultiCommitStore.InvalidInterval.selector, interval));
+    vm.expectRevert(
+      abi.encodeWithSelector(MultiCommitStore.InvalidInterval.selector, roots[0].sourceChainSelector, interval)
+    );
     s_multiCommitStore.report(abi.encode(report), ++s_latestEpochAndRound);
   }
 
@@ -631,7 +633,9 @@ contract MultiCommitStore_report is MultiCommitStoreSetup {
     });
     MultiCommitStore.CommitReport memory report =
       MultiCommitStore.CommitReport({priceUpdates: getEmptyPriceUpdates(), merkleRoots: roots});
-    vm.expectRevert(abi.encodeWithSelector(MultiCommitStore.InvalidInterval.selector, interval));
+    vm.expectRevert(
+      abi.encodeWithSelector(MultiCommitStore.InvalidInterval.selector, roots[0].sourceChainSelector, interval)
+    );
     s_multiCommitStore.report(abi.encode(report), ++s_latestEpochAndRound);
   }
 
@@ -684,7 +688,11 @@ contract MultiCommitStore_report is MultiCommitStoreSetup {
       MultiCommitStore.CommitReport({priceUpdates: getEmptyPriceUpdates(), merkleRoots: roots});
     s_multiCommitStore.report(abi.encode(report), ++s_latestEpochAndRound);
     report.merkleRoots[0].interval = MultiCommitStore.Interval(3, 3);
-    vm.expectRevert(MultiCommitStore.RootAlreadyCommitted.selector);
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        MultiCommitStore.RootAlreadyCommitted.selector, roots[0].sourceChainSelector, roots[0].merkleRoot
+      )
+    );
     s_multiCommitStore.report(abi.encode(report), ++s_latestEpochAndRound);
   }
 }
