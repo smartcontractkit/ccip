@@ -8,6 +8,15 @@ if ! [[ -n $HUSKY_ENABLE_PUSH_HOOKS ]]; then
     exit 0
 fi
 
+# Skip on no changes
+current_branch=$(git branch --show-current)
+upstream_branch="origin/ccip-develop"
+changes_root=$(git diff --name-only $upstream_branch...$current_branch -- "contracts/")
+
+if ! [[ -n $changes_root ]]; then
+    exit 0
+fi
+
 ./contracts/.husky/verify-changeset.sh
 cd contracts
 
