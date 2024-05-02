@@ -146,12 +146,26 @@ func (p *Plugin) ValidateObservation(outctx ocr3types.OutcomeContext, query ocrt
 	// todo: improve logging - including duration of each phase, etc.
 	p.lggr.Infow("in validate observation", "seqNr", outctx.SeqNr, "phase", "ValidateObservation")
 
-	_, err := models.DecodeObservation(ao.Observation)
+	obs, err := models.DecodeObservation(ao.Observation)
 	if err != nil {
 		return fmt.Errorf("invalid observation: %w", err)
 	}
 
-	// todo: consider adding more validations
+	if err := validateDedupedItems(obs.ResolvedTransfers...); err != nil {
+		return fmt.Errorf("invalid ResolvedTransfers: %w", err)
+	}
+	if err := validateDedupedItems(obs.PendingTransfers...); err != nil {
+		return fmt.Errorf("invalid PendingTransfers: %w", err)
+	}
+	if err := validateDedupedItems(obs.InflightTransfers...); err != nil {
+		return fmt.Errorf("invalid InflightTransfers: %w", err)
+	}
+	if err := validateDedupedItems(obs.Edges...); err != nil {
+		return fmt.Errorf("invalid Edges: %w", err)
+	}
+	if err := validateDedupedItems(obs.ConfigDigests...); err != nil {
+		return fmt.Errorf("invalid ConfigDigests: %w", err)
+	}
 
 	return nil
 }
@@ -715,4 +729,17 @@ func (p *Plugin) resolveProposedTransfers(ctx context.Context, lggr logger.Logge
 	lggr.Infow("finished resolving proposed transfers", "resolvedTransfers", resolvedTransfers)
 
 	return resolvedTransfers, nil
+}
+
+// validateDedupedItems checks if there are any duplicated items in the provided slice.
+func validateDedupedItems[T any](items ...T) error {
+	existing := map[string]bool{}
+	for _, item := range items {
+		k := fmt.Sprintf("%+v", item)
+		if existing[k] {
+			return fmt.Errorf("duplicated item")
+		}
+		existing[k] = true
+	}
+	return nil
 }

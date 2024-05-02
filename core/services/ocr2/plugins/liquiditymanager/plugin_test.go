@@ -328,12 +328,82 @@ func TestPlugin_ValidateObservation(t *testing.T) {
 			name: "some observation",
 			obs: models.NewObservation(
 				[]models.NetworkLiquidity{},
-				[]models.Transfer{{}, {}},
+				[]models.Transfer{{}},
 				[]models.PendingTransfer{},
 				[]models.Transfer{},
 				[]models.Edge{},
 				[]models.ConfigDigestWithMeta{},
 			).Encode(),
+		},
+		{
+			name: "deduped resolved transfers",
+			obs: models.NewObservation(
+				[]models.NetworkLiquidity{},
+				[]models.Transfer{{From: 1}, {From: 1}},
+				[]models.PendingTransfer{},
+				[]models.Transfer{},
+				[]models.Edge{},
+				[]models.ConfigDigestWithMeta{},
+			).Encode(),
+			expErr: func(t *testing.T, err error) {
+				assert.Error(t, err)
+			},
+		},
+		{
+			name: "deduped pending transfers",
+			obs: models.NewObservation(
+				[]models.NetworkLiquidity{},
+				[]models.Transfer{},
+				[]models.PendingTransfer{{ID: "1"}, {ID: "1"}},
+				[]models.Transfer{},
+				[]models.Edge{},
+				[]models.ConfigDigestWithMeta{},
+			).Encode(),
+			expErr: func(t *testing.T, err error) {
+				assert.Error(t, err)
+			},
+		},
+		{
+			name: "deduped inflight transfers",
+			obs: models.NewObservation(
+				[]models.NetworkLiquidity{},
+				[]models.Transfer{},
+				[]models.PendingTransfer{},
+				[]models.Transfer{{From: 1}, {From: 1}},
+				[]models.Edge{},
+				[]models.ConfigDigestWithMeta{},
+			).Encode(),
+			expErr: func(t *testing.T, err error) {
+				assert.Error(t, err)
+			},
+		},
+		{
+			name: "deduped edges",
+			obs: models.NewObservation(
+				[]models.NetworkLiquidity{},
+				[]models.Transfer{},
+				[]models.PendingTransfer{},
+				[]models.Transfer{},
+				[]models.Edge{{Source: 1, Dest: 2}, {Source: 1, Dest: 2}},
+				[]models.ConfigDigestWithMeta{},
+			).Encode(),
+			expErr: func(t *testing.T, err error) {
+				assert.Error(t, err)
+			},
+		},
+		{
+			name: "deduped config digest",
+			obs: models.NewObservation(
+				[]models.NetworkLiquidity{},
+				[]models.Transfer{},
+				[]models.PendingTransfer{},
+				[]models.Transfer{},
+				[]models.Edge{},
+				[]models.ConfigDigestWithMeta{{NetworkSel: 1}, {NetworkSel: 1}},
+			).Encode(),
+			expErr: func(t *testing.T, err error) {
+				assert.Error(t, err)
+			},
 		},
 	}
 
@@ -350,6 +420,49 @@ func TestPlugin_ValidateObservation(t *testing.T) {
 				return
 			}
 			assert.NoError(t, err)
+		})
+	}
+}
+
+func Test_validateDedupedItems(t *testing.T) {
+	tests := []struct {
+		name    string
+		items   []*models.Transfer
+		wantErr bool
+	}{
+		{
+			name: "no duplicates",
+			items: []*models.Transfer{
+				{From: 1},
+				{From: 2},
+				{From: 3},
+			},
+			wantErr: false,
+		},
+		{
+			name: "duplicates",
+			items: []*models.Transfer{
+				{From: 1},
+				{From: 2},
+				{From: 1},
+			},
+			wantErr: true,
+		},
+		{
+			name:    "empty",
+			items:   []*models.Transfer{},
+			wantErr: false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			err := validateDedupedItems(tc.items...)
+			if tc.wantErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
 		})
 	}
 }
