@@ -386,6 +386,13 @@ contract Router_ccipSend is EVM2EVMOnRampSetup {
   }
 }
 
+// @notice getArmProxy
+contract Router_getArmProxy is RouterSetup {
+  function test_getArmProxy() public view {
+    assertEq(s_sourceRouter.getArmProxy(), address(s_mockARM));
+  }
+}
+
 // @notice applyRampUpdates
 contract Router_applyRampUpdates is RouterSetup {
   event OffRampRemoved(uint64 indexed sourceChainSelector, address offRamp);

@@ -27,7 +27,7 @@ contract TokenPoolSetup is RouterSetup {
 contract TokenPool_constructor is TokenPoolSetup {
   function test_immutableFields_Success() public view {
     assertEq(address(s_token), address(s_tokenPool.getToken()));
-    assertEq(address(s_mockARM), s_tokenPool.getArmProxy());
+    assertEq(address(s_mockARM), s_tokenPool.getRmnProxy());
     assertEq(false, s_tokenPool.getAllowListEnabled());
     assertEq(address(s_sourceRouter), s_tokenPool.getRouter());
   }

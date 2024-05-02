@@ -249,7 +249,7 @@ func (c *CCIPContracts) DeployNewOffRamp(t *testing.T) {
 			SourceChainSelector: c.Source.ChainSelector,
 			OnRamp:              c.Source.OnRamp.Address(),
 			PrevOffRamp:         prevOffRamp,
-			ArmProxy:            c.Dest.ARMProxy.Address(),
+			RmnProxy:            c.Dest.ARMProxy.Address(), // RMN formerly ARM
 		},
 		evm_2_evm_offramp.RateLimiterConfig{
 			IsEnabled: true,
@@ -306,7 +306,7 @@ func (c *CCIPContracts) DeployNewOnRamp(t *testing.T) {
 			DefaultTxGasLimit: 200_000,
 			MaxNopFeesJuels:   big.NewInt(0).Mul(big.NewInt(100_000_000), big.NewInt(1e18)),
 			PrevOnRamp:        prevOnRamp,
-			ArmProxy:          c.Source.ARM.Address(), // ARM
+			RmnProxy:          c.Source.ARM.Address(), // RMN, formerly ARM
 		},
 		evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig{
 			Router:                            c.Source.Router.Address(),
@@ -1019,7 +1019,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 			DefaultTxGasLimit: 200_000,
 			MaxNopFeesJuels:   big.NewInt(0).Mul(big.NewInt(100_000_000), big.NewInt(1e18)),
 			PrevOnRamp:        common.HexToAddress(""),
-			ArmProxy:          armProxySourceAddress, // ARM
+			RmnProxy:          armProxySourceAddress, // RMN, formerly ARM
 		},
 		evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig{
 			Router:                            sourceRouterAddress,
@@ -1117,7 +1117,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 			SourceChainSelector: sourceChainSelector,
 			OnRamp:              onRampAddress,
 			PrevOffRamp:         common.HexToAddress(""),
-			ArmProxy:            armProxyDestAddress,
+			RmnProxy:            armProxyDestAddress, // RMN, formerly ARM
 		},
 		evm_2_evm_offramp.RateLimiterConfig{
 			IsEnabled: true,

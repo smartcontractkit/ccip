@@ -155,7 +155,7 @@ contract LockReleaseTokenPool_lockOrBurn is LockReleaseTokenPoolSetup {
     uint256 before = s_token.balanceOf(address(s_lockReleaseTokenPoolWithAllowList));
 
     vm.startPrank(s_allowedOnRamp);
-    vm.expectRevert(EVM2EVMOnRamp.BadARMSignal.selector);
+    vm.expectRevert(TokenPool.CursedByRMN.selector);
 
     s_lockReleaseTokenPoolWithAllowList.lockOrBurn(
       Pool.LockOrBurnInV1({
@@ -288,7 +288,7 @@ contract LockReleaseTokenPool_releaseOrMint is LockReleaseTokenPoolSetup {
     s_mockARM.voteToCurse(bytes32(0));
     uint256 before = s_token.balanceOf(OWNER);
     vm.startPrank(s_allowedOffRamp);
-    vm.expectRevert(EVM2EVMOffRamp.BadARMSignal.selector);
+    vm.expectRevert(TokenPool.CursedByRMN.selector);
     s_lockReleaseTokenPool.releaseOrMint(
       Pool.ReleaseOrMintInV1({
         originalSender: bytes(""),

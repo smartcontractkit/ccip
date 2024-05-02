@@ -24,7 +24,7 @@ contract BurnFromMintTokenPoolSetup is BurnMintSetup {
 contract BurnFromMintTokenPool_lockOrBurn is BurnFromMintTokenPoolSetup {
   function test_Setup_Success() public view {
     assertEq(address(s_burnMintERC677), address(s_pool.getToken()));
-    assertEq(address(s_mockARM), s_pool.getArmProxy());
+    assertEq(address(s_mockARM), s_pool.getRmnProxy());
     assertEq(false, s_pool.getAllowListEnabled());
     assertEq(type(uint256).max, s_burnMintERC677.allowance(address(s_pool), address(s_pool)));
     assertEq("BurnFromMintTokenPool 1.5.0-dev", s_pool.typeAndVersion());
@@ -68,7 +68,7 @@ contract BurnFromMintTokenPool_lockOrBurn is BurnFromMintTokenPoolSetup {
     uint256 before = s_burnMintERC677.balanceOf(address(s_pool));
     vm.startPrank(s_burnMintOnRamp);
 
-    vm.expectRevert(EVM2EVMOnRamp.BadARMSignal.selector);
+    vm.expectRevert(TokenPool.CursedByRMN.selector);
     s_pool.lockOrBurn(
       Pool.LockOrBurnInV1({
         originalSender: OWNER,

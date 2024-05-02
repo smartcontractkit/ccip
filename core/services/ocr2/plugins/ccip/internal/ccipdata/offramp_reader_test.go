@@ -277,8 +277,8 @@ func setupOffRampV1_2_0(t *testing.T, user *bind.TransactOpts, bc *client.Simula
 
 func setupOffRampV1_5_0(t *testing.T, user *bind.TransactOpts, bc *client.SimulatedBackendClient) common.Address {
 	onRampAddr := utils.RandomAddress()
-	armAddr := deployMockArm(t, user, bc)
-	csAddr := deployCommitStore(t, user, bc, onRampAddr, armAddr)
+	rmnAddr := deployMockArm(t, user, bc)
+	csAddr := deployCommitStore(t, user, bc, onRampAddr, rmnAddr)
 
 	// Deploy the OffRamp.
 	staticConfig := evm_2_evm_offramp.EVM2EVMOffRampStaticConfig{
@@ -287,7 +287,7 @@ func setupOffRampV1_5_0(t *testing.T, user *bind.TransactOpts, bc *client.Simula
 		SourceChainSelector: testutils.SimulatedChainID.Uint64(),
 		OnRamp:              onRampAddr,
 		PrevOffRamp:         common.Address{},
-		ArmProxy:            armAddr,
+		RmnProxy:            rmnAddr,
 	}
 	rateLimiterConfig := evm_2_evm_offramp.RateLimiterConfig{
 		IsEnabled: false,

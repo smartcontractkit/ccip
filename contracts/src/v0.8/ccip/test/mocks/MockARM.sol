@@ -2,10 +2,10 @@
 pragma solidity 0.8.19;
 
 import {ARM} from "../../ARM.sol";
-import {IARM} from "../../interfaces/IARM.sol";
+import {IRMN} from "../../interfaces/IRMN.sol";
 import {OwnerIsCreator} from "./../../../shared/access/OwnerIsCreator.sol";
 
-contract MockARM is IARM, OwnerIsCreator {
+contract MockARM is IRMN, OwnerIsCreator {
   error CustomError(bytes err);
 
   bool private s_curse;
@@ -13,6 +13,13 @@ contract MockARM is IARM, OwnerIsCreator {
   ARM.VersionedConfig private s_versionedConfig;
 
   function isCursed() external view override returns (bool) {
+    if (s_err.length != 0) {
+      revert CustomError(s_err);
+    }
+    return s_curse;
+  }
+
+  function isCursed(bytes32 /* subject */ ) external view override returns (bool) {
     if (s_err.length != 0) {
       revert CustomError(s_err);
     }
@@ -31,7 +38,7 @@ contract MockARM is IARM, OwnerIsCreator {
     s_curse = false;
   }
 
-  function isBlessed(IARM.TaggedRoot calldata) external view override returns (bool) {
+  function isBlessed(IRMN.TaggedRoot calldata) external view override returns (bool) {
     return !s_curse;
   }
 
