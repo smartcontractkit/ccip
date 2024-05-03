@@ -8,5 +8,6 @@ if [[ $CI == "true" ]]; then
 fi
 
 cd ../
-chmod +x contracts/.husky/*.sh
-pnpm husky contracts/
+chmod +x ./contracts/.husky/*.sh
+pnpm husky ./contracts/.husky
+echo "Husky hooks prepared."
