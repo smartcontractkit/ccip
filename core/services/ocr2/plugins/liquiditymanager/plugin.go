@@ -151,19 +151,24 @@ func (p *Plugin) ValidateObservation(outctx ocr3types.OutcomeContext, query ocrt
 		return fmt.Errorf("invalid observation: %w", err)
 	}
 
-	if err := validateDedupedItems(obs.ResolvedTransfers...); err != nil {
+	if err := validateDedupedItems(func(liq models.NetworkLiquidity) string {
+		return fmt.Sprintf("%d", liq.Network)
+	}, obs.LiquidityPerChain...); err != nil {
+		return fmt.Errorf("invalid LiquidityPerChain: %w", err)
+	}
+	if err := validateDedupedItems(dedupKeyObject, obs.ResolvedTransfers...); err != nil {
 		return fmt.Errorf("invalid ResolvedTransfers: %w", err)
 	}
-	if err := validateDedupedItems(obs.PendingTransfers...); err != nil {
+	if err := validateDedupedItems(dedupKeyObject, obs.PendingTransfers...); err != nil {
 		return fmt.Errorf("invalid PendingTransfers: %w", err)
 	}
-	if err := validateDedupedItems(obs.InflightTransfers...); err != nil {
+	if err := validateDedupedItems(dedupKeyObject, obs.InflightTransfers...); err != nil {
 		return fmt.Errorf("invalid InflightTransfers: %w", err)
 	}
-	if err := validateDedupedItems(obs.Edges...); err != nil {
+	if err := validateDedupedItems(dedupKeyObject, obs.Edges...); err != nil {
 		return fmt.Errorf("invalid Edges: %w", err)
 	}
-	if err := validateDedupedItems(obs.ConfigDigests...); err != nil {
+	if err := validateDedupedItems(dedupKeyObject, obs.ConfigDigests...); err != nil {
 		return fmt.Errorf("invalid ConfigDigests: %w", err)
 	}
 
@@ -731,11 +736,15 @@ func (p *Plugin) resolveProposedTransfers(ctx context.Context, lggr logger.Logge
 	return resolvedTransfers, nil
 }
 
+func dedupKeyObject[T any](item T) string {
+	return fmt.Sprintf("%+v", item)
+}
+
 // validateDedupedItems checks if there are any duplicated items in the provided slice.
-func validateDedupedItems[T any](items ...T) error {
+func validateDedupedItems[T any](keyFn func(T) string, items ...T) error {
 	existing := map[string]bool{}
 	for _, item := range items {
-		k := fmt.Sprintf("%+v", item)
+		k := keyFn(item)
 		if existing[k] {
 			return fmt.Errorf("duplicated item")
 		}

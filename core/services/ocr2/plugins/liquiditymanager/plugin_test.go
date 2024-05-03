@@ -335,6 +335,21 @@ func TestPlugin_ValidateObservation(t *testing.T) {
 				[]models.ConfigDigestWithMeta{},
 			).Encode(),
 		},
+
+		{
+			name: "deduped liquidity observations",
+			obs: models.NewObservation(
+				[]models.NetworkLiquidity{{Network: 1, Liquidity: ubig.New(big.NewInt(1))}, {Network: 1, Liquidity: ubig.New(big.NewInt(2))}},
+				[]models.Transfer{},
+				[]models.PendingTransfer{},
+				[]models.Transfer{},
+				[]models.Edge{},
+				[]models.ConfigDigestWithMeta{},
+			).Encode(),
+			expErr: func(t *testing.T, err error) {
+				assert.Error(t, err)
+			},
+		},
 		{
 			name: "deduped resolved transfers",
 			obs: models.NewObservation(
@@ -427,6 +442,7 @@ func TestPlugin_ValidateObservation(t *testing.T) {
 func Test_validateDedupedItems(t *testing.T) {
 	tests := []struct {
 		name    string
+		keyFn   func(*models.Transfer) string
 		items   []*models.Transfer
 		wantErr bool
 	}{
@@ -453,11 +469,26 @@ func Test_validateDedupedItems(t *testing.T) {
 			items:   []*models.Transfer{},
 			wantErr: false,
 		},
+		{
+			name: "custom keyFn",
+			keyFn: func(t *models.Transfer) string {
+				return fmt.Sprintf("%d", t.From)
+			},
+			items: []*models.Transfer{
+				{From: 1, To: 2},
+				{From: 1, To: 3},
+			},
+			wantErr: true,
+		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			err := validateDedupedItems(tc.items...)
+			keyFn := tc.keyFn
+			if keyFn == nil {
+				keyFn = dedupKeyObject
+			}
+			err := validateDedupedItems(keyFn, tc.items...)
 			if tc.wantErr {
 				require.Error(t, err)
 				return
