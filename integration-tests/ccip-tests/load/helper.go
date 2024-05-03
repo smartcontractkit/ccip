@@ -169,6 +169,8 @@ func (l *LoadArgs) ValidateCurseFollowedByUncurse() {
 
 	for _, lane := range lanes {
 		// try to send requests on lanes on which curse is applied on source RMN and the request should revert
+		// data-only transfer is sufficient
+		lane.Source.TransferAmount = []*big.Int{}
 		failedTx, _, _, err := lane.Source.SendRequest(
 			lane.Dest.ReceiverDapp.EthAddress,
 			big.NewInt(600_000), // gas limit
