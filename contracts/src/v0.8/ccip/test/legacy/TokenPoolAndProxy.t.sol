@@ -395,7 +395,7 @@ contract TokenPoolAndProxy is EVM2EVMOnRampSetup {
 
     BurnMintTokenPoolAndProxy(address(s_pool)).applyChainUpdates(chains);
 
-    s_tokenAdminRegistry.registerAdministratorPermissioned(address(s_token), OWNER);
+    // CCIP Token Admin has already been registered from TokenSetup
     s_tokenAdminRegistry.setPool(address(s_token), address(s_pool));
 
     s_token.grantMintAndBurnRoles(address(s_pool));
