@@ -211,10 +211,10 @@ contract MultiCommitStore_constructor is PriceRegistrySetup, OCR2BaseSetup {
 }
 
 /// @notice #setMinSeqNr
-contract MultiCommitStore_applySourceConfigUpdates is MultiCommitStoreSetup {
-  function test_Fuzz_ApplySourceConfigUpdates_Success(MultiCommitStore.SourceChainConfigArgs memory sourceChainConfig)
-    public
-  {
+contract MultiCommitStore_applySourceChainConfigUpdates is MultiCommitStoreSetup {
+  function test_Fuzz_applySourceChainConfigUpdates_Success(
+    MultiCommitStore.SourceChainConfigArgs memory sourceChainConfig
+  ) public {
     MultiCommitStore.SourceChainConfigArgs[] memory sourceChainConfigs = new MultiCommitStore.SourceChainConfigArgs[](1);
     sourceChainConfigs[0] = sourceChainConfig;
     bool shouldRevert;
@@ -237,7 +237,7 @@ contract MultiCommitStore_applySourceConfigUpdates is MultiCommitStoreSetup {
           MultiCommitStore.InvalidSourceChainConfig.selector, sourceChainConfig.sourceChainSelector
         )
       );
-      s_multiCommitStore.applySourceConfigUpdates(sourceChainConfigs);
+      s_multiCommitStore.applySourceChainConfigUpdates(sourceChainConfigs);
     } else {
       vm.expectEmit();
       emit SourceChainConfigUpdated(
@@ -248,7 +248,7 @@ contract MultiCommitStore_applySourceConfigUpdates is MultiCommitStoreSetup {
           onRamp: sourceChainConfig.onRamp
         })
       );
-      s_multiCommitStore.applySourceConfigUpdates(sourceChainConfigs);
+      s_multiCommitStore.applySourceChainConfigUpdates(sourceChainConfigs);
 
       MultiCommitStore.SourceChainConfig memory setSourceChainConfig =
         s_multiCommitStore.getSourceChainConfig(sourceChainConfig.sourceChainSelector);
@@ -270,7 +270,7 @@ contract MultiCommitStore_applySourceConfigUpdates is MultiCommitStoreSetup {
       onRamp: DUMMY_CONTRACT_ADDRESS
     });
     vm.expectRevert("Only callable by owner");
-    s_multiCommitStore.applySourceConfigUpdates(sourceChainConfigUpdate);
+    s_multiCommitStore.applySourceChainConfigUpdates(sourceChainConfigUpdate);
   }
 
   function test_InvalidSourceChainConfig_Revert() public {
@@ -288,7 +288,7 @@ contract MultiCommitStore_applySourceConfigUpdates is MultiCommitStoreSetup {
         MultiCommitStore.InvalidSourceChainConfig.selector, sourceChainConfigUpdate[0].sourceChainSelector
       )
     );
-    s_multiCommitStore.applySourceConfigUpdates(sourceChainConfigUpdate);
+    s_multiCommitStore.applySourceChainConfigUpdates(sourceChainConfigUpdate);
 
     // Set new source chain minSeqNr to other than 1
     sourceChainConfigUpdate[0] = MultiCommitStore.SourceChainConfigArgs({
@@ -302,7 +302,7 @@ contract MultiCommitStore_applySourceConfigUpdates is MultiCommitStoreSetup {
         MultiCommitStore.InvalidSourceChainConfig.selector, sourceChainConfigUpdate[0].sourceChainSelector
       )
     );
-    s_multiCommitStore.applySourceConfigUpdates(sourceChainConfigUpdate);
+    s_multiCommitStore.applySourceChainConfigUpdates(sourceChainConfigUpdate);
 
     // Update already set onRamp
     sourceChainConfigUpdate[0] = MultiCommitStore.SourceChainConfigArgs({
@@ -316,7 +316,7 @@ contract MultiCommitStore_applySourceConfigUpdates is MultiCommitStoreSetup {
         MultiCommitStore.InvalidSourceChainConfig.selector, sourceChainConfigUpdate[0].sourceChainSelector
       )
     );
-    s_multiCommitStore.applySourceConfigUpdates(sourceChainConfigUpdate);
+    s_multiCommitStore.applySourceChainConfigUpdates(sourceChainConfigUpdate);
   }
 }
 

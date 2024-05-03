@@ -43,7 +43,7 @@ contract MultiCommitStore is IMultiCommitStore, ITypeAndVersion, OCR2Base {
   }
 
   /// @dev Struct to hold the configs for a source chain, same as SourceChainConfig but with the sourceChainSelector
-  /// so that an array of these can be passed in the constructor and the applySourceConfigUpdates function.
+  /// so that an array of these can be passed in the constructor and the applySourceChainConfigUpdates function.
   struct SourceChainConfigArgs {
     uint64 sourceChainSelector; // ──╮ The source chain selector
     bool isEnabled; //               | Whether the source chain is enabled
@@ -108,7 +108,7 @@ contract MultiCommitStore is IMultiCommitStore, ITypeAndVersion, OCR2Base {
     i_chainSelector = staticConfig.chainSelector;
     i_armProxy = staticConfig.armProxy;
 
-    _applySourceConfigUpdates(sourceChainConfigs);
+    _applySourceChainConfigUpdates(sourceChainConfigs);
   }
 
   // ================================================================
@@ -288,12 +288,12 @@ contract MultiCommitStore is IMultiCommitStore, ITypeAndVersion, OCR2Base {
 
   /// @notice Updates the source chain specific config.
   /// @param sourceChainConfigs The source chain specific config updates.
-  function applySourceConfigUpdates(SourceChainConfigArgs[] memory sourceChainConfigs) external onlyOwner {
-    _applySourceConfigUpdates(sourceChainConfigs);
+  function applySourceChainConfigUpdates(SourceChainConfigArgs[] memory sourceChainConfigs) external onlyOwner {
+    _applySourceChainConfigUpdates(sourceChainConfigs);
   }
 
-  /// @notice Internal version applySourceConfigUpdates.
-  function _applySourceConfigUpdates(SourceChainConfigArgs[] memory sourceChainConfigs) internal onlyOwner {
+  /// @notice Internal version applySourceChainConfigUpdates.
+  function _applySourceChainConfigUpdates(SourceChainConfigArgs[] memory sourceChainConfigs) internal onlyOwner {
     for (uint256 i; i < sourceChainConfigs.length; ++i) {
       SourceChainConfigArgs memory sourceChainConfig = sourceChainConfigs[i];
       if (sourceChainConfig.onRamp == address(0) || sourceChainConfig.sourceChainSelector == 0) {
