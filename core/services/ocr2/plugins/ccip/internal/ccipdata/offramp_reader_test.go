@@ -347,7 +347,7 @@ func deployCommitStore(
 	}
 	tav, err := cs.TypeAndVersion(callOpts)
 	require.NoError(t, err)
-	require.Equal(t, "CommitStore 1.2.0", tav)
+	require.Equal(t, "CommitStore 1.5.0-dev", tav)
 	return csAddr
 }
 

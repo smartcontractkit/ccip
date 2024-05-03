@@ -19,14 +19,14 @@ contract ARMProxyTest is ARMSetup {
   }
 
   function test_ARMIsCursed_Success() public {
-    s_armProxy.setARM(address(s_mockARM));
+    s_armProxy.setARM(address(s_mockRMN));
     assertFalse(IRMN(address(s_armProxy)).isCursed());
     ARM(address(s_armProxy)).voteToCurse(bytes32(0));
     assertTrue(IRMN(address(s_armProxy)).isCursed());
   }
 
   function test_ARMIsBlessed_Success() public {
-    s_armProxy.setARM(address(s_mockARM));
+    s_armProxy.setARM(address(s_mockRMN));
     assertTrue(IRMN(address(s_armProxy)).isBlessed(IRMN.TaggedRoot({commitStore: address(0), root: bytes32(0)})));
     ARM(address(s_armProxy)).voteToCurse(bytes32(0));
     assertFalse(IRMN(address(s_armProxy)).isBlessed(IRMN.TaggedRoot({commitStore: address(0), root: bytes32(0)})));
@@ -34,8 +34,8 @@ contract ARMProxyTest is ARMSetup {
 
   function test_ARMCallRevertReasonForwarded() public {
     bytes memory err = bytes("revert");
-    s_mockARM.setRevert(err);
-    s_armProxy.setARM(address(s_mockARM));
+    s_mockRMN.setRevert(err);
+    s_armProxy.setARM(address(s_mockRMN));
     vm.expectRevert(abi.encodeWithSelector(MockARM.CustomError.selector, err));
     IRMN(address(s_armProxy)).isCursed();
   }

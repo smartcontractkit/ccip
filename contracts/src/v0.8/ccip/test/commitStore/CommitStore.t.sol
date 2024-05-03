@@ -26,7 +26,7 @@ contract CommitStoreSetup is PriceRegistrySetup, OCR2BaseSetup {
         chainSelector: DEST_CHAIN_SELECTOR,
         sourceChainSelector: SOURCE_CHAIN_SELECTOR,
         onRamp: ON_RAMP_ADDRESS,
-        armProxy: address(s_mockARM)
+        armProxy: address(s_mockRMN)
       })
     );
     CommitStore.DynamicConfig memory dynamicConfig =
@@ -92,7 +92,7 @@ contract CommitStore_constructor is PriceRegistrySetup, OCR2BaseSetup {
       chainSelector: DEST_CHAIN_SELECTOR,
       sourceChainSelector: SOURCE_CHAIN_SELECTOR,
       onRamp: 0x2C44CDDdB6a900Fa2B585dd299E03D12Fa4293Bc,
-      armProxy: address(s_mockARM)
+      armProxy: address(s_mockRMN)
     });
     CommitStore.DynamicConfig memory dynamicConfig =
       CommitStore.DynamicConfig({priceRegistry: address(s_priceRegistry)});
@@ -431,7 +431,7 @@ contract CommitStore_report is CommitStoreSetup {
   }
 
   function test_Unhealthy_Revert() public {
-    s_mockARM.voteToCurse(0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff);
+    s_mockRMN.voteToCurse(0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff);
     vm.expectRevert(CommitStore.BadRMNSignal.selector);
     bytes memory report;
     s_commitStore.report(report, ++s_latestEpochAndRound);
@@ -596,16 +596,16 @@ contract CommitStore_isUnpausedAndARMHealthy is CommitStoreSetup {
 
     // Test arm
     assertTrue(s_commitStore.isARMHealthy());
-    s_mockARM.voteToCurse(0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff);
+    s_mockRMN.voteToCurse(0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff);
     assertFalse(s_commitStore.isARMHealthy());
     assertFalse(s_commitStore.isUnpausedAndARMHealthy());
     ARM.UnvoteToCurseRecord[] memory records = new ARM.UnvoteToCurseRecord[](1);
     records[0] = ARM.UnvoteToCurseRecord({curseVoteAddr: OWNER, cursesHash: bytes32(uint256(0)), forceUnvote: true});
-    s_mockARM.ownerUnvoteToCurse(records);
+    s_mockRMN.ownerUnvoteToCurse(records);
     assertTrue(s_commitStore.isARMHealthy());
     assertTrue(s_commitStore.isUnpausedAndARMHealthy());
 
-    s_mockARM.voteToCurse(0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff);
+    s_mockRMN.voteToCurse(0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff);
     s_commitStore.pause();
     assertFalse(s_commitStore.isUnpausedAndARMHealthy());
   }
