@@ -11,17 +11,19 @@ import {Client} from "../../libraries/Client.sol";
 import {Pool} from "../../libraries/Pool.sol";
 import {RateLimiter} from "../../libraries/RateLimiter.sol";
 import {BurnMintTokenPoolAndProxy} from "../../pools/BurnMintTokenPoolAndProxy.sol";
+import {LockReleaseTokenPoolAndProxy} from "../../pools/LockReleaseTokenPoolAndProxy.sol";
 import {TokenPool} from "../../pools/TokenPool.sol";
 import {TokenSetup} from "../TokenSetup.t.sol";
 import {EVM2EVMOnRampHelper} from "../helpers/EVM2EVMOnRampHelper.sol";
 import {EVM2EVMOnRampSetup} from "../onRamp/EVM2EVMOnRampSetup.t.sol";
+import {RouterSetup} from "../router/RouterSetup.t.sol";
 import {BurnMintTokenPool1_2, TokenPool1_2} from "./BurnMintTokenPool1_2.sol";
 import {BurnMintTokenPool1_4, TokenPool1_4} from "./BurnMintTokenPool1_4.sol";
 
 import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
-import {LockReleaseTokenPoolAndProxy} from "../../pools/LockReleaseTokenPoolAndProxy.sol";
+import {IERC165} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/introspection/IERC165.sol";
 
-contract BurnMintTokenPoolAndProxyMigration is EVM2EVMOnRampSetup {
+contract TokenPoolAndProxyMigration is EVM2EVMOnRampSetup {
   BurnMintTokenPoolAndProxy internal s_newPool;
   IPoolPriorTo1_5 internal s_legacyPool;
   BurnMintERC677 internal s_token;
@@ -480,5 +482,281 @@ contract TokenPoolAndProxy is EVM2EVMOnRampSetup {
         offchainTokenData: ""
       })
     );
+  }
+}
+
+////
+/// Duplicated tests from LockReleaseTokenPool.t.sol
+///
+
+contract LockReleaseTokenPoolAndProxySetup is RouterSetup {
+  IERC20 internal s_token;
+  LockReleaseTokenPoolAndProxy internal s_lockReleaseTokenPoolAndProxy;
+  LockReleaseTokenPoolAndProxy internal s_lockReleaseTokenPoolAndProxyWithAllowList;
+  address[] internal s_allowedList;
+
+  address internal s_allowedOnRamp = address(123);
+  address internal s_allowedOffRamp = address(234);
+
+  address internal s_destPoolAddress = address(2736782345);
+  address internal s_sourcePoolAddress = address(53852352095);
+
+  function setUp() public virtual override {
+    RouterSetup.setUp();
+    s_token = new BurnMintERC677("LINK", "LNK", 18, 0);
+    deal(address(s_token), OWNER, type(uint256).max);
+    s_lockReleaseTokenPoolAndProxy =
+      new LockReleaseTokenPoolAndProxy(s_token, new address[](0), address(s_mockARM), true, address(s_sourceRouter));
+
+    s_allowedList.push(USER_1);
+    s_allowedList.push(DUMMY_CONTRACT_ADDRESS);
+    s_lockReleaseTokenPoolAndProxyWithAllowList =
+      new LockReleaseTokenPoolAndProxy(s_token, s_allowedList, address(s_mockARM), true, address(s_sourceRouter));
+
+    TokenPool.ChainUpdate[] memory chainUpdate = new TokenPool.ChainUpdate[](1);
+    chainUpdate[0] = TokenPool.ChainUpdate({
+      remoteChainSelector: DEST_CHAIN_SELECTOR,
+      remotePoolAddress: abi.encode(s_destPoolAddress),
+      allowed: true,
+      outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
+      inboundRateLimiterConfig: getInboundRateLimiterConfig()
+    });
+
+    s_lockReleaseTokenPoolAndProxy.applyChainUpdates(chainUpdate);
+    s_lockReleaseTokenPoolAndProxyWithAllowList.applyChainUpdates(chainUpdate);
+    s_lockReleaseTokenPoolAndProxy.setRebalancer(OWNER);
+
+    Router.OnRamp[] memory onRampUpdates = new Router.OnRamp[](1);
+    Router.OffRamp[] memory offRampUpdates = new Router.OffRamp[](1);
+    onRampUpdates[0] = Router.OnRamp({destChainSelector: DEST_CHAIN_SELECTOR, onRamp: s_allowedOnRamp});
+    offRampUpdates[0] = Router.OffRamp({sourceChainSelector: SOURCE_CHAIN_SELECTOR, offRamp: s_allowedOffRamp});
+    s_sourceRouter.applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), offRampUpdates);
+  }
+}
+
+contract LockReleaseTokenPoolAndProxy_setRebalancer is LockReleaseTokenPoolAndProxySetup {
+  function test_SetRebalancer_Success() public {
+    assertEq(address(s_lockReleaseTokenPoolAndProxy.getRebalancer()), OWNER);
+    s_lockReleaseTokenPoolAndProxy.setRebalancer(STRANGER);
+    assertEq(address(s_lockReleaseTokenPoolAndProxy.getRebalancer()), STRANGER);
+  }
+
+  function test_SetRebalancer_Revert() public {
+    vm.startPrank(STRANGER);
+
+    vm.expectRevert("Only callable by owner");
+    s_lockReleaseTokenPoolAndProxy.setRebalancer(STRANGER);
+  }
+}
+
+contract LockReleaseTokenPoolPoolAndProxy_canAcceptLiquidity is LockReleaseTokenPoolAndProxySetup {
+  function test_CanAcceptLiquidity_Success() public {
+    assertEq(true, s_lockReleaseTokenPoolAndProxy.canAcceptLiquidity());
+
+    s_lockReleaseTokenPoolAndProxy =
+      new LockReleaseTokenPoolAndProxy(s_token, new address[](0), address(s_mockARM), false, address(s_sourceRouter));
+    assertEq(false, s_lockReleaseTokenPoolAndProxy.canAcceptLiquidity());
+  }
+}
+
+contract LockReleaseTokenPoolPoolAndProxy_provideLiquidity is LockReleaseTokenPoolAndProxySetup {
+  function test_Fuzz_ProvideLiquidity_Success(uint256 amount) public {
+    uint256 balancePre = s_token.balanceOf(OWNER);
+    s_token.approve(address(s_lockReleaseTokenPoolAndProxy), amount);
+
+    s_lockReleaseTokenPoolAndProxy.provideLiquidity(amount);
+
+    assertEq(s_token.balanceOf(OWNER), balancePre - amount);
+    assertEq(s_token.balanceOf(address(s_lockReleaseTokenPoolAndProxy)), amount);
+  }
+
+  // Reverts
+
+  function test_Unauthorized_Revert() public {
+    vm.startPrank(STRANGER);
+    vm.expectRevert(abi.encodeWithSelector(LockReleaseTokenPoolAndProxy.Unauthorized.selector, STRANGER));
+
+    s_lockReleaseTokenPoolAndProxy.provideLiquidity(1);
+  }
+
+  function test_Fuzz_ExceedsAllowance(uint256 amount) public {
+    vm.assume(amount > 0);
+    vm.expectRevert("ERC20: insufficient allowance");
+    s_lockReleaseTokenPoolAndProxy.provideLiquidity(amount);
+  }
+
+  function test_LiquidityNotAccepted_Revert() public {
+    s_lockReleaseTokenPoolAndProxy =
+      new LockReleaseTokenPoolAndProxy(s_token, new address[](0), address(s_mockARM), false, address(s_sourceRouter));
+
+    vm.expectRevert(LockReleaseTokenPoolAndProxy.LiquidityNotAccepted.selector);
+    s_lockReleaseTokenPoolAndProxy.provideLiquidity(1);
+  }
+}
+
+contract LockReleaseTokenPoolPoolAndProxy_withdrawalLiquidity is LockReleaseTokenPoolAndProxySetup {
+  function test_Fuzz_WithdrawalLiquidity_Success(uint256 amount) public {
+    uint256 balancePre = s_token.balanceOf(OWNER);
+    s_token.approve(address(s_lockReleaseTokenPoolAndProxy), amount);
+    s_lockReleaseTokenPoolAndProxy.provideLiquidity(amount);
+
+    s_lockReleaseTokenPoolAndProxy.withdrawLiquidity(amount);
+
+    assertEq(s_token.balanceOf(OWNER), balancePre);
+  }
+
+  // Reverts
+
+  function test_Unauthorized_Revert() public {
+    vm.startPrank(STRANGER);
+    vm.expectRevert(abi.encodeWithSelector(LockReleaseTokenPoolAndProxy.Unauthorized.selector, STRANGER));
+
+    s_lockReleaseTokenPoolAndProxy.withdrawLiquidity(1);
+  }
+
+  function test_InsufficientLiquidity_Revert() public {
+    uint256 maxUint256 = 2 ** 256 - 1;
+    s_token.approve(address(s_lockReleaseTokenPoolAndProxy), maxUint256);
+    s_lockReleaseTokenPoolAndProxy.provideLiquidity(maxUint256);
+
+    vm.startPrank(address(s_lockReleaseTokenPoolAndProxy));
+    s_token.transfer(OWNER, maxUint256);
+    vm.startPrank(OWNER);
+
+    vm.expectRevert(LockReleaseTokenPoolAndProxy.InsufficientLiquidity.selector);
+    s_lockReleaseTokenPoolAndProxy.withdrawLiquidity(1);
+  }
+}
+
+contract LockReleaseTokenPoolPoolAndProxy_supportsInterface is LockReleaseTokenPoolAndProxySetup {
+  function test_SupportsInterface_Success() public view {
+    assertTrue(
+      s_lockReleaseTokenPoolAndProxy.supportsInterface(s_lockReleaseTokenPoolAndProxy.getLockReleaseInterfaceId())
+    );
+    assertTrue(s_lockReleaseTokenPoolAndProxy.supportsInterface(type(IPool).interfaceId));
+    assertTrue(s_lockReleaseTokenPoolAndProxy.supportsInterface(type(IERC165).interfaceId));
+  }
+}
+
+contract LockReleaseTokenPoolPoolAndProxy_setChainRateLimiterConfig is LockReleaseTokenPoolAndProxySetup {
+  event ConfigChanged(RateLimiter.Config);
+  event ChainConfigured(
+    uint64 chainSelector, RateLimiter.Config outboundRateLimiterConfig, RateLimiter.Config inboundRateLimiterConfig
+  );
+
+  uint64 internal s_remoteChainSelector;
+
+  function setUp() public virtual override {
+    LockReleaseTokenPoolAndProxySetup.setUp();
+    TokenPool.ChainUpdate[] memory chainUpdates = new TokenPool.ChainUpdate[](1);
+    s_remoteChainSelector = 123124;
+    chainUpdates[0] = TokenPool.ChainUpdate({
+      remoteChainSelector: s_remoteChainSelector,
+      remotePoolAddress: abi.encode(address(1)),
+      allowed: true,
+      outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
+      inboundRateLimiterConfig: getInboundRateLimiterConfig()
+    });
+    s_lockReleaseTokenPoolAndProxy.applyChainUpdates(chainUpdates);
+  }
+
+  function test_Fuzz_SetChainRateLimiterConfig_Success(uint128 capacity, uint128 rate, uint32 newTime) public {
+    // Cap the lower bound to 4 so 4/2 is still >= 2
+    vm.assume(capacity >= 4);
+    // Cap the lower bound to 2 so 2/2 is still >= 1
+    rate = uint128(bound(rate, 2, capacity - 2));
+    // Bucket updates only work on increasing time
+    newTime = uint32(bound(newTime, block.timestamp + 1, type(uint32).max));
+    vm.warp(newTime);
+
+    uint256 oldOutboundTokens =
+      s_lockReleaseTokenPoolAndProxy.getCurrentOutboundRateLimiterState(s_remoteChainSelector).tokens;
+    uint256 oldInboundTokens =
+      s_lockReleaseTokenPoolAndProxy.getCurrentInboundRateLimiterState(s_remoteChainSelector).tokens;
+
+    RateLimiter.Config memory newOutboundConfig = RateLimiter.Config({isEnabled: true, capacity: capacity, rate: rate});
+    RateLimiter.Config memory newInboundConfig =
+      RateLimiter.Config({isEnabled: true, capacity: capacity / 2, rate: rate / 2});
+
+    vm.expectEmit();
+    emit ConfigChanged(newOutboundConfig);
+    vm.expectEmit();
+    emit ConfigChanged(newInboundConfig);
+    vm.expectEmit();
+    emit ChainConfigured(s_remoteChainSelector, newOutboundConfig, newInboundConfig);
+
+    s_lockReleaseTokenPoolAndProxy.setChainRateLimiterConfig(s_remoteChainSelector, newOutboundConfig, newInboundConfig);
+
+    uint256 expectedTokens = RateLimiter._min(newOutboundConfig.capacity, oldOutboundTokens);
+
+    RateLimiter.TokenBucket memory bucket =
+      s_lockReleaseTokenPoolAndProxy.getCurrentOutboundRateLimiterState(s_remoteChainSelector);
+    assertEq(bucket.capacity, newOutboundConfig.capacity);
+    assertEq(bucket.rate, newOutboundConfig.rate);
+    assertEq(bucket.tokens, expectedTokens);
+    assertEq(bucket.lastUpdated, newTime);
+
+    expectedTokens = RateLimiter._min(newInboundConfig.capacity, oldInboundTokens);
+
+    bucket = s_lockReleaseTokenPoolAndProxy.getCurrentInboundRateLimiterState(s_remoteChainSelector);
+    assertEq(bucket.capacity, newInboundConfig.capacity);
+    assertEq(bucket.rate, newInboundConfig.rate);
+    assertEq(bucket.tokens, expectedTokens);
+    assertEq(bucket.lastUpdated, newTime);
+  }
+
+  function test_OnlyOwnerOrRateLimitAdmin_Revert() public {
+    address rateLimiterAdmin = address(28973509103597907);
+
+    s_lockReleaseTokenPoolAndProxy.setRateLimitAdmin(rateLimiterAdmin);
+
+    vm.startPrank(rateLimiterAdmin);
+
+    s_lockReleaseTokenPoolAndProxy.setChainRateLimiterConfig(
+      s_remoteChainSelector, getOutboundRateLimiterConfig(), getInboundRateLimiterConfig()
+    );
+
+    vm.startPrank(OWNER);
+
+    s_lockReleaseTokenPoolAndProxy.setChainRateLimiterConfig(
+      s_remoteChainSelector, getOutboundRateLimiterConfig(), getInboundRateLimiterConfig()
+    );
+  }
+
+  // Reverts
+
+  function test_OnlyOwner_Revert() public {
+    vm.startPrank(STRANGER);
+
+    vm.expectRevert(abi.encodeWithSelector(LockReleaseTokenPoolAndProxy.Unauthorized.selector, STRANGER));
+    s_lockReleaseTokenPoolAndProxy.setChainRateLimiterConfig(
+      s_remoteChainSelector, getOutboundRateLimiterConfig(), getInboundRateLimiterConfig()
+    );
+  }
+
+  function test_NonExistentChain_Revert() public {
+    uint64 wrongChainSelector = 9084102894;
+
+    vm.expectRevert(abi.encodeWithSelector(TokenPool.NonExistentChain.selector, wrongChainSelector));
+    s_lockReleaseTokenPoolAndProxy.setChainRateLimiterConfig(
+      wrongChainSelector, getOutboundRateLimiterConfig(), getInboundRateLimiterConfig()
+    );
+  }
+}
+
+contract LockReleaseTokenPoolAndProxy_setRateLimitAdmin is LockReleaseTokenPoolAndProxySetup {
+  function test_SetRateLimitAdmin_Success() public {
+    assertEq(address(0), s_lockReleaseTokenPoolAndProxy.getRateLimitAdmin());
+    s_lockReleaseTokenPoolAndProxy.setRateLimitAdmin(OWNER);
+    assertEq(OWNER, s_lockReleaseTokenPoolAndProxy.getRateLimitAdmin());
+  }
+
+  // Reverts
+
+  function test_SetRateLimitAdmin_Revert() public {
+    vm.startPrank(STRANGER);
+
+    vm.expectRevert("Only callable by owner");
+    s_lockReleaseTokenPoolAndProxy.setRateLimitAdmin(STRANGER);
   }
 }
