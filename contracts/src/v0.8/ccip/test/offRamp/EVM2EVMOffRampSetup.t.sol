@@ -117,7 +117,7 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSetup {
     view
     returns (Internal.EVM2EVMMessage memory)
   {
-    return _generateAny2EVMMessage(sequenceNumber, new Client.EVMTokenAmount[](0), true);
+    return _generateAny2EVMMessage(sequenceNumber, new Client.EVMTokenAmount[](0), false);
   }
 
   function _generateAny2EVMMessageWithTokens(
@@ -128,19 +128,19 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSetup {
     for (uint256 i = 0; i < tokenAmounts.length; ++i) {
       tokenAmounts[i].amount = amounts[i];
     }
-    return _generateAny2EVMMessage(sequenceNumber, tokenAmounts, true);
+    return _generateAny2EVMMessage(sequenceNumber, tokenAmounts, false);
   }
 
   function _generateAny2EVMMessage(
     uint64 sequenceNumber,
     Client.EVMTokenAmount[] memory tokenAmounts,
-    bool sequenced
+    bool allowOutOfOrder
   ) internal view returns (Internal.EVM2EVMMessage memory) {
     bytes memory data = abi.encode(0);
     Internal.EVM2EVMMessage memory message = Internal.EVM2EVMMessage({
       sequenceNumber: sequenceNumber,
       sender: OWNER,
-      nonce: sequenced ? sequenceNumber : 0,
+      nonce: allowOutOfOrder ? 0 : sequenceNumber,
       gasLimit: GAS_LIMIT,
       strict: false,
       sourceChainSelector: SOURCE_CHAIN_SELECTOR,
@@ -185,8 +185,8 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSetup {
     Client.EVMTokenAmount[] memory tokenAmounts = getCastedSourceEVMTokenAmountsWithZeroAmounts();
     tokenAmounts[0].amount = 1e18;
     tokenAmounts[1].amount = 5e18;
-    messages[0] = _generateAny2EVMMessage(1, tokenAmounts, true);
-    messages[1] = _generateAny2EVMMessage(2, tokenAmounts, true);
+    messages[0] = _generateAny2EVMMessage(1, tokenAmounts, false);
+    messages[1] = _generateAny2EVMMessage(2, tokenAmounts, false);
 
     return messages;
   }

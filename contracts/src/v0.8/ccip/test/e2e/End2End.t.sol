@@ -17,7 +17,7 @@ contract E2E is EVM2EVMOnRampSetup, CommitStoreSetup, EVM2EVMOffRampSetup {
     deployOffRamp(s_commitStore, s_destRouter, address(0));
   }
 
-  function test_E2E_SequencedAndNonSequencedInterleaved_Success() public {
+  function test_E2E_OrderedAndUnorderedInterleaved_Success() public {
     vm.pauseGasMetering();
     IERC20 token0 = IERC20(s_sourceTokens[0]);
     IERC20 token1 = IERC20(s_sourceTokens[1]);
@@ -165,17 +165,18 @@ contract E2E is EVM2EVMOnRampSetup, CommitStoreSetup, EVM2EVMOffRampSetup {
     s_offRamp.execute(execReport, new uint256[](0));
   }
 
-  function sendRequest(uint64 expectedSeqNum, bool sequenced) public returns (Internal.EVM2EVMMessage memory) {
+  function sendRequest(uint64 expectedSeqNum, bool allowOutOfOrder) public returns (Internal.EVM2EVMMessage memory) {
     Client.EVM2AnyMessage memory message = _generateTokenMessage();
-    message.extraArgs = Client._argsToBytes(Client.EVMExtraArgsV2({gasLimit: GAS_LIMIT, sequenced: sequenced}));
+    message.extraArgs =
+      Client._argsToBytes(Client.EVMExtraArgsV2({gasLimit: GAS_LIMIT, allowOutOfOrder: allowOutOfOrder}));
     uint256 expectedFee = s_sourceRouter.getFee(DEST_CHAIN_SELECTOR, message);
 
-    // Nonce is expected to be zero for non-sequenced messages.
+    // Nonce is expected to be zero for unordered messages.
     uint64 expectedNonce;
-    if (sequenced) {
-      expectedNonce = s_onRamp.getSenderNonce(OWNER) + 1;
-    } else {
+    if (allowOutOfOrder) {
       expectedNonce = 0;
+    } else {
+      expectedNonce = s_onRamp.getSenderNonce(OWNER) + 1;
     }
 
     IERC20(s_sourceTokens[0]).approve(address(s_sourceRouter), i_tokenAmount0 + expectedFee);
