@@ -59,7 +59,7 @@ func initOrCloseCommitStoreReader(lggr logger.Logger, versionFinder VersionFinde
 			return nil, cs.Close()
 		}
 		return cs, cs.RegisterFilters(pgOpts...)
-	case ccipdata.V1_2_0:
+	case ccipdata.V1_2_0, ccipdata.V1_5_0:
 		cs, err := v1_2_0.NewCommitStore(lggr, evmAddr, ec, lp, estimator, sourceMaxGasPrice)
 		if err != nil {
 			return nil, err

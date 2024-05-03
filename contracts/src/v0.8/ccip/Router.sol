@@ -2,9 +2,9 @@
 pragma solidity 0.8.19;
 
 import {ITypeAndVersion} from "../shared/interfaces/ITypeAndVersion.sol";
-import {IARM} from "./interfaces/IARM.sol";
 import {IAny2EVMMessageReceiver} from "./interfaces/IAny2EVMMessageReceiver.sol";
 import {IEVM2AnyOnRamp} from "./interfaces/IEVM2AnyOnRamp.sol";
+import {IRMN} from "./interfaces/IRMN.sol";
 import {IRouter} from "./interfaces/IRouter.sol";
 import {IRouterClient} from "./interfaces/IRouterClient.sol";
 import {IWrappedNative} from "./interfaces/IWrappedNative.sol";
@@ -284,7 +284,7 @@ contract Router is IRouter, IRouterClient, ITypeAndVersion, OwnerIsCreator {
 
   /// @notice Ensure that the ARM has not emitted a bad signal, and that the latest heartbeat is not stale.
   modifier whenHealthy() {
-    if (IARM(i_armProxy).isCursed()) revert BadARMSignal();
+    if (IRMN(i_armProxy).isCursed()) revert BadARMSignal();
     _;
   }
 }

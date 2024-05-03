@@ -2,9 +2,9 @@
 pragma solidity 0.8.19;
 
 import {ITypeAndVersion} from "../shared/interfaces/ITypeAndVersion.sol";
-import {IARM} from "./interfaces/IARM.sol";
 import {ICommitStore} from "./interfaces/ICommitStore.sol";
 import {IPriceRegistry} from "./interfaces/IPriceRegistry.sol";
+import {IRMN} from "./interfaces/IRMN.sol";
 
 import {Internal} from "./libraries/Internal.sol";
 import {MerkleMultiProof} from "./libraries/MerkleMultiProof.sol";
@@ -16,7 +16,7 @@ contract CommitStore is ICommitStore, ITypeAndVersion, OCR2Base {
   error InvalidInterval(Interval interval);
   error InvalidRoot();
   error InvalidCommitStoreConfig();
-  error BadARMSignal();
+  error BadRMNSignal();
   error RootAlreadyCommitted();
 
   event Paused(address account);
@@ -56,7 +56,7 @@ contract CommitStore is ICommitStore, ITypeAndVersion, OCR2Base {
   }
 
   // STATIC CONFIG
-  string public constant override typeAndVersion = "CommitStore 1.2.0";
+  string public constant override typeAndVersion = "CommitStore 1.5.0-dev";
   // Chain ID of this chain
   uint64 internal immutable i_chainSelector;
   // Chain ID of the source chain
@@ -139,7 +139,7 @@ contract CommitStore is ICommitStore, ITypeAndVersion, OCR2Base {
   /// @param root The merkle root to check the blessing status for.
   /// @return whether the root is blessed or not.
   function isBlessed(bytes32 root) public view returns (bool) {
-    return IARM(i_armProxy).isBlessed(IARM.TaggedRoot({commitStore: address(this), root: root}));
+    return IRMN(i_armProxy).isBlessed(IRMN.TaggedRoot({commitStore: address(this), root: root}));
   }
 
   /// @notice Used by the owner in case an invalid sequence of roots has been
@@ -181,7 +181,9 @@ contract CommitStore is ICommitStore, ITypeAndVersion, OCR2Base {
   /// and should not be rejected. When a report with a stale root but valid price updates is submitted,
   /// we are OK to revert to preserve the invariant that we always revert on invalid sequence number ranges.
   /// If that happens, prices will be updates in later rounds.
-  function _report(bytes calldata encodedReport, uint40 epochAndRound) internal override whenNotPaused whenHealthy {
+  function _report(bytes calldata encodedReport, uint40 epochAndRound) internal override whenNotPaused {
+    if (IRMN(i_armProxy).isCursed()) revert BadRMNSignal();
+
     CommitReport memory report = abi.decode(encodedReport, (CommitReport));
 
     // Check if the report contains price updates
@@ -271,18 +273,12 @@ contract CommitStore is ICommitStore, ITypeAndVersion, OCR2Base {
 
   /// @notice Single function to check the status of the commitStore.
   function isUnpausedAndARMHealthy() external view returns (bool) {
-    return !IARM(i_armProxy).isCursed() && !s_paused;
+    return !IRMN(i_armProxy).isCursed() && !s_paused;
   }
 
   /// @notice Support querying whether health checker is healthy.
   function isARMHealthy() external view returns (bool) {
-    return !IARM(i_armProxy).isCursed();
-  }
-
-  /// @notice Ensure that the ARM has not emitted a bad signal, and that the latest heartbeat is not stale.
-  modifier whenHealthy() {
-    if (IARM(i_armProxy).isCursed()) revert BadARMSignal();
-    _;
+    return !IRMN(i_armProxy).isCursed();
   }
 
   /// @notice Modifier to make a function callable only when the contract is not paused.

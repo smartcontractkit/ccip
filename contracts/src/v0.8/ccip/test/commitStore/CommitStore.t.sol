@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.19;
 
-import {IARM} from "../../interfaces/IARM.sol";
 import {IPriceRegistry} from "../../interfaces/IPriceRegistry.sol";
+import {IRMN} from "../../interfaces/IRMN.sol";
 
 import {ARM} from "../../ARM.sol";
 import {CommitStore} from "../../CommitStore.sol";
@@ -119,7 +119,7 @@ contract CommitStore_constructor is PriceRegistrySetup, OCR2BaseSetup {
     // CommitStore initial values
     assertEq(0, commitStore.getLatestPriceEpochAndRound());
     assertEq(1, commitStore.getExpectedNextSequenceNumber());
-    assertEq(commitStore.typeAndVersion(), "CommitStore 1.2.0");
+    assertEq(commitStore.typeAndVersion(), "CommitStore 1.5.0-dev");
     assertEq(OWNER, commitStore.owner());
     assertTrue(commitStore.isUnpausedAndARMHealthy());
   }
@@ -245,8 +245,8 @@ contract CommitStore_resetUnblessedRoots is CommitStoreRealARMSetup {
 
     s_commitStore.report(abi.encode(report), ++s_latestEpochAndRound);
 
-    IARM.TaggedRoot[] memory blessedTaggedRoots = new IARM.TaggedRoot[](1);
-    blessedTaggedRoots[0] = IARM.TaggedRoot({commitStore: address(s_commitStore), root: rootsToReset[1]});
+    IRMN.TaggedRoot[] memory blessedTaggedRoots = new IRMN.TaggedRoot[](1);
+    blessedTaggedRoots[0] = IRMN.TaggedRoot({commitStore: address(s_commitStore), root: rootsToReset[1]});
 
     vm.startPrank(BLESS_VOTE_ADDR);
     s_arm.voteToBless(blessedTaggedRoots);
@@ -432,7 +432,7 @@ contract CommitStore_report is CommitStoreSetup {
 
   function test_Unhealthy_Revert() public {
     s_mockARM.voteToCurse(0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff);
-    vm.expectRevert(CommitStore.BadARMSignal.selector);
+    vm.expectRevert(CommitStore.BadRMNSignal.selector);
     bytes memory report;
     s_commitStore.report(report, ++s_latestEpochAndRound);
   }
@@ -550,8 +550,8 @@ contract CommitStore_verify is CommitStoreRealARMSetup {
       ++s_latestEpochAndRound
     );
     // Bless that root.
-    IARM.TaggedRoot[] memory taggedRoots = new IARM.TaggedRoot[](1);
-    taggedRoots[0] = IARM.TaggedRoot({commitStore: address(s_commitStore), root: leaves[0]});
+    IRMN.TaggedRoot[] memory taggedRoots = new IRMN.TaggedRoot[](1);
+    taggedRoots[0] = IRMN.TaggedRoot({commitStore: address(s_commitStore), root: leaves[0]});
     vm.startPrank(BLESS_VOTE_ADDR);
     s_arm.voteToBless(taggedRoots);
     bytes32[] memory proofs = new bytes32[](0);
