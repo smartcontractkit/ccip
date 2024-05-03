@@ -5,7 +5,6 @@ import {ITypeAndVersion} from "../../shared/interfaces/ITypeAndVersion.sol";
 import {IBurnMintERC20} from "../../shared/token/ERC20/IBurnMintERC20.sol";
 
 import {Pool} from "../libraries/Pool.sol";
-
 import {LegacyPoolWrapper} from "./LegacyPoolWrapper.sol";
 
 contract BurnMintTokenPoolAndProxy is ITypeAndVersion, LegacyPoolWrapper {

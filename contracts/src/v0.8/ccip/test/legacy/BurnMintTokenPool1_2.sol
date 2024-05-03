@@ -1,12 +1,11 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.0;
 
-import {OwnerIsCreator} from "../../../shared/access/OwnerIsCreator.sol";
 import {ITypeAndVersion} from "../../../shared/interfaces/ITypeAndVersion.sol";
 import {IARM} from "../../interfaces/IARM.sol";
-
 import {IPoolPriorTo1_5} from "../../interfaces/IPoolPriorTo1_5.sol";
 
+import {OwnerIsCreator} from "../../../shared/access/OwnerIsCreator.sol";
 import {IBurnMintERC20} from "../../../shared/token/ERC20/IBurnMintERC20.sol";
 import {RateLimiter} from "../../libraries/RateLimiter.sol";
 
