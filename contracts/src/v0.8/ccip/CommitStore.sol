@@ -182,7 +182,7 @@ contract CommitStore is ICommitStore, ITypeAndVersion, OCR2Base {
   /// we are OK to revert to preserve the invariant that we always revert on invalid sequence number ranges.
   /// If that happens, prices will be updates in later rounds.
   function _report(bytes calldata encodedReport, uint40 epochAndRound) internal override whenNotPaused {
-    if (IRMN(i_armProxy).isCursed()) revert BadRMNSignal();
+    if (IRMN(i_armProxy).isCursed(bytes32(uint256(i_sourceChainSelector)))) revert BadRMNSignal();
 
     CommitReport memory report = abi.decode(encodedReport, (CommitReport));
 
@@ -273,12 +273,12 @@ contract CommitStore is ICommitStore, ITypeAndVersion, OCR2Base {
 
   /// @notice Single function to check the status of the commitStore.
   function isUnpausedAndARMHealthy() external view returns (bool) {
-    return !IRMN(i_armProxy).isCursed() && !s_paused;
+    return !IRMN(i_armProxy).isCursed(bytes32(uint256(i_sourceChainSelector))) && !s_paused;
   }
 
   /// @notice Support querying whether health checker is healthy.
   function isARMHealthy() external view returns (bool) {
-    return !IRMN(i_armProxy).isCursed();
+    return !IRMN(i_armProxy).isCursed(bytes32(uint256(i_sourceChainSelector)));
   }
 
   /// @notice Modifier to make a function callable only when the contract is not paused.

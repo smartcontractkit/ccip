@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.19;
 
-import {IARM} from "../../interfaces/IARM.sol";
+import {IRMN} from "../../interfaces/IRMN.sol";
 
 import {ARM} from "../../ARM.sol";
 import {ARMProxy} from "../../ARMProxy.sol";
@@ -20,16 +20,16 @@ contract ARMProxyTest is ARMSetup {
 
   function test_ARMIsCursed_Success() public {
     s_armProxy.setARM(address(s_mockARM));
-    assertFalse(IARM(address(s_armProxy)).isCursed());
+    assertFalse(IRMN(address(s_armProxy)).isCursed());
     ARM(address(s_armProxy)).voteToCurse(bytes32(0));
-    assertTrue(IARM(address(s_armProxy)).isCursed());
+    assertTrue(IRMN(address(s_armProxy)).isCursed());
   }
 
   function test_ARMIsBlessed_Success() public {
     s_armProxy.setARM(address(s_mockARM));
-    assertTrue(IARM(address(s_armProxy)).isBlessed(IARM.TaggedRoot({commitStore: address(0), root: bytes32(0)})));
+    assertTrue(IRMN(address(s_armProxy)).isBlessed(IRMN.TaggedRoot({commitStore: address(0), root: bytes32(0)})));
     ARM(address(s_armProxy)).voteToCurse(bytes32(0));
-    assertFalse(IARM(address(s_armProxy)).isBlessed(IARM.TaggedRoot({commitStore: address(0), root: bytes32(0)})));
+    assertFalse(IRMN(address(s_armProxy)).isBlessed(IRMN.TaggedRoot({commitStore: address(0), root: bytes32(0)})));
   }
 
   function test_ARMCallRevertReasonForwarded() public {
@@ -37,6 +37,6 @@ contract ARMProxyTest is ARMSetup {
     s_mockARM.setRevert(err);
     s_armProxy.setARM(address(s_mockARM));
     vm.expectRevert(abi.encodeWithSelector(MockARM.CustomError.selector, err));
-    IARM(address(s_armProxy)).isCursed();
+    IRMN(address(s_armProxy)).isCursed();
   }
 }

@@ -637,7 +637,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
 
   /// @notice Ensure that the RMN has not cursed the lane, and that the latest heartbeat is not stale.
   modifier whenNotCursed() {
-    if (IRMN(i_rmnProxy).isCursed(bytes32(uint256(i_chainSelector)))) revert CursedByRMN();
+    if (IRMN(i_rmnProxy).isCursed(bytes32(uint256(i_sourceChainSelector)))) revert CursedByRMN();
     _;
   }
 }

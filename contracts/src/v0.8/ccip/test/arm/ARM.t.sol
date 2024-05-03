@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.19;
 
-import {IARM} from "../../interfaces/IARM.sol";
+import {IRMN} from "../../interfaces/IRMN.sol";
 
 import {ARM} from "../../ARM.sol";
 import {ARMSetup} from "./ARMSetup.t.sol";
@@ -33,7 +33,7 @@ contract ARM_constructor is ConfigCompare, ARMSetup {
 }
 
 contract ARM_voteToBlessRoots is ARMSetup {
-  event VotedToBless(uint32 indexed configVersion, address indexed voter, IARM.TaggedRoot taggedRoot, uint8 weight);
+  event VotedToBless(uint32 indexed configVersion, address indexed voter, IRMN.TaggedRoot taggedRoot, uint8 weight);
 
   // Success
 
