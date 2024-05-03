@@ -15,6 +15,7 @@ import {EnumerableMapAddresses} from "../../shared/enumerable/EnumerableMapAddre
 import {AggregateRateLimiter} from "../AggregateRateLimiter.sol";
 import {Client} from "../libraries/Client.sol";
 import {Internal} from "../libraries/Internal.sol";
+import {Pool} from "../libraries/Pool.sol";
 import {RateLimiter} from "../libraries/RateLimiter.sol";
 import {OCR2BaseNoChecks} from "../ocr/OCR2BaseNoChecks.sol";
 
@@ -27,7 +28,7 @@ import {ERC165Checker} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts
 /// @dev OCR2BaseNoChecks is used to save gas, signatures are not required as the offramp can only execute
 /// messages which are committed in the commitStore. We still make use of OCR2 as an executor whitelist
 /// and turn-taking mechanism.
-contract EVM2EVMMultiOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersion, OCR2BaseNoChecks {
+contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersion, OCR2BaseNoChecks {
   using ERC165Checker for address;
   using EnumerableMapAddresses for EnumerableMapAddresses.AddressToAddressMap;
 
@@ -51,7 +52,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndV
   error EmptyReport();
   error BadARMSignal();
   error InvalidMessageId();
-  error InvalidEVMAddress(uint256 encodedAddress);
+  error NotACompatiblePool(address notPool);
   error InvalidDataLength(uint256 expected, uint256 got);
   error InvalidNewState(uint64 sequenceNumber, Internal.MessageExecutionState newState);
   error IndexOutOfRange();
@@ -97,8 +98,6 @@ contract EVM2EVMMultiOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndV
 
   // STATIC CONFIG
   string public constant override typeAndVersion = "EVM2EVMOffRamp 1.5.0-dev";
-  /// @dev The expected length of the return data from a pool release or mint call.
-  uint256 internal constant EXPECTED_POOL_RETURN_DATA_LENGTH = 64;
 
   /// @dev Commit store address on the destination chain
   address internal immutable i_commitStore;
@@ -398,8 +397,8 @@ contract EVM2EVMMultiOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndV
     catch (bytes memory err) {
       if (
         ReceiverError.selector == bytes4(err) || TokenHandlingError.selector == bytes4(err)
-          || InvalidEVMAddress.selector == bytes4(err) || InvalidDataLength.selector == bytes4(err)
-          || CallWithExactGas.NoContract.selector == bytes4(err)
+          || Internal.InvalidEVMAddress.selector == bytes4(err) || InvalidDataLength.selector == bytes4(err)
+          || CallWithExactGas.NoContract.selector == bytes4(err) || NotACompatiblePool.selector == bytes4(err)
       ) {
         // If CCIP receiver execution is not successful, bubble up receiver revert data,
         // prepended by the 4 bytes of ReceiverError.selector, TokenHandlingError.selector or InvalidPoolAddress.selector.
@@ -429,8 +428,17 @@ contract EVM2EVMMultiOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndV
         message.tokenAmounts, abi.encode(message.sender), message.receiver, message.sourceTokenData, offchainTokenData
       );
     }
+    // There are three cases in which we skip calling the receiver:
+    // 1. If the message data is empty AND the gas limit is 0.
+    //          This indicates a message that only transfers tokens. It is valid to only send tokens to a contract
+    //          that supports the IAny2EVMMessageReceiver interface, but without this first check we would call the
+    //          receiver without any gas, which would revert the transaction.
+    // 2. If the receiver is not a contract.
+    // 3. If the receiver is a contract but it does not support the IAny2EVMMessageReceiver interface.
+    //
+    // The ordering of these checks is important, as the first check is the cheapest to execute.
     if (
-      message.receiver.code.length == 0
+      (message.data.length == 0 && message.gasLimit == 0) || message.receiver.code.length == 0
         || !message.receiver.supportsInterface(type(IAny2EVMMessageReceiver).interfaceId)
     ) return;
 
@@ -554,11 +562,17 @@ contract EVM2EVMMultiOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndV
     for (uint256 i = 0; i < sourceTokenAmounts.length; ++i) {
       // This should never revert as the onRamp creates the sourceTokenData. Only the inner components from
       // this struct come from untrusted sources.
-      IPool.SourceTokenData memory sourceTokenData = abi.decode(encodedSourceTokenData[i], (IPool.SourceTokenData));
+      Internal.SourceTokenData memory sourceTokenData =
+        abi.decode(encodedSourceTokenData[i], (Internal.SourceTokenData));
       // We need to safely decode the pool address from the sourceTokenData, as it could be wrong,
       // in which case it doesn't have to be a valid EVM address.
-      if (sourceTokenData.destPoolAddress.length != 32) {
-        revert InvalidDataLength(32, sourceTokenData.destPoolAddress.length);
+      address localPoolAddress = Internal._validateEVMAddress(sourceTokenData.destPoolAddress);
+      // This will call the supportsInterface through the ERC165Checker, and not directly on the pool address.
+      // This is done to prevent a pool from reverting the entire transaction if it doesn't support the interface.
+      // The call gets a max or 30k gas per instance, of which there are three. This means gas estimations should
+      // account for 90k gas overhead due to the interface check.
+      if (!localPoolAddress.supportsInterface(Pool.CCIP_POOL_V1)) {
+        revert NotACompatiblePool(localPoolAddress);
       }
 
       // We determined that the pool address is a valid EVM address, but that does not mean the code at this
@@ -569,14 +583,17 @@ contract EVM2EVMMultiOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndV
       (bool success, bytes memory returnData,) = CallWithExactGas._callWithExactGasSafeReturnData(
         abi.encodeWithSelector(
           IPool.releaseOrMint.selector,
-          originalSender,
-          receiver,
-          sourceTokenAmounts[i].amount,
-          i_sourceChainSelector,
-          sourceTokenData,
-          offchainTokenData[i]
+          Pool.ReleaseOrMintInV1({
+            originalSender: originalSender,
+            receiver: receiver,
+            amount: sourceTokenAmounts[i].amount,
+            remoteChainSelector: i_sourceChainSelector,
+            sourcePoolAddress: sourceTokenData.sourcePoolAddress,
+            sourcePoolData: sourceTokenData.extraData,
+            offchainTokenData: offchainTokenData[i]
+          })
         ),
-        _validateEVMAddress(abi.decode(sourceTokenData.destPoolAddress, (uint256))),
+        localPoolAddress,
         s_dynamicConfig.maxPoolReleaseOrMintGas,
         Internal.GAS_FOR_CALL_EXACT_CHECK,
         Internal.MAX_RET_BYTES
@@ -586,11 +603,11 @@ contract EVM2EVMMultiOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndV
       if (!success) revert TokenHandlingError(returnData);
 
       // If the call was successful, the returnData should be the local token address.
-      if (returnData.length != EXPECTED_POOL_RETURN_DATA_LENGTH) {
-        revert InvalidDataLength(EXPECTED_POOL_RETURN_DATA_LENGTH, returnData.length);
+      if (returnData.length != Pool.CCIP_POOL_V1_RET_BYTES) {
+        revert InvalidDataLength(Pool.CCIP_POOL_V1_RET_BYTES, returnData.length);
       }
       (uint256 decodedAddress, uint256 amount) = abi.decode(returnData, (uint256, uint256));
-      destTokenAmounts[i].token = _validateEVMAddress(decodedAddress);
+      destTokenAmounts[i].token = Internal._validateEVMAddressFromUint256(decodedAddress);
       destTokenAmounts[i].amount = amount;
 
       if (s_rateLimitedTokensDestToSource.contains(destTokenAmounts[i].token)) {
@@ -601,16 +618,6 @@ contract EVM2EVMMultiOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndV
     if (value > 0) _rateLimitValue(value);
 
     return destTokenAmounts;
-  }
-
-  /// @notice This methods provides validation for parsing abi encoded addresses by ensuring the
-  /// address is within the EVM address space. If it isn't it will revert with an InvalidEVMAddress error, which
-  /// we can catch and handle more gracefully than a revert from abi.decode.
-  /// @param decodedAddress The address to validate, decoded into a uint256.
-  /// @return The address if it is valid, the function will revert otherwise.
-  function _validateEVMAddress(uint256 decodedAddress) internal pure returns (address) {
-    if (decodedAddress > type(uint160).max || decodedAddress < 10) revert InvalidEVMAddress(decodedAddress);
-    return address(uint160(decodedAddress));
   }
 
   // ================================================================
