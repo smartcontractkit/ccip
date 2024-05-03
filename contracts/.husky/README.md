@@ -8,7 +8,7 @@ The folder contains [husky](https://github.com/typicode/husky) git hooks that au
 pnpm prepare
 ```
 
-Modify the `.env` file in this folder to enable hooks:
+Create an `.env` file in this folder to enable hooks:
 
 ```sh
 # Can be left blank to compile everything
