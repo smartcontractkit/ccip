@@ -1,0 +1,102 @@
+[CCIP]
+[CCIP.Env]
+EnvUser = 'crib-deployment'
+Mockserver = 'http://mockserver:1080'
+
+[CCIP.Env.ExistingCLCluster]
+Name = 'crib-chad-ccip'
+NoOfNodes = 5
+
+[[CCIP.Env.ExistingCLCluster.NodeConfigs]]
+URL = 'http://app-node-1.crib-chad-ccip.svc.cluster.local:6688'
+Email = 'notreal@fakeemail.ch'
+Password = 'fj293fbBnlQ!f9vNs'
+InternalIP = 'app-node-1'
+
+[[CCIP.Env.ExistingCLCluster.NodeConfigs]]
+URL = 'http://app-node-2.crib-chad-ccip.svc.cluster.local:6688'
+Email = 'notreal@fakeemail.ch'
+Password = 'fj293fbBnlQ!f9vNs'
+InternalIP = 'app-node-2'
+
+[[CCIP.Env.ExistingCLCluster.NodeConfigs]]
+URL = 'http://app-node-3.crib-chad-ccip.svc.cluster.local:6688'
+Email = 'notreal@fakeemail.ch'
+Password = 'fj293fbBnlQ!f9vNs'
+InternalIP = 'app-node-3'
+
+[[CCIP.Env.ExistingCLCluster.NodeConfigs]]
+URL = 'http://app-node-4.crib-chad-ccip.svc.cluster.local:6688'
+Email = 'notreal@fakeemail.ch'
+Password = 'fj293fbBnlQ!f9vNs'
+InternalIP = 'app-node-4'
+
+[[CCIP.Env.ExistingCLCluster.NodeConfigs]]
+URL = 'http://app-node-5.crib-chad-ccip.svc.cluster.local:6688'
+Email = 'notreal@fakeemail.ch'
+Password = 'fj293fbBnlQ!f9vNs'
+InternalIP = 'app-node-5'
+
+[CCIP.Env.Network]
+selected_networks = ['geth_1337', 'geth_2337']
+
+[CCIP.Env.Network.EVMNetworks]
+[CCIP.Env.Network.EVMNetworks.geth_1337]
+evm_name = 'geth_1337'
+evm_chain_id = 1337
+evm_urls = ['wss://crib-chad-ccip-geth-1337-ws.main.stage.cldev.sh']
+evm_http_urls = ['https://crib-chad-ccip-geth-1337-ws.main.stage.cldev.sh']
+evm_simulated = true
+evm_simulation_type = ''
+evm_keys = ['ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80']
+evm_chainlink_transaction_limit = 500000
+evm_transaction_timeout = '2m0s'
+evm_minimum_confirmations = 1
+evm_gas_estimation_buffer = 10000
+client_implementation = 'Ethereum'
+evm_supports_eip1559 = true
+evm_default_gas_limit = 6000000
+evm_finality_tag = false
+evm_finality_depth = 1
+evm_time_to_reach_finality = '0s'
+URL = ''
+
+[CCIP.Env.Network.EVMNetworks.geth_2337]
+evm_name = 'geth_2337'
+evm_chain_id = 2337
+evm_urls = ['wss://crib-chad-ccip-geth-2337-ws.main.stage.cldev.sh']
+evm_http_urls = ['https://crib-chad-ccip-geth-2337-ws.main.stage.cldev.sh']
+evm_simulated = true
+evm_simulation_type = ''
+evm_keys = ['59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d']
+evm_chainlink_transaction_limit = 500000
+evm_transaction_timeout = '2m0s'
+evm_minimum_confirmations = 1
+evm_gas_estimation_buffer = 10000
+client_implementation = 'Ethereum'
+evm_supports_eip1559 = true
+evm_default_gas_limit = 6000000
+evm_finality_tag = false
+evm_finality_depth = 1
+evm_time_to_reach_finality = '0s'
+URL = ''
+
+[CCIP.Deployments]
+Data = "{\n  \"lane_configs\": {\n    \"geth_1337\": {\n      \"is_mock_arm\": true,\n      \"fee_token\": \"0x5FbDB2315678afecb367f032d93F642f64180aa3\",\n      \"bridge_tokens\": [\n        \"0x5FbDB2315678afecb367f032d93F642f64180aa3\"\n      ],\n      \"bridge_tokens_pools\": [\n        \"0xa513E6E4b8f2a923D98304ec87F64353C4D5C853\"\n      ],\n      \"price_aggregators\": null,\n      \"arm\": \"0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9\",\n      \"router\": \"0x0165878A594ca255338adfa4d48449f69242Eb8F\",\n      \"price_registry\": \"0x8A791620dd6260079BF849Dc5567aDC3F2FdC318\",\n      \"wrapped_native\": \"0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9\",\n      \"src_contracts\": {\n        \"geth_2337\": {\n          \"on_ramp\": \"0x610178dA211FEF7D417bC0e6FeD39F05609AD788\",\n          \"deployed_at\": 90\n        }\n      },\n      \"dest_contracts\": {\n        \"geth_2337\": {\n          \"off_ramp\": \"0x0B306BF915C4d645ff596e518fAf3F9669b97016\",\n          \"commit_store\": \"0x0DCd1Bf9A1b36cE34237eEaFef220932846BCD82\",\n          \"receiver_dapp\": \"\"\n        }\n      }\n    },\n    \"geth_2337\": {\n      \"is_mock_arm\": true,\n      \"fee_token\": \"0x8464135c8F25Da09e49BC8782676a84730C318bC\",\n      \"bridge_tokens\": [\n        \"0x8464135c8F25Da09e49BC8782676a84730C318bC\"\n      ],\n      \"bridge_tokens_pools\": [\n        \"0x1275D096B9DBf2347bD2a131Fb6BDaB0B4882487\"\n      ],\n      \"price_aggregators\": null,\n      \"arm\": \"0xbCF26943C0197d2eE0E5D05c716Be60cc2761508\",\n      \"router\": \"0xC6bA8C3233eCF65B761049ef63466945c362EdD2\",\n      \"price_registry\": \"0x0b48aF34f4c854F5ae1A3D587da471FeA45bAD52\",\n      \"wrapped_native\": \"0x712516e61C8B383dF4A63CFe83d7701Bce54B03e\",\n      \"src_contracts\": {\n        \"geth_1337\": {\n          \"on_ramp\": \"0x0f5D1ef48f12b6f691401bfe88c2037c690a6afe\",\n          \"deployed_at\": 119\n        }\n      },\n      \"dest_contracts\": {\n        \"geth_1337\": {\n          \"off_ramp\": \"0x381445710b5e73d34aF196c53A3D5cDa58EDBf7A\",\n          \"commit_store\": \"0x2dE080e97B0caE9825375D31f5D0eD5751fDf16D\",\n          \"receiver_dapp\": \"\"\n        }\n      }\n    }\n  }\n}"
+
+[CCIP.Groups]
+[CCIP.Groups.load]
+TestDuration = '15m0s'
+LocalCluster = false
+ExistingDeployment = true
+TestRunName = 'crib-chad-ccip'
+RequestPerUnitTime = [1]
+TimeUnit = '1s'
+NoOfTokensInMsg = 1
+
+[CCIP.Groups.smoke]
+LocalCluster = false
+ExistingDeployment = true
+TestRunName = 'crib-chad-ccip'
+NoOfTokensInMsg = 1
+NoOfCommitNodes = 5

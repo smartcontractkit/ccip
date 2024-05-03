@@ -126,6 +126,11 @@ func (tc *TokenConfig) Validate() error {
 	return nil
 }
 
+type MsgProfile struct {
+	MsgDetails  []*MsgDetails `toml:",omitempty"`
+	Frequencies []float64     `toml:",omitempty"`
+}
+
 type CCIPTestConfig struct {
 	Type                                       string                                `toml:",omitempty"`
 	KeepEnvAlive                               *bool                                 `toml:",omitempty"`
