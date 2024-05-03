@@ -684,7 +684,7 @@ contract Router_setWrappedNative is EVM2EVMOnRampSetup {
 
 /// @notice #getSupportedTokens
 contract Router_getSupportedTokens is EVM2EVMOnRampSetup {
-  function test_GetSupportedTokens_Success() public {
+  function test_GetSupportedTokens_Revert() public {
     vm.expectRevert(EVM2EVMOnRamp.GetSupportedTokensFunctionalityRemovedCheckAdminRegistry.selector);
     s_onRamp.getSupportedTokens(DEST_CHAIN_SELECTOR);
   }

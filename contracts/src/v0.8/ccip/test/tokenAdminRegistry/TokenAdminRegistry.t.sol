@@ -52,16 +52,16 @@ contract TokenAdminRegistry_getPool is TokenAdminRegistrySetup {
   }
 }
 
-contract TokenAdminRegistry_isSupportedChain is TokenAdminRegistrySetup {
-  function test_isSupportedChain_Success() public {
+contract TokenAdminRegistry_isTokenSupportedOnRemoteChain is TokenAdminRegistrySetup {
+  function test_isTokenSupportedOnRemoteChain_Success() public {
     uint64 nonExistentChainSelector = 2523356;
 
-    assertTrue(s_tokenAdminRegistry.isSupportedChain(s_sourceTokens[0], DEST_CHAIN_SELECTOR));
-    assertFalse(s_tokenAdminRegistry.isSupportedChain(s_sourceTokens[0], nonExistentChainSelector));
+    assertTrue(s_tokenAdminRegistry.isTokenSupportedOnRemoteChain(s_sourceTokens[0], DEST_CHAIN_SELECTOR));
+    assertFalse(s_tokenAdminRegistry.isTokenSupportedOnRemoteChain(s_sourceTokens[0], nonExistentChainSelector));
 
     address nonExistentToken = makeAddr("nonExistentToken");
 
-    assertFalse(s_tokenAdminRegistry.isSupportedChain(nonExistentToken, DEST_CHAIN_SELECTOR));
+    assertFalse(s_tokenAdminRegistry.isTokenSupportedOnRemoteChain(nonExistentToken, DEST_CHAIN_SELECTOR));
   }
 }
 

@@ -899,7 +899,7 @@ contract EVM2EVMOnRamp_getDataAvailabilityCost is EVM2EVMOnRamp_getFeeSetup {
 }
 
 contract EVM2EVMOnRamp_getSupportedTokens is EVM2EVMOnRampSetup {
-  function test_GetSupportedTokens_Success() public {
+  function test_GetSupportedTokens_Revert() public {
     vm.expectRevert(EVM2EVMOnRamp.GetSupportedTokensFunctionalityRemovedCheckAdminRegistry.selector);
     s_onRamp.getSupportedTokens(DEST_CHAIN_SELECTOR);
   }

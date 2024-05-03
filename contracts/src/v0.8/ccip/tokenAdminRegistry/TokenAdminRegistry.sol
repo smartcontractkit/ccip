@@ -77,7 +77,7 @@ contract TokenAdminRegistry is ITokenAdminRegistry, ITypeAndVersion, OwnerIsCrea
   /// @dev Due to the permissionless nature of the token pools, this function could return true even
   /// when any actual CCIP transaction containing this token to the given chain would fail. If the
   /// pool is properly written and configured, this function should be accurate.
-  function isSupportedChain(address token, uint64 remoteChainSelector) external view returns (bool) {
+  function isTokenSupportedOnRemoteChain(address token, uint64 remoteChainSelector) external view returns (bool) {
     address pool = s_tokenConfig[token].tokenPool;
     if (pool == address(0)) {
       return false;
