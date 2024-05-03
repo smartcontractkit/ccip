@@ -1,13 +1,6 @@
 #!/bin/bash
 set -e
 
-if [ -f contracts/.husky/.env ]; then
-    source contracts/.husky/.env
-else
-    printf "\033[1;33mNo .env file found in contracts/.husky, skipping hook.\e[0m\n"
-    exit 0
-fi
-
 source contracts/.husky/.env
 
 # Only run hook on enabled

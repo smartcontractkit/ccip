@@ -3,11 +3,6 @@ The folder contains [husky](https://github.com/typicode/husky) git hooks that au
 
 ## Setup
 
-```sh
-# Automatically ran after pnpm install
-pnpm prepare
-```
-
 Create an `.env` file in this folder to enable hooks:
 
 ```sh
@@ -16,6 +11,11 @@ FOUNDRY_PROFILE=ccip
 HUSKY_ENABLE_PUSH_HOOKS=true
 HUSKY_ENABLE_COMMIT_HOOKS=true
 UPSTREAM_BRANCH=origin/ccip-develop
+```
+
+```sh
+# Automatically ran after pnpm install
+pnpm prepare
 ```
 
 ### Script procedure
