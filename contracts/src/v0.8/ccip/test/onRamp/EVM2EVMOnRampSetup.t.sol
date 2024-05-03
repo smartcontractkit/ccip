@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.19;
 
-import {IPool} from "../../interfaces/pools/IPool.sol";
+import {IPool} from "../../interfaces/IPool.sol";
 
 import {PriceRegistry} from "../../PriceRegistry.sol";
 import {Router} from "../../Router.sol";
@@ -207,7 +207,7 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
       address sourcePool = s_sourcePoolByToken[message.tokenAmounts[i].token];
       address destPool = s_destPoolBySourceToken[message.tokenAmounts[i].token];
       messageEvent.sourceTokenData[i] = abi.encode(
-        IPool.SourceTokenData({
+        Internal.SourceTokenData({
           sourcePoolAddress: abi.encode(sourcePool),
           destPoolAddress: abi.encode(destPool),
           extraData: ""

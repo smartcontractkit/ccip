@@ -5,10 +5,10 @@ import {ITypeAndVersion} from "../../shared/interfaces/ITypeAndVersion.sol";
 import {IARM} from "../interfaces/IARM.sol";
 import {IEVM2AnyOnRamp} from "../interfaces/IEVM2AnyOnRamp.sol";
 import {IEVM2AnyOnRampClient} from "../interfaces/IEVM2AnyOnRampClient.sol";
+import {IPool} from "../interfaces/IPool.sol";
 import {IPriceRegistry} from "../interfaces/IPriceRegistry.sol";
 import {ITokenAdminRegistry} from "../interfaces/ITokenAdminRegistry.sol";
 import {ILinkAvailable} from "../interfaces/automation/ILinkAvailable.sol";
-import {IPool} from "../interfaces/pools/IPool.sol";
 
 import {AggregateRateLimiter} from "../AggregateRateLimiter.sol";
 import {Client} from "../libraries/Client.sol";
@@ -42,7 +42,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   error MessageTooLarge(uint256 maxSize, uint256 actualSize);
   error MessageGasLimitTooHigh();
   error UnsupportedNumberOfTokens();
-  error UnsupportedToken(IERC20 token);
+  error UnsupportedToken(address token);
   error MustBeCalledByRouter();
   error RouterMustSetOriginalSender();
   error InvalidConfig();
@@ -54,6 +54,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   error CannotSendZeroTokens();
   error SourceTokenDataTooLarge(address token);
   error InvalidChainSelector(uint64 chainSelector);
+  error GetSupportedTokensFunctionalityRemoved();
 
   event ConfigSet(StaticConfig staticConfig, DynamicConfig dynamicConfig);
   event NopPaid(address indexed nop, uint256 amount);
@@ -261,13 +262,6 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     if (msg.sender != s_dynamicConfig.router) revert MustBeCalledByRouter();
     if (destChainSelector != i_destChainSelector) revert InvalidChainSelector(destChainSelector);
 
-    // EVM destination addresses should be abi encoded and therefore always 32 bytes long
-    // Not duplicately validated in `getFee`. Invalid address is uncommon, gas cost outweighs UX gain.
-    if (message.receiver.length != 32) revert InvalidAddress(message.receiver);
-    uint256 decodedReceiver = abi.decode(message.receiver, (uint256));
-    // We want to disallow sending to address(0) and to precompiles, which exist on address(1) through address(9).
-    if (decodedReceiver > type(uint160).max || decodedReceiver < 10) revert InvalidAddress(message.receiver);
-
     uint256 gasLimit = _fromBytes(message.extraArgs).gasLimit;
     // Validate the message with various checks
     uint256 numberOfTokens = message.tokenAmounts.length;
@@ -308,7 +302,9 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     Internal.EVM2EVMMessage memory newMessage = Internal.EVM2EVMMessage({
       sourceChainSelector: i_chainSelector,
       sender: originalSender,
-      receiver: address(uint160(decodedReceiver)),
+      // EVM destination addresses should be abi encoded and therefore always 32 bytes long
+      // Not duplicately validated in `getFee`. Invalid address is uncommon, gas cost outweighs UX gain.
+      receiver: Internal._validateEVMAddress(message.receiver),
       sequenceNumber: ++s_sequenceNumber,
       gasLimit: gasLimit,
       strict: false,
@@ -326,15 +322,22 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     for (uint256 i = 0; i < numberOfTokens; ++i) {
       Client.EVMTokenAmount memory tokenAndAmount = message.tokenAmounts[i];
       IPool sourcePool = getPoolBySourceToken(destChainSelector, IERC20(tokenAndAmount.token));
-      bytes memory encodedReturnData = sourcePool.lockOrBurn(
-        originalSender,
-        message.receiver,
-        tokenAndAmount.amount,
-        i_destChainSelector,
-        bytes("") // any future extraArgs component would be added here
+      // We don't have to check if it supports the pool version in a non-reverting way here because
+      // if we revert here, there is no effect on CCIP. Therefore we directly call the supportsInterface
+      // function and not through the ERC165Checker.
+      if (address(sourcePool) == address(0) || !sourcePool.supportsInterface(Pool.CCIP_POOL_V1)) {
+        revert UnsupportedToken(tokenAndAmount.token);
+      }
+
+      Pool.LockOrBurnOutV1 memory poolReturnData = sourcePool.lockOrBurn(
+        Pool.LockOrBurnInV1({
+          originalSender: originalSender,
+          receiver: message.receiver,
+          amount: tokenAndAmount.amount,
+          remoteChainSelector: i_destChainSelector
+        })
       );
 
-      Pool.PoolReturnDataV1 memory poolReturnData = Pool._decodePoolReturnDataV1(encodedReturnData);
       // Since the DON has to pay for the extraData to be included on the destination chain, we cap the length of the extraData.
       // This prevents gas bomb attacks on the NOPs. We use destBytesOverhead as a proxy to cap the number of bytes we accept.
       // As destBytesOverhead accounts for extraData + offchainData, this caps the worst case abuse to the number of bytes reserved for offchainData.
@@ -342,11 +345,11 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
       if (poolReturnData.destPoolData.length > s_tokenTransferFeeConfig[tokenAndAmount.token].destBytesOverhead) {
         revert SourceTokenDataTooLarge(tokenAndAmount.token);
       }
-      // Since this is an EVM2EVM message, the pool address should be exactly 32 bytes
-      if (poolReturnData.destPoolAddress.length != 32) revert InvalidAddress(poolReturnData.destPoolAddress);
+      // We validate the pool address to ensure it is a valid EVM address
+      Internal._validateEVMAddress(poolReturnData.destPoolAddress);
 
       newMessage.sourceTokenData[i] = abi.encode(
-        IPool.SourceTokenData({
+        Internal.SourceTokenData({
           sourcePoolAddress: abi.encode(sourcePool),
           destPoolAddress: poolReturnData.destPoolAddress,
           extraData: poolReturnData.destPoolData
@@ -454,7 +457,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
 
   /// @inheritdoc IEVM2AnyOnRampClient
   function getSupportedTokens(uint64 /*destChainSelector*/ ) external view returns (address[] memory) {
-    return ITokenAdminRegistry(s_dynamicConfig.tokenAdminRegistry).getAllConfiguredTokens();
+    return ITokenAdminRegistry(s_dynamicConfig.tokenAdminRegistry).getPermissionedTokens();
   }
 
   // ================================================================
@@ -582,7 +585,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
 
       // Validate if the token is supported, do not calculate fee for unsupported tokens.
       if (address(getPoolBySourceToken(i_destChainSelector, IERC20(tokenAmount.token))) == address(0)) {
-        revert UnsupportedToken(IERC20(tokenAmount.token));
+        revert UnsupportedToken(tokenAmount.token);
       }
 
       TokenTransferFeeConfig memory transferFeeConfig = s_tokenTransferFeeConfig[tokenAmount.token];

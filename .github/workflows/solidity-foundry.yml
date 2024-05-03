@@ -33,7 +33,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        product: [vrf, automation, llo-feeds, l2ep, functions, keystone, shared, ccip, rebalancer]
+        product: [vrf, automation, llo-feeds, l2ep, functions, keystone, shared, ccip, liquiditymanager]
     needs: [changes]
     name: Foundry Tests ${{ matrix.product }}
     # See https://github.com/foundry-rs/foundry/issues/3827
@@ -161,7 +161,7 @@ jobs:
         with:
           update-comment: true
           coverage-files: lcov.info.pruned
-          minimum-coverage: 98.5
+          minimum-coverage: 98.6
           artifact-name: code-coverage-report
           working-directory: ./contracts
           github-token: ${{ secrets.GITHUB_TOKEN }}

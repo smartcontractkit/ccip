@@ -10,7 +10,7 @@ import {PriceRegistrySetup} from "../priceRegistry/PriceRegistry.t.sol";
 
 import {BaseTest, stdError} from "../BaseTest.t.sol";
 
-contract MultieAggregateRateLimiterSetup is BaseTest, PriceRegistrySetup {
+contract MultiAggregateRateLimiterSetup is BaseTest, PriceRegistrySetup {
   AggregateRateLimiterHelper internal s_rateLimiter;
   RateLimiter.Config internal s_config;
 
@@ -31,7 +31,7 @@ contract MultieAggregateRateLimiterSetup is BaseTest, PriceRegistrySetup {
 }
 
 /// @notice #constructor
-contract MultieAggregateRateLimiter_constructor is MultieAggregateRateLimiterSetup {
+contract MultiAggregateRateLimiter_constructor is MultiAggregateRateLimiterSetup {
   function test_Constructor_Success() public view {
     assertEq(ADMIN, s_rateLimiter.getTokenLimitAdmin());
     assertEq(OWNER, s_rateLimiter.owner());
@@ -46,14 +46,14 @@ contract MultieAggregateRateLimiter_constructor is MultieAggregateRateLimiterSet
 }
 
 /// @notice #getTokenLimitAdmin
-contract MultieAggregateRateLimiter_getTokenLimitAdmin is MultieAggregateRateLimiterSetup {
+contract MultiAggregateRateLimiter_getTokenLimitAdmin is MultiAggregateRateLimiterSetup {
   function test_GetTokenLimitAdmin_Success() public view {
     assertEq(ADMIN, s_rateLimiter.getTokenLimitAdmin());
   }
 }
 
 /// @notice #setAdmin
-contract MultieAggregateRateLimiter_setAdmin is MultieAggregateRateLimiterSetup {
+contract MultiAggregateRateLimiter_setAdmin is MultiAggregateRateLimiterSetup {
   event AdminSet(address newAdmin);
 
   function test_Owner_Success() public {
@@ -75,7 +75,7 @@ contract MultieAggregateRateLimiter_setAdmin is MultieAggregateRateLimiterSetup 
 }
 
 /// @notice #getTokenBucket
-contract MultieAggregateRateLimiter_getTokenBucket is MultieAggregateRateLimiterSetup {
+contract MultiAggregateRateLimiter_getTokenBucket is MultiAggregateRateLimiterSetup {
   function test_GetTokenBucket_Success() public view {
     RateLimiter.TokenBucket memory bucket = s_rateLimiter.currentRateLimiterState();
     assertEq(s_config.rate, bucket.rate);
@@ -123,7 +123,7 @@ contract MultieAggregateRateLimiter_getTokenBucket is MultieAggregateRateLimiter
 }
 
 /// @notice #setRateLimiterConfig
-contract MultieAggregateRateLimiter_setRateLimiterConfig is MultieAggregateRateLimiterSetup {
+contract MultiAggregateRateLimiter_setRateLimiterConfig is MultiAggregateRateLimiterSetup {
   event ConfigChanged(RateLimiter.Config config);
 
   function test_Owner_Success() public {
@@ -169,7 +169,7 @@ contract MultieAggregateRateLimiter_setRateLimiterConfig is MultieAggregateRateL
 }
 
 /// @notice #_rateLimitValue
-contract MultieAggregateRateLimiter__rateLimitValue is MultieAggregateRateLimiterSetup {
+contract MultiAggregateRateLimiter__rateLimitValue is MultiAggregateRateLimiterSetup {
   event TokensConsumed(uint256 tokens);
 
   function test_RateLimitValueSuccess_gas() public {
@@ -229,7 +229,7 @@ contract MultieAggregateRateLimiter__rateLimitValue is MultieAggregateRateLimite
 }
 
 /// @notice #_getTokenValue
-contract MultieAggregateRateLimiter__getTokenValue is MultieAggregateRateLimiterSetup {
+contract MultiAggregateRateLimiter__getTokenValue is MultiAggregateRateLimiterSetup {
   function test_GetTokenValue_Success() public view {
     uint256 numberOfTokens = 10;
     Client.EVMTokenAmount memory tokenAmount = Client.EVMTokenAmount({token: TOKEN, amount: 10});
