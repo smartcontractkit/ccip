@@ -5,7 +5,6 @@ import {ICommitStore} from "../../interfaces/ICommitStore.sol";
 import {IPool} from "../../interfaces/IPool.sol";
 
 import {CallWithExactGas} from "../../../shared/call/CallWithExactGas.sol";
-
 import {ARM} from "../../ARM.sol";
 import {AggregateRateLimiter} from "../../AggregateRateLimiter.sol";
 import {Router} from "../../Router.sol";
@@ -284,6 +283,22 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     s_offRamp.execute(_generateReportFromMessages(messages), new uint256[](0));
   }
 
+  function test__execute_SkippedAlreadyExecutedMessage_Success() public {
+    Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages();
+
+    vm.expectEmit();
+    emit ExecutionStateChanged(
+      messages[0].sequenceNumber, messages[0].messageId, Internal.MessageExecutionState.SUCCESS, ""
+    );
+
+    s_offRamp.execute(_generateReportFromMessages(messages), new uint256[](0));
+
+    vm.expectEmit();
+    emit SkippedAlreadyExecutedMessage(messages[0].sequenceNumber);
+
+    s_offRamp.execute(_generateReportFromMessages(messages), new uint256[](0));
+  }
+
   // Send a message to a contract that does not implement the CCIPReceiver interface
   // This should execute successfully.
   function test_SingleMessageToNonCCIPReceiver_Success() public {
@@ -456,13 +471,6 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages();
     s_offRamp.execute(_generateReportFromMessages(messages), _getGasLimitsFromMessages(messages));
     vm.clearMockedCalls();
-  }
-
-  function test_AlreadyExecutedMessagesAreIgnored() public {
-    Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages();
-    Internal.ExecutionReport memory executionReport = _generateReportFromMessages(messages);
-    s_offRamp.execute(executionReport, new uint256[](0));
-    s_offRamp.execute(executionReport, new uint256[](0));
   }
 
   function test_InvalidSourceChain_Revert() public {

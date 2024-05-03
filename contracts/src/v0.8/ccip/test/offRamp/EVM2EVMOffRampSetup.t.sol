@@ -36,6 +36,7 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSetup {
     uint64 indexed sequenceNumber, bytes32 indexed messageId, Internal.MessageExecutionState state, bytes returnData
   );
   event SkippedIncorrectNonce(uint64 indexed nonce, address indexed sender);
+  event SkippedAlreadyExecutedMessage(uint64 indexed sequenceNumber);
 
   function setUp() public virtual override(TokenSetup, PriceRegistrySetup, OCR2BaseSetup) {
     TokenSetup.setUp();

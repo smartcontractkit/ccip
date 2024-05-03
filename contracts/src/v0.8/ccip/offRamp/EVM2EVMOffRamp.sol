@@ -59,6 +59,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
   event ConfigSet(StaticConfig staticConfig, DynamicConfig dynamicConfig);
   event SkippedIncorrectNonce(uint64 indexed nonce, address indexed sender);
   event SkippedSenderWithPreviousRampMessageInflight(uint64 indexed nonce, address indexed sender);
+  event SkippedAlreadyExecutedMessage(uint64 indexed sequenceNumber);
   /// @dev RMN depends on this event, if changing, please notify the RMN maintainers.
   event ExecutionStateChanged(
     uint64 indexed sequenceNumber, bytes32 indexed messageId, Internal.MessageExecutionState state, bytes returnData
@@ -259,6 +260,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
 
       if (originalState == Internal.MessageExecutionState.SUCCESS) {
         // If the message has already been manually executed, we skip it.
+        emit SkippedAlreadyExecutedMessage(message.sequenceNumber);
         continue;
       }
 
