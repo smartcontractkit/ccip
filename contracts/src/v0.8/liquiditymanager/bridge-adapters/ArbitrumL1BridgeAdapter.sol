@@ -3,12 +3,10 @@ pragma solidity 0.8.19;
 
 import {IBridgeAdapter} from "../interfaces/IBridge.sol";
 
+import {IL1GatewayRouter} from "@arbitrum/token-bridge-contracts/contracts/tokenbridge/ethereum/gateway/IL1GatewayRouter.sol";
+import {IGatewayRouter} from "@arbitrum/token-bridge-contracts/contracts/tokenbridge/libraries/gateway/IGatewayRouter.sol";
 import {IERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
-import {IL1GatewayRouter} from
-  "@arbitrum/token-bridge-contracts/contracts/tokenbridge/ethereum/gateway/IL1GatewayRouter.sol";
-import {IGatewayRouter} from
-  "@arbitrum/token-bridge-contracts/contracts/tokenbridge/libraries/gateway/IGatewayRouter.sol";
 
 interface IOutbox {
   /**
@@ -70,7 +68,7 @@ contract ArbitrumL1BridgeAdapter is IBridgeAdapter {
   /// @inheritdoc IBridgeAdapter
   function sendERC20(
     address localToken,
-    address, /* remoteToken */
+    address /* remoteToken */,
     address recipient,
     uint256 amount,
     bytes calldata bridgeSpecificPayload
@@ -150,8 +148,8 @@ contract ArbitrumL1BridgeAdapter is IBridgeAdapter {
   /// i.e incorrect merkle proof, or index and 2) if the withdrawal was already finalized.
   /// @return true iff the finalization does not revert.
   function finalizeWithdrawERC20(
-    address, /* remoteSender */
-    address, /* localReceiver */
+    address /* remoteSender */,
+    address /* localReceiver */,
     bytes calldata arbitrumFinalizationPayload
   ) external override returns (bool) {
     ArbitrumFinalizationPayload memory payload = abi.decode(arbitrumFinalizationPayload, (ArbitrumFinalizationPayload));

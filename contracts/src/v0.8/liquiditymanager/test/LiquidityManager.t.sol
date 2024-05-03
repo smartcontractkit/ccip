@@ -1,21 +1,22 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.19;
 
-import {IBridgeAdapter} from "../interfaces/IBridge.sol";
 import {ILiquidityManager} from "../interfaces/ILiquidityManager.sol";
+import {IBridgeAdapter} from "../interfaces/IBridge.sol";
 
 import {LockReleaseTokenPool} from "../../ccip/pools/LockReleaseTokenPool.sol";
 import {LiquidityManager} from "../LiquidityManager.sol";
-
+import {MockL1BridgeAdapter} from "./mocks/MockBridgeAdapter.sol";
 import {LiquidityManagerBaseTest} from "./LiquidityManagerBaseTest.t.sol";
 import {LiquidityManagerHelper} from "./helpers/LiquidityManagerHelper.sol";
-import {MockL1BridgeAdapter} from "./mocks/MockBridgeAdapter.sol";
 
 import {IERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 
 contract LiquidityManagerSetup is LiquidityManagerBaseTest {
   event FinalizationStepCompleted(
-    uint64 indexed ocrSeqNum, uint64 indexed remoteChainSelector, bytes bridgeSpecificData
+    uint64 indexed ocrSeqNum,
+    uint64 indexed remoteChainSelector,
+    bytes bridgeSpecificData
   );
   event LiquidityTransferred(
     uint64 indexed ocrSeqNum,
@@ -27,7 +28,10 @@ contract LiquidityManagerSetup is LiquidityManagerBaseTest {
     bytes bridgeReturnData
   );
   event FinalizationFailed(
-    uint64 indexed ocrSeqNum, uint64 indexed remoteChainSelector, bytes bridgeSpecificData, bytes reason
+    uint64 indexed ocrSeqNum,
+    uint64 indexed remoteChainSelector,
+    bytes bridgeSpecificData,
+    bytes reason
   );
   event LiquidityAddedToContainer(address indexed provider, uint256 indexed amount);
   event LiquidityRemovedFromContainer(address indexed remover, uint256 indexed amount);
@@ -56,10 +60,19 @@ contract LiquidityManagerSetup is LiquidityManagerBaseTest {
     s_lockReleaseTokenPool.setRebalancer(address(s_rebalancer));
 
     s_wethBridgeAdapter = new MockL1BridgeAdapter(IERC20(address(s_l1Weth)), true);
-    s_wethLockReleaseTokenPool =
-      new LockReleaseTokenPool(IERC20(address(s_l1Weth)), new address[](0), address(1), true, address(123));
-    s_wethRebalancer =
-      new LiquidityManagerHelper(IERC20(address(s_l1Weth)), i_localChainSelector, s_wethLockReleaseTokenPool, 0);
+    s_wethLockReleaseTokenPool = new LockReleaseTokenPool(
+      IERC20(address(s_l1Weth)),
+      new address[](0),
+      address(1),
+      true,
+      address(123)
+    );
+    s_wethRebalancer = new LiquidityManagerHelper(
+      IERC20(address(s_l1Weth)),
+      i_localChainSelector,
+      s_wethLockReleaseTokenPool,
+      0
+    );
 
     s_wethLockReleaseTokenPool.setRebalancer(address(s_wethRebalancer));
   }
@@ -184,8 +197,12 @@ contract Rebalancer_rebalanceLiquidity is LiquidityManagerSetup {
     s_rebalancer = new LiquidityManagerHelper(s_l1Token, i_localChainSelector, s_bridgeAdapter, 0);
 
     MockL1BridgeAdapter mockRemoteBridgeAdapter = new MockL1BridgeAdapter(s_l1Token, false);
-    LiquidityManager mockRemoteRebalancer =
-      new LiquidityManager(s_l1Token, i_remoteChainSelector, mockRemoteBridgeAdapter, 0);
+    LiquidityManager mockRemoteRebalancer = new LiquidityManager(
+      s_l1Token,
+      i_remoteChainSelector,
+      mockRemoteBridgeAdapter,
+      0
+    );
 
     LiquidityManager.CrossChainRebalancerArgs[] memory args = new LiquidityManager.CrossChainRebalancerArgs[](1);
     args[0] = ILiquidityManager.CrossChainRebalancerArgs({
@@ -238,8 +255,13 @@ contract Rebalancer_rebalanceLiquidity is LiquidityManagerSetup {
     // note we use the L1 bridge adapter because it has the reverting logic
     // when finalization is already done.
     MockL1BridgeAdapter remoteBridgeAdapter = new MockL1BridgeAdapter(s_l2Token, false);
-    LockReleaseTokenPool remotePool =
-      new LockReleaseTokenPool(s_l2Token, new address[](0), address(1), true, address(123));
+    LockReleaseTokenPool remotePool = new LockReleaseTokenPool(
+      s_l2Token,
+      new address[](0),
+      address(1),
+      true,
+      address(123)
+    );
     LiquidityManager remoteRebalancer = new LiquidityManager(s_l2Token, i_remoteChainSelector, remotePool, 0);
 
     // set rebalancer role on the pool.
@@ -305,8 +327,10 @@ contract Rebalancer_rebalanceLiquidity is LiquidityManagerSetup {
     });
     bool fundsAvailable = s_bridgeAdapter.finalizeWithdrawERC20(address(0), address(s_rebalancer), abi.encode(payload));
     assertFalse(fundsAvailable, "fundsAvailable must be false");
-    MockL1BridgeAdapter.FinalizePayload memory finalizePayload =
-      MockL1BridgeAdapter.FinalizePayload({nonce: nonce, amount: AMOUNT});
+    MockL1BridgeAdapter.FinalizePayload memory finalizePayload = MockL1BridgeAdapter.FinalizePayload({
+      nonce: nonce,
+      amount: AMOUNT
+    });
     payload = MockL1BridgeAdapter.Payload({
       action: MockL1BridgeAdapter.FinalizationAction.FinalizeWithdrawal,
       data: abi.encode(finalizePayload)
@@ -322,7 +346,10 @@ contract Rebalancer_rebalanceLiquidity is LiquidityManagerSetup {
     // bytes memory revertData = abi.encodeWithSelector(NonceAlreadyUsed.selector, nonce);
     vm.expectEmit();
     emit FinalizationFailed(
-      maxSeqNum, i_remoteChainSelector, abi.encode(payload), abi.encodeWithSelector(NonceAlreadyUsed.selector, nonce)
+      maxSeqNum,
+      i_remoteChainSelector,
+      abi.encode(payload),
+      abi.encodeWithSelector(NonceAlreadyUsed.selector, nonce)
     );
     vm.expectEmit();
     emit LiquidityAdded(address(s_rebalancer), AMOUNT);
@@ -348,8 +375,13 @@ contract Rebalancer_rebalanceLiquidity is LiquidityManagerSetup {
     // note we use the L1 bridge adapter because it has the reverting logic
     // when finalization is already done.
     MockL1BridgeAdapter remoteBridgeAdapter = new MockL1BridgeAdapter(s_l2Token, false);
-    LockReleaseTokenPool remotePool =
-      new LockReleaseTokenPool(s_l2Token, new address[](0), address(1), true, address(123));
+    LockReleaseTokenPool remotePool = new LockReleaseTokenPool(
+      s_l2Token,
+      new address[](0),
+      address(1),
+      true,
+      address(123)
+    );
     LiquidityManager remoteRebalancer = new LiquidityManager(s_l2Token, i_remoteChainSelector, remotePool, 0);
 
     // set rebalancer role on the pool.
@@ -428,8 +460,10 @@ contract Rebalancer_rebalanceLiquidity is LiquidityManagerSetup {
     );
 
     // finalize withdrawal on the L1 bridge adapter, through the rebalancer.
-    MockL1BridgeAdapter.FinalizePayload memory finalizePayload =
-      MockL1BridgeAdapter.FinalizePayload({nonce: nonce, amount: AMOUNT});
+    MockL1BridgeAdapter.FinalizePayload memory finalizePayload = MockL1BridgeAdapter.FinalizePayload({
+      nonce: nonce,
+      amount: AMOUNT
+    });
     payload = MockL1BridgeAdapter.Payload({
       action: MockL1BridgeAdapter.FinalizationAction.FinalizeWithdrawal,
       data: abi.encode(finalizePayload)
@@ -461,10 +495,19 @@ contract Rebalancer_rebalanceLiquidity is LiquidityManagerSetup {
   function test_rebalanceBetweenPools_NativeRewrap() external {
     // set up a rebalancer similar to the above on another chain, an "L2".
     MockL1BridgeAdapter remoteBridgeAdapter = new MockL1BridgeAdapter(IERC20(address(s_l2Weth)), true);
-    LockReleaseTokenPool remotePool =
-      new LockReleaseTokenPool(IERC20(address(s_l2Weth)), new address[](0), address(1), true, address(123));
-    LiquidityManager remoteRebalancer =
-      new LiquidityManager(IERC20(address(s_l2Weth)), i_remoteChainSelector, remotePool, 0);
+    LockReleaseTokenPool remotePool = new LockReleaseTokenPool(
+      IERC20(address(s_l2Weth)),
+      new address[](0),
+      address(1),
+      true,
+      address(123)
+    );
+    LiquidityManager remoteRebalancer = new LiquidityManager(
+      IERC20(address(s_l2Weth)),
+      i_remoteChainSelector,
+      remotePool,
+      0
+    );
 
     // set rebalancer role on the pool.
     remotePool.setRebalancer(address(remoteRebalancer));
@@ -551,8 +594,10 @@ contract Rebalancer_rebalanceLiquidity is LiquidityManagerSetup {
     );
 
     // finalize withdrawal on the L1 bridge adapter, through the rebalancer.
-    MockL1BridgeAdapter.FinalizePayload memory finalizePayload =
-      MockL1BridgeAdapter.FinalizePayload({nonce: nonce, amount: AMOUNT});
+    MockL1BridgeAdapter.FinalizePayload memory finalizePayload = MockL1BridgeAdapter.FinalizePayload({
+      nonce: nonce,
+      amount: AMOUNT
+    });
     payload = MockL1BridgeAdapter.Payload({
       action: MockL1BridgeAdapter.FinalizationAction.FinalizeWithdrawal,
       data: abi.encode(finalizePayload)
@@ -627,7 +672,11 @@ contract Rebalancer_setCrossChainRebalancer is LiquidityManagerSetup {
 
     vm.expectEmit();
     emit CrossChainRebalancerSet(
-      remoteChainSelector, args[0].localBridge, args[0].remoteToken, newRebalancer, args[0].enabled
+      remoteChainSelector,
+      args[0].localBridge,
+      args[0].remoteToken,
+      newRebalancer,
+      args[0].enabled
     );
 
     s_rebalancer.setCrossChainRebalancers(args);
@@ -651,7 +700,11 @@ contract Rebalancer_setCrossChainRebalancer is LiquidityManagerSetup {
 
     vm.expectEmit();
     emit CrossChainRebalancerSet(
-      remoteChainSelector, args[0].localBridge, args[0].remoteToken, anotherRebalancer, args[0].enabled
+      remoteChainSelector,
+      args[0].localBridge,
+      args[0].remoteToken,
+      anotherRebalancer,
+      args[0].enabled
     );
 
     s_rebalancer.setCrossChainRebalancer(args[0]);
@@ -732,7 +785,13 @@ contract Rebalancer_setLocalLiquidityContainer is LiquidityManagerSetup {
   event LiquidityContainerSet(address indexed newLiquidityContainer);
 
   function test_setLocalLiquidityContainerSuccess() external {
-    LockReleaseTokenPool newPool = new LockReleaseTokenPool(s_l1Token, new address[](0), address(1), true, address(123));
+    LockReleaseTokenPool newPool = new LockReleaseTokenPool(
+      s_l1Token,
+      new address[](0),
+      address(1),
+      true,
+      address(123)
+    );
 
     vm.expectEmit();
     emit LiquidityContainerSet(address(newPool));

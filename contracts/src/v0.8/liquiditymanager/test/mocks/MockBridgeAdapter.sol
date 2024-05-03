@@ -2,9 +2,9 @@
 // solhint-disable one-contract-per-file
 pragma solidity ^0.8.0;
 
-import {IWrappedNative} from "../../../ccip/interfaces/IWrappedNative.sol";
 import {IBridgeAdapter} from "../../interfaces/IBridge.sol";
 import {ILiquidityContainer} from "../../interfaces/ILiquidityContainer.sol";
+import {IWrappedNative} from "../../../ccip/interfaces/IWrappedNative.sol";
 
 import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -71,8 +71,8 @@ contract MockL1BridgeAdapter is IBridgeAdapter, ILiquidityContainer {
   /// @notice Simply transferFrom msg.sender the tokens that are to be bridged to address(this).
   function sendERC20(
     address localToken,
-    address, /* remoteToken */
-    address, /* remoteReceiver */
+    address /* remoteToken */,
+    address /* remoteReceiver */,
     uint256 amount,
     bytes calldata /* bridgeSpecificPayload */
   ) external payable override returns (bytes memory) {
@@ -119,7 +119,7 @@ contract MockL1BridgeAdapter is IBridgeAdapter, ILiquidityContainer {
   /// @param bridgeSpecificPayload the payload to use for the finalization or proving.
   /// @return true if the transfer was successful, revert otherwise.
   function finalizeWithdrawERC20(
-    address, /* remoteSender */
+    address /* remoteSender */,
     address localReceiver,
     bytes calldata bridgeSpecificPayload
   ) external override returns (bool) {
@@ -151,7 +151,7 @@ contract MockL1BridgeAdapter is IBridgeAdapter, ILiquidityContainer {
 
   function _transferTokens(uint256 amount, address localReceiver) internal {
     if (i_holdNative) {
-      (bool success,) = payable(localReceiver).call{value: amount}("");
+      (bool success, ) = payable(localReceiver).call{value: amount}("");
       if (!success) {
         revert NativeSendFailed();
       }
@@ -167,8 +167,8 @@ contract MockL2BridgeAdapter is IBridgeAdapter {
   /// @notice Simply transferFrom msg.sender the tokens that are to be bridged.
   function sendERC20(
     address localToken,
-    address, /* remoteToken */
-    address, /* recipient */
+    address /* remoteToken */,
+    address /* recipient */,
     uint256 amount,
     bytes calldata /* bridgeSpecificPayload */
   ) external payable override returns (bytes memory) {
@@ -182,8 +182,8 @@ contract MockL2BridgeAdapter is IBridgeAdapter {
 
   // No-op
   function finalizeWithdrawERC20(
-    address, /* remoteSender */
-    address, /* localReceiver */
+    address /* remoteSender */,
+    address /* localReceiver */,
     bytes calldata /* bridgeSpecificData */
   ) external override returns (bool) {
     return true;
