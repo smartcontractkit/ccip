@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.19;
 
-import {ILiquidityContainer} from "../../rebalancer/interfaces/ILiquidityContainer.sol";
+import {ILiquidityContainer} from "../../liquiditymanager/interfaces/ILiquidityContainer.sol";
 import {ITypeAndVersion} from "../../shared/interfaces/ITypeAndVersion.sol";
-import {IPool} from "../interfaces/pools/IPool.sol";
 
 import {Pool} from "../libraries/Pool.sol";
 import {RateLimiter} from "../libraries/RateLimiter.sol";
@@ -23,7 +22,7 @@ contract LockReleaseTokenPool is TokenPool, ILiquidityContainer, ITypeAndVersion
   error LiquidityNotAccepted();
   error Unauthorized(address caller);
 
-  string public constant override typeAndVersion = "LockReleaseTokenPool 1.4.0";
+  string public constant override typeAndVersion = "LockReleaseTokenPool 1.5.0-dev";
 
   /// @dev The unique lock release pool flag to signal through EIP 165.
   bytes4 private constant LOCK_RELEASE_INTERFACE_ID = bytes4(keccak256("LockReleaseTokenPool"));
@@ -50,47 +49,43 @@ contract LockReleaseTokenPool is TokenPool, ILiquidityContainer, ITypeAndVersion
   }
 
   /// @notice Locks the token in the pool
-  /// @param amount Amount to lock
   /// @dev The whenHealthy check is important to ensure that even if a ramp is compromised
   /// we're able to stop token movement via ARM.
-  function lockOrBurn(
-    address originalSender,
-    bytes calldata,
-    uint256 amount,
-    uint64 remoteChainSelector,
-    bytes calldata
-  )
+  function lockOrBurn(Pool.LockOrBurnInV1 calldata lockOrBurnIn)
     external
     virtual
     override
-    onlyOnRamp(remoteChainSelector)
-    checkAllowList(originalSender)
     whenHealthy
-    returns (bytes memory)
+    returns (Pool.LockOrBurnOutV1 memory)
   {
-    _consumeOutboundRateLimit(remoteChainSelector, amount);
-    emit Locked(msg.sender, amount);
-    return Pool._generatePoolReturnDataV1(getRemotePool(remoteChainSelector), "");
+    _checkAllowList(lockOrBurnIn.originalSender);
+    _onlyOnRamp(lockOrBurnIn.remoteChainSelector);
+    _consumeOutboundRateLimit(lockOrBurnIn.remoteChainSelector, lockOrBurnIn.amount);
+
+    emit Locked(msg.sender, lockOrBurnIn.amount);
+
+    return Pool.LockOrBurnOutV1({destPoolAddress: getRemotePool(lockOrBurnIn.remoteChainSelector), destPoolData: ""});
   }
 
   /// @notice Release tokens from the pool to the recipient
-  /// @param receiver Recipient address
-  /// @param amount Amount to release
   /// @dev The whenHealthy check is important to ensure that even if a ramp is compromised
   /// we're able to stop token movement via ARM.
-  function releaseOrMint(
-    bytes memory,
-    address receiver,
-    uint256 amount,
-    uint64 remoteChainSelector,
-    IPool.SourceTokenData memory sourceTokenData,
-    bytes memory
-  ) external virtual override onlyOffRamp(remoteChainSelector) whenHealthy returns (address) {
-    _validateSourceCaller(remoteChainSelector, sourceTokenData.sourcePoolAddress);
-    _consumeInboundRateLimit(remoteChainSelector, amount);
-    getToken().safeTransfer(receiver, amount);
-    emit Released(msg.sender, receiver, amount);
-    return address(i_token);
+  function releaseOrMint(Pool.ReleaseOrMintInV1 calldata releaseOrMintIn)
+    external
+    virtual
+    override
+    whenHealthy
+    returns (Pool.ReleaseOrMintOutV1 memory)
+  {
+    _onlyOffRamp(releaseOrMintIn.remoteChainSelector);
+    _validateSourceCaller(releaseOrMintIn.remoteChainSelector, releaseOrMintIn.sourcePoolAddress);
+    _consumeInboundRateLimit(releaseOrMintIn.remoteChainSelector, releaseOrMintIn.amount);
+
+    getToken().safeTransfer(releaseOrMintIn.receiver, releaseOrMintIn.amount);
+
+    emit Released(msg.sender, releaseOrMintIn.receiver, releaseOrMintIn.amount);
+
+    return Pool.ReleaseOrMintOutV1({localToken: address(i_token), destinationAmount: releaseOrMintIn.amount});
   }
 
   /// @notice returns the lock release interface flag used for EIP165 identification.
@@ -104,13 +99,13 @@ contract LockReleaseTokenPool is TokenPool, ILiquidityContainer, ITypeAndVersion
       || super.supportsInterface(interfaceId);
   }
 
-  /// @notice Gets Rebalancer, can be address(0) if none is configured.
+  /// @notice Gets LiquidityManager, can be address(0) if none is configured.
   /// @return The current liquidity manager.
   function getRebalancer() external view returns (address) {
     return s_rebalancer;
   }
 
-  /// @notice Sets the Rebalancer address.
+  /// @notice Sets the LiquidityManager address.
   /// @dev Only callable by the owner.
   function setRebalancer(address rebalancer) external onlyOwner {
     s_rebalancer = rebalancer;

@@ -24,7 +24,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/batchreader"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/ccipdataprovider"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/hashlib"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/pkg/hashlib"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/prices"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/tokendata"
 )
@@ -89,7 +89,7 @@ type ExecutionReportingPlugin struct {
 
 	// State
 	inflightReports  *inflightExecReportsContainer
-	snoozedRoots     cache.SnoozedRoots
+	commitRootsCache cache.CommitsRootsCache
 	chainHealthcheck cache.ChainHealthcheck
 }
 
@@ -139,12 +139,7 @@ func (r *ExecutionReportingPlugin) Observation(ctx context.Context, timestamp ty
 }
 
 func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context, lggr logger.Logger, inflight []InflightInternalExecutionReport) ([]ccip.ObservedMessage, error) {
-	unexpiredReports, err := r.getUnexpiredCommitReports(
-		ctx,
-		r.commitStoreReader,
-		r.onchainConfig.PermissionLessExecutionThresholdSeconds,
-		lggr,
-	)
+	unexpiredReports, err := r.getUnexpiredCommitReports(ctx, r.commitStoreReader, lggr)
 	if err != nil {
 		return nil, err
 	}
@@ -192,7 +187,7 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 			// config.PermissionLessExecutionThresholdSeconds so it will never be considered again.
 			if allMsgsExecutedAndFinalized := rep.allRequestsAreExecutedAndFinalized(); allMsgsExecutedAndFinalized {
 				rootLggr.Infow("Snoozing root forever since there are no executable txs anymore", "root", hex.EncodeToString(merkleRoot[:]))
-				r.snoozedRoots.MarkAsExecuted(merkleRoot)
+				r.commitRootsCache.MarkAsExecuted(merkleRoot)
 				continue
 			}
 
@@ -230,7 +225,7 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 				lggr.Infow("Execution batch created", "batchSize", len(batch), "messageStates", msgExecStates)
 				return batch, nil
 			}
-			r.snoozedRoots.Snooze(merkleRoot)
+			r.commitRootsCache.Snooze(merkleRoot)
 		}
 	}
 	return []ccip.ObservedMessage{}, nil
@@ -842,10 +837,13 @@ func getTokensPrices(ctx context.Context, priceRegistry ccipdata.PriceRegistryRe
 	}
 
 	for i, token := range tokens {
-		// Prices can be zero, as we only need prices for tokens that are part of the aggregate rate limiter.
-		// TODO CCIP-1986: check against a list of tokens that DO need prices in the offRamp and error if a price is missing.
+		// price of a token can never be zero
 		if fetchedPrices[i].Value.BitLen() == 0 {
-			continue
+			priceRegistryAddress, err := priceRegistry.Address(ctx)
+			if err != nil {
+				return nil, fmt.Errorf("get price registry address: %w", err)
+			}
+			return nil, fmt.Errorf("price of token %s is zero (price registry=%s)", token, priceRegistryAddress)
 		}
 
 		// price registry should not report different price for the same token
@@ -864,12 +862,13 @@ func getTokensPrices(ctx context.Context, priceRegistry ccipdata.PriceRegistryRe
 func (r *ExecutionReportingPlugin) getUnexpiredCommitReports(
 	ctx context.Context,
 	commitStoreReader ccipdata.CommitStoreReader,
-	permissionExecutionThreshold time.Duration,
 	lggr logger.Logger,
 ) ([]cciptypes.CommitStoreReport, error) {
+	createdAfterTimestamp := r.commitRootsCache.OldestRootTimestamp()
+	lggr.Infow("Fetching unexpired commit roots from database", "createdAfterTimestamp", createdAfterTimestamp)
 	acceptedReports, err := commitStoreReader.GetAcceptedCommitReportsGteTimestamp(
 		ctx,
-		time.Now().Add(-permissionExecutionThreshold),
+		createdAfterTimestamp,
 		0,
 	)
 	if err != nil {
@@ -879,11 +878,12 @@ func (r *ExecutionReportingPlugin) getUnexpiredCommitReports(
 	var reports []cciptypes.CommitStoreReport
 	for _, acceptedReport := range acceptedReports {
 		reports = append(reports, acceptedReport.CommitStoreReport)
+		r.commitRootsCache.AppendUnexecutedRoot(acceptedReport.MerkleRoot, time.UnixMilli(acceptedReport.TxMeta.BlockTimestampUnixMilli))
 	}
 
 	notSnoozedReports := make([]cciptypes.CommitStoreReport, 0)
 	for _, report := range reports {
-		if r.snoozedRoots.IsSnoozed(report.MerkleRoot) {
+		if r.commitRootsCache.IsSkipped(report.MerkleRoot) {
 			lggr.Debugw("Skipping snoozed root",
 				"minSeqNr", report.Interval.Min,
 				"maxSeqNr", report.Interval.Max,

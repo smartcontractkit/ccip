@@ -12,39 +12,35 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rs/zerolog/log"
-
-	testutils "github.com/smartcontractkit/ccip/integration-tests/ccip-tests/utils"
-
 	"dario.cat/mergo"
 	"github.com/AlekSi/pointer"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
 	"go.uber.org/multierr"
 	"go.uber.org/zap/zapcore"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/smartcontractkit/chainlink-testing-framework/utils/testcontext"
-
-	ctfClient "github.com/smartcontractkit/chainlink-testing-framework/client"
-
-	ctftestenv "github.com/smartcontractkit/chainlink-testing-framework/docker/test_env"
-
 	chainselectors "github.com/smartcontractkit/chain-selectors"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
+	ctfClient "github.com/smartcontractkit/chainlink-testing-framework/client"
+	ctftestenv "github.com/smartcontractkit/chainlink-testing-framework/docker/test_env"
 	"github.com/smartcontractkit/chainlink-testing-framework/k8s/config"
 	"github.com/smartcontractkit/chainlink-testing-framework/k8s/environment"
 	"github.com/smartcontractkit/chainlink-testing-framework/networks"
-
-	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/contracts"
+	"github.com/smartcontractkit/chainlink-testing-framework/utils/testcontext"
 
 	integrationactions "github.com/smartcontractkit/chainlink/integration-tests/actions"
+
+	testutils "github.com/smartcontractkit/ccip/integration-tests/ccip-tests/utils"
+
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/actions"
+	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/contracts"
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/contracts/laneconfig"
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/testconfig"
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/testreporters"
@@ -230,7 +226,7 @@ func (c *CCIPTestConfig) SetNetworkPairs(lggr zerolog.Logger) error {
 				networks.AdditionalSimulatedPvtKeys = append(networks.AdditionalSimulatedPvtKeys, networks.AdditionalSimulatedPvtKeys...)
 			}
 			c.SelectedNetworks = append(c.SelectedNetworks, blockchain.EVMNetwork{
-				Name:                      fmt.Sprintf("simulated-non-dev%d", len(c.SelectedNetworks)+1),
+				Name:                      fmt.Sprintf("private-chain-%d", len(c.SelectedNetworks)+1),
 				ChainID:                   chainID,
 				Simulated:                 true,
 				PrivateKeys:               []string{networks.AdditionalSimulatedPvtKeys[i]},
@@ -303,8 +299,21 @@ func (c *CCIPTestConfig) SetOCRParams() error {
 			return err
 		}
 	}
-	if c.TestGroupInput.ExecInflightExpiry != nil && c.TestGroupInput.ExecInflightExpiry.Duration() > 0 {
-		actions.InflightExpiryExec = c.TestGroupInput.ExecInflightExpiry.Duration()
+	if c.TestGroupInput.OffRampConfig != nil {
+		if c.TestGroupInput.OffRampConfig.InflightExpiry != nil &&
+			c.TestGroupInput.OffRampConfig.InflightExpiry.Duration() > 0 {
+			actions.InflightExpiryExec = c.TestGroupInput.OffRampConfig.InflightExpiry.Duration()
+		}
+		if pointer.GetUint32(c.TestGroupInput.OffRampConfig.BatchGasLimit) > 0 {
+			actions.BatchGasLimit = pointer.GetUint32(c.TestGroupInput.OffRampConfig.BatchGasLimit)
+		}
+		if pointer.GetUint32(c.TestGroupInput.OffRampConfig.MaxDataBytes) > 0 {
+			actions.MaxDataBytes = pointer.GetUint32(c.TestGroupInput.OffRampConfig.MaxDataBytes)
+		}
+		if c.TestGroupInput.OffRampConfig.RootSnooze != nil &&
+			c.TestGroupInput.OffRampConfig.RootSnooze.Duration() > 0 {
+			actions.RootSnoozeTime = c.TestGroupInput.OffRampConfig.RootSnooze.Duration()
+		}
 	}
 	if c.TestGroupInput.CommitInflightExpiry != nil && c.TestGroupInput.CommitInflightExpiry.Duration() > 0 {
 		actions.InflightExpiryCommit = c.TestGroupInput.CommitInflightExpiry.Duration()
@@ -411,9 +420,11 @@ func (o *CCIPTestSetUpOutputs) DeployChainContracts(
 	defer chain.Close()
 	ccipCommon, err := actions.DefaultCCIPModule(
 		lggr, chain,
+		pointer.GetInt(o.Cfg.TestGroupInput.TokenConfig.NoOfTokensWithDynamicPrice),
 		o.Cfg.useExistingDeployment(),
 		o.Cfg.MultiCallEnabled(),
-		o.Cfg.TestGroupInput.NoOfUSDCMockTokens)
+		o.Cfg.TestGroupInput.USDCMockDeployment,
+	)
 	if err != nil {
 		return errors.WithStack(fmt.Errorf("failed to create ccip common module for %s: %w", networkCfg.Name, err))
 	}
@@ -431,7 +442,7 @@ func (o *CCIPTestSetUpOutputs) DeployChainContracts(
 }
 
 func (o *CCIPTestSetUpOutputs) SetupDynamicTokenPriceUpdates() error {
-	interval := o.Cfg.TestGroupInput.DynamicPriceUpdateInterval.Duration()
+	interval := o.Cfg.TestGroupInput.TokenConfig.DynamicPriceUpdateInterval.Duration()
 	covered := make(map[string]struct{})
 	for _, lanes := range o.ReadLanes() {
 		lane := lanes.ForwardLane
@@ -457,21 +468,20 @@ func (o *CCIPTestSetUpOutputs) AddLanesForNetworkPair(
 	lggr zerolog.Logger,
 	networkA, networkB blockchain.EVMNetwork,
 	chainClientA, chainClientB blockchain.EVMClient,
-	transferAmounts []*big.Int,
-	commitAndExecOnSameDON, bidirectional, withPipeline bool,
 ) error {
 	var allErrors atomic.Error
 	t := o.Cfg.Test
 	var k8Env *environment.Environment
 	ccipEnv := o.Env
 	namespace := o.Cfg.TestGroupInput.TestRunName
+	bidirectional := pointer.GetBool(o.Cfg.TestGroupInput.BiDirectionalLane)
 	if ccipEnv != nil {
 		k8Env = ccipEnv.K8Env
 		if k8Env != nil {
 			namespace = k8Env.Cfg.Namespace
 		}
 	}
-	configureCLNode := !pointer.GetBool(o.Cfg.TestGroupInput.ExistingDeployment)
+
 	setUpFuncs, ctx := errgroup.WithContext(testcontext.Get(t))
 
 	// Use new set of clients(sourceChainClient,destChainClient)
@@ -565,15 +575,11 @@ func (o *CCIPTestSetUpOutputs) AddLanesForNetworkPair(
 	}
 	o.AddToLanes(bidirectionalLane)
 
-	staticPrice := o.Cfg.TestGroupInput.DynamicPriceUpdateInterval == nil
 	setUpFuncs.Go(func() error {
 		lggr.Info().Msgf("Setting up lane %s to %s", networkA.Name, networkB.Name)
-		err := ccipLaneA2B.DeployNewCCIPLane(o.SetUpContext, o.Env, commitAndExecOnSameDON,
-			transferAmounts, o.BootstrapAdded, configureCLNode, o.JobAddGrp,
-			withPipeline, staticPrice,
-			o.Cfg.useExistingDeployment(),
-			o.Cfg.MultiCallEnabled(),
-			o.Cfg.TestGroupInput.NoOfUSDCMockTokens,
+		err := ccipLaneA2B.DeployNewCCIPLane(
+			o.SetUpContext, o.Env,
+			o.Cfg.TestGroupInput, o.BootstrapAdded, o.JobAddGrp,
 		)
 		if err != nil {
 			allErrors.Store(multierr.Append(allErrors.Load(), fmt.Errorf("deploying lane %s to %s; err - %w", networkA.Name, networkB.Name, errors.WithStack(err))))
@@ -601,12 +607,9 @@ func (o *CCIPTestSetUpOutputs) AddLanesForNetworkPair(
 	setUpFuncs.Go(func() error {
 		if bidirectional {
 			lggr.Info().Msgf("Setting up lane %s to %s", networkB.Name, networkA.Name)
-			err := ccipLaneB2A.DeployNewCCIPLane(o.SetUpContext, o.Env, commitAndExecOnSameDON,
-				transferAmounts, o.BootstrapAdded, configureCLNode, o.JobAddGrp,
-				withPipeline, staticPrice,
-				o.Cfg.useExistingDeployment(),
-				o.Cfg.MultiCallEnabled(),
-				o.Cfg.TestGroupInput.NoOfUSDCMockTokens,
+			err := ccipLaneB2A.DeployNewCCIPLane(
+				o.SetUpContext, o.Env,
+				o.Cfg.TestGroupInput, o.BootstrapAdded, o.JobAddGrp,
 			)
 			if err != nil {
 				lggr.Error().Err(err).Msgf("error deploying lane %s to %s", networkB.Name, networkA.Name)
@@ -687,7 +690,7 @@ func (o *CCIPTestSetUpOutputs) WaitForPriceUpdates() {
 				Msgf("Waiting for price update")
 			err := lane.Source.Common.WaitForPriceUpdates(
 				o.SetUpContext, lane.Logger,
-				o.Cfg.TestGroupInput.TimeoutForPriceUpdate.Duration(),
+				o.Cfg.TestGroupInput.TokenConfig.TimeoutForPriceUpdate.Duration(),
 				lane.Source.DestinationChainId,
 			)
 			if err != nil {
@@ -736,12 +739,6 @@ func CCIPDefaultTestSetUp(
 	reportPath := "tmp_laneconfig"
 	filepath := fmt.Sprintf("./%s/tmp_%s.json", reportPath, strings.ReplaceAll(t.Name(), "/", "_"))
 	reportFile := testutils.FileNameFromPath(filepath)
-	var transferAmounts []*big.Int
-	if testConfig.TestGroupInput.MsgType == actions.TokenTransfer {
-		for i := 0; i < testConfig.TestGroupInput.NoOfTokensInMsg; i++ {
-			transferAmounts = append(transferAmounts, big.NewInt(testConfig.TestGroupInput.AmountPerToken))
-		}
-	}
 	parent, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	setUpArgs := &CCIPTestSetUpOutputs{
@@ -812,7 +809,8 @@ func CCIPDefaultTestSetUp(
 			// if reuse contracts is true, copy common contracts from the same network except the router contract
 			setUpArgs.LaneConfig.CopyCommonContracts(
 				networkNameToReadCfg, n,
-				reuse, testConfig.TestGroupInput.MsgType == actions.TokenTransfer)
+				reuse, testConfig.TestGroupInput.MsgDetails.IsTokenTransfer(),
+			)
 		}
 	}
 
@@ -838,12 +836,14 @@ func CCIPDefaultTestSetUp(
 			}
 		}
 		chainAddGrp.Go(func() error {
-			return setUpArgs.DeployChainContracts(lggr, chain, net, testConfig.TestGroupInput.NoOfTokensPerChain, tokenDeployerFns, selectors)
+			return setUpArgs.DeployChainContracts(
+				lggr, chain, net,
+				pointer.GetInt(testConfig.TestGroupInput.TokenConfig.NoOfTokensPerChain),
+				tokenDeployerFns, selectors,
+			)
 		})
 	}
 	require.NoError(t, chainAddGrp.Wait(), "Deploying common contracts shouldn't fail")
-
-	withPipeline := pointer.GetBool(setUpArgs.Cfg.TestGroupInput.WithPipeline)
 
 	// set up mock server for price pipeline and usdc attestation if not using existing deployment
 	if !pointer.GetBool(setUpArgs.Cfg.TestGroupInput.ExistingDeployment) {
@@ -851,12 +851,12 @@ func CCIPDefaultTestSetUp(
 		if setUpArgs.Env.LocalCluster != nil {
 			killgrave = setUpArgs.Env.LocalCluster.MockAdapter
 		}
-		if withPipeline {
+		if setUpArgs.Cfg.TestGroupInput.TokenConfig.IsPipelineSpec() {
 			// set up mock server for price pipeline. need to set it once for all the lanes as the price pipeline path uses
 			// regex to match the path for all tokens across all lanes
 			actions.SetMockserverWithTokenPriceValue(killgrave, setUpArgs.Env.MockServer)
 		}
-		if setUpArgs.Cfg.TestGroupInput.NoOfUSDCMockTokens != nil {
+		if pointer.GetBool(setUpArgs.Cfg.TestGroupInput.USDCMockDeployment) {
 			// if it's a new USDC deployment, set up mock server for attestation,
 			// we need to set it only once for all the lanes as the attestation path uses regex to match the path for
 			// all messages across all lanes
@@ -885,10 +885,7 @@ func CCIPDefaultTestSetUp(
 		laneAddGrp.Go(func() error {
 			return setUpArgs.AddLanesForNetworkPair(
 				lggr, n.NetworkA, n.NetworkB,
-				chainByChainID[n.NetworkA.ChainID], chainByChainID[n.NetworkB.ChainID], transferAmounts,
-				pointer.GetBool(testConfig.TestGroupInput.CommitAndExecuteOnSameDON),
-				pointer.GetBool(testConfig.TestGroupInput.BiDirectionalLane),
-				withPipeline,
+				chainByChainID[n.NetworkA.ChainID], chainByChainID[n.NetworkB.ChainID],
 			)
 		})
 	}
@@ -908,7 +905,7 @@ func CCIPDefaultTestSetUp(
 		// wait for price updates to be available
 		setUpArgs.WaitForPriceUpdates()
 		// if dynamic price update is required
-		if setUpArgs.Cfg.TestGroupInput.DynamicPriceUpdateInterval != nil {
+		if setUpArgs.Cfg.TestGroupInput.TokenConfig.IsDynamicPriceUpdate() {
 			require.NoError(t, setUpArgs.SetupDynamicTokenPriceUpdates(), "setting up dynamic price update should not fail")
 		}
 	}
@@ -1129,7 +1126,7 @@ func createEnvironmentConfig(t *testing.T, envName string, testConfig *CCIPTestC
 	if existingEnv != "" {
 		envConfig.Namespace = existingEnv
 		envConfig.NamespacePrefix = ""
-		envConfig.NoManifestUpdate = true
+		envConfig.SkipManifestUpdate = true
 		envConfig.RunnerName = fmt.Sprintf("%s-%s", environment.REMOTE_RUNNER_NAME, uuid.NewString()[0:5])
 	}
 	if testConfig.EnvInput.TTL != nil {

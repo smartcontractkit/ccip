@@ -47,7 +47,7 @@ type TransactionStats struct {
 	GasUsed            uint64 `json:"gas_used,omitempty"`
 	TxHash             string `json:"tx_hash,omitempty"`
 	NoOfTokensSent     int    `json:"no_of_tokens_sent,omitempty"`
-	MessageBytesLength int    `json:"message_bytes_length,omitempty"`
+	MessageBytesLength int64  `json:"message_bytes_length,omitempty"`
 	FinalizedByBlock   string `json:"finalized_block_num,omitempty"`
 	FinalizedAt        string `json:"finalized_at,omitempty"`
 	CommitRoot         string `json:"commit_root,omitempty"`
@@ -68,7 +68,14 @@ type RequestStat struct {
 	StatusByPhase map[Phase]PhaseStat `json:"status_by_phase,omitempty"`
 }
 
-func (stat *RequestStat) UpdateState(lggr zerolog.Logger, seqNum uint64, step Phase, duration time.Duration, state Status, sendTransactionStats ...TransactionStats) {
+func (stat *RequestStat) UpdateState(
+	lggr zerolog.Logger,
+	seqNum uint64,
+	step Phase,
+	duration time.Duration,
+	state Status,
+	sendTransactionStats ...TransactionStats,
+) {
 	durationInSec := duration.Seconds()
 	stat.SeqNum = seqNum
 	phaseDetails := PhaseStat{

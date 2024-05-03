@@ -11,6 +11,24 @@
 #   version: stable
 chainlink:
   enabled: true
+  global:
+    # `toml` is initially set to null. Uncomment and modify the following example as needed.
+    # Example configuration parameters for all Chainlink nodes. Can be overridden by individual node configurations and via `overridesToml`.
+    # toml: |-
+    #   [Log]
+    #   Level = 'info'
+    #   [WebServer]
+    #   HTTPPort = 6688
+    toml: null
+    # `overridesToml` is initially set to null. Uncomment and modify the following example as needed.
+    # Example configuration parameters that override the main configuration.
+    # overridesToml: |-
+    #   [Log]
+    #   Level = 'debug'
+    #   [WebServer]
+    #   HTTPPort = 6690
+    overridesToml: null
+
   podSecurityContext:
     fsGroup: 14933
   securityContext:
@@ -36,288 +54,11 @@ chainlink:
         limits:
           cpu: 2000m
           memory: 2048Mi
-      overridesToml: |
-        [Feature]
-        LogPoller = true
-        CCIP = true
-
-        [Log]
-        Level = 'debug'
-        JSONConsole = true
-
-        [Log.File]
-        MaxSize = '0b'
-
-        [WebServer]
-        AllowOrigins = '*'
-        HTTPPort = 6688
-        SecureCookies = false
-        HTTPWriteTimeout = '1m'
-
-        [WebServer.RateLimit]
-        Authenticated = 2000
-        Unauthenticated = 1000
-
-        [WebServer.TLS]
-        HTTPSPort = 0
-
-        [Database]
-        MaxIdleConns = 50
-        MaxOpenConns = 50
-        MigrateOnStartup = true
-
-        [OCR2]
-        Enabled = true
-        DefaultTransactionQueueDepth = 0
-
-        [OCR]
-        Enabled = false
-        DefaultTransactionQueueDepth = 0
-
-        [P2P]
-        [P2P.V2]
-        Enabled = true
-        ListenAddresses = ['0.0.0.0:6690']
-        AnnounceAddresses = ['0.0.0.0:6690']
-        DeltaDial = '500ms'
-        DeltaReconcile = '5s'
     - name: node-2
-      overridesToml: |
-        [Feature]
-        LogPoller = true
-        CCIP = true
-
-        [Log]
-        Level = 'debug'
-        JSONConsole = true
-
-        [Log.File]
-        MaxSize = '0b'
-
-        [WebServer]
-        AllowOrigins = '*'
-        HTTPPort = 6688
-        SecureCookies = false
-        HTTPWriteTimeout = '1m'
-
-        [WebServer.RateLimit]
-        Authenticated = 2000
-        Unauthenticated = 1000
-
-        [WebServer.TLS]
-        HTTPSPort = 0
-
-        [Database]
-        MaxIdleConns = 50
-        MaxOpenConns = 50
-        MigrateOnStartup = true
-
-        [OCR2]
-        Enabled = true
-        DefaultTransactionQueueDepth = 0
-
-        [OCR]
-        Enabled = false
-        DefaultTransactionQueueDepth = 0
-
-        [P2P]
-        [P2P.V2]
-        Enabled = true
-        ListenAddresses = ['0.0.0.0:6690']
-        AnnounceAddresses = ['0.0.0.0:6690']
-        DeltaDial = '500ms'
-        DeltaReconcile = '5s'
     - name: node-3
-      overridesToml: |
-        [Feature]
-        LogPoller = true
-        CCIP = true
-
-        [Log]
-        Level = 'debug'
-        JSONConsole = true
-
-        [Log.File]
-        MaxSize = '0b'
-
-        [WebServer]
-        AllowOrigins = '*'
-        HTTPPort = 6688
-        SecureCookies = false
-        HTTPWriteTimeout = '1m'
-
-        [WebServer.RateLimit]
-        Authenticated = 2000
-        Unauthenticated = 1000
-
-        [WebServer.TLS]
-        HTTPSPort = 0
-
-        [Database]
-        MaxIdleConns = 50
-        MaxOpenConns = 50
-        MigrateOnStartup = true
-
-        [OCR2]
-        Enabled = true
-        DefaultTransactionQueueDepth = 0
-
-        [OCR]
-        Enabled = false
-        DefaultTransactionQueueDepth = 0
-
-        [P2P]
-        [P2P.V2]
-        Enabled = true
-        ListenAddresses = ['0.0.0.0:6690']
-        AnnounceAddresses = ['0.0.0.0:6690']
-        DeltaDial = '500ms'
-        DeltaReconcile = '5s'
     - name: node-4
-      overridesToml: |
-        [Feature]
-        LogPoller = true
-        CCIP = true
-
-        [Log]
-        Level = 'debug'
-        JSONConsole = true
-
-        [Log.File]
-        MaxSize = '0b'
-
-        [WebServer]
-        AllowOrigins = '*'
-        HTTPPort = 6688
-        SecureCookies = false
-        HTTPWriteTimeout = '1m'
-
-        [WebServer.RateLimit]
-        Authenticated = 2000
-        Unauthenticated = 1000
-
-        [WebServer.TLS]
-        HTTPSPort = 0
-
-        [Database]
-        MaxIdleConns = 50
-        MaxOpenConns = 50
-        MigrateOnStartup = true
-
-        [OCR2]
-        Enabled = true
-        DefaultTransactionQueueDepth = 0
-
-        [OCR]
-        Enabled = false
-        DefaultTransactionQueueDepth = 0
-
-        [P2P]
-        [P2P.V2]
-        Enabled = true
-        ListenAddresses = ['0.0.0.0:6690']
-        AnnounceAddresses = ['0.0.0.0:6690']
-        DeltaDial = '500ms'
-        DeltaReconcile = '5s'
     - name: node-5
-      overridesToml: |
-        [Feature]
-        LogPoller = true
-        CCIP = true
-
-        [Log]
-        Level = 'debug'
-        JSONConsole = true
-
-        [Log.File]
-        MaxSize = '0b'
-
-        [WebServer]
-        AllowOrigins = '*'
-        HTTPPort = 6688
-        SecureCookies = false
-        HTTPWriteTimeout = '1m'
-
-        [WebServer.RateLimit]
-        Authenticated = 2000
-        Unauthenticated = 1000
-
-        [WebServer.TLS]
-        HTTPSPort = 0
-
-        [Database]
-        MaxIdleConns = 50
-        MaxOpenConns = 50
-        MigrateOnStartup = true
-
-        [OCR2]
-        Enabled = true
-        DefaultTransactionQueueDepth = 0
-
-        [OCR]
-        Enabled = false
-        DefaultTransactionQueueDepth = 0
-
-        [P2P]
-        [P2P.V2]
-        Enabled = true
-        ListenAddresses = ['0.0.0.0:6690']
-        AnnounceAddresses = ['0.0.0.0:6690']
-        DeltaDial = '500ms'
-        DeltaReconcile = '5s'
     - name: node-6
-      overridesToml: |
-        [Feature]
-        LogPoller = true
-        CCIP = true
-
-        [Log]
-        Level = 'debug'
-        JSONConsole = true
-
-        [Log.File]
-        MaxSize = '0b'
-
-        [WebServer]
-        AllowOrigins = '*'
-        HTTPPort = 6688
-        SecureCookies = false
-        HTTPWriteTimeout = '1m'
-
-        [WebServer.RateLimit]
-        Authenticated = 2000
-        Unauthenticated = 1000
-
-        [WebServer.TLS]
-        HTTPSPort = 0
-
-        [Database]
-        MaxIdleConns = 50
-        MaxOpenConns = 50
-        MigrateOnStartup = true
-
-        [OCR2]
-        Enabled = true
-        DefaultTransactionQueueDepth = 0
-
-        [OCR]
-        Enabled = false
-        DefaultTransactionQueueDepth = 0
-
-        [P2P]
-        [P2P.V2]
-        Enabled = true
-        ListenAddresses = ['0.0.0.0:6690']
-        AnnounceAddresses = ['0.0.0.0:6690']
-        DeltaDial = '500ms'
-        DeltaReconcile = '5s'
-  resources:
-    requests:
-      cpu: 350m
-      memory: 1024Mi
-    limits:
-      cpu: 350m
-      memory: 1024Mi
 
 # each CL node have a dedicated PostgreSQL 11.15
 # use StatefulSet by setting:
@@ -385,72 +126,6 @@ geth:
     limits:
       cpu: 1
       memory: 1024Mi
-
-ccip:
-  ccipScriptsImage: ccip-scripts-image:image-tag
-  deployContractsAndJobs: false
-  chains:
-    - NetworkId: 1337
-      ChainId: geth_1337
-      WalletKey: "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
-      DeployLink: true
-      DeployWETH: true
-      ChainConfig:
-        EvmChainId: 1337
-        GasSettings:
-          EIP1559: true
-          GasTipCap: 1000000000
-        FeeTokens:
-          - "ChainLink Token"
-          - "WETH"
-        WrappedNative: "WETH"
-        Router: "0x0000000000000000000000000000000000000000"
-        ARM: "0x0000000000000000000000000000000000000000"
-        ARMProxy: "0x0000000000000000000000000000000000000000"
-        PriceRegistry: "0x0000000000000000000000000000000000000000"
-        DeploySettings:
-          DeployARM: true
-          DeployTokenPools: true
-          DeployRouter: true
-          DeployPriceRegistry: true
-        TunableChainValues:
-          FinalityDepth: 1
-          OptimisticConfirmations: 1
-          MaxGasPrice: 200000000000
-    - NetworkId: 2337
-      ChainId: geth_2337
-      WalletKey: "59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d"
-      DeployLink: true
-      DeployWETH: true
-      ChainConfig:
-        EvmChainId: 2337
-        GasSettings:
-          EIP1559: true
-          GasTipCap: 1000000000
-        FeeTokens:
-          - "ChainLink Token"
-          - "WETH"
-        WrappedNative: "WETH"
-        Router: "0x0000000000000000000000000000000000000000"
-        ARM: "0x0000000000000000000000000000000000000000"
-        ARMProxy: "0x0000000000000000000000000000000000000000"
-        PriceRegistry: "0x0000000000000000000000000000000000000000"
-        DeploySettings:
-          DeployARM: true
-          DeployTokenPools: true
-          DeployRouter: true
-          DeployPriceRegistry: true
-        TunableChainValues:
-          FinalityDepth: 1
-          OptimisticConfirmations: 1
-          MaxGasPrice: 200000000000
-  LaneDeploySettings:
-    geth_1337,geth_2337:
-      DeployLane: true
-      DeployPingPongDapp: true
-  CCIPLaneConfigs:
-    geth_1337:
-    geth_2337:
 
 # mockserver is https://www.mock-server.com/where/kubernetes.html
 # used to stub External Adapters
