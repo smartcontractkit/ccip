@@ -64,6 +64,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimi
   /// RMN depends on this event, if changing, please notify the RMN maintainers.
   event CCIPSendRequested(Internal.EVM2EVMMessage message);
   event NopsSet(uint256 nopWeightsTotal, NopAndWeight[] nopsAndWeights);
+  event DestChainConfigUpdated(uint64 destChainSelector, DestChainConfig destChainConfig);
 
   /// @dev Struct that contains the static configuration
   /// RMN depends on this struct, if changing, please notify the RMN maintainers.
@@ -80,21 +81,8 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimi
   /// @dev Struct to contains the dynamic configuration
   struct DynamicConfig {
     address router; // ──────────────────────────╮ Router address
-    uint16 maxNumberOfTokensPerMsg; //           │ Maximum number of distinct ERC20 token transferred per message
-    uint32 destGasOverhead; //                   │ Gas charged on top of the gasLimit to cover destination chain costs
-    uint16 destGasPerPayloadByte; //             │ Destination chain gas charged for passing each byte of `data` payload to receiver
-    uint32 destDataAvailabilityOverheadGas; // ──╯ Extra data availability gas charged on top of the message, e.g. for OCR
-    uint16 destGasPerDataAvailabilityByte; // ───╮ Amount of gas to charge per byte of message data that needs availability
-    uint16 destDataAvailabilityMultiplierBps; // │ Multiplier for data availability gas, multiples of bps, or 0.0001
     address priceRegistry; //                    │ Price registry address
-    uint32 maxDataBytes; //                      │ Maximum payload data size in bytes
-    uint32 maxPerMsgGasLimit; // ────────────────╯ Maximum gas limit for messages targeting EVMs
-    address tokenAdminRegistry; // ──────────────╮ Token admin registry address
-    //                                           │
-    // The following three properties are defaults, they can be overridden by setting the TokenTransferFeeConfig for a token
-    uint16 defaultTokenFeeUSDCents; //           │ Default token fee charged per token transfer
-    uint32 defaultTokenDestGasOverhead; //       │ Default gas charged to execute the token transfer on the destination chain
-    uint32 defaultTokenDestBytesOverhead; // ────╯ Default extra data availability bytes charged per token transfer
+    address tokenAdminRegistry; // ──────────────╯ Token admin registry address
   }
 
   /// @dev Struct to hold the execution fee configuration for a fee token
@@ -138,6 +126,42 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimi
     bool aggregateRateLimitEnabled; // ─╯ Whether this transfer token is to be included in Aggregate Rate Limiting
   }
 
+  /// @notice Destination chain specific config
+  struct DestChainConfig {
+    bool isEnabled; // ──────────────────────────╮ Whether this destination chain is enabled
+    uint16 maxNumberOfTokensPerMsg; //           │ Maximum number of distinct ERC20 token transferred per message
+    uint32 maxDataBytes; //                      │ Maximum payload data size in bytes
+    uint32 maxPerMsgGasLimit; //                 │ Maximum gas limit for messages targeting EVMs
+    uint32 destGasOverhead; //                   │ Gas charged on top of the gasLimit to cover destination chain costs
+    uint16 destGasPerPayloadByte; //             │ Destination chain gas charged for passing each byte of `data` payload to receiver
+    uint32 destDataAvailabilityOverheadGas; // ──╯ Extra data availability gas charged on top of the message, e.g. for OCR
+    uint16 destGasPerDataAvailabilityByte; // ───╮ Amount of gas to charge per byte of message data that needs availability
+    uint16 destDataAvailabilityMultiplierBps; // │ Multiplier for data availability gas, multiples of bps, or 0.0001
+    // The following three properties are defaults, they can be overridden by setting the TokenTransferFeeConfig for a token
+    uint16 defaultTokenFeeUSDCents; //           │ Default token fee charged per token transfer
+    uint32 defaultTokenDestGasOverhead; //       │ Default gas charged to execute the token transfer on the destination chain
+    uint32 defaultTokenDestBytesOverhead; // ────╯ Default extra data availability bytes charged per token transfer
+  }
+
+  /// @dev Struct to hold the configs for a destination chain, same as DestChainConfig but with the destChainSelector,
+  /// so that an array of these can be passed in the constructor and the applyDestChainConfigUpdates function.
+  struct DestChainConfigArgs {
+    uint64 destChainSelector; // ──────────────────╮ Destination chainSelector
+    bool isEnabled; //                             |
+    uint16 maxNumberOfTokensPerMsg; //             │ Maximum number of distinct ERC20 token transferred per message
+    uint32 maxDataBytes; //                        │ Maximum payload data size in bytes
+    uint32 maxPerMsgGasLimit; //                   | Maximum gas limit for messages targeting EVMs
+    uint32 destGasOverhead; //                     │ Gas charged on top of the gasLimit to cover destination chain costs
+    uint16 destGasPerPayloadByte; //               │ Destination chain gas charged for passing each byte of `data` payload to receiver
+    uint32 destDataAvailabilityOverheadGas; //     | Extra data availability gas charged on top of the message, e.g. for OCR
+    uint16 destGasPerDataAvailabilityByte; // ─────╯ Amount of gas to charge per byte of message data that needs availability
+    uint16 destDataAvailabilityMultiplierBps; // ──╮ Multiplier for data availability gas, multiples of bps, or 0.0001
+    // The following three properties are defaults, they can be overridden by setting the TokenTransferFeeConfig for a token
+    uint16 defaultTokenFeeUSDCents; //             │ Default token fee charged per token transfer
+    uint32 defaultTokenDestGasOverhead; //         │ Default gas charged to execute the token transfer on the destination chain
+    uint32 defaultTokenDestBytesOverhead; // ──────╯ Default extra data availability bytes charged per token transfer
+  }
+
   /// @dev Nop address and weight, used to set the nops and their weights
   struct NopAndWeight {
     address nop; // ────╮ Address of the node operator
@@ -177,6 +201,8 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimi
   /// @dev (address nop => uint256 weight)
   EnumerableMap.AddressToUintMap internal s_nops;
 
+  /// @dev The destination chain specific configs
+  mapping(uint64 destChainSelector => DestChainConfig destChainConfig) internal s_destChainConfig;
   /// @dev The execution fee token config that can be set by the owner or fee admin
   mapping(address token => FeeTokenConfig feeTokenConfig) internal s_feeTokenConfig;
   /// @dev The token transfer fee config that can be set by the owner or fee admin
@@ -199,6 +225,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimi
   constructor(
     StaticConfig memory staticConfig,
     DynamicConfig memory dynamicConfig,
+    DestChainConfigArgs[] memory destChainConfigs,
     RateLimiter.Config memory rateLimiterConfig,
     FeeTokenConfigArgs[] memory feeTokenConfigs,
     TokenTransferFeeConfigArgs[] memory tokenTransferFeeConfigArgs,
@@ -223,6 +250,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimi
     i_armProxy = staticConfig.armProxy;
 
     _setDynamicConfig(dynamicConfig);
+    _applyDestChainConfigUpdates(destChainConfigs);
     _setFeeTokenConfig(feeTokenConfigs);
     _setTokenTransferFeeConfig(tokenTransferFeeConfigArgs, new address[](0));
     _setNops(nopsAndWeights);
@@ -265,7 +293,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimi
     uint256 gasLimit = _fromBytes(message.extraArgs).gasLimit;
     // Validate the message with various checks
     uint256 numberOfTokens = message.tokenAmounts.length;
-    _validateMessage(message.data.length, gasLimit, numberOfTokens);
+    _validateMessage(destChainSelector, message.data.length, gasLimit, numberOfTokens);
 
     // Only check token value if there are tokens
     if (numberOfTokens > 0) {
@@ -383,15 +411,22 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimi
   /// @notice Validate the forwarded message with various checks.
   /// @dev This function can be called multiple times during a CCIPSend,
   /// only common user-driven mistakes are validated here to minimize duplicate validation cost.
+  /// @param destChainSelector The destination chain selector.
   /// @param dataLength The length of the data field of the message.
   /// @param gasLimit The gasLimit set in message for destination execution.
   /// @param numberOfTokens The number of tokens to be sent.
-  function _validateMessage(uint256 dataLength, uint256 gasLimit, uint256 numberOfTokens) internal view {
+  function _validateMessage(
+    uint64 destChainSelector,
+    uint256 dataLength,
+    uint256 gasLimit,
+    uint256 numberOfTokens
+  ) internal view {
     // Check that payload is formed correctly
-    uint256 maxDataBytes = uint256(s_dynamicConfig.maxDataBytes);
+    DestChainConfig storage destChainConfig = s_destChainConfig[destChainSelector];
+    uint256 maxDataBytes = uint256(destChainConfig.maxDataBytes);
     if (dataLength > maxDataBytes) revert MessageTooLarge(maxDataBytes, dataLength);
-    if (gasLimit > uint256(s_dynamicConfig.maxPerMsgGasLimit)) revert MessageGasLimitTooHigh();
-    if (numberOfTokens > uint256(s_dynamicConfig.maxNumberOfTokensPerMsg)) revert UnsupportedNumberOfTokens();
+    if (gasLimit > uint256(destChainConfig.maxPerMsgGasLimit)) revert MessageGasLimitTooHigh();
+    if (numberOfTokens > uint256(destChainConfig.maxNumberOfTokensPerMsg)) revert UnsupportedNumberOfTokens();
   }
 
   // ================================================================
@@ -477,7 +512,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimi
 
     uint256 gasLimit = _fromBytes(message.extraArgs).gasLimit;
     // Validate the message with various checks
-    _validateMessage(message.data.length, gasLimit, message.tokenAmounts.length);
+    _validateMessage(destChainSelector, message.data.length, gasLimit, message.tokenAmounts.length);
 
     FeeTokenConfig memory feeTokenConfig = s_feeTokenConfig[message.feeToken];
     if (!feeTokenConfig.enabled) revert NotAFeeToken(message.feeToken);
@@ -494,7 +529,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimi
     uint32 tokenTransferBytesOverhead = 0;
     if (message.tokenAmounts.length > 0) {
       (premiumFee, tokenTransferGas, tokenTransferBytesOverhead) =
-        _getTokenTransferCost(message.feeToken, feeTokenPrice, message.tokenAmounts);
+        _getTokenTransferCost(destChainSelector, message.feeToken, feeTokenPrice, message.tokenAmounts);
     } else {
       // Convert USD cents with 2 decimals to 18 decimals.
       premiumFee = uint256(feeTokenConfig.networkFeeUSDCents) * 1e16;
@@ -505,8 +540,10 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimi
     uint256 dataAvailabilityCost = 0;
     // Only calculate data availability cost if data availability multiplier is non-zero.
     // The multiplier should be set to 0 if destination chain does not charge data availability cost.
-    if (s_dynamicConfig.destDataAvailabilityMultiplierBps > 0) {
+    DestChainConfig storage destChainConfig = s_destChainConfig[destChainSelector];
+    if (destChainConfig.destDataAvailabilityMultiplierBps > 0) {
       dataAvailabilityCost = _getDataAvailabilityCost(
+        destChainSelector,
         // Parse the data availability gas price stored in the higher-order 112 bits of the encoded gas price.
         uint112(packedGasPrice >> Internal.GAS_PRICE_BITS),
         message.data.length,
@@ -521,7 +558,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimi
     // uint112(packedGasPrice) = executionGasPrice
     uint256 executionCost = uint112(packedGasPrice)
       * (
-        gasLimit + s_dynamicConfig.destGasOverhead + (message.data.length * s_dynamicConfig.destGasPerPayloadByte)
+        gasLimit + destChainConfig.destGasOverhead + (message.data.length * destChainConfig.destGasPerPayloadByte)
           + tokenTransferGas
       ) * feeTokenConfig.gasMultiplierWeiPerEth;
 
@@ -534,12 +571,14 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimi
 
   /// @notice Returns the estimated data availability cost of the message.
   /// @dev To save on gas, we use a single destGasPerDataAvailabilityByte value for both zero and non-zero bytes.
+  /// @param destChainSelector the destination chain selector.
   /// @param dataAvailabilityGasPrice USD per data availability gas in 18 decimals.
   /// @param messageDataLength length of the data field in the message.
   /// @param numberOfTokens number of distinct token transfers in the message.
   /// @param tokenTransferBytesOverhead additional token transfer data passed to destination, e.g. USDC attestation.
   /// @return dataAvailabilityCostUSD36Decimal total data availability cost in USD with 36 decimals.
   function _getDataAvailabilityCost(
+    uint64 destChainSelector,
     uint112 dataAvailabilityGasPrice,
     uint256 messageDataLength,
     uint256 numberOfTokens,
@@ -550,14 +589,15 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimi
     uint256 dataAvailabilityLengthBytes = Internal.MESSAGE_FIXED_BYTES + messageDataLength
       + (numberOfTokens * Internal.MESSAGE_FIXED_BYTES_PER_TOKEN) + tokenTransferBytesOverhead;
 
+    DestChainConfig storage destChainConfig = s_destChainConfig[destChainSelector];
     // destDataAvailabilityOverheadGas is a separate config value for flexibility to be updated independently of message cost.
     // Its value is determined by CCIP lane implementation, e.g. the overhead data posted for OCR.
-    uint256 dataAvailabilityGas = (dataAvailabilityLengthBytes * s_dynamicConfig.destGasPerDataAvailabilityByte)
-      + s_dynamicConfig.destDataAvailabilityOverheadGas;
+    uint256 dataAvailabilityGas = (dataAvailabilityLengthBytes * destChainConfig.destGasPerDataAvailabilityByte)
+      + destChainConfig.destDataAvailabilityOverheadGas;
 
     // dataAvailabilityGasPrice is in 18 decimals, destDataAvailabilityMultiplierBps is in 4 decimals
     // We pad 14 decimals to bring the result to 36 decimals, in line with token bps and execution fee.
-    return ((dataAvailabilityGas * dataAvailabilityGasPrice) * s_dynamicConfig.destDataAvailabilityMultiplierBps) * 1e14;
+    return ((dataAvailabilityGas * dataAvailabilityGasPrice) * destChainConfig.destDataAvailabilityMultiplierBps) * 1e14;
   }
 
   /// @notice Returns the token transfer cost parameters.
@@ -567,6 +607,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimi
   /// @dev Assumes that tokenAmounts are validated to be listed tokens elsewhere.
   /// @dev Splitting one token transfer into multiple transfers is discouraged,
   /// as it will result in a transferFee equal or greater than the same amount aggregated/de-duped.
+  /// @param destChainSelector the destination chain selector.
   /// @param feeToken address of the feeToken.
   /// @param feeTokenPrice price of feeToken in USD with 18 decimals.
   /// @param tokenAmounts token transfers in the message.
@@ -574,6 +615,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimi
   /// @return tokenTransferGas total execution gas of the token transfers.
   /// @return tokenTransferBytesOverhead additional token transfer data passed to destination, e.g. USDC attestation.
   function _getTokenTransferCost(
+    uint64 destChainSelector,
     address feeToken,
     uint224 feeTokenPrice,
     Client.EVMTokenAmount[] calldata tokenAmounts
@@ -592,9 +634,10 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimi
 
       // If the token has no specific overrides configured, we use the global defaults.
       if (!transferFeeConfig.isEnabled) {
-        tokenTransferFeeUSDWei += uint256(s_dynamicConfig.defaultTokenFeeUSDCents) * 1e16;
-        tokenTransferGas += s_dynamicConfig.defaultTokenDestGasOverhead;
-        tokenTransferBytesOverhead += s_dynamicConfig.defaultTokenDestBytesOverhead;
+        DestChainConfig storage destChainConfig = s_destChainConfig[destChainSelector];
+        tokenTransferFeeUSDWei += uint256(destChainConfig.defaultTokenFeeUSDCents) * 1e16;
+        tokenTransferGas += destChainConfig.defaultTokenDestGasOverhead;
+        tokenTransferBytesOverhead += destChainConfig.defaultTokenDestBytesOverhead;
         continue;
       }
 
@@ -635,6 +678,50 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimi
     }
 
     return (tokenTransferFeeUSDWei, tokenTransferGas, tokenTransferBytesOverhead);
+  }
+
+  /// @notice Updates the destination chain specific config.
+  /// @param destChainConfigs Array of source chain specific config updates.
+  function applyDestChainConfigUpdates(DestChainConfigArgs[] memory destChainConfigs) external {
+    _onlyOwnerOrAdmin();
+    _applyDestChainConfigUpdates(destChainConfigs);
+  }
+
+  /// @notice Internal version of applyDestChainConfigUpdates.
+  function _applyDestChainConfigUpdates(DestChainConfigArgs[] memory destChainConfigs) internal {
+    for (uint256 i; i < destChainConfigs.length; ++i) {
+      DestChainConfigArgs memory destChainConfigArgs = destChainConfigs[i];
+
+      // TODO: Add metadataHash to DestChainConfig and detect if new lane or not
+      // If new lane, then set defaultTxGasLimit and metadataHash as well
+
+      // If lane update
+      DestChainConfig memory destChainConfig = DestChainConfig({
+        isEnabled: destChainConfigArgs.isEnabled,
+        maxNumberOfTokensPerMsg: destChainConfigArgs.maxNumberOfTokensPerMsg,
+        maxDataBytes: destChainConfigArgs.maxDataBytes,
+        maxPerMsgGasLimit: destChainConfigArgs.maxPerMsgGasLimit,
+        destGasOverhead: destChainConfigArgs.destGasOverhead,
+        destGasPerPayloadByte: destChainConfigArgs.destGasPerPayloadByte,
+        destDataAvailabilityOverheadGas: destChainConfigArgs.destDataAvailabilityOverheadGas,
+        destGasPerDataAvailabilityByte: destChainConfigArgs.destGasPerDataAvailabilityByte,
+        destDataAvailabilityMultiplierBps: destChainConfigArgs.destDataAvailabilityMultiplierBps,
+        defaultTokenFeeUSDCents: destChainConfigArgs.defaultTokenFeeUSDCents,
+        defaultTokenDestGasOverhead: destChainConfigArgs.defaultTokenDestGasOverhead,
+        defaultTokenDestBytesOverhead: destChainConfigArgs.defaultTokenDestBytesOverhead
+      });
+
+      s_destChainConfig[destChainConfigArgs.destChainSelector] = destChainConfig;
+
+      emit DestChainConfigUpdated(destChainConfigArgs.destChainSelector, destChainConfig);
+    }
+  }
+
+  /// @notice Returns the destination chain config for givent destination chain selector.
+  /// @param destChainSelector The destination chain selector.
+  /// @return The destination chain config.
+  function getDestChainConfig(uint64 destChainSelector) external view returns (DestChainConfig memory) {
+    return s_destChainConfig[destChainSelector];
   }
 
   /// @notice Gets the fee configuration for a token
