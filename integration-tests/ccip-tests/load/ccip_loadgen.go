@@ -176,7 +176,10 @@ func (c *CCIPE2ELoad) CCIPMsg() (router.ClientEVM2AnyMessage, *testreporters.Req
 		msg.TokenAmounts = []router.ClientEVMTokenAmount{}
 	}
 	extraArgsV1, err := testhelpers.GetEVMExtraArgsV1(big.NewInt(gasLimit), false)
-	require.NoError(c.t, err, "Failed encoding the options field")
+	if err != nil {
+		return router.ClientEVM2AnyMessage{}, stats, err
+	}
+
 	msg.ExtraArgs = extraArgsV1
 	return msg, stats, nil
 }
