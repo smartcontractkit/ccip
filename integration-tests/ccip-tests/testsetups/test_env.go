@@ -463,7 +463,7 @@ func DeployEnvironments(
 						NetworkName: network.Name,
 						Values: map[string]interface{}{
 							"anvil": map[string]interface{}{
-								"chainId":                   network.ChainID,
+								"chainId":                   fmt.Sprintf("%d", network.ChainID),
 								"blockTime":                 anvilConfig.BlockTime,
 								"forkURL":                   anvilConfig.URL,
 								"forkBlockNumber":           anvilConfig.BlockNumber,
