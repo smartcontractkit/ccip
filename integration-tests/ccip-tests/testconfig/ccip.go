@@ -127,8 +127,8 @@ func (tc *TokenConfig) Validate() error {
 }
 
 type MsgProfile struct {
-	MsgDetails    []*MsgDetails `toml:",omitempty"`
-	Frequencies   []int         `toml:",omitempty"`
+	MsgDetails    *[]*MsgDetails `toml:",omitempty"`
+	Frequencies   []int          `toml:",omitempty"`
 	matrixByFreq  []int
 	mapMsgDetails map[int]*MsgDetails
 }
@@ -142,7 +142,7 @@ type MsgProfile struct {
 // This is useful to select a msg detail based on the iteration number
 func (m *MsgProfile) msgDetailsIndexMatrixByFrequency() {
 	m.mapMsgDetails = make(map[int]*MsgDetails)
-	for i, msg := range m.MsgDetails {
+	for i, msg := range *m.MsgDetails {
 		m.mapMsgDetails[i] = msg
 	}
 	m.matrixByFreq = make([]int, 0)
@@ -168,8 +168,9 @@ func (m *MsgProfile) MsgDetailsForIteration(it int64) *MsgDetails {
 
 // MsgDetailWithMaxToken returns the msg details with the max no of tokens in the msg profile
 func (m *MsgProfile) MsgDetailWithMaxToken() *MsgDetails {
-	msgDetails := m.MsgDetails[0]
-	for _, msg := range m.MsgDetails {
+	allDetails := *m.MsgDetails
+	msgDetails := allDetails[0]
+	for _, msg := range allDetails {
 		if msg.NoOfTokens != nil && pointer.GetInt(msg.NoOfTokens) > pointer.GetInt(msgDetails.NoOfTokens) {
 			msgDetails = msg
 		}
@@ -181,16 +182,20 @@ func (m *MsgProfile) Validate() error {
 	if m == nil {
 		return fmt.Errorf("msg profile should be set")
 	}
-	if len(m.MsgDetails) == 0 {
+	if m.MsgDetails == nil {
+		return fmt.Errorf("msg details should be set")
+	}
+	allDetails := *m.MsgDetails
+	if len(allDetails) == 0 {
 		return fmt.Errorf("msg details should be set")
 	}
 	if len(m.Frequencies) == 0 {
 		return fmt.Errorf("frequencies should be set")
 	}
-	if len(m.MsgDetails) != len(m.Frequencies) {
-		return fmt.Errorf("number of msg details and frequencies should be same")
+	if len(allDetails) != len(m.Frequencies) {
+		return fmt.Errorf("number of msg details %d and frequencies %d should be same", len(allDetails), len(m.Frequencies))
 	}
-	for _, msg := range m.MsgDetails {
+	for _, msg := range allDetails {
 		if err := msg.Validate(); err != nil {
 			return err
 		}
