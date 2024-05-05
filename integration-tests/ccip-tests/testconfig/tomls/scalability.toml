@@ -55,6 +55,16 @@ DBCapacity = '50Gi'
 IsStateful = true
 DBArgs = ['shared_buffers=2048MB', 'effective_cache_size=4096MB', 'work_mem=64MB']
 
+[CCIP.Env.NewCLCluster.Common]
+CommonChainConfigTOML = """
+[EVM.HeadTracker]
+HistoryDepth = 3000
+
+[GasEstimator]
+PriceMax = '200 gwei'
+LimitDefault = 6000000
+FeeCapDefault = '200 gwei'
+"""
 
 [CCIP.Groups]
 [CCIP.Groups.load]
