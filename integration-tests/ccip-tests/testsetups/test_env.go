@@ -472,6 +472,7 @@ func DeployEnvironments(
 								"forkComputeUnitsPerSecond": anvilConfig.ComputePerSecond,
 								"forkNoRateLimit":           anvilConfig.RateLimitDisabled,
 							},
+							"resources": testInputs.GethResourceProfile,
 						},
 					}))
 				selectedNetworks[i].Simulated = true
