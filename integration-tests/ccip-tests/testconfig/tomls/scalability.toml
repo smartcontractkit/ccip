@@ -65,8 +65,6 @@ NodeFunding = 1000.0
 NoOfRoutersPerPair = 2
 NoOfNetworks = 40
 MaxNoOfLanes = 400
-NoOfTokensInMsg = 5
-
 
 [CCIP.Groups.load.TokenConfig]
 TimeoutForPriceUpdate = '15m'
@@ -89,14 +87,14 @@ Frequencies = [4,12,3,1]
 MsgType = 'Token'
 DestGasLimit = 0
 DataLength = 0
-NoOfTokens = 2
+NoOfTokens = 5
 AmountPerToken = 1
 
 [[CCIP.Groups.load.LoadProfile.MsgProfile.MsgDetails]]
 MsgType = 'DataWithToken'
 DestGasLimit = 500000
 DataLength = 5000
-NoOfTokens = 2
+NoOfTokens = 5
 AmountPerToken = 1
 
 [[CCIP.Groups.load.LoadProfile.MsgProfile.MsgDetails]]
