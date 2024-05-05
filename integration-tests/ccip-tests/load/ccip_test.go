@@ -109,7 +109,7 @@ func TestLoadCCIPStableRequestTriggeringWithNetworkChaos(t *testing.T) {
 				FromLabels:  &map[string]*string{"geth": ptr.Ptr(actions.ChaosGroupCCIPGeth)},
 				ToLabels:    &map[string]*string{"app": ptr.Ptr("chainlink-0")},
 				DurationStr: testArgs.TestCfg.TestGroupInput.LoadProfile.TestDuration.String(),
-				Delay:       "300ms",
+				Delay:       "200ms",
 			}))
 	require.NoError(t, err)
 
