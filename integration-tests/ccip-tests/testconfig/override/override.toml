@@ -2,5 +2,30 @@
 [CCIP.Groups.load]
 PhaseTimeout = '20m'
 TestDuration = '5m'
-TestRunName = 'dynamic token price'
-DynamicPriceUpdateInterval = '15s'
+
+[CCIP.Groups.load.LoadProfile.MsgProfile]
+Frequencies = [4,12,3,1]
+
+[[CCIP.Groups.load.LoadProfile.MsgProfile.MsgDetails]]
+MsgType = 'Token'
+DestGasLimit = 0
+DataLength = 0
+NoOfTokens = 2
+AmountPerToken = 1
+
+[[CCIP.Groups.load.LoadProfile.MsgProfile.MsgDetails]]
+MsgType = 'DataWithToken'
+DestGasLimit = 500000
+DataLength = 5000
+NoOfTokens = 2
+AmountPerToken = 1
+
+[[CCIP.Groups.load.LoadProfile.MsgProfile.MsgDetails]]
+MsgType = 'Data'
+DestGasLimit = 800000
+DataLength = 10000
+
+[[CCIP.Groups.load.LoadProfile.MsgProfile.MsgDetails]]
+MsgType = 'Data'
+DestGasLimit = 2500000
+DataLength = 10000
