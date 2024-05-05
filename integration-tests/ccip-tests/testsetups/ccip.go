@@ -239,7 +239,9 @@ func (c *CCIPTestConfig) SetNetworkPairs(lggr zerolog.Logger) error {
 				DefaultGasLimit:           n.DefaultGasLimit,
 				FinalityDepth:             n.FinalityDepth,
 			})
-			c.EnvInput.Network.AnvilConfigs[strings.ToUpper(name)] = c.EnvInput.Network.AnvilConfigs[strings.ToUpper(n.Name)]
+			if existing, ok := c.EnvInput.Network.AnvilConfigs[strings.ToUpper(n.Name)]; c.EnvInput.Network.AnvilConfigs != nil && ok {
+				c.EnvInput.Network.AnvilConfigs[strings.ToUpper(name)] = existing
+			}
 
 			chainConfig := &ctftestenv.EthereumChainConfig{}
 			err := chainConfig.Default()
