@@ -1,0 +1,69 @@
+[CCIP]
+[CCIP.Env]
+TTL = '15h'
+
+[CCIP.Env.NewCLCluster]
+NoOfNodes = 17
+NodeMemory = '12Gi'
+NodeCPU = '6'
+DBMemory = '10Gi'
+DBCPU = '2'
+DBStorageClass = 'gp3'
+PromPgExporter = true
+DBCapacity = '50Gi'
+IsStateful = true
+DBArgs = ['shared_buffers=2048MB', 'effective_cache_size=4096MB', 'work_mem=64MB']
+
+
+[CCIP.Groups]
+[CCIP.Groups.load]
+KeepEnvAlive = true
+NoOfCommitNodes = 16
+PhaseTimeout = '50m'
+NodeFunding = 1000.0
+NoOfRoutersPerPair = 2
+NoOfNetworks = 40
+MaxNoOfLanes = 400
+NoOfTokensInMsg = 5
+
+
+[CCIP.Groups.load.TokenConfig]
+TimeoutForPriceUpdate = '15m'
+NoOfTokensPerChain = 60
+NoOfTokensWithDynamicPrice = 15
+DynamicPriceUpdateInterval ='15s'
+
+[CCIP.Groups.load.LoadProfile]
+TestDuration = '4h'
+TimeUnit = '5s'
+RequestPerUnitTime = [1]
+OptimizeSpace = true
+SendMaxDataInEveryMsgCount = 1000
+
+# to represent 20%, 60%, 15%, 5% of the total messages
+[CCIP.Groups.load.LoadProfile.MsgProfile]
+Frequencies = [4,12,3,1]
+
+[[CCIP.Groups.load.LoadProfile.MsgProfile.MsgDetails]]
+MsgType = 'Token'
+DestGasLimit = 0
+DataLength = 0
+NoOfTokens = 2
+AmountPerToken = 1
+
+[[CCIP.Groups.load.LoadProfile.MsgProfile.MsgDetails]]
+MsgType = 'DataWithToken'
+DestGasLimit = 500000
+DataLength = 5000
+NoOfTokens = 2
+AmountPerToken = 1
+
+[[CCIP.Groups.load.LoadProfile.MsgProfile.MsgDetails]]
+MsgType = 'Data'
+DestGasLimit = 800000
+DataLength = 10000
+
+[[CCIP.Groups.load.LoadProfile.MsgProfile.MsgDetails]]
+MsgType = 'Data'
+DestGasLimit = 2500000
+DataLength = 10000

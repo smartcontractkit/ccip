@@ -33,3 +33,4 @@ NeedsUpgrade = true
 [CCIP.Groups.load]
 LocalCluster = false
 ExistingDeployment = true
+TestRunName = 'upgrade-test'
