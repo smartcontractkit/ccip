@@ -37,7 +37,7 @@ import (
 
 	integrationactions "github.com/smartcontractkit/chainlink/integration-tests/actions"
 
-	testutils "github.com/smartcontractkit/ccip/integration-tests/ccip-tests/utils"
+	testutils "github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/utils"
 
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/actions"
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/contracts"

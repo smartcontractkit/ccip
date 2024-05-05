@@ -64,7 +64,10 @@ PhaseTimeout = '50m'
 NodeFunding = 1000.0
 NoOfRoutersPerPair = 2
 NoOfNetworks = 40
-MaxNoOfLanes = 400
+MaxNoOfLanes = 200
+
+[CCIP.Groups.load.OffRampConfig]
+BatchGasLimit = 11000000
 
 [CCIP.Groups.load.TokenConfig]
 TimeoutForPriceUpdate = '15m'

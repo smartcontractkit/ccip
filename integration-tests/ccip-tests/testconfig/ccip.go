@@ -11,7 +11,7 @@ import (
 
 	ctfK8config "github.com/smartcontractkit/chainlink-testing-framework/k8s/config"
 
-	testutils "github.com/smartcontractkit/ccip/integration-tests/ccip-tests/utils"
+	testutils "github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/utils"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
 	ctfconfig "github.com/smartcontractkit/chainlink-testing-framework/config"
