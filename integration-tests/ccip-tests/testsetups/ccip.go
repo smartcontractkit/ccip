@@ -225,8 +225,9 @@ func (c *CCIPTestConfig) SetNetworkPairs(lggr zerolog.Logger) error {
 			if i > len(networks.AdditionalSimulatedPvtKeys)-1 {
 				networks.AdditionalSimulatedPvtKeys = append(networks.AdditionalSimulatedPvtKeys, networks.AdditionalSimulatedPvtKeys...)
 			}
+			name := fmt.Sprintf("private-chain-%d", len(c.SelectedNetworks)+1)
 			c.SelectedNetworks = append(c.SelectedNetworks, blockchain.EVMNetwork{
-				Name:                      fmt.Sprintf("private-chain-%d", len(c.SelectedNetworks)+1),
+				Name:                      name,
 				ChainID:                   chainID,
 				Simulated:                 true,
 				PrivateKeys:               []string{networks.AdditionalSimulatedPvtKeys[i]},
@@ -238,6 +239,8 @@ func (c *CCIPTestConfig) SetNetworkPairs(lggr zerolog.Logger) error {
 				DefaultGasLimit:           n.DefaultGasLimit,
 				FinalityDepth:             n.FinalityDepth,
 			})
+			c.EnvInput.Network.AnvilConfigs[strings.ToUpper(name)] = c.EnvInput.Network.AnvilConfigs[strings.ToUpper(n.Name)]
+
 			chainConfig := &ctftestenv.EthereumChainConfig{}
 			err := chainConfig.Default()
 			if err != nil {
