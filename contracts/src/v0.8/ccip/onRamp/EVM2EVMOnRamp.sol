@@ -31,6 +31,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   using USDPriceWith18Decimals for uint224;
 
   error InvalidExtraArgsTag();
+  error InvalidExtraArgOutOfOrderValue(bool expected, bool actual);
   error OnlyCallableByOwnerOrAdmin();
   error OnlyCallableByOwnerOrAdminOrNop();
   error InvalidWithdrawParams();
@@ -94,7 +95,9 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     // The following three properties are defaults, they can be overridden by setting the TokenTransferFeeConfig for a token
     uint16 defaultTokenFeeUSDCents; //           │ Default token fee charged per token transfer
     uint32 defaultTokenDestGasOverhead; //       │ Default gas charged to execute the token transfer on the destination chain
-    uint32 defaultTokenDestBytesOverhead; // ────╯ Default extra data availability bytes charged per token transfer
+    uint32 defaultTokenDestBytesOverhead; //     | Default extra data availability bytes charged per token transfer
+    bool enforceAllowOutOfOrderDefault; //       | Whether to enforce the allowOutOfOrder extraArg default.
+    bool defaultAllowOutOfOrder; // ─────────────╯ The enforced value of the allowOutOfOrder extraArg.
   }
 
   /// @dev Struct to hold the execution fee configuration for a fee token
@@ -374,7 +377,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   /// @return The extra args struct
   function _fromBytes(bytes calldata extraArgs) internal view returns (Client.EVMExtraArgsV2 memory) {
     if (extraArgs.length == 0) {
-      return Client.EVMExtraArgsV2({gasLimit: i_defaultTxGasLimit, allowOutOfOrder: false});
+      return _enforceExtraArg(i_defaultTxGasLimit, s_dynamicConfig.defaultAllowOutOfOrder);
     }
 
     bytes4 extraArgsTag = bytes4(extraArgs);
@@ -384,12 +387,23 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
       Client.EVMExtraArgsV1 memory extraArgsV1 = abi.decode(extraArgs[4:], (Client.EVMExtraArgsV1));
 
       // Backwards compatibility: allowOutOfOrder set to false by default.
-      return Client.EVMExtraArgsV2({gasLimit: extraArgsV1.gasLimit, allowOutOfOrder: false});
+      return _enforceExtraArg(extraArgsV1.gasLimit, s_dynamicConfig.defaultAllowOutOfOrder);
     } else if (extraArgsTag == Client.EVM_EXTRA_ARGS_V2_TAG) {
-      return abi.decode(extraArgs[4:], (Client.EVMExtraArgsV2));
+      Client.EVMExtraArgsV2 memory extraArgsV2 = abi.decode(extraArgs[4:], (Client.EVMExtraArgsV2));
+      return _enforceExtraArg(extraArgsV2.gasLimit, extraArgsV2.allowOutOfOrder);
     } else {
       revert InvalidExtraArgsTag();
     }
+  }
+
+  function _enforceExtraArg(uint256 gasLimit, bool allowOutOfOrder) internal view returns (Client.EVMExtraArgsV2 memory) {
+    if (
+      s_dynamicConfig.enforceAllowOutOfOrderDefault
+        && allowOutOfOrder != s_dynamicConfig.defaultAllowOutOfOrder
+    ) {
+      revert InvalidExtraArgOutOfOrderValue(s_dynamicConfig.defaultAllowOutOfOrder, allowOutOfOrder);
+    }
+    return Client.EVMExtraArgsV2({gasLimit: gasLimit, allowOutOfOrder: allowOutOfOrder});
   }
 
   /// @notice Validate the forwarded message with various checks.
