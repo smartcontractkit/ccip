@@ -308,9 +308,9 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
       sequenceNumber: ++s_sequenceNumber,
       gasLimit: extraArgsV2.gasLimit,
       strict: false,
-      // Only bump nonce for messages that specify allowOutOfOrder == false. Otherwise, we
+      // Only bump nonce for messages that specify allowOutOfOrderExecution == false. Otherwise, we
       // may block ordered message nonces, which is not what we want.
-      nonce: extraArgsV2.allowOutOfOrder ? 0 : ++s_senderNonce[originalSender],
+      nonce: extraArgsV2.allowOutOfOrderExecution ? 0 : ++s_senderNonce[originalSender],
       feeToken: message.feeToken,
       feeTokenAmount: feeTokenAmount,
       data: message.data,
@@ -374,7 +374,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   /// @return The extra args struct
   function _fromBytes(bytes calldata extraArgs) internal view returns (Client.EVMExtraArgsV2 memory) {
     if (extraArgs.length == 0) {
-      return Client.EVMExtraArgsV2({gasLimit: i_defaultTxGasLimit, allowOutOfOrder: false});
+      return Client.EVMExtraArgsV2({gasLimit: i_defaultTxGasLimit, allowOutOfOrderExecution: false});
     }
 
     bytes4 extraArgsTag = bytes4(extraArgs);
@@ -383,8 +383,8 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
       // Clients may still send that version but it will be ignored.
       Client.EVMExtraArgsV1 memory extraArgsV1 = abi.decode(extraArgs[4:], (Client.EVMExtraArgsV1));
 
-      // Backwards compatibility: allowOutOfOrder set to false by default.
-      return Client.EVMExtraArgsV2({gasLimit: extraArgsV1.gasLimit, allowOutOfOrder: false});
+      // Backwards compatibility: allowOutOfOrderExecution set to false by default.
+      return Client.EVMExtraArgsV2({gasLimit: extraArgsV1.gasLimit, allowOutOfOrderExecution: false});
     } else if (extraArgsTag == Client.EVM_EXTRA_ARGS_V2_TAG) {
       return abi.decode(extraArgs[4:], (Client.EVMExtraArgsV2));
     } else {

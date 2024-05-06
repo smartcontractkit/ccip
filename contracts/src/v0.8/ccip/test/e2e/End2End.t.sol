@@ -25,9 +25,9 @@ contract E2E is EVM2EVMOnRampSetup, CommitStoreSetup, EVM2EVMOffRampSetup {
     uint256 balance1Pre = token1.balanceOf(OWNER);
 
     Internal.EVM2EVMMessage[] memory messages = new Internal.EVM2EVMMessage[](3);
-    messages[0] = sendRequest(1, true);
-    messages[1] = sendRequest(2, true);
-    messages[2] = sendRequest(3, true);
+    messages[0] = sendRequest(1);
+    messages[1] = sendRequest(2);
+    messages[2] = sendRequest(3);
 
     uint256 expectedFee = s_sourceRouter.getFee(DEST_CHAIN_SELECTOR, _generateTokenMessage());
     // Asserts that the tokens have been sent and the fee has been paid.
@@ -91,19 +91,14 @@ contract E2E is EVM2EVMOnRampSetup, CommitStoreSetup, EVM2EVMOffRampSetup {
     s_offRamp.execute(execReport, new uint256[](0));
   }
 
-  function sendRequest(uint64 expectedSeqNum, bool allowOutOfOrder) public returns (Internal.EVM2EVMMessage memory) {
+  function sendRequest(uint64 expectedSeqNum) public returns (Internal.EVM2EVMMessage memory) {
     Client.EVM2AnyMessage memory message = _generateTokenMessage();
     message.extraArgs =
-      Client._argsToBytes(Client.EVMExtraArgsV2({gasLimit: GAS_LIMIT, allowOutOfOrder: allowOutOfOrder}));
+      Client._argsToBytes(Client.EVMExtraArgsV2({gasLimit: GAS_LIMIT, allowOutOfOrderExecution: false}));
     uint256 expectedFee = s_sourceRouter.getFee(DEST_CHAIN_SELECTOR, message);
 
     // Nonce is expected to be zero for unordered messages.
-    uint64 expectedNonce;
-    if (allowOutOfOrder) {
-      expectedNonce = 0;
-    } else {
-      expectedNonce = s_onRamp.getSenderNonce(OWNER) + 1;
-    }
+    uint64 expectedNonce = s_onRamp.getSenderNonce(OWNER) + 1;
 
     IERC20(s_sourceTokens[0]).approve(address(s_sourceRouter), i_tokenAmount0 + expectedFee);
     IERC20(s_sourceTokens[1]).approve(address(s_sourceRouter), i_tokenAmount1);

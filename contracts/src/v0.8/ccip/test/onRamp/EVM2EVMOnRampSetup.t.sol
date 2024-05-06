@@ -192,7 +192,7 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
       sequenceNumber: seqNum,
       feeTokenAmount: feeTokenAmount,
       sender: originalSender,
-      nonce: extraArgs.allowOutOfOrder ? 0 : nonce,
+      nonce: extraArgs.allowOutOfOrderExecution ? 0 : nonce,
       gasLimit: extraArgs.gasLimit,
       strict: false,
       sourceChainSelector: SOURCE_CHAIN_SELECTOR,
@@ -226,7 +226,7 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
   ) public pure returns (Client.EVMExtraArgsV2 memory) {
     if (sig == Client.EVM_EXTRA_ARGS_V1_TAG) {
       Client.EVMExtraArgsV1 memory extraArgsV1 = abi.decode(extraArgData, (Client.EVMExtraArgsV1));
-      return Client.EVMExtraArgsV2({gasLimit: extraArgsV1.gasLimit, allowOutOfOrder: false});
+      return Client.EVMExtraArgsV2({gasLimit: extraArgsV1.gasLimit, allowOutOfOrderExecution: false});
     } else if (sig == Client.EVM_EXTRA_ARGS_V2_TAG) {
       return abi.decode(extraArgData, (Client.EVMExtraArgsV2));
     } else {
