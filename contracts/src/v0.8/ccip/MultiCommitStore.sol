@@ -279,9 +279,9 @@ contract MultiCommitStore is IMultiCommitStore, ITypeAndVersion, OCR2Base {
     emit ConfigSet(StaticConfig({chainSelector: i_chainSelector, armProxy: i_armProxy}), dynamicConfig);
   }
 
-  /// @notice Returns the next expected sequence number.
+  /// @notice Returns the config for a source chain.
   /// @param sourceChainSelector The source chain selector.
-  /// @return the next expected sequenceNumber.
+  /// @return The source chain specific config.
   function getSourceChainConfig(uint64 sourceChainSelector) external view returns (SourceChainConfig memory) {
     return s_sourceChainConfigs[sourceChainSelector];
   }
