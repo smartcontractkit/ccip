@@ -232,6 +232,7 @@ contract MultiCommitStore is IMultiCommitStore, ITypeAndVersion, OCR2Base {
         revert InvalidInterval(root.sourceChainSelector, root.interval);
       }
 
+      // TODO: confirm how RMN offchain blessing impacts commit report
       if (root.merkleRoot == bytes32(0)) revert InvalidRoot();
       // Disallow duplicate roots as that would reset the timestamp and
       // delay potential manual execution.
