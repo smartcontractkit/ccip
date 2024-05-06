@@ -28,7 +28,7 @@ import {ERC165Checker} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts
 /// @dev OCR2BaseNoChecks is used to save gas, signatures are not required as the offramp can only execute
 /// messages which are committed in the commitStore. We still make use of OCR2 as an executor whitelist
 /// and turn-taking mechanism.
-contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersion, OCR2BaseNoChecks {
+contract EVM2EVMMultiOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersion, OCR2BaseNoChecks {
   using ERC165Checker for address;
   using EnumerableMapAddresses for EnumerableMapAddresses.AddressToAddressMap;
 
@@ -97,7 +97,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
   }
 
   // STATIC CONFIG
-  string public constant override typeAndVersion = "EVM2EVMOffRamp 1.5.0-dev";
+  string public constant override typeAndVersion = "EVM2EVMMultiOffRamp 1.6.0-dev";
 
   /// @dev Commit store address on the destination chain
   address internal immutable i_commitStore;
