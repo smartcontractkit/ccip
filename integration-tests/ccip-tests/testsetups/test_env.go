@@ -11,6 +11,7 @@ import (
 	"github.com/AlekSi/pointer"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
+	ctfconfig "github.com/smartcontractkit/chainlink-testing-framework/config"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/k8s/pkg/helm/foundry"
@@ -252,7 +253,7 @@ func DeployLocalCluster(
 ) (*test_env.CLClusterTestEnv, func() error) {
 	selectedNetworks := testInputs.SelectedNetworks
 
-	privateEthereumNetworks := []*ctftestenv.EthereumNetwork{}
+	privateEthereumNetworks := []*ctfconfig.EthereumNetwork{}
 	for _, network := range testInputs.EnvInput.PrivateEthereumNetworks {
 		privateEthereumNetworks = append(privateEthereumNetworks, network)
 	}
