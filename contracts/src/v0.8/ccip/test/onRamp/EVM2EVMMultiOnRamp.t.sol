@@ -16,7 +16,7 @@ import "./EVM2EVMMultiOnRampSetup.t.sol";
 contract EVM2EVMMultiOnRamp_constructor is EVM2EVMMultiOnRampSetup {
   event ConfigSet(EVM2EVMMultiOnRamp.StaticConfig staticConfig, EVM2EVMMultiOnRamp.DynamicConfig dynamicConfig);
   event PoolAdded(address token, address pool);
-  event DestChainConfigUpdated(uint64 destChainSelector, EVM2EVMMultiOnRamp.DestChainConfig destChainConfig);
+  event DestChainConfigUpdated(uint64 indexed destChainSelector, EVM2EVMMultiOnRamp.DestChainConfig destChainConfig);
 
   function test_Constructor_Success() public {
     EVM2EVMMultiOnRamp.StaticConfig memory staticConfig = EVM2EVMMultiOnRamp.StaticConfig({
