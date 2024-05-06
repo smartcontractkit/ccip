@@ -29,19 +29,19 @@ func TestIntegration_CCIP(t *testing.T) {
 	// Run the batches of tests for both pipeline and dynamic price getter setups.
 	// We will remove the pipeline batch once the feature is deleted from the code.
 	tests := []struct {
-		name         string
-		withPipeline bool
-		sequenced    bool
+		name            string
+		withPipeline    bool
+		allowOutOfOrder bool
 	}{
 		{
-			name:         "with pipeline sequenced false",
-			withPipeline: true,
-			sequenced:    false,
+			name:            "with pipeline allowOutOfOrder true",
+			withPipeline:    true,
+			allowOutOfOrder: true,
 		},
 		{
-			name:         "with dynamic price getter sequenced true",
-			withPipeline: false,
-			sequenced:    true,
+			name:            "with dynamic price getter allowOutOfOrder false",
+			withPipeline:    false,
+			allowOutOfOrder: false,
 		},
 	}
 
@@ -110,10 +110,10 @@ func TestIntegration_CCIP(t *testing.T) {
 
 			jobParams := ccipTH.SetUpNodesAndJobs(t, tokenPricesUSDPipeline, priceGetterConfigJson, "")
 
-			// track sequence number and nonce separately since nonce doesn't bump for unsequenced messages,
+			// track sequence number and nonce separately since nonce doesn't bump for messages with allowOutOfOrder == true,
 			// but sequence number always bumps.
-			// for this test, when test.sequenced == true, sequence number and nonce are equal.
-			// when test.sequenced == false, nonce is not bumped at all, so sequence number and nonce are NOT equal.
+			// for this test, when test.outOfOrder == false, sequence number and nonce are equal.
+			// when test.outOfOrder == true, nonce is not bumped at all, so sequence number and nonce are NOT equal.
 			currentSeqNum := 1
 			currentNonce := uint64(1)
 
@@ -121,7 +121,7 @@ func TestIntegration_CCIP(t *testing.T) {
 				tokenAmount := big.NewInt(500000003) // prime number
 				gasLimit := big.NewInt(200_003)      // prime number
 
-				extraArgs, err2 := testhelpers.GetEVMExtraArgsV2(gasLimit, test.sequenced)
+				extraArgs, err2 := testhelpers.GetEVMExtraArgsV2(gasLimit, test.allowOutOfOrder)
 				require.NoError(t, err2)
 
 				sourceBalances, err2 := testhelpers.GetBalances(t, []testhelpers.BalanceReq{
@@ -176,16 +176,16 @@ func TestIntegration_CCIP(t *testing.T) {
 				require.NoError(t, err)
 				ccipTH.SendRequest(t, msg)
 				// TODO: can this be moved into SendRequest?
-				if test.sequenced {
-					// the nonce for that sender must be bumped for sequenced transactions.
+				if test.allowOutOfOrder {
+					// the nonce for that sender must not be bumped for allowOutOfOrder == true messages.
 					nonce, err2 := ccipTH.Source.OnRamp.GetSenderNonce(nil, ccipTH.Source.User.From)
 					require.NoError(t, err2)
-					require.Equal(t, beforeNonce+1, nonce, "nonce should be bumped for sequenced requests")
+					require.Equal(t, beforeNonce, nonce, "nonce must not be bumped for allowOutOfOrder == true requests")
 				} else {
-					// the nonce for that sender must not be bumped for non-sequenced transactions.
+					// the nonce for that sender must be bumped for allowOutOfOrder == false messages.
 					nonce, err2 := ccipTH.Source.OnRamp.GetSenderNonce(nil, ccipTH.Source.User.From)
 					require.NoError(t, err2)
-					require.Equal(t, beforeNonce, nonce, "nonce should not be bumped for non-sequenced requests")
+					require.Equal(t, beforeNonce+1, nonce, "nonce must be bumped for allowOutOfOrder == false requests")
 				}
 
 				// Should eventually see this executed.
@@ -246,7 +246,7 @@ func TestIntegration_CCIP(t *testing.T) {
 					},
 				})
 				currentSeqNum++
-				if test.sequenced {
+				if !test.allowOutOfOrder {
 					currentNonce = uint64(currentSeqNum)
 				}
 			})
@@ -264,12 +264,12 @@ func TestIntegration_CCIP(t *testing.T) {
 				for i := 0; i < n; i++ {
 					txGasLimit := new(big.Int).Mul(gasLimit, big.NewInt(int64(i+1)))
 
-					// interleave sequenced and non-sequenced messages.
-					sequenced := false
+					// interleave ordered and non-ordered messages.
+					allowOutOfOrder := false
 					if i%2 == 0 {
-						sequenced = true
+						allowOutOfOrder = true
 					}
-					extraArgs, err2 := testhelpers.GetEVMExtraArgsV2(txGasLimit, sequenced)
+					extraArgs, err2 := testhelpers.GetEVMExtraArgsV2(txGasLimit, allowOutOfOrder)
 					require.NoError(t, err2)
 					msg := router.ClientEVM2AnyMessage{
 						Receiver: testhelpers.MustEncodeAddress(t, ccipTH.Dest.Receivers[0].Receiver.Address()),
@@ -293,7 +293,7 @@ func TestIntegration_CCIP(t *testing.T) {
 					tx, err2 := ccipTH.Source.Router.CcipSend(ccipTH.Source.User, ccipTH.Dest.ChainSelector, msg)
 					require.NoError(t, err2)
 					txs = append(txs, tx)
-					if sequenced {
+					if !allowOutOfOrder {
 						currentNonce++
 					}
 				}
@@ -411,7 +411,7 @@ func TestIntegration_CCIP(t *testing.T) {
 				require.Equal(t, nonceAtOnRampV1+uint64(noOfRequests)+1, nonceAtOnRampV2, "nonce should be synced from v1 onRamps")
 				require.Equal(t, nonceAtOffRampV1+uint64(noOfRequests)+1, nonceAtOffRampV2, "nonce should be synced from v1 offRamps")
 				currentSeqNum = endSeqNum + 1
-				if test.sequenced {
+				if !test.allowOutOfOrder {
 					currentNonce = uint64(currentSeqNum)
 				}
 			})
@@ -471,7 +471,7 @@ func TestIntegration_CCIP(t *testing.T) {
 				ccipTH.SetNopsOnRamp(t, nopsAndWeights)
 
 				// send a message
-				extraArgs, err := testhelpers.GetEVMExtraArgsV2(big.NewInt(200_000), test.sequenced)
+				extraArgs, err := testhelpers.GetEVMExtraArgsV2(big.NewInt(200_000), test.allowOutOfOrder)
 				require.NoError(t, err)
 
 				// FeeToken is empty, indicating it should use native token
@@ -496,7 +496,7 @@ func TestIntegration_CCIP(t *testing.T) {
 				assert.Len(t, executionLogs, 1)
 				ccipTH.AssertExecState(t, executionLogs[0], testhelpers.ExecutionStateSuccess)
 				currentSeqNum++
-				if test.sequenced {
+				if test.allowOutOfOrder {
 					currentNonce = uint64(currentSeqNum)
 				}
 
@@ -636,7 +636,7 @@ func TestIntegration_CCIP(t *testing.T) {
 					node.EventuallyNodeUsesUpdatedPriceRegistry(t, ccipTH)
 				}
 				currentSeqNum = endSeq
-				if test.sequenced {
+				if test.allowOutOfOrder {
 					currentNonce = uint64(currentSeqNum)
 				}
 			})
