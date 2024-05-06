@@ -459,6 +459,7 @@ func (o *OffRamp) ChangeConfig(ctx context.Context, onchainConfigBytes []byte, o
 		Router:                                  cciptypes.Address(onchainConfigParsed.Router.String()),
 	}
 	gasPriceEstimator := prices.NewExecGasPriceEstimator(o.Estimator, o.DestMaxGasPrice, 0)
+
 	o.UpdateDynamicConfig(onchainConfig, offchainConfig, gasPriceEstimator)
 
 	o.Logger.Infow("Starting exec plugin",

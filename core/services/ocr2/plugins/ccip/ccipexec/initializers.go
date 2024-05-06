@@ -47,9 +47,8 @@ import (
 )
 
 var (
-	tokenDataWorkerTimeout       = 5 * time.Second
-	tokenDataWorkerCacheEviction = time.Hour
-	tokenDataWorkerNumWorkers    = 5
+	tokenDataWorkerTimeout    = 5 * time.Second
+	tokenDataWorkerNumWorkers = 5
 )
 
 func NewExecutionServices(ctx context.Context, lggr logger.Logger, jb job.Job, chainSet legacyevm.LegacyChainContainer, new bool, argsNoPlugin libocr2.OCR2OracleArgs, logError func(string), qopts ...pg.QOpt) ([]job.ServiceCtx, error) {
@@ -289,7 +288,7 @@ func jobSpecToExecPluginConfig(ctx context.Context, lggr logger.Logger, jb job.J
 		tokenDataProviders,
 		tokenDataWorkerNumWorkers,
 		tokenDataWorkerTimeout,
-		tokenDataWorkerCacheEviction,
+		offRampReader.GetMessageVisibilityInterval(),
 	)
 	return &ExecutionPluginStaticConfig{
 			lggr:                        execLggr,
