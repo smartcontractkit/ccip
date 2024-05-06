@@ -88,8 +88,7 @@ func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.Repor
 		return nil, types.ReportingPluginInfo{}, fmt.Errorf("get onchain config from offramp: %w", err)
 	}
 
-	/* @@@TODO: offchainConfig.MessageVisibilityInterval */
-	messageVisibilityInterval := onchainConfig.PermissionLessExecutionThresholdSeconds
+	messageVisibilityInterval := rf.config.offRampReader.GetMessageVisibilityInterval()
 
 	lggr := rf.config.lggr.Named("ExecutionReportingPlugin")
 	return &ExecutionReportingPlugin{

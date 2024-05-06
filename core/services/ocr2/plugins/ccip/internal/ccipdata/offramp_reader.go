@@ -2,6 +2,7 @@ package ccipdata
 
 import (
 	"context"
+	"time"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
 )
@@ -15,4 +16,6 @@ type OffRampReader interface {
 	cciptypes.OffRampReader
 	//TODO Move to chainlink-common
 	GetSendersNonce(ctx context.Context, senders []cciptypes.Address) (map[cciptypes.Address]uint64, error)
+
+	GetMessageVisibilityInterval() time.Duration
 }

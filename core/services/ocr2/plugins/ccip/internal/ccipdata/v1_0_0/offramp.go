@@ -90,10 +90,6 @@ func (d ExecOnchainConfig) Validate() error {
 	return nil
 }
 
-func (d ExecOnchainConfig) PermissionLessExecutionThresholdDuration() time.Duration {
-	return time.Duration(d.PermissionLessExecutionThresholdSeconds) * time.Second
-}
-
 // ExecOffchainConfig is the configuration for nodes executing committed CCIP messages (v1.0–v1.2).
 // It comes from the OffchainConfig field of the corresponding OCR2 plugin configuration.
 // NOTE: do not change the JSON format of this struct without consulting with the RDD people first.
@@ -112,9 +108,6 @@ type ExecOffchainConfig struct {
 	InflightCacheExpiry config.Duration
 	// See [ccipdata.ExecOffchainConfig.RootSnoozeTime]
 	RootSnoozeTime config.Duration
-	// See [ccipdata.ExecOffchainConfig.MessageVisibilityInterval]
-	/* @@@TODO Consult with RDD people about this new field */
-	MessageVisibilityInterval config.Duration
 }
 
 func (c ExecOffchainConfig) Validate() error {
@@ -187,6 +180,10 @@ func (o *OffRamp) GetStaticConfig(ctx context.Context) (cciptypes.OffRampStaticC
 
 func (o *OffRamp) GetExecutionState(ctx context.Context, sequenceNumber uint64) (uint8, error) {
 	return o.offRampV100.GetExecutionState(&bind.CallOpts{Context: ctx}, sequenceNumber)
+}
+
+func (o *OffRamp) GetMessageVisibilityInterval() time.Duration {
+	return o.onchainConfig.PermissionLessExecutionThresholdSeconds
 }
 
 func (o *OffRamp) GetSenderNonce(ctx context.Context, sender cciptypes.Address) (uint64, error) {
