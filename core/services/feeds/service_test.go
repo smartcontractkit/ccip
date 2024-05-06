@@ -124,7 +124,8 @@ ds1_multiply [type=multiply times=1.23];
 ds1 -> ds1_parse -> ds1_multiply -> answer1;
 answer1      [type=median index=0];
 """
-juelsPerFeeCoinCacheDuration = "1m"
+[pluginConfig.juelsPerFeeCoinCache]
+updateInterval = "1m"
 `
 const BootstrapTestSpecTemplate = `
 type				= "bootstrap"
@@ -1153,11 +1154,11 @@ func Test_Service_SyncNodeInfo(t *testing.T) {
 				Multiaddr:        null.StringFrom(multiaddr),
 				ForwarderAddress: null.StringFrom(forwarderAddr),
 				Plugins: feeds.Plugins{
-					Commit:     true,
-					Execute:    true,
-					Median:     false,
-					Mercury:    true,
-					Rebalancer: true,
+					Commit:           true,
+					Execute:          true,
+					Median:           false,
+					Mercury:          true,
+					LiquidityManager: true,
 				},
 			},
 		}
@@ -1209,7 +1210,7 @@ func Test_Service_SyncNodeInfo(t *testing.T) {
 						Execute:    ccfg.OCR2Config.Plugins.Execute,
 						Median:     ccfg.OCR2Config.Plugins.Median,
 						Mercury:    ccfg.OCR2Config.Plugins.Mercury,
-						Rebalancer: ccfg.OCR2Config.Plugins.Rebalancer,
+						Rebalancer: ccfg.OCR2Config.Plugins.LiquidityManager,
 					},
 				},
 			},
@@ -2189,7 +2190,8 @@ ds1_multiply [type=multiply times=1.23];
 ds1 -> ds1_parse -> ds1_multiply -> answer1;
 answer1      [type=median index=0];
 """
-juelsPerFeeCoinCacheDuration = "30s"
+[pluginConfig.juelsPerFeeCoinCache]
+updateInterval = "30s"
 `
 		defn2 = `
 name = 'LINK / ETH | version 3 | contract 0x0000000000000000000000000000000000000000'
@@ -2219,7 +2221,8 @@ ds1_multiply [type=multiply times=1.23];
 ds1 -> ds1_parse -> ds1_multiply -> answer1;
 answer1      [type=median index=0];
 """
-juelsPerFeeCoinCacheDuration = "20m"
+[pluginConfig.juelsPerFeeCoinCache]
+updateInterval = "20m"
 `
 
 		jp = &feeds.JobProposal{

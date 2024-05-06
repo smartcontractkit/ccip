@@ -43,9 +43,9 @@ import (
 
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/ccipcommit"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/ccipexec"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer"
-	rebalancermodels "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/models"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/ocr3impls"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager"
+	liquiditymanagermodels "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/models"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/ocr3impls"
 
 	"github.com/smartcontractkit/chainlink/v2/core/bridges"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/legacyevm"
@@ -67,7 +67,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ocr2keeper/evmregistry/v21/autotelemetry21"
 	ocr2keeper21core "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ocr2keeper/evmregistry/v21/core"
-
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ocr2keeper/evmregistry/v21/logprovider"
 	ocr2vrfconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ocr2vrf/config"
 	ocr2coordinator "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ocr2vrf/coordinator"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ocr2vrf/juelsfeecoin"
@@ -499,8 +499,8 @@ func (d *Delegate) ServicesForSpec(ctx context.Context, jb job.Job) ([]job.Servi
 		return d.newServicesCCIPCommit(ctx, lggr, jb, bootstrapPeers, kb, ocrDB, lc, transmitterID)
 	case types.CCIPExecution:
 		return d.newServicesCCIPExecution(ctx, lggr, jb, bootstrapPeers, kb, ocrDB, lc, transmitterID)
-	case "rebalancer": // TODO: add constant to chainlink-common
-		return d.newServicesRebalancer(ctx, lggr, jb, bootstrapPeers, kb, ocrDB, lc)
+	case "liquiditymanager": // TODO: add constant to chainlink-common
+		return d.newServicesLiquidityManager(ctx, lggr, jb, bootstrapPeers, kb, ocrDB, lc)
 	default:
 		return nil, errors.Errorf("plugin type %s not supported", spec.PluginType)
 	}
@@ -1340,6 +1340,14 @@ func (d *Delegate) newServicesOCR2Keepers21(
 		return nil, errors.New("could not coerce PluginProvider to AutomationProvider")
 	}
 
+	// TODO: (AUTO-9355) remove once we remove v0
+	if useBufferV1 := cfg.UseBufferV1 != nil && *cfg.UseBufferV1; useBufferV1 {
+		logProviderFeatures, ok := keeperProvider.LogEventProvider().(logprovider.LogEventProviderFeatures)
+		if ok {
+			logProviderFeatures.WithBufferVersion("v1")
+		}
+	}
+
 	services, err := ocr2keeper.EVMDependencies21(kb)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not build dependencies for ocr2 keepers")
@@ -1754,6 +1762,7 @@ func (d *Delegate) newServicesCCIPCommit(ctx context.Context, lggr logger.Sugare
 		OffchainConfigDigester: ccipProvider.OffchainConfigDigester(),
 		OffchainKeyring:        kb,
 		OnchainKeyring:         kb,
+		MetricsRegisterer:      prometheus.WrapRegistererWith(map[string]string{"job_name": jb.Name.ValueOrZero()}, prometheus.DefaultRegisterer),
 	}
 	logError := func(msg string) {
 		lggr.ErrorIf(d.jobORM.RecordError(jb.ID, msg), "unable to record error")
@@ -1807,6 +1816,7 @@ func (d *Delegate) newServicesCCIPExecution(ctx context.Context, lggr logger.Sug
 		OffchainConfigDigester: ccipProvider.OffchainConfigDigester(),
 		OffchainKeyring:        kb,
 		OnchainKeyring:         kb,
+		MetricsRegisterer:      prometheus.WrapRegistererWith(map[string]string{"job_name": jb.Name.ValueOrZero()}, prometheus.DefaultRegisterer),
 	}
 	logError := func(msg string) {
 		lggr.ErrorIf(d.jobORM.RecordError(jb.ID, msg), "unable to record error")
@@ -1814,7 +1824,7 @@ func (d *Delegate) newServicesCCIPExecution(ctx context.Context, lggr logger.Sug
 	return ccipexec.NewExecutionServices(ctx, lggr, jb, d.legacyChains, d.isNewlyCreatedJob, oracleArgsNoPlugin, logError, qopts...)
 }
 
-func (d *Delegate) newServicesRebalancer(ctx context.Context, lggr logger.SugaredLogger, jb job.Job, bootstrapPeers []commontypes.BootstrapperLocator, kb ocr2key.KeyBundle, ocrDB *db, lc ocrtypes.LocalConfig) ([]job.ServiceCtx, error) {
+func (d *Delegate) newServicesLiquidityManager(ctx context.Context, lggr logger.SugaredLogger, jb job.Job, bootstrapPeers []commontypes.BootstrapperLocator, kb ocr2key.KeyBundle, ocrDB *db, lc ocrtypes.LocalConfig) ([]job.ServiceCtx, error) {
 	spec := jb.OCR2OracleSpec
 	if spec.Relay != relay.EVM {
 		return nil, errors.New("Non evm chains are not supported for rebalancer execution")
@@ -1845,7 +1855,7 @@ func (d *Delegate) newServicesRebalancer(ctx context.Context, lggr logger.Sugare
 	if err != nil {
 		return nil, fmt.Errorf("failed to create rebalancer provider: %w", err)
 	}
-	factory, err := rebalancer.NewPluginFactory(
+	factory, err := liquiditymanager.NewPluginFactory(
 		lggr,
 		spec.PluginConfig.Bytes(),
 		rebalancerProvider.LiquidityManagerFactory(),
@@ -1855,7 +1865,7 @@ func (d *Delegate) newServicesRebalancer(ctx context.Context, lggr logger.Sugare
 	if err != nil {
 		return nil, fmt.Errorf("failed to create rebalancer plugin factory: %w", err)
 	}
-	oracleArgsNoPlugin := libocr2.OCR3OracleArgs[rebalancermodels.Report]{
+	oracleArgsNoPlugin := libocr2.OCR3OracleArgs[liquiditymanagermodels.Report]{
 		BinaryNetworkEndpointFactory: d.peerWrapper.Peer2,
 		V2Bootstrappers:              bootstrapPeers,
 		ContractTransmitter:          rebalancerProvider.ContractTransmitterOCR3(),
@@ -1870,11 +1880,12 @@ func (d *Delegate) newServicesRebalancer(ctx context.Context, lggr logger.Sugare
 		),
 		OffchainConfigDigester: rebalancerProvider.OffchainConfigDigester(),
 		OffchainKeyring:        kb,
-		OnchainKeyring:         ocr3impls.NewOnchainKeyring[rebalancermodels.Report](kb, lggr),
+		OnchainKeyring:         ocr3impls.NewOnchainKeyring[liquiditymanagermodels.Report](kb, lggr),
 		ReportingPluginFactory: factory,
 		Logger: commonlogger.NewOCRWrapper(lggr.Named("RebalancerOracle"), d.cfg.OCR2().TraceLogging(), func(msg string) {
 			lggr.ErrorIf(d.jobORM.RecordError(jb.ID, msg), "unable to record error")
 		}),
+		MetricsRegisterer: prometheus.WrapRegistererWith(map[string]string{"job_name": jb.Name.ValueOrZero()}, prometheus.DefaultRegisterer),
 	}
 	oracle, err := libocr2.NewOracle(oracleArgsNoPlugin)
 	if err != nil {
