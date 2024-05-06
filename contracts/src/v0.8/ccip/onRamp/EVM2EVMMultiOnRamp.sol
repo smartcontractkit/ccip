@@ -25,13 +25,12 @@ import {EnumerableMap} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts
 /// bridgeable token support.
 /// @dev The EVM2EVMOnRamp, CommitStore and EVM2EVMOffRamp form an xchain upgradeable unit. Any change to one of them
 /// results an onchain upgrade of all 3.
-contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, ITypeAndVersion {
+contract EVM2EVMMultiOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, ITypeAndVersion {
   using SafeERC20 for IERC20;
   using EnumerableMap for EnumerableMap.AddressToUintMap;
   using USDPriceWith18Decimals for uint224;
 
   error InvalidExtraArgsTag();
-  error InvalidExtraArgOutOfOrderValue(bool expected, bool actual);
   error OnlyCallableByOwnerOrAdmin();
   error OnlyCallableByOwnerOrAdminOrNop();
   error InvalidWithdrawParams();
@@ -95,9 +94,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     // The following three properties are defaults, they can be overridden by setting the TokenTransferFeeConfig for a token
     uint16 defaultTokenFeeUSDCents; //           │ Default token fee charged per token transfer
     uint32 defaultTokenDestGasOverhead; //       │ Default gas charged to execute the token transfer on the destination chain
-    uint32 defaultTokenDestBytesOverhead; //     | Default extra data availability bytes charged per token transfer
-    bool enforceAllowOutOfOrderDefault; //       | Whether to enforce the allowOutOfOrder extraArg default.
-    bool defaultAllowOutOfOrder; // ─────────────╯ The enforced value of the allowOutOfOrder extraArg.
+    uint32 defaultTokenDestBytesOverhead; // ────╯ Default extra data availability bytes charged per token transfer
   }
 
   /// @dev Struct to hold the execution fee configuration for a fee token
@@ -148,7 +145,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   }
 
   // STATIC CONFIG
-  string public constant override typeAndVersion = "EVM2EVMOnRamp 1.5.0-dev";
+  string public constant override typeAndVersion = "EVM2EVMMultiOnRamp 1.6.0-dev";
   /// @dev metadataHash is a lane-specific prefix for a message hash preimage which ensures global uniqueness
   /// Ensures that 2 identical messages sent to 2 different lanes will have a distinct hash.
   /// Must match the metadataHash used in computing leaf hashes offchain for the root committed in
@@ -265,10 +262,10 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     if (msg.sender != s_dynamicConfig.router) revert MustBeCalledByRouter();
     if (destChainSelector != i_destChainSelector) revert InvalidChainSelector(destChainSelector);
 
-    Client.EVMExtraArgsV2 memory extraArgsV2 = _fromBytes(message.extraArgs);
+    uint256 gasLimit = _fromBytes(message.extraArgs).gasLimit;
     // Validate the message with various checks
     uint256 numberOfTokens = message.tokenAmounts.length;
-    _validateMessage(message.data.length, extraArgsV2.gasLimit, numberOfTokens);
+    _validateMessage(message.data.length, gasLimit, numberOfTokens);
 
     // Only check token value if there are tokens
     if (numberOfTokens > 0) {
@@ -309,11 +306,9 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
       // Not duplicately validated in `getFee`. Invalid address is uncommon, gas cost outweighs UX gain.
       receiver: Internal._validateEVMAddress(message.receiver),
       sequenceNumber: ++s_sequenceNumber,
-      gasLimit: extraArgsV2.gasLimit,
+      gasLimit: gasLimit,
       strict: false,
-      // Only bump nonce for messages that specify allowOutOfOrderExecution == false. Otherwise, we
-      // may block ordered message nonces, which is not what we want.
-      nonce: extraArgsV2.allowOutOfOrderExecution ? 0 : ++s_senderNonce[originalSender],
+      nonce: ++s_senderNonce[originalSender],
       feeToken: message.feeToken,
       feeTokenAmount: feeTokenAmount,
       data: message.data,
@@ -375,35 +370,14 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   /// @dev Convert the extra args bytes into a struct
   /// @param extraArgs The extra args bytes
   /// @return The extra args struct
-  function _fromBytes(bytes calldata extraArgs) internal view returns (Client.EVMExtraArgsV2 memory) {
+  function _fromBytes(bytes calldata extraArgs) internal view returns (Client.EVMExtraArgsV1 memory) {
     if (extraArgs.length == 0) {
-      return _enforceExtraArg(i_defaultTxGasLimit, s_dynamicConfig.defaultAllowOutOfOrder);
+      return Client.EVMExtraArgsV1({gasLimit: i_defaultTxGasLimit});
     }
-
-    bytes4 extraArgsTag = bytes4(extraArgs);
-    if (extraArgsTag == Client.EVM_EXTRA_ARGS_V1_TAG) {
-      // EVMExtraArgsV1 originally included a second boolean (strict) field which we have deprecated entirely.
-      // Clients may still send that version but it will be ignored.
-      Client.EVMExtraArgsV1 memory extraArgsV1 = abi.decode(extraArgs[4:], (Client.EVMExtraArgsV1));
-
-      // Backwards compatibility: allowOutOfOrderExecution set to false by default.
-      return _enforceExtraArg(extraArgsV1.gasLimit, s_dynamicConfig.defaultAllowOutOfOrder);
-    } else if (extraArgsTag == Client.EVM_EXTRA_ARGS_V2_TAG) {
-      Client.EVMExtraArgsV2 memory extraArgsV2 = abi.decode(extraArgs[4:], (Client.EVMExtraArgsV2));
-      return _enforceExtraArg(extraArgsV2.gasLimit, extraArgsV2.allowOutOfOrderExecution);
-    } else {
-      revert InvalidExtraArgsTag();
-    }
-  }
-
-  function _enforceExtraArg(uint256 gasLimit, bool allowOutOfOrderExecution) internal view returns (Client.EVMExtraArgsV2 memory) {
-    if (
-      s_dynamicConfig.enforceAllowOutOfOrderDefault
-        && allowOutOfOrderExecution != s_dynamicConfig.defaultAllowOutOfOrder
-    ) {
-      revert InvalidExtraArgOutOfOrderValue(s_dynamicConfig.defaultAllowOutOfOrder, allowOutOfOrderExecution);
-    }
-    return Client.EVMExtraArgsV2({gasLimit: gasLimit, allowOutOfOrderExecution: allowOutOfOrderExecution});
+    if (bytes4(extraArgs) != Client.EVM_EXTRA_ARGS_V1_TAG) revert InvalidExtraArgsTag();
+    // EVMExtraArgsV1 originally included a second boolean (strict) field which we have deprecated entirely.
+    // Clients may still send that version but it will be ignored.
+    return abi.decode(extraArgs[4:], (Client.EVMExtraArgsV1));
   }
 
   /// @notice Validate the forwarded message with various checks.
@@ -482,7 +456,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   }
 
   /// @inheritdoc IEVM2AnyOnRampClient
-  function getSupportedTokens(uint64) external pure returns (address[] memory) {
+  function getSupportedTokens(uint64 /*destChainSelector*/ ) external view returns (address[] memory) {
     revert GetSupportedTokensFunctionalityRemovedCheckAdminRegistry();
   }
 
