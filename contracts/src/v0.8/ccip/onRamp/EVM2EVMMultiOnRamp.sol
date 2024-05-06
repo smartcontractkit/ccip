@@ -68,6 +68,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimi
 
   /// @dev Struct that contains the static configuration
   /// RMN depends on this struct, if changing, please notify the RMN maintainers.
+  // solhint-disable-next-line gas-struct-packing
   struct StaticConfig {
     address linkToken; // ────────╮ Link token address
     uint64 chainSelector; // ─────╯ Source chainSelector
@@ -79,6 +80,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimi
   }
 
   /// @dev Struct to contains the dynamic configuration
+  // solhint-disable-next-line gas-struct-packing
   struct DynamicConfig {
     address router; // Router address
     address priceRegistry; // Price registry address
