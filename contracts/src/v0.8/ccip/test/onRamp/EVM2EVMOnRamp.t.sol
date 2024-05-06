@@ -324,7 +324,7 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, feeAmount, OWNER);
   }
 
-  function test_FuzzEnforceExtraArgValue(bool enforce, bool defaultVal, bool value) public {
+  function test_FuzzEnforceExtraArgValue(bool enforce, bool allowOutOfOrderExecution) public {
     // Update dynamic config to enforce allowOutOfOrderExecution = defaultVal.
     vm.stopPrank();
     vm.startPrank(OWNER);
@@ -345,8 +345,7 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
         defaultTokenFeeUSDCents: dynamicConfig.defaultTokenFeeUSDCents,
         defaultTokenDestGasOverhead: dynamicConfig.defaultTokenDestGasOverhead,
         defaultTokenDestBytesOverhead: dynamicConfig.defaultTokenDestBytesOverhead,
-        enforceAllowOutOfOrderDefault: enforce,
-        defaultAllowOutOfOrder: defaultVal
+        enforceOutOfOrder: enforce
       })
     );
     vm.stopPrank();
@@ -354,19 +353,19 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
     vm.startPrank(address(s_sourceRouter));
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
     message.extraArgs = abi.encodeWithSelector(
-      Client.EVM_EXTRA_ARGS_V2_TAG, Client.EVMExtraArgsV2({gasLimit: GAS_LIMIT * 2, allowOutOfOrderExecution: value})
+      Client.EVM_EXTRA_ARGS_V2_TAG, Client.EVMExtraArgsV2({gasLimit: GAS_LIMIT * 2, allowOutOfOrderExecution: allowOutOfOrderExecution})
     );
     uint256 feeAmount = 1234567890;
     IERC20(s_sourceFeeToken).transferFrom(OWNER, address(s_onRamp), feeAmount);
 
     if (enforce) {
-      // If enforcement is on, only the defaultVal value should be allowed.
-      if (defaultVal == value) {
+      // If enforcement is on, only true should be allowed.
+      if (allowOutOfOrderExecution) {
         vm.expectEmit();
         emit CCIPSendRequested(_messageToEvent(message, 1, 1, feeAmount, OWNER));
         s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, feeAmount, OWNER);
       } else {
-        vm.expectRevert(abi.encodeWithSelector(EVM2EVMOnRamp.InvalidExtraArgOutOfOrderValue.selector, defaultVal, value));
+        vm.expectRevert(EVM2EVMOnRamp.ExtraArgOutOfOrderExecutionMustBeTrue.selector);
         s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, feeAmount, OWNER);
       }
     } else {
@@ -1881,8 +1880,7 @@ contract EVM2EVMOnRamp_setDynamicConfig is EVM2EVMOnRampSetup {
       defaultTokenFeeUSDCents: DEFAULT_TOKEN_FEE_USD_CENTS,
       defaultTokenDestGasOverhead: DEFAULT_TOKEN_DEST_GAS_OVERHEAD,
       defaultTokenDestBytesOverhead: DEFAULT_TOKEN_BYTES_OVERHEAD,
-      enforceAllowOutOfOrderDefault: false,
-      defaultAllowOutOfOrder: false
+      enforceOutOfOrder: false
     });
 
     vm.expectEmit();
@@ -1918,8 +1916,7 @@ contract EVM2EVMOnRamp_setDynamicConfig is EVM2EVMOnRampSetup {
       defaultTokenFeeUSDCents: DEFAULT_TOKEN_FEE_USD_CENTS,
       defaultTokenDestGasOverhead: DEFAULT_TOKEN_DEST_GAS_OVERHEAD,
       defaultTokenDestBytesOverhead: DEFAULT_TOKEN_BYTES_OVERHEAD,
-      enforceAllowOutOfOrderDefault: false,
-      defaultAllowOutOfOrder: false
+      enforceOutOfOrder: false
     });
 
     // Invalid price reg reverts.
