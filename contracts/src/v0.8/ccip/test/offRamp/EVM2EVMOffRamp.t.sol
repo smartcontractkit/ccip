@@ -403,7 +403,9 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
   }
 
   function test_FuzzInterleavingOrderedAndUnorderedMessages_Success(
-    bool msg1Ordered, bool msg2Ordered, bool msg3Ordered
+    bool msg1Ordered,
+    bool msg2Ordered,
+    bool msg3Ordered
   ) public {
     Internal.EVM2EVMMessage[] memory messages = new Internal.EVM2EVMMessage[](3);
     Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](3);
@@ -469,9 +471,15 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     assertEq(uint64(0), nonceBefore);
     s_offRamp.execute(_generateReportFromMessages(messages), _getGasLimitsFromMessages(messages));
     // all execution should succeed.
-    assertEq(uint256(s_offRamp.getExecutionState(messages[0].sequenceNumber)), uint256(Internal.MessageExecutionState.SUCCESS));
-    assertEq(uint256(s_offRamp.getExecutionState(messages[1].sequenceNumber)), uint256(Internal.MessageExecutionState.SUCCESS));
-    assertEq(uint256(s_offRamp.getExecutionState(messages[2].sequenceNumber)), uint256(Internal.MessageExecutionState.SUCCESS));
+    assertEq(
+      uint256(s_offRamp.getExecutionState(messages[0].sequenceNumber)), uint256(Internal.MessageExecutionState.SUCCESS)
+    );
+    assertEq(
+      uint256(s_offRamp.getExecutionState(messages[1].sequenceNumber)), uint256(Internal.MessageExecutionState.SUCCESS)
+    );
+    assertEq(
+      uint256(s_offRamp.getExecutionState(messages[2].sequenceNumber)), uint256(Internal.MessageExecutionState.SUCCESS)
+    );
     uint64 expectedNonce = 0;
     if (msg1Ordered) {
       expectedNonce++;
