@@ -288,8 +288,6 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
         if (originalState != Internal.MessageExecutionState.UNTOUCHED) revert AlreadyAttempted(message.sequenceNumber);
       }
 
-      Internal.MessageExecutionState newState;
-      bytes memory returnData;
       if (message.nonce > 0) {
         // In the scenario where we upgrade offRamps, we still want to have sequential nonces.
         // Referencing the old offRamp to check the expected nonce if none is set for a
@@ -320,11 +318,10 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
             continue;
           }
         }
-
-        (newState, returnData) = _doExecute(message, report.offchainTokenData[i], manualExecution, originalState);
-      } else {
-        (newState, returnData) = _doExecute(message, report.offchainTokenData[i], manualExecution, originalState);
       }
+
+      (Internal.MessageExecutionState newState, bytes memory returnData) =
+        _doExecute(message, report.offchainTokenData[i], manualExecution, originalState);
 
       emit ExecutionStateChanged(message.sequenceNumber, message.messageId, newState, returnData);
     }

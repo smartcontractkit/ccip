@@ -211,7 +211,7 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     assertGt(s_offRamp.getSenderNonce(messages[0].sender), nonceBefore);
   }
 
-  function test_ReceiverError_Success() public {
+  function test_FuzzReceiverError_Success(bool ordered) public {
     Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages();
 
     bytes memory realError1 = new bytes(2);
@@ -219,6 +219,9 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     realError1[1] = 0xef;
     s_reverting_receiver.setErr(realError1);
 
+    if (!ordered) {
+      messages[0].nonce = 0;
+    }
     messages[0].receiver = address(s_reverting_receiver);
     messages[0].messageId = Internal._hash(messages[0], s_offRamp.metadataHash());
 
@@ -232,17 +235,35 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
         abi.encodeWithSelector(MaybeRevertMessageReceiver.CustomError.selector, realError1)
       )
     );
-    // Nonce should increment on non-strict
+
     assertEq(uint64(0), s_offRamp.getSenderNonce(address(OWNER)), "nonce before exec should be 0");
-    assertEq(uint64(1), messages[0].nonce, "nonce of message should be 1");
+    if (ordered) {
+      // Nonce should increment on ordered messages.
+      assertEq(uint64(1), messages[0].nonce, "nonce of message should be 1");
+    } else {
+      // Nonce should not increment on unordered messages.
+      assertEq(uint64(0), messages[0].nonce, "nonce of unordered message should be 0");
+    }
+
     s_offRamp.execute(_generateReportFromMessages(messages), new uint256[](0));
-    assertEq(uint64(1), s_offRamp.getSenderNonce(address(OWNER)), "nonce after exec should be 1");
+
+    if (ordered) {
+      assertEq(uint64(1), s_offRamp.getSenderNonce(address(OWNER)), "nonce after ordered message exec should be 1");
+    } else {
+      assertEq(uint64(0), s_offRamp.getSenderNonce(address(OWNER)), "nonce after unordered message exec should be 0");
+    }
   }
 
-  function test_StrictUntouchedToSuccess_Success() public {
+  function test_FuzzStrictUntouchedToSuccess_Success(bool ordered, bool strict) public {
     Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages();
 
-    messages[0].strict = true;
+    if (!ordered) {
+      messages[0].nonce = 0;
+    }
+
+    // strict behavior is deprecated, however setting it here ensures that execution
+    // behavior does not change based on it.
+    messages[0].strict = strict;
     messages[0].receiver = address(s_receiver);
     messages[0].messageId = Internal._hash(messages[0], s_offRamp.metadataHash());
 
@@ -250,10 +271,17 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     emit ExecutionStateChanged(
       messages[0].sequenceNumber, messages[0].messageId, Internal.MessageExecutionState.SUCCESS, ""
     );
-    // Nonce should increment on a strict untouched -> success.
+
     assertEq(uint64(0), s_offRamp.getSenderNonce(address(OWNER)));
     s_offRamp.execute(_generateReportFromMessages(messages), new uint256[](0));
-    assertEq(uint64(1), s_offRamp.getSenderNonce(address(OWNER)));
+
+    if (ordered) {
+      // Nonce should increment on a strict untouched -> success.
+      assertEq(uint64(1), s_offRamp.getSenderNonce(address(OWNER)));
+    } else {
+      // Nonce should not increment on unordered messages.
+      assertEq(uint64(0), s_offRamp.getSenderNonce(address(OWNER)));
+    }
   }
 
   function test_SkippedIncorrectNonce_Success() public {
@@ -287,9 +315,13 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
 
   // Send a message to a contract that does not implement the CCIPReceiver interface
   // This should execute successfully.
-  function test_SingleMessageToNonCCIPReceiver_Success() public {
+  function test_FuzzSingleMessageToNonCCIPReceiver_Success(bool ordered) public {
     Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages();
     MaybeRevertMessageReceiverNo165 newReceiver = new MaybeRevertMessageReceiverNo165(true);
+
+    if (!ordered) {
+      messages[0].nonce = 0;
+    }
     messages[0].receiver = address(newReceiver);
     messages[0].messageId = Internal._hash(messages[0], s_offRamp.metadataHash());
 
@@ -301,9 +333,14 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     s_offRamp.execute(_generateReportFromMessages(messages), new uint256[](0));
   }
 
-  function test_SingleMessagesNoTokensSuccess_gas() public {
+  function test_FuzzSingleMessagesNoTokensSuccess_gas(bool ordered) public {
     vm.pauseGasMetering();
     Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages();
+
+    if (!ordered) {
+      messages[0].nonce = 0;
+    }
+    messages[0].messageId = Internal._hash(messages[0], s_offRamp.metadataHash());
 
     vm.expectEmit();
     emit ExecutionStateChanged(
@@ -316,9 +353,15 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     s_offRamp.execute(report, new uint256[](0));
   }
 
-  function test_TwoMessagesWithTokensSuccess_gas() public {
+  function test_FuzzTwoMessagesWithTokensSuccess_gas(bool ordered) public {
     vm.pauseGasMetering();
     Internal.EVM2EVMMessage[] memory messages = _generateMessagesWithTokens();
+
+    if (!ordered) {
+      messages[0].nonce = 0;
+      messages[1].nonce = 0;
+    }
+    messages[0].messageId = Internal._hash(messages[0], s_offRamp.metadataHash());
     // Set message 1 to use another receiver to simulate more fair gas costs
     messages[1].receiver = address(s_secondary_receiver);
     messages[1].messageId = Internal._hash(messages[1], s_offRamp.metadataHash());
@@ -360,10 +403,97 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     assertEq(uint64(2), s_offRamp.getSenderNonce(OWNER));
   }
 
-  function test_InvalidSourcePoolAddress_Success() public {
+  function test_FuzzInterleavingOrderedAndUnorderedMessages_Success(
+    bool msg1Ordered, bool msg2Ordered, bool msg3Ordered
+  ) public {
+    Internal.EVM2EVMMessage[] memory messages = new Internal.EVM2EVMMessage[](3);
+    Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](3);
+    for (uint256 i = 0; i < 3; ++i) {
+      tokenAmounts[i].token = s_sourceTokens[i % s_sourceTokens.length];
+    }
+    tokenAmounts[0].amount = 1e18;
+    tokenAmounts[1].amount = 5e18;
+    tokenAmounts[2].amount = 1e18;
+    messages[0] = _generateAny2EVMMessage(1, tokenAmounts, !msg1Ordered);
+    messages[1] = _generateAny2EVMMessage(2, tokenAmounts, !msg2Ordered);
+    messages[2] = _generateAny2EVMMessage(3, tokenAmounts, !msg3Ordered);
+
+    // somewhat annoying nonce logic to fuzz any ordering of 3 messages.
+    // _generateAny2EVMMessage sets the nonce to be the sequence number provided by default.
+    if (!msg1Ordered) {
+      messages[0].nonce = 0;
+    } else {
+      messages[1].nonce = 1;
+    }
+    if (!msg2Ordered) {
+      messages[1].nonce = 0;
+    } else {
+      if (msg1Ordered) {
+        messages[1].nonce = 2;
+      } else {
+        messages[1].nonce = 1;
+      }
+    }
+    if (!msg3Ordered) {
+      messages[2].nonce = 0;
+    } else {
+      if (msg1Ordered && msg2Ordered) {
+        messages[2].nonce = 3;
+      } else if (msg1Ordered || msg2Ordered) {
+        messages[2].nonce = 2;
+      } else {
+        messages[2].nonce = 1;
+      }
+    }
+
+    messages[0].messageId = Internal._hash(messages[0], s_offRamp.metadataHash());
+    messages[1].messageId = Internal._hash(messages[1], s_offRamp.metadataHash());
+    messages[2].messageId = Internal._hash(messages[2], s_offRamp.metadataHash());
+
+    vm.expectEmit();
+    emit ExecutionStateChanged(
+      messages[0].sequenceNumber, messages[0].messageId, Internal.MessageExecutionState.SUCCESS, ""
+    );
+
+    vm.expectEmit();
+    emit ExecutionStateChanged(
+      messages[1].sequenceNumber, messages[1].messageId, Internal.MessageExecutionState.SUCCESS, ""
+    );
+
+    vm.expectEmit();
+    emit ExecutionStateChanged(
+      messages[2].sequenceNumber, messages[2].messageId, Internal.MessageExecutionState.SUCCESS, ""
+    );
+
+    // sender nonce is zero to start with.
+    uint64 nonceBefore = s_offRamp.getSenderNonce(OWNER);
+    assertEq(uint64(0), nonceBefore);
+    s_offRamp.execute(_generateReportFromMessages(messages), _getGasLimitsFromMessages(messages));
+    // all execution should succeed.
+    assertEq(uint256(s_offRamp.getExecutionState(messages[0].sequenceNumber)), uint256(Internal.MessageExecutionState.SUCCESS));
+    assertEq(uint256(s_offRamp.getExecutionState(messages[1].sequenceNumber)), uint256(Internal.MessageExecutionState.SUCCESS));
+    assertEq(uint256(s_offRamp.getExecutionState(messages[2].sequenceNumber)), uint256(Internal.MessageExecutionState.SUCCESS));
+    uint64 expectedNonce = 0;
+    if (msg1Ordered) {
+      expectedNonce++;
+    }
+    if (msg2Ordered) {
+      expectedNonce++;
+    }
+    if (msg3Ordered) {
+      expectedNonce++;
+    }
+    assertEq(nonceBefore + expectedNonce, s_offRamp.getSenderNonce(OWNER));
+  }
+
+  function test_FuzzInvalidSourcePoolAddress_Success(bool ordered) public {
     address fakePoolAddress = address(0x0000000000333333);
 
     Internal.EVM2EVMMessage[] memory messages = _generateMessagesWithTokens();
+    if (!ordered) {
+      messages[0].nonce = 0;
+      messages[1].nonce = 0;
+    }
     messages[0].sourceTokenData[0] = abi.encode(
       Internal.SourceTokenData({
         sourcePoolAddress: abi.encode(fakePoolAddress),
@@ -459,16 +589,23 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     vm.clearMockedCalls();
   }
 
-  function test_AlreadyExecuted_Revert() public {
+  function test_FuzzAlreadyExecuted_Revert(bool ordered) public {
     Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages();
+    if (!ordered) {
+      messages[0].nonce = 0;
+    }
+    messages[0].messageId = Internal._hash(messages[0], s_offRamp.metadataHash());
     Internal.ExecutionReport memory executionReport = _generateReportFromMessages(messages);
     s_offRamp.execute(executionReport, new uint256[](0));
     vm.expectRevert(abi.encodeWithSelector(EVM2EVMOffRamp.AlreadyExecuted.selector, messages[0].sequenceNumber));
     s_offRamp.execute(executionReport, new uint256[](0));
   }
 
-  function test_InvalidSourceChain_Revert() public {
+  function test_FuzzInvalidSourceChain_Revert(bool ordered) public {
     Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages();
+    if (!ordered) {
+      messages[0].nonce = 0;
+    }
     messages[0].sourceChainSelector = SOURCE_CHAIN_SELECTOR + 1;
     messages[0].messageId = Internal._hash(messages[0], s_offRamp.metadataHash());
 
@@ -476,9 +613,12 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     s_offRamp.execute(_generateReportFromMessages(messages), new uint256[](0));
   }
 
-  function test_UnsupportedNumberOfTokens_Revert() public {
+  function test_FuzzUnsupportedNumberOfTokens_Revert(bool ordered) public {
     Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages();
     Client.EVMTokenAmount[] memory newTokens = new Client.EVMTokenAmount[](MAX_TOKENS_LENGTH + 1);
+    if (!ordered) {
+      messages[0].nonce = 0;
+    }
     messages[0].tokenAmounts = newTokens;
     messages[0].messageId = Internal._hash(messages[0], s_offRamp.metadataHash());
     Internal.ExecutionReport memory report = _generateReportFromMessages(messages);
@@ -489,8 +629,12 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     s_offRamp.execute(report, new uint256[](0));
   }
 
-  function test_TokenDataMismatch_Revert() public {
+  function test_FuzzTokenDataMismatch_Revert(bool ordered) public {
     Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages();
+    if (!ordered) {
+      messages[0].nonce = 0;
+    }
+    messages[0].messageId = Internal._hash(messages[0], s_offRamp.metadataHash());
     Internal.ExecutionReport memory report = _generateReportFromMessages(messages);
 
     report.offchainTokenData[0] = new bytes[](messages[0].tokenAmounts.length + 1);
@@ -499,8 +643,11 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     s_offRamp.execute(report, new uint256[](0));
   }
 
-  function test_MessageTooLarge_Revert() public {
+  function test_MessageTooLarge_Revert(bool ordered) public {
     Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages();
+    if (!ordered) {
+      messages[0].nonce = 0;
+    }
     messages[0].data = new bytes(MAX_DATA_SIZE + 1);
     messages[0].messageId = Internal._hash(messages[0], s_offRamp.metadataHash());
 
@@ -511,9 +658,12 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     s_offRamp.execute(executionReport, new uint256[](0));
   }
 
-  function test_RouterYULCall_Revert() public {
+  function test_FuzzRouterYULCall_Revert(bool ordered) public {
     Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages();
 
+    if (!ordered) {
+      messages[0].nonce = 0;
+    }
     // gas limit too high, Router's external call should revert
     messages[0].gasLimit = 1e36;
     messages[0].receiver = address(new ConformingReceiver(address(s_destRouter), s_destFeeToken));
