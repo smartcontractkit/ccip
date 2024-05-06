@@ -64,7 +64,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimi
   /// RMN depends on this event, if changing, please notify the RMN maintainers.
   event CCIPSendRequested(Internal.EVM2EVMMessage message);
   event NopsSet(uint256 nopWeightsTotal, NopAndWeight[] nopsAndWeights);
-  event DestChainConfigUpdated(uint64 destChainSelector, DestChainConfig destChainConfig);
+  event DestChainConfigUpdated(uint64 indexed destChainSelector, DestChainConfig destChainConfig);
 
   /// @dev Struct that contains the static configuration
   /// RMN depends on this struct, if changing, please notify the RMN maintainers.
