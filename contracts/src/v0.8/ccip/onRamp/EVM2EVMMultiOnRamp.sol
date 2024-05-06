@@ -147,7 +147,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimi
   /// so that an array of these can be passed in the constructor and the applyDestChainConfigUpdates function.
   struct DestChainConfigArgs {
     uint64 destChainSelector; // ──────────────────╮ Destination chainSelector
-    bool isEnabled; //                             |
+    bool isEnabled; //                             | Whether this destination chain is enabled
     uint16 maxNumberOfTokensPerMsg; //             │ Maximum number of distinct ERC20 token transferred per message
     uint32 maxDataBytes; //                        │ Maximum payload data size in bytes
     uint32 maxPerMsgGasLimit; //                   | Maximum gas limit for messages targeting EVMs
