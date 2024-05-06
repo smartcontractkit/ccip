@@ -288,8 +288,6 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
         if (originalState != Internal.MessageExecutionState.UNTOUCHED) revert AlreadyAttempted(message.sequenceNumber);
       }
 
-      Internal.MessageExecutionState newState;
-      bytes memory returnData;
       if (message.nonce > 0) {
         // In the scenario where we upgrade offRamps, we still want to have sequential nonces.
         // Referencing the old offRamp to check the expected nonce if none is set for a
@@ -320,61 +318,49 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
             continue;
           }
         }
+      }
 
-        (newState, returnData) = _doExecute(message, report.offchainTokenData[i], manualExecution, originalState);
-      } else {
-        (newState, returnData) = _doExecute(message, report.offchainTokenData[i], manualExecution, originalState);
+      // Although we expect only valid messages will be committed, we check again
+      // when executing as a defense in depth measure.
+      bytes[] memory offchainTokenData = report.offchainTokenData[i];
+      _isWellFormed(
+        message.sequenceNumber,
+        message.sourceChainSelector,
+        message.tokenAmounts.length,
+        message.data.length,
+        offchainTokenData.length
+      );
+
+      _setExecutionState(message.sequenceNumber, Internal.MessageExecutionState.IN_PROGRESS);
+      (Internal.MessageExecutionState newState, bytes memory returnData) = _trialExecute(message, offchainTokenData);
+      _setExecutionState(message.sequenceNumber, newState);
+
+      // Since it's hard to estimate whether manual execution will succeed, we
+      // revert the entire transaction if it fails. This will show the user if
+      // their manual exec will fail before they submit it.
+      if (manualExecution && newState == Internal.MessageExecutionState.FAILURE) {
+        // If manual execution fails, we revert the entire transaction.
+        revert ExecutionError(returnData);
+      }
+
+      // The only valid prior states are UNTOUCHED and FAILURE (checked above)
+      // The only valid post states are FAILURE and SUCCESS (checked below)
+      if (newState != Internal.MessageExecutionState.FAILURE && newState != Internal.MessageExecutionState.SUCCESS) {
+        revert InvalidNewState(message.sequenceNumber, newState);
+      }
+
+      // Nonce changes per state transition.
+      // These only apply for ordered messages.
+      // UNTOUCHED -> FAILURE  nonce bump
+      // UNTOUCHED -> SUCCESS  nonce bump
+      // FAILURE   -> FAILURE  no nonce bump
+      // FAILURE   -> SUCCESS  no nonce bump
+      if (message.nonce > 0 && originalState == Internal.MessageExecutionState.UNTOUCHED) {
+        s_senderNonce[message.sender]++;
       }
 
       emit ExecutionStateChanged(message.sequenceNumber, message.messageId, newState, returnData);
     }
-  }
-
-  function _doExecute(
-    Internal.EVM2EVMMessage memory message,
-    bytes[] memory offchainTokenData,
-    bool manualExecution,
-    Internal.MessageExecutionState originalState
-  ) internal returns (Internal.MessageExecutionState newState, bytes memory returnData) {
-    // Although we expect only valid messages will be committed, we check again
-    // when executing as a defense in depth measure.
-    _isWellFormed(
-      message.sequenceNumber,
-      message.sourceChainSelector,
-      message.tokenAmounts.length,
-      message.data.length,
-      offchainTokenData.length
-    );
-
-    _setExecutionState(message.sequenceNumber, Internal.MessageExecutionState.IN_PROGRESS);
-    (newState, returnData) = _trialExecute(message, offchainTokenData);
-    _setExecutionState(message.sequenceNumber, newState);
-
-    // Since it's hard to estimate whether manual execution will succeed, we
-    // revert the entire transaction if it fails. This will show the user if
-    // their manual exec will fail before they submit it.
-    if (manualExecution && newState == Internal.MessageExecutionState.FAILURE) {
-      // If manual execution fails, we revert the entire transaction.
-      revert ExecutionError(returnData);
-    }
-
-    // The only valid prior states are UNTOUCHED and FAILURE (checked above)
-    // The only valid post states are FAILURE and SUCCESS (checked below)
-    if (newState != Internal.MessageExecutionState.FAILURE && newState != Internal.MessageExecutionState.SUCCESS) {
-      revert InvalidNewState(message.sequenceNumber, newState);
-    }
-
-    // Nonce changes per state transition
-    // UNTOUCHED -> FAILURE  nonce bump
-    // UNTOUCHED -> SUCCESS  nonce bump
-    // FAILURE   -> FAILURE  no nonce bump
-    // FAILURE   -> SUCCESS  no nonce bump
-    // Nonce bumping only occurs for messages where message.nonce > 0.
-    if (message.nonce > 0 && originalState == Internal.MessageExecutionState.UNTOUCHED) {
-      s_senderNonce[message.sender]++;
-    }
-
-    return (newState, returnData);
   }
 
   /// @notice Does basic message validation. Should never fail.

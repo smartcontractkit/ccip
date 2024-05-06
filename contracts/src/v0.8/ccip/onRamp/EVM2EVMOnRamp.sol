@@ -311,9 +311,9 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
       sequenceNumber: ++s_sequenceNumber,
       gasLimit: extraArgsV2.gasLimit,
       strict: false,
-      // Only bump nonce for messages that specify allowOutOfOrder == false. Otherwise, we
+      // Only bump nonce for messages that specify allowOutOfOrderExecution == false. Otherwise, we
       // may block ordered message nonces, which is not what we want.
-      nonce: extraArgsV2.allowOutOfOrder ? 0 : ++s_senderNonce[originalSender],
+      nonce: extraArgsV2.allowOutOfOrderExecution ? 0 : ++s_senderNonce[originalSender],
       feeToken: message.feeToken,
       feeTokenAmount: feeTokenAmount,
       data: message.data,
@@ -386,24 +386,24 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
       // Clients may still send that version but it will be ignored.
       Client.EVMExtraArgsV1 memory extraArgsV1 = abi.decode(extraArgs[4:], (Client.EVMExtraArgsV1));
 
-      // Backwards compatibility: allowOutOfOrder set to false by default.
+      // Backwards compatibility: allowOutOfOrderExecution set to false by default.
       return _enforceExtraArg(extraArgsV1.gasLimit, s_dynamicConfig.defaultAllowOutOfOrder);
     } else if (extraArgsTag == Client.EVM_EXTRA_ARGS_V2_TAG) {
       Client.EVMExtraArgsV2 memory extraArgsV2 = abi.decode(extraArgs[4:], (Client.EVMExtraArgsV2));
-      return _enforceExtraArg(extraArgsV2.gasLimit, extraArgsV2.allowOutOfOrder);
+      return _enforceExtraArg(extraArgsV2.gasLimit, extraArgsV2.allowOutOfOrderExecution);
     } else {
       revert InvalidExtraArgsTag();
     }
   }
 
-  function _enforceExtraArg(uint256 gasLimit, bool allowOutOfOrder) internal view returns (Client.EVMExtraArgsV2 memory) {
+  function _enforceExtraArg(uint256 gasLimit, bool allowOutOfOrderExecution) internal view returns (Client.EVMExtraArgsV2 memory) {
     if (
       s_dynamicConfig.enforceAllowOutOfOrderDefault
-        && allowOutOfOrder != s_dynamicConfig.defaultAllowOutOfOrder
+        && allowOutOfOrderExecution != s_dynamicConfig.defaultAllowOutOfOrder
     ) {
-      revert InvalidExtraArgOutOfOrderValue(s_dynamicConfig.defaultAllowOutOfOrder, allowOutOfOrder);
+      revert InvalidExtraArgOutOfOrderValue(s_dynamicConfig.defaultAllowOutOfOrder, allowOutOfOrderExecution);
     }
-    return Client.EVMExtraArgsV2({gasLimit: gasLimit, allowOutOfOrder: allowOutOfOrder});
+    return Client.EVMExtraArgsV2({gasLimit: gasLimit, allowOutOfOrderExecution: allowOutOfOrderExecution});
   }
 
   /// @notice Validate the forwarded message with various checks.

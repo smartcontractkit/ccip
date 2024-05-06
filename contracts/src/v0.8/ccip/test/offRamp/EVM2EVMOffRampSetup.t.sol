@@ -134,13 +134,13 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSetup {
   function _generateAny2EVMMessage(
     uint64 sequenceNumber,
     Client.EVMTokenAmount[] memory tokenAmounts,
-    bool allowOutOfOrder
+    bool allowOutOfOrderExecution
   ) internal view returns (Internal.EVM2EVMMessage memory) {
     bytes memory data = abi.encode(0);
     Internal.EVM2EVMMessage memory message = Internal.EVM2EVMMessage({
       sequenceNumber: sequenceNumber,
       sender: OWNER,
-      nonce: allowOutOfOrder ? 0 : sequenceNumber,
+      nonce: allowOutOfOrderExecution ? 0 : sequenceNumber,
       gasLimit: GAS_LIMIT,
       strict: false,
       sourceChainSelector: SOURCE_CHAIN_SELECTOR,
