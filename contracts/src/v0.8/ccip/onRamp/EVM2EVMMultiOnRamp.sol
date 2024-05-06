@@ -80,9 +80,9 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimi
 
   /// @dev Struct to contains the dynamic configuration
   struct DynamicConfig {
-    address router; // ──────────────────────────╮ Router address
-    address priceRegistry; //                    │ Price registry address
-    address tokenAdminRegistry; // ──────────────╯ Token admin registry address
+    address router; // Router address
+    address priceRegistry; // Price registry address
+    address tokenAdminRegistry; // Token admin registry address
   }
 
   /// @dev Struct to hold the execution fee configuration for a fee token
@@ -134,13 +134,13 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimi
     uint32 maxPerMsgGasLimit; //                 │ Maximum gas limit for messages targeting EVMs
     uint32 destGasOverhead; //                   │ Gas charged on top of the gasLimit to cover destination chain costs
     uint16 destGasPerPayloadByte; //             │ Destination chain gas charged for passing each byte of `data` payload to receiver
-    uint32 destDataAvailabilityOverheadGas; // ──╯ Extra data availability gas charged on top of the message, e.g. for OCR
-    uint16 destGasPerDataAvailabilityByte; // ───╮ Amount of gas to charge per byte of message data that needs availability
+    uint32 destDataAvailabilityOverheadGas; //   | Extra data availability gas charged on top of the message, e.g. for OCR
+    uint16 destGasPerDataAvailabilityByte; //    | Amount of gas to charge per byte of message data that needs availability
     uint16 destDataAvailabilityMultiplierBps; // │ Multiplier for data availability gas, multiples of bps, or 0.0001
     // The following three properties are defaults, they can be overridden by setting the TokenTransferFeeConfig for a token
     uint16 defaultTokenFeeUSDCents; //           │ Default token fee charged per token transfer
-    uint32 defaultTokenDestGasOverhead; //       │ Default gas charged to execute the token transfer on the destination chain
-    uint32 defaultTokenDestBytesOverhead; // ────╯ Default extra data availability bytes charged per token transfer
+    uint32 defaultTokenDestGasOverhead; // ──────╯ Default gas charged to execute the token transfer on the destination chain
+    uint32 defaultTokenDestBytesOverhead; //       Default extra data availability bytes charged per token transfer
   }
 
   /// @dev Struct to hold the configs for a destination chain, same as DestChainConfig but with the destChainSelector,
