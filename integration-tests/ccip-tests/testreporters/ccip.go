@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"testing"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/slack-go/slack"
+	"gonum.org/v1/gonum/stat"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/k8s/config"
 
@@ -20,6 +22,7 @@ import (
 
 type Phase string
 type Status string
+type PercentilesList []float64
 
 const (
 	E2E                Phase  = "CommitAndExecute"
@@ -35,13 +38,27 @@ const (
 	slackFile          string = "payload_ccip.json"
 )
 
+var percentilesToCalculate PercentilesList = []float64{0.90, 0.95, 0.99}
+
 type AggregatorMetrics struct {
-	Min   float64 `json:"min_duration_for_successful_requests(s),omitempty"`
-	Max   float64 `json:"max_duration_for_successful_requests(s),omitempty"`
-	Avg   float64 `json:"avg_duration_for_successful_requests(s),omitempty"`
-	sum   float64
-	count int
+	Min         float64             `json:"min_duration_for_successful_requests(s),omitempty"`
+	Max         float64             `json:"max_duration_for_successful_requests(s),omitempty"`
+	Avg         float64             `json:"avg_duration_for_successful_requests(s),omitempty"`
+	Percentiles map[float64]float64 `json:"percentiles,omitempty"`
+	durations   []float64
+	sum         float64
+	count       int
 }
+
+func (am *AggregatorMetrics) CalculatePercentiles(percentiles []float64) {
+	sort.Float64s(am.durations)
+	am.Percentiles = make(map[float64]float64)
+
+	for _, p := range percentiles {
+		am.Percentiles[p] = stat.Quantile(p, stat.LinInterp, am.durations, nil)
+	}
+}
+
 type TransactionStats struct {
 	Fee                string `json:"fee,omitempty"`
 	GasUsed            uint64 `json:"gas_used,omitempty"`
@@ -130,10 +147,10 @@ func NewCCIPRequestStats(reqNo int64, source, dest string) *RequestStat {
 type CCIPLaneStats struct {
 	lane                    string
 	lggr                    zerolog.Logger
-	TotalRequests           int64                       `json:"total_requests,omitempty"`          // TotalRequests is the total number of requests made
-	SuccessCountsByPhase    map[Phase]int64             `json:"success_counts_by_phase,omitempty"` // SuccessCountsByPhase is the number of requests that succeeded in each phase
-	FailedCountsByPhase     map[Phase]int64             `json:"failed_counts_by_phase,omitempty"`  // FailedCountsByPhase is the number of requests that failed in each phase
-	DurationStatByPhase     map[Phase]AggregatorMetrics `json:"duration_stat_by_phase,omitempty"`  // DurationStatByPhase is the duration statistics for each phase
+	TotalRequests           int64                        `json:"total_requests,omitempty"`          // TotalRequests is the total number of requests made
+	SuccessCountsByPhase    map[Phase]int64              `json:"success_counts_by_phase,omitempty"` // SuccessCountsByPhase is the number of requests that succeeded in each phase
+	FailedCountsByPhase     map[Phase]int64              `json:"failed_counts_by_phase,omitempty"`  // FailedCountsByPhase is the number of requests that failed in each phase
+	DurationStatByPhase     map[Phase]*AggregatorMetrics `json:"duration_stat_by_phase,omitempty"`  // DurationStatByPhase is the duration statistics for each phase
 	statusByPhaseByRequests sync.Map
 }
 
@@ -143,11 +160,12 @@ func (testStats *CCIPLaneStats) UpdatePhaseStatsForReq(stat *RequestStat) {
 
 func (testStats *CCIPLaneStats) Aggregate(phase Phase, durationInSec float64) {
 	if prevDur, ok := testStats.DurationStatByPhase[phase]; !ok {
-		testStats.DurationStatByPhase[phase] = AggregatorMetrics{
-			Min:   durationInSec,
-			Max:   durationInSec,
-			sum:   durationInSec,
-			count: 1,
+		testStats.DurationStatByPhase[phase] = &AggregatorMetrics{
+			Min:       durationInSec,
+			Max:       durationInSec,
+			durations: []float64{durationInSec},
+			sum:       durationInSec,
+			count:     1,
 		}
 	} else {
 		if prevDur.Min > durationInSec {
@@ -157,6 +175,8 @@ func (testStats *CCIPLaneStats) Aggregate(phase Phase, durationInSec float64) {
 			prevDur.Max = durationInSec
 		}
 		prevDur.sum = prevDur.sum + durationInSec
+
+		prevDur.durations = append(prevDur.durations, durationInSec)
 		prevDur.count++
 		testStats.DurationStatByPhase[phase] = prevDur
 	}
@@ -191,15 +211,24 @@ func (testStats *CCIPLaneStats) Finalize(lane string) {
 	for _, phase := range phases {
 		events[phase] = testStats.lggr.Info().Str("Phase", string(phase))
 		if phaseStat, ok := testStats.DurationStatByPhase[phase]; ok {
-			testStats.DurationStatByPhase[phase] = AggregatorMetrics{
-				Min: phaseStat.Min,
-				Max: phaseStat.Max,
-				Avg: phaseStat.sum / float64(phaseStat.count),
+			testStats.DurationStatByPhase[phase].CalculatePercentiles(percentilesToCalculate)
+			testStats.DurationStatByPhase[phase] = &AggregatorMetrics{
+				Min:         phaseStat.Min,
+				Max:         phaseStat.Max,
+				Avg:         phaseStat.sum / float64(phaseStat.count),
+				Percentiles: phaseStat.Percentiles,
+			}
+			//Format percentiles string
+			percentilesStr := ""
+			for prct, val := range testStats.DurationStatByPhase[phase].Percentiles {
+				percentilesStr += fmt.Sprintf("%g:%.02f ", prct, val)
 			}
 			events[phase].
 				Str("Min Duration for Successful Requests", fmt.Sprintf("%.02f", testStats.DurationStatByPhase[phase].Min)).
 				Str("Max Duration for Successful Requests", fmt.Sprintf("%.02f", testStats.DurationStatByPhase[phase].Max)).
-				Str("Average Duration for Successful Requests", fmt.Sprintf("%.02f", testStats.DurationStatByPhase[phase].Avg))
+				Str("Average Duration for Successful Requests", fmt.Sprintf("%.02f", testStats.DurationStatByPhase[phase].Avg)).
+				Str("Total number of collected durations for calculated percentiles", fmt.Sprintf("%d", len(testStats.DurationStatByPhase[phase].durations))).
+				Str("Calculated Percentiles", fmt.Sprintf("%s", percentilesStr))
 		}
 		if failed, ok := testStats.FailedCountsByPhase[phase]; ok {
 			events[phase].Int64("Failed Count", failed)
@@ -444,7 +473,7 @@ func (r *CCIPTestReporter) AddNewLane(name string, lggr zerolog.Logger) *CCIPLan
 		lggr:                 lggr,
 		FailedCountsByPhase:  make(map[Phase]int64),
 		SuccessCountsByPhase: make(map[Phase]int64),
-		DurationStatByPhase:  make(map[Phase]AggregatorMetrics),
+		DurationStatByPhase:  make(map[Phase]*AggregatorMetrics),
 	}
 	r.LaneStats[name] = i
 	return i

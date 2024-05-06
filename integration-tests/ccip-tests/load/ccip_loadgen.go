@@ -285,6 +285,7 @@ func (c *CCIPE2ELoad) Call(_ *wasp.Generator) *wasp.Response {
 		return res
 	}
 	res.Data = stats.StatusByPhase
+	c.Lane.Reports.UpdatePhaseStatsForReq(stats)
 	return res
 }
 
