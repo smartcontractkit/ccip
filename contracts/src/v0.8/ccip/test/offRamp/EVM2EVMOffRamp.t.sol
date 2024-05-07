@@ -210,7 +210,7 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     assertGt(s_offRamp.getSenderNonce(messages[0].sender), nonceBefore);
   }
 
-  function test_FuzzReceiverError_Success(bool ordered) public {
+  function test_Fuzz_ReceiverError_Success(bool ordered) public {
     Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages();
 
     bytes memory realError1 = new bytes(2);
@@ -253,7 +253,7 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     }
   }
 
-  function test_FuzzStrictUntouchedToSuccess_Success(bool ordered, bool strict) public {
+  function test_Fuzz_StrictUntouchedToSuccess_Success(bool ordered, bool strict) public {
     Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages();
 
     if (!ordered) {
@@ -314,7 +314,7 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
 
   // Send a message to a contract that does not implement the CCIPReceiver interface
   // This should execute successfully.
-  function test_FuzzSingleMessageToNonCCIPReceiver_Success(bool ordered) public {
+  function test_Fuzz_SingleMessageToNonCCIPReceiver_Success(bool ordered) public {
     Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages();
     MaybeRevertMessageReceiverNo165 newReceiver = new MaybeRevertMessageReceiverNo165(true);
 
@@ -332,7 +332,7 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     s_offRamp.execute(_generateReportFromMessages(messages), new uint256[](0));
   }
 
-  function test_FuzzSingleMessagesNoTokensSuccess_gas(bool ordered) public {
+  function test_Fuzz_SingleMessagesNoTokensSuccess_gas(bool ordered) public {
     vm.pauseGasMetering();
     Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages();
 
@@ -352,7 +352,7 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     s_offRamp.execute(report, new uint256[](0));
   }
 
-  function test_FuzzTwoMessagesWithTokensSuccess_gas(bool ordered) public {
+  function test_Fuzz_TwoMessagesWithTokensSuccess_gas(bool ordered) public {
     vm.pauseGasMetering();
     Internal.EVM2EVMMessage[] memory messages = _generateMessagesWithTokens();
 
@@ -402,7 +402,7 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     assertEq(uint64(2), s_offRamp.getSenderNonce(OWNER));
   }
 
-  function test_FuzzInterleavingOrderedAndUnorderedMessages_Success(
+  function test_Fuzz_InterleavingOrderedAndUnorderedMessages_Success(
     bool msg1Ordered,
     bool msg2Ordered,
     bool msg3Ordered
@@ -493,7 +493,7 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     assertEq(nonceBefore + expectedNonce, s_offRamp.getSenderNonce(OWNER));
   }
 
-  function test_FuzzInvalidSourcePoolAddress_Success(bool ordered) public {
+  function test_Fuzz_InvalidSourcePoolAddress_Success(bool ordered) public {
     address fakePoolAddress = address(0x0000000000333333);
 
     Internal.EVM2EVMMessage[] memory messages = _generateMessagesWithTokens();
@@ -596,7 +596,7 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     vm.clearMockedCalls();
   }
 
-  function test_FuzzAlreadyExecuted_Revert(bool ordered) public {
+  function test_Fuzz_AlreadyExecuted_Revert(bool ordered) public {
     Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages();
     if (!ordered) {
       messages[0].nonce = 0;
@@ -608,7 +608,7 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     s_offRamp.execute(executionReport, new uint256[](0));
   }
 
-  function test_FuzzInvalidSourceChain_Revert(bool ordered) public {
+  function test_Fuzz_InvalidSourceChain_Revert(bool ordered) public {
     Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages();
     if (!ordered) {
       messages[0].nonce = 0;
@@ -620,7 +620,7 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     s_offRamp.execute(_generateReportFromMessages(messages), new uint256[](0));
   }
 
-  function test_FuzzUnsupportedNumberOfTokens_Revert(bool ordered) public {
+  function test_Fuzz_UnsupportedNumberOfTokens_Revert(bool ordered) public {
     Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages();
     Client.EVMTokenAmount[] memory newTokens = new Client.EVMTokenAmount[](MAX_TOKENS_LENGTH + 1);
     if (!ordered) {
@@ -636,7 +636,7 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     s_offRamp.execute(report, new uint256[](0));
   }
 
-  function test_FuzzTokenDataMismatch_Revert(bool ordered) public {
+  function test_Fuzz_TokenDataMismatch_Revert(bool ordered) public {
     Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages();
     if (!ordered) {
       messages[0].nonce = 0;
@@ -665,7 +665,7 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     s_offRamp.execute(executionReport, new uint256[](0));
   }
 
-  function test_FuzzRouterYULCall_Revert(bool ordered) public {
+  function test_Fuzz_RouterYULCall_Revert(bool ordered) public {
     Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages();
 
     if (!ordered) {
@@ -1618,7 +1618,7 @@ contract EVM2EVMOffRamp__releaseOrMintTokens is EVM2EVMOffRampSetup {
   /// forge-config: default.fuzz.runs = 32
   /// forge-config: ccip.fuzz.runs = 1024
   // Uint256 gives a good range of values to test, both inside and outside of the eth address space.
-  function test_Fuzz__releaseOrMintTokens_AnyRevertIsCaught_Success(uint256 destPool) public {
+  function test_Fuzz_releaseOrMintTokens_AnyRevertIsCaught_Success(uint256 destPool) public {
     // Input 447301751254033913445893214690834296930546521452, which is 0x4E59B44847B379578588920CA78FBF26C0B4956C
     // triggers some Create2Deployer and causes it to fail
     vm.assume(destPool != 447301751254033913445893214690834296930546521452);
