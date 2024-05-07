@@ -277,11 +277,13 @@ func TestPlugin_Observation(t *testing.T) {
 			mockDiscoverer := discoverermocks.NewDiscoverer(t)
 			p.discovererFactory.
 				On("NewDiscoverer", mock.Anything, mock.Anything).
-				Return(mockDiscoverer, nil)
+				Return(mockDiscoverer, nil).Maybe()
 			g, err := tc.observedGraph(t)
 			mockDiscoverer.
 				On("Discover", ctx).
 				Return(g, err)
+			mockDiscoverer.On("DiscoverBalances", ctx, g).Return(nil).Maybe()
+			p.plugin.discoverer = mockDiscoverer
 
 			// loadPendingTransfers && resolveProposedTransfers
 			for sourceDest, bridgeFn := range tc.bridges {
@@ -1606,7 +1608,7 @@ func newPluginWithMocks(
 	lmFactory := mocks.NewFactory(t)
 	discovererFactory := discoverermocks.NewFactory(t)
 	discovererMock := discoverermocks.NewDiscoverer(t)
-	discovererFactory.On("NewDiscoverer", mock.Anything, mock.Anything).Return(discovererMock, nil)
+	discovererFactory.On("NewDiscoverer", mock.Anything, mock.Anything).Return(discovererMock, nil).Maybe()
 	bridgeFactory := bridgemocks.NewFactory(t)
 	rebalancerAlg := liquidityrebalancer.NewPingPong()
 	return &pluginWithMocks{
