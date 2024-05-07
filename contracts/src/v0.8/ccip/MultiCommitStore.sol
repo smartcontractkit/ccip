@@ -3,7 +3,6 @@ pragma solidity 0.8.19;
 
 import {ITypeAndVersion} from "../shared/interfaces/ITypeAndVersion.sol";
 import {IARM} from "./interfaces/IARM.sol";
-import {ICommitStore} from "./interfaces/ICommitStore.sol";
 import {IMultiCommitStore} from "./interfaces/IMultiCommitStore.sol";
 import {IPriceRegistry} from "./interfaces/IPriceRegistry.sol";
 
