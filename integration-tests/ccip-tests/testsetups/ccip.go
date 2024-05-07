@@ -19,12 +19,13 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	ctfconfig "github.com/smartcontractkit/chainlink-testing-framework/config"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
 	"go.uber.org/multierr"
 	"go.uber.org/zap/zapcore"
 	"golang.org/x/sync/errgroup"
+
+	ctfconfig "github.com/smartcontractkit/chainlink-testing-framework/config"
 
 	chainselectors "github.com/smartcontractkit/chain-selectors"
 

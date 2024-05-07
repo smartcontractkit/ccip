@@ -9,9 +9,10 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	ctfconfig "github.com/smartcontractkit/chainlink-testing-framework/config"
 	"github.com/spf13/cobra"
 	"github.com/testcontainers/testcontainers-go"
+
+	ctfconfig "github.com/smartcontractkit/chainlink-testing-framework/config"
 
 	ctf_test_env "github.com/smartcontractkit/chainlink-testing-framework/docker/test_env"
 
