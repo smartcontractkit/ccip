@@ -6,13 +6,14 @@ import (
 	"math/rand"
 	"testing"
 
-	ubig "github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils/big"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/models"
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	ubig "github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils/big"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/models"
 )
 
 func TestPlugin_ValidateObservation(t *testing.T) {
@@ -160,6 +161,7 @@ func Test_validateDedupedItems(t *testing.T) {
 				{From: 2},
 				{From: 3},
 			},
+			keyFn:   dedupKeyTransfer,
 			wantErr: false,
 		},
 		{
@@ -169,6 +171,7 @@ func Test_validateDedupedItems(t *testing.T) {
 				{From: 2},
 				{From: 1},
 			},
+			keyFn:   dedupKeyTransfer,
 			wantErr: true,
 		},
 		{
