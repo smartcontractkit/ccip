@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.19;
 
-import {IBridgeAdapter} from "./interfaces/IBridge.sol";
-import {ILiquidityManager} from "./interfaces/ILiquidityManager.sol";
-import {ILiquidityContainer} from "./interfaces/ILiquidityContainer.sol";
 import {IWrappedNative} from "../ccip/interfaces/IWrappedNative.sol";
+import {IBridgeAdapter} from "./interfaces/IBridge.sol";
+import {ILiquidityContainer} from "./interfaces/ILiquidityContainer.sol";
+import {ILiquidityManager} from "./interfaces/ILiquidityManager.sol";
 
 import {OCR3Base} from "./ocr/OCR3Base.sol";
 
@@ -30,15 +30,14 @@ contract LiquidityManager is ILiquidityManager, OCR3Base {
   error ZeroChainSelector();
   error InsufficientLiquidity(uint256 requested, uint256 available);
   error EmptyReport();
+  error TransferFailed();
 
   /// @notice Emitted when a finalization step is completed without funds being available.
   /// @param ocrSeqNum The OCR sequence number of the report.
   /// @param remoteChainSelector The chain selector of the remote chain funds are coming from.
   /// @param bridgeSpecificData The bridge specific data that was used to finalize the transfer.
   event FinalizationStepCompleted(
-    uint64 indexed ocrSeqNum,
-    uint64 indexed remoteChainSelector,
-    bytes bridgeSpecificData
+    uint64 indexed ocrSeqNum, uint64 indexed remoteChainSelector, bytes bridgeSpecificData
   );
 
   /// @notice Emitted when liquidity is transferred to another chain, or received from another chain.
@@ -84,6 +83,11 @@ contract LiquidityManager is ILiquidityManager, OCR3Base {
   /// @param newBalance The new minimum liquidity.
   event MinimumLiquiditySet(uint256 oldBalance, uint256 newBalance);
 
+  /// @notice Emitted when native balance is withdrawn by contract owner
+  /// @param amount The amount of native withdrawn
+  /// @param destination The address the native is sent to
+  event NativeWithdrawn(uint256 amount, address destination);
+
   /// @notice Emitted when a cross chain rebalancer is set.
   /// @param remoteChainSelector The chain selector of the remote chain.
   /// @param localBridge The local bridge adapter that will be used to transfer funds.
@@ -104,10 +108,7 @@ contract LiquidityManager is ILiquidityManager, OCR3Base {
   /// @param bridgeSpecificData The bridge specific data that was used to finalize the transfer.
   /// @param reason The reason the finalization failed.
   event FinalizationFailed(
-    uint64 indexed ocrSeqNum,
-    uint64 indexed remoteChainSelector,
-    bytes bridgeSpecificData,
-    bytes reason
+    uint64 indexed ocrSeqNum, uint64 indexed remoteChainSelector, bytes bridgeSpecificData, bytes reason
   );
 
   struct CrossChainRebalancer {
@@ -148,7 +149,7 @@ contract LiquidityManager is ILiquidityManager, OCR3Base {
       revert ZeroChainSelector();
     }
 
-    if (address(token) == address(0)) {
+    if (address(token) == address(0) || address(localLiquidityContainer) == address(0)) {
       revert ZeroAddress();
     }
     i_localToken = token;
@@ -157,10 +158,22 @@ contract LiquidityManager is ILiquidityManager, OCR3Base {
     s_minimumLiquidity = minimumLiquidity;
   }
 
+  // ================================================================
+  // │                      Native Management                       │
+  // ================================================================
+
   receive() external payable {}
 
+  /// @notice withdraw native balance
+  function withdrawNative(uint256 amount, address payable destination) external onlyOwner {
+    (bool success,) = destination.call{value: amount}("");
+    if (!success) revert TransferFailed();
+
+    emit NativeWithdrawn(amount, destination);
+  }
+
   // ================================================================
-  // │                    Liquidity management                      │
+  // │                     Liquidity Management                     │
   // ================================================================
 
   /// @inheritdoc ILiquidityManager
@@ -293,13 +306,11 @@ contract LiquidityManager is ILiquidityManager, OCR3Base {
     }
 
     // finalize the withdrawal through the bridge adapter
-    try
-      remoteRebalancer.localBridge.finalizeWithdrawERC20(
-        remoteRebalancer.remoteRebalancer, // remoteSender: the remote rebalancer
-        address(this), // localReceiver: this contract
-        bridgeSpecificPayload
-      )
-    returns (bool fundsAvailable) {
+    try remoteRebalancer.localBridge.finalizeWithdrawERC20(
+      remoteRebalancer.remoteRebalancer, // remoteSender: the remote rebalancer
+      address(this), // localReceiver: this contract
+      bridgeSpecificPayload
+    ) returns (bool fundsAvailable) {
       if (fundsAvailable) {
         // finalization was successful and we can inject the liquidity into the container.
         // approve and liquidity container should transferFrom.
@@ -373,10 +384,8 @@ contract LiquidityManager is ILiquidityManager, OCR3Base {
   /// @notice Process the OCR report.
   /// @dev Called by OCR3Base's transmit() function.
   function _report(bytes calldata report, uint64 ocrSeqNum) internal override {
-    ILiquidityManager.LiquidityInstructions memory instructions = abi.decode(
-      report,
-      (ILiquidityManager.LiquidityInstructions)
-    );
+    ILiquidityManager.LiquidityInstructions memory instructions =
+      abi.decode(report, (ILiquidityManager.LiquidityInstructions));
 
     uint256 sendInstructions = instructions.sendLiquidityParams.length;
     uint256 receiveInstructions = instructions.receiveLiquidityParams.length;
@@ -461,9 +470,8 @@ contract LiquidityManager is ILiquidityManager, OCR3Base {
     }
 
     if (
-      crossChainLiqManager.remoteRebalancer == address(0) ||
-      address(crossChainLiqManager.localBridge) == address(0) ||
-      crossChainLiqManager.remoteToken == address(0)
+      crossChainLiqManager.remoteRebalancer == address(0) || address(crossChainLiqManager.localBridge) == address(0)
+        || crossChainLiqManager.remoteToken == address(0)
     ) {
       revert ZeroAddress();
     }
@@ -497,6 +505,9 @@ contract LiquidityManager is ILiquidityManager, OCR3Base {
   /// @notice Sets the local liquidity container.
   /// @dev Only the owner can call this function.
   function setLocalLiquidityContainer(ILiquidityContainer localLiquidityContainer) external onlyOwner {
+    if (address(localLiquidityContainer) == address(0)) {
+      revert ZeroAddress();
+    }
     s_localLiquidityContainer = localLiquidityContainer;
 
     emit LiquidityContainerSet(address(localLiquidityContainer));
