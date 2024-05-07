@@ -18,7 +18,7 @@ evm_transaction_timeout = '3m'
 evm_minimum_confirmations = 1
 evm_gas_estimation_buffer = 1000
 evm_supports_eip1559 = true
-evm_default_gas_limit = 6000000
+evm_default_gas_limit = 7000000
 evm_finality_depth = 1800 # with 1800 blocks of finality, and 1s block time, we have 30 minutes of finality
 
 [CCIP.Env.Network.EVMNetworks.PRIVATE-CHAIN-2]
@@ -34,7 +34,7 @@ evm_transaction_timeout = '3m'
 evm_minimum_confirmations = 1
 evm_gas_estimation_buffer = 1000
 evm_supports_eip1559 = true
-evm_default_gas_limit = 6000000
+evm_default_gas_limit = 7000000
 evm_finality_depth = 1800 # with 1800 blocks of finality, and 1s block time, we have 30 minutes of finality
 
 [CCIP.Env.Network.AnvilConfigs.PRIVATE-CHAIN-1]
