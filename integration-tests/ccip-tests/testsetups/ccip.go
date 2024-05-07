@@ -240,6 +240,7 @@ func (c *CCIPTestConfig) SetNetworkPairs(lggr zerolog.Logger) error {
 				ClientImplementation:      n.ClientImplementation,
 				DefaultGasLimit:           n.DefaultGasLimit,
 				FinalityDepth:             n.FinalityDepth,
+				SupportsEIP1559:           true,
 			})
 			if existing, ok := c.EnvInput.Network.AnvilConfigs[strings.ToUpper(n.Name)]; c.EnvInput.Network.AnvilConfigs != nil && ok {
 				c.EnvInput.Network.AnvilConfigs[strings.ToUpper(name)] = existing
