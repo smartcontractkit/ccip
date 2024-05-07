@@ -8,9 +8,9 @@ import {OwnerIsCreator} from "./../shared/access/OwnerIsCreator.sol";
 
 /// @dev This contract is owned by RMN, if changing, please notify the RMN maintainers.
 // solhint-disable chainlink-solidity/explicit-returns
-contract ARM is IRMN, OwnerIsCreator, ITypeAndVersion {
+contract RMN is IRMN, OwnerIsCreator, ITypeAndVersion {
   // STATIC CONFIG
-  string public constant override typeAndVersion = "ARM 1.5.0-dev";
+  string public constant override typeAndVersion = "RMN 1.5.0-dev";
 
   uint256 private constant MAX_NUM_VOTERS = 128;
 
@@ -34,7 +34,7 @@ contract ARM is IRMN, OwnerIsCreator, ITypeAndVersion {
     // or exceeds blessWeightThreshold, the tagged root becomes blessed.
     uint16 blessWeightThreshold;
     // When the total weight of voters that have voted to curse reaches or
-    // exceeds curseWeightThreshold, the ARM enters the cursed state.
+    // exceeds curseWeightThreshold, the RMN enters the cursed state.
     uint16 curseWeightThreshold;
   }
 
@@ -249,7 +249,7 @@ contract ARM is IRMN, OwnerIsCreator, ITypeAndVersion {
   }
 
   /// @notice Can be called by the owner to remove unintentionally voted or even blessed tagged roots in a recovery
-  /// scenario. The owner must ensure that there are no in-flight transactions by ARM nodes voting for any of the
+  /// scenario. The owner must ensure that there are no in-flight transactions by RMN nodes voting for any of the
   /// taggedRoots before calling this function, as such in-flight transactions could lead to the roots becoming
   /// re-blessed shortly after the call to this function, contrary to the original intention.
   function ownerResetBlessVotes(IRMN.TaggedRoot[] calldata taggedRoots) external onlyOwner {

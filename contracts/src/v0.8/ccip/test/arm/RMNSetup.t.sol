@@ -3,10 +3,10 @@ pragma solidity 0.8.19;
 
 import {IRMN} from "../../interfaces/IRMN.sol";
 
-import {ARM} from "../../ARM.sol";
+import {RMN} from "../../RMN.sol";
 import {BaseTest} from "../BaseTest.t.sol";
 
-contract ARMSetup is BaseTest {
+contract RMNSetup is BaseTest {
   function makeTaggedRootsInclusive(uint256 from, uint256 to) internal pure returns (IRMN.TaggedRoot[] memory) {
     IRMN.TaggedRoot[] memory votes = new IRMN.TaggedRoot[](to - from + 1);
     for (uint256 i = from; i <= to; ++i) {
@@ -32,16 +32,16 @@ contract ARMSetup is BaseTest {
     return bytes32(index);
   }
 
-  ARM internal s_arm;
+  RMN internal s_rmn;
 
   function setUp() public virtual override {
     BaseTest.setUp();
-    s_arm = new ARM(armConstructorArgs());
+    s_rmn = new RMN(rmnConstructorArgs());
     vm.stopPrank();
   }
 
   function hasVotedToBlessRoot(address voter, IRMN.TaggedRoot memory taggedRoot_) internal view returns (bool) {
-    (address[] memory voters,,) = s_arm.getBlessProgress(taggedRoot_);
+    (address[] memory voters,,) = s_rmn.getBlessProgress(taggedRoot_);
     for (uint256 i = 0; i < voters.length; ++i) {
       if (voters[i] == voter) {
         return true;
@@ -51,7 +51,7 @@ contract ARMSetup is BaseTest {
   }
 
   function getWeightOfVotesToBlessRoot(IRMN.TaggedRoot memory taggedRoot_) internal view returns (uint16) {
-    (, uint16 weight,) = s_arm.getBlessProgress(taggedRoot_);
+    (, uint16 weight,) = s_rmn.getBlessProgress(taggedRoot_);
     return weight;
   }
 }

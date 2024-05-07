@@ -16,7 +16,7 @@ contract CommitStore is ICommitStore, ITypeAndVersion, OCR2Base {
   error InvalidInterval(Interval interval);
   error InvalidRoot();
   error InvalidCommitStoreConfig();
-  error BadRMNSignal();
+  error CursedByRMN();
   error RootAlreadyCommitted();
 
   event Paused(address account);
@@ -32,7 +32,7 @@ contract CommitStore is ICommitStore, ITypeAndVersion, OCR2Base {
     uint64 chainSelector; // ───────╮  Destination chainSelector
     uint64 sourceChainSelector; // ─╯  Source chainSelector
     address onRamp; // OnRamp address on the source chain
-    address armProxy; // RMN proxy address
+    address rmnProxy; // RMN proxy address
   }
 
   /// @notice Dynamic commit store config
@@ -89,13 +89,13 @@ contract CommitStore is ICommitStore, ITypeAndVersion, OCR2Base {
   constructor(StaticConfig memory staticConfig) OCR2Base(false) {
     if (
       staticConfig.onRamp == address(0) || staticConfig.chainSelector == 0 || staticConfig.sourceChainSelector == 0
-        || staticConfig.armProxy == address(0)
+        || staticConfig.rmnProxy == address(0)
     ) revert InvalidCommitStoreConfig();
 
     i_chainSelector = staticConfig.chainSelector;
     i_sourceChainSelector = staticConfig.sourceChainSelector;
     i_onRamp = staticConfig.onRamp;
-    i_rmnProxy = staticConfig.armProxy;
+    i_rmnProxy = staticConfig.rmnProxy;
   }
 
   // ================================================================
@@ -182,7 +182,7 @@ contract CommitStore is ICommitStore, ITypeAndVersion, OCR2Base {
   /// we are OK to revert to preserve the invariant that we always revert on invalid sequence number ranges.
   /// If that happens, prices will be updates in later rounds.
   function _report(bytes calldata encodedReport, uint40 epochAndRound) internal override whenNotPaused {
-    if (IRMN(i_rmnProxy).isCursed(bytes32(uint256(i_sourceChainSelector)))) revert BadRMNSignal();
+    if (IRMN(i_rmnProxy).isCursed(bytes32(uint256(i_sourceChainSelector)))) revert CursedByRMN();
 
     CommitReport memory report = abi.decode(encodedReport, (CommitReport));
 
@@ -233,7 +233,7 @@ contract CommitStore is ICommitStore, ITypeAndVersion, OCR2Base {
       chainSelector: i_chainSelector,
       sourceChainSelector: i_sourceChainSelector,
       onRamp: i_onRamp,
-      armProxy: i_rmnProxy
+      rmnProxy: i_rmnProxy
     });
   }
 
@@ -261,7 +261,7 @@ contract CommitStore is ICommitStore, ITypeAndVersion, OCR2Base {
         chainSelector: i_chainSelector,
         sourceChainSelector: i_sourceChainSelector,
         onRamp: i_onRamp,
-        armProxy: i_rmnProxy
+        rmnProxy: i_rmnProxy
       }),
       dynamicConfig
     );
@@ -272,12 +272,12 @@ contract CommitStore is ICommitStore, ITypeAndVersion, OCR2Base {
   // ================================================================
 
   /// @notice Single function to check the status of the commitStore.
-  function isUnpausedAndARMHealthy() external view returns (bool) {
+  function isUnpausedAndRMNHealthy() external view returns (bool) {
     return !IRMN(i_rmnProxy).isCursed(bytes32(uint256(i_sourceChainSelector))) && !s_paused;
   }
 
   /// @notice Support querying whether health checker is healthy.
-  function isARMHealthy() external view returns (bool) {
+  function isRMNHealthy() external view returns (bool) {
     return !IRMN(i_rmnProxy).isCursed(bytes32(uint256(i_sourceChainSelector)));
   }
 

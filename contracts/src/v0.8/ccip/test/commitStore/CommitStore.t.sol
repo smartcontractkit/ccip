@@ -4,9 +4,9 @@ pragma solidity 0.8.19;
 import {IPriceRegistry} from "../../interfaces/IPriceRegistry.sol";
 import {IRMN} from "../../interfaces/IRMN.sol";
 
-import {ARM} from "../../ARM.sol";
 import {CommitStore} from "../../CommitStore.sol";
 import {PriceRegistry} from "../../PriceRegistry.sol";
+import {RMN} from "../../RMN.sol";
 import {MerkleMultiProof} from "../../libraries/MerkleMultiProof.sol";
 import {CommitStoreHelper} from "../helpers/CommitStoreHelper.sol";
 import {OCR2BaseSetup} from "../ocr/OCR2Base.t.sol";
@@ -26,7 +26,7 @@ contract CommitStoreSetup is PriceRegistrySetup, OCR2BaseSetup {
         chainSelector: DEST_CHAIN_SELECTOR,
         sourceChainSelector: SOURCE_CHAIN_SELECTOR,
         onRamp: ON_RAMP_ADDRESS,
-        armProxy: address(s_mockRMN)
+        rmnProxy: address(s_mockRMN)
       })
     );
     CommitStore.DynamicConfig memory dynamicConfig =
@@ -41,10 +41,10 @@ contract CommitStoreSetup is PriceRegistrySetup, OCR2BaseSetup {
   }
 }
 
-contract CommitStoreRealARMSetup is PriceRegistrySetup, OCR2BaseSetup {
+contract CommitStoreRealRMNSetup is PriceRegistrySetup, OCR2BaseSetup {
   CommitStoreHelper internal s_commitStore;
 
-  ARM internal s_arm;
+  RMN internal s_rmn;
 
   address internal constant BLESS_VOTE_ADDR = address(8888);
 
@@ -52,22 +52,22 @@ contract CommitStoreRealARMSetup is PriceRegistrySetup, OCR2BaseSetup {
     PriceRegistrySetup.setUp();
     OCR2BaseSetup.setUp();
 
-    ARM.Voter[] memory voters = new ARM.Voter[](1);
-    voters[0] = ARM.Voter({
+    RMN.Voter[] memory voters = new RMN.Voter[](1);
+    voters[0] = RMN.Voter({
       blessVoteAddr: BLESS_VOTE_ADDR,
       curseVoteAddr: address(9999),
       curseUnvoteAddr: address(19999),
       blessWeight: 1,
       curseWeight: 1
     });
-    // Overwrite base mock arm with real.
-    s_arm = new ARM(ARM.Config({voters: voters, blessWeightThreshold: 1, curseWeightThreshold: 1}));
+    // Overwrite base mock rmn with real.
+    s_rmn = new RMN(RMN.Config({voters: voters, blessWeightThreshold: 1, curseWeightThreshold: 1}));
     s_commitStore = new CommitStoreHelper(
       CommitStore.StaticConfig({
         chainSelector: DEST_CHAIN_SELECTOR,
         sourceChainSelector: SOURCE_CHAIN_SELECTOR,
         onRamp: ON_RAMP_ADDRESS,
-        armProxy: address(s_arm)
+        rmnProxy: address(s_rmn)
       })
     );
     CommitStore.DynamicConfig memory dynamicConfig =
@@ -92,7 +92,7 @@ contract CommitStore_constructor is PriceRegistrySetup, OCR2BaseSetup {
       chainSelector: DEST_CHAIN_SELECTOR,
       sourceChainSelector: SOURCE_CHAIN_SELECTOR,
       onRamp: 0x2C44CDDdB6a900Fa2B585dd299E03D12Fa4293Bc,
-      armProxy: address(s_mockRMN)
+      rmnProxy: address(s_mockRMN)
     });
     CommitStore.DynamicConfig memory dynamicConfig =
       CommitStore.DynamicConfig({priceRegistry: address(s_priceRegistry)});
@@ -110,7 +110,7 @@ contract CommitStore_constructor is PriceRegistrySetup, OCR2BaseSetup {
     assertEq(staticConfig.chainSelector, gotStaticConfig.chainSelector);
     assertEq(staticConfig.sourceChainSelector, gotStaticConfig.sourceChainSelector);
     assertEq(staticConfig.onRamp, gotStaticConfig.onRamp);
-    assertEq(staticConfig.armProxy, gotStaticConfig.armProxy);
+    assertEq(staticConfig.rmnProxy, gotStaticConfig.rmnProxy);
 
     CommitStore.DynamicConfig memory gotDynamicConfig = commitStore.getDynamicConfig();
 
@@ -121,7 +121,7 @@ contract CommitStore_constructor is PriceRegistrySetup, OCR2BaseSetup {
     assertEq(1, commitStore.getExpectedNextSequenceNumber());
     assertEq(commitStore.typeAndVersion(), "CommitStore 1.5.0-dev");
     assertEq(OWNER, commitStore.owner());
-    assertTrue(commitStore.isUnpausedAndARMHealthy());
+    assertTrue(commitStore.isUnpausedAndRMNHealthy());
   }
 }
 
@@ -212,7 +212,7 @@ contract CommitStore_setDynamicConfig is CommitStoreSetup {
 }
 
 /// @notice #resetUnblessedRoots
-contract CommitStore_resetUnblessedRoots is CommitStoreRealARMSetup {
+contract CommitStore_resetUnblessedRoots is CommitStoreRealRMNSetup {
   event RootRemoved(bytes32 root);
 
   function test_ResetUnblessedRoots_Success() public {
@@ -249,7 +249,7 @@ contract CommitStore_resetUnblessedRoots is CommitStoreRealARMSetup {
     blessedTaggedRoots[0] = IRMN.TaggedRoot({commitStore: address(s_commitStore), root: rootsToReset[1]});
 
     vm.startPrank(BLESS_VOTE_ADDR);
-    s_arm.voteToBless(blessedTaggedRoots);
+    s_rmn.voteToBless(blessedTaggedRoots);
 
     vm.expectEmit(false, false, false, true);
     emit RootRemoved(rootsToReset[0]);
@@ -432,7 +432,7 @@ contract CommitStore_report is CommitStoreSetup {
 
   function test_Unhealthy_Revert() public {
     s_mockRMN.voteToCurse(0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff);
-    vm.expectRevert(CommitStore.BadRMNSignal.selector);
+    vm.expectRevert(CommitStore.CursedByRMN.selector);
     bytes memory report;
     s_commitStore.report(report, ++s_latestEpochAndRound);
   }
@@ -516,7 +516,7 @@ contract CommitStore_report is CommitStoreSetup {
 }
 
 /// @notice #verify
-contract CommitStore_verify is CommitStoreRealARMSetup {
+contract CommitStore_verify is CommitStoreRealRMNSetup {
   function test_NotBlessed_Success() public {
     bytes32[] memory leaves = new bytes32[](1);
     leaves[0] = "root";
@@ -553,7 +553,7 @@ contract CommitStore_verify is CommitStoreRealARMSetup {
     IRMN.TaggedRoot[] memory taggedRoots = new IRMN.TaggedRoot[](1);
     taggedRoots[0] = IRMN.TaggedRoot({commitStore: address(s_commitStore), root: leaves[0]});
     vm.startPrank(BLESS_VOTE_ADDR);
-    s_arm.voteToBless(taggedRoots);
+    s_rmn.voteToBless(taggedRoots);
     bytes32[] memory proofs = new bytes32[](0);
     uint256 timestamp = s_commitStore.verify(leaves, proofs, 0);
     assertEq(BLOCK_TIME, timestamp);
@@ -582,32 +582,32 @@ contract CommitStore_verify is CommitStoreRealARMSetup {
   }
 }
 
-contract CommitStore_isUnpausedAndARMHealthy is CommitStoreSetup {
-  function test_ARM_Success() public {
+contract CommitStore_isUnpausedAndRMNHealthy is CommitStoreSetup {
+  function test_RMN_Success() public {
     // Test pausing
     assertFalse(s_commitStore.paused());
-    assertTrue(s_commitStore.isUnpausedAndARMHealthy());
+    assertTrue(s_commitStore.isUnpausedAndRMNHealthy());
     s_commitStore.pause();
     assertTrue(s_commitStore.paused());
-    assertFalse(s_commitStore.isUnpausedAndARMHealthy());
+    assertFalse(s_commitStore.isUnpausedAndRMNHealthy());
     s_commitStore.unpause();
     assertFalse(s_commitStore.paused());
-    assertTrue(s_commitStore.isUnpausedAndARMHealthy());
+    assertTrue(s_commitStore.isUnpausedAndRMNHealthy());
 
-    // Test arm
-    assertTrue(s_commitStore.isARMHealthy());
+    // Test rmn
+    assertTrue(s_commitStore.isRMNHealthy());
     s_mockRMN.voteToCurse(0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff);
-    assertFalse(s_commitStore.isARMHealthy());
-    assertFalse(s_commitStore.isUnpausedAndARMHealthy());
-    ARM.UnvoteToCurseRecord[] memory records = new ARM.UnvoteToCurseRecord[](1);
-    records[0] = ARM.UnvoteToCurseRecord({curseVoteAddr: OWNER, cursesHash: bytes32(uint256(0)), forceUnvote: true});
+    assertFalse(s_commitStore.isRMNHealthy());
+    assertFalse(s_commitStore.isUnpausedAndRMNHealthy());
+    RMN.UnvoteToCurseRecord[] memory records = new RMN.UnvoteToCurseRecord[](1);
+    records[0] = RMN.UnvoteToCurseRecord({curseVoteAddr: OWNER, cursesHash: bytes32(uint256(0)), forceUnvote: true});
     s_mockRMN.ownerUnvoteToCurse(records);
-    assertTrue(s_commitStore.isARMHealthy());
-    assertTrue(s_commitStore.isUnpausedAndARMHealthy());
+    assertTrue(s_commitStore.isRMNHealthy());
+    assertTrue(s_commitStore.isUnpausedAndRMNHealthy());
 
     s_mockRMN.voteToCurse(0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff);
     s_commitStore.pause();
-    assertFalse(s_commitStore.isUnpausedAndARMHealthy());
+    assertFalse(s_commitStore.isUnpausedAndRMNHealthy());
   }
 }
 
