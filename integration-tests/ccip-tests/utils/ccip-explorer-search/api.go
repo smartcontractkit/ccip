@@ -103,14 +103,6 @@ type Info struct {
     SourceChainSelector int64       `json:"sourceChainSelector"`
 }
 
-// func GenerateMessageQueryString(messageId string ) string {
-// 	baseURL := "https://ccip.chain.link/api/query"
-// 	queryParams := url.Values{}
-// 	queryParams.Add("query", "MESSAGE_DETAILS_QUERY")
-// 	queryParams.Add("messageId", messageId)
-// 	return baseURL + "?" + queryParams.Encode()
-// }
-
 func GenerateQueryString(sender string, receiver string, sourceNetworkName string,
 	destNetworkName string, messageId string, feeToken string,
 	first int, offset int) string {
