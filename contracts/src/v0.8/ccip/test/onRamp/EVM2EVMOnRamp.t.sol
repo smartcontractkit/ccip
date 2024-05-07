@@ -325,7 +325,7 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
   }
 
   function test_EnforceOutOfOrder_Success() public {
-    // Update dynamic config to enforce allowOutOfOrderExecution = defaultVal.
+    // Update dynamic config to enforce allowOutOfOrderExecution = true.
     vm.stopPrank();
     vm.startPrank(OWNER);
     EVM2EVMOnRamp.DynamicConfig memory dynamicConfig = s_onRamp.getDynamicConfig();
@@ -352,43 +352,12 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
 
     vm.startPrank(address(s_sourceRouter));
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
-    // Empty extraArgs to fall back to the default.
+    // Empty extraArgs to should revert since it enforceOutOfOrder is true.
     message.extraArgs = "";
     uint256 feeAmount = 1234567890;
     IERC20(s_sourceFeeToken).transferFrom(OWNER, address(s_onRamp), feeAmount);
 
-    Internal.EVM2EVMMessage memory messageEvent = Internal.EVM2EVMMessage({
-      sequenceNumber: 1,
-      feeTokenAmount: feeAmount,
-      sender: OWNER,
-      nonce: 0,
-      gasLimit: s_onRamp.getStaticConfig().defaultTxGasLimit,
-      strict: false,
-      sourceChainSelector: SOURCE_CHAIN_SELECTOR,
-      receiver: abi.decode(message.receiver, (address)),
-      data: message.data,
-      tokenAmounts: message.tokenAmounts,
-      sourceTokenData: new bytes[](message.tokenAmounts.length),
-      feeToken: message.feeToken,
-      messageId: ""
-    });
-
-    for (uint256 i = 0; i < message.tokenAmounts.length; ++i) {
-      address sourcePool = s_sourcePoolByToken[message.tokenAmounts[i].token];
-      address destPool = s_destPoolBySourceToken[message.tokenAmounts[i].token];
-      messageEvent.sourceTokenData[i] = abi.encode(
-        Internal.SourceTokenData({
-          sourcePoolAddress: abi.encode(sourcePool),
-          destPoolAddress: abi.encode(destPool),
-          extraData: ""
-        })
-      );
-    }
-
-    messageEvent.messageId = Internal._hash(messageEvent, s_metadataHash);
-
-    vm.expectEmit();
-    emit CCIPSendRequested(messageEvent);
+    vm.expectRevert(EVM2EVMOnRamp.ExtraArgOutOfOrderExecutionMustBeTrue.selector);
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, feeAmount, OWNER);
   }
 

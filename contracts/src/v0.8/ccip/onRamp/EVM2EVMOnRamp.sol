@@ -380,26 +380,29 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     }
 
     bytes4 extraArgsTag = bytes4(extraArgs);
-    if (extraArgsTag == Client.EVM_EXTRA_ARGS_V1_TAG) {
-      // EVMExtraArgsV1 originally included a second boolean (strict) field which we have deprecated entirely.
-      // Clients may still send that version but it will be ignored.
-      return _maybeEnforceOutOfOrderExecution(abi.decode(extraArgs[4:], (Client.EVMExtraArgsV1)).gasLimit);
-    } else if (extraArgsTag == Client.EVM_EXTRA_ARGS_V2_TAG) {
+    if (extraArgsTag == Client.EVM_EXTRA_ARGS_V2_TAG) {
       Client.EVMExtraArgsV2 memory extraArgsV2 = abi.decode(extraArgs[4:], (Client.EVMExtraArgsV2));
 
-      if (s_dynamicConfig.enforceOutOfOrder && !extraArgsV2.allowOutOfOrderExecution) {
+      if (!extraArgsV2.allowOutOfOrderExecution && s_dynamicConfig.enforceOutOfOrder) {
         revert ExtraArgOutOfOrderExecutionMustBeTrue();
       }
       return extraArgsV2;
-    } else {
-      revert InvalidExtraArgsTag();
+    } else if (extraArgsTag == Client.EVM_EXTRA_ARGS_V1_TAG) {
+      // EVMExtraArgsV1 originally included a second boolean (strict) field which we have deprecated entirely.
+      // Clients may still send that version but it will be ignored.
+      return _maybeEnforceOutOfOrderExecution(abi.decode(extraArgs[4:], (Client.EVMExtraArgsV1)).gasLimit);
     }
+
+    revert InvalidExtraArgsTag();
   }
 
   function _maybeEnforceOutOfOrderExecution(uint256 gasLimit) internal view returns (Client.EVMExtraArgsV2 memory) {
     if (s_dynamicConfig.enforceOutOfOrder) {
-      return Client.EVMExtraArgsV2({gasLimit: gasLimit, allowOutOfOrderExecution: true});
+      // In order to avoid varying defaults, if enforceOutOfOrder is set, we require the
+      // caller to set allowOutOfOrderExecution to true.
+      revert ExtraArgOutOfOrderExecutionMustBeTrue();
     }
+
     // Backwards compatibility: allowOutOfOrderExecution set to false by default.
     return Client.EVMExtraArgsV2({gasLimit: gasLimit, allowOutOfOrderExecution: false});
   }
