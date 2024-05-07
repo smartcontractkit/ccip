@@ -335,7 +335,7 @@ func deployCommitStore(
 		ChainSelector:       testutils.SimulatedChainID.Uint64(),
 		SourceChainSelector: testutils.SimulatedChainID.Uint64(),
 		OnRamp:              onRampAddress,
-		ArmProxy:            armAddress,
+		RmnProxy:            armAddress,
 	})
 	require.NoError(t, err)
 	bc.Commit()
