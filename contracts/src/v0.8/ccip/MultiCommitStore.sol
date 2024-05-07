@@ -221,7 +221,7 @@ contract MultiCommitStore is IMultiCommitStore, ITypeAndVersion, OCR2Base {
       }
     }
 
-    for (uint256 i; i < report.merkleRoots.length; ++i) {
+    for (uint256 i = 0; i < report.merkleRoots.length; ++i) {
       MerkleRoot memory root = report.merkleRoots[i];
       // If we reached this section, the report should contain a valid root
       SourceChainConfig storage sourceChainConfig = s_sourceChainConfigs[root.sourceChainSelector];
@@ -295,7 +295,7 @@ contract MultiCommitStore is IMultiCommitStore, ITypeAndVersion, OCR2Base {
 
   /// @notice Internal version applySourceChainConfigUpdates.
   function _applySourceChainConfigUpdates(SourceChainConfigArgs[] memory sourceChainConfigs) internal onlyOwner {
-    for (uint256 i; i < sourceChainConfigs.length; ++i) {
+    for (uint256 i = 0; i < sourceChainConfigs.length; ++i) {
       SourceChainConfigArgs memory sourceChainConfig = sourceChainConfigs[i];
       if (sourceChainConfig.onRamp == address(0) || sourceChainConfig.sourceChainSelector == 0) {
         revert InvalidSourceChainConfig(sourceChainConfig.sourceChainSelector);
