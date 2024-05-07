@@ -5,8 +5,8 @@ import {ITypeAndVersion} from "../shared/interfaces/ITypeAndVersion.sol";
 import {IARM} from "./interfaces/IARM.sol";
 import {ICommitStore} from "./interfaces/ICommitStore.sol";
 import {IPriceRegistry} from "./interfaces/IPriceRegistry.sol";
-
 import {Internal} from "./libraries/Internal.sol";
+
 import {MerkleMultiProof} from "./libraries/MerkleMultiProof.sol";
 import {OCR2Base} from "./ocr/OCR2Base.sol";
 
