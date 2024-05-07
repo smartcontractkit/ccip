@@ -168,7 +168,9 @@ func (p *Plugin) ValidateObservation(outctx ocr3types.OutcomeContext, query ocrt
 	if err := validateDedupedItems(dedupKeyObject, obs.Edges...); err != nil {
 		return fmt.Errorf("invalid Edges: %w", err)
 	}
-	if err := validateDedupedItems(dedupKeyObject, obs.ConfigDigests...); err != nil {
+	if err := validateDedupedItems(func(obs models.ConfigDigestWithMeta) string {
+		return fmt.Sprintf("%d", obs.NetworkSel) // we only allow 1 config digest per network
+	}, obs.ConfigDigests...); err != nil {
 		return fmt.Errorf("invalid ConfigDigests: %w", err)
 	}
 

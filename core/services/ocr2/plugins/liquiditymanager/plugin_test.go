@@ -335,7 +335,6 @@ func TestPlugin_ValidateObservation(t *testing.T) {
 				[]models.ConfigDigestWithMeta{},
 			).Encode(),
 		},
-
 		{
 			name: "deduped liquidity observations",
 			obs: models.NewObservation(
