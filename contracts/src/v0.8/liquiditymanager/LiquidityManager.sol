@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.19;
 
-import {IWrappedNative} from "../ccip/interfaces/IWrappedNative.sol";
 import {IBridgeAdapter} from "./interfaces/IBridge.sol";
-import {ILiquidityContainer} from "./interfaces/ILiquidityContainer.sol";
 import {ILiquidityManager} from "./interfaces/ILiquidityManager.sol";
+import {ILiquidityContainer} from "./interfaces/ILiquidityContainer.sol";
+import {IWrappedNative} from "../ccip/interfaces/IWrappedNative.sol";
 
 import {OCR3Base} from "./ocr/OCR3Base.sol";
 
@@ -37,7 +37,9 @@ contract LiquidityManager is ILiquidityManager, OCR3Base {
   /// @param remoteChainSelector The chain selector of the remote chain funds are coming from.
   /// @param bridgeSpecificData The bridge specific data that was used to finalize the transfer.
   event FinalizationStepCompleted(
-    uint64 indexed ocrSeqNum, uint64 indexed remoteChainSelector, bytes bridgeSpecificData
+    uint64 indexed ocrSeqNum,
+    uint64 indexed remoteChainSelector,
+    bytes bridgeSpecificData
   );
 
   /// @notice Emitted when liquidity is transferred to another chain, or received from another chain.
@@ -108,7 +110,10 @@ contract LiquidityManager is ILiquidityManager, OCR3Base {
   /// @param bridgeSpecificData The bridge specific data that was used to finalize the transfer.
   /// @param reason The reason the finalization failed.
   event FinalizationFailed(
-    uint64 indexed ocrSeqNum, uint64 indexed remoteChainSelector, bytes bridgeSpecificData, bytes reason
+    uint64 indexed ocrSeqNum,
+    uint64 indexed remoteChainSelector,
+    bytes bridgeSpecificData,
+    bytes reason
   );
 
   struct CrossChainRebalancer {
@@ -166,7 +171,7 @@ contract LiquidityManager is ILiquidityManager, OCR3Base {
 
   /// @notice withdraw native balance
   function withdrawNative(uint256 amount, address payable destination) external onlyOwner {
-    (bool success,) = destination.call{value: amount}("");
+    (bool success, ) = destination.call{value: amount}("");
     if (!success) revert TransferFailed();
 
     emit NativeWithdrawn(amount, destination);
@@ -306,11 +311,13 @@ contract LiquidityManager is ILiquidityManager, OCR3Base {
     }
 
     // finalize the withdrawal through the bridge adapter
-    try remoteRebalancer.localBridge.finalizeWithdrawERC20(
-      remoteRebalancer.remoteRebalancer, // remoteSender: the remote rebalancer
-      address(this), // localReceiver: this contract
-      bridgeSpecificPayload
-    ) returns (bool fundsAvailable) {
+    try
+      remoteRebalancer.localBridge.finalizeWithdrawERC20(
+        remoteRebalancer.remoteRebalancer, // remoteSender: the remote rebalancer
+        address(this), // localReceiver: this contract
+        bridgeSpecificPayload
+      )
+    returns (bool fundsAvailable) {
       if (fundsAvailable) {
         // finalization was successful and we can inject the liquidity into the container.
         // approve and liquidity container should transferFrom.
@@ -384,8 +391,10 @@ contract LiquidityManager is ILiquidityManager, OCR3Base {
   /// @notice Process the OCR report.
   /// @dev Called by OCR3Base's transmit() function.
   function _report(bytes calldata report, uint64 ocrSeqNum) internal override {
-    ILiquidityManager.LiquidityInstructions memory instructions =
-      abi.decode(report, (ILiquidityManager.LiquidityInstructions));
+    ILiquidityManager.LiquidityInstructions memory instructions = abi.decode(
+      report,
+      (ILiquidityManager.LiquidityInstructions)
+    );
 
     uint256 sendInstructions = instructions.sendLiquidityParams.length;
     uint256 receiveInstructions = instructions.receiveLiquidityParams.length;
@@ -470,8 +479,9 @@ contract LiquidityManager is ILiquidityManager, OCR3Base {
     }
 
     if (
-      crossChainLiqManager.remoteRebalancer == address(0) || address(crossChainLiqManager.localBridge) == address(0)
-        || crossChainLiqManager.remoteToken == address(0)
+      crossChainLiqManager.remoteRebalancer == address(0) ||
+      address(crossChainLiqManager.localBridge) == address(0) ||
+      crossChainLiqManager.remoteToken == address(0)
     ) {
       revert ZeroAddress();
     }
