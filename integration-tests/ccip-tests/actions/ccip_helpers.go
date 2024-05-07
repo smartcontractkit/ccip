@@ -24,6 +24,8 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"github.com/smartcontractkit/chainlink-testing-framework/k8s/pkg/helm/foundry"
+	"github.com/smartcontractkit/chainlink-testing-framework/k8s/pkg/helm/reorg"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
@@ -87,7 +89,8 @@ type CCIPTOMLEnv struct {
 }
 
 var (
-	NetworkName = func(name string) string {
+	NetworkChart = reorg.TXNodesAppLabel
+	NetworkName  = func(name string) string {
 		return strings.ReplaceAll(strings.ToLower(name), " ", "-")
 	}
 	InflightExpiryExec   = 3 * time.Minute
@@ -98,7 +101,13 @@ var (
 
 	RootSnoozeTime = 3 * time.Minute
 	GethLabel      = func(name string) string {
-		return fmt.Sprintf("%s-ethereum-geth", name)
+		switch NetworkChart {
+		case reorg.TXNodesAppLabel:
+			return fmt.Sprintf("%s-ethereum-geth", name)
+		case foundry.ChartName:
+			return fmt.Sprintf("%s-foundry", name)
+		}
+		return ""
 	}
 	// ApprovedAmountToRouter is the default amount which gets approved for router so that it can transfer token and use the fee token for fee payment
 	ApprovedAmountToRouter           = new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1))

@@ -478,6 +478,7 @@ func DeployEnvironments(
 						},
 					}))
 				selectedNetworks[i].Simulated = true
+				actions.NetworkChart = foundry.ChartName
 				continue
 			}
 		}
