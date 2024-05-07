@@ -57,7 +57,7 @@ DBArgs = ['shared_buffers=2048MB', 'effective_cache_size=4096MB', 'work_mem=64MB
 
 [CCIP.Env.NewCLCluster.Common]
 CommonChainConfigTOML = """
-[EVM.HeadTracker]
+[HeadTracker]
 HistoryDepth = 3000
 
 [GasEstimator]
@@ -90,7 +90,6 @@ TestDuration = '4h'
 TimeUnit = '5s'
 RequestPerUnitTime = [1]
 OptimizeSpace = true
-SendMaxDataInEveryMsgCount = 1000
 
 # to represent 20%, 60%, 15%, 5% of the total messages
 [CCIP.Groups.load.LoadProfile.MsgProfile]
