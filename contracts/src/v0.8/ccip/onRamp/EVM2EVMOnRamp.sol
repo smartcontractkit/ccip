@@ -264,10 +264,10 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     if (msg.sender != s_dynamicConfig.router) revert MustBeCalledByRouter();
     if (destChainSelector != i_destChainSelector) revert InvalidChainSelector(destChainSelector);
 
-    Client.EVMExtraArgsV2 memory extraArgsV2 = _fromBytes(message.extraArgs);
+    Client.EVMExtraArgsV2 memory extraArgs = _fromBytes(message.extraArgs);
     // Validate the message with various checks
     uint256 numberOfTokens = message.tokenAmounts.length;
-    _validateMessage(message.data.length, extraArgsV2.gasLimit, numberOfTokens);
+    _validateMessage(message.data.length, extraArgs.gasLimit, numberOfTokens, extraArgs.allowOutOfOrderExecution);
 
     // Only check token value if there are tokens
     if (numberOfTokens > 0) {
@@ -308,11 +308,11 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
       // Not duplicately validated in `getFee`. Invalid address is uncommon, gas cost outweighs UX gain.
       receiver: Internal._validateEVMAddress(message.receiver),
       sequenceNumber: ++s_sequenceNumber,
-      gasLimit: extraArgsV2.gasLimit,
+      gasLimit: extraArgs.gasLimit,
       strict: false,
       // Only bump nonce for messages that specify allowOutOfOrderExecution == false. Otherwise, we
       // may block ordered message nonces, which is not what we want.
-      nonce: extraArgsV2.allowOutOfOrderExecution ? 0 : ++s_senderNonce[originalSender],
+      nonce: extraArgs.allowOutOfOrderExecution ? 0 : ++s_senderNonce[originalSender],
       feeToken: message.feeToken,
       feeTokenAmount: feeTokenAmount,
       data: message.data,
@@ -376,35 +376,20 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   /// @return The extra args struct
   function _fromBytes(bytes calldata extraArgs) internal view returns (Client.EVMExtraArgsV2 memory) {
     if (extraArgs.length == 0) {
-      return _maybeEnforceOutOfOrderExecution(i_defaultTxGasLimit);
+      return Client.EVMExtraArgsV2({gasLimit: i_defaultTxGasLimit, allowOutOfOrderExecution: false});
     }
 
     bytes4 extraArgsTag = bytes4(extraArgs);
     if (extraArgsTag == Client.EVM_EXTRA_ARGS_V2_TAG) {
-      Client.EVMExtraArgsV2 memory extraArgsV2 = abi.decode(extraArgs[4:], (Client.EVMExtraArgsV2));
-
-      if (!extraArgsV2.allowOutOfOrderExecution && s_dynamicConfig.enforceOutOfOrder) {
-        revert ExtraArgOutOfOrderExecutionMustBeTrue();
-      }
-      return extraArgsV2;
+      return abi.decode(extraArgs[4:], (Client.EVMExtraArgsV2));
     } else if (extraArgsTag == Client.EVM_EXTRA_ARGS_V1_TAG) {
       // EVMExtraArgsV1 originally included a second boolean (strict) field which we have deprecated entirely.
       // Clients may still send that version but it will be ignored.
-      return _maybeEnforceOutOfOrderExecution(abi.decode(extraArgs[4:], (Client.EVMExtraArgsV1)).gasLimit);
+      Client.EVMExtraArgsV1 memory extraArgsV1 = abi.decode(extraArgs[4:], (Client.EVMExtraArgsV1));
+      return Client.EVMExtraArgsV2({gasLimit: extraArgsV1.gasLimit, allowOutOfOrderExecution: false});
     }
 
     revert InvalidExtraArgsTag();
-  }
-
-  function _maybeEnforceOutOfOrderExecution(uint256 gasLimit) internal view returns (Client.EVMExtraArgsV2 memory) {
-    if (s_dynamicConfig.enforceOutOfOrder) {
-      // In order to avoid varying defaults, if enforceOutOfOrder is set, we require the
-      // caller to set allowOutOfOrderExecution to true.
-      revert ExtraArgOutOfOrderExecutionMustBeTrue();
-    }
-
-    // Backwards compatibility: allowOutOfOrderExecution set to false by default.
-    return Client.EVMExtraArgsV2({gasLimit: gasLimit, allowOutOfOrderExecution: false});
   }
 
   /// @notice Validate the forwarded message with various checks.
@@ -413,12 +398,13 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   /// @param dataLength The length of the data field of the message.
   /// @param gasLimit The gasLimit set in message for destination execution.
   /// @param numberOfTokens The number of tokens to be sent.
-  function _validateMessage(uint256 dataLength, uint256 gasLimit, uint256 numberOfTokens) internal view {
+  function _validateMessage(uint256 dataLength, uint256 gasLimit, uint256 numberOfTokens, bool allowOutOfOrderExecution) internal view {
     // Check that payload is formed correctly
     uint256 maxDataBytes = uint256(s_dynamicConfig.maxDataBytes);
     if (dataLength > maxDataBytes) revert MessageTooLarge(maxDataBytes, dataLength);
     if (gasLimit > uint256(s_dynamicConfig.maxPerMsgGasLimit)) revert MessageGasLimitTooHigh();
     if (numberOfTokens > uint256(s_dynamicConfig.maxNumberOfTokensPerMsg)) revert UnsupportedNumberOfTokens();
+    if (s_dynamicConfig.enforceOutOfOrder && !allowOutOfOrderExecution) revert ExtraArgOutOfOrderExecutionMustBeTrue();
   }
 
   // ================================================================
@@ -502,9 +488,9 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   ) external view returns (uint256 feeTokenAmount) {
     if (destChainSelector != i_destChainSelector) revert InvalidChainSelector(destChainSelector);
 
-    uint256 gasLimit = _fromBytes(message.extraArgs).gasLimit;
+    Client.EVMExtraArgsV2 memory extraArgs = _fromBytes(message.extraArgs);
     // Validate the message with various checks
-    _validateMessage(message.data.length, gasLimit, message.tokenAmounts.length);
+    _validateMessage(message.data.length, extraArgs.gasLimit, message.tokenAmounts.length, extraArgs.allowOutOfOrderExecution);
 
     FeeTokenConfig memory feeTokenConfig = s_feeTokenConfig[message.feeToken];
     if (!feeTokenConfig.enabled) revert NotAFeeToken(message.feeToken);
@@ -548,7 +534,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     // uint112(packedGasPrice) = executionGasPrice
     uint256 executionCost = uint112(packedGasPrice)
       * (
-        gasLimit + s_dynamicConfig.destGasOverhead + (message.data.length * s_dynamicConfig.destGasPerPayloadByte)
+        extraArgs.gasLimit + s_dynamicConfig.destGasOverhead + (message.data.length * s_dynamicConfig.destGasPerPayloadByte)
           + tokenTransferGas
       ) * feeTokenConfig.gasMultiplierWeiPerEth;
 
