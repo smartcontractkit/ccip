@@ -2,9 +2,10 @@
 pragma solidity 0.8.19;
 
 import {ITypeAndVersion} from "../shared/interfaces/ITypeAndVersion.sol";
-import {IARM} from "./interfaces/IARM.sol";
+
 import {ICommitStore} from "./interfaces/ICommitStore.sol";
 import {IPriceRegistry} from "./interfaces/IPriceRegistry.sol";
+import {IRMN} from "./interfaces/IRMN.sol";
 
 import {Internal} from "./libraries/Internal.sol";
 import {MerkleMultiProof} from "./libraries/MerkleMultiProof.sol";
@@ -139,7 +140,7 @@ contract MultiCommitStore is ICommitStore, ITypeAndVersion, OCR2Base {
   /// @param root The merkle root to check the blessing status for.
   /// @return whether the root is blessed or not.
   function isBlessed(bytes32 root) public view returns (bool) {
-    return IARM(i_armProxy).isBlessed(IARM.TaggedRoot({commitStore: address(this), root: root}));
+    return IRMN(i_armProxy).isBlessed(IRMN.TaggedRoot({commitStore: address(this), root: root}));
   }
 
   /// @notice Used by the owner in case an invalid sequence of roots has been
@@ -271,17 +272,17 @@ contract MultiCommitStore is ICommitStore, ITypeAndVersion, OCR2Base {
 
   /// @notice Single function to check the status of the commitStore.
   function isUnpausedAndARMHealthy() external view returns (bool) {
-    return !IARM(i_armProxy).isCursed() && !s_paused;
+    return !IRMN(i_armProxy).isCursed() && !s_paused;
   }
 
   /// @notice Support querying whether health checker is healthy.
   function isARMHealthy() external view returns (bool) {
-    return !IARM(i_armProxy).isCursed();
+    return !IRMN(i_armProxy).isCursed();
   }
 
   /// @notice Ensure that the ARM has not emitted a bad signal, and that the latest heartbeat is not stale.
   modifier whenHealthy() {
-    if (IARM(i_armProxy).isCursed()) revert BadARMSignal();
+    if (IRMN(i_armProxy).isCursed()) revert BadARMSignal();
     _;
   }
 

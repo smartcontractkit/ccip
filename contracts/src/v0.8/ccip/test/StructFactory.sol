@@ -4,8 +4,8 @@ pragma solidity 0.8.19;
 import {IPool} from "../interfaces/IPool.sol";
 import {IPriceRegistry} from "../interfaces/IPriceRegistry.sol";
 
-import {RMN} from "../RMN.sol";
 import {PriceRegistry} from "../PriceRegistry.sol";
+import {RMN} from "../RMN.sol";
 import {Internal} from "../libraries/Internal.sol";
 import {RateLimiter} from "../libraries/RateLimiter.sol";
 import {EVM2EVMOffRamp} from "../offRamp/EVM2EVMOffRamp.sol";

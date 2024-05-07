@@ -28,7 +28,8 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/arm_proxy_contract"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store_1_2_0"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store_helper"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store_helper_1_2_0"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/custom_token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp"
@@ -197,8 +198,8 @@ type SourceChain struct {
 type DestinationChain struct {
 	Common
 
-	CommitStoreHelper *commit_store_helper_1_2_0.CommitStoreHelper
-	CommitStore       *commit_store_1_2_0.CommitStore
+	CommitStoreHelper *commit_store_helper.CommitStoreHelper
+	CommitStore       *commit_store.CommitStore
 	Router            *router.Router
 	OffRamp           *evm_2_evm_offramp.EVM2EVMOffRamp
 	Receivers         []MaybeRevertReceiver
@@ -389,10 +390,10 @@ func (c *CCIPContracts) DeployNewCommitStore(t *testing.T) {
 	)
 	require.NoError(t, err)
 	c.Dest.Chain.Commit()
-	c.Dest.CommitStoreHelper, err = commit_store_helper_1_2_0.NewCommitStoreHelper(commitStoreAddress, c.Dest.Chain)
+	c.Dest.CommitStoreHelper, err = commit_store_helper.NewCommitStoreHelper(commitStoreAddress, c.Dest.Chain)
 	require.NoError(t, err)
 	// since CommitStoreHelper derives from CommitStore, it's safe to instantiate both on same address
-	c.Dest.CommitStore, err = commit_store_1_2_0.NewCommitStore(commitStoreAddress, c.Dest.Chain)
+	c.Dest.CommitStore, err = commit_store.NewCommitStore(commitStoreAddress, c.Dest.Chain)
 	require.NoError(t, err)
 }
 
@@ -1106,9 +1107,9 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 	)
 	require.NoError(t, err)
 	destChain.Commit()
-	commitStore, err := commit_store_1_2_0.NewCommitStore(commitStoreAddress, destChain)
+	commitStore, err := commit_store.NewCommitStore(commitStoreAddress, destChain)
 	require.NoError(t, err)
-	commitStoreHelper, err := commit_store_helper_1_2_0.NewCommitStoreHelper(commitStoreAddress, destChain)
+	commitStoreHelper, err := commit_store_helper.NewCommitStoreHelper(commitStoreAddress, destChain)
 	require.NoError(t, err)
 
 	offRampAddress, _, _, err := evm_2_evm_offramp.DeployEVM2EVMOffRamp(
@@ -1378,7 +1379,7 @@ func (args *ManualExecArgs) ExecuteManually() (*types.Transaction, error) {
 		}
 		args.SeqNr = seqNr
 	}
-	commitStore, err := commit_store_1_2_0.NewCommitStore(common.HexToAddress(args.CommitStore), args.DestChain)
+	commitStore, err := commit_store.NewCommitStore(common.HexToAddress(args.CommitStore), args.DestChain)
 	if err != nil {
 		return nil, err
 	}
@@ -1393,7 +1394,7 @@ func (args *ManualExecArgs) ExecuteManually() (*types.Transaction, error) {
 		return nil, err
 	}
 
-	var commitReport *commit_store_1_2_0.CommitStoreCommitReport
+	var commitReport *commit_store.CommitStoreCommitReport
 	for iterator.Next() {
 		if iterator.Event.Report.Interval.Min <= args.SeqNr && iterator.Event.Report.Interval.Max >= args.SeqNr {
 			commitReport = &iterator.Event.Report
@@ -1408,7 +1409,7 @@ func (args *ManualExecArgs) ExecuteManually() (*types.Transaction, error) {
 	return args.execute(commitReport)
 }
 
-func (args *ManualExecArgs) execute(report *commit_store_1_2_0.CommitStoreCommitReport) (*types.Transaction, error) {
+func (args *ManualExecArgs) execute(report *commit_store.CommitStoreCommitReport) (*types.Transaction, error) {
 	log.Info().Msg("Executing request manually")
 	seqNr := args.SeqNr
 	// Build a merkle tree for the report

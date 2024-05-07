@@ -23,6 +23,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
+
 	"github.com/smartcontractkit/chainlink/integration-tests/client"
 	"github.com/smartcontractkit/chainlink/integration-tests/contracts"
 	"github.com/smartcontractkit/chainlink/integration-tests/wrappers"
@@ -419,7 +420,7 @@ func (e *CCIPContractsDeployer) DeployCommitStore(sourceChainSelector, destChain
 				ChainSelector:       destChainSelector,
 				SourceChainSelector: sourceChainSelector,
 				OnRamp:              onRamp,
-				ArmProxy:            armProxy,
+				RmnProxy:            armProxy,
 			},
 		)
 	})
