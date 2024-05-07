@@ -11,8 +11,9 @@ import (
 	"github.com/AlekSi/pointer"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
-	ctfconfig "github.com/smartcontractkit/chainlink-testing-framework/config"
 	"github.com/stretchr/testify/require"
+
+	ctfconfig "github.com/smartcontractkit/chainlink-testing-framework/config"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/k8s/pkg/helm/foundry"
 
