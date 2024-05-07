@@ -72,6 +72,12 @@ contract MultiCommitStore is IMultiCommitStore, ITypeAndVersion, OCR2Base {
     MerkleRoot[] merkleRoots;
   }
 
+  /// @dev Struct to hold a merkle root for a source chain so that an array of these can be passed in the resetUblessedRoots function.
+  struct UnblessedRoot {
+    uint64 sourceChainSelector;
+    bytes32 merkleRoot;
+  }
+
   // STATIC CONFIG
   string public constant override typeAndVersion = "MultiCommitStore 1.6.0-dev";
   // Chain ID of this chain
@@ -150,12 +156,6 @@ contract MultiCommitStore is IMultiCommitStore, ITypeAndVersion, OCR2Base {
   function isBlessed(bytes32 root) public view returns (bool) {
     // TODO: update ARM to also consider the source chain selector for blessing
     return IARM(i_armProxy).isBlessed(IARM.TaggedRoot({commitStore: address(this), root: root}));
-  }
-
-  /// @dev Struct to hold a merkle root for a source chain so that an array of these can be passed in the resetUblessedRoots function.
-  struct UnblessedRoot {
-    uint64 sourceChainSelector;
-    bytes32 merkleRoot;
   }
 
   /// @notice Used by the owner in case an invalid sequence of roots has been
