@@ -253,7 +253,7 @@ func DeployLocalCluster(
 ) (*test_env.CLClusterTestEnv, func() error) {
 	selectedNetworks := testInputs.SelectedNetworks
 
-	privateEthereumNetworks := []*ctfconfig.EthereumNetwork{}
+	privateEthereumNetworks := []*ctfconfig.EthereumNetworkConfig{}
 	for _, network := range testInputs.EnvInput.PrivateEthereumNetworks {
 		privateEthereumNetworks = append(privateEthereumNetworks, network)
 	}
@@ -273,16 +273,16 @@ func DeployLocalCluster(
 		}
 
 		for _, network := range missing {
-			chainConfig := &ctftestenv.EthereumChainConfig{}
+			chainConfig := &ctfconfig.EthereumChainConfig{}
 			err := chainConfig.Default()
 			if err != nil {
 				require.NoError(t, err, "failed to get default chain config: %w", err)
 			} else {
 				chainConfig.ChainID = int(network.ChainID)
-				eth1 := ctftestenv.EthereumVersion_Eth1
-				geth := ctftestenv.ExecutionLayer_Geth
+				eth1 := ctfconfig.EthereumVersion_Eth1
+				geth := ctfconfig.ExecutionLayer_Geth
 
-				privateEthereumNetworks = append(privateEthereumNetworks, &ctftestenv.EthereumNetwork{
+				privateEthereumNetworks = append(privateEthereumNetworks, &ctfconfig.EthereumNetworkConfig{
 					EthereumVersion:     &eth1,
 					ExecutionLayer:      &geth,
 					EthereumChainConfig: chainConfig,

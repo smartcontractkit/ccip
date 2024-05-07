@@ -19,6 +19,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	ctfconfig "github.com/smartcontractkit/chainlink-testing-framework/config"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
 	"go.uber.org/multierr"
@@ -243,16 +244,16 @@ func (c *CCIPTestConfig) SetNetworkPairs(lggr zerolog.Logger) error {
 				c.EnvInput.Network.AnvilConfigs[strings.ToUpper(name)] = existing
 			}
 
-			chainConfig := &ctftestenv.EthereumChainConfig{}
+			chainConfig := &ctfconfig.EthereumChainConfig{}
 			err := chainConfig.Default()
 			if err != nil {
 				allError = multierr.Append(allError, fmt.Errorf("failed to get default chain config: %w", err))
 			} else {
 				chainConfig.ChainID = int(chainID)
-				eth1 := ctftestenv.EthereumVersion_Eth1
-				geth := ctftestenv.ExecutionLayer_Geth
+				eth1 := ctfconfig.EthereumVersion_Eth1
+				geth := ctfconfig.ExecutionLayer_Geth
 
-				c.EnvInput.PrivateEthereumNetworks[fmt.Sprint(chainID)] = &ctftestenv.EthereumNetwork{
+				c.EnvInput.PrivateEthereumNetworks[fmt.Sprint(chainID)] = &ctfconfig.EthereumNetworkConfig{
 					EthereumVersion:     &eth1,
 					ExecutionLayer:      &geth,
 					EthereumChainConfig: chainConfig,
