@@ -307,53 +307,6 @@ func TestPlugin_Observation(t *testing.T) {
 	}
 }
 
-func TestPlugin_ValidateObservation(t *testing.T) {
-	testCases := []struct {
-		name   string
-		obs    ocrtypes.Observation
-		expErr func(t *testing.T, err error)
-	}{
-		{
-			name: "some random bytes",
-			obs:  ocrtypes.Observation("abc"),
-			expErr: func(t *testing.T, err error) {
-				assert.Error(t, err)
-			},
-		},
-		{
-			name: "empty is ok",
-			obs:  ocrtypes.Observation("{}"),
-		},
-		{
-			name: "some observation",
-			obs: models.NewObservation(
-				[]models.NetworkLiquidity{},
-				[]models.Transfer{{}, {}},
-				[]models.PendingTransfer{},
-				[]models.Transfer{},
-				[]models.Edge{},
-				[]models.ConfigDigestWithMeta{},
-			).Encode(),
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			p := newPluginWithMocksAndDefaults(t)
-			ao := ocrtypes.AttributedObservation{
-				Observation: tc.obs,
-				Observer:    commontypes.OracleID(uint8(rand.Intn(10))), // ignored by the plugin
-			}
-			err := p.plugin.ValidateObservation(ocr3types.OutcomeContext{}, ocrtypes.Query{}, ao)
-			if tc.expErr != nil {
-				tc.expErr(t, err)
-				return
-			}
-			assert.NoError(t, err)
-		})
-	}
-}
-
 func TestPlugin_ObservationQuorum(t *testing.T) {
 	p := newPluginWithMocksAndDefaults(t)
 	res, err := p.plugin.ObservationQuorum(ocr3types.OutcomeContext{}, ocrtypes.Query{})

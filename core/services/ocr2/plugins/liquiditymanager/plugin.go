@@ -142,20 +142,6 @@ func (p *Plugin) Observation(ctx context.Context, outcomeCtx ocr3types.OutcomeCo
 	return encodedObservation, nil
 }
 
-func (p *Plugin) ValidateObservation(outctx ocr3types.OutcomeContext, query ocrtypes.Query, ao ocrtypes.AttributedObservation) error {
-	// todo: improve logging - including duration of each phase, etc.
-	p.lggr.Infow("in validate observation", "seqNr", outctx.SeqNr, "phase", "ValidateObservation")
-
-	_, err := models.DecodeObservation(ao.Observation)
-	if err != nil {
-		return fmt.Errorf("invalid observation: %w", err)
-	}
-
-	// todo: consider adding more validations
-
-	return nil
-}
-
 func (p *Plugin) ObservationQuorum(outctx ocr3types.OutcomeContext, query ocrtypes.Query) (ocr3types.Quorum, error) {
 	return ocr3types.QuorumTwoFPlusOne, nil
 }
