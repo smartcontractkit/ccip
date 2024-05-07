@@ -15,6 +15,10 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/models"
 )
 
+const (
+	discoverGoroutines = 4
+)
+
 type evmLiquidityGetter func(ctx context.Context, selector models.NetworkSelector, lmAddress common.Address) (*big.Int, error)
 
 type evmDiscoverer struct {
@@ -99,20 +103,46 @@ func (e *evmDiscoverer) DiscoverBalances(ctx context.Context, g graph.Graph) err
 	if liquidityGetter == nil {
 		liquidityGetter = e.defaultLiquidityGetter
 	}
+	numOfGoroutines := discoverGoroutines
+	if len(networks) < numOfGoroutines {
+		numOfGoroutines = len(networks)
+	}
+	running := make(chan struct{}, numOfGoroutines)
+	results := make(chan error, len(networks))
 	for _, selector := range networks {
-		if err := e.updateLiquidity(ctx, selector, g, liquidityGetter); err != nil {
-			return fmt.Errorf("get liquidity: %w", err)
+		running <- struct{}{}
+		go func(c context.Context, selector models.NetworkSelector) {
+			defer func() { <-running }()
+			err := e.updateLiquidity(c, selector, g, liquidityGetter)
+			if err != nil {
+				err = fmt.Errorf("get liquidity: %w", err)
+			}
+			select {
+			case results <- err:
+			default:
+			}
+		}(ctx, selector)
+	}
+
+	for range networks {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case err := <-results:
+			if err != nil {
+				return err
+			}
 		}
 	}
 	return nil
 }
 
 func (e *evmDiscoverer) updateLiquidity(ctx context.Context, selector models.NetworkSelector, g graph.Graph, liquidityGetter evmLiquidityGetter) error {
-	rebalancerAddress, err := g.GetRebalancerAddress(selector)
+	lmAddress, err := g.GetRebalancerAddress(selector)
 	if err != nil {
 		return fmt.Errorf("get rebalancer address: %w", err)
 	}
-	liquidity, err := liquidityGetter(ctx, selector, common.Address(rebalancerAddress))
+	liquidity, err := liquidityGetter(ctx, selector, common.Address(lmAddress))
 	if err != nil {
 		return fmt.Errorf("get liquidity: %w", err)
 	}
