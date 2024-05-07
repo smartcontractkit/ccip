@@ -40,12 +40,13 @@ func main() {
 	}
 
 	resolvedFeeToken := resolveTokenAddress( args.Source, args.FeeToken, &config)
-	//fmt.Println("Resolved fee token address:", strings.ToLower(resolvedFeeToken))
 	url := GenerateQueryString(args.Sender, args.Receiver, args.Source, args.Dest, args.MessageId, resolvedFeeToken, args.First, args.Offset )
 	fmt.Println("Querying API with URL:", url)
 	apiResponse, nil := QueryTransactionsAPI(url)
-
-	fmt.Println("API Response:", apiResponse)
+	if err != nil {
+		fmt.Println("Error querying API:", err)
+		return
+	}
 
 	// print the current working directory
 	dir, err := os.Getwd()
