@@ -1809,15 +1809,12 @@ func (destCCIP *DestCCIPModule) DeployContracts(
 	}
 	// set remote pools
 	if !destCCIP.Common.ExistingDeployment {
+		sourceCCIP.Common.ChainClient.ParallelTransactions(false)
 		for i, pool := range sourceCCIP.Common.BridgeTokenPools {
 			err := pool.SetRemotePool(destChainSelector, destCCIP.Common.BridgeTokenPools[i].EthAddress)
 			if err != nil {
 				return fmt.Errorf("error setting remote pools %w", err)
 			}
-		}
-		err = sourceCCIP.Common.ChainClient.WaitForEvents()
-		if err != nil {
-			return fmt.Errorf("waiting for setting remote pools shouldn't fail %w", err)
 		}
 	}
 
