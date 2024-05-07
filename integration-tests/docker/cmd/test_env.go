@@ -9,12 +9,14 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	ctfconfig "github.com/smartcontractkit/chainlink-testing-framework/config"
 	"github.com/spf13/cobra"
 	"github.com/testcontainers/testcontainers-go"
 
 	ctf_test_env "github.com/smartcontractkit/chainlink-testing-framework/docker/test_env"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/logging"
+
 	"github.com/smartcontractkit/chainlink/integration-tests/docker/test_env"
 )
 
@@ -39,8 +41,8 @@ func main() {
 
 			ethBuilder := ctf_test_env.NewEthereumNetworkBuilder()
 			network, err := ethBuilder.
-				WithEthereumVersion(ctf_test_env.EthereumVersion_Eth1).
-				WithExecutionLayer(ctf_test_env.ExecutionLayer_Geth).
+				WithEthereumVersion(ctfconfig.EthereumVersion_Eth1).
+				WithExecutionLayer(ctfconfig.ExecutionLayer_Geth).
 				Build()
 
 			if err != nil {
@@ -48,7 +50,7 @@ func main() {
 			}
 
 			_, err = test_env.NewCLTestEnvBuilder().
-				WithPrivateEthereumNetwork(network).
+				WithPrivateEthereumNetwork(network.EthereumNetworkConfig).
 				WithMockAdapter().
 				WithCLNodes(6).
 				Build()
