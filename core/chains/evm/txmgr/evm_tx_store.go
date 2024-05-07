@@ -2242,5 +2242,5 @@ func reportQueryDuration(query string, chainID *big.Int, queryStarted time.Time)
 	}
 	txmgrQueryDuration.
 		WithLabelValues(stringChainId, query).
-		Observe(time.Since(queryStarted).Seconds())
+		Observe(float64(time.Since(queryStarted)))
 }
