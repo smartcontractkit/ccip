@@ -483,7 +483,7 @@ func (p *Plugin) syncGraph(ctx context.Context) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	if p.liquidityGraph == nil {
+	if p.liquidityGraph.IsEmpty() {
 		if err := p.syncGraphEdges(ctx); err != nil {
 			return fmt.Errorf("sync graph edges: %w", err)
 		}
