@@ -272,12 +272,12 @@ contract CommitStore is ICommitStore, ITypeAndVersion, OCR2Base {
   // ================================================================
 
   /// @notice Single function to check the status of the commitStore.
-  function isUnpausedAndRMNHealthy() external view returns (bool) {
+  function isUnpausedAndNotCursed() external view returns (bool) {
     return !IRMN(i_rmnProxy).isCursed(bytes32(uint256(i_sourceChainSelector))) && !s_paused;
   }
 
   /// @notice Support querying whether health checker is healthy.
-  function isRMNHealthy() external view returns (bool) {
+  function isNotCursed() external view returns (bool) {
     return !IRMN(i_rmnProxy).isCursed(bytes32(uint256(i_sourceChainSelector)));
   }
 

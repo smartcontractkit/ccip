@@ -19,7 +19,6 @@ import (
 
 type CommitStore struct {
 	*v1_2_0.CommitStore
-	// Static config
 	commitStore *commit_store.CommitStore
 }
 
@@ -37,11 +36,11 @@ func (c *CommitStore) GetCommitStoreStaticConfig(ctx context.Context) (cciptypes
 }
 
 func (c *CommitStore) IsDown(ctx context.Context) (bool, error) {
-	unPausedAndHealthy, err := c.commitStore.IsUnpausedAndRMNHealthy(&bind.CallOpts{Context: ctx})
+	unPausedAndNotCursed, err := c.commitStore.IsUnpausedAndNotCursed(&bind.CallOpts{Context: ctx})
 	if err != nil {
 		return true, err
 	}
-	return !unPausedAndHealthy, nil
+	return !unPausedAndNotCursed, nil
 }
 
 func NewCommitStore(lggr logger.Logger, addr common.Address, ec client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator, sourceMaxGasPrice *big.Int) (*CommitStore, error) {

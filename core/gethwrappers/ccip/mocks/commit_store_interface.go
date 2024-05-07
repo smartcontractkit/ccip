@@ -543,12 +543,12 @@ func (_m *CommitStoreInterface) IsBlessed(opts *bind.CallOpts, root [32]byte) (b
 	return r0, r1
 }
 
-// IsRMNHealthy provides a mock function with given fields: opts
-func (_m *CommitStoreInterface) IsRMNHealthy(opts *bind.CallOpts) (bool, error) {
+// IsNotCursed provides a mock function with given fields: opts
+func (_m *CommitStoreInterface) IsNotCursed(opts *bind.CallOpts) (bool, error) {
 	ret := _m.Called(opts)
 
 	if len(ret) == 0 {
-		panic("no return value specified for IsRMNHealthy")
+		panic("no return value specified for IsNotCursed")
 	}
 
 	var r0 bool
@@ -571,12 +571,12 @@ func (_m *CommitStoreInterface) IsRMNHealthy(opts *bind.CallOpts) (bool, error) 
 	return r0, r1
 }
 
-// IsUnpausedAndRMNHealthy provides a mock function with given fields: opts
-func (_m *CommitStoreInterface) IsUnpausedAndRMNHealthy(opts *bind.CallOpts) (bool, error) {
+// IsUnpausedAndNotCursed provides a mock function with given fields: opts
+func (_m *CommitStoreInterface) IsUnpausedAndNotCursed(opts *bind.CallOpts) (bool, error) {
 	ret := _m.Called(opts)
 
 	if len(ret) == 0 {
-		panic("no return value specified for IsUnpausedAndRMNHealthy")
+		panic("no return value specified for IsUnpausedAndNotCursed")
 	}
 
 	var r0 bool

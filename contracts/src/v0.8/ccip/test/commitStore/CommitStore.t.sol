@@ -121,7 +121,7 @@ contract CommitStore_constructor is PriceRegistrySetup, OCR2BaseSetup {
     assertEq(1, commitStore.getExpectedNextSequenceNumber());
     assertEq(commitStore.typeAndVersion(), "CommitStore 1.5.0-dev");
     assertEq(OWNER, commitStore.owner());
-    assertTrue(commitStore.isUnpausedAndRMNHealthy());
+    assertTrue(commitStore.isUnpausedAndNotCursed());
   }
 }
 
@@ -586,28 +586,28 @@ contract CommitStore_isUnpausedAndRMNHealthy is CommitStoreSetup {
   function test_RMN_Success() public {
     // Test pausing
     assertFalse(s_commitStore.paused());
-    assertTrue(s_commitStore.isUnpausedAndRMNHealthy());
+    assertTrue(s_commitStore.isUnpausedAndNotCursed());
     s_commitStore.pause();
     assertTrue(s_commitStore.paused());
-    assertFalse(s_commitStore.isUnpausedAndRMNHealthy());
+    assertFalse(s_commitStore.isUnpausedAndNotCursed());
     s_commitStore.unpause();
     assertFalse(s_commitStore.paused());
-    assertTrue(s_commitStore.isUnpausedAndRMNHealthy());
+    assertTrue(s_commitStore.isUnpausedAndNotCursed());
 
     // Test rmn
-    assertTrue(s_commitStore.isRMNHealthy());
+    assertTrue(s_commitStore.isNotCursed());
     s_mockRMN.voteToCurse(0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff);
-    assertFalse(s_commitStore.isRMNHealthy());
-    assertFalse(s_commitStore.isUnpausedAndRMNHealthy());
+    assertFalse(s_commitStore.isNotCursed());
+    assertFalse(s_commitStore.isUnpausedAndNotCursed());
     RMN.UnvoteToCurseRecord[] memory records = new RMN.UnvoteToCurseRecord[](1);
     records[0] = RMN.UnvoteToCurseRecord({curseVoteAddr: OWNER, cursesHash: bytes32(uint256(0)), forceUnvote: true});
     s_mockRMN.ownerUnvoteToCurse(records);
-    assertTrue(s_commitStore.isRMNHealthy());
-    assertTrue(s_commitStore.isUnpausedAndRMNHealthy());
+    assertTrue(s_commitStore.isNotCursed());
+    assertTrue(s_commitStore.isUnpausedAndNotCursed());
 
     s_mockRMN.voteToCurse(0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff);
     s_commitStore.pause();
-    assertFalse(s_commitStore.isUnpausedAndRMNHealthy());
+    assertFalse(s_commitStore.isUnpausedAndNotCursed());
   }
 }
 
