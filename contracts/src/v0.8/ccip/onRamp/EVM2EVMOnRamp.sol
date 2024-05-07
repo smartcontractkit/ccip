@@ -398,7 +398,12 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   /// @param dataLength The length of the data field of the message.
   /// @param gasLimit The gasLimit set in message for destination execution.
   /// @param numberOfTokens The number of tokens to be sent.
-  function _validateMessage(uint256 dataLength, uint256 gasLimit, uint256 numberOfTokens, bool allowOutOfOrderExecution) internal view {
+  function _validateMessage(
+    uint256 dataLength,
+    uint256 gasLimit,
+    uint256 numberOfTokens,
+    bool allowOutOfOrderExecution
+  ) internal view {
     // Check that payload is formed correctly
     uint256 maxDataBytes = uint256(s_dynamicConfig.maxDataBytes);
     if (dataLength > maxDataBytes) revert MessageTooLarge(maxDataBytes, dataLength);
@@ -490,7 +495,9 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
 
     Client.EVMExtraArgsV2 memory extraArgs = _fromBytes(message.extraArgs);
     // Validate the message with various checks
-    _validateMessage(message.data.length, extraArgs.gasLimit, message.tokenAmounts.length, extraArgs.allowOutOfOrderExecution);
+    _validateMessage(
+      message.data.length, extraArgs.gasLimit, message.tokenAmounts.length, extraArgs.allowOutOfOrderExecution
+    );
 
     FeeTokenConfig memory feeTokenConfig = s_feeTokenConfig[message.feeToken];
     if (!feeTokenConfig.enabled) revert NotAFeeToken(message.feeToken);
@@ -534,8 +541,8 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     // uint112(packedGasPrice) = executionGasPrice
     uint256 executionCost = uint112(packedGasPrice)
       * (
-        extraArgs.gasLimit + s_dynamicConfig.destGasOverhead + (message.data.length * s_dynamicConfig.destGasPerPayloadByte)
-          + tokenTransferGas
+        extraArgs.gasLimit + s_dynamicConfig.destGasOverhead
+          + (message.data.length * s_dynamicConfig.destGasPerPayloadByte) + tokenTransferGas
       ) * feeTokenConfig.gasMultiplierWeiPerEth;
 
     // Calculate number of fee tokens to charge.
