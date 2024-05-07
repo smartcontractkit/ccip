@@ -595,14 +595,11 @@ contract CommitStore_isUnpausedAndRMNHealthy is CommitStoreSetup {
     assertTrue(s_commitStore.isUnpausedAndNotCursed());
 
     // Test rmn
-    assertTrue(s_commitStore.isNotCursed());
     s_mockRMN.voteToCurse(0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff);
-    assertFalse(s_commitStore.isNotCursed());
     assertFalse(s_commitStore.isUnpausedAndNotCursed());
     RMN.UnvoteToCurseRecord[] memory records = new RMN.UnvoteToCurseRecord[](1);
     records[0] = RMN.UnvoteToCurseRecord({curseVoteAddr: OWNER, cursesHash: bytes32(uint256(0)), forceUnvote: true});
     s_mockRMN.ownerUnvoteToCurse(records);
-    assertTrue(s_commitStore.isNotCursed());
     assertTrue(s_commitStore.isUnpausedAndNotCursed());
 
     s_mockRMN.voteToCurse(0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff);

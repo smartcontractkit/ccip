@@ -543,34 +543,6 @@ func (_m *CommitStoreInterface) IsBlessed(opts *bind.CallOpts, root [32]byte) (b
 	return r0, r1
 }
 
-// IsNotCursed provides a mock function with given fields: opts
-func (_m *CommitStoreInterface) IsNotCursed(opts *bind.CallOpts) (bool, error) {
-	ret := _m.Called(opts)
-
-	if len(ret) == 0 {
-		panic("no return value specified for IsNotCursed")
-	}
-
-	var r0 bool
-	var r1 error
-	if rf, ok := ret.Get(0).(func(*bind.CallOpts) (bool, error)); ok {
-		return rf(opts)
-	}
-	if rf, ok := ret.Get(0).(func(*bind.CallOpts) bool); ok {
-		r0 = rf(opts)
-	} else {
-		r0 = ret.Get(0).(bool)
-	}
-
-	if rf, ok := ret.Get(1).(func(*bind.CallOpts) error); ok {
-		r1 = rf(opts)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
 // IsUnpausedAndNotCursed provides a mock function with given fields: opts
 func (_m *CommitStoreInterface) IsUnpausedAndNotCursed(opts *bind.CallOpts) (bool, error) {
 	ret := _m.Called(opts)

@@ -276,11 +276,6 @@ contract CommitStore is ICommitStore, ITypeAndVersion, OCR2Base {
     return !IRMN(i_rmnProxy).isCursed(bytes32(uint256(i_sourceChainSelector))) && !s_paused;
   }
 
-  /// @notice Support querying whether health checker is healthy.
-  function isNotCursed() external view returns (bool) {
-    return !IRMN(i_rmnProxy).isCursed(bytes32(uint256(i_sourceChainSelector)));
-  }
-
   /// @notice Modifier to make a function callable only when the contract is not paused.
   modifier whenNotPaused() {
     if (paused()) revert PausedError();

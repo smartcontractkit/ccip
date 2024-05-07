@@ -17,7 +17,7 @@ contract MultiCommitStore is ICommitStore, ITypeAndVersion, OCR2Base {
   error InvalidInterval(Interval interval);
   error InvalidRoot();
   error InvalidCommitStoreConfig();
-  error BadARMSignal();
+  error CursedByRMN();
   error RootAlreadyCommitted();
 
   event Paused(address account);
@@ -182,7 +182,8 @@ contract MultiCommitStore is ICommitStore, ITypeAndVersion, OCR2Base {
   /// and should not be rejected. When a report with a stale root but valid price updates is submitted,
   /// we are OK to revert to preserve the invariant that we always revert on invalid sequence number ranges.
   /// If that happens, prices will be updates in later rounds.
-  function _report(bytes calldata encodedReport, uint40 epochAndRound) internal override whenNotPaused whenHealthy {
+  function _report(bytes calldata encodedReport, uint40 epochAndRound) internal override whenNotPaused {
+    if (IRMN(i_armProxy).isCursed(bytes32(uint256(i_sourceChainSelector)))) revert CursedByRMN();
     CommitReport memory report = abi.decode(encodedReport, (CommitReport));
 
     // Check if the report contains price updates
@@ -271,19 +272,8 @@ contract MultiCommitStore is ICommitStore, ITypeAndVersion, OCR2Base {
   // ================================================================
 
   /// @notice Single function to check the status of the commitStore.
-  function isUnpausedAndARMHealthy() external view returns (bool) {
-    return !IRMN(i_armProxy).isCursed() && !s_paused;
-  }
-
-  /// @notice Support querying whether health checker is healthy.
-  function isARMHealthy() external view returns (bool) {
-    return !IRMN(i_armProxy).isCursed();
-  }
-
-  /// @notice Ensure that the ARM has not emitted a bad signal, and that the latest heartbeat is not stale.
-  modifier whenHealthy() {
-    if (IRMN(i_armProxy).isCursed()) revert BadARMSignal();
-    _;
+  function isUnpausedAndNotCursed() external view returns (bool) {
+    return !IRMN(i_armProxy).isCursed(bytes32(uint256(i_sourceChainSelector))) && !s_paused;
   }
 
   /// @notice Modifier to make a function callable only when the contract is not paused.
