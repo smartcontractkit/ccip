@@ -80,6 +80,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndV
 
   /// @notice Per-chain source config (defining a lane from a Source Chain -> Dest OffRamp)
   struct SourceChainConfig {
+    // TODO: re-evaluate on removing this (can be controlled by CommitStore)
     bool isEnabled; // ─────────╮  Flag whether the source chain is enabled or not
     address prevOffRamp; // ────╯  Address of previous-version per-lane OffRamp. Used to be able to provide seequencing continuity during a zero downtime upgrade.
     address onRamp; //             OnRamp address on the source chain
@@ -619,7 +620,6 @@ contract EVM2EVMMultiOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndV
   /// we bubble it up. If we encounter a non-rate limiting error we wrap it in a TokenHandlingError.
   function _releaseOrMintTokens(
     Client.EVMTokenAmount[] memory sourceTokenAmounts,
-    // TODO: revisit stack-depth after pulling in pool interface changes
     Any2EVMMessageRoute memory messageRoute,
     bytes[] memory encodedSourceTokenData,
     bytes[] memory offchainTokenData

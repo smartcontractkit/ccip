@@ -442,7 +442,6 @@ contract EVM2EVMMultiOffRamp__releaseOrMintTokens is EVM2EVMMultiOffRampSetup {
     Client.EVMTokenAmount[] memory srcTokenAmounts = getCastedSourceEVMTokenAmountsWithZeroAmounts();
     srcTokenAmounts[0].amount = amount;
 
-    bytes memory originalSender = abi.encode(OWNER);
     bytes[] memory offchainTokenData = new bytes[](srcTokenAmounts.length);
     bytes[] memory encodedSourceTokenData = _getDefaultSourceTokenData(srcTokenAmounts);
     Internal.SourceTokenData memory sourceTokenData = abi.decode(encodedSourceTokenData[0], (Internal.SourceTokenData));
@@ -473,7 +472,6 @@ contract EVM2EVMMultiOffRamp__releaseOrMintTokens is EVM2EVMMultiOffRampSetup {
   function test_releaseOrMintTokens_InvalidEVMAddress_Revert() public {
     Client.EVMTokenAmount[] memory srcTokenAmounts = getCastedSourceEVMTokenAmountsWithZeroAmounts();
 
-    bytes memory originalSender = abi.encode(OWNER);
     bytes[] memory offchainTokenData = new bytes[](srcTokenAmounts.length);
     bytes[] memory sourceTokenData = _getDefaultSourceTokenData(srcTokenAmounts);
     bytes memory wrongAddress = abi.encode(address(1000), address(10000), address(10000));
@@ -616,7 +614,6 @@ contract EVM2EVMMultiOffRamp_applySoureConfigUpdates is EVM2EVMMultiOffRampSetup
   uint64 SOURCE_CHAIN_SELECTOR_1 = 16015286601757825753;
 
   function test_ApplyZeroUpdates_Success() public {
-    uint64[] memory sourceChainSelectors = new uint64[](0);
     EVM2EVMMultiOffRamp.SourceChainConfigUpdateArgs[] memory sourceChainConfigs =
       new EVM2EVMMultiOffRamp.SourceChainConfigUpdateArgs[](0);
 
