@@ -1110,11 +1110,14 @@ func TestPlugin_E2EWithMocks(t *testing.T) {
 					n.resetMocks(t)
 
 					// the node will first discover the graph, let's mock the observed graph
+					g := round.discoveredGraphPerNode[i]()
 					discoverer := discoverermocks.NewDiscoverer(t)
 					discoverer.
 						On("Discover", mock.Anything).
-						Return(round.discoveredGraphPerNode[i](), nil).Maybe()
+						Return(g, nil).Maybe()
+					discoverer.On("DiscoverBalances", mock.Anything, mock.Anything).Return(nil).Maybe()
 					n.plugin.discoverer = discoverer
+					n.plugin.liquidityGraph = g
 
 					// the node will now try to load the pending transfers of all the available bridges
 					// let's mock the pending transfers
@@ -1523,9 +1526,8 @@ type node struct {
 
 func (n *node) resetMocks(t *testing.T) {
 	lmFactory := mocks.NewFactory(t)
-	discovererFactory := discoverermocks.NewFactory(t)
 	discovererMock := discoverermocks.NewDiscoverer(t)
-	discovererFactory.On("NewDiscoverer", mock.Anything, mock.Anything).Return(discovererMock, nil)
+	discovererMock.On("DiscoverBalances", mock.Anything, mock.Anything).Return(nil).Maybe()
 	bridgeFactory := bridgemocks.NewFactory(t)
 	bridgeMocks := make(map[[2]models.NetworkSelector]*bridgemocks.Bridge)
 	for _, b := range bridges {
@@ -1533,7 +1535,6 @@ func (n *node) resetMocks(t *testing.T) {
 	}
 
 	n.bridgeFactory = bridgeFactory
-	n.discovererFactory = discovererFactory
 	n.rbFactory = lmFactory
 	n.bridges = bridgeMocks
 
@@ -1546,7 +1547,10 @@ func newNode(t *testing.T, lggr logger.Logger, f int) node {
 	lmFactory := mocks.NewFactory(t)
 	discovererFactory := discoverermocks.NewFactory(t)
 	discovererMock := discoverermocks.NewDiscoverer(t)
-	discovererFactory.On("NewDiscoverer", mock.Anything, mock.Anything).Return(discovererMock, nil)
+	discovererMock.On("DiscoverBalances", mock.Anything, mock.Anything).Return(nil).Maybe()
+	// g := graph.NewGraph()
+	// discovererMock.On("Discover", mock.Anything).Return(g, nil).Maybe()
+	discovererFactory.On("NewDiscoverer", mock.Anything, mock.Anything).Return(discovererMock, nil).Maybe()
 	bridgeFactory := bridgemocks.NewFactory(t)
 	rebalancerAlg := liquidityrebalancer.NewPingPong()
 
