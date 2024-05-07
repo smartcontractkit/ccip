@@ -403,92 +403,38 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
   }
 
   function test_Fuzz_InterleavingOrderedAndUnorderedMessages_Success(
-    bool msg1Ordered,
-    bool msg2Ordered,
-    bool msg3Ordered
+    bool[7] memory orderings
   ) public {
-    Internal.EVM2EVMMessage[] memory messages = new Internal.EVM2EVMMessage[](3);
+    Internal.EVM2EVMMessage[] memory messages = new Internal.EVM2EVMMessage[](orderings.length);
+    // number of tokens needs to be capped otherwise we hit UnsupportedNumberOfTokens.
     Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](3);
     for (uint256 i = 0; i < 3; ++i) {
       tokenAmounts[i].token = s_sourceTokens[i % s_sourceTokens.length];
+      tokenAmounts[i].amount = 1e18;
     }
-    tokenAmounts[0].amount = 1e18;
-    tokenAmounts[1].amount = 5e18;
-    tokenAmounts[2].amount = 1e18;
-    messages[0] = _generateAny2EVMMessage(1, tokenAmounts, !msg1Ordered);
-    messages[1] = _generateAny2EVMMessage(2, tokenAmounts, !msg2Ordered);
-    messages[2] = _generateAny2EVMMessage(3, tokenAmounts, !msg3Ordered);
-
-    // somewhat annoying nonce logic to fuzz any ordering of 3 messages.
-    // _generateAny2EVMMessage sets the nonce to be the sequence number provided by default.
-    if (!msg1Ordered) {
-      messages[0].nonce = 0;
-    } else {
-      messages[1].nonce = 1;
-    }
-    if (!msg2Ordered) {
-      messages[1].nonce = 0;
-    } else {
-      if (msg1Ordered) {
-        messages[1].nonce = 2;
-      } else {
-        messages[1].nonce = 1;
-      }
-    }
-    if (!msg3Ordered) {
-      messages[2].nonce = 0;
-    } else {
-      if (msg1Ordered && msg2Ordered) {
-        messages[2].nonce = 3;
-      } else if (msg1Ordered || msg2Ordered) {
-        messages[2].nonce = 2;
-      } else {
-        messages[2].nonce = 1;
-      }
-    }
-
-    messages[0].messageId = Internal._hash(messages[0], s_offRamp.metadataHash());
-    messages[1].messageId = Internal._hash(messages[1], s_offRamp.metadataHash());
-    messages[2].messageId = Internal._hash(messages[2], s_offRamp.metadataHash());
-
-    vm.expectEmit();
-    emit ExecutionStateChanged(
-      messages[0].sequenceNumber, messages[0].messageId, Internal.MessageExecutionState.SUCCESS, ""
-    );
-
-    vm.expectEmit();
-    emit ExecutionStateChanged(
-      messages[1].sequenceNumber, messages[1].messageId, Internal.MessageExecutionState.SUCCESS, ""
-    );
-
-    vm.expectEmit();
-    emit ExecutionStateChanged(
-      messages[2].sequenceNumber, messages[2].messageId, Internal.MessageExecutionState.SUCCESS, ""
-    );
-
-    // sender nonce is zero to start with.
-    uint64 nonceBefore = s_offRamp.getSenderNonce(OWNER);
-    assertEq(uint64(0), nonceBefore);
-    s_offRamp.execute(_generateReportFromMessages(messages), _getGasLimitsFromMessages(messages));
-    // all execution should succeed.
-    assertEq(
-      uint256(s_offRamp.getExecutionState(messages[0].sequenceNumber)), uint256(Internal.MessageExecutionState.SUCCESS)
-    );
-    assertEq(
-      uint256(s_offRamp.getExecutionState(messages[1].sequenceNumber)), uint256(Internal.MessageExecutionState.SUCCESS)
-    );
-    assertEq(
-      uint256(s_offRamp.getExecutionState(messages[2].sequenceNumber)), uint256(Internal.MessageExecutionState.SUCCESS)
-    );
     uint64 expectedNonce = 0;
-    if (msg1Ordered) {
-      expectedNonce++;
+    for (uint256 i = 0; i < orderings.length; ++i) {
+      messages[i] = _generateAny2EVMMessage(uint64(i + 1), tokenAmounts, !orderings[i]);
+      if (orderings[i]) {
+        messages[i].nonce = ++expectedNonce;
+      }
+      messages[i].messageId = Internal._hash(messages[i], s_offRamp.metadataHash());
+
+      vm.expectEmit();
+      emit ExecutionStateChanged(
+        messages[i].sequenceNumber, messages[i].messageId, Internal.MessageExecutionState.SUCCESS, ""
+      );
     }
-    if (msg2Ordered) {
-      expectedNonce++;
-    }
-    if (msg3Ordered) {
-      expectedNonce++;
+
+    uint64 nonceBefore = s_offRamp.getSenderNonce(OWNER);
+    assertEq(uint64(0), nonceBefore, "nonce before exec should be 0");
+    s_offRamp.execute(_generateReportFromMessages(messages), _getGasLimitsFromMessages(messages));
+    // all executions should succeed.
+    for (uint256 i = 0; i < orderings.length; ++i) {
+      assertEq(
+        uint256(s_offRamp.getExecutionState(messages[i].sequenceNumber)),
+        uint256(Internal.MessageExecutionState.SUCCESS)
+      );
     }
     assertEq(nonceBefore + expectedNonce, s_offRamp.getSenderNonce(OWNER));
   }
