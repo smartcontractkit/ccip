@@ -1810,7 +1810,6 @@ func (destCCIP *DestCCIPModule) DeployContracts(
 	}
 	// set remote pools
 	if !destCCIP.Common.ExistingDeployment {
-		sourceCCIP.Common.ChainClient.ParallelTransactions(false)
 		for i, pool := range sourceCCIP.Common.BridgeTokenPools {
 			err := pool.SetRemotePool(destChainSelector, destCCIP.Common.BridgeTokenPools[i].EthAddress)
 			if err != nil {
@@ -3267,6 +3266,12 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 		return fmt.Errorf("failed to create ocr2 execution jobs: %w", err)
 	}
 
+	if err := lane.Source.Common.ChainClient.WaitForEvents(); err != nil {
+		return fmt.Errorf("failed to wait for events: %w", err)
+	}
+	if err := lane.Dest.Common.ChainClient.WaitForEvents(); err != nil {
+		return fmt.Errorf("failed to wait for events: %w", err)
+	}
 	lane.Dest.Common.ChainClient.ParallelTransactions(false)
 	lane.Source.Common.ChainClient.ParallelTransactions(false)
 
