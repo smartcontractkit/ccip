@@ -402,9 +402,7 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     assertEq(uint64(2), s_offRamp.getSenderNonce(OWNER));
   }
 
-  function test_Fuzz_InterleavingOrderedAndUnorderedMessages_Success(
-    bool[7] memory orderings
-  ) public {
+  function test_Fuzz_InterleavingOrderedAndUnorderedMessages_Success(bool[7] memory orderings) public {
     Internal.EVM2EVMMessage[] memory messages = new Internal.EVM2EVMMessage[](orderings.length);
     // number of tokens needs to be capped otherwise we hit UnsupportedNumberOfTokens.
     Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](3);
