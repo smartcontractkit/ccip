@@ -10,7 +10,7 @@ import {IgnoreContractSize} from "./IgnoreContractSize.sol";
 contract EVM2EVMMultiOffRampHelper is EVM2EVMMultiOffRamp, IgnoreContractSize {
   constructor(
     StaticConfig memory staticConfig,
-    SourceChainConfigUpdateArgs[] memory sourceChainConfigs,
+    SourceChainConfigArgs[] memory sourceChainConfigs,
     RateLimiter.Config memory rateLimiterConfig
   ) EVM2EVMMultiOffRamp(staticConfig, sourceChainConfigs, rateLimiterConfig) {}
 

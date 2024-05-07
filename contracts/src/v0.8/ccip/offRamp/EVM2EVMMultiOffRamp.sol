@@ -115,7 +115,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndV
   }
 
   /// @notice SourceChainConfig update args scoped to one source chain
-  struct SourceChainConfigUpdateArgs {
+  struct SourceChainConfigArgs {
     uint64 sourceChainSelector; //  ───╮  Source chain selector of the config to update
     bool isEnabled; //                 │  Flag whether the source chain is enabled or not
     address prevOffRamp; // ───────────╯  Address of previous-version per-lane OffRamp. Used to be able to provide seequencing continuity during a zero downtime upgrade.
@@ -158,7 +158,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndV
 
   constructor(
     StaticConfig memory staticConfig,
-    SourceChainConfigUpdateArgs[] memory sourceChainConfigs,
+    SourceChainConfigArgs[] memory sourceChainConfigs,
     // TODO: convert to array to support per-chain config once multi-ARL is ready
     RateLimiter.Config memory rateLimiterConfig
   ) OCR2BaseNoChecks() AggregateRateLimiter(rateLimiterConfig) {
@@ -168,7 +168,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndV
     i_chainSelector = staticConfig.chainSelector;
     i_armProxy = staticConfig.armProxy;
 
-    _applySourceConfigUpdates(sourceChainConfigs);
+    _applySourceChainConfigUpdates(sourceChainConfigs);
   }
 
   // ================================================================
@@ -518,15 +518,15 @@ contract EVM2EVMMultiOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndV
 
   /// @notice Updates source configs
   /// @param sourceChainConfigUpdates Source chain configs
-  function applySourceConfigUpdates(SourceChainConfigUpdateArgs[] memory sourceChainConfigUpdates) external onlyOwner {
-    _applySourceConfigUpdates(sourceChainConfigUpdates);
+  function applySourceChainConfigUpdates(SourceChainConfigArgs[] memory sourceChainConfigUpdates) external onlyOwner {
+    _applySourceChainConfigUpdates(sourceChainConfigUpdates);
   }
 
   /// @notice Updates source configs
   /// @param sourceChainConfigUpdates Source chain configs
-  function _applySourceConfigUpdates(SourceChainConfigUpdateArgs[] memory sourceChainConfigUpdates) internal {
+  function _applySourceChainConfigUpdates(SourceChainConfigArgs[] memory sourceChainConfigUpdates) internal {
     for (uint256 i = 0; i < sourceChainConfigUpdates.length; ++i) {
-      SourceChainConfigUpdateArgs memory sourceConfigUpdate = sourceChainConfigUpdates[i];
+      SourceChainConfigArgs memory sourceConfigUpdate = sourceChainConfigUpdates[i];
       uint64 sourceChainSelector = sourceConfigUpdate.sourceChainSelector;
 
       if (sourceConfigUpdate.onRamp == address(0)) {
