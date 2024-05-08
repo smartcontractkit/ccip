@@ -51,7 +51,7 @@ contract Router is IRouter, IRouterClient, ITypeAndVersion, OwnerIsCreator {
   // repeated out-of-gas scenarios.
   uint16 public constant MAX_RET_BYTES = 4 + 4 * 32;
   // STATIC CONFIG
-  // Address of arm proxy contract.
+  // Address of RMN proxy contract (formerly known as ARM)
   address private immutable i_armProxy;
 
   // DYNAMIC CONFIG
@@ -196,8 +196,8 @@ contract Router is IRouter, IRouterClient, ITypeAndVersion, OwnerIsCreator {
     s_wrappedNative = wrappedNative;
   }
 
-  /// @notice Gets the arm address
-  /// @return The address of the ARM proxy contract.
+  /// @notice Gets the RMN address, formerly known as ARM
+  /// @return The address of the RMN proxy contract, formerly known as ARM
   function getArmProxy() external view returns (address) {
     return i_armProxy;
   }
@@ -282,7 +282,7 @@ contract Router is IRouter, IRouterClient, ITypeAndVersion, OwnerIsCreator {
   // │                           Access                             │
   // ================================================================
 
-  /// @notice Ensure that the ARM has not emitted a bad signal, and that the latest heartbeat is not stale.
+  /// @notice Ensure that the RMN has not cursed the network.
   modifier whenHealthy() {
     if (IRMN(i_armProxy).isCursed()) revert BadARMSignal();
     _;

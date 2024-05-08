@@ -623,7 +623,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
   }
 
   // ================================================================
-  // │                        Access and RMN                        │
+  // │                            Access                            │
   // ================================================================
 
   /// @notice Reverts as this contract should not access CCIP messages

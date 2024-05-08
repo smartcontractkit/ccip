@@ -13,13 +13,13 @@ contract BurnMintTokenPoolAndProxy is ITypeAndVersion, LegacyPoolWrapper {
   constructor(
     IBurnMintERC20 token,
     address[] memory allowlist,
-    address armProxy,
+    address rmnProxy,
     address router
-  ) LegacyPoolWrapper(token, allowlist, armProxy, router) {}
+  ) LegacyPoolWrapper(token, allowlist, rmnProxy, router) {}
 
   /// @notice Burn the token in the pool
   /// @dev The whenHealthy check is important to ensure that even if a ramp is compromised
-  /// we're able to stop token movement via ARM.
+  /// we're able to stop token movement via RMN.
   function lockOrBurn(Pool.LockOrBurnInV1 calldata lockOrBurnIn)
     external
     virtual
@@ -44,7 +44,7 @@ contract BurnMintTokenPoolAndProxy is ITypeAndVersion, LegacyPoolWrapper {
 
   /// @notice Mint tokens from the pool to the recipient
   /// @dev The whenHealthy check is important to ensure that even if a ramp is compromised
-  /// we're able to stop token movement via ARM.
+  /// we're able to stop token movement via RMN.
   function releaseOrMint(Pool.ReleaseOrMintInV1 calldata releaseOrMintIn)
     external
     virtual
