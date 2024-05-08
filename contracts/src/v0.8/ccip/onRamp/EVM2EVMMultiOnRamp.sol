@@ -425,8 +425,9 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimi
   ) internal view {
     // Check that payload is formed correctly
     DestChainConfig storage destChainConfig = s_destChainConfig[destChainSelector];
-    uint256 maxDataBytes = uint256(destChainConfig.maxDataBytes);
-    if (dataLength > maxDataBytes) revert MessageTooLarge(maxDataBytes, dataLength);
+    if (dataLength > uint256(destChainConfig.maxDataBytes)) {
+      revert MessageTooLarge(uint256(destChainConfig.maxDataBytes), dataLength);
+    }
     if (gasLimit > uint256(destChainConfig.maxPerMsgGasLimit)) revert MessageGasLimitTooHigh();
     if (numberOfTokens > uint256(destChainConfig.maxNumberOfTokensPerMsg)) revert UnsupportedNumberOfTokens();
   }
