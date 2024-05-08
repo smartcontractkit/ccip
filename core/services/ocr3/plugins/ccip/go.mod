@@ -3,6 +3,7 @@ module github.com/smartcontractkit/ccipocr3
 go 1.21.7
 
 require (
+	github.com/deckarep/golang-set/v2 v2.1.0
 	github.com/smartcontractkit/chain-selectors v1.0.14
 	github.com/smartcontractkit/chainlink-common v0.1.7-0.20240410191726-b8a7349cd5d3
 	github.com/smartcontractkit/libocr v0.0.0-20240326191951-2bbe9382d052

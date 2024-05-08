@@ -28,6 +28,9 @@ type CCIP interface {
 	// NextSeqNum reads the destination chain.
 	// Returns the next expected sequence number for each one of the provided chains.
 	NextSeqNum(ctx context.Context, chains []model.ChainSelector) (seqNum []model.SeqNum, err error)
+
+	// GasPrices reads the provided chains gas prices.
+	GasPrices(ctx context.Context, chains []model.ChainSelector) ([]model.GasPrice, error)
 }
 
 type ChainReader interface{} // TODO: Imported from chainlink-common
@@ -53,6 +56,13 @@ func (r *CCIPChainReader) MsgsBetweenSeqNums(ctx context.Context, chains []model
 
 func (r *CCIPChainReader) NextSeqNum(ctx context.Context, chains []model.ChainSelector) (seqNum []model.SeqNum, err error) {
 	if err := r.validateReaderExistence(r.destChain); err != nil {
+		return nil, err
+	}
+	panic("implement me")
+}
+
+func (r *CCIPChainReader) GasPrices(ctx context.Context, chains []model.ChainSelector) ([]model.GasPrice, error) {
+	if err := r.validateReaderExistence(chains...); err != nil {
 		return nil, err
 	}
 	panic("implement me")

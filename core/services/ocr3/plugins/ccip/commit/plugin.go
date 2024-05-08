@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/smartcontractkit/ccipocr3/internal/libs/slicelib"
 	"github.com/smartcontractkit/ccipocr3/internal/model"
 	"github.com/smartcontractkit/ccipocr3/internal/reader"
@@ -40,21 +41,88 @@ func (p *Plugin) Query(ctx context.Context, outctx ocr3types.OutcomeContext) (ty
 }
 
 func (p *Plugin) Observation(ctx context.Context, outctx ocr3types.OutcomeContext, query types.Query) (types.Observation, error) {
-	scanFrom := time.Now().Add(-p.cfg.NewMsgScanDuration)
-	newMsgs, err := p.ccipReader.MsgsAfterTimestamp(ctx, p.cfg.Reads, scanFrom, p.cfg.NewMsgScanLimit)
-	if err != nil {
-		p.lggr.Errorw("get new ccip messages", "err", err)
-		return types.Observation{}, err
+	var newMsgs []model.CCIPMsg
+	var err error
+	var gasPrices []model.GasPriceChain
+
+	if outctx.PreviousOutcome == nil {
+		// if there is no previous outcome scan for messages in the last NewMsgScanDuration
+		scanFrom := time.Now().Add(-p.cfg.NewMsgScanDuration)
+		newMsgs, err = p.ccipReader.MsgsAfterTimestamp(ctx, p.cfg.Reads, scanFrom, p.cfg.NewMsgScanLimit)
+		if err != nil {
+			p.lggr.Errorw("get new ccip messages", "err", err)
+			return types.Observation{}, err
+		}
+		p.lggr.Debugf("found %d new ccip messages", len(newMsgs))
+	} else {
+		// if there is a previous outcome, scan for messages after the last committed or inflight sequence numbers
+		prevOutcome, err := model.DecodeCommitPluginOutcome(outctx.PreviousOutcome)
+		if err != nil {
+			return types.Observation{}, fmt.Errorf("decode commit plugin previous outcome: %w", err)
+		}
+
+		// find the maximum sequence number per chain from the previous outcome
+		chainsToCheck := mapset.NewSet[model.ChainSelector]()
+		maxSeqNumPerChainPrevOutcome := make(map[model.ChainSelector]model.SeqNum)
+		for _, seqNumChain := range prevOutcome.SequenceNumbers {
+			if seqNumChain.SeqNum > maxSeqNumPerChainPrevOutcome[seqNumChain.ChainSel] {
+				maxSeqNumPerChainPrevOutcome[seqNumChain.ChainSel] = seqNumChain.SeqNum
+			}
+			chainsToCheck.Add(seqNumChain.ChainSel)
+		}
+		chainsSlice := chainsToCheck.ToSlice()
+
+		// find the maximum sequence number per chain from the on-chain state
+		onChainMaxSeqNumPerChain := make(map[model.ChainSelector]model.SeqNum)
+		if p.canRead(p.cfg.DestChain) {
+			onChainSeqNums, err := p.ccipReader.NextSeqNum(ctx, chainsSlice)
+			if err != nil {
+				return types.Observation{}, fmt.Errorf("get next seq nums: %w", err)
+			}
+			for i, ch := range chainsSlice {
+				onChainMaxSeqNumPerChain[ch] = onChainSeqNums[i]
+			}
+		}
+
+		// find the gas prices per chain
+		gasPricesVals, err := p.ccipReader.GasPrices(ctx, chainsSlice)
+		if err != nil {
+			return nil, fmt.Errorf("get gas prices: %w", err)
+		}
+		for i, ch := range chainsSlice {
+			gasPrices = append(gasPrices, model.NewGasPriceChain(gasPricesVals[i], ch))
+		}
+
+		// find the new msgs per supported chain
+		for ch := range maxSeqNumPerChainPrevOutcome {
+			if !p.canRead(ch) {
+				continue
+			}
+
+			maxSeqNum := maxSeqNumPerChainPrevOutcome[ch]
+			if onChainMaxSeqNum := onChainMaxSeqNumPerChain[ch]; onChainMaxSeqNum > maxSeqNum {
+				maxSeqNum = onChainMaxSeqNum
+			}
+
+			newMsgs, err = p.ccipReader.MsgsBetweenSeqNums(
+				ctx,
+				[]model.ChainSelector{ch},
+				model.NewSeqNumRange(maxSeqNum+1, maxSeqNum+model.SeqNum(1+p.cfg.NewMsgScanBatchSize)),
+			)
+			if err != nil {
+				return nil, fmt.Errorf("get messages between seq nums: %w", err)
+			}
+		}
 	}
-	p.lggr.Debugf("found %d new ccip messages", len(newMsgs))
+
+	// TODO: token prices ...
 
 	newMsgDetails := make([]model.CCIPMsgBaseDetails, 0, len(newMsgs))
 	for _, msg := range newMsgs {
 		p.lggr.Debugf("new msg: %s", msg)
 		newMsgDetails = append(newMsgDetails, msg.CCIPMsgBaseDetails)
 	}
-
-	return model.NewCommitPluginObservation(p.nodeID, newMsgDetails).Encode()
+	return model.NewCommitPluginObservation(p.nodeID, newMsgDetails, gasPrices).Encode()
 }
 
 func (p *Plugin) ValidateObservation(outctx ocr3types.OutcomeContext, _ types.Query, ao types.AttributedObservation) error {
@@ -112,6 +180,15 @@ func (p *Plugin) ShouldTransmitAcceptedReport(ctx context.Context, u uint64, r o
 
 func (p *Plugin) Close() error {
 	panic("implement me")
+}
+
+func (p *Plugin) canRead(ch model.ChainSelector) bool {
+	for _, ch := range p.cfg.Reads {
+		if ch == ch {
+			return true
+		}
+	}
+	return false
 }
 
 // Interface compatibility checks.

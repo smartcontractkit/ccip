@@ -17,6 +17,7 @@ type CommitPluginConfig struct {
 	FChain map[ChainSelector]int
 
 	// TBD:
-	NewMsgScanDuration time.Duration
-	NewMsgScanLimit    int
+	NewMsgScanDuration  time.Duration
+	NewMsgScanLimit     int
+	NewMsgScanBatchSize int
 }

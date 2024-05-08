@@ -3,11 +3,27 @@ package model
 import (
 	"encoding/json"
 	"fmt"
+	"math/big"
 
 	chainselectors "github.com/smartcontractkit/chain-selectors"
 )
 
+type GasPrice *big.Int
+
+type GasPriceChain struct {
+	GasPrice GasPrice
+	ChainSel ChainSelector
+}
+
+func NewGasPriceChain(gasPrice GasPrice, chainSel ChainSelector) GasPriceChain {
+	return GasPriceChain{GasPrice: gasPrice, ChainSel: chainSel}
+}
+
 type SeqNum uint64
+
+func NewSeqNumRange(start, end SeqNum) SeqNumRange {
+	return SeqNumRange{start, end}
+}
 
 type SeqNumRange [2]SeqNum
 
