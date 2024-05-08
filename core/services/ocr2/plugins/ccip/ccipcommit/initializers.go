@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
 	chainselectors "github.com/smartcontractkit/chain-selectors"
@@ -202,7 +203,7 @@ func jobSpecToCommitPluginConfig(ctx context.Context, lggr logger.Logger, jb job
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	sourceNative, err := sourceRouter.GetWrappedNative(nil)
+	sourceNative, err := sourceRouter.GetWrappedNative(&bind.CallOpts{Context: ctx})
 	if err != nil {
 		return nil, nil, nil, err
 	}
