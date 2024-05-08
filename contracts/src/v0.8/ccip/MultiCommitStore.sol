@@ -293,6 +293,8 @@ contract MultiCommitStore is IMultiCommitStore, ITypeAndVersion, OCR2Base {
   }
 
   /// @notice Internal version applySourceChainConfigUpdates.
+  /// Note: This function is kept multi purpose for now (adding/updating lanes + enabling/disabling lanes) to reduce contract size in anticipation of
+  /// merging this contract with the EVM2EVMMultiOffRamp. This will be revisited in the merging PR.
   function _applySourceChainConfigUpdates(SourceChainConfigArgs[] memory sourceChainConfigs) internal onlyOwner {
     for (uint256 i = 0; i < sourceChainConfigs.length; ++i) {
       SourceChainConfigArgs memory sourceChainConfig = sourceChainConfigs[i];
