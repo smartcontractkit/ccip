@@ -181,13 +181,17 @@ func (m *multichainConfigTracker) GetContractAddresses() map[relay.ID]common.Add
 
 func (m *multichainConfigTracker) Start() {
 	_ = m.StartOnce("MultichainConfigTracker", func() error {
-		if m.fromBlocks != nil {
-			m.replaying.Store(true)
-			defer m.replaying.Store(false)
+		if len(m.fromBlocks) == 0 {
+			return nil
+		}
+		m.replaying.Store(true)
+		defer m.replaying.Store(false)
 
-			ctx := context.Background() // TODO: deadline?
-			running := make(chan struct{}, configTrackerWorkers)
-			results := make(chan error, len(m.fromBlocks))
+		networks := len(m.fromBlocks)
+		ctx := context.Background() // TODO: deadline?
+		running := make(chan struct{}, configTrackerWorkers)
+		results := make(chan error, networks)
+		go func() {
 			for id, fromBlock := range m.fromBlocks {
 				running <- struct{}{}
 				go func(id string, fromBlock int64) {
@@ -198,35 +202,23 @@ func (m *multichainConfigTracker) Start() {
 					} else {
 						m.lggr.Infow("successfully replayed chain", "chain", id, "fromBlock", fromBlock)
 					}
-					select {
-					case results <- err:
-					default:
-					}
+					results <- err
 				}(id, fromBlock)
 			}
-			for len(running) > 0 {
-				time.Sleep(100 * time.Millisecond) // wait for all workers to finish
-			}
+		}()
 
-			var errs error
-		resultsLoop:
-			for i := 0; i < len(m.fromBlocks); i++ {
-				select {
-				case err := <-results:
-					if err != nil {
-						errs = multierr.Append(errs, err)
-					}
-				case <-ctx.Done():
-					errs = multierr.Append(errs, ctx.Err())
-					break resultsLoop
-				}
-			}
-			if errs != nil {
-				m.lggr.Errorw("failed to replay some chains", "err", errs)
-				return errs
+		// wait for results, we expect the same number of results as networks
+		var errs error
+		for i := 0; i < networks; i++ {
+			err := <-results
+			if err != nil {
+				errs = multierr.Append(errs, err)
 			}
 		}
-		return nil
+		if errs != nil {
+			m.lggr.Errorw("failed to replay some chains", "err", errs)
+		}
+		return errs
 	})
 }
 
