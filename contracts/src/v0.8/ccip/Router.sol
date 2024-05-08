@@ -105,7 +105,7 @@ contract Router is IRouter, IRouterClient, ITypeAndVersion, OwnerIsCreator {
   function ccipSend(
     uint64 destinationChainSelector,
     Client.EVM2AnyMessage memory message
-  ) external payable whenHealthy returns (bytes32) {
+  ) external payable whenNotCursed returns (bytes32) {
     address onRamp = s_onRamps[destinationChainSelector];
     if (onRamp == address(0)) revert UnsupportedDestinationChain(destinationChainSelector);
     uint256 feeTokenAmount;
@@ -155,7 +155,7 @@ contract Router is IRouter, IRouterClient, ITypeAndVersion, OwnerIsCreator {
     uint16 gasForCallExactCheck,
     uint256 gasLimit,
     address receiver
-  ) external override whenHealthy returns (bool success, bytes memory retData, uint256 gasUsed) {
+  ) external override whenNotCursed returns (bool success, bytes memory retData, uint256 gasUsed) {
     // We only permit offRamps to call this function.
     if (!isOffRamp(message.sourceChainSelector, msg.sender)) revert OnlyOffRamp();
 
@@ -283,7 +283,7 @@ contract Router is IRouter, IRouterClient, ITypeAndVersion, OwnerIsCreator {
   // ================================================================
 
   /// @notice Ensure that the RMN has not cursed the network.
-  modifier whenHealthy() {
+  modifier whenNotCursed() {
     if (IRMN(i_armProxy).isCursed()) revert BadARMSignal();
     _;
   }

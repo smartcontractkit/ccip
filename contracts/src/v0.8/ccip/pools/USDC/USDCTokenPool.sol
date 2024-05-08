@@ -159,6 +159,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
   function releaseOrMint(Pool.ReleaseOrMintInV1 calldata releaseOrMintIn)
     external
     override
+    whenNotCursed(releaseOrMintIn.remoteChainSelector)
     returns (Pool.ReleaseOrMintOutV1 memory)
   {
     _onlyOffRamp(releaseOrMintIn.remoteChainSelector);
