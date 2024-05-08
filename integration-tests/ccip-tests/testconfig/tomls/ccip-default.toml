@@ -287,7 +287,7 @@ NoOfRoutersPerPair = 1  # same as above
 MulticallInOneTx = false # same as above
 NoOfSendsInMulticall = 5    # same as above
 RequestPerUnitTime = [1] # number of ccip requests to be sent per unit time
-TimeUnit = '10s' # unit of time for RequestPerUnitTime
+TimeUnit = '1h' # unit of time for RequestPerUnitTime
 NoOfNetworks = 2   # same as above
 
 
