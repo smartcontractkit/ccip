@@ -251,7 +251,8 @@ contract EVM2EVMMultiOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndV
   /// @dev If called from the DON, this array is always empty.
   /// @dev If called from manual execution, this array is always same length as messages.
   function _execute(Internal.ExecutionReport memory report, uint256[] memory manualExecGasLimits) internal {
-    if (IRMN(i_rmnProxy).isCursed(bytes32(uint256(i_sourceChainSelector)))) revert CursedByRMN();
+    // TODO pass in source chain selector to check for cursed source chain
+    if (IRMN(i_rmnProxy).isCursed()) revert CursedByRMN();
 
     uint256 numMsgs = report.messages.length;
     if (numMsgs == 0) revert EmptyReport();

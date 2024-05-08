@@ -1,15 +1,12 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.19;
 
-import {Vm} from "forge-std/Vm.sol";
-
 import {ICommitStore} from "../../interfaces/ICommitStore.sol";
 import {IPool} from "../../interfaces/IPool.sol";
 
 import {CallWithExactGas} from "../../../shared/call/CallWithExactGas.sol";
-
-import {ARM} from "../../ARM.sol";
 import {AggregateRateLimiter} from "../../AggregateRateLimiter.sol";
+import {RMN} from "../../RMN.sol";
 import {Router} from "../../Router.sol";
 import {Client} from "../../libraries/Client.sol";
 import {Internal} from "../../libraries/Internal.sol";
@@ -30,6 +27,7 @@ import {OCR2BaseNoChecks} from "../ocr/OCR2BaseNoChecks.t.sol";
 import {EVM2EVMMultiOffRampSetup} from "./EVM2EVMMultiOffRampSetup.t.sol";
 
 import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
+import {Vm} from "forge-std/Vm.sol";
 
 // TODO: re-add tests:
 //       - ccipReceive
@@ -52,7 +50,7 @@ contract EVM2EVMMultiOffRamp_constructor is EVM2EVMMultiOffRampSetup {
     EVM2EVMMultiOffRamp.StaticConfig memory staticConfig = EVM2EVMMultiOffRamp.StaticConfig({
       commitStore: address(s_mockCommitStore),
       chainSelector: DEST_CHAIN_SELECTOR,
-      armProxy: address(s_mockARM)
+      rmnProxy: address(s_mockRMN)
     });
     EVM2EVMMultiOffRamp.DynamicConfig memory dynamicConfig =
       generateDynamicMultiOffRampConfig(address(s_destRouter), address(s_priceRegistry));
@@ -154,7 +152,7 @@ contract EVM2EVMMultiOffRamp_constructor is EVM2EVMMultiOffRampSetup {
       EVM2EVMMultiOffRamp.StaticConfig({
         commitStore: address(s_mockCommitStore),
         chainSelector: DEST_CHAIN_SELECTOR,
-        armProxy: address(s_mockARM)
+        rmnProxy: address(s_mockRMN)
       }),
       sourceChainConfigs,
       RateLimiter.Config({isEnabled: true, rate: 1e20, capacity: 1e20})
@@ -174,7 +172,7 @@ contract EVM2EVMMultiOffRamp_constructor is EVM2EVMMultiOffRampSetup {
   //       sourceChainSelector: SOURCE_CHAIN_SELECTOR,
   //       onRamp: ON_RAMP_ADDRESS,
   //       prevOffRamp: address(0),
-  //       armProxy: address(s_mockARM)
+  //       rmnProxy: address(s_mockRMN)
   //     }),
   //     getInboundRateLimiterConfig()
   //   );
