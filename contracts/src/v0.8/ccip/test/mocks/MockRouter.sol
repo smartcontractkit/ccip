@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.19;
 
 import {IAny2EVMMessageReceiver} from "../../interfaces/IAny2EVMMessageReceiver.sol";
 import {IRouter} from "../../interfaces/IRouter.sol";
@@ -21,12 +21,16 @@ contract MockCCIPRouter is IRouter, IRouterClient {
   error InvalidAddress(bytes encodedAddress);
   error InvalidExtraArgsTag();
   error ReceiverError(bytes error);
+  error InsufficientNativeFeeTokens();
+  error InvalidNativeFeeTokens();
 
   event MessageExecuted(bytes32 messageId, uint64 sourceChainSelector, address offRamp, bytes32 calldataHash);
   event MsgExecuted(bool success, bytes retData, uint256 gasUsed);
 
   uint16 public constant GAS_FOR_CALL_EXACT_CHECK = 5_000;
   uint64 public constant DEFAULT_GAS_LIMIT = 200_000;
+
+  bool public constant FEES_ENABLED = true; //Enable to configure mock-fees for testing
 
   function routeMessage(
     Client.Any2EVMMessage calldata message,
@@ -75,6 +79,12 @@ contract MockCCIPRouter is IRouter, IRouterClient {
     // We want to disallow sending to address(0) and to precompiles, which exist on address(1) through address(9).
     if (decodedReceiver > type(uint160).max || decodedReceiver < 10) revert InvalidAddress(message.receiver);
 
+    uint256 feeTokenAmount = getFee(0, message);
+    if (feeTokenAmount != 0) {
+      if (message.feeToken == address(0) && msg.value < feeTokenAmount) revert InsufficientNativeFeeTokens();
+      if (message.feeToken != address(0) && msg.value != 0) revert InvalidNativeFeeTokens();
+    }
+
     address receiver = address(uint160(decodedReceiver));
     uint256 gasLimit = _fromBytes(message.extraArgs).gasLimit;
     bytes32 mockMsgId = keccak256(abi.encode(message));
@@ -117,8 +127,11 @@ contract MockCCIPRouter is IRouter, IRouterClient {
   }
 
   /// @notice Returns 0 as the fee is not supported in this mock contract.
-  function getFee(uint64, Client.EVM2AnyMessage memory) external pure returns (uint256 fee) {
-    return 0;
+  function getFee(uint64, Client.EVM2AnyMessage memory message) public pure returns (uint256 fee) {
+    if (FEES_ENABLED) {
+      if (message.feeToken == address(0)) fee = 0.1 ether;
+      else fee = 1e18;
+    }
   }
 
   /// @notice Always returns address(1234567890)
