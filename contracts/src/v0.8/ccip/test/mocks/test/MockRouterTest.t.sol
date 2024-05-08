@@ -34,7 +34,6 @@ contract MockRouterTest is Test {
     mockRouter.ccipSend{value: 0.1 ether}(mockChainSelector, message);
 
     message.feeToken = address(1); //Set feeToken to something other than native asset
-    
     //Should revert because msg.value should be zero when feeToken is not native asset;
     vm.expectRevert(MockCCIPRouter.InvalidNativeFeeTokens.selector);
     mockRouter.ccipSend{value: 0.1 ether}(mockChainSelector, message);
