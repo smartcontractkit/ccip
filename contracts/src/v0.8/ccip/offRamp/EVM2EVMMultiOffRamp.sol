@@ -89,6 +89,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, AggregateRateLimiter, ITyp
   /// @notice Per-chain source config (defining a lane from a Source Chain -> Dest OffRamp)
   struct SourceChainConfig {
     // TODO: re-evaluate on removing this (can be controlled by CommitStore)
+    // TODO: if used - pack together with onRamp to localise storage slot reads
     bool isEnabled; // ─────────╮  Flag whether the source chain is enabled or not
     address prevOffRamp; // ────╯  Address of previous-version per-lane OffRamp. Used to be able to provide seequencing continuity during a zero downtime upgrade.
     address onRamp; //             OnRamp address on the source chain
@@ -282,12 +283,13 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, AggregateRateLimiter, ITyp
       Internal.EVM2EVMMessage memory message = report.messages[i];
       uint64 sourceChainSelector = message.sourceChainSelector;
 
+      SourceChainConfig storage sourceConfig = s_sourceChainConfigs[sourceChainSelector];
       // TODO: this check can be moved out of the loop after the report contains the chain selector
-      if (!s_sourceChainConfigs[sourceChainSelector].isEnabled) revert SourceChainNotEnabled(sourceChainSelector);
+      if (!sourceConfig.isEnabled) revert SourceChainNotEnabled(sourceChainSelector);
 
       // We do this hash here instead of in _verifyMessages to avoid two separate loops
       // over the same data, which increases gas cost
-      hashedLeaves[i] = Internal._hash(message, s_sourceChainConfigs[sourceChainSelector].metadataHash);
+      hashedLeaves[i] = Internal._hash(message, sourceConfig.metadataHash);
       // For EVM2EVM offramps, the messageID is the leaf hash.
       // Asserting that this is true ensures we don't accidentally commit and then execute
       // a message with an unexpected hash.
@@ -340,7 +342,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, AggregateRateLimiter, ITyp
       // given sender allows us to skip the current message if it would not be the next according
       // to the old offRamp. This preserves sequencing between updates.
       uint64 prevNonce = s_senderNonce[sourceChainSelector][message.sender];
-      address prevOffRamp = s_sourceChainConfigs[message.sourceChainSelector].prevOffRamp;
+      address prevOffRamp = s_sourceChainConfigs[sourceChainSelector].prevOffRamp;
       if (prevNonce == 0 && prevOffRamp != address(0)) {
         // NOTE: assuming prevOffRamp is always a lane-specific off ramp
         // TODO: on deployment - revisit if this assumption holds
@@ -350,7 +352,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, AggregateRateLimiter, ITyp
           // is guaranteed to equal (largest v1 onramp nonce + 1).
           // if this message's nonce isn't (v1 offramp nonce + 1), then v1 offramp nonce != largest v1 onramp nonce,
           // it tells us there are still messages inflight for v1 offramp
-          emit SkippedSenderWithPreviousRampMessageInflight(message.sourceChainSelector, message.nonce, message.sender);
+          emit SkippedSenderWithPreviousRampMessageInflight(sourceChainSelector, message.nonce, message.sender);
           continue;
         }
         // Otherwise this nonce is indeed the "transitional nonce", that is
@@ -363,7 +365,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, AggregateRateLimiter, ITyp
       if (originalState == Internal.MessageExecutionState.UNTOUCHED) {
         if (prevNonce + 1 != message.nonce) {
           // We skip the message if the nonce is incorrect
-          emit SkippedIncorrectNonce(message.sourceChainSelector, message.nonce, message.sender);
+          emit SkippedIncorrectNonce(sourceChainSelector, message.nonce, message.sender);
           continue;
         }
       }
@@ -400,9 +402,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, AggregateRateLimiter, ITyp
         s_senderNonce[sourceChainSelector][message.sender]++;
       }
 
-      emit ExecutionStateChanged(
-        message.sourceChainSelector, message.sequenceNumber, message.messageId, newState, returnData
-      );
+      emit ExecutionStateChanged(sourceChainSelector, message.sequenceNumber, message.messageId, newState, returnData);
     }
   }
 
