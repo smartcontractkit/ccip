@@ -598,7 +598,7 @@ contract EVM2EVMMultiOnRamp_getFeeSetup is EVM2EVMMultiOnRampSetup {
 }
 
 contract EVM2EVMMultiOnRamp_getDataAvailabilityCost is EVM2EVMMultiOnRamp_getFeeSetup {
-  function test_EmptyMessageCalculatesDataAvailabilityCost_Success() public view {
+  function test_EmptyMessageCalculatesDataAvailabilityCost_Success() public {
     uint256 dataAvailabilityCostUSD =
       s_onRamp.getDataAvailabilityCost(DEST_CHAIN_SELECTOR, USD_PER_DATA_AVAILABILITY_GAS, 0, 0, 0);
 
@@ -610,6 +610,25 @@ contract EVM2EVMMultiOnRamp_getDataAvailabilityCost is EVM2EVMMultiOnRamp_getFee
       USD_PER_DATA_AVAILABILITY_GAS * dataAvailabilityGas * destChainConfig.destDataAvailabilityMultiplierBps * 1e14;
 
     assertEq(expectedDataAvailabilityCostUSD, dataAvailabilityCostUSD);
+
+    // Test that the cost is destnation chain specific
+    EVM2EVMMultiOnRamp.DestChainConfigArgs[] memory destChainConfigArgs = generateDestChainConfigArgs();
+    destChainConfigArgs[0].destChainSelector = DEST_CHAIN_SELECTOR + 1;
+    destChainConfigArgs[0].destDataAvailabilityOverheadGas = destChainConfig.destDataAvailabilityOverheadGas * 2;
+    destChainConfigArgs[0].destGasPerDataAvailabilityByte = destChainConfig.destGasPerDataAvailabilityByte * 2;
+    destChainConfigArgs[0].destDataAvailabilityMultiplierBps = destChainConfig.destDataAvailabilityMultiplierBps * 2;
+    s_onRamp.applyDestChainConfigUpdates(destChainConfigArgs);
+
+    destChainConfig = s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR + 1);
+    uint256 dataAvailabilityCostUSD2 =
+      s_onRamp.getDataAvailabilityCost(DEST_CHAIN_SELECTOR + 1, USD_PER_DATA_AVAILABILITY_GAS, 0, 0, 0);
+    dataAvailabilityGas = destChainConfig.destDataAvailabilityOverheadGas
+      + destChainConfig.destGasPerDataAvailabilityByte * Internal.MESSAGE_FIXED_BYTES;
+    expectedDataAvailabilityCostUSD =
+      USD_PER_DATA_AVAILABILITY_GAS * dataAvailabilityGas * destChainConfig.destDataAvailabilityMultiplierBps * 1e14;
+
+    assertEq(expectedDataAvailabilityCostUSD, dataAvailabilityCostUSD2);
+    assertFalse(dataAvailabilityCostUSD == dataAvailabilityCostUSD2);
   }
 
   function test_SimpleMessageCalculatesDataAvailabilityCost_Success() public view {
@@ -641,6 +660,7 @@ contract EVM2EVMMultiOnRamp_getDataAvailabilityCost is EVM2EVMMultiOnRamp_getFee
   }
 
   function test_Fuzz_CalculateDataAvailabilityCost_Success(
+    uint64 destChainSelector,
     uint32 destDataAvailabilityOverheadGas,
     uint16 destGasPerDataAvailabilityByte,
     uint16 destDataAvailabilityMultiplierBps,
@@ -649,13 +669,15 @@ contract EVM2EVMMultiOnRamp_getDataAvailabilityCost is EVM2EVMMultiOnRamp_getFee
     uint32 numberOfTokens,
     uint32 tokenTransferBytesOverhead
   ) public {
+    vm.assume(destChainSelector != 0);
     EVM2EVMMultiOnRamp.DestChainConfigArgs[] memory destChainConfigArgs =
       new EVM2EVMMultiOnRamp.DestChainConfigArgs[](1);
     destChainConfigArgs[0] =
-      destChainConfigToDestChainConfigArgs(s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR), DEST_CHAIN_SELECTOR);
+      destChainConfigToDestChainConfigArgs(s_onRamp.getDestChainConfig(destChainSelector), destChainSelector);
     destChainConfigArgs[0].destDataAvailabilityOverheadGas = destDataAvailabilityOverheadGas;
     destChainConfigArgs[0].destGasPerDataAvailabilityByte = destGasPerDataAvailabilityByte;
     destChainConfigArgs[0].destDataAvailabilityMultiplierBps = destDataAvailabilityMultiplierBps;
+
     s_onRamp.applyDestChainConfigUpdates(destChainConfigArgs);
 
     uint256 dataAvailabilityCostUSD = s_onRamp.getDataAvailabilityCost(
@@ -691,7 +713,7 @@ contract EVM2EVMMultiOnRamp_getTokenTransferCost is EVM2EVMMultiOnRamp_getFeeSet
     assertEq(0, destBytesOverhead);
   }
 
-  function test__getTokenTransferCost_selfServeUsesDefaults_Success() public view {
+  function test_getTokenTransferCost_selfServeUsesDefaults_Success() public view {
     Client.EVM2AnyMessage memory message = _generateSingleTokenMessage(s_selfServeTokenDefaultPricing, 1000);
 
     // Get config to assert it isn't set

@@ -494,7 +494,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimi
   }
 
   /// @inheritdoc IEVM2AnyOnRampClient
-  function getSupportedTokens(uint64 /*destChainSelector*/ ) external view returns (address[] memory) {
+  function getSupportedTokens(uint64 /*destChainSelector*/ ) external pure returns (address[] memory) {
     revert GetSupportedTokensFunctionalityRemovedCheckAdminRegistry();
   }
 
@@ -629,7 +629,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimi
       Client.EVMTokenAmount memory tokenAmount = tokenAmounts[i];
 
       // Validate if the token is supported, do not calculate fee for unsupported tokens.
-      if (address(getPoolBySourceToken(i_destChainSelector, IERC20(tokenAmount.token))) == address(0)) {
+      if (address(getPoolBySourceToken(destChainSelector, IERC20(tokenAmount.token))) == address(0)) {
         revert UnsupportedToken(tokenAmount.token);
       }
 
