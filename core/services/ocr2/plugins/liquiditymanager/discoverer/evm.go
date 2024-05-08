@@ -9,6 +9,7 @@ import (
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"go.uber.org/multierr"
 
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/liquiditymanager/generated/liquiditymanager"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/graph"
@@ -103,38 +104,33 @@ func (e *evmDiscoverer) DiscoverBalances(ctx context.Context, g graph.Graph) err
 	if liquidityGetter == nil {
 		liquidityGetter = e.defaultLiquidityGetter
 	}
-	numOfGoroutines := discoverGoroutines
-	if len(networks) < numOfGoroutines {
-		numOfGoroutines = len(networks)
-	}
-	running := make(chan struct{}, numOfGoroutines)
+	running := make(chan struct{}, discoverGoroutines)
 	results := make(chan error, len(networks))
-	for _, selector := range networks {
-		running <- struct{}{}
-		go func(c context.Context, selector models.NetworkSelector) {
-			defer func() { <-running }()
-			err := e.updateLiquidity(c, selector, g, liquidityGetter)
-			if err != nil {
-				err = fmt.Errorf("get liquidity: %w", err)
-			}
-			select {
-			case results <- err:
-			default:
-			}
-		}(ctx, selector)
-	}
+	go func() {
+		for _, selector := range networks {
+			running <- struct{}{}
+			go func(c context.Context, selector models.NetworkSelector) {
+				defer func() { <-running }()
+				err := e.updateLiquidity(c, selector, g, liquidityGetter)
+				if err != nil {
+					err = fmt.Errorf("get liquidity: %w", err)
+				}
+				select {
+				case results <- err:
+				default:
+				}
+			}(ctx, selector)
+		}
+	}()
 
+	var errs error
 	for range networks {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case err := <-results:
-			if err != nil {
-				return err
-			}
+		err := <-results
+		if err != nil {
+			errs = multierr.Append(errs, err)
 		}
 	}
-	return nil
+	return errs
 }
 
 func (e *evmDiscoverer) updateLiquidity(ctx context.Context, selector models.NetworkSelector, g graph.Graph, liquidityGetter evmLiquidityGetter) error {
