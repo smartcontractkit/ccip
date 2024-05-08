@@ -163,7 +163,6 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, AggregateRateLimiter, ITyp
   /// @dev A mapping of sequence numbers (per source chain) to execution state using a bitmap with each execution
   /// state only taking up 2 bits of the uint256, packing 128 states into a single slot.
   /// Message state is tracked to ensure message can only be executed successfully once.
-  // TODO: explore optimization of packing sourceChainSelector + seqNum into 128 bits
   mapping(uint64 sourceChainSelector => mapping(uint64 seqNum => uint256 executionStateBitmap)) internal
     s_executionStates;
 
