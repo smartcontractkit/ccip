@@ -98,6 +98,8 @@ func (e *evmDiscoverer) Discover(ctx context.Context) (graph.Graph, error) {
 	return discover(ctx, e.masterSelector, e.masterRebalancer, getVertexInfo)
 }
 
+// DiscoverBalances discovers the balances of all networks in the graph.
+// Up to discovererGoroutines goroutines are used to fetch the liquidities concurrently.
 func (e *evmDiscoverer) DiscoverBalances(ctx context.Context, g graph.Graph) error {
 	networks := g.GetNetworks()
 	liquidityGetter := e.liquidityGetter
@@ -115,14 +117,12 @@ func (e *evmDiscoverer) DiscoverBalances(ctx context.Context, g graph.Graph) err
 				if err != nil {
 					err = fmt.Errorf("get liquidity: %w", err)
 				}
-				select {
-				case results <- err:
-				default:
-				}
+				results <- err
 			}(ctx, selector)
 		}
 	}()
 
+	// wait for results, we expect the same number of results as networks
 	var errs error
 	for range networks {
 		err := <-results
@@ -130,6 +130,7 @@ func (e *evmDiscoverer) DiscoverBalances(ctx context.Context, g graph.Graph) err
 			errs = multierr.Append(errs, err)
 		}
 	}
+
 	return errs
 }
 
