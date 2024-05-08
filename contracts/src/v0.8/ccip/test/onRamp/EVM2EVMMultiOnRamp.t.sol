@@ -647,6 +647,12 @@ contract EVM2EVMMultiOnRamp_getDataAvailabilityCost is EVM2EVMMultiOnRamp_getFee
     assertEq(expectedDataAvailabilityCostUSD, dataAvailabilityCostUSD);
   }
 
+  function test_SimpleMessageCalculatesDataAvailabilityCostUnsupportedDestChainSelector_Success() public view {
+    uint256 dataAvailabilityCostUSD = s_onRamp.getDataAvailabilityCost(0, USD_PER_DATA_AVAILABILITY_GAS, 100, 5, 50);
+
+    assertEq(dataAvailabilityCostUSD, 0);
+  }
+
   function test_Fuzz_ZeroDataAvailabilityGasPriceAlwaysCalculatesZeroDataAvailabilityCost_Success(
     uint64 messageDataLength,
     uint32 numberOfTokens,
