@@ -179,8 +179,25 @@ func (c *CCIPE2ELoad) CCIPMsg() (router.ClientEVM2AnyMessage, *testreporters.Req
 	if err != nil {
 		return router.ClientEVM2AnyMessage{}, stats, err
 	}
-
 	msg.ExtraArgs = extraArgsV1
+	// if the dest gaslimit is 0, check if it's an EOA or contract, if it's a contract, change the receiver to the default wallet of destination
+	if gasLimit == 0 {
+		bytecode, err := c.Lane.Dest.Common.ChainClient.Backend().CodeAt(context.Background(), c.Lane.Dest.ReceiverDapp.EthAddress, nil)
+		if err != nil {
+			return router.ClientEVM2AnyMessage{}, nil, err
+		}
+		// if the bytecode is not empty, it's a contract,
+		// In that case change the receiver to the default wallet of destination otherwise we will get ReceiverError with 0 gaslimit
+		// if the bytecode is empty, it's an EOA, so no need to change the receiver
+		if len(bytecode) > 0 {
+			receiver, err := utils.ABIEncode(`[{"type":"address"}]`, common.HexToAddress(c.Lane.Dest.Common.ChainClient.GetDefaultWallet().Address()))
+			if err != nil {
+				return router.ClientEVM2AnyMessage{}, stats, fmt.Errorf("failed to encode receiver address %w", err)
+			}
+			msg.Receiver = receiver
+		}
+	}
+
 	return msg, stats, nil
 }
 
