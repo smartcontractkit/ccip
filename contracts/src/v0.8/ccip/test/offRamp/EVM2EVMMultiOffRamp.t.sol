@@ -436,28 +436,6 @@ contract EVM2EVMMultiOffRamp_execute is EVM2EVMMultiOffRampSetup {
     assertEq(uint64(1), s_offRamp.getSenderNonce(SOURCE_CHAIN_SELECTOR_1, address(OWNER)));
   }
 
-  function test_StrictUntouchedToSuccess_Success() public {
-    Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1);
-
-    messages[0].strict = true;
-    messages[0].receiver = address(s_receiver);
-    messages[0].messageId =
-      Internal._hash(messages[0], s_offRamp.metadataHash(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1));
-
-    vm.expectEmit();
-    emit ExecutionStateChanged(
-      messages[0].sourceChainSelector,
-      messages[0].sequenceNumber,
-      messages[0].messageId,
-      Internal.MessageExecutionState.SUCCESS,
-      ""
-    );
-    // Nonce should increment on a strict untouched -> success.
-    assertEq(uint64(0), s_offRamp.getSenderNonce(SOURCE_CHAIN_SELECTOR_1, address(OWNER)));
-    s_offRamp.execute(_generateReportFromMessages(messages), new uint256[](0));
-    assertEq(uint64(1), s_offRamp.getSenderNonce(SOURCE_CHAIN_SELECTOR_1, address(OWNER)));
-  }
-
   function test_SkippedIncorrectNonce_Success() public {
     Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1);
 

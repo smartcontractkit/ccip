@@ -61,9 +61,10 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, AggregateRateLimiter, ITyp
 
   /// @dev Atlas depends on this event, if changing, please notify Atlas.
   event ConfigSet(StaticConfig staticConfig, DynamicConfig dynamicConfig);
-  event SkippedIncorrectNonce(uint64 indexed sourceChainSelector, uint64 indexed nonce, address indexed sender);
+  // TODO: revisit if fields have to be indexed for skip events
+  event SkippedIncorrectNonce(uint64 indexed sourceChainSelector, uint64 nonce, address indexed sender);
   event SkippedSenderWithPreviousRampMessageInflight(
-    uint64 indexed sourceChainSelector, uint64 indexed nonce, address indexed sender
+    uint64 indexed sourceChainSelector, uint64 nonce, address indexed sender
   );
   /// @dev RMN depends on this event, if changing, please notify the RMN maintainers.
   event ExecutionStateChanged(
@@ -305,8 +306,9 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, AggregateRateLimiter, ITyp
     for (uint256 i = 0; i < numMsgs; ++i) {
       Internal.EVM2EVMMessage memory message = report.messages[i];
       uint64 sourceChainSelector = message.sourceChainSelector;
+      uint64 sequenceNumber = message.sequenceNumber;
 
-      Internal.MessageExecutionState originalState = getExecutionState(sourceChainSelector, message.sequenceNumber);
+      Internal.MessageExecutionState originalState = getExecutionState(sourceChainSelector, sequenceNumber);
       // Two valid cases here, we either have never touched this message before, or we tried to execute
       // and failed. This check protects against reentry and re-execution because the other states are
       // IN_PROGRESS and SUCCESS, both should not be allowed to execute.
@@ -315,7 +317,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, AggregateRateLimiter, ITyp
           originalState == Internal.MessageExecutionState.UNTOUCHED
             || originalState == Internal.MessageExecutionState.FAILURE
         )
-      ) revert AlreadyExecuted(message.sequenceNumber);
+      ) revert AlreadyExecuted(sequenceNumber);
 
       if (manualExecution) {
         bool isOldCommitReport =
@@ -333,7 +335,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, AggregateRateLimiter, ITyp
       } else {
         // DON can only execute a message once
         // Acceptable state transitions: UNTOUCHED->SUCCESS, UNTOUCHED->FAILURE
-        if (originalState != Internal.MessageExecutionState.UNTOUCHED) revert AlreadyAttempted(message.sequenceNumber);
+        if (originalState != Internal.MessageExecutionState.UNTOUCHED) revert AlreadyAttempted(sequenceNumber);
       }
 
       // In the scenario where we upgrade offRamps, we still want to have sequential nonces.
@@ -372,11 +374,11 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, AggregateRateLimiter, ITyp
       // Although we expect only valid messages will be committed, we check again
       // when executing as a defense in depth measure.
       bytes[] memory offchainTokenData = report.offchainTokenData[i];
-      _isWellFormed(message.sequenceNumber, message.tokenAmounts.length, message.data.length, offchainTokenData.length);
+      _isWellFormed(sequenceNumber, message.tokenAmounts.length, message.data.length, offchainTokenData.length);
 
-      _setExecutionState(sourceChainSelector, message.sequenceNumber, Internal.MessageExecutionState.IN_PROGRESS);
+      _setExecutionState(sourceChainSelector, sequenceNumber, Internal.MessageExecutionState.IN_PROGRESS);
       (Internal.MessageExecutionState newState, bytes memory returnData) = _trialExecute(message, offchainTokenData);
-      _setExecutionState(sourceChainSelector, message.sequenceNumber, newState);
+      _setExecutionState(sourceChainSelector, sequenceNumber, newState);
 
       // Since it's hard to estimate whether manual execution will succeed, we
       // revert the entire transaction if it fails. This will show the user if
@@ -389,7 +391,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, AggregateRateLimiter, ITyp
       // The only valid prior states are UNTOUCHED and FAILURE (checked above)
       // The only valid post states are FAILURE and SUCCESS (checked below)
       if (newState != Internal.MessageExecutionState.FAILURE && newState != Internal.MessageExecutionState.SUCCESS) {
-        revert InvalidNewState(message.sequenceNumber, newState);
+        revert InvalidNewState(sequenceNumber, newState);
       }
 
       // Nonce changes per state transition
@@ -401,7 +403,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, AggregateRateLimiter, ITyp
         s_senderNonce[sourceChainSelector][message.sender]++;
       }
 
-      emit ExecutionStateChanged(sourceChainSelector, message.sequenceNumber, message.messageId, newState, returnData);
+      emit ExecutionStateChanged(sourceChainSelector, sequenceNumber, message.messageId, newState, returnData);
     }
   }
 
