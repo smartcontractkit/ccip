@@ -88,64 +88,64 @@ func (r *ReorgSuite) annotate(text string) {
 	assert.NoError(r.t, err)
 }
 
-// runReorgBelowFinalityThreshold we rollback both chains, one by one, for N blocks back
+// RunReorgBelowFinalityThreshold we rollback both chains, one by one, for N blocks back
 // no assertions needed, load test should fail if something went wrong
-func (r *ReorgSuite) runReorgBelowFinalityThreshold() {
-	blocksBackSrc := int(r.Cfg.SrcFinalityDepth) - r.Cfg.FinalityDelta
-	r.Logger.Warn().
-		Str("URL", r.SrcClient.URL).
-		Str("Case", "below finality").
-		Int("BlocksBack", blocksBackSrc).
-		Msg("Rewinding blocks on src chain")
-	err := r.SrcClient.GethSetHead(blocksBackSrc)
-	assert.NoError(r.t, err)
-	r.annotate(fmt.Sprintf("rewinded source chain for %d blocks back, finality is: %d", blocksBackSrc, r.Cfg.SrcFinalityDepth))
-	time.Sleep(r.Cfg.ExperimentDuration)
-
-	blocksBackDst := int(r.Cfg.DstFinalityDepth) - r.Cfg.FinalityDelta
-	r.Logger.Warn().
-		Str("URL", r.SrcClient.URL).
-		Str("Case", "below finality").
-		Int("BlocksBack", blocksBackDst).
-		Msg("Rewinding blocks on dst chain")
-	err = r.DstClient.GethSetHead(blocksBackDst)
-	assert.NoError(r.t, err)
-	r.annotate(fmt.Sprintf("rewinded dest chain for %d blocks back, finality is: %d", blocksBackDst, r.Cfg.DstFinalityDepth))
-	time.Sleep(r.Cfg.ExperimentDuration)
-}
-
-// runReorgAboveFinalityThreshold we rollback both chains, one by one, for N blocks back, above threshold
-// asserting there is no messages passing
-func (r *ReorgSuite) runReorgAboveFinalityThreshold() {
-	blocksBackSrc := int(r.Cfg.SrcFinalityDepth) + r.Cfg.FinalityDelta
-	r.Logger.Warn().
-		Str("URL", r.SrcClient.URL).
-		Str("Case", "above finality").
-		Int("BlocksBack", blocksBackSrc).
-		Msg("Rewinding blocks on dst chain")
-	err := r.SrcClient.GethSetHead(blocksBackSrc)
-	assert.NoError(r.t, err)
-	r.annotate(fmt.Sprintf("rewinded source chain for %d blocks back, finality is: %d", blocksBackSrc, r.Cfg.SrcFinalityDepth))
-	// TODO: assert the interval, no messages should be processed
-	time.Sleep(r.Cfg.ExperimentDuration)
-
-	blocksBackDst := int(r.Cfg.DstFinalityDepth) + r.Cfg.FinalityDelta
-	r.Logger.Warn().
-		Str("URL", r.SrcClient.URL).
-		Str("Case", "above finality").
-		Int("BlocksBack", blocksBackDst).
-		Msg("Rewinding blocks on dst chain")
-	err = r.DstClient.GethSetHead(blocksBackDst)
-	assert.NoError(r.t, err)
-	r.annotate(fmt.Sprintf("rewinded dest chain for %d blocks back, finality is: %d", blocksBackDst, r.Cfg.DstFinalityDepth))
-	// TODO: assert the interval, no messages should be processed
-	time.Sleep(r.Cfg.ExperimentDuration)
-}
-
-// Run runs all reorg suites sequentially
-func (r *ReorgSuite) Run() {
+func (r *ReorgSuite) RunReorgBelowFinalityThreshold() {
 	go func() {
-		r.runReorgBelowFinalityThreshold()
-		r.runReorgAboveFinalityThreshold()
+		blocksBackSrc := int(r.Cfg.SrcFinalityDepth) - r.Cfg.FinalityDelta
+		r.Logger.Warn().
+			Str("URL", r.SrcClient.URL).
+			Str("Case", "below finality").
+			Int("BlocksBack", blocksBackSrc).
+			Msg("Rewinding blocks on src chain")
+		err := r.SrcClient.GethSetHead(blocksBackSrc)
+		assert.NoError(r.t, err)
+		r.annotate(fmt.Sprintf("rewinded source chain for %d blocks back, finality is: %d", blocksBackSrc, r.Cfg.SrcFinalityDepth))
+		time.Sleep(r.Cfg.ExperimentDuration)
+
+		blocksBackDst := int(r.Cfg.DstFinalityDepth) - r.Cfg.FinalityDelta
+		r.Logger.Warn().
+			Str("URL", r.SrcClient.URL).
+			Str("Case", "below finality").
+			Int("BlocksBack", blocksBackDst).
+			Msg("Rewinding blocks on dst chain")
+		err = r.DstClient.GethSetHead(blocksBackDst)
+		assert.NoError(r.t, err)
+		r.annotate(fmt.Sprintf("rewinded dest chain for %d blocks back, finality is: %d", blocksBackDst, r.Cfg.DstFinalityDepth))
+		time.Sleep(r.Cfg.ExperimentDuration)
 	}()
+}
+
+// RunReorgAboveFinalityThreshold we rollback both chains, one by one, for N blocks back, above threshold
+// asserting there is no messages passing and finality violation is detected
+func (r *ReorgSuite) RunReorgAboveFinalityThreshold() {
+	go func() {
+		blocksBackSrc := int(r.Cfg.SrcFinalityDepth) + r.Cfg.FinalityDelta
+		r.Logger.Warn().
+			Str("URL", r.SrcClient.URL).
+			Str("Case", "above finality").
+			Int("BlocksBack", blocksBackSrc).
+			Msg("Rewinding blocks on dst chain")
+		err := r.SrcClient.GethSetHead(blocksBackSrc)
+		assert.NoError(r.t, err)
+		r.annotate(fmt.Sprintf("rewinded source chain for %d blocks back, finality is: %d", blocksBackSrc, r.Cfg.SrcFinalityDepth))
+		// TODO: assert the interval, no messages should be processed
+		time.Sleep(r.Cfg.ExperimentDuration)
+
+		blocksBackDst := int(r.Cfg.DstFinalityDepth) + r.Cfg.FinalityDelta
+		r.Logger.Warn().
+			Str("URL", r.SrcClient.URL).
+			Str("Case", "above finality").
+			Int("BlocksBack", blocksBackDst).
+			Msg("Rewinding blocks on dst chain")
+		err = r.DstClient.GethSetHead(blocksBackDst)
+		assert.NoError(r.t, err)
+		r.annotate(fmt.Sprintf("rewinded dest chain for %d blocks back, finality is: %d", blocksBackDst, r.Cfg.DstFinalityDepth))
+		// TODO: assert the interval, no messages should be processed
+		time.Sleep(r.Cfg.ExperimentDuration)
+	}()
+}
+
+func (r *ReorgSuite) AssertFinalityViolation(t *testing.T) {
+
 }

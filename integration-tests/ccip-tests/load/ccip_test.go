@@ -17,7 +17,7 @@ import (
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/testsetups"
 )
 
-func TestLoadCCIPStableRPSReorgs(t *testing.T) {
+func TestLoadCCIPStableRPSReorgsBelowFinality(t *testing.T) {
 	t.Parallel()
 	lggr := logging.GetTestLogger(t)
 	testArgs := NewLoadArgs(t, lggr)
@@ -42,9 +42,39 @@ func TestLoadCCIPStableRPSReorgs(t *testing.T) {
 		ExperimentDuration: 1 * time.Minute,
 	})
 	require.NoError(t, err)
-	rs.Run()
+	rs.RunReorgBelowFinalityThreshold()
 	testArgs.TriggerLoadByLane()
 	testArgs.Wait()
+}
+
+func TestLoadCCIPStableRPSReorgsAboveFinality(t *testing.T) {
+	t.Parallel()
+	lggr := logging.GetTestLogger(t)
+	testArgs := NewLoadArgs(t, lggr)
+	testArgs.Setup()
+	// if the test runs on remote runner
+	if len(testArgs.TestSetupArgs.Lanes) == 0 {
+		return
+	}
+	t.Cleanup(func() {
+		log.Info().Msg("Tearing down the environment")
+		require.NoError(t, testArgs.TestSetupArgs.TearDown())
+	})
+	rs, err := ch.NewReorgSuite(t, &ch.ReorgConfig{
+		SrcGethHTTPURL:     testArgs.TestSetupArgs.Env.K8Env.URLs["source-chain_http"][0],
+		DstGethHTTPURL:     testArgs.TestSetupArgs.Env.K8Env.URLs["dest-chain_http"][0],
+		SrcFinalityDepth:   testArgs.TestSetupArgs.Cfg.SelectedNetworks[0].FinalityDepth,
+		DstFinalityDepth:   testArgs.TestSetupArgs.Cfg.SelectedNetworks[1].FinalityDepth,
+		GrafanaURL:         *testArgs.TestCfg.EnvInput.Logging.Grafana.BaseUrl,
+		GrafanaToken:       *testArgs.TestCfg.EnvInput.Logging.Grafana.BearerToken,
+		DashboardURL:       *testArgs.TestCfg.EnvInput.Logging.Grafana.DashboardUrl,
+		FinalityDelta:      5,
+		ExperimentDuration: 1 * time.Minute,
+	})
+	require.NoError(t, err)
+	rs.RunReorgBelowFinalityThreshold()
+	testArgs.TriggerLoadByLane()
+	// TODO: assert using /health API, add API to CTF first
 }
 
 func TestLoadCCIPStableRPS(t *testing.T) {
