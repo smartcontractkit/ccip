@@ -6,6 +6,8 @@ import (
 	"sort"
 
 	mapset "github.com/deckarep/golang-set/v2"
+	"github.com/smartcontractkit/ccipocr3/internal/libs/hashlib"
+	"github.com/smartcontractkit/ccipocr3/internal/libs/merklemulti"
 	"github.com/smartcontractkit/ccipocr3/internal/libs/slicelib"
 	"github.com/smartcontractkit/ccipocr3/internal/model"
 	"github.com/smartcontractkit/ccipocr3/internal/reader"
@@ -51,7 +53,7 @@ func (p *Plugin) Observation(ctx context.Context, outctx ocr3types.OutcomeContex
 			return types.Observation{}, fmt.Errorf("decode commit plugin previous outcome: %w", err)
 		}
 
-		for _, seqNumChain := range prevOutcome.SequenceNumbers {
+		for _, seqNumChain := range prevOutcome.MaxSequenceNumbers {
 			if seqNumChain.SeqNum > seqNumPerChain[seqNumChain.ChainSel] {
 				seqNumPerChain[seqNumChain.ChainSel] = seqNumChain.SeqNum
 			}
@@ -179,21 +181,51 @@ func (p *Plugin) ObservationQuorum(outctx ocr3types.OutcomeContext, query types.
 func (p *Plugin) Outcome(outctx ocr3types.OutcomeContext, query types.Query, aos []types.AttributedObservation) (ocr3types.Outcome, error) {
 	msgsFromObservations := make([]model.CCIPMsgBaseDetails, 0)
 	for _, ao := range aos {
-		parsedObservation, err := model.DecodeCommitPluginObservation(ao.Observation)
+		obs, err := model.DecodeCommitPluginObservation(ao.Observation)
 		if err != nil {
-			p.lggr.Errorw("decode commit plugin observation", "err", err)
-			return ocr3types.Outcome{}, err
+			return ocr3types.Outcome{}, fmt.Errorf("decode commit plugin observation: %w", err)
 		}
-		msgsFromObservations = append(msgsFromObservations, parsedObservation.NewMsgs...)
+		msgsFromObservations = append(msgsFromObservations, obs.NewMsgs...)
 	}
 
+	// Group messages by source chain.
 	sourceChains, groupedMsgs := slicelib.GroupBy(
 		msgsFromObservations, func(msg model.CCIPMsgBaseDetails) model.ChainSelector { return msg.SourceChain })
 	for _, sourceChain := range sourceChains {
-		p.lggr.Debugf("for source chain %d we got %d msg observations", len(groupedMsgs[sourceChain]))
+		p.lggr.Debugf("source chain %d we got %d msg observations", sourceChain, len(groupedMsgs[sourceChain]))
 	}
 
-	return ocr3types.Outcome{}, fmt.Errorf("implement me")
+	// Come to consensus on the observed messages by source chain.
+	consensusBySourceChain := make(map[model.ChainSelector]observedMsgsConsensus)
+	for _, sourceChain := range sourceChains {
+		observedMsgs, ok := groupedMsgs[sourceChain]
+		if !ok {
+			p.lggr.Panicw("source chain not found in grouped messages", "sourceChain", sourceChain)
+		}
+
+		msgsConsensus, err := p.observedMsgsConsensus(sourceChain, observedMsgs)
+		if err != nil {
+			return ocr3types.Outcome{}, fmt.Errorf("calculate observed msgs consensus: %w", err)
+		}
+		consensusBySourceChain[sourceChain] = msgsConsensus
+
+		/*
+			# TODO: Intention of the expiry is to prevent outctx.max_committed
+			# from getting permanently out of sync with the dest chain if something goes wrong. Maybe there's a better way?
+			# If its expired, we update from the consensus destination chain.
+			if expired(outctx.max_committed_seq_nr_by_source):
+				max_committed_seq_nr_by_source = calculate_consensus_committed_seq_nr(observations_by_source[chain], quorum)
+		*/
+	}
+
+	// Construct the outcome.
+	maxSeqNums := make([]model.SeqNumChain, 0)
+	merkleRoots := make([]model.MerkleRootChain, 0)
+	for sourceChain, consensus := range consensusBySourceChain {
+		maxSeqNums = append(maxSeqNums, model.NewSeqNumChain(sourceChain, consensus.seqNumRange.End()))
+		merkleRoots = append(merkleRoots, model.NewMerkleRootChain(sourceChain, consensus.merkleRoot))
+	}
+	return model.NewCommitPluginOutcome(maxSeqNums, merkleRoots).Encode()
 }
 
 func (p *Plugin) Reports(seqNr uint64, outcome ocr3types.Outcome) ([]ocr3types.ReportWithInfo[[]byte], error) {
@@ -223,13 +255,77 @@ func (p *Plugin) Close() error {
 	panic("implement me")
 }
 
-func (p *Plugin) canRead(ch model.ChainSelector) bool {
-	for _, ch := range p.cfg.Reads {
-		if ch == ch {
+func (p *Plugin) observedMsgsConsensus(chainSel model.ChainSelector, observedMsgs []model.CCIPMsgBaseDetails) (observedMsgsConsensus, error) {
+	fChain, ok := p.cfg.FChain[chainSel]
+	if !ok {
+		return observedMsgsConsensus{}, fmt.Errorf("fchain not found for chain %d", chainSel)
+	}
+
+	// Reach consensus on the observed msgs sequence numbers.
+	msgSeqNums := make(map[model.SeqNum]int)
+	for _, msg := range observedMsgs {
+		msgSeqNums[msg.SeqNum]++
+	}
+
+	// Filter out msgs not observed by at least 2f_chain+1 followers.
+	msgSeqNumsQuorum := mapset.NewSet[model.SeqNum]()
+	for seqNum, count := range msgSeqNums {
+		if count >= 2*fChain+1 {
+			msgSeqNumsQuorum.Add(seqNum)
+		}
+	}
+
+	// Come to consensus on the observed messages sequence numbers range.
+	msgSeqNumsQuorumSlice := msgSeqNumsQuorum.ToSlice()
+	sort.Slice(msgSeqNumsQuorumSlice, func(i, j int) bool { return msgSeqNumsQuorumSlice[i] < msgSeqNumsQuorumSlice[j] })
+	seqNumConsensusRange := model.NewSeqNumRange(msgSeqNumsQuorumSlice[0], msgSeqNumsQuorumSlice[0])
+	for _, seqNum := range msgSeqNumsQuorumSlice[1:] {
+		if seqNum != seqNumConsensusRange.End()+1 {
+			break // Found a gap in the sequence numbers.
+		}
+		seqNumConsensusRange.SetEnd(seqNum)
+	}
+
+	msgsBySeqNum := make(map[model.SeqNum]model.CCIPMsgBaseDetails)
+	for _, msg := range observedMsgs {
+		msgsBySeqNum[msg.SeqNum] = msg // todo: validate that all msgs are the same
+	}
+
+	treeLeaves := make([][32]byte, 0)
+	for seqNum := seqNumConsensusRange.Start(); seqNum <= seqNumConsensusRange.End(); seqNum++ {
+		msg, ok := msgsBySeqNum[seqNum]
+		if !ok {
+			return observedMsgsConsensus{}, fmt.Errorf("msg not found in map for seq num %d", seqNum)
+		}
+		treeLeaves = append(treeLeaves, msg.ID)
+	}
+
+	tree, err := merklemulti.NewTree(hashlib.NewKeccakCtx(), treeLeaves)
+	if err != nil {
+		return observedMsgsConsensus{}, fmt.Errorf("construct merkle tree from %d leaves: %w", len(treeLeaves), err)
+	}
+
+	// TODO: gas price consensus
+	// TODO: token prices consensus
+
+	return observedMsgsConsensus{
+		seqNumRange: seqNumConsensusRange,
+		merkleRoot:  tree.Root(),
+	}, nil
+}
+
+func (p *Plugin) canRead(targetChain model.ChainSelector) bool {
+	for _, readChain := range p.cfg.Reads {
+		if readChain == targetChain {
 			return true
 		}
 	}
 	return false
+}
+
+type observedMsgsConsensus struct {
+	seqNumRange model.SeqNumRange
+	merkleRoot  [32]byte
 }
 
 // Interface compatibility checks.

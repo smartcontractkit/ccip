@@ -37,11 +37,15 @@ func DecodeCommitPluginObservation(b []byte) (CommitPluginObservation, error) {
 }
 
 type CommitPluginOutcome struct {
-	SequenceNumbers []SeqNumChain `json:"sequenceNumbers"`
+	MaxSequenceNumbers []SeqNumChain     `json:"maxSequenceNumbers"`
+	MerkleRoots        []MerkleRootChain `json:"merkleRoots"`
 }
 
-func NewCommitPluginOutcome() CommitPluginOutcome {
-	return CommitPluginOutcome{}
+func NewCommitPluginOutcome(seqNums []SeqNumChain, merkleRoots []MerkleRootChain) CommitPluginOutcome {
+	return CommitPluginOutcome{
+		MaxSequenceNumbers: seqNums,
+		MerkleRoots:        merkleRoots,
+	}
 }
 
 func (o CommitPluginOutcome) Encode() ([]byte, error) {
@@ -57,4 +61,23 @@ func DecodeCommitPluginOutcome(b []byte) (CommitPluginOutcome, error) {
 type SeqNumChain struct {
 	ChainSel ChainSelector
 	SeqNum   SeqNum
+}
+
+func NewSeqNumChain(chainSel ChainSelector, seqNum SeqNum) SeqNumChain {
+	return SeqNumChain{
+		ChainSel: chainSel,
+		SeqNum:   seqNum,
+	}
+}
+
+type MerkleRootChain struct {
+	ChainSel   ChainSelector
+	MerkleRoot [32]byte
+}
+
+func NewMerkleRootChain(chainSel ChainSelector, merkleRoot [32]byte) MerkleRootChain {
+	return MerkleRootChain{
+		ChainSel:   chainSel,
+		MerkleRoot: merkleRoot,
+	}
 }

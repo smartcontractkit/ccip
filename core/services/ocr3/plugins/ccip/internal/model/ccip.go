@@ -44,6 +44,14 @@ func (s SeqNumRange) End() SeqNum {
 	return s[1]
 }
 
+func (s SeqNumRange) SetStart(v SeqNum) {
+	s[0] = v
+}
+
+func (s SeqNumRange) SetEnd(v SeqNum) {
+	s[1] = v
+}
+
 func (s SeqNumRange) String() string {
 	return fmt.Sprintf("[%d -> %d]", s[0], s[1])
 }
@@ -70,6 +78,7 @@ func (c CCIPMsg) String() string {
 }
 
 type CCIPMsgBaseDetails struct {
+	ID          [32]byte      `json:"id,string"`
 	SourceChain ChainSelector `json:"sourceChain,string"`
 	SeqNum      SeqNum        `json:"seqNum,string"`
 }
