@@ -2,6 +2,7 @@ package load
 
 import (
 	ch "github.com/smartcontractkit/ccip/integration-tests/ccip-tests/chaos"
+	"github.com/stretchr/testify/assert"
 	"testing"
 	"time"
 
@@ -17,6 +18,24 @@ import (
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/testsetups"
 )
 
+func setupReorgSuite(t *testing.T, loadArgs *LoadArgs) *ch.ReorgSuite {
+	rs, err := ch.NewReorgSuite(t, &ch.ReorgConfig{
+		SrcGethHTTPURL:     loadArgs.TestSetupArgs.Env.K8Env.URLs["source-chain_http"][0],
+		DstGethHTTPURL:     loadArgs.TestSetupArgs.Env.K8Env.URLs["dest-chain_http"][0],
+		SrcFinalityDepth:   loadArgs.TestSetupArgs.Cfg.SelectedNetworks[0].FinalityDepth,
+		DstFinalityDepth:   loadArgs.TestSetupArgs.Cfg.SelectedNetworks[1].FinalityDepth,
+		GrafanaURL:         *loadArgs.TestCfg.EnvInput.Logging.Grafana.BaseUrl,
+		GrafanaToken:       *loadArgs.TestCfg.EnvInput.Logging.Grafana.BearerToken,
+		DashboardURL:       *loadArgs.TestCfg.EnvInput.Logging.Grafana.DashboardUrl,
+		FinalityDelta:      5,
+		ExperimentDuration: 1 * time.Minute,
+	})
+	require.NoError(t, err)
+	return rs
+}
+
+// TestLoadCCIPStableRPSReorgsBelowFinality we run default stable RPS load test and
+// measure how below-finality reorgs are slowing us down
 func TestLoadCCIPStableRPSReorgsBelowFinality(t *testing.T) {
 	t.Parallel()
 	lggr := logging.GetTestLogger(t)
@@ -30,23 +49,14 @@ func TestLoadCCIPStableRPSReorgsBelowFinality(t *testing.T) {
 		log.Info().Msg("Tearing down the environment")
 		require.NoError(t, testArgs.TestSetupArgs.TearDown())
 	})
-	rs, err := ch.NewReorgSuite(t, &ch.ReorgConfig{
-		SrcGethHTTPURL:     testArgs.TestSetupArgs.Env.K8Env.URLs["source-chain_http"][0],
-		DstGethHTTPURL:     testArgs.TestSetupArgs.Env.K8Env.URLs["dest-chain_http"][0],
-		SrcFinalityDepth:   testArgs.TestSetupArgs.Cfg.SelectedNetworks[0].FinalityDepth,
-		DstFinalityDepth:   testArgs.TestSetupArgs.Cfg.SelectedNetworks[1].FinalityDepth,
-		GrafanaURL:         *testArgs.TestCfg.EnvInput.Logging.Grafana.BaseUrl,
-		GrafanaToken:       *testArgs.TestCfg.EnvInput.Logging.Grafana.BearerToken,
-		DashboardURL:       *testArgs.TestCfg.EnvInput.Logging.Grafana.DashboardUrl,
-		FinalityDelta:      5,
-		ExperimentDuration: 1 * time.Minute,
-	})
-	require.NoError(t, err)
+	rs := setupReorgSuite(t, testArgs)
 	rs.RunReorgBelowFinalityThreshold()
 	testArgs.TriggerLoadByLane()
 	testArgs.Wait()
 }
 
+// TestLoadCCIPStableRPSReorgsAboveFinality we run a short stable load test and assert
+// that finality violation is detected
 func TestLoadCCIPStableRPSReorgsAboveFinality(t *testing.T) {
 	t.Parallel()
 	lggr := logging.GetTestLogger(t)
@@ -60,21 +70,22 @@ func TestLoadCCIPStableRPSReorgsAboveFinality(t *testing.T) {
 		log.Info().Msg("Tearing down the environment")
 		require.NoError(t, testArgs.TestSetupArgs.TearDown())
 	})
-	rs, err := ch.NewReorgSuite(t, &ch.ReorgConfig{
-		SrcGethHTTPURL:     testArgs.TestSetupArgs.Env.K8Env.URLs["source-chain_http"][0],
-		DstGethHTTPURL:     testArgs.TestSetupArgs.Env.K8Env.URLs["dest-chain_http"][0],
-		SrcFinalityDepth:   testArgs.TestSetupArgs.Cfg.SelectedNetworks[0].FinalityDepth,
-		DstFinalityDepth:   testArgs.TestSetupArgs.Cfg.SelectedNetworks[1].FinalityDepth,
-		GrafanaURL:         *testArgs.TestCfg.EnvInput.Logging.Grafana.BaseUrl,
-		GrafanaToken:       *testArgs.TestCfg.EnvInput.Logging.Grafana.BearerToken,
-		DashboardURL:       *testArgs.TestCfg.EnvInput.Logging.Grafana.DashboardUrl,
-		FinalityDelta:      5,
-		ExperimentDuration: 1 * time.Minute,
-	})
-	require.NoError(t, err)
-	rs.RunReorgBelowFinalityThreshold()
+	rs := setupReorgSuite(t, testArgs)
+	rs.RunReorgAboveFinalityThreshold()
 	testArgs.TriggerLoadByLane()
-	// TODO: assert using /health API, add API to CTF first
+	assert.Eventually(t, func() bool {
+		resp, _, err := testArgs.TestSetupArgs.Env.CLNodes[1].Health()
+		require.NoError(t, err)
+		lggr.Debug().Any("Response", resp).Send()
+		for _, d := range resp.Data {
+			if d.Attributes.Name == "EVM.133.LogPoller" {
+				require.Equal(t, d.Attributes.Output, "finality violated")
+				require.Equal(t, d.Attributes.Status, "failing")
+				return true
+			}
+		}
+		return false
+	}, 3*time.Minute, 5*time.Second)
 }
 
 func TestLoadCCIPStableRPS(t *testing.T) {
