@@ -56,6 +56,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_arm_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/price_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers"
 	integrationtesthelpers "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers/integration"
@@ -1582,6 +1583,7 @@ func (sourceCCIP *SourceCCIPModule) AssertEventCCIPSendRequested(
 	}
 }
 
+// CCIPMsg constructs the message for a CCIP request
 func (sourceCCIP *SourceCCIPModule) CCIPMsg(
 	receiver common.Address,
 	gasLimit *big.Int,
@@ -1606,7 +1608,10 @@ func (sourceCCIP *SourceCCIPModule) CCIPMsg(
 			token = sourceCCIP.Common.BridgeTokens[i]
 		}
 		if amount == nil || amount.Cmp(big.NewInt(0)) == 0 {
-			log.Warn().Str("Token Address", token.Address()).Int("Token Index", i).Msg("Not sending a request for token transfer as the amount is 0 or nil")
+			log.Warn().
+				Str("Token Address", token.Address()).
+				Int("Token Index", i).
+				Msg("Not sending a request for token transfer as the amount is 0 or nil")
 			continue
 		}
 		tokenAndAmounts = append(tokenAndAmounts, router.ClientEVMTokenAmount{
@@ -2675,10 +2680,7 @@ func (lane *CCIPLane) SendRequests(noOfRequests int, gasLimit *big.Int) error {
 
 		noOfTokens := 0
 		for _, tokenAmount := range lane.Source.TransferAmount { // Only count tokens that are actually sent
-			if tokenAmount == nil {
-				continue
-			}
-			if tokenAmount.Cmp(big.NewInt(0)) > 0 {
+			if tokenAmount != nil && tokenAmount.Cmp(big.NewInt(0)) > 0 {
 				noOfTokens++
 			}
 		}
@@ -2873,6 +2875,69 @@ func (lane *CCIPLane) ValidateRequestByTxHash(txHash common.Hash, execState test
 		if err != nil {
 			return fmt.Errorf("could not validate ExecutionStateChanged event: %w", err)
 		}
+	}
+	return nil
+}
+
+// DisableAllRateLimiting disables all rate limiting for the lane, including ARL and token pool rate limits
+func (lane *CCIPLane) DisableAllRateLimiting() error {
+	src := lane.Source
+	dest := lane.Dest
+
+	// Tell OnRamp to not include any tokens in ARL
+	err := src.SetTokenTransferFeeConfig(false)
+	if err != nil {
+		return fmt.Errorf("error disabling token transfer fee config for OnRamp: %w", err)
+	}
+	err = dest.RemoveAllRateLimitTokens(context.Background())
+	if err != nil {
+		return fmt.Errorf("error removing rate limited tokens for OffRamp: %w", err)
+	}
+	// Disable ARL for OnRamp and OffRamp
+	err = src.OnRamp.SetRateLimit(evm_2_evm_onramp.RateLimiterConfig{
+		IsEnabled: false,
+		Capacity:  big.NewInt(0),
+		Rate:      big.NewInt(0),
+	})
+	if err != nil {
+		return fmt.Errorf("error disabling rate limit for source onramp: %w", err)
+	}
+	err = dest.OffRamp.SetRateLimit(evm_2_evm_offramp.RateLimiterConfig{
+		IsEnabled: false,
+		Capacity:  big.NewInt(0),
+		Rate:      big.NewInt(0),
+	})
+	if err != nil {
+		return fmt.Errorf("error disabling rate limit for destination offramp: %w", err)
+	}
+	// Disable individual token pool rate limits
+	for i, tokenPool := range src.Common.BridgeTokenPools {
+		err = tokenPool.SetRemoteChainRateLimits(src.DestChainSelector, token_pool.RateLimiterConfig{
+			IsEnabled: false,
+			Capacity:  big.NewInt(0),
+			Rate:      big.NewInt(0),
+		})
+		if err != nil {
+			return fmt.Errorf("error disabling rate limit for token pool %d: %w", i, err)
+		}
+	}
+	for i, tokenPool := range dest.Common.BridgeTokenPools {
+		err = tokenPool.SetRemoteChainRateLimits(dest.SourceChainSelector, token_pool.RateLimiterConfig{
+			IsEnabled: false,
+			Capacity:  big.NewInt(0),
+			Rate:      big.NewInt(0),
+		})
+		if err != nil {
+			return fmt.Errorf("error disabling rate limit for token pool %d: %w", i, err)
+		}
+	}
+	err = src.Common.ChainClient.WaitForEvents()
+	if err != nil {
+		return fmt.Errorf("error waiting for source chain events: %w", err)
+	}
+	err = dest.Common.ChainClient.WaitForEvents()
+	if err != nil {
+		return fmt.Errorf("error waiting for destination chain events: %w", err)
 	}
 	return nil
 }

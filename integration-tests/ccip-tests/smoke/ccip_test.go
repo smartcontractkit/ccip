@@ -1,7 +1,6 @@
 package smoke
 
 import (
-	"context"
 	"fmt"
 	"math/big"
 	"testing"
@@ -452,47 +451,8 @@ func TestSmokeCCIPSelfServeRateLimit(t *testing.T) {
 				limitedDestToken = dest.Common.BridgeTokens[limitedTokenIndex]
 			)
 
-			// Disable all rate limiting
-
-			// Tell OnRamp to not include any tokens in ARL
-			err := src.SetTokenTransferFeeConfig(false)
-			require.NoError(t, err, "Error disabling aggregate rate limit for OnRamp")
-			err = dest.RemoveAllRateLimitTokens(context.Background())
-			require.NoError(t, err, "Error removing rate limited tokens for OffRamp")
-			// Disable ARL for OnRamp and OffRamp
-			err = src.OnRamp.SetRateLimit(evm_2_evm_onramp.RateLimiterConfig{
-				IsEnabled: false,
-				Capacity:  big.NewInt(0),
-				Rate:      big.NewInt(0),
-			})
-			require.NoError(t, err, "Error disabling rate limit for source onramp")
-			err = dest.OffRamp.SetRateLimit(evm_2_evm_offramp.RateLimiterConfig{
-				IsEnabled: false,
-				Capacity:  big.NewInt(0),
-				Rate:      big.NewInt(0),
-			})
-			require.NoError(t, err, "Error disabling rate limit for destination offramp")
-			// Disable individual token pool rate limits
-			for i, tokenPool := range src.Common.BridgeTokenPools {
-				err = tokenPool.SetRemoteChainRateLimits(src.DestChainSelector, token_pool.RateLimiterConfig{
-					IsEnabled: false,
-					Capacity:  big.NewInt(0),
-					Rate:      big.NewInt(0),
-				})
-				require.NoError(t, err, "Error disabling rate limit for token pool %d", i)
-			}
-			for i, tokenPool := range dest.Common.BridgeTokenPools {
-				err = tokenPool.SetRemoteChainRateLimits(dest.SourceChainSelector, token_pool.RateLimiterConfig{
-					IsEnabled: false,
-					Capacity:  big.NewInt(0),
-					Rate:      big.NewInt(0),
-				})
-				require.NoError(t, err, "Error disabling rate limit for token pool %d", i)
-			}
-			err = src.Common.ChainClient.WaitForEvents()
-			require.NoError(t, err, "Error waiting for source chain events")
-			err = dest.Common.ChainClient.WaitForEvents()
-			require.NoError(t, err, "Error waiting for destination chain events")
+			err := tc.lane.DisableAllRateLimiting()
+			require.NoError(t, err, "Error disabling rate limits")
 
 			// Send both tokens with no rate limits and ensure they succeed
 			overLimitAmount := new(big.Int).Add(aggregateRateLimit, big.NewInt(1))
@@ -534,7 +494,9 @@ func TestSmokeCCIPSelfServeRateLimit(t *testing.T) {
 			require.NoError(t, err, "Failed to send rate limited token transfer")
 			err = tc.lane.Dest.AssertNoExecutionStateChangedEventReceived(tc.lane.Logger, time.Minute*5, lastSeen)
 			require.NoError(t, err, "Rate limited token transfer should not get to ExecutionStateChanged")
-			tc.lane.Logger.Info().Str("Token", limitedSrcToken.ContractAddress.Hex()).Msg("Limited token transfer failed on destination chain")
+			tc.lane.Logger.Info().
+				Str("Token", limitedSrcToken.ContractAddress.Hex()).
+				Msg("Limited token transfer failed on destination chain (a good thing in this context)")
 
 			// Enable aggregate rate limiting on the source chain for the limited token
 			err = src.SetTokenTransferFeeConfig(true)
@@ -553,7 +515,10 @@ func TestSmokeCCIPSelfServeRateLimit(t *testing.T) {
 			errReason, _, err := src.Common.ChainClient.RevertReasonFromTx(failedTx, evm_2_evm_onramp.EVM2EVMOnRampABI)
 			require.NoError(t, err)
 			require.Equal(t, "AggregateValueMaxCapacityExceeded", errReason, "Expected rate limit reached error")
-			tc.lane.Logger.Info().Str("Token", limitedSrcToken.ContractAddress.Hex()).Msg("Limited token transfer failed on source chain")
+			tc.lane.Logger.
+				Info().
+				Str("Token", limitedSrcToken.ContractAddress.Hex()).
+				Msg("Limited token transfer failed on source chain (a good thing in this context)")
 
 			// Ensure that the free token is still able to transfer freely
 			src.TransferAmount[freeTokenIndex] = overLimitAmount
@@ -562,6 +527,7 @@ func TestSmokeCCIPSelfServeRateLimit(t *testing.T) {
 			err = tc.lane.SendRequests(1, big.NewInt(600_000))
 			require.NoError(t, err)
 			tc.lane.ValidateRequests(true)
+			tc.lane.Logger.Info().Str("Token", freeSrcToken.ContractAddress.Hex()).Msg("Unlimited token transfer succeeded after rate limit")
 		})
 	}
 }
