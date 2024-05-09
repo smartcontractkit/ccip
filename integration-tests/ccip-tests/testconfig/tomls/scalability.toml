@@ -97,7 +97,7 @@ Frequencies = [4,12,3,1]
 
 [[CCIP.Groups.load.LoadProfile.MsgProfile.MsgDetails]]
 MsgType = 'Token'
-DestGasLimit = 0
+DestGasLimit = 10000 # revisit this value
 DataLength = 0
 NoOfTokens = 5
 AmountPerToken = 1
