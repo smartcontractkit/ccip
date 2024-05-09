@@ -48,8 +48,8 @@ func TestCCIPMsg_String(t *testing.T) {
 	}{
 		{
 			"base",
-			CCIPMsg{CCIPMsgBaseDetails{SourceChain: ChainSelector(1), SeqNum: 2}},
-			`{"sourceChain":"1","seqNum":"2"}`,
+			CCIPMsg{CCIPMsgBaseDetails{ID: [32]byte{123}, SourceChain: ChainSelector(1), SeqNum: 2}},
+			`{"id":[123,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"sourceChain":"1","seqNum":"2"}`,
 		},
 	}
 

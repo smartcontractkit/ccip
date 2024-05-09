@@ -6,20 +6,17 @@ import "encoding/json"
 type CommitPluginReport struct{}
 
 type CommitPluginObservation struct {
-	NodeID      NodeID               `json:"nodeID"`
 	NewMsgs     []CCIPMsgBaseDetails `json:"newMsgs"`
 	GasPrices   []GasPriceChain      `json:"gasPrices,string"`
 	TokenPrices []TokenPrice         `json:"tokenPrices"`
 }
 
 func NewCommitPluginObservation(
-	nodeID NodeID,
 	newMsgs []CCIPMsgBaseDetails,
 	gasPrices []GasPriceChain,
 	tokenPrices []TokenPrice,
 ) CommitPluginObservation {
 	return CommitPluginObservation{
-		NodeID:      nodeID,
 		NewMsgs:     newMsgs,
 		GasPrices:   gasPrices,
 		TokenPrices: tokenPrices,

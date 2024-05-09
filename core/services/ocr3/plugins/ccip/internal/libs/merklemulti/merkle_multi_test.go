@@ -170,7 +170,7 @@ func TestMerkleMultiProof(t *testing.T) {
 }
 
 // Decode decodes a hex string with 0x prefix.
-func mustDecodeHex(input string) [32]byte {
+func mustDecodeHex(input string) []byte {
 	if len(input) == 0 {
 		panic("empty string")
 	}
@@ -183,7 +183,5 @@ func mustDecodeHex(input string) [32]byte {
 		panic(err)
 	}
 
-	var h [32]byte
-	copy(h[:], b)
-	return h
+	return b
 }

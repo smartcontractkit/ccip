@@ -78,7 +78,7 @@ func (c CCIPMsg) String() string {
 }
 
 type CCIPMsgBaseDetails struct {
-	ID          [32]byte      `json:"id,string"`
+	ID          [32]byte      `json:"id"` // todo: json encode/decode to hex
 	SourceChain ChainSelector `json:"sourceChain,string"`
 	SeqNum      SeqNum        `json:"seqNum,string"`
 }

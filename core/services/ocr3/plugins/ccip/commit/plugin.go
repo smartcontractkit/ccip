@@ -11,6 +11,7 @@ import (
 	"github.com/smartcontractkit/ccipocr3/internal/libs/slicelib"
 	"github.com/smartcontractkit/ccipocr3/internal/model"
 	"github.com/smartcontractkit/ccipocr3/internal/reader"
+	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
@@ -112,18 +113,13 @@ func (p *Plugin) Observation(ctx context.Context, outctx ocr3types.OutcomeContex
 	// Find the token prices.
 	tokenPrices := make([]model.TokenPrice, 0) // TODO: token prices ...
 
-	return model.NewCommitPluginObservation(p.nodeID, observedNewMsgs, gasPrices, tokenPrices).Encode()
+	return model.NewCommitPluginObservation(observedNewMsgs, gasPrices, tokenPrices).Encode()
 }
 
 func (p *Plugin) ValidateObservation(outctx ocr3types.OutcomeContext, _ types.Query, ao types.AttributedObservation) error {
 	obs, err := model.DecodeCommitPluginObservation(ao.Observation)
 	if err != nil {
 		return fmt.Errorf("decode commit plugin observation: %w", err)
-	}
-
-	// Node id must not be empty.
-	if obs.NodeID == "" {
-		return fmt.Errorf("node id must not be empty")
 	}
 
 	// The same sequence number must not appear more than once for the same chain and must be valid.
@@ -179,12 +175,30 @@ func (p *Plugin) ObservationQuorum(outctx ocr3types.OutcomeContext, query types.
 }
 
 func (p *Plugin) Outcome(outctx ocr3types.OutcomeContext, query types.Query, aos []types.AttributedObservation) (ocr3types.Outcome, error) {
+	observerSeqNums := make(map[commontypes.OracleID]map[model.ChainSelector]mapset.Set[model.SeqNum])
 	msgsFromObservations := make([]model.CCIPMsgBaseDetails, 0)
 	for _, ao := range aos {
 		obs, err := model.DecodeCommitPluginObservation(ao.Observation)
 		if err != nil {
 			return ocr3types.Outcome{}, fmt.Errorf("decode commit plugin observation: %w", err)
 		}
+
+		// Ignore observations that have duplicate sequence numbers coming from the same sender for the same chain.
+		for _, msg := range obs.NewMsgs {
+			if _, exists := observerSeqNums[ao.Observer]; !exists {
+				observerSeqNums[ao.Observer] = map[model.ChainSelector]mapset.Set[model.SeqNum]{}
+			}
+			if _, exists := observerSeqNums[ao.Observer][msg.SourceChain]; !exists {
+				observerSeqNums[ao.Observer][msg.SourceChain] = mapset.NewSet[model.SeqNum]()
+			}
+			if observerSeqNums[ao.Observer][msg.SourceChain].Contains(msg.SeqNum) {
+				p.lggr.Warnw("duplicate follower sequence number in observation",
+					"observer", ao.Observer, "chain", msg.SourceChain, "seqNum", msg.SeqNum)
+				continue
+			}
+			observerSeqNums[ao.Observer][msg.SourceChain].Add(msg.SeqNum)
+		}
+
 		msgsFromObservations = append(msgsFromObservations, obs.NewMsgs...)
 	}
 
