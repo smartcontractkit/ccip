@@ -2851,10 +2851,9 @@ func (lane *CCIPLane) StartEventWatchers() error {
 	go lane.Dest.Common.PollRPCConnection(lane.Context, lane.Logger)
 
 	sendReqEvent := make(chan *evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested)
-	sub, err := lane.Source.OnRamp.Instance.WatchCCIPSendRequested(nil, sendReqEvent)
-	if err != nil {
-		return err
-	}
+	sub := event.Resubscribe(3*time.Hour, func(_ context.Context) (event.Subscription, error) {
+		return lane.Source.OnRamp.Instance.WatchCCIPSendRequested(nil, sendReqEvent)
+	})
 	go func(sub event.Subscription) {
 		defer sub.Unsubscribe()
 		resubscribed := false
@@ -2882,6 +2881,7 @@ func (lane *CCIPLane) StartEventWatchers() error {
 					if sub != nil {
 						sub.Unsubscribe()
 					}
+					var err error
 					sub, err = lane.Source.OnRamp.Instance.WatchCCIPSendRequested(&bind.WatchOpts{
 						Start: pointer.ToUint64(lane.Source.SrcStartBlock),
 					}, sendReqEvent)
@@ -2899,11 +2899,9 @@ func (lane *CCIPLane) StartEventWatchers() error {
 	}(sub)
 
 	reportAcceptedEvent := make(chan *commit_store.CommitStoreReportAccepted)
-	sub, err = lane.Dest.CommitStore.Instance.WatchReportAccepted(nil, reportAcceptedEvent)
-	if err != nil {
-		return err
-	}
-
+	sub = event.Resubscribe(3*time.Hour, func(_ context.Context) (event.Subscription, error) {
+		return lane.Dest.CommitStore.Instance.WatchReportAccepted(nil, reportAcceptedEvent)
+	})
 	go func(sub event.Subscription) {
 		defer sub.Unsubscribe()
 		resubscribed := false
@@ -2926,6 +2924,7 @@ func (lane *CCIPLane) StartEventWatchers() error {
 					if sub != nil {
 						sub.Unsubscribe()
 					}
+					var err error
 					sub, err = lane.Dest.CommitStore.Instance.WatchReportAccepted(&bind.WatchOpts{
 						Start: pointer.ToUint64(lane.Dest.DestStartBlock),
 					}, reportAcceptedEvent)
@@ -2944,11 +2943,9 @@ func (lane *CCIPLane) StartEventWatchers() error {
 
 	if lane.Dest.Common.ARM != nil {
 		reportBlessedEvent := make(chan *arm_contract.ARMContractTaggedRootBlessed)
-		sub, err = lane.Dest.Common.ARM.Instance.WatchTaggedRootBlessed(nil, reportBlessedEvent, nil)
-		if err != nil {
-			return err
-		}
-
+		sub = event.Resubscribe(3*time.Hour, func(_ context.Context) (event.Subscription, error) {
+			return lane.Dest.Common.ARM.Instance.WatchTaggedRootBlessed(nil, reportBlessedEvent, nil)
+		})
 		go func(sub event.Subscription) {
 			defer sub.Unsubscribe()
 			resubscribed := false
@@ -2972,6 +2969,7 @@ func (lane *CCIPLane) StartEventWatchers() error {
 						if sub != nil {
 							sub.Unsubscribe()
 						}
+						var err error
 						sub, err = lane.Dest.Common.ARM.Instance.WatchTaggedRootBlessed(&bind.WatchOpts{
 							Start: pointer.ToUint64(lane.Dest.DestStartBlock),
 						}, reportBlessedEvent, nil)
@@ -2990,11 +2988,9 @@ func (lane *CCIPLane) StartEventWatchers() error {
 	}
 
 	execStateChangedEvent := make(chan *evm_2_evm_offramp.EVM2EVMOffRampExecutionStateChanged)
-	sub, err = lane.Dest.OffRamp.Instance.WatchExecutionStateChanged(nil, execStateChangedEvent, nil, nil)
-	if err != nil {
-		return err
-	}
-
+	sub = event.Resubscribe(3*time.Hour, func(_ context.Context) (event.Subscription, error) {
+		return lane.Dest.OffRamp.Instance.WatchExecutionStateChanged(nil, execStateChangedEvent, nil, nil)
+	})
 	go func(sub event.Subscription) {
 		defer sub.Unsubscribe()
 		resubscribed := false
@@ -3016,6 +3012,7 @@ func (lane *CCIPLane) StartEventWatchers() error {
 					if sub != nil {
 						sub.Unsubscribe()
 					}
+					var err error
 					sub, err = lane.Dest.OffRamp.Instance.WatchExecutionStateChanged(&bind.WatchOpts{
 						Start: pointer.ToUint64(lane.Dest.DestStartBlock),
 					}, execStateChangedEvent, nil, nil)
