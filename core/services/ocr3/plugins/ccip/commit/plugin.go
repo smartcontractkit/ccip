@@ -122,11 +122,20 @@ func (p *Plugin) ValidateObservation(outctx ocr3types.OutcomeContext, _ types.Qu
 		return fmt.Errorf("decode commit plugin observation: %w", err)
 	}
 
-	// TODO: read home chain config and validate that the observers can actually observe the chain.
+	observerInfo, exists := p.cfg.ObserverInfo[ao.Observer]
+	if !exists {
+		return fmt.Errorf("observer %d not found in config", ao.Observer)
+	}
+	observerReadChains := mapset.NewSet(observerInfo.Reads...)
 
-	// The same sequence number must not appear more than once for the same chain and must be valid.
 	seqNums := make(map[model.ChainSelector]mapset.Set[model.SeqNum], len(obs.NewMsgs))
 	for _, msg := range obs.NewMsgs {
+		// Observer must be able to read the chain that the message is coming from.
+		if !observerReadChains.Contains(msg.SourceChain) {
+			return fmt.Errorf("observer %d is not allowed to read chain %d", ao.Observer, msg.SourceChain)
+		}
+
+		// The same sequence number must not appear more than once for the same chain and must be valid.
 		knownSeqNums, exists := seqNums[msg.SourceChain]
 		if !exists {
 			seqNums[msg.SourceChain] = mapset.NewSet(msg.SeqNum)
