@@ -291,7 +291,24 @@ WaitBetweenChaosDuringLoad = '2m'   # Duration to wait between each chaos inject
 
 # uncomment the following if you want your test results to be reflected under CCIP test grafana dashboard with namespace label same as the value of the following variable
 # TestRunName = <env>_<testnet/mainnet>_<cciprelease> i.e prod-testnet-2.7.1-ccip1.2.1-beta
+# Message Frequency Distribution Example
 
+# The 'Frequencies' array configures the relative frequency of different message types.
+# Each value in the array represents the relative frequency of a message type,
+# determining how often each type appears relative to the others.
+#[CCIP.Groups.load.LoadProfile.MsgProfile]
+#Frequencies = [4, 12, 3, 1]
+
+# Example Breakdown:
+# - Frequencies = [4, 12, 3, 1]
+# - Total Sum of Frequencies = 4 + 12 + 3 + 1 = 20
+# - Percentages:
+#   - Message Type 1: (4 / 20) * 100% = 20%
+#   - Message Type 2: (12 / 20) * 100% = 60%
+#   - Message Type 3: (3 / 20) * 100% = 15%
+#   - Message Type 4: (1 / 20) * 100% = 5%
+# These percentages reflect how often each message type should appear in the total set of messages.
+# Please note - if the total set of messages is not equal to the multiple of sum of frequencies, the percentages will not be accurate.
 [CCIP.Groups.load.LoadProfile.MsgProfile]
 Frequencies = [1] # frequency of each message type in the MsgDetails
 
