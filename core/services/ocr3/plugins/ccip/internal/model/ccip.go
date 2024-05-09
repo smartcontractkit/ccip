@@ -8,6 +8,15 @@ import (
 	chainselectors "github.com/smartcontractkit/chain-selectors"
 )
 
+type TokenPrice struct {
+	TokenID string `json:"tokenID"`
+	Price   *big.Int
+}
+
+func NewTokenPrice(tokenID string, price *big.Int) TokenPrice {
+	return TokenPrice{TokenID: tokenID, Price: price}
+}
+
 type GasPrice *big.Int
 
 type GasPriceChain struct {

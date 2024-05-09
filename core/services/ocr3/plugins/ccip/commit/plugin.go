@@ -3,7 +3,7 @@ package commit
 import (
 	"context"
 	"fmt"
-	"time"
+	"sort"
 
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/smartcontractkit/ccipocr3/internal/libs/slicelib"
@@ -41,88 +41,76 @@ func (p *Plugin) Query(ctx context.Context, outctx ocr3types.OutcomeContext) (ty
 }
 
 func (p *Plugin) Observation(ctx context.Context, outctx ocr3types.OutcomeContext, query types.Query) (types.Observation, error) {
-	var newMsgs []model.CCIPMsg
-	var err error
-	var gasPrices []model.GasPriceChain
+	knownSourceChains := mapset.NewSet[model.ChainSelector](p.cfg.Reads...)
+	seqNumPerChain := make(map[model.ChainSelector]model.SeqNum)
 
-	if outctx.PreviousOutcome == nil {
-		// if there is no previous outcome scan for messages in the last NewMsgScanDuration
-		scanFrom := time.Now().Add(-p.cfg.NewMsgScanDuration)
-		newMsgs, err = p.ccipReader.MsgsAfterTimestamp(ctx, p.cfg.Reads, scanFrom, p.cfg.NewMsgScanLimit)
-		if err != nil {
-			p.lggr.Errorw("get new ccip messages", "err", err)
-			return types.Observation{}, err
-		}
-		p.lggr.Debugf("found %d new ccip messages", len(newMsgs))
-	} else {
-		// if there is a previous outcome, scan for messages after the last committed or inflight sequence numbers
+	// If there is a previous outcome, find latest sequence numbers per chain from it.
+	if outctx.PreviousOutcome != nil {
 		prevOutcome, err := model.DecodeCommitPluginOutcome(outctx.PreviousOutcome)
 		if err != nil {
 			return types.Observation{}, fmt.Errorf("decode commit plugin previous outcome: %w", err)
 		}
 
-		// find the maximum sequence number per chain from the previous outcome
-		chainsToCheck := mapset.NewSet[model.ChainSelector]()
-		maxSeqNumPerChainPrevOutcome := make(map[model.ChainSelector]model.SeqNum)
 		for _, seqNumChain := range prevOutcome.SequenceNumbers {
-			if seqNumChain.SeqNum > maxSeqNumPerChainPrevOutcome[seqNumChain.ChainSel] {
-				maxSeqNumPerChainPrevOutcome[seqNumChain.ChainSel] = seqNumChain.SeqNum
+			if seqNumChain.SeqNum > seqNumPerChain[seqNumChain.ChainSel] {
+				seqNumPerChain[seqNumChain.ChainSel] = seqNumChain.SeqNum
 			}
-			chainsToCheck.Add(seqNumChain.ChainSel)
+			knownSourceChains.Add(seqNumChain.ChainSel)
 		}
-		chainsSlice := chainsToCheck.ToSlice()
+	}
 
-		// find the maximum sequence number per chain from the on-chain state
-		onChainMaxSeqNumPerChain := make(map[model.ChainSelector]model.SeqNum)
-		if p.canRead(p.cfg.DestChain) {
-			onChainSeqNums, err := p.ccipReader.NextSeqNum(ctx, chainsSlice)
-			if err != nil {
-				return types.Observation{}, fmt.Errorf("get next seq nums: %w", err)
-			}
-			for i, ch := range chainsSlice {
-				onChainMaxSeqNumPerChain[ch] = onChainSeqNums[i]
-			}
-		}
+	knownSourceChainsSlice := knownSourceChains.ToSlice()
+	sort.Slice(knownSourceChains, func(i, j int) bool { return knownSourceChainsSlice[i] < knownSourceChainsSlice[j] })
 
-		// find the gas prices per chain
-		gasPricesVals, err := p.ccipReader.GasPrices(ctx, chainsSlice)
+	// If reading destination chain is supported find the latest sequence numbers per chain from the onchain state.
+	if p.canRead(p.cfg.DestChain) {
+		onChainSeqNums, err := p.ccipReader.NextSeqNum(ctx, knownSourceChainsSlice)
 		if err != nil {
-			return nil, fmt.Errorf("get gas prices: %w", err)
-		}
-		for i, ch := range chainsSlice {
-			gasPrices = append(gasPrices, model.NewGasPriceChain(gasPricesVals[i], ch))
+			return types.Observation{}, fmt.Errorf("get next seq nums: %w", err)
 		}
 
-		// find the new msgs per supported chain
-		for ch := range maxSeqNumPerChainPrevOutcome {
-			if !p.canRead(ch) {
-				continue
-			}
-
-			maxSeqNum := maxSeqNumPerChainPrevOutcome[ch]
-			if onChainMaxSeqNum := onChainMaxSeqNumPerChain[ch]; onChainMaxSeqNum > maxSeqNum {
-				maxSeqNum = onChainMaxSeqNum
-			}
-
-			newMsgs, err = p.ccipReader.MsgsBetweenSeqNums(
-				ctx,
-				[]model.ChainSelector{ch},
-				model.NewSeqNumRange(maxSeqNum+1, maxSeqNum+model.SeqNum(1+p.cfg.NewMsgScanBatchSize)),
-			)
-			if err != nil {
-				return nil, fmt.Errorf("get messages between seq nums: %w", err)
+		for i, ch := range knownSourceChainsSlice {
+			if onChainSeqNums[i] > seqNumPerChain[ch] {
+				seqNumPerChain[ch] = onChainSeqNums[i]
 			}
 		}
 	}
 
-	// TODO: token prices ...
+	// Find the new msgs for each supported chain based on the discovered sequence numbers.
+	observedNewMsgs := make([]model.CCIPMsgBaseDetails, 0)
+	for ch, seqNum := range seqNumPerChain {
+		if !p.canRead(ch) {
+			continue
+		}
 
-	newMsgDetails := make([]model.CCIPMsgBaseDetails, 0, len(newMsgs))
-	for _, msg := range newMsgs {
-		p.lggr.Debugf("new msg: %s", msg)
-		newMsgDetails = append(newMsgDetails, msg.CCIPMsgBaseDetails)
+		minSeqNum := seqNum + 1
+		maxSeqNum := minSeqNum + model.SeqNum(p.cfg.NewMsgScanBatchSize)
+
+		newMsgs, err := p.ccipReader.MsgsBetweenSeqNums(
+			ctx, []model.ChainSelector{ch}, model.NewSeqNumRange(minSeqNum, maxSeqNum))
+		if err != nil {
+			return nil, fmt.Errorf("get messages between seq nums: %w", err)
+		}
+
+		for _, msg := range newMsgs {
+			observedNewMsgs = append(observedNewMsgs, msg.CCIPMsgBaseDetails)
+		}
 	}
-	return model.NewCommitPluginObservation(p.nodeID, newMsgDetails, gasPrices).Encode()
+
+	// Find the gas prices for each chain.
+	gasPricesVals, err := p.ccipReader.GasPrices(ctx, knownSourceChainsSlice)
+	if err != nil {
+		return nil, fmt.Errorf("get gas prices: %w", err)
+	}
+	gasPrices := make([]model.GasPriceChain, 0, len(knownSourceChainsSlice))
+	for i, ch := range knownSourceChainsSlice {
+		gasPrices = append(gasPrices, model.NewGasPriceChain(gasPricesVals[i], ch))
+	}
+
+	// Find the token prices.
+	tokenPrices := make([]model.TokenPrice, 0) // TODO: token prices ...
+
+	return model.NewCommitPluginObservation(p.nodeID, observedNewMsgs, gasPrices, tokenPrices).Encode()
 }
 
 func (p *Plugin) ValidateObservation(outctx ocr3types.OutcomeContext, _ types.Query, ao types.AttributedObservation) error {
