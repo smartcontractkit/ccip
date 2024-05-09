@@ -114,8 +114,61 @@ func (p *Plugin) Observation(ctx context.Context, outctx ocr3types.OutcomeContex
 }
 
 func (p *Plugin) ValidateObservation(outctx ocr3types.OutcomeContext, _ types.Query, ao types.AttributedObservation) error {
-	_, err := model.DecodeCommitPluginObservation(ao.Observation)
-	return err
+	obs, err := model.DecodeCommitPluginObservation(ao.Observation)
+	if err != nil {
+		return fmt.Errorf("decode commit plugin observation: %w", err)
+	}
+
+	// Node id must not be empty.
+	if obs.NodeID == "" {
+		return fmt.Errorf("node id must not be empty")
+	}
+
+	// The same sequence number must not appear more than once for the same chain and must be valid.
+	seqNums := make(map[model.ChainSelector]mapset.Set[model.SeqNum], len(obs.NewMsgs))
+	for _, msg := range obs.NewMsgs {
+		knownSeqNums, exists := seqNums[msg.SourceChain]
+		if !exists {
+			seqNums[msg.SourceChain] = mapset.NewSet(msg.SeqNum)
+			continue
+		}
+		if knownSeqNums.Contains(msg.SeqNum) {
+			return fmt.Errorf("duplicate sequence number %d for chain %d", msg.SeqNum, msg.SourceChain)
+		}
+		seqNums[msg.SourceChain].Add(msg.SeqNum)
+
+		if msg.SeqNum <= 0 {
+			return fmt.Errorf("sequence number must be positive")
+		}
+	}
+
+	// Duplicate gas prices must not appear for the same chain and must not be empty.
+	gasPriceChains := mapset.NewSet[model.ChainSelector]()
+	for _, g := range obs.GasPrices {
+		if gasPriceChains.Contains(g.ChainSel) {
+			return fmt.Errorf("duplicate gas price for chain %d", g.ChainSel)
+		}
+		gasPriceChains.Add(g.ChainSel)
+
+		if g.GasPrice == nil {
+			return fmt.Errorf("gas price must not be nil")
+		}
+	}
+
+	// Duplicate token prices must not appear for the same chain and must not be empty.
+	tokensWithPrice := mapset.NewSet[string]()
+	for _, t := range obs.TokenPrices {
+		if tokensWithPrice.Contains(t.TokenID) {
+			return fmt.Errorf("duplicate token price for token: %s", t.TokenID)
+		}
+		tokensWithPrice.Add(t.TokenID)
+
+		if t.Price == nil {
+			return fmt.Errorf("token price must not be nil")
+		}
+	}
+
+	return nil
 }
 
 func (p *Plugin) ObservationQuorum(outctx ocr3types.OutcomeContext, query types.Query) (ocr3types.Quorum, error) {
