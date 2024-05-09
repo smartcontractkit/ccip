@@ -128,7 +128,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndV
   address internal immutable i_commitStore;
   /// @dev ChainSelector of this chain
   uint64 internal immutable i_chainSelector;
-  /// @dev The address of the rmn proxy
+  /// @dev The address of the RMN proxy
   address internal immutable i_rmnProxy;
 
   // DYNAMIC CONFIG

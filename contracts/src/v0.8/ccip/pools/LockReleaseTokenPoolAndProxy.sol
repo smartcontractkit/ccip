@@ -50,7 +50,7 @@ contract LockReleaseTokenPoolAndProxy is LegacyPoolWrapper, ILiquidityContainer,
   }
 
   /// @notice Locks the token in the pool
-  /// @dev The whenHealthy check is important to ensure that even if a ramp is compromised
+  /// @dev The whenNotCursed check is important to ensure that even if a ramp is compromised
   /// we're able to stop token movement via RMN.
   function lockOrBurn(Pool.LockOrBurnInV1 calldata lockOrBurnIn)
     external
@@ -73,7 +73,7 @@ contract LockReleaseTokenPoolAndProxy is LegacyPoolWrapper, ILiquidityContainer,
   }
 
   /// @notice Release tokens from the pool to the recipient
-  /// @dev The whenHealthy check is important to ensure that even if a ramp is compromised
+  /// @dev The whenNotCursed check is important to ensure that even if a ramp is compromised
   /// we're able to stop token movement via RMN.
   function releaseOrMint(Pool.ReleaseOrMintInV1 calldata releaseOrMintIn)
     external

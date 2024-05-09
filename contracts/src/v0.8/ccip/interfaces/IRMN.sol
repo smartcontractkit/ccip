@@ -15,7 +15,7 @@ interface IRMN {
   /// @notice Iff there is an active global curse, this function returns true.
   function isCursed() external view returns (bool);
 
-  /// @notice Iff there is an active global curse, or an active curse for `subject`, this function returns true.
+  /// @notice Iff there is an active global curse or an active legacy curse (for backwards compatibility), this function returns true.
   /// @param subject To check whether a particular chain is cursed, set to bytes32(uint256(chainSelector)).
   function isCursed(bytes32 subject) external view returns (bool);
 }
