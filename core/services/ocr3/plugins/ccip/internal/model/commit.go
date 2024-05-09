@@ -1,6 +1,9 @@
 package model
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"fmt"
+)
 
 // CommitPluginReport is placed here for reference of shared readers structure.
 type CommitPluginReport struct{}
@@ -53,6 +56,10 @@ func DecodeCommitPluginOutcome(b []byte) (CommitPluginOutcome, error) {
 	o := CommitPluginOutcome{}
 	err := json.Unmarshal(b, &o)
 	return o, err
+}
+
+func (o CommitPluginOutcome) String() string {
+	return fmt.Sprintf("{MaxSequenceNumbers: %v, MerkleRoots: %v}", o.MaxSequenceNumbers, o.MerkleRoots)
 }
 
 type SeqNumChain struct {
