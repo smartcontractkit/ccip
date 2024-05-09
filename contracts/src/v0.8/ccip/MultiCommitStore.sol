@@ -2,7 +2,6 @@
 pragma solidity 0.8.19;
 
 import {ITypeAndVersion} from "../shared/interfaces/ITypeAndVersion.sol";
-
 import {ICommitStore} from "./interfaces/ICommitStore.sol";
 import {IPriceRegistry} from "./interfaces/IPriceRegistry.sol";
 import {IRMN} from "./interfaces/IRMN.sol";
@@ -33,7 +32,7 @@ contract MultiCommitStore is ICommitStore, ITypeAndVersion, OCR2Base {
     uint64 chainSelector; // ───────╮  Destination chainSelector
     uint64 sourceChainSelector; // ─╯  Source chainSelector
     address onRamp; // OnRamp address on the source chain
-    address armProxy; // ARM proxy address
+    address rmnProxy; // RMN proxy address
   }
 
   /// @notice Dynamic commit store config
@@ -64,8 +63,8 @@ contract MultiCommitStore is ICommitStore, ITypeAndVersion, OCR2Base {
   uint64 internal immutable i_sourceChainSelector;
   // The onRamp address on the source chain
   address internal immutable i_onRamp;
-  // The address of the arm proxy
-  address internal immutable i_armProxy;
+  // The address of the rmn proxy
+  address internal immutable i_rmnProxy;
 
   // DYNAMIC CONFIG
   // The dynamic commitStore config
@@ -90,13 +89,13 @@ contract MultiCommitStore is ICommitStore, ITypeAndVersion, OCR2Base {
   constructor(StaticConfig memory staticConfig) OCR2Base(false) {
     if (
       staticConfig.onRamp == address(0) || staticConfig.chainSelector == 0 || staticConfig.sourceChainSelector == 0
-        || staticConfig.armProxy == address(0)
+        || staticConfig.rmnProxy == address(0)
     ) revert InvalidCommitStoreConfig();
 
     i_chainSelector = staticConfig.chainSelector;
     i_sourceChainSelector = staticConfig.sourceChainSelector;
     i_onRamp = staticConfig.onRamp;
-    i_armProxy = staticConfig.armProxy;
+    i_rmnProxy = staticConfig.rmnProxy;
   }
 
   // ================================================================
@@ -140,7 +139,7 @@ contract MultiCommitStore is ICommitStore, ITypeAndVersion, OCR2Base {
   /// @param root The merkle root to check the blessing status for.
   /// @return whether the root is blessed or not.
   function isBlessed(bytes32 root) public view returns (bool) {
-    return IRMN(i_armProxy).isBlessed(IRMN.TaggedRoot({commitStore: address(this), root: root}));
+    return IRMN(i_rmnProxy).isBlessed(IRMN.TaggedRoot({commitStore: address(this), root: root}));
   }
 
   /// @notice Used by the owner in case an invalid sequence of roots has been
@@ -183,7 +182,7 @@ contract MultiCommitStore is ICommitStore, ITypeAndVersion, OCR2Base {
   /// we are OK to revert to preserve the invariant that we always revert on invalid sequence number ranges.
   /// If that happens, prices will be updates in later rounds.
   function _report(bytes calldata encodedReport, uint40 epochAndRound) internal override whenNotPaused {
-    if (IRMN(i_armProxy).isCursed(bytes32(uint256(i_sourceChainSelector)))) revert CursedByRMN();
+    if (IRMN(i_rmnProxy).isCursed(bytes32(uint256(i_sourceChainSelector)))) revert CursedByRMN();
     CommitReport memory report = abi.decode(encodedReport, (CommitReport));
 
     // Check if the report contains price updates
@@ -233,7 +232,7 @@ contract MultiCommitStore is ICommitStore, ITypeAndVersion, OCR2Base {
       chainSelector: i_chainSelector,
       sourceChainSelector: i_sourceChainSelector,
       onRamp: i_onRamp,
-      armProxy: i_armProxy
+      rmnProxy: i_rmnProxy
     });
   }
 
@@ -261,19 +260,19 @@ contract MultiCommitStore is ICommitStore, ITypeAndVersion, OCR2Base {
         chainSelector: i_chainSelector,
         sourceChainSelector: i_sourceChainSelector,
         onRamp: i_onRamp,
-        armProxy: i_armProxy
+        rmnProxy: i_rmnProxy
       }),
       dynamicConfig
     );
   }
 
   // ================================================================
-  // │                        Access and ARM                        │
+  // │                        Access and RMN                        │
   // ================================================================
 
   /// @notice Single function to check the status of the commitStore.
   function isUnpausedAndNotCursed() external view returns (bool) {
-    return !IRMN(i_armProxy).isCursed(bytes32(uint256(i_sourceChainSelector))) && !s_paused;
+    return !IRMN(i_rmnProxy).isCursed(bytes32(uint256(i_sourceChainSelector))) && !s_paused;
   }
 
   /// @notice Modifier to make a function callable only when the contract is not paused.

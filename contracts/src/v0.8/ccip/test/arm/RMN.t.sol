@@ -23,7 +23,7 @@ contract ConfigCompare is Test {
   }
 }
 
-contract ARM_constructor is ConfigCompare, RMNSetup {
+contract RMN_constructor is ConfigCompare, RMNSetup {
   function test_Constructor_Success() public view {
     RMN.Config memory expectedConfig = rmnConstructorArgs();
     (uint32 actualVersion,, RMN.Config memory actualConfig) = s_rmn.getConfigDetails();
@@ -32,7 +32,7 @@ contract ARM_constructor is ConfigCompare, RMNSetup {
   }
 }
 
-contract ARM_voteToBlessRoots is RMNSetup {
+contract RMN_voteToBlessRoots is RMNSetup {
   event VotedToBless(uint32 indexed configVersion, address indexed voter, IRMN.TaggedRoot taggedRoot, uint8 weight);
 
   // Success
@@ -153,7 +153,7 @@ contract ARM_voteToBlessRoots is RMNSetup {
   }
 }
 
-contract ARM_ownerUnbless is RMNSetup {
+contract RMN_ownerUnbless is RMNSetup {
   function test_Unbless_Success() public {
     RMN.Config memory cfg = rmnConstructorArgs();
     for (uint256 i = 0; i < cfg.voters.length; ++i) {
@@ -168,7 +168,7 @@ contract ARM_ownerUnbless is RMNSetup {
   }
 }
 
-contract ARM_unvoteToCurse is RMNSetup {
+contract RMN_unvoteToCurse is RMNSetup {
   uint256 internal s_curser;
   bytes32 internal s_cursesHash;
 
@@ -279,7 +279,7 @@ contract ARM_unvoteToCurse is RMNSetup {
   }
 }
 
-contract ARM_voteToCurse is RMNSetup {
+contract RMN_voteToCurse is RMNSetup {
   event VotedToCurse(
     uint32 indexed configVersion,
     address indexed voter,
@@ -366,7 +366,7 @@ contract ARM_voteToCurse is RMNSetup {
       weightSum // accumulatedWeight
     );
     // Asserts that this call to vote with a new curse id goes through with no
-    // reverts even when the ARM contract is cursed.
+    // reverts even when the RMN contract is cursed.
     s_rmn.voteToCurse(makeCurseId(cfg.voters.length + 1));
   }
 
@@ -428,12 +428,12 @@ contract ARM_voteToCurse is RMNSetup {
   }
 }
 
-contract ARM_ownerUnvoteToCurse is RMNSetup {
+contract RMN_ownerUnvoteToCurse is RMNSetup {
   event RecoveredFromCurse();
 
   // These cursers are going to curse in setUp curseCount times.
   function getCursersAndCurseCounts() internal pure returns (address[] memory cursers, uint32[] memory curseCounts) {
-    // NOTE: Change this when changing setUp or armConstructorArgs.
+    // NOTE: Change this when changing setUp or rmnConstructorArgs.
     // This is a bit ugly and error prone but if we read from storage we would
     // not get an accurate gas reading for ownerUnvoteToCurse when we need it.
     cursers = new address[](4);
@@ -539,7 +539,7 @@ contract ARM_ownerUnvoteToCurse is RMNSetup {
   }
 }
 
-contract ARM_setConfig is ConfigCompare, RMNSetup {
+contract RMN_setConfig is ConfigCompare, RMNSetup {
   /// @notice Test-specific function to use only in setConfig tests
   function getDifferentConfigArgs() private pure returns (RMN.Config memory) {
     RMN.Voter[] memory voters = new RMN.Voter[](2);
