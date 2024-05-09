@@ -42,6 +42,7 @@ compileContractLowOpts () {
 # Solc produces and overwrites intermediary contracts.
 # Contracts should be ordered in reverse-import-complexity-order to minimize overwrite risks.
 compileContract ccip/offRamp/EVM2EVMOffRamp.sol
+compileContract ccip/offRamp/EVM2EVMMultiOffRamp.sol
 compileContract ccip/applications/PingPongDemo.sol
 compileContract ccip/applications/SelfFundedPingPong.sol
 compileContract ccip/applications/EtherSenderReceiver.sol
@@ -54,6 +55,8 @@ compileContract ccip/pools/LockReleaseTokenPool.sol
 compileContract ccip/pools/BurnMintTokenPool.sol
 compileContract ccip/pools/BurnFromMintTokenPool.sol
 compileContract ccip/pools/BurnWithFromMintTokenPool.sol
+compileContract ccip/pools/LockReleaseTokenPoolAndProxy.sol
+compileContract ccip/pools/BurnMintTokenPoolAndProxy.sol
 compileContract ccip/pools/TokenPool.sol
 compileContract shared/token/ERC677/BurnMintERC677.sol
 compileContract ccip/ARM.sol

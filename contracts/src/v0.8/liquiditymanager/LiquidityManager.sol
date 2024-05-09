@@ -154,7 +154,7 @@ contract LiquidityManager is ILiquidityManager, OCR3Base {
       revert ZeroChainSelector();
     }
 
-    if (address(token) == address(0)) {
+    if (address(token) == address(0) || address(localLiquidityContainer) == address(0)) {
       revert ZeroAddress();
     }
     i_localToken = token;
@@ -382,12 +382,6 @@ contract LiquidityManager is ILiquidityManager, OCR3Base {
     );
   }
 
-  // TODO (question, remove before merging): @makramkd do we still want this function in here?
-  //  function _wrapNative(uint256 amount) private {
-  //    IWrappedNative weth = IWrappedNative(address(i_localToken));
-  //    weth.deposit{value: amount}();
-  //  }
-
   /// @notice Process the OCR report.
   /// @dev Called by OCR3Base's transmit() function.
   function _report(bytes calldata report, uint64 ocrSeqNum) internal override {
@@ -515,6 +509,9 @@ contract LiquidityManager is ILiquidityManager, OCR3Base {
   /// @notice Sets the local liquidity container.
   /// @dev Only the owner can call this function.
   function setLocalLiquidityContainer(ILiquidityContainer localLiquidityContainer) external onlyOwner {
+    if (address(localLiquidityContainer) == address(0)) {
+      revert ZeroAddress();
+    }
     s_localLiquidityContainer = localLiquidityContainer;
 
     emit LiquidityContainerSet(address(localLiquidityContainer));

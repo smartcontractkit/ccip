@@ -9,6 +9,8 @@ package ccip
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.19/BurnWithFromMintTokenPool/BurnWithFromMintTokenPool.abi ../../../contracts/solc/v0.8.19/BurnWithFromMintTokenPool/BurnWithFromMintTokenPool.bin BurnWithFromMintTokenPool burn_with_from_mint_token_pool
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.19/LockReleaseTokenPool/LockReleaseTokenPool.abi ../../../contracts/solc/v0.8.19/LockReleaseTokenPool/LockReleaseTokenPool.bin LockReleaseTokenPool lock_release_token_pool
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.19/CustomTokenPool/CustomTokenPool.abi ../../../contracts/solc/v0.8.19/CustomTokenPool/CustomTokenPool.bin CustomTokenPool custom_token_pool
+//go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.19/BurnMintTokenPoolAndProxy/BurnMintTokenPoolAndProxy.abi ../../../contracts/solc/v0.8.19/BurnMintTokenPoolAndProxy/BurnMintTokenPoolAndProxy.bin BurnMintTokenPoolAndProxy burn_mint_token_pool_and_proxy
+//go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.19/LockReleaseTokenPoolAndProxy/LockReleaseTokenPoolAndProxy.abi ../../../contracts/solc/v0.8.19/LockReleaseTokenPoolAndProxy/LockReleaseTokenPoolAndProxy.bin LockReleaseTokenPoolAndProxy lock_release_token_pool_and_proxy
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.19/TokenPool/TokenPool.abi ../../../contracts/solc/v0.8.19/TokenPool/TokenPool.bin TokenPool token_pool
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.19/ARM/ARM.abi ../../../contracts/solc/v0.8.19/ARM/ARM.bin ARMContract arm_contract
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.19/ARMProxy/ARMProxy.abi ../../../contracts/solc/v0.8.19/ARMProxy/ARMProxy.bin ARMProxyContract arm_proxy_contract
@@ -23,6 +25,7 @@ package ccip
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.19/EVM2EVMOnRamp/EVM2EVMOnRamp.abi ../../../contracts/solc/v0.8.19/EVM2EVMOnRamp/EVM2EVMOnRamp.bin EVM2EVMOnRamp evm_2_evm_onramp
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.19/EVM2EVMOffRamp/EVM2EVMOffRamp.abi ../../../contracts/solc/v0.8.19/EVM2EVMOffRamp/EVM2EVMOffRamp.bin EVM2EVMOffRamp evm_2_evm_offramp
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.19/EVM2EVMMultiOnRamp/EVM2EVMMultiOnRamp.abi ../../../contracts/solc/v0.8.19/EVM2EVMMultiOnRamp/EVM2EVMMultiOnRamp.bin EVM2EVMMultiOnRamp evm_2_evm_multi_onramp
+//go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.19/EVM2EVMMultiOffRamp/EVM2EVMMultiOffRamp.abi ../../../contracts/solc/v0.8.19/EVM2EVMMultiOffRamp/EVM2EVMMultiOffRamp.bin EVM2EVMMultiOffRamp evm_2_evm_multi_offramp
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.19/Router/Router.abi ../../../contracts/solc/v0.8.19/Router/Router.bin Router router
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.19/PriceRegistry/PriceRegistry.abi ../../../contracts/solc/v0.8.19/PriceRegistry/PriceRegistry.bin PriceRegistry price_registry
 
