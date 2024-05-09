@@ -31,18 +31,21 @@ contract EVM2EVMMultiOnRamp_constructor is EVM2EVMMultiOnRampSetup {
     EVM2EVMMultiOnRamp.DynamicConfig memory dynamicConfig =
       generateDynamicMultiOnRampConfig(address(s_sourceRouter), address(s_priceRegistry), address(s_tokenAdminRegistry));
 
-    EVM2EVMMultiOnRamp.DestChainConfigArgs[] memory destChainConfigs = generateDestChainConfigArgs();
-    EVM2EVMMultiOnRamp.DestChainConfigArgs memory destChainConfig = destChainConfigs[0];
+    EVM2EVMMultiOnRamp.DestChainDynamicConfigArgs[] memory destChainDynamicConfigArgs =
+      generateDestChainDynamicConfigArgs();
+    EVM2EVMMultiOnRamp.DestChainDynamicConfigArgs memory destChainDynamicConfigArg = destChainDynamicConfigArgs[0];
 
     vm.expectEmit();
     emit ConfigSet(staticConfig, dynamicConfig);
     vm.expectEmit();
-    emit DestChainConfigUpdated(DEST_CHAIN_SELECTOR, destChainConfigArgsToDestChainConfig(destChainConfig));
+    emit DestChainConfigUpdated(
+      DEST_CHAIN_SELECTOR, EVM2EVMMultiOnRamp.DestChainConfig({dynamicConfig: destChainDynamicConfigArg.dynamicConfig})
+    );
 
     s_onRamp = new EVM2EVMMultiOnRampHelper(
       staticConfig,
       dynamicConfig,
-      destChainConfigs,
+      destChainDynamicConfigArgs,
       getOutboundRateLimiterConfig(),
       s_feeTokenConfigArgs,
       s_tokenTransferFeeConfigArgs,
@@ -64,18 +67,44 @@ contract EVM2EVMMultiOnRamp_constructor is EVM2EVMMultiOnRampSetup {
     assertEq(dynamicConfig.tokenAdminRegistry, gotDynamicConfig.tokenAdminRegistry);
 
     EVM2EVMMultiOnRamp.DestChainConfig memory gotDestChainConfig = s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR);
-    assertEq(destChainConfig.isEnabled, gotDestChainConfig.isEnabled);
-    assertEq(destChainConfig.maxNumberOfTokensPerMsg, gotDestChainConfig.maxNumberOfTokensPerMsg);
-    assertEq(destChainConfig.maxDataBytes, gotDestChainConfig.maxDataBytes);
-    assertEq(destChainConfig.maxPerMsgGasLimit, gotDestChainConfig.maxPerMsgGasLimit);
-    assertEq(destChainConfig.destGasOverhead, gotDestChainConfig.destGasOverhead);
-    assertEq(destChainConfig.destGasPerPayloadByte, gotDestChainConfig.destGasPerPayloadByte);
-    assertEq(destChainConfig.destDataAvailabilityOverheadGas, gotDestChainConfig.destDataAvailabilityOverheadGas);
-    assertEq(destChainConfig.destGasPerDataAvailabilityByte, gotDestChainConfig.destGasPerDataAvailabilityByte);
-    assertEq(destChainConfig.destDataAvailabilityMultiplierBps, gotDestChainConfig.destDataAvailabilityMultiplierBps);
-    assertEq(destChainConfig.defaultTokenFeeUSDCents, gotDestChainConfig.defaultTokenFeeUSDCents);
-    assertEq(destChainConfig.defaultTokenDestGasOverhead, gotDestChainConfig.defaultTokenDestGasOverhead);
-    assertEq(destChainConfig.defaultTokenDestBytesOverhead, gotDestChainConfig.defaultTokenDestBytesOverhead);
+    assertEq(destChainDynamicConfigArg.dynamicConfig.isEnabled, gotDestChainConfig.dynamicConfig.isEnabled);
+    assertEq(
+      destChainDynamicConfigArg.dynamicConfig.maxNumberOfTokensPerMsg,
+      gotDestChainConfig.dynamicConfig.maxNumberOfTokensPerMsg
+    );
+    assertEq(destChainDynamicConfigArg.dynamicConfig.maxDataBytes, gotDestChainConfig.dynamicConfig.maxDataBytes);
+    assertEq(
+      destChainDynamicConfigArg.dynamicConfig.maxPerMsgGasLimit, gotDestChainConfig.dynamicConfig.maxPerMsgGasLimit
+    );
+    assertEq(destChainDynamicConfigArg.dynamicConfig.destGasOverhead, gotDestChainConfig.dynamicConfig.destGasOverhead);
+    assertEq(
+      destChainDynamicConfigArg.dynamicConfig.destGasPerPayloadByte,
+      gotDestChainConfig.dynamicConfig.destGasPerPayloadByte
+    );
+    assertEq(
+      destChainDynamicConfigArg.dynamicConfig.destDataAvailabilityOverheadGas,
+      gotDestChainConfig.dynamicConfig.destDataAvailabilityOverheadGas
+    );
+    assertEq(
+      destChainDynamicConfigArg.dynamicConfig.destGasPerDataAvailabilityByte,
+      gotDestChainConfig.dynamicConfig.destGasPerDataAvailabilityByte
+    );
+    assertEq(
+      destChainDynamicConfigArg.dynamicConfig.destDataAvailabilityMultiplierBps,
+      gotDestChainConfig.dynamicConfig.destDataAvailabilityMultiplierBps
+    );
+    assertEq(
+      destChainDynamicConfigArg.dynamicConfig.defaultTokenFeeUSDCents,
+      gotDestChainConfig.dynamicConfig.defaultTokenFeeUSDCents
+    );
+    assertEq(
+      destChainDynamicConfigArg.dynamicConfig.defaultTokenDestGasOverhead,
+      gotDestChainConfig.dynamicConfig.defaultTokenDestGasOverhead
+    );
+    assertEq(
+      destChainDynamicConfigArg.dynamicConfig.defaultTokenDestBytesOverhead,
+      gotDestChainConfig.dynamicConfig.defaultTokenDestBytesOverhead
+    );
 
     // Initial values
     assertEq("EVM2EVMMultiOnRamp 1.6.0-dev", s_onRamp.typeAndVersion());
@@ -210,8 +239,8 @@ contract EVM2EVMMultiOnRamp_forwardFromRouter is EVM2EVMMultiOnRampSetup {
   // Make sure any valid sender, receiver and feeAmount can be handled.
   // @TODO Temporarily setting lower fuzz run as 256 triggers snapshot gas off by 1 error.
   // https://github.com/foundry-rs/foundry/issues/5689
-  /// forge-config: default.fuzz.runs = 32
-  /// forge-config: ccip.fuzz.runs = 32
+  /// forge-dynamicConfig: default.fuzz.runs = 32
+  /// forge-dynamicConfig: ccip.fuzz.runs = 32
   function test_Fuzz_ForwardFromRouter_Success(address originalSender, address receiver, uint96 feeTokenAmount) public {
     // To avoid RouterMustSetOriginalSender
     vm.assume(originalSender != address(0));
@@ -602,30 +631,35 @@ contract EVM2EVMMultiOnRamp_getDataAvailabilityCost is EVM2EVMMultiOnRamp_getFee
     uint256 dataAvailabilityCostUSD =
       s_onRamp.getDataAvailabilityCost(DEST_CHAIN_SELECTOR, USD_PER_DATA_AVAILABILITY_GAS, 0, 0, 0);
 
-    EVM2EVMMultiOnRamp.DestChainConfig memory destChainConfig = s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR);
+    EVM2EVMMultiOnRamp.DestChainDynamicConfig memory destChainDynamicConfig =
+      s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR).dynamicConfig;
 
-    uint256 dataAvailabilityGas = destChainConfig.destDataAvailabilityOverheadGas
-      + destChainConfig.destGasPerDataAvailabilityByte * Internal.MESSAGE_FIXED_BYTES;
-    uint256 expectedDataAvailabilityCostUSD =
-      USD_PER_DATA_AVAILABILITY_GAS * dataAvailabilityGas * destChainConfig.destDataAvailabilityMultiplierBps * 1e14;
+    uint256 dataAvailabilityGas = destChainDynamicConfig.destDataAvailabilityOverheadGas
+      + destChainDynamicConfig.destGasPerDataAvailabilityByte * Internal.MESSAGE_FIXED_BYTES;
+    uint256 expectedDataAvailabilityCostUSD = USD_PER_DATA_AVAILABILITY_GAS * dataAvailabilityGas
+      * destChainDynamicConfig.destDataAvailabilityMultiplierBps * 1e14;
 
     assertEq(expectedDataAvailabilityCostUSD, dataAvailabilityCostUSD);
 
     // Test that the cost is destnation chain specific
-    EVM2EVMMultiOnRamp.DestChainConfigArgs[] memory destChainConfigArgs = generateDestChainConfigArgs();
-    destChainConfigArgs[0].destChainSelector = DEST_CHAIN_SELECTOR + 1;
-    destChainConfigArgs[0].destDataAvailabilityOverheadGas = destChainConfig.destDataAvailabilityOverheadGas * 2;
-    destChainConfigArgs[0].destGasPerDataAvailabilityByte = destChainConfig.destGasPerDataAvailabilityByte * 2;
-    destChainConfigArgs[0].destDataAvailabilityMultiplierBps = destChainConfig.destDataAvailabilityMultiplierBps * 2;
-    s_onRamp.applyDestChainConfigUpdates(destChainConfigArgs);
+    EVM2EVMMultiOnRamp.DestChainDynamicConfigArgs[] memory destChainDynamicConfigArgs =
+      generateDestChainDynamicConfigArgs();
+    destChainDynamicConfigArgs[0].destChainSelector = DEST_CHAIN_SELECTOR + 1;
+    destChainDynamicConfigArgs[0].dynamicConfig.destDataAvailabilityOverheadGas =
+      destChainDynamicConfig.destDataAvailabilityOverheadGas * 2;
+    destChainDynamicConfigArgs[0].dynamicConfig.destGasPerDataAvailabilityByte =
+      destChainDynamicConfig.destGasPerDataAvailabilityByte * 2;
+    destChainDynamicConfigArgs[0].dynamicConfig.destDataAvailabilityMultiplierBps =
+      destChainDynamicConfig.destDataAvailabilityMultiplierBps * 2;
+    s_onRamp.applyDestChainConfigUpdates(destChainDynamicConfigArgs);
 
-    destChainConfig = s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR + 1);
+    destChainDynamicConfig = s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR + 1).dynamicConfig;
     uint256 dataAvailabilityCostUSD2 =
       s_onRamp.getDataAvailabilityCost(DEST_CHAIN_SELECTOR + 1, USD_PER_DATA_AVAILABILITY_GAS, 0, 0, 0);
-    dataAvailabilityGas = destChainConfig.destDataAvailabilityOverheadGas
-      + destChainConfig.destGasPerDataAvailabilityByte * Internal.MESSAGE_FIXED_BYTES;
-    expectedDataAvailabilityCostUSD =
-      USD_PER_DATA_AVAILABILITY_GAS * dataAvailabilityGas * destChainConfig.destDataAvailabilityMultiplierBps * 1e14;
+    dataAvailabilityGas = destChainDynamicConfig.destDataAvailabilityOverheadGas
+      + destChainDynamicConfig.destGasPerDataAvailabilityByte * Internal.MESSAGE_FIXED_BYTES;
+    expectedDataAvailabilityCostUSD = USD_PER_DATA_AVAILABILITY_GAS * dataAvailabilityGas
+      * destChainDynamicConfig.destDataAvailabilityMultiplierBps * 1e14;
 
     assertEq(expectedDataAvailabilityCostUSD, dataAvailabilityCostUSD2);
     assertFalse(dataAvailabilityCostUSD == dataAvailabilityCostUSD2);
@@ -635,14 +669,15 @@ contract EVM2EVMMultiOnRamp_getDataAvailabilityCost is EVM2EVMMultiOnRamp_getFee
     uint256 dataAvailabilityCostUSD =
       s_onRamp.getDataAvailabilityCost(DEST_CHAIN_SELECTOR, USD_PER_DATA_AVAILABILITY_GAS, 100, 5, 50);
 
-    EVM2EVMMultiOnRamp.DestChainConfig memory destChainConfig = s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR);
+    EVM2EVMMultiOnRamp.DestChainDynamicConfig memory destChainDynamicConfig =
+      s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR).dynamicConfig;
 
     uint256 dataAvailabilityLengthBytes =
       Internal.MESSAGE_FIXED_BYTES + 100 + (5 * Internal.MESSAGE_FIXED_BYTES_PER_TOKEN) + 50;
-    uint256 dataAvailabilityGas = destChainConfig.destDataAvailabilityOverheadGas
-      + destChainConfig.destGasPerDataAvailabilityByte * dataAvailabilityLengthBytes;
-    uint256 expectedDataAvailabilityCostUSD =
-      USD_PER_DATA_AVAILABILITY_GAS * dataAvailabilityGas * destChainConfig.destDataAvailabilityMultiplierBps * 1e14;
+    uint256 dataAvailabilityGas = destChainDynamicConfig.destDataAvailabilityOverheadGas
+      + destChainDynamicConfig.destGasPerDataAvailabilityByte * dataAvailabilityLengthBytes;
+    uint256 expectedDataAvailabilityCostUSD = USD_PER_DATA_AVAILABILITY_GAS * dataAvailabilityGas
+      * destChainDynamicConfig.destDataAvailabilityMultiplierBps * 1e14;
 
     assertEq(expectedDataAvailabilityCostUSD, dataAvailabilityCostUSD);
   }
@@ -676,18 +711,20 @@ contract EVM2EVMMultiOnRamp_getDataAvailabilityCost is EVM2EVMMultiOnRamp_getFee
     uint32 tokenTransferBytesOverhead
   ) public {
     vm.assume(destChainSelector != 0);
-    EVM2EVMMultiOnRamp.DestChainConfigArgs[] memory destChainConfigArgs =
-      new EVM2EVMMultiOnRamp.DestChainConfigArgs[](1);
-    destChainConfigArgs[0] =
-      destChainConfigToDestChainConfigArgs(s_onRamp.getDestChainConfig(destChainSelector), destChainSelector);
-    destChainConfigArgs[0].destDataAvailabilityOverheadGas = destDataAvailabilityOverheadGas;
-    destChainConfigArgs[0].destGasPerDataAvailabilityByte = destGasPerDataAvailabilityByte;
-    destChainConfigArgs[0].destDataAvailabilityMultiplierBps = destDataAvailabilityMultiplierBps;
+    EVM2EVMMultiOnRamp.DestChainDynamicConfigArgs[] memory destChainDynamicConfigArgs =
+      new EVM2EVMMultiOnRamp.DestChainDynamicConfigArgs[](1);
+    destChainDynamicConfigArgs[0] = EVM2EVMMultiOnRamp.DestChainDynamicConfigArgs({
+      destChainSelector: destChainSelector,
+      dynamicConfig: s_onRamp.getDestChainConfig(destChainSelector).dynamicConfig
+    });
+    destChainDynamicConfigArgs[0].dynamicConfig.destDataAvailabilityOverheadGas = destDataAvailabilityOverheadGas;
+    destChainDynamicConfigArgs[0].dynamicConfig.destGasPerDataAvailabilityByte = destGasPerDataAvailabilityByte;
+    destChainDynamicConfigArgs[0].dynamicConfig.destDataAvailabilityMultiplierBps = destDataAvailabilityMultiplierBps;
 
-    s_onRamp.applyDestChainConfigUpdates(destChainConfigArgs);
+    s_onRamp.applyDestChainConfigUpdates(destChainDynamicConfigArgs);
 
     uint256 dataAvailabilityCostUSD = s_onRamp.getDataAvailabilityCost(
-      destChainConfigArgs[0].destChainSelector,
+      destChainDynamicConfigArgs[0].destChainSelector,
       dataAvailabilityGasPrice,
       messageDataLength,
       numberOfTokens,
@@ -734,12 +771,14 @@ contract EVM2EVMMultiOnRamp_getFee is EVM2EVMMultiOnRamp_getFeeSetup {
   }
 
   function test_ZeroDataAvailabilityMultiplier_Success() public {
-    EVM2EVMMultiOnRamp.DestChainConfigArgs[] memory destChainConfigArgs =
-      new EVM2EVMMultiOnRamp.DestChainConfigArgs[](1);
-    destChainConfigArgs[0] =
-      destChainConfigToDestChainConfigArgs(s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR), DEST_CHAIN_SELECTOR);
-    destChainConfigArgs[0].destDataAvailabilityMultiplierBps = 0;
-    s_onRamp.applyDestChainConfigUpdates(destChainConfigArgs);
+    EVM2EVMMultiOnRamp.DestChainDynamicConfigArgs[] memory destChainDynamicConfigArgs =
+      new EVM2EVMMultiOnRamp.DestChainDynamicConfigArgs[](1);
+    destChainDynamicConfigArgs[0] = EVM2EVMMultiOnRamp.DestChainDynamicConfigArgs({
+      destChainSelector: DEST_CHAIN_SELECTOR,
+      dynamicConfig: s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR).dynamicConfig
+    });
+    destChainDynamicConfigArgs[0].dynamicConfig.destDataAvailabilityMultiplierBps = 0;
+    s_onRamp.applyDestChainConfigUpdates(destChainDynamicConfigArgs);
 
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
     EVM2EVMMultiOnRamp.FeeTokenConfig memory feeTokenConfig = s_onRamp.getFeeTokenConfig(message.feeToken);

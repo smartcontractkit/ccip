@@ -176,66 +176,31 @@ contract StructFactory {
     });
   }
 
-  function generateDestChainConfigArgs() internal pure returns (EVM2EVMMultiOnRamp.DestChainConfigArgs[] memory) {
-    EVM2EVMMultiOnRamp.DestChainConfigArgs[] memory destChainConfigs = new EVM2EVMMultiOnRamp.DestChainConfigArgs[](1);
-    destChainConfigs[0] = EVM2EVMMultiOnRamp.DestChainConfigArgs({
-      destChainSelector: DEST_CHAIN_SELECTOR,
-      isEnabled: true,
-      maxNumberOfTokensPerMsg: MAX_TOKENS_LENGTH,
-      destGasOverhead: DEST_GAS_OVERHEAD,
-      destGasPerPayloadByte: DEST_GAS_PER_PAYLOAD_BYTE,
-      destDataAvailabilityOverheadGas: DEST_DATA_AVAILABILITY_OVERHEAD_GAS,
-      destGasPerDataAvailabilityByte: DEST_GAS_PER_DATA_AVAILABILITY_BYTE,
-      destDataAvailabilityMultiplierBps: DEST_GAS_DATA_AVAILABILITY_MULTIPLIER_BPS,
-      maxDataBytes: MAX_DATA_SIZE,
-      maxPerMsgGasLimit: MAX_GAS_LIMIT,
-      defaultTokenFeeUSDCents: DEFAULT_TOKEN_FEE_USD_CENTS,
-      defaultTokenDestGasOverhead: DEFAULT_TOKEN_DEST_GAS_OVERHEAD,
-      defaultTokenDestBytesOverhead: DEFAULT_TOKEN_BYTES_OVERHEAD
-    });
-    return destChainConfigs;
-  }
-
-  function destChainConfigArgsToDestChainConfig(EVM2EVMMultiOnRamp.DestChainConfigArgs memory destChainConfigArgs)
+  function generateDestChainDynamicConfigArgs()
     internal
     pure
-    returns (EVM2EVMMultiOnRamp.DestChainConfig memory)
+    returns (EVM2EVMMultiOnRamp.DestChainDynamicConfigArgs[] memory)
   {
-    return EVM2EVMMultiOnRamp.DestChainConfig({
-      isEnabled: destChainConfigArgs.isEnabled,
-      maxNumberOfTokensPerMsg: destChainConfigArgs.maxNumberOfTokensPerMsg,
-      destGasOverhead: destChainConfigArgs.destGasOverhead,
-      destGasPerPayloadByte: destChainConfigArgs.destGasPerPayloadByte,
-      destDataAvailabilityOverheadGas: destChainConfigArgs.destDataAvailabilityOverheadGas,
-      destGasPerDataAvailabilityByte: destChainConfigArgs.destGasPerDataAvailabilityByte,
-      destDataAvailabilityMultiplierBps: destChainConfigArgs.destDataAvailabilityMultiplierBps,
-      maxDataBytes: destChainConfigArgs.maxDataBytes,
-      maxPerMsgGasLimit: destChainConfigArgs.maxPerMsgGasLimit,
-      defaultTokenFeeUSDCents: destChainConfigArgs.defaultTokenFeeUSDCents,
-      defaultTokenDestGasOverhead: destChainConfigArgs.defaultTokenDestGasOverhead,
-      defaultTokenDestBytesOverhead: destChainConfigArgs.defaultTokenDestBytesOverhead
+    EVM2EVMMultiOnRamp.DestChainDynamicConfigArgs[] memory destChainConfigs =
+      new EVM2EVMMultiOnRamp.DestChainDynamicConfigArgs[](1);
+    destChainConfigs[0] = EVM2EVMMultiOnRamp.DestChainDynamicConfigArgs({
+      destChainSelector: DEST_CHAIN_SELECTOR,
+      dynamicConfig: EVM2EVMMultiOnRamp.DestChainDynamicConfig({
+        isEnabled: true,
+        maxNumberOfTokensPerMsg: MAX_TOKENS_LENGTH,
+        destGasOverhead: DEST_GAS_OVERHEAD,
+        destGasPerPayloadByte: DEST_GAS_PER_PAYLOAD_BYTE,
+        destDataAvailabilityOverheadGas: DEST_DATA_AVAILABILITY_OVERHEAD_GAS,
+        destGasPerDataAvailabilityByte: DEST_GAS_PER_DATA_AVAILABILITY_BYTE,
+        destDataAvailabilityMultiplierBps: DEST_GAS_DATA_AVAILABILITY_MULTIPLIER_BPS,
+        maxDataBytes: MAX_DATA_SIZE,
+        maxPerMsgGasLimit: MAX_GAS_LIMIT,
+        defaultTokenFeeUSDCents: DEFAULT_TOKEN_FEE_USD_CENTS,
+        defaultTokenDestGasOverhead: DEFAULT_TOKEN_DEST_GAS_OVERHEAD,
+        defaultTokenDestBytesOverhead: DEFAULT_TOKEN_BYTES_OVERHEAD
+      })
     });
-  }
-
-  function destChainConfigToDestChainConfigArgs(
-    EVM2EVMMultiOnRamp.DestChainConfig memory destChainConfig,
-    uint64 destChainSelector
-  ) internal pure returns (EVM2EVMMultiOnRamp.DestChainConfigArgs memory) {
-    return EVM2EVMMultiOnRamp.DestChainConfigArgs({
-      destChainSelector: destChainSelector,
-      isEnabled: destChainConfig.isEnabled,
-      maxNumberOfTokensPerMsg: destChainConfig.maxNumberOfTokensPerMsg,
-      destGasOverhead: destChainConfig.destGasOverhead,
-      destGasPerPayloadByte: destChainConfig.destGasPerPayloadByte,
-      destDataAvailabilityOverheadGas: destChainConfig.destDataAvailabilityOverheadGas,
-      destGasPerDataAvailabilityByte: destChainConfig.destGasPerDataAvailabilityByte,
-      destDataAvailabilityMultiplierBps: destChainConfig.destDataAvailabilityMultiplierBps,
-      maxDataBytes: destChainConfig.maxDataBytes,
-      maxPerMsgGasLimit: destChainConfig.maxPerMsgGasLimit,
-      defaultTokenFeeUSDCents: destChainConfig.defaultTokenFeeUSDCents,
-      defaultTokenDestGasOverhead: destChainConfig.defaultTokenDestGasOverhead,
-      defaultTokenDestBytesOverhead: destChainConfig.defaultTokenDestBytesOverhead
-    });
+    return destChainConfigs;
   }
 
   function getTokensAndPools(

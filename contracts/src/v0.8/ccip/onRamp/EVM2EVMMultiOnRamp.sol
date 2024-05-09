@@ -128,8 +128,8 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimi
     bool aggregateRateLimitEnabled; // ─╯ Whether this transfer token is to be included in Aggregate Rate Limiting
   }
 
-  /// @notice Destination chain specific config
-  struct DestChainConfig {
+  /// @dev Struct to hold the dynamic configs for a destination chain
+  struct DestChainDynamicConfig {
     bool isEnabled; // ──────────────────────────╮ Whether this destination chain is enabled
     uint16 maxNumberOfTokensPerMsg; //           │ Maximum number of distinct ERC20 token transferred per message
     uint32 maxDataBytes; //                      │ Maximum payload data size in bytes
@@ -145,23 +145,17 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimi
     uint32 defaultTokenDestBytesOverhead; //       Default extra data availability bytes charged per token transfer
   }
 
-  /// @dev Struct to hold the configs for a destination chain, same as DestChainConfig but with the destChainSelector,
-  /// so that an array of these can be passed in the constructor and the applyDestChainConfigUpdates function.
-  struct DestChainConfigArgs {
-    uint64 destChainSelector; // ──────────────────╮ Destination chainSelector
-    bool isEnabled; //                             | Whether this destination chain is enabled
-    uint16 maxNumberOfTokensPerMsg; //             │ Maximum number of distinct ERC20 token transferred per message
-    uint32 maxDataBytes; //                        │ Maximum payload data size in bytes
-    uint32 maxPerMsgGasLimit; //                   | Maximum gas limit for messages targeting EVMs
-    uint32 destGasOverhead; //                     │ Gas charged on top of the gasLimit to cover destination chain costs
-    uint16 destGasPerPayloadByte; //               │ Destination chain gas charged for passing each byte of `data` payload to receiver
-    uint32 destDataAvailabilityOverheadGas; //     | Extra data availability gas charged on top of the message, e.g. for OCR
-    uint16 destGasPerDataAvailabilityByte; // ─────╯ Amount of gas to charge per byte of message data that needs availability
-    uint16 destDataAvailabilityMultiplierBps; // ──╮ Multiplier for data availability gas, multiples of bps, or 0.0001
-    // The following three properties are defaults, they can be overridden by setting the TokenTransferFeeConfig for a token
-    uint16 defaultTokenFeeUSDCents; //             │ Default token fee charged per token transfer
-    uint32 defaultTokenDestGasOverhead; //         │ Default gas charged to execute the token transfer on the destination chain
-    uint32 defaultTokenDestBytesOverhead; // ──────╯ Default extra data availability bytes charged per token transfer
+  /// @dev Struct to hold the configs for a destination chain
+  /// Note: Non dynamic configs will be added in upcoming PRs
+  struct DestChainConfig {
+    DestChainDynamicConfig dynamicConfig;
+  }
+
+  /// @dev Struct to hold the dynamic configs and a destination chain selector, same as DestChainDynamicConfig but with the destChainSelector,
+  /// so that an array of these can be passed in the constructor and the applyDestChainConfigUpdates functiion
+  struct DestChainDynamicConfigArgs {
+    uint64 destChainSelector;
+    DestChainDynamicConfig dynamicConfig;
   }
 
   /// @dev Nop address and weight, used to set the nops and their weights
@@ -227,7 +221,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimi
   constructor(
     StaticConfig memory staticConfig,
     DynamicConfig memory dynamicConfig,
-    DestChainConfigArgs[] memory destChainConfigs,
+    DestChainDynamicConfigArgs[] memory destChainDynamicConfigsArgs,
     RateLimiter.Config memory rateLimiterConfig,
     FeeTokenConfigArgs[] memory feeTokenConfigs,
     TokenTransferFeeConfigArgs[] memory tokenTransferFeeConfigArgs,
@@ -252,7 +246,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimi
     i_armProxy = staticConfig.armProxy;
 
     _setDynamicConfig(dynamicConfig);
-    _applyDestChainConfigUpdates(destChainConfigs);
+    _applyDestChainConfigUpdates(destChainDynamicConfigsArgs);
     _setFeeTokenConfig(feeTokenConfigs);
     _setTokenTransferFeeConfig(tokenTransferFeeConfigArgs, new address[](0));
     _setNops(nopsAndWeights);
@@ -424,12 +418,12 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimi
     uint256 numberOfTokens
   ) internal view {
     // Check that payload is formed correctly
-    DestChainConfig storage destChainConfig = s_destChainConfig[destChainSelector];
-    if (dataLength > uint256(destChainConfig.maxDataBytes)) {
-      revert MessageTooLarge(uint256(destChainConfig.maxDataBytes), dataLength);
+    DestChainDynamicConfig storage destChainDynamicConfig = s_destChainConfig[destChainSelector].dynamicConfig;
+    if (dataLength > uint256(destChainDynamicConfig.maxDataBytes)) {
+      revert MessageTooLarge(uint256(destChainDynamicConfig.maxDataBytes), dataLength);
     }
-    if (gasLimit > uint256(destChainConfig.maxPerMsgGasLimit)) revert MessageGasLimitTooHigh();
-    if (numberOfTokens > uint256(destChainConfig.maxNumberOfTokensPerMsg)) revert UnsupportedNumberOfTokens();
+    if (gasLimit > uint256(destChainDynamicConfig.maxPerMsgGasLimit)) revert MessageGasLimitTooHigh();
+    if (numberOfTokens > uint256(destChainDynamicConfig.maxNumberOfTokensPerMsg)) revert UnsupportedNumberOfTokens();
   }
 
   // ================================================================
@@ -543,8 +537,8 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimi
     uint256 dataAvailabilityCost = 0;
     // Only calculate data availability cost if data availability multiplier is non-zero.
     // The multiplier should be set to 0 if destination chain does not charge data availability cost.
-    DestChainConfig storage destChainConfig = s_destChainConfig[destChainSelector];
-    if (destChainConfig.destDataAvailabilityMultiplierBps > 0) {
+    DestChainDynamicConfig storage destChainDynamicConfig = s_destChainConfig[destChainSelector].dynamicConfig;
+    if (destChainDynamicConfig.destDataAvailabilityMultiplierBps > 0) {
       dataAvailabilityCost = _getDataAvailabilityCost(
         destChainSelector,
         // Parse the data availability gas price stored in the higher-order 112 bits of the encoded gas price.
@@ -561,8 +555,8 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimi
     // uint112(packedGasPrice) = executionGasPrice
     uint256 executionCost = uint112(packedGasPrice)
       * (
-        gasLimit + destChainConfig.destGasOverhead + (message.data.length * destChainConfig.destGasPerPayloadByte)
-          + tokenTransferGas
+        gasLimit + destChainDynamicConfig.destGasOverhead
+          + (message.data.length * destChainDynamicConfig.destGasPerPayloadByte) + tokenTransferGas
       ) * feeTokenConfig.gasMultiplierWeiPerEth;
 
     // Calculate number of fee tokens to charge.
@@ -592,15 +586,16 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimi
     uint256 dataAvailabilityLengthBytes = Internal.MESSAGE_FIXED_BYTES + messageDataLength
       + (numberOfTokens * Internal.MESSAGE_FIXED_BYTES_PER_TOKEN) + tokenTransferBytesOverhead;
 
-    DestChainConfig storage destChainConfig = s_destChainConfig[destChainSelector];
+    DestChainDynamicConfig storage destChainDynamicConfig = s_destChainConfig[destChainSelector].dynamicConfig;
     // destDataAvailabilityOverheadGas is a separate config value for flexibility to be updated independently of message cost.
     // Its value is determined by CCIP lane implementation, e.g. the overhead data posted for OCR.
-    uint256 dataAvailabilityGas = (dataAvailabilityLengthBytes * destChainConfig.destGasPerDataAvailabilityByte)
-      + destChainConfig.destDataAvailabilityOverheadGas;
+    uint256 dataAvailabilityGas = (dataAvailabilityLengthBytes * destChainDynamicConfig.destGasPerDataAvailabilityByte)
+      + destChainDynamicConfig.destDataAvailabilityOverheadGas;
 
     // dataAvailabilityGasPrice is in 18 decimals, destDataAvailabilityMultiplierBps is in 4 decimals
     // We pad 14 decimals to bring the result to 36 decimals, in line with token bps and execution fee.
-    return ((dataAvailabilityGas * dataAvailabilityGasPrice) * destChainConfig.destDataAvailabilityMultiplierBps) * 1e14;
+    return ((dataAvailabilityGas * dataAvailabilityGasPrice) * destChainDynamicConfig.destDataAvailabilityMultiplierBps)
+      * 1e14;
   }
 
   /// @notice Returns the token transfer cost parameters.
@@ -637,10 +632,10 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimi
 
       // If the token has no specific overrides configured, we use the global defaults.
       if (!transferFeeConfig.isEnabled) {
-        DestChainConfig storage destChainConfig = s_destChainConfig[destChainSelector];
-        tokenTransferFeeUSDWei += uint256(destChainConfig.defaultTokenFeeUSDCents) * 1e16;
-        tokenTransferGas += destChainConfig.defaultTokenDestGasOverhead;
-        tokenTransferBytesOverhead += destChainConfig.defaultTokenDestBytesOverhead;
+        DestChainDynamicConfig storage destChainDynamicConfig = s_destChainConfig[destChainSelector].dynamicConfig;
+        tokenTransferFeeUSDWei += uint256(destChainDynamicConfig.defaultTokenFeeUSDCents) * 1e16;
+        tokenTransferGas += destChainDynamicConfig.defaultTokenDestGasOverhead;
+        tokenTransferBytesOverhead += destChainDynamicConfig.defaultTokenDestBytesOverhead;
         continue;
       }
 
@@ -684,39 +679,27 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimi
   }
 
   /// @notice Updates the destination chain specific config.
-  /// @param destChainConfigs Array of source chain specific config updates.
-  function applyDestChainConfigUpdates(DestChainConfigArgs[] memory destChainConfigs) external {
+  /// @param destChainDynamicConfigsArgs Array of source chain specific dynamic config updates.
+  function applyDestChainConfigUpdates(DestChainDynamicConfigArgs[] memory destChainDynamicConfigsArgs) external {
     _onlyOwnerOrAdmin();
-    _applyDestChainConfigUpdates(destChainConfigs);
+    _applyDestChainConfigUpdates(destChainDynamicConfigsArgs);
   }
 
   /// @notice Internal version of applyDestChainConfigUpdates.
-  function _applyDestChainConfigUpdates(DestChainConfigArgs[] memory destChainConfigs) internal {
-    for (uint256 i; i < destChainConfigs.length; ++i) {
-      DestChainConfigArgs memory destChainConfigArgs = destChainConfigs[i];
+  function _applyDestChainConfigUpdates(DestChainDynamicConfigArgs[] memory destChainDynamicConfigsArgs) internal {
+    for (uint256 i; i < destChainDynamicConfigsArgs.length; ++i) {
+      DestChainDynamicConfig memory destChainDynamicConfig = destChainDynamicConfigsArgs[i].dynamicConfig;
+      uint64 destChainSelector = destChainDynamicConfigsArgs[i].destChainSelector;
 
       // TODO: Add metadataHash to DestChainConfig and detect if new lane or not
       // If new lane, then set defaultTxGasLimit and metadataHash as well
 
       // If lane update
-      DestChainConfig memory destChainConfig = DestChainConfig({
-        isEnabled: destChainConfigArgs.isEnabled,
-        maxNumberOfTokensPerMsg: destChainConfigArgs.maxNumberOfTokensPerMsg,
-        maxDataBytes: destChainConfigArgs.maxDataBytes,
-        maxPerMsgGasLimit: destChainConfigArgs.maxPerMsgGasLimit,
-        destGasOverhead: destChainConfigArgs.destGasOverhead,
-        destGasPerPayloadByte: destChainConfigArgs.destGasPerPayloadByte,
-        destDataAvailabilityOverheadGas: destChainConfigArgs.destDataAvailabilityOverheadGas,
-        destGasPerDataAvailabilityByte: destChainConfigArgs.destGasPerDataAvailabilityByte,
-        destDataAvailabilityMultiplierBps: destChainConfigArgs.destDataAvailabilityMultiplierBps,
-        defaultTokenFeeUSDCents: destChainConfigArgs.defaultTokenFeeUSDCents,
-        defaultTokenDestGasOverhead: destChainConfigArgs.defaultTokenDestGasOverhead,
-        defaultTokenDestBytesOverhead: destChainConfigArgs.defaultTokenDestBytesOverhead
-      });
+      DestChainConfig memory destChainConfig = DestChainConfig({dynamicConfig: destChainDynamicConfig});
 
-      s_destChainConfig[destChainConfigArgs.destChainSelector] = destChainConfig;
+      s_destChainConfig[destChainSelector] = destChainConfig;
 
-      emit DestChainConfigUpdated(destChainConfigArgs.destChainSelector, destChainConfig);
+      emit DestChainConfigUpdated(destChainSelector, destChainConfig);
     }
   }
 
