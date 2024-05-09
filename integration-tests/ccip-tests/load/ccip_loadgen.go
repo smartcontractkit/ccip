@@ -54,6 +54,7 @@ type CCIPE2ELoad struct {
 	LastFinalizedTxBlock                       atomic.Uint64
 	LastFinalizedTimestamp                     atomic.Time
 	MsgProfiles                                *testconfig.MsgProfile
+	EOAReceiver                                []byte
 }
 
 func NewCCIPLoad(
@@ -115,7 +116,21 @@ func (c *CCIPE2ELoad) BeforeAllCall() {
 		}
 		c.msg.TokenAmounts = tokenAndAmounts
 	}
-
+	// we might need to change the receiver to the default wallet of destination based on the gaslimit of msg
+	// Get the receiver's bytecode to check if it's a contract or EOA
+	bytecode, err := c.Lane.Dest.Common.ChainClient.Backend().CodeAt(context.Background(), c.Lane.Dest.ReceiverDapp.EthAddress, nil)
+	require.NoError(c.t, err, "Failed to get bytecode of the receiver contract")
+	// if the bytecode is empty, it's an EOA,
+	// In that case save the receiver address as EOA to be used in the message
+	// Otherwise save destination's default wallet address as EOA
+	// so that it can be used later for msgs with gaslimit 0
+	if len(bytecode) > 0 {
+		receiver, err := utils.ABIEncode(`[{"type":"address"}]`, common.HexToAddress(c.Lane.Dest.Common.ChainClient.GetDefaultWallet().Address()))
+		require.NoError(c.t, err, "Failed encoding the receiver address")
+		c.EOAReceiver = receiver
+	} else {
+		c.EOAReceiver = c.msg.Receiver
+	}
 	if c.SendMaxDataIntermittentlyInMsgCount > 0 {
 		dCfg, err := sourceCCIP.OnRamp.Instance.GetDynamicConfig(nil)
 		require.NoError(c.t, err, "failed to fetch dynamic config")
@@ -180,24 +195,10 @@ func (c *CCIPE2ELoad) CCIPMsg() (router.ClientEVM2AnyMessage, *testreporters.Req
 		return router.ClientEVM2AnyMessage{}, stats, err
 	}
 	msg.ExtraArgs = extraArgsV1
-	// if the dest gaslimit is 0, check if it's an EOA or contract, if it's a contract, change the receiver to the default wallet of destination
+	// if gaslimit is 0, set the receiver to EOA
 	if gasLimit == 0 {
-		bytecode, err := c.Lane.Dest.Common.ChainClient.Backend().CodeAt(context.Background(), c.Lane.Dest.ReceiverDapp.EthAddress, nil)
-		if err != nil {
-			return router.ClientEVM2AnyMessage{}, nil, err
-		}
-		// if the bytecode is not empty, it's a contract,
-		// In that case change the receiver to the default wallet of destination otherwise we will get ReceiverError with 0 gaslimit
-		// if the bytecode is empty, it's an EOA, so no need to change the receiver
-		if len(bytecode) > 0 {
-			receiver, err := utils.ABIEncode(`[{"type":"address"}]`, common.HexToAddress(c.Lane.Dest.Common.ChainClient.GetDefaultWallet().Address()))
-			if err != nil {
-				return router.ClientEVM2AnyMessage{}, stats, fmt.Errorf("failed to encode receiver address %w", err)
-			}
-			msg.Receiver = receiver
-		}
+		msg.Receiver = c.EOAReceiver
 	}
-
 	return msg, stats, nil
 }
 
