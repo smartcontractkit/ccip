@@ -87,6 +87,8 @@ NodeFunding = 1000.0
 
 [CCIP.Groups.load]
 LocalCluster = false
+
+[CCIP.Groups.load.LoadProfile]
 TestRunName = 'crib-ani-demo'
 TimeUnit = '1s'
 TestDuration = '15m'

@@ -162,7 +162,7 @@ func (m *MsgProfile) msgDetailsIndexMatrixByFrequency() {
 // If the iteration is greater than the number of matrixByFreq, it will loop back to the first msg detail
 // if the final iteration in a load run is lesser than the number of matrixByFreq, there is a chance that some of the msg details might not be selected
 func (m *MsgProfile) MsgDetailsForIteration(it int64) *MsgDetails {
-	index := it % int64(len(m.matrixByFreq))
+	index := (it - 1) % int64(len(m.matrixByFreq))
 	return m.mapMsgDetails[m.matrixByFreq[index]]
 }
 
