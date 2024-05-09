@@ -62,7 +62,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, AggregateRateLimiter, ITyp
   /// @dev Atlas depends on this event, if changing, please notify Atlas.
   event ConfigSet(StaticConfig staticConfig, DynamicConfig dynamicConfig);
   // TODO: revisit if fields have to be indexed for skip events
-  event SkippedIncorrectNonce(uint64 indexed sourceChainSelector, uint64 nonce, address indexed sender);
+  event SkippedIncorrectNonce(uint64 sourceChainSelector, uint64 nonce, address indexed sender);
   event SkippedSenderWithPreviousRampMessageInflight(
     uint64 indexed sourceChainSelector, uint64 nonce, address indexed sender
   );
