@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.19;
+pragma solidity 0.8.24;
 
 import {IBridgeAdapter} from "./interfaces/IBridge.sol";
 import {ILiquidityManager} from "./interfaces/ILiquidityManager.sol";
@@ -381,12 +381,6 @@ contract LiquidityManager is ILiquidityManager, OCR3Base {
       bytes("") // no bridge return data when receiving
     );
   }
-
-  // TODO (question, remove before merging): @makramkd do we still want this function in here?
-  //  function _wrapNative(uint256 amount) private {
-  //    IWrappedNative weth = IWrappedNative(address(i_localToken));
-  //    weth.deposit{value: amount}();
-  //  }
 
   /// @notice Process the OCR report.
   /// @dev Called by OCR3Base's transmit() function.
