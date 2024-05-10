@@ -179,11 +179,6 @@ func (g *liquidityGraph) hasNetwork(n models.NetworkSelector) bool {
 	return exists
 }
 
-func (g *liquidityGraph) hasData(n models.NetworkSelector) bool {
-	_, exists := g.data[n]
-	return exists
-}
-
 func (g *liquidityGraph) hasConnection(from, to models.NetworkSelector) bool {
 	if !g.hasNetwork(from) || !g.hasNetwork(to) {
 		return false
