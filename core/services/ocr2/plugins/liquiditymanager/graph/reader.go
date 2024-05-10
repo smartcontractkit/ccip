@@ -101,7 +101,7 @@ func (g *liquidityGraph) GetNeighbors(from models.NetworkSelector, bidir bool) (
 	g.lock.RLock()
 	defer g.lock.RUnlock()
 
-	return g.getNeighbors(from, false)
+	return g.getNeighbors(from, bidir)
 }
 
 func (g *liquidityGraph) GetEdges() ([]models.Edge, error) {
