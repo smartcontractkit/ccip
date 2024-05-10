@@ -31,6 +31,9 @@ type CCIP interface {
 
 	// GasPrices reads the provided chains gas prices.
 	GasPrices(ctx context.Context, chains []model.ChainSelector) ([]model.GasPrice, error)
+
+	// Close closes any open resources.
+	Close(ctx context.Context) error
 }
 
 type ChainReader interface{} // TODO: Imported from chainlink-common
@@ -66,6 +69,10 @@ func (r *CCIPChainReader) GasPrices(ctx context.Context, chains []model.ChainSel
 		return nil, err
 	}
 	panic("implement me")
+}
+
+func (r *CCIPChainReader) Close(ctx context.Context) error {
+	return nil
 }
 
 func (r *CCIPChainReader) validateReaderExistence(chains ...model.ChainSelector) error {

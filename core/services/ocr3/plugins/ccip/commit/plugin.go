@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
+	"github.com/smartcontractkit/ccipocr3/internal/codec"
 	"github.com/smartcontractkit/ccipocr3/internal/libs/hashlib"
 	"github.com/smartcontractkit/ccipocr3/internal/libs/merklemulti"
 	"github.com/smartcontractkit/ccipocr3/internal/libs/slicelib"
@@ -20,13 +22,17 @@ import (
 
 // Plugin implements the main ocr3 plugin logic.
 type Plugin struct {
-	nodeID     commontypes.OracleID
-	cfg        model.CommitPluginConfig
-	ccipReader reader.CCIP
-	lggr       logger.Logger
+	nodeID      commontypes.OracleID
+	cfg         model.CommitPluginConfig
+	ccipReader  reader.CCIP
+	reportCodec codec.Commit
+	lggr        logger.Logger
 
-	// computed helper fields
-	readChains mapset.Set[model.ChainSelector]
+	// Computed helper fields .
+	// readableChains is the set of chains that the plugin can read from.
+	readableChains mapset.Set[model.ChainSelector]
+	// knownSourceChains is the set of chains that the plugin knows about.
+	knownSourceChains mapset.Set[model.ChainSelector]
 }
 
 func NewPlugin(
@@ -36,13 +42,19 @@ func NewPlugin(
 	ccipReader reader.CCIP,
 	lggr logger.Logger,
 ) *Plugin {
+	knownSourceChains := mapset.NewSet[model.ChainSelector](cfg.Reads...)
+	for _, inf := range cfg.ObserverInfo {
+		knownSourceChains = knownSourceChains.Union(mapset.NewSet(inf.Reads...))
+	}
+
 	return &Plugin{
 		nodeID:     nodeID,
 		cfg:        cfg,
 		ccipReader: ccipReader,
 		lggr:       lggr,
 
-		readChains: mapset.NewSet(cfg.Reads...),
+		readableChains:    mapset.NewSet(cfg.Reads...),
+		knownSourceChains: knownSourceChains,
 	}
 }
 
@@ -51,11 +63,6 @@ func (p *Plugin) Query(ctx context.Context, outctx ocr3types.OutcomeContext) (ty
 }
 
 func (p *Plugin) Observation(ctx context.Context, outctx ocr3types.OutcomeContext, query types.Query) (types.Observation, error) {
-	knownSourceChains := mapset.NewSet[model.ChainSelector](p.cfg.Reads...)
-	for _, inf := range p.cfg.ObserverInfo {
-		knownSourceChains.Union(mapset.NewSet(inf.Reads...))
-	}
-
 	seqNumPerChain := make(map[model.ChainSelector]model.SeqNum)
 
 	// If there is a previous outcome, find latest sequence numbers per chain from it.
@@ -71,17 +78,17 @@ func (p *Plugin) Observation(ctx context.Context, outctx ocr3types.OutcomeContex
 			if seqNumChain.SeqNum > seqNumPerChain[seqNumChain.ChainSel] {
 				seqNumPerChain[seqNumChain.ChainSel] = seqNumChain.SeqNum
 			}
-			knownSourceChains.Add(seqNumChain.ChainSel)
+			p.knownSourceChains.Add(seqNumChain.ChainSel)
 		}
-		p.lggr.Debugw("discovered source chains from prev outcome", "chains", knownSourceChains.ToSlice())
+		p.lggr.Debugw("discovered source chains from prev outcome", "chains", p.knownSourceChains.ToSlice())
 		p.lggr.Debugw("discovered sequence numbers from prev outcome", "seqNumPerChain", seqNumPerChain)
 	}
 
-	knownSourceChainsSlice := knownSourceChains.ToSlice()
-	sort.Slice(knownSourceChains, func(i, j int) bool { return knownSourceChainsSlice[i] < knownSourceChainsSlice[j] })
+	knownSourceChainsSlice := p.knownSourceChains.ToSlice()
+	sort.Slice(knownSourceChainsSlice, func(i, j int) bool { return knownSourceChainsSlice[i] < knownSourceChainsSlice[j] })
 
 	// If reading destination chain is supported find the latest sequence numbers per chain from the onchain state.
-	if p.readChains.Contains(p.cfg.DestChain) {
+	if p.readableChains.Contains(p.cfg.DestChain) {
 		p.lggr.Debugw("reading sequence numbers from destination")
 		onChainSeqNums, err := p.ccipReader.NextSeqNum(ctx, knownSourceChainsSlice)
 		if err != nil {
@@ -100,7 +107,7 @@ func (p *Plugin) Observation(ctx context.Context, outctx ocr3types.OutcomeContex
 	// Find the new msgs for each supported chain based on the discovered sequence numbers.
 	observedNewMsgs := make([]model.CCIPMsgBaseDetails, 0)
 	for ch, seqNum := range seqNumPerChain {
-		if !p.readChains.Contains(ch) {
+		if !p.readableChains.Contains(ch) {
 			p.lggr.Debugw("reading chain is not supported", "chain", ch)
 			continue
 		}
@@ -226,14 +233,6 @@ func (p *Plugin) Outcome(_ ocr3types.OutcomeContext, _ types.Query, aos []types.
 		}
 		consensusBySourceChain[sourceChain] = msgsConsensus
 		p.lggr.Debugw("observed messages consensus", "sourceChain", sourceChain, "consensus", msgsConsensus)
-
-		/*
-			# TODO: Intention of the expiry is to prevent outctx.max_committed
-			# from getting permanently out of sync with the dest chain if something goes wrong. Maybe there's a better way?
-			# If its expired, we update from the consensus destination chain.
-			if expired(outctx.max_committed_seq_nr_by_source):
-				max_committed_seq_nr_by_source = calculate_consensus_committed_seq_nr(observations_by_source[chain], quorum)
-		*/
 	}
 
 	// Construct the outcome.
@@ -263,7 +262,7 @@ func (p *Plugin) Reports(seqNr uint64, outcome ocr3types.Outcome) ([]ocr3types.R
 	priceUpdates := make([]model.TokenPriceUpdate, 0)
 
 	rep := model.NewCommitPluginReport(outc.MerkleRoots, priceUpdates)
-	encodedReport, err := rep.JSONEncode() // todo: abi encode
+	encodedReport, err := p.reportCodec.Encode(context.Background(), rep)
 	if err != nil {
 		return nil, fmt.Errorf("encode commit plugin report: %w", err)
 	}
@@ -272,23 +271,47 @@ func (p *Plugin) Reports(seqNr uint64, outcome ocr3types.Outcome) ([]ocr3types.R
 }
 
 func (p *Plugin) ShouldAcceptAttestedReport(ctx context.Context, u uint64, r ocr3types.ReportWithInfo[[]byte]) (bool, error) {
-	// todo: implement
-	panic("implement me")
+	decodedReport, err := p.reportCodec.Decode(ctx, r.Report)
+	if err != nil {
+		return false, fmt.Errorf("decode commit plugin report: %w", err)
+	}
+
+	isEmpty := decodedReport.IsEmpty()
+	if isEmpty {
+		p.lggr.Infow("skipping empty report")
+		return false, nil
+	}
+
+	return true, nil
 }
 
 func (p *Plugin) ShouldTransmitAcceptedReport(ctx context.Context, u uint64, r ocr3types.ReportWithInfo[[]byte]) (bool, error) {
-	/*
-		if dest not in self.chains:
-			# Can't write, skip
-			return False
-		return self.chains[dest].is_stale(report):
-	*/
-	panic("implement me")
+	if !p.cfg.Writer {
+		p.lggr.Debugw("not a writer, skipping report transmission")
+		return false, nil
+	}
+
+	decodedReport, err := p.reportCodec.Decode(ctx, r.Report)
+	if err != nil {
+		return false, fmt.Errorf("decode commit plugin report: %w", err)
+	}
+
+	p.lggr.Debugw("transmitting report",
+		"roots", len(decodedReport.MerkleRoots), "priceUpdates", len(decodedReport.PriceUpdates))
+
+	// todo: if report is stale -> do not transmit
+	return true, nil
 }
 
 func (p *Plugin) Close() error {
-	// todo: implement
-	panic("implement me")
+	timeout := 10 * time.Second
+	ctx, cf := context.WithTimeout(context.Background(), timeout)
+	defer cf()
+
+	if err := p.ccipReader.Close(ctx); err != nil {
+		return fmt.Errorf("close ccip reader: %w", err)
+	}
+	return nil
 }
 
 func (p *Plugin) observedMsgsConsensus(chainSel model.ChainSelector, observedMsgs []model.CCIPMsgBaseDetails) (observedMsgsConsensus, error) {

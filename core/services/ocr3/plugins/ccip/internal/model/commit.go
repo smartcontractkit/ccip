@@ -100,14 +100,9 @@ func NewCommitPluginReport(merkleRoots []MerkleRootChain, priceUpdates []TokenPr
 	}
 }
 
-func (r CommitPluginReport) JSONEncode() ([]byte, error) {
-	return json.Marshal(r)
-}
-
-func JSONDecodeCommitPluginReport(b []byte) (CommitPluginReport, error) {
-	r := CommitPluginReport{}
-	err := json.Unmarshal(b, &r)
-	return r, err
+// IsEmpty returns true if the CommitPluginReport is empty
+func (r CommitPluginReport) IsEmpty() bool {
+	return len(r.MerkleRoots) == 0 && len(r.PriceUpdates) == 0
 }
 
 type TokenPriceUpdate struct {
