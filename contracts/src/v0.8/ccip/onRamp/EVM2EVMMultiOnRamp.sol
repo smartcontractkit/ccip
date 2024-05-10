@@ -76,7 +76,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ILinkAvailable, AggregateRat
     address linkToken; // ────────╮ Link token address
     uint64 chainSelector; // ─────╯ Source chainSelector
     uint96 maxNopFeesJuels; // ───╮ Max nop fee balance onramp can have
-    address armProxy; // ─────────╯            Address of ARM proxy
+    address armProxy; // ─────────╯ Address of ARM proxy
   }
 
   /// @dev Struct to contains the dynamic configuration
@@ -147,11 +147,11 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ILinkAvailable, AggregateRat
   }
 
   /// @dev Struct to hold the configs for a destination chain
-  /// Note: Non dynamic configs will be added in upcoming PRs
   struct DestChainConfig {
     DestChainDynamicConfig dynamicConfig; // ──╮ Dynamic configs for a destination chain
     address prevOnRamp; // ────────────────────╯ Address of previous-version OnRamp
-    uint64 sequenceNumber; // The last used sequence number. This is zero in the case where no messages has been sent yet. 0 is not a valid sequence number for any real transaction.
+    uint64 sequenceNumber; // The last used sequence number. This is zero in the case where no messages has been sent yet.
+    // 0 is not a valid sequence number for any real transaction.
     /// @dev metadataHash is a lane-specific prefix for a message hash preimage which ensures global uniqueness
     /// Ensures that 2 identical messages sent to 2 different lanes will have a distinct hash.
     /// Must match the metadataHash used in computing leaf hashes offchain for the root committed in
@@ -159,12 +159,13 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ILinkAvailable, AggregateRat
     bytes32 metadataHash;
   }
 
-  /// @dev Struct to hold the dynamic configs, its destination chain selector and previous onRamp. same as DestChainDynamicConfig but with the destChainSelector and the prevOnRamp
-  /// so that an array of these can be passed in the constructor and the applyDestChainConfigUpdates functiion
+  /// @dev Struct to hold the dynamic configs, its destination chain selector and previous onRamp.
+  /// Same as DestChainConfig but with the destChainSelector and the prevOnRamp so that an array of these
+  /// can be passed in the constructor and the applyDestChainConfigUpdates functiion
   struct DestChainConfigArgs {
     uint64 destChainSelector; // Destination chain selector
     DestChainDynamicConfig dynamicConfig; // struct to hold the configs for a destination chain
-    address prevOnRamp; // Address of previous-version OnRamp. This part of this struct in order to add new destination chains.
+    address prevOnRamp; // Address of previous-version OnRamp.
   }
 
   /// @dev Nop address and weight, used to set the nops and their weights
@@ -663,7 +664,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ILinkAvailable, AggregateRat
   }
 
   /// @notice Updates the destination chain specific config.
-  /// @param destChainConfigArgs Array of source chain specific dynamic config updates.
+  /// @param destChainConfigArgs Array of source chain specific configs.
   function applyDestChainConfigUpdates(DestChainConfigArgs[] memory destChainConfigArgs) external {
     _onlyOwnerOrAdmin();
     _applyDestChainConfigUpdates(destChainConfigArgs);
