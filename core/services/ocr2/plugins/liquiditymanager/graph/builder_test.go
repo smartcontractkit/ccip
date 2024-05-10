@@ -70,7 +70,8 @@ func TestNewGraphWithData(t *testing.T) {
 					switch v.NetworkSelector {
 					case 1:
 						return Data{
-								Liquidity: big.NewInt(100),
+								Liquidity:       big.NewInt(100),
+								NetworkSelector: 1,
 							}, []Vertex{
 								{
 									NetworkSelector:  2,
@@ -83,7 +84,8 @@ func TestNewGraphWithData(t *testing.T) {
 							}, nil
 					case 2:
 						return Data{
-								Liquidity: big.NewInt(200),
+								Liquidity:       big.NewInt(200),
+								NetworkSelector: 2,
 							}, []Vertex{
 								{
 									NetworkSelector:  1,
@@ -92,7 +94,8 @@ func TestNewGraphWithData(t *testing.T) {
 							}, nil
 					case 3:
 						return Data{
-								Liquidity: big.NewInt(300),
+								Liquidity:       big.NewInt(300),
+								NetworkSelector: 3,
 							}, []Vertex{
 								{
 									NetworkSelector:  1,
@@ -131,7 +134,8 @@ func TestNewGraphWithData(t *testing.T) {
 					switch v.NetworkSelector {
 					case 1:
 						return Data{
-								Liquidity: big.NewInt(100),
+								Liquidity:       big.NewInt(100),
+								NetworkSelector: 1,
 							}, []Vertex{
 								{
 									NetworkSelector:  2,
@@ -148,7 +152,8 @@ func TestNewGraphWithData(t *testing.T) {
 							}, nil
 					case 2:
 						return Data{
-								Liquidity: big.NewInt(200),
+								Liquidity:       big.NewInt(200),
+								NetworkSelector: 2,
 							}, []Vertex{
 								{
 									NetworkSelector:  1,
@@ -161,7 +166,8 @@ func TestNewGraphWithData(t *testing.T) {
 							}, nil
 					case 3:
 						return Data{
-								Liquidity: big.NewInt(300),
+								Liquidity:       big.NewInt(300),
+								NetworkSelector: 3,
 							}, []Vertex{
 								{
 									NetworkSelector:  1,
@@ -178,8 +184,8 @@ func TestNewGraphWithData(t *testing.T) {
 							}, nil
 					case 4:
 						return Data{
-
-								Liquidity: big.NewInt(400),
+								Liquidity:       big.NewInt(400),
+								NetworkSelector: 4,
 							}, []Vertex{
 								{
 									NetworkSelector:  1,

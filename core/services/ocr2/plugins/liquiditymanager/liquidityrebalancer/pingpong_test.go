@@ -264,7 +264,8 @@ func genGraph(t testing.TB, balances map[models.NetworkSelector]int64, lanes [][
 	g := graph.NewGraph()
 	for netSel, balance := range balances {
 		g.(graph.GraphTest).AddNetwork(netSel, graph.Data{
-			Liquidity: big.NewInt(balance),
+			Liquidity:       big.NewInt(balance),
+			NetworkSelector: netSel,
 		})
 	}
 
