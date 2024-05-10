@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.19;
+pragma solidity 0.8.24;
 
 import {Pool} from "../../libraries/Pool.sol";
 import {TokenPool} from "../../pools/TokenPool.sol";
@@ -14,9 +14,9 @@ contract TokenPoolHelper is TokenPool {
   constructor(
     IERC20 token,
     address[] memory allowlist,
-    address armProxy,
+    address rmnProxy,
     address router
-  ) TokenPool(token, allowlist, armProxy, router) {}
+  ) TokenPool(token, allowlist, rmnProxy, router) {}
 
   function lockOrBurn(Pool.LockOrBurnInV1 calldata lockOrBurnIn)
     external

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.19;
+pragma solidity 0.8.24;
 
 import {ILiquidityContainer} from "../../liquiditymanager/interfaces/ILiquidityContainer.sol";
 import {ITypeAndVersion} from "../../shared/interfaces/ITypeAndVersion.sol";
@@ -7,7 +7,6 @@ import {ITypeAndVersion} from "../../shared/interfaces/ITypeAndVersion.sol";
 import {Pool} from "../libraries/Pool.sol";
 import {RateLimiter} from "../libraries/RateLimiter.sol";
 import {LegacyPoolWrapper} from "./LegacyPoolWrapper.sol";
-import {TokenPool} from "./TokenPool.sol";
 
 import {IERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -42,21 +41,21 @@ contract LockReleaseTokenPoolAndProxy is LegacyPoolWrapper, ILiquidityContainer,
   constructor(
     IERC20 token,
     address[] memory allowlist,
-    address armProxy,
+    address rmnProxy,
     bool acceptLiquidity,
     address router
-  ) LegacyPoolWrapper(token, allowlist, armProxy, router) {
+  ) LegacyPoolWrapper(token, allowlist, rmnProxy, router) {
     i_acceptLiquidity = acceptLiquidity;
   }
 
   /// @notice Locks the token in the pool
-  /// @dev The whenHealthy check is important to ensure that even if a ramp is compromised
-  /// we're able to stop token movement via ARM.
+  /// @dev The whenNotCursed check is important to ensure that even if a ramp is compromised
+  /// we're able to stop token movement via RMN.
   function lockOrBurn(Pool.LockOrBurnInV1 calldata lockOrBurnIn)
     external
     virtual
     override
-    whenHealthy
+    whenNotCursed(lockOrBurnIn.remoteChainSelector)
     returns (Pool.LockOrBurnOutV1 memory)
   {
     _checkAllowList(lockOrBurnIn.originalSender);
@@ -73,13 +72,13 @@ contract LockReleaseTokenPoolAndProxy is LegacyPoolWrapper, ILiquidityContainer,
   }
 
   /// @notice Release tokens from the pool to the recipient
-  /// @dev The whenHealthy check is important to ensure that even if a ramp is compromised
-  /// we're able to stop token movement via ARM.
+  /// @dev The whenNotCursed check is important to ensure that even if a ramp is compromised
+  /// we're able to stop token movement via RMN.
   function releaseOrMint(Pool.ReleaseOrMintInV1 calldata releaseOrMintIn)
     external
     virtual
     override
-    whenHealthy
+    whenNotCursed(releaseOrMintIn.remoteChainSelector)
     returns (Pool.ReleaseOrMintOutV1 memory)
   {
     _onlyOffRamp(releaseOrMintIn.remoteChainSelector);
