@@ -52,6 +52,10 @@ func (p *Plugin) Query(ctx context.Context, outctx ocr3types.OutcomeContext) (ty
 
 func (p *Plugin) Observation(ctx context.Context, outctx ocr3types.OutcomeContext, query types.Query) (types.Observation, error) {
 	knownSourceChains := mapset.NewSet[model.ChainSelector](p.cfg.Reads...)
+	for _, inf := range p.cfg.ObserverInfo {
+		knownSourceChains.Union(mapset.NewSet(inf.Reads...))
+	}
+
 	seqNumPerChain := make(map[model.ChainSelector]model.SeqNum)
 
 	// If there is a previous outcome, find latest sequence numbers per chain from it.
