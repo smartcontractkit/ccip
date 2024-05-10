@@ -4,11 +4,11 @@ pragma solidity ^0.8.0;
 import {OwnerIsCreator} from "../../shared/access/OwnerIsCreator.sol";
 import {MultiOCR3Abstract} from "./MultiOCR3Abstract.sol";
 
+// TODO: consider splitting configs & verification logic off to auth library (if size is prohibitive)
 /// @notice Onchain verification of reports from the offchain reporting protocol
-/// @dev For details on its operation, see the offchain reporting protocol design
-/// doc, which refers to this contract as simply the "contract".
+///         with multiple decentralized oracle network support.
 abstract contract MultiOCR3Base is OwnerIsCreator, MultiOCR3Abstract {
-  error InvalidConfig(string message);
+  //   error InvalidConfig(string message);
   error WrongMessageLength(uint256 expected, uint256 actual);
   error ConfigDigestMismatch(bytes32 expected, bytes32 actual);
   error ForkedChain(uint256 expected, uint256 actual);
@@ -17,18 +17,20 @@ abstract contract MultiOCR3Base is OwnerIsCreator, MultiOCR3Abstract {
   error UnauthorizedTransmitter();
   error UnauthorizedSigner();
   error NonUniqueSignatures();
-  error OracleCannotBeZeroAddress();
+  //   error OracleCannotBeZeroAddress();
 
-  // Packing these fields used on the hot path in a ConfigInfo variable reduces the
-  // retrieval of all of them to a minimum number of SLOADs.
+  /// @dev Packing these fields used on the hot path in a ConfigInfo variable reduces the
+  ///      retrieval of all of them to a minimum number of SLOADs.
   struct ConfigInfo {
     bytes32 latestConfigDigest;
-    uint8 f;
-    uint8 n;
+    uint8 f; // ───────────╮
+    uint8 n; //            │
+    bool uniqueReports; // │ if true, the reports should be unique
+    bool skipSigners; // ──╯ if true, skips signature verification on transmission verification
   }
 
-  // Used for s_oracles[a].role, where a is an address, to track the purpose
-  // of the address, or to indicate that the address is unset.
+  /// @notice Used for s_oracles[a].role, where a is an address, to track the purpose
+  ///         of the address, or to indicate that the address is unset.
   enum Role {
     // No oracle role has been set for address a
     Unset,
@@ -46,24 +48,25 @@ abstract contract MultiOCR3Base is OwnerIsCreator, MultiOCR3Abstract {
     Role role; // Role of the address which mapped to this struct
   }
 
-  // The current config
-  ConfigInfo internal s_configInfo;
+  /// @notice OCR configuration for a single DON
+  struct DONConfig {
+    /// @notice latest OCR config
+    ConfigInfo configInfo;
+    /// @notice makes it easier for offchain systems to extract config from logs.
+    uint32 latestConfigBlockNumber;
+    /// @notice signing address of each oracle
+    address[] signers;
+    /// @notice transmission address of each oracle,
+    ///         i.e. the address the oracle actually sends transactions to the contract from
+    address[] transmitters;
+  }
 
-  // incremented each time a new config is posted. This count is incorporated
-  // into the config digest, to prevent replay attacks.
-  uint32 internal s_configCount;
-  // makes it easier for offchain systems to extract config from logs.
-  uint32 internal s_latestConfigBlockNumber;
+  /// @notice mapping of DON ID -> DON config
+  mapping(uint32 donId => DONConfig config) internal s_donConfigs;
 
-  // signer OR transmitter address
-  mapping(address signerOrTransmitter => Oracle oracle) internal s_oracles;
-
-  // s_signers contains the signing address of each oracle
-  address[] internal s_signers;
-
-  // s_transmitters contains the transmission address of each oracle,
-  // i.e. the address the oracle actually sends transactions to the contract from
-  address[] internal s_transmitters;
+  // TODO: optimization: we can use bitmaps of 2-bit width to optimise the role representation
+  /// @notice Don ID => signer OR transmitter address mapping
+  mapping(uint32 donId => mapping(address signerOrTransmiter => Oracle oracle)) s_oracles;
 
   // The constant-length components of the msg.data sent to transmit.
   // See the "If we wanted to call sam" example on for example reasoning
@@ -78,108 +81,75 @@ abstract contract MultiOCR3Base is OwnerIsCreator, MultiOCR3Abstract {
     + 32 // word containing length rs
     + 32; // word containing length of ss
 
-  bool internal immutable i_uniqueReports;
   uint256 internal immutable i_chainID;
 
-  constructor(bool uniqueReports) {
-    i_uniqueReports = uniqueReports;
+  // TODO: implement config sets in constructor
+  // TODO: make uniqueReports and skipReports static
+  // TODO: should DON IDs could be fixed at construction time?
+  constructor() {
     i_chainID = block.chainid;
   }
 
-  // Reverts transaction if config args are invalid
-  modifier checkConfigValid(uint256 numSigners, uint256 numTransmitters, uint256 f) {
-    if (numSigners > MAX_NUM_ORACLES) revert InvalidConfig("too many signers");
-    if (f == 0) revert InvalidConfig("f must be positive");
-    if (numSigners != numTransmitters) revert InvalidConfig("oracle addresses out of registration");
-    if (numSigners <= 3 * f) revert InvalidConfig("faulty-oracle f too high");
-    _;
-  }
-
-  /// @notice sets offchain reporting protocol configuration incl. participating oracles
-  /// @param signers addresses with which oracles sign the reports
-  /// @param transmitters addresses oracles use to transmit the reports
-  /// @param f number of faulty oracles the system can tolerate
-  /// @param onchainConfig encoded on-chain contract configuration
-  /// @param offchainConfigVersion version number for offchainEncoding schema
-  /// @param offchainConfig encoded off-chain oracle configuration
-  function setOCR2Config(
+  /// @inheritdoc MultiOCR3Abstract
+  /// @dev assumes that the input values are validated from the home chain config source,
+  ///      and does not re-validate the data.
+  function setOCR3Config(
+    uint32 donId,
+    bytes32 configDigest,
     address[] memory signers,
     address[] memory transmitters,
-    uint8 f,
-    bytes memory onchainConfig,
-    uint64 offchainConfigVersion,
-    bytes memory offchainConfig
-  ) external override checkConfigValid(signers.length, transmitters.length, f) onlyOwner {
-    _beforeSetConfig(onchainConfig);
-    uint256 oldSignerLength = s_signers.length;
-    for (uint256 i = 0; i < oldSignerLength; ++i) {
-      delete s_oracles[s_signers[i]];
-      delete s_oracles[s_transmitters[i]];
+    uint8 f
+  ) external override onlyOwner {
+    DONConfig storage donConfig = s_donConfigs[donId];
+    ConfigInfo storage configInfo = donConfig.configInfo;
+
+    uint256 newTransmittersLength = transmitters.length;
+    if (!configInfo.skipSigners) {
+      donConfig.signers = signers;
     }
 
-    uint256 newSignersLength = signers.length;
-    for (uint256 i = 0; i < newSignersLength; ++i) {
-      // add new signer/transmitter addresses
-      address signer = signers[i];
-      if (s_oracles[signer].role != Role.Unset) revert InvalidConfig("repeated signer address");
-      if (signer == address(0)) revert OracleCannotBeZeroAddress();
-      s_oracles[signer] = Oracle(uint8(i), Role.Signer);
+    // TODO: re-add s_oracles removal logic
+    //     uint256 oldSignerLength = s_signers.length;
+    //     for (uint256 i = 0; i < oldSignerLength; ++i) {
+    //       delete s_oracles[s_signers[i]];
+    //       delete s_oracles[s_transmitters[i]];
+    //     }
 
-      address transmitter = transmitters[i];
-      if (s_oracles[transmitter].role != Role.Unset) revert InvalidConfig("repeated transmitter address");
-      if (transmitter == address(0)) revert OracleCannotBeZeroAddress();
-      s_oracles[transmitter] = Oracle(uint8(i), Role.Transmitter);
-    }
+    //     uint256 newSignersLength = signers.length;
+    //     for (uint256 i = 0; i < newSignersLength; ++i) {
+    //       // add new signer/transmitter addresses
+    //       address signer = signers[i];
+    //       if (s_oracles[signer].role != Role.Unset) revert InvalidConfig("repeated signer address");
+    //       if (signer == address(0)) revert OracleCannotBeZeroAddress();
+    //       s_oracles[signer] = Oracle(uint8(i), Role.Signer);
 
-    s_signers = signers;
-    s_transmitters = transmitters;
+    //       address transmitter = transmitters[i];
+    //       if (s_oracles[transmitter].role != Role.Unset) revert InvalidConfig("repeated transmitter address");
+    //       if (transmitter == address(0)) revert OracleCannotBeZeroAddress();
+    //       s_oracles[transmitter] = Oracle(uint8(i), Role.Transmitter);
+    //     }
 
-    s_configInfo.f = f;
-    s_configInfo.n = uint8(newSignersLength);
-    s_configInfo.latestConfigDigest = _configDigestFromConfigData(
-      block.chainid,
-      address(this),
-      ++s_configCount,
-      signers,
-      transmitters,
-      f,
-      onchainConfig,
-      offchainConfigVersion,
-      offchainConfig
-    );
+    donConfig.transmitters = transmitters;
+    configInfo.f = f;
+    configInfo.latestConfigDigest = configDigest;
+    configInfo.n = uint8(newTransmittersLength);
 
-    uint32 previousConfigBlockNumber = s_latestConfigBlockNumber;
-    s_latestConfigBlockNumber = uint32(block.number);
+    uint32 previousConfigBlockNumber = donConfig.latestConfigBlockNumber;
+    donConfig.latestConfigBlockNumber = uint32(block.number);
 
-    emit ConfigSet(
-      previousConfigBlockNumber,
-      s_configInfo.latestConfigDigest,
-      s_configCount,
-      signers,
-      transmitters,
-      f,
-      onchainConfig,
-      offchainConfigVersion,
-      offchainConfig
-    );
+    emit ConfigSet(donId, previousConfigBlockNumber, configDigest, signers, transmitters, f);
   }
 
-  /// @dev Hook that is run from setOCR2Config() right after validating configuration.
-  /// Empty by default, please provide an implementation in a child contract if you need additional configuration processing
-  function _beforeSetConfig(bytes memory _onchainConfig) internal virtual {}
-
+  /// @param donId DON ID to retrieve transmitters for
   /// @return list of addresses permitted to transmit reports to this contract
   /// @dev The list will match the order used to specify the transmitter during setConfig
-  function getTransmitters() external view returns (address[] memory) {
-    return s_transmitters;
+  function getTransmitters(uint32 donId) external view returns (address[] memory) {
+    return s_donConfigs[donId].transmitters;
   }
 
-  /// @notice transmit is called to post a new report to the contract
-  /// @param report serialized report, which the signatures are signing.
-  /// @param rs ith element is the R components of the ith signature on report. Must have at most MAX_NUM_ORACLES entries
-  /// @param ss ith element is the S components of the ith signature on report. Must have at most MAX_NUM_ORACLES entries
-  /// @param rawVs ith element is the the V component of the ith signature
-  function transmit(
+  /// @inheritdoc MultiOCR3Abstract
+  function _transmit(
+    uint32 donId,
     // NOTE: If these parameters are changed, expectedMsgDataLength and/or
     // TRANSMIT_MSGDATA_CONSTANT_LENGTH_COMPONENT need to be changed accordingly
     bytes32[3] calldata reportContext,
@@ -187,19 +157,13 @@ abstract contract MultiOCR3Base is OwnerIsCreator, MultiOCR3Abstract {
     bytes32[] calldata rs,
     bytes32[] calldata ss,
     bytes32 rawVs // signatures
-  ) external override {
-    // Scoping this reduces stack pressure and gas usage
-    {
-      // report and epochAndRound
-      _report(report, uint40(uint256(reportContext[1])));
-    }
-
+  ) internal override {
     // reportContext consists of:
     // reportContext[0]: ConfigDigest
     // reportContext[1]: 27 byte padding, 4-byte epoch and 1-byte round
     // reportContext[2]: ExtraHash
     bytes32 configDigest = reportContext[0];
-    ConfigInfo memory configInfo = s_configInfo;
+    ConfigInfo memory configInfo = s_donConfigs[donId].configInfo;
 
     if (configInfo.latestConfigDigest != configDigest) {
       revert ConfigDigestMismatch(configInfo.latestConfigDigest, configDigest);
@@ -209,25 +173,16 @@ abstract contract MultiOCR3Base is OwnerIsCreator, MultiOCR3Abstract {
     // calculated from chain A and so OCR reports will be valid on both forks.
     if (i_chainID != block.chainid) revert ForkedChain(i_chainID, block.chainid);
 
-    emit Transmitted(configDigest, uint32(uint256(reportContext[1]) >> 8));
-
-    uint256 expectedNumSignatures;
-    if (i_uniqueReports) {
-      expectedNumSignatures = (configInfo.n + configInfo.f) / 2 + 1;
-    } else {
-      expectedNumSignatures = configInfo.f + 1;
-    }
-    if (rs.length != expectedNumSignatures) revert WrongNumberOfSignatures();
-    if (rs.length != ss.length) revert SignaturesOutOfRegistration();
-
     // Scoping this reduces stack pressure and gas usage
     {
-      Oracle memory transmitter = s_oracles[msg.sender];
+      Oracle memory transmitter = s_oracles[donId][msg.sender];
       // Check that sender is authorized to report
-      if (!(transmitter.role == Role.Transmitter && msg.sender == s_transmitters[transmitter.index])) {
+      if (!(transmitter.role == Role.Transmitter && msg.sender == s_donConfigs[donId].transmitters[transmitter.index]))
+      {
         revert UnauthorizedTransmitter();
       }
     }
+    // TODO: verify if the same TRANSMIT_MSGDATA_CONSTANT_LENGTH_COMPONENT would apply to all functions
     // Scoping this reduces stack pressure and gas usage
     {
       uint256 expectedDataLength = uint256(TRANSMIT_MSGDATA_CONSTANT_LENGTH_COMPONENT) + report.length // one byte pure entry in _report
@@ -236,46 +191,40 @@ abstract contract MultiOCR3Base is OwnerIsCreator, MultiOCR3Abstract {
       if (msg.data.length != expectedDataLength) revert WrongMessageLength(expectedDataLength, msg.data.length);
     }
 
-    // Verify signatures attached to report
-    bytes32 h = keccak256(abi.encodePacked(keccak256(report), reportContext));
-    bool[MAX_NUM_ORACLES] memory signed;
+    emit Transmitted(donId, configDigest, uint32(uint256(reportContext[1]) >> 8));
 
-    uint256 numberOfSignatures = rs.length;
-    for (uint256 i = 0; i < numberOfSignatures; ++i) {
-      // Safe from ECDSA malleability here since we check for duplicate signers.
-      address signer = ecrecover(h, uint8(rawVs[i]) + 27, rs[i], ss[i]);
-      // Since we disallow address(0) as a valid signer address, it can
-      // never have a signer role.
-      Oracle memory oracle = s_oracles[signer];
-      if (oracle.role != Role.Signer) revert UnauthorizedSigner();
-      if (signed[oracle.index]) revert NonUniqueSignatures();
-      signed[oracle.index] = true;
+    if (!configInfo.skipSigners) {
+      // TODO: consider scoping this to reduce stack pressure
+      uint256 expectedNumSignatures;
+      if (configInfo.uniqueReports) {
+        expectedNumSignatures = (configInfo.n + configInfo.f) / 2 + 1;
+      } else {
+        expectedNumSignatures = configInfo.f + 1;
+      }
+      if (rs.length != expectedNumSignatures) revert WrongNumberOfSignatures();
+      if (rs.length != ss.length) revert SignaturesOutOfRegistration();
+
+      // Verify signatures attached to report
+      bytes32 h = keccak256(abi.encodePacked(keccak256(report), reportContext));
+      bool[MAX_NUM_ORACLES] memory signed;
+
+      uint256 numberOfSignatures = rs.length;
+      for (uint256 i = 0; i < numberOfSignatures; ++i) {
+        // Safe from ECDSA malleability here since we check for duplicate signers.
+        address signer = ecrecover(h, uint8(rawVs[i]) + 27, rs[i], ss[i]);
+        // Since we disallow address(0) as a valid signer address, it can
+        // never have a signer role.
+        Oracle memory oracle = s_oracles[donId][signer];
+        if (oracle.role != Role.Signer) revert UnauthorizedSigner();
+        if (signed[oracle.index]) revert NonUniqueSignatures();
+        signed[oracle.index] = true;
+      }
     }
   }
 
-  /// @notice information about current offchain reporting protocol configuration
-  /// @return configCount ordinal number of current config, out of all configs applied to this contract so far
-  /// @return blockNumber block at which this config was set
-  /// @return configDigest domain-separation tag for current config (see _configDigestFromConfigData)
-  function latestConfigDetails()
-    external
-    view
-    override
-    returns (uint32 configCount, uint32 blockNumber, bytes32 configDigest)
-  {
-    return (s_configCount, s_latestConfigBlockNumber, s_configInfo.latestConfigDigest);
-  }
-
   /// @inheritdoc MultiOCR3Abstract
-  function latestConfigDigestAndEpoch()
-    external
-    view
-    virtual
-    override
-    returns (bool scanLogs, bytes32 configDigest, uint32 epoch)
-  {
-    return (true, bytes32(0), uint32(0));
+  function latestConfigDetails(uint32 donId) external view override returns (uint32 blockNumber, bytes32 configDigest) {
+    DONConfig storage donConfig = s_donConfigs[donId];
+    return (donConfig.latestConfigBlockNumber, donConfig.configInfo.latestConfigDigest);
   }
-
-  function _report(bytes calldata report, uint40 epochAndRound) internal virtual;
 }
