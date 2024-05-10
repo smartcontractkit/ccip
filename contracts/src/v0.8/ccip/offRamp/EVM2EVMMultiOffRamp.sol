@@ -314,7 +314,9 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, AggregateRateLimiter, ITyp
 
       Internal.MessageExecutionState originalState = getExecutionState(sourceChainSelector, sequenceNumber);
       if (originalState == Internal.MessageExecutionState.SUCCESS) {
-        // If the message has already been manually executed, we skip it.
+        // If the message has already been executed, we skip it.  We want to not revert on race conditions between
+        // executing parties. This will allow us to open up manual exec while also attempting with the DON, without
+        // reverting an entire DON batch when a user manually executes while the tx is inflight.
         emit SkippedAlreadyExecutedMessage(message.sequenceNumber);
         continue;
       }
