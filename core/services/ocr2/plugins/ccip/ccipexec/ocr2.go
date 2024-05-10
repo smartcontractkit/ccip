@@ -1026,15 +1026,14 @@ func (r *ExecutionReportingPlugin) ensurePriceRegistrySynchronization(ctx contex
 // Single CommitRoot can have up to 256 messages, with current MessagesIterationStep of 1024, it means processing 4 CommitRoots at once.
 func selectReportsToFillBatch(unexpiredReports []cciptypes.CommitStoreReport, messagesLimit uint64) ([]cciptypes.CommitStoreReport, int) {
 	currentNumberOfMessages := uint64(0)
-	var index int
-
-	for index = range unexpiredReports {
-		reportMsgCount := unexpiredReports[index].Interval.Max - unexpiredReports[index].Interval.Min + 1
+	nbReports := 0
+	for _, report := range unexpiredReports {
+		reportMsgCount := report.Interval.Max - report.Interval.Min + 1
 		if currentNumberOfMessages+reportMsgCount > messagesLimit {
 			break
 		}
 		currentNumberOfMessages += reportMsgCount
+		nbReports++
 	}
-	index = min(index+1, len(unexpiredReports))
-	return unexpiredReports[:index], index
+	return unexpiredReports[:nbReports], nbReports
 }
