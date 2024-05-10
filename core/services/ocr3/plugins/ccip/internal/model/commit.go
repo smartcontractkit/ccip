@@ -3,10 +3,10 @@ package model
 import (
 	"encoding/json"
 	"fmt"
-)
+	"math/big"
 
-// CommitPluginReport is placed here for reference of shared readers structure.
-type CommitPluginReport struct{}
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+)
 
 type CommitPluginObservation struct {
 	NewMsgs     []CCIPMsgBaseDetails `json:"newMsgs"`
@@ -75,13 +75,42 @@ func NewSeqNumChain(chainSel ChainSelector, seqNum SeqNum) SeqNumChain {
 }
 
 type MerkleRootChain struct {
-	ChainSel   ChainSelector
-	MerkleRoot [32]byte
+	ChainSel     ChainSelector `json:"chain"`
+	SeqNumsRange SeqNumRange   `json:"seqNumsRange"`
+	MerkleRoot   [32]byte      `json:"merkleRoot"`
 }
 
-func NewMerkleRootChain(chainSel ChainSelector, merkleRoot [32]byte) MerkleRootChain {
+func NewMerkleRootChain(chainSel ChainSelector, seqNumsRange SeqNumRange, merkleRoot [32]byte) MerkleRootChain {
 	return MerkleRootChain{
-		ChainSel:   chainSel,
-		MerkleRoot: merkleRoot,
+		ChainSel:     chainSel,
+		SeqNumsRange: seqNumsRange,
+		MerkleRoot:   merkleRoot,
 	}
+}
+
+type CommitPluginReport struct {
+	MerkleRoots  []MerkleRootChain  `json:"merkleRoots"`
+	PriceUpdates []TokenPriceUpdate `json:"priceUpdates"`
+}
+
+func NewCommitPluginReport(merkleRoots []MerkleRootChain, priceUpdates []TokenPriceUpdate) CommitPluginReport {
+	return CommitPluginReport{
+		MerkleRoots:  merkleRoots,
+		PriceUpdates: priceUpdates,
+	}
+}
+
+func (r CommitPluginReport) JSONEncode() ([]byte, error) {
+	return json.Marshal(r)
+}
+
+func JSONDecodeCommitPluginReport(b []byte) (CommitPluginReport, error) {
+	r := CommitPluginReport{}
+	err := json.Unmarshal(b, &r)
+	return r, err
+}
+
+type TokenPriceUpdate struct {
+	TokenID types.Account `json:"tokenID"`
+	Price   *big.Int      `json:"price"`
 }

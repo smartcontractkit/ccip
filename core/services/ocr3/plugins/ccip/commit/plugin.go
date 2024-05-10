@@ -237,7 +237,7 @@ func (p *Plugin) Outcome(_ ocr3types.OutcomeContext, _ types.Query, aos []types.
 	merkleRoots := make([]model.MerkleRootChain, 0)
 	for sourceChain, consensus := range consensusBySourceChain {
 		maxSeqNums = append(maxSeqNums, model.NewSeqNumChain(sourceChain, consensus.seqNumRange.End()))
-		merkleRoots = append(merkleRoots, model.NewMerkleRootChain(sourceChain, consensus.merkleRoot))
+		merkleRoots = append(merkleRoots, model.NewMerkleRootChain(sourceChain, consensus.seqNumRange, consensus.merkleRoot))
 	}
 	return model.NewCommitPluginOutcome(maxSeqNums, merkleRoots).Encode()
 }
@@ -248,10 +248,27 @@ func (p *Plugin) Reports(seqNr uint64, outcome ocr3types.Outcome) ([]ocr3types.R
 		# and a list of roots by source. We only include the gas price batch update
 		# if a timer has expired - ie periodically we batch write all gas prices.
 	*/
-	panic("implement me")
+
+	outc, err := model.DecodeCommitPluginOutcome(outcome)
+	if err != nil {
+		return nil, fmt.Errorf("decode commit plugin outcome: %w", err)
+	}
+
+	// todo: include token price updates
+	// todo: include gas price updates
+	priceUpdates := make([]model.TokenPriceUpdate, 0)
+
+	rep := model.NewCommitPluginReport(outc.MerkleRoots, priceUpdates)
+	encodedReport, err := rep.JSONEncode() // todo: abi encode
+	if err != nil {
+		return nil, fmt.Errorf("encode commit plugin report: %w", err)
+	}
+
+	return []ocr3types.ReportWithInfo[[]byte]{{Report: encodedReport, Info: nil}}, nil
 }
 
 func (p *Plugin) ShouldAcceptAttestedReport(ctx context.Context, u uint64, r ocr3types.ReportWithInfo[[]byte]) (bool, error) {
+	// todo: implement
 	panic("implement me")
 }
 
@@ -266,6 +283,7 @@ func (p *Plugin) ShouldTransmitAcceptedReport(ctx context.Context, u uint64, r o
 }
 
 func (p *Plugin) Close() error {
+	// todo: implement
 	panic("implement me")
 }
 
@@ -397,7 +415,7 @@ func (p *Plugin) validateObservedGasAndTokenPrices(gasPrices []model.GasPriceCha
 	}
 
 	// Duplicate token prices must not appear for the same token and must not be empty.
-	tokensWithPrice := mapset.NewSet[string]()
+	tokensWithPrice := mapset.NewSet[types.Account]()
 	for _, t := range tokenPrices {
 		if tokensWithPrice.Contains(t.TokenID) {
 			return fmt.Errorf("duplicate token price for token: %s", t.TokenID)

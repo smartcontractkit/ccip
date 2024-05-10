@@ -6,14 +6,15 @@ import (
 	"math/big"
 
 	chainselectors "github.com/smartcontractkit/chain-selectors"
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 )
 
 type TokenPrice struct {
-	TokenID string `json:"tokenID"`
+	TokenID types.Account `json:"tokenID"`
 	Price   *big.Int
 }
 
-func NewTokenPrice(tokenID string, price *big.Int) TokenPrice {
+func NewTokenPrice(tokenID types.Account, price *big.Int) TokenPrice {
 	return TokenPrice{TokenID: tokenID, Price: price}
 }
 
