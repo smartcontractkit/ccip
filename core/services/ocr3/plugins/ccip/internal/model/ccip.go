@@ -66,8 +66,6 @@ func (c ChainSelector) String() string {
 	return fmt.Sprintf("%d (%s)", c, ch.Name)
 }
 
-type NodeID string
-
 type CCIPMsg struct {
 	CCIPMsgBaseDetails
 }

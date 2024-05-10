@@ -20,7 +20,7 @@ import (
 
 // Plugin implements the main ocr3 plugin logic.
 type Plugin struct {
-	nodeID     model.NodeID
+	nodeID     commontypes.OracleID
 	cfg        model.CommitPluginConfig
 	ccipReader reader.CCIP
 	lggr       logger.Logger
@@ -31,7 +31,7 @@ type Plugin struct {
 
 func NewPlugin(
 	_ context.Context,
-	nodeID model.NodeID,
+	nodeID commontypes.OracleID,
 	cfg model.CommitPluginConfig,
 	ccipReader reader.CCIP,
 	lggr logger.Logger,
@@ -149,62 +149,16 @@ func (p *Plugin) ValidateObservation(_ ocr3types.OutcomeContext, _ types.Query, 
 		return fmt.Errorf("decode commit plugin observation: %w", err)
 	}
 
-	observerInfo, exists := p.cfg.ObserverInfo[ao.Observer]
-	if !exists {
-		return fmt.Errorf("observer %d not found in config", ao.Observer)
-	}
-	observerReadChains := mapset.NewSet(observerInfo.Reads...)
-	p.lggr.Debugw("validating observation", "observer", ao.Observer,
-		"observerReadChains", observerReadChains, "msgs", len(obs.NewMsgs))
-
-	seqNums := make(map[model.ChainSelector]mapset.Set[model.SeqNum], len(obs.NewMsgs))
-	for _, msg := range obs.NewMsgs {
-		p.lggr.Debugw("validating message", "msg", msg, "observer", ao.Observer)
-		// Observer must be able to read the chain that the message is coming from.
-		if !observerReadChains.Contains(msg.SourceChain) {
-			return fmt.Errorf("observer %d is not allowed to read chain %d", ao.Observer, msg.SourceChain)
-		}
-
-		// The same sequence number must not appear more than once for the same chain and must be valid.
-		knownSeqNums, exists := seqNums[msg.SourceChain]
-		if !exists {
-			seqNums[msg.SourceChain] = mapset.NewSet(msg.SeqNum)
-			continue
-		}
-		if knownSeqNums.Contains(msg.SeqNum) {
-			return fmt.Errorf("duplicate sequence number %d for chain %d", msg.SeqNum, msg.SourceChain)
-		}
-		seqNums[msg.SourceChain].Add(msg.SeqNum)
-
-		if msg.SeqNum <= 0 {
-			return fmt.Errorf("sequence number must be positive")
-		}
+	if err := p.validateObservedSequenceNumbersUniqueness(obs.NewMsgs); err != nil {
+		return fmt.Errorf("validate sequence numbers uniqueness: %w", err)
 	}
 
-	// Duplicate gas prices must not appear for the same chain and must not be empty.
-	gasPriceChains := mapset.NewSet[model.ChainSelector]()
-	for _, g := range obs.GasPrices {
-		if gasPriceChains.Contains(g.ChainSel) {
-			return fmt.Errorf("duplicate gas price for chain %d", g.ChainSel)
-		}
-		gasPriceChains.Add(g.ChainSel)
-
-		if g.GasPrice == nil {
-			return fmt.Errorf("gas price must not be nil")
-		}
+	if err := p.validateObserverReadingEligibility(ao.Observer, obs.NewMsgs); err != nil {
+		return fmt.Errorf("validate observer %d eligibility: %w", ao.Observer, err)
 	}
 
-	// Duplicate token prices must not appear for the same chain and must not be empty.
-	tokensWithPrice := mapset.NewSet[string]()
-	for _, t := range obs.TokenPrices {
-		if tokensWithPrice.Contains(t.TokenID) {
-			return fmt.Errorf("duplicate token price for token: %s", t.TokenID)
-		}
-		tokensWithPrice.Add(t.TokenID)
-
-		if t.Price == nil {
-			return fmt.Errorf("token price must not be nil")
-		}
+	if err := p.validateObservedGasAndTokenPrices(obs.GasPrices, obs.TokenPrices); err != nil {
+		return fmt.Errorf("validate gas and token prices: %w", err)
 	}
 
 	return nil
@@ -376,6 +330,85 @@ func (p *Plugin) observedMsgsConsensus(chainSel model.ChainSelector, observedMsg
 		seqNumRange: seqNumConsensusRange,
 		merkleRoot:  tree.Root(),
 	}, nil
+}
+
+// validateObservedSequenceNumbersUniqueness checks if the sequence numbers of the provided messages are unique for each chain.
+func (p *Plugin) validateObservedSequenceNumbersUniqueness(msgs []model.CCIPMsgBaseDetails) error {
+	seqNums := make(map[model.ChainSelector]mapset.Set[model.SeqNum], len(msgs))
+
+	for _, msg := range msgs {
+		// The same sequence number must not appear more than once for the same chain and must be valid.
+		knownSeqNums, exists := seqNums[msg.SourceChain]
+		if !exists {
+			seqNums[msg.SourceChain] = mapset.NewSet(msg.SeqNum)
+			continue
+		}
+		if knownSeqNums.Contains(msg.SeqNum) {
+			return fmt.Errorf("duplicate sequence number %d for chain %d", msg.SeqNum, msg.SourceChain)
+		}
+		seqNums[msg.SourceChain].Add(msg.SeqNum)
+	}
+
+	return nil
+}
+
+// validateObserverReadingEligibility checks if the observer is eligible to observe the messages it observed.
+func (p *Plugin) validateObserverReadingEligibility(observer commontypes.OracleID, msgs []model.CCIPMsgBaseDetails) error {
+	if len(msgs) == 0 {
+		return nil
+	}
+
+	observerInfo, exists := p.cfg.ObserverInfo[observer]
+	if !exists {
+		return fmt.Errorf("observer not found in config")
+	}
+
+	observerReadChains := mapset.NewSet(observerInfo.Reads...)
+	p.lggr.Debugw("validating observation", "observer", observer,
+		"observerReadChains", observerReadChains, "msgs", len(msgs))
+
+	for _, msg := range msgs {
+		p.lggr.Debugw("validating message", "msg", msg, "observer", observer)
+		// Observer must be able to read the chain that the message is coming from.
+		if !observerReadChains.Contains(msg.SourceChain) {
+			return fmt.Errorf("observer not allowed to read chain %d", msg.SourceChain)
+		}
+
+		if msg.SeqNum <= 0 {
+			return fmt.Errorf("sequence number must be positive")
+		}
+	}
+
+	return nil
+}
+
+// validateGasAndTokenPrices checks if the provided gas and token prices are valid.
+func (p *Plugin) validateObservedGasAndTokenPrices(gasPrices []model.GasPriceChain, tokenPrices []model.TokenPrice) error {
+	// Duplicate gas prices must not appear for the same chain and must not be empty.
+	gasPriceChains := mapset.NewSet[model.ChainSelector]()
+	for _, g := range gasPrices {
+		if gasPriceChains.Contains(g.ChainSel) {
+			return fmt.Errorf("duplicate gas price for chain %d", g.ChainSel)
+		}
+		gasPriceChains.Add(g.ChainSel)
+		if g.GasPrice == nil {
+			return fmt.Errorf("gas price must not be nil")
+		}
+	}
+
+	// Duplicate token prices must not appear for the same token and must not be empty.
+	tokensWithPrice := mapset.NewSet[string]()
+	for _, t := range tokenPrices {
+		if tokensWithPrice.Contains(t.TokenID) {
+			return fmt.Errorf("duplicate token price for token: %s", t.TokenID)
+		}
+		tokensWithPrice.Add(t.TokenID)
+		if t.Price == nil {
+			return fmt.Errorf("token price must not be nil")
+		}
+	}
+
+	return nil
 }
 
 type observedMsgsConsensus struct {
