@@ -194,14 +194,9 @@ contract StructFactory {
     });
   }
 
-  function generateDestChainDynamicConfigArgs()
-    internal
-    pure
-    returns (EVM2EVMMultiOnRamp.DestChainDynamicConfigArgs[] memory)
-  {
-    EVM2EVMMultiOnRamp.DestChainDynamicConfigArgs[] memory destChainConfigs =
-      new EVM2EVMMultiOnRamp.DestChainDynamicConfigArgs[](1);
-    destChainConfigs[0] = EVM2EVMMultiOnRamp.DestChainDynamicConfigArgs({
+  function generateDestChainConfigArgs() internal pure returns (EVM2EVMMultiOnRamp.DestChainConfigArgs[] memory) {
+    EVM2EVMMultiOnRamp.DestChainConfigArgs[] memory destChainConfigs = new EVM2EVMMultiOnRamp.DestChainConfigArgs[](1);
+    destChainConfigs[0] = EVM2EVMMultiOnRamp.DestChainConfigArgs({
       destChainSelector: DEST_CHAIN_SELECTOR,
       dynamicConfig: EVM2EVMMultiOnRamp.DestChainDynamicConfig({
         isEnabled: true,
@@ -215,8 +210,10 @@ contract StructFactory {
         maxPerMsgGasLimit: MAX_GAS_LIMIT,
         defaultTokenFeeUSDCents: DEFAULT_TOKEN_FEE_USD_CENTS,
         defaultTokenDestGasOverhead: DEFAULT_TOKEN_DEST_GAS_OVERHEAD,
-        defaultTokenDestBytesOverhead: DEFAULT_TOKEN_BYTES_OVERHEAD
-      })
+        defaultTokenDestBytesOverhead: DEFAULT_TOKEN_BYTES_OVERHEAD,
+        defaultTxGasLimit: GAS_LIMIT
+      }),
+      prevOnRamp: address(0)
     });
     return destChainConfigs;
   }

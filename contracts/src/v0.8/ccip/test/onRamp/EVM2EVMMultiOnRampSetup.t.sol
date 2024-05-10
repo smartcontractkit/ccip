@@ -101,14 +101,11 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
       EVM2EVMMultiOnRamp.StaticConfig({
         linkToken: s_sourceTokens[0],
         chainSelector: SOURCE_CHAIN_SELECTOR,
-        destChainSelector: DEST_CHAIN_SELECTOR,
-        defaultTxGasLimit: GAS_LIMIT,
         maxNopFeesJuels: MAX_NOP_FEES_JUELS,
-        prevOnRamp: address(0),
         armProxy: address(s_mockARM)
       }),
       generateDynamicMultiOnRampConfig(address(s_sourceRouter), address(s_priceRegistry), address(s_tokenAdminRegistry)),
-      generateDestChainDynamicConfigArgs(),
+      generateDestChainConfigArgs(),
       getOutboundRateLimiterConfig(),
       s_feeTokenConfigArgs,
       s_tokenTransferFeeConfigArgs,
