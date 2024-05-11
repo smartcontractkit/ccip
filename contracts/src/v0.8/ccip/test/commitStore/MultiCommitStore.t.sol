@@ -1,14 +1,13 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.19;
-
-import {IARM} from "../../interfaces/IARM.sol";
-import {IPriceRegistry} from "../../interfaces/IPriceRegistry.sol";
-
-import {ARM} from "../../ARM.sol";
-import {MultiCommitStore} from "../../MultiCommitStore.sol";
-import {PriceRegistry} from "../../PriceRegistry.sol";
+pragma solidity 0.8.24;
 
 import {IMultiCommitStore} from "../../interfaces/IMultiCommitStore.sol";
+import {IPriceRegistry} from "../../interfaces/IPriceRegistry.sol";
+import {IRMN} from "../../interfaces/IRMN.sol";
+
+import {MultiCommitStore} from "../../MultiCommitStore.sol";
+import {PriceRegistry} from "../../PriceRegistry.sol";
+import {RMN} from "../../RMN.sol";
 import {MerkleMultiProof} from "../../libraries/MerkleMultiProof.sol";
 import {MultiCommitStoreHelper} from "../helpers/MultiCommitStoreHelper.sol";
 import {OCR2BaseSetup} from "../ocr/OCR2Base.t.sol";
@@ -35,7 +34,7 @@ contract MultiCommitStoreSetup is PriceRegistrySetup, OCR2BaseSetup {
     });
 
     s_multiCommitStore = new MultiCommitStoreHelper(
-      MultiCommitStore.StaticConfig({chainSelector: DEST_CHAIN_SELECTOR, armProxy: address(s_mockARM)}),
+      MultiCommitStore.StaticConfig({chainSelector: DEST_CHAIN_SELECTOR, armProxy: address(s_mockRMN)}),
       sourceChainConfigs
     );
     MultiCommitStore.DynamicConfig memory dynamicConfig =
@@ -50,10 +49,10 @@ contract MultiCommitStoreSetup is PriceRegistrySetup, OCR2BaseSetup {
   }
 }
 
-contract MultiCommitStoreRealARMSetup is PriceRegistrySetup, OCR2BaseSetup {
+contract MultiCommitStoreRealRMNSetup is PriceRegistrySetup, OCR2BaseSetup {
   MultiCommitStoreHelper internal s_multiCommitStore;
 
-  ARM internal s_arm;
+  RMN internal s_arm;
 
   address internal constant BLESS_VOTE_ADDR = address(8888);
 
@@ -61,8 +60,8 @@ contract MultiCommitStoreRealARMSetup is PriceRegistrySetup, OCR2BaseSetup {
     PriceRegistrySetup.setUp();
     OCR2BaseSetup.setUp();
 
-    ARM.Voter[] memory voters = new ARM.Voter[](1);
-    voters[0] = ARM.Voter({
+    RMN.Voter[] memory voters = new RMN.Voter[](1);
+    voters[0] = RMN.Voter({
       blessVoteAddr: BLESS_VOTE_ADDR,
       curseVoteAddr: address(9999),
       curseUnvoteAddr: address(19999),
@@ -70,7 +69,7 @@ contract MultiCommitStoreRealARMSetup is PriceRegistrySetup, OCR2BaseSetup {
       curseWeight: 1
     });
     // Overwrite base mock arm with real.
-    s_arm = new ARM(ARM.Config({voters: voters, blessWeightThreshold: 1, curseWeightThreshold: 1}));
+    s_arm = new RMN(RMN.Config({voters: voters, blessWeightThreshold: 1, curseWeightThreshold: 1}));
 
     MultiCommitStore.SourceChainConfigArgs[] memory sourceChainConfigs = new MultiCommitStore.SourceChainConfigArgs[](1);
     sourceChainConfigs[0] = MultiCommitStore.SourceChainConfigArgs({
@@ -112,7 +111,7 @@ contract MultiCommitStore_constructor is PriceRegistrySetup, OCR2BaseSetup {
       onRamp: 0x2C44CDDdB6a900Fa2B585dd299E03D12Fa4293Bc
     });
     MultiCommitStore.StaticConfig memory staticConfig =
-      MultiCommitStore.StaticConfig({chainSelector: DEST_CHAIN_SELECTOR, armProxy: address(s_mockARM)});
+      MultiCommitStore.StaticConfig({chainSelector: DEST_CHAIN_SELECTOR, armProxy: address(s_mockRMN)});
     MultiCommitStore.DynamicConfig memory dynamicConfig =
       MultiCommitStore.DynamicConfig({priceRegistry: address(s_priceRegistry)});
 
@@ -149,7 +148,7 @@ contract MultiCommitStore_constructor is PriceRegistrySetup, OCR2BaseSetup {
     assertEq(1, sourceChainConfig.minSeqNr);
     assertEq(multiCommitStore.typeAndVersion(), "MultiCommitStore 1.6.0-dev");
     assertEq(OWNER, multiCommitStore.owner());
-    assertTrue(multiCommitStore.isUnpausedAndARMHealthy());
+    assertTrue(multiCommitStore.isUnpausedAndNotCursed(sourceChainConfigs[0].sourceChainSelector));
   }
 
   function test_Constructor_Failure() public {
@@ -163,7 +162,7 @@ contract MultiCommitStore_constructor is PriceRegistrySetup, OCR2BaseSetup {
       onRamp: ON_RAMP_ADDRESS
     });
     MultiCommitStore.StaticConfig memory staticConfig =
-      MultiCommitStore.StaticConfig({chainSelector: 0, armProxy: address(s_mockARM)});
+      MultiCommitStore.StaticConfig({chainSelector: 0, armProxy: address(s_mockRMN)});
 
     vm.expectRevert(MultiCommitStore.InvalidCommitStoreConfig.selector);
     new MultiCommitStore(staticConfig, sourceChainConfigs);
@@ -176,7 +175,7 @@ contract MultiCommitStore_constructor is PriceRegistrySetup, OCR2BaseSetup {
     new MultiCommitStore(staticConfig, sourceChainConfigs);
 
     // Invalid source chain selector
-    staticConfig.armProxy = address(s_mockARM);
+    staticConfig.armProxy = address(s_mockRMN);
     sourceChainConfigs[0].sourceChainSelector = 0;
 
     vm.expectRevert(
@@ -392,7 +391,7 @@ contract MultiCommitStore_setDynamicConfig is MultiCommitStoreSetup {
 }
 
 /// @notice #resetUnblessedRoots
-contract MultiCommitStore_resetUnblessedRoots is MultiCommitStoreRealARMSetup {
+contract MultiCommitStore_resetUnblessedRoots is MultiCommitStoreRealRMNSetup {
   event RootRemoved(bytes32 root);
 
   function test_ResetUnblessedRoots_Success() public {
@@ -423,9 +422,9 @@ contract MultiCommitStore_resetUnblessedRoots is MultiCommitStoreRealARMSetup {
 
     s_multiCommitStore.report(abi.encode(report), ++s_latestEpochAndRound);
 
-    IARM.TaggedRoot[] memory blessedTaggedRoots = new IARM.TaggedRoot[](1);
+    IRMN.TaggedRoot[] memory blessedTaggedRoots = new IRMN.TaggedRoot[](1);
     blessedTaggedRoots[0] =
-      IARM.TaggedRoot({commitStore: address(s_multiCommitStore), root: rootsToReset[1].merkleRoot});
+      IRMN.TaggedRoot({commitStore: address(s_multiCommitStore), root: rootsToReset[1].merkleRoot});
 
     vm.startPrank(BLESS_VOTE_ADDR);
     s_arm.voteToBless(blessedTaggedRoots);
@@ -612,10 +611,18 @@ contract MultiCommitStore_report is MultiCommitStoreSetup {
   }
 
   function test_Unhealthy_Revert() public {
-    s_mockARM.voteToCurse(0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff);
-    vm.expectRevert(MultiCommitStore.BadARMSignal.selector);
-    bytes memory report;
-    s_multiCommitStore.report(report, ++s_latestEpochAndRound);
+    s_mockRMN.voteToCurse(0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff);
+    MultiCommitStore.MerkleRoot[] memory roots = new MultiCommitStore.MerkleRoot[](1);
+    roots[0] = MultiCommitStore.MerkleRoot({
+      sourceChainSelector: SOURCE_CHAIN_SELECTOR,
+      interval: MultiCommitStore.Interval(1, 2),
+      merkleRoot: "Only a single root"
+    });
+
+    MultiCommitStore.CommitReport memory report =
+      MultiCommitStore.CommitReport({priceUpdates: getEmptyPriceUpdates(), merkleRoots: roots});
+    vm.expectRevert(abi.encodeWithSelector(MultiCommitStore.CursedByRMN.selector, roots[0].sourceChainSelector));
+    s_multiCommitStore.report(abi.encode(report), ++s_latestEpochAndRound);
   }
 
   function test_InvalidRootRevert() public {
@@ -723,7 +730,7 @@ contract MultiCommitStore_report is MultiCommitStoreSetup {
 }
 /// @notice #verify
 
-contract MultiCommitStore_verify is MultiCommitStoreRealARMSetup {
+contract MultiCommitStore_verify is MultiCommitStoreRealRMNSetup {
   function test_NotBlessed_Success() public {
     bytes32[] memory leaves = new bytes32[](1);
     leaves[0] = "root";
@@ -756,8 +763,8 @@ contract MultiCommitStore_verify is MultiCommitStoreRealARMSetup {
       MultiCommitStore.CommitReport({priceUpdates: getEmptyPriceUpdates(), merkleRoots: roots});
     s_multiCommitStore.report(abi.encode(report), ++s_latestEpochAndRound);
     // Bless that root.
-    IARM.TaggedRoot[] memory taggedRoots = new IARM.TaggedRoot[](1);
-    taggedRoots[0] = IARM.TaggedRoot({commitStore: address(s_multiCommitStore), root: leaves[0]});
+    IRMN.TaggedRoot[] memory taggedRoots = new IRMN.TaggedRoot[](1);
+    taggedRoots[0] = IRMN.TaggedRoot({commitStore: address(s_multiCommitStore), root: leaves[0]});
     vm.startPrank(BLESS_VOTE_ADDR);
     s_arm.voteToBless(taggedRoots);
     bytes32[] memory proofs = new bytes32[](0);
@@ -783,30 +790,27 @@ contract MultiCommitStore_verify is MultiCommitStoreRealARMSetup {
   }
 }
 
-contract MultiCommitStore_isUnpausedAndARMHealthy is MultiCommitStoreSetup {
-  function test_ARM_Success() public {
+contract MultiCommitStore_isUnpausedAndRMNHealthy is MultiCommitStoreSetup {
+  function test_RMN_Success() public {
     // Test pausing
     assertFalse(s_multiCommitStore.paused());
-    assertTrue(s_multiCommitStore.isUnpausedAndARMHealthy());
+    assertTrue(s_multiCommitStore.isUnpausedAndNotCursed(SOURCE_CHAIN_SELECTOR));
     s_multiCommitStore.pause();
     assertTrue(s_multiCommitStore.paused());
-    assertFalse(s_multiCommitStore.isUnpausedAndARMHealthy());
+    assertFalse(s_multiCommitStore.isUnpausedAndNotCursed(SOURCE_CHAIN_SELECTOR));
     s_multiCommitStore.unpause();
     assertFalse(s_multiCommitStore.paused());
-    assertTrue(s_multiCommitStore.isUnpausedAndARMHealthy());
+    assertTrue(s_multiCommitStore.isUnpausedAndNotCursed(SOURCE_CHAIN_SELECTOR));
     // Test arm
-    assertTrue(s_multiCommitStore.isARMHealthy());
-    s_mockARM.voteToCurse(0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff);
-    assertFalse(s_multiCommitStore.isARMHealthy());
-    assertFalse(s_multiCommitStore.isUnpausedAndARMHealthy());
-    ARM.UnvoteToCurseRecord[] memory records = new ARM.UnvoteToCurseRecord[](1);
-    records[0] = ARM.UnvoteToCurseRecord({curseVoteAddr: OWNER, cursesHash: bytes32(uint256(0)), forceUnvote: true});
-    s_mockARM.ownerUnvoteToCurse(records);
-    assertTrue(s_multiCommitStore.isARMHealthy());
-    assertTrue(s_multiCommitStore.isUnpausedAndARMHealthy());
-    s_mockARM.voteToCurse(0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff);
+    s_mockRMN.voteToCurse(0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff);
+    assertFalse(s_multiCommitStore.isUnpausedAndNotCursed(SOURCE_CHAIN_SELECTOR));
+    RMN.UnvoteToCurseRecord[] memory records = new RMN.UnvoteToCurseRecord[](1);
+    records[0] = RMN.UnvoteToCurseRecord({curseVoteAddr: OWNER, cursesHash: bytes32(uint256(0)), forceUnvote: true});
+    s_mockRMN.ownerUnvoteToCurse(records);
+    assertTrue(s_multiCommitStore.isUnpausedAndNotCursed(SOURCE_CHAIN_SELECTOR));
+    s_mockRMN.voteToCurse(0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff);
     s_multiCommitStore.pause();
-    assertFalse(s_multiCommitStore.isUnpausedAndARMHealthy());
+    assertFalse(s_multiCommitStore.isUnpausedAndNotCursed(SOURCE_CHAIN_SELECTOR));
   }
 }
 /// @notice #setLatestPriceEpochAndRound

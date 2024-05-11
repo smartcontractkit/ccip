@@ -2,7 +2,6 @@
 pragma solidity 0.8.24;
 
 import {ITypeAndVersion} from "../shared/interfaces/ITypeAndVersion.sol";
-import {IARM} from "./interfaces/IARM.sol";
 import {IMultiCommitStore} from "./interfaces/IMultiCommitStore.sol";
 import {IPriceRegistry} from "./interfaces/IPriceRegistry.sol";
 import {IRMN} from "./interfaces/IRMN.sol";
@@ -19,6 +18,7 @@ contract MultiCommitStore is IMultiCommitStore, ITypeAndVersion, OCR2Base {
   error InvalidCommitStoreConfig();
   error InvalidSourceChainConfig(uint64 sourceChainSelector);
   error BadARMSignal();
+  error CursedByRMN(uint64 sourceChainSelector);
   error RootAlreadyCommitted(uint64 sourceChainSelector, bytes32 merkleRoot);
   error SourceChainNotEnabled(uint64 chainSelector);
 
@@ -83,7 +83,7 @@ contract MultiCommitStore is IMultiCommitStore, ITypeAndVersion, OCR2Base {
   // Chain ID of this chain
   uint64 internal immutable i_chainSelector;
   // The address of the arm proxy
-  address internal immutable i_armProxy;
+  address internal immutable i_rmnProxy;
 
   // DYNAMIC CONFIG
   // The dynamic commitStore config
@@ -112,7 +112,7 @@ contract MultiCommitStore is IMultiCommitStore, ITypeAndVersion, OCR2Base {
     }
 
     i_chainSelector = staticConfig.chainSelector;
-    i_armProxy = staticConfig.armProxy;
+    i_rmnProxy = staticConfig.armProxy;
 
     _applySourceChainConfigUpdates(sourceChainConfigs);
   }
@@ -155,7 +155,7 @@ contract MultiCommitStore is IMultiCommitStore, ITypeAndVersion, OCR2Base {
   /// @return whether the root is blessed or not.
   function isBlessed(bytes32 root) public view returns (bool) {
     // TODO: update ARM to also consider the source chain selector for blessing
-    return IARM(i_armProxy).isBlessed(IARM.TaggedRoot({commitStore: address(this), root: root}));
+    return IRMN(i_rmnProxy).isBlessed(IRMN.TaggedRoot({commitStore: address(this), root: root}));
   }
 
   /// @notice Used by the owner in case an invalid sequence of roots has been
@@ -199,7 +199,6 @@ contract MultiCommitStore is IMultiCommitStore, ITypeAndVersion, OCR2Base {
   /// we are OK to revert to preserve the invariant that we always revert on invalid sequence number ranges.
   /// If that happens, prices will be updates in later rounds.
   function _report(bytes calldata encodedReport, uint40 epochAndRound) internal override whenNotPaused {
-    if (IRMN(i_rmnProxy).isCursed(bytes32(uint256(i_sourceChainSelector)))) revert CursedByRMN();
     CommitReport memory report = abi.decode(encodedReport, (CommitReport));
 
     // Check if the report contains price updates
@@ -224,11 +223,14 @@ contract MultiCommitStore is IMultiCommitStore, ITypeAndVersion, OCR2Base {
 
     for (uint256 i = 0; i < report.merkleRoots.length; ++i) {
       MerkleRoot memory root = report.merkleRoots[i];
+      uint64 sourceChainSelector = root.sourceChainSelector;
+
+      if (IRMN(i_rmnProxy).isCursed(bytes32(uint256(sourceChainSelector)))) revert CursedByRMN(sourceChainSelector);
+
+      SourceChainConfig storage sourceChainConfig = s_sourceChainConfigs[sourceChainSelector];
+
+      if (!sourceChainConfig.isEnabled) revert SourceChainNotEnabled(sourceChainSelector);
       // If we reached this section, the report should contain a valid root
-      SourceChainConfig storage sourceChainConfig = s_sourceChainConfigs[root.sourceChainSelector];
-
-      if (!sourceChainConfig.isEnabled) revert SourceChainNotEnabled(root.sourceChainSelector);
-
       if (sourceChainConfig.minSeqNr != root.interval.min || root.interval.min > root.interval.max) {
         revert InvalidInterval(root.sourceChainSelector, root.interval);
       }
@@ -256,7 +258,7 @@ contract MultiCommitStore is IMultiCommitStore, ITypeAndVersion, OCR2Base {
   /// @dev RMN depends on this function, if changing, please notify the RMN maintainers.
   /// @return the configuration.
   function getStaticConfig() external view returns (StaticConfig memory) {
-    return StaticConfig({chainSelector: i_chainSelector, armProxy: i_armProxy});
+    return StaticConfig({chainSelector: i_chainSelector, armProxy: i_rmnProxy});
   }
 
   /// @notice Returns the dynamic commit store config.
@@ -278,7 +280,7 @@ contract MultiCommitStore is IMultiCommitStore, ITypeAndVersion, OCR2Base {
     // across reconfigurations and are de-duplicated separately.
     s_latestPriceEpochAndRound = 0;
 
-    emit ConfigSet(StaticConfig({chainSelector: i_chainSelector, armProxy: i_armProxy}), dynamicConfig);
+    emit ConfigSet(StaticConfig({chainSelector: i_chainSelector, armProxy: i_rmnProxy}), dynamicConfig);
   }
 
   /// @notice Returns the config for a source chain.
@@ -331,8 +333,8 @@ contract MultiCommitStore is IMultiCommitStore, ITypeAndVersion, OCR2Base {
   // ================================================================
 
   /// @notice Single function to check the status of the commitStore.
-  function isUnpausedAndNotCursed() external view returns (bool) {
-    return !IRMN(i_rmnProxy).isCursed(bytes32(uint256(i_sourceChainSelector))) && !s_paused;
+  function isUnpausedAndNotCursed(uint64 sourceChainSelector) external view returns (bool) {
+    return !IRMN(i_rmnProxy).isCursed(bytes32(uint256(sourceChainSelector))) && !s_paused;
   }
 
   /// @notice Modifier to make a function callable only when the contract is not paused.
