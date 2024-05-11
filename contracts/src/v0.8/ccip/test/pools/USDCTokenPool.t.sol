@@ -365,7 +365,7 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
       destPoolAddress: abi.encode(address(s_usdcTokenPool)),
       extraData: abi.encode(
         USDCTokenPool.SourceTokenDataPayload({nonce: usdcMessage.nonce, sourceDomain: SOURCE_DOMAIN_IDENTIFIER})
-      )
+        )
     });
 
     bytes memory offchainTokenData =
@@ -453,7 +453,7 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
       destPoolAddress: abi.encode(address(s_usdcTokenPool)),
       extraData: abi.encode(
         USDCTokenPool.SourceTokenDataPayload({nonce: usdcMessage.nonce, sourceDomain: SOURCE_DOMAIN_IDENTIFIER})
-      )
+        )
     });
 
     bytes memory offchainTokenData = abi.encode(
