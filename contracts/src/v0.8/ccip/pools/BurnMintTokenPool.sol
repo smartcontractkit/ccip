@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.19;
+pragma solidity 0.8.24;
 
 import {ITypeAndVersion} from "../../shared/interfaces/ITypeAndVersion.sol";
 import {IBurnMintERC20} from "../../shared/token/ERC20/IBurnMintERC20.sol";
@@ -18,9 +18,9 @@ contract BurnMintTokenPool is BurnMintTokenPoolAbstract, ITypeAndVersion {
   constructor(
     IBurnMintERC20 token,
     address[] memory allowlist,
-    address armProxy,
+    address rmnProxy,
     address router
-  ) TokenPool(token, allowlist, armProxy, router) {}
+  ) TokenPool(token, allowlist, rmnProxy, router) {}
 
   /// @inheritdoc BurnMintTokenPoolAbstract
   function _burn(uint256 amount) internal virtual override {
