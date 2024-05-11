@@ -105,7 +105,7 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
         defaultTxGasLimit: GAS_LIMIT,
         maxNopFeesJuels: MAX_NOP_FEES_JUELS,
         prevOnRamp: address(0),
-        armProxy: address(s_mockARM)
+        rmnProxy: address(s_mockRMN)
       }),
       generateDynamicMultiOnRampConfig(address(s_sourceRouter), address(s_priceRegistry), address(s_tokenAdminRegistry)),
       generateDestChainDynamicConfigArgs(),
