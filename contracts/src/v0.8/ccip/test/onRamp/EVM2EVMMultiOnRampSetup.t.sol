@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.19;
+pragma solidity 0.8.24;
 
 import {IPool} from "../../interfaces/IPool.sol";
 
@@ -102,7 +102,7 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
         linkToken: s_sourceTokens[0],
         chainSelector: SOURCE_CHAIN_SELECTOR,
         maxNopFeesJuels: MAX_NOP_FEES_JUELS,
-        armProxy: address(s_mockARM)
+        rmnProxy: address(s_mockRMN)
       }),
       generateDynamicMultiOnRampConfig(address(s_sourceRouter), address(s_priceRegistry), address(s_tokenAdminRegistry)),
       generateDestChainConfigArgs(),

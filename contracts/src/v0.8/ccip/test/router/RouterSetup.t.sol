@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.19;
+pragma solidity 0.8.24;
 
 import {Router} from "../../Router.sol";
 import {Client} from "../../libraries/Client.sol";
@@ -16,12 +16,12 @@ contract RouterSetup is BaseTest {
 
     if (address(s_sourceRouter) == address(0)) {
       WETH9 weth = new WETH9();
-      s_sourceRouter = new Router(address(weth), address(s_mockARM));
+      s_sourceRouter = new Router(address(weth), address(s_mockRMN));
       vm.label(address(s_sourceRouter), "sourceRouter");
     }
     if (address(s_destRouter) == address(0)) {
       WETH9 weth = new WETH9();
-      s_destRouter = new Router(address(weth), address(s_mockARM));
+      s_destRouter = new Router(address(weth), address(s_mockRMN));
       vm.label(address(s_destRouter), "destRouter");
     }
   }

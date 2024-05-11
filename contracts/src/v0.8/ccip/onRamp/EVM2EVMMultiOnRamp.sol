@@ -1,13 +1,12 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.19;
+pragma solidity 0.8.24;
 
 import {ITypeAndVersion} from "../../shared/interfaces/ITypeAndVersion.sol";
-import {IARM} from "../interfaces/IARM.sol";
-import {IEVM2AnyMultiOnRamp} from "../interfaces/IEVM2AnyMultiOnRamp.sol";
 import {IEVM2AnyOnRamp} from "../interfaces/IEVM2AnyOnRamp.sol";
 import {IEVM2AnyOnRampClient} from "../interfaces/IEVM2AnyOnRampClient.sol";
 import {IPool} from "../interfaces/IPool.sol";
 import {IPriceRegistry} from "../interfaces/IPriceRegistry.sol";
+import {IRMN} from "../interfaces/IRMN.sol";
 import {ITokenAdminRegistry} from "../interfaces/ITokenAdminRegistry.sol";
 import {ILinkAvailable} from "../interfaces/automation/ILinkAvailable.sol";
 
@@ -48,7 +47,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ILinkAvailable, AggregateRat
   error RouterMustSetOriginalSender();
   error InvalidConfig();
   error InvalidAddress(bytes encodedAddress);
-  error BadARMSignal();
+  error CursedByRMN(uint64 sourceChainSelector);
   error LinkBalanceNotSettled();
   error InvalidNopAddress(address nop);
   error NotAFeeToken(address token);
@@ -76,7 +75,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ILinkAvailable, AggregateRat
     address linkToken; // ────────╮ Link token address
     uint64 chainSelector; // ─────╯ Source chainSelector
     uint96 maxNopFeesJuels; // ───╮ Max nop fee balance onramp can have
-    address armProxy; // ─────────╯ Address of ARM proxy
+    address rmnProxy; // ─────────╯ Address of ARM proxy
   }
 
   /// @dev Struct to contains the dynamic configuration
@@ -183,7 +182,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ILinkAvailable, AggregateRat
   /// @dev The chain ID of the source chain that this contract is deployed to
   uint64 internal immutable i_chainSelector;
   /// @dev The address of the arm proxy
-  address internal immutable i_armProxy;
+  address internal immutable i_rmnProxy;
   /// @dev the maximum number of nops that can be configured at the same time.
   /// Used to bound gas for loops over nops.
   uint256 private constant MAX_NUMBER_OF_NOPS = 64;
@@ -228,7 +227,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ILinkAvailable, AggregateRat
     i_linkToken = staticConfig.linkToken;
     i_chainSelector = staticConfig.chainSelector;
     i_maxNopFeesJuels = staticConfig.maxNopFeesJuels;
-    i_armProxy = staticConfig.armProxy;
+    i_rmnProxy = staticConfig.rmnProxy;
 
     _setDynamicConfig(dynamicConfig);
     _applyDestChainConfigUpdates(destChainConfigArgs);
@@ -265,7 +264,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ILinkAvailable, AggregateRat
     uint256 feeTokenAmount,
     address originalSender
   ) external returns (bytes32) {
-    if (IARM(i_armProxy).isCursed()) revert BadARMSignal();
+    if (IRMN(i_rmnProxy).isCursed(bytes32(uint256(destChainSelector)))) revert CursedByRMN(destChainSelector);
     // Validate message sender is set and allowed. Not validated in `getFee` since it is not user-driven.
     if (originalSender == address(0)) revert RouterMustSetOriginalSender();
     // Router address may be zero intentionally to pause.
@@ -426,7 +425,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ILinkAvailable, AggregateRat
       linkToken: i_linkToken,
       chainSelector: i_chainSelector,
       maxNopFeesJuels: i_maxNopFeesJuels,
-      armProxy: i_armProxy
+      rmnProxy: i_rmnProxy
     });
   }
 
@@ -454,7 +453,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ILinkAvailable, AggregateRat
         linkToken: i_linkToken,
         chainSelector: i_chainSelector,
         maxNopFeesJuels: i_maxNopFeesJuels,
-        armProxy: i_armProxy
+        rmnProxy: i_rmnProxy
       }),
       dynamicConfig
     );
@@ -926,7 +925,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ILinkAvailable, AggregateRat
   }
 
   // ================================================================
-  // │                        Access and ARM                        │
+  // │                           Access                             │
   // ================================================================
 
   /// @dev Require that the sender is the owner or the fee admin
