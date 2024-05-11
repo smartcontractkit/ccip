@@ -2,6 +2,7 @@
 pragma solidity 0.8.24;
 
 import {ITypeAndVersion} from "../../shared/interfaces/ITypeAndVersion.sol";
+import {IEVM2AnyMultiOnRamp} from "../interfaces/IEVM2AnyMultiOnRamp.sol";
 import {IEVM2AnyOnRamp} from "../interfaces/IEVM2AnyOnRamp.sol";
 import {IEVM2AnyOnRampClient} from "../interfaces/IEVM2AnyOnRampClient.sol";
 import {IPool} from "../interfaces/IPool.sol";
@@ -219,7 +220,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ILinkAvailable, AggregateRat
     TokenTransferFeeConfigArgs[] memory tokenTransferFeeConfigArgs,
     NopAndWeight[] memory nopsAndWeights
   ) AggregateRateLimiter(rateLimiterConfig) {
-    if (staticConfig.linkToken == address(0) || staticConfig.chainSelector == 0 || staticConfig.armProxy == address(0))
+    if (staticConfig.linkToken == address(0) || staticConfig.chainSelector == 0 || staticConfig.rmnProxy == address(0))
     {
       revert InvalidConfig();
     }
