@@ -125,14 +125,13 @@ contract EVM2EVMMultiOnRamp_constructor is EVM2EVMMultiOnRampSetup {
       generateDynamicMultiOnRampConfig(address(s_sourceRouter), address(s_priceRegistry), address(s_tokenAdminRegistry));
 
     EVM2EVMMultiOnRamp.DestChainConfigArgs[] memory destChainConfigArgs = generateDestChainConfigArgs();
-    EVM2EVMMultiOnRamp.DestChainConfigArgs memory destChainConfigArg = destChainConfigArgs[0];
 
     // Link token == address(0)
     EVM2EVMMultiOnRamp.StaticConfig memory staticConfig = EVM2EVMMultiOnRamp.StaticConfig({
       linkToken: address(0),
       chainSelector: SOURCE_CHAIN_SELECTOR,
       maxNopFeesJuels: MAX_NOP_FEES_JUELS,
-      armProxy: address(s_mockARM)
+      rmnProxy: address(s_mockRMN)
     });
     vm.expectRevert(EVM2EVMMultiOnRamp.InvalidConfig.selector);
     s_onRamp = new EVM2EVMMultiOnRampHelper(
@@ -161,7 +160,7 @@ contract EVM2EVMMultiOnRamp_constructor is EVM2EVMMultiOnRampSetup {
 
     // ArmProxy == address(0)
     staticConfig.chainSelector = SOURCE_CHAIN_SELECTOR;
-    staticConfig.armProxy = address(0);
+    staticConfig.rmnProxy = address(0);
     vm.expectRevert(EVM2EVMMultiOnRamp.InvalidConfig.selector);
     s_onRamp = new EVM2EVMMultiOnRampHelper(
       staticConfig,
@@ -186,44 +185,46 @@ contract EVM2EVMMultiOnRamp_applyDestChainConfigUpdates is EVM2EVMMultiOnRampSet
     destChainConfigArgs[1] = generateDestChainConfigArgs()[0];
     destChainConfigArgs[1].destChainSelector = DEST_CHAIN_SELECTOR + 1;
 
+    EVM2EVMMultiOnRamp.DestChainConfig memory expectedDestChainConfig0 = EVM2EVMMultiOnRamp.DestChainConfig({
+      dynamicConfig: destChainConfigArgs[0].dynamicConfig,
+      prevOnRamp: address(0),
+      sequenceNumber: 0,
+      metadataHash: keccak256(
+        abi.encode(
+          Internal.EVM_2_EVM_MESSAGE_HASH,
+          SOURCE_CHAIN_SELECTOR,
+          destChainConfigArgs[0].destChainSelector,
+          address(s_onRamp)
+        )
+        )
+    });
+
+    EVM2EVMMultiOnRamp.DestChainConfig memory expectedDestChainConfig1 = EVM2EVMMultiOnRamp.DestChainConfig({
+      dynamicConfig: destChainConfigArgs[1].dynamicConfig,
+      prevOnRamp: address(0),
+      sequenceNumber: 0,
+      metadataHash: keccak256(
+        abi.encode(
+          Internal.EVM_2_EVM_MESSAGE_HASH,
+          SOURCE_CHAIN_SELECTOR,
+          destChainConfigArgs[1].destChainSelector,
+          address(s_onRamp)
+        )
+        )
+    });
+
     vm.expectEmit();
-    emit DestChainConfigUpdated(
-      DEST_CHAIN_SELECTOR,
-      EVM2EVMMultiOnRamp.DestChainConfig({
-        dynamicConfig: destChainConfigArgs[0].dynamicConfig,
-        prevOnRamp: address(0),
-        sequenceNumber: 0,
-        metadataHash: keccak256(
-          abi.encode(
-            Internal.EVM_2_EVM_MESSAGE_HASH,
-            SOURCE_CHAIN_SELECTOR,
-            destChainConfigArgs[0].destChainSelector,
-            address(s_onRamp)
-          )
-          )
-      })
-    );
+    emit DestChainConfigUpdated(DEST_CHAIN_SELECTOR, expectedDestChainConfig0);
     vm.expectEmit();
-    emit DestChainConfigUpdated(
-      DEST_CHAIN_SELECTOR + 1,
-      EVM2EVMMultiOnRamp.DestChainConfig({
-        dynamicConfig: destChainConfigArgs[1].dynamicConfig,
-        prevOnRamp: address(0),
-        sequenceNumber: 0,
-        metadataHash: keccak256(
-          abi.encode(
-            Internal.EVM_2_EVM_MESSAGE_HASH,
-            SOURCE_CHAIN_SELECTOR,
-            destChainConfigArgs[1].destChainSelector,
-            address(s_onRamp)
-          )
-          )
-      })
-    );
+    emit DestChainConfigUpdated(DEST_CHAIN_SELECTOR + 1, expectedDestChainConfig1);
 
     s_onRamp.applyDestChainConfigUpdates(destChainConfigArgs);
 
-    EVM2EVMMultiOnRamp.DestChainConfig memory gotDestChainConfig1 = s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR);
+    EVM2EVMMultiOnRamp.DestChainConfig memory gotDestChainConfig0 = s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR);
+    EVM2EVMMultiOnRamp.DestChainConfig memory gotDestChainConfig1 = s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR + 1);
+
+    assertEq(keccak256(abi.encode(expectedDestChainConfig0)), keccak256(abi.encode(gotDestChainConfig0)));
+    assertEq(keccak256(abi.encode(expectedDestChainConfig1)), keccak256(abi.encode(gotDestChainConfig1)));
   }
 
   function test_InvalidDestChainConfig_Revert() public {
