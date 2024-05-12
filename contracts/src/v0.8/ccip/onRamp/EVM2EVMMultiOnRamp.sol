@@ -672,7 +672,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ILinkAvailable, AggregateRat
 
   /// @notice Internal version of applyDestChainConfigUpdates.
   function _applyDestChainConfigUpdates(DestChainConfigArgs[] memory destChainConfigArgs) internal {
-    for (uint256 i; i < destChainConfigArgs.length; ++i) {
+    for (uint256 i = 0; i < destChainConfigArgs.length; ++i) {
       DestChainConfigArgs memory destChainConfigArg = destChainConfigArgs[i];
       uint64 destChainSelector = destChainConfigArgs[i].destChainSelector;
 
