@@ -177,6 +177,37 @@ contract EVM2EVMMultiOnRamp_constructor is EVM2EVMMultiOnRampSetup {
 contract EVM2EVMMultiOnRamp_applyDestChainConfigUpdates is EVM2EVMMultiOnRampSetup {
   event DestChainConfigUpdated(uint64 indexed destChainSelector, EVM2EVMMultiOnRamp.DestChainConfig destChainConfig);
 
+  function test_Fuzz_applyDestChainConfigUpdates_Success(
+    EVM2EVMMultiOnRamp.DestChainConfigArgs memory destChainConfigArgs
+  ) public {
+    vm.assume(destChainConfigArgs.destChainSelector != 0);
+    if (destChainConfigArgs.destChainSelector == DEST_CHAIN_SELECTOR) {
+      destChainConfigArgs.prevOnRamp = address(0);
+    }
+    EVM2EVMMultiOnRamp.DestChainConfigArgs[] memory newDestChainConfigArgs =
+      new EVM2EVMMultiOnRamp.DestChainConfigArgs[](1);
+    newDestChainConfigArgs[0] = destChainConfigArgs;
+    EVM2EVMMultiOnRamp.DestChainConfig memory expectedDestChainConfig = EVM2EVMMultiOnRamp.DestChainConfig({
+      dynamicConfig: destChainConfigArgs.dynamicConfig,
+      prevOnRamp: destChainConfigArgs.prevOnRamp,
+      sequenceNumber: 0,
+      metadataHash: keccak256(
+        abi.encode(
+          Internal.EVM_2_EVM_MESSAGE_HASH, SOURCE_CHAIN_SELECTOR, destChainConfigArgs.destChainSelector, address(s_onRamp)
+        )
+        )
+    });
+    vm.expectEmit();
+    emit DestChainConfigUpdated(destChainConfigArgs.destChainSelector, expectedDestChainConfig);
+
+    s_onRamp.applyDestChainConfigUpdates(newDestChainConfigArgs);
+
+    assertEq(
+      keccak256(abi.encode(expectedDestChainConfig)),
+      keccak256(abi.encode(s_onRamp.getDestChainConfig(destChainConfigArgs.destChainSelector)))
+    );
+  }
+
   function test_applyDestChainConfigUpdates_Success() public {
     EVM2EVMMultiOnRamp.DestChainConfigArgs[] memory destChainConfigArgs =
       new EVM2EVMMultiOnRamp.DestChainConfigArgs[](2);

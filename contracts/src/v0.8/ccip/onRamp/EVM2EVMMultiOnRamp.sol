@@ -679,7 +679,6 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ILinkAvailable, AggregateRat
       if (destChainSelector == 0) revert InvalidDestChainConfig(destChainSelector);
 
       DestChainConfig storage destChainConfig = s_destChainConfig[destChainSelector];
-
       address prevOnRamp = destChainConfigArg.prevOnRamp;
 
       DestChainConfig memory newDestChainConfig = DestChainConfig({
@@ -693,8 +692,8 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ILinkAvailable, AggregateRat
         newDestChainConfig.metadataHash =
           keccak256(abi.encode(Internal.EVM_2_EVM_MESSAGE_HASH, i_chainSelector, destChainSelector, address(this)));
         destChainConfig.dynamicConfig = newDestChainConfig.dynamicConfig;
-        destChainConfig.prevOnRamp = prevOnRamp;
         destChainConfig.metadataHash = newDestChainConfig.metadataHash;
+        if (prevOnRamp != address(0)) destChainConfig.prevOnRamp = prevOnRamp;
       } else {
         if (destChainConfig.prevOnRamp != prevOnRamp) {
           revert InvalidDestChainConfig(destChainSelector);
@@ -702,7 +701,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ILinkAvailable, AggregateRat
         destChainConfig.dynamicConfig = newDestChainConfig.dynamicConfig;
       }
 
-      emit DestChainConfigUpdated(destChainSelector, destChainConfig);
+      emit DestChainConfigUpdated(destChainSelector, newDestChainConfig);
     }
   }
 
