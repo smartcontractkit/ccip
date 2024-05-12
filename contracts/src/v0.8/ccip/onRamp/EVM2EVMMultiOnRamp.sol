@@ -76,7 +76,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ILinkAvailable, AggregateRat
     address linkToken; // ────────╮ Link token address
     uint64 chainSelector; // ─────╯ Source chainSelector
     uint96 maxNopFeesJuels; // ───╮ Max nop fee balance onramp can have
-    address rmnProxy; // ─────────╯ Address of ARM proxy
+    address rmnProxy; // ─────────╯ Address of RMN proxy
   }
 
   /// @dev Struct to contains the dynamic configuration
@@ -182,7 +182,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ILinkAvailable, AggregateRat
   address internal immutable i_linkToken;
   /// @dev The chain ID of the source chain that this contract is deployed to
   uint64 internal immutable i_chainSelector;
-  /// @dev The address of the arm proxy
+  /// @dev The address of the rmn proxy
   address internal immutable i_rmnProxy;
   /// @dev the maximum number of nops that can be configured at the same time.
   /// Used to bound gas for loops over nops.
