@@ -249,12 +249,15 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ILinkAvailable, AggregateRat
   /// @inheritdoc IEVM2AnyMultiOnRamp
   function getSenderNonce(uint64 destChainSelector, address sender) external view returns (uint64) {
     uint256 senderNonce = s_senderNonce[sender];
-    address prevOnRamp = s_destChainConfig[destChainSelector].prevOnRamp;
 
-    if (senderNonce == 0 && prevOnRamp != address(0)) {
-      // If OnRamp was upgraded, check if sender has a nonce from the previous OnRamp.
-      return IEVM2AnyOnRamp(prevOnRamp).getSenderNonce(sender);
+    if (senderNonce == 0) {
+      address prevOnRamp = s_destChainConfig[destChainSelector].prevOnRamp;
+      if (prevOnRamp != address(0)) {
+        // If OnRamp was upgraded, check if sender has a nonce from the previous OnRamp.
+        return IEVM2AnyOnRamp(prevOnRamp).getSenderNonce(sender);
+      }
     }
+
     return uint64(senderNonce);
   }
 
