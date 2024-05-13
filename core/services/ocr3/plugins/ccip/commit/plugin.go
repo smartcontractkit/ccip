@@ -20,7 +20,8 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 )
 
-// Plugin implements the main ocr3 plugin logic.
+// Plugin implements the main ocr3 ccip commit plugin logic.
+// To learn more about the plugin lifecycle, see the ocr3types.ReportingPlugin interface.
 type Plugin struct {
 	nodeID      commontypes.OracleID
 	cfg         model.CommitPluginConfig
@@ -28,7 +29,6 @@ type Plugin struct {
 	reportCodec codec.Commit
 	lggr        logger.Logger
 
-	// Computed helper fields .
 	// readableChains is the set of chains that the plugin can read from.
 	readableChains mapset.Set[model.ChainSelector]
 	// knownSourceChains is the set of chains that the plugin knows about.
@@ -40,6 +40,7 @@ func NewPlugin(
 	nodeID commontypes.OracleID,
 	cfg model.CommitPluginConfig,
 	ccipReader reader.CCIP,
+	reportCodec codec.Commit,
 	lggr logger.Logger,
 ) *Plugin {
 	knownSourceChains := mapset.NewSet[model.ChainSelector](cfg.Reads...)
@@ -48,94 +49,58 @@ func NewPlugin(
 	}
 
 	return &Plugin{
-		nodeID:     nodeID,
-		cfg:        cfg,
-		ccipReader: ccipReader,
-		lggr:       lggr,
+		nodeID:      nodeID,
+		cfg:         cfg,
+		ccipReader:  ccipReader,
+		reportCodec: reportCodec,
+		lggr:        lggr,
 
 		readableChains:    mapset.NewSet(cfg.Reads...),
 		knownSourceChains: knownSourceChains,
 	}
 }
 
-func (p *Plugin) Query(ctx context.Context, outctx ocr3types.OutcomeContext) (types.Query, error) {
+// Query phase is not used.
+func (p *Plugin) Query(_ context.Context, _ ocr3types.OutcomeContext) (types.Query, error) {
 	return types.Query{}, nil
 }
 
-func (p *Plugin) Observation(ctx context.Context, outctx ocr3types.OutcomeContext, query types.Query) (types.Observation, error) {
-	seqNumPerChain := make(map[model.ChainSelector]model.SeqNum)
-
-	// If there is a previous outcome, find latest sequence numbers per chain from it.
-	if outctx.PreviousOutcome != nil {
-		p.lggr.Debugw("observing based on previous outcome")
-		prevOutcome, err := model.DecodeCommitPluginOutcome(outctx.PreviousOutcome)
-		if err != nil {
-			return types.Observation{}, fmt.Errorf("decode commit plugin previous outcome: %w", err)
-		}
-		p.lggr.Debugw("previous outcome decoded", "outcome", prevOutcome.String())
-
-		for _, seqNumChain := range prevOutcome.MaxSequenceNumbers {
-			if seqNumChain.SeqNum > seqNumPerChain[seqNumChain.ChainSel] {
-				seqNumPerChain[seqNumChain.ChainSel] = seqNumChain.SeqNum
-			}
-			p.knownSourceChains.Add(seqNumChain.ChainSel)
-		}
-		p.lggr.Debugw("discovered source chains from prev outcome", "chains", p.knownSourceChains.ToSlice())
-		p.lggr.Debugw("discovered sequence numbers from prev outcome", "seqNumPerChain", seqNumPerChain)
+// Observation phase is used to discover max chain sequence numbers, new messages, gas and token prices.
+//
+// Max Chain Sequence Numbers:
+//
+//	It is the sequence number of the last known committed message for each known source chain.
+//	If there was a previous outcome we start with the max sequence numbers of the previous outcome.
+//	We then read the sequence numbers from the destination chain and override when the on-chain sequence number
+//	is greater than previous outcome or when previous outcome did not contain a sequence number for a known source chain.
+//
+// New Messages:
+//
+//	We discover new ccip messages only for the chains that the current node is allowed to read from based on the
+//	previously discovered max chain sequence numbers. For each chain we scan for new messages
+//	in the [max_sequence_number+1, max_sequence_number+1+p.cfg.NewMsgScanBatchSize] range.
+//
+// Gas Prices:
+//
+//	TODO
+//
+// Token Prices:
+//
+//	TODO
+func (p *Plugin) Observation(ctx context.Context, outctx ocr3types.OutcomeContext, _ types.Query) (types.Observation, error) {
+	maxSeqNumsPerChain, err := p.observeMaxSeqNumsPerChain(ctx, outctx.PreviousOutcome)
+	if err != nil {
+		return types.Observation{}, fmt.Errorf("observe max sequence numbers per chain: %w", err)
 	}
 
+	newMsgs, err := p.observeNewMsgs(ctx, maxSeqNumsPerChain)
+	if err != nil {
+		return types.Observation{}, fmt.Errorf("observe new messages: %w", err)
+	}
+
+	// TODO: The code below is related to token and gas prices and should be cleaned up in relevant PRs...
 	knownSourceChainsSlice := p.knownSourceChains.ToSlice()
 	sort.Slice(knownSourceChainsSlice, func(i, j int) bool { return knownSourceChainsSlice[i] < knownSourceChainsSlice[j] })
-
-	// If reading destination chain is supported find the latest sequence numbers per chain from the onchain state.
-	if p.readableChains.Contains(p.cfg.DestChain) {
-		p.lggr.Debugw("reading sequence numbers from destination")
-		onChainSeqNums, err := p.ccipReader.NextSeqNum(ctx, knownSourceChainsSlice)
-		if err != nil {
-			return types.Observation{}, fmt.Errorf("get next seq nums: %w", err)
-		}
-		p.lggr.Debugw("discovered sequence numbers from destination", "onChainSeqNums", onChainSeqNums)
-
-		for i, ch := range knownSourceChainsSlice {
-			if onChainSeqNums[i] > seqNumPerChain[ch] {
-				seqNumPerChain[ch] = onChainSeqNums[i]
-				p.lggr.Debugw("updated sequence number", "chain", ch, "seqNum", onChainSeqNums[i])
-			}
-		}
-	}
-
-	// Find the new msgs for each supported chain based on the discovered sequence numbers.
-	observedNewMsgs := make([]model.CCIPMsgBaseDetails, 0)
-	maxSeqNums := make([]model.SeqNumChain, 0)
-	for ch, seqNum := range seqNumPerChain {
-		maxSeqNums = append(maxSeqNums, model.NewSeqNumChain(ch, seqNum))
-
-		if !p.readableChains.Contains(ch) {
-			p.lggr.Debugw("reading chain is not supported", "chain", ch)
-			continue
-		}
-
-		minSeqNum := seqNum + 1
-		maxSeqNum := minSeqNum + model.SeqNum(p.cfg.NewMsgScanBatchSize)
-		p.lggr.Debugw("scanning for new messages",
-			"chain", ch, "minSeqNum", minSeqNum, "maxSeqNum", maxSeqNum)
-
-		newMsgs, err := p.ccipReader.MsgsBetweenSeqNums(
-			ctx, []model.ChainSelector{ch}, model.NewSeqNumRange(minSeqNum, maxSeqNum))
-		if err != nil {
-			return nil, fmt.Errorf("get messages between seq nums: %w", err)
-		}
-
-		if len(newMsgs) > 0 {
-			p.lggr.Debugw("discovered new messages", "chain", ch, "newMsgs", len(newMsgs))
-		} else {
-			p.lggr.Debugw("no new messages discovered", "chain", ch)
-		}
-
-		for _, msg := range newMsgs {
-			observedNewMsgs = append(observedNewMsgs, msg.CCIPMsgBaseDetails)
-		}
-	}
 
 	// Find the gas prices for each chain.
 	gasPricesVals, err := p.ccipReader.GasPrices(ctx, knownSourceChainsSlice)
@@ -153,8 +118,8 @@ func (p *Plugin) Observation(ctx context.Context, outctx ocr3types.OutcomeContex
 	// Find the token prices.
 	tokenPrices := make([]model.TokenPrice, 0) // TODO: token prices ...
 
-	p.lggr.Infow("submitting observation", "observedNewMsgs", len(observedNewMsgs), "gasPrices", len(gasPrices), "tokenPrices", len(tokenPrices))
-	return model.NewCommitPluginObservation(observedNewMsgs, gasPrices, tokenPrices, maxSeqNums).Encode()
+	p.lggr.Infow("submitting observation", "observedNewMsgs", len(newMsgs), "gasPrices", len(gasPrices), "tokenPrices", len(tokenPrices))
+	return model.NewCommitPluginObservation(newMsgs, gasPrices, tokenPrices, maxSeqNumsPerChain).Encode()
 }
 
 func (p *Plugin) ValidateObservation(_ ocr3types.OutcomeContext, _ types.Query, ao types.AttributedObservation) error {
@@ -164,11 +129,11 @@ func (p *Plugin) ValidateObservation(_ ocr3types.OutcomeContext, _ types.Query, 
 	}
 
 	if err := p.validateObservedSequenceNumbers(obs.NewMsgs, obs.MaxSeqNums); err != nil {
-		return fmt.Errorf("validate sequence numbers uniqueness: %w", err)
+		return fmt.Errorf("validate sequence numbers: %w", err)
 	}
 
 	if err := p.validateObserverReadingEligibility(ao.Observer, obs.NewMsgs); err != nil {
-		return fmt.Errorf("validate observer %d eligibility: %w", ao.Observer, err)
+		return fmt.Errorf("validate observer %d reading eligibility: %w", ao.Observer, err)
 	}
 
 	if err := p.validateObservedGasAndTokenPrices(obs.GasPrices, obs.TokenPrices); err != nil {
@@ -179,10 +144,16 @@ func (p *Plugin) ValidateObservation(_ ocr3types.OutcomeContext, _ types.Query, 
 }
 
 func (p *Plugin) ObservationQuorum(_ ocr3types.OutcomeContext, _ types.Query) (ocr3types.Quorum, error) {
-	// across all chains we require at least 2f+1 observations.
+	// Across all chains we require at least 2f+1 observations.
 	return ocr3types.QuorumTwoFPlusOne, nil
 }
 
+// Outcome phase is used to construct the final outcome based on the observations of multiple followers.
+//
+// The outcome contains:
+//   - Max Sequence Numbers: The max sequence number for each source chain.
+//   - Merkle Roots: One merkle tree root per source chain. The leaves of the tree are the IDs of the observed messages.
+//     The merkle root data type contains information about the chain and the sequence numbers range.
 func (p *Plugin) Outcome(_ ocr3types.OutcomeContext, _ types.Query, aos []types.AttributedObservation) (ocr3types.Outcome, error) {
 	observerMsgSeqNums := make(map[commontypes.OracleID]map[model.ChainSelector]mapset.Set[model.SeqNum])
 	msgsFromObservations := make([]model.CCIPMsgBaseDetails, 0)
@@ -328,6 +299,86 @@ func (p *Plugin) Close() error {
 		return fmt.Errorf("close ccip reader: %w", err)
 	}
 	return nil
+}
+
+func (p *Plugin) observeMaxSeqNumsPerChain(ctx context.Context, previousOutcomeBytes []byte) ([]model.SeqNumChain, error) {
+	// If there is a previous outcome, start with the sequence numbers of it.
+	seqNumPerChain := make(map[model.ChainSelector]model.SeqNum)
+	if previousOutcomeBytes != nil {
+		p.lggr.Debugw("observing based on previous outcome")
+		prevOutcome, err := model.DecodeCommitPluginOutcome(previousOutcomeBytes)
+		if err != nil {
+			return nil, fmt.Errorf("decode commit plugin previous outcome: %w", err)
+		}
+		p.lggr.Debugw("previous outcome decoded", "outcome", prevOutcome.String())
+
+		for _, seqNumChain := range prevOutcome.MaxSequenceNumbers {
+			if seqNumChain.SeqNum > seqNumPerChain[seqNumChain.ChainSel] {
+				seqNumPerChain[seqNumChain.ChainSel] = seqNumChain.SeqNum
+			}
+			p.knownSourceChains.Add(seqNumChain.ChainSel) // discover new source chains from previous outcome
+		}
+		p.lggr.Debugw("discovered sequence numbers from prev outcome", "seqNumPerChain", seqNumPerChain)
+	}
+
+	// If reading destination chain is supported find the latest sequence numbers per chain from the onchain state.
+	if p.readableChains.Contains(p.cfg.DestChain) {
+		p.lggr.Debugw("reading sequence numbers from destination")
+		onChainSeqNums, err := p.ccipReader.NextSeqNum(ctx, p.knownSourceChainsSlice())
+		if err != nil {
+			return nil, fmt.Errorf("get next seq nums: %w", err)
+		}
+		p.lggr.Debugw("discovered sequence numbers from destination", "onChainSeqNums", onChainSeqNums)
+
+		// Update the seq nums if the on-chain sequence number is greater than previous outcome.
+		for i, ch := range p.knownSourceChainsSlice() {
+			if onChainSeqNums[i] > seqNumPerChain[ch] {
+				seqNumPerChain[ch] = onChainSeqNums[i]
+				p.lggr.Debugw("updated sequence number", "chain", ch, "seqNum", onChainSeqNums[i])
+			}
+		}
+	}
+
+	maxChainSeqNums := make([]model.SeqNumChain, 0)
+	for ch, seqNum := range seqNumPerChain {
+		maxChainSeqNums = append(maxChainSeqNums, model.NewSeqNumChain(ch, seqNum))
+	}
+
+	return maxChainSeqNums, nil
+}
+
+func (p *Plugin) observeNewMsgs(ctx context.Context, maxSeqNumsPerChain []model.SeqNumChain) ([]model.CCIPMsgBaseDetails, error) {
+	// Find the new msgs for each supported chain based on the discovered max sequence numbers.
+	observedNewMsgs := make([]model.CCIPMsgBaseDetails, 0)
+	for _, seqNumChain := range maxSeqNumsPerChain {
+		if !p.readableChains.Contains(seqNumChain.ChainSel) {
+			p.lggr.Debugw("reading chain is not supported", "chain", seqNumChain.ChainSel)
+			continue
+		}
+
+		minSeqNum := seqNumChain.SeqNum + 1
+		maxSeqNum := minSeqNum + model.SeqNum(p.cfg.NewMsgScanBatchSize)
+		p.lggr.Debugw("scanning for new messages",
+			"chain", seqNumChain.ChainSel, "minSeqNum", minSeqNum, "maxSeqNum", maxSeqNum)
+
+		newMsgs, err := p.ccipReader.MsgsBetweenSeqNums(
+			ctx, []model.ChainSelector{seqNumChain.ChainSel}, model.NewSeqNumRange(minSeqNum, maxSeqNum))
+		if err != nil {
+			return nil, fmt.Errorf("get messages between seq nums: %w", err)
+		}
+
+		if len(newMsgs) > 0 {
+			p.lggr.Debugw("discovered new messages", "chain", seqNumChain.ChainSel, "newMsgs", len(newMsgs))
+		} else {
+			p.lggr.Debugw("no new messages discovered", "chain", seqNumChain.ChainSel)
+		}
+
+		for _, msg := range newMsgs {
+			observedNewMsgs = append(observedNewMsgs, msg.CCIPMsgBaseDetails)
+		}
+	}
+
+	return observedNewMsgs, nil
 }
 
 func (p *Plugin) observedMsgsConsensus(chainSel model.ChainSelector, observedMsgs []model.CCIPMsgBaseDetails) (observedMsgsConsensus, error) {
@@ -512,6 +563,12 @@ func (p *Plugin) validateObservedGasAndTokenPrices(gasPrices []model.GasPriceCha
 	}
 
 	return nil
+}
+
+func (p *Plugin) knownSourceChainsSlice() []model.ChainSelector {
+	knownSourceChainsSlice := p.knownSourceChains.ToSlice()
+	sort.Slice(knownSourceChainsSlice, func(i, j int) bool { return knownSourceChainsSlice[i] < knownSourceChainsSlice[j] })
+	return knownSourceChainsSlice
 }
 
 type observedMsgsConsensus struct {
