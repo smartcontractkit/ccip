@@ -693,17 +693,17 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ILinkAvailable, AggregateRat
         metadataHash: destChainConfig.metadataHash
       });
 
+      destChainConfig.dynamicConfig = newDestChainConfig.dynamicConfig;
+
       if (destChainConfig.metadataHash == 0) {
         newDestChainConfig.metadataHash =
           keccak256(abi.encode(Internal.EVM_2_EVM_MESSAGE_HASH, i_chainSelector, destChainSelector, address(this)));
-        destChainConfig.dynamicConfig = newDestChainConfig.dynamicConfig;
         destChainConfig.metadataHash = newDestChainConfig.metadataHash;
         if (prevOnRamp != address(0)) destChainConfig.prevOnRamp = prevOnRamp;
       } else {
         if (destChainConfig.prevOnRamp != prevOnRamp) {
           revert InvalidDestChainConfig(destChainSelector);
         }
-        destChainConfig.dynamicConfig = newDestChainConfig.dynamicConfig;
       }
 
       emit DestChainConfigUpdated(destChainSelector, newDestChainConfig);
