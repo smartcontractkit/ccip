@@ -27,10 +27,15 @@ contract PriceRegistrySetup is TokenSetup {
   address[] internal s_destFeeTokens;
   uint224[] internal s_destTokenPrices;
 
+  mapping(address token => address dataFeedAddress) internal s_dataFeedByToken;
+
   function setUp() public virtual override {
     TokenSetup.setUp();
 
+    _deployTokenPriceDataFeed(s_sourceFeeToken, 8, 1e8);
+
     s_weth = s_sourceRouter.getWrappedNative();
+    _deployTokenPriceDataFeed(s_weth, 8, 1e11);
 
     address[] memory sourceFeeTokens = new address[](3);
     sourceFeeTokens[0] = s_sourceTokens[0];
@@ -83,6 +88,12 @@ contract PriceRegistrySetup is TokenSetup {
 
     s_priceRegistry = new PriceRegistry(priceUpdaters, feeTokens, uint32(TWELVE_HOURS), tokenPriceFeedUpdates);
     s_priceRegistry.updatePrices(priceUpdates);
+  }
+
+  function _deployTokenPriceDataFeed(address token, uint8 decimals, int256 initialAnswer) internal returns (address) {
+    MockV3Aggregator dataFeed = new MockV3Aggregator(decimals, initialAnswer);
+    s_dataFeedByToken[token] = address(dataFeed);
+    return address(dataFeed);
   }
 
   function getPriceUpdatesStruct(
