@@ -16,7 +16,7 @@ import "./EVM2EVMMultiOnRampSetup.t.sol";
 contract EVM2EVMMultiOnRamp_constructor is EVM2EVMMultiOnRampSetup {
   event ConfigSet(EVM2EVMMultiOnRamp.StaticConfig staticConfig, EVM2EVMMultiOnRamp.DynamicConfig dynamicConfig);
   event PoolAdded(address token, address pool);
-  event DestChainConfigUpdated(uint64 indexed destChainSelector, EVM2EVMMultiOnRamp.DestChainConfig destChainConfig);
+  event DestChainAdded(uint64 indexed destChainSelector, EVM2EVMMultiOnRamp.DestChainConfig destChainConfig);
 
   function test_Constructor_Success() public {
     EVM2EVMMultiOnRamp.StaticConfig memory staticConfig = EVM2EVMMultiOnRamp.StaticConfig({
@@ -35,7 +35,7 @@ contract EVM2EVMMultiOnRamp_constructor is EVM2EVMMultiOnRampSetup {
     emit ConfigSet(staticConfig, dynamicConfig);
     // We ignore the DestChainConfig values as metadataHash is reliant on contract address.
     vm.expectEmit(true, false, false, false);
-    emit DestChainConfigUpdated(
+    emit DestChainAdded(
       DEST_CHAIN_SELECTOR,
       EVM2EVMMultiOnRamp.DestChainConfig({
         dynamicConfig: destChainConfigArg.dynamicConfig,
@@ -175,14 +175,20 @@ contract EVM2EVMMultiOnRamp_constructor is EVM2EVMMultiOnRampSetup {
 }
 
 contract EVM2EVMMultiOnRamp_applyDestChainConfigUpdates is EVM2EVMMultiOnRampSetup {
-  event DestChainConfigUpdated(uint64 indexed destChainSelector, EVM2EVMMultiOnRamp.DestChainConfig destChainConfig);
+  event DestChainAdded(uint64 indexed destChainSelector, EVM2EVMMultiOnRamp.DestChainConfig destChainConfig);
+  event DestChainDynamicConfigUpdated(
+    uint64 indexed destChainSelector, EVM2EVMMultiOnRamp.DestChainDynamicConfig dynamicConfig
+  );
 
   function test_Fuzz_applyDestChainConfigUpdates_Success(
     EVM2EVMMultiOnRamp.DestChainConfigArgs memory destChainConfigArgs
   ) public {
     vm.assume(destChainConfigArgs.destChainSelector != 0);
+    bool isNewChain = true;
+
     if (destChainConfigArgs.destChainSelector == DEST_CHAIN_SELECTOR) {
       destChainConfigArgs.prevOnRamp = address(0);
+      isNewChain = false;
     }
     EVM2EVMMultiOnRamp.DestChainConfigArgs[] memory newDestChainConfigArgs =
       new EVM2EVMMultiOnRamp.DestChainConfigArgs[](1);
@@ -197,8 +203,14 @@ contract EVM2EVMMultiOnRamp_applyDestChainConfigUpdates is EVM2EVMMultiOnRampSet
         )
         )
     });
-    vm.expectEmit();
-    emit DestChainConfigUpdated(destChainConfigArgs.destChainSelector, expectedDestChainConfig);
+
+    if (isNewChain) {
+      vm.expectEmit();
+      emit DestChainAdded(destChainConfigArgs.destChainSelector, expectedDestChainConfig);
+    } else {
+      vm.expectEmit();
+      emit DestChainDynamicConfigUpdated(destChainConfigArgs.destChainSelector, expectedDestChainConfig.dynamicConfig);
+    }
 
     s_onRamp.applyDestChainConfigUpdates(newDestChainConfigArgs);
 
@@ -245,9 +257,9 @@ contract EVM2EVMMultiOnRamp_applyDestChainConfigUpdates is EVM2EVMMultiOnRampSet
     });
 
     vm.expectEmit();
-    emit DestChainConfigUpdated(DEST_CHAIN_SELECTOR, expectedDestChainConfig0);
+    emit DestChainDynamicConfigUpdated(DEST_CHAIN_SELECTOR, expectedDestChainConfig0.dynamicConfig);
     vm.expectEmit();
-    emit DestChainConfigUpdated(DEST_CHAIN_SELECTOR + 1, expectedDestChainConfig1);
+    emit DestChainAdded(DEST_CHAIN_SELECTOR + 1, expectedDestChainConfig1);
 
     s_onRamp.applyDestChainConfigUpdates(destChainConfigArgs);
 

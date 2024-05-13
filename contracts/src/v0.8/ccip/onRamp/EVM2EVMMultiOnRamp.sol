@@ -67,7 +67,8 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ILinkAvailable, AggregateRat
   /// RMN depends on this event, if changing, please notify the RMN maintainers.
   event CCIPSendRequested(Internal.EVM2EVMMessage message);
   event NopsSet(uint256 nopWeightsTotal, NopAndWeight[] nopsAndWeights);
-  event DestChainConfigUpdated(uint64 indexed destChainSelector, DestChainConfig destChainConfig);
+  event DestChainAdded(uint64 indexed destChainSelector, DestChainConfig destChainConfig);
+  event DestChainDynamicConfigUpdated(uint64 indexed destChainSelector, DestChainDynamicConfig dynamicConfig);
 
   /// @dev Struct that contains the static configuration
   /// RMN depends on this struct, if changing, please notify the RMN maintainers.
@@ -700,13 +701,13 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ILinkAvailable, AggregateRat
           keccak256(abi.encode(Internal.EVM_2_EVM_MESSAGE_HASH, i_chainSelector, destChainSelector, address(this)));
         destChainConfig.metadataHash = newDestChainConfig.metadataHash;
         if (prevOnRamp != address(0)) destChainConfig.prevOnRamp = prevOnRamp;
-      } else {
-        if (destChainConfig.prevOnRamp != prevOnRamp) {
-          revert InvalidDestChainConfig(destChainSelector);
-        }
-      }
 
-      emit DestChainConfigUpdated(destChainSelector, newDestChainConfig);
+        emit DestChainAdded(destChainSelector, destChainConfig);
+      } else {
+        if (destChainConfig.prevOnRamp != prevOnRamp) revert InvalidDestChainConfig(destChainSelector);
+
+        emit DestChainDynamicConfigUpdated(destChainSelector, destChainConfigArg.dynamicConfig);
+      }
     }
   }
 
