@@ -225,7 +225,9 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     // Nonce never increments on unordered messages.
     uint64 nonceBefore = s_offRamp.getSenderNonce(messages[0].sender);
     s_offRamp.execute(_generateReportFromMessages(messages), new uint256[](0));
-    assertEq(s_offRamp.getSenderNonce(messages[0].sender), nonceBefore, "nonce must remain unchanged on unordered messages");
+    assertEq(
+      s_offRamp.getSenderNonce(messages[0].sender), nonceBefore, "nonce must remain unchanged on unordered messages"
+    );
 
     messages[0].sequenceNumber++;
     messages[0].messageId = Internal._hash(messages[0], s_offRamp.metadataHash());
@@ -238,7 +240,9 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     // Nonce never increments on unordered messages.
     nonceBefore = s_offRamp.getSenderNonce(messages[0].sender);
     s_offRamp.execute(_generateReportFromMessages(messages), new uint256[](0));
-    assertEq(s_offRamp.getSenderNonce(messages[0].sender), nonceBefore, "nonce must remain unchanged on unordered messages");
+    assertEq(
+      s_offRamp.getSenderNonce(messages[0].sender), nonceBefore, "nonce must remain unchanged on unordered messages"
+    );
   }
 
   function test_ReceiverError_Success() public {
