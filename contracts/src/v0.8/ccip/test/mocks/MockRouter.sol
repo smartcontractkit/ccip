@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.0;
 
 import {IAny2EVMMessageReceiver} from "../../interfaces/IAny2EVMMessageReceiver.sol";
 import {IRouter} from "../../interfaces/IRouter.sol";
@@ -21,8 +21,6 @@ contract MockCCIPRouter is IRouter, IRouterClient {
   error InvalidAddress(bytes encodedAddress);
   error InvalidExtraArgsTag();
   error ReceiverError(bytes error);
-  error InsufficientNativeFeeTokens();
-  error InvalidNativeFeeTokens();
 
   event MessageExecuted(bytes32 messageId, uint64 sourceChainSelector, address offRamp, bytes32 calldataHash);
   event MsgExecuted(bool success, bytes retData, uint256 gasUsed);
@@ -30,7 +28,7 @@ contract MockCCIPRouter is IRouter, IRouterClient {
   uint16 public constant GAS_FOR_CALL_EXACT_CHECK = 5_000;
   uint64 public constant DEFAULT_GAS_LIMIT = 200_000;
 
-  bool public constant FEES_ENABLED = true; //Enable to configure mock-fees for testing
+  uint256 public MockFeeTokenAmount;//use setFee() to change to non-zero to test fees
 
   function routeMessage(
     Client.Any2EVMMessage calldata message,
@@ -71,7 +69,7 @@ contract MockCCIPRouter is IRouter, IRouterClient {
   /// @dev Returns a mock message ID, which is not calculated from the message contents in the
   /// same way as the real message ID.
   function ccipSend(
-    uint64, // destinationChainSelector
+    uint64 destinationChainSelector,
     Client.EVM2AnyMessage calldata message
   ) external payable returns (bytes32) {
     if (message.receiver.length != 32) revert InvalidAddress(message.receiver);
@@ -79,11 +77,18 @@ contract MockCCIPRouter is IRouter, IRouterClient {
     // We want to disallow sending to address(0) and to precompiles, which exist on address(1) through address(9).
     if (decodedReceiver > type(uint160).max || decodedReceiver < 10) revert InvalidAddress(message.receiver);
 
-    uint256 feeTokenAmount = getFee(0, message);
-    if (feeTokenAmount != 0) {
-      if (message.feeToken == address(0) && msg.value < feeTokenAmount) revert InsufficientNativeFeeTokens();
-      if (message.feeToken != address(0) && msg.value != 0) revert InvalidNativeFeeTokens();
+    uint256 feeTokenAmount;
+    if (message.feeToken == address(0)) {
+      feeTokenAmount = getFee(destinationChainSelector, message);
+      if (msg.value < feeTokenAmount) revert InsufficientFeeTokenAmount();
+    } else {
+      if (msg.value > 0) revert InvalidMsgValue();
     }
+    
+    // if (feeTokenAmount != 0) {
+    //   if (message.feeToken == address(0) && msg.value < feeTokenAmount) revert InsufficientFeeTokenAmount();
+    //   if (message.feeToken != address(0) && msg.value != 0) revert InvalidMsgValue();
+    // }
 
     address receiver = address(uint160(decodedReceiver));
     uint256 gasLimit = _fromBytes(message.extraArgs).gasLimit;
@@ -127,12 +132,14 @@ contract MockCCIPRouter is IRouter, IRouterClient {
   }
 
   /// @notice Returns 0 as the fee is not supported in this mock contract.
-  function getFee(uint64, Client.EVM2AnyMessage memory message) public pure returns (uint256 fee) {
-    if (FEES_ENABLED) {
-      if (message.feeToken == address(0)) fee = 0.1 ether;
-      else fee = 1e18;
-    }
+  function getFee(uint64, Client.EVM2AnyMessage memory) public view returns (uint256) {
+    return MockFeeTokenAmount;
   }
+
+  function setFee(uint256 _feeAmount) public returns (uint256) {
+    MockFeeTokenAmount = _feeAmount;
+    return _feeAmount;
+  } 
 
   /// @notice Always returns address(1234567890)
   function getOnRamp(uint64 /* destChainSelector */ ) external pure returns (address onRampAddress) {
