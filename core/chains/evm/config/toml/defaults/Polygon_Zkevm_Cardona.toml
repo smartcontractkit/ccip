@@ -1,23 +1,20 @@
 ChainID = '2442'
-FinalityDepth = 500
-NoNewHeadsThreshold = '12m'
+FinalityTagEnabled = true
+NoNewHeadsThreshold = '6m'
 MinIncomingConfirmations = 1
 LogPollInterval = '30s'
+RPCBlockQueryDelay = 15
 RPCDefaultBatchSize = 100
-
-[OCR]
-ContractConfirmations = 1
 
 [Transactions]
 ResendAfterThreshold = '3m'
 
 [GasEstimator]
-PriceMin = '50 mwei'
+PriceMax = '1000 gwei'
+PriceMin = '100 mwei'
 BumpPercent = 40
-BumpMin = '20 mwei'
+BumpMin = '100 mwei'
+LimitDefault = 8000000
 
 [GasEstimator.BlockHistory]
 BlockHistorySize = 12
-
-[HeadTracker]
-HistoryDepth = 2000

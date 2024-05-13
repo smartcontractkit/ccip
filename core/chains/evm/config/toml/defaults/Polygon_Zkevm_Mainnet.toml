@@ -1,25 +1,21 @@
 ChainID = '1101'
-FinalityDepth = 500
+FinalityTagEnabled = true
 NoNewHeadsThreshold = '6m'
 MinIncomingConfirmations = 1
 LogPollInterval = '30s'
 RPCBlockQueryDelay = 15
 RPCDefaultBatchSize = 100
 
-[OCR]
-ContractConfirmations = 1
-
 [Transactions]
 ResendAfterThreshold = '3m'
 
 [GasEstimator]
+PriceMax = '1000 gwei'
 PriceMin = '100 mwei'
+FeeCapDefault = '1000 gwei'
 BumpPercent = 40
 BumpMin = '100 mwei'
+LimitDefault = 8000000
 
 [GasEstimator.BlockHistory]
 BlockHistorySize = 12
-
-[HeadTracker]
-# Polygon suffers from a tremendous number of re-orgs, we need to set this to something very large to be conservative enough
-HistoryDepth = 2000
