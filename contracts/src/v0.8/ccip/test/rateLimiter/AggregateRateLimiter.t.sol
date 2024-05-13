@@ -8,7 +8,8 @@ import {RateLimiter} from "../../libraries/RateLimiter.sol";
 import {AggregateRateLimiterHelper} from "../helpers/AggregateRateLimiterHelper.sol";
 import {PriceRegistrySetup} from "../priceRegistry/PriceRegistry.t.sol";
 
-import {BaseTest, stdError} from "../BaseTest.t.sol";
+import {BaseTest} from "../BaseTest.t.sol";
+import {stdError} from "forge-std/Test.sol";
 
 contract AggregateTokenLimiterSetup is BaseTest, PriceRegistrySetup {
   AggregateRateLimiterHelper internal s_rateLimiter;

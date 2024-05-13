@@ -4,9 +4,14 @@ pragma solidity 0.8.24;
 import {IRMN} from "../../interfaces/IRMN.sol";
 
 import {RMN} from "../../RMN.sol";
-import {BaseTest} from "../BaseTest.t.sol";
+import {MockRMN} from "../mocks/MockRMN.sol";
+import {Test} from "forge-std/Test.sol";
 
-contract RMNSetup is BaseTest {
+contract RMNSetup is Test {
+  address internal constant OWNER = 0x00007e64E1fB0C487F25dd6D3601ff6aF8d32e4e;
+  address internal constant STRANGER = address(999999);
+  address internal constant ZERO_ADDRESS = address(0);
+
   address internal constant BLESS_VOTER_1 = address(1);
   address internal constant CURSE_VOTER_1 = address(10);
   address internal constant CURSE_UNVOTER_1 = address(110);
@@ -51,11 +56,13 @@ contract RMNSetup is BaseTest {
     return bytes32(index);
   }
 
+  MockRMN internal s_mockRMN;
   RMN internal s_rmn;
 
-  function setUp() public virtual override {
-    BaseTest.setUp();
+  function setUp() public virtual {
+    vm.startPrank(OWNER);
     s_rmn = new RMN(rmnConstructorArgs());
+    s_mockRMN = new MockRMN();
     vm.stopPrank();
   }
 
