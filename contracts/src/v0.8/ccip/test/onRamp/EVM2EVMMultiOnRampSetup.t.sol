@@ -264,7 +264,7 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
   function assertDestChainConfigsEqual(
     EVM2EVMMultiOnRamp.DestChainConfig memory a,
     EVM2EVMMultiOnRamp.DestChainConfig memory b
-  ) internal {
+  ) internal pure {
     assertEq(a.dynamicConfig.isEnabled, b.dynamicConfig.isEnabled);
     assertEq(a.dynamicConfig.maxNumberOfTokensPerMsg, b.dynamicConfig.maxNumberOfTokensPerMsg);
     assertEq(a.dynamicConfig.maxDataBytes, b.dynamicConfig.maxDataBytes);
@@ -286,7 +286,7 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
   function assertStaticConfigsEqual(
     EVM2EVMMultiOnRamp.StaticConfig memory a,
     EVM2EVMMultiOnRamp.StaticConfig memory b
-  ) internal {
+  ) internal pure {
     assertEq(a.linkToken, b.linkToken);
     assertEq(a.chainSelector, b.chainSelector);
     assertEq(a.maxNopFeesJuels, b.maxNopFeesJuels);
@@ -296,7 +296,7 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
   function assertDynamicConfigsEqual(
     EVM2EVMMultiOnRamp.DynamicConfig memory a,
     EVM2EVMMultiOnRamp.DynamicConfig memory b
-  ) internal {
+  ) internal pure {
     assertEq(a.router, b.router);
     assertEq(a.priceRegistry, b.priceRegistry);
     assertEq(a.tokenAdminRegistry, b.tokenAdminRegistry);

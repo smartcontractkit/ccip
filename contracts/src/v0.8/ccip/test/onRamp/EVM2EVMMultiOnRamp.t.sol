@@ -81,19 +81,17 @@ contract EVM2EVMMultiOnRamp_constructor is EVM2EVMMultiOnRampSetup {
     assertEq(1, s_onRamp.getExpectedNextSequenceNumber(destChainConfigArg.destChainSelector));
   }
 
-  function test_Constructor_InvalidConfig_Revert() public {
+  function test_Constructor_InvalidConfigLinkTokenEqAddressZero_Revert() public {
     EVM2EVMMultiOnRamp.DynamicConfig memory dynamicConfig =
       generateDynamicMultiOnRampConfig(address(s_sourceRouter), address(s_priceRegistry), address(s_tokenAdminRegistry));
-
     EVM2EVMMultiOnRamp.DestChainConfigArgs[] memory destChainConfigArgs = generateDestChainConfigArgs();
-
-    // Link token == address(0)
     EVM2EVMMultiOnRamp.StaticConfig memory staticConfig = EVM2EVMMultiOnRamp.StaticConfig({
       linkToken: address(0),
       chainSelector: SOURCE_CHAIN_SELECTOR,
       maxNopFeesJuels: MAX_NOP_FEES_JUELS,
       rmnProxy: address(s_mockRMN)
     });
+
     vm.expectRevert(EVM2EVMMultiOnRamp.InvalidConfig.selector);
     s_onRamp = new EVM2EVMMultiOnRampHelper(
       staticConfig,
@@ -104,10 +102,19 @@ contract EVM2EVMMultiOnRamp_constructor is EVM2EVMMultiOnRampSetup {
       s_tokenTransferFeeConfigArgs,
       getMultiOnRampNopsAndWeights()
     );
+  }
 
-    // Chain selector == 0
-    staticConfig.linkToken = s_sourceTokens[0];
-    staticConfig.chainSelector = 0;
+  function test_Constructor_InvalidConfigLinkChainSelectorEqZero_Revert() public {
+    EVM2EVMMultiOnRamp.DynamicConfig memory dynamicConfig =
+      generateDynamicMultiOnRampConfig(address(s_sourceRouter), address(s_priceRegistry), address(s_tokenAdminRegistry));
+    EVM2EVMMultiOnRamp.DestChainConfigArgs[] memory destChainConfigArgs = generateDestChainConfigArgs();
+    EVM2EVMMultiOnRamp.StaticConfig memory staticConfig = EVM2EVMMultiOnRamp.StaticConfig({
+      linkToken: s_sourceTokens[0],
+      chainSelector: 0,
+      maxNopFeesJuels: MAX_NOP_FEES_JUELS,
+      rmnProxy: address(s_mockRMN)
+    });
+
     vm.expectRevert(EVM2EVMMultiOnRamp.InvalidConfig.selector);
     s_onRamp = new EVM2EVMMultiOnRampHelper(
       staticConfig,
@@ -118,10 +125,19 @@ contract EVM2EVMMultiOnRamp_constructor is EVM2EVMMultiOnRampSetup {
       s_tokenTransferFeeConfigArgs,
       getMultiOnRampNopsAndWeights()
     );
+  }
 
-    // ArmProxy == address(0)
-    staticConfig.chainSelector = SOURCE_CHAIN_SELECTOR;
-    staticConfig.rmnProxy = address(0);
+  function test_Constructor_InvalidConfigRMNProxyEqAddressZero_Revert() public {
+    EVM2EVMMultiOnRamp.DynamicConfig memory dynamicConfig =
+      generateDynamicMultiOnRampConfig(address(s_sourceRouter), address(s_priceRegistry), address(s_tokenAdminRegistry));
+    EVM2EVMMultiOnRamp.DestChainConfigArgs[] memory destChainConfigArgs = generateDestChainConfigArgs();
+    EVM2EVMMultiOnRamp.StaticConfig memory staticConfig = EVM2EVMMultiOnRamp.StaticConfig({
+      linkToken: s_sourceTokens[0],
+      chainSelector: SOURCE_CHAIN_SELECTOR,
+      maxNopFeesJuels: MAX_NOP_FEES_JUELS,
+      rmnProxy: address(0)
+    });
+
     vm.expectRevert(EVM2EVMMultiOnRamp.InvalidConfig.selector);
     s_onRamp = new EVM2EVMMultiOnRampHelper(
       staticConfig,
@@ -230,7 +246,7 @@ contract EVM2EVMMultiOnRamp_applyDestChainConfigUpdates is EVM2EVMMultiOnRampSet
     assertDestChainConfigsEqual(expectedDestChainConfig1, gotDestChainConfig1);
   }
 
-  function test_InvalidDestChainConfig_Revert() public {
+  function test_InvalidDestChainConfigDestChainSelectorEqZero_Revert() public {
     EVM2EVMMultiOnRamp.DestChainConfigArgs[] memory destChainConfigArgs = generateDestChainConfigArgs();
     EVM2EVMMultiOnRamp.DestChainConfigArgs memory destChainConfigArg = destChainConfigArgs[0];
 
@@ -240,9 +256,13 @@ contract EVM2EVMMultiOnRamp_applyDestChainConfigUpdates is EVM2EVMMultiOnRampSet
       abi.encodeWithSelector(EVM2EVMMultiOnRamp.InvalidDestChainConfig.selector, destChainConfigArg.destChainSelector)
     );
     s_onRamp.applyDestChainConfigUpdates(destChainConfigArgs);
+  }
+
+  function test_InvalidDestChainConfigNewPrevOnRampOnExistingChain_Revert() public {
+    EVM2EVMMultiOnRamp.DestChainConfigArgs[] memory destChainConfigArgs = generateDestChainConfigArgs();
+    EVM2EVMMultiOnRamp.DestChainConfigArgs memory destChainConfigArg = destChainConfigArgs[0];
 
     // Changing prevOnRamp on already set destination chain
-    destChainConfigArg.destChainSelector = DEST_CHAIN_SELECTOR;
     destChainConfigArg.prevOnRamp = address(1);
     vm.expectRevert(
       abi.encodeWithSelector(EVM2EVMMultiOnRamp.InvalidDestChainConfig.selector, destChainConfigArg.destChainSelector)
