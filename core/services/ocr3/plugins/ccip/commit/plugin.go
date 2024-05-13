@@ -585,7 +585,7 @@ func (p *Plugin) validateObservedGasAndTokenPrices(gasPrices []model.GasPriceCha
 func (p *Plugin) knownSourceChainsSlice() []model.ChainSelector {
 	knownSourceChainsSlice := p.knownSourceChains.ToSlice()
 	sort.Slice(knownSourceChainsSlice, func(i, j int) bool { return knownSourceChainsSlice[i] < knownSourceChainsSlice[j] })
-	return knownSourceChainsSlice
+	return slicelib.Filter(knownSourceChainsSlice, func(ch model.ChainSelector) bool { return ch != p.cfg.DestChain })
 }
 
 type observedMsgsConsensus struct {
