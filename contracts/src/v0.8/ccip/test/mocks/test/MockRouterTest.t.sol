@@ -1,7 +1,7 @@
 pragma solidity ^0.8.0;
 
 import {Client} from "../../../libraries/Client.sol";
-import {MockCCIPRouter, IRouter, IRouterClient} from "../MockRouter.sol";
+import {IRouter, IRouterClient, MockCCIPRouter} from "../MockRouter.sol";
 
 import {Test} from "forge-std/Test.sol";
 
@@ -19,7 +19,7 @@ contract MockRouterTest is Test {
     mockRouter.setFee(0.1 ether);
 
     deal(address(this), 100 ether);
-  
+
     message.receiver = abi.encode(address(0x12345));
     message.data = abi.encode("Hello World");
   }
@@ -36,14 +36,14 @@ contract MockRouterTest is Test {
   }
 
   function test_ccipSendWithInvalidMsgValue_Revert() public {
-    message.feeToken = address(1);//Set to non native-token fees
+    message.feeToken = address(1); //Set to non native-token fees
 
     vm.expectRevert(IRouterClient.InvalidMsgValue.selector);
     mockRouter.ccipSend{value: 0.1 ether}(mockChainSelector, message);
   }
 
   function test_ccipSendWithValidMsgValueAndNonNativeFeeToken_Success() public {
-    message.feeToken = address(1);//Set to non native-token fees
+    message.feeToken = address(1); //Set to non native-token fees
 
     mockRouter.ccipSend(mockChainSelector, message);
   }

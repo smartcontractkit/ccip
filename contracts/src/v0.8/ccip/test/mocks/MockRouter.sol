@@ -28,7 +28,7 @@ contract MockCCIPRouter is IRouter, IRouterClient {
   uint16 public constant GAS_FOR_CALL_EXACT_CHECK = 5_000;
   uint64 public constant DEFAULT_GAS_LIMIT = 200_000;
 
-  uint256 public MockFeeTokenAmount;//use setFee() to change to non-zero to test fees
+  uint256 public MockFeeTokenAmount; //use setFee() to change to non-zero to test fees
 
   function routeMessage(
     Client.Any2EVMMessage calldata message,
@@ -84,7 +84,7 @@ contract MockCCIPRouter is IRouter, IRouterClient {
     } else {
       if (msg.value > 0) revert InvalidMsgValue();
     }
-    
+
     // if (feeTokenAmount != 0) {
     //   if (message.feeToken == address(0) && msg.value < feeTokenAmount) revert InsufficientFeeTokenAmount();
     //   if (message.feeToken != address(0) && msg.value != 0) revert InvalidMsgValue();
@@ -139,7 +139,7 @@ contract MockCCIPRouter is IRouter, IRouterClient {
   function setFee(uint256 _feeAmount) public returns (uint256) {
     MockFeeTokenAmount = _feeAmount;
     return _feeAmount;
-  } 
+  }
 
   /// @notice Always returns address(1234567890)
   function getOnRamp(uint64 /* destChainSelector */ ) external pure returns (address onRampAddress) {
