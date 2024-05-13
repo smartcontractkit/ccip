@@ -55,64 +55,25 @@ contract EVM2EVMMultiOnRamp_constructor is EVM2EVMMultiOnRampSetup {
       getMultiOnRampNopsAndWeights()
     );
 
+    EVM2EVMMultiOnRamp.DestChainConfig memory expectedDestChainConfig = EVM2EVMMultiOnRamp.DestChainConfig({
+      dynamicConfig: destChainConfigArg.dynamicConfig,
+      prevOnRamp: address(0),
+      sequenceNumber: 0,
+      metadataHash: keccak256(
+        abi.encode(
+          Internal.EVM_2_EVM_MESSAGE_HASH, SOURCE_CHAIN_SELECTOR, destChainConfigArg.destChainSelector, address(s_onRamp)
+        )
+        )
+    });
+
     EVM2EVMMultiOnRamp.StaticConfig memory gotStaticConfig = s_onRamp.getStaticConfig();
-    assertEq(staticConfig.linkToken, gotStaticConfig.linkToken);
-    assertEq(staticConfig.chainSelector, gotStaticConfig.chainSelector);
-    assertEq(staticConfig.maxNopFeesJuels, gotStaticConfig.maxNopFeesJuels);
-    assertEq(staticConfig.rmnProxy, gotStaticConfig.rmnProxy);
+    assertStaticConfigsEqual(staticConfig, gotStaticConfig);
 
     EVM2EVMMultiOnRamp.DynamicConfig memory gotDynamicConfig = s_onRamp.getDynamicConfig();
-    assertEq(dynamicConfig.router, gotDynamicConfig.router);
-    assertEq(dynamicConfig.priceRegistry, gotDynamicConfig.priceRegistry);
-    assertEq(dynamicConfig.tokenAdminRegistry, gotDynamicConfig.tokenAdminRegistry);
+    assertDynamicConfigsEqual(dynamicConfig, gotDynamicConfig);
 
     EVM2EVMMultiOnRamp.DestChainConfig memory gotDestChainConfig = s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR);
-    assertEq(destChainConfigArg.dynamicConfig.isEnabled, gotDestChainConfig.dynamicConfig.isEnabled);
-    assertEq(
-      destChainConfigArg.dynamicConfig.maxNumberOfTokensPerMsg, gotDestChainConfig.dynamicConfig.maxNumberOfTokensPerMsg
-    );
-    assertEq(destChainConfigArg.dynamicConfig.maxDataBytes, gotDestChainConfig.dynamicConfig.maxDataBytes);
-    assertEq(destChainConfigArg.dynamicConfig.maxPerMsgGasLimit, gotDestChainConfig.dynamicConfig.maxPerMsgGasLimit);
-    assertEq(destChainConfigArg.dynamicConfig.destGasOverhead, gotDestChainConfig.dynamicConfig.destGasOverhead);
-    assertEq(
-      destChainConfigArg.dynamicConfig.destGasPerPayloadByte, gotDestChainConfig.dynamicConfig.destGasPerPayloadByte
-    );
-    assertEq(
-      destChainConfigArg.dynamicConfig.destDataAvailabilityOverheadGas,
-      gotDestChainConfig.dynamicConfig.destDataAvailabilityOverheadGas
-    );
-    assertEq(
-      destChainConfigArg.dynamicConfig.destGasPerDataAvailabilityByte,
-      gotDestChainConfig.dynamicConfig.destGasPerDataAvailabilityByte
-    );
-    assertEq(
-      destChainConfigArg.dynamicConfig.destDataAvailabilityMultiplierBps,
-      gotDestChainConfig.dynamicConfig.destDataAvailabilityMultiplierBps
-    );
-    assertEq(
-      destChainConfigArg.dynamicConfig.defaultTokenFeeUSDCents, gotDestChainConfig.dynamicConfig.defaultTokenFeeUSDCents
-    );
-    assertEq(
-      destChainConfigArg.dynamicConfig.defaultTokenDestGasOverhead,
-      gotDestChainConfig.dynamicConfig.defaultTokenDestGasOverhead
-    );
-    assertEq(
-      destChainConfigArg.dynamicConfig.defaultTokenDestBytesOverhead,
-      gotDestChainConfig.dynamicConfig.defaultTokenDestBytesOverhead
-    );
-    assertEq(destChainConfigArg.dynamicConfig.defaultTxGasLimit, gotDestChainConfig.dynamicConfig.defaultTxGasLimit);
-    assertEq(destChainConfigArg.prevOnRamp, gotDestChainConfig.prevOnRamp);
-    assertEq(
-      keccak256(
-        abi.encode(
-          Internal.EVM_2_EVM_MESSAGE_HASH,
-          staticConfig.chainSelector,
-          destChainConfigArg.destChainSelector,
-          address(s_onRamp)
-        )
-      ),
-      gotDestChainConfig.metadataHash
-    );
+    assertDestChainConfigsEqual(expectedDestChainConfig, gotDestChainConfig);
 
     // Initial values
     assertEq("EVM2EVMMultiOnRamp 1.6.0-dev", s_onRamp.typeAndVersion());
@@ -214,9 +175,8 @@ contract EVM2EVMMultiOnRamp_applyDestChainConfigUpdates is EVM2EVMMultiOnRampSet
 
     s_onRamp.applyDestChainConfigUpdates(newDestChainConfigArgs);
 
-    assertEq(
-      keccak256(abi.encode(expectedDestChainConfig)),
-      keccak256(abi.encode(s_onRamp.getDestChainConfig(destChainConfigArgs.destChainSelector)))
+    assertDestChainConfigsEqual(
+      expectedDestChainConfig, s_onRamp.getDestChainConfig(destChainConfigArgs.destChainSelector)
     );
   }
 
@@ -266,8 +226,8 @@ contract EVM2EVMMultiOnRamp_applyDestChainConfigUpdates is EVM2EVMMultiOnRampSet
     EVM2EVMMultiOnRamp.DestChainConfig memory gotDestChainConfig0 = s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR);
     EVM2EVMMultiOnRamp.DestChainConfig memory gotDestChainConfig1 = s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR + 1);
 
-    assertEq(keccak256(abi.encode(expectedDestChainConfig0)), keccak256(abi.encode(gotDestChainConfig0)));
-    assertEq(keccak256(abi.encode(expectedDestChainConfig1)), keccak256(abi.encode(gotDestChainConfig1)));
+    assertDestChainConfigsEqual(expectedDestChainConfig0, gotDestChainConfig0);
+    assertDestChainConfigsEqual(expectedDestChainConfig1, gotDestChainConfig1);
   }
 
   function test_InvalidDestChainConfig_Revert() public {
