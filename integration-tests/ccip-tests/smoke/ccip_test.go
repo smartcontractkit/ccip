@@ -123,6 +123,7 @@ func TestSmokeCCIPRateLimit(t *testing.T) {
 	for _, test := range tests {
 		tc := test
 		t.Run(fmt.Sprintf("%s - Rate Limit", tc.testName), func(t *testing.T) {
+			t.Parallel()
 			tc.lane.Test = t
 			src := tc.lane.Source
 			// add liquidity to pools on both networks
@@ -447,9 +448,16 @@ func TestSmokeCCIPSelfServeRateLimit(t *testing.T) {
 				limitedTokenIndex = 1
 
 				freeSrcToken     = src.Common.BridgeTokens[freeTokenIndex]
+				freeDestToken    = dest.Common.BridgeTokens[freeTokenIndex]
 				limitedSrcToken  = src.Common.BridgeTokens[limitedTokenIndex]
 				limitedDestToken = dest.Common.BridgeTokens[limitedTokenIndex]
 			)
+			tc.lane.Logger.Info().
+				Str("Free Source Token", freeSrcToken.Address()).
+				Str("Free Dest Token", freeDestToken.Address()).
+				Str("Limited Source Token", limitedSrcToken.Address()).
+				Str("Limited Dest Token", limitedDestToken.Address()).
+				Msg("Tokens for rate limit testing")
 
 			err := tc.lane.DisableAllRateLimiting()
 			require.NoError(t, err, "Error disabling rate limits")
@@ -492,14 +500,37 @@ func TestSmokeCCIPSelfServeRateLimit(t *testing.T) {
 			tc.lane.RecordStateBeforeTransfer()
 			err = tc.lane.SendRequests(1, big.NewInt(600_000))
 			require.NoError(t, err, "Failed to send rate limited token transfer")
-			err = tc.lane.Dest.AssertNoExecutionStateChangedEventReceived(tc.lane.Logger, time.Minute*5, lastSeen)
+			// DEBUG: Figuring out if this time is long enough.
+			err = tc.lane.Dest.AssertNoExecutionStateChangedEventReceived(tc.lane.Logger, time.Minute*30, lastSeen)
+			// err = tc.lane.Dest.AssertNoExecutionStateChangedEventReceived(tc.lane.Logger, time.Minute*5, lastSeen)
 			require.NoError(t, err, "Rate limited token transfer should not get to ExecutionStateChanged")
 			tc.lane.Logger.Info().
 				Str("Token", limitedSrcToken.ContractAddress.Hex()).
 				Msg("Limited token transfer failed on destination chain (a good thing in this context)")
 
+			// DEBUG: This fails with
+			// could not find the commit phase in the request stats, reqNo 1
+			// Seems it expects the transaction to at least get to the commit phase?
+			err = tc.lane.ExecuteManually()
+			require.Error(t, err, "There should be errors executing manually")
+
+			// DEBUG: This is the problem. Nothing else can go through as the above tx is stuck in the queue
+			// Ask Ani: Can we just break this into two or more tests? This seems fragile.
+			src.TransferAmount[freeTokenIndex] = overLimitAmount
+			src.TransferAmount[limitedTokenIndex] = big.NewInt(0)
+			tc.lane.RecordStateBeforeTransfer()
+			err = tc.lane.SendRequests(1, big.NewInt(600_000))
+			require.NoError(t, err, "Unlimited token transfer failed")
+			tc.lane.ValidateRequests(true)
+			tc.lane.Logger.Info().Str("Token", freeSrcToken.ContractAddress.Hex()).Msg("Unlimited token transfer succeeded")
+
 			// Enable aggregate rate limiting on the source chain for the limited token
-			err = src.SetTokenTransferFeeConfig(true)
+			err = src.OnRamp.SetTokenTransferFeeConfig([]evm_2_evm_onramp.EVM2EVMOnRampTokenTransferFeeConfigArgs{
+				{
+					Token:                     limitedSrcToken.ContractAddress,
+					AggregateRateLimitEnabled: true,
+				},
+			})
 			require.NoError(t, err, "Error setting OnRamp rate limits")
 			err = src.OnRamp.SetRateLimit(evm_2_evm_onramp.RateLimiterConfig{
 				IsEnabled: true,
@@ -509,6 +540,8 @@ func TestSmokeCCIPSelfServeRateLimit(t *testing.T) {
 			require.NoError(t, err, "Error setting OnRamp rate limits")
 			err = src.Common.ChainClient.WaitForEvents()
 			require.NoError(t, err, "Error waiting for events")
+
+			// Send limited token with rate limit that should fail on the source chain
 			tc.lane.Logger.Debug().Str("Token", limitedSrcToken.ContractAddress.Hex()).Msg("Enabled aggregate rate limit on OnRamp")
 			failedTx, _, _, err := tc.lane.Source.SendRequest(tc.lane.Dest.ReceiverDapp.EthAddress, big.NewInt(600_000))
 			require.Error(t, err, "Limited token transfer should immediately revert")

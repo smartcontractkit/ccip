@@ -1253,9 +1253,9 @@ func (sourceCCIP *SourceCCIPModule) LoadContracts(conf *laneconfig.LaneConfig) {
 	}
 }
 
-// SetTokenTransferFeeConfig sets the transfer fee config for all BridgeTokens on the CCIP source chain.
+// SetAllTokenTransferFeeConfigs sets a default transfer fee config for all BridgeTokens on the CCIP source chain.
 // enableAggregateRateLimit is used to enable/disable aggregate rate limit for all BridgeTokens.
-func (sourceCCIP *SourceCCIPModule) SetTokenTransferFeeConfig(enableAggregateRateLimit bool) error {
+func (sourceCCIP *SourceCCIPModule) SetAllTokenTransferFeeConfigs(enableAggregateRateLimit bool) error {
 	var tokenTransferFeeConfig []evm_2_evm_onramp.EVM2EVMOnRampTokenTransferFeeConfigArgs
 	for i, token := range sourceCCIP.Common.BridgeTokens {
 		destByteOverhead := uint32(0)
@@ -1374,7 +1374,7 @@ func (sourceCCIP *SourceCCIPModule) DeployContracts(lane *laneconfig.LaneConfig)
 		}
 
 		// now sync the pools and tokens
-		err := sourceCCIP.SetTokenTransferFeeConfig(true)
+		err := sourceCCIP.SetAllTokenTransferFeeConfigs(true)
 		if err != nil {
 			return err
 		}
@@ -2067,17 +2067,21 @@ func (destCCIP *DestCCIPModule) AssertNoReportAcceptedEventReceived(lggr zerolog
 }
 
 // AssertNoExecutionStateChangedEventReceived validates that no ExecutionStateChangedEvent is emitted for mentioned timeRange after lastSeenTimestamp
-func (destCCIP *DestCCIPModule) AssertNoExecutionStateChangedEventReceived(lggr zerolog.Logger, timeRange time.Duration, lastSeenTimestamp time.Time) error {
+func (destCCIP *DestCCIPModule) AssertNoExecutionStateChangedEventReceived(
+	lggr zerolog.Logger,
+	timeRange time.Duration,
+	lastSeenTimestamp time.Time,
+) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeRange)
 	defer cancel()
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
-	lggr.Info().Dur("Wait Time", timeRange).Time("Since", lastSeenTimestamp).Msg("Waiting to ensure no ExecutionStateChanged event")
+	lggr.Info().Str("Wait Time", timeRange.String()).Time("Since", lastSeenTimestamp).Msg("Waiting to ensure no ExecutionStateChanged event")
 	for {
 		select {
 		case <-ticker.C:
 			var eventFoundAfterCursing *time.Time
-			// verify if executionstate changed is received, it's not generated after provided lastSeenTimestamp
+			// verify if ExecutionStateChanged is received, it's not generated after provided lastSeenTimestamp
 			destCCIP.ExecStateChangedWatcher.Range(func(_, value any) bool {
 				e, exists := value.(*evm_2_evm_offramp.EVM2EVMOffRampExecutionStateChanged)
 				if exists {
@@ -2891,7 +2895,7 @@ func (lane *CCIPLane) DisableAllRateLimiting() error {
 	dest := lane.Dest
 
 	// Tell OnRamp to not include any tokens in ARL
-	err := src.SetTokenTransferFeeConfig(false)
+	err := src.SetAllTokenTransferFeeConfigs(false)
 	if err != nil {
 		return fmt.Errorf("error disabling token transfer fee config for OnRamp: %w", err)
 	}
