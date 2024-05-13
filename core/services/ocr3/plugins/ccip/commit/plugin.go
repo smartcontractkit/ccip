@@ -186,7 +186,7 @@ func (p *Plugin) ObservationQuorum(_ ocr3types.OutcomeContext, _ types.Query) (o
 func (p *Plugin) Outcome(_ ocr3types.OutcomeContext, _ types.Query, aos []types.AttributedObservation) (ocr3types.Outcome, error) {
 	observerMsgSeqNums := make(map[commontypes.OracleID]map[model.ChainSelector]mapset.Set[model.SeqNum])
 	msgsFromObservations := make([]model.CCIPMsgBaseDetails, 0)
-	maxSeqNumsObservations := make(map[model.ChainSelector]mapset.Set[model.SeqNum])
+	maxSeqNumsObservations := make(map[model.ChainSelector][]model.SeqNum)
 
 	p.lggr.Debugw("calculating outcome", "observations", len(aos))
 	for _, ao := range aos {
@@ -197,9 +197,9 @@ func (p *Plugin) Outcome(_ ocr3types.OutcomeContext, _ types.Query, aos []types.
 
 		for _, maxSeqNum := range obs.MaxSeqNums {
 			if _, exists := maxSeqNumsObservations[maxSeqNum.ChainSel]; !exists {
-				maxSeqNumsObservations[maxSeqNum.ChainSel] = mapset.NewSet[model.SeqNum]()
+				maxSeqNumsObservations[maxSeqNum.ChainSel] = make([]model.SeqNum, 0)
 			}
-			maxSeqNumsObservations[maxSeqNum.ChainSel].Add(maxSeqNum.SeqNum)
+			maxSeqNumsObservations[maxSeqNum.ChainSel] = append(maxSeqNumsObservations[maxSeqNum.ChainSel], maxSeqNum.SeqNum)
 		}
 
 		p.lggr.Debugw("processing observation", "observer", ao.Observer, "msgs", len(obs.NewMsgs))
@@ -223,7 +223,11 @@ func (p *Plugin) Outcome(_ ocr3types.OutcomeContext, _ types.Query, aos []types.
 	}
 	p.lggr.Debugw("total observed messages across all followers", "msgs", len(msgsFromObservations))
 
-	maxSeqNumsConsensus := p.maxSeqNumsConsensus(maxSeqNumsObservations)
+	maxSeqNumsConsensus, err := p.maxSeqNumsConsensus(maxSeqNumsObservations)
+	if err != nil {
+		return ocr3types.Outcome{}, fmt.Errorf("calculate max sequence numbers consensus: %w", err)
+	}
+
 	p.lggr.Debugw("max sequence numbers consensus", "maxSeqNumsConsensus", maxSeqNumsConsensus)
 
 	// Group messages by source chain.
@@ -389,18 +393,17 @@ func (p *Plugin) observedMsgsConsensus(chainSel model.ChainSelector, observedMsg
 	}, nil
 }
 
-func (p *Plugin) maxSeqNumsConsensus(maxSeqNumsObservations map[model.ChainSelector]mapset.Set[model.SeqNum]) []model.SeqNumChain {
+func (p *Plugin) maxSeqNumsConsensus(maxSeqNumsObservations map[model.ChainSelector][]model.SeqNum) ([]model.SeqNumChain, error) {
 	maxSeqNumsConsensus := make(map[model.ChainSelector]model.SeqNum)
 
-	for ch, observedMaxSeqNums := range maxSeqNumsObservations {
-		fChain, ok := p.cfg.FChain[ch]
-		if !ok {
-			p.lggr.Errorw("fChain not found for chain", "chain", ch)
-			continue
-		}
-		seqNumsSlice := observedMaxSeqNums.ToSlice()
-		sort.Slice(seqNumsSlice, func(i, j int) bool { return seqNumsSlice[i] < seqNumsSlice[j] })
-		maxSeqNum := seqNumsSlice[fChain]
+	fChain, ok := p.cfg.FChain[p.cfg.DestChain]
+	if !ok {
+		return nil, fmt.Errorf("fchain not found for chain %d", p.cfg.DestChain)
+	}
+
+	for ch, observedSeqNums := range maxSeqNumsObservations {
+		sort.Slice(observedSeqNums, func(i, j int) bool { return observedSeqNums[i] < observedSeqNums[j] })
+		maxSeqNum := observedSeqNums[fChain]
 		maxSeqNumsConsensus[ch] = maxSeqNum
 	}
 
@@ -408,7 +411,8 @@ func (p *Plugin) maxSeqNumsConsensus(maxSeqNumsObservations map[model.ChainSelec
 	for ch, maxSeqNum := range maxSeqNumsConsensus {
 		res = append(res, model.NewSeqNumChain(ch, maxSeqNum))
 	}
-	return res
+
+	return res, nil
 }
 
 // validateObservedSequenceNumbers checks if the sequence numbers of the provided messages are unique for each chain and
