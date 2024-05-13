@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.19;
+pragma solidity 0.8.24;
 
 import {ITypeAndVersion} from "../../shared/interfaces/ITypeAndVersion.sol";
-import {IARM} from "../interfaces/IARM.sol";
 import {IEVM2AnyOnRamp} from "../interfaces/IEVM2AnyOnRamp.sol";
 import {IEVM2AnyOnRampClient} from "../interfaces/IEVM2AnyOnRampClient.sol";
 import {IPool} from "../interfaces/IPool.sol";
 import {IPriceRegistry} from "../interfaces/IPriceRegistry.sol";
+import {IRMN} from "../interfaces/IRMN.sol";
 import {ITokenAdminRegistry} from "../interfaces/ITokenAdminRegistry.sol";
 import {ILinkAvailable} from "../interfaces/automation/ILinkAvailable.sol";
 
@@ -48,7 +48,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   error RouterMustSetOriginalSender();
   error InvalidConfig();
   error InvalidAddress(bytes encodedAddress);
-  error BadARMSignal();
+  error CursedByRMN();
   error LinkBalanceNotSettled();
   error InvalidNopAddress(address nop);
   error NotAFeeToken(address token);
@@ -75,7 +75,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     uint64 defaultTxGasLimit; //  │ Default gas limit for a tx
     uint96 maxNopFeesJuels; // ───╯ Max nop fee balance onramp can have
     address prevOnRamp; //          Address of previous-version OnRamp
-    address armProxy; //            Address of ARM proxy
+    address rmnProxy; //            Address of RMN proxy
   }
 
   /// @dev Struct to contains the dynamic configuration
@@ -167,8 +167,8 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   /// @dev The address of previous-version OnRamp for this lane
   /// Used to be able to provide sequencing continuity during a zero downtime upgrade.
   address internal immutable i_prevOnRamp;
-  /// @dev The address of the arm proxy
-  address internal immutable i_armProxy;
+  /// @dev The address of the RMN proxy
+  address internal immutable i_rmnProxy;
   /// @dev the maximum number of nops that can be configured at the same time.
   /// Used to bound gas for loops over nops.
   uint256 private constant MAX_NUMBER_OF_NOPS = 64;
@@ -208,7 +208,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   ) AggregateRateLimiter(rateLimiterConfig) {
     if (
       staticConfig.linkToken == address(0) || staticConfig.chainSelector == 0 || staticConfig.destChainSelector == 0
-        || staticConfig.defaultTxGasLimit == 0 || staticConfig.armProxy == address(0)
+        || staticConfig.defaultTxGasLimit == 0 || staticConfig.rmnProxy == address(0)
     ) revert InvalidConfig();
 
     i_metadataHash = keccak256(
@@ -222,7 +222,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     i_defaultTxGasLimit = staticConfig.defaultTxGasLimit;
     i_maxNopFeesJuels = staticConfig.maxNopFeesJuels;
     i_prevOnRamp = staticConfig.prevOnRamp;
-    i_armProxy = staticConfig.armProxy;
+    i_rmnProxy = staticConfig.rmnProxy;
 
     _setDynamicConfig(dynamicConfig);
     _setFeeTokenConfig(feeTokenConfigs);
@@ -257,7 +257,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     uint256 feeTokenAmount,
     address originalSender
   ) external returns (bytes32) {
-    if (IARM(i_armProxy).isCursed()) revert BadARMSignal();
+    if (IRMN(i_rmnProxy).isCursed(bytes32(uint256(destChainSelector)))) revert CursedByRMN();
     // Validate message sender is set and allowed. Not validated in `getFee` since it is not user-driven.
     if (originalSender == address(0)) revert RouterMustSetOriginalSender();
     // Router address may be zero intentionally to pause.
@@ -427,7 +427,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
       defaultTxGasLimit: i_defaultTxGasLimit,
       maxNopFeesJuels: i_maxNopFeesJuels,
       prevOnRamp: i_prevOnRamp,
-      armProxy: i_armProxy
+      rmnProxy: i_rmnProxy
     });
   }
 
@@ -458,7 +458,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
         defaultTxGasLimit: i_defaultTxGasLimit,
         maxNopFeesJuels: i_maxNopFeesJuels,
         prevOnRamp: i_prevOnRamp,
-        armProxy: i_armProxy
+        rmnProxy: i_rmnProxy
       }),
       dynamicConfig
     );
@@ -870,7 +870,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   }
 
   // ================================================================
-  // │                        Access and ARM                        │
+  // │                           Access                             │
   // ================================================================
 
   /// @dev Require that the sender is the owner or the fee admin

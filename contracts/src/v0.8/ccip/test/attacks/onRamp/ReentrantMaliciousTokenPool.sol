@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.19;
+pragma solidity 0.8.24;
 
 import {Pool} from "../../../libraries/Pool.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
@@ -15,9 +15,9 @@ contract ReentrantMaliciousTokenPool is TokenPool {
   constructor(
     address facade,
     IERC20 token,
-    address armProxy,
+    address rmnProxy,
     address router
-  ) TokenPool(token, new address[](0), armProxy, router) {
+  ) TokenPool(token, new address[](0), rmnProxy, router) {
     i_facade = facade;
   }
 

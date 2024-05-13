@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.19;
+pragma solidity 0.8.24;
 
 import {ICommitStore} from "../../interfaces/ICommitStore.sol";
 import {IPool} from "../../interfaces/IPool.sol";
 
 import {CallWithExactGas} from "../../../shared/call/CallWithExactGas.sol";
-import {ARM} from "../../ARM.sol";
 import {AggregateRateLimiter} from "../../AggregateRateLimiter.sol";
+import {RMN} from "../../RMN.sol";
 import {Router} from "../../Router.sol";
 import {Client} from "../../libraries/Client.sol";
 import {Internal} from "../../libraries/Internal.sol";
@@ -38,7 +38,7 @@ contract EVM2EVMOffRamp_constructor is EVM2EVMOffRampSetup {
       sourceChainSelector: SOURCE_CHAIN_SELECTOR,
       onRamp: ON_RAMP_ADDRESS,
       prevOffRamp: address(0),
-      armProxy: address(s_mockARM)
+      rmnProxy: address(s_mockRMN)
     });
     EVM2EVMOffRamp.DynamicConfig memory dynamicConfig =
       generateDynamicOffRampConfig(address(s_destRouter), address(s_priceRegistry));
@@ -81,7 +81,7 @@ contract EVM2EVMOffRamp_constructor is EVM2EVMOffRampSetup {
         sourceChainSelector: SOURCE_CHAIN_SELECTOR,
         onRamp: ZERO_ADDRESS,
         prevOffRamp: address(0),
-        armProxy: address(s_mockARM)
+        rmnProxy: address(s_mockRMN)
       }),
       RateLimiter.Config({isEnabled: true, rate: 1e20, capacity: 1e20})
     );
@@ -99,7 +99,7 @@ contract EVM2EVMOffRamp_constructor is EVM2EVMOffRampSetup {
         sourceChainSelector: SOURCE_CHAIN_SELECTOR,
         onRamp: ON_RAMP_ADDRESS,
         prevOffRamp: address(0),
-        armProxy: address(s_mockARM)
+        rmnProxy: address(s_mockRMN)
       }),
       getInboundRateLimiterConfig()
     );
@@ -185,6 +185,8 @@ contract EVM2EVMOffRamp_ccipReceive is EVM2EVMOffRampSetup {
 }
 
 contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
+  event SkippedAlreadyExecutedMessage(uint64 indexed sequenceNumber);
+
   error PausedError();
 
   function test_SingleMessageNoTokens_Success() public {
@@ -308,6 +310,22 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
 
     vm.expectEmit();
     emit SkippedIncorrectNonce(messages[1].nonce, messages[1].sender);
+
+    s_offRamp.execute(_generateReportFromMessages(messages), new uint256[](0));
+  }
+
+  function test__execute_SkippedAlreadyExecutedMessage_Success() public {
+    Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages();
+
+    vm.expectEmit();
+    emit ExecutionStateChanged(
+      messages[0].sequenceNumber, messages[0].messageId, Internal.MessageExecutionState.SUCCESS, ""
+    );
+
+    s_offRamp.execute(_generateReportFromMessages(messages), new uint256[](0));
+
+    vm.expectEmit();
+    emit SkippedAlreadyExecutedMessage(messages[0].sequenceNumber);
 
     s_offRamp.execute(_generateReportFromMessages(messages), new uint256[](0));
   }
@@ -488,13 +506,13 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
   }
 
   function test_Unhealthy_Revert() public {
-    s_mockARM.voteToCurse(0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff);
-    vm.expectRevert(EVM2EVMOffRamp.BadARMSignal.selector);
+    s_mockRMN.voteToCurse(0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff);
+    vm.expectRevert(EVM2EVMOffRamp.CursedByRMN.selector);
     s_offRamp.execute(_generateReportFromMessages(_generateMessagesWithTokens()), new uint256[](0));
     // Uncurse should succeed
-    ARM.UnvoteToCurseRecord[] memory records = new ARM.UnvoteToCurseRecord[](1);
-    records[0] = ARM.UnvoteToCurseRecord({curseVoteAddr: OWNER, cursesHash: bytes32(uint256(0)), forceUnvote: true});
-    s_mockARM.ownerUnvoteToCurse(records);
+    RMN.UnvoteToCurseRecord[] memory records = new RMN.UnvoteToCurseRecord[](1);
+    records[0] = RMN.UnvoteToCurseRecord({curseVoteAddr: OWNER, cursesHash: bytes32(uint256(0)), forceUnvote: true});
+    s_mockRMN.ownerUnvoteToCurse(records);
     s_offRamp.execute(_generateReportFromMessages(_generateMessagesWithTokens()), new uint256[](0));
   }
 
