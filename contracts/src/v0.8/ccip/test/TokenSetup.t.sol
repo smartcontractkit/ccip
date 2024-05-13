@@ -112,7 +112,7 @@ contract TokenSetup is RouterSetup {
     _deployTokenAndBurnMintPool(destEth, false);
 
     // Float the dest link lock release pool with funds
-    IERC20(destLink).transfer(s_destPoolByToken[destLink], POOL_BALANCE);
+    IERC20(destLink).transfer(s_destPoolByToken[destLink], 1000 ether);
 
     s_tokenAdminRegistry = new TokenAdminRegistry();
 

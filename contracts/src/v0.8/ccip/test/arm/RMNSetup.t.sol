@@ -7,6 +7,25 @@ import {RMN} from "../../RMN.sol";
 import {BaseTest} from "../BaseTest.t.sol";
 
 contract RMNSetup is BaseTest {
+  address internal constant BLESS_VOTER_1 = address(1);
+  address internal constant CURSE_VOTER_1 = address(10);
+  address internal constant CURSE_UNVOTER_1 = address(110);
+  address internal constant BLESS_VOTER_2 = address(2);
+  address internal constant CURSE_VOTER_2 = address(12);
+  address internal constant CURSE_UNVOTER_2 = address(112);
+  address internal constant BLESS_VOTER_3 = address(3);
+  address internal constant CURSE_VOTER_3 = address(13);
+  address internal constant CURSE_UNVOTER_3 = address(113);
+  address internal constant BLESS_VOTER_4 = address(4);
+  address internal constant CURSE_VOTER_4 = address(14);
+  address internal constant CURSE_UNVOTER_4 = address(114);
+
+  uint8 internal constant ZERO = 0;
+  uint8 internal constant WEIGHT_1 = 1;
+  uint8 internal constant WEIGHT_10 = 10;
+  uint8 internal constant WEIGHT_20 = 20;
+  uint8 internal constant WEIGHT_40 = 40;
+
   function makeTaggedRootsInclusive(uint256 from, uint256 to) internal pure returns (IRMN.TaggedRoot[] memory) {
     IRMN.TaggedRoot[] memory votes = new IRMN.TaggedRoot[](to - from + 1);
     for (uint256 i = from; i <= to; ++i) {
@@ -38,6 +57,43 @@ contract RMNSetup is BaseTest {
     BaseTest.setUp();
     s_rmn = new RMN(rmnConstructorArgs());
     vm.stopPrank();
+  }
+
+  function rmnConstructorArgs() internal pure returns (RMN.Config memory) {
+    RMN.Voter[] memory voters = new RMN.Voter[](4);
+    voters[0] = RMN.Voter({
+      blessVoteAddr: BLESS_VOTER_1,
+      curseVoteAddr: CURSE_VOTER_1,
+      curseUnvoteAddr: CURSE_UNVOTER_1,
+      blessWeight: WEIGHT_1,
+      curseWeight: WEIGHT_1
+    });
+    voters[1] = RMN.Voter({
+      blessVoteAddr: BLESS_VOTER_2,
+      curseVoteAddr: CURSE_VOTER_2,
+      curseUnvoteAddr: CURSE_UNVOTER_2,
+      blessWeight: WEIGHT_10,
+      curseWeight: WEIGHT_10
+    });
+    voters[2] = RMN.Voter({
+      blessVoteAddr: BLESS_VOTER_3,
+      curseVoteAddr: CURSE_VOTER_3,
+      curseUnvoteAddr: CURSE_UNVOTER_3,
+      blessWeight: WEIGHT_20,
+      curseWeight: WEIGHT_20
+    });
+    voters[3] = RMN.Voter({
+      blessVoteAddr: BLESS_VOTER_4,
+      curseVoteAddr: CURSE_VOTER_4,
+      curseUnvoteAddr: CURSE_UNVOTER_4,
+      blessWeight: WEIGHT_40,
+      curseWeight: WEIGHT_40
+    });
+    return RMN.Config({
+      voters: voters,
+      blessWeightThreshold: WEIGHT_10 + WEIGHT_20 + WEIGHT_40,
+      curseWeightThreshold: WEIGHT_1 + WEIGHT_10 + WEIGHT_20 + WEIGHT_40
+    });
   }
 
   function hasVotedToBlessRoot(address voter, IRMN.TaggedRoot memory taggedRoot_) internal view returns (bool) {

@@ -85,6 +85,40 @@ contract PriceRegistrySetup is TokenSetup {
     s_priceRegistry.updatePrices(priceUpdates);
   }
 
+  function getPriceUpdatesStruct(
+    address[] memory tokens,
+    uint224[] memory prices
+  ) internal pure returns (Internal.PriceUpdates memory) {
+    uint256 length = tokens.length;
+
+    Internal.TokenPriceUpdate[] memory tokenPriceUpdates = new Internal.TokenPriceUpdate[](length);
+    for (uint256 i = 0; i < length; ++i) {
+      tokenPriceUpdates[i] = Internal.TokenPriceUpdate({sourceToken: tokens[i], usdPerToken: prices[i]});
+    }
+    Internal.PriceUpdates memory priceUpdates =
+      Internal.PriceUpdates({tokenPriceUpdates: tokenPriceUpdates, gasPriceUpdates: new Internal.GasPriceUpdate[](0)});
+
+    return priceUpdates;
+  }
+
+  function getEmptyPriceUpdates() internal pure returns (Internal.PriceUpdates memory priceUpdates) {
+    return Internal.PriceUpdates({
+      tokenPriceUpdates: new Internal.TokenPriceUpdate[](0),
+      gasPriceUpdates: new Internal.GasPriceUpdate[](0)
+    });
+  }
+
+  function getSingleTokenPriceFeedUpdateStruct(
+    address sourceToken,
+    address dataFeedAddress,
+    uint8 tokenDecimals
+  ) internal pure returns (PriceRegistry.TokenPriceFeedUpdate memory) {
+    return PriceRegistry.TokenPriceFeedUpdate({
+      sourceToken: sourceToken,
+      feedConfig: IPriceRegistry.TokenPriceFeedConfig({dataFeedAddress: dataFeedAddress, tokenDecimals: tokenDecimals})
+    });
+  }
+
   function _initialiseSingleTokenPriceFeed() internal returns (address) {
     PriceRegistry.TokenPriceFeedUpdate[] memory tokenPriceFeedUpdates = new PriceRegistry.TokenPriceFeedUpdate[](1);
     tokenPriceFeedUpdates[0] =
