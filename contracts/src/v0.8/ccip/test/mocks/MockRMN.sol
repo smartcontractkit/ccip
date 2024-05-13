@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.19;
+pragma solidity 0.8.24;
 
 import {RMN} from "../../RMN.sol";
 import {IRMN} from "../../interfaces/IRMN.sol";
@@ -43,8 +43,6 @@ contract MockRMN is IRMN, OwnerIsCreator {
   }
 
   function getConfigDetails() external view returns (uint32 version, uint32 blockNumber, RMN.Config memory config) {
-    version = s_versionedConfig.configVersion;
-    blockNumber = s_versionedConfig.blockNumber;
-    config = s_versionedConfig.config;
+    return (s_versionedConfig.configVersion, s_versionedConfig.blockNumber, s_versionedConfig.config);
   }
 }

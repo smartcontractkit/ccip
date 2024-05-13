@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.19;
+pragma solidity 0.8.24;
 
 import {IAny2EVMMessageReceiver} from "../../interfaces/IAny2EVMMessageReceiver.sol";
 import {ICommitStore} from "../../interfaces/ICommitStore.sol";
@@ -91,6 +91,20 @@ contract EVM2EVMMultiOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSet
       tokensToAdd[i] = EVM2EVMMultiOffRamp.RateLimitToken({sourceToken: s_sourceTokens[i], destToken: s_destTokens[i]});
     }
     s_offRamp.updateRateLimitTokens(new EVM2EVMMultiOffRamp.RateLimitToken[](0), tokensToAdd);
+  }
+
+  function generateDynamicMultiOffRampConfig(
+    address router,
+    address priceRegistry
+  ) internal pure returns (EVM2EVMMultiOffRamp.DynamicConfig memory) {
+    return EVM2EVMMultiOffRamp.DynamicConfig({
+      permissionLessExecutionThresholdSeconds: PERMISSION_LESS_EXECUTION_THRESHOLD_SECONDS,
+      router: router,
+      priceRegistry: priceRegistry,
+      maxNumberOfTokensPerMsg: MAX_TOKENS_LENGTH,
+      maxDataBytes: MAX_DATA_SIZE,
+      maxPoolReleaseOrMintGas: MAX_TOKEN_POOL_RELEASE_OR_MINT_GAS
+    });
   }
 
   function _convertToGeneralMessage(Internal.EVM2EVMMessage memory original)
