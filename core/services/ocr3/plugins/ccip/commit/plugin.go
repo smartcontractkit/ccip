@@ -253,7 +253,7 @@ func (p *Plugin) observeMaxSeqNumsPerChain(ctx context.Context, previousOutcomeB
 		}
 		p.lggr.Debugw("previous outcome decoded", "outcome", prevOutcome.String())
 
-		for _, seqNumChain := range prevOutcome.MaxSequenceNumbers {
+		for _, seqNumChain := range prevOutcome.MaxSeqNums {
 			if seqNumChain.SeqNum > seqNumPerChain[seqNumChain.ChainSel] {
 				seqNumPerChain[seqNumChain.ChainSel] = seqNumChain.SeqNum
 			}

@@ -1,6 +1,7 @@
 package model
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"math/big"
@@ -15,7 +16,10 @@ type TokenPrice struct {
 }
 
 func NewTokenPrice(tokenID types.Account, price *big.Int) TokenPrice {
-	return TokenPrice{TokenID: tokenID, Price: price}
+	return TokenPrice{
+		TokenID: tokenID,
+		Price:   price,
+	}
 }
 
 type GasPrice *big.Int
@@ -26,7 +30,10 @@ type GasPriceChain struct {
 }
 
 func NewGasPriceChain(gasPrice GasPrice, chainSel ChainSelector) GasPriceChain {
-	return GasPriceChain{GasPrice: gasPrice, ChainSel: chainSel}
+	return GasPriceChain{
+		GasPrice: gasPrice,
+		ChainSel: chainSel,
+	}
 }
 
 type SeqNum uint64
@@ -45,11 +52,11 @@ func (s SeqNumRange) End() SeqNum {
 	return s[1]
 }
 
-func (s SeqNumRange) SetStart(v SeqNum) {
+func (s *SeqNumRange) SetStart(v SeqNum) {
 	s[0] = v
 }
 
-func (s SeqNumRange) SetEnd(v SeqNum) {
+func (s *SeqNumRange) SetEnd(v SeqNum) {
 	s[1] = v
 }
 
@@ -80,4 +87,27 @@ type CCIPMsgBaseDetails struct {
 	ID          [32]byte      `json:"id"` // todo: json encode/decode to hex
 	SourceChain ChainSelector `json:"sourceChain,string"`
 	SeqNum      SeqNum        `json:"seqNum,string"`
+}
+
+type MerkleRoot [32]byte
+
+func (m MerkleRoot) String() string {
+	return "0x" + hex.EncodeToString(m[:])
+}
+
+func (m MerkleRoot) MarshalJSON() ([]byte, error) {
+	return []byte(fmt.Sprintf(`"%s"`, m.String())), nil
+}
+
+func (m *MerkleRoot) UnmarshalJSON(data []byte) error {
+	v := string(data)
+	if len(v) < 4 {
+		return fmt.Errorf("invalid MerkleRoot: %s", v)
+	}
+	b, err := hex.DecodeString(v[1 : len(v)-1][2:])
+	if err != nil {
+		return err
+	}
+	copy(m[:], b)
+	return nil
 }

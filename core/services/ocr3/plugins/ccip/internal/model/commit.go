@@ -40,14 +40,14 @@ func DecodeCommitPluginObservation(b []byte) (CommitPluginObservation, error) {
 }
 
 type CommitPluginOutcome struct {
-	MaxSequenceNumbers []SeqNumChain     `json:"maxSequenceNumbers"`
-	MerkleRoots        []MerkleRootChain `json:"merkleRoots"`
+	MaxSeqNums  []SeqNumChain     `json:"maxSeqNums"`
+	MerkleRoots []MerkleRootChain `json:"merkleRoots"`
 }
 
 func NewCommitPluginOutcome(seqNums []SeqNumChain, merkleRoots []MerkleRootChain) CommitPluginOutcome {
 	return CommitPluginOutcome{
-		MaxSequenceNumbers: seqNums,
-		MerkleRoots:        merkleRoots,
+		MaxSeqNums:  seqNums,
+		MerkleRoots: merkleRoots,
 	}
 }
 
@@ -62,12 +62,12 @@ func DecodeCommitPluginOutcome(b []byte) (CommitPluginOutcome, error) {
 }
 
 func (o CommitPluginOutcome) String() string {
-	return fmt.Sprintf("{MaxSequenceNumbers: %v, MerkleRoots: %v}", o.MaxSequenceNumbers, o.MerkleRoots)
+	return fmt.Sprintf("{MaxSeqNums: %v, MerkleRoots: %v}", o.MaxSeqNums, o.MerkleRoots)
 }
 
 type SeqNumChain struct {
-	ChainSel ChainSelector
-	SeqNum   SeqNum
+	ChainSel ChainSelector `json:"chainSel"`
+	SeqNum   SeqNum        `json:"seqNum"`
 }
 
 func NewSeqNumChain(chainSel ChainSelector, seqNum SeqNum) SeqNumChain {
@@ -80,10 +80,10 @@ func NewSeqNumChain(chainSel ChainSelector, seqNum SeqNum) SeqNumChain {
 type MerkleRootChain struct {
 	ChainSel     ChainSelector `json:"chain"`
 	SeqNumsRange SeqNumRange   `json:"seqNumsRange"`
-	MerkleRoot   [32]byte      `json:"merkleRoot"`
+	MerkleRoot   MerkleRoot    `json:"merkleRoot"`
 }
 
-func NewMerkleRootChain(chainSel ChainSelector, seqNumsRange SeqNumRange, merkleRoot [32]byte) MerkleRootChain {
+func NewMerkleRootChain(chainSel ChainSelector, seqNumsRange SeqNumRange, merkleRoot MerkleRoot) MerkleRootChain {
 	return MerkleRootChain{
 		ChainSel:     chainSel,
 		SeqNumsRange: seqNumsRange,
@@ -105,7 +105,8 @@ func NewCommitPluginReport(merkleRoots []MerkleRootChain, priceUpdates []TokenPr
 
 // IsEmpty returns true if the CommitPluginReport is empty
 func (r CommitPluginReport) IsEmpty() bool {
-	return len(r.MerkleRoots) == 0 && len(r.PriceUpdates) == 0
+	return len(r.MerkleRoots) == 0 &&
+		len(r.PriceUpdates) == 0
 }
 
 type TokenPriceUpdate struct {
