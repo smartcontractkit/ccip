@@ -155,90 +155,31 @@ func (p *Plugin) ObservationQuorum(_ ocr3types.OutcomeContext, _ types.Query) (o
 //   - Merkle Roots: One merkle tree root per source chain. The leaves of the tree are the IDs of the observed messages.
 //     The merkle root data type contains information about the chain and the sequence numbers range.
 func (p *Plugin) Outcome(_ ocr3types.OutcomeContext, _ types.Query, aos []types.AttributedObservation) (ocr3types.Outcome, error) {
-	observerMsgSeqNums := make(map[commontypes.OracleID]map[model.ChainSelector]mapset.Set[model.SeqNum])
-	msgsFromObservations := make([]model.CCIPMsgBaseDetails, 0)
-	maxSeqNumsObservations := make(map[model.ChainSelector][]model.SeqNum)
-
-	p.lggr.Debugw("calculating outcome", "observations", len(aos))
+	decodedObservations := make([]model.CommitPluginObservation, 0)
 	for _, ao := range aos {
 		obs, err := model.DecodeCommitPluginObservation(ao.Observation)
 		if err != nil {
 			return ocr3types.Outcome{}, fmt.Errorf("decode commit plugin observation: %w", err)
 		}
-
-		for _, maxSeqNum := range obs.MaxSeqNums {
-			if _, exists := maxSeqNumsObservations[maxSeqNum.ChainSel]; !exists {
-				maxSeqNumsObservations[maxSeqNum.ChainSel] = make([]model.SeqNum, 0)
-			}
-			maxSeqNumsObservations[maxSeqNum.ChainSel] = append(maxSeqNumsObservations[maxSeqNum.ChainSel], maxSeqNum.SeqNum)
-		}
-
-		p.lggr.Debugw("processing observation", "observer", ao.Observer, "msgs", len(obs.NewMsgs))
-		// Ignore observations that have duplicate sequence numbers coming from the same sender for the same chain.
-		for _, msg := range obs.NewMsgs {
-			if _, exists := observerMsgSeqNums[ao.Observer]; !exists {
-				observerMsgSeqNums[ao.Observer] = map[model.ChainSelector]mapset.Set[model.SeqNum]{}
-			}
-			if _, exists := observerMsgSeqNums[ao.Observer][msg.SourceChain]; !exists {
-				observerMsgSeqNums[ao.Observer][msg.SourceChain] = mapset.NewSet[model.SeqNum]()
-			}
-			if observerMsgSeqNums[ao.Observer][msg.SourceChain].Contains(msg.SeqNum) {
-				p.lggr.Warnw("duplicate follower sequence number in observation",
-					"observer", ao.Observer, "chain", msg.SourceChain, "seqNum", msg.SeqNum)
-				continue
-			}
-			observerMsgSeqNums[ao.Observer][msg.SourceChain].Add(msg.SeqNum)
-		}
-
-		msgsFromObservations = append(msgsFromObservations, obs.NewMsgs...)
+		decodedObservations = append(decodedObservations, obs)
 	}
-	p.lggr.Debugw("total observed messages across all followers", "msgs", len(msgsFromObservations))
 
-	maxSeqNumsConsensus, err := p.maxSeqNumsConsensus(maxSeqNumsObservations)
+	maxSeqNumsConsensus, err := p.maxSeqNumsConsensus(decodedObservations)
 	if err != nil {
-		return ocr3types.Outcome{}, fmt.Errorf("calculate max sequence numbers consensus: %w", err)
+		return ocr3types.Outcome{}, fmt.Errorf("max sequence numbers consensus: %w", err)
 	}
-
 	p.lggr.Debugw("max sequence numbers consensus", "maxSeqNumsConsensus", maxSeqNumsConsensus)
 
-	// Group messages by source chain.
-	sourceChains, groupedMsgs := slicelib.GroupBy(
-		msgsFromObservations, func(msg model.CCIPMsgBaseDetails) model.ChainSelector { return msg.SourceChain })
-	for _, sourceChain := range sourceChains {
-		p.lggr.Debugw("grouped messages by source chain", "sourceChain", sourceChain, "msgs", len(groupedMsgs[sourceChain]))
+	merkleRoots, err := p.newMsgsConsensus(maxSeqNumsConsensus, decodedObservations)
+	if err != nil {
+		return ocr3types.Outcome{}, fmt.Errorf("new messages consensus: %w", err)
 	}
+	p.lggr.Debugw("new messages consensus", "merkleRoots", merkleRoots)
 
-	// Come to consensus on the observed messages by source chain.
-	consensusBySourceChain := make(map[model.ChainSelector]observedMsgsConsensus)
-	for _, sourceChain := range sourceChains {
-		observedMsgs, ok := groupedMsgs[sourceChain]
-		if !ok {
-			p.lggr.Panicw("source chain not found in grouped messages", "sourceChain", sourceChain)
-		}
-
-		msgsConsensus, err := p.observedMsgsConsensus(sourceChain, observedMsgs)
-		if err != nil {
-			return ocr3types.Outcome{}, fmt.Errorf("calculate observed msgs consensus: %w", err)
-		}
-		consensusBySourceChain[sourceChain] = msgsConsensus
-		p.lggr.Debugw("observed messages consensus", "sourceChain", sourceChain, "consensus", msgsConsensus)
-	}
-
-	// Construct the outcome.
-	merkleRoots := make([]model.MerkleRootChain, 0)
-	for sourceChain, consensus := range consensusBySourceChain {
-		merkleRoots = append(merkleRoots, model.NewMerkleRootChain(sourceChain, consensus.seqNumRange, consensus.merkleRoot))
-	}
 	return model.NewCommitPluginOutcome(maxSeqNumsConsensus, merkleRoots).Encode()
 }
 
 func (p *Plugin) Reports(seqNr uint64, outcome ocr3types.Outcome) ([]ocr3types.ReportWithInfo[[]byte], error) {
-	/*
-		# Only a single report is needed containing a batch of gas price updates for the chain.
-		# and a list of roots by source. We only include the gas price batch update
-		# if a timer has expired - ie periodically we batch write all gas prices.
-	*/
-
 	outc, err := model.DecodeCommitPluginOutcome(outcome)
 	if err != nil {
 		return nil, fmt.Errorf("decode commit plugin outcome: %w", err)
@@ -381,7 +322,64 @@ func (p *Plugin) observeNewMsgs(ctx context.Context, maxSeqNumsPerChain []model.
 	return observedNewMsgs, nil
 }
 
-func (p *Plugin) observedMsgsConsensus(chainSel model.ChainSelector, observedMsgs []model.CCIPMsgBaseDetails) (observedMsgsConsensus, error) {
+func (p *Plugin) newMsgsConsensus(maxSeqNumsSlice []model.SeqNumChain, observations []model.CommitPluginObservation) ([]model.MerkleRootChain, error) {
+	maxSeqNumsPerChain := make(map[model.ChainSelector]model.SeqNum)
+	for _, seqNumChain := range maxSeqNumsSlice {
+		maxSeqNumsPerChain[seqNumChain.ChainSel] = seqNumChain.SeqNum
+	}
+
+	// Gather all messages from all observations.
+	msgsFromObservations := make([]model.CCIPMsgBaseDetails, 0)
+	for _, obs := range observations {
+		msgsFromObservations = append(msgsFromObservations, obs.NewMsgs...)
+	}
+	p.lggr.Debugw("total observed messages across all followers", "msgs", len(msgsFromObservations))
+
+	// Filter out messages less than or equal to the max sequence numbers.
+	msgsFromObservations = slicelib.Filter(msgsFromObservations, func(msg model.CCIPMsgBaseDetails) bool {
+		maxSeqNum, ok := maxSeqNumsPerChain[msg.SourceChain]
+		if !ok {
+			return false
+		}
+		return msg.SeqNum > maxSeqNum
+	})
+
+	// Group messages by source chain.
+	sourceChains, groupedMsgs := slicelib.GroupBy(
+		msgsFromObservations,
+		func(msg model.CCIPMsgBaseDetails) model.ChainSelector { return msg.SourceChain },
+	)
+
+	// Come to consensus on the observed messages by source chain.
+	consensusBySourceChain := make(map[model.ChainSelector]observedMsgsConsensus)
+	for _, sourceChain := range sourceChains { // note: we iterate using sourceChains slice for deterministic order.
+		observedMsgs, ok := groupedMsgs[sourceChain]
+		if !ok {
+			p.lggr.Panicw("source chain not found in grouped messages", "sourceChain", sourceChain)
+		}
+
+		msgsConsensus, err := p.newMsgsConsensusForChain(sourceChain, observedMsgs)
+		if err != nil {
+			return nil, fmt.Errorf("calculate observed msgs consensus: %w", err)
+		}
+		consensusBySourceChain[sourceChain] = msgsConsensus
+		p.lggr.Debugw("observed messages consensus", "sourceChain", sourceChain, "consensus", msgsConsensus)
+	}
+
+	merkleRoots := make([]model.MerkleRootChain, 0)
+	for sourceChain, consensus := range consensusBySourceChain {
+		merkleRoots = append(
+			merkleRoots,
+			model.NewMerkleRootChain(sourceChain, consensus.seqNumRange, consensus.merkleRoot),
+		)
+	}
+	return merkleRoots, nil
+}
+
+// Given a list of observed msgs
+//   - Keep the messages that were observed by at least 2f_chain+1 followers.
+//   - Starting from the first message (min seq num), keep adding the messages to the merkle tree until a gap is found.
+func (p *Plugin) newMsgsConsensusForChain(chainSel model.ChainSelector, observedMsgs []model.CCIPMsgBaseDetails) (observedMsgsConsensus, error) {
 	fChain, ok := p.cfg.FChain[chainSel]
 	if !ok {
 		return observedMsgsConsensus{}, fmt.Errorf("fchain not found for chain %d", chainSel)
@@ -393,6 +391,7 @@ func (p *Plugin) observedMsgsConsensus(chainSel model.ChainSelector, observedMsg
 	msgSeqNums := make(map[model.SeqNum]int)
 	for _, msg := range observedMsgs {
 		msgSeqNums[msg.SeqNum]++
+		// TODO: message data might be spoofed, validate the message data
 	}
 	p.lggr.Debugw("observed message counts", "chain", chainSel, "msgSeqNums", msgSeqNums)
 
@@ -402,6 +401,9 @@ func (p *Plugin) observedMsgsConsensus(chainSel model.ChainSelector, observedMsg
 		if count >= 2*fChain+1 {
 			msgSeqNumsQuorum.Add(seqNum)
 		}
+	}
+	if msgSeqNumsQuorum.Cardinality() == 0 {
+		return observedMsgsConsensus{}, nil
 	}
 
 	// Come to consensus on the observed messages sequence numbers range.
@@ -417,7 +419,7 @@ func (p *Plugin) observedMsgsConsensus(chainSel model.ChainSelector, observedMsg
 
 	msgsBySeqNum := make(map[model.SeqNum]model.CCIPMsgBaseDetails)
 	for _, msg := range observedMsgs {
-		msgsBySeqNum[msg.SeqNum] = msg // todo: validate that all msgs are the same
+		msgsBySeqNum[msg.SeqNum] = msg
 	}
 
 	treeLeaves := make([][32]byte, 0)
@@ -435,35 +437,50 @@ func (p *Plugin) observedMsgsConsensus(chainSel model.ChainSelector, observedMsg
 		return observedMsgsConsensus{}, fmt.Errorf("construct merkle tree from %d leaves: %w", len(treeLeaves), err)
 	}
 
-	// TODO: gas price consensus
-	// TODO: token prices consensus
-
 	return observedMsgsConsensus{
 		seqNumRange: seqNumConsensusRange,
 		merkleRoot:  tree.Root(),
 	}, nil
 }
 
-func (p *Plugin) maxSeqNumsConsensus(maxSeqNumsObservations map[model.ChainSelector][]model.SeqNum) ([]model.SeqNumChain, error) {
-	maxSeqNumsConsensus := make(map[model.ChainSelector]model.SeqNum)
-
+// maxSeqNumsConsensus groups the observed max seq nums across all followers per chain.
+// Orders the sequence numbers and selects the one at the index of destination chain fChain.
+//
+// For example:
+//
+//	seqNums: [1, 1, 1, 10, 10, 10, 10, 10, 10]
+//	fChain: 4
+//	result: 10
+//
+// Selecting seqNums[fChain] ensures:
+//   - At least one honest node has seen this value, so adversary cannot bias the value lower which would cause reverts
+//   - If an honest oracle reports sorted_min[f] which happens to be stale i.e. that oracle has a delayed view
+//     of the chain, then the report will revert onchain but still succeed upon retry
+//   - We minimize the risk of naturally hitting the error condition minSeqNum > maxSeqNum due to oracles
+//     delayed views of the chain (would be an issue with taking sorted_mins[-f])
+func (p *Plugin) maxSeqNumsConsensus(observations []model.CommitPluginObservation) ([]model.SeqNumChain, error) {
 	fChain, ok := p.cfg.FChain[p.cfg.DestChain]
 	if !ok {
 		return nil, fmt.Errorf("fchain not found for chain %d", p.cfg.DestChain)
 	}
 
-	for ch, observedSeqNums := range maxSeqNumsObservations {
+	observedSeqNumsPerChain := make(map[model.ChainSelector][]model.SeqNum)
+	for _, obs := range observations {
+		for _, maxSeqNum := range obs.MaxSeqNums {
+			if _, exists := observedSeqNumsPerChain[maxSeqNum.ChainSel]; !exists {
+				observedSeqNumsPerChain[maxSeqNum.ChainSel] = make([]model.SeqNum, 0)
+			}
+			observedSeqNumsPerChain[maxSeqNum.ChainSel] = append(observedSeqNumsPerChain[maxSeqNum.ChainSel], maxSeqNum.SeqNum)
+		}
+	}
+
+	maxSeqNumsConsensus := make([]model.SeqNumChain, 0, len(observedSeqNumsPerChain))
+	for ch, observedSeqNums := range observedSeqNumsPerChain {
 		sort.Slice(observedSeqNums, func(i, j int) bool { return observedSeqNums[i] < observedSeqNums[j] })
-		maxSeqNum := observedSeqNums[fChain]
-		maxSeqNumsConsensus[ch] = maxSeqNum
+		maxSeqNumsConsensus[ch] = model.NewSeqNumChain(ch, observedSeqNums[fChain])
 	}
 
-	res := make([]model.SeqNumChain, 0, len(maxSeqNumsConsensus))
-	for ch, maxSeqNum := range maxSeqNumsConsensus {
-		res = append(res, model.NewSeqNumChain(ch, maxSeqNum))
-	}
-
-	return res, nil
+	return maxSeqNumsConsensus, nil
 }
 
 // validateObservedSequenceNumbers checks if the sequence numbers of the provided messages are unique for each chain and
@@ -492,7 +509,7 @@ func (p *Plugin) validateObservedSequenceNumbers(msgs []model.CCIPMsgBaseDetails
 		}
 		seqNums[msg.SourceChain].Add(msg.SeqNum)
 
-		// The observed msg sequence number cannot be less than or equal to the max sequence number.
+		// The observed msg sequence number cannot be less than or equal to the max observed sequence number.
 		maxSeqNum, exists := maxSeqNumsMap[msg.SourceChain]
 		if !exists {
 			return fmt.Errorf("max sequence number observation not found for chain %d", msg.SourceChain)
