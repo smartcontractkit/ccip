@@ -383,10 +383,9 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     if (extraArgsTag == Client.EVM_EXTRA_ARGS_V2_TAG) {
       return abi.decode(extraArgs[4:], (Client.EVMExtraArgsV2));
     } else if (extraArgsTag == Client.EVM_EXTRA_ARGS_V1_TAG) {
-      // EVMExtraArgsV1 originally included a second boolean (strict) field which we have deprecated entirely.
-      // Clients may still send that version but it will be ignored.
-      Client.EVMExtraArgsV1 memory extraArgsV1 = abi.decode(extraArgs[4:], (Client.EVMExtraArgsV1));
-      return Client.EVMExtraArgsV2({gasLimit: extraArgsV1.gasLimit, allowOutOfOrderExecution: false});
+      // EVMExtraArgsV1 originally included a second boolean (strict) field which has been deprecated.
+      // Clients may still include it but it will be ignored.
+      return Client.EVMExtraArgsV2({gasLimit: abi.decode(extraArgs[4:], (uint256)), allowOutOfOrderExecution: false});
     }
 
     revert InvalidExtraArgsTag();
@@ -404,7 +403,6 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     uint256 numberOfTokens,
     bool allowOutOfOrderExecution
   ) internal view {
-    // Check that payload is formed correctly
     uint256 maxDataBytes = uint256(s_dynamicConfig.maxDataBytes);
     if (dataLength > maxDataBytes) revert MessageTooLarge(maxDataBytes, dataLength);
     if (gasLimit > uint256(s_dynamicConfig.maxPerMsgGasLimit)) revert MessageGasLimitTooHigh();
