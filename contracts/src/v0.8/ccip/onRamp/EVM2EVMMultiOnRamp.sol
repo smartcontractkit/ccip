@@ -278,8 +278,9 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ILinkAvailable, AggregateRat
 
     if (!destChainConfig.dynamicConfig.isEnabled) revert DestinationChainNotEnabled(destChainSelector);
 
-    uint256 gasLimit =
-      message.extraArgs.length == 0 ? destChainConfig.dynamicConfig.defaultTxGasLimit : _fromBytes(message.extraArgs);
+    uint256 gasLimit = message.extraArgs.length == 0
+      ? destChainConfig.dynamicConfig.defaultTxGasLimit
+      : _gasLimitFromBytes(message.extraArgs);
     // Validate the message with various checks
     uint256 numberOfTokens = message.tokenAmounts.length;
     _validateMessage(destChainSelector, message.data.length, gasLimit, numberOfTokens);
@@ -388,7 +389,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ILinkAvailable, AggregateRat
   /// @dev Convert the extra args bytes into a struct
   /// @param extraArgs The extra args bytes
   /// @return The extra args struct
-  function _fromBytes(bytes calldata extraArgs) internal pure returns (uint256) {
+  function _gasLimitFromBytes(bytes calldata extraArgs) internal pure returns (uint256) {
     if (bytes4(extraArgs) != Client.EVM_EXTRA_ARGS_V1_TAG) revert InvalidExtraArgsTag();
     // EVMExtraArgsV1 originally included a second boolean (strict) field which we have deprecated entirely.
     // Clients may still send that version but it will be ignored.
@@ -494,8 +495,9 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ILinkAvailable, AggregateRat
 
     if (!destChainConfig.dynamicConfig.isEnabled) revert DestinationChainNotEnabled(destChainSelector);
 
-    uint256 gasLimit =
-      message.extraArgs.length == 0 ? destChainConfig.dynamicConfig.defaultTxGasLimit : _fromBytes(message.extraArgs);
+    uint256 gasLimit = message.extraArgs.length == 0
+      ? destChainConfig.dynamicConfig.defaultTxGasLimit
+      : _gasLimitFromBytes(message.extraArgs);
     // Validate the message with various checks
     _validateMessage(destChainSelector, message.data.length, gasLimit, message.tokenAmounts.length);
 
