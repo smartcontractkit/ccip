@@ -283,9 +283,8 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, AggregateRateLimiter, ITyp
   /// @dev Expects an encoded ExecutionReport
   function _report(bytes calldata report) internal override {
     Internal.ExecutionReportSingleChain[] memory reports = abi.decode(report, (Internal.ExecutionReportSingleChain[]));
-    uint256[][] memory manualExecGasLimits = new uint256[][](reports.length);
 
-    _batchExecute(reports, manualExecGasLimits);
+    _batchExecute(reports, new uint256[][](reports.length));
   }
 
   /// @notice Batch executes a set of reports, each report matching one single source chain
@@ -302,9 +301,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, AggregateRateLimiter, ITyp
     if (reports.length == 0) revert EmptyReport();
 
     for (uint256 i = 0; i < reports.length; ++i) {
-      Internal.ExecutionReportSingleChain memory reportSingleChain = reports[i];
-      uint256[] memory manualExecGasLimitsSingleChain = manualExecGasLimits[i];
-      _execute(reportSingleChain, manualExecGasLimitsSingleChain);
+      _execute(reports[i], manualExecGasLimits[i]);
     }
   }
 
