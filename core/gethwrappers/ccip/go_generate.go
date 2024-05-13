@@ -27,6 +27,7 @@ package ccip
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.19/EVM2EVMMultiOffRamp/EVM2EVMMultiOffRamp.abi ../../../contracts/solc/v0.8.19/EVM2EVMMultiOffRamp/EVM2EVMMultiOffRamp.bin EVM2EVMMultiOffRamp evm_2_evm_multi_offramp
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.19/Router/Router.abi ../../../contracts/solc/v0.8.19/Router/Router.bin Router router
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.19/PriceRegistry/PriceRegistry.abi ../../../contracts/solc/v0.8.19/PriceRegistry/PriceRegistry.bin PriceRegistry price_registry
+//go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.19/CCIPCapabilityConfiguration/CCIPCapabilityConfiguration.abi ../../../contracts/solc/v0.8.19/CCIPCapabilityConfiguration/CCIPCapabilityConfiguration.bin CCIPCapabilityConfiguration ccip_capability_configuration
 
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.19/MaybeRevertMessageReceiver/MaybeRevertMessageReceiver.abi ../../../contracts/solc/v0.8.19/MaybeRevertMessageReceiver/MaybeRevertMessageReceiver.bin MaybeRevertMessageReceiver maybe_revert_message_receiver
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.19/PingPongDemo/PingPongDemo.abi ../../../contracts/solc/v0.8.19/PingPongDemo/PingPongDemo.bin PingPongDemo ping_pong_demo
