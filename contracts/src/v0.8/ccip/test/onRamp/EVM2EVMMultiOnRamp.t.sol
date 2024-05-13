@@ -11,6 +11,7 @@ import {EVM2EVMMultiOnRamp} from "../../onRamp/EVM2EVMMultiOnRamp.sol";
 import {TokenAdminRegistry} from "../../tokenAdminRegistry/TokenAdminRegistry.sol";
 import {MaybeRevertingBurnMintTokenPool} from "../helpers/MaybeRevertingBurnMintTokenPool.sol";
 import "./EVM2EVMMultiOnRampSetup.t.sol";
+import {Vm} from "forge-std/Vm.sol";
 
 /// @notice #constructor
 contract EVM2EVMMultiOnRamp_constructor is EVM2EVMMultiOnRampSetup {
@@ -237,13 +238,25 @@ contract EVM2EVMMultiOnRamp_applyDestChainConfigUpdates is EVM2EVMMultiOnRampSet
     vm.expectEmit();
     emit DestChainAdded(DEST_CHAIN_SELECTOR + 1, expectedDestChainConfig1);
 
+    vm.recordLogs();
     s_onRamp.applyDestChainConfigUpdates(destChainConfigArgs);
 
     EVM2EVMMultiOnRamp.DestChainConfig memory gotDestChainConfig0 = s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR);
     EVM2EVMMultiOnRamp.DestChainConfig memory gotDestChainConfig1 = s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR + 1);
 
+    assertEq(vm.getRecordedLogs().length, 2);
     assertDestChainConfigsEqual(expectedDestChainConfig0, gotDestChainConfig0);
     assertDestChainConfigsEqual(expectedDestChainConfig1, gotDestChainConfig1);
+  }
+
+  function test_applyDestChainConfigUpdatesZeroIntput() public {
+    EVM2EVMMultiOnRamp.DestChainConfigArgs[] memory destChainConfigArgs =
+      new EVM2EVMMultiOnRamp.DestChainConfigArgs[](0);
+
+    vm.recordLogs();
+    s_onRamp.applyDestChainConfigUpdates(destChainConfigArgs);
+
+    assertEq(vm.getRecordedLogs().length, 0);
   }
 
   function test_InvalidDestChainConfigDestChainSelectorEqZero_Revert() public {
