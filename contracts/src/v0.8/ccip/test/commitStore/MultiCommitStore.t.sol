@@ -34,7 +34,7 @@ contract MultiCommitStoreSetup is PriceRegistrySetup, OCR2BaseSetup {
     });
 
     s_multiCommitStore = new MultiCommitStoreHelper(
-      MultiCommitStore.StaticConfig({chainSelector: DEST_CHAIN_SELECTOR, armProxy: address(s_mockRMN)}),
+      MultiCommitStore.StaticConfig({chainSelector: DEST_CHAIN_SELECTOR, rmnProxy: address(s_mockRMN)}),
       sourceChainConfigs
     );
     MultiCommitStore.DynamicConfig memory dynamicConfig =
@@ -52,7 +52,7 @@ contract MultiCommitStoreSetup is PriceRegistrySetup, OCR2BaseSetup {
 contract MultiCommitStoreRealRMNSetup is PriceRegistrySetup, OCR2BaseSetup {
   MultiCommitStoreHelper internal s_multiCommitStore;
 
-  RMN internal s_arm;
+  RMN internal s_rmn;
 
   address internal constant BLESS_VOTE_ADDR = address(8888);
 
@@ -68,8 +68,8 @@ contract MultiCommitStoreRealRMNSetup is PriceRegistrySetup, OCR2BaseSetup {
       blessWeight: 1,
       curseWeight: 1
     });
-    // Overwrite base mock arm with real.
-    s_arm = new RMN(RMN.Config({voters: voters, blessWeightThreshold: 1, curseWeightThreshold: 1}));
+    // Overwrite base mock rmn with real.
+    s_rmn = new RMN(RMN.Config({voters: voters, blessWeightThreshold: 1, curseWeightThreshold: 1}));
 
     MultiCommitStore.SourceChainConfigArgs[] memory sourceChainConfigs = new MultiCommitStore.SourceChainConfigArgs[](1);
     sourceChainConfigs[0] = MultiCommitStore.SourceChainConfigArgs({
@@ -80,7 +80,7 @@ contract MultiCommitStoreRealRMNSetup is PriceRegistrySetup, OCR2BaseSetup {
     });
 
     s_multiCommitStore = new MultiCommitStoreHelper(
-      MultiCommitStore.StaticConfig({chainSelector: DEST_CHAIN_SELECTOR, armProxy: address(s_arm)}), sourceChainConfigs
+      MultiCommitStore.StaticConfig({chainSelector: DEST_CHAIN_SELECTOR, rmnProxy: address(s_rmn)}), sourceChainConfigs
     );
     MultiCommitStore.DynamicConfig memory dynamicConfig =
       MultiCommitStore.DynamicConfig({priceRegistry: address(s_priceRegistry)});
@@ -111,7 +111,7 @@ contract MultiCommitStore_constructor is PriceRegistrySetup, OCR2BaseSetup {
       onRamp: 0x2C44CDDdB6a900Fa2B585dd299E03D12Fa4293Bc
     });
     MultiCommitStore.StaticConfig memory staticConfig =
-      MultiCommitStore.StaticConfig({chainSelector: DEST_CHAIN_SELECTOR, armProxy: address(s_mockRMN)});
+      MultiCommitStore.StaticConfig({chainSelector: DEST_CHAIN_SELECTOR, rmnProxy: address(s_mockRMN)});
     MultiCommitStore.DynamicConfig memory dynamicConfig =
       MultiCommitStore.DynamicConfig({priceRegistry: address(s_priceRegistry)});
 
@@ -131,7 +131,7 @@ contract MultiCommitStore_constructor is PriceRegistrySetup, OCR2BaseSetup {
     MultiCommitStore.StaticConfig memory gotStaticConfig = multiCommitStore.getStaticConfig();
 
     assertEq(staticConfig.chainSelector, gotStaticConfig.chainSelector);
-    assertEq(staticConfig.armProxy, gotStaticConfig.armProxy);
+    assertEq(staticConfig.rmnProxy, gotStaticConfig.rmnProxy);
     assertEq(multiCommitStore.getOnRamp(sourceChainConfigs[0].sourceChainSelector), sourceChainConfigs[0].onRamp);
 
     MultiCommitStore.DynamicConfig memory gotDynamicConfig = multiCommitStore.getDynamicConfig();
@@ -162,20 +162,20 @@ contract MultiCommitStore_constructor is PriceRegistrySetup, OCR2BaseSetup {
       onRamp: ON_RAMP_ADDRESS
     });
     MultiCommitStore.StaticConfig memory staticConfig =
-      MultiCommitStore.StaticConfig({chainSelector: 0, armProxy: address(s_mockRMN)});
+      MultiCommitStore.StaticConfig({chainSelector: 0, rmnProxy: address(s_mockRMN)});
 
     vm.expectRevert(MultiCommitStore.InvalidCommitStoreConfig.selector);
     new MultiCommitStore(staticConfig, sourceChainConfigs);
 
-    // Invalid arm proxy
+    // Invalid rmn proxy
     staticConfig.chainSelector = DEST_CHAIN_SELECTOR;
-    staticConfig.armProxy = address(0);
+    staticConfig.rmnProxy = address(0);
 
     vm.expectRevert(MultiCommitStore.InvalidCommitStoreConfig.selector);
     new MultiCommitStore(staticConfig, sourceChainConfigs);
 
     // Invalid source chain selector
-    staticConfig.armProxy = address(s_mockRMN);
+    staticConfig.rmnProxy = address(s_mockRMN);
     sourceChainConfigs[0].sourceChainSelector = 0;
 
     vm.expectRevert(
@@ -427,7 +427,7 @@ contract MultiCommitStore_resetUnblessedRoots is MultiCommitStoreRealRMNSetup {
       IRMN.TaggedRoot({commitStore: address(s_multiCommitStore), root: rootsToReset[1].merkleRoot});
 
     vm.startPrank(BLESS_VOTE_ADDR);
-    s_arm.voteToBless(blessedTaggedRoots);
+    s_rmn.voteToBless(blessedTaggedRoots);
 
     vm.expectEmit(false, false, false, true);
     emit RootRemoved(rootsToReset[0].merkleRoot);
@@ -766,7 +766,7 @@ contract MultiCommitStore_verify is MultiCommitStoreRealRMNSetup {
     IRMN.TaggedRoot[] memory taggedRoots = new IRMN.TaggedRoot[](1);
     taggedRoots[0] = IRMN.TaggedRoot({commitStore: address(s_multiCommitStore), root: leaves[0]});
     vm.startPrank(BLESS_VOTE_ADDR);
-    s_arm.voteToBless(taggedRoots);
+    s_rmn.voteToBless(taggedRoots);
     bytes32[] memory proofs = new bytes32[](0);
     uint256 timestamp = s_multiCommitStore.verify(SOURCE_CHAIN_SELECTOR, leaves, proofs, 0);
     assertEq(BLOCK_TIME, timestamp);
@@ -801,7 +801,7 @@ contract MultiCommitStore_isUnpausedAndRMNHealthy is MultiCommitStoreSetup {
     s_multiCommitStore.unpause();
     assertFalse(s_multiCommitStore.paused());
     assertTrue(s_multiCommitStore.isUnpausedAndNotCursed(SOURCE_CHAIN_SELECTOR));
-    // Test arm
+    // Test rmn
     s_mockRMN.voteToCurse(0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff);
     assertFalse(s_multiCommitStore.isUnpausedAndNotCursed(SOURCE_CHAIN_SELECTOR));
     RMN.UnvoteToCurseRecord[] memory records = new RMN.UnvoteToCurseRecord[](1);

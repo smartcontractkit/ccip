@@ -34,7 +34,7 @@ contract MultiCommitStore is IMultiCommitStore, ITypeAndVersion, OCR2Base {
   /// @dev RMN depends on this struct, if changing, please notify the RMN maintainers.
   struct StaticConfig {
     uint64 chainSelector; // ───────╮  Destination chainSelector
-    address armProxy; // ───────────╯ ARM proxy address
+    address rmnProxy; // ───────────╯ RMN proxy address
   }
 
   /// @notice Dynamic commit store config
@@ -82,7 +82,7 @@ contract MultiCommitStore is IMultiCommitStore, ITypeAndVersion, OCR2Base {
   string public constant override typeAndVersion = "MultiCommitStore 1.6.0-dev";
   // Chain ID of this chain
   uint64 internal immutable i_chainSelector;
-  // The address of the arm proxy
+  // The address of the rmn proxy
   address internal immutable i_rmnProxy;
 
   // DYNAMIC CONFIG
@@ -107,12 +107,12 @@ contract MultiCommitStore is IMultiCommitStore, ITypeAndVersion, OCR2Base {
   /// the DON. In our case additional valid reports (i.e. approved by >= f+1 oracles) are not a problem, as they will
   /// will either be ignored (reverted as an invalid interval) or will be accepted as an additional valid price update.
   constructor(StaticConfig memory staticConfig, SourceChainConfigArgs[] memory sourceChainConfigs) OCR2Base(false) {
-    if (staticConfig.chainSelector == 0 || staticConfig.armProxy == address(0)) {
+    if (staticConfig.chainSelector == 0 || staticConfig.rmnProxy == address(0)) {
       revert InvalidCommitStoreConfig();
     }
 
     i_chainSelector = staticConfig.chainSelector;
-    i_rmnProxy = staticConfig.armProxy;
+    i_rmnProxy = staticConfig.rmnProxy;
 
     _applySourceChainConfigUpdates(sourceChainConfigs);
   }
@@ -154,7 +154,7 @@ contract MultiCommitStore is IMultiCommitStore, ITypeAndVersion, OCR2Base {
   /// @param root The merkle root to check the blessing status for.
   /// @return whether the root is blessed or not.
   function isBlessed(bytes32 root) public view returns (bool) {
-    // TODO: update ARM to also consider the source chain selector for blessing
+    // TODO: update RMN to also consider the source chain selector for blessing
     return IRMN(i_rmnProxy).isBlessed(IRMN.TaggedRoot({commitStore: address(this), root: root}));
   }
 
@@ -258,7 +258,7 @@ contract MultiCommitStore is IMultiCommitStore, ITypeAndVersion, OCR2Base {
   /// @dev RMN depends on this function, if changing, please notify the RMN maintainers.
   /// @return the configuration.
   function getStaticConfig() external view returns (StaticConfig memory) {
-    return StaticConfig({chainSelector: i_chainSelector, armProxy: i_rmnProxy});
+    return StaticConfig({chainSelector: i_chainSelector, rmnProxy: i_rmnProxy});
   }
 
   /// @notice Returns the dynamic commit store config.
@@ -280,7 +280,7 @@ contract MultiCommitStore is IMultiCommitStore, ITypeAndVersion, OCR2Base {
     // across reconfigurations and are de-duplicated separately.
     s_latestPriceEpochAndRound = 0;
 
-    emit ConfigSet(StaticConfig({chainSelector: i_chainSelector, armProxy: i_rmnProxy}), dynamicConfig);
+    emit ConfigSet(StaticConfig({chainSelector: i_chainSelector, rmnProxy: i_rmnProxy}), dynamicConfig);
   }
 
   /// @notice Returns the config for a source chain.
