@@ -106,7 +106,10 @@ func (p *Plugin) Observation(ctx context.Context, outctx ocr3types.OutcomeContex
 
 	// Find the new msgs for each supported chain based on the discovered sequence numbers.
 	observedNewMsgs := make([]model.CCIPMsgBaseDetails, 0)
+	maxSeqNums := make([]model.SeqNumChain, 0)
 	for ch, seqNum := range seqNumPerChain {
+		maxSeqNums = append(maxSeqNums, model.NewSeqNumChain(ch, seqNum))
+
 		if !p.readableChains.Contains(ch) {
 			p.lggr.Debugw("reading chain is not supported", "chain", ch)
 			continue
@@ -151,7 +154,7 @@ func (p *Plugin) Observation(ctx context.Context, outctx ocr3types.OutcomeContex
 	tokenPrices := make([]model.TokenPrice, 0) // TODO: token prices ...
 
 	p.lggr.Infow("submitting observation", "observedNewMsgs", len(observedNewMsgs), "gasPrices", len(gasPrices), "tokenPrices", len(tokenPrices))
-	return model.NewCommitPluginObservation(observedNewMsgs, gasPrices, tokenPrices).Encode()
+	return model.NewCommitPluginObservation(observedNewMsgs, gasPrices, tokenPrices, maxSeqNums).Encode()
 }
 
 func (p *Plugin) ValidateObservation(_ ocr3types.OutcomeContext, _ types.Query, ao types.AttributedObservation) error {
@@ -160,7 +163,7 @@ func (p *Plugin) ValidateObservation(_ ocr3types.OutcomeContext, _ types.Query, 
 		return fmt.Errorf("decode commit plugin observation: %w", err)
 	}
 
-	if err := p.validateObservedSequenceNumbersUniqueness(obs.NewMsgs); err != nil {
+	if err := p.validateObservedSequenceNumbers(obs.NewMsgs, obs.MaxSeqNums); err != nil {
 		return fmt.Errorf("validate sequence numbers uniqueness: %w", err)
 	}
 
@@ -181,8 +184,9 @@ func (p *Plugin) ObservationQuorum(_ ocr3types.OutcomeContext, _ types.Query) (o
 }
 
 func (p *Plugin) Outcome(_ ocr3types.OutcomeContext, _ types.Query, aos []types.AttributedObservation) (ocr3types.Outcome, error) {
-	observerSeqNums := make(map[commontypes.OracleID]map[model.ChainSelector]mapset.Set[model.SeqNum])
+	observerMsgSeqNums := make(map[commontypes.OracleID]map[model.ChainSelector]mapset.Set[model.SeqNum])
 	msgsFromObservations := make([]model.CCIPMsgBaseDetails, 0)
+	maxSeqNumsObservations := make(map[model.ChainSelector]mapset.Set[model.SeqNum])
 
 	p.lggr.Debugw("calculating outcome", "observations", len(aos))
 	for _, ao := range aos {
@@ -191,26 +195,36 @@ func (p *Plugin) Outcome(_ ocr3types.OutcomeContext, _ types.Query, aos []types.
 			return ocr3types.Outcome{}, fmt.Errorf("decode commit plugin observation: %w", err)
 		}
 
+		for _, maxSeqNum := range obs.MaxSeqNums {
+			if _, exists := maxSeqNumsObservations[maxSeqNum.ChainSel]; !exists {
+				maxSeqNumsObservations[maxSeqNum.ChainSel] = mapset.NewSet[model.SeqNum]()
+			}
+			maxSeqNumsObservations[maxSeqNum.ChainSel].Add(maxSeqNum.SeqNum)
+		}
+
 		p.lggr.Debugw("processing observation", "observer", ao.Observer, "msgs", len(obs.NewMsgs))
 		// Ignore observations that have duplicate sequence numbers coming from the same sender for the same chain.
 		for _, msg := range obs.NewMsgs {
-			if _, exists := observerSeqNums[ao.Observer]; !exists {
-				observerSeqNums[ao.Observer] = map[model.ChainSelector]mapset.Set[model.SeqNum]{}
+			if _, exists := observerMsgSeqNums[ao.Observer]; !exists {
+				observerMsgSeqNums[ao.Observer] = map[model.ChainSelector]mapset.Set[model.SeqNum]{}
 			}
-			if _, exists := observerSeqNums[ao.Observer][msg.SourceChain]; !exists {
-				observerSeqNums[ao.Observer][msg.SourceChain] = mapset.NewSet[model.SeqNum]()
+			if _, exists := observerMsgSeqNums[ao.Observer][msg.SourceChain]; !exists {
+				observerMsgSeqNums[ao.Observer][msg.SourceChain] = mapset.NewSet[model.SeqNum]()
 			}
-			if observerSeqNums[ao.Observer][msg.SourceChain].Contains(msg.SeqNum) {
+			if observerMsgSeqNums[ao.Observer][msg.SourceChain].Contains(msg.SeqNum) {
 				p.lggr.Warnw("duplicate follower sequence number in observation",
 					"observer", ao.Observer, "chain", msg.SourceChain, "seqNum", msg.SeqNum)
 				continue
 			}
-			observerSeqNums[ao.Observer][msg.SourceChain].Add(msg.SeqNum)
+			observerMsgSeqNums[ao.Observer][msg.SourceChain].Add(msg.SeqNum)
 		}
 
 		msgsFromObservations = append(msgsFromObservations, obs.NewMsgs...)
 	}
 	p.lggr.Debugw("total observed messages across all followers", "msgs", len(msgsFromObservations))
+
+	maxSeqNumsConsensus := p.maxSeqNumsConsensus(maxSeqNumsObservations)
+	p.lggr.Debugw("max sequence numbers consensus", "maxSeqNumsConsensus", maxSeqNumsConsensus)
 
 	// Group messages by source chain.
 	sourceChains, groupedMsgs := slicelib.GroupBy(
@@ -236,13 +250,11 @@ func (p *Plugin) Outcome(_ ocr3types.OutcomeContext, _ types.Query, aos []types.
 	}
 
 	// Construct the outcome.
-	maxSeqNums := make([]model.SeqNumChain, 0)
 	merkleRoots := make([]model.MerkleRootChain, 0)
 	for sourceChain, consensus := range consensusBySourceChain {
-		maxSeqNums = append(maxSeqNums, model.NewSeqNumChain(sourceChain, consensus.seqNumRange.End()))
 		merkleRoots = append(merkleRoots, model.NewMerkleRootChain(sourceChain, consensus.seqNumRange, consensus.merkleRoot))
 	}
-	return model.NewCommitPluginOutcome(maxSeqNums, merkleRoots).Encode()
+	return model.NewCommitPluginOutcome(maxSeqNumsConsensus, merkleRoots).Encode()
 }
 
 func (p *Plugin) Reports(seqNr uint64, outcome ocr3types.Outcome) ([]ocr3types.ReportWithInfo[[]byte], error) {
@@ -377,9 +389,41 @@ func (p *Plugin) observedMsgsConsensus(chainSel model.ChainSelector, observedMsg
 	}, nil
 }
 
-// validateObservedSequenceNumbersUniqueness checks if the sequence numbers of the provided messages are unique for each chain.
-func (p *Plugin) validateObservedSequenceNumbersUniqueness(msgs []model.CCIPMsgBaseDetails) error {
+func (p *Plugin) maxSeqNumsConsensus(maxSeqNumsObservations map[model.ChainSelector]mapset.Set[model.SeqNum]) []model.SeqNumChain {
+	maxSeqNumsConsensus := make(map[model.ChainSelector]model.SeqNum)
+
+	for ch, observedMaxSeqNums := range maxSeqNumsObservations {
+		fChain, ok := p.cfg.FChain[ch]
+		if !ok {
+			p.lggr.Errorw("fChain not found for chain", "chain", ch)
+			continue
+		}
+		seqNumsSlice := observedMaxSeqNums.ToSlice()
+		sort.Slice(seqNumsSlice, func(i, j int) bool { return seqNumsSlice[i] < seqNumsSlice[j] })
+		maxSeqNum := seqNumsSlice[fChain]
+		maxSeqNumsConsensus[ch] = maxSeqNum
+	}
+
+	res := make([]model.SeqNumChain, 0, len(maxSeqNumsConsensus))
+	for ch, maxSeqNum := range maxSeqNumsConsensus {
+		res = append(res, model.NewSeqNumChain(ch, maxSeqNum))
+	}
+	return res
+}
+
+// validateObservedSequenceNumbers checks if the sequence numbers of the provided messages are unique for each chain and
+// that they match the observed max sequence numbers.
+func (p *Plugin) validateObservedSequenceNumbers(msgs []model.CCIPMsgBaseDetails, maxSeqNums []model.SeqNumChain) error {
 	seqNums := make(map[model.ChainSelector]mapset.Set[model.SeqNum], len(msgs))
+
+	// MaxSeqNums must be unique for each chain.
+	maxSeqNumsMap := make(map[model.ChainSelector]model.SeqNum)
+	for _, maxSeqNum := range maxSeqNums {
+		if _, exists := maxSeqNumsMap[maxSeqNum.ChainSel]; exists {
+			return fmt.Errorf("duplicate max sequence number for chain %d", maxSeqNum.ChainSel)
+		}
+		maxSeqNumsMap[maxSeqNum.ChainSel] = maxSeqNum.SeqNum
+	}
 
 	for _, msg := range msgs {
 		// The same sequence number must not appear more than once for the same chain and must be valid.
@@ -392,6 +436,16 @@ func (p *Plugin) validateObservedSequenceNumbersUniqueness(msgs []model.CCIPMsgB
 			return fmt.Errorf("duplicate sequence number %d for chain %d", msg.SeqNum, msg.SourceChain)
 		}
 		seqNums[msg.SourceChain].Add(msg.SeqNum)
+
+		// The observed msg sequence number cannot be less than or equal to the max sequence number.
+		maxSeqNum, exists := maxSeqNumsMap[msg.SourceChain]
+		if !exists {
+			return fmt.Errorf("max sequence number observation not found for chain %d", msg.SourceChain)
+		}
+		if maxSeqNum <= msg.SeqNum {
+			return fmt.Errorf("max sequence number %d must be greater than observed sequence number %d for chain %d",
+				maxSeqNum, msg.SeqNum, msg.SourceChain)
+		}
 	}
 
 	return nil

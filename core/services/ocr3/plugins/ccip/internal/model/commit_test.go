@@ -15,11 +15,12 @@ func TestCommitPluginObservation_EncodeAndDecode(t *testing.T) {
 		},
 		[]GasPriceChain{},
 		[]TokenPrice{},
+		[]SeqNumChain{},
 	)
 
 	b, err := obs.Encode()
 	assert.NoError(t, err)
-	assert.Equal(t, `{"newMsgs":[{"id":[1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"sourceChain":"18446744073709551615","seqNum":"123"},{"id":[2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"sourceChain":"321","seqNum":"18446744073709551615"}],"gasPrices":[],"tokenPrices":[]}`, string(b))
+	assert.Equal(t, `{"newMsgs":[{"id":[1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"sourceChain":"18446744073709551615","seqNum":"123"},{"id":[2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"sourceChain":"321","seqNum":"18446744073709551615"}],"gasPrices":[],"tokenPrices":[],"maxSeqNums":[]}`, string(b))
 
 	obs2, err := DecodeCommitPluginObservation(b)
 	assert.NoError(t, err)
