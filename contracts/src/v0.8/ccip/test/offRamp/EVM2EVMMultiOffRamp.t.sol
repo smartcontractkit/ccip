@@ -1018,10 +1018,19 @@ contract EVM2EVMMultiOffRamp_batchExecute is EVM2EVMMultiOffRampSetup {
   }
 
   function test_OutOfBoundsGasLimitsAccess_Revert() public {
-    Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1);
+    Internal.EVM2EVMMessage[] memory messages1 = new Internal.EVM2EVMMessage[](2);
+    Internal.EVM2EVMMessage[] memory messages2 = new Internal.EVM2EVMMessage[](1);
+
+    messages1[0] = _generateAny2EVMMessageNoTokens(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1, 1);
+    messages1[1] = _generateAny2EVMMessageNoTokens(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1, 2);
+    messages2[0] = _generateAny2EVMMessageNoTokens(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1, 3);
+
+    Internal.ExecutionReportSingleChain[] memory reports = new Internal.ExecutionReportSingleChain[](2);
+    reports[0] = _generateReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messages1);
+    reports[1] = _generateReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messages2);
 
     vm.expectRevert();
-    s_offRamp.batchExecute(_generateBatchReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messages), new uint256[][](0));
+    s_offRamp.batchExecute(reports, new uint256[][](1));
   }
 }
 
