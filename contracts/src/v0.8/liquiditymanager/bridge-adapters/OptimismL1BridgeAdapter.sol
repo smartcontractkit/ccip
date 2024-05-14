@@ -1,14 +1,15 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.19;
+pragma solidity 0.8.24;
 
-import {IBridgeAdapter} from "../interfaces/IBridge.sol";
 import {IWrappedNative} from "../../ccip/interfaces/IWrappedNative.sol";
-import {Types} from "../interfaces/optimism/Types.sol";
-import {IOptimismPortal} from "../interfaces/optimism/IOptimismPortal.sol";
+import {IBridgeAdapter} from "../interfaces/IBridge.sol";
 
-import {IL1StandardBridge} from "@eth-optimism/contracts/L1/messaging/IL1StandardBridge.sol";
+import {IOptimismPortal} from "../interfaces/optimism/IOptimismPortal.sol";
+import {Types} from "../interfaces/optimism/Types.sol";
+
 import {IERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IL1StandardBridge} from "@eth-optimism/contracts/L1/messaging/IL1StandardBridge.sol";
 
 /// @notice OptimismL1BridgeAdapter implements IBridgeAdapter for the Optimism L1<=>L2 bridge.
 /// @dev L1 -> L2 deposits are done via the depositERC20To and depositETHTo functions on the L1StandardBridge.
@@ -136,8 +137,8 @@ contract OptimismL1BridgeAdapter is IBridgeAdapter {
   /// @return true iff finalization is successful, and false for proving a withdrawal. If either of these fail,
   /// the call to this function will revert.
   function finalizeWithdrawERC20(
-    address /* remoteSender */,
-    address /* localReceiver */,
+    address, /* remoteSender */
+    address, /* localReceiver */
     bytes calldata data
   ) external override returns (bool) {
     // decode the data into FinalizeWithdrawERC20Payload first and extract the action.
@@ -165,10 +166,7 @@ contract OptimismL1BridgeAdapter is IBridgeAdapter {
   function _proveWithdrawal(OptimismProveWithdrawalPayload memory payload) internal {
     // will revert if the proof is invalid or the output index is not yet included on L1.
     i_optimismPortal.proveWithdrawalTransaction(
-      payload.withdrawalTransaction,
-      payload.l2OutputIndex,
-      payload.outputRootProof,
-      payload.withdrawalProof
+      payload.withdrawalTransaction, payload.l2OutputIndex, payload.outputRootProof, payload.withdrawalProof
     );
   }
 

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.19;
+pragma solidity 0.8.24;
 
 import {IBurnMintERC20} from "../../../shared/token/ERC20/IBurnMintERC20.sol";
 import {IPool} from "../../interfaces/IPool.sol";
@@ -60,12 +60,12 @@ contract USDCTokenPoolSetup is BaseTest {
     s_mockUSDC = new MockUSDCTokenMessenger(0, address(s_mockUSDCTransmitter));
 
     s_usdcTokenPool =
-      new USDCTokenPoolHelper(s_mockUSDC, s_token, new address[](0), address(s_mockARM), address(s_router));
+      new USDCTokenPoolHelper(s_mockUSDC, s_token, new address[](0), address(s_mockRMN), address(s_router));
     linkToken.grantMintAndBurnRoles(address(s_mockUSDC));
 
     s_allowedList.push(USER_1);
     s_usdcTokenPoolWithAllowList =
-      new USDCTokenPoolHelper(s_mockUSDC, s_token, s_allowedList, address(s_mockARM), address(s_router));
+      new USDCTokenPoolHelper(s_mockUSDC, s_token, s_allowedList, address(s_mockRMN), address(s_router));
 
     TokenPool.ChainUpdate[] memory chainUpdates = new TokenPool.ChainUpdate[](2);
     chainUpdates[0] = TokenPool.ChainUpdate({
@@ -99,7 +99,7 @@ contract USDCTokenPoolSetup is BaseTest {
   }
 
   function setUpRamps() internal {
-    s_router = new Router(address(s_token), address(s_mockARM));
+    s_router = new Router(address(s_token), address(s_mockRMN));
 
     Router.OnRamp[] memory onRampUpdates = new Router.OnRamp[](1);
     onRampUpdates[0] = Router.OnRamp({destChainSelector: DEST_CHAIN_SELECTOR, onRamp: s_routerAllowedOnRamp});
@@ -161,7 +161,7 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
       address(s_usdcTokenPool),
       receiver,
       expectedDomain.domainIdentifier,
-      s_mockUSDC.i_destinationTokenMessenger(),
+      s_mockUSDC.DESTINATION_TOKEN_MESSENGER(),
       expectedDomain.allowedCaller
     );
 
@@ -200,7 +200,7 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
       address(s_usdcTokenPool),
       destinationReceiver,
       expectedDomain.domainIdentifier,
-      s_mockUSDC.i_destinationTokenMessenger(),
+      s_mockUSDC.DESTINATION_TOKEN_MESSENGER(),
       expectedDomain.allowedCaller
     );
 
@@ -239,7 +239,7 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
       address(s_usdcTokenPoolWithAllowList),
       destinationReceiver,
       expectedDomain.domainIdentifier,
-      s_mockUSDC.i_destinationTokenMessenger(),
+      s_mockUSDC.DESTINATION_TOKEN_MESSENGER(),
       expectedDomain.allowedCaller
     );
     vm.expectEmit();
@@ -365,7 +365,7 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
       destPoolAddress: abi.encode(address(s_usdcTokenPool)),
       extraData: abi.encode(
         USDCTokenPool.SourceTokenDataPayload({nonce: usdcMessage.nonce, sourceDomain: SOURCE_DOMAIN_IDENTIFIER})
-        )
+      )
     });
 
     bytes memory offchainTokenData =
@@ -453,7 +453,7 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
       destPoolAddress: abi.encode(address(s_usdcTokenPool)),
       extraData: abi.encode(
         USDCTokenPool.SourceTokenDataPayload({nonce: usdcMessage.nonce, sourceDomain: SOURCE_DOMAIN_IDENTIFIER})
-        )
+      )
     });
 
     bytes memory offchainTokenData = abi.encode(

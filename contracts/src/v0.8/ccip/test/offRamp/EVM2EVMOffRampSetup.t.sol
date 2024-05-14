@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.19;
+pragma solidity 0.8.24;
 
 import {IAny2EVMMessageReceiver} from "../../interfaces/IAny2EVMMessageReceiver.sol";
 import {ICommitStore} from "../../interfaces/ICommitStore.sol";
@@ -60,7 +60,7 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSetup {
         sourceChainSelector: SOURCE_CHAIN_SELECTOR,
         onRamp: ON_RAMP_ADDRESS,
         prevOffRamp: prevOffRamp,
-        armProxy: address(s_mockARM)
+        rmnProxy: address(s_mockRMN)
       }),
       getInboundRateLimiterConfig()
     );
@@ -83,6 +83,20 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSetup {
       tokensToAdd[i] = EVM2EVMOffRamp.RateLimitToken({sourceToken: s_sourceTokens[i], destToken: s_destTokens[i]});
     }
     s_offRamp.updateRateLimitTokens(new EVM2EVMOffRamp.RateLimitToken[](0), tokensToAdd);
+  }
+
+  function generateDynamicOffRampConfig(
+    address router,
+    address priceRegistry
+  ) internal pure returns (EVM2EVMOffRamp.DynamicConfig memory) {
+    return EVM2EVMOffRamp.DynamicConfig({
+      permissionLessExecutionThresholdSeconds: PERMISSION_LESS_EXECUTION_THRESHOLD_SECONDS,
+      router: router,
+      priceRegistry: priceRegistry,
+      maxNumberOfTokensPerMsg: MAX_TOKENS_LENGTH,
+      maxDataBytes: MAX_DATA_SIZE,
+      maxPoolReleaseOrMintGas: MAX_TOKEN_POOL_RELEASE_OR_MINT_GAS
+    });
   }
 
   function _convertToGeneralMessage(Internal.EVM2EVMMessage memory original)
@@ -117,7 +131,7 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSetup {
     view
     returns (Internal.EVM2EVMMessage memory)
   {
-    return _generateAny2EVMMessage(sequenceNumber, new Client.EVMTokenAmount[](0));
+    return _generateAny2EVMMessage(sequenceNumber, new Client.EVMTokenAmount[](0), false);
   }
 
   function _generateAny2EVMMessageWithTokens(
@@ -128,18 +142,19 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSetup {
     for (uint256 i = 0; i < tokenAmounts.length; ++i) {
       tokenAmounts[i].amount = amounts[i];
     }
-    return _generateAny2EVMMessage(sequenceNumber, tokenAmounts);
+    return _generateAny2EVMMessage(sequenceNumber, tokenAmounts, false);
   }
 
   function _generateAny2EVMMessage(
     uint64 sequenceNumber,
-    Client.EVMTokenAmount[] memory tokenAmounts
+    Client.EVMTokenAmount[] memory tokenAmounts,
+    bool allowOutOfOrderExecution
   ) internal view returns (Internal.EVM2EVMMessage memory) {
     bytes memory data = abi.encode(0);
     Internal.EVM2EVMMessage memory message = Internal.EVM2EVMMessage({
       sequenceNumber: sequenceNumber,
       sender: OWNER,
-      nonce: sequenceNumber,
+      nonce: allowOutOfOrderExecution ? 0 : sequenceNumber,
       gasLimit: GAS_LIMIT,
       strict: false,
       sourceChainSelector: SOURCE_CHAIN_SELECTOR,
@@ -184,8 +199,8 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSetup {
     Client.EVMTokenAmount[] memory tokenAmounts = getCastedSourceEVMTokenAmountsWithZeroAmounts();
     tokenAmounts[0].amount = 1e18;
     tokenAmounts[1].amount = 5e18;
-    messages[0] = _generateAny2EVMMessage(1, tokenAmounts);
-    messages[1] = _generateAny2EVMMessage(2, tokenAmounts);
+    messages[0] = _generateAny2EVMMessage(1, tokenAmounts, false);
+    messages[1] = _generateAny2EVMMessage(2, tokenAmounts, false);
 
     return messages;
   }

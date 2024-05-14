@@ -1,15 +1,12 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.19;
-
-import {Vm} from "forge-std/Vm.sol";
+pragma solidity 0.8.24;
 
 import {ICommitStore} from "../../interfaces/ICommitStore.sol";
 import {IPool} from "../../interfaces/IPool.sol";
 
 import {CallWithExactGas} from "../../../shared/call/CallWithExactGas.sol";
-
-import {ARM} from "../../ARM.sol";
 import {AggregateRateLimiter} from "../../AggregateRateLimiter.sol";
+import {RMN} from "../../RMN.sol";
 import {Router} from "../../Router.sol";
 import {Client} from "../../libraries/Client.sol";
 import {Internal} from "../../libraries/Internal.sol";
@@ -30,6 +27,7 @@ import {OCR2BaseNoChecks} from "../ocr/OCR2BaseNoChecks.t.sol";
 import {EVM2EVMMultiOffRampSetup} from "./EVM2EVMMultiOffRampSetup.t.sol";
 
 import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
+import {Vm} from "forge-std/Vm.sol";
 
 // TODO: re-use constants (SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1, etc.) in other tests
 
@@ -48,7 +46,7 @@ contract EVM2EVMMultiOffRamp_constructor is EVM2EVMMultiOffRampSetup {
     EVM2EVMMultiOffRamp.StaticConfig memory staticConfig = EVM2EVMMultiOffRamp.StaticConfig({
       commitStore: address(s_mockCommitStore),
       chainSelector: DEST_CHAIN_SELECTOR,
-      armProxy: address(s_mockARM)
+      rmnProxy: address(s_mockRMN)
     });
     EVM2EVMMultiOffRamp.DynamicConfig memory dynamicConfig =
       generateDynamicMultiOffRampConfig(address(s_destRouter), address(s_priceRegistry));
@@ -150,7 +148,7 @@ contract EVM2EVMMultiOffRamp_constructor is EVM2EVMMultiOffRampSetup {
       EVM2EVMMultiOffRamp.StaticConfig({
         commitStore: address(s_mockCommitStore),
         chainSelector: DEST_CHAIN_SELECTOR,
-        armProxy: address(s_mockARM)
+        rmnProxy: address(s_mockRMN)
       }),
       sourceChainConfigs,
       RateLimiter.Config({isEnabled: true, rate: 1e20, capacity: 1e20})
@@ -170,7 +168,7 @@ contract EVM2EVMMultiOffRamp_constructor is EVM2EVMMultiOffRampSetup {
   //       sourceChainSelector: SOURCE_CHAIN_SELECTOR,
   //       onRamp: ON_RAMP_ADDRESS,
   //       prevOffRamp: address(0),
-  //       armProxy: address(s_mockARM)
+  //       rmnProxy: address(s_mockRMN)
   //     }),
   //     getInboundRateLimiterConfig()
   //   );
@@ -427,6 +425,26 @@ contract EVM2EVMMultiOffRamp_execute is EVM2EVMMultiOffRampSetup {
   //   s_offRamp.execute(_generateReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messages), new uint256[](0));
   // }
 
+  function test__execute_SkippedAlreadyExecutedMessage_Success() public {
+    Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1);
+
+    vm.expectEmit();
+    emit ExecutionStateChanged(
+      messages[0].sourceChainSelector,
+      messages[0].sequenceNumber,
+      messages[0].messageId,
+      Internal.MessageExecutionState.SUCCESS,
+      ""
+    );
+
+    s_offRamp.execute(_generateReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messages), new uint256[](0));
+
+    vm.expectEmit();
+    emit SkippedAlreadyExecutedMessage(messages[0].sequenceNumber);
+
+    s_offRamp.execute(_generateReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messages), new uint256[](0));
+  }
+
   // Send a message to a contract that does not implement the CCIPReceiver interface
   // This should execute successfully.
   function test_SingleMessageToNonCCIPReceiver_Success() public {
@@ -587,6 +605,27 @@ contract EVM2EVMMultiOffRamp_execute is EVM2EVMMultiOffRampSetup {
     );
   }
 
+  function test_Unhealthy_Revert() public {
+    s_mockRMN.voteToCurse(0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff);
+    vm.expectRevert(EVM2EVMMultiOffRamp.CursedByRMN.selector);
+    s_offRamp.execute(
+      _generateReportFromMessages(
+        SOURCE_CHAIN_SELECTOR_1, _generateMessagesWithTokens(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1)
+      ),
+      new uint256[](0)
+    );
+    // Uncurse should succeed
+    RMN.UnvoteToCurseRecord[] memory records = new RMN.UnvoteToCurseRecord[](1);
+    records[0] = RMN.UnvoteToCurseRecord({curseVoteAddr: OWNER, cursesHash: bytes32(uint256(0)), forceUnvote: true});
+    s_mockRMN.ownerUnvoteToCurse(records);
+    s_offRamp.execute(
+      _generateReportFromMessages(
+        SOURCE_CHAIN_SELECTOR_1, _generateMessagesWithTokens(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1)
+      ),
+      new uint256[](0)
+    );
+  }
+
   function test_UnexpectedTokenData_Revert() public {
     Internal.ExecutionReportSingleChain memory report = _generateReportFromMessages(
       SOURCE_CHAIN_SELECTOR_1, _generateBasicMessages(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1)
@@ -636,19 +675,6 @@ contract EVM2EVMMultiOffRamp_execute is EVM2EVMMultiOffRampSetup {
       _generateReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messages), _getGasLimitsFromMessages(messages)
     );
     vm.clearMockedCalls();
-  }
-
-  function test_AlreadyExecuted_Revert() public {
-    Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1);
-    Internal.ExecutionReportSingleChain memory executionReport =
-      _generateReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messages);
-    s_offRamp.execute(executionReport, new uint256[](0));
-    vm.expectRevert(
-      abi.encodeWithSelector(
-        EVM2EVMMultiOffRamp.AlreadyExecuted.selector, SOURCE_CHAIN_SELECTOR_1, messages[0].sequenceNumber
-      )
-    );
-    s_offRamp.execute(executionReport, new uint256[](0));
   }
 
   function test_NonExistingSourceChain_Revert() public {
@@ -950,6 +976,28 @@ contract EVM2EVMMultiOffRamp_batchExecute is EVM2EVMMultiOffRampSetup {
     assertGt(nonceChain3, 0);
   }
 
+  function test_MultipleReportsSkipDuplicate_Success() public {
+    Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1);
+
+    Internal.ExecutionReportSingleChain[] memory reports = new Internal.ExecutionReportSingleChain[](2);
+    reports[0] = _generateReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messages);
+    reports[1] = _generateReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messages);
+
+    vm.expectEmit();
+    emit ExecutionStateChanged(
+      messages[0].sourceChainSelector,
+      messages[0].sequenceNumber,
+      messages[0].messageId,
+      Internal.MessageExecutionState.SUCCESS,
+      ""
+    );
+
+    vm.expectEmit();
+    emit SkippedAlreadyExecutedMessage(messages[0].sequenceNumber);
+
+    s_offRamp.batchExecute(reports, new uint256[][](2));
+  }
+
   // Reverts
   function test_ZeroReports_Revert() public {
     vm.expectRevert(EVM2EVMMultiOffRamp.EmptyReport.selector);
@@ -957,8 +1005,8 @@ contract EVM2EVMMultiOffRamp_batchExecute is EVM2EVMMultiOffRampSetup {
   }
 
   function test_Unhealthy_Revert() public {
-    s_mockARM.voteToCurse(0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff);
-    vm.expectRevert(EVM2EVMMultiOffRamp.BadARMSignal.selector);
+    s_mockRMN.voteToCurse(0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff);
+    vm.expectRevert(EVM2EVMMultiOffRamp.CursedByRMN.selector);
     s_offRamp.batchExecute(
       _generateBatchReportFromMessages(
         SOURCE_CHAIN_SELECTOR_1, _generateMessagesWithTokens(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1)
@@ -966,9 +1014,9 @@ contract EVM2EVMMultiOffRamp_batchExecute is EVM2EVMMultiOffRampSetup {
       new uint256[][](1)
     );
     // Uncurse should succeed
-    ARM.UnvoteToCurseRecord[] memory records = new ARM.UnvoteToCurseRecord[](1);
-    records[0] = ARM.UnvoteToCurseRecord({curseVoteAddr: OWNER, cursesHash: bytes32(uint256(0)), forceUnvote: true});
-    s_mockARM.ownerUnvoteToCurse(records);
+    RMN.UnvoteToCurseRecord[] memory records = new RMN.UnvoteToCurseRecord[](1);
+    records[0] = RMN.UnvoteToCurseRecord({curseVoteAddr: OWNER, cursesHash: bytes32(uint256(0)), forceUnvote: true});
+    s_mockRMN.ownerUnvoteToCurse(records);
     s_offRamp.batchExecute(
       _generateBatchReportFromMessages(
         SOURCE_CHAIN_SELECTOR_1, _generateMessagesWithTokens(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1)
@@ -986,21 +1034,6 @@ contract EVM2EVMMultiOffRamp_batchExecute is EVM2EVMMultiOffRampSetup {
       ),
       new uint256[][](1)
     );
-  }
-
-  function test_MultipleReportsWithDuplicate_Revert() public {
-    Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1);
-
-    Internal.ExecutionReportSingleChain[] memory reports = new Internal.ExecutionReportSingleChain[](2);
-    reports[0] = _generateReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messages);
-    reports[1] = _generateReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messages);
-
-    vm.expectRevert(
-      abi.encodeWithSelector(
-        EVM2EVMMultiOffRamp.AlreadyExecuted.selector, SOURCE_CHAIN_SELECTOR_1, messages[0].sequenceNumber
-      )
-    );
-    s_offRamp.batchExecute(reports, new uint256[][](2));
   }
 
   function test_OutOfBoundsGasLimitsAccess_Revert() public {

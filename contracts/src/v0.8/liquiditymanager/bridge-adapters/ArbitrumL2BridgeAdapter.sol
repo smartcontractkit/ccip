@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.19;
+pragma solidity 0.8.24;
 
 import {IBridgeAdapter} from "../interfaces/IBridge.sol";
 
@@ -60,8 +60,8 @@ contract ArbitrumL2BridgeAdapter is IBridgeAdapter {
   /// @notice No-op since L1 -> L2 transfers do not need finalization.
   /// @return true always.
   function finalizeWithdrawERC20(
-    address /* remoteSender */,
-    address /* localReceiver */,
+    address, /* remoteSender */
+    address, /* localReceiver */
     bytes calldata /* bridgeSpecificPayload */
   ) external override returns (bool) {
     return true;

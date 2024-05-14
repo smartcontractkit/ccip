@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.19;
+pragma solidity 0.8.24;
 
 import {IAny2EVMMessageReceiver} from "../../interfaces/IAny2EVMMessageReceiver.sol";
 import {ICommitStore} from "../../interfaces/ICommitStore.sol";
@@ -47,6 +47,7 @@ contract EVM2EVMMultiOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSet
     bytes returnData
   );
   event SkippedIncorrectNonce(uint64 sourceChainSelector, uint64 nonce, address indexed sender);
+  event SkippedAlreadyExecutedMessage(uint64 indexed sequenceNumber);
 
   function setUp() public virtual override(TokenSetup, PriceRegistrySetup, OCR2BaseSetup) {
     TokenSetup.setUp();
@@ -71,7 +72,7 @@ contract EVM2EVMMultiOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSet
       EVM2EVMMultiOffRamp.StaticConfig({
         commitStore: address(commitStore),
         chainSelector: DEST_CHAIN_SELECTOR,
-        armProxy: address(s_mockARM)
+        rmnProxy: address(s_mockRMN)
       }),
       sourceChainConfigs,
       getInboundRateLimiterConfig()
@@ -131,6 +132,20 @@ contract EVM2EVMMultiOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSet
     }
 
     s_destRouter.applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), offRampUpdates);
+  }
+
+  function generateDynamicMultiOffRampConfig(
+    address router,
+    address priceRegistry
+  ) internal pure returns (EVM2EVMMultiOffRamp.DynamicConfig memory) {
+    return EVM2EVMMultiOffRamp.DynamicConfig({
+      permissionLessExecutionThresholdSeconds: PERMISSION_LESS_EXECUTION_THRESHOLD_SECONDS,
+      router: router,
+      priceRegistry: priceRegistry,
+      maxNumberOfTokensPerMsg: MAX_TOKENS_LENGTH,
+      maxDataBytes: MAX_DATA_SIZE,
+      maxPoolReleaseOrMintGas: MAX_TOKEN_POOL_RELEASE_OR_MINT_GAS
+    });
   }
 
   function _convertToGeneralMessage(Internal.EVM2EVMMessage memory original)

@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.19;
+pragma solidity 0.8.24;
 
 import {ITypeAndVersion} from "../../shared/interfaces/ITypeAndVersion.sol";
-import {IARM} from "../interfaces/IARM.sol";
 import {IAny2EVMMessageReceiver} from "../interfaces/IAny2EVMMessageReceiver.sol";
 
 import {IAny2EVMMultiOffRamp} from "../interfaces/IAny2EVMMultiOffRamp.sol";
@@ -10,6 +9,7 @@ import {IAny2EVMOffRamp} from "../interfaces/IAny2EVMOffRamp.sol";
 import {ICommitStore} from "../interfaces/ICommitStore.sol";
 import {IPool} from "../interfaces/IPool.sol";
 import {IPriceRegistry} from "../interfaces/IPriceRegistry.sol";
+import {IRMN} from "../interfaces/IRMN.sol";
 import {IRouter} from "../interfaces/IRouter.sol";
 
 import {CallWithExactGas} from "../../shared/call/CallWithExactGas.sol";
@@ -52,7 +52,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, AggregateRateLimiter, ITyp
   error ReceiverError(bytes error);
   error TokenHandlingError(bytes error);
   error EmptyReport();
-  error BadARMSignal();
+  error CursedByRMN();
   error InvalidMessageId(bytes32 messageId);
   error NotACompatiblePool(address notPool);
   error InvalidDataLength(uint256 expected, uint256 got);
@@ -78,13 +78,15 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, AggregateRateLimiter, ITyp
   event TokenAggregateRateLimitRemoved(address sourceToken, address destToken);
   event SourceChainSelectorAdded(uint64 sourceChainSelector);
   event SourceChainConfigSet(uint64 indexed sourceChainSelector, SourceChainConfig sourceConfig);
+  // TODO: index with source chain selector
+  event SkippedAlreadyExecutedMessage(uint64 indexed sequenceNumber);
 
   /// @notice Static offRamp config
   /// @dev RMN depends on this struct, if changing, please notify the RMN maintainers.
   struct StaticConfig {
     address commitStore; // ────────╮  CommitStore address on the destination chain
     uint64 chainSelector; // ───────╯  Destination chainSelector
-    address armProxy; //               ARM proxy address
+    address rmnProxy; //               RMN proxy address
   }
 
   /// @notice Per-chain source config (defining a lane from a Source Chain -> Dest OffRamp)
@@ -138,8 +140,8 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, AggregateRateLimiter, ITyp
   address internal immutable i_commitStore;
   /// @dev ChainSelector of this chain
   uint64 internal immutable i_chainSelector;
-  /// @dev The address of the arm proxy
-  address internal immutable i_armProxy;
+  /// @dev The address of the RMN proxy
+  address internal immutable i_rmnProxy;
 
   // DYNAMIC CONFIG
   DynamicConfig internal s_dynamicConfig;
@@ -177,7 +179,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, AggregateRateLimiter, ITyp
 
     i_commitStore = staticConfig.commitStore;
     i_chainSelector = staticConfig.chainSelector;
-    i_armProxy = staticConfig.armProxy;
+    i_rmnProxy = staticConfig.rmnProxy;
 
     _applySourceChainConfigUpdates(sourceChainConfigs);
   }
@@ -296,7 +298,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, AggregateRateLimiter, ITyp
   function _batchExecute(
     Internal.ExecutionReportSingleChain[] memory reports,
     uint256[][] memory manualExecGasLimits
-  ) internal whenHealthy {
+  ) internal {
     if (reports.length == 0) revert EmptyReport();
 
     bool areManualGasLimitsEmpty = manualExecGasLimits.length == 0;
@@ -313,8 +315,10 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, AggregateRateLimiter, ITyp
   /// @param manualExecGasLimits An array of gas limits to use for manual execution.
   /// @dev If called from the DON, this array is always empty.
   /// @dev If called from manual execution, this array is always same length as messages.
-  /// @dev Does not perform validation of whenHealthy - this checks should be performed before calling the function.
   function _execute(Internal.ExecutionReportSingleChain memory report, uint256[] memory manualExecGasLimits) internal {
+    // TODO pass in source chain selector to check for cursed source chain
+    if (IRMN(i_rmnProxy).isCursed()) revert CursedByRMN();
+
     uint256 numMsgs = report.messages.length;
     if (numMsgs == 0) revert EmptyReport();
     if (numMsgs != report.offchainTokenData.length) revert UnexpectedTokenData();
@@ -351,9 +355,16 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, AggregateRateLimiter, ITyp
       uint64 sequenceNumber = message.sequenceNumber;
 
       Internal.MessageExecutionState originalState = getExecutionState(sourceChainSelector, sequenceNumber);
+      if (originalState == Internal.MessageExecutionState.SUCCESS) {
+        // If the message has already been executed, we skip it.  We want to not revert on race conditions between
+        // executing parties. This will allow us to open up manual exec while also attempting with the DON, without
+        // reverting an entire DON batch when a user manually executes while the tx is inflight.
+        emit SkippedAlreadyExecutedMessage(message.sequenceNumber);
+        continue;
+      }
       // Two valid cases here, we either have never touched this message before, or we tried to execute
-      // and failed. This check protects against reentry and re-execution because the other states are
-      // IN_PROGRESS and SUCCESS, both should not be allowed to execute.
+      // and failed. This check protects against reentry and re-execution because the other state is
+      // IN_PROGRESS which should not be allowed to execute.
       if (
         !(
           originalState == Internal.MessageExecutionState.UNTOUCHED
@@ -569,7 +580,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, AggregateRateLimiter, ITyp
   /// @dev This function will always return the same struct as the contents is static and can never change.
   /// RMN depends on this function, if changing, please notify the RMN maintainers.
   function getStaticConfig() external view returns (StaticConfig memory) {
-    return StaticConfig({commitStore: i_commitStore, chainSelector: i_chainSelector, armProxy: i_armProxy});
+    return StaticConfig({commitStore: i_commitStore, chainSelector: i_chainSelector, rmnProxy: i_rmnProxy});
   }
 
   /// @notice Returns the current dynamic config.
@@ -643,7 +654,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, AggregateRateLimiter, ITyp
     s_dynamicConfig = dynamicConfig;
 
     emit ConfigSet(
-      StaticConfig({commitStore: i_commitStore, chainSelector: i_chainSelector, armProxy: i_armProxy}), dynamicConfig
+      StaticConfig({commitStore: i_commitStore, chainSelector: i_chainSelector, rmnProxy: i_rmnProxy}), dynamicConfig
     );
   }
 
@@ -764,7 +775,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, AggregateRateLimiter, ITyp
   }
 
   // ================================================================
-  // │                        Access and ARM                        │
+  // │                            Access                            │
   // ================================================================
 
   /// @notice Reverts as this contract should not access CCIP messages
@@ -772,11 +783,5 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, AggregateRateLimiter, ITyp
     /* solhint-disable */
     revert();
     /* solhint-enable*/
-  }
-
-  /// @notice Ensure that the ARM has not emitted a bad signal, and that the latest heartbeat is not stale.
-  modifier whenHealthy() {
-    if (IARM(i_armProxy).isCursed()) revert BadARMSignal();
-    _;
   }
 }

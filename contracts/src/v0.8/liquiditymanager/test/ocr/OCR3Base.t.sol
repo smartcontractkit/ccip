@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.19;
+pragma solidity 0.8.24;
 
-import {OCR3Setup} from "./OCR3Setup.t.sol";
 import {OCR3Base} from "../../ocr/OCR3Base.sol";
 import {OCR3Helper} from "../helpers/OCR3Helper.sol";
+import {OCR3Setup} from "./OCR3Setup.t.sol";
 
 contract OCR3BaseSetup is OCR3Setup {
   event ConfigSet(
@@ -47,18 +47,17 @@ contract OCR3BaseSetup is OCR3Setup {
 
   function getBasicConfigDigest(uint8 f, uint64 currentConfigCount) internal view returns (bytes32) {
     bytes memory configBytes = abi.encode("");
-    return
-      s_OCR3Base.configDigestFromConfigData(
-        block.chainid,
-        address(s_OCR3Base),
-        currentConfigCount + 1,
-        s_valid_signers,
-        s_valid_transmitters,
-        f,
-        configBytes,
-        s_offchainConfigVersion,
-        configBytes
-      );
+    return s_OCR3Base.configDigestFromConfigData(
+      block.chainid,
+      address(s_OCR3Base),
+      currentConfigCount + 1,
+      s_valid_signers,
+      s_valid_transmitters,
+      f,
+      configBytes,
+      s_offchainConfigVersion,
+      configBytes
+    );
   }
 
   function getTestReportDigest() internal view returns (bytes32) {
@@ -73,18 +72,17 @@ contract OCR3BaseSetup is OCR3Setup {
     uint64 currentConfigCount,
     bytes memory onchainConfig
   ) internal view returns (bytes32) {
-    return
-      s_OCR3Base.configDigestFromConfigData(
-        block.chainid,
-        contractAddress,
-        currentConfigCount + 1,
-        s_valid_signers,
-        s_valid_transmitters,
-        f,
-        onchainConfig,
-        s_offchainConfigVersion,
-        abi.encode("")
-      );
+    return s_OCR3Base.configDigestFromConfigData(
+      block.chainid,
+      contractAddress,
+      currentConfigCount + 1,
+      s_valid_signers,
+      s_valid_transmitters,
+      f,
+      onchainConfig,
+      s_offchainConfigVersion,
+      abi.encode("")
+    );
   }
 }
 
@@ -97,12 +95,7 @@ contract OCR3Base_transmit is OCR3BaseSetup {
 
     s_configDigest = getBasicConfigDigest(s_f, 0);
     s_OCR3Base.setOCR3Config(
-      s_valid_signers,
-      s_valid_transmitters,
-      s_f,
-      configBytes,
-      s_offchainConfigVersion,
-      configBytes
+      s_valid_signers, s_valid_transmitters, s_f, configBytes, s_offchainConfigVersion, configBytes
     );
   }
 
@@ -118,7 +111,7 @@ contract OCR3Base_transmit is OCR3BaseSetup {
   // Reverts
 
   function testNonIncreasingSequenceNumberReverts() public {
-    bytes32[3] memory reportContext = [s_configDigest, bytes32(uint256(0)) /* sequence number */, s_configDigest];
+    bytes32[3] memory reportContext = [s_configDigest, bytes32(uint256(0)), /* sequence number */ s_configDigest];
 
     vm.expectRevert(abi.encodeWithSelector(OCR3Base.NonIncreasingSequenceNumber.selector, 0, 0));
     s_OCR3Base.transmit(reportContext, REPORT, s_rs, s_ss, s_rawVs);
@@ -144,7 +137,7 @@ contract OCR3Base_transmit is OCR3BaseSetup {
 
   function testConfigDigestMismatchReverts() public {
     bytes32 configDigest;
-    bytes32[3] memory reportContext = [configDigest, bytes32(uint256(1)) /* sequence number */, configDigest];
+    bytes32[3] memory reportContext = [configDigest, bytes32(uint256(1)), /* sequence number */ configDigest];
 
     vm.expectRevert(abi.encodeWithSelector(OCR3Base.ConfigDigestMismatch.selector, s_configDigest, configDigest));
     s_OCR3Base.transmit(reportContext, REPORT, new bytes32[](0), new bytes32[](0), s_rawVs);
@@ -221,12 +214,7 @@ contract OCR3Base_setOCR3Config is OCR3BaseSetup {
     );
 
     s_OCR3Base.setOCR3Config(
-      s_valid_signers,
-      s_valid_transmitters,
-      s_f,
-      configBytes,
-      s_offchainConfigVersion,
-      configBytes
+      s_valid_signers, s_valid_transmitters, s_f, configBytes, s_offchainConfigVersion, configBytes
     );
 
     transmitters = s_OCR3Base.getTransmitters();
@@ -248,12 +236,7 @@ contract OCR3Base_setOCR3Config is OCR3BaseSetup {
     );
     vm.resumeGasMetering();
     s_OCR3Base.setOCR3Config(
-      s_valid_signers,
-      s_valid_transmitters,
-      s_f,
-      configBytes,
-      s_offchainConfigVersion,
-      configBytes
+      s_valid_signers, s_valid_transmitters, s_f, configBytes, s_offchainConfigVersion, configBytes
     );
   }
 

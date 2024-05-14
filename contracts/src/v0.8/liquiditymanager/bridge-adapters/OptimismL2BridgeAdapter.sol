@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.19;
+pragma solidity 0.8.24;
 
-import {IBridgeAdapter} from "../interfaces/IBridge.sol";
 import {IWrappedNative} from "../../ccip/interfaces/IWrappedNative.sol";
+import {IBridgeAdapter} from "../interfaces/IBridge.sol";
 
 import {Lib_PredeployAddresses} from "@eth-optimism/contracts/libraries/constants/Lib_PredeployAddresses.sol";
 
@@ -57,7 +57,7 @@ contract OptimismL2BridgeAdapter is IBridgeAdapter {
   /// @inheritdoc IBridgeAdapter
   function sendERC20(
     address localToken,
-    address /* remoteToken */,
+    address, /* remoteToken */
     address recipient,
     uint256 amount,
     bytes calldata /* bridgeSpecificPayload */
@@ -93,8 +93,8 @@ contract OptimismL2BridgeAdapter is IBridgeAdapter {
   /// @notice No-op since L1 -> L2 transfers do not need finalization.
   /// @return true always.
   function finalizeWithdrawERC20(
-    address /* remoteSender */,
-    address /* localReceiver */,
+    address, /* remoteSender */
+    address, /* localReceiver */
     bytes calldata /* bridgeSpecificPayload */
   ) external override returns (bool) {
     return true;

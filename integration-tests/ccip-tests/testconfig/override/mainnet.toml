@@ -656,11 +656,11 @@ selected_networks = [
 
 [CCIP.Groups.load]
 NetworkPairs = [
-  #'ETHEREUM_MAINNET,OPTIMISM_MAINNET',
+  'ETHEREUM_MAINNET,OPTIMISM_MAINNET',
   'ETHEREUM_MAINNET,AVALANCHE_MAINNET',
   'ETHEREUM_MAINNET,POLYGON_MAINNET',
   'ETHEREUM_MAINNET,BSC_MAINNET',
-  # 'ETHEREUM_MAINNET,ARBITRUM_MAINNET',
+  'ETHEREUM_MAINNET,ARBITRUM_MAINNET',
   'ETHEREUM_MAINNET,BASE_MAINNET',
   'ETHEREUM_MAINNET,WEMIX_MAINNET',
   'AVALANCHE_MAINNET,POLYGON_MAINNET',
@@ -672,7 +672,7 @@ NetworkPairs = [
   'BASE_MAINNET,BSC_MAINNET',
   'POLYGON_MAINNET,ARBITRUM_MAINNET', # added as batch 1
   'ARBITRUM_MAINNET,BSC_MAINNET', # added as batch 1
-  # 'ARBITRUM_MAINNET,OPTIMISM_MAINNET', # added as batch 1
+  'ARBITRUM_MAINNET,OPTIMISM_MAINNET', # added as batch 1
   'AVALANCHE_MAINNET,OPTIMISM_MAINNET', # added as batch 2
   'AVALANCHE_MAINNET,ARBITRUM_MAINNET', # added as batch 2
   'BASE_MAINNET,POLYGON_MAINNET', # added as batch 2
@@ -688,19 +688,20 @@ NetworkPairs = [
 
 BiDirectionalLane = true
 PhaseTimeout = '20m'
-TestDuration = '5h'
 ExistingDeployment = true
-RequestPerUnitTime = [1]
-TimeUnit = '1h'
-TestRunName = 'mainnet-2.7-ccip1.2'
-FailOnFirstErrorInLoad = true
-SkipRequestIfAnotherRequestTriggeredWithin = '40m'
 
 [CCIP.Groups.load.TokenConfig]
 NoOfTokensPerChain = 1
 
+[CCIP.Groups.load.LoadProfile]
+RequestPerUnitTime = [1]
+TimeUnit = '1h'
+TestDuration = '5h'
+TestRunName = 'mainnet-2.7-ccip1.2'
+FailOnFirstErrorInLoad = true
+SkipRequestIfAnotherRequestTriggeredWithin = '40m'
 
-[CCIP.Groups.load.MsgDetails]
+[[CCIP.Groups.load.LoadProfile.MsgProfile.MsgDetails]]
 MsgType = 'Data'
 DestGasLimit = 0
 DataLength = 100
@@ -745,7 +746,7 @@ PhaseTimeout = '20m'
 LocalCluster = false
 ExistingDeployment = true
 ReuseContracts = true
-TestRunName = 'mainnet-2.7-ccip1.2'
+
 
 [CCIP.Groups.smoke.TokenConfig]
 NoOfTokensPerChain = 1
