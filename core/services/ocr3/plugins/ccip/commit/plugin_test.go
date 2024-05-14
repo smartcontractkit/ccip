@@ -244,3 +244,229 @@ func TestPlugin_observeNewMsgs(t *testing.T) {
 		})
 	}
 }
+
+func TestPlugin_newMsgsConsensus(t *testing.T) {
+	testCases := []struct {
+		name           string
+		maxSeqNums     []model.SeqNumChain
+		observations   []model.CommitPluginObservation
+		expMerkleRoots []model.MerkleRootChain
+		fChain         map[model.ChainSelector]int
+		expErr         bool
+	}{
+		{
+			name:           "empty",
+			maxSeqNums:     []model.SeqNumChain{},
+			observations:   nil,
+			expMerkleRoots: []model.MerkleRootChain{},
+			expErr:         false,
+		},
+		{
+			name: "one message but not reaching 2fChain+1 observations",
+			fChain: map[model.ChainSelector]int{
+				1: 2,
+			},
+			maxSeqNums: []model.SeqNumChain{
+				{ChainSel: 1, SeqNum: 10},
+			},
+			observations: []model.CommitPluginObservation{
+				{NewMsgs: []model.CCIPMsgBaseDetails{{ID: [32]byte{1}, SourceChain: 1, SeqNum: 11}}},
+				{NewMsgs: []model.CCIPMsgBaseDetails{{ID: [32]byte{1}, SourceChain: 1, SeqNum: 11}}},
+				{NewMsgs: []model.CCIPMsgBaseDetails{{ID: [32]byte{1}, SourceChain: 1, SeqNum: 11}}},
+			},
+			expMerkleRoots: []model.MerkleRootChain{},
+			expErr:         false,
+		},
+		{
+			name: "one message reaching 2fChain+1 observations",
+			fChain: map[model.ChainSelector]int{
+				1: 2,
+			},
+			maxSeqNums: []model.SeqNumChain{
+				{ChainSel: 1, SeqNum: 10},
+			},
+			observations: []model.CommitPluginObservation{
+				{NewMsgs: []model.CCIPMsgBaseDetails{{ID: [32]byte{1}, SourceChain: 1, SeqNum: 11}}},
+				{NewMsgs: []model.CCIPMsgBaseDetails{{ID: [32]byte{1}, SourceChain: 1, SeqNum: 11}}},
+				{NewMsgs: []model.CCIPMsgBaseDetails{{ID: [32]byte{1}, SourceChain: 1, SeqNum: 11}}},
+				{NewMsgs: []model.CCIPMsgBaseDetails{{ID: [32]byte{1}, SourceChain: 1, SeqNum: 11}}},
+				{NewMsgs: []model.CCIPMsgBaseDetails{{ID: [32]byte{1}, SourceChain: 1, SeqNum: 11}}},
+			},
+			expMerkleRoots: []model.MerkleRootChain{
+				{
+					ChainSel:     1,
+					SeqNumsRange: model.NewSeqNumRange(11, 11),
+				},
+			},
+			expErr: false,
+		},
+		{
+			name: "multiple messages all of them reaching 2fChain+1 observations",
+			fChain: map[model.ChainSelector]int{
+				1: 2,
+			},
+			maxSeqNums: []model.SeqNumChain{
+				{ChainSel: 1, SeqNum: 10},
+			},
+			observations: []model.CommitPluginObservation{
+				{NewMsgs: []model.CCIPMsgBaseDetails{{ID: [32]byte{1}, SourceChain: 1, SeqNum: 11}}},
+				{NewMsgs: []model.CCIPMsgBaseDetails{{ID: [32]byte{1}, SourceChain: 1, SeqNum: 11}}},
+				{NewMsgs: []model.CCIPMsgBaseDetails{{ID: [32]byte{1}, SourceChain: 1, SeqNum: 11}}},
+				{NewMsgs: []model.CCIPMsgBaseDetails{{ID: [32]byte{1}, SourceChain: 1, SeqNum: 11}}},
+				{NewMsgs: []model.CCIPMsgBaseDetails{{ID: [32]byte{1}, SourceChain: 1, SeqNum: 11}}},
+
+				{NewMsgs: []model.CCIPMsgBaseDetails{{ID: [32]byte{2}, SourceChain: 1, SeqNum: 12}}},
+				{NewMsgs: []model.CCIPMsgBaseDetails{{ID: [32]byte{2}, SourceChain: 1, SeqNum: 12}}},
+				{NewMsgs: []model.CCIPMsgBaseDetails{{ID: [32]byte{2}, SourceChain: 1, SeqNum: 12}}},
+				{NewMsgs: []model.CCIPMsgBaseDetails{{ID: [32]byte{2}, SourceChain: 1, SeqNum: 12}}},
+				{NewMsgs: []model.CCIPMsgBaseDetails{{ID: [32]byte{2}, SourceChain: 1, SeqNum: 12}}},
+
+				{NewMsgs: []model.CCIPMsgBaseDetails{{ID: [32]byte{3}, SourceChain: 1, SeqNum: 13}}},
+				{NewMsgs: []model.CCIPMsgBaseDetails{{ID: [32]byte{3}, SourceChain: 1, SeqNum: 13}}},
+				{NewMsgs: []model.CCIPMsgBaseDetails{{ID: [32]byte{3}, SourceChain: 1, SeqNum: 13}}},
+				{NewMsgs: []model.CCIPMsgBaseDetails{{ID: [32]byte{3}, SourceChain: 1, SeqNum: 13}}},
+				{NewMsgs: []model.CCIPMsgBaseDetails{{ID: [32]byte{3}, SourceChain: 1, SeqNum: 13}}},
+			},
+			expMerkleRoots: []model.MerkleRootChain{
+				{
+					ChainSel:     1,
+					SeqNumsRange: model.NewSeqNumRange(11, 13),
+				},
+			},
+			expErr: false,
+		},
+		{
+			name: "one message sequence number is lower than consensus max seq num",
+			fChain: map[model.ChainSelector]int{
+				1: 2,
+			},
+			maxSeqNums: []model.SeqNumChain{
+				{ChainSel: 1, SeqNum: 10},
+			},
+			observations: []model.CommitPluginObservation{
+				{NewMsgs: []model.CCIPMsgBaseDetails{{ID: [32]byte{1}, SourceChain: 1, SeqNum: 10}}},
+				{NewMsgs: []model.CCIPMsgBaseDetails{{ID: [32]byte{1}, SourceChain: 1, SeqNum: 10}}},
+				{NewMsgs: []model.CCIPMsgBaseDetails{{ID: [32]byte{1}, SourceChain: 1, SeqNum: 10}}},
+				{NewMsgs: []model.CCIPMsgBaseDetails{{ID: [32]byte{1}, SourceChain: 1, SeqNum: 10}}},
+				{NewMsgs: []model.CCIPMsgBaseDetails{{ID: [32]byte{1}, SourceChain: 1, SeqNum: 10}}},
+
+				{NewMsgs: []model.CCIPMsgBaseDetails{{ID: [32]byte{2}, SourceChain: 1, SeqNum: 12}}},
+				{NewMsgs: []model.CCIPMsgBaseDetails{{ID: [32]byte{2}, SourceChain: 1, SeqNum: 12}}},
+				{NewMsgs: []model.CCIPMsgBaseDetails{{ID: [32]byte{2}, SourceChain: 1, SeqNum: 12}}},
+				{NewMsgs: []model.CCIPMsgBaseDetails{{ID: [32]byte{2}, SourceChain: 1, SeqNum: 12}}},
+				{NewMsgs: []model.CCIPMsgBaseDetails{{ID: [32]byte{2}, SourceChain: 1, SeqNum: 12}}},
+
+				{NewMsgs: []model.CCIPMsgBaseDetails{{ID: [32]byte{3}, SourceChain: 1, SeqNum: 13}}},
+				{NewMsgs: []model.CCIPMsgBaseDetails{{ID: [32]byte{3}, SourceChain: 1, SeqNum: 13}}},
+				{NewMsgs: []model.CCIPMsgBaseDetails{{ID: [32]byte{3}, SourceChain: 1, SeqNum: 13}}},
+				{NewMsgs: []model.CCIPMsgBaseDetails{{ID: [32]byte{3}, SourceChain: 1, SeqNum: 13}}},
+				{NewMsgs: []model.CCIPMsgBaseDetails{{ID: [32]byte{3}, SourceChain: 1, SeqNum: 13}}},
+			},
+			expMerkleRoots: []model.MerkleRootChain{
+				{
+					ChainSel:     1,
+					SeqNumsRange: model.NewSeqNumRange(12, 13),
+				},
+			},
+			expErr: false,
+		},
+		{
+			name: "multiple messages some of them not reaching 2fChain+1 observations",
+			fChain: map[model.ChainSelector]int{
+				1: 2,
+			},
+			maxSeqNums: []model.SeqNumChain{
+				{ChainSel: 1, SeqNum: 10},
+			},
+			observations: []model.CommitPluginObservation{
+				{NewMsgs: []model.CCIPMsgBaseDetails{{ID: [32]byte{1}, SourceChain: 1, SeqNum: 11}}},
+				{NewMsgs: []model.CCIPMsgBaseDetails{{ID: [32]byte{1}, SourceChain: 1, SeqNum: 11}}},
+				{NewMsgs: []model.CCIPMsgBaseDetails{{ID: [32]byte{1}, SourceChain: 1, SeqNum: 11}}},
+				{NewMsgs: []model.CCIPMsgBaseDetails{{ID: [32]byte{1}, SourceChain: 1, SeqNum: 11}}},
+				{NewMsgs: []model.CCIPMsgBaseDetails{{ID: [32]byte{1}, SourceChain: 1, SeqNum: 11}}},
+
+				{NewMsgs: []model.CCIPMsgBaseDetails{{ID: [32]byte{2}, SourceChain: 1, SeqNum: 12}}},
+				{NewMsgs: []model.CCIPMsgBaseDetails{{ID: [32]byte{2}, SourceChain: 1, SeqNum: 12}}},
+
+				{NewMsgs: []model.CCIPMsgBaseDetails{{ID: [32]byte{3}, SourceChain: 1, SeqNum: 13}}},
+				{NewMsgs: []model.CCIPMsgBaseDetails{{ID: [32]byte{3}, SourceChain: 1, SeqNum: 13}}},
+				{NewMsgs: []model.CCIPMsgBaseDetails{{ID: [32]byte{3}, SourceChain: 1, SeqNum: 13}}},
+				{NewMsgs: []model.CCIPMsgBaseDetails{{ID: [32]byte{3}, SourceChain: 1, SeqNum: 13}}},
+				{NewMsgs: []model.CCIPMsgBaseDetails{{ID: [32]byte{3}, SourceChain: 1, SeqNum: 13}}},
+			},
+			expMerkleRoots: []model.MerkleRootChain{
+				{
+					ChainSel:     1,
+					SeqNumsRange: model.NewSeqNumRange(11, 11), // we stop at 11 because there is a gap for going to 13
+				},
+			},
+			expErr: false,
+		},
+		{
+			name: "multiple messages on different chains",
+			fChain: map[model.ChainSelector]int{
+				1: 2,
+				2: 1,
+			},
+			maxSeqNums: []model.SeqNumChain{
+				{ChainSel: 1, SeqNum: 10},
+				{ChainSel: 2, SeqNum: 20},
+			},
+			observations: []model.CommitPluginObservation{
+				{NewMsgs: []model.CCIPMsgBaseDetails{{ID: [32]byte{1}, SourceChain: 1, SeqNum: 11}}},
+				{NewMsgs: []model.CCIPMsgBaseDetails{{ID: [32]byte{1}, SourceChain: 1, SeqNum: 11}}},
+				{NewMsgs: []model.CCIPMsgBaseDetails{{ID: [32]byte{1}, SourceChain: 1, SeqNum: 11}}},
+				{NewMsgs: []model.CCIPMsgBaseDetails{{ID: [32]byte{1}, SourceChain: 1, SeqNum: 11}}},
+				{NewMsgs: []model.CCIPMsgBaseDetails{{ID: [32]byte{1}, SourceChain: 1, SeqNum: 11}}},
+
+				{NewMsgs: []model.CCIPMsgBaseDetails{{ID: [32]byte{3}, SourceChain: 2, SeqNum: 21}}},
+				{NewMsgs: []model.CCIPMsgBaseDetails{{ID: [32]byte{3}, SourceChain: 2, SeqNum: 21}}},
+				{NewMsgs: []model.CCIPMsgBaseDetails{{ID: [32]byte{3}, SourceChain: 2, SeqNum: 21}}},
+
+				{NewMsgs: []model.CCIPMsgBaseDetails{{ID: [32]byte{4}, SourceChain: 2, SeqNum: 22}}},
+				{NewMsgs: []model.CCIPMsgBaseDetails{{ID: [32]byte{4}, SourceChain: 2, SeqNum: 22}}},
+				{NewMsgs: []model.CCIPMsgBaseDetails{{ID: [32]byte{4}, SourceChain: 2, SeqNum: 22}}},
+			},
+			expMerkleRoots: []model.MerkleRootChain{
+				{
+					ChainSel:     1,
+					SeqNumsRange: model.NewSeqNumRange(11, 11), // we stop at 11 because there is a gap for going to 13
+				},
+				{
+					ChainSel:     2,
+					SeqNumsRange: model.NewSeqNumRange(21, 22), // we stop at 11 because there is a gap for going to 13
+				},
+			},
+			expErr: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			lggr := logger.Test(t)
+			p := NewPlugin(
+				ctx,
+				commontypes.OracleID(123),
+				model.CommitPluginConfig{
+					FChain: tc.fChain,
+				},
+				nil,
+				nil,
+				lggr,
+			)
+
+			merkleRoots, err := p.newMsgsConsensus(tc.maxSeqNums, tc.observations)
+			if tc.expErr {
+				assert.Error(t, err)
+				return
+			}
+			assert.NoError(t, err)
+			assert.Equal(t, len(tc.expMerkleRoots), len(merkleRoots))
+			for i, exp := range tc.expMerkleRoots {
+				assert.Equal(t, exp.ChainSel, merkleRoots[i].ChainSel)
+				assert.Equal(t, exp.SeqNumsRange, merkleRoots[i].SeqNumsRange)
+			}
+		})
+	}
+}

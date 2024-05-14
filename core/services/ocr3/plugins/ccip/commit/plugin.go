@@ -322,9 +322,9 @@ func (p *Plugin) observeNewMsgs(ctx context.Context, maxSeqNumsPerChain []model.
 	return observedNewMsgs, nil
 }
 
-func (p *Plugin) newMsgsConsensus(maxSeqNumsSlice []model.SeqNumChain, observations []model.CommitPluginObservation) ([]model.MerkleRootChain, error) {
+func (p *Plugin) newMsgsConsensus(maxSeqNums []model.SeqNumChain, observations []model.CommitPluginObservation) ([]model.MerkleRootChain, error) {
 	maxSeqNumsPerChain := make(map[model.ChainSelector]model.SeqNum)
-	for _, seqNumChain := range maxSeqNumsSlice {
+	for _, seqNumChain := range maxSeqNums {
 		maxSeqNumsPerChain[seqNumChain.ChainSel] = seqNumChain.SeqNum
 	}
 
@@ -343,6 +343,7 @@ func (p *Plugin) newMsgsConsensus(maxSeqNumsSlice []model.SeqNumChain, observati
 		}
 		return msg.SeqNum > maxSeqNum
 	})
+	p.lggr.Debugw("observed messages after filtering", "msgs", len(msgsFromObservations))
 
 	// Group messages by source chain.
 	sourceChains, groupedMsgs := slicelib.GroupBy(
@@ -361,6 +362,11 @@ func (p *Plugin) newMsgsConsensus(maxSeqNumsSlice []model.SeqNumChain, observati
 		msgsConsensus, err := p.newMsgsConsensusForChain(sourceChain, observedMsgs)
 		if err != nil {
 			return nil, fmt.Errorf("calculate observed msgs consensus: %w", err)
+		}
+
+		if msgsConsensus.isEmpty() {
+			p.lggr.Debugw("no consensus on observed messages", "sourceChain", sourceChain)
+			continue
 		}
 		consensusBySourceChain[sourceChain] = msgsConsensus
 		p.lggr.Debugw("observed messages consensus", "sourceChain", sourceChain, "consensus", msgsConsensus)
@@ -591,6 +597,10 @@ func (p *Plugin) knownSourceChainsSlice() []model.ChainSelector {
 type observedMsgsConsensus struct {
 	seqNumRange model.SeqNumRange
 	merkleRoot  [32]byte
+}
+
+func (o observedMsgsConsensus) isEmpty() bool {
+	return o.seqNumRange.Start() == 0 && o.seqNumRange.End() == 0 && o.merkleRoot == [32]byte{}
 }
 
 // Interface compatibility checks.
