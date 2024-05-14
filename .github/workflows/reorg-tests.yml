@@ -303,17 +303,11 @@ jobs:
       - name: Build Go Test Command
         id: build-go-test-command
         run: |
-          # if dir is provided use it, otherwise use the load dir
-          if [ "${{ matrix.product.dir }}" != "" ]; then
-            dir=${{ matrix.product.dir }}
+          # if the matrix.test is set, use it for a different command
+          if [ "${{ matrix.test }}" != "" ]; then
+            echo "run_command=-run '^${{ matrix.test }}$' ./ccip-tests/load/ccip_test.go" >> "$GITHUB_OUTPUT"
           else
-            dir=load
-          fi
-          # if the matrix.product.run is set, use it for a different command
-          if [ "${{ matrix.product.run }}" != "" ]; then
-            echo "run_command=${{ matrix.product.run }} ./${dir}/${{ matrix.product.file }}_test.go" >> "$GITHUB_OUTPUT"
-          else
-            echo "run_command=./${dir}/${{ matrix.product.name }}_test.go" >> "$GITHUB_OUTPUT"
+            echo "run_command=./ccip-tests/load/ccip_test.go" >> "$GITHUB_OUTPUT"
           fi
       - name: Set Override Config
         id: set_override_config
