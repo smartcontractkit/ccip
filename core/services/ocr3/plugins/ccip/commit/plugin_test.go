@@ -3,6 +3,7 @@ package commit
 import (
 	"context"
 	"reflect"
+	"slices"
 	"testing"
 
 	"github.com/smartcontractkit/ccipocr3/internal/mocks"
@@ -121,6 +122,125 @@ func TestPlugin_observeMaxSeqNumsPerChain(t *testing.T) {
 			}
 			assert.NoError(t, err)
 			assert.Equal(t, tc.expMaxSeqNums, seqNums)
+		})
+	}
+}
+
+func TestPlugin_observeNewMsgs(t *testing.T) {
+	testCases := []struct {
+		name               string
+		maxSeqNumsPerChain []model.SeqNumChain
+		readChains         []model.ChainSelector
+		destChain          model.ChainSelector
+		msgScanBatchSize   int
+		newMsgs            map[model.ChainSelector][]model.CCIPMsg
+		expMsgs            []model.CCIPMsgBaseDetails
+		expErr             bool
+	}{
+		{
+			name: "no new messages",
+			maxSeqNumsPerChain: []model.SeqNumChain{
+				{ChainSel: 1, SeqNum: 10},
+				{ChainSel: 2, SeqNum: 20},
+			},
+			readChains:       []model.ChainSelector{1, 2},
+			msgScanBatchSize: 256,
+			newMsgs: map[model.ChainSelector][]model.CCIPMsg{
+				1: {},
+				2: {},
+			},
+			expMsgs: []model.CCIPMsgBaseDetails{},
+			expErr:  false,
+		},
+		{
+			name: "new messages",
+			maxSeqNumsPerChain: []model.SeqNumChain{
+				{ChainSel: 1, SeqNum: 10},
+				{ChainSel: 2, SeqNum: 20},
+			},
+			readChains:       []model.ChainSelector{1, 2},
+			msgScanBatchSize: 256,
+			newMsgs: map[model.ChainSelector][]model.CCIPMsg{
+				1: {
+					{CCIPMsgBaseDetails: model.CCIPMsgBaseDetails{ID: [32]byte{1}, SourceChain: 1, SeqNum: 11}},
+				},
+				2: {
+					{CCIPMsgBaseDetails: model.CCIPMsgBaseDetails{ID: [32]byte{2}, SourceChain: 2, SeqNum: 21}},
+					{CCIPMsgBaseDetails: model.CCIPMsgBaseDetails{ID: [32]byte{3}, SourceChain: 2, SeqNum: 22}},
+				},
+			},
+			expMsgs: []model.CCIPMsgBaseDetails{
+				{ID: [32]byte{1}, SourceChain: 1, SeqNum: 11},
+				{ID: [32]byte{2}, SourceChain: 2, SeqNum: 21},
+				{ID: [32]byte{3}, SourceChain: 2, SeqNum: 22},
+			},
+			expErr: false,
+		},
+		{
+			name: "new messages but one chain is not readable",
+			maxSeqNumsPerChain: []model.SeqNumChain{
+				{ChainSel: 1, SeqNum: 10},
+				{ChainSel: 2, SeqNum: 20},
+			},
+			readChains:       []model.ChainSelector{2},
+			msgScanBatchSize: 256,
+			newMsgs: map[model.ChainSelector][]model.CCIPMsg{
+				2: {
+					{CCIPMsgBaseDetails: model.CCIPMsgBaseDetails{ID: [32]byte{2}, SourceChain: 2, SeqNum: 21}},
+					{CCIPMsgBaseDetails: model.CCIPMsgBaseDetails{ID: [32]byte{3}, SourceChain: 2, SeqNum: 22}},
+				},
+			},
+			expMsgs: []model.CCIPMsgBaseDetails{
+				{ID: [32]byte{2}, SourceChain: 2, SeqNum: 21},
+				{ID: [32]byte{3}, SourceChain: 2, SeqNum: 22},
+			},
+			expErr: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			mockReader := mocks.NewCCIPReader()
+			lggr := logger.Test(t)
+
+			p := NewPlugin(
+				ctx,
+				commontypes.OracleID(123),
+				model.CommitPluginConfig{
+					Writer:              false,
+					Reads:               tc.readChains,
+					DestChain:           tc.destChain,
+					FChain:              map[model.ChainSelector]int{},
+					ObserverInfo:        nil,
+					NewMsgScanDuration:  0,
+					NewMsgScanLimit:     0,
+					NewMsgScanBatchSize: tc.msgScanBatchSize,
+				},
+				mockReader,
+				nil,
+				lggr,
+			)
+
+			for _, seqNumChain := range tc.maxSeqNumsPerChain {
+				if slices.Contains(tc.readChains, seqNumChain.ChainSel) {
+					mockReader.On(
+						"MsgsBetweenSeqNums",
+						ctx,
+						[]model.ChainSelector{seqNumChain.ChainSel},
+						model.NewSeqNumRange(seqNumChain.SeqNum+1, seqNumChain.SeqNum+model.SeqNum(1+tc.msgScanBatchSize)),
+					).Return(tc.newMsgs[seqNumChain.ChainSel], nil)
+				}
+			}
+
+			msgs, err := p.observeNewMsgs(ctx, tc.maxSeqNumsPerChain)
+			if tc.expErr {
+				assert.Error(t, err)
+				return
+			}
+			assert.NoError(t, err)
+			assert.Equal(t, tc.expMsgs, msgs)
+			mockReader.AssertExpectations(t)
 		})
 	}
 }
