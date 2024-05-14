@@ -35,6 +35,8 @@ type Plugin struct {
 	knownSourceChains mapset.Set[model.ChainSelector]
 }
 
+// TODO: background service for home chain config polling
+
 func NewPlugin(
 	_ context.Context,
 	nodeID commontypes.OracleID,
@@ -144,7 +146,7 @@ func (p *Plugin) ValidateObservation(_ ocr3types.OutcomeContext, _ types.Query, 
 }
 
 func (p *Plugin) ObservationQuorum(_ ocr3types.OutcomeContext, _ types.Query) (ocr3types.Quorum, error) {
-	// Across all chains we require at least 2f+1 observations.
+	// Across all chains we require at least 2F+1 observations.
 	return ocr3types.QuorumTwoFPlusOne, nil
 }
 
@@ -189,6 +191,10 @@ func (p *Plugin) Reports(seqNr uint64, outcome ocr3types.Outcome) ([]ocr3types.R
 	// todo: include gas price updates
 	priceUpdates := make([]model.TokenPriceUpdate, 0)
 
+	/*
+		Once token/gas prices are implemented, we would want to probably check if outc.MerkleRoots is empty or not
+		and only create a report if outc.MerkleRoots is non-empty OR gas/token price timer has expired
+	*/
 	rep := model.NewCommitPluginReport(outc.MerkleRoots, priceUpdates)
 	encodedReport, err := p.reportCodec.Encode(context.Background(), rep)
 	if err != nil {
@@ -257,7 +263,6 @@ func (p *Plugin) observeMaxSeqNumsPerChain(ctx context.Context, previousOutcomeB
 			if seqNumChain.SeqNum > seqNumPerChain[seqNumChain.ChainSel] {
 				seqNumPerChain[seqNumChain.ChainSel] = seqNumChain.SeqNum
 			}
-			p.knownSourceChains.Add(seqNumChain.ChainSel) // discover new source chains from previous outcome
 		}
 		p.lggr.Debugw("discovered sequence numbers from prev outcome", "seqNumPerChain", seqNumPerChain)
 	}

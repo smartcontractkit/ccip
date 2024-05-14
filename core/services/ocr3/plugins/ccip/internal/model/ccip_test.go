@@ -62,7 +62,7 @@ func TestCCIPMsg_String(t *testing.T) {
 		{
 			"base",
 			CCIPMsg{CCIPMsgBaseDetails{ID: [32]byte{123}, SourceChain: ChainSelector(1), SeqNum: 2}},
-			`{"id":[123,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"sourceChain":"1","seqNum":"2"}`,
+			`{"id":"0x7b00000000000000000000000000000000000000000000000000000000000000","sourceChain":"1","seqNum":"2"}`,
 		},
 	}
 
@@ -91,22 +91,22 @@ func TestNewGasPriceChain(t *testing.T) {
 
 func TestMerkleRoot(t *testing.T) {
 	t.Run("str", func(t *testing.T) {
-		mr := MerkleRoot([32]byte{1})
+		mr := Bytes32([32]byte{1})
 		assert.Equal(t, "0x0100000000000000000000000000000000000000000000000000000000000000", mr.String())
 	})
 
 	t.Run("json", func(t *testing.T) {
-		mr := MerkleRoot([32]byte{1})
+		mr := Bytes32([32]byte{1})
 		b, err := json.Marshal(mr)
 		assert.NoError(t, err)
 		assert.Equal(t, `"0x0100000000000000000000000000000000000000000000000000000000000000"`, string(b))
 
-		mr2 := MerkleRoot{}
+		mr2 := Bytes32{}
 		err = json.Unmarshal(b, &mr2)
 		assert.NoError(t, err)
 		assert.Equal(t, mr, mr2)
 
-		mr3 := MerkleRoot{}
+		mr3 := Bytes32{}
 		err = json.Unmarshal([]byte(`"123"`), &mr3)
 		assert.Error(t, err)
 

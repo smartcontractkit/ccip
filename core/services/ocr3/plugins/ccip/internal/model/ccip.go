@@ -84,22 +84,22 @@ func (c CCIPMsg) String() string {
 }
 
 type CCIPMsgBaseDetails struct {
-	ID          [32]byte      `json:"id"` // todo: json encode/decode to hex
+	ID          Bytes32       `json:"id"`
 	SourceChain ChainSelector `json:"sourceChain,string"`
 	SeqNum      SeqNum        `json:"seqNum,string"`
 }
 
-type MerkleRoot [32]byte
+type Bytes32 [32]byte
 
-func (m MerkleRoot) String() string {
+func (m Bytes32) String() string {
 	return "0x" + hex.EncodeToString(m[:])
 }
 
-func (m MerkleRoot) MarshalJSON() ([]byte, error) {
+func (m Bytes32) MarshalJSON() ([]byte, error) {
 	return []byte(fmt.Sprintf(`"%s"`, m.String())), nil
 }
 
-func (m *MerkleRoot) UnmarshalJSON(data []byte) error {
+func (m *Bytes32) UnmarshalJSON(data []byte) error {
 	v := string(data)
 	if len(v) < 4 {
 		return fmt.Errorf("invalid MerkleRoot: %s", v)

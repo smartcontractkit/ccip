@@ -80,10 +80,10 @@ func NewSeqNumChain(chainSel ChainSelector, seqNum SeqNum) SeqNumChain {
 type MerkleRootChain struct {
 	ChainSel     ChainSelector `json:"chain"`
 	SeqNumsRange SeqNumRange   `json:"seqNumsRange"`
-	MerkleRoot   MerkleRoot    `json:"merkleRoot"`
+	MerkleRoot   Bytes32       `json:"merkleRoot"`
 }
 
-func NewMerkleRootChain(chainSel ChainSelector, seqNumsRange SeqNumRange, merkleRoot MerkleRoot) MerkleRootChain {
+func NewMerkleRootChain(chainSel ChainSelector, seqNumsRange SeqNumRange, merkleRoot Bytes32) MerkleRootChain {
 	return MerkleRootChain{
 		ChainSel:     chainSel,
 		SeqNumsRange: seqNumsRange,
