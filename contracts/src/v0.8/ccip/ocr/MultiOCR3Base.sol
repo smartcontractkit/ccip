@@ -23,10 +23,10 @@ abstract contract MultiOCR3Base is OwnerIsCreator, MultiOCR3Abstract {
   ///      retrieval of all of them to a minimum number of SLOADs.
   struct ConfigInfo {
     bytes32 latestConfigDigest;
-    uint8 f; // ───────────╮
-    uint8 n; //            │
-    bool uniqueReports; // │ if true, the reports should be unique
-    bool skipSigners; // ──╯ if true, skips signature verification on transmission verification
+    uint8 F; // ───────────────────────────╮ maximum number of faulty/dishonest oracles
+    uint8 n; //                            │ number of signers / transmitters
+    bool uniqueReports; //                 │ if true, the reports should be unique
+    bool enableSignatureVerification; // ──╯ if true, requires signers and verifies signatures on transmission verification
   }
 
   /// @notice Used for s_oracles[a].role, where a is an address, to track the purpose
@@ -98,17 +98,17 @@ abstract contract MultiOCR3Base is OwnerIsCreator, MultiOCR3Abstract {
     bytes32 configDigest,
     address[] memory signers,
     address[] memory transmitters,
-    uint8 f
+    uint8 F
   ) external override onlyOwner {
     DONConfig storage donConfig = s_donConfigs[donId];
     ConfigInfo storage configInfo = donConfig.configInfo;
 
     uint256 newTransmittersLength = transmitters.length;
-    if (!configInfo.skipSigners) {
+    if (configInfo.enableSignatureVerification) {
       donConfig.signers = signers;
     }
 
-    // TODO: re-add s_oracles removal logic
+    // TODO: re-add s_oracles removal logic & validations
     //     uint256 oldSignerLength = s_signers.length;
     //     for (uint256 i = 0; i < oldSignerLength; ++i) {
     //       delete s_oracles[s_signers[i]];
@@ -130,14 +130,14 @@ abstract contract MultiOCR3Base is OwnerIsCreator, MultiOCR3Abstract {
     //     }
 
     donConfig.transmitters = transmitters;
-    configInfo.f = f;
+    configInfo.F = F;
     configInfo.latestConfigDigest = configDigest;
     configInfo.n = uint8(newTransmittersLength);
 
     uint32 previousConfigBlockNumber = donConfig.latestConfigBlockNumber;
     donConfig.latestConfigBlockNumber = uint32(block.number);
 
-    emit ConfigSet(donId, previousConfigBlockNumber, configDigest, signers, transmitters, f);
+    emit ConfigSet(donId, previousConfigBlockNumber, configDigest, signers, transmitters, F);
   }
 
   /// @param donId DON ID to retrieve transmitters for
@@ -193,13 +193,13 @@ abstract contract MultiOCR3Base is OwnerIsCreator, MultiOCR3Abstract {
 
     emit Transmitted(donId, configDigest, uint32(uint256(reportContext[1]) >> 8));
 
-    if (!configInfo.skipSigners) {
+    if (configInfo.enableSignatureVerification) {
       // TODO: consider scoping this to reduce stack pressure
       uint256 expectedNumSignatures;
       if (configInfo.uniqueReports) {
-        expectedNumSignatures = (configInfo.n + configInfo.f) / 2 + 1;
+        expectedNumSignatures = (configInfo.n + configInfo.F) / 2 + 1;
       } else {
-        expectedNumSignatures = configInfo.f + 1;
+        expectedNumSignatures = configInfo.F + 1;
       }
       if (rs.length != expectedNumSignatures) revert WrongNumberOfSignatures();
       if (rs.length != ss.length) revert SignaturesOutOfRegistration();
@@ -209,7 +209,7 @@ abstract contract MultiOCR3Base is OwnerIsCreator, MultiOCR3Abstract {
       bool[MAX_NUM_ORACLES] memory signed;
 
       uint256 numberOfSignatures = rs.length;
-      for (uint256 i = 0; i < numberOfSignatures; ++i) {
+      for (uint256 i; i < numberOfSignatures; ++i) {
         // Safe from ECDSA malleability here since we check for duplicate signers.
         address signer = ecrecover(h, uint8(rawVs[i]) + 27, rs[i], ss[i]);
         // Since we disallow address(0) as a valid signer address, it can

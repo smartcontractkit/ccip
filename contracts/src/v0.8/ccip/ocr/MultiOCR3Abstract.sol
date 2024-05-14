@@ -7,6 +7,7 @@ import {ITypeAndVersion} from "../../shared/interfaces/ITypeAndVersion.sol";
 ///         with multiple decentralized oracle network support.
 abstract contract MultiOCR3Abstract is ITypeAndVersion {
   // Maximum number of oracles the offchain reporting protocol is designed for
+  // TODO: bump up to theoretical max if required
   uint256 internal constant MAX_NUM_ORACLES = 31;
 
   /// @notice triggers a new run of the offchain reporting protocol
@@ -15,14 +16,14 @@ abstract contract MultiOCR3Abstract is ITypeAndVersion {
   /// @param configDigest configDigest of this configuration
   /// @param signers ith element is address ith oracle uses to sign a report
   /// @param transmitters ith element is address ith oracle uses to transmit a report via the transmit method
-  /// @param f maximum number of faulty/dishonest oracles the protocol can tolerate while still working correctly
+  /// @param F maximum number of faulty/dishonest oracles the protocol can tolerate while still working correctly
   event ConfigSet(
     uint32 donId,
     uint32 previousConfigBlockNumber,
     bytes32 configDigest,
     address[] signers,
     address[] transmitters,
-    uint8 f
+    uint8 F
   );
 
   /// @notice sets offchain reporting protocol configuration incl. participating oracles
@@ -30,13 +31,13 @@ abstract contract MultiOCR3Abstract is ITypeAndVersion {
   /// @param configDigest Config digest to assign to the DON OCR config
   /// @param signers addresses with which oracles sign the reports
   /// @param transmitters addresses oracles use to transmit the reports
-  /// @param f number of faulty oracles the system can tolerate
+  /// @param F number of faulty oracles the system can tolerate
   function setOCR3Config(
     uint32 donId,
     bytes32 configDigest,
     address[] memory signers,
     address[] memory transmitters,
-    uint8 f
+    uint8 F
   ) external virtual;
 
   /// @notice information about current offchain reporting protocol configuration
