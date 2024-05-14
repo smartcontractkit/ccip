@@ -1505,6 +1505,33 @@ contract EVM2EVMMultiOffRamp_report is EVM2EVMMultiOffRampSetup {
     s_offRamp.report(abi.encode(reports));
   }
 
+  function test_LargeBatch_Success() public {
+    Internal.ExecutionReportSingleChain[] memory reports = new Internal.ExecutionReportSingleChain[](10);
+    for (uint64 i = 0; i < reports.length; ++i) {
+      Internal.EVM2EVMMessage[] memory messages = new Internal.EVM2EVMMessage[](3);
+      messages[0] = _generateAny2EVMMessageNoTokens(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1, 1 + i * 3);
+      messages[1] = _generateAny2EVMMessageNoTokens(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1, 2 + i * 3);
+      messages[2] = _generateAny2EVMMessageNoTokens(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1, 3 + i * 3);
+
+      reports[i] = _generateReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messages);
+    }
+
+    for (uint64 i = 0; i < reports.length; ++i) {
+      for (uint64 j = 0; j < reports[i].messages.length; ++j) {
+        vm.expectEmit();
+        emit ExecutionStateChanged(
+          reports[i].messages[j].sourceChainSelector,
+          reports[i].messages[j].sequenceNumber,
+          reports[i].messages[j].messageId,
+          Internal.MessageExecutionState.SUCCESS,
+          ""
+        );
+      }
+    }
+
+    s_offRamp.report(abi.encode(reports));
+  }
+
   // Reverts
 
   function test_ZeroReports_Revert() public {
