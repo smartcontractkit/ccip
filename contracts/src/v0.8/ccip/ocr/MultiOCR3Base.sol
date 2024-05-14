@@ -6,7 +6,7 @@ import {MultiOCR3Abstract} from "./MultiOCR3Abstract.sol";
 
 // TODO: consider splitting configs & verification logic off to auth library (if size is prohibitive)
 /// @notice Onchain verification of reports from the offchain reporting protocol
-///         with multiple decentralized oracle network support.
+///         with multiple OCR plugin support.
 abstract contract MultiOCR3Base is OwnerIsCreator, MultiOCR3Abstract {
   //   error InvalidConfig(string message);
   error WrongMessageLength(uint256 expected, uint256 actual);
@@ -48,8 +48,9 @@ abstract contract MultiOCR3Base is OwnerIsCreator, MultiOCR3Abstract {
     Role role; // Role of the address which mapped to this struct
   }
 
-  /// @notice OCR configuration for a single DON
-  struct DONConfig {
+  /// @notice OCR configuration for a single OCR plugin within a DON
+  // TODO: make uniqueReports and skipReports static
+  struct OCRConfig {
     /// @notice latest OCR config
     ConfigInfo configInfo;
     /// @notice makes it easier for offchain systems to extract config from logs.
@@ -61,13 +62,14 @@ abstract contract MultiOCR3Base is OwnerIsCreator, MultiOCR3Abstract {
     address[] transmitters;
   }
 
-  /// @notice mapping of DON ID -> DON config
-  mapping(uint32 donId => DONConfig config) internal s_donConfigs;
+  /// @notice mapping of OCR plugin type -> DON config
+  mapping(uint8 ocrPluginType => OCRConfig config) internal s_ocrConfigs;
 
   // TODO: optimization: we can use bitmaps of 2-bit width to optimise the role representation
-  /// @notice Don ID => signer OR transmitter address mapping
-  mapping(uint32 donId => mapping(address signerOrTransmiter => Oracle oracle)) s_oracles;
+  /// @notice OCR plugin type => signer OR transmitter address mapping
+  mapping(uint8 ocrPluginType => mapping(address signerOrTransmiter => Oracle oracle)) s_oracles;
 
+  // TODO: verify if the same TRANSMIT_MSGDATA_CONSTANT_LENGTH_COMPONENT would apply to all plugins
   // The constant-length components of the msg.data sent to transmit.
   // See the "If we wanted to call sam" example on for example reasoning
   // https://solidity.readthedocs.io/en/v0.7.2/abi-spec.html
@@ -84,8 +86,6 @@ abstract contract MultiOCR3Base is OwnerIsCreator, MultiOCR3Abstract {
   uint256 internal immutable i_chainID;
 
   // TODO: implement config sets in constructor
-  // TODO: make uniqueReports and skipReports static
-  // TODO: should DON IDs could be fixed at construction time?
   constructor() {
     i_chainID = block.chainid;
   }
@@ -93,19 +93,20 @@ abstract contract MultiOCR3Base is OwnerIsCreator, MultiOCR3Abstract {
   /// @inheritdoc MultiOCR3Abstract
   /// @dev assumes that the input values are validated from the home chain config source,
   ///      and does not re-validate the data.
+  /// @dev the ocrPluginType should be an enumeration determined by the concrete OCR implementation
   function setOCR3Config(
-    uint32 donId,
+    uint8 ocrPluginType,
     bytes32 configDigest,
     address[] memory signers,
     address[] memory transmitters,
     uint8 F
   ) external override onlyOwner {
-    DONConfig storage donConfig = s_donConfigs[donId];
-    ConfigInfo storage configInfo = donConfig.configInfo;
+    OCRConfig storage ocrConfig = s_ocrConfigs[ocrPluginType];
+    ConfigInfo storage configInfo = ocrConfig.configInfo;
 
     uint256 newTransmittersLength = transmitters.length;
     if (configInfo.enableSignatureVerification) {
-      donConfig.signers = signers;
+      ocrConfig.signers = signers;
     }
 
     // TODO: re-add s_oracles removal logic & validations
@@ -129,27 +130,27 @@ abstract contract MultiOCR3Base is OwnerIsCreator, MultiOCR3Abstract {
     //       s_oracles[transmitter] = Oracle(uint8(i), Role.Transmitter);
     //     }
 
-    donConfig.transmitters = transmitters;
+    ocrConfig.transmitters = transmitters;
     configInfo.F = F;
     configInfo.latestConfigDigest = configDigest;
     configInfo.n = uint8(newTransmittersLength);
 
-    uint32 previousConfigBlockNumber = donConfig.latestConfigBlockNumber;
-    donConfig.latestConfigBlockNumber = uint32(block.number);
+    uint32 previousConfigBlockNumber = ocrConfig.latestConfigBlockNumber;
+    ocrConfig.latestConfigBlockNumber = uint32(block.number);
 
-    emit ConfigSet(donId, previousConfigBlockNumber, configDigest, signers, transmitters, F);
+    emit ConfigSet(ocrPluginType, previousConfigBlockNumber, configDigest, signers, transmitters, F);
   }
 
-  /// @param donId DON ID to retrieve transmitters for
+  /// @param ocrPluginType OCR plugin type to retrieve transmitters for
   /// @return list of addresses permitted to transmit reports to this contract
   /// @dev The list will match the order used to specify the transmitter during setConfig
-  function getTransmitters(uint32 donId) external view returns (address[] memory) {
-    return s_donConfigs[donId].transmitters;
+  function getTransmitters(uint8 ocrPluginType) external view returns (address[] memory) {
+    return s_ocrConfigs[ocrPluginType].transmitters;
   }
 
   /// @inheritdoc MultiOCR3Abstract
   function _transmit(
-    uint32 donId,
+    uint8 ocrPluginType,
     // NOTE: If these parameters are changed, expectedMsgDataLength and/or
     // TRANSMIT_MSGDATA_CONSTANT_LENGTH_COMPONENT need to be changed accordingly
     bytes32[3] calldata reportContext,
@@ -163,7 +164,7 @@ abstract contract MultiOCR3Base is OwnerIsCreator, MultiOCR3Abstract {
     // reportContext[1]: 27 byte padding, 4-byte epoch and 1-byte round
     // reportContext[2]: ExtraHash
     bytes32 configDigest = reportContext[0];
-    ConfigInfo memory configInfo = s_donConfigs[donId].configInfo;
+    ConfigInfo memory configInfo = s_ocrConfigs[ocrPluginType].configInfo;
 
     if (configInfo.latestConfigDigest != configDigest) {
       revert ConfigDigestMismatch(configInfo.latestConfigDigest, configDigest);
@@ -175,14 +176,17 @@ abstract contract MultiOCR3Base is OwnerIsCreator, MultiOCR3Abstract {
 
     // Scoping this reduces stack pressure and gas usage
     {
-      Oracle memory transmitter = s_oracles[donId][msg.sender];
+      Oracle memory transmitter = s_oracles[ocrPluginType][msg.sender];
       // Check that sender is authorized to report
-      if (!(transmitter.role == Role.Transmitter && msg.sender == s_donConfigs[donId].transmitters[transmitter.index]))
-      {
+      if (
+        !(
+          transmitter.role == Role.Transmitter
+            && msg.sender == s_ocrConfigs[ocrPluginType].transmitters[transmitter.index]
+        )
+      ) {
         revert UnauthorizedTransmitter();
       }
     }
-    // TODO: verify if the same TRANSMIT_MSGDATA_CONSTANT_LENGTH_COMPONENT would apply to all functions
     // Scoping this reduces stack pressure and gas usage
     {
       uint256 expectedDataLength = uint256(TRANSMIT_MSGDATA_CONSTANT_LENGTH_COMPONENT) + report.length // one byte pure entry in _report
@@ -191,7 +195,7 @@ abstract contract MultiOCR3Base is OwnerIsCreator, MultiOCR3Abstract {
       if (msg.data.length != expectedDataLength) revert WrongMessageLength(expectedDataLength, msg.data.length);
     }
 
-    emit Transmitted(donId, configDigest, uint32(uint256(reportContext[1]) >> 8));
+    emit Transmitted(ocrPluginType, configDigest, uint32(uint256(reportContext[1]) >> 8));
 
     if (configInfo.enableSignatureVerification) {
       // TODO: consider scoping this to reduce stack pressure
@@ -214,7 +218,7 @@ abstract contract MultiOCR3Base is OwnerIsCreator, MultiOCR3Abstract {
         address signer = ecrecover(h, uint8(rawVs[i]) + 27, rs[i], ss[i]);
         // Since we disallow address(0) as a valid signer address, it can
         // never have a signer role.
-        Oracle memory oracle = s_oracles[donId][signer];
+        Oracle memory oracle = s_oracles[ocrPluginType][signer];
         if (oracle.role != Role.Signer) revert UnauthorizedSigner();
         if (signed[oracle.index]) revert NonUniqueSignatures();
         signed[oracle.index] = true;
@@ -223,8 +227,13 @@ abstract contract MultiOCR3Base is OwnerIsCreator, MultiOCR3Abstract {
   }
 
   /// @inheritdoc MultiOCR3Abstract
-  function latestConfigDetails(uint32 donId) external view override returns (uint32 blockNumber, bytes32 configDigest) {
-    DONConfig storage donConfig = s_donConfigs[donId];
-    return (donConfig.latestConfigBlockNumber, donConfig.configInfo.latestConfigDigest);
+  function latestConfigDetails(uint8 ocrPluginType)
+    external
+    view
+    override
+    returns (uint32 blockNumber, bytes32 configDigest)
+  {
+    OCRConfig storage ocrConfig = s_ocrConfigs[ocrPluginType];
+    return (ocrConfig.latestConfigBlockNumber, ocrConfig.configInfo.latestConfigDigest);
   }
 }
