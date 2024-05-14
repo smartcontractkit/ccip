@@ -23,10 +23,10 @@ abstract contract MultiOCR3Base is OwnerIsCreator, MultiOCR3Abstract {
   ///      retrieval of all of them to a minimum number of SLOADs.
   struct ConfigInfo {
     bytes32 latestConfigDigest;
-    uint8 F; // ───────────────────────────╮ maximum number of faulty/dishonest oracles
-    uint8 n; //                            │ number of signers / transmitters
-    bool uniqueReports; //                 │ if true, the reports should be unique
-    bool enableSignatureVerification; // ──╯ if true, requires signers and verifies signatures on transmission verification
+    uint8 F; // ──────────────────────────────╮ maximum number of faulty/dishonest oracles
+    uint8 n; //                               │ number of signers / transmitters
+    bool uniqueReports; //                    │ if true, the reports should be unique
+    bool isSignatureVerificationEnabled; // ──╯ if true, requires signers and verifies signatures on transmission verification
   }
 
   /// @notice Used for s_oracles[a].role, where a is an address, to track the purpose
@@ -68,7 +68,7 @@ abstract contract MultiOCR3Base is OwnerIsCreator, MultiOCR3Abstract {
     bytes32 configDigest; // Config digest to update to
     uint8 F; // ───────────────────────────╮ maximum number of faulty/dishonest oracles
     bool uniqueReports; //                 │ if true, the reports should be unique
-    bool enableSignatureVerification; // ──╯ if true, requires signers and verifies signatures on transmission verification
+    bool isSignatureVerificationEnabled; // ──╯ if true, requires signers and verifies signatures on transmission verification
     address[] signers; // signing address of each oracle
     address[] transmitters; // transmission address of each oracle (i.e. the address the oracle actually sends transactions to the contract from)
   }
@@ -117,7 +117,7 @@ abstract contract MultiOCR3Base is OwnerIsCreator, MultiOCR3Abstract {
     ConfigInfo storage configInfo = ocrConfig.configInfo;
 
     uint256 newTransmittersLength = ocrConfigArgs.transmitters.length;
-    if (configInfo.enableSignatureVerification) {
+    if (configInfo.isSignatureVerificationEnabled) {
       ocrConfig.signers = ocrConfigArgs.signers;
     }
     // TODO: validate signers / transmitters <= MAX_NUM_ORACLES
@@ -217,7 +217,7 @@ abstract contract MultiOCR3Base is OwnerIsCreator, MultiOCR3Abstract {
 
     emit Transmitted(ocrPluginType, configDigest, uint32(uint256(reportContext[1]) >> 8));
 
-    if (configInfo.enableSignatureVerification) {
+    if (configInfo.isSignatureVerificationEnabled) {
       // TODO: consider scoping this to reduce stack pressure
       uint256 expectedNumSignatures;
       if (configInfo.uniqueReports) {
