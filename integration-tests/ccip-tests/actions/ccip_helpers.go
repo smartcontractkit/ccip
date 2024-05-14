@@ -2716,6 +2716,9 @@ func (lane *CCIPLane) SendRequests(noOfRequests int, gasLimit *big.Int) error {
 	return nil
 }
 
+// ExecuteManually attempts to execute pending CCIP transactions manually.
+// This is necessary in niche situations where the transaction is reverted on the destination chain,
+// which can block further transactions for that user. More info: https://docs.chain.link/ccip/concepts/manual-execution#manual-execution
 func (lane *CCIPLane) ExecuteManually() error {
 	onRampABI, err := abi.JSON(strings.NewReader(evm_2_evm_onramp.EVM2EVMOnRampABI))
 	if err != nil {
