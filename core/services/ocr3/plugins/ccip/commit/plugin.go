@@ -170,6 +170,10 @@ func (p *Plugin) Outcome(_ ocr3types.OutcomeContext, _ types.Query, aos []types.
 	if err != nil {
 		return ocr3types.Outcome{}, fmt.Errorf("max sequence numbers consensus: %w", err)
 	}
+	if len(maxSeqNumsConsensus) == 0 {
+		p.lggr.Warnw("no consensus on max sequence numbers")
+		return ocr3types.Outcome{}, nil
+	}
 	p.lggr.Debugw("max sequence numbers consensus", "maxSeqNumsConsensus", maxSeqNumsConsensus)
 
 	merkleRoots, err := p.newMsgsConsensus(maxSeqNumsConsensus, decodedObservations)
@@ -290,6 +294,7 @@ func (p *Plugin) observeMaxSeqNumsPerChain(ctx context.Context, previousOutcomeB
 		maxChainSeqNums = append(maxChainSeqNums, model.NewSeqNumChain(ch, seqNum))
 	}
 
+	sort.Slice(maxChainSeqNums, func(i, j int) bool { return maxChainSeqNums[i].ChainSel < maxChainSeqNums[j].ChainSel })
 	return maxChainSeqNums, nil
 }
 
@@ -384,6 +389,8 @@ func (p *Plugin) newMsgsConsensus(maxSeqNums []model.SeqNumChain, observations [
 			model.NewMerkleRootChain(sourceChain, consensus.seqNumRange, consensus.merkleRoot),
 		)
 	}
+
+	sort.Slice(merkleRoots, func(i, j int) bool { return merkleRoots[i].ChainSel < merkleRoots[j].ChainSel })
 	return merkleRoots, nil
 }
 
@@ -487,18 +494,22 @@ func (p *Plugin) maxSeqNumsConsensus(observations []model.CommitPluginObservatio
 
 	maxSeqNumsConsensus := make([]model.SeqNumChain, 0, len(observedSeqNumsPerChain))
 	for ch, observedSeqNums := range observedSeqNumsPerChain {
+		if len(observedSeqNums) < 2*fChain+1 {
+			p.lggr.Warnw("not enough observations for chain", "chain", ch, "observedSeqNums", observedSeqNums)
+			continue
+		}
+
 		sort.Slice(observedSeqNums, func(i, j int) bool { return observedSeqNums[i] < observedSeqNums[j] })
-		maxSeqNumsConsensus[ch] = model.NewSeqNumChain(ch, observedSeqNums[fChain])
+		maxSeqNumsConsensus = append(maxSeqNumsConsensus, model.NewSeqNumChain(ch, observedSeqNums[fChain]))
 	}
 
+	sort.Slice(maxSeqNumsConsensus, func(i, j int) bool { return maxSeqNumsConsensus[i].ChainSel < maxSeqNumsConsensus[j].ChainSel })
 	return maxSeqNumsConsensus, nil
 }
 
 // validateObservedSequenceNumbers checks if the sequence numbers of the provided messages are unique for each chain and
 // that they match the observed max sequence numbers.
 func (p *Plugin) validateObservedSequenceNumbers(msgs []model.CCIPMsgBaseDetails, maxSeqNums []model.SeqNumChain) error {
-	seqNums := make(map[model.ChainSelector]mapset.Set[model.SeqNum], len(msgs))
-
 	// MaxSeqNums must be unique for each chain.
 	maxSeqNumsMap := make(map[model.ChainSelector]model.SeqNum)
 	for _, maxSeqNum := range maxSeqNums {
@@ -508,14 +519,15 @@ func (p *Plugin) validateObservedSequenceNumbers(msgs []model.CCIPMsgBaseDetails
 		maxSeqNumsMap[maxSeqNum.ChainSel] = maxSeqNum.SeqNum
 	}
 
+	seqNums := make(map[model.ChainSelector]mapset.Set[model.SeqNum], len(msgs))
 	for _, msg := range msgs {
 		// The same sequence number must not appear more than once for the same chain and must be valid.
-		knownSeqNums, exists := seqNums[msg.SourceChain]
-		if !exists {
-			seqNums[msg.SourceChain] = mapset.NewSet(msg.SeqNum)
-			continue
+
+		if _, exists := seqNums[msg.SourceChain]; !exists {
+			seqNums[msg.SourceChain] = mapset.NewSet[model.SeqNum]()
 		}
-		if knownSeqNums.Contains(msg.SeqNum) {
+
+		if seqNums[msg.SourceChain].Contains(msg.SeqNum) {
 			return fmt.Errorf("duplicate sequence number %d for chain %d", msg.SeqNum, msg.SourceChain)
 		}
 		seqNums[msg.SourceChain].Add(msg.SeqNum)
@@ -525,7 +537,7 @@ func (p *Plugin) validateObservedSequenceNumbers(msgs []model.CCIPMsgBaseDetails
 		if !exists {
 			return fmt.Errorf("max sequence number observation not found for chain %d", msg.SourceChain)
 		}
-		if maxSeqNum <= msg.SeqNum {
+		if msg.SeqNum <= maxSeqNum {
 			return fmt.Errorf("max sequence number %d must be greater than observed sequence number %d for chain %d",
 				maxSeqNum, msg.SeqNum, msg.SourceChain)
 		}
@@ -554,10 +566,6 @@ func (p *Plugin) validateObserverReadingEligibility(observer commontypes.OracleI
 		// Observer must be able to read the chain that the message is coming from.
 		if !observerReadChains.Contains(msg.SourceChain) {
 			return fmt.Errorf("observer not allowed to read chain %d", msg.SourceChain)
-		}
-
-		if msg.SeqNum <= 0 {
-			return fmt.Errorf("sequence number must be positive")
 		}
 	}
 

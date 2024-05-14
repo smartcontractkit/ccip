@@ -245,6 +245,207 @@ func TestPlugin_observeNewMsgs(t *testing.T) {
 	}
 }
 
+func TestPlugin_validateObservedSequenceNumbers(t *testing.T) {
+	testCases := []struct {
+		name       string
+		msgs       []model.CCIPMsgBaseDetails
+		maxSeqNums []model.SeqNumChain
+		expErr     bool
+	}{
+		{
+			name:       "empty",
+			msgs:       nil,
+			maxSeqNums: nil,
+			expErr:     false,
+		},
+		{
+			name: "dup seq num observation",
+			msgs: nil,
+			maxSeqNums: []model.SeqNumChain{
+				{ChainSel: 1, SeqNum: 10},
+				{ChainSel: 2, SeqNum: 20},
+				{ChainSel: 1, SeqNum: 10},
+			},
+			expErr: true,
+		},
+		{
+			name: "seq nums ok",
+			msgs: nil,
+			maxSeqNums: []model.SeqNumChain{
+				{ChainSel: 1, SeqNum: 10},
+				{ChainSel: 2, SeqNum: 20},
+			},
+			expErr: false,
+		},
+		{
+			name: "dup msg seq num",
+			msgs: []model.CCIPMsgBaseDetails{
+				{ID: model.Bytes32{1}, SourceChain: 1, SeqNum: 12},
+				{ID: model.Bytes32{1}, SourceChain: 1, SeqNum: 13},
+				{ID: model.Bytes32{1}, SourceChain: 1, SeqNum: 14},
+				{ID: model.Bytes32{1}, SourceChain: 1, SeqNum: 13}, // dup
+			},
+			maxSeqNums: []model.SeqNumChain{
+				{ChainSel: 1, SeqNum: 10},
+				{ChainSel: 2, SeqNum: 20},
+			},
+			expErr: true,
+		},
+		{
+			name: "msg seq nums ok",
+			msgs: []model.CCIPMsgBaseDetails{
+				{ID: model.Bytes32{1}, SourceChain: 1, SeqNum: 12},
+				{ID: model.Bytes32{1}, SourceChain: 1, SeqNum: 13},
+				{ID: model.Bytes32{1}, SourceChain: 1, SeqNum: 14},
+				{ID: model.Bytes32{1}, SourceChain: 2, SeqNum: 21},
+			},
+			maxSeqNums: []model.SeqNumChain{
+				{ChainSel: 1, SeqNum: 10},
+				{ChainSel: 2, SeqNum: 20},
+			},
+			expErr: false,
+		},
+		{
+			name: "msg seq nums does not match observed max seq num",
+			msgs: []model.CCIPMsgBaseDetails{
+				{ID: model.Bytes32{1}, SourceChain: 1, SeqNum: 12},
+				{ID: model.Bytes32{1}, SourceChain: 1, SeqNum: 13},
+				{ID: model.Bytes32{1}, SourceChain: 1, SeqNum: 10}, // max seq num is already 10
+				{ID: model.Bytes32{1}, SourceChain: 2, SeqNum: 21},
+			},
+			maxSeqNums: []model.SeqNumChain{
+				{ChainSel: 1, SeqNum: 10},
+				{ChainSel: 2, SeqNum: 20},
+			},
+			expErr: true,
+		},
+		{
+			name: "max seq num not found",
+			msgs: []model.CCIPMsgBaseDetails{
+				{ID: model.Bytes32{1}, SourceChain: 1, SeqNum: 12},
+				{ID: model.Bytes32{1}, SourceChain: 1, SeqNum: 13},
+				{ID: model.Bytes32{1}, SourceChain: 1, SeqNum: 14},
+				{ID: model.Bytes32{1}, SourceChain: 2, SeqNum: 21}, // max seq num not reported
+			},
+			maxSeqNums: []model.SeqNumChain{
+				{ChainSel: 1, SeqNum: 10},
+			},
+			expErr: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			lggr := logger.Test(t)
+			p := NewPlugin(
+				ctx,
+				commontypes.OracleID(123),
+				model.CommitPluginConfig{
+					FChain: map[model.ChainSelector]int{},
+				},
+				nil,
+				nil,
+				lggr,
+			)
+
+			err := p.validateObservedSequenceNumbers(tc.msgs, tc.maxSeqNums)
+			if tc.expErr {
+				assert.Error(t, err)
+				return
+			}
+			assert.NoError(t, err)
+		})
+	}
+}
+
+func TestPlugin_validateObserverReadingEligibility(t *testing.T) {
+	testCases := []struct {
+		name         string
+		observer     commontypes.OracleID
+		msgs         []model.CCIPMsgBaseDetails
+		observerInfo map[commontypes.OracleID]model.ObserverInfo
+		expErr       bool
+	}{
+		{
+			name:     "observer can read all chains",
+			observer: commontypes.OracleID(10),
+			msgs: []model.CCIPMsgBaseDetails{
+				{ID: model.Bytes32{1}, SourceChain: 1, SeqNum: 12},
+				{ID: model.Bytes32{3}, SourceChain: 2, SeqNum: 12},
+				{ID: model.Bytes32{1}, SourceChain: 3, SeqNum: 12},
+				{ID: model.Bytes32{2}, SourceChain: 3, SeqNum: 12},
+			},
+			observerInfo: map[commontypes.OracleID]model.ObserverInfo{
+				10: {Reads: []model.ChainSelector{1, 2, 3}},
+			},
+			expErr: false,
+		},
+		{
+			name:     "observer cannot read one chain",
+			observer: commontypes.OracleID(10),
+			msgs: []model.CCIPMsgBaseDetails{
+				{ID: model.Bytes32{1}, SourceChain: 1, SeqNum: 12},
+				{ID: model.Bytes32{3}, SourceChain: 2, SeqNum: 12},
+				{ID: model.Bytes32{1}, SourceChain: 3, SeqNum: 12},
+				{ID: model.Bytes32{2}, SourceChain: 3, SeqNum: 12},
+			},
+			observerInfo: map[commontypes.OracleID]model.ObserverInfo{
+				10: {Reads: []model.ChainSelector{1, 3}},
+			},
+			expErr: true,
+		},
+		{
+			name:     "observer cfg not found",
+			observer: commontypes.OracleID(10),
+			msgs: []model.CCIPMsgBaseDetails{
+				{ID: model.Bytes32{1}, SourceChain: 1, SeqNum: 12},
+				{ID: model.Bytes32{3}, SourceChain: 2, SeqNum: 12},
+				{ID: model.Bytes32{1}, SourceChain: 3, SeqNum: 12},
+				{ID: model.Bytes32{2}, SourceChain: 3, SeqNum: 12},
+			},
+			observerInfo: map[commontypes.OracleID]model.ObserverInfo{
+				20: {Reads: []model.ChainSelector{1, 3}}, // observer 10 not found
+			},
+			expErr: true,
+		},
+		{
+			name:         "no msgs",
+			observer:     commontypes.OracleID(10),
+			msgs:         []model.CCIPMsgBaseDetails{},
+			observerInfo: map[commontypes.OracleID]model.ObserverInfo{},
+			expErr:       false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			lggr := logger.Test(t)
+			p := NewPlugin(
+				ctx,
+				commontypes.OracleID(123),
+				model.CommitPluginConfig{
+					FChain:       map[model.ChainSelector]int{},
+					ObserverInfo: tc.observerInfo,
+				},
+				nil,
+				nil,
+				lggr,
+			)
+
+			err := p.validateObserverReadingEligibility(tc.observer, tc.msgs)
+			if tc.expErr {
+				assert.Error(t, err)
+				return
+			}
+			assert.NoError(t, err)
+		})
+	}
+}
+
+func TestPlugin_validateObservedGasAndTokenPrices(t *testing.T) {}
+
 func TestPlugin_newMsgsConsensus(t *testing.T) {
 	testCases := []struct {
 		name           string
@@ -467,6 +668,170 @@ func TestPlugin_newMsgsConsensus(t *testing.T) {
 				assert.Equal(t, exp.ChainSel, merkleRoots[i].ChainSel)
 				assert.Equal(t, exp.SeqNumsRange, merkleRoots[i].SeqNumsRange)
 			}
+		})
+	}
+}
+
+func TestPlugin_maxSeqNumsConsensus(t *testing.T) {
+	testCases := []struct {
+		name         string
+		observations []model.CommitPluginObservation
+		fChain       map[model.ChainSelector]int
+		destChain    model.ChainSelector
+		expSeqNums   []model.SeqNumChain
+		expErr       bool
+	}{
+		{
+			name:         "empty observations",
+			observations: []model.CommitPluginObservation{},
+			fChain:       map[model.ChainSelector]int{1: 2},
+			destChain:    1,
+			expSeqNums:   []model.SeqNumChain{},
+			expErr:       false,
+		},
+		{
+			name: "one chain all followers agree",
+			observations: []model.CommitPluginObservation{
+				{
+					MaxSeqNums: []model.SeqNumChain{
+						{ChainSel: 2, SeqNum: 20},
+						{ChainSel: 2, SeqNum: 20},
+						{ChainSel: 2, SeqNum: 20},
+						{ChainSel: 2, SeqNum: 20},
+						{ChainSel: 2, SeqNum: 20},
+						{ChainSel: 2, SeqNum: 20},
+						{ChainSel: 2, SeqNum: 20},
+					},
+				},
+			},
+			fChain:    map[model.ChainSelector]int{1: 2},
+			destChain: 1,
+			expSeqNums: []model.SeqNumChain{
+				{ChainSel: 2, SeqNum: 20},
+			},
+			expErr: false,
+		},
+		{
+			name: "one chain all followers agree but not enough observations",
+			observations: []model.CommitPluginObservation{
+				{
+					MaxSeqNums: []model.SeqNumChain{
+						{ChainSel: 2, SeqNum: 20},
+						{ChainSel: 2, SeqNum: 20},
+						{ChainSel: 2, SeqNum: 20},
+						{ChainSel: 2, SeqNum: 20},
+						{ChainSel: 2, SeqNum: 20},
+					},
+				},
+			},
+			fChain:     map[model.ChainSelector]int{1: 3},
+			destChain:  1,
+			expSeqNums: []model.SeqNumChain{},
+			expErr:     false,
+		},
+		{
+			name: "one chain 3 followers not in sync, 4 in sync",
+			observations: []model.CommitPluginObservation{
+				{
+					MaxSeqNums: []model.SeqNumChain{
+						{ChainSel: 2, SeqNum: 20},
+						{ChainSel: 2, SeqNum: 19},
+						{ChainSel: 2, SeqNum: 20},
+						{ChainSel: 2, SeqNum: 19},
+						{ChainSel: 2, SeqNum: 20},
+						{ChainSel: 2, SeqNum: 19},
+						{ChainSel: 2, SeqNum: 20},
+					},
+				},
+			},
+			fChain:    map[model.ChainSelector]int{1: 3},
+			destChain: 1,
+			expSeqNums: []model.SeqNumChain{
+				{ChainSel: 2, SeqNum: 20},
+			},
+			expErr: false,
+		},
+		{
+			name: "two chains",
+			observations: []model.CommitPluginObservation{
+				{
+					MaxSeqNums: []model.SeqNumChain{
+						{ChainSel: 2, SeqNum: 20},
+						{ChainSel: 2, SeqNum: 20},
+						{ChainSel: 2, SeqNum: 20},
+						{ChainSel: 2, SeqNum: 20},
+						{ChainSel: 2, SeqNum: 20},
+						{ChainSel: 2, SeqNum: 20},
+						{ChainSel: 2, SeqNum: 20},
+
+						{ChainSel: 3, SeqNum: 30},
+						{ChainSel: 3, SeqNum: 30},
+						{ChainSel: 3, SeqNum: 30},
+						{ChainSel: 3, SeqNum: 30},
+						{ChainSel: 3, SeqNum: 30},
+					},
+				},
+			},
+			fChain: map[model.ChainSelector]int{
+				1: 2,
+			},
+			destChain: 1,
+			expSeqNums: []model.SeqNumChain{
+				{ChainSel: 2, SeqNum: 20},
+				{ChainSel: 3, SeqNum: 30},
+			},
+			expErr: false,
+		},
+		{
+			name: "two chains but f chain is not defined for dest",
+			observations: []model.CommitPluginObservation{
+				{
+					MaxSeqNums: []model.SeqNumChain{
+						{ChainSel: 2, SeqNum: 20},
+						{ChainSel: 2, SeqNum: 20},
+						{ChainSel: 2, SeqNum: 20},
+						{ChainSel: 2, SeqNum: 20},
+						{ChainSel: 2, SeqNum: 20},
+						{ChainSel: 2, SeqNum: 20},
+						{ChainSel: 2, SeqNum: 20},
+
+						{ChainSel: 3, SeqNum: 30},
+						{ChainSel: 3, SeqNum: 30},
+						{ChainSel: 3, SeqNum: 30},
+						{ChainSel: 3, SeqNum: 30},
+						{ChainSel: 3, SeqNum: 30},
+					},
+				},
+			},
+			fChain:    map[model.ChainSelector]int{},
+			destChain: 1,
+			expErr:    true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			lggr := logger.Test(t)
+			p := NewPlugin(
+				ctx,
+				commontypes.OracleID(123),
+				model.CommitPluginConfig{
+					FChain:    tc.fChain,
+					DestChain: tc.destChain,
+				},
+				nil,
+				nil,
+				lggr,
+			)
+
+			seqNums, err := p.maxSeqNumsConsensus(tc.observations)
+			if tc.expErr {
+				assert.Error(t, err)
+				return
+			}
+			assert.NoError(t, err)
+			assert.Equal(t, tc.expSeqNums, seqNums)
 		})
 	}
 }
