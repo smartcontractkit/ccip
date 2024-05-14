@@ -123,19 +123,19 @@ jobs:
             os: ubuntu-latest
           - name: ccip-reorg-below-finality
             os: ubuntu-latest
-            run: -run ^TestLoadCCIPStableRPSReorgsBelowFinality$
+            run: ^TestLoadCCIPStableRPSReorgsBelowFinality$
             config_path: ./integration-tests/ccip-tests/testconfig/tomls/ccip-reorg.toml
           - name: ccip-reorg-above-finality
             os: ubuntu-latest
-            run: -run ^TestLoadCCIPStableRPSReorgsAboveFinality$
+            run: ^TestLoadCCIPStableRPSReorgsAboveFinality$
             config_path: ./integration-tests/ccip-tests/testconfig/tomls/ccip-reorg.toml
           - name: ccip-reorg-below-finality-tag
             os: ubuntu-latest
-            run: -run ^TestLoadCCIPStableRPSReorgsBelowFinality$
+            run: ^TestLoadCCIPStableRPSReorgsBelowFinality$
             config_path: ./integration-tests/ccip-tests/testconfig/tomls/ccip-reorg-finality-tag.toml
           - name: ccip-reorg-above-finality-tag
             os: ubuntu-latest
-            run: -run ^TestLoadCCIPStableRPSReorgsAboveFinality$
+            run: ^TestLoadCCIPStableRPSReorgsAboveFinality$
             config_path: ./integration-tests/ccip-tests/testconfig/tomls/ccip-reorg-finality-tag.tom
     runs-on: ${{ matrix.type.os }}
     name: CCIP ${{ matrix.type.name }}
