@@ -305,9 +305,9 @@ jobs:
         run: |
           # if the matrix.test is set, use it for a different command
           if [ "${{ matrix.test }}" != "" ]; then
-            echo "run_command=-run '^${{ matrix.test }}$' ./ccip-tests/load/ccip_test.go" >> "$GITHUB_OUTPUT"
+            echo "run_command=-run '^${{ matrix.test }}$' ./integration-tests/ccip-tests/load/ccip_test.go" >> "$GITHUB_OUTPUT"
           else
-            echo "run_command=./ccip-tests/load/ccip_test.go" >> "$GITHUB_OUTPUT"
+            echo "run_command=./integration-tests/ccip-tests/load/ccip_test.go" >> "$GITHUB_OUTPUT"
           fi
       - name: Set Override Config
         id: set_override_config
