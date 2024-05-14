@@ -78,7 +78,7 @@ func TestLoadCCIPStableRPSReorgsAboveFinality(t *testing.T) {
 		require.NoError(t, err)
 		lggr.Debug().Any("Response", resp).Send()
 		for _, d := range resp.Data {
-			if d.Attributes.Name == "EVM.133.LogPoller" {
+			if d.Attributes.Name == "EVM.1337.LogPoller" {
 				require.Equal(t, d.Attributes.Output, "finality violated")
 				require.Equal(t, d.Attributes.Status, "failing")
 				return true
