@@ -2,14 +2,16 @@ package chaos
 
 import (
 	"fmt"
-	"github.com/rs/zerolog"
-	"github.com/smartcontractkit/chainlink-testing-framework/client"
-	"github.com/smartcontractkit/chainlink-testing-framework/grafana"
-	"github.com/smartcontractkit/chainlink-testing-framework/logging"
-	"github.com/stretchr/testify/assert"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/assert"
+
+	"github.com/smartcontractkit/chainlink-testing-framework/client"
+	"github.com/smartcontractkit/chainlink-testing-framework/grafana"
+	"github.com/smartcontractkit/chainlink-testing-framework/logging"
 )
 
 // ReorgSuite is a test suite that generates reorgs on source/dest chains
@@ -144,8 +146,4 @@ func (r *ReorgSuite) RunReorgAboveFinalityThreshold() {
 		// TODO: assert the interval, no messages should be processed
 		time.Sleep(r.Cfg.ExperimentDuration)
 	}()
-}
-
-func (r *ReorgSuite) AssertFinalityViolation(t *testing.T) {
-
 }

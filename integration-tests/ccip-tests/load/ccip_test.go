@@ -1,10 +1,11 @@
 package load
 
 import (
-	ch "github.com/smartcontractkit/ccip/integration-tests/ccip-tests/chaos"
-	"github.com/stretchr/testify/assert"
 	"testing"
 	"time"
+
+	ch "github.com/smartcontractkit/ccip/integration-tests/ccip-tests/chaos"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/require"
