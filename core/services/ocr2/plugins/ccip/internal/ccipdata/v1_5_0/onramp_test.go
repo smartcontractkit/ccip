@@ -86,7 +86,7 @@ func Test_ProperlyRecognizesPerLaneCurses(t *testing.T) {
 	assert.False(t, isCursed)
 
 	// Cursing different chain selector
-	_, err = mockRMN.VoteToCurse(user, ccipcommon.SelectorToBytes(sourceChainSelector))
+	_, err = mockRMN.VoteToCurse0(user, [32]byte{}, ccipcommon.SelectorToBytes(sourceChainSelector))
 	require.NoError(t, err)
 	bc.Commit()
 
@@ -95,7 +95,7 @@ func Test_ProperlyRecognizesPerLaneCurses(t *testing.T) {
 	assert.False(t, isCursed)
 
 	// Cursing the correct chain selector
-	_, err = mockRMN.VoteToCurse(user, ccipcommon.SelectorToBytes(destChainSelector))
+	_, err = mockRMN.VoteToCurse0(user, [32]byte{}, ccipcommon.SelectorToBytes(destChainSelector))
 	require.NoError(t, err)
 	bc.Commit()
 

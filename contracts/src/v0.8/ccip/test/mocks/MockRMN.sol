@@ -27,11 +27,11 @@ contract MockRMN is IRMN, OwnerIsCreator {
     return s_curse || s_subjectCurses[subject];
   }
 
-  function voteToCurse() external {
+  function voteToCurse(bytes32) external {
     s_curse = true;
   }
 
-  function voteToCurse(bytes32 subject) external {
+  function voteToCurse(bytes32, bytes32 subject) external {
     s_subjectCurses[subject] = true;
   }
 
