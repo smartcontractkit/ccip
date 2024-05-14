@@ -848,6 +848,8 @@ github.com/grafana/dskit v0.0.0-20231120170505-765e343eda4f h1:gyojr97YeWZ70pKNa
 github.com/grafana/dskit v0.0.0-20231120170505-765e343eda4f/go.mod h1:8dsy5tQOkeNQyjXpm5mQsbCu3H5uzeBD35MzRQFznKU=
 github.com/grafana/gomemcache v0.0.0-20231023152154-6947259a0586 h1:/of8Z8taCPftShATouOrBVy6GaTTjgQd/VfNiZp/VXQ=
 github.com/grafana/gomemcache v0.0.0-20231023152154-6947259a0586/go.mod h1:PGk3RjYHpxMM8HFPhKKo+vve3DdlPUELZLSDEFehPuU=
+github.com/grafana/grafana-foundation-sdk/go v0.0.0-20240326122733-6f96a993222b h1:Msqs1nc2qWMxTriDCITKl58Td+7Md/RURmUmH7RXKns=
+github.com/grafana/grafana-foundation-sdk/go v0.0.0-20240326122733-6f96a993222b/go.mod h1:WtWosval1KCZP9BGa42b8aVoJmVXSg0EvQXi9LDSVZQ=
 github.com/grafana/loki v1.6.2-0.20231215164305-b51b7d7b5503 h1:gdrsYbmk8822v6qvPwZO5DC6QjnAW7uKJ9YXnoUmV8c=
 github.com/grafana/loki v1.6.2-0.20231215164305-b51b7d7b5503/go.mod h1:d8seWXCEXkL42mhuIJYcGi6DxfehzoIpLrMQWJojvOo=
 github.com/grafana/loki/pkg/push v0.0.0-20231201111602-11ef833ed3e4 h1:wQ0FnSeebhJIBkgYOD06Mxk9HV2KhtEG0hp/7R+5RUQ=
@@ -1514,8 +1516,7 @@ github.com/smartcontractkit/chainlink-starknet/relayer v0.0.1-beta-test.0.202403
 github.com/smartcontractkit/chainlink-starknet/relayer v0.0.1-beta-test.0.20240325075535-0f7eb05ee595/go.mod h1:vV6WfnVIbK5Q1JsIru4YcTG0T1uRpLJm6t2BgCnCSsg=
 github.com/smartcontractkit/chainlink-testing-framework v1.28.10 h1:ywCDnDq1walqabCaJy+slwY2ppL4pc1Wf8z15SVw6oA=
 github.com/smartcontractkit/chainlink-testing-framework v1.28.10/go.mod h1:x1zDOz8zcLjEvs9fNA9y/DMguLam/2+CJdpxX0+rM8A=
-github.com/smartcontractkit/chainlink-testing-framework/grafana v0.0.0-20240227164431-18a7065e23ea h1:ZdLmNAfKRjH8AYUvjiiDGUgiWQfq/7iNpxyTkvjx/ko=
-github.com/smartcontractkit/chainlink-testing-framework/grafana v0.0.0-20240227164431-18a7065e23ea/go.mod h1:gCKC9w6XpNk6jm+XIk2psrkkfxhi421N9NSiFceXW88=
+github.com/smartcontractkit/chainlink-testing-framework/grafana v0.0.0-20240508164646-7ae47c88ecbb h1:GC/P6iyLZWBlcOg9525MisP0Awve4X/P/GTguc72nGk=
 github.com/smartcontractkit/chainlink-testing-framework/grafana v0.0.0-20240508164646-7ae47c88ecbb/go.mod h1:DC8sQMyTlI/44UCTL8QWFwb0bYNoXCfjwCv2hMivYZU=
 github.com/smartcontractkit/chainlink-vrf v0.0.0-20231120191722-fef03814f868 h1:FFdvEzlYwcuVHkdZ8YnZR/XomeMGbz5E2F2HZI3I3w8=
 github.com/smartcontractkit/chainlink-vrf v0.0.0-20231120191722-fef03814f868/go.mod h1:Kn1Hape05UzFZ7bOUnm3GVsHzP0TNrVmpfXYNHdqGGs=
