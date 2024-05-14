@@ -219,4 +219,51 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
     messageEvent.messageId = Internal._hash(messageEvent, s_metadataHash);
     return messageEvent;
   }
+
+  function generateDynamicMultiOnRampConfig(
+    address router,
+    address priceRegistry,
+    address tokenAdminRegistry
+  ) internal pure returns (EVM2EVMMultiOnRamp.DynamicConfig memory) {
+    return EVM2EVMMultiOnRamp.DynamicConfig({
+      router: router,
+      priceRegistry: priceRegistry,
+      tokenAdminRegistry: tokenAdminRegistry
+    });
+  }
+
+  function generateDestChainDynamicConfigArgs()
+    internal
+    pure
+    returns (EVM2EVMMultiOnRamp.DestChainDynamicConfigArgs[] memory)
+  {
+    EVM2EVMMultiOnRamp.DestChainDynamicConfigArgs[] memory destChainConfigs =
+      new EVM2EVMMultiOnRamp.DestChainDynamicConfigArgs[](1);
+    destChainConfigs[0] = EVM2EVMMultiOnRamp.DestChainDynamicConfigArgs({
+      destChainSelector: DEST_CHAIN_SELECTOR,
+      dynamicConfig: EVM2EVMMultiOnRamp.DestChainDynamicConfig({
+        isEnabled: true,
+        maxNumberOfTokensPerMsg: MAX_TOKENS_LENGTH,
+        destGasOverhead: DEST_GAS_OVERHEAD,
+        destGasPerPayloadByte: DEST_GAS_PER_PAYLOAD_BYTE,
+        destDataAvailabilityOverheadGas: DEST_DATA_AVAILABILITY_OVERHEAD_GAS,
+        destGasPerDataAvailabilityByte: DEST_GAS_PER_DATA_AVAILABILITY_BYTE,
+        destDataAvailabilityMultiplierBps: DEST_GAS_DATA_AVAILABILITY_MULTIPLIER_BPS,
+        maxDataBytes: MAX_DATA_SIZE,
+        maxPerMsgGasLimit: MAX_GAS_LIMIT,
+        defaultTokenFeeUSDCents: DEFAULT_TOKEN_FEE_USD_CENTS,
+        defaultTokenDestGasOverhead: DEFAULT_TOKEN_DEST_GAS_OVERHEAD,
+        defaultTokenDestBytesOverhead: DEFAULT_TOKEN_BYTES_OVERHEAD
+      })
+    });
+    return destChainConfigs;
+  }
+
+  function getMultiOnRampNopsAndWeights() internal pure returns (EVM2EVMMultiOnRamp.NopAndWeight[] memory) {
+    EVM2EVMMultiOnRamp.NopAndWeight[] memory nopsAndWeights = new EVM2EVMMultiOnRamp.NopAndWeight[](3);
+    nopsAndWeights[0] = EVM2EVMMultiOnRamp.NopAndWeight({nop: USER_1, weight: 19284});
+    nopsAndWeights[1] = EVM2EVMMultiOnRamp.NopAndWeight({nop: USER_2, weight: 52935});
+    nopsAndWeights[2] = EVM2EVMMultiOnRamp.NopAndWeight({nop: USER_3, weight: 8});
+    return nopsAndWeights;
+  }
 }
