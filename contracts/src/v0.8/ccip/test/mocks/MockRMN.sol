@@ -11,7 +11,7 @@ contract MockRMN is IRMN, OwnerIsCreator {
   bool private s_curse;
   bytes private s_err;
   RMN.VersionedConfig private s_versionedConfig;
-  mapping(bytes32 => bool) private s_subjectCurses;
+  mapping(bytes32 subject => bool cursed) private s_curseBySubject;
 
   function isCursed() external view override returns (bool) {
     if (s_err.length != 0) {
@@ -24,7 +24,7 @@ contract MockRMN is IRMN, OwnerIsCreator {
     if (s_err.length != 0) {
       revert CustomError(s_err);
     }
-    return s_curse || s_subjectCurses[subject];
+    return s_curse || s_curseBySubject[subject];
   }
 
   function voteToCurse(bytes32) external {
@@ -32,7 +32,7 @@ contract MockRMN is IRMN, OwnerIsCreator {
   }
 
   function voteToCurse(bytes32, bytes32 subject) external {
-    s_subjectCurses[subject] = true;
+    s_curseBySubject[subject] = true;
   }
 
   function ownerUnvoteToCurse(RMN.UnvoteToCurseRecord[] memory) external {
@@ -40,7 +40,7 @@ contract MockRMN is IRMN, OwnerIsCreator {
   }
 
   function ownerUnvoteToCurse(RMN.UnvoteToCurseRecord[] memory, bytes32 subject) external {
-    s_subjectCurses[subject] = false;
+    s_curseBySubject[subject] = false;
   }
 
   function setRevert(bytes memory err) external {
