@@ -25,12 +25,11 @@ import (
 	"go.uber.org/zap/zapcore"
 	"golang.org/x/sync/errgroup"
 
-	ctfconfig "github.com/smartcontractkit/chainlink-testing-framework/config"
-
 	chainselectors "github.com/smartcontractkit/chain-selectors"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
 	ctfClient "github.com/smartcontractkit/chainlink-testing-framework/client"
+	ctfconfig "github.com/smartcontractkit/chainlink-testing-framework/config"
 	ctftestenv "github.com/smartcontractkit/chainlink-testing-framework/docker/test_env"
 	"github.com/smartcontractkit/chainlink-testing-framework/k8s/config"
 	"github.com/smartcontractkit/chainlink-testing-framework/k8s/environment"
@@ -38,14 +37,12 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/utils/testcontext"
 
 	integrationactions "github.com/smartcontractkit/chainlink/integration-tests/actions"
-
-	testutils "github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/utils"
-
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/actions"
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/contracts"
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/contracts/laneconfig"
 	tsconfig "github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/testconfig"
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/testreporters"
+	testutils "github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/utils"
 	"github.com/smartcontractkit/chainlink/integration-tests/docker/test_env"
 )
 
@@ -742,6 +739,7 @@ func (o *CCIPTestSetUpOutputs) WaitForPriceUpdates() {
 // 1. CCIPLane for NetworkA --> NetworkB
 // 2. If bidirectional is true, CCIPLane for NetworkB --> NetworkA
 // 3. If configureCLNode is true, the tearDown func to call when environment needs to be destroyed
+// TODO: We should configure this to utilize Go functional options pattern for customization and readability
 func CCIPDefaultTestSetUp(
 	t *testing.T,
 	lggr zerolog.Logger,
@@ -749,9 +747,7 @@ func CCIPDefaultTestSetUp(
 	tokenDeployerFns []blockchain.ContractDeployer,
 	testConfig *CCIPTestConfig,
 ) *CCIPTestSetUpOutputs {
-	var (
-		err error
-	)
+	var err error
 	reportPath := "tmp_laneconfig"
 	filepath := fmt.Sprintf("./%s/tmp_%s.json", reportPath, strings.ReplaceAll(t.Name(), "/", "_"))
 	reportFile := testutils.FileNameFromPath(filepath)

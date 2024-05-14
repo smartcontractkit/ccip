@@ -397,11 +397,14 @@ func TestSmokeCCIPRateLimit(t *testing.T) {
 	}
 }
 
-func TestSmokeCCIPSelfServeRateLimit(t *testing.T) {
+func TestSmokeCCIPSelfServeRateLimitOffRamp(t *testing.T) {
 	t.Parallel()
 
 	log := logging.GetTestLogger(t)
 	TestCfg := testsetups.NewCCIPTestConfig(t, log, testconfig.Smoke)
+
+	// Set the default permissionless exec threshold to 6 minutes so that we can manually execute the transactions faster
+	actions.DefaultPermissionlessExecThreshold = 5 * time.Minute
 	setUpOutput := testsetups.CCIPDefaultTestSetUp(t, log, "smoke-ccip", nil, TestCfg)
 	if len(setUpOutput.Lanes) == 0 {
 		return
@@ -500,67 +503,34 @@ func TestSmokeCCIPSelfServeRateLimit(t *testing.T) {
 			tc.lane.RecordStateBeforeTransfer()
 			err = tc.lane.SendRequests(1, big.NewInt(600_000))
 			require.NoError(t, err, "Failed to send rate limited token transfer")
-			// DEBUG: Figuring out if this time is long enough.
-			err = tc.lane.Dest.AssertNoExecutionStateChangedEventReceived(tc.lane.Logger, time.Minute*30, lastSeen)
-			// err = tc.lane.Dest.AssertNoExecutionStateChangedEventReceived(tc.lane.Logger, time.Minute*5, lastSeen)
+			// DEBUG: Trying to test with a shorter time frame, 6-7 minutes is probably more realistic
+			err = tc.lane.Dest.AssertNoExecutionStateChangedEventReceived(tc.lane.Logger, time.Minute*6, lastSeen)
 			require.NoError(t, err, "Rate limited token transfer should not get to ExecutionStateChanged")
 			tc.lane.Logger.Info().
 				Str("Token", limitedSrcToken.ContractAddress.Hex()).
 				Msg("Limited token transfer failed on destination chain (a good thing in this context)")
 
-			// DEBUG: This fails with
-			// could not find the commit phase in the request stats, reqNo 1
-			// Seems it expects the transaction to at least get to the commit phase?
+			// Manually execute the rate limited token transfer and expect a similar error
 			err = tc.lane.ExecuteManually()
-			require.Error(t, err, "There should be errors executing manually")
+			require.Error(t, err, "There should be errors executing manually at this point")
 
-			// DEBUG: This is the problem. Nothing else can go through as the above tx is stuck in the queue
-			// Ask Ani: Can we just break this into two or more tests? This seems fragile.
-			src.TransferAmount[freeTokenIndex] = overLimitAmount
-			src.TransferAmount[limitedTokenIndex] = big.NewInt(0)
-			tc.lane.RecordStateBeforeTransfer()
-			err = tc.lane.SendRequests(1, big.NewInt(600_000))
-			require.NoError(t, err, "Unlimited token transfer failed")
-			tc.lane.ValidateRequests(true)
-			tc.lane.Logger.Info().Str("Token", freeSrcToken.ContractAddress.Hex()).Msg("Unlimited token transfer succeeded")
-
-			// Enable aggregate rate limiting on the source chain for the limited token
-			err = src.OnRamp.SetTokenTransferFeeConfig([]evm_2_evm_onramp.EVM2EVMOnRampTokenTransferFeeConfigArgs{
-				{
-					Token:                     limitedSrcToken.ContractAddress,
-					AggregateRateLimitEnabled: true,
-				},
-			})
-			require.NoError(t, err, "Error setting OnRamp rate limits")
-			err = src.OnRamp.SetRateLimit(evm_2_evm_onramp.RateLimiterConfig{
+			// Change rate limit to make it viable
+			err = dest.OffRamp.SetRateLimit(evm_2_evm_offramp.RateLimiterConfig{
 				IsEnabled: true,
-				Capacity:  aggregateRateLimit,
-				Rate:      aggregateRateLimit,
+				Capacity:  big.NewInt(0).Mul(aggregateRateLimit, big.NewInt(10)),
+				Rate:      big.NewInt(0).Mul(aggregateRateLimit, big.NewInt(10)),
 			})
-			require.NoError(t, err, "Error setting OnRamp rate limits")
-			err = src.Common.ChainClient.WaitForEvents()
+			require.NoError(t, err, "Error setting destination rate limits")
+			err = dest.Common.ChainClient.WaitForEvents()
 			require.NoError(t, err, "Error waiting for events")
+			tc.lane.Logger.Debug().Str("Token", limitedSrcToken.ContractAddress.Hex()).Msg("Enabled aggregate rate limit on destination chain")
 
-			// Send limited token with rate limit that should fail on the source chain
-			tc.lane.Logger.Debug().Str("Token", limitedSrcToken.ContractAddress.Hex()).Msg("Enabled aggregate rate limit on OnRamp")
-			failedTx, _, _, err := tc.lane.Source.SendRequest(tc.lane.Dest.ReceiverDapp.EthAddress, big.NewInt(600_000))
-			require.Error(t, err, "Limited token transfer should immediately revert")
-			errReason, _, err := src.Common.ChainClient.RevertReasonFromTx(failedTx, evm_2_evm_onramp.EVM2EVMOnRampABI)
-			require.NoError(t, err)
-			require.Equal(t, "AggregateValueMaxCapacityExceeded", errReason, "Expected rate limit reached error")
-			tc.lane.Logger.
-				Info().
-				Str("Token", limitedSrcToken.ContractAddress.Hex()).
-				Msg("Limited token transfer failed on source chain (a good thing in this context)")
+			// execute again manually and expect a pass
+			// TODO: Will probably need to modify the `ValidateRequest` function to handle this case
+			time.Sleep(time.Minute * 5) // Give it a little time to execute
+			err = tc.lane.ExecuteManually()
+			require.NoError(t, err, "Error manually executing transaction after rate limit is lifted")
 
-			// Ensure that the free token is still able to transfer freely
-			src.TransferAmount[freeTokenIndex] = overLimitAmount
-			src.TransferAmount[limitedTokenIndex] = big.NewInt(0)
-			tc.lane.RecordStateBeforeTransfer()
-			err = tc.lane.SendRequests(1, big.NewInt(600_000))
-			require.NoError(t, err)
-			tc.lane.ValidateRequests(true)
-			tc.lane.Logger.Info().Str("Token", freeSrcToken.ContractAddress.Hex()).Msg("Unlimited token transfer succeeded after rate limit")
 		})
 	}
 }

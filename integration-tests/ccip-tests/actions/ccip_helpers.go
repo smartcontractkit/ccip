@@ -31,9 +31,8 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/k8s/pkg/helm/foundry"
-	"github.com/smartcontractkit/chainlink-testing-framework/k8s/pkg/helm/reorg"
-
 	"github.com/smartcontractkit/chainlink-testing-framework/k8s/pkg/helm/mockserver"
+	"github.com/smartcontractkit/chainlink-testing-framework/k8s/pkg/helm/reorg"
 
 	chainselectors "github.com/smartcontractkit/chain-selectors"
 
@@ -79,11 +78,18 @@ const (
 	ChaosGroupCCIPGeth                = "CCIPGeth"                        // both source and destination simulated geth networks
 	ChaosGroupNetworkACCIPGeth        = "CCIPNetworkAGeth"
 	ChaosGroupNetworkBCCIPGeth        = "CCIPNetworkBGeth"
-	// The higher the load/throughput, the higher value we might need here to guarantee that nonces are not blocked
+)
+
+// TODO: These should be refactored along with the default CCIP test setup to use optional config functions
+var (
+	// DefaultPermissionlessExecThreshold denotes how long the DON will retry a transaction before giving up,
+	// otherwise known as the "Smart Execution Time Window". If a transaction fails to execute within this time window,
+	// the DON will give up and the transaction will need Manual Execution as detailed here: https://docs.chain.link/ccip/concepts/manual-execution#manual-execution
+	// For performance tests: the higher the load/throughput, the higher value we might need here to guarantee that nonces are not blocked
 	// 1 day should be enough for most of the cases
-	PermissionlessExecThreshold        = 60 * 60 * 8 // 8 hr
-	MaxNoOfTokensInMsg                 = 50
-	CurrentVersion              string = "1.5.0-dev"
+	DefaultPermissionlessExecThreshold        = time.Hour * 8
+	DefaultMaxNoOfTokensInMsg          uint16 = 50
+	CurrentVersion                            = "1.5.0-dev"
 )
 
 type CCIPTOMLEnv struct {
@@ -2717,7 +2723,7 @@ func (lane *CCIPLane) SendRequests(noOfRequests int, gasLimit *big.Int) error {
 }
 
 // ExecuteManually attempts to execute pending CCIP transactions manually.
-// This is necessary in niche situations where the transaction is reverted on the destination chain,
+// This is necessary in situations where the transaction is reverted on, or not able to reach,the destination chain,
 // which can block further transactions for that user. More info: https://docs.chain.link/ccip/concepts/manual-execution#manual-execution
 func (lane *CCIPLane) ExecuteManually() error {
 	onRampABI, err := abi.JSON(strings.NewReader(evm_2_evm_onramp.EVM2EVMOnRampABI))
@@ -2735,10 +2741,6 @@ func (lane *CCIPLane) ExecuteManually() error {
 			}
 			if sendReqReceipt == nil {
 				return fmt.Errorf("could not find the receipt for tx %s", txHash.Hex())
-			}
-			destUser, err := lane.DestChain.TransactionOpts(lane.DestChain.GetDefaultWallet())
-			if err != nil {
-				return err
 			}
 			commitStat, ok := ccipReq.RequestStat.StatusByPhase[testreporters.Commit]
 			if !ok {
@@ -2767,6 +2769,11 @@ func (lane *CCIPLane) ExecuteManually() error {
 				return err
 			}
 			sourceChainSelector, err := chainselectors.SelectorFromChainId(lane.SourceChain.GetChainID().Uint64())
+			if err != nil {
+				return err
+			}
+			// Calling `TransactionOpts` will automatically increase the nonce, so if this fails, any other destination transactions will time out
+			destUser, err := lane.DestChain.TransactionOpts(lane.DestChain.GetDefaultWallet())
 			if err != nil {
 				return err
 			}
@@ -2809,6 +2816,8 @@ func (lane *CCIPLane) ExecuteManually() error {
 	return nil
 }
 
+// ValidateRequests validates that all sent CCIP transactions have been executed.
+// If you expect the transactions to ultimately fail, set successfulExecution to false.
 func (lane *CCIPLane) ValidateRequests(successfulExecution bool) {
 	for txHash, ccipReqs := range lane.SentReqs {
 		require.Greater(lane.Test, len(ccipReqs), 0, "no ccip requests found for tx hash")
@@ -2874,7 +2883,8 @@ func (lane *CCIPLane) ValidateRequestByTxHash(txHash common.Hash, execState test
 
 		// Verify whether commitStore has accepted the report
 		commitReport, reportAcceptedAt, err := lane.Dest.AssertEventReportAccepted(
-			lane.Logger, seqNumber, lane.ValidationTimeout, sourceLogFinalizedAt, reqStat)
+			lane.Logger, seqNumber, lane.ValidationTimeout, sourceLogFinalizedAt, reqStat,
+		)
 		if err != nil || commitReport == nil {
 			return fmt.Errorf("could not validate ReportAccepted event: %w", err)
 		}
@@ -3188,6 +3198,7 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 	configureCLNodes := !existingDeployment
 	USDCMockDeployment := testConf.USDCMockDeployment
 	multiCall := pointer.GetBool(testConf.MulticallInOneTx)
+
 	lane.Source, err = DefaultSourceCCIPModule(
 		lane.Logger,
 		sourceChainClient, destChainClient.GetChainID().Uint64(),
@@ -3359,8 +3370,7 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 
 	jobParams.P2PV2Bootstrappers = []string{p2pBootstrappersCommit.P2PV2Bootstrapper()}
 
-	// set up ocr2 config
-	err = SetOCR2Configs(commitNodes, execNodes, *lane.Dest)
+	err = SetOCR2Config(commitNodes, execNodes, *lane.Dest)
 	if err != nil {
 		return fmt.Errorf("failed to set ocr2 config: %w", err)
 	}
@@ -3390,9 +3400,12 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 	return nil
 }
 
-// SetOCR2Configs sets the oracle config in ocr2 contracts
-// nil value in execNodes denotes commit and execution jobs are to be set up in same DON
-func SetOCR2Configs(commitNodes, execNodes []*client.CLNodesWithKeys, destCCIP DestCCIPModule) error {
+// SetOCR2Config sets the oracle config in ocr2 contracts. If execNodes is nil, commit and execution jobs are set up in same DON
+func SetOCR2Config(
+	commitNodes,
+	execNodes []*client.CLNodesWithKeys,
+	destCCIP DestCCIPModule,
+) error {
 	inflightExpiryExec := commonconfig.MustNewDuration(InflightExpiryExec)
 	inflightExpiryCommit := commonconfig.MustNewDuration(InflightExpiryCommit)
 
@@ -3430,10 +3443,10 @@ func SetOCR2Configs(commitNodes, execNodes []*client.CLNodesWithKeys, destCCIP D
 				*inflightExpiryExec,
 				*commonconfig.MustNewDuration(RootSnoozeTime),
 			), testhelpers.NewExecOnchainConfig(
-				PermissionlessExecThreshold,
+				uint32(DefaultPermissionlessExecThreshold.Seconds()),
 				destCCIP.Common.Router.EthAddress,
 				destCCIP.Common.PriceRegistry.EthAddress,
-				MaxNoOfTokensInMsg,
+				DefaultMaxNoOfTokensInMsg,
 				MaxDataBytes,
 				200_000,
 			), contracts.OCR2ParamsForExec, 3*time.Minute)
