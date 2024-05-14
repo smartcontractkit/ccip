@@ -5,6 +5,7 @@ import {ITypeAndVersion} from "../../shared/interfaces/ITypeAndVersion.sol";
 
 /// @notice Abstract contract for onchain verification of reports from the offchain reporting protocol
 ///         with multiple OCR plugin support.
+// TODO: remove Abstract interface
 abstract contract MultiOCR3Abstract is ITypeAndVersion {
   // Maximum number of oracles the offchain reporting protocol is designed for
   // TODO: bump up to theoretical max if required
@@ -32,23 +33,13 @@ abstract contract MultiOCR3Abstract is ITypeAndVersion {
   /// @param signers addresses with which oracles sign the reports
   /// @param transmitters addresses oracles use to transmit the reports
   /// @param F number of faulty oracles the system can tolerate
-  function setOCR3Config(
-    uint8 ocrPluginType,
-    bytes32 configDigest,
-    address[] memory signers,
-    address[] memory transmitters,
-    uint8 F
-  ) external virtual;
-
-  /// @notice information about current offchain reporting protocol configuration
-  /// @param ocrPluginType OCR plugin type to return config details for
-  /// @return blockNumber block at which this config was set
-  /// @return configDigest domain-separation tag for current config (see _configDigestFromConfigData)
-  function latestConfigDetails(uint8 ocrPluginType)
-    external
-    view
-    virtual
-    returns (uint32 blockNumber, bytes32 configDigest);
+  // function setOCR3Config(
+  //   uint8 ocrPluginType,
+  //   bytes32 configDigest,
+  //   address[] memory signers,
+  //   address[] memory transmitters,
+  //   uint8 F
+  // ) external virtual;
 
   /// @notice optionally emitted to indicate the latest configDigest and sequence number
   /// for which a report was successfully transmitted. Alternatively, the contract may

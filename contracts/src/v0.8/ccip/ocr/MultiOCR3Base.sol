@@ -62,6 +62,17 @@ abstract contract MultiOCR3Base is OwnerIsCreator, MultiOCR3Abstract {
     address[] transmitters;
   }
 
+  /// @notice Args to update an OCR Config
+  struct OCRConfigArgs {
+    uint8 ocrPluginType; // OCR plugin type to update config for
+    bytes32 configDigest; // Config digest to update to
+    uint8 F; // ───────────────────────────╮ maximum number of faulty/dishonest oracles
+    bool uniqueReports; //                 │ if true, the reports should be unique
+    bool enableSignatureVerification; // ──╯ if true, requires signers and verifies signatures on transmission verification
+    address[] signers; // signing address of each oracle
+    address[] transmitters; // transmission address of each oracle (i.e. the address the oracle actually sends transactions to the contract from)
+  }
+
   /// @notice mapping of OCR plugin type -> DON config
   mapping(uint8 ocrPluginType => OCRConfig config) internal s_ocrConfigs;
 
@@ -90,24 +101,26 @@ abstract contract MultiOCR3Base is OwnerIsCreator, MultiOCR3Abstract {
     i_chainID = block.chainid;
   }
 
-  /// @inheritdoc MultiOCR3Abstract
-  /// @dev assumes that the input values are validated from the home chain config source,
-  ///      and does not re-validate the data.
-  /// @dev the ocrPluginType should be an enumeration determined by the concrete OCR implementation
-  function setOCR3Config(
-    uint8 ocrPluginType,
-    bytes32 configDigest,
-    address[] memory signers,
-    address[] memory transmitters,
-    uint8 F
-  ) external override onlyOwner {
+  /// @notice sets offchain reporting protocol configuration incl. participating oracles
+  /// @param ocrConfigArgs OCR config update args
+  function setOCR3Configs(OCRConfigArgs[] memory ocrConfigArgs) external onlyOwner {
+    for (uint256 i; i < ocrConfigArgs.length; ++i) {
+      _setOCR3Config(ocrConfigArgs[i]);
+    }
+  }
+
+  /// @notice sets offchain reporting protocol configuration incl. participating oracles for a single OCR plugin type
+  /// @param ocrConfigArgs OCR config update args
+  function _setOCR3Config(OCRConfigArgs memory ocrConfigArgs) internal {
+    uint8 ocrPluginType = ocrConfigArgs.ocrPluginType;
     OCRConfig storage ocrConfig = s_ocrConfigs[ocrPluginType];
     ConfigInfo storage configInfo = ocrConfig.configInfo;
 
-    uint256 newTransmittersLength = transmitters.length;
+    uint256 newTransmittersLength = ocrConfigArgs.transmitters.length;
     if (configInfo.enableSignatureVerification) {
-      ocrConfig.signers = signers;
+      ocrConfig.signers = ocrConfigArgs.signers;
     }
+    // TODO: validate signers / transmitters <= MAX_NUM_ORACLES
 
     // TODO: re-add s_oracles removal logic & validations
     //     uint256 oldSignerLength = s_signers.length;
@@ -130,15 +143,22 @@ abstract contract MultiOCR3Base is OwnerIsCreator, MultiOCR3Abstract {
     //       s_oracles[transmitter] = Oracle(uint8(i), Role.Transmitter);
     //     }
 
-    ocrConfig.transmitters = transmitters;
-    configInfo.F = F;
-    configInfo.latestConfigDigest = configDigest;
+    ocrConfig.transmitters = ocrConfigArgs.transmitters;
+    configInfo.F = ocrConfigArgs.F;
+    configInfo.latestConfigDigest = ocrConfigArgs.configDigest;
     configInfo.n = uint8(newTransmittersLength);
 
     uint32 previousConfigBlockNumber = ocrConfig.latestConfigBlockNumber;
     ocrConfig.latestConfigBlockNumber = uint32(block.number);
 
-    emit ConfigSet(ocrPluginType, previousConfigBlockNumber, configDigest, signers, transmitters, F);
+    emit ConfigSet(
+      ocrPluginType,
+      previousConfigBlockNumber,
+      ocrConfigArgs.configDigest,
+      ocrConfigArgs.signers,
+      ocrConfigArgs.transmitters,
+      ocrConfigArgs.F
+    );
   }
 
   /// @param ocrPluginType OCR plugin type to retrieve transmitters for
@@ -226,14 +246,10 @@ abstract contract MultiOCR3Base is OwnerIsCreator, MultiOCR3Abstract {
     }
   }
 
-  /// @inheritdoc MultiOCR3Abstract
-  function latestConfigDetails(uint8 ocrPluginType)
-    external
-    view
-    override
-    returns (uint32 blockNumber, bytes32 configDigest)
-  {
-    OCRConfig storage ocrConfig = s_ocrConfigs[ocrPluginType];
-    return (ocrConfig.latestConfigBlockNumber, ocrConfig.configInfo.latestConfigDigest);
+  /// @notice information about current offchain reporting protocol configuration
+  /// @param ocrPluginType OCR plugin type to return config details for
+  /// @return ocrConfig OCR config for the plugin type
+  function latestConfigDetails(uint8 ocrPluginType) external view returns (OCRConfig memory ocrConfig) {
+    return s_ocrConfigs[ocrPluginType];
   }
 }
