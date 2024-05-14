@@ -555,20 +555,6 @@ contract EVM2EVMMultiOffRamp_execute is EVM2EVMMultiOffRampSetup {
     s_offRamp.execute(executionReport, new uint256[](0));
   }
 
-  function test_MismatchingReportMessageSourceChainSelector_Revert() public {
-    Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages(SOURCE_CHAIN_SELECTOR_3, ON_RAMP_ADDRESS_3);
-    Internal.ExecutionReportSingleChain memory executionReport =
-      _generateReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messages);
-    vm.expectRevert(
-      abi.encodeWithSelector(
-        EVM2EVMMultiOffRamp.MismatchingSourceChainSelectors.selector,
-        messages[0].sourceChainSelector,
-        SOURCE_CHAIN_SELECTOR_1
-      )
-    );
-    s_offRamp.execute(executionReport, new uint256[](0));
-  }
-
   function test_MismatchingSourceChainSelector_Revert() public {
     Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages(SOURCE_CHAIN_SELECTOR_3, ON_RAMP_ADDRESS_3);
     messages[0].sourceChainSelector = SOURCE_CHAIN_SELECTOR_1;

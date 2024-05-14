@@ -58,7 +58,6 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, AggregateRateLimiter, ITyp
   error InvalidDataLength(uint256 expected, uint256 got);
   error InvalidNewState(uint64 sourceChainSelector, uint64 sequenceNumber, Internal.MessageExecutionState newState);
   error IndexOutOfRange();
-  error MismatchingSourceChainSelectors(uint64 expectedSelector, uint64 actualSelector);
 
   /// @dev Atlas depends on this event, if changing, please notify Atlas.
   event ConfigSet(StaticConfig staticConfig, DynamicConfig dynamicConfig);
@@ -330,12 +329,6 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, AggregateRateLimiter, ITyp
 
     for (uint256 i = 0; i < numMsgs; ++i) {
       Internal.EVM2EVMMessage memory message = report.messages[i];
-
-      // TODO: is the validation required?
-      if (message.sourceChainSelector != sourceChainSelector) {
-        revert MismatchingSourceChainSelectors(message.sourceChainSelector, sourceChainSelector);
-      }
-
       // We do this hash here instead of in _verifyMessages to avoid two separate loops
       // over the same data, which increases gas cost
       hashedLeaves[i] = Internal._hash(message, sourceChainConfig.metadataHash);
@@ -346,6 +339,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, AggregateRateLimiter, ITyp
     }
 
     // SECURITY CRITICAL CHECK
+    // NOTE: This check also verifies that all messages match the report's sourceChainSelector
     // TODO: revisit after MultiCommitStore implementation
     uint256 timestampCommitted = ICommitStore(i_commitStore).verify(hashedLeaves, report.proofs, report.proofFlagBits);
     if (timestampCommitted == 0) revert RootNotCommitted(sourceChainSelector);
