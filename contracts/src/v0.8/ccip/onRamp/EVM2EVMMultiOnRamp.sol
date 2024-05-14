@@ -389,7 +389,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ILinkAvailable, AggregateRat
 
   /// @dev Convert the extra args bytes into a struct
   /// @param extraArgs The extra args bytes
-  /// @return The extra args struct
+  /// @return The gas limit from the extra args
   function _gasLimitFromBytes(bytes calldata extraArgs) internal pure returns (uint256) {
     if (bytes4(extraArgs) != Client.EVM_EXTRA_ARGS_V1_TAG) revert InvalidExtraArgsTag();
     // EVMExtraArgsV1 originally included a second boolean (strict) field which we have deprecated entirely.
