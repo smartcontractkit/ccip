@@ -23,7 +23,7 @@ require (
 	github.com/smartcontractkit/libocr v0.0.0-20240326191951-2bbe9382d052
 	github.com/smartcontractkit/seth v0.1.6-0.20240429143720-cacb8160ecec
 	github.com/smartcontractkit/tdh2/go/tdh2 v0.0.0-20230906073235-9e478e5e19f1
-	github.com/smartcontractkit/wasp v0.4.6
+	github.com/smartcontractkit/wasp v0.4.7
 	github.com/stretchr/testify v1.9.0
 	github.com/wiremock/go-wiremock v1.9.0
 	go.uber.org/ratelimit v0.3.0
