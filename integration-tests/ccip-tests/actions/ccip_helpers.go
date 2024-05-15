@@ -2105,7 +2105,8 @@ func (destCCIP *DestCCIPModule) AssertEventExecutionStateChanged(
 							testreporters.TransactionStats{
 								TxHash:  vLogs.TxHash.Hex(),
 								GasUsed: gasUsed,
-							})
+							},
+						)
 						return e.State, nil
 					}
 					reqStat.UpdateState(lggr, seqNum, testreporters.ExecStateChanged, time.Since(timeNow), testreporters.Failure)
@@ -2757,17 +2758,15 @@ func (lane *CCIPLane) ExecuteManually() error {
 	return nil
 }
 
-func (lane *CCIPLane) ValidateRequests(successfulExecution bool) {
+// ValidateRequests validates all sent request events.
+// If a phaseExpectedToFail is provided, it will return no error if that phase fails, but will error if it succeeds.
+func (lane *CCIPLane) ValidateRequests(phaseExpectedToFail *testreporters.Phase) {
 	for txHash, ccipReqs := range lane.SentReqs {
 		require.Greater(lane.Test, len(ccipReqs), 0, "no ccip requests found for tx hash")
-		execState := testhelpers.ExecutionStateSuccess
-		if !successfulExecution {
-			execState = testhelpers.ExecutionStateFailure
-		}
-		require.NoError(lane.Test, lane.ValidateRequestByTxHash(txHash, execState),
+		require.NoError(lane.Test, lane.ValidateRequestByTxHash(txHash, phaseExpectedToFail),
 			"validating request events by tx hash")
 	}
-	if !successfulExecution {
+	if phaseExpectedToFail != nil {
 		return
 	}
 	// Asserting balances reliably work only for simulated private chains. The testnet contract balances might get updated by other transactions
@@ -2778,11 +2777,14 @@ func (lane *CCIPLane) ValidateRequests(successfulExecution bool) {
 	}
 }
 
-func (lane *CCIPLane) ValidateRequestByTxHash(txHash common.Hash, execState testhelpers.MessageExecutionState) error {
+// ValidateRequestByTxHash validates the request events by tx hash.
+// If a phaseExpectedToFail is provided, it will return no error if that phase fails, but will error if it succeeds.
+func (lane *CCIPLane) ValidateRequestByTxHash(txHash common.Hash, phaseExpectedToFail *testreporters.Phase) error {
 	var reqStats []*testreporters.RequestStat
 	ccipRequests := lane.SentReqs[txHash]
 	require.Greater(lane.Test, len(ccipRequests), 0, "no ccip requests found for tx hash")
 	txConfirmation := ccipRequests[0].txConfirmationTimestamp
+
 	defer func() {
 		for _, req := range ccipRequests {
 			lane.Reports.UpdatePhaseStatsForReq(req.RequestStat)
@@ -2793,11 +2795,27 @@ func (lane *CCIPLane) ValidateRequestByTxHash(txHash common.Hash, execState test
 	}
 
 	msgLogs, ccipSendReqGenAt, err := lane.Source.AssertEventCCIPSendRequested(
-		lane.Logger, txHash.Hex(), lane.ValidationTimeout, txConfirmation, reqStats)
+		lane.Logger, txHash.Hex(), lane.ValidationTimeout, txConfirmation, reqStats,
+	)
+	if phaseExpectedToFail != nil && *phaseExpectedToFail == testreporters.CCIPSendRe {
+		if err != nil {
+			lane.Logger.Debug().Str("Phase", string(testreporters.CCIPSendRe)).Msg("Phase expected to fail, skipping validation")
+			return nil
+		}
+		return fmt.Errorf("expected phase '%s' to fail, but it passed", testreporters.CCIPSendRe)
+	}
 	if err != nil || msgLogs == nil {
 		return fmt.Errorf("could not validate CCIPSendRequested event: %w", err)
 	}
+
 	sourceLogFinalizedAt, _, err := lane.Source.AssertSendRequestedLogFinalized(lane.Logger, txHash, ccipSendReqGenAt, reqStats)
+	if phaseExpectedToFail != nil && *phaseExpectedToFail == testreporters.SourceLogFinalized {
+		if err != nil {
+			lane.Logger.Debug().Str("Phase", string(testreporters.SourceLogFinalized)).Msg("Phase expected to fail, skipping validation")
+			return nil
+		}
+		return fmt.Errorf("expected phase '%s' to fail, but it passed", testreporters.SourceLogFinalized)
+	}
 	if err != nil {
 		return fmt.Errorf("could not finalize CCIPSendRequested event: %w", err)
 	}
@@ -2821,14 +2839,34 @@ func (lane *CCIPLane) ValidateRequestByTxHash(txHash common.Hash, execState test
 
 		// Verify whether commitStore has accepted the report
 		commitReport, reportAcceptedAt, err := lane.Dest.AssertEventReportAccepted(
-			lane.Logger, seqNumber, lane.ValidationTimeout, sourceLogFinalizedAt, reqStat)
+			lane.Logger, seqNumber, lane.ValidationTimeout, sourceLogFinalizedAt, reqStat,
+		)
+		if phaseExpectedToFail != nil && *phaseExpectedToFail == testreporters.Commit {
+			if err != nil {
+				lane.Logger.Debug().Str("Phase", string(testreporters.Commit)).Msg("Phase expected to fail, skipping validation")
+				return nil
+			}
+			return fmt.Errorf("expected phase '%s' to fail, but it passed", testreporters.Commit)
+		}
 		if err != nil || commitReport == nil {
 			return fmt.Errorf("could not validate ReportAccepted event: %w", err)
 		}
 
 		reportBlessedAt, err := lane.Dest.AssertReportBlessed(lane.Logger, seqNumber, lane.ValidationTimeout, *commitReport, reportAcceptedAt, reqStat)
+		if phaseExpectedToFail != nil && *phaseExpectedToFail == testreporters.ReportBlessed {
+			if err != nil {
+				lane.Logger.Debug().Str("Phase", string(testreporters.ReportBlessed)).Msg("Phase expected to fail, skipping validation")
+				return nil
+			}
+			return fmt.Errorf("expected phase '%s' to fail, but it passed", testreporters.ReportBlessed)
+		}
 		if err != nil {
 			return fmt.Errorf("could not validate ReportBlessed event: %w", err)
+		}
+
+		execState := testhelpers.ExecutionStateSuccess
+		if phaseExpectedToFail != nil && (*phaseExpectedToFail == testreporters.E2E || *phaseExpectedToFail == testreporters.ExecStateChanged) {
+			execState = testhelpers.ExecutionStateFailure
 		}
 		// Verify whether the execution state is changed and the transfer is successful
 		_, err = lane.Dest.AssertEventExecutionStateChanged(lane.Logger, seqNumber, lane.ValidationTimeout, reportBlessedAt, reqStat, execState)
