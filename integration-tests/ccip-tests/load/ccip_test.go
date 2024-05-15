@@ -20,6 +20,13 @@ import (
 )
 
 func setupReorgSuite(t *testing.T, loadArgs *LoadArgs) *ch.ReorgSuite {
+	t.Logf("source chain: %v", loadArgs.TestSetupArgs.Env.K8Env.URLs["source-chain_http"][0])
+	t.Logf("dest chain: %v", loadArgs.TestSetupArgs.Env.K8Env.URLs["dest-chain_http"][0])
+	t.Logf("source chain finality: %v", loadArgs.TestSetupArgs.Cfg.SelectedNetworks[0].FinalityDepth)
+	t.Logf("dest chain finality: %v", loadArgs.TestSetupArgs.Cfg.SelectedNetworks[1].FinalityDepth)
+	t.Logf("GrafanaURL: %v", *loadArgs.TestCfg.EnvInput.Logging.Grafana.BaseUrl)
+	t.Logf("GrafanaToken: %v", *loadArgs.TestCfg.EnvInput.Logging.Grafana.BearerToken)
+	t.Logf("DashboardURL: %v", *loadArgs.TestCfg.EnvInput.Logging.Grafana.DashboardUrl)
 	rs, err := ch.NewReorgSuite(t, &ch.ReorgConfig{
 		SrcGethHTTPURL:     loadArgs.TestSetupArgs.Env.K8Env.URLs["source-chain_http"][0],
 		DstGethHTTPURL:     loadArgs.TestSetupArgs.Env.K8Env.URLs["dest-chain_http"][0],
@@ -50,7 +57,6 @@ func TestLoadCCIPStableRPSReorgsBelowFinality(t *testing.T) {
 		log.Info().Msg("Tearing down the environment")
 		require.NoError(t, testArgs.TestSetupArgs.TearDown())
 	})
-	lggr.Warn().Any("Args", testArgs).Msg("Test input")
 	rs := setupReorgSuite(t, testArgs)
 	rs.RunReorgBelowFinalityThreshold()
 	testArgs.TriggerLoadByLane()
@@ -72,7 +78,6 @@ func TestLoadCCIPStableRPSReorgsAboveFinality(t *testing.T) {
 		log.Info().Msg("Tearing down the environment")
 		require.NoError(t, testArgs.TestSetupArgs.TearDown())
 	})
-	lggr.Warn().Any("Args", testArgs).Msg("Test input")
 	rs := setupReorgSuite(t, testArgs)
 	rs.RunReorgAboveFinalityThreshold()
 	testArgs.TriggerLoadByLane()
