@@ -293,7 +293,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, AggregateRateLimiter, ITyp
   /// @param manualExecGasLimits An array of gas limits to use for manual execution
   //         The outer array represents each report, inner array represents each message in the report.
   //         i.e. gasLimitOverrides[report1][report1Message1] -> access message1 from report1
-  /// @dev The array should always match the length of the array.
+  /// @dev The manualExecGasLimits array should either be empty, or match the length of the reports array
   /// @dev If called from manual execution, each inner array's length has to match the number of messages.
   function _batchExecute(
     Internal.ExecutionReportSingleChain[] memory reports,
