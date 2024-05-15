@@ -680,6 +680,7 @@ func TestPlugin_Outcome(t *testing.T) {
 			}
 			assert.NoError(t, err)
 			expectedOutcome, err := tc.expectedOutcome.Encode()
+			assert.NoError(t, err)
 			assert.Equal(t, string(expectedOutcome), string(outc))
 		})
 	}
