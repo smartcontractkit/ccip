@@ -34,6 +34,7 @@ contract CCIPCapabilityConfiguration is ICapabilityConfiguration, OwnerIsCreator
   error SignerP2PIdPairMustBeLengthTwo(uint256 gotLength);
   error TooManyOCR3Configs();
   error InvalidConfigState();
+  error InvalidConfigLength();
   error InvalidConfigStateTransition(ConfigState currentState, ConfigState proposedState);
   error InvalidConfigTransition();
   error WrongConfigCount(uint64 got, uint64 expected);
@@ -177,9 +178,9 @@ contract CCIPCapabilityConfiguration is ICapabilityConfiguration, OwnerIsCreator
 
   /// @notice Called by the registry prior to the config being set for a particular DON.
   function beforeCapabilityConfigSet(
-    bytes32[] calldata /* nodes */,
+    bytes32[] calldata, /* nodes */
     bytes calldata config,
-    uint64 /* configCount */,
+    uint64, /* configCount */
     uint32 donId
   ) external override {
     if (msg.sender != i_capabilityRegistry) {
@@ -214,6 +215,10 @@ contract CCIPCapabilityConfiguration is ICapabilityConfiguration, OwnerIsCreator
     }
   }
 
+  // ================================================================
+  // │                    Config State Machine                      │
+  // ================================================================
+
   /// @notice Determine the config state of the configuration from the length of the config.
   /// @param configLen The length of the configuration.
   /// @return The config state.
@@ -225,7 +230,7 @@ contract CCIPCapabilityConfiguration is ICapabilityConfiguration, OwnerIsCreator
     } else if (configLen == 2) {
       return ConfigState.Staging;
     }
-    revert InvalidConfigState();
+    revert InvalidConfigLength();
   }
 
   // the only valid state transitions are the following:
