@@ -6,6 +6,8 @@ import (
 	"slices"
 	"testing"
 
+	mapset "github.com/deckarep/golang-set/v2"
+	"github.com/smartcontractkit/ccipocr3/internal/libs/slicelib"
 	"github.com/smartcontractkit/ccipocr3/internal/mocks"
 	"github.com/smartcontractkit/ccipocr3/internal/model"
 	"github.com/smartcontractkit/libocr/commontypes"
@@ -14,7 +16,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 )
 
-func TestPlugin_observeMaxSeqNumsPerChain(t *testing.T) {
+func Test_observeMaxSeqNumsPerChain(t *testing.T) {
 	testCases := []struct {
 		name           string
 		prevOutcome    model.CommitPluginOutcome
@@ -77,45 +79,36 @@ func TestPlugin_observeMaxSeqNumsPerChain(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
 			mockReader := mocks.NewCCIPReader()
+			knownSourceChains := slicelib.Filter(tc.readChains, func(ch model.ChainSelector) bool { return ch != tc.destChain })
 			lggr := logger.Test(t)
 
-			p := NewPlugin(
-				ctx,
-				commontypes.OracleID(123),
-				model.CommitPluginConfig{
-					Writer:              false,
-					Reads:               tc.readChains,
-					DestChain:           tc.destChain,
-					FChain:              map[model.ChainSelector]int{},
-					ObserverInfo:        nil,
-					NewMsgScanDuration:  0,
-					NewMsgScanLimit:     0,
-					NewMsgScanBatchSize: 0,
-				},
-				mockReader,
-				nil,
-				lggr,
-			)
-
-			var b []byte
+			var encodedPrevOutcome []byte
 			var err error
 			if !reflect.DeepEqual(tc.prevOutcome, model.CommitPluginOutcome{}) {
-				b, err = tc.prevOutcome.Encode()
+				encodedPrevOutcome, err = tc.prevOutcome.Encode()
 				assert.NoError(t, err)
 			}
 
-			knownChainsSlice := p.knownSourceChainsSlice()
 			onChainSeqNums := make([]model.SeqNum, 0)
-			for _, chain := range knownChainsSlice {
+			for _, chain := range knownSourceChains {
 				if v, ok := tc.onChainSeqNums[chain]; !ok {
 					t.Fatalf("invalid test case missing on chain seq num expectation for %d", chain)
 				} else {
 					onChainSeqNums = append(onChainSeqNums, v)
 				}
 			}
-			mockReader.On("NextSeqNum", ctx, knownChainsSlice).Return(onChainSeqNums, nil)
+			mockReader.On("NextSeqNum", ctx, knownSourceChains).Return(onChainSeqNums, nil)
 
-			seqNums, err := p.observeMaxSeqNumsPerChain(ctx, b)
+			seqNums, err := observeMaxSeqNums(
+				ctx,
+				lggr,
+				mockReader,
+				encodedPrevOutcome,
+				mapset.NewSet(tc.readChains...),
+				tc.destChain,
+				knownSourceChains,
+			)
+
 			if tc.expErr {
 				assert.Error(t, err)
 				return
@@ -126,7 +119,7 @@ func TestPlugin_observeMaxSeqNumsPerChain(t *testing.T) {
 	}
 }
 
-func TestPlugin_observeNewMsgs(t *testing.T) {
+func Test_observeNewMsgs(t *testing.T) {
 	testCases := []struct {
 		name               string
 		maxSeqNumsPerChain []model.SeqNumChain
@@ -204,24 +197,6 @@ func TestPlugin_observeNewMsgs(t *testing.T) {
 			mockReader := mocks.NewCCIPReader()
 			lggr := logger.Test(t)
 
-			p := NewPlugin(
-				ctx,
-				commontypes.OracleID(123),
-				model.CommitPluginConfig{
-					Writer:              false,
-					Reads:               tc.readChains,
-					DestChain:           tc.destChain,
-					FChain:              map[model.ChainSelector]int{},
-					ObserverInfo:        nil,
-					NewMsgScanDuration:  0,
-					NewMsgScanLimit:     0,
-					NewMsgScanBatchSize: tc.msgScanBatchSize,
-				},
-				mockReader,
-				nil,
-				lggr,
-			)
-
 			for _, seqNumChain := range tc.maxSeqNumsPerChain {
 				if slices.Contains(tc.readChains, seqNumChain.ChainSel) {
 					mockReader.On(
@@ -233,7 +208,14 @@ func TestPlugin_observeNewMsgs(t *testing.T) {
 				}
 			}
 
-			msgs, err := p.observeNewMsgs(ctx, tc.maxSeqNumsPerChain)
+			msgs, err := observeNewMsgs(
+				ctx,
+				lggr,
+				mockReader,
+				mapset.NewSet(tc.readChains...),
+				tc.maxSeqNumsPerChain,
+				tc.msgScanBatchSize,
+			)
 			if tc.expErr {
 				assert.Error(t, err)
 				return
@@ -245,7 +227,7 @@ func TestPlugin_observeNewMsgs(t *testing.T) {
 	}
 }
 
-func TestPlugin_validateObservedSequenceNumbers(t *testing.T) {
+func Test_validateObservedSequenceNumbers(t *testing.T) {
 	testCases := []struct {
 		name       string
 		msgs       []model.CCIPMsgBaseDetails
@@ -336,20 +318,7 @@ func TestPlugin_validateObservedSequenceNumbers(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			ctx := context.Background()
-			lggr := logger.Test(t)
-			p := NewPlugin(
-				ctx,
-				commontypes.OracleID(123),
-				model.CommitPluginConfig{
-					FChain: map[model.ChainSelector]int{},
-				},
-				nil,
-				nil,
-				lggr,
-			)
-
-			err := p.validateObservedSequenceNumbers(tc.msgs, tc.maxSeqNums)
+			err := validateObservedSequenceNumbers(tc.msgs, tc.maxSeqNums)
 			if tc.expErr {
 				assert.Error(t, err)
 				return
@@ -359,7 +328,7 @@ func TestPlugin_validateObservedSequenceNumbers(t *testing.T) {
 	}
 }
 
-func TestPlugin_validateObserverReadingEligibility(t *testing.T) {
+func Test_validateObserverReadingEligibility(t *testing.T) {
 	testCases := []struct {
 		name         string
 		observer     commontypes.OracleID
@@ -420,21 +389,7 @@ func TestPlugin_validateObserverReadingEligibility(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			ctx := context.Background()
-			lggr := logger.Test(t)
-			p := NewPlugin(
-				ctx,
-				commontypes.OracleID(123),
-				model.CommitPluginConfig{
-					FChain:       map[model.ChainSelector]int{},
-					ObserverInfo: tc.observerInfo,
-				},
-				nil,
-				nil,
-				lggr,
-			)
-
-			err := p.validateObserverReadingEligibility(tc.observer, tc.msgs)
+			err := validateObserverReadingEligibility(tc.observer, tc.msgs, tc.observerInfo)
 			if tc.expErr {
 				assert.Error(t, err)
 				return
@@ -444,9 +399,9 @@ func TestPlugin_validateObserverReadingEligibility(t *testing.T) {
 	}
 }
 
-func TestPlugin_validateObservedGasAndTokenPrices(t *testing.T) {}
+func Test_validateObservedGasAndTokenPrices(t *testing.T) {}
 
-func TestPlugin_newMsgsConsensus(t *testing.T) {
+func Test_newMsgsConsensus(t *testing.T) {
 	testCases := []struct {
 		name           string
 		maxSeqNums     []model.SeqNumChain
@@ -644,20 +599,8 @@ func TestPlugin_newMsgsConsensus(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			ctx := context.Background()
 			lggr := logger.Test(t)
-			p := NewPlugin(
-				ctx,
-				commontypes.OracleID(123),
-				model.CommitPluginConfig{
-					FChain: tc.fChain,
-				},
-				nil,
-				nil,
-				lggr,
-			)
-
-			merkleRoots, err := p.newMsgsConsensus(tc.maxSeqNums, tc.observations)
+			merkleRoots, err := newMsgsConsensus(lggr, tc.maxSeqNums, tc.observations, tc.fChain)
 			if tc.expErr {
 				assert.Error(t, err)
 				return
@@ -672,7 +615,7 @@ func TestPlugin_newMsgsConsensus(t *testing.T) {
 	}
 }
 
-func TestPlugin_maxSeqNumsConsensus(t *testing.T) {
+func Test_maxSeqNumsConsensus(t *testing.T) {
 	testCases := []struct {
 		name         string
 		observations []model.CommitPluginObservation
