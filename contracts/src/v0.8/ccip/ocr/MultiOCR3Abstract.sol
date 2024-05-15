@@ -8,24 +8,16 @@ import {ITypeAndVersion} from "../../shared/interfaces/ITypeAndVersion.sol";
 // TODO: remove Abstract interface
 abstract contract MultiOCR3Abstract is ITypeAndVersion {
   // Maximum number of oracles the offchain reporting protocol is designed for
-  // TODO: bump up to theoretical max if required
+  // TODO: consider bumping up to theoretical max
   uint256 internal constant MAX_NUM_ORACLES = 31;
 
   /// @notice triggers a new run of the offchain reporting protocol
   /// @param ocrPluginType OCR plugin type for which the config was set
-  /// @param previousConfigBlockNumber block in which the previous config was set, to simplify historic analysis
   /// @param configDigest configDigest of this configuration
   /// @param signers ith element is address ith oracle uses to sign a report
   /// @param transmitters ith element is address ith oracle uses to transmit a report via the transmit method
   /// @param F maximum number of faulty/dishonest oracles the protocol can tolerate while still working correctly
-  event ConfigSet(
-    uint8 ocrPluginType,
-    uint32 previousConfigBlockNumber,
-    bytes32 configDigest,
-    address[] signers,
-    address[] transmitters,
-    uint8 F
-  );
+  event ConfigSet(uint8 ocrPluginType, bytes32 configDigest, address[] signers, address[] transmitters, uint8 F);
 
   /// @notice sets offchain reporting protocol configuration incl. participating oracles
   /// @param ocrPluginType OCR plugin type to set the config for

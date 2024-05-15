@@ -53,8 +53,6 @@ abstract contract MultiOCR3Base is OwnerIsCreator, MultiOCR3Abstract {
   struct OCRConfig {
     /// @notice latest OCR config
     ConfigInfo configInfo;
-    /// @notice makes it easier for offchain systems to extract config from logs.
-    uint32 latestConfigBlockNumber;
     /// @notice signing address of each oracle
     address[] signers;
     /// @notice transmission address of each oracle,
@@ -148,16 +146,8 @@ abstract contract MultiOCR3Base is OwnerIsCreator, MultiOCR3Abstract {
     configInfo.latestConfigDigest = ocrConfigArgs.configDigest;
     configInfo.n = uint8(newTransmittersLength);
 
-    uint32 previousConfigBlockNumber = ocrConfig.latestConfigBlockNumber;
-    ocrConfig.latestConfigBlockNumber = uint32(block.number);
-
     emit ConfigSet(
-      ocrPluginType,
-      previousConfigBlockNumber,
-      ocrConfigArgs.configDigest,
-      ocrConfigArgs.signers,
-      ocrConfigArgs.transmitters,
-      ocrConfigArgs.F
+      ocrPluginType, ocrConfigArgs.configDigest, ocrConfigArgs.signers, ocrConfigArgs.transmitters, ocrConfigArgs.F
     );
   }
 
@@ -218,7 +208,7 @@ abstract contract MultiOCR3Base is OwnerIsCreator, MultiOCR3Abstract {
     emit Transmitted(ocrPluginType, configDigest, uint32(uint256(reportContext[1]) >> 8));
 
     if (configInfo.isSignatureVerificationEnabled) {
-      // TODO: consider scoping this to reduce stack pressure
+      // TODO: consider scoping this to reduce stack pressure / move to separate internal function
       uint256 expectedNumSignatures;
       if (configInfo.uniqueReports) {
         expectedNumSignatures = (configInfo.n + configInfo.F) / 2 + 1;
@@ -244,6 +234,17 @@ abstract contract MultiOCR3Base is OwnerIsCreator, MultiOCR3Abstract {
         signed[oracle.index] = true;
       }
     }
+  }
+
+  /// @inheritdoc MultiOCR3Abstract
+  function latestConfigDigestAndEpoch(uint8 ocrPluginType)
+    external
+    view
+    virtual
+    override
+    returns (bool scanLogs, bytes32 configDigest, uint64 sequenceNumber)
+  {
+    return (true, bytes32(0), uint64(0));
   }
 
   /// @notice information about current offchain reporting protocol configuration
