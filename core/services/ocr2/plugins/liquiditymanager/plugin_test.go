@@ -304,7 +304,9 @@ func TestPlugin_Observation(t *testing.T) {
 				return
 			}
 			assert.NoError(t, err)
-			assert.Equal(t, string(tc.expObservation.Encode()), string(obs))
+			o, err := tc.expObservation.Encode()
+			assert.NoError(t, err)
+			assert.Equal(t, string(o), string(obs))
 		})
 	}
 }
@@ -662,8 +664,9 @@ func TestPlugin_Outcome(t *testing.T) {
 
 			attributedObservations := make([]ocrtypes.AttributedObservation, 0, len(tc.observations))
 			for _, o := range tc.observations {
+				obs, _ := o.Encode()
 				attributedObservations = append(attributedObservations, ocrtypes.AttributedObservation{
-					Observation: o.Encode(),
+					Observation: obs,
 					Observer:    commontypes.OracleID(uint8(rand.Intn(10))),
 				})
 			}

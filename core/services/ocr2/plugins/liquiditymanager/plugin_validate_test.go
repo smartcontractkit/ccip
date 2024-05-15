@@ -35,95 +35,95 @@ func TestPlugin_ValidateObservation(t *testing.T) {
 		},
 		{
 			name: "some observation",
-			obs: models.NewObservation(
+			obs: newTestObservation(models.NewObservation(
 				[]models.NetworkLiquidity{},
 				[]models.Transfer{{}},
 				[]models.PendingTransfer{},
 				[]models.Transfer{},
 				[]models.Edge{},
 				[]models.ConfigDigestWithMeta{},
-			).Encode(),
+			)),
 		},
 		{
 			name: "deduped liquidity observations",
-			obs: models.NewObservation(
+			obs: newTestObservation(models.NewObservation(
 				[]models.NetworkLiquidity{{Network: 1, Liquidity: ubig.New(big.NewInt(1))}, {Network: 1, Liquidity: ubig.New(big.NewInt(2))}},
 				[]models.Transfer{},
 				[]models.PendingTransfer{},
 				[]models.Transfer{},
 				[]models.Edge{},
 				[]models.ConfigDigestWithMeta{},
-			).Encode(),
+			)),
 			expErr: func(t *testing.T, err error) {
 				assert.Error(t, err)
 			},
 		},
 		{
 			name: "deduped resolved transfers",
-			obs: models.NewObservation(
+			obs: newTestObservation(models.NewObservation(
 				[]models.NetworkLiquidity{},
 				[]models.Transfer{{From: 1}, {From: 1}},
 				[]models.PendingTransfer{},
 				[]models.Transfer{},
 				[]models.Edge{},
 				[]models.ConfigDigestWithMeta{},
-			).Encode(),
+			)),
 			expErr: func(t *testing.T, err error) {
 				assert.Error(t, err)
 			},
 		},
 		{
 			name: "deduped pending transfers",
-			obs: models.NewObservation(
+			obs: newTestObservation(models.NewObservation(
 				[]models.NetworkLiquidity{},
 				[]models.Transfer{},
 				[]models.PendingTransfer{{ID: "1"}, {ID: "1"}},
 				[]models.Transfer{},
 				[]models.Edge{},
 				[]models.ConfigDigestWithMeta{},
-			).Encode(),
+			)),
 			expErr: func(t *testing.T, err error) {
 				assert.Error(t, err)
 			},
 		},
 		{
 			name: "deduped inflight transfers",
-			obs: models.NewObservation(
+			obs: newTestObservation(models.NewObservation(
 				[]models.NetworkLiquidity{},
 				[]models.Transfer{},
 				[]models.PendingTransfer{},
 				[]models.Transfer{{From: 1}, {From: 1}},
 				[]models.Edge{},
 				[]models.ConfigDigestWithMeta{},
-			).Encode(),
+			)),
 			expErr: func(t *testing.T, err error) {
 				assert.Error(t, err)
 			},
 		},
 		{
 			name: "deduped edges",
-			obs: models.NewObservation(
+			obs: newTestObservation(models.NewObservation(
 				[]models.NetworkLiquidity{},
 				[]models.Transfer{},
 				[]models.PendingTransfer{},
 				[]models.Transfer{},
 				[]models.Edge{{Source: 1, Dest: 2}, {Source: 1, Dest: 2}},
 				[]models.ConfigDigestWithMeta{},
-			).Encode(),
+			)),
 			expErr: func(t *testing.T, err error) {
 				assert.Error(t, err)
 			},
 		},
 		{
 			name: "deduped config digest",
-			obs: models.NewObservation(
+			obs: newTestObservation(models.NewObservation(
 				[]models.NetworkLiquidity{},
 				[]models.Transfer{},
 				[]models.PendingTransfer{},
 				[]models.Transfer{},
 				[]models.Edge{},
 				[]models.ConfigDigestWithMeta{{NetworkSel: 1}, {NetworkSel: 1}},
-			).Encode(),
+			)),
 			expErr: func(t *testing.T, err error) {
 				assert.Error(t, err)
 			},
@@ -203,4 +203,9 @@ func Test_validateDedupedItems(t *testing.T) {
 			require.NoError(t, err)
 		})
 	}
+}
+
+func newTestObservation(obs models.Observation) ocrtypes.Observation {
+	o, _ := obs.Encode()
+	return o
 }
