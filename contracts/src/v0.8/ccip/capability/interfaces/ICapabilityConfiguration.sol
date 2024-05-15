@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
 /// @notice Interface for capability configuration contract. It MUST be
@@ -26,5 +27,10 @@ interface ICapabilityConfiguration {
   /// @param config The configuration being set on the capability registry.
   /// @param configCount The number of times the DON has been configured, tracked on the capability registry.
   /// @param donId The DON ID on the capability registry.
-  function beforeCapabilityConfigSet(bytes32[] calldata nodes, bytes calldata config, uint64 configCount, uint32 donId) external;
+  function beforeCapabilityConfigSet(
+    bytes32[] calldata nodes,
+    bytes calldata config,
+    uint64 configCount,
+    uint32 donId
+  ) external;
 }
