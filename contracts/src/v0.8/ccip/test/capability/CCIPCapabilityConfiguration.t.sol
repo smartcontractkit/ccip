@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import {Test} from "forge-std/Test.sol";
 
+import {ICapabilityRegistry} from "../../capability/interfaces/ICapabilityRegistry.sol";
 import {CCIPCapabilityConfiguration} from "../../capability/CCIPCapabilityConfiguration.sol";
 import {CCIPCapabilityConfigurationHelper} from "../helpers/CCIPCapabilityConfigurationHelper.sol";
 
@@ -15,6 +16,95 @@ contract CCIPCapabilityConfigurationSetup is Test {
   function setUp() public {
     changePrank(OWNER);
     s_ccipCC = new CCIPCapabilityConfigurationHelper(CAPABILITY_REGISTRY);
+  }
+}
+
+contract CCIPCapabilityConfiguration_chainConfig is CCIPCapabilityConfigurationSetup {
+  event ChainConfigSet(uint64 chainSelector, CCIPCapabilityConfiguration.ChainConfig chainConfig);
+
+  function test_applyChainConfigUpdates_addChainConfigs_Success() public {
+    bytes32[] memory chainReaders = new bytes32[](1);
+    chainReaders[0] = keccak256(abi.encode(1));
+    CCIPCapabilityConfiguration.ChainConfigUpdate[] memory adds = new CCIPCapabilityConfiguration.ChainConfigUpdate[](1);
+    adds[0] = CCIPCapabilityConfiguration.ChainConfigUpdate({
+      chainSelector: 1,
+      chainConfig: CCIPCapabilityConfiguration.ChainConfig({
+        readers: chainReaders,
+        config: abi.encode(1, 2, 3)
+      })
+    });
+
+    vm.mockCall(
+      CAPABILITY_REGISTRY,
+      abi.encodeWithSelector(ICapabilityRegistry.getNode.selector, chainReaders[0]),
+      abi.encode(
+        ICapabilityRegistry.NodeParams({
+          nodeOperatorId: 1,
+          signer: address(1),
+          p2pId: chainReaders[0],
+          hashedCapabilityIds: new bytes32[](0)
+        }),
+        uint32(1)
+      )
+    );
+
+    vm.expectEmit();
+    emit ChainConfigSet(1, adds[0].chainConfig);
+    s_ccipCC.applyChainConfigUpdates(new CCIPCapabilityConfiguration.ChainConfigUpdate[](0), adds);
+  }
+
+  function test_applyChainConfigUpdates_removeChainConfigs_Success() public {
+
+  }
+
+  function test_applyChainConfigUpdates_selectorNotFound_Reverts() public {
+    CCIPCapabilityConfiguration.ChainConfigUpdate[] memory removes = new CCIPCapabilityConfiguration.ChainConfigUpdate[](1);
+    removes[0] = CCIPCapabilityConfiguration.ChainConfigUpdate({
+      chainSelector: 1,
+      chainConfig: CCIPCapabilityConfiguration.ChainConfig({
+        readers: new bytes32[](0),
+        config: abi.encode(1, 2, 3)
+      })
+    });
+
+    vm.expectRevert(abi.encodeWithSelector(CCIPCapabilityConfiguration.ChainSelectorNotFound.selector, 1));
+    s_ccipCC.applyChainConfigUpdates(removes, new CCIPCapabilityConfiguration.ChainConfigUpdate[](0));
+  }
+
+  function test_applyChainConfigUpdates_nodeNotInRegistry_Reverts() public {
+    bytes32[] memory chainReaders = new bytes32[](1);
+    chainReaders[0] = keccak256(abi.encode(1));
+    CCIPCapabilityConfiguration.ChainConfigUpdate[] memory adds = new CCIPCapabilityConfiguration.ChainConfigUpdate[](1);
+    adds[0] = CCIPCapabilityConfiguration.ChainConfigUpdate({
+      chainSelector: 1,
+      chainConfig: CCIPCapabilityConfiguration.ChainConfig({
+        readers: chainReaders,
+        config: abi.encode(1, 2, 3)
+      })
+    });
+
+    vm.mockCall(
+      CAPABILITY_REGISTRY,
+      abi.encodeWithSelector(ICapabilityRegistry.getNode.selector, chainReaders[0]),
+      abi.encode(
+        ICapabilityRegistry.NodeParams({
+          nodeOperatorId: 0,
+          signer: address(0),
+          p2pId: bytes32(uint256(0)),
+          hashedCapabilityIds: new bytes32[](0)
+        }),
+        uint32(1)
+      )
+    );
+
+    vm.expectRevert(abi.encodeWithSelector(CCIPCapabilityConfiguration.NodeNotInRegistry.selector, chainReaders[0]));
+    s_ccipCC.applyChainConfigUpdates(new CCIPCapabilityConfiguration.ChainConfigUpdate[](0), adds);
+  }
+}
+
+contract CCIPCapabilityConfiguration_validateConfig is CCIPCapabilityConfigurationSetup {
+  function test__validateConfig_Success() public {
+
   }
 }
 
@@ -47,6 +137,60 @@ contract CCIPCapabilityConfiguration_ConfigStateMachine is CCIPCapabilityConfigu
     s_ccipCC.validateConfigStateTransition(
       CCIPCapabilityConfiguration.ConfigState.Staging, CCIPCapabilityConfiguration.ConfigState.Running
     );
+  }
+
+  function makeAssociativeArray(uint256 length, uint256 seed) internal pure returns (bytes[][] memory) {
+    bytes[][] memory arr = new bytes[][](length);
+    for (uint256 i = 0; i < length; i++) {
+      arr[i] = new bytes[](2);
+      arr[i][0] = abi.encode(keccak256(abi.encode(i, 0)));
+      arr[i][1] = abi.encode(keccak256(abi.encode(i, 1, seed)));
+    }
+    return arr;
+  }
+
+  function test__computeConfigDigest_Success() public {
+    // config digest must change upon:
+    // - ocr config change (e.g plugin type, chain selector, etc.)
+    // - don id change
+    // - config count change
+    bytes[][] memory signers = makeAssociativeArray(2, 10);
+    bytes[][] memory transmitters = makeAssociativeArray(2, 20);
+    CCIPCapabilityConfiguration.OCR3Config memory config = CCIPCapabilityConfiguration.OCR3Config({
+      pluginType: CCIPCapabilityConfiguration.PluginType.Commit,
+      chainSelector: 1,
+      signers: signers,
+      transmitters: transmitters,
+      f: 1,
+      offchainConfigVersion: 30,
+      offchainConfig: bytes("offchainConfig")
+    });
+    uint32 donId = 1;
+    uint32 configCount = 1;
+
+    bytes32 configDigest1 = s_ccipCC.computeConfigDigest(donId, configCount, config);
+
+    donId = 2;
+    bytes32 configDigest2 = s_ccipCC.computeConfigDigest(donId, configCount, config);
+
+    donId = 1;
+    configCount = 2;
+    bytes32 configDigest3 = s_ccipCC.computeConfigDigest(donId, configCount, config);
+
+    configCount = 1;
+    config.pluginType = CCIPCapabilityConfiguration.PluginType.Execution;
+    bytes32 configDigest4 = s_ccipCC.computeConfigDigest(donId, configCount, config);
+
+    assertNotEq(configDigest1, configDigest2, "config digests must not match");
+    assertNotEq(configDigest1, configDigest3, "config digests must not match");
+    assertNotEq(configDigest1, configDigest4, "config digests must not match");
+
+    assertNotEq(configDigest2, configDigest3, "config digests must not match");
+    assertNotEq(configDigest2, configDigest4, "config digests must not match");
+  }
+
+  function test__groupByPluginType_Success() public {
+
   }
 
   // Reverts.
