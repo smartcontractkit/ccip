@@ -247,9 +247,17 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ILinkAvailable, AggregateRat
     return s_destChainConfig[destChainSelector].sequenceNumber + 1;
   }
 
-  /// @inheritdoc IEVM2AnyMultiOnRamp
-  function getSenderNonce(uint64 destChainSelector, address sender) external view returns (uint64) {
-    uint256 senderNonce = s_senderNonce[sender];
+  // /// @inheritdoc IEVM2AnyMultiOnRamp
+  // function getSenderNonce(uint64 destChainSelector, address sender) external view returns (uint64) {
+  //   return _getSenderNonce(destChainSelector, sender);
+  // }
+
+  /// @notice Returns the current nonce for a sender
+  /// @param destChainSelector The destination chain selector
+  /// @param sender The sender address
+  /// @return The sender's nonce
+  function getSenderNonce(uint64 destChainSelector, address sender) public view returns (uint64) {
+    uint64 senderNonce = s_senderNonce[sender];
 
     if (senderNonce == 0) {
       address prevOnRamp = s_destChainConfig[destChainSelector].prevOnRamp;
@@ -259,7 +267,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ILinkAvailable, AggregateRat
       }
     }
 
-    return uint64(senderNonce);
+    return senderNonce;
   }
 
   /// @inheritdoc IEVM2AnyOnRampClient
@@ -269,14 +277,78 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ILinkAvailable, AggregateRat
     uint256 feeTokenAmount,
     address originalSender
   ) external returns (bytes32) {
+    DestChainConfig storage destChainConfig = s_destChainConfig[destChainSelector];
+    Internal.EVM2EVMMessage memory newMessage =
+      _generateNewMessage(destChainConfig, destChainSelector, message, feeTokenAmount, originalSender);
+
+    // Lock the tokens as last step. TokenPools may not always be trusted.
+    // There should be no state changes after external call to TokenPools.
+    for (uint256 i = 0; i < newMessage.tokenAmounts.length; ++i) {
+      Client.EVMTokenAmount memory tokenAndAmount = message.tokenAmounts[i];
+      IPool sourcePool = getPoolBySourceToken(destChainSelector, IERC20(tokenAndAmount.token));
+      // We don't have to check if it supports the pool version in a non-reverting way here because
+      // if we revert here, there is no effect on CCIP. Therefore we directly call the supportsInterface
+      // function and not through the ERC165Checker.
+      if (address(sourcePool) == address(0) || !sourcePool.supportsInterface(Pool.CCIP_POOL_V1)) {
+        revert UnsupportedToken(tokenAndAmount.token);
+      }
+
+      Pool.LockOrBurnOutV1 memory poolReturnData = sourcePool.lockOrBurn(
+        Pool.LockOrBurnInV1({
+          originalSender: originalSender,
+          receiver: message.receiver,
+          amount: tokenAndAmount.amount,
+          remoteChainSelector: destChainSelector
+        })
+      );
+
+      // Since the DON has to pay for the extraData to be included on the destination chain, we cap the length of the extraData.
+      // This prevents gas bomb attacks on the NOPs. We use destBytesOverhead as a proxy to cap the number of bytes we accept.
+      // As destBytesOverhead accounts for extraData + offchainData, this caps the worst case abuse to the number of bytes reserved for offchainData.
+      // It therefore fully mitigates gas bombs for most tokens, as most tokens don't use offchainData.
+      if (poolReturnData.destPoolData.length > s_tokenTransferFeeConfig[tokenAndAmount.token].destBytesOverhead) {
+        revert SourceTokenDataTooLarge(tokenAndAmount.token);
+      }
+      // We validate the pool address to ensure it is a valid EVM address
+      Internal._validateEVMAddress(poolReturnData.destPoolAddress);
+
+      newMessage.sourceTokenData[i] = abi.encode(
+        Internal.SourceTokenData({
+          sourcePoolAddress: abi.encode(sourcePool),
+          destPoolAddress: poolReturnData.destPoolAddress,
+          extraData: poolReturnData.destPoolData
+        })
+      );
+    }
+
+    // Hash only after the sourceTokenData has been set
+    newMessage.messageId = Internal._hash(newMessage, destChainConfig.metadataHash);
+
+    // Emit message request
+    // Note this must happen after pools, some tokens (eg USDC) emit events that we
+    // expect to directly precede this event.
+    emit CCIPSendRequested(newMessage);
+    return newMessage.messageId;
+  }
+
+  /// @notice Helper function to relieve stack pressure from `forwardFromRouter`
+  /// @param destChainConfig The destination chain config storage pointer
+  /// @param destChainSelector The destination chain selector
+  /// @param message Message struct to send
+  /// @param feeTokenAmount Amount of fee tokens for payment
+  /// @param originalSender The original initiator of the CCIP request
+  function _generateNewMessage(
+    DestChainConfig storage destChainConfig,
+    uint64 destChainSelector,
+    Client.EVM2AnyMessage calldata message,
+    uint256 feeTokenAmount,
+    address originalSender
+  ) internal returns (Internal.EVM2EVMMessage memory) {
     if (IRMN(i_rmnProxy).isCursed(bytes32(uint256(destChainSelector)))) revert CursedByRMN(destChainSelector);
     // Validate message sender is set and allowed. Not validated in `getFee` since it is not user-driven.
     if (originalSender == address(0)) revert RouterMustSetOriginalSender();
     // Router address may be zero intentionally to pause.
     if (msg.sender != s_dynamicConfig.router) revert MustBeCalledByRouter();
-
-    DestChainConfig storage destChainConfig = s_destChainConfig[destChainSelector];
-
     if (!destChainConfig.dynamicConfig.isEnabled) revert DestinationChainNotEnabled(destChainSelector);
 
     uint256 gasLimit = message.extraArgs.length == 0
@@ -311,14 +383,11 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ILinkAvailable, AggregateRat
     }
     if (s_nopFeesJuels > i_maxNopFeesJuels) revert MaxFeeBalanceReached();
 
-    if (s_senderNonce[originalSender] == 0 && destChainConfig.prevOnRamp != address(0)) {
-      // If this is first time send for a sender in new OnRamp, check if they have a nonce
-      // from the previous OnRamp and start from there instead of zero.
-      s_senderNonce[originalSender] = IEVM2AnyOnRamp(destChainConfig.prevOnRamp).getSenderNonce(originalSender);
-    }
+    uint64 nonce = getSenderNonce(destChainSelector, originalSender) + 1;
+    s_senderNonce[originalSender] = nonce;
 
     // We need the next available sequence number so we increment before we use the value
-    Internal.EVM2EVMMessage memory newMessage = Internal.EVM2EVMMessage({
+    return Internal.EVM2EVMMessage({
       sourceChainSelector: i_chainSelector,
       sender: originalSender,
       // EVM destination addresses should be abi encoded and therefore always 32 bytes long
@@ -327,7 +396,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ILinkAvailable, AggregateRat
       sequenceNumber: ++destChainConfig.sequenceNumber,
       gasLimit: gasLimit,
       strict: false,
-      nonce: ++s_senderNonce[originalSender],
+      nonce: nonce,
       feeToken: message.feeToken,
       feeTokenAmount: feeTokenAmount,
       data: message.data,
@@ -335,56 +404,6 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ILinkAvailable, AggregateRat
       sourceTokenData: new bytes[](numberOfTokens), // will be populated below
       messageId: ""
     });
-
-    // Lock the tokens as last step. TokenPools may not always be trusted.
-    // There should be no state changes after external call to TokenPools.
-    for (uint256 i = 0; i < numberOfTokens; ++i) {
-      IPool sourcePool = getPoolBySourceToken(destChainSelector, IERC20(message.tokenAmounts[i].token));
-      // We don't have to check if it supports the pool version in a non-reverting way here because
-      // if we revert here, there is no effect on CCIP. Therefore we directly call the supportsInterface
-      // function and not through the ERC165Checker.
-      if (address(sourcePool) == address(0) || !sourcePool.supportsInterface(Pool.CCIP_POOL_V1)) {
-        revert UnsupportedToken(message.tokenAmounts[i].token);
-      }
-
-      Pool.LockOrBurnOutV1 memory poolReturnData = sourcePool.lockOrBurn(
-        Pool.LockOrBurnInV1({
-          originalSender: originalSender,
-          receiver: message.receiver,
-          amount: message.tokenAmounts[i].amount,
-          remoteChainSelector: destChainSelector
-        })
-      );
-
-      // Since the DON has to pay for the extraData to be included on the destination chain, we cap the length of the extraData.
-      // This prevents gas bomb attacks on the NOPs. We use destBytesOverhead as a proxy to cap the number of bytes we accept.
-      // As destBytesOverhead accounts for extraData + offchainData, this caps the worst case abuse to the number of bytes reserved for offchainData.
-      // It therefore fully mitigates gas bombs for most tokens, as most tokens don't use offchainData.
-      if (
-        poolReturnData.destPoolData.length > s_tokenTransferFeeConfig[message.tokenAmounts[i].token].destBytesOverhead
-      ) {
-        revert SourceTokenDataTooLarge(message.tokenAmounts[i].token);
-      }
-      // We validate the pool address to ensure it is a valid EVM address
-      Internal._validateEVMAddress(poolReturnData.destPoolAddress);
-
-      newMessage.sourceTokenData[i] = abi.encode(
-        Internal.SourceTokenData({
-          sourcePoolAddress: abi.encode(sourcePool),
-          destPoolAddress: poolReturnData.destPoolAddress,
-          extraData: poolReturnData.destPoolData
-        })
-      );
-    }
-
-    // Hash only after the sourceTokenData has been set
-    newMessage.messageId = Internal._hash(newMessage, destChainConfig.metadataHash);
-
-    // Emit message request
-    // Note this must happen after pools, some tokens (eg USDC) emit events that we
-    // expect to directly precede this event.
-    emit CCIPSendRequested(newMessage);
-    return newMessage.messageId;
   }
 
   /// @dev Convert the extra args bytes into a struct
