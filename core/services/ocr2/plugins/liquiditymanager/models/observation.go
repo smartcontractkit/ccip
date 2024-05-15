@@ -105,12 +105,12 @@ func NewOutcome(
 	}
 }
 
-func (o Outcome) Encode() []byte {
+func (o Outcome) Encode() ([]byte, error) {
 	b, err := json.Marshal(o)
 	if err != nil {
-		panic(fmt.Errorf("outcome %#v encoding unexpected internal error: %w", o, err))
+		return nil, fmt.Errorf("outcome %#v encoding unexpected internal error: %w", o, err)
 	}
-	return b
+	return b, nil
 }
 
 func DecodeOutcome(b []byte) (Outcome, error) {
