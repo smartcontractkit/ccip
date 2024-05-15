@@ -16,6 +16,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
 
+	"github.com/smartcontractkit/ccip/integration-tests/wrappers"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/arm_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store_1_2_0"
@@ -856,6 +857,24 @@ func (b *CommitStore) SetOCR2Config(
 	return b.client.ProcessTransaction(tx)
 }
 
+// WatchReportAccepted watches for report accepted events
+// There is no need to differentiate between the two versions of the contract as the event signature is the same
+// we can cast the contract to the latest version
+func (b *CommitStore) WatchReportAccepted(opts *bind.WatchOpts, acceptedEvent chan *commit_store.CommitStoreReportAccepted) (event.Subscription, error) {
+	if b.Instance.Latest != nil {
+		return b.Instance.Latest.WatchReportAccepted(opts, acceptedEvent)
+	}
+	if b.Instance.V1_2_0 != nil {
+		newCommitStore, err := commit_store.NewCommitStore(b.EthAddress, wrappers.MustNewWrappedContractBackend(b.client, nil))
+		if err != nil {
+			return nil, fmt.Errorf("failed to create new CommitStore contract: %w", err)
+		}
+		return newCommitStore.WatchReportAccepted(opts, acceptedEvent)
+	}
+	log.Fatal().Msg("No instance found to watch for report accepted")
+	return nil, fmt.Errorf("no instance found to watch for report accepted")
+}
+
 type ReceiverDapp struct {
 	client     blockchain.EVMClient
 	instance   *maybe_revert_message_receiver.MaybeRevertMessageReceiver
@@ -961,24 +980,6 @@ func (p *PriceRegistryWrappers) GetDestinationChainGasPrice(opts *bind.CallOpts,
 		}, nil
 	}
 	return InternalTimestampedPackedUint224{}, fmt.Errorf("no instance found to add fee token")
-}
-
-func (p *PriceRegistryWrappers) WatchForPriceUpdates(ch interface{}) (event.Subscription, error) {
-	if p.Latest != nil {
-		subChan, ok := ch.(chan *price_registry.PriceRegistryUsdPerUnitGasUpdated)
-		if !ok {
-			return nil, fmt.Errorf("failed to cast to correct channel type in WatchForPriceUpdates, expected chan *price_registry.PriceRegistryUsdPerUnitGasUpdated")
-		}
-		return p.Latest.WatchUsdPerUnitGasUpdated(nil, subChan, nil)
-	}
-	if p.V1_2_0 != nil {
-		subChan, ok := ch.(chan *price_registry_1_2_0.PriceRegistryUsdPerUnitGasUpdated)
-		if !ok {
-			return nil, fmt.Errorf("failed to cast to correct channel type in WatchForPriceUpdates, expected chan *price_registry_1_2_0.PriceRegistryUsdPerUnitGasUpdated")
-		}
-		return p.V1_2_0.WatchUsdPerUnitGasUpdated(nil, subChan, nil)
-	}
-	return nil, fmt.Errorf("no instance found to watch for price updates")
 }
 
 type InternalGasPriceUpdate struct {
@@ -1094,6 +1095,21 @@ func (c *PriceRegistry) UpdatePrices(tokenUpdates []InternalTokenPriceUpdate, ga
 		Interface("gasUpdates", gasUpdates).
 		Msg("Prices updated")
 	return c.client.ProcessTransaction(tx)
+}
+
+func (c *PriceRegistry) WatchUsdPerUnitGasUpdated(opts *bind.WatchOpts, latest chan *price_registry.PriceRegistryUsdPerUnitGasUpdated, destChain []uint64) (event.Subscription, error) {
+	if c.Instance.Latest != nil {
+		return c.Instance.Latest.WatchUsdPerUnitGasUpdated(opts, latest, destChain)
+	}
+	if c.Instance.V1_2_0 != nil {
+		newP, err := price_registry.NewPriceRegistry(c.Instance.V1_2_0.Address(), wrappers.MustNewWrappedContractBackend(c.client, nil))
+		if err != nil {
+			return nil, fmt.Errorf("failed to create new PriceRegistry contract: %w", err)
+		}
+		return newP.WatchUsdPerUnitGasUpdated(opts, latest, destChain)
+	}
+	log.Fatal().Msg("No instance found to watch for price updates")
+	return nil, fmt.Errorf("no instance found to watch for price updates")
 }
 
 type TokenAdminRegistry struct {
@@ -1408,6 +1424,7 @@ func (w OnRampWrapper) CurrentRateLimiterState(opts *bind.CallOpts) (*RateLimite
 			IsEnabled: rlConfig.IsEnabled,
 			Rate:      rlConfig.Rate,
 			Capacity:  rlConfig.Capacity,
+			Tokens:    rlConfig.Tokens,
 		}, err
 	}
 	if w.V1_2_0 != nil {
@@ -1419,6 +1436,7 @@ func (w OnRampWrapper) CurrentRateLimiterState(opts *bind.CallOpts) (*RateLimite
 			IsEnabled: rlConfig.IsEnabled,
 			Rate:      rlConfig.Rate,
 			Capacity:  rlConfig.Capacity,
+			Tokens:    rlConfig.Tokens,
 		}, err
 	}
 	return nil, fmt.Errorf("no instance found to get current rate limiter state")
@@ -1428,6 +1446,26 @@ type OnRamp struct {
 	client     blockchain.EVMClient
 	Instance   *OnRampWrapper
 	EthAddress common.Address
+}
+
+// WatchCCIPSendRequested returns a subscription to watch for CCIPSendRequested events
+// there is no difference in the event between the two versions
+// so we can use the latest version to watch for events
+func (onRamp *OnRamp) WatchCCIPSendRequested(opts *bind.WatchOpts, sendReqEvent chan *evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested) (event.Subscription, error) {
+	if onRamp.Instance.Latest != nil {
+		return onRamp.Instance.Latest.WatchCCIPSendRequested(opts, sendReqEvent)
+	}
+	// cast the contract to the latest version so that we can watch for events with latest wrapper
+	if onRamp.Instance.V1_2_0 != nil {
+		newRamp, err := evm_2_evm_onramp.NewEVM2EVMOnRamp(onRamp.EthAddress, wrappers.MustNewWrappedContractBackend(onRamp.client, nil))
+		if err != nil {
+			return nil, fmt.Errorf("failed to cast to latest version: %w", err)
+		}
+		return newRamp.WatchCCIPSendRequested(opts, sendReqEvent)
+	}
+	// should never reach here
+	log.Fatal().Msg("no instance found to watch for CCIPSendRequested")
+	return nil, fmt.Errorf("no instance found to watch for CCIPSendRequested")
 }
 
 func (onRamp *OnRamp) Address() string {
@@ -1578,6 +1616,24 @@ type OffRamp struct {
 
 func (offRamp *OffRamp) Address() string {
 	return offRamp.EthAddress.Hex()
+}
+
+// WatchExecutionStateChanged returns a subscription to watch for ExecutionStateChanged events
+// there is no difference in the event between the two versions
+// so we can use the latest version to watch for events
+func (offRamp *OffRamp) WatchExecutionStateChanged(opts *bind.WatchOpts, execEvent chan *evm_2_evm_offramp.EVM2EVMOffRampExecutionStateChanged, sequenceNumber []uint64, messageId [][32]byte) (event.Subscription, error) {
+	if offRamp.Instance.Latest != nil {
+		return offRamp.Instance.Latest.WatchExecutionStateChanged(opts, execEvent, sequenceNumber, messageId)
+	}
+	if offRamp.Instance.V1_2_0 != nil {
+		newOffRamp, err := evm_2_evm_offramp.NewEVM2EVMOffRamp(offRamp.EthAddress, wrappers.MustNewWrappedContractBackend(offRamp.client, nil))
+		if err != nil {
+			return nil, fmt.Errorf("failed to cast to latest version of OffRamp from v1_2_0: %w", err)
+		}
+		return newOffRamp.WatchExecutionStateChanged(opts, execEvent, sequenceNumber, messageId)
+	}
+	log.Fatal().Msg("no instance found to watch for ExecutionStateChanged")
+	return nil, fmt.Errorf("no instance found to watch for ExecutionStateChanged")
 }
 
 // SetOCR2Config sets the offchain reporting protocol configuration

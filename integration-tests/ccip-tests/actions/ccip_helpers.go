@@ -54,14 +54,11 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/arm_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store_1_2_0"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp_1_2_0"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp_1_2_0"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_arm_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/price_registry"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/price_registry_1_2_0"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers"
@@ -486,20 +483,14 @@ func (ccipModule *CCIPCommon) WaitForPriceUpdates(
 
 func (ccipModule *CCIPCommon) WatchForPriceUpdates(ctx context.Context) error {
 	var sub event.Subscription
-	var gasUpdateEventLatest chan *price_registry.PriceRegistryUsdPerUnitGasUpdated
-	var gasUpdateEventV1_2_0 chan *price_registry_1_2_0.PriceRegistryUsdPerUnitGasUpdated
-	if ccipModule.PriceRegistry.Instance.Latest != nil {
-		gasUpdateEventLatest = make(chan *price_registry.PriceRegistryUsdPerUnitGasUpdated)
-		sub = event.Resubscribe(2*time.Hour, func(_ context.Context) (event.Subscription, error) {
-			return ccipModule.PriceRegistry.Instance.Latest.WatchUsdPerUnitGasUpdated(nil, gasUpdateEventLatest, nil)
-		})
-	}
-	if ccipModule.PriceRegistry.Instance.V1_2_0 != nil {
-		gasUpdateEventV1_2_0 = make(chan *price_registry_1_2_0.PriceRegistryUsdPerUnitGasUpdated)
-		sub = event.Resubscribe(2*time.Hour, func(_ context.Context) (event.Subscription, error) {
-			return ccipModule.PriceRegistry.Instance.V1_2_0.WatchUsdPerUnitGasUpdated(nil, gasUpdateEventV1_2_0, nil)
-		})
-	}
+	gasUpdateEventLatest := make(chan *price_registry.PriceRegistryUsdPerUnitGasUpdated)
+	sub = event.Resubscribe(2*time.Hour, func(_ context.Context) (event.Subscription, error) {
+		sub, err := ccipModule.PriceRegistry.WatchUsdPerUnitGasUpdated(nil, gasUpdateEventLatest, nil)
+		if err != nil {
+			log.Error().Err(err).Msg("error in subscribing to UsdPerUnitGasUpdated event")
+		}
+		return sub, err
+	})
 	if sub == nil {
 		return fmt.Errorf("no event subscription found")
 	}
@@ -528,11 +519,6 @@ func (ccipModule *CCIPCommon) WatchForPriceUpdates(ctx context.Context) error {
 		}()
 		for {
 			select {
-			case e := <-gasUpdateEventV1_2_0:
-				err := processEvent(e.Timestamp, e.DestChain)
-				if err != nil {
-					continue
-				}
 			case e := <-gasUpdateEventLatest:
 				err := processEvent(e.Timestamp, e.DestChain)
 				if err != nil {
@@ -2918,6 +2904,7 @@ func (lane *CCIPLane) ValidateRequestByTxHash(txHash common.Hash, execState test
 }
 
 func (lane *CCIPLane) StartEventWatchers() error {
+	lane.Logger.Info().Msg("Starting event watchers")
 	if lane.Source.Common.ChainClient.GetNetworkConfig().FinalityDepth == 0 {
 		err := lane.Source.Common.ChainClient.PollFinality()
 		if err != nil {
@@ -2929,16 +2916,16 @@ func (lane *CCIPLane) StartEventWatchers() error {
 	go lane.Dest.Common.PollRPCConnection(lane.Context, lane.Logger)
 
 	sendReqEventLatest := make(chan *evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested)
-	sendReqEventV1_2 := make(chan *evm_2_evm_onramp_1_2_0.EVM2EVMOnRampCCIPSendRequested)
-	sub := event.Resubscribe(3*time.Hour, func(_ context.Context) (event.Subscription, error) {
-		if lane.Source.OnRamp.Instance.Latest != nil {
-			return lane.Source.OnRamp.Instance.Latest.WatchCCIPSendRequested(nil, sendReqEventLatest)
+	senReqSub := event.Resubscribe(3*time.Hour, func(_ context.Context) (event.Subscription, error) {
+		sub, err := lane.Source.OnRamp.WatchCCIPSendRequested(nil, sendReqEventLatest)
+		if err != nil {
+			log.Error().Err(err).Msg("error in subscribing to CCIPSendRequested event")
 		}
-		if lane.Source.OnRamp.Instance.V1_2_0 != nil {
-			return lane.Source.OnRamp.Instance.V1_2_0.WatchCCIPSendRequested(nil, sendReqEventV1_2)
-		}
-		return nil, fmt.Errorf("no onramp instance found")
+		return sub, err
 	})
+	if senReqSub == nil {
+		return fmt.Errorf("failed to subscribe to CCIPSendRequested event")
+	}
 	go func(sub event.Subscription) {
 		defer sub.Unsubscribe()
 		for {
@@ -2964,44 +2951,23 @@ func (lane *CCIPLane) StartEventWatchers() error {
 				}
 
 				lane.Source.CCIPSendRequestedWatcher = testutils.DeleteNilEntriesFromMap(lane.Source.CCIPSendRequestedWatcher)
-			case e := <-sendReqEventV1_2:
-				lane.Logger.Info().Msgf("CCIPSendRequested event received for seq number %d", e.Message.SequenceNumber)
-				eventsForTx, ok := lane.Source.CCIPSendRequestedWatcher.Load(e.Raw.TxHash.Hex())
-				if ok {
-					lane.Source.CCIPSendRequestedWatcher.Store(e.Raw.TxHash.Hex(), append(eventsForTx.([]*contracts.SendReqEventData),
-						&contracts.SendReqEventData{
-							MessageId:      e.Message.MessageId,
-							SequenceNumber: e.Message.SequenceNumber,
-							Raw:            e.Raw,
-						}))
-				} else {
-					lane.Source.CCIPSendRequestedWatcher.Store(e.Raw.TxHash.Hex(), []*contracts.SendReqEventData{
-						{
-							MessageId:      e.Message.MessageId,
-							SequenceNumber: e.Message.SequenceNumber,
-							Raw:            e.Raw,
-						},
-					})
-				}
-
-				lane.Source.CCIPSendRequestedWatcher = testutils.DeleteNilEntriesFromMap(lane.Source.CCIPSendRequestedWatcher)
 			case <-lane.Context.Done():
 				return
 			}
 		}
-	}(sub)
+	}(senReqSub)
 
 	reportAcceptedEvent := make(chan *commit_store.CommitStoreReportAccepted)
-	reportAcceptedEventV1_2_0 := make(chan *commit_store_1_2_0.CommitStoreReportAccepted)
-	sub = event.Resubscribe(3*time.Hour, func(_ context.Context) (event.Subscription, error) {
-		if lane.Dest.CommitStore.Instance.Latest != nil {
-			return lane.Dest.CommitStore.Instance.Latest.WatchReportAccepted(nil, reportAcceptedEvent)
+	reportAccSub := event.Resubscribe(3*time.Hour, func(_ context.Context) (event.Subscription, error) {
+		sub, err := lane.Dest.CommitStore.WatchReportAccepted(nil, reportAcceptedEvent)
+		if err != nil {
+			log.Error().Err(err).Msg("error in subscribing to ReportAccepted event")
 		}
-		if lane.Dest.CommitStore.Instance.V1_2_0 != nil {
-			return lane.Dest.CommitStore.Instance.V1_2_0.WatchReportAccepted(nil, reportAcceptedEventV1_2_0)
-		}
-		return nil, fmt.Errorf("no commit store instance found")
+		return sub, err
 	})
+	if reportAccSub == nil {
+		return fmt.Errorf("failed to subscribe to ReportAccepted event")
+	}
 	go func(sub event.Subscription) {
 		defer sub.Unsubscribe()
 		for {
@@ -3017,28 +2983,24 @@ func (lane *CCIPLane) StartEventWatchers() error {
 					})
 				}
 				lane.Dest.ReportAcceptedWatcher = testutils.DeleteNilEntriesFromMap(lane.Dest.ReportAcceptedWatcher)
-			case e := <-reportAcceptedEventV1_2_0:
-				lane.Logger.Info().Interface("Interval", e.Report.Interval).Msgf("ReportAccepted event received")
-				for i := e.Report.Interval.Min; i <= e.Report.Interval.Max; i++ {
-					lane.Dest.ReportAcceptedWatcher.Store(i, &contracts.CommitStoreReportAccepted{
-						Min:        e.Report.Interval.Min,
-						Max:        e.Report.Interval.Max,
-						MerkleRoot: e.Report.MerkleRoot,
-						Raw:        e.Raw,
-					})
-				}
-				lane.Dest.ReportAcceptedWatcher = testutils.DeleteNilEntriesFromMap(lane.Dest.ReportAcceptedWatcher)
 			case <-lane.Context.Done():
 				return
 			}
 		}
-	}(sub)
+	}(reportAccSub)
 
 	if lane.Dest.Common.ARM != nil {
 		reportBlessedEvent := make(chan *arm_contract.ARMContractTaggedRootBlessed)
-		sub = event.Resubscribe(3*time.Hour, func(_ context.Context) (event.Subscription, error) {
-			return lane.Dest.Common.ARM.Instance.WatchTaggedRootBlessed(nil, reportBlessedEvent, nil)
+		blessedSub := event.Resubscribe(3*time.Hour, func(_ context.Context) (event.Subscription, error) {
+			sub, err := lane.Dest.Common.ARM.Instance.WatchTaggedRootBlessed(nil, reportBlessedEvent, nil)
+			if err != nil {
+				log.Error().Err(err).Msg("error in subscribing to TaggedRootBlessed event")
+			}
+			return sub, err
 		})
+		if blessedSub == nil {
+			return fmt.Errorf("failed to subscribe to TaggedRootBlessed event")
+		}
 		go func(sub event.Subscription) {
 			defer sub.Unsubscribe()
 			for {
@@ -3053,20 +3015,20 @@ func (lane *CCIPLane) StartEventWatchers() error {
 					return
 				}
 			}
-		}(sub)
+		}(blessedSub)
 	}
 
 	execStateChangedEventLatest := make(chan *evm_2_evm_offramp.EVM2EVMOffRampExecutionStateChanged)
-	execStateChangedEvent1_2_0 := make(chan *evm_2_evm_offramp_1_2_0.EVM2EVMOffRampExecutionStateChanged)
-	sub = event.Resubscribe(3*time.Hour, func(_ context.Context) (event.Subscription, error) {
-		if lane.Dest.OffRamp.Instance.Latest != nil {
-			return lane.Dest.OffRamp.Instance.Latest.WatchExecutionStateChanged(nil, execStateChangedEventLatest, nil, nil)
+	execSub := event.Resubscribe(3*time.Hour, func(_ context.Context) (event.Subscription, error) {
+		sub, err := lane.Dest.OffRamp.WatchExecutionStateChanged(nil, execStateChangedEventLatest, nil, nil)
+		if err != nil {
+			log.Error().Err(err).Msg("error in subscribing to ExecutionStateChanged event")
 		}
-		if lane.Dest.OffRamp.Instance.V1_2_0 != nil {
-			return lane.Dest.OffRamp.Instance.V1_2_0.WatchExecutionStateChanged(nil, execStateChangedEvent1_2_0, nil, nil)
-		}
-		return nil, fmt.Errorf("no offramp contract instance found")
+		return sub, err
 	})
+	if execSub == nil {
+		return fmt.Errorf("failed to subscribe to ExecutionStateChanged event")
+	}
 	go func(sub event.Subscription) {
 		defer sub.Unsubscribe()
 		for {
@@ -3081,21 +3043,11 @@ func (lane *CCIPLane) StartEventWatchers() error {
 					Raw:            e.Raw,
 				})
 				lane.Dest.ExecStateChangedWatcher = testutils.DeleteNilEntriesFromMap(lane.Dest.ExecStateChangedWatcher)
-			case e := <-execStateChangedEvent1_2_0:
-				lane.Logger.Info().Msgf("Execution state changed event received for seq number %d", e.SequenceNumber)
-				lane.Dest.ExecStateChangedWatcher.Store(e.SequenceNumber, &contracts.EVM2EVMOffRampExecutionStateChanged{
-					SequenceNumber: e.SequenceNumber,
-					MessageId:      e.MessageId,
-					State:          e.State,
-					ReturnData:     e.ReturnData,
-					Raw:            e.Raw,
-				})
-				lane.Dest.ExecStateChangedWatcher = testutils.DeleteNilEntriesFromMap(lane.Dest.ExecStateChangedWatcher)
 			case <-lane.Context.Done():
 				return
 			}
 		}
-	}(sub)
+	}(execSub)
 	return nil
 }
 
@@ -3197,7 +3149,7 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 	}
 	err = lane.Source.Common.WatchForPriceUpdates(setUpCtx)
 	if err != nil {
-		return fmt.Errorf("error in starting price update watch")
+		return fmt.Errorf("error in starting price update watch %w", err)
 	}
 	if env == nil {
 		return fmt.Errorf("test environment not set")
