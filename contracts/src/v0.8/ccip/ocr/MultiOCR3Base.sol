@@ -2,12 +2,28 @@
 pragma solidity ^0.8.0;
 
 import {OwnerIsCreator} from "../../shared/access/OwnerIsCreator.sol";
-import {MultiOCR3Abstract} from "./MultiOCR3Abstract.sol";
 
 // TODO: consider splitting configs & verification logic off to auth library (if size is prohibitive)
 /// @notice Onchain verification of reports from the offchain reporting protocol
 ///         with multiple OCR plugin support.
-abstract contract MultiOCR3Base is OwnerIsCreator, MultiOCR3Abstract {
+abstract contract MultiOCR3Base is OwnerIsCreator {
+  // Maximum number of oracles the offchain reporting protocol is designed for
+  // TODO: consider bumping up to theoretical max
+  uint256 internal constant MAX_NUM_ORACLES = 31;
+
+  /// @notice triggers a new run of the offchain reporting protocol
+  /// @param ocrPluginType OCR plugin type for which the config was set
+  /// @param configDigest configDigest of this configuration
+  /// @param signers ith element is address ith oracle uses to sign a report
+  /// @param transmitters ith element is address ith oracle uses to transmit a report via the transmit method
+  /// @param F maximum number of faulty/dishonest oracles the protocol can tolerate while still working correctly
+  event ConfigSet(uint8 ocrPluginType, bytes32 configDigest, address[] signers, address[] transmitters, uint8 F);
+
+  /// @notice optionally emitted to indicate the latest configDigest and sequence number
+  /// for which a report was successfully transmitted. Alternatively, the contract may
+  /// use latestConfigDigestAndEpoch with scanLogs set to false.
+  event Transmitted(uint8 indexed ocrPluginType, bytes32 configDigest, uint64 sequenceNumber);
+
   //   error InvalidConfig(string message);
   error WrongMessageLength(uint256 expected, uint256 actual);
   error ConfigDigestMismatch(bytes32 expected, bytes32 actual);
@@ -23,7 +39,7 @@ abstract contract MultiOCR3Base is OwnerIsCreator, MultiOCR3Abstract {
   ///      retrieval of all of them to a minimum number of SLOADs.
   struct ConfigInfo {
     bytes32 latestConfigDigest;
-    uint8 F; // ──────────────────────────────╮ maximum number of faulty/dishonest oracles
+    uint8 F; // ──────────────────────────────╮ maximum number of faulty/dishonest oracles the system can tolerate
     uint8 n; //                               │ number of signers / transmitters
     bool uniqueReports; //                    │ if true, the reports should be unique
     bool isSignatureVerificationEnabled; // ──╯ if true, requires signers and verifies signatures on transmission verification
@@ -51,13 +67,9 @@ abstract contract MultiOCR3Base is OwnerIsCreator, MultiOCR3Abstract {
   /// @notice OCR configuration for a single OCR plugin within a DON
   // TODO: make uniqueReports and skipReports static
   struct OCRConfig {
-    /// @notice latest OCR config
-    ConfigInfo configInfo;
-    /// @notice signing address of each oracle
-    address[] signers;
-    /// @notice transmission address of each oracle,
-    ///         i.e. the address the oracle actually sends transactions to the contract from
-    address[] transmitters;
+    ConfigInfo configInfo; //  latest OCR config
+    address[] signers; //      addresses oracles use to sign the reports
+    address[] transmitters; // addresses oracles use to transmit the reports
   }
 
   /// @notice Args to update an OCR Config
@@ -158,7 +170,13 @@ abstract contract MultiOCR3Base is OwnerIsCreator, MultiOCR3Abstract {
     return s_ocrConfigs[ocrPluginType].transmitters;
   }
 
-  /// @inheritdoc MultiOCR3Abstract
+  /// @notice _transmit is called to post a new report to the contract.
+  ///         The function should be called after the per-DON reporting logic is completed.
+  /// @param ocrPluginType OCR plugin type to transmit report for
+  /// @param report serialized report, which the signatures are signing.
+  /// @param rs ith element is the R components of the ith signature on report. Must have at most MAX_NUM_ORACLES entries
+  /// @param ss ith element is the S components of the ith signature on report. Must have at most MAX_NUM_ORACLES entries
+  /// @param rawVs ith element is the the V component of the ith signature
   function _transmit(
     uint8 ocrPluginType,
     // NOTE: If these parameters are changed, expectedMsgDataLength and/or
@@ -168,7 +186,7 @@ abstract contract MultiOCR3Base is OwnerIsCreator, MultiOCR3Abstract {
     bytes32[] calldata rs,
     bytes32[] calldata ss,
     bytes32 rawVs // signatures
-  ) internal override {
+  ) internal {
     // reportContext consists of:
     // reportContext[0]: ConfigDigest
     // reportContext[1]: 27 byte padding, 4-byte epoch and 1-byte round
@@ -236,12 +254,19 @@ abstract contract MultiOCR3Base is OwnerIsCreator, MultiOCR3Abstract {
     }
   }
 
-  /// @inheritdoc MultiOCR3Abstract
+  /// @notice optionally returns the latest configDigest and sequence number for which
+  /// a report was successfully transmitted. Alternatively, the contract may return
+  /// scanLogs set to true and use Transmitted events to provide this information
+  /// to offchain watchers.
+  /// @param ocrPluginType OCR plugin type to fetch config digest & sequence number for
+  /// @return scanLogs indicates whether to rely on the configDigest and sequence number
+  /// returned or whether to scan logs for the Transmitted event instead.
+  /// @return configDigest
+  /// @return sequenceNumber
   function latestConfigDigestAndEpoch(uint8 ocrPluginType)
     external
     view
     virtual
-    override
     returns (bool scanLogs, bytes32 configDigest, uint64 sequenceNumber)
   {
     return (true, bytes32(0), uint64(0));
