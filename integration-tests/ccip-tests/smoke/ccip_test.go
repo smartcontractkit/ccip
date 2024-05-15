@@ -502,6 +502,7 @@ func TestSmokeCCIPSelfServeRateLimitOffRamp(t *testing.T) {
 			tc.lane.RecordStateBeforeTransfer()
 			err = tc.lane.SendRequests(1, big.NewInt(600_000))
 			require.NoError(t, err, "Failed to send rate limited token transfer")
+			tc.lane.ValidateRequests(actions.ExpectExecStateChangedToFail(false))
 			tc.lane.Logger.Info().
 				Str("Token", limitedSrcToken.ContractAddress.Hex()).
 				Msg("Limited token transfer failed on destination chain (a good thing in this context)")
@@ -524,7 +525,7 @@ func TestSmokeCCIPSelfServeRateLimitOffRamp(t *testing.T) {
 			require.NoError(t, err, "Error waiting for events")
 			tc.lane.Logger.Debug().Str("Token", limitedSrcToken.ContractAddress.Hex()).Msg("Enabled aggregate rate limit on destination chain")
 
-			// execute again manually and expect a pass
+			// Execute again manually and expect a pass
 			waitTime := time.Minute
 			tc.lane.Logger.Info().
 				Str("Wait Time", waitTime.String()).
