@@ -247,15 +247,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ILinkAvailable, AggregateRat
     return s_destChainConfig[destChainSelector].sequenceNumber + 1;
   }
 
-  // /// @inheritdoc IEVM2AnyMultiOnRamp
-  // function getSenderNonce(uint64 destChainSelector, address sender) external view returns (uint64) {
-  //   return _getSenderNonce(destChainSelector, sender);
-  // }
-
-  /// @notice Returns the current nonce for a sender
-  /// @param destChainSelector The destination chain selector
-  /// @param sender The sender address
-  /// @return The sender's nonce
+  /// @inheritdoc IEVM2AnyMultiOnRamp
   function getSenderNonce(uint64 destChainSelector, address sender) public view returns (uint64) {
     uint64 senderNonce = s_senderNonce[sender];
 
