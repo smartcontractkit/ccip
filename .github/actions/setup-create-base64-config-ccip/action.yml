@@ -31,6 +31,8 @@ inputs:
     description: Where to send logs (e.g. file, loki)
   grafanaUrl:
     description: Grafana URL
+  grafanaToken:
+    description: Grafana Token
   grafanaDashboardUrl:
     description: Grafana dashboard URL
   customEvmNodes:
@@ -58,6 +60,7 @@ runs:
         LOKI_BASIC_AUTH: ${{ inputs.lokiBasicAuth }}
         LOGSTREAM_LOG_TARGETS: ${{ inputs.logstreamLogTargets }}
         GRAFANA_URL: ${{ inputs.grafanaUrl }}
+        GRAFANA_TOKEN: ${{ inputs.grafanaToken }}
         GRAFANA_DASHBOARD_URL: ${{ inputs.grafanaDashboardUrl }}
         CUSTOM_EVM_NODES: ${{ inputs.customEvmNodes }}
         EVM_NODE_LOG_LEVEL: ${{ inputs.evmNodeLogLevel }}
@@ -159,6 +162,7 @@ runs:
         [CCIP.Env.Logging.Grafana]
         base_url="$GRAFANA_URL"
         dashboard_url="$GRAFANA_DASHBOARD_URL"
+        bearer_token_secret="$GRAFANA_TOKEN"
 
         [CCIP.Groups.load]
         TestRunName = '$EXISTING_NAMESPACE'
