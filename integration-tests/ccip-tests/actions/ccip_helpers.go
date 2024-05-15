@@ -1806,7 +1806,24 @@ func (destCCIP *DestCCIPModule) SyncTokensAndPools(srcTokens []*contracts.ERC20T
 	for i := range destCCIP.Common.BridgeTokenPools {
 		pools = append(pools, destCCIP.Common.BridgeTokenPools[i].EthAddress)
 	}
-
+	if len(sourceTokens) != len(pools) {
+		return fmt.Errorf("source token and destination pool length mismatch")
+	}
+	// if number of tokens are more than 10, then we need to split the tokens in batch of 10 and call sync
+	// otherwise the tx gets too large and we will get out of gas error
+	if len(sourceTokens) > 10 {
+		for i := 0; i < len(sourceTokens); i += 10 {
+			end := i + 10
+			if end > len(sourceTokens) {
+				end = len(sourceTokens)
+			}
+			err := destCCIP.OffRamp.SyncTokensAndPools(sourceTokens[i:end], pools[i:end])
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	}
 	return destCCIP.OffRamp.SyncTokensAndPools(sourceTokens, pools)
 }
 
@@ -1828,7 +1845,21 @@ func (destCCIP *DestCCIPModule) AddRateLimitTokens(srcTokens, destTokens []*cont
 		sourceTokenAddresses = append(sourceTokenAddresses, common.HexToAddress(token.Address()))
 		destTokenAddresses = append(destTokenAddresses, common.HexToAddress(destTokens[i].Address()))
 	}
-
+	// if number of tokens are more than 10, then we need to split the tokens in batch of 10 and update the rate limit
+	// otherwise the tx gets too large and we will get out of gas error
+	if len(sourceTokenAddresses) > 10 {
+		for i := 0; i < len(sourceTokenAddresses); i += 10 {
+			end := i + 10
+			if end > len(sourceTokenAddresses) {
+				end = len(sourceTokenAddresses)
+			}
+			err := destCCIP.OffRamp.UpdateRateLimitTokens(sourceTokenAddresses[i:end], destTokenAddresses[i:end])
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	}
 	return destCCIP.OffRamp.UpdateRateLimitTokens(sourceTokenAddresses, destTokenAddresses)
 }
 
@@ -1932,11 +1963,6 @@ func (destCCIP *DestCCIPModule) DeployContracts(
 		if err != nil {
 			return fmt.Errorf("syncing tokens and pools shouldn't fail %w", err)
 		}
-		err = destCCIP.Common.ChainClient.WaitForEvents()
-		if err != nil {
-			return fmt.Errorf("waiting for events on destination contract shouldn't fail %w", err)
-		}
-
 		err = destCCIP.Common.ChainClient.WaitForEvents()
 		if err != nil {
 			return fmt.Errorf("waiting for events on destination contract shouldn't fail %w", err)
