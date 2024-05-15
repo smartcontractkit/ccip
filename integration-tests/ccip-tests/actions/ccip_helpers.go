@@ -1566,7 +1566,7 @@ func (sourceCCIP *SourceCCIPModule) AssertEventCCIPSendRequested(
 						reqStat[i].UpdateState(lggr, seqNum, testreporters.CCIPSendRe, 0, testreporters.Success)
 					}
 					var err error
-					if sendRequestedEvents == nil || len(sendRequestedEvents) == 0 {
+					if len(sendRequestedEvents) == 0 {
 						err = fmt.Errorf("message logs not found, no CCIPSendRequested event found for tx %s", txHash)
 					}
 					return sendRequestedEvents, prevEventAt, err
