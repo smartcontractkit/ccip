@@ -1406,8 +1406,8 @@ func (w OnRampWrapper) CurrentRateLimiterState(opts *bind.CallOpts) (*RateLimite
 		}
 		return &RateLimiterConfig{
 			IsEnabled: rlConfig.IsEnabled,
-			Rate:      nil,
-			Capacity:  nil,
+			Rate:      rlConfig.Rate,
+			Capacity:  rlConfig.Capacity,
 		}, err
 	}
 	if w.V1_2_0 != nil {
