@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
+
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/aggregator_v3_interface"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
@@ -93,6 +94,7 @@ func TestDynamicPriceGetter(t *testing.T) {
 func testParamAggregatorOnly(t *testing.T) testParameters {
 	tk1 := utils.RandomAddress()
 	tk2 := utils.RandomAddress()
+	tk3 := utils.RandomAddress()
 	cfg := config.DynamicPriceGetterConfig{
 		AggregatorPrices: map[common.Address]config.AggregatorPriceConfig{
 			tk1: {
@@ -101,6 +103,10 @@ func testParamAggregatorOnly(t *testing.T) testParameters {
 			},
 			tk2: {
 				ChainID:                   102,
+				AggregatorContractAddress: utils.RandomAddress(),
+			},
+			tk3: {
+				ChainID:                   103,
 				AggregatorContractAddress: utils.RandomAddress(),
 			},
 		},
@@ -122,13 +128,23 @@ func testParamAggregatorOnly(t *testing.T) testParameters {
 		UpdatedAt:       big.NewInt(1704897197),
 		AnsweredInRound: big.NewInt(2000),
 	}
+	// Real LINK/ETH example from OP.
+	round3 := aggregator_v3_interface.LatestRoundData{
+		RoundId:         big.NewInt(3000),
+		Answer:          big.NewInt(4468862777874802),
+		StartedAt:       big.NewInt(1715743907),
+		UpdatedAt:       big.NewInt(1715743907),
+		AnsweredInRound: big.NewInt(3000),
+	}
 	evmClients := map[uint64]DynamicPriceGetterClient{
-		uint64(101): mockClientFromRound(t, round1),
-		uint64(102): mockClientFromRound(t, round2),
+		uint64(101): mockClient(t, 8, round1),
+		uint64(102): mockClient(t, 8, round2),
+		uint64(103): mockClient(t, 18, round3),
 	}
 	expectedTokenPrices := map[common.Address]big.Int{
-		tk1: *round1.Answer,
-		tk2: *round2.Answer,
+		tk1: *multExp(round1.Answer, 10), // expected in 1e18 format.
+		tk2: *multExp(round2.Answer, 10), // expected in 1e18 format.
+		tk3: *round3.Answer,              // already in 1e18 format (contract decimals==18).
 	}
 	return testParameters{
 		cfg:                        cfg,
@@ -212,12 +228,12 @@ func testParamAggregatorAndStaticValid(t *testing.T) testParameters {
 		AnsweredInRound: big.NewInt(2000),
 	}
 	evmClients := map[uint64]DynamicPriceGetterClient{
-		uint64(101): mockClientFromRound(t, round1),
-		uint64(102): mockClientFromRound(t, round2),
+		uint64(101): mockClient(t, 8, round1),
+		uint64(102): mockClient(t, 8, round2),
 	}
 	expectedTokenPrices := map[common.Address]big.Int{
-		tk1: *round1.Answer,
-		tk2: *round2.Answer,
+		tk1: *multExp(round1.Answer, 10),
+		tk2: *multExp(round2.Answer, 10),
 		tk3: *cfg.StaticPrices[tk3].Price,
 	}
 	return testParameters{
@@ -277,9 +293,9 @@ func testParamAggregatorAndStaticTokenCollision(t *testing.T) testParameters {
 		AnsweredInRound: big.NewInt(3000),
 	}
 	evmClients := map[uint64]DynamicPriceGetterClient{
-		uint64(101): mockClientFromRound(t, round1),
-		uint64(102): mockClientFromRound(t, round2),
-		uint64(103): mockClientFromRound(t, round3),
+		uint64(101): mockClient(t, 8, round1),
+		uint64(102): mockClient(t, 8, round2),
+		uint64(103): mockClient(t, 8, round3),
 	}
 	return testParameters{
 		cfg:                        cfg,
@@ -328,8 +344,8 @@ func testParamNoAggregatorForToken(t *testing.T) testParameters {
 		AnsweredInRound: big.NewInt(2000),
 	}
 	evmClients := map[uint64]DynamicPriceGetterClient{
-		uint64(101): mockClientFromRound(t, round1),
-		uint64(102): mockClientFromRound(t, round2),
+		uint64(101): mockClient(t, 8, round1),
+		uint64(102): mockClient(t, 8, round2),
 	}
 	expectedTokenPrices := map[common.Address]big.Int{
 		tk1: *round1.Answer,
@@ -345,15 +361,29 @@ func testParamNoAggregatorForToken(t *testing.T) testParameters {
 	}
 }
 
-func mockClientFromRound(t *testing.T, round aggregator_v3_interface.LatestRoundData) DynamicPriceGetterClient {
+func mockClient(t *testing.T, decimals uint8, round aggregator_v3_interface.LatestRoundData) DynamicPriceGetterClient {
 	return DynamicPriceGetterClient{
-		BatchCaller: mockCallerFromRound(t, round),
+		BatchCaller: mockCaller(t, decimals, round),
 	}
 }
 
-func mockCallerFromRound(t *testing.T, round aggregator_v3_interface.LatestRoundData) *rpclibmocks.EvmBatchCaller {
+func mockCaller(t *testing.T, decimals uint8, round aggregator_v3_interface.LatestRoundData) *rpclibmocks.EvmBatchCaller {
 	caller := rpclibmocks.NewEvmBatchCaller(t)
-	caller.On("BatchCall", mock.Anything, uint64(0), mock.Anything).Return(
+
+	caller.On("BatchCall", mock.Anything, uint64(0), mock.MatchedBy(func(c []rpclib.EvmCall) bool {
+		return c[0].MethodName() == decimalsMethodName
+	})).Return(
+		[]rpclib.DataAndErr{
+			{
+				Outputs: []any{decimals},
+			},
+		},
+		nil,
+	).Maybe()
+
+	caller.On("BatchCall", mock.Anything, uint64(0), mock.MatchedBy(func(c []rpclib.EvmCall) bool {
+		return c[0].MethodName() == latestRoundDataMethodName
+	})).Return(
 		[]rpclib.DataAndErr{
 			{
 				Outputs: []any{round.RoundId, round.Answer, round.StartedAt, round.UpdatedAt, round.AnsweredInRound},
@@ -361,5 +391,11 @@ func mockCallerFromRound(t *testing.T, round aggregator_v3_interface.LatestRound
 		},
 		nil,
 	).Maybe()
+
 	return caller
+}
+
+// multExp returns the result of multiplying x by 10^e.
+func multExp(x *big.Int, e int64) *big.Int {
+	return big.NewInt(0).Mul(x, big.NewInt(0).Exp(big.NewInt(10), big.NewInt(e), nil))
 }
