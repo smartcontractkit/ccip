@@ -148,7 +148,7 @@ func TestSmokeCCIPRateLimit(t *testing.T) {
 			require.NoError(t, err)
 			tc.lane.Logger.Info().Interface("rate limit", prevRLOnRamp).Msg("Initial OnRamp rate limiter state")
 
-			prevOnRampRLTokenPool, err := src.Common.BridgeTokenPools[0].PoolInterface.GetCurrentOutboundRateLimiterState(
+			prevOnRampRLTokenPool, err := src.Common.BridgeTokenPools[0].Instance.Latest.PoolInterface.GetCurrentOutboundRateLimiterState(
 				nil, tc.lane.Source.DestinationChainId,
 			) // TODO RENS maybe?
 			require.NoError(t, err)
@@ -168,7 +168,7 @@ func TestSmokeCCIPRateLimit(t *testing.T) {
 				)
 			}
 
-			prevOffRampRLTokenPool, err := tc.lane.Dest.Common.BridgeTokenPools[0].PoolInterface.GetCurrentInboundRateLimiterState(
+			prevOffRampRLTokenPool, err := tc.lane.Dest.Common.BridgeTokenPools[0].Instance.Latest.PoolInterface.GetCurrentInboundRateLimiterState(
 				nil, tc.lane.Dest.SourceChainId,
 			) // TODO RENS maybe?
 			require.NoError(t, err)
@@ -231,11 +231,11 @@ func TestSmokeCCIPRateLimit(t *testing.T) {
 
 			tokenPrice, err := src.Common.PriceRegistry.Instance.GetTokenPrice(nil, src.Common.BridgeTokens[0].ContractAddress)
 			require.NoError(t, err)
-			tc.lane.Logger.Info().Str("tokenPrice.Value", tokenPrice.Value.String()).Msg("Price Registry Token Price")
+			tc.lane.Logger.Info().Str("tokenPrice.Value", tokenPrice.String()).Msg("Price Registry Token Price")
 
 			totalTokensForOnRampCapacity := new(big.Int).Mul(
 				big.NewInt(1e18),
-				new(big.Int).Div(rlOnRamp.Capacity, tokenPrice.Value),
+				new(big.Int).Div(rlOnRamp.Capacity, tokenPrice),
 			)
 
 			tc.lane.Source.Common.ChainClient.ParallelTransactions(true)
@@ -315,7 +315,7 @@ func TestSmokeCCIPRateLimit(t *testing.T) {
 				TokenPoolRateLimitRate = prevOnRampRLTokenPool.Rate
 			}
 
-			rlOnPool, err := src.Common.BridgeTokenPools[0].PoolInterface.GetCurrentOutboundRateLimiterState(nil, src.DestChainSelector)
+			rlOnPool, err := src.Common.BridgeTokenPools[0].Instance.GetCurrentOutboundRateLimiterState(nil, src.DestChainSelector)
 			require.NoError(t, err)
 			require.True(t, rlOnPool.IsEnabled, "Token Pool rate limiter should be enabled")
 
