@@ -485,11 +485,11 @@ func (ccipModule *CCIPCommon) WatchForPriceUpdates(ctx context.Context) error {
 	var sub event.Subscription
 	gasUpdateEventLatest := make(chan *price_registry.PriceRegistryUsdPerUnitGasUpdated)
 	sub = event.Resubscribe(2*time.Hour, func(_ context.Context) (event.Subscription, error) {
-		sub, err := ccipModule.PriceRegistry.WatchUsdPerUnitGasUpdated(nil, gasUpdateEventLatest, nil)
+		eventSub, err := ccipModule.PriceRegistry.WatchUsdPerUnitGasUpdated(nil, gasUpdateEventLatest, nil)
 		if err != nil {
 			log.Error().Err(err).Msg("error in subscribing to UsdPerUnitGasUpdated event")
 		}
-		return sub, err
+		return eventSub, err
 	})
 	if sub == nil {
 		return fmt.Errorf("no event subscription found")
