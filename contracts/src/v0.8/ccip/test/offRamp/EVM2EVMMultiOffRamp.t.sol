@@ -2,6 +2,7 @@
 pragma solidity 0.8.24;
 
 import {ICommitStore} from "../../interfaces/ICommitStore.sol";
+import {IMultiCommitStore} from "../../interfaces/IMultiCommitStore.sol";
 import {IPool} from "../../interfaces/IPool.sol";
 
 import {CallWithExactGas} from "../../../shared/call/CallWithExactGas.sol";
@@ -35,7 +36,6 @@ import {Vm} from "forge-std/Vm.sol";
 // TODO: re-add tests:
 //       - getAllRateLimitTokens
 //       - updateRateLimitTokens
-//       - trialExecute - after pool interface changes
 
 contract EVM2EVMMultiOffRamp_constructor is EVM2EVMMultiOffRampSetup {
   event ConfigSet(EVM2EVMMultiOffRamp.StaticConfig staticConfig, EVM2EVMMultiOffRamp.DynamicConfig dynamicConfig);
@@ -80,6 +80,8 @@ contract EVM2EVMMultiOffRamp_constructor is EVM2EVMMultiOffRampSetup {
       metadataHash: s_offRamp.metadataHash(SOURCE_CHAIN_SELECTOR + 1, sourceChainConfigs[1].onRamp)
     });
 
+    _setupMultiCommitStoreFromOffRampConfigs(sourceChainConfigs);
+
     vm.expectEmit();
     emit SourceChainSelectorAdded(SOURCE_CHAIN_SELECTOR);
 
@@ -110,9 +112,6 @@ contract EVM2EVMMultiOffRamp_constructor is EVM2EVMMultiOffRampSetup {
     (uint32 configCount, uint32 blockNumber,) = s_offRamp.latestConfigDetails();
     assertEq(1, configCount);
     assertEq(block.number, blockNumber);
-
-    // Source config
-    s_offRamp.applySourceChainConfigUpdates(sourceChainConfigs);
 
     // uint64[] memory resultSourceChainSelectors = s_offRamp.getSourceChainSelectors();
     // assertEq(resultSourceChainSelectors.length, 2);
@@ -154,25 +153,6 @@ contract EVM2EVMMultiOffRamp_constructor is EVM2EVMMultiOffRampSetup {
       RateLimiter.Config({isEnabled: true, rate: 1e20, capacity: 1e20})
     );
   }
-
-  // TODO: revisit in applySourceChainConfigUpdates after MultiCommitStore integration
-  // function test_CommitStoreAlreadyInUse_Revert() public {
-  //   s_mockCommitStore.setExpectedNextSequenceNumber(2);
-
-  //   vm.expectRevert(EVM2EVMMultiOffRamp.CommitStoreAlreadyInUse.selector);
-
-  //   s_offRamp = new EVM2EVMMultiOffRampHelper(
-  //     EVM2EVMMultiOffRamp.StaticConfig({
-  //       commitStore: address(s_mockCommitStore),
-  //       chainSelector: DEST_CHAIN_SELECTOR,
-  //       sourceChainSelector: SOURCE_CHAIN_SELECTOR,
-  //       onRamp: ON_RAMP_ADDRESS,
-  //       prevOffRamp: address(0),
-  //       rmnProxy: address(s_mockRMN)
-  //     }),
-  //     getInboundRateLimiterConfig()
-  //   );
-  // }
 }
 
 contract EVM2EVMMultiOffRamp_setDynamicConfig is EVM2EVMMultiOffRampSetup {
@@ -676,7 +656,7 @@ contract EVM2EVMMultiOffRamp_execute is EVM2EVMMultiOffRampSetup {
   }
 
   function test_RootNotCommitted_Revert() public {
-    vm.mockCall(address(s_mockCommitStore), abi.encodeWithSelector(ICommitStore.verify.selector), abi.encode(0));
+    vm.mockCall(address(s_mockCommitStore), abi.encodeWithSelector(IMultiCommitStore.verify.selector), abi.encode(0));
     vm.expectRevert(abi.encodeWithSelector(EVM2EVMMultiOffRamp.RootNotCommitted.selector, SOURCE_CHAIN_SELECTOR_1));
 
     Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1);
@@ -688,7 +668,7 @@ contract EVM2EVMMultiOffRamp_execute is EVM2EVMMultiOffRampSetup {
 
   function test_ManualExecutionNotYetEnabled_Revert() public {
     vm.mockCall(
-      address(s_mockCommitStore), abi.encodeWithSelector(ICommitStore.verify.selector), abi.encode(BLOCK_TIME)
+      address(s_mockCommitStore), abi.encodeWithSelector(IMultiCommitStore.verify.selector), abi.encode(BLOCK_TIME)
     );
     vm.expectRevert(
       abi.encodeWithSelector(EVM2EVMMultiOffRamp.ManualExecutionNotYetEnabled.selector, SOURCE_CHAIN_SELECTOR_1)
@@ -798,14 +778,17 @@ contract EVM2EVMMultiOffRamp_execute_upgrade is EVM2EVMMultiOffRampSetup {
   function setUp() public virtual override {
     super.setUp();
 
-    s_prevOffRamp =
-      _deploySingleLaneOffRamp(s_mockCommitStore, s_destRouter, address(0), SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1);
+    ICommitStore mockPrevCommitStore = new MockCommitStore();
+    s_prevOffRamp = _deploySingleLaneOffRamp(
+      mockPrevCommitStore, s_destRouter, address(0), SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1
+    );
 
     s_nestedPrevOffRamps = new EVM2EVMOffRampHelper[](2);
-    s_nestedPrevOffRamps[0] =
-      _deploySingleLaneOffRamp(s_mockCommitStore, s_destRouter, address(0), SOURCE_CHAIN_SELECTOR_2, ON_RAMP_ADDRESS_2);
+    s_nestedPrevOffRamps[0] = _deploySingleLaneOffRamp(
+      mockPrevCommitStore, s_destRouter, address(0), SOURCE_CHAIN_SELECTOR_2, ON_RAMP_ADDRESS_2
+    );
     s_nestedPrevOffRamps[1] = _deploySingleLaneOffRamp(
-      s_mockCommitStore, s_destRouter, address(s_nestedPrevOffRamps[0]), SOURCE_CHAIN_SELECTOR_2, ON_RAMP_ADDRESS_2
+      mockPrevCommitStore, s_destRouter, address(s_nestedPrevOffRamps[0]), SOURCE_CHAIN_SELECTOR_2, ON_RAMP_ADDRESS_2
     );
 
     EVM2EVMMultiOffRamp.SourceChainConfigArgs[] memory sourceChainConfigs =
@@ -829,6 +812,7 @@ contract EVM2EVMMultiOffRamp_execute_upgrade is EVM2EVMMultiOffRampSetup {
       onRamp: ON_RAMP_ADDRESS_3
     });
 
+    _setupMultiCommitStoreFromOffRampConfigs(sourceChainConfigs);
     _setupMultipleOffRampsFromConfigs(sourceChainConfigs);
   }
 
@@ -884,7 +868,7 @@ contract EVM2EVMMultiOffRamp_execute_upgrade is EVM2EVMMultiOffRampSetup {
     }
   }
 
-  function test_UpgradedSEnderNoncesReadsPreviousRampTransitive_Success() public {
+  function test_UpgradedSenderNoncesReadsPreviousRampTransitive_Success() public {
     Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages(SOURCE_CHAIN_SELECTOR_2, ON_RAMP_ADDRESS_2);
     uint64 startNonce = s_offRamp.getSenderNonce(SOURCE_CHAIN_SELECTOR_2, messages[0].sender);
 
@@ -2506,6 +2490,7 @@ contract EVM2EVMMultiOffRamp_applySourceChainConfigUpdates is EVM2EVMMultiOffRam
       prevOffRamp: address(0),
       onRamp: ON_RAMP_ADDRESS
     });
+    _setupMultiCommitStoreFromOffRampConfigs(sourceChainConfigs);
 
     EVM2EVMMultiOffRamp.SourceChainConfig memory expectedSourceChainConfig = EVM2EVMMultiOffRamp.SourceChainConfig({
       isEnabled: true,
@@ -2539,6 +2524,7 @@ contract EVM2EVMMultiOffRamp_applySourceChainConfigUpdates is EVM2EVMMultiOffRam
       onRamp: ON_RAMP_ADDRESS
     });
 
+    _setupMultiCommitStoreFromOffRampConfigs(sourceChainConfigs);
     s_offRamp.applySourceChainConfigUpdates(sourceChainConfigs);
 
     sourceChainConfigs[0].isEnabled = false;
@@ -2587,6 +2573,7 @@ contract EVM2EVMMultiOffRamp_applySourceChainConfigUpdates is EVM2EVMMultiOffRam
       prevOffRamp: address(1000),
       onRamp: address(uint160(ON_RAMP_ADDRESS) + 42)
     });
+    _setupMultiCommitStoreFromOffRampConfigs(sourceChainConfigs);
 
     EVM2EVMMultiOffRamp.SourceChainConfig[] memory expectedSourceChainConfigs =
       new EVM2EVMMultiOffRamp.SourceChainConfig[](3);
@@ -2631,6 +2618,7 @@ contract EVM2EVMMultiOffRamp_applySourceChainConfigUpdates is EVM2EVMMultiOffRam
       onRamp: address(0)
     });
 
+    _setupMultiCommitStoreFromOffRampConfigs(sourceChainConfigs);
     vm.expectRevert(EVM2EVMMultiOffRamp.ZeroAddressNotAllowed.selector);
     s_offRamp.applySourceChainConfigUpdates(sourceChainConfigs);
   }
@@ -2645,11 +2633,12 @@ contract EVM2EVMMultiOffRamp_applySourceChainConfigUpdates is EVM2EVMMultiOffRam
       onRamp: ON_RAMP_ADDRESS
     });
 
+    _setupMultiCommitStoreFromOffRampConfigs(sourceChainConfigs);
     s_offRamp.applySourceChainConfigUpdates(sourceChainConfigs);
 
     sourceChainConfigs[0].onRamp = address(uint160(sourceChainConfigs[0].onRamp) + 1);
 
-    vm.expectRevert(EVM2EVMMultiOffRamp.StaticConfigCannotBeUpdated.selector);
+    vm.expectRevert(abi.encodeWithSelector(EVM2EVMMultiOffRamp.InvalidStaticConfig.selector, SOURCE_CHAIN_SELECTOR_1));
     s_offRamp.applySourceChainConfigUpdates(sourceChainConfigs);
   }
 
@@ -2663,11 +2652,12 @@ contract EVM2EVMMultiOffRamp_applySourceChainConfigUpdates is EVM2EVMMultiOffRam
       onRamp: ON_RAMP_ADDRESS
     });
 
+    _setupMultiCommitStoreFromOffRampConfigs(sourceChainConfigs);
     s_offRamp.applySourceChainConfigUpdates(sourceChainConfigs);
 
     sourceChainConfigs[0].prevOffRamp = address(uint160(sourceChainConfigs[0].prevOffRamp) + 1);
 
-    vm.expectRevert(EVM2EVMMultiOffRamp.StaticConfigCannotBeUpdated.selector);
+    vm.expectRevert(abi.encodeWithSelector(EVM2EVMMultiOffRamp.InvalidStaticConfig.selector, SOURCE_CHAIN_SELECTOR_1));
     s_offRamp.applySourceChainConfigUpdates(sourceChainConfigs);
   }
 
@@ -2681,12 +2671,51 @@ contract EVM2EVMMultiOffRamp_applySourceChainConfigUpdates is EVM2EVMMultiOffRam
       onRamp: ON_RAMP_ADDRESS
     });
 
+    _setupMultiCommitStoreFromOffRampConfigs(sourceChainConfigs);
     s_offRamp.applySourceChainConfigUpdates(sourceChainConfigs);
 
     sourceChainConfigs[0].onRamp = address(uint160(sourceChainConfigs[0].onRamp) + 1);
     sourceChainConfigs[0].prevOffRamp = address(uint160(sourceChainConfigs[0].prevOffRamp) + 1);
 
-    vm.expectRevert(EVM2EVMMultiOffRamp.StaticConfigCannotBeUpdated.selector);
+    vm.expectRevert(abi.encodeWithSelector(EVM2EVMMultiOffRamp.InvalidStaticConfig.selector, SOURCE_CHAIN_SELECTOR_1));
+    s_offRamp.applySourceChainConfigUpdates(sourceChainConfigs);
+  }
+
+  function test_CommitStoreAlreadyInUse_Revert() public {
+    EVM2EVMMultiOffRamp.SourceChainConfigArgs[] memory sourceChainConfigs =
+      new EVM2EVMMultiOffRamp.SourceChainConfigArgs[](1);
+    sourceChainConfigs[0] = EVM2EVMMultiOffRamp.SourceChainConfigArgs({
+      sourceChainSelector: SOURCE_CHAIN_SELECTOR_1,
+      isEnabled: true,
+      prevOffRamp: address(0),
+      onRamp: ON_RAMP_ADDRESS_1
+    });
+
+    s_mockCommitStore.setSourceChainConfig(
+      SOURCE_CHAIN_SELECTOR_1,
+      IMultiCommitStore.SourceChainConfig({isEnabled: true, minSeqNr: 1, onRamp: ON_RAMP_ADDRESS_1})
+    );
+
+    vm.expectRevert(abi.encodeWithSelector(EVM2EVMMultiOffRamp.InvalidStaticConfig.selector, SOURCE_CHAIN_SELECTOR_1));
+    s_offRamp.applySourceChainConfigUpdates(sourceChainConfigs);
+  }
+
+  function test_CommitStoreMismatchingOnRamp_Revert() public {
+    EVM2EVMMultiOffRamp.SourceChainConfigArgs[] memory sourceChainConfigs =
+      new EVM2EVMMultiOffRamp.SourceChainConfigArgs[](1);
+    sourceChainConfigs[0] = EVM2EVMMultiOffRamp.SourceChainConfigArgs({
+      sourceChainSelector: SOURCE_CHAIN_SELECTOR_1,
+      isEnabled: true,
+      prevOffRamp: address(0),
+      onRamp: ON_RAMP_ADDRESS_1
+    });
+
+    s_mockCommitStore.setSourceChainConfig(
+      SOURCE_CHAIN_SELECTOR_1,
+      IMultiCommitStore.SourceChainConfig({isEnabled: true, minSeqNr: 0, onRamp: ON_RAMP_ADDRESS_2})
+    );
+
+    vm.expectRevert(abi.encodeWithSelector(EVM2EVMMultiOffRamp.InvalidStaticConfig.selector, SOURCE_CHAIN_SELECTOR_1));
     s_offRamp.applySourceChainConfigUpdates(sourceChainConfigs);
   }
 }
