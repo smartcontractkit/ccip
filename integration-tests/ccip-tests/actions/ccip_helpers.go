@@ -2861,48 +2861,47 @@ type validationOptions struct {
 }
 
 // ValidationOptionFunc is a function that can be passed to ValidateRequests to specify which phase is expected to fail
-type ValidationOptionFunc func(*validationOptions)
+type ValidationOptionFunc func(logger zerolog.Logger, opts *validationOptions)
 
-// ExpectCCIPSendRequestedToFail specifies that the CCIPSendRequested phase is expected to fail
-func ExpectCCIPSendRequestedToFail() ValidationOptionFunc {
+type PhaseSpecificValidationOptionFunc func(*validationOptions)
+
+// WithErrorMessage specifies the expected error message for the phase that is expected to fail.
+func WithErrorMessage(expectedErrorMessage string) PhaseSpecificValidationOptionFunc {
 	return func(opts *validationOptions) {
-		opts.phaseExpectedToFail = testreporters.CCIPSendRe
+		opts.expectedErrorMessage = expectedErrorMessage
 	}
 }
 
-// ExpectSourceLogFinalizedToFail specifies that the SourceLogFinalized phase is expected to fail
-func ExpectSourceLogFinalizedToFail() ValidationOptionFunc {
+// PhaseShouldExist specifies that a specific phase should exist, but be in a failed state. This is only applicable to the `ExecStateChanged` phase.
+func ShouldExist() PhaseSpecificValidationOptionFunc {
 	return func(opts *validationOptions) {
-		opts.phaseExpectedToFail = testreporters.SourceLogFinalized
+		opts.phaseShouldExist = true
 	}
 }
 
-// ExpectCommitToFail specifies that the Commit phase is expected to fail
-func ExpectCommitToFail() ValidationOptionFunc {
-	return func(opts *validationOptions) {
-		opts.phaseExpectedToFail = testreporters.Commit
-	}
-}
-
-// ExpectReportAcceptedToFail specifies that the ReportAccepted phase is expected to fail
-func ExpectReportBlessedToFail() ValidationOptionFunc {
-	return func(opts *validationOptions) {
-		opts.phaseExpectedToFail = testreporters.ReportBlessed
-	}
-}
-
-// ExpectExecStateChangedToFail specifies that the ExecStateChanged phase is expected to fail.
-// It also accepts a boolean to specify whether the phase should exist or not.
+// ExpectPhaseToFail specifies that a specific phase is expected to fail.
+// You can optionally provide an expected error message, if you don't have one in mind, just pass an empty string.
+// shouldExist is used to specify whether the phase should exist or not, which is only applicable to the `ExecStateChanged` phase.
 // If you expect the `ExecStateChanged` events to be there, but in a "failed" state, set this to true.
-// If you don't want the `ExecStateChanged` events to be there at all, set this to false.
-func ExpectExecStateChangedToFail(shouldExist bool) ValidationOptionFunc {
-	return func(opts *validationOptions) {
-		opts.phaseExpectedToFail = testreporters.ExecStateChanged
-		opts.phaseShouldExist = shouldExist
-		if !shouldExist {
-			opts.expectedErrorMessage = "ExecutionStateChanged event not found for seq num"
-		} else {
-			opts.expectedErrorMessage = "ExecutionStateChanged event state - expected"
+// It will otherwise be ignored.
+func ExpectPhaseToFail(phase testreporters.Phase, phaseSpecificOptions ...PhaseSpecificValidationOptionFunc) ValidationOptionFunc {
+	return func(logger zerolog.Logger, opts *validationOptions) {
+		opts.phaseExpectedToFail = phase
+		for _, f := range phaseSpecificOptions {
+			f(opts)
+		}
+		if phase == testreporters.ExecStateChanged {
+			if opts.expectedErrorMessage != "" {
+				logger.Warn().Msg("You are overriding the expected error message for the ExecStateChanged phase. This can cause unexpected behavior and is generally not recommended.")
+			} else if !opts.phaseShouldExist {
+				opts.expectedErrorMessage = "ExecutionStateChanged event not found for seq num"
+			} else {
+				opts.expectedErrorMessage = "ExecutionStateChanged event state - expected"
+			}
+		}
+		if phase != testreporters.ExecStateChanged && opts.phaseShouldExist {
+			logger.Warn().Msg("phaseShouldExist is only applicable to the ExecStateChanged phase. Ignoring for other phases.")
+			opts.phaseShouldExist = false
 		}
 	}
 }
@@ -2910,16 +2909,17 @@ func ExpectExecStateChangedToFail(shouldExist bool) ValidationOptionFunc {
 // ValidateRequests validates all sent request events.
 // If you expect a specific phase to fail, you can pass a validationOptionFunc to specify exactly which one.
 // If not, just pass in nil.
-func (lane *CCIPLane) ValidateRequests(validationOptionFunc ValidationOptionFunc) {
+func (lane *CCIPLane) ValidateRequests(validationOptionFuncs ...ValidationOptionFunc) {
 	var opts validationOptions
-	if validationOptionFunc != nil {
-		validationOptionFunc(&opts)
+	require.LessOrEqual(lane.Test, len(validationOptionFuncs), 1, "only one validation option function can be passed in to ValidateRequests")
+	for _, f := range validationOptionFuncs {
+		f(lane.Logger, &opts)
 	}
 	for txHash, ccipReqs := range lane.SentReqs {
 		require.Greater(lane.Test, len(ccipReqs), 0, "no ccip requests found for tx hash")
 		require.NoError(lane.Test, lane.ValidateRequestByTxHash(txHash, opts), "validating request events by tx hash")
 	}
-	if validationOptionFunc != nil {
+	if len(validationOptionFuncs) > 0 {
 		return
 	}
 	// Asserting balances reliably work only for simulated private chains. The testnet contract balances might get updated by other transactions
