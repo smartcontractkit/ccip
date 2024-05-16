@@ -33,7 +33,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/rpclib"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/prices"
-	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 )
 
 const (
@@ -108,6 +107,8 @@ type ExecOffchainConfig struct {
 	InflightCacheExpiry config.Duration
 	// See [ccipdata.ExecOffchainConfig.RootSnoozeTime]
 	RootSnoozeTime config.Duration
+	// See [ccipdata.ExecOffchainConfig.MessageVisibilityInterval]
+	MessageVisibilityInterval config.Duration
 }
 
 func (c ExecOffchainConfig) Validate() error {
@@ -131,6 +132,9 @@ func (c ExecOffchainConfig) Validate() error {
 	}
 	if c.RootSnoozeTime.Duration() == 0 {
 		return errors.New("must set RootSnoozeTime")
+	}
+	if c.MessageVisibilityInterval.Duration() == 0 {
+		return errors.New("must set MessageVisibilityInterval")
 	}
 
 	return nil
@@ -194,7 +198,7 @@ func (o *OffRamp) GetSenderNonce(ctx context.Context, sender cciptypes.Address) 
 	return o.offRampV100.GetSenderNonce(&bind.CallOpts{Context: ctx}, evmAddr)
 }
 
-func (o *OffRamp) GetSendersNonce(ctx context.Context, senders []cciptypes.Address) (map[cciptypes.Address]uint64, error) {
+func (o *OffRamp) ListSenderNonces(ctx context.Context, senders []cciptypes.Address) (map[cciptypes.Address]uint64, error) {
 	if len(senders) == 0 {
 		return make(map[cciptypes.Address]uint64), nil
 	}
@@ -452,7 +456,7 @@ func (o *OffRamp) ChangeConfig(ctx context.Context, onchainConfigBytes []byte, o
 		RelativeBoostPerWaitHour:    offchainConfigParsed.RelativeBoostPerWaitHour,
 		InflightCacheExpiry:         offchainConfigParsed.InflightCacheExpiry,
 		RootSnoozeTime:              offchainConfigParsed.RootSnoozeTime,
-		//MessageVisibilityInterval:   offchainConfigParsed.MessageVisibilityInterval, /* @@@TODO include field in cl-common */
+		MessageVisibilityInterval:   offchainConfigParsed.MessageVisibilityInterval,
 	}
 	onchainConfig := cciptypes.ExecOnchainConfig{
 		PermissionLessExecutionThresholdSeconds: time.Second * time.Duration(onchainConfigParsed.PermissionLessExecutionThresholdSeconds),
@@ -659,7 +663,7 @@ func (o *OffRamp) DecodeExecutionReport(ctx context.Context, report []byte) (cci
 	return DecodeExecReport(ctx, o.ExecutionReportArgs, report)
 }
 
-func (o *OffRamp) RegisterFilters(qopts ...pg.QOpt) error {
+func (o *OffRamp) RegisterFilters() error {
 	return logpollerutil.RegisterLpFilters(o.lp, o.filters)
 }
 

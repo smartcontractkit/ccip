@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.19;
+pragma solidity 0.8.24;
 
 import {ITypeAndVersion} from "../../shared/interfaces/ITypeAndVersion.sol";
-import {IARM} from "../interfaces/IARM.sol";
 import {IEVM2AnyOnRamp} from "../interfaces/IEVM2AnyOnRamp.sol";
 import {IEVM2AnyOnRampClient} from "../interfaces/IEVM2AnyOnRampClient.sol";
 import {IPool} from "../interfaces/IPool.sol";
 import {IPriceRegistry} from "../interfaces/IPriceRegistry.sol";
+import {IRMN} from "../interfaces/IRMN.sol";
 import {ITokenAdminRegistry} from "../interfaces/ITokenAdminRegistry.sol";
 import {ILinkAvailable} from "../interfaces/automation/ILinkAvailable.sol";
 
@@ -31,6 +31,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   using USDPriceWith18Decimals for uint224;
 
   error InvalidExtraArgsTag();
+  error ExtraArgOutOfOrderExecutionMustBeTrue();
   error OnlyCallableByOwnerOrAdmin();
   error OnlyCallableByOwnerOrAdminOrNop();
   error InvalidWithdrawParams();
@@ -47,7 +48,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   error RouterMustSetOriginalSender();
   error InvalidConfig();
   error InvalidAddress(bytes encodedAddress);
-  error BadARMSignal();
+  error CursedByRMN();
   error LinkBalanceNotSettled();
   error InvalidNopAddress(address nop);
   error NotAFeeToken(address token);
@@ -74,7 +75,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     uint64 defaultTxGasLimit; //  │ Default gas limit for a tx
     uint96 maxNopFeesJuels; // ───╯ Max nop fee balance onramp can have
     address prevOnRamp; //          Address of previous-version OnRamp
-    address armProxy; //            Address of ARM proxy
+    address rmnProxy; //            Address of RMN proxy
   }
 
   /// @dev Struct to contains the dynamic configuration
@@ -94,7 +95,8 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     // The following three properties are defaults, they can be overridden by setting the TokenTransferFeeConfig for a token
     uint16 defaultTokenFeeUSDCents; //           │ Default token fee charged per token transfer
     uint32 defaultTokenDestGasOverhead; //       │ Default gas charged to execute the token transfer on the destination chain
-    uint32 defaultTokenDestBytesOverhead; // ────╯ Default extra data availability bytes charged per token transfer
+    uint32 defaultTokenDestBytesOverhead; //     | Default extra data availability bytes charged per token transfer
+    bool enforceOutOfOrder; // ──────────────────╯ Whether to enforce the allowOutOfOrderExecution extraArg value to be true.
   }
 
   /// @dev Struct to hold the execution fee configuration for a fee token
@@ -165,8 +167,8 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   /// @dev The address of previous-version OnRamp for this lane
   /// Used to be able to provide sequencing continuity during a zero downtime upgrade.
   address internal immutable i_prevOnRamp;
-  /// @dev The address of the arm proxy
-  address internal immutable i_armProxy;
+  /// @dev The address of the RMN proxy
+  address internal immutable i_rmnProxy;
   /// @dev the maximum number of nops that can be configured at the same time.
   /// Used to bound gas for loops over nops.
   uint256 private constant MAX_NUMBER_OF_NOPS = 64;
@@ -206,7 +208,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   ) AggregateRateLimiter(rateLimiterConfig) {
     if (
       staticConfig.linkToken == address(0) || staticConfig.chainSelector == 0 || staticConfig.destChainSelector == 0
-        || staticConfig.defaultTxGasLimit == 0 || staticConfig.armProxy == address(0)
+        || staticConfig.defaultTxGasLimit == 0 || staticConfig.rmnProxy == address(0)
     ) revert InvalidConfig();
 
     i_metadataHash = keccak256(
@@ -220,7 +222,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     i_defaultTxGasLimit = staticConfig.defaultTxGasLimit;
     i_maxNopFeesJuels = staticConfig.maxNopFeesJuels;
     i_prevOnRamp = staticConfig.prevOnRamp;
-    i_armProxy = staticConfig.armProxy;
+    i_rmnProxy = staticConfig.rmnProxy;
 
     _setDynamicConfig(dynamicConfig);
     _setFeeTokenConfig(feeTokenConfigs);
@@ -255,17 +257,17 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     uint256 feeTokenAmount,
     address originalSender
   ) external returns (bytes32) {
-    if (IARM(i_armProxy).isCursed()) revert BadARMSignal();
+    if (IRMN(i_rmnProxy).isCursed(bytes32(uint256(destChainSelector)))) revert CursedByRMN();
     // Validate message sender is set and allowed. Not validated in `getFee` since it is not user-driven.
     if (originalSender == address(0)) revert RouterMustSetOriginalSender();
     // Router address may be zero intentionally to pause.
     if (msg.sender != s_dynamicConfig.router) revert MustBeCalledByRouter();
     if (destChainSelector != i_destChainSelector) revert InvalidChainSelector(destChainSelector);
 
-    uint256 gasLimit = _fromBytes(message.extraArgs).gasLimit;
+    Client.EVMExtraArgsV2 memory extraArgs = _fromBytes(message.extraArgs);
     // Validate the message with various checks
     uint256 numberOfTokens = message.tokenAmounts.length;
-    _validateMessage(message.data.length, gasLimit, numberOfTokens);
+    _validateMessage(message.data.length, extraArgs.gasLimit, numberOfTokens, extraArgs.allowOutOfOrderExecution);
 
     // Only check token value if there are tokens
     if (numberOfTokens > 0) {
@@ -306,9 +308,11 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
       // Not duplicately validated in `getFee`. Invalid address is uncommon, gas cost outweighs UX gain.
       receiver: Internal._validateEVMAddress(message.receiver),
       sequenceNumber: ++s_sequenceNumber,
-      gasLimit: gasLimit,
+      gasLimit: extraArgs.gasLimit,
       strict: false,
-      nonce: ++s_senderNonce[originalSender],
+      // Only bump nonce for messages that specify allowOutOfOrderExecution == false. Otherwise, we
+      // may block ordered message nonces, which is not what we want.
+      nonce: extraArgs.allowOutOfOrderExecution ? 0 : ++s_senderNonce[originalSender],
       feeToken: message.feeToken,
       feeTokenAmount: feeTokenAmount,
       data: message.data,
@@ -370,14 +374,21 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   /// @dev Convert the extra args bytes into a struct
   /// @param extraArgs The extra args bytes
   /// @return The extra args struct
-  function _fromBytes(bytes calldata extraArgs) internal view returns (Client.EVMExtraArgsV1 memory) {
+  function _fromBytes(bytes calldata extraArgs) internal view returns (Client.EVMExtraArgsV2 memory) {
     if (extraArgs.length == 0) {
-      return Client.EVMExtraArgsV1({gasLimit: i_defaultTxGasLimit});
+      return Client.EVMExtraArgsV2({gasLimit: i_defaultTxGasLimit, allowOutOfOrderExecution: false});
     }
-    if (bytes4(extraArgs) != Client.EVM_EXTRA_ARGS_V1_TAG) revert InvalidExtraArgsTag();
-    // EVMExtraArgsV1 originally included a second boolean (strict) field which we have deprecated entirely.
-    // Clients may still send that version but it will be ignored.
-    return abi.decode(extraArgs[4:], (Client.EVMExtraArgsV1));
+
+    bytes4 extraArgsTag = bytes4(extraArgs);
+    if (extraArgsTag == Client.EVM_EXTRA_ARGS_V2_TAG) {
+      return abi.decode(extraArgs[4:], (Client.EVMExtraArgsV2));
+    } else if (extraArgsTag == Client.EVM_EXTRA_ARGS_V1_TAG) {
+      // EVMExtraArgsV1 originally included a second boolean (strict) field which has been deprecated.
+      // Clients may still include it but it will be ignored.
+      return Client.EVMExtraArgsV2({gasLimit: abi.decode(extraArgs[4:], (uint256)), allowOutOfOrderExecution: false});
+    }
+
+    revert InvalidExtraArgsTag();
   }
 
   /// @notice Validate the forwarded message with various checks.
@@ -386,12 +397,17 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   /// @param dataLength The length of the data field of the message.
   /// @param gasLimit The gasLimit set in message for destination execution.
   /// @param numberOfTokens The number of tokens to be sent.
-  function _validateMessage(uint256 dataLength, uint256 gasLimit, uint256 numberOfTokens) internal view {
-    // Check that payload is formed correctly
+  function _validateMessage(
+    uint256 dataLength,
+    uint256 gasLimit,
+    uint256 numberOfTokens,
+    bool allowOutOfOrderExecution
+  ) internal view {
     uint256 maxDataBytes = uint256(s_dynamicConfig.maxDataBytes);
     if (dataLength > maxDataBytes) revert MessageTooLarge(maxDataBytes, dataLength);
     if (gasLimit > uint256(s_dynamicConfig.maxPerMsgGasLimit)) revert MessageGasLimitTooHigh();
     if (numberOfTokens > uint256(s_dynamicConfig.maxNumberOfTokensPerMsg)) revert UnsupportedNumberOfTokens();
+    if (s_dynamicConfig.enforceOutOfOrder && !allowOutOfOrderExecution) revert ExtraArgOutOfOrderExecutionMustBeTrue();
   }
 
   // ================================================================
@@ -409,7 +425,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
       defaultTxGasLimit: i_defaultTxGasLimit,
       maxNopFeesJuels: i_maxNopFeesJuels,
       prevOnRamp: i_prevOnRamp,
-      armProxy: i_armProxy
+      rmnProxy: i_rmnProxy
     });
   }
 
@@ -440,7 +456,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
         defaultTxGasLimit: i_defaultTxGasLimit,
         maxNopFeesJuels: i_maxNopFeesJuels,
         prevOnRamp: i_prevOnRamp,
-        armProxy: i_armProxy
+        rmnProxy: i_rmnProxy
       }),
       dynamicConfig
     );
@@ -475,9 +491,11 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   ) external view returns (uint256 feeTokenAmount) {
     if (destChainSelector != i_destChainSelector) revert InvalidChainSelector(destChainSelector);
 
-    uint256 gasLimit = _fromBytes(message.extraArgs).gasLimit;
+    Client.EVMExtraArgsV2 memory extraArgs = _fromBytes(message.extraArgs);
     // Validate the message with various checks
-    _validateMessage(message.data.length, gasLimit, message.tokenAmounts.length);
+    _validateMessage(
+      message.data.length, extraArgs.gasLimit, message.tokenAmounts.length, extraArgs.allowOutOfOrderExecution
+    );
 
     FeeTokenConfig memory feeTokenConfig = s_feeTokenConfig[message.feeToken];
     if (!feeTokenConfig.enabled) revert NotAFeeToken(message.feeToken);
@@ -521,8 +539,8 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     // uint112(packedGasPrice) = executionGasPrice
     uint256 executionCost = uint112(packedGasPrice)
       * (
-        gasLimit + s_dynamicConfig.destGasOverhead + (message.data.length * s_dynamicConfig.destGasPerPayloadByte)
-          + tokenTransferGas
+        extraArgs.gasLimit + s_dynamicConfig.destGasOverhead
+          + (message.data.length * s_dynamicConfig.destGasPerPayloadByte) + tokenTransferGas
       ) * feeTokenConfig.gasMultiplierWeiPerEth;
 
     // Calculate number of fee tokens to charge.
@@ -850,7 +868,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   }
 
   // ================================================================
-  // │                        Access and ARM                        │
+  // │                           Access                             │
   // ================================================================
 
   /// @dev Require that the sender is the owner or the fee admin

@@ -106,9 +106,13 @@ func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.Repor
 			offRampReader:               rf.config.offRampReader,
 			tokenPoolBatchedReader:      rf.config.tokenPoolBatchedReader,
 			inflightReports:             newInflightExecReportsContainer(offchainConfig.InflightCacheExpiry.Duration()),
-			commitRootsCache:            cache.NewCommitRootsCache(lggr, rf.config.offRampReader.GetMessageVisibilityInterval(), offchainConfig.RootSnoozeTime.Duration()),
-			metricsCollector:            rf.config.metricsCollector,
-			chainHealthcheck:            rf.config.chainHealthcheck,
+			commitRootsCache: cache.NewCommitRootsCache(
+				lggr,
+				offchainConfig.MessageVisibilityInterval.Duration(),
+				offchainConfig.RootSnoozeTime.Duration(),
+			),
+			metricsCollector: rf.config.metricsCollector,
+			chainHealthcheck: rf.config.chainHealthcheck,
 		}, types.ReportingPluginInfo{
 			Name: "CCIPExecution",
 			// Setting this to false saves on calldata since OffRamp doesn't require agreement between NOPs

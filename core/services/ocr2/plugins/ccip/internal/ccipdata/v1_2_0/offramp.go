@@ -98,6 +98,8 @@ type JSONExecOffchainConfig struct {
 	InflightCacheExpiry config.Duration
 	// See [ccipdata.ExecOffchainConfig.RootSnoozeTime]
 	RootSnoozeTime config.Duration
+	// See [ccipdata.ExecOffchainConfig.MessageVisibilityInterval]
+	MessageVisibilityInterval config.Duration
 }
 
 func (c JSONExecOffchainConfig) Validate() error {
@@ -173,7 +175,7 @@ func (o *OffRamp) ChangeConfig(ctx context.Context, onchainConfigBytes []byte, o
 		RelativeBoostPerWaitHour:    offchainConfigParsed.RelativeBoostPerWaitHour,
 		InflightCacheExpiry:         offchainConfigParsed.InflightCacheExpiry,
 		RootSnoozeTime:              offchainConfigParsed.RootSnoozeTime,
-		//MessageVisibilityInterval:   offchainConfigParsed.MessageVisibilityInterval, /* @@@TODO include field in cl-common */
+		MessageVisibilityInterval:   offchainConfigParsed.MessageVisibilityInterval,
 	}
 	onchainConfig := cciptypes.ExecOnchainConfig{
 		PermissionLessExecutionThresholdSeconds: time.Second * time.Duration(onchainConfigParsed.PermissionLessExecutionThresholdSeconds),

@@ -9,7 +9,6 @@ import (
 	"go/token"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"regexp"
 	"strings"
 
@@ -40,7 +39,7 @@ type AbigenArgs struct {
 // Check whether native abigen is installed, and has correct version
 func Abigen(a AbigenArgs) {
 	var versionResponse bytes.Buffer
-	abigenExecutablePath := filepath.Join(GetProjectRoot(), "tools/bin/abigen")
+	abigenExecutablePath := "abigen"
 	abigenVersionCheck := exec.Command(abigenExecutablePath, "--version")
 	abigenVersionCheck.Stdout = &versionResponse
 	if err := abigenVersionCheck.Run(); err != nil {

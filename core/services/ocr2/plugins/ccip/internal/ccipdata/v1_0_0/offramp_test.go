@@ -36,6 +36,7 @@ func TestExecOffchainConfig100_Encoding(t *testing.T) {
 				RelativeBoostPerWaitHour:    0.07,
 				InflightCacheExpiry:         *config.MustNewDuration(64 * time.Second),
 				RootSnoozeTime:              *config.MustNewDuration(128 * time.Minute),
+				MessageVisibilityInterval:   *config.MustNewDuration(6 * time.Hour),
 			},
 		},
 		{
@@ -48,6 +49,7 @@ func TestExecOffchainConfig100_Encoding(t *testing.T) {
 				RelativeBoostPerWaitHour:    0,
 				InflightCacheExpiry:         *config.MustNewDuration(0),
 				RootSnoozeTime:              *config.MustNewDuration(0),
+				MessageVisibilityInterval:   *config.MustNewDuration(0),
 			},
 			expectErr: true,
 		},
@@ -83,7 +85,7 @@ func TestExecOffchainConfig100_Encoding(t *testing.T) {
 }
 
 func TestExecOffchainConfig100_AllFieldsRequired(t *testing.T) {
-	config := ExecOffchainConfig{
+	cfg := ExecOffchainConfig{
 		SourceFinalityDepth:         3,
 		DestOptimisticConfirmations: 6,
 		DestFinalityDepth:           3,
@@ -91,8 +93,9 @@ func TestExecOffchainConfig100_AllFieldsRequired(t *testing.T) {
 		RelativeBoostPerWaitHour:    0.07,
 		InflightCacheExpiry:         *config.MustNewDuration(64 * time.Second),
 		RootSnoozeTime:              *config.MustNewDuration(128 * time.Minute),
+		MessageVisibilityInterval:   *config.MustNewDuration(6 * time.Hour),
 	}
-	encoded, err := ccipconfig.EncodeOffchainConfig(&config)
+	encoded, err := ccipconfig.EncodeOffchainConfig(&cfg)
 	require.NoError(t, err)
 
 	var configAsMap map[string]any
@@ -207,7 +210,7 @@ func Test_GetSendersNonce(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			offramp := OffRamp{evmBatchCaller: test.batchCaller, Logger: logger.TestLogger(t)}
-			nonce, err := offramp.GetSendersNonce(testutils.Context(t), test.addresses)
+			nonce, err := offramp.ListSenderNonces(testutils.Context(t), test.addresses)
 
 			if test.expectedError {
 				require.Error(t, err)
