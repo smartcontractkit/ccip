@@ -3019,7 +3019,7 @@ func isPhaseValid(
 	if err == nil {
 		return true, fmt.Errorf("expected phase '%s' to fail, but it passed", opts.phaseExpectedToFail)
 	}
-	logmsg := logger.Debug().Str("Failed with Error", err.Error()).Str("Phase", string(currentPhase))
+	logmsg := logger.Info().Str("Failed with Error", err.Error()).Str("Phase", string(currentPhase))
 	if opts.expectedErrorMessage != "" {
 		if !strings.Contains(err.Error(), opts.expectedErrorMessage) {
 			return true, fmt.Errorf("expected phase '%s' to fail with error message '%s' but got error '%s'", currentPhase, opts.expectedErrorMessage, err.Error())
