@@ -162,8 +162,9 @@ runs:
         [CCIP.Env.Logging.Grafana]
         base_url="$GRAFANA_URL"
         dashboard_url="$GRAFANA_DASHBOARD_URL"
-        bearer_token_secret="$GRAFANA_BEARER_TOKEN"
-
+        if [ -n "$GRAFANA_BEARER_TOKEN" ]; then
+          bearer_token_secret="$GRAFANA_BEARER_TOKEN"
+        fi
         [CCIP.Groups.load]
         TestRunName = '$EXISTING_NAMESPACE'
 
