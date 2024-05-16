@@ -390,15 +390,57 @@ contract CCIPCapabilityConfiguration_ConfigStateMachine is CCIPCapabilityConfigu
     config.pluginType = CCIPCapabilityConfiguration.PluginType.Execution;
     bytes32 configDigest4 = s_ccipCC.computeConfigDigest(donId, configCount, config);
 
-    assertNotEq(configDigest1, configDigest2, "config digests must not match");
-    assertNotEq(configDigest1, configDigest3, "config digests must not match");
-    assertNotEq(configDigest1, configDigest4, "config digests must not match");
+    assertNotEq(configDigest1, configDigest2, "config digests 1 and 2 must not match");
+    assertNotEq(configDigest1, configDigest3, "config digests 1 and 3 must not match");
+    assertNotEq(configDigest1, configDigest4, "config digests 1 and 4 must not match");
 
-    assertNotEq(configDigest2, configDigest3, "config digests must not match");
-    assertNotEq(configDigest2, configDigest4, "config digests must not match");
+    assertNotEq(configDigest2, configDigest3, "config digests 2 and 3 must not match");
+    assertNotEq(configDigest2, configDigest4, "config digests 2 and 4 must not match");
   }
 
-  function test__groupByPluginType_Success() public {}
+  function test_Fuzz__groupByPluginType_Success(uint256 numCommitCfgs, uint256 numExecCfgs) public {
+    vm.assume(numCommitCfgs >= 0 && numCommitCfgs < 3);
+    vm.assume(numExecCfgs >= 0 && numExecCfgs < 3);
+
+    bytes[][] memory signers = makeAssociativeArray(4, 10);
+    bytes[][] memory transmitters = makeAssociativeArray(4, 20);
+    CCIPCapabilityConfiguration.OCR3Config[] memory cfgs = new CCIPCapabilityConfiguration.OCR3Config[](numCommitCfgs + numExecCfgs);
+    for (uint256 i = 0; i < numCommitCfgs; i++) {
+      cfgs[i] = CCIPCapabilityConfiguration.OCR3Config({
+        pluginType: CCIPCapabilityConfiguration.PluginType.Commit,
+        chainSelector: 1,
+        signers: signers,
+        transmitters: transmitters,
+        f: 1,
+        offchainConfigVersion: 30,
+        offchainConfig: abi.encode("commit", i)
+      });
+    }
+    for (uint256 i = 0; i < numExecCfgs; i++) {
+      cfgs[numCommitCfgs + i] = CCIPCapabilityConfiguration.OCR3Config({
+        pluginType: CCIPCapabilityConfiguration.PluginType.Execution,
+        chainSelector: 1,
+        signers: signers,
+        transmitters: transmitters,
+        f: 1,
+        offchainConfigVersion: 30,
+        offchainConfig: abi.encode("exec", numCommitCfgs + i)
+      });
+    }
+    (CCIPCapabilityConfiguration.OCR3Config[] memory commitCfgs, CCIPCapabilityConfiguration.OCR3Config[] memory execCfgs) =
+      s_ccipCC.groupByPluginType(cfgs);
+
+    assertEq(commitCfgs.length, numCommitCfgs, "commitCfgs length must match");
+    assertEq(execCfgs.length, numExecCfgs, "execCfgs length must match");
+    for (uint256 i = 0; i < commitCfgs.length; i++) {
+      assertEq(uint8(commitCfgs[i].pluginType), uint8(CCIPCapabilityConfiguration.PluginType.Commit), "plugin type must be commit");
+      assertEq(commitCfgs[i].offchainConfig, abi.encode("commit", i), "offchain config must match");
+    }
+    for (uint256 i = 0; i < execCfgs.length; i++) {
+      assertEq(uint8(execCfgs[i].pluginType), uint8(CCIPCapabilityConfiguration.PluginType.Execution), "plugin type must be execution");
+      assertEq(execCfgs[i].offchainConfig, abi.encode("exec", numCommitCfgs + i), "offchain config must match");
+    }
+  }
 
   // Reverts.
 
@@ -406,5 +448,49 @@ contract CCIPCapabilityConfiguration_ConfigStateMachine is CCIPCapabilityConfigu
     vm.assume(configLen > 2);
     vm.expectRevert(CCIPCapabilityConfiguration.InvalidConfigLength.selector);
     s_ccipCC.stateFromConfigLength(configLen);
+  }
+
+  function test__groupByPluginType_threeCommitConfigs_Reverts() public {
+    bytes[][] memory signers = makeAssociativeArray(4, 10);
+    bytes[][] memory transmitters = makeAssociativeArray(4, 20);
+    CCIPCapabilityConfiguration.OCR3Config[] memory cfgs = new CCIPCapabilityConfiguration.OCR3Config[](3);
+    for (uint256 i = 0; i < 3; i++) {
+      cfgs[i] = CCIPCapabilityConfiguration.OCR3Config({
+        pluginType: CCIPCapabilityConfiguration.PluginType.Commit,
+        chainSelector: 1,
+        signers: signers,
+        transmitters: transmitters,
+        f: 1,
+        offchainConfigVersion: 30,
+        offchainConfig: abi.encode("commit", i)
+      });
+    }
+    vm.expectRevert();
+    s_ccipCC.groupByPluginType(cfgs);
+  }
+
+  function test__groupByPluginType_threeExecutionConfigs_Reverts() public {
+    bytes[][] memory signers = makeAssociativeArray(4, 10);
+    bytes[][] memory transmitters = makeAssociativeArray(4, 20);
+    CCIPCapabilityConfiguration.OCR3Config[] memory cfgs = new CCIPCapabilityConfiguration.OCR3Config[](3);
+    for (uint256 i = 0; i < 3; i++) {
+      cfgs[i] = CCIPCapabilityConfiguration.OCR3Config({
+        pluginType: CCIPCapabilityConfiguration.PluginType.Execution,
+        chainSelector: 1,
+        signers: signers,
+        transmitters: transmitters,
+        f: 1,
+        offchainConfigVersion: 30,
+        offchainConfig: abi.encode("exec", i)
+      });
+    }
+    vm.expectRevert();
+    s_ccipCC.groupByPluginType(cfgs);
+  }
+
+  function test__groupByPluginType_TooManyOCR3Configs_Reverts() public {
+    CCIPCapabilityConfiguration.OCR3Config[] memory cfgs = new CCIPCapabilityConfiguration.OCR3Config[](5);
+    vm.expectRevert(CCIPCapabilityConfiguration.TooManyOCR3Configs.selector);
+    s_ccipCC.groupByPluginType(cfgs);
   }
 }
