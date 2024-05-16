@@ -17,6 +17,9 @@ import {PriceRegistrySetup} from "../priceRegistry/PriceRegistry.t.sol";
 import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 
 contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
+  // Duplicate event of the CCIPSendRequested in the IOnRamp
+  event CCIPSendRequested(Internal.EVM2EVMMessage message);
+
   address internal constant CUSTOM_TOKEN = address(12345);
   uint224 internal constant CUSTOM_TOKEN_PRICE = 1e17; // $0.1 CUSTOM
 
@@ -30,7 +33,7 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
 
   address internal s_destTokenPool = makeAddr("destTokenPool");
 
-  EVM2EVMMultiOnRamp.PremiumMultiplierWeiPerEthArgs[] internal s_premiumMultiplierWeiPerEthArgs;
+  EVM2EVMMultiOnRamp.FeeTokenConfigArgs[] internal s_feeTokenConfigArgs;
   EVM2EVMMultiOnRamp.TokenTransferFeeConfigArgs[] internal s_tokenTransferFeeConfigArgs;
 
   function setUp() public virtual override(TokenSetup, PriceRegistrySetup) {
@@ -39,16 +42,22 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
 
     s_priceRegistry.updatePrices(getSingleTokenPriceUpdateStruct(CUSTOM_TOKEN, CUSTOM_TOKEN_PRICE));
 
-    s_premiumMultiplierWeiPerEthArgs.push(
-      EVM2EVMMultiOnRamp.PremiumMultiplierWeiPerEthArgs({
+    s_feeTokenConfigArgs.push(
+      EVM2EVMMultiOnRamp.FeeTokenConfigArgs({
         token: s_sourceFeeToken,
-        premiumMultiplierWeiPerEth: 5e17 // 0.5x
+        feeTokenConfig: EVM2EVMMultiOnRamp.FeeTokenConfig({
+          premiumMultiplierWeiPerEth: 5e17, // 0.5x
+          enabled: true
+        })
       })
     );
-    s_premiumMultiplierWeiPerEthArgs.push(
-      EVM2EVMMultiOnRamp.PremiumMultiplierWeiPerEthArgs({
+    s_feeTokenConfigArgs.push(
+      EVM2EVMMultiOnRamp.FeeTokenConfigArgs({
         token: s_sourceRouter.getWrappedNative(),
-        premiumMultiplierWeiPerEth: 2e18 // 2x
+        feeTokenConfig: EVM2EVMMultiOnRamp.FeeTokenConfig({
+          premiumMultiplierWeiPerEth: 2e18, // 2x
+          enabled: true
+        })
       })
     );
 
@@ -59,7 +68,7 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
         maxFeeUSDCents: 1000_00, // 1,000 USD
         deciBps: 2_5, // 2.5 bps, or 0.025%
         destGasOverhead: 40_000,
-        destBytesOverhead: 32,
+        destBytesOverhead: 0,
         aggregateRateLimitEnabled: true
       })
     );
@@ -96,7 +105,7 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
       generateDynamicMultiOnRampConfig(address(s_sourceRouter), address(s_priceRegistry), address(s_tokenAdminRegistry)),
       generateDestChainConfigArgs(),
       getOutboundRateLimiterConfig(),
-      s_premiumMultiplierWeiPerEthArgs,
+      s_feeTokenConfigArgs,
       s_tokenTransferFeeConfigArgs,
       getMultiOnRampNopsAndWeights()
     );
@@ -291,5 +300,13 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
     assertEq(a.router, b.router);
     assertEq(a.priceRegistry, b.priceRegistry);
     assertEq(a.tokenAdminRegistry, b.tokenAdminRegistry);
+  }
+
+  function assertFeeTokenConfigEqual(
+    EVM2EVMMultiOnRamp.FeeTokenConfig memory a,
+    EVM2EVMMultiOnRamp.FeeTokenConfig memory b
+  ) internal pure {
+    assertEq(a.premiumMultiplierWeiPerEth, b.premiumMultiplierWeiPerEth);
+    assertEq(a.enabled, b.enabled);
   }
 }
