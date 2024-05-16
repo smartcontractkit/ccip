@@ -643,7 +643,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, AggregateRateLimiter, ITyp
 
           // Ensures we can never deploy a new offRamp that points to a commitStore that
           // already has roots committed for the target source chain. Also ensures that the onRamps are in sync.
-          // TODO: revisit this on commit store / ramp merge - onRamp can be a shared parameter
+          // TODO: revisit this on commit store / ramp merge
           if (commitStoreConfig.onRamp != sourceConfigUpdate.onRamp || commitStoreConfig.minSeqNr != 0) {
             revert InvalidStaticConfig(sourceChainSelector);
           }
