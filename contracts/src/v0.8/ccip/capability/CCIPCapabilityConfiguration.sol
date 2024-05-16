@@ -33,6 +33,11 @@ contract CCIPCapabilityConfiguration is ICapabilityConfiguration, OwnerIsCreator
   error ChainSelectorNotSet();
   error SignerP2PIdPairMustBeLengthTwo(uint256 gotLength);
   error TooManyOCR3Configs();
+  error TooManySigners();
+  error TooManyTransmitters();
+  error FMustBePositive();
+  error FTooHigh();
+  error InvalidPluginType();
   error InvalidConfigState();
   error InvalidConfigLength();
   error InvalidConfigStateTransition(ConfigState currentState, ConfigState proposedState);
@@ -119,6 +124,7 @@ contract CCIPCapabilityConfiguration is ICapabilityConfiguration, OwnerIsCreator
 
   uint8 internal constant MAX_OCR3_CONFIGS_PER_PLUGIN = 2;
   uint8 internal constant MAX_OCR3_CONFIGS_PER_DON = 4;
+  uint8 internal constant MAX_NUM_ORACLES = 31;
 
   /// @param capabilityRegistry the canonical capability registry address.
   constructor(address capabilityRegistry) {
@@ -363,20 +369,46 @@ contract CCIPCapabilityConfiguration is ICapabilityConfiguration, OwnerIsCreator
     return (commitConfigs, execConfigs);
   }
 
-  function _validateConfig(OCR3Config memory ocr3Config) internal view {
-    if (ocr3Config.chainSelector == 0) {
+  function _validateConfig(OCR3Config memory cfg) internal view {
+    if (cfg.chainSelector == 0) {
       revert ChainSelectorNotSet();
     }
 
+    if (cfg.pluginType != PluginType.Commit && cfg.pluginType != PluginType.Execution) {
+      revert InvalidPluginType();
+    }
+
     // Check that the chain configuration is set.
-    if (!s_chainSelectors.contains(ocr3Config.chainSelector)) {
-      revert ChainSelectorNotFound(ocr3Config.chainSelector);
+    if (!s_chainSelectors.contains(cfg.chainSelector)) {
+      revert ChainSelectorNotFound(cfg.chainSelector);
+    }
+
+    // Some of these checks below are done in OCR2/3Base config validation, so we do them again here.
+    // Role DON OCR configs will have all the Role DON signers but only a subset of transmitters.
+    if (cfg.signers.length > MAX_NUM_ORACLES) {
+      revert TooManySigners();
+    }
+
+    if (cfg.transmitters.length > MAX_NUM_ORACLES) {
+      revert TooManyTransmitters();
+    }
+
+    if (cfg.f == 0) {
+      revert FMustBePositive();
+    }
+
+    if (cfg.signers.length <= 3 * cfg.f) {
+      revert FTooHigh();
     }
 
     // Check that the readers are in the capability registry.
-    for (uint256 i = 0; i < ocr3Config.signers.length; i++) {
+    for (uint256 i = 0; i < cfg.signers.length; i++) {
       // We expect a pair of (p2pId, signer) for each element in the signers array.
-      bytes[] memory signerP2PIdPair = ocr3Config.signers[i];
+      // p2pId is always the RageP2P public key of the oracle.
+      // signer is the onchain public key of the oracle, which is an address on EVM chains
+      // but could be different on other chain families.
+      bytes[] memory signerP2PIdPair = cfg.signers[i];
+
       if (signerP2PIdPair.length != 2) {
         revert SignerP2PIdPairMustBeLengthTwo(signerP2PIdPair.length);
       }
@@ -441,18 +473,19 @@ contract CCIPCapabilityConfiguration is ICapabilityConfiguration, OwnerIsCreator
 
     // Process additions next.
     for (uint256 i = 0; i < adds.length; i++) {
-      bytes32[] memory readers = adds[i].chainConfig.readers;
+      ChainConfig memory chainConfig = adds[i].chainConfig;
+      bytes32[] memory readers = chainConfig.readers;
       uint64 chainSelector = adds[i].chainSelector;
 
       // Verify that the provided readers are present in the capability registry.
-      for (uint256 j = 0; i < readers.length; j++) {
+      for (uint256 j = 0; j < readers.length; j++) {
         _ensureInRegistry(readers[j]);
       }
 
-      s_chainConfigurations[chainSelector] = adds[i].chainConfig;
+      s_chainConfigurations[chainSelector] = chainConfig;
       s_chainSelectors.add(chainSelector);
 
-      emit ChainConfigSet(chainSelector, adds[i].chainConfig);
+      emit ChainConfigSet(chainSelector, chainConfig);
     }
   }
 

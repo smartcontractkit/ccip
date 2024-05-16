@@ -46,4 +46,8 @@ contract CCIPCapabilityConfigurationHelper is CCIPCapabilityConfiguration {
   ) public pure returns (bytes32) {
     return _computeConfigDigest(donId, configCount, ocr3Config);
   }
+
+  function validateConfig(OCR3Config memory cfg) public view {
+    _validateConfig(cfg);
+  }
 }
