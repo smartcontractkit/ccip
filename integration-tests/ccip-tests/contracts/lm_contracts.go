@@ -48,62 +48,6 @@ func (e *CCIPContractsDeployer) DeployArmProxy(arm common.Address) (*ArmProxy, e
 	}, err
 }
 
-func (pool *TokenPool) SetRouter(routerAddr common.Address) error {
-	log.Info().
-		Str("Token Pool", pool.Address()).
-		Msg("Setting router on pool")
-	opts, err := pool.client.TransactionOpts(pool.client.GetDefaultWallet())
-	if err != nil {
-		return fmt.Errorf("failed to get transaction opts: %w", err)
-	}
-	tx, err := pool.Instance.Latest.LockReleasePool.SetRouter(opts, routerAddr)
-	if err != nil {
-		return fmt.Errorf("failed to set router: %w", err)
-
-	}
-	log.Info().
-		Str("Token Pool", pool.Address()).
-		Str("Router", routerAddr.String()).
-		Msg("Router set on pool")
-	return pool.client.ProcessTransaction(tx)
-}
-
-func (pool *TokenPool) GetRouter() (common.Address, error) {
-	routerAddr, err := pool.Instance.Latest.LockReleasePool.GetRouter(nil)
-	if err != nil {
-		return common.Address{}, fmt.Errorf("failed to get router address: %w", err)
-	}
-	return routerAddr, nil
-}
-
-func (pool *TokenPool) SetRebalancer(rebalancerAddress common.Address) error {
-	log.Info().
-		Str("Token Pool", pool.Address()).
-		Msg("Setting rebalancer on pool")
-	opts, err := pool.client.TransactionOpts(pool.client.GetDefaultWallet())
-	if err != nil {
-		return fmt.Errorf("failed to get transaction opts: %w", err)
-	}
-	tx, err := pool.Instance.Latest.LockReleasePool.SetRebalancer(opts, rebalancerAddress)
-	if err != nil {
-		return fmt.Errorf("failed to set router: %w", err)
-
-	}
-	log.Info().
-		Str("Token Pool", pool.Address()).
-		Str("Rebalancer", rebalancerAddress.String()).
-		Msg("Rebalancer set on pool")
-	return pool.client.ProcessTransaction(tx)
-}
-
-func (pool *TokenPool) GetRebalancer() (common.Address, error) {
-	rebalancerAddr, err := pool.Instance.Latest.LockReleasePool.GetRebalancer(nil)
-	if err != nil {
-		return common.Address{}, fmt.Errorf("failed to get rebalancer address: %w", err)
-	}
-	return rebalancerAddr, nil
-}
-
 type LiquidityManager struct {
 	client     blockchain.EVMClient
 	Instance   *liquiditymanager.LiquidityManager
