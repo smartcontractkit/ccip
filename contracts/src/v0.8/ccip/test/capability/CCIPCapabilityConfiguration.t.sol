@@ -442,6 +442,92 @@ contract CCIPCapabilityConfiguration_ConfigStateMachine is CCIPCapabilityConfigu
     }
   }
 
+  function test__computeNewConfigWithMeta_InitToRunning_Success() public {
+    uint32 donId = 1;
+    CCIPCapabilityConfiguration.OCR3ConfigWithMeta[] memory currentConfig = new CCIPCapabilityConfiguration.OCR3ConfigWithMeta[](0);
+    CCIPCapabilityConfiguration.OCR3Config[] memory newConfig = new CCIPCapabilityConfiguration.OCR3Config[](1);
+    newConfig[0] = CCIPCapabilityConfiguration.OCR3Config({
+      pluginType: CCIPCapabilityConfiguration.PluginType.Commit,
+      chainSelector: 1,
+      signers: makeAssociativeArray(4, 10),
+      transmitters: makeAssociativeArray(4, 20),
+      f: 1,
+      offchainConfigVersion: 30,
+      offchainConfig: bytes("commit")
+    });
+    CCIPCapabilityConfiguration.ConfigState currentState = CCIPCapabilityConfiguration.ConfigState.Init;
+    CCIPCapabilityConfiguration.ConfigState newState = CCIPCapabilityConfiguration.ConfigState.Running;
+    CCIPCapabilityConfiguration.OCR3ConfigWithMeta[] memory newConfigWithMeta =
+      s_ccipCC.computeNewConfigWithMeta(donId, currentConfig, newConfig, currentState, newState);
+    assertEq(newConfigWithMeta.length, 1, "new config with meta length must be 1");
+    assertEq(newConfigWithMeta[0].configCount, uint64(1), "config count must be 1");
+    assertEq(uint8(newConfigWithMeta[0].config.pluginType), uint8(newConfig[0].pluginType), "plugin type must match");
+    assertEq(newConfigWithMeta[0].config.offchainConfig, newConfig[0].offchainConfig, "offchain config must match");
+    assertEq(newConfigWithMeta[0].configDigest, s_ccipCC.computeConfigDigest(donId, 1, newConfig[0]), "config digest must match");
+
+    // This ensures that the test case is using correct inputs.
+    s_ccipCC.validateConfigTransition(currentConfig, newConfigWithMeta);
+  }
+
+  function test__computeNewConfigWithMeta_RunningToStaging_Success() public {
+    uint32 donId = 1;
+    CCIPCapabilityConfiguration.OCR3Config memory blueConfig = CCIPCapabilityConfiguration.OCR3Config({
+      pluginType: CCIPCapabilityConfiguration.PluginType.Commit,
+      chainSelector: 1,
+      signers: makeAssociativeArray(4, 10),
+      transmitters: makeAssociativeArray(4, 20),
+      f: 1,
+      offchainConfigVersion: 30,
+      offchainConfig: bytes("commit")
+    });
+    CCIPCapabilityConfiguration.OCR3Config memory greenConfig = CCIPCapabilityConfiguration.OCR3Config({
+      pluginType: CCIPCapabilityConfiguration.PluginType.Commit,
+      chainSelector: 1,
+      signers: makeAssociativeArray(4, 10),
+      transmitters: makeAssociativeArray(4, 20),
+      f: 1,
+      offchainConfigVersion: 30,
+      offchainConfig: bytes("commit-new")
+    });
+
+    CCIPCapabilityConfiguration.OCR3ConfigWithMeta[] memory currentConfig = new CCIPCapabilityConfiguration.OCR3ConfigWithMeta[](1);
+    currentConfig[0] = CCIPCapabilityConfiguration.OCR3ConfigWithMeta({
+      configCount: 1,
+      config: blueConfig,
+      configDigest: s_ccipCC.computeConfigDigest(donId, 1, blueConfig)
+    });
+
+    CCIPCapabilityConfiguration.OCR3Config[] memory newConfig = new CCIPCapabilityConfiguration.OCR3Config[](2);
+    // existing blue config first.
+    newConfig[0] = blueConfig;
+    // green config next.
+    newConfig[1] = greenConfig;
+
+    CCIPCapabilityConfiguration.ConfigState currentState = CCIPCapabilityConfiguration.ConfigState.Running;
+    CCIPCapabilityConfiguration.ConfigState newState = CCIPCapabilityConfiguration.ConfigState.Staging;
+
+    CCIPCapabilityConfiguration.OCR3ConfigWithMeta[] memory newConfigWithMeta =
+      s_ccipCC.computeNewConfigWithMeta(donId, currentConfig, newConfig, currentState, newState);
+    assertEq(newConfigWithMeta.length, 2, "new config with meta length must be 2");
+
+    assertEq(newConfigWithMeta[0].configCount, uint64(1), "config count of blue must be 1");
+    assertEq(uint8(newConfigWithMeta[0].config.pluginType), uint8(blueConfig.pluginType), "plugin type of blue must match");
+    assertEq(newConfigWithMeta[0].config.offchainConfig, blueConfig.offchainConfig, "offchain config of blue must match");
+    assertEq(newConfigWithMeta[0].configDigest, s_ccipCC.computeConfigDigest(donId, 1, blueConfig), "config digest of blue must match");
+
+    assertEq(newConfigWithMeta[1].configCount, uint64(2), "config count of green must be 2");
+    assertEq(uint8(newConfigWithMeta[1].config.pluginType), uint8(greenConfig.pluginType), "plugin type of green must match");
+    assertEq(newConfigWithMeta[1].config.offchainConfig, greenConfig.offchainConfig, "offchain config of green must match");
+    assertEq(newConfigWithMeta[1].configDigest, s_ccipCC.computeConfigDigest(donId, 2, greenConfig), "config digest of green must match");
+
+    // This ensures that the test case is using correct inputs.
+    s_ccipCC.validateConfigTransition(currentConfig, newConfigWithMeta);
+  }
+
+  function test__computeNewConfigWithMeta_StagingToRunning_Success() public {
+
+  }
+
   // Reverts.
 
   function test_Fuzz__stateFromConfigLength_Reverts(uint256 configLen) public {

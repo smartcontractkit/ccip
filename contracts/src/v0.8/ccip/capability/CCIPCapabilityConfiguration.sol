@@ -44,6 +44,7 @@ contract CCIPCapabilityConfiguration is ICapabilityConfiguration, OwnerIsCreator
   error InvalidConfigTransition();
   error WrongConfigCount(uint64 got, uint64 expected);
   error WrongConfigDigest(bytes32 got, bytes32 expected);
+  error WrongConfigDigestBlueGreen(bytes32 got, bytes32 expected);
 
   /// @notice PluginType indicates the type of plugin that the configuration is for.
   /// @param Commit The configuration is for the commit plugin.
@@ -195,11 +196,15 @@ contract CCIPCapabilityConfiguration is ICapabilityConfiguration, OwnerIsCreator
 
     OCR3Config[] memory ocr3Configs = abi.decode(config, (OCR3Config[]));
     (OCR3Config[] memory commitConfigs, OCR3Config[] memory execConfigs) = _groupByPluginType(ocr3Configs);
-    _updateConfigs(donId, PluginType.Commit, commitConfigs);
-    _updateConfigs(donId, PluginType.Execution, execConfigs);
+    if (commitConfigs.length > 0) {
+      _updatePluginConfig(donId, PluginType.Commit, commitConfigs);
+    }
+    if (execConfigs.length > 0) {
+      _updatePluginConfig(donId, PluginType.Execution, execConfigs);
+    }
   }
 
-  function _updateConfigs(uint32 donId, PluginType pluginType, OCR3Config[] memory newConfig) internal {
+  function _updatePluginConfig(uint32 donId, PluginType pluginType, OCR3Config[] memory newConfig) internal {
     OCR3ConfigWithMeta[] memory currentConfig = s_ocr3Configs[donId][pluginType];
 
     // Validate the state transition being proposed, which is implicitly defined by the combination
@@ -270,7 +275,7 @@ contract CCIPCapabilityConfiguration is ICapabilityConfiguration, OwnerIsCreator
       // * the config digest of the blue config must remain unchanged.
       // * the green config count must be the blue config count + 1.
       if (newConfigWithMeta[0].configDigest != currentConfig[0].configDigest) {
-        revert WrongConfigDigest(newConfigWithMeta[0].configDigest, currentConfig[0].configDigest);
+        revert WrongConfigDigestBlueGreen(newConfigWithMeta[0].configDigest, currentConfig[0].configDigest);
       }
       if (newConfigWithMeta[1].configCount != currentConfig[0].configCount + 1) {
         revert WrongConfigCount(newConfigWithMeta[1].configCount, currentConfig[0].configCount + 1);
