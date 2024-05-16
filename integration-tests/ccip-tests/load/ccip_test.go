@@ -20,23 +20,28 @@ import (
 )
 
 func setupReorgSuite(t *testing.T, loadArgs *LoadArgs) *ch.ReorgSuite {
-	t.Logf("source chain: %v", loadArgs.TestSetupArgs.Env.K8Env.URLs["source-chain_http"][0])
-	t.Logf("dest chain: %v", loadArgs.TestSetupArgs.Env.K8Env.URLs["dest-chain_http"][0])
-	t.Logf("source chain finality: %v", loadArgs.TestSetupArgs.Cfg.SelectedNetworks[0].FinalityDepth)
-	t.Logf("dest chain finality: %v", loadArgs.TestSetupArgs.Cfg.SelectedNetworks[1].FinalityDepth)
-	t.Logf("GrafanaURL: %v", *loadArgs.TestCfg.EnvInput.Logging.Grafana.BaseUrl)
-	t.Logf("GrafanaToken: %v", *loadArgs.TestCfg.EnvInput.Logging.Grafana.BearerToken)
-	t.Logf("DashboardURL: %v", *loadArgs.TestCfg.EnvInput.Logging.Grafana.DashboardUrl)
+	var finalitySrc uint64
+	var finalityDst uint64
+	if loadArgs.TestSetupArgs.Cfg.SelectedNetworks[0].FinalityTag {
+		finalitySrc = 10
+	} else {
+		finalitySrc = loadArgs.TestSetupArgs.Cfg.SelectedNetworks[0].FinalityDepth
+	}
+	if loadArgs.TestSetupArgs.Cfg.SelectedNetworks[1].FinalityTag {
+		finalityDst = 10
+	} else {
+		finalityDst = loadArgs.TestSetupArgs.Cfg.SelectedNetworks[1].FinalityDepth
+	}
 	rs, err := ch.NewReorgSuite(t, &ch.ReorgConfig{
 		SrcGethHTTPURL:     loadArgs.TestSetupArgs.Env.K8Env.URLs["source-chain_http"][0],
 		DstGethHTTPURL:     loadArgs.TestSetupArgs.Env.K8Env.URLs["dest-chain_http"][0],
-		SrcFinalityDepth:   loadArgs.TestSetupArgs.Cfg.SelectedNetworks[0].FinalityDepth,
-		DstFinalityDepth:   loadArgs.TestSetupArgs.Cfg.SelectedNetworks[1].FinalityDepth,
+		SrcFinalityDepth:   finalitySrc,
+		DstFinalityDepth:   finalityDst,
 		GrafanaURL:         *loadArgs.TestCfg.EnvInput.Logging.Grafana.BaseUrl,
 		GrafanaToken:       *loadArgs.TestCfg.EnvInput.Logging.Grafana.BearerToken,
 		DashboardURL:       *loadArgs.TestCfg.EnvInput.Logging.Grafana.DashboardUrl,
 		FinalityDelta:      5,
-		ExperimentDuration: 1 * time.Minute,
+		ExperimentDuration: 3 * time.Minute,
 	})
 	require.NoError(t, err)
 	return rs
@@ -58,7 +63,7 @@ func TestLoadCCIPStableRPSReorgsBelowFinality(t *testing.T) {
 		require.NoError(t, testArgs.TestSetupArgs.TearDown())
 	})
 	rs := setupReorgSuite(t, testArgs)
-	rs.RunReorgBelowFinalityThreshold()
+	rs.RunReorgBelowFinalityThreshold(1 * time.Minute)
 	testArgs.TriggerLoadByLane()
 	testArgs.Wait()
 }
@@ -79,7 +84,7 @@ func TestLoadCCIPStableRPSReorgsAboveFinality(t *testing.T) {
 		require.NoError(t, testArgs.TestSetupArgs.TearDown())
 	})
 	rs := setupReorgSuite(t, testArgs)
-	rs.RunReorgAboveFinalityThreshold()
+	rs.RunReorgAboveFinalityThreshold(1 * time.Minute)
 	testArgs.TriggerLoadByLane()
 	assert.Eventually(t, func() bool {
 		resp, _, err := testArgs.TestSetupArgs.Env.CLNodes[1].Health()

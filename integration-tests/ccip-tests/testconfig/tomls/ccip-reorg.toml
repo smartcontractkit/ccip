@@ -56,3 +56,6 @@ PriceMax = '200 gwei'
 LimitDefault = 6000000
 FeeCapDefault = '200 gwei'
 """
+
+[CCIP.Groups.load.LoadProfile]
+TestDuration = '30m'

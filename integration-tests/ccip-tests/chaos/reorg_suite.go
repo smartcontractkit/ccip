@@ -92,8 +92,9 @@ func (r *ReorgSuite) annotate(text string) {
 
 // RunReorgBelowFinalityThreshold we rollback both chains, one by one, for N blocks back
 // no assertions needed, load test should fail if something went wrong
-func (r *ReorgSuite) RunReorgBelowFinalityThreshold() {
+func (r *ReorgSuite) RunReorgBelowFinalityThreshold(startDelay time.Duration) {
 	go func() {
+		time.Sleep(startDelay)
 		blocksBackSrc := int(r.Cfg.SrcFinalityDepth) - r.Cfg.FinalityDelta
 		r.Logger.Warn().
 			Str("URL", r.SrcClient.URL).
@@ -120,8 +121,9 @@ func (r *ReorgSuite) RunReorgBelowFinalityThreshold() {
 
 // RunReorgAboveFinalityThreshold we rollback both chains, one by one, for N blocks back, above threshold
 // asserting there is no messages passing and finality violation is detected
-func (r *ReorgSuite) RunReorgAboveFinalityThreshold() {
+func (r *ReorgSuite) RunReorgAboveFinalityThreshold(startDelay time.Duration) {
 	go func() {
+		time.Sleep(startDelay)
 		blocksBackSrc := int(r.Cfg.SrcFinalityDepth) + r.Cfg.FinalityDelta
 		r.Logger.Warn().
 			Str("URL", r.SrcClient.URL).
