@@ -84,21 +84,23 @@ func TestLoadCCIPStableRPSReorgsAboveFinality(t *testing.T) {
 		require.NoError(t, testArgs.TestSetupArgs.TearDown())
 	})
 	rs := setupReorgSuite(t, testArgs)
-	rs.RunReorgAboveFinalityThreshold(1 * time.Minute)
+	rs.RunReorgAboveFinalityThreshold(1 * time.Second)
 	testArgs.TriggerLoadByLane()
+	clNodes := testArgs.TestSetupArgs.Env.CLNodes
 	assert.Eventually(t, func() bool {
-		resp, _, err := testArgs.TestSetupArgs.Env.CLNodes[1].Health()
-		require.NoError(t, err)
-		lggr.Debug().Any("Response", resp).Send()
-		for _, d := range resp.Data {
-			if d.Attributes.Name == "EVM.1337.LogPoller" {
-				require.Equal(t, d.Attributes.Output, "finality violated")
-				require.Equal(t, d.Attributes.Status, "failing")
-				return true
+		violatedResponses := 0
+		for _, node := range clNodes {
+			resp, _, err := node.Health()
+			require.NoError(t, err)
+			for _, d := range resp.Data {
+				if d.Attributes.Name == "EVM.1337.LogPoller" && d.Attributes.Output == "finality violated" && d.Attributes.Status == "failing" {
+					violatedResponses++
+				}
 			}
 		}
-		return false
-	}, 3*time.Minute, 5*time.Second)
+		lggr.Debug().Any("FinalityViolatedResponses", violatedResponses).Send()
+		return violatedResponses == len(clNodes)
+	}, 3*time.Minute, 20*time.Second, "not all the nodes report finality violation")
 }
 
 func TestLoadCCIPStableRPS(t *testing.T) {
