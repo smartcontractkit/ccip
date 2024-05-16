@@ -2,11 +2,12 @@
 pragma solidity ^0.8.0;
 
 import {OwnerIsCreator} from "../../shared/access/OwnerIsCreator.sol";
+import {ITypeAndVersion} from "../../shared/interfaces/ITypeAndVersion.sol";
 
 // TODO: consider splitting configs & verification logic off to auth library (if size is prohibitive)
 /// @notice Onchain verification of reports from the offchain reporting protocol
 ///         with multiple OCR plugin support.
-abstract contract MultiOCR3Base is OwnerIsCreator {
+abstract contract MultiOCR3Base is ITypeAndVersion, OwnerIsCreator {
   // Maximum number of oracles the offchain reporting protocol is designed for
   // TODO: consider bumping up to theoretical max
   uint256 internal constant MAX_NUM_ORACLES = 31;
@@ -163,13 +164,6 @@ abstract contract MultiOCR3Base is OwnerIsCreator {
     );
   }
 
-  /// @param ocrPluginType OCR plugin type to retrieve transmitters for
-  /// @return list of addresses permitted to transmit reports to this contract
-  /// @dev The list will match the order used to specify the transmitter during setConfig
-  function getTransmitters(uint8 ocrPluginType) external view returns (address[] memory) {
-    return s_ocrConfigs[ocrPluginType].transmitters;
-  }
-
   /// @notice _transmit is called to post a new report to the contract.
   ///         The function should be called after the per-DON reporting logic is completed.
   /// @param ocrPluginType OCR plugin type to transmit report for
@@ -226,34 +220,54 @@ abstract contract MultiOCR3Base is OwnerIsCreator {
     emit Transmitted(ocrPluginType, configDigest, uint32(uint256(reportContext[1]) >> 8));
 
     if (configInfo.isSignatureVerificationEnabled) {
-      // TODO: consider scoping this to reduce stack pressure / move to separate internal function
-      uint256 expectedNumSignatures;
-      if (configInfo.uniqueReports) {
-        expectedNumSignatures = (configInfo.n + configInfo.F) / 2 + 1;
-      } else {
-        expectedNumSignatures = configInfo.F + 1;
+      // Scoping to reduce stack pressure
+      // TODO: evaluate gas overhead of moving this to a separate internal function
+      {
+        uint256 expectedNumSignatures;
+        if (configInfo.uniqueReports) {
+          expectedNumSignatures = (configInfo.n + configInfo.F) / 2 + 1;
+        } else {
+          expectedNumSignatures = configInfo.F + 1;
+        }
+        if (rs.length != expectedNumSignatures) revert WrongNumberOfSignatures();
+        if (rs.length != ss.length) revert SignaturesOutOfRegistration();
       }
-      if (rs.length != expectedNumSignatures) revert WrongNumberOfSignatures();
-      if (rs.length != ss.length) revert SignaturesOutOfRegistration();
 
-      // Verify signatures attached to report
       bytes32 h = keccak256(abi.encodePacked(keccak256(report), reportContext));
-      bool[MAX_NUM_ORACLES] memory signed;
-
-      uint256 numberOfSignatures = rs.length;
-      for (uint256 i; i < numberOfSignatures; ++i) {
-        // Safe from ECDSA malleability here since we check for duplicate signers.
-        address signer = ecrecover(h, uint8(rawVs[i]) + 27, rs[i], ss[i]);
-        // Since we disallow address(0) as a valid signer address, it can
-        // never have a signer role.
-        Oracle memory oracle = s_oracles[ocrPluginType][signer];
-        if (oracle.role != Role.Signer) revert UnauthorizedSigner();
-        if (signed[oracle.index]) revert NonUniqueSignatures();
-        signed[oracle.index] = true;
-      }
+      _verifySignatures(ocrPluginType, h, rs, ss, rawVs);
     }
   }
 
+  /// @notice verifies the signatures of a hashed report value for one OCR plugin type
+  /// @param ocrPluginType OCR plugin type to transmit report for
+  /// @param hashedReport hashed encoded packing of report + reportContext
+  /// @param rs ith element is the R components of the ith signature on report. Must have at most MAX_NUM_ORACLES entries
+  /// @param ss ith element is the S components of the ith signature on report. Must have at most MAX_NUM_ORACLES entries
+  /// @param rawVs ith element is the the V component of the ith signature
+  function _verifySignatures(
+    uint8 ocrPluginType,
+    bytes32 hashedReport,
+    bytes32[] calldata rs,
+    bytes32[] calldata ss,
+    bytes32 rawVs // signatures
+  ) internal view {
+    // Verify signatures attached to report
+    bool[MAX_NUM_ORACLES] memory signed;
+
+    uint256 numberOfSignatures = rs.length;
+    for (uint256 i; i < numberOfSignatures; ++i) {
+      // Safe from ECDSA malleability here since we check for duplicate signers.
+      address signer = ecrecover(hashedReport, uint8(rawVs[i]) + 27, rs[i], ss[i]);
+      // Since we disallow address(0) as a valid signer address, it can
+      // never have a signer role.
+      Oracle memory oracle = s_oracles[ocrPluginType][signer];
+      if (oracle.role != Role.Signer) revert UnauthorizedSigner();
+      if (signed[oracle.index]) revert NonUniqueSignatures();
+      signed[oracle.index] = true;
+    }
+  }
+
+  // TODO: is this function required?
   /// @notice optionally returns the latest configDigest and sequence number for which
   /// a report was successfully transmitted. Alternatively, the contract may return
   /// scanLogs set to true and use Transmitted events to provide this information
@@ -263,14 +277,14 @@ abstract contract MultiOCR3Base is OwnerIsCreator {
   /// returned or whether to scan logs for the Transmitted event instead.
   /// @return configDigest
   /// @return sequenceNumber
-  function latestConfigDigestAndEpoch(uint8 ocrPluginType)
-    external
-    view
-    virtual
-    returns (bool scanLogs, bytes32 configDigest, uint64 sequenceNumber)
-  {
-    return (true, bytes32(0), uint64(0));
-  }
+  // function latestConfigDigestAndEpoch(uint8 ocrPluginType)
+  //   external
+  //   view
+  //   virtual
+  //   returns (bool scanLogs, bytes32 configDigest, uint64 sequenceNumber)
+  // {
+  //   return (true, bytes32(0), uint64(0));
+  // }
 
   /// @notice information about current offchain reporting protocol configuration
   /// @param ocrPluginType OCR plugin type to return config details for
