@@ -318,10 +318,8 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     s_offRamp.execute(_generateReportFromMessages(messages), new uint256[](0));
   }
 
-  function test__execute_SkippedAlreadyExecutedMessageUnordered_Success() public {
+  function test__execute_SkippedAlreadyExecutedMessage_Success() public {
     Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages();
-    messages[0].nonce = 0;
-    messages[0].messageId = Internal._hash(messages[0], s_offRamp.metadataHash());
 
     vm.expectEmit();
     emit ExecutionStateChanged(
@@ -336,8 +334,10 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     s_offRamp.execute(_generateReportFromMessages(messages), new uint256[](0));
   }
 
-  function test__execute_SkippedAlreadyExecutedMessage_Success() public {
+  function test__execute_SkippedAlreadyExecutedMessageUnordered_Success() public {
     Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages();
+    messages[0].nonce = 0;
+    messages[0].messageId = Internal._hash(messages[0], s_offRamp.metadataHash());
 
     vm.expectEmit();
     emit ExecutionStateChanged(

@@ -88,6 +88,12 @@ func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.Repor
 		return nil, types.ReportingPluginInfo{}, fmt.Errorf("get onchain config from offramp: %w", err)
 	}
 
+	msgVisibilityInterval := offchainConfig.MessageVisibilityInterval.Duration()
+	if msgVisibilityInterval == 0 {
+		// fallback to onchain config if offchain config is not set
+		msgVisibilityInterval = onchainConfig.PermissionLessExecutionThresholdSeconds
+	}
+
 	lggr := rf.config.lggr.Named("ExecutionReportingPlugin")
 	return &ExecutionReportingPlugin{
 			F:                           config.F,
@@ -108,7 +114,7 @@ func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.Repor
 			inflightReports:             newInflightExecReportsContainer(offchainConfig.InflightCacheExpiry.Duration()),
 			commitRootsCache: cache.NewCommitRootsCache(
 				lggr,
-				offchainConfig.MessageVisibilityInterval.Duration(),
+				msgVisibilityInterval,
 				offchainConfig.RootSnoozeTime.Duration(),
 			),
 			metricsCollector: rf.config.metricsCollector,
