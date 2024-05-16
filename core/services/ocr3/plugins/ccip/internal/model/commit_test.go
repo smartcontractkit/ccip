@@ -2,6 +2,7 @@ package model
 
 import (
 	"math"
+	"math/big"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -37,11 +38,15 @@ func TestCommitPluginOutcome_EncodeAndDecode(t *testing.T) {
 			NewMerkleRootChain(ChainSelector(1), NewSeqNumRange(21, 22), [32]byte{1}),
 			NewMerkleRootChain(ChainSelector(2), NewSeqNumRange(25, 35), [32]byte{2}),
 		},
+		[]TokenPrice{
+			NewTokenPrice("0x123", big.NewInt(1234)),
+			NewTokenPrice("0x125", big.NewInt(0).Mul(big.NewInt(999999999999), big.NewInt(999999999999))),
+		},
 	)
 
 	b, err := o.Encode()
 	assert.NoError(t, err)
-	assert.Equal(t, string(b), `{"maxSeqNums":[{"chainSel":1,"seqNum":20},{"chainSel":2,"seqNum":25}],"merkleRoots":[{"chain":1,"seqNumsRange":[21,22],"merkleRoot":"0x0100000000000000000000000000000000000000000000000000000000000000"},{"chain":2,"seqNumsRange":[25,35],"merkleRoot":"0x0200000000000000000000000000000000000000000000000000000000000000"}]}`)
+	assert.Equal(t, `{"maxSeqNums":[{"chainSel":1,"seqNum":20},{"chainSel":2,"seqNum":25}],"merkleRoots":[{"chain":1,"seqNumsRange":[21,22],"merkleRoot":"0x0100000000000000000000000000000000000000000000000000000000000000"},{"chain":2,"seqNumsRange":[25,35],"merkleRoot":"0x0200000000000000000000000000000000000000000000000000000000000000"}],"tokenPrices":[{"tokenID":"0x123","price":"1234"},{"tokenID":"0x125","price":"999999999998000000000001"}]}`, string(b))
 
 	o2, err := DecodeCommitPluginOutcome(b)
 	assert.NoError(t, err)
@@ -60,10 +65,10 @@ func TestCommitPluginReport(t *testing.T) {
 		r := NewCommitPluginReport(make([]MerkleRootChain, 1), nil)
 		assert.False(t, r.IsEmpty())
 
-		r = NewCommitPluginReport(nil, make([]TokenPriceUpdate, 1))
+		r = NewCommitPluginReport(nil, make([]TokenPrice, 1))
 		assert.False(t, r.IsEmpty())
 
-		r = NewCommitPluginReport(make([]MerkleRootChain, 1), make([]TokenPriceUpdate, 1))
+		r = NewCommitPluginReport(make([]MerkleRootChain, 1), make([]TokenPrice, 1))
 		assert.False(t, r.IsEmpty())
 	})
 }
