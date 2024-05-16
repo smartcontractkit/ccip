@@ -443,7 +443,7 @@ func TestSmokeCCIPSelfServeRateLimitOffRamp(t *testing.T) {
 					}
 				}
 				addFund(src.Common)
-				addFund(tc.lane.Dest.Common)
+				addFund(dest.Common)
 			}
 
 			var (
@@ -512,6 +512,8 @@ func TestSmokeCCIPSelfServeRateLimitOffRamp(t *testing.T) {
 			time.Sleep(actions.DefaultPermissionlessExecThreshold) // Give time to exit the window
 			err = tc.lane.ExecuteManually()
 			require.Error(t, err, "There should be errors executing manually at this point")
+			src.UpdateBalance(int64(tc.lane.NumberOfReq), tc.lane.TotalFee, tc.lane.Balance)
+			dest.UpdateBalance(tc.lane.Source.TransferAmount, int64(tc.lane.NumberOfReq), tc.lane.Balance)
 			tc.lane.Logger.Debug().Str("Error", err.Error()).Msg("Manually executed rate limited token transfer failed as expected")
 
 			// Change rate limit to make it viable
@@ -533,6 +535,8 @@ func TestSmokeCCIPSelfServeRateLimitOffRamp(t *testing.T) {
 			time.Sleep(waitTime)
 			err = tc.lane.ExecuteManually()
 			require.NoError(t, err, "Error manually executing transaction after rate limit is lifted")
+			src.UpdateBalance(int64(tc.lane.NumberOfReq), tc.lane.TotalFee, tc.lane.Balance)
+			dest.UpdateBalance(tc.lane.Source.TransferAmount, int64(tc.lane.NumberOfReq), tc.lane.Balance)
 		})
 	}
 }
