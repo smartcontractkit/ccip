@@ -2928,6 +2928,7 @@ type validationOptions struct {
 // ValidationOptionFunc is a function that can be passed to ValidateRequests to specify which phase is expected to fail
 type ValidationOptionFunc func(logger zerolog.Logger, opts *validationOptions)
 
+// PhaseSpecificValidationOptionFunc can specify how exactly you want a phase to fail
 type PhaseSpecificValidationOptionFunc func(*validationOptions)
 
 // WithErrorMessage specifies the expected error message for the phase that is expected to fail.
@@ -2937,7 +2938,7 @@ func WithErrorMessage(expectedErrorMessage string) PhaseSpecificValidationOption
 	}
 }
 
-// PhaseShouldExist specifies that a specific phase should exist, but be in a failed state. This is only applicable to the `ExecStateChanged` phase.
+// ShouldExist specifies that a specific phase should exist, but be in a failed state. This is only applicable to the `ExecStateChanged` phase.
 func ShouldExist() PhaseSpecificValidationOptionFunc {
 	return func(opts *validationOptions) {
 		opts.phaseShouldExist = true
