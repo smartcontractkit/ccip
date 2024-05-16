@@ -330,14 +330,13 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, AggregateRateLimiter, ITyp
   /// @dev If called from the DON, this array is always empty.
   /// @dev If called from manual execution, this array is always same length as messages.
   function _execute(Internal.ExecutionReportSingleChain memory report, uint256[] memory manualExecGasLimits) internal {
-    // TODO pass in source chain selector to check for cursed source chain
-    if (IRMN(i_rmnProxy).isCursed()) revert CursedByRMN();
+    uint64 sourceChainSelector = report.sourceChainSelector;
+    if (IRMN(i_rmnProxy).isCursed(bytes32(uint256(sourceChainSelector)))) revert CursedByRMN();
 
     uint256 numMsgs = report.messages.length;
     if (numMsgs == 0) revert EmptyReport();
     if (numMsgs != report.offchainTokenData.length) revert UnexpectedTokenData();
 
-    uint64 sourceChainSelector = report.sourceChainSelector;
     SourceChainConfig storage sourceChainConfig = s_sourceChainConfigs[sourceChainSelector];
     if (!sourceChainConfig.isEnabled) {
       revert SourceChainNotEnabled(sourceChainSelector);
@@ -366,9 +365,8 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, AggregateRateLimiter, ITyp
     bool manualExecution = manualExecGasLimits.length != 0;
     for (uint256 i = 0; i < numMsgs; ++i) {
       Internal.EVM2EVMMessage memory message = report.messages[i];
-      uint64 sequenceNumber = message.sequenceNumber;
 
-      Internal.MessageExecutionState originalState = getExecutionState(sourceChainSelector, sequenceNumber);
+      Internal.MessageExecutionState originalState = getExecutionState(sourceChainSelector, message.sequenceNumber);
       if (originalState == Internal.MessageExecutionState.SUCCESS) {
         // If the message has already been executed, we skip it.  We want to not revert on race conditions between
         // executing parties. This will allow us to open up manual exec while also attempting with the DON, without
@@ -384,7 +382,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, AggregateRateLimiter, ITyp
           originalState == Internal.MessageExecutionState.UNTOUCHED
             || originalState == Internal.MessageExecutionState.FAILURE
         )
-      ) revert AlreadyExecuted(sourceChainSelector, sequenceNumber);
+      ) revert AlreadyExecuted(sourceChainSelector, message.sequenceNumber);
 
       if (manualExecution) {
         bool isOldCommitReport =
@@ -403,7 +401,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, AggregateRateLimiter, ITyp
         // DON can only execute a message once
         // Acceptable state transitions: UNTOUCHED->SUCCESS, UNTOUCHED->FAILURE
         if (originalState != Internal.MessageExecutionState.UNTOUCHED) {
-          revert AlreadyAttempted(sourceChainSelector, sequenceNumber);
+          revert AlreadyAttempted(sourceChainSelector, message.sequenceNumber);
         }
       }
 
@@ -438,19 +436,20 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, AggregateRateLimiter, ITyp
 
       // Although we expect only valid messages will be committed, we check again
       // when executing as a defense in depth measure.
+      // TODO: GAS GOLF - evaluate caching sequenceNumber instead of offchainTokenData
       bytes[] memory offchainTokenData = report.offchainTokenData[i];
       _isWellFormed(
         message.messageId,
         sourceChainSelector,
-        sequenceNumber,
+        message.sequenceNumber,
         message.tokenAmounts.length,
         message.data.length,
         offchainTokenData.length
       );
 
-      _setExecutionState(sourceChainSelector, sequenceNumber, Internal.MessageExecutionState.IN_PROGRESS);
+      _setExecutionState(sourceChainSelector, message.sequenceNumber, Internal.MessageExecutionState.IN_PROGRESS);
       (Internal.MessageExecutionState newState, bytes memory returnData) = _trialExecute(message, offchainTokenData);
-      _setExecutionState(sourceChainSelector, sequenceNumber, newState);
+      _setExecutionState(sourceChainSelector, message.sequenceNumber, newState);
 
       // Since it's hard to estimate whether manual execution will succeed, we
       // revert the entire transaction if it fails. This will show the user if
@@ -463,7 +462,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, AggregateRateLimiter, ITyp
       // The only valid prior states are UNTOUCHED and FAILURE (checked above)
       // The only valid post states are FAILURE and SUCCESS (checked below)
       if (newState != Internal.MessageExecutionState.FAILURE && newState != Internal.MessageExecutionState.SUCCESS) {
-        revert InvalidNewState(sourceChainSelector, sequenceNumber, newState);
+        revert InvalidNewState(sourceChainSelector, message.sequenceNumber, newState);
       }
 
       // Nonce changes per state transition
@@ -475,7 +474,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, AggregateRateLimiter, ITyp
         s_senderNonce[sourceChainSelector][message.sender]++;
       }
 
-      emit ExecutionStateChanged(sourceChainSelector, sequenceNumber, message.messageId, newState, returnData);
+      emit ExecutionStateChanged(sourceChainSelector, message.sequenceNumber, message.messageId, newState, returnData);
     }
   }
 

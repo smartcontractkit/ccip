@@ -567,6 +567,18 @@ contract EVM2EVMMultiOffRamp_execute is EVM2EVMMultiOffRampSetup {
     s_offRamp.execute(_generateReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messages), new uint256[](0));
   }
 
+  function test_WithCurseOnAnotherSourceChain_Success() public {
+    s_mockRMN.voteToCurse(
+      0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff, bytes32(uint256(SOURCE_CHAIN_SELECTOR_2))
+    );
+    s_offRamp.execute(
+      _generateReportFromMessages(
+        SOURCE_CHAIN_SELECTOR_1, _generateMessagesWithTokens(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1)
+      ),
+      new uint256[](0)
+    );
+  }
+
   // Reverts
 
   function test_InvalidMessageId_Revert() public {
@@ -624,6 +636,28 @@ contract EVM2EVMMultiOffRamp_execute is EVM2EVMMultiOffRampSetup {
     RMN.UnvoteToCurseRecord[] memory records = new RMN.UnvoteToCurseRecord[](1);
     records[0] = RMN.UnvoteToCurseRecord({curseVoteAddr: OWNER, cursesHash: bytes32(uint256(0)), forceUnvote: true});
     s_mockRMN.ownerUnvoteToCurse(records);
+    s_offRamp.execute(
+      _generateReportFromMessages(
+        SOURCE_CHAIN_SELECTOR_1, _generateMessagesWithTokens(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1)
+      ),
+      new uint256[](0)
+    );
+  }
+
+  function test_UnhealthySingleChainCurse_Revert() public {
+    bytes32 subject = bytes32(uint256(SOURCE_CHAIN_SELECTOR_1));
+    s_mockRMN.voteToCurse(0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff, subject);
+    vm.expectRevert(EVM2EVMMultiOffRamp.CursedByRMN.selector);
+    s_offRamp.execute(
+      _generateReportFromMessages(
+        SOURCE_CHAIN_SELECTOR_1, _generateMessagesWithTokens(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1)
+      ),
+      new uint256[](0)
+    );
+    // Uncurse should succeed
+    RMN.UnvoteToCurseRecord[] memory records = new RMN.UnvoteToCurseRecord[](1);
+    records[0] = RMN.UnvoteToCurseRecord({curseVoteAddr: OWNER, cursesHash: bytes32(uint256(0)), forceUnvote: true});
+    s_mockRMN.ownerUnvoteToCurse(records, subject);
     s_offRamp.execute(
       _generateReportFromMessages(
         SOURCE_CHAIN_SELECTOR_1, _generateMessagesWithTokens(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1)
