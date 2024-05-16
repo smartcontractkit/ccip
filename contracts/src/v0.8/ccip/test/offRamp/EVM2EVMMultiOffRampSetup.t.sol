@@ -51,8 +51,6 @@ contract EVM2EVMMultiOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSet
     Internal.MessageExecutionState state,
     bytes returnData
   );
-  event SkippedIncorrectNonce(uint64 sourceChainSelector, uint64 nonce, address indexed sender);
-  event SkippedAlreadyExecutedMessage(uint64 indexed sequenceNumber);
 
   function setUp() public virtual override(TokenSetup, PriceRegistrySetup, OCR2BaseSetup) {
     TokenSetup.setUp();

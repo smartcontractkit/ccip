@@ -382,7 +382,9 @@ contract EVM2EVMMultiOffRamp_execute is EVM2EVMMultiOffRampSetup {
       Internal._hash(messages[0], s_offRamp.metadataHash(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1));
 
     vm.expectEmit();
-    emit SkippedIncorrectNonce(messages[0].sourceChainSelector, messages[0].nonce, messages[0].sender);
+    emit EVM2EVMMultiOffRamp.SkippedIncorrectNonce(
+      messages[0].sourceChainSelector, messages[0].nonce, messages[0].sender
+    );
 
     s_offRamp.execute(_generateReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messages), new uint256[](0));
   }
@@ -404,7 +406,7 @@ contract EVM2EVMMultiOffRamp_execute is EVM2EVMMultiOffRampSetup {
     );
 
     vm.expectEmit();
-    emit SkippedIncorrectNonce(SOURCE_CHAIN_SELECTOR_1, messages[1].nonce, messages[1].sender);
+    emit EVM2EVMMultiOffRamp.SkippedIncorrectNonce(SOURCE_CHAIN_SELECTOR_1, messages[1].nonce, messages[1].sender);
 
     s_offRamp.execute(_generateReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messages), new uint256[](0));
   }
@@ -424,7 +426,7 @@ contract EVM2EVMMultiOffRamp_execute is EVM2EVMMultiOffRampSetup {
     s_offRamp.execute(_generateReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messages), new uint256[](0));
 
     vm.expectEmit();
-    emit SkippedAlreadyExecutedMessage(messages[0].sequenceNumber);
+    emit EVM2EVMMultiOffRamp.SkippedAlreadyExecutedMessage(SOURCE_CHAIN_SELECTOR_1, messages[0].sequenceNumber);
 
     s_offRamp.execute(_generateReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messages), new uint256[](0));
   }
@@ -768,10 +770,6 @@ contract EVM2EVMMultiOffRamp_execute is EVM2EVMMultiOffRampSetup {
 }
 
 contract EVM2EVMMultiOffRamp_execute_upgrade is EVM2EVMMultiOffRampSetup {
-  event SkippedSenderWithPreviousRampMessageInflight(
-    uint64 indexed sourceChainSelector, uint64 nonce, address indexed sender
-  );
-
   EVM2EVMOffRampHelper internal s_prevOffRamp;
   EVM2EVMOffRampHelper[] internal s_nestedPrevOffRamps;
 
@@ -968,7 +966,9 @@ contract EVM2EVMMultiOffRamp_execute_upgrade is EVM2EVMMultiOffRampSetup {
     // new offramp sees msg nonce higher than senderNonce
     // it waits for previous offramp to execute
     vm.expectEmit();
-    emit SkippedSenderWithPreviousRampMessageInflight(SOURCE_CHAIN_SELECTOR_1, messages[0].nonce, newSender);
+    emit EVM2EVMMultiOffRamp.SkippedSenderWithPreviousRampMessageInflight(
+      SOURCE_CHAIN_SELECTOR_1, messages[0].nonce, newSender
+    );
     s_offRamp.execute(_generateReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messages), new uint256[](0));
     assertEq(startNonce, s_offRamp.getSenderNonce(SOURCE_CHAIN_SELECTOR_1, messages[0].sender));
 
@@ -1259,7 +1259,7 @@ contract EVM2EVMMultiOffRamp_batchExecute is EVM2EVMMultiOffRampSetup {
     );
 
     vm.expectEmit();
-    emit SkippedAlreadyExecutedMessage(messages[0].sequenceNumber);
+    emit EVM2EVMMultiOffRamp.SkippedAlreadyExecutedMessage(SOURCE_CHAIN_SELECTOR_1, messages[0].sequenceNumber);
 
     s_offRamp.batchExecute(reports, new uint256[][](2));
   }

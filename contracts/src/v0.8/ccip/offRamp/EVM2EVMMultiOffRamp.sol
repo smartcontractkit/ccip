@@ -61,11 +61,8 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, AggregateRateLimiter, ITyp
 
   /// @dev Atlas depends on this event, if changing, please notify Atlas.
   event ConfigSet(StaticConfig staticConfig, DynamicConfig dynamicConfig);
-  // TODO: revisit if fields have to be indexed for skip events
-  event SkippedIncorrectNonce(uint64 sourceChainSelector, uint64 nonce, address indexed sender);
-  event SkippedSenderWithPreviousRampMessageInflight(
-    uint64 indexed sourceChainSelector, uint64 nonce, address indexed sender
-  );
+  event SkippedIncorrectNonce(uint64 sourceChainSelector, uint64 nonce, address sender);
+  event SkippedSenderWithPreviousRampMessageInflight(uint64 sourceChainSelector, uint64 nonce, address sender);
   /// @dev RMN depends on this event, if changing, please notify the RMN maintainers.
   event ExecutionStateChanged(
     uint64 indexed sourceChainSelector,
@@ -78,8 +75,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, AggregateRateLimiter, ITyp
   event TokenAggregateRateLimitRemoved(address sourceToken, address destToken);
   event SourceChainSelectorAdded(uint64 sourceChainSelector);
   event SourceChainConfigSet(uint64 indexed sourceChainSelector, SourceChainConfig sourceConfig);
-  // TODO: index with source chain selector
-  event SkippedAlreadyExecutedMessage(uint64 indexed sequenceNumber);
+  event SkippedAlreadyExecutedMessage(uint64 indexed sourceChainSelector, uint64 indexed sequenceNumber);
 
   /// @notice Static offRamp config
   /// @dev RMN depends on this struct, if changing, please notify the RMN maintainers.
@@ -377,7 +373,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, AggregateRateLimiter, ITyp
         // If the message has already been executed, we skip it.  We want to not revert on race conditions between
         // executing parties. This will allow us to open up manual exec while also attempting with the DON, without
         // reverting an entire DON batch when a user manually executes while the tx is inflight.
-        emit SkippedAlreadyExecutedMessage(message.sequenceNumber);
+        emit SkippedAlreadyExecutedMessage(sourceChainSelector, message.sequenceNumber);
         continue;
       }
       // Two valid cases here, we either have never touched this message before, or we tried to execute
