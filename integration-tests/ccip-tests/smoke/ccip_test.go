@@ -530,13 +530,7 @@ func TestSmokeCCIPSelfServeRateLimitOffRamp(t *testing.T) {
 
 			// Execute again manually and expect a pass
 			err = tc.lane.ExecuteManually()
-			// DEBUG: Tracing the error
-			if err != nil {
-				tc.lane.Logger.Error().Err(err).Msg("Error executing manually")
-				tc.lane.Logger.Warn().Msg("Waiting so you can look at the revert reason")
-				time.Sleep(15 * time.Minute)
-			}
-			// require.NoError(t, err, "Error manually executing transaction after rate limit is lifted")
+			require.NoError(t, err, "Error manually executing transaction after rate limit is lifted")
 			src.UpdateBalance(int64(tc.lane.NumberOfReq), tc.lane.TotalFee, tc.lane.Balance)
 			dest.UpdateBalance(tc.lane.Source.TransferAmount, int64(tc.lane.NumberOfReq), tc.lane.Balance)
 		})
