@@ -41,7 +41,7 @@ contract CCIPCapabilityConfiguration is ICapabilityConfiguration, OwnerIsCreator
   error InvalidConfigState();
   error InvalidConfigLength();
   error InvalidConfigStateTransition(ConfigState currentState, ConfigState proposedState);
-  error InvalidConfigTransition();
+  error NonExistentConfigTransition();
   error WrongConfigCount(uint64 got, uint64 expected);
   error WrongConfigDigest(bytes32 got, bytes32 expected);
   error WrongConfigDigestBlueGreen(bytes32 got, bytes32 expected);
@@ -286,7 +286,7 @@ contract CCIPCapabilityConfiguration is ICapabilityConfiguration, OwnerIsCreator
         revert WrongConfigDigest(newConfigWithMeta[0].configDigest, currentConfig[1].configDigest);
       }
     } else {
-      revert InvalidConfigTransition();
+      revert NonExistentConfigTransition();
     }
   }
 

@@ -31,6 +31,7 @@ contract CCIPCapabilityConfigurationSetup is Test {
 
 contract CCIPCapabilityConfiguration_chainConfig is CCIPCapabilityConfigurationSetup {
   event ChainConfigSet(uint64 chainSelector, CCIPCapabilityConfiguration.ChainConfig chainConfig);
+  event ChainConfigRemoved(uint64 chainSelector);
 
   function test_applyChainConfigUpdates_addChainConfigs_Success() public {
     bytes32[] memory chainReaders = new bytes32[](1);
@@ -66,7 +67,50 @@ contract CCIPCapabilityConfiguration_chainConfig is CCIPCapabilityConfigurationS
     s_ccipCC.applyChainConfigUpdates(new CCIPCapabilityConfiguration.ChainConfigUpdate[](0), adds);
   }
 
-  function test_applyChainConfigUpdates_removeChainConfigs_Success() public {}
+  function test_applyChainConfigUpdates_removeChainConfigs_Success() public {
+    bytes32[] memory chainReaders = new bytes32[](1);
+    chainReaders[0] = keccak256(abi.encode(1));
+    CCIPCapabilityConfiguration.ChainConfigUpdate[] memory adds = new CCIPCapabilityConfiguration.ChainConfigUpdate[](2);
+    adds[0] = CCIPCapabilityConfiguration.ChainConfigUpdate({
+      chainSelector: 1,
+      chainConfig: CCIPCapabilityConfiguration.ChainConfig({readers: chainReaders, config: bytes("config1")})
+    });
+    adds[1] = CCIPCapabilityConfiguration.ChainConfigUpdate({
+      chainSelector: 2,
+      chainConfig: CCIPCapabilityConfiguration.ChainConfig({readers: chainReaders, config: bytes("config2")})
+    });
+
+    vm.mockCall(
+      CAPABILITY_REGISTRY,
+      abi.encodeWithSelector(ICapabilityRegistry.getNode.selector, chainReaders[0]),
+      abi.encode(
+        ICapabilityRegistry.NodeParams({
+          nodeOperatorId: 1,
+          signer: address(1),
+          p2pId: chainReaders[0],
+          hashedCapabilityIds: new bytes32[](0)
+        }),
+        uint32(1)
+      )
+    );
+
+    vm.expectEmit();
+    emit ChainConfigSet(1, adds[0].chainConfig);
+    vm.expectEmit();
+    emit ChainConfigSet(2, adds[1].chainConfig);
+    s_ccipCC.applyChainConfigUpdates(new CCIPCapabilityConfiguration.ChainConfigUpdate[](0), adds);
+
+    CCIPCapabilityConfiguration.ChainConfigUpdate[] memory removes =
+      new CCIPCapabilityConfiguration.ChainConfigUpdate[](1);
+    removes[0] = CCIPCapabilityConfiguration.ChainConfigUpdate({
+      chainSelector: 1,
+      chainConfig: CCIPCapabilityConfiguration.ChainConfig({readers: new bytes32[](0), config: bytes("config1")})
+    });
+
+    vm.expectEmit();
+    emit ChainConfigRemoved(1);
+    s_ccipCC.applyChainConfigUpdates(removes, new CCIPCapabilityConfiguration.ChainConfigUpdate[](0));
+  }
 
   function test_applyChainConfigUpdates_selectorNotFound_Reverts() public {
     CCIPCapabilityConfiguration.ChainConfigUpdate[] memory removes =
@@ -951,6 +995,15 @@ contract CCIPCapabilityConfiguration_ConfigStateMachine is CCIPCapabilityConfigu
         s_ccipCC.computeConfigDigest(donId, 2, greenConfig)
       )
     );
+    s_ccipCC.validateConfigTransition(currentConfig, newConfig);
+  }
+
+  function test__validateConfigTransition_NonExistentConfigTransition_Reverts() public {
+    CCIPCapabilityConfiguration.OCR3ConfigWithMeta[] memory currentConfig =
+      new CCIPCapabilityConfiguration.OCR3ConfigWithMeta[](3);
+    CCIPCapabilityConfiguration.OCR3ConfigWithMeta[] memory newConfig =
+      new CCIPCapabilityConfiguration.OCR3ConfigWithMeta[](1);
+    vm.expectRevert(CCIPCapabilityConfiguration.NonExistentConfigTransition.selector);
     s_ccipCC.validateConfigTransition(currentConfig, newConfig);
   }
 }
