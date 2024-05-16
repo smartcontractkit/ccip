@@ -45,9 +45,6 @@ func TestRunLogBasic(t *testing.T) {
 		Build()
 	require.NoError(t, err)
 
-	//TODO remove me
-	require.Truef(t, false, "only here to make the test fail")
-
 	network := networks.MustGetSelectedNetworkConfig(config.GetNetworkConfig())[0]
 	sethClient, err := env.GetSethClient(network.ChainID)
 	require.NoError(t, err, "Error getting seth client")
