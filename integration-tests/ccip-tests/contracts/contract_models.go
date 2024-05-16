@@ -1844,6 +1844,24 @@ func (offRamp *OffRamp) SetRateLimit(rlConfig evm_2_evm_offramp.RateLimiterConfi
 	return offRamp.client.ProcessTransaction(tx)
 }
 
+func (offRamp *OffRamp) CurrentRateLimiterState(ctx context.Context) (*evm_2_evm_offramp_1_2_0.RateLimiterTokenBucket, error) {
+	if offRamp.Instance.Latest != nil {
+		return nil, nil
+	}
+	opts := &bind.CallOpts{
+		From:    common.HexToAddress(offRamp.client.GetDefaultWallet().Address()),
+		Context: ctx,
+	}
+	if offRamp.Instance.V1_2_0 != nil {
+		state, err := offRamp.Instance.V1_2_0.CurrentRateLimiterState(opts)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get current rate limiter state: %w", err)
+		}
+		return &state, err
+	}
+	return nil, fmt.Errorf("no instance found to get current rate limiter state")
+}
+
 func (offRamp *OffRamp) SyncTokensAndPools(sourceTokens, pools []common.Address) error {
 	if offRamp.Instance.Latest != nil {
 		return nil

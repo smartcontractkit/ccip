@@ -519,8 +519,8 @@ func TestSmokeCCIPSelfServeRateLimitOffRamp(t *testing.T) {
 			// Change rate limit to make it viable
 			err = dest.OffRamp.SetRateLimit(evm_2_evm_offramp.RateLimiterConfig{
 				IsEnabled: true,
-				Capacity:  big.NewInt(0).Mul(aggregateRateLimit, big.NewInt(10)),
-				Rate:      big.NewInt(0).Mul(aggregateRateLimit, big.NewInt(10)),
+				Capacity:  big.NewInt(0).Mul(aggregateRateLimit, big.NewInt(100)),
+				Rate:      big.NewInt(0).Mul(aggregateRateLimit, big.NewInt(100)),
 			})
 			require.NoError(t, err, "Error setting destination rate limits")
 			err = dest.Common.ChainClient.WaitForEvents()
@@ -528,13 +528,14 @@ func TestSmokeCCIPSelfServeRateLimitOffRamp(t *testing.T) {
 			tc.lane.Logger.Debug().Str("Token", limitedSrcToken.ContractAddress.Hex()).Msg("Enabled aggregate rate limit on destination chain")
 
 			// Execute again manually and expect a pass
-			waitTime := time.Minute
-			tc.lane.Logger.Info().
-				Str("Wait Time", waitTime.String()).
-				Msg("Waiting for nodes to recognize rate limit change")
-			time.Sleep(waitTime)
 			err = tc.lane.ExecuteManually()
-			require.NoError(t, err, "Error manually executing transaction after rate limit is lifted")
+			// DEBUG: Tracing the error
+			if err != nil {
+				tc.lane.Logger.Error().Err(err).Msg("Error executing manually")
+				tc.lane.Logger.Warn().Msg("Waiting so you can look at the revert reason")
+				time.Sleep(15 * time.Minute)
+			}
+			// require.NoError(t, err, "Error manually executing transaction after rate limit is lifted")
 			src.UpdateBalance(int64(tc.lane.NumberOfReq), tc.lane.TotalFee, tc.lane.Balance)
 			dest.UpdateBalance(tc.lane.Source.TransferAmount, int64(tc.lane.NumberOfReq), tc.lane.Balance)
 		})

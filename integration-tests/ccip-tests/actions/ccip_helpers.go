@@ -2901,7 +2901,10 @@ func (lane *CCIPLane) ExecuteManually() error {
 				return fmt.Errorf("could not get receipt: %w seqNum %d", err, seqNum)
 			}
 			if rec.Status != 1 {
-				return fmt.Errorf("manual execution failed for seqNum %d with receipt status %d and error: %w", seqNum, rec.Status, err)
+				return fmt.Errorf(
+					"manual execution failed for seqNum %d with receipt status %d, use the revert-reason script on this transaction hash '%s' and this sender address '%s'",
+					seqNum, rec.Status, tx.Hash().Hex(), destUser.From.Hex(),
+				)
 			}
 			lane.Logger.Info().Uint64("seqNum", seqNum).Msg("Manual Execution completed")
 			_, err = lane.Dest.AssertEventExecutionStateChanged(lane.Logger, seqNum, lane.ValidationTimeout,
