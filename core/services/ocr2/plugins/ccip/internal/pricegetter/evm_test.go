@@ -99,6 +99,7 @@ func testParamAggregatorOnly(t *testing.T) testParameters {
 	tk1 := utils.RandomAddress()
 	tk2 := utils.RandomAddress()
 	tk3 := utils.RandomAddress()
+	tk4 := utils.RandomAddress()
 	cfg := config.DynamicPriceGetterConfig{
 		AggregatorPrices: map[common.Address]config.AggregatorPriceConfig{
 			tk1: {
@@ -111,6 +112,10 @@ func testParamAggregatorOnly(t *testing.T) testParameters {
 			},
 			tk3: {
 				ChainID:                   103,
+				AggregatorContractAddress: utils.RandomAddress(),
+			},
+			tk4: {
+				ChainID:                   104,
 				AggregatorContractAddress: utils.RandomAddress(),
 			},
 		},
@@ -140,15 +145,25 @@ func testParamAggregatorOnly(t *testing.T) testParameters {
 		UpdatedAt:       big.NewInt(1715743907),
 		AnsweredInRound: big.NewInt(3000),
 	}
+	// Fake data for a token with more than 18 decimals.
+	round4 := aggregator_v3_interface.LatestRoundData{
+		RoundId:         big.NewInt(4000),
+		Answer:          multExp(big.NewInt(1234567890), 10), // 20 digits.
+		StartedAt:       big.NewInt(1715753907),
+		UpdatedAt:       big.NewInt(1715753907),
+		AnsweredInRound: big.NewInt(4000),
+	}
 	evmClients := map[uint64]DynamicPriceGetterClient{
 		uint64(101): mockClient(t, []uint8{8}, []aggregator_v3_interface.LatestRoundData{round1}),
 		uint64(102): mockClient(t, []uint8{8}, []aggregator_v3_interface.LatestRoundData{round2}),
 		uint64(103): mockClient(t, []uint8{18}, []aggregator_v3_interface.LatestRoundData{round3}),
+		uint64(104): mockClient(t, []uint8{20}, []aggregator_v3_interface.LatestRoundData{round4}),
 	}
 	expectedTokenPrices := map[common.Address]big.Int{
-		tk1: *multExp(round1.Answer, 10), // expected in 1e18 format.
-		tk2: *multExp(round2.Answer, 10), // expected in 1e18 format.
-		tk3: *round3.Answer,              // already in 1e18 format (contract decimals==18).
+		tk1: *multExp(round1.Answer, 10),         // expected in 1e18 format.
+		tk2: *multExp(round2.Answer, 10),         // expected in 1e18 format.
+		tk3: *round3.Answer,                      // already in 1e18 format (contract decimals==18).
+		tk4: *multExp(big.NewInt(1234567890), 8), // expected in 1e18 format.
 	}
 	return testParameters{
 		cfg:                        cfg,
