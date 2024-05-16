@@ -2888,7 +2888,9 @@ func ExpectPhaseToFail(phase testreporters.Phase, phaseSpecificOptions ...PhaseS
 	return func(logger zerolog.Logger, opts *validationOptions) {
 		opts.phaseExpectedToFail = phase
 		for _, f := range phaseSpecificOptions {
-			f(opts)
+			if f != nil {
+				f(opts)
+			}
 		}
 		if phase == testreporters.ExecStateChanged {
 			if opts.expectedErrorMessage != "" {
@@ -2913,7 +2915,9 @@ func (lane *CCIPLane) ValidateRequests(validationOptionFuncs ...ValidationOption
 	var opts validationOptions
 	require.LessOrEqual(lane.Test, len(validationOptionFuncs), 1, "only one validation option function can be passed in to ValidateRequests")
 	for _, f := range validationOptionFuncs {
-		f(lane.Logger, &opts)
+		if f != nil {
+			f(lane.Logger, &opts)
+		}
 	}
 	for txHash, ccipReqs := range lane.SentReqs {
 		require.Greater(lane.Test, len(ccipReqs), 0, "no ccip requests found for tx hash")
