@@ -2855,9 +2855,9 @@ func (lane *CCIPLane) ExecuteManually() error {
 
 // validationOptions are used in the ValidateRequests function to specify which phase is expected to fail and how
 type validationOptions struct {
-	phaseExpectedToFail testreporters.Phase // the phase expected to fail
-	phaseShouldExist    bool                // for some phases, their lack of existence is a failure, for others their existence can also have a failure state
-	errorMessage        string              // if the phase doesn't exist, it should return an error message that matches this one
+	phaseExpectedToFail  testreporters.Phase // the phase expected to fail
+	phaseShouldExist     bool                // for some phases, their lack of existence is a failure, for others their existence can also have a failure state
+	expectedErrorMessage string              // if provided, we're looking for a specific error message
 }
 
 // ValidationOptionFunc is a function that can be passed to ValidateRequests to specify which phase is expected to fail
@@ -2900,7 +2900,9 @@ func ExpectExecStateChangedToFail(shouldExist bool) ValidationOptionFunc {
 		opts.phaseExpectedToFail = testreporters.ExecStateChanged
 		opts.phaseShouldExist = shouldExist
 		if !shouldExist {
-			opts.errorMessage = "ExecutionStateChanged event not found for seq num"
+			opts.expectedErrorMessage = "ExecutionStateChanged event not found for seq num"
+		} else {
+			opts.expectedErrorMessage = "ExecutionStateChanged event state - expected"
 		}
 	}
 }
@@ -3017,19 +3019,14 @@ func isPhaseValid(
 	if err == nil {
 		return true, fmt.Errorf("expected phase '%s' to fail, but it passed", opts.phaseExpectedToFail)
 	}
-	// Handles the case where the phase is expected to have been found, but generate an error message
-	if opts.phaseShouldExist && opts.errorMessage != "" {
-		if !strings.Contains(err.Error(), opts.errorMessage) {
-			return true, fmt.Errorf(
-				"expected phase '%s' to fail, which it did, but also expected its error message to contain '%s', but got '%s'",
-				currentPhase, opts.errorMessage, err.Error(),
-			)
+	logmsg := logger.Debug().Str("Failed with Error", err.Error()).Str("Phase", string(currentPhase))
+	if opts.expectedErrorMessage != "" {
+		if !strings.Contains(err.Error(), opts.expectedErrorMessage) {
+			return true, fmt.Errorf("expected phase '%s' to fail with error message '%s' but got error '%s'", currentPhase, opts.expectedErrorMessage, err.Error())
 		}
+		logmsg.Str("Expected Error Message", opts.expectedErrorMessage)
 	}
-	logger.Debug().
-		Str("Failed with Error", err.Error()).
-		Str("Phase", string(currentPhase)).
-		Msg("Expected phase to fail and it did")
+	logmsg.Msg("Expected phase to fail and it did")
 	return true, nil
 }
 
