@@ -9,10 +9,10 @@ on:
         description: 'Base64 encoded toml test input'
         required: false
 
-# Only run 1 of this workflow at a time per PR
-concurrency:
-  group: load-ccip-tests-chainlink-${{ github.ref }}
-  cancel-in-progress: true
+## Only run 1 of this workflow at a time per PR
+#concurrency:
+#  group: load-ccip-tests-chainlink-${{ github.ref }}
+#  cancel-in-progress: true
 
 env:
   CHAINLINK_IMAGE: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink
