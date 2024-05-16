@@ -42,24 +42,22 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
 
     s_priceRegistry.updatePrices(getSingleTokenPriceUpdateStruct(CUSTOM_TOKEN, CUSTOM_TOKEN_PRICE));
 
-    address WETH = s_sourceRouter.getWrappedNative();
-
     s_feeTokenConfigArgs.push(
       EVM2EVMMultiOnRamp.FeeTokenConfigArgs({
         token: s_sourceFeeToken,
-        networkFeeUSDCents: 1_00, // 1 USD
-        gasMultiplierWeiPerEth: 1e18, // 1x
-        premiumMultiplierWeiPerEth: 5e17, // 0.5x
-        enabled: true
+        feeTokenConfig: EVM2EVMMultiOnRamp.FeeTokenConfig({
+          premiumMultiplierWeiPerEth: 5e17, // 0.5x
+          enabled: true
+        })
       })
     );
     s_feeTokenConfigArgs.push(
       EVM2EVMMultiOnRamp.FeeTokenConfigArgs({
-        token: WETH,
-        networkFeeUSDCents: 5_00, // 5 USD
-        gasMultiplierWeiPerEth: 2e18, // 2x
-        premiumMultiplierWeiPerEth: 2e18, // 2x
-        enabled: true
+        token: s_sourceRouter.getWrappedNative(),
+        feeTokenConfig: EVM2EVMMultiOnRamp.FeeTokenConfig({
+          premiumMultiplierWeiPerEth: 2e18, // 2x
+          enabled: true
+        })
       })
     );
 
@@ -246,7 +244,9 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
         defaultTokenFeeUSDCents: DEFAULT_TOKEN_FEE_USD_CENTS,
         defaultTokenDestGasOverhead: DEFAULT_TOKEN_DEST_GAS_OVERHEAD,
         defaultTokenDestBytesOverhead: DEFAULT_TOKEN_BYTES_OVERHEAD,
-        defaultTxGasLimit: GAS_LIMIT
+        defaultTxGasLimit: GAS_LIMIT,
+        gasMultiplierWeiPerEth: 5e17,
+        networkFeeUSDCents: 1_00
       }),
       prevOnRamp: address(0)
     });
@@ -300,5 +300,13 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
     assertEq(a.router, b.router);
     assertEq(a.priceRegistry, b.priceRegistry);
     assertEq(a.tokenAdminRegistry, b.tokenAdminRegistry);
+  }
+
+  function assertFeeTokenConfigEqual(
+    EVM2EVMMultiOnRamp.FeeTokenConfig memory a,
+    EVM2EVMMultiOnRamp.FeeTokenConfig memory b
+  ) internal pure {
+    assertEq(a.premiumMultiplierWeiPerEth, b.premiumMultiplierWeiPerEth);
+    assertEq(a.enabled, b.enabled);
   }
 }
