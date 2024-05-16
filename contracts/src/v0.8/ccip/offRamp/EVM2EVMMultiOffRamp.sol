@@ -51,7 +51,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, AggregateRateLimiter, ITyp
   error ReceiverError(bytes error);
   error TokenHandlingError(bytes error);
   error EmptyReport();
-  error CursedByRMN();
+  error CursedByRMN(uint64 sourceChainSelector);
   error InvalidMessageId(bytes32 messageId);
   error NotACompatiblePool(address notPool);
   error InvalidDataLength(uint256 expected, uint256 got);
@@ -98,6 +98,14 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, AggregateRateLimiter, ITyp
     bytes32 metadataHash; //      Source-chain specific message hash preimage to ensure global uniqueness
   }
 
+  /// @notice SourceChainConfig update args scoped to one source chain
+  struct SourceChainConfigArgs {
+    uint64 sourceChainSelector; //  ───╮  Source chain selector of the config to update
+    bool isEnabled; //                 │  Flag whether the source chain is enabled or not
+    address prevOffRamp; // ───────────╯  Address of previous-version per-lane OffRamp. Used to be able to provide seequencing continuity during a zero downtime upgrade.
+    address onRamp; //                    OnRamp address on the source chain
+  }
+
   /// @notice Dynamic offRamp config
   /// @dev since OffRampConfig is part of OffRampConfigChanged event, if changing it, we should update the ABI on Atlas
   struct DynamicConfig {
@@ -120,14 +128,6 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, AggregateRateLimiter, ITyp
     bytes sender; //                    Message sender
     uint64 sourceChainSelector; // ───╮ Source chain that the message originates from
     address receiver; // ─────────────╯ Address that receives the message
-  }
-
-  /// @notice SourceChainConfig update args scoped to one source chain
-  struct SourceChainConfigArgs {
-    uint64 sourceChainSelector; //  ───╮  Source chain selector of the config to update
-    bool isEnabled; //                 │  Flag whether the source chain is enabled or not
-    address prevOffRamp; // ───────────╯  Address of previous-version per-lane OffRamp. Used to be able to provide seequencing continuity during a zero downtime upgrade.
-    address onRamp; //                    OnRamp address on the source chain
   }
 
   // STATIC CONFIG
@@ -331,7 +331,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, AggregateRateLimiter, ITyp
   /// @dev If called from manual execution, this array is always same length as messages.
   function _execute(Internal.ExecutionReportSingleChain memory report, uint256[] memory manualExecGasLimits) internal {
     uint64 sourceChainSelector = report.sourceChainSelector;
-    if (IRMN(i_rmnProxy).isCursed(bytes32(uint256(sourceChainSelector)))) revert CursedByRMN();
+    if (IRMN(i_rmnProxy).isCursed(bytes32(uint256(sourceChainSelector)))) revert CursedByRMN(sourceChainSelector);
 
     uint256 numMsgs = report.messages.length;
     if (numMsgs == 0) revert EmptyReport();
@@ -623,6 +623,10 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, AggregateRateLimiter, ITyp
     for (uint256 i = 0; i < sourceChainConfigUpdates.length; ++i) {
       SourceChainConfigArgs memory sourceConfigUpdate = sourceChainConfigUpdates[i];
       uint64 sourceChainSelector = sourceConfigUpdate.sourceChainSelector;
+
+      if (sourceChainSelector == 0) {
+        revert InvalidStaticConfig(sourceChainSelector);
+      }
 
       if (sourceConfigUpdate.onRamp == address(0)) {
         revert ZeroAddressNotAllowed();
