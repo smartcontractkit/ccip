@@ -402,6 +402,7 @@ contract CCIPCapabilityConfiguration is ICapabilityConfiguration, OwnerIsCreator
     }
 
     // Check that the readers are in the capability registry.
+    // TODO: check for duplicate signers, duplicate p2p ids, etc.
     for (uint256 i = 0; i < cfg.signers.length; i++) {
       // We expect a pair of (p2pId, signer) for each element in the signers array.
       // p2pId is always the RageP2P public key of the oracle.

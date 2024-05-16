@@ -111,10 +111,9 @@ contract CCIPCapabilityConfiguration_chainConfig is CCIPCapabilityConfigurationS
 contract CCIPCapabilityConfiguration_validateConfig is CCIPCapabilityConfigurationSetup {
   event ChainConfigSet(uint64 chainSelector, CCIPCapabilityConfiguration.ChainConfig chainConfig);
 
-  function test__validateConfig_Success() public {
-    uint256 numNodes = 4;
-    bytes[][] memory signers = makeAssociativeArray(numNodes, 10);
-    bytes[][] memory transmitters = makeAssociativeArray(numNodes, 20);
+  function addChainConfig(uint256 numNodes) internal returns (bytes[][] memory signers, bytes[][] memory transmitters) {
+    signers = makeAssociativeArray(numNodes, 10);
+    transmitters = makeAssociativeArray(numNodes, 20);
     bytes32[] memory readers = new bytes32[](numNodes);
     for (uint256 i = 0; i < numNodes; i++) {
       readers[i] = abi.decode(signers[i][0], (bytes32));
@@ -143,16 +142,187 @@ contract CCIPCapabilityConfiguration_validateConfig is CCIPCapabilityConfigurati
     emit ChainConfigSet(1, adds[0].chainConfig);
     s_ccipCC.applyChainConfigUpdates(new CCIPCapabilityConfiguration.ChainConfigUpdate[](0), adds);
 
+    return (signers, transmitters);
+  }
+
+  function test__validateConfig_Success() public {
+    (bytes[][] memory signers, bytes[][] memory transmitters) = addChainConfig(4);
+
     // Config is for 4 nodes, so f == 1.
     CCIPCapabilityConfiguration.OCR3Config memory config = CCIPCapabilityConfiguration.OCR3Config({
       pluginType: CCIPCapabilityConfiguration.PluginType.Commit,
       chainSelector: 1,
       signers: signers,
-      transmitters: signers,
+      transmitters: transmitters,
       f: 1,
       offchainConfigVersion: 30,
       offchainConfig: bytes("offchainConfig")
     });
+    s_ccipCC.validateConfig(config);
+  }
+
+  function test__validateConfig_ChainSelectorNotSet_Reverts() public {
+    (bytes[][] memory signers, bytes[][] memory transmitters) = addChainConfig(4);
+
+    // Config is for 4 nodes, so f == 1.
+    CCIPCapabilityConfiguration.OCR3Config memory config = CCIPCapabilityConfiguration.OCR3Config({
+      pluginType: CCIPCapabilityConfiguration.PluginType.Commit,
+      chainSelector: 0, // invalid
+      signers: signers,
+      transmitters: transmitters,
+      f: 1,
+      offchainConfigVersion: 30,
+      offchainConfig: bytes("offchainConfig")
+    });
+
+    vm.expectRevert(CCIPCapabilityConfiguration.ChainSelectorNotSet.selector);
+    s_ccipCC.validateConfig(config);
+  }
+
+  function test__validateConfig_ChainSelectorNotFound_Reverts() public {
+    (bytes[][] memory signers, bytes[][] memory transmitters) = addChainConfig(4);
+
+    // Config is for 4 nodes, so f == 1.
+    CCIPCapabilityConfiguration.OCR3Config memory config = CCIPCapabilityConfiguration.OCR3Config({
+      pluginType: CCIPCapabilityConfiguration.PluginType.Commit,
+      chainSelector: 2, // not set
+      signers: signers,
+      transmitters: transmitters,
+      f: 1,
+      offchainConfigVersion: 30,
+      offchainConfig: bytes("offchainConfig")
+    });
+
+    vm.expectRevert(abi.encodeWithSelector(CCIPCapabilityConfiguration.ChainSelectorNotFound.selector, 2));
+    s_ccipCC.validateConfig(config);
+  }
+
+  function test__validateConfig_TooManySigners_Reverts() public {
+    // 32 > 31 (max num oracles)
+    (bytes[][] memory signers, bytes[][] memory transmitters) = addChainConfig(32);
+
+    CCIPCapabilityConfiguration.OCR3Config memory config = CCIPCapabilityConfiguration.OCR3Config({
+      pluginType: CCIPCapabilityConfiguration.PluginType.Commit,
+      chainSelector: 1,
+      signers: signers,
+      transmitters: transmitters,
+      f: 1,
+      offchainConfigVersion: 30,
+      offchainConfig: bytes("offchainConfig")
+    });
+
+    vm.expectRevert(CCIPCapabilityConfiguration.TooManySigners.selector);
+    s_ccipCC.validateConfig(config);
+  }
+
+  function test__validateConfig_TooManyTransmitters_Reverts() public {
+    // 32 > 31 (max num oracles)
+    (bytes[][] memory signers, bytes[][] memory transmitters) = addChainConfig(32);
+
+    // truncate signers but keep transmitters > 31
+    assembly {
+      mstore(signers, 30)
+    }
+
+    CCIPCapabilityConfiguration.OCR3Config memory config = CCIPCapabilityConfiguration.OCR3Config({
+      pluginType: CCIPCapabilityConfiguration.PluginType.Commit,
+      chainSelector: 1,
+      signers: signers,
+      transmitters: transmitters,
+      f: 1,
+      offchainConfigVersion: 30,
+      offchainConfig: bytes("offchainConfig")
+    });
+
+    vm.expectRevert(CCIPCapabilityConfiguration.TooManyTransmitters.selector);
+    s_ccipCC.validateConfig(config);
+  }
+
+  function test__validateConfig_FMustBePositive_Reverts() public {
+    (bytes[][] memory signers, bytes[][] memory transmitters) = addChainConfig(4);
+
+    // Config is for 4 nodes, so f == 1.
+    CCIPCapabilityConfiguration.OCR3Config memory config = CCIPCapabilityConfiguration.OCR3Config({
+      pluginType: CCIPCapabilityConfiguration.PluginType.Commit,
+      chainSelector: 1,
+      signers: signers,
+      transmitters: transmitters,
+      f: 0,
+      offchainConfigVersion: 30,
+      offchainConfig: bytes("offchainConfig")
+    });
+
+    vm.expectRevert(CCIPCapabilityConfiguration.FMustBePositive.selector);
+    s_ccipCC.validateConfig(config);
+  }
+
+  function test__validateConfig_FTooHigh_Reverts() public {
+    (bytes[][] memory signers, bytes[][] memory transmitters) = addChainConfig(4);
+
+    CCIPCapabilityConfiguration.OCR3Config memory config = CCIPCapabilityConfiguration.OCR3Config({
+      pluginType: CCIPCapabilityConfiguration.PluginType.Commit,
+      chainSelector: 1,
+      signers: signers,
+      transmitters: transmitters,
+      f: 2,
+      offchainConfigVersion: 30,
+      offchainConfig: bytes("offchainConfig")
+    });
+
+    vm.expectRevert(CCIPCapabilityConfiguration.FTooHigh.selector);
+    s_ccipCC.validateConfig(config);
+  }
+
+  function test__validateConfig_SignerP2PIdPairMustBeLengthTwo_Reverts() public {
+    (bytes[][] memory signers, bytes[][] memory transmitters) = addChainConfig(4);
+    signers[0] = new bytes[](1);
+
+    // Config is for 4 nodes, so f == 1.
+    CCIPCapabilityConfiguration.OCR3Config memory config = CCIPCapabilityConfiguration.OCR3Config({
+      pluginType: CCIPCapabilityConfiguration.PluginType.Commit,
+      chainSelector: 1,
+      signers: signers,
+      transmitters: transmitters,
+      f: 1,
+      offchainConfigVersion: 30,
+      offchainConfig: bytes("offchainConfig")
+    });
+
+    vm.expectRevert(abi.encodeWithSelector(CCIPCapabilityConfiguration.SignerP2PIdPairMustBeLengthTwo.selector, 1));
+    s_ccipCC.validateConfig(config);
+  }
+
+  function test__validateConfig_NodeNotInRegistry_Reverts() public {
+    (bytes[][] memory signers, bytes[][] memory transmitters) = addChainConfig(4);
+    bytes32 nonExistentP2PId = keccak256("notInRegistry");
+    signers[0][0] = abi.encode(nonExistentP2PId);
+
+    vm.mockCall(
+      CAPABILITY_REGISTRY,
+      abi.encodeWithSelector(ICapabilityRegistry.getNode.selector, nonExistentP2PId),
+      abi.encode(
+        ICapabilityRegistry.NodeParams({
+          nodeOperatorId: 0,
+          signer: address(0),
+          p2pId: bytes32(uint256(0)),
+          hashedCapabilityIds: new bytes32[](0)
+        }),
+        uint32(1)
+      )
+    );
+
+    // Config is for 4 nodes, so f == 1.
+    CCIPCapabilityConfiguration.OCR3Config memory config = CCIPCapabilityConfiguration.OCR3Config({
+      pluginType: CCIPCapabilityConfiguration.PluginType.Commit,
+      chainSelector: 1,
+      signers: signers,
+      transmitters: transmitters,
+      f: 1,
+      offchainConfigVersion: 30,
+      offchainConfig: bytes("offchainConfig")
+    });
+
+    vm.expectRevert(abi.encodeWithSelector(CCIPCapabilityConfiguration.NodeNotInRegistry.selector, nonExistentP2PId));
     s_ccipCC.validateConfig(config);
   }
 }
