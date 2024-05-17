@@ -12,7 +12,6 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/logging"
 	"github.com/smartcontractkit/chainlink-testing-framework/utils/ptr"
 
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/token_pool"
@@ -478,7 +477,7 @@ func TestSmokeCCIPSelfServeRateLimitOffRamp(t *testing.T) {
 			// Enable aggregate rate limiting on the destination chain for the limited token
 			err = dest.AddRateLimitTokens([]*contracts.ERC20Token{limitedSrcToken}, []*contracts.ERC20Token{limitedDestToken})
 			require.NoError(t, err, "Error setting destination rate limits")
-			err = dest.OffRamp.SetRateLimit(evm_2_evm_offramp.RateLimiterConfig{
+			err = dest.OffRamp.SetRateLimit(contracts.RateLimiterConfig{
 				IsEnabled: true,
 				Capacity:  aggregateRateLimit,
 				Rate:      aggregateRateLimit,
@@ -516,7 +515,7 @@ func TestSmokeCCIPSelfServeRateLimitOffRamp(t *testing.T) {
 			tc.lane.Logger.Debug().Str("Error", err.Error()).Msg("Manually executed rate limited token transfer failed as expected")
 
 			// Change rate limit to make it viable
-			err = dest.OffRamp.SetRateLimit(evm_2_evm_offramp.RateLimiterConfig{
+			err = dest.OffRamp.SetRateLimit(contracts.RateLimiterConfig{
 				IsEnabled: true,
 				Capacity:  big.NewInt(0).Mul(aggregateRateLimit, big.NewInt(100)),
 				Rate:      big.NewInt(0).Mul(aggregateRateLimit, big.NewInt(100)),

@@ -3123,7 +3123,7 @@ func (lane *CCIPLane) DisableAllRateLimiting() error {
 	if err != nil {
 		return fmt.Errorf("error disabling rate limit for source onramp: %w", err)
 	}
-	err = dest.OffRamp.SetRateLimit(evm_2_evm_offramp.RateLimiterConfig{
+	err = dest.OffRamp.SetRateLimit(contracts.RateLimiterConfig{
 		IsEnabled: false,
 		Capacity:  big.NewInt(0),
 		Rate:      big.NewInt(0),
