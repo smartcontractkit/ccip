@@ -160,7 +160,7 @@ func TestSmokeCCIPRateLimit(t *testing.T) {
 				Msg("Initial Token Pool rate limiter state")
 
 			// some sanity checks
-			rlOffRamp, err := tc.lane.Dest.OffRamp.Instance.CurrentRateLimiterState(nil)
+			rlOffRamp, err := tc.lane.Dest.OffRamp.CurrentRateLimiterState(nil)
 			require.NoError(t, err)
 			tc.lane.Logger.Info().Interface("rate limit", rlOffRamp).Msg("Initial OffRamp rate limiter state")
 			if rlOffRamp.IsEnabled {
