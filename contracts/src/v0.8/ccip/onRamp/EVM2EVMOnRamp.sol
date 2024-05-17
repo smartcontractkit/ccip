@@ -342,11 +342,12 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
         })
       );
 
-      // Since the DON has to pay for the extraData to be included on the destination chain, we cap the length of the extraData.
-      // This prevents gas bomb attacks on the NOPs. We use destBytesOverhead as a proxy to cap the number of bytes we accept.
-      // As destBytesOverhead accounts for extraData + offchainData, this caps the worst case abuse to the number of bytes reserved for offchainData.
-      // It therefore fully mitigates gas bombs for most tokens, as most tokens don't use offchainData.
-      if (poolReturnData.destPoolData.length > s_tokenTransferFeeConfig[tokenAndAmount.token].destBytesOverhead) {
+      // Since the DON has to pay for the extraData to be included on the destination chain, we cap the length of the
+      // extraData. This prevents gas bomb attacks on the NOPs.
+      if (
+        poolReturnData.destPoolData.length > Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES
+          && poolReturnData.destPoolData.length > s_tokenTransferFeeConfig[tokenAndAmount.token].destBytesOverhead
+      ) {
         revert SourceTokenDataTooLarge(tokenAndAmount.token);
       }
       // We validate the pool address to ensure it is a valid EVM address
@@ -365,8 +366,8 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     newMessage.messageId = Internal._hash(newMessage, i_metadataHash);
 
     // Emit message request
-    // Note this must happen after pools, some tokens (eg USDC) emit events that we
-    // expect to directly precede this event.
+    // This must happen after any pool events as some tokens (e.g. USDC) emit events that we expect to precede this
+    // event in the offchain code.
     emit CCIPSendRequested(newMessage);
     return newMessage.messageId;
   }
@@ -633,7 +634,9 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
       }
 
       tokenTransferGas += transferFeeConfig.destGasOverhead;
-      tokenTransferBytesOverhead += transferFeeConfig.destBytesOverhead;
+      tokenTransferBytesOverhead += transferFeeConfig.destBytesOverhead == 0
+        ? uint32(Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES)
+        : transferFeeConfig.destBytesOverhead;
 
       // Bps fees should be kept within range of [minFeeUSD, maxFeeUSD].
       // Convert USD values with 2 decimals to 18 decimals.

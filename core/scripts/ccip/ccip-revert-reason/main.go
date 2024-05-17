@@ -20,13 +20,15 @@ var (
 )
 
 func main() {
-	flag.Usage = func() {
-		fmt.Println("Usage: go run . [flags]")
-		fmt.Println("You must provide either an error code string or the transaction details and an RPC URL to decode the error")
-		flag.PrintDefaults()
-	}
-
-	flag.Parse()
+	//flag.Usage = func() {
+	//	fmt.Println("Usage: go run . [flags]")
+	//	fmt.Println("You must provide either an error code string or the transaction details and an RPC URL to decode the error")
+	//	flag.PrintDefaults()
+	//}
+	//
+	//flag.Parse()
+	errrrr := "0x37c3be29"
+	errorCodeString = &errrrr
 
 	if *errorCodeString == "" && (*chainId == 0 || *txHash == "" || *txRequester == "") {
 		flag.Usage()
