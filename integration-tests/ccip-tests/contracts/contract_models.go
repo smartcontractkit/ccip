@@ -771,7 +771,7 @@ func (pool *TokenPool) SetRemoteChainOnPool(remoteChainSelectors []uint64) error
 	return pool.client.ProcessTransaction(tx)
 }
 
-// SetRemoteChainRateLimits is an offchain function that sets the RateLimiterConfig on the token pool, which controls the Token Pool's rate limit.
+// SetRemoteChainRateLimits sets the rate limits for the token pool on the remote chain
 func (pool *TokenPool) SetRemoteChainRateLimits(remoteChainSelector uint64, rl token_pool.RateLimiterConfig) error {
 	opts, err := pool.client.TransactionOpts(pool.client.GetDefaultWallet())
 	if err != nil {
@@ -1826,6 +1826,9 @@ func (offRamp *OffRamp) AddRateLimitTokens(sourceTokens, destTokens []common.Add
 // RemoveRateLimitTokens removes token pairs to the OffRamp's rate limit.
 // If you ask to remove a token pair that doesn't exist, it will return an error.
 func (offRamp *OffRamp) RemoveRateLimitTokens(ctx context.Context, sourceTokens, destTokens []common.Address) error {
+	if offRamp.Instance.Latest == nil {
+		return nil
+	}
 	if len(sourceTokens) != len(destTokens) {
 		return fmt.Errorf("source and dest tokens must be of the same length")
 	}
@@ -1886,6 +1889,10 @@ func (offRamp *OffRamp) RemoveRateLimitTokens(ctx context.Context, sourceTokens,
 
 // RemoveAllRateLimitTokens removes all token pairs from the OffRamp's rate limit.
 func (offRamp *OffRamp) RemoveAllRateLimitTokens(ctx context.Context) error {
+	if offRamp.Instance.Latest == nil {
+		return nil
+	}
+
 	callOpts := &bind.CallOpts{
 		From:    common.HexToAddress(offRamp.client.GetDefaultWallet().Address()),
 		Context: ctx,

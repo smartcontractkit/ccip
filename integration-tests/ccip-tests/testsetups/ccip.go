@@ -41,7 +41,7 @@ import (
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/contracts"
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/contracts/laneconfig"
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/testconfig"
-	tsconfig "github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/testconfig"
+	ccipconfig "github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/testconfig"
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/testreporters"
 	testutils "github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/utils"
 	"github.com/smartcontractkit/chainlink/integration-tests/docker/test_env"
@@ -354,12 +354,12 @@ func (c *CCIPTestConfig) SetOCRParams() error {
 }
 
 func NewCCIPTestConfig(t *testing.T, lggr zerolog.Logger, tType string) *CCIPTestConfig {
-	testCfg := tsconfig.GlobalTestConfig()
+	testCfg := ccipconfig.GlobalTestConfig()
 	groupCfg, exists := testCfg.CCIP.Groups[tType]
 	if !exists {
 		t.Fatalf("group config for %s does not exist", tType)
 	}
-	if tType == tsconfig.Load {
+	if tType == ccipconfig.Load {
 		if testCfg.CCIP.Env.Logging == nil || testCfg.CCIP.Env.Logging.Loki == nil {
 			t.Fatal("loki config is required to be set for load test")
 		}

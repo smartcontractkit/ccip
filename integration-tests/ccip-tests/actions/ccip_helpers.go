@@ -89,7 +89,6 @@ var (
 	// 1 day should be enough for most of the cases
 	DefaultPermissionlessExecThreshold        = time.Hour * 8
 	DefaultMaxNoOfTokensInMsg          uint16 = 50
-	CurrentVersion                            = "1.5.0-dev"
 )
 
 type CCIPTOMLEnv struct {
@@ -2820,8 +2819,10 @@ func (lane *CCIPLane) SendRequests(noOfRequests int, gasLimit *big.Int) error {
 }
 
 // ExecuteManually attempts to execute pending CCIP transactions manually.
-// This is necessary in situations where the transaction is reverted on, or not able to reach,the destination chain,
-// which can block further transactions for that user. More info: https://docs.chain.link/ccip/concepts/manual-execution#manual-execution
+// This is necessary in situations where Smart Execution window for that message is over and Offchain plugin
+// will not attempt to execute the message.In such situation any further message from same sender will not be executed until
+// the blocking message is executed by the OffRamp.
+// More info: https://docs.chain.link/ccip/concepts/manual-execution#manual-execution
 func (lane *CCIPLane) ExecuteManually() error {
 	onRampABI, err := abi.JSON(strings.NewReader(evm_2_evm_onramp.EVM2EVMOnRampABI))
 	if err != nil {
