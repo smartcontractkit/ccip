@@ -18,7 +18,7 @@ contract EVM2EVMMultiOnRamp_constructor is EVM2EVMMultiOnRampSetup {
   event ConfigSet(EVM2EVMMultiOnRamp.StaticConfig staticConfig, EVM2EVMMultiOnRamp.DynamicConfig dynamicConfig);
   event PoolAdded(address token, address pool);
   event DestChainAdded(uint64 indexed destChainSelector, EVM2EVMMultiOnRamp.DestChainConfig destChainConfig);
-  event FeeTokenConfigUpdated(address indexed token, EVM2EVMMultiOnRamp.FeeTokenConfig feeTokenConfig);
+  event FeeTokenConfigUpdated(address indexed token, uint64 feeTokenConfig);
 
   function test_Constructor_Success() public {
     EVM2EVMMultiOnRamp.StaticConfig memory staticConfig = EVM2EVMMultiOnRamp.StaticConfig({
@@ -81,13 +81,11 @@ contract EVM2EVMMultiOnRamp_constructor is EVM2EVMMultiOnRampSetup {
     EVM2EVMMultiOnRamp.DestChainConfig memory gotDestChainConfig = s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR);
     assertDestChainConfigsEqual(expectedDestChainConfig, gotDestChainConfig);
 
-    EVM2EVMMultiOnRamp.FeeTokenConfig memory gotFeeTokenConfig0 =
-      s_onRamp.getFeeTokenConfig(s_feeTokenConfigArgs[0].token);
-    assertFeeTokenConfigEqual(s_feeTokenConfigArgs[0].feeTokenConfig, gotFeeTokenConfig0);
+    uint64 gotFeeTokenConfig0 = s_onRamp.getFeeTokenConfig(s_feeTokenConfigArgs[0].token);
+    assertEq(s_feeTokenConfigArgs[0].feeTokenConfig, gotFeeTokenConfig0);
 
-    EVM2EVMMultiOnRamp.FeeTokenConfig memory gotFeeTokenConfig1 =
-      s_onRamp.getFeeTokenConfig(s_feeTokenConfigArgs[1].token);
-    assertFeeTokenConfigEqual(s_feeTokenConfigArgs[1].feeTokenConfig, gotFeeTokenConfig1);
+    uint64 gotFeeTokenConfig1 = s_onRamp.getFeeTokenConfig(s_feeTokenConfigArgs[1].token);
+    assertEq(s_feeTokenConfigArgs[1].feeTokenConfig, gotFeeTokenConfig1);
 
     // Initial values
     assertEq("EVM2EVMMultiOnRamp 1.6.0-dev", s_onRamp.typeAndVersion());
@@ -938,7 +936,7 @@ contract EVM2EVMMultiOnRamp_getFee is EVM2EVMMultiOnRamp_getFeeSetup {
     for (uint256 i = 0; i < feeTokenPrices.length; ++i) {
       Client.EVM2AnyMessage memory message = _generateEmptyMessage();
       message.feeToken = testTokens[i];
-      EVM2EVMMultiOnRamp.FeeTokenConfig memory feeTokenConfig = s_onRamp.getFeeTokenConfig(message.feeToken);
+      uint64 feeTokenConfig = s_onRamp.getFeeTokenConfig(message.feeToken);
       EVM2EVMMultiOnRamp.DestChainDynamicConfig memory destChainDynamicConfig =
         s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR).dynamicConfig;
 
@@ -946,8 +944,7 @@ contract EVM2EVMMultiOnRamp_getFee is EVM2EVMMultiOnRamp_getFeeSetup {
 
       uint256 gasUsed = GAS_LIMIT + DEST_GAS_OVERHEAD;
       uint256 gasFeeUSD = (gasUsed * destChainDynamicConfig.gasMultiplierWeiPerEth * USD_PER_GAS);
-      uint256 messageFeeUSD =
-        (configUSDCentToWei(destChainDynamicConfig.networkFeeUSDCents) * feeTokenConfig.premiumMultiplierWeiPerEth);
+      uint256 messageFeeUSD = (configUSDCentToWei(destChainDynamicConfig.networkFeeUSDCents) * feeTokenConfig);
       uint256 dataAvailabilityFeeUSD = s_onRamp.getDataAvailabilityCost(
         DEST_CHAIN_SELECTOR, USD_PER_DATA_AVAILABILITY_GAS, message.data.length, message.tokenAmounts.length, 0
       );
@@ -970,7 +967,7 @@ contract EVM2EVMMultiOnRamp_getFee is EVM2EVMMultiOnRamp_getFeeSetup {
     s_onRamp.applyDestChainConfigUpdates(destChainConfigArgs);
 
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
-    EVM2EVMMultiOnRamp.FeeTokenConfig memory feeTokenConfig = s_onRamp.getFeeTokenConfig(message.feeToken);
+    uint64 feeTokenConfig = s_onRamp.getFeeTokenConfig(message.feeToken);
     EVM2EVMMultiOnRamp.DestChainDynamicConfig memory destChainDynamicConfig =
       s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR).dynamicConfig;
 
@@ -978,8 +975,7 @@ contract EVM2EVMMultiOnRamp_getFee is EVM2EVMMultiOnRamp_getFeeSetup {
 
     uint256 gasUsed = GAS_LIMIT + DEST_GAS_OVERHEAD;
     uint256 gasFeeUSD = (gasUsed * destChainDynamicConfig.gasMultiplierWeiPerEth * USD_PER_GAS);
-    uint256 messageFeeUSD =
-      (configUSDCentToWei(destChainDynamicConfig.networkFeeUSDCents) * feeTokenConfig.premiumMultiplierWeiPerEth);
+    uint256 messageFeeUSD = (configUSDCentToWei(destChainDynamicConfig.networkFeeUSDCents) * feeTokenConfig);
 
     uint256 totalPriceInFeeToken = (gasFeeUSD + messageFeeUSD) / s_feeTokenPrice;
     assertEq(totalPriceInFeeToken, feeAmount);
@@ -1000,15 +996,14 @@ contract EVM2EVMMultiOnRamp_getFee is EVM2EVMMultiOnRamp_getFeeSetup {
         extraArgs: Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: customGasLimit}))
       });
 
-      EVM2EVMMultiOnRamp.FeeTokenConfig memory feeTokenConfig = s_onRamp.getFeeTokenConfig(message.feeToken);
+      uint64 feeTokenConfig = s_onRamp.getFeeTokenConfig(message.feeToken);
       EVM2EVMMultiOnRamp.DestChainDynamicConfig memory destChainDynamicConfig =
         s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR).dynamicConfig;
 
       uint256 feeAmount = s_onRamp.getFee(DEST_CHAIN_SELECTOR, message);
       uint256 gasUsed = customGasLimit + DEST_GAS_OVERHEAD + customDataSize * DEST_GAS_PER_PAYLOAD_BYTE;
       uint256 gasFeeUSD = (gasUsed * destChainDynamicConfig.gasMultiplierWeiPerEth * USD_PER_GAS);
-      uint256 messageFeeUSD =
-        (configUSDCentToWei(destChainDynamicConfig.networkFeeUSDCents) * feeTokenConfig.premiumMultiplierWeiPerEth);
+      uint256 messageFeeUSD = (configUSDCentToWei(destChainDynamicConfig.networkFeeUSDCents) * feeTokenConfig);
       uint256 dataAvailabilityFeeUSD = s_onRamp.getDataAvailabilityCost(
         DEST_CHAIN_SELECTOR, USD_PER_DATA_AVAILABILITY_GAS, message.data.length, message.tokenAmounts.length, 0
       );
@@ -1026,7 +1021,7 @@ contract EVM2EVMMultiOnRamp_getFee is EVM2EVMMultiOnRamp_getFeeSetup {
     for (uint256 i = 0; i < feeTokenPrices.length; ++i) {
       Client.EVM2AnyMessage memory message = _generateSingleTokenMessage(s_sourceFeeToken, tokenAmount);
       message.feeToken = testTokens[i];
-      EVM2EVMMultiOnRamp.FeeTokenConfig memory feeTokenConfig = s_onRamp.getFeeTokenConfig(message.feeToken);
+      uint64 feeTokenConfig = s_onRamp.getFeeTokenConfig(message.feeToken);
       EVM2EVMMultiOnRamp.DestChainDynamicConfig memory destChainDynamicConfig =
         s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR).dynamicConfig;
       uint32 tokenGasOverhead = s_onRamp.getTokenTransferFeeConfig(message.tokenAmounts[0].token).destGasOverhead;
@@ -1038,7 +1033,7 @@ contract EVM2EVMMultiOnRamp_getFee is EVM2EVMMultiOnRamp_getFeeSetup {
       uint256 gasFeeUSD = (gasUsed * destChainDynamicConfig.gasMultiplierWeiPerEth * USD_PER_GAS);
       (uint256 transferFeeUSD,,) =
         s_onRamp.getTokenTransferCost(DEST_CHAIN_SELECTOR, message.feeToken, feeTokenPrices[i], message.tokenAmounts);
-      uint256 messageFeeUSD = (transferFeeUSD * feeTokenConfig.premiumMultiplierWeiPerEth);
+      uint256 messageFeeUSD = (transferFeeUSD * feeTokenConfig);
       uint256 dataAvailabilityFeeUSD = s_onRamp.getDataAvailabilityCost(
         DEST_CHAIN_SELECTOR,
         USD_PER_DATA_AVAILABILITY_GAS,
@@ -1065,7 +1060,7 @@ contract EVM2EVMMultiOnRamp_getFee is EVM2EVMMultiOnRamp_getFeeSetup {
         feeToken: testTokens[i],
         extraArgs: Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: customGasLimit}))
       });
-      EVM2EVMMultiOnRamp.FeeTokenConfig memory feeTokenConfig = s_onRamp.getFeeTokenConfig(message.feeToken);
+      uint64 feeTokenConfig = s_onRamp.getFeeTokenConfig(message.feeToken);
       EVM2EVMMultiOnRamp.DestChainDynamicConfig memory destChainDynamicConfig =
         s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR).dynamicConfig;
 
@@ -1085,7 +1080,7 @@ contract EVM2EVMMultiOnRamp_getFee is EVM2EVMMultiOnRamp_getFeeSetup {
       uint256 gasFeeUSD = (gasUsed * destChainDynamicConfig.gasMultiplierWeiPerEth * USD_PER_GAS);
       (uint256 transferFeeUSD,,) =
         s_onRamp.getTokenTransferCost(DEST_CHAIN_SELECTOR, message.feeToken, feeTokenPrices[i], message.tokenAmounts);
-      uint256 messageFeeUSD = (transferFeeUSD * feeTokenConfig.premiumMultiplierWeiPerEth);
+      uint256 messageFeeUSD = (transferFeeUSD * feeTokenConfig);
       uint256 dataAvailabilityFeeUSD = s_onRamp.getDataAvailabilityCost(
         DEST_CHAIN_SELECTOR,
         USD_PER_DATA_AVAILABILITY_GAS,
@@ -1190,7 +1185,7 @@ contract EVM2EVMMultiOnRamp_setDynamicConfig is EVM2EVMMultiOnRampSetup {
 }
 
 contract EVM2EVMOnRamp_applyFeeTokenConfigUpdates is EVM2EVMMultiOnRampSetup {
-  event FeeTokenConfigUpdated(address indexed token, EVM2EVMMultiOnRamp.FeeTokenConfig feeTokenConfig);
+  event FeeTokenConfigUpdated(address indexed token, uint64 feeTokenConfig);
 
   function test_Fuzz_applyFeeTokenConfigUpdates_Success(EVM2EVMMultiOnRamp.FeeTokenConfigArgs memory feeTokenConfigArg)
     public
@@ -1203,7 +1198,7 @@ contract EVM2EVMOnRamp_applyFeeTokenConfigUpdates is EVM2EVMMultiOnRampSetup {
 
     s_onRamp.applyFeeTokenConfigUpdates(feeTokenConfigArgs);
 
-    assertFeeTokenConfigEqual(feeTokenConfigArg.feeTokenConfig, s_onRamp.getFeeTokenConfig(feeTokenConfigArg.token));
+    assertEq(feeTokenConfigArg.feeTokenConfig, s_onRamp.getFeeTokenConfig(feeTokenConfigArg.token));
   }
 
   function test_applyFeeTokenConfigUpdatesSingleToken_Success() public {
@@ -1216,7 +1211,7 @@ contract EVM2EVMOnRamp_applyFeeTokenConfigUpdates is EVM2EVMMultiOnRampSetup {
 
     s_onRamp.applyFeeTokenConfigUpdates(feeTokenConfigArgs);
 
-    assertFeeTokenConfigEqual(s_feeTokenConfigArgs[0].feeTokenConfig, s_onRamp.getFeeTokenConfig(vm.addr(1)));
+    assertEq(s_feeTokenConfigArgs[0].feeTokenConfig, s_onRamp.getFeeTokenConfig(vm.addr(1)));
   }
 
   function test_applyFeeTokenConfigUpdatesMultipleTokens_Success() public {
@@ -1232,8 +1227,8 @@ contract EVM2EVMOnRamp_applyFeeTokenConfigUpdates is EVM2EVMMultiOnRampSetup {
 
     s_onRamp.applyFeeTokenConfigUpdates(feeTokenConfigArgs);
 
-    assertFeeTokenConfigEqual(feeTokenConfigArgs[0].feeTokenConfig, s_onRamp.getFeeTokenConfig(vm.addr(1)));
-    assertFeeTokenConfigEqual(feeTokenConfigArgs[1].feeTokenConfig, s_onRamp.getFeeTokenConfig(vm.addr(2)));
+    assertEq(feeTokenConfigArgs[0].feeTokenConfig, s_onRamp.getFeeTokenConfig(vm.addr(1)));
+    assertEq(feeTokenConfigArgs[1].feeTokenConfig, s_onRamp.getFeeTokenConfig(vm.addr(2)));
   }
 
   function test_applyFeeTokenConfigUpdatesByAdmin_Success() public {
@@ -1250,8 +1245,8 @@ contract EVM2EVMOnRamp_applyFeeTokenConfigUpdates is EVM2EVMMultiOnRampSetup {
 
     s_onRamp.applyFeeTokenConfigUpdates(s_feeTokenConfigArgs);
 
-    assertFeeTokenConfigEqual(s_feeTokenConfigArgs[0].feeTokenConfig, s_onRamp.getFeeTokenConfig(vm.addr(1)));
-    assertFeeTokenConfigEqual(s_feeTokenConfigArgs[1].feeTokenConfig, s_onRamp.getFeeTokenConfig(vm.addr(2)));
+    assertEq(s_feeTokenConfigArgs[0].feeTokenConfig, s_onRamp.getFeeTokenConfig(vm.addr(1)));
+    assertEq(s_feeTokenConfigArgs[1].feeTokenConfig, s_onRamp.getFeeTokenConfig(vm.addr(2)));
   }
 
   function test_applyFeeTokenConfigUpdatesZeroInput() public {

@@ -61,7 +61,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ILinkAvailable, AggregateRat
 
   event ConfigSet(StaticConfig staticConfig, DynamicConfig dynamicConfig);
   event NopPaid(address indexed nop, uint256 amount);
-  event FeeTokenConfigUpdated(address indexed token, FeeTokenConfig feeTokenConfig);
+  event FeeTokenConfigUpdated(address indexed token, uint64 feeTokenConfig);
   event TokenTransferFeeConfigSet(TokenTransferFeeConfigArgs[] transferFeeConfig);
   event TokenTransferFeeConfigDeleted(address[] tokens);
   /// RMN depends on this event, if changing, please notify the RMN maintainers.
@@ -88,18 +88,12 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ILinkAvailable, AggregateRat
     address tokenAdminRegistry; // Token admin registry address
   }
 
-  /// @dev Struct to hold the execution fee configuration for a fee token
-  struct FeeTokenConfig {
-    uint64 premiumMultiplierWeiPerEth; // ─╮ Multiplier for fee-token-specific premiums
-    bool enabled; // ──────────────────────╯ Whether this fee token is enabled
-  }
-
-  /// @dev Struct to hold the fee token configuration for a token, same as the FeeTokenConfig but with
+  /// @dev Struct to hold the fee token configuration for a token, same as the s_feeTokenConfig but with
   /// the token address included so that an array of these can be passed in the constructor and
   /// applyFeeToken to set the mapping
   struct FeeTokenConfigArgs {
-    address token; // // ────────────────╮ Token address
-    FeeTokenConfig feeTokenConfig; // ───╯ Execution fee configuration for a fee token
+    address token; // // ───────╮ Token address
+    uint64 feeTokenConfig; // ──╯ Multiplier for destination chain specific premiums
   }
 
   /// @dev Struct to hold the transfer fee configuration for token transfers
@@ -195,8 +189,8 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ILinkAvailable, AggregateRat
 
   /// @dev The destination chain specific configs
   mapping(uint64 destChainSelector => DestChainConfig destChainConfig) internal s_destChainConfig;
-  /// @dev The execution fee token config that can be set by the owner or fee admin
-  mapping(address token => FeeTokenConfig feeTokenConfig) internal s_feeTokenConfig;
+  /// @dev The multiplier for destination chain specific premiums that can be set by the owner or fee admin
+  mapping(address token => uint64 feeTokenConfig) internal s_feeTokenConfig;
   /// @dev The token transfer fee config that can be set by the owner or fee admin
   mapping(address token => TokenTransferFeeConfig tranferFeeConfig) internal s_tokenTransferFeeConfig;
 
@@ -510,8 +504,8 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ILinkAvailable, AggregateRat
     // Validate the message with various checks
     _validateMessage(destChainSelector, message.data.length, gasLimit, message.tokenAmounts.length);
 
-    FeeTokenConfig memory feeTokenConfig = s_feeTokenConfig[message.feeToken];
-    if (!feeTokenConfig.enabled) revert NotAFeeToken(message.feeToken);
+    uint64 feeTokenConfig = s_feeTokenConfig[message.feeToken];
+    if (feeTokenConfig == 0) revert NotAFeeToken(message.feeToken);
 
     (uint224 feeTokenPrice, uint224 packedGasPrice) =
       IPriceRegistry(s_dynamicConfig.priceRegistry).getTokenAndGasPrices(message.feeToken, destChainSelector);
@@ -560,8 +554,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ILinkAvailable, AggregateRat
     // Calculate number of fee tokens to charge.
     // Total USD fee is in 36 decimals, feeTokenPrice is in 18 decimals USD for 1e18 smallest token denominations.
     // Result of the division is the number of smallest token denominations.
-    return
-      ((premiumFee * feeTokenConfig.premiumMultiplierWeiPerEth) + executionCost + dataAvailabilityCost) / feeTokenPrice;
+    return ((premiumFee * feeTokenConfig) + executionCost + dataAvailabilityCost) / feeTokenPrice;
   }
 
   /// @notice Returns the estimated data availability cost of the message.
@@ -728,7 +721,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ILinkAvailable, AggregateRat
   /// @notice Gets the fee configuration for a token
   /// @param token The token to get the fee configuration for
   /// @return feeTokenConfig FeeTokenConfig struct
-  function getFeeTokenConfig(address token) external view returns (FeeTokenConfig memory feeTokenConfig) {
+  function getFeeTokenConfig(address token) external view returns (uint64 feeTokenConfig) {
     return s_feeTokenConfig[token];
   }
 
@@ -743,8 +736,8 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ILinkAvailable, AggregateRat
   /// @param feeTokenConfigArgs The fee token configs.
   function _applyFeeTokenConfigUpdates(FeeTokenConfigArgs[] memory feeTokenConfigArgs) internal {
     for (uint256 i = 0; i < feeTokenConfigArgs.length; ++i) {
-      FeeTokenConfig memory feeTokenConfig = feeTokenConfigArgs[i].feeTokenConfig;
       address token = feeTokenConfigArgs[i].token;
+      uint64 feeTokenConfig = feeTokenConfigArgs[i].feeTokenConfig;
       s_feeTokenConfig[token] = feeTokenConfig;
 
       emit FeeTokenConfigUpdated(token, feeTokenConfig);
