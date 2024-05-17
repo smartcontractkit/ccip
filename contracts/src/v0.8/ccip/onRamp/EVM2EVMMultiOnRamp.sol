@@ -125,7 +125,9 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ILinkAvailable, AggregateRat
     uint32 maxFeeUSDCents; //           │ Maximum fee to charge per token transfer, multiples of 0.01 USD
     uint16 deciBps; // ─────────────────╯ Basis points charged on token transfers, multiples of 0.1bps, or 1e-5
     uint32 destGasOverhead; // ─────────╮ Gas charged to execute the token transfer on the destination chain
-    uint32 destBytesOverhead; //        │ Extra data availability bytes on top of fixed transfer data, including sourceTokenData and offchainData
+    //                                  │ Extra data availability bytes that are returned from the source pool and sent
+    //                                  │ to the destination pool. This value can only increase the value of
+    uint32 destBytesOverhead; //        │ Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES, any value below will be ignored.
     bool aggregateRateLimitEnabled; // ─╯ Whether this transfer token is to be included in Aggregate Rate Limiting
   }
 
