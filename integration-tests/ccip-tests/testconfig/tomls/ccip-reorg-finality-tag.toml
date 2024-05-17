@@ -18,7 +18,6 @@ evm_minimum_confirmations = 1
 evm_gas_estimation_buffer = 1000
 evm_supports_eip1559 = true
 evm_default_gas_limit = 6000000
-evm_finality_depth = 10
 evm_finality_tag = true
 
 [CCIP.Env.Network.EVMNetworks.dest-chain]
@@ -35,7 +34,6 @@ evm_minimum_confirmations = 1
 evm_gas_estimation_buffer = 1000
 evm_supports_eip1559 = true
 evm_default_gas_limit = 6000000
-evm_finality_depth = 10
 evm_finality_tag = true
 
 [CCIP.Env.NewCLCluster]

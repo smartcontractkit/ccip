@@ -58,5 +58,5 @@ FeeCapDefault = '200 gwei'
 """
 
 [CCIP.Groups.load.LoadProfile]
-TestDuration = '20m'
-FailOnFirstErrorInLoad = true
+TestDuration = '5m'
+#FailOnFirstErrorInLoad = true

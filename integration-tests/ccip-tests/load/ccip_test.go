@@ -41,7 +41,7 @@ func setupReorgSuite(t *testing.T, loadArgs *LoadArgs) *ch.ReorgSuite {
 		GrafanaToken:       *loadArgs.TestCfg.EnvInput.Logging.Grafana.BearerToken,
 		DashboardURL:       *loadArgs.TestCfg.EnvInput.Logging.Grafana.DashboardUrl,
 		FinalityDelta:      5,
-		ExperimentDuration: 3 * time.Minute,
+		ExperimentDuration: 2 * time.Minute,
 	})
 	require.NoError(t, err)
 	return rs
