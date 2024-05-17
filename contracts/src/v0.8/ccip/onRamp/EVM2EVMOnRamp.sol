@@ -56,6 +56,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   error SourceTokenDataTooLarge(address token);
   error InvalidChainSelector(uint64 chainSelector);
   error GetSupportedTokensFunctionalityRemovedCheckAdminRegistry();
+  error InvalidDestBytesOverhead(address token, uint32 destBytesOverhead);
 
   event ConfigSet(StaticConfig staticConfig, DynamicConfig dynamicConfig);
   event NopPaid(address indexed nop, uint256 amount);
@@ -123,7 +124,9 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     uint32 maxFeeUSDCents; //           │ Maximum fee to charge per token transfer, multiples of 0.01 USD
     uint16 deciBps; //                  │ Basis points charged on token transfers, multiples of 0.1bps, or 1e-5
     uint32 destGasOverhead; //          │ Gas charged to execute the token transfer on the destination chain
-    uint32 destBytesOverhead; //        │ Extra data availability bytes on top of fixed transfer data, including sourceTokenData and offchainData
+    //                                  │ Extra data availability bytes that are returned from the source pool and sent
+    //                                  │ to the destination pool. This value can only increase the value of
+    uint32 destBytesOverhead; //        │ Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES, any value below will be ignored.
     bool aggregateRateLimitEnabled; //  │ Whether this transfer token is to be included in Aggregate Rate Limiting
     bool isEnabled; // ─────────────────╯ Whether this token has custom transfer fees
   }
@@ -716,6 +719,10 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   ) internal {
     for (uint256 i = 0; i < tokenTransferFeeConfigArgs.length; ++i) {
       TokenTransferFeeConfigArgs memory configArg = tokenTransferFeeConfigArgs[i];
+
+      if (configArg.destBytesOverhead < Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES) {
+        revert InvalidDestBytesOverhead(configArg.token, configArg.destBytesOverhead);
+      }
 
       s_tokenTransferFeeConfig[configArg.token] = TokenTransferFeeConfig({
         minFeeUSDCents: configArg.minFeeUSDCents,

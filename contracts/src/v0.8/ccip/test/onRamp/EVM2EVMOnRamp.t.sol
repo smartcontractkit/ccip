@@ -1238,7 +1238,7 @@ contract EVM2EVMOnRamp_getTokenTransferCost is EVM2EVMOnRamp_getFeeSetup {
       maxFeeUSDCents: 0,
       deciBps: 0,
       destGasOverhead: 0,
-      destBytesOverhead: 0,
+      destBytesOverhead: uint32(Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES),
       aggregateRateLimitEnabled: true
     });
     s_onRamp.setTokenTransferFeeConfig(tokenTransferFeeConfigArgs, new address[](0));
@@ -1303,8 +1303,8 @@ contract EVM2EVMOnRamp_getTokenTransferCost is EVM2EVMOnRamp_getFeeSetup {
     for (uint256 i = 0; i < testTokens.length; ++i) {
       message.tokenAmounts[i] = Client.EVMTokenAmount({token: testTokens[i], amount: 1e14});
       expectedTotalGas += s_onRamp.getTokenTransferFeeConfig(testTokens[i]).destGasOverhead;
-      uint32 destBytesOverhead = s_onRamp.getTokenTransferFeeConfig(message.tokenAmounts[i].token).destBytesOverhead;
-      expectedTotalBytes += destBytesOverhead == 0 ? uint32(Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES) : destBytesOverhead;
+      uint32 dstBytesOverhead = s_onRamp.getTokenTransferFeeConfig(message.tokenAmounts[i].token).destBytesOverhead;
+      expectedTotalBytes += dstBytesOverhead == 0 ? uint32(Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES) : dstBytesOverhead;
     }
     (uint256 feeUSDWei, uint32 destGasOverhead, uint32 destBytesOverhead) =
       s_onRamp.getTokenTransferCost(message.feeToken, s_wrappedTokenPrice, message.tokenAmounts);
@@ -1833,7 +1833,7 @@ contract EVM2EVMOnRamp_setTokenTransferFeeConfig is EVM2EVMOnRampSetup {
       maxFeeUSDCents: 7,
       deciBps: 8,
       destGasOverhead: 9,
-      destBytesOverhead: 10,
+      destBytesOverhead: 312,
       aggregateRateLimitEnabled: true
     });
     tokenTransferFeeArgs[1] = EVM2EVMOnRamp.TokenTransferFeeConfigArgs({
@@ -1842,7 +1842,7 @@ contract EVM2EVMOnRamp_setTokenTransferFeeConfig is EVM2EVMOnRampSetup {
       maxFeeUSDCents: 13,
       deciBps: 14,
       destGasOverhead: 15,
-      destBytesOverhead: 16,
+      destBytesOverhead: 394,
       aggregateRateLimitEnabled: false
     });
 
