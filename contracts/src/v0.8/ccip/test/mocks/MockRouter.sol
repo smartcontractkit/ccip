@@ -28,7 +28,7 @@ contract MockCCIPRouter is IRouter, IRouterClient {
   uint16 public constant GAS_FOR_CALL_EXACT_CHECK = 5_000;
   uint64 public constant DEFAULT_GAS_LIMIT = 200_000;
 
-  uint256 public MockFeeTokenAmount; //use setFee() to change to non-zero to test fees
+  uint256 internal s_MockFeeTokenAmount; //use setFee() to change to non-zero to test fees
 
   function routeMessage(
     Client.Any2EVMMessage calldata message,
@@ -77,18 +77,12 @@ contract MockCCIPRouter is IRouter, IRouterClient {
     // We want to disallow sending to address(0) and to precompiles, which exist on address(1) through address(9).
     if (decodedReceiver > type(uint160).max || decodedReceiver < 10) revert InvalidAddress(message.receiver);
 
-    uint256 feeTokenAmount;
     if (message.feeToken == address(0)) {
-      feeTokenAmount = getFee(destinationChainSelector, message);
+      uint256 feeTokenAmount = getFee(destinationChainSelector, message);
       if (msg.value < feeTokenAmount) revert InsufficientFeeTokenAmount();
     } else {
       if (msg.value > 0) revert InvalidMsgValue();
     }
-
-    // if (feeTokenAmount != 0) {
-    //   if (message.feeToken == address(0) && msg.value < feeTokenAmount) revert InsufficientFeeTokenAmount();
-    //   if (message.feeToken != address(0) && msg.value != 0) revert InvalidMsgValue();
-    // }
 
     address receiver = address(uint160(decodedReceiver));
     uint256 gasLimit = _fromBytes(message.extraArgs).gasLimit;
@@ -133,12 +127,12 @@ contract MockCCIPRouter is IRouter, IRouterClient {
 
   /// @notice Returns 0 as the fee is not supported in this mock contract.
   function getFee(uint64, Client.EVM2AnyMessage memory) public view returns (uint256) {
-    return MockFeeTokenAmount;
+    return s_MockFeeTokenAmount;
   }
 
-  function setFee(uint256 _feeAmount) public returns (uint256) {
-    MockFeeTokenAmount = _feeAmount;
-    return _feeAmount;
+  /// @notice Sets the fees returned by getFee but is only checked when using native fee tokens
+  function setFee(uint256 feeAmount) external {
+    s_MockFeeTokenAmount = feeAmount;
   }
 
   /// @notice Always returns address(1234567890)
