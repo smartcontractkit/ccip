@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.19;
+pragma solidity 0.8.24;
 
 import {IBurnMintERC20} from "../../../shared/token/ERC20/IBurnMintERC20.sol";
 import {IPool} from "../../interfaces/IPool.sol";
@@ -161,7 +161,7 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
       address(s_usdcTokenPool),
       receiver,
       expectedDomain.domainIdentifier,
-      s_mockUSDC.i_destinationTokenMessenger(),
+      s_mockUSDC.DESTINATION_TOKEN_MESSENGER(),
       expectedDomain.allowedCaller
     );
 
@@ -200,7 +200,7 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
       address(s_usdcTokenPool),
       destinationReceiver,
       expectedDomain.domainIdentifier,
-      s_mockUSDC.i_destinationTokenMessenger(),
+      s_mockUSDC.DESTINATION_TOKEN_MESSENGER(),
       expectedDomain.allowedCaller
     );
 
@@ -239,7 +239,7 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
       address(s_usdcTokenPoolWithAllowList),
       destinationReceiver,
       expectedDomain.domainIdentifier,
-      s_mockUSDC.i_destinationTokenMessenger(),
+      s_mockUSDC.DESTINATION_TOKEN_MESSENGER(),
       expectedDomain.allowedCaller
     );
     vm.expectEmit();

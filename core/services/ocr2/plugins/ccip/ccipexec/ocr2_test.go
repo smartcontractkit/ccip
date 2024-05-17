@@ -175,7 +175,7 @@ func TestExecutionReportingPlugin_Observation(t *testing.T) {
 			senderNonces := map[cciptypes.Address]uint64{
 				cciptypes.Address(utils.RandomAddress().String()): tc.senderNonce,
 			}
-			mockOffRampReader.On("GetSendersNonce", mock.Anything, mock.Anything).Return(senderNonces, nil).Maybe()
+			mockOffRampReader.On("ListSenderNonces", mock.Anything, mock.Anything).Return(senderNonces, nil).Maybe()
 			mockOffRampReader.On("GetTokenPoolsRateLimits", ctx, []ccipdata.TokenPoolReader{}).
 				Return([]cciptypes.TokenBucketRateLimit{}, nil).Maybe()
 
@@ -729,6 +729,76 @@ func TestExecutionReportingPlugin_buildBatch(t *testing.T) {
 				newMessageExecState(12, [32]byte{}, InvalidNonce),
 			},
 		},
+		{
+			name: "unordered messages",
+			reqs: []cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta{
+				{
+					EVM2EVMMessage: cciptypes.EVM2EVMMessage{
+						SequenceNumber: 10,
+						FeeTokenAmount: big.NewInt(1e9),
+						Sender:         sender1,
+						Nonce:          0,
+						GasLimit:       big.NewInt(1),
+						Data:           bytes.Repeat([]byte{'a'}, 1000),
+						FeeToken:       srcNative,
+						MessageID:      [32]byte{},
+					},
+					BlockTimestamp: time.Date(2010, 1, 1, 12, 12, 12, 0, time.UTC),
+				},
+			},
+			inflight:              big.NewInt(0),
+			tokenLimit:            big.NewInt(0),
+			destGasPrice:          big.NewInt(10),
+			srcPrices:             map[cciptypes.Address]*big.Int{srcNative: big.NewInt(1)},
+			dstPrices:             map[cciptypes.Address]*big.Int{destNative: big.NewInt(1)},
+			offRampNoncesBySender: map[cciptypes.Address]uint64{sender1: 0},
+			expectedSeqNrs:        []ccip.ObservedMessage{{SeqNr: uint64(10)}},
+			expectedStates: []messageExecStatus{
+				newMessageExecState(10, [32]byte{}, AddedToBatch),
+			},
+		},
+		{
+			name: "unordered messages not blocked by nonce",
+			reqs: []cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta{
+				{
+					EVM2EVMMessage: cciptypes.EVM2EVMMessage{
+						SequenceNumber: 9,
+						FeeTokenAmount: big.NewInt(1e9),
+						Sender:         sender1,
+						Nonce:          5,
+						GasLimit:       big.NewInt(1),
+						Data:           bytes.Repeat([]byte{'a'}, 1000),
+						FeeToken:       srcNative,
+						MessageID:      [32]byte{},
+					},
+					BlockTimestamp: time.Date(2010, 1, 1, 12, 12, 12, 0, time.UTC),
+				},
+				{
+					EVM2EVMMessage: cciptypes.EVM2EVMMessage{
+						SequenceNumber: 10,
+						FeeTokenAmount: big.NewInt(1e9),
+						Sender:         sender1,
+						Nonce:          0,
+						GasLimit:       big.NewInt(1),
+						Data:           bytes.Repeat([]byte{'a'}, 1000),
+						FeeToken:       srcNative,
+						MessageID:      [32]byte{},
+					},
+					BlockTimestamp: time.Date(2010, 1, 1, 12, 12, 12, 0, time.UTC),
+				},
+			},
+			inflight:              big.NewInt(0),
+			tokenLimit:            big.NewInt(0),
+			destGasPrice:          big.NewInt(10),
+			srcPrices:             map[cciptypes.Address]*big.Int{srcNative: big.NewInt(1)},
+			dstPrices:             map[cciptypes.Address]*big.Int{destNative: big.NewInt(1)},
+			offRampNoncesBySender: map[cciptypes.Address]uint64{sender1: 3},
+			expectedSeqNrs:        []ccip.ObservedMessage{{SeqNr: uint64(10)}},
+			expectedStates: []messageExecStatus{
+				newMessageExecState(9, [32]byte{}, InvalidNonce),
+				newMessageExecState(10, [32]byte{}, AddedToBatch),
+			},
+		},
 	}
 
 	for _, tc := range tt {
@@ -743,7 +813,7 @@ func TestExecutionReportingPlugin_buildBatch(t *testing.T) {
 
 			// Mock calls to reader.
 			mockOffRampReader := ccipdatamocks.NewOffRampReader(t)
-			mockOffRampReader.On("GetSendersNonce", mock.Anything, mock.Anything).Return(tc.offRampNoncesBySender, nil).Maybe()
+			mockOffRampReader.On("ListSenderNonces", mock.Anything, mock.Anything).Return(tc.offRampNoncesBySender, nil).Maybe()
 
 			plugin := ExecutionReportingPlugin{
 				tokenDataWorker:   tokendata.NewBackgroundWorker(map[cciptypes.Address]tokendata.Reader{}, 10, 5*time.Second, time.Hour),

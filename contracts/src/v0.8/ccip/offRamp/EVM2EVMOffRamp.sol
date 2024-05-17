@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.19;
+pragma solidity 0.8.24;
 
 import {ITypeAndVersion} from "../../shared/interfaces/ITypeAndVersion.sol";
 import {IAny2EVMMessageReceiver} from "../interfaces/IAny2EVMMessageReceiver.sol";
@@ -67,6 +67,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
   );
   event TokenAggregateRateLimitAdded(address sourceToken, address destToken);
   event TokenAggregateRateLimitRemoved(address sourceToken, address destToken);
+  event SkippedAlreadyExecutedMessage(uint64 indexed sequenceNumber);
 
   /// @notice Static offRamp config
   /// @dev RMN depends on this struct, if changing, please notify the RMN maintainers.
@@ -261,9 +262,16 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
     for (uint256 i = 0; i < numMsgs; ++i) {
       Internal.EVM2EVMMessage memory message = report.messages[i];
       Internal.MessageExecutionState originalState = getExecutionState(message.sequenceNumber);
+      if (originalState == Internal.MessageExecutionState.SUCCESS) {
+        // If the message has already been executed, we skip it.  We want to not revert on race conditions between
+        // executing parties. This will allow us to open up manual exec while also attempting with the DON, without
+        // reverting an entire DON batch when a user manually executes while the tx is inflight.
+        emit SkippedAlreadyExecutedMessage(message.sequenceNumber);
+        continue;
+      }
       // Two valid cases here, we either have never touched this message before, or we tried to execute
-      // and failed. This check protects against reentry and re-execution because the other states are
-      // IN_PROGRESS and SUCCESS, both should not be allowed to execute.
+      // and failed. This check protects against reentry and re-execution because the other state is
+      // IN_PROGRESS which should not be allowed to execute.
       if (
         !(
           originalState == Internal.MessageExecutionState.UNTOUCHED
@@ -290,33 +298,35 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
         if (originalState != Internal.MessageExecutionState.UNTOUCHED) revert AlreadyAttempted(message.sequenceNumber);
       }
 
-      // In the scenario where we upgrade offRamps, we still want to have sequential nonces.
-      // Referencing the old offRamp to check the expected nonce if none is set for a
-      // given sender allows us to skip the current message if it would not be the next according
-      // to the old offRamp. This preserves sequencing between updates.
-      uint64 prevNonce = s_senderNonce[message.sender];
-      if (prevNonce == 0 && i_prevOffRamp != address(0)) {
-        prevNonce = IAny2EVMOffRamp(i_prevOffRamp).getSenderNonce(message.sender);
-        if (prevNonce + 1 != message.nonce) {
-          // the starting v2 onramp nonce, i.e. the 1st message nonce v2 offramp is expected to receive,
-          // is guaranteed to equal (largest v1 onramp nonce + 1).
-          // if this message's nonce isn't (v1 offramp nonce + 1), then v1 offramp nonce != largest v1 onramp nonce,
-          // it tells us there are still messages inflight for v1 offramp
-          emit SkippedSenderWithPreviousRampMessageInflight(message.nonce, message.sender);
-          continue;
+      if (message.nonce > 0) {
+        // In the scenario where we upgrade offRamps, we still want to have sequential nonces.
+        // Referencing the old offRamp to check the expected nonce if none is set for a
+        // given sender allows us to skip the current message if it would not be the next according
+        // to the old offRamp. This preserves sequencing between updates.
+        uint64 prevNonce = s_senderNonce[message.sender];
+        if (prevNonce == 0 && i_prevOffRamp != address(0)) {
+          prevNonce = IAny2EVMOffRamp(i_prevOffRamp).getSenderNonce(message.sender);
+          if (prevNonce + 1 != message.nonce) {
+            // the starting v2 onramp nonce, i.e. the 1st message nonce v2 offramp is expected to receive,
+            // is guaranteed to equal (largest v1 onramp nonce + 1).
+            // if this message's nonce isn't (v1 offramp nonce + 1), then v1 offramp nonce != largest v1 onramp nonce,
+            // it tells us there are still messages inflight for v1 offramp
+            emit SkippedSenderWithPreviousRampMessageInflight(message.nonce, message.sender);
+            continue;
+          }
+          // Otherwise this nonce is indeed the "transitional nonce", that is
+          // all messages sent to v1 ramp have been executed by the DON and the sequence can resume in V2.
+          // Note if first time user in V2, then prevNonce will be 0, and message.nonce = 1, so this will be a no-op.
+          s_senderNonce[message.sender] = prevNonce;
         }
-        // Otherwise this nonce is indeed the "transitional nonce", that is
-        // all messages sent to v1 ramp have been executed by the DON and the sequence can resume in V2.
-        // Note if first time user in V2, then prevNonce will be 0, and message.nonce = 1, so this will be a no-op.
-        s_senderNonce[message.sender] = prevNonce;
-      }
 
-      // UNTOUCHED messages MUST be executed in order always
-      if (originalState == Internal.MessageExecutionState.UNTOUCHED) {
-        if (prevNonce + 1 != message.nonce) {
-          // We skip the message if the nonce is incorrect
-          emit SkippedIncorrectNonce(message.nonce, message.sender);
-          continue;
+        // UNTOUCHED messages MUST be executed in order always IF message.nonce > 0.
+        if (originalState == Internal.MessageExecutionState.UNTOUCHED) {
+          if (prevNonce + 1 != message.nonce) {
+            // We skip the message if the nonce is incorrect, since message.nonce > 0.
+            emit SkippedIncorrectNonce(message.nonce, message.sender);
+            continue;
+          }
         }
       }
 
@@ -349,12 +359,13 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
         revert InvalidNewState(message.sequenceNumber, newState);
       }
 
-      // Nonce changes per state transition
+      // Nonce changes per state transition.
+      // These only apply for ordered messages.
       // UNTOUCHED -> FAILURE  nonce bump
       // UNTOUCHED -> SUCCESS  nonce bump
       // FAILURE   -> FAILURE  no nonce bump
       // FAILURE   -> SUCCESS  no nonce bump
-      if (originalState == Internal.MessageExecutionState.UNTOUCHED) {
+      if (message.nonce > 0 && originalState == Internal.MessageExecutionState.UNTOUCHED) {
         s_senderNonce[message.sender]++;
       }
 

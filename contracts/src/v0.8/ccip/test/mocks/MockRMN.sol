@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.19;
+pragma solidity 0.8.24;
 
 import {RMN} from "../../RMN.sol";
 import {IRMN} from "../../interfaces/IRMN.sol";
@@ -11,6 +11,7 @@ contract MockRMN is IRMN, OwnerIsCreator {
   bool private s_curse;
   bytes private s_err;
   RMN.VersionedConfig private s_versionedConfig;
+  mapping(bytes32 subject => bool cursed) private s_curseBySubject;
 
   function isCursed() external view override returns (bool) {
     if (s_err.length != 0) {
@@ -19,23 +20,31 @@ contract MockRMN is IRMN, OwnerIsCreator {
     return s_curse;
   }
 
-  function isCursed(bytes32 /* subject */ ) external view override returns (bool) {
+  function isCursed(bytes32 subject) external view override returns (bool) {
     if (s_err.length != 0) {
       revert CustomError(s_err);
     }
-    return s_curse;
+    return s_curse || s_curseBySubject[subject];
   }
 
   function voteToCurse(bytes32) external {
     s_curse = true;
   }
 
-  function setRevert(bytes memory err) external {
-    s_err = err;
+  function voteToCurse(bytes32, bytes32 subject) external {
+    s_curseBySubject[subject] = true;
   }
 
   function ownerUnvoteToCurse(RMN.UnvoteToCurseRecord[] memory) external {
     s_curse = false;
+  }
+
+  function ownerUnvoteToCurse(RMN.UnvoteToCurseRecord[] memory, bytes32 subject) external {
+    s_curseBySubject[subject] = false;
+  }
+
+  function setRevert(bytes memory err) external {
+    s_err = err;
   }
 
   function isBlessed(IRMN.TaggedRoot calldata) external view override returns (bool) {
@@ -43,8 +52,6 @@ contract MockRMN is IRMN, OwnerIsCreator {
   }
 
   function getConfigDetails() external view returns (uint32 version, uint32 blockNumber, RMN.Config memory config) {
-    version = s_versionedConfig.configVersion;
-    blockNumber = s_versionedConfig.blockNumber;
-    config = s_versionedConfig.config;
+    return (s_versionedConfig.configVersion, s_versionedConfig.blockNumber, s_versionedConfig.config);
   }
 }

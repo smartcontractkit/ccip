@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.19;
+pragma solidity 0.8.24;
 
 import {Pool} from "../../libraries/Pool.sol";
-import {EVM2EVMOnRamp} from "../../onRamp/EVM2EVMOnRamp.sol";
 import {BurnWithFromMintTokenPool} from "../../pools/BurnWithFromMintTokenPool.sol";
 import {TokenPool} from "../../pools/TokenPool.sol";
 import {BaseTest} from "../BaseTest.t.sol";
