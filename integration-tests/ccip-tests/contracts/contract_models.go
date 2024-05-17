@@ -526,14 +526,14 @@ func (w TokenPoolWrapper) GetRouter(opts *bind.CallOpts) (common.Address, error)
 }
 
 func (w TokenPoolWrapper) GetRebalancer(opts *bind.CallOpts) (common.Address, error) {
-	if w.Latest != nil && w.Latest.PoolInterface != nil {
+	if w.Latest != nil && w.Latest.LockReleasePool != nil {
 		addr, err := w.Latest.LockReleasePool.GetRebalancer(opts)
 		if err != nil {
 			return common.Address{}, err
 		}
 		return addr, nil
 	}
-	if w.V1_4_0 != nil && w.V1_4_0.PoolInterface != nil {
+	if w.V1_4_0 != nil && w.V1_4_0.LockReleasePool != nil {
 		addr, err := w.V1_4_0.LockReleasePool.GetRebalancer(opts)
 		if err != nil {
 			return common.Address{}, err
