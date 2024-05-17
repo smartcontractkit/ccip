@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/ccipcommit"
@@ -596,35 +598,49 @@ func (r *Relayer) NewCCIPCommitProvider(rargs commontypes.RelayArgs, pargs commo
 
 func (r *Relayer) NewCCIPCommitProviderSource(rargs commontypes.RelayArgs, pargs commontypes.PluginArgs) (commontypes.CCIPCommitProvider, error) {
 	// TODO https://smartcontract-it.atlassian.net/browse/BCF-2887
-	ctx := context.Background()
-
+	//ctx := context.Background()
+	panic("implement me")
 }
 
 func (r *Relayer) NewCCIPCommitProviderDest(rargs commontypes.RelayArgs, pargs commontypes.PluginArgs) (commontypes.CCIPCommitProvider, error) {
 	// TODO https://smartcontract-it.atlassian.net/browse/BCF-2887
-	ctx := context.Background()
-
+	//ctx := context.Background()
+	panic("implement me")
 }
 
-type EVMCCIPCommitProviderImpl struct{}
+type EVMCCIPCommitProviderImpl struct {
+	lggr               logger.Logger
+	replay             logpoller.LogPoller
+	startBlock         uint64
+	commitStoreAddress common.Address
+	isSource           bool
+	client             client.Client
+	lp                 logpoller.LogPoller
+}
 
-func XXXCreateEVMCCIPCommitProvider(cpsc ccipcommit.CommitPluginStaticConfig, backfillArgs ccipcommon.BackfillArgs, chainHealthcheck *cache.ObservedChainHealthcheck) EVMCCIPCommitProviderImpl {
+func (r *Relayer) XXXCreateEVMCCIPCommitProvider(lggr logger.Logger, isSource bool) EVMCCIPCommitProviderImpl {
 	// huiepatr TODO: do something sensible
-	return EVMCCIPCommitProviderImpl{}
+	return EVMCCIPCommitProviderImpl{
+		lggr:     lggr,
+		isSource: isSource,
+		client:   r.chain.Client(),
+		lp:       r.chain.LogPoller(),
+	}
 }
 
 func (E EVMCCIPCommitProviderImpl) Name() string {
 	return "EVMCCIPCommitProvider"
 }
 
+// Also satisfies job.ServiceCtx interface for Backfilled Oracle
 func (E EVMCCIPCommitProviderImpl) Start(ctx context.Context) error {
-	//TODO implement me
-	panic("implement me")
+	srcReplayErr := E.replay.Replay(ctx, int64(E.startBlock))
+	return srcReplayErr
 }
 
+// Also satisfies job.ServiceCtx interface for Backfilled Oracle
 func (E EVMCCIPCommitProviderImpl) Close() error {
-	//TODO implement me
-	panic("implement me")
+	return nil
 }
 
 func (E EVMCCIPCommitProviderImpl) Ready() error {
@@ -662,9 +678,13 @@ func (E EVMCCIPCommitProviderImpl) Codec() commontypes.Codec {
 	panic("implement me")
 }
 
+// addr is the address of the commit store.
 func (E EVMCCIPCommitProviderImpl) NewCommitStoreReader(ctx context.Context, addr cciptypes.Address) (cciptypes.CommitStoreReader, error) {
-	//TODO implement me
-	panic("implement me")
+	if E.isSource {
+		panic("called NewCommitStoreReader on source provider")
+	}
+	versionFinder := factory.NewEvmVersionFinder()
+	commitStoreReader, err := factory.NewCommitStoreReader(E.lggr, versionFinder, addr, E.client, E.lp, params.sourceChain.GasEstimator(), params.sourceChain.Config().EVM().GasEstimator().PriceMax().ToInt(), nil)
 }
 
 func (E EVMCCIPCommitProviderImpl) NewOffRampReader(ctx context.Context, addr cciptypes.Address) (cciptypes.OffRampReader, error) {
@@ -692,11 +712,27 @@ func (E EVMCCIPCommitProviderImpl) SourceNativeToken(ctx context.Context) (ccipt
 	panic("implement me")
 }
 
-type CommitStoreStaticConfig struct {
-	ChainSelector       uint64
-	SourceChainSelector uint64
-	OnRamp              common.Address
-	ArmProxy            common.Address
+func (E EVMCCIPCommitProviderImpl) NewOffRampReaders(ctx context.Context, offRampReader cciptypes.OffRampReader) ([]cciptypes.OffRampReader, error) {
+}
+
+// GetStaticConfig returns the commit store static config. For the Commit service, this lives on the dest chain.
+func (E EVMCCIPCommitProviderImpl) GetStaticConfig(ctx context.Context, addr cciptypes.Address) (cciptypes.CommitStoreStaticConfig, error) {
+	if E.isSource {
+		panic("called GetStaticConfig on source provider")
+	}
+
+	commitStoreAddress := common.HexToAddress(string(addr))
+	staticConfig, err := ccipdata.FetchCommitStoreStaticConfig(commitStoreAddress, E.client)
+	if err != nil {
+		return cciptypes.CommitStoreStaticConfig{}, fmt.Errorf("get commit store static config: %w", err)
+	}
+
+	return cciptypes.CommitStoreStaticConfig{
+		ChainSelector:       staticConfig.ChainSelector,
+		SourceChainSelector: staticConfig.SourceChainSelector,
+		OnRamp:              cciptypes.Address(staticConfig.OnRamp.String()),
+		ArmProxy:            cciptypes.Address(staticConfig.ArmProxy.String()),
+	}, nil
 }
 
 // NewConfigProvider is called by bootstrap jobs

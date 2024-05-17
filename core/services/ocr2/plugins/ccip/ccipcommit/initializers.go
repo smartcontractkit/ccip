@@ -7,6 +7,9 @@ import (
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	"math/big"
 	"strings"
+	"sync"
+	"sync/atomic"
+	"time"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -81,7 +84,7 @@ func NewCommitServices(ctx context.Context, lggr logger.Logger, jb job.Job, chai
 	}, nil
 }
 
-func NewCommitServices2(ctx context.Context, srcProvider commontypes.CCIPCommitProvider, destProvider commontypes.CCIPCommitProvider, jb job.Job, lggr logger.Logger, pr pipeline.Runner, argsNoPlugin libocr2.OCR2OracleArgs, new bool) ([]job.ServiceCtx, error) {
+func NewCommitServices2(ctx context.Context, srcProvider commontypes.CCIPCommitProvider, destProvider commontypes.CCIPCommitProvider, jb job.Job, lggr logger.Logger, pr pipeline.Runner, argsNoPlugin libocr2.OCR2OracleArgs, new bool, onRampAddress string) ([]job.ServiceCtx, error) {
 	spec := jb.OCR2OracleSpec
 
 	var pluginConfig ccipconfig.CommitPluginJobSpecConfig
@@ -98,13 +101,12 @@ func NewCommitServices2(ctx context.Context, srcProvider commontypes.CCIPCommitP
 
 	commitLggr := lggr.Named("CCIPCommit").With("sourceChain", sourceChainName, "destChain", destChainName)
 
-	priceGetter, err = srcProvider.NewPriceGetter(ctx)
+	priceGetter, err := srcProvider.NewPriceGetter(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("creating dynamic price getter: %w", err)
 	}
 
-	onRampAddress := srcProvider.OnRampAddress(ctx) // implement in provider? Or can it be in plugin config?
-	onRampReader, err := srcProvider.NewOnRampReader(ctx, ccipcalc.EvmAddrToGeneric(onRampAddress))
+	onRampReader, err := srcProvider.NewOnRampReader(ctx, ccip.Address(onRampAddress))
 	if err != nil {
 		return nil, err
 	}
@@ -114,7 +116,7 @@ func NewCommitServices2(ctx context.Context, srcProvider commontypes.CCIPCommitP
 		return nil, err
 	}
 
-	destOffRampReaders, err := destProvider.NewDestOffRampReaders(ctx) // implement in provider
+	destOffRampReaders, err := destProvider.NewOffRampReaders(ctx) // implement in provider
 
 	sourceNative, err := srcProvider.SourceNativeToken(ctx)
 
@@ -126,7 +128,7 @@ func NewCommitServices2(ctx context.Context, srcProvider commontypes.CCIPCommitP
 		destOffRampReaders[i] = observability.NewObservedOffRampReader(o, params.destChain.ID().Int64(), ccip.CommitPluginLabel)
 	}
 
-	onrampAddress := common.HexToAddress(spec.ContractID)
+	// onrampAddress :=
 
 	chainHealthcheck := cache.NewObservedChainHealthCheck(
 		cache.NewChainHealthcheck(
@@ -141,7 +143,7 @@ func NewCommitServices2(ctx context.Context, srcProvider commontypes.CCIPCommitP
 			commitStoreReader,
 		),
 		ccip.CommitPluginLabel,
-		sourceChain,
+		sourceChain, // assuming this is the chain id?
 		destChain,
 		onrampAddress,
 	)
@@ -155,12 +157,12 @@ func NewCommitServices2(ctx context.Context, srcProvider commontypes.CCIPCommitP
 	// If this is a brand-new job, then we make use of the start blocks. If not then we're rebooting and log poller will pick up where we left off.
 	if new {
 		return []job.ServiceCtx{
-			oraclelib.NewBackfilledOracle(
+			NewChainAgnosticBackFilledOracle(
 				lggr,
-				backfillArgs.SourceLP,
-				backfillArgs.DestLP,
-				backfillArgs.SourceStartBlock,
-				backfillArgs.DestStartBlock,
+				srcProvider,
+				destProvider,
+				srcStartBlock,
+				destStartBlock,
 				job.NewServiceAdapter(oracle),
 			),
 			chainHealthcheck,
@@ -171,6 +173,106 @@ func NewCommitServices2(ctx context.Context, srcProvider commontypes.CCIPCommitP
 		chainHealthcheck,
 	}, nil
 
+}
+
+func NewChainAgnosticBackFilledOracle(lggr logger.Logger, srcProvider commontypes.CCIPCommitProvider, dstProvider commontypes.CCIPCommitProvider, srcStartBlock, dstStartBlock uint64, oracle job.ServiceCtx) *ChainAgnosticBackFilledOracle {
+	return &ChainAgnosticBackFilledOracle{
+		srcProvider:   srcProvider,
+		dstProvider:   dstProvider,
+		srcStartBlock: srcStartBlock,
+		dstStartBlock: dstStartBlock,
+		oracle:        oracle,
+		lggr:          lggr,
+	}
+}
+
+type ChainAgnosticBackFilledOracle struct {
+	srcProvider commontypes.CCIPCommitProvider
+	dstProvider commontypes.CCIPCommitProvider
+	//srcStartBlock, dstStartBlock uint64
+	oracle        job.ServiceCtx
+	lggr          logger.Logger
+	oracleStarted atomic.Bool
+	cancelFn      context.CancelFunc
+}
+
+func (r *ChainAgnosticBackFilledOracle) Start(ctx context.Context) error {
+	ctx, cancelFn := context.WithCancel(context.Background())
+	r.cancelFn = cancelFn
+	var err error
+	var errMu sync.Mutex
+	var wg sync.WaitGroup
+	// Replay in parallel if both requested.
+	if r.srcStartBlock != 0 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			s := time.Now()
+			r.lggr.Infow("start replaying src chain", "fromBlock", r.srcStartBlock)
+			srcReplayErr := r.srcProvider.Start(ctx)
+			errMu.Lock()
+			err = multierr.Combine(err, srcReplayErr)
+			errMu.Unlock()
+			r.lggr.Infow("finished replaying src chain", "time", time.Since(s))
+		}()
+	}
+	if r.dstStartBlock != 0 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			s := time.Now()
+			r.lggr.Infow("start replaying dst chain", "fromBlock", r.dstStartBlock)
+			dstReplayErr := r.dstProvider.Start(ctx)
+			errMu.Lock()
+			err = multierr.Combine(err, dstReplayErr)
+			errMu.Unlock()
+			r.lggr.Infow("finished replaying dst chain", "time", time.Since(s))
+		}()
+	}
+	wg.Wait()
+	if err != nil {
+		r.lggr.Criticalw("unexpected error replaying, continuing plugin boot without all the logs backfilled", "err", err)
+	}
+	if err := ctx.Err(); err != nil {
+		r.lggr.Errorw("context already cancelled", "err", err)
+		return err
+	}
+	// Start oracle with all logs present from dstStartBlock on dst and
+	// all logs from srcStartBlock on src.
+	if err := r.oracle.Start(ctx); err != nil {
+		// Should never happen.
+		r.lggr.Errorw("unexpected error starting oracle", "err", err)
+	} else {
+		r.oracleStarted.Store(true)
+	}
+
+	return nil
+}
+
+func (r *ChainAgnosticBackFilledOracle) Close() error {
+	if r.oracleStarted.Load() {
+		// If the oracle is running, it must be Closed/stopped
+		// TODO: Close should be safe to call in either case?
+		if err := r.oracle.Close(); err != nil {
+			r.lggr.Errorw("unexpected error stopping oracle", "err", err)
+			return err
+		}
+		// Flag the oracle as closed with our internal variable that keeps track
+		// of its state.  This will allow to re-start the process
+		r.oracleStarted.Store(false)
+	}
+	if r.cancelFn != nil {
+		// This is useful to step the previous tasks that are spawned in
+		// parallel before starting the Oracle. This will use the context to
+		// signal them to exit immediately.
+		//
+		// It can be possible this is the only way to stop the Start() async
+		// flow, specially when the previusly task are running (the replays) and
+		// `oracleStarted` would be false in that example. Calling `cancelFn()`
+		// will stop the replays and will prevent the oracle to start
+		r.cancelFn()
+	}
+	return nil
 }
 
 func NewCommitServices3(ctx context.Context, sourceProvider commontypes.CCIPCommitProvider, destProvider commontypes.CCIPCommitProvider, new bool, pr pipeline.Runner, argsNoPlugin libocr2.OCR2OracleArgs, logError func(string), qopts ...pg.QOpt) ([]job.ServiceCtx, error) {
@@ -228,7 +330,7 @@ func jobSpecToCommitPluginConfig(ctx context.Context, lggr logger.Logger, jb job
 		"DestChainSelector", params.commitStoreStaticCfg.ChainSelector)
 
 	versionFinder := factory.NewEvmVersionFinder()
-	commitStoreReader, err := factory.NewCommitStoreReader(lggr, versionFinder, params.commitStoreAddress, params.destChain.Client(), params.destChain.LogPoller(), params.sourceChain.GasEstimator(), params.sourceChain.Config().EVM().GasEstimator().PriceMax().ToInt(), qopts...)
+	commitStoreReader, err := factory.NewCommitStoreReader(lggr, versionFinder, params.commitStoreAddress, params.destChain.Client(), params.destChain.LogPoller(), params.sourceChain.GasEstimator(), params.sourceChain.Config().EVM().GasEstimator().PriceMax().ToInt(), nil)
 	if err != nil {
 		return nil, nil, nil, errors.Wrap(err, "could not create commitStore reader")
 	}
