@@ -75,7 +75,6 @@ abstract contract MultiOCR3Base is ITypeAndVersion, OwnerIsCreator {
     address[] transmitters; // addresses oracles use to transmit the reports
   }
 
-  // TODO: evaluate contract size decrease if combined with ConfigInfo
   /// @notice Args to update an OCR Config
   struct OCRConfigArgs {
     uint8 ocrPluginType; // OCR plugin type to update config for
@@ -238,7 +237,6 @@ abstract contract MultiOCR3Base is ITypeAndVersion, OwnerIsCreator {
 
     if (configInfo.isSignatureVerificationEnabled) {
       // Scoping to reduce stack pressure
-      // TODO: evaluate gas overhead of moving this to a separate internal function
       {
         uint256 expectedNumSignatures;
         if (configInfo.uniqueReports) {
