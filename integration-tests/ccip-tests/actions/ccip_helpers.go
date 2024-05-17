@@ -219,22 +219,6 @@ func (ccipModule *CCIPCommon) IsCursed() (bool, error) {
 	return arm.IsCursed(nil)
 }
 
-func (ccipModule *CCIPCommon) SetRemoteChainsOnPools() error {
-	if ccipModule.ExistingDeployment {
-		return nil
-	}
-	for _, pool := range ccipModule.BridgeTokenPools {
-		err := pool.SetRemoteChainOnPool(ccipModule.RemoteChains)
-		if err != nil {
-			return fmt.Errorf("error updating remote chain selectors %w", err)
-		}
-	}
-	if err := ccipModule.ChainClient.WaitForEvents(); err != nil {
-		return fmt.Errorf("error waiting for updating remote chain selectors %w", err)
-	}
-	return nil
-}
-
 func (ccipModule *CCIPCommon) CurseARM() (*types.Transaction, error) {
 	if ccipModule.ARM != nil {
 		return nil, fmt.Errorf("real ARM deployed. cannot curse through test")
@@ -1007,10 +991,6 @@ func (ccipModule *CCIPCommon) DeployContracts(noOfTokens int,
 		}
 	}
 	log.Info().Msg("finished deploying common contracts")
-	err = ccipModule.SetRemoteChainsOnPools()
-	if err != nil {
-		return fmt.Errorf("error setting remote chains %w", err)
-	}
 	// approve router to spend fee token
 	return ccipModule.ApproveTokens()
 }
@@ -3220,6 +3200,20 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 		tokenAddresses = append(tokenAddresses, token.Address())
 	}
 	tokenAddresses = append(tokenAddresses, lane.Dest.Common.FeeToken.Address(), lane.Source.Common.WrappedNative.Hex(), lane.Dest.Common.WrappedNative.Hex())
+
+	// Configure the tokens on this lane
+	for i, src := range lane.Source.Common.BridgeTokenPools {
+		dst := lane.Dest.Common.BridgeTokenPools[i]
+
+		err := src.SetRemoteChainOnPool(lane.Source.DestChainSelector, dst.EthAddress)
+		if err != nil {
+			return err
+		}
+		err = dst.SetRemoteChainOnPool(lane.Dest.SourceChainSelector, src.EthAddress)
+		if err != nil {
+			return err
+		}
+	}
 
 	// Only one off pipeline or price getter to be set.
 	tokenPricesUSDPipeline := ""
