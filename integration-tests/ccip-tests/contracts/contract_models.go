@@ -1510,6 +1510,7 @@ func (w OnRampWrapper) ApplyPoolUpdates(opts *bind.TransactOpts, tokens []common
 	return nil, fmt.Errorf("no instance found to apply pool updates")
 }
 
+// CurrentRateLimiterState returns the current state of the rate limiter
 func (w OnRampWrapper) CurrentRateLimiterState(opts *bind.CallOpts) (*RateLimiterConfig, error) {
 	if w.Latest != nil {
 		rlConfig, err := w.Latest.CurrentRateLimiterState(opts)
