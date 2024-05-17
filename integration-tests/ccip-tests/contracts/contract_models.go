@@ -498,13 +498,13 @@ func (w TokenPoolWrapper) GetCurrentInboundRateLimiterState(opts *bind.CallOpts,
 }
 
 func (w TokenPoolWrapper) SetRouter(opts *bind.TransactOpts, routerAddr common.Address) (*types.Transaction, error) {
-	if w.Latest != nil && w.Latest.LockReleasePool != nil {
-		return w.Latest.LockReleasePool.SetRouter(opts, routerAddr)
+	if w.Latest != nil && w.Latest.PoolInterface != nil {
+		return w.Latest.PoolInterface.SetRouter(opts, routerAddr)
 	}
-	if w.V1_4_0 != nil && w.V1_4_0.LockReleasePool != nil {
-		return w.V1_4_0.LockReleasePool.SetRouter(opts, routerAddr)
+	if w.V1_4_0 != nil && w.V1_4_0.PoolInterface != nil {
+		return w.V1_4_0.PoolInterface.SetRouter(opts, routerAddr)
 	}
-	return nil, fmt.Errorf("no pool found to set rebalancer")
+	return nil, fmt.Errorf("no pool found to set router")
 }
 
 func (w TokenPoolWrapper) GetRouter(opts *bind.CallOpts) (common.Address, error) {
@@ -522,7 +522,7 @@ func (w TokenPoolWrapper) GetRouter(opts *bind.CallOpts) (common.Address, error)
 		}
 		return addr, nil
 	}
-	return common.Address{}, fmt.Errorf("no pool found to get current outbound rate limiter state")
+	return common.Address{}, fmt.Errorf("no pool found to get router")
 }
 
 func (w TokenPoolWrapper) GetRebalancer(opts *bind.CallOpts) (common.Address, error) {
@@ -540,7 +540,7 @@ func (w TokenPoolWrapper) GetRebalancer(opts *bind.CallOpts) (common.Address, er
 		}
 		return addr, nil
 	}
-	return common.Address{}, fmt.Errorf("no pool found to get current outbound rate limiter state")
+	return common.Address{}, fmt.Errorf("no pool found to get rebalancer")
 }
 
 // TokenPool represents a TokenPool address
