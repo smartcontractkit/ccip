@@ -6,7 +6,6 @@ import {BaseTest} from "../BaseTest.t.sol";
 import {MultiOCR3Helper} from "../helpers/MultiOCR3Helper.sol";
 
 import {Vm} from "forge-std/Vm.sol";
-import {console} from "forge-std/console.sol";
 
 // TODO: revisit pulling more tests from OCR2BaseNoChecks
 contract MultiOCR3BaseSetup is BaseTest {
@@ -100,7 +99,7 @@ contract MultiOCR3BaseSetup is BaseTest {
   function _getSignaturesForDigest(
     uint256[] memory signerPrivateKeys,
     bytes32 configDigest
-  ) internal view returns (bytes32[] memory rs, bytes32[] memory ss, uint8[] memory vs, bytes32 rawVs) {
+  ) internal pure returns (bytes32[] memory rs, bytes32[] memory ss, uint8[] memory vs, bytes32 rawVs) {
     rs = new bytes32[](signerPrivateKeys.length);
     ss = new bytes32[](signerPrivateKeys.length);
     vs = new uint8[](signerPrivateKeys.length);

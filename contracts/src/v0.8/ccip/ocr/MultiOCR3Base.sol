@@ -4,8 +4,6 @@ pragma solidity ^0.8.0;
 import {OwnerIsCreator} from "../../shared/access/OwnerIsCreator.sol";
 import {ITypeAndVersion} from "../../shared/interfaces/ITypeAndVersion.sol";
 
-import {console} from "forge-std/console.sol";
-
 // TODO: consider splitting configs & verification logic off to auth library (if size is prohibitive)
 /// @notice Onchain verification of reports from the offchain reporting protocol
 ///         with multiple OCR plugin support.
@@ -77,9 +75,9 @@ abstract contract MultiOCR3Base is ITypeAndVersion, OwnerIsCreator {
 
   /// @notice Args to update an OCR Config
   struct OCRConfigArgs {
-    uint8 ocrPluginType; // OCR plugin type to update config for
     bytes32 configDigest; // Config digest to update to
-    uint8 F; // ──────────────────────────────╮ maximum number of faulty/dishonest oracles
+    uint8 ocrPluginType; // ──────────────────╮ OCR plugin type to update config for
+    uint8 F; //                               │ maximum number of faulty/dishonest oracles
     bool uniqueReports; //                    │ if true, the reports should be unique
     bool isSignatureVerificationEnabled; // ──╯ if true, requires signers and verifies signatures on transmission verification
     address[] signers; // signing address of each oracle
@@ -90,7 +88,7 @@ abstract contract MultiOCR3Base is ITypeAndVersion, OwnerIsCreator {
   mapping(uint8 ocrPluginType => OCRConfig config) internal s_ocrConfigs;
 
   /// @notice OCR plugin type => signer OR transmitter address mapping
-  mapping(uint8 ocrPluginType => mapping(address signerOrTransmiter => Oracle oracle)) s_oracles;
+  mapping(uint8 ocrPluginType => mapping(address signerOrTransmiter => Oracle oracle)) internal s_oracles;
 
   // The constant-length components of the msg.data sent to transmit.
   // See the "If we wanted to call sam" example on for example reasoning
