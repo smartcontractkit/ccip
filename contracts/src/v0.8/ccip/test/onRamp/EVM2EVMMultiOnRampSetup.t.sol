@@ -45,19 +45,13 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
     s_feeTokenConfigArgs.push(
       EVM2EVMMultiOnRamp.FeeTokenConfigArgs({
         token: s_sourceFeeToken,
-        feeTokenConfig: EVM2EVMMultiOnRamp.FeeTokenConfig({
-          premiumMultiplierWeiPerEth: 5e17, // 0.5x
-          enabled: true
-        })
+        feeTokenConfig: 5e17 // 0.5x
       })
     );
     s_feeTokenConfigArgs.push(
       EVM2EVMMultiOnRamp.FeeTokenConfigArgs({
         token: s_sourceRouter.getWrappedNative(),
-        feeTokenConfig: EVM2EVMMultiOnRamp.FeeTokenConfig({
-          premiumMultiplierWeiPerEth: 2e18, // 2x
-          enabled: true
-        })
+        feeTokenConfig: 2e18 // 2x
       })
     );
 
@@ -300,13 +294,5 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
     assertEq(a.router, b.router);
     assertEq(a.priceRegistry, b.priceRegistry);
     assertEq(a.tokenAdminRegistry, b.tokenAdminRegistry);
-  }
-
-  function assertFeeTokenConfigEqual(
-    EVM2EVMMultiOnRamp.FeeTokenConfig memory a,
-    EVM2EVMMultiOnRamp.FeeTokenConfig memory b
-  ) internal pure {
-    assertEq(a.premiumMultiplierWeiPerEth, b.premiumMultiplierWeiPerEth);
-    assertEq(a.enabled, b.enabled);
   }
 }
