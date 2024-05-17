@@ -132,9 +132,8 @@ func (c *CCIPE2ELoad) BeforeAllCall() {
 		c.EOAReceiver = c.msg.Receiver
 	}
 	if c.SendMaxDataIntermittentlyInMsgCount > 0 {
-		dCfg, err := sourceCCIP.OnRamp.Instance.GetDynamicConfig(nil)
+		c.MaxDataBytes, err = sourceCCIP.OnRamp.Instance.GetDynamicConfig(nil)
 		require.NoError(c.t, err, "failed to fetch dynamic config")
-		c.MaxDataBytes = dCfg.MaxDataBytes
 	}
 	// if the msg is sent via multicall, transfer the token transfer amount to multicall contract
 	if sourceCCIP.Common.MulticallEnabled &&
@@ -321,8 +320,7 @@ func (c *CCIPE2ELoad) Validate(lggr zerolog.Logger, sendTx *types.Transaction, t
 	// wait for
 	// - CCIPSendRequested Event log to be generated,
 	msgLogs, sourceLogTime, err := c.Lane.Source.AssertEventCCIPSendRequested(lggr, sendTx.Hash().Hex(), c.CallTimeOut, txConfirmationTime, stats)
-
-	if err != nil || msgLogs == nil || len(msgLogs) == 0 {
+	if err != nil {
 		return err
 	}
 
@@ -354,9 +352,9 @@ func (c *CCIPE2ELoad) Validate(lggr zerolog.Logger, sendTx *types.Transaction, t
 	}
 
 	for _, msgLog := range msgLogs {
-		seqNum := msgLog.Message.SequenceNumber
+		seqNum := msgLog.SequenceNumber
 		var reqStat *testreporters.RequestStat
-		lggr = lggr.With().Str("msgId ", fmt.Sprintf("0x%x", msgLog.Message.MessageId[:])).Logger()
+		lggr = lggr.With().Str("msgId ", fmt.Sprintf("0x%x", msgLog.MessageId[:])).Logger()
 		for _, stat := range stats {
 			if stat.SeqNum == seqNum {
 				reqStat = stat
