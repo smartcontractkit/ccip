@@ -51,6 +51,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/chaintype"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/ocr2key"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/bridge/testonlybridge"
+	lmjobspec "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/jobspec"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/validate"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocrbootstrap"
 
@@ -322,18 +323,7 @@ func newTestUniverse(t *testing.T, numChains int, adapterHoldNative bool) {
 	evmChains := bootstrapNode.app.GetRelayers().LegacyEVMChains()
 	require.NotNil(t, evmChains)
 	require.Len(t, evmChains.Slice(), numChains)
-	bootstrapJobSpec := fmt.Sprintf(
-		`
-type = "bootstrap"
-name = "bootstrap"
-contractConfigTrackerPollInterval = "1s"
-relay = "evm"
-schemaVersion = 1
-contractID = "%s"
-[relayConfig]
-chainID = 1337
-fromBlock = %d
-`, mainContract.Hex(), mainFromBlock)
+	bootstrapJobSpec := lmjobspec.BootstrapJobSpec(10001, mainContract.Hex(), mainFromBlock)
 	t.Log("creating bootstrap job with spec:\n", bootstrapJobSpec)
 	ocrJob, err := ocrbootstrap.ValidatedBootstrapSpecToml(bootstrapJobSpec)
 	require.NoError(t, err, "failed to validate bootstrap job")
@@ -351,42 +341,17 @@ fromBlock = %d
 
 		mainChain := mustGetChainByEvmID(t, testutils.SimulatedChainID.Int64())
 
-		jobSpec := fmt.Sprintf(
-			`
-type                 	= "offchainreporting2"
-schemaVersion        	= 1
-name                 	= "liquiditymanager-integration-test"
-maxTaskDuration      	= "30s"
-contractID           	= "%s"
-ocrKeyBundleID       	= "%s"
-relay                	= "evm"
-pluginType           	= "liquiditymanager"
-transmitterID        	= "%s"
-forwardingAllowed       = false
-contractConfigTrackerPollInterval = "5s"
-
-[relayConfig]
-chainID              	= 1337
-# This is the fromBlock for the main chain
-fromBlock               = %d
-[relayConfig.fromBlocks]
-# these are the fromBlock values for the follower chains
-%s
-
-[pluginConfig]
-liquidityManagerAddress = "%s"
-liquidityManagerNetwork = "%d"
-closePluginTimeoutSec = 10
-[pluginConfig.rebalancerConfig]
-type = "ping-pong"
-`,
-			mainContract.Hex(),
-			kbs[i].ID(),
-			nodes[i].transmitters[1337].Hex(),
-			mainFromBlock,
-			buildFollowerChainsFromBlocksToml(blocksBeforeConfig),
-			mainContract.Hex(),
-			mainChain.Selector)
+		jobSpec := lmjobspec.NodeJobSpec(&lmjobspec.JobSpecOptions{
+			Name:                    "liquiditymanager-integration-test",
+			Type:                    "ping-pong",
+			ContractID:              mainContract.Hex(),
+			OcrKeyBundleID:          kbs[i].ID(),
+			TransmitterID:           nodes[i].transmitters[1337].Hex(),
+			RelayFromBlock:          mainFromBlock,
+			FollowerChains:          buildFollowerChainsFromBlocksToml(blocksBeforeConfig),
+			LiquidityManagerAddress: mainContract,
+			NetworkSelector:         mainChain.Selector,
+		})
 		t.Log("Creating liquidityManager job with spec:\n", jobSpec)
 		ocrJob2, err2 := validate.ValidatedOracleSpecToml(
 			testutils.Context(t),
