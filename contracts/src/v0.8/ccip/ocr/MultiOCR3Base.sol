@@ -4,6 +4,8 @@ pragma solidity ^0.8.0;
 import {OwnerIsCreator} from "../../shared/access/OwnerIsCreator.sol";
 import {ITypeAndVersion} from "../../shared/interfaces/ITypeAndVersion.sol";
 
+import {console} from "forge-std/console.sol";
+
 // TODO: consider splitting configs & verification logic off to auth library (if size is prohibitive)
 /// @notice Onchain verification of reports from the offchain reporting protocol
 ///         with multiple OCR plugin support.
@@ -91,11 +93,13 @@ abstract contract MultiOCR3Base is ITypeAndVersion, OwnerIsCreator {
   /// @notice OCR plugin type => signer OR transmitter address mapping
   mapping(uint8 ocrPluginType => mapping(address signerOrTransmiter => Oracle oracle)) s_oracles;
 
-  // TODO: verify if the same TRANSMIT_MSGDATA_CONSTANT_LENGTH_COMPONENT would apply to all plugins
   // The constant-length components of the msg.data sent to transmit.
   // See the "If we wanted to call sam" example on for example reasoning
   // https://solidity.readthedocs.io/en/v0.7.2/abi-spec.html
+  // TODO: assumes a constant function sig like in _transmit. Will need adjustment (either removing
+  //       the ocrPluginType word or allowing variable lengths)
   uint16 private constant TRANSMIT_MSGDATA_CONSTANT_LENGTH_COMPONENT = 4 // function selector
+    + 32 // word containing ocrPluginType
     + 32 * 3 // 3 words containing reportContext
     + 32 // word containing start location of abiencoded report value
     + 32 // word containing location start of abiencoded rs value
@@ -120,6 +124,7 @@ abstract contract MultiOCR3Base is ITypeAndVersion, OwnerIsCreator {
     }
   }
 
+  // TODO: evaluate gas & contract size efficiency of unfolding OCRConfigArgs into the function args
   /// @notice sets offchain reporting protocol configuration incl. participating oracles for a single OCR plugin type
   /// @param ocrConfigArgs OCR config update args
   function _setOCR3Config(OCRConfigArgs memory ocrConfigArgs) internal {
@@ -127,11 +132,26 @@ abstract contract MultiOCR3Base is ITypeAndVersion, OwnerIsCreator {
     OCRConfig storage ocrConfig = s_ocrConfigs[ocrPluginType];
     ConfigInfo storage configInfo = ocrConfig.configInfo;
 
-    uint256 newTransmittersLength = ocrConfigArgs.transmitters.length;
-    if (configInfo.isSignatureVerificationEnabled) {
+    // TODO: re-add checkConfigValid validation
+    //       - validate signers / transmitters <= MAX_NUM_ORACLES
+    //       - validate len(signers) == len(transmitters) (when enabled)
+
+    address[] memory transmitters = ocrConfigArgs.transmitters;
+    // Transmitters are expected to never exceed 255 (since this is bounded by MAX_NUM_ORACLES)
+    uint8 newTransmittersLength = uint8(transmitters.length);
+
+    if (ocrConfigArgs.isSignatureVerificationEnabled) {
       ocrConfig.signers = ocrConfigArgs.signers;
+      address[] memory signers = ocrConfigArgs.signers;
+
+      for (uint8 i = 0; i < newTransmittersLength; ++i) {
+        // add new signer/transmitter addresses
+        address signer = signers[i];
+        if (s_oracles[ocrPluginType][signer].role != Role.Unset) revert InvalidConfig("repeated signer address");
+        if (signer == address(0)) revert OracleCannotBeZeroAddress();
+        s_oracles[ocrPluginType][signer] = Oracle(uint8(i), Role.Signer);
+      }
     }
-    // TODO: validate signers / transmitters <= MAX_NUM_ORACLES
 
     // TODO: re-add s_oracles removal logic & validations
     //     uint256 oldSignerLength = s_signers.length;
@@ -140,24 +160,21 @@ abstract contract MultiOCR3Base is ITypeAndVersion, OwnerIsCreator {
     //       delete s_oracles[s_transmitters[i]];
     //     }
 
-    //     uint256 newSignersLength = signers.length;
-    //     for (uint256 i = 0; i < newSignersLength; ++i) {
-    //       // add new signer/transmitter addresses
-    //       address signer = signers[i];
-    //       if (s_oracles[signer].role != Role.Unset) revert InvalidConfig("repeated signer address");
-    //       if (signer == address(0)) revert OracleCannotBeZeroAddress();
-    //       s_oracles[signer] = Oracle(uint8(i), Role.Signer);
+    for (uint8 i = 0; i < newTransmittersLength; ++i) {
+      address transmitter = transmitters[i];
+      if (s_oracles[ocrPluginType][transmitter].role != Role.Unset) {
+        revert InvalidConfig("repeated transmitter address");
+      }
+      if (transmitter == address(0)) revert OracleCannotBeZeroAddress();
+      s_oracles[ocrPluginType][transmitter] = Oracle(uint8(i), Role.Transmitter);
+    }
 
-    //       address transmitter = transmitters[i];
-    //       if (s_oracles[transmitter].role != Role.Unset) revert InvalidConfig("repeated transmitter address");
-    //       if (transmitter == address(0)) revert OracleCannotBeZeroAddress();
-    //       s_oracles[transmitter] = Oracle(uint8(i), Role.Transmitter);
-    //     }
-
-    ocrConfig.transmitters = ocrConfigArgs.transmitters;
+    ocrConfig.transmitters = transmitters;
     configInfo.F = ocrConfigArgs.F;
     configInfo.configDigest = ocrConfigArgs.configDigest;
-    configInfo.n = uint8(newTransmittersLength);
+    configInfo.n = newTransmittersLength;
+    configInfo.uniqueReports = ocrConfigArgs.uniqueReports;
+    configInfo.isSignatureVerificationEnabled = ocrConfigArgs.isSignatureVerificationEnabled;
 
     emit ConfigSet(
       ocrPluginType, ocrConfigArgs.configDigest, ocrConfigArgs.signers, ocrConfigArgs.transmitters, ocrConfigArgs.F
@@ -177,6 +194,7 @@ abstract contract MultiOCR3Base is ITypeAndVersion, OwnerIsCreator {
     // TRANSMIT_MSGDATA_CONSTANT_LENGTH_COMPONENT need to be changed accordingly
     bytes32[3] calldata reportContext,
     bytes calldata report,
+    // TODO: revisit keeping calldata vs using memory and allowing smaller inputs
     bytes32[] calldata rs,
     bytes32[] calldata ss,
     bytes32 rawVs // signatures
@@ -209,6 +227,7 @@ abstract contract MultiOCR3Base is ITypeAndVersion, OwnerIsCreator {
         revert UnauthorizedTransmitter();
       }
     }
+
     // Scoping this reduces stack pressure and gas usage
     {
       uint256 expectedDataLength = uint256(TRANSMIT_MSGDATA_CONSTANT_LENGTH_COMPONENT) + report.length // one byte pure entry in _report
@@ -216,8 +235,6 @@ abstract contract MultiOCR3Base is ITypeAndVersion, OwnerIsCreator {
         + ss.length * 32; // 32 bytes per entry in _ss)
       if (msg.data.length != expectedDataLength) revert WrongMessageLength(expectedDataLength, msg.data.length);
     }
-
-    emit Transmitted(ocrPluginType, configDigest, uint32(uint256(reportContext[1]) >> 8));
 
     if (configInfo.isSignatureVerificationEnabled) {
       // Scoping to reduce stack pressure
@@ -236,6 +253,8 @@ abstract contract MultiOCR3Base is ITypeAndVersion, OwnerIsCreator {
       bytes32 h = keccak256(abi.encodePacked(keccak256(report), reportContext));
       _verifySignatures(ocrPluginType, h, rs, ss, rawVs);
     }
+
+    emit Transmitted(ocrPluginType, configDigest, uint32(uint256(reportContext[1]) >> 8));
   }
 
   /// @notice verifies the signatures of a hashed report value for one OCR plugin type
