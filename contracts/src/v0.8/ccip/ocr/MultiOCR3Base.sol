@@ -25,7 +25,7 @@ abstract contract MultiOCR3Base is ITypeAndVersion, OwnerIsCreator {
   /// use latestConfigDigestAndEpoch with scanLogs set to false.
   event Transmitted(uint8 indexed ocrPluginType, bytes32 configDigest, uint64 sequenceNumber);
 
-  //   error InvalidConfig(string message);
+  error InvalidConfig(string message);
   error WrongMessageLength(uint256 expected, uint256 actual);
   error ConfigDigestMismatch(bytes32 expected, bytes32 actual);
   error ForkedChain(uint256 expected, uint256 actual);
@@ -34,12 +34,12 @@ abstract contract MultiOCR3Base is ITypeAndVersion, OwnerIsCreator {
   error UnauthorizedTransmitter();
   error UnauthorizedSigner();
   error NonUniqueSignatures();
-  //   error OracleCannotBeZeroAddress();
+  error OracleCannotBeZeroAddress();
 
   /// @dev Packing these fields used on the hot path in a ConfigInfo variable reduces the
   ///      retrieval of all of them to a minimum number of SLOADs.
   struct ConfigInfo {
-    bytes32 latestConfigDigest;
+    bytes32 configDigest;
     uint8 F; // ──────────────────────────────╮ maximum number of faulty/dishonest oracles the system can tolerate
     uint8 n; //                               │ number of signers / transmitters
     bool uniqueReports; //                    │ if true, the reports should be unique
@@ -61,8 +61,8 @@ abstract contract MultiOCR3Base is ITypeAndVersion, OwnerIsCreator {
   }
 
   struct Oracle {
-    uint8 index; // Index of oracle in s_signers/s_transmitters
-    Role role; // Role of the address which mapped to this struct
+    uint8 index; // ───╮ Index of oracle in s_signers/s_transmitters
+    Role role; // ─────╯ Role of the address which mapped to this struct
   }
 
   /// @notice OCR configuration for a single OCR plugin within a DON
@@ -73,12 +73,13 @@ abstract contract MultiOCR3Base is ITypeAndVersion, OwnerIsCreator {
     address[] transmitters; // addresses oracles use to transmit the reports
   }
 
+  // TODO: evaluate contract size decrease if combined with ConfigInfo
   /// @notice Args to update an OCR Config
   struct OCRConfigArgs {
     uint8 ocrPluginType; // OCR plugin type to update config for
     bytes32 configDigest; // Config digest to update to
-    uint8 F; // ───────────────────────────╮ maximum number of faulty/dishonest oracles
-    bool uniqueReports; //                 │ if true, the reports should be unique
+    uint8 F; // ──────────────────────────────╮ maximum number of faulty/dishonest oracles
+    bool uniqueReports; //                    │ if true, the reports should be unique
     bool isSignatureVerificationEnabled; // ──╯ if true, requires signers and verifies signatures on transmission verification
     address[] signers; // signing address of each oracle
     address[] transmitters; // transmission address of each oracle (i.e. the address the oracle actually sends transactions to the contract from)
@@ -87,7 +88,6 @@ abstract contract MultiOCR3Base is ITypeAndVersion, OwnerIsCreator {
   /// @notice mapping of OCR plugin type -> DON config
   mapping(uint8 ocrPluginType => OCRConfig config) internal s_ocrConfigs;
 
-  // TODO: optimization: we can use bitmaps of 2-bit width to optimise the role representation
   /// @notice OCR plugin type => signer OR transmitter address mapping
   mapping(uint8 ocrPluginType => mapping(address signerOrTransmiter => Oracle oracle)) s_oracles;
 
@@ -156,7 +156,7 @@ abstract contract MultiOCR3Base is ITypeAndVersion, OwnerIsCreator {
 
     ocrConfig.transmitters = ocrConfigArgs.transmitters;
     configInfo.F = ocrConfigArgs.F;
-    configInfo.latestConfigDigest = ocrConfigArgs.configDigest;
+    configInfo.configDigest = ocrConfigArgs.configDigest;
     configInfo.n = uint8(newTransmittersLength);
 
     emit ConfigSet(
@@ -188,8 +188,8 @@ abstract contract MultiOCR3Base is ITypeAndVersion, OwnerIsCreator {
     bytes32 configDigest = reportContext[0];
     ConfigInfo memory configInfo = s_ocrConfigs[ocrPluginType].configInfo;
 
-    if (configInfo.latestConfigDigest != configDigest) {
-      revert ConfigDigestMismatch(configInfo.latestConfigDigest, configDigest);
+    if (configInfo.configDigest != configDigest) {
+      revert ConfigDigestMismatch(configInfo.configDigest, configDigest);
     }
     // If the cached chainID at time of deployment doesn't match the current chainID, we reject all signed reports.
     // This avoids a (rare) scenario where chain A forks into chain A and A', A' still has configDigest
