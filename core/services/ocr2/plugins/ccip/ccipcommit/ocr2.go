@@ -15,6 +15,7 @@ import (
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	cciporm "github.com/smartcontractkit/chainlink/v2/core/services/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
@@ -52,8 +53,9 @@ type update struct {
 }
 
 type CommitPluginStaticConfig struct {
-	orm  cciporm.ORM
-	lggr logger.Logger
+	jobId int32
+	orm   cciporm.ORM
+	lggr  logger.Logger
 	// Source
 	onRampReader        ccipdata.OnRampReader
 	sourceChainSelector uint64
@@ -70,14 +72,16 @@ type CommitPluginStaticConfig struct {
 }
 
 type CommitReportingPlugin struct {
-	orm  cciporm.ORM
-	lggr logger.Logger
+	jobId int32
+	orm   cciporm.ORM
+	lggr  logger.Logger
 	// Source
 	onRampReader        ccipdata.OnRampReader
 	sourceChainSelector uint64
 	sourceNative        cciptypes.Address
 	gasPriceEstimator   prices.GasPriceEstimatorCommit
 	// Dest
+	destChainSelector       uint64
 	commitStoreReader       ccipdata.CommitStoreReader
 	destPriceRegistryReader ccipdata.PriceRegistryReader
 	offchainConfig          cciptypes.CommitOffchainConfig
@@ -188,7 +192,61 @@ func (r *CommitReportingPlugin) observePriceUpdates(
 		return nil, nil, fmt.Errorf("get destination tokens: %w", err)
 	}
 
-	return r.generatePriceUpdates(ctx, lggr, sortedLaneTokens)
+	gasPrice, tokenPricesUSD, err := r.generatePriceUpdates(ctx, lggr, sortedLaneTokens)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// all lanes write prices to DB
+	// @MATT TODO consider deviation check here
+	err = r.writePricesToDB(ctx, gasPrice, tokenPricesUSD)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// if not leader lane, no need to report prices, can return immediately
+	if r.offchainConfig.PriceReportingDisabled {
+		return nil, nil, nil
+	}
+
+	// @MATT TODO report prices from DB
+	return gasPrice, tokenPricesUSD, nil
+}
+
+func (r *CommitReportingPlugin) writePricesToDB(
+	ctx context.Context,
+	sourceGasPriceUSD *big.Int,
+	tokenPricesUSD map[cciptypes.Address]*big.Int,
+) (err error) {
+	if sourceGasPriceUSD != nil {
+		err := r.orm.InsertGasPricesForDestChain(ctx, r.destChainSelector, r.jobId, []cciporm.GasPriceUpdate{
+			{
+				SourceChainSelector: r.sourceChainSelector,
+				GasPrice:            assets.NewWei(sourceGasPriceUSD),
+			},
+		})
+		if err != nil {
+			return fmt.Errorf("failed to insert gas prices to db: %w", err)
+		}
+	}
+
+	if tokenPricesUSD != nil {
+		var tokenPrices []cciporm.TokenPriceUpdate
+
+		for token, price := range tokenPricesUSD {
+			tokenPrices = append(tokenPrices, cciporm.TokenPriceUpdate{
+				TokenAddr:  string(token),
+				TokenPrice: assets.NewWei(price),
+			})
+		}
+
+		err := r.orm.InsertTokenPricesForDestChain(ctx, r.destChainSelector, r.jobId, tokenPrices)
+		if err != nil {
+			return fmt.Errorf("failed to insert tokens prices to db: %w", err)
+		}
+	}
+
+	return nil
 }
 
 // All prices are USD ($1=1e18) denominated. All prices must be not nil.
