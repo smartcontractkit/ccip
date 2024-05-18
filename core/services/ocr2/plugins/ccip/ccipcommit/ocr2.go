@@ -16,6 +16,7 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
+	cciporm "github.com/smartcontractkit/chainlink/v2/core/services/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
@@ -51,6 +52,7 @@ type update struct {
 }
 
 type CommitPluginStaticConfig struct {
+	orm  cciporm.ORM
 	lggr logger.Logger
 	// Source
 	onRampReader        ccipdata.OnRampReader
@@ -68,6 +70,7 @@ type CommitPluginStaticConfig struct {
 }
 
 type CommitReportingPlugin struct {
+	orm  cciporm.ORM
 	lggr logger.Logger
 	// Source
 	onRampReader        ccipdata.OnRampReader

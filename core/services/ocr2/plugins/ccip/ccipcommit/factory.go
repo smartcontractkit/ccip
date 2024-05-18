@@ -99,6 +99,7 @@ func (rf *CommitReportingPluginFactory) NewReportingPlugin(config types.Reportin
 			commitStoreReader:       rf.config.commitStore,
 			priceGetter:             rf.config.priceGetter,
 			F:                       config.F,
+			orm:                     rf.config.orm,
 			lggr:                    lggr,
 			destPriceRegistryReader: rf.destPriceRegReader,
 			offRampReader:           rf.config.offRamp,
