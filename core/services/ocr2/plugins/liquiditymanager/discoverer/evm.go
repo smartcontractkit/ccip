@@ -11,6 +11,7 @@ import (
 	"go.uber.org/multierr"
 
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/liquiditymanager/generated/liquiditymanager"
+	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/graph"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/models"
 )
@@ -22,18 +23,36 @@ const (
 type evmLiquidityGetter func(ctx context.Context, selector models.NetworkSelector, lmAddress common.Address) (*big.Int, error)
 
 type evmDiscoverer struct {
-	lock             sync.RWMutex
-	evmClients       map[models.NetworkSelector]evmDep
-	masterRebalancer models.Address
-	masterSelector   models.NetworkSelector
-	liquidityGetter  evmLiquidityGetter
+	lggr                   logger.Logger
+	lock                   sync.RWMutex
+	evmClients             map[models.NetworkSelector]evmDep
+	masterLiquidityManager models.Address
+	masterSelector         models.NetworkSelector
+	liquidityGetter        evmLiquidityGetter
+}
+
+func newEvmDiscoverer(lggr logger.Logger, evmDeps map[models.NetworkSelector]evmDep, lmAddress models.Address, selector models.NetworkSelector) *evmDiscoverer {
+	masterLmAddr := models.Address{}
+	copy(masterLmAddr[:], lmAddress[:])
+	return &evmDiscoverer{
+		lggr:                   lggr.With("where", "evmDiscoverer"),
+		evmClients:             evmDeps,
+		masterLiquidityManager: masterLmAddr,
+		masterSelector:         selector,
+	}
 }
 
 func (e *evmDiscoverer) Discover(ctx context.Context) (graph.Graph, error) {
 	return graph.NewGraphWithData(ctx, graph.Vertex{
 		NetworkSelector:  e.masterSelector,
-		LiquidityManager: e.masterRebalancer,
-	}, e.getVertexData)
+		LiquidityManager: e.masterLiquidityManager,
+	}, func(ctx context.Context, v graph.Vertex) (graph.Data, []graph.Vertex, error) {
+		d, n, err := e.getVertexData(ctx, v)
+		if err != nil {
+			e.lggr.Warnw("failed to get vertex data", "vertex", v, "error", err)
+		}
+		return d, n, err
+	})
 }
 
 // DiscoverBalances discovers the balances of all networks in the graph.
@@ -53,7 +72,7 @@ func (e *evmDiscoverer) DiscoverBalances(ctx context.Context, g graph.Graph) err
 				defer func() { <-running }()
 				err := e.updateLiquidity(c, selector, g, liquidityGetter)
 				if err != nil {
-					err = fmt.Errorf("get liquidity: %w", err)
+					err = fmt.Errorf("update liquidity: %w", err)
 				}
 				results <- err
 			}(ctx, selector)
@@ -86,7 +105,7 @@ func (e *evmDiscoverer) getVertexData(ctx context.Context, v graph.Vertex) (grap
 		Context: ctx,
 	})
 	if err != nil {
-		return graph.Data{}, nil, fmt.Errorf("get liquidity: %w", err)
+		return graph.Data{}, nil, fmt.Errorf("failed get liquidity: %w", err)
 	}
 	token, err := rebal.ILocalToken(&bind.CallOpts{
 		Context: ctx,
