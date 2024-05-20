@@ -395,7 +395,7 @@ func LMDefaultTestSetup(
 		net.URLs = chain.GetNetworkConfig().URLs
 		var selectors []uint64
 		for chainId, selector := range chainSelectors {
-			if chainId != net.ChainID {
+			if chainId == net.ChainID {
 				selectors = append(selectors, selector)
 			}
 		}
