@@ -63,6 +63,24 @@ func setupGasSuite(t *testing.T, loadArgs *LoadArgs) *ch.GasSuite {
 	return rs
 }
 
+// TestLoadCCIPStableRPS clean and stable load test
+func TestLoadCCIPStableRPS(t *testing.T) {
+	t.Parallel()
+	lggr := logging.GetTestLogger(t)
+	testArgs := NewLoadArgs(t, lggr)
+	testArgs.Setup()
+	// if the test runs on remote runner
+	if len(testArgs.TestSetupArgs.Lanes) == 0 {
+		return
+	}
+	t.Cleanup(func() {
+		log.Info().Msg("Tearing down the environment")
+		require.NoError(t, testArgs.TestSetupArgs.TearDown())
+	})
+	testArgs.TriggerLoadByLane()
+	testArgs.Wait()
+}
+
 // TestLoadCCIPStableRPSReorgsBelowFinality we run default stable RPS load test and
 // measure how below-finality reorgs are slowing us down
 func TestLoadCCIPStableRPSReorgsBelowFinality(t *testing.T) {
@@ -143,23 +161,6 @@ func TestLoadCCIPStableRPSGasSpike(t *testing.T) {
 	gs := setupGasSuite(t, testArgs)
 	gs.RaiseGas(chcfg.TargetChain, chcfg.StartGasPrice, chcfg.GasRaisePercentage, chcfg.Duration.Duration(), chcfg.Spike)
 
-	testArgs.TriggerLoadByLane()
-	testArgs.Wait()
-}
-
-func TestLoadCCIPStableRPS(t *testing.T) {
-	t.Parallel()
-	lggr := logging.GetTestLogger(t)
-	testArgs := NewLoadArgs(t, lggr)
-	testArgs.Setup()
-	// if the test runs on remote runner
-	if len(testArgs.TestSetupArgs.Lanes) == 0 {
-		return
-	}
-	t.Cleanup(func() {
-		log.Info().Msg("Tearing down the environment")
-		require.NoError(t, testArgs.TestSetupArgs.TearDown())
-	})
 	testArgs.TriggerLoadByLane()
 	testArgs.Wait()
 }

@@ -49,7 +49,7 @@ DBArgs = ['shared_buffers=1536MB', 'effective_cache_size=4096MB', 'work_mem=64MB
 [CCIP.Env.NewCLCluster.Common]
 CommonChainConfigTOML = """
 [HeadTracker]
-HistoryDepth = 20
+HistoryDepth = 30
 
 [GasEstimator]
 PriceMax = '200 gwei'
