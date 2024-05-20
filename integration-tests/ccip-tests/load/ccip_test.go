@@ -37,11 +37,27 @@ func setupReorgSuite(t *testing.T, loadArgs *LoadArgs) *ch.ReorgSuite {
 		DstGethHTTPURL:     loadArgs.TestSetupArgs.Env.K8Env.URLs["dest-chain_http"][0],
 		SrcFinalityDepth:   finalitySrc,
 		DstFinalityDepth:   finalityDst,
-		GrafanaURL:         *loadArgs.TestCfg.EnvInput.Logging.Grafana.BaseUrl,
-		GrafanaToken:       *loadArgs.TestCfg.EnvInput.Logging.Grafana.BearerToken,
-		DashboardURL:       *loadArgs.TestCfg.EnvInput.Logging.Grafana.DashboardUrl,
-		FinalityDelta:      5,
-		ExperimentDuration: 2 * time.Minute,
+		FinalityDelta:      loadArgs.TestSetupArgs.Cfg.TestGroupInput.ChaosReorgProfile.FinalityDelta,
+		ExperimentDuration: loadArgs.TestSetupArgs.Cfg.TestGroupInput.ChaosReorgProfile.Duration.Duration(),
+		GrafanaConfig: &ch.GrafanaConfig{
+			GrafanaURL:   *loadArgs.TestCfg.EnvInput.Logging.Grafana.BaseUrl,
+			GrafanaToken: *loadArgs.TestCfg.EnvInput.Logging.Grafana.BearerToken,
+			DashboardURL: *loadArgs.TestCfg.EnvInput.Logging.Grafana.DashboardUrl,
+		},
+	})
+	require.NoError(t, err)
+	return rs
+}
+
+func setupGasSuite(t *testing.T, loadArgs *LoadArgs) *ch.GasSuite {
+	rs, err := ch.NewGasSuite(t, &ch.GasSuiteConfig{
+		SrcGethHTTPURL: loadArgs.TestSetupArgs.Env.K8Env.URLs["source-chain_http"][0],
+		DstGethHTTPURL: loadArgs.TestSetupArgs.Env.K8Env.URLs["dest-chain_http"][0],
+		GrafanaConfig: &ch.GrafanaConfig{
+			GrafanaURL:   *loadArgs.TestCfg.EnvInput.Logging.Grafana.BaseUrl,
+			GrafanaToken: *loadArgs.TestCfg.EnvInput.Logging.Grafana.BearerToken,
+			DashboardURL: *loadArgs.TestCfg.EnvInput.Logging.Grafana.DashboardUrl,
+		},
 	})
 	require.NoError(t, err)
 	return rs
@@ -81,12 +97,18 @@ func TestLoadCCIPStableRPSReorgsAboveFinality(t *testing.T) {
 	}
 	t.Cleanup(func() {
 		log.Info().Msg("Tearing down the environment")
-		require.NoError(t, testArgs.TestSetupArgs.TearDown())
+		err := testArgs.TestSetupArgs.TearDown()
+		require.Error(t, err)
+		// we should see 'crit' message there because finality was violated
+		t.Logf("error teardown: %s", err.Error())
+		require.Contains(t, err.Error(), "found log at level 'crit'")
+		require.Contains(t, err.Error(), "one of the RPC nodes has gotten far out of sync")
 	})
 	rs := setupReorgSuite(t, testArgs)
 	rs.RunReorgAboveFinalityThreshold(1 * time.Second)
 	testArgs.TriggerLoadByLane()
 	clNodes := testArgs.TestSetupArgs.Env.CLNodes
+	// validate that all nodes has healthcheck failing
 	assert.Eventually(t, func() bool {
 		violatedResponses := 0
 		for _, node := range clNodes {
@@ -98,9 +120,31 @@ func TestLoadCCIPStableRPSReorgsAboveFinality(t *testing.T) {
 				}
 			}
 		}
-		lggr.Debug().Any("FinalityViolatedResponses", violatedResponses).Send()
+		lggr.Info().Any("FinalityViolatedResponses", violatedResponses).Send()
 		return violatedResponses == len(clNodes)
 	}, 3*time.Minute, 20*time.Second, "not all the nodes report finality violation")
+}
+
+func TestLoadCCIPStableRPSGasSpike(t *testing.T) {
+	t.Parallel()
+	lggr := logging.GetTestLogger(t)
+	testArgs := NewLoadArgs(t, lggr)
+	testArgs.Setup()
+	// if the test runs on remote runner
+	if len(testArgs.TestSetupArgs.Lanes) == 0 {
+		return
+	}
+	t.Cleanup(func() {
+		log.Info().Msg("Tearing down the environment")
+		require.NoError(t, testArgs.TestSetupArgs.TearDown())
+	})
+
+	chcfg := testArgs.TestCfg.TestGroupInput.ChaosGasProfile
+	gs := setupGasSuite(t, testArgs)
+	gs.RaiseGas(chcfg.TargetChain, chcfg.StartGasPrice, chcfg.GasRaisePercentage, chcfg.Duration.Duration(), chcfg.Spike)
+
+	testArgs.TriggerLoadByLane()
+	testArgs.Wait()
 }
 
 func TestLoadCCIPStableRPS(t *testing.T) {

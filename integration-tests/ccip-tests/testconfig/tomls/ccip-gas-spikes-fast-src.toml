@@ -61,6 +61,9 @@ FeeCapDefault = '200 gwei'
 TestDuration = '5m'
 FailOnFirstErrorInLoad = true
 
-[CCIP.Groups.load.ChaosReorgProfile]
-FinalityDelta = 5
+[CCIP.Groups.load.ChaosGasProfile]
+TargetChain = "src"
+StartGasPrice = 2000000000
+GasRaisePercentage = 0.7
+Spike = true
 Duration = '3m'

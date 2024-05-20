@@ -122,6 +122,7 @@ jobs:
             run: ^TestLoadCCIPStableRPSAfterARMCurseAndUncurse$
             config_path: ./integration-tests/ccip-tests/testconfig/tomls/load-with-arm-curse-uncurse.toml
             os: ubuntu-latest
+            # reorgs chaos
           - name: ccip-reorg-below-finality
             os: ubuntu-latest
             run: ^TestLoadCCIPStableRPSReorgsBelowFinality$
@@ -138,6 +139,23 @@ jobs:
             os: ubuntu-latest
             run: ^TestLoadCCIPStableRPSReorgsAboveFinality$
             config_path: ./integration-tests/ccip-tests/testconfig/tomls/ccip-reorg-finality-tag.tom
+            # gas chaos
+          - name: ccip-gas-spike-slow-src
+            os: ubuntu-latest
+            run: ^TestLoadCCIPStableRPSGasSpike$
+            config_path: ./integration-tests/ccip-tests/testconfig/tomls/ccip-gas-spike-slow-src.toml
+          - name: ccip-gas-spike-slow-dst
+            os: ubuntu-latest
+            run: ^TestLoadCCIPStableRPSGasSpike$
+            config_path: ./integration-tests/ccip-tests/testconfig/tomls/ccip-gas-spike-slow-dst.toml
+          - name: ccip-gas-spike-fast-src
+            os: ubuntu-latest
+            run: ^TestLoadCCIPStableRPSGasSpike$
+            config_path: ./integration-tests/ccip-tests/testconfig/tomls/ccip-gas-spike-fast-src.toml
+          - name: ccip-gas-spike-fast-dst
+            os: ubuntu-latest
+            run: ^TestLoadCCIPStableRPSGasSpike$
+            config_path: ./integration-tests/ccip-tests/testconfig/tomls/ccip-gas-spike-fast-dst.toml
     runs-on: ${{ matrix.type.os }}
     name: CCIP ${{ matrix.type.name }}
     steps:

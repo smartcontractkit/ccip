@@ -2,7 +2,7 @@ package chaos
 
 import (
 	"fmt"
-	"strings"
+	"github.com/stretchr/testify/require"
 	"testing"
 	"time"
 
@@ -38,14 +38,8 @@ type ReorgConfig struct {
 	FinalityDelta int
 	// ExperimentDuration experiment duration
 	ExperimentDuration time.Duration
-	// GrafanaURL Grafana URL
-	GrafanaURL string
-	// GrafanaToken Grafana API token
-	GrafanaToken string
-	// DashboardURL dashboard URL in format "/d/6vjVx-1V8/ccip-long-running-tests"
-	DashboardURL string
-	// dashboardUID part of DashboardURL to put annotation on
-	dashboardUID string
+	// GrafanaConfig is common Grafana config
+	*GrafanaConfig
 }
 
 // Validate validates ReorgConfig params
@@ -56,12 +50,7 @@ func (rc *ReorgConfig) Validate() error {
 			rc.FinalityDelta, rc.SrcFinalityDepth, rc.DstFinalityDepth,
 		)
 	}
-	urlParams := strings.Split(rc.DashboardURL, "/")
-	if len(urlParams) != 4 {
-		return fmt.Errorf("invalid Grafana dashboard URL format, must be: /d/6vjVx-1V8/ccip-long-running-tests")
-	}
-	rc.dashboardUID = urlParams[2]
-	return nil
+	return rc.GrafanaConfig.Validate()
 }
 
 // NewReorgSuite creates new reorg suite with source/dest RPC clients, works only with Geth
@@ -79,42 +68,45 @@ func NewReorgSuite(t *testing.T, cfg *ReorgConfig) (*ReorgSuite, error) {
 	}, nil
 }
 
-// annotate sets dashboard annotation about when block was rewinding on which chain
-func (r *ReorgSuite) annotate(text string) {
-	res, _, err := r.GrafanaClient.PostAnnotation(grafana.PostAnnotation{
-		DashboardUID: r.Cfg.dashboardUID,
-		Tags:         []string{"reorg", "rewind_head"},
-		Text:         fmt.Sprintf("<pre>%s</pre>", text),
-	})
-	r.Logger.Warn().Str("DashboardUID", r.Cfg.dashboardUID).Any("ResponseBody", res).Msg("Annotated experiment")
-	assert.NoError(r.t, err)
-}
-
 // RunReorgBelowFinalityThreshold we rollback both chains, one by one, for N blocks back
 // no assertions needed, load test should fail if something went wrong
 func (r *ReorgSuite) RunReorgBelowFinalityThreshold(startDelay time.Duration) {
 	go func() {
 		time.Sleep(startDelay)
 		blocksBackSrc := int(r.Cfg.SrcFinalityDepth) - r.Cfg.FinalityDelta
-		r.Logger.Warn().
+		r.Logger.Info().
 			Str("URL", r.SrcClient.URL).
 			Str("Case", "below finality").
 			Int("BlocksBack", blocksBackSrc).
 			Msg("Rewinding blocks on src chain")
 		err := r.SrcClient.GethSetHead(blocksBackSrc)
 		assert.NoError(r.t, err)
-		r.annotate(fmt.Sprintf("rewinded source chain for %d blocks back, finality is: %d", blocksBackSrc, r.Cfg.SrcFinalityDepth))
+		err = PostGrafanaAnnotation(
+			r.Logger,
+			r.GrafanaClient,
+			r.Cfg.dashboardUID,
+			fmt.Sprintf("rewinded source chain for %d blocks back, finality is: %d", blocksBackSrc, r.Cfg.SrcFinalityDepth),
+			nil,
+		)
+		require.NoError(r.t, err)
 		time.Sleep(r.Cfg.ExperimentDuration)
 
 		blocksBackDst := int(r.Cfg.DstFinalityDepth) - r.Cfg.FinalityDelta
-		r.Logger.Warn().
+		r.Logger.Info().
 			Str("URL", r.SrcClient.URL).
 			Str("Case", "below finality").
 			Int("BlocksBack", blocksBackDst).
 			Msg("Rewinding blocks on dst chain")
 		err = r.DstClient.GethSetHead(blocksBackDst)
 		assert.NoError(r.t, err)
-		r.annotate(fmt.Sprintf("rewinded dest chain for %d blocks back, finality is: %d", blocksBackDst, r.Cfg.DstFinalityDepth))
+		err = PostGrafanaAnnotation(
+			r.Logger,
+			r.GrafanaClient,
+			r.Cfg.dashboardUID,
+			fmt.Sprintf("rewinded dest chain for %d blocks back, finality is: %d", blocksBackDst, r.Cfg.DstFinalityDepth),
+			nil,
+		)
+		require.NoError(r.t, err)
 		time.Sleep(r.Cfg.ExperimentDuration)
 	}()
 }
@@ -125,27 +117,39 @@ func (r *ReorgSuite) RunReorgAboveFinalityThreshold(startDelay time.Duration) {
 	go func() {
 		time.Sleep(startDelay)
 		blocksBackSrc := int(r.Cfg.SrcFinalityDepth) + r.Cfg.FinalityDelta
-		r.Logger.Warn().
+		r.Logger.Info().
 			Str("URL", r.SrcClient.URL).
 			Str("Case", "above finality").
 			Int("BlocksBack", blocksBackSrc).
 			Msg("Rewinding blocks on dst chain")
 		err := r.SrcClient.GethSetHead(blocksBackSrc)
 		assert.NoError(r.t, err)
-		r.annotate(fmt.Sprintf("rewinded source chain for %d blocks back, finality is: %d", blocksBackSrc, r.Cfg.SrcFinalityDepth))
-		// TODO: assert the interval, no messages should be processed
+		err = PostGrafanaAnnotation(
+			r.Logger,
+			r.GrafanaClient,
+			r.Cfg.dashboardUID,
+			fmt.Sprintf("rewinded source chain for %d blocks back, finality is: %d", blocksBackSrc, r.Cfg.SrcFinalityDepth),
+			nil,
+		)
+		require.NoError(r.t, err)
 		time.Sleep(r.Cfg.ExperimentDuration)
 
 		blocksBackDst := int(r.Cfg.DstFinalityDepth) + r.Cfg.FinalityDelta
-		r.Logger.Warn().
+		r.Logger.Info().
 			Str("URL", r.SrcClient.URL).
 			Str("Case", "above finality").
 			Int("BlocksBack", blocksBackDst).
 			Msg("Rewinding blocks on dst chain")
 		err = r.DstClient.GethSetHead(blocksBackDst)
 		assert.NoError(r.t, err)
-		r.annotate(fmt.Sprintf("rewinded dest chain for %d blocks back, finality is: %d", blocksBackDst, r.Cfg.DstFinalityDepth))
-		// TODO: assert the interval, no messages should be processed
+		err = PostGrafanaAnnotation(
+			r.Logger,
+			r.GrafanaClient,
+			r.Cfg.dashboardUID,
+			fmt.Sprintf("rewinded dest chain for %d blocks back, finality is: %d", blocksBackDst, r.Cfg.DstFinalityDepth),
+			nil,
+		)
+		require.NoError(r.t, err)
 		time.Sleep(r.Cfg.ExperimentDuration)
 	}()
 }
