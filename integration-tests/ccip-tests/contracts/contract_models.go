@@ -1011,12 +1011,12 @@ type PriceRegistryUsdPerUnitGasUpdated struct {
 	Raw       types.Log
 }
 
-type PriceRegistryWrappers struct {
+type PriceRegistryWrapper struct {
 	Latest *price_registry.PriceRegistry
 	V1_2_0 *price_registry_1_2_0.PriceRegistry
 }
 
-func (p *PriceRegistryWrappers) GetTokenPrice(opts *bind.CallOpts, token common.Address) (*big.Int, error) {
+func (p *PriceRegistryWrapper) GetTokenPrice(opts *bind.CallOpts, token common.Address) (*big.Int, error) {
 	if p.Latest != nil {
 		price, err := p.Latest.GetTokenPrice(opts, token)
 		if err != nil {
@@ -1034,7 +1034,7 @@ func (p *PriceRegistryWrappers) GetTokenPrice(opts *bind.CallOpts, token common.
 	return nil, fmt.Errorf("no instance found to get token price")
 }
 
-func (p *PriceRegistryWrappers) AddPriceUpdater(opts *bind.TransactOpts, addr common.Address) (*types.Transaction, error) {
+func (p *PriceRegistryWrapper) AddPriceUpdater(opts *bind.TransactOpts, addr common.Address) (*types.Transaction, error) {
 	if p.Latest != nil {
 		return p.Latest.ApplyPriceUpdatersUpdates(opts, []common.Address{addr}, []common.Address{})
 	}
@@ -1044,7 +1044,7 @@ func (p *PriceRegistryWrappers) AddPriceUpdater(opts *bind.TransactOpts, addr co
 	return nil, fmt.Errorf("no instance found to add price updater")
 }
 
-func (p *PriceRegistryWrappers) AddFeeToken(opts *bind.TransactOpts, addr common.Address) (*types.Transaction, error) {
+func (p *PriceRegistryWrapper) AddFeeToken(opts *bind.TransactOpts, addr common.Address) (*types.Transaction, error) {
 	if p.Latest != nil {
 		return p.Latest.ApplyFeeTokensUpdates(opts, []common.Address{addr}, []common.Address{})
 	}
@@ -1054,7 +1054,7 @@ func (p *PriceRegistryWrappers) AddFeeToken(opts *bind.TransactOpts, addr common
 	return nil, fmt.Errorf("no instance found to add fee token")
 }
 
-func (p *PriceRegistryWrappers) GetDestinationChainGasPrice(opts *bind.CallOpts, chainselector uint64) (InternalTimestampedPackedUint224, error) {
+func (p *PriceRegistryWrapper) GetDestinationChainGasPrice(opts *bind.CallOpts, chainselector uint64) (InternalTimestampedPackedUint224, error) {
 	if p.Latest != nil {
 		price, err := p.Latest.GetDestinationChainGasPrice(opts, chainselector)
 		if err != nil {
@@ -1090,7 +1090,7 @@ type InternalTokenPriceUpdate struct {
 
 type PriceRegistry struct {
 	client     blockchain.EVMClient
-	Instance   *PriceRegistryWrappers
+	Instance   *PriceRegistryWrapper
 	EthAddress common.Address
 }
 
@@ -1689,9 +1689,9 @@ type OffRampWrapper struct {
 }
 
 // CurrentRateLimiterState retrieves the current rate limiter state for the OffRamp contract
-func (offRamp *OffRamp) CurrentRateLimiterState(opts *bind.CallOpts) (RateLimiterConfig, error) {
-	if offRamp.Instance.Latest != nil {
-		rlConfig, err := offRamp.Instance.Latest.CurrentRateLimiterState(opts)
+func (offRamp *OffRampWrapper) CurrentRateLimiterState(opts *bind.CallOpts) (RateLimiterConfig, error) {
+	if offRamp.Latest != nil {
+		rlConfig, err := offRamp.Latest.CurrentRateLimiterState(opts)
 		if err != nil {
 			return RateLimiterConfig{}, err
 		}
@@ -1701,8 +1701,8 @@ func (offRamp *OffRamp) CurrentRateLimiterState(opts *bind.CallOpts) (RateLimite
 			Rate:      rlConfig.Rate,
 		}, nil
 	}
-	if offRamp.Instance.V1_2_0 != nil {
-		rlConfig, err := offRamp.Instance.V1_2_0.CurrentRateLimiterState(opts)
+	if offRamp.V1_2_0 != nil {
+		rlConfig, err := offRamp.V1_2_0.CurrentRateLimiterState(opts)
 		if err != nil {
 			return RateLimiterConfig{}, err
 		}
