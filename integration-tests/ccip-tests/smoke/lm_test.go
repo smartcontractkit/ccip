@@ -2,6 +2,7 @@ package smoke
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -17,4 +18,8 @@ func TestLmBasic(t *testing.T) {
 	require.NotNil(t, TestCfg.TestGroupInput.MsgDetails.DestGasLimit)
 	//gasLimit := big.NewInt(*TestCfg.TestGroupInput.MsgDetails.DestGasLimit)
 	_ = testsetups.LMDefaultTestSetup(t, log, "smoke-lm", TestCfg)
+
+	//TODO: For debug only, to be removed
+	time.Sleep(5 * time.Minute)
+	t.Fail()
 }
