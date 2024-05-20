@@ -77,11 +77,12 @@ contract MockCCIPRouter is IRouter, IRouterClient {
     // We want to disallow sending to address(0) and to precompiles, which exist on address(1) through address(9).
     if (decodedReceiver > type(uint160).max || decodedReceiver < 10) revert InvalidAddress(message.receiver);
 
+    uint256 feeTokenAmount = getFee(destinationChainSelector, message);
     if (message.feeToken == address(0)) {
-      uint256 feeTokenAmount = getFee(destinationChainSelector, message);
       if (msg.value < feeTokenAmount) revert InsufficientFeeTokenAmount();
     } else {
       if (msg.value > 0) revert InvalidMsgValue();
+      IERC20(message.feeToken).safeTransferFrom(msg.sender, address(this), feeTokenAmount);
     }
 
     address receiver = address(uint160(decodedReceiver));
