@@ -245,7 +245,7 @@ func newRebalancerConfigProvider(
 	liquidityGraph, err := discoverer.Discover(ctx)
 	cancel()
 	if err != nil {
-		return nil, nil, nil, nil, nil, fmt.Errorf("failed to discover liquidity graph: %w", err)
+		return nil, nil, nil, nil, nil, fmt.Errorf("failed to discover liquidity graph for chain-id %d address %s: %w", masterSelector.EvmChainID, contractAddress, err)
 	}
 
 	// at this point we can instantiate the bridges

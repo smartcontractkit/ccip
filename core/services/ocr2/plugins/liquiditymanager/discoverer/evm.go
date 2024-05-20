@@ -49,7 +49,9 @@ func (e *evmDiscoverer) Discover(ctx context.Context) (graph.Graph, error) {
 	}, func(ctx context.Context, v graph.Vertex) (graph.Data, []graph.Vertex, error) {
 		d, n, err := e.getVertexData(ctx, v)
 		if err != nil {
-			e.lggr.Warnw("failed to get vertex data", "vertex", v, "error", err)
+			e.lggr.Warnw("failed to get vertex data", "selector", v.NetworkSelector, "addr", v.LiquidityManager, "error", err)
+		} else {
+			e.lggr.Debugw("Got vertex data", "selector", v.NetworkSelector, "addr", v.LiquidityManager, "data", d)
 		}
 		return d, n, err
 	})
@@ -105,7 +107,7 @@ func (e *evmDiscoverer) getVertexData(ctx context.Context, v graph.Vertex) (grap
 		Context: ctx,
 	})
 	if err != nil {
-		return graph.Data{}, nil, fmt.Errorf("failed get liquidity: %w", err)
+		return graph.Data{}, nil, fmt.Errorf("get liquidity: %w", err)
 	}
 	token, err := lm.ILocalToken(&bind.CallOpts{
 		Context: ctx,
@@ -154,7 +156,7 @@ func (e *evmDiscoverer) getVertexData(ctx context.Context, v graph.Vertex) (grap
 		NetworkSelector:         selector,
 		MinimumLiquidity:        minimumLiquidity,
 	}
-	e.lggr.Debugw("Got vertex data", "vertex", v, "data", data)
+
 	return data, neighbors, nil
 }
 
