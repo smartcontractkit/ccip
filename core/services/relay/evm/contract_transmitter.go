@@ -54,7 +54,7 @@ func transmitterFilterName(addr common.Address) string {
 	return logpoller.FilterName("OCR ContractTransmitter", addr.String())
 }
 
-func newOCRContractTransmitter(
+func NewOCRContractTransmitter(
 	ctx context.Context,
 	address gethcommon.Address,
 	caller contractReader,
@@ -64,10 +64,10 @@ func newOCRContractTransmitter(
 	lggr logger.Logger,
 	reportToEvmTxMeta ReportToEthMetadata,
 ) (*contractTransmitter, error) {
-	return newOCRContractTransmitterWithMaxLogsKept(ctx, address, caller, contractABI, transmitter, lp, lggr, reportToEvmTxMeta, 0)
+	return NewOCRContractTransmitterWithMaxLogsKept(ctx, address, caller, contractABI, transmitter, lp, lggr, reportToEvmTxMeta, 0)
 }
 
-func newOCRContractTransmitterWithMaxLogsKept(
+func NewOCRContractTransmitterWithMaxLogsKept(
 	ctx context.Context,
 	address gethcommon.Address,
 	caller contractReader,

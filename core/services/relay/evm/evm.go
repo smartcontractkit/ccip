@@ -171,7 +171,7 @@ func (r *Relayer) NewPluginProvider(rargs commontypes.RelayArgs, pargs commontyp
 		return nil, err
 	}
 
-	transmitter, err := newOnChainContractTransmitter(ctx, r.lggr, rargs, pargs.TransmitterID, r.ks.Eth(), configWatcher, configTransmitterOpts{}, OCR2AggregatorTransmissionContractABI, nil)
+	transmitter, err := NewOnChainContractTransmitter(ctx, r.lggr, rargs, pargs.TransmitterID, r.ks.Eth(), configWatcher, configTransmitterOpts{}, OCR2AggregatorTransmissionContractABI, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -472,7 +472,7 @@ type configTransmitterOpts struct {
 }
 
 // newOnChainContractTransmitter creates a new contract transmitter.
-func newOnChainContractTransmitter(ctx context.Context, lggr logger.Logger, rargs commontypes.RelayArgs, transmitterID string, ethKeystore keystore.Eth, configWatcher *configWatcher, opts configTransmitterOpts, transmissionContractABI abi.ABI, reportToEvmTxMeta ReportToEthMetadata) (*contractTransmitter, error) {
+func NewOnChainContractTransmitter(ctx context.Context, lggr logger.Logger, rargs commontypes.RelayArgs, transmitterID string, ethKeystore keystore.Eth, configWatcher *configWatcher, opts configTransmitterOpts, transmissionContractABI abi.ABI, reportToEvmTxMeta ReportToEthMetadata) (*contractTransmitter, error) {
 
 	const defaultMaxLogsKept = 1
 
@@ -538,7 +538,7 @@ func newOnChainContractTransmitter(ctx context.Context, lggr logger.Logger, rarg
 		return nil, pkgerrors.Wrap(err, "failed to create transmitter")
 	}
 
-	return newOCRContractTransmitterWithMaxLogsKept(
+	return NewOCRContractTransmitterWithMaxLogsKept(
 		ctx,
 		configWatcher.contractAddress,
 		configWatcher.chain.Client(),
@@ -577,7 +577,7 @@ func (r *Relayer) NewMedianProvider(rargs commontypes.RelayArgs, pargs commontyp
 
 	reportCodec := evmreportcodec.ReportCodec{}
 
-	contractTransmitter, err := newOnChainContractTransmitter(ctx, lggr, rargs, pargs.TransmitterID, r.ks.Eth(), configWatcher, configTransmitterOpts{}, OCR2AggregatorTransmissionContractABI, nil)
+	contractTransmitter, err := NewOnChainContractTransmitter(ctx, lggr, rargs, pargs.TransmitterID, r.ks.Eth(), configWatcher, configTransmitterOpts{}, OCR2AggregatorTransmissionContractABI, nil)
 	if err != nil {
 		return nil, err
 	}

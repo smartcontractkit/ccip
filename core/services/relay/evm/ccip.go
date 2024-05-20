@@ -64,7 +64,7 @@ func NewCCIPCommitProvider(ctx context.Context, lggr logger.Logger, chainSet leg
 		return nil, err
 	}
 	subjectID := chainToUUID(configWatcher.chain.ID())
-	contractTransmitter, err := newOnChainContractTransmitter(ctx, lggr, rargs, transmitterID, ks, configWatcher, configTransmitterOpts{
+	contractTransmitter, err := NewOnChainContractTransmitter(ctx, lggr, rargs, transmitterID, ks, configWatcher, configTransmitterOpts{
 		subjectID: &subjectID,
 	}, OCR2AggregatorTransmissionContractABI, fn)
 	if err != nil {
@@ -112,7 +112,7 @@ func NewCCIPExecutionProvider(ctx context.Context, lggr logger.Logger, chainSet 
 		return nil, err
 	}
 	subjectID := chainToUUID(configWatcher.chain.ID())
-	contractTransmitter, err := newOnChainContractTransmitter(ctx, lggr, rargs, transmitterID, ks, configWatcher, configTransmitterOpts{
+	contractTransmitter, err := NewOnChainContractTransmitter(ctx, lggr, rargs, transmitterID, ks, configWatcher, configTransmitterOpts{
 		subjectID: &subjectID,
 	}, OCR2AggregatorTransmissionContractABI, fn)
 	if err != nil {
