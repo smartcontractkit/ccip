@@ -452,15 +452,15 @@ func LMDefaultTestSetup(
 	onchainRebalancerL2, err := lmModules[l2ChainId].TokenPool.GetRebalancer()
 	require.NoError(t, err, "Getting rebalancer from Token Pool shouldn't fail")
 
-	if onchainRebalancerL1.String() != lmModules[l2ChainId].LM.EthAddress.String() ||
-		onchainRebalancerL2.String() != lmModules[l1ChainId].LM.EthAddress.String() {
+	if onchainRebalancerL1.String() != lmModules[l1ChainId].LM.EthAddress.String() ||
+		onchainRebalancerL2.String() != lmModules[l2ChainId].LM.EthAddress.String() {
 		lggr.Debug().
 			Str("onchainRebalancerL1", onchainRebalancerL1.String()).
 			Str("onchainRebalancerL2", onchainRebalancerL2.String()).
 			Str("L2 LM", lmModules[l2ChainId].LM.EthAddress.String()).
 			Str("L1 LM", lmModules[l1ChainId].LM.EthAddress.String()).
 			Msg("Onchain rebalancer mismatch")
-		t.Logf("Onchain rebalancer mismatch")
+		t.Fatalf("Onchain rebalancer mismatch")
 	}
 
 	err = setUpArgs.Env.CLNodeWithKeyReady.Wait()
