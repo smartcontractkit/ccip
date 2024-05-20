@@ -2,12 +2,22 @@ package testsetups
 
 import (
 	"context"
+	"crypto/ed25519"
+	"encoding/hex"
 	"fmt"
 	"math/big"
 	"os"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
+
+	ocrconfighelper2 "github.com/smartcontractkit/libocr/offchainreporting2/confighelper"
+	ocrtypes2 "github.com/smartcontractkit/libocr/offchainreporting2/types"
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3confighelper"
+	"golang.org/x/crypto/curve25519"
+
+	"github.com/smartcontractkit/chainlink/v2/core/services/relay/evm"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/lib/pq"
@@ -348,6 +358,90 @@ func (o *LMTestSetupOutputs) DeployLMChainContracts(
 	return nil
 }
 
+func stripKeyPrefix(key string) string {
+	chunks := strings.Split(key, "_")
+	if len(chunks) == 3 {
+		return chunks[2]
+	}
+	return key
+}
+
+func (o *LMTestSetupOutputs) SetOCR3Config(chainId int64) error {
+	clNodesWithKeys := o.Env.CLNodesWithKeys[strconv.FormatInt(chainId, 10)]
+	donNodes := clNodesWithKeys[1:]
+	oracleIdentities := make([]ocrconfighelper2.OracleIdentityExtra, 0)
+	var onChainKeys []ocrtypes2.OnchainPublicKey
+	var transmitters []common.Address
+	var schedule []int
+
+	for i, nodeWithKeys := range donNodes {
+		ocr2Key := nodeWithKeys.KeysBundle.OCR2Key.Data
+		offChainPubKeyTemp, err := hex.DecodeString(stripKeyPrefix(ocr2Key.Attributes.OffChainPublicKey))
+		if err != nil {
+			return errors.WithStack(fmt.Errorf("failed to decode offchain public key: %w", err))
+		}
+		formattedOnChainPubKey := stripKeyPrefix(ocr2Key.Attributes.OnChainPublicKey)
+		cfgPubKeyTemp, err := hex.DecodeString(stripKeyPrefix(ocr2Key.Attributes.ConfigPublicKey))
+		if err != nil {
+			return errors.WithStack(fmt.Errorf("failed to decode config public key: %w", err))
+		}
+		cfgPubKeyBytes := [ed25519.PublicKeySize]byte{}
+		copy(cfgPubKeyBytes[:], cfgPubKeyTemp)
+		offChainPubKey := [curve25519.PointSize]byte{}
+		copy(offChainPubKey[:], offChainPubKeyTemp)
+		ethAddress := nodeWithKeys.KeysBundle.EthAddress
+		p2pKeys := nodeWithKeys.KeysBundle.P2PKeys
+		peerID := p2pKeys.Data[0].Attributes.PeerID
+		oracleIdentities = append(oracleIdentities, ocrconfighelper2.OracleIdentityExtra{
+			OracleIdentity: ocrconfighelper2.OracleIdentity{
+				OffchainPublicKey: offChainPubKey,
+				OnchainPublicKey:  common.HexToAddress(formattedOnChainPubKey).Bytes(),
+				PeerID:            peerID,
+				TransmitAccount:   ocrtypes2.Account(ethAddress),
+			},
+			ConfigEncryptionPublicKey: cfgPubKeyBytes,
+		})
+		onChainKeys = append(onChainKeys, oracleIdentities[i].OnchainPublicKey)
+		transmitters = append(transmitters, common.HexToAddress(ethAddress))
+		schedule = append(schedule, 1)
+
+	}
+	signers, err := evm.OnchainPublicKeyToAddress(onChainKeys)
+	if err != nil {
+		return errors.WithStack(fmt.Errorf("failed to convert onchain public keys to addresses: %w", err))
+	}
+
+	offchainConfig, onchainConfig := []byte{}, []byte{}
+	f := uint8(1)
+	_, _, f, onchainConfig, offchainConfigVersion, offchainConfig, err := ocr3confighelper.ContractSetConfigArgsForTests(
+		2*time.Minute,
+		2*time.Minute,
+		20*time.Second,
+		2*time.Second,
+		20*time.Second,
+		10*time.Second,
+		40*time.Second,
+		3,
+		schedule,
+		oracleIdentities,
+		offchainConfig,
+		50*time.Millisecond,
+		1*time.Minute,
+		1*time.Minute,
+		1*time.Second,
+		int(f),
+		onchainConfig,
+	)
+	if err != nil {
+		return errors.WithStack(fmt.Errorf("failed to set OCR3 config args for tests: %w", err))
+	}
+	err = o.LMModules[chainId].LM.SetOCR3Config(signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig)
+	if err != nil {
+		return errors.WithStack(fmt.Errorf("failed to set OCR3 config: %w", err))
+	}
+	return nil
+}
+
 func LMDefaultTestSetup(
 	t *testing.T,
 	lggr zerolog.Logger,
@@ -466,10 +560,17 @@ func LMDefaultTestSetup(
 	err = setUpArgs.Env.CLNodeWithKeyReady.Wait()
 	require.NoError(t, err, "Waiting for CL nodes to be ready shouldn't fail")
 
+	// Set Config on L2 Chain
+	err = setUpArgs.SetOCR3Config(l2ChainId)
+	require.NoError(t, err, "Setting OCR3 config on L2 chain shouldn't fail")
+
+	// Set Config on L1 Chain
+	err = setUpArgs.SetOCR3Config(l1ChainId)
+	require.NoError(t, err, "Setting OCR3 config on L1 chain shouldn't fail")
+
+	// Add bootstrap job
 	clNodesWithKeys := setUpArgs.Env.CLNodesWithKeys[strconv.FormatInt(l1ChainId, 10)]
-
 	bootstrapNode := clNodesWithKeys[0]
-
 	bootstrapSpec := &client.OCR2TaskJobSpec{
 		Name:    "ocr2 bootstrap node " + lmModules[l1ChainId].LM.EthAddress.String(),
 		JobType: "bootstrap",
@@ -490,6 +591,7 @@ func LMDefaultTestSetup(
 
 	P2Pv2Bootstrapper := fmt.Sprintf("%s@%s:%d", bootstrapNode.KeysBundle.P2PKeys.Data[0].Attributes.PeerID, bootstrapNode.Node.InternalIP(), 6690)
 
+	// Add LM jobs
 	donNodes := clNodesWithKeys[1:]
 
 	for _, node := range donNodes {
