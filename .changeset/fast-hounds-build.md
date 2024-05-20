@@ -2,4 +2,4 @@
 "ccip": patch
 ---
 
-Use decimals to normalize aggregator prices
+#bugfix Use decimals to normalize aggregator prices
