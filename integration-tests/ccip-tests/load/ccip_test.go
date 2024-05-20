@@ -33,7 +33,14 @@ func TestLoadCCIPStableRPS(t *testing.T) {
 	testArgs.Wait()
 }
 
-// TestLoadCCIPWithUpgradeNodeVersion starts all nodes with a specific version, triggers load and then upgrades the node version as the load is running
+// TestLoadCCIPWithUpgradeNodeVersion tests the load with upgrade of node version
+// The upgrade is done based on the node config mentioned in test input https://github.com/smartcontractkit/ccip/blob/ccip-develop/integration-tests/ccip-tests/testconfig/global.go#L380
+// Sample test input: https://github.com/smartcontractkit/ccip/blob/ccip-develop/integration-tests/ccip-tests/testconfig/tomls/node-post-upgrade-compatibility.toml
+// The test needs upgrade image to be set in the test input - https://github.com/smartcontractkit/ccip/blob/ccip-develop/integration-tests/ccip-tests/testconfig/global.go#L382
+// This test is generally run on existing environment where the nodes are already running with the older version with existing CCIP deployment.
+// The test waits for the load to start on existing environment and then upgrades few of the nodes( based on test config) to the new version
+// It continues to run the load while the nodes are being upgraded and validates all the requests are served after the upgrade.
+// The test is triggered with workflow https://github.com/smartcontractkit/ccip/blob/ccip-develop/.github/workflows/ccip-offchain-upgrade-tests.yml
 func TestLoadCCIPWithUpgradeNodeVersion(t *testing.T) {
 	t.Parallel()
 	lggr := logging.GetTestLogger(t)

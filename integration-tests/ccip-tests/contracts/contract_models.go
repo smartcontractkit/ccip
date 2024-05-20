@@ -17,7 +17,6 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
 
 	"github.com/smartcontractkit/ccip/integration-tests/wrappers"
-
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/arm_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store_1_2_0"
@@ -40,9 +39,11 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/usdc_token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/usdc_token_pool_1_4_0"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/link_token_interface"
+	type_and_version "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/type_and_version_interface_wrapper"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/burn_mint_erc677"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/erc20"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 )
 
 var (
@@ -56,7 +57,6 @@ const (
 	Network                               = "Network Name"
 	V1_2_0                ContractVersion = "1.2.0"
 	V1_4_0                ContractVersion = "1.4.0"
-	LatestPoolVersion     ContractVersion = "1.5.0-dev"
 	Latest                ContractVersion = "latest"
 	PriceRegistryContract                 = "PriceRegistry"
 	OffRampContract                       = "OffRamp"
@@ -552,6 +552,22 @@ type TokenPool struct {
 
 func (pool *TokenPool) Address() string {
 	return pool.EthAddress.Hex()
+}
+
+func (pool *TokenPool) TypeAndVersion() (string, error) {
+	tv, err := type_and_version.NewTypeAndVersionInterface(pool.EthAddress, pool.client.Backend())
+	if err != nil {
+		return "", fmt.Errorf("failed to get type and version: %w", err)
+	}
+	tvStr, err := tv.TypeAndVersion(nil)
+	if err != nil {
+		return "", fmt.Errorf("failed to call type and version: %w", err)
+	}
+	_, s, err := config.ParseTypeAndVersion(tvStr)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse type and version: %w", err)
+	}
+	return s, nil
 }
 
 func (pool *TokenPool) IsUSDC() bool {

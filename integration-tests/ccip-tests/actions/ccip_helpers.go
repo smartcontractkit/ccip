@@ -44,6 +44,7 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/k8s/environment"
 	"github.com/smartcontractkit/chainlink-testing-framework/networks"
 
+	contracts2 "github.com/smartcontractkit/ccip/integration-tests/ccip-tests/contracts"
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/contracts"
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/contracts/laneconfig"
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/testconfig"
@@ -685,8 +686,11 @@ func (ccipModule *CCIPCommon) AddPriceAggregatorToken(token common.Address, init
 func (ccipModule *CCIPCommon) NeedTokenAdminRegistry() bool {
 	// find out the pool version
 	version := contracts.VersionMap[contracts.TokenPoolContract]
-	if version == contracts.Latest {
-		return true
+	for _, pool := range ccipModule.BridgeTokenPools {
+		verStr, err := pool.TypeAndVersion()
+		if err == nil {
+			version = contracts2.ContractVersion(verStr)
+		}
 	}
 	currentSemver := semver.MustParse(string(version))
 	tokenAdminEnabledVersion := semver.MustParse("1.5.0-dev")
@@ -3484,17 +3488,34 @@ func SetOCR2Configs(commitNodes, execNodes []*client.CLNodesWithKeys, destCCIP D
 	return destCCIP.Common.ChainClient.WaitForEvents()
 }
 
+func JobExists(n *client.CLNodesWithKeys, jobName string) (bool, error) {
+	jobs, _, err := n.Node.ReadJobs()
+	if err != nil {
+		return false, fmt.Errorf("failed to read jobs from bootstrap node %w", err)
+	}
+	for _, maps := range jobs.Data {
+		jb := maps["attributes"].(map[string]interface{})
+		jbName := jb["name"].(string)
+		if jbName == jobName {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 func CreateBootstrapJob(
 	jobParams integrationtesthelpers.CCIPJobSpecParams,
 	bootstrapCommit *client.CLNodesWithKeys,
 	bootstrapExec *client.CLNodesWithKeys,
 ) error {
-	_, err := bootstrapCommit.Node.MustCreateJob(jobParams.BootstrapJob(jobParams.CommitStore.Hex()))
+	bootstrapCommitSpec := jobParams.BootstrapJob(jobParams.CommitStore.Hex())
+	_, err := bootstrapCommit.Node.MustCreateJob(bootstrapCommitSpec)
 	if err != nil {
 		return fmt.Errorf("shouldn't fail creating bootstrap job on bootstrap node %w", err)
 	}
 	if bootstrapExec != nil {
-		_, err := bootstrapExec.Node.MustCreateJob(jobParams.BootstrapJob(jobParams.OffRamp.Hex()))
+		bootstrapExecSpec := jobParams.BootstrapJob(jobParams.OffRamp.Hex())
+		_, err := bootstrapExec.Node.MustCreateJob(bootstrapExecSpec)
 		if err != nil {
 			return fmt.Errorf("shouldn't fail creating bootstrap job on bootstrap node %w", err)
 		}
@@ -3513,18 +3534,6 @@ func CreateOCR2CCIPCommitJobs(
 	if err != nil {
 		return fmt.Errorf("failed to create ocr2 commit job spec: %w", err)
 	}
-	createJob := func(index int, node *client.CLNodesWithKeys, ocr2SpecCommit client.OCR2TaskJobSpec, mu *sync.Mutex) error {
-		mu.Lock()
-		defer mu.Unlock()
-		ocr2SpecCommit.OCR2OracleSpec.OCRKeyBundleID.SetValid(node.KeysBundle.OCR2Key.Data.ID)
-		ocr2SpecCommit.OCR2OracleSpec.TransmitterID.SetValid(node.KeysBundle.EthAddress)
-		lggr.Info().Msgf("Creating CCIP-Commit job on OCR node %d job name %s", index+1, ocr2SpecCommit.Name)
-		_, err = node.Node.MustCreateJob(&ocr2SpecCommit)
-		if err != nil {
-			return fmt.Errorf("shouldn't fail creating CCIP-Commit job on OCR node %d job name %s - %w", index+1, ocr2SpecCommit.Name, err)
-		}
-		return nil
-	}
 
 	testSpec := client.OCR2TaskJobSpec{
 		Name:           ocr2SpecCommit.Name,
@@ -3535,8 +3544,22 @@ func CreateOCR2CCIPCommitJobs(
 		node := node
 		i := i
 		group.Go(func() error {
-			return createJob(i, node, testSpec, mutexes[i])
+			return CreateCCIPJob(lggr, i, node, testSpec, mutexes[i])
 		})
+	}
+	return nil
+}
+
+func CreateCCIPJob(lggr zerolog.Logger, index int, node *client.CLNodesWithKeys, ocr2Spec client.OCR2TaskJobSpec, mu *sync.Mutex) error {
+	mu.Lock()
+	defer mu.Unlock()
+	ocr2Spec.OCR2OracleSpec.OCRKeyBundleID.SetValid(node.KeysBundle.OCR2Key.Data.ID)
+	ocr2Spec.OCR2OracleSpec.TransmitterID.SetValid(node.KeysBundle.EthAddress)
+	lggr.Info().Msgf("Creating CCIP-Exec job on OCR node %d job name %s", index+1, ocr2Spec.Name)
+	_, err := node.Node.MustCreateJob(&ocr2Spec)
+	if err != nil {
+		return fmt.Errorf("shouldn't fail creating CCIP-Exec job on OCR node %d job name %s - %w", index+1,
+			ocr2Spec.Name, err)
 	}
 	return nil
 }
@@ -3552,25 +3575,13 @@ func CreateOCR2CCIPExecutionJobs(
 	if err != nil {
 		return fmt.Errorf("failed to create ocr2 execution job spec: %w", err)
 	}
-	createJob := func(index int, node *client.CLNodesWithKeys, ocr2SpecExec client.OCR2TaskJobSpec, mu *sync.Mutex) error {
-		mu.Lock()
-		defer mu.Unlock()
-		ocr2SpecExec.OCR2OracleSpec.OCRKeyBundleID.SetValid(node.KeysBundle.OCR2Key.Data.ID)
-		ocr2SpecExec.OCR2OracleSpec.TransmitterID.SetValid(node.KeysBundle.EthAddress)
-		lggr.Info().Msgf("Creating CCIP-Exec job on OCR node %d job name %s", index+1, ocr2SpecExec.Name)
-		_, err = node.Node.MustCreateJob(&ocr2SpecExec)
-		if err != nil {
-			return fmt.Errorf("shouldn't fail creating CCIP-Exec job on OCR node %d job name %s - %w", index+1,
-				ocr2SpecExec.Name, err)
-		}
-		return nil
-	}
+
 	if ocr2SpecExec != nil {
 		for i, node := range execNodes {
 			node := node
 			i := i
 			group.Go(func() error {
-				return createJob(i, node, client.OCR2TaskJobSpec{
+				return CreateCCIPJob(lggr, i, node, client.OCR2TaskJobSpec{
 					Name:              ocr2SpecExec.Name,
 					JobType:           ocr2SpecExec.JobType,
 					MaxTaskDuration:   ocr2SpecExec.MaxTaskDuration,

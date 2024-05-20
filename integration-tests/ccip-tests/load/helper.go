@@ -61,6 +61,9 @@ func (l *LoadArgs) SetReportParams() {
 	require.NoError(l.t, err, "failed to set grafana query params")
 }
 
+func (l *LoadArgs) AddAnotherLane() {
+}
+
 func (l *LoadArgs) Setup() {
 	lggr := l.lggr
 	existing := pointer.GetBool(l.TestCfg.TestGroupInput.ExistingDeployment)
