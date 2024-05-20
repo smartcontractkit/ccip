@@ -2,4 +2,4 @@
 "ccip": patch
 ---
 
-Set maxLogsKept to 1 for ContractTransmitter
+#changed Set maxLogsKept to 1 for ContractTransmitter
