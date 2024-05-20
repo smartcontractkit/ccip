@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"math/big"
-	"time"
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi"
@@ -55,7 +54,7 @@ func transmitterFilterName(addr common.Address) string {
 	return logpoller.FilterName("OCR ContractTransmitter", addr.String())
 }
 
-func NewOCRContractTransmitter(
+func newOCRContractTransmitter(
 	ctx context.Context,
 	address gethcommon.Address,
 	caller contractReader,
@@ -65,10 +64,10 @@ func NewOCRContractTransmitter(
 	lggr logger.Logger,
 	reportToEvmTxMeta ReportToEthMetadata,
 ) (*contractTransmitter, error) {
-	return NewOCRContractTransmitterWithRetention(ctx, address, caller, contractABI, transmitter, lp, lggr, reportToEvmTxMeta, 0)
+	return newOCRContractTransmitterWithMaxLogsKept(ctx, address, caller, contractABI, transmitter, lp, lggr, reportToEvmTxMeta, 0)
 }
 
-func NewOCRContractTransmitterWithRetention(
+func newOCRContractTransmitterWithMaxLogsKept(
 	ctx context.Context,
 	address gethcommon.Address,
 	caller contractReader,
@@ -77,7 +76,7 @@ func NewOCRContractTransmitterWithRetention(
 	lp logpoller.LogPoller,
 	lggr logger.Logger,
 	reportToEvmTxMeta ReportToEthMetadata,
-	retention time.Duration,
+	maxLogsKept uint64,
 ) (*contractTransmitter, error) {
 	transmitted, ok := contractABI.Events["Transmitted"]
 	if !ok {
@@ -90,8 +89,7 @@ func NewOCRContractTransmitterWithRetention(
 		Name:        transmitterFilterName(address),
 		EventSigs:   []common.Hash{transmitted.ID},
 		Addresses:   []common.Address{address},
-		Retention:   retention,
-		MaxLogsKept: 1,
+		MaxLogsKept: maxLogsKept,
 	})
 	if err != nil {
 		return nil, err
@@ -201,9 +199,6 @@ func (oc *contractTransmitter) LatestConfigDigestAndEpoch(ctx context.Context) (
 	}
 
 	// Otherwise, we have to scan for the logs.
-	if err != nil {
-		return ocrtypes.ConfigDigest{}, 0, err
-	}
 	latest, err := oc.lp.LatestLogByEventSigWithConfs(ctx, oc.transmittedEventSig, oc.contractAddress, 1)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
