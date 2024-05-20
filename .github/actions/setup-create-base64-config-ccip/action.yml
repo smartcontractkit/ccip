@@ -31,10 +31,10 @@ inputs:
     description: Where to send logs (e.g. file, loki)
   grafanaUrl:
     description: Grafana URL
-  grafanaToken:
-    description: Grafana Token
   grafanaDashboardUrl:
     description: Grafana dashboard URL
+  grafanaBearerToken:
+    description: Grafana bearer token
   customEvmNodes:
     description: Custom EVM nodes to use  in key=value format, where key is chain id and value is docker image to use. If they are provided the number of networksSelected must be equal to the number of customEvmNodes
   evmNodeLogLevel:
@@ -60,8 +60,8 @@ runs:
         LOKI_BASIC_AUTH: ${{ inputs.lokiBasicAuth }}
         LOGSTREAM_LOG_TARGETS: ${{ inputs.logstreamLogTargets }}
         GRAFANA_URL: ${{ inputs.grafanaUrl }}
-        GRAFANA_TOKEN: ${{ inputs.grafanaToken }}
         GRAFANA_DASHBOARD_URL: ${{ inputs.grafanaDashboardUrl }}
+        GRAFANA_BEARER_TOKEN: ${{ inputs.grafanaBearerToken }}
         CUSTOM_EVM_NODES: ${{ inputs.customEvmNodes }}
         EVM_NODE_LOG_LEVEL: ${{ inputs.evmNodeLogLevel }}
       run: |
@@ -131,6 +131,11 @@ runs:
           fi
         fi
 
+        grafana_bearer_token=""
+        if [ -n "$GRAFANA_BEARER_TOKEN" ]; then
+          grafana_bearer_token="bearer_token_secret=\"$GRAFANA_BEARER_TOKEN\""
+        fi
+
         cat << EOF > config.toml
         [CCIP]
         [CCIP.Env]
@@ -162,7 +167,7 @@ runs:
         [CCIP.Env.Logging.Grafana]
         base_url="$GRAFANA_URL"
         dashboard_url="$GRAFANA_DASHBOARD_URL"
-        bearer_token_secret="$GRAFANA_TOKEN"
+        $grafana_bearer_token
 
         [CCIP.Groups.load]
         TestRunName = '$EXISTING_NAMESPACE'

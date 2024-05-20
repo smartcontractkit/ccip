@@ -2,6 +2,7 @@ package commit
 
 import (
 	"context"
+	"math/big"
 	"reflect"
 	"slices"
 	"testing"
@@ -11,6 +12,7 @@ import (
 	"github.com/smartcontractkit/ccipocr3/internal/mocks"
 	"github.com/smartcontractkit/ccipocr3/internal/model"
 	"github.com/smartcontractkit/libocr/commontypes"
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -227,6 +229,34 @@ func Test_observeNewMsgs(t *testing.T) {
 	}
 }
 
+func Test_observeTokenPrices(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("happy path", func(t *testing.T) {
+		priceReader := mocks.NewTokenPricesReader()
+		tokens := []types.Account{"0x1", "0x2", "0x3"}
+		mockPrices := []*big.Int{big.NewInt(10), big.NewInt(20), big.NewInt(30)}
+		priceReader.On("GetTokenPricesUSD", ctx, tokens).Return(mockPrices, nil)
+		prices, err := observeTokenPrices(ctx, priceReader, tokens)
+		assert.NoError(t, err)
+		assert.Equal(t, []model.TokenPrice{
+			model.NewTokenPrice("0x1", big.NewInt(10)),
+			model.NewTokenPrice("0x2", big.NewInt(20)),
+			model.NewTokenPrice("0x3", big.NewInt(30)),
+		}, prices)
+	})
+
+	t.Run("price reader internal issue", func(t *testing.T) {
+		priceReader := mocks.NewTokenPricesReader()
+		tokens := []types.Account{"0x1", "0x2", "0x3"}
+		mockPrices := []*big.Int{big.NewInt(10), big.NewInt(20)} // returned two prices for three tokens
+		priceReader.On("GetTokenPricesUSD", ctx, tokens).Return(mockPrices, nil)
+		_, err := observeTokenPrices(ctx, priceReader, tokens)
+		assert.Error(t, err)
+	})
+
+}
+
 func Test_validateObservedSequenceNumbers(t *testing.T) {
 	testCases := []struct {
 		name       string
@@ -399,7 +429,61 @@ func Test_validateObserverReadingEligibility(t *testing.T) {
 	}
 }
 
-func Test_validateObservedGasAndTokenPrices(t *testing.T) {}
+func Test_validateObservedTokenPrices(t *testing.T) {
+	testCases := []struct {
+		name        string
+		tokenPrices []model.TokenPrice
+		expErr      bool
+	}{
+		{
+			name:        "empty is valid",
+			tokenPrices: []model.TokenPrice{},
+			expErr:      false,
+		},
+		{
+			name: "all valid",
+			tokenPrices: []model.TokenPrice{
+				model.NewTokenPrice("0x1", big.NewInt(1)),
+				model.NewTokenPrice("0x2", big.NewInt(1)),
+				model.NewTokenPrice("0x3", big.NewInt(1)),
+				model.NewTokenPrice("0xa", big.NewInt(1)),
+			},
+			expErr: false,
+		},
+		{
+			name: "dup price",
+			tokenPrices: []model.TokenPrice{
+				model.NewTokenPrice("0x1", big.NewInt(1)),
+				model.NewTokenPrice("0x2", big.NewInt(1)),
+				model.NewTokenPrice("0x1", big.NewInt(1)), // dup
+				model.NewTokenPrice("0xa", big.NewInt(1)),
+			},
+			expErr: true,
+		},
+		{
+			name: "nil price",
+			tokenPrices: []model.TokenPrice{
+				model.NewTokenPrice("0x1", big.NewInt(1)),
+				model.NewTokenPrice("0x2", big.NewInt(1)),
+				model.NewTokenPrice("0x3", nil), // nil price
+				model.NewTokenPrice("0xa", big.NewInt(1)),
+			},
+			expErr: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := validateObservedTokenPrices(tc.tokenPrices)
+			if tc.expErr {
+				assert.Error(t, err)
+				return
+			}
+			assert.NoError(t, err)
+		})
+
+	}
+}
 
 func Test_newMsgsConsensus(t *testing.T) {
 	testCases := []struct {
@@ -619,16 +703,14 @@ func Test_maxSeqNumsConsensus(t *testing.T) {
 	testCases := []struct {
 		name         string
 		observations []model.CommitPluginObservation
-		fChain       map[model.ChainSelector]int
-		destChain    model.ChainSelector
+		fChain       int
 		expSeqNums   []model.SeqNumChain
 		expErr       bool
 	}{
 		{
 			name:         "empty observations",
 			observations: []model.CommitPluginObservation{},
-			fChain:       map[model.ChainSelector]int{1: 2},
-			destChain:    1,
+			fChain:       2,
 			expSeqNums:   []model.SeqNumChain{},
 			expErr:       false,
 		},
@@ -647,8 +729,7 @@ func Test_maxSeqNumsConsensus(t *testing.T) {
 					},
 				},
 			},
-			fChain:    map[model.ChainSelector]int{1: 2},
-			destChain: 1,
+			fChain: 2,
 			expSeqNums: []model.SeqNumChain{
 				{ChainSel: 2, SeqNum: 20},
 			},
@@ -667,8 +748,7 @@ func Test_maxSeqNumsConsensus(t *testing.T) {
 					},
 				},
 			},
-			fChain:     map[model.ChainSelector]int{1: 3},
-			destChain:  1,
+			fChain:     3,
 			expSeqNums: []model.SeqNumChain{},
 			expErr:     false,
 		},
@@ -687,8 +767,7 @@ func Test_maxSeqNumsConsensus(t *testing.T) {
 					},
 				},
 			},
-			fChain:    map[model.ChainSelector]int{1: 3},
-			destChain: 1,
+			fChain: 3,
 			expSeqNums: []model.SeqNumChain{
 				{ChainSel: 2, SeqNum: 20},
 			},
@@ -715,66 +794,135 @@ func Test_maxSeqNumsConsensus(t *testing.T) {
 					},
 				},
 			},
-			fChain: map[model.ChainSelector]int{
-				1: 2,
-			},
-			destChain: 1,
+			fChain: 2,
 			expSeqNums: []model.SeqNumChain{
 				{ChainSel: 2, SeqNum: 20},
 				{ChainSel: 3, SeqNum: 30},
 			},
 			expErr: false,
 		},
-		{
-			name: "two chains but f chain is not defined for dest",
-			observations: []model.CommitPluginObservation{
-				{
-					MaxSeqNums: []model.SeqNumChain{
-						{ChainSel: 2, SeqNum: 20},
-						{ChainSel: 2, SeqNum: 20},
-						{ChainSel: 2, SeqNum: 20},
-						{ChainSel: 2, SeqNum: 20},
-						{ChainSel: 2, SeqNum: 20},
-						{ChainSel: 2, SeqNum: 20},
-						{ChainSel: 2, SeqNum: 20},
-
-						{ChainSel: 3, SeqNum: 30},
-						{ChainSel: 3, SeqNum: 30},
-						{ChainSel: 3, SeqNum: 30},
-						{ChainSel: 3, SeqNum: 30},
-						{ChainSel: 3, SeqNum: 30},
-					},
-				},
-			},
-			fChain:    map[model.ChainSelector]int{},
-			destChain: 1,
-			expErr:    true,
-		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			ctx := context.Background()
 			lggr := logger.Test(t)
-			p := NewPlugin(
-				ctx,
-				commontypes.OracleID(123),
-				model.CommitPluginConfig{
-					FChain:    tc.fChain,
-					DestChain: tc.destChain,
-				},
-				nil,
-				nil,
-				lggr,
-			)
-
-			seqNums, err := p.maxSeqNumsConsensus(tc.observations)
+			seqNums, err := maxSeqNumsConsensus(lggr, tc.fChain, tc.observations)
 			if tc.expErr {
 				assert.Error(t, err)
 				return
 			}
 			assert.NoError(t, err)
 			assert.Equal(t, tc.expSeqNums, seqNums)
+		})
+	}
+}
+
+func Test_tokenPricesConsensus(t *testing.T) {
+	testCases := []struct {
+		name         string
+		observations []model.CommitPluginObservation
+		fChain       int
+		expPrices    []model.TokenPrice
+		expErr       bool
+	}{
+		{
+			name:         "empty",
+			observations: make([]model.CommitPluginObservation, 0),
+			fChain:       2,
+			expPrices:    make([]model.TokenPrice, 0),
+			expErr:       false,
+		},
+		{
+			name: "happy flow",
+			observations: []model.CommitPluginObservation{
+				{
+					TokenPrices: []model.TokenPrice{
+						model.NewTokenPrice("0x1", big.NewInt(10)),
+						model.NewTokenPrice("0x2", big.NewInt(20)),
+					},
+				},
+				{
+					TokenPrices: []model.TokenPrice{
+						model.NewTokenPrice("0x1", big.NewInt(11)),
+						model.NewTokenPrice("0x2", big.NewInt(21)),
+					},
+				},
+				{
+					TokenPrices: []model.TokenPrice{
+						model.NewTokenPrice("0x1", big.NewInt(11)),
+						model.NewTokenPrice("0x2", big.NewInt(21)),
+					},
+				},
+				{
+					TokenPrices: []model.TokenPrice{
+						model.NewTokenPrice("0x1", big.NewInt(10)),
+						model.NewTokenPrice("0x2", big.NewInt(21)),
+					},
+				},
+				{
+					TokenPrices: []model.TokenPrice{
+						model.NewTokenPrice("0x1", big.NewInt(11)),
+						model.NewTokenPrice("0x2", big.NewInt(20)),
+					},
+				},
+			},
+			fChain: 2,
+			expPrices: []model.TokenPrice{
+				model.NewTokenPrice("0x1", big.NewInt(11)),
+				model.NewTokenPrice("0x2", big.NewInt(21)),
+			},
+			expErr: false,
+		},
+		{
+			name: "not enough observations for some token",
+			observations: []model.CommitPluginObservation{
+				{
+					TokenPrices: []model.TokenPrice{
+						model.NewTokenPrice("0x2", big.NewInt(20)),
+					},
+				},
+				{
+					TokenPrices: []model.TokenPrice{
+						model.NewTokenPrice("0x1", big.NewInt(11)),
+						model.NewTokenPrice("0x2", big.NewInt(21)),
+					},
+				},
+				{
+					TokenPrices: []model.TokenPrice{
+						model.NewTokenPrice("0x1", big.NewInt(11)),
+						model.NewTokenPrice("0x2", big.NewInt(21)),
+					},
+				},
+				{
+					TokenPrices: []model.TokenPrice{
+						model.NewTokenPrice("0x1", big.NewInt(10)),
+						model.NewTokenPrice("0x2", big.NewInt(21)),
+					},
+				},
+				{
+					TokenPrices: []model.TokenPrice{
+						model.NewTokenPrice("0x1", big.NewInt(10)),
+						model.NewTokenPrice("0x2", big.NewInt(20)),
+					},
+				},
+			},
+			fChain: 2,
+			expPrices: []model.TokenPrice{
+				model.NewTokenPrice("0x2", big.NewInt(21)),
+			},
+			expErr: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			prices, err := tokenPricesConsensus(tc.observations, tc.fChain)
+			if tc.expErr {
+				assert.Error(t, err)
+				return
+			}
+			assert.NoError(t, err)
+			assert.Equal(t, tc.expPrices, prices)
 		})
 	}
 }
