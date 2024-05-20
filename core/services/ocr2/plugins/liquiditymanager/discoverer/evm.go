@@ -126,6 +126,7 @@ func (e *evmDiscoverer) getVertexData(ctx context.Context, v graph.Vertex) (grap
 		xchainRebalancerData = make(map[models.NetworkSelector]graph.XChainLiquidityManagerData)
 	)
 	for _, v := range xchainRebalancers {
+		e.lggr.Debugw("Found cross chain rebalancer", "remoteChain", v.RemoteChainSelector, "remoteRebalancer", v.RemoteRebalancer, "localBridge", v.LocalBridge, "remoteToken", v.RemoteToken)
 		neighbors = append(neighbors, graph.Vertex{
 			NetworkSelector:  models.NetworkSelector(v.RemoteChainSelector),
 			LiquidityManager: models.Address(v.RemoteRebalancer),
