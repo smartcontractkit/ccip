@@ -97,23 +97,23 @@ func (e *evmDiscoverer) getVertexData(ctx context.Context, v graph.Vertex) (grap
 	if !ok {
 		return graph.Data{}, nil, fmt.Errorf("no client for master chain %+v", selector)
 	}
-	rebal, err := liquiditymanager.NewLiquidityManager(common.Address(lmAddress), dep.ethClient)
+	lm, err := liquiditymanager.NewLiquidityManager(common.Address(lmAddress), dep.ethClient)
 	if err != nil {
 		return graph.Data{}, nil, fmt.Errorf("new liquiditymanager: %w", err)
 	}
-	liquidity, err := rebal.GetLiquidity(&bind.CallOpts{
+	liquidity, err := lm.GetLiquidity(&bind.CallOpts{
 		Context: ctx,
 	})
 	if err != nil {
 		return graph.Data{}, nil, fmt.Errorf("failed get liquidity: %w", err)
 	}
-	token, err := rebal.ILocalToken(&bind.CallOpts{
+	token, err := lm.ILocalToken(&bind.CallOpts{
 		Context: ctx,
 	})
 	if err != nil {
 		return graph.Data{}, nil, fmt.Errorf("get token: %w", err)
 	}
-	xchainRebalancers, err := rebal.GetAllCrossChainRebalancers(&bind.CallOpts{
+	xchainRebalancers, err := lm.GetAllCrossChainRebalancers(&bind.CallOpts{
 		Context: ctx,
 	})
 	if err != nil {
@@ -135,17 +135,17 @@ func (e *evmDiscoverer) getVertexData(ctx context.Context, v graph.Vertex) (grap
 		}
 	}
 
-	configDigestAndEpoch, err := rebal.LatestConfigDigestAndEpoch(&bind.CallOpts{Context: ctx})
+	configDigestAndEpoch, err := lm.LatestConfigDigestAndEpoch(&bind.CallOpts{Context: ctx})
 	if err != nil {
 		return graph.Data{}, nil, fmt.Errorf("latest config digest and epoch: %w", err)
 	}
 
-	minimumLiquidity, err := rebal.GetMinimumLiquidity(&bind.CallOpts{Context: ctx})
+	minimumLiquidity, err := lm.GetMinimumLiquidity(&bind.CallOpts{Context: ctx})
 	if err != nil {
 		return graph.Data{}, nil, fmt.Errorf("get target balance: %w", err)
 	}
 
-	return graph.Data{
+	data := graph.Data{
 		Liquidity:               liquidity,
 		TokenAddress:            models.Address(token),
 		LiquidityManagerAddress: lmAddress,
@@ -153,7 +153,9 @@ func (e *evmDiscoverer) getVertexData(ctx context.Context, v graph.Vertex) (grap
 		ConfigDigest:            models.ConfigDigest{ConfigDigest: configDigestAndEpoch.ConfigDigest},
 		NetworkSelector:         selector,
 		MinimumLiquidity:        minimumLiquidity,
-	}, neighbors, nil
+	}
+	e.lggr.Debugw("Got vertex data", "vertex", v, "data", data)
+	return data, neighbors, nil
 }
 
 func (e *evmDiscoverer) updateLiquidity(ctx context.Context, selector models.NetworkSelector, g graph.Graph, liquidityGetter evmLiquidityGetter) error {
