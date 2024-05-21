@@ -149,8 +149,16 @@ func (p *Plugin) Observation(ctx context.Context, outctx ocr3types.OutcomeContex
 	p.lggr.Infow("submitting observation",
 		"observedNewMsgs", len(newMsgs),
 		"gasPrices", len(gasPrices),
-		"tokenPrices", len(tokenPrices))
-	return model.NewCommitPluginObservation(newMsgs, gasPrices, tokenPrices, maxSeqNumsPerChain).Encode()
+		"tokenPrices", len(tokenPrices),
+		"observerInfo", p.cfg.ObserverInfo)
+
+	return model.NewCommitPluginObservation(
+		newMsgs,
+		gasPrices,
+		tokenPrices,
+		maxSeqNumsPerChain,
+		p.cfg,
+	).Encode()
 }
 
 func (p *Plugin) ValidateObservation(_ ocr3types.OutcomeContext, _ types.Query, ao types.AttributedObservation) error {
@@ -171,6 +179,10 @@ func (p *Plugin) ValidateObservation(_ ocr3types.OutcomeContext, _ types.Query, 
 		return fmt.Errorf("validate token prices: %w", err)
 	}
 
+	if err := obs.PluginConfig.Validate(); err != nil {
+		return fmt.Errorf("validate plugin config: %w", err)
+	}
+
 	return nil
 }
 
@@ -186,11 +198,6 @@ func (p *Plugin) ObservationQuorum(_ ocr3types.OutcomeContext, _ types.Query) (o
 //   - Merkle Roots: One merkle tree root per source chain. The leaves of the tree are the IDs of the observed messages.
 //     The merkle root data type contains information about the chain and the sequence numbers range.
 func (p *Plugin) Outcome(_ ocr3types.OutcomeContext, _ types.Query, aos []types.AttributedObservation) (ocr3types.Outcome, error) {
-	fChainDest, ok := p.cfg.FChain[p.cfg.DestChain]
-	if !ok {
-		return ocr3types.Outcome{}, fmt.Errorf("missing destination chain %d in fChain config", p.cfg.DestChain)
-	}
-
 	decodedObservations := make([]model.CommitPluginObservation, 0)
 	for _, ao := range aos {
 		obs, err := model.DecodeCommitPluginObservation(ao.Observation)
@@ -198,6 +205,16 @@ func (p *Plugin) Outcome(_ ocr3types.OutcomeContext, _ types.Query, aos []types.
 			return ocr3types.Outcome{}, fmt.Errorf("decode commit plugin observation: %w", err)
 		}
 		decodedObservations = append(decodedObservations, obs)
+	}
+
+	cfg := pluginConfigConsensus(p.cfg, decodedObservations)
+	if err := cfg.Validate(); err != nil {
+		return ocr3types.Outcome{}, fmt.Errorf("critical issue validating plugin config consensus: %w", err)
+	}
+
+	fChainDest, ok := cfg.FChain[cfg.DestChain]
+	if !ok {
+		return ocr3types.Outcome{}, fmt.Errorf("missing destination chain %d in fChain config", p.cfg.DestChain)
 	}
 
 	maxSeqNums, err := maxSeqNumsConsensus(p.lggr, fChainDest, decodedObservations)
@@ -210,13 +227,13 @@ func (p *Plugin) Outcome(_ ocr3types.OutcomeContext, _ types.Query, aos []types.
 	}
 	p.lggr.Debugw("max sequence numbers consensus", "maxSeqNumsConsensus", maxSeqNums)
 
-	merkleRoots, err := newMsgsConsensus(p.lggr, maxSeqNums, decodedObservations, p.cfg.FChain)
+	merkleRoots, err := newMsgsConsensus(p.lggr, maxSeqNums, decodedObservations, cfg.FChain)
 	if err != nil {
 		return ocr3types.Outcome{}, fmt.Errorf("new messages consensus: %w", err)
 	}
 	p.lggr.Debugw("new messages consensus", "merkleRoots", merkleRoots)
 
-	tokenPrices, err := tokenPricesConsensus(decodedObservations, p.cfg.FChain[p.cfg.DestChain])
+	tokenPrices, err := tokenPricesConsensus(decodedObservations, fChainDest)
 	if err != nil {
 		return ocr3types.Outcome{}, fmt.Errorf("token prices consensus: %w", err)
 	}
