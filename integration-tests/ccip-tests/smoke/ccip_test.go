@@ -402,6 +402,11 @@ func TestSmokeCCIPSelfServeRateLimitOffRamp(t *testing.T) {
 
 	log := logging.GetTestLogger(t)
 	TestCfg := testsetups.NewCCIPTestConfig(t, log, testconfig.Smoke)
+	if offRampVersion, exists := TestCfg.VersionInput[contracts.OffRampContract]; exists {
+		require.NotEqual(t, offRampVersion, contracts.V1_2_0, "Provided OffRamp contract version '%s' is not supported for this test", offRampVersion)
+	} else {
+		require.FailNow(t, "OffRamp contract version not found in test config")
+	}
 
 	// Set the default permissionless exec threshold to 6 minutes so that we can manually execute the transactions faster
 	actions.DefaultPermissionlessExecThreshold = 5 * time.Minute
