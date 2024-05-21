@@ -496,19 +496,19 @@ func (o *LMTestSetupOutputs) FundLM(chainId int64, lggr zerolog.Logger, fundingA
 	if err != nil {
 		return errors.WithStack(fmt.Errorf("failed to get transaction options: %w", err))
 	}
-	client := o.LMModules[chainId].ChainClient.Backend()
+	cl := o.LMModules[chainId].ChainClient.Backend()
 
-	nonce, err := client.PendingNonceAt(context.Background(), transactor.From)
+	nonce, err := cl.PendingNonceAt(context.Background(), transactor.From)
 	if err != nil {
 		return err
 	}
 
-	gasPrice, err := client.SuggestGasPrice(context.Background())
+	gasPrice, err := cl.SuggestGasPrice(context.Background())
 	if err != nil {
 		return err
 	}
 
-	gasEstimate, err := client.EstimateGas(context.Background(), ethereum.CallMsg{
+	gasEstimate, err := cl.EstimateGas(context.Background(), ethereum.CallMsg{
 		From:  transactor.From,
 		To:    o.LMModules[chainId].LM.EthAddress,
 		Value: fundingAmount,
@@ -531,7 +531,7 @@ func (o *LMTestSetupOutputs) FundLM(chainId int64, lggr zerolog.Logger, fundingA
 		return err
 	}
 	lggr.Info().Msg("Funding Liquidity Manager")
-	err = client.SendTransaction(context.Background(), signedTx)
+	err = cl.SendTransaction(context.Background(), signedTx)
 	if err != nil {
 		return err
 	}
@@ -702,12 +702,14 @@ func LMDefaultTestSetup(
 		})
 	require.NoError(t, err, "Setting Cross Chain Rebalancer on L1 Rebalancer shouldn't fail")
 
+	// Wait for setting cross chain balancers on both chains to confirm
 	err = lmModules[l1ChainId].ChainClient.WaitForEvents()
 	require.NoError(t, err, "Waiting for events to confirm on L1 chain shouldn't fail")
 
 	err = lmModules[l2ChainId].ChainClient.WaitForEvents()
 	require.NoError(t, err, "Waiting for events to confirm on L2 chain shouldn't fail")
 
+	// Verify that onchain rebalancer matches the deployed Liquidity Manager
 	onchainRebalancerL1, err := lmModules[l1ChainId].TokenPool.GetRebalancer()
 	require.NoError(t, err, "Getting rebalancer from Token Pool shouldn't fail")
 
