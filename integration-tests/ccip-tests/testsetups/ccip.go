@@ -644,6 +644,9 @@ func (o *CCIPTestSetUpOutputs) AddLanesForNetworkPair(
 			allErrors.Store(multierr.Append(allErrors.Load(), fmt.Errorf("writing lane config for %s; err - %w", networkB.Name, errors.WithStack(err))))
 			return err
 		}
+		// we need to set the remote chains on the pool after the lane is deployed
+		// it's sufficient to do this only for the forward lane, as the destination pools will also be updated with source pool updates
+		// The reverse lane will have the same pools as the forward lane but in reverse order of source and destination
 		err = ccipLaneA2B.SetRemoteChainsOnPool()
 		if err != nil {
 			allErrors.Store(multierr.Append(allErrors.Load(), fmt.Errorf("error setting remote chains; err - %w", errors.WithStack(err))))
