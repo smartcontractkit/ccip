@@ -3214,6 +3214,7 @@ func (lane *CCIPLane) DisableAllRateLimiting() error {
 	if err != nil {
 		return fmt.Errorf("error waiting for destination chain events: %w", err)
 	}
+	lane.Logger.Info().Msg("Disabled all rate limiting")
 	return nil
 }
 
