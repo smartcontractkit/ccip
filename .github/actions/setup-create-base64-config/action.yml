@@ -64,7 +64,7 @@ runs:
         LOGSTREAM_LOG_TARGETS: ${{ inputs.logstreamLogTargets }}
         GRAFANA_URL: ${{ inputs.grafanaUrl }}
         GRAFANA_DASHBOARD_URL: ${{ inputs.grafanaDashboardUrl }}
-        GRAFANA_BEARER_TOKEN: ${{ inputs.grafanaBearerToken }}
+        GRAFANA_TOKEN: ${{ inputs.grafanaBearerToken }}
         ETH_EXECUTION_CLIENT: ${{ inputs.ethExecutionClient }}
         CUSTOM_ETH_CLIENT_DOCKER_IMAGE: ${{ inputs.customEthClientDockerImage }}
       run: |
@@ -113,8 +113,8 @@ runs:
         fi
 
         grafana_bearer_token=""
-        if [ -n "$GRAFANA_BEARER_TOKEN" ]; then
-          grafana_bearer_token="bearer_token_secret=\"$GRAFANA_BEARER_TOKEN\""
+        if [ -n "$GRAFANA_TOKEN" ]; then
+          grafana_bearer_token="bearer_token_secret=\"$GRAFANA_TOKEN\""
         fi
 
         cat << EOF > config.toml
