@@ -2821,12 +2821,37 @@ func (lane *CCIPLane) SendRequests(noOfRequests int, gasLimit *big.Int) error {
 	return nil
 }
 
+// manualExecutionOpts modify how ExecuteManually behaves
+type manualExecutionOpts struct {
+	timeout time.Duration
+}
+
+// ManualExecutionOption is a function that modifies ExecuteManually behavior
+type ManualExecutionOption func(*manualExecutionOpts)
+
+// WithConfirmationTimeout sets a custom timeout for waiting for the confirmation of the manual execution
+func WithConfirmationTimeout(timeout time.Duration) ManualExecutionOption {
+	return func(opts *manualExecutionOpts) {
+		opts.timeout = timeout
+	}
+}
+
 // ExecuteManually attempts to execute pending CCIP transactions manually.
 // This is necessary in situations where Smart Execution window for that message is over and Offchain plugin
 // will not attempt to execute the message.In such situation any further message from same sender will not be executed until
 // the blocking message is executed by the OffRamp.
 // More info: https://docs.chain.link/ccip/concepts/manual-execution#manual-execution
-func (lane *CCIPLane) ExecuteManually() error {
+func (lane *CCIPLane) ExecuteManually(options ...ManualExecutionOption) error {
+	var opts manualExecutionOpts
+	for _, opt := range options {
+		if opt != nil {
+			opt(&opts)
+		}
+	}
+	if opts.timeout == 0 {
+		opts.timeout = lane.ValidationTimeout
+	}
+
 	onRampABI, err := abi.JSON(strings.NewReader(evm_2_evm_onramp.EVM2EVMOnRampABI))
 	if err != nil {
 		return err
@@ -2899,10 +2924,13 @@ func (lane *CCIPLane) ExecuteManually() error {
 				return fmt.Errorf("could not execute manually: %w seqNum %d", err, seqNum)
 			}
 
-			rec, err := bind.WaitMined(context.Background(), lane.DestChain.DeployBackend(), tx)
+			ctx, cancel := context.WithTimeout(context.Background(), opts.timeout)
+			rec, err := bind.WaitMined(ctx, lane.DestChain.DeployBackend(), tx)
 			if err != nil {
+				cancel()
 				return fmt.Errorf("could not get receipt: %w seqNum %d", err, seqNum)
 			}
+			cancel()
 			if rec.Status != 1 {
 				return fmt.Errorf(
 					"manual execution failed for seqNum %d with receipt status %d, use the revert-reason script on this transaction hash '%s' and this sender address '%s'",
@@ -2910,7 +2938,7 @@ func (lane *CCIPLane) ExecuteManually() error {
 				)
 			}
 			lane.Logger.Info().Uint64("seqNum", seqNum).Msg("Manual Execution completed")
-			_, err = lane.Dest.AssertEventExecutionStateChanged(lane.Logger, seqNum, lane.ValidationTimeout,
+			_, err = lane.Dest.AssertEventExecutionStateChanged(lane.Logger, seqNum, opts.timeout,
 				timeNow, ccipReq.RequestStat, testhelpers.ExecutionStateSuccess,
 			)
 			if err != nil {
@@ -3110,9 +3138,9 @@ func isPhaseValid(
 ) (shouldComplete bool, validationError error) {
 	// If no phase is expected to fail or the current phase is not the one expected to fail, we just return what we were given
 	if opts.phaseExpectedToFail == "" || currentPhase != opts.phaseExpectedToFail {
-		return false, err
+		return err != nil, err
 	}
-	if err == nil {
+	if err == nil && currentPhase == opts.phaseExpectedToFail {
 		return true, fmt.Errorf("expected phase '%s' to fail, but it passed", opts.phaseExpectedToFail)
 	}
 	logmsg := logger.Info().Str("Failed with Error", err.Error()).Str("Phase", string(currentPhase))

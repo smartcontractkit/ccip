@@ -478,7 +478,7 @@ func TestSmokeCCIPSelfServeRateLimitOffRamp(t *testing.T) {
 			tc.lane.RecordStateBeforeTransfer()
 			err = tc.lane.SendRequests(1, big.NewInt(600_000))
 			require.NoError(t, err)
-			tc.lane.ValidateRequests(nil)
+			tc.lane.ValidateRequests()
 
 			// Enable aggregate rate limiting on the destination chain for the limited token
 			err = dest.AddRateLimitTokens([]*contracts.ERC20Token{limitedSrcToken}, []*contracts.ERC20Token{limitedDestToken})
@@ -499,7 +499,7 @@ func TestSmokeCCIPSelfServeRateLimitOffRamp(t *testing.T) {
 			tc.lane.RecordStateBeforeTransfer()
 			err = tc.lane.SendRequests(1, big.NewInt(600_000))
 			require.NoError(t, err, "Unlimited token transfer failed")
-			tc.lane.ValidateRequests(nil)
+			tc.lane.ValidateRequests()
 			tc.lane.Logger.Info().Str("Token", freeSrcToken.ContractAddress.Hex()).Msg("Unlimited token transfer succeeded")
 
 			// Send limited token with rate limit that should fail on the destination chain
@@ -516,7 +516,7 @@ func TestSmokeCCIPSelfServeRateLimitOffRamp(t *testing.T) {
 			// Manually execute the rate limited token transfer and expect a similar error
 			tc.lane.Logger.Info().Str("Wait Time", actions.DefaultPermissionlessExecThreshold.String()).Msg("Waiting for Exec Threshold to Expire")
 			time.Sleep(actions.DefaultPermissionlessExecThreshold) // Give time to exit the window
-			err = tc.lane.ExecuteManually()
+			err = tc.lane.ExecuteManually(actions.WithConfirmationTimeout(time.Minute))
 			require.Error(t, err, "There should be errors executing manually at this point")
 			tc.lane.Logger.Debug().Str("Error", err.Error()).Msg("Manually executed rate limited token transfer failed as expected")
 
