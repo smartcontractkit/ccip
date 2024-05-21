@@ -2923,6 +2923,7 @@ type validationOptions struct {
 	phaseExpectedToFail  testreporters.Phase // the phase expected to fail
 	phaseShouldExist     bool                // for some phases, their lack of existence is a failure, for others their existence can also have a failure state
 	expectedErrorMessage string              // if provided, we're looking for a specific error message
+	timeout              time.Duration       // timeout for the validation
 }
 
 // ValidationOptionFunc is a function that can be passed to ValidateRequests to specify which phase is expected to fail
@@ -2935,6 +2936,13 @@ type PhaseSpecificValidationOptionFunc func(*validationOptions)
 func WithErrorMessage(expectedErrorMessage string) PhaseSpecificValidationOptionFunc {
 	return func(opts *validationOptions) {
 		opts.expectedErrorMessage = expectedErrorMessage
+	}
+}
+
+// WithTimeout specifies a custom timeout for validating that the phase failed.
+func WithTimeout(timeout time.Duration) PhaseSpecificValidationOptionFunc {
+	return func(opts *validationOptions) {
+		opts.timeout = timeout
 	}
 }
 
@@ -3003,10 +3011,13 @@ func (lane *CCIPLane) ValidateRequests(validationOptionFuncs ...ValidationOption
 // ValidateRequestByTxHash validates the request events by tx hash.
 // If a phaseExpectedToFail is provided, it will return no error if that phase fails, but will error if it succeeds.
 func (lane *CCIPLane) ValidateRequestByTxHash(txHash common.Hash, opts validationOptions) error {
-	var reqStats []*testreporters.RequestStat
-	ccipRequests := lane.SentReqs[txHash]
+	var (
+		reqStats       []*testreporters.RequestStat
+		timeout        = lane.ValidationTimeout
+		ccipRequests   = lane.SentReqs[txHash]
+		txConfirmation = ccipRequests[0].txConfirmationTimestamp
+	)
 	require.Greater(lane.Test, len(ccipRequests), 0, "no ccip requests found for tx hash")
-	txConfirmation := ccipRequests[0].txConfirmationTimestamp
 
 	defer func() {
 		for _, req := range ccipRequests {
@@ -3017,8 +3028,11 @@ func (lane *CCIPLane) ValidateRequestByTxHash(txHash common.Hash, opts validatio
 		reqStats = append(reqStats, req.RequestStat)
 	}
 
+	if opts.phaseExpectedToFail == testreporters.CCIPSendRe && opts.timeout != 0 {
+		timeout = opts.timeout
+	}
 	msgLogs, ccipSendReqGenAt, err := lane.Source.AssertEventCCIPSendRequested(
-		lane.Logger, txHash.Hex(), lane.ValidationTimeout, txConfirmation, reqStats,
+		lane.Logger, txHash.Hex(), timeout, txConfirmation, reqStats,
 	)
 	if shouldReturn, phaseErr := isPhaseValid(lane.Logger, testreporters.CCIPSendRe, opts, err); shouldReturn {
 		return phaseErr
@@ -3041,24 +3055,33 @@ func (lane *CCIPLane) ValidateRequestByTxHash(txHash common.Hash, opts validatio
 			return fmt.Errorf("could not find request stat for seq number %d", seqNumber)
 		}
 
-		err = lane.Dest.AssertSeqNumberExecuted(lane.Logger, seqNumber, lane.ValidationTimeout, sourceLogFinalizedAt, reqStat)
+		if opts.phaseExpectedToFail == testreporters.Commit && opts.timeout != 0 {
+			timeout = opts.timeout
+		}
+		err = lane.Dest.AssertSeqNumberExecuted(lane.Logger, seqNumber, timeout, sourceLogFinalizedAt, reqStat)
 		if shouldReturn, phaseErr := isPhaseValid(lane.Logger, testreporters.Commit, opts, err); shouldReturn {
 			return phaseErr
 		}
 
 		// Verify whether commitStore has accepted the report
 		commitReport, reportAcceptedAt, err := lane.Dest.AssertEventReportAccepted(
-			lane.Logger, seqNumber, lane.ValidationTimeout, sourceLogFinalizedAt, reqStat,
+			lane.Logger, seqNumber, timeout, sourceLogFinalizedAt, reqStat,
 		)
 		if shouldReturn, phaseErr := isPhaseValid(lane.Logger, testreporters.Commit, opts, err); shouldReturn {
 			return phaseErr
 		}
 
-		reportBlessedAt, err := lane.Dest.AssertReportBlessed(lane.Logger, seqNumber, lane.ValidationTimeout, *commitReport, reportAcceptedAt, reqStat)
+		if opts.phaseExpectedToFail == testreporters.ReportBlessed && opts.timeout != 0 {
+			timeout = opts.timeout
+		}
+		reportBlessedAt, err := lane.Dest.AssertReportBlessed(lane.Logger, seqNumber, timeout, *commitReport, reportAcceptedAt, reqStat)
 		if shouldReturn, phaseErr := isPhaseValid(lane.Logger, testreporters.ReportBlessed, opts, err); shouldReturn {
 			return phaseErr
 		}
 
+		if opts.phaseExpectedToFail == testreporters.ExecStateChanged && opts.timeout != 0 {
+			timeout = opts.timeout
+		}
 		// Verify whether the execution state is changed and the transfer is successful
 		_, err = lane.Dest.AssertEventExecutionStateChanged(
 			lane.Logger, seqNumber,

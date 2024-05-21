@@ -407,6 +407,7 @@ func TestSmokeCCIPSelfServeRateLimitOffRamp(t *testing.T) {
 	} else {
 		require.FailNow(t, "OffRamp contract version not found in test config")
 	}
+	require.True(t, TestCfg.SelectedNetworks[0].Simulated, "This test relies on timing assumptions and should only be run on simulated networks")
 
 	// Set the default permissionless exec threshold to 6 minutes so that we can manually execute the transactions faster
 	actions.DefaultPermissionlessExecThreshold = 30 * time.Second
@@ -507,7 +508,7 @@ func TestSmokeCCIPSelfServeRateLimitOffRamp(t *testing.T) {
 			tc.lane.RecordStateBeforeTransfer()
 			err = tc.lane.SendRequests(1, big.NewInt(600_000))
 			require.NoError(t, err, "Failed to send rate limited token transfer")
-			tc.lane.ValidateRequests(actions.ExpectPhaseToFail(testreporters.ExecStateChanged))
+			tc.lane.ValidateRequests(actions.ExpectPhaseToFail(testreporters.ExecStateChanged, actions.WithTimeout(time.Minute)))
 			tc.lane.Logger.Info().
 				Str("Token", limitedSrcToken.ContractAddress.Hex()).
 				Msg("Limited token transfer failed on destination chain (a good thing in this context)")
