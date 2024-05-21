@@ -143,7 +143,6 @@ type CCIPCommon struct {
 	BridgeTokens                  []*contracts.ERC20Token
 	PriceAggregators              map[common.Address]*contracts.MockAggregator
 	NoOfTokensNeedingDynamicPrice int
-	RemoteChains                  []uint64
 	BridgeTokenPools              []*contracts.TokenPool
 	RateLimiterConfig             contracts.RateLimiterConfig
 	ARMContract                   *common.Address
@@ -170,7 +169,6 @@ type CCIPCommon struct {
 func (ccipModule *CCIPCommon) FreeUpUnusedSpace() {
 	ccipModule.PriceAggregators = nil
 	ccipModule.BridgeTokenPools = []*contracts.TokenPool{}
-	ccipModule.RemoteChains = nil
 	ccipModule.TokenMessenger = nil
 	ccipModule.TokenTransmitter = nil
 	runtime.GC()
@@ -1867,15 +1865,6 @@ func (destCCIP *DestCCIPModule) DeployContracts(
 	if !destCCIP.Common.ExistingDeployment && len(sourceCCIP.Common.BridgeTokenPools) != len(destCCIP.Common.BridgeTokenPools) {
 		return fmt.Errorf("source and destination token pool number does not match")
 	}
-	// set remote pools
-	if !destCCIP.Common.ExistingDeployment {
-		for i, pool := range sourceCCIP.Common.BridgeTokenPools {
-			err := pool.SetRemotePool(destChainSelector, destCCIP.Common.BridgeTokenPools[i].EthAddress)
-			if err != nil {
-				return fmt.Errorf("error setting remote pools %w", err)
-			}
-		}
-	}
 
 	if destCCIP.CommitStore == nil {
 		if destCCIP.Common.ExistingDeployment {
@@ -2525,6 +2514,24 @@ func (lane *CCIPLane) TokenPricesConfig() (string, error) {
 		return "", fmt.Errorf("error in adding PriceConfig for source WrappedNative token %s: %w", lane.Source.Common.WrappedNative.Hex(), err)
 	}
 	return d.String()
+}
+
+func (lane *CCIPLane) SetRemoteChainsOnPool() error {
+	if len(lane.Source.Common.BridgeTokenPools) != len(lane.Dest.Common.BridgeTokenPools) {
+		return fmt.Errorf("source (%d) and dest (%d) bridge token pools length should be same", len(lane.Source.Common.BridgeTokenPools), len(lane.Dest.Common.BridgeTokenPools))
+	}
+	for i, src := range lane.Source.Common.BridgeTokenPools {
+		dst := lane.Dest.Common.BridgeTokenPools[i]
+		err := src.SetRemoteChainOnPool(lane.Source.DestChainSelector, dst.EthAddress)
+		if err != nil {
+			return err
+		}
+		err = dst.SetRemoteChainOnPool(lane.Dest.SourceChainSelector, src.EthAddress)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // OptimizeStorage sets nil to various elements of CCIPLane which are only used
@@ -3305,20 +3312,6 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 		tokenAddresses = append(tokenAddresses, token.Address())
 	}
 	tokenAddresses = append(tokenAddresses, lane.Dest.Common.FeeToken.Address(), lane.Source.Common.WrappedNative.Hex(), lane.Dest.Common.WrappedNative.Hex())
-
-	// Configure the tokens on this lane
-	for i, src := range lane.Source.Common.BridgeTokenPools {
-		dst := lane.Dest.Common.BridgeTokenPools[i]
-
-		err := src.SetRemoteChainOnPool(lane.Source.DestChainSelector, dst.EthAddress)
-		if err != nil {
-			return err
-		}
-		err = dst.SetRemoteChainOnPool(lane.Dest.SourceChainSelector, src.EthAddress)
-		if err != nil {
-			return err
-		}
-	}
 
 	// Only one off pipeline or price getter to be set.
 	tokenPricesUSDPipeline := ""
