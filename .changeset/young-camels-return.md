@@ -2,4 +2,5 @@
 "ccip": patch
 ---
 
-Added logs to track graph building process and enabling test network 2337
+#added logs to track graph building process 
+#added support for test network 2337
