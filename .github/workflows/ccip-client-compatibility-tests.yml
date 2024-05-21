@@ -1,13 +1,13 @@
 name: CCIP Client Compatibility Tests
 on:
-#  merge_group:
-#  pull_request:
-#  push:
-#    tags:
-#      - "*"
-#    branches:
-#      - ccip-develop
-#      - "release/**"
+  merge_group:
+  pull_request:
+  push:
+    tags:
+      - "*"
+    branches:
+      - ccip-develop
+      - "release/**"
   workflow_dispatch:
 
 env:
@@ -235,12 +235,13 @@ jobs:
             timeout: 30m
             pyroscope_env: ci-ccip-bidirectionallane-besu
             chainConfig: "1337=hyperledger/besu:${{ needs.get-latest-available-images.outputs.besu_tag }},2337=hyperledger/besu:${{ needs.get-latest-available-images.outputs.besu_tag }}"
-          - name: bidirectionallane-erigon
-            test: TestSmokeCCIPForBidirectionalLane
-            client: erigon
-            timeout: 30m
-            pyroscope_env: ci-ccip-bidirectionallane-erigon
-            chainConfig: "1337=thorax/erigon:${{ needs.get-latest-available-images.outputs.erigon_tag }},2337=thorax/erigon:${{ needs.get-latest-available-images.outputs.erigon_tag }}"
+            # uncomment when Erigon compatibility is fixed: https://smartcontract-it.atlassian.net/browse/BCF-3237
+#          - name: bidirectionallane-erigon
+#            test: TestSmokeCCIPForBidirectionalLane
+#            client: erigon
+#            timeout: 30m
+#            pyroscope_env: ci-ccip-bidirectionallane-erigon
+#            chainConfig: "1337=thorax/erigon:${{ needs.get-latest-available-images.outputs.erigon_tag }},2337=thorax/erigon:${{ needs.get-latest-available-images.outputs.erigon_tag }}"
     runs-on: ubuntu-latest
     name: CCIP Latest EVM Node Compatibility Test with ${{ matrix.client }}
     steps:
