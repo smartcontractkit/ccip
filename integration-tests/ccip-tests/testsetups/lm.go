@@ -5,6 +5,11 @@ import (
 	"crypto/ed25519"
 	"encoding/hex"
 	"fmt"
+	"github.com/ethereum/go-ethereum"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/weth9"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/erc20"
 	"math/big"
 	"os"
 	"strconv"
@@ -442,6 +447,167 @@ func (o *LMTestSetupOutputs) SetOCR3Config(chainId int64) error {
 	return nil
 }
 
+func (o *LMTestSetupOutputs) FundPool(chainId int64, lggr zerolog.Logger, fundingAmount *big.Int) error {
+	token, err := erc20.NewERC20(*o.LMModules[chainId].WrapperNative, o.LMModules[chainId].ChainClient.Backend())
+	if err != nil {
+		return errors.WithStack(fmt.Errorf("failed to create ERC20 contract instance: %w", err))
+	}
+	symbol, err := token.Symbol(nil)
+	if err != nil {
+		return errors.WithStack(fmt.Errorf("failed to get token symbol: %w", err))
+	}
+	if symbol == "WETH" {
+		weth, err := weth9.NewWETH9(*o.LMModules[chainId].WrapperNative, o.LMModules[chainId].ChainClient.Backend())
+		if err != nil {
+			return errors.WithStack(fmt.Errorf("failed to create WETH contract instance: %w", err))
+		}
+		nativeBalance, err := o.LMModules[chainId].ChainClient.BalanceAt(context.Background(), common.HexToAddress(o.LMModules[chainId].ChainClient.GetDefaultWallet().Address()))
+		if err != nil {
+			return errors.WithStack(fmt.Errorf("failed to get native balance: %w", err))
+		}
+		if nativeBalance.Cmp(big.NewInt(0)) < 0 {
+			return errors.WithStack(fmt.Errorf("not enough native balance"))
+		}
+		lggr.Info().Msg("Depositing tokenpool funding to WETH contract")
+		txOpts, err := o.LMModules[chainId].ChainClient.TransactionOpts(o.LMModules[chainId].ChainClient.GetDefaultWallet())
+		if err != nil {
+			return errors.WithStack(fmt.Errorf("failed to get transaction options: %w", err))
+		}
+		txOpts.Value = fundingAmount
+		tx, err := weth.Deposit(txOpts)
+		if err != nil {
+			return errors.WithStack(fmt.Errorf("failed to deposit to WETH contract: %w", err))
+		}
+		receipt, err := bind.WaitMined(context.Background(), o.LMModules[chainId].ChainClient.DeployBackend(), tx)
+		if err != nil {
+			return errors.WithStack(fmt.Errorf("failed to wait for transaction receipt: %w", err))
+		}
+
+		lggr.Info().Str("tx hash", receipt.TxHash.String()).Msg("Deposited tokenpool funding to WETH contract")
+	}
+
+	return nil
+}
+
+func (o *LMTestSetupOutputs) FundLM(chainId int64, lggr zerolog.Logger, fundingAmount *big.Int) error {
+	transactor, err := o.LMModules[chainId].ChainClient.TransactionOpts(o.LMModules[chainId].ChainClient.GetDefaultWallet())
+	if err != nil {
+		return errors.WithStack(fmt.Errorf("failed to get transaction options: %w", err))
+	}
+	client := o.LMModules[chainId].ChainClient.Backend()
+
+	nonce, err := client.PendingNonceAt(context.Background(), transactor.From)
+	if err != nil {
+		return err
+	}
+
+	gasPrice, err := client.SuggestGasPrice(context.Background())
+	if err != nil {
+		return err
+	}
+
+	gasEstimate, err := client.EstimateGas(context.Background(), ethereum.CallMsg{
+		From:  transactor.From,
+		To:    o.LMModules[chainId].LM.EthAddress,
+		Value: fundingAmount,
+	})
+	if err != nil {
+		return err
+	}
+
+	tx := types.NewTx(
+		&types.LegacyTx{
+			Nonce:    nonce,
+			GasPrice: gasPrice,
+			Gas:      gasEstimate,
+			To:       o.LMModules[chainId].LM.EthAddress,
+			Value:    fundingAmount,
+		},
+	)
+	signedTx, err := transactor.Signer(transactor.From, tx)
+	if err != nil {
+		return err
+	}
+	lggr.Info().Msg("Funding Liquidity Manager")
+	err = client.SendTransaction(context.Background(), signedTx)
+	if err != nil {
+		return err
+	}
+	receipt, err := bind.WaitMined(context.Background(), o.LMModules[chainId].ChainClient.DeployBackend(), signedTx)
+	if err != nil {
+		return errors.WithStack(fmt.Errorf("failed to wait for transaction receipt: %w", err))
+	}
+	lggr.Info().Str("tx hash", receipt.TxHash.String()).Msg("Funded Liquidity Manager")
+	return nil
+}
+
+func (o *LMTestSetupOutputs) AddJobs(chainId int64, lggr zerolog.Logger) error {
+	// Add bootstrap job
+	clNodesWithKeys := o.Env.CLNodesWithKeys[strconv.FormatInt(chainId, 10)]
+	bootstrapNode := clNodesWithKeys[0]
+	bootstrapSpec := &client.OCR2TaskJobSpec{
+		Name:    "ocr2 bootstrap node " + o.LMModules[chainId].LM.EthAddress.String(),
+		JobType: "bootstrap",
+		OCR2OracleSpec: job.OCR2OracleSpec{
+			ContractID: o.LMModules[chainId].LM.EthAddress.String(),
+			Relay:      "evm",
+			RelayConfig: map[string]interface{}{
+				"chainID": int(chainId),
+			},
+			ContractConfigTrackerPollInterval: *models.NewInterval(time.Second * 15),
+		},
+	}
+
+	lggr.Info().Msg("Adding bootstrap job")
+	j, err := bootstrapNode.Node.MustCreateJob(bootstrapSpec)
+	if err != nil {
+		return errors.WithStack(fmt.Errorf("failed to create bootstrap job: %w", err))
+	}
+	lggr.Info().Str("jobId", j.Data.ID).Msg("Bootstrap job added")
+
+	P2Pv2Bootstrapper := fmt.Sprintf("%s@%s:%d", bootstrapNode.KeysBundle.P2PKeys.Data[0].Attributes.PeerID, bootstrapNode.Node.InternalIP(), 6690)
+
+	// Add LM jobs
+	donNodes := clNodesWithKeys[1:]
+
+	for _, node := range donNodes {
+		lmPluginConf := job.JSONConfig{
+			"closePluginTimeoutSec":   10,
+			"liquidityManagerAddress": "\"" + o.LMModules[chainId].LM.EthAddress.String() + "\"",
+			"liquidityManagerNetwork": "\"" + strconv.FormatUint(o.LMModules[chainId].ChainSelectror, 10) +
+				"\"" + "\n[pluginConfig.rebalancerConfig]\n type = \"ping-pong\"\n",
+		}
+
+		lmJobSpec := &client.OCR2TaskJobSpec{
+			Name:    "lm " + o.LMModules[chainId].LM.EthAddress.String(),
+			JobType: "offchainreporting2",
+			OCR2OracleSpec: job.OCR2OracleSpec{
+				PluginType: "liquiditymanager",
+				Relay:      "evm",
+				RelayConfig: map[string]interface{}{
+					"chainID": int(chainId),
+				},
+				PluginConfig: lmPluginConf,
+
+				ContractConfigTrackerPollInterval: *models.NewInterval(time.Second * 15),
+				ContractID:                        o.LMModules[chainId].LM.EthAddress.String(),      // registryAddr
+				OCRKeyBundleID:                    null.StringFrom(node.KeysBundle.OCR2Key.Data.ID), // get node ocr2config.ID
+				TransmitterID:                     null.StringFrom(node.KeysBundle.EthAddress),      // node addr
+				P2PV2Bootstrappers:                pq.StringArray{P2Pv2Bootstrapper},                // bootstrap node key and address <p2p-key>@bootstrap:8000
+			},
+		}
+		lggr.Debug().Interface("lmJobSpec", lmJobSpec).Msg("lmJobSpec")
+		lggr.Info().Str("Node URL", node.Node.URL()).Msg("Adding LM job")
+		j, err := node.Node.MustCreateJob(lmJobSpec)
+		if err != nil {
+			return errors.WithStack(fmt.Errorf("failed to create LM job: %w", err))
+		}
+		lggr.Info().Str("jobId", j.Data.ID).Msg("LM job added")
+
+	}
+	return nil
+}
+
 func LMDefaultTestSetup(
 	t *testing.T,
 	lggr zerolog.Logger,
@@ -557,76 +723,43 @@ func LMDefaultTestSetup(
 		t.Fatalf("Onchain rebalancer mismatch")
 	}
 
+	// Fund L1 Token Pool
+	err = setUpArgs.FundPool(l1ChainId, lggr, big.NewInt(1000000000))
+	require.NoError(t, err, "Funding L1 Token Pool shouldn't fail")
+
+	//Fund L1 LM
+	err = setUpArgs.FundLM(l1ChainId, lggr, big.NewInt(1000000000))
+	require.NoError(t, err, "Funding L1 LM shouldn't fail")
+
+	err = lmModules[l1ChainId].ChainClient.WaitForEvents()
+	require.NoError(t, err, "Waiting for events to confirm on L1 chain shouldn't fail")
+
+	// Fund L2 Token Pool
+	err = setUpArgs.FundPool(l2ChainId, lggr, big.NewInt(1000000000))
+	require.NoError(t, err, "Funding L2 Token Pool shouldn't fail")
+
+	//Fund L2 LM
+	err = setUpArgs.FundLM(l2ChainId, lggr, big.NewInt(1000000000))
+	require.NoError(t, err, "Funding L2 LM shouldn't fail")
+
+	err = lmModules[l2ChainId].ChainClient.WaitForEvents()
+	require.NoError(t, err, "Waiting for events to confirm on L2 chain shouldn't fail")
+
 	err = setUpArgs.Env.CLNodeWithKeyReady.Wait()
 	require.NoError(t, err, "Waiting for CL nodes to be ready shouldn't fail")
+
+	err = setUpArgs.AddJobs(l1ChainId, lggr)
+	require.NoError(t, err, "Adding jobs on L1 chain shouldn't fail")
 
 	// Set Config on L2 Chain
 	err = setUpArgs.SetOCR3Config(l2ChainId)
 	require.NoError(t, err, "Setting OCR3 config on L2 chain shouldn't fail")
 
+	time.Sleep(30 * time.Second)
+
 	// Set Config on L1 Chain
 	err = setUpArgs.SetOCR3Config(l1ChainId)
 	require.NoError(t, err, "Setting OCR3 config on L1 chain shouldn't fail")
-
-	// Add bootstrap job
-	clNodesWithKeys := setUpArgs.Env.CLNodesWithKeys[strconv.FormatInt(l1ChainId, 10)]
-	bootstrapNode := clNodesWithKeys[0]
-	bootstrapSpec := &client.OCR2TaskJobSpec{
-		Name:    "ocr2 bootstrap node " + lmModules[l1ChainId].LM.EthAddress.String(),
-		JobType: "bootstrap",
-		OCR2OracleSpec: job.OCR2OracleSpec{
-			ContractID: lmModules[l1ChainId].LM.EthAddress.String(),
-			Relay:      "evm",
-			RelayConfig: map[string]interface{}{
-				"chainID": int(l1ChainId),
-			},
-			ContractConfigTrackerPollInterval: *models.NewInterval(time.Second * 15),
-		},
-	}
-
-	lggr.Info().Msg("Adding bootstrap job")
-	j, err := bootstrapNode.Node.MustCreateJob(bootstrapSpec)
-	require.NoError(t, err, "Adding bootstrap job shouldn't fail")
-	lggr.Info().Str("jobId", j.Data.ID).Msg("Bootstrap job added")
-
-	P2Pv2Bootstrapper := fmt.Sprintf("%s@%s:%d", bootstrapNode.KeysBundle.P2PKeys.Data[0].Attributes.PeerID, bootstrapNode.Node.InternalIP(), 6690)
-
-	// Add LM jobs
-	donNodes := clNodesWithKeys[1:]
-
-	for _, node := range donNodes {
-		lmPluginConf := job.JSONConfig{
-			"closePluginTimeoutSec":   10,
-			"liquidityManagerAddress": "\"" + lmModules[l1ChainId].LM.EthAddress.String() + "\"",
-			"liquidityManagerNetwork": "\"" + strconv.FormatUint(lmModules[l1ChainId].ChainSelectror, 10) +
-				"\"" + "\n[pluginConfig.rebalancerConfig]\n type = \"ping-pong\"\n",
-		}
-
-		lmJobSpec := &client.OCR2TaskJobSpec{
-			Name:    "lm " + lmModules[l1ChainId].LM.EthAddress.String(),
-			JobType: "offchainreporting2",
-			OCR2OracleSpec: job.OCR2OracleSpec{
-				PluginType: "liquiditymanager",
-				Relay:      "evm",
-				RelayConfig: map[string]interface{}{
-					"chainID": int(l1ChainId),
-				},
-				PluginConfig: lmPluginConf,
-
-				ContractConfigTrackerPollInterval: *models.NewInterval(time.Second * 15),
-				ContractID:                        lmModules[l1ChainId].LM.EthAddress.String(),      // registryAddr
-				OCRKeyBundleID:                    null.StringFrom(node.KeysBundle.OCR2Key.Data.ID), // get node ocr2config.ID
-				TransmitterID:                     null.StringFrom(node.KeysBundle.EthAddress),      // node addr
-				P2PV2Bootstrappers:                pq.StringArray{P2Pv2Bootstrapper},                // bootstrap node key and address <p2p-key>@bootstrap:8000
-			},
-		}
-		lggr.Debug().Interface("lmJobSpec", lmJobSpec).Msg("lmJobSpec")
-		lggr.Info().Str("Node URL", node.Node.URL()).Msg("Adding LM job")
-		j, err := node.Node.MustCreateJob(lmJobSpec)
-		require.NoError(t, err, "Adding LM job shouldn't fail")
-		lggr.Info().Str("jobId", j.Data.ID).Msg("LM job added")
-
-	}
 
 	defer lmModules[l1ChainId].ChainClient.Close()
 	defer lmModules[l2ChainId].ChainClient.Close()
