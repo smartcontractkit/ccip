@@ -134,22 +134,14 @@ func (p *Plugin) Observation(ctx context.Context, outctx ocr3types.OutcomeContex
 	sort.Slice(knownSourceChainsSlice, func(i, j int) bool { return knownSourceChainsSlice[i] < knownSourceChainsSlice[j] })
 
 	// Find the gas prices for each chain.
-	gasPricesVals, err := p.ccipReader.GasPrices(ctx, knownSourceChainsSlice)
-	if err != nil {
-		return nil, fmt.Errorf("get gas prices: %w", err)
-	}
-	p.lggr.Debugw("reading gas prices", "chains",
-		len(knownSourceChainsSlice), "gasPrices", len(gasPricesVals))
-	gasPrices := make([]model.GasPriceChain, 0, len(knownSourceChainsSlice))
-	for i, ch := range knownSourceChainsSlice {
-		p.lggr.Debugw("gas price", "chain", ch, "price", gasPricesVals[i])
-		gasPrices = append(gasPrices, model.NewGasPriceChain(gasPricesVals[i], ch))
+	var gasPrices []model.GasPriceChain
+	if p.cfg.GasPricesObserver {
+		gasPrices, err = observeGasPrices(ctx, p.ccipReader, knownSourceChainsSlice)
+		if err != nil {
+			return types.Observation{}, fmt.Errorf("observe gas prices: %w", err)
+		}
 	}
 
-	p.lggr.Infow("submitting observation",
-		"observedNewMsgs", len(newMsgs),
-		"gasPrices", len(gasPrices),
-		"tokenPrices", len(tokenPrices))
 	return model.NewCommitPluginObservation(newMsgs, gasPrices, tokenPrices, maxSeqNumsPerChain).Encode()
 }
 
@@ -169,6 +161,10 @@ func (p *Plugin) ValidateObservation(_ ocr3types.OutcomeContext, _ types.Query, 
 
 	if err := validateObservedTokenPrices(obs.TokenPrices); err != nil {
 		return fmt.Errorf("validate token prices: %w", err)
+	}
+
+	if err := validateObservedGasPrices(obs.GasPrices); err != nil {
+		return fmt.Errorf("validate gas prices: %w", err)
 	}
 
 	return nil

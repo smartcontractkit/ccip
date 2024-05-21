@@ -257,6 +257,33 @@ func Test_observeTokenPrices(t *testing.T) {
 
 }
 
+func Test_observeGasPrices(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("happy path", func(t *testing.T) {
+		mockReader := mocks.NewCCIPReader()
+		chains := []model.ChainSelector{1, 2, 3}
+		mockGasPrices := []model.GasPrice{big.NewInt(10), big.NewInt(20), big.NewInt(30)}
+		mockReader.On("GasPrices", ctx, chains).Return(mockGasPrices, nil)
+		gasPrices, err := observeGasPrices(ctx, mockReader, chains)
+		assert.NoError(t, err)
+		assert.Equal(t, []model.GasPriceChain{
+			model.NewGasPriceChain(mockGasPrices[0], chains[0]),
+			model.NewGasPriceChain(mockGasPrices[1], chains[1]),
+			model.NewGasPriceChain(mockGasPrices[2], chains[2]),
+		}, gasPrices)
+	})
+
+	t.Run("gas reader internal issue", func(t *testing.T) {
+		mockReader := mocks.NewCCIPReader()
+		chains := []model.ChainSelector{1, 2, 3}
+		mockGasPrices := []model.GasPrice{big.NewInt(10), big.NewInt(20)} // return 2 prices for 3 chains
+		mockReader.On("GasPrices", chains).Return(mockGasPrices, nil)
+		_, err := observeGasPrices(ctx, mockReader, chains)
+		assert.Error(t, err)
+	})
+}
+
 func Test_validateObservedSequenceNumbers(t *testing.T) {
 	testCases := []struct {
 		name       string
