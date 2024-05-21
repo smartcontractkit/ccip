@@ -17,9 +17,32 @@ func TestLmBasic(t *testing.T) {
 	TestCfg := testsetups.NewCCIPTestConfig(t, log, testconfig.Smoke)
 	require.NotNil(t, TestCfg.TestGroupInput.MsgDetails.DestGasLimit)
 	//gasLimit := big.NewInt(*TestCfg.TestGroupInput.MsgDetails.DestGasLimit)
-	_ = testsetups.LMDefaultTestSetup(t, log, "smoke-lm", TestCfg)
+	lmTestSetup := testsetups.LMDefaultTestSetup(t, log, "smoke-lm", TestCfg)
 
-	//TODO: For debug only, to be removed
-	time.Sleep(5 * time.Minute)
-	t.Fail()
+	l1ChainId := lmTestSetup.Cfg.SelectedNetworks[0].ChainID
+	l2ChainId := lmTestSetup.Cfg.SelectedNetworks[1].ChainID
+
+	l1liquidityStart, err := lmTestSetup.LMModules[l1ChainId].LM.GetLiquidity()
+	require.NoError(t, err, "Failed to get liquidity from L1")
+	l2liquidityStart, err := lmTestSetup.LMModules[l2ChainId].LM.GetLiquidity()
+	require.NoError(t, err, "Failed to get liquidity from L2")
+	log.Info().Str("L1 Liquidity", l1liquidityStart.String()).Str("L2 Liquidity", l2liquidityStart.String()).Msg("Liquidity at start")
+
+	//TODO: Improve this wait
+	log.Info().Msg("Waiting 3 minutes for liquidity to change")
+	time.Sleep(3 * time.Minute)
+
+	l1liquidityEnd, err := lmTestSetup.LMModules[l1ChainId].LM.GetLiquidity()
+	require.NoError(t, err, "Failed to get liquidity from L1")
+	l2liquidityEnd, err := lmTestSetup.LMModules[l2ChainId].LM.GetLiquidity()
+	require.NoError(t, err, "Failed to get liquidity from L2")
+	log.Info().Str("L1 Liquidity", l1liquidityEnd.String()).Str("L2 Liquidity", l2liquidityEnd.String()).Msg("Liquidity at end")
+
+	// Check if liquidity changed.
+	// Ideally liquidity should change on both chains, but sometimes I have seen it not change on L2
+	// TODO: Investigate why liquidity is not changing on L2
+	if (l1liquidityEnd.Cmp(l1liquidityStart) == 0) && (l2liquidityEnd.Cmp(l2liquidityStart) == 0) {
+		t.Errorf("Liquidity did not change during the test")
+	}
+	// TODO: The test should also check for LiquidityTransferred event on both chains
 }

@@ -796,6 +796,7 @@ func LMDefaultTestSetup(
 	err = setUpArgs.SetOCR3Config(l2ChainId)
 	require.NoError(t, err, "Setting OCR3 config on L2 chain shouldn't fail")
 
+	// TODO: Remove this sleep when it is no longer needed
 	time.Sleep(30 * time.Second)
 
 	// Set Config on L1 Chain
