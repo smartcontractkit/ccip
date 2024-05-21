@@ -406,8 +406,9 @@ jobs:
     name: ETH Smoke Tests ${{ matrix.product.name }}${{ matrix.product.tag_suffix }}
     steps:
       # Handy for debugging resource usage
-      # - name: Collect Workflow Telemetry
-      #   uses: catchpoint/workflow-telemetry-action@v2
+      # DEBUG: Comment this back out after analysis
+      - name: Collect Workflow Telemetry
+        uses: catchpoint/workflow-telemetry-action@v2
       - name: Collect Metrics
         if: needs.changes.outputs.src == 'true' || github.event_name == 'workflow_dispatch'
         id: collect-gha-metrics
