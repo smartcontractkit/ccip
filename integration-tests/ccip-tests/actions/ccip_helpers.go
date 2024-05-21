@@ -1270,7 +1270,7 @@ func (sourceCCIP *SourceCCIPModule) SetTokenTransferFeeConfig() error {
 	for i, token := range sourceCCIP.Common.BridgeTokens {
 		tokens = append(tokens, token.ContractAddress)
 		pools = append(pools, sourceCCIP.Common.BridgeTokenPools[i].EthAddress)
-		destByteOverhead := uint32(0)
+		destByteOverhead := uint32(32)
 		destGasOverhead := uint32(29_000)
 		if sourceCCIP.Common.BridgeTokenPools[i].IsUSDC() {
 			destByteOverhead = 640
