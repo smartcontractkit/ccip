@@ -1093,7 +1093,7 @@ contract EVM2EVMOnRamp_getTokenTransferCost is EVM2EVMOnRamp_getFeeSetup {
     // Assert that the default values are used
     assertEq(uint256(DEFAULT_TOKEN_FEE_USD_CENTS) * 1e16, feeUSDWei);
     assertEq(DEFAULT_TOKEN_DEST_GAS_OVERHEAD, destGasOverhead);
-    assertEq(DEFAULT_TOKEN_BYTES_OVERHEAD, destBytesOverhead);
+    assertEq(DEFAULT_TOKEN_BYTES_OVERHEAD + Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES, destBytesOverhead);
   }
 
   function test_SmallTokenTransferChargesMinFeeAndGas_Success() public view {
@@ -1824,7 +1824,7 @@ contract EVM2EVMOnRamp_setTokenTransferFeeConfig is EVM2EVMOnRampSetup {
   event TokenTransferFeeConfigSet(EVM2EVMOnRamp.TokenTransferFeeConfigArgs[] transferFeeConfig);
   event TokenTransferFeeConfigDeleted(address[] tokens);
 
-  function test_SetTokenTransferFee_Success() public {
+  function test__setTokenTransferFeeConfig_Success() public {
     EVM2EVMOnRamp.TokenTransferFeeConfigArgs[] memory tokenTransferFeeArgs =
       new EVM2EVMOnRamp.TokenTransferFeeConfigArgs[](2);
     tokenTransferFeeArgs[0] = EVM2EVMOnRamp.TokenTransferFeeConfigArgs({
@@ -1903,7 +1903,7 @@ contract EVM2EVMOnRamp_setTokenTransferFeeConfig is EVM2EVMOnRampSetup {
     assertTrue(config1.isEnabled);
   }
 
-  function test_SetFeeTokenConfigByAdmin_Success() public {
+  function test__setTokenTransferFeeConfig_byAdmin_Success() public {
     EVM2EVMOnRamp.TokenTransferFeeConfigArgs[] memory transferFeeConfig;
     vm.startPrank(ADMIN);
 
@@ -1915,7 +1915,21 @@ contract EVM2EVMOnRamp_setTokenTransferFeeConfig is EVM2EVMOnRampSetup {
 
   // Reverts
 
-  function test_OnlyCallableByOwnerOrAdmin_Revert() public {
+  function test__setTokenTransferFeeConfig_InvalidDestBytesOverhead_Revert() public {
+    EVM2EVMOnRamp.TokenTransferFeeConfigArgs[] memory transferFeeConfig =
+      new EVM2EVMOnRamp.TokenTransferFeeConfigArgs[](1);
+    transferFeeConfig[0].destBytesOverhead = uint32(Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES) - 1;
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        EVM2EVMOnRamp.InvalidDestBytesOverhead.selector,
+        transferFeeConfig[0].token,
+        transferFeeConfig[0].destBytesOverhead
+      )
+    );
+    s_onRamp.setTokenTransferFeeConfig(transferFeeConfig, new address[](0));
+  }
+
+  function test__setTokenTransferFeeConfig_OnlyCallableByOwnerOrAdmin_Revert() public {
     EVM2EVMOnRamp.TokenTransferFeeConfigArgs[] memory transferFeeConfig;
     vm.startPrank(STRANGER);
 

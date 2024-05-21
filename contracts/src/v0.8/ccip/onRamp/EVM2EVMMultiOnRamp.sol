@@ -643,7 +643,8 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ILinkAvailable, AggregateRat
         DestChainDynamicConfig storage destChainDynamicConfig = s_destChainConfig[destChainSelector].dynamicConfig;
         tokenTransferFeeUSDWei += uint256(destChainDynamicConfig.defaultTokenFeeUSDCents) * 1e16;
         tokenTransferGas += destChainDynamicConfig.defaultTokenDestGasOverhead;
-        tokenTransferBytesOverhead += destChainDynamicConfig.defaultTokenDestBytesOverhead;
+        tokenTransferBytesOverhead +=
+          destChainDynamicConfig.defaultTokenDestBytesOverhead + uint32(Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES);
         continue;
       }
 
@@ -664,9 +665,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ILinkAvailable, AggregateRat
       }
 
       tokenTransferGas += transferFeeConfig.destGasOverhead;
-      tokenTransferBytesOverhead += transferFeeConfig.destBytesOverhead == 0
-        ? uint32(Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES)
-        : transferFeeConfig.destBytesOverhead;
+      tokenTransferBytesOverhead += transferFeeConfig.destBytesOverhead;
 
       // Bps fees should be kept within range of [minFeeUSD, maxFeeUSD].
       // Convert USD values with 2 decimals to 18 decimals.

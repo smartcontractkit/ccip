@@ -618,7 +618,8 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
       if (!transferFeeConfig.isEnabled) {
         tokenTransferFeeUSDWei += uint256(s_dynamicConfig.defaultTokenFeeUSDCents) * 1e16;
         tokenTransferGas += s_dynamicConfig.defaultTokenDestGasOverhead;
-        tokenTransferBytesOverhead += s_dynamicConfig.defaultTokenDestBytesOverhead;
+        tokenTransferBytesOverhead +=
+          s_dynamicConfig.defaultTokenDestBytesOverhead + uint32(Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES);
         continue;
       }
 
@@ -639,9 +640,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
       }
 
       tokenTransferGas += transferFeeConfig.destGasOverhead;
-      tokenTransferBytesOverhead += transferFeeConfig.destBytesOverhead == 0
-        ? uint32(Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES)
-        : transferFeeConfig.destBytesOverhead;
+      tokenTransferBytesOverhead += transferFeeConfig.destBytesOverhead;
 
       // Bps fees should be kept within range of [minFeeUSD, maxFeeUSD].
       // Convert USD values with 2 decimals to 18 decimals.
