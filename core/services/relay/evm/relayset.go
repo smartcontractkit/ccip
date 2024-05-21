@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
-	"github.com/ethereum/go-ethereum/common"
+	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
@@ -13,16 +13,21 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/x_internal/ccipcalc"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/x_internal/ccipdata"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/x_internal/ccipdata/ccipdataprovider"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/x_internal/ccipdata/factory"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/x_internal/pricegetter"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/x_internal/rpclib"
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+	"go.uber.org/multierr"
 	"golang.org/x/exp/maps"
 	"math/big"
 	"strconv"
+	"sync"
+	"time"
 
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config" //TODO: does this break the dependency graph?
 )
@@ -149,6 +154,8 @@ func (rs *CCIPRelayerSet) NewCCIPCommitProvider_V2(ctx context.Context, rargs co
 		destGasEstimator:   rs.destRelayer.chain.GasEstimator(),
 		sourceMaxGasPrice:  *rs.sourceRelayer.chain.Config().EVM().GasEstimator().PriceMax().ToInt(),
 		destMaxGasPrice:    *rs.destRelayer.chain.Config().EVM().GasEstimator().PriceMax().ToInt(),
+		sourceCodec:        rs.sourceRelayer.codec,
+		sourceChainReader:  rs.sourceRelayer.chainReader,
 		priceGetterClients: priceGetterClients,
 		priceGetterConfig:  *pluginConfig.PriceGetterConfig,
 	}, nil
@@ -168,9 +175,13 @@ type EVMCCIPCommitProviderImpl_V2 struct {
 	destGasEstimator   gas.EvmFeeEstimator
 	sourceMaxGasPrice  big.Int
 	destMaxGasPrice    big.Int
+	sourceCodec        commontypes.Codec
+	sourceChainReader  commontypes.ChainReader
 	priceGetterClients map[uint64]pricegetter.DynamicPriceGetterClient
 	priceGetterConfig  config.DynamicPriceGetterConfig
 	versionFinder      factory.VersionFinder
+	s                  services.Service
+	cp                 commontypes.ConfigProvider
 }
 
 func (E EVMCCIPCommitProviderImpl_V2) Name() string {
@@ -178,48 +189,84 @@ func (E EVMCCIPCommitProviderImpl_V2) Name() string {
 }
 
 func (E EVMCCIPCommitProviderImpl_V2) Start(ctx context.Context) error {
-	//TODO implement me
-	panic("implement me")
+	err := E.s.Start(ctx)
+	if err != nil {
+		return err
+	}
+
+	var errMu sync.Mutex
+	var wg sync.WaitGroup
+	// Replay in parallel if both requested.
+	if E.sourceStartBlock != 0 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			s := time.Now()
+			E.lggr.Infow("start replaying src chain", "fromBlock", E.sourceStartBlock)
+			srcReplayErr := E.sourceLP.Replay(ctx, int64(E.sourceStartBlock))
+			errMu.Lock()
+			err = multierr.Combine(err, srcReplayErr)
+			errMu.Unlock()
+			E.lggr.Infow("finished replaying src chain", "time", time.Since(s))
+		}()
+	}
+	if E.destStartBlock != 0 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			s := time.Now()
+			E.lggr.Infow("start replaying dst chain", "fromBlock", E.destStartBlock)
+			dstReplayErr := E.destLP.Replay(ctx, int64(E.destStartBlock))
+			errMu.Lock()
+			err = multierr.Combine(err, dstReplayErr)
+			errMu.Unlock()
+			E.lggr.Infow("finished replaying dst chain", "time", time.Since(s))
+		}()
+	}
+	wg.Wait()
+	if err != nil {
+		E.lggr.Criticalw("unexpected error replaying, continuing plugin boot without all the logs backfilled", "err", err)
+	}
+	if err := ctx.Err(); err != nil {
+		E.lggr.Errorw("context already cancelled", "err", err)
+		return err
+	}
+	return nil
 }
 
 func (E EVMCCIPCommitProviderImpl_V2) Close() error {
-	//TODO implement me
-	panic("implement me")
+	return E.s.Close()
 }
 
 func (E EVMCCIPCommitProviderImpl_V2) Ready() error {
-	//TODO implement me
-	panic("implement me")
+	return E.s.Ready()
 }
 
 func (E EVMCCIPCommitProviderImpl_V2) HealthReport() map[string]error {
-	//TODO implement me
-	panic("implement me")
+	report := map[string]error{}
+	services.CopyHealth(report, E.cp.HealthReport())
+	services.CopyHealth(report, E.s.HealthReport())
+	return report
 }
 
 func (E EVMCCIPCommitProviderImpl_V2) OffchainConfigDigester() ocrtypes.OffchainConfigDigester {
-	//TODO implement me
-	panic("implement me")
+	return E.cp.OffchainConfigDigester()
 }
 
 func (E EVMCCIPCommitProviderImpl_V2) ContractConfigTracker() ocrtypes.ContractConfigTracker {
-	//TODO implement me
-	panic("implement me")
+	return E.cp.ContractConfigTracker()
 }
 
 func (E EVMCCIPCommitProviderImpl_V2) ContractTransmitter() ocrtypes.ContractTransmitter {
-	//TODO implement me
-	panic("implement me")
+	E.source
 }
 
 func (E EVMCCIPCommitProviderImpl_V2) ChainReader() commontypes.ChainReader {
-	//TODO implement me
-	panic("implement me")
+	return E.sourceChainReader
 }
 
 func (E EVMCCIPCommitProviderImpl_V2) Codec() commontypes.Codec {
-	//TODO implement me
-	panic("implement me")
+	return E.sourceCodec
 }
 
 func (E EVMCCIPCommitProviderImpl_V2) NewCommitStoreReader(ctx context.Context, _ cciptypes.Address) (commitStoreReader cciptypes.CommitStoreReader, err error) {
@@ -244,9 +291,10 @@ func (E EVMCCIPCommitProviderImpl_V2) NewPriceGetter(ctx context.Context) (price
 	return
 }
 
-func (E EVMCCIPCommitProviderImpl_V2) NewPriceRegistryReader(ctx context.Context, addr cciptypes.Address) (cciptypes.PriceRegistryReader, error) {
-	//TODO implement me
-	panic("implement me")
+func (E EVMCCIPCommitProviderImpl_V2) NewPriceRegistryReader(ctx context.Context, addr cciptypes.Address) (priceRegistryReader cciptypes.PriceRegistryReader, err error) {
+	destPriceRegistry := ccipdataprovider.NewEvmPriceRegistry(E.destLP, E.destClient, E.lggr, ccip.CommitPluginLabel)
+	priceRegistryReader, err = destPriceRegistry.NewPriceRegistryReader(ctx, addr)
+	return
 }
 
 func (E EVMCCIPCommitProviderImpl_V2) SourceNativeToken(ctx context.Context, sourceRouterAddr cciptypes.Address) (cciptypes.Address, error) {
@@ -304,19 +352,4 @@ func (E EVMCCIPCommitProviderImpl_V2) NewOffRampReaders(ctx context.Context, des
 		offRampReaders = append(offRampReaders, d)
 	}
 	return
-}
-
-func (E EVMCCIPCommitProviderImpl_V2) GetStaticConfig(ctx context.Context, addr cciptypes.Address) (cciptypes.CommitStoreStaticConfig, error) {
-	commitStoreAddress := common.HexToAddress(string(addr))
-	staticConfig, err := ccipdata.FetchCommitStoreStaticConfig(commitStoreAddress, E.destClient)
-	if err != nil {
-		return cciptypes.CommitStoreStaticConfig{}, fmt.Errorf("get commit store static config: %w", err)
-	}
-
-	return cciptypes.CommitStoreStaticConfig{
-		ChainSelector:       staticConfig.ChainSelector,
-		SourceChainSelector: staticConfig.SourceChainSelector,
-		OnRamp:              cciptypes.Address(staticConfig.OnRamp.String()),
-		ArmProxy:            cciptypes.Address(staticConfig.ArmProxy.String()),
-	}, nil
 }
