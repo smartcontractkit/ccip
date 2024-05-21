@@ -1763,7 +1763,7 @@ func (offRamp *OffRamp) SetOCR2Config(
 			offchainConfig,
 		)
 		if err != nil {
-			return fmt.Errorf("failed to set OCR2 config: %w", err)
+			return fmt.Errorf("failed to set latest OCR2 config: %w", err)
 		}
 		return offRamp.client.ProcessTransaction(tx)
 	}
@@ -1778,7 +1778,7 @@ func (offRamp *OffRamp) SetOCR2Config(
 			offchainConfig,
 		)
 		if err != nil {
-			return fmt.Errorf("failed to set OCR2 config: %w", err)
+			return fmt.Errorf("failed to set 1.2 OCR2 config: %w", err)
 		}
 		return offRamp.client.ProcessTransaction(tx)
 	}
