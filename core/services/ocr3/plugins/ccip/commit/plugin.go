@@ -129,17 +129,14 @@ func (p *Plugin) Observation(ctx context.Context, outctx ocr3types.OutcomeContex
 		}
 	}
 
-	// TODO: The code below is related to gas prices and should be cleaned up in relevant PRs...
-	knownSourceChainsSlice := p.knownSourceChains.ToSlice()
-	sort.Slice(knownSourceChainsSlice, func(i, j int) bool { return knownSourceChainsSlice[i] < knownSourceChainsSlice[j] })
+	readableSourceChainsSlice := p.readableChains.ToSlice()
+	sort.Slice(readableSourceChainsSlice, func(i, j int) bool { return readableSourceChainsSlice[i] < readableSourceChainsSlice[j] })
 
 	// Find the gas prices for each chain.
 	var gasPrices []model.GasPriceChain
-	if p.cfg.GasPricesObserver {
-		gasPrices, err = observeGasPrices(ctx, p.ccipReader, knownSourceChainsSlice)
-		if err != nil {
-			return types.Observation{}, fmt.Errorf("observe gas prices: %w", err)
-		}
+	gasPrices, err = observeGasPrices(ctx, p.ccipReader, readableSourceChainsSlice)
+	if err != nil {
+		return types.Observation{}, fmt.Errorf("observe gas prices: %w", err)
 	}
 
 	return model.NewCommitPluginObservation(newMsgs, gasPrices, tokenPrices, maxSeqNumsPerChain).Encode()
@@ -217,7 +214,12 @@ func (p *Plugin) Outcome(_ ocr3types.OutcomeContext, _ types.Query, aos []types.
 		return ocr3types.Outcome{}, fmt.Errorf("token prices consensus: %w", err)
 	}
 
-	return model.NewCommitPluginOutcome(maxSeqNums, merkleRoots, tokenPrices).Encode()
+	gasPrices, err := gasPricesConsensus(decodedObservations, p.cfg.FChain[p.cfg.DestChain])
+	if err != nil {
+		return ocr3types.Outcome{}, fmt.Errorf("gas prices consensus: %w", err)
+	}
+
+	return model.NewCommitPluginOutcome(maxSeqNums, merkleRoots, tokenPrices, gasPrices).Encode()
 }
 
 func (p *Plugin) Reports(seqNr uint64, outcome ocr3types.Outcome) ([]ocr3types.ReportWithInfo[[]byte], error) {
@@ -233,7 +235,7 @@ func (p *Plugin) Reports(seqNr uint64, outcome ocr3types.Outcome) ([]ocr3types.R
 		and only create a report if outc.MerkleRoots is non-empty OR gas/token price timer has expired
 	*/
 
-	rep := model.NewCommitPluginReport(outc.MerkleRoots, outc.TokenPrices)
+	rep := model.NewCommitPluginReport(outc.MerkleRoots, outc.TokenPrices, outc.GasPrices)
 
 	encodedReport, err := p.reportCodec.Encode(context.Background(), rep)
 	if err != nil {
@@ -271,7 +273,9 @@ func (p *Plugin) ShouldTransmitAcceptedReport(ctx context.Context, u uint64, r o
 
 	p.lggr.Debugw("transmitting report",
 		"roots", len(decodedReport.MerkleRoots),
-		"tokenPriceUpdates", len(decodedReport.TokenPriceUpdates))
+		"tokenPriceUpdates", len(decodedReport.PriceUpdates.TokenPriceUpdates),
+		"gasPriceUpdates", len(decodedReport.PriceUpdates.GasPriceUpdates),
+	)
 
 	// todo: if report is stale -> do not transmit
 	return true, nil

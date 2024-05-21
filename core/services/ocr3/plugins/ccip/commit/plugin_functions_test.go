@@ -278,7 +278,7 @@ func Test_observeGasPrices(t *testing.T) {
 		mockReader := mocks.NewCCIPReader()
 		chains := []model.ChainSelector{1, 2, 3}
 		mockGasPrices := []model.GasPrice{big.NewInt(10), big.NewInt(20)} // return 2 prices for 3 chains
-		mockReader.On("GasPrices", chains).Return(mockGasPrices, nil)
+		mockReader.On("GasPrices", ctx, chains).Return(mockGasPrices, nil)
 		_, err := observeGasPrices(ctx, mockReader, chains)
 		assert.Error(t, err)
 	})

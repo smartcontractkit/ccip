@@ -30,9 +30,6 @@ type CommitPluginConfig struct {
 	// TokenPricesObserver indicates that the node can observe token prices.
 	TokenPricesObserver bool
 
-	// GasPricesObserver indicates that the node can observe gas prices.
-	GasPricesObserver bool
-
 	NewMsgScanDuration  time.Duration
 	NewMsgScanLimit     int
 	NewMsgScanBatchSize int
