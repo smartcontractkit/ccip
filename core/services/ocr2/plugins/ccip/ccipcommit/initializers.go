@@ -187,13 +187,13 @@ func NewChainAgnosticBackFilledOracle(lggr logger.Logger, srcProvider commontype
 }
 
 type ChainAgnosticBackFilledOracle struct {
-	srcProvider commontypes.CCIPCommitProvider
-	dstProvider commontypes.CCIPCommitProvider
-	//srcStartBlock, dstStartBlock uint64
-	oracle        job.ServiceCtx
-	lggr          logger.Logger
-	oracleStarted atomic.Bool
-	cancelFn      context.CancelFunc
+	srcProvider                  commontypes.CCIPCommitProvider
+	dstProvider                  commontypes.CCIPCommitProvider
+	srcStartBlock, dstStartBlock uint64
+	oracle                       job.ServiceCtx
+	lggr                         logger.Logger
+	oracleStarted                atomic.Bool
+	cancelFn                     context.CancelFunc
 }
 
 func (r *ChainAgnosticBackFilledOracle) Start(ctx context.Context) error {

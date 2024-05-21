@@ -27,26 +27,34 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config" //TODO: does this break the dependency graph?
 )
 
-type RelayID struct {
-	Network string // TODO: consider removing?
-	ChainID string
-}
-
 type RelayerSet interface {
-	Get(RelayID) (Relayer, error)
-	GetAll() (map[RelayID]Relayer, error)
+	Get(ctx context.Context, relayID commontypes.RelayID) (Relayer, error)
+
+	// List lists the relayers corresponding to `...types.RelayID`
+	// returning all relayers if len(...types.RelayID) == 0.
+	List(ctx context.Context, relayIDs ...commontypes.RelayID) (map[commontypes.RelayID]Relayer, error)
 }
 
 type CCIPRelayerSet struct {
-	relayerMap    map[RelayID]Relayer
+	relayerMap    map[commontypes.RelayID]Relayer
 	sourceRelayer Relayer
 	destRelayer   Relayer
+	lggr          logger.Logger
 }
 
-func chainIDToRelayerID(rs RelayerSet, chainID string) (RelayID, error) {
-	relayerMap, err := rs.GetAll()
+func NewCCIPRelayerSet(relayerMap map[commontypes.RelayID]Relayer, sourceRelayer Relayer, destRelayer Relayer, lggr logger.Logger) *CCIPRelayerSet {
+	return &CCIPRelayerSet{
+		relayerMap:    relayerMap,
+		sourceRelayer: sourceRelayer,
+		destRelayer:   destRelayer,
+		lggr:          lggr,
+	}
+}
+
+func chainIDToRelayerID(ctx context.Context, rs RelayerSet, chainID string) (commontypes.RelayID, error) {
+	relayerMap, err := rs.List(ctx)
 	if err != nil {
-		return RelayID{}, err
+		return commontypes.RelayID{}, err
 	}
 
 	rids := maps.Keys(relayerMap)
@@ -56,19 +64,40 @@ func chainIDToRelayerID(rs RelayerSet, chainID string) (RelayID, error) {
 		}
 	}
 
-	return RelayID{}, fmt.Errorf("chain ID '%s' not found", chainID)
+	return commontypes.RelayID{}, fmt.Errorf("chain ID '%s' not found", chainID)
 
 }
 
-func (rs *CCIPRelayerSet) Get(relayID RelayID) (Relayer, error) {
+func (rs *CCIPRelayerSet) Get(ctx context.Context, relayID commontypes.RelayID) (Relayer, error) {
 	return rs.relayerMap[relayID], nil
 }
 
-func (rs *CCIPRelayerSet) GetAll() (map[RelayID]Relayer, error) {
-	return rs.relayerMap, nil
+func (rs *CCIPRelayerSet) List(ctx context.Context, relayIDs ...commontypes.RelayID) (map[commontypes.RelayID]Relayer, error) {
+	if len(relayIDs) == 0 {
+		return rs.relayerMap, nil
+	}
+
+	subset := make(map[commontypes.RelayID]Relayer)
+	// subset relayer ids
+	for _, srid := range relayIDs {
+		subset[srid] = Relayer{}
+	}
+
+	// target relayer ids
+	for trid := range rs.relayerMap {
+		_, ok := subset[trid]
+		if ok {
+			subset[trid] = rs.relayerMap[trid]
+		}
+	}
+
+	return subset, nil
 }
 
-func (rs *CCIPRelayerSet) NewCCIPCommitProvider_V2(context context.Context, rargs commontypes.RelayArgs, pargs commontypes.PluginArgs) (commontypes.CCIPCommitProvider, error) {
+func (rs *CCIPRelayerSet) NewCCIPCommitProvider_V2(ctx context.Context, rargs commontypes.RelayArgs, pargs commontypes.PluginArgs) (commontypes.CCIPCommitProvider, error) {
+	lggr := rs.lggr
+	commitStoreAddress := rargs.ContractID
+
 	var pluginConfig ccipconfig.CommitPluginJobSpecConfig
 	err := json.Unmarshal(pargs.PluginConfig, &pluginConfig)
 	if err != nil {
@@ -76,20 +105,22 @@ func (rs *CCIPRelayerSet) NewCCIPCommitProvider_V2(context context.Context, rarg
 	}
 
 	offRampAddress := string(pluginConfig.OffRamp)
+	sourceStartBlock := pluginConfig.SourceStartBlock
+	destStartBlock := pluginConfig.DestStartBlock
 
 	// Build price getter clients for all chains specified in the aggregator configurations.
 	// Some lanes (e.g. Wemix/Kroma) requires other clients than source and destination, since they use feeds from other chains.
-	// TODO: Double check i've wired this in from Delegate
+	// TODO: Double check i've wired this in from Delegate (i.e. creating the RelayerSet with all the necessary relayers)
 	priceGetterClients := map[uint64]pricegetter.DynamicPriceGetterClient{}
 	for _, aggCfg := range pluginConfig.PriceGetterConfig.AggregatorPrices {
 		chainID := aggCfg.ChainID
 		// Retrieve the chain.
-		aggRelayerID, err2 := chainIDToRelayerID(rs, strconv.FormatUint(chainID, 10))
+		aggRelayerID, err2 := chainIDToRelayerID(ctx, rs, strconv.FormatUint(chainID, 10))
 		if err2 != nil {
 			return nil, fmt.Errorf("retrieving chain for chainID %d: %w", chainID, err2)
 		}
 
-		aggRelayer, err2 := rs.Get(aggRelayerID)
+		aggRelayer, err2 := rs.Get(ctx, aggRelayerID)
 		if err2 != nil {
 			return nil, fmt.Errorf("retrieving relayer for relayerID %v: %w", aggRelayerID, err2)
 		}
@@ -104,8 +135,20 @@ func (rs *CCIPRelayerSet) NewCCIPCommitProvider_V2(context context.Context, rarg
 		priceGetterClients[chainID] = pricegetter.NewDynamicPriceGetterClient(caller)
 	}
 
-	return &EVMCCIPCommitProviderImpl_V2{
+	return EVMCCIPCommitProviderImpl_V2{
+		lggr:               lggr,
+		sourceLP:           rs.sourceRelayer.chain.LogPoller(),
+		destLP:             rs.destRelayer.chain.LogPoller(),
+		sourceStartBlock:   sourceStartBlock,
+		destStartBlock:     destStartBlock,
+		commitStoreAddress: commitStoreAddress,
 		offRampAddress:     offRampAddress,
+		sourceClient:       rs.sourceRelayer.chain.Client(),
+		destClient:         rs.destRelayer.chain.Client(),
+		sourceGasEstimator: rs.sourceRelayer.chain.GasEstimator(),
+		destGasEstimator:   rs.destRelayer.chain.GasEstimator(),
+		sourceMaxGasPrice:  *rs.sourceRelayer.chain.Config().EVM().GasEstimator().PriceMax().ToInt(),
+		destMaxGasPrice:    *rs.destRelayer.chain.Config().EVM().GasEstimator().PriceMax().ToInt(),
 		priceGetterClients: priceGetterClients,
 		priceGetterConfig:  *pluginConfig.PriceGetterConfig,
 	}, nil
@@ -117,9 +160,8 @@ type EVMCCIPCommitProviderImpl_V2 struct {
 	destLP             logpoller.LogPoller
 	sourceStartBlock   uint64
 	destStartBlock     uint64
-	commitStoreAddress common.Address
+	commitStoreAddress string
 	offRampAddress     string
-	new                bool
 	sourceClient       client.Client
 	destClient         client.Client
 	sourceGasEstimator gas.EvmFeeEstimator
@@ -180,8 +222,8 @@ func (E EVMCCIPCommitProviderImpl_V2) Codec() commontypes.Codec {
 	panic("implement me")
 }
 
-func (E EVMCCIPCommitProviderImpl_V2) NewCommitStoreReader(ctx context.Context, addr cciptypes.Address) (commitStoreReader cciptypes.CommitStoreReader, err error) {
-	commitStoreReader, err = factory.NewCommitStoreReader(E.lggr, E.versionFinder, addr, E.destClient, E.destLP, E.sourceGasEstimator, &E.sourceMaxGasPrice, nil)
+func (E EVMCCIPCommitProviderImpl_V2) NewCommitStoreReader(ctx context.Context, _ cciptypes.Address) (commitStoreReader cciptypes.CommitStoreReader, err error) {
+	commitStoreReader, err = factory.NewCommitStoreReader(E.lggr, E.versionFinder, cciptypes.Address(E.commitStoreAddress), E.destClient, E.destLP, E.sourceGasEstimator, &E.sourceMaxGasPrice, nil)
 	return
 }
 
@@ -190,9 +232,9 @@ func (E EVMCCIPCommitProviderImpl_V2) NewOffRampReader(ctx context.Context, offR
 	return
 }
 
-func (E EVMCCIPCommitProviderImpl_V2) NewOnRampReader(ctx context.Context, onRampAddress cciptypes.Address, cfg cciptypes.CommitStoreStaticConfig) (onRampReader cciptypes.OnRampReader, err error) {
+func (E EVMCCIPCommitProviderImpl_V2) NewOnRampReader(ctx context.Context, onRampAddress cciptypes.Address, sourceChainSelector uint64, destChainSelector uint64) (onRampReader cciptypes.OnRampReader, err error) {
 	versionFinder := factory.NewEvmVersionFinder()
-	onRampReader, err = factory.NewOnRampReader(E.lggr, versionFinder, cfg.SourceChainSelector, cfg.ChainSelector, onRampAddress, E.sourceLP, E.sourceClient, nil)
+	onRampReader, err = factory.NewOnRampReader(E.lggr, versionFinder, sourceChainSelector, destChainSelector, onRampAddress, E.sourceLP, E.sourceClient, nil)
 	return
 }
 
@@ -208,7 +250,7 @@ func (E EVMCCIPCommitProviderImpl_V2) NewPriceRegistryReader(ctx context.Context
 }
 
 func (E EVMCCIPCommitProviderImpl_V2) SourceNativeToken(ctx context.Context, sourceRouterAddr cciptypes.Address) (cciptypes.Address, error) {
-	sourceRouterAddrHex := ccipAddressToCCIPAddress(sourceRouterAddr)
+	sourceRouterAddrHex := sourceRouterAddr.ToCommonAddress()
 	sourceRouter, err := router.NewRouter(sourceRouterAddrHex, E.sourceClient)
 	if err != nil {
 		return "", err
@@ -218,15 +260,11 @@ func (E EVMCCIPCommitProviderImpl_V2) SourceNativeToken(ctx context.Context, sou
 		return "", err
 	}
 
-	return commonAddressToCCIPAddress(sourceNative)
+	return cciptypes.FromCommonAddress(sourceNative), nil
 }
 
-func (E EVMCCIPCommitProviderImpl_V2) NewOffRampReaders(ctx context.Context, offRampReader cciptypes.OffRampReader) (offRampReaders []cciptypes.OffRampReader, err error) {
+func (E EVMCCIPCommitProviderImpl_V2) NewOffRampReaders(ctx context.Context, destRouterAddr cciptypes.Address) (offRampReaders []cciptypes.OffRampReader, err error) {
 	// Look up all destination offRamps connected to the same router
-	destRouterAddr, err := offRampReader.GetRouter(ctx)
-	if err != nil {
-		return nil, err
-	}
 	destRouterEvmAddr, err := ccipcalc.GenericAddrToEvm(destRouterAddr)
 	if err != nil {
 		return nil, err
