@@ -6,7 +6,6 @@ import {IMultiCommitStore} from "../../interfaces/IMultiCommitStore.sol";
 import {IPool} from "../../interfaces/IPool.sol";
 
 import {CallWithExactGas} from "../../../shared/call/CallWithExactGas.sol";
-import {AggregateRateLimiter} from "../../AggregateRateLimiter.sol";
 import {RMN} from "../../RMN.sol";
 import {Router} from "../../Router.sol";
 import {Client} from "../../libraries/Client.sol";
@@ -88,7 +87,7 @@ contract EVM2EVMMultiOffRamp_constructor is EVM2EVMMultiOffRampSetup {
     vm.expectEmit();
     emit SourceChainConfigSet(SOURCE_CHAIN_SELECTOR_1 + 1, expectedSourceChainConfig2);
 
-    s_offRamp = new EVM2EVMMultiOffRampHelper(staticConfig, sourceChainConfigs, getInboundRateLimiterConfig());
+    s_offRamp = new EVM2EVMMultiOffRampHelper(staticConfig, sourceChainConfigs);
 
     s_offRamp.setOCR2Config(
       s_valid_signers, s_valid_transmitters, s_f, abi.encode(dynamicConfig), s_offchainConfigVersion, abi.encode("")
@@ -145,8 +144,7 @@ contract EVM2EVMMultiOffRamp_constructor is EVM2EVMMultiOffRampSetup {
         chainSelector: DEST_CHAIN_SELECTOR,
         rmnProxy: address(s_mockRMN)
       }),
-      sourceChainConfigs,
-      RateLimiter.Config({isEnabled: true, rate: 1e20, capacity: 1e20})
+      sourceChainConfigs
     );
   }
 }
@@ -264,7 +262,7 @@ contract EVM2EVMMultiOffRamp_metadataHash is EVM2EVMMultiOffRampSetup {
       new EVM2EVMMultiOffRamp.SourceChainConfigArgs[](0);
 
     staticConfig.chainSelector = destChainSelector;
-    s_offRamp = new EVM2EVMMultiOffRampHelper(staticConfig, sourceChainConfigs, getInboundRateLimiterConfig());
+    s_offRamp = new EVM2EVMMultiOffRampHelper(staticConfig, sourceChainConfigs);
 
     bytes32 h1 = s_offRamp.metadataHash(sourceChainSelector1, onRamp1);
     bytes32 h2 = s_offRamp.metadataHash(sourceChainSelector2, onRamp2);
@@ -2471,24 +2469,6 @@ contract EVM2EVMMultiOffRamp_releaseOrMintTokens is EVM2EVMMultiOffRampSetup {
     );
     vm.expectRevert();
     s_offRamp.releaseOrMintTokens(srcTokenAmounts, messageRouteChain3, encodedSourceTokenData, offchainTokenData);
-  }
-
-  function test_PriceNotFoundForToken_Reverts() public {
-    // Set token price to 0
-    s_priceRegistry.updatePrices(getSingleTokenPriceUpdateStruct(s_destFeeToken, 0));
-
-    Client.EVMTokenAmount[] memory srcTokenAmounts = getCastedSourceEVMTokenAmountsWithZeroAmounts();
-    uint256 amount1 = 100;
-    srcTokenAmounts[0].amount = amount1;
-
-    bytes[] memory offchainTokenData = new bytes[](srcTokenAmounts.length);
-    offchainTokenData[0] = abi.encode(0x12345678);
-
-    bytes[] memory sourceTokenData = _getDefaultSourceTokenData(srcTokenAmounts);
-
-    vm.expectRevert(abi.encodeWithSelector(AggregateRateLimiter.PriceNotFoundForToken.selector, s_destFeeToken));
-
-    s_offRamp.releaseOrMintTokens(srcTokenAmounts, MESSAGE_ROUTE, sourceTokenData, offchainTokenData);
   }
 
   /// forge-config: default.fuzz.runs = 32

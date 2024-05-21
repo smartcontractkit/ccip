@@ -77,8 +77,7 @@ contract EVM2EVMMultiOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSet
         chainSelector: DEST_CHAIN_SELECTOR,
         rmnProxy: address(s_mockRMN)
       }),
-      sourceChainConfigs,
-      getInboundRateLimiterConfig()
+      sourceChainConfigs
     );
     s_offRamp.setOCR2Config(
       s_valid_signers,
@@ -88,13 +87,6 @@ contract EVM2EVMMultiOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSet
       s_offchainConfigVersion,
       abi.encode("")
     );
-
-    EVM2EVMMultiOffRamp.RateLimitToken[] memory tokensToAdd =
-      new EVM2EVMMultiOffRamp.RateLimitToken[](s_sourceTokens.length);
-    for (uint256 i = 0; i < s_sourceTokens.length; ++i) {
-      tokensToAdd[i] = EVM2EVMMultiOffRamp.RateLimitToken({sourceToken: s_sourceTokens[i], destToken: s_destTokens[i]});
-    }
-    s_offRamp.updateRateLimitTokens(new EVM2EVMMultiOffRamp.RateLimitToken[](0), tokensToAdd);
   }
 
   // TODO: function can be made common across OffRampSetup and MultiOffRampSetup
@@ -222,7 +214,8 @@ contract EVM2EVMMultiOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSet
       priceRegistry: priceRegistry,
       maxNumberOfTokensPerMsg: MAX_TOKENS_LENGTH,
       maxDataBytes: MAX_DATA_SIZE,
-      maxPoolReleaseOrMintGas: MAX_TOKEN_POOL_RELEASE_OR_MINT_GAS
+      maxPoolReleaseOrMintGas: MAX_TOKEN_POOL_RELEASE_OR_MINT_GAS,
+      messageValidator: address(0)
     });
   }
 
