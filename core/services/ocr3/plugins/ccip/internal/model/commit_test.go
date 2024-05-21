@@ -42,6 +42,10 @@ func TestCommitPluginOutcome_EncodeAndDecode(t *testing.T) {
 			NewTokenPrice("0x123", big.NewInt(1234)),
 			NewTokenPrice("0x125", big.NewInt(0).Mul(big.NewInt(999999999999), big.NewInt(999999999999))),
 		},
+		[]GasPriceChain{
+			NewGasPriceChain(big.NewInt(1234), ChainSelector(1)),
+			NewGasPriceChain(big.NewInt(0).Mul(big.NewInt(999999999999), big.NewInt(999999999999)), ChainSelector(2)),
+		},
 	)
 
 	b, err := o.Encode()
@@ -57,18 +61,18 @@ func TestCommitPluginOutcome_EncodeAndDecode(t *testing.T) {
 
 func TestCommitPluginReport(t *testing.T) {
 	t.Run("is empty", func(t *testing.T) {
-		r := NewCommitPluginReport(nil, nil)
+		r := NewCommitPluginReport(nil, nil, nil)
 		assert.True(t, r.IsEmpty())
 	})
 
 	t.Run("is not empty", func(t *testing.T) {
-		r := NewCommitPluginReport(make([]MerkleRootChain, 1), nil)
+		r := NewCommitPluginReport(make([]MerkleRootChain, 1), nil, nil)
 		assert.False(t, r.IsEmpty())
 
-		r = NewCommitPluginReport(nil, make([]TokenPrice, 1))
+		r = NewCommitPluginReport(nil, make([]TokenPrice, 1), make([]GasPriceChain, 1))
 		assert.False(t, r.IsEmpty())
 
-		r = NewCommitPluginReport(make([]MerkleRootChain, 1), make([]TokenPrice, 1))
+		r = NewCommitPluginReport(make([]MerkleRootChain, 1), make([]TokenPrice, 1), make([]GasPriceChain, 1))
 		assert.False(t, r.IsEmpty())
 	})
 }
