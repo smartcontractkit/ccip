@@ -259,7 +259,7 @@ func newRebalancerConfigProvider(
 		if err2 != nil {
 			return nil, nil, nil, nil, nil, fmt.Errorf("failed to get legacy chain chain %d: %w", chain.EvmChainID, err2)
 		}
-		rebalancerAddress, err2 := liquidityGraph.GetLiquidityManagerAddress(networkID)
+		lmAddress, err2 := liquidityGraph.GetLiquidityManagerAddress(networkID)
 		if err2 != nil {
 			return nil, nil, nil, nil, nil, fmt.Errorf("failed to get rebalancer address for network %d: %w", networkID, err2)
 		}
@@ -275,7 +275,7 @@ func newRebalancerConfigProvider(
 			networkID,
 			legacyChain.LogPoller(),
 			legacyChain.Client(),
-			rebalancerAddress,
+			lmAddress,
 			bridgeAdapters,
 		))
 	}
