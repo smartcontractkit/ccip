@@ -109,6 +109,7 @@ func (e *evmDiscoverer) getVertexData(ctx context.Context, v graph.Vertex) (grap
 	if err != nil {
 		return graph.Data{}, nil, fmt.Errorf("get liquidity: %w", err)
 	}
+	e.lggr.Debugw("Got liquidity", "liquidity", liquidity, "selector", selector, "lmAddress", lmAddress)
 	token, err := lm.ILocalToken(&bind.CallOpts{
 		Context: ctx,
 	})
