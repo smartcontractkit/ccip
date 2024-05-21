@@ -2,4 +2,4 @@
 "ccip": minor
 ---
 
-A factory to provide access to the internal HashLeaf functions.
+#added A factory to provide access to the internal HashLeaf functions.
