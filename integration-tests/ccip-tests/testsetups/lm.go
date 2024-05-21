@@ -59,6 +59,7 @@ type LMTestSetupOutputs struct {
 	LMModules map[int64]*actions.LMCommon
 }
 
+// TODO - Copied over from ccip tests as such. Refactor and remove unused code
 func (o *LMTestSetupOutputs) CreateLMEnvironment(
 	lggr zerolog.Logger,
 	envName string,
@@ -599,6 +600,7 @@ func (o *LMTestSetupOutputs) AddJobs(chainId int64, lggr zerolog.Logger) error {
 	// Add LM jobs
 	donNodes := clNodesWithKeys[1:]
 
+	//TODO: Replace this with proper LM job config generation
 	for _, node := range donNodes {
 		lmPluginConf := job.JSONConfig{
 			"closePluginTimeoutSec":   10,
@@ -676,6 +678,7 @@ func LMDefaultTestSetup(
 		}
 	}
 
+	//TODO: Refactor this to detect if the chain is L1 or L2 based on a config
 	i := 0
 	for _, net := range testConfig.AllNetworks {
 		chain := chainByChainID[net.ChainID]
