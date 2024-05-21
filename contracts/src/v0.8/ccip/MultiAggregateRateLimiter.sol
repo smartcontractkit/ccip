@@ -5,41 +5,49 @@ import {IPriceRegistry} from "./interfaces/IPriceRegistry.sol";
 
 import {OwnerIsCreator} from "./../shared/access/OwnerIsCreator.sol";
 import {Client} from "./libraries/Client.sol";
-import {RateLimiter} from "./libraries/RateLimiter.sol";
+import {RateLimiterNoEvents} from "./libraries/RateLimiterNoEvents.sol";
 import {USDPriceWith18Decimals} from "./libraries/USDPriceWith18Decimals.sol";
 
 /// @notice The aggregate rate limiter is a wrapper of the token bucket rate limiter
 /// which permits rate limiting based on the aggregate value of a group of
 /// token transfers, using a price registry to convert to a numeraire asset (e.g. USD).
 contract MultiAggregateRateLimiter is OwnerIsCreator {
-  using RateLimiter for RateLimiter.TokenBucket;
+  using RateLimiterNoEvents for RateLimiterNoEvents.TokenBucket;
   using USDPriceWith18Decimals for uint224;
 
   error PriceNotFoundForToken(address token);
+  error UpdateLengthMismatch();
 
+  event RateLimiterConfigUpdated(uint64 indexed chainSelector, RateLimiterNoEvents.Config config);
+  event RateLimiterTokensConsumed(uint64 indexed chainSelector, uint256 tokens);
   event AdminSet(address newAdmin);
 
   // The address of the token limit admin that has the same permissions as the owner.
   address internal s_admin;
 
-  // The token bucket object that contains the bucket state.
-  RateLimiter.TokenBucket private s_rateLimiter;
+  // Rate limiter token bucket states per chain
+  mapping(uint64 chainSelector => RateLimiterNoEvents.TokenBucket rateLimiter) s_rateLimitersByChainSelector;
 
-  /// @param config The RateLimiter.Config containing the capacity and refill rate
-  /// of the bucket, plus the admin address.
-  constructor(RateLimiter.Config memory config) {
-    s_rateLimiter = RateLimiter.TokenBucket({
-      rate: config.rate,
-      capacity: config.capacity,
-      tokens: config.capacity,
-      lastUpdated: uint32(block.timestamp),
-      isEnabled: config.isEnabled
-    });
+  /// @notice A collection of rate limiter configuration updates
+  struct RateLimiterConfigUpdates {
+    uint64[] chainSelectors;
+    RateLimiterNoEvents.Config[] rateLimiterConfigs;
+  }
+
+  /// @param rateLimiterConfigs The RateLimiterNoEvents.Configs per chain containing the capacity and refill rate
+  /// of the bucket
+  /// @param admin the admin address to set
+  constructor(RateLimiterConfigUpdates memory rateLimiterConfigs, address admin) {
+    _applyRateLimiterConfigUpdates(rateLimiterConfigs);
+    _setAdmin(admin);
   }
 
   /// @notice Consumes value from the rate limiter bucket based on the token value given.
-  function _rateLimitValue(uint256 value) internal {
-    s_rateLimiter._consume(value, address(0));
+  /// @param chainSelector chain selector to apply rate limit to
+  /// @param value consumed value
+  function _rateLimitValue(uint64 chainSelector, uint256 value) internal {
+    s_rateLimitersByChainSelector[chainSelector]._consume(value, address(0));
+    emit RateLimiterTokensConsumed(chainSelector, value);
   }
 
   function _getTokenValue(
@@ -54,16 +62,48 @@ contract MultiAggregateRateLimiter is OwnerIsCreator {
   }
 
   /// @notice Gets the token bucket with its values for the block it was requested at.
+  /// @param chainSelector chain selector to retrieve state for
   /// @return The token bucket.
-  function currentRateLimiterState() external view returns (RateLimiter.TokenBucket memory) {
-    return s_rateLimiter._currentTokenBucketState();
+  function currentRateLimiterState(uint64 chainSelector) external view returns (RateLimiterNoEvents.TokenBucket memory) {
+    return s_rateLimitersByChainSelector[chainSelector]._currentTokenBucketState();
   }
 
-  /// @notice Sets the rate limited config.
-  /// @param config The new rate limiter config.
-  /// @dev should only be callable by the owner or token limit admin.
-  function setRateLimiterConfig(RateLimiter.Config memory config) external onlyAdminOrOwner {
-    s_rateLimiter._setTokenBucketConfig(config);
+  /// @notice Applies the provided rate limiter config updates.
+  /// @param rateLimiterUpdates Rate limiter updates
+  /// @dev should only be callable by the owner or token limit admin
+  function applyRateLimiterConfigUpdates(RateLimiterConfigUpdates memory rateLimiterUpdates) external onlyAdminOrOwner {
+    _applyRateLimiterConfigUpdates(rateLimiterUpdates);
+  }
+
+  /// @notice Applies the provided rate limiter config updates.
+  /// @param rateLimiterUpdates Rate limiter updates
+  function _applyRateLimiterConfigUpdates(RateLimiterConfigUpdates memory rateLimiterUpdates) internal {
+    uint256 updateLength = rateLimiterUpdates.chainSelectors.length;
+    if (updateLength != rateLimiterUpdates.rateLimiterConfigs.length) {
+      revert UpdateLengthMismatch();
+    }
+
+    for (uint256 i = 0; i < updateLength; ++i) {
+      RateLimiterNoEvents.Config memory configUpdate = rateLimiterUpdates.rateLimiterConfigs[i];
+      uint64 chainSelector = rateLimiterUpdates.chainSelectors[i];
+
+      RateLimiterNoEvents.TokenBucket memory tokenBucket = s_rateLimitersByChainSelector[chainSelector];
+      uint32 lastUpdated = tokenBucket.lastUpdated;
+
+      if (lastUpdated == 0) {
+        // Token bucket needs to be newly added
+        s_rateLimitersByChainSelector[chainSelector] = RateLimiterNoEvents.TokenBucket({
+          rate: configUpdate.rate,
+          capacity: configUpdate.capacity,
+          tokens: configUpdate.capacity,
+          lastUpdated: uint32(block.timestamp),
+          isEnabled: configUpdate.isEnabled
+        });
+      } else {
+        s_rateLimitersByChainSelector[chainSelector]._setTokenBucketConfig(configUpdate);
+      }
+      emit RateLimiterConfigUpdated(chainSelector, configUpdate);
+    }
   }
 
   // ================================================================
@@ -80,6 +120,13 @@ contract MultiAggregateRateLimiter is OwnerIsCreator {
   /// @param newAdmin the address of the new admin.
   /// @dev setting this to address(0) indicates there is no active admin.
   function setAdmin(address newAdmin) external onlyAdminOrOwner {
+    _setAdmin(newAdmin);
+  }
+
+  /// @notice Sets the token limit admin address.
+  /// @param newAdmin the address of the new admin.
+  /// @dev setting this to address(0) indicates there is no active admin.
+  function _setAdmin(address newAdmin) internal {
     s_admin = newAdmin;
     emit AdminSet(newAdmin);
   }
@@ -87,7 +134,7 @@ contract MultiAggregateRateLimiter is OwnerIsCreator {
   /// @notice a modifier that allows the owner or the s_tokenLimitAdmin call the functions
   /// it is applied to.
   modifier onlyAdminOrOwner() {
-    if (msg.sender != owner() && msg.sender != s_admin) revert RateLimiter.OnlyCallableByAdminOrOwner();
+    if (msg.sender != owner() && msg.sender != s_admin) revert RateLimiterNoEvents.OnlyCallableByAdminOrOwner();
     _;
   }
 }
