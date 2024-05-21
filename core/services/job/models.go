@@ -48,6 +48,7 @@ const (
 	VRF                     Type = (Type)(pipeline.VRFJobType)
 	Webhook                 Type = (Type)(pipeline.WebhookJobType)
 	Workflow                Type = (Type)(pipeline.WorkflowJobType)
+	CCIP                    Type = (Type)(pipeline.CCIPJobType)
 )
 
 //revive:disable:redefines-builtin-id
@@ -166,6 +167,8 @@ type Job struct {
 	PipelineSpec                  *pipeline.Spec
 	WorkflowSpecID                *int32
 	WorkflowSpec                  *WorkflowSpec
+	CCIPID                        *int32
+	CCIPSpec                      *CCIPSpec
 	JobSpecErrors                 []SpecError
 	Type                          Type          `toml:"type"`
 	SchemaVersion                 uint32        `toml:"schemaVersion"`
@@ -839,6 +842,24 @@ type LiquidityBalancerSpec struct {
 	ID int32
 
 	LiquidityBalancerConfig string `toml:"liquidityBalancerConfig" db:"liquidity_balancer_config"`
+}
+
+// This spec represents a multi-OCR instance CCIPv2 job.
+type CCIPSpec struct {
+	ID int32 `toml:"-"`
+	// CCIP Configuration for all relays i.e. chain reader/writer configuration.
+	RelayConfig  JSONConfig `toml:"relayConfig"`
+	PluginConfig JSONConfig `toml:"pluginConfig"`
+	// Does bootstrappers really vary across instances?
+	P2PV2Bootstrappers pq.StringArray `toml:"p2pv2Bootstrappers"`
+	// Multiple families if needed.
+	OCRKeyBundleIDs map[string]string `toml:"ocrKeyBundleIDs"`
+	// Transmission keys per chain.
+	TransmitterIDs map[string]string `toml:"transmitterIDs"`
+	// Same endpoint for all instances
+	MonitoringEndpoint null.String `toml:"monitoringEndpoint"`
+	CreatedAt          time.Time   `toml:"-"`
+	UpdatedAt          time.Time   `toml:"-"`
 }
 
 type WorkflowSpec struct {
