@@ -454,6 +454,11 @@ func (o *LMTestSetupOutputs) FundPool(chainId int64, lggr zerolog.Logger, fundin
 	if err != nil {
 		return errors.WithStack(fmt.Errorf("failed to create ERC20 contract instance: %w", err))
 	}
+	balance, err := token.BalanceOf(nil, common.HexToAddress(o.LMModules[chainId].ChainClient.GetDefaultWallet().Address()))
+	if err != nil {
+		return errors.WithStack(fmt.Errorf("failed to get token pool balance: %w", err))
+	}
+	lggr.Debug().Str("balance", balance.String()).Msg("weth balance of transactor")
 	symbol, err := token.Symbol(nil)
 	if err != nil {
 		return errors.WithStack(fmt.Errorf("failed to get token symbol: %w", err))
@@ -467,7 +472,8 @@ func (o *LMTestSetupOutputs) FundPool(chainId int64, lggr zerolog.Logger, fundin
 		if err != nil {
 			return errors.WithStack(fmt.Errorf("failed to get native balance: %w", err))
 		}
-		if nativeBalance.Cmp(big.NewInt(0)) < 0 {
+		lggr.Debug().Str("nativeBalance", nativeBalance.String()).Msg("nativeBalance")
+		if nativeBalance.Cmp(fundingAmount) < 0 {
 			return errors.WithStack(fmt.Errorf("not enough native balance"))
 		}
 		lggr.Info().Msg("Depositing tokenpool funding to WETH contract")
@@ -487,6 +493,27 @@ func (o *LMTestSetupOutputs) FundPool(chainId int64, lggr zerolog.Logger, fundin
 
 		lggr.Info().Str("tx hash", receipt.TxHash.String()).Msg("Deposited tokenpool funding to WETH contract")
 	}
+	lggr.Info().Msg("Funding token pool")
+	txOpts, err := o.LMModules[chainId].ChainClient.TransactionOpts(o.LMModules[chainId].ChainClient.GetDefaultWallet())
+	if err != nil {
+		return errors.WithStack(fmt.Errorf("failed to get transaction options: %w", err))
+
+	}
+	tx, err := token.Transfer(txOpts, o.LMModules[chainId].TokenPool.EthAddress, fundingAmount)
+	if err != nil {
+		return errors.WithStack(fmt.Errorf("failed to transfer to token pool: %w", err))
+	}
+	receipt, err := bind.WaitMined(context.Background(), o.LMModules[chainId].ChainClient.DeployBackend(), tx)
+	if err != nil {
+		return errors.WithStack(fmt.Errorf("failed to wait for transaction receipt: %w", err))
+	}
+	lggr.Info().Str("tx hash", receipt.TxHash.String()).Msg("Funded token pool")
+
+	balance, err = token.BalanceOf(nil, o.LMModules[chainId].TokenPool.EthAddress)
+	if err != nil {
+		return errors.WithStack(fmt.Errorf("failed to get token pool balance: %w", err))
+	}
+	lggr.Debug().Str("balance", balance.String()).Msg("weth balance of token pool")
 
 	return nil
 }
@@ -748,6 +775,16 @@ func LMDefaultTestSetup(
 
 	err = lmModules[l2ChainId].ChainClient.WaitForEvents()
 	require.NoError(t, err, "Waiting for events to confirm on L2 chain shouldn't fail")
+
+	liquidity, err := setUpArgs.LMModules[l1ChainId].LM.GetLiquidity()
+	require.NoError(t, err, "Getting liquidity from L1 LM shouldn't fail")
+	lggr.Debug().Interface("liquidity", liquidity).Msg("Liquidity")
+	require.Equal(t, big.NewInt(1000000000), liquidity, "Liquidity should match")
+
+	liquidity, err = setUpArgs.LMModules[l2ChainId].LM.GetLiquidity()
+	require.NoError(t, err, "Getting liquidity from L1 LM shouldn't fail")
+	lggr.Debug().Interface("liquidity", liquidity).Msg("Liquidity")
+	require.Equal(t, big.NewInt(1000000000), liquidity, "Liquidity should match")
 
 	err = setUpArgs.Env.CLNodeWithKeyReady.Wait()
 	require.NoError(t, err, "Waiting for CL nodes to be ready shouldn't fail")
