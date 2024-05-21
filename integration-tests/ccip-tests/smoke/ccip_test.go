@@ -409,7 +409,7 @@ func TestSmokeCCIPSelfServeRateLimitOffRamp(t *testing.T) {
 	}
 
 	// Set the default permissionless exec threshold to 6 minutes so that we can manually execute the transactions faster
-	actions.DefaultPermissionlessExecThreshold = 5 * time.Minute
+	actions.DefaultPermissionlessExecThreshold = 30 * time.Second
 	setUpOutput := testsetups.CCIPDefaultTestSetUp(t, log, "smoke-ccip", nil, TestCfg)
 	if len(setUpOutput.Lanes) == 0 {
 		return
