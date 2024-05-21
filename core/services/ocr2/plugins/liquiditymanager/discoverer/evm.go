@@ -170,6 +170,7 @@ func (e *evmDiscoverer) updateLiquidity(ctx context.Context, selector models.Net
 	if err != nil {
 		return fmt.Errorf("get liquidity: %w", err)
 	}
+	e.lggr.Debugw("Updating liquidity", "liquidity", liquidity, "selector", selector, "lmAddress", lmAddress)
 	_ = g.SetLiquidity(selector, liquidity) // TODO: handle non-existing network
 	return nil
 }
