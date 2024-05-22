@@ -95,6 +95,11 @@ make test_smoke_ccip_default testname=TestSmokeCCIPForBidirectionalLane secret_t
 ```
 Currently other types of tests like load and chaos can only be run using remote kubernetes cluster.
 
+### Load + Chaos tests
+We test CCIP with multiple blockchain chaos experiments
+
+
+
 ### Using remote kubernetes cluster
 
 These tests remain bound to a Kubernetes run environment, and require more complex setup and running instructions. We endeavor to make these easier to run and configure, but for the time being please seek a member of the QA/Test Tooling team if you want to run these.

@@ -181,6 +181,10 @@ runs:
         GasRaisePercentage = 0.7
         Spike = true
         Duration = '3m'
+        
+        [CCIP.Groups.load.ChaosGasLimitProfile]
+        TargetChain = "src"
+        BlockGasLimitPercentage = 0.1
 
         EOF
 

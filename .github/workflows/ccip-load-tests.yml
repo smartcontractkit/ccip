@@ -1,11 +1,11 @@
 name: CCIP Load Test
 on:
   push:
-#    branches:
-#      - ccip-develop
+  #    branches:
+  #      - ccip-develop
   workflow_dispatch:
     inputs:
-      base64_test_input : # base64 encoded toml for test input
+      base64_test_input: # base64 encoded toml for test input
         description: 'Base64 encoded toml test input'
         required: false
 
@@ -156,6 +156,14 @@ jobs:
             os: ubuntu-latest
             run: ^TestLoadCCIPStableRPSGasSpike$
             config_path: ./integration-tests/ccip-tests/testconfig/tomls/ccip-gas-spike-fast-dst.toml
+          - name: ccip-gas-limit-block-capacity-halving-src
+            os: ubuntu-latest
+            run: ^TestLoadCCIPStableRPSChangeBlockGasLimit$
+            config_path: ./integration-tests/ccip-tests/testconfig/tomls/ccip-gas-block-halving-src.toml
+          - name: ccip-gas-limit-block-capacity-halving-dst
+            os: ubuntu-latest
+            run: ^TestLoadCCIPStableRPSChangeBlockGasLimit$
+            config_path: ./integration-tests/ccip-tests/testconfig/tomls/ccip-gas-block-halving-dst.toml
     runs-on: ${{ matrix.type.os }}
     name: CCIP ${{ matrix.type.name }}
     steps:
@@ -236,12 +244,12 @@ jobs:
           cache_key_id: ccip-load-${{ env.MOD_CACHE_VERSION }}
           cache_restore_only: "true"
           should_cleanup: "true"
-      ## Notify in slack if the job fails
-      - name: Notify Slack
-        if: failure() && github.event_name != 'workflow_dispatch'
-        uses: slackapi/slack-github-action@6c661ce58804a1a20f6dc5fbee7f0381b469e001 # v1.25.0
-        env:
-          SLACK_BOT_TOKEN: ${{ secrets.QA_SLACK_API_KEY }}
-        with:
-          channel-id: "#ccip-testing"
-          slack-message: ":x: :mild-panic-intensifies: CCIP load tests failed: ${{ job.html_url }}\n${{ format('https://github.com/smartcontractkit/chainlink/actions/runs/{0}', github.run_id) }}"
+#      ## Notify in slack if the job fails
+#      - name: Notify Slack
+#        if: failure() && github.event_name != 'workflow_dispatch'
+#        uses: slackapi/slack-github-action@6c661ce58804a1a20f6dc5fbee7f0381b469e001 # v1.25.0
+#        env:
+#          SLACK_BOT_TOKEN: ${{ secrets.QA_SLACK_API_KEY }}
+#        with:
+#          channel-id: "#ccip-testing"
+#          slack-message: ":x: :mild-panic-intensifies: CCIP load tests failed: ${{ job.html_url }}\n${{ format('https://github.com/smartcontractkit/chainlink/actions/runs/{0}', github.run_id) }}"

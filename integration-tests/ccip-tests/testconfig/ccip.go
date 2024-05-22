@@ -241,6 +241,18 @@ func (l *LoadProfile) SetTestRunName(name string) {
 	}
 }
 
+type ChaosGasLimitProfile struct {
+	TargetChain             string  `toml:",omitempty"`
+	BlockGasLimitPercentage float64 `toml:",omitempty"`
+}
+
+func (gp *ChaosGasLimitProfile) Validate() error {
+	if gp.TargetChain != "src" && gp.TargetChain != "dst" {
+		return fmt.Errorf("target chain for gas chaos should be 'src' or 'dst'")
+	}
+	return nil
+}
+
 type ChaosGasProfile struct {
 	TargetChain        string           `toml:",omitempty"`
 	StartGasPrice      int64            `toml:",omitempty"`
@@ -294,6 +306,7 @@ type CCIPTestConfig struct {
 	StoreLaneConfig           *bool                                 `toml:",omitempty"`
 	LoadProfile               *LoadProfile                          `toml:",omitempty"`
 	ChaosGasProfile           *ChaosGasProfile                      `toml:",omitempty"`
+	ChaosGasLimitProfile      *ChaosGasLimitProfile                 `toml:",omitempty"`
 	ChaosReorgProfile         *ChaosReorgProfile                    `toml:",omitempty"`
 }
 

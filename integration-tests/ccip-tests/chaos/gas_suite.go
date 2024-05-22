@@ -1,7 +1,10 @@
 package chaos
 
 import (
+	"context"
 	"fmt"
+	"github.com/ethereum/go-ethereum/ethclient"
+	"math"
 	"testing"
 	"time"
 
@@ -18,8 +21,10 @@ type GasSuite struct {
 	t             *testing.T
 	Cfg           *GasSuiteConfig
 	Logger        zerolog.Logger
-	SrcClient     *client.RPCClient
-	DstClient     *client.RPCClient
+	SrcRPCClient  *client.RPCClient
+	DstRPCClient  *client.RPCClient
+	SrcEVMClient  *ethclient.Client
+	DstEVMClient  *ethclient.Client
 	GrafanaClient *grafana.Client
 }
 
@@ -44,18 +49,28 @@ func NewGasSuite(t *testing.T, cfg *GasSuiteConfig) (*GasSuite, error) {
 	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
+	srcEVMClient, err := ethclient.Dial(cfg.SrcGethHTTPURL)
+	if err != nil {
+		return nil, err
+	}
+	dstEVMClient, err := ethclient.Dial(cfg.DstGethHTTPURL)
+	if err != nil {
+		return nil, err
+	}
 	return &GasSuite{
 		t:             t,
 		Cfg:           cfg,
 		Logger:        l,
-		SrcClient:     client.NewRPCClient(cfg.SrcGethHTTPURL),
-		DstClient:     client.NewRPCClient(cfg.DstGethHTTPURL),
+		SrcRPCClient:  client.NewRPCClient(cfg.SrcGethHTTPURL),
+		DstRPCClient:  client.NewRPCClient(cfg.DstGethHTTPURL),
+		SrcEVMClient:  srcEVMClient,
+		DstEVMClient:  dstEVMClient,
 		GrafanaClient: grafana.NewGrafanaClient(cfg.GrafanaURL, cfg.GrafanaToken),
 	}, nil
 }
 
-// RaiseGas simulates slow or fast gas spike
-func (r *GasSuite) RaiseGas(chain string, from int64, percentage float64, duration time.Duration, spike bool) {
+// ChangeBlockGasBaseFee simulates slow or fast gas spike
+func (r *GasSuite) ChangeBlockGasBaseFee(chain string, from int64, percentage float64, duration time.Duration, spike bool) {
 	go func() {
 		err := PostGrafanaAnnotation(
 			r.Logger,
@@ -67,10 +82,10 @@ func (r *GasSuite) RaiseGas(chain string, from int64, percentage float64, durati
 		assert.NoError(r.t, err)
 		switch chain {
 		case "src":
-			err := r.SrcClient.ModulateBaseFeeOverDuration(r.Logger, from, percentage, duration, spike)
+			err := r.SrcRPCClient.ModulateBaseFeeOverDuration(r.Logger, from, percentage, duration, spike)
 			assert.NoError(r.t, err)
 		case "dst":
-			err := r.DstClient.ModulateBaseFeeOverDuration(r.Logger, from, percentage, duration, spike)
+			err := r.DstRPCClient.ModulateBaseFeeOverDuration(r.Logger, from, percentage, duration, spike)
 			assert.NoError(r.t, err)
 		default:
 			r.t.Errorf("chain can be 'src' or 'dst'")
@@ -83,5 +98,61 @@ func (r *GasSuite) RaiseGas(chain string, from int64, percentage float64, durati
 			[]string{"gas-spike"},
 		)
 		assert.NoError(r.t, err)
+	}()
+}
+
+// ChangeNextBlockGasLimit changes next block gas limit,
+// sets it to percentage of last gasUsed in previous block creating congestion
+func (r *GasSuite) ChangeNextBlockGasLimit(startIn time.Duration, wait time.Duration, chain string, percentage float64) {
+	go func() {
+		time.Sleep(startIn)
+		latestBlock, err := r.SrcEVMClient.BlockByNumber(context.Background(), nil)
+		assert.NoError(r.t, err)
+		newGasLimit := int64(math.Ceil(float64(latestBlock.GasUsed()) * percentage))
+		r.Logger.Info().
+			Str("Network", chain).
+			Int64("GasLimit", newGasLimit).
+			Uint64("GasUsed", latestBlock.GasUsed()).
+			Msg("Setting next block gas limit")
+		err = PostGrafanaAnnotation(
+			r.Logger,
+			r.GrafanaClient,
+			r.Cfg.dashboardUID,
+			fmt.Sprintf("changed block gas limit, now: %d, was used in last block: %d, network: %s", newGasLimit, latestBlock.GasUsed(), chain),
+			[]string{"gas-limit"},
+		)
+		assert.NoError(r.t, err)
+		switch chain {
+		case "src":
+			err := r.SrcRPCClient.AnvilSetBlockGasLimit([]interface{}{newGasLimit})
+			assert.NoError(r.t, err)
+		case "dst":
+			err := r.DstRPCClient.AnvilSetBlockGasLimit([]interface{}{newGasLimit})
+			assert.NoError(r.t, err)
+		default:
+			r.t.Errorf("chain can be 'src' or 'dst'")
+		}
+		time.Sleep(wait)
+		r.Logger.Info().
+			Str("Network", chain).
+			Uint64("GasLimit", latestBlock.GasLimit()).
+			Msg("Returning old gas limit")
+		switch chain {
+		case "src":
+			err := r.SrcRPCClient.AnvilSetBlockGasLimit([]interface{}{latestBlock.GasLimit()})
+			assert.NoError(r.t, err)
+		case "dst":
+			err := r.DstRPCClient.AnvilSetBlockGasLimit([]interface{}{latestBlock.GasLimit()})
+			assert.NoError(r.t, err)
+		default:
+			r.t.Errorf("chain can be 'src' or 'dst'")
+		}
+		err = PostGrafanaAnnotation(
+			r.Logger,
+			r.GrafanaClient,
+			r.Cfg.dashboardUID,
+			fmt.Sprintf("changed block gas limit, now: %d, network: %s", newGasLimit, chain),
+			[]string{"gas-limit"},
+		)
 	}()
 }

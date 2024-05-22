@@ -158,9 +158,30 @@ func TestLoadCCIPStableRPSGasSpike(t *testing.T) {
 	})
 
 	chcfg := testArgs.TestCfg.TestGroupInput.ChaosGasProfile
-	log.Warn().Any("Config", chcfg).Msg("Gas config")
 	gs := setupGasSuite(t, testArgs)
-	gs.RaiseGas(chcfg.TargetChain, chcfg.StartGasPrice, chcfg.GasRaisePercentage, chcfg.Duration.Duration(), chcfg.Spike)
+	gs.ChangeBlockGasBaseFee(chcfg.TargetChain, chcfg.StartGasPrice, chcfg.GasRaisePercentage, chcfg.Duration.Duration(), chcfg.Spike)
+
+	testArgs.TriggerLoadByLane()
+	testArgs.Wait()
+}
+
+func TestLoadCCIPStableRPSChangeBlockGasLimit(t *testing.T) {
+	t.Parallel()
+	lggr := logging.GetTestLogger(t)
+	testArgs := NewLoadArgs(t, lggr)
+	testArgs.Setup()
+	// if the test runs on remote runner
+	if len(testArgs.TestSetupArgs.Lanes) == 0 {
+		return
+	}
+	t.Cleanup(func() {
+		log.Info().Msg("Tearing down the environment")
+		require.NoError(t, testArgs.TestSetupArgs.TearDown())
+	})
+
+	chcfg := testArgs.TestCfg.TestGroupInput.ChaosGasLimitProfile
+	gs := setupGasSuite(t, testArgs)
+	gs.ChangeNextBlockGasLimit(1*time.Minute, 1*time.Minute, chcfg.TargetChain, chcfg.BlockGasLimitPercentage)
 
 	testArgs.TriggerLoadByLane()
 	testArgs.Wait()
