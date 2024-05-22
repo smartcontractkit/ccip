@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.0;
 
+import {IPool} from "../../interfaces/IPool.sol";
+
 import {TokenAdminRegistry} from "../../tokenAdminRegistry/TokenAdminRegistry.sol";
 import {TokenSetup} from "../TokenSetup.t.sol";
 
@@ -68,6 +70,7 @@ contract TokenAdminRegistry_isTokenSupportedOnRemoteChain is TokenAdminRegistryS
 contract TokenAdminRegistry_setPool is TokenAdminRegistrySetup {
   function test_setPool_Success() public {
     address pool = makeAddr("pool");
+    vm.mockCall(pool, abi.encodeWithSelector(IPool.isSupportedToken.selector), abi.encode(true));
 
     vm.expectEmit();
     emit PoolSet(s_sourceTokens[0], s_sourcePoolByToken[s_sourceTokens[0]], pool);

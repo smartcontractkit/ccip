@@ -104,6 +104,11 @@ abstract contract TokenPool is IPool, OwnerIsCreator {
     return i_rmnProxy;
   }
 
+  /// @inheritdoc IPool
+  function isSupportedToken(address token) external view virtual returns (bool) {
+    return token == address(i_token);
+  }
+
   /// @notice Gets the IERC20 token that this pool can lock or burn.
   /// @return token The IERC20 token representation.
   function getToken() public view returns (IERC20 token) {
