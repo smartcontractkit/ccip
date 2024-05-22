@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.24;
 
-import {MultiAggregateRateLimiter} from "../../MultiAggregateRateLimiter.sol";
 import {IPriceRegistry} from "../../interfaces/IPriceRegistry.sol";
 import {Client} from "../../libraries/Client.sol";
+import {MultiAggregateRateLimiter} from "../../validators/MultiAggregateRateLimiter.sol";
 
 contract MultiAggregateRateLimiterHelper is MultiAggregateRateLimiter {
   constructor(
