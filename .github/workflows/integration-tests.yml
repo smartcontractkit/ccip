@@ -413,7 +413,7 @@ jobs:
     steps:
       # Handy for debugging resource usage
       # - name: Collect Workflow Telemetry
-      #   uses: catchpoint/workflow-telemetry-action@94c3c3d9567a0205de6da68a76c428ce4e769af1
+      #   uses: catchpoint/workflow-telemetry-action@94c3c3d9567a0205de6da68a76c428ce4e769af1 # v2.0.0
       - name: Collect Metrics
         if: needs.changes.outputs.src == 'true' || github.event_name == 'workflow_dispatch'
         id: collect-gha-metrics
