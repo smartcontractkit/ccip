@@ -4,6 +4,12 @@ Mockserver = 'http://mockserver:1080'
 [CCIP.Env.Network]
 selected_networks= ['source-chain', 'dest-chain']
 
+[CCIP.Env.Network.AnvilConfigs.source-chain]
+block_time = 1
+
+[CCIP.Env.Network.AnvilConfigs.dest-chain]
+block_time = 1
+
 [CCIP.Env.Network.EVMNetworks.source-chain]
 evm_name = 'source-chain'
 evm_chain_id = 1337
@@ -56,6 +62,7 @@ PriceMax = '200 gwei'
 LimitDefault = 6000000
 FeeCapDefault = '200 gwei'
 """
+
 
 [CCIP.Groups.load.LoadProfile]
 TestDuration = '5m'

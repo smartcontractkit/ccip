@@ -45,6 +45,7 @@ func NewGasSuite(t *testing.T, cfg *GasSuiteConfig) (*GasSuite, error) {
 		return nil, err
 	}
 	return &GasSuite{
+		t:             t,
 		Cfg:           cfg,
 		Logger:        l,
 		SrcClient:     client.NewRPCClient(cfg.SrcGethHTTPURL),
@@ -60,7 +61,7 @@ func (r *GasSuite) RaiseGas(chain string, from int64, percentage float64, durati
 			r.Logger,
 			r.GrafanaClient,
 			r.Cfg.dashboardUID,
-			fmt.Sprintf("gas spike started (src chain), price: %d", from),
+			fmt.Sprintf("gas spike started (src chain), initial price: %d, raise: %.2f", from, percentage),
 			[]string{"gas-spike"},
 		)
 		assert.NoError(r.t, err)
@@ -78,7 +79,7 @@ func (r *GasSuite) RaiseGas(chain string, from int64, percentage float64, durati
 			r.Logger,
 			r.GrafanaClient,
 			r.Cfg.dashboardUID,
-			fmt.Sprintf("gas spike ended (src chain), price: %.2f", float64(from)*percentage),
+			fmt.Sprintf("gas spike ended (src chain), price: %.2f, raise: %.2f", float64(from)*percentage, percentage),
 			[]string{"gas-spike"},
 		)
 		assert.NoError(r.t, err)
