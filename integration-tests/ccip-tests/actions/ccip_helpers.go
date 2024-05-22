@@ -3116,7 +3116,7 @@ func (lane *CCIPLane) ValidateRequestByTxHash(txHash common.Hash, opts validatio
 		// Verify whether the execution state is changed and the transfer is successful
 		_, err = lane.Dest.AssertEventExecutionStateChanged(
 			lane.Logger, seqNumber,
-			lane.ValidationTimeout,
+			timeout,
 			reportBlessedAt,
 			reqStat,
 			testhelpers.ExecutionStateSuccess,

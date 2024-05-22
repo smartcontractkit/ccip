@@ -409,8 +409,9 @@ func TestSmokeCCIPSelfServeRateLimitOffRamp(t *testing.T) {
 	}
 	require.True(t, TestCfg.SelectedNetworks[0].Simulated, "This test relies on timing assumptions and should only be run on simulated networks")
 
-	// Set the default permissionless exec threshold to 6 minutes so that we can manually execute the transactions faster
-	actions.DefaultPermissionlessExecThreshold = 30 * time.Second
+	// Set the default permissionless exec threshold lower so that we can manually execute the transactions faster
+	// Tuning this too low stops any transactions from being realistically executed
+	actions.DefaultPermissionlessExecThreshold = 1 * time.Minute
 	setUpOutput := testsetups.CCIPDefaultTestSetUp(t, log, "smoke-ccip", nil, TestCfg)
 	if len(setUpOutput.Lanes) == 0 {
 		return
@@ -508,6 +509,12 @@ func TestSmokeCCIPSelfServeRateLimitOffRamp(t *testing.T) {
 			tc.lane.RecordStateBeforeTransfer()
 			err = tc.lane.SendRequests(1, big.NewInt(600_000))
 			require.NoError(t, err, "Failed to send rate limited token transfer")
+			// Expect the ExecutionStateChanged event to never show up
+			// Since we're looking to confirm that an event has NOT occurred, this can lead to some imperfect assumptions and results
+			// We set the timeout to stop waiting for the event after a minute
+			// 99% of transactions occur in under a minute in ideal simulated conditions, so this is an okay assumption there
+			// but on real chains this risks false negatives
+			// If we don't set this timeout, this test can take a long time and hold up CI
 			tc.lane.ValidateRequests(actions.ExpectPhaseToFail(testreporters.ExecStateChanged, actions.WithTimeout(time.Minute)))
 			tc.lane.Logger.Info().
 				Str("Token", limitedSrcToken.ContractAddress.Hex()).
@@ -516,6 +523,7 @@ func TestSmokeCCIPSelfServeRateLimitOffRamp(t *testing.T) {
 			// Manually execute the rate limited token transfer and expect a similar error
 			tc.lane.Logger.Info().Str("Wait Time", actions.DefaultPermissionlessExecThreshold.String()).Msg("Waiting for Exec Threshold to Expire")
 			time.Sleep(actions.DefaultPermissionlessExecThreshold) // Give time to exit the window
+			// See above comment on timeout
 			err = tc.lane.ExecuteManually(actions.WithConfirmationTimeout(time.Minute))
 			require.Error(t, err, "There should be errors executing manually at this point")
 			tc.lane.Logger.Debug().Str("Error", err.Error()).Msg("Manually executed rate limited token transfer failed as expected")
