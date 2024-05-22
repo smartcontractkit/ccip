@@ -106,19 +106,130 @@ func (d *DynamicPriceGetter) FilterConfiguredTokens(ctx context.Context, tokens 
 type batchCallsForChain struct {
 	decimalCalls         []rpclib.EvmCall
 	latestRoundDataCalls []rpclib.EvmCall
-	tokenOrder           []common.Address // required to maintain the order of the batched rpc calls for mapping the results.
+	//calls                []rpclib.EvmCall // decimals then latest round data calls.
+	tokenOrder []common.Address // required to maintain the order of the batched rpc calls for mapping the results.
 }
 
 // TokenPricesUSD implements the PriceGetter interface.
-// It returns static prices stored in the price getter, and batch calls to aggregators (on per chain) for aggregator-based prices.
+// It returns static prices stored in the price getter, and batch calls aggregators (one per chain) to retrieve aggregator-based prices.
 func (d *DynamicPriceGetter) TokenPricesUSD(ctx context.Context, tokens []cciptypes.Address) (map[cciptypes.Address]*big.Int, error) {
-	prices := make(map[cciptypes.Address]*big.Int, len(tokens))
-
-	batchCallsPerChain := make(map[uint64]*batchCallsForChain)
-
-	evmAddrs, err := ccipcalc.GenericAddrsToEvm(tokens...)
+	prices, batchCallsPerChain, err := d.preparePricesAndBatchCallsPerChain(tokens)
 	if err != nil {
 		return nil, err
+	}
+	if err = d.performBatchCalls(ctx, batchCallsPerChain, prices); err != nil {
+		return nil, err
+	}
+	return prices, nil
+}
+
+func (d *DynamicPriceGetter) performBatchCalls(ctx context.Context, batchCallsPerChain map[uint64]*batchCallsForChain, prices map[cciptypes.Address]*big.Int) error {
+	for chainID, batchCalls := range batchCallsPerChain {
+
+		//if err := d.performBatchCall(ctx, chainID, batchCalls, prices); err!=nil {
+		//	return err
+		//}
+
+		client, exists := d.evmClients[chainID]
+		if !exists {
+			return fmt.Errorf("evm caller for chain %d not found", chainID)
+		}
+
+		evmCaller := client.BatchCaller
+		resultsDecimals, err := evmCaller.BatchCall(ctx, 0, batchCalls.decimalCalls)
+		if err != nil {
+			return fmt.Errorf("batch call: %w", err)
+		}
+		resultsLatestRoundData, err := evmCaller.BatchCall(ctx, 0, batchCalls.latestRoundDataCalls)
+		if err != nil {
+			return fmt.Errorf("batch call: %w", err)
+		}
+
+		decimals, err := rpclib.ParseOutputs[uint8](resultsDecimals, func(d rpclib.DataAndErr) (uint8, error) {
+			return rpclib.ParseOutput[uint8](d, 0)
+		})
+		if err != nil {
+			return fmt.Errorf("parse outputs: %w", err)
+		}
+
+		// latestRoundData function has multiple outputs (roundId,answer,startedAt,updatedAt,answeredInRound).
+		// we want the second one (answer, idx=1).
+		latestRounds, err := rpclib.ParseOutputs[*big.Int](resultsLatestRoundData, func(d rpclib.DataAndErr) (*big.Int, error) {
+			return rpclib.ParseOutput[*big.Int](d, 1)
+		})
+		if err != nil {
+			return fmt.Errorf("parse outputs: %w", err)
+		}
+
+		for i := range batchCalls.tokenOrder {
+			// Normalize to 1e18.
+			if decimals[i] < 18 {
+				latestRounds[i].Mul(latestRounds[i], big.NewInt(0).Exp(big.NewInt(10), big.NewInt(18-int64(decimals[i])), nil))
+			} else if decimals[i] > 18 {
+				latestRounds[i].Div(latestRounds[i], big.NewInt(0).Exp(big.NewInt(10), big.NewInt(int64(decimals[i])-18), nil))
+			}
+			prices[ccipcalc.EvmAddrToGeneric(batchCalls.tokenOrder[i])] = latestRounds[i]
+		}
+	}
+	return nil
+}
+
+// performBatchCall performs a batch call on a given chain to retrieve token prices.
+func (d *DynamicPriceGetter) performBatchCall(ctx context.Context, chainID uint64, batchCalls *batchCallsForChain, prices map[cciptypes.Address]*big.Int) error {
+	client, exists := d.evmClients[chainID]
+	if !exists {
+		return fmt.Errorf("evm caller for chain %d not found", chainID)
+	}
+
+	// Perform call.
+	evmCaller := client.BatchCaller
+	resultsDecimals, err := evmCaller.BatchCall(ctx, 0, batchCalls.decimalCalls)
+	if err != nil {
+		return fmt.Errorf("batch call: %w", err)
+	}
+	resultsLatestRoundData, err := evmCaller.BatchCall(ctx, 0, batchCalls.latestRoundDataCalls)
+	if err != nil {
+		return fmt.Errorf("batch call: %w", err)
+	}
+
+	// Extract results.
+	decimals, err := rpclib.ParseOutputs[uint8](resultsDecimals, func(d rpclib.DataAndErr) (uint8, error) {
+		return rpclib.ParseOutput[uint8](d, 0)
+	})
+	if err != nil {
+		return fmt.Errorf("parse outputs: %w", err)
+	}
+
+	// latestRoundData function has multiple outputs (roundId,answer,startedAt,updatedAt,answeredInRound).
+	// we want the second one (answer, idx=1).
+	latestRounds, err := rpclib.ParseOutputs[*big.Int](resultsLatestRoundData, func(d rpclib.DataAndErr) (*big.Int, error) {
+		return rpclib.ParseOutput[*big.Int](d, 1)
+	})
+	if err != nil {
+		return fmt.Errorf("parse outputs: %w", err)
+	}
+
+	for i := range batchCalls.tokenOrder {
+		// Normalize to 1e18.
+		if decimals[i] < 18 {
+			latestRounds[i].Mul(latestRounds[i], big.NewInt(0).Exp(big.NewInt(10), big.NewInt(18-int64(decimals[i])), nil))
+		} else if decimals[i] > 18 {
+			latestRounds[i].Div(latestRounds[i], big.NewInt(0).Exp(big.NewInt(10), big.NewInt(int64(decimals[i])-18), nil))
+		}
+		prices[ccipcalc.EvmAddrToGeneric(batchCalls.tokenOrder[i])] = latestRounds[i]
+	}
+	return nil
+}
+
+// preparePricesAndBatchCallsPerChain uses this price getter to prepare for a list of tokens:
+// - the map of token address to their prices (static prices)
+// - the map of and batch calls per chain for the given tokens (dynamic prices)
+func (d *DynamicPriceGetter) preparePricesAndBatchCallsPerChain(tokens []cciptypes.Address) (map[cciptypes.Address]*big.Int, map[uint64]*batchCallsForChain, error) {
+	prices := make(map[cciptypes.Address]*big.Int, len(tokens))
+	batchCallsPerChain := make(map[uint64]*batchCallsForChain)
+	evmAddrs, err := ccipcalc.GenericAddrsToEvm(tokens...)
+	if err != nil {
+		return nil, nil, err
 	}
 	for _, tk := range evmAddrs {
 		if aggCfg, isAgg := d.cfg.AggregatorPrices[tk]; isAgg {
@@ -147,55 +258,10 @@ func (d *DynamicPriceGetter) TokenPricesUSD(ctx context.Context, tokens []ccipty
 			// Fill static prices.
 			prices[ccipcalc.EvmAddrToGeneric(tk)] = staticCfg.Price
 		} else {
-			return nil, fmt.Errorf("no price resolution rule for token %s", tk.Hex())
+			return nil, nil, fmt.Errorf("no price resolution rule for token %s", tk.Hex())
 		}
 	}
-
-	for chainID, batchCalls := range batchCallsPerChain {
-		client, exists := d.evmClients[chainID]
-		if !exists {
-			return nil, fmt.Errorf("evm caller for chain %d not found", chainID)
-		}
-
-		evmCaller := client.BatchCaller
-
-		resultsDecimals, err := evmCaller.BatchCall(ctx, 0, batchCalls.decimalCalls)
-		if err != nil {
-			return nil, fmt.Errorf("batch call: %w", err)
-		}
-		resultsLatestRoundData, err := evmCaller.BatchCall(ctx, 0, batchCalls.latestRoundDataCalls)
-		if err != nil {
-			return nil, fmt.Errorf("batch call: %w", err)
-		}
-
-		decimals, err := rpclib.ParseOutputs[uint8](resultsDecimals, func(d rpclib.DataAndErr) (uint8, error) {
-			return rpclib.ParseOutput[uint8](d, 0)
-		})
-		if err != nil {
-			return nil, fmt.Errorf("parse outputs: %w", err)
-		}
-
-		// latestRoundData function has multiple outputs (roundId,answer,startedAt,updatedAt,answeredInRound).
-		// we want the second one (answer, idx=1).
-		latestRounds, err := rpclib.ParseOutputs[*big.Int](resultsLatestRoundData, func(d rpclib.DataAndErr) (*big.Int, error) {
-			return rpclib.ParseOutput[*big.Int](d, 1)
-		})
-		if err != nil {
-			return nil, fmt.Errorf("parse outputs: %w", err)
-		}
-
-		for i := range batchCalls.tokenOrder {
-			// Normalize to 1e18.
-			if decimals[i] < 18 {
-				latestRounds[i].Mul(latestRounds[i], big.NewInt(0).Exp(big.NewInt(10), big.NewInt(18-int64(decimals[i])), nil))
-			} else if decimals[i] > 18 {
-				latestRounds[i].Div(latestRounds[i], big.NewInt(0).Exp(big.NewInt(10), big.NewInt(int64(decimals[i])-18), nil))
-			}
-			prices[ccipcalc.EvmAddrToGeneric(batchCalls.tokenOrder[i])] = latestRounds[i]
-		}
-	}
-
-	return prices, nil
+	return prices, batchCallsPerChain, nil
 }
 
 func (d *DynamicPriceGetter) Close() error {
