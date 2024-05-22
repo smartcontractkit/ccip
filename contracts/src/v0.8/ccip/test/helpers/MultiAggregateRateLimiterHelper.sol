@@ -17,10 +17,7 @@ contract MultiAggregateRateLimiterHelper is MultiAggregateRateLimiter {
     _rateLimitValue(chainSelector, value);
   }
 
-  function getTokenValue(
-    Client.EVMTokenAmount memory tokenAmount,
-    IPriceRegistry priceRegistry
-  ) public view returns (uint256) {
-    return _getTokenValue(tokenAmount, priceRegistry);
+  function getTokenValue(Client.EVMTokenAmount memory tokenAmount) public view returns (uint256) {
+    return _getTokenValue(tokenAmount);
   }
 }

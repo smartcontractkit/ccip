@@ -93,7 +93,7 @@ contract MultiAggregateRateLimiter is IMessageValidator, OwnerIsCreator {
     Client.EVMTokenAmount[] memory destTokenAmounts = message.destTokenAmounts;
     for (uint256 i; i < destTokenAmounts.length; ++i) {
       if (s_rateLimitedTokensDestToSource.contains(destTokenAmounts[i].token)) {
-        value += _getTokenValue(destTokenAmounts[i], IPriceRegistry(s_priceRegistry));
+        value += _getTokenValue(destTokenAmounts[i]);
       }
     }
 
@@ -113,13 +113,12 @@ contract MultiAggregateRateLimiter is IMessageValidator, OwnerIsCreator {
     emit RateLimiterTokensConsumed(chainSelector, value);
   }
 
-  function _getTokenValue(
-    Client.EVMTokenAmount memory tokenAmount,
-    IPriceRegistry priceRegistry
-  ) internal view returns (uint256) {
+  /// @notice Retrieves the token value for a token using the PriceRegistry
+  /// @return tokenValue USD value in 18 decimals
+  function _getTokenValue(Client.EVMTokenAmount memory tokenAmount) internal view returns (uint256) {
     // not fetching validated price, as price staleness is not important for value-based rate limiting
     // we only need to verify the price is not 0
-    uint224 pricePerToken = priceRegistry.getTokenPrice(tokenAmount.token).value;
+    uint224 pricePerToken = IPriceRegistry(s_priceRegistry).getTokenPrice(tokenAmount.token).value;
     if (pricePerToken == 0) revert PriceNotFoundForToken(tokenAmount.token);
     return pricePerToken._calcUSDValueFromTokenAmount(tokenAmount.amount);
   }
