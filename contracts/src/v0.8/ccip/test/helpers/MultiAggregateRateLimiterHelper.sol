@@ -7,7 +7,7 @@ import {MultiAggregateRateLimiter} from "../../validators/MultiAggregateRateLimi
 
 contract MultiAggregateRateLimiterHelper is MultiAggregateRateLimiter {
   constructor(
-    MultiAggregateRateLimiter.RateLimiterConfigUpdates memory rateLimiterConfigs,
+    MultiAggregateRateLimiter.RateLimiterConfigArgs[] memory rateLimiterConfigs,
     address admin,
     address priceRegistry,
     address[] memory authorizedCallers

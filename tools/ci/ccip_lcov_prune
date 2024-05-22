@@ -28,5 +28,4 @@ lcov --remove $1 -o $2 \
   'src/v0.8/ccip/applications/CCIPClientExample.sol' \
   'src/v0.8/ccip/pools/BurnWithFromMintTokenPool.sol' \
   'src/v0.8/ccip/onRamp/EVM2EVMMultiOnRamp.sol' \
-  'src/v0.8/ccip/validators/MultiAggregateRateLimiter.sol' \
   --rc lcov_branch_coverage=1

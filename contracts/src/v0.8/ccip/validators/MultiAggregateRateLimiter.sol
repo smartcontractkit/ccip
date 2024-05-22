@@ -22,6 +22,7 @@ contract MultiAggregateRateLimiter is IMessageValidator, OwnerIsCreator {
   error PriceNotFoundForToken(address token);
   error UpdateLengthMismatch();
   error ZeroAddressNotAllowed();
+  error ZeroChainSelectorNotAllowed();
 
   event RateLimiterConfigUpdated(uint64 indexed chainSelector, RateLimiterNoEvents.Config config);
   event RateLimiterTokensConsumed(uint64 indexed chainSelector, uint256 tokens);
@@ -58,10 +59,10 @@ contract MultiAggregateRateLimiter is IMessageValidator, OwnerIsCreator {
   /// @notice Rate limiter token bucket states per chain
   mapping(uint64 chainSelector => RateLimiterNoEvents.TokenBucket rateLimiter) s_rateLimitersByChainSelector;
 
-  /// @notice A collection of rate limiter configuration updates
-  struct RateLimiterConfigUpdates {
-    uint64[] chainSelectors;
-    RateLimiterNoEvents.Config[] rateLimiterConfigs;
+  /// @notice Update args for a single rate limiter config update
+  struct RateLimiterConfigArgs {
+    uint64 chainSelector; // Chain selector to set config for
+    RateLimiterNoEvents.Config rateLimiterConfig; // Rate limiter config to set
   }
 
   /// @param rateLimiterConfigs The RateLimiterNoEvents.Configs per chain containing the capacity and refill rate
@@ -70,7 +71,7 @@ contract MultiAggregateRateLimiter is IMessageValidator, OwnerIsCreator {
   /// @param priceRegistry the price registry to set
   /// @param authorizedCallers the authorized callers to set
   constructor(
-    RateLimiterConfigUpdates memory rateLimiterConfigs,
+    RateLimiterConfigArgs[] memory rateLimiterConfigs,
     address admin,
     address priceRegistry,
     address[] memory authorizedCallers
@@ -133,21 +134,21 @@ contract MultiAggregateRateLimiter is IMessageValidator, OwnerIsCreator {
   /// @notice Applies the provided rate limiter config updates.
   /// @param rateLimiterUpdates Rate limiter updates
   /// @dev should only be callable by the owner or token limit admin
-  function applyRateLimiterConfigUpdates(RateLimiterConfigUpdates memory rateLimiterUpdates) external onlyAdminOrOwner {
+  function applyRateLimiterConfigUpdates(RateLimiterConfigArgs[] memory rateLimiterUpdates) external onlyAdminOrOwner {
     _applyRateLimiterConfigUpdates(rateLimiterUpdates);
   }
 
   /// @notice Applies the provided rate limiter config updates.
   /// @param rateLimiterUpdates Rate limiter updates
-  function _applyRateLimiterConfigUpdates(RateLimiterConfigUpdates memory rateLimiterUpdates) internal {
-    uint256 updateLength = rateLimiterUpdates.chainSelectors.length;
-    if (updateLength != rateLimiterUpdates.rateLimiterConfigs.length) {
-      revert UpdateLengthMismatch();
-    }
+  function _applyRateLimiterConfigUpdates(RateLimiterConfigArgs[] memory rateLimiterUpdates) internal {
+    for (uint256 i = 0; i < rateLimiterUpdates.length; ++i) {
+      RateLimiterConfigArgs memory updateArgs = rateLimiterUpdates[i];
+      RateLimiterNoEvents.Config memory configUpdate = updateArgs.rateLimiterConfig;
+      uint64 chainSelector = updateArgs.chainSelector;
 
-    for (uint256 i = 0; i < updateLength; ++i) {
-      RateLimiterNoEvents.Config memory configUpdate = rateLimiterUpdates.rateLimiterConfigs[i];
-      uint64 chainSelector = rateLimiterUpdates.chainSelectors[i];
+      if (chainSelector == 0) {
+        revert ZeroChainSelectorNotAllowed();
+      }
 
       RateLimiterNoEvents.TokenBucket memory tokenBucket = s_rateLimitersByChainSelector[chainSelector];
       uint32 lastUpdated = tokenBucket.lastUpdated;
@@ -199,10 +200,22 @@ contract MultiAggregateRateLimiter is IMessageValidator, OwnerIsCreator {
     }
 
     for (uint256 i = 0; i < adds.length; ++i) {
-      if (s_rateLimitedTokensDestToSource.set(adds[i].destToken, adds[i].sourceToken)) {
-        emit TokenAggregateRateLimitAdded(adds[i].sourceToken, adds[i].destToken);
+      address destToken = adds[i].destToken;
+      address sourceToken = adds[i].sourceToken;
+
+      if (destToken == address(0) || sourceToken == address(0)) {
+        revert ZeroAddressNotAllowed();
+      }
+
+      if (s_rateLimitedTokensDestToSource.set(destToken, sourceToken)) {
+        emit TokenAggregateRateLimitAdded(sourceToken, destToken);
       }
     }
+  }
+
+  /// @return priceRegistry The configured PriceRegistry address
+  function getPriceRegistry() external view returns (address) {
+    return s_priceRegistry;
   }
 
   /// @notice Sets the Price Registry address
@@ -227,6 +240,12 @@ contract MultiAggregateRateLimiter is IMessageValidator, OwnerIsCreator {
   // ================================================================
   // │                           Access                             │
   // ================================================================
+
+  /// @param caller Address to check whether it is an authorized caller
+  /// @return flag whether the caller is an authorized caller
+  function isAuthorizedCaller(address caller) external view returns (bool) {
+    return s_authorizedCallers[caller];
+  }
 
   /// @notice Updates the callers that are authorized to call the message validation functions
   /// @param authorizedCallerArgs Callers to add and remove
@@ -253,9 +272,10 @@ contract MultiAggregateRateLimiter is IMessageValidator, OwnerIsCreator {
     for (uint256 i; i < removedCallers.length; ++i) {
       address caller = removedCallers[i];
 
-      delete s_authorizedCallers[caller];
-      // TODO: only emit if value was present
-      emit AuthorizedCallerRemoved(caller);
+      if (s_authorizedCallers[caller]) {
+        delete s_authorizedCallers[caller];
+        emit AuthorizedCallerRemoved(caller);
+      }
     }
   }
 
