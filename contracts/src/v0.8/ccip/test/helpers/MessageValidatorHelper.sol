@@ -10,6 +10,10 @@ contract MessageValidatorHelper is IMessageValidator {
 
   constructor() {}
 
+  function setMessageIdValidationState(bytes32 messageId, bool isInvalid) external {
+    s_invalidMessageIds[messageId] = isInvalid;
+  }
+
   /// @inheritdoc IMessageValidator
   function validateIncomingMessage(Client.Any2EVMMessage memory message) external view {
     if (s_invalidMessageIds[message.messageId]) {

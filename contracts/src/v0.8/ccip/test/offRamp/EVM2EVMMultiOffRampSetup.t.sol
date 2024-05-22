@@ -17,6 +17,8 @@ import {TokenSetup} from "../TokenSetup.t.sol";
 import {EVM2EVMMultiOffRampHelper} from "../helpers/EVM2EVMMultiOffRampHelper.sol";
 import {EVM2EVMOffRampHelper} from "../helpers/EVM2EVMOffRampHelper.sol";
 import {MaybeRevertingBurnMintTokenPool} from "../helpers/MaybeRevertingBurnMintTokenPool.sol";
+
+import {MessageValidatorHelper} from "../helpers/MessageValidatorHelper.sol";
 import {MaybeRevertMessageReceiver} from "../helpers/receivers/MaybeRevertMessageReceiver.sol";
 import {MockCommitStore} from "../mocks/MockCommitStore.sol";
 import {MockMultiCommitStore} from "../mocks/MockMultiCommitStore.sol";
@@ -42,6 +44,7 @@ contract EVM2EVMMultiOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSet
   MaybeRevertingBurnMintTokenPool internal s_maybeRevertingPool;
 
   EVM2EVMMultiOffRampHelper internal s_offRamp;
+  MessageValidatorHelper internal s_messageValidator;
   address internal s_sourceTokenPool = makeAddr("sourceTokenPool");
 
   event ExecutionStateChanged(
@@ -57,6 +60,7 @@ contract EVM2EVMMultiOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSet
     PriceRegistrySetup.setUp();
     OCR2BaseSetup.setUp();
 
+    s_messageValidator = new MessageValidatorHelper();
     s_mockCommitStore = new MockMultiCommitStore();
     s_receiver = new MaybeRevertMessageReceiver(false);
     s_secondary_receiver = new MaybeRevertMessageReceiver(false);
@@ -396,6 +400,7 @@ contract EVM2EVMMultiOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSet
     assertEq(a.maxNumberOfTokensPerMsg, b.maxNumberOfTokensPerMsg);
     assertEq(a.maxDataBytes, b.maxDataBytes);
     assertEq(a.maxPoolReleaseOrMintGas, b.maxPoolReleaseOrMintGas);
+    assertEq(a.messageValidator, b.messageValidator);
   }
 
   function _assertSourceChainConfigEquality(
@@ -424,5 +429,14 @@ contract EVM2EVMMultiOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSet
       );
     }
     return sourceTokenData;
+  }
+
+  function _enableMessageValidator() internal {
+    EVM2EVMMultiOffRamp.DynamicConfig memory dynamicConfig = s_offRamp.getDynamicConfig();
+    dynamicConfig.messageValidator = address(s_messageValidator);
+    bytes memory onchainConfig = abi.encode(dynamicConfig);
+    s_offRamp.setOCR2Config(
+      s_valid_signers, s_valid_transmitters, s_f, onchainConfig, s_offchainConfigVersion, abi.encode("")
+    );
   }
 }

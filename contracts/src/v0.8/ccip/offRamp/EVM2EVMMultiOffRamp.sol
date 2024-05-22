@@ -22,6 +22,8 @@ import {OCR2BaseNoChecks} from "../ocr/OCR2BaseNoChecks.sol";
 
 import {ERC165Checker} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/introspection/ERC165Checker.sol";
 
+import {console} from "forge-std/console.sol";
+
 /// @notice EVM2EVMOffRamp enables OCR networks to execute multiple messages
 /// in an OffRamp in a single transaction.
 /// @dev The EVM2EVMOnRamp, CommitStore and EVM2EVMOffRamp form an xchain upgradeable unit. Any change to one of them
@@ -496,11 +498,12 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, OCR2BaseN
   ) internal returns (Internal.MessageExecutionState, bytes memory) {
     try this.executeSingleMessage(message, offchainTokenData) {}
     catch (bytes memory err) {
+      bytes4 errorSelector = bytes4(err);
       if (
-        ReceiverError.selector == bytes4(err) || TokenHandlingError.selector == bytes4(err)
-          || Internal.InvalidEVMAddress.selector == bytes4(err) || InvalidDataLength.selector == bytes4(err)
-          || CallWithExactGas.NoContract.selector == bytes4(err) || NotACompatiblePool.selector == bytes4(err)
-          || IMessageValidator.MessageValidationError.selector == bytes4(err)
+        ReceiverError.selector == errorSelector || TokenHandlingError.selector == errorSelector
+          || Internal.InvalidEVMAddress.selector == errorSelector || InvalidDataLength.selector == errorSelector
+          || CallWithExactGas.NoContract.selector == errorSelector || NotACompatiblePool.selector == errorSelector
+          || IMessageValidator.MessageValidationError.selector == errorSelector
       ) {
         // If CCIP receiver execution is not successful, bubble up receiver revert data,
         // prepended by the 4 bytes of ReceiverError.selector, TokenHandlingError.selector or InvalidPoolAddress.selector.
