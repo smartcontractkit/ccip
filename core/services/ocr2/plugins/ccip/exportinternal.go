@@ -1,0 +1,69 @@
+package ccip
+
+import (
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas"
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
+	"github.com/smartcontractkit/chainlink/v2/core/logger"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/ccipdataprovider"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/factory"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/pricegetter"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/rpclib"
+	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
+	"math/big"
+)
+
+func GenericAddrToEvm(addr ccip.Address) (common.Address, error) {
+	return ccipcalc.GenericAddrToEvm(addr)
+}
+
+func NewEvmPriceRegistry(lp logpoller.LogPoller, ec client.Client, lggr logger.Logger, pluginLabel string) *ccipdataprovider.EvmPriceRegistry {
+	return ccipdataprovider.NewEvmPriceRegistry(lp, ec, lggr, pluginLabel)
+}
+
+type VersionFinder = factory.VersionFinder
+
+func NewCommitStoreReader(lggr logger.Logger, versionFinder VersionFinder, address ccip.Address, ec client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator, sourceMaxGasPrice *big.Int, pgOpts ...pg.QOpt) (ccipdata.CommitStoreReader, error) {
+	return factory.NewCommitStoreReader(lggr, versionFinder, address, ec, lp, estimator, sourceMaxGasPrice, pgOpts...)
+}
+
+func NewOffRampReader(lggr logger.Logger, versionFinder VersionFinder, addr ccip.Address, destClient client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator, destMaxGasPrice *big.Int, registerFilters bool, pgOpts ...pg.QOpt) (ccipdata.OffRampReader, error) {
+	return factory.NewOffRampReader(lggr, versionFinder, addr, destClient, lp, estimator, destMaxGasPrice, registerFilters, pgOpts...)
+}
+
+func NewEvmVersionFinder() factory.EvmVersionFinder {
+	return factory.NewEvmVersionFinder()
+}
+
+func NewOnRampReader(lggr logger.Logger, versionFinder VersionFinder, sourceSelector, destSelector uint64, onRampAddress cciptypes.Address, sourceLP logpoller.LogPoller, source client.Client, pgOpts ...pg.QOpt) (ccipdata.OnRampReader, error) {
+	return factory.NewOnRampReader(lggr, versionFinder, sourceSelector, destSelector, onRampAddress, sourceLP, source, pgOpts...)
+}
+
+type OffRampReader = ccipdata.OffRampReader
+
+type DynamicPriceGetterClient = pricegetter.DynamicPriceGetterClient
+
+type DynamicPriceGetter = pricegetter.DynamicPriceGetter
+
+func NewDynamicPriceGetterClient(batchCaller rpclib.EvmBatchCaller) DynamicPriceGetterClient {
+	return pricegetter.NewDynamicPriceGetterClient(batchCaller)
+}
+
+func NewDynamicPriceGetter(cfg config.DynamicPriceGetterConfig, evmClients map[uint64]DynamicPriceGetterClient) (*DynamicPriceGetter, error) {
+	return pricegetter.NewDynamicPriceGetter(cfg, evmClients)
+}
+
+func NewDynamicLimitedBatchCaller(
+	lggr logger.Logger, batchSender client.BatchSender, batchSizeLimit, backOffMultiplier, parallelRpcCallsLimit uint,
+) *rpclib.DynamicLimitedBatchCaller {
+	return rpclib.NewDynamicLimitedBatchCaller(lggr, batchSender, batchSizeLimit, backOffMultiplier, parallelRpcCallsLimit)
+}
+
+var DefaultRpcBatchSizeLimit = rpclib.DefaultRpcBatchSizeLimit
+var DefaultRpcBatchBackOffMultiplier = rpclib.DefaultRpcBatchBackOffMultiplier
+var DefaultMaxParallelRpcCalls = rpclib.DefaultMaxParallelRpcCalls

@@ -16,12 +16,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/x_internal/ccipcalc"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/x_internal/ccipdata"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/x_internal/ccipdata/ccipdataprovider"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/x_internal/ccipdata/factory"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/x_internal/pricegetter"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/x_internal/rpclib"
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	"go.uber.org/multierr"
 	"golang.org/x/exp/maps"
@@ -139,7 +133,7 @@ func (rs *EVMRelayerSet) NewCCIPCommitProvider(ctx context.Context, rargs types.
 	// Build price getter clients for all chains specified in the aggregator configurations.
 	// Some lanes (e.g. Wemix/Kroma) requires other clients than source and destination, since they use feeds from other chains.
 	// TODO: Double check i've wired this in from Delegate (i.e. creating the RelayerSet with all the necessary relayers)
-	priceGetterClients := map[uint64]pricegetter.DynamicPriceGetterClient{}
+	priceGetterClients := map[uint64]ccip.DynamicPriceGetterClient{}
 	for _, aggCfg := range pluginConfig.PriceGetterConfig.AggregatorPrices {
 		chainID := aggCfg.ChainID
 		// Retrieve the chain.
@@ -153,14 +147,14 @@ func (rs *EVMRelayerSet) NewCCIPCommitProvider(ctx context.Context, rargs types.
 			return nil, fmt.Errorf("retrieving relayer for relayerID %v: %w", aggRelayerID, err2)
 		}
 
-		caller := rpclib.NewDynamicLimitedBatchCaller(
+		caller := ccip.NewDynamicLimitedBatchCaller(
 			lggr,
 			aggRelayer.chain.Client(),
-			rpclib.DefaultRpcBatchSizeLimit,
-			rpclib.DefaultRpcBatchBackOffMultiplier,
-			rpclib.DefaultMaxParallelRpcCalls,
+			uint(ccip.DefaultRpcBatchSizeLimit),
+			uint(ccip.DefaultRpcBatchBackOffMultiplier),
+			uint(ccip.DefaultMaxParallelRpcCalls),
 		)
-		priceGetterClients[chainID] = pricegetter.NewDynamicPriceGetterClient(caller)
+		priceGetterClients[chainID] = ccip.NewDynamicPriceGetterClient(caller)
 	}
 
 	return EVMCCIPCommitProviderImpl_V2{
@@ -200,9 +194,9 @@ type EVMCCIPCommitProviderImpl_V2 struct {
 	destMaxGasPrice    big.Int
 	sourceCodec        types.Codec
 	sourceChainReader  types.ChainReader
-	priceGetterClients map[uint64]pricegetter.DynamicPriceGetterClient
+	priceGetterClients map[uint64]ccip.DynamicPriceGetterClient
 	priceGetterConfig  config.DynamicPriceGetterConfig
-	versionFinder      factory.VersionFinder
+	versionFinder      ccip.VersionFinder
 	s                  services.Service
 	cp                 types.ConfigProvider
 }
@@ -281,7 +275,7 @@ func (E EVMCCIPCommitProviderImpl_V2) ContractConfigTracker() ocrtypes.ContractC
 }
 
 func (E EVMCCIPCommitProviderImpl_V2) ContractTransmitter() ocrtypes.ContractTransmitter {
-	return
+	panic("not implemented")
 }
 
 func (E EVMCCIPCommitProviderImpl_V2) ChainReader() types.ChainReader {
@@ -293,29 +287,29 @@ func (E EVMCCIPCommitProviderImpl_V2) Codec() types.Codec {
 }
 
 func (E EVMCCIPCommitProviderImpl_V2) NewCommitStoreReader(ctx context.Context, _ cciptypes.Address) (commitStoreReader cciptypes.CommitStoreReader, err error) {
-	commitStoreReader, err = factory.NewCommitStoreReader(E.lggr, E.versionFinder, cciptypes.Address(E.commitStoreAddress), E.destClient, E.destLP, E.sourceGasEstimator, &E.sourceMaxGasPrice, nil)
+	commitStoreReader, err = ccip.NewCommitStoreReader(E.lggr, E.versionFinder, cciptypes.Address(E.commitStoreAddress), E.destClient, E.destLP, E.sourceGasEstimator, &E.sourceMaxGasPrice, nil)
 	return
 }
 
 func (E EVMCCIPCommitProviderImpl_V2) NewOffRampReader(ctx context.Context, offRampAddr cciptypes.Address) (offRampReader cciptypes.OffRampReader, err error) {
-	offRampReader, err = factory.NewOffRampReader(E.lggr, E.versionFinder, offRampAddr, E.destClient, E.destLP, E.destGasEstimator, &E.destMaxGasPrice, true, nil)
+	offRampReader, err = ccip.NewOffRampReader(E.lggr, E.versionFinder, offRampAddr, E.destClient, E.destLP, E.destGasEstimator, &E.destMaxGasPrice, true, nil)
 	return
 }
 
 func (E EVMCCIPCommitProviderImpl_V2) NewOnRampReader(ctx context.Context, onRampAddress cciptypes.Address, sourceChainSelector uint64, destChainSelector uint64) (onRampReader cciptypes.OnRampReader, err error) {
-	versionFinder := factory.NewEvmVersionFinder()
-	onRampReader, err = factory.NewOnRampReader(E.lggr, versionFinder, sourceChainSelector, destChainSelector, onRampAddress, E.sourceLP, E.sourceClient, nil)
+	versionFinder := ccip.NewEvmVersionFinder()
+	onRampReader, err = ccip.NewOnRampReader(E.lggr, versionFinder, sourceChainSelector, destChainSelector, onRampAddress, E.sourceLP, E.sourceClient, nil)
 	return
 }
 
 // Dynamic Price Getter for CCIP commit service
 func (E EVMCCIPCommitProviderImpl_V2) NewPriceGetter(ctx context.Context) (priceGetter cciptypes.PriceGetter, err error) {
-	priceGetter, err = pricegetter.NewDynamicPriceGetter(E.priceGetterConfig, E.priceGetterClients)
+	priceGetter, err = ccip.NewDynamicPriceGetter(E.priceGetterConfig, E.priceGetterClients)
 	return
 }
 
 func (E EVMCCIPCommitProviderImpl_V2) NewPriceRegistryReader(ctx context.Context, addr cciptypes.Address) (priceRegistryReader cciptypes.PriceRegistryReader, err error) {
-	destPriceRegistry := ccipdataprovider.NewEvmPriceRegistry(E.destLP, E.destClient, E.lggr, ccip.CommitPluginLabel)
+	destPriceRegistry := ccip.NewEvmPriceRegistry(E.destLP, E.destClient, E.lggr, ccip.CommitPluginLabel)
 	priceRegistryReader, err = destPriceRegistry.NewPriceRegistryReader(ctx, addr)
 	return
 }
@@ -336,7 +330,7 @@ func (E EVMCCIPCommitProviderImpl_V2) SourceNativeToken(ctx context.Context, sou
 
 func (E EVMCCIPCommitProviderImpl_V2) NewOffRampReaders(ctx context.Context, destRouterAddr cciptypes.Address) (offRampReaders []cciptypes.OffRampReader, err error) {
 	// Look up all destination offRamps connected to the same router
-	destRouterEvmAddr, err := ccipcalc.GenericAddrToEvm(destRouterAddr)
+	destRouterEvmAddr, err := ccip.GenericAddrToEvm(destRouterAddr)
 	if err != nil {
 		return nil, err
 	}
@@ -348,10 +342,10 @@ func (E EVMCCIPCommitProviderImpl_V2) NewOffRampReaders(ctx context.Context, des
 	if err != nil {
 		return nil, err
 	}
-	var destOffRampReaders []ccipdata.OffRampReader
+	var destOffRampReaders []ccip.OffRampReader
 	for _, o := range destRouterOffRamps {
 		destOffRampAddr := cciptypes.Address(o.OffRamp.String())
-		destOffRampReader, err2 := factory.NewOffRampReader(
+		destOffRampReader, err2 := ccip.NewOffRampReader(
 			E.lggr,
 			E.versionFinder,
 			destOffRampAddr,
