@@ -500,7 +500,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, OCR2BaseN
         ReceiverError.selector == bytes4(err) || TokenHandlingError.selector == bytes4(err)
           || Internal.InvalidEVMAddress.selector == bytes4(err) || InvalidDataLength.selector == bytes4(err)
           || CallWithExactGas.NoContract.selector == bytes4(err) || NotACompatiblePool.selector == bytes4(err)
-          || IMessageValidator.MessageValidationFailure.selector == bytes4(err)
+          || IMessageValidator.MessageValidationError.selector == bytes4(err)
       ) {
         // If CCIP receiver execution is not successful, bubble up receiver revert data,
         // prepended by the 4 bytes of ReceiverError.selector, TokenHandlingError.selector or InvalidPoolAddress.selector.
@@ -555,7 +555,10 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, OCR2BaseN
 
     address messageValidator = s_dynamicConfig.messageValidator;
     if (messageValidator != address(0)) {
-      IMessageValidator(messageValidator).validateIncomingMessage(any2EvmMessage);
+      try IMessageValidator(messageValidator).validateIncomingMessage(any2EvmMessage) {}
+      catch (bytes memory err) {
+        revert IMessageValidator.MessageValidationError(err);
+      }
     }
 
     (bool success, bytes memory returnData,) = IRouter(s_dynamicConfig.router).routeMessage(

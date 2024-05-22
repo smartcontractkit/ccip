@@ -7,9 +7,9 @@ import {Client} from "../libraries/Client.sol";
 ///         and perform validations on top of the messages. All validation functions are expected to
 ///         revert on validation failures.
 interface IMessageValidator {
-  /// @notice The error that is expected to be thrown on validation failures
+  /// @notice Common error that can be thrown on validation failures and used by consumers
   /// @param errorReason abi encoded revert reason
-  error MessageValidationFailure(bytes errorReason);
+  error MessageValidationError(bytes errorReason);
 
   /// @notice Validates the given OffRamp message. Reverts on validation failure
   /// @param message to validate
