@@ -3,6 +3,7 @@ package config
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"math/big"
 	"strings"
 
@@ -27,28 +28,9 @@ type CommitPluginJobSpecConfig struct {
 	PriceGetterConfig *DynamicPriceGetterConfig `json:"priceGetterConfig,omitempty"`
 }
 
-// CommitProviderJobSpecConfigSource contains the source chain specific variables for the ccip.CCIPCommit provider.
-type CommitProviderJobSpecConfigSource struct {
-	SourceStartBlock uint64            // Only for first time job add.
-	OffRamp          cciptypes.Address `json:"offRamp"`
-	// TokenPricesUSDPipeline should contain a token price pipeline for the following tokens:
-	//		The SOURCE chain wrapped native
-	// 		The DESTINATION supported tokens (including fee tokens) as defined in destination OffRamp and PriceRegistry.
-	TokenPricesUSDPipeline string `json:"tokenPricesUSDPipeline,omitempty"`
-	// PriceGetterConfig defines where to get the token prices from (i.e. static or aggregator source).
-	PriceGetterConfig *DynamicPriceGetterConfig `json:"priceGetterConfig,omitempty"`
-}
-
-// CommitProviderJobSpecConfigDest contains the destination chain specific variables for the ccip.CCIPCommit provider.
-type CommitProviderJobSpecConfigDest struct {
-	SourceStartBlock, DestStartBlock uint64            // Only for first time job add.
-	OffRamp                          cciptypes.Address `json:"offRamp"`
-	// TokenPricesUSDPipeline should contain a token price pipeline for the following tokens:
-	//		The SOURCE chain wrapped native
-	// 		The DESTINATION supported tokens (including fee tokens) as defined in destination OffRamp and PriceRegistry.
-	TokenPricesUSDPipeline string `json:"tokenPricesUSDPipeline,omitempty"`
-	// PriceGetterConfig defines where to get the token prices from (i.e. static or aggregator source).
-	PriceGetterConfig *DynamicPriceGetterConfig `json:"priceGetterConfig,omitempty"`
+type CommitPluginConfig struct {
+	SourceRelayerID types.RelayID
+	DestRelayerID   types.RelayID
 }
 
 // DynamicPriceGetterConfig specifies which configuration to use for getting the price of tokens (map keys).

@@ -73,6 +73,13 @@ func (g *relayGetter) Get(id relay.ID) (loop.Relayer, error) {
 	return evmrelayer.NewLoopRelayServerAdapter(g.r, g.e), nil
 }
 
+func (g *relayGetter) List(...relay.ID) (map[relay.ID]loop.Relayer, error) {
+	relayMap := make(map[relay.ID]loop.Relayer, 1)
+	r := evmrelayer.NewLoopRelayServerAdapter(g.r, g.e)
+	relayMap[relay.ID{Network: "dummy", ChainID: "dummy"}] = r
+	return relayMap, nil
+}
+
 func TestSpawner_CreateJobDeleteJob(t *testing.T) {
 	t.Parallel()
 

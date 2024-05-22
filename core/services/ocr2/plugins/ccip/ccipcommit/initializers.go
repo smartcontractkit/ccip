@@ -81,7 +81,7 @@ func NewCommitServices(ctx context.Context, lggr logger.Logger, jb job.Job, chai
 	}, nil
 }
 
-func NewCommitServices2(ctx context.Context, provider commontypes.CCIPCommitProvider, jb job.Job, lggr logger.Logger, pr pipeline.Runner, argsNoPlugin libocr2.OCR2OracleArgs, new bool, onRampAddress string, sourceChainID int64, destChainID int64, logError func(string)) ([]job.ServiceCtx, error) {
+func NewCommitServices2(ctx context.Context, provider commontypes.CCIPCommitProvider, jb job.Job, lggr logger.Logger, pr pipeline.Runner, argsNoPlugin libocr2.OCR2OracleArgs, new bool, sourceChainID int64, destChainID int64, logError func(string)) ([]job.ServiceCtx, error) {
 	spec := jb.OCR2OracleSpec
 
 	var pluginConfig ccipconfig.CommitPluginJobSpecConfig
@@ -121,8 +121,9 @@ func NewCommitServices2(ctx context.Context, provider commontypes.CCIPCommitProv
 	if err != nil {
 		return nil, err
 	}
+	onRampAddress := staticConfig.OnRamp
 
-	onRampReader, err := provider.NewOnRampReader(ctx, cciptypes.Address(onRampAddress), staticConfig.SourceChainSelector, staticConfig.ChainSelector)
+	onRampReader, err := provider.NewOnRampReader(ctx, onRampAddress, staticConfig.SourceChainSelector, staticConfig.ChainSelector)
 	if err != nil {
 		return nil, err
 	}

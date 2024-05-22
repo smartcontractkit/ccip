@@ -5,7 +5,10 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"log"
+	"strconv"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -115,6 +118,8 @@ func (e ErrRelayNotEnabled) Error() string {
 
 type RelayGetter interface {
 	Get(id relay.ID) (loop.Relayer, error)
+	GetAll() map[relay.ID]loop.Relayer
+	GetRelayerSet() core.RelayerSet
 }
 type Delegate struct {
 	db                    *sqlx.DB
@@ -1712,13 +1717,14 @@ func (d *Delegate) newServicesCCIPCommit(ctx context.Context, lggr logger.Sugare
 	if spec.Relay != relay.EVM {
 		return nil, errors.New("Non evm chains are not supported for CCIP commit")
 	}
-	rid, err := spec.RelayID()
+	srcRid, err := spec.RelayID()
+
 	if err != nil {
 		return nil, ErrJobSpecNoRelayer{Err: err, PluginName: string(spec.PluginType)}
 	}
-	chain, err := d.legacyChains.Get(rid.ChainID)
+	chain, err := d.legacyChains.Get(srcRid.ChainID)
 	if err != nil {
-		return nil, fmt.Errorf("ccip services; failed to get chain %s: %w", rid.ChainID, err)
+		return nil, fmt.Errorf("ccip services; failed to get chain %s: %w", srcRid.ChainID, err)
 	}
 
 	ccipProvider, err2 := evmrelay.NewCCIPCommitProvider(
@@ -1746,8 +1752,8 @@ func (d *Delegate) newServicesCCIPCommit(ctx context.Context, lggr logger.Sugare
 		Database:                     ocrDB,
 		LocalConfig:                  lc,
 		MonitoringEndpoint: d.monitoringEndpointGen.GenMonitoringEndpoint(
-			rid.Network,
-			rid.ChainID,
+			srcRid.Network,
+			srcRid.ChainID,
 			spec.ContractID,
 			synchronization.OCR2CCIPCommit,
 		),
@@ -1759,29 +1765,71 @@ func (d *Delegate) newServicesCCIPCommit(ctx context.Context, lggr logger.Sugare
 		lggr.ErrorIf(d.jobORM.RecordError(jb.ID, msg), "unable to record error")
 	}
 
-	dummyRelayer, err := d.RelayGetter.Get(rid)
+	relayers := d.RelayGetter.GetAll()
+
+	// Get the relayer ID corresponding to the dest chain
+	chainIDInterface, ok := spec.RelayConfig["chainID"]
+	if !ok {
+		return nil, errors.New("chainID must be provided in relay config")
+	}
+	destChainID := uint64(chainIDInterface.(float64))
+	_, err = d.legacyChains.Get(strconv.FormatUint(destChainID, 10))
+	if err != nil {
+		return nil, errors.Wrap(err, "dest chain not found in chainset")
+	}
+	var dstRid relay.ID
+	for r := range relayers {
+		if fmt.Sprintf("%d", destChainID) == r.ChainID {
+			dstRid = r
+		}
+	}
+
+	commitPluginConfigBytes, err := ccipSourceDestRelayerToPluginConfig(srcRid, dstRid)
 	if err != nil {
 		return nil, err
 	}
 
-	ccipCommitProvider, err := dummyRelayer.NewCCIPCommitProvider(
-		types.RelayArgs{
-			ExternalJobID: jb.ExternalJobID,
-			JobID:         spec.ID,
-			ContractID:    spec.ContractID,
-			RelayConfig:   spec.RelayConfig.Bytes(),
-			New:           d.isNewlyCreatedJob,
+	relayerSet := d.RelayGetter.GetRelayerSet()
+
+	provider, err := relayerSet.NewCrossRelayerPluginProvider(
+		ctx,
+		core.RelayArgs{
+			ContractID:   spec.ContractID,
+			RelayConfig:  spec.RelayConfig.Bytes(),
+			ProviderType: string(types.CCIPCommit),
 		},
-		types.PluginArgs{},
-		d.legacyChains,
-		d.pipelineRunner,
-		jb.Name.ValueOrZero(),
+		core.PluginArgs{
+			PluginConfig: commitPluginConfigBytes,
+		},
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	return ccipcommit.NewCommitServices(ctx, ccipCommitProvider, lggr, jb, d.legacyChains, d.isNewlyCreatedJob, d.pipelineRunner, oracleArgsNoPlugin, logError, qopts...)
+	ccipCommitProvider, ok := provider.(types.CCIPCommitProvider)
+	if !ok {
+		return nil, errors.New("could not coerce PluginProvider to MercuryProvider")
+	}
+
+	sourceChainID, err := strconv.ParseInt(srcRid.ChainID, 10, 64)
+	if err != nil {
+		return nil, err
+	}
+
+	return ccipcommit.NewCommitServices2(ctx, ccipCommitProvider, jb, lggr, d.pipelineRunner, oracleArgsNoPlugin, d.isNewlyCreatedJob, sourceChainID, int64(destChainID), logError)
+}
+
+func ccipSourceDestRelayerToPluginConfig(sID relay.ID, dID relay.ID) ([]byte, error) {
+	commitPluginConfig := &config.CommitPluginConfig{
+		SourceRelayerID: types.RelayID(sID),
+		DestRelayerID:   types.RelayID(dID),
+	}
+
+	bytes, err := json.Marshal(commitPluginConfig)
+	if err != nil {
+		return nil, err
+	}
+	return bytes, nil
 }
 
 func (d *Delegate) newServicesCCIPExecution(ctx context.Context, lggr logger.SugaredLogger, jb job.Job, bootstrapPeers []commontypes.BootstrapperLocator, kb ocr2key.KeyBundle, ocrDB *db, lc ocrtypes.LocalConfig, transmitterID string, qopts ...pg.QOpt) ([]job.ServiceCtx, error) {

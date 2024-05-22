@@ -6,8 +6,9 @@ import (
 	"fmt"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
-	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
+	types "github.com/smartcontractkit/chainlink-common/pkg/types"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
@@ -33,33 +34,30 @@ import (
 )
 
 type RelayerSet interface {
-	Get(ctx context.Context, relayID commontypes.RelayID) (Relayer, error)
+	Get(ctx context.Context, relayID types.RelayID) (Relayer, error)
 
 	// List lists the relayers corresponding to `...types.RelayID`
 	// returning all relayers if len(...types.RelayID) == 0.
-	List(ctx context.Context, relayIDs ...commontypes.RelayID) (map[commontypes.RelayID]Relayer, error)
+	List(ctx context.Context, relayIDs ...types.RelayID) (map[types.RelayID]Relayer, error)
+	NewCrossRelayerPluginProvider(context.Context, types.RelayArgs, types.PluginArgs) (types.PluginProvider, error)
 }
 
-type CCIPRelayerSet struct {
-	relayerMap    map[commontypes.RelayID]Relayer
-	sourceRelayer Relayer
-	destRelayer   Relayer
-	lggr          logger.Logger
+type EVMRelayerSet struct {
+	relayerMap map[types.RelayID]Relayer
+	lggr       logger.Logger
 }
 
-func NewCCIPRelayerSet(relayerMap map[commontypes.RelayID]Relayer, sourceRelayer Relayer, destRelayer Relayer, lggr logger.Logger) *CCIPRelayerSet {
-	return &CCIPRelayerSet{
-		relayerMap:    relayerMap,
-		sourceRelayer: sourceRelayer,
-		destRelayer:   destRelayer,
-		lggr:          lggr,
+func NewEVMRelayerSet(relayerMap map[types.RelayID]Relayer, lggr logger.Logger) *EVMRelayerSet {
+	return &EVMRelayerSet{
+		relayerMap: relayerMap,
+		lggr:       lggr,
 	}
 }
 
-func chainIDToRelayerID(ctx context.Context, rs RelayerSet, chainID string) (commontypes.RelayID, error) {
+func chainIDToRelayerID(ctx context.Context, rs core.RelayerSet, chainID string) (types.RelayID, error) {
 	relayerMap, err := rs.List(ctx)
 	if err != nil {
-		return commontypes.RelayID{}, err
+		return types.RelayID{}, err
 	}
 
 	rids := maps.Keys(relayerMap)
@@ -69,20 +67,20 @@ func chainIDToRelayerID(ctx context.Context, rs RelayerSet, chainID string) (com
 		}
 	}
 
-	return commontypes.RelayID{}, fmt.Errorf("chain ID '%s' not found", chainID)
+	return types.RelayID{}, fmt.Errorf("chain ID '%s' not found", chainID)
 
 }
 
-func (rs *CCIPRelayerSet) Get(ctx context.Context, relayID commontypes.RelayID) (Relayer, error) {
+func (rs *EVMRelayerSet) Get(ctx context.Context, relayID types.RelayID) (Relayer, error) {
 	return rs.relayerMap[relayID], nil
 }
 
-func (rs *CCIPRelayerSet) List(ctx context.Context, relayIDs ...commontypes.RelayID) (map[commontypes.RelayID]Relayer, error) {
+func (rs *EVMRelayerSet) List(ctx context.Context, relayIDs ...types.RelayID) (map[types.RelayID]Relayer, error) {
 	if len(relayIDs) == 0 {
 		return rs.relayerMap, nil
 	}
 
-	subset := make(map[commontypes.RelayID]Relayer)
+	subset := make(map[types.RelayID]Relayer)
 	// subset relayer ids
 	for _, srid := range relayIDs {
 		subset[srid] = Relayer{}
@@ -99,12 +97,37 @@ func (rs *CCIPRelayerSet) List(ctx context.Context, relayIDs ...commontypes.Rela
 	return subset, nil
 }
 
-func (rs *CCIPRelayerSet) NewCCIPCommitProvider_V2(ctx context.Context, rargs commontypes.RelayArgs, pargs commontypes.PluginArgs) (commontypes.CCIPCommitProvider, error) {
+func (rs *EVMRelayerSet) NewCrossRelayerPluginProvider(ctx context.Context, rargs types.RelayArgs, pargs types.PluginArgs) (types.PluginProvider, error) {
+	switch rargs.ProviderType {
+	case string(types.CCIPCommit):
+		return rs.NewCCIPCommitProvider(ctx, rargs, pargs)
+	}
+
+	return nil, fmt.Errorf("unsupported relayer type: %s", rargs.ProviderType)
+}
+
+func (rs *EVMRelayerSet) NewCCIPCommitProvider(ctx context.Context, rargs types.RelayArgs, pargs types.PluginArgs) (types.CCIPCommitProvider, error) {
+	var commitPluginConfig ccipconfig.CommitPluginConfig
+	err := json.Unmarshal(pargs.PluginConfig, &commitPluginConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	sourceRelayer, err := rs.Get(ctx, commitPluginConfig.SourceRelayerID)
+	if err != nil {
+		return nil, err
+	}
+
+	destRelayer, err := rs.Get(ctx, commitPluginConfig.DestRelayerID)
+	if err != nil {
+		return nil, err
+	}
+
 	lggr := rs.lggr
 	commitStoreAddress := rargs.ContractID
 
 	var pluginConfig ccipconfig.CommitPluginJobSpecConfig
-	err := json.Unmarshal(pargs.PluginConfig, &pluginConfig)
+	err = json.Unmarshal(pargs.PluginConfig, &pluginConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -142,20 +165,20 @@ func (rs *CCIPRelayerSet) NewCCIPCommitProvider_V2(ctx context.Context, rargs co
 
 	return EVMCCIPCommitProviderImpl_V2{
 		lggr:               lggr,
-		sourceLP:           rs.sourceRelayer.chain.LogPoller(),
-		destLP:             rs.destRelayer.chain.LogPoller(),
+		sourceLP:           sourceRelayer.chain.LogPoller(),
+		destLP:             destRelayer.chain.LogPoller(),
 		sourceStartBlock:   sourceStartBlock,
 		destStartBlock:     destStartBlock,
 		commitStoreAddress: commitStoreAddress,
 		offRampAddress:     offRampAddress,
-		sourceClient:       rs.sourceRelayer.chain.Client(),
-		destClient:         rs.destRelayer.chain.Client(),
-		sourceGasEstimator: rs.sourceRelayer.chain.GasEstimator(),
-		destGasEstimator:   rs.destRelayer.chain.GasEstimator(),
-		sourceMaxGasPrice:  *rs.sourceRelayer.chain.Config().EVM().GasEstimator().PriceMax().ToInt(),
-		destMaxGasPrice:    *rs.destRelayer.chain.Config().EVM().GasEstimator().PriceMax().ToInt(),
-		sourceCodec:        rs.sourceRelayer.codec,
-		sourceChainReader:  rs.sourceRelayer.chainReader,
+		sourceClient:       sourceRelayer.chain.Client(),
+		destClient:         destRelayer.chain.Client(),
+		sourceGasEstimator: sourceRelayer.chain.GasEstimator(),
+		destGasEstimator:   destRelayer.chain.GasEstimator(),
+		sourceMaxGasPrice:  *sourceRelayer.chain.Config().EVM().GasEstimator().PriceMax().ToInt(),
+		destMaxGasPrice:    *destRelayer.chain.Config().EVM().GasEstimator().PriceMax().ToInt(),
+		sourceCodec:        sourceRelayer.codec,
+		sourceChainReader:  sourceRelayer.chainReader,
 		priceGetterClients: priceGetterClients,
 		priceGetterConfig:  *pluginConfig.PriceGetterConfig,
 	}, nil
@@ -175,13 +198,13 @@ type EVMCCIPCommitProviderImpl_V2 struct {
 	destGasEstimator   gas.EvmFeeEstimator
 	sourceMaxGasPrice  big.Int
 	destMaxGasPrice    big.Int
-	sourceCodec        commontypes.Codec
-	sourceChainReader  commontypes.ChainReader
+	sourceCodec        types.Codec
+	sourceChainReader  types.ChainReader
 	priceGetterClients map[uint64]pricegetter.DynamicPriceGetterClient
 	priceGetterConfig  config.DynamicPriceGetterConfig
 	versionFinder      factory.VersionFinder
 	s                  services.Service
-	cp                 commontypes.ConfigProvider
+	cp                 types.ConfigProvider
 }
 
 func (E EVMCCIPCommitProviderImpl_V2) Name() string {
@@ -258,14 +281,14 @@ func (E EVMCCIPCommitProviderImpl_V2) ContractConfigTracker() ocrtypes.ContractC
 }
 
 func (E EVMCCIPCommitProviderImpl_V2) ContractTransmitter() ocrtypes.ContractTransmitter {
-	E.source
+	return
 }
 
-func (E EVMCCIPCommitProviderImpl_V2) ChainReader() commontypes.ChainReader {
+func (E EVMCCIPCommitProviderImpl_V2) ChainReader() types.ChainReader {
 	return E.sourceChainReader
 }
 
-func (E EVMCCIPCommitProviderImpl_V2) Codec() commontypes.Codec {
+func (E EVMCCIPCommitProviderImpl_V2) Codec() types.Codec {
 	return E.sourceCodec
 }
 
