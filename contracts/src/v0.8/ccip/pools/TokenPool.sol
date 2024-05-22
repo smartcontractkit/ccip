@@ -30,6 +30,7 @@ abstract contract TokenPool is IPool, OwnerIsCreator {
   error CursedByRMN();
   error ChainAlreadyExists(uint64 chainSelector);
   error InvalidSourcePoolAddress(bytes sourcePoolAddress);
+  error InvalidToken(address token);
 
   event Locked(address indexed sender, uint256 amount);
   event Burned(address indexed sender, uint256 amount);
@@ -135,20 +136,38 @@ abstract contract TokenPool is IPool, OwnerIsCreator {
   // │                         Validation                           │
   // ================================================================
 
-  function _validateLockOrBurn(Pool.LockOrBurnInV1 memory lockOrBurnIn)
-    internal
-    whenNotCursed(lockOrBurnIn.remoteChainSelector)
-  {
+  /// @notice Validates the lock or burn input for correctness on
+  /// - token to be locked or burned
+  /// - RMN curse status
+  /// - allowlist status
+  /// - if the sender is a valid onRamp
+  /// - rate limit status
+  /// @param lockOrBurnIn The input to validate.
+  /// @dev This function should always be called before executing a lock or burn. Not doing so would allow
+  /// for various exploits.
+  function _validateLockOrBurn(Pool.LockOrBurnInV1 memory lockOrBurnIn) internal {
+    if (lockOrBurnIn.token != address(i_token)) revert InvalidToken(lockOrBurnIn.token);
+    if (IRMN(i_rmnProxy).isCursed(bytes32(uint256(lockOrBurnIn.remoteChainSelector)))) revert CursedByRMN();
     _checkAllowList(lockOrBurnIn.originalSender);
+
     _onlyOnRamp(lockOrBurnIn.remoteChainSelector);
     _consumeOutboundRateLimit(lockOrBurnIn.remoteChainSelector, lockOrBurnIn.amount);
   }
 
-  function _validateReleaseOrMint(Pool.ReleaseOrMintInV1 memory releaseOrMintIn)
-    internal
-    whenNotCursed(releaseOrMintIn.remoteChainSelector)
-  {
+  /// @notice Validates the release or mint input for correctness on
+  /// - token to be released or minted
+  /// - RMN curse status
+  /// - if the sender is a valid offRamp
+  /// - if the source pool is valid
+  /// - rate limit status
+  /// @param releaseOrMintIn The input to validate.
+  /// @dev This function should always be called before executing a lock or burn. Not doing so would allow
+  /// for various exploits.
+  function _validateReleaseOrMint(Pool.ReleaseOrMintInV1 memory releaseOrMintIn) internal {
+    if (IRMN(i_rmnProxy).isCursed(bytes32(uint256(releaseOrMintIn.remoteChainSelector)))) revert CursedByRMN();
     _onlyOffRamp(releaseOrMintIn.remoteChainSelector);
+
+    // Validates that the source pool address is configured on this pool.
     if (keccak256(releaseOrMintIn.sourcePoolAddress) != keccak256(getRemotePool(releaseOrMintIn.remoteChainSelector))) {
       revert InvalidSourcePoolAddress(releaseOrMintIn.sourcePoolAddress);
     }
@@ -371,12 +390,5 @@ abstract contract TokenPool is IPool, OwnerIsCreator {
         emit AllowListAdd(toAdd);
       }
     }
-  }
-
-  /// @notice Ensure that the RMN has not cursed the lane, and that the latest heartbeat is not stale.
-  /// @param remoteChainSelector - The chain ID of the remote chain
-  modifier whenNotCursed(uint64 remoteChainSelector) {
-    if (IRMN(i_rmnProxy).isCursed(bytes32(uint256(remoteChainSelector)))) revert CursedByRMN();
-    _;
   }
 }
