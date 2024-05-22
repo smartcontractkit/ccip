@@ -83,7 +83,7 @@ contract EVM2EVMMultiOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSet
       s_valid_signers,
       s_valid_transmitters,
       s_f,
-      abi.encode(generateDynamicMultiOffRampConfig(address(router), address(s_priceRegistry))),
+      abi.encode(generateDynamicMultiOffRampConfig(address(router))),
       s_offchainConfigVersion,
       abi.encode("")
     );
@@ -204,14 +204,14 @@ contract EVM2EVMMultiOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSet
     });
   }
 
-  function generateDynamicMultiOffRampConfig(
-    address router,
-    address priceRegistry
-  ) internal pure returns (EVM2EVMMultiOffRamp.DynamicConfig memory) {
+  function generateDynamicMultiOffRampConfig(address router)
+    internal
+    pure
+    returns (EVM2EVMMultiOffRamp.DynamicConfig memory)
+  {
     return EVM2EVMMultiOffRamp.DynamicConfig({
       permissionLessExecutionThresholdSeconds: PERMISSION_LESS_EXECUTION_THRESHOLD_SECONDS,
       router: router,
-      priceRegistry: priceRegistry,
       maxNumberOfTokensPerMsg: MAX_TOKENS_LENGTH,
       maxDataBytes: MAX_DATA_SIZE,
       maxPoolReleaseOrMintGas: MAX_TOKEN_POOL_RELEASE_OR_MINT_GAS,
@@ -393,7 +393,6 @@ contract EVM2EVMMultiOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSet
   ) public pure {
     assertEq(a.permissionLessExecutionThresholdSeconds, b.permissionLessExecutionThresholdSeconds);
     assertEq(a.router, b.router);
-    assertEq(a.priceRegistry, b.priceRegistry);
     assertEq(a.maxNumberOfTokensPerMsg, b.maxNumberOfTokensPerMsg);
     assertEq(a.maxDataBytes, b.maxDataBytes);
     assertEq(a.maxPoolReleaseOrMintGas, b.maxPoolReleaseOrMintGas);

@@ -41,8 +41,7 @@ contract EVM2EVMMultiOffRamp_constructor is EVM2EVMMultiOffRampSetup {
       chainSelector: DEST_CHAIN_SELECTOR,
       rmnProxy: address(s_mockRMN)
     });
-    EVM2EVMMultiOffRamp.DynamicConfig memory dynamicConfig =
-      generateDynamicMultiOffRampConfig(address(s_destRouter), address(s_priceRegistry));
+    EVM2EVMMultiOffRamp.DynamicConfig memory dynamicConfig = generateDynamicMultiOffRampConfig(address(s_destRouter));
 
     EVM2EVMMultiOffRamp.SourceChainConfigArgs[] memory sourceChainConfigs =
       new EVM2EVMMultiOffRamp.SourceChainConfigArgs[](2);
@@ -155,8 +154,7 @@ contract EVM2EVMMultiOffRamp_setDynamicConfig is EVM2EVMMultiOffRampSetup {
 
   function test_SetDynamicConfig_Success() public {
     EVM2EVMMultiOffRamp.StaticConfig memory staticConfig = s_offRamp.getStaticConfig();
-    EVM2EVMMultiOffRamp.DynamicConfig memory dynamicConfig =
-      generateDynamicMultiOffRampConfig(USER_3, address(s_priceRegistry));
+    EVM2EVMMultiOffRamp.DynamicConfig memory dynamicConfig = generateDynamicMultiOffRampConfig(USER_3);
     bytes memory onchainConfig = abi.encode(dynamicConfig);
 
     vm.expectEmit();
@@ -186,8 +184,7 @@ contract EVM2EVMMultiOffRamp_setDynamicConfig is EVM2EVMMultiOffRampSetup {
 
   function test_NonOwner_Revert() public {
     vm.startPrank(STRANGER);
-    EVM2EVMMultiOffRamp.DynamicConfig memory dynamicConfig =
-      generateDynamicMultiOffRampConfig(USER_3, address(s_priceRegistry));
+    EVM2EVMMultiOffRamp.DynamicConfig memory dynamicConfig = generateDynamicMultiOffRampConfig(USER_3);
 
     vm.expectRevert("Only callable by owner");
 
@@ -197,8 +194,7 @@ contract EVM2EVMMultiOffRamp_setDynamicConfig is EVM2EVMMultiOffRampSetup {
   }
 
   function test_RouterZeroAddress_Revert() public {
-    EVM2EVMMultiOffRamp.DynamicConfig memory dynamicConfig =
-      generateDynamicMultiOffRampConfig(ZERO_ADDRESS, ZERO_ADDRESS);
+    EVM2EVMMultiOffRamp.DynamicConfig memory dynamicConfig = generateDynamicMultiOffRampConfig(ZERO_ADDRESS);
 
     vm.expectRevert(EVM2EVMMultiOffRamp.ZeroAddressNotAllowed.selector);
 

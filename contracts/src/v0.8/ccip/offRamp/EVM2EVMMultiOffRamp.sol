@@ -10,7 +10,6 @@ import {IAny2EVMOffRamp} from "../interfaces/IAny2EVMOffRamp.sol";
 import {IMessageValidator} from "../interfaces/IMessageValidator.sol";
 import {IMultiCommitStore} from "../interfaces/IMultiCommitStore.sol";
 import {IPool} from "../interfaces/IPool.sol";
-import {IPriceRegistry} from "../interfaces/IPriceRegistry.sol";
 import {IRMN} from "../interfaces/IRMN.sol";
 import {IRouter} from "../interfaces/IRouter.sol";
 
@@ -109,11 +108,10 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, OCR2BaseN
   struct DynamicConfig {
     uint32 permissionLessExecutionThresholdSeconds; // ─╮ Waiting time before manual execution is enabled
     address router; // ─────────────────────────────────╯ Router address
-    address priceRegistry; // ──────────╮ Price registry address
-    uint16 maxNumberOfTokensPerMsg; //  │ Maximum number of ERC20 token transfers that can be included per message
-    uint32 maxDataBytes; //             │ Maximum payload data size in bytes
-    uint32 maxPoolReleaseOrMintGas; // ─╯ Maximum amount of gas passed on to token pool when calling releaseOrMint
-    address messageValidator; // Optional message validator to validate incoming messages (zero address = no validator)
+    uint16 maxNumberOfTokensPerMsg; // ──╮ Maximum number of ERC20 token transfers that can be included per message
+    uint32 maxDataBytes; //              │ Maximum payload data size in bytes
+    uint32 maxPoolReleaseOrMintGas; //   │ Maximum amount of gas passed on to token pool when calling releaseOrMint
+    address messageValidator; // ────────╯ Optional message validator to validate incoming messages (zero address = no validator)
   }
 
   /// @notice Struct that represents a message route (sender -> receiver and source chain)
