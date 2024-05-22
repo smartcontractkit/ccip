@@ -1288,33 +1288,6 @@ func (sourceCCIP *SourceCCIPModule) DeployContracts(lane *laneconfig.LaneConfig)
 		return fmt.Errorf("getting chain selector shouldn't fail %w", err)
 	}
 
-	// update prices for price registry. It might be omitted in future
-	if !sourceCCIP.Common.ExistingDeployment {
-		var tokenUpdates []contracts.InternalTokenPriceUpdate
-		for _, token := range sourceCCIP.Common.BridgeTokens {
-			tokenUpdates = append(tokenUpdates, contracts.InternalTokenPriceUpdate{
-				SourceToken: token.ContractAddress,
-				UsdPerToken: LinkToUSD,
-			})
-		}
-		tokenUpdates = append(tokenUpdates, contracts.InternalTokenPriceUpdate{
-			SourceToken: sourceCCIP.Common.WrappedNative,
-			UsdPerToken: WrappedNativeToUSD,
-		}, contracts.InternalTokenPriceUpdate{
-			SourceToken: sourceCCIP.Common.FeeToken.EthAddress,
-			UsdPerToken: LinkToUSD,
-		})
-		err := sourceCCIP.Common.PriceRegistry.UpdatePrices(tokenUpdates,
-			[]contracts.InternalGasPriceUpdate{
-				{
-					DestChainSelector: sourceCCIP.DestChainSelector,
-					UsdPerUnitGas:     big.NewInt(20000e9),
-				},
-			})
-		if err != nil {
-			return fmt.Errorf("error updating prices %w in price registry", err)
-		}
-	}
 	if sourceCCIP.OnRamp == nil {
 		if sourceCCIP.Common.ExistingDeployment {
 			return fmt.Errorf("existing deployment is set to true but no onramp address is provided")
@@ -2651,13 +2624,13 @@ func (lane *CCIPLane) Multicall(noOfRequests int, multiSendAddr common.Address) 
 		lane.TotalFee = new(big.Int).Add(lane.TotalFee, fee)
 		ccipMultipleMsg = append(ccipMultipleMsg, sendData)
 		// if token transfer is required, transfer the token amount to multisend
-		for i, amount := range lane.Source.TransferAmount {
+		for j, amount := range lane.Source.TransferAmount {
 			// if length of sourceCCIP.TransferAmount is more than available bridge token use first bridge token
 			token := lane.Source.Common.BridgeTokens[0]
-			if i < len(lane.Source.Common.BridgeTokens) {
-				token = lane.Source.Common.BridgeTokens[i]
+			if j < len(lane.Source.Common.BridgeTokens) {
+				token = lane.Source.Common.BridgeTokens[j]
 			}
-			err := token.Transfer(multiSendAddr.Hex(), amount)
+			err = token.Transfer(multiSendAddr.Hex(), amount)
 			if err != nil {
 				return err
 			}
@@ -2674,7 +2647,7 @@ func (lane *CCIPLane) Multicall(noOfRequests int, multiSendAddr common.Address) 
 	// transfer the fee amount to multisend
 	if feeToken != (common.Address{}) {
 		isNative = false
-		err := lane.Source.Common.FeeToken.Transfer(multiSendAddr.Hex(), lane.TotalFee)
+		err = lane.Source.Common.FeeToken.Transfer(multiSendAddr.Hex(), lane.TotalFee)
 		if err != nil {
 			return err
 		}
