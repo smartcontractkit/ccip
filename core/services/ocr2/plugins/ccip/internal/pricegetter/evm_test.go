@@ -89,7 +89,8 @@ func TestDynamicPriceGetter(t *testing.T) {
 			assert.True(t, len(prices) >= len(test.param.expectedTokenPrices))
 			// Check prices are matching expected result.
 			for tk, expectedPrice := range test.param.expectedTokenPrices {
-				assert.Equal(t, 0, expectedPrice.Cmp(prices[cciptypes.Address(tk.String())]))
+				assert.Equal(t, 0, expectedPrice.Cmp(prices[cciptypes.Address(tk.String())]),
+					"Token price mismatch: expected price %v, got %v", expectedPrice, *prices[cciptypes.Address(tk.String())])
 			}
 		})
 	}
@@ -173,6 +174,7 @@ func testParamAggregatorOnly(t *testing.T) testParameters {
 	}
 }
 
+// testParamAggregatorOnlyMulti test with several tokens on chain 102.
 func testParamAggregatorOnlyMulti(t *testing.T) testParameters {
 	tk1 := utils.RandomAddress()
 	tk2 := utils.RandomAddress()

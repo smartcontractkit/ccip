@@ -80,7 +80,7 @@ func NewDynamicPriceGetter(cfg config.DynamicPriceGetterConfig, evmClients map[u
 	return &priceGetter, nil
 }
 
-// FilterForConfiguredTokens implements the PriceGetter interface.
+// FilterConfiguredTokens implements the PriceGetter interface.
 // It filters a list of token addresses for only those that have a price resolution rule configured on the PriceGetterConfig
 func (d *DynamicPriceGetter) FilterConfiguredTokens(ctx context.Context, tokens []cciptypes.Address) (configured []cciptypes.Address, unconfigured []cciptypes.Address, err error) {
 	configured = []cciptypes.Address{}
@@ -100,14 +100,6 @@ func (d *DynamicPriceGetter) FilterConfiguredTokens(ctx context.Context, tokens 
 		}
 	}
 	return configured, unconfigured, nil
-}
-
-// BatchCallsForChain Defines the batch calls to perform on a given chain.
-type batchCallsForChain struct {
-	decimalCalls         []rpclib.EvmCall
-	latestRoundDataCalls []rpclib.EvmCall
-	//calls                []rpclib.EvmCall // decimals then latest round data calls.
-	tokenOrder []common.Address // required to maintain the order of the batched rpc calls for mapping the results.
 }
 
 // TokenPricesUSD implements the PriceGetter interface.
@@ -224,6 +216,13 @@ func (d *DynamicPriceGetter) preparePricesAndBatchCallsPerChain(tokens []cciptyp
 		}
 	}
 	return prices, batchCallsPerChain, nil
+}
+
+// batchCallsForChain Defines the batch calls to perform on a given chain.
+type batchCallsForChain struct {
+	decimalCalls         []rpclib.EvmCall
+	latestRoundDataCalls []rpclib.EvmCall
+	tokenOrder           []common.Address // required to maintain the order of the batched rpc calls for mapping the results.
 }
 
 func (d *DynamicPriceGetter) Close() error {
