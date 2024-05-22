@@ -131,11 +131,28 @@ abstract contract TokenPool is IPool, OwnerIsCreator {
       || interfaceId == type(IERC165).interfaceId;
   }
 
-  // Validate if the sending pool is allowed
-  function _validateSourceCaller(uint64 remoteChainSelector, bytes memory sourcePoolAddress) internal view {
-    if (keccak256(sourcePoolAddress) != keccak256(getRemotePool(remoteChainSelector))) {
-      revert InvalidSourcePoolAddress(sourcePoolAddress);
+  // ================================================================
+  // │                         Validation                           │
+  // ================================================================
+
+  function _validateLockOrBurn(Pool.LockOrBurnInV1 memory lockOrBurnIn)
+    internal
+    whenNotCursed(lockOrBurnIn.remoteChainSelector)
+  {
+    _checkAllowList(lockOrBurnIn.originalSender);
+    _onlyOnRamp(lockOrBurnIn.remoteChainSelector);
+    _consumeOutboundRateLimit(lockOrBurnIn.remoteChainSelector, lockOrBurnIn.amount);
+  }
+
+  function _validateReleaseOrMint(Pool.ReleaseOrMintInV1 memory releaseOrMintIn)
+    internal
+    whenNotCursed(releaseOrMintIn.remoteChainSelector)
+  {
+    _onlyOffRamp(releaseOrMintIn.remoteChainSelector);
+    if (keccak256(releaseOrMintIn.sourcePoolAddress) != keccak256(getRemotePool(releaseOrMintIn.remoteChainSelector))) {
+      revert InvalidSourcePoolAddress(releaseOrMintIn.sourcePoolAddress);
     }
+    _consumeInboundRateLimit(releaseOrMintIn.remoteChainSelector, releaseOrMintIn.amount);
   }
 
   // ================================================================
