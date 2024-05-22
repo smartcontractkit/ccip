@@ -450,28 +450,19 @@ func mockClient(t *testing.T, decimals []uint8, rounds []aggregator_v3_interface
 func mockCaller(t *testing.T, decimals []uint8, rounds []aggregator_v3_interface.LatestRoundData) *rpclibmocks.EvmBatchCaller {
 	caller := rpclibmocks.NewEvmBatchCaller(t)
 
-	// Mock decimals calls.
-	dataAndErrs := make([]rpclib.DataAndErr, 0, len(rounds))
+	// Mock batch calls per chain: all decimals calls then all latestRoundData calls.
+	dataAndErrs := make([]rpclib.DataAndErr, 0, len(decimals)+len(rounds))
 	for _, d := range decimals {
 		dataAndErrs = append(dataAndErrs, rpclib.DataAndErr{
 			Outputs: []any{d},
 		})
 	}
-	caller.On("BatchCall", mock.Anything, uint64(0), mock.MatchedBy(func(c []rpclib.EvmCall) bool {
-		return c[0].MethodName() == decimalsMethodName
-	})).Return(dataAndErrs, nil).Maybe()
-
-	// Mock latestRoundData calls.
-	dataAndErrs = make([]rpclib.DataAndErr, 0, len(rounds))
 	for _, round := range rounds {
 		dataAndErrs = append(dataAndErrs, rpclib.DataAndErr{
 			Outputs: []any{round.RoundId, round.Answer, round.StartedAt, round.UpdatedAt, round.AnsweredInRound},
 		})
 	}
-	caller.On("BatchCall", mock.Anything, uint64(0), mock.MatchedBy(func(c []rpclib.EvmCall) bool {
-		return c[0].MethodName() == latestRoundDataMethodName
-	})).Return(dataAndErrs, nil).Maybe()
-
+	caller.On("BatchCall", mock.Anything, uint64(0), mock.Anything).Return(dataAndErrs, nil).Maybe()
 	return caller
 }
 

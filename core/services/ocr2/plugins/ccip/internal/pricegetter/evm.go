@@ -123,52 +123,11 @@ func (d *DynamicPriceGetter) TokenPricesUSD(ctx context.Context, tokens []ccipty
 	return prices, nil
 }
 
+// performBatchCalls performs batch calls on all chains to retrieve token prices.
 func (d *DynamicPriceGetter) performBatchCalls(ctx context.Context, batchCallsPerChain map[uint64]*batchCallsForChain, prices map[cciptypes.Address]*big.Int) error {
 	for chainID, batchCalls := range batchCallsPerChain {
-
-		//if err := d.performBatchCall(ctx, chainID, batchCalls, prices); err!=nil {
-		//	return err
-		//}
-
-		client, exists := d.evmClients[chainID]
-		if !exists {
-			return fmt.Errorf("evm caller for chain %d not found", chainID)
-		}
-
-		evmCaller := client.BatchCaller
-		resultsDecimals, err := evmCaller.BatchCall(ctx, 0, batchCalls.decimalCalls)
-		if err != nil {
-			return fmt.Errorf("batch call: %w", err)
-		}
-		resultsLatestRoundData, err := evmCaller.BatchCall(ctx, 0, batchCalls.latestRoundDataCalls)
-		if err != nil {
-			return fmt.Errorf("batch call: %w", err)
-		}
-
-		decimals, err := rpclib.ParseOutputs[uint8](resultsDecimals, func(d rpclib.DataAndErr) (uint8, error) {
-			return rpclib.ParseOutput[uint8](d, 0)
-		})
-		if err != nil {
-			return fmt.Errorf("parse outputs: %w", err)
-		}
-
-		// latestRoundData function has multiple outputs (roundId,answer,startedAt,updatedAt,answeredInRound).
-		// we want the second one (answer, idx=1).
-		latestRounds, err := rpclib.ParseOutputs[*big.Int](resultsLatestRoundData, func(d rpclib.DataAndErr) (*big.Int, error) {
-			return rpclib.ParseOutput[*big.Int](d, 1)
-		})
-		if err != nil {
-			return fmt.Errorf("parse outputs: %w", err)
-		}
-
-		for i := range batchCalls.tokenOrder {
-			// Normalize to 1e18.
-			if decimals[i] < 18 {
-				latestRounds[i].Mul(latestRounds[i], big.NewInt(0).Exp(big.NewInt(10), big.NewInt(18-int64(decimals[i])), nil))
-			} else if decimals[i] > 18 {
-				latestRounds[i].Div(latestRounds[i], big.NewInt(0).Exp(big.NewInt(10), big.NewInt(int64(decimals[i])-18), nil))
-			}
-			prices[ccipcalc.EvmAddrToGeneric(batchCalls.tokenOrder[i])] = latestRounds[i]
+		if err := d.performBatchCall(ctx, chainID, batchCalls, prices); err != nil {
+			return err
 		}
 	}
 	return nil
@@ -176,39 +135,42 @@ func (d *DynamicPriceGetter) performBatchCalls(ctx context.Context, batchCallsPe
 
 // performBatchCall performs a batch call on a given chain to retrieve token prices.
 func (d *DynamicPriceGetter) performBatchCall(ctx context.Context, chainID uint64, batchCalls *batchCallsForChain, prices map[cciptypes.Address]*big.Int) error {
+	// Retrieve the EVM caller for the chain.
 	client, exists := d.evmClients[chainID]
 	if !exists {
 		return fmt.Errorf("evm caller for chain %d not found", chainID)
 	}
-
-	// Perform call.
 	evmCaller := client.BatchCaller
-	resultsDecimals, err := evmCaller.BatchCall(ctx, 0, batchCalls.decimalCalls)
-	if err != nil {
-		return fmt.Errorf("batch call: %w", err)
-	}
-	resultsLatestRoundData, err := evmCaller.BatchCall(ctx, 0, batchCalls.latestRoundDataCalls)
-	if err != nil {
-		return fmt.Errorf("batch call: %w", err)
-	}
+
+	// Perform batched call (all decimals calls followed by latest round data calls).
+	calls := make([]rpclib.EvmCall, 0, len(batchCalls.decimalCalls)+len(batchCalls.latestRoundDataCalls))
+	calls = append(calls, batchCalls.decimalCalls...)
+	calls = append(calls, batchCalls.latestRoundDataCalls...)
+
+	results, err := evmCaller.BatchCall(ctx, 0, calls)
 
 	// Extract results.
-	decimals, err := rpclib.ParseOutputs[uint8](resultsDecimals, func(d rpclib.DataAndErr) (uint8, error) {
-		return rpclib.ParseOutput[uint8](d, 0)
-	})
-	if err != nil {
-		return fmt.Errorf("parse outputs: %w", err)
+	decimals := make([]uint8, 0, len(batchCalls.decimalCalls))
+	latestRounds := make([]*big.Int, 0, len(batchCalls.latestRoundDataCalls))
+	for i, res := range results {
+		if i < len(batchCalls.decimalCalls) {
+			v, err1 := rpclib.ParseOutput[uint8](res, 0)
+			if err1 != nil {
+				return fmt.Errorf("parse contract output (decimals): %w", err)
+			}
+			decimals = append(decimals, v)
+		} else {
+			// latestRoundData function has multiple outputs (roundId,answer,startedAt,updatedAt,answeredInRound).
+			// we want the second one (answer, idx=1).
+			v, err1 := rpclib.ParseOutput[*big.Int](res, 1)
+			if err1 != nil {
+				return fmt.Errorf("parse contract output (latest round data): %w", err)
+			}
+			latestRounds = append(latestRounds, v)
+		}
 	}
 
-	// latestRoundData function has multiple outputs (roundId,answer,startedAt,updatedAt,answeredInRound).
-	// we want the second one (answer, idx=1).
-	latestRounds, err := rpclib.ParseOutputs[*big.Int](resultsLatestRoundData, func(d rpclib.DataAndErr) (*big.Int, error) {
-		return rpclib.ParseOutput[*big.Int](d, 1)
-	})
-	if err != nil {
-		return fmt.Errorf("parse outputs: %w", err)
-	}
-
+	// Normalize and store prices.
 	for i := range batchCalls.tokenOrder {
 		// Normalize to 1e18.
 		if decimals[i] < 18 {
