@@ -456,3 +456,24 @@ func NewLoadArgs(t *testing.T, lggr zerolog.Logger, chaosExps ...ChaosConfig) *L
 		pauseLoad:     atomic.NewBool(false),
 	}
 }
+
+func NewLoadArgsWithTestCfg(t *testing.T, lggr zerolog.Logger, testCfg *testconfig.CCIP, chaosExps ...ChaosConfig) *LoadArgs {
+	wg, _ := errgroup.WithContext(testcontext.Get(t))
+	ctx := testcontext.Get(t)
+	// set override test config
+	_, err := testconfig.EncodeConfigAndSetEnv(testCfg, testconfig.OVERIDECONFIG)
+	if err != nil {
+		return nil
+	}
+
+	return &LoadArgs{
+		t:             t,
+		Ctx:           ctx,
+		lggr:          lggr,
+		RunnerWg:      wg,
+		TestCfg:       testsetups.NewCCIPTestConfig(t, lggr, testconfig.Load),
+		ChaosExps:     chaosExps,
+		LoadStarterWg: &sync.WaitGroup{},
+		pauseLoad:     atomic.NewBool(false),
+	}
+}

@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/AlekSi/pointer"
 	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/require"
 
@@ -12,6 +13,9 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/logging"
 	"github.com/smartcontractkit/chainlink-testing-framework/utils/ptr"
 
+	ccipcontracts "github.com/smartcontractkit/ccip/integration-tests/ccip-tests/contracts"
+	"github.com/smartcontractkit/ccip/integration-tests/ccip-tests/testconfig"
+	"github.com/smartcontractkit/ccip/integration-tests/client"
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/actions"
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/testsetups"
 )
@@ -35,7 +39,7 @@ func TestLoadCCIPStableRPS(t *testing.T) {
 
 // TestLoadCCIPWithUpgradeNodeVersion tests the load with upgrade of node version
 // The upgrade is done based on the node config mentioned in test input https://github.com/smartcontractkit/ccip/blob/ccip-develop/integration-tests/ccip-tests/testconfig/global.go#L380
-// Sample test input: https://github.com/smartcontractkit/ccip/blob/ccip-develop/integration-tests/ccip-tests/testconfig/tomls/node-post-upgrade-compatibility.toml
+// Sample test input: https://github.com/smartcontractkit/ccip/blob/ccip-develop/integration-tests/ccip-tests/testconfig/tomls/node-upgrade-compatibility.toml
 // The test needs upgrade image to be set in the test input - https://github.com/smartcontractkit/ccip/blob/ccip-develop/integration-tests/ccip-tests/testconfig/global.go#L382
 // This test is generally run on existing environment where the nodes are already running with the older version with existing CCIP deployment.
 // The test waits for the load to start on existing environment and then upgrades few of the nodes( based on test config) to the new version
@@ -45,6 +49,8 @@ func TestLoadCCIPWithUpgradeNodeVersion(t *testing.T) {
 	t.Parallel()
 	lggr := logging.GetTestLogger(t)
 	testArgs := NewLoadArgs(t, lggr)
+	require.False(t, pointer.GetBool(testArgs.TestCfg.TestGroupInput.ExistingDeployment),
+		"This test is not meant to be run on existing deployment")
 	testArgs.Setup()
 	// if the test runs on remote runner
 	if len(testArgs.TestSetupArgs.Lanes) == 0 {
@@ -65,6 +71,32 @@ func TestLoadCCIPWithUpgradeNodeVersion(t *testing.T) {
 	require.NoError(t, err)
 	// after upgrade send a request to all lanes as a sanity check
 	testArgs.SanityCheck()
+
+	// now add another lane with updated config and trigger the load
+	versions := make(map[string]*ccipcontracts.ContractVersion)
+	for name := range testArgs.TestCfg.VersionInput {
+		versions[name] = ptr.Ptr(ccipcontracts.Latest)
+	}
+	// node configs
+	var nodeConfigs []*client.ChainlinkConfig
+	require.NotEmpty(t, testArgs.TestSetupArgs.Env.CLNodes, "No nodes found in the environment")
+	noOfNodes := len(testArgs.TestSetupArgs.Env.CLNodes)
+	envName := testArgs.TestSetupArgs.Env.K8Env.Cfg.Namespace
+	for _, node := range testArgs.TestSetupArgs.Env.CLNodes {
+		nodeConfigs = append(nodeConfigs, node.Config)
+	}
+	ccipConfig := &testconfig.CCIP{
+		ContractVersions: versions,
+		Env: &testconfig.Common{
+			ExistingCLCluster: &testconfig.CLCluster{
+				Name:        ptr.Ptr(envName),
+				NoOfNodes:   ptr.Ptr(noOfNodes),
+				NodeConfigs: nodeConfigs,
+			},
+		},
+	}
+	_, err = testconfig.EncodeConfigAndSetEnv(ccipConfig, testconfig.OVERIDECONFIG)
+	require.NoError(t, err, "Failed to set the config after upgrade")
 	// now wait for the load to finish
 	testArgs.Wait()
 }
