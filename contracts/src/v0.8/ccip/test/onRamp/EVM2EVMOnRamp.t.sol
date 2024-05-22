@@ -1106,11 +1106,7 @@ contract EVM2EVMOnRamp_getTokenTransferCost is EVM2EVMOnRamp_getFeeSetup {
 
     assertEq(configUSDCentToWei(transferFeeConfig.minFeeUSDCents), feeUSDWei);
     assertEq(transferFeeConfig.destGasOverhead, destGasOverhead);
-    if (transferFeeConfig.destBytesOverhead <= Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES) {
-      assertEq(Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES, destBytesOverhead);
-    } else {
-      assertEq(transferFeeConfig.destBytesOverhead, destBytesOverhead);
-    }
+    assertEq(Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES, destBytesOverhead);
   }
 
   function test_ZeroAmountTokenTransferChargesMinFeeAndGas_Success() public view {
@@ -1123,11 +1119,7 @@ contract EVM2EVMOnRamp_getTokenTransferCost is EVM2EVMOnRamp_getFeeSetup {
 
     assertEq(configUSDCentToWei(transferFeeConfig.minFeeUSDCents), feeUSDWei);
     assertEq(transferFeeConfig.destGasOverhead, destGasOverhead);
-    if (transferFeeConfig.destBytesOverhead <= Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES) {
-      assertEq(Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES, destBytesOverhead);
-    } else {
-      assertEq(transferFeeConfig.destBytesOverhead, destBytesOverhead);
-    }
+    assertEq(Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES, destBytesOverhead);
   }
 
   function test_LargeTokenTransferChargesMaxFeeAndGas_Success() public view {
@@ -1140,11 +1132,7 @@ contract EVM2EVMOnRamp_getTokenTransferCost is EVM2EVMOnRamp_getFeeSetup {
 
     assertEq(configUSDCentToWei(transferFeeConfig.maxFeeUSDCents), feeUSDWei);
     assertEq(transferFeeConfig.destGasOverhead, destGasOverhead);
-    if (transferFeeConfig.destBytesOverhead <= Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES) {
-      assertEq(Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES, destBytesOverhead);
-    } else {
-      assertEq(transferFeeConfig.destBytesOverhead, destBytesOverhead);
-    }
+    assertEq(Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES, destBytesOverhead);
   }
 
   function test_FeeTokenBpsFee_Success() public view {
@@ -1162,11 +1150,7 @@ contract EVM2EVMOnRamp_getTokenTransferCost is EVM2EVMOnRamp_getFeeSetup {
 
     assertEq(bpsUSDWei, feeUSDWei);
     assertEq(transferFeeConfig.destGasOverhead, destGasOverhead);
-    if (transferFeeConfig.destBytesOverhead <= Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES) {
-      assertEq(Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES, destBytesOverhead);
-    } else {
-      assertEq(transferFeeConfig.destBytesOverhead, destBytesOverhead);
-    }
+    assertEq(Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES, destBytesOverhead);
   }
 
   function test_WETHTokenBpsFee_Success() public view {
@@ -1192,11 +1176,7 @@ contract EVM2EVMOnRamp_getTokenTransferCost is EVM2EVMOnRamp_getFeeSetup {
 
     assertEq(bpsUSDWei, feeUSDWei);
     assertEq(transferFeeConfig.destGasOverhead, destGasOverhead);
-    if (transferFeeConfig.destBytesOverhead <= Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES) {
-      assertEq(Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES, destBytesOverhead);
-    } else {
-      assertEq(transferFeeConfig.destBytesOverhead, destBytesOverhead);
-    }
+    assertEq(transferFeeConfig.destBytesOverhead, destBytesOverhead);
   }
 
   function test_CustomTokenBpsFee_Success() public view {
@@ -1222,11 +1202,7 @@ contract EVM2EVMOnRamp_getTokenTransferCost is EVM2EVMOnRamp_getFeeSetup {
 
     assertEq(bpsUSDWei, feeUSDWei);
     assertEq(transferFeeConfig.destGasOverhead, destGasOverhead);
-    if (transferFeeConfig.destBytesOverhead <= Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES) {
-      assertEq(Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES, destBytesOverhead);
-    } else {
-      assertEq(transferFeeConfig.destBytesOverhead, destBytesOverhead);
-    }
+    assertEq(transferFeeConfig.destBytesOverhead, destBytesOverhead);
   }
 
   function test_ZeroFeeConfigChargesMinFee_Success() public {
