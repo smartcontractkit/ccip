@@ -447,6 +447,7 @@ func (ccipModule *CCIPCommon) WaitForPriceUpdates(
 	defer ticker.Stop()
 	localCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
+	var tokensMissingForUpdate common.Address
 	for {
 		select {
 		case <-ticker.C:
@@ -460,6 +461,7 @@ func (ccipModule *CCIPCommon) WaitForPriceUpdates(
 					timestampOfTokenUpdate, okToken := ccipModule.tokenPriceUpdateWatcher[token]
 					if !okToken || timestampOfTokenUpdate.Cmp(big.NewInt(0)) < 1 {
 						tokenPricesUpdated = false
+						tokensMissingForUpdate = token
 						break
 					}
 					tokenPricesUpdated = true
@@ -476,7 +478,10 @@ func (ccipModule *CCIPCommon) WaitForPriceUpdates(
 				return nil
 			}
 		case <-localCtx.Done():
-			return fmt.Errorf("UsdPerUnitGasUpdated is not found for chain %d", destChainId)
+			if tokensMissingForUpdate != (common.Address{}) {
+				return fmt.Errorf("price Updates not found for token %s", tokensMissingForUpdate.Hex())
+			}
+			return fmt.Errorf("price Updates not found for chain %d", destChainId)
 		}
 	}
 }
@@ -2524,10 +2529,7 @@ func (lane *CCIPLane) TokenPricesConfig() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("error in adding PriceConfig for dest WrappedNative token %s: %w", lane.Dest.Common.WrappedNative.Hex(), err)
 	}
-	err = d.AddPriceConfig(lane.Source.Common.WrappedNative.Hex(), lane.Source.Common.PriceAggregators, WrappedNativeToUSD, lane.SourceChain.GetChainID().Uint64())
-	if err != nil {
-		return "", fmt.Errorf("error in adding PriceConfig for source WrappedNative token %s: %w", lane.Source.Common.WrappedNative.Hex(), err)
-	}
+	types.Block{}
 	return d.String()
 }
 
