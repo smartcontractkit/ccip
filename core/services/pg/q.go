@@ -13,6 +13,8 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
 	"github.com/pkg/errors"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil"
@@ -189,6 +191,7 @@ func (q Q) ExecQIter(query string, args ...interface{}) (sql.Result, context.Can
 	ql := q.newQueryLogger(query, args)
 	ql.logSqlQuery()
 	defer ql.postSqlLog(ctx, time.Now())
+	defer measureDuration(time.Now(), query)
 
 	res, err := q.Queryer.ExecContext(ctx, query, args...)
 	return res, cancel, ql.withLogError(err)
@@ -210,6 +213,7 @@ func (q Q) ExecQ(query string, args ...interface{}) error {
 	ql := q.newQueryLogger(query, args)
 	ql.logSqlQuery()
 	defer ql.postSqlLog(ctx, time.Now())
+	defer measureDuration(time.Now(), query)
 
 	_, err := q.Queryer.ExecContext(ctx, query, args...)
 	return ql.withLogError(err)
@@ -225,6 +229,7 @@ func (q Q) ExecQNamed(query string, arg interface{}) (err error) {
 	ql := q.newQueryLogger(query, args)
 	ql.logSqlQuery()
 	defer ql.postSqlLog(ctx, time.Now())
+	defer measureDuration(time.Now(), query)
 
 	_, err = q.Queryer.ExecContext(ctx, query, args...)
 	return ql.withLogError(err)
@@ -239,6 +244,7 @@ func (q Q) Select(dest interface{}, query string, args ...interface{}) error {
 	ql := q.newQueryLogger(query, args)
 	ql.logSqlQuery()
 	defer ql.postSqlLog(ctx, time.Now())
+	defer measureDuration(time.Now(), query)
 
 	return ql.withLogError(q.Queryer.SelectContext(ctx, dest, query, args...))
 }
@@ -258,6 +264,7 @@ func (q Q) Get(dest interface{}, query string, args ...interface{}) error {
 	ql := q.newQueryLogger(query, args)
 	ql.logSqlQuery()
 	defer ql.postSqlLog(ctx, time.Now())
+	defer measureDuration(time.Now(), query)
 
 	return ql.withLogError(q.Queryer.GetContext(ctx, dest, query, args...))
 }
@@ -273,6 +280,7 @@ func (q Q) GetNamed(sql string, dest interface{}, arg interface{}) error {
 	ql := q.newQueryLogger(query, args)
 	ql.logSqlQuery()
 	defer ql.postSqlLog(ctx, time.Now())
+	defer measureDuration(time.Now(), query)
 
 	return ql.withLogError(errors.Wrap(q.GetContext(ctx, dest, query, args...), "error in get query"))
 }
@@ -381,3 +389,38 @@ func (q *queryLogger) postSqlLog(ctx context.Context, begin time.Time) {
 
 	promSQLQueryTime.Observe(pct)
 }
+
+func measureDuration(begin time.Time, query string) {
+	elapsed := time.Since(begin)
+	queryDuration.WithLabelValues(query).Observe(float64(elapsed))
+}
+
+var (
+	sqlLatencyBuckets = []float64{
+		float64(1 * time.Millisecond),
+		float64(5 * time.Millisecond),
+		float64(10 * time.Millisecond),
+		float64(20 * time.Millisecond),
+		float64(30 * time.Millisecond),
+		float64(40 * time.Millisecond),
+		float64(50 * time.Millisecond),
+		float64(60 * time.Millisecond),
+		float64(70 * time.Millisecond),
+		float64(80 * time.Millisecond),
+		float64(90 * time.Millisecond),
+		float64(100 * time.Millisecond),
+		float64(200 * time.Millisecond),
+		float64(300 * time.Millisecond),
+		float64(400 * time.Millisecond),
+		float64(500 * time.Millisecond),
+		float64(750 * time.Millisecond),
+		float64(1 * time.Second),
+		float64(2 * time.Second),
+		float64(5 * time.Second),
+	}
+	queryDuration = promauto.NewHistogramVec(prometheus.HistogramOpts{
+		Name:    "q_query_duration",
+		Help:    "Measures duration of Log Poller's queries fetching logs",
+		Buckets: sqlLatencyBuckets,
+	}, []string{"query"})
+)
