@@ -3,11 +3,43 @@ package model
 import (
 	"encoding/json"
 	"fmt"
+	"math/big"
 
 	chainselectors "github.com/smartcontractkit/chain-selectors"
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 )
 
+type TokenPrice struct {
+	TokenID types.Account `json:"tokenID"`
+	Price   BigInt        `json:"price"`
+}
+
+func NewTokenPrice(tokenID types.Account, price *big.Int) TokenPrice {
+	return TokenPrice{
+		TokenID: tokenID,
+		Price:   BigInt{price},
+	}
+}
+
+type GasPrice *big.Int
+
+type GasPriceChain struct {
+	GasPrice GasPrice
+	ChainSel ChainSelector
+}
+
+func NewGasPriceChain(gasPrice GasPrice, chainSel ChainSelector) GasPriceChain {
+	return GasPriceChain{
+		GasPrice: gasPrice,
+		ChainSel: chainSel,
+	}
+}
+
 type SeqNum uint64
+
+func NewSeqNumRange(start, end SeqNum) SeqNumRange {
+	return SeqNumRange{start, end}
+}
 
 type SeqNumRange [2]SeqNum
 
@@ -17,6 +49,14 @@ func (s SeqNumRange) Start() SeqNum {
 
 func (s SeqNumRange) End() SeqNum {
 	return s[1]
+}
+
+func (s *SeqNumRange) SetStart(v SeqNum) {
+	s[0] = v
+}
+
+func (s *SeqNumRange) SetEnd(v SeqNum) {
+	s[1] = v
 }
 
 func (s SeqNumRange) String() string {
@@ -33,8 +73,6 @@ func (c ChainSelector) String() string {
 	return fmt.Sprintf("%d (%s)", c, ch.Name)
 }
 
-type NodeID string
-
 type CCIPMsg struct {
 	CCIPMsgBaseDetails
 }
@@ -45,6 +83,7 @@ func (c CCIPMsg) String() string {
 }
 
 type CCIPMsgBaseDetails struct {
+	ID          Bytes32       `json:"id"`
 	SourceChain ChainSelector `json:"sourceChain,string"`
 	SeqNum      SeqNum        `json:"seqNum,string"`
 }

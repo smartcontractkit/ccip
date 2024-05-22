@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.19;
+pragma solidity 0.8.24;
 
 import {IPool} from "../../interfaces/IPool.sol";
 
 import {BurnMintERC677} from "../../../shared/token/ERC677/BurnMintERC677.sol";
 import {Router} from "../../Router.sol";
 import {Internal} from "../../libraries/Internal.sol";
+import {Pool} from "../../libraries/Pool.sol";
 import {RateLimiter} from "../../libraries/RateLimiter.sol";
 import {EVM2EVMOffRamp} from "../../offRamp/EVM2EVMOffRamp.sol";
-import {EVM2EVMOnRamp} from "../../onRamp/EVM2EVMOnRamp.sol";
 import {LockReleaseTokenPool} from "../../pools/LockReleaseTokenPool.sol";
 import {TokenPool} from "../../pools/TokenPool.sol";
 import {BaseTest} from "../BaseTest.t.sol";
@@ -34,12 +34,12 @@ contract LockReleaseTokenPoolSetup is RouterSetup {
     s_token = new BurnMintERC677("LINK", "LNK", 18, 0);
     deal(address(s_token), OWNER, type(uint256).max);
     s_lockReleaseTokenPool =
-      new LockReleaseTokenPool(s_token, new address[](0), address(s_mockARM), true, address(s_sourceRouter));
+      new LockReleaseTokenPool(s_token, new address[](0), address(s_mockRMN), true, address(s_sourceRouter));
 
     s_allowedList.push(USER_1);
     s_allowedList.push(DUMMY_CONTRACT_ADDRESS);
     s_lockReleaseTokenPoolWithAllowList =
-      new LockReleaseTokenPool(s_token, s_allowedList, address(s_mockARM), true, address(s_sourceRouter));
+      new LockReleaseTokenPool(s_token, s_allowedList, address(s_mockRMN), true, address(s_sourceRouter));
 
     TokenPool.ChainUpdate[] memory chainUpdate = new TokenPool.ChainUpdate[](1);
     chainUpdate[0] = TokenPool.ChainUpdate({
@@ -92,7 +92,14 @@ contract LockReleaseTokenPool_lockOrBurn is LockReleaseTokenPoolSetup {
     vm.expectEmit();
     emit Locked(s_allowedOnRamp, amount);
 
-    s_lockReleaseTokenPool.lockOrBurn(STRANGER, bytes(""), amount, DEST_CHAIN_SELECTOR, bytes(""));
+    s_lockReleaseTokenPool.lockOrBurn(
+      Pool.LockOrBurnInV1({
+        originalSender: STRANGER,
+        receiver: bytes(""),
+        amount: amount,
+        remoteChainSelector: DEST_CHAIN_SELECTOR
+      })
+    );
   }
 
   function test_LockOrBurnWithAllowList_Success() public {
@@ -104,12 +111,26 @@ contract LockReleaseTokenPool_lockOrBurn is LockReleaseTokenPoolSetup {
     vm.expectEmit();
     emit Locked(s_allowedOnRamp, amount);
 
-    s_lockReleaseTokenPoolWithAllowList.lockOrBurn(s_allowedList[0], bytes(""), amount, DEST_CHAIN_SELECTOR, bytes(""));
+    s_lockReleaseTokenPoolWithAllowList.lockOrBurn(
+      Pool.LockOrBurnInV1({
+        originalSender: s_allowedList[0],
+        receiver: bytes(""),
+        amount: amount,
+        remoteChainSelector: DEST_CHAIN_SELECTOR
+      })
+    );
 
     vm.expectEmit();
     emit Locked(s_allowedOnRamp, amount);
 
-    s_lockReleaseTokenPoolWithAllowList.lockOrBurn(s_allowedList[1], bytes(""), amount, DEST_CHAIN_SELECTOR, bytes(""));
+    s_lockReleaseTokenPoolWithAllowList.lockOrBurn(
+      Pool.LockOrBurnInV1({
+        originalSender: s_allowedList[1],
+        receiver: bytes(""),
+        amount: amount,
+        remoteChainSelector: DEST_CHAIN_SELECTOR
+      })
+    );
   }
 
   function test_LockOrBurnWithAllowList_Revert() public {
@@ -117,18 +138,32 @@ contract LockReleaseTokenPool_lockOrBurn is LockReleaseTokenPoolSetup {
 
     vm.expectRevert(abi.encodeWithSelector(SenderNotAllowed.selector, STRANGER));
 
-    s_lockReleaseTokenPoolWithAllowList.lockOrBurn(STRANGER, bytes(""), 100, DEST_CHAIN_SELECTOR, bytes(""));
+    s_lockReleaseTokenPoolWithAllowList.lockOrBurn(
+      Pool.LockOrBurnInV1({
+        originalSender: STRANGER,
+        receiver: bytes(""),
+        amount: 100,
+        remoteChainSelector: DEST_CHAIN_SELECTOR
+      })
+    );
   }
 
   function test_PoolBurnRevertNotHealthy_Revert() public {
     // Should not burn tokens if cursed.
-    s_mockARM.voteToCurse(bytes32(0));
+    s_mockRMN.voteToCurse(bytes32(0));
     uint256 before = s_token.balanceOf(address(s_lockReleaseTokenPoolWithAllowList));
 
     vm.startPrank(s_allowedOnRamp);
-    vm.expectRevert(EVM2EVMOnRamp.BadARMSignal.selector);
+    vm.expectRevert(TokenPool.CursedByRMN.selector);
 
-    s_lockReleaseTokenPoolWithAllowList.lockOrBurn(s_allowedList[0], bytes(""), 1e5, DEST_CHAIN_SELECTOR, bytes(""));
+    s_lockReleaseTokenPoolWithAllowList.lockOrBurn(
+      Pool.LockOrBurnInV1({
+        originalSender: s_allowedList[0],
+        receiver: bytes(""),
+        amount: 1e5,
+        remoteChainSelector: DEST_CHAIN_SELECTOR
+      })
+    );
 
     assertEq(s_token.balanceOf(address(s_lockReleaseTokenPoolWithAllowList)), before);
   }
@@ -165,16 +200,15 @@ contract LockReleaseTokenPool_releaseOrMint is LockReleaseTokenPoolSetup {
     emit Released(s_allowedOffRamp, OWNER, amount);
 
     s_lockReleaseTokenPool.releaseOrMint(
-      bytes(""),
-      OWNER,
-      amount,
-      SOURCE_CHAIN_SELECTOR,
-      IPool.SourceTokenData({
+      Pool.ReleaseOrMintInV1({
+        originalSender: bytes(""),
+        receiver: OWNER,
+        amount: amount,
+        remoteChainSelector: SOURCE_CHAIN_SELECTOR,
         sourcePoolAddress: abi.encode(s_sourcePoolAddress),
-        destPoolAddress: abi.encode(address(s_lockReleaseTokenPool)),
-        extraData: ""
-      }),
-      ""
+        sourcePoolData: "",
+        offchainTokenData: ""
+      })
     );
   }
 
@@ -206,16 +240,15 @@ contract LockReleaseTokenPool_releaseOrMint is LockReleaseTokenPoolSetup {
     }
 
     s_lockReleaseTokenPool.releaseOrMint(
-      bytes(""),
-      recipient,
-      amount,
-      SOURCE_CHAIN_SELECTOR,
-      IPool.SourceTokenData({
+      Pool.ReleaseOrMintInV1({
+        originalSender: bytes(""),
+        receiver: recipient,
+        amount: amount,
+        remoteChainSelector: SOURCE_CHAIN_SELECTOR,
         sourcePoolAddress: abi.encode(s_sourcePoolAddress),
-        destPoolAddress: abi.encode(address(s_lockReleaseTokenPool)),
-        extraData: ""
-      }),
-      ""
+        sourcePoolData: "",
+        offchainTokenData: ""
+      })
     );
   }
 
@@ -237,28 +270,36 @@ contract LockReleaseTokenPool_releaseOrMint is LockReleaseTokenPoolSetup {
 
     vm.expectRevert(abi.encodeWithSelector(TokenPool.ChainNotAllowed.selector, SOURCE_CHAIN_SELECTOR));
     s_lockReleaseTokenPool.releaseOrMint(
-      bytes(""),
-      OWNER,
-      1e5,
-      SOURCE_CHAIN_SELECTOR,
-      IPool.SourceTokenData({
+      Pool.ReleaseOrMintInV1({
+        originalSender: bytes(""),
+        receiver: OWNER,
+        amount: 1e5,
+        remoteChainSelector: SOURCE_CHAIN_SELECTOR,
         sourcePoolAddress: abi.encode(s_sourcePoolAddress),
-        destPoolAddress: abi.encode(address(s_lockReleaseTokenPool)),
-        extraData: ""
-      }),
-      bytes("")
+        sourcePoolData: "",
+        offchainTokenData: ""
+      })
     );
   }
 
   function test_PoolMintNotHealthy_Revert() public {
     // Should not mint tokens if cursed.
-    s_mockARM.voteToCurse(bytes32(0));
+    s_mockRMN.voteToCurse(bytes32(0));
     uint256 before = s_token.balanceOf(OWNER);
     vm.startPrank(s_allowedOffRamp);
-    vm.expectRevert(EVM2EVMOffRamp.BadARMSignal.selector);
+    vm.expectRevert(TokenPool.CursedByRMN.selector);
     s_lockReleaseTokenPool.releaseOrMint(
-      bytes(""), OWNER, 1e5, SOURCE_CHAIN_SELECTOR, generateSourceTokenData(), bytes("")
+      Pool.ReleaseOrMintInV1({
+        originalSender: bytes(""),
+        receiver: OWNER,
+        amount: 1e5,
+        remoteChainSelector: SOURCE_CHAIN_SELECTOR,
+        sourcePoolAddress: generateSourceTokenData().sourcePoolAddress,
+        sourcePoolData: generateSourceTokenData().extraData,
+        offchainTokenData: ""
+      })
     );
+
     assertEq(s_token.balanceOf(OWNER), before);
   }
 }
@@ -268,7 +309,7 @@ contract LockReleaseTokenPool_canAcceptLiquidity is LockReleaseTokenPoolSetup {
     assertEq(true, s_lockReleaseTokenPool.canAcceptLiquidity());
 
     s_lockReleaseTokenPool =
-      new LockReleaseTokenPool(s_token, new address[](0), address(s_mockARM), false, address(s_sourceRouter));
+      new LockReleaseTokenPool(s_token, new address[](0), address(s_mockRMN), false, address(s_sourceRouter));
     assertEq(false, s_lockReleaseTokenPool.canAcceptLiquidity());
   }
 }
@@ -301,7 +342,7 @@ contract LockReleaseTokenPool_provideLiquidity is LockReleaseTokenPoolSetup {
 
   function test_LiquidityNotAccepted_Revert() public {
     s_lockReleaseTokenPool =
-      new LockReleaseTokenPool(s_token, new address[](0), address(s_mockARM), false, address(s_sourceRouter));
+      new LockReleaseTokenPool(s_token, new address[](0), address(s_mockRMN), false, address(s_sourceRouter));
 
     vm.expectRevert(LockReleaseTokenPool.LiquidityNotAccepted.selector);
     s_lockReleaseTokenPool.provideLiquidity(1);

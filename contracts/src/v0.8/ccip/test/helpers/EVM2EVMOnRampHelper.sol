@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.19;
+pragma solidity 0.8.24;
 
 import "../../onRamp/EVM2EVMOnRamp.sol";
 import {IgnoreContractSize} from "./IgnoreContractSize.sol";
@@ -39,5 +39,9 @@ contract EVM2EVMOnRampHelper is EVM2EVMOnRamp, IgnoreContractSize {
     Client.EVMTokenAmount[] calldata tokenAmounts
   ) external view returns (uint256, uint32, uint32) {
     return _getTokenTransferCost(feeToken, feeTokenPrice, tokenAmounts);
+  }
+
+  function getSequenceNumber() external view returns (uint64) {
+    return s_sequenceNumber;
   }
 }

@@ -1,6 +1,6 @@
 # ALL_FOUNDRY_PRODUCTS contains a list of all products that have a foundry
 # profile defined and use the Foundry snapshots.
-ALL_FOUNDRY_PRODUCTS = l2ep llo-feeds functions keystone shared ccip rebalancer transmission
+ALL_FOUNDRY_PRODUCTS = l2ep llo-feeds functions keystone shared ccip liquiditymanager transmission
 
 # To make a snapshot for a specific product, either set the `FOUNDRY_PROFILE` env var
 # or call the target with `FOUNDRY_PROFILE=product`
@@ -39,7 +39,7 @@ abigen: ## Build & install abigen.
 
 .PHONY: mockery
 mockery: $(mockery) ## Install mockery.
-	go install github.com/vektra/mockery/v2@v2.38.0
+	go install github.com/vektra/mockery/v2@v2.42.2
 
 .PHONY: foundry
 foundry: ## Install foundry.
@@ -55,7 +55,7 @@ ccip-precommit: export FOUNDRY_PROFILE=ccip
 ccip-precommit:
 	forge test
 	make snapshot
-	pnpm prettier:write
+	forge fmt
 	pnpm solhint
 
 ccip-lcov: export FOUNDRY_PROFILE=ccip

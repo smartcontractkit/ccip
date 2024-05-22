@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.19;
+pragma solidity 0.8.24;
 
 import {Pool} from "../../libraries/Pool.sol";
-import {RateLimiter} from "../../libraries/RateLimiter.sol";
 import {TokenPool} from "../../pools/TokenPool.sol";
 
 import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
@@ -11,32 +10,30 @@ contract CustomTokenPool is TokenPool {
   event SynthBurned(uint256 amount);
   event SynthMinted(uint256 amount);
 
-  constructor(IERC20 token, address armProxy, address router) TokenPool(token, new address[](0), armProxy, router) {}
+  constructor(IERC20 token, address rmnProxy, address router) TokenPool(token, new address[](0), rmnProxy, router) {}
 
   /// @notice Locks the token in the pool
-  /// @param amount Amount to lock
-  function lockOrBurn(
-    address,
-    bytes calldata,
-    uint256 amount,
-    uint64 remoteChainSelector,
-    bytes calldata
-  ) external override whenHealthy onlyOnRamp(remoteChainSelector) returns (bytes memory) {
-    emit SynthBurned(amount);
-    return Pool._generatePoolReturnDataV1(getRemotePool(remoteChainSelector), "");
+  function lockOrBurn(Pool.LockOrBurnInV1 calldata lockOrBurnIn)
+    external
+    virtual
+    override
+    whenNotCursed(lockOrBurnIn.remoteChainSelector)
+    returns (Pool.LockOrBurnOutV1 memory)
+  {
+    _onlyOnRamp(lockOrBurnIn.remoteChainSelector);
+    emit SynthBurned(lockOrBurnIn.amount);
+    return Pool.LockOrBurnOutV1({destPoolAddress: getRemotePool(lockOrBurnIn.remoteChainSelector), destPoolData: ""});
   }
 
   /// @notice Release tokens from the pool to the recipient
-  /// @param amount Amount to release
-  function releaseOrMint(
-    bytes memory,
-    address,
-    uint256 amount,
-    uint64 remoteChainSelector,
-    SourceTokenData memory,
-    bytes memory
-  ) external override whenHealthy onlyOffRamp(remoteChainSelector) returns (address, uint256) {
-    emit SynthMinted(amount);
-    return (address(i_token), amount);
+  function releaseOrMint(Pool.ReleaseOrMintInV1 calldata releaseOrMintIn)
+    external
+    override
+    whenNotCursed(releaseOrMintIn.remoteChainSelector)
+    returns (Pool.ReleaseOrMintOutV1 memory)
+  {
+    _onlyOffRamp(releaseOrMintIn.remoteChainSelector);
+    emit SynthMinted(releaseOrMintIn.amount);
+    return Pool.ReleaseOrMintOutV1({localToken: address(i_token), destinationAmount: releaseOrMintIn.amount});
   }
 }

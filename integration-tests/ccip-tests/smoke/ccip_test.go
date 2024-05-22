@@ -14,6 +14,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/actions"
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/testconfig"
+	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/testreporters"
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/testsetups"
 
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp"
@@ -30,8 +31,8 @@ func TestSmokeCCIPForBidirectionalLane(t *testing.T) {
 	t.Parallel()
 	log := logging.GetTestLogger(t)
 	TestCfg := testsetups.NewCCIPTestConfig(t, log, testconfig.Smoke)
-	require.NotNil(t, TestCfg.TestGroupInput.DestGasLimit)
-	gasLimit := big.NewInt(*TestCfg.TestGroupInput.DestGasLimit)
+	require.NotNil(t, TestCfg.TestGroupInput.MsgDetails.DestGasLimit)
+	gasLimit := big.NewInt(*TestCfg.TestGroupInput.MsgDetails.DestGasLimit)
 	setUpOutput := testsetups.CCIPDefaultTestSetUp(t, log, "smoke-ccip", nil, TestCfg)
 	if len(setUpOutput.Lanes) == 0 {
 		log.Info().Msg("No lanes found")
@@ -41,7 +42,9 @@ func TestSmokeCCIPForBidirectionalLane(t *testing.T) {
 	t.Cleanup(func() {
 		// If we are running a test that is a token transfer, we need to verify the balance.
 		// For USDC deployment, the mock contracts cannot mint the token in destination, therefore skip the balance check.
-		if TestCfg.TestGroupInput.MsgType == actions.TokenTransfer && !pointer.GetBool(TestCfg.TestGroupInput.USDCMockDeployment) {
+		if TestCfg.TestGroupInput.MsgDetails.IsTokenTransfer() &&
+			!pointer.GetBool(TestCfg.TestGroupInput.USDCMockDeployment) &&
+			!pointer.GetBool(TestCfg.TestGroupInput.ExistingDeployment) {
 			setUpOutput.Balance.Verify(t)
 		}
 		require.NoError(t, setUpOutput.TearDown())
@@ -77,9 +80,9 @@ func TestSmokeCCIPForBidirectionalLane(t *testing.T) {
 				Msgf("Starting lane %s -> %s", tc.lane.SourceNetworkName, tc.lane.DestNetworkName)
 
 			tc.lane.RecordStateBeforeTransfer()
-			err := tc.lane.SendRequests(1, TestCfg.TestGroupInput.MsgType, gasLimit)
+			err := tc.lane.SendRequests(1, gasLimit)
 			require.NoError(t, err)
-			tc.lane.ValidateRequests(true)
+			tc.lane.ValidateRequests()
 		})
 	}
 }
@@ -88,7 +91,7 @@ func TestSmokeCCIPRateLimit(t *testing.T) {
 	t.Parallel()
 	log := logging.GetTestLogger(t)
 	TestCfg := testsetups.NewCCIPTestConfig(t, log, testconfig.Smoke)
-	require.Equal(t, actions.TokenTransfer, TestCfg.TestGroupInput.MsgType, "Test config should have token transfer message type")
+	require.True(t, TestCfg.TestGroupInput.MsgDetails.IsTokenTransfer(), "Test config should have token transfer message type")
 	setUpOutput := testsetups.CCIPDefaultTestSetUp(t, log, "smoke-ccip", nil, TestCfg)
 	if len(setUpOutput.Lanes) == 0 {
 		return
@@ -142,7 +145,7 @@ func TestSmokeCCIPRateLimit(t *testing.T) {
 			require.NoError(t, err)
 			tc.lane.Logger.Info().Interface("rate limit", prevRLOnRamp).Msg("Initial OnRamp rate limiter state")
 
-			prevOnRampRLTokenPool, err := src.Common.BridgeTokenPools[0].PoolInterface.GetCurrentOutboundRateLimiterState(nil, tc.lane.Source.DestinationChainId) // TODO RENS maybe?
+			prevOnRampRLTokenPool, err := src.Common.BridgeTokenPools[0].Instance.GetCurrentOutboundRateLimiterState(nil, tc.lane.Source.DestChainSelector) // TODO RENS maybe?
 			require.NoError(t, err)
 			tc.lane.Logger.Info().
 				Interface("rate limit", prevOnRampRLTokenPool).
@@ -158,7 +161,7 @@ func TestSmokeCCIPRateLimit(t *testing.T) {
 				require.GreaterOrEqual(t, rlOffRamp.Capacity.Cmp(prevRLOnRamp.Capacity), 0, "OffRamp Aggregated capacity should be greater than or equal to OnRamp Aggregated capacity")
 			}
 
-			prevOffRampRLTokenPool, err := tc.lane.Dest.Common.BridgeTokenPools[0].PoolInterface.GetCurrentInboundRateLimiterState(nil, tc.lane.Dest.SourceChainId) // TODO RENS maybe?
+			prevOffRampRLTokenPool, err := tc.lane.Dest.Common.BridgeTokenPools[0].Instance.GetCurrentInboundRateLimiterState(nil, tc.lane.Dest.SourceChainSelector) // TODO RENS maybe?
 			require.NoError(t, err)
 			tc.lane.Logger.Info().
 				Interface("rate limit", prevOffRampRLTokenPool).
@@ -218,11 +221,11 @@ func TestSmokeCCIPRateLimit(t *testing.T) {
 
 			tokenPrice, err := src.Common.PriceRegistry.Instance.GetTokenPrice(nil, src.Common.BridgeTokens[0].ContractAddress)
 			require.NoError(t, err)
-			tc.lane.Logger.Info().Str("tokenPrice.Value", tokenPrice.Value.String()).Msg("Price Registry Token Price")
+			tc.lane.Logger.Info().Str("tokenPrice.Value", tokenPrice.String()).Msg("Price Registry Token Price")
 
 			totalTokensForOnRampCapacity := new(big.Int).Mul(
 				big.NewInt(1e18),
-				new(big.Int).Div(rlOnRamp.Capacity, tokenPrice.Value))
+				new(big.Int).Div(rlOnRamp.Capacity, tokenPrice))
 
 			tc.lane.Source.Common.ChainClient.ParallelTransactions(true)
 
@@ -234,7 +237,6 @@ func TestSmokeCCIPRateLimit(t *testing.T) {
 			require.NoError(t, tc.lane.Source.Common.ChainClient.WaitForEvents())
 			failedTx, _, _, err := tc.lane.Source.SendRequest(
 				tc.lane.Dest.ReceiverDapp.EthAddress,
-				actions.TokenTransfer, "msg with token more than aggregated capacity",
 				big.NewInt(600_000), // gas limit
 			)
 			require.NoError(t, err)
@@ -255,7 +257,7 @@ func TestSmokeCCIPRateLimit(t *testing.T) {
 			tc.lane.Logger.Info().Str("tokensTobeSent", tokensTobeSent.String()).Msg("99% of Aggregated Capacity")
 			tc.lane.RecordStateBeforeTransfer()
 			src.TransferAmount[0] = tokensTobeSent
-			err = tc.lane.SendRequests(1, TestCfg.TestGroupInput.MsgType, big.NewInt(600_000))
+			err = tc.lane.SendRequests(1, big.NewInt(600_000))
 			require.NoError(t, err)
 
 			// try to send again with amount more than the amount refilled by rate and
@@ -263,7 +265,6 @@ func TestSmokeCCIPRateLimit(t *testing.T) {
 			src.TransferAmount[0] = new(big.Int).Mul(AggregatedRateLimitRate, big.NewInt(10))
 			failedTx, _, _, err = tc.lane.Source.SendRequest(
 				tc.lane.Dest.ReceiverDapp.EthAddress,
-				actions.TokenTransfer, "msg with token more than aggregated rate",
 				big.NewInt(600_000), // gas limit
 			)
 			tc.lane.Logger.Info().Str("tokensTobeSent", src.TransferAmount[0].String()).Msg("More than Aggregated Rate")
@@ -281,7 +282,7 @@ func TestSmokeCCIPRateLimit(t *testing.T) {
 			require.Equal(t, "AggregateValueRateLimitReached", errReason)
 
 			// validate the  successful request was delivered to the destination
-			tc.lane.ValidateRequests(true)
+			tc.lane.ValidateRequests()
 
 			// now set the token pool rate limit
 			if SetRateLimit {
@@ -304,7 +305,7 @@ func TestSmokeCCIPRateLimit(t *testing.T) {
 				TokenPoolRateLimitRate = prevOnRampRLTokenPool.Rate
 			}
 
-			rlOnPool, err := src.Common.BridgeTokenPools[0].PoolInterface.GetCurrentOutboundRateLimiterState(nil, src.DestChainSelector)
+			rlOnPool, err := src.Common.BridgeTokenPools[0].Instance.GetCurrentOutboundRateLimiterState(nil, src.DestChainSelector)
 			require.NoError(t, err)
 			require.True(t, rlOnPool.IsEnabled, "Token Pool rate limiter should be enabled")
 
@@ -332,7 +333,6 @@ func TestSmokeCCIPRateLimit(t *testing.T) {
 
 			failedTx, _, _, err = tc.lane.Source.SendRequest(
 				tc.lane.Dest.ReceiverDapp.EthAddress,
-				actions.TokenTransfer, "msg with token more than token pool capacity",
 				big.NewInt(600_000), // gas limit
 			)
 			require.NoError(t, err)
@@ -353,7 +353,7 @@ func TestSmokeCCIPRateLimit(t *testing.T) {
 			src.TransferAmount[0] = tokensTobeSent
 			tc.lane.Logger.Info().Str("tokensTobeSent", tokensTobeSent.String()).Msg("99% of Token Pool Capacity")
 			tc.lane.RecordStateBeforeTransfer()
-			err = tc.lane.SendRequests(1, TestCfg.TestGroupInput.MsgType, big.NewInt(600_000))
+			err = tc.lane.SendRequests(1, big.NewInt(600_000))
 			require.NoError(t, err)
 
 			// try to send again with amount more than the amount refilled by token pool rate and
@@ -366,7 +366,6 @@ func TestSmokeCCIPRateLimit(t *testing.T) {
 			require.NoError(t, tc.lane.Source.Common.ChainClient.WaitForEvents())
 			failedTx, _, _, err = tc.lane.Source.SendRequest(
 				tc.lane.Dest.ReceiverDapp.EthAddress,
-				actions.TokenTransfer, "msg with token more than token pool rate",
 				big.NewInt(600_000),
 			)
 			require.NoError(t, err)
@@ -383,7 +382,7 @@ func TestSmokeCCIPRateLimit(t *testing.T) {
 			require.Equal(t, "TokenRateLimitReached", errReason)
 
 			// validate that the successful transfers are reflected in destination
-			tc.lane.ValidateRequests(true)
+			tc.lane.ValidateRequests()
 		})
 	}
 }
@@ -399,7 +398,7 @@ func TestSmokeCCIPMulticall(t *testing.T) {
 		return
 	}
 	t.Cleanup(func() {
-		if TestCfg.TestGroupInput.MsgType == actions.TokenTransfer {
+		if TestCfg.TestGroupInput.MsgDetails.IsTokenTransfer() {
 			setUpOutput.Balance.Verify(t)
 		}
 		require.NoError(t, setUpOutput.TearDown())
@@ -433,9 +432,9 @@ func TestSmokeCCIPMulticall(t *testing.T) {
 				Msgf("Starting lane %s -> %s", tc.lane.SourceNetworkName, tc.lane.DestNetworkName)
 
 			tc.lane.RecordStateBeforeTransfer()
-			err := tc.lane.Multicall(TestCfg.TestGroupInput.NoOfSendsInMulticall, TestCfg.TestGroupInput.MsgType, tc.lane.Source.Common.MulticallContract)
+			err := tc.lane.Multicall(TestCfg.TestGroupInput.NoOfSendsInMulticall, tc.lane.Source.Common.MulticallContract)
 			require.NoError(t, err)
-			tc.lane.ValidateRequests(true)
+			tc.lane.ValidateRequests()
 		})
 	}
 }
@@ -449,7 +448,7 @@ func TestSmokeCCIPManuallyExecuteAfterExecutionFailingDueToInsufficientGas(t *te
 		return
 	}
 	t.Cleanup(func() {
-		if TestCfg.TestGroupInput.MsgType == actions.TokenTransfer {
+		if TestCfg.TestGroupInput.MsgDetails.IsTokenTransfer() {
 			setUpOutput.Balance.Verify(t)
 		}
 		require.NoError(t, setUpOutput.TearDown())
@@ -484,9 +483,9 @@ func TestSmokeCCIPManuallyExecuteAfterExecutionFailingDueToInsufficientGas(t *te
 
 			tc.lane.RecordStateBeforeTransfer()
 			// send with insufficient gas for ccip-receive to fail
-			err := tc.lane.SendRequests(1, TestCfg.TestGroupInput.MsgType, big.NewInt(0))
+			err := tc.lane.SendRequests(1, big.NewInt(0))
 			require.NoError(t, err)
-			tc.lane.ValidateRequests(false)
+			tc.lane.ValidateRequests(actions.ExpectPhaseToFail(testreporters.ExecStateChanged, actions.ShouldExist()))
 			// wait for events
 			err = tc.lane.Dest.Common.ChainClient.WaitForEvents()
 			require.NoError(t, err)

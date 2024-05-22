@@ -1,4 +1,11 @@
 [CCIP]
+[CCIP.ContractVersions]
+PriceRegistry = '1.2.0'
+OffRamp = '1.2.0'
+OnRamp = '1.2.0'
+TokenPool = '1.4.0'
+CommitStore = '1.2.0'
+
 [CCIP.Deployments]
 DataFile = 'lane-config/.*.json'
 
@@ -33,3 +40,6 @@ NeedsUpgrade = true
 [CCIP.Groups.load]
 LocalCluster = false
 ExistingDeployment = true
+
+[CCIP.Groups.load.LoadProfile]
+TestRunName = 'upgrade-test'

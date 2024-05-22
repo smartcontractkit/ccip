@@ -23,9 +23,9 @@ type CommonContracts struct {
 	IsNativeFeeToken   bool              `json:"is_native_fee_token,omitempty"`
 	IsMockARM          bool              `json:"is_mock_arm,omitempty"`
 	FeeToken           string            `json:"fee_token"`
-	BridgeTokens       []string          `json:"bridge_tokens"`
-	BridgeTokenPools   []string          `json:"bridge_tokens_pools"`
-	PriceAggregators   map[string]string `json:"price_aggregators"`
+	BridgeTokens       []string          `json:"bridge_tokens,omitempty"`
+	BridgeTokenPools   []string          `json:"bridge_tokens_pools,omitempty"`
+	PriceAggregators   map[string]string `json:"price_aggregators,omitempty"`
 	ARM                string            `json:"arm"`
 	Router             string            `json:"router"`
 	PriceRegistry      string            `json:"price_registry"`
@@ -34,7 +34,6 @@ type CommonContracts struct {
 	TokenTransmitter   string            `json:"token_transmitter,omitempty"`
 	TokenMessenger     string            `json:"token_messenger,omitempty"`
 	TokenAdminRegistry string            `json:"token_admin_registry,omitempty"`
-	Version            string            `json:"version,omitempty"`
 }
 
 type SourceContracts struct {
@@ -83,9 +82,6 @@ func (l *LaneConfig) Validate() error {
 	}
 	if l.PriceRegistry == "" || !common.IsHexAddress(l.PriceRegistry) {
 		laneConfigError = multierr.Append(laneConfigError, errors.New("must set proper address for price_registry"))
-	}
-	if l.Version != "" && (l.TokenAdminRegistry == "" || !common.IsHexAddress(l.TokenAdminRegistry)) {
-		laneConfigError = multierr.Append(laneConfigError, errors.New("must set proper address for token_admin_registry"))
 	}
 	if l.WrappedNative == "" || !common.IsHexAddress(l.WrappedNative) {
 		laneConfigError = multierr.Append(laneConfigError, errors.New("must set proper address for wrapped_native"))
