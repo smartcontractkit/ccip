@@ -543,10 +543,9 @@ func (ccipModule *CCIPCommon) WatchForPriceUpdates(ctx context.Context) error {
 				ccipModule.tokenPriceUpdateWatcherMu.Unlock()
 				log.Info().
 					Str("token", e.Token.Hex()).
-					Str("source_chain", ccipModule.ChainClient.GetNetworkName()).
+					Str("chain", ccipModule.ChainClient.GetNetworkName()).
 					Str("price_registry", ccipModule.PriceRegistry.Address()).
-					Msgf("UsdPerTokenUpdated event received for token %d source chain %s",
-						e.Token.Hex(), ccipModule.ChainClient.GetNetworkName())
+					Msg("UsdPerTokenUpdated event received")
 			case <-ctx.Done():
 				return
 			}
