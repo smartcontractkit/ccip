@@ -1173,7 +1173,21 @@ func (c *PriceRegistry) WatchUsdPerUnitGasUpdated(opts *bind.WatchOpts, latest c
 		}
 		return newP.WatchUsdPerUnitGasUpdated(opts, latest, destChain)
 	}
-	return nil, fmt.Errorf("no instance found to watch for price updates")
+	return nil, fmt.Errorf("no instance found to watch for price updates for gas")
+}
+
+func (c *PriceRegistry) WatchUsdPerTokenUpdated(opts *bind.WatchOpts, latest chan *price_registry.PriceRegistryUsdPerTokenUpdated) (event.Subscription, error) {
+	if c.Instance.Latest != nil {
+		return c.Instance.Latest.WatchUsdPerTokenUpdated(opts, latest, nil)
+	}
+	if c.Instance.V1_2_0 != nil {
+		newP, err := price_registry.NewPriceRegistry(c.Instance.V1_2_0.Address(), wrappers.MustNewWrappedContractBackend(c.client, nil))
+		if err != nil {
+			return nil, fmt.Errorf("failed to create new PriceRegistry contract: %w", err)
+		}
+		return newP.WatchUsdPerTokenUpdated(opts, latest, nil)
+	}
+	return nil, fmt.Errorf("no instance found to watch for price updates for tokens")
 }
 
 type TokenAdminRegistry struct {

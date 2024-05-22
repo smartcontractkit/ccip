@@ -739,6 +739,11 @@ func (o *CCIPTestSetUpOutputs) WaitForPriceUpdates() {
 					Msg("Stopping price update watch")
 
 			}()
+			var allDestTokens []common.Address
+			for _, token := range lane.Dest.Common.BridgeTokens {
+				allDestTokens = append(allDestTokens, token.ContractAddress)
+			}
+			allDestTokens = append(allDestTokens, lane.Dest.Common.FeeToken.EthAddress)
 			lane.Logger.Info().
 				Str("source_chain", lane.Source.Common.ChainClient.GetNetworkName()).
 				Uint64("dest_chain", lane.Source.DestinationChainId).
@@ -748,6 +753,7 @@ func (o *CCIPTestSetUpOutputs) WaitForPriceUpdates() {
 				o.SetUpContext, lane.Logger,
 				o.Cfg.TestGroupInput.TokenConfig.TimeoutForPriceUpdate.Duration(),
 				lane.Source.DestinationChainId,
+				allDestTokens,
 			)
 			if err != nil {
 				return errors.Wrapf(err, "waiting for price update failed on lane %s-->%s", lane.SourceNetworkName, lane.DestNetworkName)
