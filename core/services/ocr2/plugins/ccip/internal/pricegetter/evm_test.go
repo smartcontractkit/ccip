@@ -15,6 +15,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/aggregator_v3_interface"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/rpclib"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/rpclib/rpclibmocks"
 )
@@ -22,6 +23,7 @@ import (
 type testParameters struct {
 	cfg                          config.DynamicPriceGetterConfig
 	evmClients                   map[uint64]DynamicPriceGetterClient
+	tokens                       []common.Address
 	expectedTokenPrices          map[common.Address]big.Int
 	invalidConfigErrorExpected   bool
 	priceResolutionErrorExpected bool
@@ -74,9 +76,9 @@ func TestDynamicPriceGetter(t *testing.T) {
 			assert.Equal(t, []cciptypes.Address{}, cfgTokens)
 			assert.Equal(t, []cciptypes.Address{unconfiguredTk}, uncfgTokens)
 			// Build list of tokens to query.
-			tokens := make([]cciptypes.Address, 0, len(test.param.expectedTokenPrices))
-			for tk := range test.param.expectedTokenPrices {
-				tokenAddr := cciptypes.Address(tk.String())
+			tokens := make([]cciptypes.Address, 0, len(test.param.tokens))
+			for _, tk := range test.param.tokens {
+				tokenAddr := ccipcalc.EvmAddrToGeneric(tk)
 				tokens = append(tokens, tokenAddr)
 			}
 			prices, err := pg.TokenPricesUSD(ctx, tokens)
@@ -89,6 +91,9 @@ func TestDynamicPriceGetter(t *testing.T) {
 			assert.True(t, len(prices) >= len(test.param.expectedTokenPrices))
 			// Check prices are matching expected result.
 			for tk, expectedPrice := range test.param.expectedTokenPrices {
+				if prices[cciptypes.Address(tk.String())] == nil {
+					assert.Fail(t, "Token price not found")
+				}
 				assert.Equal(t, 0, expectedPrice.Cmp(prices[cciptypes.Address(tk.String())]),
 					"Token price mismatch: expected price %v, got %v", expectedPrice, *prices[cciptypes.Address(tk.String())])
 			}
@@ -169,8 +174,9 @@ func testParamAggregatorOnly(t *testing.T) testParameters {
 	return testParameters{
 		cfg:                        cfg,
 		evmClients:                 evmClients,
-		invalidConfigErrorExpected: false,
+		tokens:                     []common.Address{tk1, tk2, tk3, tk4},
 		expectedTokenPrices:        expectedTokenPrices,
+		invalidConfigErrorExpected: false,
 	}
 }
 
@@ -232,6 +238,7 @@ func testParamAggregatorOnlyMulti(t *testing.T) testParameters {
 		cfg:                        cfg,
 		evmClients:                 evmClients,
 		invalidConfigErrorExpected: false,
+		tokens:                     []common.Address{tk1, tk2, tk3},
 		expectedTokenPrices:        expectedTokenPrices,
 	}
 }
@@ -267,6 +274,7 @@ func testParamStaticOnly() testParameters {
 	return testParameters{
 		cfg:                 cfg,
 		evmClients:          evmClients,
+		tokens:              []common.Address{tk1, tk2, tk3},
 		expectedTokenPrices: expectedTokenPrices,
 	}
 }
@@ -321,6 +329,7 @@ func testParamAggregatorAndStaticValid(t *testing.T) testParameters {
 	return testParameters{
 		cfg:                 cfg,
 		evmClients:          evmClients,
+		tokens:              []common.Address{tk1, tk2, tk3},
 		expectedTokenPrices: expectedTokenPrices,
 	}
 }
@@ -382,6 +391,7 @@ func testParamAggregatorAndStaticTokenCollision(t *testing.T) testParameters {
 	return testParameters{
 		cfg:                        cfg,
 		evmClients:                 evmClients,
+		tokens:                     []common.Address{tk1, tk2, tk3},
 		invalidConfigErrorExpected: true,
 	}
 }
@@ -438,6 +448,7 @@ func testParamNoAggregatorForToken(t *testing.T) testParameters {
 	return testParameters{
 		cfg:                          cfg,
 		evmClients:                   evmClients,
+		tokens:                       []common.Address{tk1, tk2, tk3, tk4},
 		expectedTokenPrices:          expectedTokenPrices,
 		priceResolutionErrorExpected: true,
 	}
