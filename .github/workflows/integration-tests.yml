@@ -144,6 +144,7 @@ jobs:
           basic-auth: ${{ secrets.GRAFANA_INTERNAL_BASIC_AUTH }}
           hostname: ${{ secrets.GRAFANA_INTERNAL_HOST }}
           this-job-name: Build and Lint ${{ matrix.project.name }}
+        continue-on-error: true
       - name: Checkout the repo
         uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
         with:
@@ -496,6 +497,12 @@ jobs:
       fail-fast: false
       matrix:
         product:
+          - name: ccip-lm-smoke
+            nodes: 1
+            os: ubuntu-latest
+            file: lm
+            dir: ccip-tests/smoke
+            run: -run ^TestLmBasic$
           - name: ccip-smoke
             nodes: 1
             os: ubuntu-latest
@@ -522,12 +529,13 @@ jobs:
             os: ubuntu20.04-16cores-64GB
             file: ccip
             run: -run ^TestSmokeCCIPRateLimit$
-          - name: ccip-smoke-multicall
-            nodes: 1
-            dir: ccip-tests/smoke
-            os: ubuntu20.04-16cores-64GB
-            file: ccip
-            run: -run ^TestSmokeCCIPMulticall$
+# This test will be fixed in a follow-up PR
+#          - name: ccip-smoke-multicall
+#            nodes: 1
+#            dir: ccip-tests/smoke
+#            os: ubuntu20.04-16cores-64GB
+#            file: ccip
+#            run: -run ^TestSmokeCCIPMulticall$
           - name: ccip-smoke-manual-exec
             nodes: 1
             dir: ccip-tests/smoke

@@ -143,7 +143,6 @@ type CCIPCommon struct {
 	BridgeTokens                  []*contracts.ERC20Token
 	PriceAggregators              map[common.Address]*contracts.MockAggregator
 	NoOfTokensNeedingDynamicPrice int
-	RemoteChains                  []uint64
 	BridgeTokenPools              []*contracts.TokenPool
 	RateLimiterConfig             contracts.RateLimiterConfig
 	ARMContract                   *common.Address
@@ -170,7 +169,6 @@ type CCIPCommon struct {
 func (ccipModule *CCIPCommon) FreeUpUnusedSpace() {
 	ccipModule.PriceAggregators = nil
 	ccipModule.BridgeTokenPools = []*contracts.TokenPool{}
-	ccipModule.RemoteChains = nil
 	ccipModule.TokenMessenger = nil
 	ccipModule.TokenTransmitter = nil
 	runtime.GC()
@@ -217,22 +215,6 @@ func (ccipModule *CCIPCommon) IsCursed() (bool, error) {
 		return false, fmt.Errorf("error instantiating arm %w", err)
 	}
 	return arm.IsCursed(nil)
-}
-
-func (ccipModule *CCIPCommon) SetRemoteChainsOnPools() error {
-	if ccipModule.ExistingDeployment {
-		return nil
-	}
-	for _, pool := range ccipModule.BridgeTokenPools {
-		err := pool.SetRemoteChainOnPool(ccipModule.RemoteChains)
-		if err != nil {
-			return fmt.Errorf("error updating remote chain selectors %w", err)
-		}
-	}
-	if err := ccipModule.ChainClient.WaitForEvents(); err != nil {
-		return fmt.Errorf("error waiting for updating remote chain selectors %w", err)
-	}
-	return nil
 }
 
 func (ccipModule *CCIPCommon) CurseARM() (*types.Transaction, error) {
@@ -1007,10 +989,6 @@ func (ccipModule *CCIPCommon) DeployContracts(noOfTokens int,
 		}
 	}
 	log.Info().Msg("finished deploying common contracts")
-	err = ccipModule.SetRemoteChainsOnPools()
-	if err != nil {
-		return fmt.Errorf("error setting remote chains %w", err)
-	}
 	// approve router to spend fee token
 	return ccipModule.ApproveTokens()
 }
@@ -1587,7 +1565,13 @@ func (sourceCCIP *SourceCCIPModule) AssertEventCCIPSendRequested(
 					for i, sendRequestedEvent := range sendRequestedEvents {
 						seqNum := sendRequestedEvent.SequenceNumber
 						// prevEventAt is the time when the message was successful, this should be same as the time when the event was emitted
-						reqStat[i].UpdateState(lggr, seqNum, testreporters.CCIPSendRe, 0, testreporters.Success)
+						reqStat[i].UpdateState(lggr, seqNum, testreporters.CCIPSendRe, 0, testreporters.Success,
+							testreporters.TransactionStats{
+								MsgID:              fmt.Sprintf("0x%x", sendRequestedEvent.MessageId[:]),
+								TxHash:             "",
+								NoOfTokensSent:     sendRequestedEvent.NoOfTokens,
+								MessageBytesLength: int64(sendRequestedEvent.DataLength),
+							})
 					}
 					var err error
 					if len(sendRequestedEvents) == 0 {
@@ -1887,15 +1871,6 @@ func (destCCIP *DestCCIPModule) DeployContracts(
 	if !destCCIP.Common.ExistingDeployment && len(sourceCCIP.Common.BridgeTokenPools) != len(destCCIP.Common.BridgeTokenPools) {
 		return fmt.Errorf("source and destination token pool number does not match")
 	}
-	// set remote pools
-	if !destCCIP.Common.ExistingDeployment {
-		for i, pool := range sourceCCIP.Common.BridgeTokenPools {
-			err := pool.SetRemotePool(destChainSelector, destCCIP.Common.BridgeTokenPools[i].EthAddress)
-			if err != nil {
-				return fmt.Errorf("error setting remote pools %w", err)
-			}
-		}
-	}
 
 	if destCCIP.CommitStore == nil {
 		if destCCIP.Common.ExistingDeployment {
@@ -2191,6 +2166,7 @@ func (destCCIP *DestCCIPModule) AssertEventExecutionStateChanged(
 							testreporters.Success,
 							testreporters.TransactionStats{
 								TxHash:  vLogs.TxHash.Hex(),
+								MsgID:   fmt.Sprintf("0x%x", e.MessageId[:]),
 								GasUsed: gasUsed,
 							},
 						)
@@ -2545,6 +2521,24 @@ func (lane *CCIPLane) TokenPricesConfig() (string, error) {
 		return "", fmt.Errorf("error in adding PriceConfig for source WrappedNative token %s: %w", lane.Source.Common.WrappedNative.Hex(), err)
 	}
 	return d.String()
+}
+
+func (lane *CCIPLane) SetRemoteChainsOnPool() error {
+	if len(lane.Source.Common.BridgeTokenPools) != len(lane.Dest.Common.BridgeTokenPools) {
+		return fmt.Errorf("source (%d) and dest (%d) bridge token pools length should be same", len(lane.Source.Common.BridgeTokenPools), len(lane.Dest.Common.BridgeTokenPools))
+	}
+	for i, src := range lane.Source.Common.BridgeTokenPools {
+		dst := lane.Dest.Common.BridgeTokenPools[i]
+		err := src.SetRemoteChainOnPool(lane.Source.DestChainSelector, dst.EthAddress)
+		if err != nil {
+			return err
+		}
+		err = dst.SetRemoteChainOnPool(lane.Dest.SourceChainSelector, src.EthAddress)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // OptimizeStorage sets nil to various elements of CCIPLane which are only used
@@ -3069,6 +3063,8 @@ func (lane *CCIPLane) StartEventWatchers() error {
 						&contracts.SendReqEventData{
 							MessageId:      e.Message.MessageId,
 							SequenceNumber: e.Message.SequenceNumber,
+							DataLength:     len(e.Message.Data),
+							NoOfTokens:     len(e.Message.TokenAmounts),
 							Raw:            e.Raw,
 						}))
 				} else {
@@ -3076,6 +3072,8 @@ func (lane *CCIPLane) StartEventWatchers() error {
 						{
 							MessageId:      e.Message.MessageId,
 							SequenceNumber: e.Message.SequenceNumber,
+							DataLength:     len(e.Message.Data),
+							NoOfTokens:     len(e.Message.TokenAmounts),
 							Raw:            e.Raw,
 						},
 					})
