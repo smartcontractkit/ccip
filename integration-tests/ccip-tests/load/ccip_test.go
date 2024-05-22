@@ -158,6 +158,7 @@ func TestLoadCCIPStableRPSGasSpike(t *testing.T) {
 	})
 
 	chcfg := testArgs.TestCfg.TestGroupInput.ChaosGasProfile
+	log.Warn().Any("Config", chcfg).Msg("Gas config")
 	gs := setupGasSuite(t, testArgs)
 	gs.RaiseGas(chcfg.TargetChain, chcfg.StartGasPrice, chcfg.GasRaisePercentage, chcfg.Duration.Duration(), chcfg.Spike)
 

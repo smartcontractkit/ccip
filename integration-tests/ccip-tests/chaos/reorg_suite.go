@@ -60,6 +60,7 @@ func NewReorgSuite(t *testing.T, cfg *ReorgConfig) (*ReorgSuite, error) {
 		return nil, err
 	}
 	return &ReorgSuite{
+		t:             t,
 		Cfg:           cfg,
 		Logger:        l,
 		SrcClient:     client.NewRPCClient(cfg.SrcGethHTTPURL),
