@@ -64,7 +64,7 @@ contract EVM2EVMMultiOnRamp_constructor is EVM2EVMMultiOnRampSetup {
         abi.encode(
           Internal.EVM_2_EVM_MESSAGE_HASH, SOURCE_CHAIN_SELECTOR, destChainConfigArg.destChainSelector, address(s_onRamp)
         )
-      )
+        )
     });
 
     EVM2EVMMultiOnRamp.StaticConfig memory gotStaticConfig = s_onRamp.getStaticConfig();
@@ -179,7 +179,7 @@ contract EVM2EVMMultiOnRamp_applyDestChainConfigUpdates is EVM2EVMMultiOnRampSet
         abi.encode(
           Internal.EVM_2_EVM_MESSAGE_HASH, SOURCE_CHAIN_SELECTOR, destChainConfigArgs.destChainSelector, address(s_onRamp)
         )
-      )
+        )
     });
 
     if (isNewChain) {
@@ -216,7 +216,7 @@ contract EVM2EVMMultiOnRamp_applyDestChainConfigUpdates is EVM2EVMMultiOnRampSet
           destChainConfigArgs[0].destChainSelector,
           address(s_onRamp)
         )
-      )
+        )
     });
 
     EVM2EVMMultiOnRamp.DestChainConfig memory expectedDestChainConfig1 = EVM2EVMMultiOnRamp.DestChainConfig({
@@ -230,7 +230,7 @@ contract EVM2EVMMultiOnRamp_applyDestChainConfigUpdates is EVM2EVMMultiOnRampSet
           destChainConfigArgs[1].destChainSelector,
           address(s_onRamp)
         )
-      )
+        )
     });
 
     vm.expectEmit();
