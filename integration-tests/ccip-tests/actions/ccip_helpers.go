@@ -2592,7 +2592,6 @@ func (lane *CCIPLane) TokenPricesConfig() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("error in adding PriceConfig for dest WrappedNative token %s: %w", lane.Dest.Common.WrappedNative.Hex(), err)
 	}
-	types.Block{}
 	return d.String()
 }
 
