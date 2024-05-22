@@ -85,7 +85,7 @@ func (p *Plugin) Query(_ context.Context, _ ocr3types.OutcomeContext) (types.Que
 //
 // Gas Prices:
 //
-//	TODO
+//	We discover the gas prices for each readable source chain.
 //
 // Token Prices:
 //
@@ -129,12 +129,9 @@ func (p *Plugin) Observation(ctx context.Context, outctx ocr3types.OutcomeContex
 		}
 	}
 
-	readableSourceChainsSlice := p.readableChains.ToSlice()
-	sort.Slice(readableSourceChainsSlice, func(i, j int) bool { return readableSourceChainsSlice[i] < readableSourceChainsSlice[j] })
-
-	// Find the gas prices for each chain.
+	// Find the gas prices for each source chain.
 	var gasPrices []model.GasPriceChain
-	gasPrices, err = observeGasPrices(ctx, p.ccipReader, readableSourceChainsSlice)
+	gasPrices, err = observeGasPrices(ctx, p.ccipReader, p.knownSourceChainsSlice())
 	if err != nil {
 		return types.Observation{}, fmt.Errorf("observe gas prices: %w", err)
 	}
@@ -214,7 +211,7 @@ func (p *Plugin) Outcome(_ ocr3types.OutcomeContext, _ types.Query, aos []types.
 		return ocr3types.Outcome{}, fmt.Errorf("token prices consensus: %w", err)
 	}
 
-	gasPrices, err := gasPricesConsensus(decodedObservations, p.cfg.FChain[p.cfg.DestChain])
+	gasPrices, err := gasPricesConsensus(p.lggr, decodedObservations, p.cfg.FChain[p.cfg.DestChain])
 	if err != nil {
 		return ocr3types.Outcome{}, fmt.Errorf("gas prices consensus: %w", err)
 	}

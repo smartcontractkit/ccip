@@ -145,12 +145,13 @@ func observeGasPrices(ctx context.Context, ccipReader reader.CCIP, chains []mode
 	}
 
 	if len(gasPrices) != len(chains) {
-		return nil, fmt.Errorf("internal critical error gas prices length mismatch: got %d, want %d", len(gasPrices), len(chains))
+		return nil, fmt.Errorf("internal critical error gas prices length mismatch: got %d, want %d",
+			len(gasPrices), len(chains))
 	}
 
 	gasPricesGwei := make([]model.GasPriceChain, 0, len(chains))
 	for i, chain := range chains {
-		gasPricesGwei = append(gasPricesGwei, model.NewGasPriceChain(gasPrices[i], chain))
+		gasPricesGwei = append(gasPricesGwei, model.NewGasPriceChain(gasPrices[i].Int, chain))
 	}
 
 	return gasPricesGwei, nil
@@ -367,12 +368,13 @@ func tokenPricesConsensus(
 	return consensusPrices, nil
 }
 
-func gasPricesConsensus(observations []model.CommitPluginObservation, fChain int) ([]model.GasPriceChain, error) {
-	gasPricePerChain := make(map[model.ChainSelector][]model.GasPrice)
+func gasPricesConsensus(lggr logger.Logger, observations []model.CommitPluginObservation, fChain int) ([]model.GasPriceChain, error) {
+	// Group the observed gas prices by chain.
+	gasPricePerChain := make(map[model.ChainSelector][]model.BigInt)
 	for _, obs := range observations {
 		for _, gasPrice := range obs.GasPrices {
 			if _, exists := gasPricePerChain[gasPrice.ChainSel]; !exists {
-				gasPricePerChain[gasPrice.ChainSel] = make([]model.GasPrice, 0)
+				gasPricePerChain[gasPrice.ChainSel] = make([]model.BigInt, 0)
 			}
 			gasPricePerChain[gasPrice.ChainSel] = append(gasPricePerChain[gasPrice.ChainSel], gasPrice.GasPrice)
 		}
@@ -382,13 +384,18 @@ func gasPricesConsensus(observations []model.CommitPluginObservation, fChain int
 	consensusGasPrices := make([]model.GasPriceChain, 0)
 	for chain, gasPrices := range gasPricePerChain {
 		if len(gasPrices) < 2*fChain+1 {
+			lggr.Warnw("not enough gas price observations", "chain", chain, "gasPrices", gasPrices)
 			continue
 		}
+
 		values := make([]model.BigInt, 0, len(gasPrices))
 		for _, gasPrice := range gasPrices {
-			values = append(values, model.BigInt{Int: gasPrice})
+			values = append(values, gasPrice)
 		}
-		consensusGasPrices = append(consensusGasPrices, model.NewGasPriceChain(model.GasPrice(slicelib.BigIntSortedMiddle(values).Int), chain))
+		consensusGasPrices = append(
+			consensusGasPrices,
+			model.NewGasPriceChain(slicelib.BigIntSortedMiddle(values).Int, chain),
+		)
 	}
 
 	sort.Slice(consensusGasPrices, func(i, j int) bool { return consensusGasPrices[i].ChainSel < consensusGasPrices[j].ChainSel })
@@ -485,8 +492,8 @@ func validateObservedGasPrices(gasPrices []model.GasPriceChain) error {
 			return fmt.Errorf("duplicate gas price for chain %d", g.ChainSel)
 		}
 		gasPriceChains.Add(g.ChainSel)
-		if g.GasPrice == nil {
-			return fmt.Errorf("gas price must not be nil")
+		if g.GasPrice.IsEmpty() {
+			return fmt.Errorf("gas price must not be empty")
 		}
 	}
 
