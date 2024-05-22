@@ -96,7 +96,8 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     // The following three properties are defaults, they can be overridden by setting the TokenTransferFeeConfig for a token
     uint16 defaultTokenFeeUSDCents; //           │ Default token fee charged per token transfer
     uint32 defaultTokenDestGasOverhead; //       │ Default gas charged to execute the token transfer on the destination chain
-    uint32 defaultTokenDestBytesOverhead; //     | Default extra data availability bytes charged per token transfer
+    //                                           │ Default data availability bytes that are returned from the source pool and sent
+    uint32 defaultTokenDestBytesOverhead; //     | to the destination pool. Must be >= Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES
     bool enforceOutOfOrder; // ──────────────────╯ Whether to enforce the allowOutOfOrderExecution extraArg value to be true.
   }
 
@@ -450,6 +451,9 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   function _setDynamicConfig(DynamicConfig memory dynamicConfig) internal {
     // We permit router to be set to zero as a way to pause the contract.
     if (dynamicConfig.priceRegistry == address(0)) revert InvalidConfig();
+    if (dynamicConfig.defaultTokenDestBytesOverhead < Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES) {
+      revert InvalidDestBytesOverhead(address(0), dynamicConfig.defaultTokenDestBytesOverhead);
+    }
 
     s_dynamicConfig = dynamicConfig;
 
@@ -617,8 +621,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
       if (!transferFeeConfig.isEnabled) {
         tokenTransferFeeUSDWei += uint256(s_dynamicConfig.defaultTokenFeeUSDCents) * 1e16;
         tokenTransferGas += s_dynamicConfig.defaultTokenDestGasOverhead;
-        tokenTransferBytesOverhead +=
-          s_dynamicConfig.defaultTokenDestBytesOverhead + uint32(Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES);
+        tokenTransferBytesOverhead += s_dynamicConfig.defaultTokenDestBytesOverhead;
         continue;
       }
 

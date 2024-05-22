@@ -1093,7 +1093,7 @@ contract EVM2EVMOnRamp_getTokenTransferCost is EVM2EVMOnRamp_getFeeSetup {
     // Assert that the default values are used
     assertEq(uint256(DEFAULT_TOKEN_FEE_USD_CENTS) * 1e16, feeUSDWei);
     assertEq(DEFAULT_TOKEN_DEST_GAS_OVERHEAD, destGasOverhead);
-    assertEq(DEFAULT_TOKEN_BYTES_OVERHEAD + Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES, destBytesOverhead);
+    assertEq(DEFAULT_TOKEN_BYTES_OVERHEAD, destBytesOverhead);
   }
 
   function test_SmallTokenTransferChargesMinFeeAndGas_Success() public view {
