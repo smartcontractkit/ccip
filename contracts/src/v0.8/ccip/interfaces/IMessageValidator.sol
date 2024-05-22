@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
 import {Client} from "../libraries/Client.sol";
 
 /// @notice Interface for plug-in message validator contracts that intercept OffRamp & OnRamp messages
@@ -10,9 +13,10 @@ interface IMessageValidator {
 
   /// @notice Validates the given OffRamp message. Reverts on validation failure
   /// @param message to validate
-  function validateIncomingMessage(Client.Any2EVMMessage memory message) external view;
+  function validateIncomingMessage(Client.Any2EVMMessage memory message) external;
 
   /// @notice Validates the given OnRamp message. Reverts on validation failure
   /// @param message to valdidate
-  function validateOutgoingMessages(Client.EVM2AnyMessage memory message) external view;
+  /// @param destChainSelector dest chain selector where the message is being sent to
+  function validateOutgoingMessage(Client.EVM2AnyMessage memory message, uint64 destChainSelector) external;
 }

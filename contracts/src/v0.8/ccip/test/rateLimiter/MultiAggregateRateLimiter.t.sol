@@ -26,6 +26,9 @@ contract MultiAggregateRateLimiterSetup is BaseTest, PriceRegistrySetup {
   RateLimiterNoEvents.Config internal SRC_CHAIN_2_RATE_LIMITER_CONFIG =
     RateLimiterNoEvents.Config({isEnabled: true, rate: 10, capacity: 200});
 
+  address internal immutable MOCK_OFFRAMP = address(1111);
+  address internal immutable MOCK_ONRAMP = address(1112);
+
   function setUp() public virtual override(BaseTest, PriceRegistrySetup) {
     BaseTest.setUp();
     PriceRegistrySetup.setUp();
@@ -44,7 +47,12 @@ contract MultiAggregateRateLimiterSetup is BaseTest, PriceRegistrySetup {
     MultiAggregateRateLimiter.RateLimiterConfigUpdates memory configUpdates = MultiAggregateRateLimiter
       .RateLimiterConfigUpdates({chainSelectors: chainSelectors, rateLimiterConfigs: rateLimiterConfigs});
 
-    s_rateLimiter = new MultiAggregateRateLimiterHelper(configUpdates, ADMIN);
+    address[] memory authorizedCallers = new address[](2);
+    authorizedCallers[0] = MOCK_OFFRAMP;
+    authorizedCallers[1] = MOCK_ONRAMP;
+
+    s_rateLimiter =
+      new MultiAggregateRateLimiterHelper(configUpdates, ADMIN, address(s_priceRegistry), authorizedCallers);
   }
 }
 
@@ -59,8 +67,13 @@ contract MultiAggregateRateLimiter_constructor is MultiAggregateRateLimiterSetup
     MultiAggregateRateLimiter.RateLimiterConfigUpdates memory configUpdates = MultiAggregateRateLimiter
       .RateLimiterConfigUpdates({chainSelectors: chainSelectors, rateLimiterConfigs: rateLimiterConfigs});
 
+    address[] memory authorizedCallers = new address[](2);
+    authorizedCallers[0] = MOCK_OFFRAMP;
+    authorizedCallers[1] = MOCK_ONRAMP;
+
     vm.recordLogs();
-    s_rateLimiter = new MultiAggregateRateLimiterHelper(configUpdates, ADMIN);
+    s_rateLimiter =
+      new MultiAggregateRateLimiterHelper(configUpdates, ADMIN, address(s_priceRegistry), authorizedCallers);
 
     // Single log for AdminSet
     Vm.Log[] memory logEntries = vm.getRecordedLogs();
@@ -77,11 +90,16 @@ contract MultiAggregateRateLimiter_constructor is MultiAggregateRateLimiterSetup
     MultiAggregateRateLimiter.RateLimiterConfigUpdates memory configUpdates = MultiAggregateRateLimiter
       .RateLimiterConfigUpdates({chainSelectors: chainSelectors, rateLimiterConfigs: rateLimiterConfigs});
 
+    address[] memory authorizedCallers = new address[](2);
+    authorizedCallers[0] = MOCK_OFFRAMP;
+    authorizedCallers[1] = MOCK_ONRAMP;
+
     vm.expectEmit();
     emit RateLimiterConfigUpdated(SRC_CHAIN_1_SELECTOR, SRC_CHAIN_1_RATE_LIMITER_CONFIG);
 
     vm.recordLogs();
-    s_rateLimiter = new MultiAggregateRateLimiterHelper(configUpdates, ADMIN);
+    s_rateLimiter =
+      new MultiAggregateRateLimiterHelper(configUpdates, ADMIN, address(s_priceRegistry), authorizedCallers);
 
     // Log for AdminSet + RateLimiterConfigSet
     Vm.Log[] memory logEntries = vm.getRecordedLogs();
@@ -107,13 +125,18 @@ contract MultiAggregateRateLimiter_constructor is MultiAggregateRateLimiterSetup
     MultiAggregateRateLimiter.RateLimiterConfigUpdates memory configUpdates = MultiAggregateRateLimiter
       .RateLimiterConfigUpdates({chainSelectors: chainSelectors, rateLimiterConfigs: rateLimiterConfigs});
 
+    address[] memory authorizedCallers = new address[](2);
+    authorizedCallers[0] = MOCK_OFFRAMP;
+    authorizedCallers[1] = MOCK_ONRAMP;
+
     vm.expectEmit();
     emit RateLimiterConfigUpdated(SRC_CHAIN_1_SELECTOR, SRC_CHAIN_1_RATE_LIMITER_CONFIG);
 
     vm.expectEmit();
     emit RateLimiterConfigUpdated(SRC_CHAIN_2_SELECTOR, SRC_CHAIN_2_RATE_LIMITER_CONFIG);
 
-    s_rateLimiter = new MultiAggregateRateLimiterHelper(configUpdates, ADMIN);
+    s_rateLimiter =
+      new MultiAggregateRateLimiterHelper(configUpdates, ADMIN, address(s_priceRegistry), authorizedCallers);
 
     assertEq(ADMIN, s_rateLimiter.getTokenLimitAdmin());
     assertEq(OWNER, s_rateLimiter.owner());
