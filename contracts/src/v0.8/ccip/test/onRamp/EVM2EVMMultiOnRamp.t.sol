@@ -163,6 +163,13 @@ contract EVM2EVMMultiOnRamp_applyDestChainConfigUpdates is EVM2EVMMultiOnRampSet
     EVM2EVMMultiOnRamp.DestChainConfigArgs memory destChainConfigArgs
   ) public {
     vm.assume(destChainConfigArgs.destChainSelector != 0);
+    destChainConfigArgs.dynamicConfig.defaultTokenDestBytesOverhead = uint32(
+      bound(
+        destChainConfigArgs.dynamicConfig.defaultTokenDestBytesOverhead,
+        Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES,
+        type(uint32).max
+      )
+    );
     bool isNewChain = true;
 
     if (destChainConfigArgs.destChainSelector == DEST_CHAIN_SELECTOR) {

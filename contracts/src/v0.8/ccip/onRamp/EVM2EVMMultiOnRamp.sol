@@ -165,7 +165,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ILinkAvailable, AggregateRat
 
   /// @dev Struct to hold the dynamic configs, its destination chain selector and previous onRamp.
   /// Same as DestChainConfig but with the destChainSelector and the prevOnRamp so that an array of these
-  /// can be passed in the constructor and the applyDestChainConfigUpdates functiion
+  /// can be passed in the constructor and the applyDestChainConfigUpdates function
   struct DestChainConfigArgs {
     uint64 destChainSelector; // Destination chain selector
     DestChainDynamicConfig dynamicConfig; // struct to hold the configs for a destination chain
@@ -642,8 +642,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ILinkAvailable, AggregateRat
         DestChainDynamicConfig storage destChainDynamicConfig = s_destChainConfig[destChainSelector].dynamicConfig;
         tokenTransferFeeUSDWei += uint256(destChainDynamicConfig.defaultTokenFeeUSDCents) * 1e16;
         tokenTransferGas += destChainDynamicConfig.defaultTokenDestGasOverhead;
-        tokenTransferBytesOverhead +=
-          destChainDynamicConfig.defaultTokenDestBytesOverhead + uint32(Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES);
+        tokenTransferBytesOverhead += destChainDynamicConfig.defaultTokenDestBytesOverhead;
         continue;
       }
 
@@ -722,13 +721,16 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ILinkAvailable, AggregateRat
         emit DestChainAdded(destChainSelector, destChainConfig);
       } else {
         if (destChainConfig.prevOnRamp != prevOnRamp) revert InvalidDestChainConfig(destChainSelector);
+        if (destChainConfigArg.dynamicConfig.defaultTokenDestBytesOverhead < Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES) {
+          revert InvalidDestBytesOverhead(address(0), destChainConfigArg.dynamicConfig.defaultTokenDestBytesOverhead);
+        }
 
         emit DestChainDynamicConfigUpdated(destChainSelector, destChainConfigArg.dynamicConfig);
       }
     }
   }
 
-  /// @notice Returns the destination chain config for givent destination chain selector.
+  /// @notice Returns the destination chain config for given destination chain selector.
   /// @param destChainSelector The destination chain selector.
   /// @return The destination chain config.
   function getDestChainConfig(uint64 destChainSelector) external view returns (DestChainConfig memory) {
