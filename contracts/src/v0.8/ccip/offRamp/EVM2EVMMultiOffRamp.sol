@@ -75,7 +75,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, AggregateRateLimiter, ITyp
   event TokenAggregateRateLimitRemoved(address sourceToken, address destToken);
   event SourceChainSelectorAdded(uint64 sourceChainSelector);
   event SourceChainConfigSet(uint64 indexed sourceChainSelector, SourceChainConfig sourceConfig);
-  event SkippedAlreadyExecutedMessage(uint64 indexed sourceChainSelector, uint64 indexed sequenceNumber);
+  event SkippedAlreadyExecutedMessage(uint64 sourceChainSelector, uint64 sequenceNumber);
 
   /// @notice Static offRamp config
   /// @dev RMN depends on this struct, if changing, please notify the RMN maintainers.
@@ -636,17 +636,14 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, AggregateRateLimiter, ITyp
 
       // OnRamp can never be zero - if it is, then the source chain has been added for the first time
       if (currentConfig.onRamp == address(0)) {
-        // Scoping to reduce stack pressure
-        {
-          IMultiCommitStore.SourceChainConfig memory commitStoreConfig =
-            IMultiCommitStore(i_commitStore).getSourceChainConfig(sourceChainSelector);
+        IMultiCommitStore.SourceChainConfig memory commitStoreConfig =
+          IMultiCommitStore(i_commitStore).getSourceChainConfig(sourceChainSelector);
 
-          // Ensures we can never deploy a new offRamp that points to a commitStore that
-          // already has roots committed for the target source chain. Also ensures that the onRamps are in sync.
-          // TODO: revisit this on commit store / ramp merge
-          if (commitStoreConfig.onRamp != sourceConfigUpdate.onRamp || commitStoreConfig.minSeqNr != 0) {
-            revert InvalidStaticConfig(sourceChainSelector);
-          }
+        // Ensures we can never deploy a new offRamp that points to a commitStore that
+        // already has roots committed for the target source chain. Also ensures that the onRamps are in sync.
+        // TODO: revisit this on commit store / ramp merge
+        if (commitStoreConfig.onRamp != sourceConfigUpdate.onRamp || commitStoreConfig.minSeqNr != 0) {
+          revert InvalidStaticConfig(sourceChainSelector);
         }
 
         currentConfig.metadataHash =
