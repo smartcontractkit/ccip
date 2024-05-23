@@ -3,10 +3,10 @@ pragma solidity 0.8.24;
 
 import {Vm} from "forge-std/Vm.sol";
 
+import {MultiAggregateRateLimiter} from "../../MultiAggregateRateLimiter.sol";
 import {Client} from "../../libraries/Client.sol";
 import {Internal} from "../../libraries/Internal.sol";
 import {RateLimiterNoEvents} from "../../libraries/RateLimiterNoEvents.sol";
-import {MultiAggregateRateLimiter} from "../../validators/MultiAggregateRateLimiter.sol";
 import {BaseTest} from "../BaseTest.t.sol";
 import {MultiAggregateRateLimiterHelper} from "../helpers/MultiAggregateRateLimiterHelper.sol";
 import {PriceRegistrySetup} from "../priceRegistry/PriceRegistry.t.sol";
