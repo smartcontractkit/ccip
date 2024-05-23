@@ -986,7 +986,6 @@ contract MultiAggregateRateLimiter_validateIncomingMessage is MultiAggregateRate
     tokenAmounts[0] = Client.EVMTokenAmount({token: s_destTokens[0], amount: 20});
 
     // Remaining capacity: 100 -> 20
-    uint256 totalValue = (20 * TOKEN_PRICE) / 1e18;
     s_rateLimiter.validateIncomingMessage(_generateAny2EVMMessage(CHAIN_SELECTOR_1, tokenAmounts));
 
     // Cannot fit 80 rate limit value (need to wait at least 12 blocks, current capacity is 20)
