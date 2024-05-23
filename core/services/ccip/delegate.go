@@ -165,7 +165,7 @@ type ccipService struct {
 	registrySyncer  CapabilityRegistrySyncer
 
 	// State
-	dons map[uint32][]Oracle
+	dons map[uint32]Oracle
 }
 
 func (c *ccipService) Start(ctx context.Context) error {
@@ -176,35 +176,53 @@ func (c *ccipService) Start(ctx context.Context) error {
 		case diff := <-c.registrySyncer.Listen(ctx):
 			fmt.Println(">>> new diff: ", diff)
 
-			// Start/close various oracles if required using providers, example of a new commit plugin
-			// instance for chain evm.123:
-			relayID := types.RelayID{
-				Network: "evm",
-				ChainID: "123",
-			}
+			if diff.Init {
+				for donID, cfg := range diff.Config {
+					// Start/close various oracles if required using providers, example of a new commit plugin
+					// instance for chain evm.123:
+					relayID := types.RelayID{
+						Network: "evm",
+						ChainID: "123",
+					}
 
-			commitProvider := c.commitProviders[relayID]
+					commitProvider := c.commitProviders[relayID]
 
-			oracleArgs := libocr2.OCR3OracleArgs[[]byte]{
-				BinaryNetworkEndpointFactory: c.d.peerWrapper.Peer2, // passed in
-				V2Bootstrappers:              c.d.bootstrappers,     // spec
-				ContractConfigTracker:        commitProvider.ContractConfigTracker(),
-				ContractTransmitter:          ocrcommon.NewOCR3ContractTransmitterAdapter(commitProvider.ContractTransmitter()),
-				Database:                     c.d.database,
-				//LocalConfig:                  c.d.localConfig,
-				Logger:                 c.d.lggr,
-				MonitoringEndpoint:     c.d.monitoringEndpointGen.GenMonitoringEndpoint("", "", "", synchronization.OCR3CCIP),
-				OffchainConfigDigester: commitProvider.OffchainConfigDigester(),
-				OffchainKeyring:        c.ocrKeys[relayID],
-				OnchainKeyring:         ocrcommon.NewOCR3OnchainKeyringAdapter(c.ocrKeys[relayID]),
-				MetricsRegisterer:      nil, // TODO
+					oracleArgs := libocr2.OCR3OracleArgs[[]byte]{
+						BinaryNetworkEndpointFactory: c.d.peerWrapper.Peer2, // passed in
+						V2Bootstrappers:              c.d.bootstrappers,     // spec
+						ContractConfigTracker:        commitProvider.ContractConfigTracker(),
+						ContractTransmitter:          ocrcommon.NewOCR3ContractTransmitterAdapter(commitProvider.ContractTransmitter()),
+						Database:                     c.d.database,
+						//LocalConfig:                  c.d.localConfig,
+						Logger:                 c.d.lggr,
+						MonitoringEndpoint:     c.d.monitoringEndpointGen.GenMonitoringEndpoint("", "", "", synchronization.OCR3CCIP),
+						OffchainConfigDigester: commitProvider.OffchainConfigDigester(),
+						OffchainKeyring:        c.ocrKeys[relayID],
+						OnchainKeyring:         ocrcommon.NewOCR3OnchainKeyringAdapter(c.ocrKeys[relayID]),
+						MetricsRegisterer:      nil, // TODO
+					}
+					// Can maybe use this? Or our own plugin factory client directly
+					//plugin := ocr3.NewLOOPPService(c.lggr, grpcOpts, cmdFn, pluginConfig, providerClientConn, pr, ta, errorLog,
+					//	 capabilitiesRegistry, keyValueStore, relayerSet)
+					oracleArgs.ReportingPluginFactory = nil
+					oracle, _ := libocr2.NewOracle(oracleArgs)
+					oracle.Start()
+
+					c.dons[uint32(donID)] = Oracle{
+						ocrOracle: oracle,
+						config: libocr2types.ContractConfig{
+							ConfigDigest:          libocr2types.ConfigDigest{},
+							ConfigCount:           0,
+							Signers:               nil,
+							Transmitters:          nil,
+							F:                     0,
+							OnchainConfig:         nil,
+							OffchainConfigVersion: 0,
+							OffchainConfig:        nil,
+						},
+					}
+				}
 			}
-			// Can maybe use this? Or our own plugin factory client directly
-			//plugin := ocr3.NewLOOPPService(c.lggr, grpcOpts, cmdFn, pluginConfig, providerClientConn, pr, ta, errorLog,
-			//	 capabilitiesRegistry, keyValueStore, relayerSet)
-			oracleArgs.ReportingPluginFactory = nil
-			oracle, _ := libocr2.NewOracle(oracleArgs)
-			oracle.Start()
 		}
 	}
 }

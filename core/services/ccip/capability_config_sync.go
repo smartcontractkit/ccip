@@ -16,6 +16,8 @@ type CapabilityRegistrySyncer interface {
 }
 
 type CapabilityRegistryDiff struct {
+	Config map[DonID]DONCapability
+
 	Init          bool
 	AddedDons     []DonAddedDetails
 	RemovedDons   []DonRemovedDetails
@@ -98,7 +100,10 @@ func (s *BaseCapabilityConfigSync) poll(ctx context.Context) (*CapabilityRegistr
 	donsHash := hex.EncodeToString(hashBytes[:])
 
 	if s.lastPollHash == "" {
-		return &CapabilityRegistryDiff{Init: true}, donsHash, nil
+		return &CapabilityRegistryDiff{
+			Init:   true,
+			Config: dons,
+		}, donsHash, nil
 	}
 
 	// ...
