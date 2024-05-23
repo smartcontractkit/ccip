@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/AlekSi/pointer"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -2012,7 +2013,13 @@ func (a *MockAggregator) ChainID() uint64 {
 	return a.client.GetChainID().Uint64()
 }
 
-func (a *MockAggregator) UpdateRoundData(answer *big.Int) error {
+// UpdateRoundData updates the round data in the aggregator contract
+// if answer is nil, it will set next round data by adding random percentage( within provided range) to the previous round data
+func (a *MockAggregator) UpdateRoundData(answer *big.Int, minP, maxP *int) error {
+	if answer == nil && (minP == nil || maxP == nil) {
+		return fmt.Errorf("minP and maxP are required to update round data with random percentage if answer is nil")
+	}
+
 	opts, err := a.client.TransactionOpts(a.client.GetDefaultWallet())
 	if err != nil {
 		return fmt.Errorf("unable to get transaction opts: %w", err)
@@ -2024,12 +2031,17 @@ func (a *MockAggregator) UpdateRoundData(answer *big.Int) error {
 	// we get the round from latest round data
 	// if there is any error in fetching the round , we set the round with a random number
 	// otherwise increase the latest round by 1 and set the value for the next round
-	round, err := a.Instance.LatestRound(nil)
-	if err != nil {
-		rand.Seed(uint64(time.Now().UnixNano()))
-		round = big.NewInt(int64(rand.Uint64()))
+	roundData, err := a.Instance.LatestRoundData(nil)
+	if err != nil || roundData.RoundId == nil || roundData.Answer == nil {
+		return fmt.Errorf("unable to get latest round data: %w", err)
 	}
-	round = new(big.Int).Add(round, big.NewInt(1))
+	if answer == nil {
+		rand.Seed(uint64(time.Now().UnixNano()))
+		randomNumber := rand.Intn(pointer.GetInt(maxP)-pointer.GetInt(minP)+1) + pointer.GetInt(minP)
+		// answer = previous round answer + (previous round answer * random percentage)
+		answer = new(big.Int).Add(roundData.Answer, new(big.Int).Div(new(big.Int).Mul(roundData.Answer, big.NewInt(int64(randomNumber))), big.NewInt(100)))
+	}
+	round := new(big.Int).Add(roundData.RoundId, big.NewInt(1))
 	tx, err := a.Instance.UpdateRoundData(opts, round, answer, big.NewInt(time.Now().UTC().UnixNano()), big.NewInt(time.Now().UTC().UnixNano()))
 	if err != nil {
 		return fmt.Errorf("unable to update round data: %w", err)

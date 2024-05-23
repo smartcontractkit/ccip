@@ -24,6 +24,7 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"github.com/smartcontractkit/chainlink-testing-framework/utils/ptr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
@@ -591,7 +592,7 @@ func (ccipModule *CCIPCommon) UpdateTokenPricesAtRegularInterval(ctx context.Con
 			case <-ticker.C:
 				// randomly choose an aggregator contract from slice of aggregators
 				randomIndex := rand.Intn(len(aggregators))
-				err := aggregators[randomIndex].UpdateRoundData(new(big.Int).Add(big.NewInt(1e18), big.NewInt(rand.Int63n(1000))))
+				err := aggregators[randomIndex].UpdateRoundData(nil, ptr.Ptr(-5), ptr.Ptr(2))
 				if err != nil {
 					continue
 				}
@@ -1077,7 +1078,7 @@ func (d *DynamicPriceGetterConfig) AddAggregatorPriceConfig(
 		return fmt.Errorf("aggregator contract not found for token %s", tokenAddr)
 	}
 	// update round Data
-	err := aggregatorContract.UpdateRoundData(price)
+	err := aggregatorContract.UpdateRoundData(price, nil, nil)
 	if err != nil {
 		return fmt.Errorf("error in updating round data %w", err)
 	}
