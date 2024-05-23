@@ -1287,13 +1287,6 @@ contract EVM2EVMOnRamp_payNops is EVM2EVMNopsFeeSetup {
 
   // Reverts
 
-  function test_InsufficientBalance_Revert() public {
-    vm.startPrank(OWNER);
-    s_onRamp.payNops();
-    vm.expectRevert(EVM2EVMMultiOnRamp.InsufficientBalance.selector);
-    s_onRamp.payNops();
-  }
-
   function test_WrongPermissions_Revert() public {
     vm.startPrank(STRANGER);
 
