@@ -279,7 +279,7 @@ jobs:
 
   start-slack-thread:
     name: Start Slack Thread
-    if: ${{ always() && needs.*.result != 'skipped' && needs.*.result != 'cancelled' }}
+    if: ${{ always() && needs.*.result != 'skipped' && needs.*.result != 'cancelled' && github.event_name != 'workflow_dispatch'}}
     environment: integration
     outputs:
       thread_ts: ${{ steps.slack.outputs.thread_ts }}
