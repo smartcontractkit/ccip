@@ -294,7 +294,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ILinkAvailable, AggregateRat
           remoteChainSelector: destChainSelector,
           originalSender: originalSender,
           amount: tokenAndAmount.amount,
-          token: tokenAndAmount.token
+          localToken: tokenAndAmount.token
         })
       );
 

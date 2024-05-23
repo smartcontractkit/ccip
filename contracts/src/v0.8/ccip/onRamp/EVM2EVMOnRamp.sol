@@ -343,7 +343,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
           remoteChainSelector: i_destChainSelector,
           originalSender: originalSender,
           amount: tokenAndAmount.amount,
-          token: tokenAndAmount.token
+          localToken: tokenAndAmount.token
         })
       );
 

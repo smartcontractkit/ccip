@@ -414,7 +414,7 @@ contract TokenPoolAndProxy is EVM2EVMOnRampSetup {
         remoteChainSelector: DEST_CHAIN_SELECTOR,
         originalSender: OWNER,
         amount: amount,
-        token: address(s_token)
+        localToken: address(s_token)
       })
     );
 
@@ -437,7 +437,7 @@ contract TokenPoolAndProxy is EVM2EVMOnRampSetup {
         remoteChainSelector: DEST_CHAIN_SELECTOR,
         originalSender: OWNER,
         amount: amount,
-        token: address(s_token)
+        localToken: address(s_token)
       })
     );
   }

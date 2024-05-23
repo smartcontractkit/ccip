@@ -58,7 +58,7 @@ contract BurnMintTokenPool_lockOrBurn is BurnMintTokenPoolSetup {
         receiver: bytes(""),
         amount: burnAmount,
         remoteChainSelector: DEST_CHAIN_SELECTOR,
-        token: address(s_burnMintERC677)
+        localToken: address(s_burnMintERC677)
       })
     );
 
@@ -78,7 +78,7 @@ contract BurnMintTokenPool_lockOrBurn is BurnMintTokenPoolSetup {
         receiver: bytes(""),
         amount: 1e5,
         remoteChainSelector: DEST_CHAIN_SELECTOR,
-        token: address(s_burnMintERC677)
+        localToken: address(s_burnMintERC677)
       })
     );
 
@@ -95,7 +95,7 @@ contract BurnMintTokenPool_lockOrBurn is BurnMintTokenPoolSetup {
         receiver: bytes(""),
         amount: 1,
         remoteChainSelector: wrongChainSelector,
-        token: address(s_burnMintERC677)
+        localToken: address(s_burnMintERC677)
       })
     );
   }

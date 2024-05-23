@@ -174,7 +174,7 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
         receiver: abi.encodePacked(receiver),
         amount: amount,
         remoteChainSelector: DEST_CHAIN_SELECTOR,
-        token: address(s_token)
+        localToken: address(s_token)
       })
     );
 
@@ -214,7 +214,7 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
         receiver: abi.encodePacked(destinationReceiver),
         amount: amount,
         remoteChainSelector: DEST_CHAIN_SELECTOR,
-        token: address(s_token)
+        localToken: address(s_token)
       })
     );
 
@@ -253,7 +253,7 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
         receiver: abi.encodePacked(destinationReceiver),
         amount: amount,
         remoteChainSelector: DEST_CHAIN_SELECTOR,
-        token: address(s_token)
+        localToken: address(s_token)
       })
     );
     uint64 nonce = abi.decode(poolReturnDataV1.destPoolData, (uint64));
@@ -293,7 +293,7 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
         receiver: abi.encodePacked(address(0)),
         amount: amount,
         remoteChainSelector: wrongDomain,
-        token: address(s_token)
+        localToken: address(s_token)
       })
     );
   }
@@ -307,7 +307,7 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
         receiver: abi.encodePacked(address(0)),
         amount: 0,
         remoteChainSelector: DEST_CHAIN_SELECTOR,
-        token: address(s_token)
+        localToken: address(s_token)
       })
     );
   }
@@ -323,7 +323,7 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
         receiver: abi.encodePacked(address(0)),
         amount: 1000,
         remoteChainSelector: DEST_CHAIN_SELECTOR,
-        token: address(s_token)
+        localToken: address(s_token)
       })
     );
   }
@@ -341,7 +341,7 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
         receiver: receiver,
         amount: 1,
         remoteChainSelector: DEST_CHAIN_SELECTOR,
-        token: address(s_token)
+        localToken: address(s_token)
       })
     );
   }
