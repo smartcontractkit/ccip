@@ -26,6 +26,7 @@ const (
 	AutomationCustom  TelemetryType = "automation-custom"
 	OCR3Automation    TelemetryType = "ocr3-automation"
 	OCR3Rebalancer    TelemetryType = "ocr3-rebalancer"
+	OCR3CCIP          TelemetryType = "ocr3-ccip"
 )
 
 type TelemPayload struct {

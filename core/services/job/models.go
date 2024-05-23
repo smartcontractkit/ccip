@@ -35,6 +35,7 @@ const (
 	BlockHeaderFeeder       Type = (Type)(pipeline.BlockHeaderFeederJobType)
 	BlockhashStore          Type = (Type)(pipeline.BlockhashStoreJobType)
 	Bootstrap               Type = (Type)(pipeline.BootstrapJobType)
+	CCIP                    Type = (Type)(pipeline.CCIPJobType)
 	Cron                    Type = (Type)(pipeline.CronJobType)
 	DirectRequest           Type = (Type)(pipeline.DirectRequestJobType)
 	FluxMonitor             Type = (Type)(pipeline.FluxMonitorJobType)
@@ -167,7 +168,9 @@ type Job struct {
 	WorkflowSpecID                *int32
 	WorkflowSpec                  *WorkflowSpec
 	JobSpecErrors                 []SpecError
-	Type                          Type          `toml:"type"`
+	Type                          Type `toml:"type"`
+	CCIPID                        *int32
+	CCIPSpec                      *CCIPSpec
 	SchemaVersion                 uint32        `toml:"schemaVersion"`
 	GasLimit                      clnull.Uint32 `toml:"gasLimit"`
 	ForwardingAllowed             bool          `toml:"forwardingAllowed"`
@@ -839,6 +842,24 @@ type LiquidityBalancerSpec struct {
 	ID int32
 
 	LiquidityBalancerConfig string `toml:"liquidityBalancerConfig" db:"liquidity_balancer_config"`
+}
+
+// This spec represents a multi-OCR instance CCIPv2 job.
+type CCIPSpec struct {
+	ID int32 `toml:"-"`
+	// CCIP Configuration for all relays i.e. chain reader/writer configuration.
+	RelayConfig  JSONConfig `toml:"relayConfig"`
+	PluginConfig JSONConfig `toml:"pluginConfig"`
+	// Does bootstrappers really vary across instances?
+	P2PV2Bootstrappers pq.StringArray `toml:"p2pv2Bootstrappers"`
+	// Multiple families if needed.
+	OCRKeyBundleIDs map[string]string `toml:"ocrKeyBundleIDs"`
+	// Transmission keys per chain.
+	TransmitterIDs map[string]string `toml:"transmitterIDs"`
+	// Same endpoint for all instances
+	MonitoringEndpoint null.String `toml:"monitoringEndpoint"`
+	CreatedAt          time.Time   `toml:"-"`
+	UpdatedAt          time.Time   `toml:"-"`
 }
 
 type WorkflowSpec struct {

@@ -22,6 +22,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/utils"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/jsonserializable"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/mailbox"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ccip"
 
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
@@ -379,6 +380,9 @@ func NewApplication(opts ApplicationOpts) (Application, error) {
 				streamRegistry,
 				pipelineRunner,
 				cfg.JobPipeline(),
+			),
+			job.CCIP: ccip.NewDelegate(
+				globalLogger,
 			),
 		}
 		webhookJobRunner = delegates[job.Webhook].(*webhook.Delegate).WebhookJobRunner()
