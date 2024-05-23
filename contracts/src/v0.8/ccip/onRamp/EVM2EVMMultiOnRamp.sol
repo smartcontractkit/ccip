@@ -21,9 +21,6 @@ import {IERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/
 import {SafeERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
 import {EnumerableSet} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/structs/EnumerableSet.sol";
 
-import {IERC20Metadata} from
-  "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-
 /// @notice The onRamp is a contract that handles lane-specific fee logic and
 /// bridgeable token support.
 /// @dev The EVM2EVMOnRamp, CommitStore and EVM2EVMOffRamp form an xchain upgradeable unit. Any change to one of them
@@ -37,7 +34,6 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, AggregateRateLimiter, ITypeA
   error OnlyCallableByOwnerOrAdmin();
   error InvalidWithdrawParams();
   error NoFeesToPay();
-  error InsufficientBalance();
   error MaxFeeBalanceReached();
   error MessageTooLarge(uint256 maxSize, uint256 actualSize);
   error MessageGasLimitTooHigh();
@@ -842,14 +838,11 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, AggregateRateLimiter, ITypeA
 
   /// @dev Internal function to pay the Node Ops their outstanding balances.
   function _payNops() internal {
-    uint96 nopFeesJuels = s_nopFeesJuels;
-
-    if (nopFeesJuels == 0) revert InsufficientBalance();
-
     address feeAggregator = s_dynamicConfig.feeAggregator;
     uint256 feeTokensLength = s_feeTokens.length();
+    uint96 nopFeesJuels = s_nopFeesJuels;
 
-    delete s_nopFeesJuels;
+    s_nopFeesJuels = 0;
 
     for (uint256 i = 0; i < feeTokensLength; ++i) {
       IERC20 feeToken = IERC20(s_feeTokens.at(i));
