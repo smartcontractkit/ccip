@@ -281,7 +281,10 @@ func (c *CCIPTestConfig) SetNetworkPairs(lggr zerolog.Logger) error {
 	}
 
 	for _, n := range c.NetworkPairs {
-		lggr.Info().Str("NetworkA", n.NetworkA.Name).Str("NetworkB", n.NetworkB.Name).Msg("Network Pairs")
+		lggr.Info().
+			Str("NetworkA", fmt.Sprintf("%s-%d", n.NetworkA.Name, n.NetworkA.ChainID)).
+			Str("NetworkB", fmt.Sprintf("%s-%d", n.NetworkB.Name, n.NetworkB.ChainID)).
+			Msg("Network Pairs")
 	}
 	lggr.Info().Int("Pairs", len(c.NetworkPairs)).Msg("No Of Lanes")
 
