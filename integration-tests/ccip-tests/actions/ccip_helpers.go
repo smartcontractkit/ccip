@@ -2575,7 +2575,7 @@ type CCIPLane struct {
 }
 
 func (lane *CCIPLane) TokenPricesConfig() (string, error) {
-	d := DynamicPriceGetterConfig{
+	d := &DynamicPriceGetterConfig{
 		AggregatorPrices: make(map[common.Address]AggregatorPriceConfig),
 		StaticPrices:     make(map[common.Address]StaticPriceConfig),
 	}
@@ -2594,6 +2594,10 @@ func (lane *CCIPLane) TokenPricesConfig() (string, error) {
 	err = d.AddPriceConfig(lane.Dest.Common.WrappedNative.Hex(), lane.Dest.Common.PriceAggregators, WrappedNativeToUSD, lane.DestChain.GetChainID().Uint64())
 	if err != nil {
 		return "", fmt.Errorf("error in adding PriceConfig for dest WrappedNative token %s: %w", lane.Dest.Common.WrappedNative.Hex(), err)
+	}
+	err = d.AddPriceConfig(lane.Source.Common.WrappedNative.Hex(), lane.Source.Common.PriceAggregators, WrappedNativeToUSD, lane.SourceChain.GetChainID().Uint64())
+	if err != nil {
+		return "", fmt.Errorf("error in adding PriceConfig for source WrappedNative token %s: %w", lane.Source.Common.WrappedNative.Hex(), err)
 	}
 	return d.String()
 }
