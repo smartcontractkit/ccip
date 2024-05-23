@@ -78,6 +78,9 @@ const (
 	ChaosGroupCCIPGeth                = "CCIPGeth"                        // both source and destination simulated geth networks
 	ChaosGroupNetworkACCIPGeth        = "CCIPNetworkAGeth"
 	ChaosGroupNetworkBCCIPGeth        = "CCIPNetworkBGeth"
+
+	defaultUSDCDestBytesOverhead = 640
+	defaultUSDCDestGasOverhead   = 120_000
 )
 
 // TODO: These should be refactored along with the default CCIP test setup to use optional config functions
@@ -1264,8 +1267,8 @@ func (sourceCCIP *SourceCCIPModule) SetAllTokenTransferFeeConfigs(enableAggregat
 			AggregateRateLimitEnabled: enableAggregateRateLimit,
 		}
 		if sourceCCIP.Common.BridgeTokenPools[i].IsUSDC() {
-			conf.DestBytesOverhead = 640
-			conf.DestGasOverhead = 120_000
+			conf.DestBytesOverhead = defaultUSDCDestBytesOverhead
+			conf.DestGasOverhead = defaultUSDCDestGasOverhead
 		}
 		tokenTransferFeeConfig = append(tokenTransferFeeConfig, conf)
 	}
