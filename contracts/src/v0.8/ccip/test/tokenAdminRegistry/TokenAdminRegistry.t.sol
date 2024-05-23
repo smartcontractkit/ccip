@@ -86,6 +86,29 @@ contract TokenAdminRegistry_setPool is TokenAdminRegistrySetup {
     vm.assertEq(vm.getRecordedLogs().length, 0);
   }
 
+  function test_setPool_ZeroAddressRemovesPool_Success() public {
+    address pool = makeAddr("pool");
+    vm.mockCall(pool, abi.encodeWithSelector(IPool.isSupportedToken.selector), abi.encode(true));
+    s_tokenAdminRegistry.setPool(s_sourceTokens[0], pool);
+
+    assertEq(s_tokenAdminRegistry.getPool(s_sourceTokens[0]), pool);
+
+    vm.expectEmit();
+    emit PoolSet(s_sourceTokens[0], pool, address(0));
+
+    s_tokenAdminRegistry.setPool(s_sourceTokens[0], address(0));
+
+    assertEq(s_tokenAdminRegistry.getPool(s_sourceTokens[0]), address(0));
+  }
+
+  function test_setPool_InvalidTokenPoolToken_Revert() public {
+    address pool = makeAddr("pool");
+    vm.mockCall(pool, abi.encodeWithSelector(IPool.isSupportedToken.selector), abi.encode(false));
+
+    vm.expectRevert(abi.encodeWithSelector(TokenAdminRegistry.InvalidTokenPoolToken.selector, s_sourceTokens[0]));
+    s_tokenAdminRegistry.setPool(s_sourceTokens[0], pool);
+  }
+
   function test_setPool_OnlyAdministrator_Revert() public {
     vm.stopPrank();
 
