@@ -2028,13 +2028,13 @@ func (a *MockAggregator) UpdateRoundData(answer *big.Int, minP, maxP *int) error
 		Str("Contract Address", a.ContractAddress.Hex()).
 		Str("Network Name", a.client.GetNetworkConfig().Name).
 		Msg("Updating Round Data")
-	// we get the round from latest round data
-	// if there is any error in fetching the round , we set the round with a random number
-	// otherwise increase the latest round by 1 and set the value for the next round
+	// we get the latest round data
+	// and increase the latest round by 1 and set the value for the next round
 	roundData, err := a.Instance.LatestRoundData(nil)
 	if err != nil || roundData.RoundId == nil || roundData.Answer == nil {
 		return fmt.Errorf("unable to get latest round data: %w", err)
 	}
+	// if answer is nil, we calculate the answer with random percentage within the provided range
 	if answer == nil {
 		rand.Seed(uint64(time.Now().UnixNano()))
 		randomNumber := rand.Intn(pointer.GetInt(maxP)-pointer.GetInt(minP)+1) + pointer.GetInt(minP)
