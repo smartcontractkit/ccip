@@ -134,32 +134,38 @@ func (d *DynamicPriceGetter) performBatchCall(ctx context.Context, chainID uint6
 	}
 	evmCaller := client.BatchCaller
 
+	nbDecimalCalls := len(batchCalls.decimalCalls)
+	nbLatestRoundDataCalls := len(batchCalls.decimalCalls)
+
 	// Perform batched call (all decimals calls followed by latest round data calls).
-	calls := make([]rpclib.EvmCall, 0, len(batchCalls.decimalCalls)+len(batchCalls.latestRoundDataCalls))
+	calls := make([]rpclib.EvmCall, 0, nbDecimalCalls+nbLatestRoundDataCalls)
 	calls = append(calls, batchCalls.decimalCalls...)
 	calls = append(calls, batchCalls.latestRoundDataCalls...)
 
 	results, err := evmCaller.BatchCall(ctx, 0, calls)
 
 	// Extract results.
-	decimals := make([]uint8, 0, len(batchCalls.decimalCalls))
-	latestRounds := make([]*big.Int, 0, len(batchCalls.latestRoundDataCalls))
-	for i, res := range results {
-		if i < len(batchCalls.decimalCalls) {
-			v, err1 := rpclib.ParseOutput[uint8](res, 0)
-			if err1 != nil {
-				return fmt.Errorf("parse contract output (decimals): %w", err)
-			}
-			decimals = append(decimals, v)
-		} else {
-			// latestRoundData function has multiple outputs (roundId,answer,startedAt,updatedAt,answeredInRound).
-			// we want the second one (answer, idx=1).
-			v, err1 := rpclib.ParseOutput[*big.Int](res, 1)
-			if err1 != nil {
-				return fmt.Errorf("parse contract output (latest round data): %w", err)
-			}
-			latestRounds = append(latestRounds, v)
+	decimals := make([]uint8, 0, nbDecimalCalls)
+	latestRounds := make([]*big.Int, 0, nbLatestRoundDataCalls)
+
+	for i, res := range results[0:nbDecimalCalls] {
+		v, err1 := rpclib.ParseOutput[uint8](res, 0)
+		if err1 != nil {
+			callSignature := batchCalls.decimalCalls[i].String()
+			return fmt.Errorf("parse contract output while calling %v on chain %d: %w", callSignature, chainID, err)
 		}
+		decimals = append(decimals, v)
+	}
+
+	for i, res := range results[nbDecimalCalls : nbDecimalCalls+nbLatestRoundDataCalls] {
+		// latestRoundData function has multiple outputs (roundId,answer,startedAt,updatedAt,answeredInRound).
+		// we want the second one (answer, at idx=1).
+		v, err1 := rpclib.ParseOutput[*big.Int](res, 1)
+		if err1 != nil {
+			callSignature := batchCalls.latestRoundDataCalls[i].String()
+			return fmt.Errorf("parse contract output while calling %v on chain %d: %w", callSignature, chainID, err)
+		}
+		latestRounds = append(latestRounds, v)
 	}
 
 	// Normalize and store prices.
