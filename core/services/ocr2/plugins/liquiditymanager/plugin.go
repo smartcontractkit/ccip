@@ -32,7 +32,8 @@ type Plugin struct {
 	discoverer              discoverer.Discoverer
 	bridgeFactory           bridge.Factory
 	mu                      sync.RWMutex
-	liquidityGraph          graph.Graph
+	graphs                  graph.MultiGraph
+	token                   models.Address
 	liquidityRebalancer     liquidityrebalancer.Rebalancer
 	inflight                inflight.Container
 	lggr                    logger.Logger
@@ -57,7 +58,8 @@ func NewPlugin(
 		liquidityManagerFactory: liquidityManagerFactory,
 		bridgeFactory:           bridgeFactory,
 		discoverer:              discoverer,
-		liquidityGraph:          graph.NewGraph(),
+		graphs:                  graph.NewMultiGraph(),
+		token:                   models.Address(rootAddress),
 		liquidityRebalancer:     liquidityRebalancer,
 		inflight:                inflight.New(),
 		reportCodec:             reportCodec,
@@ -79,9 +81,11 @@ func (p *Plugin) Observation(ctx context.Context, outcomeCtx ocr3types.OutcomeCo
 		return ocrtypes.Observation{}, fmt.Errorf("sync graph edges: %w", err)
 	}
 
+	liquidityGraph := p.graphs.GetOrCreate(p.token.String())
+
 	networkLiquidities := make([]models.NetworkLiquidity, 0)
-	for _, net := range p.liquidityGraph.GetNetworks() {
-		liq, err := p.liquidityGraph.GetLiquidity(net)
+	for _, net := range liquidityGraph.GetNetworks() {
+		liq, err := liquidityGraph.GetLiquidity(net)
 		if err != nil {
 			return ocrtypes.Observation{}, err
 		}
@@ -96,7 +100,7 @@ func (p *Plugin) Observation(ctx context.Context, outcomeCtx ocr3types.OutcomeCo
 	numExpired := p.inflight.Expire(pendingTransfers)
 	inflightTransfers := p.inflight.GetAll()
 
-	edges, err := p.liquidityGraph.GetEdges()
+	edges, err := liquidityGraph.GetEdges()
 	if err != nil {
 		return ocrtypes.Observation{}, fmt.Errorf("get edges: %w", err)
 	}
@@ -107,8 +111,8 @@ func (p *Plugin) Observation(ctx context.Context, outcomeCtx ocr3types.OutcomeCo
 	}
 
 	configDigests := make([]models.ConfigDigestWithMeta, 0)
-	for _, net := range p.liquidityGraph.GetNetworks() {
-		data, err := p.liquidityGraph.GetData(net)
+	for _, net := range liquidityGraph.GetNetworks() {
+		data, err := liquidityGraph.GetData(net)
 		if err != nil {
 			return nil, fmt.Errorf("get rb %d data: %w", net, err)
 		}
@@ -276,10 +280,12 @@ func (p *Plugin) Reports(seqNr uint64, outcome ocr3types.Outcome) ([]ocr3types.R
 		configDigestsMap[cd.NetworkSel] = cd.Digest.ConfigDigest
 	}
 
+	liquidityGraph := p.graphs.GetOrCreate(p.token.String())
+
 	var reports []ocr3types.ReportWithInfo[models.Report]
 	for networkID, transfers := range incomingAndOutgoing {
 		// todo: we shouldn't use plugin state
-		rebalancerAddress, err := p.liquidityGraph.GetLiquidityManagerAddress(networkID)
+		rebalancerAddress, err := liquidityGraph.GetLiquidityManagerAddress(networkID)
 		if err != nil {
 			return nil, fmt.Errorf("liquidity manager for %v does not exist", networkID)
 		}
@@ -437,11 +443,15 @@ func (p *Plugin) Close() error {
 	ctx, cf := context.WithTimeout(context.Background(), p.closePluginTimeout)
 	defer cf()
 
+	liquidityGraph, ok := p.graphs.Get(p.token.String())
+	if !ok {
+		return nil
+	}
 	var errs []error
-	for _, networkID := range p.liquidityGraph.GetNetworks() {
+	for _, networkID := range liquidityGraph.GetNetworks() {
 		p.lggr.Infow("closing liquidityManager network", "network", networkID)
 
-		liquidityManagerAddress, err := p.liquidityGraph.GetLiquidityManagerAddress(networkID)
+		liquidityManagerAddress, err := liquidityGraph.GetLiquidityManagerAddress(networkID)
 		if err != nil {
 			errs = append(errs, fmt.Errorf("get liquidityManager address for %d: %w", networkID, err))
 			continue
@@ -464,30 +474,32 @@ func (p *Plugin) Close() error {
 	return multierr.Combine(errs...)
 }
 
-func (p *Plugin) syncGraphEdges(ctx context.Context) error {
+func (p *Plugin) syncGraphEdges(ctx context.Context) (graph.Graph, error) {
 	p.lggr.Infow("syncing graph edges")
 	// todo: discoverer factory is not required we can pass a discoverer instance to the plugin
 	p.lggr.Infow("discovering liquidity managers")
 	g, err := p.discoverer.Discover(ctx)
 	if err != nil {
-		return fmt.Errorf("discovering rebalancers: %w", err)
+		return nil, fmt.Errorf("discovering rebalancers: %w", err)
 	}
 	p.lggr.Infow("finished syncing graph edges", "graph", g.String())
-	p.liquidityGraph = g
-	return nil
+	return g, nil
 }
 
 func (p *Plugin) syncGraph(ctx context.Context) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	if p.liquidityGraph.IsEmpty() {
-		if err := p.syncGraphEdges(ctx); err != nil {
+	liquidityGraph := p.graphs.GetOrCreate(p.token.String())
+
+	if liquidityGraph.IsEmpty() {
+		var err error
+		if liquidityGraph, err = p.syncGraphEdges(ctx); err != nil {
 			return fmt.Errorf("sync graph edges: %w", err)
 		}
 	} else {
 		p.lggr.Infow("syncing graph liquidities")
-		if err := p.discoverer.DiscoverBalances(ctx, p.liquidityGraph); err != nil {
+		if err := p.discoverer.DiscoverBalances(ctx, liquidityGraph); err != nil {
 			return fmt.Errorf("discovering balances: %w", err)
 		}
 		p.lggr.Infow("finished syncing graph liquidities")
@@ -499,8 +511,12 @@ func (p *Plugin) syncGraph(ctx context.Context) error {
 func (p *Plugin) loadPendingTransfers(ctx context.Context, lggr logger.Logger) ([]models.PendingTransfer, error) {
 	p.lggr.Infow("loading pending transfers")
 
+	liquidityGraph, ok := p.graphs.Get(p.token.String())
+	if !ok {
+		return nil, fmt.Errorf("liquidity graph not found")
+	}
 	pendingTransfers := make([]models.PendingTransfer, 0)
-	edges, err := p.liquidityGraph.GetEdges()
+	edges, err := liquidityGraph.GetEdges()
 	if err != nil {
 		return nil, fmt.Errorf("get edges: %w", err)
 	}
@@ -515,11 +531,11 @@ func (p *Plugin) loadPendingTransfers(ctx context.Context, lggr logger.Logger) (
 			continue
 		}
 
-		localToken, err := p.liquidityGraph.GetTokenAddress(edge.Source)
+		localToken, err := liquidityGraph.GetTokenAddress(edge.Source)
 		if err != nil {
 			return nil, fmt.Errorf("get local token address for %v: %w", edge.Source, err)
 		}
-		remoteToken, err := p.liquidityGraph.GetTokenAddress(edge.Dest)
+		remoteToken, err := liquidityGraph.GetTokenAddress(edge.Dest)
 		if err != nil {
 			return nil, fmt.Errorf("get remote token address for %v: %w", edge.Dest, err)
 		}
@@ -648,6 +664,8 @@ func (p *Plugin) resolveProposedTransfers(ctx context.Context, lggr logger.Logge
 		return nil, fmt.Errorf("decode previous outcome: %w", err)
 	}
 
+	liquidityGraph := p.graphs.GetOrCreate(p.token.String())
+
 	resolvedTransfers := make([]models.Transfer, 0, len(outcome.ProposedTransfers))
 	for _, proposedTransfer := range outcome.ProposedTransfers {
 		bridge, err := p.bridgeFactory.NewBridge(proposedTransfer.From, proposedTransfer.To)
@@ -655,22 +673,22 @@ func (p *Plugin) resolveProposedTransfers(ctx context.Context, lggr logger.Logge
 			return nil, fmt.Errorf("init bridge: %w", err)
 		}
 
-		fromNetRebalancer, err := p.liquidityGraph.GetLiquidityManagerAddress(proposedTransfer.From)
+		fromNetRebalancer, err := liquidityGraph.GetLiquidityManagerAddress(proposedTransfer.From)
 		if err != nil {
 			return nil, fmt.Errorf("get liquidityManager address for %v: %w", proposedTransfer.From, err)
 		}
 
-		fromNetToken, err := p.liquidityGraph.GetTokenAddress(proposedTransfer.From)
+		fromNetToken, err := liquidityGraph.GetTokenAddress(proposedTransfer.From)
 		if err != nil {
 			return nil, fmt.Errorf("get token address for %v: %w", proposedTransfer.From, err)
 		}
 
-		toNetRebalancer, err := p.liquidityGraph.GetLiquidityManagerAddress(proposedTransfer.To)
+		toNetRebalancer, err := liquidityGraph.GetLiquidityManagerAddress(proposedTransfer.To)
 		if err != nil {
 			return nil, fmt.Errorf("get liquidityManager address for %v: %w", proposedTransfer.To, err)
 		}
 
-		toNetToken, err := p.liquidityGraph.GetTokenAddress(proposedTransfer.To)
+		toNetToken, err := liquidityGraph.GetTokenAddress(proposedTransfer.To)
 		if err != nil {
 			return nil, fmt.Errorf("get token address for %v: %w", proposedTransfer.To, err)
 		}

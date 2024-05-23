@@ -787,7 +787,7 @@ func TestPlugin_Reports(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			p := newPluginWithMocksAndDefaults(t)
 			for net, addr := range tc.rebalancerAddress {
-				p.plugin.liquidityGraph.(graph.GraphTest).AddNetwork(net, graph.Data{LiquidityManagerAddress: addr, NetworkSelector: net})
+				p.plugin.graphs.GetOrCreate(p.plugin.token.String()).(graph.GraphTest).AddNetwork(net, graph.Data{LiquidityManagerAddress: addr, NetworkSelector: net})
 			}
 			outcome, err := tc.outcome.Encode()
 			assert.NoError(t, err)
@@ -1071,7 +1071,7 @@ func TestPlugin_Close(t *testing.T) {
 	g.(graph.GraphTest).AddNetwork(networkA, graph.Data{LiquidityManagerAddress: rebalancerA})
 	g.(graph.GraphTest).AddNetwork(networkB, graph.Data{LiquidityManagerAddress: rebalancerB})
 	g.(graph.GraphTest).AddNetwork(networkC, graph.Data{LiquidityManagerAddress: rebalancerC})
-	p.plugin.liquidityGraph = g
+	p.plugin.graphs.Add(p.plugin.token.String(), g)
 
 	rbA := liquiditymanagermocks.NewLiquidityManager(t)
 	rbB := liquiditymanagermocks.NewLiquidityManager(t)
@@ -1125,7 +1125,7 @@ func TestPlugin_E2EWithMocks(t *testing.T) {
 						Return(g, nil).Maybe()
 					discoverer.On("DiscoverBalances", mock.Anything, mock.Anything).Return(nil).Maybe()
 					n.plugin.discoverer = discoverer
-					n.plugin.liquidityGraph = g
+					n.plugin.graphs.Add(n.plugin.token.String(), g)
 
 					// the node will now try to load the pending transfers of all the available bridges
 					// let's mock the pending transfers
