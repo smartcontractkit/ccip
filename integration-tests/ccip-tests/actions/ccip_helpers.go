@@ -1256,21 +1256,18 @@ func (sourceCCIP *SourceCCIPModule) SetAllTokenTransferFeeConfigs(enableAggregat
 	for i, token := range sourceCCIP.Common.BridgeTokens {
 		tokens = append(tokens, token.ContractAddress)
 		pools = append(pools, sourceCCIP.Common.BridgeTokenPools[i].EthAddress)
-		destByteOverhead := uint32(32)
-		destGasOverhead := uint32(29_000)
-		if sourceCCIP.Common.BridgeTokenPools[i].IsUSDC() {
-			destByteOverhead = 640
-			destGasOverhead = 120_000
-		}
-		tokenTransferFeeConfig = append(tokenTransferFeeConfig, evm_2_evm_onramp.EVM2EVMOnRampTokenTransferFeeConfigArgs{
+		conf := evm_2_evm_onramp.EVM2EVMOnRampTokenTransferFeeConfigArgs{
 			Token:                     token.ContractAddress,
 			MinFeeUSDCents:            50,           // $0.5
 			MaxFeeUSDCents:            1_000_000_00, // $ 1 million
 			DeciBps:                   5_0,          // 5 bps
-			DestGasOverhead:           destGasOverhead,
-			DestBytesOverhead:         destByteOverhead,
 			AggregateRateLimitEnabled: enableAggregateRateLimit,
-		})
+		}
+		if sourceCCIP.Common.BridgeTokenPools[i].IsUSDC() {
+			conf.DestBytesOverhead = 640
+			conf.DestGasOverhead = 120_000
+		}
+		tokenTransferFeeConfig = append(tokenTransferFeeConfig, conf)
 	}
 	err := sourceCCIP.OnRamp.SetTokenTransferFeeConfig(tokenTransferFeeConfig)
 	if err != nil {
