@@ -11,7 +11,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
 	solcfg "github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana"
 	"github.com/smartcontractkit/chainlink/v2/core/cmd"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/cltest"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils/solanatest"
@@ -42,7 +41,7 @@ func TestShell_IndexSolanaNodes(t *testing.T) {
 	}
 	chain := solcfg.TOMLConfig{
 		ChainID: &id,
-		Nodes:   solana.SolanaNodes{&node1, &node2},
+		Nodes:   solcfg.Nodes{&node1, &node2},
 	}
 	app := solanaStartNewApplication(t, &chain)
 	client, r := app.NewShellAndRenderer()

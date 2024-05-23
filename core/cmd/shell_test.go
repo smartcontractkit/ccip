@@ -19,7 +19,6 @@ import (
 
 	commoncfg "github.com/smartcontractkit/chainlink-common/pkg/config"
 	solcfg "github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
-	"github.com/smartcontractkit/chainlink-starknet/relayer/pkg/chainlink/config"
 	stkcfg "github.com/smartcontractkit/chainlink-starknet/relayer/pkg/chainlink/config"
 	"github.com/smartcontractkit/chainlink/v2/core/cmd"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/cltest"
@@ -479,21 +478,21 @@ func TestSetupStarkNetRelayer(t *testing.T) {
 				ChainID:   ptr[string]("starknet-id-1"),
 				Enabled:   ptr(true),
 				Chain:     stkcfg.Chain{},
-				Nodes:     []*config.Node{},
+				Nodes:     []*stkcfg.Node{},
 				FeederURL: commoncfg.MustParseURL("https://feeder.url"),
 			},
 			&stkcfg.TOMLConfig{
 				ChainID:   ptr[string]("starknet-id-2"),
 				Enabled:   ptr(true),
 				Chain:     stkcfg.Chain{},
-				Nodes:     []*config.Node{},
+				Nodes:     []*stkcfg.Node{},
 				FeederURL: commoncfg.MustParseURL("https://feeder.url"),
 			},
 			&stkcfg.TOMLConfig{
 				ChainID:   ptr[string]("disabled-starknet-id-1"),
 				Enabled:   ptr(false),
 				Chain:     stkcfg.Chain{},
-				Nodes:     []*config.Node{},
+				Nodes:     []*stkcfg.Node{},
 				FeederURL: commoncfg.MustParseURL("https://feeder.url"),
 			},
 		}
@@ -505,7 +504,7 @@ func TestSetupStarkNetRelayer(t *testing.T) {
 				ChainID:   ptr[string]("starknet-id-3"),
 				Enabled:   ptr(true),
 				Chain:     stkcfg.Chain{},
-				Nodes:     []*config.Node{},
+				Nodes:     []*stkcfg.Node{},
 				FeederURL: commoncfg.MustParseURL("https://feeder.url"),
 			},
 		}
@@ -543,14 +542,14 @@ func TestSetupStarkNetRelayer(t *testing.T) {
 				ChainID:   ptr[string]("dupe"),
 				Enabled:   ptr(true),
 				Chain:     stkcfg.Chain{},
-				Nodes:     []*config.Node{},
+				Nodes:     []*stkcfg.Node{},
 				FeederURL: commoncfg.MustParseURL("https://feeder.url"),
 			},
 			&stkcfg.TOMLConfig{
 				ChainID:   ptr[string]("dupe"),
 				Enabled:   ptr(true),
 				Chain:     stkcfg.Chain{},
-				Nodes:     []*config.Node{},
+				Nodes:     []*stkcfg.Node{},
 				FeederURL: commoncfg.MustParseURL("https://feeder.url"),
 			},
 		}
