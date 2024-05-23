@@ -47,10 +47,6 @@ type LoadArgs struct {
 	pauseLoad        *atomic.Bool
 }
 
-func (l *LoadArgs) CreateDummyTraffic() {
-
-}
-
 func (l *LoadArgs) SetReportParams() {
 	var qParams []string
 	for k, v := range l.Labels {

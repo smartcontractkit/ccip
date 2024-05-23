@@ -492,11 +492,12 @@ func (ccipModule *CCIPCommon) WaitForPriceUpdates(
 	}
 }
 
-func (ccipModule *CCIPCommon) WatchForPriceUpdates(ctx context.Context) error {
+func (ccipModule *CCIPCommon) WatchForPriceUpdates(lggr zerolog.Logger, ctx context.Context) error {
 	var sub event.Subscription
 	gasUpdateEventLatest := make(chan *price_registry.PriceRegistryUsdPerUnitGasUpdated)
 	tokenUpdateEvent := make(chan *price_registry.PriceRegistryUsdPerTokenUpdated)
 	sub = event.Resubscribe(2*time.Hour, func(_ context.Context) (event.Subscription, error) {
+		lggr.Info().Msg("Subscribing to UsdPerUnitGasUpdated event")
 		eventSub, err := ccipModule.PriceRegistry.WatchUsdPerUnitGasUpdated(nil, gasUpdateEventLatest, nil)
 		if err != nil {
 			log.Error().Err(err).Msg("error in subscribing to UsdPerUnitGasUpdated event")
@@ -506,14 +507,15 @@ func (ccipModule *CCIPCommon) WatchForPriceUpdates(ctx context.Context) error {
 	if sub == nil {
 		return fmt.Errorf("no event subscription found")
 	}
-	sub = event.Resubscribe(2*time.Hour, func(_ context.Context) (event.Subscription, error) {
+	tokenUpdateSub := event.Resubscribe(2*time.Hour, func(_ context.Context) (event.Subscription, error) {
+		lggr.Info().Msg("Subscribing to UsdPerTokenUpdated event")
 		eventSub, err := ccipModule.PriceRegistry.WatchUsdPerTokenUpdated(nil, tokenUpdateEvent)
 		if err != nil {
 			log.Error().Err(err).Msg("error in subscribing to UsdPerTokenUpdated event")
 		}
 		return eventSub, err
 	})
-	if sub == nil {
+	if tokenUpdateSub == nil {
 		return fmt.Errorf("no event subscription found")
 	}
 	processEvent := func(timestamp *big.Int, destChainSelector uint64) error {
@@ -524,7 +526,7 @@ func (ccipModule *CCIPCommon) WatchForPriceUpdates(ctx context.Context) error {
 		ccipModule.gasUpdateWatcherMu.Lock()
 		ccipModule.gasUpdateWatcher[destChain] = timestamp
 		ccipModule.gasUpdateWatcherMu.Unlock()
-		log.Info().
+		lggr.Info().
 			Uint64("chainSelector", destChainSelector).
 			Str("source_chain", ccipModule.ChainClient.GetNetworkName()).
 			Uint64("dest_chain", destChain).
@@ -536,6 +538,7 @@ func (ccipModule *CCIPCommon) WatchForPriceUpdates(ctx context.Context) error {
 	go func() {
 		defer func() {
 			sub.Unsubscribe()
+			tokenUpdateSub.Unsubscribe()
 			ccipModule.gasUpdateWatcher = nil
 			ccipModule.gasUpdateWatcherMu = nil
 			ccipModule.tokenPriceUpdateWatcher = nil
@@ -548,12 +551,12 @@ func (ccipModule *CCIPCommon) WatchForPriceUpdates(ctx context.Context) error {
 				if err != nil {
 					continue
 				}
-			case e := <-tokenUpdateEvent:
+			case tk := <-tokenUpdateEvent:
 				ccipModule.tokenPriceUpdateWatcherMu.Lock()
-				ccipModule.tokenPriceUpdateWatcher[e.Token] = e.Timestamp
+				ccipModule.tokenPriceUpdateWatcher[tk.Token] = tk.Timestamp
 				ccipModule.tokenPriceUpdateWatcherMu.Unlock()
-				log.Info().
-					Str("token", e.Token.Hex()).
+				lggr.Info().
+					Str("token", tk.Token.Hex()).
 					Str("chain", ccipModule.ChainClient.GetNetworkName()).
 					Str("price_registry", ccipModule.PriceRegistry.Address()).
 					Msg("UsdPerTokenUpdated event received")
@@ -3477,7 +3480,7 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 	if !configureCLNodes {
 		return nil
 	}
-	err = lane.Source.Common.WatchForPriceUpdates(setUpCtx)
+	err = lane.Source.Common.WatchForPriceUpdates(lane.Logger, setUpCtx)
 	if err != nil {
 		return fmt.Errorf("error in starting price update watch %w", err)
 	}

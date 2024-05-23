@@ -2,6 +2,8 @@ package load
 
 import (
 	"math/big"
+	"testing"
+	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -55,4 +57,22 @@ func NewDummy(url, ownerKey string, chainid *big.Int) (*Dummy, error) {
 		Owner:   ownerKey,
 		ChainId: chainid,
 	}, nil
+}
+
+func CreateDummyTraffic(t *testing.T, url, ownerKey string, chainId *big.Int) error {
+	d, err := NewDummy(url, ownerKey, chainId)
+	if err != nil {
+		return err
+	}
+	waspCfg := &wasp.Config{
+		T:                     t,
+		Schedule:              wasp.Plain(1, 30*time.Minute),
+		LoadType:              wasp.RPS,
+		RateLimitUnitDuration: 300 * time.Millisecond,
+		CallResultBufLen:      10, // we keep the last 10 call results for each generator, as the detailed report is generated at the end of the test
+		Gun:                   d,
+	}
+	loadRunner, err := wasp.NewGenerator(waspCfg)
+	loadRunner.Run(false)
+	return nil
 }
