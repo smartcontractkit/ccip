@@ -108,8 +108,7 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
       generateDestChainConfigArgs(),
       getOutboundRateLimiterConfig(),
       s_feeTokenConfigArgs,
-      s_tokenTransferFeeConfigArgs,
-      getMultiOnRampNopsAndWeights()
+      s_tokenTransferFeeConfigArgs
     );
     s_onRamp.setAdmin(ADMIN);
 
@@ -225,7 +224,8 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
     return EVM2EVMMultiOnRamp.DynamicConfig({
       router: router,
       priceRegistry: priceRegistry,
-      tokenAdminRegistry: tokenAdminRegistry
+      tokenAdminRegistry: tokenAdminRegistry,
+      feeAggregator: FEE_AGGREGATOR
     });
   }
 
@@ -251,14 +251,6 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
       prevOnRamp: address(0)
     });
     return destChainConfigs;
-  }
-
-  function getMultiOnRampNopsAndWeights() internal pure returns (EVM2EVMMultiOnRamp.NopAndWeight[] memory) {
-    EVM2EVMMultiOnRamp.NopAndWeight[] memory nopsAndWeights = new EVM2EVMMultiOnRamp.NopAndWeight[](3);
-    nopsAndWeights[0] = EVM2EVMMultiOnRamp.NopAndWeight({nop: USER_1, weight: 19284});
-    nopsAndWeights[1] = EVM2EVMMultiOnRamp.NopAndWeight({nop: USER_2, weight: 52935});
-    nopsAndWeights[2] = EVM2EVMMultiOnRamp.NopAndWeight({nop: USER_3, weight: 8});
-    return nopsAndWeights;
   }
 
   function assertDestChainConfigsEqual(

@@ -13,6 +13,8 @@ import {MaybeRevertingBurnMintTokenPool} from "../helpers/MaybeRevertingBurnMint
 import "./EVM2EVMMultiOnRampSetup.t.sol";
 import {Vm} from "forge-std/Vm.sol";
 
+import {console2} from "forge-std/console2.sol";
+
 /// @notice #constructor
 contract EVM2EVMMultiOnRamp_constructor is EVM2EVMMultiOnRampSetup {
   event ConfigSet(EVM2EVMMultiOnRamp.StaticConfig staticConfig, EVM2EVMMultiOnRamp.DynamicConfig dynamicConfig);
@@ -52,8 +54,7 @@ contract EVM2EVMMultiOnRamp_constructor is EVM2EVMMultiOnRampSetup {
       destChainConfigArgs,
       getOutboundRateLimiterConfig(),
       s_feeTokenConfigArgs,
-      s_tokenTransferFeeConfigArgs,
-      getMultiOnRampNopsAndWeights()
+      s_tokenTransferFeeConfigArgs
     );
 
     EVM2EVMMultiOnRamp.DestChainConfig memory expectedDestChainConfig = EVM2EVMMultiOnRamp.DestChainConfig({
@@ -64,7 +65,7 @@ contract EVM2EVMMultiOnRamp_constructor is EVM2EVMMultiOnRampSetup {
         abi.encode(
           Internal.EVM_2_EVM_MESSAGE_HASH, SOURCE_CHAIN_SELECTOR, destChainConfigArg.destChainSelector, address(s_onRamp)
         )
-        )
+      )
     });
 
     EVM2EVMMultiOnRamp.StaticConfig memory gotStaticConfig = s_onRamp.getStaticConfig();
@@ -100,8 +101,7 @@ contract EVM2EVMMultiOnRamp_constructor is EVM2EVMMultiOnRampSetup {
       destChainConfigArgs,
       getOutboundRateLimiterConfig(),
       s_feeTokenConfigArgs,
-      s_tokenTransferFeeConfigArgs,
-      getMultiOnRampNopsAndWeights()
+      s_tokenTransferFeeConfigArgs
     );
   }
 
@@ -123,8 +123,7 @@ contract EVM2EVMMultiOnRamp_constructor is EVM2EVMMultiOnRampSetup {
       destChainConfigArgs,
       getOutboundRateLimiterConfig(),
       s_feeTokenConfigArgs,
-      s_tokenTransferFeeConfigArgs,
-      getMultiOnRampNopsAndWeights()
+      s_tokenTransferFeeConfigArgs
     );
   }
 
@@ -146,8 +145,7 @@ contract EVM2EVMMultiOnRamp_constructor is EVM2EVMMultiOnRampSetup {
       destChainConfigArgs,
       getOutboundRateLimiterConfig(),
       s_feeTokenConfigArgs,
-      s_tokenTransferFeeConfigArgs,
-      getMultiOnRampNopsAndWeights()
+      s_tokenTransferFeeConfigArgs
     );
   }
 }
@@ -179,7 +177,7 @@ contract EVM2EVMMultiOnRamp_applyDestChainConfigUpdates is EVM2EVMMultiOnRampSet
         abi.encode(
           Internal.EVM_2_EVM_MESSAGE_HASH, SOURCE_CHAIN_SELECTOR, destChainConfigArgs.destChainSelector, address(s_onRamp)
         )
-        )
+      )
     });
 
     if (isNewChain) {
@@ -216,7 +214,7 @@ contract EVM2EVMMultiOnRamp_applyDestChainConfigUpdates is EVM2EVMMultiOnRampSet
           destChainConfigArgs[0].destChainSelector,
           address(s_onRamp)
         )
-        )
+      )
     });
 
     EVM2EVMMultiOnRamp.DestChainConfig memory expectedDestChainConfig1 = EVM2EVMMultiOnRamp.DestChainConfig({
@@ -230,7 +228,7 @@ contract EVM2EVMMultiOnRamp_applyDestChainConfigUpdates is EVM2EVMMultiOnRampSet
           destChainConfigArgs[1].destChainSelector,
           address(s_onRamp)
         )
-        )
+      )
     });
 
     vm.expectEmit();
@@ -1125,7 +1123,8 @@ contract EVM2EVMMultiOnRamp_setDynamicConfig is EVM2EVMMultiOnRampSetup {
     EVM2EVMMultiOnRamp.DynamicConfig memory newConfig = EVM2EVMMultiOnRamp.DynamicConfig({
       router: address(2134),
       priceRegistry: address(23423),
-      tokenAdminRegistry: address(s_tokenAdminRegistry)
+      tokenAdminRegistry: address(s_tokenAdminRegistry),
+      feeAggregator: FEE_AGGREGATOR
     });
 
     vm.expectEmit();
@@ -1141,20 +1140,36 @@ contract EVM2EVMMultiOnRamp_setDynamicConfig is EVM2EVMMultiOnRampSetup {
 
   // Reverts
 
-  function test_SetConfigInvalidConfig_Revert() public {
+  function test_SetConfigInvalidConfigPriceRegistryEqAddressZero_Revert() public {
     EVM2EVMMultiOnRamp.DynamicConfig memory newConfig = EVM2EVMMultiOnRamp.DynamicConfig({
-      router: address(1),
-      priceRegistry: address(23423),
-      tokenAdminRegistry: address(s_tokenAdminRegistry)
+      router: address(2134),
+      priceRegistry: address(0),
+      tokenAdminRegistry: address(s_tokenAdminRegistry),
+      feeAggregator: FEE_AGGREGATOR
     });
-
-    // Invalid price reg reverts.
-    newConfig.priceRegistry = address(0);
     vm.expectRevert(EVM2EVMMultiOnRamp.InvalidConfig.selector);
     s_onRamp.setDynamicConfig(newConfig);
+  }
 
-    // Succeeds if valid
-    newConfig.priceRegistry = address(23423);
+  function test_SetConfigInvalidConfigTokenAdminRegistryEqAddressZero_Revert() public {
+    EVM2EVMMultiOnRamp.DynamicConfig memory newConfig = EVM2EVMMultiOnRamp.DynamicConfig({
+      router: address(2134),
+      priceRegistry: address(23423),
+      tokenAdminRegistry: address(0),
+      feeAggregator: FEE_AGGREGATOR
+    });
+    vm.expectRevert(EVM2EVMMultiOnRamp.InvalidConfig.selector);
+    s_onRamp.setDynamicConfig(newConfig);
+  }
+
+  function test_SetConfigInvalidConfigFeeAggregatorEqAddressZero_Revert() public {
+    EVM2EVMMultiOnRamp.DynamicConfig memory newConfig = EVM2EVMMultiOnRamp.DynamicConfig({
+      router: address(2134),
+      priceRegistry: address(23423),
+      tokenAdminRegistry: address(s_tokenAdminRegistry),
+      feeAggregator: address(0)
+    });
+    vm.expectRevert(EVM2EVMMultiOnRamp.InvalidConfig.selector);
     s_onRamp.setDynamicConfig(newConfig);
   }
 
@@ -1165,5 +1180,91 @@ contract EVM2EVMMultiOnRamp_setDynamicConfig is EVM2EVMMultiOnRampSetup {
     vm.startPrank(ADMIN);
     vm.expectRevert("Only callable by owner");
     s_onRamp.setDynamicConfig(generateDynamicMultiOnRampConfig(address(1), address(2), address(3)));
+  }
+}
+
+contract EVM2EVMNopsFeeSetup is EVM2EVMMultiOnRampSetup {
+  uint256 s_expectedNopFeesJuels;
+  address[] internal s_feeTokens;
+  mapping(address => uint256) internal s_nopFees;
+
+  function setUp() public virtual override {
+    EVM2EVMMultiOnRampSetup.setUp();
+
+    // Since we'll mostly be testing for valid calls from the router we'll
+    // mock all calls to be originating from the router and re-mock in
+    // tests that require failure.
+    vm.startPrank(address(s_sourceRouter));
+
+    s_feeTokens = s_onRamp.getFeeTokens();
+    uint256 feeAmount = 1234567890;
+    uint256 numberOfMessages = 5;
+
+    // Send a bunch of messages, increasing the juels in the contract
+    for (uint256 i = 0; i < numberOfMessages; ++i) {
+      Client.EVM2AnyMessage memory message = _generateEmptyMessage();
+      message.feeToken = s_feeTokens[i % s_feeTokens.length];
+      s_expectedNopFeesJuels += message.feeToken == s_sourceFeeToken
+        ? feeAmount
+        : s_priceRegistry.convertTokenAmount(message.feeToken, feeAmount, s_sourceFeeToken);
+      s_nopFees[message.feeToken] += feeAmount;
+      deal(message.feeToken, address(s_onRamp), IERC20(message.feeToken).balanceOf(address(s_onRamp)) + feeAmount);
+      s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, feeAmount, OWNER);
+    }
+
+    for (uint256 i = 0; i < s_feeTokens.length; ++i) {
+      assertEq(IERC20(s_feeTokens[i]).balanceOf(address(s_onRamp)), s_nopFees[s_feeTokens[i]]);
+    }
+    assertEq(s_onRamp.getNopFeesJuels(), s_expectedNopFeesJuels);
+  }
+}
+
+contract EVM2EVMOnRamp_payNops is EVM2EVMNopsFeeSetup {
+  event NopsPaid(address indexed feeAggregator, uint256 amount);
+
+  function test_OwnerPayNops_Success() public {
+    vm.startPrank(OWNER);
+
+    vm.expectEmit();
+    emit NopsPaid(FEE_AGGREGATOR, s_expectedNopFeesJuels);
+
+    s_onRamp.payNops();
+
+    assertEq(s_onRamp.getNopFeesJuels(), 0);
+    for (uint256 i = 0; i < s_feeTokens.length; ++i) {
+      assertEq(IERC20(s_feeTokens[i]).balanceOf(FEE_AGGREGATOR), s_nopFees[s_feeTokens[i]]);
+      assertEq(IERC20(s_feeTokens[i]).balanceOf(address(s_onRamp)), 0);
+    }
+  }
+
+  function test_AdminPayNops_Success() public {
+    vm.startPrank(ADMIN);
+
+    vm.expectEmit();
+    emit NopsPaid(FEE_AGGREGATOR, s_expectedNopFeesJuels);
+
+    s_onRamp.payNops();
+
+    assertEq(s_onRamp.getNopFeesJuels(), 0);
+    for (uint256 i = 0; i < s_feeTokens.length; ++i) {
+      assertEq(IERC20(s_feeTokens[i]).balanceOf(FEE_AGGREGATOR), s_nopFees[s_feeTokens[i]]);
+      assertEq(IERC20(s_feeTokens[i]).balanceOf(address(s_onRamp)), 0);
+    }
+  }
+
+  // Reverts
+
+  function test_InsufficientBalance_Revert() public {
+    vm.startPrank(OWNER);
+    s_onRamp.payNops();
+    vm.expectRevert(EVM2EVMMultiOnRamp.InsufficientBalance.selector);
+    s_onRamp.payNops();
+  }
+
+  function test_WrongPermissions_Revert() public {
+    vm.startPrank(STRANGER);
+
+    vm.expectRevert(EVM2EVMMultiOnRamp.OnlyCallableByOwnerOrAdmin.selector);
+    s_onRamp.payNops();
   }
 }
