@@ -14,7 +14,6 @@ import (
 	"github.com/slack-go/slack"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/k8s/config"
-
 	"github.com/smartcontractkit/chainlink-testing-framework/testreporters"
 )
 
@@ -47,6 +46,7 @@ type AggregatorMetrics struct {
 }
 type TransactionStats struct {
 	Fee                string `json:"fee,omitempty"`
+	MsgID              string `json:"msg_id,omitempty"`
 	GasUsed            uint64 `json:"gas_used,omitempty"`
 	TxHash             string `json:"tx_hash,omitempty"`
 	NoOfTokensSent     int    `json:"no_of_tokens_sent,omitempty"`
