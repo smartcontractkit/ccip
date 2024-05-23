@@ -160,7 +160,6 @@ abstract contract TokenPool is IPool, OwnerIsCreator {
   }
 
   /// @notice Validates the release or mint input for correctness on
-  /// - token to be released or minted
   /// - RMN curse status
   /// - if the sender is a valid offRamp
   /// - if the source pool is valid
