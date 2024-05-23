@@ -11,13 +11,27 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 )
 
-type CapabilityRegistryEvent struct {
-	CapabilityID string
-	DonID        DonID
+type CapabilityRegistrySyncer interface {
+	Listen(ctx context.Context) <-chan CapabilityRegistryDiff
 }
 
-type CapabilityRegistrySync interface {
-	Listen(ctx context.Context) <-chan CapabilityRegistryEvent
+type CapabilityRegistryDiff struct {
+	Init          bool
+	AddedDons     []DonAddedDetails
+	RemovedDons   []DonRemovedDetails
+	ConfigChanges []DONConfigChange
+}
+
+type DonAddedDetails struct {
+	DonID string
+}
+
+type DonRemovedDetails struct {
+	DonID string
+}
+
+type DONConfigChange struct {
+	DonID string
 }
 
 type BaseCapabilityConfigSync struct {
@@ -28,7 +42,7 @@ type BaseCapabilityConfigSync struct {
 	capabilityID string
 }
 
-func NewBaseCapabilityConfigSync(lggr logger.Logger, registry CapabilityRegistry, pollInterval time.Duration, capabilityID string) *BaseCapabilityConfigSync {
+func NewBaseCapabilityConfigSyncer(lggr logger.Logger, registry CapabilityRegistry, pollInterval time.Duration, capabilityID string) *BaseCapabilityConfigSync {
 	return &BaseCapabilityConfigSync{
 		lggr:         lggr,
 		registry:     registry,
@@ -38,8 +52,8 @@ func NewBaseCapabilityConfigSync(lggr logger.Logger, registry CapabilityRegistry
 	}
 }
 
-func (s *BaseCapabilityConfigSync) Listen(ctx context.Context) <-chan CapabilityRegistryEvent {
-	ch := make(chan CapabilityRegistryEvent)
+func (s *BaseCapabilityConfigSync) Listen(ctx context.Context) <-chan CapabilityRegistryDiff {
+	ch := make(chan CapabilityRegistryDiff)
 
 	go func() {
 		defer close(ch)
@@ -50,13 +64,9 @@ func (s *BaseCapabilityConfigSync) Listen(ctx context.Context) <-chan Capability
 			case <-ctx.Done():
 				return
 			case <-tick.C:
-				events, pollHash, err := s.poll(ctx)
+				diff, pollHash, err := s.poll(ctx)
 				if err != nil {
 					s.lggr.Error("error polling capability registry", "err", err)
-					continue
-				}
-
-				if len(events) == 0 {
 					continue
 				}
 
@@ -65,13 +75,7 @@ func (s *BaseCapabilityConfigSync) Listen(ctx context.Context) <-chan Capability
 				}
 
 				s.lastPollHash = pollHash
-				for _, event := range events {
-					select {
-					case ch <- event:
-					case <-ctx.Done():
-						return
-					}
-				}
+				ch <- *diff
 			}
 		}
 	}()
@@ -80,7 +84,7 @@ func (s *BaseCapabilityConfigSync) Listen(ctx context.Context) <-chan Capability
 }
 
 // poll queries the capability registry to find changes and returns a list of events.
-func (s *BaseCapabilityConfigSync) poll(ctx context.Context) ([]CapabilityRegistryEvent, string, error) {
+func (s *BaseCapabilityConfigSync) poll(ctx context.Context) (*CapabilityRegistryDiff, string, error) {
 	dons, err := s.registry.GetDONsWithCapability(ctx, s.capabilityID)
 	if err != nil {
 		return nil, "", fmt.Errorf("get dons with capability: %w", err)
@@ -93,9 +97,13 @@ func (s *BaseCapabilityConfigSync) poll(ctx context.Context) ([]CapabilityRegist
 	hashBytes := sha256.Sum256(encodedDons)
 	donsHash := hex.EncodeToString(hashBytes[:])
 
+	if s.lastPollHash == "" {
+		return &CapabilityRegistryDiff{Init: true}, donsHash, nil
+	}
+
+	// ...
 	for donID, cfg := range dons {
 		fmt.Println(donID, cfg)
 	}
-
 	return nil, donsHash, nil
 }

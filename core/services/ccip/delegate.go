@@ -162,7 +162,7 @@ type ccipService struct {
 	ocrDB           libocr2types.Database
 	ocrKeys         map[types.RelayID]ocr2key.KeyBundle
 	database        ocrtypes.Database
-	registrySync    CapabilityRegistrySync
+	registrySyncer  CapabilityRegistrySyncer
 
 	// State
 	dons map[uint32][]Oracle
@@ -173,8 +173,8 @@ func (c *ccipService) Start(ctx context.Context) error {
 		select {
 		case <-ctx.Done():
 			return nil
-		case ev := <-c.registrySync.Listen(ctx):
-			fmt.Println(">>> new event: ", ev)
+		case diff := <-c.registrySyncer.Listen(ctx):
+			fmt.Println(">>> new diff: ", diff)
 
 			// Start/close various oracles if required using providers, example of a new commit plugin
 			// instance for chain evm.123:
