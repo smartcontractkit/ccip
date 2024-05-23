@@ -271,7 +271,7 @@ contract EVM2EVMMultiOffRamp_metadataHash is EVM2EVMMultiOffRampSetup {
   // NOTE: to get a reliable result, set fuzz runs to at least 1mil
   /// forge-config: default.fuzz.runs = 32
   /// forge-config: ccip.fuzz.runs = 10000
-  function test_fuzz__MetadataHash_NoCollisions(
+  function test_Fuzz__MetadataHash_NoCollisions(
     uint64 destChainSelector,
     uint64 sourceChainSelector1,
     uint64 sourceChainSelector2,
@@ -2390,7 +2390,6 @@ contract EVM2EVMMultiOffRamp_releaseOrMintTokens is EVM2EVMMultiOffRampSetup {
 
   function test_releaseOrMintTokens_PoolDoesNotSupportDest_Reverts() public {
     Client.EVMTokenAmount[] memory srcTokenAmounts = getCastedSourceEVMTokenAmountsWithZeroAmounts();
-    IERC20 dstToken1 = IERC20(s_destFeeToken);
     uint256 amount1 = 100;
     srcTokenAmounts[0].amount = amount1;
 
