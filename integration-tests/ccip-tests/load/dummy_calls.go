@@ -9,6 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/smartcontractkit/wasp"
+	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/link_token_interface"
 )
@@ -73,6 +74,7 @@ func CreateDummyTraffic(t *testing.T, url, ownerKey string, chainId *big.Int) er
 		Gun:                   d,
 	}
 	loadRunner, err := wasp.NewGenerator(waspCfg)
+	require.NoError(t, err)
 	loadRunner.Run(false)
 	return nil
 }

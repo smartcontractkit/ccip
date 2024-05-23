@@ -492,7 +492,7 @@ func (ccipModule *CCIPCommon) WaitForPriceUpdates(
 	}
 }
 
-func (ccipModule *CCIPCommon) WatchForPriceUpdates(lggr zerolog.Logger, ctx context.Context) error {
+func (ccipModule *CCIPCommon) WatchForPriceUpdates(ctx context.Context, lggr zerolog.Logger) error {
 	var sub event.Subscription
 	gasUpdateEventLatest := make(chan *price_registry.PriceRegistryUsdPerUnitGasUpdated)
 	tokenUpdateEvent := make(chan *price_registry.PriceRegistryUsdPerTokenUpdated)
@@ -3484,7 +3484,7 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 	if !configureCLNodes {
 		return nil
 	}
-	err = lane.Source.Common.WatchForPriceUpdates(lane.Logger, setUpCtx)
+	err = lane.Source.Common.WatchForPriceUpdates(setUpCtx, lane.Logger)
 	if err != nil {
 		return fmt.Errorf("error in starting price update watch %w", err)
 	}
