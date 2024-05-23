@@ -217,7 +217,6 @@ type LoadProfile struct {
 	FailOnFirstErrorInLoad                     *bool              `toml:",omitempty"`
 	SendMaxDataInEveryMsgCount                 *int64             `toml:",omitempty"`
 	TestRunName                                string             `toml:",omitempty"`
-	CreateDummyTxsBeforeLoad                   *bool              `toml:",omitempty"`
 }
 
 func (l *LoadProfile) Validate() error {
