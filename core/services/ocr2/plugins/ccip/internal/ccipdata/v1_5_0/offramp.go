@@ -51,9 +51,9 @@ func (o *OffRamp) GetTokens(ctx context.Context) (cciptypes.OffRampTokens, error
 
 func (o *OffRamp) GetSourceAndDestRateLimitTokens(ctx context.Context) (sourceTokens []cciptypes.Address, destTokens []cciptypes.Address, err error) {
 	cachedTokens, err := o.cachedRateLimitTokens.Get(ctx, func(ctx context.Context) (cciptypes.OffRampTokens, error) {
-		tokens, err := o.offRampV150.GetAllRateLimitTokens(&bind.CallOpts{Context: ctx})
-		if err != nil {
-			return cciptypes.OffRampTokens{}, err
+		tokens, err2 := o.offRampV150.GetAllRateLimitTokens(&bind.CallOpts{Context: ctx})
+		if err2 != nil {
+			return cciptypes.OffRampTokens{}, err2
 		}
 
 		if len(tokens.SourceTokens) != len(tokens.DestTokens) {
@@ -61,8 +61,8 @@ func (o *OffRamp) GetSourceAndDestRateLimitTokens(ctx context.Context) (sourceTo
 		}
 
 		return cciptypes.OffRampTokens{
-			DestinationTokens: ccipcalc.EvmAddrsToGeneric(tokens.SourceTokens...),
-			SourceTokens:      ccipcalc.EvmAddrsToGeneric(tokens.DestTokens...),
+			DestinationTokens: ccipcalc.EvmAddrsToGeneric(tokens.DestTokens...),
+			SourceTokens:      ccipcalc.EvmAddrsToGeneric(tokens.SourceTokens...),
 		}, nil
 	})
 	if err != nil {
