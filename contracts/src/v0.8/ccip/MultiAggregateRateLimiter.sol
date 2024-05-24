@@ -45,6 +45,12 @@ contract MultiAggregateRateLimiter is IMessageValidator, OwnerIsCreator {
     address[] removedCallers;
   }
 
+  /// @notice Update args for a single rate limiter config update
+  struct RateLimiterConfigArgs {
+    uint64 chainSelector; // Chain selector to set config for
+    RateLimiterNoEvents.Config rateLimiterConfig; // Rate limiter config to set
+  }
+
   /// @dev Tokens that should be included in Aggregate Rate Limiting (from dest -> source)
   EnumerableMapAddresses.AddressToAddressMap internal s_rateLimitedTokensDestToSource;
 
@@ -58,12 +64,6 @@ contract MultiAggregateRateLimiter is IMessageValidator, OwnerIsCreator {
 
   /// @notice Rate limiter token bucket states per chain
   mapping(uint64 chainSelector => RateLimiterNoEvents.TokenBucket rateLimiter) s_rateLimitersByChainSelector;
-
-  /// @notice Update args for a single rate limiter config update
-  struct RateLimiterConfigArgs {
-    uint64 chainSelector; // Chain selector to set config for
-    RateLimiterNoEvents.Config rateLimiterConfig; // Rate limiter config to set
-  }
 
   /// @param rateLimiterConfigs The RateLimiterNoEvents.Configs per chain containing the capacity and refill rate
   /// of the bucket
@@ -150,10 +150,9 @@ contract MultiAggregateRateLimiter is IMessageValidator, OwnerIsCreator {
         revert ZeroChainSelectorNotAllowed();
       }
 
-      RateLimiterNoEvents.TokenBucket memory tokenBucket = s_rateLimitersByChainSelector[chainSelector];
-      uint32 lastUpdated = tokenBucket.lastUpdated;
+      RateLimiterNoEvents.TokenBucket storage tokenBucket = s_rateLimitersByChainSelector[chainSelector];
 
-      if (lastUpdated == 0) {
+      if (tokenBucket.lastUpdated == 0) {
         // Token bucket needs to be newly added
         s_rateLimitersByChainSelector[chainSelector] = RateLimiterNoEvents.TokenBucket({
           rate: configUpdate.rate,
@@ -163,7 +162,7 @@ contract MultiAggregateRateLimiter is IMessageValidator, OwnerIsCreator {
           isEnabled: configUpdate.isEnabled
         });
       } else {
-        s_rateLimitersByChainSelector[chainSelector]._setTokenBucketConfig(configUpdate);
+        tokenBucket._setTokenBucketConfig(configUpdate);
       }
       emit RateLimiterConfigUpdated(chainSelector, configUpdate);
     }
