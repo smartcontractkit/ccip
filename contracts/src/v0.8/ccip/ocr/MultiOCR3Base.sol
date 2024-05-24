@@ -125,7 +125,7 @@ abstract contract MultiOCR3Base is ITypeAndVersion, OwnerIsCreator {
   /// @notice sets offchain reporting protocol configuration incl. participating oracles for a single OCR plugin type
   /// @param ocrConfigArgs OCR config update args
   function _setOCR3Config(OCRConfigArgs memory ocrConfigArgs) internal {
-    if (ocrConfigArgs.F == 0) revert InvalidConfig("f must be positive");
+    if (ocrConfigArgs.F == 0) revert InvalidConfig("F must be positive");
 
     uint8 ocrPluginType = ocrConfigArgs.ocrPluginType;
     OCRConfig storage ocrConfig = s_ocrConfigs[ocrPluginType];

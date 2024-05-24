@@ -213,6 +213,70 @@ contract MultiOCR3Base_transmit is MultiOCR3BaseSetup {
     s_multiOCR3.transmitWithoutSignatures(reportContext, REPORT);
   }
 
+  function test_TransmitSignersWithSignatures_Fuzz_Success(
+    uint8 F,
+    uint64 randomAddressOffset,
+    bool uniqueReports
+  ) public {
+    vm.pauseGasMetering();
+
+    F = uint8(bound(F, 1, 3));
+
+    // condition: signers.length > 3F
+    uint8 signersLength = 3 * F + 1;
+    address[] memory signers = new address[](signersLength);
+    address[] memory transmitters = new address[](signersLength);
+    uint256[] memory signerKeys = new uint256[](signersLength);
+
+    // Force addresses to be unique (with a random offset for broader testing)
+    for (uint160 i = 0; i < signersLength; ++i) {
+      transmitters[i] = vm.addr(PRIVATE0 + randomAddressOffset + i);
+      // condition: non-zero oracle address
+      vm.assume(transmitters[i] != address(0));
+
+      // condition: non-repeating addresses (no clashes with transmitters)
+      signerKeys[i] = PRIVATE0 + randomAddressOffset + i + signersLength;
+      signers[i] = vm.addr(signerKeys[i]);
+      vm.assume(signers[i] != address(0));
+    }
+
+    MultiOCR3Base.OCRConfigArgs[] memory ocrConfigs = new MultiOCR3Base.OCRConfigArgs[](1);
+    ocrConfigs[0] = MultiOCR3Base.OCRConfigArgs({
+      ocrPluginType: 3,
+      configDigest: s_configDigest1,
+      F: F,
+      uniqueReports: uniqueReports,
+      isSignatureVerificationEnabled: true,
+      signers: signers,
+      transmitters: transmitters
+    });
+    s_multiOCR3.setOCR3Configs(ocrConfigs);
+    s_multiOCR3.setTransmitOcrPluginType(3);
+
+    // Randomise picked transmitter with random offset
+    vm.startPrank(transmitters[randomAddressOffset % signersLength]);
+
+    bytes32[3] memory reportContext = [s_configDigest1, s_configDigest1, s_configDigest1];
+
+    // condition: matches signature expectation for transmit
+    uint8 numSignatures = uniqueReports ? ((signersLength + F) / 2 + 1) : (F + 1);
+    uint256[] memory pickedSignerKeys = new uint256[](numSignatures);
+
+    // Randomise picked signers with random offset
+    for (uint256 i; i < numSignatures; ++i) {
+      pickedSignerKeys[i] = signerKeys[(i + randomAddressOffset) % numSignatures];
+    }
+
+    (bytes32[] memory rs, bytes32[] memory ss,, bytes32 rawVs) =
+      _getSignaturesForDigest(pickedSignerKeys, s_configDigest1, numSignatures);
+
+    vm.expectEmit();
+    emit MultiOCR3Base.Transmitted(3, s_configDigest1, uint32(uint256(s_configDigest1) >> 8));
+
+    vm.resumeGasMetering();
+    s_multiOCR3.transmitWithSignatures(reportContext, REPORT, rs, ss, rawVs);
+  }
+
   // Reverts
   function test_ForkedChain_Revert() public {
     bytes32[3] memory reportContext = [s_configDigest1, s_configDigest1, s_configDigest1];
@@ -396,9 +460,6 @@ contract MultiOCR3Base_transmit is MultiOCR3BaseSetup {
 }
 
 contract MultiOCR3Base_setOCR3Configs is MultiOCR3BaseSetup {
-  // TODO: fuzz test for setOCR3Configs (single config)
-  // TODO: fuzz test for transmit with varied signatures
-
   function test_SetConfigsZeroInput_Success() public {
     vm.recordLogs();
     s_multiOCR3.setOCR3Configs(new MultiOCR3Base.OCRConfigArgs[](0));
@@ -552,6 +613,68 @@ contract MultiOCR3Base_setOCR3Configs is MultiOCR3BaseSetup {
 
     // pluginType 3 remains unconfigured
     _assertOCRConfigUnconfigured(s_multiOCR3.latestConfigDetails(3));
+  }
+
+  function test_SetConfig_Fuzz_Success(MultiOCR3Base.OCRConfigArgs memory ocrConfig, uint64 randomAddressOffset) public {
+    // condition: cannot assume max oracle count
+    vm.assume(ocrConfig.transmitters.length <= 31);
+
+    // condition: F > 0
+    ocrConfig.F = uint8(bound(ocrConfig.F, 1, 3));
+
+    uint256 transmittersLength = ocrConfig.transmitters.length;
+
+    // Force addresses to be unique (with a random offset for broader testing)
+    for (uint160 i = 0; i < transmittersLength; ++i) {
+      ocrConfig.transmitters[i] = vm.addr(PRIVATE0 + randomAddressOffset + i);
+      // condition: non-zero oracle address
+      vm.assume(ocrConfig.transmitters[i] != address(0));
+    }
+
+    if (ocrConfig.signers.length == 0) {
+      ocrConfig.isSignatureVerificationEnabled = false;
+    } else {
+      ocrConfig.isSignatureVerificationEnabled = true;
+
+      // condition: signers length must equal transmitters length
+      if (ocrConfig.signers.length != transmittersLength) {
+        ocrConfig.signers = new address[](transmittersLength);
+      }
+
+      // condition: number of signers > 3F
+      vm.assume(ocrConfig.signers.length > 3 * ocrConfig.F);
+
+      // Force addresses to be unique - continuing generation with an offset after the transmitter addresses
+      for (uint160 i = 0; i < transmittersLength; ++i) {
+        ocrConfig.signers[i] = vm.addr(PRIVATE0 + randomAddressOffset + i + transmittersLength);
+        // condition: non-zero oracle address
+        vm.assume(ocrConfig.signers[i] != address(0));
+      }
+    }
+
+    _assertOCRConfigUnconfigured(s_multiOCR3.latestConfigDetails(ocrConfig.ocrPluginType));
+
+    MultiOCR3Base.OCRConfigArgs[] memory ocrConfigs = new MultiOCR3Base.OCRConfigArgs[](1);
+    ocrConfigs[0] = ocrConfig;
+
+    vm.expectEmit();
+    emit MultiOCR3Base.ConfigSet(
+      ocrConfig.ocrPluginType, ocrConfig.configDigest, ocrConfig.signers, ocrConfig.transmitters, ocrConfig.F
+    );
+    s_multiOCR3.setOCR3Configs(ocrConfigs);
+
+    MultiOCR3Base.OCRConfig memory expectedConfig = MultiOCR3Base.OCRConfig({
+      configInfo: MultiOCR3Base.ConfigInfo({
+        configDigest: ocrConfig.configDigest,
+        F: ocrConfig.F,
+        n: uint8(ocrConfig.transmitters.length),
+        uniqueReports: ocrConfig.uniqueReports,
+        isSignatureVerificationEnabled: ocrConfig.isSignatureVerificationEnabled
+      }),
+      signers: ocrConfig.signers,
+      transmitters: ocrConfig.transmitters
+    });
+    _assertOCRConfigEquality(s_multiOCR3.latestConfigDetails(ocrConfig.ocrPluginType), expectedConfig);
   }
 
   function test_UpdateConfigTransmittersWithoutSigners_Success() public {
