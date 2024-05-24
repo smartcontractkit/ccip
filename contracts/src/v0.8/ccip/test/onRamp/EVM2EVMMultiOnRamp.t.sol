@@ -1250,7 +1250,7 @@ contract EVM2EVMNopsFeeSetup is EVM2EVMMultiOnRampSetup {
   }
 }
 
-contract EVM2EVMOnRamp_payNops is EVM2EVMNopsFeeSetup {
+contract EVM2EVMMultiOnRamp_payNops is EVM2EVMNopsFeeSetup {
   event NopsPaid(address indexed feeAggregator, address indexed feeToken, uint256 amount);
 
   function test_OwnerPayNops_Success() public {
