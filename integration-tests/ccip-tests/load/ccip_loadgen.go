@@ -228,16 +228,22 @@ func (c *CCIPE2ELoad) Call(_ *wasp.Generator) *wasp.Response {
 
 	destChainSelector, err := chain_selectors.SelectorFromChainId(sourceCCIP.DestinationChainId)
 	if err != nil {
-		res.Error = err.Error()
+		res.Error = fmt.Sprintf("err %w - while getting selector from chainid ", err.Error())
+		res.Failed = true
+		return res
+	}
+	// if there is an connection error , we will skip sending the request
+	// this is to avoid sending the request when the connection is not restored yet
+	if sourceCCIP.Common.IsConnectionRestoredRecently != nil && !sourceCCIP.Common.IsConnectionRestoredRecently.Load() {
+		res.Error = "Connection Error.. skipping this request"
 		res.Failed = true
 		return res
 	}
 	// initiate the transfer
 	// if the token address is 0x0 it will use Native as fee token and the fee amount should be mentioned in bind.TransactOpts's value
-
 	fee, err := sourceCCIP.Common.Router.GetFee(destChainSelector, msg)
 	if err != nil {
-		res.Error = err.Error()
+		res.Error = fmt.Sprintf("err %w - while getting fee from router ", err.Error())
 		res.Failed = true
 		return res
 	}
@@ -250,7 +256,7 @@ func (c *CCIPE2ELoad) Call(_ *wasp.Generator) *wasp.Response {
 	}
 	if err != nil {
 		stats.UpdateState(lggr, 0, testreporters.TX, time.Since(startTime), testreporters.Failure)
-		res.Error = err.Error()
+		res.Error = fmt.Sprintf("ccip-send tx error %w for reqNo %d", err, msgSerialNo)
 		res.Data = stats.StatusByPhase
 		res.Failed = true
 		return res
@@ -260,7 +266,7 @@ func (c *CCIPE2ELoad) Call(_ *wasp.Generator) *wasp.Response {
 
 	if err != nil {
 		stats.UpdateState(lggr, 0, testreporters.TX, time.Since(startTime), testreporters.Failure)
-		res.Error = fmt.Sprintf("ccip-send tx error %+v for msg ID %d", err, msgSerialNo)
+		res.Error = fmt.Sprintf("failed to mark tx as sent on L2 %w", err)
 		res.Data = stats.StatusByPhase
 		res.Failed = true
 		return res
