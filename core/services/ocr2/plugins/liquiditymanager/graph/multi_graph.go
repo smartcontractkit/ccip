@@ -5,7 +5,7 @@ import "sync"
 type MultiGraph interface {
 	Get(id string) (Graph, bool)
 	GetOrCreate(id string) Graph
-	Add(id string, g Graph) bool
+	Set(id string, g Graph)
 }
 
 type multiGraph struct {
@@ -40,14 +40,9 @@ func (g *multiGraph) GetOrCreate(id string) Graph {
 	return gr
 }
 
-func (g *multiGraph) Add(id string, graph Graph) bool {
+func (g *multiGraph) Set(id string, graph Graph) {
 	g.lock.Lock()
 	defer g.lock.Unlock()
 
-	if _, ok := g.graphs[id]; ok {
-		return false
-	}
 	g.graphs[id] = graph
-
-	return true
 }

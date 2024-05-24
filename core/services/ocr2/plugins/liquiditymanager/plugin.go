@@ -59,7 +59,7 @@ func NewPlugin(
 		bridgeFactory:           bridgeFactory,
 		discoverer:              discoverer,
 		graphs:                  graph.NewMultiGraph(),
-		token:                   models.Address(rootAddress),
+		token:                   rootAddress,
 		liquidityRebalancer:     liquidityRebalancer,
 		inflight:                inflight.New(),
 		reportCodec:             reportCodec,
@@ -497,6 +497,7 @@ func (p *Plugin) syncGraph(ctx context.Context) error {
 		if liquidityGraph, err = p.syncGraphEdges(ctx); err != nil {
 			return fmt.Errorf("sync graph edges: %w", err)
 		}
+		p.graphs.Set(p.token.String(), liquidityGraph)
 	} else {
 		p.lggr.Infow("syncing graph liquidities")
 		if err := p.discoverer.DiscoverBalances(ctx, liquidityGraph); err != nil {
