@@ -576,7 +576,7 @@ func (ccipModule *CCIPCommon) WatchForPriceUpdates(ctx context.Context, lggr zer
 
 // UpdateTokenPricesAtRegularInterval updates aggregator contract with updated answer at regular interval.
 // At each iteration of ticker it chooses one of the aggregator contracts and updates its round answer.
-func (ccipModule *CCIPCommon) UpdateTokenPricesAtRegularInterval(ctx context.Context, interval time.Duration, conf *laneconfig.LaneConfig) error {
+func (ccipModule *CCIPCommon) UpdateTokenPricesAtRegularInterval(ctx context.Context, lggr zerolog.Logger, interval time.Duration, conf *laneconfig.LaneConfig) error {
 	if ccipModule.ExistingDeployment {
 		return nil
 	}
@@ -586,6 +586,12 @@ func (ccipModule *CCIPCommon) UpdateTokenPricesAtRegularInterval(ctx context.Con
 		if err != nil {
 			return err
 		}
+		// creating a separate client for each aggregator contract to avoid getting rate limited by the chain client
+		newC, err := blockchain.ConcurrentEVMClient(*ccipModule.ChainClient.GetNetworkConfig(), nil, ccipModule.ChainClient, lggr)
+		if err != nil {
+			return err
+		}
+		contract.SetClient(newC)
 		aggregators = append(aggregators, contract)
 	}
 	go func() {
@@ -598,9 +604,16 @@ func (ccipModule *CCIPCommon) UpdateTokenPricesAtRegularInterval(ctx context.Con
 				randomIndex := rand.Intn(len(aggregators))
 				err := aggregators[randomIndex].UpdateRoundData(nil, ptr.Ptr(-5), ptr.Ptr(2))
 				if err != nil {
+					lggr.Error().Err(err).Msg("error in updating round data")
 					continue
 				}
 			case <-ctx.Done():
+				for _, aggregator := range aggregators {
+					err := aggregator.Close()
+					if err != nil {
+						lggr.Error().Err(err).Msg("error in closing aggregator client")
+					}
+				}
 				return
 			}
 		}

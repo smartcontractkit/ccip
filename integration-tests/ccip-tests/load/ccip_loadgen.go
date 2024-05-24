@@ -234,10 +234,13 @@ func (c *CCIPE2ELoad) Call(_ *wasp.Generator) *wasp.Response {
 	}
 	// if there is an connection error , we will skip sending the request
 	// this is to avoid sending the request when the connection is not restored yet
-	if sourceCCIP.Common.IsConnectionRestoredRecently != nil && !sourceCCIP.Common.IsConnectionRestoredRecently.Load() {
-		res.Error = "RPC Connection Error.. skipping this request"
-		res.Failed = true
-		return res
+	if sourceCCIP.Common.IsConnectionRestoredRecently != nil {
+		if !sourceCCIP.Common.IsConnectionRestoredRecently.Load() {
+			c.Lane.Logger.Info().Msg("RPC Connection Error.. skipping this request")
+			return res
+		} else {
+			c.Lane.Logger.Info().Msg("Connection is restored, Resuming load")
+		}
 	}
 	// initiate the transfer
 	// if the token address is 0x0 it will use Native as fee token and the fee amount should be mentioned in bind.TransactOpts's value

@@ -2020,6 +2020,14 @@ type MockAggregator struct {
 	ContractAddress common.Address
 }
 
+func (a *MockAggregator) SetClient(client blockchain.EVMClient) {
+	a.client = client
+}
+
+func (a *MockAggregator) Close() error {
+	return a.client.Close()
+}
+
 func (a *MockAggregator) ChainID() uint64 {
 	return a.client.GetChainID().Uint64()
 }
