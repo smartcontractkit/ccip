@@ -26,7 +26,7 @@ contract EVM2EVMMultiOnRamp_constructor is EVM2EVMMultiOnRampSetup {
     EVM2EVMMultiOnRamp.StaticConfig memory staticConfig = EVM2EVMMultiOnRamp.StaticConfig({
       linkToken: s_sourceTokens[0],
       chainSelector: SOURCE_CHAIN_SELECTOR,
-      maxNopFeesJuels: MAX_NOP_FEES_JUELS,
+      maxFeeJuelsPerMsg: MAX_NOP_FEES_JUELS,
       rmnProxy: address(s_mockRMN)
     });
     EVM2EVMMultiOnRamp.DynamicConfig memory dynamicConfig =
@@ -91,7 +91,7 @@ contract EVM2EVMMultiOnRamp_constructor is EVM2EVMMultiOnRampSetup {
     EVM2EVMMultiOnRamp.StaticConfig memory staticConfig = EVM2EVMMultiOnRamp.StaticConfig({
       linkToken: address(0),
       chainSelector: SOURCE_CHAIN_SELECTOR,
-      maxNopFeesJuels: MAX_NOP_FEES_JUELS,
+      maxFeeJuelsPerMsg: MAX_NOP_FEES_JUELS,
       rmnProxy: address(s_mockRMN)
     });
 
@@ -113,7 +113,7 @@ contract EVM2EVMMultiOnRamp_constructor is EVM2EVMMultiOnRampSetup {
     EVM2EVMMultiOnRamp.StaticConfig memory staticConfig = EVM2EVMMultiOnRamp.StaticConfig({
       linkToken: s_sourceTokens[0],
       chainSelector: 0,
-      maxNopFeesJuels: MAX_NOP_FEES_JUELS,
+      maxFeeJuelsPerMsg: MAX_NOP_FEES_JUELS,
       rmnProxy: address(s_mockRMN)
     });
 
@@ -135,7 +135,7 @@ contract EVM2EVMMultiOnRamp_constructor is EVM2EVMMultiOnRampSetup {
     EVM2EVMMultiOnRamp.StaticConfig memory staticConfig = EVM2EVMMultiOnRamp.StaticConfig({
       linkToken: s_sourceTokens[0],
       chainSelector: SOURCE_CHAIN_SELECTOR,
-      maxNopFeesJuels: MAX_NOP_FEES_JUELS,
+      maxFeeJuelsPerMsg: MAX_NOP_FEES_JUELS,
       rmnProxy: address(0)
     });
 
@@ -292,6 +292,8 @@ contract EVM2EVMMultiOnRamp_applyDestChainConfigUpdates is EVM2EVMMultiOnRampSet
 
 /// @notice #forwardFromRouter
 contract EVM2EVMMultiOnRamp_forwardFromRouter is EVM2EVMMultiOnRampSetup {
+  event FeePaid(address indexed feeToken, uint256 feeValueJuels);
+
   struct LegacyExtraArgs {
     uint256 gasLimit;
     bool strict;
@@ -387,10 +389,11 @@ contract EVM2EVMMultiOnRamp_forwardFromRouter is EVM2EVMMultiOnRampSetup {
     uint256 feeAmount = 1234567890;
     IERC20(s_sourceFeeToken).transferFrom(OWNER, address(s_onRamp), feeAmount);
 
+    vm.expectEmit();
+    emit FeePaid(s_sourceFeeToken, feeAmount);
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, feeAmount, OWNER);
 
     assertEq(IERC20(s_sourceFeeToken).balanceOf(address(s_onRamp)), feeAmount);
-    assertEq(s_onRamp.getNopFeesJuels(), feeAmount);
   }
 
   function test_ShouldStoreNonLinkFees() public {
@@ -400,17 +403,17 @@ contract EVM2EVMMultiOnRamp_forwardFromRouter is EVM2EVMMultiOnRampSetup {
     uint256 feeAmount = 1234567890;
     IERC20(s_sourceTokens[1]).transferFrom(OWNER, address(s_onRamp), feeAmount);
 
-    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, feeAmount, OWNER);
-
-    assertEq(IERC20(s_sourceTokens[1]).balanceOf(address(s_onRamp)), feeAmount);
-
     // Calculate conversion done by prices contract
     uint256 feeTokenPrice = s_priceRegistry.getTokenPrice(s_sourceTokens[1]).value;
     uint256 linkTokenPrice = s_priceRegistry.getTokenPrice(s_sourceFeeToken).value;
     uint256 conversionRate = (feeTokenPrice * 1e18) / linkTokenPrice;
     uint256 expectedJuels = (feeAmount * conversionRate) / 1e18;
 
-    assertEq(s_onRamp.getNopFeesJuels(), expectedJuels);
+    vm.expectEmit();
+    emit FeePaid(s_sourceTokens[1], expectedJuels);
+    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, feeAmount, OWNER);
+
+    assertEq(IERC20(s_sourceTokens[1]).balanceOf(address(s_onRamp)), feeAmount);
   }
 
   // Make sure any valid sender, receiver and feeAmount can be handled.
@@ -422,7 +425,7 @@ contract EVM2EVMMultiOnRamp_forwardFromRouter is EVM2EVMMultiOnRampSetup {
     // To avoid RouterMustSetOriginalSender
     vm.assume(originalSender != address(0));
     vm.assume(uint160(receiver) >= 10);
-    vm.assume(feeTokenAmount <= MAX_NOP_FEES_JUELS);
+    vm.assume(feeTokenAmount <= MAX_MSG_FEES_JUELS);
 
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
     message.receiver = abi.encode(receiver);
@@ -432,6 +435,8 @@ contract EVM2EVMMultiOnRamp_forwardFromRouter is EVM2EVMMultiOnRampSetup {
 
     Internal.EVM2EVMMessage memory expectedEvent = _messageToEvent(message, 1, 1, feeTokenAmount, originalSender);
 
+    vm.expectEmit();
+    emit FeePaid(s_sourceFeeToken, feeTokenAmount);
     vm.expectEmit(false, false, false, true);
     emit CCIPSendRequested(expectedEvent);
 
@@ -439,8 +444,6 @@ contract EVM2EVMMultiOnRamp_forwardFromRouter is EVM2EVMMultiOnRampSetup {
     assertEq(
       expectedEvent.messageId, s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, feeTokenAmount, originalSender)
     );
-    // Assert the fee token amount is correctly assigned to the nop fee pool
-    assertEq(feeTokenAmount, s_onRamp.getNopFeesJuels());
   }
 
   function test_OverValueWithARLOff_Success() public {
@@ -655,12 +658,14 @@ contract EVM2EVMMultiOnRamp_forwardFromRouter is EVM2EVMMultiOnRampSetup {
     }
   }
 
-  function test_MaxFeeBalanceReached_Revert() public {
+  function test_MesssageFeeTooHigh_Revert() public {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
 
-    vm.expectRevert(EVM2EVMMultiOnRamp.MaxFeeBalanceReached.selector);
+    vm.expectRevert(
+      abi.encodeWithSelector(EVM2EVMMultiOnRamp.MessageFeeTooHigh.selector, MAX_MSG_FEES_JUELS + 1, MAX_MSG_FEES_JUELS)
+    );
 
-    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, MAX_NOP_FEES_JUELS + 1, OWNER);
+    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, MAX_MSG_FEES_JUELS + 1, OWNER);
   }
 
   function test_InvalidChainSelector_Revert() public {
@@ -1217,8 +1222,6 @@ contract EVM2EVMMultiOnRamp_setDynamicConfig is EVM2EVMMultiOnRampSetup {
 }
 
 contract EVM2EVMNopsFeeSetup is EVM2EVMMultiOnRampSetup {
-  uint256 s_expectedNopFeesJuels;
-  address[] internal s_feeTokens;
   mapping(address => uint256) internal s_nopFees;
 
   function setUp() public virtual override {
@@ -1229,59 +1232,56 @@ contract EVM2EVMNopsFeeSetup is EVM2EVMMultiOnRampSetup {
     // tests that require failure.
     vm.startPrank(address(s_sourceRouter));
 
-    s_feeTokens = s_onRamp.getFeeTokens();
     uint256 feeAmount = 1234567890;
-    uint256 numberOfMessages = 5;
 
     // Send a bunch of messages, increasing the juels in the contract
-    for (uint256 i = 0; i < numberOfMessages; ++i) {
+    for (uint256 i = 0; i < s_sourceFeeTokens.length; ++i) {
       Client.EVM2AnyMessage memory message = _generateEmptyMessage();
-      message.feeToken = s_feeTokens[i % s_feeTokens.length];
-      s_expectedNopFeesJuels += message.feeToken == s_sourceFeeToken
-        ? feeAmount
-        : s_priceRegistry.convertTokenAmount(message.feeToken, feeAmount, s_sourceFeeToken);
-      s_nopFees[message.feeToken] += feeAmount;
-      deal(message.feeToken, address(s_onRamp), IERC20(message.feeToken).balanceOf(address(s_onRamp)) + feeAmount);
+      message.feeToken = s_sourceFeeTokens[i % s_sourceFeeTokens.length];
+      uint256 newFeeTokenBalance = IERC20(message.feeToken).balanceOf(address(s_onRamp)) + feeAmount;
+      deal(message.feeToken, address(s_onRamp), newFeeTokenBalance);
+      s_nopFees[message.feeToken] = newFeeTokenBalance;
       s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, feeAmount, OWNER);
     }
 
-    for (uint256 i = 0; i < s_feeTokens.length; ++i) {
-      assertEq(IERC20(s_feeTokens[i]).balanceOf(address(s_onRamp)), s_nopFees[s_feeTokens[i]]);
+    for (uint256 i = 0; i < s_sourceFeeTokens.length; ++i) {
+      assertEq(IERC20(s_sourceFeeTokens[i]).balanceOf(address(s_onRamp)), s_nopFees[s_sourceFeeTokens[i]]);
     }
-    assertEq(s_onRamp.getNopFeesJuels(), s_expectedNopFeesJuels);
   }
 }
 
 contract EVM2EVMOnRamp_payNops is EVM2EVMNopsFeeSetup {
-  event NopsPaid(address indexed feeAggregator, uint256 amount);
+  event NopsPaid(address indexed feeAggregator, address indexed feeToken, uint256 amount);
 
   function test_OwnerPayNops_Success() public {
     vm.startPrank(OWNER);
 
-    vm.expectEmit();
-    emit NopsPaid(FEE_AGGREGATOR, s_expectedNopFeesJuels);
+    for (uint256 i = 0; i < s_sourceFeeTokens.length; ++i) {
+      vm.expectEmit();
+      emit NopsPaid(FEE_AGGREGATOR, s_sourceFeeTokens[i], s_nopFees[s_sourceFeeTokens[i]]);
+    }
 
-    s_onRamp.payNops();
+    s_onRamp.payNops(s_sourceFeeTokens);
 
-    assertEq(s_onRamp.getNopFeesJuels(), 0);
-    for (uint256 i = 0; i < s_feeTokens.length; ++i) {
-      assertEq(IERC20(s_feeTokens[i]).balanceOf(FEE_AGGREGATOR), s_nopFees[s_feeTokens[i]]);
-      assertEq(IERC20(s_feeTokens[i]).balanceOf(address(s_onRamp)), 0);
+    for (uint256 i = 0; i < s_sourceFeeTokens.length; ++i) {
+      assertEq(IERC20(s_sourceFeeTokens[i]).balanceOf(FEE_AGGREGATOR), s_nopFees[s_sourceFeeTokens[i]]);
+      assertEq(IERC20(s_sourceFeeTokens[i]).balanceOf(address(s_onRamp)), 0);
     }
   }
 
   function test_AdminPayNops_Success() public {
     vm.startPrank(ADMIN);
 
-    vm.expectEmit();
-    emit NopsPaid(FEE_AGGREGATOR, s_expectedNopFeesJuels);
+    for (uint256 i = 0; i < s_sourceFeeTokens.length; ++i) {
+      vm.expectEmit();
+      emit NopsPaid(FEE_AGGREGATOR, s_sourceFeeTokens[i], s_nopFees[s_sourceFeeTokens[i]]);
+    }
 
-    s_onRamp.payNops();
+    s_onRamp.payNops(s_sourceFeeTokens);
 
-    assertEq(s_onRamp.getNopFeesJuels(), 0);
-    for (uint256 i = 0; i < s_feeTokens.length; ++i) {
-      assertEq(IERC20(s_feeTokens[i]).balanceOf(FEE_AGGREGATOR), s_nopFees[s_feeTokens[i]]);
-      assertEq(IERC20(s_feeTokens[i]).balanceOf(address(s_onRamp)), 0);
+    for (uint256 i = 0; i < s_sourceFeeTokens.length; ++i) {
+      assertEq(IERC20(s_sourceFeeTokens[i]).balanceOf(FEE_AGGREGATOR), s_nopFees[s_sourceFeeTokens[i]]);
+      assertEq(IERC20(s_sourceFeeTokens[i]).balanceOf(address(s_onRamp)), 0);
     }
   }
 
@@ -1291,6 +1291,6 @@ contract EVM2EVMOnRamp_payNops is EVM2EVMNopsFeeSetup {
     vm.startPrank(STRANGER);
 
     vm.expectRevert(EVM2EVMMultiOnRamp.OnlyCallableByOwnerOrAdmin.selector);
-    s_onRamp.payNops();
+    s_onRamp.payNops(s_sourceFeeTokens);
   }
 }

@@ -19,7 +19,6 @@ import {USDPriceWith18Decimals} from "../libraries/USDPriceWith18Decimals.sol";
 
 import {IERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
-import {EnumerableSet} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/structs/EnumerableSet.sol";
 
 /// @notice The onRamp is a contract that handles lane-specific fee logic and
 /// bridgeable token support.
@@ -27,7 +26,6 @@ import {EnumerableSet} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts
 /// results an onchain upgrade of all 3.
 contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, AggregateRateLimiter, ITypeAndVersion {
   using SafeERC20 for IERC20;
-  using EnumerableSet for EnumerableSet.AddressSet;
   using USDPriceWith18Decimals for uint224;
 
   error InvalidExtraArgsTag();
@@ -37,6 +35,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, AggregateRateLimiter, ITypeA
   error MaxFeeBalanceReached();
   error MessageTooLarge(uint256 maxSize, uint256 actualSize);
   error MessageGasLimitTooHigh();
+  error MessageFeeTooHigh(uint256 msgFeeJuels, uint256 maxFeeJuelsPerMsg);
   error UnsupportedNumberOfTokens();
   error UnsupportedToken(address token);
   error MustBeCalledByRouter();
@@ -55,7 +54,8 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, AggregateRateLimiter, ITypeA
   error InvalidDestBytesOverhead(address token, uint32 destBytesOverhead);
 
   event ConfigSet(StaticConfig staticConfig, DynamicConfig dynamicConfig);
-  event NopsPaid(address indexed feeAggregator, uint256 amount);
+  event FeePaid(address indexed feeToken, uint256 feeValueJuels);
+  event NopsPaid(address indexed feeAggregator, address indexed feeToken, uint256 amount);
   event FeeConfigSet(FeeTokenConfigArgs[] feeConfig);
   event TokenTransferFeeConfigSet(TokenTransferFeeConfigArgs[] transferFeeConfig);
   event TokenTransferFeeConfigDeleted(address[] tokens);
@@ -70,7 +70,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, AggregateRateLimiter, ITypeA
   struct StaticConfig {
     address linkToken; // ────────╮ Link token address
     uint64 chainSelector; // ─────╯ Source chainSelector
-    uint96 maxNopFeesJuels; // ───╮ Max nop fee balance onramp can have
+    uint96 maxFeeJuelsPerMsg; // ─╮ Maximum fee that can be charged for a message
     address rmnProxy; // ─────────╯ Address of RMN proxy
   }
 
@@ -168,8 +168,8 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, AggregateRateLimiter, ITypeA
 
   // STATIC CONFIG
   string public constant override typeAndVersion = "EVM2EVMMultiOnRamp 1.6.0-dev";
-  /// @dev Maximum nop fee that can accumulate in this onramp
-  uint96 internal immutable i_maxNopFeesJuels;
+  /// @dev Maximum fee that can be charged for a message
+  uint96 internal immutable i_maxFeeJuelsPerMsg;
   /// @dev The link token address - known to pay nops for their work
   address internal immutable i_linkToken;
   /// @dev The chain ID of the source chain that this contract is deployed to
@@ -194,11 +194,6 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, AggregateRateLimiter, ITypeA
   /// are executed in the same order they are sent.
   mapping(address sender => uint64 nonce) internal s_senderNonce;
 
-  /// @dev The list of enabled fee tokens
-  EnumerableSet.AddressSet internal s_feeTokens;
-  /// @dev The total LINK value available to pay NOPS
-  uint96 internal s_nopFeesJuels;
-
   constructor(
     StaticConfig memory staticConfig,
     DynamicConfig memory dynamicConfig,
@@ -214,7 +209,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, AggregateRateLimiter, ITypeA
 
     i_linkToken = staticConfig.linkToken;
     i_chainSelector = staticConfig.chainSelector;
-    i_maxNopFeesJuels = staticConfig.maxNopFeesJuels;
+    i_maxFeeJuelsPerMsg = staticConfig.maxFeeJuelsPerMsg;
     i_rmnProxy = staticConfig.rmnProxy;
 
     _setDynamicConfig(dynamicConfig);
@@ -350,17 +345,18 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, AggregateRateLimiter, ITypeA
       if (value > 0) _rateLimitValue(value);
     }
 
+    uint256 msgFeeJuels;
     // Convert feeToken to link if not already in link
     if (message.feeToken == i_linkToken) {
-      // Since there is only 1b link this is safe
-      s_nopFeesJuels += uint96(feeTokenAmount);
+      msgFeeJuels = feeTokenAmount;
+      emit FeePaid(message.feeToken, msgFeeJuels);
     } else {
-      // the cast from uint256 to uint96 is considered safe, uint96 can store more than max supply of link token
-      s_nopFeesJuels += uint96(
-        IPriceRegistry(s_dynamicConfig.priceRegistry).convertTokenAmount(message.feeToken, feeTokenAmount, i_linkToken)
-      );
+      msgFeeJuels =
+        IPriceRegistry(s_dynamicConfig.priceRegistry).convertTokenAmount(message.feeToken, feeTokenAmount, i_linkToken);
+      emit FeePaid(message.feeToken, msgFeeJuels);
     }
-    if (s_nopFeesJuels > i_maxNopFeesJuels) revert MaxFeeBalanceReached();
+
+    if (msgFeeJuels > i_maxFeeJuelsPerMsg) revert MessageFeeTooHigh(msgFeeJuels, i_maxFeeJuelsPerMsg);
 
     uint64 nonce = getSenderNonce(destChainSelector, originalSender) + 1;
     s_senderNonce[originalSender] = nonce;
@@ -428,7 +424,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, AggregateRateLimiter, ITypeA
     return StaticConfig({
       linkToken: i_linkToken,
       chainSelector: i_chainSelector,
-      maxNopFeesJuels: i_maxNopFeesJuels,
+      maxFeeJuelsPerMsg: i_maxFeeJuelsPerMsg,
       rmnProxy: i_rmnProxy
     });
   }
@@ -459,7 +455,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, AggregateRateLimiter, ITypeA
       StaticConfig({
         linkToken: i_linkToken,
         chainSelector: i_chainSelector,
-        maxNopFeesJuels: i_maxNopFeesJuels,
+        maxFeeJuelsPerMsg: i_maxFeeJuelsPerMsg,
         rmnProxy: i_rmnProxy
       }),
       dynamicConfig
@@ -729,10 +725,6 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, AggregateRateLimiter, ITypeA
     return s_feeTokenConfig[token];
   }
 
-  function getFeeTokens() external view returns (address[] memory) {
-    return s_feeTokens.values();
-  }
-
   /// @notice Sets the fee configuration for a token
   /// @param feeTokenConfigArgs Array of FeeTokenConfigArgs structs.
   function setFeeTokenConfig(FeeTokenConfigArgs[] memory feeTokenConfigArgs) external {
@@ -752,18 +744,6 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, AggregateRateLimiter, ITypeA
         premiumMultiplierWeiPerEth: configArg.premiumMultiplierWeiPerEth,
         enabled: configArg.enabled
       });
-
-      // If an existing fee token is disabled, remove it from the fee tokens list
-      if (!configArg.enabled && s_feeTokens.contains(configArg.token)) {
-        s_feeTokens.remove(configArg.token);
-        // If there is an outsanding balance for the fee token, pay the Node Ops
-        if (IERC20(configArg.token).balanceOf(address(this)) > 0) {
-          _payNops();
-        }
-        // If a new fee token is enabled, add it to the fee tokens list
-      } else if (configArg.enabled && !s_feeTokens.contains(configArg.token)) {
-        s_feeTokens.add(configArg.token);
-      }
     }
     emit FeeConfigSet(feeTokenConfigArgs);
   }
@@ -824,32 +804,21 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, AggregateRateLimiter, ITypeA
   // │                         NOP payments                         │
   // ================================================================
 
-  /// @notice Get the total amount of fees to be paid to the Nops (in LINK)
-  /// @return totalNopFees
-  function getNopFeesJuels() external view returns (uint96) {
-    return s_nopFeesJuels;
-  }
-
   /// @notice Pays the Node Ops their outstanding balances.
-  function payNops() external {
+  function payNops(address[] calldata feeTokens) external {
     _onlyOwnerOrAdmin();
-    _payNops();
-  }
-
-  /// @dev Internal function to pay the Node Ops their outstanding balances.
-  function _payNops() internal {
     address feeAggregator = s_dynamicConfig.feeAggregator;
-    uint256 feeTokensLength = s_feeTokens.length();
-    uint96 nopFeesJuels = s_nopFeesJuels;
 
-    s_nopFeesJuels = 0;
+    for (uint256 i = 0; i < feeTokens.length; ++i) {
+      IERC20 feeToken = IERC20(feeTokens[i]);
+      uint256 feeTokenBalance = feeToken.balanceOf(address(this));
 
-    for (uint256 i = 0; i < feeTokensLength; ++i) {
-      IERC20 feeToken = IERC20(s_feeTokens.at(i));
-      feeToken.safeTransfer(feeAggregator, feeToken.balanceOf(address(this)));
+      if (feeTokenBalance > 0) {
+        feeToken.safeTransfer(feeAggregator, feeTokenBalance);
+
+        emit NopsPaid(feeAggregator, address(feeToken), feeTokenBalance);
+      }
     }
-
-    emit NopsPaid(feeAggregator, nopFeesJuels);
   }
 
   // ================================================================

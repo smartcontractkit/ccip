@@ -101,7 +101,7 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
       EVM2EVMMultiOnRamp.StaticConfig({
         linkToken: s_sourceTokens[0],
         chainSelector: SOURCE_CHAIN_SELECTOR,
-        maxNopFeesJuels: MAX_NOP_FEES_JUELS,
+        maxFeeJuelsPerMsg: MAX_MSG_FEES_JUELS,
         rmnProxy: address(s_mockRMN)
       }),
       generateDynamicMultiOnRampConfig(address(s_sourceRouter), address(s_priceRegistry), address(s_tokenAdminRegistry)),
@@ -281,7 +281,7 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
   ) internal pure {
     assertEq(a.linkToken, b.linkToken);
     assertEq(a.chainSelector, b.chainSelector);
-    assertEq(a.maxNopFeesJuels, b.maxNopFeesJuels);
+    assertEq(a.maxFeeJuelsPerMsg, b.maxFeeJuelsPerMsg);
     assertEq(a.rmnProxy, b.rmnProxy);
   }
 
