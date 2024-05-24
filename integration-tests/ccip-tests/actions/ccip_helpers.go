@@ -24,12 +24,13 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	"github.com/smartcontractkit/chainlink-testing-framework/utils/ptr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
 	"golang.org/x/exp/rand"
 	"golang.org/x/sync/errgroup"
+
+	"github.com/smartcontractkit/chainlink-testing-framework/utils/ptr"
 
 	chainselectors "github.com/smartcontractkit/chain-selectors"
 
