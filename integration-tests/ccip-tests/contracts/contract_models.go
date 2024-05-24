@@ -64,6 +64,9 @@ const (
 	OnRampContract                        = "OnRamp"
 	TokenPoolContract                     = "TokenPool"
 	CommitStoreContract                   = "CommitStore"
+
+	defaultDestByteOverhead = uint32(32)
+	defaultDestGasOverhead  = uint32(29_000)
 )
 
 var (
@@ -1574,6 +1577,14 @@ func (onRamp *OnRamp) SetTokenTransferFeeConfig(tokenTransferFeeConfig []evm_2_e
 	opts, err := onRamp.client.TransactionOpts(onRamp.client.GetDefaultWallet())
 	if err != nil {
 		return fmt.Errorf("failed to get transaction opts: %w", err)
+	}
+	for i := range tokenTransferFeeConfig {
+		if tokenTransferFeeConfig[i].DestBytesOverhead == 0 {
+			tokenTransferFeeConfig[i].DestBytesOverhead = defaultDestByteOverhead
+		}
+		if tokenTransferFeeConfig[i].DestGasOverhead == 0 {
+			tokenTransferFeeConfig[i].DestGasOverhead = defaultDestGasOverhead
+		}
 	}
 	tx, err := onRamp.Instance.SetTokenTransferFeeConfig(opts, tokenTransferFeeConfig, []common.Address{})
 	if err != nil {
