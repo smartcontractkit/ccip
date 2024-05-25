@@ -1221,7 +1221,9 @@ contract EVM2EVMMultiOnRamp_setDynamicConfig is EVM2EVMMultiOnRampSetup {
   }
 }
 
-contract EVM2EVMNopsFeeSetup is EVM2EVMMultiOnRampSetup {
+contract EVM2EVMMultiOnRamp_payNops is EVM2EVMMultiOnRampSetup {
+  event NopsPaid(address indexed feeAggregator, address indexed feeToken, uint256 amount);
+
   mapping(address => uint256) internal s_nopFees;
 
   function setUp() public virtual override {
@@ -1248,10 +1250,28 @@ contract EVM2EVMNopsFeeSetup is EVM2EVMMultiOnRampSetup {
       assertEq(IERC20(s_sourceFeeTokens[i]).balanceOf(address(s_onRamp)), s_nopFees[s_sourceFeeTokens[i]]);
     }
   }
-}
 
-contract EVM2EVMMultiOnRamp_payNops is EVM2EVMNopsFeeSetup {
-  event NopsPaid(address indexed feeAggregator, address indexed feeToken, uint256 amount);
+  function test_Fuzz_PayNops_Success(uint256[5] memory amounts) public {
+    vm.startPrank(OWNER);
+    address[] memory feeTokens = new address[](amounts.length);
+    for (uint256 i = 0; i < amounts.length; ++i) {
+      vm.assume(amounts[i] > 0);
+      feeTokens[i] = _deploySourceToken("", amounts[i], 18);
+      IERC20(feeTokens[i]).transfer(address(s_onRamp), amounts[i]);
+    }
+
+    for (uint256 i = 0; i < feeTokens.length; ++i) {
+      vm.expectEmit();
+      emit NopsPaid(FEE_AGGREGATOR, feeTokens[i], amounts[i]);
+    }
+
+    s_onRamp.payNops(feeTokens);
+
+    for (uint256 i = 0; i < feeTokens.length; ++i) {
+      assertEq(IERC20(feeTokens[i]).balanceOf(FEE_AGGREGATOR), amounts[i]);
+      assertEq(IERC20(feeTokens[i]).balanceOf(address(s_onRamp)), 0);
+    }
+  }
 
   function test_OwnerPayNops_Success() public {
     vm.startPrank(OWNER);
