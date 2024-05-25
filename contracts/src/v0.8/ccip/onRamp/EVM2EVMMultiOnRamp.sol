@@ -350,12 +350,12 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, AggregateRateLimiter, ITypeA
     // Convert feeToken to link if not already in link
     if (message.feeToken == i_linkToken) {
       msgFeeJuels = feeTokenAmount;
-      emit FeePaid(message.feeToken, msgFeeJuels);
     } else {
       msgFeeJuels =
         IPriceRegistry(s_dynamicConfig.priceRegistry).convertTokenAmount(message.feeToken, feeTokenAmount, i_linkToken);
-      emit FeePaid(message.feeToken, msgFeeJuels);
     }
+
+    emit FeePaid(message.feeToken, msgFeeJuels);
 
     if (msgFeeJuels > i_maxFeeJuelsPerMsg) revert MessageFeeTooHigh(msgFeeJuels, i_maxFeeJuelsPerMsg);
 
