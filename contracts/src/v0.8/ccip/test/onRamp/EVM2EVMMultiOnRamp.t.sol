@@ -1305,6 +1305,13 @@ contract EVM2EVMMultiOnRamp_payNops is EVM2EVMMultiOnRampSetup {
     }
   }
 
+  function test_PayNops_ZeroInput() public {
+    vm.startPrank(OWNER);
+    vm.recordLogs();
+    s_onRamp.payNops(new address[](0));
+    assertEq(vm.getRecordedLogs().length, 0);
+  }
+
   // Reverts
 
   function test_WrongPermissions_Revert() public {
