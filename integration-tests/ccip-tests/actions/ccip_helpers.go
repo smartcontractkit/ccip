@@ -581,13 +581,13 @@ func (ccipModule *CCIPCommon) UpdateTokenPricesAtRegularInterval(ctx context.Con
 		return nil
 	}
 	var aggregators []*contracts.MockAggregator
+	// creating a separate client for each aggregator contract to avoid getting rate limited by the chain client
+	newC, err := blockchain.ConcurrentEVMClient(*ccipModule.ChainClient.GetNetworkConfig(), nil, ccipModule.ChainClient, lggr)
+	if err != nil {
+		return err
+	}
 	for _, aggregatorContract := range conf.PriceAggregators {
 		contract, err := ccipModule.Deployer.NewMockAggregator(common.HexToAddress(aggregatorContract))
-		if err != nil {
-			return err
-		}
-		// creating a separate client for each aggregator contract to avoid getting rate limited by the chain client
-		newC, err := blockchain.ConcurrentEVMClient(*ccipModule.ChainClient.GetNetworkConfig(), nil, ccipModule.ChainClient, lggr)
 		if err != nil {
 			return err
 		}
