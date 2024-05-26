@@ -212,6 +212,17 @@ func (c *CCIPE2ELoad) Call(_ *wasp.Generator) *wasp.Response {
 			Msgf("Skipping ...Another Request found within given timeframe %s", c.SkipRequestIfAnotherRequestTriggeredWithin.String())
 		return res
 	}
+	// if there is an connection error , we will skip sending the request
+	// this is to avoid sending the request when the connection is not restored yet
+	if sourceCCIP.Common.IsConnectionRestoredRecently != nil {
+		if !sourceCCIP.Common.IsConnectionRestoredRecently.Load() {
+			c.Lane.Logger.Info().Msg("RPC Connection Error.. skipping this request")
+			res.Failed = true
+			res.Error = fmt.Sprintf("RPC Connection error .. this request was skipped")
+			return res
+		}
+		c.Lane.Logger.Info().Msg("Connection is restored, Resuming load")
+	}
 	msg, stats, err := c.CCIPMsg()
 	if err != nil {
 		res.Error = err.Error()
@@ -232,16 +243,7 @@ func (c *CCIPE2ELoad) Call(_ *wasp.Generator) *wasp.Response {
 		res.Failed = true
 		return res
 	}
-	// if there is an connection error , we will skip sending the request
-	// this is to avoid sending the request when the connection is not restored yet
-	if sourceCCIP.Common.IsConnectionRestoredRecently != nil {
-		if !sourceCCIP.Common.IsConnectionRestoredRecently.Load() {
-			c.Lane.Logger.Info().Msg("RPC Connection Error.. skipping this request")
-			return res
-		} else {
-			c.Lane.Logger.Info().Msg("Connection is restored, Resuming load")
-		}
-	}
+
 	// initiate the transfer
 	// if the token address is 0x0 it will use Native as fee token and the fee amount should be mentioned in bind.TransactOpts's value
 	fee, err := sourceCCIP.Common.Router.GetFee(destChainSelector, msg)
@@ -250,7 +252,7 @@ func (c *CCIPE2ELoad) Call(_ *wasp.Generator) *wasp.Response {
 		res.Failed = true
 		return res
 	}
-	startTime := time.Now()
+	startTime := time.Now().UTC()
 	if feeToken != common.HexToAddress("0x0") {
 		sendTx, err = sourceCCIP.Common.Router.CCIPSend(destChainSelector, msg, nil)
 	} else {
@@ -276,7 +278,11 @@ func (c *CCIPE2ELoad) Call(_ *wasp.Generator) *wasp.Response {
 	}
 
 	txConfirmationTime := time.Now().UTC()
-	rcpt, err1 := bind.WaitMined(context.Background(), sourceCCIP.Common.ChainClient.DeployBackend(), sendTx)
+	// wait for the tx to be mined, timeout is set to 10 minutes
+	lggr.Info().Str("tx", sendTx.Hash().Hex()).Msg("waiting for tx to be mined")
+	ctx, cancel := context.WithTimeout(context.Background(), sourceCCIP.Common.ChainClient.GetNetworkConfig().Timeout.Duration)
+	defer cancel()
+	rcpt, err1 := bind.WaitMined(ctx, sourceCCIP.Common.ChainClient.DeployBackend(), sendTx)
 	if err1 == nil {
 		hdr, err1 := c.Lane.Source.Common.ChainClient.HeaderByNumber(context.Background(), rcpt.BlockNumber)
 		if err1 == nil {
@@ -289,7 +295,7 @@ func (c *CCIPE2ELoad) Call(_ *wasp.Generator) *wasp.Response {
 		gasUsed = rcpt.GasUsed
 	}
 	if rcpt.Status != types.ReceiptStatusSuccessful {
-		stats.UpdateState(lggr, 0, testreporters.TX, startTime.Sub(txConfirmationTime), testreporters.Failure,
+		stats.UpdateState(lggr, 0, testreporters.TX, txConfirmationTime.Sub(startTime), testreporters.Failure,
 			testreporters.TransactionStats{
 				Fee:                fee.String(),
 				GasUsed:            gasUsed,
@@ -306,7 +312,7 @@ func (c *CCIPE2ELoad) Call(_ *wasp.Generator) *wasp.Response {
 		res.Data = stats.StatusByPhase
 		return res
 	}
-	stats.UpdateState(lggr, 0, testreporters.TX, startTime.Sub(txConfirmationTime), testreporters.Success,
+	stats.UpdateState(lggr, 0, testreporters.TX, txConfirmationTime.Sub(startTime), testreporters.Success,
 		testreporters.TransactionStats{
 			Fee:                fee.String(),
 			GasUsed:            gasUsed,

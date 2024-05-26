@@ -181,9 +181,11 @@ type CCIPCommon struct {
 // this is called mainly by load test to keep the memory usage minimum for high number of lanes
 func (ccipModule *CCIPCommon) FreeUpUnusedSpace() {
 	ccipModule.PriceAggregators = nil
-	ccipModule.BridgeTokenPools = []*contracts.TokenPool{}
+	ccipModule.BridgeTokenPools = nil
 	ccipModule.TokenMessenger = nil
 	ccipModule.TokenTransmitter = nil
+	ccipModule.PriceRegistry = nil
+	ccipModule.ARM = nil
 	runtime.GC()
 }
 
@@ -498,10 +500,9 @@ func (ccipModule *CCIPCommon) WaitForPriceUpdates(
 }
 
 func (ccipModule *CCIPCommon) WatchForPriceUpdates(ctx context.Context, lggr zerolog.Logger) error {
-	var sub event.Subscription
 	gasUpdateEventLatest := make(chan *price_registry.PriceRegistryUsdPerUnitGasUpdated)
 	tokenUpdateEvent := make(chan *price_registry.PriceRegistryUsdPerTokenUpdated)
-	sub = event.Resubscribe(2*time.Hour, func(_ context.Context) (event.Subscription, error) {
+	sub := event.Resubscribe(2*time.Hour, func(_ context.Context) (event.Subscription, error) {
 		lggr.Info().Msg("Subscribing to UsdPerUnitGasUpdated event")
 		eventSub, err := ccipModule.PriceRegistry.WatchUsdPerUnitGasUpdated(nil, gasUpdateEventLatest, nil)
 		if err != nil {
@@ -581,17 +582,11 @@ func (ccipModule *CCIPCommon) UpdateTokenPricesAtRegularInterval(ctx context.Con
 		return nil
 	}
 	var aggregators []*contracts.MockAggregator
-	// creating a separate client for each aggregator contract to avoid getting rate limited by the chain client
-	newC, err := blockchain.ConcurrentEVMClient(*ccipModule.ChainClient.GetNetworkConfig(), nil, ccipModule.ChainClient, lggr)
-	if err != nil {
-		return err
-	}
 	for _, aggregatorContract := range conf.PriceAggregators {
 		contract, err := ccipModule.Deployer.NewMockAggregator(common.HexToAddress(aggregatorContract))
 		if err != nil {
 			return err
 		}
-		contract.SetClient(newC)
 		aggregators = append(aggregators, contract)
 	}
 	go func() {
@@ -608,12 +603,6 @@ func (ccipModule *CCIPCommon) UpdateTokenPricesAtRegularInterval(ctx context.Con
 					continue
 				}
 			case <-ctx.Done():
-				for _, aggregator := range aggregators {
-					err := aggregator.Close()
-					if err != nil {
-						lggr.Error().Err(err).Msg("error in closing aggregator client")
-					}
-				}
 				return
 			}
 		}

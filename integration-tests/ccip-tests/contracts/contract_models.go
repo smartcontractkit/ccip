@@ -2018,14 +2018,8 @@ type MockAggregator struct {
 	logger          zerolog.Logger
 	Instance        *mock_v3_aggregator_contract.MockV3Aggregator
 	ContractAddress common.Address
-}
-
-func (a *MockAggregator) SetClient(client blockchain.EVMClient) {
-	a.client = client
-}
-
-func (a *MockAggregator) Close() error {
-	return a.client.Close()
+	RoundId         *big.Int
+	Answer          *big.Int
 }
 
 func (a *MockAggregator) ChainID() uint64 {
@@ -2038,7 +2032,27 @@ func (a *MockAggregator) UpdateRoundData(answer *big.Int, minP, maxP *int) error
 	if answer == nil && (minP == nil || maxP == nil) {
 		return fmt.Errorf("minP and maxP are required to update round data with random percentage if answer is nil")
 	}
+	// if there is no answer provided and last saved answer is nil
+	// or last saved round id is nil , we fetch the last round data from chain
+	if (answer == nil && a.Answer == nil) || a.RoundId == nil {
+		roundData, err := a.Instance.LatestRoundData(nil)
+		if err != nil || roundData.RoundId == nil || roundData.Answer == nil {
+			return fmt.Errorf("unable to get latest round data: %w", err)
+		}
+		a.Answer = roundData.Answer
+		a.RoundId = roundData.RoundId
+	}
 
+	// if answer is nil, we calculate the answer with random percentage (within the provided range) of previous answer
+	if answer == nil {
+		rand.Seed(uint64(time.Now().UnixNano()))
+		randomNumber := rand.Intn(pointer.GetInt(maxP)-pointer.GetInt(minP)+1) + pointer.GetInt(minP)
+		// answer = previous round answer + (previous round answer * random percentage)
+		answer = new(big.Int).Add(a.Answer, new(big.Int).Div(new(big.Int).Mul(a.Answer, big.NewInt(int64(randomNumber))), big.NewInt(100)))
+		a.Answer = answer
+	}
+	round := new(big.Int).Add(a.RoundId, big.NewInt(1))
+	a.RoundId = round
 	opts, err := a.client.TransactionOpts(a.client.GetDefaultWallet())
 	if err != nil {
 		return fmt.Errorf("unable to get transaction opts: %w", err)
@@ -2047,20 +2061,6 @@ func (a *MockAggregator) UpdateRoundData(answer *big.Int, minP, maxP *int) error
 		Str("Contract Address", a.ContractAddress.Hex()).
 		Str("Network Name", a.client.GetNetworkConfig().Name).
 		Msg("Updating Round Data")
-	// we get the latest round data
-	// and increase the latest round by 1 and set the value for the next round
-	roundData, err := a.Instance.LatestRoundData(nil)
-	if err != nil || roundData.RoundId == nil || roundData.Answer == nil {
-		return fmt.Errorf("unable to get latest round data: %w", err)
-	}
-	// if answer is nil, we calculate the answer with random percentage within the provided range
-	if answer == nil {
-		rand.Seed(uint64(time.Now().UnixNano()))
-		randomNumber := rand.Intn(pointer.GetInt(maxP)-pointer.GetInt(minP)+1) + pointer.GetInt(minP)
-		// answer = previous round answer + (previous round answer * random percentage)
-		answer = new(big.Int).Add(roundData.Answer, new(big.Int).Div(new(big.Int).Mul(roundData.Answer, big.NewInt(int64(randomNumber))), big.NewInt(100)))
-	}
-	round := new(big.Int).Add(roundData.RoundId, big.NewInt(1))
 	tx, err := a.Instance.UpdateRoundData(opts, round, answer, big.NewInt(time.Now().UTC().UnixNano()), big.NewInt(time.Now().UTC().UnixNano()))
 	if err != nil {
 		return fmt.Errorf("unable to update round data: %w", err)
