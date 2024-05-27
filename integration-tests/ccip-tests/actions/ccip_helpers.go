@@ -184,8 +184,6 @@ func (ccipModule *CCIPCommon) FreeUpUnusedSpace() {
 	ccipModule.BridgeTokenPools = nil
 	ccipModule.TokenMessenger = nil
 	ccipModule.TokenTransmitter = nil
-	ccipModule.PriceRegistry = nil
-	ccipModule.ARM = nil
 	runtime.GC()
 }
 
