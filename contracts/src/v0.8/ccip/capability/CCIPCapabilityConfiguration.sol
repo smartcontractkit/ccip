@@ -250,6 +250,7 @@ contract CCIPCapabilityConfiguration is ICapabilityConfiguration, OwnerIsCreator
   // staging -> running (promotion)
   // everything else is invalid and should revert.
   function _validateConfigStateTransition(ConfigState currentState, ConfigState newState) internal pure {
+    // TODO: may be able to save gas if we put this in the if condition.
     bool initToRunning = currentState == ConfigState.Init && newState == ConfigState.Running;
     bool runningToStaging = currentState == ConfigState.Running && newState == ConfigState.Staging;
     bool stagingToRunning = currentState == ConfigState.Staging && newState == ConfigState.Running;

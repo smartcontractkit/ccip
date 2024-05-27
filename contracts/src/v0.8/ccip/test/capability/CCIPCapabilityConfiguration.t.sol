@@ -27,11 +27,18 @@ contract CCIPCapabilityConfigurationSetup is Test {
     }
     return arr;
   }
+
+  function test_getCapabilityConfiguration_Success() public {
+    bytes memory capConfig = s_ccipCC.getCapabilityConfiguration(42 /* doesn't matter, not used */ );
+    assertEq(capConfig.length, 0, "capability config length must be 0");
+  }
 }
 
 contract CCIPCapabilityConfiguration_chainConfig is CCIPCapabilityConfigurationSetup {
   event ChainConfigSet(uint64 chainSelector, CCIPCapabilityConfiguration.ChainConfig chainConfig);
   event ChainConfigRemoved(uint64 chainSelector);
+
+  // Successes.
 
   function test_applyChainConfigUpdates_addChainConfigs_Success() public {
     bytes32[] memory chainReaders = new bytes32[](1);
@@ -65,6 +72,9 @@ contract CCIPCapabilityConfiguration_chainConfig is CCIPCapabilityConfigurationS
     vm.expectEmit();
     emit ChainConfigSet(2, adds[1].chainConfig);
     s_ccipCC.applyChainConfigUpdates(new CCIPCapabilityConfiguration.ChainConfigUpdate[](0), adds);
+
+    CCIPCapabilityConfiguration.ChainConfig[] memory configs = s_ccipCC.getAllChainConfigs();
+    assertEq(configs.length, 2, "chain configs length must be 2");
   }
 
   function test_applyChainConfigUpdates_removeChainConfigs_Success() public {
@@ -111,6 +121,8 @@ contract CCIPCapabilityConfiguration_chainConfig is CCIPCapabilityConfigurationS
     emit ChainConfigRemoved(1);
     s_ccipCC.applyChainConfigUpdates(removes, new CCIPCapabilityConfiguration.ChainConfigUpdate[](0));
   }
+
+  // Reverts.
 
   function test_applyChainConfigUpdates_selectorNotFound_Reverts() public {
     CCIPCapabilityConfiguration.ChainConfigUpdate[] memory removes =
@@ -189,6 +201,8 @@ contract CCIPCapabilityConfiguration_validateConfig is CCIPCapabilityConfigurati
     return (signers, transmitters);
   }
 
+  // Successes.
+
   function test__validateConfig_Success() public {
     (bytes[][] memory signers, bytes[][] memory transmitters) = addChainConfig(4);
 
@@ -204,6 +218,8 @@ contract CCIPCapabilityConfiguration_validateConfig is CCIPCapabilityConfigurati
     });
     s_ccipCC.validateConfig(config);
   }
+
+  // Reverts.
 
   function test__validateConfig_ChainSelectorNotSet_Reverts() public {
     (bytes[][] memory signers, bytes[][] memory transmitters) = addChainConfig(4);
@@ -1005,5 +1021,166 @@ contract CCIPCapabilityConfiguration_ConfigStateMachine is CCIPCapabilityConfigu
       new CCIPCapabilityConfiguration.OCR3ConfigWithMeta[](1);
     vm.expectRevert(CCIPCapabilityConfiguration.NonExistentConfigTransition.selector);
     s_ccipCC.validateConfigTransition(currentConfig, newConfig);
+  }
+}
+
+contract CCIPCapabilityConfiguration__updatePluginConfig is CCIPCapabilityConfigurationSetup {
+  // Successes.
+
+  function test__updatePluginConfig_InitToRunning_Success() public {
+    uint32 donId = 1;
+    CCIPCapabilityConfiguration.OCR3Config memory blueConfig = CCIPCapabilityConfiguration.OCR3Config({
+      pluginType: CCIPCapabilityConfiguration.PluginType.Commit,
+      chainSelector: 1,
+      signers: makeAssociativeArray(4, 10),
+      transmitters: makeAssociativeArray(4, 20),
+      f: 1,
+      offchainConfigVersion: 30,
+      offchainConfig: bytes("commit")
+    });
+    CCIPCapabilityConfiguration.OCR3Config[] memory configs = new CCIPCapabilityConfiguration.OCR3Config[](1);
+    configs[0] = blueConfig;
+
+    s_ccipCC.updatePluginConfig(donId, CCIPCapabilityConfiguration.PluginType.Commit, configs);
+
+    // should see the updated config in the contract state.
+    CCIPCapabilityConfiguration.OCR3ConfigWithMeta[] memory storedConfig =
+      s_ccipCC.getPluginOCRConfig(donId, CCIPCapabilityConfiguration.PluginType.Commit);
+    assertEq(storedConfig.length, 1, "don config length must be 1");
+    assertEq(storedConfig[0].configCount, uint64(1), "config count must be 1");
+    assertEq(uint256(storedConfig[0].config.pluginType), uint256(blueConfig.pluginType), "plugin type must match");
+  }
+
+  function test__updatePluginConfig_RunningToStaging_Success() public {
+    // add blue config.
+    uint32 donId = 1;
+    CCIPCapabilityConfiguration.PluginType pluginType = CCIPCapabilityConfiguration.PluginType.Commit;
+    CCIPCapabilityConfiguration.OCR3Config memory blueConfig = CCIPCapabilityConfiguration.OCR3Config({
+      pluginType: CCIPCapabilityConfiguration.PluginType.Commit,
+      chainSelector: 1,
+      signers: makeAssociativeArray(4, 10),
+      transmitters: makeAssociativeArray(4, 20),
+      f: 1,
+      offchainConfigVersion: 30,
+      offchainConfig: bytes("commit")
+    });
+    CCIPCapabilityConfiguration.OCR3Config[] memory startConfigs = new CCIPCapabilityConfiguration.OCR3Config[](1);
+    startConfigs[0] = blueConfig;
+
+    // add blue AND green config to indicate an update.
+    s_ccipCC.updatePluginConfig(donId, CCIPCapabilityConfiguration.PluginType.Commit, startConfigs);
+    CCIPCapabilityConfiguration.OCR3Config memory greenConfig = CCIPCapabilityConfiguration.OCR3Config({
+      pluginType: CCIPCapabilityConfiguration.PluginType.Commit,
+      chainSelector: 1,
+      signers: makeAssociativeArray(4, 10),
+      transmitters: makeAssociativeArray(4, 20),
+      f: 1,
+      offchainConfigVersion: 30,
+      offchainConfig: bytes("commit-new")
+    });
+    CCIPCapabilityConfiguration.OCR3Config[] memory blueAndGreen = new CCIPCapabilityConfiguration.OCR3Config[](2);
+    blueAndGreen[0] = blueConfig;
+    blueAndGreen[1] = greenConfig;
+
+    s_ccipCC.updatePluginConfig(donId, CCIPCapabilityConfiguration.PluginType.Commit, blueAndGreen);
+
+    // should see the updated config in the contract state.
+    CCIPCapabilityConfiguration.OCR3ConfigWithMeta[] memory storedConfig =
+      s_ccipCC.getPluginOCRConfig(donId, CCIPCapabilityConfiguration.PluginType.Commit);
+    assertEq(storedConfig.length, 2, "don config length must be 2");
+    // 0 index is blue config, 1 index is green config.
+    assertEq(storedConfig[1].configCount, uint64(2), "config count must be 2");
+    assertEq(uint256(storedConfig[0].config.pluginType), uint256(CCIPCapabilityConfiguration.PluginType.Commit), "plugin type must match");
+    assertEq(uint256(storedConfig[1].config.pluginType), uint256(CCIPCapabilityConfiguration.PluginType.Commit), "plugin type must match");
+    assertEq(storedConfig[0].config.offchainConfig, bytes("commit"), "blue offchain config must match");
+    assertEq(storedConfig[1].config.offchainConfig, bytes("commit-new"), "green offchain config must match");
+  }
+
+  function test__updatePluginConfig_StagingToRunning_Success() public {
+    // add blue config.
+    uint32 donId = 1;
+    CCIPCapabilityConfiguration.PluginType pluginType = CCIPCapabilityConfiguration.PluginType.Commit;
+    CCIPCapabilityConfiguration.OCR3Config memory blueConfig = CCIPCapabilityConfiguration.OCR3Config({
+      pluginType: CCIPCapabilityConfiguration.PluginType.Commit,
+      chainSelector: 1,
+      signers: makeAssociativeArray(4, 10),
+      transmitters: makeAssociativeArray(4, 20),
+      f: 1,
+      offchainConfigVersion: 30,
+      offchainConfig: bytes("commit")
+    });
+    CCIPCapabilityConfiguration.OCR3Config[] memory startConfigs = new CCIPCapabilityConfiguration.OCR3Config[](1);
+    startConfigs[0] = blueConfig;
+
+    // add blue AND green config to indicate an update.
+    s_ccipCC.updatePluginConfig(donId, CCIPCapabilityConfiguration.PluginType.Commit, startConfigs);
+    CCIPCapabilityConfiguration.OCR3Config memory greenConfig = CCIPCapabilityConfiguration.OCR3Config({
+      pluginType: CCIPCapabilityConfiguration.PluginType.Commit,
+      chainSelector: 1,
+      signers: makeAssociativeArray(4, 10),
+      transmitters: makeAssociativeArray(4, 20),
+      f: 1,
+      offchainConfigVersion: 30,
+      offchainConfig: bytes("commit-new")
+    });
+    CCIPCapabilityConfiguration.OCR3Config[] memory blueAndGreen = new CCIPCapabilityConfiguration.OCR3Config[](2);
+    blueAndGreen[0] = blueConfig;
+    blueAndGreen[1] = greenConfig;
+
+    s_ccipCC.updatePluginConfig(donId, CCIPCapabilityConfiguration.PluginType.Commit, blueAndGreen);
+
+    // should see the updated config in the contract state.
+    CCIPCapabilityConfiguration.OCR3ConfigWithMeta[] memory storedConfig =
+      s_ccipCC.getPluginOCRConfig(donId, CCIPCapabilityConfiguration.PluginType.Commit);
+    assertEq(storedConfig.length, 2, "don config length must be 2");
+    // 0 index is blue config, 1 index is green config.
+    assertEq(storedConfig[1].configCount, uint64(2), "config count must be 2");
+    assertEq(uint256(storedConfig[0].config.pluginType), uint256(CCIPCapabilityConfiguration.PluginType.Commit), "plugin type must match");
+    assertEq(uint256(storedConfig[1].config.pluginType), uint256(CCIPCapabilityConfiguration.PluginType.Commit), "plugin type must match");
+    assertEq(storedConfig[0].config.offchainConfig, bytes("commit"), "blue offchain config must match");
+    assertEq(storedConfig[1].config.offchainConfig, bytes("commit-new"), "green offchain config must match");
+
+    // promote green to blue.
+    CCIPCapabilityConfiguration.OCR3Config[] memory promote = new CCIPCapabilityConfiguration.OCR3Config[](1);
+    promote[0] = greenConfig;
+
+    s_ccipCC.updatePluginConfig(donId, CCIPCapabilityConfiguration.PluginType.Commit, promote);
+
+    // should see the updated config in the contract state.
+    storedConfig = s_ccipCC.getPluginOCRConfig(donId, CCIPCapabilityConfiguration.PluginType.Commit);
+    assertEq(storedConfig.length, 1, "don config length must be 1");
+    assertEq(storedConfig[0].configCount, uint64(2), "config count must be 2");
+    assertEq(uint256(storedConfig[0].config.pluginType), uint256(CCIPCapabilityConfiguration.PluginType.Commit), "plugin type must match");
+    assertEq(storedConfig[0].config.offchainConfig, bytes("commit-new"), "green offchain config must match");
+  }
+
+  // Reverts.
+}
+
+contract CCIPCapabilityConfiguration_beforeCapabilityConfigSet is CCIPCapabilityConfigurationSetup {
+  // Successes.
+  function test_beforeCapabilityConfigSet_ZeroLengthConfig_Success() public {
+    changePrank(CAPABILITY_REGISTRY);
+
+    CCIPCapabilityConfiguration.OCR3Config[] memory configs = new CCIPCapabilityConfiguration.OCR3Config[](0);
+    bytes memory encodedConfigs = abi.encode(configs);
+    s_ccipCC.beforeCapabilityConfigSet(new bytes32[](0), encodedConfigs, 1, 1);
+  }
+
+  function test_beforeCapabilityConfigSet_CommitConfigOnly_Success() public {}
+
+  function test_beforeCapabilityConfigSet_ExecConfigOnly_Success() public {}
+
+  function test_beforeCapabilityConfigSet_CommitAndExecConfig_Success() public {}
+
+  // Reverts.
+
+  function test_beforeCapabilityConfigSet_OnlyCapabilityRegistryCanCall_Reverts() public {
+    bytes32[] memory nodes = new bytes32[](0);
+    bytes memory config = bytes("");
+    uint64 configCount = 1;
+    uint32 donId = 1;
+    vm.expectRevert(CCIPCapabilityConfiguration.OnlyCapabilityRegistryCanCall.selector);
+    s_ccipCC.beforeCapabilityConfigSet(nodes, config, configCount, donId);
   }
 }
