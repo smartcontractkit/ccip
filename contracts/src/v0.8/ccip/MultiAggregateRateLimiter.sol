@@ -26,7 +26,6 @@ contract MultiAggregateRateLimiter is IMessageValidator, OwnerIsCreator {
 
   event RateLimiterConfigUpdated(uint64 indexed remoteChainSelector, RateLimiterNoEvents.Config config);
   event RateLimiterTokensConsumed(uint64 indexed remoteChainSelector, uint256 tokens);
-  event AdminSet(address newAdmin);
   event PriceRegistrySet(address newPriceRegistry);
   event TokenAggregateRateLimitAdded(address sourceToken, address destToken);
   event TokenAggregateRateLimitRemoved(address sourceToken, address destToken);
@@ -57,8 +56,6 @@ contract MultiAggregateRateLimiter is IMessageValidator, OwnerIsCreator {
   /// @dev Set of callers that can call the validation functions (this is required since the validations modify state)
   mapping(address authorizedCaller => bool isAuthorized) internal s_authorizedCallers;
 
-  /// @notice The address of the token limit admin that has the same permissions as the owner.
-  address internal s_admin;
   /// @notice The address of the PriceRegistry used to query token values for ratelimiting
   address internal s_priceRegistry;
 
@@ -67,17 +64,14 @@ contract MultiAggregateRateLimiter is IMessageValidator, OwnerIsCreator {
 
   /// @param rateLimiterConfigs The RateLimiterNoEvents.Configs per chain containing the capacity and refill rate
   /// of the bucket
-  /// @param admin the admin address to set
   /// @param priceRegistry the price registry to set
   /// @param authorizedCallers the authorized callers to set
   constructor(
     RateLimiterConfigArgs[] memory rateLimiterConfigs,
-    address admin,
     address priceRegistry,
     address[] memory authorizedCallers
   ) {
     _applyRateLimiterConfigUpdates(rateLimiterConfigs);
-    _setAdmin(admin);
     _setPriceRegistry(priceRegistry);
     _applyAuthorizedCallerUpdates(
       AuthorizedCallerArgs({addedCallers: authorizedCallers, removedCallers: new address[](0)})
@@ -138,7 +132,7 @@ contract MultiAggregateRateLimiter is IMessageValidator, OwnerIsCreator {
   /// @notice Applies the provided rate limiter config updates.
   /// @param rateLimiterUpdates Rate limiter updates
   /// @dev should only be callable by the owner or token limit admin
-  function applyRateLimiterConfigUpdates(RateLimiterConfigArgs[] memory rateLimiterUpdates) external onlyAdminOrOwner {
+  function applyRateLimiterConfigUpdates(RateLimiterConfigArgs[] memory rateLimiterUpdates) external onlyOwner {
     _applyRateLimiterConfigUpdates(rateLimiterUpdates);
   }
 
@@ -192,10 +186,7 @@ contract MultiAggregateRateLimiter is IMessageValidator, OwnerIsCreator {
   /// @notice Adds or removes tokens from being used in Aggregate Rate Limiting.
   /// @param removes - A list of one or more tokens to be removed.
   /// @param adds - A list of one or more tokens to be added.
-  function updateRateLimitTokens(
-    RateLimitToken[] memory removes,
-    RateLimitToken[] memory adds
-  ) external onlyAdminOrOwner {
+  function updateRateLimitTokens(RateLimitToken[] memory removes, RateLimitToken[] memory adds) external onlyOwner {
     for (uint256 i = 0; i < removes.length; ++i) {
       if (s_rateLimitedTokensDestToSource.remove(removes[i].destToken)) {
         emit TokenAggregateRateLimitRemoved(removes[i].sourceToken, removes[i].destToken);
@@ -224,7 +215,7 @@ contract MultiAggregateRateLimiter is IMessageValidator, OwnerIsCreator {
   /// @notice Sets the Price Registry address
   /// @param newPriceRegistry the address of the new PriceRegistry
   /// @dev precondition The address must be a non-zero address
-  function setPriceRegistry(address newPriceRegistry) external onlyAdminOrOwner {
+  function setPriceRegistry(address newPriceRegistry) external onlyOwner {
     _setPriceRegistry(newPriceRegistry);
   }
 
@@ -252,7 +243,7 @@ contract MultiAggregateRateLimiter is IMessageValidator, OwnerIsCreator {
 
   /// @notice Updates the callers that are authorized to call the message validation functions
   /// @param authorizedCallerArgs Callers to add and remove
-  function applyAuthorizedCallerUpdates(AuthorizedCallerArgs memory authorizedCallerArgs) external onlyAdminOrOwner {
+  function applyAuthorizedCallerUpdates(AuthorizedCallerArgs memory authorizedCallerArgs) external onlyOwner {
     _applyAuthorizedCallerUpdates(authorizedCallerArgs);
   }
 
@@ -280,33 +271,5 @@ contract MultiAggregateRateLimiter is IMessageValidator, OwnerIsCreator {
         emit AuthorizedCallerRemoved(caller);
       }
     }
-  }
-
-  /// @notice Gets the token limit admin address.
-  /// @return the token limit admin address.
-  function getTokenLimitAdmin() external view returns (address) {
-    return s_admin;
-  }
-
-  /// @notice Sets the token limit admin address.
-  /// @param newAdmin the address of the new admin.
-  /// @dev setting this to address(0) indicates there is no active admin.
-  function setAdmin(address newAdmin) external onlyAdminOrOwner {
-    _setAdmin(newAdmin);
-  }
-
-  /// @notice Sets the token limit admin address.
-  /// @param newAdmin the address of the new admin.
-  /// @dev setting this to address(0) indicates there is no active admin.
-  function _setAdmin(address newAdmin) internal {
-    s_admin = newAdmin;
-    emit AdminSet(newAdmin);
-  }
-
-  /// @notice a modifier that allows the owner or the s_tokenLimitAdmin call the functions
-  /// it is applied to.
-  modifier onlyAdminOrOwner() {
-    if (msg.sender != owner() && msg.sender != s_admin) revert RateLimiterNoEvents.OnlyCallableByAdminOrOwner();
-    _;
   }
 }

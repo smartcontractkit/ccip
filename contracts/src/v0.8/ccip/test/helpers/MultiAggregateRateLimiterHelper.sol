@@ -8,10 +8,9 @@ import {Client} from "../../libraries/Client.sol";
 contract MultiAggregateRateLimiterHelper is MultiAggregateRateLimiter {
   constructor(
     MultiAggregateRateLimiter.RateLimiterConfigArgs[] memory rateLimiterConfigs,
-    address admin,
     address priceRegistry,
     address[] memory authorizedCallers
-  ) MultiAggregateRateLimiter(rateLimiterConfigs, admin, priceRegistry, authorizedCallers) {}
+  ) MultiAggregateRateLimiter(rateLimiterConfigs, priceRegistry, authorizedCallers) {}
 
   function rateLimitValue(uint64 chainSelector, uint256 value) public {
     _rateLimitValue(chainSelector, value);

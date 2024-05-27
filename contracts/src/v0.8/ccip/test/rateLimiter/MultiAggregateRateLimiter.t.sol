@@ -52,8 +52,7 @@ contract MultiAggregateRateLimiterSetup is BaseTest, PriceRegistrySetup {
     authorizedCallers[0] = MOCK_OFFRAMP;
     authorizedCallers[1] = MOCK_ONRAMP;
 
-    s_rateLimiter =
-      new MultiAggregateRateLimiterHelper(configUpdates, ADMIN, address(s_priceRegistry), authorizedCallers);
+    s_rateLimiter = new MultiAggregateRateLimiterHelper(configUpdates, address(s_priceRegistry), authorizedCallers);
   }
 
   function _assertConfigWithTokenBucketEquality(
@@ -85,14 +84,12 @@ contract MultiAggregateRateLimiter_constructor is MultiAggregateRateLimiterSetup
     address[] memory authorizedCallers = new address[](0);
 
     vm.recordLogs();
-    s_rateLimiter =
-      new MultiAggregateRateLimiterHelper(configUpdates, ADMIN, address(s_priceRegistry), authorizedCallers);
+    s_rateLimiter = new MultiAggregateRateLimiterHelper(configUpdates, address(s_priceRegistry), authorizedCallers);
 
-    // AdminSet + PriceRegistrySet
+    // PriceRegistrySet
     Vm.Log[] memory logEntries = vm.getRecordedLogs();
-    assertEq(logEntries.length, 2);
+    assertEq(logEntries.length, 1);
 
-    assertEq(ADMIN, s_rateLimiter.getTokenLimitAdmin());
     assertEq(OWNER, s_rateLimiter.owner());
     assertEq(address(s_priceRegistry), s_rateLimiter.getPriceRegistry());
   }
@@ -105,14 +102,12 @@ contract MultiAggregateRateLimiter_constructor is MultiAggregateRateLimiterSetup
     authorizedCallers[1] = MOCK_ONRAMP;
 
     vm.recordLogs();
-    s_rateLimiter =
-      new MultiAggregateRateLimiterHelper(configUpdates, ADMIN, address(s_priceRegistry), authorizedCallers);
+    s_rateLimiter = new MultiAggregateRateLimiterHelper(configUpdates, address(s_priceRegistry), authorizedCallers);
 
-    // AdminSet + PriceRegistrySet + 2 authorized caller sets
+    // PriceRegistrySet + 2 authorized caller sets
     Vm.Log[] memory logEntries = vm.getRecordedLogs();
-    assertEq(logEntries.length, 4);
+    assertEq(logEntries.length, 3);
 
-    assertEq(ADMIN, s_rateLimiter.getTokenLimitAdmin());
     assertEq(OWNER, s_rateLimiter.owner());
     assertEq(address(s_priceRegistry), s_rateLimiter.getPriceRegistry());
   }
@@ -148,10 +143,8 @@ contract MultiAggregateRateLimiter_constructor is MultiAggregateRateLimiterSetup
     vm.expectEmit();
     emit MultiAggregateRateLimiter.AuthorizedCallerAdded(MOCK_ONRAMP);
 
-    s_rateLimiter =
-      new MultiAggregateRateLimiterHelper(configUpdates, ADMIN, address(s_priceRegistry), authorizedCallers);
+    s_rateLimiter = new MultiAggregateRateLimiterHelper(configUpdates, address(s_priceRegistry), authorizedCallers);
 
-    assertEq(ADMIN, s_rateLimiter.getTokenLimitAdmin());
     assertEq(OWNER, s_rateLimiter.owner());
     assertEq(address(s_priceRegistry), s_rateLimiter.getPriceRegistry());
 
@@ -162,43 +155,6 @@ contract MultiAggregateRateLimiter_constructor is MultiAggregateRateLimiterSetup
     RateLimiterNoEvents.TokenBucket memory bucketSrcChain2 = s_rateLimiter.currentRateLimiterState(CHAIN_SELECTOR_2);
     _assertConfigWithTokenBucketEquality(RATE_LIMITER_CONFIG_2, bucketSrcChain2);
     assertEq(BLOCK_TIME, bucketSrcChain2.lastUpdated);
-  }
-}
-
-/// @notice #getTokenLimitAdmin
-contract MultiAggregateRateLimiter_getTokenLimitAdmin is MultiAggregateRateLimiterSetup {
-  function test_GetTokenLimitAdmin_Success() public view {
-    assertEq(ADMIN, s_rateLimiter.getTokenLimitAdmin());
-  }
-}
-
-/// @notice #setAdmin
-contract MultiAggregateRateLimiter_setAdmin is MultiAggregateRateLimiterSetup {
-  function test_Owner_Success() public {
-    vm.expectEmit();
-    emit MultiAggregateRateLimiter.AdminSet(STRANGER);
-
-    s_rateLimiter.setAdmin(STRANGER);
-    assertEq(STRANGER, s_rateLimiter.getTokenLimitAdmin());
-  }
-
-  function test_Admin_Success() public {
-    vm.startPrank(ADMIN);
-
-    vm.expectEmit();
-    emit MultiAggregateRateLimiter.AdminSet(STRANGER);
-
-    s_rateLimiter.setAdmin(STRANGER);
-    assertEq(STRANGER, s_rateLimiter.getTokenLimitAdmin());
-  }
-
-  // Reverts
-
-  function test_OnlyOwnerOrAdmin_Revert() public {
-    vm.startPrank(STRANGER);
-    vm.expectRevert(RateLimiterNoEvents.OnlyCallableByAdminOrOwner.selector);
-
-    s_rateLimiter.setAdmin(STRANGER);
   }
 }
 
@@ -214,23 +170,11 @@ contract MultiAggregateRateLimiter_setPriceRegistry is MultiAggregateRateLimiter
     assertEq(newAddress, s_rateLimiter.getPriceRegistry());
   }
 
-  function test_Admin_Success() public {
-    vm.startPrank(ADMIN);
-
-    address newAddress = address(42);
-
-    vm.expectEmit();
-    emit MultiAggregateRateLimiter.PriceRegistrySet(newAddress);
-
-    s_rateLimiter.setPriceRegistry(newAddress);
-    assertEq(newAddress, s_rateLimiter.getPriceRegistry());
-  }
-
   // Reverts
 
-  function test_OnlyOwnerOrAdmin_Revert() public {
+  function test_OnlyOwner_Revert() public {
     vm.startPrank(STRANGER);
-    vm.expectRevert(RateLimiterNoEvents.OnlyCallableByAdminOrOwner.selector);
+    vm.expectRevert(bytes("Only callable by owner"));
 
     s_rateLimiter.setPriceRegistry(STRANGER);
   }
@@ -350,26 +294,11 @@ contract MultiAggregateRateLimiter_setAuthorizedCallers is MultiAggregateRateLim
     assertEq(logEntries.length, 0);
   }
 
-  function test_ChangedByAdmin_Success() public {
-    vm.startPrank(ADMIN);
-
-    address[] memory addedCallers = new address[](0);
-
-    address[] memory removedCallers = new address[](1);
-    removedCallers[0] = MOCK_OFFRAMP;
-
-    s_rateLimiter.applyAuthorizedCallerUpdates(
-      MultiAggregateRateLimiter.AuthorizedCallerArgs({addedCallers: addedCallers, removedCallers: removedCallers})
-    );
-
-    assertFalse(s_rateLimiter.isAuthorizedCaller(removedCallers[0]));
-  }
-
   // Reverts
 
-  function test_OnlyOwnerOrAdmin_Revert() public {
+  function test_OnlyOwner_Revert() public {
     vm.startPrank(STRANGER);
-    vm.expectRevert(RateLimiterNoEvents.OnlyCallableByAdminOrOwner.selector);
+    vm.expectRevert(bytes("Only callable by owner"));
 
     address[] memory addedCallers = new address[](2);
     addedCallers[0] = address(42);
@@ -464,32 +393,6 @@ contract MultiAggregateRateLimiter_applyRateLimiterConfigUpdates is MultiAggrega
   }
 
   function test_SingleConfig_Success() public {
-    MultiAggregateRateLimiter.RateLimiterConfigArgs[] memory configUpdates =
-      new MultiAggregateRateLimiter.RateLimiterConfigArgs[](1);
-    configUpdates[0] = MultiAggregateRateLimiter.RateLimiterConfigArgs({
-      remoteChainSelector: CHAIN_SELECTOR_1 + 1,
-      rateLimiterConfig: RATE_LIMITER_CONFIG_1
-    });
-
-    vm.expectEmit();
-    emit MultiAggregateRateLimiter.RateLimiterConfigUpdated(
-      configUpdates[0].remoteChainSelector, configUpdates[0].rateLimiterConfig
-    );
-
-    vm.recordLogs();
-    s_rateLimiter.applyRateLimiterConfigUpdates(configUpdates);
-
-    Vm.Log[] memory logEntries = vm.getRecordedLogs();
-    assertEq(logEntries.length, 1);
-
-    RateLimiterNoEvents.TokenBucket memory bucket1 =
-      s_rateLimiter.currentRateLimiterState(configUpdates[0].remoteChainSelector);
-    _assertConfigWithTokenBucketEquality(configUpdates[0].rateLimiterConfig, bucket1);
-    assertEq(BLOCK_TIME, bucket1.lastUpdated);
-  }
-
-  function test_SingleConfigByAdmin_Success() public {
-    vm.startPrank(ADMIN);
     MultiAggregateRateLimiter.RateLimiterConfigArgs[] memory configUpdates =
       new MultiAggregateRateLimiter.RateLimiterConfigArgs[](1);
     configUpdates[0] = MultiAggregateRateLimiter.RateLimiterConfigArgs({
@@ -613,7 +516,7 @@ contract MultiAggregateRateLimiter_applyRateLimiterConfigUpdates is MultiAggrega
     s_rateLimiter.applyRateLimiterConfigUpdates(configUpdates);
   }
 
-  function test_OnlyCallableByAdminOrOwner_Revert() public {
+  function test_OnlyCallableByOwner_Revert() public {
     MultiAggregateRateLimiter.RateLimiterConfigArgs[] memory configUpdates =
       new MultiAggregateRateLimiter.RateLimiterConfigArgs[](1);
     configUpdates[0] = MultiAggregateRateLimiter.RateLimiterConfigArgs({
@@ -622,7 +525,7 @@ contract MultiAggregateRateLimiter_applyRateLimiterConfigUpdates is MultiAggrega
     });
     vm.startPrank(STRANGER);
 
-    vm.expectRevert(RateLimiterNoEvents.OnlyCallableByAdminOrOwner.selector);
+    vm.expectRevert(bytes("Only callable by owner"));
     s_rateLimiter.applyRateLimiterConfigUpdates(configUpdates);
   }
 }
@@ -811,28 +714,6 @@ contract MultiAggregateRateLimiter_updateRateLimitTokens is MultiAggregateRateLi
     assertEq(adds[1].destToken, destTokens[0]);
   }
 
-  function test_UpdateRateLimitTokensByAdmin_Success() public {
-    vm.startPrank(ADMIN);
-
-    MultiAggregateRateLimiter.RateLimitToken[] memory adds = new MultiAggregateRateLimiter.RateLimitToken[](2);
-    adds[0] = MultiAggregateRateLimiter.RateLimitToken({sourceToken: s_sourceTokens[0], destToken: s_destTokens[0]});
-    adds[1] = MultiAggregateRateLimiter.RateLimitToken({sourceToken: s_sourceTokens[1], destToken: s_destTokens[1]});
-
-    for (uint256 i = 0; i < adds.length; ++i) {
-      vm.expectEmit();
-      emit MultiAggregateRateLimiter.TokenAggregateRateLimitAdded(adds[i].sourceToken, adds[i].destToken);
-    }
-
-    s_rateLimiter.updateRateLimitTokens(new MultiAggregateRateLimiter.RateLimitToken[](0), adds);
-
-    (address[] memory sourceTokens, address[] memory destTokens) = s_rateLimiter.getAllRateLimitTokens();
-
-    for (uint256 i = 0; i < adds.length; ++i) {
-      assertEq(adds[i].sourceToken, sourceTokens[i]);
-      assertEq(adds[i].destToken, destTokens[i]);
-    }
-  }
-
   // Reverts
 
   function test_ZeroSourceToken_Revert() public {
@@ -856,7 +737,7 @@ contract MultiAggregateRateLimiter_updateRateLimitTokens is MultiAggregateRateLi
 
     vm.startPrank(STRANGER);
 
-    vm.expectRevert(RateLimiterNoEvents.OnlyCallableByAdminOrOwner.selector);
+    vm.expectRevert(bytes("Only callable by owner"));
     s_rateLimiter.updateRateLimitTokens(addsAndRemoves, addsAndRemoves);
   }
 }
