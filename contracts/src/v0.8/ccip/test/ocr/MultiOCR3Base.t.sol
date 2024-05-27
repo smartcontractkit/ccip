@@ -964,7 +964,7 @@ contract MultiOCR3Base_setOCR3Configs is MultiOCR3BaseSetup {
       transmitters: transmitters
     });
 
-    vm.expectRevert(abi.encodeWithSelector(MultiOCR3Base.InvalidConfig.selector, "faulty-oracle f too high"));
+    vm.expectRevert(abi.encodeWithSelector(MultiOCR3Base.InvalidConfig.selector, "faulty-oracle F too high"));
     s_multiOCR3.setOCR3Configs(ocrConfigs);
   }
 
@@ -980,7 +980,7 @@ contract MultiOCR3Base_setOCR3Configs is MultiOCR3BaseSetup {
       transmitters: s_validTransmitters
     });
 
-    vm.expectRevert(abi.encodeWithSelector(MultiOCR3Base.InvalidConfig.selector, "f must be positive"));
+    vm.expectRevert(abi.encodeWithSelector(MultiOCR3Base.InvalidConfig.selector, "F must be positive"));
     s_multiOCR3.setOCR3Configs(ocrConfigs);
   }
 

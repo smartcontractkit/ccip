@@ -165,7 +165,7 @@ abstract contract MultiOCR3Base is ITypeAndVersion, OwnerIsCreator {
       address[] memory signers = ocrConfigArgs.signers;
 
       if (signers.length != newTransmittersLength) revert InvalidConfig("oracle addresses out of registration");
-      if (signers.length <= 3 * ocrConfigArgs.F) revert InvalidConfig("faulty-oracle f too high");
+      if (signers.length <= 3 * ocrConfigArgs.F) revert InvalidConfig("faulty-oracle F too high");
 
       for (uint8 i = 0; i < newTransmittersLength; ++i) {
         // add new signer/transmitter addresses
