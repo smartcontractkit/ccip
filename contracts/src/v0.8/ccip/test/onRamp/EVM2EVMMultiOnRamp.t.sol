@@ -726,17 +726,22 @@ contract EVM2EVMMultiOnRamp_forwardFromRouter is EVM2EVMMultiOnRampSetup {
     // Set token config to allow larger data
     vm.startPrank(OWNER);
     EVM2EVMMultiOnRamp.TokenTransferFeeConfigArgs[] memory tokenTransferFeeConfigArgs =
-      new EVM2EVMMultiOnRamp.TokenTransferFeeConfigArgs[](1);
-    tokenTransferFeeConfigArgs[0] = EVM2EVMMultiOnRamp.TokenTransferFeeConfigArgs({
-      token: sourceETH,
+      generateTokenTransferFeeConfigArgs(1, 1);
+    tokenTransferFeeConfigArgs[0].destChainSelector = DEST_CHAIN_SELECTOR;
+    tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].token = sourceETH;
+    tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].tokenTransferFeeConfig = EVM2EVMMultiOnRamp
+      .TokenTransferFeeConfig({
       minFeeUSDCents: 1,
       maxFeeUSDCents: 0,
       deciBps: 0,
       destGasOverhead: 0,
       destBytesOverhead: uint32(Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES) + 32,
-      aggregateRateLimitEnabled: false
+      aggregateRateLimitEnabled: false,
+      isEnabled: true
     });
-    s_onRamp.setTokenTransferFeeConfig(tokenTransferFeeConfigArgs, new address[](0));
+    s_onRamp.applyTokenTransferFeeConfigUpdates(
+      tokenTransferFeeConfigArgs, new EVM2EVMMultiOnRamp.DestChainAndToken[](0)
+    );
 
     vm.startPrank(address(s_sourceRouter));
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 0, OWNER);
@@ -1047,14 +1052,15 @@ contract EVM2EVMMultiOnRamp_getFee is EVM2EVMMultiOnRamp_getFeeSetup {
       message.feeToken = testTokens[i];
       EVM2EVMMultiOnRamp.DestChainDynamicConfig memory destChainDynamicConfig =
         s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR).dynamicConfig;
-      uint32 destBytesOverhead = s_onRamp.getTokenTransferFeeConfig(message.tokenAmounts[0].token).destBytesOverhead;
+      uint32 destBytesOverhead =
+        s_onRamp.getTokenTransferFeeConfig(DEST_CHAIN_SELECTOR, message.tokenAmounts[0].token).destBytesOverhead;
       uint32 tokenBytesOverhead =
         destBytesOverhead == 0 ? uint32(Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES) : destBytesOverhead;
 
       uint256 feeAmount = s_onRamp.getFee(DEST_CHAIN_SELECTOR, message);
 
       uint256 gasUsed = GAS_LIMIT + DEST_GAS_OVERHEAD
-        + s_onRamp.getTokenTransferFeeConfig(message.tokenAmounts[0].token).destGasOverhead;
+        + s_onRamp.getTokenTransferFeeConfig(DEST_CHAIN_SELECTOR, message.tokenAmounts[0].token).destGasOverhead;
       uint256 gasFeeUSD = (gasUsed * destChainDynamicConfig.gasMultiplierWeiPerEth * USD_PER_GAS);
       (uint256 transferFeeUSD,,) =
         s_onRamp.getTokenTransferCost(DEST_CHAIN_SELECTOR, message.feeToken, feeTokenPrices[i], message.tokenAmounts);
