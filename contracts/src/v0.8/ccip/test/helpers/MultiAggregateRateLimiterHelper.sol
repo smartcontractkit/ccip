@@ -12,11 +12,15 @@ contract MultiAggregateRateLimiterHelper is MultiAggregateRateLimiter {
     address[] memory authorizedCallers
   ) MultiAggregateRateLimiter(rateLimiterConfigs, priceRegistry, authorizedCallers) {}
 
-  function rateLimitValue(uint64 chainSelector, uint256 value) public {
-    _rateLimitValue(chainSelector, value);
+  function rateLimitValue(uint64 chainSelector, bool isOutgoingLane, uint256 value) public {
+    _rateLimitValue(chainSelector, isOutgoingLane, value);
   }
 
   function getTokenValue(Client.EVMTokenAmount memory tokenAmount) public view returns (uint256) {
     return _getTokenValue(tokenAmount);
+  }
+
+  function getChainSelectorWithDirection(uint64 remoteChainSelector, bool isOutgoingLane) public view returns (uint72) {
+    return _getChainSelectorWithDirection(remoteChainSelector, isOutgoingLane);
   }
 }

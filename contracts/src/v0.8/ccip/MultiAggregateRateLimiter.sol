@@ -28,7 +28,7 @@ contract MultiAggregateRateLimiter is IMessageValidator, OwnerIsCreator {
   error ZeroAddressNotAllowed();
   error ZeroChainSelectorNotAllowed();
 
-  event RateLimiterConfigUpdated(uint64 indexed remoteChainSelector, RateLimiter.Config config);
+  event RateLimiterConfigUpdated(uint64 indexed remoteChainSelector, bool isOutgoingLane, RateLimiter.Config config);
   event PriceRegistrySet(address newPriceRegistry);
   event TokenAggregateRateLimitAdded(address remoteToken, address localToken);
   event TokenAggregateRateLimitRemoved(address remoteToken, address localToken);
@@ -51,7 +51,8 @@ contract MultiAggregateRateLimiter is IMessageValidator, OwnerIsCreator {
 
   /// @notice Update args for a single rate limiter config update
   struct RateLimiterConfigArgs {
-    uint64 remoteChainSelector; // Chain selector to set config for
+    uint64 remoteChainSelector; // ────╮ Chain selector to set config for
+    bool isOutgoingLane; // ───────────╯ If set to true, represents the outgoing message lane (OnRamp), and the incoming message lane otherwise (OffRamp)
     RateLimiter.Config rateLimiterConfig; // Rate limiter config to set
   }
 
@@ -64,8 +65,13 @@ contract MultiAggregateRateLimiter is IMessageValidator, OwnerIsCreator {
   /// @notice The address of the PriceRegistry used to query token values for ratelimiting
   address internal s_priceRegistry;
 
-  /// @notice Rate limiter token bucket states per chain
-  mapping(uint64 remoteChainSelector => RateLimiter.TokenBucket rateLimiter) s_rateLimitersByChainSelector;
+  /// @notice Rate limiter token bucket states per chain.
+  /// For the key - the first 7 bits are discarded, the 8th bit represents the direction, the last 64 bits represent the chain selector.
+  /// Directions of 0 are used for the OffRamp (incoming messages), while directions are 1 are used for the OnRamp (outgoing messages)
+  mapping(uint72 remoteChainSelectorWithDirection => RateLimiter.TokenBucket rateLimiter) s_rateLimitersByChainSelector;
+
+  /// @dev The direction in the remoteChainSelectorWithDirection key is in the 65th bit
+  uint72 internal DIRECTION_BIT_MASK = 1 << 64;
 
   /// @param rateLimiterConfigs The RateLimiter.Configs per chain containing the capacity and refill rate
   /// of the bucket
@@ -97,7 +103,7 @@ contract MultiAggregateRateLimiter is IMessageValidator, OwnerIsCreator {
       }
     }
 
-    if (value > 0) _rateLimitValue(message.sourceChainSelector, value);
+    if (value > 0) _rateLimitValue(message.sourceChainSelector, false, value);
   }
 
   /// @inheritdoc IMessageValidator
@@ -105,11 +111,35 @@ contract MultiAggregateRateLimiter is IMessageValidator, OwnerIsCreator {
     // TODO: to be implemented (assuming the same rate limiter states are shared for incoming and outgoing messages)
   }
 
+  /// @notice Returns the remoteChainWithDirection key value that can be used to get the correct lane selector.
+  /// @param remoteChainSelector Remote chain selector to fetch key for
+  /// @param isOutgoingLane if set to true, fetches the rate limit for the outgoing message lane (OnRamp). Otherwise fetches for the incoming message lane (OffRamp).
+  /// The outgoing and incoming message rate limit state is completely separated.
+  /// @return remoteChainSelectorWithDirection Remote chain selector with direction key
+  /// (2^64) | remoteChainSelector if isOutgoingLane is set to true, and the unmodified remoteChainSelector otherwise
+  function _getChainSelectorWithDirection(
+    uint64 remoteChainSelector,
+    bool isOutgoingLane
+  ) internal view returns (uint72) {
+    uint72 remoteChainWithDirection = remoteChainSelector;
+
+    // Flip the direction bit
+    if (isOutgoingLane) {
+      remoteChainWithDirection |= DIRECTION_BIT_MASK;
+    }
+
+    return remoteChainWithDirection;
+  }
+
   /// @notice Consumes value from the rate limiter bucket based on the token value given.
   /// @param remoteChainSelector chain selector to apply rate limit to
+  /// @param isOutgoingLane if set to true, fetches the rate limit for the outgoing message lane (OnRamp). Otherwise fetches for the incoming message lane (OffRamp).
+  /// The outgoing and incoming message rate limit state is completely separated.
   /// @param value consumed value
-  function _rateLimitValue(uint64 remoteChainSelector, uint256 value) internal {
-    s_rateLimitersByChainSelector[remoteChainSelector]._consume(value, address(0));
+  function _rateLimitValue(uint64 remoteChainSelector, bool isOutgoingLane, uint256 value) internal {
+    s_rateLimitersByChainSelector[_getChainSelectorWithDirection(remoteChainSelector, isOutgoingLane)]._consume(
+      value, address(0)
+    );
   }
 
   /// @notice Retrieves the token value for a token using the PriceRegistry
@@ -124,9 +154,15 @@ contract MultiAggregateRateLimiter is IMessageValidator, OwnerIsCreator {
 
   /// @notice Gets the token bucket with its values for the block it was requested at.
   /// @param remoteChainSelector chain selector to retrieve state for
+  /// @param isOutgoingLane if set to true, fetches the rate limit for the outgoing message lane (OnRamp). Otherwise fetches for the incoming message lane (OffRamp).
+  /// The outgoing and incoming message rate limit state is completely separated.
   /// @return The token bucket.
-  function currentRateLimiterState(uint64 remoteChainSelector) external view returns (RateLimiter.TokenBucket memory) {
-    return s_rateLimitersByChainSelector[remoteChainSelector]._currentTokenBucketState();
+  function currentRateLimiterState(
+    uint64 remoteChainSelector,
+    bool isOutgoingLane
+  ) external view returns (RateLimiter.TokenBucket memory) {
+    return s_rateLimitersByChainSelector[_getChainSelectorWithDirection(remoteChainSelector, isOutgoingLane)]
+      ._currentTokenBucketState();
   }
 
   /// @notice Applies the provided rate limiter config updates.
@@ -148,11 +184,14 @@ contract MultiAggregateRateLimiter is IMessageValidator, OwnerIsCreator {
         revert ZeroChainSelectorNotAllowed();
       }
 
-      RateLimiter.TokenBucket storage tokenBucket = s_rateLimitersByChainSelector[remoteChainSelector];
+      bool isOutgoingLane = updateArgs.isOutgoingLane;
+      uint72 remoteChainSelectorWithDirection = _getChainSelectorWithDirection(remoteChainSelector, isOutgoingLane);
+
+      RateLimiter.TokenBucket storage tokenBucket = s_rateLimitersByChainSelector[remoteChainSelectorWithDirection];
 
       if (tokenBucket.lastUpdated == 0) {
         // Token bucket needs to be newly added
-        s_rateLimitersByChainSelector[remoteChainSelector] = RateLimiter.TokenBucket({
+        s_rateLimitersByChainSelector[remoteChainSelectorWithDirection] = RateLimiter.TokenBucket({
           rate: configUpdate.rate,
           capacity: configUpdate.capacity,
           tokens: configUpdate.capacity,
@@ -162,7 +201,7 @@ contract MultiAggregateRateLimiter is IMessageValidator, OwnerIsCreator {
       } else {
         tokenBucket._setTokenBucketConfig(configUpdate);
       }
-      emit RateLimiterConfigUpdated(remoteChainSelector, configUpdate);
+      emit RateLimiterConfigUpdated(remoteChainSelector, isOutgoingLane, configUpdate);
     }
   }
 
