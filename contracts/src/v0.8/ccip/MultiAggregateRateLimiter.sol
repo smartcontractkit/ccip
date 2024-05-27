@@ -30,16 +30,18 @@ contract MultiAggregateRateLimiter is IMessageValidator, OwnerIsCreator {
 
   event RateLimiterConfigUpdated(uint64 indexed remoteChainSelector, RateLimiter.Config config);
   event PriceRegistrySet(address newPriceRegistry);
-  event TokenAggregateRateLimitAdded(address sourceToken, address destToken);
-  event TokenAggregateRateLimitRemoved(address sourceToken, address destToken);
+  event TokenAggregateRateLimitAdded(address remoteToken, address localToken);
+  event TokenAggregateRateLimitRemoved(address remoteToken, address localToken);
   event AuthorizedCallerAdded(address caller);
   event AuthorizedCallerRemoved(address caller);
 
   /// @notice RateLimitToken struct containing both the source and destination token addresses
   struct RateLimitToken {
-    address sourceToken;
-    address destToken;
+    // TODO: change to bytes32 for non-EVM support
+    address remoteToken;
+    address localToken;
   }
+  // TODO: include chain selector in update
 
   /// @notice Update args for changing the authorized callers
   struct AuthorizedCallerArgs {
@@ -53,8 +55,8 @@ contract MultiAggregateRateLimiter is IMessageValidator, OwnerIsCreator {
     RateLimiter.Config rateLimiterConfig; // Rate limiter config to set
   }
 
-  /// @dev Tokens that should be included in Aggregate Rate Limiting (from dest -> source)
-  EnumerableMapAddresses.AddressToAddressMap internal s_rateLimitedTokensDestToSource;
+  /// @dev Tokens that should be included in Aggregate Rate Limiting (from local chain (this chain) -> remote)
+  EnumerableMapAddresses.AddressToAddressMap internal s_rateLimitedTokensLocalToRemote;
 
   /// @dev Set of callers that can call the validation functions (this is required since the validations modify state)
   EnumerableSet.AddressSet internal s_authorizedCallers;
@@ -90,7 +92,7 @@ contract MultiAggregateRateLimiter is IMessageValidator, OwnerIsCreator {
     uint256 value;
     Client.EVMTokenAmount[] memory destTokenAmounts = message.destTokenAmounts;
     for (uint256 i = 0; i < destTokenAmounts.length; ++i) {
-      if (s_rateLimitedTokensDestToSource.contains(destTokenAmounts[i].token)) {
+      if (s_rateLimitedTokensLocalToRemote.contains(destTokenAmounts[i].token)) {
         value += _getTokenValue(destTokenAmounts[i]);
       }
     }
@@ -165,20 +167,21 @@ contract MultiAggregateRateLimiter is IMessageValidator, OwnerIsCreator {
   }
 
   /// @notice Get all tokens which are included in Aggregate Rate Limiting.
-  /// @return sourceTokens The source representation of the tokens that are rate limited.
-  /// @return destTokens The destination representation of the tokens that are rate limited.
+  /// @return remoteTokens The source representation of the tokens that are rate limited.
+  /// @return localTokens The destination representation of the tokens that are rate limited.
   /// @dev the order of IDs in the list is **not guaranteed**, therefore, if ordering matters when
   /// making successive calls, one should keep the blockheight constant to ensure a consistent result.
-  function getAllRateLimitTokens() external view returns (address[] memory sourceTokens, address[] memory destTokens) {
-    sourceTokens = new address[](s_rateLimitedTokensDestToSource.length());
-    destTokens = new address[](s_rateLimitedTokensDestToSource.length());
+  // TODO: include chain selector in request
+  function getAllRateLimitTokens() external view returns (address[] memory remoteTokens, address[] memory localTokens) {
+    remoteTokens = new address[](s_rateLimitedTokensLocalToRemote.length());
+    localTokens = new address[](s_rateLimitedTokensLocalToRemote.length());
 
-    for (uint256 i = 0; i < s_rateLimitedTokensDestToSource.length(); ++i) {
-      (address destToken, address sourceToken) = s_rateLimitedTokensDestToSource.at(i);
-      sourceTokens[i] = sourceToken;
-      destTokens[i] = destToken;
+    for (uint256 i = 0; i < s_rateLimitedTokensLocalToRemote.length(); ++i) {
+      (address localToken, address remoteToken) = s_rateLimitedTokensLocalToRemote.at(i);
+      remoteTokens[i] = remoteToken;
+      localTokens[i] = localToken;
     }
-    return (sourceTokens, destTokens);
+    return (remoteTokens, localTokens);
   }
 
   /// @notice Adds or removes tokens from being used in Aggregate Rate Limiting.
@@ -186,21 +189,21 @@ contract MultiAggregateRateLimiter is IMessageValidator, OwnerIsCreator {
   /// @param adds - A list of one or more tokens to be added.
   function updateRateLimitTokens(RateLimitToken[] memory removes, RateLimitToken[] memory adds) external onlyOwner {
     for (uint256 i = 0; i < removes.length; ++i) {
-      if (s_rateLimitedTokensDestToSource.remove(removes[i].destToken)) {
-        emit TokenAggregateRateLimitRemoved(removes[i].sourceToken, removes[i].destToken);
+      if (s_rateLimitedTokensLocalToRemote.remove(removes[i].localToken)) {
+        emit TokenAggregateRateLimitRemoved(removes[i].remoteToken, removes[i].localToken);
       }
     }
 
     for (uint256 i = 0; i < adds.length; ++i) {
-      address destToken = adds[i].destToken;
-      address sourceToken = adds[i].sourceToken;
+      address localToken = adds[i].localToken;
+      address remoteToken = adds[i].remoteToken;
 
-      if (destToken == address(0) || sourceToken == address(0)) {
+      if (localToken == address(0) || remoteToken == address(0)) {
         revert ZeroAddressNotAllowed();
       }
 
-      if (s_rateLimitedTokensDestToSource.set(destToken, sourceToken)) {
-        emit TokenAggregateRateLimitAdded(sourceToken, destToken);
+      if (s_rateLimitedTokensLocalToRemote.set(localToken, remoteToken)) {
+        emit TokenAggregateRateLimitAdded(remoteToken, localToken);
       }
     }
   }
