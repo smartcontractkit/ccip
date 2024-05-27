@@ -2032,9 +2032,14 @@ func (a *MockAggregator) UpdateRoundData(answer *big.Int, minP, maxP *int) error
 	if answer == nil && (minP == nil || maxP == nil) {
 		return fmt.Errorf("minP and maxP are required to update round data with random percentage if answer is nil")
 	}
+	// if round id is nil, set it to 1
+	if a.RoundId == nil {
+		a.RoundId = big.NewInt(1)
+	}
 	// if there is no answer provided and last saved answer is nil
-	// or last saved round id is nil , we fetch the last round data from chain
-	if (answer == nil && a.Answer == nil) || a.RoundId == nil {
+	// we fetch the last round data from chain
+	// and set the answer to the aggregator's latest answer and round id to the aggregator's latest round id
+	if answer == nil && a.Answer == nil {
 		roundData, err := a.Instance.LatestRoundData(nil)
 		if err != nil || roundData.RoundId == nil || roundData.Answer == nil {
 			return fmt.Errorf("unable to get latest round data: %w", err)
@@ -2043,16 +2048,18 @@ func (a *MockAggregator) UpdateRoundData(answer *big.Int, minP, maxP *int) error
 		a.RoundId = roundData.RoundId
 	}
 
-	// if answer is nil, we calculate the answer with random percentage (within the provided range) of previous answer
+	// if answer is nil, we calculate the answer with random percentage (within the provided range) of latest answer
 	if answer == nil {
 		rand.Seed(uint64(time.Now().UnixNano()))
 		randomNumber := rand.Intn(pointer.GetInt(maxP)-pointer.GetInt(minP)+1) + pointer.GetInt(minP)
 		// answer = previous round answer + (previous round answer * random percentage)
 		answer = new(big.Int).Add(a.Answer, new(big.Int).Div(new(big.Int).Mul(a.Answer, big.NewInt(int64(randomNumber))), big.NewInt(100)))
-		a.Answer = answer
 	}
+	// increment the round id
 	round := new(big.Int).Add(a.RoundId, big.NewInt(1))
+	// save the round data as the latest round data
 	a.RoundId = round
+	a.Answer = answer
 	opts, err := a.client.TransactionOpts(a.client.GetDefaultWallet())
 	if err != nil {
 		return fmt.Errorf("unable to get transaction opts: %w", err)
@@ -2071,9 +2078,14 @@ func (a *MockAggregator) UpdateRoundData(answer *big.Int, minP, maxP *int) error
 		Str("Round", round.String()).
 		Str("Answer", answer.String()).
 		Msg("Updated Round Data")
-	_, err = bind.WaitMined(context.Background(), a.client.DeployBackend(), tx)
+	ctx, cancel := context.WithTimeout(context.Background(), a.client.GetNetworkConfig().Timeout.Duration)
+	defer cancel()
+	rec, err := bind.WaitMined(ctx, a.client.DeployBackend(), tx)
 	if err != nil {
 		return fmt.Errorf("error waiting for tx %s to be mined", tx.Hash().Hex())
+	}
+	if rec.Status != types.ReceiptStatusSuccessful {
+		return fmt.Errorf("tx %s failed while updating round data", tx.Hash().Hex())
 	}
 
 	return a.client.MarkTxAsSentOnL2(tx)
