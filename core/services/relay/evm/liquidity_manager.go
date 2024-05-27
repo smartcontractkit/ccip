@@ -29,8 +29,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/models"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/ocr3impls"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocrcommon"
-	"github.com/smartcontractkit/chainlink/v2/core/services/relay"
-	"github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/types"
+	relaytypes "github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/types"
 )
 
 var (
@@ -76,7 +75,7 @@ func (r *rebalancerRelayer) NewRebalancerProvider(ctx context.Context, rargs com
 	}
 
 	var (
-		transmitters = make(map[relay.ID]ocr3types.ContractTransmitter[models.Report])
+		transmitters = make(map[commontypes.RelayID]ocr3types.ContractTransmitter[models.Report])
 	)
 	for _, chain := range r.chains.Slice() {
 		fromAddresses, err2 := r.ethKeystore.EnabledAddressesForChain(ctx, chain.ID())
@@ -86,7 +85,7 @@ func (r *rebalancerRelayer) NewRebalancerProvider(ctx context.Context, rargs com
 		if len(fromAddresses) != 1 {
 			return nil, fmt.Errorf("rebalancer services: expected only one enabled key for chain %s, got %d", chain.ID().String(), len(fromAddresses))
 		}
-		relayID := relay.NewID(relay.EVM, chain.ID().String())
+		relayID := commontypes.NewRelayID(commontypes.NetworkEVM, chain.ID().String())
 		tm, err2 := ocrcommon.NewTransmitter(
 			chain.TxManager(),
 			fromAddresses,
@@ -174,13 +173,13 @@ func newRebalancerConfigProvider(
 	rargs commontypes.RelayArgs,
 ) (
 	*configWatcher,
-	map[relay.ID]common.Address,
+	map[commontypes.RelayID]common.Address,
 	evmliquiditymanager.Factory,
 	discoverer.Factory,
 	bridge.Factory,
 	error,
 ) {
-	var relayConfig types.RelayConfig
+	var relayConfig relaytypes.RelayConfig
 	err := json.Unmarshal(rargs.RelayConfig, &relayConfig)
 	if err != nil {
 		return nil, nil, nil, nil, nil, fmt.Errorf("failed to unmarshal relay config (%s): %w", string(rargs.RelayConfig), err)
@@ -214,9 +213,9 @@ func newRebalancerConfigProvider(
 		return nil, nil, nil, nil, nil, fmt.Errorf("failed to get master chain %s: %w", relayConfig.ChainID, err)
 	}
 
-	logPollers := make(map[relay.ID]logpoller.LogPoller)
+	logPollers := make(map[commontypes.RelayID]logpoller.LogPoller)
 	for _, chain := range chains.Slice() {
-		logPollers[relay.NewID(relay.EVM, chain.ID().String())] = chain.LogPoller()
+		logPollers[commontypes.NewRelayID(commontypes.NetworkEVM, chain.ID().String())] = chain.LogPoller()
 	}
 
 	// sanity check that all chains specified in RelayConfig.fromBlocks are present
@@ -243,15 +242,15 @@ func newRebalancerConfigProvider(
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	rebalancerGraph, err := discoverer.Discover(ctx)
+	liquidityGraph, err := discoverer.Discover(ctx)
 	cancel()
 	if err != nil {
-		return nil, nil, nil, nil, nil, fmt.Errorf("failed to discover rebalancer graph: %w", err)
+		return nil, nil, nil, nil, nil, fmt.Errorf("failed to discover liquidity graph for chain-id %d address %s: %w", masterSelector.EvmChainID, contractAddress, err)
 	}
 
 	// at this point we can instantiate the bridges
 	var bridgeOpts []bridge.Opt
-	for _, networkID := range rebalancerGraph.GetNetworks() {
+	for _, networkID := range liquidityGraph.GetNetworks() {
 		chain, ok := chainsel.ChainBySelector(uint64(networkID))
 		if !ok {
 			return nil, nil, nil, nil, nil, fmt.Errorf("chain selector for network %d not found", networkID)
@@ -260,11 +259,11 @@ func newRebalancerConfigProvider(
 		if err2 != nil {
 			return nil, nil, nil, nil, nil, fmt.Errorf("failed to get legacy chain chain %d: %w", chain.EvmChainID, err2)
 		}
-		rebalancerAddress, err2 := rebalancerGraph.GetLiquidityManagerAddress(networkID)
+		lmAddress, err2 := liquidityGraph.GetLiquidityManagerAddress(networkID)
 		if err2 != nil {
 			return nil, nil, nil, nil, nil, fmt.Errorf("failed to get rebalancer address for network %d: %w", networkID, err2)
 		}
-		xchainRebalData, err2 := rebalancerGraph.GetXChainLiquidityManagerData(networkID)
+		xchainRebalData, err2 := liquidityGraph.GetXChainLiquidityManagerData(networkID)
 		if err2 != nil {
 			return nil, nil, nil, nil, nil, fmt.Errorf("failed to get xchain rebalancer data for network %d: %w", networkID, err2)
 		}
@@ -276,14 +275,14 @@ func newRebalancerConfigProvider(
 			networkID,
 			legacyChain.LogPoller(),
 			legacyChain.Client(),
-			rebalancerAddress,
+			lmAddress,
 			bridgeAdapters,
 		))
 	}
 	bridgeFactory := bridge.NewFactory(lggr, bridgeOpts...)
 
 	mcct, err := ocr3impls.NewMultichainConfigTracker(
-		relay.NewID(relay.EVM, relayConfig.ChainID.String()),
+		commontypes.NewRelayID(commontypes.NetworkEVM, relayConfig.ChainID.String()),
 		lggr.Named("MultichainConfigTracker"),
 		logPollers,
 		masterChain.Client(),
