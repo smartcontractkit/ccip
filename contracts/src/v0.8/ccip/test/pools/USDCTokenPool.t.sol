@@ -3,7 +3,7 @@ pragma solidity 0.8.24;
 
 import {IBurnMintERC20} from "../../../shared/token/ERC20/IBurnMintERC20.sol";
 import {IPool} from "../../interfaces/IPool.sol";
-import {ITokenMessenger} from "../../pools/usdc/ITokenMessenger.sol";
+import {ITokenMessenger} from "../../pools/USDC/ITokenMessenger.sol";
 
 import {BurnMintERC677} from "../../../shared/token/ERC677/BurnMintERC677.sol";
 import {Router} from "../../Router.sol";
