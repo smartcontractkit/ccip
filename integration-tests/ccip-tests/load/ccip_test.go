@@ -37,7 +37,7 @@ func setupReorgSuite(t *testing.T, loadArgs *LoadArgs) *ch.ReorgSuite {
 		DstGethHTTPURL:     loadArgs.TestSetupArgs.Env.K8Env.URLs["dest-chain_http"][0],
 		SrcFinalityDepth:   finalitySrc,
 		DstFinalityDepth:   finalityDst,
-		FinalityDelta:      loadArgs.TestSetupArgs.Cfg.TestGroupInput.ChaosReorgProfile.FinalityDelta,
+		FinalityDelta:      *loadArgs.TestSetupArgs.Cfg.TestGroupInput.ChaosReorgProfile.FinalityDelta,
 		ExperimentDuration: loadArgs.TestSetupArgs.Cfg.TestGroupInput.ChaosReorgProfile.Duration.Duration(),
 		GrafanaConfig: &ch.GrafanaConfig{
 			GrafanaURL:   *loadArgs.TestCfg.EnvInput.Logging.Grafana.BaseUrl,
@@ -159,7 +159,7 @@ func TestLoadCCIPStableRPSGasSpike(t *testing.T) {
 
 	chcfg := testArgs.TestCfg.TestGroupInput.ChaosGasProfile
 	gs := setupGasSuite(t, testArgs)
-	gs.ChangeBlockGasBaseFee(chcfg.TargetChain, chcfg.StartGasPrice, chcfg.GasRaisePercentage, chcfg.Duration.Duration(), chcfg.Spike)
+	gs.ChangeBlockGasBaseFee(*chcfg.TargetChain, *chcfg.StartGasPrice, *chcfg.GasRaisePercentage, chcfg.Duration.Duration(), *chcfg.Spike)
 
 	testArgs.TriggerLoadByLane()
 	testArgs.Wait()
@@ -181,7 +181,7 @@ func TestLoadCCIPStableRPSChangeBlockGasLimit(t *testing.T) {
 
 	chcfg := testArgs.TestCfg.TestGroupInput.ChaosGasLimitProfile
 	gs := setupGasSuite(t, testArgs)
-	gs.ChangeNextBlockGasLimit(1*time.Minute, 1*time.Minute, chcfg.TargetChain, chcfg.BlockGasLimitPercentage)
+	gs.ChangeNextBlockGasLimit(1*time.Minute, 1*time.Minute, *chcfg.TargetChain, *chcfg.BlockGasLimitPercentage)
 
 	testArgs.TriggerLoadByLane()
 	testArgs.Wait()

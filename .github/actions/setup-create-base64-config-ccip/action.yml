@@ -175,17 +175,6 @@ runs:
         [CCIP.Groups.smoke]
         TestRunName = '$EXISTING_NAMESPACE'
         
-        [CCIP.Groups.load.ChaosGasProfile]
-        TargetChain = "dst"
-        StartGasPrice = 2000000000
-        GasRaisePercentage = 0.7
-        Spike = true
-        Duration = '3m'
-        
-        [CCIP.Groups.load.ChaosGasLimitProfile]
-        TargetChain = "src"
-        BlockGasLimitPercentage = 0.1
-
         EOF
 
         BASE64_CCIP_SECRETS_CONFIG=$(cat config.toml | base64 -w 0)

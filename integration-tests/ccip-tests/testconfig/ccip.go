@@ -242,34 +242,34 @@ func (l *LoadProfile) SetTestRunName(name string) {
 }
 
 type ChaosGasLimitProfile struct {
-	TargetChain             string  `toml:",omitempty"`
-	BlockGasLimitPercentage float64 `toml:",omitempty"`
+	TargetChain             *string  `toml:",omitempty"`
+	BlockGasLimitPercentage *float64 `toml:",omitempty"`
 }
 
 func (gp *ChaosGasLimitProfile) Validate() error {
-	if gp.TargetChain != "src" && gp.TargetChain != "dst" {
+	if *gp.TargetChain != "src" && *gp.TargetChain != "dst" {
 		return fmt.Errorf("target chain for gas chaos should be 'src' or 'dst'")
 	}
 	return nil
 }
 
 type ChaosGasProfile struct {
-	TargetChain        string           `toml:",omitempty"`
-	StartGasPrice      int64            `toml:",omitempty"`
-	GasRaisePercentage float64          `toml:",omitempty"`
-	Spike              bool             `toml:",omitempty"`
+	TargetChain        *string          `toml:",omitempty"`
+	StartGasPrice      *int64           `toml:",omitempty"`
+	GasRaisePercentage *float64         `toml:",omitempty"`
+	Spike              *bool            `toml:",omitempty"`
 	Duration           *config.Duration `toml:",omitempty"`
 }
 
 func (gp *ChaosGasProfile) Validate() error {
-	if gp.TargetChain != "src" && gp.TargetChain != "dst" {
+	if *gp.TargetChain != "src" && *gp.TargetChain != "dst" {
 		return fmt.Errorf("target chain for gas chaos should be 'src' or 'dst'")
 	}
 	return nil
 }
 
 type ChaosReorgProfile struct {
-	FinalityDelta int              `toml:",omitempty"`
+	FinalityDelta *int             `toml:",omitempty"`
 	Duration      *config.Duration `toml:",omitempty"`
 }
 

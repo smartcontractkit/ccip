@@ -159,11 +159,11 @@ jobs:
           - name: ccip-gas-limit-block-capacity-halving-src
             os: ubuntu-latest
             run: ^TestLoadCCIPStableRPSChangeBlockGasLimit$
-            config_path: ./integration-tests/ccip-tests/testconfig/tomls/ccip-gas-block-halving-src.toml
+            config_path: ./integration-tests/ccip-tests/testconfig/tomls/ccip-gas-block-shrink-src.toml
           - name: ccip-gas-limit-block-capacity-halving-dst
             os: ubuntu-latest
             run: ^TestLoadCCIPStableRPSChangeBlockGasLimit$
-            config_path: ./integration-tests/ccip-tests/testconfig/tomls/ccip-gas-block-halving-dst.toml
+            config_path: ./integration-tests/ccip-tests/testconfig/tomls/ccip-gas-block-shrink-dst.toml
     runs-on: ${{ matrix.type.os }}
     name: CCIP ${{ matrix.type.name }}
     steps:
