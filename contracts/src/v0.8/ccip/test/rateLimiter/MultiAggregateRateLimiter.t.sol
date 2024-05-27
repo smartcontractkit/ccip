@@ -40,11 +40,11 @@ contract MultiAggregateRateLimiterSetup is BaseTest, PriceRegistrySetup {
     MultiAggregateRateLimiter.RateLimiterConfigArgs[] memory configUpdates =
       new MultiAggregateRateLimiter.RateLimiterConfigArgs[](2);
     configUpdates[0] = MultiAggregateRateLimiter.RateLimiterConfigArgs({
-      chainSelector: CHAIN_SELECTOR_1,
+      remoteChainSelector: CHAIN_SELECTOR_1,
       rateLimiterConfig: RATE_LIMITER_CONFIG_1
     });
     configUpdates[1] = MultiAggregateRateLimiter.RateLimiterConfigArgs({
-      chainSelector: CHAIN_SELECTOR_2,
+      remoteChainSelector: CHAIN_SELECTOR_2,
       rateLimiterConfig: RATE_LIMITER_CONFIG_2
     });
 
@@ -121,11 +121,11 @@ contract MultiAggregateRateLimiter_constructor is MultiAggregateRateLimiterSetup
     MultiAggregateRateLimiter.RateLimiterConfigArgs[] memory configUpdates =
       new MultiAggregateRateLimiter.RateLimiterConfigArgs[](2);
     configUpdates[0] = MultiAggregateRateLimiter.RateLimiterConfigArgs({
-      chainSelector: CHAIN_SELECTOR_1,
+      remoteChainSelector: CHAIN_SELECTOR_1,
       rateLimiterConfig: RATE_LIMITER_CONFIG_1
     });
     configUpdates[1] = MultiAggregateRateLimiter.RateLimiterConfigArgs({
-      chainSelector: CHAIN_SELECTOR_2,
+      remoteChainSelector: CHAIN_SELECTOR_2,
       rateLimiterConfig: RATE_LIMITER_CONFIG_2
     });
 
@@ -410,7 +410,7 @@ contract MultiAggregateRateLimiter_getTokenBucket is MultiAggregateRateLimiterSe
     MultiAggregateRateLimiter.RateLimiterConfigArgs[] memory configUpdates =
       new MultiAggregateRateLimiter.RateLimiterConfigArgs[](1);
     configUpdates[0] = MultiAggregateRateLimiter.RateLimiterConfigArgs({
-      chainSelector: CHAIN_SELECTOR_1,
+      remoteChainSelector: CHAIN_SELECTOR_1,
       rateLimiterConfig: RATE_LIMITER_CONFIG_1
     });
 
@@ -467,13 +467,13 @@ contract MultiAggregateRateLimiter_applyRateLimiterConfigUpdates is MultiAggrega
     MultiAggregateRateLimiter.RateLimiterConfigArgs[] memory configUpdates =
       new MultiAggregateRateLimiter.RateLimiterConfigArgs[](1);
     configUpdates[0] = MultiAggregateRateLimiter.RateLimiterConfigArgs({
-      chainSelector: CHAIN_SELECTOR_1 + 1,
+      remoteChainSelector: CHAIN_SELECTOR_1 + 1,
       rateLimiterConfig: RATE_LIMITER_CONFIG_1
     });
 
     vm.expectEmit();
     emit MultiAggregateRateLimiter.RateLimiterConfigUpdated(
-      configUpdates[0].chainSelector, configUpdates[0].rateLimiterConfig
+      configUpdates[0].remoteChainSelector, configUpdates[0].rateLimiterConfig
     );
 
     vm.recordLogs();
@@ -483,7 +483,7 @@ contract MultiAggregateRateLimiter_applyRateLimiterConfigUpdates is MultiAggrega
     assertEq(logEntries.length, 1);
 
     RateLimiterNoEvents.TokenBucket memory bucket1 =
-      s_rateLimiter.currentRateLimiterState(configUpdates[0].chainSelector);
+      s_rateLimiter.currentRateLimiterState(configUpdates[0].remoteChainSelector);
     _assertConfigWithTokenBucketEquality(configUpdates[0].rateLimiterConfig, bucket1);
     assertEq(BLOCK_TIME, bucket1.lastUpdated);
   }
@@ -493,13 +493,13 @@ contract MultiAggregateRateLimiter_applyRateLimiterConfigUpdates is MultiAggrega
     MultiAggregateRateLimiter.RateLimiterConfigArgs[] memory configUpdates =
       new MultiAggregateRateLimiter.RateLimiterConfigArgs[](1);
     configUpdates[0] = MultiAggregateRateLimiter.RateLimiterConfigArgs({
-      chainSelector: CHAIN_SELECTOR_1 + 1,
+      remoteChainSelector: CHAIN_SELECTOR_1 + 1,
       rateLimiterConfig: RATE_LIMITER_CONFIG_1
     });
 
     vm.expectEmit();
     emit MultiAggregateRateLimiter.RateLimiterConfigUpdated(
-      configUpdates[0].chainSelector, configUpdates[0].rateLimiterConfig
+      configUpdates[0].remoteChainSelector, configUpdates[0].rateLimiterConfig
     );
 
     vm.recordLogs();
@@ -509,7 +509,7 @@ contract MultiAggregateRateLimiter_applyRateLimiterConfigUpdates is MultiAggrega
     assertEq(logEntries.length, 1);
 
     RateLimiterNoEvents.TokenBucket memory bucket1 =
-      s_rateLimiter.currentRateLimiterState(configUpdates[0].chainSelector);
+      s_rateLimiter.currentRateLimiterState(configUpdates[0].remoteChainSelector);
     _assertConfigWithTokenBucketEquality(configUpdates[0].rateLimiterConfig, bucket1);
     assertEq(BLOCK_TIME, bucket1.lastUpdated);
   }
@@ -520,13 +520,13 @@ contract MultiAggregateRateLimiter_applyRateLimiterConfigUpdates is MultiAggrega
 
     for (uint64 i; i < configUpdates.length; ++i) {
       configUpdates[i] = MultiAggregateRateLimiter.RateLimiterConfigArgs({
-        chainSelector: CHAIN_SELECTOR_1 + i + 1,
+        remoteChainSelector: CHAIN_SELECTOR_1 + i + 1,
         rateLimiterConfig: RateLimiterNoEvents.Config({isEnabled: true, rate: 5 + i, capacity: 100 + i})
       });
 
       vm.expectEmit();
       emit MultiAggregateRateLimiter.RateLimiterConfigUpdated(
-        configUpdates[i].chainSelector, configUpdates[i].rateLimiterConfig
+        configUpdates[i].remoteChainSelector, configUpdates[i].rateLimiterConfig
       );
     }
 
@@ -538,7 +538,7 @@ contract MultiAggregateRateLimiter_applyRateLimiterConfigUpdates is MultiAggrega
 
     for (uint256 i; i < configUpdates.length; ++i) {
       RateLimiterNoEvents.TokenBucket memory bucket =
-        s_rateLimiter.currentRateLimiterState(configUpdates[i].chainSelector);
+        s_rateLimiter.currentRateLimiterState(configUpdates[i].remoteChainSelector);
       _assertConfigWithTokenBucketEquality(configUpdates[i].rateLimiterConfig, bucket);
       assertEq(BLOCK_TIME, bucket.lastUpdated);
     }
@@ -548,26 +548,26 @@ contract MultiAggregateRateLimiter_applyRateLimiterConfigUpdates is MultiAggrega
     MultiAggregateRateLimiter.RateLimiterConfigArgs[] memory configUpdates =
       new MultiAggregateRateLimiter.RateLimiterConfigArgs[](1);
     configUpdates[0] = MultiAggregateRateLimiter.RateLimiterConfigArgs({
-      chainSelector: CHAIN_SELECTOR_1,
+      remoteChainSelector: CHAIN_SELECTOR_1,
       rateLimiterConfig: RATE_LIMITER_CONFIG_2
     });
 
     RateLimiterNoEvents.TokenBucket memory bucket1 =
-      s_rateLimiter.currentRateLimiterState(configUpdates[0].chainSelector);
+      s_rateLimiter.currentRateLimiterState(configUpdates[0].remoteChainSelector);
 
     // Capacity equals tokens
     assertEq(bucket1.capacity, bucket1.tokens);
 
     vm.expectEmit();
     emit MultiAggregateRateLimiter.RateLimiterConfigUpdated(
-      configUpdates[0].chainSelector, configUpdates[0].rateLimiterConfig
+      configUpdates[0].remoteChainSelector, configUpdates[0].rateLimiterConfig
     );
 
     vm.recordLogs();
     s_rateLimiter.applyRateLimiterConfigUpdates(configUpdates);
 
     vm.warp(BLOCK_TIME + 1);
-    bucket1 = s_rateLimiter.currentRateLimiterState(configUpdates[0].chainSelector);
+    bucket1 = s_rateLimiter.currentRateLimiterState(configUpdates[0].remoteChainSelector);
     assertEq(BLOCK_TIME + 1, bucket1.lastUpdated);
 
     // Tokens < capacity since capacity doubled
@@ -578,16 +578,16 @@ contract MultiAggregateRateLimiter_applyRateLimiterConfigUpdates is MultiAggrega
     MultiAggregateRateLimiter.RateLimiterConfigArgs[] memory configUpdates =
       new MultiAggregateRateLimiter.RateLimiterConfigArgs[](1);
     configUpdates[0] = MultiAggregateRateLimiter.RateLimiterConfigArgs({
-      chainSelector: CHAIN_SELECTOR_1,
+      remoteChainSelector: CHAIN_SELECTOR_1,
       rateLimiterConfig: RATE_LIMITER_CONFIG_1
     });
 
     RateLimiterNoEvents.TokenBucket memory bucketPreUpdate =
-      s_rateLimiter.currentRateLimiterState(configUpdates[0].chainSelector);
+      s_rateLimiter.currentRateLimiterState(configUpdates[0].remoteChainSelector);
 
     vm.expectEmit();
     emit MultiAggregateRateLimiter.RateLimiterConfigUpdated(
-      configUpdates[0].chainSelector, configUpdates[0].rateLimiterConfig
+      configUpdates[0].remoteChainSelector, configUpdates[0].rateLimiterConfig
     );
 
     vm.recordLogs();
@@ -595,7 +595,7 @@ contract MultiAggregateRateLimiter_applyRateLimiterConfigUpdates is MultiAggrega
 
     vm.warp(BLOCK_TIME + 1);
     RateLimiterNoEvents.TokenBucket memory bucketPostUpdate =
-      s_rateLimiter.currentRateLimiterState(configUpdates[0].chainSelector);
+      s_rateLimiter.currentRateLimiterState(configUpdates[0].remoteChainSelector);
     _assertTokenBucketEquality(bucketPreUpdate, bucketPostUpdate);
     assertEq(BLOCK_TIME + 1, bucketPostUpdate.lastUpdated);
   }
@@ -604,8 +604,10 @@ contract MultiAggregateRateLimiter_applyRateLimiterConfigUpdates is MultiAggrega
   function test_ZeroChainSelector_Revert() public {
     MultiAggregateRateLimiter.RateLimiterConfigArgs[] memory configUpdates =
       new MultiAggregateRateLimiter.RateLimiterConfigArgs[](1);
-    configUpdates[0] =
-      MultiAggregateRateLimiter.RateLimiterConfigArgs({chainSelector: 0, rateLimiterConfig: RATE_LIMITER_CONFIG_1});
+    configUpdates[0] = MultiAggregateRateLimiter.RateLimiterConfigArgs({
+      remoteChainSelector: 0,
+      rateLimiterConfig: RATE_LIMITER_CONFIG_1
+    });
 
     vm.expectRevert(MultiAggregateRateLimiter.ZeroChainSelectorNotAllowed.selector);
     s_rateLimiter.applyRateLimiterConfigUpdates(configUpdates);
@@ -615,7 +617,7 @@ contract MultiAggregateRateLimiter_applyRateLimiterConfigUpdates is MultiAggrega
     MultiAggregateRateLimiter.RateLimiterConfigArgs[] memory configUpdates =
       new MultiAggregateRateLimiter.RateLimiterConfigArgs[](1);
     configUpdates[0] = MultiAggregateRateLimiter.RateLimiterConfigArgs({
-      chainSelector: CHAIN_SELECTOR_1 + 1,
+      remoteChainSelector: CHAIN_SELECTOR_1 + 1,
       rateLimiterConfig: RATE_LIMITER_CONFIG_1
     });
     vm.startPrank(STRANGER);
@@ -926,7 +928,7 @@ contract MultiAggregateRateLimiter_validateIncomingMessage is MultiAggregateRate
     MultiAggregateRateLimiter.RateLimiterConfigArgs[] memory configUpdates =
       new MultiAggregateRateLimiter.RateLimiterConfigArgs[](1);
     configUpdates[0] = MultiAggregateRateLimiter.RateLimiterConfigArgs({
-      chainSelector: CHAIN_SELECTOR_1,
+      remoteChainSelector: CHAIN_SELECTOR_1,
       rateLimiterConfig: RATE_LIMITER_CONFIG_1
     });
     configUpdates[0].rateLimiterConfig.isEnabled = false;
