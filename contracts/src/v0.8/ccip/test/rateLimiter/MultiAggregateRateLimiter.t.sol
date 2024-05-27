@@ -28,6 +28,8 @@ contract MultiAggregateRateLimiterSetup is BaseTest, PriceRegistrySetup {
   address internal immutable MOCK_OFFRAMP = address(1111);
   address internal immutable MOCK_ONRAMP = address(1112);
 
+  address[] internal s_authorizedCallers;
+
   function setUp() public virtual override(BaseTest, PriceRegistrySetup) {
     BaseTest.setUp();
     PriceRegistrySetup.setUp();
@@ -46,11 +48,11 @@ contract MultiAggregateRateLimiterSetup is BaseTest, PriceRegistrySetup {
       rateLimiterConfig: RATE_LIMITER_CONFIG_2
     });
 
-    address[] memory authorizedCallers = new address[](2);
-    authorizedCallers[0] = MOCK_OFFRAMP;
-    authorizedCallers[1] = MOCK_ONRAMP;
+    s_authorizedCallers = new address[](2);
+    s_authorizedCallers[0] = MOCK_OFFRAMP;
+    s_authorizedCallers[1] = MOCK_ONRAMP;
 
-    s_rateLimiter = new MultiAggregateRateLimiterHelper(configUpdates, address(s_priceRegistry), authorizedCallers);
+    s_rateLimiter = new MultiAggregateRateLimiterHelper(configUpdates, address(s_priceRegistry), s_authorizedCallers);
   }
 
   function _assertConfigWithTokenBucketEquality(
@@ -74,7 +76,6 @@ contract MultiAggregateRateLimiterSetup is BaseTest, PriceRegistrySetup {
   }
 }
 
-/// @notice #constructor
 contract MultiAggregateRateLimiter_constructor is MultiAggregateRateLimiterSetup {
   function test_ConstructorNoAuthorizedCallers_Success() public {
     MultiAggregateRateLimiter.RateLimiterConfigArgs[] memory configUpdates =
@@ -156,7 +157,6 @@ contract MultiAggregateRateLimiter_constructor is MultiAggregateRateLimiterSetup
   }
 }
 
-/// @notice #setPriceRegistry
 contract MultiAggregateRateLimiter_setPriceRegistry is MultiAggregateRateLimiterSetup {
   function test_Owner_Success() public {
     address newAddress = address(42);
@@ -183,7 +183,6 @@ contract MultiAggregateRateLimiter_setPriceRegistry is MultiAggregateRateLimiter
   }
 }
 
-/// @notice #setPriceRegistry
 contract MultiAggregateRateLimiter_setAuthorizedCallers is MultiAggregateRateLimiterSetup {
   function test_OnlyAdd_Success() public {
     address[] memory addedCallers = new address[](2);
@@ -192,8 +191,7 @@ contract MultiAggregateRateLimiter_setAuthorizedCallers is MultiAggregateRateLim
 
     address[] memory removedCallers = new address[](0);
 
-    assertFalse(s_rateLimiter.isAuthorizedCaller(addedCallers[0]));
-    assertFalse(s_rateLimiter.isAuthorizedCaller(addedCallers[1]));
+    assertEq(s_rateLimiter.getAllAuthorizedCallers(), s_authorizedCallers);
 
     vm.expectEmit();
     emit MultiAggregateRateLimiter.AuthorizedCallerAdded(addedCallers[0]);
@@ -204,17 +202,22 @@ contract MultiAggregateRateLimiter_setAuthorizedCallers is MultiAggregateRateLim
       MultiAggregateRateLimiter.AuthorizedCallerArgs({addedCallers: addedCallers, removedCallers: removedCallers})
     );
 
-    assertTrue(s_rateLimiter.isAuthorizedCaller(addedCallers[0]));
-    assertTrue(s_rateLimiter.isAuthorizedCaller(addedCallers[1]));
+    address[] memory expectedCallers = new address[](4);
+    expectedCallers[0] = s_authorizedCallers[0];
+    expectedCallers[1] = s_authorizedCallers[1];
+    expectedCallers[2] = addedCallers[0];
+    expectedCallers[3] = addedCallers[1];
+
+    assertEq(s_rateLimiter.getAllAuthorizedCallers(), expectedCallers);
   }
 
   function test_OnlyRemove_Success() public {
     address[] memory addedCallers = new address[](0);
 
     address[] memory removedCallers = new address[](1);
-    removedCallers[0] = MOCK_OFFRAMP;
+    removedCallers[0] = s_authorizedCallers[0];
 
-    assertTrue(s_rateLimiter.isAuthorizedCaller(removedCallers[0]));
+    assertEq(s_rateLimiter.getAllAuthorizedCallers(), s_authorizedCallers);
 
     vm.expectEmit();
     emit MultiAggregateRateLimiter.AuthorizedCallerRemoved(removedCallers[0]);
@@ -223,7 +226,10 @@ contract MultiAggregateRateLimiter_setAuthorizedCallers is MultiAggregateRateLim
       MultiAggregateRateLimiter.AuthorizedCallerArgs({addedCallers: addedCallers, removedCallers: removedCallers})
     );
 
-    assertFalse(s_rateLimiter.isAuthorizedCaller(removedCallers[0]));
+    address[] memory expectedCallers = new address[](1);
+    expectedCallers[0] = s_authorizedCallers[1];
+
+    assertEq(s_rateLimiter.getAllAuthorizedCallers(), expectedCallers);
   }
 
   function test_AddAndRemove_Success() public {
@@ -232,11 +238,9 @@ contract MultiAggregateRateLimiter_setAuthorizedCallers is MultiAggregateRateLim
     addedCallers[1] = address(43);
 
     address[] memory removedCallers = new address[](1);
-    removedCallers[0] = MOCK_OFFRAMP;
+    removedCallers[0] = s_authorizedCallers[0];
 
-    assertFalse(s_rateLimiter.isAuthorizedCaller(addedCallers[0]));
-    assertFalse(s_rateLimiter.isAuthorizedCaller(addedCallers[1]));
-    assertTrue(s_rateLimiter.isAuthorizedCaller(removedCallers[0]));
+    assertEq(s_rateLimiter.getAllAuthorizedCallers(), s_authorizedCallers);
 
     vm.expectEmit();
     emit MultiAggregateRateLimiter.AuthorizedCallerAdded(addedCallers[0]);
@@ -249,9 +253,13 @@ contract MultiAggregateRateLimiter_setAuthorizedCallers is MultiAggregateRateLim
       MultiAggregateRateLimiter.AuthorizedCallerArgs({addedCallers: addedCallers, removedCallers: removedCallers})
     );
 
-    assertTrue(s_rateLimiter.isAuthorizedCaller(addedCallers[0]));
-    assertTrue(s_rateLimiter.isAuthorizedCaller(addedCallers[1]));
-    assertFalse(s_rateLimiter.isAuthorizedCaller(removedCallers[0]));
+    // Order of the set changes on removal
+    address[] memory expectedCallers = new address[](3);
+    expectedCallers[0] = addedCallers[1];
+    expectedCallers[1] = s_authorizedCallers[1];
+    expectedCallers[2] = addedCallers[0];
+
+    assertEq(s_rateLimiter.getAllAuthorizedCallers(), expectedCallers);
   }
 
   function test_AddThenRemove_Success() public {
@@ -261,7 +269,7 @@ contract MultiAggregateRateLimiter_setAuthorizedCallers is MultiAggregateRateLim
     address[] memory removedCallers = new address[](1);
     removedCallers[0] = address(42);
 
-    assertFalse(s_rateLimiter.isAuthorizedCaller(addedCallers[0]));
+    assertEq(s_rateLimiter.getAllAuthorizedCallers(), s_authorizedCallers);
 
     vm.expectEmit();
     emit MultiAggregateRateLimiter.AuthorizedCallerAdded(addedCallers[0]);
@@ -272,7 +280,7 @@ contract MultiAggregateRateLimiter_setAuthorizedCallers is MultiAggregateRateLim
       MultiAggregateRateLimiter.AuthorizedCallerArgs({addedCallers: addedCallers, removedCallers: removedCallers})
     );
 
-    assertFalse(s_rateLimiter.isAuthorizedCaller(addedCallers[0]));
+    assertEq(s_rateLimiter.getAllAuthorizedCallers(), s_authorizedCallers);
   }
 
   function test_SkipRemove_Success() public {
@@ -286,7 +294,7 @@ contract MultiAggregateRateLimiter_setAuthorizedCallers is MultiAggregateRateLim
       MultiAggregateRateLimiter.AuthorizedCallerArgs({addedCallers: addedCallers, removedCallers: removedCallers})
     );
 
-    assertFalse(s_rateLimiter.isAuthorizedCaller(removedCallers[0]));
+    assertEq(s_rateLimiter.getAllAuthorizedCallers(), s_authorizedCallers);
 
     Vm.Log[] memory logEntries = vm.getRecordedLogs();
     assertEq(logEntries.length, 0);
@@ -321,7 +329,6 @@ contract MultiAggregateRateLimiter_setAuthorizedCallers is MultiAggregateRateLim
   }
 }
 
-/// @notice #getTokenBucket
 contract MultiAggregateRateLimiter_getTokenBucket is MultiAggregateRateLimiterSetup {
   function test_GetTokenBucket_Success() public view {
     RateLimiter.TokenBucket memory bucket = s_rateLimiter.currentRateLimiterState(CHAIN_SELECTOR_1);
@@ -377,7 +384,6 @@ contract MultiAggregateRateLimiter_getTokenBucket is MultiAggregateRateLimiterSe
   }
 }
 
-/// @notice #applyRateLimiterConfigUpdates
 contract MultiAggregateRateLimiter_applyRateLimiterConfigUpdates is MultiAggregateRateLimiterSetup {
   function test_ZeroConfigs_Success() public {
     MultiAggregateRateLimiter.RateLimiterConfigArgs[] memory configUpdates =
@@ -526,7 +532,6 @@ contract MultiAggregateRateLimiter_applyRateLimiterConfigUpdates is MultiAggrega
   }
 }
 
-// /// @notice #_rateLimitValue
 contract MultiAggregateRateLimiter__rateLimitValue is MultiAggregateRateLimiterSetup {
   function test_RateLimitValue_Success_gas() public {
     vm.pauseGasMetering();
@@ -624,7 +629,6 @@ contract MultiAggregateRateLimiter__rateLimitValue is MultiAggregateRateLimiterS
   }
 }
 
-/// @notice #_getTokenValue
 contract MultiAggregateRateLimiter__getTokenValue is MultiAggregateRateLimiterSetup {
   function test_GetTokenValue_Success() public view {
     uint256 numberOfTokens = 10;
@@ -643,7 +647,6 @@ contract MultiAggregateRateLimiter__getTokenValue is MultiAggregateRateLimiterSe
   }
 }
 
-/// @notice #updateRateLimitTokens
 contract MultiAggregateRateLimiter_updateRateLimitTokens is MultiAggregateRateLimiterSetup {
   function setUp() public virtual override {
     super.setUp();
@@ -736,7 +739,6 @@ contract MultiAggregateRateLimiter_updateRateLimitTokens is MultiAggregateRateLi
   }
 }
 
-/// @notice #validateIncomingMessage
 contract MultiAggregateRateLimiter_validateIncomingMessage is MultiAggregateRateLimiterSetup {
   address internal immutable MOCK_RECEIVER = address(1113);
 

@@ -6,6 +6,7 @@ import {IPriceRegistry} from "./interfaces/IPriceRegistry.sol";
 
 import {OwnerIsCreator} from "./../shared/access/OwnerIsCreator.sol";
 import {EnumerableMapAddresses} from "./../shared/enumerable/EnumerableMapAddresses.sol";
+import {EnumerableSet} from "./../vendor/openzeppelin-solidity/v4.7.3/contracts/utils/structs/EnumerableSet.sol";
 import {Client} from "./libraries/Client.sol";
 import {RateLimiter} from "./libraries/RateLimiter.sol";
 import {USDPriceWith18Decimals} from "./libraries/USDPriceWith18Decimals.sol";
@@ -13,10 +14,13 @@ import {USDPriceWith18Decimals} from "./libraries/USDPriceWith18Decimals.sol";
 /// @notice The aggregate rate limiter is a wrapper of the token bucket rate limiter
 /// which permits rate limiting based on the aggregate value of a group of
 /// token transfers, using a price registry to convert to a numeraire asset (e.g. USD).
+/// The contract is a standalone multi-lane message validator contract, which can be called by authorized
+/// ramp contracts to apply rate limit changes to lanes, and revert when the rate limits get breached.
 contract MultiAggregateRateLimiter is IMessageValidator, OwnerIsCreator {
   using RateLimiter for RateLimiter.TokenBucket;
   using USDPriceWith18Decimals for uint224;
   using EnumerableMapAddresses for EnumerableMapAddresses.AddressToAddressMap;
+  using EnumerableSet for EnumerableSet.AddressSet;
 
   error UnauthorizedCaller(address caller);
   error PriceNotFoundForToken(address token);
@@ -53,7 +57,7 @@ contract MultiAggregateRateLimiter is IMessageValidator, OwnerIsCreator {
   EnumerableMapAddresses.AddressToAddressMap internal s_rateLimitedTokensDestToSource;
 
   /// @dev Set of callers that can call the validation functions (this is required since the validations modify state)
-  mapping(address authorizedCaller => bool isAuthorized) internal s_authorizedCallers;
+  EnumerableSet.AddressSet internal s_authorizedCallers;
 
   /// @notice The address of the PriceRegistry used to query token values for ratelimiting
   address internal s_priceRegistry;
@@ -79,7 +83,7 @@ contract MultiAggregateRateLimiter is IMessageValidator, OwnerIsCreator {
 
   /// @inheritdoc IMessageValidator
   function validateIncomingMessage(Client.Any2EVMMessage memory message) external {
-    if (!s_authorizedCallers[msg.sender]) {
+    if (!s_authorizedCallers.contains(msg.sender)) {
       revert UnauthorizedCaller(msg.sender);
     }
 
@@ -229,10 +233,9 @@ contract MultiAggregateRateLimiter is IMessageValidator, OwnerIsCreator {
   // │                           Access                             │
   // ================================================================
 
-  /// @param caller Address to check whether it is an authorized caller
-  /// @return flag whether the caller is an authorized caller
-  function isAuthorizedCaller(address caller) external view returns (bool) {
-    return s_authorizedCallers[caller];
+  /// @return authorizedCallers Returns all callers that are authorized to call the validation functions
+  function getAllAuthorizedCallers() external view returns (address[] memory) {
+    return s_authorizedCallers.values();
   }
 
   /// @notice Updates the callers that are authorized to call the message validation functions
@@ -252,7 +255,7 @@ contract MultiAggregateRateLimiter is IMessageValidator, OwnerIsCreator {
         revert ZeroAddressNotAllowed();
       }
 
-      s_authorizedCallers[caller] = true;
+      s_authorizedCallers.add(caller);
       emit AuthorizedCallerAdded(caller);
     }
 
@@ -260,8 +263,7 @@ contract MultiAggregateRateLimiter is IMessageValidator, OwnerIsCreator {
     for (uint256 i = 0; i < removedCallers.length; ++i) {
       address caller = removedCallers[i];
 
-      if (s_authorizedCallers[caller]) {
-        delete s_authorizedCallers[caller];
+      if (s_authorizedCallers.remove(caller)) {
         emit AuthorizedCallerRemoved(caller);
       }
     }
