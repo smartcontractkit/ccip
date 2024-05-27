@@ -15,11 +15,6 @@ import {Vm} from "forge-std/Vm.sol";
 
 /// @notice #constructor
 contract EVM2EVMMultiOnRamp_constructor is EVM2EVMMultiOnRampSetup {
-  event ConfigSet(EVM2EVMMultiOnRamp.StaticConfig staticConfig, EVM2EVMMultiOnRamp.DynamicConfig dynamicConfig);
-  event PoolAdded(address token, address pool);
-  event DestChainAdded(uint64 indexed destChainSelector, EVM2EVMMultiOnRamp.DestChainConfig destChainConfig);
-  event FeeTokenConfigUpdated(address indexed token, uint64 feeTokenConfig);
-
   function test_Constructor_Success() public {
     EVM2EVMMultiOnRamp.StaticConfig memory staticConfig = EVM2EVMMultiOnRamp.StaticConfig({
       linkToken: s_sourceTokens[0],
@@ -34,10 +29,10 @@ contract EVM2EVMMultiOnRamp_constructor is EVM2EVMMultiOnRampSetup {
     EVM2EVMMultiOnRamp.DestChainConfigArgs memory destChainConfigArg = destChainConfigArgs[0];
 
     vm.expectEmit();
-    emit ConfigSet(staticConfig, dynamicConfig);
+    emit EVM2EVMMultiOnRamp.ConfigSet(staticConfig, dynamicConfig);
     // We ignore the DestChainConfig values as metadataHash is reliant on contract address.
     vm.expectEmit(true, false, false, false);
-    emit DestChainAdded(
+    emit EVM2EVMMultiOnRamp.DestChainAdded(
       DEST_CHAIN_SELECTOR,
       EVM2EVMMultiOnRamp.DestChainConfig({
         dynamicConfig: destChainConfigArg.dynamicConfig,
@@ -47,16 +42,20 @@ contract EVM2EVMMultiOnRamp_constructor is EVM2EVMMultiOnRampSetup {
       })
     );
     vm.expectEmit();
-    emit FeeTokenConfigUpdated(s_feeTokenConfigArgs[0].token, s_feeTokenConfigArgs[0].feeTokenConfig);
+    emit EVM2EVMMultiOnRamp.PremiumMultiplierWeiPerEthUpdated(
+      s_premiumMultiplierWeiPerEthArgs[0].token, s_premiumMultiplierWeiPerEthArgs[0].premiumMultiplierWeiPerEth
+    );
     vm.expectEmit();
-    emit FeeTokenConfigUpdated(s_feeTokenConfigArgs[1].token, s_feeTokenConfigArgs[1].feeTokenConfig);
+    emit EVM2EVMMultiOnRamp.PremiumMultiplierWeiPerEthUpdated(
+      s_premiumMultiplierWeiPerEthArgs[1].token, s_premiumMultiplierWeiPerEthArgs[1].premiumMultiplierWeiPerEth
+    );
 
     s_onRamp = new EVM2EVMMultiOnRampHelper(
       staticConfig,
       dynamicConfig,
       destChainConfigArgs,
       getOutboundRateLimiterConfig(),
-      s_feeTokenConfigArgs,
+      s_premiumMultiplierWeiPerEthArgs,
       s_tokenTransferFeeConfigArgs,
       getMultiOnRampNopsAndWeights()
     );
@@ -81,11 +80,11 @@ contract EVM2EVMMultiOnRamp_constructor is EVM2EVMMultiOnRampSetup {
     EVM2EVMMultiOnRamp.DestChainConfig memory gotDestChainConfig = s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR);
     assertDestChainConfigsEqual(expectedDestChainConfig, gotDestChainConfig);
 
-    uint64 gotFeeTokenConfig0 = s_onRamp.getFeeTokenConfig(s_feeTokenConfigArgs[0].token);
-    assertEq(s_feeTokenConfigArgs[0].feeTokenConfig, gotFeeTokenConfig0);
+    uint64 gotFeeTokenConfig0 = s_onRamp.getPremiumMultiplierWeiPerEth(s_premiumMultiplierWeiPerEthArgs[0].token);
+    assertEq(s_premiumMultiplierWeiPerEthArgs[0].premiumMultiplierWeiPerEth, gotFeeTokenConfig0);
 
-    uint64 gotFeeTokenConfig1 = s_onRamp.getFeeTokenConfig(s_feeTokenConfigArgs[1].token);
-    assertEq(s_feeTokenConfigArgs[1].feeTokenConfig, gotFeeTokenConfig1);
+    uint64 gotFeeTokenConfig1 = s_onRamp.getPremiumMultiplierWeiPerEth(s_premiumMultiplierWeiPerEthArgs[1].token);
+    assertEq(s_premiumMultiplierWeiPerEthArgs[1].premiumMultiplierWeiPerEth, gotFeeTokenConfig1);
 
     // Initial values
     assertEq("EVM2EVMMultiOnRamp 1.6.0-dev", s_onRamp.typeAndVersion());
@@ -110,7 +109,7 @@ contract EVM2EVMMultiOnRamp_constructor is EVM2EVMMultiOnRampSetup {
       dynamicConfig,
       destChainConfigArgs,
       getOutboundRateLimiterConfig(),
-      s_feeTokenConfigArgs,
+      s_premiumMultiplierWeiPerEthArgs,
       s_tokenTransferFeeConfigArgs,
       getMultiOnRampNopsAndWeights()
     );
@@ -133,7 +132,7 @@ contract EVM2EVMMultiOnRamp_constructor is EVM2EVMMultiOnRampSetup {
       dynamicConfig,
       destChainConfigArgs,
       getOutboundRateLimiterConfig(),
-      s_feeTokenConfigArgs,
+      s_premiumMultiplierWeiPerEthArgs,
       s_tokenTransferFeeConfigArgs,
       getMultiOnRampNopsAndWeights()
     );
@@ -156,7 +155,7 @@ contract EVM2EVMMultiOnRamp_constructor is EVM2EVMMultiOnRampSetup {
       dynamicConfig,
       destChainConfigArgs,
       getOutboundRateLimiterConfig(),
-      s_feeTokenConfigArgs,
+      s_premiumMultiplierWeiPerEthArgs,
       s_tokenTransferFeeConfigArgs,
       getMultiOnRampNopsAndWeights()
     );
@@ -938,7 +937,7 @@ contract EVM2EVMMultiOnRamp_getFee is EVM2EVMMultiOnRamp_getFeeSetup {
     for (uint256 i = 0; i < feeTokenPrices.length; ++i) {
       Client.EVM2AnyMessage memory message = _generateEmptyMessage();
       message.feeToken = testTokens[i];
-      uint64 feeTokenConfig = s_onRamp.getFeeTokenConfig(message.feeToken);
+      uint64 premiumMultiplierWeiPerEth = s_onRamp.getPremiumMultiplierWeiPerEth(message.feeToken);
       EVM2EVMMultiOnRamp.DestChainDynamicConfig memory destChainDynamicConfig =
         s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR).dynamicConfig;
 
@@ -946,7 +945,8 @@ contract EVM2EVMMultiOnRamp_getFee is EVM2EVMMultiOnRamp_getFeeSetup {
 
       uint256 gasUsed = GAS_LIMIT + DEST_GAS_OVERHEAD;
       uint256 gasFeeUSD = (gasUsed * destChainDynamicConfig.gasMultiplierWeiPerEth * USD_PER_GAS);
-      uint256 messageFeeUSD = (configUSDCentToWei(destChainDynamicConfig.networkFeeUSDCents) * feeTokenConfig);
+      uint256 messageFeeUSD =
+        (configUSDCentToWei(destChainDynamicConfig.networkFeeUSDCents) * premiumMultiplierWeiPerEth);
       uint256 dataAvailabilityFeeUSD = s_onRamp.getDataAvailabilityCost(
         DEST_CHAIN_SELECTOR, USD_PER_DATA_AVAILABILITY_GAS, message.data.length, message.tokenAmounts.length, 0
       );
@@ -969,7 +969,7 @@ contract EVM2EVMMultiOnRamp_getFee is EVM2EVMMultiOnRamp_getFeeSetup {
     s_onRamp.applyDestChainConfigUpdates(destChainConfigArgs);
 
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
-    uint64 feeTokenConfig = s_onRamp.getFeeTokenConfig(message.feeToken);
+    uint64 premiumMultiplierWeiPerEth = s_onRamp.getPremiumMultiplierWeiPerEth(message.feeToken);
     EVM2EVMMultiOnRamp.DestChainDynamicConfig memory destChainDynamicConfig =
       s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR).dynamicConfig;
 
@@ -977,7 +977,7 @@ contract EVM2EVMMultiOnRamp_getFee is EVM2EVMMultiOnRamp_getFeeSetup {
 
     uint256 gasUsed = GAS_LIMIT + DEST_GAS_OVERHEAD;
     uint256 gasFeeUSD = (gasUsed * destChainDynamicConfig.gasMultiplierWeiPerEth * USD_PER_GAS);
-    uint256 messageFeeUSD = (configUSDCentToWei(destChainDynamicConfig.networkFeeUSDCents) * feeTokenConfig);
+    uint256 messageFeeUSD = (configUSDCentToWei(destChainDynamicConfig.networkFeeUSDCents) * premiumMultiplierWeiPerEth);
 
     uint256 totalPriceInFeeToken = (gasFeeUSD + messageFeeUSD) / s_feeTokenPrice;
     assertEq(totalPriceInFeeToken, feeAmount);
@@ -998,14 +998,15 @@ contract EVM2EVMMultiOnRamp_getFee is EVM2EVMMultiOnRamp_getFeeSetup {
         extraArgs: Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: customGasLimit}))
       });
 
-      uint64 feeTokenConfig = s_onRamp.getFeeTokenConfig(message.feeToken);
+      uint64 premiumMultiplierWeiPerEth = s_onRamp.getPremiumMultiplierWeiPerEth(message.feeToken);
       EVM2EVMMultiOnRamp.DestChainDynamicConfig memory destChainDynamicConfig =
         s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR).dynamicConfig;
 
       uint256 feeAmount = s_onRamp.getFee(DEST_CHAIN_SELECTOR, message);
       uint256 gasUsed = customGasLimit + DEST_GAS_OVERHEAD + customDataSize * DEST_GAS_PER_PAYLOAD_BYTE;
       uint256 gasFeeUSD = (gasUsed * destChainDynamicConfig.gasMultiplierWeiPerEth * USD_PER_GAS);
-      uint256 messageFeeUSD = (configUSDCentToWei(destChainDynamicConfig.networkFeeUSDCents) * feeTokenConfig);
+      uint256 messageFeeUSD =
+        (configUSDCentToWei(destChainDynamicConfig.networkFeeUSDCents) * premiumMultiplierWeiPerEth);
       uint256 dataAvailabilityFeeUSD = s_onRamp.getDataAvailabilityCost(
         DEST_CHAIN_SELECTOR, USD_PER_DATA_AVAILABILITY_GAS, message.data.length, message.tokenAmounts.length, 0
       );
@@ -1023,7 +1024,7 @@ contract EVM2EVMMultiOnRamp_getFee is EVM2EVMMultiOnRamp_getFeeSetup {
     for (uint256 i = 0; i < feeTokenPrices.length; ++i) {
       Client.EVM2AnyMessage memory message = _generateSingleTokenMessage(s_sourceFeeToken, tokenAmount);
       message.feeToken = testTokens[i];
-      uint64 feeTokenConfig = s_onRamp.getFeeTokenConfig(message.feeToken);
+      uint64 premiumMultiplierWeiPerEth = s_onRamp.getPremiumMultiplierWeiPerEth(message.feeToken);
       EVM2EVMMultiOnRamp.DestChainDynamicConfig memory destChainDynamicConfig =
         s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR).dynamicConfig;
       EVM2EVMMultiOnRamp.TokenTransferFeeConfig memory tokenTransferFeeConfig =
@@ -1035,7 +1036,7 @@ contract EVM2EVMMultiOnRamp_getFee is EVM2EVMMultiOnRamp_getFeeSetup {
       uint256 gasFeeUSD = (gasUsed * destChainDynamicConfig.gasMultiplierWeiPerEth * USD_PER_GAS);
       (uint256 transferFeeUSD,,) =
         s_onRamp.getTokenTransferCost(DEST_CHAIN_SELECTOR, message.feeToken, feeTokenPrices[i], message.tokenAmounts);
-      uint256 messageFeeUSD = (transferFeeUSD * feeTokenConfig);
+      uint256 messageFeeUSD = (transferFeeUSD * premiumMultiplierWeiPerEth);
       uint256 dataAvailabilityFeeUSD = s_onRamp.getDataAvailabilityCost(
         DEST_CHAIN_SELECTOR,
         USD_PER_DATA_AVAILABILITY_GAS,
@@ -1062,7 +1063,7 @@ contract EVM2EVMMultiOnRamp_getFee is EVM2EVMMultiOnRamp_getFeeSetup {
         feeToken: testTokens[i],
         extraArgs: Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: customGasLimit}))
       });
-      uint64 feeTokenConfig = s_onRamp.getFeeTokenConfig(message.feeToken);
+      uint64 premiumMultiplierWeiPerEth = s_onRamp.getPremiumMultiplierWeiPerEth(message.feeToken);
       EVM2EVMMultiOnRamp.DestChainDynamicConfig memory destChainDynamicConfig =
         s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR).dynamicConfig;
 
@@ -1084,7 +1085,7 @@ contract EVM2EVMMultiOnRamp_getFee is EVM2EVMMultiOnRamp_getFeeSetup {
       uint256 gasFeeUSD = (gasUsed * destChainDynamicConfig.gasMultiplierWeiPerEth * USD_PER_GAS);
       (uint256 transferFeeUSD,,) =
         s_onRamp.getTokenTransferCost(DEST_CHAIN_SELECTOR, message.feeToken, feeTokenPrices[i], message.tokenAmounts);
-      uint256 messageFeeUSD = (transferFeeUSD * feeTokenConfig);
+      uint256 messageFeeUSD = (transferFeeUSD * premiumMultiplierWeiPerEth);
       uint256 dataAvailabilityFeeUSD = s_onRamp.getDataAvailabilityCost(
         DEST_CHAIN_SELECTOR,
         USD_PER_DATA_AVAILABILITY_GAS,
@@ -1496,74 +1497,100 @@ contract EVM2EVMMultiOnRamp_setDynamicConfig is EVM2EVMMultiOnRampSetup {
   }
 }
 
-contract EVM2EVMOnRamp_applyFeeTokenConfigUpdates is EVM2EVMMultiOnRampSetup {
-  event FeeTokenConfigUpdated(address indexed token, uint64 feeTokenConfig);
-
-  function test_Fuzz_applyFeeTokenConfigUpdates_Success(EVM2EVMMultiOnRamp.FeeTokenConfigArgs memory feeTokenConfigArg)
-    public
-  {
-    EVM2EVMMultiOnRamp.FeeTokenConfigArgs[] memory feeTokenConfigArgs = new EVM2EVMMultiOnRamp.FeeTokenConfigArgs[](1);
-    feeTokenConfigArgs[0] = feeTokenConfigArg;
+contract EVM2EVMOnRamp_applyPremiumMultiplierWeiPerEthUpdates is EVM2EVMMultiOnRampSetup {
+  function test_Fuzz_applyPremiumMultiplierWeiPerEthUpdates_Success(
+    EVM2EVMMultiOnRamp.PremiumMultiplierWeiPerEthArgs memory premiumMultiplierWeiPerEthArg
+  ) public {
+    EVM2EVMMultiOnRamp.PremiumMultiplierWeiPerEthArgs[] memory premiumMultiplierWeiPerEthArgs =
+      new EVM2EVMMultiOnRamp.PremiumMultiplierWeiPerEthArgs[](1);
+    premiumMultiplierWeiPerEthArgs[0] = premiumMultiplierWeiPerEthArg;
 
     vm.expectEmit();
-    emit FeeTokenConfigUpdated(feeTokenConfigArg.token, feeTokenConfigArg.feeTokenConfig);
+    emit EVM2EVMMultiOnRamp.PremiumMultiplierWeiPerEthUpdated(
+      premiumMultiplierWeiPerEthArg.token, premiumMultiplierWeiPerEthArg.premiumMultiplierWeiPerEth
+    );
 
-    s_onRamp.applyFeeTokenConfigUpdates(feeTokenConfigArgs);
+    s_onRamp.applyPremiumMultiplierWeiPerEthUpdates(premiumMultiplierWeiPerEthArgs);
 
-    assertEq(feeTokenConfigArg.feeTokenConfig, s_onRamp.getFeeTokenConfig(feeTokenConfigArg.token));
+    assertEq(
+      premiumMultiplierWeiPerEthArg.premiumMultiplierWeiPerEth,
+      s_onRamp.getPremiumMultiplierWeiPerEth(premiumMultiplierWeiPerEthArg.token)
+    );
   }
 
-  function test_applyFeeTokenConfigUpdatesSingleToken_Success() public {
-    EVM2EVMMultiOnRamp.FeeTokenConfigArgs[] memory feeTokenConfigArgs = new EVM2EVMMultiOnRamp.FeeTokenConfigArgs[](1);
-    feeTokenConfigArgs[0] = s_feeTokenConfigArgs[0];
-    feeTokenConfigArgs[0].token = vm.addr(1);
+  function test_applyPremiumMultiplierWeiPerEthUpdatesSingleToken_Success() public {
+    EVM2EVMMultiOnRamp.PremiumMultiplierWeiPerEthArgs[] memory premiumMultiplierWeiPerEthArgs =
+      new EVM2EVMMultiOnRamp.PremiumMultiplierWeiPerEthArgs[](1);
+    premiumMultiplierWeiPerEthArgs[0] = s_premiumMultiplierWeiPerEthArgs[0];
+    premiumMultiplierWeiPerEthArgs[0].token = vm.addr(1);
 
     vm.expectEmit();
-    emit FeeTokenConfigUpdated(vm.addr(1), feeTokenConfigArgs[0].feeTokenConfig);
+    emit EVM2EVMMultiOnRamp.PremiumMultiplierWeiPerEthUpdated(
+      vm.addr(1), premiumMultiplierWeiPerEthArgs[0].premiumMultiplierWeiPerEth
+    );
 
-    s_onRamp.applyFeeTokenConfigUpdates(feeTokenConfigArgs);
+    s_onRamp.applyPremiumMultiplierWeiPerEthUpdates(premiumMultiplierWeiPerEthArgs);
 
-    assertEq(s_feeTokenConfigArgs[0].feeTokenConfig, s_onRamp.getFeeTokenConfig(vm.addr(1)));
+    assertEq(
+      s_premiumMultiplierWeiPerEthArgs[0].premiumMultiplierWeiPerEth, s_onRamp.getPremiumMultiplierWeiPerEth(vm.addr(1))
+    );
   }
 
-  function test_applyFeeTokenConfigUpdatesMultipleTokens_Success() public {
-    EVM2EVMMultiOnRamp.FeeTokenConfigArgs[] memory feeTokenConfigArgs = new EVM2EVMMultiOnRamp.FeeTokenConfigArgs[](2);
-    feeTokenConfigArgs[0] = s_feeTokenConfigArgs[0];
-    feeTokenConfigArgs[0].token = vm.addr(1);
-    feeTokenConfigArgs[1].token = vm.addr(2);
+  function test_applyPremiumMultiplierWeiPerEthUpdatesMultipleTokens_Success() public {
+    EVM2EVMMultiOnRamp.PremiumMultiplierWeiPerEthArgs[] memory premiumMultiplierWeiPerEthArgs =
+      new EVM2EVMMultiOnRamp.PremiumMultiplierWeiPerEthArgs[](2);
+    premiumMultiplierWeiPerEthArgs[0] = s_premiumMultiplierWeiPerEthArgs[0];
+    premiumMultiplierWeiPerEthArgs[0].token = vm.addr(1);
+    premiumMultiplierWeiPerEthArgs[1].token = vm.addr(2);
 
     vm.expectEmit();
-    emit FeeTokenConfigUpdated(vm.addr(1), feeTokenConfigArgs[0].feeTokenConfig);
+    emit EVM2EVMMultiOnRamp.PremiumMultiplierWeiPerEthUpdated(
+      vm.addr(1), premiumMultiplierWeiPerEthArgs[0].premiumMultiplierWeiPerEth
+    );
     vm.expectEmit();
-    emit FeeTokenConfigUpdated(vm.addr(2), feeTokenConfigArgs[1].feeTokenConfig);
+    emit EVM2EVMMultiOnRamp.PremiumMultiplierWeiPerEthUpdated(
+      vm.addr(2), premiumMultiplierWeiPerEthArgs[1].premiumMultiplierWeiPerEth
+    );
 
-    s_onRamp.applyFeeTokenConfigUpdates(feeTokenConfigArgs);
+    s_onRamp.applyPremiumMultiplierWeiPerEthUpdates(premiumMultiplierWeiPerEthArgs);
 
-    assertEq(feeTokenConfigArgs[0].feeTokenConfig, s_onRamp.getFeeTokenConfig(vm.addr(1)));
-    assertEq(feeTokenConfigArgs[1].feeTokenConfig, s_onRamp.getFeeTokenConfig(vm.addr(2)));
+    assertEq(
+      premiumMultiplierWeiPerEthArgs[0].premiumMultiplierWeiPerEth, s_onRamp.getPremiumMultiplierWeiPerEth(vm.addr(1))
+    );
+    assertEq(
+      premiumMultiplierWeiPerEthArgs[1].premiumMultiplierWeiPerEth, s_onRamp.getPremiumMultiplierWeiPerEth(vm.addr(2))
+    );
   }
 
-  function test_applyFeeTokenConfigUpdatesByAdmin_Success() public {
-    s_feeTokenConfigArgs[0] = s_feeTokenConfigArgs[0];
-    s_feeTokenConfigArgs[0].token = vm.addr(1);
-    s_feeTokenConfigArgs[1].token = vm.addr(2);
+  function test_applyPremiumMultiplierWeiPerEthUpdatesByAdmin_Success() public {
+    s_premiumMultiplierWeiPerEthArgs[0] = s_premiumMultiplierWeiPerEthArgs[0];
+    s_premiumMultiplierWeiPerEthArgs[0].token = vm.addr(1);
+    s_premiumMultiplierWeiPerEthArgs[1].token = vm.addr(2);
 
     vm.startPrank(ADMIN);
 
     vm.expectEmit();
-    emit FeeTokenConfigUpdated(vm.addr(1), s_feeTokenConfigArgs[0].feeTokenConfig);
+    emit EVM2EVMMultiOnRamp.PremiumMultiplierWeiPerEthUpdated(
+      vm.addr(1), s_premiumMultiplierWeiPerEthArgs[0].premiumMultiplierWeiPerEth
+    );
     vm.expectEmit();
-    emit FeeTokenConfigUpdated(vm.addr(2), s_feeTokenConfigArgs[1].feeTokenConfig);
+    emit EVM2EVMMultiOnRamp.PremiumMultiplierWeiPerEthUpdated(
+      vm.addr(2), s_premiumMultiplierWeiPerEthArgs[1].premiumMultiplierWeiPerEth
+    );
 
-    s_onRamp.applyFeeTokenConfigUpdates(s_feeTokenConfigArgs);
+    s_onRamp.applyPremiumMultiplierWeiPerEthUpdates(s_premiumMultiplierWeiPerEthArgs);
 
-    assertEq(s_feeTokenConfigArgs[0].feeTokenConfig, s_onRamp.getFeeTokenConfig(vm.addr(1)));
-    assertEq(s_feeTokenConfigArgs[1].feeTokenConfig, s_onRamp.getFeeTokenConfig(vm.addr(2)));
+    assertEq(
+      s_premiumMultiplierWeiPerEthArgs[0].premiumMultiplierWeiPerEth, s_onRamp.getPremiumMultiplierWeiPerEth(vm.addr(1))
+    );
+    assertEq(
+      s_premiumMultiplierWeiPerEthArgs[1].premiumMultiplierWeiPerEth, s_onRamp.getPremiumMultiplierWeiPerEth(vm.addr(2))
+    );
   }
 
-  function test_applyFeeTokenConfigUpdatesZeroInput() public {
+  function test_applyPremiumMultiplierWeiPerEthUpdatesZeroInput() public {
     vm.recordLogs();
-    s_onRamp.applyFeeTokenConfigUpdates(new EVM2EVMMultiOnRamp.FeeTokenConfigArgs[](0));
+    s_onRamp.applyPremiumMultiplierWeiPerEthUpdates(new EVM2EVMMultiOnRamp.PremiumMultiplierWeiPerEthArgs[](0));
 
     assertEq(vm.getRecordedLogs().length, 0);
   }
@@ -1571,12 +1598,12 @@ contract EVM2EVMOnRamp_applyFeeTokenConfigUpdates is EVM2EVMMultiOnRampSetup {
   // Reverts
 
   function test_OnlyCallableByOwnerOrAdmin_Revert() public {
-    EVM2EVMMultiOnRamp.FeeTokenConfigArgs[] memory feeTokenConfigArgs;
+    EVM2EVMMultiOnRamp.PremiumMultiplierWeiPerEthArgs[] memory premiumMultiplierWeiPerEthArgs;
     vm.startPrank(STRANGER);
 
     vm.expectRevert(EVM2EVMMultiOnRamp.OnlyCallableByOwnerOrAdmin.selector);
 
-    s_onRamp.applyFeeTokenConfigUpdates(feeTokenConfigArgs);
+    s_onRamp.applyPremiumMultiplierWeiPerEthUpdates(premiumMultiplierWeiPerEthArgs);
   }
 }
 
