@@ -1045,21 +1045,20 @@ contract EVM2EVMMultiOnRamp_getFee is EVM2EVMMultiOnRamp_getFeeSetup {
     for (uint256 i = 0; i < feeTokenPrices.length; ++i) {
       Client.EVM2AnyMessage memory message = _generateSingleTokenMessage(s_sourceFeeToken, tokenAmount);
       message.feeToken = testTokens[i];
-      uint64 premiumMultiplierWeiPerEth = s_onRamp.getPremiumMultiplierWeiPerEth(message.feeToken);
       EVM2EVMMultiOnRamp.DestChainDynamicConfig memory destChainDynamicConfig =
         s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR).dynamicConfig;
-      uint32 tokenGasOverhead = s_onRamp.getTokenTransferFeeConfig(message.tokenAmounts[0].token).destGasOverhead;
       uint32 destBytesOverhead = s_onRamp.getTokenTransferFeeConfig(message.tokenAmounts[0].token).destBytesOverhead;
       uint32 tokenBytesOverhead =
         destBytesOverhead == 0 ? uint32(Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES) : destBytesOverhead;
 
       uint256 feeAmount = s_onRamp.getFee(DEST_CHAIN_SELECTOR, message);
 
-      uint256 gasUsed = GAS_LIMIT + DEST_GAS_OVERHEAD + tokenGasOverhead;
+      uint256 gasUsed = GAS_LIMIT + DEST_GAS_OVERHEAD
+        + s_onRamp.getTokenTransferFeeConfig(message.tokenAmounts[0].token).destGasOverhead;
       uint256 gasFeeUSD = (gasUsed * destChainDynamicConfig.gasMultiplierWeiPerEth * USD_PER_GAS);
       (uint256 transferFeeUSD,,) =
         s_onRamp.getTokenTransferCost(DEST_CHAIN_SELECTOR, message.feeToken, feeTokenPrices[i], message.tokenAmounts);
-      uint256 messageFeeUSD = (transferFeeUSD * premiumMultiplierWeiPerEth);
+      uint256 messageFeeUSD = (transferFeeUSD * s_onRamp.getPremiumMultiplierWeiPerEth(message.feeToken));
       uint256 dataAvailabilityFeeUSD = s_onRamp.getDataAvailabilityCost(
         DEST_CHAIN_SELECTOR,
         USD_PER_DATA_AVAILABILITY_GAS,
