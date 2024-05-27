@@ -6,7 +6,7 @@ import {Vm} from "forge-std/Vm.sol";
 import {MultiAggregateRateLimiter} from "../../MultiAggregateRateLimiter.sol";
 import {Client} from "../../libraries/Client.sol";
 import {Internal} from "../../libraries/Internal.sol";
-import {RateLimiterNoEvents} from "../../libraries/RateLimiterNoEvents.sol";
+import {RateLimiter} from "../../libraries/RateLimiter.sol";
 import {BaseTest} from "../BaseTest.t.sol";
 import {MultiAggregateRateLimiterHelper} from "../helpers/MultiAggregateRateLimiterHelper.sol";
 import {PriceRegistrySetup} from "../priceRegistry/PriceRegistry.t.sol";
@@ -22,10 +22,8 @@ contract MultiAggregateRateLimiterSetup is BaseTest, PriceRegistrySetup {
   uint64 internal constant CHAIN_SELECTOR_1 = 5009297550715157269;
   uint64 internal constant CHAIN_SELECTOR_2 = 4949039107694359620;
 
-  RateLimiterNoEvents.Config internal RATE_LIMITER_CONFIG_1 =
-    RateLimiterNoEvents.Config({isEnabled: true, rate: 5, capacity: 100});
-  RateLimiterNoEvents.Config internal RATE_LIMITER_CONFIG_2 =
-    RateLimiterNoEvents.Config({isEnabled: true, rate: 10, capacity: 200});
+  RateLimiter.Config internal RATE_LIMITER_CONFIG_1 = RateLimiter.Config({isEnabled: true, rate: 5, capacity: 100});
+  RateLimiter.Config internal RATE_LIMITER_CONFIG_2 = RateLimiter.Config({isEnabled: true, rate: 10, capacity: 200});
 
   address internal immutable MOCK_OFFRAMP = address(1111);
   address internal immutable MOCK_ONRAMP = address(1112);
@@ -56,8 +54,8 @@ contract MultiAggregateRateLimiterSetup is BaseTest, PriceRegistrySetup {
   }
 
   function _assertConfigWithTokenBucketEquality(
-    RateLimiterNoEvents.Config memory config,
-    RateLimiterNoEvents.TokenBucket memory tokenBucket
+    RateLimiter.Config memory config,
+    RateLimiter.TokenBucket memory tokenBucket
   ) internal pure {
     assertEq(config.rate, tokenBucket.rate);
     assertEq(config.capacity, tokenBucket.capacity);
@@ -66,8 +64,8 @@ contract MultiAggregateRateLimiterSetup is BaseTest, PriceRegistrySetup {
   }
 
   function _assertTokenBucketEquality(
-    RateLimiterNoEvents.TokenBucket memory tokenBucketA,
-    RateLimiterNoEvents.TokenBucket memory tokenBucketB
+    RateLimiter.TokenBucket memory tokenBucketA,
+    RateLimiter.TokenBucket memory tokenBucketB
   ) internal pure {
     assertEq(tokenBucketA.rate, tokenBucketB.rate);
     assertEq(tokenBucketA.capacity, tokenBucketB.capacity);
@@ -148,11 +146,11 @@ contract MultiAggregateRateLimiter_constructor is MultiAggregateRateLimiterSetup
     assertEq(OWNER, s_rateLimiter.owner());
     assertEq(address(s_priceRegistry), s_rateLimiter.getPriceRegistry());
 
-    RateLimiterNoEvents.TokenBucket memory bucketSrcChain1 = s_rateLimiter.currentRateLimiterState(CHAIN_SELECTOR_1);
+    RateLimiter.TokenBucket memory bucketSrcChain1 = s_rateLimiter.currentRateLimiterState(CHAIN_SELECTOR_1);
     _assertConfigWithTokenBucketEquality(RATE_LIMITER_CONFIG_1, bucketSrcChain1);
     assertEq(BLOCK_TIME, bucketSrcChain1.lastUpdated);
 
-    RateLimiterNoEvents.TokenBucket memory bucketSrcChain2 = s_rateLimiter.currentRateLimiterState(CHAIN_SELECTOR_2);
+    RateLimiter.TokenBucket memory bucketSrcChain2 = s_rateLimiter.currentRateLimiterState(CHAIN_SELECTOR_2);
     _assertConfigWithTokenBucketEquality(RATE_LIMITER_CONFIG_2, bucketSrcChain2);
     assertEq(BLOCK_TIME, bucketSrcChain2.lastUpdated);
   }
@@ -326,7 +324,7 @@ contract MultiAggregateRateLimiter_setAuthorizedCallers is MultiAggregateRateLim
 /// @notice #getTokenBucket
 contract MultiAggregateRateLimiter_getTokenBucket is MultiAggregateRateLimiterSetup {
   function test_GetTokenBucket_Success() public view {
-    RateLimiterNoEvents.TokenBucket memory bucket = s_rateLimiter.currentRateLimiterState(CHAIN_SELECTOR_1);
+    RateLimiter.TokenBucket memory bucket = s_rateLimiter.currentRateLimiterState(CHAIN_SELECTOR_1);
     assertEq(RATE_LIMITER_CONFIG_1.rate, bucket.rate);
     assertEq(RATE_LIMITER_CONFIG_1.capacity, bucket.capacity);
     assertEq(RATE_LIMITER_CONFIG_1.capacity, bucket.tokens);
@@ -345,7 +343,7 @@ contract MultiAggregateRateLimiter_getTokenBucket is MultiAggregateRateLimiterSe
 
     s_rateLimiter.applyRateLimiterConfigUpdates(configUpdates);
 
-    RateLimiterNoEvents.TokenBucket memory bucket = s_rateLimiter.currentRateLimiterState(CHAIN_SELECTOR_1);
+    RateLimiter.TokenBucket memory bucket = s_rateLimiter.currentRateLimiterState(CHAIN_SELECTOR_1);
 
     assertEq(RATE_LIMITER_CONFIG_1.rate, bucket.rate);
     assertEq(RATE_LIMITER_CONFIG_1.capacity, bucket.capacity);
@@ -411,8 +409,7 @@ contract MultiAggregateRateLimiter_applyRateLimiterConfigUpdates is MultiAggrega
     Vm.Log[] memory logEntries = vm.getRecordedLogs();
     assertEq(logEntries.length, 1);
 
-    RateLimiterNoEvents.TokenBucket memory bucket1 =
-      s_rateLimiter.currentRateLimiterState(configUpdates[0].remoteChainSelector);
+    RateLimiter.TokenBucket memory bucket1 = s_rateLimiter.currentRateLimiterState(configUpdates[0].remoteChainSelector);
     _assertConfigWithTokenBucketEquality(configUpdates[0].rateLimiterConfig, bucket1);
     assertEq(BLOCK_TIME, bucket1.lastUpdated);
   }
@@ -424,7 +421,7 @@ contract MultiAggregateRateLimiter_applyRateLimiterConfigUpdates is MultiAggrega
     for (uint64 i; i < configUpdates.length; ++i) {
       configUpdates[i] = MultiAggregateRateLimiter.RateLimiterConfigArgs({
         remoteChainSelector: CHAIN_SELECTOR_1 + i + 1,
-        rateLimiterConfig: RateLimiterNoEvents.Config({isEnabled: true, rate: 5 + i, capacity: 100 + i})
+        rateLimiterConfig: RateLimiter.Config({isEnabled: true, rate: 5 + i, capacity: 100 + i})
       });
 
       vm.expectEmit();
@@ -440,7 +437,7 @@ contract MultiAggregateRateLimiter_applyRateLimiterConfigUpdates is MultiAggrega
     assertEq(logEntries.length, configUpdates.length);
 
     for (uint256 i; i < configUpdates.length; ++i) {
-      RateLimiterNoEvents.TokenBucket memory bucket =
+      RateLimiter.TokenBucket memory bucket =
         s_rateLimiter.currentRateLimiterState(configUpdates[i].remoteChainSelector);
       _assertConfigWithTokenBucketEquality(configUpdates[i].rateLimiterConfig, bucket);
       assertEq(BLOCK_TIME, bucket.lastUpdated);
@@ -455,8 +452,7 @@ contract MultiAggregateRateLimiter_applyRateLimiterConfigUpdates is MultiAggrega
       rateLimiterConfig: RATE_LIMITER_CONFIG_2
     });
 
-    RateLimiterNoEvents.TokenBucket memory bucket1 =
-      s_rateLimiter.currentRateLimiterState(configUpdates[0].remoteChainSelector);
+    RateLimiter.TokenBucket memory bucket1 = s_rateLimiter.currentRateLimiterState(configUpdates[0].remoteChainSelector);
 
     // Capacity equals tokens
     assertEq(bucket1.capacity, bucket1.tokens);
@@ -485,7 +481,7 @@ contract MultiAggregateRateLimiter_applyRateLimiterConfigUpdates is MultiAggrega
       rateLimiterConfig: RATE_LIMITER_CONFIG_1
     });
 
-    RateLimiterNoEvents.TokenBucket memory bucketPreUpdate =
+    RateLimiter.TokenBucket memory bucketPreUpdate =
       s_rateLimiter.currentRateLimiterState(configUpdates[0].remoteChainSelector);
 
     vm.expectEmit();
@@ -497,7 +493,7 @@ contract MultiAggregateRateLimiter_applyRateLimiterConfigUpdates is MultiAggrega
     s_rateLimiter.applyRateLimiterConfigUpdates(configUpdates);
 
     vm.warp(BLOCK_TIME + 1);
-    RateLimiterNoEvents.TokenBucket memory bucketPostUpdate =
+    RateLimiter.TokenBucket memory bucketPostUpdate =
       s_rateLimiter.currentRateLimiterState(configUpdates[0].remoteChainSelector);
     _assertTokenBucketEquality(bucketPreUpdate, bucketPostUpdate);
     assertEq(BLOCK_TIME + 1, bucketPostUpdate.lastUpdated);
@@ -542,14 +538,14 @@ contract MultiAggregateRateLimiter__rateLimitValue is MultiAggregateRateLimiterS
     uint256 value = (numberOfTokens * TOKEN_PRICE) / 1e18;
 
     vm.expectEmit();
-    emit MultiAggregateRateLimiter.RateLimiterTokensConsumed(CHAIN_SELECTOR_1, value);
+    emit RateLimiter.TokensConsumed(value);
 
     vm.resumeGasMetering();
     s_rateLimiter.rateLimitValue(CHAIN_SELECTOR_1, value);
     vm.pauseGasMetering();
 
     // Get the updated bucket status
-    RateLimiterNoEvents.TokenBucket memory bucket = s_rateLimiter.currentRateLimiterState(CHAIN_SELECTOR_1);
+    RateLimiter.TokenBucket memory bucket = s_rateLimiter.currentRateLimiterState(CHAIN_SELECTOR_1);
     // Assert the proper value has been taken out of the bucket
     assertEq(bucket.capacity - value, bucket.tokens);
 
@@ -557,7 +553,7 @@ contract MultiAggregateRateLimiter__rateLimitValue is MultiAggregateRateLimiterS
     // Expect a revert when we try, with a wait time.
     uint256 waitTime = 4;
     vm.expectRevert(
-      abi.encodeWithSelector(RateLimiterNoEvents.AggregateValueRateLimitReached.selector, waitTime, bucket.tokens)
+      abi.encodeWithSelector(RateLimiter.AggregateValueRateLimitReached.selector, waitTime, bucket.tokens)
     );
     s_rateLimiter.rateLimitValue(CHAIN_SELECTOR_1, value);
 
@@ -581,15 +577,15 @@ contract MultiAggregateRateLimiter__rateLimitValue is MultiAggregateRateLimiterS
     uint256 value = (numberOfTokens * TOKEN_PRICE) / 1e18;
 
     vm.expectEmit();
-    emit MultiAggregateRateLimiter.RateLimiterTokensConsumed(CHAIN_SELECTOR_1, value);
+    emit RateLimiter.TokensConsumed(value);
 
     vm.resumeGasMetering();
     s_rateLimiter.rateLimitValue(CHAIN_SELECTOR_1, value);
     vm.pauseGasMetering();
 
     // Get the updated bucket status
-    RateLimiterNoEvents.TokenBucket memory bucket1 = s_rateLimiter.currentRateLimiterState(CHAIN_SELECTOR_1);
-    RateLimiterNoEvents.TokenBucket memory bucket2 = s_rateLimiter.currentRateLimiterState(CHAIN_SELECTOR_2);
+    RateLimiter.TokenBucket memory bucket1 = s_rateLimiter.currentRateLimiterState(CHAIN_SELECTOR_1);
+    RateLimiter.TokenBucket memory bucket2 = s_rateLimiter.currentRateLimiterState(CHAIN_SELECTOR_2);
 
     // Assert the proper value has been taken out of the bucket
     assertEq(bucket1.capacity - value, bucket1.tokens);
@@ -597,7 +593,7 @@ contract MultiAggregateRateLimiter__rateLimitValue is MultiAggregateRateLimiterS
     assertEq(bucket2.capacity, bucket2.tokens);
 
     vm.expectEmit();
-    emit MultiAggregateRateLimiter.RateLimiterTokensConsumed(CHAIN_SELECTOR_2, value);
+    emit RateLimiter.TokensConsumed(value);
 
     vm.resumeGasMetering();
     s_rateLimiter.rateLimitValue(CHAIN_SELECTOR_2, value);
@@ -614,16 +610,14 @@ contract MultiAggregateRateLimiter__rateLimitValue is MultiAggregateRateLimiterS
   // Reverts
 
   function test_AggregateValueMaxCapacityExceeded_Revert() public {
-    RateLimiterNoEvents.TokenBucket memory bucket = s_rateLimiter.currentRateLimiterState(CHAIN_SELECTOR_1);
+    RateLimiter.TokenBucket memory bucket = s_rateLimiter.currentRateLimiterState(CHAIN_SELECTOR_1);
 
     uint256 numberOfTokens = 100;
     uint256 value = (numberOfTokens * TOKEN_PRICE) / 1e18;
 
     vm.expectRevert(
       abi.encodeWithSelector(
-        RateLimiterNoEvents.AggregateValueMaxCapacityExceeded.selector,
-        bucket.capacity,
-        (numberOfTokens * TOKEN_PRICE) / 1e18
+        RateLimiter.AggregateValueMaxCapacityExceeded.selector, bucket.capacity, (numberOfTokens * TOKEN_PRICE) / 1e18
       )
     );
     s_rateLimiter.rateLimitValue(CHAIN_SELECTOR_1, value);
@@ -782,7 +776,7 @@ contract MultiAggregateRateLimiter_validateIncomingMessage is MultiAggregateRate
 
     // 3 tokens * TOKEN_PRICE + 1 token * (2 * TOKEN_PRICE)
     vm.expectEmit();
-    emit MultiAggregateRateLimiter.RateLimiterTokensConsumed(CHAIN_SELECTOR_1, (5 * TOKEN_PRICE) / 1e18);
+    emit RateLimiter.TokensConsumed((5 * TOKEN_PRICE) / 1e18);
 
     s_rateLimiter.validateIncomingMessage(_generateAny2EVMMessage(CHAIN_SELECTOR_1, tokenAmounts));
   }
@@ -800,7 +794,7 @@ contract MultiAggregateRateLimiter_validateIncomingMessage is MultiAggregateRate
     vm.startPrank(MOCK_OFFRAMP);
 
     vm.expectEmit();
-    emit MultiAggregateRateLimiter.RateLimiterTokensConsumed(CHAIN_SELECTOR_1, (5 * TOKEN_PRICE) / 1e18);
+    emit RateLimiter.TokensConsumed((5 * TOKEN_PRICE) / 1e18);
 
     s_rateLimiter.validateIncomingMessage(_generateAny2EVMMessage(CHAIN_SELECTOR_1, tokenAmounts));
   }
@@ -841,15 +835,15 @@ contract MultiAggregateRateLimiter_validateIncomingMessage is MultiAggregateRate
     s_rateLimiter.validateIncomingMessage(_generateAny2EVMMessage(CHAIN_SELECTOR_1, tokenAmounts));
 
     // Chain 1 changed
-    RateLimiterNoEvents.TokenBucket memory bucketChain1 = s_rateLimiter.currentRateLimiterState(CHAIN_SELECTOR_1);
+    RateLimiter.TokenBucket memory bucketChain1 = s_rateLimiter.currentRateLimiterState(CHAIN_SELECTOR_1);
     assertEq(bucketChain1.capacity - totalValue, bucketChain1.tokens);
 
     // Chain 2 unchanged
-    RateLimiterNoEvents.TokenBucket memory bucketChain2 = s_rateLimiter.currentRateLimiterState(CHAIN_SELECTOR_2);
+    RateLimiter.TokenBucket memory bucketChain2 = s_rateLimiter.currentRateLimiterState(CHAIN_SELECTOR_2);
     assertEq(bucketChain2.capacity, bucketChain2.tokens);
 
     vm.expectEmit();
-    emit MultiAggregateRateLimiter.RateLimiterTokensConsumed(CHAIN_SELECTOR_2, (4 * TOKEN_PRICE) / 1e18);
+    emit RateLimiter.TokensConsumed((4 * TOKEN_PRICE) / 1e18);
 
     s_rateLimiter.validateIncomingMessage(_generateAny2EVMMessage(CHAIN_SELECTOR_2, tokenAmounts));
 
@@ -872,12 +866,12 @@ contract MultiAggregateRateLimiter_validateIncomingMessage is MultiAggregateRate
     s_rateLimiter.validateIncomingMessage(_generateAny2EVMMessage(CHAIN_SELECTOR_1, tokenAmounts));
 
     // Cannot fit 80 rate limit value (need to wait at least 12 blocks, current capacity is 20)
-    vm.expectRevert(abi.encodeWithSelector(RateLimiterNoEvents.AggregateValueRateLimitReached.selector, 12, 20));
+    vm.expectRevert(abi.encodeWithSelector(RateLimiter.AggregateValueRateLimitReached.selector, 12, 20));
     s_rateLimiter.validateIncomingMessage(_generateAny2EVMMessage(CHAIN_SELECTOR_1, tokenAmounts));
 
     // Remaining capacity: 20 -> 35 (need to wait 9 more blocks)
     vm.warp(BLOCK_TIME + 3);
-    vm.expectRevert(abi.encodeWithSelector(RateLimiterNoEvents.AggregateValueRateLimitReached.selector, 9, 35));
+    vm.expectRevert(abi.encodeWithSelector(RateLimiter.AggregateValueRateLimitReached.selector, 9, 35));
     s_rateLimiter.validateIncomingMessage(_generateAny2EVMMessage(CHAIN_SELECTOR_1, tokenAmounts));
 
     // Remaining capacity: 35 -> 80 (can fit exactly 80)
@@ -895,9 +889,7 @@ contract MultiAggregateRateLimiter_validateIncomingMessage is MultiAggregateRate
     tokenAmounts[1] = Client.EVMTokenAmount({token: s_destTokens[1], amount: 30});
 
     uint256 totalValue = (80 * TOKEN_PRICE + 2 * (30 * TOKEN_PRICE)) / 1e18;
-    vm.expectRevert(
-      abi.encodeWithSelector(RateLimiterNoEvents.AggregateValueMaxCapacityExceeded.selector, 100, totalValue)
-    );
+    vm.expectRevert(abi.encodeWithSelector(RateLimiter.AggregateValueMaxCapacityExceeded.selector, 100, totalValue));
     s_rateLimiter.validateIncomingMessage(_generateAny2EVMMessage(CHAIN_SELECTOR_1, tokenAmounts));
   }
 

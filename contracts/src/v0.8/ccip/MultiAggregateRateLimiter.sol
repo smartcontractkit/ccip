@@ -7,14 +7,14 @@ import {IPriceRegistry} from "./interfaces/IPriceRegistry.sol";
 import {OwnerIsCreator} from "./../shared/access/OwnerIsCreator.sol";
 import {EnumerableMapAddresses} from "./../shared/enumerable/EnumerableMapAddresses.sol";
 import {Client} from "./libraries/Client.sol";
-import {RateLimiterNoEvents} from "./libraries/RateLimiterNoEvents.sol";
+import {RateLimiter} from "./libraries/RateLimiter.sol";
 import {USDPriceWith18Decimals} from "./libraries/USDPriceWith18Decimals.sol";
 
 /// @notice The aggregate rate limiter is a wrapper of the token bucket rate limiter
 /// which permits rate limiting based on the aggregate value of a group of
 /// token transfers, using a price registry to convert to a numeraire asset (e.g. USD).
 contract MultiAggregateRateLimiter is IMessageValidator, OwnerIsCreator {
-  using RateLimiterNoEvents for RateLimiterNoEvents.TokenBucket;
+  using RateLimiter for RateLimiter.TokenBucket;
   using USDPriceWith18Decimals for uint224;
   using EnumerableMapAddresses for EnumerableMapAddresses.AddressToAddressMap;
 
@@ -24,8 +24,7 @@ contract MultiAggregateRateLimiter is IMessageValidator, OwnerIsCreator {
   error ZeroAddressNotAllowed();
   error ZeroChainSelectorNotAllowed();
 
-  event RateLimiterConfigUpdated(uint64 indexed remoteChainSelector, RateLimiterNoEvents.Config config);
-  event RateLimiterTokensConsumed(uint64 indexed remoteChainSelector, uint256 tokens);
+  event RateLimiterConfigUpdated(uint64 indexed remoteChainSelector, RateLimiter.Config config);
   event PriceRegistrySet(address newPriceRegistry);
   event TokenAggregateRateLimitAdded(address sourceToken, address destToken);
   event TokenAggregateRateLimitRemoved(address sourceToken, address destToken);
@@ -47,7 +46,7 @@ contract MultiAggregateRateLimiter is IMessageValidator, OwnerIsCreator {
   /// @notice Update args for a single rate limiter config update
   struct RateLimiterConfigArgs {
     uint64 remoteChainSelector; // Chain selector to set config for
-    RateLimiterNoEvents.Config rateLimiterConfig; // Rate limiter config to set
+    RateLimiter.Config rateLimiterConfig; // Rate limiter config to set
   }
 
   /// @dev Tokens that should be included in Aggregate Rate Limiting (from dest -> source)
@@ -60,9 +59,9 @@ contract MultiAggregateRateLimiter is IMessageValidator, OwnerIsCreator {
   address internal s_priceRegistry;
 
   /// @notice Rate limiter token bucket states per chain
-  mapping(uint64 remoteChainSelector => RateLimiterNoEvents.TokenBucket rateLimiter) s_rateLimitersByChainSelector;
+  mapping(uint64 remoteChainSelector => RateLimiter.TokenBucket rateLimiter) s_rateLimitersByChainSelector;
 
-  /// @param rateLimiterConfigs The RateLimiterNoEvents.Configs per chain containing the capacity and refill rate
+  /// @param rateLimiterConfigs The RateLimiter.Configs per chain containing the capacity and refill rate
   /// of the bucket
   /// @param priceRegistry the price registry to set
   /// @param authorizedCallers the authorized callers to set
@@ -105,7 +104,6 @@ contract MultiAggregateRateLimiter is IMessageValidator, OwnerIsCreator {
   /// @param value consumed value
   function _rateLimitValue(uint64 remoteChainSelector, uint256 value) internal {
     s_rateLimitersByChainSelector[remoteChainSelector]._consume(value, address(0));
-    emit RateLimiterTokensConsumed(remoteChainSelector, value);
   }
 
   /// @notice Retrieves the token value for a token using the PriceRegistry
@@ -121,11 +119,7 @@ contract MultiAggregateRateLimiter is IMessageValidator, OwnerIsCreator {
   /// @notice Gets the token bucket with its values for the block it was requested at.
   /// @param remoteChainSelector chain selector to retrieve state for
   /// @return The token bucket.
-  function currentRateLimiterState(uint64 remoteChainSelector)
-    external
-    view
-    returns (RateLimiterNoEvents.TokenBucket memory)
-  {
+  function currentRateLimiterState(uint64 remoteChainSelector) external view returns (RateLimiter.TokenBucket memory) {
     return s_rateLimitersByChainSelector[remoteChainSelector]._currentTokenBucketState();
   }
 
@@ -141,18 +135,18 @@ contract MultiAggregateRateLimiter is IMessageValidator, OwnerIsCreator {
   function _applyRateLimiterConfigUpdates(RateLimiterConfigArgs[] memory rateLimiterUpdates) internal {
     for (uint256 i = 0; i < rateLimiterUpdates.length; ++i) {
       RateLimiterConfigArgs memory updateArgs = rateLimiterUpdates[i];
-      RateLimiterNoEvents.Config memory configUpdate = updateArgs.rateLimiterConfig;
+      RateLimiter.Config memory configUpdate = updateArgs.rateLimiterConfig;
       uint64 remoteChainSelector = updateArgs.remoteChainSelector;
 
       if (remoteChainSelector == 0) {
         revert ZeroChainSelectorNotAllowed();
       }
 
-      RateLimiterNoEvents.TokenBucket storage tokenBucket = s_rateLimitersByChainSelector[remoteChainSelector];
+      RateLimiter.TokenBucket storage tokenBucket = s_rateLimitersByChainSelector[remoteChainSelector];
 
       if (tokenBucket.lastUpdated == 0) {
         // Token bucket needs to be newly added
-        s_rateLimitersByChainSelector[remoteChainSelector] = RateLimiterNoEvents.TokenBucket({
+        s_rateLimitersByChainSelector[remoteChainSelector] = RateLimiter.TokenBucket({
           rate: configUpdate.rate,
           capacity: configUpdate.capacity,
           tokens: configUpdate.capacity,
