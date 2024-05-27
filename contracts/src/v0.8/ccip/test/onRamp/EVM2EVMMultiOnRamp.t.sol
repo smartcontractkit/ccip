@@ -5,6 +5,7 @@ import {ITokenAdminRegistry} from "../../interfaces/ITokenAdminRegistry.sol";
 
 import {BurnMintERC677} from "../../../shared/token/ERC677/BurnMintERC677.sol";
 import {AggregateRateLimiter} from "../../AggregateRateLimiter.sol";
+import {Pool} from "../../libraries/Pool.sol";
 import {RateLimiter} from "../../libraries/RateLimiter.sol";
 import {USDPriceWith18Decimals} from "../../libraries/USDPriceWith18Decimals.sol";
 import {EVM2EVMMultiOnRamp} from "../../onRamp/EVM2EVMMultiOnRamp.sol";
@@ -13,7 +14,6 @@ import {MaybeRevertingBurnMintTokenPool} from "../helpers/MaybeRevertingBurnMint
 import "./EVM2EVMMultiOnRampSetup.t.sol";
 import {Vm} from "forge-std/Vm.sol";
 
-/// @notice #constructor
 contract EVM2EVMMultiOnRamp_constructor is EVM2EVMMultiOnRampSetup {
   function test_Constructor_Success() public {
     EVM2EVMMultiOnRamp.StaticConfig memory staticConfig = EVM2EVMMultiOnRamp.StaticConfig({
@@ -163,15 +163,17 @@ contract EVM2EVMMultiOnRamp_constructor is EVM2EVMMultiOnRampSetup {
 }
 
 contract EVM2EVMMultiOnRamp_applyDestChainConfigUpdates is EVM2EVMMultiOnRampSetup {
-  event DestChainAdded(uint64 indexed destChainSelector, EVM2EVMMultiOnRamp.DestChainConfig destChainConfig);
-  event DestChainDynamicConfigUpdated(
-    uint64 indexed destChainSelector, EVM2EVMMultiOnRamp.DestChainDynamicConfig dynamicConfig
-  );
-
   function test_Fuzz_applyDestChainConfigUpdates_Success(
     EVM2EVMMultiOnRamp.DestChainConfigArgs memory destChainConfigArgs
   ) public {
     vm.assume(destChainConfigArgs.destChainSelector != 0);
+    destChainConfigArgs.dynamicConfig.defaultTokenDestBytesOverhead = uint32(
+      bound(
+        destChainConfigArgs.dynamicConfig.defaultTokenDestBytesOverhead,
+        Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES,
+        type(uint32).max
+      )
+    );
     bool isNewChain = true;
 
     if (destChainConfigArgs.destChainSelector == DEST_CHAIN_SELECTOR) {
@@ -194,10 +196,12 @@ contract EVM2EVMMultiOnRamp_applyDestChainConfigUpdates is EVM2EVMMultiOnRampSet
 
     if (isNewChain) {
       vm.expectEmit();
-      emit DestChainAdded(destChainConfigArgs.destChainSelector, expectedDestChainConfig);
+      emit EVM2EVMMultiOnRamp.DestChainAdded(destChainConfigArgs.destChainSelector, expectedDestChainConfig);
     } else {
       vm.expectEmit();
-      emit DestChainDynamicConfigUpdated(destChainConfigArgs.destChainSelector, expectedDestChainConfig.dynamicConfig);
+      emit EVM2EVMMultiOnRamp.DestChainDynamicConfigUpdated(
+        destChainConfigArgs.destChainSelector, expectedDestChainConfig.dynamicConfig
+      );
     }
 
     s_onRamp.applyDestChainConfigUpdates(newDestChainConfigArgs);
@@ -244,9 +248,9 @@ contract EVM2EVMMultiOnRamp_applyDestChainConfigUpdates is EVM2EVMMultiOnRampSet
     });
 
     vm.expectEmit();
-    emit DestChainDynamicConfigUpdated(DEST_CHAIN_SELECTOR, expectedDestChainConfig0.dynamicConfig);
+    emit EVM2EVMMultiOnRamp.DestChainDynamicConfigUpdated(DEST_CHAIN_SELECTOR, expectedDestChainConfig0.dynamicConfig);
     vm.expectEmit();
-    emit DestChainAdded(DEST_CHAIN_SELECTOR + 1, expectedDestChainConfig1);
+    emit EVM2EVMMultiOnRamp.DestChainAdded(DEST_CHAIN_SELECTOR + 1, expectedDestChainConfig1);
 
     vm.recordLogs();
     s_onRamp.applyDestChainConfigUpdates(destChainConfigArgs);
@@ -294,7 +298,6 @@ contract EVM2EVMMultiOnRamp_applyDestChainConfigUpdates is EVM2EVMMultiOnRampSet
   }
 }
 
-/// @notice #forwardFromRouter
 contract EVM2EVMMultiOnRamp_forwardFromRouter is EVM2EVMMultiOnRampSetup {
   struct LegacyExtraArgs {
     uint256 gasLimit;
@@ -321,7 +324,7 @@ contract EVM2EVMMultiOnRamp_forwardFromRouter is EVM2EVMMultiOnRampSetup {
     IERC20(s_sourceFeeToken).transferFrom(OWNER, address(s_onRamp), feeAmount);
 
     vm.expectEmit();
-    emit CCIPSendRequested(_messageToEvent(message, 1, 1, feeAmount, OWNER));
+    emit EVM2EVMMultiOnRamp.CCIPSendRequested(_messageToEvent(message, 1, 1, feeAmount, OWNER));
 
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, feeAmount, OWNER);
   }
@@ -335,7 +338,7 @@ contract EVM2EVMMultiOnRamp_forwardFromRouter is EVM2EVMMultiOnRampSetup {
 
     vm.expectEmit();
     // We expect the message to be emitted with strict = false.
-    emit CCIPSendRequested(_messageToEvent(message, 1, 1, feeAmount, OWNER));
+    emit EVM2EVMMultiOnRamp.CCIPSendRequested(_messageToEvent(message, 1, 1, feeAmount, OWNER));
 
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, feeAmount, OWNER);
   }
@@ -350,7 +353,7 @@ contract EVM2EVMMultiOnRamp_forwardFromRouter is EVM2EVMMultiOnRampSetup {
     expectedMessage.extraArgs = Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: GAS_LIMIT}));
     vm.expectEmit();
     // We expect the message to be emitted with strict = false.
-    emit CCIPSendRequested(_messageToEvent(expectedMessage, 1, 1, feeAmount, OWNER));
+    emit EVM2EVMMultiOnRamp.CCIPSendRequested(_messageToEvent(expectedMessage, 1, 1, feeAmount, OWNER));
 
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, feeAmount, OWNER);
   }
@@ -362,7 +365,7 @@ contract EVM2EVMMultiOnRamp_forwardFromRouter is EVM2EVMMultiOnRampSetup {
     IERC20(s_sourceFeeToken).transferFrom(OWNER, address(s_onRamp), feeAmount);
 
     vm.expectEmit();
-    emit CCIPSendRequested(_messageToEvent(message, 1, 1, feeAmount, OWNER));
+    emit EVM2EVMMultiOnRamp.CCIPSendRequested(_messageToEvent(message, 1, 1, feeAmount, OWNER));
 
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, feeAmount, OWNER);
   }
@@ -374,7 +377,7 @@ contract EVM2EVMMultiOnRamp_forwardFromRouter is EVM2EVMMultiOnRampSetup {
       uint64 nonceBefore = s_onRamp.getSenderNonce(DEST_CHAIN_SELECTOR, OWNER);
 
       vm.expectEmit();
-      emit CCIPSendRequested(_messageToEvent(message, i, i, 0, OWNER));
+      emit EVM2EVMMultiOnRamp.CCIPSendRequested(_messageToEvent(message, i, i, 0, OWNER));
 
       s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 0, OWNER);
 
@@ -382,8 +385,6 @@ contract EVM2EVMMultiOnRamp_forwardFromRouter is EVM2EVMMultiOnRampSetup {
       assertEq(nonceAfter, nonceBefore + 1);
     }
   }
-
-  event Transfer(address indexed from, address indexed to, uint256 value);
 
   function test_ShouldStoreLinkFees() public {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
@@ -437,7 +438,7 @@ contract EVM2EVMMultiOnRamp_forwardFromRouter is EVM2EVMMultiOnRampSetup {
     Internal.EVM2EVMMessage memory expectedEvent = _messageToEvent(message, 1, 1, feeTokenAmount, originalSender);
 
     vm.expectEmit(false, false, false, true);
-    emit CCIPSendRequested(expectedEvent);
+    emit EVM2EVMMultiOnRamp.CCIPSendRequested(expectedEvent);
 
     // Assert the message Id is correct
     assertEq(
@@ -473,18 +474,21 @@ contract EVM2EVMMultiOnRamp_forwardFromRouter is EVM2EVMMultiOnRampSetup {
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 0, OWNER);
 
     // Configure ARL off for token
+    EVM2EVMMultiOnRamp.TokenTransferFeeConfig memory tokenTransferFeeConfig =
+      s_onRamp.getTokenTransferFeeConfig(s_sourceTokens[0]);
     EVM2EVMMultiOnRamp.TokenTransferFeeConfigArgs[] memory tokenTransferFeeConfigArgs =
-      generateTokenTransferFeeConfigArgs(1, 1);
-    tokenTransferFeeConfigArgs[0].destChainSelector = DEST_CHAIN_SELECTOR;
-    tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].token = s_sourceTokens[0];
-    tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].tokenTransferFeeConfig =
-      s_onRamp.getTokenTransferFeeConfig(DEST_CHAIN_SELECTOR, s_sourceTokens[0]);
-    tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].tokenTransferFeeConfig.aggregateRateLimitEnabled = false;
-
+      new EVM2EVMMultiOnRamp.TokenTransferFeeConfigArgs[](1);
+    tokenTransferFeeConfigArgs[0] = EVM2EVMMultiOnRamp.TokenTransferFeeConfigArgs({
+      token: s_sourceTokens[0],
+      minFeeUSDCents: tokenTransferFeeConfig.minFeeUSDCents,
+      maxFeeUSDCents: tokenTransferFeeConfig.maxFeeUSDCents,
+      deciBps: tokenTransferFeeConfig.deciBps,
+      destGasOverhead: tokenTransferFeeConfig.destGasOverhead,
+      destBytesOverhead: tokenTransferFeeConfig.destBytesOverhead,
+      aggregateRateLimitEnabled: false
+    });
     vm.startPrank(OWNER);
-    s_onRamp.applyTokenTransferFeeConfigUpdates(
-      tokenTransferFeeConfigArgs, new EVM2EVMMultiOnRamp.DestChainAndToken[](0)
-    );
+    s_onRamp.setTokenTransferFeeConfig(tokenTransferFeeConfigArgs, new address[](0));
 
     vm.startPrank(address(s_sourceRouter));
     // Expect the call now succeeds
@@ -681,35 +685,13 @@ contract EVM2EVMMultiOnRamp_forwardFromRouter is EVM2EVMMultiOnRampSetup {
     MaybeRevertingBurnMintTokenPool newPool = new MaybeRevertingBurnMintTokenPool(
       BurnMintERC677(sourceETH), new address[](0), address(s_mockRMN), address(s_sourceRouter)
     );
-    // Allow Pool to burn/mint Eth
     BurnMintERC677(sourceETH).grantMintAndBurnRoles(address(newPool));
-    // Pool will be burning its own balance
     deal(address(sourceETH), address(newPool), type(uint256).max);
-
-    // Set destBytesOverhead to 0, and let tokenPool return 64 bytes
-    EVM2EVMMultiOnRamp.TokenTransferFeeConfigArgs[] memory tokenTransferFeeConfigArgs =
-      generateTokenTransferFeeConfigArgs(1, 1);
-    tokenTransferFeeConfigArgs[0].destChainSelector = DEST_CHAIN_SELECTOR;
-    tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].token = sourceETH;
-    tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].tokenTransferFeeConfig = EVM2EVMMultiOnRamp
-      .TokenTransferFeeConfig({
-      minFeeUSDCents: 1,
-      maxFeeUSDCents: 0,
-      deciBps: 0,
-      destGasOverhead: 0,
-      destBytesOverhead: 0,
-      aggregateRateLimitEnabled: true,
-      isEnabled: true
-    });
-    s_onRamp.applyTokenTransferFeeConfigUpdates(
-      tokenTransferFeeConfigArgs, new EVM2EVMMultiOnRamp.DestChainAndToken[](0)
-    );
-    newPool.setSourceTokenData(new bytes(64));
 
     // Add TokenPool to OnRamp
     s_tokenAdminRegistry.setPool(sourceETH, address(newPool));
 
-    // Whitelist OnRamp in TokenPool
+    // Allow chain in TokenPool
     TokenPool.ChainUpdate[] memory chainUpdates = new TokenPool.ChainUpdate[](1);
     chainUpdates[0] = TokenPool.ChainUpdate({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
@@ -722,9 +704,48 @@ contract EVM2EVMMultiOnRamp_forwardFromRouter is EVM2EVMMultiOnRampSetup {
 
     Client.EVM2AnyMessage memory message = _generateSingleTokenMessage(address(sourceETH), 1000);
 
-    // only call OnRamp from Router
+    // No data set, should succeed
     vm.startPrank(address(s_sourceRouter));
+    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 0, OWNER);
 
+    // Set max data length, should succeed
+    vm.startPrank(OWNER);
+    newPool.setSourceTokenData(new bytes(Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES));
+
+    vm.startPrank(address(s_sourceRouter));
+    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 0, OWNER);
+
+    // Set data to max length +1, should revert
+    vm.startPrank(OWNER);
+    newPool.setSourceTokenData(new bytes(Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES + 1));
+
+    vm.startPrank(address(s_sourceRouter));
+    vm.expectRevert(abi.encodeWithSelector(EVM2EVMMultiOnRamp.SourceTokenDataTooLarge.selector, sourceETH));
+    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 0, OWNER);
+
+    // Set token config to allow larger data
+    vm.startPrank(OWNER);
+    EVM2EVMMultiOnRamp.TokenTransferFeeConfigArgs[] memory tokenTransferFeeConfigArgs =
+      new EVM2EVMMultiOnRamp.TokenTransferFeeConfigArgs[](1);
+    tokenTransferFeeConfigArgs[0] = EVM2EVMMultiOnRamp.TokenTransferFeeConfigArgs({
+      token: sourceETH,
+      minFeeUSDCents: 1,
+      maxFeeUSDCents: 0,
+      deciBps: 0,
+      destGasOverhead: 0,
+      destBytesOverhead: uint32(Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES) + 32,
+      aggregateRateLimitEnabled: false
+    });
+    s_onRamp.setTokenTransferFeeConfig(tokenTransferFeeConfigArgs, new address[](0));
+
+    vm.startPrank(address(s_sourceRouter));
+    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 0, OWNER);
+
+    // Set the token data larger than the configured token data, should revert
+    vm.startPrank(OWNER);
+    newPool.setSourceTokenData(new bytes(uint32(Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES) + 32 + 1));
+
+    vm.startPrank(address(s_sourceRouter));
     vm.expectRevert(abi.encodeWithSelector(EVM2EVMMultiOnRamp.SourceTokenDataTooLarge.selector, sourceETH));
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 0, OWNER);
   }
@@ -1024,25 +1045,26 @@ contract EVM2EVMMultiOnRamp_getFee is EVM2EVMMultiOnRamp_getFeeSetup {
     for (uint256 i = 0; i < feeTokenPrices.length; ++i) {
       Client.EVM2AnyMessage memory message = _generateSingleTokenMessage(s_sourceFeeToken, tokenAmount);
       message.feeToken = testTokens[i];
-      uint64 premiumMultiplierWeiPerEth = s_onRamp.getPremiumMultiplierWeiPerEth(message.feeToken);
       EVM2EVMMultiOnRamp.DestChainDynamicConfig memory destChainDynamicConfig =
         s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR).dynamicConfig;
-      EVM2EVMMultiOnRamp.TokenTransferFeeConfig memory tokenTransferFeeConfig =
-        s_onRamp.getTokenTransferFeeConfig(DEST_CHAIN_SELECTOR, message.tokenAmounts[0].token);
+      uint32 destBytesOverhead = s_onRamp.getTokenTransferFeeConfig(message.tokenAmounts[0].token).destBytesOverhead;
+      uint32 tokenBytesOverhead =
+        destBytesOverhead == 0 ? uint32(Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES) : destBytesOverhead;
 
       uint256 feeAmount = s_onRamp.getFee(DEST_CHAIN_SELECTOR, message);
 
-      uint256 gasUsed = GAS_LIMIT + DEST_GAS_OVERHEAD + tokenTransferFeeConfig.destGasOverhead;
+      uint256 gasUsed = GAS_LIMIT + DEST_GAS_OVERHEAD
+        + s_onRamp.getTokenTransferFeeConfig(message.tokenAmounts[0].token).destGasOverhead;
       uint256 gasFeeUSD = (gasUsed * destChainDynamicConfig.gasMultiplierWeiPerEth * USD_PER_GAS);
       (uint256 transferFeeUSD,,) =
         s_onRamp.getTokenTransferCost(DEST_CHAIN_SELECTOR, message.feeToken, feeTokenPrices[i], message.tokenAmounts);
-      uint256 messageFeeUSD = (transferFeeUSD * premiumMultiplierWeiPerEth);
+      uint256 messageFeeUSD = (transferFeeUSD * s_onRamp.getPremiumMultiplierWeiPerEth(message.feeToken));
       uint256 dataAvailabilityFeeUSD = s_onRamp.getDataAvailabilityCost(
         DEST_CHAIN_SELECTOR,
         USD_PER_DATA_AVAILABILITY_GAS,
         message.data.length,
         message.tokenAmounts.length,
-        tokenTransferFeeConfig.destBytesOverhead
+        tokenBytesOverhead
       );
 
       uint256 totalPriceInFeeToken = (gasFeeUSD + messageFeeUSD + dataAvailabilityFeeUSD) / feeTokenPrices[i];
@@ -1074,10 +1096,9 @@ contract EVM2EVMMultiOnRamp_getFee is EVM2EVMMultiOnRamp_getFeeSetup {
       uint32 tokenGasOverhead = 0;
       uint32 tokenBytesOverhead = 0;
       for (uint256 j = 0; j < message.tokenAmounts.length; ++j) {
-        tokenGasOverhead +=
-          s_onRamp.getTokenTransferFeeConfig(DEST_CHAIN_SELECTOR, message.tokenAmounts[j].token).destGasOverhead;
-        tokenBytesOverhead +=
-          s_onRamp.getTokenTransferFeeConfig(DEST_CHAIN_SELECTOR, message.tokenAmounts[j].token).destBytesOverhead;
+        tokenGasOverhead += s_onRamp.getTokenTransferFeeConfig(message.tokenAmounts[j].token).destGasOverhead;
+        uint32 destBytesOverhead = s_onRamp.getTokenTransferFeeConfig(message.tokenAmounts[j].token).destBytesOverhead;
+        tokenBytesOverhead += destBytesOverhead == 0 ? uint32(Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES) : destBytesOverhead;
       }
 
       uint256 gasUsed =
@@ -1100,13 +1121,6 @@ contract EVM2EVMMultiOnRamp_getFee is EVM2EVMMultiOnRamp_getFeeSetup {
   }
 
   // Reverts
-
-  function test_DestinationChainNotEnabled_Revert() public {
-    vm.expectRevert(
-      abi.encodeWithSelector(EVM2EVMMultiOnRamp.DestinationChainNotEnabled.selector, DEST_CHAIN_SELECTOR + 1)
-    );
-    s_onRamp.getFee(DEST_CHAIN_SELECTOR + 1, _generateEmptyMessage());
-  }
 
   function test_NotAFeeToken_Revert() public {
     address notAFeeToken = address(0x111111);
@@ -1145,310 +1159,7 @@ contract EVM2EVMMultiOnRamp_getFee is EVM2EVMMultiOnRamp_getFeeSetup {
   }
 }
 
-contract EVM2EVMMultiOnRamp_getTokenTransferCost is EVM2EVMMultiOnRamp_getFeeSetup {
-  using USDPriceWith18Decimals for uint224;
-
-  function test_NoTokenTransferChargesZeroFee_Success() public view {
-    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
-    (uint256 feeUSDWei, uint32 destGasOverhead, uint32 destBytesOverhead) =
-      s_onRamp.getTokenTransferCost(DEST_CHAIN_SELECTOR, message.feeToken, s_feeTokenPrice, message.tokenAmounts);
-
-    assertEq(0, feeUSDWei);
-    assertEq(0, destGasOverhead);
-    assertEq(0, destBytesOverhead);
-  }
-
-  function test_getTokenTransferCost_selfServeUsesDefaults_Success() public view {
-    Client.EVM2AnyMessage memory message = _generateSingleTokenMessage(s_selfServeTokenDefaultPricing, 1000);
-
-    // Get config to assert it isn't set
-    EVM2EVMMultiOnRamp.TokenTransferFeeConfig memory transferFeeConfig =
-      s_onRamp.getTokenTransferFeeConfig(DEST_CHAIN_SELECTOR, message.tokenAmounts[0].token);
-
-    assertFalse(transferFeeConfig.isEnabled);
-
-    (uint256 feeUSDWei, uint32 destGasOverhead, uint32 destBytesOverhead) =
-      s_onRamp.getTokenTransferCost(DEST_CHAIN_SELECTOR, message.feeToken, s_feeTokenPrice, message.tokenAmounts);
-
-    // Assert that the default values are used
-    assertEq(uint256(DEFAULT_TOKEN_FEE_USD_CENTS) * 1e16, feeUSDWei);
-    assertEq(DEFAULT_TOKEN_DEST_GAS_OVERHEAD, destGasOverhead);
-    assertEq(DEFAULT_TOKEN_BYTES_OVERHEAD, destBytesOverhead);
-  }
-
-  function test_SmallTokenTransferChargesMinFeeAndGas_Success() public view {
-    Client.EVM2AnyMessage memory message = _generateSingleTokenMessage(s_sourceFeeToken, 1000);
-    EVM2EVMMultiOnRamp.TokenTransferFeeConfig memory transferFeeConfig =
-      s_onRamp.getTokenTransferFeeConfig(DEST_CHAIN_SELECTOR, message.tokenAmounts[0].token);
-
-    (uint256 feeUSDWei, uint32 destGasOverhead, uint32 destBytesOverhead) =
-      s_onRamp.getTokenTransferCost(DEST_CHAIN_SELECTOR, message.feeToken, s_feeTokenPrice, message.tokenAmounts);
-
-    assertEq(configUSDCentToWei(transferFeeConfig.minFeeUSDCents), feeUSDWei);
-    assertEq(transferFeeConfig.destGasOverhead, destGasOverhead);
-    assertEq(transferFeeConfig.destBytesOverhead, destBytesOverhead);
-  }
-
-  function test_ZeroAmountTokenTransferChargesMinFeeAndGas_Success() public view {
-    Client.EVM2AnyMessage memory message = _generateSingleTokenMessage(s_sourceFeeToken, 0);
-    EVM2EVMMultiOnRamp.TokenTransferFeeConfig memory transferFeeConfig =
-      s_onRamp.getTokenTransferFeeConfig(DEST_CHAIN_SELECTOR, message.tokenAmounts[0].token);
-
-    (uint256 feeUSDWei, uint32 destGasOverhead, uint32 destBytesOverhead) =
-      s_onRamp.getTokenTransferCost(DEST_CHAIN_SELECTOR, message.feeToken, s_feeTokenPrice, message.tokenAmounts);
-
-    assertEq(configUSDCentToWei(transferFeeConfig.minFeeUSDCents), feeUSDWei);
-    assertEq(transferFeeConfig.destGasOverhead, destGasOverhead);
-    assertEq(transferFeeConfig.destBytesOverhead, destBytesOverhead);
-  }
-
-  function test_LargeTokenTransferChargesMaxFeeAndGas_Success() public view {
-    Client.EVM2AnyMessage memory message = _generateSingleTokenMessage(s_sourceFeeToken, 1e36);
-    EVM2EVMMultiOnRamp.TokenTransferFeeConfig memory transferFeeConfig =
-      s_onRamp.getTokenTransferFeeConfig(DEST_CHAIN_SELECTOR, message.tokenAmounts[0].token);
-
-    (uint256 feeUSDWei, uint32 destGasOverhead, uint32 destBytesOverhead) =
-      s_onRamp.getTokenTransferCost(DEST_CHAIN_SELECTOR, message.feeToken, s_feeTokenPrice, message.tokenAmounts);
-
-    assertEq(configUSDCentToWei(transferFeeConfig.maxFeeUSDCents), feeUSDWei);
-    assertEq(transferFeeConfig.destGasOverhead, destGasOverhead);
-    assertEq(transferFeeConfig.destBytesOverhead, destBytesOverhead);
-  }
-
-  function test_FeeTokenBpsFee_Success() public view {
-    uint256 tokenAmount = 10000e18;
-
-    Client.EVM2AnyMessage memory message = _generateSingleTokenMessage(s_sourceFeeToken, tokenAmount);
-    EVM2EVMMultiOnRamp.TokenTransferFeeConfig memory transferFeeConfig =
-      s_onRamp.getTokenTransferFeeConfig(DEST_CHAIN_SELECTOR, message.tokenAmounts[0].token);
-
-    (uint256 feeUSDWei, uint32 destGasOverhead, uint32 destBytesOverhead) =
-      s_onRamp.getTokenTransferCost(DEST_CHAIN_SELECTOR, message.feeToken, s_feeTokenPrice, message.tokenAmounts);
-
-    uint256 usdWei = calcUSDValueFromTokenAmount(s_feeTokenPrice, tokenAmount);
-    uint256 bpsUSDWei =
-      applyBpsRatio(usdWei, s_tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].tokenTransferFeeConfig.deciBps);
-
-    assertEq(bpsUSDWei, feeUSDWei);
-    assertEq(transferFeeConfig.destGasOverhead, destGasOverhead);
-    assertEq(transferFeeConfig.destBytesOverhead, destBytesOverhead);
-  }
-
-  function test_WETHTokenBpsFee_Success() public view {
-    uint256 tokenAmount = 100e18;
-
-    Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
-      receiver: abi.encode(OWNER),
-      data: "",
-      tokenAmounts: new Client.EVMTokenAmount[](1),
-      feeToken: s_sourceRouter.getWrappedNative(),
-      extraArgs: Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: GAS_LIMIT}))
-    });
-    message.tokenAmounts[0] = Client.EVMTokenAmount({token: s_sourceRouter.getWrappedNative(), amount: tokenAmount});
-
-    EVM2EVMMultiOnRamp.TokenTransferFeeConfig memory transferFeeConfig =
-      s_onRamp.getTokenTransferFeeConfig(DEST_CHAIN_SELECTOR, message.tokenAmounts[0].token);
-
-    (uint256 feeUSDWei, uint32 destGasOverhead, uint32 destBytesOverhead) =
-      s_onRamp.getTokenTransferCost(DEST_CHAIN_SELECTOR, message.feeToken, s_wrappedTokenPrice, message.tokenAmounts);
-
-    uint256 usdWei = calcUSDValueFromTokenAmount(s_wrappedTokenPrice, tokenAmount);
-    uint256 bpsUSDWei =
-      applyBpsRatio(usdWei, s_tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[1].tokenTransferFeeConfig.deciBps);
-
-    assertEq(bpsUSDWei, feeUSDWei);
-    assertEq(transferFeeConfig.destGasOverhead, destGasOverhead);
-    assertEq(transferFeeConfig.destBytesOverhead, destBytesOverhead);
-  }
-
-  function test_CustomTokenBpsFee_Success() public view {
-    uint256 tokenAmount = 200000e18;
-
-    Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
-      receiver: abi.encode(OWNER),
-      data: "",
-      tokenAmounts: new Client.EVMTokenAmount[](1),
-      feeToken: s_sourceFeeToken,
-      extraArgs: Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: GAS_LIMIT}))
-    });
-    message.tokenAmounts[0] = Client.EVMTokenAmount({token: CUSTOM_TOKEN, amount: tokenAmount});
-
-    EVM2EVMMultiOnRamp.TokenTransferFeeConfig memory transferFeeConfig =
-      s_onRamp.getTokenTransferFeeConfig(DEST_CHAIN_SELECTOR, message.tokenAmounts[0].token);
-
-    (uint256 feeUSDWei, uint32 destGasOverhead, uint32 destBytesOverhead) =
-      s_onRamp.getTokenTransferCost(DEST_CHAIN_SELECTOR, message.feeToken, s_feeTokenPrice, message.tokenAmounts);
-
-    uint256 usdWei = calcUSDValueFromTokenAmount(s_customTokenPrice, tokenAmount);
-    uint256 bpsUSDWei =
-      applyBpsRatio(usdWei, s_tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[2].tokenTransferFeeConfig.deciBps);
-
-    assertEq(bpsUSDWei, feeUSDWei);
-    assertEq(transferFeeConfig.destGasOverhead, destGasOverhead);
-    assertEq(transferFeeConfig.destBytesOverhead, destBytesOverhead);
-  }
-
-  function test_ZeroFeeConfigChargesMinFee_Success() public {
-    EVM2EVMMultiOnRamp.TokenTransferFeeConfigArgs[] memory tokenTransferFeeConfigArgs =
-      generateTokenTransferFeeConfigArgs(1, 1);
-    tokenTransferFeeConfigArgs[0].destChainSelector = DEST_CHAIN_SELECTOR;
-    tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].token = s_sourceFeeToken;
-    tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].tokenTransferFeeConfig = EVM2EVMMultiOnRamp
-      .TokenTransferFeeConfig({
-      minFeeUSDCents: 1,
-      maxFeeUSDCents: 0,
-      deciBps: 0,
-      destGasOverhead: 0,
-      destBytesOverhead: 0,
-      aggregateRateLimitEnabled: true,
-      isEnabled: true
-    });
-    s_onRamp.applyTokenTransferFeeConfigUpdates(
-      tokenTransferFeeConfigArgs, new EVM2EVMMultiOnRamp.DestChainAndToken[](0)
-    );
-
-    Client.EVM2AnyMessage memory message = _generateSingleTokenMessage(s_sourceFeeToken, 1e36);
-    (uint256 feeUSDWei, uint32 destGasOverhead, uint32 destBytesOverhead) =
-      s_onRamp.getTokenTransferCost(DEST_CHAIN_SELECTOR, message.feeToken, s_feeTokenPrice, message.tokenAmounts);
-
-    // if token charges 0 bps, it should cost minFee to transfer
-    assertEq(
-      configUSDCentToWei(tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].tokenTransferFeeConfig.minFeeUSDCents),
-      feeUSDWei
-    );
-    assertEq(0, destGasOverhead);
-    assertEq(0, destBytesOverhead);
-  }
-
-  function test_Fuzz_TokenTransferFeeDuplicateTokens_Success(uint256 transfers, uint256 amount) public view {
-    // It shouldn't be possible to pay materially lower fees by splitting up the transfers.
-    // Note it is possible to pay higher fees since the minimum fees are added.
-    EVM2EVMMultiOnRamp.DestChainDynamicConfig memory dynamicConfig =
-      s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR).dynamicConfig;
-    transfers = bound(transfers, 1, dynamicConfig.maxNumberOfTokensPerMsg);
-    // Cap amount to avoid overflow
-    amount = bound(amount, 0, 1e36);
-    Client.EVMTokenAmount[] memory multiple = new Client.EVMTokenAmount[](transfers);
-    for (uint256 i = 0; i < transfers; ++i) {
-      multiple[i] = Client.EVMTokenAmount({token: s_sourceTokens[0], amount: amount});
-    }
-    Client.EVMTokenAmount[] memory single = new Client.EVMTokenAmount[](1);
-    single[0] = Client.EVMTokenAmount({token: s_sourceTokens[0], amount: amount * transfers});
-
-    address feeToken = s_sourceRouter.getWrappedNative();
-
-    (uint256 feeSingleUSDWei, uint32 gasOverheadSingle, uint32 bytesOverheadSingle) =
-      s_onRamp.getTokenTransferCost(DEST_CHAIN_SELECTOR, feeToken, s_wrappedTokenPrice, single);
-    (uint256 feeMultipleUSDWei, uint32 gasOverheadMultiple, uint32 bytesOverheadMultiple) =
-      s_onRamp.getTokenTransferCost(DEST_CHAIN_SELECTOR, feeToken, s_wrappedTokenPrice, multiple);
-
-    // Note that there can be a rounding error once per split.
-    assertTrue(feeMultipleUSDWei >= (feeSingleUSDWei - dynamicConfig.maxNumberOfTokensPerMsg));
-    assertEq(gasOverheadMultiple, gasOverheadSingle * transfers);
-    assertEq(bytesOverheadMultiple, bytesOverheadSingle * transfers);
-  }
-
-  function test_MixedTokenTransferFee_Success() public view {
-    address[3] memory testTokens = [s_sourceFeeToken, s_sourceRouter.getWrappedNative(), CUSTOM_TOKEN];
-    uint224[3] memory tokenPrices = [s_feeTokenPrice, s_wrappedTokenPrice, s_customTokenPrice];
-    EVM2EVMMultiOnRamp.TokenTransferFeeConfig[3] memory tokenTransferFeeConfigs = [
-      s_onRamp.getTokenTransferFeeConfig(DEST_CHAIN_SELECTOR, testTokens[0]),
-      s_onRamp.getTokenTransferFeeConfig(DEST_CHAIN_SELECTOR, testTokens[1]),
-      s_onRamp.getTokenTransferFeeConfig(DEST_CHAIN_SELECTOR, testTokens[2])
-    ];
-
-    Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
-      receiver: abi.encode(OWNER),
-      data: "",
-      tokenAmounts: new Client.EVMTokenAmount[](3),
-      feeToken: s_sourceRouter.getWrappedNative(),
-      extraArgs: Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: GAS_LIMIT}))
-    });
-    uint256 expectedTotalGas = 0;
-    uint256 expectedTotalBytes = 0;
-
-    // Start with small token transfers, total bps fee is lower than min token transfer fee
-    for (uint256 i = 0; i < testTokens.length; ++i) {
-      message.tokenAmounts[i] = Client.EVMTokenAmount({token: testTokens[i], amount: 1e14});
-      expectedTotalGas += s_onRamp.getTokenTransferFeeConfig(DEST_CHAIN_SELECTOR, testTokens[i]).destGasOverhead;
-      expectedTotalBytes += s_onRamp.getTokenTransferFeeConfig(DEST_CHAIN_SELECTOR, testTokens[i]).destBytesOverhead;
-    }
-    (uint256 feeUSDWei, uint32 destGasOverhead, uint32 destBytesOverhead) =
-      s_onRamp.getTokenTransferCost(DEST_CHAIN_SELECTOR, message.feeToken, s_wrappedTokenPrice, message.tokenAmounts);
-
-    uint256 expectedFeeUSDWei = 0;
-    for (uint256 i = 0; i < testTokens.length; ++i) {
-      expectedFeeUSDWei += configUSDCentToWei(tokenTransferFeeConfigs[i].minFeeUSDCents);
-    }
-
-    assertEq(expectedFeeUSDWei, feeUSDWei);
-    assertEq(expectedTotalGas, destGasOverhead);
-    assertEq(expectedTotalBytes, destBytesOverhead);
-
-    // Set 1st token transfer to a meaningful amount so its bps fee is now between min and max fee
-    message.tokenAmounts[0] = Client.EVMTokenAmount({token: testTokens[0], amount: 10000e18});
-
-    (feeUSDWei, destGasOverhead, destBytesOverhead) =
-      s_onRamp.getTokenTransferCost(DEST_CHAIN_SELECTOR, message.feeToken, s_wrappedTokenPrice, message.tokenAmounts);
-    expectedFeeUSDWei = applyBpsRatio(
-      calcUSDValueFromTokenAmount(tokenPrices[0], message.tokenAmounts[0].amount), tokenTransferFeeConfigs[0].deciBps
-    );
-    expectedFeeUSDWei += configUSDCentToWei(tokenTransferFeeConfigs[1].minFeeUSDCents);
-    expectedFeeUSDWei += configUSDCentToWei(tokenTransferFeeConfigs[2].minFeeUSDCents);
-
-    assertEq(expectedFeeUSDWei, feeUSDWei);
-    assertEq(expectedTotalGas, destGasOverhead);
-    assertEq(expectedTotalBytes, destBytesOverhead);
-
-    // Set 2nd token transfer to a large amount that is higher than maxFeeUSD
-    message.tokenAmounts[1] = Client.EVMTokenAmount({token: testTokens[1], amount: 1e36});
-
-    (feeUSDWei, destGasOverhead, destBytesOverhead) =
-      s_onRamp.getTokenTransferCost(DEST_CHAIN_SELECTOR, message.feeToken, s_wrappedTokenPrice, message.tokenAmounts);
-    expectedFeeUSDWei = applyBpsRatio(
-      calcUSDValueFromTokenAmount(tokenPrices[0], message.tokenAmounts[0].amount), tokenTransferFeeConfigs[0].deciBps
-    );
-    expectedFeeUSDWei += configUSDCentToWei(tokenTransferFeeConfigs[1].maxFeeUSDCents);
-    expectedFeeUSDWei += configUSDCentToWei(tokenTransferFeeConfigs[2].minFeeUSDCents);
-
-    assertEq(expectedFeeUSDWei, feeUSDWei);
-    assertEq(expectedTotalGas, destGasOverhead);
-    assertEq(expectedTotalBytes, destBytesOverhead);
-  }
-
-  // reverts
-
-  function test_UnsupportedToken_Revert() public {
-    address NOT_SUPPORTED_TOKEN = address(123);
-    Client.EVM2AnyMessage memory message = _generateSingleTokenMessage(NOT_SUPPORTED_TOKEN, 200);
-
-    vm.expectRevert(abi.encodeWithSelector(EVM2EVMMultiOnRamp.UnsupportedToken.selector, NOT_SUPPORTED_TOKEN));
-
-    s_onRamp.getTokenTransferCost(DEST_CHAIN_SELECTOR, message.feeToken, s_feeTokenPrice, message.tokenAmounts);
-  }
-
-  function test_ValidatedPriceStaleness_Revert() public {
-    vm.warp(block.timestamp + TWELVE_HOURS + 1);
-
-    Client.EVM2AnyMessage memory message = _generateSingleTokenMessage(s_sourceFeeToken, 1e36);
-    message.tokenAmounts[0].token = s_sourceRouter.getWrappedNative();
-
-    vm.expectRevert(
-      abi.encodeWithSelector(
-        PriceRegistry.StaleTokenPrice.selector,
-        s_sourceRouter.getWrappedNative(),
-        uint128(TWELVE_HOURS),
-        uint128(TWELVE_HOURS + 1)
-      )
-    );
-
-    s_onRamp.getTokenTransferCost(DEST_CHAIN_SELECTOR, message.feeToken, s_feeTokenPrice, message.tokenAmounts);
-  }
-}
-
 contract EVM2EVMMultiOnRamp_setDynamicConfig is EVM2EVMMultiOnRampSetup {
-  event ConfigSet(EVM2EVMMultiOnRamp.StaticConfig staticConfig, EVM2EVMMultiOnRamp.DynamicConfig dynamicConfig);
-
   function test_SetDynamicConfig_Success() public {
     EVM2EVMMultiOnRamp.StaticConfig memory staticConfig = s_onRamp.getStaticConfig();
     EVM2EVMMultiOnRamp.DynamicConfig memory newConfig = EVM2EVMMultiOnRamp.DynamicConfig({
@@ -1458,7 +1169,7 @@ contract EVM2EVMMultiOnRamp_setDynamicConfig is EVM2EVMMultiOnRampSetup {
     });
 
     vm.expectEmit();
-    emit ConfigSet(staticConfig, newConfig);
+    emit EVM2EVMMultiOnRamp.ConfigSet(staticConfig, newConfig);
 
     s_onRamp.setDynamicConfig(newConfig);
 
@@ -1604,168 +1315,5 @@ contract EVM2EVMOnRamp_applyPremiumMultiplierWeiPerEthUpdates is EVM2EVMMultiOnR
     vm.expectRevert(EVM2EVMMultiOnRamp.OnlyCallableByOwnerOrAdmin.selector);
 
     s_onRamp.applyPremiumMultiplierWeiPerEthUpdates(premiumMultiplierWeiPerEthArgs);
-  }
-}
-
-contract EVM2EVMMultiOnRamp_applyTokenTransferFeeConfigUpdates is EVM2EVMMultiOnRampSetup {
-  function test_Fuzz_ApplyTokenTransferFeeConfig_Success(
-    EVM2EVMMultiOnRamp.TokenTransferFeeConfig[2] memory tokenTransferFeeConfigs
-  ) public {
-    EVM2EVMMultiOnRamp.TokenTransferFeeConfigArgs[] memory tokenTransferFeeConfigArgs =
-      generateTokenTransferFeeConfigArgs(2, 2);
-    tokenTransferFeeConfigArgs[0].destChainSelector = DEST_CHAIN_SELECTOR;
-    tokenTransferFeeConfigArgs[1].destChainSelector = DEST_CHAIN_SELECTOR + 1;
-
-    for (uint256 i = 0; i < tokenTransferFeeConfigs.length; ++i) {
-      address feeToken = s_sourceTokens[i];
-      tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[i].token = feeToken;
-      tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[i].tokenTransferFeeConfig = tokenTransferFeeConfigs[i];
-
-      vm.expectEmit();
-      emit EVM2EVMMultiOnRamp.TokenTransferFeeConfigUpdated(
-        tokenTransferFeeConfigArgs[0].destChainSelector, feeToken, tokenTransferFeeConfigs[i]
-      );
-    }
-
-    s_onRamp.applyTokenTransferFeeConfigUpdates(
-      tokenTransferFeeConfigArgs, new EVM2EVMMultiOnRamp.DestChainAndToken[](0)
-    );
-
-    for (uint256 i = 0; i < tokenTransferFeeConfigs.length; ++i) {
-      assertTokenTransferFeeConfigEqual(
-        tokenTransferFeeConfigs[i],
-        s_onRamp.getTokenTransferFeeConfig(
-          tokenTransferFeeConfigArgs[0].destChainSelector,
-          tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[i].token
-        )
-      );
-    }
-  }
-
-  function test_ApplyTokenTransferFeeConfig_Success() public {
-    EVM2EVMMultiOnRamp.TokenTransferFeeConfigArgs[] memory tokenTransferFeeConfigArgs =
-      generateTokenTransferFeeConfigArgs(1, 2);
-    tokenTransferFeeConfigArgs[0].destChainSelector = DEST_CHAIN_SELECTOR;
-    tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].token = address(5);
-    tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].tokenTransferFeeConfig = EVM2EVMMultiOnRamp
-      .TokenTransferFeeConfig({
-      minFeeUSDCents: 6,
-      maxFeeUSDCents: 7,
-      deciBps: 8,
-      destGasOverhead: 9,
-      destBytesOverhead: 10,
-      aggregateRateLimitEnabled: true,
-      isEnabled: true
-    });
-    tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[1].token = address(11);
-    tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[1].tokenTransferFeeConfig = EVM2EVMMultiOnRamp
-      .TokenTransferFeeConfig({
-      minFeeUSDCents: 12,
-      maxFeeUSDCents: 13,
-      deciBps: 14,
-      destGasOverhead: 15,
-      destBytesOverhead: 16,
-      aggregateRateLimitEnabled: false,
-      isEnabled: true
-    });
-
-    vm.expectEmit();
-    emit EVM2EVMMultiOnRamp.TokenTransferFeeConfigUpdated(
-      tokenTransferFeeConfigArgs[0].destChainSelector,
-      tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].token,
-      tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].tokenTransferFeeConfig
-    );
-    vm.expectEmit();
-    emit EVM2EVMMultiOnRamp.TokenTransferFeeConfigUpdated(
-      tokenTransferFeeConfigArgs[0].destChainSelector,
-      tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[1].token,
-      tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[1].tokenTransferFeeConfig
-    );
-
-    EVM2EVMMultiOnRamp.DestChainAndToken[] memory tokensToRemove = new EVM2EVMMultiOnRamp.DestChainAndToken[](0);
-    s_onRamp.applyTokenTransferFeeConfigUpdates(tokenTransferFeeConfigArgs, tokensToRemove);
-
-    EVM2EVMMultiOnRamp.TokenTransferFeeConfig memory config0 = s_onRamp.getTokenTransferFeeConfig(
-      tokenTransferFeeConfigArgs[0].destChainSelector, tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].token
-    );
-    EVM2EVMMultiOnRamp.TokenTransferFeeConfig memory config1 = s_onRamp.getTokenTransferFeeConfig(
-      tokenTransferFeeConfigArgs[0].destChainSelector, tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[1].token
-    );
-
-    assertTokenTransferFeeConfigEqual(
-      tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].tokenTransferFeeConfig, config0
-    );
-    assertTokenTransferFeeConfigEqual(
-      tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[1].tokenTransferFeeConfig, config1
-    );
-
-    // Remove only the first token and validate only the first token is removed
-    tokensToRemove = new EVM2EVMMultiOnRamp.DestChainAndToken[](1);
-    tokensToRemove[0] = EVM2EVMMultiOnRamp.DestChainAndToken({
-      destChainSelector: tokenTransferFeeConfigArgs[0].destChainSelector,
-      token: tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].token
-    });
-
-    vm.expectEmit();
-    emit EVM2EVMMultiOnRamp.TokenTransferFeeConfigDeleted(
-      tokenTransferFeeConfigArgs[0].destChainSelector, tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].token
-    );
-
-    s_onRamp.applyTokenTransferFeeConfigUpdates(new EVM2EVMMultiOnRamp.TokenTransferFeeConfigArgs[](0), tokensToRemove);
-
-    config0 = s_onRamp.getTokenTransferFeeConfig(
-      tokenTransferFeeConfigArgs[0].destChainSelector, tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].token
-    );
-    config1 = s_onRamp.getTokenTransferFeeConfig(
-      tokenTransferFeeConfigArgs[0].destChainSelector, tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[1].token
-    );
-
-    EVM2EVMMultiOnRamp.TokenTransferFeeConfig memory emptyConfig;
-
-    assertTokenTransferFeeConfigEqual(emptyConfig, config0);
-    assertTokenTransferFeeConfigEqual(
-      tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[1].tokenTransferFeeConfig, config1
-    );
-  }
-
-  function test_ApplyTokenTransferFeeConfigByAdmin_Success() public {
-    vm.startPrank(ADMIN);
-    EVM2EVMMultiOnRamp.TokenTransferFeeConfigArgs[] memory tokenTransferFeeConfigArgs =
-      generateTokenTransferFeeConfigArgs(1, 1);
-    tokenTransferFeeConfigArgs[0].destChainSelector = DEST_CHAIN_SELECTOR;
-    tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].token = address(5);
-
-    vm.expectEmit();
-    emit EVM2EVMMultiOnRamp.TokenTransferFeeConfigUpdated(
-      tokenTransferFeeConfigArgs[0].destChainSelector,
-      tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].token,
-      tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].tokenTransferFeeConfig
-    );
-
-    s_onRamp.applyTokenTransferFeeConfigUpdates(
-      tokenTransferFeeConfigArgs, new EVM2EVMMultiOnRamp.DestChainAndToken[](0)
-    );
-  }
-
-  function test_ApplyTokenTransferFeeConfigByAdminZeroInput() public {
-    vm.recordLogs();
-    s_onRamp.applyTokenTransferFeeConfigUpdates(
-      new EVM2EVMMultiOnRamp.TokenTransferFeeConfigArgs[](0), new EVM2EVMMultiOnRamp.DestChainAndToken[](0)
-    );
-
-    assertEq(vm.getRecordedLogs().length, 0);
-  }
-
-  // Reverts
-
-  function test_OnlyCallableByOwnerOrAdmin_Revert() public {
-    vm.startPrank(STRANGER);
-    EVM2EVMMultiOnRamp.TokenTransferFeeConfigArgs[] memory tokenTransferFeeConfigArgs;
-
-    vm.expectRevert(EVM2EVMMultiOnRamp.OnlyCallableByOwnerOrAdmin.selector);
-
-    s_onRamp.applyTokenTransferFeeConfigUpdates(
-      tokenTransferFeeConfigArgs, new EVM2EVMMultiOnRamp.DestChainAndToken[](0)
-    );
   }
 }
