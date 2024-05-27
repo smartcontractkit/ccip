@@ -262,6 +262,7 @@ func newMsgsConsensusForChain(
 	msgSeqNumToID := make(map[model.SeqNum]model.Bytes32)
 	for seqNum, idCounts := range msgSeqNumToIDCounts {
 		if len(idCounts) == 0 {
+			lggr.Errorw("critical error id counts should never be empty", "seqNum", seqNum)
 			continue
 		}
 
