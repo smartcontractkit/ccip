@@ -32,7 +32,7 @@ type Plugin struct {
 	discoverer              discoverer.Discoverer
 	bridgeFactory           bridge.Factory
 	mu                      sync.RWMutex
-	graphs                  graph.MultiGraph
+	graphs                  graph.GraphContainer
 	token                   models.Address
 	liquidityRebalancer     liquidityrebalancer.Rebalancer
 	inflight                inflight.Container
@@ -58,7 +58,7 @@ func NewPlugin(
 		liquidityManagerFactory: liquidityManagerFactory,
 		bridgeFactory:           bridgeFactory,
 		discoverer:              discoverer,
-		graphs:                  graph.NewMultiGraph(),
+		graphs:                  graph.NewGraphContainer(),
 		token:                   rootAddress,
 		liquidityRebalancer:     liquidityRebalancer,
 		inflight:                inflight.New(),
