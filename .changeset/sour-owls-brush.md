@@ -2,4 +2,4 @@
 "ccip": patch
 ---
 
-Temporarily remove PriceReportingDisabled flag in plugin
+#removed PriceReportingDisabled flag use in plugin
