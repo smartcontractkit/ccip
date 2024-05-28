@@ -1224,11 +1224,79 @@ contract CCIPCapabilityConfiguration_beforeCapabilityConfigSet is CCIPCapability
 
     bytes memory encoded = abi.encode(configs);
     s_ccipCC.beforeCapabilityConfigSet(new bytes32[](0), encoded, 1, donId);
+
+    CCIPCapabilityConfiguration.OCR3ConfigWithMeta[] memory storedConfigs = s_ccipCC.getPluginOCRConfig(donId, CCIPCapabilityConfiguration.PluginType.Commit);
+    assertEq(storedConfigs.length, 1, "config length must be 1");
+    assertEq(storedConfigs[0].configCount, uint64(1), "config count must be 1");
+    assertEq(uint256(storedConfigs[0].config.pluginType), uint256(CCIPCapabilityConfiguration.PluginType.Commit), "plugin type must be commit");
   }
 
-  function test_beforeCapabilityConfigSet_ExecConfigOnly_Success() public {}
+  function test_beforeCapabilityConfigSet_ExecConfigOnly_Success() public {
+    (bytes[][] memory signers, bytes[][] memory transmitters) = addChainConfig(4);
+    changePrank(CAPABILITY_REGISTRY);
 
-  function test_beforeCapabilityConfigSet_CommitAndExecConfig_Success() public {}
+    uint32 donId = 1;
+    CCIPCapabilityConfiguration.OCR3Config memory blueConfig = CCIPCapabilityConfiguration.OCR3Config({
+      pluginType: CCIPCapabilityConfiguration.PluginType.Execution,
+      chainSelector: 1,
+      signers: signers,
+      transmitters: transmitters,
+      f: 1,
+      offchainConfigVersion: 30,
+      offchainConfig: bytes("exec")
+    });
+    CCIPCapabilityConfiguration.OCR3Config[] memory configs = new CCIPCapabilityConfiguration.OCR3Config[](1);
+    configs[0] = blueConfig;
+
+    bytes memory encoded = abi.encode(configs);
+    s_ccipCC.beforeCapabilityConfigSet(new bytes32[](0), encoded, 1, donId);
+
+    CCIPCapabilityConfiguration.OCR3ConfigWithMeta[] memory storedConfigs = s_ccipCC.getPluginOCRConfig(donId, CCIPCapabilityConfiguration.PluginType.Execution);
+    assertEq(storedConfigs.length, 1, "config length must be 1");
+    assertEq(storedConfigs[0].configCount, uint64(1), "config count must be 1");
+    assertEq(uint256(storedConfigs[0].config.pluginType), uint256(CCIPCapabilityConfiguration.PluginType.Execution), "plugin type must be execution");
+  }
+
+  function test_beforeCapabilityConfigSet_CommitAndExecConfig_Success() public {
+    (bytes[][] memory signers, bytes[][] memory transmitters) = addChainConfig(4);
+    changePrank(CAPABILITY_REGISTRY);
+
+    uint32 donId = 1;
+    CCIPCapabilityConfiguration.OCR3Config memory blueCommitConfig = CCIPCapabilityConfiguration.OCR3Config({
+      pluginType: CCIPCapabilityConfiguration.PluginType.Commit,
+      chainSelector: 1,
+      signers: signers,
+      transmitters: transmitters,
+      f: 1,
+      offchainConfigVersion: 30,
+      offchainConfig: bytes("commit")
+    });
+    CCIPCapabilityConfiguration.OCR3Config memory blueExecConfig = CCIPCapabilityConfiguration.OCR3Config({
+      pluginType: CCIPCapabilityConfiguration.PluginType.Execution,
+      chainSelector: 1,
+      signers: signers,
+      transmitters: transmitters,
+      f: 1,
+      offchainConfigVersion: 30,
+      offchainConfig: bytes("exec")
+    });
+    CCIPCapabilityConfiguration.OCR3Config[] memory configs = new CCIPCapabilityConfiguration.OCR3Config[](2);
+    configs[0] = blueExecConfig;
+    configs[1] = blueCommitConfig;
+
+    bytes memory encoded = abi.encode(configs);
+    s_ccipCC.beforeCapabilityConfigSet(new bytes32[](0), encoded, 1, donId);
+
+    CCIPCapabilityConfiguration.OCR3ConfigWithMeta[] memory storedExecConfigs = s_ccipCC.getPluginOCRConfig(donId, CCIPCapabilityConfiguration.PluginType.Execution);
+    assertEq(storedExecConfigs.length, 1, "config length must be 1");
+    assertEq(storedExecConfigs[0].configCount, uint64(1), "config count must be 1");
+    assertEq(uint256(storedExecConfigs[0].config.pluginType), uint256(CCIPCapabilityConfiguration.PluginType.Execution), "plugin type must be execution");
+
+    CCIPCapabilityConfiguration.OCR3ConfigWithMeta[] memory storedCommitConfigs = s_ccipCC.getPluginOCRConfig(donId, CCIPCapabilityConfiguration.PluginType.Commit);
+    assertEq(storedCommitConfigs.length, 1, "config length must be 1");
+    assertEq(storedCommitConfigs[0].configCount, uint64(1), "config count must be 1");
+    assertEq(uint256(storedCommitConfigs[0].config.pluginType), uint256(CCIPCapabilityConfiguration.PluginType.Commit), "plugin type must be commit");
+  }
 
   // Reverts.
 

@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {ITypeAndVersion} from "../../shared/interfaces/ITypeAndVersion.sol";
+
 import {ICapabilityConfiguration} from "./interfaces/ICapabilityConfiguration.sol";
 import {ICapabilityRegistry} from "./interfaces/ICapabilityRegistry.sol";
 
@@ -13,7 +15,7 @@ import {EnumerableSet} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts
 /// Each chain will have a single configuration which includes information like the router address.
 /// Each CR DON will have up to four configurations: for each of (commit, exec), one blue and one green configuration.
 /// This is done in order to achieve "blue-green" deployments.
-contract CCIPCapabilityConfiguration is ICapabilityConfiguration, OwnerIsCreator {
+contract CCIPCapabilityConfiguration is ITypeAndVersion, ICapabilityConfiguration, OwnerIsCreator {
   using EnumerableSet for EnumerableSet.UintSet;
 
   /// @notice Emitted when a chain's configuration is set.
@@ -106,6 +108,9 @@ contract CCIPCapabilityConfiguration is ICapabilityConfiguration, OwnerIsCreator
     bytes32 configDigest;
   }
 
+  /// @notice Type and version override.
+  string public constant override typeAndVersion = "CCIPCapabilityConfiguration 1.0.0-dev";
+
   /// @notice The canonical capability registry address.
   address internal immutable i_capabilityRegistry;
 
@@ -135,31 +140,6 @@ contract CCIPCapabilityConfiguration is ICapabilityConfiguration, OwnerIsCreator
   // ================================================================
   // │                    Config Getters                            │
   // ================================================================
-
-  /// @notice Returns the latest OCR3 configurations for all DONs.
-  /// The offchain code will call this function to get the latest OCR3 configurations
-  /// and spin up the appropriate OCR3 instances.
-  /// This is expected to be called off-chain only and can have prohibitively high gas costs.
-  /// @return The latest OCR3 configurations for all DONs.
-  // TODO: will this eventually hit the RPC max response size limit?
-  function getAllOCRConfigs() external view returns (OCR3ConfigWithMeta[][] memory) {
-    OCR3ConfigWithMeta[][] memory ocr3Configs = new OCR3ConfigWithMeta[][](s_donIds.length());
-    for (uint256 i = 0; i < s_donIds.length(); i++) {
-      // This is a safe cast, don IDs are uint32 in the CR.
-      uint32 donId = uint32(s_donIds.at(i));
-      ocr3Configs[i] = new OCR3ConfigWithMeta[](
-        s_ocr3Configs[donId][PluginType.Commit].length + s_ocr3Configs[donId][PluginType.Execution].length
-      );
-      for (uint256 j = 0; j < s_ocr3Configs[donId][PluginType.Commit].length; j++) {
-        ocr3Configs[i][j] = s_ocr3Configs[donId][PluginType.Commit][j];
-      }
-      for (uint256 j = 0; j < s_ocr3Configs[donId][PluginType.Execution].length; j++) {
-        ocr3Configs[i][j + s_ocr3Configs[donId][PluginType.Commit].length] =
-          s_ocr3Configs[donId][PluginType.Execution][j];
-      }
-    }
-    return ocr3Configs;
-  }
 
   /// @notice Returns all the chain configurations.
   /// @return The chain configurations.
