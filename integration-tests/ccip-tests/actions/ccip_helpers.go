@@ -473,6 +473,8 @@ func (ccipModule *CCIPCommon) WaitForPriceUpdates(
 				ccipModule.tokenPriceUpdateWatcherMu.Lock()
 				for _, token := range allTokens {
 					timestampOfTokenUpdate, okToken := ccipModule.tokenPriceUpdateWatcher[token]
+					// we consider token prices updated only if all tokens have been updated
+					// if any token is missing, we retry
 					if !okToken || timestampOfTokenUpdate.Cmp(big.NewInt(0)) < 1 {
 						tokenPricesUpdated = false
 						tokensMissingForUpdate = token
