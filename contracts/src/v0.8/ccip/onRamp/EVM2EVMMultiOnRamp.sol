@@ -162,13 +162,13 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, AggregateRateLimiter, ITypeA
   /// can be passed in the constructor and the applyDestChainConfigUpdates function
   struct DestChainConfigArgs {
     uint64 destChainSelector; // Destination chain selector
-    DestChainDynamicConfig dynamicConfig; // struct to hold the configs for a destination chain
+    DestChainDynamicConfig dynamicConfig; // Struct to hold the configs for a destination chain
     address prevOnRamp; // Address of previous-version OnRamp.
   }
 
   // STATIC CONFIG
   string public constant override typeAndVersion = "EVM2EVMMultiOnRamp 1.6.0-dev";
-  /// @dev Maximum fee that can be charged for a message
+  /// @dev Maximum fee that can be charged for a message. This is a guard to prevent massively overcharging due to misconfiguation.
   uint96 internal immutable i_maxFeeJuelsPerMsg;
   /// @dev The link token address - known to pay nops for their work
   address internal immutable i_linkToken;
