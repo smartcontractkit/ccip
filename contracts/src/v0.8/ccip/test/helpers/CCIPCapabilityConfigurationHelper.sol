@@ -27,7 +27,7 @@ contract CCIPCapabilityConfigurationHelper is CCIPCapabilityConfiguration {
     OCR3Config[] memory newConfig,
     ConfigState currentState,
     ConfigState newState
-  ) public pure returns (OCR3ConfigWithMeta[] memory) {
+  ) public view returns (OCR3ConfigWithMeta[] memory) {
     return _computeNewConfigWithMeta(donId, currentConfig, newConfig, currentState, newState);
   }
 

@@ -304,7 +304,7 @@ contract CCIPCapabilityConfiguration is ICapabilityConfiguration, OwnerIsCreator
     OCR3Config[] memory newConfig,
     ConfigState currentState,
     ConfigState newState
-  ) internal pure returns (OCR3ConfigWithMeta[] memory) {
+  ) internal view returns (OCR3ConfigWithMeta[] memory) {
     uint64[] memory configCounts = new uint64[](newConfig.length);
 
     // Set config counts based on the only valid state transitions.
@@ -327,6 +327,7 @@ contract CCIPCapabilityConfiguration is ICapabilityConfiguration, OwnerIsCreator
 
     OCR3ConfigWithMeta[] memory newConfigWithMeta = new OCR3ConfigWithMeta[](newConfig.length);
     for (uint256 i = 0; i < configCounts.length; i++) {
+      _validateConfig(newConfig[i]);
       newConfigWithMeta[i] = OCR3ConfigWithMeta({
         config: newConfig[i],
         configCount: configCounts[i],

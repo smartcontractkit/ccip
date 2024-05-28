@@ -28,6 +28,40 @@ contract CCIPCapabilityConfigurationSetup is Test {
     return arr;
   }
 
+  function addChainConfig(uint256 numNodes) internal returns (bytes[][] memory signers, bytes[][] memory transmitters) {
+    signers = makeAssociativeArray(numNodes, 10);
+    transmitters = makeAssociativeArray(numNodes, 20);
+    bytes32[] memory readers = new bytes32[](numNodes);
+    for (uint256 i = 0; i < numNodes; i++) {
+      readers[i] = abi.decode(signers[i][0], (bytes32));
+      vm.mockCall(
+        CAPABILITY_REGISTRY,
+        abi.encodeWithSelector(ICapabilityRegistry.getNode.selector, readers[i]),
+        abi.encode(
+          ICapabilityRegistry.NodeParams({
+            nodeOperatorId: 1,
+            signer: address(uint160(i)),
+            p2pId: readers[i],
+            hashedCapabilityIds: new bytes32[](0)
+          }),
+          uint32(1)
+        )
+      );
+    }
+    // Add chain selector for chain 1.
+    CCIPCapabilityConfiguration.ChainConfigUpdate[] memory adds = new CCIPCapabilityConfiguration.ChainConfigUpdate[](1);
+    adds[0] = CCIPCapabilityConfiguration.ChainConfigUpdate({
+      chainSelector: 1,
+      chainConfig: CCIPCapabilityConfiguration.ChainConfig({readers: readers, config: bytes("config1")})
+    });
+
+    vm.expectEmit();
+    emit CCIPCapabilityConfiguration.ChainConfigSet(1, adds[0].chainConfig);
+    s_ccipCC.applyChainConfigUpdates(new CCIPCapabilityConfiguration.ChainConfigUpdate[](0), adds);
+
+    return (signers, transmitters);
+  }
+
   function test_getCapabilityConfiguration_Success() public {
     bytes memory capConfig = s_ccipCC.getCapabilityConfiguration(42 /* doesn't matter, not used */ );
     assertEq(capConfig.length, 0, "capability config length must be 0");
@@ -35,9 +69,6 @@ contract CCIPCapabilityConfigurationSetup is Test {
 }
 
 contract CCIPCapabilityConfiguration_chainConfig is CCIPCapabilityConfigurationSetup {
-  event ChainConfigSet(uint64 chainSelector, CCIPCapabilityConfiguration.ChainConfig chainConfig);
-  event ChainConfigRemoved(uint64 chainSelector);
-
   // Successes.
 
   function test_applyChainConfigUpdates_addChainConfigs_Success() public {
@@ -68,9 +99,9 @@ contract CCIPCapabilityConfiguration_chainConfig is CCIPCapabilityConfigurationS
     );
 
     vm.expectEmit();
-    emit ChainConfigSet(1, adds[0].chainConfig);
+    emit CCIPCapabilityConfiguration.ChainConfigSet(1, adds[0].chainConfig);
     vm.expectEmit();
-    emit ChainConfigSet(2, adds[1].chainConfig);
+    emit CCIPCapabilityConfiguration.ChainConfigSet(2, adds[1].chainConfig);
     s_ccipCC.applyChainConfigUpdates(new CCIPCapabilityConfiguration.ChainConfigUpdate[](0), adds);
 
     CCIPCapabilityConfiguration.ChainConfig[] memory configs = s_ccipCC.getAllChainConfigs();
@@ -105,9 +136,9 @@ contract CCIPCapabilityConfiguration_chainConfig is CCIPCapabilityConfigurationS
     );
 
     vm.expectEmit();
-    emit ChainConfigSet(1, adds[0].chainConfig);
+    emit CCIPCapabilityConfiguration.ChainConfigSet(1, adds[0].chainConfig);
     vm.expectEmit();
-    emit ChainConfigSet(2, adds[1].chainConfig);
+    emit CCIPCapabilityConfiguration.ChainConfigSet(2, adds[1].chainConfig);
     s_ccipCC.applyChainConfigUpdates(new CCIPCapabilityConfiguration.ChainConfigUpdate[](0), adds);
 
     CCIPCapabilityConfiguration.ChainConfigUpdate[] memory removes =
@@ -118,7 +149,7 @@ contract CCIPCapabilityConfiguration_chainConfig is CCIPCapabilityConfigurationS
     });
 
     vm.expectEmit();
-    emit ChainConfigRemoved(1);
+    emit CCIPCapabilityConfiguration.ChainConfigRemoved(1);
     s_ccipCC.applyChainConfigUpdates(removes, new CCIPCapabilityConfiguration.ChainConfigUpdate[](0));
   }
 
@@ -165,42 +196,6 @@ contract CCIPCapabilityConfiguration_chainConfig is CCIPCapabilityConfigurationS
 }
 
 contract CCIPCapabilityConfiguration_validateConfig is CCIPCapabilityConfigurationSetup {
-  event ChainConfigSet(uint64 chainSelector, CCIPCapabilityConfiguration.ChainConfig chainConfig);
-
-  function addChainConfig(uint256 numNodes) internal returns (bytes[][] memory signers, bytes[][] memory transmitters) {
-    signers = makeAssociativeArray(numNodes, 10);
-    transmitters = makeAssociativeArray(numNodes, 20);
-    bytes32[] memory readers = new bytes32[](numNodes);
-    for (uint256 i = 0; i < numNodes; i++) {
-      readers[i] = abi.decode(signers[i][0], (bytes32));
-      vm.mockCall(
-        CAPABILITY_REGISTRY,
-        abi.encodeWithSelector(ICapabilityRegistry.getNode.selector, readers[i]),
-        abi.encode(
-          ICapabilityRegistry.NodeParams({
-            nodeOperatorId: 1,
-            signer: address(uint160(i)),
-            p2pId: readers[i],
-            hashedCapabilityIds: new bytes32[](0)
-          }),
-          uint32(1)
-        )
-      );
-    }
-    // Add chain selector for chain 1.
-    CCIPCapabilityConfiguration.ChainConfigUpdate[] memory adds = new CCIPCapabilityConfiguration.ChainConfigUpdate[](1);
-    adds[0] = CCIPCapabilityConfiguration.ChainConfigUpdate({
-      chainSelector: 1,
-      chainConfig: CCIPCapabilityConfiguration.ChainConfig({readers: readers, config: bytes("config1")})
-    });
-
-    vm.expectEmit();
-    emit ChainConfigSet(1, adds[0].chainConfig);
-    s_ccipCC.applyChainConfigUpdates(new CCIPCapabilityConfiguration.ChainConfigUpdate[](0), adds);
-
-    return (signers, transmitters);
-  }
-
   // Successes.
 
   function test__validateConfig_Success() public {
@@ -514,6 +509,7 @@ contract CCIPCapabilityConfiguration_ConfigStateMachine is CCIPCapabilityConfigu
   }
 
   function test__computeNewConfigWithMeta_InitToRunning_Success() public {
+    (bytes[][] memory signers, bytes[][] memory transmitters) = addChainConfig(4);
     uint32 donId = 1;
     CCIPCapabilityConfiguration.OCR3ConfigWithMeta[] memory currentConfig =
       new CCIPCapabilityConfiguration.OCR3ConfigWithMeta[](0);
@@ -521,8 +517,8 @@ contract CCIPCapabilityConfiguration_ConfigStateMachine is CCIPCapabilityConfigu
     newConfig[0] = CCIPCapabilityConfiguration.OCR3Config({
       pluginType: CCIPCapabilityConfiguration.PluginType.Commit,
       chainSelector: 1,
-      signers: makeAssociativeArray(4, 10),
-      transmitters: makeAssociativeArray(4, 20),
+      signers: signers,
+      transmitters: transmitters,
       f: 1,
       offchainConfigVersion: 30,
       offchainConfig: bytes("commit")
@@ -546,12 +542,13 @@ contract CCIPCapabilityConfiguration_ConfigStateMachine is CCIPCapabilityConfigu
   }
 
   function test__computeNewConfigWithMeta_RunningToStaging_Success() public {
+    (bytes[][] memory signers, bytes[][] memory transmitters) = addChainConfig(4);
     uint32 donId = 1;
     CCIPCapabilityConfiguration.OCR3Config memory blueConfig = CCIPCapabilityConfiguration.OCR3Config({
       pluginType: CCIPCapabilityConfiguration.PluginType.Commit,
       chainSelector: 1,
-      signers: makeAssociativeArray(4, 10),
-      transmitters: makeAssociativeArray(4, 20),
+      signers: signers,
+      transmitters: transmitters,
       f: 1,
       offchainConfigVersion: 30,
       offchainConfig: bytes("commit")
@@ -559,8 +556,8 @@ contract CCIPCapabilityConfiguration_ConfigStateMachine is CCIPCapabilityConfigu
     CCIPCapabilityConfiguration.OCR3Config memory greenConfig = CCIPCapabilityConfiguration.OCR3Config({
       pluginType: CCIPCapabilityConfiguration.PluginType.Commit,
       chainSelector: 1,
-      signers: makeAssociativeArray(4, 10),
-      transmitters: makeAssociativeArray(4, 20),
+      signers: signers,
+      transmitters: transmitters,
       f: 1,
       offchainConfigVersion: 30,
       offchainConfig: bytes("commit-new")
@@ -618,12 +615,13 @@ contract CCIPCapabilityConfiguration_ConfigStateMachine is CCIPCapabilityConfigu
   }
 
   function test__computeNewConfigWithMeta_StagingToRunning_Success() public {
+    (bytes[][] memory signers, bytes[][] memory transmitters) = addChainConfig(4);
     uint32 donId = 1;
     CCIPCapabilityConfiguration.OCR3Config memory blueConfig = CCIPCapabilityConfiguration.OCR3Config({
       pluginType: CCIPCapabilityConfiguration.PluginType.Commit,
       chainSelector: 1,
-      signers: makeAssociativeArray(4, 10),
-      transmitters: makeAssociativeArray(4, 20),
+      signers: signers,
+      transmitters: transmitters,
       f: 1,
       offchainConfigVersion: 30,
       offchainConfig: bytes("commit")
@@ -631,8 +629,8 @@ contract CCIPCapabilityConfiguration_ConfigStateMachine is CCIPCapabilityConfigu
     CCIPCapabilityConfiguration.OCR3Config memory greenConfig = CCIPCapabilityConfiguration.OCR3Config({
       pluginType: CCIPCapabilityConfiguration.PluginType.Commit,
       chainSelector: 1,
-      signers: makeAssociativeArray(4, 10),
-      transmitters: makeAssociativeArray(4, 20),
+      signers: signers,
+      transmitters: transmitters,
       f: 1,
       offchainConfigVersion: 30,
       offchainConfig: bytes("commit-new")
@@ -672,12 +670,13 @@ contract CCIPCapabilityConfiguration_ConfigStateMachine is CCIPCapabilityConfigu
   }
 
   function test__validateConfigTransition_InitToRunning_Success() public {
+    (bytes[][] memory signers, bytes[][] memory transmitters) = addChainConfig(4);
     uint32 donId = 1;
     CCIPCapabilityConfiguration.OCR3Config memory blueConfig = CCIPCapabilityConfiguration.OCR3Config({
       pluginType: CCIPCapabilityConfiguration.PluginType.Commit,
       chainSelector: 1,
-      signers: makeAssociativeArray(4, 10),
-      transmitters: makeAssociativeArray(4, 20),
+      signers: signers,
+      transmitters: transmitters,
       f: 1,
       offchainConfigVersion: 30,
       offchainConfig: bytes("commit")
@@ -697,12 +696,13 @@ contract CCIPCapabilityConfiguration_ConfigStateMachine is CCIPCapabilityConfigu
   }
 
   function test__validateConfigTransition_RunningToStaging_Success() public {
+    (bytes[][] memory signers, bytes[][] memory transmitters) = addChainConfig(4);
     uint32 donId = 1;
     CCIPCapabilityConfiguration.OCR3Config memory blueConfig = CCIPCapabilityConfiguration.OCR3Config({
       pluginType: CCIPCapabilityConfiguration.PluginType.Commit,
       chainSelector: 1,
-      signers: makeAssociativeArray(4, 10),
-      transmitters: makeAssociativeArray(4, 20),
+      signers: signers,
+      transmitters: transmitters,
       f: 1,
       offchainConfigVersion: 30,
       offchainConfig: bytes("commit")
@@ -710,8 +710,8 @@ contract CCIPCapabilityConfiguration_ConfigStateMachine is CCIPCapabilityConfigu
     CCIPCapabilityConfiguration.OCR3Config memory greenConfig = CCIPCapabilityConfiguration.OCR3Config({
       pluginType: CCIPCapabilityConfiguration.PluginType.Commit,
       chainSelector: 1,
-      signers: makeAssociativeArray(4, 10),
-      transmitters: makeAssociativeArray(4, 20),
+      signers: signers,
+      transmitters: transmitters,
       f: 1,
       offchainConfigVersion: 30,
       offchainConfig: bytes("commit-new")
@@ -742,12 +742,13 @@ contract CCIPCapabilityConfiguration_ConfigStateMachine is CCIPCapabilityConfigu
   }
 
   function test__validateConfigTransition_StagingToRunning_Success() public {
+    (bytes[][] memory signers, bytes[][] memory transmitters) = addChainConfig(4);
     uint32 donId = 1;
     CCIPCapabilityConfiguration.OCR3Config memory blueConfig = CCIPCapabilityConfiguration.OCR3Config({
       pluginType: CCIPCapabilityConfiguration.PluginType.Commit,
       chainSelector: 1,
-      signers: makeAssociativeArray(4, 10),
-      transmitters: makeAssociativeArray(4, 20),
+      signers: signers,
+      transmitters: transmitters,
       f: 1,
       offchainConfigVersion: 30,
       offchainConfig: bytes("commit")
@@ -755,8 +756,8 @@ contract CCIPCapabilityConfiguration_ConfigStateMachine is CCIPCapabilityConfigu
     CCIPCapabilityConfiguration.OCR3Config memory greenConfig = CCIPCapabilityConfiguration.OCR3Config({
       pluginType: CCIPCapabilityConfiguration.PluginType.Commit,
       chainSelector: 1,
-      signers: makeAssociativeArray(4, 10),
-      transmitters: makeAssociativeArray(4, 20),
+      signers: signers,
+      transmitters: transmitters,
       f: 1,
       offchainConfigVersion: 30,
       offchainConfig: bytes("commit-new")
@@ -1028,12 +1029,13 @@ contract CCIPCapabilityConfiguration__updatePluginConfig is CCIPCapabilityConfig
   // Successes.
 
   function test__updatePluginConfig_InitToRunning_Success() public {
+    (bytes[][] memory signers, bytes[][] memory transmitters) = addChainConfig(4);
     uint32 donId = 1;
     CCIPCapabilityConfiguration.OCR3Config memory blueConfig = CCIPCapabilityConfiguration.OCR3Config({
       pluginType: CCIPCapabilityConfiguration.PluginType.Commit,
       chainSelector: 1,
-      signers: makeAssociativeArray(4, 10),
-      transmitters: makeAssociativeArray(4, 20),
+      signers: signers,
+      transmitters: transmitters,
       f: 1,
       offchainConfigVersion: 30,
       offchainConfig: bytes("commit")
@@ -1052,14 +1054,15 @@ contract CCIPCapabilityConfiguration__updatePluginConfig is CCIPCapabilityConfig
   }
 
   function test__updatePluginConfig_RunningToStaging_Success() public {
+    (bytes[][] memory signers, bytes[][] memory transmitters) = addChainConfig(4);
     // add blue config.
     uint32 donId = 1;
     CCIPCapabilityConfiguration.PluginType pluginType = CCIPCapabilityConfiguration.PluginType.Commit;
     CCIPCapabilityConfiguration.OCR3Config memory blueConfig = CCIPCapabilityConfiguration.OCR3Config({
       pluginType: CCIPCapabilityConfiguration.PluginType.Commit,
       chainSelector: 1,
-      signers: makeAssociativeArray(4, 10),
-      transmitters: makeAssociativeArray(4, 20),
+      signers: signers,
+      transmitters: transmitters,
       f: 1,
       offchainConfigVersion: 30,
       offchainConfig: bytes("commit")
@@ -1072,8 +1075,8 @@ contract CCIPCapabilityConfiguration__updatePluginConfig is CCIPCapabilityConfig
     CCIPCapabilityConfiguration.OCR3Config memory greenConfig = CCIPCapabilityConfiguration.OCR3Config({
       pluginType: CCIPCapabilityConfiguration.PluginType.Commit,
       chainSelector: 1,
-      signers: makeAssociativeArray(4, 10),
-      transmitters: makeAssociativeArray(4, 20),
+      signers: signers,
+      transmitters: transmitters,
       f: 1,
       offchainConfigVersion: 30,
       offchainConfig: bytes("commit-new")
@@ -1105,14 +1108,15 @@ contract CCIPCapabilityConfiguration__updatePluginConfig is CCIPCapabilityConfig
   }
 
   function test__updatePluginConfig_StagingToRunning_Success() public {
+    (bytes[][] memory signers, bytes[][] memory transmitters) = addChainConfig(4);
     // add blue config.
     uint32 donId = 1;
     CCIPCapabilityConfiguration.PluginType pluginType = CCIPCapabilityConfiguration.PluginType.Commit;
     CCIPCapabilityConfiguration.OCR3Config memory blueConfig = CCIPCapabilityConfiguration.OCR3Config({
       pluginType: CCIPCapabilityConfiguration.PluginType.Commit,
       chainSelector: 1,
-      signers: makeAssociativeArray(4, 10),
-      transmitters: makeAssociativeArray(4, 20),
+      signers: signers,
+      transmitters: transmitters,
       f: 1,
       offchainConfigVersion: 30,
       offchainConfig: bytes("commit")
@@ -1125,8 +1129,8 @@ contract CCIPCapabilityConfiguration__updatePluginConfig is CCIPCapabilityConfig
     CCIPCapabilityConfiguration.OCR3Config memory greenConfig = CCIPCapabilityConfiguration.OCR3Config({
       pluginType: CCIPCapabilityConfiguration.PluginType.Commit,
       chainSelector: 1,
-      signers: makeAssociativeArray(4, 10),
-      transmitters: makeAssociativeArray(4, 20),
+      signers: signers,
+      transmitters: transmitters,
       f: 1,
       offchainConfigVersion: 30,
       offchainConfig: bytes("commit-new")
@@ -1201,7 +1205,26 @@ contract CCIPCapabilityConfiguration_beforeCapabilityConfigSet is CCIPCapability
     s_ccipCC.beforeCapabilityConfigSet(new bytes32[](0), encodedConfigs, 1, 1);
   }
 
-  function test_beforeCapabilityConfigSet_CommitConfigOnly_Success() public {}
+  function test_beforeCapabilityConfigSet_CommitConfigOnly_Success() public {
+    (bytes[][] memory signers, bytes[][] memory transmitters) = addChainConfig(4);
+    changePrank(CAPABILITY_REGISTRY);
+
+    uint32 donId = 1;
+    CCIPCapabilityConfiguration.OCR3Config memory blueConfig = CCIPCapabilityConfiguration.OCR3Config({
+      pluginType: CCIPCapabilityConfiguration.PluginType.Commit,
+      chainSelector: 1,
+      signers: signers,
+      transmitters: transmitters,
+      f: 1,
+      offchainConfigVersion: 30,
+      offchainConfig: bytes("commit")
+    });
+    CCIPCapabilityConfiguration.OCR3Config[] memory configs = new CCIPCapabilityConfiguration.OCR3Config[](1);
+    configs[0] = blueConfig;
+
+    bytes memory encoded = abi.encode(configs);
+    s_ccipCC.beforeCapabilityConfigSet(new bytes32[](0), encoded, 1, donId);
+  }
 
   function test_beforeCapabilityConfigSet_ExecConfigOnly_Success() public {}
 
