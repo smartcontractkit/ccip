@@ -7,7 +7,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/rs/zerolog/log"
+	"github.com/rs/zerolog"
 	"github.com/smartcontractkit/ccip/integration-tests/wrappers"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
@@ -50,6 +50,7 @@ func (e *CCIPContractsDeployer) DeployArmProxy(arm common.Address) (*ArmProxy, e
 
 type LiquidityManager struct {
 	client     blockchain.EVMClient
+	logger     zerolog.Logger
 	Instance   *liquiditymanager.LiquidityManager
 	EthAddress *common.Address
 }
@@ -78,15 +79,20 @@ func (e *CCIPContractsDeployer) DeployLiquidityManager(
 	}
 	return &LiquidityManager{
 		client:     e.evmClient,
+		logger:     e.logger,
 		Instance:   instance.(*liquiditymanager.LiquidityManager),
 		EthAddress: address,
 	}, err
 }
 
+func (v *LiquidityManager) GetLiquidity() (*big.Int, error) {
+	return v.Instance.GetLiquidity(nil)
+}
+
 func (v *LiquidityManager) SetCrossChainRebalancer(
 	crossChainRebalancerArgs liquiditymanager.ILiquidityManagerCrossChainRebalancerArgs,
 ) error {
-	log.Info().
+	v.logger.Info().
 		Str("Liquidity Manager", v.EthAddress.String()).
 		Msg("Setting crosschain rebalancer on liquidity manager")
 	opts, err := v.client.TransactionOpts(v.client.GetDefaultWallet())
@@ -98,7 +104,7 @@ func (v *LiquidityManager) SetCrossChainRebalancer(
 		return fmt.Errorf("failed to set cross chain rebalancer: %w", err)
 
 	}
-	log.Info().
+	v.logger.Info().
 		Str("Liquidity Manager", v.EthAddress.String()).
 		Interface("Rebalance Argsr", crossChainRebalancerArgs).
 		Msg("Crosschain Rebalancer set on liquidity manager")
@@ -113,8 +119,7 @@ func (v *LiquidityManager) SetOCR3Config(
 	offchainConfigVersion uint64,
 	offchainConfig []byte,
 ) error {
-
-	log.Info().
+	v.logger.Info().
 		Str("Liquidity Manager", v.EthAddress.String()).
 		Msg("Setting ocr3 config on liquidity manager")
 	opts, err := v.client.TransactionOpts(v.client.GetDefaultWallet())
@@ -133,7 +138,7 @@ func (v *LiquidityManager) SetOCR3Config(
 		return fmt.Errorf("failed to set cross chain rebalancer: %w", err)
 
 	}
-	log.Info().
+	v.logger.Info().
 		Str("Liquidity Manager", v.EthAddress.String()).
 		Msg("Set OCR3Config on LM")
 	return v.client.ProcessTransaction(tx)

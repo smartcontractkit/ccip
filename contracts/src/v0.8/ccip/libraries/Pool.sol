@@ -11,11 +11,17 @@ library Pool {
   // This should match the size of the ReleaseOrMintOutV1 struct.
   uint16 public constant CCIP_POOL_V1_RET_BYTES = 2 * 32;
 
+  // The default max number of bytes in the return data for a pool v1 lockOrBurn call.
+  // This data can be used to send information to the destination chain token pool. Can be overwritten
+  // in the TokenTransferFeeConfig.destBytesOverhead if more data is required.
+  uint256 public constant CCIP_LOCK_OR_BURN_V1_RET_BYTES = 32;
+
   struct LockOrBurnInV1 {
     bytes receiver; //  The recipient of the tokens on the destination chain, abi encoded
     uint64 remoteChainSelector; // ─╮ The chain ID of the destination chain
     address originalSender; // ─────╯ The original sender of the tx on the source chain
     uint256 amount; //  The amount of tokens to lock or burn, denominated in the source token's decimals
+    address localToken; //  The address on this chain of the token to lock or burn
   }
 
   struct LockOrBurnOutV1 {
