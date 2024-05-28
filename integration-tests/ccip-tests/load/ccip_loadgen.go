@@ -218,7 +218,7 @@ func (c *CCIPE2ELoad) Call(_ *wasp.Generator) *wasp.Response {
 		if !sourceCCIP.Common.IsConnectionRestoredRecently.Load() {
 			c.Lane.Logger.Info().Msg("RPC Connection Error.. skipping this request")
 			res.Failed = true
-			res.Error = fmt.Sprintf("RPC Connection error .. this request was skipped")
+			res.Error = "RPC Connection error .. this request was skipped"
 			return res
 		}
 		c.Lane.Logger.Info().Msg("Connection is restored, Resuming load")
