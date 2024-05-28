@@ -83,6 +83,9 @@ const (
 
 	defaultUSDCDestBytesOverhead = 640
 	defaultUSDCDestGasOverhead   = 120_000
+	// DefaultResubscriptionTimeout denotes the max backoff duration for resubscription for various watch events
+	// if the subscription keeps failing even after this duration, the test will fail
+	DefaultResubscriptionTimeout = 2 * time.Hour
 )
 
 // TODO: These should be refactored along with the default CCIP test setup to use optional config functions
@@ -500,7 +503,7 @@ func (ccipModule *CCIPCommon) WaitForPriceUpdates(
 func (ccipModule *CCIPCommon) WatchForPriceUpdates(ctx context.Context, lggr zerolog.Logger) error {
 	gasUpdateEventLatest := make(chan *price_registry.PriceRegistryUsdPerUnitGasUpdated)
 	tokenUpdateEvent := make(chan *price_registry.PriceRegistryUsdPerTokenUpdated)
-	sub := event.Resubscribe(2*time.Hour, func(_ context.Context) (event.Subscription, error) {
+	sub := event.Resubscribe(DefaultResubscriptionTimeout, func(_ context.Context) (event.Subscription, error) {
 		lggr.Info().Msg("Subscribing to UsdPerUnitGasUpdated event")
 		eventSub, err := ccipModule.PriceRegistry.WatchUsdPerUnitGasUpdated(nil, gasUpdateEventLatest, nil)
 		if err != nil {
@@ -511,7 +514,7 @@ func (ccipModule *CCIPCommon) WatchForPriceUpdates(ctx context.Context, lggr zer
 	if sub == nil {
 		return fmt.Errorf("no event subscription found")
 	}
-	tokenUpdateSub := event.Resubscribe(2*time.Hour, func(_ context.Context) (event.Subscription, error) {
+	tokenUpdateSub := event.Resubscribe(DefaultResubscriptionTimeout, func(_ context.Context) (event.Subscription, error) {
 		lggr.Info().Msg("Subscribing to UsdPerTokenUpdated event")
 		eventSub, err := ccipModule.PriceRegistry.WatchUsdPerTokenUpdated(nil, tokenUpdateEvent)
 		if err != nil {
@@ -587,7 +590,7 @@ func (ccipModule *CCIPCommon) UpdateTokenPricesAtRegularInterval(ctx context.Con
 		}
 		aggregators = append(aggregators, contract)
 	}
-	go func() {
+	go func(aggregators []*contracts.MockAggregator) {
 		rand.NewSource(uint64(time.Now().UnixNano()))
 		ticker := time.NewTicker(interval)
 		for {
@@ -604,7 +607,7 @@ func (ccipModule *CCIPCommon) UpdateTokenPricesAtRegularInterval(ctx context.Con
 				return
 			}
 		}
-	}()
+	}(aggregators)
 	return nil
 }
 
@@ -3237,7 +3240,7 @@ func (lane *CCIPLane) StartEventWatchers() error {
 	go lane.Dest.Common.PollRPCConnection(lane.Context, lane.Logger)
 
 	sendReqEventLatest := make(chan *evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested)
-	senReqSub := event.Resubscribe(3*time.Hour, func(_ context.Context) (event.Subscription, error) {
+	senReqSub := event.Resubscribe(DefaultResubscriptionTimeout, func(_ context.Context) (event.Subscription, error) {
 		sub, err := lane.Source.OnRamp.WatchCCIPSendRequested(nil, sendReqEventLatest)
 		if err != nil {
 			log.Error().Err(err).Msg("error in subscribing to CCIPSendRequested event")
@@ -3283,7 +3286,7 @@ func (lane *CCIPLane) StartEventWatchers() error {
 	}(senReqSub)
 
 	reportAcceptedEvent := make(chan *commit_store.CommitStoreReportAccepted)
-	reportAccSub := event.Resubscribe(3*time.Hour, func(_ context.Context) (event.Subscription, error) {
+	reportAccSub := event.Resubscribe(DefaultResubscriptionTimeout, func(_ context.Context) (event.Subscription, error) {
 		sub, err := lane.Dest.CommitStore.WatchReportAccepted(nil, reportAcceptedEvent)
 		if err != nil {
 			log.Error().Err(err).Msg("error in subscribing to ReportAccepted event")
@@ -3316,7 +3319,7 @@ func (lane *CCIPLane) StartEventWatchers() error {
 
 	if lane.Dest.Common.ARM != nil {
 		reportBlessedEvent := make(chan *arm_contract.ARMContractTaggedRootBlessed)
-		blessedSub := event.Resubscribe(3*time.Hour, func(_ context.Context) (event.Subscription, error) {
+		blessedSub := event.Resubscribe(DefaultResubscriptionTimeout, func(_ context.Context) (event.Subscription, error) {
 			sub, err := lane.Dest.Common.ARM.Instance.WatchTaggedRootBlessed(nil, reportBlessedEvent, nil)
 			if err != nil {
 				log.Error().Err(err).Msg("error in subscribing to TaggedRootBlessed event")
@@ -3344,7 +3347,7 @@ func (lane *CCIPLane) StartEventWatchers() error {
 	}
 
 	execStateChangedEventLatest := make(chan *evm_2_evm_offramp.EVM2EVMOffRampExecutionStateChanged)
-	execSub := event.Resubscribe(3*time.Hour, func(_ context.Context) (event.Subscription, error) {
+	execSub := event.Resubscribe(DefaultResubscriptionTimeout, func(_ context.Context) (event.Subscription, error) {
 		sub, err := lane.Dest.OffRamp.WatchExecutionStateChanged(nil, execStateChangedEventLatest, nil, nil)
 		if err != nil {
 			log.Error().Err(err).Msg("error in subscribing to ExecutionStateChanged event")

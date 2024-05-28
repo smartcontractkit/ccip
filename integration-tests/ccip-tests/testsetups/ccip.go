@@ -966,7 +966,8 @@ func CCIPDefaultTestSetUp(
 
 	// start event watchers for all lanes
 	setUpArgs.StartEventWatchers()
-
+	// now that lane configs are already dumped to file, we can clean up the lane config map
+	setUpArgs.LaneConfig = nil
 	setUpArgs.TearDown = func() error {
 		var errs error
 		for _, lanes := range setUpArgs.Lanes {
