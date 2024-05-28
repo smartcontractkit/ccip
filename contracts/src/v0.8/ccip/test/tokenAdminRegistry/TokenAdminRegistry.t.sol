@@ -1,18 +1,12 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.0;
 
+import {IPool} from "../../interfaces/IPool.sol";
+
 import {TokenAdminRegistry} from "../../tokenAdminRegistry/TokenAdminRegistry.sol";
 import {TokenSetup} from "../TokenSetup.t.sol";
 
 contract TokenAdminRegistrySetup is TokenSetup {
-  event AdministratorRegistered(address indexed token, address indexed administrator);
-  event PoolSet(address indexed token, address indexed previousPool, address indexed newPool);
-  event AdministratorTransferRequested(address indexed token, address indexed currentAdmin, address indexed newAdmin);
-  event AdministratorTransferred(address indexed token, address indexed newAdmin);
-  event DisableReRegistrationSet(address indexed token, bool disabled);
-  event RegistryModuleAdded(address indexed module);
-  event RegistryModuleRemoved(address indexed module);
-
   address internal s_registryModule = makeAddr("registryModule");
 
   function setUp() public virtual override {
@@ -68,9 +62,10 @@ contract TokenAdminRegistry_isTokenSupportedOnRemoteChain is TokenAdminRegistryS
 contract TokenAdminRegistry_setPool is TokenAdminRegistrySetup {
   function test_setPool_Success() public {
     address pool = makeAddr("pool");
+    vm.mockCall(pool, abi.encodeWithSelector(IPool.isSupportedToken.selector), abi.encode(true));
 
     vm.expectEmit();
-    emit PoolSet(s_sourceTokens[0], s_sourcePoolByToken[s_sourceTokens[0]], pool);
+    emit TokenAdminRegistry.PoolSet(s_sourceTokens[0], s_sourcePoolByToken[s_sourceTokens[0]], pool);
 
     s_tokenAdminRegistry.setPool(s_sourceTokens[0], pool);
 
@@ -81,6 +76,29 @@ contract TokenAdminRegistry_setPool is TokenAdminRegistrySetup {
     s_tokenAdminRegistry.setPool(s_sourceTokens[0], pool);
 
     vm.assertEq(vm.getRecordedLogs().length, 0);
+  }
+
+  function test_setPool_ZeroAddressRemovesPool_Success() public {
+    address pool = makeAddr("pool");
+    vm.mockCall(pool, abi.encodeWithSelector(IPool.isSupportedToken.selector), abi.encode(true));
+    s_tokenAdminRegistry.setPool(s_sourceTokens[0], pool);
+
+    assertEq(s_tokenAdminRegistry.getPool(s_sourceTokens[0]), pool);
+
+    vm.expectEmit();
+    emit TokenAdminRegistry.PoolSet(s_sourceTokens[0], pool, address(0));
+
+    s_tokenAdminRegistry.setPool(s_sourceTokens[0], address(0));
+
+    assertEq(s_tokenAdminRegistry.getPool(s_sourceTokens[0]), address(0));
+  }
+
+  function test_setPool_InvalidTokenPoolToken_Revert() public {
+    address pool = makeAddr("pool");
+    vm.mockCall(pool, abi.encodeWithSelector(IPool.isSupportedToken.selector), abi.encode(false));
+
+    vm.expectRevert(abi.encodeWithSelector(TokenAdminRegistry.InvalidTokenPoolToken.selector, s_sourceTokens[0]));
+    s_tokenAdminRegistry.setPool(s_sourceTokens[0], pool);
   }
 
   function test_setPool_OnlyAdministrator_Revert() public {
@@ -129,7 +147,7 @@ contract TokenAdminRegistry_transferAdminRole is TokenAdminRegistrySetup {
     address newAdmin = makeAddr("newAdmin");
 
     vm.expectEmit();
-    emit AdministratorTransferRequested(token, currentAdmin, newAdmin);
+    emit TokenAdminRegistry.AdministratorTransferRequested(token, currentAdmin, newAdmin);
 
     s_tokenAdminRegistry.transferAdminRole(token, newAdmin);
 
@@ -158,7 +176,7 @@ contract TokenAdminRegistry_acceptAdminRole is TokenAdminRegistrySetup {
     address newAdmin = makeAddr("newAdmin");
 
     vm.expectEmit();
-    emit AdministratorTransferRequested(token, currentAdmin, newAdmin);
+    emit TokenAdminRegistry.AdministratorTransferRequested(token, currentAdmin, newAdmin);
 
     s_tokenAdminRegistry.transferAdminRole(token, newAdmin);
 
@@ -171,7 +189,7 @@ contract TokenAdminRegistry_acceptAdminRole is TokenAdminRegistrySetup {
     vm.startPrank(newAdmin);
 
     vm.expectEmit();
-    emit AdministratorTransferred(token, newAdmin);
+    emit TokenAdminRegistry.AdministratorTransferred(token, newAdmin);
 
     s_tokenAdminRegistry.acceptAdminRole(token);
 
@@ -206,14 +224,14 @@ contract TokenAdminRegistry_acceptAdminRole is TokenAdminRegistrySetup {
 contract TokenAdminRegistry_setDisableReRegistration is TokenAdminRegistrySetup {
   function test_setDisableReRegistration_Success() public {
     vm.expectEmit();
-    emit DisableReRegistrationSet(s_sourceTokens[0], true);
+    emit TokenAdminRegistry.DisableReRegistrationSet(s_sourceTokens[0], true);
 
     s_tokenAdminRegistry.setDisableReRegistration(s_sourceTokens[0], true);
 
     assertTrue(s_tokenAdminRegistry.getTokenConfig(s_sourceTokens[0]).disableReRegistration);
 
     vm.expectEmit();
-    emit DisableReRegistrationSet(s_sourceTokens[0], false);
+    emit TokenAdminRegistry.DisableReRegistrationSet(s_sourceTokens[0], false);
 
     s_tokenAdminRegistry.setDisableReRegistration(s_sourceTokens[0], false);
 
@@ -242,7 +260,7 @@ contract TokenAdminRegistry_registerAdministrator is TokenAdminRegistrySetup {
     address newToken = makeAddr("newToken");
 
     vm.expectEmit();
-    emit AdministratorRegistered(newToken, newOwner);
+    emit TokenAdminRegistry.AdministratorRegistered(newToken, newOwner);
 
     s_tokenAdminRegistry.registerAdministrator(newToken, newOwner);
 
@@ -281,7 +299,7 @@ contract TokenAdminRegistry_registerAdministratorPermissioned is TokenAdminRegis
     address newToken = makeAddr("newToken");
 
     vm.expectEmit();
-    emit AdministratorRegistered(newToken, newAdmin);
+    emit TokenAdminRegistry.AdministratorRegistered(newToken, newAdmin);
 
     s_tokenAdminRegistry.registerAdministratorPermissioned(newToken, newAdmin);
 
@@ -372,7 +390,7 @@ contract TokenAdminRegistry_removeRegistryModule is TokenAdminRegistrySetup {
     assertTrue(s_tokenAdminRegistry.isRegistryModule(newModule));
 
     vm.expectEmit();
-    emit RegistryModuleRemoved(newModule);
+    emit TokenAdminRegistry.RegistryModuleRemoved(newModule);
 
     s_tokenAdminRegistry.removeRegistryModule(newModule);
 
