@@ -28,9 +28,15 @@ type CommitPluginJobSpecConfig struct {
 	PriceGetterConfig *DynamicPriceGetterConfig `json:"priceGetterConfig,omitempty"`
 }
 
+// implemented for CrossRelayerPluginProvider
+// TODO: remove
 type CommitPluginConfig struct {
 	SourceRelayerID types.RelayID
 	DestRelayerID   types.RelayID
+}
+
+type CommitPluginConfigV2 struct {
+	IsSourceProvider bool
 }
 
 // DynamicPriceGetterConfig specifies which configuration to use for getting the price of tokens (map keys).

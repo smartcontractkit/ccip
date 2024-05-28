@@ -52,20 +52,20 @@ type update struct {
 }
 
 type CommitPluginStaticConfig struct {
-	Lggr logger.Logger
+	lggr logger.Logger
 	// Source
-	OnRampReader        ccipdata.OnRampReader
-	SourceChainSelector uint64
-	SourceNative        cciptypes.Address
+	onRampReader        ccipdata.OnRampReader
+	sourceChainSelector uint64
+	sourceNative        cciptypes.Address
 	// Dest
 	offRamp               ccipdata.OffRampReader
 	commitStore           ccipdata.CommitStoreReader
 	destChainSelector     uint64
 	priceRegistryProvider ccipdataprovider.PriceRegistry
 	// Offchain
-	PriceGetter      pricegetter.PriceGetter
-	MetricsCollector ccip.PluginMetricsCollector
-	ChainHealthcheck cache.ChainHealthcheck
+	priceGetter      pricegetter.PriceGetter
+	metricsCollector ccip.PluginMetricsCollector
+	chainHealthcheck cache.ChainHealthcheck
 }
 
 type CommitReportingPlugin struct {

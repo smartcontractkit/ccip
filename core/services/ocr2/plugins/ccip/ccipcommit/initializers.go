@@ -10,12 +10,15 @@ import (
 	"github.com/pkg/errors"
 	chainselectors "github.com/smartcontractkit/chain-selectors"
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/ccipdataprovider"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/rpclib"
 	libocr2 "github.com/smartcontractkit/libocr/offchainreporting2plus"
 	"go.uber.org/multierr"
 	"math/big"
 	"strings"
+	"sync"
 	"sync/atomic"
+	"time"
 
 	commonlogger "github.com/smartcontractkit/chainlink-common/pkg/logger"
 
@@ -48,12 +51,12 @@ func NewCommitServices(ctx context.Context, lggr logger.Logger, jb job.Job, chai
 		return nil, err
 	}
 	wrappedPluginFactory := NewCommitReportingPluginFactory(*pluginConfig)
-	destChainID, err := chainselectors.ChainIdFromSelector(pluginConfig.DestChainSelector)
+	destChainID, err := chainselectors.ChainIdFromSelector(pluginConfig.destChainSelector)
 	if err != nil {
 		return nil, err
 	}
 	argsNoPlugin.ReportingPluginFactory = promwrapper.NewPromFactory(wrappedPluginFactory, "CCIPCommit", jb.OCR2OracleSpec.Relay, big.NewInt(0).SetUint64(destChainID))
-	argsNoPlugin.Logger = commonlogger.NewOCRWrapper(pluginConfig.Lggr, true, logError)
+	argsNoPlugin.Logger = commonlogger.NewOCRWrapper(pluginConfig.lggr, true, logError)
 	oracle, err := libocr2.NewOracle(argsNoPlugin)
 	if err != nil {
 		return nil, err
@@ -62,7 +65,7 @@ func NewCommitServices(ctx context.Context, lggr logger.Logger, jb job.Job, chai
 	if new {
 		return []job.ServiceCtx{
 			oraclelib.NewBackfilledOracle(
-				pluginConfig.Lggr,
+				pluginConfig.lggr,
 				backfillArgs.SourceLP,
 				backfillArgs.DestLP,
 				backfillArgs.SourceStartBlock,
@@ -78,7 +81,7 @@ func NewCommitServices(ctx context.Context, lggr logger.Logger, jb job.Job, chai
 	}, nil
 }
 
-func NewCommitServices2(ctx context.Context, provider commontypes.CCIPCommitProvider, jb job.Job, lggr logger.Logger, pr pipeline.Runner, argsNoPlugin libocr2.OCR2OracleArgs, new bool, sourceChainID int64, destChainID int64, logError func(string)) ([]job.ServiceCtx, error) {
+func NewCommitServices2(ctx context.Context, srcProvider commontypes.CCIPCommitProvider, dstProvider commontypes.CCIPCommitProvider, srcChain legacyevm.Chain, dstChain legacyevm.Chain, chainSet legacyevm.LegacyChainContainer, jb job.Job, lggr logger.Logger, pr pipeline.Runner, argsNoPlugin libocr2.OCR2OracleArgs, new bool, sourceChainID int64, destChainID int64, logError func(string)) ([]job.ServiceCtx, error) {
 	spec := jb.OCR2OracleSpec
 
 	var pluginConfig ccipconfig.CommitPluginJobSpecConfig
@@ -87,8 +90,11 @@ func NewCommitServices2(ctx context.Context, provider commontypes.CCIPCommitProv
 		return nil, err
 	}
 
+	// TODO: EVM family specific behavior leaked for CommitStore, which requires access to two relayers
+	versionFinder := factory.NewEvmVersionFinder()
 	commitStoreAddress := common.HexToAddress(spec.ContractID)
-	commitStoreReader, err := provider.NewCommitStoreReader(ctx, ccipcalc.EvmAddrToGeneric(commitStoreAddress))
+	sourceMaxGasPrice := srcChain.Config().EVM().GasEstimator().PriceMax().ToInt()
+	commitStoreReader, err := ccip.NewCommitStoreReader(lggr, versionFinder, ccipcalc.EvmAddrToGeneric(commitStoreAddress), dstChain.Client(), dstChain.LogPoller(), srcChain.GasEstimator(), sourceMaxGasPrice)
 	if err != nil {
 		return nil, err
 	}
@@ -103,50 +109,63 @@ func NewCommitServices2(ctx context.Context, provider commontypes.CCIPCommitProv
 			return nil, fmt.Errorf("creating pipeline price getter: %w", err)
 		}
 	} else {
-		priceGetter, err = provider.NewPriceGetter(ctx)
+		// Use dynamic price getter.
+		if pluginConfig.PriceGetterConfig == nil {
+			return nil, fmt.Errorf("priceGetterConfig is nil")
+		}
+
+		// Build price getter clients for all chains specified in the aggregator configurations.
+		// Some lanes (e.g. Wemix/Kroma) requires other clients than source and destination, since they use feeds from other chains.
+		priceGetterClients := map[uint64]pricegetter.DynamicPriceGetterClient{}
+		for _, aggCfg := range pluginConfig.PriceGetterConfig.AggregatorPrices {
+			chainID := aggCfg.ChainID
+			// Retrieve the chain.
+			chain, _, err2 := ccipconfig.GetChainByChainID(chainSet, chainID)
+			if err2 != nil {
+				return nil, fmt.Errorf("retrieving chain for chainID %d: %w", chainID, err2)
+			}
+			caller := rpclib.NewDynamicLimitedBatchCaller(
+				lggr,
+				chain.Client(),
+				rpclib.DefaultRpcBatchSizeLimit,
+				rpclib.DefaultRpcBatchBackOffMultiplier,
+				rpclib.DefaultMaxParallelRpcCalls,
+			)
+			priceGetterClients[chainID] = pricegetter.NewDynamicPriceGetterClient(caller)
+		}
+
+		priceGetter, err = pricegetter.NewDynamicPriceGetter(*pluginConfig.PriceGetterConfig, priceGetterClients)
 		if err != nil {
 			return nil, fmt.Errorf("creating dynamic price getter: %w", err)
 		}
 	}
 
-	offRampReader, err := provider.NewOffRampReader(ctx, pluginConfig.OffRamp)
+	offRampReader, err := dstProvider.NewOffRampReader(ctx, pluginConfig.OffRamp)
 	if err != nil {
 		return nil, err
 	}
 
-	staticConfig, err := offRampReader.GetStaticConfig(ctx)
+	staticConfig, err := commitStoreReader.GetCommitStoreStaticConfig(ctx)
 	if err != nil {
 		return nil, err
 	}
 	onRampAddress := staticConfig.OnRamp
 
-	onRampReader, err := provider.NewOnRampReader(ctx, onRampAddress, staticConfig.SourceChainSelector, staticConfig.ChainSelector)
+	onRampReader, err := srcProvider.NewOnRampReader(ctx, onRampAddress, staticConfig.SourceChainSelector, staticConfig.ChainSelector)
 	if err != nil {
 		return nil, err
-	}
-
-	destRouterAddr, err := offRampReader.GetRouter(ctx)
-
-	destOffRampReaders, err := provider.NewOffRampReaders(ctx, destRouterAddr)
-	// convert internal CCIP OffRampReader type to common type
-	offRampReaders := make([]ccipdata.OffRampReader, 0, len(destOffRampReaders))
-	for _, d := range destOffRampReaders {
-		offRampReaders = append(offRampReaders, d)
 	}
 
 	onRampRouterAddr, err := onRampReader.RouterAddress(ctx)
 	if err != nil {
 		return nil, err
 	}
-	sourceNative, err := provider.SourceNativeToken(ctx, onRampRouterAddr)
+	sourceNative, err := srcProvider.SourceNativeToken(ctx, onRampRouterAddr)
 
 	// Prom wrappers
 	onRampReader = observability.NewObservedOnRampReader(onRampReader, sourceChainID, ccip.CommitPluginLabel)
 	commitStoreReader = observability.NewObservedCommitStoreReader(commitStoreReader, destChainID, ccip.CommitPluginLabel)
 	metricsCollector := ccip.NewPluginMetricsCollector(ccip.CommitPluginLabel, sourceChainID, destChainID)
-	for i, o := range destOffRampReaders {
-		destOffRampReaders[i] = observability.NewObservedOffRampReader(o, destChainID, ccip.CommitPluginLabel)
-	}
 
 	chainHealthCheck := cache.NewObservedChainHealthCheck(
 		cache.NewChainHealthcheck(
@@ -166,13 +185,17 @@ func NewCommitServices2(ctx context.Context, provider commontypes.CCIPCommitProv
 		cciptypes.Address(onRampAddress),
 	)
 	wrappedPluginFactory := NewCommitReportingPluginFactory(CommitPluginStaticConfig{
-		Lggr:                lggr,
-		OnRampReader:        onRampReader,
-		SourceChainSelector: staticConfig.SourceChainSelector,
-		SourceNative:        sourceNative,
-		PriceGetter:         priceGetter,
-		MetricsCollector:    metricsCollector,
-		ChainHealthcheck:    chainHealthCheck,
+		lggr:                  lggr,
+		onRampReader:          onRampReader,
+		sourceChainSelector:   staticConfig.SourceChainSelector,
+		sourceNative:          sourceNative,
+		offRamp:               offRampReader,
+		commitStore:           commitStoreReader,
+		destChainSelector:     staticConfig.ChainSelector,
+		priceRegistryProvider: NewChainAgnosticPriceRegistry(dstProvider),
+		priceGetter:           priceGetter,
+		metricsCollector:      metricsCollector,
+		chainHealthcheck:      chainHealthCheck,
 	})
 	argsNoPlugin.ReportingPluginFactory = promwrapper.NewPromFactory(wrappedPluginFactory, "CCIPCommit", jb.OCR2OracleSpec.Relay, big.NewInt(0).SetInt64(destChainID))
 	argsNoPlugin.Logger = commonlogger.NewOCRWrapper(commitLggr, true, logError)
@@ -185,7 +208,8 @@ func NewCommitServices2(ctx context.Context, provider commontypes.CCIPCommitProv
 		return []job.ServiceCtx{
 			NewChainAgnosticBackFilledOracle(
 				lggr,
-				provider,
+				srcProvider,
+				dstProvider,
 				job.NewServiceAdapter(oracle),
 			),
 			chainHealthCheck,
@@ -210,16 +234,18 @@ func NewChainAgnosticPriceRegistry(p commontypes.CCIPCommitProvider) *ChainAgnos
 	return &ChainAgnosticPriceRegistry{p}
 }
 
-func NewChainAgnosticBackFilledOracle(lggr logger.Logger, provider commontypes.CCIPCommitProvider, oracle job.ServiceCtx) *ChainAgnosticBackFilledOracle {
+func NewChainAgnosticBackFilledOracle(lggr logger.Logger, srcProvider commontypes.CCIPCommitProvider, dstProvider commontypes.CCIPCommitProvider, oracle job.ServiceCtx) *ChainAgnosticBackFilledOracle {
 	return &ChainAgnosticBackFilledOracle{
-		provider: provider,
-		oracle:   oracle,
-		lggr:     lggr,
+		srcProvider: srcProvider,
+		dstProvider: dstProvider,
+		oracle:      oracle,
+		lggr:        lggr,
 	}
 }
 
 type ChainAgnosticBackFilledOracle struct {
-	provider      commontypes.CCIPCommitProvider
+	srcProvider   commontypes.CCIPCommitProvider
+	dstProvider   commontypes.CCIPCommitProvider
 	oracle        job.ServiceCtx
 	lggr          logger.Logger
 	oracleStarted atomic.Bool
@@ -229,9 +255,39 @@ type ChainAgnosticBackFilledOracle struct {
 func (r *ChainAgnosticBackFilledOracle) Start(ctx context.Context) error {
 	ctx, cancelFn := context.WithCancel(context.Background())
 	r.cancelFn = cancelFn
-	err := r.provider.Start(ctx)
+	var err error
+	var errMu sync.Mutex
+	var wg sync.WaitGroup
+	// Replay in parallel if both requested.
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		s := time.Now()
+		srcReplayErr := r.srcProvider.Start(ctx)
+		errMu.Lock()
+		err = multierr.Combine(err, srcReplayErr)
+		errMu.Unlock()
+		r.lggr.Infow("finished replaying src chain", "time", time.Since(s))
+	}()
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		s := time.Now()
+		dstReplayErr := r.dstProvider.Start(ctx)
+		errMu.Lock()
+		err = multierr.Combine(err, dstReplayErr)
+		errMu.Unlock()
+		r.lggr.Infow("finished replaying dst chain", "time", time.Since(s))
+	}()
+
+	wg.Wait()
 	if err != nil {
-		return err
+		r.lggr.Criticalw("unexpected error replaying, continuing plugin boot without all the logs backfilled", "err", err)
+	}
+	if err := ctx.Err(); err != nil {
+		r.lggr.Errorw("context already cancelled", "err", err)
+		return nil
 	}
 	// Start oracle with all logs present from dstStartBlock on dst and
 	// all logs from srcStartBlock on src.
@@ -241,7 +297,6 @@ func (r *ChainAgnosticBackFilledOracle) Start(ctx context.Context) error {
 	} else {
 		r.oracleStarted.Store(true)
 	}
-
 	return nil
 }
 
@@ -431,13 +486,17 @@ func jobSpecToCommitPluginConfig(ctx context.Context, lggr logger.Logger, jb job
 		"sourceNative", sourceNative,
 		"sourceRouter", sourceRouter.Address())
 	return &CommitPluginStaticConfig{
-			Lggr:                commitLggr,
-			OnRampReader:        onRampReader,
-			SourceNative:        ccipcalc.EvmAddrToGeneric(sourceNative),
-			PriceGetter:         priceGetter,
-			SourceChainSelector: params.commitStoreStaticCfg.SourceChainSelector,
-			MetricsCollector:    metricsCollector,
-			ChainHealthcheck:    chainHealthcheck,
+			lggr:                  commitLggr,
+			onRampReader:          onRampReader,
+			offRamp:               offRampReader,
+			sourceNative:          ccipcalc.EvmAddrToGeneric(sourceNative),
+			priceGetter:           priceGetter,
+			sourceChainSelector:   params.commitStoreStaticCfg.SourceChainSelector,
+			destChainSelector:     params.commitStoreStaticCfg.ChainSelector,
+			commitStore:           commitStoreReader,
+			priceRegistryProvider: ccipdataprovider.NewEvmPriceRegistry(params.destChain.LogPoller(), params.destChain.Client(), commitLggr, ccip.CommitPluginLabel),
+			metricsCollector:      metricsCollector,
+			chainHealthcheck:      chainHealthcheck,
 		}, &ccipcommon.BackfillArgs{
 			SourceLP:         params.sourceChain.LogPoller(),
 			DestLP:           params.destChain.LogPoller(),

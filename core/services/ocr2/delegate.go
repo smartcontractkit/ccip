@@ -1724,7 +1724,7 @@ func (d *Delegate) newServicesCCIPCommit(ctx context.Context, lggr logger.Sugare
 	if err != nil {
 		return nil, ErrJobSpecNoRelayer{Err: err, PluginName: string(spec.PluginType)}
 	}
-	chain, err := d.legacyChains.Get(srcRid.ChainID)
+	srcChain, err := d.legacyChains.Get(srcRid.ChainID)
 	if err != nil {
 		return nil, fmt.Errorf("ccip services; failed to get chain %s: %w", srcRid.ChainID, err)
 	}
@@ -1732,7 +1732,7 @@ func (d *Delegate) newServicesCCIPCommit(ctx context.Context, lggr logger.Sugare
 	ccipProvider, err2 := evmrelay.NewCCIPCommitProvider(
 		ctx,
 		lggr.Named("CCIPCommit"),
-		chain,
+		srcChain,
 		types.RelayArgs{
 			ExternalJobID: jb.ExternalJobID,
 			JobID:         spec.ID,
@@ -1776,7 +1776,7 @@ func (d *Delegate) newServicesCCIPCommit(ctx context.Context, lggr logger.Sugare
 		return nil, errors.New("chainID must be provided in relay config")
 	}
 	destChainID := uint64(chainIDInterface.(float64))
-	_, err = d.legacyChains.Get(strconv.FormatUint(destChainID, 10))
+	dstChain, err := d.legacyChains.Get(strconv.FormatUint(destChainID, 10))
 	if err != nil {
 		return nil, errors.Wrap(err, "dest chain not found in chainset")
 	}
@@ -1787,31 +1787,14 @@ func (d *Delegate) newServicesCCIPCommit(ctx context.Context, lggr logger.Sugare
 		}
 	}
 
-	commitPluginConfigBytes, err := ccipSourceDestRelayerToPluginConfig(srcRid, dstRid)
+	srcConfigBytes, err := ccipProviderTypeToPluginConfig(true)
 	if err != nil {
 		return nil, err
 	}
 
-	relayerSet := d.RelayGetter.GetRelayerSet()
-
-	provider, err := relayerSet.NewCrossRelayerPluginProvider(
-		ctx,
-		core.RelayArgs{
-			ContractID:   spec.ContractID,
-			RelayConfig:  spec.RelayConfig.Bytes(),
-			ProviderType: string(types.CCIPCommit),
-		},
-		core.PluginArgs{
-			PluginConfig: commitPluginConfigBytes,
-		},
-	)
+	dstConfigBytes, err := ccipProviderTypeToPluginConfig(false)
 	if err != nil {
 		return nil, err
-	}
-
-	ccipCommitProvider, ok := provider.(types.CCIPCommitProvider)
-	if !ok {
-		return nil, errors.New("could not coerce PluginProvider to MercuryProvider")
 	}
 
 	sourceChainID, err := strconv.ParseInt(srcRid.ChainID, 10, 64)
@@ -1819,13 +1802,50 @@ func (d *Delegate) newServicesCCIPCommit(ctx context.Context, lggr logger.Sugare
 		return nil, err
 	}
 
-	return ccipcommit.NewCommitServices2(ctx, ccipCommitProvider, jb, lggr, d.pipelineRunner, oracleArgsNoPlugin, d.isNewlyCreatedJob, sourceChainID, int64(destChainID), logError)
+	// Get provider from source chain
+	srcRelayer, err := d.RelayGetter.Get(srcRid)
+	if err != nil {
+		return nil, err
+	}
+	provider, err := srcRelayer.NewPluginProvider(ctx,
+		types.RelayArgs{
+			ContractID:   spec.ContractID,
+			RelayConfig:  spec.RelayConfig.Bytes(),
+			ProviderType: string(types.CCIPCommit),
+		},
+		types.PluginArgs{
+			PluginConfig: srcConfigBytes,
+		})
+	srcProvider, ok := provider.(types.CCIPCommitProvider)
+	if !ok {
+		return nil, errors.New("could not coerce PluginProvider to CCIPCommitProvider")
+	}
+
+	// Get provider from dest chain
+	dstRelayer, err := d.RelayGetter.Get(dstRid)
+	if err != nil {
+		return nil, err
+	}
+	provider, err = dstRelayer.NewPluginProvider(ctx,
+		types.RelayArgs{
+			ContractID:   spec.ContractID,
+			RelayConfig:  spec.RelayConfig.Bytes(),
+			ProviderType: string(types.CCIPCommit),
+		},
+		types.PluginArgs{
+			PluginConfig: dstConfigBytes,
+		})
+	dstProvider, ok := provider.(types.CCIPCommitProvider)
+	if !ok {
+		return nil, errors.New("could not coerce PluginProvider to CCIPCommitProvider")
+	}
+
+	return ccipcommit.NewCommitServices2(ctx, ccipCommitProvider, srcProvider, dstProvider, srcChain, dstChain, d.legacyChains, jb, lggr, d.pipelineRunner, oracleArgsNoPlugin, d.isNewlyCreatedJob, sourceChainID, int64(destChainID), logError)
 }
 
-func ccipSourceDestRelayerToPluginConfig(sID types.RelayID, dID types.RelayID) ([]byte, error) {
-	commitPluginConfig := &config.CommitPluginConfig{
-		SourceRelayerID: types.RelayID(sID),
-		DestRelayerID:   types.RelayID(dID),
+func ccipProviderTypeToPluginConfig(isSourceProvider bool) ([]byte, error) {
+	commitPluginConfig := &config.CommitPluginConfigV2{
+		IsSourceProvider: isSourceProvider,
 	}
 
 	bytes, err := json.Marshal(commitPluginConfig)
