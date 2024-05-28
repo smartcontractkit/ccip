@@ -65,7 +65,6 @@ func setupGasSuite(t *testing.T, loadArgs *LoadArgs) *ch.GasSuite {
 
 // TestLoadCCIPStableRPS clean and stable load test
 func TestLoadCCIPStableRPS(t *testing.T) {
-	t.Skip()
 	t.Parallel()
 	lggr := logging.GetTestLogger(t)
 	testArgs := NewLoadArgs(t, lggr)
@@ -85,7 +84,6 @@ func TestLoadCCIPStableRPS(t *testing.T) {
 // TestLoadCCIPStableRPSReorgsBelowFinality we run default stable RPS load test and
 // measure how below-finality reorgs are slowing us down
 func TestLoadCCIPStableRPSReorgsBelowFinality(t *testing.T) {
-	t.Skip()
 	t.Parallel()
 	lggr := logging.GetTestLogger(t)
 	testArgs := NewLoadArgs(t, lggr)
@@ -107,7 +105,6 @@ func TestLoadCCIPStableRPSReorgsBelowFinality(t *testing.T) {
 // TestLoadCCIPStableRPSReorgsAboveFinality we run a short stable load test and assert
 // that finality violation is detected
 func TestLoadCCIPStableRPSReorgsAboveFinality(t *testing.T) {
-	t.Skip()
 	t.Parallel()
 	lggr := logging.GetTestLogger(t)
 	testArgs := NewLoadArgs(t, lggr)
@@ -147,7 +144,6 @@ func TestLoadCCIPStableRPSReorgsAboveFinality(t *testing.T) {
 }
 
 func TestLoadCCIPStableRPSGasSpike(t *testing.T) {
-	t.Skip()
 	t.Parallel()
 	lggr := logging.GetTestLogger(t)
 	testArgs := NewLoadArgs(t, lggr)
@@ -170,7 +166,6 @@ func TestLoadCCIPStableRPSGasSpike(t *testing.T) {
 }
 
 func TestLoadCCIPStableRPSChangeBlockGasLimit(t *testing.T) {
-	t.Skip()
 	t.Parallel()
 	lggr := logging.GetTestLogger(t)
 	testArgs := NewLoadArgs(t, lggr)

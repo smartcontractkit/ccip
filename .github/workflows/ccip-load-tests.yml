@@ -138,7 +138,7 @@ jobs:
           - name: ccip-reorg-above-finality-tag
             os: ubuntu-latest
             run: ^TestLoadCCIPStableRPSReorgsAboveFinality$
-            config_path: /home/runner/work/ccip/ccip/integration-tests/ccip-tests/testconfig/tomls/ccip-reorg-finality-tag.tom
+            config_path: /home/runner/work/ccip/ccip/integration-tests/ccip-tests/testconfig/tomls/ccip-reorg-finality-tag.toml
             # gas chaos
           - name: ccip-gas-spike-slow-src
             os: ubuntu-latest
