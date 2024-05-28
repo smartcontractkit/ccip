@@ -11,16 +11,18 @@ import (
 type NetworkLiquidity struct {
 	Network   NetworkSelector
 	Liquidity *ubig.Big
+	TokenID   TokenID
 }
 
 func (n NetworkLiquidity) String() string {
-	return fmt.Sprintf("NetworkLiquidity{Network: %d, Liquidity: %s}", n.Network, n.Liquidity.String())
+	return fmt.Sprintf("NetworkLiquidity{Network: %d, Liquidity: %s, TokenID: %s}", n.Network, n.Liquidity.String(), n.TokenID.String())
 }
 
-func NewNetworkLiquidity(chain NetworkSelector, liq *big.Int) NetworkLiquidity {
+func NewNetworkLiquidity(chain NetworkSelector, liq *big.Int, tid TokenID) NetworkLiquidity {
 	return NetworkLiquidity{
 		Network:   chain,
 		Liquidity: ubig.New(liq),
+		TokenID:   tid,
 	}
 }
 
@@ -122,4 +124,5 @@ func DecodeOutcome(b []byte) (Outcome, error) {
 type ConfigDigestWithMeta struct {
 	Digest     ConfigDigest
 	NetworkSel NetworkSelector
+	TokenID    TokenID
 }

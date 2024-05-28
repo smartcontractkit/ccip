@@ -83,9 +83,10 @@ type NetworkType string
 
 // ProposedTransfer is a transfer that is proposed by the rebalancing algorithm.
 type ProposedTransfer struct {
-	From   NetworkSelector
-	To     NetworkSelector
-	Amount *ubig.Big
+	From    NetworkSelector
+	To      NetworkSelector
+	Amount  *ubig.Big
+	TokenID TokenID
 }
 
 func (p ProposedTransfer) FromNetwork() NetworkSelector {
@@ -105,7 +106,7 @@ func (p ProposedTransfer) TransferStatus() TransferStatus {
 }
 
 func (p ProposedTransfer) String() string {
-	return fmt.Sprintf("from:%d to:%d amount:%s", p.From, p.To, p.Amount.String())
+	return fmt.Sprintf("from:%d to:%d amount:%s token:%s", p.From, p.To, p.Amount.String(), p.TokenID.String())
 }
 
 // Transfer is a ProposedTransfer that has had a lot of its information resolved.
@@ -256,13 +257,15 @@ const (
 )
 
 type Edge struct {
-	Source NetworkSelector
-	Dest   NetworkSelector
+	Source  NetworkSelector
+	Dest    NetworkSelector
+	TokenID TokenID
 }
 
-func NewEdge(source, dest NetworkSelector) Edge {
+func NewEdge(source, dest NetworkSelector, tid TokenID) Edge {
 	return Edge{
-		Source: source,
-		Dest:   dest,
+		Source:  source,
+		Dest:    dest,
+		TokenID: tid,
 	}
 }
