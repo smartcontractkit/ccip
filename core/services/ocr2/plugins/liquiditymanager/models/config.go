@@ -13,6 +13,15 @@ type PluginConfig struct {
 	LiquidityManagerNetwork NetworkSelector  `json:"liquidityManagerNetwork,string"`
 	ClosePluginTimeoutSec   int              `json:"closePluginTimeoutSec"`
 	RebalancerConfig        RebalancerConfig `json:"rebalancerConfig"`
+	Tokens                  []string         `json:"tokens,omitempty"`
+}
+
+func (pc PluginConfig) TokenIDs() []TokenID {
+	tokens := make([]TokenID, 0, len(pc.Tokens))
+	for _, token := range pc.Tokens {
+		tokens = append(tokens, NewTokenID(token))
+	}
+	return tokens
 }
 
 type RebalancerConfig struct {
