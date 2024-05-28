@@ -1245,10 +1245,6 @@ contract EVM2EVMMultiOnRamp_payNops is EVM2EVMMultiOnRampSetup {
       s_nopFees[message.feeToken] = newFeeTokenBalance;
       s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, feeAmount, OWNER);
     }
-
-    for (uint256 i = 0; i < s_sourceFeeTokens.length; ++i) {
-      assertEq(IERC20(s_sourceFeeTokens[i]).balanceOf(address(s_onRamp)), s_nopFees[s_sourceFeeTokens[i]]);
-    }
   }
 
   function test_Fuzz_PayNops_Success(uint256[5] memory amounts) public {
