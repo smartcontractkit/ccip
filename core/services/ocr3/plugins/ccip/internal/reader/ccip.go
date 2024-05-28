@@ -15,6 +15,10 @@ var (
 )
 
 type CCIP interface {
+	// ReportsFromBlockNum ReportsAfterBlockNum reads the requested chain starting at a given
+	// block number and finds all ReportAccepted up to the provided limit.
+	ReportsFromBlockNum(ctx context.Context, chain model.ChainSelector, blockNum uint64, limit int) (map[model.ChainSelector][]model.CommitReport, error)
+
 	// MsgsAfterTimestamp reads the provided chains.
 	// Finds and returns ccip messages submitted after the target time.
 	// Messages are sorted ascending based on their timestamp and limited up to the provided limit.
@@ -41,6 +45,13 @@ type ChainReader interface{} // TODO: Imported from chainlink-common
 type CCIPChainReader struct {
 	chainReaders map[model.ChainSelector]ChainReader
 	destChain    model.ChainSelector
+}
+
+func (r *CCIPChainReader) ReportsFromBlockNum(ctx context.Context, chain model.ChainSelector, blockNum uint64, limit int) (map[model.ChainSelector][]model.CommitReport, error) {
+	if err := r.validateReaderExistence(chain); err != nil {
+		return nil, err
+	}
+	panic("implement me")
 }
 
 func (r *CCIPChainReader) MsgsAfterTimestamp(ctx context.Context, chains []model.ChainSelector, ts time.Time, limit int) ([]model.CCIPMsg, error) {

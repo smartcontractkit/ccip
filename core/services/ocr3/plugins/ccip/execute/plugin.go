@@ -5,6 +5,7 @@ import (
 
 	//cache "github.com/smartcontractkit/ccipocr3/internal/copypaste/commit_roots_cache"
 	"github.com/smartcontractkit/ccipocr3/internal/model"
+	"github.com/smartcontractkit/ccipocr3/internal/reader"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 )
@@ -22,7 +23,12 @@ type StaticConfig struct {
 type Plugin struct {
 	StaticConfig
 
+	destChain model.ChainSelector
+
+	reader reader.CCIP
+
 	//commitRootsCache cache.CommitsRootsCache
+	lastReportBlock uint64
 }
 
 func NewPlugin(config StaticConfig) *Plugin {
@@ -36,15 +42,6 @@ func (p *Plugin) Query(ctx context.Context, outctx ocr3types.OutcomeContext) (ty
 	return types.Query{}, nil
 }
 
-type Observation struct {
-	NodeID model.NodeID
-	// slice of messages for each chain
-	Msgs map[model.ChainSelector][]model.CCIPMsgBaseDetails
-
-	// slice of (oldest?) reports from destination
-	Reports [][]byte
-}
-
 // Observation collects data across two phases which happen in separate rounds.
 // These phases happen continuously so that except for the first round, every
 // subsequent round can have a new execution report.
@@ -55,8 +52,43 @@ type Observation struct {
 // Phase 2: Gather messages from the source chains and build the execution
 // report.
 func (p *Plugin) Observation(ctx context.Context, outctx ocr3types.OutcomeContext, query types.Query) (types.Observation, error) {
+	previousOutcome, err := model.DecodeExecutePluginOutcome(outctx.PreviousOutcome)
+	if err != nil {
+		return types.Observation{}, err
+	}
 
-	return model.NewExecutePluginObservation("", nil).Encode()
+	// Phase 1: Gather commit reports from the destination chain and determine which messages are required to build a valid execution report.
+	// TODO: filter out "cannot read p.destChain" errors? Or avoid calling it in the first place?
+	commitReports, err := p.reader.ReportsFromBlockNum(ctx, p.destChain, p.lastReportBlock, 1000)
+	if err != nil {
+		return types.Observation{}, err
+	}
+
+	// Phase 2: Gather messages from the source chains and build the execution report.
+	messages := make(map[model.ChainSelector][]model.CCIPMessage)
+	if len(previousOutcome.Messages) == 0 {
+		// No messages to execute.
+		// This is expected after a cold start.
+	} else {
+		for selector, reports := range previousOutcome.NextCommits {
+			for _, report := range reports {
+				msgs, err := p.reader.MsgsBetweenSeqNums(ctx, []model.ChainSelector{selector}, report.SequenceNumberRange)
+				if err != nil {
+					return types.Observation{}, err
+				}
+				var convert []model.CCIPMessage
+				for _, msg := range msgs {
+					convert = append(convert, model.CCIPMessage{
+						SequenceNumber: msg.SeqNum,
+						Message:        msg.ID[:],
+					})
+				}
+				messages[selector] = convert
+			}
+		}
+	}
+
+	return model.NewExecutePluginObservation(commitReports, messages).Encode()
 }
 
 func (p *Plugin) ValidateObservation(outctx ocr3types.OutcomeContext, query types.Query, ao types.AttributedObservation) error {
