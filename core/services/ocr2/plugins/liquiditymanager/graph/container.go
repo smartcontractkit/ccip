@@ -6,6 +6,7 @@ type GraphContainer interface {
 	Get(id string) (Graph, bool)
 	GetOrCreate(id string) Graph
 	Set(id string, g Graph)
+	IsEmpty() bool
 }
 
 type graphContainer struct {
@@ -45,4 +46,11 @@ func (c *graphContainer) Set(id string, graph Graph) {
 	defer c.lock.Unlock()
 
 	c.graphs[id] = graph
+}
+
+func (c *graphContainer) IsEmpty() bool {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+
+	return len(c.graphs) == 0
 }
