@@ -302,17 +302,16 @@ func DeployLocalCluster(
 		WithoutCleanup().
 		Build()
 	require.NoError(t, err)
-	// the builder builds network with a static network config, we don't want that.
-	env.EVMNetworks = []*blockchain.EVMNetwork{}
 	for i, networkCfg := range selectedNetworks {
-		rpcProvider, err := env.GetRpcProvider(networkCfg.ChainID)
-		require.NoError(t, err, "Error getting rpc provider")
-		selectedNetworks[i].URLs = rpcProvider.PrivateWsUrsl()
-		selectedNetworks[i].HTTPURLs = rpcProvider.PrivateHttpUrls()
-		newNetwork := networkCfg
-		newNetwork.URLs = rpcProvider.PublicWsUrls()
-		newNetwork.HTTPURLs = rpcProvider.PublicHttpUrls()
-		env.EVMNetworks = append(env.EVMNetworks, &newNetwork)
+		for _, network := range env.EVMNetworks {
+			if network.ChainID == networkCfg.ChainID {
+				rpcProvider, err := env.GetRpcProvider(networkCfg.ChainID)
+				require.NoError(t, err, "Error getting rpc provider")
+				selectedNetworks[i].URLs = rpcProvider.PrivateWsUrsl()
+				selectedNetworks[i].HTTPURLs = rpcProvider.PrivateHttpUrls()
+				selectedNetworks[i].SupportsEIP1559 = network.SupportsEIP1559
+			}
+		}
 	}
 	testInputs.SelectedNetworks = selectedNetworks
 

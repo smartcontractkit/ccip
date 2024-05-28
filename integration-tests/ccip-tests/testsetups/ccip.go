@@ -881,6 +881,7 @@ func CCIPDefaultTestSetUp(
 		net := net
 		net.HTTPURLs = chain.GetNetworkConfig().HTTPURLs
 		net.URLs = chain.GetNetworkConfig().URLs
+		net.SupportsEIP1559 = chain.GetNetworkConfig().SupportsEIP1559
 		chainAddGrp.Go(func() error {
 			return setUpArgs.DeployChainContracts(
 				lggr, chain, net,
@@ -924,8 +925,10 @@ func CCIPDefaultTestSetUp(
 
 		n.NetworkA.HTTPURLs = n.ChainClientA.GetNetworkConfig().HTTPURLs
 		n.NetworkA.URLs = n.ChainClientA.GetNetworkConfig().URLs
+		n.NetworkA.SupportsEIP1559 = n.ChainClientA.GetNetworkConfig().SupportsEIP1559
 		n.NetworkB.HTTPURLs = n.ChainClientB.GetNetworkConfig().HTTPURLs
 		n.NetworkB.URLs = n.ChainClientB.GetNetworkConfig().URLs
+		n.NetworkB.SupportsEIP1559 = n.ChainClientB.GetNetworkConfig().SupportsEIP1559
 
 		laneAddGrp.Go(func() error {
 			return setUpArgs.AddLanesForNetworkPair(

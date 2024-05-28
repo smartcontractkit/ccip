@@ -187,7 +187,7 @@ jobs:
           echo "NETHERMIND_TAG=$nethermind_tag" >> $GITHUB_ENV
           echo "Nethermind latest tag: $nethermind_tag"
 
-          besu_tag=$(get_latest_version_tag hyperledger/besu '^[0-9]+\.[0-9]+$')
+          besu_tag=$(get_latest_version_tag hyperledger/besu '^[0-9]+\.[0-9]+(\.[0-9]+)?$')
           echo "BESU_TAG=$besu_tag" >> $GITHUB_ENV
           echo "Besu latest tag: $besu_tag"
 
