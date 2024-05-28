@@ -741,9 +741,11 @@ func (ccipModule *CCIPCommon) NeedTokenAdminRegistry() bool {
 
 // DeployContracts deploys the contracts which are necessary in both source and dest chain
 // This reuses common contracts for bidirectional lanes
-func (ccipModule *CCIPCommon) DeployContracts(noOfTokens int,
+func (ccipModule *CCIPCommon) DeployContracts(
+	noOfTokens int,
 	tokenDeployerFns []blockchain.ContractDeployer,
-	conf *laneconfig.LaneConfig) error {
+	conf *laneconfig.LaneConfig,
+) error {
 	var err error
 	cd := ccipModule.Deployer
 
@@ -865,15 +867,17 @@ func (ccipModule *CCIPCommon) DeployContracts(noOfTokens int,
 		ccipModule.FeeToken = token
 	}
 
-	// number of deployed bridge tokens does not match noOfTokens; deploy rest of the tokens in case ExistingDeployment is false
+	// If the number of deployed bridge tokens does not match noOfTokens, deploy rest of the tokens in case ExistingDeployment is false
 	// In case of ExistingDeployment as true use whatever is provided in laneconfig
 	if len(ccipModule.BridgeTokens) < noOfTokens {
 		// deploy bridge token.
 		for i := len(ccipModule.BridgeTokens); i < noOfTokens; i++ {
 			// if it's an existing deployment, we don't deploy the token
 			if !ccipModule.ExistingDeployment {
-				var token *contracts.ERC20Token
-				var err error
+				var (
+					token *contracts.ERC20Token
+					err   error
+				)
 				if len(tokenDeployerFns) != noOfTokens {
 					if ccipModule.IsUSDCDeployment() && i == 0 {
 						// if it's USDC deployment, we deploy the burn mint token 677 with decimal 6 and cast it to ERC20Token
@@ -909,6 +913,7 @@ func (ccipModule *CCIPCommon) DeployContracts(noOfTokens int,
 						}
 					}
 				} else {
+					// TODO: CCIP-2155 - User should deploy the token
 					token, err = cd.DeployERC20TokenContract(tokenDeployerFns[i])
 					if err != nil {
 						return fmt.Errorf("deploying bridge token contract shouldn't fail %w", err)
@@ -959,6 +964,7 @@ func (ccipModule *CCIPCommon) DeployContracts(noOfTokens int,
 
 				ccipModule.BridgeTokenPools = append(ccipModule.BridgeTokenPools, usdcPool)
 			} else {
+				// TODO: CCIP-2155 - User should deploy the pool
 				// deploy lock release token pool in case of non-usdc deployment
 				btp, err := cd.DeployLockReleaseTokenPoolContract(token.Address(), *ccipModule.ARMContract, ccipModule.Router.Instance.Address())
 				if err != nil {
@@ -1216,7 +1222,14 @@ func NewCCIPCommonFromConfig(
 	return newCCIPModule, nil
 }
 
-func DefaultCCIPModule(logger zerolog.Logger, chainClient blockchain.EVMClient, noOfTokensWithDynamicPrice int, existingDeployment, multiCall bool, USDCMockDeployment *bool) (*CCIPCommon, error) {
+func DefaultCCIPModule(
+	logger zerolog.Logger,
+	chainClient blockchain.EVMClient,
+	noOfTokensWithDynamicPrice int,
+	existingDeployment,
+	multiCall bool,
+	USDCMockDeployment *bool,
+) (*CCIPCommon, error) {
 	cd, err := contracts.NewCCIPContractsDeployer(logger, chainClient)
 	if err != nil {
 		return nil, err
@@ -1285,8 +1298,8 @@ func (sourceCCIP *SourceCCIPModule) LoadContracts(conf *laneconfig.LaneConfig) {
 					EthAddress: common.HexToAddress(cfg.OnRamp),
 				}
 			}
-			if cfg.DepolyedAt > 0 {
-				sourceCCIP.SrcStartBlock = cfg.DepolyedAt
+			if cfg.DeployedAt > 0 {
+				sourceCCIP.SrcStartBlock = cfg.DeployedAt
 			}
 		}
 	}
@@ -2642,7 +2655,7 @@ func (lane *CCIPLane) UpdateLaneConfig() {
 	lane.SrcNetworkLaneCfg.SrcContractsMu.Lock()
 	lane.SrcNetworkLaneCfg.SrcContracts[lane.Source.DestNetworkName] = laneconfig.SourceContracts{
 		OnRamp:     lane.Source.OnRamp.Address(),
-		DepolyedAt: lane.Source.SrcStartBlock,
+		DeployedAt: lane.Source.SrcStartBlock,
 	}
 	lane.SrcNetworkLaneCfg.SrcContractsMu.Unlock()
 	lane.Dest.Common.WriteLaneConfig(lane.DstNetworkLaneCfg)

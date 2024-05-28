@@ -543,6 +543,7 @@ func (w TokenPoolWrapper) GetRebalancer(opts *bind.CallOpts) (common.Address, er
 	return common.Address{}, fmt.Errorf("no pool found to get rebalancer")
 }
 
+// TODO: CCIP-2155 - Add wallet of owner of the pool
 // TokenPool represents a TokenPool address
 type TokenPool struct {
 	client     blockchain.EVMClient
@@ -1210,6 +1211,7 @@ func (r *TokenAdminRegistry) SetAdminAndRegisterPool(tokenAddr, poolAddr common.
 	if err != nil {
 		return fmt.Errorf("error getting transaction opts: %w", err)
 	}
+	// TODO: CCIP-2155 - Need to set this to the actual user address
 	tx, err := r.Instance.RegisterAdministratorPermissioned(opts, tokenAddr, opts.From)
 	if err != nil {
 		return fmt.Errorf("error setting admin for token %s : %w", tokenAddr.Hex(), err)

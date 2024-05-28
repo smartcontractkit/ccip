@@ -894,7 +894,8 @@ func CCIPDefaultTestSetUp(
 			return setUpArgs.DeployChainContracts(
 				lggr, chain, net,
 				pointer.GetInt(testConfig.TestGroupInput.TokenConfig.NoOfTokensPerChain),
-				tokenDeployerFns)
+				tokenDeployerFns,
+			)
 		})
 	}
 	require.NoError(t, chainAddGrp.Wait(), "Deploying common contracts shouldn't fail")
