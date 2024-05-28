@@ -8,7 +8,6 @@ import (
 	"sort"
 	"time"
 
-	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/pkg/errors"
 
@@ -325,19 +324,8 @@ func (r *CommitReportingPlugin) Report(ctx context.Context, epochAndRound types.
 
 	parsableObservations := ccip.GetParsableObservations[ccip.CommitObservation](lggr, observations)
 
-	sortedLaneTokens, _, err := ccipcommon.GetFilteredSortedLaneTokens(ctx, r.offRampReader, r.destPriceRegistryReader, r.priceGetter)
-	if err != nil {
-		return false, nil, fmt.Errorf("get destination tokens: %w", err)
-	}
-
-	// Filters out parsable but faulty observations
-	validObservations, err := validateObservations(ctx, lggr, sortedLaneTokens, r.F, parsableObservations, r.offchainConfig.PriceReportingDisabled)
-	if err != nil {
-		return false, nil, err
-	}
-
 	var intervals []cciptypes.CommitStoreInterval
-	for _, obs := range validObservations {
+	for _, obs := range parsableObservations {
 		intervals = append(intervals, obs.Interval)
 	}
 
@@ -346,7 +334,7 @@ func (r *CommitReportingPlugin) Report(ctx context.Context, epochAndRound types.
 		return false, nil, err
 	}
 
-	tokenPrices, gasPrices, err := r.selectPriceUpdates(ctx, now, validObservations)
+	tokenPrices, gasPrices, err := r.selectPriceUpdates(ctx, now, parsableObservations)
 	if err != nil {
 		return false, nil, err
 	}
@@ -375,67 +363,6 @@ func (r *CommitReportingPlugin) Report(ctx context.Context, epochAndRound types.
 		"epochAndRound", epochAndRound,
 	)
 	return true, encodedReport, nil
-}
-
-// validateObservations validates the given observations.
-// An observation is rejected if any of its gas price or token price is nil. With current CommitObservation implementation, prices
-// are checked to ensure no nil values before adding to Observation, hence an observation that contains nil values comes from a faulty node.
-func validateObservations(ctx context.Context, lggr logger.Logger, destTokens []cciptypes.Address, f int, observations []ccip.CommitObservation, priceReportingDisabled bool) (validObs []ccip.CommitObservation, err error) {
-	for _, obs := range observations {
-		// If price reporting is disabled, a valid observations should not contain price data
-		if priceReportingDisabled {
-			if obs.SourceGasPriceUSD != nil || len(obs.TokenPricesUSD) > 0 {
-				lggr.Warnw("Skipping observation due to it containing price data when price reporting is disabled")
-				continue
-			}
-			validObs = append(validObs, obs)
-			continue
-		}
-
-		// If gas price is reported as nil, the observation is faulty, skip the observation.
-		if obs.SourceGasPriceUSD == nil {
-			lggr.Warnw("Skipping observation due to nil SourceGasPriceUSD")
-			continue
-		}
-
-		// If observed number of token prices does not match number of supported tokens on dest chain, skip the observation.
-		if len(destTokens) != len(obs.TokenPricesUSD) {
-			lggr.Warnw("Skipping observation due to token count mismatch", "expecting", len(destTokens), "got", len(obs.TokenPricesUSD))
-			continue
-		}
-
-		destTokensSet := mapset.NewSet[cciptypes.Address](destTokens...)
-
-		// If any of the observed token prices is reported as nil, or not supported on dest chain, the observation is faulty, skip the observation.
-		// Printing all faulty prices instead of short-circuiting to make log more informative.
-		skipObservation := false
-		for token, price := range obs.TokenPricesUSD {
-			if price == nil {
-				lggr.Warnw("Nil value in observed TokenPricesUSD", "token", token)
-				skipObservation = true
-			}
-
-			if !destTokensSet.Contains(token) {
-				lggr.Warnw("Unsupported token in observed TokenPricesUSD",
-					"token", token,
-					"destTokens", destTokensSet.String())
-				skipObservation = true
-			}
-		}
-		if skipObservation {
-			lggr.Warnw("Skipping observation due to invalid TokenPricesUSD")
-			continue
-		}
-
-		validObs = append(validObs, obs)
-	}
-
-	// We require at least f+1 valid observations. This corresponds to the scenario where f of the 2f+1 are faulty.
-	if len(validObs) <= f {
-		return nil, errors.Errorf("Not enough valid observations to form consensus: #obs=%d, f=%d", len(validObs), f)
-	}
-
-	return validObs, nil
 }
 
 // calculateIntervalConsensus compresses a set of intervals into one interval
@@ -525,15 +452,32 @@ func (r *CommitReportingPlugin) calculatePriceUpdates(observations []ccip.Commit
 	var sourceGasObservations []*big.Int
 
 	for _, obs := range observations {
-		sourceGasObservations = append(sourceGasObservations, obs.SourceGasPriceUSD)
+		if obs.SourceGasPriceUSD != nil {
+			sourceGasObservations = append(sourceGasObservations, obs.SourceGasPriceUSD)
+		}
 		// iterate over any token which price is included in observations
 		for token, price := range obs.TokenPricesUSD {
-			priceObservations[token] = append(priceObservations[token], price)
+			if price == nil {
+				priceObservations[token] = append(priceObservations[token], price)
+			}
 		}
+	}
+	// Observations are invalid if observed gasPrice is nil, we require at least f+1 valid observations.
+	// This corresponds to the scenario where f of the 2f+1 are faulty.
+	if len(sourceGasObservations) <= r.F {
+		return nil, nil, fmt.Errorf("not enough valid observations with non-nil gas prices: #obs=%d, f=%d", len(sourceGasObservations), r.F)
 	}
 
 	var tokenPriceUpdates []cciptypes.TokenPrice
 	for token, tokenPriceObservations := range priceObservations {
+		// Token price is dropped if there are not enough valid observations. Depending on rollout status of job specs,
+		// it is possible for different nodes in the DON to observe different tokens. We can conclude a token should indeed
+		// be observed if there are at least f+1 valid observations.
+		if len(tokenPriceObservations) <= r.F {
+			r.lggr.Warnf("sKipping token %s due to not enough valid observations: #obs=%d, f=%d", string(token), len(tokenPriceObservations), r.F)
+			continue
+		}
+
 		medianPrice := ccipcalc.BigIntSortedMiddle(tokenPriceObservations)
 
 		latestTokenPrice, exists := latestTokenPrices[token]
