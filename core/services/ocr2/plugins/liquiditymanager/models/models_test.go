@@ -12,6 +12,57 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/models"
 )
 
+func TestTokenID(t *testing.T) {
+	tests := []struct {
+		name  string
+		sym   string
+		token models.TokenID
+	}{
+		{
+			name:  "empty",
+			sym:   "",
+			token: [8]byte{},
+		},
+		{
+			name:  "eth",
+			sym:   "ETH",
+			token: [8]byte{'E', 'T', 'H', 0, 0, 0, 0, 0},
+		},
+		{
+			name:  "usdc",
+			sym:   "USDC",
+			token: [8]byte{'U', 'S', 'D', 'C', 0, 0, 0, 0},
+		},
+		{
+			name:  "usdt",
+			sym:   "USDT",
+			token: [8]byte{'U', 'S', 'D', 'T', 0, 0, 0, 0},
+		},
+		{
+			name:  "btc",
+			sym:   "BTC",
+			token: [8]byte{'B', 'T', 'C', 0, 0, 0, 0, 0},
+		},
+		{
+			name:  "long symbol",
+			sym:   "BTCCCXXXY",
+			token: [8]byte{'B', 'T', 'C', 'C', 'C', 'X', 'X', 'X'},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			tid := models.NewTokenID(tc.sym)
+			require.Equal(t, tc.token, tid)
+			s := tc.sym
+			if len(s) > 8 {
+				s = s[:8]
+			}
+			require.Equal(t, s, tid.String())
+		})
+	}
+}
+
 func TestJSONEncoding(t *testing.T) {
 	t.Parallel()
 

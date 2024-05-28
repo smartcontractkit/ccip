@@ -15,6 +15,33 @@ import (
 	ubig "github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils/big"
 )
 
+// TokenID is a unique identifier for a token.
+// It is the first 8 bytes of the token symbol.
+type TokenID [8]byte
+
+// NewTokenID returns a new token identifier from the given token ticker.
+func NewTokenID(ticker string) TokenID {
+	tid := [8]byte{}
+	if len(ticker) == 0 {
+		return tid
+	} else if len(ticker) > 8 {
+		ticker = ticker[:8]
+	}
+	copy(tid[:], ticker)
+	return tid
+}
+
+func (t TokenID) String() string {
+	s := ""
+	for _, c := range t {
+		if c == 0 {
+			break
+		}
+		s += string(c)
+	}
+	return s
+}
+
 type Address common.Address
 
 func (a *Address) String() string {
