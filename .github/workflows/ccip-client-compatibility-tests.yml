@@ -3,8 +3,9 @@ on:
   push:
     tags:
       - '*'
-  schedule:
-    - cron: "30 5 * * *"
+  # TODO: Uncomment when CCIP-2255 is resolved
+  # schedule:
+  #   - cron: "30 5 * * *"
   workflow_dispatch:
 
 env:
@@ -172,23 +173,24 @@ jobs:
             client: geth
             pyroscope_env: ci-ccip-bidirectional-lane-geth
             chainConfig: "1337=ethereum/client-go:${{ needs.get-latest-available-images.outputs.geth_tag }},2337=ethereum/client-go:${{ needs.get-latest-available-images.outputs.geth_tag }}"
-          # uncomment when nethermind flake reason is addressed
+          # TODO: uncomment when nethermind flake reason is addressed
           # - name: bidirectional-lane-nethermind
           #   test: TestSmokeCCIPForBidirectionalLane
           #   client: nethermind
           #   pyroscope_env: ci-ccip-bidirectional-lane-nethermind
           #   chainConfig: "1337=nethermind/nethermind:${{ needs.get-latest-available-images.outputs.nethermind_tag }},2337=nethermind/nethermind:${{ needs.get-latest-available-images.outputs.nethermind_tag }}"
-          # uncomment when 24.4.0  is released with our data/input fix
+          # TODO: uncomment when 24.4.0  is released with our data/input fix
           # - name: bidirectional-lane-besu
           #   test: TestSmokeCCIPForBidirectionalLane
           #   client: besu
           #   pyroscope_env: ci-ccip-bidirectional-lane-besu
           #   chainConfig: "1337=hyperledger/besu:${{ needs.get-latest-available-images.outputs.besu_tag }},2337=hyperledger/besu:${{ needs.get-latest-available-images.outputs.besu_tag }}"
-          - name: bidirectional-lane-erigon
-            test: TestSmokeCCIPForBidirectionalLane
-            client: erigon
-            pyroscope_env: ci-ccip-bidirectional-lane-erigon
-            chainConfig: "1337=thorax/erigon:${{ needs.get-latest-available-images.outputs.erigon_tag }},2337=thorax/erigon:${{ needs.get-latest-available-images.outputs.erigon_tag }}"
+          # TODO: Waiting for CCIP-2255 to be resolved
+          # - name: bidirectional-lane-erigon
+          #   test: TestSmokeCCIPForBidirectionalLane
+          #   client: erigon
+          #   pyroscope_env: ci-ccip-bidirectional-lane-erigon
+          #   chainConfig: "1337=thorax/erigon:${{ needs.get-latest-available-images.outputs.erigon_tag }},2337=thorax/erigon:${{ needs.get-latest-available-images.outputs.erigon_tag }}"
     runs-on: ubuntu-latest
     name: CCIP Latest EVM Node Compatibility Test with ${{ matrix.client }}
     steps:
@@ -360,6 +362,6 @@ jobs:
           workflow_run_id: ${{ github.run_id }}
           github_job_name_regex: ^CCIP Latest EVM Node Compatibility Test with (?<cap>.*?)$
           message_title: CCIP Compatibility Test Results
-          slack_channel_id: "#ccip-testing"
+          slack_channel_id: ${{ secrets.QA_CCIP_SLACK_CHANNEL }}
           slack_bot_token: ${{ secrets.QA_SLACK_API_KEY }}
           slack_thread_ts: ${{ needs.start-slack-thread.outputs.thread_ts }}
