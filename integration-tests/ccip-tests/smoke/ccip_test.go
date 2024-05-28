@@ -433,7 +433,7 @@ func TestSmokeCCIPSelfServeRateLimitOnRamp(t *testing.T) {
 	aggregateRateLimit := big.NewInt(1e16)
 
 	for _, tc := range tests {
-		t.Run(fmt.Sprintf("%s - Self Serve Rate Limit", tc.testName), func(t *testing.T) {
+		t.Run(fmt.Sprintf("%s - Self Serve Rate Limit OnRamp", tc.testName), func(t *testing.T) {
 			tc.lane.Test = t
 			src := tc.lane.Source
 			dest := tc.lane.Dest
@@ -470,17 +470,26 @@ func TestSmokeCCIPSelfServeRateLimitOnRamp(t *testing.T) {
 				Str("Limited Dest Token", limitedDestToken.Address()).
 				Msg("Tokens for rate limit testing")
 
-			err := tc.lane.DisableAllRateLimiting()
+			// DEBUG:
+			adminWalletIndex := 0
+			clientWalletIndex, err := src.Common.ChainClient.NewWallet(big.NewFloat(.01))
+			require.NoError(t, err, "Error creating client wallet")
+
+			err = tc.lane.DisableAllRateLimiting()
 			require.NoError(t, err, "Error disabling rate limits")
 
 			// Send both tokens with no rate limits and ensure they succeed
 			overLimitAmount := new(big.Int).Add(aggregateRateLimit, big.NewInt(1))
 			src.TransferAmount[freeTokenIndex] = overLimitAmount
 			src.TransferAmount[limitedTokenIndex] = overLimitAmount
+			// err = src.Common.ChainClient.SetDefaultWallet(clientWalletIndex)
+			// require.NoError(t, err, "Error setting default wallet to client")
 			tc.lane.RecordStateBeforeTransfer()
 			err = tc.lane.SendRequests(1, big.NewInt(600_000))
 			require.NoError(t, err)
 			tc.lane.ValidateRequests()
+			err = src.Common.ChainClient.SetDefaultWallet(adminWalletIndex)
+			require.NoError(t, err, "Error setting default wallet to admin")
 
 			// Enable aggregate rate limiting on the destination and source chains for the limited token
 			err = dest.AddRateLimitTokens([]*contracts.ERC20Token{limitedSrcToken}, []*contracts.ERC20Token{limitedDestToken})
@@ -510,6 +519,9 @@ func TestSmokeCCIPSelfServeRateLimitOnRamp(t *testing.T) {
 			require.NoError(t, err, "Error setting OnRamp rate limits")
 			err = src.Common.ChainClient.WaitForEvents()
 			require.NoError(t, err, "Error waiting for events")
+
+			err = src.Common.ChainClient.SetDefaultWallet(clientWalletIndex)
+			require.NoError(t, err, "Error setting default wallet to client")
 
 			// Send free token that should not have a rate limit and should succeed
 			src.TransferAmount[freeTokenIndex] = overLimitAmount
@@ -572,7 +584,7 @@ func TestSmokeCCIPSelfServeRateLimitOffRamp(t *testing.T) {
 	aggregateRateLimit := big.NewInt(1e16)
 
 	for _, tc := range tests {
-		t.Run(fmt.Sprintf("%s - Self Serve Rate Limit", tc.testName), func(t *testing.T) {
+		t.Run(fmt.Sprintf("%s - Self Serve Rate Limit OffRamp", tc.testName), func(t *testing.T) {
 			tc.lane.Test = t
 			src := tc.lane.Source
 			dest := tc.lane.Dest
