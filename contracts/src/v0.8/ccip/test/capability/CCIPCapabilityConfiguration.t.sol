@@ -1090,8 +1090,16 @@ contract CCIPCapabilityConfiguration__updatePluginConfig is CCIPCapabilityConfig
     assertEq(storedConfig.length, 2, "don config length must be 2");
     // 0 index is blue config, 1 index is green config.
     assertEq(storedConfig[1].configCount, uint64(2), "config count must be 2");
-    assertEq(uint256(storedConfig[0].config.pluginType), uint256(CCIPCapabilityConfiguration.PluginType.Commit), "plugin type must match");
-    assertEq(uint256(storedConfig[1].config.pluginType), uint256(CCIPCapabilityConfiguration.PluginType.Commit), "plugin type must match");
+    assertEq(
+      uint256(storedConfig[0].config.pluginType),
+      uint256(CCIPCapabilityConfiguration.PluginType.Commit),
+      "plugin type must match"
+    );
+    assertEq(
+      uint256(storedConfig[1].config.pluginType),
+      uint256(CCIPCapabilityConfiguration.PluginType.Commit),
+      "plugin type must match"
+    );
     assertEq(storedConfig[0].config.offchainConfig, bytes("commit"), "blue offchain config must match");
     assertEq(storedConfig[1].config.offchainConfig, bytes("commit-new"), "green offchain config must match");
   }
@@ -1135,8 +1143,16 @@ contract CCIPCapabilityConfiguration__updatePluginConfig is CCIPCapabilityConfig
     assertEq(storedConfig.length, 2, "don config length must be 2");
     // 0 index is blue config, 1 index is green config.
     assertEq(storedConfig[1].configCount, uint64(2), "config count must be 2");
-    assertEq(uint256(storedConfig[0].config.pluginType), uint256(CCIPCapabilityConfiguration.PluginType.Commit), "plugin type must match");
-    assertEq(uint256(storedConfig[1].config.pluginType), uint256(CCIPCapabilityConfiguration.PluginType.Commit), "plugin type must match");
+    assertEq(
+      uint256(storedConfig[0].config.pluginType),
+      uint256(CCIPCapabilityConfiguration.PluginType.Commit),
+      "plugin type must match"
+    );
+    assertEq(
+      uint256(storedConfig[1].config.pluginType),
+      uint256(CCIPCapabilityConfiguration.PluginType.Commit),
+      "plugin type must match"
+    );
     assertEq(storedConfig[0].config.offchainConfig, bytes("commit"), "blue offchain config must match");
     assertEq(storedConfig[1].config.offchainConfig, bytes("commit-new"), "green offchain config must match");
 
@@ -1150,11 +1166,29 @@ contract CCIPCapabilityConfiguration__updatePluginConfig is CCIPCapabilityConfig
     storedConfig = s_ccipCC.getPluginOCRConfig(donId, CCIPCapabilityConfiguration.PluginType.Commit);
     assertEq(storedConfig.length, 1, "don config length must be 1");
     assertEq(storedConfig[0].configCount, uint64(2), "config count must be 2");
-    assertEq(uint256(storedConfig[0].config.pluginType), uint256(CCIPCapabilityConfiguration.PluginType.Commit), "plugin type must match");
+    assertEq(
+      uint256(storedConfig[0].config.pluginType),
+      uint256(CCIPCapabilityConfiguration.PluginType.Commit),
+      "plugin type must match"
+    );
     assertEq(storedConfig[0].config.offchainConfig, bytes("commit-new"), "green offchain config must match");
   }
 
   // Reverts.
+  function test__updatePluginConfig_InvalidConfigLength_Reverts() public {
+    uint32 donId = 1;
+    CCIPCapabilityConfiguration.OCR3Config[] memory newConfig = new CCIPCapabilityConfiguration.OCR3Config[](3);
+    vm.expectRevert(CCIPCapabilityConfiguration.InvalidConfigLength.selector);
+    s_ccipCC.updatePluginConfig(donId, CCIPCapabilityConfiguration.PluginType.Commit, newConfig);
+  }
+
+  function test__updatePluginConfig_InvalidConfigStateTransition_Reverts() public {
+    uint32 donId = 1;
+    CCIPCapabilityConfiguration.OCR3Config[] memory newConfig = new CCIPCapabilityConfiguration.OCR3Config[](2);
+    // 0 -> 2 is an invalid state transition.
+    vm.expectRevert(abi.encodeWithSelector(CCIPCapabilityConfiguration.InvalidConfigStateTransition.selector, 0, 2));
+    s_ccipCC.updatePluginConfig(donId, CCIPCapabilityConfiguration.PluginType.Commit, newConfig);
+  }
 }
 
 contract CCIPCapabilityConfiguration_beforeCapabilityConfigSet is CCIPCapabilityConfigurationSetup {
