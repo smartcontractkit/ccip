@@ -179,24 +179,6 @@ contract MultiAggregateRateLimiter_constructor is MultiAggregateRateLimiterSetup
   }
 }
 
-contract MultiAggregateRateLimiter_getChainSelectorWithDirection is MultiAggregateRateLimiterSetup {
-  function test_IncomingLane_Fuzz_Success(uint64 remoteChainSelector) public view {
-    uint72 remoteChainSelectorWithDirection = s_rateLimiter.getChainSelectorWithDirection(remoteChainSelector, true);
-
-    // 1 << 64 | remoteChainSelector should be equivalent to ((2^64) + remoteChianSelector)
-    uint72 expectedRemoteChainSelector = uint72(type(uint64).max) + 1 + remoteChainSelector;
-    assertEq(remoteChainSelectorWithDirection, expectedRemoteChainSelector);
-
-    // Should never clash with the remoteChainSelector
-    assertNotEq(remoteChainSelectorWithDirection, remoteChainSelector);
-  }
-
-  function test_OutgoingLane_Fuzz_Success(uint64 remoteChainSelector) public view {
-    uint72 remoteChainSelectorWithDirection = s_rateLimiter.getChainSelectorWithDirection(remoteChainSelector, false);
-    assertEq(remoteChainSelectorWithDirection, remoteChainSelector);
-  }
-}
-
 contract MultiAggregateRateLimiter_setPriceRegistry is MultiAggregateRateLimiterSetup {
   function test_Owner_Success() public {
     address newAddress = address(42);

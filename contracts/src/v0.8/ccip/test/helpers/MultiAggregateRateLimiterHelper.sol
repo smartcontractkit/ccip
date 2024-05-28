@@ -19,8 +19,4 @@ contract MultiAggregateRateLimiterHelper is MultiAggregateRateLimiter {
   function getTokenValue(Client.EVMTokenAmount memory tokenAmount) public view returns (uint256) {
     return _getTokenValue(tokenAmount);
   }
-
-  function getChainSelectorWithDirection(uint64 remoteChainSelector, bool isOutgoingLane) public view returns (uint72) {
-    return _getChainSelectorWithDirection(remoteChainSelector, isOutgoingLane);
-  }
 }
