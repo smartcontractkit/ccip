@@ -143,19 +143,19 @@ jobs:
           - name: ccip-gas-spike-slow-src
             os: ubuntu-latest
             run: ^TestLoadCCIPStableRPSGasSpike$
-            config_path: /home/runner/work/ccip/ccip/integration-tests/ccip-tests/testconfig/tomls/ccip-gas-spike-slow-src.toml
+            config_path: /home/runner/work/ccip/ccip/integration-tests/ccip-tests/testconfig/tomls/ccip-gas-spikes-slow-src.toml
           - name: ccip-gas-spike-slow-dst
             os: ubuntu-latest
             run: ^TestLoadCCIPStableRPSGasSpike$
-            config_path: /home/runner/work/ccip/ccip/integration-tests/ccip-tests/testconfig/tomls/ccip-gas-spike-slow-dst.toml
+            config_path: /home/runner/work/ccip/ccip/integration-tests/ccip-tests/testconfig/tomls/ccip-gas-spikes-slow-dst.toml
           - name: ccip-gas-spike-fast-src
             os: ubuntu-latest
             run: ^TestLoadCCIPStableRPSGasSpike$
-            config_path: /home/runner/work/ccip/ccip/integration-tests/ccip-tests/testconfig/tomls/ccip-gas-spike-fast-src.toml
+            config_path: /home/runner/work/ccip/ccip/integration-tests/ccip-tests/testconfig/tomls/ccip-gas-spikes-fast-src.toml
           - name: ccip-gas-spike-fast-dst
             os: ubuntu-latest
             run: ^TestLoadCCIPStableRPSGasSpike$
-            config_path: /home/runner/work/ccip/ccip/integration-tests/ccip-tests/testconfig/tomls/ccip-gas-spike-fast-dst.toml
+            config_path: /home/runner/work/ccip/ccip/integration-tests/ccip-tests/testconfig/tomls/ccip-gas-spikes-fast-dst.toml
           - name: ccip-block-gas-limit-dst
             os: ubuntu-latest
             run: ^TestLoadCCIPStableRPSChangeBlockGasLimit$
