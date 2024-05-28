@@ -104,3 +104,41 @@ make test_smoke_ccip_default testname=TestSmokeCCIPForBidirectionalLane secret_t
 ### Using Remote Kubernetes Cluster
 
 For running more complex and intensive tests (like load and chaos tests) you need to connect the test to a Kubernetes cluster. These tests have more complex setup and running instructions. We endeavor to make these easier to run and configure, but for the time being please seek a member of the QA/Test Tooling team if you want to run these.
+
+## Test types
+### Load + Chaos
+Get secrets from our vault and add `secrets.toml` to `integration-tests/ccip-tests/load`
+```
+[CCIP]
+[CCIP.Env]
+[CCIP.Env.NewCLCluster]
+[CCIP.Env.NewCLCluster.Common]
+[CCIP.Env.NewCLCluster.Common.ChainlinkImage]
+image = "***.dkr.ecr.us-west-2.amazonaws.com/chainlink-ccip"
+version = "ccip-develop"
+
+[CCIP.Env.Logging.Loki]
+tenant_id = "promtail"
+endpoint = "..."
+
+[CCIP.Env.Logging.Grafana]
+base_url = "..."
+dashboard_url = "/d/6vjVx-1V8/ccip-long-running-tests"
+bearer_token_secret="..."
+```
+
+Running different load + chaos tests
+```
+# reorgs, we simulate chain reorganization by rewinding head below or above LogPoller threshold
+make test_load_ccip testimage="" testname=TestLoadCCIPStableRPSReorgsBelowFinality  override_toml=./testconfig/tomls/ccip-reorg.toml secret_toml=./load/secrets.toml
+make test_load_ccip testimage="" testname=TestLoadCCIPStableRPSReorgsAboveFinality  override_toml=./testconfig/tomls/ccip-reorg.toml secret_toml=./load/secrets.toml
+
+# gas spikes, we simulate slow and fast gas spikes on source/dest chains
+make test_load_ccip testimage="" testname=TestLoadCCIPStableRPSGasSpike  override_toml=./testconfig/tomls/ccip-gas-spikes-fast-dst.toml secret_toml=./load/secrets.toml
+make test_load_ccip testimage="" testname=TestLoadCCIPStableRPSGasSpike  override_toml=./testconfig/tomls/ccip-gas-spikes-fast-src.toml secret_toml=./load/secrets.toml
+make test_load_ccip testimage="" testname=TestLoadCCIPStableRPSGasSpike  override_toml=./testconfig/tomls/ccip-gas-spikes-slow-dst.toml secret_toml=./load/secrets.toml
+make test_load_ccip testimage="" testname=TestLoadCCIPStableRPSGasSpike  override_toml=./testconfig/tomls/ccip-gas-spikes-slow-src.toml secret_toml=./load/secrets.toml
+
+# block size reducing, we reduce block size so transactions exceed gas limit of a next block
+make test_load_ccip testimage="" testname=TestLoadCCIPStableRPSChangeBlockGasLimit  override_toml=./testconfig/tomls/ccip-gas-spikes-slow-src.toml secret_toml=./load/secrets.toml
+```
