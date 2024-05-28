@@ -18,7 +18,7 @@ import {EVM2EVMMultiOffRampHelper} from "../helpers/EVM2EVMMultiOffRampHelper.so
 import {EVM2EVMOffRampHelper} from "../helpers/EVM2EVMOffRampHelper.sol";
 import {MaybeRevertingBurnMintTokenPool} from "../helpers/MaybeRevertingBurnMintTokenPool.sol";
 
-import {MessageValidatorHelper} from "../helpers/MessageValidatorHelper.sol";
+import {MessageInterceptorHelper} from "../helpers/MessageInterceptorHelper.sol";
 import {MaybeRevertMessageReceiver} from "../helpers/receivers/MaybeRevertMessageReceiver.sol";
 import {MockCommitStore} from "../mocks/MockCommitStore.sol";
 import {MockMultiCommitStore} from "../mocks/MockMultiCommitStore.sol";
@@ -44,7 +44,7 @@ contract EVM2EVMMultiOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSet
   MaybeRevertingBurnMintTokenPool internal s_maybeRevertingPool;
 
   EVM2EVMMultiOffRampHelper internal s_offRamp;
-  MessageValidatorHelper internal s_messageValidator;
+  MessageInterceptorHelper internal s_messageValidator;
   address internal s_sourceTokenPool = makeAddr("sourceTokenPool");
 
   event ExecutionStateChanged(
@@ -60,7 +60,7 @@ contract EVM2EVMMultiOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSet
     PriceRegistrySetup.setUp();
     OCR2BaseSetup.setUp();
 
-    s_messageValidator = new MessageValidatorHelper();
+    s_messageValidator = new MessageInterceptorHelper();
     s_mockCommitStore = new MockMultiCommitStore();
     s_receiver = new MaybeRevertMessageReceiver(false);
     s_secondary_receiver = new MaybeRevertMessageReceiver(false);

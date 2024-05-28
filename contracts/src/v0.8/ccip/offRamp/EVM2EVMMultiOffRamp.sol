@@ -5,7 +5,7 @@ import {ITypeAndVersion} from "../../shared/interfaces/ITypeAndVersion.sol";
 import {IAny2EVMMessageReceiver} from "../interfaces/IAny2EVMMessageReceiver.sol";
 import {IAny2EVMMultiOffRamp} from "../interfaces/IAny2EVMMultiOffRamp.sol";
 import {IAny2EVMOffRamp} from "../interfaces/IAny2EVMOffRamp.sol";
-import {IMessageValidator} from "../interfaces/IMessageValidator.sol";
+import {IMessageInterceptor} from "../interfaces/IMessageInterceptor.sol";
 import {IMultiCommitStore} from "../interfaces/IMultiCommitStore.sol";
 import {IPool} from "../interfaces/IPool.sol";
 import {IRMN} from "../interfaces/IRMN.sol";
@@ -499,7 +499,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, OCR2BaseN
         ReceiverError.selector == errorSelector || TokenHandlingError.selector == errorSelector
           || Internal.InvalidEVMAddress.selector == errorSelector || InvalidDataLength.selector == errorSelector
           || CallWithExactGas.NoContract.selector == errorSelector || NotACompatiblePool.selector == errorSelector
-          || IMessageValidator.MessageValidationError.selector == errorSelector
+          || IMessageInterceptor.MessageValidationError.selector == errorSelector
       ) {
         // If CCIP receiver execution is not successful, bubble up receiver revert data,
         // prepended by the 4 bytes of ReceiverError.selector, TokenHandlingError.selector or InvalidPoolAddress.selector.
@@ -554,9 +554,9 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, OCR2BaseN
 
     address messageValidator = s_dynamicConfig.messageValidator;
     if (messageValidator != address(0)) {
-      try IMessageValidator(messageValidator).validateIncomingMessage(any2EvmMessage) {}
+      try IMessageInterceptor(messageValidator).onIncomingMessage(any2EvmMessage) {}
       catch (bytes memory err) {
-        revert IMessageValidator.MessageValidationError(err);
+        revert IMessageInterceptor.MessageValidationError(err);
       }
     }
 

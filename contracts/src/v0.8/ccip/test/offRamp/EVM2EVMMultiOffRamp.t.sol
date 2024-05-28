@@ -8,7 +8,7 @@ import {IPool} from "../../interfaces/IPool.sol";
 import {CallWithExactGas} from "../../../shared/call/CallWithExactGas.sol";
 import {RMN} from "../../RMN.sol";
 import {Router} from "../../Router.sol";
-import {IMessageValidator} from "../../interfaces/IMessageValidator.sol";
+import {IMessageInterceptor} from "../../interfaces/IMessageInterceptor.sol";
 import {Client} from "../../libraries/Client.sol";
 import {Internal} from "../../libraries/Internal.sol";
 import {Pool} from "../../libraries/Pool.sol";
@@ -19,7 +19,7 @@ import {TokenPool} from "../../pools/TokenPool.sol";
 import {EVM2EVMMultiOffRampHelper} from "../helpers/EVM2EVMMultiOffRampHelper.sol";
 import {EVM2EVMOffRampHelper} from "../helpers/EVM2EVMOffRampHelper.sol";
 import {MaybeRevertingBurnMintTokenPool} from "../helpers/MaybeRevertingBurnMintTokenPool.sol";
-import {MessageValidatorHelper} from "../helpers/MessageValidatorHelper.sol";
+import {MessageInterceptorHelper} from "../helpers/MessageInterceptorHelper.sol";
 import {ConformingReceiver} from "../helpers/receivers/ConformingReceiver.sol";
 import {MaybeRevertMessageReceiver} from "../helpers/receivers/MaybeRevertMessageReceiver.sol";
 import {MaybeRevertMessageReceiverNo165} from "../helpers/receivers/MaybeRevertMessageReceiverNo165.sol";
@@ -1224,8 +1224,10 @@ contract EVM2EVMMultiOffRamp_executeSingleMessage is EVM2EVMMultiOffRampSetup {
     s_messageValidator.setMessageIdValidationState(message.messageId, true);
     vm.expectRevert(
       abi.encodeWithSelector(
-        IMessageValidator.MessageValidationError.selector,
-        abi.encodeWithSelector(MessageValidatorHelper.IncomingMessageValidationError.selector, bytes("Invalid message"))
+        IMessageInterceptor.MessageValidationError.selector,
+        abi.encodeWithSelector(
+          MessageInterceptorHelper.IncomingMessageValidationError.selector, bytes("Invalid message")
+        )
       )
     );
     s_offRamp.executeSingleMessage(message, new bytes[](message.tokenAmounts.length));
@@ -1951,8 +1953,10 @@ contract EVM2EVMMultiOffRamp_report is EVM2EVMMultiOffRampSetup {
       messages1[0].messageId,
       Internal.MessageExecutionState.FAILURE,
       abi.encodeWithSelector(
-        IMessageValidator.MessageValidationError.selector,
-        abi.encodeWithSelector(MessageValidatorHelper.IncomingMessageValidationError.selector, bytes("Invalid message"))
+        IMessageInterceptor.MessageValidationError.selector,
+        abi.encodeWithSelector(
+          MessageInterceptorHelper.IncomingMessageValidationError.selector, bytes("Invalid message")
+        )
       )
     );
 
@@ -1972,8 +1976,10 @@ contract EVM2EVMMultiOffRamp_report is EVM2EVMMultiOffRampSetup {
       messages2[0].messageId,
       Internal.MessageExecutionState.FAILURE,
       abi.encodeWithSelector(
-        IMessageValidator.MessageValidationError.selector,
-        abi.encodeWithSelector(MessageValidatorHelper.IncomingMessageValidationError.selector, bytes("Invalid message"))
+        IMessageInterceptor.MessageValidationError.selector,
+        abi.encodeWithSelector(
+          MessageInterceptorHelper.IncomingMessageValidationError.selector, bytes("Invalid message")
+        )
       )
     );
 

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.24;
 
-import {IMessageValidator} from "./interfaces/IMessageValidator.sol";
+import {IMessageInterceptor} from "./interfaces/IMessageInterceptor.sol";
 import {IPriceRegistry} from "./interfaces/IPriceRegistry.sol";
 
 import {OwnerIsCreator} from "./../shared/access/OwnerIsCreator.sol";
@@ -16,7 +16,7 @@ import {USDPriceWith18Decimals} from "./libraries/USDPriceWith18Decimals.sol";
 /// token transfers, using a price registry to convert to a numeraire asset (e.g. USD).
 /// The contract is a standalone multi-lane message validator contract, which can be called by authorized
 /// ramp contracts to apply rate limit changes to lanes, and revert when the rate limits get breached.
-contract MultiAggregateRateLimiter is IMessageValidator, OwnerIsCreator {
+contract MultiAggregateRateLimiter is IMessageInterceptor, OwnerIsCreator {
   using RateLimiter for RateLimiter.TokenBucket;
   using USDPriceWith18Decimals for uint224;
   using EnumerableMapAddresses for EnumerableMapAddresses.AddressToAddressMap;
@@ -89,8 +89,8 @@ contract MultiAggregateRateLimiter is IMessageValidator, OwnerIsCreator {
     );
   }
 
-  /// @inheritdoc IMessageValidator
-  function validateIncomingMessage(Client.Any2EVMMessage memory message) external {
+  /// @inheritdoc IMessageInterceptor
+  function onIncomingMessage(Client.Any2EVMMessage memory message) external {
     if (!s_authorizedCallers.contains(msg.sender)) {
       revert UnauthorizedCaller(msg.sender);
     }
@@ -106,8 +106,8 @@ contract MultiAggregateRateLimiter is IMessageValidator, OwnerIsCreator {
     if (value > 0) _rateLimitValue(message.sourceChainSelector, false, value);
   }
 
-  /// @inheritdoc IMessageValidator
-  function validateOutgoingMessage(Client.EVM2AnyMessage memory message, uint64 destChainSelector) external {
+  /// @inheritdoc IMessageInterceptor
+  function onOutgoingMessage(Client.EVM2AnyMessage memory message, uint64 destChainSelector) external {
     // TODO: to be implemented (assuming the same rate limiter states are shared for incoming and outgoing messages)
   }
 

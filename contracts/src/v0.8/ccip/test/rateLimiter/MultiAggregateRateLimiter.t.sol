@@ -893,7 +893,7 @@ contract MultiAggregateRateLimiter_updateRateLimitTokens is MultiAggregateRateLi
   }
 }
 
-contract MultiAggregateRateLimiter_validateIncomingMessage is MultiAggregateRateLimiterSetup {
+contract MultiAggregateRateLimiter_onIncomingMessage is MultiAggregateRateLimiterSetup {
   address internal immutable MOCK_RECEIVER = address(1113);
 
   function setUp() public virtual override {
@@ -916,7 +916,7 @@ contract MultiAggregateRateLimiter_validateIncomingMessage is MultiAggregateRate
     vm.startPrank(MOCK_OFFRAMP);
 
     vm.recordLogs();
-    s_rateLimiter.validateIncomingMessage(_generateAny2EVMMessageNoTokens(CHAIN_SELECTOR_1));
+    s_rateLimiter.onIncomingMessage(_generateAny2EVMMessageNoTokens(CHAIN_SELECTOR_1));
 
     // No consumed rate limit events
     Vm.Log[] memory logEntries = vm.getRecordedLogs();
@@ -934,7 +934,7 @@ contract MultiAggregateRateLimiter_validateIncomingMessage is MultiAggregateRate
     vm.expectEmit();
     emit RateLimiter.TokensConsumed((5 * TOKEN_PRICE) / 1e18);
 
-    s_rateLimiter.validateIncomingMessage(_generateAny2EVMMessage(CHAIN_SELECTOR_1, tokenAmounts));
+    s_rateLimiter.onIncomingMessage(_generateAny2EVMMessage(CHAIN_SELECTOR_1, tokenAmounts));
   }
 
   function test_ValidateMessageWithDisabledRateLimitToken_Success() public {
@@ -952,7 +952,7 @@ contract MultiAggregateRateLimiter_validateIncomingMessage is MultiAggregateRate
     vm.expectEmit();
     emit RateLimiter.TokensConsumed((5 * TOKEN_PRICE) / 1e18);
 
-    s_rateLimiter.validateIncomingMessage(_generateAny2EVMMessage(CHAIN_SELECTOR_1, tokenAmounts));
+    s_rateLimiter.onIncomingMessage(_generateAny2EVMMessage(CHAIN_SELECTOR_1, tokenAmounts));
   }
 
   function test_ValidateMessageWithRateLimitDisabled_Success() public {
@@ -972,7 +972,7 @@ contract MultiAggregateRateLimiter_validateIncomingMessage is MultiAggregateRate
     tokenAmounts[1] = Client.EVMTokenAmount({token: s_destTokens[1], amount: 50});
 
     vm.startPrank(MOCK_OFFRAMP);
-    s_rateLimiter.validateIncomingMessage(_generateAny2EVMMessage(CHAIN_SELECTOR_1, tokenAmounts));
+    s_rateLimiter.onIncomingMessage(_generateAny2EVMMessage(CHAIN_SELECTOR_1, tokenAmounts));
 
     // No consumed rate limit events
     Vm.Log[] memory logEntries = vm.getRecordedLogs();
@@ -989,7 +989,7 @@ contract MultiAggregateRateLimiter_validateIncomingMessage is MultiAggregateRate
     // 2 tokens * (TOKEN_PRICE) + 1 token * (2 * TOKEN_PRICE)
     uint256 totalValue = (4 * TOKEN_PRICE) / 1e18;
 
-    s_rateLimiter.validateIncomingMessage(_generateAny2EVMMessage(CHAIN_SELECTOR_1, tokenAmounts));
+    s_rateLimiter.onIncomingMessage(_generateAny2EVMMessage(CHAIN_SELECTOR_1, tokenAmounts));
 
     // Chain 1 changed
     RateLimiter.TokenBucket memory bucketChain1 = s_rateLimiter.currentRateLimiterState(CHAIN_SELECTOR_1, false);
@@ -1002,7 +1002,7 @@ contract MultiAggregateRateLimiter_validateIncomingMessage is MultiAggregateRate
     vm.expectEmit();
     emit RateLimiter.TokensConsumed((4 * TOKEN_PRICE) / 1e18);
 
-    s_rateLimiter.validateIncomingMessage(_generateAny2EVMMessage(CHAIN_SELECTOR_2, tokenAmounts));
+    s_rateLimiter.onIncomingMessage(_generateAny2EVMMessage(CHAIN_SELECTOR_2, tokenAmounts));
 
     // Chain 1 unchanged
     bucketChain1 = s_rateLimiter.currentRateLimiterState(CHAIN_SELECTOR_1, false);
@@ -1020,20 +1020,20 @@ contract MultiAggregateRateLimiter_validateIncomingMessage is MultiAggregateRate
     tokenAmounts[0] = Client.EVMTokenAmount({token: s_destTokens[0], amount: 20});
 
     // Remaining capacity: 100 -> 20
-    s_rateLimiter.validateIncomingMessage(_generateAny2EVMMessage(CHAIN_SELECTOR_1, tokenAmounts));
+    s_rateLimiter.onIncomingMessage(_generateAny2EVMMessage(CHAIN_SELECTOR_1, tokenAmounts));
 
     // Cannot fit 80 rate limit value (need to wait at least 12 blocks, current capacity is 20)
     vm.expectRevert(abi.encodeWithSelector(RateLimiter.AggregateValueRateLimitReached.selector, 12, 20));
-    s_rateLimiter.validateIncomingMessage(_generateAny2EVMMessage(CHAIN_SELECTOR_1, tokenAmounts));
+    s_rateLimiter.onIncomingMessage(_generateAny2EVMMessage(CHAIN_SELECTOR_1, tokenAmounts));
 
     // Remaining capacity: 20 -> 35 (need to wait 9 more blocks)
     vm.warp(BLOCK_TIME + 3);
     vm.expectRevert(abi.encodeWithSelector(RateLimiter.AggregateValueRateLimitReached.selector, 9, 35));
-    s_rateLimiter.validateIncomingMessage(_generateAny2EVMMessage(CHAIN_SELECTOR_1, tokenAmounts));
+    s_rateLimiter.onIncomingMessage(_generateAny2EVMMessage(CHAIN_SELECTOR_1, tokenAmounts));
 
     // Remaining capacity: 35 -> 80 (can fit exactly 80)
     vm.warp(BLOCK_TIME + 12);
-    s_rateLimiter.validateIncomingMessage(_generateAny2EVMMessage(CHAIN_SELECTOR_1, tokenAmounts));
+    s_rateLimiter.onIncomingMessage(_generateAny2EVMMessage(CHAIN_SELECTOR_1, tokenAmounts));
   }
 
   // Reverts
@@ -1047,14 +1047,14 @@ contract MultiAggregateRateLimiter_validateIncomingMessage is MultiAggregateRate
 
     uint256 totalValue = (80 * TOKEN_PRICE + 2 * (30 * TOKEN_PRICE)) / 1e18;
     vm.expectRevert(abi.encodeWithSelector(RateLimiter.AggregateValueMaxCapacityExceeded.selector, 100, totalValue));
-    s_rateLimiter.validateIncomingMessage(_generateAny2EVMMessage(CHAIN_SELECTOR_1, tokenAmounts));
+    s_rateLimiter.onIncomingMessage(_generateAny2EVMMessage(CHAIN_SELECTOR_1, tokenAmounts));
   }
 
   function test_ValidateMessageFromUnauthorizedCaller_Revert() public {
     vm.startPrank(STRANGER);
 
     vm.expectRevert(abi.encodeWithSelector(MultiAggregateRateLimiter.UnauthorizedCaller.selector, STRANGER));
-    s_rateLimiter.validateIncomingMessage(_generateAny2EVMMessageNoTokens(CHAIN_SELECTOR_1));
+    s_rateLimiter.onIncomingMessage(_generateAny2EVMMessageNoTokens(CHAIN_SELECTOR_1));
   }
 
   function _generateAny2EVMMessageNoTokens(uint64 sourceChainSelector)
