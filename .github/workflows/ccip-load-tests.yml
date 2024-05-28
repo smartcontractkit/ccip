@@ -156,11 +156,11 @@ jobs:
             os: ubuntu-latest
             run: ^TestLoadCCIPStableRPSGasSpike$
             config_path: ./integration-tests/ccip-tests/testconfig/tomls/ccip-gas-spike-fast-dst.toml
-          - name: ccip-gas-limit-block-capacity-halving-src
+          - name: ccip-block-gas-limit-dst
             os: ubuntu-latest
             run: ^TestLoadCCIPStableRPSChangeBlockGasLimit$
             config_path: ./integration-tests/ccip-tests/testconfig/tomls/ccip-gas-block-shrink-src.toml
-          - name: ccip-gas-limit-block-capacity-halving-dst
+          - name: ccip-block-gas-limit-dst
             os: ubuntu-latest
             run: ^TestLoadCCIPStableRPSChangeBlockGasLimit$
             config_path: ./integration-tests/ccip-tests/testconfig/tomls/ccip-gas-block-shrink-dst.toml
