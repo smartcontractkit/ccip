@@ -2602,6 +2602,9 @@ func (lane *CCIPLane) TokenPricesConfig() (string, error) {
 }
 
 func (lane *CCIPLane) SetRemoteChainsOnPool() error {
+	if lane.Source.Common.ExistingDeployment {
+		return nil
+	}
 	if len(lane.Source.Common.BridgeTokenPools) != len(lane.Dest.Common.BridgeTokenPools) {
 		return fmt.Errorf("source (%d) and dest (%d) bridge token pools length should be same", len(lane.Source.Common.BridgeTokenPools), len(lane.Dest.Common.BridgeTokenPools))
 	}
