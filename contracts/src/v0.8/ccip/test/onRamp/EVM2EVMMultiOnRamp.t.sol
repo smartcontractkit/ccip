@@ -1369,7 +1369,7 @@ contract EVM2EVMMultiOnRamp_getTokenTransferCost is EVM2EVMMultiOnRamp_getFeeSet
       s_onRamp.getTokenTransferCost(DEST_CHAIN_SELECTOR, feeToken, s_wrappedTokenPrice, multiple);
 
     // Note that there can be a rounding error once per split.
-    assertTrue(feeMultipleUSDWei >= (feeSingleUSDWei - dynamicConfig.maxNumberOfTokensPerMsg));
+    assertGe(feeMultipleUSDWei, (feeSingleUSDWei - dynamicConfig.maxNumberOfTokensPerMsg));
     assertEq(gasOverheadMultiple, gasOverheadSingle * transfers);
     assertEq(bytesOverheadMultiple, bytesOverheadSingle * transfers);
   }
