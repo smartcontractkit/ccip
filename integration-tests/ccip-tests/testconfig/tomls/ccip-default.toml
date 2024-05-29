@@ -49,7 +49,7 @@ addresses_to_fund = [
 # eth2-only, epoch at which chain will upgrade do Dencun or Deneb/Cancun (1 is minimum)
 Deneb = 500
 
-# [PrivateEthereumNetwork.CustomDockerImages]
+# [CCIP.Env.PrivateEthereumNetworks.SIMULATED_1.CustomDockerImages]
 # custom docker image that will be used for execution layer client. It has to be one of: hyperledger/besu, nethermind/nethermind, thorax/erigon or ethereum/client-go.
 # instead of using a specific tag you can also use "latest_available" to use latest published tag in Github or "latest_stable" to use latest stable release from Github
 # (if corresponding Docker image on Docker Hub has not been published environment creation will fail).
