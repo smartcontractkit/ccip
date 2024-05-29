@@ -3599,7 +3599,7 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 
 	jobParams.P2PV2Bootstrappers = []string{p2pBootstrappersCommit.P2PV2Bootstrapper()}
 
-	err = SetOCR2Config(lane.Context, *testConf, commitNodes, execNodes, *lane.Dest)
+	err = SetOCR2Config(lane.Context, lane.Logger, *testConf, commitNodes, execNodes, *lane.Dest)
 	if err != nil {
 		return fmt.Errorf("failed to set ocr2 config: %w", err)
 	}
@@ -3632,6 +3632,7 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 // SetOCR2Config sets the oracle config in ocr2 contracts. If execNodes is nil, commit and execution jobs are set up in same DON
 func SetOCR2Config(
 	ctx context.Context,
+	lggr zerolog.Logger,
 	testConf testconfig.CCIPTestConfig,
 	commitNodes,
 	execNodes []*client.CLNodesWithKeys,
@@ -3643,6 +3644,7 @@ func SetOCR2Config(
 	if err != nil {
 		return fmt.Errorf("failed to get avg block time: %w", err)
 	}
+
 	OCR2ParamsForCommit := contracts.OCR2ParamsForCommit(blockTime)
 	OCR2ParamsForExec := contracts.OCR2ParamsForExec(blockTime)
 	// if test config has custom ocr2 params, merge them with default params to replace default with custom ocr2 params provided in config
@@ -3659,6 +3661,11 @@ func SetOCR2Config(
 			return err
 		}
 	}
+	lggr.Info().
+		Dur("AvgBlockTimeOnDest", blockTime).
+		Interface("OCRParmsForCommit", OCR2ParamsForCommit).
+		Interface("OCRParmsForExec", OCR2ParamsForExec).
+		Msg("Setting OCR2 config")
 	signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig, err := contracts.NewOffChainAggregatorV2ConfigForCCIPPlugin(
 		commitNodes, testhelpers.NewCommitOffchainConfig(
 			*commonconfig.MustNewDuration(5 * time.Second),
