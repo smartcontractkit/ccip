@@ -35,6 +35,11 @@ type CommitPluginConfig struct {
 	NewMsgScanBatchSize int
 }
 
+type ExecutePluginConfig struct {
+	// DestChain is the ccip destination chain configured for the commit execute DON.
+	DestChain ChainSelector
+}
+
 type ObserverInfo struct {
 	Reads []ChainSelector
 }

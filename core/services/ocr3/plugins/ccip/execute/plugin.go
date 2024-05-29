@@ -6,35 +6,31 @@ import (
 	//cache "github.com/smartcontractkit/ccipocr3/internal/copypaste/commit_roots_cache"
 	"github.com/smartcontractkit/ccipocr3/internal/model"
 	"github.com/smartcontractkit/ccipocr3/internal/reader"
+	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 )
 
-// Interface compatibility checks.
-var (
-	_ ocr3types.ReportingPlugin[[]byte] = &Plugin{}
-)
-
-// StaticConfig contains configuration derived from the job spec that is shared across all instances of the plugin.
-type StaticConfig struct {
-}
-
 // Plugin implements the main ocr3 plugin logic.
 type Plugin struct {
-	StaticConfig
+	nodeID     commontypes.OracleID
+	cfg        model.ExecutePluginConfig
+	ccipReader reader.CCIP
 
-	destChain model.ChainSelector
-
-	reader reader.CCIP
-
-	//commitRootsCache cache.CommitsRootsCache
 	lastReportBlock uint64
 }
 
-func NewPlugin(config StaticConfig) *Plugin {
+func NewPlugin(
+	_ context.Context,
+	nodeID commontypes.OracleID,
+	cfg model.ExecutePluginConfig,
+	ccipReader reader.CCIP,
+) *Plugin {
 	return &Plugin{
-		StaticConfig: config,
-		//commitRootsCache: cache.NewCommitRootsCache(lggr, onchainConfig.PermissionLessExecutionThresholdSeconds, offchainConfig.RootSnoozeTime.Duration()),
+		nodeID:          nodeID,
+		cfg:             cfg,
+		ccipReader:      ccipReader,
+		lastReportBlock: 0,
 	}
 }
 
@@ -59,7 +55,7 @@ func (p *Plugin) Observation(ctx context.Context, outctx ocr3types.OutcomeContex
 
 	// Phase 1: Gather commit reports from the destination chain and determine which messages are required to build a valid execution report.
 	// TODO: filter out "cannot read p.destChain" errors? Or avoid calling it in the first place?
-	commitReports, err := p.reader.ReportsFromBlockNum(ctx, p.destChain, p.lastReportBlock, 1000)
+	commitReports, err := p.ccipReader.ReportsFromBlockNum(ctx, p.cfg.DestChain, p.lastReportBlock, 1000)
 	if err != nil {
 		return types.Observation{}, err
 	}
@@ -72,7 +68,7 @@ func (p *Plugin) Observation(ctx context.Context, outctx ocr3types.OutcomeContex
 	} else {
 		for selector, reports := range previousOutcome.NextCommits {
 			for _, report := range reports {
-				msgs, err := p.reader.MsgsBetweenSeqNums(ctx, []model.ChainSelector{selector}, report.SequenceNumberRange)
+				msgs, err := p.ccipReader.MsgsBetweenSeqNums(ctx, []model.ChainSelector{selector}, report.SequenceNumberRange)
 				if err != nil {
 					return types.Observation{}, err
 				}
@@ -125,3 +121,6 @@ func (p *Plugin) ShouldTransmitAcceptedReport(ctx context.Context, u uint64, r o
 func (p *Plugin) Close() error {
 	panic("implement me")
 }
+
+// Interface compatibility checks.
+var _ ocr3types.ReportingPlugin[[]byte] = &Plugin{}
