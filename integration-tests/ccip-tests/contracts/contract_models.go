@@ -7,12 +7,12 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/AlekSi/pointer"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 	"golang.org/x/exp/rand"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
@@ -64,6 +64,9 @@ const (
 	OnRampContract                        = "OnRamp"
 	TokenPoolContract                     = "TokenPool"
 	CommitStoreContract                   = "CommitStore"
+
+	defaultDestByteOverhead = uint32(32)
+	defaultDestGasOverhead  = uint32(29_000)
 )
 
 var (
@@ -382,13 +385,6 @@ func (w TokenPoolWrapper) ProvideLiquidity(opts *bind.TransactOpts, amount *big.
 	return nil, fmt.Errorf("no pool found to provide liquidity")
 }
 
-func (w TokenPoolWrapper) SetRemotePool(opts *bind.TransactOpts, selector uint64, pool []byte) (*types.Transaction, error) {
-	if w.Latest != nil && w.Latest.PoolInterface != nil {
-		return w.Latest.PoolInterface.SetRemotePool(opts, selector, pool)
-	}
-	return nil, fmt.Errorf("no pool found to set remote pool")
-}
-
 func (w TokenPoolWrapper) IsSupportedChain(opts *bind.CallOpts, remoteChainSelector uint64) (bool, error) {
 	if w.Latest != nil && w.Latest.PoolInterface != nil {
 		return w.Latest.PoolInterface.IsSupportedChain(opts, remoteChainSelector)
@@ -688,75 +684,45 @@ func (pool *TokenPool) AddLiquidity(approveFn tokenApproveFn, tokenAddr string, 
 	return pool.client.ProcessTransaction(tx)
 }
 
-func (pool *TokenPool) SetRemotePool(remoteChainSelector uint64, remotePool common.Address) error {
-	// if pool is of version 1.4.0, no need to set remote pool
-	if pool.Instance.V1_4_0 != nil {
-		return nil
-	}
-	pool.logger.Info().
-		Str("Token Pool", pool.Address()).
-		Str("Dest Pool", remotePool.Hex()).
-		Uint64("RemoteChain", remoteChainSelector).
-		Msg("Setting remote pool")
-	abiEncodedRemotePool, err := abihelpers.EncodeAddress(remotePool)
-	if err != nil {
-		return fmt.Errorf("error getting abiEncodedRemotePool %s : %w", remotePool.Hex(), err)
-	}
-	opts, err := pool.client.TransactionOpts(pool.client.GetDefaultWallet())
-	if err != nil {
-		return fmt.Errorf("failed to get transaction opts: %w", err)
-	}
-	tx, err := pool.Instance.SetRemotePool(opts, remoteChainSelector, abiEncodedRemotePool)
-
-	if err != nil {
-		return fmt.Errorf("failed to set remote pool %s on token pool: %w", remotePool.Hex(), err)
-	}
-	pool.logger.Info().
-		Str("Token Pool", pool.Address()).
-		Str("Dest Pool", remotePool.Hex()).
-		Uint64("RemoteChain", remoteChainSelector).
-		Msg("Done setting remote pool")
-	return pool.client.ProcessTransaction(tx)
-}
-
-func (pool *TokenPool) SetRemoteChainOnPool(remoteChainSelectors []uint64) error {
+func (pool *TokenPool) SetRemoteChainOnPool(remoteChainSelector uint64, remotePoolAddresses common.Address) error {
 	pool.logger.Info().
 		Str("Token Pool", pool.Address()).
 		Msg("Setting remote chain on pool")
 	var selectorsToUpdate []token_pool.TokenPoolChainUpdate
-	for _, remoteChainSelector := range remoteChainSelectors {
-		isSupported, err := pool.Instance.IsSupportedChain(nil, remoteChainSelector)
-		if err != nil {
-			return fmt.Errorf("failed to get if chain is supported: %w", err)
-		}
-		// Check if remote chain is already supported , if yes continue
-		if isSupported {
-			pool.logger.Info().
-				Str("Token Pool", pool.Address()).
-				Str(Network, pool.client.GetNetworkName()).
-				Uint64("Remote Chain Selector", remoteChainSelector).
-				Msg("Remote chain is already supported")
-			continue
-		}
-		selectorsToUpdate = append(selectorsToUpdate, token_pool.TokenPoolChainUpdate{
-			RemoteChainSelector: remoteChainSelector,
-			Allowed:             true,
-			InboundRateLimiterConfig: token_pool.RateLimiterConfig{
-				IsEnabled: true,
-				Capacity:  new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e9)),
-				Rate:      new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e5)),
-			},
-			OutboundRateLimiterConfig: token_pool.RateLimiterConfig{
-				IsEnabled: true,
-				Capacity:  new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e9)),
-				Rate:      new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e5)),
-			},
-		})
+
+	isSupported, err := pool.Instance.IsSupportedChain(nil, remoteChainSelector)
+	if err != nil {
+		return fmt.Errorf("failed to get if chain is supported: %w", err)
 	}
-	// if none to update return
-	if len(selectorsToUpdate) == 0 {
+	// Check if remote chain is already supported , if yes return
+	if isSupported {
+		pool.logger.Info().
+			Str("Token Pool", pool.Address()).
+			Str(Network, pool.client.GetNetworkName()).
+			Uint64("Remote Chain Selector", remoteChainSelector).
+			Msg("Remote chain is already supported")
 		return nil
 	}
+	encodedAddress, err := abihelpers.EncodeAddress(remotePoolAddresses)
+	if err != nil {
+		return fmt.Errorf("failed to encode address: %w", err)
+	}
+
+	selectorsToUpdate = append(selectorsToUpdate, token_pool.TokenPoolChainUpdate{
+		RemoteChainSelector: remoteChainSelector,
+		RemotePoolAddress:   encodedAddress,
+		Allowed:             true,
+		InboundRateLimiterConfig: token_pool.RateLimiterConfig{
+			IsEnabled: true,
+			Capacity:  new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e9)),
+			Rate:      new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e5)),
+		},
+		OutboundRateLimiterConfig: token_pool.RateLimiterConfig{
+			IsEnabled: true,
+			Capacity:  new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e9)),
+			Rate:      new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e5)),
+		},
+	})
 	// If remote chain is not supported , add it
 	opts, err := pool.client.TransactionOpts(pool.client.GetDefaultWallet())
 	if err != nil {
@@ -770,12 +736,13 @@ func (pool *TokenPool) SetRemoteChainOnPool(remoteChainSelectors []uint64) error
 
 	pool.logger.Info().
 		Str("Token Pool", pool.Address()).
-		Uints64("Chain selectors", remoteChainSelectors).
+		Uint64("Chain selector", remoteChainSelector).
 		Str(Network, pool.client.GetNetworkConfig().Name).
 		Msg("Remote chains set on token pool")
 	return pool.client.ProcessTransaction(tx)
 }
 
+// SetRemoteChainRateLimits sets the rate limits for the token pool on the remote chain
 func (pool *TokenPool) SetRemoteChainRateLimits(remoteChainSelector uint64, rl token_pool.RateLimiterConfig) error {
 	opts, err := pool.client.TransactionOpts(pool.client.GetDefaultWallet())
 	if err != nil {
@@ -1016,12 +983,12 @@ type PriceRegistryUsdPerUnitGasUpdated struct {
 	Raw       types.Log
 }
 
-type PriceRegistryWrappers struct {
+type PriceRegistryWrapper struct {
 	Latest *price_registry.PriceRegistry
 	V1_2_0 *price_registry_1_2_0.PriceRegistry
 }
 
-func (p *PriceRegistryWrappers) GetTokenPrice(opts *bind.CallOpts, token common.Address) (*big.Int, error) {
+func (p *PriceRegistryWrapper) GetTokenPrice(opts *bind.CallOpts, token common.Address) (*big.Int, error) {
 	if p.Latest != nil {
 		price, err := p.Latest.GetTokenPrice(opts, token)
 		if err != nil {
@@ -1039,7 +1006,7 @@ func (p *PriceRegistryWrappers) GetTokenPrice(opts *bind.CallOpts, token common.
 	return nil, fmt.Errorf("no instance found to get token price")
 }
 
-func (p *PriceRegistryWrappers) AddPriceUpdater(opts *bind.TransactOpts, addr common.Address) (*types.Transaction, error) {
+func (p *PriceRegistryWrapper) AddPriceUpdater(opts *bind.TransactOpts, addr common.Address) (*types.Transaction, error) {
 	if p.Latest != nil {
 		return p.Latest.ApplyPriceUpdatersUpdates(opts, []common.Address{addr}, []common.Address{})
 	}
@@ -1049,7 +1016,7 @@ func (p *PriceRegistryWrappers) AddPriceUpdater(opts *bind.TransactOpts, addr co
 	return nil, fmt.Errorf("no instance found to add price updater")
 }
 
-func (p *PriceRegistryWrappers) AddFeeToken(opts *bind.TransactOpts, addr common.Address) (*types.Transaction, error) {
+func (p *PriceRegistryWrapper) AddFeeToken(opts *bind.TransactOpts, addr common.Address) (*types.Transaction, error) {
 	if p.Latest != nil {
 		return p.Latest.ApplyFeeTokensUpdates(opts, []common.Address{addr}, []common.Address{})
 	}
@@ -1059,7 +1026,7 @@ func (p *PriceRegistryWrappers) AddFeeToken(opts *bind.TransactOpts, addr common
 	return nil, fmt.Errorf("no instance found to add fee token")
 }
 
-func (p *PriceRegistryWrappers) GetDestinationChainGasPrice(opts *bind.CallOpts, chainselector uint64) (InternalTimestampedPackedUint224, error) {
+func (p *PriceRegistryWrapper) GetDestinationChainGasPrice(opts *bind.CallOpts, chainselector uint64) (InternalTimestampedPackedUint224, error) {
 	if p.Latest != nil {
 		price, err := p.Latest.GetDestinationChainGasPrice(opts, chainselector)
 		if err != nil {
@@ -1095,8 +1062,8 @@ type InternalTokenPriceUpdate struct {
 
 type PriceRegistry struct {
 	client     blockchain.EVMClient
+	Instance   *PriceRegistryWrapper
 	logger     zerolog.Logger
-	Instance   *PriceRegistryWrappers
 	EthAddress common.Address
 }
 
@@ -1210,7 +1177,21 @@ func (c *PriceRegistry) WatchUsdPerUnitGasUpdated(opts *bind.WatchOpts, latest c
 		}
 		return newP.WatchUsdPerUnitGasUpdated(opts, latest, destChain)
 	}
-	return nil, fmt.Errorf("no instance found to watch for price updates")
+	return nil, fmt.Errorf("no instance found to watch for price updates for gas")
+}
+
+func (c *PriceRegistry) WatchUsdPerTokenUpdated(opts *bind.WatchOpts, latest chan *price_registry.PriceRegistryUsdPerTokenUpdated) (event.Subscription, error) {
+	if c.Instance.Latest != nil {
+		return c.Instance.Latest.WatchUsdPerTokenUpdated(opts, latest, nil)
+	}
+	if c.Instance.V1_2_0 != nil {
+		newP, err := price_registry.NewPriceRegistry(c.Instance.V1_2_0.Address(), wrappers.MustNewWrappedContractBackend(c.client, nil))
+		if err != nil {
+			return nil, fmt.Errorf("failed to create new PriceRegistry contract: %w", err)
+		}
+		return newP.WatchUsdPerTokenUpdated(opts, latest, nil)
+	}
+	return nil, fmt.Errorf("no instance found to watch for price updates for tokens")
 }
 
 type TokenAdminRegistry struct {
@@ -1326,11 +1307,11 @@ func (r *Router) CCIPSendAndProcessTx(destChainSelector uint64, msg router.Clien
 		return nil, fmt.Errorf("failed to send msg: %w", err)
 	}
 	r.logger.Info().
-		Str("router", r.Address()).
+		Str("Router", r.Address()).
 		Str("txHash", tx.Hash().Hex()).
 		Str(Network, r.client.GetNetworkConfig().Name).
-		Str("chain selector", strconv.FormatUint(destChainSelector, 10)).
-		Msg("msg is sent")
+		Str("Chain Selector", strconv.FormatUint(destChainSelector, 10)).
+		Msg("Message Sent")
 	return tx, r.client.ProcessTransaction(tx)
 }
 
@@ -1374,6 +1355,8 @@ func (r *Router) GetFee(destChainSelector uint64, message router.ClientEVM2AnyMe
 type SendReqEventData struct {
 	MessageId      [32]byte
 	SequenceNumber uint64
+	DataLength     int
+	NoOfTokens     int
 	Raw            types.Log
 }
 
@@ -1517,6 +1500,7 @@ func (w OnRampWrapper) ApplyPoolUpdates(opts *bind.TransactOpts, tokens []common
 	return nil, fmt.Errorf("no instance found to apply pool updates")
 }
 
+// CurrentRateLimiterState returns the current state of the rate limiter
 func (w OnRampWrapper) CurrentRateLimiterState(opts *bind.CallOpts) (*RateLimiterConfig, error) {
 	if w.Latest != nil {
 		rlConfig, err := w.Latest.CurrentRateLimiterState(opts)
@@ -1594,6 +1578,14 @@ func (onRamp *OnRamp) SetTokenTransferFeeConfig(tokenTransferFeeConfig []evm_2_e
 	if err != nil {
 		return fmt.Errorf("failed to get transaction opts: %w", err)
 	}
+	for i := range tokenTransferFeeConfig {
+		if tokenTransferFeeConfig[i].DestBytesOverhead == 0 {
+			tokenTransferFeeConfig[i].DestBytesOverhead = defaultDestByteOverhead
+		}
+		if tokenTransferFeeConfig[i].DestGasOverhead == 0 {
+			tokenTransferFeeConfig[i].DestGasOverhead = defaultDestGasOverhead
+		}
+	}
 	tx, err := onRamp.Instance.SetTokenTransferFeeConfig(opts, tokenTransferFeeConfig, []common.Address{})
 	if err != nil {
 		return fmt.Errorf("failed to set token transfer fee config: %w", err)
@@ -1631,6 +1623,7 @@ func (onRamp *OnRamp) WithdrawNonLinkFees(wrappedNative common.Address) error {
 	return onRamp.client.ProcessTransaction(tx)
 }
 
+// SetRateLimit sets the Aggregate Rate Limit (ARL) values for the OnRamp
 func (onRamp *OnRamp) SetRateLimit(rlConfig evm_2_evm_onramp.RateLimiterConfig) error {
 	opts, err := onRamp.client.TransactionOpts(onRamp.client.GetDefaultWallet())
 	if err != nil {
@@ -1672,11 +1665,320 @@ func (onRamp *OnRamp) ApplyPoolUpdates(tokens []common.Address, pools []common.A
 	return onRamp.client.ProcessTransaction(tx)
 }
 
+// OffRamp represents the OffRamp CCIP contract on the destination chain
+type OffRamp struct {
+	client     blockchain.EVMClient
+	logger     zerolog.Logger
+	Instance   *OffRampWrapper
+	EthAddress common.Address
+}
+
+func (offRamp *OffRamp) Address() string {
+	return offRamp.EthAddress.Hex()
+}
+
+// WatchExecutionStateChanged returns a subscription to watch for ExecutionStateChanged events
+// there is no difference in the event between the two versions
+// so we can use the latest version to watch for events
+func (offRamp *OffRamp) WatchExecutionStateChanged(
+	opts *bind.WatchOpts,
+	execEvent chan *evm_2_evm_offramp.EVM2EVMOffRampExecutionStateChanged,
+	sequenceNumber []uint64,
+	messageId [][32]byte,
+) (event.Subscription, error) {
+	if offRamp.Instance.Latest != nil {
+		return offRamp.Instance.Latest.WatchExecutionStateChanged(opts, execEvent, sequenceNumber, messageId)
+	}
+	if offRamp.Instance.V1_2_0 != nil {
+		newOffRamp, err := evm_2_evm_offramp.NewEVM2EVMOffRamp(offRamp.EthAddress, wrappers.MustNewWrappedContractBackend(offRamp.client, nil))
+		if err != nil {
+			return nil, fmt.Errorf("failed to cast to latest version of OffRamp from v1_2_0: %w", err)
+		}
+		return newOffRamp.WatchExecutionStateChanged(opts, execEvent, sequenceNumber, messageId)
+	}
+	return nil, fmt.Errorf("no instance found to watch for ExecutionStateChanged")
+}
+
+// SetOCR2Config sets the offchain reporting protocol configuration
+func (offRamp *OffRamp) SetOCR2Config(
+	signers []common.Address,
+	transmitters []common.Address,
+	f uint8,
+	onchainConfig []byte,
+	offchainConfigVersion uint64,
+	offchainConfig []byte,
+) error {
+	offRamp.logger.Info().Str("Contract Address", offRamp.Address()).Msg("Configuring OffRamp Contract")
+	// Set Config
+	opts, err := offRamp.client.TransactionOpts(offRamp.client.GetDefaultWallet())
+	if err != nil {
+		return fmt.Errorf("failed to get transaction options: %w", err)
+	}
+	offRamp.logger.Debug().
+		Interface("SignerAddresses", signers).
+		Interface("TransmitterAddresses", transmitters).
+		Str(Network, offRamp.client.GetNetworkConfig().Name).
+		Msg("Configuring OffRamp")
+	if offRamp.Instance.Latest != nil {
+		tx, err := offRamp.Instance.Latest.SetOCR2Config(
+			opts,
+			signers,
+			transmitters,
+			f,
+			onchainConfig,
+			offchainConfigVersion,
+			offchainConfig,
+		)
+		if err != nil {
+			return fmt.Errorf("failed to set latest OCR2 config: %w", err)
+		}
+		return offRamp.client.ProcessTransaction(tx)
+	}
+	if offRamp.Instance.V1_2_0 != nil {
+		tx, err := offRamp.Instance.V1_2_0.SetOCR2Config(
+			opts,
+			signers,
+			transmitters,
+			f,
+			onchainConfig,
+			offchainConfigVersion,
+			offchainConfig,
+		)
+		if err != nil {
+			return fmt.Errorf("failed to set 1.2 OCR2 config: %w", err)
+		}
+		return offRamp.client.ProcessTransaction(tx)
+	}
+	return fmt.Errorf("no instance found to set OCR2 config")
+}
+
+// AddRateLimitTokens adds token pairs to the OffRamp's rate limit
+func (offRamp *OffRamp) AddRateLimitTokens(sourceTokens, destTokens []common.Address) error {
+	if offRamp.Instance.V1_2_0 != nil {
+		return nil
+	}
+
+	if len(sourceTokens) != len(destTokens) {
+		return fmt.Errorf("source and dest tokens must be of the same length")
+	}
+	opts, err := offRamp.client.TransactionOpts(offRamp.client.GetDefaultWallet())
+	if err != nil {
+		return fmt.Errorf("failed to get transaction opts: %w", err)
+	}
+
+	if offRamp.Instance.Latest != nil {
+		rateLimitTokens := make([]evm_2_evm_offramp.EVM2EVMOffRampRateLimitToken, len(sourceTokens))
+		for i, sourceToken := range sourceTokens {
+			rateLimitTokens[i] = evm_2_evm_offramp.EVM2EVMOffRampRateLimitToken{
+				SourceToken: sourceToken,
+				DestToken:   destTokens[i],
+			}
+		}
+
+		tx, err := offRamp.Instance.Latest.UpdateRateLimitTokens(opts, []evm_2_evm_offramp.EVM2EVMOffRampRateLimitToken{}, rateLimitTokens)
+		if err != nil {
+			return fmt.Errorf("failed to apply rate limit tokens updates: %w", err)
+		}
+		offRamp.logger.Info().
+			Interface("rateLimitToken adds", rateLimitTokens).
+			Str("offRamp", offRamp.Address()).
+			Str(Network, offRamp.client.GetNetworkConfig().Name).
+			Msg("rateLimitTokens set in OffRamp")
+		return offRamp.client.ProcessTransaction(tx)
+	}
+	return fmt.Errorf("no supported OffRamp version instance found")
+}
+
+// RemoveRateLimitTokens removes token pairs to the OffRamp's rate limit.
+// If you ask to remove a token pair that doesn't exist, it will return an error.
+func (offRamp *OffRamp) RemoveRateLimitTokens(ctx context.Context, sourceTokens, destTokens []common.Address) error {
+	callOpts := &bind.CallOpts{
+		From:    common.HexToAddress(offRamp.client.GetDefaultWallet().Address()),
+		Context: ctx,
+	}
+
+	switch {
+	case offRamp.Instance.Latest != nil:
+		existingRateLimitTokens, err := offRamp.Instance.Latest.GetAllRateLimitTokens(callOpts)
+		if err != nil {
+			return fmt.Errorf("failed to get all rate limit tokens: %w", err)
+		}
+
+		rateLimitTokens := make([]evm_2_evm_offramp.EVM2EVMOffRampRateLimitToken, len(sourceTokens))
+		for i, sourceToken := range sourceTokens {
+			destToken := destTokens[i]
+			// Check if the source rate limit token exists
+			foundIndex := -1
+			for j, existingSourceToken := range existingRateLimitTokens.SourceTokens {
+				if existingSourceToken == sourceToken {
+					foundIndex = j
+					break
+				}
+			}
+			if foundIndex == -1 {
+				return fmt.Errorf("source rate limit token not found for pair: %s -> %s", sourceTokens[i].Hex(), destTokens[i].Hex())
+			}
+			// Check if the matching dest rate limit token exists
+			if existingRateLimitTokens.DestTokens[foundIndex] != destToken {
+				return fmt.Errorf("dest rate limit token not found for pair: %s -> %s", sourceTokens[i].Hex(), destTokens[i].Hex())
+			}
+			// Update the existing rate limit tokens to remove the pair for visibility
+			existingRateLimitTokens.SourceTokens = append(existingRateLimitTokens.SourceTokens[:foundIndex], existingRateLimitTokens.SourceTokens[foundIndex+1:]...)
+			existingRateLimitTokens.DestTokens = append(existingRateLimitTokens.DestTokens[:foundIndex], existingRateLimitTokens.DestTokens[foundIndex+1:]...)
+
+			rateLimitTokens[i] = evm_2_evm_offramp.EVM2EVMOffRampRateLimitToken{
+				SourceToken: sourceToken,
+				DestToken:   destToken,
+			}
+		}
+
+		opts, err := offRamp.client.TransactionOpts(offRamp.client.GetDefaultWallet())
+		if err != nil {
+			return fmt.Errorf("failed to get transaction opts: %w", err)
+		}
+		tx, err := offRamp.Instance.Latest.UpdateRateLimitTokens(opts, rateLimitTokens, []evm_2_evm_offramp.EVM2EVMOffRampRateLimitToken{})
+		if err != nil {
+			return fmt.Errorf("failed to remove rate limit tokens: %w", err)
+		}
+		offRamp.logger.Info().
+			Interface("RateLimitTokens Remaining", existingRateLimitTokens).
+			Interface("RateLimitTokens Removed", rateLimitTokens).
+			Str("OffRamp", offRamp.Address()).
+			Str(Network, offRamp.client.GetNetworkConfig().Name).
+			Msg("RateLimitTokens Removed from OffRamp")
+		return offRamp.client.ProcessTransaction(tx)
+	case offRamp.Instance.V1_2_0 != nil:
+		return nil
+	}
+	return fmt.Errorf("no supported OffRamp version instance found")
+}
+
+// RemoveAllRateLimitTokens removes all token pairs from the OffRamp's rate limit.
+func (offRamp *OffRamp) RemoveAllRateLimitTokens(ctx context.Context) error {
+	callOpts := &bind.CallOpts{
+		From:    common.HexToAddress(offRamp.client.GetDefaultWallet().Address()),
+		Context: ctx,
+	}
+
+	switch {
+	case offRamp.Instance.Latest != nil:
+		allRateLimitTokens, err := offRamp.Instance.Latest.GetAllRateLimitTokens(callOpts)
+		if err != nil {
+			return fmt.Errorf("failed to get all rate limit tokens: %w", err)
+		}
+
+		rateLimitTokens := make([]evm_2_evm_offramp.EVM2EVMOffRampRateLimitToken, len(allRateLimitTokens.SourceTokens))
+		for i, sourceToken := range allRateLimitTokens.SourceTokens {
+			rateLimitTokens[i] = evm_2_evm_offramp.EVM2EVMOffRampRateLimitToken{
+				SourceToken: sourceToken,
+				DestToken:   allRateLimitTokens.DestTokens[i],
+			}
+		}
+
+		opts, err := offRamp.client.TransactionOpts(offRamp.client.GetDefaultWallet())
+		if err != nil {
+			return fmt.Errorf("failed to get transaction opts: %w", err)
+		}
+		tx, err := offRamp.Instance.Latest.UpdateRateLimitTokens(opts, rateLimitTokens, []evm_2_evm_offramp.EVM2EVMOffRampRateLimitToken{})
+		if err != nil {
+			return fmt.Errorf("failed to remove rate limit tokens: %w", err)
+		}
+		offRamp.logger.Info().
+			Interface("RateLimitTokens Removed", rateLimitTokens).
+			Str("OffRamp", offRamp.Address()).
+			Str(Network, offRamp.client.GetNetworkConfig().Name).
+			Msg("Removed all RateLimitTokens from OffRamp")
+		return offRamp.client.ProcessTransaction(tx)
+	case offRamp.Instance.V1_2_0 != nil:
+		return nil
+	}
+	return fmt.Errorf("no supported OffRamp version instance found")
+}
+
+// SetRateLimit sets the Aggregate Rate Limit (ARL) values for the OffRamp
+func (offRamp *OffRamp) SetRateLimit(rlConfig RateLimiterConfig) error {
+	opts, err := offRamp.client.TransactionOpts(offRamp.client.GetDefaultWallet())
+	if err != nil {
+		return err
+	}
+	offRamp.logger.Info().
+		Bool("Enabled", rlConfig.IsEnabled).
+		Str("Capacity", rlConfig.Capacity.String()).
+		Str("Rate", rlConfig.Rate.String()).
+		Str("OffRamp", offRamp.Address()).
+		Str(Network, offRamp.client.GetNetworkConfig().Name).
+		Msg("Setting Rate limit on OffRamp")
+
+	switch {
+	case offRamp.Instance.Latest != nil:
+		tx, err := offRamp.Instance.Latest.SetRateLimiterConfig(opts, evm_2_evm_offramp.RateLimiterConfig{
+			IsEnabled: rlConfig.IsEnabled,
+			Capacity:  rlConfig.Capacity,
+			Rate:      rlConfig.Rate,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to set rate limit: %w", err)
+		}
+		return offRamp.client.ProcessTransaction(tx)
+	case offRamp.Instance.V1_2_0 != nil:
+		tx, err := offRamp.Instance.V1_2_0.SetRateLimiterConfig(opts, evm_2_evm_offramp_1_2_0.RateLimiterConfig{
+			IsEnabled: rlConfig.IsEnabled,
+			Capacity:  rlConfig.Capacity,
+			Rate:      rlConfig.Rate,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to set rate limit: %w", err)
+		}
+		return offRamp.client.ProcessTransaction(tx)
+	}
+	return fmt.Errorf("no supported OffRamp version instance found")
+}
+
+func (offRamp *OffRamp) SyncTokensAndPools(sourceTokens, pools []common.Address) error {
+	if offRamp.Instance.Latest != nil {
+		return nil
+	}
+	opts, err := offRamp.client.TransactionOpts(offRamp.client.GetDefaultWallet())
+	if err != nil {
+		return fmt.Errorf("failed to get transaction opts: %w", err)
+	}
+	if offRamp.Instance.V1_2_0 != nil {
+		var tokenUpdates []evm_2_evm_offramp_1_2_0.InternalPoolUpdate
+		for i, srcToken := range sourceTokens {
+			tokenUpdates = append(tokenUpdates, evm_2_evm_offramp_1_2_0.InternalPoolUpdate{
+				Token: srcToken,
+				Pool:  pools[i],
+			})
+		}
+		tx, err := offRamp.Instance.V1_2_0.ApplyPoolUpdates(opts, []evm_2_evm_offramp_1_2_0.InternalPoolUpdate{}, tokenUpdates)
+		if err != nil {
+			return fmt.Errorf("failed to apply pool updates: %w", err)
+		}
+		offRamp.logger.Info().
+			Interface("tokenUpdates", tokenUpdates).
+			Str("offRamp", offRamp.Address()).
+			Str(Network, offRamp.client.GetNetworkConfig().Name).
+			Msg("tokenUpdates set in OffRamp")
+		return offRamp.client.ProcessTransaction(tx)
+	}
+	return fmt.Errorf("no instance found to sync tokens and pools")
+}
+
+// OffRampWrapper wraps multiple versions of the OffRamp contract as we support multiple at once.
+// If you are using any of the functions in this struct, be sure to follow best practices:
+//  1. If the function does not make sense for a specific version,
+//     (e.g. crucial functionality that changes state, but doesn't exist yet) return an error.
+//  2. If the function does not make sense for a specific version, but calling it doesn't change how execution would work
+//     (e.g. functionality that wouldn't change state), you can return a nil or default value, treating it as a no-op.
+//  3. If no valid versions are available, return an error.
+//
+// See CurrentRateLimiterState, WatchExecutionStateChanged, and AddRateLimitTokens for examples.
 type OffRampWrapper struct {
 	Latest *evm_2_evm_offramp.EVM2EVMOffRamp
 	V1_2_0 *evm_2_evm_offramp_1_2_0.EVM2EVMOffRamp
 }
 
+// CurrentRateLimiterState retrieves the current rate limiter state for the OffRamp contract
 func (offRamp *OffRampWrapper) CurrentRateLimiterState(opts *bind.CallOpts) (RateLimiterConfig, error) {
 	if offRamp.Latest != nil {
 		rlConfig, err := offRamp.Latest.CurrentRateLimiterState(opts)
@@ -1711,160 +2013,53 @@ type EVM2EVMOffRampExecutionStateChanged struct {
 	Raw            types.Log
 }
 
-type OffRamp struct {
-	client     blockchain.EVMClient
-	logger     zerolog.Logger
-	Instance   *OffRampWrapper
-	EthAddress common.Address
-}
-
-func (offRamp *OffRamp) Address() string {
-	return offRamp.EthAddress.Hex()
-}
-
-// WatchExecutionStateChanged returns a subscription to watch for ExecutionStateChanged events
-// there is no difference in the event between the two versions
-// so we can use the latest version to watch for events
-func (offRamp *OffRamp) WatchExecutionStateChanged(opts *bind.WatchOpts, execEvent chan *evm_2_evm_offramp.EVM2EVMOffRampExecutionStateChanged, sequenceNumber []uint64, messageId [][32]byte) (event.Subscription, error) {
-	if offRamp.Instance.Latest != nil {
-		return offRamp.Instance.Latest.WatchExecutionStateChanged(opts, execEvent, sequenceNumber, messageId)
-	}
-	if offRamp.Instance.V1_2_0 != nil {
-		newOffRamp, err := evm_2_evm_offramp.NewEVM2EVMOffRamp(offRamp.EthAddress, wrappers.MustNewWrappedContractBackend(offRamp.client, nil))
-		if err != nil {
-			return nil, fmt.Errorf("failed to cast to latest version of OffRamp from v1_2_0: %w", err)
-		}
-		return newOffRamp.WatchExecutionStateChanged(opts, execEvent, sequenceNumber, messageId)
-	}
-	return nil, fmt.Errorf("no instance found to watch for ExecutionStateChanged")
-}
-
-// SetOCR2Config sets the offchain reporting protocol configuration
-func (offRamp *OffRamp) SetOCR2Config(
-	signers []common.Address,
-	transmitters []common.Address,
-	f uint8,
-	onchainConfig []byte,
-	offchainConfigVersion uint64,
-	offchainConfig []byte,
-) error {
-	offRamp.logger.Info().Str("Contract Address", offRamp.Address()).Msg("Configuring OffRamp Contract")
-	// Set Config
-	opts, err := offRamp.client.TransactionOpts(offRamp.client.GetDefaultWallet())
-	if err != nil {
-		return fmt.Errorf("failed to get transaction options: %w", err)
-	}
-	offRamp.logger.Info().
-		Interface("signerAddresses", signers).
-		Interface("transmitterAddresses", transmitters).
-		Str(Network, offRamp.client.GetNetworkConfig().Name).
-		Msg("Configuring OffRamp")
-	if offRamp.Instance.Latest != nil {
-		tx, err := offRamp.Instance.Latest.SetOCR2Config(
-			opts,
-			signers,
-			transmitters,
-			f,
-			onchainConfig,
-			offchainConfigVersion,
-			offchainConfig,
-		)
-		if err != nil {
-			return fmt.Errorf("failed to set OCR2 config: %w", err)
-		}
-		return offRamp.client.ProcessTransaction(tx)
-	}
-	if offRamp.Instance.V1_2_0 != nil {
-		tx, err := offRamp.Instance.V1_2_0.SetOCR2Config(
-			opts,
-			signers,
-			transmitters,
-			f,
-			onchainConfig,
-			offchainConfigVersion,
-			offchainConfig,
-		)
-		if err != nil {
-			return fmt.Errorf("failed to set OCR2 config: %w", err)
-		}
-		return offRamp.client.ProcessTransaction(tx)
-	}
-	return fmt.Errorf("no instance found to set OCR2 config")
-}
-
-func (offRamp *OffRamp) UpdateRateLimitTokens(sourceTokens, destTokens []common.Address) error {
-	if offRamp.Instance.V1_2_0 != nil {
-		return nil
-	}
-	opts, err := offRamp.client.TransactionOpts(offRamp.client.GetDefaultWallet())
-	if err != nil {
-		return fmt.Errorf("failed to get transaction opts: %w", err)
-	}
-	if offRamp.Instance.Latest != nil {
-		rateLimitTokens := make([]evm_2_evm_offramp.EVM2EVMOffRampRateLimitToken, len(sourceTokens))
-		for i, sourceToken := range sourceTokens {
-			rateLimitTokens[i] = evm_2_evm_offramp.EVM2EVMOffRampRateLimitToken{
-				SourceToken: sourceToken,
-				DestToken:   destTokens[i],
-			}
-		}
-
-		tx, err := offRamp.Instance.Latest.UpdateRateLimitTokens(opts, []evm_2_evm_offramp.EVM2EVMOffRampRateLimitToken{}, rateLimitTokens)
-		if err != nil {
-			return fmt.Errorf("failed to apply rate limit tokens updates: %w", err)
-		}
-		offRamp.logger.Info().
-			Interface("rateLimitToken adds", rateLimitTokens).
-			Str("offRamp", offRamp.Address()).
-			Str(Network, offRamp.client.GetNetworkConfig().Name).
-			Msg("rateLimitTokens set in OffRamp")
-		return offRamp.client.ProcessTransaction(tx)
-	}
-	return fmt.Errorf("no instance found to update rate limit tokens")
-}
-
-func (offRamp *OffRamp) SyncTokensAndPools(sourceTokens, pools []common.Address) error {
-	if offRamp.Instance.Latest != nil {
-		return nil
-	}
-	opts, err := offRamp.client.TransactionOpts(offRamp.client.GetDefaultWallet())
-	if err != nil {
-		return fmt.Errorf("failed to get transaction opts: %w", err)
-	}
-	if offRamp.Instance.V1_2_0 != nil {
-		var tokenUpdates []evm_2_evm_offramp_1_2_0.InternalPoolUpdate
-		for i, srcToken := range sourceTokens {
-			tokenUpdates = append(tokenUpdates, evm_2_evm_offramp_1_2_0.InternalPoolUpdate{
-				Token: srcToken,
-				Pool:  pools[i],
-			})
-		}
-		tx, err := offRamp.Instance.V1_2_0.ApplyPoolUpdates(opts, []evm_2_evm_offramp_1_2_0.InternalPoolUpdate{}, tokenUpdates)
-		if err != nil {
-			return fmt.Errorf("failed to apply pool updates: %w", err)
-		}
-		offRamp.logger.Info().
-			Interface("tokenUpdates", tokenUpdates).
-			Str("offRamp", offRamp.Address()).
-			Str(Network, offRamp.client.GetNetworkConfig().Name).
-			Msg("tokenUpdates set in OffRamp")
-		return offRamp.client.ProcessTransaction(tx)
-	}
-	return fmt.Errorf("no instance found to sync tokens and pools")
-}
-
 type MockAggregator struct {
 	client          blockchain.EVMClient
 	logger          zerolog.Logger
 	Instance        *mock_v3_aggregator_contract.MockV3Aggregator
 	ContractAddress common.Address
+	RoundId         *big.Int
+	Answer          *big.Int
 }
 
 func (a *MockAggregator) ChainID() uint64 {
 	return a.client.GetChainID().Uint64()
 }
 
-func (a *MockAggregator) UpdateRoundData(answer *big.Int) error {
+// UpdateRoundData updates the round data in the aggregator contract
+// if answer is nil, it will set next round data by adding random percentage( within provided range) to the previous round data
+func (a *MockAggregator) UpdateRoundData(answer *big.Int, minP, maxP *int) error {
+	if answer == nil && (minP == nil || maxP == nil) {
+		return fmt.Errorf("minP and maxP are required to update round data with random percentage if answer is nil")
+	}
+	// if round id is nil, set it to 1
+	if a.RoundId == nil {
+		a.RoundId = big.NewInt(1)
+	}
+	// if there is no answer provided and last saved answer is nil
+	// we fetch the last round data from chain
+	// and set the answer to the aggregator's latest answer and round id to the aggregator's latest round id
+	if answer == nil && a.Answer == nil {
+		roundData, err := a.Instance.LatestRoundData(nil)
+		if err != nil || roundData.RoundId == nil || roundData.Answer == nil {
+			return fmt.Errorf("unable to get latest round data: %w", err)
+		}
+		a.Answer = roundData.Answer
+		a.RoundId = roundData.RoundId
+	}
+
+	// if answer is nil, we calculate the answer with random percentage (within the provided range) of latest answer
+	if answer == nil {
+		rand.Seed(uint64(time.Now().UnixNano()))
+		randomNumber := rand.Intn(pointer.GetInt(maxP)-pointer.GetInt(minP)+1) + pointer.GetInt(minP)
+		// answer = previous round answer + (previous round answer * random percentage)
+		answer = new(big.Int).Add(a.Answer, new(big.Int).Div(new(big.Int).Mul(a.Answer, big.NewInt(int64(randomNumber))), big.NewInt(100)))
+	}
+	// increment the round id
+	round := new(big.Int).Add(a.RoundId, big.NewInt(1))
+	// save the round data as the latest round data
+	a.RoundId = round
+	a.Answer = answer
 	opts, err := a.client.TransactionOpts(a.client.GetDefaultWallet())
 	if err != nil {
 		return fmt.Errorf("unable to get transaction opts: %w", err)
@@ -1873,28 +2068,24 @@ func (a *MockAggregator) UpdateRoundData(answer *big.Int) error {
 		Str("Contract Address", a.ContractAddress.Hex()).
 		Str("Network Name", a.client.GetNetworkConfig().Name).
 		Msg("Updating Round Data")
-	// we get the round from latest round data
-	// if there is any error in fetching the round , we set the round with a random number
-	// otherwise increase the latest round by 1 and set the value for the next round
-	round, err := a.Instance.LatestRound(nil)
-	if err != nil {
-		rand.Seed(uint64(time.Now().UnixNano()))
-		round = big.NewInt(int64(rand.Uint64()))
-	}
-	round = new(big.Int).Add(round, big.NewInt(1))
 	tx, err := a.Instance.UpdateRoundData(opts, round, answer, big.NewInt(time.Now().UTC().UnixNano()), big.NewInt(time.Now().UTC().UnixNano()))
 	if err != nil {
 		return fmt.Errorf("unable to update round data: %w", err)
 	}
-	log.Info().
+	a.logger.Info().
 		Str("Contract Address", a.ContractAddress.Hex()).
 		Str("Network Name", a.client.GetNetworkConfig().Name).
 		Str("Round", round.String()).
 		Str("Answer", answer.String()).
 		Msg("Updated Round Data")
-	_, err = bind.WaitMined(context.Background(), a.client.DeployBackend(), tx)
+	ctx, cancel := context.WithTimeout(context.Background(), a.client.GetNetworkConfig().Timeout.Duration)
+	defer cancel()
+	rec, err := bind.WaitMined(ctx, a.client.DeployBackend(), tx)
 	if err != nil {
 		return fmt.Errorf("error waiting for tx %s to be mined", tx.Hash().Hex())
+	}
+	if rec.Status != types.ReceiptStatusSuccessful {
+		return fmt.Errorf("tx %s failed while updating round data", tx.Hash().Hex())
 	}
 
 	return a.client.MarkTxAsSentOnL2(tx)

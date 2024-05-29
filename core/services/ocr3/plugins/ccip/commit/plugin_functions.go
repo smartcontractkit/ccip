@@ -13,6 +13,7 @@ import (
 	"github.com/smartcontractkit/ccipocr3/internal/reader"
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 )
@@ -81,37 +82,57 @@ func observeNewMsgs(
 	readableChains mapset.Set[model.ChainSelector],
 	maxSeqNumsPerChain []model.SeqNumChain,
 	msgScanBatchSize int,
-) ([]model.CCIPMsgBaseDetails, error) {
+) ([]model.CCIPMsg, error) {
 	// Find the new msgs for each supported chain based on the discovered max sequence numbers.
-	observedNewMsgs := make([]model.CCIPMsgBaseDetails, 0)
-	for _, seqNumChain := range maxSeqNumsPerChain {
+	newMsgsPerChain := make([][]model.CCIPMsg, len(maxSeqNumsPerChain))
+	eg := new(errgroup.Group)
+
+	for chainIdx, seqNumChain := range maxSeqNumsPerChain {
 		if !readableChains.Contains(seqNumChain.ChainSel) {
 			lggr.Debugw("reading chain is not supported", "chain", seqNumChain.ChainSel)
 			continue
 		}
 
-		minSeqNum := seqNumChain.SeqNum + 1
-		maxSeqNum := minSeqNum + model.SeqNum(msgScanBatchSize)
-		lggr.Debugw("scanning for new messages",
-			"chain", seqNumChain.ChainSel, "minSeqNum", minSeqNum, "maxSeqNum", maxSeqNum)
+		seqNumChain := seqNumChain
+		chainIdx := chainIdx
+		eg.Go(func() error {
+			minSeqNum := seqNumChain.SeqNum + 1
+			maxSeqNum := minSeqNum + model.SeqNum(msgScanBatchSize)
+			lggr.Debugw("scanning for new messages",
+				"chain", seqNumChain.ChainSel, "minSeqNum", minSeqNum, "maxSeqNum", maxSeqNum)
 
-		newMsgs, err := ccipReader.MsgsBetweenSeqNums(
-			ctx, []model.ChainSelector{seqNumChain.ChainSel}, model.NewSeqNumRange(minSeqNum, maxSeqNum))
-		if err != nil {
-			return nil, fmt.Errorf("get messages between seq nums: %w", err)
-		}
+			newMsgs, err := ccipReader.MsgsBetweenSeqNums(
+				ctx, []model.ChainSelector{seqNumChain.ChainSel}, model.NewSeqNumRange(minSeqNum, maxSeqNum))
+			if err != nil {
+				return fmt.Errorf("get messages between seq nums: %w", err)
+			}
 
-		if len(newMsgs) > 0 {
-			lggr.Debugw("discovered new messages", "chain", seqNumChain.ChainSel, "newMsgs", len(newMsgs))
-		} else {
-			lggr.Debugw("no new messages discovered", "chain", seqNumChain.ChainSel)
-		}
+			if len(newMsgs) > 0 {
+				lggr.Debugw("discovered new messages", "chain", seqNumChain.ChainSel, "newMsgs", len(newMsgs))
+			} else {
+				lggr.Debugw("no new messages discovered", "chain", seqNumChain.ChainSel)
+			}
 
-		for _, msg := range newMsgs {
-			observedNewMsgs = append(observedNewMsgs, msg.CCIPMsgBaseDetails)
-		}
+			for _, msg := range newMsgs {
+				if err := msg.IsValid(); err != nil {
+					lggr.Warnw("invalid message discovered", "msg", msg, "err", err)
+					continue
+				}
+			}
+
+			newMsgsPerChain[chainIdx] = newMsgs
+			return nil
+		})
 	}
 
+	if err := eg.Wait(); err != nil {
+		return nil, fmt.Errorf("wait for new msg observations: %w", err)
+	}
+
+	observedNewMsgs := make([]model.CCIPMsg, 0)
+	for chainIdx := range maxSeqNumsPerChain {
+		observedNewMsgs = append(observedNewMsgs, newMsgsPerChain[chainIdx]...)
+	}
 	return observedNewMsgs, nil
 }
 
@@ -136,6 +157,25 @@ func observeTokenPrices(
 	}
 
 	return tokenPricesUSD, nil
+}
+
+func observeGasPrices(ctx context.Context, ccipReader reader.CCIP, chains []model.ChainSelector) ([]model.GasPriceChain, error) {
+	gasPrices, err := ccipReader.GasPrices(ctx, chains)
+	if err != nil {
+		return nil, fmt.Errorf("get gas prices: %w", err)
+	}
+
+	if len(gasPrices) != len(chains) {
+		return nil, fmt.Errorf("internal critical error gas prices length mismatch: got %d, want %d",
+			len(gasPrices), len(chains))
+	}
+
+	gasPricesGwei := make([]model.GasPriceChain, 0, len(chains))
+	for i, chain := range chains {
+		gasPricesGwei = append(gasPricesGwei, model.NewGasPriceChain(gasPrices[i].Int, chain))
+	}
+
+	return gasPricesGwei, nil
 }
 
 // newMsgsConsensus comes in consensus on the observed messages for each source chain. Generates one merkle root
@@ -223,17 +263,56 @@ func newMsgsConsensusForChain(
 	lggr.Debugw("observed messages consensus",
 		"chain", chainSel, "fChain", fChain, "observedMsgs", len(observedMsgs))
 
-	// Reach consensus on the observed msgs sequence numbers.
-	msgSeqNums := make(map[model.SeqNum]int)
+	// First come to consensus about the (sequence number, id) pairs.
+	// For each sequence number consider correct the ID with the most votes.
+	msgSeqNumToIDCounts := make(map[model.SeqNum]map[string]int) // seqNum -> msgID -> count
 	for _, msg := range observedMsgs {
-		msgSeqNums[msg.SeqNum]++
-		// TODO: message data might be spoofed, validate the message data
+		if _, exists := msgSeqNumToIDCounts[msg.SeqNum]; !exists {
+			msgSeqNumToIDCounts[msg.SeqNum] = make(map[string]int)
+		}
+		msgSeqNumToIDCounts[msg.SeqNum][msg.ID.String()]++
 	}
-	lggr.Debugw("observed message counts", "chain", chainSel, "msgSeqNums", msgSeqNums)
+	lggr.Debugw("observed message counts", "chain", chainSel, "msgSeqNumToIdCounts", msgSeqNumToIDCounts)
+
+	msgObservationsCount := make(map[model.SeqNum]int)
+	msgSeqNumToID := make(map[model.SeqNum]model.Bytes32)
+	for seqNum, idCounts := range msgSeqNumToIDCounts {
+		if len(idCounts) == 0 {
+			lggr.Errorw("critical error id counts should never be empty", "seqNum", seqNum)
+			continue
+		}
+
+		// Find the ID with the most votes for each sequence number.
+		idsSlice := make([]string, 0, len(idCounts))
+		for id := range idCounts {
+			idsSlice = append(idsSlice, id)
+		}
+		// determinism in case we have the same count for different ids
+		sort.Slice(idsSlice, func(i, j int) bool { return idsSlice[i] < idsSlice[j] })
+
+		maxCnt := idCounts[idsSlice[0]]
+		mostVotedID := idsSlice[0]
+		for _, id := range idsSlice[1:] {
+			cnt := idCounts[id]
+			if cnt > maxCnt {
+				maxCnt = cnt
+				mostVotedID = id
+			}
+		}
+
+		msgObservationsCount[seqNum] = maxCnt
+		idBytes, err := model.NewBytes32FromString(mostVotedID)
+		if err != nil {
+			return observedMsgsConsensus{}, fmt.Errorf("critical issue converting id '%s' to bytes32: %w",
+				mostVotedID, err)
+		}
+		msgSeqNumToID[seqNum] = idBytes
+	}
+	lggr.Debugw("observed message consensus", "chain", chainSel, "msgSeqNumToId", msgSeqNumToID)
 
 	// Filter out msgs not observed by at least 2f_chain+1 followers.
 	msgSeqNumsQuorum := mapset.NewSet[model.SeqNum]()
-	for seqNum, count := range msgSeqNums {
+	for seqNum, count := range msgObservationsCount {
 		if count >= 2*fChain+1 {
 			msgSeqNumsQuorum.Add(seqNum)
 		}
@@ -255,6 +334,10 @@ func newMsgsConsensusForChain(
 
 	msgsBySeqNum := make(map[model.SeqNum]model.CCIPMsgBaseDetails)
 	for _, msg := range observedMsgs {
+		consensusMsgID, ok := msgSeqNumToID[msg.SeqNum]
+		if !ok || consensusMsgID != msg.ID {
+			continue
+		}
 		msgsBySeqNum[msg.SeqNum] = msg
 	}
 
@@ -349,6 +432,40 @@ func tokenPricesConsensus(
 	return consensusPrices, nil
 }
 
+func gasPricesConsensus(lggr logger.Logger, observations []model.CommitPluginObservation, fChain int) ([]model.GasPriceChain, error) {
+	// Group the observed gas prices by chain.
+	gasPricePerChain := make(map[model.ChainSelector][]model.BigInt)
+	for _, obs := range observations {
+		for _, gasPrice := range obs.GasPrices {
+			if _, exists := gasPricePerChain[gasPrice.ChainSel]; !exists {
+				gasPricePerChain[gasPrice.ChainSel] = make([]model.BigInt, 0)
+			}
+			gasPricePerChain[gasPrice.ChainSel] = append(gasPricePerChain[gasPrice.ChainSel], gasPrice.GasPrice)
+		}
+	}
+
+	// Keep the median
+	consensusGasPrices := make([]model.GasPriceChain, 0)
+	for chain, gasPrices := range gasPricePerChain {
+		if len(gasPrices) < 2*fChain+1 {
+			lggr.Warnw("not enough gas price observations", "chain", chain, "gasPrices", gasPrices)
+			continue
+		}
+
+		values := make([]model.BigInt, 0, len(gasPrices))
+		for _, gasPrice := range gasPrices {
+			values = append(values, gasPrice)
+		}
+		consensusGasPrices = append(
+			consensusGasPrices,
+			model.NewGasPriceChain(slicelib.BigIntSortedMiddle(values).Int, chain),
+		)
+	}
+
+	sort.Slice(consensusGasPrices, func(i, j int) bool { return consensusGasPrices[i].ChainSel < consensusGasPrices[j].ChainSel })
+	return consensusGasPrices, nil
+}
+
 // validateObservedSequenceNumbers checks if the sequence numbers of the provided messages are unique for each chain and
 // that they match the observed max sequence numbers.
 func validateObservedSequenceNumbers(msgs []model.CCIPMsgBaseDetails, maxSeqNums []model.SeqNumChain) error {
@@ -431,7 +548,7 @@ func validateObservedTokenPrices(tokenPrices []model.TokenPrice) error {
 	return nil
 }
 
-func validateObservedGasPrices(gasPrices []model.GasPriceChain, tokenPrices []model.TokenPrice) error {
+func validateObservedGasPrices(gasPrices []model.GasPriceChain) error {
 	// Duplicate gas prices must not appear for the same chain and must not be empty.
 	gasPriceChains := mapset.NewSet[model.ChainSelector]()
 	for _, g := range gasPrices {
@@ -439,8 +556,8 @@ func validateObservedGasPrices(gasPrices []model.GasPriceChain, tokenPrices []mo
 			return fmt.Errorf("duplicate gas price for chain %d", g.ChainSel)
 		}
 		gasPriceChains.Add(g.ChainSel)
-		if g.GasPrice == nil {
-			return fmt.Errorf("gas price must not be nil")
+		if g.GasPrice.IsEmpty() {
+			return fmt.Errorf("gas price must not be empty")
 		}
 	}
 

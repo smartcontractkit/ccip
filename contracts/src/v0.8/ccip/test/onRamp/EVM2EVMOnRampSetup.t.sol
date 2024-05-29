@@ -7,6 +7,7 @@ import {PriceRegistry} from "../../PriceRegistry.sol";
 import {Router} from "../../Router.sol";
 import {Client} from "../../libraries/Client.sol";
 import {Internal} from "../../libraries/Internal.sol";
+import {Pool} from "../../libraries/Pool.sol";
 import {EVM2EVMOnRamp} from "../../onRamp/EVM2EVMOnRamp.sol";
 import {LockReleaseTokenPool} from "../../pools/LockReleaseTokenPool.sol";
 import {TokenPool} from "../../pools/TokenPool.sol";
@@ -17,9 +18,6 @@ import {PriceRegistrySetup} from "../priceRegistry/PriceRegistry.t.sol";
 import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 
 contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
-  // Duplicate event of the CCIPSendRequested in the IOnRamp
-  event CCIPSendRequested(Internal.EVM2EVMMessage message);
-
   address internal constant CUSTOM_TOKEN = address(12345);
   uint224 internal constant CUSTOM_TOKEN_PRICE = 1e17; // $0.1 CUSTOM
 
@@ -70,7 +68,7 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
         maxFeeUSDCents: 1000_00, // 1,000 USD
         deciBps: 2_5, // 2.5 bps, or 0.025%
         destGasOverhead: 40_000,
-        destBytesOverhead: 0,
+        destBytesOverhead: uint32(Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES),
         aggregateRateLimitEnabled: true
       })
     );
