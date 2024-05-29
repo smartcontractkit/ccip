@@ -107,7 +107,7 @@ jobs:
           echo "NETHERMIND_TAG=$nethermind_tag" >> $GITHUB_ENV
           echo "Nethermind latest tag: $nethermind_tag"
 
-          besu_tag=$(get_latest_version_tag hyperledger/besu '^[0-9]+\.[0-9]+$')
+          besu_tag=$(get_latest_version_tag hyperledger/besu '^[0-9]+\.[0-9]+(\.[0-9]+)?$')
           echo "BESU_TAG=$besu_tag" >> $GITHUB_ENV
           echo "Besu latest tag: $besu_tag"
 
@@ -126,7 +126,6 @@ jobs:
       contents: read
     needs: [build-chainlink, get-latest-available-images]
     env:
-      SELECTED_NETWORKS: SIMULATED_1,SIMULATED_2
       CHAINLINK_COMMIT_SHA: ${{ github.sha }}
       CHAINLINK_ENV_USER: ${{ github.actor }}
       TEST_LOG_LEVEL: debug
@@ -140,24 +139,27 @@ jobs:
             client: geth
             pyroscope_env: ci-ccip-bidirectional-lane-geth
             chainConfig: "1337=ethereum/client-go:${{ needs.get-latest-available-images.outputs.geth_tag }},2337=ethereum/client-go:${{ needs.get-latest-available-images.outputs.geth_tag }}"
+            networks: "SIMULATED_1,SIMULATED_2"
           # TODO: uncomment when nethermind flake reason is addressed
           # - name: bidirectional-lane-nethermind
           #   test: TestSmokeCCIPForBidirectionalLane
           #   client: nethermind
           #   pyroscope_env: ci-ccip-bidirectional-lane-nethermind
           #   chainConfig: "1337=nethermind/nethermind:${{ needs.get-latest-available-images.outputs.nethermind_tag }},2337=nethermind/nethermind:${{ needs.get-latest-available-images.outputs.nethermind_tag }}"
-          # TODO: uncomment when 24.4.0  is released with our data/input fix
-          # - name: bidirectional-lane-besu
-          #   test: TestSmokeCCIPForBidirectionalLane
-          #   client: besu
-          #   pyroscope_env: ci-ccip-bidirectional-lane-besu
-          #   chainConfig: "1337=hyperledger/besu:${{ needs.get-latest-available-images.outputs.besu_tag }},2337=hyperledger/besu:${{ needs.get-latest-available-images.outputs.besu_tag }}"
+          #   networks: "SIMULATED_1,SIMULATED_2"
+          - name: bidirectional-lane-besu
+            test: TestSmokeCCIPForBidirectionalLane
+            client: besu
+            pyroscope_env: ci-ccip-bidirectional-lane-besu
+            chainConfig: "1337=hyperledger/besu:${{ needs.get-latest-available-images.outputs.besu_tag }},2337=hyperledger/besu:${{ needs.get-latest-available-images.outputs.besu_tag }}"
+            networks: "SIMULATED_BESU_NONDEV_1,SIMULATED_BESU_NONDEV_2"
           # TODO: Waiting for CCIP-2255 to be resolved
           # - name: bidirectional-lane-erigon
           #   test: TestSmokeCCIPForBidirectionalLane
           #   client: erigon
           #   pyroscope_env: ci-ccip-bidirectional-lane-erigon
           #   chainConfig: "1337=thorax/erigon:${{ needs.get-latest-available-images.outputs.erigon_tag }},2337=thorax/erigon:${{ needs.get-latest-available-images.outputs.erigon_tag }}"
+          #   networks: "SIMULATED_1,SIMULATED_2"
     runs-on: ubuntu-latest
     name: CCIP Latest EVM Node Compatibility Test with ${{ matrix.client }}
     steps:
@@ -190,7 +192,7 @@ jobs:
         with:
           runId: ${{ github.run_id }}
           testLogCollect: ${{ vars.TEST_LOG_COLLECT }}
-          selectedNetworks: ${{ env.SELECTED_NETWORKS }}
+          selectedNetworks: ${{ matrix.networks }}
           chainlinkImage: ${{ env.CHAINLINK_IMAGE }}
           chainlinkVersion: ${{ github.sha }}
           pyroscopeServer: ${{ matrix.pyroscope_env == '' && '' || !startsWith(github.ref, 'refs/tags/') && '' || secrets.QA_PYROSCOPE_INSTANCE }} # Avoid sending blank envs https://github.com/orgs/community/discussions/25725
@@ -207,7 +209,7 @@ jobs:
         with:
           runId: ${{ github.run_id }}
           testLogCollect: ${{ vars.TEST_LOG_COLLECT }}
-          selectedNetworks: SIMULATED_1,SIMULATED_2
+          selectedNetworks: ${{ matrix.networks }}
           chainlinkImage: ${{ env.CHAINLINK_IMAGE }}
           chainlinkVersion: ${{ github.sha }}
           lokiEndpoint: ${{ secrets.LOKI_URL_CI }}

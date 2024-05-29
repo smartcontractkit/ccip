@@ -31,12 +31,12 @@ require (
 	github.com/smartcontractkit/chain-selectors v1.0.16
 	github.com/smartcontractkit/chainlink-automation v1.0.3
 	github.com/smartcontractkit/chainlink-common v0.1.7-0.20240429120925-907b29311feb
-	github.com/smartcontractkit/chainlink-testing-framework v1.28.13
+	github.com/smartcontractkit/chainlink-testing-framework v1.29.1
 	github.com/smartcontractkit/chainlink-vrf v0.0.0-20231120191722-fef03814f868
 	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-00010101000000-000000000000
 	github.com/smartcontractkit/chainlink/v2 v2.0.0-00010101000000-000000000000
 	github.com/smartcontractkit/libocr v0.0.0-20240419185742-fd3cab206b2c
-	github.com/smartcontractkit/seth v0.1.6-0.20240429143720-cacb8160ecec
+	github.com/smartcontractkit/seth v1.0.11
 	github.com/smartcontractkit/wasp v0.4.5
 	github.com/spf13/cobra v1.8.0
 	github.com/stretchr/testify v1.9.0
