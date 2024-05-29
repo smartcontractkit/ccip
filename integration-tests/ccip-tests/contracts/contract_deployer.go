@@ -1242,10 +1242,10 @@ func (e *CCIPContractsDeployer) TypeAndVersion(addr common.Address) (string, err
 }
 
 // OCR2ParamsForCommit and OCR2ParamsForExec -
-// These values are used for fast blocktime chains like Avalanche, If you are running test
-// for slow blocktime chains like Ethereum, you should adjust these values accordingly through test config.
-// Refer to CommitOCRParams and ExecOCRParams in CCIPTestConfig located in testconfig/ccip.go for more details.
+// These functions return the default OCR2 parameters for Commit and Exec respectively.
+// Refer to CommitOCRParams and ExecOCRParams in CCIPTestConfig located in testconfig/ccip.go to override these values with custom param values.
 func OCR2ParamsForCommit(blockTime time.Duration) contracts.OffChainAggregatorV2Config {
+	// slow blocktime chains like Ethereum
 	if blockTime >= 10*time.Second {
 		return contracts.OffChainAggregatorV2Config{
 			DeltaProgress:                           config.MustNewDuration(2 * time.Minute),
@@ -1260,6 +1260,7 @@ func OCR2ParamsForCommit(blockTime time.Duration) contracts.OffChainAggregatorV2
 			MaxDurationShouldTransmitAcceptedReport: config.MustNewDuration(10 * time.Second),
 		}
 	}
+	// fast blocktime chains like Avalanche
 	return contracts.OffChainAggregatorV2Config{
 		DeltaProgress:                           config.MustNewDuration(2 * time.Minute),
 		DeltaResend:                             config.MustNewDuration(5 * time.Second),
@@ -1275,6 +1276,7 @@ func OCR2ParamsForCommit(blockTime time.Duration) contracts.OffChainAggregatorV2
 }
 
 func OCR2ParamsForExec(blockTime time.Duration) contracts.OffChainAggregatorV2Config {
+	// slow blocktime chains like Ethereum
 	if blockTime >= 10*time.Second {
 		return contracts.OffChainAggregatorV2Config{
 			DeltaProgress:                           config.MustNewDuration(2 * time.Minute),
@@ -1289,6 +1291,7 @@ func OCR2ParamsForExec(blockTime time.Duration) contracts.OffChainAggregatorV2Co
 			MaxDurationShouldTransmitAcceptedReport: config.MustNewDuration(10 * time.Second),
 		}
 	}
+	// fast blocktime chains like Avalanche
 	return contracts.OffChainAggregatorV2Config{
 		DeltaProgress:                           config.MustNewDuration(120 * time.Second),
 		DeltaResend:                             config.MustNewDuration(5 * time.Second),
