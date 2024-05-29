@@ -128,7 +128,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ILinkAvailable, AggregateRat
 
   /// @dev Struct to hold a pair of destination chain selector and token address so that an array of these can be passed in the
   /// applyTokenTransferFeeConfigUpdates function to remove the token transfer fee configuration for a token
-  struct DestChainAndToken {
+  struct TokenTransferFeeConfigRemoveArgs {
     uint64 destChainSelector; // ─╮ Destination chain selector
     address token; // ────────────╯ Token address
   }
@@ -242,7 +242,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ILinkAvailable, AggregateRat
     _setDynamicConfig(dynamicConfig);
     _applyDestChainConfigUpdates(destChainConfigArgs);
     _applyPremiumMultiplierWeiPerEthUpdates(premiumMultiplierWeiPerEthArgs);
-    _applyTokenTransferFeeConfigUpdates(tokenTransferFeeConfigArgs, new DestChainAndToken[](0));
+    _applyTokenTransferFeeConfigUpdates(tokenTransferFeeConfigArgs, new TokenTransferFeeConfigRemoveArgs[](0));
     _setNops(nopsAndWeights);
   }
 
@@ -787,7 +787,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ILinkAvailable, AggregateRat
   /// @dev only callable by the owner or admin.
   function applyTokenTransferFeeConfigUpdates(
     TokenTransferFeeConfigArgs[] memory tokenTransferFeeConfigArgs,
-    DestChainAndToken[] memory tokensToUseDefaultFeeConfigs
+    TokenTransferFeeConfigRemoveArgs[] memory tokensToUseDefaultFeeConfigs
   ) external {
     _onlyOwnerOrAdmin();
     _applyTokenTransferFeeConfigUpdates(tokenTransferFeeConfigArgs, tokensToUseDefaultFeeConfigs);
@@ -796,7 +796,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ILinkAvailable, AggregateRat
   /// @notice internal helper to set the token transfer fee config.
   function _applyTokenTransferFeeConfigUpdates(
     TokenTransferFeeConfigArgs[] memory tokenTransferFeeConfigArgs,
-    DestChainAndToken[] memory tokensToUseDefaultFeeConfigs
+    TokenTransferFeeConfigRemoveArgs[] memory tokensToUseDefaultFeeConfigs
   ) internal {
     for (uint256 i = 0; i < tokenTransferFeeConfigArgs.length; ++i) {
       TokenTransferFeeConfigArgs memory tokenTransferFeeConfigArg = tokenTransferFeeConfigArgs[i];
