@@ -13,21 +13,22 @@ type ExecutePluginReport struct{}
 /////////////////////////
 
 type ExecutePluginObservation struct {
-	CommitReports map[ChainSelector][]CommitReport `json:"CommitReports"`
-	Messages      map[ChainSelector][]CCIPMessage  `json:"messages"`
+	CommitReports map[ChainSelector][]ExecutePluginCommitData `json:"CommitReports"`
+	Messages      map[ChainSelector][]ExecutePluginCCIPData   `json:"messages"`
 }
 
-type CCIPMessage struct {
-	SequenceNumber SeqNum `json:"sequenceNumber"`
-	Message        []byte `json:"message"`
+type ExecutePluginCCIPData struct {
+	SequenceNumber SeqNum  `json:"sequenceNumber"`
+	Message        Bytes32 `json:"message"`
 }
-type CommitReport struct {
-	MerkleRoot          []byte      `json:"merkleRoot"`
+
+type ExecutePluginCommitData struct {
+	MerkleRoot          Bytes32     `json:"merkleRoot"`
 	SequenceNumberRange SeqNumRange `json:"sequenceNumberRange"`
 	ExecutedMessages    []SeqNum    `json:"executed"`
 }
 
-func NewExecutePluginObservation(commitReports map[ChainSelector][]CommitReport, messages map[ChainSelector][]CCIPMessage) ExecutePluginObservation {
+func NewExecutePluginObservation(commitReports map[ChainSelector][]ExecutePluginCommitData, messages map[ChainSelector][]ExecutePluginCCIPData) ExecutePluginObservation {
 	return ExecutePluginObservation{
 		CommitReports: commitReports,
 		Messages:      messages,
@@ -49,12 +50,12 @@ func DecodeExecutePluginObservation(b []byte) (CommitPluginObservation, error) {
 /////////////////////
 
 type ExecutePluginOutcome struct {
-	NextCommits map[ChainSelector][]CommitReport `json:"nextCommits"`
+	NextCommits map[ChainSelector][]ExecutePluginCommitData `json:"nextCommits"`
 	Messages    map[ChainSelector]map[SeqNum][]byte
 }
 
 func NewExecutePluginOutcome(
-	nextCommits map[ChainSelector][]CommitReport,
+	nextCommits map[ChainSelector][]ExecutePluginCommitData,
 	messages map[ChainSelector]map[SeqNum][]byte,
 ) ExecutePluginOutcome {
 	return ExecutePluginOutcome{

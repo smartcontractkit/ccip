@@ -15,22 +15,29 @@ var (
 )
 
 type CCIP interface {
-	// ReportsFromBlockNum ReportsAfterBlockNum reads the requested chain starting at a given
-	// block number and finds all ReportAccepted up to the provided limit.
-	ReportsFromBlockNum(ctx context.Context, chain model.ChainSelector, blockNum uint64, limit int) (map[model.ChainSelector][]model.CommitReport, error)
+	// CommitReportsGTETimestamp reads the requested chain starting at a given timestamp
+	// and finds all ReportAccepted up to the provided limit.
+	// TODO: the timestamp version of this is convenient for the initial report fetch.
+	//       from that point on we could use the block number. In either case, we need to
+	//       return the timestamp or block number of the final report.
+	CommitReportsGTETimestamp(ctx context.Context, dest model.ChainSelector, ts time.Time, limit int) ([]model.CommitPluginReport, error)
 
 	// MsgsAfterTimestamp reads the provided chains.
 	// Finds and returns ccip messages submitted after the target time.
 	// Messages are sorted ascending based on their timestamp and limited up to the provided limit.
+	// TODO: unused.
 	MsgsAfterTimestamp(ctx context.Context, chains []model.ChainSelector, ts time.Time, limit int) ([]model.CCIPMsg, error)
 
 	// MsgsBetweenSeqNums reads the provided chains.
 	// Finds and returns ccip messages submitted between the provided sequence numbers.
 	// Messages are sorted ascending based on their timestamp and limited up to the provided limit.
+	// TODO: a slice of chain selectors and a single seqNumRange doesn't make sense. Either have one
+	//       chain to read or a slice of sequence number ranges.
 	MsgsBetweenSeqNums(ctx context.Context, chains []model.ChainSelector, seqNumRange model.SeqNumRange) ([]model.CCIPMsg, error)
 
 	// NextSeqNum reads the destination chain.
 	// Returns the next expected sequence number for each one of the provided chains.
+	// TODO: if destination was a parameter, this could be a capability reused across plugin instances.
 	NextSeqNum(ctx context.Context, chains []model.ChainSelector) (seqNum []model.SeqNum, err error)
 
 	// GasPrices reads the provided chains gas prices.
@@ -47,8 +54,8 @@ type CCIPChainReader struct {
 	destChain    model.ChainSelector
 }
 
-func (r *CCIPChainReader) ReportsFromBlockNum(ctx context.Context, chain model.ChainSelector, blockNum uint64, limit int) (map[model.ChainSelector][]model.CommitReport, error) {
-	if err := r.validateReaderExistence(chain); err != nil {
+func (r *CCIPChainReader) CommitReportsGTETimestamp(ctx context.Context, dest model.ChainSelector, ts time.Time, limit int) ([]model.CommitPluginReport, error) {
+	if err := r.validateReaderExistence(dest); err != nil {
 		return nil, err
 	}
 	panic("implement me")
