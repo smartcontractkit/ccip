@@ -43,7 +43,7 @@ func NewPluginFactory() *PluginFactory {
 }
 
 func (p PluginFactory) NewReportingPlugin(config ocr3types.ReportingPluginConfig) (ocr3types.ReportingPlugin[[]byte], ocr3types.ReportingPluginInfo, error) {
-	return NewPlugin(), ocr3types.ReportingPluginInfo{}, nil
+	return NewPlugin(StaticConfig{}), ocr3types.ReportingPluginInfo{}, nil
 }
 
 func (p PluginFactory) Name() string {

@@ -74,5 +74,5 @@ func DecodeExecutePluginOutcome(b []byte) (ExecutePluginOutcome, error) {
 }
 
 func (o ExecutePluginOutcome) String() string {
-	return fmt.Sprintf("{MaxSeqNums: %v, MerkleRoots: %v}", o.MaxSeqNums, o.MerkleRoots)
+	return fmt.Sprintf("NextCommits: %v, Messages: %v", o.NextCommits, o.Messages)
 }
