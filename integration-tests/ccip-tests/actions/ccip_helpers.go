@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"dario.cat/mergo"
 	"github.com/AlekSi/pointer"
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum"
@@ -1055,6 +1056,10 @@ func (ccipModule *CCIPCommon) DeployContracts(noOfTokens int,
 	log.Info().Msg("finished deploying common contracts")
 	// approve router to spend fee token
 	return ccipModule.ApproveTokens()
+}
+
+func (ccipModule *CCIPCommon) BlockTime(ctx context.Context) (time.Duration, error) {
+	return ccipModule.ChainClient.AvgBlockTime(ctx)
 }
 
 // DynamicPriceGetterConfig specifies the configuration for the price getter in price pipeline.
@@ -3594,7 +3599,7 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 
 	jobParams.P2PV2Bootstrappers = []string{p2pBootstrappersCommit.P2PV2Bootstrapper()}
 
-	err = SetOCR2Config(commitNodes, execNodes, *lane.Dest)
+	err = SetOCR2Config(lane.Context, *testConf, commitNodes, execNodes, *lane.Dest)
 	if err != nil {
 		return fmt.Errorf("failed to set ocr2 config: %w", err)
 	}
@@ -3626,13 +3631,34 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 
 // SetOCR2Config sets the oracle config in ocr2 contracts. If execNodes is nil, commit and execution jobs are set up in same DON
 func SetOCR2Config(
+	ctx context.Context,
+	testConf testconfig.CCIPTestConfig,
 	commitNodes,
 	execNodes []*client.CLNodesWithKeys,
 	destCCIP DestCCIPModule,
 ) error {
 	inflightExpiryExec := commonconfig.MustNewDuration(InflightExpiryExec)
 	inflightExpiryCommit := commonconfig.MustNewDuration(InflightExpiryCommit)
-
+	blockTime, err := destCCIP.Common.BlockTime(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get avg block time: %w", err)
+	}
+	OCR2ParamsForCommit := contracts.OCR2ParamsForCommit(blockTime)
+	OCR2ParamsForExec := contracts.OCR2ParamsForExec(blockTime)
+	// if test config has custom ocr2 params, merge them with default params to replace default with custom ocr2 params provided in config
+	// for commit and exec
+	if testConf.CommitOCRParams != nil {
+		err := mergo.Merge(&OCR2ParamsForCommit, testConf.CommitOCRParams, mergo.WithOverride)
+		if err != nil {
+			return err
+		}
+	}
+	if testConf.ExecOCRParams != nil {
+		err := mergo.Merge(&OCR2ParamsForExec, testConf.ExecOCRParams, mergo.WithOverride)
+		if err != nil {
+			return err
+		}
+	}
 	signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig, err := contracts.NewOffChainAggregatorV2ConfigForCCIPPlugin(
 		commitNodes, testhelpers.NewCommitOffchainConfig(
 			*commonconfig.MustNewDuration(5 * time.Second),
@@ -3643,7 +3669,7 @@ func SetOCR2Config(
 			*inflightExpiryCommit,
 		), testhelpers.NewCommitOnchainConfig(
 			destCCIP.Common.PriceRegistry.EthAddress,
-		), contracts.OCR2ParamsForCommit, 3*time.Minute)
+		), OCR2ParamsForCommit, 3*time.Minute)
 	if err != nil {
 		return fmt.Errorf("failed to create ocr2 config params for commit: %w", err)
 	}
@@ -3673,7 +3699,7 @@ func SetOCR2Config(
 				DefaultMaxNoOfTokensInMsg,
 				MaxDataBytes,
 				200_000,
-			), contracts.OCR2ParamsForExec, 3*time.Minute)
+			), OCR2ParamsForExec, 3*time.Minute)
 		if err != nil {
 			return fmt.Errorf("failed to create ocr2 config params for exec: %w", err)
 		}
