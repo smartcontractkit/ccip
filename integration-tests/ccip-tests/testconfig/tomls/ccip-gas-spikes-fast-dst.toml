@@ -66,6 +66,7 @@ FeeCapDefault = '200 gwei'
 
 [CCIP.Groups.load.LoadProfile]
 TestDuration = '5m'
+PhaseTimeout = '10m'
 FailOnFirstErrorInLoad = true
 
 [CCIP.Groups.load.ChaosGasProfile]
