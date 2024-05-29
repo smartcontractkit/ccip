@@ -3,6 +3,7 @@ package evm
 import (
 	"context"
 	"fmt"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 	"reflect"
 	"strings"
 	"time"
@@ -37,6 +38,10 @@ type chainReader struct {
 	commonservices.StateMachine
 }
 
+func (cr *chainReader) QueryKey(ctx context.Context, contractName string, filter query.KeyFilter, limitAndSort query.LimitAndSort, sequenceDataType any) ([]commontypes.Sequence, error) {
+	return nil, fmt.Errorf("QueryKey for chainReader not yet implemented.")
+}
+
 // NewChainReaderService is a constructor for ChainReader, returns nil if there is any error
 // Note that the ChainReaderService returned does not support anonymous events.
 func NewChainReaderService(ctx context.Context, lggr logger.Logger, lp logpoller.LogPoller, client evmclient.Client, config types.ChainReaderConfig) (ChainReaderService, error) {
@@ -68,6 +73,7 @@ func NewChainReaderService(ctx context.Context, lggr logger.Logger, lp logpoller
 func (cr *chainReader) Name() string { return cr.lggr.Name() }
 
 var _ commontypes.ContractTypeProvider = &chainReader{}
+var _ ChainReaderService = &chainReader{}
 
 func (cr *chainReader) GetLatestValue(ctx context.Context, contractName, method string, params any, returnVal any) error {
 	b, err := cr.contractBindings.GetReadBinding(contractName, method)

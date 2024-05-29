@@ -257,7 +257,6 @@ func (r *Relayer) NewMercuryProvider(rargs commontypes.RelayArgs, pargs commonty
 
 func (r *Relayer) NewCCIPCommitProvider(rargs commontypes.RelayArgs, pargs commontypes.PluginArgs) (commontypes.CCIPCommitProvider, error) {
 	// TODO https://smartcontract-it.atlassian.net/browse/BCF-2887
-	ctx := context.Background()
 
 	var commitPluginConfig ccipconfig.CommitPluginConfigV2
 	err := json.Unmarshal(pargs.PluginConfig, &commitPluginConfig)
@@ -645,6 +644,14 @@ func (r *Relayer) NewAutomationProvider(rargs commontypes.RelayArgs, pargs commo
 	ocr2keeperRelayer := NewOCR2KeeperRelayer(r.ds, r.chain, lggr.Named("OCR2KeeperRelayer"), r.ks.Eth())
 
 	return ocr2keeperRelayer.NewOCR2KeeperProvider(rargs, pargs)
+}
+
+func (r *Relayer) NewContractReader(_ []byte) (commontypes.ContractReader, error) {
+	return nil, errors.New("contract reader is not supported for starknet")
+}
+
+func (r *Relayer) NewOCR3CapabilityProvider(rargs commontypes.RelayArgs, pargs commontypes.PluginArgs) (commontypes.OCR3CapabilityProvider, error) {
+	panic("implement me")
 }
 
 var _ commontypes.MedianProvider = (*medianProvider)(nil)

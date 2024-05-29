@@ -49,6 +49,10 @@ type PriceRegistry struct {
 	tokenDecimalsCache sync.Map
 }
 
+func (p *PriceRegistry) GetAllGasPriceUpdatesCreatedAfter(ctx context.Context, ts time.Time, confirmations int) ([]cciptypes.GasPriceUpdateWithTxMeta, error) {
+	panic("implement me")
+}
+
 func NewPriceRegistry(lggr logger.Logger, priceRegistryAddr common.Address, lp logpoller.LogPoller, ec client.Client, registerFilters bool) (*PriceRegistry, error) {
 	priceRegistry, err := price_registry_1_0_0.NewPriceRegistry(priceRegistryAddr, ec)
 	if err != nil {

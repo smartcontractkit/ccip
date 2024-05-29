@@ -4,8 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
-	evmrelay "github.com/smartcontractkit/chainlink/v2/core/services/relay/evm"
 	"sort"
 	"sync"
 
@@ -116,8 +114,6 @@ func InitEVM(ctx context.Context, factory RelayerFactory, config EVMFactoryConfi
 			legacyMap[id.ChainID] = a.Chain()
 		}
 		op.legacyChains.EVMChains = legacyevm.NewLegacyChains(legacyMap, config.AppConfig.EVMConfigs())
-
-		relayerSet := evmrelay.NewCCIPRelayerSet()
 		return nil
 	}
 }
@@ -336,7 +332,7 @@ func FilterRelayersByType(network string) func(id types.RelayID) bool {
 // A typical usage pattern to use [List] with [FilterByType] to obtain a set of [RelayerChainInteroperators]
 // for a given chain
 func (rs *CoreRelayerChainInteroperators) List(filter FilterFn) RelayerChainInteroperators {
-	matches := make(map[relay.ID]loop.Relayer)
+	matches := make(map[types.RelayID]loop.Relayer)
 	rs.mu.Lock()
 	for id, relayer := range rs.loopRelayers {
 		if filter(id) {
@@ -349,11 +345,7 @@ func (rs *CoreRelayerChainInteroperators) List(filter FilterFn) RelayerChainInte
 	}
 }
 
-func (rs *CoreRelayerChainInteroperators) GetAll() map[relay.ID]loop.Relayer {
-	return rs.loopRelayers
-}
-
-func (rs *CoreRelayerChainInteroperators) GetRelayerSet() core.RelayerSet {
+func (rs *CoreRelayerChainInteroperators) GetAll() map[types.RelayID]loop.Relayer {
 	return rs.loopRelayers
 }
 

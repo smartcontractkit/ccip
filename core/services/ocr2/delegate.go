@@ -113,7 +113,6 @@ func (e ErrRelayNotEnabled) Error() string {
 type RelayGetter interface {
 	Get(id types.RelayID) (loop.Relayer, error)
 	GetAll() map[types.RelayID]loop.Relayer
-	GetRelayerSet() core.RelayerSet
 	GetIDToRelayerMap() (map[types.RelayID]loop.Relayer, error)
 }
 type Delegate struct {
@@ -1840,7 +1839,7 @@ func (d *Delegate) newServicesCCIPCommit(ctx context.Context, lggr logger.Sugare
 		return nil, errors.New("could not coerce PluginProvider to CCIPCommitProvider")
 	}
 
-	return ccipcommit.NewCommitServices2(ctx, ccipCommitProvider, srcProvider, dstProvider, srcChain, dstChain, d.legacyChains, jb, lggr, d.pipelineRunner, oracleArgsNoPlugin, d.isNewlyCreatedJob, sourceChainID, int64(destChainID), logError)
+	return ccipcommit.NewCommitServices2(ctx, srcProvider, dstProvider, srcChain, dstChain, d.legacyChains, jb, lggr, d.pipelineRunner, oracleArgsNoPlugin, d.isNewlyCreatedJob, sourceChainID, int64(destChainID), logError)
 }
 
 func ccipProviderTypeToPluginConfig(isSourceProvider bool) ([]byte, error) {
