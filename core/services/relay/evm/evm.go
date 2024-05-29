@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/ccipcommit"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"strings"
 	"sync"
@@ -173,7 +175,7 @@ func (r *Relayer) NewPluginProvider(rargs commontypes.RelayArgs, pargs commontyp
 		return nil, err
 	}
 
-	transmitter, err := newOnChainContractTransmitter(ctx, r.lggr, rargs, pargs.TransmitterID, r.ks.Eth(), configWatcher, configTransmitterOpts{}, OCR2AggregatorTransmissionContractABI, nil, 0)
+	transmitter, err := newOnChainContractTransmitter(ctx, r.lggr, rargs, r.ks.Eth(), configWatcher, configTransmitterOpts{}, OCR2AggregatorTransmissionContractABI, nil, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -257,17 +259,59 @@ func (r *Relayer) NewMercuryProvider(rargs commontypes.RelayArgs, pargs commonty
 
 func (r *Relayer) NewCCIPCommitProvider(rargs commontypes.RelayArgs, pargs commontypes.PluginArgs) (commontypes.CCIPCommitProvider, error) {
 	// TODO https://smartcontract-it.atlassian.net/browse/BCF-2887
+	ctx := context.Background()
 
-	var commitPluginConfig ccipconfig.CommitPluginConfigV2
+	versionFinder := ccip.NewEvmVersionFinder()
+
+	var commitPluginConfig ccipconfig.CommitPluginConfig
 	err := json.Unmarshal(pargs.PluginConfig, &commitPluginConfig)
+	if err != nil {
+		return nil, err
+	}
+	sourceStartBlock := commitPluginConfig.SourceStartBlock
+	destStartBlock := commitPluginConfig.DestStartBlock
+
+	relayOpts := types.NewRelayOpts(rargs)
+	configWatcher, err := newStandardConfigProvider(ctx, r.lggr, r.chain, relayOpts)
+	if err != nil {
+		return nil, err
+	}
+	address := common.HexToAddress(relayOpts.ContractID)
+	typ, ver, err := ccipconfig.TypeAndVersion(address, r.chain.Client())
+	if err != nil {
+		return nil, err
+	}
+	fn, err := ccipcommit.CommitReportToEthTxMeta(typ, ver)
+	if err != nil {
+		return nil, err
+	}
+	subjectID := chainToUUID(configWatcher.chain.ID())
+	contractTransmitter, err := newOnChainContractTransmitter(ctx, r.lggr, rargs, r.ks.Eth(), configWatcher, configTransmitterOpts{
+		subjectID: &subjectID,
+	}, OCR2AggregatorTransmissionContractABI, fn, 0)
 	if err != nil {
 		return nil, err
 	}
 
 	if commitPluginConfig.IsSourceProvider {
-		return NewSrcCommitProvider(), nil
+		return NewSrcCommitProvider(
+			r.lggr,
+			sourceStartBlock,
+			r.chain.Client(),
+			r.chain.LogPoller(),
+			*contractTransmitter,
+			configWatcher,
+		), nil
 	} else {
-		return NewDstCommitProvider(), nil
+		return NewDstCommitProvider(
+			r.lggr,
+			versionFinder,
+			destStartBlock,
+			r.chain.Client(),
+			r.chain.LogPoller(),
+			r.chain.GasEstimator(),
+			*r.chain.Config().EVM().GasEstimator().PriceMax().ToInt(),
+		), nil
 	}
 
 }
@@ -491,7 +535,7 @@ type configTransmitterOpts struct {
 }
 
 // newOnChainContractTransmitter creates a new contract transmitter.
-func newOnChainContractTransmitter(ctx context.Context, lggr logger.Logger, rargs commontypes.RelayArgs, transmitterID string, ethKeystore keystore.Eth, configWatcher *configWatcher, opts configTransmitterOpts, transmissionContractABI abi.ABI, reportToEvmTxMeta ReportToEthMetadata, transmissionContractRetention time.Duration) (*contractTransmitter, error) {
+func newOnChainContractTransmitter(ctx context.Context, lggr logger.Logger, rargs commontypes.RelayArgs, ethKeystore keystore.Eth, configWatcher *configWatcher, opts configTransmitterOpts, transmissionContractABI abi.ABI, reportToEvmTxMeta ReportToEthMetadata, transmissionContractRetention time.Duration) (*contractTransmitter, error) {
 	var relayConfig types.RelayConfig
 	if err := json.Unmarshal(rargs.RelayConfig, &relayConfig); err != nil {
 		return nil, err
@@ -593,7 +637,7 @@ func (r *Relayer) NewMedianProvider(rargs commontypes.RelayArgs, pargs commontyp
 
 	reportCodec := evmreportcodec.ReportCodec{}
 
-	contractTransmitter, err := newOnChainContractTransmitter(ctx, lggr, rargs, pargs.TransmitterID, r.ks.Eth(), configWatcher, configTransmitterOpts{}, OCR2AggregatorTransmissionContractABI, nil, 0)
+	contractTransmitter, err := newOnChainContractTransmitter(ctx, lggr, rargs, r.ks.Eth(), configWatcher, configTransmitterOpts{}, OCR2AggregatorTransmissionContractABI, nil, 0)
 	if err != nil {
 		return nil, err
 	}

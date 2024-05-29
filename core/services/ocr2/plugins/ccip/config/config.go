@@ -3,7 +3,6 @@ package config
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"math/big"
 	"strings"
 
@@ -28,15 +27,9 @@ type CommitPluginJobSpecConfig struct {
 	PriceGetterConfig *DynamicPriceGetterConfig `json:"priceGetterConfig,omitempty"`
 }
 
-// implemented for CrossRelayerPluginProvider
-// TODO: remove
 type CommitPluginConfig struct {
-	SourceRelayerID types.RelayID
-	DestRelayerID   types.RelayID
-}
-
-type CommitPluginConfigV2 struct {
-	IsSourceProvider bool
+	IsSourceProvider                 bool
+	SourceStartBlock, DestStartBlock uint64
 }
 
 // DynamicPriceGetterConfig specifies which configuration to use for getting the price of tokens (map keys).

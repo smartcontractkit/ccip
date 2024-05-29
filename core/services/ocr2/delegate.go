@@ -85,6 +85,8 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/synchronization"
 	"github.com/smartcontractkit/chainlink/v2/core/services/telemetry"
 	"github.com/smartcontractkit/chainlink/v2/plugins"
+
+	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 )
 
 type ErrJobSpecNoRelayer struct {
@@ -1728,41 +1730,6 @@ func (d *Delegate) newServicesCCIPCommit(ctx context.Context, lggr logger.Sugare
 		return nil, fmt.Errorf("ccip services; failed to get chain %s: %w", srcRid.ChainID, err)
 	}
 
-	ccipProvider, err2 := evmrelay.NewCCIPCommitProvider(
-		ctx,
-		lggr.Named("CCIPCommit"),
-		srcChain,
-		types.RelayArgs{
-			ExternalJobID: jb.ExternalJobID,
-			JobID:         spec.ID,
-			ContractID:    spec.ContractID,
-			RelayConfig:   spec.RelayConfig.Bytes(),
-			New:           d.isNewlyCreatedJob,
-		},
-		transmitterID,
-		d.ethKs,
-	)
-	if err2 != nil {
-		return nil, err2
-	}
-	oracleArgsNoPlugin := libocr2.OCR2OracleArgs{
-		BinaryNetworkEndpointFactory: d.peerWrapper.Peer2,
-		V2Bootstrappers:              bootstrapPeers,
-		ContractTransmitter:          ccipProvider.ContractTransmitter(),
-		ContractConfigTracker:        ccipProvider.ContractConfigTracker(),
-		Database:                     ocrDB,
-		LocalConfig:                  lc,
-		MonitoringEndpoint: d.monitoringEndpointGen.GenMonitoringEndpoint(
-			srcRid.Network,
-			srcRid.ChainID,
-			spec.ContractID,
-			synchronization.OCR2CCIPCommit,
-		),
-		OffchainConfigDigester: ccipProvider.OffchainConfigDigester(),
-		OffchainKeyring:        kb,
-		OnchainKeyring:         kb,
-		MetricsRegisterer:      prometheus.WrapRegistererWith(map[string]string{"job_name": jb.Name.ValueOrZero()}, prometheus.DefaultRegisterer),
-	}
 	logError := func(msg string) {
 		lggr.ErrorIf(d.jobORM.RecordError(context.Background(), jb.ID, msg), "unable to record error")
 	}
@@ -1786,12 +1753,19 @@ func (d *Delegate) newServicesCCIPCommit(ctx context.Context, lggr logger.Sugare
 		}
 	}
 
-	srcConfigBytes, err := ccipProviderTypeToPluginConfig(true)
+	// Write PluginConfig bytes to send source/dest relayer provider + info outside of top level rargs/pargs over the wire
+	var pluginJobSpecConfig ccipconfig.CommitPluginJobSpecConfig
+	err = json.Unmarshal(spec.PluginConfig.Bytes(), &pluginJobSpecConfig)
 	if err != nil {
 		return nil, err
 	}
 
-	dstConfigBytes, err := ccipProviderTypeToPluginConfig(false)
+	srcConfigBytes, err := ccipProviderTypeToPluginConfig(true, pluginJobSpecConfig.SourceStartBlock, pluginJobSpecConfig.DestStartBlock)
+	if err != nil {
+		return nil, err
+	}
+
+	dstConfigBytes, err := ccipProviderTypeToPluginConfig(false, pluginJobSpecConfig.SourceStartBlock, pluginJobSpecConfig.DestStartBlock)
 	if err != nil {
 		return nil, err
 	}
@@ -1813,7 +1787,8 @@ func (d *Delegate) newServicesCCIPCommit(ctx context.Context, lggr logger.Sugare
 			ProviderType: string(types.CCIPCommit),
 		},
 		types.PluginArgs{
-			PluginConfig: srcConfigBytes,
+			TransmitterID: transmitterID,
+			PluginConfig:  srcConfigBytes,
 		})
 	srcProvider, ok := provider.(types.CCIPCommitProvider)
 	if !ok {
@@ -1832,19 +1807,41 @@ func (d *Delegate) newServicesCCIPCommit(ctx context.Context, lggr logger.Sugare
 			ProviderType: string(types.CCIPCommit),
 		},
 		types.PluginArgs{
-			PluginConfig: dstConfigBytes,
+			TransmitterID: transmitterID,
+			PluginConfig:  dstConfigBytes,
 		})
 	dstProvider, ok := provider.(types.CCIPCommitProvider)
 	if !ok {
 		return nil, errors.New("could not coerce PluginProvider to CCIPCommitProvider")
 	}
 
+	oracleArgsNoPlugin := libocr2.OCR2OracleArgs{
+		BinaryNetworkEndpointFactory: d.peerWrapper.Peer2,
+		V2Bootstrappers:              bootstrapPeers,
+		ContractTransmitter:          srcProvider.ContractTransmitter(),
+		ContractConfigTracker:        srcProvider.ContractConfigTracker(),
+		Database:                     ocrDB,
+		LocalConfig:                  lc,
+		MonitoringEndpoint: d.monitoringEndpointGen.GenMonitoringEndpoint(
+			srcRid.Network,
+			srcRid.ChainID,
+			spec.ContractID,
+			synchronization.OCR2CCIPCommit,
+		),
+		OffchainConfigDigester: srcProvider.OffchainConfigDigester(),
+		OffchainKeyring:        kb,
+		OnchainKeyring:         kb,
+		MetricsRegisterer:      prometheus.WrapRegistererWith(map[string]string{"job_name": jb.Name.ValueOrZero()}, prometheus.DefaultRegisterer),
+	}
+
 	return ccipcommit.NewCommitServices2(ctx, srcProvider, dstProvider, srcChain, dstChain, d.legacyChains, jb, lggr, d.pipelineRunner, oracleArgsNoPlugin, d.isNewlyCreatedJob, sourceChainID, int64(destChainID), logError)
 }
 
-func ccipProviderTypeToPluginConfig(isSourceProvider bool) ([]byte, error) {
-	commitPluginConfig := &config.CommitPluginConfigV2{
+func ccipProviderTypeToPluginConfig(isSourceProvider bool, sourceStartBlock uint64, destStartBlock uint64) ([]byte, error) {
+	commitPluginConfig := &config.CommitPluginConfig{
 		IsSourceProvider: isSourceProvider,
+		SourceStartBlock: sourceStartBlock,
+		DestStartBlock:   destStartBlock,
 	}
 
 	bytes, err := json.Marshal(commitPluginConfig)

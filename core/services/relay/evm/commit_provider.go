@@ -23,8 +23,26 @@ type SrcCommitProvider struct {
 	startBlock          uint64
 	client              client.Client
 	lp                  logpoller.LogPoller
-	sourceChainSelector uint64
-	destChainSelector   uint64
+	contractTransmitter *contractTransmitter
+	configWatcher       *configWatcher
+}
+
+func NewSrcCommitProvider(
+	lggr logger.Logger,
+	startBlock uint64,
+	client client.Client,
+	lp logpoller.LogPoller,
+	contractTransmitter contractTransmitter,
+	configWatcher *configWatcher,
+) commontypes.CCIPCommitProvider {
+	return &SrcCommitProvider{
+		lggr:                lggr,
+		startBlock:          startBlock,
+		client:              client,
+		lp:                  lp,
+		contractTransmitter: &contractTransmitter,
+		configWatcher:       configWatcher,
+	}
 }
 
 type DstCommitProvider struct {
@@ -37,8 +55,28 @@ type DstCommitProvider struct {
 	maxGasPrice   big.Int
 }
 
+func NewDstCommitProvider(
+	lggr logger.Logger,
+	versionFinder ccip.VersionFinder,
+	startBlock uint64,
+	client client.Client,
+	lp logpoller.LogPoller,
+	gasEstimator gas.EvmFeeEstimator,
+	maxGasPrice big.Int,
+) commontypes.CCIPCommitProvider {
+	return &DstCommitProvider{
+		lggr:          lggr,
+		versionFinder: versionFinder,
+		startBlock:    startBlock,
+		client:        client,
+		lp:            lp,
+		gasEstimator:  gasEstimator,
+		maxGasPrice:   maxGasPrice,
+	}
+}
+
 func (P SrcCommitProvider) Name() string {
-	return "CCIPCommitProvider.SourceRelayerProvider"
+	return "CCIPCommitProvider.SrcRelayerProvider"
 }
 
 func (P SrcCommitProvider) Close() error {
@@ -57,81 +95,60 @@ func (P SrcCommitProvider) HealthReport() map[string]error {
 }
 
 func (P SrcCommitProvider) OffchainConfigDigester() ocrtypes.OffchainConfigDigester {
-	//TODO implement me
-	panic("implement me")
+	return P.configWatcher.OffchainConfigDigester()
 }
 
 func (P SrcCommitProvider) ContractConfigTracker() ocrtypes.ContractConfigTracker {
-	//TODO implement me
-	panic("implement me")
+	return P.configWatcher.ContractConfigTracker()
 }
 
 func (P SrcCommitProvider) ContractTransmitter() ocrtypes.ContractTransmitter {
-	//TODO implement me
-	panic("implement me")
+	return P.contractTransmitter
 }
 
 func (P SrcCommitProvider) ChainReader() commontypes.ChainReader {
-	//TODO implement me
-	panic("implement me")
+	return nil
 }
 
 func (P SrcCommitProvider) Codec() commontypes.Codec {
-	//TODO implement me
-	panic("implement me")
+	return nil
 }
 
 func (P DstCommitProvider) Name() string {
-	//TODO implement me
-	panic("implement me")
+	return "CCIPCommitProvider.DstRelayerProvider"
 }
 
 func (P DstCommitProvider) Close() error {
 	//TODO implement me
-	panic("implement me")
+	return nil
 }
 
 func (P DstCommitProvider) Ready() error {
-	//TODO implement me
-	panic("implement me")
+	return nil
 }
 
 func (P DstCommitProvider) HealthReport() map[string]error {
-	//TODO implement me
-	panic("implement me")
+	return nil
 }
 
 func (P DstCommitProvider) OffchainConfigDigester() ocrtypes.OffchainConfigDigester {
-	//TODO implement me
-	panic("implement me")
+	panic("OffchainConfigDigester called on DstCommitProvider. Valid on SrcCommitProvider.")
 }
 
 func (P DstCommitProvider) ContractConfigTracker() ocrtypes.ContractConfigTracker {
-	//TODO implement me
-	panic("implement me")
+	panic("ContractConfigTracker called on DstCommitProvider. Valid on SrcCommitProvider.")
 }
 
 func (P DstCommitProvider) ContractTransmitter() ocrtypes.ContractTransmitter {
-	//TODO implement me
-	panic("implement me")
+	panic("ContractTransmitter called on DstCommitProvider. Valid on SrcCommitProvider.")
 }
 
 func (P DstCommitProvider) ChainReader() commontypes.ChainReader {
-	//TODO implement me
-	panic("implement me")
+	return nil
 }
 
 func (P DstCommitProvider) Codec() commontypes.Codec {
-	//TODO implement me
-	panic("implement me")
-}
-
-func NewSrcCommitProvider() commontypes.CCIPCommitProvider {
-	panic("implement me")
-}
-
-func NewDstCommitProvider() commontypes.CCIPCommitProvider {
-	panic("implement me")
+	return nil
 }
 
 func (P SrcCommitProvider) Start(ctx context.Context) error {
