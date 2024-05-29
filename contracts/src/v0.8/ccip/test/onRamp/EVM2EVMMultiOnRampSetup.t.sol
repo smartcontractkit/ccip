@@ -58,7 +58,7 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
     s_tokenTransferFeeConfigArgs.push();
     s_tokenTransferFeeConfigArgs[0].destChainSelector = DEST_CHAIN_SELECTOR;
     s_tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs.push(
-      EVM2EVMMultiOnRamp.TokenTransferFeeConfigWithToken({
+      EVM2EVMMultiOnRamp.TokenTransferFeeConfigSingleTokenArgs({
         token: s_sourceFeeToken,
         tokenTransferFeeConfig: EVM2EVMMultiOnRamp.TokenTransferFeeConfig({
           minFeeUSDCents: 1_00, // 1 USD
@@ -72,7 +72,7 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
       })
     );
     s_tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs.push(
-      EVM2EVMMultiOnRamp.TokenTransferFeeConfigWithToken({
+      EVM2EVMMultiOnRamp.TokenTransferFeeConfigSingleTokenArgs({
         token: s_sourceRouter.getWrappedNative(),
         tokenTransferFeeConfig: EVM2EVMMultiOnRamp.TokenTransferFeeConfig({
           minFeeUSDCents: 50, // 0.5 USD
@@ -86,7 +86,7 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
       })
     );
     s_tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs.push(
-      EVM2EVMMultiOnRamp.TokenTransferFeeConfigWithToken({
+      EVM2EVMMultiOnRamp.TokenTransferFeeConfigSingleTokenArgs({
         token: CUSTOM_TOKEN,
         tokenTransferFeeConfig: EVM2EVMMultiOnRamp.TokenTransferFeeConfig({
           minFeeUSDCents: 2_00, // 1 USD
@@ -266,7 +266,7 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
       new EVM2EVMMultiOnRamp.TokenTransferFeeConfigArgs[](destChainSelectorLength);
     for (uint256 i = 0; i < destChainSelectorLength; ++i) {
       tokenTransferFeeConfigArgs[i].tokenTransferFeeConfigs =
-        new EVM2EVMMultiOnRamp.TokenTransferFeeConfigWithToken[](tokenLength);
+        new EVM2EVMMultiOnRamp.TokenTransferFeeConfigSingleTokenArgs[](tokenLength);
     }
     return tokenTransferFeeConfigArgs;
   }
