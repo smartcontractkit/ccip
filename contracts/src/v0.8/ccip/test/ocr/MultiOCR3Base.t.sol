@@ -213,7 +213,7 @@ contract MultiOCR3Base_transmit is MultiOCR3BaseSetup {
     s_multiOCR3.transmitWithoutSignatures(reportContext, REPORT);
   }
 
-  function test_TransmitSignersWithSignatures_Fuzz_Success(
+  function test_Fuzz_TransmitSignersWithSignatures_Success(
     uint8 F,
     uint64 randomAddressOffset,
     bool uniqueReports
@@ -615,7 +615,7 @@ contract MultiOCR3Base_setOCR3Configs is MultiOCR3BaseSetup {
     _assertOCRConfigUnconfigured(s_multiOCR3.latestConfigDetails(3));
   }
 
-  function test_SetConfig_Fuzz_Success(MultiOCR3Base.OCRConfigArgs memory ocrConfig, uint64 randomAddressOffset) public {
+  function test_Fuzz_SetConfig_Success(MultiOCR3Base.OCRConfigArgs memory ocrConfig, uint64 randomAddressOffset) public {
     // condition: cannot assume max oracle count
     vm.assume(ocrConfig.transmitters.length <= 31);
 
