@@ -1058,7 +1058,7 @@ func (ccipModule *CCIPCommon) DeployContracts(noOfTokens int,
 	return ccipModule.ApproveTokens()
 }
 
-func (ccipModule *CCIPCommon) BlockTime(ctx context.Context) (time.Duration, error) {
+func (ccipModule *CCIPCommon) AvgBlockTime(ctx context.Context) (time.Duration, error) {
 	return ccipModule.ChainClient.AvgBlockTime(ctx)
 }
 
@@ -3640,7 +3640,7 @@ func SetOCR2Config(
 ) error {
 	inflightExpiryExec := commonconfig.MustNewDuration(InflightExpiryExec)
 	inflightExpiryCommit := commonconfig.MustNewDuration(InflightExpiryCommit)
-	blockTime, err := destCCIP.Common.BlockTime(ctx)
+	blockTime, err := destCCIP.Common.AvgBlockTime(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get avg block time: %w", err)
 	}
