@@ -536,6 +536,17 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, OCR2BaseN
         offchainTokenData
       );
     }
+
+    Client.Any2EVMMessage memory any2EvmMessage = Internal._toAny2EVMMessage(message, destTokenAmounts);
+
+    address messageValidator = s_dynamicConfig.messageValidator;
+    if (messageValidator != address(0)) {
+      try IMessageInterceptor(messageValidator).onIncomingMessage(any2EvmMessage) {}
+      catch (bytes memory err) {
+        revert IMessageInterceptor.MessageValidationError(err);
+      }
+    }
+
     // There are three cases in which we skip calling the receiver:
     // 1. If the message data is empty AND the gas limit is 0.
     //          This indicates a message that only transfers tokens. It is valid to only send tokens to a contract
@@ -549,16 +560,6 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, OCR2BaseN
       (message.data.length == 0 && message.gasLimit == 0) || message.receiver.code.length == 0
         || !message.receiver.supportsInterface(type(IAny2EVMMessageReceiver).interfaceId)
     ) return;
-
-    Client.Any2EVMMessage memory any2EvmMessage = Internal._toAny2EVMMessage(message, destTokenAmounts);
-
-    address messageValidator = s_dynamicConfig.messageValidator;
-    if (messageValidator != address(0)) {
-      try IMessageInterceptor(messageValidator).onIncomingMessage(any2EvmMessage) {}
-      catch (bytes memory err) {
-        revert IMessageInterceptor.MessageValidationError(err);
-      }
-    }
 
     (bool success, bytes memory returnData,) = IRouter(s_dynamicConfig.router).routeMessage(
       any2EvmMessage, Internal.GAS_FOR_CALL_EXACT_CHECK, message.gasLimit, message.receiver

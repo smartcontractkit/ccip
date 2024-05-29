@@ -1209,6 +1209,32 @@ contract EVM2EVMMultiOffRamp_executeSingleMessage is EVM2EVMMultiOffRampSetup {
     );
     s_offRamp.executeSingleMessage(message, new bytes[](message.tokenAmounts.length));
   }
+
+  function test_executeSingleMessage_WithFailingValidationNoRouterCall_Revert() public {
+    vm.stopPrank();
+    vm.startPrank(OWNER);
+    _enableMessageValidator();
+    vm.startPrank(address(s_offRamp));
+
+    Internal.EVM2EVMMessage memory message =
+      _generateAny2EVMMessageNoTokens(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1, 1);
+
+    // Setup the receiver to a non-CCIP Receiver, which will skip the Router call (but should still perform the validation)
+    MaybeRevertMessageReceiverNo165 newReceiver = new MaybeRevertMessageReceiverNo165(true);
+    message.receiver = address(newReceiver);
+    message.messageId = Internal._hash(message, s_offRamp.metadataHash(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1));
+
+    s_messageValidator.setMessageIdValidationState(message.messageId, true);
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        IMessageInterceptor.MessageValidationError.selector,
+        abi.encodeWithSelector(
+          MessageInterceptorHelper.IncomingMessageValidationError.selector, bytes("Invalid message")
+        )
+      )
+    );
+    s_offRamp.executeSingleMessage(message, new bytes[](message.tokenAmounts.length));
+  }
 }
 
 contract EVM2EVMMultiOffRamp_batchExecute is EVM2EVMMultiOffRampSetup {

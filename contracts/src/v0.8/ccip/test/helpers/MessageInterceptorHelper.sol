@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.24;
 
-import "../../interfaces/IMessageInterceptor.sol";
+import {IMessageInterceptor} from "../../interfaces/IMessageInterceptor.sol";
+import {Client} from "../../libraries/Client.sol";
 
 contract MessageInterceptorHelper is IMessageInterceptor {
   error IncomingMessageValidationError(bytes errorReason);
