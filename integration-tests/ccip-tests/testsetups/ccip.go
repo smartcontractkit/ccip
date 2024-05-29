@@ -501,7 +501,7 @@ func (o *CCIPTestSetUpOutputs) SetupDynamicTokenPriceUpdates() error {
 		}
 		if _, exists := covered[lane.DestNetworkName]; !exists {
 			covered[lane.DestNetworkName] = struct{}{}
-			err := lane.Dest.Common.UpdateTokenPricesAtRegularInterval(lane.Context, lane.Logger, interval, o.LaneConfig.ReadLaneConfig(lane.SourceNetworkName))
+			err := lane.Dest.Common.UpdateTokenPricesAtRegularInterval(lane.Context, lane.Logger, interval, o.LaneConfig.ReadLaneConfig(lane.DestNetworkName))
 			if err != nil {
 				return err
 			}
