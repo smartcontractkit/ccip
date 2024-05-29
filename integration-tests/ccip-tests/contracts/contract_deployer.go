@@ -731,7 +731,7 @@ func (e *CCIPContractsDeployer) NewPriceRegistry(addr common.Address) (
 	*PriceRegistry,
 	error,
 ) {
-	var wrapper *PriceRegistryWrappers
+	var wrapper *PriceRegistryWrapper
 	version := VersionMap[PriceRegistryContract]
 	e.logger.Info().Str("version", string(version)).Msg("New PriceRegistry")
 	switch version {
@@ -740,7 +740,7 @@ func (e *CCIPContractsDeployer) NewPriceRegistry(addr common.Address) (
 		if err != nil {
 			return nil, fmt.Errorf("error in creating price registry instance: %w", err)
 		}
-		wrapper = &PriceRegistryWrappers{
+		wrapper = &PriceRegistryWrapper{
 			Latest: ins,
 		}
 	case V1_2_0:
@@ -748,7 +748,7 @@ func (e *CCIPContractsDeployer) NewPriceRegistry(addr common.Address) (
 		if err != nil {
 			return nil, fmt.Errorf("error in creating price registry instance: %w", err)
 		}
-		wrapper = &PriceRegistryWrappers{
+		wrapper = &PriceRegistryWrapper{
 			V1_2_0: ins,
 		}
 	default:
@@ -770,7 +770,7 @@ func (e *CCIPContractsDeployer) NewPriceRegistry(addr common.Address) (
 
 func (e *CCIPContractsDeployer) DeployPriceRegistry(tokens []common.Address) (*PriceRegistry, error) {
 	var address *common.Address
-	var wrapper *PriceRegistryWrappers
+	var wrapper *PriceRegistryWrapper
 	var err error
 	var instance interface{}
 	version := VersionMap[PriceRegistryContract]
@@ -786,7 +786,7 @@ func (e *CCIPContractsDeployer) DeployPriceRegistry(tokens []common.Address) (*P
 		if err != nil {
 			return nil, err
 		}
-		wrapper = &PriceRegistryWrappers{
+		wrapper = &PriceRegistryWrapper{
 			Latest: instance.(*price_registry.PriceRegistry),
 		}
 	case V1_2_0:
@@ -799,7 +799,7 @@ func (e *CCIPContractsDeployer) DeployPriceRegistry(tokens []common.Address) (*P
 		if err != nil {
 			return nil, err
 		}
-		wrapper = &PriceRegistryWrappers{
+		wrapper = &PriceRegistryWrapper{
 			V1_2_0: instance.(*price_registry_1_2_0.PriceRegistry),
 		}
 	default:
@@ -1241,11 +1241,16 @@ func (e *CCIPContractsDeployer) TypeAndVersion(addr common.Address) (string, err
 	return v.String(), nil
 }
 
+// OCR2ParamsForCommit and OCR2ParamsForExec -
+// These values are used for fast blocktime chains like Avalanche, If you are running test
+// for slow blocktime chains like Ethereum, you should adjust these values accordingly through test config.
+// Refer to CommitOCRParams and ExecOCRParams in CCIPTestConfig located in testconfig/ccip.go for more details.
 var OCR2ParamsForCommit = contracts.OffChainAggregatorV2Config{
 	DeltaProgress:                           config.MustNewDuration(2 * time.Minute),
 	DeltaResend:                             config.MustNewDuration(5 * time.Second),
-	DeltaRound:                              config.MustNewDuration(75 * time.Second),
+	DeltaRound:                              config.MustNewDuration(60 * time.Second),
 	DeltaGrace:                              config.MustNewDuration(5 * time.Second),
+	DeltaStage:                              config.MustNewDuration(25 * time.Second),
 	MaxDurationQuery:                        config.MustNewDuration(100 * time.Millisecond),
 	MaxDurationObservation:                  config.MustNewDuration(35 * time.Second),
 	MaxDurationReport:                       config.MustNewDuration(10 * time.Second),
@@ -1254,15 +1259,16 @@ var OCR2ParamsForCommit = contracts.OffChainAggregatorV2Config{
 }
 
 var OCR2ParamsForExec = contracts.OffChainAggregatorV2Config{
-	DeltaProgress:                           config.MustNewDuration(100 * time.Second),
+	DeltaProgress:                           config.MustNewDuration(120 * time.Second),
 	DeltaResend:                             config.MustNewDuration(5 * time.Second),
-	DeltaRound:                              config.MustNewDuration(40 * time.Second),
+	DeltaRound:                              config.MustNewDuration(30 * time.Second),
 	DeltaGrace:                              config.MustNewDuration(5 * time.Second),
+	DeltaStage:                              config.MustNewDuration(10 * time.Second),
 	MaxDurationQuery:                        config.MustNewDuration(100 * time.Millisecond),
-	MaxDurationObservation:                  config.MustNewDuration(20 * time.Second),
-	MaxDurationReport:                       config.MustNewDuration(8 * time.Second),
+	MaxDurationObservation:                  config.MustNewDuration(35 * time.Second),
+	MaxDurationReport:                       config.MustNewDuration(10 * time.Second),
 	MaxDurationShouldAcceptFinalizedReport:  config.MustNewDuration(5 * time.Second),
-	MaxDurationShouldTransmitAcceptedReport: config.MustNewDuration(8 * time.Second),
+	MaxDurationShouldTransmitAcceptedReport: config.MustNewDuration(10 * time.Second),
 }
 
 func OffChainAggregatorV2ConfigWithNodes(numberNodes int, inflightExpiry time.Duration, cfg contracts.OffChainAggregatorV2Config) contracts.OffChainAggregatorV2Config {
