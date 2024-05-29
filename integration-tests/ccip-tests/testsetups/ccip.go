@@ -1152,6 +1152,11 @@ func (o *CCIPTestSetUpOutputs) CreateEnvironment(
 			lggr.Info().Msg("Tearing down the environment")
 			err = integrationactions.TeardownSuite(t, ccipEnv.K8Env, ccipEnv.CLNodes, o.Reporter,
 				zapcore.DPanicLevel, o.Cfg.EnvInput, chains...)
+			if strings.Contains(err.Error(), "Got very old block with number") &&
+				strings.Contains(err.Error(), "This node may not function correctly without manual intervention") {
+				// the only negative reorg case, it's okay, and we test for this error
+				return
+			}
 			require.NoError(t, err, "Environment teardown shouldn't fail")
 		} else {
 			//just send the report
