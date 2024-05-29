@@ -19,7 +19,7 @@ import {USDPriceWith18Decimals} from "./libraries/USDPriceWith18Decimals.sol";
 contract MultiAggregateRateLimiter is IMessageInterceptor, OwnerIsCreator {
   using RateLimiter for RateLimiter.TokenBucket;
   using USDPriceWith18Decimals for uint224;
-  using EnumerableMapAddresses for EnumerableMapAddresses.AddressToAddressMap;
+  using EnumerableMapAddresses for EnumerableMapAddresses.AddressToBytes32Map;
   using EnumerableSet for EnumerableSet.AddressSet;
 
   error UnauthorizedCaller(address caller);
@@ -30,18 +30,17 @@ contract MultiAggregateRateLimiter is IMessageInterceptor, OwnerIsCreator {
 
   event RateLimiterConfigUpdated(uint64 indexed remoteChainSelector, bool isOutgoingLane, RateLimiter.Config config);
   event PriceRegistrySet(address newPriceRegistry);
-  event TokenAggregateRateLimitAdded(address remoteToken, address localToken);
-  event TokenAggregateRateLimitRemoved(address remoteToken, address localToken);
+  event TokenAggregateRateLimitAdded(uint64 remoteChainSelector, bytes32 remoteToken, address localToken);
+  event TokenAggregateRateLimitRemoved(uint64 remoteChainSelector, bytes32 remoteToken, address localToken);
   event AuthorizedCallerAdded(address caller);
   event AuthorizedCallerRemoved(address caller);
 
-  /// @notice RateLimitToken struct containing both the source and destination token addresses
+  /// @notice RateLimitToken struct containing both the local and remote token addresses
   struct RateLimitToken {
-    // TODO: change to bytes32 for non-EVM support
-    address remoteToken;
-    address localToken;
+    uint64 remoteChainSelector; // ────╮ Remote chain selector for which to update the rate limit token mapping
+    address localToken; // ────────────╯ Token on the chain on which the multi-ARL is deployed
+    bytes32 remoteToken; // Token on the remote chain (for OnRamp - dest, of OffRamp - source)
   }
-  // TODO: include chain selector in update
 
   /// @notice Update args for changing the authorized callers
   struct AuthorizedCallerArgs {
@@ -62,8 +61,10 @@ contract MultiAggregateRateLimiter is IMessageInterceptor, OwnerIsCreator {
     RateLimiter.TokenBucket outgoingLaneBucket; // Bucket for the outgoing lane (local -> remote)
   }
 
-  /// @dev Tokens that should be included in Aggregate Rate Limiting (from local chain (this chain) -> remote)
-  EnumerableMapAddresses.AddressToAddressMap internal s_rateLimitedTokensLocalToRemote;
+  /// @dev Tokens that should be included in Aggregate Rate Limiting (from local chain (this chain) -> remote),
+  /// grouped per-remote chain.
+  mapping(uint64 remoteChainSelector => EnumerableMapAddresses.AddressToBytes32Map) internal
+    s_rateLimitedTokensLocalToRemote;
 
   /// @dev Set of callers that can call the validation functions (this is required since the validations modify state)
   EnumerableSet.AddressSet internal s_authorizedCallers;
@@ -96,15 +97,21 @@ contract MultiAggregateRateLimiter is IMessageInterceptor, OwnerIsCreator {
       revert UnauthorizedCaller(msg.sender);
     }
 
-    uint256 value;
-    Client.EVMTokenAmount[] memory destTokenAmounts = message.destTokenAmounts;
-    for (uint256 i = 0; i < destTokenAmounts.length; ++i) {
-      if (s_rateLimitedTokensLocalToRemote.contains(destTokenAmounts[i].token)) {
-        value += _getTokenValue(destTokenAmounts[i]);
-      }
-    }
+    uint64 remoteChainSelector = message.sourceChainSelector;
+    RateLimiter.TokenBucket storage tokenBucket = _getTokenBucket(remoteChainSelector, false);
 
-    if (value > 0) _rateLimitValue(message.sourceChainSelector, false, value);
+    // Skip rate limiting if it is disabled
+    if (tokenBucket.isEnabled) {
+      uint256 value;
+      Client.EVMTokenAmount[] memory destTokenAmounts = message.destTokenAmounts;
+      for (uint256 i = 0; i < destTokenAmounts.length; ++i) {
+        if (s_rateLimitedTokensLocalToRemote[remoteChainSelector].contains(destTokenAmounts[i].token)) {
+          value += _getTokenValue(destTokenAmounts[i]);
+        }
+      }
+
+      if (value > 0) tokenBucket._consume(value, address(0));
+    }
   }
 
   /// @inheritdoc IMessageInterceptor
@@ -126,15 +133,6 @@ contract MultiAggregateRateLimiter is IMessageInterceptor, OwnerIsCreator {
     } else {
       return rateLimiterBuckets.incomingLaneBucket;
     }
-  }
-
-  /// @notice Consumes value from the rate limiter bucket based on the token value given.
-  /// @param remoteChainSelector chain selector to apply rate limit to
-  /// @param isOutgoingLane if set to true, applies the rate limit for the outgoing message lane (OnRamp).
-  /// Otherwise fetches for the incoming message lane (OffRamp).
-  /// @param value consumed value
-  function _rateLimitValue(uint64 remoteChainSelector, bool isOutgoingLane, uint256 value) internal {
-    _getTokenBucket(remoteChainSelector, isOutgoingLane)._consume(value, address(0));
   }
 
   /// @notice Retrieves the token value for a token using the PriceRegistry
@@ -206,43 +204,58 @@ contract MultiAggregateRateLimiter is IMessageInterceptor, OwnerIsCreator {
   }
 
   /// @notice Get all tokens which are included in Aggregate Rate Limiting.
-  /// @return remoteTokens The source representation of the tokens that are rate limited.
-  /// @return localTokens The destination representation of the tokens that are rate limited.
+  /// @param remoteChainSelector chain selector to get rate limit tokens for
+  /// @return localTokens The local chain representation of the tokens that are rate limited.
+  /// @return remoteTokens The remote representation of the tokens that are rate limited.
   /// @dev the order of IDs in the list is **not guaranteed**, therefore, if ordering matters when
   /// making successive calls, one should keep the blockheight constant to ensure a consistent result.
-  // TODO: include chain selector in request
-  function getAllRateLimitTokens() external view returns (address[] memory remoteTokens, address[] memory localTokens) {
-    remoteTokens = new address[](s_rateLimitedTokensLocalToRemote.length());
-    localTokens = new address[](s_rateLimitedTokensLocalToRemote.length());
+  function getAllRateLimitTokens(uint64 remoteChainSelector)
+    external
+    view
+    returns (address[] memory localTokens, bytes32[] memory remoteTokens)
+  {
+    uint256 tokenCount = s_rateLimitedTokensLocalToRemote[remoteChainSelector].length();
 
-    for (uint256 i = 0; i < s_rateLimitedTokensLocalToRemote.length(); ++i) {
-      (address localToken, address remoteToken) = s_rateLimitedTokensLocalToRemote.at(i);
-      remoteTokens[i] = remoteToken;
+    localTokens = new address[](tokenCount);
+    remoteTokens = new bytes32[](tokenCount);
+
+    for (uint256 i = 0; i < tokenCount; ++i) {
+      (address localToken, bytes32 remoteToken) = s_rateLimitedTokensLocalToRemote[remoteChainSelector].at(i);
       localTokens[i] = localToken;
+      remoteTokens[i] = remoteToken;
     }
-    return (remoteTokens, localTokens);
+    return (localTokens, remoteTokens);
   }
 
   /// @notice Adds or removes tokens from being used in Aggregate Rate Limiting.
   /// @param removes - A list of one or more tokens to be removed.
   /// @param adds - A list of one or more tokens to be added.
+  // TODO: update removes array - it should not contain the remoteToken
   function updateRateLimitTokens(RateLimitToken[] memory removes, RateLimitToken[] memory adds) external onlyOwner {
     for (uint256 i = 0; i < removes.length; ++i) {
-      if (s_rateLimitedTokensLocalToRemote.remove(removes[i].localToken)) {
-        emit TokenAggregateRateLimitRemoved(removes[i].remoteToken, removes[i].localToken);
+      address localToken = removes[i].localToken;
+      uint64 remoteChainSelector = removes[i].remoteChainSelector;
+
+      // Skip removing token if it is unconfigured
+      (bool containsToken, bytes32 remoteToken) =
+        s_rateLimitedTokensLocalToRemote[remoteChainSelector].tryGet(localToken);
+      if (containsToken) {
+        s_rateLimitedTokensLocalToRemote[remoteChainSelector].remove(localToken);
+        emit TokenAggregateRateLimitRemoved(remoteChainSelector, remoteToken, localToken);
       }
     }
 
     for (uint256 i = 0; i < adds.length; ++i) {
       address localToken = adds[i].localToken;
-      address remoteToken = adds[i].remoteToken;
+      bytes32 remoteToken = adds[i].remoteToken;
+      uint64 remoteChainSelector = adds[i].remoteChainSelector;
 
-      if (localToken == address(0) || remoteToken == address(0)) {
+      if (localToken == address(0) || remoteToken == bytes32("")) {
         revert ZeroAddressNotAllowed();
       }
 
-      if (s_rateLimitedTokensLocalToRemote.set(localToken, remoteToken)) {
-        emit TokenAggregateRateLimitAdded(remoteToken, localToken);
+      if (s_rateLimitedTokensLocalToRemote[remoteChainSelector].set(localToken, remoteToken)) {
+        emit TokenAggregateRateLimitAdded(remoteChainSelector, remoteToken, localToken);
       }
     }
   }
