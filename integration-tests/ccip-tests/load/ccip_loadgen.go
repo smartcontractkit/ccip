@@ -288,6 +288,10 @@ func (c *CCIPE2ELoad) Call(_ *wasp.Generator) *wasp.Response {
 		if err1 == nil {
 			txConfirmationTime = hdr.Timestamp
 		}
+	} else {
+		res.Error = fmt.Sprintf("failed to wait for mined transaction: %s", err1.Error())
+		res.Failed = true
+		return res
 	}
 	lggr = lggr.With().Str("Msg Tx", sendTx.Hash().String()).Logger()
 	var gasUsed uint64
