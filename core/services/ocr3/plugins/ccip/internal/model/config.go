@@ -38,6 +38,9 @@ type CommitPluginConfig struct {
 type ExecutePluginConfig struct {
 	// DestChain is the ccip destination chain configured for the commit execute DON.
 	DestChain ChainSelector
+
+	// ObserverInfo is a map of oracle IDs to ObserverInfo.
+	ObserverInfo map[commontypes.OracleID]ObserverInfo
 }
 
 type ObserverInfo struct {

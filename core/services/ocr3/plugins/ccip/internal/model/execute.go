@@ -13,7 +13,7 @@ type ExecutePluginReport struct{}
 /////////////////////////
 
 type ExecutePluginObservation struct {
-	CommitReports map[ChainSelector][]ExecutePluginCommitData `json:"CommitReports"`
+	CommitReports map[ChainSelector][]ExecutePluginCommitData `json:"commitReports"`
 	Messages      map[ChainSelector][]ExecutePluginCCIPData   `json:"messages"`
 }
 
@@ -39,8 +39,8 @@ func (obs ExecutePluginObservation) Encode() ([]byte, error) {
 	return json.Marshal(obs)
 }
 
-func DecodeExecutePluginObservation(b []byte) (CommitPluginObservation, error) {
-	obs := CommitPluginObservation{}
+func DecodeExecutePluginObservation(b []byte) (ExecutePluginObservation, error) {
+	obs := ExecutePluginObservation{}
 	err := json.Unmarshal(b, &obs)
 	return obs, err
 }

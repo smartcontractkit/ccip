@@ -57,6 +57,16 @@ func (s *SeqNumRange) SetEnd(v SeqNum) {
 	s[1] = v
 }
 
+// Overlaps returns true if the two ranges overlap.
+func (s SeqNumRange) Overlaps(other SeqNumRange) bool {
+	return s.Start() <= other.End() && other.Start() <= s.End()
+}
+
+// Contains returns true if the range contains the given sequence number.
+func (s SeqNumRange) Contains(seq SeqNum) bool {
+	return s.Start() <= seq && seq <= s.End()
+}
+
 func (s SeqNumRange) String() string {
 	return fmt.Sprintf("[%d -> %d]", s[0], s[1])
 }

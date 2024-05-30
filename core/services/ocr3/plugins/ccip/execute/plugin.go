@@ -2,6 +2,7 @@ package commit
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	//cache "github.com/smartcontractkit/ccipocr3/internal/copypaste/commit_roots_cache"
@@ -145,10 +146,20 @@ func (p *Plugin) Observation(ctx context.Context, outctx ocr3types.OutcomeContex
 }
 
 func (p *Plugin) ValidateObservation(outctx ocr3types.OutcomeContext, query types.Query, ao types.AttributedObservation) error {
-	// TODO: do "readers" need to be configured?
-	//       for security, it doesn't matter. A merkle root is generated which must be consisted with the commit report.
+	decodedObservation, err := model.DecodeExecutePluginObservation(ao.Observation)
+	if err != nil {
+		return fmt.Errorf("decode observation: %w", err)
+	}
 
-	panic("implement me")
+	if err := validateObserverReadingEligibility(p.nodeID, p.cfg.ObserverInfo, decodedObservation.Messages); err != nil {
+		return fmt.Errorf("validate observer reading eligibility: %w", err)
+	}
+
+	if err := validateObservedSequenceNumbers(decodedObservation.CommitReports); err != nil {
+		return fmt.Errorf("validate observed sequence numbers: %w", err)
+	}
+
+	return nil
 }
 
 func (p *Plugin) ObservationQuorum(outctx ocr3types.OutcomeContext, query types.Query) (ocr3types.Quorum, error) {
