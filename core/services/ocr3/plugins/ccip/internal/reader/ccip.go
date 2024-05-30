@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/smartcontractkit/ccipocr3/internal/model"
 
@@ -48,8 +49,15 @@ type CCIPChainReader struct {
 	destChain    model.ChainSelector
 }
 
-func (r *CCIPChainReader) CommitReportsGTETimestamp(ctx context.Context, dest model.ChainSelector, ts time.Time, limit int) ([]model.CommitPluginReport, error) {
+func (r *CCIPChainReader) CommitReportsGTETimestamp(ctx context.Context, dest model.ChainSelector, ts time.Time, limit int) ([]model.CommitPluginReportWithMeta, error) {
 	if err := r.validateReaderExistence(dest); err != nil {
+		return nil, err
+	}
+	panic("implement me")
+}
+
+func (r *CCIPChainReader) ExecutedMessageRanges(ctx context.Context, source, dest model.ChainSelector, seqNumRange model.SeqNumRange) ([]model.SeqNumRange, error) {
+	if err := r.validateReaderExistence(source, dest); err != nil {
 		return nil, err
 	}
 	panic("implement me")
