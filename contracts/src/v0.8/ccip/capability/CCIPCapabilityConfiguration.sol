@@ -134,9 +134,10 @@ contract CCIPCapabilityConfiguration is ITypeAndVersion, ICapabilityConfiguratio
   /// @return The chain configurations.
   // TODO: will this eventually hit the RPC max response size limit?
   function getAllChainConfigs() external view returns (ChainConfig[] memory) {
+    uint256[] memory chainSelectors = s_chainSelectors.values();
     ChainConfig[] memory chainConfigs = new ChainConfig[](s_chainSelectors.length());
-    for (uint256 i = 0; i < s_chainSelectors.length(); i++) {
-      chainConfigs[i] = s_chainConfigurations[uint64(s_chainSelectors.at(i))];
+    for (uint256 i = 0; i < chainSelectors.length; i++) {
+      chainConfigs[i] = s_chainConfigurations[uint64(chainSelectors[i])];
     }
     return chainConfigs;
   }
@@ -146,9 +147,9 @@ contract CCIPCapabilityConfiguration is ITypeAndVersion, ICapabilityConfiguratio
   // ================================================================
 
   /// @inheritdoc ICapabilityConfiguration
+  /// @dev The CCIP capability will fetch the configuration needed directly from this contract.
+  /// The offchain syncer will call this function, however, so its important that it doesn't revert.
   function getCapabilityConfiguration(uint256 /* donId */ ) external pure override returns (bytes memory configuration) {
-    // The CCIP capability will fetch the configuration needed directly from this contract.
-    // The offchain syncer will call this function, however, so its important that it doesn't revert.
     return bytes("");
   }
 
@@ -434,7 +435,8 @@ contract CCIPCapabilityConfiguration is ITypeAndVersion, ICapabilityConfiguratio
     // Process removals first.
     for (uint256 i = 0; i < chainSelectorRemoves.length; i++) {
       // check if the chain selector is in s_chainSelectors first.
-      if (!s_chainSelectors.contains(chainSelectorRemoves[i])) {
+      bool present = s_chainSelectors.contains(chainSelectorRemoves[i]);
+      if (!present) {
         revert ChainSelectorNotFound(chainSelectorRemoves[i]);
       }
 
