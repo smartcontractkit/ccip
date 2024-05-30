@@ -80,18 +80,15 @@ func (P SrcCommitProvider) Name() string {
 }
 
 func (P SrcCommitProvider) Close() error {
-	//TODO implement me
-	panic("implement me")
+	return nil
 }
 
 func (P SrcCommitProvider) Ready() error {
-	//TODO implement me
-	panic("implement me")
+	return nil
 }
 
 func (P SrcCommitProvider) HealthReport() map[string]error {
-	//TODO implement me
-	panic("implement me")
+	return nil
 }
 
 func (P SrcCommitProvider) OffchainConfigDigester() ocrtypes.OffchainConfigDigester {
@@ -119,7 +116,6 @@ func (P DstCommitProvider) Name() string {
 }
 
 func (P DstCommitProvider) Close() error {
-	//TODO implement me
 	return nil
 }
 
