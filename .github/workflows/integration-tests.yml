@@ -801,8 +801,6 @@ jobs:
         with:
           channel-id: "#team-test-tooling-internal"
           slack-message: ":x: :mild-panic-intensifies: Node Migration Tests Failed: ${{ job.html_url }}\n${{ format('https://github.com/smartcontractkit/chainlink/actions/runs/{0}', github.run_id) }}"
-<<<<<<< HEAD
-=======
 
   ## Solana Section
   get_solana_sha:
@@ -1106,4 +1104,3 @@ jobs:
           path: .covdata
           retention-days: 1
 
->>>>>>> e2bedae359 (bump solana + cleanup types (#13253))

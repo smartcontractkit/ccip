@@ -2,6 +2,7 @@ package cmd_test
 
 import (
 	"bytes"
+	"github.com/pelletier/go-toml/v2"
 	"strings"
 	"testing"
 

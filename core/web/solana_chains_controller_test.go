@@ -81,7 +81,7 @@ Nodes = []
 
 			controller := setupSolanaChainsControllerTestV2(t, &solcfg.TOMLConfig{
 				ChainID: ptr(validId),
-				Chain: config.Chain{
+				Chain: solcfg.Chain{
 					SkipPreflight: ptr(false),
 					TxTimeout:     commoncfg.MustNewDuration(time.Hour),
 				},
@@ -110,23 +110,15 @@ Nodes = []
 func Test_SolanaChainsController_Index(t *testing.T) {
 	t.Parallel()
 
-<<<<<<< HEAD
 	chainA := &solcfg.TOMLConfig{
-=======
-	chainA := &config.TOMLConfig{
->>>>>>> e2bedae359 (bump solana + cleanup types (#13253))
 		ChainID: ptr(fmt.Sprintf("ChainlinktestA-%d", rand.Int31n(999999))),
-		Chain: config.Chain{
+		Chain: solcfg.Chain{
 			TxTimeout: commoncfg.MustNewDuration(time.Hour),
 		},
 	}
-<<<<<<< HEAD
 	chainB := &solcfg.TOMLConfig{
-=======
-	chainB := &config.TOMLConfig{
->>>>>>> e2bedae359 (bump solana + cleanup types (#13253))
 		ChainID: ptr(fmt.Sprintf("ChainlinktestB-%d", rand.Int31n(999999))),
-		Chain: config.Chain{
+		Chain: solcfg.Chain{
 			SkipPreflight: ptr(false),
 		},
 	}
@@ -182,11 +174,7 @@ type TestSolanaChainsController struct {
 	client cltest.HTTPClientCleaner
 }
 
-<<<<<<< HEAD
 func setupSolanaChainsControllerTestV2(t *testing.T, cfgs ...*solcfg.TOMLConfig) *TestSolanaChainsController {
-=======
-func setupSolanaChainsControllerTestV2(t *testing.T, cfgs ...*config.TOMLConfig) *TestSolanaChainsController {
->>>>>>> e2bedae359 (bump solana + cleanup types (#13253))
 	for i := range cfgs {
 		cfgs[i].SetDefaults()
 	}
