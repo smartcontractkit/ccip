@@ -17,10 +17,7 @@ var (
 type CCIP interface {
 	// CommitReportsGTETimestamp reads the requested chain starting at a given timestamp
 	// and finds all ReportAccepted up to the provided limit.
-	// TODO: the timestamp version of this is convenient for the initial report fetch.
-	//       from that point on we could use the block number. In either case, we need to
-	//       return the timestamp or block number of the final report.
-	CommitReportsGTETimestamp(ctx context.Context, dest model.ChainSelector, ts time.Time, limit int) ([]model.CommitPluginReport, error)
+	CommitReportsGTETimestamp(ctx context.Context, dest model.ChainSelector, ts time.Time, limit int) ([]model.CommitPluginReportWithMeta, error)
 
 	// MsgsAfterTimestamp reads the provided chains.
 	// Finds and returns ccip messages submitted after the target time.

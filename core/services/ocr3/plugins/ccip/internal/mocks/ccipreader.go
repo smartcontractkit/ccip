@@ -19,9 +19,9 @@ func NewCCIPReader() *CCIPReader {
 	}
 }
 
-func (r CCIPReader) CommitReportsGTETimestamp(ctx context.Context, dest model.ChainSelector, ts time.Time, limit int) ([]model.CommitPluginReport, error) {
+func (r CCIPReader) CommitReportsGTETimestamp(ctx context.Context, dest model.ChainSelector, ts time.Time, limit int) ([]model.CommitPluginReportWithMeta, error) {
 	args := r.Called(ctx, dest, ts, limit)
-	return args.Get(0).([]model.CommitPluginReport), args.Error(1)
+	return args.Get(0).([]model.CommitPluginReportWithMeta), args.Error(1)
 }
 
 func (r CCIPReader) MsgsAfterTimestamp(ctx context.Context, chains []model.ChainSelector, ts time.Time, limit int) ([]model.CCIPMsg, error) {

@@ -41,6 +41,9 @@ type ExecutePluginConfig struct {
 
 	// ObserverInfo is a map of oracle IDs to ObserverInfo.
 	ObserverInfo map[commontypes.OracleID]ObserverInfo
+
+	// MessageVisibilityInterval is the time interval for which the messages are visible by the plugin.
+	MessageVisibilityInterval time.Duration
 }
 
 type ObserverInfo struct {

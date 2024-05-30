@@ -3,6 +3,7 @@ package commit
 import (
 	"context"
 	"fmt"
+	"sync/atomic"
 	"time"
 
 	//cache "github.com/smartcontractkit/ccipocr3/internal/copypaste/commit_roots_cache"
@@ -20,8 +21,7 @@ type Plugin struct {
 	ccipReader reader.CCIP
 
 	//commitRootsCache cache.CommitsRootsCache
-	//lastReportBlock uint64
-	lastReportTS time.Time
+	lastReportTS *atomic.Int64
 }
 
 func NewPlugin(
@@ -30,11 +30,14 @@ func NewPlugin(
 	cfg model.ExecutePluginConfig,
 	ccipReader reader.CCIP,
 ) *Plugin {
+	lastReportTS := &atomic.Int64{}
+	lastReportTS.Store(time.Now().Add(-cfg.MessageVisibilityInterval).UnixMilli())
+
 	return &Plugin{
 		nodeID:       nodeID,
 		cfg:          cfg,
 		ccipReader:   ccipReader,
-		lastReportTS: time.Now().Add(-8 * time.Hour), // TODO: get this from a config
+		lastReportTS: lastReportTS,
 	}
 }
 
@@ -42,10 +45,10 @@ func (p *Plugin) Query(ctx context.Context, outctx ocr3types.OutcomeContext) (ty
 	return types.Query{}, nil
 }
 
-func groupByChainSelector(reports []model.CommitPluginReport) map[model.ChainSelector][]model.ExecutePluginCommitData {
+func groupByChainSelector(reports []model.CommitPluginReportWithMeta) map[model.ChainSelector][]model.ExecutePluginCommitData {
 	commitReportCache := make(map[model.ChainSelector][]model.ExecutePluginCommitData)
-	for _, reports := range reports {
-		for _, singleReport := range reports.MerkleRoots {
+	for _, report := range reports {
+		for _, singleReport := range report.Report.MerkleRoots {
 			commitReportCache[singleReport.ChainSel] = append(commitReportCache[singleReport.ChainSel], model.ExecutePluginCommitData{
 				MerkleRoot:          singleReport.MerkleRoot,
 				SequenceNumberRange: singleReport.SeqNumsRange,
@@ -88,14 +91,14 @@ func (p *Plugin) Observation(ctx context.Context, outctx ocr3types.OutcomeContex
 
 	// Phase 1: Gather commit reports from the destination chain and determine which messages are required to build a valid execution report.
 	// TODO: filter out "cannot read p.destChain" errors? Or avoid calling it in the first place?
-	commitReports, err := p.ccipReader.CommitReportsGTETimestamp(ctx, p.cfg.DestChain, p.lastReportTS, 1000)
+	commitReports, err := p.ccipReader.CommitReportsGTETimestamp(
+		ctx, p.cfg.DestChain, time.UnixMilli(p.lastReportTS.Load()), 1000)
 	if err != nil {
 		return types.Observation{}, err
 	}
 	if len(commitReports) > 0 {
-		//lastReport := commitReports[len(commitReports)-1]
-		//p.lastReportTS = lastReport.
-		// TODO: Need a way to get a timestamp of the report.
+		lastReport := commitReports[len(commitReports)-1]
+		p.lastReportTS.Store(lastReport.Timestamp.UnixMilli())
 	}
 
 	// Phase 2: Gather messages from the source chains and build the execution report.
