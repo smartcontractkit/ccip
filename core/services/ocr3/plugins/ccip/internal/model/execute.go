@@ -5,8 +5,17 @@ import (
 	"fmt"
 )
 
-// ExecutePluginReport is placed here for reference of shared readers structure.
-type ExecutePluginReport struct{}
+type ExecutePluginReport struct {
+	ChainReports []ExecutionPluginReportSingleChain `json:"chainReports"`
+}
+
+type ExecutionPluginReportSingleChain struct {
+	SourceChainSelector ChainSelector    `json:"sourceChainSelector"`
+	Messages            []Evm2EvmMessage `json:"messages"`
+	OffchainTokenData   [][][]byte       `json:"offchainTokenData"`
+	Proofs              []Bytes32        `json:"proofs"`
+	ProofFlagBits       BigInt           `json:"proofFlagBits"`
+}
 
 /////////////////////////
 // Execute Observation //

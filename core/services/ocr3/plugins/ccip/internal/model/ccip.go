@@ -106,3 +106,6 @@ type CCIPMsgBaseDetails struct {
 	SourceChain ChainSelector `json:"sourceChain,string"`
 	SeqNum      SeqNum        `json:"seqNum,string"`
 }
+
+type Evm2EvmMessage struct {
+}
