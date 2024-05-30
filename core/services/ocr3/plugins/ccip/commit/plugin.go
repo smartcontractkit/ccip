@@ -26,6 +26,7 @@ type Plugin struct {
 	ccipReader        reader.CCIP
 	tokenPricesReader reader.TokenPrices
 	reportCodec       codec.Commit
+	msgHasher         codec.MessageHasher
 	lggr              logger.Logger
 
 	// readableChains is the set of chains that the plugin can read from.
@@ -43,6 +44,7 @@ func NewPlugin(
 	ccipReader reader.CCIP,
 	tokenPricesReader reader.TokenPrices,
 	reportCodec codec.Commit,
+	msgHasher codec.MessageHasher,
 	lggr logger.Logger,
 ) *Plugin {
 	knownSourceChains := mapset.NewSet[model.ChainSelector](cfg.Reads...)
@@ -56,6 +58,7 @@ func NewPlugin(
 		ccipReader:        ccipReader,
 		tokenPricesReader: tokenPricesReader,
 		reportCodec:       reportCodec,
+		msgHasher:         msgHasher,
 		lggr:              lggr,
 
 		readableChains:    mapset.NewSet(cfg.Reads...),
@@ -109,6 +112,7 @@ func (p *Plugin) Observation(ctx context.Context, outctx ocr3types.OutcomeContex
 		ctx,
 		p.lggr,
 		p.ccipReader,
+		p.msgHasher,
 		p.readableChains,
 		maxSeqNumsPerChain,
 		p.cfg.NewMsgScanBatchSize,
@@ -142,13 +146,12 @@ func (p *Plugin) Observation(ctx context.Context, outctx ocr3types.OutcomeContex
 		"tokenPrices", len(tokenPrices),
 		"observerInfo", p.cfg.ObserverInfo)
 
-	return model.NewCommitPluginObservation(
-		newMsgs,
-		gasPrices,
-		tokenPrices,
-		maxSeqNumsPerChain,
-		p.cfg,
-	).Encode()
+	msgBaseDetails := make([]model.CCIPMsgBaseDetails, 0)
+	for _, msg := range newMsgs {
+		msgBaseDetails = append(msgBaseDetails, msg.CCIPMsgBaseDetails)
+	}
+	return model.NewCommitPluginObservation(msgBaseDetails, gasPrices, tokenPrices, maxSeqNumsPerChain, p.cfg).Encode()
+
 }
 
 func (p *Plugin) ValidateObservation(_ ocr3types.OutcomeContext, _ types.Query, ao types.AttributedObservation) error {
