@@ -119,7 +119,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ILinkAvailable, AggregateRat
   }
 
   /// @dev Struct to hold the token transfer fee configurations for a destination chain and a set of tokens. Same as TokenTransferFeeConfigSingleTokenArgs
-  /// but with the destChainSelector and an array of TokenTransferFeeConfigSingleTokenArgs included so that an of these can be passed in the constructor
+  /// but with the destChainSelector and an array of TokenTransferFeeConfigSingleTokenArgs included so that an array of these can be passed in the constructor
   /// and the applyTokenTransferFeeConfigUpdates function
   struct TokenTransferFeeConfigArgs {
     uint64 destChainSelector; // Destination chain selector
