@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
+	"strconv"
 
 	chainselectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
@@ -34,6 +35,10 @@ func NewGasPriceChain(gasPrice *big.Int, chainSel ChainSelector) GasPriceChain {
 }
 
 type SeqNum uint64
+
+func (s SeqNum) String() string {
+	return strconv.FormatUint(uint64(s), 10)
+}
 
 func NewSeqNumRange(start, end SeqNum) SeqNumRange {
 	return SeqNumRange{start, end}
@@ -73,17 +78,6 @@ func (c ChainSelector) String() string {
 
 type CCIPMsg struct {
 	CCIPMsgBaseDetails
-}
-
-func (c CCIPMsg) IsValid() error {
-	if c.ID != c.Hash() {
-		return fmt.Errorf("message id does not match the computed hash")
-	}
-	return nil
-}
-
-func (c CCIPMsg) Hash() Bytes32 {
-	return c.ID // todo: hash msg fields similar to what the contract does
 }
 
 func (c CCIPMsg) String() string {
