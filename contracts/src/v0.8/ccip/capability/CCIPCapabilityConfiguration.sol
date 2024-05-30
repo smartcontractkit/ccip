@@ -27,8 +27,6 @@ contract CCIPCapabilityConfiguration is ITypeAndVersion, ICapabilityConfiguratio
   /// @param chainSelector The chain selector.
   event ChainConfigRemoved(uint64 chainSelector);
 
-  error InvalidConfigOperation();
-  error NoCapabilityConfigurationSet(uint32 donId);
   error NodeNotInRegistry(bytes32 p2pId);
   error OnlyCapabilityRegistryCanCall();
   error ChainSelectorNotFound(uint64 chainSelector);
@@ -40,7 +38,6 @@ contract CCIPCapabilityConfiguration is ITypeAndVersion, ICapabilityConfiguratio
   error FMustBePositive();
   error FTooHigh();
   error InvalidPluginType();
-  error InvalidConfigState();
   error InvalidConfigLength();
   error InvalidConfigStateTransition(ConfigState currentState, ConfigState proposedState);
   error NonExistentConfigTransition();
@@ -69,12 +66,10 @@ contract CCIPCapabilityConfiguration is ITypeAndVersion, ICapabilityConfiguratio
   }
 
   /// @notice Chain configuration.
-  /// @param readers The P2P IDs of the readers for the chain. These IDs must be registered in the capability registry.
-  /// @param config The chain configuration. This is kept intentionally opaque so as to add fields in the future if needed.
-  /// Changes to chain configs are detected out-of-band offchain and decoded offchain.
+  /// Changes to chain configuration are detected out-of-band in plugins and decoded offchain.
   struct ChainConfig {
-    bytes32[] readers;
-    bytes config;
+    bytes32[] readers; // The P2P IDs of the readers for the chain. These IDs must be registered in the capability registry.
+    bytes config; // The chain configuration. This is kept intentionally opaque so as to add fields in the future if needed.
   }
 
   /// @notice Chain configuration update struct used in applyChainConfigUpdates.
@@ -84,28 +79,22 @@ contract CCIPCapabilityConfiguration is ITypeAndVersion, ICapabilityConfiguratio
   }
 
   /// @notice OCR3 configuration.
-  /// @param pluginType The plugin that the configuration is for.
-  /// @param chainSelector The (remote) chain that the configuration is for.
-  /// @param signers An associative array that contains (onchain signer public key, p2p id) pairs.
-  /// @param transmitters An associative array that contains (transmitter, p2p id) pairs.
-  /// @param f The "big F" parameter for the role DON.
-  /// @param offchainConfigVersion The version of the offchain configuration.
   /// @param offchainConfig The offchain configuration for the OCR3 protocol. Protobuf encoded.
   struct OCR3Config {
-    PluginType pluginType;
-    uint64 chainSelector;
-    bytes[][] signers; // TODO: make bytes32?
-    bytes[][] transmitters; // TODO: make bytes32?
-    uint8 f;
-    uint64 offchainConfigVersion;
-    bytes offchainConfig;
+    PluginType pluginType; // ───────╮ The plugin that the configuration is for.
+    uint64 chainSelector; //         | The (remote) chain that the configuration is for.
+    uint8 F; //                      | The "big F" parameter for the role DON.
+    uint64 offchainConfigVersion; // ╯ The version of the offchain configuration.
+    bytes32[2][] signers; // An associative array that contains (onchain signer public key, p2p id) pairs.
+    bytes32[2][] transmitters; // An associative array that contains (transmitter, p2p id) pairs.
+    bytes offchainConfig; // The offchain configuration for the OCR3 protocol. Protobuf encoded.
   }
 
   /// @notice OCR3 configuration with metadata, specifically the config count and the config digest.
   struct OCR3ConfigWithMeta {
-    OCR3Config config;
-    uint64 configCount;
-    bytes32 configDigest;
+    OCR3Config config; // The OCR3 configuration.
+    uint64 configCount; // The config count used to compute the config digest.
+    bytes32 configDigest; // The config digest of the OCR3 configuration.
   }
 
   /// @notice Type and version override.
@@ -380,11 +369,11 @@ contract CCIPCapabilityConfiguration is ITypeAndVersion, ICapabilityConfiguratio
       revert TooManyTransmitters();
     }
 
-    if (cfg.f == 0) {
+    if (cfg.F == 0) {
       revert FMustBePositive();
     }
 
-    if (cfg.signers.length <= 3 * cfg.f) {
+    if (cfg.signers.length <= 3 * cfg.F) {
       revert FTooHigh();
     }
 
@@ -395,14 +384,10 @@ contract CCIPCapabilityConfiguration is ITypeAndVersion, ICapabilityConfiguratio
       // p2pId is always the RageP2P public key of the oracle.
       // signer is the onchain public key of the oracle, which is an address on EVM chains
       // but could be different on other chain families.
-      bytes[] memory signerP2PIdPair = cfg.signers[i];
-
-      if (signerP2PIdPair.length != 2) {
-        revert SignerP2PIdPairMustBeLengthTwo(signerP2PIdPair.length);
-      }
+      bytes32[2] memory signerP2PIdPair = cfg.signers[i];
 
       // The provided p2pId must be in the capability registry.
-      _ensureInRegistry(abi.decode(signerP2PIdPair[0], (bytes32)));
+      _ensureInRegistry(signerP2PIdPair[0]);
     }
   }
 
@@ -428,7 +413,7 @@ contract CCIPCapabilityConfiguration is ITypeAndVersion, ICapabilityConfiguratio
         configCount,
         ocr3Config.signers,
         ocr3Config.transmitters,
-        ocr3Config.f,
+        ocr3Config.F,
         ocr3Config.offchainConfigVersion,
         ocr3Config.offchainConfig
       )
@@ -440,23 +425,23 @@ contract CCIPCapabilityConfiguration is ITypeAndVersion, ICapabilityConfiguratio
   // ================================================================
 
   /// @notice Sets and/or removes chain configurations.
-  /// @param removes The chain configurations to remove.
+  /// @param chainSelectorRemoves The chain configurations to remove.
   /// @param adds The chain configurations to add.
   function applyChainConfigUpdates(
-    ChainConfigUpdate[] calldata removes,
+    uint64[] calldata chainSelectorRemoves,
     ChainConfigUpdate[] calldata adds
   ) external onlyOwner {
     // Process removals first.
-    for (uint256 i = 0; i < removes.length; i++) {
+    for (uint256 i = 0; i < chainSelectorRemoves.length; i++) {
       // check if the chain selector is in s_chainSelectors first.
-      if (!s_chainSelectors.contains(removes[i].chainSelector)) {
-        revert ChainSelectorNotFound(removes[i].chainSelector);
+      if (!s_chainSelectors.contains(chainSelectorRemoves[i])) {
+        revert ChainSelectorNotFound(chainSelectorRemoves[i]);
       }
 
-      delete s_chainConfigurations[removes[i].chainSelector];
-      s_chainSelectors.remove(removes[i].chainSelector);
+      delete s_chainConfigurations[chainSelectorRemoves[i]];
+      s_chainSelectors.remove(chainSelectorRemoves[i]);
 
-      emit ChainConfigRemoved(removes[i].chainSelector);
+      emit ChainConfigRemoved(chainSelectorRemoves[i]);
     }
 
     // Process additions next.
@@ -480,8 +465,8 @@ contract CCIPCapabilityConfiguration is ITypeAndVersion, ICapabilityConfiguratio
   /// @notice Helper function to ensure that a node is in the capability registry.
   /// @param p2pId The P2P ID of the node to check.
   function _ensureInRegistry(bytes32 p2pId) internal view {
-    (ICapabilityRegistry.NodeParams memory node,) = ICapabilityRegistry(i_capabilityRegistry).getNode(p2pId);
-    if (node.p2pId != p2pId) {
+    (ICapabilityRegistry.NodeInfo memory node,) = ICapabilityRegistry(i_capabilityRegistry).getNode(p2pId);
+    if (node.p2pId == bytes32("")) {
       revert NodeNotInRegistry(p2pId);
     }
   }
