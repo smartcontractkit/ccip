@@ -85,22 +85,22 @@ func TestPlugin_Observation(t *testing.T) {
 			seqNr: 1,
 			observedGraph: func(t *testing.T) (graph.Graph, error) {
 				g := graph.NewGraph()
-				g.AddNetwork(networkA, graph.Data{
-					Liquidity:         big.NewInt(1000),
-					TokenAddress:      tokenX,
-					RebalancerAddress: rebalancerA,
-					NetworkSelector:   networkA,
-					ConfigDigest:      cfgDigest1,
-				})
-				g.AddNetwork(networkB, graph.Data{
-					Liquidity:         big.NewInt(2000),
-					TokenAddress:      tokenY,
-					RebalancerAddress: rebalancerB,
-					NetworkSelector:   networkB,
-					ConfigDigest:      cfgDigest2,
-				})
-				assert.NoError(t, g.AddConnection(networkA, networkB))
-				assert.NoError(t, g.AddConnection(networkB, networkA))
+				a := graph.Data{
+					Liquidity:               big.NewInt(1000),
+					TokenAddress:            tokenX,
+					LiquidityManagerAddress: rebalancerA,
+					NetworkSelector:         networkA,
+					ConfigDigest:            cfgDigest1,
+				}
+				b := graph.Data{
+					Liquidity:               big.NewInt(2000),
+					TokenAddress:            tokenY,
+					LiquidityManagerAddress: rebalancerB,
+					NetworkSelector:         networkB,
+					ConfigDigest:            cfgDigest2,
+				}
+				assert.NoError(t, g.Add(a, b))
+				assert.NoError(t, g.Add(b, a))
 				return g, nil
 			},
 			previousOutcome: models.Outcome{
@@ -196,22 +196,22 @@ func TestPlugin_Observation(t *testing.T) {
 			seqNr: 10,
 			observedGraph: func(t *testing.T) (graph.Graph, error) {
 				g := graph.NewGraph()
-				g.AddNetwork(networkA, graph.Data{
-					Liquidity:         big.NewInt(1000),
-					TokenAddress:      tokenX,
-					RebalancerAddress: rebalancerA,
-					NetworkSelector:   networkA,
-					ConfigDigest:      cfgDigest1,
-				})
-				g.AddNetwork(networkB, graph.Data{
-					Liquidity:         big.NewInt(2000),
-					TokenAddress:      tokenY,
-					RebalancerAddress: rebalancerB,
-					NetworkSelector:   networkB,
-					ConfigDigest:      cfgDigest2,
-				})
-				assert.NoError(t, g.AddConnection(networkA, networkB))
-				assert.NoError(t, g.AddConnection(networkB, networkA))
+				a := graph.Data{
+					Liquidity:               big.NewInt(1000),
+					TokenAddress:            tokenX,
+					LiquidityManagerAddress: rebalancerA,
+					NetworkSelector:         networkA,
+					ConfigDigest:            cfgDigest1,
+				}
+				b := graph.Data{
+					Liquidity:               big.NewInt(2000),
+					TokenAddress:            tokenY,
+					LiquidityManagerAddress: rebalancerB,
+					NetworkSelector:         networkB,
+					ConfigDigest:            cfgDigest2,
+				}
+				assert.NoError(t, g.Add(a, b))
+				assert.NoError(t, g.Add(b, a))
 				return g, nil
 			},
 			previousOutcome: models.Outcome{},
@@ -276,12 +276,14 @@ func TestPlugin_Observation(t *testing.T) {
 			// syncGraph
 			mockDiscoverer := discoverermocks.NewDiscoverer(t)
 			p.discovererFactory.
-				On("NewDiscoverer", p.plugin.rootNetwork, p.plugin.rootAddress).
-				Return(mockDiscoverer, nil)
+				On("NewDiscoverer", mock.Anything, mock.Anything).
+				Return(mockDiscoverer, nil).Maybe()
 			g, err := tc.observedGraph(t)
 			mockDiscoverer.
 				On("Discover", ctx).
 				Return(g, err)
+			mockDiscoverer.On("DiscoverBalances", ctx, g).Return(nil).Maybe()
+			p.plugin.discoverer = mockDiscoverer
 
 			// loadPendingTransfers && resolveProposedTransfers
 			for sourceDest, bridgeFn := range tc.bridges {
@@ -291,10 +293,12 @@ func TestPlugin_Observation(t *testing.T) {
 					Return(br, err2)
 			}
 
+			prevObs, err := tc.previousOutcome.Encode()
+			assert.NoError(t, err)
 			// run the observation
 			obs, err := p.plugin.Observation(ctx, ocr3types.OutcomeContext{
 				SeqNr:           tc.seqNr,
-				PreviousOutcome: tc.previousOutcome.Encode(),
+				PreviousOutcome: prevObs,
 			}, ocrtypes.Query{})
 
 			if tc.expErr != nil {
@@ -302,198 +306,9 @@ func TestPlugin_Observation(t *testing.T) {
 				return
 			}
 			assert.NoError(t, err)
-			assert.Equal(t, string(tc.expObservation.Encode()), string(obs))
-		})
-	}
-}
-
-func TestPlugin_ValidateObservation(t *testing.T) {
-	testCases := []struct {
-		name   string
-		obs    ocrtypes.Observation
-		expErr func(t *testing.T, err error)
-	}{
-		{
-			name: "some random bytes",
-			obs:  ocrtypes.Observation("abc"),
-			expErr: func(t *testing.T, err error) {
-				assert.Error(t, err)
-			},
-		},
-		{
-			name: "empty is ok",
-			obs:  ocrtypes.Observation("{}"),
-		},
-		{
-			name: "some observation",
-			obs: models.NewObservation(
-				[]models.NetworkLiquidity{},
-				[]models.Transfer{{}},
-				[]models.PendingTransfer{},
-				[]models.Transfer{},
-				[]models.Edge{},
-				[]models.ConfigDigestWithMeta{},
-			).Encode(),
-		},
-
-		{
-			name: "deduped liquidity observations",
-			obs: models.NewObservation(
-				[]models.NetworkLiquidity{{Network: 1, Liquidity: ubig.New(big.NewInt(1))}, {Network: 1, Liquidity: ubig.New(big.NewInt(2))}},
-				[]models.Transfer{},
-				[]models.PendingTransfer{},
-				[]models.Transfer{},
-				[]models.Edge{},
-				[]models.ConfigDigestWithMeta{},
-			).Encode(),
-			expErr: func(t *testing.T, err error) {
-				assert.Error(t, err)
-			},
-		},
-		{
-			name: "deduped resolved transfers",
-			obs: models.NewObservation(
-				[]models.NetworkLiquidity{},
-				[]models.Transfer{{From: 1}, {From: 1}},
-				[]models.PendingTransfer{},
-				[]models.Transfer{},
-				[]models.Edge{},
-				[]models.ConfigDigestWithMeta{},
-			).Encode(),
-			expErr: func(t *testing.T, err error) {
-				assert.Error(t, err)
-			},
-		},
-		{
-			name: "deduped pending transfers",
-			obs: models.NewObservation(
-				[]models.NetworkLiquidity{},
-				[]models.Transfer{},
-				[]models.PendingTransfer{{ID: "1"}, {ID: "1"}},
-				[]models.Transfer{},
-				[]models.Edge{},
-				[]models.ConfigDigestWithMeta{},
-			).Encode(),
-			expErr: func(t *testing.T, err error) {
-				assert.Error(t, err)
-			},
-		},
-		{
-			name: "deduped inflight transfers",
-			obs: models.NewObservation(
-				[]models.NetworkLiquidity{},
-				[]models.Transfer{},
-				[]models.PendingTransfer{},
-				[]models.Transfer{{From: 1}, {From: 1}},
-				[]models.Edge{},
-				[]models.ConfigDigestWithMeta{},
-			).Encode(),
-			expErr: func(t *testing.T, err error) {
-				assert.Error(t, err)
-			},
-		},
-		{
-			name: "deduped edges",
-			obs: models.NewObservation(
-				[]models.NetworkLiquidity{},
-				[]models.Transfer{},
-				[]models.PendingTransfer{},
-				[]models.Transfer{},
-				[]models.Edge{{Source: 1, Dest: 2}, {Source: 1, Dest: 2}},
-				[]models.ConfigDigestWithMeta{},
-			).Encode(),
-			expErr: func(t *testing.T, err error) {
-				assert.Error(t, err)
-			},
-		},
-		{
-			name: "deduped config digest",
-			obs: models.NewObservation(
-				[]models.NetworkLiquidity{},
-				[]models.Transfer{},
-				[]models.PendingTransfer{},
-				[]models.Transfer{},
-				[]models.Edge{},
-				[]models.ConfigDigestWithMeta{{NetworkSel: 1}, {NetworkSel: 1}},
-			).Encode(),
-			expErr: func(t *testing.T, err error) {
-				assert.Error(t, err)
-			},
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			p := newPluginWithMocksAndDefaults(t)
-			ao := ocrtypes.AttributedObservation{
-				Observation: tc.obs,
-				Observer:    commontypes.OracleID(uint8(rand.Intn(10))), // ignored by the plugin
-			}
-			err := p.plugin.ValidateObservation(ocr3types.OutcomeContext{}, ocrtypes.Query{}, ao)
-			if tc.expErr != nil {
-				tc.expErr(t, err)
-				return
-			}
+			o, err := tc.expObservation.Encode()
 			assert.NoError(t, err)
-		})
-	}
-}
-
-func Test_validateDedupedItems(t *testing.T) {
-	tests := []struct {
-		name    string
-		keyFn   func(*models.Transfer) string
-		items   []*models.Transfer
-		wantErr bool
-	}{
-		{
-			name: "no duplicates",
-			items: []*models.Transfer{
-				{From: 1},
-				{From: 2},
-				{From: 3},
-			},
-			wantErr: false,
-		},
-		{
-			name: "duplicates",
-			items: []*models.Transfer{
-				{From: 1},
-				{From: 2},
-				{From: 1},
-			},
-			wantErr: true,
-		},
-		{
-			name:    "empty",
-			items:   []*models.Transfer{},
-			wantErr: false,
-		},
-		{
-			name: "custom keyFn",
-			keyFn: func(t *models.Transfer) string {
-				return fmt.Sprintf("%d", t.From)
-			},
-			items: []*models.Transfer{
-				{From: 1, To: 2},
-				{From: 1, To: 3},
-			},
-			wantErr: true,
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			keyFn := tc.keyFn
-			if keyFn == nil {
-				keyFn = dedupKeyObject
-			}
-			err := validateDedupedItems(keyFn, tc.items...)
-			if tc.wantErr {
-				require.Error(t, err)
-				return
-			}
-			require.NoError(t, err)
+			assert.Equal(t, string(o), string(obs))
 		})
 	}
 }
@@ -851,8 +666,9 @@ func TestPlugin_Outcome(t *testing.T) {
 
 			attributedObservations := make([]ocrtypes.AttributedObservation, 0, len(tc.observations))
 			for _, o := range tc.observations {
+				obs, _ := o.Encode()
 				attributedObservations = append(attributedObservations, ocrtypes.AttributedObservation{
-					Observation: o.Encode(),
+					Observation: obs,
 					Observer:    commontypes.OracleID(uint8(rand.Intn(10))),
 				})
 			}
@@ -863,7 +679,9 @@ func TestPlugin_Outcome(t *testing.T) {
 				return
 			}
 			assert.NoError(t, err)
-			assert.Equal(t, string(tc.expectedOutcome.Encode()), string(outc))
+			expectedOutcome, err := tc.expectedOutcome.Encode()
+			assert.NoError(t, err)
+			assert.Equal(t, string(expectedOutcome), string(outc))
 		})
 	}
 }
@@ -969,10 +787,11 @@ func TestPlugin_Reports(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			p := newPluginWithMocksAndDefaults(t)
 			for net, addr := range tc.rebalancerAddress {
-				p.plugin.rebalancerGraph.AddNetwork(net, graph.Data{RebalancerAddress: addr, NetworkSelector: net})
+				p.plugin.liquidityGraph.(graph.GraphTest).AddNetwork(net, graph.Data{LiquidityManagerAddress: addr, NetworkSelector: net})
 			}
-
-			reports, err := p.plugin.Reports(tc.seqNr, tc.outcome.Encode())
+			outcome, err := tc.outcome.Encode()
+			assert.NoError(t, err)
+			reports, err := p.plugin.Reports(tc.seqNr, outcome)
 			if tc.expErr != nil {
 				tc.expErr(t, err)
 				return
@@ -1249,10 +1068,10 @@ func TestPlugin_Close(t *testing.T) {
 	p := newPluginWithMocksAndDefaults(t)
 
 	g := graph.NewGraph()
-	g.AddNetwork(networkA, graph.Data{RebalancerAddress: rebalancerA})
-	g.AddNetwork(networkB, graph.Data{RebalancerAddress: rebalancerB})
-	g.AddNetwork(networkC, graph.Data{RebalancerAddress: rebalancerC})
-	p.plugin.rebalancerGraph = g
+	g.(graph.GraphTest).AddNetwork(networkA, graph.Data{LiquidityManagerAddress: rebalancerA})
+	g.(graph.GraphTest).AddNetwork(networkB, graph.Data{LiquidityManagerAddress: rebalancerB})
+	g.(graph.GraphTest).AddNetwork(networkC, graph.Data{LiquidityManagerAddress: rebalancerC})
+	p.plugin.liquidityGraph = g
 
 	rbA := liquiditymanagermocks.NewLiquidityManager(t)
 	rbB := liquiditymanagermocks.NewLiquidityManager(t)
@@ -1299,13 +1118,14 @@ func TestPlugin_E2EWithMocks(t *testing.T) {
 					n.resetMocks(t)
 
 					// the node will first discover the graph, let's mock the observed graph
+					g := round.discoveredGraphPerNode[i]()
 					discoverer := discoverermocks.NewDiscoverer(t)
-					n.discovererFactory.
-						On("NewDiscoverer", n.plugin.rootNetwork, n.plugin.rootAddress).
-						Return(discoverer, nil).Maybe()
 					discoverer.
 						On("Discover", mock.Anything).
-						Return(round.discoveredGraphPerNode[i](), nil).Maybe()
+						Return(g, nil).Maybe()
+					discoverer.On("DiscoverBalances", mock.Anything, mock.Anything).Return(nil).Maybe()
+					n.plugin.discoverer = discoverer
+					n.plugin.liquidityGraph = g
 
 					// the node will now try to load the pending transfers of all the available bridges
 					// let's mock the pending transfers
@@ -1378,24 +1198,24 @@ func TestPlugin_E2EWithMocks(t *testing.T) {
 
 func twoNodesFourRounds(t *testing.T) testCase {
 	g := graph.NewGraph()
-	g.AddNetwork(networkA, graph.Data{
-		Liquidity:         big.NewInt(1000),
-		TokenAddress:      tokenX,
-		RebalancerAddress: rebalancerA,
-		XChainRebalancers: nil,
-		NetworkSelector:   networkA,
-		ConfigDigest:      cfgDigest1,
-	})
-	g.AddNetwork(networkB, graph.Data{
-		Liquidity:         big.NewInt(2000),
-		TokenAddress:      tokenY,
-		RebalancerAddress: rebalancerB,
-		XChainRebalancers: nil,
-		NetworkSelector:   networkB,
-		ConfigDigest:      cfgDigest2,
-	})
-	require.NoError(t, g.AddConnection(networkA, networkB))
-	require.NoError(t, g.AddConnection(networkB, networkA))
+	a := graph.Data{
+		Liquidity:               big.NewInt(1000),
+		TokenAddress:            tokenX,
+		LiquidityManagerAddress: rebalancerA,
+		XChainLiquidityManagers: nil,
+		NetworkSelector:         networkA,
+		ConfigDigest:            cfgDigest1,
+	}
+	b := graph.Data{
+		Liquidity:               big.NewInt(2000),
+		TokenAddress:            tokenY,
+		LiquidityManagerAddress: rebalancerB,
+		XChainLiquidityManagers: nil,
+		NetworkSelector:         networkB,
+		ConfigDigest:            cfgDigest2,
+	}
+	require.NoError(t, g.Add(a, b))
+	require.NoError(t, g.Add(b, a))
 
 	return testCase{
 		name:     "four nodes four rounds",
@@ -1456,7 +1276,7 @@ func twoNodesFourRounds(t *testing.T) testCase {
 				expTransmitted: []ocr3types.ReportWithInfo[models.Report]{
 					{
 						Info: models.Report{
-							Transfers:               []models.Transfer{{From: networkA, To: networkB, Amount: ubig.NewI(1000), LocalTokenAddress: tokenX, RemoteTokenAddress: tokenY, Sender: rebalancerA, Receiver: rebalancerB}},
+							Transfers:               []models.Transfer{{From: networkA, To: networkB, Amount: ubig.NewI(1000), NativeBridgeFee: ubig.New(nativeBridgeFee), LocalTokenAddress: tokenX, RemoteTokenAddress: tokenY, Sender: rebalancerA, Receiver: rebalancerB}},
 							LiquidityManagerAddress: rebalancerA,
 							NetworkID:               networkA,
 							ConfigDigest:            cfgDigest1,
@@ -1467,7 +1287,7 @@ func twoNodesFourRounds(t *testing.T) testCase {
 				expNotAccepted:    []ocr3types.ReportWithInfo[models.Report]{},
 				expOutcome: models.NewOutcome(
 					nil,
-					[]models.Transfer{{From: networkA, To: networkB, Amount: ubig.NewI(1000), LocalTokenAddress: tokenX, RemoteTokenAddress: tokenY, Sender: rebalancerA, Receiver: rebalancerB}},
+					[]models.Transfer{{From: networkA, To: networkB, Amount: ubig.NewI(1000), LocalTokenAddress: tokenX, RemoteTokenAddress: tokenY, Sender: rebalancerA, Receiver: rebalancerB, NativeBridgeFee: ubig.New(nativeBridgeFee)}},
 					nil,
 					[]models.ConfigDigestWithMeta{{Digest: cfgDigest1, NetworkSel: networkA}, {Digest: cfgDigest2, NetworkSel: networkB}}),
 				dataPerRebalancer: map[models.NetworkSelector]perRebalancerData{
@@ -1535,6 +1355,7 @@ func twoNodesFourRounds(t *testing.T) testCase {
 							From:               networkA,
 							To:                 networkB,
 							Amount:             ubig.NewI(1000),
+							NativeBridgeFee:    ubig.New(nativeBridgeFee),
 							LocalTokenAddress:  tokenX,
 							RemoteTokenAddress: tokenY,
 							Stage:              1,
@@ -1547,6 +1368,7 @@ func twoNodesFourRounds(t *testing.T) testCase {
 							From:               networkA,
 							To:                 networkB,
 							Amount:             ubig.NewI(1000),
+							NativeBridgeFee:    ubig.New(nativeBridgeFee),
 							LocalTokenAddress:  tokenX,
 							RemoteTokenAddress: tokenY,
 							Stage:              1,
@@ -1559,6 +1381,7 @@ func twoNodesFourRounds(t *testing.T) testCase {
 							From:               networkA,
 							To:                 networkB,
 							Amount:             ubig.NewI(1000),
+							NativeBridgeFee:    ubig.New(nativeBridgeFee),
 							LocalTokenAddress:  tokenX,
 							RemoteTokenAddress: tokenY,
 							Stage:              1,
@@ -1571,6 +1394,7 @@ func twoNodesFourRounds(t *testing.T) testCase {
 							From:               networkA,
 							To:                 networkB,
 							Amount:             ubig.NewI(1000),
+							NativeBridgeFee:    ubig.New(nativeBridgeFee),
 							LocalTokenAddress:  tokenX,
 							RemoteTokenAddress: tokenY,
 							Stage:              1,
@@ -1591,6 +1415,7 @@ func twoNodesFourRounds(t *testing.T) testCase {
 								From:               networkA,
 								To:                 networkB,
 								Amount:             ubig.NewI(1000),
+								NativeBridgeFee:    ubig.New(nativeBridgeFee),
 								LocalTokenAddress:  tokenX,
 								RemoteTokenAddress: tokenY,
 							},
@@ -1655,10 +1480,8 @@ func assertProposedTransfersEqual(t *testing.T, a, b []models.ProposedTransfer) 
 }
 
 func assertOutcomeEqual(t *testing.T, exp models.Outcome, got []byte) {
-	decodedOutcome := models.Outcome{}
-	err := json.Unmarshal(got, &decodedOutcome)
+	decodedOutcome, err := models.DecodeOutcome(got)
 	require.NoError(t, err)
-
 	require.Equal(t, exp.ConfigDigests, decodedOutcome.ConfigDigests)
 	assertTransfersEqual(t, exp.ResolvedTransfers, decodedOutcome.ResolvedTransfers)
 	assertPendingTransfersEqual(t, exp.PendingTransfers, decodedOutcome.PendingTransfers)
@@ -1714,7 +1537,8 @@ type node struct {
 
 func (n *node) resetMocks(t *testing.T) {
 	lmFactory := mocks.NewFactory(t)
-	discovererFactory := discoverermocks.NewFactory(t)
+	discovererMock := discoverermocks.NewDiscoverer(t)
+	discovererMock.On("DiscoverBalances", mock.Anything, mock.Anything).Return(nil).Maybe()
 	bridgeFactory := bridgemocks.NewFactory(t)
 	bridgeMocks := make(map[[2]models.NetworkSelector]*bridgemocks.Bridge)
 	for _, b := range bridges {
@@ -1722,18 +1546,22 @@ func (n *node) resetMocks(t *testing.T) {
 	}
 
 	n.bridgeFactory = bridgeFactory
-	n.discovererFactory = discovererFactory
 	n.rbFactory = lmFactory
 	n.bridges = bridgeMocks
 
 	n.plugin.bridgeFactory = bridgeFactory
-	n.plugin.discovererFactory = discovererFactory
+	n.plugin.discoverer = discovererMock
 	n.plugin.liquidityManagerFactory = lmFactory
 }
 
 func newNode(t *testing.T, lggr logger.Logger, f int) node {
 	lmFactory := mocks.NewFactory(t)
 	discovererFactory := discoverermocks.NewFactory(t)
+	discovererMock := discoverermocks.NewDiscoverer(t)
+	discovererMock.On("DiscoverBalances", mock.Anything, mock.Anything).Return(nil).Maybe()
+	// g := graph.NewGraph()
+	// discovererMock.On("Discover", mock.Anything).Return(g, nil).Maybe()
+	discovererFactory.On("NewDiscoverer", mock.Anything, mock.Anything).Return(discovererMock, nil).Maybe()
 	bridgeFactory := bridgemocks.NewFactory(t)
 	rebalancerAlg := liquidityrebalancer.NewPingPong()
 
@@ -1743,7 +1571,7 @@ func newNode(t *testing.T, lggr logger.Logger, f int) node {
 		networkA,
 		models.Address(utils.RandomAddress()),
 		lmFactory,
-		discovererFactory,
+		discovererMock,
 		bridgeFactory,
 		rebalancerAlg,
 		NewJsonReportCodec(),
@@ -1794,6 +1622,8 @@ func newPluginWithMocks(
 ) *pluginWithMocks {
 	lmFactory := mocks.NewFactory(t)
 	discovererFactory := discoverermocks.NewFactory(t)
+	discovererMock := discoverermocks.NewDiscoverer(t)
+	discovererFactory.On("NewDiscoverer", mock.Anything, mock.Anything).Return(discovererMock, nil).Maybe()
 	bridgeFactory := bridgemocks.NewFactory(t)
 	rebalancerAlg := liquidityrebalancer.NewPingPong()
 	return &pluginWithMocks{
@@ -1803,7 +1633,7 @@ func newPluginWithMocks(
 			rootNetwork,
 			rootAddress,
 			lmFactory,
-			discovererFactory,
+			discovererMock,
 			bridgeFactory,
 			rebalancerAlg,
 			NewJsonReportCodec(),

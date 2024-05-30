@@ -1,16 +1,18 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.19;
+pragma solidity 0.8.24;
 
 import {IPool} from "../../interfaces/IPool.sol";
 
 import {Internal} from "../../libraries/Internal.sol";
 import {Pool} from "../../libraries/Pool.sol";
+import {RateLimiter} from "../../libraries/RateLimiter.sol";
 import {EVM2EVMOffRamp} from "../../offRamp/EVM2EVMOffRamp.sol";
-import {EVM2EVMOnRamp} from "../../onRamp/EVM2EVMOnRamp.sol";
 import {BurnMintTokenPool} from "../../pools/BurnMintTokenPool.sol";
 import {TokenPool} from "../../pools/TokenPool.sol";
 import {BaseTest} from "../BaseTest.t.sol";
 import {BurnMintSetup} from "./BurnMintSetup.t.sol";
+
+import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 
 contract BurnMintTokenPoolSetup is BurnMintSetup {
   BurnMintTokenPool internal s_pool;
@@ -18,7 +20,7 @@ contract BurnMintTokenPoolSetup is BurnMintSetup {
   function setUp() public virtual override {
     BurnMintSetup.setUp();
 
-    s_pool = new BurnMintTokenPool(s_burnMintERC677, new address[](0), address(s_mockARM), address(s_sourceRouter));
+    s_pool = new BurnMintTokenPool(s_burnMintERC677, new address[](0), address(s_mockRMN), address(s_sourceRouter));
     s_burnMintERC677.grantMintAndBurnRoles(address(s_pool));
 
     _applyChainUpdates(address(s_pool));
@@ -28,7 +30,7 @@ contract BurnMintTokenPoolSetup is BurnMintSetup {
 contract BurnMintTokenPool_lockOrBurn is BurnMintTokenPoolSetup {
   function test_Setup_Success() public view {
     assertEq(address(s_burnMintERC677), address(s_pool.getToken()));
-    assertEq(address(s_mockARM), s_pool.getArmProxy());
+    assertEq(address(s_mockRMN), s_pool.getRmnProxy());
     assertEq(false, s_pool.getAllowListEnabled());
     assertEq("BurnMintTokenPool 1.5.0-dev", s_pool.typeAndVersion());
   }
@@ -42,13 +44,13 @@ contract BurnMintTokenPool_lockOrBurn is BurnMintTokenPoolSetup {
     vm.startPrank(s_burnMintOnRamp);
 
     vm.expectEmit();
-    emit TokensConsumed(burnAmount);
+    emit RateLimiter.TokensConsumed(burnAmount);
 
     vm.expectEmit();
-    emit Transfer(address(s_pool), address(0), burnAmount);
+    emit IERC20.Transfer(address(s_pool), address(0), burnAmount);
 
     vm.expectEmit();
-    emit Burned(address(s_burnMintOnRamp), burnAmount);
+    emit TokenPool.Burned(address(s_burnMintOnRamp), burnAmount);
 
     bytes4 expectedSignature = bytes4(keccak256("burn(uint256)"));
     vm.expectCall(address(s_burnMintERC677), abi.encodeWithSelector(expectedSignature, burnAmount));
@@ -58,7 +60,8 @@ contract BurnMintTokenPool_lockOrBurn is BurnMintTokenPoolSetup {
         originalSender: OWNER,
         receiver: bytes(""),
         amount: burnAmount,
-        remoteChainSelector: DEST_CHAIN_SELECTOR
+        remoteChainSelector: DEST_CHAIN_SELECTOR,
+        localToken: address(s_burnMintERC677)
       })
     );
 
@@ -67,17 +70,18 @@ contract BurnMintTokenPool_lockOrBurn is BurnMintTokenPoolSetup {
 
   // Should not burn tokens if cursed.
   function test_PoolBurnRevertNotHealthy_Revert() public {
-    s_mockARM.voteToCurse(bytes32(0));
+    s_mockRMN.voteToCurse(bytes32(0));
     uint256 before = s_burnMintERC677.balanceOf(address(s_pool));
     vm.startPrank(s_burnMintOnRamp);
 
-    vm.expectRevert(EVM2EVMOnRamp.BadARMSignal.selector);
+    vm.expectRevert(TokenPool.CursedByRMN.selector);
     s_pool.lockOrBurn(
       Pool.LockOrBurnInV1({
         originalSender: OWNER,
         receiver: bytes(""),
         amount: 1e5,
-        remoteChainSelector: DEST_CHAIN_SELECTOR
+        remoteChainSelector: DEST_CHAIN_SELECTOR,
+        localToken: address(s_burnMintERC677)
       })
     );
 
@@ -93,7 +97,8 @@ contract BurnMintTokenPool_lockOrBurn is BurnMintTokenPoolSetup {
         originalSender: OWNER,
         receiver: bytes(""),
         amount: 1,
-        remoteChainSelector: wrongChainSelector
+        remoteChainSelector: wrongChainSelector,
+        localToken: address(s_burnMintERC677)
       })
     );
   }
@@ -106,7 +111,7 @@ contract BurnMintTokenPool_releaseOrMint is BurnMintTokenPoolSetup {
     vm.startPrank(s_burnMintOffRamp);
 
     vm.expectEmit();
-    emit Transfer(address(0), OWNER, amount);
+    emit IERC20.Transfer(address(0), OWNER, amount);
     s_pool.releaseOrMint(
       Pool.ReleaseOrMintInV1({
         originalSender: bytes(""),
@@ -124,11 +129,11 @@ contract BurnMintTokenPool_releaseOrMint is BurnMintTokenPoolSetup {
 
   function test_PoolMintNotHealthy_Revert() public {
     // Should not mint tokens if cursed.
-    s_mockARM.voteToCurse(bytes32(0));
+    s_mockRMN.voteToCurse(bytes32(0));
     uint256 before = s_burnMintERC677.balanceOf(OWNER);
     vm.startPrank(s_burnMintOffRamp);
 
-    vm.expectRevert(EVM2EVMOffRamp.BadARMSignal.selector);
+    vm.expectRevert(TokenPool.CursedByRMN.selector);
     s_pool.releaseOrMint(
       Pool.ReleaseOrMintInV1({
         originalSender: bytes(""),

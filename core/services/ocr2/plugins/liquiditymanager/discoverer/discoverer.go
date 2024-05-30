@@ -23,7 +23,10 @@ type Factory interface {
 
 //go:generate mockery --quiet --name Discoverer --output ./mocks --filename discoverer_mock.go --case=underscore
 type Discoverer interface {
+	// Discover fetches the entire graph
 	Discover(ctx context.Context) (graph.Graph, error)
+	// DiscoverBalances fetch only the balances rather building the entire graph
+	DiscoverBalances(context.Context, graph.Graph) error
 }
 
 type evmDep struct {
@@ -66,7 +69,7 @@ func (f *factory) NewDiscoverer(selector models.NetworkSelector, rebalancerAddre
 	return d, err
 }
 
-func (f *factory) initDiscoverer(selector models.NetworkSelector, rebalancerAddress models.Address) (Discoverer, error) {
+func (f *factory) initDiscoverer(selector models.NetworkSelector, lmAddress models.Address) (Discoverer, error) {
 	var d Discoverer
 
 	switch typ := selector.Type(); typ {
@@ -75,14 +78,10 @@ func (f *factory) initDiscoverer(selector models.NetworkSelector, rebalancerAddr
 		if !exists {
 			return nil, fmt.Errorf("evm dependencies not found for selector %d", selector)
 		}
-		d = &evmDiscoverer{
-			evmClients:       f.evmDeps,
-			masterRebalancer: rebalancerAddress,
-			masterSelector:   selector,
-		}
+		d = newEvmDiscoverer(f.lggr, f.evmDeps, lmAddress, selector)
+		f.lggr.Debugw("Created EVM Discoverer", "selector", selector, "lmAddress", lmAddress)
 	}
-
-	f.cachedDiscoverers.Store(f.cacheKey(selector, rebalancerAddress), d)
+	f.cachedDiscoverers.Store(f.cacheKey(selector, lmAddress), d)
 	return d, nil
 }
 

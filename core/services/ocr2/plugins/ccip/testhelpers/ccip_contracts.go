@@ -30,7 +30,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/arm_proxy_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store_helper"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/custom_token_pool"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store_helper_1_2_0"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp_1_2_0"
@@ -178,7 +178,6 @@ type Common struct {
 	Chain              *backends.SimulatedBackend
 	LinkToken          *link_token_interface.LinkToken
 	LinkTokenPool      *lock_release_token_pool.LockReleaseTokenPool
-	CustomPool         *custom_token_pool.CustomTokenPool
 	CustomToken        *link_token_interface.LinkToken
 	WrappedNative      *weth9.WETH9
 	WrappedNativePool  *lock_release_token_pool.LockReleaseTokenPool
@@ -249,7 +248,7 @@ func (c *CCIPContracts) DeployNewOffRamp(t *testing.T) {
 			SourceChainSelector: c.Source.ChainSelector,
 			OnRamp:              c.Source.OnRamp.Address(),
 			PrevOffRamp:         prevOffRamp,
-			ArmProxy:            c.Dest.ARMProxy.Address(),
+			RmnProxy:            c.Dest.ARMProxy.Address(), // RMN formerly ARM
 		},
 		evm_2_evm_offramp.RateLimiterConfig{
 			IsEnabled: true,
@@ -306,7 +305,7 @@ func (c *CCIPContracts) DeployNewOnRamp(t *testing.T) {
 			DefaultTxGasLimit: 200_000,
 			MaxNopFeesJuels:   big.NewInt(0).Mul(big.NewInt(100_000_000), big.NewInt(1e18)),
 			PrevOnRamp:        prevOnRamp,
-			ArmProxy:          c.Source.ARM.Address(), // ARM
+			RmnProxy:          c.Source.ARM.Address(), // RMN, formerly ARM
 		},
 		evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig{
 			Router:                            c.Source.Router.Address(),
@@ -352,7 +351,7 @@ func (c *CCIPContracts) DeployNewOnRamp(t *testing.T) {
 				MaxFeeUSDCents:            1_000_000_00, // $ 1 million
 				DeciBps:                   5_0,          // 5 bps
 				DestGasOverhead:           34_000,
-				DestBytesOverhead:         0,
+				DestBytesOverhead:         32,
 				AggregateRateLimitEnabled: true,
 			},
 		},
@@ -377,10 +376,10 @@ func (c *CCIPContracts) EnableOnRamp(t *testing.T) {
 }
 
 func (c *CCIPContracts) DeployNewCommitStore(t *testing.T) {
-	commitStoreAddress, _, _, err := commit_store_helper.DeployCommitStoreHelper(
+	commitStoreAddress, _, _, err := commit_store_helper_1_2_0.DeployCommitStoreHelper(
 		c.Dest.User,  // user
 		c.Dest.Chain, // client
-		commit_store_helper.CommitStoreStaticConfig{
+		commit_store_helper_1_2_0.CommitStoreStaticConfig{
 			ChainSelector:       c.Dest.ChainSelector,
 			SourceChainSelector: c.Source.ChainSelector,
 			OnRamp:              c.Source.OnRamp.Address(),
@@ -404,6 +403,7 @@ func (c *CCIPContracts) DeployNewPriceRegistry(t *testing.T) {
 		[]common.Address{c.Dest.CommitStore.Address()},
 		[]common.Address{c.Dest.LinkToken.Address()},
 		60*60*24*14, // two weeks
+		nil,
 	)
 	require.NoError(t, err)
 	c.Source.Chain.Commit()
@@ -979,6 +979,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 		nil,
 		[]common.Address{sourceLinkTokenAddress, sourceWeth9addr},
 		60*60*24*14, // two weeks
+		nil,
 	)
 	require.NoError(t, err)
 
@@ -1019,7 +1020,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 			DefaultTxGasLimit: 200_000,
 			MaxNopFeesJuels:   big.NewInt(0).Mul(big.NewInt(100_000_000), big.NewInt(1e18)),
 			PrevOnRamp:        common.HexToAddress(""),
-			ArmProxy:          armProxySourceAddress, // ARM
+			RmnProxy:          armProxySourceAddress, // RMN, formerly ARM
 		},
 		evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig{
 			Router:                            sourceRouterAddress,
@@ -1065,7 +1066,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 				MaxFeeUSDCents:            1_000_000_00, // $ 1 million
 				DeciBps:                   5_0,          // 5 bps
 				DestGasOverhead:           34_000,
-				DestBytesOverhead:         0,
+				DestBytesOverhead:         32,
 				AggregateRateLimitEnabled: true,
 			},
 		},
@@ -1085,16 +1086,17 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 		nil,
 		[]common.Address{destLinkTokenAddress, destWeth9addr},
 		60*60*24*14, // two weeks
+		nil,
 	)
 	require.NoError(t, err)
 	destPriceRegistry, err := price_registry.NewPriceRegistry(destPriceRegistryAddress, destChain)
 	require.NoError(t, err)
 
 	// Deploy commit store.
-	commitStoreAddress, _, _, err := commit_store_helper.DeployCommitStoreHelper(
+	commitStoreAddress, _, _, err := commit_store_helper_1_2_0.DeployCommitStoreHelper(
 		destUser,  // user
 		destChain, // client
-		commit_store_helper.CommitStoreStaticConfig{
+		commit_store_helper_1_2_0.CommitStoreStaticConfig{
 			ChainSelector:       destChainSelector,
 			SourceChainSelector: sourceChainSelector,
 			OnRamp:              onRamp.Address(),
@@ -1117,7 +1119,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 			SourceChainSelector: sourceChainSelector,
 			OnRamp:              onRampAddress,
 			PrevOffRamp:         common.HexToAddress(""),
-			ArmProxy:            armProxyDestAddress,
+			RmnProxy:            armProxyDestAddress, // RMN, formerly ARM
 		},
 		evm_2_evm_offramp.RateLimiterConfig{
 			IsEnabled: true,
@@ -1164,7 +1166,6 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 			Chain:              sourceChain,
 			LinkToken:          sourceLinkToken,
 			LinkTokenPool:      sourceLinkPool,
-			CustomPool:         nil,
 			CustomToken:        sourceCustomToken,
 			ARM:                sourceARM,
 			ARMProxy:           sourceARMProxy,
@@ -1184,7 +1185,6 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 			Chain:              destChain,
 			LinkToken:          destLinkToken,
 			LinkTokenPool:      destLinkPool,
-			CustomPool:         nil,
 			CustomToken:        destCustomToken,
 			ARM:                destARM,
 			ARMProxy:           destARMProxy,
@@ -1240,6 +1240,18 @@ func GetEVMExtraArgsV1(gasLimit *big.Int, strict bool) ([]byte, error) {
 	}
 
 	return append(EVMV1Tag, encodedArgs...), nil
+}
+
+func GetEVMExtraArgsV2(gasLimit *big.Int, allowOutOfOrder bool) ([]byte, error) {
+	// see Client.sol.
+	EVMV2Tag := hexutil.MustDecode("0x181dcf10")
+
+	encodedArgs, err := utils.ABIEncode(`[{"type":"uint256"},{"type":"bool"}]`, gasLimit, allowOutOfOrder)
+	if err != nil {
+		return nil, err
+	}
+
+	return append(EVMV2Tag, encodedArgs...), nil
 }
 
 type ManualExecArgs struct {

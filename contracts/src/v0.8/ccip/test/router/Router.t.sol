@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.19;
+pragma solidity 0.8.24;
 
 import {IAny2EVMMessageReceiver} from "../../interfaces/IAny2EVMMessageReceiver.sol";
 import {IRouter} from "../../interfaces/IRouter.sol";
@@ -17,16 +17,13 @@ import {RouterSetup} from "../router/RouterSetup.t.sol";
 
 import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 
-/// @notice #constructor
 contract Router_constructor is EVM2EVMOnRampSetup {
   function test_Constructor_Success() public view {
     assertEq("Router 1.2.0", s_sourceRouter.typeAndVersion());
-    // owner
     assertEq(OWNER, s_sourceRouter.owner());
   }
 }
 
-/// @notice #recoverTokens
 contract Router_recoverTokens is EVM2EVMOnRampSetup {
   function test_RecoverTokens_Success() public {
     // Assert we can recover sourceToken
@@ -75,7 +72,6 @@ contract Router_recoverTokens is EVM2EVMOnRampSetup {
   }
 }
 
-/// @notice #ccipSend
 contract Router_ccipSend is EVM2EVMOnRampSetup {
   event Burned(address indexed sender, uint256 amount);
 
@@ -102,7 +98,7 @@ contract Router_ccipSend is EVM2EVMOnRampSetup {
     Internal.EVM2EVMMessage memory msgEvent = _messageToEvent(message, 1, 1, expectedFee, OWNER);
 
     vm.expectEmit();
-    emit CCIPSendRequested(msgEvent);
+    emit EVM2EVMOnRamp.CCIPSendRequested(msgEvent);
 
     vm.resumeGasMetering();
     bytes32 messageId = s_sourceRouter.ccipSend(DEST_CHAIN_SELECTOR, message);
@@ -125,7 +121,7 @@ contract Router_ccipSend is EVM2EVMOnRampSetup {
     Internal.EVM2EVMMessage memory msgEvent = _messageToEvent(message, 1, 1, expectedFee, OWNER);
 
     vm.expectEmit();
-    emit CCIPSendRequested(msgEvent);
+    emit EVM2EVMOnRamp.CCIPSendRequested(msgEvent);
 
     vm.resumeGasMetering();
     bytes32 messageId = s_sourceRouter.ccipSend(DEST_CHAIN_SELECTOR, message);
@@ -162,7 +158,7 @@ contract Router_ccipSend is EVM2EVMOnRampSetup {
     message.feeToken = address(0);
 
     vm.expectEmit();
-    emit CCIPSendRequested(msgEvent);
+    emit EVM2EVMOnRamp.CCIPSendRequested(msgEvent);
 
     vm.resumeGasMetering();
     bytes32 messageId = s_sourceRouter.ccipSend{value: expectedFee}(DEST_CHAIN_SELECTOR, message);
@@ -190,7 +186,7 @@ contract Router_ccipSend is EVM2EVMOnRampSetup {
     message.feeToken = address(0);
 
     vm.expectEmit();
-    emit CCIPSendRequested(msgEvent);
+    emit EVM2EVMOnRamp.CCIPSendRequested(msgEvent);
 
     vm.resumeGasMetering();
     bytes32 messageId = s_sourceRouter.ccipSend{value: expectedFee}(DEST_CHAIN_SELECTOR, message);
@@ -269,8 +265,8 @@ contract Router_ccipSend is EVM2EVMOnRampSetup {
     s_priceRegistry.applyFeeTokensUpdates(feeTokens, new address[](0));
 
     // Update the price of the newly set feeToken
-    Internal.PriceUpdates memory priceUpdates =
-      getSingleTokenAndGasPriceUpdateStruct(feeTokenWithZeroFeeAndGas, 2_000 ether, DEST_CHAIN_SELECTOR, 0);
+    Internal.PriceUpdates memory priceUpdates = getSingleTokenPriceUpdateStruct(feeTokenWithZeroFeeAndGas, 2_000 ether);
+    priceUpdates.gasPriceUpdates = getSingleGasPriceUpdateStruct(DEST_CHAIN_SELECTOR, 0).gasPriceUpdates;
     s_priceRegistry.updatePrices(priceUpdates);
 
     // Set the feeToken args on the onRamp
@@ -300,7 +296,7 @@ contract Router_ccipSend is EVM2EVMOnRampSetup {
 
   function test_WhenNotHealthy_Revert() public {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
-    s_mockARM.voteToCurse(bytes32(0));
+    s_mockRMN.voteToCurse(bytes32(0));
     vm.expectRevert(Router.BadARMSignal.selector);
     s_sourceRouter.ccipSend(DEST_CHAIN_SELECTOR, message);
   }
@@ -386,12 +382,13 @@ contract Router_ccipSend is EVM2EVMOnRampSetup {
   }
 }
 
-// @notice applyRampUpdates
-contract Router_applyRampUpdates is RouterSetup {
-  event OffRampRemoved(uint64 indexed sourceChainSelector, address offRamp);
-  event OffRampAdded(uint64 indexed sourceChainSelector, address offRamp);
-  event OnRampSet(uint64 indexed destChainSelector, address onRamp);
+contract Router_getArmProxy is RouterSetup {
+  function test_getArmProxy() public view {
+    assertEq(s_sourceRouter.getArmProxy(), address(s_mockRMN));
+  }
+}
 
+contract Router_applyRampUpdates is RouterSetup {
   MaybeRevertMessageReceiver internal s_receiver;
 
   function setUp() public virtual override(RouterSetup) {
@@ -476,7 +473,7 @@ contract Router_applyRampUpdates is RouterSetup {
 
     for (uint256 i = 0; i < offRampUpdates.length; ++i) {
       vm.expectEmit();
-      emit OffRampAdded(offRampUpdates[i].sourceChainSelector, offRampUpdates[i].offRamp);
+      emit Router.OffRampAdded(offRampUpdates[i].sourceChainSelector, offRampUpdates[i].offRamp);
     }
     s_sourceRouter.applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), offRampUpdates);
 
@@ -508,11 +505,11 @@ contract Router_applyRampUpdates is RouterSetup {
 
     for (uint256 i = 0; i < numberOfPartialUpdates; ++i) {
       vm.expectEmit();
-      emit OffRampRemoved(partialOffRampRemoves[i].sourceChainSelector, partialOffRampRemoves[i].offRamp);
+      emit Router.OffRampRemoved(partialOffRampRemoves[i].sourceChainSelector, partialOffRampRemoves[i].offRamp);
     }
     for (uint256 i = 0; i < numberOfPartialUpdates; ++i) {
       vm.expectEmit();
-      emit OffRampAdded(partialOffRampAdds[i].sourceChainSelector, partialOffRampAdds[i].offRamp);
+      emit Router.OffRampAdded(partialOffRampAdds[i].sourceChainSelector, partialOffRampAdds[i].offRamp);
     }
     s_sourceRouter.applyRampUpdates(onRampUpdates, partialOffRampRemoves, partialOffRampAdds);
 
@@ -535,11 +532,11 @@ contract Router_applyRampUpdates is RouterSetup {
 
     vm.startPrank(OWNER);
 
-    // 3rd test scenario: remove all offramps.
+    // 3rd test scenario: remove all offRamps.
     // Check all offramps have been removed, no offramp is able to route messages.
     for (uint256 i = 0; i < numberOfPartialUpdates; ++i) {
       vm.expectEmit();
-      emit OffRampRemoved(partialOffRampAdds[i].sourceChainSelector, partialOffRampAdds[i].offRamp);
+      emit Router.OffRampRemoved(partialOffRampAdds[i].sourceChainSelector, partialOffRampAdds[i].offRamp);
     }
     s_sourceRouter.applyRampUpdates(onRampUpdates, partialOffRampAdds, new Router.OffRamp[](0));
 
@@ -551,7 +548,7 @@ contract Router_applyRampUpdates is RouterSetup {
 
     for (uint256 i = 0; i < numberOfRemainingOfframps; ++i) {
       vm.expectEmit();
-      emit OffRampRemoved(remainingOffRampRemoves[i].sourceChainSelector, remainingOffRampRemoves[i].offRamp);
+      emit Router.OffRampRemoved(remainingOffRampRemoves[i].sourceChainSelector, remainingOffRampRemoves[i].offRamp);
     }
     s_sourceRouter.applyRampUpdates(onRampUpdates, remainingOffRampRemoves, new Router.OffRamp[](0));
 
@@ -569,12 +566,12 @@ contract Router_applyRampUpdates is RouterSetup {
 
     vm.startPrank(OWNER);
 
-    // 4th test scenario: add initial onramps back.
+    // 4th test scenario: add initial onRamps back.
     // Check the offramps are added correctly, and can route messages.
     // Check offramps that were not added back remain unset, and cannot route messages.
     for (uint256 i = 0; i < offRampUpdates.length; ++i) {
       vm.expectEmit();
-      emit OffRampAdded(offRampUpdates[i].sourceChainSelector, offRampUpdates[i].offRamp);
+      emit Router.OffRampAdded(offRampUpdates[i].sourceChainSelector, offRampUpdates[i].offRamp);
     }
     s_sourceRouter.applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), offRampUpdates);
 
@@ -599,7 +596,7 @@ contract Router_applyRampUpdates is RouterSetup {
     // Test adding onRamps
     for (uint256 i = 0; i < onRamps.length; ++i) {
       vm.expectEmit();
-      emit OnRampSet(onRamps[i].destChainSelector, onRamps[i].onRamp);
+      emit Router.OnRampSet(onRamps[i].destChainSelector, onRamps[i].onRamp);
     }
 
     s_sourceRouter.applyRampUpdates(onRamps, new Router.OffRamp[](0), new Router.OffRamp[](0));
@@ -609,7 +606,7 @@ contract Router_applyRampUpdates is RouterSetup {
       onRamps[i].onRamp = address(0);
 
       vm.expectEmit();
-      emit OnRampSet(onRamps[i].destChainSelector, onRamps[i].onRamp);
+      emit Router.OnRampSet(onRamps[i].destChainSelector, onRamps[i].onRamp);
     }
     s_sourceRouter.applyRampUpdates(onRamps, new Router.OffRamp[](0), new Router.OffRamp[](0));
     for (uint256 i = 0; i < onRamps.length; ++i) {
@@ -657,7 +654,7 @@ contract Router_applyRampUpdates is RouterSetup {
     offRampUpdates[0] = Router.OffRamp(DEST_CHAIN_SELECTOR, offRamp);
 
     vm.expectEmit();
-    emit OffRampAdded(DEST_CHAIN_SELECTOR, offRamp);
+    emit Router.OffRampAdded(DEST_CHAIN_SELECTOR, offRamp);
     s_sourceRouter.applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), offRampUpdates);
 
     offRampUpdates[0] = Router.OffRamp(SOURCE_CHAIN_SELECTOR, offRamp);
@@ -667,7 +664,6 @@ contract Router_applyRampUpdates is RouterSetup {
   }
 }
 
-/// @notice #setWrappedNative
 contract Router_setWrappedNative is EVM2EVMOnRampSetup {
   function test_Fuzz_SetWrappedNative_Success(address wrappedNative) public {
     s_sourceRouter.setWrappedNative(wrappedNative);
@@ -682,7 +678,6 @@ contract Router_setWrappedNative is EVM2EVMOnRampSetup {
   }
 }
 
-/// @notice #getSupportedTokens
 contract Router_getSupportedTokens is EVM2EVMOnRampSetup {
   function test_GetSupportedTokens_Revert() public {
     vm.expectRevert(EVM2EVMOnRamp.GetSupportedTokensFunctionalityRemovedCheckAdminRegistry.selector);
@@ -690,13 +685,14 @@ contract Router_getSupportedTokens is EVM2EVMOnRampSetup {
   }
 }
 
-/// @notice #routeMessage
 contract Router_routeMessage is EVM2EVMOffRampSetup {
-  event MessageExecuted(bytes32 messageId, uint64 sourceChainSelector, address offRamp, bytes32 calldataHash);
-
   function setUp() public virtual override {
     EVM2EVMOffRampSetup.setUp();
     vm.startPrank(address(s_offRamp));
+  }
+
+  function generateManualGasLimit(uint256 callDataLength) internal view returns (uint256) {
+    return ((gasleft() - 2 * (16 * callDataLength + GAS_FOR_CALL_EXACT_CHECK)) * 62) / 64;
   }
 
   function test_ManualExec_Success() public {
@@ -723,7 +719,7 @@ contract Router_routeMessage is EVM2EVMOffRampSetup {
     s_reverting_receiver.setErr(realError1);
 
     vm.expectEmit();
-    emit MessageExecuted(
+    emit Router.MessageExecuted(
       message.messageId,
       message.sourceChainSelector,
       address(s_offRamp),
@@ -749,7 +745,7 @@ contract Router_routeMessage is EVM2EVMOffRampSetup {
     s_reverting_receiver.setErr(realError2);
 
     vm.expectEmit();
-    emit MessageExecuted(
+    emit Router.MessageExecuted(
       message.messageId,
       message.sourceChainSelector,
       address(s_offRamp),
@@ -778,7 +774,7 @@ contract Router_routeMessage is EVM2EVMOffRampSetup {
 
     // Should emit success
     vm.expectEmit();
-    emit MessageExecuted(
+    emit Router.MessageExecuted(
       message.messageId,
       message.sourceChainSelector,
       address(s_offRamp),
@@ -806,7 +802,7 @@ contract Router_routeMessage is EVM2EVMOffRampSetup {
     if (error.length >= 33) {
       uint256 cutOff = error.length > 64 ? 64 : error.length;
       vm.expectEmit();
-      emit MessageExecuted(
+      emit Router.MessageExecuted(
         message.messageId,
         message.sourceChainSelector,
         address(s_offRamp),
@@ -821,7 +817,7 @@ contract Router_routeMessage is EVM2EVMOffRampSetup {
       );
     } else {
       vm.expectEmit();
-      emit MessageExecuted(
+      emit Router.MessageExecuted(
         message.messageId,
         message.sourceChainSelector,
         address(s_offRamp),
@@ -868,7 +864,7 @@ contract Router_routeMessage is EVM2EVMOffRampSetup {
   }
 
   function test_WhenNotHealthy_Revert() public {
-    s_mockARM.voteToCurse(bytes32(0));
+    s_mockRMN.voteToCurse(bytes32(0));
     vm.expectRevert(Router.BadARMSignal.selector);
     s_destRouter.routeMessage(
       generateReceiverMessage(SOURCE_CHAIN_SELECTOR), GAS_FOR_CALL_EXACT_CHECK, 100_000, address(s_receiver)
@@ -876,7 +872,6 @@ contract Router_routeMessage is EVM2EVMOffRampSetup {
   }
 }
 
-/// @notice #getFee
 contract Router_getFee is EVM2EVMOnRampSetup {
   function test_GetFeeSupportedChain_Success() public view {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();

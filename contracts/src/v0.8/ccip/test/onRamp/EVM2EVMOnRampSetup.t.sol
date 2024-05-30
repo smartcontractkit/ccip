@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.19;
+pragma solidity 0.8.24;
 
 import {IPool} from "../../interfaces/IPool.sol";
 
@@ -7,6 +7,7 @@ import {PriceRegistry} from "../../PriceRegistry.sol";
 import {Router} from "../../Router.sol";
 import {Client} from "../../libraries/Client.sol";
 import {Internal} from "../../libraries/Internal.sol";
+import {Pool} from "../../libraries/Pool.sol";
 import {EVM2EVMOnRamp} from "../../onRamp/EVM2EVMOnRamp.sol";
 import {LockReleaseTokenPool} from "../../pools/LockReleaseTokenPool.sol";
 import {TokenPool} from "../../pools/TokenPool.sol";
@@ -17,9 +18,6 @@ import {PriceRegistrySetup} from "../priceRegistry/PriceRegistry.t.sol";
 import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 
 contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
-  // Duplicate event of the CCIPSendRequested in the IOnRamp
-  event CCIPSendRequested(Internal.EVM2EVMMessage message);
-
   address internal constant CUSTOM_TOKEN = address(12345);
   uint224 internal constant CUSTOM_TOKEN_PRICE = 1e17; // $0.1 CUSTOM
 
@@ -70,7 +68,7 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
         maxFeeUSDCents: 1000_00, // 1,000 USD
         deciBps: 2_5, // 2.5 bps, or 0.025%
         destGasOverhead: 40_000,
-        destBytesOverhead: 0,
+        destBytesOverhead: uint32(Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES),
         aggregateRateLimitEnabled: true
       })
     );
@@ -105,7 +103,7 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
         defaultTxGasLimit: GAS_LIMIT,
         maxNopFeesJuels: MAX_NOP_FEES_JUELS,
         prevOnRamp: address(0),
-        armProxy: address(s_mockARM)
+        rmnProxy: address(s_mockRMN)
       }),
       generateDynamicOnRampConfig(address(s_sourceRouter), address(s_priceRegistry), address(s_tokenAdminRegistry)),
       getOutboundRateLimiterConfig(),
@@ -133,6 +131,38 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
     // only cover actual gas usage from the ramps
     IERC20(s_sourceTokens[0]).approve(address(s_sourceRouter), 2 ** 128);
     IERC20(s_sourceTokens[1]).approve(address(s_sourceRouter), 2 ** 128);
+  }
+
+  function getNopsAndWeights() internal pure returns (EVM2EVMOnRamp.NopAndWeight[] memory) {
+    EVM2EVMOnRamp.NopAndWeight[] memory nopsAndWeights = new EVM2EVMOnRamp.NopAndWeight[](3);
+    nopsAndWeights[0] = EVM2EVMOnRamp.NopAndWeight({nop: USER_1, weight: 19284});
+    nopsAndWeights[1] = EVM2EVMOnRamp.NopAndWeight({nop: USER_2, weight: 52935});
+    nopsAndWeights[2] = EVM2EVMOnRamp.NopAndWeight({nop: USER_3, weight: 8});
+    return nopsAndWeights;
+  }
+
+  function generateDynamicOnRampConfig(
+    address router,
+    address priceRegistry,
+    address tokenAdminRegistry
+  ) internal pure returns (EVM2EVMOnRamp.DynamicConfig memory) {
+    return EVM2EVMOnRamp.DynamicConfig({
+      router: router,
+      maxNumberOfTokensPerMsg: MAX_TOKENS_LENGTH,
+      destGasOverhead: DEST_GAS_OVERHEAD,
+      destGasPerPayloadByte: DEST_GAS_PER_PAYLOAD_BYTE,
+      destDataAvailabilityOverheadGas: DEST_DATA_AVAILABILITY_OVERHEAD_GAS,
+      destGasPerDataAvailabilityByte: DEST_GAS_PER_DATA_AVAILABILITY_BYTE,
+      destDataAvailabilityMultiplierBps: DEST_GAS_DATA_AVAILABILITY_MULTIPLIER_BPS,
+      priceRegistry: priceRegistry,
+      maxDataBytes: MAX_DATA_SIZE,
+      maxPerMsgGasLimit: MAX_GAS_LIMIT,
+      tokenAdminRegistry: tokenAdminRegistry,
+      defaultTokenFeeUSDCents: DEFAULT_TOKEN_FEE_USD_CENTS,
+      defaultTokenDestGasOverhead: DEFAULT_TOKEN_DEST_GAS_OVERHEAD,
+      defaultTokenDestBytesOverhead: DEFAULT_TOKEN_BYTES_OVERHEAD,
+      enforceOutOfOrder: false
+    });
   }
 
   function _generateTokenMessage() public view returns (Client.EVM2AnyMessage memory) {
@@ -187,12 +217,13 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
       args[i - 4] = message.extraArgs[i];
     }
     uint256 numberOfTokens = message.tokenAmounts.length;
+    Client.EVMExtraArgsV2 memory extraArgs = _extraArgsFromBytes(bytes4(message.extraArgs), args);
     Internal.EVM2EVMMessage memory messageEvent = Internal.EVM2EVMMessage({
       sequenceNumber: seqNum,
       feeTokenAmount: feeTokenAmount,
       sender: originalSender,
-      nonce: nonce,
-      gasLimit: abi.decode(args, (Client.EVMExtraArgsV1)).gasLimit,
+      nonce: extraArgs.allowOutOfOrderExecution ? 0 : nonce,
+      gasLimit: extraArgs.gasLimit,
       strict: false,
       sourceChainSelector: SOURCE_CHAIN_SELECTOR,
       receiver: abi.decode(message.receiver, (address)),
@@ -217,5 +248,19 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
 
     messageEvent.messageId = Internal._hash(messageEvent, s_metadataHash);
     return messageEvent;
+  }
+
+  function _extraArgsFromBytes(
+    bytes4 sig,
+    bytes memory extraArgData
+  ) public pure returns (Client.EVMExtraArgsV2 memory) {
+    if (sig == Client.EVM_EXTRA_ARGS_V1_TAG) {
+      Client.EVMExtraArgsV1 memory extraArgsV1 = abi.decode(extraArgData, (Client.EVMExtraArgsV1));
+      return Client.EVMExtraArgsV2({gasLimit: extraArgsV1.gasLimit, allowOutOfOrderExecution: false});
+    } else if (sig == Client.EVM_EXTRA_ARGS_V2_TAG) {
+      return abi.decode(extraArgData, (Client.EVMExtraArgsV2));
+    } else {
+      revert("Invalid extraArgs tag");
+    }
   }
 }

@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.19;
+pragma solidity 0.8.24;
 
 import {ITypeAndVersion} from "../../shared/interfaces/ITypeAndVersion.sol";
-import {IARM} from "../interfaces/IARM.sol";
+import {IEVM2AnyMultiOnRamp} from "../interfaces/IEVM2AnyMultiOnRamp.sol";
 import {IEVM2AnyOnRamp} from "../interfaces/IEVM2AnyOnRamp.sol";
 import {IEVM2AnyOnRampClient} from "../interfaces/IEVM2AnyOnRampClient.sol";
 import {IPool} from "../interfaces/IPool.sol";
 import {IPriceRegistry} from "../interfaces/IPriceRegistry.sol";
+import {IRMN} from "../interfaces/IRMN.sol";
 import {ITokenAdminRegistry} from "../interfaces/ITokenAdminRegistry.sol";
 import {ILinkAvailable} from "../interfaces/automation/ILinkAvailable.sol";
 
@@ -25,7 +26,7 @@ import {EnumerableMap} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts
 /// bridgeable token support.
 /// @dev The EVM2EVMOnRamp, CommitStore and EVM2EVMOffRamp form an xchain upgradeable unit. Any change to one of them
 /// results an onchain upgrade of all 3.
-contract EVM2EVMMultiOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, ITypeAndVersion {
+contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ILinkAvailable, AggregateRateLimiter, ITypeAndVersion {
   using SafeERC20 for IERC20;
   using EnumerableMap for EnumerableMap.AddressToUintMap;
   using USDPriceWith18Decimals for uint224;
@@ -47,7 +48,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimi
   error RouterMustSetOriginalSender();
   error InvalidConfig();
   error InvalidAddress(bytes encodedAddress);
-  error BadARMSignal();
+  error CursedByRMN(uint64 sourceChainSelector);
   error LinkBalanceNotSettled();
   error InvalidNopAddress(address nop);
   error NotAFeeToken(address token);
@@ -55,64 +56,45 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimi
   error SourceTokenDataTooLarge(address token);
   error InvalidChainSelector(uint64 chainSelector);
   error GetSupportedTokensFunctionalityRemovedCheckAdminRegistry();
+  error InvalidDestChainConfig(uint64 destChainSelector);
+  error DestinationChainNotEnabled(uint64 destChainSelector);
+  error InvalidDestBytesOverhead(address token, uint32 destBytesOverhead);
 
   event ConfigSet(StaticConfig staticConfig, DynamicConfig dynamicConfig);
   event NopPaid(address indexed nop, uint256 amount);
-  event FeeConfigSet(FeeTokenConfigArgs[] feeConfig);
+  event PremiumMultiplierWeiPerEthUpdated(address indexed token, uint64 premiumMultiplierWeiPerEth);
   event TokenTransferFeeConfigSet(TokenTransferFeeConfigArgs[] transferFeeConfig);
   event TokenTransferFeeConfigDeleted(address[] tokens);
   /// RMN depends on this event, if changing, please notify the RMN maintainers.
   event CCIPSendRequested(Internal.EVM2EVMMessage message);
   event NopsSet(uint256 nopWeightsTotal, NopAndWeight[] nopsAndWeights);
+  event DestChainAdded(uint64 indexed destChainSelector, DestChainConfig destChainConfig);
+  event DestChainDynamicConfigUpdated(uint64 indexed destChainSelector, DestChainDynamicConfig dynamicConfig);
 
   /// @dev Struct that contains the static configuration
   /// RMN depends on this struct, if changing, please notify the RMN maintainers.
+  // solhint-disable-next-line gas-struct-packing
   struct StaticConfig {
     address linkToken; // ────────╮ Link token address
     uint64 chainSelector; // ─────╯ Source chainSelector
-    uint64 destChainSelector; // ─╮ Destination chainSelector
-    uint64 defaultTxGasLimit; //  │ Default gas limit for a tx
-    uint96 maxNopFeesJuels; // ───╯ Max nop fee balance onramp can have
-    address prevOnRamp; //          Address of previous-version OnRamp
-    address armProxy; //            Address of ARM proxy
+    uint96 maxNopFeesJuels; // ───╮ Max nop fee balance onramp can have
+    address rmnProxy; // ─────────╯ Address of RMN proxy
   }
 
   /// @dev Struct to contains the dynamic configuration
+  // solhint-disable-next-line gas-struct-packing
   struct DynamicConfig {
-    address router; // ──────────────────────────╮ Router address
-    uint16 maxNumberOfTokensPerMsg; //           │ Maximum number of distinct ERC20 token transferred per message
-    uint32 destGasOverhead; //                   │ Gas charged on top of the gasLimit to cover destination chain costs
-    uint16 destGasPerPayloadByte; //             │ Destination chain gas charged for passing each byte of `data` payload to receiver
-    uint32 destDataAvailabilityOverheadGas; // ──╯ Extra data availability gas charged on top of the message, e.g. for OCR
-    uint16 destGasPerDataAvailabilityByte; // ───╮ Amount of gas to charge per byte of message data that needs availability
-    uint16 destDataAvailabilityMultiplierBps; // │ Multiplier for data availability gas, multiples of bps, or 0.0001
-    address priceRegistry; //                    │ Price registry address
-    uint32 maxDataBytes; //                      │ Maximum payload data size in bytes
-    uint32 maxPerMsgGasLimit; // ────────────────╯ Maximum gas limit for messages targeting EVMs
-    address tokenAdminRegistry; // ──────────────╮ Token admin registry address
-    //                                           │
-    // The following three properties are defaults, they can be overridden by setting the TokenTransferFeeConfig for a token
-    uint16 defaultTokenFeeUSDCents; //           │ Default token fee charged per token transfer
-    uint32 defaultTokenDestGasOverhead; //       │ Default gas charged to execute the token transfer on the destination chain
-    uint32 defaultTokenDestBytesOverhead; // ────╯ Default extra data availability bytes charged per token transfer
+    address router; // Router address
+    address priceRegistry; // Price registry address
+    address tokenAdminRegistry; // Token admin registry address
   }
 
-  /// @dev Struct to hold the execution fee configuration for a fee token
-  struct FeeTokenConfig {
-    uint32 networkFeeUSDCents; // ─────────╮ Flat network fee to charge for messages,  multiples of 0.01 USD
-    uint64 gasMultiplierWeiPerEth; //      │ Multiplier for gas costs, 1e18 based so 11e17 = 10% extra cost.
-    uint64 premiumMultiplierWeiPerEth; //  │ Multiplier for fee-token-specific premiums
-    bool enabled; // ──────────────────────╯ Whether this fee token is enabled
-  }
-
-  /// @dev Struct to hold the fee configuration for a fee token, same as the FeeTokenConfig but with
-  /// token included so that an array of these can be passed in to setFeeTokenConfig to set the mapping
-  struct FeeTokenConfigArgs {
-    address token; // ─────────────────────╮ Token address
-    uint32 networkFeeUSDCents; //          │ Flat network fee to charge for messages,  multiples of 0.01 USD
-    uint64 gasMultiplierWeiPerEth; // ─────╯ Multiplier for gas costs, 1e18 based so 11e17 = 10% extra cost
-    uint64 premiumMultiplierWeiPerEth; // ─╮ Multiplier for fee-token-specific premiums, 1e18 based
-    bool enabled; // ──────────────────────╯ Whether this fee token is enabled
+  /// @dev Struct to hold the fee token configuration for a token, same as the s_premiumMultiplierWeiPerEth but with
+  /// the token address included so that an array of these can be passed in the constructor and
+  /// applyPremiumMultiplierWeiPerEthUpdates to set the mapping
+  struct PremiumMultiplierWeiPerEthArgs {
+    address token; // // ───────────────────╮ Token address
+    uint64 premiumMultiplierWeiPerEth; // ──╯ Multiplier for destination chain specific premiums. Should never be 0 so can be used as an isEnabled flag
   }
 
   /// @dev Struct to hold the transfer fee configuration for token transfers
@@ -121,7 +103,8 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimi
     uint32 maxFeeUSDCents; //           │ Maximum fee to charge per token transfer, multiples of 0.01 USD
     uint16 deciBps; //                  │ Basis points charged on token transfers, multiples of 0.1bps, or 1e-5
     uint32 destGasOverhead; //          │ Gas charged to execute the token transfer on the destination chain
-    uint32 destBytesOverhead; //        │ Extra data availability bytes on top of fixed transfer data, including sourceTokenData and offchainData
+    //                                  │ Extra data availability bytes that are returned from the source pool and sent
+    uint32 destBytesOverhead; //        │ to the destination pool. Must be >= Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES
     bool aggregateRateLimitEnabled; //  │ Whether this transfer token is to be included in Aggregate Rate Limiting
     bool isEnabled; // ─────────────────╯ Whether this token has custom transfer fees
   }
@@ -134,8 +117,51 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimi
     uint32 maxFeeUSDCents; //           │ Maximum fee to charge per token transfer, multiples of 0.01 USD
     uint16 deciBps; // ─────────────────╯ Basis points charged on token transfers, multiples of 0.1bps, or 1e-5
     uint32 destGasOverhead; // ─────────╮ Gas charged to execute the token transfer on the destination chain
-    uint32 destBytesOverhead; //        │ Extra data availability bytes on top of fixed transfer data, including sourceTokenData and offchainData
+    //                                  │ Extra data availability bytes that are returned from the source pool and sent
+    uint32 destBytesOverhead; //        │ to the destination pool. Must be >= Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES
     bool aggregateRateLimitEnabled; // ─╯ Whether this transfer token is to be included in Aggregate Rate Limiting
+  }
+
+  /// @dev Struct to hold the dynamic configs for a destination chain
+  struct DestChainDynamicConfig {
+    bool isEnabled; // ──────────────────────────╮ Whether this destination chain is enabled
+    uint16 maxNumberOfTokensPerMsg; //           │ Maximum number of distinct ERC20 token transferred per message
+    uint32 maxDataBytes; //                      │ Maximum payload data size in bytes
+    uint32 maxPerMsgGasLimit; //                 │ Maximum gas limit for messages targeting EVMs
+    uint32 destGasOverhead; //                   │ Gas charged on top of the gasLimit to cover destination chain costs
+    uint16 destGasPerPayloadByte; //             │ Destination chain gas charged for passing each byte of `data` payload to receiver
+    uint32 destDataAvailabilityOverheadGas; //   | Extra data availability gas charged on top of the message, e.g. for OCR
+    uint16 destGasPerDataAvailabilityByte; //    | Amount of gas to charge per byte of message data that needs availability
+    uint16 destDataAvailabilityMultiplierBps; // │ Multiplier for data availability gas, multiples of bps, or 0.0001
+    // The following three properties are defaults, they can be overridden by setting the TokenTransferFeeConfig for a token
+    uint16 defaultTokenFeeUSDCents; //           │ Default token fee charged per token transfer
+    uint32 defaultTokenDestGasOverhead; // ──────╯ Default gas charged to execute the token transfer on the destination chain
+    uint32 defaultTokenDestBytesOverhead; // ────╮ Default extra data availability bytes charged per token transfer
+    uint64 defaultTxGasLimit; //                 │ Default gas limit for a tx
+    uint64 gasMultiplierWeiPerEth; //            │ Multiplier for gas costs, 1e18 based so 11e17 = 10% extra cost.
+    uint32 networkFeeUSDCents; // ───────────────╯ Flat network fee to charge for messages,  multiples of 0.01 USD
+  }
+
+  /// @dev Struct to hold the configs for a destination chain
+  struct DestChainConfig {
+    DestChainDynamicConfig dynamicConfig; // ──╮ Dynamic configs for a destination chain
+    address prevOnRamp; // ────────────────────╯ Address of previous-version OnRamp
+    uint64 sequenceNumber; // The last used sequence number. This is zero in the case where no messages has been sent yet.
+    // 0 is not a valid sequence number for any real transaction.
+    /// @dev metadataHash is a lane-specific prefix for a message hash preimage which ensures global uniqueness
+    /// Ensures that 2 identical messages sent to 2 different lanes will have a distinct hash.
+    /// Must match the metadataHash used in computing leaf hashes offchain for the root committed in
+    /// the commitStore and i_metadataHash in the offRamp.
+    bytes32 metadataHash;
+  }
+
+  /// @dev Struct to hold the dynamic configs, its destination chain selector and previous onRamp.
+  /// Same as DestChainConfig but with the destChainSelector and the prevOnRamp so that an array of these
+  /// can be passed in the constructor and the applyDestChainConfigUpdates function
+  struct DestChainConfigArgs {
+    uint64 destChainSelector; // Destination chain selector
+    DestChainDynamicConfig dynamicConfig; // struct to hold the configs for a destination chain
+    address prevOnRamp; // Address of previous-version OnRamp.
   }
 
   /// @dev Nop address and weight, used to set the nops and their weights
@@ -146,27 +172,14 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimi
 
   // STATIC CONFIG
   string public constant override typeAndVersion = "EVM2EVMMultiOnRamp 1.6.0-dev";
-  /// @dev metadataHash is a lane-specific prefix for a message hash preimage which ensures global uniqueness
-  /// Ensures that 2 identical messages sent to 2 different lanes will have a distinct hash.
-  /// Must match the metadataHash used in computing leaf hashes offchain for the root committed in
-  /// the commitStore and i_metadataHash in the offRamp.
-  bytes32 internal immutable i_metadataHash;
-  /// @dev Default gas limit for a transactions that did not specify
-  /// a gas limit in the extraArgs.
-  uint64 internal immutable i_defaultTxGasLimit;
   /// @dev Maximum nop fee that can accumulate in this onramp
   uint96 internal immutable i_maxNopFeesJuels;
   /// @dev The link token address - known to pay nops for their work
   address internal immutable i_linkToken;
   /// @dev The chain ID of the source chain that this contract is deployed to
   uint64 internal immutable i_chainSelector;
-  /// @dev The chain ID of the destination chain
-  uint64 internal immutable i_destChainSelector;
-  /// @dev The address of previous-version OnRamp for this lane
-  /// Used to be able to provide sequencing continuity during a zero downtime upgrade.
-  address internal immutable i_prevOnRamp;
-  /// @dev The address of the arm proxy
-  address internal immutable i_armProxy;
+  /// @dev The address of the rmn proxy
+  address internal immutable i_rmnProxy;
   /// @dev the maximum number of nops that can be configured at the same time.
   /// Used to bound gas for loops over nops.
   uint256 private constant MAX_NUMBER_OF_NOPS = 64;
@@ -177,8 +190,11 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimi
   /// @dev (address nop => uint256 weight)
   EnumerableMap.AddressToUintMap internal s_nops;
 
-  /// @dev The execution fee token config that can be set by the owner or fee admin
-  mapping(address token => FeeTokenConfig feeTokenConfig) internal s_feeTokenConfig;
+  /// @dev The destination chain specific configs
+  mapping(uint64 destChainSelector => DestChainConfig destChainConfig) internal s_destChainConfig;
+  /// @dev The multiplier for destination chain specific premiums that can be set by the owner or fee admin
+  /// This should never be 0 once set, so it can be used as an isEnabled flag
+  mapping(address token => uint64 premiumMultiplierWeiPerEth) internal s_premiumMultiplierWeiPerEth;
   /// @dev The token transfer fee config that can be set by the owner or fee admin
   mapping(address token => TokenTransferFeeConfig tranferFeeConfig) internal s_tokenTransferFeeConfig;
 
@@ -191,39 +207,29 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimi
   uint96 internal s_nopFeesJuels;
   /// @dev The combined weight of all NOPs weights
   uint32 internal s_nopWeightsTotal;
-  /// @dev The last used sequence number. This is zero in the case where no
-  /// messages has been sent yet. 0 is not a valid sequence number for any
-  /// real transaction.
-  uint64 internal s_sequenceNumber;
 
   constructor(
     StaticConfig memory staticConfig,
     DynamicConfig memory dynamicConfig,
+    DestChainConfigArgs[] memory destChainConfigArgs,
     RateLimiter.Config memory rateLimiterConfig,
-    FeeTokenConfigArgs[] memory feeTokenConfigs,
+    PremiumMultiplierWeiPerEthArgs[] memory premiumMultiplierWeiPerEthArgs,
     TokenTransferFeeConfigArgs[] memory tokenTransferFeeConfigArgs,
     NopAndWeight[] memory nopsAndWeights
   ) AggregateRateLimiter(rateLimiterConfig) {
-    if (
-      staticConfig.linkToken == address(0) || staticConfig.chainSelector == 0 || staticConfig.destChainSelector == 0
-        || staticConfig.defaultTxGasLimit == 0 || staticConfig.armProxy == address(0)
-    ) revert InvalidConfig();
+    if (staticConfig.linkToken == address(0) || staticConfig.chainSelector == 0 || staticConfig.rmnProxy == address(0))
+    {
+      revert InvalidConfig();
+    }
 
-    i_metadataHash = keccak256(
-      abi.encode(
-        Internal.EVM_2_EVM_MESSAGE_HASH, staticConfig.chainSelector, staticConfig.destChainSelector, address(this)
-      )
-    );
     i_linkToken = staticConfig.linkToken;
     i_chainSelector = staticConfig.chainSelector;
-    i_destChainSelector = staticConfig.destChainSelector;
-    i_defaultTxGasLimit = staticConfig.defaultTxGasLimit;
     i_maxNopFeesJuels = staticConfig.maxNopFeesJuels;
-    i_prevOnRamp = staticConfig.prevOnRamp;
-    i_armProxy = staticConfig.armProxy;
+    i_rmnProxy = staticConfig.rmnProxy;
 
     _setDynamicConfig(dynamicConfig);
-    _setFeeTokenConfig(feeTokenConfigs);
+    _applyDestChainConfigUpdates(destChainConfigArgs);
+    _applyPremiumMultiplierWeiPerEthUpdates(premiumMultiplierWeiPerEthArgs);
     _setTokenTransferFeeConfig(tokenTransferFeeConfigArgs, new address[](0));
     _setNops(nopsAndWeights);
   }
@@ -232,20 +238,24 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimi
   // │                          Messaging                           │
   // ================================================================
 
-  /// @inheritdoc IEVM2AnyOnRamp
-  function getExpectedNextSequenceNumber() external view returns (uint64) {
-    return s_sequenceNumber + 1;
+  /// @inheritdoc IEVM2AnyMultiOnRamp
+  function getExpectedNextSequenceNumber(uint64 destChainSelector) external view returns (uint64) {
+    return s_destChainConfig[destChainSelector].sequenceNumber + 1;
   }
 
-  /// @inheritdoc IEVM2AnyOnRamp
-  function getSenderNonce(address sender) external view returns (uint64) {
-    uint256 senderNonce = s_senderNonce[sender];
+  /// @inheritdoc IEVM2AnyMultiOnRamp
+  function getSenderNonce(uint64 destChainSelector, address sender) public view returns (uint64) {
+    uint64 senderNonce = s_senderNonce[sender];
 
-    if (senderNonce == 0 && i_prevOnRamp != address(0)) {
-      // If OnRamp was upgraded, check if sender has a nonce from the previous OnRamp.
-      return IEVM2AnyOnRamp(i_prevOnRamp).getSenderNonce(sender);
+    if (senderNonce == 0) {
+      address prevOnRamp = s_destChainConfig[destChainSelector].prevOnRamp;
+      if (prevOnRamp != address(0)) {
+        // If OnRamp was upgraded, check if sender has a nonce from the previous OnRamp.
+        return IEVM2AnyOnRamp(prevOnRamp).getSenderNonce(sender);
+      }
     }
-    return uint64(senderNonce);
+
+    return senderNonce;
   }
 
   /// @inheritdoc IEVM2AnyOnRampClient
@@ -255,17 +265,89 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimi
     uint256 feeTokenAmount,
     address originalSender
   ) external returns (bytes32) {
-    if (IARM(i_armProxy).isCursed()) revert BadARMSignal();
+    DestChainConfig storage destChainConfig = s_destChainConfig[destChainSelector];
+    Internal.EVM2EVMMessage memory newMessage =
+      _generateNewMessage(destChainConfig, destChainSelector, message, feeTokenAmount, originalSender);
+
+    // Lock the tokens as last step. TokenPools may not always be trusted.
+    // There should be no state changes after external call to TokenPools.
+    for (uint256 i = 0; i < newMessage.tokenAmounts.length; ++i) {
+      Client.EVMTokenAmount memory tokenAndAmount = message.tokenAmounts[i];
+      IPool sourcePool = getPoolBySourceToken(destChainSelector, IERC20(tokenAndAmount.token));
+      // We don't have to check if it supports the pool version in a non-reverting way here because
+      // if we revert here, there is no effect on CCIP. Therefore we directly call the supportsInterface
+      // function and not through the ERC165Checker.
+      if (address(sourcePool) == address(0) || !sourcePool.supportsInterface(Pool.CCIP_POOL_V1)) {
+        revert UnsupportedToken(tokenAndAmount.token);
+      }
+
+      Pool.LockOrBurnOutV1 memory poolReturnData = sourcePool.lockOrBurn(
+        Pool.LockOrBurnInV1({
+          receiver: message.receiver,
+          remoteChainSelector: destChainSelector,
+          originalSender: originalSender,
+          amount: tokenAndAmount.amount,
+          localToken: tokenAndAmount.token
+        })
+      );
+
+      // Since the DON has to pay for the extraData to be included on the destination chain, we cap the length of the
+      // extraData. This prevents gas bomb attacks on the NOPs. As destBytesOverhead accounts for both
+      // extraData and offchainData, this caps the worst case abuse to the number of bytes reserved for offchainData.
+      if (
+        poolReturnData.destPoolData.length > Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES
+          && poolReturnData.destPoolData.length > s_tokenTransferFeeConfig[tokenAndAmount.token].destBytesOverhead
+      ) {
+        revert SourceTokenDataTooLarge(tokenAndAmount.token);
+      }
+      // We validate the pool address to ensure it is a valid EVM address
+      Internal._validateEVMAddress(poolReturnData.destPoolAddress);
+
+      newMessage.sourceTokenData[i] = abi.encode(
+        Internal.SourceTokenData({
+          sourcePoolAddress: abi.encode(sourcePool),
+          destPoolAddress: poolReturnData.destPoolAddress,
+          extraData: poolReturnData.destPoolData
+        })
+      );
+    }
+
+    // Hash only after the sourceTokenData has been set
+    newMessage.messageId = Internal._hash(newMessage, destChainConfig.metadataHash);
+
+    // Emit message request
+    // This must happen after any pool events as some tokens (e.g. USDC) emit events that we expect to precede this
+    // event in the offchain code.
+    emit CCIPSendRequested(newMessage);
+    return newMessage.messageId;
+  }
+
+  /// @notice Helper function to relieve stack pressure from `forwardFromRouter`
+  /// @param destChainConfig The destination chain config storage pointer
+  /// @param destChainSelector The destination chain selector
+  /// @param message Message struct to send
+  /// @param feeTokenAmount Amount of fee tokens for payment
+  /// @param originalSender The original initiator of the CCIP request
+  function _generateNewMessage(
+    DestChainConfig storage destChainConfig,
+    uint64 destChainSelector,
+    Client.EVM2AnyMessage calldata message,
+    uint256 feeTokenAmount,
+    address originalSender
+  ) internal returns (Internal.EVM2EVMMessage memory) {
+    if (IRMN(i_rmnProxy).isCursed(bytes32(uint256(destChainSelector)))) revert CursedByRMN(destChainSelector);
     // Validate message sender is set and allowed. Not validated in `getFee` since it is not user-driven.
     if (originalSender == address(0)) revert RouterMustSetOriginalSender();
     // Router address may be zero intentionally to pause.
     if (msg.sender != s_dynamicConfig.router) revert MustBeCalledByRouter();
-    if (destChainSelector != i_destChainSelector) revert InvalidChainSelector(destChainSelector);
+    if (!destChainConfig.dynamicConfig.isEnabled) revert DestinationChainNotEnabled(destChainSelector);
 
-    uint256 gasLimit = _fromBytes(message.extraArgs).gasLimit;
+    uint256 gasLimit = message.extraArgs.length == 0
+      ? destChainConfig.dynamicConfig.defaultTxGasLimit
+      : _gasLimitFromBytes(message.extraArgs);
     // Validate the message with various checks
     uint256 numberOfTokens = message.tokenAmounts.length;
-    _validateMessage(message.data.length, gasLimit, numberOfTokens);
+    _validateMessage(destChainSelector, message.data.length, gasLimit, numberOfTokens);
 
     // Only check token value if there are tokens
     if (numberOfTokens > 0) {
@@ -292,23 +374,20 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimi
     }
     if (s_nopFeesJuels > i_maxNopFeesJuels) revert MaxFeeBalanceReached();
 
-    if (s_senderNonce[originalSender] == 0 && i_prevOnRamp != address(0)) {
-      // If this is first time send for a sender in new OnRamp, check if they have a nonce
-      // from the previous OnRamp and start from there instead of zero.
-      s_senderNonce[originalSender] = IEVM2AnyOnRamp(i_prevOnRamp).getSenderNonce(originalSender);
-    }
+    uint64 nonce = getSenderNonce(destChainSelector, originalSender) + 1;
+    s_senderNonce[originalSender] = nonce;
 
     // We need the next available sequence number so we increment before we use the value
-    Internal.EVM2EVMMessage memory newMessage = Internal.EVM2EVMMessage({
+    return Internal.EVM2EVMMessage({
       sourceChainSelector: i_chainSelector,
       sender: originalSender,
       // EVM destination addresses should be abi encoded and therefore always 32 bytes long
       // Not duplicately validated in `getFee`. Invalid address is uncommon, gas cost outweighs UX gain.
       receiver: Internal._validateEVMAddress(message.receiver),
-      sequenceNumber: ++s_sequenceNumber,
+      sequenceNumber: ++destChainConfig.sequenceNumber,
       gasLimit: gasLimit,
       strict: false,
-      nonce: ++s_senderNonce[originalSender],
+      nonce: nonce,
       feeToken: message.feeToken,
       feeTokenAmount: feeTokenAmount,
       data: message.data,
@@ -316,82 +395,38 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimi
       sourceTokenData: new bytes[](numberOfTokens), // will be populated below
       messageId: ""
     });
-
-    // Lock the tokens as last step. TokenPools may not always be trusted.
-    // There should be no state changes after external call to TokenPools.
-    for (uint256 i = 0; i < numberOfTokens; ++i) {
-      Client.EVMTokenAmount memory tokenAndAmount = message.tokenAmounts[i];
-      IPool sourcePool = getPoolBySourceToken(destChainSelector, IERC20(tokenAndAmount.token));
-      // We don't have to check if it supports the pool version in a non-reverting way here because
-      // if we revert here, there is no effect on CCIP. Therefore we directly call the supportsInterface
-      // function and not through the ERC165Checker.
-      if (address(sourcePool) == address(0) || !sourcePool.supportsInterface(Pool.CCIP_POOL_V1)) {
-        revert UnsupportedToken(tokenAndAmount.token);
-      }
-
-      Pool.LockOrBurnOutV1 memory poolReturnData = sourcePool.lockOrBurn(
-        Pool.LockOrBurnInV1({
-          originalSender: originalSender,
-          receiver: message.receiver,
-          amount: tokenAndAmount.amount,
-          remoteChainSelector: i_destChainSelector
-        })
-      );
-
-      // Since the DON has to pay for the extraData to be included on the destination chain, we cap the length of the extraData.
-      // This prevents gas bomb attacks on the NOPs. We use destBytesOverhead as a proxy to cap the number of bytes we accept.
-      // As destBytesOverhead accounts for extraData + offchainData, this caps the worst case abuse to the number of bytes reserved for offchainData.
-      // It therefore fully mitigates gas bombs for most tokens, as most tokens don't use offchainData.
-      if (poolReturnData.destPoolData.length > s_tokenTransferFeeConfig[tokenAndAmount.token].destBytesOverhead) {
-        revert SourceTokenDataTooLarge(tokenAndAmount.token);
-      }
-      // We validate the pool address to ensure it is a valid EVM address
-      Internal._validateEVMAddress(poolReturnData.destPoolAddress);
-
-      newMessage.sourceTokenData[i] = abi.encode(
-        Internal.SourceTokenData({
-          sourcePoolAddress: abi.encode(sourcePool),
-          destPoolAddress: poolReturnData.destPoolAddress,
-          extraData: poolReturnData.destPoolData
-        })
-      );
-    }
-
-    // Hash only after the sourceTokenData has been set
-    newMessage.messageId = Internal._hash(newMessage, i_metadataHash);
-
-    // Emit message request
-    // Note this must happen after pools, some tokens (eg USDC) emit events that we
-    // expect to directly precede this event.
-    emit CCIPSendRequested(newMessage);
-    return newMessage.messageId;
   }
 
   /// @dev Convert the extra args bytes into a struct
   /// @param extraArgs The extra args bytes
-  /// @return The extra args struct
-  function _fromBytes(bytes calldata extraArgs) internal view returns (Client.EVMExtraArgsV1 memory) {
-    if (extraArgs.length == 0) {
-      return Client.EVMExtraArgsV1({gasLimit: i_defaultTxGasLimit});
-    }
+  /// @return The gas limit from the extra args
+  function _gasLimitFromBytes(bytes calldata extraArgs) internal pure returns (uint256) {
     if (bytes4(extraArgs) != Client.EVM_EXTRA_ARGS_V1_TAG) revert InvalidExtraArgsTag();
     // EVMExtraArgsV1 originally included a second boolean (strict) field which we have deprecated entirely.
     // Clients may still send that version but it will be ignored.
-    return abi.decode(extraArgs[4:], (Client.EVMExtraArgsV1));
+    return abi.decode(extraArgs[4:], (Client.EVMExtraArgsV1)).gasLimit;
   }
 
   /// @notice Validate the forwarded message with various checks.
   /// @dev This function can be called multiple times during a CCIPSend,
   /// only common user-driven mistakes are validated here to minimize duplicate validation cost.
+  /// @param destChainSelector The destination chain selector.
   /// @param dataLength The length of the data field of the message.
   /// @param gasLimit The gasLimit set in message for destination execution.
   /// @param numberOfTokens The number of tokens to be sent.
-  function _validateMessage(uint256 dataLength, uint256 gasLimit, uint256 numberOfTokens) internal view {
+  function _validateMessage(
+    uint64 destChainSelector,
+    uint256 dataLength,
+    uint256 gasLimit,
+    uint256 numberOfTokens
+  ) internal view {
     // Check that payload is formed correctly
-    uint256 maxDataBytes = uint256(s_dynamicConfig.maxDataBytes);
-    if (dataLength > maxDataBytes) revert MessageTooLarge(maxDataBytes, dataLength);
-    if (gasLimit > uint256(s_dynamicConfig.maxPerMsgGasLimit)) revert MessageGasLimitTooHigh();
-    if (numberOfTokens > uint256(s_dynamicConfig.maxNumberOfTokensPerMsg)) revert UnsupportedNumberOfTokens();
+    DestChainDynamicConfig storage destChainDynamicConfig = s_destChainConfig[destChainSelector].dynamicConfig;
+    if (dataLength > uint256(destChainDynamicConfig.maxDataBytes)) {
+      revert MessageTooLarge(uint256(destChainDynamicConfig.maxDataBytes), dataLength);
+    }
+    if (gasLimit > uint256(destChainDynamicConfig.maxPerMsgGasLimit)) revert MessageGasLimitTooHigh();
+    if (numberOfTokens > uint256(destChainDynamicConfig.maxNumberOfTokensPerMsg)) revert UnsupportedNumberOfTokens();
   }
 
   // ================================================================
@@ -405,11 +440,8 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimi
     return StaticConfig({
       linkToken: i_linkToken,
       chainSelector: i_chainSelector,
-      destChainSelector: i_destChainSelector,
-      defaultTxGasLimit: i_defaultTxGasLimit,
       maxNopFeesJuels: i_maxNopFeesJuels,
-      prevOnRamp: i_prevOnRamp,
-      armProxy: i_armProxy
+      rmnProxy: i_rmnProxy
     });
   }
 
@@ -436,11 +468,8 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimi
       StaticConfig({
         linkToken: i_linkToken,
         chainSelector: i_chainSelector,
-        destChainSelector: i_destChainSelector,
-        defaultTxGasLimit: i_defaultTxGasLimit,
         maxNopFeesJuels: i_maxNopFeesJuels,
-        prevOnRamp: i_prevOnRamp,
-        armProxy: i_armProxy
+        rmnProxy: i_rmnProxy
       }),
       dynamicConfig
     );
@@ -456,7 +485,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimi
   }
 
   /// @inheritdoc IEVM2AnyOnRampClient
-  function getSupportedTokens(uint64 /*destChainSelector*/ ) external view returns (address[] memory) {
+  function getSupportedTokens(uint64 /*destChainSelector*/ ) external pure returns (address[] memory) {
     revert GetSupportedTokensFunctionalityRemovedCheckAdminRegistry();
   }
 
@@ -473,14 +502,19 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimi
     uint64 destChainSelector,
     Client.EVM2AnyMessage calldata message
   ) external view returns (uint256 feeTokenAmount) {
-    if (destChainSelector != i_destChainSelector) revert InvalidChainSelector(destChainSelector);
+    DestChainDynamicConfig storage destChainDynamicConfig = s_destChainConfig[destChainSelector].dynamicConfig;
 
-    uint256 gasLimit = _fromBytes(message.extraArgs).gasLimit;
+    if (!destChainDynamicConfig.isEnabled) revert DestinationChainNotEnabled(destChainSelector);
+
+    uint256 gasLimit =
+      message.extraArgs.length == 0 ? destChainDynamicConfig.defaultTxGasLimit : _gasLimitFromBytes(message.extraArgs);
     // Validate the message with various checks
-    _validateMessage(message.data.length, gasLimit, message.tokenAmounts.length);
+    _validateMessage(destChainSelector, message.data.length, gasLimit, message.tokenAmounts.length);
 
-    FeeTokenConfig memory feeTokenConfig = s_feeTokenConfig[message.feeToken];
-    if (!feeTokenConfig.enabled) revert NotAFeeToken(message.feeToken);
+    uint64 premiumMultiplierWeiPerEth = s_premiumMultiplierWeiPerEth[message.feeToken];
+
+    // premiumMultiplierWeiPerEth should never be 0 so it can be used as an isEnabled flag
+    if (premiumMultiplierWeiPerEth == 0) revert NotAFeeToken(message.feeToken);
 
     (uint224 feeTokenPrice, uint224 packedGasPrice) =
       IPriceRegistry(s_dynamicConfig.priceRegistry).getTokenAndGasPrices(message.feeToken, destChainSelector);
@@ -494,10 +528,10 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimi
     uint32 tokenTransferBytesOverhead = 0;
     if (message.tokenAmounts.length > 0) {
       (premiumFee, tokenTransferGas, tokenTransferBytesOverhead) =
-        _getTokenTransferCost(message.feeToken, feeTokenPrice, message.tokenAmounts);
+        _getTokenTransferCost(destChainSelector, message.feeToken, feeTokenPrice, message.tokenAmounts);
     } else {
       // Convert USD cents with 2 decimals to 18 decimals.
-      premiumFee = uint256(feeTokenConfig.networkFeeUSDCents) * 1e16;
+      premiumFee = uint256(destChainDynamicConfig.networkFeeUSDCents) * 1e16;
     }
 
     // Calculate data availability cost in USD with 36 decimals. Data availability cost exists on rollups that need to post
@@ -505,8 +539,9 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimi
     uint256 dataAvailabilityCost = 0;
     // Only calculate data availability cost if data availability multiplier is non-zero.
     // The multiplier should be set to 0 if destination chain does not charge data availability cost.
-    if (s_dynamicConfig.destDataAvailabilityMultiplierBps > 0) {
+    if (destChainDynamicConfig.destDataAvailabilityMultiplierBps > 0) {
       dataAvailabilityCost = _getDataAvailabilityCost(
+        destChainSelector,
         // Parse the data availability gas price stored in the higher-order 112 bits of the encoded gas price.
         uint112(packedGasPrice >> Internal.GAS_PRICE_BITS),
         message.data.length,
@@ -521,25 +556,26 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimi
     // uint112(packedGasPrice) = executionGasPrice
     uint256 executionCost = uint112(packedGasPrice)
       * (
-        gasLimit + s_dynamicConfig.destGasOverhead + (message.data.length * s_dynamicConfig.destGasPerPayloadByte)
-          + tokenTransferGas
-      ) * feeTokenConfig.gasMultiplierWeiPerEth;
+        gasLimit + destChainDynamicConfig.destGasOverhead
+          + (message.data.length * destChainDynamicConfig.destGasPerPayloadByte) + tokenTransferGas
+      ) * destChainDynamicConfig.gasMultiplierWeiPerEth;
 
     // Calculate number of fee tokens to charge.
     // Total USD fee is in 36 decimals, feeTokenPrice is in 18 decimals USD for 1e18 smallest token denominations.
     // Result of the division is the number of smallest token denominations.
-    return
-      ((premiumFee * feeTokenConfig.premiumMultiplierWeiPerEth) + executionCost + dataAvailabilityCost) / feeTokenPrice;
+    return ((premiumFee * premiumMultiplierWeiPerEth) + executionCost + dataAvailabilityCost) / feeTokenPrice;
   }
 
   /// @notice Returns the estimated data availability cost of the message.
   /// @dev To save on gas, we use a single destGasPerDataAvailabilityByte value for both zero and non-zero bytes.
+  /// @param destChainSelector the destination chain selector.
   /// @param dataAvailabilityGasPrice USD per data availability gas in 18 decimals.
   /// @param messageDataLength length of the data field in the message.
   /// @param numberOfTokens number of distinct token transfers in the message.
   /// @param tokenTransferBytesOverhead additional token transfer data passed to destination, e.g. USDC attestation.
   /// @return dataAvailabilityCostUSD36Decimal total data availability cost in USD with 36 decimals.
   function _getDataAvailabilityCost(
+    uint64 destChainSelector,
     uint112 dataAvailabilityGasPrice,
     uint256 messageDataLength,
     uint256 numberOfTokens,
@@ -550,14 +586,16 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimi
     uint256 dataAvailabilityLengthBytes = Internal.MESSAGE_FIXED_BYTES + messageDataLength
       + (numberOfTokens * Internal.MESSAGE_FIXED_BYTES_PER_TOKEN) + tokenTransferBytesOverhead;
 
+    DestChainDynamicConfig storage destChainDynamicConfig = s_destChainConfig[destChainSelector].dynamicConfig;
     // destDataAvailabilityOverheadGas is a separate config value for flexibility to be updated independently of message cost.
     // Its value is determined by CCIP lane implementation, e.g. the overhead data posted for OCR.
-    uint256 dataAvailabilityGas = (dataAvailabilityLengthBytes * s_dynamicConfig.destGasPerDataAvailabilityByte)
-      + s_dynamicConfig.destDataAvailabilityOverheadGas;
+    uint256 dataAvailabilityGas = (dataAvailabilityLengthBytes * destChainDynamicConfig.destGasPerDataAvailabilityByte)
+      + destChainDynamicConfig.destDataAvailabilityOverheadGas;
 
     // dataAvailabilityGasPrice is in 18 decimals, destDataAvailabilityMultiplierBps is in 4 decimals
     // We pad 14 decimals to bring the result to 36 decimals, in line with token bps and execution fee.
-    return ((dataAvailabilityGas * dataAvailabilityGasPrice) * s_dynamicConfig.destDataAvailabilityMultiplierBps) * 1e14;
+    return ((dataAvailabilityGas * dataAvailabilityGasPrice) * destChainDynamicConfig.destDataAvailabilityMultiplierBps)
+      * 1e14;
   }
 
   /// @notice Returns the token transfer cost parameters.
@@ -567,6 +605,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimi
   /// @dev Assumes that tokenAmounts are validated to be listed tokens elsewhere.
   /// @dev Splitting one token transfer into multiple transfers is discouraged,
   /// as it will result in a transferFee equal or greater than the same amount aggregated/de-duped.
+  /// @param destChainSelector the destination chain selector.
   /// @param feeToken address of the feeToken.
   /// @param feeTokenPrice price of feeToken in USD with 18 decimals.
   /// @param tokenAmounts token transfers in the message.
@@ -574,6 +613,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimi
   /// @return tokenTransferGas total execution gas of the token transfers.
   /// @return tokenTransferBytesOverhead additional token transfer data passed to destination, e.g. USDC attestation.
   function _getTokenTransferCost(
+    uint64 destChainSelector,
     address feeToken,
     uint224 feeTokenPrice,
     Client.EVMTokenAmount[] calldata tokenAmounts
@@ -584,7 +624,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimi
       Client.EVMTokenAmount memory tokenAmount = tokenAmounts[i];
 
       // Validate if the token is supported, do not calculate fee for unsupported tokens.
-      if (address(getPoolBySourceToken(i_destChainSelector, IERC20(tokenAmount.token))) == address(0)) {
+      if (address(getPoolBySourceToken(destChainSelector, IERC20(tokenAmount.token))) == address(0)) {
         revert UnsupportedToken(tokenAmount.token);
       }
 
@@ -592,9 +632,10 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimi
 
       // If the token has no specific overrides configured, we use the global defaults.
       if (!transferFeeConfig.isEnabled) {
-        tokenTransferFeeUSDWei += uint256(s_dynamicConfig.defaultTokenFeeUSDCents) * 1e16;
-        tokenTransferGas += s_dynamicConfig.defaultTokenDestGasOverhead;
-        tokenTransferBytesOverhead += s_dynamicConfig.defaultTokenDestBytesOverhead;
+        DestChainDynamicConfig storage destChainDynamicConfig = s_destChainConfig[destChainSelector].dynamicConfig;
+        tokenTransferFeeUSDWei += uint256(destChainDynamicConfig.defaultTokenFeeUSDCents) * 1e16;
+        tokenTransferGas += destChainDynamicConfig.defaultTokenDestGasOverhead;
+        tokenTransferBytesOverhead += destChainDynamicConfig.defaultTokenDestBytesOverhead;
         continue;
       }
 
@@ -637,34 +678,86 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimi
     return (tokenTransferFeeUSDWei, tokenTransferGas, tokenTransferBytesOverhead);
   }
 
-  /// @notice Gets the fee configuration for a token
-  /// @param token The token to get the fee configuration for
-  /// @return feeTokenConfig FeeTokenConfig struct
-  function getFeeTokenConfig(address token) external view returns (FeeTokenConfig memory feeTokenConfig) {
-    return s_feeTokenConfig[token];
+  /// @notice Updates the destination chain specific config.
+  /// @param destChainConfigArgs Array of source chain specific configs.
+  function applyDestChainConfigUpdates(DestChainConfigArgs[] memory destChainConfigArgs) external {
+    _onlyOwnerOrAdmin();
+    _applyDestChainConfigUpdates(destChainConfigArgs);
+  }
+
+  /// @notice Internal version of applyDestChainConfigUpdates.
+  function _applyDestChainConfigUpdates(DestChainConfigArgs[] memory destChainConfigArgs) internal {
+    for (uint256 i = 0; i < destChainConfigArgs.length; ++i) {
+      DestChainConfigArgs memory destChainConfigArg = destChainConfigArgs[i];
+      uint64 destChainSelector = destChainConfigArgs[i].destChainSelector;
+
+      if (destChainSelector == 0) revert InvalidDestChainConfig(destChainSelector);
+
+      DestChainConfig storage destChainConfig = s_destChainConfig[destChainSelector];
+      address prevOnRamp = destChainConfigArg.prevOnRamp;
+
+      DestChainConfig memory newDestChainConfig = DestChainConfig({
+        dynamicConfig: destChainConfigArg.dynamicConfig,
+        prevOnRamp: prevOnRamp,
+        sequenceNumber: destChainConfig.sequenceNumber,
+        metadataHash: destChainConfig.metadataHash
+      });
+
+      destChainConfig.dynamicConfig = newDestChainConfig.dynamicConfig;
+
+      if (destChainConfig.metadataHash == 0) {
+        newDestChainConfig.metadataHash =
+          keccak256(abi.encode(Internal.EVM_2_EVM_MESSAGE_HASH, i_chainSelector, destChainSelector, address(this)));
+        destChainConfig.metadataHash = newDestChainConfig.metadataHash;
+        if (prevOnRamp != address(0)) destChainConfig.prevOnRamp = prevOnRamp;
+
+        emit DestChainAdded(destChainSelector, destChainConfig);
+      } else {
+        if (destChainConfig.prevOnRamp != prevOnRamp) revert InvalidDestChainConfig(destChainSelector);
+        if (destChainConfigArg.dynamicConfig.defaultTokenDestBytesOverhead < Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES) {
+          revert InvalidDestBytesOverhead(address(0), destChainConfigArg.dynamicConfig.defaultTokenDestBytesOverhead);
+        }
+
+        emit DestChainDynamicConfigUpdated(destChainSelector, destChainConfigArg.dynamicConfig);
+      }
+    }
+  }
+
+  /// @notice Returns the destination chain config for given destination chain selector.
+  /// @param destChainSelector The destination chain selector.
+  /// @return The destination chain config.
+  function getDestChainConfig(uint64 destChainSelector) external view returns (DestChainConfig memory) {
+    return s_destChainConfig[destChainSelector];
+  }
+
+  /// @notice Gets the fee configuration for a token.
+  /// @param token The token to get the fee configuration for.
+  /// @return premiumMultiplierWeiPerEth The multiplier for destination chain specific premiums.
+  function getPremiumMultiplierWeiPerEth(address token) external view returns (uint64 premiumMultiplierWeiPerEth) {
+    return s_premiumMultiplierWeiPerEth[token];
   }
 
   /// @notice Sets the fee configuration for a token
-  /// @param feeTokenConfigArgs Array of FeeTokenConfigArgs structs.
-  function setFeeTokenConfig(FeeTokenConfigArgs[] memory feeTokenConfigArgs) external {
+  /// @param premiumMultiplierWeiPerEthArgs Array of PremiumMultiplierWeiPerEthArgs structs.
+  function applyPremiumMultiplierWeiPerEthUpdates(
+    PremiumMultiplierWeiPerEthArgs[] memory premiumMultiplierWeiPerEthArgs
+  ) external {
     _onlyOwnerOrAdmin();
-    _setFeeTokenConfig(feeTokenConfigArgs);
+    _applyPremiumMultiplierWeiPerEthUpdates(premiumMultiplierWeiPerEthArgs);
   }
 
-  /// @dev Set the fee config
-  /// @param feeTokenConfigArgs The fee token configs.
-  function _setFeeTokenConfig(FeeTokenConfigArgs[] memory feeTokenConfigArgs) internal {
-    for (uint256 i = 0; i < feeTokenConfigArgs.length; ++i) {
-      FeeTokenConfigArgs memory configArg = feeTokenConfigArgs[i];
+  /// @dev Set the fee config.
+  /// @param premiumMultiplierWeiPerEthArgs The multiplier for destination chain specific premiums.
+  function _applyPremiumMultiplierWeiPerEthUpdates(
+    PremiumMultiplierWeiPerEthArgs[] memory premiumMultiplierWeiPerEthArgs
+  ) internal {
+    for (uint256 i = 0; i < premiumMultiplierWeiPerEthArgs.length; ++i) {
+      address token = premiumMultiplierWeiPerEthArgs[i].token;
+      uint64 premiumMultiplierWeiPerEth = premiumMultiplierWeiPerEthArgs[i].premiumMultiplierWeiPerEth;
+      s_premiumMultiplierWeiPerEth[token] = premiumMultiplierWeiPerEth;
 
-      s_feeTokenConfig[configArg.token] = FeeTokenConfig({
-        networkFeeUSDCents: configArg.networkFeeUSDCents,
-        gasMultiplierWeiPerEth: configArg.gasMultiplierWeiPerEth,
-        premiumMultiplierWeiPerEth: configArg.premiumMultiplierWeiPerEth,
-        enabled: configArg.enabled
-      });
+      emit PremiumMultiplierWeiPerEthUpdated(token, premiumMultiplierWeiPerEth);
     }
-    emit FeeConfigSet(feeTokenConfigArgs);
   }
 
   /// @notice Gets the transfer fee config for a given token.
@@ -693,6 +786,10 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimi
   ) internal {
     for (uint256 i = 0; i < tokenTransferFeeConfigArgs.length; ++i) {
       TokenTransferFeeConfigArgs memory configArg = tokenTransferFeeConfigArgs[i];
+
+      if (configArg.destBytesOverhead < Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES) {
+        revert InvalidDestBytesOverhead(configArg.token, configArg.destBytesOverhead);
+      }
 
       s_tokenTransferFeeConfig[configArg.token] = TokenTransferFeeConfig({
         minFeeUSDCents: configArg.minFeeUSDCents,
@@ -850,7 +947,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimi
   }
 
   // ================================================================
-  // │                        Access and ARM                        │
+  // │                           Access                             │
   // ================================================================
 
   /// @dev Require that the sender is the owner or the fee admin

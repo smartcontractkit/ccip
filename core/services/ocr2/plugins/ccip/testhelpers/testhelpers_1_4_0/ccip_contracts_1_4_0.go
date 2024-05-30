@@ -28,9 +28,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/arm_proxy_contract"
 	burn_mint_token_pool "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/burn_mint_token_pool_1_4_0"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store_helper"
-	custom_token_pool "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/custom_token_pool_1_4_0"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store_1_2_0"
 	evm_2_evm_offramp "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp_1_2_0"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp_1_2_0"
 	evm_2_evm_onramp "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp_1_2_0"
@@ -38,7 +36,7 @@ import (
 	lock_release_token_pool "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/lock_release_token_pool_1_4_0"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/maybe_revert_message_receiver"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_arm_contract"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/price_registry"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/price_registry_1_2_0"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/weth9"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/link_token_interface"
@@ -180,13 +178,12 @@ type Common struct {
 	Chain             *backends.SimulatedBackend
 	LinkToken         *link_token_interface.LinkToken
 	LinkTokenPool     *lock_release_token_pool.LockReleaseTokenPool
-	CustomPool        *custom_token_pool.CustomTokenPool
 	CustomToken       *link_token_interface.LinkToken
 	WrappedNative     *weth9.WETH9
 	WrappedNativePool *lock_release_token_pool_1_0_0.LockReleaseTokenPool
 	ARM               *mock_arm_contract.MockARMContract
 	ARMProxy          *arm_proxy_contract.ARMProxyContract
-	PriceRegistry     *price_registry.PriceRegistry
+	PriceRegistry     *price_registry_1_2_0.PriceRegistry
 }
 
 type SourceChain struct {
@@ -198,11 +195,10 @@ type SourceChain struct {
 type DestinationChain struct {
 	Common
 
-	CommitStoreHelper *commit_store_helper.CommitStoreHelper
-	CommitStore       *commit_store.CommitStore
-	Router            *router.Router
-	OffRamp           *evm_2_evm_offramp.EVM2EVMOffRamp
-	Receivers         []MaybeRevertReceiver
+	CommitStore *commit_store_1_2_0.CommitStore
+	Router      *router.Router
+	OffRamp     *evm_2_evm_offramp.EVM2EVMOffRamp
+	Receivers   []MaybeRevertReceiver
 }
 
 type OCR2Config struct {
@@ -357,7 +353,7 @@ func (c *CCIPContracts) DeployNewOnRamp(t *testing.T) {
 				MaxFeeUSDCents:    1_000_000_00, // $ 1 million
 				DeciBps:           5_0,          // 5 bps
 				DestGasOverhead:   34_000,
-				DestBytesOverhead: 0,
+				DestBytesOverhead: 32,
 			},
 		},
 		[]evm_2_evm_onramp.EVM2EVMOnRampNopAndWeight{},
@@ -381,10 +377,10 @@ func (c *CCIPContracts) EnableOnRamp(t *testing.T) {
 }
 
 func (c *CCIPContracts) DeployNewCommitStore(t *testing.T) {
-	commitStoreAddress, _, _, err := commit_store_helper.DeployCommitStoreHelper(
+	commitStoreAddress, _, _, err := commit_store_1_2_0.DeployCommitStore(
 		c.Dest.User,  // user
 		c.Dest.Chain, // client
-		commit_store_helper.CommitStoreStaticConfig{
+		commit_store_1_2_0.CommitStoreStaticConfig{
 			ChainSelector:       c.Dest.ChainSelector,
 			SourceChainSelector: c.Source.ChainSelector,
 			OnRamp:              c.Source.OnRamp.Address(),
@@ -393,16 +389,14 @@ func (c *CCIPContracts) DeployNewCommitStore(t *testing.T) {
 	)
 	require.NoError(t, err)
 	c.Dest.Chain.Commit()
-	c.Dest.CommitStoreHelper, err = commit_store_helper.NewCommitStoreHelper(commitStoreAddress, c.Dest.Chain)
-	require.NoError(t, err)
 	// since CommitStoreHelper derives from CommitStore, it's safe to instantiate both on same address
-	c.Dest.CommitStore, err = commit_store.NewCommitStore(commitStoreAddress, c.Dest.Chain)
+	c.Dest.CommitStore, err = commit_store_1_2_0.NewCommitStore(commitStoreAddress, c.Dest.Chain)
 	require.NoError(t, err)
 }
 
 func (c *CCIPContracts) DeployNewPriceRegistry(t *testing.T) {
 	t.Log("Deploying new Price Registry")
-	destPricesAddress, _, _, err := price_registry.DeployPriceRegistry(
+	destPricesAddress, _, _, err := price_registry_1_2_0.DeployPriceRegistry(
 		c.Dest.User,
 		c.Dest.Chain,
 		[]common.Address{c.Dest.CommitStore.Address()},
@@ -412,11 +406,11 @@ func (c *CCIPContracts) DeployNewPriceRegistry(t *testing.T) {
 	require.NoError(t, err)
 	c.Source.Chain.Commit()
 	c.Dest.Chain.Commit()
-	c.Dest.PriceRegistry, err = price_registry.NewPriceRegistry(destPricesAddress, c.Dest.Chain)
+	c.Dest.PriceRegistry, err = price_registry_1_2_0.NewPriceRegistry(destPricesAddress, c.Dest.Chain)
 	require.NoError(t, err)
 
-	priceUpdates := price_registry.InternalPriceUpdates{
-		TokenPriceUpdates: []price_registry.InternalTokenPriceUpdate{
+	priceUpdates := price_registry_1_2_0.InternalPriceUpdates{
+		TokenPriceUpdates: []price_registry_1_2_0.InternalTokenPriceUpdate{
 			{
 				SourceToken: c.Dest.LinkToken.Address(),
 				UsdPerToken: big.NewInt(8e18), // 8usd
@@ -426,7 +420,7 @@ func (c *CCIPContracts) DeployNewPriceRegistry(t *testing.T) {
 				UsdPerToken: big.NewInt(1e18), // 1usd
 			},
 		},
-		GasPriceUpdates: []price_registry.InternalGasPriceUpdate{
+		GasPriceUpdates: []price_registry_1_2_0.InternalGasPriceUpdate{
 			{
 				DestChainSelector: c.Source.ChainSelector,
 				UsdPerUnitGas:     big.NewInt(2000e9), // $2000 per eth * 1gwei = 2000e9
@@ -692,14 +686,14 @@ func (c *CCIPContracts) SetupLockAndMintTokenPool(
 	}
 
 	//native token is used as fee token
-	_, err = c.Source.PriceRegistry.UpdatePrices(c.Source.User, price_registry.InternalPriceUpdates{
-		TokenPriceUpdates: []price_registry.InternalTokenPriceUpdate{
+	_, err = c.Source.PriceRegistry.UpdatePrices(c.Source.User, price_registry_1_2_0.InternalPriceUpdates{
+		TokenPriceUpdates: []price_registry_1_2_0.InternalTokenPriceUpdate{
 			{
 				SourceToken: sourceTokenAddress,
 				UsdPerToken: big.NewInt(5),
 			},
 		},
-		GasPriceUpdates: []price_registry.InternalGasPriceUpdate{},
+		GasPriceUpdates: []price_registry_1_2_0.InternalGasPriceUpdate{},
 	})
 	if err != nil {
 		return [20]byte{}, nil, err
@@ -889,7 +883,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 	destChain.Commit()
 
 	// Deploy and configure onramp
-	sourcePricesAddress, _, _, err := price_registry.DeployPriceRegistry(
+	sourcePricesAddress, _, _, err := price_registry_1_2_0.DeployPriceRegistry(
 		sourceUser,
 		sourceChain,
 		nil,
@@ -898,11 +892,11 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 	)
 	require.NoError(t, err)
 
-	srcPriceRegistry, err := price_registry.NewPriceRegistry(sourcePricesAddress, sourceChain)
+	srcPriceRegistry, err := price_registry_1_2_0.NewPriceRegistry(sourcePricesAddress, sourceChain)
 	require.NoError(t, err)
 
-	_, err = srcPriceRegistry.UpdatePrices(sourceUser, price_registry.InternalPriceUpdates{
-		TokenPriceUpdates: []price_registry.InternalTokenPriceUpdate{
+	_, err = srcPriceRegistry.UpdatePrices(sourceUser, price_registry_1_2_0.InternalPriceUpdates{
+		TokenPriceUpdates: []price_registry_1_2_0.InternalTokenPriceUpdate{
 			{
 				SourceToken: sourceLinkTokenAddress,
 				UsdPerToken: new(big.Int).Mul(big.NewInt(1e18), big.NewInt(20)),
@@ -912,7 +906,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 				UsdPerToken: new(big.Int).Mul(big.NewInt(1e18), big.NewInt(2000)),
 			},
 		},
-		GasPriceUpdates: []price_registry.InternalGasPriceUpdate{
+		GasPriceUpdates: []price_registry_1_2_0.InternalGasPriceUpdate{
 			{
 				DestChainSelector: destChainSelector,
 				UsdPerUnitGas:     big.NewInt(20000e9),
@@ -983,7 +977,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 				MaxFeeUSDCents:    1_000_000_00, // $ 1 million
 				DeciBps:           5_0,          // 5 bps
 				DestGasOverhead:   34_000,
-				DestBytesOverhead: 0,
+				DestBytesOverhead: 32,
 			},
 		},
 		[]evm_2_evm_onramp.EVM2EVMOnRampNopAndWeight{},
@@ -1094,7 +1088,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 	destChain.Commit()
 
 	// Deploy and configure ge offramp.
-	destPricesAddress, _, _, err := price_registry.DeployPriceRegistry(
+	destPricesAddress, _, _, err := price_registry_1_2_0.DeployPriceRegistry(
 		destUser,
 		destChain,
 		nil,
@@ -1102,14 +1096,14 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 		60*60*24*14, // two weeks
 	)
 	require.NoError(t, err)
-	destPriceRegistry, err := price_registry.NewPriceRegistry(destPricesAddress, destChain)
+	destPriceRegistry, err := price_registry_1_2_0.NewPriceRegistry(destPricesAddress, destChain)
 	require.NoError(t, err)
 
 	// Deploy commit store.
-	commitStoreAddress, _, _, err := commit_store_helper.DeployCommitStoreHelper(
+	commitStoreAddress, _, _, err := commit_store_1_2_0.DeployCommitStore(
 		destUser,  // user
 		destChain, // client
-		commit_store_helper.CommitStoreStaticConfig{
+		commit_store_1_2_0.CommitStoreStaticConfig{
 			ChainSelector:       destChainSelector,
 			SourceChainSelector: sourceChainSelector,
 			OnRamp:              onRamp.Address(),
@@ -1118,9 +1112,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 	)
 	require.NoError(t, err)
 	destChain.Commit()
-	commitStore, err := commit_store.NewCommitStore(commitStoreAddress, destChain)
-	require.NoError(t, err)
-	commitStoreHelper, err := commit_store_helper.NewCommitStoreHelper(commitStoreAddress, destChain)
+	commitStore, err := commit_store_1_2_0.NewCommitStore(commitStoreAddress, destChain)
 	require.NoError(t, err)
 
 	offRampAddress, _, _, err := evm_2_evm_offramp.DeployEVM2EVMOffRamp(
@@ -1209,7 +1201,6 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 			Chain:             sourceChain,
 			LinkToken:         sourceLinkToken,
 			LinkTokenPool:     sourcePool,
-			CustomPool:        nil,
 			CustomToken:       sourceCustomToken,
 			ARM:               sourceARM,
 			ARMProxy:          sourceARMProxy,
@@ -1228,7 +1219,6 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 			Chain:             destChain,
 			LinkToken:         destLinkToken,
 			LinkTokenPool:     destPool,
-			CustomPool:        nil,
 			CustomToken:       destCustomToken,
 			ARM:               destARM,
 			ARMProxy:          destARMProxy,
@@ -1236,11 +1226,10 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 			WrappedNative:     destWrapped,
 			WrappedNativePool: destWrappedPool,
 		},
-		CommitStoreHelper: commitStoreHelper,
-		CommitStore:       commitStore,
-		Router:            destRouter,
-		OffRamp:           offRamp,
-		Receivers:         []MaybeRevertReceiver{{Receiver: revertingMessageReceiver1, Strict: false}, {Receiver: revertingMessageReceiver2, Strict: true}},
+		CommitStore: commitStore,
+		Router:      destRouter,
+		OffRamp:     offRamp,
+		Receivers:   []MaybeRevertReceiver{{Receiver: revertingMessageReceiver1, Strict: false}, {Receiver: revertingMessageReceiver2, Strict: true}},
 	}
 
 	return CCIPContracts{
@@ -1418,7 +1407,7 @@ func (args *ManualExecArgs) ExecuteManually() (*types.Transaction, error) {
 		}
 		args.SeqNr = seqNr
 	}
-	commitStore, err := commit_store.NewCommitStore(common.HexToAddress(args.CommitStore), args.DestChain)
+	commitStore, err := commit_store_1_2_0.NewCommitStore(common.HexToAddress(args.CommitStore), args.DestChain)
 	if err != nil {
 		return nil, err
 	}
@@ -1433,7 +1422,7 @@ func (args *ManualExecArgs) ExecuteManually() (*types.Transaction, error) {
 		return nil, err
 	}
 
-	var commitReport *commit_store.CommitStoreCommitReport
+	var commitReport *commit_store_1_2_0.CommitStoreCommitReport
 	for iterator.Next() {
 		if iterator.Event.Report.Interval.Min <= args.SeqNr && iterator.Event.Report.Interval.Max >= args.SeqNr {
 			commitReport = &iterator.Event.Report
@@ -1448,7 +1437,7 @@ func (args *ManualExecArgs) ExecuteManually() (*types.Transaction, error) {
 	return args.execute(commitReport)
 }
 
-func (args *ManualExecArgs) execute(report *commit_store.CommitStoreCommitReport) (*types.Transaction, error) {
+func (args *ManualExecArgs) execute(report *commit_store_1_2_0.CommitStoreCommitReport) (*types.Transaction, error) {
 	log.Info().Msg("Executing request manually")
 	seqNr := args.SeqNr
 	// Build a merkle tree for the report

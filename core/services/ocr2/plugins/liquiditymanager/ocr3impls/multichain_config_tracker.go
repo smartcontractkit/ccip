@@ -18,6 +18,7 @@ import (
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
+	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 
 	evmclient "github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
@@ -25,7 +26,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/discoverer"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/models"
-	"github.com/smartcontractkit/chainlink/v2/core/services/relay"
 )
 
 var (
@@ -37,6 +37,8 @@ var (
 	_ ocrtypes.ContractConfigTracker = &multichainConfigTracker{}
 
 	defaultTimeout = 1 * time.Minute
+
+	configTrackerWorkers = 4
 )
 
 func init() {
@@ -49,18 +51,18 @@ func init() {
 	ConfigSet = defaultABI.Events["ConfigSet"].ID
 }
 
-type CombinerFn func(masterChain relay.ID, contractConfigs map[relay.ID]ocrtypes.ContractConfig) (ocrtypes.ContractConfig, error)
+type CombinerFn func(masterChain commontypes.RelayID, contractConfigs map[commontypes.RelayID]ocrtypes.ContractConfig) (ocrtypes.ContractConfig, error)
 
 type multichainConfigTracker struct {
 	services.StateMachine
 
 	// masterChain is the chain that contains the "master" OCR3 configuration
 	// contract.
-	masterChain       relay.ID
+	masterChain       commontypes.RelayID
 	lggr              logger.Logger
-	logPollers        map[relay.ID]logpoller.LogPoller
+	logPollers        map[commontypes.RelayID]logpoller.LogPoller
 	masterClient      evmclient.Client
-	contractAddresses map[relay.ID]common.Address
+	contractAddresses map[commontypes.RelayID]common.Address
 	masterContract    no_op_ocr3.NoOpOCR3Interface
 	combiner          CombinerFn
 	fromBlocks        map[string]int64
@@ -68,9 +70,9 @@ type multichainConfigTracker struct {
 }
 
 func NewMultichainConfigTracker(
-	masterChain relay.ID,
+	masterChain commontypes.RelayID,
 	lggr logger.Logger,
-	logPollers map[relay.ID]logpoller.LogPoller,
+	logPollers map[commontypes.RelayID]logpoller.LogPoller,
 	masterClient evmclient.Client,
 	masterContract common.Address,
 	discovererFactory discoverer.Factory,
@@ -128,7 +130,7 @@ func NewMultichainConfigTracker(
 	}
 
 	// Register filters on all log pollers
-	contracts := make(map[relay.ID]common.Address)
+	contracts := make(map[commontypes.RelayID]common.Address)
 	for id, lp := range logPollers {
 		nid, err2 := strconv.ParseUint(id.ChainID, 10, 64)
 		if err2 != nil {
@@ -140,7 +142,7 @@ func NewMultichainConfigTracker(
 			return nil, fmt.Errorf("chain %d not found", nid)
 		}
 
-		address, err2 := grph.GetRebalancerAddress(models.NetworkSelector(ch.Selector))
+		address, err2 := grph.GetLiquidityManagerAddress(models.NetworkSelector(ch.Selector))
 		if err2 != nil {
 			return nil, fmt.Errorf("no rebalancer found for network selector %d", ch.Selector)
 		}
@@ -173,34 +175,50 @@ func NewMultichainConfigTracker(
 	}, nil
 }
 
-func (m *multichainConfigTracker) GetContractAddresses() map[relay.ID]common.Address {
+func (m *multichainConfigTracker) GetContractAddresses() map[commontypes.RelayID]common.Address {
 	return m.contractAddresses
 }
 
 func (m *multichainConfigTracker) Start() {
 	_ = m.StartOnce("MultichainConfigTracker", func() error {
-		if m.fromBlocks != nil {
-			m.replaying.Store(true)
-			defer m.replaying.Store(false)
+		if len(m.fromBlocks) == 0 {
+			return nil
+		}
+		m.replaying.Store(true)
+		defer m.replaying.Store(false)
 
-			// TODO: replay multiple chains in parallel?
-			var errs error
+		networks := len(m.fromBlocks)
+		ctx := context.Background() // TODO: deadline?
+		running := make(chan struct{}, configTrackerWorkers)
+		results := make(chan error, networks)
+		go func() {
 			for id, fromBlock := range m.fromBlocks {
-				err := m.ReplayChain(context.Background(), relay.NewID("evm", id), fromBlock)
-				if err != nil {
-					m.lggr.Errorw("failed to replay chain", "chain", id, "fromBlock", fromBlock, "err", err)
-					errs = multierr.Append(errs, err)
-				} else {
-					m.lggr.Infow("successfully replayed chain", "chain", id, "fromBlock", fromBlock)
-				}
+				running <- struct{}{}
+				go func(id string, fromBlock int64) {
+					defer func() { <-running }()
+					err := m.ReplayChain(ctx, commontypes.NewRelayID("evm", id), fromBlock)
+					if err != nil {
+						m.lggr.Errorw("failed to replay chain", "chain", id, "fromBlock", fromBlock, "err", err)
+					} else {
+						m.lggr.Infow("successfully replayed chain", "chain", id, "fromBlock", fromBlock)
+					}
+					results <- err
+				}(id, fromBlock)
 			}
+		}()
 
-			if errs != nil {
-				m.lggr.Errorw("failed to replay some chains", "err", errs)
-				return errs
+		// wait for results, we expect the same number of results as networks
+		var errs error
+		for i := 0; i < networks; i++ {
+			err := <-results
+			if err != nil {
+				errs = multierr.Append(errs, err)
 			}
 		}
-		return nil
+		if errs != nil {
+			m.lggr.Errorw("failed to replay some chains", "err", errs)
+		}
+		return errs
 	})
 }
 
@@ -214,7 +232,7 @@ func (m *multichainConfigTracker) Notify() <-chan struct{} {
 }
 
 // ReplayChain replays the log poller for the provided chain
-func (m *multichainConfigTracker) ReplayChain(ctx context.Context, id relay.ID, fromBlock int64) error {
+func (m *multichainConfigTracker) ReplayChain(ctx context.Context, id commontypes.RelayID, fromBlock int64) error {
 	if _, ok := m.logPollers[id]; !ok {
 		return fmt.Errorf("chain %s not in log pollers", id)
 	}
@@ -263,7 +281,7 @@ func (m *multichainConfigTracker) LatestConfig(ctx context.Context, changedInBlo
 	m.lggr.Infow("LatestConfig from master chain", "latestConfig", masterConfig)
 
 	// check all other chains for their config
-	contractConfigs := map[relay.ID]ocrtypes.ContractConfig{
+	contractConfigs := map[commontypes.RelayID]ocrtypes.ContractConfig{
 		m.masterChain: masterConfig,
 	}
 	for id, lp := range m.logPollers {
