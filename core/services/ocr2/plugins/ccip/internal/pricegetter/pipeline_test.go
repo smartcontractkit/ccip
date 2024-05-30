@@ -57,11 +57,9 @@ func TestDataSource(t *testing.T) {
 
 	priceGetter := newTestPipelineGetter(t, source)
 
-	// USDC & LINK are configured
-	confTokens, _, err := priceGetter.FilterConfiguredTokens(context.Background(), []cciptypes.Address{linkTokenAddress, usdcTokenAddress})
-	require.NoError(t, err)
-	assert.Equal(t, linkTokenAddress, confTokens[0])
-	assert.Equal(t, usdcTokenAddress, confTokens[1])
+	// FilterConfiguredTokens has been removed and should error.
+	_, _, err := priceGetter.FilterConfiguredTokens(context.Background(), []cciptypes.Address{linkTokenAddress, usdcTokenAddress})
+	require.Error(t, err)
 
 	// Ask for all prices present in spec.
 	prices, err := priceGetter.TokenPricesUSD(context.Background(), []cciptypes.Address{
@@ -80,11 +78,12 @@ func TestDataSource(t *testing.T) {
 	})
 	require.Error(t, err)
 
-	// Ask only one price
+	// Ask only one price, expect to get all prices back
 	prices, err = priceGetter.TokenPricesUSD(context.Background(), []cciptypes.Address{linkTokenAddress})
 	require.NoError(t, err)
 	assert.Equal(t, prices, map[cciptypes.Address]*big.Int{
 		linkTokenAddress: big.NewInt(0).Mul(big.NewInt(200), big.NewInt(1000000000000000000)),
+		usdcTokenAddress: big.NewInt(0).Mul(big.NewInt(1000), big.NewInt(1000000000000000000)),
 	})
 
 }

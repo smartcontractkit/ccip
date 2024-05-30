@@ -5,7 +5,6 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
-	"sort"
 	"strings"
 
 	"golang.org/x/sync/errgroup"
@@ -27,35 +26,6 @@ func GetMessageIDsAsHexString(messages []cciptypes.EVM2EVMMessage) []string {
 type BackfillArgs struct {
 	SourceLP, DestLP                 logpoller.LogPoller
 	SourceStartBlock, DestStartBlock uint64
-}
-
-// GetFilteredSortedLaneTokens returns union of tokens supported on this lane, including fee tokens from the provided price registry
-// and the bridgeable tokens from offRamp. Bridgeable tokens are only included if they are configured on the pricegetter
-// Fee tokens are not filtered as they must always be priced
-func GetFilteredSortedLaneTokens(ctx context.Context, offRamp ccipdata.OffRampReader, priceRegistry cciptypes.PriceRegistryReader, priceGetter cciptypes.PriceGetter) (laneTokens []cciptypes.Address, excludedTokens []cciptypes.Address, err error) {
-	destFeeTokens, destBridgeableTokens, err := GetDestinationTokens(ctx, offRamp, priceRegistry)
-	if err != nil {
-		return nil, nil, fmt.Errorf("get tokens with batch limit: %w", err)
-	}
-
-	destTokensWithPrice, destTokensWithoutPrice, err := priceGetter.FilterConfiguredTokens(ctx, destBridgeableTokens)
-	if err != nil {
-		return nil, nil, fmt.Errorf("filter for priced tokens: %w", err)
-	}
-
-	return flattenedAndSortedTokens(destFeeTokens, destTokensWithPrice), destTokensWithoutPrice, nil
-}
-
-func flattenedAndSortedTokens(slices ...[]cciptypes.Address) (tokens []cciptypes.Address) {
-	// fee token can overlap with bridgeable tokens, we need to dedup them to arrive at lane token set
-	tokens = FlattenUniqueSlice(slices...)
-
-	// return the tokens in deterministic order to aid with testing and debugging
-	sort.Slice(tokens, func(i, j int) bool {
-		return tokens[i] < tokens[j]
-	})
-
-	return tokens
 }
 
 // GetDestinationTokens returns the destination chain fee tokens from the provided price registry

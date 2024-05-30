@@ -3,10 +3,8 @@ package pricegetter
 import (
 	"context"
 	"math/big"
-	"strings"
 	"time"
 
-	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 
@@ -21,49 +19,39 @@ import (
 var _ PriceGetter = &PipelineGetter{}
 
 type PipelineGetter struct {
-	source        string
-	runner        pipeline.Runner
-	jobID         int32
-	externalJobID uuid.UUID
-	name          string
-	lggr          logger.Logger
+	rawPipelineDefinition string
+	runner                pipeline.Runner
+	jobID                 int32
+	externalJobID         uuid.UUID
+	name                  string
+	lggr                  logger.Logger
 }
 
-func NewPipelineGetter(source string, runner pipeline.Runner, jobID int32, externalJobID uuid.UUID, name string, lggr logger.Logger) (*PipelineGetter, error) {
-	_, err := pipeline.Parse(source)
+func NewPipelineGetter(rawPipelineDefinition string, runner pipeline.Runner, jobID int32, externalJobID uuid.UUID, name string, lggr logger.Logger) (*PipelineGetter, error) {
+	_, err := pipeline.Parse(rawPipelineDefinition)
 	if err != nil {
 		return nil, err
 	}
 
 	return &PipelineGetter{
-		source:        source,
-		runner:        runner,
-		jobID:         jobID,
-		externalJobID: externalJobID,
-		name:          name,
-		lggr:          lggr,
+		rawPipelineDefinition: rawPipelineDefinition,
+		runner:                runner,
+		jobID:                 jobID,
+		externalJobID:         externalJobID,
+		name:                  name,
+		lggr:                  lggr,
 	}, nil
 }
 
-// FilterForConfiguredTokens implements the PriceGetter interface.
-// It filters a list of token addresses for only those that have a pipeline job configured on the TokenPricesUSDPipeline
-func (d *PipelineGetter) FilterConfiguredTokens(ctx context.Context, tokens []cciptypes.Address) (configured []cciptypes.Address, unconfigured []cciptypes.Address, err error) {
-	lcSource := strings.ToLower(d.source)
-	for _, tk := range tokens {
-		lcToken := strings.ToLower(string(tk))
-		if strings.Contains(lcSource, lcToken) {
-			configured = append(configured, tk)
-		} else {
-			unconfigured = append(unconfigured, tk)
-		}
-	}
-	return configured, unconfigured, nil
+// FilterConfiguredTokens implements the PriceGetter interface.
+func (d *PipelineGetter) FilterConfiguredTokens(context.Context, []cciptypes.Address) ([]cciptypes.Address, []cciptypes.Address, error) {
+	return nil, nil, errors.Errorf("FilterConfiguredTokens has been removed")
 }
 
 func (d *PipelineGetter) TokenPricesUSD(ctx context.Context, tokens []cciptypes.Address) (map[cciptypes.Address]*big.Int, error) {
 	_, trrs, err := d.runner.ExecuteRun(ctx, pipeline.Spec{
 		ID:           d.jobID,
-		DotDagSource: d.source,
+		DotDagSource: d.rawPipelineDefinition,
 		CreatedAt:    time.Now(),
 		JobID:        d.jobID,
 		JobName:      d.name,
@@ -84,7 +72,6 @@ func (d *PipelineGetter) TokenPricesUSD(ctx context.Context, tokens []cciptypes.
 		return nil, errors.Errorf("expected map output of price pipeline, got %T", finalResult.Values[0])
 	}
 
-	providedTokensSet := mapset.NewSet(tokens...)
 	tokenPrices := make(map[cciptypes.Address]*big.Int)
 	for tokenAddressStr, rawPrice := range prices {
 		tokenAddressStr := ccipcalc.HexToAddress(tokenAddressStr)
@@ -92,10 +79,7 @@ func (d *PipelineGetter) TokenPricesUSD(ctx context.Context, tokens []cciptypes.
 		if err != nil {
 			return nil, err
 		}
-
-		if providedTokensSet.Contains(tokenAddressStr) {
-			tokenPrices[tokenAddressStr] = castedPrice
-		}
+		tokenPrices[tokenAddressStr] = castedPrice
 	}
 
 	// The mapping of token address to source of token price has to live offchain.

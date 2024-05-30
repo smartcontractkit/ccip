@@ -8,7 +8,6 @@ import (
 	"sort"
 	"time"
 
-	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/pkg/errors"
 
@@ -20,7 +19,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcommon"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/ccipdataprovider"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/pricegetter"
@@ -112,7 +110,7 @@ func (r *CommitReportingPlugin) Observation(ctx context.Context, epochAndRound t
 		return nil, err
 	}
 
-	sourceGasPriceUSD, tokenPricesUSD, err := r.observePriceUpdates(ctx, lggr)
+	sourceGasPriceUSD, tokenPricesUSD, err := r.generatePriceUpdates(ctx, lggr)
 	if err != nil {
 		return nil, err
 	}
@@ -174,57 +172,41 @@ func (r *CommitReportingPlugin) calculateMinMaxSequenceNumbers(ctx context.Conte
 	return minSeqNr, maxSeqNr, messageIDs, nil
 }
 
-// observePriceUpdates only observes price updates if price reporting is enabled
-func (r *CommitReportingPlugin) observePriceUpdates(
-	ctx context.Context,
-	lggr logger.Logger,
-) (sourceGasPriceUSD *big.Int, tokenPricesUSD map[cciptypes.Address]*big.Int, err error) {
-	sortedLaneTokens, filteredLaneTokens, err := ccipcommon.GetFilteredSortedLaneTokens(ctx, r.offRampReader, r.destPriceRegistryReader, r.priceGetter)
-	lggr.Debugw("Filtered bridgeable tokens with no configured price getter", "filteredLaneTokens", filteredLaneTokens)
-
-	if err != nil {
-		return nil, nil, fmt.Errorf("get destination tokens: %w", err)
-	}
-
-	return r.generatePriceUpdates(ctx, lggr, sortedLaneTokens)
-}
-
 // All prices are USD ($1=1e18) denominated. All prices must be not nil.
 // Return token prices should contain the exact same tokens as in tokenDecimals.
 func (r *CommitReportingPlugin) generatePriceUpdates(
 	ctx context.Context,
 	lggr logger.Logger,
-	sortedLaneTokens []cciptypes.Address,
 ) (sourceGasPriceUSD *big.Int, tokenPricesUSD map[cciptypes.Address]*big.Int, err error) {
-	// Include wrapped native in our token query as way to identify the source native USD price.
-	// notice USD is in 1e18 scale, i.e. $1 = 1e18
-	queryTokens := ccipcommon.FlattenUniqueSlice([]cciptypes.Address{r.sourceNative}, sortedLaneTokens)
-
-	rawTokenPricesUSD, err := r.priceGetter.TokenPricesUSD(ctx, queryTokens)
+	rawTokenPricesUSD, err := r.priceGetter.TokenPricesUSD(ctx, []cciptypes.Address{})
 	if err != nil {
 		return nil, nil, err
 	}
 	lggr.Infow("Raw token prices", "rawTokenPrices", rawTokenPricesUSD)
-
-	// make sure that we got prices for all the tokens of our query
-	for _, token := range queryTokens {
-		if rawTokenPricesUSD[token] == nil {
-			return nil, nil, errors.Errorf("missing token price: %+v", token)
-		}
-	}
 
 	sourceNativePriceUSD, exists := rawTokenPricesUSD[r.sourceNative]
 	if !exists {
 		return nil, nil, fmt.Errorf("missing source native (%s) price", r.sourceNative)
 	}
 
-	destTokensDecimals, err := r.destPriceRegistryReader.GetTokensDecimals(ctx, sortedLaneTokens)
+	var tokensWithPrices []cciptypes.Address
+	for token := range rawTokenPricesUSD {
+		if token != r.sourceNative {
+			tokensWithPrices = append(tokensWithPrices, token)
+		}
+	}
+	// return the tokens in deterministic order to aid with testing and debugging
+	sort.Slice(tokensWithPrices, func(i, j int) bool {
+		return tokensWithPrices[i] < tokensWithPrices[j]
+	})
+
+	destTokensDecimals, err := r.destPriceRegistryReader.GetTokensDecimals(ctx, tokensWithPrices)
 	if err != nil {
 		return nil, nil, fmt.Errorf("get tokens decimals: %w", err)
 	}
 
 	tokenPricesUSD = make(map[cciptypes.Address]*big.Int, len(rawTokenPricesUSD))
-	for i, token := range sortedLaneTokens {
+	for i, token := range tokensWithPrices {
 		tokenPricesUSD[token] = calculateUsdPer1e18TokenAmount(rawTokenPricesUSD[token], destTokensDecimals[i])
 	}
 
@@ -321,19 +303,8 @@ func (r *CommitReportingPlugin) Report(ctx context.Context, epochAndRound types.
 
 	parsableObservations := ccip.GetParsableObservations[ccip.CommitObservation](lggr, observations)
 
-	sortedLaneTokens, _, err := ccipcommon.GetFilteredSortedLaneTokens(ctx, r.offRampReader, r.destPriceRegistryReader, r.priceGetter)
-	if err != nil {
-		return false, nil, fmt.Errorf("get destination tokens: %w", err)
-	}
-
-	// Filters out parsable but faulty observations
-	validObservations, err := validateObservations(ctx, lggr, sortedLaneTokens, r.F, parsableObservations)
-	if err != nil {
-		return false, nil, err
-	}
-
 	var intervals []cciptypes.CommitStoreInterval
-	for _, obs := range validObservations {
+	for _, obs := range parsableObservations {
 		intervals = append(intervals, obs.Interval)
 	}
 
@@ -342,7 +313,7 @@ func (r *CommitReportingPlugin) Report(ctx context.Context, epochAndRound types.
 		return false, nil, err
 	}
 
-	tokenPrices, gasPrices, err := r.selectPriceUpdates(ctx, now, validObservations)
+	tokenPrices, gasPrices, err := r.selectPriceUpdates(ctx, now, parsableObservations)
 	if err != nil {
 		return false, nil, err
 	}
@@ -371,57 +342,6 @@ func (r *CommitReportingPlugin) Report(ctx context.Context, epochAndRound types.
 		"epochAndRound", epochAndRound,
 	)
 	return true, encodedReport, nil
-}
-
-// validateObservations validates the given observations.
-// An observation is rejected if any of its gas price or token price is nil. With current CommitObservation implementation, prices
-// are checked to ensure no nil values before adding to Observation, hence an observation that contains nil values comes from a faulty node.
-func validateObservations(ctx context.Context, lggr logger.Logger, destTokens []cciptypes.Address, f int, observations []ccip.CommitObservation) (validObs []ccip.CommitObservation, err error) {
-	for _, obs := range observations {
-		// If gas price is reported as nil, the observation is faulty, skip the observation.
-		if obs.SourceGasPriceUSD == nil {
-			lggr.Warnw("Skipping observation due to nil SourceGasPriceUSD")
-			continue
-		}
-
-		// If observed number of token prices does not match number of supported tokens on dest chain, skip the observation.
-		if len(destTokens) != len(obs.TokenPricesUSD) {
-			lggr.Warnw("Skipping observation due to token count mismatch", "expecting", len(destTokens), "got", len(obs.TokenPricesUSD))
-			continue
-		}
-
-		destTokensSet := mapset.NewSet[cciptypes.Address](destTokens...)
-
-		// If any of the observed token prices is reported as nil, or not supported on dest chain, the observation is faulty, skip the observation.
-		// Printing all faulty prices instead of short-circuiting to make log more informative.
-		skipObservation := false
-		for token, price := range obs.TokenPricesUSD {
-			if price == nil {
-				lggr.Warnw("Nil value in observed TokenPricesUSD", "token", token)
-				skipObservation = true
-			}
-
-			if !destTokensSet.Contains(token) {
-				lggr.Warnw("Unsupported token in observed TokenPricesUSD",
-					"token", token,
-					"destTokens", destTokensSet.String())
-				skipObservation = true
-			}
-		}
-		if skipObservation {
-			lggr.Warnw("Skipping observation due to invalid TokenPricesUSD")
-			continue
-		}
-
-		validObs = append(validObs, obs)
-	}
-
-	// We require at least f+1 valid observations. This corresponds to the scenario where f of the 2f+1 are faulty.
-	if len(validObs) <= f {
-		return nil, errors.Errorf("Not enough valid observations to form consensus: #obs=%d, f=%d", len(validObs), f)
-	}
-
-	return validObs, nil
 }
 
 // calculateIntervalConsensus compresses a set of intervals into one interval

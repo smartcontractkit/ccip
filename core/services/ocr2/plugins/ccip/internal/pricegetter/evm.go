@@ -9,6 +9,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/pkg/errors"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
 
@@ -81,25 +82,8 @@ func NewDynamicPriceGetter(cfg config.DynamicPriceGetterConfig, evmClients map[u
 }
 
 // FilterConfiguredTokens implements the PriceGetter interface.
-// It filters a list of token addresses for only those that have a price resolution rule configured on the PriceGetterConfig
-func (d *DynamicPriceGetter) FilterConfiguredTokens(ctx context.Context, tokens []cciptypes.Address) (configured []cciptypes.Address, unconfigured []cciptypes.Address, err error) {
-	configured = []cciptypes.Address{}
-	unconfigured = []cciptypes.Address{}
-	for _, tk := range tokens {
-		evmAddr, err := ccipcalc.GenericAddrToEvm(tk)
-		if err != nil {
-			return nil, nil, err
-		}
-
-		if _, isAgg := d.cfg.AggregatorPrices[evmAddr]; isAgg {
-			configured = append(configured, tk)
-		} else if _, isStatic := d.cfg.StaticPrices[evmAddr]; isStatic {
-			configured = append(configured, tk)
-		} else {
-			unconfigured = append(unconfigured, tk)
-		}
-	}
-	return configured, unconfigured, nil
+func (d *DynamicPriceGetter) FilterConfiguredTokens(context.Context, []cciptypes.Address) ([]cciptypes.Address, []cciptypes.Address, error) {
+	return nil, nil, errors.Errorf("FilterConfiguredTokens has been removed")
 }
 
 // TokenPricesUSD implements the PriceGetter interface.
