@@ -229,6 +229,8 @@ func (c *CCIPE2ELoad) Call(_ *wasp.Generator) *wasp.Response {
 		res.Failed = true
 		return res
 	}
+	defer c.Lane.Reports.UpdatePhaseStatsForReq(stats)
+
 	msgSerialNo := stats.ReqNo
 	lggr := c.Lane.Logger.With().Int64("msg Number", stats.ReqNo).Logger()
 
@@ -331,7 +333,7 @@ func (c *CCIPE2ELoad) Call(_ *wasp.Generator) *wasp.Response {
 		return res
 	}
 	res.Data = stats.StatusByPhase
-	c.Lane.Reports.UpdatePhaseStatsForReq(stats)
+
 	return res
 }
 
