@@ -37,7 +37,10 @@ type ExecutePluginCommitData struct {
 	ExecutedMessages    []SeqNum    `json:"executed"`
 }
 
-func NewExecutePluginObservation(commitReports map[ChainSelector][]ExecutePluginCommitData, messages map[ChainSelector][]ExecutePluginCCIPData) ExecutePluginObservation {
+type ExecutePluginCommitObservations map[ChainSelector][]ExecutePluginCommitData
+type ExecutePluginMessageObservations map[ChainSelector]map[SeqNum]Bytes32
+
+func NewExecutePluginObservation(commitReports ExecutePluginCommitObservations, messages ExecutePluginMessageObservations) ExecutePluginObservation {
 	return ExecutePluginObservation{
 		CommitReports: commitReports,
 		Messages:      messages,

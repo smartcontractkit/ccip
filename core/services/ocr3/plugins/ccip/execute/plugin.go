@@ -45,33 +45,59 @@ func (p *Plugin) Query(ctx context.Context, outctx ocr3types.OutcomeContext) (ty
 	return types.Query{}, nil
 }
 
-func groupByChainSelector(reports []model.CommitPluginReportWithMeta) map[model.ChainSelector][]model.ExecutePluginCommitData {
-	commitReportCache := make(map[model.ChainSelector][]model.ExecutePluginCommitData)
-	for _, report := range reports {
-		for _, singleReport := range report.Report.MerkleRoots {
-			commitReportCache[singleReport.ChainSel] = append(commitReportCache[singleReport.ChainSel], model.ExecutePluginCommitData{
-				MerkleRoot:          singleReport.MerkleRoot,
-				SequenceNumberRange: singleReport.SeqNumsRange,
-				ExecutedMessages:    nil,
-			})
-		}
-	}
-	return commitReportCache
-}
-
-func readAndAppendNextRange(ctx context.Context, ccipReader reader.CCIP, messages []model.ExecutePluginCCIPData, selector model.ChainSelector, seqRange model.SeqNumRange) ([]model.ExecutePluginCCIPData, error) {
+func readAndAddNextRange(ctx context.Context, ccipReader reader.CCIP, messages map[model.SeqNum]model.Bytes32, selector model.ChainSelector, seqRange model.SeqNumRange) (map[model.SeqNum]model.Bytes32, error) {
 	msgs, err := ccipReader.MsgsBetweenSeqNums(ctx, []model.ChainSelector{selector}, seqRange)
 	if err != nil {
 		return nil, err
 	}
-	var convert []model.ExecutePluginCCIPData
 	for _, msg := range msgs {
-		convert = append(convert, model.ExecutePluginCCIPData{
-			SequenceNumber: msg.SeqNum,
-			Message:        msg.ID,
-		})
+		messages[msg.SeqNum] = msg.ID
 	}
 	return messages, nil
+}
+
+func getNonExecutedReports(ctx context.Context, ccipReader reader.CCIP, dest model.ChainSelector, ts time.Time) (model.ExecutePluginCommitObservations, time.Time, error) {
+	// TODO: filter out "cannot read p.destChain" errors? Or avoid calling it in the first place?
+	commitReports, err := ccipReader.CommitReportsGTETimestamp(ctx, dest, ts, 1000)
+	if err != nil {
+		return nil, time.Time{}, err
+	}
+	if len(commitReports) > 0 {
+		//lastReport := commitReports[len(commitReports)-1]
+		//p.lastReportTS = lastReport.
+		// TODO: Need a way to get a timestamp of the report.
+	}
+
+	groupedCommits := groupByChainSelector(commitReports)
+
+	// Remove fully executed reports.
+	for selector, reports := range groupedCommits {
+		if len(reports) == 0 {
+			continue
+		}
+
+		ranges, err := computeRanges(reports)
+		if err != nil {
+			return nil, time.Time{}, err
+		}
+
+		var executedMessages []model.SeqNumRange
+		for _, seqRange := range ranges {
+			executedMessagesForRange, err := ccipReader.ExecutedMessageRanges(ctx, selector, dest, seqRange)
+			if err != nil {
+				return nil, time.Time{}, err
+			}
+			executedMessages = append(executedMessages, executedMessagesForRange...)
+		}
+
+		// Remove fully executed reports.
+		groupedCommits[selector], err = filterOutFullyExecutedMessages(reports, executedMessages)
+		if err != nil {
+			return nil, time.Time{}, err
+		}
+	}
+
+	return groupedCommits, time.Time{}, nil
 }
 
 // Observation collects data across two phases which happen in separate rounds.
@@ -90,19 +116,11 @@ func (p *Plugin) Observation(ctx context.Context, outctx ocr3types.OutcomeContex
 	}
 
 	// Phase 1: Gather commit reports from the destination chain and determine which messages are required to build a valid execution report.
-	// TODO: filter out "cannot read p.destChain" errors? Or avoid calling it in the first place?
-	commitReports, err := p.ccipReader.CommitReportsGTETimestamp(
-		ctx, p.cfg.DestChain, time.UnixMilli(p.lastReportTS.Load()), 1000)
-	if err != nil {
-		return types.Observation{}, err
-	}
-	if len(commitReports) > 0 {
-		lastReport := commitReports[len(commitReports)-1]
-		p.lastReportTS.Store(lastReport.Timestamp.UnixMilli())
-	}
+	groupedCommits, _, err := getNonExecutedReports(ctx, p.ccipReader, p.cfg.DestChain, p.lastReportTS)
+	// TODO: Need a way to get a timestamp of the report.
 
 	// Phase 2: Gather messages from the source chains and build the execution report.
-	messages := make(map[model.ChainSelector][]model.ExecutePluginCCIPData)
+	messages := make(model.ExecutePluginMessageObservations)
 	if len(previousOutcome.Messages) == 0 {
 		// No messages to execute.
 		// This is expected after a cold start.
@@ -112,40 +130,23 @@ func (p *Plugin) Observation(ctx context.Context, outctx ocr3types.OutcomeContex
 				continue
 			}
 
-			// The total number of reads are minimized by grouping together contiguous ranges.
-			// For new reports, we expect all sequence numbers to be sequential. Handling for
-			// non-contiguous ranges is also implemented to handle older reports when necessary.
-			var seqRange model.SeqNumRange
-			for i, report := range reports {
-				if i == 0 {
-					// initialize
-					seqRange.SetStart(report.SequenceNumberRange.Start())
-					seqRange.SetEnd(report.SequenceNumberRange.End())
-				} else if report.SequenceNumberRange.Start()-1 == seqRange.End() {
-					// extend the contiguous range
-					seqRange.SetEnd(report.SequenceNumberRange.End())
-				} else {
-					// non-contiguous range detected, make a request for the contiguous range.
-					messages[selector], err = readAndAppendNextRange(ctx, p.ccipReader, messages[selector], selector, seqRange)
-					if err != nil {
-						return types.Observation{}, err
-					}
-
-					// Reset the range.
-					seqRange.SetStart(report.SequenceNumberRange.Start())
-					seqRange.SetEnd(report.SequenceNumberRange.End())
-				}
-			}
-
-			// Append the last contiguous range.
-			messages[selector], err = readAndAppendNextRange(ctx, p.ccipReader, messages[selector], selector, seqRange)
+			ranges, err := computeRanges(reports)
 			if err != nil {
 				return types.Observation{}, err
+			}
+
+			for _, seqRange := range ranges {
+				messages[selector], err = readAndAddNextRange(ctx, p.ccipReader, messages[selector], selector, seqRange)
+				if err != nil {
+					return types.Observation{}, err
+				}
 			}
 		}
 	}
 
-	return model.NewExecutePluginObservation(groupByChainSelector(commitReports), messages).Encode()
+	// TODO: Fire off messages for an attestation check.
+
+	return model.NewExecutePluginObservation(groupedCommits, messages).Encode()
 }
 
 func (p *Plugin) ValidateObservation(outctx ocr3types.OutcomeContext, query types.Query, ao types.AttributedObservation) error {
@@ -171,9 +172,35 @@ func (p *Plugin) ObservationQuorum(outctx ocr3types.OutcomeContext, query types.
 }
 
 func (p *Plugin) Outcome(outctx ocr3types.OutcomeContext, query types.Query, aos []types.AttributedObservation) (ocr3types.Outcome, error) {
-	// aggregated list of observations?
-	// TODO: whats the difference between this and the Report?
-	//       just the seqNr it seems, attach that to the outcome to make a report?
+	// TODO: do we care about f_chain here? I believe only commit is needs true consensus.
+	//       if we do, it would mainly be to prevent bad participants from invalidating the proofs with bad data.
+	// Aggregate messages from the current observations
+	aggregatedMessages := make(map[model.ChainSelector]map[model.SeqNum]model.Bytes32)
+	for _, ao := range aos {
+		obs, err := model.DecodeExecutePluginObservation(ao.Observation)
+		if err != nil {
+			return ocr3types.Outcome{}, err
+		}
+
+		for selector, messages := range obs.Messages {
+			for seqNr, message := range messages {
+				aggregatedMessages[selector][seqNr] = message
+			}
+		}
+	}
+
+	// Reports from previous outcome
+	// TODO: Build the proof
+	/*
+		previousOutcome, err := model.DecodeExecutePluginOutcome(outctx.PreviousOutcome)
+		if err != nil {
+			return ocr3types.Outcome{}, err
+		}
+		for selector, report := range previousOutcome.NextCommits {
+			// if we have all of the messages, build the proof.
+		}
+	*/
+
 	panic("implement me")
 }
 

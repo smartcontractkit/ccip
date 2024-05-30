@@ -4,9 +4,10 @@ import (
 	"context"
 	"time"
 
+	"github.com/stretchr/testify/mock"
+
 	"github.com/smartcontractkit/ccipocr3/internal/model"
 	"github.com/smartcontractkit/ccipocr3/internal/reader"
-	"github.com/stretchr/testify/mock"
 )
 
 type CCIPReader struct {
@@ -22,6 +23,11 @@ func NewCCIPReader() *CCIPReader {
 func (r CCIPReader) CommitReportsGTETimestamp(ctx context.Context, dest model.ChainSelector, ts time.Time, limit int) ([]model.CommitPluginReportWithMeta, error) {
 	args := r.Called(ctx, dest, ts, limit)
 	return args.Get(0).([]model.CommitPluginReportWithMeta), args.Error(1)
+}
+
+func (r CCIPReader) ExecutedMessageRanges(ctx context.Context, source, dest model.ChainSelector, seqNumRange model.SeqNumRange) ([]model.SeqNumRange, error) {
+	args := r.Called(ctx, source, dest, seqNumRange)
+	return args.Get(0).([]model.SeqNumRange), args.Error(1)
 }
 
 func (r CCIPReader) MsgsAfterTimestamp(ctx context.Context, chains []model.ChainSelector, ts time.Time, limit int) ([]model.CCIPMsg, error) {

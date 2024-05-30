@@ -19,6 +19,10 @@ type CCIP interface {
 	// and finds all ReportAccepted up to the provided limit.
 	CommitReportsGTETimestamp(ctx context.Context, dest model.ChainSelector, ts time.Time, limit int) ([]model.CommitPluginReportWithMeta, error)
 
+	// ExecutedMessageRanges reads the destination chain and finds which messages are executed.
+	// A slice of sequence number ranges is returned to express which messages are executed.
+	ExecutedMessageRanges(ctx context.Context, source, dest model.ChainSelector, seqNumRange model.SeqNumRange) ([]model.SeqNumRange, error)
+
 	// MsgsAfterTimestamp reads the provided chains.
 	// Finds and returns ccip messages submitted after the target time.
 	// Messages are sorted ascending based on their timestamp and limited up to the provided limit.
