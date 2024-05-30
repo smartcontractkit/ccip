@@ -94,7 +94,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ILinkAvailable, AggregateRat
   /// applyPremiumMultiplierWeiPerEthUpdates to set the mapping
   struct PremiumMultiplierWeiPerEthArgs {
     address token; // // ───────────────────╮ Token address
-    uint64 premiumMultiplierWeiPerEth; // ──╯ Multiplier for destination chain specific premiums
+    uint64 premiumMultiplierWeiPerEth; // ──╯ Multiplier for destination chain specific premiums. Should never be 0 so can be used as an isEnabled flag
   }
 
   /// @dev Struct to hold the transfer fee configuration for token transfers
@@ -193,6 +193,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ILinkAvailable, AggregateRat
   /// @dev The destination chain specific configs
   mapping(uint64 destChainSelector => DestChainConfig destChainConfig) internal s_destChainConfig;
   /// @dev The multiplier for destination chain specific premiums that can be set by the owner or fee admin
+  /// This should never be 0 once set, so it can be used as an isEnabled flag
   mapping(address token => uint64 premiumMultiplierWeiPerEth) internal s_premiumMultiplierWeiPerEth;
   /// @dev The token transfer fee config that can be set by the owner or fee admin
   mapping(address token => TokenTransferFeeConfig tranferFeeConfig) internal s_tokenTransferFeeConfig;
