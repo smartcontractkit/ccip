@@ -33,6 +33,8 @@ type ExecutePluginCommitData struct {
 type ExecutePluginCommitObservations map[ChainSelector][]ExecutePluginCommitData
 type ExecutePluginMessageObservations map[ChainSelector]map[SeqNum]Bytes32
 
+// TODO: revisit observation types. The maps used here are more space efficient and easier to work
+// with but require more transformations compared to the on-chain representations.
 type ExecutePluginObservation struct {
 	CommitReports ExecutePluginCommitObservations  `json:"commitReports"`
 	Messages      ExecutePluginMessageObservations `json:"messages"`

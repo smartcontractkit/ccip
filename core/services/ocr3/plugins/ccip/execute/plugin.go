@@ -45,7 +45,7 @@ func (p *Plugin) Query(ctx context.Context, outctx ocr3types.OutcomeContext) (ty
 	return types.Query{}, nil
 }
 
-func getNonExecutedReports(ctx context.Context, ccipReader reader.CCIP, dest model.ChainSelector, ts time.Time) (model.ExecutePluginCommitObservations, time.Time, error) {
+func getPendingExecutedReports(ctx context.Context, ccipReader reader.CCIP, dest model.ChainSelector, ts time.Time) (model.ExecutePluginCommitObservations, time.Time, error) {
 	// TODO: filter out "cannot read p.destChain" errors? Or avoid calling it in the first place?
 	commitReports, err := ccipReader.CommitReportsGTETimestamp(ctx, dest, ts, 1000)
 	if err != nil {
@@ -105,7 +105,7 @@ func (p *Plugin) Observation(ctx context.Context, outctx ocr3types.OutcomeContex
 	}
 
 	// Phase 1: Gather commit reports from the destination chain and determine which messages are required to build a valid execution report.
-	groupedCommits, _, err := getNonExecutedReports(ctx, p.ccipReader, p.cfg.DestChain, time.UnixMilli(p.lastReportTS.Load()))
+	groupedCommits, _, err := getPendingExecutedReports(ctx, p.ccipReader, p.cfg.DestChain, time.UnixMilli(p.lastReportTS.Load()))
 	// TODO: Need a way to get a timestamp of the report.
 
 	// Phase 2: Gather messages from the source chains and build the execution report.
