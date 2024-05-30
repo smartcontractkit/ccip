@@ -2,7 +2,6 @@ package mocks
 
 import (
 	"context"
-	"time"
 
 	"github.com/stretchr/testify/mock"
 
@@ -35,8 +34,8 @@ func (r CCIPReader) MsgsAfterTimestamp(ctx context.Context, chains []model.Chain
 	return args.Get(0).([]model.CCIPMsg), args.Error(1)
 }
 
-func (r CCIPReader) MsgsBetweenSeqNums(ctx context.Context, chains []model.ChainSelector, seqNumRange model.SeqNumRange) ([]model.CCIPMsg, error) {
-	args := r.Called(ctx, chains, seqNumRange)
+func (r CCIPReader) MsgsBetweenSeqNums(ctx context.Context, chain model.ChainSelector, seqNumRange model.SeqNumRange) ([]model.CCIPMsg, error) {
+	args := r.Called(ctx, chain, seqNumRange)
 	return args.Get(0).([]model.CCIPMsg), args.Error(1)
 }
 
