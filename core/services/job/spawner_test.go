@@ -2,7 +2,6 @@ package job_test
 
 import (
 	"context"
-	"github.com/smartcontractkit/chainlink-common/pkg/loop/adapters/relay"
 	"testing"
 	"time"
 
@@ -70,14 +69,18 @@ type relayGetter struct {
 	r *evmrelayer.Relayer
 }
 
+func (g *relayGetter) GetAll() map[types.RelayID]loop.Relayer {
+	return map[types.RelayID]loop.Relayer{}
+}
+
 func (g *relayGetter) Get(id types.RelayID) (loop.Relayer, error) {
 	return evmrelayer.NewLoopRelayServerAdapter(g.r, g.e), nil
 }
 
-func (g *relayGetter) List(...relay.ID) (map[relay.ID]loop.Relayer, error) {
-	relayMap := make(map[relay.ID]loop.Relayer, 1)
+func (g *relayGetter) List(...types.RelayID) (map[types.RelayID]loop.Relayer, error) {
+	relayMap := make(map[types.RelayID]loop.Relayer, 1)
 	r := evmrelayer.NewLoopRelayServerAdapter(g.r, g.e)
-	relayMap[relay.ID{Network: "dummy", ChainID: "dummy"}] = r
+	relayMap[types.RelayID{Network: "dummy", ChainID: "dummy"}] = r
 	return relayMap, nil
 }
 
