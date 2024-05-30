@@ -78,7 +78,7 @@ func Test_computeRanges(t *testing.T) {
 
 func Test_groupByChainSelector(t *testing.T) {
 	type args struct {
-		reports []model.CommitPluginReport
+		reports []model.CommitPluginReportWithMeta
 	}
 	tests := []struct {
 		name string
@@ -87,15 +87,17 @@ func Test_groupByChainSelector(t *testing.T) {
 	}{
 		{
 			name: "empty",
-			args: args{reports: []model.CommitPluginReport{}},
+			args: args{reports: []model.CommitPluginReportWithMeta{}},
 			want: model.ExecutePluginCommitObservations{},
 		},
 		{
 			name: "reports",
-			args: args{reports: []model.CommitPluginReport{{MerkleRoots: []model.MerkleRootChain{
-				{ChainSel: 1, SeqNumsRange: model.NewSeqNumRange(10, 20), MerkleRoot: model.Bytes32{1}},
-				{ChainSel: 2, SeqNumsRange: model.NewSeqNumRange(30, 40), MerkleRoot: model.Bytes32{2}},
-			}}}},
+			args: args{reports: []model.CommitPluginReportWithMeta{{
+				Report: model.CommitPluginReport{
+					MerkleRoots: []model.MerkleRootChain{
+						{ChainSel: 1, SeqNumsRange: model.NewSeqNumRange(10, 20), MerkleRoot: model.Bytes32{1}},
+						{ChainSel: 2, SeqNumsRange: model.NewSeqNumRange(30, 40), MerkleRoot: model.Bytes32{2}},
+					}}}}},
 			want: model.ExecutePluginCommitObservations{
 				1: {
 					{

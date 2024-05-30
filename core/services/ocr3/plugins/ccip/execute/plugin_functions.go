@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	mapset "github.com/deckarep/golang-set/v2"
+
 	"github.com/smartcontractkit/ccipocr3/internal/model"
 	"github.com/smartcontractkit/libocr/commontypes"
 )
@@ -12,7 +13,7 @@ import (
 func validateObserverReadingEligibility(
 	observer commontypes.OracleID,
 	observerCfg map[commontypes.OracleID]model.ObserverInfo,
-	observedMsgs map[model.ChainSelector][]model.ExecutePluginCCIPData,
+	observedMsgs model.ExecutePluginMessageObservations,
 ) error {
 	observerInfo, exists := observerCfg[observer]
 	if !exists {

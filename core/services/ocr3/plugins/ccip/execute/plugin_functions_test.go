@@ -3,9 +3,10 @@ package commit
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/smartcontractkit/ccipocr3/internal/model"
 	"github.com/smartcontractkit/libocr/commontypes"
-	"github.com/stretchr/testify/assert"
 )
 
 func Test_validateObserverReadingEligibility(t *testing.T) {
@@ -13,8 +14,8 @@ func Test_validateObserverReadingEligibility(t *testing.T) {
 		name         string
 		observer     commontypes.OracleID
 		observerCfg  map[commontypes.OracleID]model.ObserverInfo
-		observedMsgs map[model.ChainSelector][]model.ExecutePluginCCIPData
-		expErr       bool
+		observedMsgs model.ExecutePluginMessageObservations
+		expErr       string
 	}{
 		{
 			name:     "ValidObserverAndMessages",
@@ -22,9 +23,9 @@ func Test_validateObserverReadingEligibility(t *testing.T) {
 			observerCfg: map[commontypes.OracleID]model.ObserverInfo{
 				1: {Reads: []model.ChainSelector{1, 2}},
 			},
-			observedMsgs: map[model.ChainSelector][]model.ExecutePluginCCIPData{
-				1: {{}, {}},
-				2: {{}, {}},
+			observedMsgs: model.ExecutePluginMessageObservations{
+				1: {1: {}, 2: {}},
+				2: {},
 			},
 		},
 		{
@@ -33,10 +34,10 @@ func Test_validateObserverReadingEligibility(t *testing.T) {
 			observerCfg: map[commontypes.OracleID]model.ObserverInfo{
 				2: {Reads: []model.ChainSelector{1, 2}},
 			},
-			observedMsgs: map[model.ChainSelector][]model.ExecutePluginCCIPData{
-				1: {{}, {}},
+			observedMsgs: model.ExecutePluginMessageObservations{
+				1: {1: {}, 2: {}},
 			},
-			expErr: true,
+			expErr: "observer not found in config",
 		},
 		{
 			name:     "ObserverNotAllowedToReadChain",
@@ -44,10 +45,10 @@ func Test_validateObserverReadingEligibility(t *testing.T) {
 			observerCfg: map[commontypes.OracleID]model.ObserverInfo{
 				1: {Reads: []model.ChainSelector{1}},
 			},
-			observedMsgs: map[model.ChainSelector][]model.ExecutePluginCCIPData{
-				2: {{}, {}},
+			observedMsgs: model.ExecutePluginMessageObservations{
+				2: {1: {}},
 			},
-			expErr: true,
+			expErr: "observer not allowed to read from chain 2",
 		},
 		{
 			name:     "NoMessagesObserved",
@@ -55,7 +56,7 @@ func Test_validateObserverReadingEligibility(t *testing.T) {
 			observerCfg: map[commontypes.OracleID]model.ObserverInfo{
 				1: {Reads: []model.ChainSelector{1, 2}},
 			},
-			observedMsgs: map[model.ChainSelector][]model.ExecutePluginCCIPData{},
+			observedMsgs: model.ExecutePluginMessageObservations{},
 		},
 		{
 			name:     "EmptyMessagesInChain",
@@ -63,9 +64,9 @@ func Test_validateObserverReadingEligibility(t *testing.T) {
 			observerCfg: map[commontypes.OracleID]model.ObserverInfo{
 				1: {Reads: []model.ChainSelector{1, 2}},
 			},
-			observedMsgs: map[model.ChainSelector][]model.ExecutePluginCCIPData{
+			observedMsgs: model.ExecutePluginMessageObservations{
 				1: {},
-				2: {{}, {}},
+				2: {1: {}, 2: {}},
 			},
 		},
 		{
@@ -74,7 +75,7 @@ func Test_validateObserverReadingEligibility(t *testing.T) {
 			observerCfg: map[commontypes.OracleID]model.ObserverInfo{
 				1: {Reads: []model.ChainSelector{1, 2}},
 			},
-			observedMsgs: map[model.ChainSelector][]model.ExecutePluginCCIPData{
+			observedMsgs: model.ExecutePluginMessageObservations{
 				1: {},
 				2: {},
 			},
@@ -84,8 +85,9 @@ func Test_validateObserverReadingEligibility(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			err := validateObserverReadingEligibility(tc.observer, tc.observerCfg, tc.observedMsgs)
-			if tc.expErr {
+			if len(tc.expErr) != 0 {
 				assert.Error(t, err)
+				assert.ErrorContains(t, err, tc.expErr)
 				return
 			}
 			assert.NoError(t, err)

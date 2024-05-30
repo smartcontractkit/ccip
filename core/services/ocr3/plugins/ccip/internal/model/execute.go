@@ -3,6 +3,7 @@ package model
 import (
 	"encoding/json"
 	"fmt"
+	"time"
 )
 
 type ExecutePluginReport struct {
@@ -21,17 +22,9 @@ type ExecutionPluginReportSingleChain struct {
 // Execute Observation //
 /////////////////////////
 
-type ExecutePluginObservation struct {
-	CommitReports map[ChainSelector][]ExecutePluginCommitData `json:"commitReports"`
-	Messages      map[ChainSelector][]ExecutePluginCCIPData   `json:"messages"`
-}
-
-type ExecutePluginCCIPData struct {
-	SequenceNumber SeqNum  `json:"sequenceNumber"`
-	Message        Bytes32 `json:"message"`
-}
-
 type ExecutePluginCommitData struct {
+	Timestamp           time.Time   `json:"timestamp"`
+	BlockNum            uint64      `json:"blockNum"`
 	MerkleRoot          Bytes32     `json:"merkleRoot"`
 	SequenceNumberRange SeqNumRange `json:"sequenceNumberRange"`
 	ExecutedMessages    []SeqNum    `json:"executed"`
@@ -39,6 +32,16 @@ type ExecutePluginCommitData struct {
 
 type ExecutePluginCommitObservations map[ChainSelector][]ExecutePluginCommitData
 type ExecutePluginMessageObservations map[ChainSelector]map[SeqNum]Bytes32
+
+type ExecutePluginObservation struct {
+	CommitReports ExecutePluginCommitObservations  `json:"commitReports"`
+	Messages      ExecutePluginMessageObservations `json:"messages"`
+}
+
+type ExecutePluginCCIPData struct {
+	SequenceNumber SeqNum  `json:"sequenceNumber"`
+	Message        Bytes32 `json:"message"`
+}
 
 func NewExecutePluginObservation(commitReports ExecutePluginCommitObservations, messages ExecutePluginMessageObservations) ExecutePluginObservation {
 	return ExecutePluginObservation{

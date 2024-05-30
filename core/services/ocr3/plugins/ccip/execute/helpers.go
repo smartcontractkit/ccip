@@ -42,11 +42,13 @@ func computeRanges(reports []model.ExecutePluginCommitData) ([]model.SeqNumRange
 	return ranges, nil
 }
 
-func groupByChainSelector(reports []model.CommitPluginReport) model.ExecutePluginCommitObservations {
+func groupByChainSelector(reports []model.CommitPluginReportWithMeta) model.ExecutePluginCommitObservations {
 	commitReportCache := make(map[model.ChainSelector][]model.ExecutePluginCommitData)
-	for _, reports := range reports {
-		for _, singleReport := range reports.MerkleRoots {
+	for _, report := range reports {
+		for _, singleReport := range report.Report.MerkleRoots {
 			commitReportCache[singleReport.ChainSel] = append(commitReportCache[singleReport.ChainSel], model.ExecutePluginCommitData{
+				Timestamp:           report.Timestamp,
+				BlockNum:            report.BlockNum,
 				MerkleRoot:          singleReport.MerkleRoot,
 				SequenceNumberRange: singleReport.SeqNumsRange,
 				ExecutedMessages:    nil,
