@@ -38,11 +38,6 @@ type ExecutePluginObservation struct {
 	Messages      ExecutePluginMessageObservations `json:"messages"`
 }
 
-type ExecutePluginCCIPData struct {
-	SequenceNumber SeqNum  `json:"sequenceNumber"`
-	Message        Bytes32 `json:"message"`
-}
-
 func NewExecutePluginObservation(commitReports ExecutePluginCommitObservations, messages ExecutePluginMessageObservations) ExecutePluginObservation {
 	return ExecutePluginObservation{
 		CommitReports: commitReports,
