@@ -24,8 +24,8 @@ type CommitPluginConfig struct {
 	// ObserverInfo is a map of oracle IDs to ObserverInfo.
 	ObserverInfo map[commontypes.OracleID]ObserverInfo `json:"observerInfo"`
 
-	// FeeTokens is a list of tokens that can be used to pay for ccip fees.
-	FeeTokens []types.Account `json:"feeTokens"`
+	// PricedTokens is a list of tokens that we want to submit price updates for.
+	PricedTokens []types.Account `json:"pricedTokens"`
 
 	// TokenPricesObserver indicates that the node can observe token prices.
 	TokenPricesObserver bool `json:"tokenPricesObserver"`
@@ -43,8 +43,8 @@ func (c CommitPluginConfig) Validate() error {
 		return fmt.Errorf("fChain not set")
 	}
 
-	if len(c.FeeTokens) == 0 {
-		return fmt.Errorf("feeTokens not set")
+	if len(c.PricedTokens) == 0 {
+		return fmt.Errorf("priced tokens not set")
 	}
 
 	if c.NewMsgScanBatchSize == 0 {

@@ -122,7 +122,7 @@ func (p *Plugin) Observation(ctx context.Context, outctx ocr3types.OutcomeContex
 		tokenPrices, err = observeTokenPrices(
 			ctx,
 			p.tokenPricesReader,
-			p.cfg.FeeTokens,
+			p.cfg.PricedTokens,
 		)
 		if err != nil {
 			return types.Observation{}, fmt.Errorf("observe token prices: %w", err)

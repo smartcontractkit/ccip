@@ -405,10 +405,10 @@ func gasPricesConsensus(lggr logger.Logger, observations []model.CommitPluginObs
 // pluginConfigConsensus comes to consensus on the plugin config based on the observations.
 // We cannot trust the state of a single follower, so we need to come to consensus on the config.
 func pluginConfigConsensus(
-	followerCfg model.CommitPluginConfig, // the config of the follower calling this function
+	baseCfg model.CommitPluginConfig, // the config of the follower calling this function
 	observations []model.CommitPluginObservation, // observations from all followers
 ) model.CommitPluginConfig {
-	consensusCfg := followerCfg
+	consensusCfg := baseCfg
 
 	// Come to consensus on fChain.
 	// Use the fChain observed by most followers for each chain.
@@ -437,7 +437,7 @@ func pluginConfigConsensus(
 	// We want to keep the tokens observed by at least 2f_chain+1 followers.
 	feeTokensCounts := make(map[types.Account]int)
 	for _, obs := range observations {
-		for _, token := range obs.PluginConfig.FeeTokens {
+		for _, token := range obs.PluginConfig.PricedTokens {
 			feeTokensCounts[token]++
 		}
 	}
@@ -447,7 +447,7 @@ func pluginConfigConsensus(
 			consensusFeeTokens = append(consensusFeeTokens, token)
 		}
 	}
-	consensusCfg.FeeTokens = consensusFeeTokens
+	consensusCfg.PricedTokens = consensusFeeTokens
 
 	// Come to consensus on reading observers.
 	// An observer can read a chain only if at least 2f_chain+1 followers observed that.
