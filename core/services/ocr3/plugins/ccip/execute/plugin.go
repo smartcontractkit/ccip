@@ -45,17 +45,6 @@ func (p *Plugin) Query(ctx context.Context, outctx ocr3types.OutcomeContext) (ty
 	return types.Query{}, nil
 }
 
-func readAndAddNextRange(ctx context.Context, ccipReader reader.CCIP, messages map[model.SeqNum]model.Bytes32, selector model.ChainSelector, seqRange model.SeqNumRange) (map[model.SeqNum]model.Bytes32, error) {
-	msgs, err := ccipReader.MsgsBetweenSeqNums(ctx, []model.ChainSelector{selector}, seqRange)
-	if err != nil {
-		return nil, err
-	}
-	for _, msg := range msgs {
-		messages[msg.SeqNum] = msg.ID
-	}
-	return messages, nil
-}
-
 func getNonExecutedReports(ctx context.Context, ccipReader reader.CCIP, dest model.ChainSelector, ts time.Time) (model.ExecutePluginCommitObservations, time.Time, error) {
 	// TODO: filter out "cannot read p.destChain" errors? Or avoid calling it in the first place?
 	commitReports, err := ccipReader.CommitReportsGTETimestamp(ctx, dest, ts, 1000)
@@ -135,8 +124,16 @@ func (p *Plugin) Observation(ctx context.Context, outctx ocr3types.OutcomeContex
 				return types.Observation{}, err
 			}
 
+			// Read messages for each range.
 			for _, seqRange := range ranges {
-				messages[selector], err = readAndAddNextRange(ctx, p.ccipReader, messages[selector], selector, seqRange)
+				msgs, err := p.ccipReader.MsgsBetweenSeqNums(ctx, []model.ChainSelector{selector}, seqRange)
+				if err != nil {
+					return nil, err
+				}
+				for _, msg := range msgs {
+					messages[selector][msg.SeqNum] = msg.ID
+				}
+
 				if err != nil {
 					return types.Observation{}, err
 				}
@@ -144,7 +141,7 @@ func (p *Plugin) Observation(ctx context.Context, outctx ocr3types.OutcomeContex
 		}
 	}
 
-	// TODO: Fire off messages for an attestation check.
+	// TODO: Fire off messages for an attestation check service.
 
 	return model.NewExecutePluginObservation(groupedCommits, messages).Encode()
 }
