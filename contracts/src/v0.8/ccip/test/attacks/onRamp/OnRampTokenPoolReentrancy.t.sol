@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.19;
+pragma solidity 0.8.24;
 
 import {Client} from "../../../libraries/Client.sol";
 import {Internal} from "../../../libraries/Internal.sol";
+import {EVM2EVMOnRamp} from "../../../onRamp/EVM2EVMOnRamp.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
 import {EVM2EVMOnRampSetup} from "../../onRamp/EVM2EVMOnRampSetup.t.sol";
 import {FacadeClient} from "./FacadeClient.sol";
@@ -27,7 +28,7 @@ contract OnRampTokenPoolReentrancy is EVM2EVMOnRampSetup {
     s_facadeClient = new FacadeClient(address(s_sourceRouter), DEST_CHAIN_SELECTOR, s_sourceToken, s_feeToken);
 
     s_maliciousTokenPool = new ReentrantMaliciousTokenPool(
-      address(s_facadeClient), s_sourceToken, address(s_mockARM), address(s_sourceRouter)
+      address(s_facadeClient), s_sourceToken, address(s_mockRMN), address(s_sourceRouter)
     );
 
     TokenPool.ChainUpdate[] memory chainUpdates = new TokenPool.ChainUpdate[](1);
@@ -103,9 +104,9 @@ contract OnRampTokenPoolReentrancy is EVM2EVMOnRampSetup {
     Internal.EVM2EVMMessage memory msgEvent2 = _messageToEvent(message2, 2, 2, expectedFee, address(s_facadeClient));
 
     vm.expectEmit();
-    emit CCIPSendRequested(msgEvent2);
+    emit EVM2EVMOnRamp.CCIPSendRequested(msgEvent2);
     vm.expectEmit();
-    emit CCIPSendRequested(msgEvent1);
+    emit EVM2EVMOnRamp.CCIPSendRequested(msgEvent1);
 
     s_facadeClient.send(amount);
   }

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.19;
+pragma solidity 0.8.24;
 
 import {AggregateRateLimiter} from "../../AggregateRateLimiter.sol";
 import {Client} from "../../libraries/Client.sol";
@@ -8,17 +8,16 @@ import {RateLimiter} from "../../libraries/RateLimiter.sol";
 import {AggregateRateLimiterHelper} from "../helpers/AggregateRateLimiterHelper.sol";
 import {PriceRegistrySetup} from "../priceRegistry/PriceRegistry.t.sol";
 
-import {BaseTest, stdError} from "../BaseTest.t.sol";
+import {stdError} from "forge-std/Test.sol";
 
-contract AggregateTokenLimiterSetup is BaseTest, PriceRegistrySetup {
+contract AggregateTokenLimiterSetup is PriceRegistrySetup {
   AggregateRateLimiterHelper internal s_rateLimiter;
   RateLimiter.Config internal s_config;
 
   address internal immutable TOKEN = 0x21118E64E1fB0c487F25Dd6d3601FF6af8D32E4e;
   uint224 internal constant TOKEN_PRICE = 4e18;
 
-  function setUp() public virtual override(BaseTest, PriceRegistrySetup) {
-    BaseTest.setUp();
+  function setUp() public virtual override {
     PriceRegistrySetup.setUp();
 
     Internal.PriceUpdates memory priceUpdates = getSingleTokenPriceUpdateStruct(TOKEN, TOKEN_PRICE);
@@ -30,7 +29,6 @@ contract AggregateTokenLimiterSetup is BaseTest, PriceRegistrySetup {
   }
 }
 
-/// @notice #constructor
 contract AggregateTokenLimiter_constructor is AggregateTokenLimiterSetup {
   function test_Constructor_Success() public view {
     assertEq(ADMIN, s_rateLimiter.getTokenLimitAdmin());
@@ -45,20 +43,16 @@ contract AggregateTokenLimiter_constructor is AggregateTokenLimiterSetup {
   }
 }
 
-/// @notice #getTokenLimitAdmin
 contract AggregateTokenLimiter_getTokenLimitAdmin is AggregateTokenLimiterSetup {
   function test_GetTokenLimitAdmin_Success() public view {
     assertEq(ADMIN, s_rateLimiter.getTokenLimitAdmin());
   }
 }
 
-/// @notice #setAdmin
 contract AggregateTokenLimiter_setAdmin is AggregateTokenLimiterSetup {
-  event AdminSet(address newAdmin);
-
   function test_Owner_Success() public {
     vm.expectEmit();
-    emit AdminSet(STRANGER);
+    emit AggregateRateLimiter.AdminSet(STRANGER);
 
     s_rateLimiter.setAdmin(STRANGER);
     assertEq(STRANGER, s_rateLimiter.getTokenLimitAdmin());
@@ -74,7 +68,6 @@ contract AggregateTokenLimiter_setAdmin is AggregateTokenLimiterSetup {
   }
 }
 
-/// @notice #getTokenBucket
 contract AggregateTokenLimiter_getTokenBucket is AggregateTokenLimiterSetup {
   function test_GetTokenBucket_Success() public view {
     RateLimiter.TokenBucket memory bucket = s_rateLimiter.currentRateLimiterState();
@@ -122,10 +115,7 @@ contract AggregateTokenLimiter_getTokenBucket is AggregateTokenLimiterSetup {
   }
 }
 
-/// @notice #setRateLimiterConfig
 contract AggregateTokenLimiter_setRateLimiterConfig is AggregateTokenLimiterSetup {
-  event ConfigChanged(RateLimiter.Config config);
-
   function test_Owner_Success() public {
     setConfig();
   }
@@ -147,7 +137,7 @@ contract AggregateTokenLimiter_setRateLimiterConfig is AggregateTokenLimiterSetu
     }
 
     vm.expectEmit();
-    emit ConfigChanged(s_config);
+    emit RateLimiter.ConfigChanged(s_config);
 
     s_rateLimiter.setRateLimiterConfig(s_config);
 
@@ -168,10 +158,7 @@ contract AggregateTokenLimiter_setRateLimiterConfig is AggregateTokenLimiterSetu
   }
 }
 
-/// @notice #_rateLimitValue
 contract AggregateTokenLimiter__rateLimitValue is AggregateTokenLimiterSetup {
-  event TokensConsumed(uint256 tokens);
-
   function test_RateLimitValueSuccess_gas() public {
     vm.pauseGasMetering();
     // start from blocktime that does not equal rate limiter init timestamp
@@ -182,7 +169,7 @@ contract AggregateTokenLimiter__rateLimitValue is AggregateTokenLimiterSetup {
     uint256 value = (numberOfTokens * TOKEN_PRICE) / 1e18;
 
     vm.expectEmit();
-    emit TokensConsumed(value);
+    emit RateLimiter.TokensConsumed(value);
 
     vm.resumeGasMetering();
     s_rateLimiter.rateLimitValue(value);
@@ -228,7 +215,6 @@ contract AggregateTokenLimiter__rateLimitValue is AggregateTokenLimiterSetup {
   }
 }
 
-/// @notice #_getTokenValue
 contract AggregateTokenLimiter__getTokenValue is AggregateTokenLimiterSetup {
   function test_GetTokenValue_Success() public view {
     uint256 numberOfTokens = 10;

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.19;
+pragma solidity 0.8.24;
 
 import {MockV3Aggregator} from "../../../tests/MockV3Aggregator.sol";
 import {PriceRegistry} from "../../PriceRegistry.sol";
@@ -27,10 +27,15 @@ contract PriceRegistrySetup is TokenSetup {
   address[] internal s_destFeeTokens;
   uint224[] internal s_destTokenPrices;
 
+  mapping(address token => address dataFeedAddress) internal s_dataFeedByToken;
+
   function setUp() public virtual override {
     TokenSetup.setUp();
 
+    _deployTokenPriceDataFeed(s_sourceFeeToken, 8, 1e8);
+
     s_weth = s_sourceRouter.getWrappedNative();
+    _deployTokenPriceDataFeed(s_weth, 8, 1e11);
 
     address[] memory sourceFeeTokens = new address[](3);
     sourceFeeTokens[0] = s_sourceTokens[0];
@@ -83,6 +88,46 @@ contract PriceRegistrySetup is TokenSetup {
 
     s_priceRegistry = new PriceRegistry(priceUpdaters, feeTokens, uint32(TWELVE_HOURS), tokenPriceFeedUpdates);
     s_priceRegistry.updatePrices(priceUpdates);
+  }
+
+  function _deployTokenPriceDataFeed(address token, uint8 decimals, int256 initialAnswer) internal returns (address) {
+    MockV3Aggregator dataFeed = new MockV3Aggregator(decimals, initialAnswer);
+    s_dataFeedByToken[token] = address(dataFeed);
+    return address(dataFeed);
+  }
+
+  function getPriceUpdatesStruct(
+    address[] memory tokens,
+    uint224[] memory prices
+  ) internal pure returns (Internal.PriceUpdates memory) {
+    uint256 length = tokens.length;
+
+    Internal.TokenPriceUpdate[] memory tokenPriceUpdates = new Internal.TokenPriceUpdate[](length);
+    for (uint256 i = 0; i < length; ++i) {
+      tokenPriceUpdates[i] = Internal.TokenPriceUpdate({sourceToken: tokens[i], usdPerToken: prices[i]});
+    }
+    Internal.PriceUpdates memory priceUpdates =
+      Internal.PriceUpdates({tokenPriceUpdates: tokenPriceUpdates, gasPriceUpdates: new Internal.GasPriceUpdate[](0)});
+
+    return priceUpdates;
+  }
+
+  function getEmptyPriceUpdates() internal pure returns (Internal.PriceUpdates memory priceUpdates) {
+    return Internal.PriceUpdates({
+      tokenPriceUpdates: new Internal.TokenPriceUpdate[](0),
+      gasPriceUpdates: new Internal.GasPriceUpdate[](0)
+    });
+  }
+
+  function getSingleTokenPriceFeedUpdateStruct(
+    address sourceToken,
+    address dataFeedAddress,
+    uint8 tokenDecimals
+  ) internal pure returns (PriceRegistry.TokenPriceFeedUpdate memory) {
+    return PriceRegistry.TokenPriceFeedUpdate({
+      sourceToken: sourceToken,
+      feedConfig: IPriceRegistry.TokenPriceFeedConfig({dataFeedAddress: dataFeedAddress, tokenDecimals: tokenDecimals})
+    });
   }
 
   function _initialiseSingleTokenPriceFeed() internal returns (address) {
@@ -351,15 +396,12 @@ contract PriceRegistry_getValidatedTokenPrice is PriceRegistrySetup {
 }
 
 contract PriceRegistry_applyPriceUpdatersUpdates is PriceRegistrySetup {
-  event PriceUpdaterSet(address indexed priceUpdater);
-  event PriceUpdaterRemoved(address indexed priceUpdater);
-
   function test_ApplyPriceUpdaterUpdates_Success() public {
     address[] memory priceUpdaters = new address[](1);
     priceUpdaters[0] = STRANGER;
 
     vm.expectEmit();
-    emit PriceUpdaterSet(STRANGER);
+    emit PriceRegistry.PriceUpdaterSet(STRANGER);
 
     s_priceRegistry.applyPriceUpdatersUpdates(priceUpdaters, new address[](0));
     assertEq(s_priceRegistry.getPriceUpdaters().length, 1);
@@ -371,7 +413,7 @@ contract PriceRegistry_applyPriceUpdatersUpdates is PriceRegistrySetup {
     assertEq(s_priceRegistry.getPriceUpdaters()[0], STRANGER);
 
     vm.expectEmit();
-    emit PriceUpdaterRemoved(STRANGER);
+    emit PriceRegistry.PriceUpdaterRemoved(STRANGER);
 
     s_priceRegistry.applyPriceUpdatersUpdates(new address[](0), priceUpdaters);
     assertEq(s_priceRegistry.getPriceUpdaters().length, 0);
@@ -391,15 +433,12 @@ contract PriceRegistry_applyPriceUpdatersUpdates is PriceRegistrySetup {
 }
 
 contract PriceRegistry_applyFeeTokensUpdates is PriceRegistrySetup {
-  event FeeTokenAdded(address indexed feeToken);
-  event FeeTokenRemoved(address indexed feeToken);
-
   function test_ApplyFeeTokensUpdates_Success() public {
     address[] memory feeTokens = new address[](1);
     feeTokens[0] = s_sourceTokens[1];
 
     vm.expectEmit();
-    emit FeeTokenAdded(feeTokens[0]);
+    emit PriceRegistry.FeeTokenAdded(feeTokens[0]);
 
     s_priceRegistry.applyFeeTokensUpdates(feeTokens, new address[](0));
     assertEq(s_priceRegistry.getFeeTokens().length, 3);
@@ -411,7 +450,7 @@ contract PriceRegistry_applyFeeTokensUpdates is PriceRegistrySetup {
     assertEq(s_priceRegistry.getFeeTokens()[2], feeTokens[0]);
 
     vm.expectEmit();
-    emit FeeTokenRemoved(feeTokens[0]);
+    emit PriceRegistry.FeeTokenRemoved(feeTokens[0]);
 
     s_priceRegistry.applyFeeTokensUpdates(new address[](0), feeTokens);
     assertEq(s_priceRegistry.getFeeTokens().length, 2);
@@ -431,9 +470,6 @@ contract PriceRegistry_applyFeeTokensUpdates is PriceRegistrySetup {
 }
 
 contract PriceRegistry_updatePrices is PriceRegistrySetup {
-  event UsdPerTokenUpdated(address indexed token, uint256 value, uint256 timestamp);
-  event UsdPerUnitGasUpdated(uint64 indexed destChain, uint256 value, uint256 timestamp);
-
   function test_OnlyTokenPrice_Success() public {
     Internal.PriceUpdates memory update = Internal.PriceUpdates({
       tokenPriceUpdates: new Internal.TokenPriceUpdate[](1),
@@ -442,7 +478,7 @@ contract PriceRegistry_updatePrices is PriceRegistrySetup {
     update.tokenPriceUpdates[0] = Internal.TokenPriceUpdate({sourceToken: s_sourceTokens[0], usdPerToken: 4e18});
 
     vm.expectEmit();
-    emit UsdPerTokenUpdated(
+    emit PriceRegistry.UsdPerTokenUpdated(
       update.tokenPriceUpdates[0].sourceToken, update.tokenPriceUpdates[0].usdPerToken, block.timestamp
     );
 
@@ -460,7 +496,7 @@ contract PriceRegistry_updatePrices is PriceRegistrySetup {
       Internal.GasPriceUpdate({destChainSelector: DEST_CHAIN_SELECTOR, usdPerUnitGas: 2000e18});
 
     vm.expectEmit();
-    emit UsdPerUnitGasUpdated(
+    emit PriceRegistry.UsdPerUnitGasUpdated(
       update.gasPriceUpdates[0].destChainSelector, update.gasPriceUpdates[0].usdPerUnitGas, block.timestamp
     );
 
@@ -487,13 +523,13 @@ contract PriceRegistry_updatePrices is PriceRegistrySetup {
 
     for (uint256 i = 0; i < tokenPriceUpdates.length; ++i) {
       vm.expectEmit();
-      emit UsdPerTokenUpdated(
+      emit PriceRegistry.UsdPerTokenUpdated(
         update.tokenPriceUpdates[i].sourceToken, update.tokenPriceUpdates[i].usdPerToken, block.timestamp
       );
     }
     for (uint256 i = 0; i < gasPriceUpdates.length; ++i) {
       vm.expectEmit();
-      emit UsdPerUnitGasUpdated(
+      emit PriceRegistry.UsdPerUnitGasUpdated(
         update.gasPriceUpdates[i].destChainSelector, update.gasPriceUpdates[i].usdPerUnitGas, block.timestamp
       );
     }
@@ -674,8 +710,6 @@ contract PriceRegistry_getTokenAndGasPrices is PriceRegistrySetup {
 }
 
 contract PriceRegistry_updateTokenPriceFeeds is PriceRegistrySetup {
-  event PriceFeedPerTokenUpdated(address indexed token, IPriceRegistry.TokenPriceFeedConfig priceFeedConfig);
-
   function test_ZeroFeeds_Success() public {
     Vm.Log[] memory logEntries = vm.getRecordedLogs();
 
@@ -697,7 +731,9 @@ contract PriceRegistry_updateTokenPriceFeeds is PriceRegistrySetup {
     );
 
     vm.expectEmit();
-    emit PriceFeedPerTokenUpdated(tokenPriceFeedUpdates[0].sourceToken, tokenPriceFeedUpdates[0].feedConfig);
+    emit PriceRegistry.PriceFeedPerTokenUpdated(
+      tokenPriceFeedUpdates[0].sourceToken, tokenPriceFeedUpdates[0].feedConfig
+    );
 
     s_priceRegistry.updateTokenPriceFeeds(tokenPriceFeedUpdates);
 
@@ -718,7 +754,9 @@ contract PriceRegistry_updateTokenPriceFeeds is PriceRegistrySetup {
       );
 
       vm.expectEmit();
-      emit PriceFeedPerTokenUpdated(tokenPriceFeedUpdates[i].sourceToken, tokenPriceFeedUpdates[i].feedConfig);
+      emit PriceRegistry.PriceFeedPerTokenUpdated(
+        tokenPriceFeedUpdates[i].sourceToken, tokenPriceFeedUpdates[i].feedConfig
+      );
     }
 
     s_priceRegistry.updateTokenPriceFeeds(tokenPriceFeedUpdates);
@@ -747,7 +785,9 @@ contract PriceRegistry_updateTokenPriceFeeds is PriceRegistrySetup {
 
     tokenPriceFeedUpdates[0].feedConfig.dataFeedAddress = address(0);
     vm.expectEmit();
-    emit PriceFeedPerTokenUpdated(tokenPriceFeedUpdates[0].sourceToken, tokenPriceFeedUpdates[0].feedConfig);
+    emit PriceRegistry.PriceFeedPerTokenUpdated(
+      tokenPriceFeedUpdates[0].sourceToken, tokenPriceFeedUpdates[0].feedConfig
+    );
 
     s_priceRegistry.updateTokenPriceFeeds(tokenPriceFeedUpdates);
     _assertTokenPriceFeedConfigEquality(

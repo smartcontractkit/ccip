@@ -30,19 +30,24 @@ var (
 	_ = abi.ConvertType
 )
 
-type ARMConfig struct {
-	Voters               []ARMVoter
+type IRMNTaggedRoot struct {
+	CommitStore common.Address
+	Root        [32]byte
+}
+
+type RMNConfig struct {
+	Voters               []RMNVoter
 	BlessWeightThreshold uint16
 	CurseWeightThreshold uint16
 }
 
-type ARMUnvoteToCurseRecord struct {
+type RMNUnvoteToCurseRecord struct {
 	CurseVoteAddr common.Address
 	CursesHash    [32]byte
 	ForceUnvote   bool
 }
 
-type ARMVoter struct {
+type RMNVoter struct {
 	BlessVoteAddr   common.Address
 	CurseVoteAddr   common.Address
 	CurseUnvoteAddr common.Address
@@ -50,14 +55,9 @@ type ARMVoter struct {
 	CurseWeight     uint8
 }
 
-type IARMTaggedRoot struct {
-	CommitStore common.Address
-	Root        [32]byte
-}
-
 var MockARMContractMetaData = &bind.MetaData{
-	ABI: "[{\"inputs\":[{\"internalType\":\"bytes\",\"name\":\"err\",\"type\":\"bytes\"}],\"name\":\"CustomError\",\"type\":\"error\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"from\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"}],\"name\":\"OwnershipTransferRequested\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"from\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"}],\"name\":\"OwnershipTransferred\",\"type\":\"event\"},{\"inputs\":[],\"name\":\"acceptOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getConfigDetails\",\"outputs\":[{\"internalType\":\"uint32\",\"name\":\"version\",\"type\":\"uint32\"},{\"internalType\":\"uint32\",\"name\":\"blockNumber\",\"type\":\"uint32\"},{\"components\":[{\"components\":[{\"internalType\":\"address\",\"name\":\"blessVoteAddr\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"curseVoteAddr\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"curseUnvoteAddr\",\"type\":\"address\"},{\"internalType\":\"uint8\",\"name\":\"blessWeight\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"curseWeight\",\"type\":\"uint8\"}],\"internalType\":\"structARM.Voter[]\",\"name\":\"voters\",\"type\":\"tuple[]\"},{\"internalType\":\"uint16\",\"name\":\"blessWeightThreshold\",\"type\":\"uint16\"},{\"internalType\":\"uint16\",\"name\":\"curseWeightThreshold\",\"type\":\"uint16\"}],\"internalType\":\"structARM.Config\",\"name\":\"config\",\"type\":\"tuple\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"components\":[{\"internalType\":\"address\",\"name\":\"commitStore\",\"type\":\"address\"},{\"internalType\":\"bytes32\",\"name\":\"root\",\"type\":\"bytes32\"}],\"internalType\":\"structIARM.TaggedRoot\",\"name\":\"\",\"type\":\"tuple\"}],\"name\":\"isBlessed\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"isCursed\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"owner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"components\":[{\"internalType\":\"address\",\"name\":\"curseVoteAddr\",\"type\":\"address\"},{\"internalType\":\"bytes32\",\"name\":\"cursesHash\",\"type\":\"bytes32\"},{\"internalType\":\"bool\",\"name\":\"forceUnvote\",\"type\":\"bool\"}],\"internalType\":\"structARM.UnvoteToCurseRecord[]\",\"name\":\"\",\"type\":\"tuple[]\"}],\"name\":\"ownerUnvoteToCurse\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes\",\"name\":\"err\",\"type\":\"bytes\"}],\"name\":\"setRevert\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"}],\"name\":\"transferOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"name\":\"voteToCurse\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]",
-	Bin: "0x608060405234801561001057600080fd5b5033806000816100675760405162461bcd60e51b815260206004820152601860248201527f43616e6e6f7420736574206f776e657220746f207a65726f000000000000000060448201526064015b60405180910390fd5b600080546001600160a01b0319166001600160a01b0384811691909117909155811615610097576100978161009f565b505050610148565b336001600160a01b038216036100f75760405162461bcd60e51b815260206004820152601760248201527f43616e6e6f74207472616e7366657220746f2073656c66000000000000000000604482015260640161005e565b600180546001600160a01b0319166001600160a01b0383811691821790925560008054604051929316917fed8889f560326eb138920d842192f0eb3dd22b4f139c87a2c57538e05bae12789190a350565b610c33806101576000396000f3fe608060405234801561001057600080fd5b50600436106100a35760003560e01c8063618af128116100765780637a7c27491161005b5780637a7c2749146101a05780638da5cb5b146101b3578063f2fde38b146101db57600080fd5b8063618af1281461015f57806379ba50971461019857600080fd5b8063119a3527146100a8578063397796f7146100fa5780633f42ab73146101175780634d6167711461012e575b600080fd5b6100f86100b6366004610635565b50600180547fffffffffffffffffffffff00ffffffffffffffffffffffffffffffffffffffff1674010000000000000000000000000000000000000000179055565b005b6101026101ee565b60405190151581526020015b60405180910390f35b61011f610264565b60405161010e9392919061064e565b61010261013c366004610720565b5060015474010000000000000000000000000000000000000000900460ff161590565b6100f861016d366004610808565b50600180547fffffffffffffffffffffff00ffffffffffffffffffffffffffffffffffffffff169055565b6100f861039c565b6100f86101ae3660046108f2565b610499565b60005460405173ffffffffffffffffffffffffffffffffffffffff909116815260200161010e565b6100f86101e93660046109a5565b6104a9565b6000600280546101fd906109c7565b1590506102425760026040517f5a4ff6710000000000000000000000000000000000000000000000000000000081526004016102399190610a14565b60405180910390fd5b5060015474010000000000000000000000000000000000000000900460ff1690565b6040805160608082018352808252600060208084018290528385018290526005548551600380549384028201608090810190985294810183815263ffffffff808416986401000000009094041696959194919385939192859285015b8282101561036c5760008481526020908190206040805160a08101825260038602909201805473ffffffffffffffffffffffffffffffffffffffff90811684526001808301548216858701526002909201549081169284019290925260ff740100000000000000000000000000000000000000008304811660608501527501000000000000000000000000000000000000000000909204909116608083015290835290920191016102c0565b505050908252506001919091015461ffff8082166020840152620100009091041660409091015292939192919050565b60015473ffffffffffffffffffffffffffffffffffffffff16331461041d576040517f08c379a000000000000000000000000000000000000000000000000000000000815260206004820152601660248201527f4d7573742062652070726f706f736564206f776e6572000000000000000000006044820152606401610239565b60008054337fffffffffffffffffffffffff00000000000000000000000000000000000000008083168217845560018054909116905560405173ffffffffffffffffffffffffffffffffffffffff90921692909183917f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e091a350565b60026104a58282610b0c565b5050565b6104b16104bd565b6104ba81610540565b50565b60005473ffffffffffffffffffffffffffffffffffffffff16331461053e576040517f08c379a000000000000000000000000000000000000000000000000000000000815260206004820152601660248201527f4f6e6c792063616c6c61626c65206279206f776e6572000000000000000000006044820152606401610239565b565b3373ffffffffffffffffffffffffffffffffffffffff8216036105bf576040517f08c379a000000000000000000000000000000000000000000000000000000000815260206004820152601760248201527f43616e6e6f74207472616e7366657220746f2073656c660000000000000000006044820152606401610239565b600180547fffffffffffffffffffffffff00000000000000000000000000000000000000001673ffffffffffffffffffffffffffffffffffffffff83811691821790925560008054604051929316917fed8889f560326eb138920d842192f0eb3dd22b4f139c87a2c57538e05bae12789190a350565b60006020828403121561064757600080fd5b5035919050565b63ffffffff84811682528316602080830191909152606060408084018290528451848301839052805160c0860181905260009491820190859060e08801905b808310156106f4578351805173ffffffffffffffffffffffffffffffffffffffff9081168452868201518116878501528782015116878401528781015160ff908116898501526080918201511690830152928401926001929092019160a09091019061068d565b509288015161ffff9081166080890152939097015190921660a090950194909452509195945050505050565b60006040828403121561073257600080fd5b50919050565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052604160045260246000fd5b6040516060810167ffffffffffffffff8111828210171561078a5761078a610738565b60405290565b604051601f82017fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe016810167ffffffffffffffff811182821017156107d7576107d7610738565b604052919050565b803573ffffffffffffffffffffffffffffffffffffffff8116811461080357600080fd5b919050565b6000602080838503121561081b57600080fd5b823567ffffffffffffffff8082111561083357600080fd5b818501915085601f83011261084757600080fd5b81358181111561085957610859610738565b610867848260051b01610790565b8181528481019250606091820284018501918883111561088657600080fd5b938501935b828510156108e65780858a0312156108a35760008081fd5b6108ab610767565b6108b4866107df565b8152868601358782015260408087013580151581146108d35760008081fd5b908201528452938401939285019261088b565b50979650505050505050565b6000602080838503121561090557600080fd5b823567ffffffffffffffff8082111561091d57600080fd5b818501915085601f83011261093157600080fd5b81358181111561094357610943610738565b610973847fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe0601f84011601610790565b9150808252868482850101111561098957600080fd5b8084840185840137600090820190930192909252509392505050565b6000602082840312156109b757600080fd5b6109c0826107df565b9392505050565b600181811c908216806109db57607f821691505b602082108103610732577f4e487b7100000000000000000000000000000000000000000000000000000000600052602260045260246000fd5b6000602080835260008454610a28816109c7565b80848701526040600180841660008114610a495760018114610a8157610aaf565b7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff008516838a01528284151560051b8a01019550610aaf565b896000528660002060005b85811015610aa75781548b8201860152908301908801610a8c565b8a0184019650505b509398975050505050505050565b601f821115610b0757600081815260208120601f850160051c81016020861015610ae45750805b601f850160051c820191505b81811015610b0357828155600101610af0565b5050505b505050565b815167ffffffffffffffff811115610b2657610b26610738565b610b3a81610b3484546109c7565b84610abd565b602080601f831160018114610b8d5760008415610b575750858301515b7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff600386901b1c1916600185901b178555610b03565b6000858152602081207fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe08616915b82811015610bda57888601518255948401946001909101908401610bbb565b5085821015610c1657878501517fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff600388901b60f8161c191681555b5050505050600190811b0190555056fea164736f6c6343000813000a",
+	ABI: "[{\"inputs\":[{\"internalType\":\"bytes\",\"name\":\"err\",\"type\":\"bytes\"}],\"name\":\"CustomError\",\"type\":\"error\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"from\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"}],\"name\":\"OwnershipTransferRequested\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"from\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"}],\"name\":\"OwnershipTransferred\",\"type\":\"event\"},{\"inputs\":[],\"name\":\"acceptOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getConfigDetails\",\"outputs\":[{\"internalType\":\"uint32\",\"name\":\"version\",\"type\":\"uint32\"},{\"internalType\":\"uint32\",\"name\":\"blockNumber\",\"type\":\"uint32\"},{\"components\":[{\"components\":[{\"internalType\":\"address\",\"name\":\"blessVoteAddr\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"curseVoteAddr\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"curseUnvoteAddr\",\"type\":\"address\"},{\"internalType\":\"uint8\",\"name\":\"blessWeight\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"curseWeight\",\"type\":\"uint8\"}],\"internalType\":\"structRMN.Voter[]\",\"name\":\"voters\",\"type\":\"tuple[]\"},{\"internalType\":\"uint16\",\"name\":\"blessWeightThreshold\",\"type\":\"uint16\"},{\"internalType\":\"uint16\",\"name\":\"curseWeightThreshold\",\"type\":\"uint16\"}],\"internalType\":\"structRMN.Config\",\"name\":\"config\",\"type\":\"tuple\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"components\":[{\"internalType\":\"address\",\"name\":\"commitStore\",\"type\":\"address\"},{\"internalType\":\"bytes32\",\"name\":\"root\",\"type\":\"bytes32\"}],\"internalType\":\"structIRMN.TaggedRoot\",\"name\":\"\",\"type\":\"tuple\"}],\"name\":\"isBlessed\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"isCursed\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"subject\",\"type\":\"bytes32\"}],\"name\":\"isCursed\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"owner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"components\":[{\"internalType\":\"address\",\"name\":\"curseVoteAddr\",\"type\":\"address\"},{\"internalType\":\"bytes32\",\"name\":\"cursesHash\",\"type\":\"bytes32\"},{\"internalType\":\"bool\",\"name\":\"forceUnvote\",\"type\":\"bool\"}],\"internalType\":\"structRMN.UnvoteToCurseRecord[]\",\"name\":\"\",\"type\":\"tuple[]\"},{\"internalType\":\"bytes32\",\"name\":\"subject\",\"type\":\"bytes32\"}],\"name\":\"ownerUnvoteToCurse\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"components\":[{\"internalType\":\"address\",\"name\":\"curseVoteAddr\",\"type\":\"address\"},{\"internalType\":\"bytes32\",\"name\":\"cursesHash\",\"type\":\"bytes32\"},{\"internalType\":\"bool\",\"name\":\"forceUnvote\",\"type\":\"bool\"}],\"internalType\":\"structRMN.UnvoteToCurseRecord[]\",\"name\":\"\",\"type\":\"tuple[]\"}],\"name\":\"ownerUnvoteToCurse\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes\",\"name\":\"err\",\"type\":\"bytes\"}],\"name\":\"setRevert\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"}],\"name\":\"transferOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"name\":\"voteToCurse\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"},{\"internalType\":\"bytes32\",\"name\":\"subject\",\"type\":\"bytes32\"}],\"name\":\"voteToCurse\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]",
+	Bin: "0x608060405234801561001057600080fd5b5033806000816100675760405162461bcd60e51b815260206004820152601860248201527f43616e6e6f7420736574206f776e657220746f207a65726f000000000000000060448201526064015b60405180910390fd5b600080546001600160a01b0319166001600160a01b0384811691909117909155811615610097576100978161009f565b505050610148565b336001600160a01b038216036100f75760405162461bcd60e51b815260206004820152601760248201527f43616e6e6f74207472616e7366657220746f2073656c66000000000000000000604482015260640161005e565b600180546001600160a01b0319166001600160a01b0383811691821790925560008054604051929316917fed8889f560326eb138920d842192f0eb3dd22b4f139c87a2c57538e05bae12789190a350565b610e1b806101576000396000f3fe608060405234801561001057600080fd5b50600436106100d45760003560e01c8063618af128116100815780637a7c27491161005b5780637a7c2749146102715780638da5cb5b14610284578063f2fde38b146102ac57600080fd5b8063618af128146101e85780636bbd8b721461022157806379ba50971461026957600080fd5b8063447deab7116100b2578063447deab71461015f5780634d616771146101a457806358babe33146101d557600080fd5b8063119a3527146100d9578063397796f71461012b5780633f42ab7314610148575b600080fd5b6101296100e7366004610797565b50600180547fffffffffffffffffffffff00ffffffffffffffffffffffffffffffffffffffff1674010000000000000000000000000000000000000000179055565b005b6101336102bf565b60405190151581526020015b60405180910390f35b610150610335565b60405161013f939291906107b0565b61012961016d366004610a17565b600090815260066020526040902080547fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff0016905550565b6101336101b2366004610a5c565b5060015474010000000000000000000000000000000000000000900460ff161590565b6101336101e3366004610797565b610476565b6101296101f6366004610a74565b50600180547fffffffffffffffffffffff00ffffffffffffffffffffffffffffffffffffffff169055565b61012961022f366004610ab1565b600090815260066020526040902080547fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff0016600117905550565b6101296104fe565b61012961027f366004610ad3565b6105fb565b60005460405173ffffffffffffffffffffffffffffffffffffffff909116815260200161013f565b6101296102ba366004610b86565b61060b565b6000600280546102ce90610ba8565b1590506103135760026040517f5a4ff67100000000000000000000000000000000000000000000000000000000815260040161030a9190610bf5565b60405180910390fd5b5060015474010000000000000000000000000000000000000000900460ff1690565b6040805160608082018352815260006020820181905291810182905281906005546040805160038054608060208202840181019094526060830181815263ffffffff8087169664010000000090041694929392849284929184919060009085015b828210156104425760008481526020908190206040805160a08101825260038602909201805473ffffffffffffffffffffffffffffffffffffffff90811684526001808301548216858701526002909201549081169284019290925260ff74010000000000000000000000000000000000000000830481166060850152750100000000000000000000000000000000000000000090920490911660808301529083529092019101610396565b505050908252506001919091015461ffff808216602084015262010000909104166040909101529296919550919350915050565b60006002805461048590610ba8565b1590506104c15760026040517f5a4ff67100000000000000000000000000000000000000000000000000000000815260040161030a9190610bf5565b60015474010000000000000000000000000000000000000000900460ff16806104f8575060008281526006602052604090205460ff165b92915050565b60015473ffffffffffffffffffffffffffffffffffffffff16331461057f576040517f08c379a000000000000000000000000000000000000000000000000000000000815260206004820152601660248201527f4d7573742062652070726f706f736564206f776e657200000000000000000000604482015260640161030a565b60008054337fffffffffffffffffffffffff00000000000000000000000000000000000000008083168217845560018054909116905560405173ffffffffffffffffffffffffffffffffffffffff90921692909183917f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e091a350565b60026106078282610cf4565b5050565b61061361061f565b61061c816106a2565b50565b60005473ffffffffffffffffffffffffffffffffffffffff1633146106a0576040517f08c379a000000000000000000000000000000000000000000000000000000000815260206004820152601660248201527f4f6e6c792063616c6c61626c65206279206f776e657200000000000000000000604482015260640161030a565b565b3373ffffffffffffffffffffffffffffffffffffffff821603610721576040517f08c379a000000000000000000000000000000000000000000000000000000000815260206004820152601760248201527f43616e6e6f74207472616e7366657220746f2073656c66000000000000000000604482015260640161030a565b600180547fffffffffffffffffffffffff00000000000000000000000000000000000000001673ffffffffffffffffffffffffffffffffffffffff83811691821790925560008054604051929316917fed8889f560326eb138920d842192f0eb3dd22b4f139c87a2c57538e05bae12789190a350565b6000602082840312156107a957600080fd5b5035919050565b63ffffffff84811682528316602080830191909152606060408084018290528451848301839052805160c0860181905260009491820190859060e08801905b80831015610856578351805173ffffffffffffffffffffffffffffffffffffffff9081168452868201518116878501528782015116878401528781015160ff908116898501526080918201511690830152928401926001929092019160a0909101906107ef565b509288015161ffff908116608089015260409098015190971660a090960195909552979650505050505050565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052604160045260246000fd5b6040516060810167ffffffffffffffff811182821017156108d5576108d5610883565b60405290565b604051601f82017fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe016810167ffffffffffffffff8111828210171561092257610922610883565b604052919050565b803573ffffffffffffffffffffffffffffffffffffffff8116811461094e57600080fd5b919050565b600082601f83011261096457600080fd5b8135602067ffffffffffffffff82111561098057610980610883565b61098e818360051b016108db565b828152606092830285018201928282019190878511156109ad57600080fd5b8387015b85811015610a0a5781818a0312156109c95760008081fd5b6109d16108b2565b6109da8261092a565b8152858201358682015260408083013580151581146109f95760008081fd5b9082015284529284019281016109b1565b5090979650505050505050565b60008060408385031215610a2a57600080fd5b823567ffffffffffffffff811115610a4157600080fd5b610a4d85828601610953565b95602094909401359450505050565b600060408284031215610a6e57600080fd5b50919050565b600060208284031215610a8657600080fd5b813567ffffffffffffffff811115610a9d57600080fd5b610aa984828501610953565b949350505050565b60008060408385031215610ac457600080fd5b50508035926020909101359150565b60006020808385031215610ae657600080fd5b823567ffffffffffffffff80821115610afe57600080fd5b818501915085601f830112610b1257600080fd5b813581811115610b2457610b24610883565b610b54847fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe0601f840116016108db565b91508082528684828501011115610b6a57600080fd5b8084840185840137600090820190930192909252509392505050565b600060208284031215610b9857600080fd5b610ba18261092a565b9392505050565b600181811c90821680610bbc57607f821691505b602082108103610a6e577f4e487b7100000000000000000000000000000000000000000000000000000000600052602260045260246000fd5b6000602080835260008454610c0981610ba8565b8060208701526040600180841660008114610c2b5760018114610c6557610c95565b7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00851660408a0152604084151560051b8a01019550610c95565b89600052602060002060005b85811015610c8c5781548b8201860152908301908801610c71565b8a016040019650505b509398975050505050505050565b601f821115610cef576000816000526020600020601f850160051c81016020861015610ccc5750805b601f850160051c820191505b81811015610ceb57828155600101610cd8565b5050505b505050565b815167ffffffffffffffff811115610d0e57610d0e610883565b610d2281610d1c8454610ba8565b84610ca3565b602080601f831160018114610d755760008415610d3f5750858301515b7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff600386901b1c1916600185901b178555610ceb565b6000858152602081207fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe08616915b82811015610dc257888601518255948401946001909101908401610da3565b5085821015610dfe57878501517fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff600388901b60f8161c191681555b5050505050600190811b0190555056fea164736f6c6343000818000a",
 }
 
 var MockARMContractABI = MockARMContractMetaData.ABI
@@ -209,7 +209,7 @@ func (_MockARMContract *MockARMContractCaller) GetConfigDetails(opts *bind.CallO
 
 	outstruct.Version = *abi.ConvertType(out[0], new(uint32)).(*uint32)
 	outstruct.BlockNumber = *abi.ConvertType(out[1], new(uint32)).(*uint32)
-	outstruct.Config = *abi.ConvertType(out[2], new(ARMConfig)).(*ARMConfig)
+	outstruct.Config = *abi.ConvertType(out[2], new(RMNConfig)).(*RMNConfig)
 
 	return *outstruct, err
 
@@ -227,7 +227,7 @@ func (_MockARMContract *MockARMContractCallerSession) GetConfigDetails() (GetCon
 	return _MockARMContract.Contract.GetConfigDetails(&_MockARMContract.CallOpts)
 }
 
-func (_MockARMContract *MockARMContractCaller) IsBlessed(opts *bind.CallOpts, arg0 IARMTaggedRoot) (bool, error) {
+func (_MockARMContract *MockARMContractCaller) IsBlessed(opts *bind.CallOpts, arg0 IRMNTaggedRoot) (bool, error) {
 	var out []interface{}
 	err := _MockARMContract.contract.Call(opts, &out, "isBlessed", arg0)
 
@@ -241,11 +241,11 @@ func (_MockARMContract *MockARMContractCaller) IsBlessed(opts *bind.CallOpts, ar
 
 }
 
-func (_MockARMContract *MockARMContractSession) IsBlessed(arg0 IARMTaggedRoot) (bool, error) {
+func (_MockARMContract *MockARMContractSession) IsBlessed(arg0 IRMNTaggedRoot) (bool, error) {
 	return _MockARMContract.Contract.IsBlessed(&_MockARMContract.CallOpts, arg0)
 }
 
-func (_MockARMContract *MockARMContractCallerSession) IsBlessed(arg0 IARMTaggedRoot) (bool, error) {
+func (_MockARMContract *MockARMContractCallerSession) IsBlessed(arg0 IRMNTaggedRoot) (bool, error) {
 	return _MockARMContract.Contract.IsBlessed(&_MockARMContract.CallOpts, arg0)
 }
 
@@ -269,6 +269,28 @@ func (_MockARMContract *MockARMContractSession) IsCursed() (bool, error) {
 
 func (_MockARMContract *MockARMContractCallerSession) IsCursed() (bool, error) {
 	return _MockARMContract.Contract.IsCursed(&_MockARMContract.CallOpts)
+}
+
+func (_MockARMContract *MockARMContractCaller) IsCursed0(opts *bind.CallOpts, subject [32]byte) (bool, error) {
+	var out []interface{}
+	err := _MockARMContract.contract.Call(opts, &out, "isCursed0", subject)
+
+	if err != nil {
+		return *new(bool), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(bool)).(*bool)
+
+	return out0, err
+
+}
+
+func (_MockARMContract *MockARMContractSession) IsCursed0(subject [32]byte) (bool, error) {
+	return _MockARMContract.Contract.IsCursed0(&_MockARMContract.CallOpts, subject)
+}
+
+func (_MockARMContract *MockARMContractCallerSession) IsCursed0(subject [32]byte) (bool, error) {
+	return _MockARMContract.Contract.IsCursed0(&_MockARMContract.CallOpts, subject)
 }
 
 func (_MockARMContract *MockARMContractCaller) Owner(opts *bind.CallOpts) (common.Address, error) {
@@ -305,16 +327,28 @@ func (_MockARMContract *MockARMContractTransactorSession) AcceptOwnership() (*ty
 	return _MockARMContract.Contract.AcceptOwnership(&_MockARMContract.TransactOpts)
 }
 
-func (_MockARMContract *MockARMContractTransactor) OwnerUnvoteToCurse(opts *bind.TransactOpts, arg0 []ARMUnvoteToCurseRecord) (*types.Transaction, error) {
-	return _MockARMContract.contract.Transact(opts, "ownerUnvoteToCurse", arg0)
+func (_MockARMContract *MockARMContractTransactor) OwnerUnvoteToCurse(opts *bind.TransactOpts, arg0 []RMNUnvoteToCurseRecord, subject [32]byte) (*types.Transaction, error) {
+	return _MockARMContract.contract.Transact(opts, "ownerUnvoteToCurse", arg0, subject)
 }
 
-func (_MockARMContract *MockARMContractSession) OwnerUnvoteToCurse(arg0 []ARMUnvoteToCurseRecord) (*types.Transaction, error) {
-	return _MockARMContract.Contract.OwnerUnvoteToCurse(&_MockARMContract.TransactOpts, arg0)
+func (_MockARMContract *MockARMContractSession) OwnerUnvoteToCurse(arg0 []RMNUnvoteToCurseRecord, subject [32]byte) (*types.Transaction, error) {
+	return _MockARMContract.Contract.OwnerUnvoteToCurse(&_MockARMContract.TransactOpts, arg0, subject)
 }
 
-func (_MockARMContract *MockARMContractTransactorSession) OwnerUnvoteToCurse(arg0 []ARMUnvoteToCurseRecord) (*types.Transaction, error) {
-	return _MockARMContract.Contract.OwnerUnvoteToCurse(&_MockARMContract.TransactOpts, arg0)
+func (_MockARMContract *MockARMContractTransactorSession) OwnerUnvoteToCurse(arg0 []RMNUnvoteToCurseRecord, subject [32]byte) (*types.Transaction, error) {
+	return _MockARMContract.Contract.OwnerUnvoteToCurse(&_MockARMContract.TransactOpts, arg0, subject)
+}
+
+func (_MockARMContract *MockARMContractTransactor) OwnerUnvoteToCurse0(opts *bind.TransactOpts, arg0 []RMNUnvoteToCurseRecord) (*types.Transaction, error) {
+	return _MockARMContract.contract.Transact(opts, "ownerUnvoteToCurse0", arg0)
+}
+
+func (_MockARMContract *MockARMContractSession) OwnerUnvoteToCurse0(arg0 []RMNUnvoteToCurseRecord) (*types.Transaction, error) {
+	return _MockARMContract.Contract.OwnerUnvoteToCurse0(&_MockARMContract.TransactOpts, arg0)
+}
+
+func (_MockARMContract *MockARMContractTransactorSession) OwnerUnvoteToCurse0(arg0 []RMNUnvoteToCurseRecord) (*types.Transaction, error) {
+	return _MockARMContract.Contract.OwnerUnvoteToCurse0(&_MockARMContract.TransactOpts, arg0)
 }
 
 func (_MockARMContract *MockARMContractTransactor) SetRevert(opts *bind.TransactOpts, err []byte) (*types.Transaction, error) {
@@ -351,6 +385,18 @@ func (_MockARMContract *MockARMContractSession) VoteToCurse(arg0 [32]byte) (*typ
 
 func (_MockARMContract *MockARMContractTransactorSession) VoteToCurse(arg0 [32]byte) (*types.Transaction, error) {
 	return _MockARMContract.Contract.VoteToCurse(&_MockARMContract.TransactOpts, arg0)
+}
+
+func (_MockARMContract *MockARMContractTransactor) VoteToCurse0(opts *bind.TransactOpts, arg0 [32]byte, subject [32]byte) (*types.Transaction, error) {
+	return _MockARMContract.contract.Transact(opts, "voteToCurse0", arg0, subject)
+}
+
+func (_MockARMContract *MockARMContractSession) VoteToCurse0(arg0 [32]byte, subject [32]byte) (*types.Transaction, error) {
+	return _MockARMContract.Contract.VoteToCurse0(&_MockARMContract.TransactOpts, arg0, subject)
+}
+
+func (_MockARMContract *MockARMContractTransactorSession) VoteToCurse0(arg0 [32]byte, subject [32]byte) (*types.Transaction, error) {
+	return _MockARMContract.Contract.VoteToCurse0(&_MockARMContract.TransactOpts, arg0, subject)
 }
 
 type MockARMContractOwnershipTransferRequestedIterator struct {
@@ -628,7 +674,7 @@ func (_MockARMContract *MockARMContractFilterer) ParseOwnershipTransferred(log t
 type GetConfigDetails struct {
 	Version     uint32
 	BlockNumber uint32
-	Config      ARMConfig
+	Config      RMNConfig
 }
 
 func (_MockARMContract *MockARMContract) ParseLog(log types.Log) (generated.AbigenLog, error) {
@@ -660,21 +706,27 @@ type MockARMContractInterface interface {
 
 		error)
 
-	IsBlessed(opts *bind.CallOpts, arg0 IARMTaggedRoot) (bool, error)
+	IsBlessed(opts *bind.CallOpts, arg0 IRMNTaggedRoot) (bool, error)
 
 	IsCursed(opts *bind.CallOpts) (bool, error)
+
+	IsCursed0(opts *bind.CallOpts, subject [32]byte) (bool, error)
 
 	Owner(opts *bind.CallOpts) (common.Address, error)
 
 	AcceptOwnership(opts *bind.TransactOpts) (*types.Transaction, error)
 
-	OwnerUnvoteToCurse(opts *bind.TransactOpts, arg0 []ARMUnvoteToCurseRecord) (*types.Transaction, error)
+	OwnerUnvoteToCurse(opts *bind.TransactOpts, arg0 []RMNUnvoteToCurseRecord, subject [32]byte) (*types.Transaction, error)
+
+	OwnerUnvoteToCurse0(opts *bind.TransactOpts, arg0 []RMNUnvoteToCurseRecord) (*types.Transaction, error)
 
 	SetRevert(opts *bind.TransactOpts, err []byte) (*types.Transaction, error)
 
 	TransferOwnership(opts *bind.TransactOpts, to common.Address) (*types.Transaction, error)
 
 	VoteToCurse(opts *bind.TransactOpts, arg0 [32]byte) (*types.Transaction, error)
+
+	VoteToCurse0(opts *bind.TransactOpts, arg0 [32]byte, subject [32]byte) (*types.Transaction, error)
 
 	FilterOwnershipTransferRequested(opts *bind.FilterOpts, from []common.Address, to []common.Address) (*MockARMContractOwnershipTransferRequestedIterator, error)
 

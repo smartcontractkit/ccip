@@ -44,7 +44,7 @@ import (
 	evmUtils "github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils/big"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/legacyevm"
 	configv2 "github.com/smartcontractkit/chainlink/v2/core/config/toml"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store_1_2_0"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp_1_2_0"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp_1_2_0"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/cltest/heavyweight"
@@ -431,7 +431,7 @@ func setupNodeCCIP(
 	key, err := csakey.NewV2()
 	require.NoError(t, err)
 	csaKeyStore.On("GetAll").Return([]csakey.KeyV2{key}, nil)
-	keyStore := NewKsa(db, lggr, csaKeyStore, config)
+	keyStore := NewKsa(db, lggr, csaKeyStore)
 
 	simEthKeyStore := testhelpers.EthKeyStoreSim{
 		ETHKS: keyStore.Eth(),
@@ -451,8 +451,7 @@ func setupNodeCCIP(
 				return nil
 			},
 			MailMon: mailMon,
-			DB:      db,
-			SqlxDB:  db,
+			DS:      db,
 		},
 		CSAETHKeystore: simEthKeyStore,
 	}
@@ -475,7 +474,7 @@ func setupNodeCCIP(
 
 	app, err := chainlink.NewApplication(chainlink.ApplicationOpts{
 		Config:                     config,
-		SqlxDB:                     db,
+		DS:                         db,
 		KeyStore:                   keyStore,
 		RelayerChainInteroperators: relayChainInterops,
 		Logger:                     lggr,
@@ -487,9 +486,10 @@ func setupNodeCCIP(
 		MailMon:                    mailMon,
 		LoopRegistry:               plugins.NewLoopRegistry(lggr, config.Tracing()),
 	})
+	ctx := testutils.Context(t)
 	require.NoError(t, err)
-	require.NoError(t, app.GetKeyStore().Unlock("password"))
-	_, err = app.GetKeyStore().P2P().Create()
+	require.NoError(t, app.GetKeyStore().Unlock(ctx, "password"))
+	_, err = app.GetKeyStore().P2P().Create(ctx)
 	require.NoError(t, err)
 
 	p2pIDs, err := app.GetKeyStore().P2P().GetAll()
@@ -518,7 +518,7 @@ func setupNodeCCIP(
 	require.NoError(t, err)
 	destChain.Commit()
 
-	kb, err := app.GetKeyStore().OCR2().Create(chaintype.EVM)
+	kb, err := app.GetKeyStore().OCR2().Create(ctx, chaintype.EVM)
 	require.NoError(t, err)
 	return app, peerID.Raw(), transmitter, kb
 }
@@ -614,10 +614,11 @@ func (c *CCIPIntegrationTestHarness) jobSpecProposal(t *testing.T, specTemplate 
 }
 
 func (c *CCIPIntegrationTestHarness) SetupFeedsManager(t *testing.T) {
+	ctx := testutils.Context(t)
 	for _, node := range c.Nodes {
 		f := node.App.GetFeedsService()
 
-		managers, err := f.ListManagers()
+		managers, err := f.ListManagers(ctx)
 		require.NoError(t, err)
 		if len(managers) > 0 {
 			// Use at most one feeds manager, don't register if one already exists
@@ -650,7 +651,7 @@ func (c *CCIPIntegrationTestHarness) ApproveJobSpecs(t *testing.T, jobParams int
 
 	for _, node := range c.Nodes {
 		f := node.App.GetFeedsService()
-		managers, err := f.ListManagers()
+		managers, err := f.ListManagers(ctx)
 		require.NoError(t, err)
 		require.Len(t, managers, 1, "expected exactly one feeds manager")
 
@@ -755,18 +756,18 @@ func (c *CCIPIntegrationTestHarness) NoNodesHaveExecutedSeqNum(t *testing.T, seq
 	return log
 }
 
-func (c *CCIPIntegrationTestHarness) EventuallyCommitReportAccepted(t *testing.T, currentBlock uint64, commitStoreOpts ...common.Address) commit_store.CommitStoreCommitReport {
-	var commitStore *commit_store.CommitStore
+func (c *CCIPIntegrationTestHarness) EventuallyCommitReportAccepted(t *testing.T, currentBlock uint64, commitStoreOpts ...common.Address) commit_store_1_2_0.CommitStoreCommitReport {
+	var commitStore *commit_store_1_2_0.CommitStore
 	var err error
 	if len(commitStoreOpts) > 0 {
-		commitStore, err = commit_store.NewCommitStore(commitStoreOpts[0], c.Dest.Chain)
+		commitStore, err = commit_store_1_2_0.NewCommitStore(commitStoreOpts[0], c.Dest.Chain)
 		require.NoError(t, err)
 	} else {
 		require.NotNil(t, c.Dest.CommitStore, "no commitStore configured")
 		commitStore = c.Dest.CommitStore
 	}
 	g := gomega.NewGomegaWithT(t)
-	var report commit_store.CommitStoreCommitReport
+	var report commit_store_1_2_0.CommitStoreCommitReport
 	g.Eventually(func() bool {
 		it, err := commitStore.FilterReportAccepted(&bind.FilterOpts{Start: currentBlock})
 		g.Expect(err).NotTo(gomega.HaveOccurred(), "Error filtering ReportAccepted event")
@@ -808,11 +809,11 @@ func (c *CCIPIntegrationTestHarness) EventuallyExecutionStateChangedToSuccess(t 
 }
 
 func (c *CCIPIntegrationTestHarness) EventuallyReportCommitted(t *testing.T, max int, commitStoreOpts ...common.Address) uint64 {
-	var commitStore *commit_store.CommitStore
+	var commitStore *commit_store_1_2_0.CommitStore
 	var err error
 	var committedSeqNum uint64
 	if len(commitStoreOpts) > 0 {
-		commitStore, err = commit_store.NewCommitStore(commitStoreOpts[0], c.Dest.Chain)
+		commitStore, err = commit_store_1_2_0.NewCommitStore(commitStoreOpts[0], c.Dest.Chain)
 		require.NoError(t, err)
 	} else {
 		require.NotNil(t, c.Dest.CommitStore, "no commitStore configured")
@@ -856,10 +857,10 @@ func (c *CCIPIntegrationTestHarness) EventuallySendRequested(t *testing.T, seqNu
 }
 
 func (c *CCIPIntegrationTestHarness) ConsistentlyReportNotCommitted(t *testing.T, max int, commitStoreOpts ...common.Address) {
-	var commitStore *commit_store.CommitStore
+	var commitStore *commit_store_1_2_0.CommitStore
 	var err error
 	if len(commitStoreOpts) > 0 {
-		commitStore, err = commit_store.NewCommitStore(commitStoreOpts[0], c.Dest.Chain)
+		commitStore, err = commit_store_1_2_0.NewCommitStore(commitStoreOpts[0], c.Dest.Chain)
 		require.NoError(t, err)
 	} else {
 		require.NotNil(t, c.Dest.CommitStore, "no commitStore configured")
@@ -1013,9 +1014,9 @@ func (k *ksa) CSA() keystore.CSA {
 	return k.csa
 }
 
-func NewKsa(db *sqlx.DB, lggr logger.Logger, csa keystore.CSA, config chainlink.GeneralConfig) *ksa {
+func NewKsa(db *sqlx.DB, lggr logger.Logger, csa keystore.CSA) *ksa {
 	return &ksa{
-		Master: keystore.New(db, clutils.FastScryptParams, lggr, config.Database()),
+		Master: keystore.New(db, clutils.FastScryptParams, lggr),
 		csa:    csa,
 	}
 }

@@ -127,15 +127,13 @@ func (p *Plugin) Observation(ctx context.Context, outcomeCtx ocr3types.OutcomeCo
 		"numExpired", numExpired,
 	)
 
-	encodedObservation := models.NewObservation(
+	return models.NewObservation(
 		networkLiquidities,
 		resolvedTransfers,
 		pendingTransfers,
 		inflightTransfers,
 		edges,
 		configDigests).Encode()
-
-	return encodedObservation, nil
 }
 
 func (p *Plugin) ObservationQuorum(outctx ocr3types.OutcomeContext, query ocrtypes.Query) (ocr3types.Quorum, error) {
@@ -212,7 +210,7 @@ func (p *Plugin) Outcome(outctx ocr3types.OutcomeContext, query ocrtypes.Query, 
 		"resolvedTransfers", resolvedTransfersQuorum,
 	)
 
-	return models.NewOutcome(proposedTransfers, resolvedTransfersQuorum, pendingTransfers, configDigests).Encode(), nil
+	return models.NewOutcome(proposedTransfers, resolvedTransfersQuorum, pendingTransfers, configDigests).Encode()
 }
 
 func combinedUnexecutedTransfers(
@@ -281,7 +279,7 @@ func (p *Plugin) Reports(seqNr uint64, outcome ocr3types.Outcome) ([]ocr3types.R
 	var reports []ocr3types.ReportWithInfo[models.Report]
 	for networkID, transfers := range incomingAndOutgoing {
 		// todo: we shouldn't use plugin state
-		rebalancerAddress, err := p.liquidityGraph.GetRebalancerAddress(networkID)
+		rebalancerAddress, err := p.liquidityGraph.GetLiquidityManagerAddress(networkID)
 		if err != nil {
 			return nil, fmt.Errorf("liquidity manager for %v does not exist", networkID)
 		}
@@ -443,7 +441,7 @@ func (p *Plugin) Close() error {
 	for _, networkID := range p.liquidityGraph.GetNetworks() {
 		p.lggr.Infow("closing liquidityManager network", "network", networkID)
 
-		liquidityManagerAddress, err := p.liquidityGraph.GetRebalancerAddress(networkID)
+		liquidityManagerAddress, err := p.liquidityGraph.GetLiquidityManagerAddress(networkID)
 		if err != nil {
 			errs = append(errs, fmt.Errorf("get liquidityManager address for %d: %w", networkID, err))
 			continue
@@ -657,7 +655,7 @@ func (p *Plugin) resolveProposedTransfers(ctx context.Context, lggr logger.Logge
 			return nil, fmt.Errorf("init bridge: %w", err)
 		}
 
-		fromNetRebalancer, err := p.liquidityGraph.GetRebalancerAddress(proposedTransfer.From)
+		fromNetRebalancer, err := p.liquidityGraph.GetLiquidityManagerAddress(proposedTransfer.From)
 		if err != nil {
 			return nil, fmt.Errorf("get liquidityManager address for %v: %w", proposedTransfer.From, err)
 		}
@@ -667,7 +665,7 @@ func (p *Plugin) resolveProposedTransfers(ctx context.Context, lggr logger.Logge
 			return nil, fmt.Errorf("get token address for %v: %w", proposedTransfer.From, err)
 		}
 
-		toNetRebalancer, err := p.liquidityGraph.GetRebalancerAddress(proposedTransfer.To)
+		toNetRebalancer, err := p.liquidityGraph.GetLiquidityManagerAddress(proposedTransfer.To)
 		if err != nil {
 			return nil, fmt.Errorf("get liquidityManager address for %v: %w", proposedTransfer.To, err)
 		}
