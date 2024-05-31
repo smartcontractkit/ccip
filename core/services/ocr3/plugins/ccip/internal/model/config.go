@@ -3,18 +3,12 @@ package model
 import (
 	"fmt"
 
+	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 )
 
 type CommitPluginConfig struct {
-	// Writer indicates that the node can contribute by sending reports to the destination chain.
-	// Being a Writer guarantees that the node can also read from the destination chain.
-	Writer bool `json:"writer"`
-
-	// Reads define the chains that the current node can read from.
-	Reads []ChainSelector `json:"reads"`
-
 	// DestChain is the ccip destination chain configured for the commit plugin DON.
 	DestChain ChainSelector `json:"destChain"`
 
@@ -51,7 +45,11 @@ func (c CommitPluginConfig) Validate() error {
 		return fmt.Errorf("fChain not set for dest chain")
 	}
 
-	for _, ch := range c.Reads {
+	allChains := mapset.NewSet[ChainSelector]()
+	for _, inf := range c.ObserverInfo {
+		allChains.Union(mapset.NewSet[ChainSelector](inf.Reads...))
+	}
+	for _, ch := range allChains.ToSlice() {
 		if _, ok := c.FChain[ch]; !ok {
 			return fmt.Errorf("fChain not set for chain %d", ch)
 		}
@@ -61,5 +59,10 @@ func (c CommitPluginConfig) Validate() error {
 }
 
 type ObserverInfo struct {
-	Reads []ChainSelector
+	// Writer indicates that the node can contribute by sending reports to the destination chain.
+	// Being a Writer guarantees that the node can also read from the destination chain.
+	Writer bool `json:"writer"`
+
+	// Reads define the chains that the current node can read from.
+	Reads []ChainSelector `json:"reads"`
 }

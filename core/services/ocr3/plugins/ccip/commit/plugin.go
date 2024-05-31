@@ -47,7 +47,7 @@ func NewPlugin(
 	msgHasher codec.MessageHasher,
 	lggr logger.Logger,
 ) *Plugin {
-	knownSourceChains := mapset.NewSet[model.ChainSelector](cfg.Reads...)
+	knownSourceChains := mapset.NewSet[model.ChainSelector]()
 	for _, inf := range cfg.ObserverInfo {
 		knownSourceChains = knownSourceChains.Union(mapset.NewSet(inf.Reads...))
 	}
@@ -61,7 +61,7 @@ func NewPlugin(
 		msgHasher:         msgHasher,
 		lggr:              lggr,
 
-		readableChains:    mapset.NewSet(cfg.Reads...),
+		readableChains:    mapset.NewSet(cfg.ObserverInfo[nodeID].Reads...),
 		knownSourceChains: knownSourceChains,
 	}
 }
@@ -205,6 +205,7 @@ func (p *Plugin) Outcome(_ ocr3types.OutcomeContext, _ types.Query, aos []types.
 	}
 
 	cfg := pluginConfigConsensus(p.cfg, decodedObservations)
+	p.lggr.Debugw("plugin config follower state", "pluginConfig", p.cfg)
 	p.lggr.Debugw("plugin config after consensus", "pluginConfig", cfg)
 	if err := cfg.Validate(); err != nil {
 		return ocr3types.Outcome{}, fmt.Errorf("no consensus on plugin config: %w", err)
@@ -285,7 +286,7 @@ func (p *Plugin) ShouldAcceptAttestedReport(ctx context.Context, u uint64, r ocr
 }
 
 func (p *Plugin) ShouldTransmitAcceptedReport(ctx context.Context, u uint64, r ocr3types.ReportWithInfo[[]byte]) (bool, error) {
-	if !p.cfg.Writer {
+	if !p.cfg.ObserverInfo[p.nodeID].Writer {
 		p.lggr.Debugw("not a writer, skipping report transmission")
 		return false, nil
 	}

@@ -30,14 +30,16 @@ var (
 // TODO: move to a shared repository.
 type OCR3Runner[RI any] struct {
 	nodes           []ocr3types.ReportingPlugin[RI]
+	nodeIDs         []commontypes.OracleID
 	round           int
 	previousOutcome ocr3types.Outcome
 }
 
-func NewOCR3Runner[RI any](nodes []ocr3types.ReportingPlugin[RI]) *OCR3Runner[RI] {
+func NewOCR3Runner[RI any](nodes []ocr3types.ReportingPlugin[RI], nodeIDs []commontypes.OracleID) *OCR3Runner[RI] {
 	return &OCR3Runner[RI]{
-		nodes: nodes,
-		round: 0,
+		nodes:   nodes,
+		nodeIDs: nodeIDs,
+		round:   0,
 	}
 }
 
@@ -63,7 +65,7 @@ func (r *OCR3Runner[RI]) RunRound(ctx context.Context) (result RoundResult[RI], 
 			return RoundResult[RI]{}, fmt.Errorf("%s: %w", err2, ErrObservation)
 		}
 
-		attrObs := types.AttributedObservation{Observation: obs, Observer: commontypes.OracleID(i)}
+		attrObs := types.AttributedObservation{Observation: obs, Observer: commontypes.OracleID(r.nodeIDs[i])}
 		err = leaderNode.ValidateObservation(outcomeCtx, q, attrObs)
 		if err != nil {
 			return RoundResult[RI]{}, fmt.Errorf("%s: %w", err, ErrValidateObservation)
