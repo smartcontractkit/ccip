@@ -75,11 +75,11 @@ require (
 	github.com/smartcontractkit/chain-selectors v1.0.16
 	github.com/smartcontractkit/chainlink-automation v1.0.3
 	github.com/smartcontractkit/chainlink-common v0.1.7-0.20240531164135-2537dc9ad8fe
-	github.com/smartcontractkit/chainlink-cosmos v0.4.1-0.20240524214833-c362c2ebbd2d
+	github.com/smartcontractkit/chainlink-cosmos v0.4.1-0.20240531181747-cb077c3c5008
 	github.com/smartcontractkit/chainlink-data-streams v0.0.0-20240220203239-09be0ea34540
 	github.com/smartcontractkit/chainlink-feeds v0.0.0-20240422130241-13c17a91b2ab
-	github.com/smartcontractkit/chainlink-solana v1.0.3-0.20240529135715-17ffc7854b76
-	github.com/smartcontractkit/chainlink-starknet/relayer v0.0.1-beta-test.0.20240527073251-56197f1413e0
+	github.com/smartcontractkit/chainlink-solana v1.0.3-0.20240531174550-51e7073bafbf
+	github.com/smartcontractkit/chainlink-starknet/relayer v0.0.1-beta-test.0.20240531182416-d2f9937354bf
 	github.com/smartcontractkit/chainlink-vrf v0.0.0-20231120191722-fef03814f868
 	github.com/smartcontractkit/libocr v0.0.0-20240419185742-fd3cab206b2c
 	github.com/smartcontractkit/tdh2/go/ocr2/decryptionplugin v0.0.0-20230906073235-9e478e5e19f1
