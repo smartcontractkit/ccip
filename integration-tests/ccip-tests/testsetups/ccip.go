@@ -60,6 +60,7 @@ var (
 	// to set default values through test config use sync.once
 	setContractVersion sync.Once
 	setOCRParams       sync.Once
+	setConfigOverrides sync.Once
 )
 
 type NetworkPair struct {
@@ -72,7 +73,7 @@ type NetworkPair struct {
 type CCIPTestConfig struct {
 	Test                *testing.T
 	EnvInput            *testconfig.Common
-	TestGroupInput      *testconfig.CCIPTestConfig
+	TestGroupInput      *testconfig.CCIPTestGroupConfig
 	VersionInput        map[string]*contracts.ContractVersion
 	ContractsInput      *testconfig.CCIPContractConfig
 	AllNetworks         map[string]blockchain.EVMNetwork
@@ -346,7 +347,8 @@ func (c *CCIPTestConfig) SetOCRParams() error {
 	return nil
 }
 
-func NewCCIPTestConfig(t *testing.T, lggr zerolog.Logger, tType string) *CCIPTestConfig {
+// NewCCIPTestConfig reads the CCIP test config from TOML files, applies any overrides, and configures the test environment
+func NewCCIPTestConfig(t *testing.T, lggr zerolog.Logger, tType string, overrides ...TestConfigOverrideOption) *CCIPTestConfig {
 	testCfg := ccipconfig.GlobalTestConfig()
 	groupCfg, exists := testCfg.CCIP.Groups[tType]
 	if !exists {
@@ -386,11 +388,38 @@ func NewCCIPTestConfig(t *testing.T, lggr zerolog.Logger, tType string) *CCIPTes
 			t.Fatal(err)
 		}
 	})
+	setConfigOverrides.Do(func() {
+		overrideMessages := []string{}
+		for _, override := range overrides {
+			if override != nil {
+				overrideMessages = append(overrideMessages, override(ccipTestConfig))
+			}
+		}
+		if len(overrideMessages) > 0 {
+			lggr.Debug().Int("Overrides", len(overrideMessages)).Msg("Test Specific Config Overrides Applied")
+			for _, msg := range overrideMessages {
+				lggr.Debug().Msg(msg)
+			}
+		}
+	})
 	err := ccipTestConfig.SetNetworkPairs(lggr)
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	return ccipTestConfig
+}
+
+// TestConfigOverrideOption is a function that modifies the test config and overrides any values passed in by test files
+// This is useful for setting up test specific configurations.
+type TestConfigOverrideOption func(*CCIPTestConfig) string
+
+// WithCCIPOwnerTokens sets the number of tokens to be deployed and owned by the same account that owns all CCIP contracts
+func WithCCIPOwnerTokens() TestConfigOverrideOption {
+	return func(c *CCIPTestConfig) string {
+		c.TestGroupInput.TokenConfig.CCIPOwnerTokens = pointer.ToBool(true)
+		return "NumberOfCCIPOwnerTokens set to true"
+	}
 }
 
 type BiDirectionalLaneConfig struct {
@@ -452,11 +481,7 @@ func (o *CCIPTestSetUpOutputs) DeployChainContracts(
 	chain.ParallelTransactions(true)
 	defer chain.Close()
 	ccipCommon, err := actions.DefaultCCIPModule(
-		lggr, chain,
-		pointer.GetInt(o.Cfg.TestGroupInput.TokenConfig.NoOfTokensWithDynamicPrice),
-		o.Cfg.useExistingDeployment(),
-		o.Cfg.MultiCallEnabled(),
-		o.Cfg.TestGroupInput.USDCMockDeployment,
+		lggr, o.Cfg.TestGroupInput, chain,
 	)
 	if err != nil {
 		return errors.WithStack(fmt.Errorf("failed to create ccip common module for %s: %w", networkCfg.Name, err))

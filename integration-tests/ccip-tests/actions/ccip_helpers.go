@@ -152,6 +152,8 @@ func GetUSDCDomain(networkName string, simulated bool) (uint32, error) {
 }
 
 type CCIPCommon struct {
+	Logger                        zerolog.Logger
+	TestGroupConfig               *testconfig.CCIPTestGroupConfig
 	ChainClient                   blockchain.EVMClient
 	Deployer                      *contracts.CCIPContractsDeployer
 	FeeToken                      *contracts.LinkToken
@@ -173,7 +175,6 @@ type CCIPCommon struct {
 	TokenMessenger                *common.Address
 	TokenTransmitter              *contracts.TokenTransmitter
 	IsConnectionRestoredRecently  *atomic.Bool
-	Logger                        zerolog.Logger
 
 	poolFunds                 *big.Int
 	tokenPriceUpdateWatcherMu *sync.Mutex
@@ -873,22 +874,25 @@ func (ccipModule *CCIPCommon) DeployContracts(
 	// If the number of deployed bridge tokens does not match noOfTokens, deploy rest of the tokens in case ExistingDeployment is false
 	// In case of ExistingDeployment as true use whatever is provided in laneconfig
 	if len(ccipModule.BridgeTokens) < noOfTokens && !ccipModule.ExistingDeployment {
-		// TODO: This is a very rough guess for funding and could lead to issues, especially with live chains
-		fundingEstimate := 0.1 * float64(noOfTokens)
-		nonAdminWalletIndex, err := ccipModule.ChainClient.NewWallet(big.NewFloat(fundingEstimate))
-		if err != nil {
-			return fmt.Errorf("error in creating non-admin wallet to deploy tokens with %w", err)
-		}
-		if err = ccipModule.ChainClient.WaitForEvents(); err != nil {
-			return fmt.Errorf("error in waiting for non-admin wallet creation %w", err)
-		}
-		// TODO: This could run into issues with different versions of the token contracts
-		ccipModule.ChainClient.SetDefaultWallet(nonAdminWalletIndex)
-		defer func() {
-			if err = ccipModule.ChainClient.SetDefaultWallet(0); err != nil {
-				ccipModule.Logger.Error().Err(err).Msg("Error resetting default wallet to admin wallet after token deployment")
+		// If we need a token admin registry, then we need tokens to be deployed with a non-CCIP owner wallet
+		if ccipModule.NeedTokenAdminRegistry() && !pointer.GetBool(ccipModule.TestGroupConfig.TokenConfig.CCIPOwnerTokens) {
+			// TODO: This is a very rough guess for funding and could lead to issues, especially with live chains
+			fundingEstimate := 0.1 * float64(noOfTokens)
+			nonAdminWalletIndex, err := ccipModule.ChainClient.NewWallet(big.NewFloat(fundingEstimate))
+			if err != nil {
+				return fmt.Errorf("error in creating non-admin wallet to deploy tokens with %w", err)
 			}
-		}()
+			if err = ccipModule.ChainClient.WaitForEvents(); err != nil {
+				return fmt.Errorf("error in waiting for non-admin wallet creation %w", err)
+			}
+
+			ccipModule.ChainClient.SetDefaultWallet(nonAdminWalletIndex)
+			defer func() {
+				if err = ccipModule.ChainClient.SetDefaultWallet(0); err != nil {
+					ccipModule.Logger.Error().Err(err).Msg("Error resetting default wallet to CCIP owner wallet after token deployment")
+				}
+			}()
+		}
 
 		// deploy bridge token.
 		for i := len(ccipModule.BridgeTokens); i < noOfTokens; i++ {
@@ -1002,7 +1006,7 @@ func (ccipModule *CCIPCommon) DeployContracts(
 		}
 		ccipModule.BridgeTokenPools = pools
 	}
-	// In case we have set
+	// In case we have set the wallet differently for token deployment, we need to reset it back to the CCIP owner account
 	if err = ccipModule.ChainClient.SetDefaultWallet(0); err != nil {
 		return fmt.Errorf("error in setting default wallet back to admin after deploying token contracts %w", err)
 	}
@@ -1158,20 +1162,16 @@ type StaticPriceConfig struct {
 
 func NewCCIPCommonFromConfig(
 	logger zerolog.Logger,
+	testGroupConf *testconfig.CCIPTestGroupConfig,
 	chainClient blockchain.EVMClient,
-	noOfTokensPerChain,
-	noOfTokensWithDynamicPrice int,
-	existingDeployment,
-	multiCall bool,
-	USDCMockDeployment *bool,
 	laneConfig *laneconfig.LaneConfig,
 ) (*CCIPCommon, error) {
-	newCCIPModule, err := DefaultCCIPModule(logger, chainClient, noOfTokensWithDynamicPrice, existingDeployment, multiCall, USDCMockDeployment)
+	newCCIPModule, err := DefaultCCIPModule(logger, testGroupConf, chainClient)
 	if err != nil {
 		return nil, err
 	}
 	newCD := newCCIPModule.Deployer
-	newCCIPModule.LoadContractAddresses(laneConfig, &noOfTokensPerChain)
+	newCCIPModule.LoadContractAddresses(laneConfig, testGroupConf.TokenConfig.NoOfTokensPerChain)
 	if newCCIPModule.TokenAdminRegistry != nil {
 		newCCIPModule.TokenAdminRegistry, err = newCD.NewTokenAdminRegistry(common.HexToAddress(newCCIPModule.TokenAdminRegistry.Address()))
 		if err != nil {
@@ -1245,28 +1245,27 @@ func NewCCIPCommonFromConfig(
 
 func DefaultCCIPModule(
 	logger zerolog.Logger,
+	testGroupConf *testconfig.CCIPTestGroupConfig,
 	chainClient blockchain.EVMClient,
-	noOfTokensWithDynamicPrice int,
-	existingDeployment,
-	multiCall bool,
-	USDCMockDeployment *bool,
+
 ) (*CCIPCommon, error) {
 	cd, err := contracts.NewCCIPContractsDeployer(logger, chainClient)
 	if err != nil {
 		return nil, err
 	}
 	return &CCIPCommon{
-		ChainClient: chainClient,
-		Deployer:    cd,
+		Logger:          logger,
+		TestGroupConfig: testGroupConf,
+		ChainClient:     chainClient,
+		Deployer:        cd,
 		RateLimiterConfig: contracts.RateLimiterConfig{
 			Rate:     contracts.FiftyCoins,
 			Capacity: contracts.HundredCoins,
 		},
-		ExistingDeployment:            existingDeployment,
-		MulticallEnabled:              multiCall,
-		USDCMockDeployment:            USDCMockDeployment,
-		NoOfTokensNeedingDynamicPrice: noOfTokensWithDynamicPrice,
-		Logger:                        logger,
+		ExistingDeployment:            *testGroupConf.ExistingDeployment,
+		MulticallEnabled:              *testGroupConf.MulticallInOneTx,
+		USDCMockDeployment:            testGroupConf.USDCMockDeployment,
+		NoOfTokensNeedingDynamicPrice: *testGroupConf.TokenConfig.NoOfTokensWithDynamicPrice,
 		poolFunds:                     testhelpers.Link(5),
 		gasUpdateWatcherMu:            &sync.Mutex{},
 		gasUpdateWatcher:              make(map[uint64]*big.Int),
@@ -1779,18 +1778,15 @@ func (sourceCCIP *SourceCCIPModule) SendRequest(
 
 func DefaultSourceCCIPModule(
 	logger zerolog.Logger,
+	testConf *testconfig.CCIPTestGroupConfig,
 	chainClient blockchain.EVMClient,
 	destChainId uint64,
 	destChain string,
-	noOfTokensPerChain, noOfTokensWithDynamicPrice int,
-	transferAmount []*big.Int,
-	MsgByteLength int64,
-	existingDeployment bool,
-	multiCall bool,
-	USDCMockDeployment *bool,
 	laneConf *laneconfig.LaneConfig,
 ) (*SourceCCIPModule, error) {
-	cmn, err := NewCCIPCommonFromConfig(logger, chainClient, noOfTokensPerChain, noOfTokensWithDynamicPrice, existingDeployment, multiCall, USDCMockDeployment, laneConf)
+	cmn, err := NewCCIPCommonFromConfig(
+		logger, testConf, chainClient, laneConf,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -1801,8 +1797,8 @@ func DefaultSourceCCIPModule(
 	}
 	source := &SourceCCIPModule{
 		Common:                   cmn,
-		TransferAmount:           transferAmount,
-		MsgDataLength:            MsgByteLength,
+		TransferAmount:           testConf.MsgDetails.TransferAmounts(),
+		MsgDataLength:            pointer.GetInt64(testConf.MsgDetails.DataLength),
 		DestinationChainId:       destChainId,
 		DestChainSelector:        destChainSelector,
 		DestNetworkName:          destChain,
@@ -2526,16 +2522,14 @@ func (destCCIP *DestCCIPModule) AssertSeqNumberExecuted(
 
 func DefaultDestinationCCIPModule(
 	logger zerolog.Logger,
+	testConf *testconfig.CCIPTestGroupConfig,
 	chainClient blockchain.EVMClient,
 	sourceChainId uint64,
 	sourceChain string,
-	noOfTokensPerChain, noOfTokensWithDynamicPrice int,
-	existingDeployment, multiCall bool,
-	USDCMockDeployment *bool,
 	laneConf *laneconfig.LaneConfig,
 ) (*DestCCIPModule, error) {
 	cmn, err := NewCCIPCommonFromConfig(
-		logger, chainClient, noOfTokensPerChain, noOfTokensWithDynamicPrice, existingDeployment, multiCall, USDCMockDeployment, laneConf,
+		logger, testConf, chainClient, laneConf,
 	)
 	if err != nil {
 		return nil, err
@@ -3443,43 +3437,35 @@ func (lane *CCIPLane) CleanUp(clearFees bool) error {
 func (lane *CCIPLane) DeployNewCCIPLane(
 	setUpCtx context.Context,
 	env *CCIPTestEnv,
-	testConf *testconfig.CCIPTestConfig,
+	testConf *testconfig.CCIPTestGroupConfig,
 	bootstrapAdded *atomic.Bool,
 	jobErrGroup *errgroup.Group,
 ) error {
-	var err error
-	sourceChainClient := lane.SourceChain
-	destChainClient := lane.DestChain
-	srcConf := lane.SrcNetworkLaneCfg
-	destConf := lane.DstNetworkLaneCfg
-	commitAndExecOnSameDON := pointer.GetBool(testConf.CommitAndExecuteOnSameDON)
-	withPipeline := pointer.GetBool(testConf.TokenConfig.WithPipeline)
-	transferAmounts := testConf.MsgDetails.TransferAmounts()
-	msgByteLength := pointer.GetInt64(testConf.MsgDetails.DataLength)
-	existingDeployment := pointer.GetBool(testConf.ExistingDeployment)
-	configureCLNodes := !existingDeployment
-	USDCMockDeployment := testConf.USDCMockDeployment
-	multiCall := pointer.GetBool(testConf.MulticallInOneTx)
+	var (
+		err                    error
+		sourceChainClient      = lane.SourceChain
+		destChainClient        = lane.DestChain
+		srcConf                = lane.SrcNetworkLaneCfg
+		destConf               = lane.DstNetworkLaneCfg
+		commitAndExecOnSameDON = pointer.GetBool(testConf.CommitAndExecuteOnSameDON)
+		withPipeline           = pointer.GetBool(testConf.TokenConfig.WithPipeline)
+		configureCLNodes       = !pointer.GetBool(testConf.ExistingDeployment)
+	)
 
 	lane.Source, err = DefaultSourceCCIPModule(
 		lane.Logger,
+		testConf,
 		sourceChainClient, destChainClient.GetChainID().Uint64(),
 		destChainClient.GetNetworkName(),
-		pointer.GetInt(testConf.TokenConfig.NoOfTokensPerChain),
-		pointer.GetInt(testConf.TokenConfig.NoOfTokensWithDynamicPrice),
-		transferAmounts, msgByteLength,
-		existingDeployment, multiCall, USDCMockDeployment, srcConf,
+		srcConf,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create source module: %w", err)
 	}
 	lane.Dest, err = DefaultDestinationCCIPModule(
-		lane.Logger,
+		lane.Logger, testConf,
 		destChainClient, sourceChainClient.GetChainID().Uint64(),
-		sourceChainClient.GetNetworkName(),
-		pointer.GetInt(testConf.TokenConfig.NoOfTokensPerChain),
-		pointer.GetInt(testConf.TokenConfig.NoOfTokensWithDynamicPrice),
-		existingDeployment, multiCall, USDCMockDeployment, destConf,
+		sourceChainClient.GetNetworkName(), destConf,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create destination module: %w", err)
@@ -3666,7 +3652,7 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 func SetOCR2Config(
 	ctx context.Context,
 	lggr zerolog.Logger,
-	testConf testconfig.CCIPTestConfig,
+	testConf testconfig.CCIPTestGroupConfig,
 	commitNodes,
 	execNodes []*client.CLNodesWithKeys,
 	destCCIP DestCCIPModule,
