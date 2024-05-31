@@ -6,6 +6,7 @@ import (
 	"sort"
 
 	mapset "github.com/deckarep/golang-set/v2"
+	"github.com/smartcontractkit/ccipocr3/internal/codec"
 	"github.com/smartcontractkit/ccipocr3/internal/libs/hashlib"
 	"github.com/smartcontractkit/ccipocr3/internal/libs/merklemulti"
 	"github.com/smartcontractkit/ccipocr3/internal/libs/slicelib"
@@ -13,6 +14,7 @@ import (
 	"github.com/smartcontractkit/ccipocr3/internal/reader"
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 )
@@ -78,45 +80,66 @@ func observeNewMsgs(
 	ctx context.Context,
 	lggr logger.Logger,
 	ccipReader reader.CCIP,
+	msgHasher codec.MessageHasher,
 	readableChains mapset.Set[model.ChainSelector],
 	maxSeqNumsPerChain []model.SeqNumChain,
 	msgScanBatchSize int,
 ) ([]model.CCIPMsg, error) {
 	// Find the new msgs for each supported chain based on the discovered max sequence numbers.
-	observedNewMsgs := make([]model.CCIPMsg, 0)
+	newMsgsPerChain := make([][]model.CCIPMsg, len(maxSeqNumsPerChain))
+	eg := new(errgroup.Group)
 
-	for _, seqNumChain := range maxSeqNumsPerChain {
+	for chainIdx, seqNumChain := range maxSeqNumsPerChain {
 		if !readableChains.Contains(seqNumChain.ChainSel) {
 			lggr.Debugw("reading chain is not supported", "chain", seqNumChain.ChainSel)
 			continue
 		}
 
-		minSeqNum := seqNumChain.SeqNum + 1
-		maxSeqNum := minSeqNum + model.SeqNum(msgScanBatchSize)
-		lggr.Debugw("scanning for new messages",
-			"chain", seqNumChain.ChainSel, "minSeqNum", minSeqNum, "maxSeqNum", maxSeqNum)
+		seqNumChain := seqNumChain
+		chainIdx := chainIdx
+		eg.Go(func() error {
+			minSeqNum := seqNumChain.SeqNum + 1
+			maxSeqNum := minSeqNum + model.SeqNum(msgScanBatchSize)
+			lggr.Debugw("scanning for new messages",
+				"chain", seqNumChain.ChainSel, "minSeqNum", minSeqNum, "maxSeqNum", maxSeqNum)
 
-		newMsgs, err := ccipReader.MsgsBetweenSeqNums(
-			ctx, []model.ChainSelector{seqNumChain.ChainSel}, model.NewSeqNumRange(minSeqNum, maxSeqNum))
-		if err != nil {
-			return nil, fmt.Errorf("get messages between seq nums: %w", err)
-		}
-
-		if len(newMsgs) > 0 {
-			lggr.Debugw("discovered new messages", "chain", seqNumChain.ChainSel, "newMsgs", len(newMsgs))
-		} else {
-			lggr.Debugw("no new messages discovered", "chain", seqNumChain.ChainSel)
-		}
-
-		for _, msg := range newMsgs {
-			if err := msg.IsValid(); err != nil {
-				lggr.Warnw("invalid message discovered", "msg", msg, "err", err)
-				continue
+			newMsgs, err := ccipReader.MsgsBetweenSeqNums(
+				ctx, seqNumChain.ChainSel, model.NewSeqNumRange(minSeqNum, maxSeqNum))
+			if err != nil {
+				return fmt.Errorf("get messages between seq nums: %w", err)
 			}
-			observedNewMsgs = append(observedNewMsgs, msg)
-		}
+
+			if len(newMsgs) > 0 {
+				lggr.Debugw("discovered new messages", "chain", seqNumChain.ChainSel, "newMsgs", len(newMsgs))
+			} else {
+				lggr.Debugw("no new messages discovered", "chain", seqNumChain.ChainSel)
+			}
+
+			for _, msg := range newMsgs {
+				msgHash, err := msgHasher.Hash(msg)
+				if err != nil {
+					return fmt.Errorf("hash message: %w", err)
+				}
+
+				if msgHash != msg.ID {
+					lggr.Warnw("invalid message discovered", "msg", msg, "err", err)
+					continue
+				}
+			}
+
+			newMsgsPerChain[chainIdx] = newMsgs
+			return nil
+		})
 	}
 
+	if err := eg.Wait(); err != nil {
+		return nil, fmt.Errorf("wait for new msg observations: %w", err)
+	}
+
+	observedNewMsgs := make([]model.CCIPMsg, 0)
+	for chainIdx := range maxSeqNumsPerChain {
+		observedNewMsgs = append(observedNewMsgs, newMsgsPerChain[chainIdx]...)
+	}
 	return observedNewMsgs, nil
 }
 
@@ -448,6 +471,82 @@ func gasPricesConsensus(lggr logger.Logger, observations []model.CommitPluginObs
 
 	sort.Slice(consensusGasPrices, func(i, j int) bool { return consensusGasPrices[i].ChainSel < consensusGasPrices[j].ChainSel })
 	return consensusGasPrices, nil
+}
+
+// pluginConfigConsensus comes to consensus on the plugin config based on the observations.
+// We cannot trust the state of a single follower, so we need to come to consensus on the config.
+func pluginConfigConsensus(
+	baseCfg model.CommitPluginConfig, // the config of the follower calling this function
+	observations []model.CommitPluginObservation, // observations from all followers
+) model.CommitPluginConfig {
+	consensusCfg := baseCfg
+
+	// Come to consensus on fChain.
+	// Use the fChain observed by most followers for each chain.
+	fChainCounts := make(map[model.ChainSelector]map[int]int) // {chain: {fChain: count}}
+	for _, obs := range observations {
+		for chain, fChain := range obs.PluginConfig.FChain {
+			if _, exists := fChainCounts[chain]; !exists {
+				fChainCounts[chain] = make(map[int]int)
+			}
+			fChainCounts[chain][fChain]++
+		}
+	}
+	consensusFChain := make(map[model.ChainSelector]int)
+	for chain, counts := range fChainCounts {
+		maxCount := 0
+		for fChain, count := range counts {
+			if count > maxCount {
+				maxCount = count
+				consensusFChain[chain] = fChain
+			}
+		}
+	}
+	consensusCfg.FChain = consensusFChain
+
+	// Come to consensus on what the feeTokens are.
+	// We want to keep the tokens observed by at least 2f_chain+1 followers.
+	feeTokensCounts := make(map[types.Account]int)
+	for _, obs := range observations {
+		for _, token := range obs.PluginConfig.PricedTokens {
+			feeTokensCounts[token]++
+		}
+	}
+	consensusFeeTokens := make([]types.Account, 0)
+	for token, count := range feeTokensCounts {
+		if count >= 2*consensusCfg.FChain[consensusCfg.DestChain]+1 {
+			consensusFeeTokens = append(consensusFeeTokens, token)
+		}
+	}
+	consensusCfg.PricedTokens = consensusFeeTokens
+
+	// Come to consensus on reading observers.
+	// An observer can read a chain only if at least 2f_chain+1 followers observed that.
+	observerReadChainsCounts := make(map[commontypes.OracleID]map[model.ChainSelector]int)
+	for _, obs := range observations {
+		for observer, info := range obs.PluginConfig.ObserverInfo {
+			if _, exists := observerReadChainsCounts[observer]; !exists {
+				observerReadChainsCounts[observer] = make(map[model.ChainSelector]int)
+			}
+			for _, chain := range info.Reads {
+				observerReadChainsCounts[observer][chain]++
+			}
+		}
+	}
+	consensusObserverInfo := make(map[commontypes.OracleID]model.ObserverInfo)
+	for observer, chainCounts := range observerReadChainsCounts {
+		observerReadChains := make([]model.ChainSelector, 0)
+		for chain, count := range chainCounts {
+			if count >= 2*consensusCfg.FChain[consensusCfg.DestChain]+1 {
+				observerReadChains = append(observerReadChains, chain)
+			}
+		}
+		observerInfo := consensusCfg.ObserverInfo[observer]
+		observerInfo.Reads = observerReadChains
+		consensusObserverInfo[observer] = observerInfo
+	}
+
+	return consensusCfg
 }
 
 // validateObservedSequenceNumbers checks if the sequence numbers of the provided messages are unique for each chain and
