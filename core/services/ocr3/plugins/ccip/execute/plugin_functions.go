@@ -72,7 +72,7 @@ func validateObservedSequenceNumbers(observedData map[model.ChainSelector][]mode
 	return nil
 }
 
-var ErrOverlappingRanges = errors.New("overlapping sequence numbers in reports")
+var errOverlappingRanges = errors.New("overlapping sequence numbers in reports")
 
 // computeRanges takes a slice of reports and computes the smallest number of contiguous ranges
 // that cover all the sequence numbers in the reports.
@@ -92,7 +92,7 @@ func computeRanges(reports []model.ExecutePluginCommitData) ([]model.SeqNumRange
 			// extend the contiguous range
 			seqRange.SetEnd(report.SequenceNumberRange.End())
 		} else if report.SequenceNumberRange.Start() < seqRange.End() {
-			return nil, ErrOverlappingRanges
+			return nil, errOverlappingRanges
 		} else {
 			ranges = append(ranges, seqRange)
 
@@ -137,7 +137,7 @@ func filterOutFullyExecutedMessages(reports []model.ExecutePluginCommitData, exe
 	previousMax := model.SeqNum(0)
 	for _, seqRange := range executedMessages {
 		if seqRange.Start() < previousMax {
-			return nil, ErrOverlappingRanges
+			return nil, errOverlappingRanges
 		}
 		previousMax = seqRange.End()
 	}

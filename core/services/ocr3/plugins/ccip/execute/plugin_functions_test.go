@@ -216,7 +216,7 @@ func Test_computeRanges(t *testing.T) {
 				{SequenceNumberRange: model.NewSeqNumRange(10, 20)},
 				{SequenceNumberRange: model.NewSeqNumRange(15, 25)}},
 			},
-			err: ErrOverlappingRanges,
+			err: errOverlappingRanges,
 		},
 		{
 			name: "simple ranges collapsed",
