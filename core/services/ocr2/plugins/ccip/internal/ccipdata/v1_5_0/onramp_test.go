@@ -113,25 +113,25 @@ func Test_ProperlyRecognizesPerLaneCurses(t *testing.T) {
 	assert.False(t, isCursed)
 }
 
-// Before caching amr.NewARMContract:
-// BenchmarkIsSourceCursed-14    	    2328	    437426 ns/op
-// After caching amr.NewARMContract:
-// BenchmarkIsSourceCursed-14    	    2227	    476024 ns/op
-
-func BenchmarkIsSourceCursed(b *testing.B) {
+// BenchmarkIsSourceCursedWithCache-14        90266             12526 ns/op
+// BenchmarkIsSourceCursedWithCache-14        88867             12411 ns/op
+// BenchmarkIsSourceCursedWithCache-14        90930             12379 ns/op
+// BenchmarkIsSourceCursedWithCache-14        91108             12259 ns/op
+// BenchmarkIsSourceCursedWithCache-14        90915             12306 ns/op
+// BenchmarkIsSourceCursedOriginal-14          3002            397356 ns/op
+// BenchmarkIsSourceCursedOriginal-14          2996            402220 ns/op
+// BenchmarkIsSourceCursedOriginal-14          3009            399806 ns/op
+// BenchmarkIsSourceCursedOriginal-14          2575            397963 ns/op
+// BenchmarkIsSourceCursedOriginal-14          2596            396812 ns/op
+// This is written to benchmark before and after the caching of StaticConfig and RMNContract
+func BenchmarkIsSourceCursedWithCache(b *testing.B) {
 	user, bc := ccipdata.NewSimulation(b)
 	ctx := testutils.Context(b)
 	destChainSelector := uint64(100)
-	onRampAddress, _, mockRMNAddress := setupOnRampV1_5_0(b, user, bc)
+	onRampAddress, _, _ := setupOnRampV1_5_0(b, user, bc)
 
 	onRamp, err := NewOnRamp(logger.TestLogger(b), 1, destChainSelector, onRampAddress, mocks.NewLogPoller(b), bc)
 	require.NoError(b, err)
-
-	onRamp.cachedStaticConfig = func(ctx context.Context) (evm_2_evm_onramp.EVM2EVMOnRampStaticConfig, error) {
-		return evm_2_evm_onramp.EVM2EVMOnRampStaticConfig{
-			RmnProxy: mockRMNAddress,
-		}, nil
-	}
 
 	for i := 0; i < b.N; i++ {
 		_, _ = onRamp.IsSourceCursed(ctx)
