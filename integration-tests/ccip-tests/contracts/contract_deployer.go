@@ -404,7 +404,7 @@ func (e *CCIPContractsDeployer) DeployUSDCTokenPoolContract(tokenAddr string, to
 	error,
 ) {
 	version := VersionMap[TokenPoolContract]
-	e.logger.Debug().Str("token", tokenAddr).Msg("Deploying usdc token pool")
+	e.logger.Debug().Str("Token", tokenAddr).Msg("Deploying USDC token pool")
 	token := common.HexToAddress(tokenAddr)
 	switch version {
 	case Latest:

@@ -873,8 +873,8 @@ func (ccipModule *CCIPCommon) DeployContracts(
 	// If the number of deployed bridge tokens does not match noOfTokens, deploy rest of the tokens in case ExistingDeployment is false
 	// In case of ExistingDeployment as true use whatever is provided in laneconfig
 	if len(ccipModule.BridgeTokens) < noOfTokens && !ccipModule.ExistingDeployment {
-		// TODO: This is a very rough guess and could lead to issues, especially with live chains
-		fundingEstimate := 0.1 * float64(len(ccipModule.BridgeTokenPools))
+		// TODO: This is a very rough guess for funding and could lead to issues, especially with live chains
+		fundingEstimate := 0.1 * float64(noOfTokens)
 		nonAdminWalletIndex, err := ccipModule.ChainClient.NewWallet(big.NewFloat(fundingEstimate))
 		if err != nil {
 			return fmt.Errorf("error in creating non-admin wallet to deploy tokens with %w", err)
@@ -882,7 +882,13 @@ func (ccipModule *CCIPCommon) DeployContracts(
 		if err = ccipModule.ChainClient.WaitForEvents(); err != nil {
 			return fmt.Errorf("error in waiting for non-admin wallet creation %w", err)
 		}
+		// TODO: This could run into issues with different versions of the token contracts
 		ccipModule.ChainClient.SetDefaultWallet(nonAdminWalletIndex)
+		defer func() {
+			if err = ccipModule.ChainClient.SetDefaultWallet(0); err != nil {
+				ccipModule.Logger.Error().Err(err).Msg("Error resetting default wallet to admin wallet after token deployment")
+			}
+		}()
 
 		// deploy bridge token.
 		for i := len(ccipModule.BridgeTokens); i < noOfTokens; i++ {
@@ -997,7 +1003,9 @@ func (ccipModule *CCIPCommon) DeployContracts(
 		ccipModule.BridgeTokenPools = pools
 	}
 	// In case we have set
-	ccipModule.ChainClient.SetDefaultWallet(0)
+	if err = ccipModule.ChainClient.SetDefaultWallet(0); err != nil {
+		return fmt.Errorf("error in setting default wallet back to admin after deploying token contracts %w", err)
+	}
 
 	if ccipModule.PriceRegistry == nil {
 		if ccipModule.ExistingDeployment {

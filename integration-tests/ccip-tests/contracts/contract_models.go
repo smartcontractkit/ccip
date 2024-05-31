@@ -724,6 +724,16 @@ func (pool *TokenPool) SetRemoteChainOnPool(remoteChainSelector uint64, remotePo
 			Rate:      new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e5)),
 		},
 	})
+	if len(pool.client.GetWallets()) > 1 { // We're using a different wallet to deploy and interact with the pool
+		if err = pool.client.SetDefaultWallet(1); err != nil {
+			return fmt.Errorf("failed to set default wallet to index %d: %w", 1, err)
+		}
+		defer func() {
+			if err = pool.client.SetDefaultWallet(0); err != nil {
+				pool.logger.Error().Err(err).Msg("failed to set default wallet back to index 0")
+			}
+		}()
+	}
 	// If remote chain is not supported , add it
 	opts, err := pool.client.TransactionOpts(pool.client.GetDefaultWallet())
 	if err != nil {
