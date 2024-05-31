@@ -113,7 +113,32 @@ func Test_ProperlyRecognizesPerLaneCurses(t *testing.T) {
 	assert.False(t, isCursed)
 }
 
-func setupOnRampV1_5_0(t *testing.T, user *bind.TransactOpts, bc *client.SimulatedBackendClient) (common.Address, *mock_arm_contract.MockARMContract, common.Address) {
+// Before caching amr.NewARMContract:
+// BenchmarkIsSourceCursed-14    	    2328	    437426 ns/op
+// After caching amr.NewARMContract:
+// BenchmarkIsSourceCursed-14    	    2227	    476024 ns/op
+
+func BenchmarkIsSourceCursed(b *testing.B) {
+	user, bc := ccipdata.NewSimulation(b)
+	ctx := testutils.Context(b)
+	destChainSelector := uint64(100)
+	onRampAddress, _, mockRMNAddress := setupOnRampV1_5_0(b, user, bc)
+
+	onRamp, err := NewOnRamp(logger.TestLogger(b), 1, destChainSelector, onRampAddress, mocks.NewLogPoller(b), bc)
+	require.NoError(b, err)
+
+	onRamp.cachedStaticConfig = func(ctx context.Context) (evm_2_evm_onramp.EVM2EVMOnRampStaticConfig, error) {
+		return evm_2_evm_onramp.EVM2EVMOnRampStaticConfig{
+			RmnProxy: mockRMNAddress,
+		}, nil
+	}
+
+	for i := 0; i < b.N; i++ {
+		_, _ = onRamp.IsSourceCursed(ctx)
+	}
+}
+
+func setupOnRampV1_5_0(t testing.TB, user *bind.TransactOpts, bc *client.SimulatedBackendClient) (common.Address, *mock_arm_contract.MockARMContract, common.Address) {
 	rmnAddress, transaction, rmnContract, err := mock_arm_contract.DeployMockARMContract(user, bc)
 	bc.Commit()
 	require.NoError(t, err)
