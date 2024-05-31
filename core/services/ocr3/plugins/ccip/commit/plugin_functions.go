@@ -167,6 +167,10 @@ func observeTokenPrices(
 }
 
 func observeGasPrices(ctx context.Context, ccipReader reader.CCIP, chains []model.ChainSelector) ([]model.GasPriceChain, error) {
+	if len(chains) == 0 {
+		return nil, nil
+	}
+
 	gasPrices, err := ccipReader.GasPrices(ctx, chains)
 	if err != nil {
 		return nil, fmt.Errorf("get gas prices: %w", err)

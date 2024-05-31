@@ -60,6 +60,23 @@ func TestCommitPluginOutcome_EncodeAndDecode(t *testing.T) {
 	assert.Equal(t, `{MaxSeqNums: [{ChainSelector(1) 20} {ChainSelector(2) 25}], MerkleRoots: [{ChainSelector(1) [21 -> 22] 0x0100000000000000000000000000000000000000000000000000000000000000} {ChainSelector(2) [25 -> 35] 0x0200000000000000000000000000000000000000000000000000000000000000}]}`, o.String())
 }
 
+func TestCommitPluginOutcome_IsEmpty(t *testing.T) {
+	o := NewCommitPluginOutcome(nil, nil, nil, nil)
+	assert.True(t, o.IsEmpty())
+
+	o = NewCommitPluginOutcome(nil, nil, nil, []GasPriceChain{NewGasPriceChain(big.NewInt(1), ChainSelector(1))})
+	assert.False(t, o.IsEmpty())
+
+	o = NewCommitPluginOutcome(nil, nil, []TokenPrice{NewTokenPrice("0x123", big.NewInt(123))}, nil)
+	assert.False(t, o.IsEmpty())
+
+	o = NewCommitPluginOutcome(nil, []MerkleRootChain{NewMerkleRootChain(ChainSelector(1), NewSeqNumRange(1, 2), [32]byte{1})}, nil, nil)
+	assert.False(t, o.IsEmpty())
+
+	o = NewCommitPluginOutcome([]SeqNumChain{NewSeqNumChain(ChainSelector(1), SeqNum(1))}, nil, nil, nil)
+	assert.False(t, o.IsEmpty())
+}
+
 func TestCommitPluginReport(t *testing.T) {
 	t.Run("is empty", func(t *testing.T) {
 		r := NewCommitPluginReport(nil, nil, nil)

@@ -205,8 +205,9 @@ func (p *Plugin) Outcome(_ ocr3types.OutcomeContext, _ types.Query, aos []types.
 	}
 
 	cfg := pluginConfigConsensus(p.cfg, decodedObservations)
+	p.lggr.Debugw("plugin config after consensus", "pluginConfig", cfg)
 	if err := cfg.Validate(); err != nil {
-		return ocr3types.Outcome{}, fmt.Errorf("critical issue validating plugin config consensus: %w", err)
+		return ocr3types.Outcome{}, fmt.Errorf("no consensus on plugin config: %w", err)
 	}
 
 	fChainDest, ok := cfg.FChain[cfg.DestChain]
@@ -217,10 +218,6 @@ func (p *Plugin) Outcome(_ ocr3types.OutcomeContext, _ types.Query, aos []types.
 	maxSeqNums, err := maxSeqNumsConsensus(p.lggr, fChainDest, decodedObservations)
 	if err != nil {
 		return ocr3types.Outcome{}, fmt.Errorf("max sequence numbers consensus: %w", err)
-	}
-	if len(maxSeqNums) == 0 {
-		p.lggr.Warnw("no consensus on max sequence numbers")
-		return ocr3types.Outcome{}, nil
 	}
 	p.lggr.Debugw("max sequence numbers consensus", "maxSeqNumsConsensus", maxSeqNums)
 
@@ -240,12 +237,20 @@ func (p *Plugin) Outcome(_ ocr3types.OutcomeContext, _ types.Query, aos []types.
 		return ocr3types.Outcome{}, fmt.Errorf("gas prices consensus: %w", err)
 	}
 
-	return model.NewCommitPluginOutcome(maxSeqNums, merkleRoots, tokenPrices, gasPrices).Encode()
+	outcome := model.NewCommitPluginOutcome(maxSeqNums, merkleRoots, tokenPrices, gasPrices)
+	if outcome.IsEmpty() {
+		p.lggr.Debugw("empty outcome")
+		return ocr3types.Outcome{}, nil
+	}
+	p.lggr.Debugw("sending outcome", "outcome", outcome)
+
+	return outcome.Encode()
 }
 
 func (p *Plugin) Reports(seqNr uint64, outcome ocr3types.Outcome) ([]ocr3types.ReportWithInfo[[]byte], error) {
 	outc, err := model.DecodeCommitPluginOutcome(outcome)
 	if err != nil {
+		p.lggr.Errorw("decode commit plugin outcome", "outcome", outcome, "err", err)
 		return nil, fmt.Errorf("decode commit plugin outcome: %w", err)
 	}
 

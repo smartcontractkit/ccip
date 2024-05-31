@@ -39,12 +39,8 @@ func (c CommitPluginConfig) Validate() error {
 		return fmt.Errorf("destChain not set")
 	}
 
-	if len(c.FChain) == 0 {
-		return fmt.Errorf("fChain not set")
-	}
-
 	if len(c.PricedTokens) == 0 {
-		return fmt.Errorf("priced tokens not set")
+		return fmt.Errorf("priced tokens not set, at least one priced token is required")
 	}
 
 	if c.NewMsgScanBatchSize == 0 {
@@ -53,6 +49,12 @@ func (c CommitPluginConfig) Validate() error {
 
 	if _, ok := c.FChain[c.DestChain]; !ok {
 		return fmt.Errorf("fChain not set for dest chain")
+	}
+
+	for _, ch := range c.Reads {
+		if _, ok := c.FChain[ch]; !ok {
+			return fmt.Errorf("fChain not set for chain %d", ch)
+		}
 	}
 
 	return nil

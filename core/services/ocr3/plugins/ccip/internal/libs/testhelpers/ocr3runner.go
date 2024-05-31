@@ -19,6 +19,7 @@ var (
 	ErrObservation                  = errors.New("error in observation phase")
 	ErrValidateObservation          = errors.New("error in validate observation phase")
 	ErrOutcome                      = errors.New("error in outcome phase")
+	ErrEmptyOutcome                 = errors.New("outcome is empty")
 	ErrReports                      = errors.New("error in reports phase")
 	ErrShouldAcceptAttestedReport   = errors.New("error in should accept attested report phase")
 	ErrShouldTransmitAcceptedReport = errors.New("error in should transmit accepted report phase")
@@ -76,6 +77,9 @@ func (r *OCR3Runner[RI]) RunRound(ctx context.Context) (result RoundResult[RI], 
 		outcome, err2 := n.Outcome(outcomeCtx, q, attributedObservations)
 		if err2 != nil {
 			return RoundResult[RI]{}, fmt.Errorf("%s: %w", err2, ErrOutcome)
+		}
+		if len(outcome) == 0 {
+			return RoundResult[RI]{}, ErrEmptyOutcome
 		}
 
 		outcomes[i] = outcome
