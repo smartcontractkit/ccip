@@ -47,15 +47,20 @@ func (p *Plugin) Query(ctx context.Context, outctx ocr3types.OutcomeContext) (ty
 }
 
 func getPendingExecutedReports(ctx context.Context, ccipReader reader.CCIP, dest model.ChainSelector, ts time.Time) (model.ExecutePluginCommitObservations, time.Time, error) {
+	oldestReport := time.Time{}
+
 	// TODO: filter out "cannot read p.destChain" errors? Or avoid calling it in the first place?
 	commitReports, err := ccipReader.CommitReportsGTETimestamp(ctx, dest, ts, 1000)
 	if err != nil {
 		return nil, time.Time{}, err
 	}
-	if len(commitReports) > 0 {
-		//lastReport := commitReports[len(commitReports)-1]
-		//p.lastReportTS = lastReport.
-		// TODO: Need a way to get a timestamp of the report.
+
+	// Grab the oldest report.
+	// TODO: If this is guaranteed to be in order, could grab the last one instead of checking all.
+	for _, report := range commitReports {
+		if report.Timestamp.After(oldestReport) {
+			oldestReport = report.Timestamp
+		}
 	}
 
 	groupedCommits := groupByChainSelector(commitReports)
@@ -87,7 +92,7 @@ func getPendingExecutedReports(ctx context.Context, ccipReader reader.CCIP, dest
 		}
 	}
 
-	return groupedCommits, time.Time{}, nil
+	return groupedCommits, oldestReport, nil
 }
 
 // Observation collects data across two phases which happen in separate rounds.
@@ -109,12 +114,14 @@ func (p *Plugin) Observation(ctx context.Context, outctx ocr3types.OutcomeContex
 	ownConfig := p.cfg.ObserverInfo[p.nodeID]
 	var groupedCommits model.ExecutePluginCommitObservations
 	if slices.Contains(ownConfig.Reads, p.cfg.DestChain) {
-		groupedCommits, _, err = getPendingExecutedReports(ctx, p.ccipReader, p.cfg.DestChain, time.UnixMilli(p.lastReportTS.Load()))
+		var oldestReport time.Time
+		groupedCommits, oldestReport, err = getPendingExecutedReports(ctx, p.ccipReader, p.cfg.DestChain, time.UnixMilli(p.lastReportTS.Load()))
 		if err != nil {
 			return types.Observation{}, err
 		}
+		// Update timestamp to the last report.
+		p.lastReportTS.Store(oldestReport.UnixMilli())
 	}
-	// TODO: Need a way to get a timestamp of the report.
 
 	// Phase 2: Gather messages from the source chains and build the execution report.
 	messages := make(model.ExecutePluginMessageObservations)
