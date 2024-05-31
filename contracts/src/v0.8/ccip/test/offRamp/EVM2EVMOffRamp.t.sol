@@ -31,6 +31,8 @@ import {EVM2EVMOffRampSetup} from "./EVM2EVMOffRampSetup.t.sol";
 
 import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 
+import {console2 as console} from "forge-std/console2.sol";
+
 contract EVM2EVMOffRamp_constructor is EVM2EVMOffRampSetup {
   function test_Constructor_Success() public {
     EVM2EVMOffRamp.StaticConfig memory staticConfig = EVM2EVMOffRamp.StaticConfig({
@@ -1186,10 +1188,13 @@ contract EVM2EVMOffRamp_getExecutionState is EVM2EVMOffRampSetup {
 }
 
 contract EVM2EVMOffRamp__trialExecute is EVM2EVMOffRampSetup {
-  function _generateMsgWithoutTokens(uint256 gasLimit) internal view returns (Internal.EVM2EVMMessage memory) {
+  function _generateMsgWithoutTokens(
+    uint256 gasLimit,
+    bytes memory messageData
+  ) internal view returns (Internal.EVM2EVMMessage memory) {
     Internal.EVM2EVMMessage memory message = _generateAny2EVMMessageNoTokens(1);
     message.gasLimit = gasLimit;
-    message.data = "";
+    message.data = abi.encodePacked(messageData);
     message.messageId = Internal._hash(
       message,
       keccak256(
@@ -1199,23 +1204,32 @@ contract EVM2EVMOffRamp__trialExecute is EVM2EVMOffRampSetup {
     return message;
   }
 
-  function test_Fuzz_trialExecuteWithoutTokens_Success(bytes4 funcSelector) public {
+  function test_Fuzz_trialExecuteWithoutTokens_Success(bytes4 funcSelector, bytes memory messageData) public {
     vm.assume(
       funcSelector != GenericReceiver.setRevert.selector && funcSelector != GenericReceiver.setErr.selector
-        && funcSelector != 0x5100fc21 // s_toRevert(), which is public and therefore has a function selector
+        && funcSelector != 0x5100fc21 && funcSelector != 0x00000000 // s_toRevert(), which is public and therefore has a function selector
     );
 
     //Convert bytes4 into bytes memory to use in the message
-    Internal.EVM2EVMMessage memory message = _generateMsgWithoutTokens(GAS_LIMIT);
-    message.data = abi.encodePacked(funcSelector);
+    Internal.EVM2EVMMessage memory message = _generateMsgWithoutTokens(GAS_LIMIT, messageData);
 
+    // Convert an Internal.EVM2EVMMessage into a Client.Any2EVMMessage digestable by the client
+    Client.Any2EVMMessage memory receivedMessage = _convertToGeneralMessage(message);
+    bytes memory expectedCallData =
+      abi.encodeWithSelector(MaybeRevertMessageReceiver.ccipReceive.selector, receivedMessage);
+
+    vm.expectCall(address(s_receiver), expectedCallData);
     (Internal.MessageExecutionState newState, bytes memory err) =
       s_offRamp.trialExecute(message, new bytes[](message.tokenAmounts.length));
     assertEq(uint256(Internal.MessageExecutionState.SUCCESS), uint256(newState));
     assertEq("", err);
   }
 
-  function test_Fuzz_trialExecuteWithTokens_Success(bytes4 funcSelector, uint16 tokenAmount) public {
+  function test_Fuzz_trialExecuteWithTokens_Success(
+    bytes4 funcSelector,
+    uint16 tokenAmount,
+    bytes calldata messageData
+  ) public {
     vm.assume(tokenAmount != 0);
 
     uint256[] memory amounts = new uint256[](2);
@@ -1223,10 +1237,18 @@ contract EVM2EVMOffRamp__trialExecute is EVM2EVMOffRampSetup {
     amounts[1] = uint256(tokenAmount);
 
     Internal.EVM2EVMMessage memory message = _generateAny2EVMMessageWithTokens(1, amounts);
-    message.data = abi.encodePacked(funcSelector);
+    message.data = messageData;
 
     IERC20 dstToken0 = IERC20(s_destTokens[0]);
     uint256 startingBalance = dstToken0.balanceOf(message.receiver);
+
+    // Convert an Internal.EVM2EVMMessage into a Client.Any2EVMMessage digestable by the client
+    Client.Any2EVMMessage memory receivedMessage = _convertToGeneralMessage(message);
+    bytes memory expectedCallData =
+      abi.encodeWithSelector(MaybeRevertMessageReceiver.ccipReceive.selector, receivedMessage);
+
+    vm.expectCall(address(s_receiver), expectedCallData);
+    vm.expectCall(s_destTokens[0], abi.encodeWithSelector(IERC20.transfer.selector, address(s_receiver), amounts[0]));
 
     (Internal.MessageExecutionState newState, bytes memory err) =
       s_offRamp.trialExecute(message, new bytes[](message.tokenAmounts.length));
@@ -1238,22 +1260,31 @@ contract EVM2EVMOffRamp__trialExecute is EVM2EVMOffRampSetup {
   }
 
   function test_Fuzz_getSenderNonce(uint8 trialExecutions) public {
+    vm.assume(trialExecutions > 1);
+
     Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages();
 
     // Fuzz the number of calls from the sender to ensure that getSenderNonce works
-    for (uint256 x = 0; x < trialExecutions; x++) {
+    for (uint256 i = 1; i < trialExecutions; ++i) {
       s_offRamp.execute(_generateReportFromMessages(messages), new uint256[](0));
 
       messages[0].nonce++;
       messages[0].sequenceNumber++;
       messages[0].messageId = Internal._hash(messages[0], s_offRamp.metadataHash());
     }
+
+    messages[0].nonce = 0;
+    messages[0].sequenceNumber = 0;
+    messages[0].messageId = Internal._hash(messages[0], s_offRamp.metadataHash());
+    s_offRamp.execute(_generateReportFromMessages(messages), new uint256[](0));
+
     uint64 nonceBefore = s_offRamp.getSenderNonce(messages[0].sender);
     s_offRamp.execute(_generateReportFromMessages(messages), new uint256[](0));
-    assertGt(s_offRamp.getSenderNonce(messages[0].sender), nonceBefore);
+    assertEq(s_offRamp.getSenderNonce(messages[0].sender), nonceBefore, "sender nonce is not as expected");
   }
 
   function test_Fuzz_getSenderNonceWithPrevOffRamp_Success(uint8 trialExecutions) public {
+    vm.assume(trialExecutions > 1);
     // Fuzz a random nonce for getSenderNonce
     test_Fuzz_getSenderNonce(trialExecutions);
 
@@ -1269,7 +1300,13 @@ contract EVM2EVMOffRamp__trialExecute is EVM2EVMOffRampSetup {
     vm.expectCall(prevOffRamp, abi.encodeWithSelector(s_offRamp.getSenderNonce.selector, OWNER));
     uint256 currentSenderNonce = s_offRamp.getSenderNonce(OWNER);
     assertNotEq(currentSenderNonce, 0, "Sender nonce should not be zero");
-    assertGt(currentSenderNonce, trialExecutions, "Sender Nonce does not match expected trial executions");
+    assertEq(currentSenderNonce, trialExecutions - 1, "Sender Nonce does not match expected trial executions");
+
+    Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages();
+    s_offRamp.execute(_generateReportFromMessages(messages), new uint256[](0));
+
+    currentSenderNonce = s_offRamp.getSenderNonce(OWNER);
+    assertEq(currentSenderNonce, trialExecutions - 1, "Sender Nonce on new offramp does not match expected executions");
   }
 
   function test_trialExecute_Success() public {
