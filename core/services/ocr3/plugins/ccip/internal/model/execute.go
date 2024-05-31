@@ -22,22 +22,36 @@ type ExecutionPluginReportSingleChain struct {
 // Execute Observation //
 /////////////////////////
 
+// ExecutePluginCommitData is the data that is committed to the chain.
 type ExecutePluginCommitData struct {
-	Timestamp           time.Time   `json:"timestamp"`
-	BlockNum            uint64      `json:"blockNum"`
-	MerkleRoot          Bytes32     `json:"merkleRoot"`
+	// Timestamp of the block that contains the commit.
+	Timestamp time.Time `json:"timestamp"`
+	// BlockNum of the block that contains the commit.
+	BlockNum uint64 `json:"blockNum"`
+	// MerkleRoot of the messages that are in this commit report.
+	MerkleRoot Bytes32 `json:"merkleRoot"`
+	// SequenceNumberRange of the messages that are in this commit report.
 	SequenceNumberRange SeqNumRange `json:"sequenceNumberRange"`
-	ExecutedMessages    []SeqNum    `json:"executed"`
+	// ExecutedMessages are the messages in this report that have already been executed.
+	ExecutedMessages []SeqNum `json:"executed"`
 }
 
 type ExecutePluginCommitObservations map[ChainSelector][]ExecutePluginCommitData
 type ExecutePluginMessageObservations map[ChainSelector]map[SeqNum]Bytes32
 
+// ExecutePluginObservation is the observation of the ExecutePlugin.
 // TODO: revisit observation types. The maps used here are more space efficient and easier to work
 // with but require more transformations compared to the on-chain representations.
 type ExecutePluginObservation struct {
-	CommitReports ExecutePluginCommitObservations  `json:"commitReports"`
-	Messages      ExecutePluginMessageObservations `json:"messages"`
+	// CommitReports are determined during the first phase of execute.
+	// It contains the commit reports we would like to execute in the following round.
+	CommitReports ExecutePluginCommitObservations `json:"commitReports"`
+	// Messages are determined during the second phase of execute.
+	// Ideally, it contains all the messages identified by the previous outcome's
+	// NextCommits. With the previous outcome, and these messsages, we can build the
+	// execute report.
+	Messages ExecutePluginMessageObservations `json:"messages"`
+	// TODO: some of the nodes configuration may need to be included here.
 }
 
 func NewExecutePluginObservation(commitReports ExecutePluginCommitObservations, messages ExecutePluginMessageObservations) ExecutePluginObservation {
@@ -61,14 +75,21 @@ func DecodeExecutePluginObservation(b []byte) (ExecutePluginObservation, error) 
 // Execute Outcome //
 /////////////////////
 
+// ExecutePluginOutcome is the outcome of the ExecutePlugin.
 type ExecutePluginOutcome struct {
-	NextCommits map[ChainSelector][]ExecutePluginCommitData `json:"nextCommits"`
-	Messages    map[ChainSelector]map[SeqNum][]byte
+	// NextCommits are determined during the first phase of execute.
+	// It contains the commit reports we would like to execute in the following round.
+	NextCommits ExecutePluginCommitObservations `json:"nextCommits"`
+	// Messages are determined during the second phase of execute.
+	// Ideally, it contains all the messages identified by the previous outcome's
+	// NextCommits. With the previous outcome, and these messsages, we can build the
+	// execute report.
+	Messages ExecutePluginMessageObservations `json:"messages"`
 }
 
 func NewExecutePluginOutcome(
-	nextCommits map[ChainSelector][]ExecutePluginCommitData,
-	messages map[ChainSelector]map[SeqNum][]byte,
+	nextCommits ExecutePluginCommitObservations,
+	messages ExecutePluginMessageObservations,
 ) ExecutePluginOutcome {
 	return ExecutePluginOutcome{
 		NextCommits: nextCommits,

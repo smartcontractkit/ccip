@@ -65,6 +65,7 @@ func filterOutFullyExecutedMessages(reports []model.ExecutePluginCommitData, exe
 		return reports, nil
 	}
 
+	// TODO: Test order
 	sort.Slice(executedMessages, func(i, j int) bool {
 		return executedMessages[i].Start() < executedMessages[j].Start()
 	})

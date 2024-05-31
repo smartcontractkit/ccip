@@ -2,6 +2,7 @@ package model
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
@@ -59,7 +60,7 @@ func (c CommitPluginConfig) Validate() error {
 }
 
 type ExecutePluginConfig struct {
-	// DestChain is the ccip destination chain configured for the commit execute DON.
+	// DestChain is the ccip destination chain configured for the execute DON.
 	DestChain ChainSelector
 
 	// ObserverInfo is a map of oracle IDs to ObserverInfo.

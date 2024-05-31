@@ -3,6 +3,7 @@ package commit
 import (
 	"context"
 	"fmt"
+	"slices"
 	"sync/atomic"
 	"time"
 
@@ -105,7 +106,14 @@ func (p *Plugin) Observation(ctx context.Context, outctx ocr3types.OutcomeContex
 	}
 
 	// Phase 1: Gather commit reports from the destination chain and determine which messages are required to build a valid execution report.
-	groupedCommits, _, err := getPendingExecutedReports(ctx, p.ccipReader, p.cfg.DestChain, time.UnixMilli(p.lastReportTS.Load()))
+	ownConfig := p.cfg.ObserverInfo[p.nodeID]
+	var groupedCommits model.ExecutePluginCommitObservations
+	if slices.Contains(ownConfig.Reads, p.cfg.DestChain) {
+		groupedCommits, _, err = getPendingExecutedReports(ctx, p.ccipReader, p.cfg.DestChain, time.UnixMilli(p.lastReportTS.Load()))
+		if err != nil {
+			return types.Observation{}, err
+		}
+	}
 	// TODO: Need a way to get a timestamp of the report.
 
 	// Phase 2: Gather messages from the source chains and build the execution report.
@@ -126,16 +134,12 @@ func (p *Plugin) Observation(ctx context.Context, outctx ocr3types.OutcomeContex
 
 			// Read messages for each range.
 			for _, seqRange := range ranges {
-				msgs, err := p.ccipReader.MsgsBetweenSeqNums(ctx, []model.ChainSelector{selector}, seqRange)
+				msgs, err := p.ccipReader.MsgsBetweenSeqNums(ctx, selector, seqRange)
 				if err != nil {
 					return nil, err
 				}
 				for _, msg := range msgs {
 					messages[selector][msg.SeqNum] = msg.ID
-				}
-
-				if err != nil {
-					return types.Observation{}, err
 				}
 			}
 		}
