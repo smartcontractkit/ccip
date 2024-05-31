@@ -443,6 +443,40 @@ func Test_filterOutFullyExecutedMessages(t *testing.T) {
 			},
 			wantErr: assert.NoError,
 		},
+		{
+			name: "sort-report",
+			args: args{
+				reports: []model.ExecutePluginCommitData{
+					{SequenceNumberRange: model.NewSeqNumRange(30, 40)},
+					{SequenceNumberRange: model.NewSeqNumRange(50, 60)},
+					{SequenceNumberRange: model.NewSeqNumRange(10, 20)},
+				},
+				executedMessages: nil,
+			},
+			want: []model.ExecutePluginCommitData{
+				{SequenceNumberRange: model.NewSeqNumRange(10, 20)},
+				{SequenceNumberRange: model.NewSeqNumRange(30, 40)},
+				{SequenceNumberRange: model.NewSeqNumRange(50, 60)},
+			},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "sort-executed",
+			args: args{
+				reports: []model.ExecutePluginCommitData{
+					{SequenceNumberRange: model.NewSeqNumRange(10, 20)},
+					{SequenceNumberRange: model.NewSeqNumRange(30, 40)},
+					{SequenceNumberRange: model.NewSeqNumRange(50, 60)},
+				},
+				executedMessages: []model.SeqNumRange{
+					model.NewSeqNumRange(50, 60),
+					model.NewSeqNumRange(10, 20),
+					model.NewSeqNumRange(30, 40),
+				},
+			},
+			want:    nil,
+			wantErr: assert.NoError,
+		},
 	}
 
 	for _, tt := range tests {

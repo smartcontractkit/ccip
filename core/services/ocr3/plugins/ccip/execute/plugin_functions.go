@@ -123,16 +123,21 @@ func groupByChainSelector(reports []model.CommitPluginReportWithMeta) model.Exec
 }
 
 // filterOutFullyExecutedMessages returns a new reports slice with fully executed messages removed.
+// Unordered inputs are supported.
 func filterOutFullyExecutedMessages(reports []model.ExecutePluginCommitData, executedMessages []model.SeqNumRange) ([]model.ExecutePluginCommitData, error) {
-	// If none are executed, return the input.
+	sort.Slice(reports, func(i, j int) bool {
+		return reports[i].SequenceNumberRange.Start() < reports[j].SequenceNumberRange.Start()
+	})
+
+	// If none are executed, return the (sorted) input.
 	if len(executedMessages) == 0 {
 		return reports, nil
 	}
 
-	// TODO: Test order
 	sort.Slice(executedMessages, func(i, j int) bool {
 		return executedMessages[i].Start() < executedMessages[j].Start()
 	})
+
 	// Make sure they do not overlap
 	previousMax := model.SeqNum(0)
 	for _, seqRange := range executedMessages {
