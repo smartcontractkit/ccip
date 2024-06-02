@@ -450,6 +450,7 @@ func extractObservationData(lggr logger.Logger, f int, observations []ccip.Commi
 		return nil, nil, nil, fmt.Errorf("not enough valid observations with non-nil gas prices: #obs=%d, f=%d", len(gasPrices), f)
 	}
 
+	tokenPrices = make(map[cciptypes.Address][]*big.Int)
 	for token, tokenPriceObservations := range tokenPriceObservations {
 		// Token price is dropped if there are not enough valid observations. Depending on rollout status of job specs,
 		// it is possible for different nodes in the DON to observe different tokens. We can conclude a token should indeed
