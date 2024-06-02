@@ -4551,6 +4551,8 @@ TransactionPercentile = 60
 HistoryDepth = 600
 MaxBufferSize = 3
 SamplingInterval = '1s'
+MaxAllowedFinalityDepth = 10000
+FinalityTagBypass = true
 
 [NodePool]
 PollFailureThreshold = 5
