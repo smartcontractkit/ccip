@@ -209,7 +209,10 @@ func (P DstCommitProvider) NewPriceRegistryReader(ctx context.Context, addr ccip
 }
 
 func (P SrcCommitProvider) SourceNativeToken(ctx context.Context, sourceRouterAddr cciptypes.Address) (cciptypes.Address, error) {
-	sourceRouterAddrHex := sourceRouterAddr.ToCommonAddress()
+	sourceRouterAddrHex, err := ccip.GenericAddrToEvm(sourceRouterAddr)
+	if err != nil {
+		return "", err
+	}
 	sourceRouter, err := router.NewRouter(sourceRouterAddrHex, P.client)
 	if err != nil {
 		return "", err
@@ -219,7 +222,7 @@ func (P SrcCommitProvider) SourceNativeToken(ctx context.Context, sourceRouterAd
 		return "", err
 	}
 
-	return cciptypes.FromCommonAddress(sourceNative), nil
+	return ccip.EvmAddrToGeneric(sourceNative), nil
 }
 
 func (P DstCommitProvider) SourceNativeToken(ctx context.Context, sourceRouterAddr cciptypes.Address) (cciptypes.Address, error) {

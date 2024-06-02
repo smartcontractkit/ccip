@@ -21,6 +21,10 @@ func GenericAddrToEvm(addr ccip.Address) (common.Address, error) {
 	return ccipcalc.GenericAddrToEvm(addr)
 }
 
+func EvmAddrToGeneric(addr common.Address) ccip.Address {
+	return ccipcalc.EvmAddrToGeneric(addr)
+}
+
 func NewEvmPriceRegistry(lp logpoller.LogPoller, ec client.Client, lggr logger.Logger, pluginLabel string) *ccipdataprovider.EvmPriceRegistry {
 	return ccipdataprovider.NewEvmPriceRegistry(lp, ec, lggr, pluginLabel)
 }

@@ -151,7 +151,14 @@ func NewCommitServices2(ctx context.Context, srcProvider commontypes.CCIPCommitP
 	}
 	onRampAddress := staticConfig.OnRamp
 
-	onRampReader, err := srcProvider.NewOnRampReader(ctx, onRampAddress, staticConfig.SourceChainSelector, staticConfig.ChainSelector)
+	staticConfig2, err := ccipdata.FetchCommitStoreStaticConfig(commitStoreAddress, dstChain.Client())
+	if err != nil {
+		return nil, fmt.Errorf("get commit store static config 2: %w", err)
+	}
+	onRampAddress2common := staticConfig2.OnRamp
+	onRampAddress2 := ccipcalc.EvmAddrToGeneric(onRampAddress2common)
+
+	onRampReader, err := srcProvider.NewOnRampReader(ctx, onRampAddress2, staticConfig.SourceChainSelector, staticConfig.ChainSelector)
 	if err != nil {
 		return nil, err
 	}
@@ -182,7 +189,7 @@ func NewCommitServices2(ctx context.Context, srcProvider commontypes.CCIPCommitP
 		ccip.CommitPluginLabel,
 		sourceChainID, // assuming this is the chain id?
 		destChainID,
-		cciptypes.Address(onRampAddress),
+		onRampAddress,
 	)
 	wrappedPluginFactory := NewCommitReportingPluginFactory(CommitPluginStaticConfig{
 		lggr:                  lggr,
