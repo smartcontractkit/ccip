@@ -48,7 +48,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/chainlink"
 )
 
-// NewEthBroadcaster creates a new txmgr.EthBroadcaster for use in testing.
+// NewTestEthBroadcaster creates a new txmgr.EthBroadcaster for use in testing.
 func NewTestEthBroadcaster(
 	t testing.TB,
 	txStore txmgr.TestEvmTxStore,
