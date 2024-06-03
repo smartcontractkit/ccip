@@ -30,7 +30,8 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/mailbox"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/mailbox/mailboxtest"
 
-	commonmocks "github.com/smartcontractkit/chainlink/v2/common/types/mocks"
+	htmocks "github.com/smartcontractkit/chainlink/v2/common/headtracker/mocks"
+	evmclient "github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	evmclimocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/client/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/headtracker"
 	httypes "github.com/smartcontractkit/chainlink/v2/core/chains/evm/headtracker/types"
@@ -468,7 +469,7 @@ func TestHeadTracker_SwitchesToLongestChainWithHeadSamplingEnabled(t *testing.T)
 
 	ethClient := evmtest.NewEthClientMockWithDefaultChain(t)
 
-	checker := commonmocks.NewHeadTrackable[*evmtypes.Head, gethCommon.Hash](t)
+	checker := htmocks.NewHeadTrackable[*evmtypes.Head, gethCommon.Hash](t)
 	orm := headtracker.NewORM(*evmtest.MustGetDefaultChainID(t, config.EVMConfigs()), db)
 	csCfg := evmtest.NewChainScopedConfig(t, config)
 	ht := createHeadTrackerWithChecker(t, ethClient, csCfg.EVM(), csCfg.EVM().HeadTracker(), orm, checker)
@@ -597,7 +598,7 @@ func TestHeadTracker_SwitchesToLongestChainWithHeadSamplingDisabled(t *testing.T
 
 	ethClient := evmtest.NewEthClientMockWithDefaultChain(t)
 
-	checker := commonmocks.NewHeadTrackable[*evmtypes.Head, gethCommon.Hash](t)
+	checker := htmocks.NewHeadTrackable[*evmtypes.Head, gethCommon.Hash](t)
 	orm := headtracker.NewORM(cltest.FixtureChainID, db)
 	evmcfg := evmtest.NewChainScopedConfig(t, config)
 	ht := createHeadTrackerWithChecker(t, ethClient, evmcfg.EVM(), evmcfg.EVM().HeadTracker(), orm, checker)
@@ -983,7 +984,46 @@ func TestHeadTracker_Backfill(t *testing.T) {
 	})
 }
 
-func createHeadTracker(t *testing.T, ethClient *evmclimocks.Client, config headtracker.Config, htConfig headtracker.HeadTrackerConfig, orm headtracker.ORM) *headTrackerUniverse {
+// BenchmarkHeadTracker_Backfill - benchmarks HeadTracker's Backfill with focus on efficiency after initial
+// backfill on start up
+func BenchmarkHeadTracker_Backfill(b *testing.B) {
+	cfg := configtest.NewGeneralConfig(b, nil)
+
+	evmcfg := evmtest.NewChainScopedConfig(b, cfg)
+	db := pgtest.NewSqlxDB(b)
+	chainID := big.NewInt(evmclient.NullClientChainID)
+	orm := headtracker.NewORM(*chainID, db)
+	ethClient := evmclimocks.NewClient(b)
+	ethClient.On("ConfiguredChainID").Return(chainID)
+	ht := createHeadTracker(b, ethClient, evmcfg.EVM(), evmcfg.EVM().HeadTracker(), orm)
+	ctx := tests.Context(b)
+	makeHash := func(n int64) gethCommon.Hash {
+		return gethCommon.BigToHash(big.NewInt(n))
+	}
+	const finalityDepth = 12000 // observed value on Arbitrum
+	makeBlock := func(n int64) *evmtypes.Head {
+		return &evmtypes.Head{Number: n, Hash: makeHash(n), ParentHash: makeHash(n - 1)}
+	}
+	latest := makeBlock(finalityDepth)
+	finalized := makeBlock(1)
+	ethClient.On("HeadByHash", mock.Anything, mock.Anything).Return(func(_ context.Context, hash gethCommon.Hash) (*evmtypes.Head, error) {
+		number := hash.Big().Int64()
+		return makeBlock(number), nil
+	})
+	// run initial backfill to populate the database
+	err := ht.headTracker.Backfill(ctx, latest, finalized)
+	require.NoError(b, err)
+	b.ResetTimer()
+	// focus benchmark on processing of a new latest block
+	for i := 0; i < b.N; i++ {
+		latest = makeBlock(int64(finalityDepth + i))
+		finalized = makeBlock(int64(i + 1))
+		err := ht.headTracker.Backfill(ctx, latest, finalized)
+		require.NoError(b, err)
+	}
+}
+
+func createHeadTracker(t testing.TB, ethClient *evmclimocks.Client, config headtracker.Config, htConfig headtracker.HeadTrackerConfig, orm headtracker.ORM) *headTrackerUniverse {
 	lggr, ob := logger.TestObserved(t, zap.DebugLevel)
 	hb := headtracker.NewHeadBroadcaster(lggr)
 	hs := headtracker.NewHeadSaver(lggr, orm, config, htConfig)

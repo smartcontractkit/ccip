@@ -276,10 +276,9 @@ func setupOffRampV1_2_0(t *testing.T, user *bind.TransactOpts, bc *client.Simula
 }
 
 func setupOffRampV1_5_0(t *testing.T, user *bind.TransactOpts, bc *client.SimulatedBackendClient) common.Address {
-
 	onRampAddr := utils.RandomAddress()
-	armAddr := deployMockArm(t, user, bc)
-	csAddr := deployCommitStore(t, user, bc, onRampAddr, armAddr)
+	rmnAddr := deployMockArm(t, user, bc)
+	csAddr := deployCommitStore(t, user, bc, onRampAddr, rmnAddr)
 
 	// Deploy the OffRamp.
 	staticConfig := evm_2_evm_offramp.EVM2EVMOffRampStaticConfig{
@@ -288,17 +287,15 @@ func setupOffRampV1_5_0(t *testing.T, user *bind.TransactOpts, bc *client.Simula
 		SourceChainSelector: testutils.SimulatedChainID.Uint64(),
 		OnRamp:              onRampAddr,
 		PrevOffRamp:         common.Address{},
-		ArmProxy:            armAddr,
+		RmnProxy:            rmnAddr,
 	}
-	sourceTokens := []common.Address{}
-	pools := []common.Address{}
 	rateLimiterConfig := evm_2_evm_offramp.RateLimiterConfig{
 		IsEnabled: false,
 		Capacity:  big.NewInt(0),
 		Rate:      big.NewInt(0),
 	}
 
-	offRampAddr, tx, offRamp, err := evm_2_evm_offramp.DeployEVM2EVMOffRamp(user, bc, staticConfig, sourceTokens, pools, rateLimiterConfig)
+	offRampAddr, tx, offRamp, err := evm_2_evm_offramp.DeployEVM2EVMOffRamp(user, bc, staticConfig, rateLimiterConfig)
 	bc.Commit()
 	require.NoError(t, err)
 	ccipdata.AssertNonRevert(t, tx, bc, user)
@@ -338,7 +335,7 @@ func deployCommitStore(
 		ChainSelector:       testutils.SimulatedChainID.Uint64(),
 		SourceChainSelector: testutils.SimulatedChainID.Uint64(),
 		OnRamp:              onRampAddress,
-		ArmProxy:            armAddress,
+		RmnProxy:            armAddress,
 	})
 	require.NoError(t, err)
 	bc.Commit()
@@ -350,7 +347,7 @@ func deployCommitStore(
 	}
 	tav, err := cs.TypeAndVersion(callOpts)
 	require.NoError(t, err)
-	require.Equal(t, "CommitStore 1.2.0", tav)
+	require.Equal(t, "CommitStore 1.5.0-dev", tav)
 	return csAddr
 }
 
@@ -369,7 +366,6 @@ func testOffRampReader(t *testing.T, th offRampReaderTH) {
 	require.Empty(t, sourceToDestTokens)
 
 	require.NoError(t, err)
-	require.Empty(t, tokens.DestinationPool)
 }
 
 func TestNewOffRampReader(t *testing.T) {

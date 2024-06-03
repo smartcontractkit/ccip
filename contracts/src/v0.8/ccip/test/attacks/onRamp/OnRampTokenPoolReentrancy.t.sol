@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.19;
+pragma solidity 0.8.24;
 
 import {Client} from "../../../libraries/Client.sol";
 import {Internal} from "../../../libraries/Internal.sol";
+import {EVM2EVMOnRamp} from "../../../onRamp/EVM2EVMOnRamp.sol";
+import {TokenPool} from "../../../pools/TokenPool.sol";
 import {EVM2EVMOnRampSetup} from "../../onRamp/EVM2EVMOnRampSetup.t.sol";
 import {FacadeClient} from "./FacadeClient.sol";
 import {ReentrantMaliciousTokenPool} from "./ReentrantMaliciousTokenPool.sol";
@@ -26,17 +28,28 @@ contract OnRampTokenPoolReentrancy is EVM2EVMOnRampSetup {
     s_facadeClient = new FacadeClient(address(s_sourceRouter), DEST_CHAIN_SELECTOR, s_sourceToken, s_feeToken);
 
     s_maliciousTokenPool = new ReentrantMaliciousTokenPool(
-      address(s_facadeClient), s_sourceToken, address(s_mockARM), address(s_sourceRouter)
+      address(s_facadeClient), s_sourceToken, address(s_mockRMN), address(s_sourceRouter)
     );
+
+    TokenPool.ChainUpdate[] memory chainUpdates = new TokenPool.ChainUpdate[](1);
+    chainUpdates[0] = TokenPool.ChainUpdate({
+      remoteChainSelector: DEST_CHAIN_SELECTOR,
+      remotePoolAddress: abi.encode(s_destPoolBySourceToken[s_sourceTokens[0]]),
+      allowed: true,
+      outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
+      inboundRateLimiterConfig: getInboundRateLimiterConfig()
+    });
+    s_maliciousTokenPool.applyChainUpdates(chainUpdates);
+    s_sourcePoolByToken[address(s_sourceToken)] = address(s_maliciousTokenPool);
 
     Internal.PoolUpdate[] memory removes = new Internal.PoolUpdate[](1);
     removes[0].token = address(s_sourceToken);
-    removes[0].pool = address(s_sourcePools[0]);
+    removes[0].pool = address(s_sourcePoolByToken[address(s_sourceToken)]);
     Internal.PoolUpdate[] memory adds = new Internal.PoolUpdate[](1);
     adds[0].token = address(s_sourceToken);
     adds[0].pool = address(s_maliciousTokenPool);
 
-    s_onRamp.applyPoolUpdates(removes, adds);
+    s_tokenAdminRegistry.setPool(address(s_sourceToken), address(s_maliciousTokenPool));
 
     s_sourceToken.transfer(address(s_facadeClient), 1e18);
     s_feeToken.transfer(address(s_facadeClient), 1e18);
@@ -50,7 +63,7 @@ contract OnRampTokenPoolReentrancy is EVM2EVMOnRampSetup {
   /// In this case, Facade's second call would produce an EVM2EVM msg with a lower sequence number.
   /// The issue was fixed by moving state updates and event construction to before TokenPool calls.
   /// This test is kept to verify message sequence expectations are not broken.
-  function testSuccess() public {
+  function test_Success() public {
     uint256 amount = 1;
 
     Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
@@ -91,9 +104,9 @@ contract OnRampTokenPoolReentrancy is EVM2EVMOnRampSetup {
     Internal.EVM2EVMMessage memory msgEvent2 = _messageToEvent(message2, 2, 2, expectedFee, address(s_facadeClient));
 
     vm.expectEmit();
-    emit CCIPSendRequested(msgEvent2);
+    emit EVM2EVMOnRamp.CCIPSendRequested(msgEvent2);
     vm.expectEmit();
-    emit CCIPSendRequested(msgEvent1);
+    emit EVM2EVMOnRamp.CCIPSendRequested(msgEvent1);
 
     s_facadeClient.send(amount);
   }
