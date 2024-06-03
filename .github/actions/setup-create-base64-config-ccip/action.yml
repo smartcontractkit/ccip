@@ -179,8 +179,6 @@ runs:
         EOF
 
         BASE64_CCIP_SECRETS_CONFIG=$(cat config.toml | base64 -w 0)
-#        echo ::add-mask::$BASE64_CCIP_SECRETS_CONFIG
-        # remove me
         cat config.toml 
         echo "BASE64_CCIP_SECRETS_CONFIG=$BASE64_CCIP_SECRETS_CONFIG" >> $GITHUB_ENV
         echo "TEST_BASE64_CCIP_SECRETS_CONFIG=$BASE64_CCIP_SECRETS_CONFIG" >> $GITHUB_ENV

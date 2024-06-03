@@ -157,7 +157,5 @@ runs:
         EOF
 
         BASE64_CONFIG_OVERRIDE=$(cat config.toml | base64 -w 0)
-#        echo ::add-mask::$BASE64_CONFIG_OVERRIDE
-        # remove me
         cat config.toml     
         echo "BASE64_CONFIG_OVERRIDE=$BASE64_CONFIG_OVERRIDE" >> $GITHUB_ENV
