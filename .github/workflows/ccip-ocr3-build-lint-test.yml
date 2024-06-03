@@ -15,9 +15,9 @@ jobs:
       run:
         working-directory: ./core/services/ocr3/plugins/ccip
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
       - name: Setup Go ${{ matrix.go-version }}
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@0c52d547c9bc32b1aa3301fd7a9cb496313a4491 # v5.0.0
         with:
           go-version: ${{ matrix.go-version }}
       - name: Display Go version
