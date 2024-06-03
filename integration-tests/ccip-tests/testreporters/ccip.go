@@ -14,7 +14,6 @@ import (
 	"github.com/slack-go/slack"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/k8s/config"
-
 	"github.com/smartcontractkit/chainlink-testing-framework/testreporters"
 )
 
@@ -22,17 +21,20 @@ type Phase string
 type Status string
 
 const (
-	E2E                Phase  = "CommitAndExecute"
-	TX                 Phase  = "CCIP-Send Transaction"
-	CCIPSendRe         Phase  = "CCIPSendRequested"
-	SourceLogFinalized Phase  = "SourceLogFinalizedTentatively"
-	Commit             Phase  = "Commit-ReportAccepted"
-	ExecStateChanged   Phase  = "ExecutionStateChanged"
-	ReportBlessed      Phase  = "ReportBlessedByARM"
-	Success            Status = "✅"
-	Failure            Status = "❌"
-	Unsure                    = "⚠️"
-	slackFile          string = "payload_ccip.json"
+	// These are the different phases of a CCIP transaction lifecycle
+	// You can see an illustration of the flow here: https://docs.chain.link/images/ccip/ccip-diagram-04_v04.webp
+	TX                 Phase = "CCIP-Send Transaction"         // The initial transaction is sent from the client to the OnRamp
+	CCIPSendRe         Phase = "CCIPSendRequested"             // The OnRamp emits the CCIPSendRequested event which acknowledges the transaction requesting a CCIP transfer
+	SourceLogFinalized Phase = "SourceLogFinalizedTentatively" // The source chain finalizes the transaction where the CCIPSendRequested event was emitted
+	Commit             Phase = "Commit-ReportAccepted"         // The destination chain commits to the transaction and emits the ReportAccepted event
+	ReportBlessed      Phase = "ReportBlessedByARM"            // The destination chain emits the ReportBlessed event. This is triggered by the RMN, for tests we usually mock it.
+	E2E                Phase = "CommitAndExecute"              // This is effectively an alias for the below phase, but it's used to represent the end-to-end flow
+	ExecStateChanged   Phase = "ExecutionStateChanged"         // The destination chain emits the ExecutionStateChanged event. This indicates that the transaction has been executed
+
+	Success   Status = "✅"
+	Failure   Status = "❌"
+	Unsure           = "⚠️"
+	slackFile string = "payload_ccip.json"
 )
 
 type AggregatorMetrics struct {
@@ -44,10 +46,11 @@ type AggregatorMetrics struct {
 }
 type TransactionStats struct {
 	Fee                string `json:"fee,omitempty"`
+	MsgID              string `json:"msg_id,omitempty"`
 	GasUsed            uint64 `json:"gas_used,omitempty"`
 	TxHash             string `json:"tx_hash,omitempty"`
 	NoOfTokensSent     int    `json:"no_of_tokens_sent,omitempty"`
-	MessageBytesLength int    `json:"message_bytes_length,omitempty"`
+	MessageBytesLength int64  `json:"message_bytes_length,omitempty"`
 	FinalizedByBlock   string `json:"finalized_block_num,omitempty"`
 	FinalizedAt        string `json:"finalized_at,omitempty"`
 	CommitRoot         string `json:"commit_root,omitempty"`
@@ -68,7 +71,14 @@ type RequestStat struct {
 	StatusByPhase map[Phase]PhaseStat `json:"status_by_phase,omitempty"`
 }
 
-func (stat *RequestStat) UpdateState(lggr zerolog.Logger, seqNum uint64, step Phase, duration time.Duration, state Status, sendTransactionStats ...TransactionStats) {
+func (stat *RequestStat) UpdateState(
+	lggr zerolog.Logger,
+	seqNum uint64,
+	step Phase,
+	duration time.Duration,
+	state Status,
+	sendTransactionStats ...TransactionStats,
+) {
 	durationInSec := duration.Seconds()
 	stat.SeqNum = seqNum
 	phaseDetails := PhaseStat{
@@ -375,9 +385,8 @@ func (r *CCIPTestReporter) WriteReport(folderPath string) error {
 	}
 	if len(r.FailedLanes) > 0 {
 		r.logger.Info().Interface("List of Failed Lanes", r.FailedLanes).Msg("Failed Lanes")
-	} else {
-		r.logger.Info().Msg("All Lanes Passed")
 	}
+
 	// if grafanaURLProvider is set, we don't want to write the report in a file
 	// the report will be shared in terms of grafana dashboard link
 	if r.grafanaURLProvider != nil {

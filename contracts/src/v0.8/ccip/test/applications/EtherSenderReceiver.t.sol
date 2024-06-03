@@ -42,7 +42,7 @@ contract EtherSenderReceiverTest is Test {
 }
 
 contract EtherSenderReceiverTest_constructor is EtherSenderReceiverTest {
-  function test_constructor() public {
+  function test_constructor() public view {
     assertEq(s_etherSenderReceiver.getRouter(), ROUTER, "router must be set correctly");
     uint256 allowance = s_weth.allowance(address(s_etherSenderReceiver), ROUTER);
     assertEq(allowance, type(uint256).max, "allowance must be set infinite");
@@ -107,7 +107,7 @@ contract EtherSenderReceiverTest_validatedMessage is EtherSenderReceiverTest {
 
   uint256 internal constant amount = 100;
 
-  function testFuzz_validatedMessage_msgSenderOverwrite(bytes memory data) public {
+  function test_Fuzz_validatedMessage_msgSenderOverwrite(bytes memory data) public view {
     Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
     tokenAmounts[0] = Client.EVMTokenAmount({
       token: address(0), // callers may not specify this.
@@ -130,7 +130,7 @@ contract EtherSenderReceiverTest_validatedMessage is EtherSenderReceiverTest {
     assertEq(validatedMessage.extraArgs, bytes(""), "extraArgs must be empty");
   }
 
-  function testFuzz_validatedMessage_tokenAddressOverwrite(address token) public {
+  function test_Fuzz_validatedMessage_tokenAddressOverwrite(address token) public view {
     Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
     tokenAmounts[0] = Client.EVMTokenAmount({token: token, amount: amount});
     Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
@@ -150,7 +150,7 @@ contract EtherSenderReceiverTest_validatedMessage is EtherSenderReceiverTest {
     assertEq(validatedMessage.extraArgs, bytes(""), "extraArgs must be empty");
   }
 
-  function test_validatedMessage_emptyDataOverwrittenToMsgSender() public {
+  function test_validatedMessage_emptyDataOverwrittenToMsgSender() public view {
     Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
     tokenAmounts[0] = Client.EVMTokenAmount({
       token: address(0), // callers may not specify this.
@@ -173,7 +173,7 @@ contract EtherSenderReceiverTest_validatedMessage is EtherSenderReceiverTest {
     assertEq(validatedMessage.extraArgs, bytes(""), "extraArgs must be empty");
   }
 
-  function test_validatedMessage_dataOverwrittenToMsgSender() public {
+  function test_validatedMessage_dataOverwrittenToMsgSender() public view {
     Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
     tokenAmounts[0] = Client.EVMTokenAmount({
       token: address(0), // callers may not specify this.
@@ -196,7 +196,7 @@ contract EtherSenderReceiverTest_validatedMessage is EtherSenderReceiverTest {
     assertEq(validatedMessage.extraArgs, bytes(""), "extraArgs must be empty");
   }
 
-  function test_validatedMessage_tokenOverwrittenToWeth() public {
+  function test_validatedMessage_tokenOverwrittenToWeth() public view {
     Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
     tokenAmounts[0] = Client.EVMTokenAmount({
       token: address(42), // incorrect token.
@@ -219,7 +219,7 @@ contract EtherSenderReceiverTest_validatedMessage is EtherSenderReceiverTest {
     assertEq(validatedMessage.extraArgs, bytes(""), "extraArgs must be empty");
   }
 
-  function test_validatedMessage_validMessage_extraArgs() public {
+  function test_validatedMessage_validMessage_extraArgs() public view {
     Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
     tokenAmounts[0] = Client.EVMTokenAmount({
       token: address(0), // callers may not specify this.
@@ -300,7 +300,7 @@ contract EtherSenderReceiverTest_ccipReceive is EtherSenderReceiverTest {
   error InvalidTokenAmounts(uint256 gotAmounts);
   error InvalidToken(address gotToken, address expectedToken);
 
-  function testFuzz_ccipReceive(uint256 tokenAmount) public {
+  function test_Fuzz_ccipReceive(uint256 tokenAmount) public {
     // cap to 10 ether because OWNER only has 10 ether.
     if (tokenAmount > 10 ether) {
       return;
@@ -407,7 +407,7 @@ contract EtherSenderReceiverTest_ccipSend is EtherSenderReceiverTest {
   uint256 internal constant feeWei = 121212;
   uint256 internal constant feeJuels = 232323;
 
-  function testFuzz_ccipSend(uint256 feeFromRouter, uint256 feeSupplied) public {
+  function test_Fuzz_ccipSend(uint256 feeFromRouter, uint256 feeSupplied) public {
     // cap the fuzzer because OWNER only has a million ether.
     vm.assume(feeSupplied < 1_000_000 ether - amount);
 
@@ -450,7 +450,7 @@ contract EtherSenderReceiverTest_ccipSend is EtherSenderReceiverTest {
     }
   }
 
-  function testFuzz_ccipSend_feeToken(uint256 feeFromRouter, uint256 feeSupplied) public {
+  function test_Fuzz_ccipSend_feeToken(uint256 feeFromRouter, uint256 feeSupplied) public {
     // cap the fuzzer because OWNER only has a million LINK.
     vm.assume(feeSupplied < 1_000_000 ether - amount);
 

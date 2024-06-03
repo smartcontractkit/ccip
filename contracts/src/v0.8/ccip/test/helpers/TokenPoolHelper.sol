@@ -1,36 +1,40 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.19;
+pragma solidity 0.8.24;
 
-import "../../pools/TokenPool.sol";
+import {Pool} from "../../libraries/Pool.sol";
+import {TokenPool} from "../../pools/TokenPool.sol";
+
+import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 
 contract TokenPoolHelper is TokenPool {
-  event LockOrBurn(uint256 amount);
-  event ReleaseOrMint(address indexed recipient, uint256 amount);
-  event AssertionPassed();
-
   constructor(
     IERC20 token,
     address[] memory allowlist,
-    address armProxy,
+    address rmnProxy,
     address router
-  ) TokenPool(token, allowlist, armProxy, router) {}
+  ) TokenPool(token, allowlist, rmnProxy, router) {}
 
-  function lockOrBurn(
-    address,
-    bytes calldata,
-    uint256 amount,
-    uint64,
-    bytes calldata
-  ) external override returns (bytes memory) {
-    emit LockOrBurn(amount);
-    return "";
+  function lockOrBurn(Pool.LockOrBurnInV1 calldata lockOrBurnIn)
+    external
+    override
+    returns (Pool.LockOrBurnOutV1 memory)
+  {
+    return Pool.LockOrBurnOutV1({destPoolAddress: getRemotePool(lockOrBurnIn.remoteChainSelector), destPoolData: ""});
   }
 
-  function releaseOrMint(bytes memory, address receiver, uint256 amount, uint64, bytes memory) external override {
-    emit ReleaseOrMint(receiver, amount);
+  function releaseOrMint(Pool.ReleaseOrMintInV1 calldata releaseOrMintIn)
+    external
+    override
+    returns (Pool.ReleaseOrMintOutV1 memory)
+  {
+    return Pool.ReleaseOrMintOutV1({localToken: address(i_token), destinationAmount: releaseOrMintIn.amount});
   }
 
-  function onlyOnRampModifier(uint64 remoteChainSelector) external onlyOnRamp(remoteChainSelector) {}
+  function onlyOnRampModifier(uint64 remoteChainSelector) external view {
+    _onlyOnRamp(remoteChainSelector);
+  }
 
-  function onlyOffRampModifier(uint64 remoteChainSelector) external onlyOffRamp(remoteChainSelector) {}
+  function onlyOffRampModifier(uint64 remoteChainSelector) external view {
+    _onlyOffRamp(remoteChainSelector);
+  }
 }

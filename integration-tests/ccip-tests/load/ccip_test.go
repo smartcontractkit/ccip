@@ -36,7 +36,6 @@ func TestLoadCCIPStableRPS(t *testing.T) {
 // TestLoadCCIPWithUpgradeNodeVersion starts all nodes with a specific version, triggers load and then upgrades the node version as the load is running
 func TestLoadCCIPWithUpgradeNodeVersion(t *testing.T) {
 	t.Parallel()
-	t.Skipf("skipping this test until we have a better way to find the right onchain-offchain version pair")
 	lggr := logging.GetTestLogger(t)
 	testArgs := NewLoadArgs(t, lggr)
 	testArgs.Setup()
@@ -55,8 +54,11 @@ func TestLoadCCIPWithUpgradeNodeVersion(t *testing.T) {
 	// sleep for 30s to let load run for a while
 	time.Sleep(30 * time.Second)
 	// upgrade node version for few nodes
-	err := testsetups.UpgradeNodes(testArgs.lggr, 2, 3, testArgs.TestCfg, testArgs.TestSetupArgs.Env)
+	err := testsetups.UpgradeNodes(testArgs.t, testArgs.lggr, testArgs.TestCfg, testArgs.TestSetupArgs.Env)
 	require.NoError(t, err)
+	// after upgrade send a request to all lanes as a sanity check
+	testArgs.SanityCheck()
+	// now wait for the load to finish
 	testArgs.Wait()
 }
 
@@ -101,13 +103,16 @@ func TestLoadCCIPStableRequestTriggeringWithNetworkChaos(t *testing.T) {
 		gethNetworksLabels = append(gethNetworksLabels, actions.GethLabel(net.Name))
 	}
 	testEnv.ChaosLabelForAllGeth(t, gethNetworksLabels)
+	if testArgs.TestCfg.TestGroupInput.LoadProfile.NetworkChaosDelay == nil {
+		testArgs.TestCfg.TestGroupInput.LoadProfile.NetworkChaosDelay = config.MustNewDuration(200 * time.Millisecond)
+	}
 	chaosId, err := testEnv.K8Env.Chaos.Run(
 		chaos.NewNetworkLatency(
 			testEnv.K8Env.Cfg.Namespace, &chaos.Props{
 				FromLabels:  &map[string]*string{"geth": ptr.Ptr(actions.ChaosGroupCCIPGeth)},
 				ToLabels:    &map[string]*string{"app": ptr.Ptr("chainlink-0")},
-				DurationStr: testArgs.TestCfg.TestGroupInput.TestDuration.String(),
-				Delay:       "300ms",
+				DurationStr: testArgs.TestCfg.TestGroupInput.LoadProfile.TestDuration.String(),
+				Delay:       testArgs.TestCfg.TestGroupInput.LoadProfile.NetworkChaosDelay.Duration().String(),
 			}))
 	require.NoError(t, err)
 
@@ -148,12 +153,12 @@ func TestLoadCCIPStableWithMajorityNodeFailure(t *testing.T) {
 	for i := range inputs {
 		inputs[i].ChaosProps.DurationStr = testArgs.TestCfg.TestGroupInput.ChaosDuration.String()
 		allChaosDur += testArgs.TestCfg.TestGroupInput.ChaosDuration.Duration()
-		inputs[i].WaitBetweenChaos = testArgs.TestCfg.TestGroupInput.WaitBetweenChaosDuringLoad.Duration()
+		inputs[i].WaitBetweenChaos = testArgs.TestCfg.TestGroupInput.LoadProfile.WaitBetweenChaosDuringLoad.Duration()
 		allChaosDur += inputs[i].WaitBetweenChaos
 	}
 
 	// the duration of load test should be greater than the duration of chaos
-	if testArgs.TestCfg.TestGroupInput.TestDuration.Duration() < allChaosDur+2*time.Minute {
+	if testArgs.TestCfg.TestGroupInput.LoadProfile.TestDuration.Duration() < allChaosDur+2*time.Minute {
 		t.Fatalf("Skipping the test as the test duration is less than the chaos duration")
 	}
 
@@ -202,12 +207,12 @@ func TestLoadCCIPStableWithMinorityNodeFailure(t *testing.T) {
 	for i := range inputs {
 		inputs[i].ChaosProps.DurationStr = testArgs.TestCfg.TestGroupInput.ChaosDuration.String()
 		allChaosDur += testArgs.TestCfg.TestGroupInput.ChaosDuration.Duration()
-		inputs[i].WaitBetweenChaos = testArgs.TestCfg.TestGroupInput.WaitBetweenChaosDuringLoad.Duration()
+		inputs[i].WaitBetweenChaos = testArgs.TestCfg.TestGroupInput.LoadProfile.WaitBetweenChaosDuringLoad.Duration()
 		allChaosDur += inputs[i].WaitBetweenChaos
 	}
 
 	// the duration of load test should be greater than the duration of chaos
-	if testArgs.TestCfg.TestGroupInput.TestDuration.Duration() < allChaosDur+2*time.Minute {
+	if testArgs.TestCfg.TestGroupInput.LoadProfile.TestDuration.Duration() < allChaosDur+2*time.Minute {
 		t.Fatalf("Skipping the test as the test duration is less than the chaos duration")
 	}
 
@@ -275,9 +280,10 @@ func TestLoadCCIPStableWithPodChaosDiffCommitAndExec(t *testing.T) {
 			t.Parallel()
 			lggr := logging.GetTestLogger(t)
 			testArgs := NewLoadArgs(t, lggr, in)
-			testArgs.TestCfg.TestGroupInput.TestDuration = config.MustNewDuration(5 * time.Minute)
-			testArgs.TestCfg.TestGroupInput.TimeUnit = config.MustNewDuration(1 * time.Second)
-			testArgs.TestCfg.TestGroupInput.RequestPerUnitTime = []int64{2}
+			testArgs.TestCfg.TestGroupInput.LoadProfile.TestDuration = config.MustNewDuration(5 * time.Minute)
+			testArgs.TestCfg.TestGroupInput.LoadProfile.TimeUnit = config.MustNewDuration(1 * time.Second)
+			testArgs.TestCfg.TestGroupInput.LoadProfile.RequestPerUnitTime = []int64{2}
+			testArgs.TestCfg.TestGroupInput.PhaseTimeout = config.MustNewDuration(15 * time.Minute)
 
 			testArgs.Setup()
 			// if the test runs on remote runner
@@ -303,6 +309,7 @@ func TestLoadCCIPStableWithPodChaosDiffCommitAndExec(t *testing.T) {
 // the remote-runner pod gets evicted after the loadgen is resumed.
 // The recommended frequency for this test 2req/min
 func TestLoadCCIPStableRPSAfterARMCurseAndUncurse(t *testing.T) {
+	t.Skipf("need to be enabled as part of CCIP-2277")
 	t.Parallel()
 	lggr := logging.GetTestLogger(t)
 	testArgs := NewLoadArgs(t, lggr)

@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.19;
+pragma solidity 0.8.24;
 
 import {IBurnMintERC20} from "../../shared/token/ERC20/IBurnMintERC20.sol";
 
+import {Pool} from "../libraries/Pool.sol";
 import {TokenPool} from "./TokenPool.sol";
 
 abstract contract BurnMintTokenPoolAbstract is TokenPool {
@@ -12,44 +13,38 @@ abstract contract BurnMintTokenPoolAbstract is TokenPool {
   function _burn(uint256 amount) internal virtual;
 
   /// @notice Burn the token in the pool
-  /// @param amount Amount to burn
-  /// @dev The whenHealthy check is important to ensure that even if a ramp is compromised
-  /// we're able to stop token movement via ARM.
-  function lockOrBurn(
-    address originalSender,
-    bytes calldata,
-    uint256 amount,
-    uint64 remoteChainSelector,
-    bytes calldata
-  )
+  /// @dev The whenNotCursed check is important to ensure that even if a ramp is compromised
+  /// we're able to stop token movement via RMN.
+  function lockOrBurn(Pool.LockOrBurnInV1 calldata lockOrBurnIn)
     external
     virtual
     override
-    onlyOnRamp(remoteChainSelector)
-    checkAllowList(originalSender)
-    whenHealthy
-    returns (bytes memory)
+    returns (Pool.LockOrBurnOutV1 memory)
   {
-    _consumeOutboundRateLimit(remoteChainSelector, amount);
-    _burn(amount);
-    emit Burned(msg.sender, amount);
-    return "";
+    _validateLockOrBurn(lockOrBurnIn);
+
+    _burn(lockOrBurnIn.amount);
+
+    emit Burned(msg.sender, lockOrBurnIn.amount);
+
+    return Pool.LockOrBurnOutV1({destPoolAddress: getRemotePool(lockOrBurnIn.remoteChainSelector), destPoolData: ""});
   }
 
   /// @notice Mint tokens from the pool to the recipient
-  /// @param receiver Recipient address
-  /// @param amount Amount to mint
-  /// @dev The whenHealthy check is important to ensure that even if a ramp is compromised
-  /// we're able to stop token movement via ARM.
-  function releaseOrMint(
-    bytes memory,
-    address receiver,
-    uint256 amount,
-    uint64 remoteChainSelector,
-    bytes memory
-  ) external virtual override whenHealthy onlyOffRamp(remoteChainSelector) {
-    _consumeInboundRateLimit(remoteChainSelector, amount);
-    IBurnMintERC20(address(i_token)).mint(receiver, amount);
-    emit Minted(msg.sender, receiver, amount);
+  /// @dev The whenNotCursed check is important to ensure that even if a ramp is compromised
+  /// we're able to stop token movement via RMN.
+  function releaseOrMint(Pool.ReleaseOrMintInV1 calldata releaseOrMintIn)
+    external
+    virtual
+    override
+    returns (Pool.ReleaseOrMintOutV1 memory)
+  {
+    _validateReleaseOrMint(releaseOrMintIn);
+
+    IBurnMintERC20(address(i_token)).mint(releaseOrMintIn.receiver, releaseOrMintIn.amount);
+
+    emit Minted(msg.sender, releaseOrMintIn.receiver, releaseOrMintIn.amount);
+
+    return Pool.ReleaseOrMintOutV1({localToken: address(i_token), destinationAmount: releaseOrMintIn.amount});
   }
 }

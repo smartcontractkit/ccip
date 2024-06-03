@@ -20,9 +20,10 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcommon"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/hashlib"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/logpollerutil"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/pkg/hashlib"
 )
 
 var (
@@ -48,11 +49,10 @@ func init() {
 
 var _ ccipdata.OnRampReader = &OnRamp{}
 
-// Significant change in 1.2:
-// - CCIPSendRequested event signature has changed
 type OnRamp struct {
 	onRamp                           *evm_2_evm_onramp.EVM2EVMOnRamp
 	address                          common.Address
+	destChainSelectorBytes           [32]byte
 	lggr                             logger.Logger
 	lp                               logpoller.LogPoller
 	leafHasher                       ccipdata.LeafHasherInterface[[32]byte]
@@ -93,6 +93,7 @@ func NewOnRamp(lggr logger.Logger, sourceSelector, destSelector uint64, onRampAd
 	return &OnRamp{
 		lggr:                       lggr,
 		client:                     source,
+		destChainSelectorBytes:     ccipcommon.SelectorToBytes(destSelector),
 		lp:                         sourceLP,
 		leafHasher:                 NewLeafHasher(sourceSelector, destSelector, onRampAddress, hashlib.NewKeccakCtx(), onRamp),
 		onRamp:                     onRamp,
@@ -119,7 +120,7 @@ func (o *OnRamp) GetDynamicConfig(context.Context) (cciptypes.OnRampDynamicConfi
 	}
 	config, err := o.onRamp.GetDynamicConfig(&bind.CallOpts{})
 	if err != nil {
-		return cciptypes.OnRampDynamicConfig{}, fmt.Errorf("get dynamic config: %w", err)
+		return cciptypes.OnRampDynamicConfig{}, fmt.Errorf("get dynamic config v1.5: %w", err)
 	}
 	return cciptypes.OnRampDynamicConfig{
 		Router:                            ccipcalc.EvmAddrToGeneric(config.Router),
@@ -195,14 +196,14 @@ func (o *OnRamp) IsSourceCursed(ctx context.Context) (bool, error) {
 		return false, err
 	}
 
-	arm, err := arm_contract.NewARMContract(staticConfig.ArmProxy, o.client)
+	arm, err := arm_contract.NewARMContract(staticConfig.RmnProxy, o.client)
 	if err != nil {
-		return false, fmt.Errorf("intializing Arm contract through the ArmProxy: %w", err)
+		return false, fmt.Errorf("intializing RMN contract through the RmnProxy: %w", err)
 	}
 
-	cursed, err := arm.IsCursed(&bind.CallOpts{Context: ctx})
+	cursed, err := arm.IsCursed0(&bind.CallOpts{Context: ctx}, o.destChainSelectorBytes)
 	if err != nil {
-		return false, fmt.Errorf("checking if source Arm is cursed: %w", err)
+		return false, fmt.Errorf("checking if source is cursed by RMN: %w", err)
 	}
 	return cursed, nil
 }

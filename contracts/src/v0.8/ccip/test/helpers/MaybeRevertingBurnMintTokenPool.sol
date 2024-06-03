@@ -2,6 +2,8 @@
 pragma solidity ^0.8.0;
 
 import {IBurnMintERC20} from "../../../shared/token/ERC20/IBurnMintERC20.sol";
+
+import {Pool} from "../../libraries/Pool.sol";
 import {BurnMintTokenPool} from "../../pools/BurnMintTokenPool.sol";
 
 contract MaybeRevertingBurnMintTokenPool is BurnMintTokenPool {
@@ -11,9 +13,9 @@ contract MaybeRevertingBurnMintTokenPool is BurnMintTokenPool {
   constructor(
     IBurnMintERC20 token,
     address[] memory allowlist,
-    address armProxy,
+    address rmnProxy,
     address router
-  ) BurnMintTokenPool(token, allowlist, armProxy, router) {}
+  ) BurnMintTokenPool(token, allowlist, rmnProxy, router) {}
 
   function setShouldRevert(bytes calldata revertReason) external {
     s_revertReason = revertReason;
@@ -23,49 +25,46 @@ contract MaybeRevertingBurnMintTokenPool is BurnMintTokenPool {
     s_sourceTokenData = sourceTokenData;
   }
 
-  function lockOrBurn(
-    address originalSender,
-    bytes calldata,
-    uint256 amount,
-    uint64 remoteChainSelector,
-    bytes calldata
-  )
+  function lockOrBurn(Pool.LockOrBurnInV1 calldata lockOrBurnIn)
     external
     virtual
     override
-    onlyOnRamp(remoteChainSelector)
-    checkAllowList(originalSender)
-    whenHealthy
-    returns (bytes memory)
+    returns (Pool.LockOrBurnOutV1 memory)
   {
+    _validateLockOrBurn(lockOrBurnIn);
+
     bytes memory revertReason = s_revertReason;
     if (revertReason.length != 0) {
       assembly {
         revert(add(32, revertReason), mload(revertReason))
       }
     }
-    _consumeOutboundRateLimit(remoteChainSelector, amount);
-    IBurnMintERC20(address(i_token)).burn(amount);
-    emit Burned(msg.sender, amount);
-    return s_sourceTokenData;
+
+    IBurnMintERC20(address(i_token)).burn(lockOrBurnIn.amount);
+    emit Burned(msg.sender, lockOrBurnIn.amount);
+    return Pool.LockOrBurnOutV1({
+      destPoolAddress: getRemotePool(lockOrBurnIn.remoteChainSelector),
+      destPoolData: s_sourceTokenData
+    });
   }
 
   /// @notice Reverts depending on the value of `s_revertReason`
-  function releaseOrMint(
-    bytes memory,
-    address receiver,
-    uint256 amount,
-    uint64 remoteChainSelector,
-    bytes memory
-  ) external virtual override whenHealthy onlyOffRamp(remoteChainSelector) {
+  function releaseOrMint(Pool.ReleaseOrMintInV1 calldata releaseOrMintIn)
+    external
+    virtual
+    override
+    returns (Pool.ReleaseOrMintOutV1 memory)
+  {
+    _validateReleaseOrMint(releaseOrMintIn);
+
     bytes memory revertReason = s_revertReason;
     if (revertReason.length != 0) {
       assembly {
         revert(add(32, revertReason), mload(revertReason))
       }
     }
-    _consumeInboundRateLimit(remoteChainSelector, amount);
-    IBurnMintERC20(address(i_token)).mint(receiver, amount);
-    emit Minted(msg.sender, receiver, amount);
+    IBurnMintERC20(address(i_token)).mint(releaseOrMintIn.receiver, releaseOrMintIn.amount);
+    emit Minted(msg.sender, releaseOrMintIn.receiver, releaseOrMintIn.amount);
+    return Pool.ReleaseOrMintOutV1({localToken: address(i_token), destinationAmount: releaseOrMintIn.amount});
   }
 }

@@ -1,15 +1,12 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.19;
+pragma solidity 0.8.24;
 
-import "../../applications/PingPongDemo.sol";
-import "../../libraries/Client.sol";
+import {PingPongDemo} from "../../applications/PingPongDemo.sol";
+import {Client} from "../../libraries/Client.sol";
 import "../onRamp/EVM2EVMOnRampSetup.t.sol";
 
 // setup
 contract PingPongDappSetup is EVM2EVMOnRampSetup {
-  event Ping(uint256 pingPongs);
-  event Pong(uint256 pingPongs);
-
   PingPongDemo internal s_pingPong;
   IERC20 internal s_feeToken;
 
@@ -29,11 +26,8 @@ contract PingPongDappSetup is EVM2EVMOnRampSetup {
   }
 }
 
-/// @notice #startPingPong
 contract PingPong_startPingPong is PingPongDappSetup {
-  event ConfigPropagated(uint64 chainSelector, address contractAddress);
-
-  function testStartPingPongSuccess() public {
+  function test_StartPingPong_Success() public {
     uint256 pingPongNumber = 1;
     bytes memory data = abi.encode(pingPongNumber);
 
@@ -65,18 +59,17 @@ contract PingPong_startPingPong is PingPongDappSetup {
     message.messageId = Internal._hash(message, s_metadataHash);
 
     vm.expectEmit();
-    emit Ping(pingPongNumber);
+    emit PingPongDemo.Ping(pingPongNumber);
 
     vm.expectEmit();
-    emit CCIPSendRequested(message);
+    emit EVM2EVMOnRamp.CCIPSendRequested(message);
 
     s_pingPong.startPingPong();
   }
 }
 
-/// @notice #ccipReceive
 contract PingPong_ccipReceive is PingPongDappSetup {
-  function testCcipReceiveSuccess() public {
+  function test_CcipReceive_Success() public {
     Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](0);
 
     uint256 pingPongNumber = 5;
@@ -92,33 +85,33 @@ contract PingPong_ccipReceive is PingPongDappSetup {
     vm.startPrank(address(s_sourceRouter));
 
     vm.expectEmit();
-    emit Pong(pingPongNumber + 1);
+    emit PingPongDemo.Pong(pingPongNumber + 1);
 
     s_pingPong.ccipReceive(message);
   }
 }
 
 contract PingPong_plumbing is PingPongDappSetup {
-  function testFuzz_CounterPartChainSelectorSuccess(uint64 chainSelector) public {
+  function test_Fuzz_CounterPartChainSelector_Success(uint64 chainSelector) public {
     s_pingPong.setCounterpartChainSelector(chainSelector);
 
     assertEq(s_pingPong.getCounterpartChainSelector(), chainSelector);
   }
 
-  function testFuzz_CounterPartAddressSuccess(address counterpartAddress) public {
+  function test_Fuzz_CounterPartAddress_Success(address counterpartAddress) public {
     s_pingPong.setCounterpartAddress(counterpartAddress);
 
     assertEq(s_pingPong.getCounterpartAddress(), counterpartAddress);
   }
 
-  function testFuzz_CounterPartAddressSuccess(uint64 chainSelector, address counterpartAddress) public {
+  function test_Fuzz_CounterPartAddress_Success(uint64 chainSelector, address counterpartAddress) public {
     s_pingPong.setCounterpart(chainSelector, counterpartAddress);
 
     assertEq(s_pingPong.getCounterpartAddress(), counterpartAddress);
     assertEq(s_pingPong.getCounterpartChainSelector(), chainSelector);
   }
 
-  function testPausingSuccess() public {
+  function test_Pausing_Success() public {
     assertFalse(s_pingPong.isPaused());
 
     s_pingPong.setPaused(true);

@@ -1,4 +1,11 @@
 [CCIP]
+[CCIP.ContractVersions]
+PriceRegistry = '1.2.0'
+OffRamp = '1.2.0'
+OnRamp = '1.2.0'
+TokenPool = '1.4.0'
+CommitStore = '1.2.0'
+
 [CCIP.Deployments]
 Data = """
 {
@@ -12,6 +19,7 @@ Data = """
             "router": "0x141fa059441E0ca23ce184B6A78bafD2A517DdE8",
             "price_registry": "0x13015e4E6f839E1Aa1016DF521ea458ecA20438c",
             "wrapped_native": "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1",
+            "version" : "1.4.0",
             "src_contracts": {
                 "Avalanche Mainnet": {
                     "on_ramp": "0x05B723f3db92430FbE4395fD03E40Cc7e9D17988",
@@ -654,23 +662,30 @@ NetworkPairs = [
   'ARBITRUM_MAINNET,OPTIMISM_MAINNET' # added as batch 1
 ]
 
-MsgType = 'WithToken'
-DestGasLimit = 0
 BiDirectionalLane = true
 PhaseTimeout = '40m'
-TestDuration = '24h'
 ExistingDeployment = true
+
+[CCIP.Groups.load.TokenConfig]
+NoOfTokensPerChain = 1
+
+
+[CCIP.Groups.load.LoadProfile]
 RequestPerUnitTime = [1]
 TimeUnit = '3h'
-NoOfTokensPerChain = 1
-NoOfTokensInMsg = 1
-AmountPerToken = 1
+TestDuration = '24h'
 TestRunName = 'mainnet-2.7-ccip1.2'
 FailOnFirstErrorInLoad = true
 SkipRequestIfAnotherRequestTriggeredWithin = '40m'
 
+[[CCIP.Groups.load.LoadProfile.MsgProfile.MsgDetails]]
+MsgType = 'Data'
+DestGasLimit = 0
+DataLength = 100
+NoOfTokens = 1
+AmountPerToken = 1
+
 [CCIP.Groups.smoke]
-MsgType = 'WithoutToken'
 # these are all the valid network pairs
 NetworkPairs = [
   'ETHEREUM_MAINNET,OPTIMISM_MAINNET',
@@ -684,7 +699,13 @@ PhaseTimeout = '20m'
 LocalCluster = false
 ExistingDeployment = true
 ReuseContracts = true
+
+[CCIP.Groups.smoke.TokenConfig]
 NoOfTokensPerChain = 1
-NoOfTokensInMsg = 1
+
+[CCIP.Groups.smoke.MsgDetails]
+MsgType = 'Data'
+DestGasLimit = 0
+DataLength = 100
+NoOfTokens = 1
 AmountPerToken = 1
-TestRunName = 'mainnet-2.7-ccip1.2'
