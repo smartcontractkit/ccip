@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/rpclib"
 	"math/big"
 	"net/url"
@@ -47,7 +48,97 @@ import (
 
 const numTokenDataWorkers = 5
 
-func NewExecutionServices(ctx context.Context, lggr logger.Logger, jb job.Job, chainSet legacyevm.LegacyChainContainer, new bool, argsNoPlugin libocr2.OCR2OracleArgs, logError func(string)) ([]job.ServiceCtx, error) {
+func NewExecServices2(ctx context.Context, lggr logger.Logger, jb job.Job, srcProvider types.CCIPExecProvider, dstProvider types.CCIPExecProvider, srcChain legacyevm.Chain, dstChain legacyevm.Chain, chainSet legacyevm.LegacyChainContainer, new bool, argsNoPlugin libocr2.OCR2OracleArgs, logError func(string)) ([]job.ServiceCtx, error) {
+	if jb.OCR2OracleSpec == nil {
+		return nil, errors.New("spec is nil")
+	}
+	spec := jb.OCR2OracleSpec
+	var pluginConfig ccipconfig.ExecPluginJobSpecConfig
+	err := json.Unmarshal(spec.PluginConfig.Bytes(), &pluginConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	offRampAddress := ccipcalc.HexToAddress(spec.ContractID)
+	offRampReader, err := dstProvider.NewOffRampReader(ctx, offRampAddress)
+	if err != nil {
+		return nil, errors.Wrap(err, "create offRampReader")
+	}
+
+	offRampConfig, err := offRampReader.GetStaticConfig(context.Background())
+	if err != nil {
+		return nil, errors.Wrap(err, "get offRamp static config")
+	}
+
+	onRampReader, err := srcProvider.NewOnRampReader(ctx, offRampAddress, offRampConfig.SourceChainSelector, offRampConfig.ChainSelector)
+	if err != nil {
+		return nil, errors.Wrap(err, "create onRampReader")
+	}
+
+	dynamicOnRampConfig, err := onRampReader.GetDynamicConfig(ctx)
+	if err != nil {
+		return nil, errors.Wrap(err, "get onramp dynamic config")
+	}
+
+	sourceWrappedNative, err := srcProvider.SourceNativeToken(ctx, dynamicOnRampConfig.Router)
+
+	versionFinder := ccip.NewEvmVersionFinder()
+	commitStoreReader, err := factory.NewCommitStoreReader(lggr, versionFinder, offRampConfig.CommitStore, dstChain.Client(), dstChain.LogPoller(), srcChain.GasEstimator(), srcChain.Config().EVM().GasEstimator().PriceMax().ToInt())
+	if err != nil {
+		return nil, errors.Wrap(err, "could not load commitStoreReader reader")
+	}
+
+	tokenDataProviders := make(map[cciptypes.Address]tokendata.Reader)
+	// init usdc token data provider
+	if pluginConfig.USDCConfig.AttestationAPI != "" {
+		lggr.Infof("USDC token data provider enabled")
+		err := pluginConfig.USDCConfig.ValidateUSDCConfig()
+		if err != nil {
+			return nil, err
+		}
+
+		attestationURI, err := url.ParseRequestURI(pluginConfig.USDCConfig.AttestationAPI)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to parse USDC attestation API")
+		}
+
+		usdcReader, err := srcProvider.NewTokenDataReader(ctx, ccip.EvmAddrToGeneric(pluginConfig.USDCConfig.SourceTokenAddress))
+		if err != nil {
+			return nil, errors.Wrap(err, "new usdc reader")
+		}
+		tokenDataProviders[cciptypes.Address(pluginConfig.USDCConfig.SourceTokenAddress.String())] = usdcReader
+	}
+
+	// Prom wrappers
+	onRampReader = observability.NewObservedOnRampReader(onRampReader, sourceChainID, ccip.ExecPluginLabel)
+	commitStoreReader = observability.NewObservedCommitStoreReader(commitStoreReader, destChainID, ccip.ExecPluginLabel)
+	offRampReader := observability.NewObservedOffRampReader(offRampReader, destChainID, ccip.ExecPluginLabel)
+	metricsCollector := ccip.NewPluginMetricsCollector(ccip.ExecPluginLabel, sourceChainID, destChainID)
+
+	batchCaller := rpclib.NewDynamicLimitedBatchCaller(
+		lggr,
+		params.destChain.Client(),
+		rpclib.DefaultRpcBatchSizeLimit,
+		rpclib.DefaultRpcBatchBackOffMultiplier,
+		rpclib.DefaultMaxParallelRpcCalls,
+	)
+
+	// TODO: does offRampAddress2 = offRampAddress?
+	offRampAddress2, err := offRampReader.Address(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("get offramp reader address: %w", err)
+	}
+
+	tokenPoolBatchedReader, err := dstProvider.NewTokenPoolBatchedReader(ctx, offRampAddress2)
+
+	tokenPoolBatchedReader, err := batchreader.NewEVMTokenPoolBatchedReader(execLggr, sourceChainSelector, offrampAddress, batchCaller)
+	if err != nil {
+		return nil, fmt.Errorf("new token pool batched reader: %w", err)
+	}
+
+}
+
+func NewExecServices(ctx context.Context, lggr logger.Logger, jb job.Job, chainSet legacyevm.LegacyChainContainer, new bool, argsNoPlugin libocr2.OCR2OracleArgs, logError func(string)) ([]job.ServiceCtx, error) {
 	execPluginConfig, backfillArgs, chainHealthcheck, tokenWorker, err := jobSpecToExecPluginConfig(ctx, lggr, jb, chainSet)
 	if err != nil {
 		return nil, err
@@ -87,7 +178,7 @@ func NewExecutionServices(ctx context.Context, lggr logger.Logger, jb job.Job, c
 
 // UnregisterExecPluginLpFilters unregisters all the registered filters for both source and dest chains.
 // See comment in UnregisterCommitPluginLpFilters
-// It MUST mirror the filters registered in NewExecutionServices.
+// It MUST mirror the filters registered in NewExecServices.
 func UnregisterExecPluginLpFilters(ctx context.Context, lggr logger.Logger, jb job.Job, chainSet legacyevm.LegacyChainContainer) error {
 	params, err := extractJobSpecParams(lggr, jb, chainSet, false)
 	if err != nil {
@@ -133,7 +224,7 @@ func ExecReportToEthTxMeta(ctx context.Context, typ ccipconfig.ContractType, ver
 	return factory.ExecReportToEthTxMeta(ctx, typ, ver)
 }
 
-func initTokenDataProviders(lggr logger.Logger, jobID string, pluginConfig ccipconfig.ExecutionPluginJobSpecConfig, sourceLP logpoller.LogPoller) (map[cciptypes.Address]tokendata.Reader, error) {
+func initTokenDataProviders(lggr logger.Logger, jobID string, pluginConfig ccipconfig.ExecPluginJobSpecConfig, sourceLP logpoller.LogPoller) (map[cciptypes.Address]tokendata.Reader, error) {
 	tokenDataProviders := make(map[cciptypes.Address]tokendata.Reader)
 
 	// init usdc token data provider
@@ -316,7 +407,7 @@ func jobSpecToExecPluginConfig(ctx context.Context, lggr logger.Logger, jb job.J
 }
 
 type jobSpecParams struct {
-	pluginConfig  ccipconfig.ExecutionPluginJobSpecConfig
+	pluginConfig  ccipconfig.ExecPluginJobSpecConfig
 	offRampConfig cciptypes.OffRampStaticConfig
 	offRampReader ccipdata.OffRampReader
 	sourceChain   legacyevm.Chain
@@ -328,7 +419,7 @@ func extractJobSpecParams(lggr logger.Logger, jb job.Job, chainSet legacyevm.Leg
 		return nil, errors.New("spec is nil")
 	}
 	spec := jb.OCR2OracleSpec
-	var pluginConfig ccipconfig.ExecutionPluginJobSpecConfig
+	var pluginConfig ccipconfig.ExecPluginJobSpecConfig
 	err := json.Unmarshal(spec.PluginConfig.Bytes(), &pluginConfig)
 	if err != nil {
 		return nil, err

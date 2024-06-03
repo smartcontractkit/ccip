@@ -96,8 +96,8 @@ func (c *DynamicPriceGetterConfig) Validate() error {
 	return nil
 }
 
-// ExecutionPluginJobSpecConfig contains the plugin specific variables for the ccip.CCIPExecution plugin.
-type ExecutionPluginJobSpecConfig struct {
+// ExecPluginJobSpecConfig contains the plugin specific variables for the ccip.CCIPExecution plugin.
+type ExecPluginJobSpecConfig struct {
 	SourceStartBlock, DestStartBlock uint64 // Only for first time job add.
 	USDCConfig                       USDCConfig
 }
@@ -109,6 +109,10 @@ type USDCConfig struct {
 	AttestationAPITimeoutSeconds    uint
 	// AttestationAPIIntervalMilliseconds can be set to -1 to disable or 0 to use a default interval.
 	AttestationAPIIntervalMilliseconds int
+}
+
+type ExecPluginConfig struct {
+	IsSourceProvider bool
 }
 
 func (uc *USDCConfig) ValidateUSDCConfig() error {

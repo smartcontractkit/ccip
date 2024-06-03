@@ -318,6 +318,37 @@ func (r *Relayer) NewCCIPCommitProvider(rargs commontypes.RelayArgs, pargs commo
 
 }
 
+func (r *Relayer) NewExecProvider(rargs commontypes.RelayArgs, pargs commontypes.PluginArgs) (commontypes.CCIPExecProvider, error) {
+	// TODO https://smartcontract-it.atlassian.net/browse/BCF-2887
+	// ctx := context.Background()
+
+	versionFinder := ccip.NewEvmVersionFinder()
+
+	var commitPluginConfig ccipconfig.ExecPluginConfig
+	err := json.Unmarshal(pargs.PluginConfig, &commitPluginConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	if commitPluginConfig.IsSourceProvider {
+		return NewSrcExecProvider(
+			r.lggr,
+			versionFinder,
+			r.chain.Client(),
+			r.chain.LogPoller(),
+		), nil
+	}
+
+	return NewDstExecProvider(
+		r.lggr,
+		versionFinder,
+		r.chain.Client(),
+		r.chain.LogPoller(),
+		r.chain.GasEstimator(),
+		*r.chain.Config().EVM().GasEstimator().PriceMax().ToInt(),
+	), nil
+}
+
 func (r *Relayer) NewLLOProvider(rargs commontypes.RelayArgs, pargs commontypes.PluginArgs) (commontypes.LLOProvider, error) {
 	// TODO https://smartcontract-it.atlassian.net/browse/BCF-2887
 	ctx := context.Background()
