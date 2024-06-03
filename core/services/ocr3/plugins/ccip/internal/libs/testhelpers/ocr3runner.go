@@ -2,7 +2,6 @@ package testhelpers
 
 import (
 	"context"
-	"crypto/sha1"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
@@ -184,7 +183,7 @@ func countUniqueOutcomes(outcomes []ocr3types.Outcome) int {
 func countUniqueReports[RI any](reports []ocr3types.ReportWithInfo[RI]) int {
 	flattenedHashes := make([]string, 0, len(reports))
 	for _, report := range reports {
-		h := sha1.New()
+		h := sha256.New()
 		h.Write(report.Report)
 		flattenedHashes = append(flattenedHashes, hex.EncodeToString(h.Sum(nil)))
 	}
