@@ -7245,14 +7245,14 @@ Mode = 'FixedPrice'
 
 ### LimitDefault
 ```toml
-LimitDefault = 500_000 # Default
+LimitDefault = 8000000 # Default
 ```
 LimitDefault sets default gas limit for outgoing transactions. This should not need to be changed in most cases.
 Some job types, such as Keeper jobs, might set their own gas limit unrelated to this value.
 
 ### LimitMax
 ```toml
-LimitMax = 500_000 # Default
+LimitMax = 8000000 # Default
 ```
 LimitMax sets a maximum for _estimated_ gas limits. This currently only applies to `Arbitrum` `GasEstimatorMode`.
 
