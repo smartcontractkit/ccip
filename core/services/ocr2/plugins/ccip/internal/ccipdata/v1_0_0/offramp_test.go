@@ -91,6 +91,7 @@ func TestExecOffchainConfig100_AllFieldsRequired(t *testing.T) {
 		RelativeBoostPerWaitHour:    0.07,
 		InflightCacheExpiry:         *config.MustNewDuration(64 * time.Second),
 		RootSnoozeTime:              *config.MustNewDuration(128 * time.Minute),
+		BatchingStrategyId:          0,
 	}
 	encoded, err := ccipconfig.EncodeOffchainConfig(&config)
 	require.NoError(t, err)
@@ -108,7 +109,11 @@ func TestExecOffchainConfig100_AllFieldsRequired(t *testing.T) {
 		encodedPartialConfig, err := json.Marshal(partialConfig)
 		require.NoError(t, err)
 		_, err = ccipconfig.DecodeOffchainConfig[ExecOffchainConfig](encodedPartialConfig)
-		require.ErrorContains(t, err, keyToDelete)
+		if keyToDelete == "BatchingStrategyId" {
+			require.NoError(t, err)
+		} else {
+			require.ErrorContains(t, err, keyToDelete)
+		}
 	}
 }
 
