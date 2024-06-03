@@ -16,7 +16,6 @@ import (
 
 	"dario.cat/mergo"
 	"github.com/AlekSi/pointer"
-	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -730,19 +729,6 @@ func (ccipModule *CCIPCommon) AddPriceAggregatorToken(token common.Address, init
 	return nil
 }
 
-// NeedTokenAdminRegistry checks if token admin registry is needed for the current version of ccip
-// if the version is less than 1.5.0-dev, then token admin registry is not needed
-func (ccipModule *CCIPCommon) NeedTokenAdminRegistry() bool {
-	// find out the pool version
-	version := contracts.VersionMap[contracts.TokenPoolContract]
-	if version == contracts.Latest {
-		return true
-	}
-	currentSemver := semver.MustParse(string(version))
-	tokenAdminEnabledVersion := semver.MustParse("1.5.0-dev")
-	return currentSemver.Compare(tokenAdminEnabledVersion) >= 0
-}
-
 // DeployContracts deploys the contracts which are necessary in both source and dest chain
 // This reuses common contracts for bidirectional lanes
 func (ccipModule *CCIPCommon) DeployContracts(
@@ -875,19 +861,14 @@ func (ccipModule *CCIPCommon) DeployContracts(
 	// In case of ExistingDeployment as true use whatever is provided in laneconfig
 	if len(ccipModule.BridgeTokens) < noOfTokens && !ccipModule.ExistingDeployment {
 		// If we need a token admin registry, then we need tokens to be deployed with a non-CCIP owner wallet
-		if ccipModule.NeedTokenAdminRegistry() && !pointer.GetBool(ccipModule.TestGroupConfig.TokenConfig.CCIPOwnerTokens) {
-			// TODO: This is a very rough guess for funding and could lead to issues, especially with live chains
-			fundingEstimate := 0.1 * float64(noOfTokens)
-			nonAdminWalletIndex, err := ccipModule.ChainClient.NewWallet(big.NewFloat(fundingEstimate))
-			if err != nil {
-				return fmt.Errorf("error in creating non-admin wallet to deploy tokens with %w", err)
+		if contracts.NeedTokenAdminRegistry() &&
+			!pointer.GetBool(ccipModule.TestGroupConfig.TokenConfig.CCIPOwnerTokens) &&
+			len(ccipModule.ChainClient.GetWallets()) > 1 {
+			if err = ccipModule.ChainClient.SetDefaultWallet(1); err != nil {
+				return fmt.Errorf("error setting default wallet to non-CCIP owner wallet %w", err)
 			}
-			if err = ccipModule.ChainClient.WaitForEvents(); err != nil {
-				return fmt.Errorf("error in waiting for non-admin wallet creation %w", err)
-			}
-
-			ccipModule.ChainClient.SetDefaultWallet(nonAdminWalletIndex)
 			defer func() {
+				// reset default wallet to CCIP owner wallet when we're done
 				if err = ccipModule.ChainClient.SetDefaultWallet(0); err != nil {
 					ccipModule.Logger.Error().Err(err).Msg("Error resetting default wallet to CCIP owner wallet after token deployment")
 				}
@@ -1042,7 +1023,7 @@ func (ccipModule *CCIPCommon) DeployContracts(
 	}
 
 	// if the version is after 1.4.0, we need to deploy TokenAdminRegistry
-	if ccipModule.NeedTokenAdminRegistry() {
+	if contracts.NeedTokenAdminRegistry() {
 		if ccipModule.TokenAdminRegistry == nil {
 			if ccipModule.ExistingDeployment {
 				return fmt.Errorf("token admin registry contract address is not provided in lane config")
@@ -1262,10 +1243,10 @@ func DefaultCCIPModule(
 			Rate:     contracts.FiftyCoins,
 			Capacity: contracts.HundredCoins,
 		},
-		ExistingDeployment:            *testGroupConf.ExistingDeployment,
-		MulticallEnabled:              *testGroupConf.MulticallInOneTx,
+		ExistingDeployment:            pointer.GetBool(testGroupConf.ExistingDeployment),
+		MulticallEnabled:              pointer.GetBool(testGroupConf.MulticallInOneTx),
 		USDCMockDeployment:            testGroupConf.USDCMockDeployment,
-		NoOfTokensNeedingDynamicPrice: *testGroupConf.TokenConfig.NoOfTokensWithDynamicPrice,
+		NoOfTokensNeedingDynamicPrice: pointer.GetInt(testGroupConf.TokenConfig.NoOfTokensWithDynamicPrice),
 		poolFunds:                     testhelpers.Link(5),
 		gasUpdateWatcherMu:            &sync.Mutex{},
 		gasUpdateWatcher:              make(map[uint64]*big.Int),
@@ -1386,7 +1367,7 @@ func (sourceCCIP *SourceCCIPModule) DeployContracts(lane *laneconfig.LaneConfig)
 			return fmt.Errorf("getting latest block number shouldn't fail %w", err)
 		}
 		var tokenAdminReg common.Address
-		if sourceCCIP.Common.NeedTokenAdminRegistry() {
+		if contracts.NeedTokenAdminRegistry() {
 			if sourceCCIP.Common.TokenAdminRegistry == nil {
 				return fmt.Errorf("token admin registry contract address is not provided in lane config")
 			}
@@ -2630,7 +2611,9 @@ func (lane *CCIPLane) SetRemoteChainsOnPool() error {
 		return nil
 	}
 	if len(lane.Source.Common.BridgeTokenPools) != len(lane.Dest.Common.BridgeTokenPools) {
-		return fmt.Errorf("source (%d) and dest (%d) bridge token pools length should be same", len(lane.Source.Common.BridgeTokenPools), len(lane.Dest.Common.BridgeTokenPools))
+		return fmt.Errorf("source (%d) and dest (%d) bridge token pools length should be same",
+			len(lane.Source.Common.BridgeTokenPools), len(lane.Dest.Common.BridgeTokenPools),
+		)
 	}
 	for i, src := range lane.Source.Common.BridgeTokenPools {
 		dst := lane.Dest.Common.BridgeTokenPools[i]

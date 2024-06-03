@@ -184,6 +184,7 @@ type ERC20Token struct {
 	logger          zerolog.Logger
 	instance        *erc20.ERC20
 	ContractAddress common.Address
+	OwnerAddress    common.Address
 }
 
 func (token *ERC20Token) Address() string {
@@ -543,13 +544,13 @@ func (w TokenPoolWrapper) GetRebalancer(opts *bind.CallOpts) (common.Address, er
 	return common.Address{}, fmt.Errorf("no pool found to get rebalancer")
 }
 
-// TODO: CCIP-2155 - Add wallet of owner of the pool
 // TokenPool represents a TokenPool address
 type TokenPool struct {
-	client     blockchain.EVMClient
-	logger     zerolog.Logger
-	Instance   *TokenPoolWrapper
-	EthAddress common.Address
+	client       blockchain.EVMClient
+	logger       zerolog.Logger
+	Instance     *TokenPoolWrapper
+	EthAddress   common.Address
+	OwnerAddress common.Address
 }
 
 func (pool *TokenPool) Address() string {
@@ -650,6 +651,18 @@ func (pool *TokenPool) AddLiquidity(approveFn tokenApproveFn, tokenAddr string, 
 		Str("Link Token", tokenAddr).
 		Str("Token Pool", pool.Address()).
 		Msg("Initiating transferring of token to token pool")
+	if common.HexToAddress(pool.client.GetDefaultWallet().Address()) != pool.OwnerAddress {
+		pool.logger.Debug().
+			Str("Current Wallet", pool.client.GetDefaultWallet().Address()).
+			Str("Owner Wallet", pool.OwnerAddress.Hex()).
+			Str("Pool", pool.Address()).
+			Msg("Switching to TokenPool owner wallet to add liquidity")
+		if pool.client.GetWalletByAddress(pool.OwnerAddress) == nil {
+			return fmt.Errorf("cannot switch to Token Pool owner wallet '%s' as it is not present in the client's wallets", pool.OwnerAddress.Hex())
+		}
+		defer pool.client.SetDefaultWalletByAddress(common.HexToAddress(pool.client.GetDefaultWallet().Address()))
+		pool.client.SetDefaultWalletByAddress(pool.OwnerAddress)
+	}
 	err := approveFn(pool.Address(), amount)
 	if err != nil {
 		return fmt.Errorf("failed to approve token transfer: %w", err)
@@ -724,15 +737,18 @@ func (pool *TokenPool) SetRemoteChainOnPool(remoteChainSelector uint64, remotePo
 			Rate:      new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e5)),
 		},
 	})
-	if len(pool.client.GetWallets()) > 1 { // We're using a different wallet to deploy and interact with the pool
-		if err = pool.client.SetDefaultWallet(1); err != nil {
-			return fmt.Errorf("failed to set default wallet to index %d: %w", 1, err)
+	// DEBUG: This isn't getting set properly, or something else is wack
+	if common.HexToAddress(pool.client.GetDefaultWallet().Address()) != pool.OwnerAddress {
+		pool.logger.Debug().
+			Str("Current Wallet", pool.client.GetDefaultWallet().Address()).
+			Str("Owner Wallet", pool.OwnerAddress.Hex()).
+			Str("Pool", pool.Address()).
+			Msg("Switching to TokenPool owner wallet to set remote chain")
+		if pool.client.GetWalletByAddress(pool.OwnerAddress) == nil {
+			return fmt.Errorf("cannot switch to Token Pool owner wallet '%s' as it is not present in the client's wallets", pool.OwnerAddress.Hex())
 		}
-		defer func() {
-			if err = pool.client.SetDefaultWallet(0); err != nil {
-				pool.logger.Error().Err(err).Msg("failed to set default wallet back to index 0")
-			}
-		}()
+		defer pool.client.SetDefaultWalletByAddress(common.HexToAddress(pool.client.GetDefaultWallet().Address()))
+		pool.client.SetDefaultWalletByAddress(pool.OwnerAddress)
 	}
 	// If remote chain is not supported , add it
 	opts, err := pool.client.TransactionOpts(pool.client.GetDefaultWallet())
