@@ -88,6 +88,19 @@ func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.Repor
 		return nil, types.ReportingPluginInfo{}, fmt.Errorf("get onchain config from offramp: %w", err)
 	}
 
+	// TODO: add to ExecOffchainConfig (chainlink-common) a BatchingStrategyId field
+	// batchingStrategyId := offchainConfig.BatchingStrategyId
+	batchingStrategyId := 0 // TODO: remove this line when the above TODO is done
+	var batchingStrategy BatchingStrategy
+	switch batchingStrategyId {
+	case 0:
+		batchingStrategy = &BestEffortBatchingStrategy{}
+	case 1:
+		batchingStrategy = &ZKOverflowBatchingStrategy{}
+	default:
+		batchingStrategy = &BestEffortBatchingStrategy{} // Default strategy
+	}
+
 	lggr := rf.config.lggr.Named("ExecutionReportingPlugin")
 	return &ExecutionReportingPlugin{
 			F:                           config.F,
@@ -109,6 +122,7 @@ func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.Repor
 			commitRootsCache:            cache.NewCommitRootsCache(lggr, onchainConfig.PermissionLessExecutionThresholdSeconds, offchainConfig.RootSnoozeTime.Duration()),
 			metricsCollector:            rf.config.metricsCollector,
 			chainHealthcheck:            rf.config.chainHealthcheck,
+			batchingStrategy:            batchingStrategy,
 		}, types.ReportingPluginInfo{
 			Name: "CCIPExecution",
 			// Setting this to false saves on calldata since OffRamp doesn't require agreement between NOPs

@@ -98,6 +98,8 @@ type JSONExecOffchainConfig struct {
 	InflightCacheExpiry config.Duration
 	// See [ccipdata.ExecOffchainConfig.RootSnoozeTime]
 	RootSnoozeTime config.Duration
+	// See [ccipdata.ExecOffchainConfig.BatchingStrategy]
+	BatchingStrategyId uint8
 }
 
 func (c JSONExecOffchainConfig) Validate() error {

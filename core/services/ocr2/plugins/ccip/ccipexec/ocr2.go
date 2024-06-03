@@ -71,6 +71,8 @@ type ExecutionReportingPlugin struct {
 	offchainConfig   cciptypes.ExecOffchainConfig
 	tokenDataWorker  tokendata.Worker
 	metricsCollector ccip.PluginMetricsCollector
+	batchingStrategy BatchingStrategy
+
 	// Source
 	gasPriceEstimator           prices.GasPriceEstimatorExec
 	sourcePriceRegistry         ccipdata.PriceRegistryReader
@@ -78,8 +80,8 @@ type ExecutionReportingPlugin struct {
 	sourcePriceRegistryLock     sync.RWMutex
 	sourceWrappedNativeToken    cciptypes.Address
 	onRampReader                ccipdata.OnRampReader
-	// Dest
 
+	// Dest
 	commitStoreReader      ccipdata.CommitStoreReader
 	destPriceRegistry      ccipdata.PriceRegistryReader
 	destWrappedNative      cciptypes.Address
@@ -276,169 +278,28 @@ func (r *ExecutionReportingPlugin) buildBatch(
 		return []ccip.ObservedMessage{}, []messageExecStatus{}
 	}
 
-	availableGas := uint64(r.offchainConfig.BatchGasLimit)
-	expectedNonces := make(map[cciptypes.Address]uint64)
-	availableDataLen := MaxDataLenPerBatch
-	tokenDataRemainingDuration := MaximumAllowedTokenDataWaitTimePerBatch
-	batchBuilder := newBatchBuildContainer(len(report.sendRequestsWithMeta))
-
-	for _, msg := range report.sendRequestsWithMeta {
-		msgLggr := lggr.With("messageID", hexutil.Encode(msg.MessageID[:]), "seqNr", msg.SequenceNumber)
-
-		if msg.Executed {
-			msgLggr.Infow("Skipping message - already executed")
-			batchBuilder.skip(msg, AlreadyExecuted)
-			continue
-		}
-
-		if len(msg.Data) > availableDataLen {
-			msgLggr.Infow("Skipping message - insufficient remaining batch data length", "msgDataLen", len(msg.Data), "availableBatchDataLen", availableDataLen)
-			batchBuilder.skip(msg, InsufficientRemainingBatchDataLength)
-			continue
-		}
-
-		messageMaxGas, err1 := calculateMessageMaxGas(
-			msg.GasLimit,
-			len(report.sendRequestsWithMeta),
-			len(msg.Data),
-			len(msg.TokenAmounts),
-		)
-		if err1 != nil {
-			msgLggr.Errorw("Skipping message - message max gas calculation error", "err", err1)
-			batchBuilder.skip(msg, MessageMaxGasCalcError)
-			continue
-		}
-
-		// Check sufficient gas in batch
-		if availableGas < messageMaxGas {
-			msgLggr.Infow("Skipping message - insufficient remaining batch gas limit", "availableGas", availableGas, "messageMaxGas", messageMaxGas)
-			batchBuilder.skip(msg, InsufficientRemainingBatchGas)
-			continue
-		}
-
-		if _, ok := expectedNonces[msg.Sender]; !ok {
-			nonce, ok1 := sendersNonce[msg.Sender]
-			if !ok1 {
-				msgLggr.Errorw("Skipping message - missing nonce", "sender", msg.Sender)
-				batchBuilder.skip(msg, MissingNonce)
-				continue
-			}
-			expectedNonces[msg.Sender] = nonce + 1
-		}
-
-		// Check expected nonce is valid for sequenced messages.
-		// Sequenced messages have non-zero nonces.
-		if msg.Nonce > 0 && msg.Nonce != expectedNonces[msg.Sender] {
-			msgLggr.Warnw("Skipping message - invalid nonce", "have", msg.Nonce, "want", expectedNonces[msg.Sender])
-			batchBuilder.skip(msg, InvalidNonce)
-			continue
-		}
-
-		msgValue, err1 := aggregateTokenValue(lggr, destTokenPricesUSD, sourceToDestToken, msg.TokenAmounts)
-		if err1 != nil {
-			msgLggr.Errorw("Skipping message - aggregate token value compute error", "err", err1)
-			batchBuilder.skip(msg, AggregateTokenValueComputeError)
-			continue
-		}
-
-		// if token limit is smaller than message value skip message
-		if tokensLeft, hasCapacity := hasEnoughTokens(aggregateTokenLimit, msgValue, inflightAggregateValue); !hasCapacity {
-			msgLggr.Warnw("Skipping message - aggregate token limit exceeded", "aggregateTokenLimit", tokensLeft.String(), "msgValue", msgValue.String())
-			batchBuilder.skip(msg, AggregateTokenLimitExceeded)
-			continue
-		}
-
-		tokenData, elapsed, err1 := r.getTokenDataWithTimeout(ctx, msg, tokenDataRemainingDuration)
-		tokenDataRemainingDuration -= elapsed
-		if err1 != nil {
-			if errors.Is(err1, tokendata.ErrNotReady) {
-				msgLggr.Warnw("Skipping message - token data not ready", "err", err1)
-				batchBuilder.skip(msg, TokenDataNotReady)
-				continue
-			}
-			msgLggr.Errorw("Skipping message - token data fetch error", "err", err1)
-			batchBuilder.skip(msg, TokenDataFetchError)
-			continue
-		}
-
-		dstWrappedNativePrice, exists := destTokenPricesUSD[r.destWrappedNative]
-		if !exists {
-			msgLggr.Errorw("Skipping message - token not in destination token prices", "token", r.destWrappedNative)
-			batchBuilder.skip(msg, TokenNotInDestTokenPrices)
-			continue
-		}
-
-		// calculating the source chain fee, dividing by 1e18 for denomination.
-		// For example:
-		// FeeToken=link; FeeTokenAmount=1e17 i.e. 0.1 link, price is 6e18 USD/link (1 USD = 1e18),
-		// availableFee is 1e17*6e18/1e18 = 6e17 = 0.6 USD
-		sourceFeeTokenPrice, exists := sourceTokenPricesUSD[msg.FeeToken]
-		if !exists {
-			msgLggr.Errorw("Skipping message - token not in source token prices", "token", msg.FeeToken)
-			batchBuilder.skip(msg, TokenNotInSrcTokenPrices)
-			continue
-		}
-
-		// Fee boosting
-		execCostUsd, err1 := r.gasPriceEstimator.EstimateMsgCostUSD(gasPrice, dstWrappedNativePrice, msg)
-		if err1 != nil {
-			msgLggr.Errorw("Failed to estimate message cost USD", "err", err1)
-			return []ccip.ObservedMessage{}, []messageExecStatus{}
-		}
-
-		availableFee := big.NewInt(0).Mul(msg.FeeTokenAmount, sourceFeeTokenPrice)
-		availableFee = availableFee.Div(availableFee, big.NewInt(1e18))
-		availableFeeUsd := waitBoostedFee(time.Since(msg.BlockTimestamp), availableFee, r.offchainConfig.RelativeBoostPerWaitHour)
-		if availableFeeUsd.Cmp(execCostUsd) < 0 {
-			msgLggr.Infow(
-				"Skipping message - insufficient remaining fee",
-				"availableFeeUsd", availableFeeUsd,
-				"execCostUsd", execCostUsd,
-				"sourceBlockTimestamp", msg.BlockTimestamp,
-				"waitTime", time.Since(msg.BlockTimestamp),
-				"boost", r.offchainConfig.RelativeBoostPerWaitHour,
-			)
-			batchBuilder.skip(msg, InsufficientRemainingFee)
-			continue
-		}
-
-		availableGas -= messageMaxGas
-		availableDataLen -= len(msg.Data)
-		aggregateTokenLimit.Sub(aggregateTokenLimit, msgValue)
-		expectedNonces[msg.Sender] = msg.Nonce + 1
-		batchBuilder.addToBatch(msg, tokenData)
-
-		msgLggr.Infow(
-			"Message added to execution batch",
-			"nonce", msg.Nonce,
-			"sender", msg.Sender,
-			"value", msgValue,
-			"availableAggrTokenLimit", aggregateTokenLimit,
-			"availableGas", availableGas,
-			"availableDataLen", availableDataLen,
-		)
+	batchCtx := &BatchContext{
+		ctx,
+		report,
+		lggr,
+		MaxDataLenPerBatch,
+		uint64(r.offchainConfig.BatchGasLimit),
+		make(map[cciptypes.Address]uint64),
+		sendersNonce,
+		sourceTokenPricesUSD,
+		destTokenPricesUSD,
+		gasPrice,
+		sourceToDestToken,
+		inflightAggregateValue,
+		aggregateTokenLimit,
+		MaximumAllowedTokenDataWaitTimePerBatch,
+		r.tokenDataWorker,
+		r.gasPriceEstimator,
+		r.destWrappedNative,
+		r.offchainConfig,
 	}
 
-	return batchBuilder.batch, batchBuilder.statuses
-}
-
-// getTokenDataWithCappedLatency gets the token data for the provided message.
-// Stops and returns an error if more than allowedWaitingTime is passed.
-func (r *ExecutionReportingPlugin) getTokenDataWithTimeout(
-	ctx context.Context,
-	msg cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta,
-	timeout time.Duration,
-) ([][]byte, time.Duration, error) {
-	if len(msg.TokenAmounts) == 0 {
-		return nil, 0, nil
-	}
-
-	ctxTimeout, cf := context.WithTimeout(ctx, timeout)
-	defer cf()
-	tStart := time.Now()
-	tokenData, err := r.tokenDataWorker.GetMsgTokenData(ctxTimeout, msg)
-	tDur := time.Since(tStart)
-	return tokenData, tDur, err
+	return r.batchingStrategy.BuildBatch(batchCtx)
 }
 
 func hasEnoughTokens(tokenLimit *big.Int, msgValue *big.Int, inflightValue *big.Int) (*big.Int, bool) {
