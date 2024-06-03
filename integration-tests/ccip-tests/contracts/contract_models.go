@@ -651,17 +651,9 @@ func (pool *TokenPool) AddLiquidity(approveFn tokenApproveFn, tokenAddr string, 
 		Str("Link Token", tokenAddr).
 		Str("Token Pool", pool.Address()).
 		Msg("Initiating transferring of token to token pool")
-	if common.HexToAddress(pool.client.GetDefaultWallet().Address()) != pool.OwnerAddress {
-		pool.logger.Debug().
-			Str("Current Wallet", pool.client.GetDefaultWallet().Address()).
-			Str("Owner Wallet", pool.OwnerAddress.Hex()).
-			Str("Pool", pool.Address()).
-			Msg("Switching to TokenPool owner wallet to add liquidity")
-		if pool.client.GetWalletByAddress(pool.OwnerAddress) == nil {
-			return fmt.Errorf("cannot switch to Token Pool owner wallet '%s' as it is not present in the client's wallets", pool.OwnerAddress.Hex())
-		}
-		defer pool.client.SetDefaultWalletByAddress(common.HexToAddress(pool.client.GetDefaultWallet().Address()))
-		pool.client.SetDefaultWalletByAddress(pool.OwnerAddress)
+	ownerWallet := pool.client.GetWalletByAddress(pool.OwnerAddress)
+	if ownerWallet == nil {
+		return fmt.Errorf("owner wallet '%s' not found", pool.OwnerAddress.Hex())
 	}
 	err := approveFn(pool.Address(), amount)
 	if err != nil {
@@ -671,7 +663,7 @@ func (pool *TokenPool) AddLiquidity(approveFn tokenApproveFn, tokenAddr string, 
 	if err != nil {
 		return fmt.Errorf("failed to wait for events: %w", err)
 	}
-	opts, err := pool.client.TransactionOpts(pool.client.GetDefaultWallet())
+	opts, err := pool.client.TransactionOpts(ownerWallet)
 	if err != nil {
 		return fmt.Errorf("failed to get transaction opts: %w", err)
 	}
@@ -679,7 +671,7 @@ func (pool *TokenPool) AddLiquidity(approveFn tokenApproveFn, tokenAddr string, 
 	if err != nil {
 		return fmt.Errorf("failed to set rebalancer: %w", err)
 	}
-	opts, err = pool.client.TransactionOpts(pool.client.GetDefaultWallet())
+	opts, err = pool.client.TransactionOpts(ownerWallet)
 	if err != nil {
 		return fmt.Errorf("failed to get transaction opts: %w", err)
 	}
@@ -737,21 +729,12 @@ func (pool *TokenPool) SetRemoteChainOnPool(remoteChainSelector uint64, remotePo
 			Rate:      new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e5)),
 		},
 	})
-	// DEBUG: This isn't getting set properly, or something else is wack
-	if common.HexToAddress(pool.client.GetDefaultWallet().Address()) != pool.OwnerAddress {
-		pool.logger.Debug().
-			Str("Current Wallet", pool.client.GetDefaultWallet().Address()).
-			Str("Owner Wallet", pool.OwnerAddress.Hex()).
-			Str("Pool", pool.Address()).
-			Msg("Switching to TokenPool owner wallet to set remote chain")
-		if pool.client.GetWalletByAddress(pool.OwnerAddress) == nil {
-			return fmt.Errorf("cannot switch to Token Pool owner wallet '%s' as it is not present in the client's wallets", pool.OwnerAddress.Hex())
-		}
-		defer pool.client.SetDefaultWalletByAddress(common.HexToAddress(pool.client.GetDefaultWallet().Address()))
-		pool.client.SetDefaultWalletByAddress(pool.OwnerAddress)
+	ownerWallet := pool.client.GetWalletByAddress(pool.OwnerAddress)
+	if ownerWallet == nil {
+		return fmt.Errorf("owner wallet not found")
 	}
 	// If remote chain is not supported , add it
-	opts, err := pool.client.TransactionOpts(pool.client.GetDefaultWallet())
+	opts, err := pool.client.TransactionOpts(ownerWallet)
 	if err != nil {
 		return fmt.Errorf("failed to get transaction opts: %w", err)
 	}
