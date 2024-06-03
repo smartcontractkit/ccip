@@ -146,6 +146,8 @@ func (p *Plugin) Observation(ctx context.Context, outctx ocr3types.OutcomeContex
 		"tokenPrices", len(tokenPrices),
 		"observerInfo", p.cfg.ObserverInfo)
 
+	// tmp
+
 	msgBaseDetails := make([]model.CCIPMsgBaseDetails, 0)
 	for _, msg := range newMsgs {
 		msgBaseDetails = append(msgBaseDetails, msg.CCIPMsgBaseDetails)
