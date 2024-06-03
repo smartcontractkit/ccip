@@ -136,8 +136,6 @@ runs:
         if [ -n "$GRAFANA_BEARER_TOKEN" ]; then
           grafana_bearer_token="bearer_token_secret=\"$GRAFANA_BEARER_TOKEN\""
         fi
-        
-        echo "Custom nodes toml:\n $custom_nodes_toml"
 
         cat << EOF > config.toml
         [CCIP]
@@ -181,6 +179,8 @@ runs:
         EOF
 
         BASE64_CCIP_SECRETS_CONFIG=$(cat config.toml | base64 -w 0)
-        echo ::add-mask::$BASE64_CCIP_SECRETS_CONFIG
+#        echo ::add-mask::$BASE64_CCIP_SECRETS_CONFIG
+        # remove me
+        cat config.toml 
         echo "BASE64_CCIP_SECRETS_CONFIG=$BASE64_CCIP_SECRETS_CONFIG" >> $GITHUB_ENV
         echo "TEST_BASE64_CCIP_SECRETS_CONFIG=$BASE64_CCIP_SECRETS_CONFIG" >> $GITHUB_ENV
