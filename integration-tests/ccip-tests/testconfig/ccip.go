@@ -9,16 +9,15 @@ import (
 	"github.com/pelletier/go-toml/v2"
 	"github.com/rs/zerolog"
 
-	ctfK8config "github.com/smartcontractkit/chainlink-testing-framework/k8s/config"
-
-	testutils "github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/utils"
-
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
 	ctfconfig "github.com/smartcontractkit/chainlink-testing-framework/config"
+	ctfK8config "github.com/smartcontractkit/chainlink-testing-framework/k8s/config"
+
+	ccipcontracts "github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/contracts"
+	testutils "github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/utils"
+	"github.com/smartcontractkit/chainlink/integration-tests/contracts"
 
 	"github.com/smartcontractkit/ccip/integration-tests/testconfig"
-	ccipcontracts "github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/contracts"
-	"github.com/smartcontractkit/chainlink/integration-tests/contracts"
 )
 
 const (
@@ -435,9 +434,7 @@ func handleDefaultConfigOverride(logger zerolog.Logger, target *CCIP, content []
 	// override selected networks instead of merging (default behavior of toml.Unmarshal for slices)
 	if (newConfig.Env != nil && newConfig.Env.Network != nil && len(newConfig.Env.Network.SelectedNetworks) > 0) && (oldConfig != nil && oldConfig.Env != nil && oldConfig.Env.Network != nil && len(oldConfig.Env.Network.SelectedNetworks) > 0) {
 		target.Env.Network.SelectedNetworks = []string{}
-		for _, network := range newConfig.Env.Network.SelectedNetworks {
-			target.Env.Network.SelectedNetworks = append(target.Env.Network.SelectedNetworks, network)
-		}
+		target.Env.Network.SelectedNetworks = append(target.Env.Network.SelectedNetworks, newConfig.Env.Network.SelectedNetworks...)
 	}
 
 	return nil
