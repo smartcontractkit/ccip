@@ -79,7 +79,7 @@ contract MultiAggregateRateLimiter is IMessageInterceptor, OwnerIsCreator {
   address internal s_priceRegistry;
 
   /// @notice Rate limiter token bucket states per chain, with separate buckets for incoming and outgoing lanes.
-  mapping(uint64 remoteChainSelector => RateLimiterBuckets buckets) s_rateLimitersByChainSelector;
+  mapping(uint64 remoteChainSelector => RateLimiterBuckets buckets) internal s_rateLimitersByChainSelector;
 
   /// @param rateLimiterConfigs The RateLimiter.Configs per chain containing the capacity and refill rate
   /// of the bucket

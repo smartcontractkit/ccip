@@ -70,6 +70,7 @@ library EnumerableMapAddresses {
    * Returns true if the key was added to the map, that is if it was not
    * already present.
    */
+  // solhint-disable-next-line chainlink-solidity/prefix-internal-functions-with-underscore
   function set(AddressToBytes32Map storage map, address key, bytes32 value) internal returns (bool) {
     return map._inner.set(bytes32(uint256(uint160(key))), value);
   }
@@ -79,6 +80,7 @@ library EnumerableMapAddresses {
    *
    * Returns true if the key was removed from the map, that is if it was present.
    */
+  // solhint-disable-next-line chainlink-solidity/prefix-internal-functions-with-underscore
   function remove(AddressToBytes32Map storage map, address key) internal returns (bool) {
     return map._inner.remove(bytes32(uint256(uint160(key))));
   }
@@ -86,6 +88,7 @@ library EnumerableMapAddresses {
   /**
    * @dev Returns true if the key is in the map. O(1).
    */
+  // solhint-disable-next-line chainlink-solidity/prefix-internal-functions-with-underscore
   function contains(AddressToBytes32Map storage map, address key) internal view returns (bool) {
     return map._inner.contains(bytes32(uint256(uint160(key))));
   }
@@ -93,6 +96,7 @@ library EnumerableMapAddresses {
   /**
    * @dev Returns the number of elements in the map. O(1).
    */
+  // solhint-disable-next-line chainlink-solidity/prefix-internal-functions-with-underscore
   function length(AddressToBytes32Map storage map) internal view returns (uint256) {
     return map._inner.length();
   }
@@ -106,6 +110,7 @@ library EnumerableMapAddresses {
    *
    * - `index` must be strictly less than {length}.
    */
+  // solhint-disable-next-line chainlink-solidity/prefix-internal-functions-with-underscore
   function at(AddressToBytes32Map storage map, uint256 index) internal view returns (address, bytes32) {
     (bytes32 key, bytes32 value) = map._inner.at(index);
     return (address(uint160(uint256(key))), value);
@@ -115,6 +120,7 @@ library EnumerableMapAddresses {
    * @dev Tries to returns the value associated with `key`. O(1).
    * Does not revert if `key` is not in the map.
    */
+  // solhint-disable-next-line chainlink-solidity/prefix-internal-functions-with-underscore
   function tryGet(AddressToBytes32Map storage map, address key) internal view returns (bool, bytes32) {
     (bool success, bytes32 value) = map._inner.tryGet(bytes32(uint256(uint160(key))));
     return (success, value);
@@ -127,6 +133,7 @@ library EnumerableMapAddresses {
    *
    * - `key` must be in the map.
    */
+  // solhint-disable-next-line chainlink-solidity/prefix-internal-functions-with-underscore
   function get(AddressToBytes32Map storage map, address key) internal view returns (bytes32) {
     return map._inner.get(bytes32(uint256(uint160(key))));
   }
