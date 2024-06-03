@@ -49,7 +49,6 @@ func (p *Plugin) Query(ctx context.Context, outctx ocr3types.OutcomeContext) (ty
 func getPendingExecutedReports(ctx context.Context, ccipReader reader.CCIP, dest model.ChainSelector, ts time.Time) (model.ExecutePluginCommitObservations, time.Time, error) {
 	oldestReport := time.Time{}
 
-	// TODO: filter out "cannot read p.destChain" errors? Or avoid calling it in the first place?
 	commitReports, err := ccipReader.CommitReportsGTETimestamp(ctx, dest, ts, 1000)
 	if err != nil {
 		return nil, time.Time{}, err
@@ -86,7 +85,7 @@ func getPendingExecutedReports(ctx context.Context, ccipReader reader.CCIP, dest
 		}
 
 		// Remove fully executed reports.
-		groupedCommits[selector], err = filterOutFullyExecutedMessages(reports, executedMessages)
+		groupedCommits[selector], err = filterOutExecutedMessages(reports, executedMessages)
 		if err != nil {
 			return nil, time.Time{}, err
 		}

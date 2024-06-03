@@ -122,9 +122,9 @@ func groupByChainSelector(reports []model.CommitPluginReportWithMeta) model.Exec
 	return commitReportCache
 }
 
-// filterOutFullyExecutedMessages returns a new reports slice with fully executed messages removed.
+// filterOutExecutedMessages returns a new reports slice with fully executed messages removed.
 // Unordered inputs are supported.
-func filterOutFullyExecutedMessages(reports []model.ExecutePluginCommitData, executedMessages []model.SeqNumRange) ([]model.ExecutePluginCommitData, error) {
+func filterOutExecutedMessages(reports []model.ExecutePluginCommitData, executedMessages []model.SeqNumRange) ([]model.ExecutePluginCommitData, error) {
 	sort.Slice(reports, func(i, j int) bool {
 		return reports[i].SequenceNumberRange.Start() < reports[j].SequenceNumberRange.Start()
 	})
