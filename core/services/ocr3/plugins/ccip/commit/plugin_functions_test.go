@@ -894,14 +894,12 @@ func Test_maxSeqNumsConsensus(t *testing.T) {
 		observations []model.CommitPluginObservation
 		fChain       int
 		expSeqNums   []model.SeqNumChain
-		expErr       bool
 	}{
 		{
 			name:         "empty observations",
 			observations: []model.CommitPluginObservation{},
 			fChain:       2,
 			expSeqNums:   []model.SeqNumChain{},
-			expErr:       false,
 		},
 		{
 			name: "one chain all followers agree",
@@ -922,7 +920,6 @@ func Test_maxSeqNumsConsensus(t *testing.T) {
 			expSeqNums: []model.SeqNumChain{
 				{ChainSel: 2, SeqNum: 20},
 			},
-			expErr: false,
 		},
 		{
 			name: "one chain all followers agree but not enough observations",
@@ -939,7 +936,6 @@ func Test_maxSeqNumsConsensus(t *testing.T) {
 			},
 			fChain:     3,
 			expSeqNums: []model.SeqNumChain{},
-			expErr:     false,
 		},
 		{
 			name: "one chain 3 followers not in sync, 4 in sync",
@@ -960,7 +956,6 @@ func Test_maxSeqNumsConsensus(t *testing.T) {
 			expSeqNums: []model.SeqNumChain{
 				{ChainSel: 2, SeqNum: 20},
 			},
-			expErr: false,
 		},
 		{
 			name: "two chains",
@@ -988,19 +983,13 @@ func Test_maxSeqNumsConsensus(t *testing.T) {
 				{ChainSel: 2, SeqNum: 20},
 				{ChainSel: 3, SeqNum: 30},
 			},
-			expErr: false,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			lggr := logger.Test(t)
-			seqNums, err := maxSeqNumsConsensus(lggr, tc.fChain, tc.observations)
-			if tc.expErr {
-				assert.Error(t, err)
-				return
-			}
-			assert.NoError(t, err)
+			seqNums := maxSeqNumsConsensus(lggr, tc.fChain, tc.observations)
 			assert.Equal(t, tc.expSeqNums, seqNums)
 		})
 	}
@@ -1122,14 +1111,12 @@ func Test_gasPricesConsensus(t *testing.T) {
 		observations []model.CommitPluginObservation
 		fChain       int
 		expPrices    []model.GasPriceChain
-		expErr       bool
 	}{
 		{
 			name:         "empty",
 			observations: make([]model.CommitPluginObservation, 0),
 			fChain:       2,
 			expPrices:    make([]model.GasPriceChain, 0),
-			expErr:       false,
 		},
 		{
 			name: "one chain happy path",
@@ -1144,7 +1131,6 @@ func Test_gasPricesConsensus(t *testing.T) {
 			expPrices: []model.GasPriceChain{
 				model.NewGasPriceChain(big.NewInt(10), 1),
 			},
-			expErr: false,
 		},
 		{
 			name: "one chain no consensus",
@@ -1157,7 +1143,6 @@ func Test_gasPricesConsensus(t *testing.T) {
 			},
 			fChain:    3, // notice fChain is 3, means we need at least 2*3+1=7 observations
 			expPrices: []model.GasPriceChain{},
-			expErr:    false,
 		},
 		{
 			name: "two chains determinism check",
@@ -1178,20 +1163,13 @@ func Test_gasPricesConsensus(t *testing.T) {
 				model.NewGasPriceChain(big.NewInt(10), 1),
 				model.NewGasPriceChain(big.NewInt(100), 10),
 			},
-			expErr: false,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			lggr := logger.Test(t)
-			prices, err := gasPricesConsensus(lggr, tc.observations, tc.fChain)
-			if tc.expErr {
-				assert.Error(t, err)
-				return
-			}
-
-			assert.NoError(t, err)
+			prices := gasPricesConsensus(lggr, tc.observations, tc.fChain)
 			assert.Equal(t, tc.expPrices, prices)
 		})
 	}

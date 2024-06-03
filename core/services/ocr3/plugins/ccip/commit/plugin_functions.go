@@ -388,8 +388,7 @@ func newMsgsConsensusForChain(
 //     of the chain, then the report will revert onchain but still succeed upon retry
 //   - We minimize the risk of naturally hitting the error condition minSeqNum > maxSeqNum due to oracles
 //     delayed views of the chain (would be an issue with taking sorted_mins[-f])
-func maxSeqNumsConsensus(lggr logger.Logger, fChain int, observations []model.CommitPluginObservation,
-) ([]model.SeqNumChain, error) {
+func maxSeqNumsConsensus(lggr logger.Logger, fChain int, observations []model.CommitPluginObservation) []model.SeqNumChain {
 	observedSeqNumsPerChain := make(map[model.ChainSelector][]model.SeqNum)
 	for _, obs := range observations {
 		for _, maxSeqNum := range obs.MaxSeqNums {
@@ -400,7 +399,7 @@ func maxSeqNumsConsensus(lggr logger.Logger, fChain int, observations []model.Co
 		}
 	}
 
-	maxSeqNumsConsensus := make([]model.SeqNumChain, 0, len(observedSeqNumsPerChain))
+	seqNums := make([]model.SeqNumChain, 0, len(observedSeqNumsPerChain))
 	for ch, observedSeqNums := range observedSeqNumsPerChain {
 		if len(observedSeqNums) < 2*fChain+1 {
 			lggr.Warnw("not enough observations for chain", "chain", ch, "observedSeqNums", observedSeqNums)
@@ -408,11 +407,11 @@ func maxSeqNumsConsensus(lggr logger.Logger, fChain int, observations []model.Co
 		}
 
 		sort.Slice(observedSeqNums, func(i, j int) bool { return observedSeqNums[i] < observedSeqNums[j] })
-		maxSeqNumsConsensus = append(maxSeqNumsConsensus, model.NewSeqNumChain(ch, observedSeqNums[fChain]))
+		seqNums = append(seqNums, model.NewSeqNumChain(ch, observedSeqNums[fChain]))
 	}
 
-	sort.Slice(maxSeqNumsConsensus, func(i, j int) bool { return maxSeqNumsConsensus[i].ChainSel < maxSeqNumsConsensus[j].ChainSel })
-	return maxSeqNumsConsensus, nil
+	sort.Slice(seqNums, func(i, j int) bool { return seqNums[i].ChainSel < seqNums[j].ChainSel })
+	return seqNums
 }
 
 // tokenPricesConsensus returns the median price for tokens that have at least 2f_chain+1 observations.
@@ -443,7 +442,7 @@ func tokenPricesConsensus(
 	return consensusPrices, nil
 }
 
-func gasPricesConsensus(lggr logger.Logger, observations []model.CommitPluginObservation, fChain int) ([]model.GasPriceChain, error) {
+func gasPricesConsensus(lggr logger.Logger, observations []model.CommitPluginObservation, fChain int) []model.GasPriceChain {
 	// Group the observed gas prices by chain.
 	gasPricePerChain := make(map[model.ChainSelector][]model.BigInt)
 	for _, obs := range observations {
@@ -474,7 +473,7 @@ func gasPricesConsensus(lggr logger.Logger, observations []model.CommitPluginObs
 	}
 
 	sort.Slice(consensusGasPrices, func(i, j int) bool { return consensusGasPrices[i].ChainSel < consensusGasPrices[j].ChainSel })
-	return consensusGasPrices, nil
+	return consensusGasPrices
 }
 
 // pluginConfigConsensus comes to consensus on the plugin config based on the observations.

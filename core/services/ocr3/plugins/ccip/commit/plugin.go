@@ -144,6 +144,7 @@ func (p *Plugin) Observation(ctx context.Context, outctx ocr3types.OutcomeContex
 		"observedNewMsgs", len(newMsgs),
 		"gasPrices", len(gasPrices),
 		"tokenPrices", len(tokenPrices),
+		"maxSeqNumsPerChain", maxSeqNumsPerChain,
 		"observerInfo", p.cfg.ObserverInfo)
 
 	msgBaseDetails := make([]model.CCIPMsgBaseDetails, 0)
@@ -216,10 +217,7 @@ func (p *Plugin) Outcome(_ ocr3types.OutcomeContext, _ types.Query, aos []types.
 		return ocr3types.Outcome{}, fmt.Errorf("missing destination chain %d in fChain config", p.cfg.DestChain)
 	}
 
-	maxSeqNums, err := maxSeqNumsConsensus(p.lggr, fChainDest, decodedObservations)
-	if err != nil {
-		return ocr3types.Outcome{}, fmt.Errorf("max sequence numbers consensus: %w", err)
-	}
+	maxSeqNums := maxSeqNumsConsensus(p.lggr, fChainDest, decodedObservations)
 	p.lggr.Debugw("max sequence numbers consensus", "maxSeqNumsConsensus", maxSeqNums)
 
 	merkleRoots, err := newMsgsConsensus(p.lggr, maxSeqNums, decodedObservations, cfg.FChain)
@@ -233,10 +231,8 @@ func (p *Plugin) Outcome(_ ocr3types.OutcomeContext, _ types.Query, aos []types.
 		return ocr3types.Outcome{}, fmt.Errorf("token prices consensus: %w", err)
 	}
 
-	gasPrices, err := gasPricesConsensus(p.lggr, decodedObservations, cfg.FChain[cfg.DestChain])
-	if err != nil {
-		return ocr3types.Outcome{}, fmt.Errorf("gas prices consensus: %w", err)
-	}
+	gasPrices := gasPricesConsensus(p.lggr, decodedObservations, cfg.FChain[cfg.DestChain])
+	p.lggr.Debugw("gas prices consensus", "gasPrices", gasPrices)
 
 	outcome := model.NewCommitPluginOutcome(maxSeqNums, merkleRoots, tokenPrices, gasPrices)
 	if outcome.IsEmpty() {

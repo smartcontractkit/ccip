@@ -22,11 +22,12 @@ func TestPlugin(t *testing.T) {
 	lggr := logger.Test(t)
 
 	testCases := []struct {
-		name        string
-		description string
-		nodes       []nodeSetup
-		expErr      func(*testing.T, error)
-		expOutcome  model.CommitPluginOutcome
+		name                  string
+		description           string
+		nodes                 []nodeSetup
+		expErr                func(*testing.T, error)
+		expOutcome            model.CommitPluginOutcome
+		expTransmittedReports []model.CommitPluginReport
 	}{
 		{
 			name:        "EmptyOutcome",
@@ -51,6 +52,49 @@ func TestPlugin(t *testing.T) {
 				GasPrices: []model.GasPriceChain{
 					{ChainSel: chainA, GasPrice: model.BigInt{Int: big.NewInt(1000)}},
 					{ChainSel: chainB, GasPrice: model.BigInt{Int: big.NewInt(20000)}},
+				},
+			},
+			expTransmittedReports: []model.CommitPluginReport{
+				{
+					MerkleRoots: []model.MerkleRootChain{
+						{ChainSel: chainB, SeqNumsRange: model.NewSeqNumRange(21, 22)},
+					},
+					PriceUpdates: model.PriceUpdate{
+						TokenPriceUpdates: []model.TokenPrice{},
+						GasPriceUpdates: []model.GasPriceChain{
+							{ChainSel: chainA, GasPrice: model.BigInt{Int: big.NewInt(1000)}},
+							{ChainSel: chainB, GasPrice: model.BigInt{Int: big.NewInt(20000)}},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:        "NodesDoNotAgreeOnMsgs",
+			description: "Nodes do not agree on messages which leads to an outcome with empty merkle roots.",
+			nodes:       setupNodesDoNotAgreeOnMsgs(t, ctx, lggr),
+			expOutcome: model.CommitPluginOutcome{
+				MaxSeqNums: []model.SeqNumChain{
+					{ChainSel: chainA, SeqNum: 10},
+					{ChainSel: chainB, SeqNum: 20},
+				},
+				MerkleRoots: []model.MerkleRootChain{},
+				TokenPrices: []model.TokenPrice{},
+				GasPrices: []model.GasPriceChain{
+					{ChainSel: chainA, GasPrice: model.BigInt{Int: big.NewInt(1000)}},
+					{ChainSel: chainB, GasPrice: model.BigInt{Int: big.NewInt(20000)}},
+				},
+			},
+			expTransmittedReports: []model.CommitPluginReport{
+				{
+					MerkleRoots: []model.MerkleRootChain{},
+					PriceUpdates: model.PriceUpdate{
+						TokenPriceUpdates: []model.TokenPrice{},
+						GasPriceUpdates: []model.GasPriceChain{
+							{ChainSel: chainA, GasPrice: model.BigInt{Int: big.NewInt(1000)}},
+							{ChainSel: chainB, GasPrice: model.BigInt{Int: big.NewInt(20000)}},
+						},
+					},
 				},
 			},
 		},
@@ -93,6 +137,18 @@ func TestPlugin(t *testing.T) {
 				for i, exp := range tc.expOutcome.MerkleRoots {
 					assert.Equal(t, exp.ChainSel, outcome.MerkleRoots[i].ChainSel)
 					assert.Equal(t, exp.SeqNumsRange, outcome.MerkleRoots[i].SeqNumsRange)
+				}
+			}
+
+			assert.Equal(t, len(tc.expTransmittedReports), len(res.Transmitted))
+			for i, exp := range tc.expTransmittedReports {
+				actual, err := nodesSetup[0].reportCodec.Decode(ctx, res.Transmitted[i].Report)
+				assert.NoError(t, err)
+				assert.Equal(t, exp.PriceUpdates, actual.PriceUpdates)
+				assert.Equal(t, len(exp.MerkleRoots), len(actual.MerkleRoots))
+				for j, expRoot := range exp.MerkleRoots {
+					assert.Equal(t, expRoot.ChainSel, actual.MerkleRoots[j].ChainSel)
+					assert.Equal(t, expRoot.SeqNumsRange, actual.MerkleRoots[j].SeqNumsRange)
 				}
 			}
 		})
@@ -170,6 +226,63 @@ func setupAllNodesReadAllChains(t *testing.T, ctx context.Context, lggr logger.L
 				{big.NewInt(1000)},
 				{big.NewInt(20000)},
 			}, nil)
+	}
+
+	return nodes
+}
+
+func setupNodesDoNotAgreeOnMsgs(t *testing.T, ctx context.Context, lggr logger.Logger) []nodeSetup {
+	cfg := model.CommitPluginConfig{
+		DestChain: chainC,
+		FChain: map[model.ChainSelector]int{
+			chainA: 1,
+			chainB: 1,
+			chainC: 1,
+		},
+		ObserverInfo: map[commontypes.OracleID]model.ObserverInfo{
+			1: {Writer: true, Reads: []model.ChainSelector{chainA, chainB, chainC}},
+			2: {Writer: true, Reads: []model.ChainSelector{chainA, chainB, chainC}},
+			3: {Writer: true, Reads: []model.ChainSelector{chainA, chainB, chainC}},
+		},
+		PricedTokens:        []types.Account{tokenX},
+		TokenPricesObserver: false,
+		NewMsgScanBatchSize: 256,
+	}
+
+	n1 := newNode(t, ctx, lggr, 1, cfg)
+	n2 := newNode(t, ctx, lggr, 2, cfg)
+	n3 := newNode(t, ctx, lggr, 3, cfg)
+	nodes := []nodeSetup{n1, n2, n3}
+
+	for i, n := range nodes {
+		// all nodes observe the same sequence numbers 10 for chainA and 20 for chainB
+		n.ccipReader.On("NextSeqNum", ctx, []model.ChainSelector{chainA, chainB}).
+			Return([]model.SeqNum{10, 20}, nil)
+
+		// then they fetch new msgs, there is nothing new on chainA
+		n.ccipReader.On(
+			"MsgsBetweenSeqNums",
+			ctx,
+			chainA,
+			model.NewSeqNumRange(11, model.SeqNum(11+cfg.NewMsgScanBatchSize)),
+		).Return([]model.CCIPMsg{}, nil)
+
+		// and there are two new message on chainB
+		n.ccipReader.On(
+			"MsgsBetweenSeqNums",
+			ctx,
+			chainB,
+			model.NewSeqNumRange(
+				21,
+				model.SeqNum(21+cfg.NewMsgScanBatchSize),
+			),
+		).Return([]model.CCIPMsg{
+			{CCIPMsgBaseDetails: model.CCIPMsgBaseDetails{ID: model.Bytes32{1, byte(i)}, SourceChain: chainB, SeqNum: 21 + model.SeqNum(i*10)}},
+			{CCIPMsgBaseDetails: model.CCIPMsgBaseDetails{ID: model.Bytes32{2, byte(i)}, SourceChain: chainB, SeqNum: 22 + model.SeqNum(i*20)}},
+		}, nil)
+
+		n.ccipReader.On("GasPrices", ctx, []model.ChainSelector{chainA, chainB}).
+			Return([]model.BigInt{{big.NewInt(1000)}, {big.NewInt(20000)}}, nil)
 	}
 
 	return nodes
