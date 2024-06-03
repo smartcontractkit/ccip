@@ -113,16 +113,6 @@ func Test_ProperlyRecognizesPerLaneCurses(t *testing.T) {
 	assert.False(t, isCursed)
 }
 
-// BenchmarkIsSourceCursedWithCache-14        90266             12526 ns/op
-// BenchmarkIsSourceCursedWithCache-14        88867             12411 ns/op
-// BenchmarkIsSourceCursedWithCache-14        90930             12379 ns/op
-// BenchmarkIsSourceCursedWithCache-14        91108             12259 ns/op
-// BenchmarkIsSourceCursedWithCache-14        90915             12306 ns/op
-// BenchmarkIsSourceCursedOriginal-14          3002            397356 ns/op
-// BenchmarkIsSourceCursedOriginal-14          2996            402220 ns/op
-// BenchmarkIsSourceCursedOriginal-14          3009            399806 ns/op
-// BenchmarkIsSourceCursedOriginal-14          2575            397963 ns/op
-// BenchmarkIsSourceCursedOriginal-14          2596            396812 ns/op
 // This is written to benchmark before and after the caching of StaticConfig and RMNContract
 func BenchmarkIsSourceCursedWithCache(b *testing.B) {
 	user, bc := ccipdata.NewSimulation(b)
