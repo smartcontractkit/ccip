@@ -80,7 +80,8 @@ runs:
           echo "$toml_array_format"
         }
 
-        log_targets=$(convert_to_toml_array "$LOGSTREAM_LOG_TARGETS")
+        selected_networks=$(convert_to_toml_array "$SELECTED_NETWORKS")
+        log_targets=$(convert_to_toml_array "$LOGSTREAM_LOG_TARGETS")      
 
         if [ -n "$TEST_LOG_COLLECT" ]; then
           test_log_collect=true
@@ -141,6 +142,8 @@ runs:
         [CCIP]
         [CCIP.Env]
         EnvToConnect="$EXISTING_NAMESPACE"
+        [CCIP.Env.Network]
+        selected_networks = $selected_networks
         [CCIP.Env.NewCLCluster]
         [CCIP.Env.NewCLCluster.Common]
         [CCIP.Env.NewCLCluster.Common.ChainlinkImage]
@@ -179,6 +182,6 @@ runs:
         EOF
 
         BASE64_CCIP_SECRETS_CONFIG=$(cat config.toml | base64 -w 0)
-        cat config.toml 
+        echo ::add-mask::$BASE64_CCIP_SECRETS_CONFIG
         echo "BASE64_CCIP_SECRETS_CONFIG=$BASE64_CCIP_SECRETS_CONFIG" >> $GITHUB_ENV
         echo "TEST_BASE64_CCIP_SECRETS_CONFIG=$BASE64_CCIP_SECRETS_CONFIG" >> $GITHUB_ENV

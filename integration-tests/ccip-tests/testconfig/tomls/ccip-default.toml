@@ -17,19 +17,19 @@ TTL = '5h'
 # then lanes will be set up between SIMULATED_1 and SIMULATED_2, SIMULATED_1 and SIMULATED_3, SIMULATED_2 and SIMULATED_3
 # default value is ['SIMULATED_1', 'SIMULATED_2'] which means that test will create two private geth networks from scratch and set up lanes between them
 [CCIP.Env.Network]
-selected_networks = ['SIMULATED_BESU_NONDEV_1', 'SIMULATED_2']
+selected_networks = ['SIMULATED_1', 'SIMULATED_2']
 
 # PrivateEthereumNetworks.NETWORK_NAME contains the configuration of private ethereum network that includes ethereum version, evm node client, chain id,
 # certain chain configurations, addresses to fund or custom docker images to be used. These are non-dev networks, but they all run just a single node.
-[CCIP.Env.PrivateEthereumNetworks.SIMULATED_BESU_NONDEV_1]
+[CCIP.Env.PrivateEthereumNetworks.SIMULATED_1]
 # either eth1 or eth2 (for post-Merge); for eth2 Prysm is used for consensus layer.
-ethereum_version = "eth2"
+ethereum_version = "eth1"
 # geth, besu, erigon or nethermind
-execution_layer = ""
+execution_layer = "geth"
 # eth2-only, if set to true environment startup will wait until at least 1 epoch has been finalised
-wait_for_finalization=true
+wait_for_finalization=false
 
-[CCIP.Env.PrivateEthereumNetworks.SIMULATED_BESU_NONDEV_1.EthereumChainConfig]
+[CCIP.Env.PrivateEthereumNetworks.SIMULATED_1.EthereumChainConfig]
 # eth2-only, the lower the value the faster the block production (3 is minimum)
 seconds_per_slot = 3
 # eth2-only, the lower the value the faster the epoch finalisation (2 is minimum)
@@ -45,15 +45,15 @@ addresses_to_fund = [
     "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
 ]
 
-[CCIP.Env.PrivateEthereumNetworks.SIMULATED_BESU_NONDEV_1.EthereumChainConfig.HardForkEpochs]
+[CCIP.Env.PrivateEthereumNetworks.SIMULATED_1.EthereumChainConfig.HardForkEpochs]
 # eth2-only, epoch at which chain will upgrade do Dencun or Deneb/Cancun (1 is minimum)
 Deneb = 500
 
-[CCIP.Env.PrivateEthereumNetworks.SIMULATED_BESU_NONDEV_1.CustomDockerImages]
+#[CCIP.Env.PrivateEthereumNetworks.SIMULATED_1.CustomDockerImages]
 # custom docker image that will be used for execution layer client. It has to be one of: hyperledger/besu, nethermind/nethermind, thorax/erigon or ethereum/client-go.
 # instead of using a specific tag you can also use "latest_available" to use latest published tag in Github or "latest_stable" to use latest stable release from Github
 # (if corresponding Docker image on Docker Hub has not been published environment creation will fail).
-execution_layer="hyperledger/besu:latest_stable"
+#execution_layer="hyperledger/besu:latest_stable"
 
 [CCIP.Env.PrivateEthereumNetworks.SIMULATED_2]
 ethereum_version = "eth1"
@@ -228,10 +228,6 @@ FeeCapDefault = '200 gwei'
 BlockHistorySize = 200
 EIP1559FeeCapBufferBlocks = 0
 """
-
-[CCIP.Env.NewCLCluster.Common.ChainlinkImage]
-image = "chainlink-ccip"
-version = "latest"
 
 # the following configs are specific to each test type, smoke, load , chaos, etc...
 [CCIP.Groups]
