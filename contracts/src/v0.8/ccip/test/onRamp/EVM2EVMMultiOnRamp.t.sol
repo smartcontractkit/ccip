@@ -1325,7 +1325,7 @@ contract EVM2EVMMultiOnRamp_getTokenTransferCost is EVM2EVMMultiOnRamp_getFeeSet
       maxFeeUSDCents: 0,
       deciBps: 0,
       destGasOverhead: 0,
-      destBytesOverhead: 0,
+      destBytesOverhead: uint32(Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES),
       aggregateRateLimitEnabled: true,
       isEnabled: true
     });
@@ -1343,7 +1343,7 @@ contract EVM2EVMMultiOnRamp_getTokenTransferCost is EVM2EVMMultiOnRamp_getFeeSet
       feeUSDWei
     );
     assertEq(0, destGasOverhead);
-    assertEq(0, destBytesOverhead);
+    assertEq(Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES, destBytesOverhead);
   }
 
   function test_Fuzz_TokenTransferFeeDuplicateTokens_Success(uint256 transfers, uint256 amount) public view {
@@ -1640,15 +1640,20 @@ contract EVM2EVMMultiOnRamp_applyTokenTransferFeeConfigUpdates is EVM2EVMMultiOn
     tokenTransferFeeConfigArgs[0].destChainSelector = DEST_CHAIN_SELECTOR;
     tokenTransferFeeConfigArgs[1].destChainSelector = DEST_CHAIN_SELECTOR + 1;
 
-    for (uint256 i = 0; i < tokenTransferFeeConfigs.length; ++i) {
-      address feeToken = s_sourceTokens[i];
-      tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[i].token = feeToken;
-      tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[i].tokenTransferFeeConfig = tokenTransferFeeConfigs[i];
+    for (uint256 i = 0; i < tokenTransferFeeConfigArgs.length; ++i) {
+      for (uint256 j = 0; j < tokenTransferFeeConfigs.length; ++j) {
+        tokenTransferFeeConfigs[j].destBytesOverhead = uint32(
+          bound(tokenTransferFeeConfigs[j].destBytesOverhead, Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES, type(uint32).max)
+        );
+        address feeToken = s_sourceTokens[j];
+        tokenTransferFeeConfigArgs[i].tokenTransferFeeConfigs[j].token = feeToken;
+        tokenTransferFeeConfigArgs[i].tokenTransferFeeConfigs[j].tokenTransferFeeConfig = tokenTransferFeeConfigs[j];
 
-      vm.expectEmit();
-      emit EVM2EVMMultiOnRamp.TokenTransferFeeConfigUpdated(
-        tokenTransferFeeConfigArgs[0].destChainSelector, feeToken, tokenTransferFeeConfigs[i]
-      );
+        vm.expectEmit();
+        emit EVM2EVMMultiOnRamp.TokenTransferFeeConfigUpdated(
+          tokenTransferFeeConfigArgs[i].destChainSelector, feeToken, tokenTransferFeeConfigs[j]
+        );
+      }
     }
 
     s_onRamp.applyTokenTransferFeeConfigUpdates(
@@ -1677,7 +1682,7 @@ contract EVM2EVMMultiOnRamp_applyTokenTransferFeeConfigUpdates is EVM2EVMMultiOn
       maxFeeUSDCents: 7,
       deciBps: 8,
       destGasOverhead: 9,
-      destBytesOverhead: 10,
+      destBytesOverhead: 312,
       aggregateRateLimitEnabled: true,
       isEnabled: true
     });
@@ -1688,7 +1693,7 @@ contract EVM2EVMMultiOnRamp_applyTokenTransferFeeConfigUpdates is EVM2EVMMultiOn
       maxFeeUSDCents: 13,
       deciBps: 14,
       destGasOverhead: 15,
-      destBytesOverhead: 16,
+      destBytesOverhead: 394,
       aggregateRateLimitEnabled: false,
       isEnabled: true
     });
@@ -1759,6 +1764,8 @@ contract EVM2EVMMultiOnRamp_applyTokenTransferFeeConfigUpdates is EVM2EVMMultiOn
       generateTokenTransferFeeConfigArgs(1, 1);
     tokenTransferFeeConfigArgs[0].destChainSelector = DEST_CHAIN_SELECTOR;
     tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].token = address(5);
+    tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].tokenTransferFeeConfig.destBytesOverhead =
+      DEFAULT_TOKEN_BYTES_OVERHEAD;
 
     vm.expectEmit();
     emit EVM2EVMMultiOnRamp.TokenTransferFeeConfigUpdated(
@@ -1772,7 +1779,7 @@ contract EVM2EVMMultiOnRamp_applyTokenTransferFeeConfigUpdates is EVM2EVMMultiOn
     );
   }
 
-  function test_ApplyTokenTransferFeeConfigByAdminZeroInput() public {
+  function test_ApplyTokenTransferFeeZeroInput() public {
     vm.recordLogs();
     s_onRamp.applyTokenTransferFeeConfigUpdates(
       new EVM2EVMMultiOnRamp.TokenTransferFeeConfigArgs[](0),
@@ -1789,6 +1796,35 @@ contract EVM2EVMMultiOnRamp_applyTokenTransferFeeConfigUpdates is EVM2EVMMultiOn
     EVM2EVMMultiOnRamp.TokenTransferFeeConfigArgs[] memory tokenTransferFeeConfigArgs;
 
     vm.expectRevert(EVM2EVMMultiOnRamp.OnlyCallableByOwnerOrAdmin.selector);
+
+    s_onRamp.applyTokenTransferFeeConfigUpdates(
+      tokenTransferFeeConfigArgs, new EVM2EVMMultiOnRamp.TokenTransferFeeConfigRemoveArgs[](0)
+    );
+  }
+
+  function test_InvalidDestBytesOverhead_Revert() public {
+    EVM2EVMMultiOnRamp.TokenTransferFeeConfigArgs[] memory tokenTransferFeeConfigArgs =
+      generateTokenTransferFeeConfigArgs(1, 1);
+    tokenTransferFeeConfigArgs[0].destChainSelector = DEST_CHAIN_SELECTOR;
+    tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].token = address(5);
+    tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].tokenTransferFeeConfig = EVM2EVMMultiOnRamp
+      .TokenTransferFeeConfig({
+      minFeeUSDCents: 6,
+      maxFeeUSDCents: 7,
+      deciBps: 8,
+      destGasOverhead: 9,
+      destBytesOverhead: uint32(Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES - 1),
+      aggregateRateLimitEnabled: true,
+      isEnabled: true
+    });
+
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        EVM2EVMMultiOnRamp.InvalidDestBytesOverhead.selector,
+        tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].token,
+        tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].tokenTransferFeeConfig.destBytesOverhead
+      )
+    );
 
     s_onRamp.applyTokenTransferFeeConfigUpdates(
       tokenTransferFeeConfigArgs, new EVM2EVMMultiOnRamp.TokenTransferFeeConfigRemoveArgs[](0)

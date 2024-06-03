@@ -806,6 +806,11 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ILinkAvailable, AggregateRat
         TokenTransferFeeConfig memory tokenTransferFeeConfig =
           tokenTransferFeeConfigArg.tokenTransferFeeConfigs[j].tokenTransferFeeConfig;
         address token = tokenTransferFeeConfigArg.tokenTransferFeeConfigs[j].token;
+
+        if (tokenTransferFeeConfig.destBytesOverhead < Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES) {
+          revert InvalidDestBytesOverhead(token, tokenTransferFeeConfig.destBytesOverhead);
+        }
+
         s_tokenTransferFeeConfig[destChainSelector][token] = tokenTransferFeeConfig;
 
         emit TokenTransferFeeConfigUpdated(destChainSelector, token, tokenTransferFeeConfig);
