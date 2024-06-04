@@ -1954,7 +1954,7 @@ func (d *Delegate) newServicesCCIPExecution(ctx context.Context, lggr logger.Sug
 		types.RelayArgs{
 			ContractID:   spec.ContractID,
 			RelayConfig:  spec.RelayConfig.Bytes(),
-			ProviderType: string(types.CCIPCommit),
+			ProviderType: string(types.CCIPExecution),
 		},
 		types.PluginArgs{
 			TransmitterID: transmitterID,
@@ -1974,7 +1974,7 @@ func (d *Delegate) newServicesCCIPExecution(ctx context.Context, lggr logger.Sug
 		types.RelayArgs{
 			ContractID:   spec.ContractID,
 			RelayConfig:  spec.RelayConfig.Bytes(),
-			ProviderType: string(types.CCIPCommit),
+			ProviderType: string(types.CCIPExecution),
 		},
 		types.PluginArgs{
 			TransmitterID: transmitterID,
