@@ -22,9 +22,9 @@ import {IERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/
 import {SafeERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
 import {EnumerableMap} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/structs/EnumerableMap.sol";
 
-/// @notice The onRamp is a contract that handles lane-specific fee logic, NOP payments and
+/// @notice The EVM2EVMOnRamp is a contract that handles lane-specific fee logic, NOP payments and
 /// bridgeable token support.
-/// @dev The EVM2EVMOnRamp, CommitStore and EVM2EVMOffRamp form an xchain upgradeable unit. Any change to one of them
+/// @dev The EVM2EVMOnRamp, MultiCommitStore and MultiEVM2EVMOffRamp form an xchain upgradeable unit. Any change to one of them
 /// results an onchain upgrade of all 3.
 contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ILinkAvailable, AggregateRateLimiter, ITypeAndVersion {
   using SafeERC20 for IERC20;
@@ -214,7 +214,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ILinkAvailable, AggregateRat
   /// @dev The current nonce per sender.
   /// The offramp has a corresponding s_senderNonce mapping to ensure messages
   /// are executed in the same order they are sent.
-  mapping(address sender => uint64 nonce) internal s_senderNonce;
+  mapping(uint64 destChainSelector => mapping(address sender => uint64 nonce)) internal s_senderNonce;
   /// @dev The amount of LINK available to pay NOPS
   uint96 internal s_nopFeesJuels;
   /// @dev The combined weight of all NOPs weights
@@ -257,7 +257,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ILinkAvailable, AggregateRat
 
   /// @inheritdoc IEVM2AnyMultiOnRamp
   function getSenderNonce(uint64 destChainSelector, address sender) public view returns (uint64) {
-    uint64 senderNonce = s_senderNonce[sender];
+    uint64 senderNonce = s_senderNonce[destChainSelector][sender];
 
     if (senderNonce == 0) {
       address prevOnRamp = s_destChainConfig[destChainSelector].prevOnRamp;
@@ -388,7 +388,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ILinkAvailable, AggregateRat
     if (s_nopFeesJuels > i_maxNopFeesJuels) revert MaxFeeBalanceReached();
 
     uint64 nonce = getSenderNonce(destChainSelector, originalSender) + 1;
-    s_senderNonce[originalSender] = nonce;
+    s_senderNonce[destChainSelector][originalSender] = nonce;
 
     // We need the next available sequence number so we increment before we use the value
     return Internal.EVM2EVMMessage({
