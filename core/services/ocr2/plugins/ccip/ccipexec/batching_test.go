@@ -5,6 +5,7 @@ import (
 	"context"
 	"math"
 	"math/big"
+	"reflect"
 	"testing"
 	"time"
 
@@ -13,6 +14,7 @@ import (
 	"github.com/stretchr/testify/mock"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
+	txmmocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/txmgr/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
@@ -471,6 +473,15 @@ func TestBatchingStrategies(t *testing.T) {
 		},
 	}
 
+	// TODO: add following scenarios
+	// 1 message, no ZKO (multiple answers and none of them is ZKO) => batch with 1st
+	// 1 message, ZKO (with multiple answers and 1 is ZKO) => empty batch/no batch
+	// 1 message, no ZKO (with multiple answers and none is ZKO) => empty batch/no batch
+	// 2 messages, 1st is pending, 2nd is not ZKO => batch with 1st
+	// 2 messages, 1st is ZKO, 2nd is ZKO => empty batch/no batch
+	// 3 messages, 1st is not ZKO, 2nd is not ZKO, 3rd is not ZKO => batch with 1st
+	// 3 messages, 1st is ZKO, 2nd is not ZKO, 3rd is not ZKO => batch with 2nd
+	// 3 messages, 1st is ZKO, 2nd is ZKO, 3rd is not ZKO => batch with 3rd
 	specificZkOverflowTestCases := []testCase{
 		{
 			name: "batch size is 1",
@@ -534,7 +545,10 @@ func TestBatchingStrategies(t *testing.T) {
 	})
 
 	t.Run("ZKOverflowBatchingStrategy", func(t *testing.T) {
-		strategy := &ZKOverflowBatchingStrategy{}
+		mockedTxManager := new(txmmocks.MockEvmTxManager)
+		strategy := &ZKOverflowBatchingStrategy{
+			txManager: mockedTxManager,
+		}
 		runBatchingStrategyTests(t, strategy, 1_000_000, append(testCases, specificZkOverflowTestCases...))
 	})
 }
@@ -564,6 +578,12 @@ func runBatchingStrategyTests(t *testing.T, strategy BatchingStrategy, available
 			// Mock calls to reader.
 			mockOffRampReader := ccipdatamocks.NewOffRampReader(t)
 			mockOffRampReader.On("ListSenderNonces", mock.Anything, mock.Anything).Return(tc.offRampNoncesBySender, nil).Maybe()
+
+			// Mock calls to TXM
+			strategyType := reflect.TypeOf(strategy)
+			if strategyType == reflect.TypeOf(&ZKOverflowBatchingStrategy{}) {
+				strategy.(*ZKOverflowBatchingStrategy).txManager.(*txmmocks.MockEvmTxManager).On("Name").Return("dummy name", nil).Maybe()
+			}
 
 			batchContext := &BatchContext{
 				ctx:                        context.Background(),

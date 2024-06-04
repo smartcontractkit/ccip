@@ -11,6 +11,7 @@ import (
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
 
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/txmgr"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
@@ -91,7 +92,7 @@ func (s *BestEffortBatchingStrategy) BuildBatch(
 
 type ZKOverflowBatchingStrategy struct {
 	BaseBatchingStrategy
-	txm struct{} // TODO: replace with actual TXM
+	txManager txmgr.TxManager
 }
 
 // ZKOverflowBatchingStrategy is a batching strategy for ZK chains overflowing under certain conditions.
@@ -121,7 +122,8 @@ func (bs *ZKOverflowBatchingStrategy) BuildBatch(
 		batchCtx.expectedNonces[msg.Sender] = msg.Nonce + 1
 		batchBuilder.addToBatch(msg, tokenData)
 
-		// TODO: Perform the ZK check here using bs.txm.someMethod()
+		// TODO: Perform the ZK check here
+		bs.txManager.Name()
 
 		msgLggr.Infow(
 			"Message added to execution batch",

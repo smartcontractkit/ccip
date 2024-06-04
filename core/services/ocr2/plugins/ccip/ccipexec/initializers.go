@@ -304,6 +304,7 @@ func jobSpecToExecPluginConfig(ctx context.Context, lggr logger.Logger, jb job.J
 			tokenDataWorker:             tokenBackgroundWorker,
 			metricsCollector:            metricsCollector,
 			chainHealthcheck:            chainHealthcheck,
+			txManager:                   params.destChain.TxManager(),
 		}, &ccipcommon.BackfillArgs{
 			SourceLP:         params.sourceChain.LogPoller(),
 			DestLP:           params.destChain.LogPoller(),

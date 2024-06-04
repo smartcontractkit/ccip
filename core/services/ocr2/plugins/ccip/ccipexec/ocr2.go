@@ -17,6 +17,7 @@ import (
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
 
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/txmgr"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache"
@@ -62,6 +63,7 @@ type ExecutionPluginStaticConfig struct {
 	tokenPoolBatchedReader      batchreader.TokenPoolBatchedReader
 	metricsCollector            ccip.PluginMetricsCollector
 	chainHealthcheck            cache.ChainHealthcheck
+	txManager                   txmgr.TxManager
 }
 
 type ExecutionReportingPlugin struct {

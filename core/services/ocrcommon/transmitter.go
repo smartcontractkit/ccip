@@ -71,7 +71,12 @@ func (t *transmitter) CreateEthTransaction(ctx context.Context, toAddress common
 		return errors.Wrap(err, "skipped OCR transmission, error getting round-robin address")
 	}
 
+	// TODO: Add the idempotency key from the TxMeta
+	// messageIds := txMeta.MessageIDs
+	// save it in the shared store
+
 	_, err = t.txm.CreateTransaction(ctx, txmgr.TxRequest{
+		// IdempotencyKey:   &messageIds[0],
 		FromAddress:      roundRobinFromAddress,
 		ToAddress:        toAddress,
 		EncodedPayload:   payload,
