@@ -907,7 +907,7 @@ func CCIPDefaultTestSetUp(
 		for _, net := range testConfig.AllNetworks {
 			chainClient := chainClientByChainID[net.ChainID]
 			// TODO: This is a total guess at how much funds we need to deploy the tokens. This could be way off, especially on live chains.
-			// There aren't a lot of good ways to estimate this though.
+			// There aren't a lot of good ways to estimate this though. See CCIP-2471.
 			_, err = chainClient.NewWallet(big.NewFloat(0.1))
 			require.NoError(t, err, "failed to create new wallet to deploy tokens from")
 			err = chainClient.WaitForEvents()
