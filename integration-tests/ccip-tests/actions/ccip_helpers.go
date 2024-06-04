@@ -3696,20 +3696,26 @@ func SetOCR2Config(
 	}
 	if destCCIP.OffRamp != nil {
 		signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig, err = contracts.NewOffChainAggregatorV2ConfigForCCIPPlugin(
-			nodes, testhelpers.NewExecOffchainConfig(
+			nodes,
+			testhelpers.NewExecOffchainConfig(
 				1,
 				BatchGasLimit,
 				0.7,
 				*inflightExpiryExec,
 				*commonconfig.MustNewDuration(RootSnoozeTime),
-			), testhelpers.NewExecOnchainConfig(
+			),
+			testhelpers.NewExecOnchainConfig(
 				uint32(DefaultPermissionlessExecThreshold.Seconds()),
 				destCCIP.Common.Router.EthAddress,
 				destCCIP.Common.PriceRegistry.EthAddress,
 				DefaultMaxNoOfTokensInMsg,
 				MaxDataBytes,
 				200_000,
-			), OCR2ParamsForExec, 3*time.Minute)
+				50_000,
+			),
+			OCR2ParamsForExec,
+			3*time.Minute,
+		)
 		if err != nil {
 			return fmt.Errorf("failed to create ocr2 config params for exec: %w", err)
 		}

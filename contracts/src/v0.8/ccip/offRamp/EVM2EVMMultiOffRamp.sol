@@ -106,11 +106,12 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, OCR2BaseN
   /// @dev since OffRampConfig is part of OffRampConfigChanged event, if changing it, we should update the ABI on Atlas
   struct DynamicConfig {
     uint32 permissionLessExecutionThresholdSeconds; // ─╮ Waiting time before manual execution is enabled
-    address router; // ─────────────────────────────────╯ Router address
-    uint16 maxNumberOfTokensPerMsg; // ──╮ Maximum number of ERC20 token transfers that can be included per message
-    uint32 maxDataBytes; //              │ Maximum payload data size in bytes
-    uint32 maxPoolReleaseOrMintGas; //   │ Maximum amount of gas passed on to token pool when calling releaseOrMint
-    address messageValidator; // ────────╯ Optional message validator to validate incoming messages (zero address = no validator)
+    uint32 maxDataBytes; //                             │ Maximum payload data size in bytes
+    uint16 maxNumberOfTokensPerMsg; //                  │ Maximum number of ERC20 token transfers that can be included per message
+    address router; // ─────────────────────────────────╯ Router address\
+    address messageValidator; // ───────╮ Optional message validator to validate incoming messages (zero address = no validator)
+    uint32 maxPoolReleaseOrMintGas; //  │ Maximum amount of gas passed on to token pool when calling releaseOrMint
+    uint32 maxTokenTransferGas; // ─────╯ Maximum amount of gas passed on to token `transfer` call
   }
 
   /// @notice Struct that represents a message route (sender -> receiver and source chain)
@@ -745,7 +746,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, OCR2BaseN
       (success, returnData,) = CallWithExactGas._callWithExactGasSafeReturnData(
         abi.encodeWithSelector(IERC20.transfer.selector, messageRoute.receiver, amount),
         destTokenAddress,
-        s_dynamicConfig.maxPoolReleaseOrMintGas,
+        s_dynamicConfig.maxTokenTransferGas,
         Internal.GAS_FOR_CALL_EXACT_CHECK,
         Internal.MAX_RET_BYTES
       );

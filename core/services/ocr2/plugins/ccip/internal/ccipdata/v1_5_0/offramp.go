@@ -31,6 +31,24 @@ var (
 
 type ExecOnchainConfig evm_2_evm_offramp.EVM2EVMOffRampDynamicConfig
 
+func (d ExecOnchainConfig) AbiString() string {
+	return `
+	[
+		{
+			"components": [
+				{"name": "permissionLessExecutionThresholdSeconds", "type": "uint32"},
+				{"name": "maxDataBytes", "type": "uint32"},
+				{"name": "maxNumberOfTokensPerMsg", "type": "uint16"},
+				{"name": "router", "type": "address"},
+				{"name": "priceRegistry", "type": "address"},
+				{"name": "maxPoolReleaseOrMintGas", "type": "uint32"},
+				{"name": "maxTokenTransferGas", "type": "uint32"}
+			],
+			"type": "tuple"
+		}
+	]`
+}
+
 type OffRamp struct {
 	*v1_2_0.OffRamp
 	offRampV150           evm_2_evm_offramp.EVM2EVMOffRampInterface
