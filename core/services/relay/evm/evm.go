@@ -319,7 +319,7 @@ func (r *Relayer) NewCCIPCommitProvider(rargs commontypes.RelayArgs, pargs commo
 
 }
 
-func (r *Relayer) NewExecProvider(rargs commontypes.RelayArgs, pargs commontypes.PluginArgs) (commontypes.CCIPExecProvider, error) {
+func (r *Relayer) NewCCIPExecProvider(rargs commontypes.RelayArgs, pargs commontypes.PluginArgs) (commontypes.CCIPExecProvider, error) {
 	// TODO https://smartcontract-it.atlassian.net/browse/BCF-2887
 	ctx := context.Background()
 

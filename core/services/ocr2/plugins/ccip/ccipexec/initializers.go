@@ -72,7 +72,7 @@ func NewExecServices2(ctx context.Context, lggr logger.Logger, jb job.Job, srcPr
 
 	srcChainSelector := offRampConfig.SourceChainSelector
 	dstChainSelector := offRampConfig.ChainSelector
-	onRampReader, err := srcProvider.NewOnRampReader(ctx, offRampAddress, srcChainSelector, dstChainSelector)
+	onRampReader, err := srcProvider.NewOnRampReader(ctx, offRampConfig.OnRamp, srcChainSelector, dstChainSelector)
 	if err != nil {
 		return nil, errors.Wrap(err, "create onRampReader")
 	}
@@ -479,7 +479,7 @@ func extractJobSpecParams(lggr logger.Logger, jb job.Job, chainSet legacyevm.Leg
 		return nil, err
 	}
 
-	destChain, _, err := ccipconfig.GetChainFromSpec(spec, chainSet)
+	destChain, dstChainID, err := ccipconfig.GetChainFromSpec(spec, chainSet)
 	if err != nil {
 		return nil, err
 	}
@@ -505,6 +505,8 @@ func extractJobSpecParams(lggr logger.Logger, jb job.Job, chainSet legacyevm.Leg
 	if err != nil {
 		return nil, errors.Wrap(err, "open source chain")
 	}
+
+	panic(fmt.Sprintf("srcChainID: %v, dstChainID: %v", chainID, dstChainID))
 
 	return &jobSpecParams{
 		pluginConfig:  pluginConfig,

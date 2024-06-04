@@ -5,6 +5,8 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	chainselectors "github.com/smartcontractkit/chain-selectors"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"log"
@@ -1834,7 +1836,9 @@ func (d *Delegate) newServicesCCIPCommit(ctx context.Context, lggr logger.Sugare
 		MetricsRegisterer:      prometheus.WrapRegistererWith(map[string]string{"job_name": jb.Name.ValueOrZero()}, prometheus.DefaultRegisterer),
 	}
 
-	return ccipcommit.NewCommitServices2(ctx, srcProvider, dstProvider, srcChain, dstChain, d.legacyChains, jb, lggr, d.pipelineRunner, oracleArgsNoPlugin, d.isNewlyCreatedJob, sourceChainID, int64(destChainID), logError)
+	ccipcommit.NewCommitServices2(ctx, srcProvider, dstProvider, srcChain, dstChain, d.legacyChains, jb, lggr, d.pipelineRunner, oracleArgsNoPlugin, d.isNewlyCreatedJob, sourceChainID, int64(destChainID), logError)
+	return ccipcommit.NewCommitServices(ctx, lggr, jb, d.legacyChains, d.isNewlyCreatedJob, d.pipelineRunner, oracleArgsNoPlugin, logError)
+	//return ccipcommit.NewCommitServices2(ctx, srcProvider, dstProvider, srcChain, dstChain, d.legacyChains, jb, lggr, d.pipelineRunner, oracleArgsNoPlugin, d.isNewlyCreatedJob, sourceChainID, int64(destChainID), logError)
 }
 
 func ccipCommitProviderTypeToPluginConfig(isSourceProvider bool, sourceStartBlock uint64, destStartBlock uint64) ([]byte, error) {
@@ -1856,18 +1860,19 @@ func (d *Delegate) newServicesCCIPExecution(ctx context.Context, lggr logger.Sug
 	if spec.Relay != types.NetworkEVM {
 		return nil, errors.New("Non evm chains are not supported for CCIP execution")
 	}
-	srcRid, err := spec.RelayID()
+	dstRid, err := spec.RelayID()
+
 	if err != nil {
 		return nil, ErrJobSpecNoRelayer{Err: err, PluginName: string(spec.PluginType)}
 	}
-	srcChain, err := d.legacyChains.Get(srcRid.ChainID)
+	dstChain, err := d.legacyChains.Get(dstRid.ChainID)
 	if err != nil {
-		return nil, fmt.Errorf("ccip services; failed to get chain %s: %w", srcRid.ChainID, err)
+		return nil, fmt.Errorf("ccip services; failed to get chain %s: %w", dstRid.ChainID, err)
 	}
 	ccipProvider, err2 := evmrelay.NewCCIPExecutionProvider(
 		ctx,
 		lggr.Named("CCIPExec"),
-		srcChain,
+		dstChain,
 		types.RelayArgs{
 			ExternalJobID: jb.ExternalJobID,
 			JobID:         spec.ID,
@@ -1889,8 +1894,8 @@ func (d *Delegate) newServicesCCIPExecution(ctx context.Context, lggr logger.Sug
 		Database:                     ocrDB,
 		LocalConfig:                  lc,
 		MonitoringEndpoint: d.monitoringEndpointGen.GenMonitoringEndpoint(
-			srcRid.Network,
-			srcRid.ChainID,
+			dstRid.Network,
+			dstRid.ChainID,
 			spec.ContractID,
 			synchronization.OCR2CCIPExec,
 		),
@@ -1904,24 +1909,6 @@ func (d *Delegate) newServicesCCIPExecution(ctx context.Context, lggr logger.Sug
 	}
 
 	// PROVIDER BASED ARG CONSTRUCTION
-	relayers := d.RelayGetter.GetAll()
-
-	// Get the relayer ID corresponding to the dest chain
-	chainIDInterface, ok := spec.RelayConfig["chainID"]
-	if !ok {
-		return nil, errors.New("chainID must be provided in relay config")
-	}
-	dstChainID := uint64(chainIDInterface.(float64))
-	dstChain, err := d.legacyChains.Get(strconv.FormatUint(dstChainID, 10))
-	if err != nil {
-		return nil, errors.Wrap(err, "dest chain not found in chainset")
-	}
-	var dstRid types.RelayID
-	for r := range relayers {
-		if fmt.Sprintf("%d", dstChainID) == r.ChainID {
-			dstRid = r
-		}
-	}
 
 	// Write PluginConfig bytes to send source/dest relayer provider + info outside of top level rargs/pargs over the wire
 	var pluginJobSpecConfig ccipconfig.ExecPluginJobSpecConfig
@@ -1940,29 +1927,9 @@ func (d *Delegate) newServicesCCIPExecution(ctx context.Context, lggr logger.Sug
 		return nil, err
 	}
 
-	srcChainID, err := strconv.ParseInt(srcRid.ChainID, 10, 64)
+	dstChainID, err := strconv.ParseInt(dstRid.ChainID, 10, 64)
 	if err != nil {
 		return nil, err
-	}
-
-	// Get provider from source chain
-	srcRelayer, err := d.RelayGetter.Get(srcRid)
-	if err != nil {
-		return nil, err
-	}
-	provider, err := srcRelayer.NewPluginProvider(ctx,
-		types.RelayArgs{
-			ContractID:   spec.ContractID,
-			RelayConfig:  spec.RelayConfig.Bytes(),
-			ProviderType: string(types.CCIPExecution),
-		},
-		types.PluginArgs{
-			TransmitterID: transmitterID,
-			PluginConfig:  srcConfigBytes,
-		})
-	srcProvider, ok := provider.(types.CCIPExecProvider)
-	if !ok {
-		return nil, errors.New("could not coerce PluginProvider to CCIPExecProvider")
 	}
 
 	// Get provider from dest chain
@@ -1970,7 +1937,7 @@ func (d *Delegate) newServicesCCIPExecution(ctx context.Context, lggr logger.Sug
 	if err != nil {
 		return nil, err
 	}
-	provider, err = dstRelayer.NewPluginProvider(ctx,
+	provider, err := dstRelayer.NewPluginProvider(ctx,
 		types.RelayArgs{
 			ContractID:   spec.ContractID,
 			RelayConfig:  spec.RelayConfig.Bytes(),
@@ -1980,7 +1947,59 @@ func (d *Delegate) newServicesCCIPExecution(ctx context.Context, lggr logger.Sug
 			TransmitterID: transmitterID,
 			PluginConfig:  dstConfigBytes,
 		})
+	if err != nil {
+		return nil, errors.Wrap(err, "NewPluginProvider failed on dstRelayer")
+	}
 	dstProvider, ok := provider.(types.CCIPExecProvider)
+	if !ok {
+		return nil, errors.New("could not coerce PluginProvider to CCIPExecProvider")
+	}
+
+	if err != nil {
+		return nil, errors.Wrap(err, "get offRamp static config")
+	}
+	// Get Src Chain ID from Provider
+	offRampAddress := cciptypes.Address(common.HexToAddress(spec.ContractID).String())
+	offRampReader, err := dstProvider.NewOffRampReader(ctx, offRampAddress)
+	if err != nil {
+		return nil, errors.Wrap(err, "create offRampReader")
+	}
+
+	offRampConfig, err := offRampReader.GetStaticConfig(context.Background())
+	if err != nil {
+		return nil, errors.Wrap(err, "get offRamp static config")
+	}
+
+	srcChainID, err := chainselectors.ChainIdFromSelector(offRampConfig.SourceChainSelector)
+	if err != nil {
+		return nil, err
+	}
+	srcChainIDstr := strconv.FormatUint(srcChainID, 10)
+	srcChain, err := d.legacyChains.Get(srcChainIDstr)
+	if err != nil {
+		return nil, errors.Wrap(err, "open source chain")
+	}
+
+	// Get provider from source chain
+	srcRelayer, err := d.RelayGetter.Get(types.RelayID{Network: spec.Relay, ChainID: srcChainIDstr})
+	if err != nil {
+		return nil, errors.Wrap(err, "Failed to get relayer")
+	}
+	provider, err = srcRelayer.NewPluginProvider(ctx,
+		types.RelayArgs{
+			ContractID:   spec.ContractID,
+			RelayConfig:  spec.RelayConfig.Bytes(),
+			ProviderType: string(types.CCIPExecution),
+		},
+		types.PluginArgs{
+			TransmitterID: transmitterID,
+			PluginConfig:  srcConfigBytes,
+		})
+	if err != nil {
+		return nil, err
+	}
+	panic(fmt.Sprintf("%v", provider.Name()))
+	srcProvider, ok := provider.(types.CCIPExecProvider)
 	if !ok {
 		return nil, errors.New("could not coerce PluginProvider to CCIPExecProvider")
 	}
@@ -1993,8 +2012,8 @@ func (d *Delegate) newServicesCCIPExecution(ctx context.Context, lggr logger.Sug
 		Database:                     ocrDB,
 		LocalConfig:                  lc,
 		MonitoringEndpoint: d.monitoringEndpointGen.GenMonitoringEndpoint(
-			srcRid.Network,
-			srcRid.ChainID,
+			dstRid.Network,
+			dstRid.ChainID,
 			spec.ContractID,
 			synchronization.OCR2CCIPExec,
 		),
@@ -2005,7 +2024,7 @@ func (d *Delegate) newServicesCCIPExecution(ctx context.Context, lggr logger.Sug
 	}
 
 	ccipexec.NewExecServices(ctx, lggr, jb, d.legacyChains, d.isNewlyCreatedJob, oracleArgsNoPlugin, logError)
-	return ccipexec.NewExecServices2(ctx, lggr, jb, srcProvider, dstProvider, srcChain, dstChain, srcChainID, int64(dstChainID), d.legacyChains, d.isNewlyCreatedJob, oracleArgsNoPlugin2, logError)
+	return ccipexec.NewExecServices2(ctx, lggr, jb, srcProvider, dstProvider, srcChain, dstChain, int64(srcChainID), dstChainID, d.legacyChains, d.isNewlyCreatedJob, oracleArgsNoPlugin2, logError)
 }
 
 func ccipExecProviderTypeToPluginConfig(isSourceProvider bool, srcStartBlock uint64, dstStartBlock uint64, usdcConfig ccipconfig.USDCConfig, jobID string) ([]byte, error) {
