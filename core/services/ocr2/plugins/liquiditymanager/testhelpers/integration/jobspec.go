@@ -10,6 +10,7 @@ import (
 	"github.com/lib/pq"
 	"github.com/pelletier/go-toml/v2"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
+	"gopkg.in/guregu/null.v4"
 
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 	"github.com/smartcontractkit/chainlink/v2/core/store/models"
@@ -36,7 +37,7 @@ type LMJobSpecParams struct {
 	Type                    string
 	ChainID                 uint64
 	ContractID              string
-	OcrKeyBundleID          string
+	OCRKeyBundleID          string
 	TransmitterID           string
 	RelayFromBlock          int64
 	FollowerChains          string
@@ -87,6 +88,7 @@ func (p *LMJobSpecParams) JobSpec() *OCR3TaskJobSpec {
 		Relay:                             types.NetworkEVM,
 		PluginType:                        "liquiditymanager",
 		ContractID:                        p.ContractID,
+		OCRKeyBundleID:                    null.StringFrom(p.OCRKeyBundleID),
 		ContractConfigConfirmations:       1,
 		ContractConfigTrackerPollInterval: models.Interval(p.CfgTrackerInterval),
 		P2PV2Bootstrappers:                p.P2PV2Bootstrappers,
@@ -96,7 +98,7 @@ func (p *LMJobSpecParams) JobSpec() *OCR3TaskJobSpec {
 
 	return &OCR3TaskJobSpec{
 		Name:              p.Name,
-		JobType:           "liquiditymanager",
+		JobType:           "offchainreporting2",
 		MaxTaskDuration:   "30s",
 		ForwardingAllowed: false,
 		OCR2OracleSpec:    ocrSpec,
