@@ -9,8 +9,9 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/lib/pq"
 	"github.com/pelletier/go-toml/v2"
-	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"gopkg.in/guregu/null.v4"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/types"
 
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 	"github.com/smartcontractkit/chainlink/v2/core/store/models"
@@ -177,7 +178,7 @@ func (o *OCR3TaskJobSpec) String() (string, error) {
 		MaxTaskDuration:       o.MaxTaskDuration,
 		ContractID:            o.OCR2OracleSpec.ContractID,
 		FeedID:                feedID,
-		Relay:                 string(o.OCR2OracleSpec.Relay),
+		Relay:                 o.OCR2OracleSpec.Relay,
 		PluginType:            string(o.OCR2OracleSpec.PluginType),
 		RelayConfig:           string(relayConfig),
 		PluginConfig:          o.OCR2OracleSpec.PluginConfig,

@@ -352,7 +352,7 @@ func newTestUniverse(t *testing.T, numChains int, adapterHoldNative bool) {
 			Type:                    "ping-pong",
 			ChainID:                 1337,
 			ContractID:              mainContract.Hex(),
-			OcrKeyBundleID:          kbs[i].ID(),
+			OCRKeyBundleID:          kbs[i].ID(),
 			TransmitterID:           nodes[i].transmitters[1337].Hex(),
 			RelayFromBlock:          mainFromBlock,
 			FollowerChains:          buildFollowerChainsFromBlocksToml(blocksBeforeConfig),
