@@ -11,7 +11,7 @@ import "../onRamp/EVM2EVMMultiOnRampSetup.t.sol";
 /// 1. Send multiple messages from multiple source chains to a single destination chain (2 messages from source chain 1 and 1 from
 /// source chain 2).
 /// 2. Commit multiple merkle roots (1 for each source chain).
-/// 3. Batch exectue all the commited messages.
+/// 3. Batch execute all the committed messages.
 contract MultiRampsE2E is EVM2EVMMultiOnRampSetup, MultiCommitStoreSetup, EVM2EVMMultiOffRampSetup {
   using Internal for Internal.EVM2EVMMessage;
 
@@ -28,13 +28,13 @@ contract MultiRampsE2E is EVM2EVMMultiOnRampSetup, MultiCommitStoreSetup, EVM2EV
     MultiCommitStoreSetup.setUp();
     EVM2EVMMultiOffRampSetup.setUp();
 
-    // Deoply new source router for the new source chain
+    // Deploy new source router for the new source chain
     s_sourceRouter2 = new Router(s_sourceRouter.getWrappedNative(), address(s_mockRMN));
 
     // Deploy new TokenAdminRegistry for the new source chain
     s_tokenAdminRegistry2 = new TokenAdminRegistry();
 
-    // Depploy new token pools and set them on the new TokenAdminRegistry
+    // Deploy new token pools and set them on the new TokenAdminRegistry
     for (uint256 i = 0; i < s_sourceTokens.length; ++i) {
       address token = s_sourceTokens[i];
       address pool = address(
