@@ -3,13 +3,15 @@ package model
 import (
 	"encoding/json"
 	"fmt"
+	"time"
 )
 
 type CommitPluginObservation struct {
-	NewMsgs     []CCIPMsgBaseDetails `json:"newMsgs"`
-	GasPrices   []GasPriceChain      `json:"gasPrices,string"`
-	TokenPrices []TokenPrice         `json:"tokenPrices"`
-	MaxSeqNums  []SeqNumChain        `json:"maxSeqNums"`
+	NewMsgs      []CCIPMsgBaseDetails `json:"newMsgs"`
+	GasPrices    []GasPriceChain      `json:"gasPrices"`
+	TokenPrices  []TokenPrice         `json:"tokenPrices"`
+	MaxSeqNums   []SeqNumChain        `json:"maxSeqNums"`
+	PluginConfig CommitPluginConfig   `json:"pluginConfig"`
 }
 
 func NewCommitPluginObservation(
@@ -17,12 +19,14 @@ func NewCommitPluginObservation(
 	gasPrices []GasPriceChain,
 	tokenPrices []TokenPrice,
 	maxSeqNums []SeqNumChain,
+	pluginConfig CommitPluginConfig,
 ) CommitPluginObservation {
 	return CommitPluginObservation{
-		NewMsgs:     newMsgs,
-		GasPrices:   gasPrices,
-		TokenPrices: tokenPrices,
-		MaxSeqNums:  maxSeqNums,
+		NewMsgs:      newMsgs,
+		GasPrices:    gasPrices,
+		TokenPrices:  tokenPrices,
+		MaxSeqNums:   maxSeqNums,
+		PluginConfig: pluginConfig,
 	}
 }
 
@@ -53,12 +57,20 @@ func NewCommitPluginOutcome(
 		MaxSeqNums:  seqNums,
 		MerkleRoots: merkleRoots,
 		TokenPrices: tokenPrices,
-		GasPrices: gasPrices,
+		GasPrices:   gasPrices,
 	}
 }
 
 func (o CommitPluginOutcome) Encode() ([]byte, error) {
 	return json.Marshal(o)
+}
+
+// IsEmpty returns true if the CommitPluginOutcome is empty
+func (o CommitPluginOutcome) IsEmpty() bool {
+	return len(o.MaxSeqNums) == 0 &&
+		len(o.MerkleRoots) == 0 &&
+		len(o.TokenPrices) == 0 &&
+		len(o.GasPrices) == 0
 }
 
 func DecodeCommitPluginOutcome(b []byte) (CommitPluginOutcome, error) {
@@ -98,20 +110,26 @@ func NewMerkleRootChain(chainSel ChainSelector, seqNumsRange SeqNumRange, merkle
 }
 
 type PriceUpdate struct {
-	TokenPriceUpdates []TokenPrice `json:"tokenPriceUpdates"`
-	GasPriceUpdates  []GasPriceChain   `json:"gasPriceUpdates"`
+	TokenPriceUpdates []TokenPrice    `json:"tokenPriceUpdates"`
+	GasPriceUpdates   []GasPriceChain `json:"gasPriceUpdates"`
 }
 
 type CommitPluginReport struct {
-	MerkleRoots       []MerkleRootChain `json:"merkleRoots"`
-	PriceUpdates	  PriceUpdate       `json:"priceUpdates"`
+	MerkleRoots  []MerkleRootChain `json:"merkleRoots"`
+	PriceUpdates PriceUpdate       `json:"priceUpdates"`
+}
+
+type CommitPluginReportWithMeta struct {
+	Report    CommitPluginReport `json:"report"`
+	Timestamp time.Time          `json:"timestamp"`
+	BlockNum  uint64             `json:"blockNum"`
 }
 
 // TODO: also accept gas prices slice in the constructor
 func NewCommitPluginReport(merkleRoots []MerkleRootChain, tokenPriceUpdates []TokenPrice, gasPriceUpdate []GasPriceChain) CommitPluginReport {
 	return CommitPluginReport{
-		MerkleRoots:       merkleRoots,
-		PriceUpdates: 	  PriceUpdate{TokenPriceUpdates: tokenPriceUpdates, GasPriceUpdates: gasPriceUpdate},
+		MerkleRoots:  merkleRoots,
+		PriceUpdates: PriceUpdate{TokenPriceUpdates: tokenPriceUpdates, GasPriceUpdates: gasPriceUpdate},
 	}
 }
 
