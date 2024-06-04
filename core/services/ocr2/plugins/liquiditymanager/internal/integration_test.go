@@ -51,7 +51,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/chaintype"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/ocr2key"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/bridge/testonlybridge"
-	lmjobspec "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/jobspec"
+	integrationtesthelpers "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/testhelpers/integration"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/validate"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocrbootstrap"
 
@@ -323,9 +323,16 @@ func newTestUniverse(t *testing.T, numChains int, adapterHoldNative bool) {
 	evmChains := bootstrapNode.app.GetRelayers().LegacyEVMChains()
 	require.NotNil(t, evmChains)
 	require.Len(t, evmChains.Slice(), numChains)
-	bootstrapJobSpec := lmjobspec.BootstrapJobSpec(10001, mainContract.Hex(), mainFromBlock)
-	t.Log("creating bootstrap job with spec:\n", bootstrapJobSpec)
-	ocrJob, err := ocrbootstrap.ValidatedBootstrapSpecToml(bootstrapJobSpec)
+	bootstrapJobSpec, err := integrationtesthelpers.NewBootsrapJobSpec(&integrationtesthelpers.LMJobSpecParams{
+		ChainID:        10001,
+		ContractID:     mainContract.Hex(),
+		RelayFromBlock: mainFromBlock,
+	})
+	require.NoError(t, err, "failed to create bootstrap job spec")
+	bootstrapJobSpecStr, err := bootstrapJobSpec.String()
+	require.NoError(t, err, "failed to convert bootstrap job spec to string")
+	t.Log("creating bootstrap job with spec:\n", bootstrapJobSpecStr)
+	ocrJob, err := ocrbootstrap.ValidatedBootstrapSpecToml(bootstrapJobSpecStr)
 	require.NoError(t, err, "failed to validate bootstrap job")
 	err = bootstrapNode.app.AddJobV2(testutils.Context(t), &ocrJob)
 	require.NoError(t, err, "failed to add bootstrap job")
@@ -340,8 +347,7 @@ func newTestUniverse(t *testing.T, numChains int, adapterHoldNative bool) {
 		})
 
 		mainChain := mustGetChainByEvmID(t, testutils.SimulatedChainID.Int64())
-
-		jobSpec := lmjobspec.NodeJobSpec(&lmjobspec.JobSpecOptions{
+		jobSpec, err := integrationtesthelpers.NewJobSpec(&integrationtesthelpers.LMJobSpecParams{
 			Name:                    "liquiditymanager-integration-test",
 			Type:                    "ping-pong",
 			ContractID:              mainContract.Hex(),
@@ -352,12 +358,15 @@ func newTestUniverse(t *testing.T, numChains int, adapterHoldNative bool) {
 			LiquidityManagerAddress: mainContract,
 			NetworkSelector:         mainChain.Selector,
 		})
-		t.Log("Creating liquidityManager job with spec:\n", jobSpec)
+		require.NoError(t, err, "failed to create job spec")
+		jobSpecStr, err := jobSpec.String()
+		require.NoError(t, err, "failed to convert job spec to string")
+		t.Log("Creating liquidityManager job with spec:\n", jobSpecStr)
 		ocrJob2, err2 := validate.ValidatedOracleSpecToml(
 			testutils.Context(t),
 			apps[i].GetConfig().OCR2(),
 			apps[i].GetConfig().Insecure(),
-			jobSpec,
+			jobSpecStr,
 			nil,
 		)
 		require.NoError(t, err2, "failed to validate liquidityManager job")
