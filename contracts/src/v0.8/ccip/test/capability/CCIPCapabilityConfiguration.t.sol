@@ -765,7 +765,7 @@ contract CCIPCapabilityConfiguration_ConfigStateMachine is CCIPCapabilityConfigu
 
   function test_Fuzz__stateFromConfigLength_Reverts(uint256 configLen) public {
     vm.assume(configLen > 2);
-    vm.expectRevert(CCIPCapabilityConfiguration.InvalidConfigLength.selector);
+    vm.expectRevert(abi.encodeWithSelector(CCIPCapabilityConfiguration.InvalidConfigLength.selector, configLen));
     s_ccipCC.stateFromConfigLength(configLen);
   }
 
@@ -1156,7 +1156,7 @@ contract CCIPCapabilityConfiguration__updatePluginConfig is CCIPCapabilityConfig
   function test__updatePluginConfig_InvalidConfigLength_Reverts() public {
     uint32 donId = 1;
     CCIPCapabilityConfiguration.OCR3Config[] memory newConfig = new CCIPCapabilityConfiguration.OCR3Config[](3);
-    vm.expectRevert(CCIPCapabilityConfiguration.InvalidConfigLength.selector);
+    vm.expectRevert(abi.encodeWithSelector(CCIPCapabilityConfiguration.InvalidConfigLength.selector, uint256(3)));
     s_ccipCC.updatePluginConfig(donId, CCIPCapabilityConfiguration.PluginType.Commit, newConfig);
   }
 

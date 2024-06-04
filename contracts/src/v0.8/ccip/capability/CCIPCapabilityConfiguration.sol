@@ -38,7 +38,7 @@ contract CCIPCapabilityConfiguration is ITypeAndVersion, ICapabilityConfiguratio
   error FMustBePositive();
   error FTooHigh();
   error InvalidPluginType();
-  error InvalidConfigLength();
+  error InvalidConfigLength(uint256 length);
   error InvalidConfigStateTransition(ConfigState currentState, ConfigState proposedState);
   error NonExistentConfigTransition();
   error WrongConfigCount(uint64 got, uint64 expected);
@@ -211,7 +211,7 @@ contract CCIPCapabilityConfiguration is ITypeAndVersion, ICapabilityConfiguratio
     } else if (configLen == 2) {
       return ConfigState.Staging;
     }
-    revert InvalidConfigLength();
+    revert InvalidConfigLength(configLen);
   }
 
   // the only valid state transitions are the following:
@@ -325,15 +325,15 @@ contract CCIPCapabilityConfiguration is ITypeAndVersion, ICapabilityConfiguratio
     // access in the for loop below.
     commitConfigs = new OCR3Config[](MAX_OCR3_CONFIGS_PER_PLUGIN);
     execConfigs = new OCR3Config[](MAX_OCR3_CONFIGS_PER_PLUGIN);
-    uint8 commitCount = 0;
-    uint8 execCount = 0;
-    for (uint256 i = 0; i < ocr3Configs.length; i++) {
+    uint8 commitCount;
+    uint8 execCount;
+    for (uint256 i; i < ocr3Configs.length; ++i) {
       if (ocr3Configs[i].pluginType == PluginType.Commit) {
         commitConfigs[commitCount] = ocr3Configs[i];
-        commitCount++;
+        ++commitCount;
       } else {
         execConfigs[execCount] = ocr3Configs[i];
-        execCount++;
+        ++execCount;
       }
     }
 
@@ -380,7 +380,7 @@ contract CCIPCapabilityConfiguration is ITypeAndVersion, ICapabilityConfiguratio
 
     // Check that the readers are in the capability registry.
     // TODO: check for duplicate signers, duplicate p2p ids, etc.
-    for (uint256 i = 0; i < cfg.signers.length; i++) {
+    for (uint256 i; i < cfg.signers.length; ++i) {
       // We expect a pair of (p2pId, signer) for each element in the signers array.
       // p2pId is always the RageP2P public key of the oracle.
       // signer is the onchain public key of the oracle, which is an address on EVM chains
