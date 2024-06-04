@@ -12,21 +12,20 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/pkg/errors"
 
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
-
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
 
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache"
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcommon"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/ccipdataprovider"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/hashlib"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/merklemulti"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/pricegetter"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/pkg/hashlib"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/pkg/merklemulti"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/prices"
 )
 
@@ -59,7 +58,7 @@ type CommitPluginStaticConfig struct {
 	sourceChainSelector uint64
 	sourceNative        cciptypes.Address
 	// Dest
-	offRamps              []ccipdata.OffRampReader
+	offRamp               ccipdata.OffRampReader
 	commitStore           ccipdata.CommitStoreReader
 	destChainSelector     uint64
 	priceRegistryProvider ccipdataprovider.PriceRegistry
@@ -80,7 +79,7 @@ type CommitReportingPlugin struct {
 	commitStoreReader       ccipdata.CommitStoreReader
 	destPriceRegistryReader ccipdata.PriceRegistryReader
 	offchainConfig          cciptypes.CommitOffchainConfig
-	offRampReaders          []ccipdata.OffRampReader
+	offRampReader           ccipdata.OffRampReader
 	F                       int
 	// Offchain
 	priceGetter      pricegetter.PriceGetter
@@ -180,18 +179,14 @@ func (r *CommitReportingPlugin) observePriceUpdates(
 	ctx context.Context,
 	lggr logger.Logger,
 ) (sourceGasPriceUSD *big.Int, tokenPricesUSD map[cciptypes.Address]*big.Int, err error) {
-	if r.offchainConfig.PriceReportingDisabled {
-		return nil, nil, nil
-	}
-
-	sortedChainTokens, filteredChainTokens, err := ccipcommon.GetFilteredSortedChainTokens(ctx, r.offRampReaders, r.destPriceRegistryReader, r.priceGetter)
-	lggr.Debugw("Filtered bridgeable tokens with no configured price getter", filteredChainTokens)
+	sortedLaneTokens, filteredLaneTokens, err := ccipcommon.GetFilteredSortedLaneTokens(ctx, r.offRampReader, r.destPriceRegistryReader, r.priceGetter)
+	lggr.Debugw("Filtered bridgeable tokens with no configured price getter", "filteredLaneTokens", filteredLaneTokens)
 
 	if err != nil {
 		return nil, nil, fmt.Errorf("get destination tokens: %w", err)
 	}
 
-	return r.generatePriceUpdates(ctx, lggr, sortedChainTokens)
+	return r.generatePriceUpdates(ctx, lggr, sortedLaneTokens)
 }
 
 // All prices are USD ($1=1e18) denominated. All prices must be not nil.
@@ -199,11 +194,11 @@ func (r *CommitReportingPlugin) observePriceUpdates(
 func (r *CommitReportingPlugin) generatePriceUpdates(
 	ctx context.Context,
 	lggr logger.Logger,
-	sortedChainTokens []cciptypes.Address,
+	sortedLaneTokens []cciptypes.Address,
 ) (sourceGasPriceUSD *big.Int, tokenPricesUSD map[cciptypes.Address]*big.Int, err error) {
 	// Include wrapped native in our token query as way to identify the source native USD price.
 	// notice USD is in 1e18 scale, i.e. $1 = 1e18
-	queryTokens := ccipcommon.FlattenUniqueSlice([]cciptypes.Address{r.sourceNative}, sortedChainTokens)
+	queryTokens := ccipcommon.FlattenUniqueSlice([]cciptypes.Address{r.sourceNative}, sortedLaneTokens)
 
 	rawTokenPricesUSD, err := r.priceGetter.TokenPricesUSD(ctx, queryTokens)
 	if err != nil {
@@ -223,13 +218,13 @@ func (r *CommitReportingPlugin) generatePriceUpdates(
 		return nil, nil, fmt.Errorf("missing source native (%s) price", r.sourceNative)
 	}
 
-	destTokensDecimals, err := r.destPriceRegistryReader.GetTokensDecimals(ctx, sortedChainTokens)
+	destTokensDecimals, err := r.destPriceRegistryReader.GetTokensDecimals(ctx, sortedLaneTokens)
 	if err != nil {
 		return nil, nil, fmt.Errorf("get tokens decimals: %w", err)
 	}
 
 	tokenPricesUSD = make(map[cciptypes.Address]*big.Int, len(rawTokenPricesUSD))
-	for i, token := range sortedChainTokens {
+	for i, token := range sortedLaneTokens {
 		tokenPricesUSD[token] = calculateUsdPer1e18TokenAmount(rawTokenPricesUSD[token], destTokensDecimals[i])
 	}
 
@@ -326,13 +321,13 @@ func (r *CommitReportingPlugin) Report(ctx context.Context, epochAndRound types.
 
 	parsableObservations := ccip.GetParsableObservations[ccip.CommitObservation](lggr, observations)
 
-	sortedChainTokens, _, err := ccipcommon.GetFilteredSortedChainTokens(ctx, r.offRampReaders, r.destPriceRegistryReader, r.priceGetter)
+	sortedLaneTokens, _, err := ccipcommon.GetFilteredSortedLaneTokens(ctx, r.offRampReader, r.destPriceRegistryReader, r.priceGetter)
 	if err != nil {
 		return false, nil, fmt.Errorf("get destination tokens: %w", err)
 	}
 
 	// Filters out parsable but faulty observations
-	validObservations, err := validateObservations(ctx, lggr, sortedChainTokens, r.F, parsableObservations, r.offchainConfig.PriceReportingDisabled)
+	validObservations, err := validateObservations(ctx, lggr, sortedLaneTokens, r.F, parsableObservations)
 	if err != nil {
 		return false, nil, err
 	}
@@ -381,18 +376,8 @@ func (r *CommitReportingPlugin) Report(ctx context.Context, epochAndRound types.
 // validateObservations validates the given observations.
 // An observation is rejected if any of its gas price or token price is nil. With current CommitObservation implementation, prices
 // are checked to ensure no nil values before adding to Observation, hence an observation that contains nil values comes from a faulty node.
-func validateObservations(ctx context.Context, lggr logger.Logger, destTokens []cciptypes.Address, f int, observations []ccip.CommitObservation, priceReportingDisabled bool) (validObs []ccip.CommitObservation, err error) {
+func validateObservations(ctx context.Context, lggr logger.Logger, destTokens []cciptypes.Address, f int, observations []ccip.CommitObservation) (validObs []ccip.CommitObservation, err error) {
 	for _, obs := range observations {
-		// If price reporting is disabled, a valid observations should not contain price data
-		if priceReportingDisabled {
-			if obs.SourceGasPriceUSD != nil || len(obs.TokenPricesUSD) > 0 {
-				lggr.Warnw("Skipping observation due to it containing price data when price reporting is disabled")
-				continue
-			}
-			validObs = append(validObs, obs)
-			continue
-		}
-
 		// If gas price is reported as nil, the observation is faulty, skip the observation.
 		if obs.SourceGasPriceUSD == nil {
 			lggr.Warnw("Skipping observation due to nil SourceGasPriceUSD")
@@ -502,10 +487,6 @@ func calculateIntervalConsensus(intervals []cciptypes.CommitStoreInterval, f int
 
 // selectPriceUpdates filters out gas and token price updates that are already inflight
 func (r *CommitReportingPlugin) selectPriceUpdates(ctx context.Context, now time.Time, observations []ccip.CommitObservation) ([]cciptypes.TokenPrice, []cciptypes.GasPrice, error) {
-	if r.offchainConfig.PriceReportingDisabled {
-		return nil, nil, nil
-	}
-
 	latestGasPrice, err := r.getLatestGasPriceUpdate(ctx, now)
 	if err != nil {
 		return nil, nil, err
@@ -704,7 +685,6 @@ func (r *CommitReportingPlugin) ShouldTransmitAcceptedReport(ctx context.Context
 // If there is no merkle root but there is a gas update, only this gas update is used for staleness checks.
 // If only price updates are included, the price updates are used to check for staleness
 // If nothing is included the report is always considered stale.
-// If PriceReportingDisabled is set, this effectively only checks merkle root, as prices will always be empty.
 func (r *CommitReportingPlugin) isStaleReport(ctx context.Context, lggr logger.Logger, report cciptypes.CommitStoreReport, reportTimestamp types.ReportTimestamp) bool {
 	// If there is a merkle root, ignore all other staleness checks and only check for sequence number staleness
 	if report.MerkleRoot != [32]byte{} {

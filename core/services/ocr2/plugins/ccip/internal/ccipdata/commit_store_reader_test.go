@@ -24,11 +24,11 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	lpmocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store_helper"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store_helper_1_0_0"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store_helper_1_2_0"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_arm_contract"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/price_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/price_registry_1_0_0"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/price_registry_1_2_0"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils/pgtest"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
@@ -171,7 +171,7 @@ func TestCommitStoreReaders(t *testing.T) {
 		ArmProxy:            armAddr,
 	})
 	require.NoError(t, err)
-	addr2, _, ch2, err := commit_store_helper.DeployCommitStoreHelper(user, ec, commit_store_helper.CommitStoreStaticConfig{
+	addr2, _, ch2, err := commit_store_helper_1_2_0.DeployCommitStoreHelper(user, ec, commit_store_helper_1_2_0.CommitStoreStaticConfig{
 		ChainSelector:       testutils.SimulatedChainID.Uint64(),
 		SourceChainSelector: testutils.SimulatedChainID.Uint64(),
 		OnRamp:              onramp2,
@@ -181,7 +181,7 @@ func TestCommitStoreReaders(t *testing.T) {
 	commitAndGetBlockTs(ec) // Deploy these
 	pr, _, _, err := price_registry_1_0_0.DeployPriceRegistry(user, ec, []common.Address{addr}, nil, 1e6)
 	require.NoError(t, err)
-	pr2, _, _, err := price_registry.DeployPriceRegistry(user, ec, []common.Address{addr2}, nil, 1e6)
+	pr2, _, _, err := price_registry_1_2_0.DeployPriceRegistry(user, ec, []common.Address{addr2}, nil, 1e6)
 	require.NoError(t, err)
 	commitAndGetBlockTs(ec) // Deploy these
 	ge := new(gasmocks.EvmFeeEstimator)
@@ -305,7 +305,7 @@ func TestCommitStoreReaders(t *testing.T) {
 			down, err = cr.IsDown(context.Background())
 			require.NoError(t, err)
 			assert.True(t, down)
-			_, err = arm.OwnerUnvoteToCurse(user, nil)
+			_, err = arm.OwnerUnvoteToCurse0(user, nil)
 			require.NoError(t, err)
 			ec.Commit()
 

@@ -90,10 +90,11 @@ func NewMultiCallLoadGenerator(testCfg *testsetups.CCIPTestConfig, lanes []*acti
 		// cause oversized data for multicall
 		ccipLoad := NewCCIPLoad(
 			testCfg.Test, lane, testCfg.TestGroupInput.PhaseTimeout.Duration(),
-			100000, 0,
-			testCfg.TestGroupInput.SkipRequestIfAnotherRequestTriggeredWithin,
+			100000,
+			testCfg.TestGroupInput.LoadProfile.MsgProfile, 0,
+			testCfg.TestGroupInput.LoadProfile.SkipRequestIfAnotherRequestTriggeredWithin,
 		)
-		ccipLoad.BeforeAllCall(testCfg.TestGroupInput.MsgType, big.NewInt(*testCfg.TestGroupInput.DestGasLimit))
+		ccipLoad.BeforeAllCall()
 		m.E2ELoads[fmt.Sprintf("%s-%s", lane.SourceNetworkName, lane.DestNetworkName)] = ccipLoad
 	}
 
@@ -202,7 +203,7 @@ func (m *CCIPMultiCallLoadGenerator) Call(_ *wasp.Generator) *wasp.Response {
 					GasUsed:            gasUsed,
 					TxHash:             sendTx.Hash().Hex(),
 					NoOfTokensSent:     len(msg.Msg.TokenAmounts),
-					MessageBytesLength: len(msg.Msg.Data),
+					MessageBytesLength: int64(len(msg.Msg.Data)),
 				})
 		}
 	}
@@ -252,7 +253,10 @@ func (m *CCIPMultiCallLoadGenerator) MergeCalls() ([]contracts.CCIPMsgData, map[
 		var allStatsForDest []*testreporters.RequestStat
 		var allMsgsForDest []contracts.CCIPMsgData
 		for i := int64(0); i < m.NoOfRequestsPerUnitTime; i++ {
-			msg, stats := e2eLoad.CCIPMsg()
+			msg, stats, err := e2eLoad.CCIPMsg()
+			if err != nil {
+				return ccipMsgs, statDetails, err
+			}
 			msg.FeeToken = common.Address{}
 			fee, err := e2eLoad.Lane.Source.Common.Router.GetFee(destChainSelector, msg)
 			if err != nil {

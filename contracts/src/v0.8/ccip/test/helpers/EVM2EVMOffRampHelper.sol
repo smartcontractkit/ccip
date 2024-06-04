@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.19;
+pragma solidity 0.8.24;
 
 import "../../offRamp/EVM2EVMOffRamp.sol";
 import {IgnoreContractSize} from "./IgnoreContractSize.sol";
@@ -7,10 +7,8 @@ import {IgnoreContractSize} from "./IgnoreContractSize.sol";
 contract EVM2EVMOffRampHelper is EVM2EVMOffRamp, IgnoreContractSize {
   constructor(
     StaticConfig memory staticConfig,
-    IERC20[] memory sourceTokens,
-    IPool[] memory pools,
     RateLimiter.Config memory rateLimiterConfig
-  ) EVM2EVMOffRamp(staticConfig, sourceTokens, pools, rateLimiterConfig) {}
+  ) EVM2EVMOffRamp(staticConfig, rateLimiterConfig) {}
 
   function setExecutionStateHelper(uint64 sequenceNumber, Internal.MessageExecutionState state) public {
     _setExecutionState(sequenceNumber, state);

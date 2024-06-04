@@ -14,8 +14,9 @@
 
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
-pragma solidity 0.8.19;
+pragma solidity 0.8.24;
 
+// solhint-disable
 contract WETH9 {
   string public name = "Wrapped Ether";
   string public symbol = "WETH";

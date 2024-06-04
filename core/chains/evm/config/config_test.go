@@ -23,6 +23,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils/configtest"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils/evmtest"
 	"github.com/smartcontractkit/chainlink/v2/core/services/chainlink"
+	"github.com/smartcontractkit/chainlink/v2/core/store/models"
 )
 
 func TestChainScopedConfig(t *testing.T) {
@@ -277,8 +278,8 @@ func TestChainScopedConfig_GasEstimator(t *testing.T) {
 	assert.Equal(t, assets.GWei(20), ge.PriceDefault())
 	assert.Equal(t, assets.GWei(500), ge.PriceMax())
 	assert.Equal(t, assets.GWei(1), ge.PriceMin())
-	assert.Equal(t, uint64(500000), ge.LimitDefault())
-	assert.Equal(t, uint64(500000), ge.LimitMax())
+	assert.Equal(t, uint64(8000000), ge.LimitDefault())
+	assert.Equal(t, uint64(8000000), ge.LimitMax())
 	assert.Equal(t, float32(1), ge.LimitMultiplier())
 	assert.Equal(t, uint64(21000), ge.LimitTransfer())
 	assert.Equal(t, assets.GWei(5), ge.BumpMin())
@@ -320,23 +321,23 @@ func TestChainScopedConfig_Profiles(t *testing.T) {
 		expectedGasLimitDefault        uint64
 		expectedMinimumContractPayment string
 	}{
-		{"default", 0, 500000, "0.00001"},
-		{"mainnet", 1, 500000, "0.1"},
-		{"kovan", 42, 500000, "0.1"},
+		{"default", 0, 8000000, "0.00001"},
+		{"mainnet", 1, 8000000, "0.1"},
+		{"kovan", 42, 8000000, "0.1"},
 
-		{"optimism", 10, 500000, "0.00001"},
-		{"optimism", 69, 500000, "0.00001"},
-		{"optimism", 420, 500000, "0.00001"},
+		{"optimism", 10, 8000000, "0.00001"},
+		{"optimism", 69, 8000000, "0.00001"},
+		{"optimism", 420, 8000000, "0.00001"},
 
-		{"bscMainnet", 56, 500000, "0.00001"},
-		{"hecoMainnet", 128, 500000, "0.00001"},
-		{"fantomMainnet", 250, 500000, "0.00001"},
-		{"fantomTestnet", 4002, 500000, "0.00001"},
-		{"polygonMatic", 800001, 500000, "0.00001"},
-		{"harmonyMainnet", 1666600000, 500000, "0.00001"},
-		{"harmonyTestnet", 1666700000, 500000, "0.00001"},
+		{"bscMainnet", 56, 8000000, "0.00001"},
+		{"hecoMainnet", 128, 8000000, "0.00001"},
+		{"fantomMainnet", 250, 8000000, "0.00001"},
+		{"fantomTestnet", 4002, 8000000, "0.00001"},
+		{"polygonMatic", 800001, 8000000, "0.00001"},
+		{"harmonyMainnet", 1666600000, 8000000, "0.00001"},
+		{"harmonyTestnet", 1666700000, 8000000, "0.00001"},
 
-		{"gnosisMainnet", 100, 500000, "0.00001"},
+		{"gnosisMainnet", 100, 8000000, "0.00001"},
 	}
 	for _, test := range tests {
 		tt := test
@@ -380,6 +381,7 @@ func TestChainScopedConfig_HeadTracker(t *testing.T) {
 func Test_chainScopedConfig_Validate(t *testing.T) {
 	configWithChains := func(t *testing.T, id int64, chains ...*toml.Chain) config.AppConfig {
 		return configtest.NewGeneralConfig(t, func(c *chainlink.Config, s *chainlink.Secrets) {
+			s.Database.URL = models.MustSecretURL("postgresql://doesnotexist:justtopassvalidationtests@localhost:5432/chainlink_na_test")
 			chainID := ubig.NewI(id)
 			c.EVM[0] = &toml.EVMConfig{ChainID: chainID, Enabled: ptr(true), Chain: toml.Defaults(chainID, chains...),
 				Nodes: toml.EVMNodes{{
@@ -476,6 +478,60 @@ func TestNodePoolConfig(t *testing.T) {
 	require.Equal(t, time.Duration(10000000000), cfg.EVM().NodePool().PollInterval())
 	require.Equal(t, uint32(5), cfg.EVM().NodePool().PollFailureThreshold())
 	require.Equal(t, false, cfg.EVM().NodePool().NodeIsSyncingEnabled())
+}
+
+func TestClientErrorsConfig(t *testing.T) {
+	t.Parallel()
+
+	t.Run("EVM().NodePool().Errors()", func(t *testing.T) {
+		clientErrorsOverrides := func(c *chainlink.Config, s *chainlink.Secrets) {
+			id := ubig.New(big.NewInt(rand.Int63()))
+			c.EVM[0] = &toml.EVMConfig{
+				ChainID: id,
+				Chain: toml.Defaults(id, &toml.Chain{
+					NodePool: toml.NodePool{
+						Errors: toml.ClientErrors{
+							NonceTooLow:                       ptr[string]("client error nonce too low"),
+							NonceTooHigh:                      ptr[string]("client error nonce too high"),
+							ReplacementTransactionUnderpriced: ptr[string]("client error replacement underpriced"),
+							LimitReached:                      ptr[string]("client error limit reached"),
+							TransactionAlreadyInMempool:       ptr[string]("client error transaction already in mempool"),
+							TerminallyUnderpriced:             ptr[string]("client error terminally underpriced"),
+							InsufficientEth:                   ptr[string]("client error insufficient eth"),
+							TxFeeExceedsCap:                   ptr[string]("client error tx fee exceeds cap"),
+							L2FeeTooLow:                       ptr[string]("client error l2 fee too low"),
+							L2FeeTooHigh:                      ptr[string]("client error l2 fee too high"),
+							L2Full:                            ptr[string]("client error l2 full"),
+							TransactionAlreadyMined:           ptr[string]("client error transaction already mined"),
+							Fatal:                             ptr[string]("client error fatal"),
+							ServiceUnavailable:                ptr[string]("client error service unavailable"),
+						},
+					},
+				}),
+			}
+		}
+
+		gcfg := configtest.NewGeneralConfig(t, func(c *chainlink.Config, s *chainlink.Secrets) {
+			clientErrorsOverrides(c, s)
+		})
+		cfg := evmtest.NewChainScopedConfig(t, gcfg)
+
+		errors := cfg.EVM().NodePool().Errors()
+		assert.Equal(t, "client error nonce too low", errors.NonceTooLow())
+		assert.Equal(t, "client error nonce too high", errors.NonceTooHigh())
+		assert.Equal(t, "client error replacement underpriced", errors.ReplacementTransactionUnderpriced())
+		assert.Equal(t, "client error limit reached", errors.LimitReached())
+		assert.Equal(t, "client error transaction already in mempool", errors.TransactionAlreadyInMempool())
+		assert.Equal(t, "client error terminally underpriced", errors.TerminallyUnderpriced())
+		assert.Equal(t, "client error insufficient eth", errors.InsufficientEth())
+		assert.Equal(t, "client error tx fee exceeds cap", errors.TxFeeExceedsCap())
+		assert.Equal(t, "client error l2 fee too low", errors.L2FeeTooLow())
+		assert.Equal(t, "client error l2 fee too high", errors.L2FeeTooHigh())
+		assert.Equal(t, "client error l2 full", errors.L2Full())
+		assert.Equal(t, "client error transaction already mined", errors.TransactionAlreadyMined())
+		assert.Equal(t, "client error fatal", errors.Fatal())
+		assert.Equal(t, "client error service unavailable", errors.ServiceUnavailable())
+	})
 }
 
 func ptr[T any](t T) *T { return &t }

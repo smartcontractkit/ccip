@@ -51,11 +51,6 @@ core/services/relay/evm/functions @smartcontractkit/functions
 core/scripts/functions @smartcontractkit/functions
 core/scripts/gateway @smartcontractkit/functions
 
-
-# Contracts
-/contracts/ @rensr @matyang @makramkd
-/contracts/**/*shared* @rensr @matyang @makramkd
-
 # First we match on project names to catch files like the compilation scripts,
 # gas snapshots and other files not places in the project directories.
 # This could give some false positives, so afterwards we match on the project directories
@@ -65,7 +60,7 @@ core/scripts/gateway @smartcontractkit/functions
 /contracts/**/*upkeep* @smartcontractkit/keepers
 /contracts/**/*automation* @smartcontractkit/keepers
 /contracts/gas-snapshots/automation.gas-snapshot @smartcontractkit/keepers
-/contracts/**/ccip/ @rensr @matyang @makramkd
+/contracts/**/ccip/ @smartcontractkit/ccip-onchain @makramkd
 /contracts/**/*Functions* @smartcontractkit/functions
 
 /contracts/src/v0.8/functions @smartcontractkit/functions
@@ -82,7 +77,7 @@ core/scripts/gateway @smartcontractkit/functions
 /contracts/src/v0.8/l2ep @chris-de-leon-cll
 /contracts/src/v0.8/llo-feeds @smartcontractkit/mercury-team
 # TODO: mocks folder, folder should be removed and files moved to the correct folders
-/contracts/src/v0.8/operatorforwarder @RensR
+/contracts/src/v0.8/operatorforwarder @austinborn
 /contracts/src/v0.8/shared @RensR
 # TODO: tests folder, folder should be removed and files moved to the correct folders
 # TODO: transmission folder, owner should be found
@@ -97,12 +92,13 @@ core/scripts/gateway @smartcontractkit/functions
 
 
 # Tests
-/integration-tests/**/*ccip* @smartcontractkit/test-tooling-team @jasonmci
+/integration-tests/**/*ccip* @smartcontractkit/test-tooling-team @jasonmci @mateusz-sekara @emate
 /integration-tests/**/*keeper* @smartcontractkit/keepers
 /integration-tests/**/*automation* @smartcontractkit/keepers
+/integration-tests/**/*lm_* @smartcontractkit/liquidity-manager
 
 # CI/CD
-/.github/** @smartcontractkit/releng @jkongie @jmank88 @samsondav
+/.github/** @smartcontractkit/releng @smartcontractkit/test-tooling-team @jasonmci
 /.github/workflows/integration-tests.yml @smartcontractkit/test-tooling-team @jasonmci
 /.github/workflows/**-tests.yml @smartcontractkit/test-tooling-team @jasonmci
 /.github/workflows/integration-chaos-tests.yml @smartcontractkit/test-tooling-team @jasonmci
@@ -142,12 +138,14 @@ flake.lock @smartcontractkit/prodsec-public
 
 # CCIP override
 /core/ @smartcontractkit/ccip
-/contracts/ @rensr @matyang @makramkd
-/core/services/ocr2/plugins/rebalancer @rensr @dimkouv @makramkd
-/.github/ @rensr @connorwstein @smartcontractkit/test-tooling-team @jasonmci
+/contracts/ @smartcontractkit/ccip-onchain @makramkd
+
+# CCIP LM
+/core/services/ocr2/plugins/liquiditymanager/ @smartcontractkit/liquidity-manager
+/core/services/relay/evm/liquidity_manager.go @smartcontractkit/liquidity-manager
 
 # CCIP ARM
-/contracts/src/v0.8/ccip/ARM.sol @gtklocker @kaleofduty
-/contracts/src/v0.8/ccip/ARMProxy.sol @gtklocker @kaleofduty
-/contracts/src/v0.8/ccip/interfaces/IARM.sol @gtklocker @kaleofduty
-/contracts/src/v0.8/ccip/test/arm @gtklocker @kaleofduty
+/contracts/src/v0.8/ccip/RMN.sol @smartcontractkit/rmn
+/contracts/src/v0.8/ccip/ARMProxy.sol @smartcontractkit/rmn
+/contracts/src/v0.8/ccip/interfaces/IARM.sol @smartcontractkit/rmn
+/contracts/src/v0.8/ccip/test/arm @smartcontractkit/rmn

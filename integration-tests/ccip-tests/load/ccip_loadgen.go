@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/AlekSi/pointer"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -21,6 +22,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
 
+	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/testconfig"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers"
@@ -51,6 +53,8 @@ type CCIPE2ELoad struct {
 	SkipRequestIfAnotherRequestTriggeredWithin *config.Duration
 	LastFinalizedTxBlock                       atomic.Uint64
 	LastFinalizedTimestamp                     atomic.Time
+	MsgProfiles                                *testconfig.MsgProfile
+	EOAReceiver                                []byte
 }
 
 func NewCCIPLoad(
@@ -58,6 +62,7 @@ func NewCCIPLoad(
 	lane *actions.CCIPLane,
 	timeout time.Duration,
 	noOfReq int64,
+	m *testconfig.MsgProfile,
 	sendMaxDataIntermittentlyInEveryMsgCount int64,
 	SkipRequestIfAnotherRequestTriggeredWithin *config.Duration,
 ) *CCIPE2ELoad {
@@ -79,51 +84,61 @@ func NewCCIPLoad(
 		NoOfReq:                             noOfReq,
 		SendMaxDataIntermittentlyInMsgCount: sendMaxDataIntermittentlyInEveryMsgCount,
 		SkipRequestIfAnotherRequestTriggeredWithin: SkipRequestIfAnotherRequestTriggeredWithin,
+		MsgProfiles: m,
 	}
 }
 
 // BeforeAllCall funds subscription, approves the token transfer amount.
 // Needs to be called before load sequence is started.
 // Needs to approve and fund for the entire sequence.
-func (c *CCIPE2ELoad) BeforeAllCall(msgType string, gasLimit *big.Int) {
+func (c *CCIPE2ELoad) BeforeAllCall() {
 	sourceCCIP := c.Lane.Source
 	destCCIP := c.Lane.Dest
-	var tokenAndAmounts []router.ClientEVMTokenAmount
-	for i := range c.Lane.Source.TransferAmount {
-		// if length of sourceCCIP.TransferAmount is more than available bridge token use first bridge token
-		token := sourceCCIP.Common.BridgeTokens[0]
-		if i < len(sourceCCIP.Common.BridgeTokens) {
-			token = sourceCCIP.Common.BridgeTokens[i]
-		}
-		tokenAndAmounts = append(tokenAndAmounts, router.ClientEVMTokenAmount{
-			Token: common.HexToAddress(token.Address()), Amount: c.Lane.Source.TransferAmount[i],
-		})
-	}
-
-	err := sourceCCIP.Common.ChainClient.WaitForEvents()
-	require.NoError(c.t, err, "Failed to wait for events")
-
-	extraArgsV1, err := testhelpers.GetEVMExtraArgsV1(gasLimit, false)
-	require.NoError(c.t, err, "Failed encoding the options field")
 
 	receiver, err := utils.ABIEncode(`[{"type":"address"}]`, destCCIP.ReceiverDapp.EthAddress)
 	require.NoError(c.t, err, "Failed encoding the receiver address")
 	c.msg = router.ClientEVM2AnyMessage{
-		Receiver:  receiver,
-		ExtraArgs: extraArgsV1,
-		FeeToken:  common.HexToAddress(sourceCCIP.Common.FeeToken.Address()),
-		Data:      []byte("message with Id 1"),
+		Receiver: receiver,
+		FeeToken: common.HexToAddress(sourceCCIP.Common.FeeToken.Address()),
+		Data:     []byte("message with Id 1"),
 	}
-	if msgType == actions.TokenTransfer {
+	var tokenAndAmounts []router.ClientEVMTokenAmount
+	if len(c.Lane.Source.Common.BridgeTokens) > 0 {
+		for i := range c.Lane.Source.TransferAmount {
+			// if length of sourceCCIP.TransferAmount is more than available bridge token use first bridge token
+			token := sourceCCIP.Common.BridgeTokens[0]
+			if i < len(sourceCCIP.Common.BridgeTokens) {
+				token = sourceCCIP.Common.BridgeTokens[i]
+			}
+			tokenAndAmounts = append(tokenAndAmounts, router.ClientEVMTokenAmount{
+				Token: common.HexToAddress(token.Address()), Amount: c.Lane.Source.TransferAmount[i],
+			})
+		}
 		c.msg.TokenAmounts = tokenAndAmounts
 	}
+	// we might need to change the receiver to the default wallet of destination based on the gaslimit of msg
+	// Get the receiver's bytecode to check if it's a contract or EOA
+	bytecode, err := c.Lane.Dest.Common.ChainClient.Backend().CodeAt(context.Background(), c.Lane.Dest.ReceiverDapp.EthAddress, nil)
+	require.NoError(c.t, err, "Failed to get bytecode of the receiver contract")
+	// if the bytecode is empty, it's an EOA,
+	// In that case save the receiver address as EOA to be used in the message
+	// Otherwise save destination's default wallet address as EOA
+	// so that it can be used later for msgs with gaslimit 0
+	if len(bytecode) > 0 {
+		receiver, err := utils.ABIEncode(`[{"type":"address"}]`, common.HexToAddress(c.Lane.Dest.Common.ChainClient.GetDefaultWallet().Address()))
+		require.NoError(c.t, err, "Failed encoding the receiver address")
+		c.EOAReceiver = receiver
+	} else {
+		c.EOAReceiver = c.msg.Receiver
+	}
 	if c.SendMaxDataIntermittentlyInMsgCount > 0 {
-		dCfg, err := sourceCCIP.OnRamp.Instance.GetDynamicConfig(nil)
+		c.MaxDataBytes, err = sourceCCIP.OnRamp.Instance.GetDynamicConfig(nil)
 		require.NoError(c.t, err, "failed to fetch dynamic config")
-		c.MaxDataBytes = dCfg.MaxDataBytes
 	}
 	// if the msg is sent via multicall, transfer the token transfer amount to multicall contract
-	if sourceCCIP.Common.MulticallEnabled && sourceCCIP.Common.MulticallContract != (common.Address{}) {
+	if sourceCCIP.Common.MulticallEnabled &&
+		sourceCCIP.Common.MulticallContract != (common.Address{}) &&
+		len(c.Lane.Source.Common.BridgeTokens) > 0 {
 		for i, amount := range sourceCCIP.TransferAmount {
 			// if length of sourceCCIP.TransferAmount is more than available bridge token use first bridge token
 			token := sourceCCIP.Common.BridgeTokens[0]
@@ -139,18 +154,7 @@ func (c *CCIPE2ELoad) BeforeAllCall(msgType string, gasLimit *big.Int) {
 			}
 		}
 	}
-	// if it's not multicall set the tokens to nil to free up some space,
-	// we have already formed the msg to be sent in load, there is no need to store the bridge tokens anymore
-	// In case of multicall we still need the BridgeTokens to transfer amount from mutlicall to owner
-	if !sourceCCIP.Common.MulticallEnabled {
-		sourceCCIP.Common.BridgeTokens = nil
-		destCCIP.Common.BridgeTokens = nil
-	}
-	// wait for any pending txs before moving on
-	err = sourceCCIP.Common.ChainClient.WaitForEvents()
-	require.NoError(c.t, err, "Failed to wait for events")
-	err = destCCIP.Common.ChainClient.WaitForEvents()
-	require.NoError(c.t, err, "Failed to wait for events")
+
 	c.LastFinalizedTxBlock.Store(c.Lane.Source.NewFinalizedBlockNum.Load())
 	c.LastFinalizedTimestamp.Store(c.Lane.Source.NewFinalizedBlockTimestamp.Load())
 
@@ -158,29 +162,43 @@ func (c *CCIPE2ELoad) BeforeAllCall(msgType string, gasLimit *big.Int) {
 	destCCIP.Common.ChainClient.ParallelTransactions(false)
 }
 
-func (c *CCIPE2ELoad) CCIPMsg() (router.ClientEVM2AnyMessage, *testreporters.RequestStat) {
+func (c *CCIPE2ELoad) CCIPMsg() (router.ClientEVM2AnyMessage, *testreporters.RequestStat, error) {
 	msgSerialNo := c.CurrentMsgSerialNo.Load()
 	c.CurrentMsgSerialNo.Inc()
-
+	msgDetails := c.MsgProfiles.MsgDetailsForIteration(msgSerialNo)
 	stats := testreporters.NewCCIPRequestStats(msgSerialNo, c.Lane.SourceNetworkName, c.Lane.DestNetworkName)
 	// form the message for transfer
-	msgStr := fmt.Sprintf("new message with Id %d", msgSerialNo)
-	if c.SendMaxDataIntermittentlyInMsgCount > 0 {
-		// every SendMaxDataIntermittentlyInMsgCount message will have extra data with almost MaxDataBytes
-		if msgSerialNo%c.SendMaxDataIntermittentlyInMsgCount == 0 {
-			length := c.MaxDataBytes - 1
-			b := make([]byte, c.MaxDataBytes-1)
-			_, err := crypto_rand.Read(b)
-			if err == nil {
-				randomString := base64.URLEncoding.EncodeToString(b)
-				msgStr = randomString[:length]
+	msgLength := pointer.GetInt64(msgDetails.DataLength)
+	gasLimit := pointer.GetInt64(msgDetails.DestGasLimit)
+	msg := c.msg
+	if msgLength > 0 && msgDetails.IsDataTransfer() {
+		if c.SendMaxDataIntermittentlyInMsgCount > 0 {
+			// every SendMaxDataIntermittentlyInMsgCount message will have extra data with almost MaxDataBytes
+			if msgSerialNo%c.SendMaxDataIntermittentlyInMsgCount == 0 {
+				msgLength = int64(c.MaxDataBytes - 1)
 			}
 		}
+		b := make([]byte, msgLength)
+		_, err := crypto_rand.Read(b)
+		if err != nil {
+			return router.ClientEVM2AnyMessage{}, stats, fmt.Errorf("failed to generate random string %w", err)
+		}
+		randomString := base64.URLEncoding.EncodeToString(b)
+		msg.Data = []byte(randomString[:msgLength])
 	}
-	msg := c.msg
-	msg.Data = []byte(msgStr)
-
-	return msg, stats
+	if !msgDetails.IsTokenTransfer() {
+		msg.TokenAmounts = []router.ClientEVMTokenAmount{}
+	}
+	extraArgsV1, err := testhelpers.GetEVMExtraArgsV1(big.NewInt(gasLimit), false)
+	if err != nil {
+		return router.ClientEVM2AnyMessage{}, stats, err
+	}
+	msg.ExtraArgs = extraArgsV1
+	// if gaslimit is 0, set the receiver to EOA
+	if gasLimit == 0 {
+		msg.Receiver = c.EOAReceiver
+	}
+	return msg, stats, nil
 }
 
 func (c *CCIPE2ELoad) Call(_ *wasp.Generator) *wasp.Response {
@@ -194,7 +212,23 @@ func (c *CCIPE2ELoad) Call(_ *wasp.Generator) *wasp.Response {
 			Msgf("Skipping ...Another Request found within given timeframe %s", c.SkipRequestIfAnotherRequestTriggeredWithin.String())
 		return res
 	}
-	msg, stats := c.CCIPMsg()
+	// if there is an connection error , we will skip sending the request
+	// this is to avoid sending the request when the connection is not restored yet
+	if sourceCCIP.Common.IsConnectionRestoredRecently != nil {
+		if !sourceCCIP.Common.IsConnectionRestoredRecently.Load() {
+			c.Lane.Logger.Info().Msg("RPC Connection Error.. skipping this request")
+			res.Failed = true
+			res.Error = "RPC Connection error .. this request was skipped"
+			return res
+		}
+		c.Lane.Logger.Info().Msg("Connection is restored, Resuming load")
+	}
+	msg, stats, err := c.CCIPMsg()
+	if err != nil {
+		res.Error = err.Error()
+		res.Failed = true
+		return res
+	}
 	msgSerialNo := stats.ReqNo
 	lggr := c.Lane.Logger.With().Int64("msg Number", stats.ReqNo).Logger()
 
@@ -202,33 +236,35 @@ func (c *CCIPE2ELoad) Call(_ *wasp.Generator) *wasp.Response {
 	// initiate the transfer
 	lggr.Debug().Str("triggeredAt", time.Now().GoString()).Msg("triggering transfer")
 	var sendTx *types.Transaction
-	var err error
 
 	destChainSelector, err := chain_selectors.SelectorFromChainId(sourceCCIP.DestinationChainId)
 	if err != nil {
-		res.Error = err.Error()
+		res.Error = fmt.Sprintf("reqNo %d err %s - while getting selector from chainid", msgSerialNo, err.Error())
 		res.Failed = true
 		return res
 	}
+
 	// initiate the transfer
 	// if the token address is 0x0 it will use Native as fee token and the fee amount should be mentioned in bind.TransactOpts's value
-
 	fee, err := sourceCCIP.Common.Router.GetFee(destChainSelector, msg)
 	if err != nil {
-		res.Error = err.Error()
+		res.Error = fmt.Sprintf("reqNo %d err %s - while getting fee from router - msg Data %x FeeToken %s TokenAmounts %+v ExtraArgs %x Receiver %x",
+			msgSerialNo, err.Error(),
+			msg.Data, msg.FeeToken, msg.TokenAmounts, msg.ExtraArgs, msg.Receiver)
+
 		res.Failed = true
 		return res
 	}
-	startTime := time.Now()
+	startTime := time.Now().UTC()
 	if feeToken != common.HexToAddress("0x0") {
 		sendTx, err = sourceCCIP.Common.Router.CCIPSend(destChainSelector, msg, nil)
 	} else {
 		// add a bit buffer to fee
-		sendTx, err = sourceCCIP.Common.Router.CCIPSend(destChainSelector, msg, new(big.Int).Add(big.NewInt(1e2), fee))
+		sendTx, err = sourceCCIP.Common.Router.CCIPSend(destChainSelector, msg, new(big.Int).Add(big.NewInt(1e5), fee))
 	}
 	if err != nil {
 		stats.UpdateState(lggr, 0, testreporters.TX, time.Since(startTime), testreporters.Failure)
-		res.Error = err.Error()
+		res.Error = fmt.Sprintf("ccip-send tx error %s for reqNo %d", err.Error(), msgSerialNo)
 		res.Data = stats.StatusByPhase
 		res.Failed = true
 		return res
@@ -238,14 +274,18 @@ func (c *CCIPE2ELoad) Call(_ *wasp.Generator) *wasp.Response {
 
 	if err != nil {
 		stats.UpdateState(lggr, 0, testreporters.TX, time.Since(startTime), testreporters.Failure)
-		res.Error = fmt.Sprintf("ccip-send tx error %+v for msg ID %d", err, msgSerialNo)
+		res.Error = fmt.Sprintf("reqNo %d failed to mark tx as sent on L2 %s", msgSerialNo, err.Error())
 		res.Data = stats.StatusByPhase
 		res.Failed = true
 		return res
 	}
 
 	txConfirmationTime := time.Now().UTC()
-	rcpt, err1 := bind.WaitMined(context.Background(), sourceCCIP.Common.ChainClient.DeployBackend(), sendTx)
+	// wait for the tx to be mined, timeout is set to 10 minutes
+	lggr.Info().Str("tx", sendTx.Hash().Hex()).Msg("waiting for tx to be mined")
+	ctx, cancel := context.WithTimeout(context.Background(), sourceCCIP.Common.ChainClient.GetNetworkConfig().Timeout.Duration)
+	defer cancel()
+	rcpt, err1 := bind.WaitMined(ctx, sourceCCIP.Common.ChainClient.DeployBackend(), sendTx)
 	if err1 == nil {
 		hdr, err1 := c.Lane.Source.Common.ChainClient.HeaderByNumber(context.Background(), rcpt.BlockNumber)
 		if err1 == nil {
@@ -257,13 +297,31 @@ func (c *CCIPE2ELoad) Call(_ *wasp.Generator) *wasp.Response {
 	if rcpt != nil {
 		gasUsed = rcpt.GasUsed
 	}
-	stats.UpdateState(lggr, 0, testreporters.TX, startTime.Sub(txConfirmationTime), testreporters.Success,
+	if rcpt.Status != types.ReceiptStatusSuccessful {
+		stats.UpdateState(lggr, 0, testreporters.TX, txConfirmationTime.Sub(startTime), testreporters.Failure,
+			testreporters.TransactionStats{
+				Fee:                fee.String(),
+				GasUsed:            gasUsed,
+				TxHash:             sendTx.Hash().Hex(),
+				NoOfTokensSent:     len(msg.TokenAmounts),
+				MessageBytesLength: int64(len(msg.Data)),
+			})
+		errReason, v, err := c.Lane.Source.Common.ChainClient.RevertReasonFromTx(rcpt.TxHash, router.RouterABI)
+		if err != nil {
+			errReason = "could not decode"
+		}
+		res.Error = fmt.Sprintf("ccip-send request receipt is not successful, errReason=%s, args =%v", errReason, v)
+		res.Failed = true
+		res.Data = stats.StatusByPhase
+		return res
+	}
+	stats.UpdateState(lggr, 0, testreporters.TX, txConfirmationTime.Sub(startTime), testreporters.Success,
 		testreporters.TransactionStats{
 			Fee:                fee.String(),
 			GasUsed:            gasUsed,
 			TxHash:             sendTx.Hash().Hex(),
 			NoOfTokensSent:     len(msg.TokenAmounts),
-			MessageBytesLength: len(msg.Data),
+			MessageBytesLength: int64(len(msg.Data)),
 		})
 	err = c.Validate(lggr, sendTx, txConfirmationTime, []*testreporters.RequestStat{stats})
 	if err != nil {
@@ -280,8 +338,7 @@ func (c *CCIPE2ELoad) Validate(lggr zerolog.Logger, sendTx *types.Transaction, t
 	// wait for
 	// - CCIPSendRequested Event log to be generated,
 	msgLogs, sourceLogTime, err := c.Lane.Source.AssertEventCCIPSendRequested(lggr, sendTx.Hash().Hex(), c.CallTimeOut, txConfirmationTime, stats)
-
-	if err != nil || msgLogs == nil || len(msgLogs) == 0 {
+	if err != nil {
 		return err
 	}
 
@@ -313,9 +370,9 @@ func (c *CCIPE2ELoad) Validate(lggr zerolog.Logger, sendTx *types.Transaction, t
 	}
 
 	for _, msgLog := range msgLogs {
-		seqNum := msgLog.Message.SequenceNumber
+		seqNum := msgLog.SequenceNumber
 		var reqStat *testreporters.RequestStat
-		lggr = lggr.With().Str("msgId ", fmt.Sprintf("0x%x", msgLog.Message.MessageId[:])).Logger()
+		lggr = lggr.With().Str("msgId ", fmt.Sprintf("0x%x", msgLog.MessageId[:])).Logger()
 		for _, stat := range stats {
 			if stat.SeqNum == seqNum {
 				reqStat = stat

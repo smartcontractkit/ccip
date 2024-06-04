@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.19;
+pragma solidity 0.8.24;
 
 import {ITypeAndVersion} from "../shared/interfaces/ITypeAndVersion.sol";
 
@@ -41,8 +41,8 @@ contract ARMProxy is OwnerIsCreator, ITypeAndVersion {
   }
 
   // We use a fallback function instead of explicit implementations of the functions
-  // defined in IARM.sol to preserve compatibility with future additions to the IARM
-  // interface. Calling IARM interface methods in ARMProxy should be transparent, i.e.
+  // defined in IRMN.sol to preserve compatibility with future additions to the IRMN
+  // interface. Calling IRMN interface methods in ARMProxy should be transparent, i.e.
   // their input/output behaviour should be identical to calling the proxied s_arm
   // contract directly. (If s_arm doesn't point to a contract, we always revert.)
   // solhint-disable-next-line payable-fallback, no-complex-fallback

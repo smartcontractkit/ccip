@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.19;
+pragma solidity 0.8.24;
 
 import {SelfFundedPingPong} from "../../applications/SelfFundedPingPong.sol";
 import {Client} from "../../libraries/Client.sol";
@@ -9,10 +9,6 @@ import {EVM2EVMOnRampSetup} from "../onRamp/EVM2EVMOnRampSetup.t.sol";
 import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 
 contract SelfFundedPingPongDappSetup is EVM2EVMOnRampSetup {
-  event Ping(uint256 pingPongs);
-  event Pong(uint256 pingPongs);
-  event CountIncrBeforeFundingSet(uint8 countIncrBeforeFunding);
-
   SelfFundedPingPong internal s_pingPong;
   IERC20 internal s_feeToken;
   uint8 internal constant s_roundTripsBeforeFunding = 0;
@@ -38,11 +34,8 @@ contract SelfFundedPingPongDappSetup is EVM2EVMOnRampSetup {
   }
 }
 
-/// @notice #ccipReceive
 contract SelfFundedPingPong_ccipReceive is SelfFundedPingPongDappSetup {
-  event Funded();
-
-  function test_FundingSuccess() public {
+  function test_Funding_Success() public {
     Client.Any2EVMMessage memory message = Client.Any2EVMMessage({
       messageId: bytes32("a"),
       sourceChainSelector: DEST_CHAIN_SELECTOR,
@@ -54,7 +47,7 @@ contract SelfFundedPingPong_ccipReceive is SelfFundedPingPongDappSetup {
     uint8 countIncrBeforeFunding = 5;
 
     vm.expectEmit();
-    emit CountIncrBeforeFundingSet(countIncrBeforeFunding);
+    emit SelfFundedPingPong.CountIncrBeforeFundingSet(countIncrBeforeFunding);
 
     s_pingPong.setCountIncrBeforeFunding(countIncrBeforeFunding);
 
@@ -63,14 +56,14 @@ contract SelfFundedPingPong_ccipReceive is SelfFundedPingPongDappSetup {
       message.data = abi.encode(pingPongNumber);
       if (pingPongNumber == countIncrBeforeFunding - 1) {
         vm.expectEmit();
-        emit Funded();
+        emit SelfFundedPingPong.Funded();
         vm.expectCall(address(s_onRamp), "");
       }
       s_pingPong.ccipReceive(message);
     }
   }
 
-  function test_FundingIfNotANopReverts() public {
+  function test_FundingIfNotANop_Revert() public {
     EVM2EVMOnRamp.NopAndWeight[] memory nopsAndWeights = new EVM2EVMOnRamp.NopAndWeight[](0);
     s_onRamp.setNops(nopsAndWeights);
 
@@ -92,13 +85,12 @@ contract SelfFundedPingPong_ccipReceive is SelfFundedPingPongDappSetup {
   }
 }
 
-/// @notice #setCountIncrBeforeFunding
 contract SelfFundedPingPong_setCountIncrBeforeFunding is SelfFundedPingPongDappSetup {
   function test_setCountIncrBeforeFunding() public {
     uint8 c = s_pingPong.getCountIncrBeforeFunding();
 
     vm.expectEmit();
-    emit CountIncrBeforeFundingSet(c + 1);
+    emit SelfFundedPingPong.CountIncrBeforeFundingSet(c + 1);
 
     s_pingPong.setCountIncrBeforeFunding(c + 1);
     uint8 c2 = s_pingPong.getCountIncrBeforeFunding();
