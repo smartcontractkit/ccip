@@ -1,6 +1,7 @@
 package ccip
 
 import (
+	"context"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
@@ -80,4 +81,21 @@ var DefaultMaxParallelRpcCalls = rpclib.DefaultMaxParallelRpcCalls
 
 func NewEVMTokenPoolBatchedReader(lggr logger.Logger, remoteChainSelector uint64, offRampAddress ccip.Address, evmBatchCaller rpclib.EvmBatchCaller) (*batchreader.EVMTokenPoolBatchedReader, error) {
 	return batchreader.NewEVMTokenPoolBatchedReader(lggr, remoteChainSelector, offRampAddress, evmBatchCaller)
+}
+
+type ChainAgnosticPriceRegistry struct {
+	p ChainAgnosticPriceRegistryFactory
+}
+
+// [ChainAgnosticPriceRegistryFactory] is satisfied by [commontypes.CCIPCommitProvider] and [commontypes.CCIPExecProvider]
+type ChainAgnosticPriceRegistryFactory interface {
+	NewPriceRegistryReader(ctx context.Context, addr ccip.Address) (ccip.PriceRegistryReader, error)
+}
+
+func (c *ChainAgnosticPriceRegistry) NewPriceRegistryReader(ctx context.Context, addr ccip.Address) (ccip.PriceRegistryReader, error) {
+	return c.p.NewPriceRegistryReader(ctx, addr)
+}
+
+func NewChainAgnosticPriceRegistry(provider ChainAgnosticPriceRegistryFactory) *ChainAgnosticPriceRegistry {
+	return &ChainAgnosticPriceRegistry{provider}
 }

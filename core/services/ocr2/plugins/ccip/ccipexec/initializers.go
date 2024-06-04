@@ -48,7 +48,7 @@ import (
 
 const numTokenDataWorkers = 5
 
-func NewExecServices2(ctx context.Context, lggr logger.Logger, jb job.Job, srcProvider types.CCIPExecProvider, dstProvider types.CCIPExecProvider, srcChain legacyevm.Chain, dstChain legacyevm.Chain, chainSet legacyevm.LegacyChainContainer, new bool, argsNoPlugin libocr2.OCR2OracleArgs, logError func(string)) ([]job.ServiceCtx, error) {
+func NewExecServices2(ctx context.Context, lggr logger.Logger, jb job.Job, srcProvider types.CCIPExecProvider, dstProvider types.CCIPExecProvider, srcChain legacyevm.Chain, dstChain legacyevm.Chain, srcChainID int64, dstChainID int64, chainSet legacyevm.LegacyChainContainer, new bool, argsNoPlugin libocr2.OCR2OracleArgs, logError func(string)) ([]job.ServiceCtx, error) {
 	if jb.OCR2OracleSpec == nil {
 		return nil, errors.New("spec is nil")
 	}
@@ -70,7 +70,9 @@ func NewExecServices2(ctx context.Context, lggr logger.Logger, jb job.Job, srcPr
 		return nil, errors.Wrap(err, "get offRamp static config")
 	}
 
-	onRampReader, err := srcProvider.NewOnRampReader(ctx, offRampAddress, offRampConfig.SourceChainSelector, offRampConfig.ChainSelector)
+	srcChainSelector := offRampConfig.SourceChainSelector
+	dstChainSelector := offRampConfig.ChainSelector
+	onRampReader, err := srcProvider.NewOnRampReader(ctx, offRampAddress, srcChainSelector, dstChainSelector)
 	if err != nil {
 		return nil, errors.Wrap(err, "create onRampReader")
 	}
@@ -97,11 +99,6 @@ func NewExecServices2(ctx context.Context, lggr logger.Logger, jb job.Job, srcPr
 			return nil, err
 		}
 
-		attestationURI, err := url.ParseRequestURI(pluginConfig.USDCConfig.AttestationAPI)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to parse USDC attestation API")
-		}
-
 		usdcReader, err := srcProvider.NewTokenDataReader(ctx, ccip.EvmAddrToGeneric(pluginConfig.USDCConfig.SourceTokenAddress))
 		if err != nil {
 			return nil, errors.Wrap(err, "new usdc reader")
@@ -110,18 +107,10 @@ func NewExecServices2(ctx context.Context, lggr logger.Logger, jb job.Job, srcPr
 	}
 
 	// Prom wrappers
-	onRampReader = observability.NewObservedOnRampReader(onRampReader, sourceChainID, ccip.ExecPluginLabel)
-	commitStoreReader = observability.NewObservedCommitStoreReader(commitStoreReader, destChainID, ccip.ExecPluginLabel)
-	offRampReader := observability.NewObservedOffRampReader(offRampReader, destChainID, ccip.ExecPluginLabel)
-	metricsCollector := ccip.NewPluginMetricsCollector(ccip.ExecPluginLabel, sourceChainID, destChainID)
-
-	batchCaller := rpclib.NewDynamicLimitedBatchCaller(
-		lggr,
-		params.destChain.Client(),
-		rpclib.DefaultRpcBatchSizeLimit,
-		rpclib.DefaultRpcBatchBackOffMultiplier,
-		rpclib.DefaultMaxParallelRpcCalls,
-	)
+	onRampReader = observability.NewObservedOnRampReader(onRampReader, srcChainID, ccip.ExecPluginLabel)
+	commitStoreReader = observability.NewObservedCommitStoreReader(commitStoreReader, dstChainID, ccip.ExecPluginLabel)
+	offRampReader = observability.NewObservedOffRampReader(offRampReader, dstChainID, ccip.ExecPluginLabel)
+	metricsCollector := ccip.NewPluginMetricsCollector(ccip.ExecPluginLabel, srcChainID, dstChainID)
 
 	// TODO: does offRampAddress2 = offRampAddress?
 	offRampAddress2, err := offRampReader.Address(ctx)
@@ -129,12 +118,77 @@ func NewExecServices2(ctx context.Context, lggr logger.Logger, jb job.Job, srcPr
 		return nil, fmt.Errorf("get offramp reader address: %w", err)
 	}
 
-	tokenPoolBatchedReader, err := dstProvider.NewTokenPoolBatchedReader(ctx, offRampAddress2)
+	tokenPoolBatchedReader, err := dstProvider.NewTokenPoolBatchedReader(ctx, offRampAddress2, srcChainSelector)
 
-	tokenPoolBatchedReader, err := batchreader.NewEVMTokenPoolBatchedReader(execLggr, sourceChainSelector, offrampAddress, batchCaller)
+	chainHealthcheck := cache.NewObservedChainHealthCheck(
+		cache.NewChainHealthcheck(
+			// Adding more details to Logger to make healthcheck logs more informative
+			// It's safe because healthcheck logs only in case of unhealthy state
+			lggr.With(
+				"onramp", offRampConfig.OnRamp,
+				"commitStore", offRampConfig.CommitStore,
+				"offramp", offRampAddress,
+			),
+			onRampReader,
+			commitStoreReader,
+		),
+		ccip.ExecPluginLabel,
+		srcChainID,
+		dstChainID,
+		offRampConfig.OnRamp,
+	)
+
+	onchainConfig, err := offRampReader.OnchainConfig(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("new token pool batched reader: %w", err)
+		return nil, fmt.Errorf("get onchain config from offramp reader: %w", err)
 	}
+
+	tokenBackgroundWorker := tokendata.NewBackgroundWorker(
+		tokenDataProviders,
+		numTokenDataWorkers,
+		5*time.Second,
+		onchainConfig.PermissionLessExecutionThresholdSeconds,
+	)
+
+	wrappedPluginFactory := NewExecutionReportingPluginFactory(ExecutionPluginStaticConfig{
+		lggr:                        lggr,
+		onRampReader:                onRampReader,
+		commitStoreReader:           commitStoreReader,
+		offRampReader:               offRampReader,
+		sourcePriceRegistryProvider: ccip.NewChainAgnosticPriceRegistry(srcProvider),
+		sourceWrappedNativeToken:    sourceWrappedNative,
+		destChainSelector:           dstChainSelector,
+		priceRegistryProvider:       ccip.NewChainAgnosticPriceRegistry(dstProvider),
+		tokenPoolBatchedReader:      tokenPoolBatchedReader,
+		tokenDataWorker:             tokenBackgroundWorker,
+		metricsCollector:            metricsCollector,
+		chainHealthcheck:            chainHealthcheck,
+	})
+
+	argsNoPlugin.ReportingPluginFactory = promwrapper.NewPromFactory(wrappedPluginFactory, "CCIPExecution", jb.OCR2OracleSpec.Relay, big.NewInt(0).SetInt64(dstChainID))
+	argsNoPlugin.Logger = commonlogger.NewOCRWrapper(lggr, true, logError)
+	oracle, err := libocr2.NewOracle(argsNoPlugin)
+	if err != nil {
+		return nil, err
+	}
+	// If this is a brand-new job, then we make use of the start blocks. If not then we're rebooting and log poller will pick up where we left off.
+	if new {
+		return []job.ServiceCtx{
+			oraclelib.NewChainAgnosticBackFilledOracle(
+				lggr,
+				srcProvider,
+				dstProvider,
+				job.NewServiceAdapter(oracle),
+			),
+			chainHealthcheck,
+			tokenBackgroundWorker,
+		}, nil
+	}
+	return []job.ServiceCtx{
+		job.NewServiceAdapter(oracle),
+		chainHealthcheck,
+		tokenBackgroundWorker,
+	}, nil
 
 }
 

@@ -9,6 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
 	chainselectors "github.com/smartcontractkit/chain-selectors"
+	commonlogger "github.com/smartcontractkit/chainlink-common/pkg/logger"
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/ccipdataprovider"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/rpclib"
@@ -16,11 +17,6 @@ import (
 	"go.uber.org/multierr"
 	"math/big"
 	"strings"
-	"sync"
-	"sync/atomic"
-	"time"
-
-	commonlogger "github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
 
@@ -199,7 +195,7 @@ func NewCommitServices2(ctx context.Context, srcProvider commontypes.CCIPCommitP
 		offRamp:               offRampReader,
 		commitStore:           commitStoreReader,
 		destChainSelector:     staticConfig.ChainSelector,
-		priceRegistryProvider: NewChainAgnosticPriceRegistry(dstProvider),
+		priceRegistryProvider: ccip.NewChainAgnosticPriceRegistry(dstProvider),
 		priceGetter:           priceGetter,
 		metricsCollector:      metricsCollector,
 		chainHealthcheck:      chainHealthCheck,
@@ -213,7 +209,7 @@ func NewCommitServices2(ctx context.Context, srcProvider commontypes.CCIPCommitP
 	// If this is a brand-new job, then we make use of the start blocks. If not then we're rebooting and log poller will pick up where we left off.
 	if new {
 		return []job.ServiceCtx{
-			NewChainAgnosticBackFilledOracle(
+			oraclelib.NewChainAgnosticBackFilledOracle(
 				lggr,
 				srcProvider,
 				dstProvider,
@@ -227,110 +223,6 @@ func NewCommitServices2(ctx context.Context, srcProvider commontypes.CCIPCommitP
 		chainHealthCheck,
 	}, nil
 
-}
-
-type ChainAgnosticPriceRegistry struct {
-	p commontypes.CCIPCommitProvider
-}
-
-func (c *ChainAgnosticPriceRegistry) NewPriceRegistryReader(ctx context.Context, addr cciptypes.Address) (cciptypes.PriceRegistryReader, error) {
-	return c.p.NewPriceRegistryReader(ctx, addr)
-}
-
-func NewChainAgnosticPriceRegistry(p commontypes.CCIPCommitProvider) *ChainAgnosticPriceRegistry {
-	return &ChainAgnosticPriceRegistry{p}
-}
-
-func NewChainAgnosticBackFilledOracle(lggr logger.Logger, srcProvider commontypes.CCIPCommitProvider, dstProvider commontypes.CCIPCommitProvider, oracle job.ServiceCtx) *ChainAgnosticBackFilledOracle {
-	return &ChainAgnosticBackFilledOracle{
-		srcProvider: srcProvider,
-		dstProvider: dstProvider,
-		oracle:      oracle,
-		lggr:        lggr,
-	}
-}
-
-type ChainAgnosticBackFilledOracle struct {
-	srcProvider   commontypes.CCIPCommitProvider
-	dstProvider   commontypes.CCIPCommitProvider
-	oracle        job.ServiceCtx
-	lggr          logger.Logger
-	oracleStarted atomic.Bool
-	cancelFn      context.CancelFunc
-}
-
-func (r *ChainAgnosticBackFilledOracle) Start(ctx context.Context) error {
-	ctx, cancelFn := context.WithCancel(context.Background())
-	r.cancelFn = cancelFn
-	var err error
-	var errMu sync.Mutex
-	var wg sync.WaitGroup
-	// Replay in parallel if both requested.
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		s := time.Now()
-		srcReplayErr := r.srcProvider.Start(ctx)
-		errMu.Lock()
-		err = multierr.Combine(err, srcReplayErr)
-		errMu.Unlock()
-		r.lggr.Infow("finished replaying src chain", "time", time.Since(s))
-	}()
-
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		s := time.Now()
-		dstReplayErr := r.dstProvider.Start(ctx)
-		errMu.Lock()
-		err = multierr.Combine(err, dstReplayErr)
-		errMu.Unlock()
-		r.lggr.Infow("finished replaying dst chain", "time", time.Since(s))
-	}()
-
-	wg.Wait()
-	if err != nil {
-		r.lggr.Criticalw("unexpected error replaying, continuing plugin boot without all the logs backfilled", "err", err)
-	}
-	if err := ctx.Err(); err != nil {
-		r.lggr.Errorw("context already cancelled", "err", err)
-		return nil
-	}
-	// Start oracle with all logs present from dstStartBlock on dst and
-	// all logs from srcStartBlock on src.
-	if err := r.oracle.Start(ctx); err != nil {
-		// Should never happen.
-		r.lggr.Errorw("unexpected error starting oracle", "err", err)
-	} else {
-		r.oracleStarted.Store(true)
-	}
-	return nil
-}
-
-func (r *ChainAgnosticBackFilledOracle) Close() error {
-	if r.oracleStarted.Load() {
-		// If the oracle is running, it must be Closed/stopped
-		// TODO: Close should be safe to call in either case?
-		if err := r.oracle.Close(); err != nil {
-			r.lggr.Errorw("unexpected error stopping oracle", "err", err)
-			return err
-		}
-		// Flag the oracle as closed with our internal variable that keeps track
-		// of its state.  This will allow to re-start the process
-		r.oracleStarted.Store(false)
-	}
-	if r.cancelFn != nil {
-		// This is useful to step the previous tasks that are spawned in
-		// parallel before starting the Oracle. This will use the context to
-		// signal them to exit immediately.
-		//
-		// It can be possible this is the only way to stop the Start() async
-		// flow, specially when the previusly task are running (the replays) and
-		// `oracleStarted` would be false in that example. Calling `cancelFn()`
-		// will stop the replays and will prevent the oracle to start
-		r.cancelFn()
-	}
-	return nil
 }
 
 func CommitReportToEthTxMeta(typ ccipconfig.ContractType, ver semver.Version) (func(report []byte) (*txmgr.TxMeta, error), error) {

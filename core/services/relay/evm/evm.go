@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/ccipcommit"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/ccipexec"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"strings"
 	"sync"
@@ -320,23 +321,56 @@ func (r *Relayer) NewCCIPCommitProvider(rargs commontypes.RelayArgs, pargs commo
 
 func (r *Relayer) NewExecProvider(rargs commontypes.RelayArgs, pargs commontypes.PluginArgs) (commontypes.CCIPExecProvider, error) {
 	// TODO https://smartcontract-it.atlassian.net/browse/BCF-2887
-	// ctx := context.Background()
+	ctx := context.Background()
 
 	versionFinder := ccip.NewEvmVersionFinder()
 
-	var commitPluginConfig ccipconfig.ExecPluginConfig
-	err := json.Unmarshal(pargs.PluginConfig, &commitPluginConfig)
+	relayOpts := types.NewRelayOpts(rargs)
+
+	configWatcher, err := newStandardConfigProvider(ctx, r.lggr, r.chain, relayOpts)
+	if err != nil {
+		return nil, err
+	}
+	address := common.HexToAddress(relayOpts.ContractID)
+	typ, ver, err := ccipconfig.TypeAndVersion(address, r.chain.Client())
+	if err != nil {
+		return nil, err
+	}
+	fn, err := ccipexec.ExecReportToEthTxMeta(ctx, typ, ver)
+	if err != nil {
+		return nil, err
+	}
+	subjectID := chainToUUID(configWatcher.chain.ID())
+	contractTransmitter, err := newOnChainContractTransmitter(ctx, r.lggr, rargs, r.ks.Eth(), configWatcher, configTransmitterOpts{
+		subjectID: &subjectID,
+	}, OCR2AggregatorTransmissionContractABI, fn, 0)
 	if err != nil {
 		return nil, err
 	}
 
-	if commitPluginConfig.IsSourceProvider {
+	var execPluginConfig ccipconfig.ExecPluginConfig
+	err = json.Unmarshal(pargs.PluginConfig, &execPluginConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	usdcConfig := execPluginConfig.USDCConfig
+
+	if execPluginConfig.IsSourceProvider {
 		return NewSrcExecProvider(
 			r.lggr,
 			versionFinder,
 			r.chain.Client(),
 			r.chain.LogPoller(),
-		), nil
+			execPluginConfig.SourceStartBlock,
+			contractTransmitter,
+			configWatcher,
+			execPluginConfig.JobID,
+			usdcConfig.AttestationAPI,
+			int(usdcConfig.AttestationAPITimeoutSeconds),
+			usdcConfig.AttestationAPIIntervalMilliseconds,
+			usdcConfig.SourceMessageTransmitterAddress,
+		)
 	}
 
 	return NewDstExecProvider(
@@ -344,9 +378,10 @@ func (r *Relayer) NewExecProvider(rargs commontypes.RelayArgs, pargs commontypes
 		versionFinder,
 		r.chain.Client(),
 		r.chain.LogPoller(),
+		execPluginConfig.DestStartBlock,
 		r.chain.GasEstimator(),
 		*r.chain.Config().EVM().GasEstimator().PriceMax().ToInt(),
-	), nil
+	)
 }
 
 func (r *Relayer) NewLLOProvider(rargs commontypes.RelayArgs, pargs commontypes.PluginArgs) (commontypes.LLOProvider, error) {

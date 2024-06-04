@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
@@ -25,6 +26,9 @@ type SrcExecProvider struct {
 	versionFinder                          ccip.VersionFinder
 	client                                 client.Client
 	lp                                     logpoller.LogPoller
+	startBlock                             uint64
+	contractTransmitter                    *contractTransmitter
+	configWatcher                          *configWatcher
 	gasEstimator                           gas.EvmFeeEstimator
 	maxGasPrice                            big.Int
 	jobID                                  string
@@ -32,6 +36,7 @@ type SrcExecProvider struct {
 	usdcAttestationAPI                     string
 	usdcAttestationAPITimeoutSeconds       int
 	usdcAttestationAPIIntervalMilliseconds int
+	usdcSrcMsgTransmitterAddr              common.Address
 }
 
 func NewSrcExecProvider(
@@ -39,25 +44,36 @@ func NewSrcExecProvider(
 	versionFinder ccip.VersionFinder,
 	client client.Client,
 	lp logpoller.LogPoller,
+	startBlock uint64,
+	contractTransmitter *contractTransmitter,
+	configWatcher *configWatcher,
 	jobID string,
-	usdcReader ccip.USDCReaderImpl,
 	usdcAttestationAPI string,
 	usdcAttestationAPITimeoutSeconds int,
 	usdcAttestationAPIIntervalMilliseconds int,
+	usdcSrcMsgTransmitterAddr common.Address,
 	// gasEstimator gas.EvmFeeEstimator,
 	// maxGasPrice big.Int,
 ) (commontypes.CCIPExecProvider, error) {
+
+	usdcReader, err := ccip.NewUSDCReader(lggr, jobID, usdcSrcMsgTransmitterAddr, lp, true)
+	if err != nil {
+		return nil, errors.Wrap(err, "new usdc reader")
+	}
 
 	return &SrcExecProvider{
 		lggr:                                   lggr,
 		versionFinder:                          versionFinder,
 		client:                                 client,
 		lp:                                     lp,
-		jobID:                                  jobID,
-		usdcReader:                             usdcReader,
+		startBlock:                             startBlock,
+		contractTransmitter:                    contractTransmitter,
+		configWatcher:                          configWatcher,
+		usdcReader:                             *usdcReader,
 		usdcAttestationAPI:                     usdcAttestationAPI,
 		usdcAttestationAPITimeoutSeconds:       usdcAttestationAPITimeoutSeconds,
 		usdcAttestationAPIIntervalMilliseconds: usdcAttestationAPIIntervalMilliseconds,
+		usdcSrcMsgTransmitterAddr:              usdcSrcMsgTransmitterAddr,
 		//gasEstimator:  gasEstimator,
 		//maxGasPrice:   maxGasPrice,
 	}, nil
@@ -69,48 +85,43 @@ func (s SrcExecProvider) Name() string {
 }
 
 func (s SrcExecProvider) Start(ctx context.Context) error {
-	//TODO implement me
-	panic("implement me")
+	if s.startBlock != 0 {
+		s.lggr.Infow("start replaying src chain", "fromBlock", s.startBlock)
+		return s.lp.Replay(ctx, int64(s.startBlock))
+	}
+	return nil
 }
 
 func (s SrcExecProvider) Close() error {
-	//TODO implement me
-	panic("implement me")
+	return nil
 }
 
 func (s SrcExecProvider) Ready() error {
-	//TODO implement me
-	panic("implement me")
+	return nil
 }
 
 func (s SrcExecProvider) HealthReport() map[string]error {
-	//TODO implement me
-	panic("implement me")
+	return nil
 }
 
 func (s SrcExecProvider) OffchainConfigDigester() ocrtypes.OffchainConfigDigester {
-	//TODO implement me
-	panic("implement me")
+	return s.configWatcher.OffchainConfigDigester()
 }
 
 func (s SrcExecProvider) ContractConfigTracker() ocrtypes.ContractConfigTracker {
-	//TODO implement me
-	panic("implement me")
+	return s.configWatcher.ContractConfigTracker()
 }
 
 func (s SrcExecProvider) ContractTransmitter() ocrtypes.ContractTransmitter {
-	//TODO implement me
-	panic("implement me")
+	return s.contractTransmitter
 }
 
 func (s SrcExecProvider) ChainReader() commontypes.ChainReader {
-	//TODO implement me
-	panic("implement me")
+	return nil
 }
 
 func (s SrcExecProvider) Codec() commontypes.Codec {
-	//TODO implement me
-	panic("implement me")
+	return nil
 }
 
 func (s SrcExecProvider) NewCommitStoreReader(ctx context.Context, addr cciptypes.Address) (cciptypes.CommitStoreReader, error) {
@@ -122,14 +133,16 @@ func (s SrcExecProvider) NewOffRampReader(ctx context.Context, addr cciptypes.Ad
 	panic("NewOffRampReader called on SrcExecProvider. Valid on DstExecProvider.")
 }
 
-func (s SrcExecProvider) NewOnRampReader(ctx context.Context, addr cciptypes.Address, sourceSelector uint64, destSelector uint64) (cciptypes.OnRampReader, error) {
-	//TODO implement me
-	panic("implement me")
+func (s SrcExecProvider) NewOnRampReader(ctx context.Context, onRampAddress cciptypes.Address, sourceChainSelector uint64, destChainSelector uint64) (onRampReader cciptypes.OnRampReader, err error) {
+	versionFinder := ccip.NewEvmVersionFinder()
+	onRampReader, err = ccip.NewOnRampReader(s.lggr, versionFinder, sourceChainSelector, destChainSelector, onRampAddress, s.lp, s.client)
+	return
 }
 
-func (s SrcExecProvider) NewPriceRegistryReader(ctx context.Context, addr cciptypes.Address) (cciptypes.PriceRegistryReader, error) {
-	//TODO implement me
-	panic("implement me")
+func (s SrcExecProvider) NewPriceRegistryReader(ctx context.Context, addr cciptypes.Address) (priceRegistryReader cciptypes.PriceRegistryReader, err error) {
+	srcPriceRegistry := ccip.NewEvmPriceRegistry(s.lp, s.client, s.lggr, ccip.ExecPluginLabel)
+	priceRegistryReader, err = srcPriceRegistry.NewPriceRegistryReader(ctx, addr)
+	return
 }
 
 func (s SrcExecProvider) NewTokenDataReader(ctx context.Context, tokenAddress cciptypes.Address) (tokenDataReader cciptypes.TokenDataReader, err error) {
@@ -153,8 +166,8 @@ func (s SrcExecProvider) NewTokenDataReader(ctx context.Context, tokenAddress cc
 	return tokenDataReader, nil
 }
 
-func (s SrcExecProvider) NewTokenPoolBatchedReader(ctx context.Context, offRampAddr cciptypes.Address) (cciptypes.TokenPoolBatchedReader, error) {
-	panic("don't do this")
+func (s SrcExecProvider) NewTokenPoolBatchedReader(ctx context.Context, offRampAddr cciptypes.Address, sourceChainSelector uint64) (cciptypes.TokenPoolBatchedReader, error) {
+	panic("NewTokenPoolBatchedReader called on SrcExecProvider. It should only be called on DstExecProvdier")
 }
 
 func (s SrcExecProvider) SourceNativeToken(ctx context.Context, sourceRouterAddr cciptypes.Address) (cciptypes.Address, error) {
@@ -175,13 +188,13 @@ func (s SrcExecProvider) SourceNativeToken(ctx context.Context, sourceRouterAddr
 }
 
 type DstExecProvider struct {
-	lggr                logger.Logger
-	versionFinder       ccip.VersionFinder
-	client              client.Client
-	lp                  logpoller.LogPoller
-	gasEstimator        gas.EvmFeeEstimator
-	maxGasPrice         big.Int
-	sourceChainSelector uint64
+	lggr          logger.Logger
+	versionFinder ccip.VersionFinder
+	client        client.Client
+	lp            logpoller.LogPoller
+	startBlock    uint64
+	gasEstimator  gas.EvmFeeEstimator
+	maxGasPrice   big.Int
 }
 
 func NewDstExecProvider(
@@ -189,19 +202,19 @@ func NewDstExecProvider(
 	versionFinder ccip.VersionFinder,
 	client client.Client,
 	lp logpoller.LogPoller,
+	startBlock uint64,
 	gasEstimator gas.EvmFeeEstimator,
 	maxGasPrice big.Int,
-	sourceChainSelector uint64,
-) commontypes.CCIPExecProvider {
+) (commontypes.CCIPExecProvider, error) {
 	return &DstExecProvider{
-		lggr:                lggr,
-		versionFinder:       versionFinder,
-		client:              client,
-		lp:                  lp,
-		gasEstimator:        gasEstimator,
-		maxGasPrice:         maxGasPrice,
-		sourceChainSelector: sourceChainSelector,
-	}
+		lggr:          lggr,
+		versionFinder: versionFinder,
+		client:        client,
+		lp:            lp,
+		startBlock:    startBlock,
+		gasEstimator:  gasEstimator,
+		maxGasPrice:   maxGasPrice,
+	}, nil
 }
 
 func (d DstExecProvider) Name() string {
@@ -209,48 +222,43 @@ func (d DstExecProvider) Name() string {
 }
 
 func (d DstExecProvider) Start(ctx context.Context) error {
-	//TODO implement me
-	panic("implement me")
+	if d.startBlock != 0 {
+		d.lggr.Infow("start replaying dst chain", "fromBlock", d.startBlock)
+		return d.lp.Replay(ctx, int64(d.startBlock))
+	}
+	return nil
 }
 
 func (d DstExecProvider) Close() error {
-	//TODO implement me
-	panic("implement me")
+	return nil
 }
 
 func (d DstExecProvider) Ready() error {
-	//TODO implement me
-	panic("implement me")
+	return nil
 }
 
 func (d DstExecProvider) HealthReport() map[string]error {
-	//TODO implement me
-	panic("implement me")
+	return nil
 }
 
 func (d DstExecProvider) OffchainConfigDigester() ocrtypes.OffchainConfigDigester {
-	//TODO implement me
-	panic("implement me")
+	panic("OffchainConfigDigester called on DstExecProvider. It should only be called on SrcExecProvider.")
 }
 
 func (d DstExecProvider) ContractConfigTracker() ocrtypes.ContractConfigTracker {
-	//TODO implement me
-	panic("implement me")
+	panic("ContractConfigTracker called on DstExecProvider. It should only be called on SrcExecProvider.")
 }
 
 func (d DstExecProvider) ContractTransmitter() ocrtypes.ContractTransmitter {
-	//TODO implement me
-	panic("implement me")
+	panic("ContractTransmitter called on DstExecProvider. It should only be called on SrcExecProvider.")
 }
 
 func (d DstExecProvider) ChainReader() commontypes.ChainReader {
-	//TODO implement me
-	panic("implement me")
+	return nil
 }
 
 func (d DstExecProvider) Codec() commontypes.Codec {
-	//TODO implement me
-	panic("implement me")
+	return nil
 }
 
 func (d DstExecProvider) NewCommitStoreReader(ctx context.Context, addr cciptypes.Address) (cciptypes.CommitStoreReader, error) {
@@ -263,14 +271,14 @@ func (d DstExecProvider) NewOffRampReader(ctx context.Context, offRampAddress cc
 	return
 }
 
-func (d DstExecProvider) NewOnRampReader(ctx context.Context, addr cciptypes.Address, sourceSelector uint64, destSelector uint64) (cciptypes.OnRampReader, error) {
-	//TODO implement me
-	panic("implement me")
+func (d DstExecProvider) NewOnRampReader(ctx context.Context, addr cciptypes.Address, sourceChainSelector uint64, destChainSelector uint64) (cciptypes.OnRampReader, error) {
+	panic("NewOnRampReader called on DstExecProvider. It should only be called on SrcExecProvider")
 }
 
-func (d DstExecProvider) NewPriceRegistryReader(ctx context.Context, addr cciptypes.Address) (cciptypes.PriceRegistryReader, error) {
-	//TODO implement me
-	panic("implement me")
+func (d DstExecProvider) NewPriceRegistryReader(ctx context.Context, addr cciptypes.Address) (priceRegistryReader cciptypes.PriceRegistryReader, err error) {
+	destPriceRegistry := ccip.NewEvmPriceRegistry(d.lp, d.client, d.lggr, ccip.ExecPluginLabel)
+	priceRegistryReader, err = destPriceRegistry.NewPriceRegistryReader(ctx, addr)
+	return
 }
 
 func (d DstExecProvider) NewTokenDataReader(ctx context.Context, tokenAddress cciptypes.Address) (cciptypes.TokenDataReader, error) {
@@ -278,7 +286,7 @@ func (d DstExecProvider) NewTokenDataReader(ctx context.Context, tokenAddress cc
 	panic("implement me")
 }
 
-func (d DstExecProvider) NewTokenPoolBatchedReader(ctx context.Context, offRampAddress cciptypes.Address) (tokenPoolBatchedReader cciptypes.TokenPoolBatchedReader, err error) {
+func (d DstExecProvider) NewTokenPoolBatchedReader(ctx context.Context, offRampAddress cciptypes.Address, sourceChainSelector uint64) (tokenPoolBatchedReader cciptypes.TokenPoolBatchedReader, err error) {
 	batchCaller := ccip.NewDynamicLimitedBatchCaller(
 		d.lggr,
 		d.client,
@@ -287,10 +295,11 @@ func (d DstExecProvider) NewTokenPoolBatchedReader(ctx context.Context, offRampA
 		uint(ccip.DefaultMaxParallelRpcCalls),
 	)
 
-	tokenPoolBatchedReader, err = ccip.NewEVMTokenPoolBatchedReader(d.lggr, d.sourceChainSelector, offRampAddress, batchCaller)
+	tokenPoolBatchedReader, err = ccip.NewEVMTokenPoolBatchedReader(d.lggr, sourceChainSelector, offRampAddress, batchCaller)
 	if err != nil {
 		return nil, fmt.Errorf("new token pool batched reader: %w", err)
 	}
+	return
 }
 
 func (d DstExecProvider) SourceNativeToken(ctx context.Context, addr cciptypes.Address) (cciptypes.Address, error) {

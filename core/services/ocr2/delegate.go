@@ -1760,12 +1760,12 @@ func (d *Delegate) newServicesCCIPCommit(ctx context.Context, lggr logger.Sugare
 		return nil, err
 	}
 
-	srcConfigBytes, err := ccipProviderTypeToPluginConfig(true, pluginJobSpecConfig.SourceStartBlock, pluginJobSpecConfig.DestStartBlock)
+	srcConfigBytes, err := ccipCommitProviderTypeToPluginConfig(true, pluginJobSpecConfig.SourceStartBlock, pluginJobSpecConfig.DestStartBlock)
 	if err != nil {
 		return nil, err
 	}
 
-	dstConfigBytes, err := ccipProviderTypeToPluginConfig(false, pluginJobSpecConfig.SourceStartBlock, pluginJobSpecConfig.DestStartBlock)
+	dstConfigBytes, err := ccipCommitProviderTypeToPluginConfig(false, pluginJobSpecConfig.SourceStartBlock, pluginJobSpecConfig.DestStartBlock)
 	if err != nil {
 		return nil, err
 	}
@@ -1837,7 +1837,7 @@ func (d *Delegate) newServicesCCIPCommit(ctx context.Context, lggr logger.Sugare
 	return ccipcommit.NewCommitServices2(ctx, srcProvider, dstProvider, srcChain, dstChain, d.legacyChains, jb, lggr, d.pipelineRunner, oracleArgsNoPlugin, d.isNewlyCreatedJob, sourceChainID, int64(destChainID), logError)
 }
 
-func ccipProviderTypeToPluginConfig(isSourceProvider bool, sourceStartBlock uint64, destStartBlock uint64) ([]byte, error) {
+func ccipCommitProviderTypeToPluginConfig(isSourceProvider bool, sourceStartBlock uint64, destStartBlock uint64) ([]byte, error) {
 	commitPluginConfig := &config.CommitPluginConfig{
 		IsSourceProvider: isSourceProvider,
 		SourceStartBlock: sourceStartBlock,
@@ -1856,18 +1856,18 @@ func (d *Delegate) newServicesCCIPExecution(ctx context.Context, lggr logger.Sug
 	if spec.Relay != types.NetworkEVM {
 		return nil, errors.New("Non evm chains are not supported for CCIP execution")
 	}
-	rid, err := spec.RelayID()
+	srcRid, err := spec.RelayID()
 	if err != nil {
 		return nil, ErrJobSpecNoRelayer{Err: err, PluginName: string(spec.PluginType)}
 	}
-	chain, err := d.legacyChains.Get(rid.ChainID)
+	srcChain, err := d.legacyChains.Get(srcRid.ChainID)
 	if err != nil {
-		return nil, fmt.Errorf("ccip services; failed to get chain %s: %w", rid.ChainID, err)
+		return nil, fmt.Errorf("ccip services; failed to get chain %s: %w", srcRid.ChainID, err)
 	}
 	ccipProvider, err2 := evmrelay.NewCCIPExecutionProvider(
 		ctx,
 		lggr.Named("CCIPExec"),
-		chain,
+		srcChain,
 		types.RelayArgs{
 			ExternalJobID: jb.ExternalJobID,
 			JobID:         spec.ID,
@@ -1889,8 +1889,8 @@ func (d *Delegate) newServicesCCIPExecution(ctx context.Context, lggr logger.Sug
 		Database:                     ocrDB,
 		LocalConfig:                  lc,
 		MonitoringEndpoint: d.monitoringEndpointGen.GenMonitoringEndpoint(
-			rid.Network,
-			rid.ChainID,
+			srcRid.Network,
+			srcRid.ChainID,
 			spec.ContractID,
 			synchronization.OCR2CCIPExec,
 		),
@@ -1903,7 +1903,125 @@ func (d *Delegate) newServicesCCIPExecution(ctx context.Context, lggr logger.Sug
 		lggr.ErrorIf(d.jobORM.RecordError(context.Background(), jb.ID, msg), "unable to record error")
 	}
 
-	return ccipexec.NewExecServices(ctx, lggr, jb, d.legacyChains, d.isNewlyCreatedJob, oracleArgsNoPlugin, logError)
+	// PROVIDER BASED ARG CONSTRUCTION
+	relayers := d.RelayGetter.GetAll()
+
+	// Get the relayer ID corresponding to the dest chain
+	chainIDInterface, ok := spec.RelayConfig["chainID"]
+	if !ok {
+		return nil, errors.New("chainID must be provided in relay config")
+	}
+	dstChainID := uint64(chainIDInterface.(float64))
+	dstChain, err := d.legacyChains.Get(strconv.FormatUint(dstChainID, 10))
+	if err != nil {
+		return nil, errors.Wrap(err, "dest chain not found in chainset")
+	}
+	var dstRid types.RelayID
+	for r := range relayers {
+		if fmt.Sprintf("%d", dstChainID) == r.ChainID {
+			dstRid = r
+		}
+	}
+
+	// Write PluginConfig bytes to send source/dest relayer provider + info outside of top level rargs/pargs over the wire
+	var pluginJobSpecConfig ccipconfig.ExecPluginJobSpecConfig
+	err = json.Unmarshal(spec.PluginConfig.Bytes(), &pluginJobSpecConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	srcConfigBytes, err := ccipExecProviderTypeToPluginConfig(true, pluginJobSpecConfig.SourceStartBlock, pluginJobSpecConfig.DestStartBlock, pluginJobSpecConfig.USDCConfig, string(jb.ID))
+	if err != nil {
+		return nil, err
+	}
+
+	dstConfigBytes, err := ccipExecProviderTypeToPluginConfig(false, pluginJobSpecConfig.SourceStartBlock, pluginJobSpecConfig.DestStartBlock, pluginJobSpecConfig.USDCConfig, string(jb.ID))
+	if err != nil {
+		return nil, err
+	}
+
+	srcChainID, err := strconv.ParseInt(srcRid.ChainID, 10, 64)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get provider from source chain
+	srcRelayer, err := d.RelayGetter.Get(srcRid)
+	if err != nil {
+		return nil, err
+	}
+	provider, err := srcRelayer.NewPluginProvider(ctx,
+		types.RelayArgs{
+			ContractID:   spec.ContractID,
+			RelayConfig:  spec.RelayConfig.Bytes(),
+			ProviderType: string(types.CCIPCommit),
+		},
+		types.PluginArgs{
+			TransmitterID: transmitterID,
+			PluginConfig:  srcConfigBytes,
+		})
+	srcProvider, ok := provider.(types.CCIPExecProvider)
+	if !ok {
+		return nil, errors.New("could not coerce PluginProvider to CCIPExecProvider")
+	}
+
+	// Get provider from dest chain
+	dstRelayer, err := d.RelayGetter.Get(dstRid)
+	if err != nil {
+		return nil, err
+	}
+	provider, err = dstRelayer.NewPluginProvider(ctx,
+		types.RelayArgs{
+			ContractID:   spec.ContractID,
+			RelayConfig:  spec.RelayConfig.Bytes(),
+			ProviderType: string(types.CCIPCommit),
+		},
+		types.PluginArgs{
+			TransmitterID: transmitterID,
+			PluginConfig:  dstConfigBytes,
+		})
+	dstProvider, ok := provider.(types.CCIPExecProvider)
+	if !ok {
+		return nil, errors.New("could not coerce PluginProvider to CCIPExecProvider")
+	}
+
+	oracleArgsNoPlugin2 := libocr2.OCR2OracleArgs{
+		BinaryNetworkEndpointFactory: d.peerWrapper.Peer2,
+		V2Bootstrappers:              bootstrapPeers,
+		ContractTransmitter:          srcProvider.ContractTransmitter(),
+		ContractConfigTracker:        srcProvider.ContractConfigTracker(),
+		Database:                     ocrDB,
+		LocalConfig:                  lc,
+		MonitoringEndpoint: d.monitoringEndpointGen.GenMonitoringEndpoint(
+			srcRid.Network,
+			srcRid.ChainID,
+			spec.ContractID,
+			synchronization.OCR2CCIPExec,
+		),
+		OffchainConfigDigester: srcProvider.OffchainConfigDigester(),
+		OffchainKeyring:        kb,
+		OnchainKeyring:         kb,
+		MetricsRegisterer:      prometheus.WrapRegistererWith(map[string]string{"job_name": jb.Name.ValueOrZero()}, prometheus.DefaultRegisterer),
+	}
+
+	ccipexec.NewExecServices(ctx, lggr, jb, d.legacyChains, d.isNewlyCreatedJob, oracleArgsNoPlugin, logError)
+	return ccipexec.NewExecServices2(ctx, lggr, jb, srcProvider, dstProvider, srcChain, dstChain, srcChainID, int64(dstChainID), d.legacyChains, d.isNewlyCreatedJob, oracleArgsNoPlugin2, logError)
+}
+
+func ccipExecProviderTypeToPluginConfig(isSourceProvider bool, srcStartBlock uint64, dstStartBlock uint64, usdcConfig ccipconfig.USDCConfig, jobID string) ([]byte, error) {
+	execPluginConfig := &config.ExecPluginConfig{
+		IsSourceProvider: isSourceProvider,
+		SourceStartBlock: srcStartBlock,
+		DestStartBlock:   dstStartBlock,
+		USDCConfig:       usdcConfig,
+		JobID:            jobID,
+	}
+
+	bytes, err := json.Marshal(execPluginConfig)
+	if err != nil {
+		return nil, err
+	}
+	return bytes, nil
 }
 
 func (d *Delegate) newServicesLiquidityManager(ctx context.Context, lggr logger.SugaredLogger, jb job.Job, bootstrapPeers []commontypes.BootstrapperLocator, kb ocr2key.KeyBundle, ocrDB *db, lc ocrtypes.LocalConfig) ([]job.ServiceCtx, error) {

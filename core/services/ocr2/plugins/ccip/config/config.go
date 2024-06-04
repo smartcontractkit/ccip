@@ -112,7 +112,10 @@ type USDCConfig struct {
 }
 
 type ExecPluginConfig struct {
-	IsSourceProvider bool
+	SourceStartBlock, DestStartBlock uint64 // Only for first time job add.
+	IsSourceProvider                 bool
+	USDCConfig                       USDCConfig
+	JobID                            string
 }
 
 func (uc *USDCConfig) ValidateUSDCConfig() error {
