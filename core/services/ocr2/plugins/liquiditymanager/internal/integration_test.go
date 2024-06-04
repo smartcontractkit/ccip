@@ -324,7 +324,7 @@ func newTestUniverse(t *testing.T, numChains int, adapterHoldNative bool) {
 	require.NotNil(t, evmChains)
 	require.Len(t, evmChains.Slice(), numChains)
 	bootstrapJobSpec, err := integrationtesthelpers.NewBootsrapJobSpec(&integrationtesthelpers.LMJobSpecParams{
-		ChainID:        10001,
+		ChainID:        1337,
 		ContractID:     mainContract.Hex(),
 		RelayFromBlock: mainFromBlock,
 	})
@@ -350,7 +350,7 @@ func newTestUniverse(t *testing.T, numChains int, adapterHoldNative bool) {
 		jobSpec, err := integrationtesthelpers.NewJobSpec(&integrationtesthelpers.LMJobSpecParams{
 			Name:                    "liquiditymanager-integration-test",
 			Type:                    "ping-pong",
-			ChainID:                 10001,
+			ChainID:                 1337,
 			ContractID:              mainContract.Hex(),
 			OcrKeyBundleID:          kbs[i].ID(),
 			TransmitterID:           nodes[i].transmitters[1337].Hex(),
