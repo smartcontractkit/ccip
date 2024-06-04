@@ -86,7 +86,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, OCR2BaseN
     // TODO: re-evaluate on removing this (can be controlled by CommitStore)
     //       if used - pack together with onRamp to localise storage slot reads
     bool isEnabled; // ─────────╮  Flag whether the source chain is enabled or not
-    address prevOffRamp; // ────╯  Address of previous-version per-lane OffRamp. Used to be able to provide seequencing continuity during a zero downtime upgrade.
+    address prevOffRamp; // ────╯  Address of previous-version per-lane OffRamp. Used to be able to provide sequencing continuity during a zero downtime upgrade.
     address onRamp; //             OnRamp address on the source chain
     /// @dev Ensures that 2 identical messages sent to 2 different lanes will have a distinct hash.
     /// Must match the metadataHash used in computing leaf hashes offchain for the root committed in
@@ -98,7 +98,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, OCR2BaseN
   struct SourceChainConfigArgs {
     uint64 sourceChainSelector; //  ───╮  Source chain selector of the config to update
     bool isEnabled; //                 │  Flag whether the source chain is enabled or not
-    address prevOffRamp; // ───────────╯  Address of previous-version per-lane OffRamp. Used to be able to provide seequencing continuity during a zero downtime upgrade.
+    address prevOffRamp; // ───────────╯  Address of previous-version per-lane OffRamp. Used to be able to provide sequencing continuity during a zero downtime upgrade.
     address onRamp; //                    OnRamp address on the source chain
   }
 
@@ -475,7 +475,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, OCR2BaseN
     uint256 dataLength,
     uint256 offchainTokenDataLength
   ) private view {
-    // TODO: move maxNumberOfTokens & data lnegth validation offchain
+    // TODO: move maxNumberOfTokens & data length validation offchain
     if (numberOfTokens > uint256(s_dynamicConfig.maxNumberOfTokensPerMsg)) {
       revert UnsupportedNumberOfTokens(sourceChainSelector, sequenceNumber);
     }

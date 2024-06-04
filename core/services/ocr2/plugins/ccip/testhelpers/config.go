@@ -50,7 +50,7 @@ func (c *CCIPContracts) CreateDefaultExecOnchainConfig(t *testing.T) []byte {
 		MaxDataBytes:                            1e5,
 		MaxNumberOfTokensPerMsg:                 5,
 		MaxPoolReleaseOrMintGas:                 200_000,
-		MaxTokenTransferGas:                     50_000,
+		MaxTokenTransferGas:                     100_000,
 	})
 	require.NoError(t, err)
 	return config

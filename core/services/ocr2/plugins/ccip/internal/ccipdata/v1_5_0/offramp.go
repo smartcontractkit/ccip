@@ -49,6 +49,28 @@ func (d ExecOnchainConfig) AbiString() string {
 	]`
 }
 
+func (d ExecOnchainConfig) Validate() error {
+	if d.PermissionLessExecutionThresholdSeconds == 0 {
+		return errors.New("must set PermissionLessExecutionThresholdSeconds")
+	}
+	if d.Router == (common.Address{}) {
+		return errors.New("must set Router address")
+	}
+	if d.PriceRegistry == (common.Address{}) {
+		return errors.New("must set PriceRegistry address")
+	}
+	if d.MaxNumberOfTokensPerMsg == 0 {
+		return errors.New("must set MaxNumberOfTokensPerMsg")
+	}
+	if d.MaxPoolReleaseOrMintGas == 0 {
+		return errors.New("must set MaxPoolReleaseOrMintGas")
+	}
+	if d.MaxTokenTransferGas == 0 {
+		return errors.New("must set MaxTokenTransferGas")
+	}
+	return nil
+}
+
 type OffRamp struct {
 	*v1_2_0.OffRamp
 	offRampV150           evm_2_evm_offramp.EVM2EVMOffRampInterface

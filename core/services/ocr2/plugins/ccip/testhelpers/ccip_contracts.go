@@ -1140,7 +1140,8 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 	_, err = destRouter.ApplyRampUpdates(
 		destUser,
 		nil,
-		nil, []router.RouterOffRamp{{SourceChainSelector: sourceChainSelector, OffRamp: offRampAddress}},
+		nil,
+		[]router.RouterOffRamp{{SourceChainSelector: sourceChainSelector, OffRamp: offRampAddress}},
 	)
 	require.NoError(t, err)
 
