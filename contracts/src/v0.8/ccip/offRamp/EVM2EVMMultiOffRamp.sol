@@ -18,6 +18,7 @@ import {Internal} from "../libraries/Internal.sol";
 import {Pool} from "../libraries/Pool.sol";
 import {OCR2BaseNoChecks} from "../ocr/OCR2BaseNoChecks.sol";
 
+import {IERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {ERC165Checker} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/introspection/ERC165Checker.sol";
 
 /// @notice EVM2EVMOffRamp enables OCR networks to execute multiple messages
@@ -739,7 +740,25 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, OCR2BaseN
         revert InvalidDataLength(Pool.CCIP_POOL_V1_RET_BYTES, returnData.length);
       }
       (uint256 decodedAddress, uint256 amount) = abi.decode(returnData, (uint256, uint256));
-      destTokenAmounts[i].token = Internal._validateEVMAddressFromUint256(decodedAddress);
+      address destTokenAddress = Internal._validateEVMAddressFromUint256(decodedAddress);
+
+      (success, returnData,) = CallWithExactGas._callWithExactGasSafeReturnData(
+        abi.encodeWithSelector(IERC20.transfer.selector, messageRoute.receiver, amount),
+        destTokenAddress,
+        s_dynamicConfig.maxPoolReleaseOrMintGas,
+        Internal.GAS_FOR_CALL_EXACT_CHECK,
+        Internal.MAX_RET_BYTES
+      );
+
+      // wrap and rethrow the error so we can catch it lower in the stack
+      if (!success) revert TokenHandlingError(returnData);
+      // This is the same check SafeERC20 does. We validate the optional boolean return value of the transfer function.
+      // If nothing is returned, we assume success, if something is returned, it should be `true`.
+      if (returnData.length > 0 && !abi.decode(returnData, (bool))) {
+        revert TokenHandlingError(returnData);
+      }
+
+      destTokenAmounts[i].token = destTokenAddress;
       destTokenAmounts[i].amount = amount;
     }
 

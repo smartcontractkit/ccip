@@ -145,7 +145,7 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
       address(s_token),
       amount,
       address(s_usdcTokenPool),
-      receiver,
+      expectedDomain.allowedCaller,
       expectedDomain.domainIdentifier,
       s_mockUSDC.DESTINATION_TOKEN_MESSENGER(),
       expectedDomain.allowedCaller
@@ -185,7 +185,7 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
       address(s_token),
       amount,
       address(s_usdcTokenPool),
-      destinationReceiver,
+      expectedDomain.allowedCaller,
       expectedDomain.domainIdentifier,
       s_mockUSDC.DESTINATION_TOKEN_MESSENGER(),
       expectedDomain.allowedCaller
@@ -225,7 +225,7 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
       address(s_token),
       amount,
       address(s_usdcTokenPoolWithAllowList),
-      destinationReceiver,
+      expectedDomain.allowedCaller,
       expectedDomain.domainIdentifier,
       s_mockUSDC.DESTINATION_TOKEN_MESSENGER(),
       expectedDomain.allowedCaller
@@ -362,6 +362,9 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
     bytes memory offchainTokenData =
       abi.encode(USDCTokenPool.MessageAndAttestation({message: message, attestation: attestation}));
 
+    // The mocked receiver does not release the token to the pool, so we manually do it here
+    deal(address(s_token), address(s_usdcTokenPool), amount);
+
     vm.expectEmit();
     emit TokenPool.Minted(s_routerAllowedOffRamp, recipient, amount);
 
@@ -392,12 +395,16 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
 
     uint32 nonce = 4730;
     uint32 sourceDomain = 3;
+    uint256 amount = 100;
 
     Internal.SourceTokenData memory sourceTokenData = Internal.SourceTokenData({
       sourcePoolAddress: abi.encode(SOURCE_CHAIN_USDC_POOL),
       destPoolAddress: abi.encode(address(s_usdcTokenPool)),
       extraData: abi.encode(USDCTokenPool.SourceTokenDataPayload({nonce: nonce, sourceDomain: sourceDomain}))
     });
+
+    // The mocked receiver does not release the token to the pool, so we manually do it here
+    deal(address(s_token), address(s_usdcTokenPool), amount);
 
     bytes memory offchainTokenData =
       abi.encode(USDCTokenPool.MessageAndAttestation({message: encodedUsdcMessage, attestation: attestation}));
@@ -412,7 +419,7 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
       Pool.ReleaseOrMintInV1({
         originalSender: abi.encode(OWNER),
         receiver: OWNER,
-        amount: 100,
+        amount: amount,
         remoteChainSelector: SOURCE_CHAIN_SELECTOR,
         sourcePoolAddress: sourceTokenData.sourcePoolAddress,
         sourcePoolData: sourceTokenData.extraData,
