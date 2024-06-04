@@ -8,7 +8,7 @@ import (
 
 type CommitPluginObservation struct {
 	NewMsgs      []CCIPMsgBaseDetails `json:"newMsgs"`
-	GasPrices    []GasPriceChain      `json:"gasPrices,string"`
+	GasPrices    []GasPriceChain      `json:"gasPrices"`
 	TokenPrices  []TokenPrice         `json:"tokenPrices"`
 	MaxSeqNums   []SeqNumChain        `json:"maxSeqNums"`
 	PluginConfig CommitPluginConfig   `json:"pluginConfig"`
@@ -63,6 +63,14 @@ func NewCommitPluginOutcome(
 
 func (o CommitPluginOutcome) Encode() ([]byte, error) {
 	return json.Marshal(o)
+}
+
+// IsEmpty returns true if the CommitPluginOutcome is empty
+func (o CommitPluginOutcome) IsEmpty() bool {
+	return len(o.MaxSeqNums) == 0 &&
+		len(o.MerkleRoots) == 0 &&
+		len(o.TokenPrices) == 0 &&
+		len(o.GasPrices) == 0
 }
 
 func DecodeCommitPluginOutcome(b []byte) (CommitPluginOutcome, error) {

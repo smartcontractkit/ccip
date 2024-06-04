@@ -29,7 +29,7 @@ type GasPriceChain struct {
 
 func NewGasPriceChain(gasPrice *big.Int, chainSel ChainSelector) GasPriceChain {
 	return GasPriceChain{
-		GasPrice: BigInt{Int: gasPrice},
+		GasPrice: NewBigInt(gasPrice),
 		ChainSel: chainSel,
 	}
 }
@@ -92,7 +92,7 @@ type CCIPMsg struct {
 
 func (c CCIPMsg) String() string {
 	js, _ := json.Marshal(c)
-	return fmt.Sprintf("%s", js)
+	return string(js)
 }
 
 type CCIPMsgBaseDetails struct {
