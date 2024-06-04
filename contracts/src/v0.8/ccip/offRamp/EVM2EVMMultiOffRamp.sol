@@ -751,11 +751,9 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, OCR2BaseN
         Internal.MAX_RET_BYTES
       );
 
-      // wrap and rethrow the error so we can catch it lower in the stack
-      if (!success) revert TokenHandlingError(returnData);
       // This is the same check SafeERC20 does. We validate the optional boolean return value of the transfer function.
       // If nothing is returned, we assume success, if something is returned, it should be `true`.
-      if (returnData.length > 0 && !abi.decode(returnData, (bool))) {
+      if (!success || (returnData.length > 0 && !abi.decode(returnData, (bool)))) {
         revert TokenHandlingError(returnData);
       }
 
