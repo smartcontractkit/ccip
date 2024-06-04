@@ -22,7 +22,7 @@ import {IERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/
 import {SafeERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
 import {EnumerableMap} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/structs/EnumerableMap.sol";
 
-/// @notice The EVM2EVMOnRamp is a contract that handles lane-specific fee logic, NOP payments and
+/// @notice The EVM2EVMMultiOnRamp is a contract that handles lane-specific fee logic, NOP payments and
 /// bridgeable token support.
 /// @dev The EVM2EVMMultiOnRamp, MultiCommitStore and MultiEVM2EVMOffRamp form an xchain upgradeable unit. Any change to one of them
 /// results an onchain upgrade of all 3.
