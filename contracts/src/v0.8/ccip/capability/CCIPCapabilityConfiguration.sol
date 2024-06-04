@@ -27,6 +27,7 @@ contract CCIPCapabilityConfiguration is ITypeAndVersion, ICapabilityConfiguratio
   /// @param chainSelector The chain selector.
   event ChainConfigRemoved(uint64 chainSelector);
 
+  error ChainConfigNotSetForChain(uint64 chainSelector);
   error NodeNotInRegistry(bytes32 p2pId);
   error OnlyCapabilityRegistryCanCall();
   error ChainSelectorNotFound(uint64 chainSelector);
@@ -35,7 +36,9 @@ contract CCIPCapabilityConfiguration is ITypeAndVersion, ICapabilityConfiguratio
   error TooManyOCR3Configs();
   error TooManySigners();
   error TooManyTransmitters();
+  error NotEnoughTransmitters(uint256 got, uint256 minimum);
   error FMustBePositive();
+  error FChainMustBePositive();
   error FTooHigh();
   error InvalidPluginType();
   error InvalidConfigLength(uint256 length);
@@ -69,6 +72,7 @@ contract CCIPCapabilityConfiguration is ITypeAndVersion, ICapabilityConfiguratio
   /// Changes to chain configuration are detected out-of-band in plugins and decoded offchain.
   struct ChainConfig {
     bytes32[] readers; // The P2P IDs of the readers for the chain. These IDs must be registered in the capability registry.
+    uint8 fChain; // The fault tolerance parameter of the chain.
     bytes config; // The chain configuration. This is kept intentionally opaque so as to add fields in the future if needed.
   }
 
@@ -370,6 +374,12 @@ contract CCIPCapabilityConfiguration is ITypeAndVersion, ICapabilityConfiguratio
       revert TooManyTransmitters();
     }
 
+    // We check for chain config presence above, so fChain here must be non-zero.
+    uint256 minTransmittersLength = 3 * s_chainConfigurations[cfg.chainSelector].fChain + 1;
+    if (cfg.transmitters.length < minTransmittersLength) {
+      revert NotEnoughTransmitters(cfg.transmitters.length, minTransmittersLength);
+    }
+
     if (cfg.F == 0) {
       revert FMustBePositive();
     }
@@ -455,6 +465,11 @@ contract CCIPCapabilityConfiguration is ITypeAndVersion, ICapabilityConfiguratio
       // Verify that the provided readers are present in the capability registry.
       for (uint256 j = 0; j < readers.length; j++) {
         _ensureInRegistry(readers[j]);
+      }
+
+      // Verify that fChain is positive.
+      if (chainConfig.fChain == 0) {
+        revert FChainMustBePositive();
       }
 
       s_chainConfigurations[chainSelector] = chainConfig;
