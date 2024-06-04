@@ -375,11 +375,11 @@ func (ccipModule *CCIPCommon) LoadContractAddresses(conf *laneconfig.LaneConfig,
 // ApproveTokens approves tokens for the router to send usually a massive amount of tokens enough to cover all the ccip transfers
 // to be triggered by the test.
 // Also, if the test is using self-serve tokens and pools deployed by the non-default address, this sends the same amount of tokens
-// to the default address for sending.
+// to the default address so that it can actually send those tokens on CCIP
 func (ccipModule *CCIPCommon) ApproveTokens() error {
 	isApproved := false
 	for _, token := range ccipModule.BridgeTokens {
-		if token.OwnerWallet.Address() == ccipModule.ChainClient.GetDefaultWallet().Address() {
+		if token.OwnerWallet.Address() != ccipModule.ChainClient.GetDefaultWallet().Address() {
 			err := token.Transfer(token.OwnerWallet, ccipModule.ChainClient.GetDefaultWallet().Address(), ApprovedAmountToRouter)
 			if err != nil {
 				return fmt.Errorf("failed to transfer token from '%s' to '%s' %s: %w",
@@ -388,12 +388,12 @@ func (ccipModule *CCIPCommon) ApproveTokens() error {
 			}
 		}
 
-		allowance, err := token.Allowance(token.OwnerAddress.Hex(), ccipModule.Router.Address())
+		allowance, err := token.Allowance(ccipModule.ChainClient.GetDefaultWallet().Address(), ccipModule.Router.Address())
 		if err != nil {
 			return fmt.Errorf("failed to get allowance for token %s: %w", token.ContractAddress.Hex(), err)
 		}
 		if allowance.Cmp(ApprovedAmountToRouter) < 0 {
-			err := token.Approve(token.OwnerWallet, ccipModule.Router.Address(), ApprovedAmountToRouter)
+			err := token.Approve(ccipModule.ChainClient.GetDefaultWallet(), ccipModule.Router.Address(), ApprovedAmountToRouter)
 			if err != nil {
 				return fmt.Errorf("failed to approve token %s: %w", token.ContractAddress.Hex(), err)
 			}
