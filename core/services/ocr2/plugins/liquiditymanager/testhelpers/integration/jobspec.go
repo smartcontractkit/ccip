@@ -10,6 +10,7 @@ import (
 	"github.com/lib/pq"
 	"github.com/pelletier/go-toml/v2"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
+
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 	"github.com/smartcontractkit/chainlink/v2/core/store/models"
 )
