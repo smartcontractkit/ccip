@@ -65,7 +65,7 @@ func (r *OCR3Runner[RI]) RunRound(ctx context.Context) (result RoundResult[RI], 
 			return RoundResult[RI]{}, fmt.Errorf("%s: %w", err2, ErrObservation)
 		}
 
-		attrObs := types.AttributedObservation{Observation: obs, Observer: commontypes.OracleID(r.nodeIDs[i])}
+		attrObs := types.AttributedObservation{Observation: obs, Observer: r.nodeIDs[i]}
 		err = leaderNode.ValidateObservation(outcomeCtx, q, attrObs)
 		if err != nil {
 			return RoundResult[RI]{}, fmt.Errorf("%s: %w", err, ErrValidateObservation)

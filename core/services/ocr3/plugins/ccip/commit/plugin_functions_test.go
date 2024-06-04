@@ -332,9 +332,9 @@ func Test_observeGasPrices(t *testing.T) {
 		mockReader := mocks.NewCCIPReader()
 		chains := []model.ChainSelector{1, 2, 3}
 		mockGasPrices := []model.BigInt{
-			{Int: big.NewInt(10)},
-			{Int: big.NewInt(20)},
-			{Int: big.NewInt(30)},
+			model.NewBigIntFromInt64(10),
+			model.NewBigIntFromInt64(20),
+			model.NewBigIntFromInt64(30),
 		}
 		mockReader.On("GasPrices", ctx, chains).Return(mockGasPrices, nil)
 		gasPrices, err := observeGasPrices(ctx, mockReader, chains)
@@ -350,8 +350,8 @@ func Test_observeGasPrices(t *testing.T) {
 		mockReader := mocks.NewCCIPReader()
 		chains := []model.ChainSelector{1, 2, 3}
 		mockGasPrices := []model.BigInt{
-			{Int: big.NewInt(10)},
-			{Int: big.NewInt(20)},
+			model.NewBigIntFromInt64(10),
+			model.NewBigIntFromInt64(20),
 		} // return 2 prices for 3 chains
 		mockReader.On("GasPrices", ctx, chains).Return(mockGasPrices, nil)
 		_, err := observeGasPrices(ctx, mockReader, chains)

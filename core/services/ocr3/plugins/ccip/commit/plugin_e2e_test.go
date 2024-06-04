@@ -2,7 +2,6 @@ package commit
 
 import (
 	"context"
-	"math/big"
 	"reflect"
 	"testing"
 
@@ -32,14 +31,14 @@ func TestPlugin(t *testing.T) {
 		{
 			name:        "EmptyOutcome",
 			description: "Empty observations are returned by all nodes which leads to an empty outcome.",
-			nodes:       setupEmptyOutcome(t, ctx, lggr),
+			nodes:       setupEmptyOutcome(ctx, t, lggr),
 			expErr:      func(t *testing.T, err error) { assert.Equal(t, testhelpers.ErrEmptyOutcome, err) },
 		},
 		{
 			name: "AllNodesReadAllChains",
 			description: "Nodes observe the latest sequence numbers and new messages after those sequence numbers. " +
 				"They also observe gas prices. In this setup all nodes can read all chains.",
-			nodes: setupAllNodesReadAllChains(t, ctx, lggr),
+			nodes: setupAllNodesReadAllChains(ctx, t, lggr),
 			expOutcome: model.CommitPluginOutcome{
 				MaxSeqNums: []model.SeqNumChain{
 					{ChainSel: chainA, SeqNum: 10},
@@ -50,8 +49,8 @@ func TestPlugin(t *testing.T) {
 				},
 				TokenPrices: []model.TokenPrice{},
 				GasPrices: []model.GasPriceChain{
-					{ChainSel: chainA, GasPrice: model.BigInt{Int: big.NewInt(1000)}},
-					{ChainSel: chainB, GasPrice: model.BigInt{Int: big.NewInt(20000)}},
+					{ChainSel: chainA, GasPrice: model.NewBigIntFromInt64(1000)},
+					{ChainSel: chainB, GasPrice: model.NewBigIntFromInt64(20_000)},
 				},
 			},
 			expTransmittedReports: []model.CommitPluginReport{
@@ -62,8 +61,8 @@ func TestPlugin(t *testing.T) {
 					PriceUpdates: model.PriceUpdate{
 						TokenPriceUpdates: []model.TokenPrice{},
 						GasPriceUpdates: []model.GasPriceChain{
-							{ChainSel: chainA, GasPrice: model.BigInt{Int: big.NewInt(1000)}},
-							{ChainSel: chainB, GasPrice: model.BigInt{Int: big.NewInt(20000)}},
+							{ChainSel: chainA, GasPrice: model.NewBigIntFromInt64(1000)},
+							{ChainSel: chainB, GasPrice: model.NewBigIntFromInt64(20_000)},
 						},
 					},
 				},
@@ -72,7 +71,7 @@ func TestPlugin(t *testing.T) {
 		{
 			name:        "NodesDoNotAgreeOnMsgs",
 			description: "Nodes do not agree on messages which leads to an outcome with empty merkle roots.",
-			nodes:       setupNodesDoNotAgreeOnMsgs(t, ctx, lggr),
+			nodes:       setupNodesDoNotAgreeOnMsgs(ctx, t, lggr),
 			expOutcome: model.CommitPluginOutcome{
 				MaxSeqNums: []model.SeqNumChain{
 					{ChainSel: chainA, SeqNum: 10},
@@ -81,8 +80,8 @@ func TestPlugin(t *testing.T) {
 				MerkleRoots: []model.MerkleRootChain{},
 				TokenPrices: []model.TokenPrice{},
 				GasPrices: []model.GasPriceChain{
-					{ChainSel: chainA, GasPrice: model.BigInt{Int: big.NewInt(1000)}},
-					{ChainSel: chainB, GasPrice: model.BigInt{Int: big.NewInt(20000)}},
+					{ChainSel: chainA, GasPrice: model.NewBigIntFromInt64(1000)},
+					{ChainSel: chainB, GasPrice: model.NewBigIntFromInt64(20_000)},
 				},
 			},
 			expTransmittedReports: []model.CommitPluginReport{
@@ -91,8 +90,8 @@ func TestPlugin(t *testing.T) {
 					PriceUpdates: model.PriceUpdate{
 						TokenPriceUpdates: []model.TokenPrice{},
 						GasPriceUpdates: []model.GasPriceChain{
-							{ChainSel: chainA, GasPrice: model.BigInt{Int: big.NewInt(1000)}},
-							{ChainSel: chainB, GasPrice: model.BigInt{Int: big.NewInt(20000)}},
+							{ChainSel: chainA, GasPrice: model.NewBigIntFromInt64(1000)},
+							{ChainSel: chainB, GasPrice: model.NewBigIntFromInt64(20_000)},
 						},
 					},
 				},
@@ -155,7 +154,7 @@ func TestPlugin(t *testing.T) {
 	}
 }
 
-func setupEmptyOutcome(t *testing.T, ctx context.Context, lggr logger.Logger) []nodeSetup {
+func setupEmptyOutcome(ctx context.Context, t *testing.T, lggr logger.Logger) []nodeSetup {
 	cfg := model.CommitPluginConfig{
 		DestChain: chainC,
 		FChain: map[model.ChainSelector]int{
@@ -168,13 +167,13 @@ func setupEmptyOutcome(t *testing.T, ctx context.Context, lggr logger.Logger) []
 	}
 
 	return []nodeSetup{
-		newNode(t, ctx, lggr, 1, cfg),
-		newNode(t, ctx, lggr, 2, cfg),
-		newNode(t, ctx, lggr, 3, cfg),
+		newNode(ctx, t, lggr, 1, cfg),
+		newNode(ctx, t, lggr, 2, cfg),
+		newNode(ctx, t, lggr, 3, cfg),
 	}
 }
 
-func setupAllNodesReadAllChains(t *testing.T, ctx context.Context, lggr logger.Logger) []nodeSetup {
+func setupAllNodesReadAllChains(ctx context.Context, t *testing.T, lggr logger.Logger) []nodeSetup {
 	cfg := model.CommitPluginConfig{
 		DestChain: chainC,
 		FChain: map[model.ChainSelector]int{
@@ -192,9 +191,9 @@ func setupAllNodesReadAllChains(t *testing.T, ctx context.Context, lggr logger.L
 		NewMsgScanBatchSize: 256,
 	}
 
-	n1 := newNode(t, ctx, lggr, 1, cfg)
-	n2 := newNode(t, ctx, lggr, 2, cfg)
-	n3 := newNode(t, ctx, lggr, 3, cfg)
+	n1 := newNode(ctx, t, lggr, 1, cfg)
+	n2 := newNode(ctx, t, lggr, 2, cfg)
+	n3 := newNode(ctx, t, lggr, 3, cfg)
 	nodes := []nodeSetup{n1, n2, n3}
 
 	for _, n := range nodes {
@@ -223,15 +222,15 @@ func setupAllNodesReadAllChains(t *testing.T, ctx context.Context, lggr logger.L
 
 		n.ccipReader.On("GasPrices", ctx, []model.ChainSelector{chainA, chainB}).
 			Return([]model.BigInt{
-				{big.NewInt(1000)},
-				{big.NewInt(20000)},
+				model.NewBigIntFromInt64(1000),
+				model.NewBigIntFromInt64(20_000),
 			}, nil)
 	}
 
 	return nodes
 }
 
-func setupNodesDoNotAgreeOnMsgs(t *testing.T, ctx context.Context, lggr logger.Logger) []nodeSetup {
+func setupNodesDoNotAgreeOnMsgs(ctx context.Context, t *testing.T, lggr logger.Logger) []nodeSetup {
 	cfg := model.CommitPluginConfig{
 		DestChain: chainC,
 		FChain: map[model.ChainSelector]int{
@@ -249,9 +248,9 @@ func setupNodesDoNotAgreeOnMsgs(t *testing.T, ctx context.Context, lggr logger.L
 		NewMsgScanBatchSize: 256,
 	}
 
-	n1 := newNode(t, ctx, lggr, 1, cfg)
-	n2 := newNode(t, ctx, lggr, 2, cfg)
-	n3 := newNode(t, ctx, lggr, 3, cfg)
+	n1 := newNode(ctx, t, lggr, 1, cfg)
+	n2 := newNode(ctx, t, lggr, 2, cfg)
+	n3 := newNode(ctx, t, lggr, 3, cfg)
 	nodes := []nodeSetup{n1, n2, n3}
 
 	for i, n := range nodes {
@@ -282,7 +281,10 @@ func setupNodesDoNotAgreeOnMsgs(t *testing.T, ctx context.Context, lggr logger.L
 		}, nil)
 
 		n.ccipReader.On("GasPrices", ctx, []model.ChainSelector{chainA, chainB}).
-			Return([]model.BigInt{{big.NewInt(1000)}, {big.NewInt(20000)}}, nil)
+			Return([]model.BigInt{
+				model.NewBigIntFromInt64(1000),
+				model.NewBigIntFromInt64(20_000),
+			}, nil)
 	}
 
 	return nodes
@@ -296,7 +298,7 @@ type nodeSetup struct {
 	msgHasher   *mocks.MessageHasher
 }
 
-func newNode(t *testing.T, ctx context.Context, lggr logger.Logger, id int, cfg model.CommitPluginConfig) nodeSetup {
+func newNode(ctx context.Context, t *testing.T, lggr logger.Logger, id int, cfg model.CommitPluginConfig) nodeSetup {
 	ccipReader := mocks.NewCCIPReader()
 	priceReader := mocks.NewTokenPricesReader()
 	reportCodec := mocks.NewCommitPluginJSONReportCodec()
@@ -328,6 +330,4 @@ var (
 	chainC = model.ChainSelector(3)
 
 	tokenX = types.Account("tk_xxx")
-	tokenY = types.Account("tk_yyy")
-	tokenZ = types.Account("tk_zzz")
 )
