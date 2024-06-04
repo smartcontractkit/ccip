@@ -350,6 +350,7 @@ func newTestUniverse(t *testing.T, numChains int, adapterHoldNative bool) {
 		jobSpec, err := integrationtesthelpers.NewJobSpec(&integrationtesthelpers.LMJobSpecParams{
 			Name:                    "liquiditymanager-integration-test",
 			Type:                    "ping-pong",
+			ChainID:                 10001,
 			ContractID:              mainContract.Hex(),
 			OcrKeyBundleID:          kbs[i].ID(),
 			TransmitterID:           nodes[i].transmitters[1337].Hex(),
