@@ -3,6 +3,7 @@ package model
 import (
 	"encoding/json"
 	"fmt"
+	"time"
 )
 
 type CommitPluginObservation struct {
@@ -108,6 +109,12 @@ type PriceUpdate struct {
 type CommitPluginReport struct {
 	MerkleRoots  []MerkleRootChain `json:"merkleRoots"`
 	PriceUpdates PriceUpdate       `json:"priceUpdates"`
+}
+
+type CommitPluginReportWithMeta struct {
+	Report    CommitPluginReport `json:"report"`
+	Timestamp time.Time          `json:"timestamp"`
+	BlockNum  uint64             `json:"blockNum"`
 }
 
 // TODO: also accept gas prices slice in the constructor
