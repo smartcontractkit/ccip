@@ -24,10 +24,10 @@ jobs:
         run: go version
       - name: Build
         run: go build -v ./...
-      - name: Install golangci-lint
+      - name: Install linter
         run: |
           curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.59.0
-      - name: Run golangci-lint
+      - name: Run linter
         run: golangci-lint run
-      - name: Test with the Go CLI
-        run: go test -v ./...
+      - name: Run tests
+        run: go test -race -fullpath -shuffle on -count 20 ./...
