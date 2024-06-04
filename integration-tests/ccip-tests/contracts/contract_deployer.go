@@ -278,6 +278,7 @@ func (e *CCIPContractsDeployer) NewERC20TokenContract(addr common.Address) (*ERC
 		instance:        token,
 		ContractAddress: addr,
 		OwnerAddress:    common.HexToAddress(e.evmClient.GetDefaultWallet().Address()),
+		OwnerWallet:     e.evmClient.GetDefaultWallet(),
 	}, err
 }
 
@@ -314,7 +315,8 @@ func (e *CCIPContractsDeployer) NewLockReleaseTokenPoolContract(addr common.Addr
 				},
 			},
 			EthAddress:   addr,
-			OwnerAddress: ownerAddress,
+			OwnerAddress: common.HexToAddress(e.evmClient.GetDefaultWallet().Address()),
+			OwnerWallet:  e.evmClient.GetDefaultWallet(),
 		}, err
 	case V1_4_0:
 		pool, err := lock_release_token_pool_1_4_0.NewLockReleaseTokenPool(addr, wrappers.MustNewWrappedContractBackend(e.evmClient, nil))
@@ -341,7 +343,8 @@ func (e *CCIPContractsDeployer) NewLockReleaseTokenPoolContract(addr common.Addr
 				},
 			},
 			EthAddress:   addr,
-			OwnerAddress: ownerAddress,
+			OwnerAddress: common.HexToAddress(e.evmClient.GetDefaultWallet().Address()),
+			OwnerWallet:  e.evmClient.GetDefaultWallet(),
 		}, err
 	default:
 		return nil, fmt.Errorf("version not supported: %s", version)
@@ -381,7 +384,8 @@ func (e *CCIPContractsDeployer) NewUSDCTokenPoolContract(addr common.Address) (
 				},
 			},
 			EthAddress:   addr,
-			OwnerAddress: ownerAddress,
+			OwnerAddress: common.HexToAddress(e.evmClient.GetDefaultWallet().Address()),
+			OwnerWallet:  e.evmClient.GetDefaultWallet(),
 		}, err
 	case V1_4_0:
 		pool, err := usdc_token_pool_1_4_0.NewUSDCTokenPool(addr, wrappers.MustNewWrappedContractBackend(e.evmClient, nil))
@@ -409,7 +413,8 @@ func (e *CCIPContractsDeployer) NewUSDCTokenPoolContract(addr common.Address) (
 				},
 			},
 			EthAddress:   addr,
-			OwnerAddress: ownerAddress,
+			OwnerAddress: common.HexToAddress(e.evmClient.GetDefaultWallet().Address()),
+			OwnerWallet:  e.evmClient.GetDefaultWallet(),
 		}, err
 	default:
 		return nil, fmt.Errorf("version not supported: %s", version)

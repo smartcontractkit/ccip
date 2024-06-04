@@ -473,15 +473,15 @@ func (o *CCIPTestSetUpOutputs) DeployChainContracts(
 		networkCfg.URLs = k8Env.URLs[chainClient.GetNetworkConfig().Name]
 	}
 
-	chain, err := blockchain.ConcurrentEVMClient(networkCfg, k8Env, chainClient, lggr)
+	mainChainClient, err := blockchain.ConcurrentEVMClient(networkCfg, k8Env, chainClient, lggr)
 	if err != nil {
 		return errors.WithStack(fmt.Errorf("failed to create chain client for %s: %w", networkCfg.Name, err))
 	}
 
-	chain.ParallelTransactions(true)
-	defer chain.Close()
+	mainChainClient.ParallelTransactions(true)
+	defer mainChainClient.Close()
 	ccipCommon, err := actions.DefaultCCIPModule(
-		lggr, o.Cfg.TestGroupInput, chain,
+		lggr, o.Cfg.TestGroupInput, o.Env, mainChainClient,
 	)
 	if err != nil {
 		return errors.WithStack(fmt.Errorf("failed to create ccip common module for %s: %w", networkCfg.Name, err))
@@ -660,6 +660,7 @@ func (o *CCIPTestSetUpOutputs) AddLanesForNetworkPair(
 			allErrors.Store(multierr.Append(allErrors.Load(), fmt.Errorf("writing lane config for %s; err - %w", networkB.Name, errors.WithStack(err))))
 			return err
 		}
+
 		// we need to set the remote chains on the pool after the lane is deployed
 		// it's sufficient to do this only for the forward lane, as the destination pools will also be updated with source pool updates
 		// The reverse lane will have the same pools as the forward lane but in reverse order of source and destination
@@ -1027,9 +1028,10 @@ func (o *CCIPTestSetUpOutputs) CreateEnvironment(
 	envName string,
 	reportPath string,
 ) map[int64]blockchain.EVMClient {
-	t := o.Cfg.Test
-	testConfig := o.Cfg
 	var (
+		testConfig = o.Cfg
+		t          = o.Cfg.Test
+
 		ccipEnv  *actions.CCIPTestEnv
 		k8Env    *environment.Environment
 		err      error

@@ -22,6 +22,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
+	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
@@ -151,10 +152,13 @@ func GetUSDCDomain(networkName string, simulated bool) (uint32, error) {
 }
 
 type CCIPCommon struct {
-	Logger                        zerolog.Logger
-	TestGroupConfig               *testconfig.CCIPTestGroupConfig
-	ChainClient                   blockchain.EVMClient
-	Deployer                      *contracts.CCIPContractsDeployer
+	Logger          zerolog.Logger
+	TestGroupConfig *testconfig.CCIPTestGroupConfig
+	ChainClient     blockchain.EVMClient
+	// Deployer deploys all CCIP contracts
+	Deployer *contracts.CCIPContractsDeployer
+	// tokenDeployer is used exclusively for deploying self-serve tokens and their pools
+	tokenDeployer                 *contracts.CCIPContractsDeployer
 	FeeToken                      *contracts.LinkToken
 	BridgeTokens                  []*contracts.ERC20Token
 	PriceAggregators              map[common.Address]*contracts.MockAggregator
@@ -368,17 +372,28 @@ func (ccipModule *CCIPCommon) LoadContractAddresses(conf *laneconfig.LaneConfig,
 	}
 }
 
-// ApproveTokens approve tokens for router - usually a massive amount of tokens enough to cover all the ccip transfers
-// to be triggered by the test
+// ApproveTokens approves tokens for the router to send usually a massive amount of tokens enough to cover all the ccip transfers
+// to be triggered by the test.
+// Also, if the test is using self-serve tokens and pools deployed by the non-default address, this sends the same amount of tokens
+// to the default address for sending.
 func (ccipModule *CCIPCommon) ApproveTokens() error {
 	isApproved := false
 	for _, token := range ccipModule.BridgeTokens {
-		allowance, err := token.Allowance(ccipModule.ChainClient.GetDefaultWallet().Address(), ccipModule.Router.Address())
+		if token.OwnerWallet.Address() == ccipModule.ChainClient.GetDefaultWallet().Address() {
+			err := token.Transfer(token.OwnerWallet, ccipModule.ChainClient.GetDefaultWallet().Address(), ApprovedAmountToRouter)
+			if err != nil {
+				return fmt.Errorf("failed to transfer token from '%s' to '%s' %s: %w",
+					token.ContractAddress.Hex(), token.OwnerAddress.Hex(), ccipModule.ChainClient.GetDefaultWallet().Address(), err,
+				)
+			}
+		}
+
+		allowance, err := token.Allowance(token.OwnerAddress.Hex(), ccipModule.Router.Address())
 		if err != nil {
 			return fmt.Errorf("failed to get allowance for token %s: %w", token.ContractAddress.Hex(), err)
 		}
 		if allowance.Cmp(ApprovedAmountToRouter) < 0 {
-			err := token.Approve(ccipModule.Router.Address(), ApprovedAmountToRouter)
+			err := token.Approve(token.OwnerWallet, ccipModule.Router.Address(), ApprovedAmountToRouter)
 			if err != nil {
 				return fmt.Errorf("failed to approve token %s: %w", token.ContractAddress.Hex(), err)
 			}
@@ -860,21 +875,6 @@ func (ccipModule *CCIPCommon) DeployContracts(
 	// If the number of deployed bridge tokens does not match noOfTokens, deploy rest of the tokens in case ExistingDeployment is false
 	// In case of ExistingDeployment as true use whatever is provided in laneconfig
 	if len(ccipModule.BridgeTokens) < noOfTokens && !ccipModule.ExistingDeployment {
-		// If we need a token admin registry, then we need tokens to be deployed with a non-CCIP owner wallet
-		if contracts.NeedTokenAdminRegistry() &&
-			!pointer.GetBool(ccipModule.TestGroupConfig.TokenConfig.CCIPOwnerTokens) &&
-			len(ccipModule.ChainClient.GetWallets()) > 1 {
-			if err = ccipModule.ChainClient.SetDefaultWallet(1); err != nil {
-				return fmt.Errorf("error setting default wallet to non-CCIP owner wallet %w", err)
-			}
-			defer func() {
-				// reset default wallet to CCIP owner wallet when we're done
-				if err = ccipModule.ChainClient.SetDefaultWallet(0); err != nil {
-					ccipModule.Logger.Error().Err(err).Msg("Error resetting default wallet to CCIP owner wallet after token deployment")
-				}
-			}()
-		}
-
 		// deploy bridge token.
 		for i := len(ccipModule.BridgeTokens); i < noOfTokens; i++ {
 			var token *contracts.ERC20Token
@@ -882,11 +882,11 @@ func (ccipModule *CCIPCommon) DeployContracts(
 			if len(tokenDeployerFns) != noOfTokens {
 				if ccipModule.IsUSDCDeployment() && i == 0 {
 					// if it's USDC deployment, we deploy the burn mint token 677 with decimal 6 and cast it to ERC20Token
-					erc677Token, err := cd.DeployBurnMintERC677(new(big.Int).Mul(big.NewInt(1e6), big.NewInt(1e18)))
+					erc677Token, err := ccipModule.tokenDeployer.DeployBurnMintERC677(new(big.Int).Mul(big.NewInt(1e6), big.NewInt(1e18)))
 					if err != nil {
 						return fmt.Errorf("deploying bridge usdc token contract shouldn't fail %w", err)
 					}
-					token, err = cd.NewERC20TokenContract(erc677Token.ContractAddress)
+					token, err = ccipModule.tokenDeployer.NewERC20TokenContract(erc677Token.ContractAddress)
 					if err != nil {
 						return fmt.Errorf("getting new bridge usdc token contract shouldn't fail %w", err)
 					}
@@ -900,11 +900,11 @@ func (ccipModule *CCIPCommon) DeployContracts(
 					}
 				} else {
 					// otherwise we deploy link token and cast it to ERC20Token
-					linkToken, err := cd.DeployLinkTokenContract()
+					linkToken, err := ccipModule.tokenDeployer.DeployLinkTokenContract()
 					if err != nil {
 						return fmt.Errorf("deploying bridge token contract shouldn't fail %w", err)
 					}
-					token, err = cd.NewERC20TokenContract(common.HexToAddress(linkToken.Address()))
+					token, err = ccipModule.tokenDeployer.NewERC20TokenContract(common.HexToAddress(linkToken.Address()))
 					if err != nil {
 						return fmt.Errorf("getting new bridge token contract shouldn't fail %w", err)
 					}
@@ -914,7 +914,7 @@ func (ccipModule *CCIPCommon) DeployContracts(
 					}
 				}
 			} else {
-				token, err = cd.DeployERC20TokenContract(tokenDeployerFns[i])
+				token, err = ccipModule.tokenDeployer.DeployERC20TokenContract(tokenDeployerFns[i])
 				if err != nil {
 					return fmt.Errorf("deploying bridge token contract shouldn't fail %w", err)
 				}
@@ -933,7 +933,7 @@ func (ccipModule *CCIPCommon) DeployContracts(
 
 	var tokens []*contracts.ERC20Token
 	for _, token := range ccipModule.BridgeTokens {
-		newToken, err := cd.NewERC20TokenContract(common.HexToAddress(token.Address()))
+		newToken, err := ccipModule.tokenDeployer.NewERC20TokenContract(common.HexToAddress(token.Address()))
 		if err != nil {
 			return fmt.Errorf("getting new bridge token contract shouldn't fail %w", err)
 		}
@@ -956,7 +956,7 @@ func (ccipModule *CCIPCommon) DeployContracts(
 				if ccipModule.TokenTransmitter == nil {
 					return fmt.Errorf("TokenTransmitter contract address is not provided")
 				}
-				usdcPool, err := cd.DeployUSDCTokenPoolContract(token.Address(), *ccipModule.TokenMessenger, *ccipModule.ARMContract, ccipModule.Router.Instance.Address())
+				usdcPool, err := ccipModule.tokenDeployer.DeployUSDCTokenPoolContract(token.Address(), *ccipModule.TokenMessenger, *ccipModule.ARMContract, ccipModule.Router.Instance.Address())
 				if err != nil {
 					return fmt.Errorf("deploying bridge Token pool(usdc) shouldn't fail %w", err)
 				}
@@ -964,7 +964,7 @@ func (ccipModule *CCIPCommon) DeployContracts(
 				ccipModule.BridgeTokenPools = append(ccipModule.BridgeTokenPools, usdcPool)
 			} else {
 				// deploy lock release token pool in case of non-usdc deployment
-				btp, err := cd.DeployLockReleaseTokenPoolContract(token.Address(), *ccipModule.ARMContract, ccipModule.Router.Instance.Address())
+				btp, err := ccipModule.tokenDeployer.DeployLockReleaseTokenPoolContract(token.Address(), *ccipModule.ARMContract, ccipModule.Router.Instance.Address())
 				if err != nil {
 					return fmt.Errorf("deploying bridge Token pool(lock&release) shouldn't fail %w", err)
 				}
@@ -979,17 +979,13 @@ func (ccipModule *CCIPCommon) DeployContracts(
 	} else {
 		var pools []*contracts.TokenPool
 		for _, pool := range ccipModule.BridgeTokenPools {
-			newPool, err := cd.NewLockReleaseTokenPoolContract(pool.EthAddress)
+			newPool, err := ccipModule.tokenDeployer.NewLockReleaseTokenPoolContract(pool.EthAddress)
 			if err != nil {
 				return fmt.Errorf("getting new bridge token pool contract shouldn't fail %w", err)
 			}
 			pools = append(pools, newPool)
 		}
 		ccipModule.BridgeTokenPools = pools
-	}
-	// In case we have set the wallet differently for token deployment, we need to reset it back to the CCIP owner account
-	if err = ccipModule.ChainClient.SetDefaultWallet(0); err != nil {
-		return fmt.Errorf("error in setting default wallet back to admin after deploying token contracts %w", err)
 	}
 
 	if ccipModule.PriceRegistry == nil {
@@ -1144,10 +1140,11 @@ type StaticPriceConfig struct {
 func NewCCIPCommonFromConfig(
 	logger zerolog.Logger,
 	testGroupConf *testconfig.CCIPTestGroupConfig,
+	testEnv *CCIPTestEnv,
 	chainClient blockchain.EVMClient,
 	laneConfig *laneconfig.LaneConfig,
 ) (*CCIPCommon, error) {
-	newCCIPModule, err := DefaultCCIPModule(logger, testGroupConf, chainClient)
+	newCCIPModule, err := DefaultCCIPModule(logger, testGroupConf, testEnv, chainClient)
 	if err != nil {
 		return nil, err
 	}
@@ -1171,13 +1168,13 @@ func NewCCIPCommonFromConfig(
 	for i := range newCCIPModule.BridgeTokenPools {
 		// if there is usdc token, the corresponding pool will always be added as first one in the slice
 		if newCCIPModule.IsUSDCDeployment() && i == 0 {
-			pool, err := newCD.NewUSDCTokenPoolContract(common.HexToAddress(newCCIPModule.BridgeTokenPools[i].Address()))
+			pool, err := newCCIPModule.tokenDeployer.NewUSDCTokenPoolContract(common.HexToAddress(newCCIPModule.BridgeTokenPools[i].Address()))
 			if err != nil {
 				return nil, err
 			}
 			pools = append(pools, pool)
 		} else {
-			pool, err := newCD.NewLockReleaseTokenPoolContract(common.HexToAddress(newCCIPModule.BridgeTokenPools[i].Address()))
+			pool, err := newCCIPModule.tokenDeployer.NewLockReleaseTokenPoolContract(common.HexToAddress(newCCIPModule.BridgeTokenPools[i].Address()))
 			if err != nil {
 				return nil, err
 			}
@@ -1187,7 +1184,7 @@ func NewCCIPCommonFromConfig(
 	newCCIPModule.BridgeTokenPools = pools
 	var tokens []*contracts.ERC20Token
 	for i := range newCCIPModule.BridgeTokens {
-		token, err := newCD.NewERC20TokenContract(common.HexToAddress(newCCIPModule.BridgeTokens[i].Address()))
+		token, err := newCCIPModule.tokenDeployer.NewERC20TokenContract(common.HexToAddress(newCCIPModule.BridgeTokens[i].Address()))
 		if err != nil {
 			return nil, err
 		}
@@ -1227,10 +1224,33 @@ func NewCCIPCommonFromConfig(
 func DefaultCCIPModule(
 	logger zerolog.Logger,
 	testGroupConf *testconfig.CCIPTestGroupConfig,
+	testEnv *CCIPTestEnv,
 	chainClient blockchain.EVMClient,
-
 ) (*CCIPCommon, error) {
+	networkCfg := chainClient.GetNetworkConfig()
+	var k8Env *environment.Environment
+	if testEnv != nil {
+		k8Env = testEnv.K8Env
+	}
+	if k8Env != nil && chainClient.NetworkSimulated() {
+		networkCfg.URLs = k8Env.URLs[chainClient.GetNetworkConfig().Name]
+	}
+	tokenDeployerChainClient, err := blockchain.ConcurrentEVMClient(*networkCfg, k8Env, chainClient, logger)
+	if err != nil {
+		return nil, errors.WithStack(fmt.Errorf("failed to create token deployment chain client for %s: %w", networkCfg.Name, err))
+	}
+	if contracts.NeedTokenAdminRegistry() &&
+		!pointer.GetBool(testGroupConf.TokenConfig.CCIPOwnerTokens) &&
+		len(tokenDeployerChainClient.GetWallets()) > 1 { // If we want to deploy tokens as a non CCIP owner, we need to set the default wallet to something other than the first one
+		if err = tokenDeployerChainClient.SetDefaultWallet(1); err != nil {
+			return nil, errors.WithStack(fmt.Errorf("failed to set default wallet for token deployment client %s: %w", networkCfg.Name, err))
+		}
+	}
 	cd, err := contracts.NewCCIPContractsDeployer(logger, chainClient)
+	if err != nil {
+		return nil, err
+	}
+	tokenCD, err := contracts.NewCCIPContractsDeployer(logger, tokenDeployerChainClient)
 	if err != nil {
 		return nil, err
 	}
@@ -1239,6 +1259,7 @@ func DefaultCCIPModule(
 		TestGroupConfig: testGroupConf,
 		ChainClient:     chainClient,
 		Deployer:        cd,
+		tokenDeployer:   tokenCD,
 		RateLimiterConfig: contracts.RateLimiterConfig{
 			Rate:     contracts.FiftyCoins,
 			Capacity: contracts.HundredCoins,
@@ -1760,13 +1781,14 @@ func (sourceCCIP *SourceCCIPModule) SendRequest(
 func DefaultSourceCCIPModule(
 	logger zerolog.Logger,
 	testConf *testconfig.CCIPTestGroupConfig,
+	testEnv *CCIPTestEnv,
 	chainClient blockchain.EVMClient,
 	destChainId uint64,
 	destChain string,
 	laneConf *laneconfig.LaneConfig,
 ) (*SourceCCIPModule, error) {
 	cmn, err := NewCCIPCommonFromConfig(
-		logger, testConf, chainClient, laneConf,
+		logger, testConf, testEnv, chainClient, laneConf,
 	)
 	if err != nil {
 		return nil, err
@@ -2504,13 +2526,14 @@ func (destCCIP *DestCCIPModule) AssertSeqNumberExecuted(
 func DefaultDestinationCCIPModule(
 	logger zerolog.Logger,
 	testConf *testconfig.CCIPTestGroupConfig,
+	testEnv *CCIPTestEnv,
 	chainClient blockchain.EVMClient,
 	sourceChainId uint64,
 	sourceChain string,
 	laneConf *laneconfig.LaneConfig,
 ) (*DestCCIPModule, error) {
 	cmn, err := NewCCIPCommonFromConfig(
-		logger, testConf, chainClient, laneConf,
+		logger, testConf, testEnv, chainClient, laneConf,
 	)
 	if err != nil {
 		return nil, err
@@ -2752,7 +2775,7 @@ func (lane *CCIPLane) Multicall(noOfRequests int, multiSendAddr common.Address) 
 			if j < len(lane.Source.Common.BridgeTokens) {
 				token = lane.Source.Common.BridgeTokens[j]
 			}
-			err = token.Transfer(multiSendAddr.Hex(), amount)
+			err = token.Transfer(token.OwnerWallet, multiSendAddr.Hex(), amount)
 			if err != nil {
 				return err
 			}
@@ -3438,6 +3461,7 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 	lane.Source, err = DefaultSourceCCIPModule(
 		lane.Logger,
 		testConf,
+		env,
 		sourceChainClient, destChainClient.GetChainID().Uint64(),
 		destChainClient.GetNetworkName(),
 		srcConf,
@@ -3446,7 +3470,7 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 		return fmt.Errorf("failed to create source module: %w", err)
 	}
 	lane.Dest, err = DefaultDestinationCCIPModule(
-		lane.Logger, testConf,
+		lane.Logger, testConf, env,
 		destChainClient, sourceChainClient.GetChainID().Uint64(),
 		sourceChainClient.GetNetworkName(), destConf,
 	)

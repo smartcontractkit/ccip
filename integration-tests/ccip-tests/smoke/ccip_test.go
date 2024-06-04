@@ -239,7 +239,7 @@ func TestSmokeCCIPRateLimit(t *testing.T) {
 			src.TransferAmount[0] = rlOnRamp.Tokens
 			tc.lane.Logger.Info().Str("tokensToSend", rlOnRamp.Tokens.String()).Msg("Aggregated Capacity")
 			// approve the tokens
-			require.NoError(t, src.Common.BridgeTokens[0].Approve(src.Common.Router.Address(), src.TransferAmount[0]))
+			require.NoError(t, src.Common.BridgeTokens[0].Approve(src.Common.BridgeTokens[0].OwnerWallet, src.Common.Router.Address(), src.TransferAmount[0]))
 			require.NoError(t, tc.lane.Source.Common.ChainClient.WaitForEvents())
 			failedTx, _, _, err := tc.lane.Source.SendRequest(
 				tc.lane.Dest.ReceiverDapp.EthAddress,
@@ -367,7 +367,7 @@ func TestSmokeCCIPRateLimit(t *testing.T) {
 			tc.lane.Logger.Info().Str("tokensToSend", tokensToSend.String()).Msg("More than TokenPool Rate")
 			src.TransferAmount[0] = tokensToSend
 			// approve the tokens
-			require.NoError(t, src.Common.BridgeTokens[0].Approve(src.Common.Router.Address(), src.TransferAmount[0]))
+			require.NoError(t, src.Common.BridgeTokens[0].Approve(src.Common.BridgeTokens[0].OwnerWallet, src.Common.Router.Address(), src.TransferAmount[0]))
 			require.NoError(t, tc.lane.Source.Common.ChainClient.WaitForEvents())
 			failedTx, _, _, err = tc.lane.Source.SendRequest(
 				tc.lane.Dest.ReceiverDapp.EthAddress,

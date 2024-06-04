@@ -185,6 +185,7 @@ type ERC20Token struct {
 	instance        *erc20.ERC20
 	ContractAddress common.Address
 	OwnerAddress    common.Address
+	OwnerWallet     *blockchain.EthereumWallet
 }
 
 func (token *ERC20Token) Address() string {
@@ -203,6 +204,8 @@ func (token *ERC20Token) BalanceOf(ctx context.Context, addr string) (*big.Int, 
 	return balance, nil
 }
 
+// Allowance returns the amount which spender is still allowed to withdraw from owner
+// https://docs.openzeppelin.com/contracts/2.x/api/token/erc20#IERC20-allowance-address-address-
 func (token *ERC20Token) Allowance(owner, spender string) (*big.Int, error) {
 	allowance, err := token.instance.Allowance(nil, common.HexToAddress(owner), common.HexToAddress(spender))
 	if err != nil {
@@ -211,33 +214,35 @@ func (token *ERC20Token) Allowance(owner, spender string) (*big.Int, error) {
 	return allowance, nil
 }
 
-func (token *ERC20Token) Approve(to string, amount *big.Int) error {
-	opts, err := token.client.TransactionOpts(token.client.GetDefaultWallet())
+// Approve approves the spender to spend the given amount of tokens on behalf of the owner
+// https://docs.openzeppelin.com/contracts/2.x/api/token/erc20#IERC20-approve-address-uint256-
+func (token *ERC20Token) Approve(onBehalf *blockchain.EthereumWallet, spender string, amount *big.Int) error {
+	opts, err := token.client.TransactionOpts(onBehalf)
 	if err != nil {
 		return fmt.Errorf("failed to get transaction options: %w", err)
 	}
 	token.logger.Info().
-		Str("From", token.client.GetDefaultWallet().Address()).
-		Str("To", to).
+		Str("On Behalf Of", onBehalf.Address()).
+		Str("Spender", spender).
 		Str("Token", token.Address()).
 		Str("Amount", amount.String()).
 		Uint64("Nonce", opts.Nonce.Uint64()).
 		Str(Network, token.client.GetNetworkConfig().Name).
 		Msg("Approving ERC20 Transfer")
-	tx, err := token.instance.Approve(opts, common.HexToAddress(to), amount)
+	tx, err := token.instance.Approve(opts, common.HexToAddress(spender), amount)
 	if err != nil {
 		return fmt.Errorf("failed to approve ERC20: %w", err)
 	}
 	return token.client.ProcessTransaction(tx)
 }
 
-func (token *ERC20Token) Transfer(to string, amount *big.Int) error {
-	opts, err := token.client.TransactionOpts(token.client.GetDefaultWallet())
+func (token *ERC20Token) Transfer(from *blockchain.EthereumWallet, to string, amount *big.Int) error {
+	opts, err := token.client.TransactionOpts(from)
 	if err != nil {
 		return fmt.Errorf("failed to get transaction options: %w", err)
 	}
 	token.logger.Info().
-		Str("From", token.client.GetDefaultWallet().Address()).
+		Str("From", from.Address()).
 		Str("To", to).
 		Str("Amount", amount.String()).
 		Uint64("Nonce", opts.Nonce.Uint64()).
@@ -551,6 +556,7 @@ type TokenPool struct {
 	Instance     *TokenPoolWrapper
 	EthAddress   common.Address
 	OwnerAddress common.Address
+	OwnerWallet  *blockchain.EthereumWallet
 }
 
 func (pool *TokenPool) Address() string {
@@ -584,7 +590,9 @@ func (pool *TokenPool) SyncUSDCDomain(destTokenTransmitter *TokenTransmitter, de
 
 	var allowedCallerBytes [32]byte
 	copy(allowedCallerBytes[12:], destPoolAddr.Bytes())
-	destTokenTransmitterIns, err := mock_usdc_token_transmitter.NewMockE2EUSDCTransmitter(destTokenTransmitter.ContractAddress, destTokenTransmitter.client.Backend())
+	destTokenTransmitterIns, err := mock_usdc_token_transmitter.NewMockE2EUSDCTransmitter(
+		destTokenTransmitter.ContractAddress, destTokenTransmitter.client.Backend(),
+	)
 	if err != nil {
 		return fmt.Errorf("failed to create mock USDC token transmitter: %w", err)
 	}
@@ -592,12 +600,13 @@ func (pool *TokenPool) SyncUSDCDomain(destTokenTransmitter *TokenTransmitter, de
 	if err != nil {
 		return fmt.Errorf("failed to get local domain: %w", err)
 	}
-	opts, err := pool.client.TransactionOpts(pool.client.GetDefaultWallet())
+	opts, err := pool.client.TransactionOpts(pool.OwnerWallet)
 	if err != nil {
 		return fmt.Errorf("failed to get transaction opts: %w", err)
 	}
 	pool.logger.Info().
 		Str("Token Pool", pool.Address()).
+		Str("From", pool.OwnerAddress.Hex()).
 		Str(Network, pool.client.GetNetworkName()).
 		Uint32("Domain", domain).
 		Str("Allowed Caller", destPoolAddr.Hex()).
@@ -621,7 +630,7 @@ func (pool *TokenPool) RemoveLiquidity(amount *big.Int) error {
 	if !pool.IsLockRelease() {
 		return fmt.Errorf("pool is not a lock release pool, cannot remove liquidity")
 	}
-	opts, err := pool.client.TransactionOpts(pool.client.GetDefaultWallet())
+	opts, err := pool.client.TransactionOpts(pool.OwnerWallet)
 	if err != nil {
 		return fmt.Errorf("failed to get transaction opts: %w", err)
 	}
@@ -641,7 +650,7 @@ func (pool *TokenPool) RemoveLiquidity(amount *big.Int) error {
 	return pool.client.ProcessTransaction(tx)
 }
 
-type tokenApproveFn func(string, *big.Int) error
+type tokenApproveFn func(*blockchain.EthereumWallet, string, *big.Int) error
 
 func (pool *TokenPool) AddLiquidity(approveFn tokenApproveFn, tokenAddr string, amount *big.Int) error {
 	if !pool.IsLockRelease() {
@@ -651,11 +660,7 @@ func (pool *TokenPool) AddLiquidity(approveFn tokenApproveFn, tokenAddr string, 
 		Str("Link Token", tokenAddr).
 		Str("Token Pool", pool.Address()).
 		Msg("Initiating transferring of token to token pool")
-	ownerWallet := pool.client.GetWalletByAddress(pool.OwnerAddress)
-	if ownerWallet == nil {
-		return fmt.Errorf("owner wallet '%s' not found", pool.OwnerAddress.Hex())
-	}
-	err := approveFn(pool.Address(), amount)
+	err := approveFn(pool.OwnerWallet, pool.Address(), amount)
 	if err != nil {
 		return fmt.Errorf("failed to approve token transfer: %w", err)
 	}
@@ -663,7 +668,7 @@ func (pool *TokenPool) AddLiquidity(approveFn tokenApproveFn, tokenAddr string, 
 	if err != nil {
 		return fmt.Errorf("failed to wait for events: %w", err)
 	}
-	opts, err := pool.client.TransactionOpts(ownerWallet)
+	opts, err := pool.client.TransactionOpts(pool.OwnerWallet)
 	if err != nil {
 		return fmt.Errorf("failed to get transaction opts: %w", err)
 	}
@@ -671,7 +676,7 @@ func (pool *TokenPool) AddLiquidity(approveFn tokenApproveFn, tokenAddr string, 
 	if err != nil {
 		return fmt.Errorf("failed to set rebalancer: %w", err)
 	}
-	opts, err = pool.client.TransactionOpts(ownerWallet)
+	opts, err = pool.client.TransactionOpts(pool.OwnerWallet)
 	if err != nil {
 		return fmt.Errorf("failed to get transaction opts: %w", err)
 	}
@@ -700,8 +705,7 @@ func (pool *TokenPool) SetRemoteChainOnPool(remoteChainSelector uint64, remotePo
 	if err != nil {
 		return fmt.Errorf("failed to get if chain is supported: %w", err)
 	}
-	// Check if remote chain is already supported , if yes return
-	if isSupported {
+	if isSupported { // Check if remote chain is already supported, if yes return
 		pool.logger.Info().
 			Str("Token Pool", pool.Address()).
 			Str(Network, pool.client.GetNetworkName()).
@@ -709,6 +713,7 @@ func (pool *TokenPool) SetRemoteChainOnPool(remoteChainSelector uint64, remotePo
 			Msg("Remote chain is already supported")
 		return nil
 	}
+	// if not, add it
 	encodedAddress, err := abihelpers.EncodeAddress(remotePoolAddresses)
 	if err != nil {
 		return fmt.Errorf("failed to encode address: %w", err)
@@ -729,17 +734,11 @@ func (pool *TokenPool) SetRemoteChainOnPool(remoteChainSelector uint64, remotePo
 			Rate:      new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e5)),
 		},
 	})
-	ownerWallet := pool.client.GetWalletByAddress(pool.OwnerAddress)
-	if ownerWallet == nil {
-		return fmt.Errorf("owner wallet not found")
-	}
-	// If remote chain is not supported , add it
-	opts, err := pool.client.TransactionOpts(ownerWallet)
+	opts, err := pool.client.TransactionOpts(pool.OwnerWallet)
 	if err != nil {
 		return fmt.Errorf("failed to get transaction opts: %w", err)
 	}
 	tx, err := pool.Instance.ApplyChainUpdates(opts, selectorsToUpdate)
-
 	if err != nil {
 		return fmt.Errorf("failed to set chain updates on token pool: %w", err)
 	}
@@ -754,7 +753,7 @@ func (pool *TokenPool) SetRemoteChainOnPool(remoteChainSelector uint64, remotePo
 
 // SetRemoteChainRateLimits sets the rate limits for the token pool on the remote chain
 func (pool *TokenPool) SetRemoteChainRateLimits(remoteChainSelector uint64, rl token_pool.RateLimiterConfig) error {
-	opts, err := pool.client.TransactionOpts(pool.client.GetDefaultWallet())
+	opts, err := pool.client.TransactionOpts(pool.OwnerWallet)
 	if err != nil {
 		return fmt.Errorf("error getting transaction opts: %w", err)
 	}
@@ -781,7 +780,7 @@ func (pool *TokenPool) SetRouter(routerAddr common.Address) error {
 	pool.logger.Info().
 		Str("Token Pool", pool.Address()).
 		Msg("Setting router on pool")
-	opts, err := pool.client.TransactionOpts(pool.client.GetDefaultWallet())
+	opts, err := pool.client.TransactionOpts(pool.OwnerWallet)
 	if err != nil {
 		return fmt.Errorf("failed to get transaction opts: %w", err)
 	}
@@ -805,7 +804,7 @@ func (pool *TokenPool) SetRebalancer(rebalancerAddress common.Address) error {
 	pool.logger.Info().
 		Str("Token Pool", pool.Address()).
 		Msg("Setting rebalancer on pool")
-	opts, err := pool.client.TransactionOpts(pool.client.GetDefaultWallet())
+	opts, err := pool.client.TransactionOpts(pool.OwnerWallet)
 	if err != nil {
 		return fmt.Errorf("failed to get transaction opts: %w", err)
 	}
