@@ -90,9 +90,24 @@ func (s *BestEffortBatchingStrategy) BuildBatch(
 	return batchBuilder.batch, batchBuilder.statuses
 }
 
+// define an enum status
+type status string
+
+// define the value
+const (
+	Failed     status = "failed"
+	Pending    status = "pending"
+	Successful status = "successful"
+)
+
+type TxManager interface {
+	FindTxsByIdempotencyPrefix(ctx context.Context, msgIdPrefix string) ([]status, error)
+}
+
 type ZKOverflowBatchingStrategy struct {
 	BaseBatchingStrategy
-	txManager txmgr.TxManager
+	txManager     txmgr.TxManager
+	txManagerFake TxManager
 }
 
 // ZKOverflowBatchingStrategy is a batching strategy for ZK chains overflowing under certain conditions.
@@ -116,14 +131,45 @@ func (bs *ZKOverflowBatchingStrategy) BuildBatch(
 			continue
 		}
 
+		// TODO: Perform the ZK check here
+		// bs.txManager.Name()
+		statuses, err := bs.txManagerFake.FindTxsByIdempotencyPrefix(batchCtx.ctx, hexutil.Encode(msg.MessageID[:]))
+		if err != nil { // TODO: should we add the message to the batch if err?
+			msgLggr.Errorw("Failed to find txs by idempotency prefix", "err", err)
+			return []ccip.ObservedMessage{}, []messageExecStatus{}
+		}
+
+		if len(statuses) == 0 {
+			// log that we have no status so message can be added to the batch
+			msgLggr.Infow("No status found for message, adding to batch")
+		} else {
+			// need to look for a final status
+			finalStatus := false
+			for _, s := range statuses {
+				if s == Failed {
+					msgLggr.Infow("Skipping message - ZK check failed")
+					batchBuilder.skip(msg, "zk_check_failed")
+					finalStatus = true
+					break
+				}
+				if s == Successful {
+					msgLggr.Infow("Skipping message - ZK check passed")
+					batchBuilder.skip(msg, "zk_check_passed")
+					finalStatus = true
+					break
+				}
+			}
+			if finalStatus {
+				continue
+			}
+			msgLggr.Infow("No final status found for message, adding to batch")
+		}
+
 		batchCtx.availableGas -= messageMaxGas
 		batchCtx.availableDataLen -= len(msg.Data)
 		batchCtx.aggregateTokenLimit.Sub(batchCtx.aggregateTokenLimit, msgValue)
 		batchCtx.expectedNonces[msg.Sender] = msg.Nonce + 1
 		batchBuilder.addToBatch(msg, tokenData)
-
-		// TODO: Perform the ZK check here
-		bs.txManager.Name()
 
 		msgLggr.Infow(
 			"Message added to execution batch",
