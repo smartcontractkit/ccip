@@ -180,7 +180,7 @@ contract EVM2EVMMultiOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSet
       EVM2EVMMultiOffRamp.SourceChainConfigArgs memory sourceChainConfig = sourceChainConfigs[i];
       s_mockCommitStore.setSourceChainConfig(
         sourceChainConfig.sourceChainSelector,
-        IMultiCommitStore.SourceChainConfig({isEnabled: true, minSeqNr: 0, onRamp: sourceChainConfig.onRamp})
+        IMultiCommitStore.SourceChainConfig({isEnabled: true, minSeqNr: 1, onRamp: sourceChainConfig.onRamp})
       );
       s_mockCommitStore.setVerifyResult(sourceChainConfig.sourceChainSelector, true);
     }

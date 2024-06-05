@@ -2873,7 +2873,7 @@ contract EVM2EVMMultiOffRamp_applySourceChainConfigUpdates is EVM2EVMMultiOffRam
 
     s_mockCommitStore.setSourceChainConfig(
       SOURCE_CHAIN_SELECTOR_1,
-      IMultiCommitStore.SourceChainConfig({isEnabled: true, minSeqNr: 0, onRamp: ON_RAMP_ADDRESS_2})
+      IMultiCommitStore.SourceChainConfig({isEnabled: true, minSeqNr: 1, onRamp: ON_RAMP_ADDRESS_2})
     );
 
     vm.expectRevert(abi.encodeWithSelector(EVM2EVMMultiOffRamp.InvalidStaticConfig.selector, SOURCE_CHAIN_SELECTOR_1));
