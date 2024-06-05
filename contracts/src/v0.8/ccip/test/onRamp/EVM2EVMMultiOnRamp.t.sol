@@ -247,6 +247,18 @@ contract EVM2EVMMultiOnRamp_applyDestChainConfigUpdates is EVM2EVMMultiOnRampSet
     s_onRamp.applyDestChainConfigUpdates(destChainConfigArgs);
   }
 
+  function test_applyDestChainConfigUpdatesDefaultTxGasLimitEqZero() public {
+    EVM2EVMMultiOnRamp.DestChainConfigArgs[] memory destChainConfigArgs = generateDestChainConfigArgs();
+    EVM2EVMMultiOnRamp.DestChainConfigArgs memory destChainConfigArg = destChainConfigArgs[0];
+
+    // destChainSelector == address(0)
+    destChainConfigArg.dynamicConfig.defaultTxGasLimit = 0;
+    vm.expectRevert(
+      abi.encodeWithSelector(EVM2EVMMultiOnRamp.InvalidDestChainConfig.selector, destChainConfigArg.destChainSelector)
+    );
+    s_onRamp.applyDestChainConfigUpdates(destChainConfigArgs);
+  }
+
   function test_InvalidDestChainConfigNewPrevOnRampOnExistingChain_Revert() public {
     EVM2EVMMultiOnRamp.DestChainConfigArgs[] memory destChainConfigArgs = generateDestChainConfigArgs();
     EVM2EVMMultiOnRamp.DestChainConfigArgs memory destChainConfigArg = destChainConfigArgs[0];

@@ -704,8 +704,9 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ILinkAvailable, AggregateRat
       DestChainConfigArgs memory destChainConfigArg = destChainConfigArgs[i];
       uint64 destChainSelector = destChainConfigArgs[i].destChainSelector;
 
-      // TODO: add destChainConfigArg.defaultTxGasLimit validation
-      if (destChainSelector == 0) revert InvalidDestChainConfig(destChainSelector);
+      if (destChainSelector == 0 || destChainConfigArg.dynamicConfig.defaultTxGasLimit == 0) {
+        revert InvalidDestChainConfig(destChainSelector);
+      }
 
       DestChainConfig storage destChainConfig = s_destChainConfig[destChainSelector];
       address prevOnRamp = destChainConfigArg.prevOnRamp;
