@@ -8,6 +8,7 @@ import (
 
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/smartcontractkit/ccipocr3/internal/libs/slicelib"
+	"github.com/smartcontractkit/ccipocr3/internal/reader"
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
@@ -27,6 +28,9 @@ type Plugin struct {
 	msgHasher         cciptypes.MessageHasher
 	lggr              logger.Logger
 
+	homeChainConfig reader.HomeChainConfig
+	//homeChainReader reader.HomeChainReader
+
 	// readableChains is the set of chains that the plugin can read from.
 	readableChains mapset.Set[cciptypes.ChainSelector]
 	// knownSourceChains is the set of chains that the plugin knows about.
@@ -44,11 +48,15 @@ func NewPlugin(
 	reportCodec cciptypes.CommitPluginCodec,
 	msgHasher cciptypes.MessageHasher,
 	lggr logger.Logger,
+	homeChainConfig reader.HomeChainConfig,
+	// homeChainReader reader.HomeChainReader
 ) *Plugin {
 	knownSourceChains := mapset.NewSet[cciptypes.ChainSelector]()
-	for _, inf := range cfg.ObserverInfo {
-		knownSourceChains = knownSourceChains.Union(mapset.NewSet(inf.Reads...))
+	for _, inf := range homeChainConfig.NodeSupportedChains {
+		knownSourceChains = knownSourceChains.Union(inf.Supported)
 	}
+
+	// TODO create homeChainReader and run StartConfigAutoUpdate with homeChainConfig
 
 	return &Plugin{
 		nodeID:            nodeID,
@@ -58,8 +66,9 @@ func NewPlugin(
 		reportCodec:       reportCodec,
 		msgHasher:         msgHasher,
 		lggr:              lggr,
+		homeChainConfig:   homeChainConfig,
 
-		readableChains:    mapset.NewSet(cfg.ObserverInfo[nodeID].Reads...),
+		readableChains:    homeChainConfig.GetSupportedChains(nodeID),
 		knownSourceChains: knownSourceChains,
 	}
 }

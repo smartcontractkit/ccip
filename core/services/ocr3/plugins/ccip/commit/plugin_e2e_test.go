@@ -5,8 +5,10 @@ import (
 	"reflect"
 	"testing"
 
+	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/smartcontractkit/ccipocr3/internal/libs/testhelpers"
 	"github.com/smartcontractkit/ccipocr3/internal/mocks"
+	"github.com/smartcontractkit/ccipocr3/internal/reader"
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
@@ -166,10 +168,15 @@ func setupEmptyOutcome(ctx context.Context, t *testing.T, lggr logger.Logger) []
 		NewMsgScanBatchSize: 256,
 	}
 
+	homeChainConfig := reader.HomeChainConfig{
+		FChain:              map[cciptypes.ChainSelector]int{chainC: 1},
+		NodeSupportedChains: map[commontypes.OracleID]reader.SupportedChains{},
+	}
+
 	return []nodeSetup{
-		newNode(ctx, t, lggr, 1, cfg),
-		newNode(ctx, t, lggr, 2, cfg),
-		newNode(ctx, t, lggr, 3, cfg),
+		newNode(ctx, t, lggr, 1, cfg, homeChainConfig),
+		newNode(ctx, t, lggr, 2, cfg, homeChainConfig),
+		newNode(ctx, t, lggr, 3, cfg, homeChainConfig),
 	}
 }
 
@@ -191,9 +198,21 @@ func setupAllNodesReadAllChains(ctx context.Context, t *testing.T, lggr logger.L
 		NewMsgScanBatchSize: 256,
 	}
 
-	n1 := newNode(ctx, t, lggr, 1, cfg)
-	n2 := newNode(ctx, t, lggr, 2, cfg)
-	n3 := newNode(ctx, t, lggr, 3, cfg)
+	homeChainConfig := reader.HomeChainConfig{
+		FChain: map[cciptypes.ChainSelector]int{
+			chainA: 1,
+			chainB: 1,
+			chainC: 1,
+		},
+		NodeSupportedChains: map[commontypes.OracleID]reader.SupportedChains{
+			1: {Supported: mapset.NewSet[cciptypes.ChainSelector](chainA, chainB, chainC)},
+			2: {Supported: mapset.NewSet[cciptypes.ChainSelector](chainA, chainB, chainC)},
+			3: {Supported: mapset.NewSet[cciptypes.ChainSelector](chainA, chainB, chainC)},
+		},
+	}
+	n1 := newNode(ctx, t, lggr, 1, cfg, homeChainConfig)
+	n2 := newNode(ctx, t, lggr, 2, cfg, homeChainConfig)
+	n3 := newNode(ctx, t, lggr, 3, cfg, homeChainConfig)
 	nodes := []nodeSetup{n1, n2, n3}
 
 	for _, n := range nodes {
@@ -248,9 +267,22 @@ func setupNodesDoNotAgreeOnMsgs(ctx context.Context, t *testing.T, lggr logger.L
 		NewMsgScanBatchSize: 256,
 	}
 
-	n1 := newNode(ctx, t, lggr, 1, cfg)
-	n2 := newNode(ctx, t, lggr, 2, cfg)
-	n3 := newNode(ctx, t, lggr, 3, cfg)
+	homeChainConfig := reader.HomeChainConfig{
+		FChain: map[cciptypes.ChainSelector]int{
+			chainA: 1,
+			chainB: 1,
+			chainC: 1,
+		},
+		NodeSupportedChains: map[commontypes.OracleID]reader.SupportedChains{
+			1: {Supported: mapset.NewSet[cciptypes.ChainSelector](chainA, chainB, chainC)},
+			2: {Supported: mapset.NewSet[cciptypes.ChainSelector](chainA, chainB, chainC)},
+			3: {Supported: mapset.NewSet[cciptypes.ChainSelector](chainA, chainB, chainC)},
+		},
+	}
+
+	n1 := newNode(ctx, t, lggr, 1, cfg, homeChainConfig)
+	n2 := newNode(ctx, t, lggr, 2, cfg, homeChainConfig)
+	n3 := newNode(ctx, t, lggr, 3, cfg, homeChainConfig)
 	nodes := []nodeSetup{n1, n2, n3}
 
 	for i, n := range nodes {
@@ -298,7 +330,7 @@ type nodeSetup struct {
 	msgHasher   *mocks.MessageHasher
 }
 
-func newNode(ctx context.Context, t *testing.T, lggr logger.Logger, id int, cfg cciptypes.CommitPluginConfig) nodeSetup {
+func newNode(ctx context.Context, t *testing.T, lggr logger.Logger, id int, cfg cciptypes.CommitPluginConfig, homeChainConfig reader.HomeChainConfig) nodeSetup {
 	ccipReader := mocks.NewCCIPReader()
 	priceReader := mocks.NewTokenPricesReader()
 	reportCodec := mocks.NewCommitPluginJSONReportCodec()
@@ -313,6 +345,7 @@ func newNode(ctx context.Context, t *testing.T, lggr logger.Logger, id int, cfg 
 		reportCodec,
 		msgHasher,
 		lggr,
+		homeChainConfig,
 	)
 
 	return nodeSetup{

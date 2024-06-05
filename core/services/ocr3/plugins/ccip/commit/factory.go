@@ -3,6 +3,7 @@ package commit
 import (
 	"context"
 
+	"github.com/smartcontractkit/ccipocr3/internal/reader"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"google.golang.org/grpc"
 
@@ -53,6 +54,7 @@ func (p PluginFactory) NewReportingPlugin(config ocr3types.ReportingPluginConfig
 		nil,
 		nil,
 		nil,
+		reader.HomeChainConfig{},
 	), ocr3types.ReportingPluginInfo{}, nil
 }
 
