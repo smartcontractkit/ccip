@@ -822,7 +822,11 @@ contract MultiOCR3Base_setOCR3Configs is MultiOCR3BaseSetup {
       transmitters: transmitters
     });
 
-    vm.expectRevert(abi.encodeWithSelector(MultiOCR3Base.InvalidConfig.selector, "repeated transmitter address"));
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        MultiOCR3Base.InvalidConfig.selector, MultiOCR3Base.InvalidConfigErrorType.REPEATED_TRANSMITTER_ADDRESS
+      )
+    );
     s_multiOCR3.setOCR3Configs(ocrConfigs);
   }
 
@@ -842,7 +846,11 @@ contract MultiOCR3Base_setOCR3Configs is MultiOCR3BaseSetup {
       transmitters: transmitters
     });
 
-    vm.expectRevert(abi.encodeWithSelector(MultiOCR3Base.InvalidConfig.selector, "repeated signer address"));
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        MultiOCR3Base.InvalidConfig.selector, MultiOCR3Base.InvalidConfigErrorType.REPEATED_SIGNER_ADDRESS
+      )
+    );
     s_multiOCR3.setOCR3Configs(ocrConfigs);
   }
 
@@ -928,27 +936,6 @@ contract MultiOCR3Base_setOCR3Configs is MultiOCR3BaseSetup {
     s_multiOCR3.setOCR3Configs(ocrConfigs);
   }
 
-  function test_OracleOutOfRegister_Revert() public {
-    address[] memory signers = new address[](10);
-    address[] memory transmitters = new address[](0);
-
-    MultiOCR3Base.OCRConfigArgs[] memory ocrConfigs = new MultiOCR3Base.OCRConfigArgs[](1);
-    ocrConfigs[0] = MultiOCR3Base.OCRConfigArgs({
-      ocrPluginType: 0,
-      configDigest: _getBasicConfigDigest(2, signers, transmitters),
-      F: 1,
-      uniqueReports: false,
-      isSignatureVerificationEnabled: true,
-      signers: signers,
-      transmitters: transmitters
-    });
-
-    vm.expectRevert(
-      abi.encodeWithSelector(MultiOCR3Base.InvalidConfig.selector, "oracle addresses out of registration")
-    );
-    s_multiOCR3.setOCR3Configs(ocrConfigs);
-  }
-
   function test_FTooHigh_Revert() public {
     address[] memory signers = new address[](0);
     address[] memory transmitters = new address[](0);
@@ -964,7 +951,9 @@ contract MultiOCR3Base_setOCR3Configs is MultiOCR3BaseSetup {
       transmitters: transmitters
     });
 
-    vm.expectRevert(abi.encodeWithSelector(MultiOCR3Base.InvalidConfig.selector, "faulty-oracle F too high"));
+    vm.expectRevert(
+      abi.encodeWithSelector(MultiOCR3Base.InvalidConfig.selector, MultiOCR3Base.InvalidConfigErrorType.F_TOO_HIGH)
+    );
     s_multiOCR3.setOCR3Configs(ocrConfigs);
   }
 
@@ -980,7 +969,11 @@ contract MultiOCR3Base_setOCR3Configs is MultiOCR3BaseSetup {
       transmitters: s_validTransmitters
     });
 
-    vm.expectRevert(abi.encodeWithSelector(MultiOCR3Base.InvalidConfig.selector, "F must be positive"));
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        MultiOCR3Base.InvalidConfig.selector, MultiOCR3Base.InvalidConfigErrorType.F_MUST_BE_POSITIVE
+      )
+    );
     s_multiOCR3.setOCR3Configs(ocrConfigs);
   }
 
@@ -999,7 +992,11 @@ contract MultiOCR3Base_setOCR3Configs is MultiOCR3BaseSetup {
       transmitters: transmitters
     });
 
-    vm.expectRevert(abi.encodeWithSelector(MultiOCR3Base.InvalidConfig.selector, "too many transmitters"));
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        MultiOCR3Base.InvalidConfig.selector, MultiOCR3Base.InvalidConfigErrorType.TOO_MANY_TRANSMITTERS
+      )
+    );
     s_multiOCR3.setOCR3Configs(ocrConfigs);
   }
 }

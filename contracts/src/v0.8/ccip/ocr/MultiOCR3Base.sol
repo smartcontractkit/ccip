@@ -24,7 +24,16 @@ abstract contract MultiOCR3Base is ITypeAndVersion, OwnerIsCreator {
   /// use latestConfigDigestAndEpoch with scanLogs set to false.
   event Transmitted(uint8 indexed ocrPluginType, bytes32 configDigest, uint64 sequenceNumber);
 
-  error InvalidConfig(string message);
+  enum InvalidConfigErrorType {
+    F_MUST_BE_POSITIVE,
+    TOO_MANY_TRANSMITTERS,
+    TOO_MANY_SIGNERS,
+    F_TOO_HIGH,
+    REPEATED_SIGNER_ADDRESS,
+    REPEATED_TRANSMITTER_ADDRESS
+  }
+
+  error InvalidConfig(InvalidConfigErrorType errorType);
   error WrongMessageLength(uint256 expected, uint256 actual);
   error ConfigDigestMismatch(bytes32 expected, bytes32 actual);
   error ForkedChain(uint256 expected, uint256 actual);
@@ -125,7 +134,7 @@ abstract contract MultiOCR3Base is ITypeAndVersion, OwnerIsCreator {
   /// @notice sets offchain reporting protocol configuration incl. participating oracles for a single OCR plugin type
   /// @param ocrConfigArgs OCR config update args
   function _setOCR3Config(OCRConfigArgs memory ocrConfigArgs) internal {
-    if (ocrConfigArgs.F == 0) revert InvalidConfig("F must be positive");
+    if (ocrConfigArgs.F == 0) revert InvalidConfig(InvalidConfigErrorType.F_MUST_BE_POSITIVE);
 
     uint8 ocrPluginType = ocrConfigArgs.ocrPluginType;
     OCRConfig storage ocrConfig = s_ocrConfigs[ocrPluginType];
@@ -146,31 +155,34 @@ abstract contract MultiOCR3Base is ITypeAndVersion, OwnerIsCreator {
     // Transmitters are expected to never exceed 255 (since this is bounded by MAX_NUM_ORACLES)
     uint8 newTransmittersLength = uint8(transmitters.length);
 
-    if (newTransmittersLength > MAX_NUM_ORACLES) revert InvalidConfig("too many transmitters");
+    if (newTransmittersLength > MAX_NUM_ORACLES) revert InvalidConfig(InvalidConfigErrorType.TOO_MANY_TRANSMITTERS);
 
     address[] memory oldTransmitters = ocrConfig.transmitters;
-    address[] memory oldSigners = ocrConfig.signers;
-    bool isSignatureVerificationEnabled = ocrConfigArgs.isSignatureVerificationEnabled;
     for (uint256 i = 0; i < oldTransmitters.length; ++i) {
       delete s_oracles[ocrPluginType][oldTransmitters[i]];
-
-      // NOTE: oldSigners.length == oldTransmitters.length
-      if (isSignatureVerificationEnabled) {
-        delete s_oracles[ocrPluginType][oldSigners[i]];
-      }
     }
 
+    bool isSignatureVerificationEnabled = ocrConfigArgs.isSignatureVerificationEnabled;
+
     if (isSignatureVerificationEnabled) {
+      address[] memory oldSigners = ocrConfig.signers;
+      for (uint256 i = 0; i < oldSigners.length; ++i) {
+        delete s_oracles[ocrPluginType][oldSigners[i]];
+      }
+
       ocrConfig.signers = ocrConfigArgs.signers;
       address[] memory signers = ocrConfigArgs.signers;
+      uint8 newSignersLength = uint8(signers.length);
 
-      if (signers.length != newTransmittersLength) revert InvalidConfig("oracle addresses out of registration");
-      if (signers.length <= 3 * ocrConfigArgs.F) revert InvalidConfig("faulty-oracle F too high");
+      if (newSignersLength > MAX_NUM_ORACLES) revert InvalidConfig(InvalidConfigErrorType.TOO_MANY_SIGNERS);
+      if (signers.length <= 3 * ocrConfigArgs.F) revert InvalidConfig(InvalidConfigErrorType.F_TOO_HIGH);
 
-      for (uint8 i = 0; i < newTransmittersLength; ++i) {
+      for (uint8 i = 0; i < newSignersLength; ++i) {
         // add new signer/transmitter addresses
         address signer = signers[i];
-        if (s_oracles[ocrPluginType][signer].role != Role.Unset) revert InvalidConfig("repeated signer address");
+        if (s_oracles[ocrPluginType][signer].role != Role.Unset) {
+          revert InvalidConfig(InvalidConfigErrorType.REPEATED_SIGNER_ADDRESS);
+        }
         if (signer == address(0)) revert OracleCannotBeZeroAddress();
         s_oracles[ocrPluginType][signer] = Oracle(uint8(i), Role.Signer);
       }
@@ -179,7 +191,7 @@ abstract contract MultiOCR3Base is ITypeAndVersion, OwnerIsCreator {
     for (uint8 i = 0; i < newTransmittersLength; ++i) {
       address transmitter = transmitters[i];
       if (s_oracles[ocrPluginType][transmitter].role != Role.Unset) {
-        revert InvalidConfig("repeated transmitter address");
+        revert InvalidConfig(InvalidConfigErrorType.REPEATED_TRANSMITTER_ADDRESS);
       }
       if (transmitter == address(0)) revert OracleCannotBeZeroAddress();
       s_oracles[ocrPluginType][transmitter] = Oracle(uint8(i), Role.Transmitter);
