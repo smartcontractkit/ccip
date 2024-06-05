@@ -14,7 +14,7 @@ import (
 
 var _ types.OffchainConfigDigester = (*MultichainConfigDigester)(nil)
 
-// MultichainConfigDigest is an offchain config digester implementation that is
+// MultichainConfigDigester is an offchain config digester implementation that is
 // aware of the ContractConfig that is constructed from configs on multiple chains.
 type MultichainConfigDigester struct {
 	MasterChainDigester evmutil.EVMOffchainConfigDigester

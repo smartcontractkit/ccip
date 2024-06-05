@@ -13,7 +13,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/web/presenters"
 )
 
-// OCRKeysController manages OCR key bundles
+// OCR2KeysController manages OCR key bundles
 type OCR2KeysController struct {
 	App chainlink.Application
 }
