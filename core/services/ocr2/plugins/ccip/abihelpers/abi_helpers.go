@@ -176,13 +176,13 @@ func getABI(abiStr string, operationType uint8) (*abi.ABI, error) {
 	}
 	myAbiCache.mu.RUnlock()
 
-	myAbiCache.mu.Lock()
-	defer myAbiCache.mu.Unlock()
-
 	res, err := abi.JSON(strings.NewReader(inDef))
 	if err != nil {
 		return nil, err
 	}
+
+	myAbiCache.mu.Lock()
+	defer myAbiCache.mu.Unlock()
 	myAbiCache.cache[inDef] = &res
 	return &res, nil
 }
