@@ -30,7 +30,7 @@ type SrcExecProvider struct {
 	gasEstimator                           gas.EvmFeeEstimator
 	maxGasPrice                            big.Int
 	jobID                                  string
-	usdcReader                             ccip.USDCReaderImpl
+	usdcReader                             *ccip.USDCReaderImpl
 	usdcAttestationAPI                     string
 	usdcAttestationAPITimeoutSeconds       int
 	usdcAttestationAPIIntervalMilliseconds int
@@ -52,9 +52,13 @@ func NewSrcExecProvider(
 	// maxGasPrice big.Int,
 ) (commontypes.CCIPExecProvider, error) {
 
-	usdcReader, err := ccip.NewUSDCReader(lggr, jobID, usdcSrcMsgTransmitterAddr, lp, true)
-	if err != nil {
-		return nil, errors.Wrap(err, "new usdc reader")
+	var usdcReader *ccip.USDCReaderImpl
+	var err error
+	if usdcAttestationAPI != "" {
+		usdcReader, err = ccip.NewUSDCReader(lggr, jobID, usdcSrcMsgTransmitterAddr, lp, true)
+		if err != nil {
+			return nil, errors.Wrap(err, "new usdc reader")
+		}
 	}
 
 	return &SrcExecProvider{
@@ -63,7 +67,7 @@ func NewSrcExecProvider(
 		client:                                 client,
 		lp:                                     lp,
 		startBlock:                             startBlock,
-		usdcReader:                             *usdcReader,
+		usdcReader:                             usdcReader,
 		usdcAttestationAPI:                     usdcAttestationAPI,
 		usdcAttestationAPITimeoutSeconds:       usdcAttestationAPITimeoutSeconds,
 		usdcAttestationAPIIntervalMilliseconds: usdcAttestationAPIIntervalMilliseconds,
@@ -150,7 +154,7 @@ func (s SrcExecProvider) NewTokenDataReader(ctx context.Context, tokenAddress cc
 	}
 	tokenDataReader = usdc.NewUSDCTokenDataReader(
 		s.lggr,
-		&s.usdcReader,
+		s.usdcReader,
 		attestationURI,
 		s.usdcAttestationAPITimeoutSeconds,
 		tokenAddr,
