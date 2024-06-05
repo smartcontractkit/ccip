@@ -274,6 +274,15 @@ func (r *Relayer) NewCCIPCommitProvider(rargs commontypes.RelayArgs, pargs commo
 	sourceStartBlock := commitPluginConfig.SourceStartBlock
 	destStartBlock := commitPluginConfig.DestStartBlock
 
+	if commitPluginConfig.IsSourceProvider {
+		return NewSrcCommitProvider(
+			r.lggr,
+			sourceStartBlock,
+			r.chain.Client(),
+			r.chain.LogPoller(),
+		), nil
+	}
+
 	relayOpts := types.NewRelayOpts(rargs)
 	configWatcher, err := newStandardConfigProvider(ctx, r.lggr, r.chain, relayOpts)
 	if err != nil {
@@ -296,27 +305,17 @@ func (r *Relayer) NewCCIPCommitProvider(rargs commontypes.RelayArgs, pargs commo
 		return nil, err
 	}
 
-	if commitPluginConfig.IsSourceProvider {
-		return NewSrcCommitProvider(
-			r.lggr,
-			sourceStartBlock,
-			r.chain.Client(),
-			r.chain.LogPoller(),
-			*contractTransmitter,
-			configWatcher,
-		), nil
-	} else {
-		return NewDstCommitProvider(
-			r.lggr,
-			versionFinder,
-			destStartBlock,
-			r.chain.Client(),
-			r.chain.LogPoller(),
-			r.chain.GasEstimator(),
-			*r.chain.Config().EVM().GasEstimator().PriceMax().ToInt(),
-		), nil
-	}
-
+	return NewDstCommitProvider(
+		r.lggr,
+		versionFinder,
+		destStartBlock,
+		r.chain.Client(),
+		r.chain.LogPoller(),
+		r.chain.GasEstimator(),
+		*r.chain.Config().EVM().GasEstimator().PriceMax().ToInt(),
+		*contractTransmitter,
+		configWatcher,
+	), nil
 }
 
 func (r *Relayer) NewCCIPExecProvider(rargs commontypes.RelayArgs, pargs commontypes.PluginArgs) (commontypes.CCIPExecProvider, error) {

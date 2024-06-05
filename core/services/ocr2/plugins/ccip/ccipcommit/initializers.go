@@ -81,7 +81,7 @@ func NewCommitServices2(ctx context.Context, srcProvider commontypes.CCIPCommitP
 	spec := jb.OCR2OracleSpec
 
 	var pluginConfig ccipconfig.CommitPluginJobSpecConfig
-	err := json.Unmarshal(spec.PluginConfig.Bytes(), &pluginConfig) // TODO: is this chain-agnostic
+	err := json.Unmarshal(spec.PluginConfig.Bytes(), &pluginConfig)
 	if err != nil {
 		return nil, err
 	}

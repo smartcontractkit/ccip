@@ -19,12 +19,10 @@ var _ commontypes.CCIPCommitProvider = (*SrcCommitProvider)(nil)
 var _ commontypes.CCIPCommitProvider = (*DstCommitProvider)(nil)
 
 type SrcCommitProvider struct {
-	lggr                logger.Logger
-	startBlock          uint64
-	client              client.Client
-	lp                  logpoller.LogPoller
-	contractTransmitter *contractTransmitter
-	configWatcher       *configWatcher
+	lggr       logger.Logger
+	startBlock uint64
+	client     client.Client
+	lp         logpoller.LogPoller
 }
 
 func NewSrcCommitProvider(
@@ -32,27 +30,25 @@ func NewSrcCommitProvider(
 	startBlock uint64,
 	client client.Client,
 	lp logpoller.LogPoller,
-	contractTransmitter contractTransmitter,
-	configWatcher *configWatcher,
 ) commontypes.CCIPCommitProvider {
 	return &SrcCommitProvider{
-		lggr:                lggr,
-		startBlock:          startBlock,
-		client:              client,
-		lp:                  lp,
-		contractTransmitter: &contractTransmitter,
-		configWatcher:       configWatcher,
+		lggr:       lggr,
+		startBlock: startBlock,
+		client:     client,
+		lp:         lp,
 	}
 }
 
 type DstCommitProvider struct {
-	lggr          logger.Logger
-	versionFinder ccip.VersionFinder
-	startBlock    uint64
-	client        client.Client
-	lp            logpoller.LogPoller
-	gasEstimator  gas.EvmFeeEstimator
-	maxGasPrice   big.Int
+	lggr                logger.Logger
+	versionFinder       ccip.VersionFinder
+	startBlock          uint64
+	client              client.Client
+	lp                  logpoller.LogPoller
+	contractTransmitter *contractTransmitter
+	configWatcher       *configWatcher
+	gasEstimator        gas.EvmFeeEstimator
+	maxGasPrice         big.Int
 }
 
 func NewDstCommitProvider(
@@ -63,15 +59,19 @@ func NewDstCommitProvider(
 	lp logpoller.LogPoller,
 	gasEstimator gas.EvmFeeEstimator,
 	maxGasPrice big.Int,
+	contractTransmitter contractTransmitter,
+	configWatcher *configWatcher,
 ) commontypes.CCIPCommitProvider {
 	return &DstCommitProvider{
-		lggr:          lggr,
-		versionFinder: versionFinder,
-		startBlock:    startBlock,
-		client:        client,
-		lp:            lp,
-		gasEstimator:  gasEstimator,
-		maxGasPrice:   maxGasPrice,
+		lggr:                lggr,
+		versionFinder:       versionFinder,
+		startBlock:          startBlock,
+		client:              client,
+		lp:                  lp,
+		contractTransmitter: &contractTransmitter,
+		configWatcher:       configWatcher,
+		gasEstimator:        gasEstimator,
+		maxGasPrice:         maxGasPrice,
 	}
 }
 
@@ -92,15 +92,15 @@ func (P SrcCommitProvider) HealthReport() map[string]error {
 }
 
 func (P SrcCommitProvider) OffchainConfigDigester() ocrtypes.OffchainConfigDigester {
-	return P.configWatcher.OffchainConfigDigester()
+	panic("OffchainConfigDigester called on SrcCommitProvider. Valid on DstCommitProvider.")
 }
 
 func (P SrcCommitProvider) ContractConfigTracker() ocrtypes.ContractConfigTracker {
-	return P.configWatcher.ContractConfigTracker()
+	panic("ContractConfigTracker called on SrcCommitProvider. Valid on DstCommitProvider.")
 }
 
 func (P SrcCommitProvider) ContractTransmitter() ocrtypes.ContractTransmitter {
-	return P.contractTransmitter
+	panic("ContractTransmitter called on SrcCommitProvider. Valid on DstCommitProvider.")
 }
 
 func (P SrcCommitProvider) ChainReader() commontypes.ChainReader {
@@ -128,15 +128,16 @@ func (P DstCommitProvider) HealthReport() map[string]error {
 }
 
 func (P DstCommitProvider) OffchainConfigDigester() ocrtypes.OffchainConfigDigester {
-	panic("OffchainConfigDigester called on DstCommitProvider. Valid on SrcCommitProvider.")
+
+	return P.configWatcher.OffchainConfigDigester()
 }
 
 func (P DstCommitProvider) ContractConfigTracker() ocrtypes.ContractConfigTracker {
-	panic("ContractConfigTracker called on DstCommitProvider. Valid on SrcCommitProvider.")
+	return P.configWatcher.ContractConfigTracker()
 }
 
 func (P DstCommitProvider) ContractTransmitter() ocrtypes.ContractTransmitter {
-	panic("ContractTransmitter called on DstCommitProvider. Valid on SrcCommitProvider.")
+	return P.contractTransmitter
 }
 
 func (P DstCommitProvider) ChainReader() commontypes.ChainReader {
