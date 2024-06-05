@@ -31,8 +31,6 @@ import {EVM2EVMOffRampSetup} from "./EVM2EVMOffRampSetup.t.sol";
 
 import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 
-import {console2 as console} from "forge-std/console2.sol";
-
 contract EVM2EVMOffRamp_constructor is EVM2EVMOffRampSetup {
   function test_Constructor_Success() public {
     EVM2EVMOffRamp.StaticConfig memory staticConfig = EVM2EVMOffRamp.StaticConfig({
@@ -1194,7 +1192,7 @@ contract EVM2EVMOffRamp__trialExecute is EVM2EVMOffRampSetup {
   ) internal view returns (Internal.EVM2EVMMessage memory) {
     Internal.EVM2EVMMessage memory message = _generateAny2EVMMessageNoTokens(1);
     message.gasLimit = gasLimit;
-    message.data = abi.encodePacked(messageData);
+    message.data = messageData;
     message.messageId = Internal._hash(
       message,
       keccak256(
@@ -1210,7 +1208,7 @@ contract EVM2EVMOffRamp__trialExecute is EVM2EVMOffRampSetup {
         && funcSelector != 0x5100fc21 && funcSelector != 0x00000000 // s_toRevert(), which is public and therefore has a function selector
     );
 
-    //Convert bytes4 into bytes memory to use in the message
+    // Convert bytes4 into bytes memory to use in the message
     Internal.EVM2EVMMessage memory message = _generateMsgWithoutTokens(GAS_LIMIT, messageData);
 
     // Convert an Internal.EVM2EVMMessage into a Client.Any2EVMMessage digestable by the client
@@ -1262,7 +1260,14 @@ contract EVM2EVMOffRamp__trialExecute is EVM2EVMOffRampSetup {
   function test_Fuzz_getSenderNonce(uint8 trialExecutions) public {
     vm.assume(trialExecutions > 1);
 
-    Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages();
+    Internal.EVM2EVMMessage[] memory messages;
+
+    if (trialExecutions == 1) {
+      messages = new Internal.EVM2EVMMessage[](1);
+      messages[0] = _generateAny2EVMMessageNoTokens(0);
+    } else {
+      messages = _generateBasicMessages();
+    }
 
     // Fuzz the number of calls from the sender to ensure that getSenderNonce works
     for (uint256 i = 1; i < trialExecutions; ++i) {
