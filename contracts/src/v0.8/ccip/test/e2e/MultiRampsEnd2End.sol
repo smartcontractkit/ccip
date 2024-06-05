@@ -117,7 +117,7 @@ contract MultiRampsE2E is EVM2EVMMultiOnRampSetup, MultiCommitStoreSetup, EVM2EV
 
     // Enable destination chain on new source chain router
     Router.OnRamp[] memory onRampUpdates = new Router.OnRamp[](1);
-    onRampUpdates[0] = Router.OnRamp({destChainSelector: SOURCE_CHAIN_SELECTOR + 1, onRamp: address(s_onRamp2)});
+    onRampUpdates[0] = Router.OnRamp({destChainSelector: DEST_CHAIN_SELECTOR, onRamp: address(s_onRamp2)});
     s_sourceRouter2.applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), new Router.OffRamp[](0));
 
     // Deploy offramp
