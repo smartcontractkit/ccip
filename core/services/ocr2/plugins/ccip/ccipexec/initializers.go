@@ -48,6 +48,8 @@ import (
 
 const numTokenDataWorkers = 5
 
+var defaultNewReportingPluginRetryConfig = ccipdata.RetryConfig{InitialDelay: time.Second, MaxDelay: 5 * time.Minute}
+
 func NewExecServices2(ctx context.Context, lggr logger.Logger, jb job.Job, srcProvider types.CCIPExecProvider, dstProvider types.CCIPExecProvider, srcChain legacyevm.Chain, dstChain legacyevm.Chain, srcChainID int64, dstChainID int64, chainSet legacyevm.LegacyChainContainer, new bool, argsNoPlugin libocr2.OCR2OracleArgs, logError func(string)) ([]job.ServiceCtx, error) {
 	if jb.OCR2OracleSpec == nil {
 		return nil, errors.New("spec is nil")
@@ -151,18 +153,19 @@ func NewExecServices2(ctx context.Context, lggr logger.Logger, jb job.Job, srcPr
 	)
 
 	wrappedPluginFactory := NewExecutionReportingPluginFactory(ExecutionPluginStaticConfig{
-		lggr:                        lggr,
-		onRampReader:                onRampReader,
-		commitStoreReader:           commitStoreReader,
-		offRampReader:               offRampReader,
-		sourcePriceRegistryProvider: ccip.NewChainAgnosticPriceRegistry(srcProvider),
-		sourceWrappedNativeToken:    sourceWrappedNative,
-		destChainSelector:           dstChainSelector,
-		priceRegistryProvider:       ccip.NewChainAgnosticPriceRegistry(dstProvider),
-		tokenPoolBatchedReader:      tokenPoolBatchedReader,
-		tokenDataWorker:             tokenBackgroundWorker,
-		metricsCollector:            metricsCollector,
-		chainHealthcheck:            chainHealthcheck,
+		lggr:                          lggr,
+		onRampReader:                  onRampReader,
+		commitStoreReader:             commitStoreReader,
+		offRampReader:                 offRampReader,
+		sourcePriceRegistryProvider:   ccip.NewChainAgnosticPriceRegistry(srcProvider),
+		sourceWrappedNativeToken:      sourceWrappedNative,
+		destChainSelector:             dstChainSelector,
+		priceRegistryProvider:         ccip.NewChainAgnosticPriceRegistry(dstProvider),
+		tokenPoolBatchedReader:        tokenPoolBatchedReader,
+		tokenDataWorker:               tokenBackgroundWorker,
+		metricsCollector:              metricsCollector,
+		chainHealthcheck:              chainHealthcheck,
+		newReportingPluginRetryConfig: defaultNewReportingPluginRetryConfig,
 	})
 
 	argsNoPlugin.ReportingPluginFactory = promwrapper.NewPromFactory(wrappedPluginFactory, "CCIPExecution", jb.OCR2OracleSpec.Relay, big.NewInt(0).SetInt64(dstChainID))
@@ -192,7 +195,7 @@ func NewExecServices2(ctx context.Context, lggr logger.Logger, jb job.Job, srcPr
 
 }
 
-func NewExecServices(ctx context.Context, lggr logger.Logger, jb job.Job, chainSet legacyevm.LegacyChainContainer, new bool, argsNoPlugin libocr2.OCR2OracleArgs, logError func(string)) ([]job.ServiceCtx, error) {
+func NewExecutionServices(ctx context.Context, lggr logger.Logger, jb job.Job, chainSet legacyevm.LegacyChainContainer, new bool, argsNoPlugin libocr2.OCR2OracleArgs, logError func(string)) ([]job.ServiceCtx, error) {
 	execPluginConfig, backfillArgs, chainHealthcheck, tokenWorker, err := jobSpecToExecPluginConfig(ctx, lggr, jb, chainSet)
 	if err != nil {
 		return nil, err
@@ -437,18 +440,19 @@ func jobSpecToExecPluginConfig(ctx context.Context, lggr logger.Logger, jb job.J
 		onchainConfig.PermissionLessExecutionThresholdSeconds,
 	)
 	return &ExecutionPluginStaticConfig{
-			lggr:                        execLggr,
-			onRampReader:                onRampReader,
-			commitStoreReader:           commitStoreReader,
-			offRampReader:               offRampReader,
-			sourcePriceRegistryProvider: ccipdataprovider.NewEvmPriceRegistry(params.sourceChain.LogPoller(), params.sourceChain.Client(), execLggr, ccip.ExecPluginLabel),
-			sourceWrappedNativeToken:    cciptypes.Address(sourceWrappedNative.String()),
-			destChainSelector:           destChainSelector,
-			priceRegistryProvider:       ccipdataprovider.NewEvmPriceRegistry(params.destChain.LogPoller(), params.destChain.Client(), execLggr, ccip.ExecPluginLabel),
-			tokenPoolBatchedReader:      tokenPoolBatchedReader,
-			tokenDataWorker:             tokenBackgroundWorker,
-			metricsCollector:            metricsCollector,
-			chainHealthcheck:            chainHealthcheck,
+			lggr:                          execLggr,
+			onRampReader:                  onRampReader,
+			commitStoreReader:             commitStoreReader,
+			offRampReader:                 offRampReader,
+			sourcePriceRegistryProvider:   ccipdataprovider.NewEvmPriceRegistry(params.sourceChain.LogPoller(), params.sourceChain.Client(), execLggr, ccip.ExecPluginLabel),
+			sourceWrappedNativeToken:      cciptypes.Address(sourceWrappedNative.String()),
+			destChainSelector:             destChainSelector,
+			priceRegistryProvider:         ccipdataprovider.NewEvmPriceRegistry(params.destChain.LogPoller(), params.destChain.Client(), execLggr, ccip.ExecPluginLabel),
+			tokenPoolBatchedReader:        tokenPoolBatchedReader,
+			tokenDataWorker:               tokenBackgroundWorker,
+			metricsCollector:              metricsCollector,
+			chainHealthcheck:              chainHealthcheck,
+			newReportingPluginRetryConfig: defaultNewReportingPluginRetryConfig,
 		}, &ccipcommon.BackfillArgs{
 			SourceLP:         params.sourceChain.LogPoller(),
 			DestLP:           params.destChain.LogPoller(),
