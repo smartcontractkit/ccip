@@ -379,8 +379,15 @@ func (ccipModule *CCIPCommon) LoadContractAddresses(conf *laneconfig.LaneConfig,
 func (ccipModule *CCIPCommon) ApproveTokens() error {
 	isApproved := false
 	for _, token := range ccipModule.BridgeTokens {
+		// TODO: We send all token funds back to the CCIP Deployer account, which isn't particularly realistic.
+		// See CCIP-2477
 		if token.OwnerWallet.Address() != ccipModule.ChainClient.GetDefaultWallet().Address() {
-			err := token.Transfer(token.OwnerWallet, ccipModule.ChainClient.GetDefaultWallet().Address(), ApprovedAmountToRouter)
+			tokenBalance, err := token.BalanceOf(context.Background(), token.OwnerWallet.Address())
+			if err != nil {
+				return fmt.Errorf("failed to get balance of token %s: %w", token.ContractAddress.Hex(), err)
+			}
+			tokenBalance.Div(tokenBalance, big.NewInt(2)) // Send half of the balance to the default wallet
+			err = token.Transfer(token.OwnerWallet, ccipModule.ChainClient.GetDefaultWallet().Address(), tokenBalance)
 			if err != nil {
 				return fmt.Errorf("failed to transfer token from '%s' to '%s' %s: %w",
 					token.ContractAddress.Hex(), token.OwnerAddress.Hex(), ccipModule.ChainClient.GetDefaultWallet().Address(), err,
@@ -970,7 +977,7 @@ func (ccipModule *CCIPCommon) DeployContracts(
 				}
 				ccipModule.BridgeTokenPools = append(ccipModule.BridgeTokenPools, btp)
 
-				err = btp.AddLiquidity(token.Approve, token.Address(), ccipModule.poolFunds)
+				err = btp.AddLiquidity(token, token.OwnerWallet, ccipModule.poolFunds)
 				if err != nil {
 					return fmt.Errorf("adding liquidity token to dest pool shouldn't fail %w", err)
 				}

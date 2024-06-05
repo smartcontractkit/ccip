@@ -130,7 +130,9 @@ func TestSmokeCCIPRateLimit(t *testing.T) {
 				addFund := func(ccipCommon *actions.CCIPCommon) {
 					for i, btp := range ccipCommon.BridgeTokenPools {
 						token := ccipCommon.BridgeTokens[i]
-						err := btp.AddLiquidity(token.Approve, token.Address(), new(big.Int).Mul(AggregatedRateLimitCapacity, big.NewInt(20)))
+						err := btp.AddLiquidity(
+							token, token.OwnerWallet, new(big.Int).Mul(AggregatedRateLimitCapacity, big.NewInt(20)),
+						)
 						require.NoError(t, err)
 					}
 				}
@@ -147,7 +149,9 @@ func TestSmokeCCIPRateLimit(t *testing.T) {
 			require.NoError(t, err)
 			tc.lane.Logger.Info().Interface("rate limit", prevRLOnRamp).Msg("Initial OnRamp rate limiter state")
 
-			prevOnRampRLTokenPool, err := src.Common.BridgeTokenPools[0].Instance.GetCurrentOutboundRateLimiterState(nil, tc.lane.Source.DestChainSelector) // TODO RENS maybe?
+			prevOnRampRLTokenPool, err := src.Common.BridgeTokenPools[0].Instance.GetCurrentOutboundRateLimiterState(
+				nil, tc.lane.Source.DestChainSelector,
+			) // TODO RENS maybe?
 			require.NoError(t, err)
 			tc.lane.Logger.Info().
 				Interface("rate limit", prevOnRampRLTokenPool).
@@ -165,7 +169,9 @@ func TestSmokeCCIPRateLimit(t *testing.T) {
 				)
 			}
 
-			prevOffRampRLTokenPool, err := tc.lane.Dest.Common.BridgeTokenPools[0].Instance.GetCurrentInboundRateLimiterState(nil, tc.lane.Dest.SourceChainSelector) // TODO RENS maybe?
+			prevOffRampRLTokenPool, err := tc.lane.Dest.Common.BridgeTokenPools[0].Instance.GetCurrentInboundRateLimiterState(
+				nil, tc.lane.Dest.SourceChainSelector,
+			) // TODO RENS maybe?
 			require.NoError(t, err)
 			tc.lane.Logger.Info().
 				Interface("rate limit", prevOffRampRLTokenPool).
@@ -239,7 +245,9 @@ func TestSmokeCCIPRateLimit(t *testing.T) {
 			src.TransferAmount[0] = rlOnRamp.Tokens
 			tc.lane.Logger.Info().Str("tokensToSend", rlOnRamp.Tokens.String()).Msg("Aggregated Capacity")
 			// approve the tokens
-			require.NoError(t, src.Common.BridgeTokens[0].Approve(src.Common.BridgeTokens[0].OwnerWallet, src.Common.Router.Address(), src.TransferAmount[0]))
+			require.NoError(t, src.Common.BridgeTokens[0].Approve(
+				tc.lane.Source.Common.ChainClient.GetDefaultWallet(), src.Common.Router.Address(), src.TransferAmount[0]),
+			)
 			require.NoError(t, tc.lane.Source.Common.ChainClient.WaitForEvents())
 			failedTx, _, _, err := tc.lane.Source.SendRequest(
 				tc.lane.Dest.ReceiverDapp.EthAddress,
@@ -367,7 +375,9 @@ func TestSmokeCCIPRateLimit(t *testing.T) {
 			tc.lane.Logger.Info().Str("tokensToSend", tokensToSend.String()).Msg("More than TokenPool Rate")
 			src.TransferAmount[0] = tokensToSend
 			// approve the tokens
-			require.NoError(t, src.Common.BridgeTokens[0].Approve(src.Common.BridgeTokens[0].OwnerWallet, src.Common.Router.Address(), src.TransferAmount[0]))
+			require.NoError(t, src.Common.BridgeTokens[0].Approve(
+				src.Common.ChainClient.GetDefaultWallet(), src.Common.Router.Address(), src.TransferAmount[0]),
+			)
 			require.NoError(t, tc.lane.Source.Common.ChainClient.WaitForEvents())
 			failedTx, _, _, err = tc.lane.Source.SendRequest(
 				tc.lane.Dest.ReceiverDapp.EthAddress,
@@ -441,7 +451,9 @@ func TestSmokeCCIPSelfServeRateLimitOnRamp(t *testing.T) {
 				addFund := func(ccipCommon *actions.CCIPCommon) {
 					for i, btp := range ccipCommon.BridgeTokenPools {
 						token := ccipCommon.BridgeTokens[i]
-						err := btp.AddLiquidity(token.Approve, token.Address(), new(big.Int).Mul(aggregateRateLimit, big.NewInt(20)))
+						err := btp.AddLiquidity(
+							token, ccipCommon.ChainClient.GetDefaultWallet(), new(big.Int).Mul(aggregateRateLimit, big.NewInt(20)),
+						)
 						require.NoError(t, err)
 					}
 				}
@@ -580,7 +592,9 @@ func TestSmokeCCIPSelfServeRateLimitOffRamp(t *testing.T) {
 				addFund := func(ccipCommon *actions.CCIPCommon) {
 					for i, btp := range ccipCommon.BridgeTokenPools {
 						token := ccipCommon.BridgeTokens[i]
-						err := btp.AddLiquidity(token.Approve, token.Address(), new(big.Int).Mul(aggregateRateLimit, big.NewInt(20)))
+						err := btp.AddLiquidity(
+							token, ccipCommon.ChainClient.GetDefaultWallet(), new(big.Int).Mul(aggregateRateLimit, big.NewInt(20)),
+						)
 						require.NoError(t, err)
 					}
 				}

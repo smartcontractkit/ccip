@@ -214,25 +214,39 @@ func (token *ERC20Token) Allowance(owner, spender string) (*big.Int, error) {
 	return allowance, nil
 }
 
-// Approve approves the spender to spend the given amount of tokens on behalf of the owner
+// Approve approves the spender to spend the given amount of tokens on behalf of another account
 // https://docs.openzeppelin.com/contracts/2.x/api/token/erc20#IERC20-approve-address-uint256-
 func (token *ERC20Token) Approve(onBehalf *blockchain.EthereumWallet, spender string, amount *big.Int) error {
+	onBehalfBalance, err := token.BalanceOf(context.Background(), onBehalf.Address())
+	if err != nil {
+		return fmt.Errorf("failed to get balance of onBehalf: %w", err)
+	}
+	if onBehalfBalance.Cmp(amount) < 0 {
+		return fmt.Errorf("onBehalf '%s' does not have enough balance to approve", onBehalf.Address())
+	}
+	currentAllowance, err := token.Allowance(onBehalf.Address(), spender)
+	if err != nil {
+		return fmt.Errorf("failed to get current allowance for '%s' on behalf of '%s': %w", spender, onBehalf.Address(), err)
+	}
 	opts, err := token.client.TransactionOpts(onBehalf)
 	if err != nil {
 		return fmt.Errorf("failed to get transaction options: %w", err)
 	}
-	token.logger.Info().
+	log := token.logger.Info().
 		Str("On Behalf Of", onBehalf.Address()).
+		Str("On Behalf Of Balance", onBehalfBalance.String()).
 		Str("Spender", spender).
+		Str("Spender Current Allowance", currentAllowance.String()).
 		Str("Token", token.Address()).
 		Str("Amount", amount.String()).
 		Uint64("Nonce", opts.Nonce.Uint64()).
-		Str(Network, token.client.GetNetworkConfig().Name).
-		Msg("Approving ERC20 Transfer")
+		Str(Network, token.client.GetNetworkConfig().Name)
 	tx, err := token.instance.Approve(opts, common.HexToAddress(spender), amount)
 	if err != nil {
+		log.Err(err).Msg("Error Approving ERC20 Transfer")
 		return fmt.Errorf("failed to approve ERC20: %w", err)
 	}
+	log.Str("Hash", tx.Hash().Hex()).Msg("Approving ERC20 Transfer")
 	return token.client.ProcessTransaction(tx)
 }
 
@@ -650,17 +664,16 @@ func (pool *TokenPool) RemoveLiquidity(amount *big.Int) error {
 	return pool.client.ProcessTransaction(tx)
 }
 
-type tokenApproveFn func(*blockchain.EthereumWallet, string, *big.Int) error
-
-func (pool *TokenPool) AddLiquidity(approveFn tokenApproveFn, tokenAddr string, amount *big.Int) error {
+// AddLiquidity approves the token pool to spend the given amount of tokens from the given wallet
+func (pool *TokenPool) AddLiquidity(token *ERC20Token, fromWallet *blockchain.EthereumWallet, amount *big.Int) error {
 	if !pool.IsLockRelease() {
 		return fmt.Errorf("pool is not a lock release pool, cannot add liquidity")
 	}
 	pool.logger.Info().
-		Str("Link Token", tokenAddr).
+		Str("Token", token.Address()).
 		Str("Token Pool", pool.Address()).
-		Msg("Initiating transferring of token to token pool")
-	err := approveFn(pool.OwnerWallet, pool.Address(), amount)
+		Msg("Initiating adding liquidity to token pool")
+	err := token.Approve(fromWallet, pool.Address(), amount)
 	if err != nil {
 		return fmt.Errorf("failed to approve token transfer: %w", err)
 	}
@@ -689,7 +702,7 @@ func (pool *TokenPool) AddLiquidity(approveFn tokenApproveFn, tokenAddr string, 
 	}
 	pool.logger.Info().
 		Str("Token Pool", pool.Address()).
-		Str("Link Token", tokenAddr).
+		Str("Token", token.Address()).
 		Str(Network, pool.client.GetNetworkConfig().Name).
 		Msg("Liquidity added")
 	return pool.client.ProcessTransaction(tx)
