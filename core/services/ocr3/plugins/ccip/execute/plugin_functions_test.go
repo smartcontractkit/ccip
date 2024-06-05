@@ -6,8 +6,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/smartcontractkit/ccipocr3/internal/model"
 	"github.com/smartcontractkit/libocr/commontypes"
+
+	"github.com/smartcontractkit/ccipocr3/internal/model"
 )
 
 func Test_validateObserverReadingEligibility(t *testing.T) {

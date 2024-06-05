@@ -7,12 +7,13 @@ import (
 	"sync/atomic"
 	"time"
 
-	//cache "github.com/smartcontractkit/ccipocr3/internal/copypaste/commit_roots_cache"
-	"github.com/smartcontractkit/ccipocr3/internal/model"
-	"github.com/smartcontractkit/ccipocr3/internal/reader"
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+
+	//cache "github.com/smartcontractkit/ccipocr3/internal/copypaste/commit_roots_cache"
+	"github.com/smartcontractkit/ccipocr3/internal/model"
+	"github.com/smartcontractkit/ccipocr3/internal/reader"
 )
 
 // Plugin implements the main ocr3 plugin logic.

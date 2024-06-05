@@ -3,9 +3,10 @@ package commit
 import (
 	"context"
 
-	"github.com/smartcontractkit/ccipocr3/internal/model"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"google.golang.org/grpc"
+
+	"github.com/smartcontractkit/ccipocr3/internal/model"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 )
@@ -17,6 +18,7 @@ type PluginFactoryConstructor struct{}
 func NewPluginFactoryConstructor() *PluginFactoryConstructor {
 	return &PluginFactoryConstructor{}
 }
+
 func (p PluginFactoryConstructor) NewReportingPluginFactory(
 	ctx context.Context,
 	config core.ReportingPluginServiceConfig,

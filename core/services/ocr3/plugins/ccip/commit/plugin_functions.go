@@ -6,15 +6,16 @@ import (
 	"sort"
 
 	mapset "github.com/deckarep/golang-set/v2"
+	"github.com/smartcontractkit/libocr/commontypes"
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+	"golang.org/x/sync/errgroup"
+
 	"github.com/smartcontractkit/ccipocr3/internal/codec"
 	"github.com/smartcontractkit/ccipocr3/internal/libs/hashlib"
 	"github.com/smartcontractkit/ccipocr3/internal/libs/merklemulti"
 	"github.com/smartcontractkit/ccipocr3/internal/libs/slicelib"
 	"github.com/smartcontractkit/ccipocr3/internal/model"
 	"github.com/smartcontractkit/ccipocr3/internal/reader"
-	"github.com/smartcontractkit/libocr/commontypes"
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
-	"golang.org/x/sync/errgroup"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 )

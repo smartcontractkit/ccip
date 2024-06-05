@@ -3,8 +3,9 @@ package slicelib
 import (
 	"testing"
 
-	"github.com/smartcontractkit/ccipocr3/internal/model"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/smartcontractkit/ccipocr3/internal/model"
 )
 
 func TestBigIntSortedMiddle(t *testing.T) {

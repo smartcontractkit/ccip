@@ -4,9 +4,10 @@ import (
 	"context"
 	"math/big"
 
-	"github.com/smartcontractkit/ccipocr3/internal/reader"
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	"github.com/stretchr/testify/mock"
+
+	"github.com/smartcontractkit/ccipocr3/internal/reader"
 )
 
 type TokenPricesReader struct {

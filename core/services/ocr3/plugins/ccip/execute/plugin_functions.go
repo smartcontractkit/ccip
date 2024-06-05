@@ -7,8 +7,9 @@ import (
 
 	mapset "github.com/deckarep/golang-set/v2"
 
-	"github.com/smartcontractkit/ccipocr3/internal/model"
 	"github.com/smartcontractkit/libocr/commontypes"
+
+	"github.com/smartcontractkit/ccipocr3/internal/model"
 )
 
 // validateObserverReadingEligibility checks if the observer is eligible to observe the messages it observed.

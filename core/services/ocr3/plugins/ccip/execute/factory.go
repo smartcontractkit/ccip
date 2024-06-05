@@ -3,8 +3,9 @@ package commit
 import (
 	"context"
 
-	"github.com/smartcontractkit/ccipocr3/internal/model"
 	"google.golang.org/grpc"
+
+	"github.com/smartcontractkit/ccipocr3/internal/model"
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 
