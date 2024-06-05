@@ -2,7 +2,6 @@
 pragma solidity 0.8.19;
 
 import {BaseTest} from "../BaseTest.t.sol";
-
 import {EnumerableMapAddressesBytes32Helper} from "./EnumerableMapAddressesBytes32Helper.sol";
 import {EnumerableMapAddressesHelper} from "./EnumerableMapAddressesHelper.sol";
 

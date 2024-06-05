@@ -6,10 +6,11 @@ import {IPriceRegistry} from "./interfaces/IPriceRegistry.sol";
 
 import {OwnerIsCreator} from "./../shared/access/OwnerIsCreator.sol";
 import {EnumerableMapAddresses} from "./../shared/enumerable/EnumerableMapAddresses.sol";
-import {EnumerableSet} from "./../vendor/openzeppelin-solidity/v4.7.3/contracts/utils/structs/EnumerableSet.sol";
 import {Client} from "./libraries/Client.sol";
 import {RateLimiter} from "./libraries/RateLimiter.sol";
 import {USDPriceWith18Decimals} from "./libraries/USDPriceWith18Decimals.sol";
+
+import {EnumerableSet} from "./../vendor/openzeppelin-solidity/v4.7.3/contracts/utils/structs/EnumerableSet.sol";
 
 /// @notice The aggregate rate limiter is a wrapper of the token bucket rate limiter
 /// which permits rate limiting based on the aggregate value of a group of
@@ -31,11 +32,11 @@ contract MultiAggregateRateLimiter is IMessageInterceptor, OwnerIsCreator {
   event RateLimiterConfigUpdated(uint64 indexed remoteChainSelector, bool isOutgoingLane, RateLimiter.Config config);
   event PriceRegistrySet(address newPriceRegistry);
   event TokenAggregateRateLimitAdded(uint64 remoteChainSelector, bytes32 remoteToken, address localToken);
-  event TokenAggregateRateLimitRemoved(uint64 remoteChainSelector, bytes32 remoteToken, address localToken);
+  event TokenAggregateRateLimitRemoved(uint64 remoteChainSelector, address localToken);
   event AuthorizedCallerAdded(address caller);
   event AuthorizedCallerRemoved(address caller);
 
-  /// @notice RemoteRatelimitToken struct containing the local token address with the chain selector
+  /// @notice RemoteRateLimitToken struct containing the local token address with the chain selector
   /// The struct is used for removals and updates, since the local -> remote token mappings are scoped per-chain
   struct LocalRateLimitToken {
     uint64 remoteChainSelector; // ────╮ Remote chain selector for which to update the rate limit token mapping
@@ -69,7 +70,7 @@ contract MultiAggregateRateLimiter is IMessageInterceptor, OwnerIsCreator {
 
   /// @dev Tokens that should be included in Aggregate Rate Limiting (from local chain (this chain) -> remote),
   /// grouped per-remote chain.
-  mapping(uint64 remoteChainSelector => EnumerableMapAddresses.AddressToBytes32Map) internal
+  mapping(uint64 remoteChainSelector => EnumerableMapAddresses.AddressToBytes32Map tokensLocalToRemote) internal
     s_rateLimitedTokensLocalToRemote;
 
   /// @dev Set of callers that can call the validation functions (this is required since the validations modify state)
@@ -214,7 +215,7 @@ contract MultiAggregateRateLimiter is IMessageInterceptor, OwnerIsCreator {
   /// @return localTokens The local chain representation of the tokens that are rate limited.
   /// @return remoteTokens The remote representation of the tokens that are rate limited.
   /// @dev the order of IDs in the list is **not guaranteed**, therefore, if ordering matters when
-  /// making successive calls, one should keep the blockheight constant to ensure a consistent result.
+  /// making successive calls, one should keep the block height constant to ensure a consistent result.
   function getAllRateLimitTokens(uint64 remoteChainSelector)
     external
     view
@@ -244,12 +245,8 @@ contract MultiAggregateRateLimiter is IMessageInterceptor, OwnerIsCreator {
       address localToken = removes[i].localToken;
       uint64 remoteChainSelector = removes[i].remoteChainSelector;
 
-      // Skip removing token if it is unconfigured
-      (bool containsToken, bytes32 remoteToken) =
-        s_rateLimitedTokensLocalToRemote[remoteChainSelector].tryGet(localToken);
-      if (containsToken) {
-        s_rateLimitedTokensLocalToRemote[remoteChainSelector].remove(localToken);
-        emit TokenAggregateRateLimitRemoved(remoteChainSelector, remoteToken, localToken);
+      if (s_rateLimitedTokensLocalToRemote[remoteChainSelector].remove(localToken)) {
+        emit TokenAggregateRateLimitRemoved(remoteChainSelector, localToken);
       }
     }
 
@@ -312,6 +309,15 @@ contract MultiAggregateRateLimiter is IMessageInterceptor, OwnerIsCreator {
   /// @notice Updates the callers that are authorized to call the message validation functions
   /// @param authorizedCallerArgs Callers to add and remove
   function _applyAuthorizedCallerUpdates(AuthorizedCallerArgs memory authorizedCallerArgs) internal {
+    address[] memory removedCallers = authorizedCallerArgs.removedCallers;
+    for (uint256 i = 0; i < removedCallers.length; ++i) {
+      address caller = removedCallers[i];
+
+      if (s_authorizedCallers.remove(caller)) {
+        emit AuthorizedCallerRemoved(caller);
+      }
+    }
+
     address[] memory addedCallers = authorizedCallerArgs.addedCallers;
     for (uint256 i = 0; i < addedCallers.length; ++i) {
       address caller = addedCallers[i];
@@ -322,15 +328,6 @@ contract MultiAggregateRateLimiter is IMessageInterceptor, OwnerIsCreator {
 
       s_authorizedCallers.add(caller);
       emit AuthorizedCallerAdded(caller);
-    }
-
-    address[] memory removedCallers = authorizedCallerArgs.removedCallers;
-    for (uint256 i = 0; i < removedCallers.length; ++i) {
-      address caller = removedCallers[i];
-
-      if (s_authorizedCallers.remove(caller)) {
-        emit AuthorizedCallerRemoved(caller);
-      }
     }
   }
 }

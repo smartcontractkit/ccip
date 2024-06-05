@@ -265,11 +265,11 @@ contract MultiAggregateRateLimiter_setAuthorizedCallers is MultiAggregateRateLim
     assertEq(s_rateLimiter.getAllAuthorizedCallers(), s_authorizedCallers);
 
     vm.expectEmit();
+    emit MultiAggregateRateLimiter.AuthorizedCallerRemoved(removedCallers[0]);
+    vm.expectEmit();
     emit MultiAggregateRateLimiter.AuthorizedCallerAdded(addedCallers[0]);
     vm.expectEmit();
     emit MultiAggregateRateLimiter.AuthorizedCallerAdded(addedCallers[1]);
-    vm.expectEmit();
-    emit MultiAggregateRateLimiter.AuthorizedCallerRemoved(removedCallers[0]);
 
     s_rateLimiter.applyAuthorizedCallerUpdates(
       MultiAggregateRateLimiter.AuthorizedCallerArgs({addedCallers: addedCallers, removedCallers: removedCallers})
@@ -277,32 +277,37 @@ contract MultiAggregateRateLimiter_setAuthorizedCallers is MultiAggregateRateLim
 
     // Order of the set changes on removal
     address[] memory expectedCallers = new address[](3);
-    expectedCallers[0] = addedCallers[1];
-    expectedCallers[1] = s_authorizedCallers[1];
-    expectedCallers[2] = addedCallers[0];
+    expectedCallers[0] = s_authorizedCallers[1];
+    expectedCallers[1] = addedCallers[0];
+    expectedCallers[2] = addedCallers[1];
 
     assertEq(s_rateLimiter.getAllAuthorizedCallers(), expectedCallers);
   }
 
-  function test_AddThenRemove_Success() public {
+  function test_RemoveThenAdd_Success() public {
     address[] memory addedCallers = new address[](1);
-    addedCallers[0] = address(42);
+    addedCallers[0] = s_authorizedCallers[0];
 
     address[] memory removedCallers = new address[](1);
-    removedCallers[0] = address(42);
+    removedCallers[0] = s_authorizedCallers[0];
 
     assertEq(s_rateLimiter.getAllAuthorizedCallers(), s_authorizedCallers);
 
     vm.expectEmit();
-    emit MultiAggregateRateLimiter.AuthorizedCallerAdded(addedCallers[0]);
+    emit MultiAggregateRateLimiter.AuthorizedCallerRemoved(removedCallers[0]);
+
     vm.expectEmit();
-    emit MultiAggregateRateLimiter.AuthorizedCallerRemoved(addedCallers[0]);
+    emit MultiAggregateRateLimiter.AuthorizedCallerAdded(addedCallers[0]);
 
     s_rateLimiter.applyAuthorizedCallerUpdates(
       MultiAggregateRateLimiter.AuthorizedCallerArgs({addedCallers: addedCallers, removedCallers: removedCallers})
     );
 
-    assertEq(s_rateLimiter.getAllAuthorizedCallers(), s_authorizedCallers);
+    address[] memory expectedCallers = new address[](2);
+    expectedCallers[0] = s_authorizedCallers[1];
+    expectedCallers[1] = s_authorizedCallers[0];
+
+    assertEq(s_rateLimiter.getAllAuthorizedCallers(), expectedCallers);
   }
 
   function test_SkipRemove_Success() public {
@@ -774,9 +779,7 @@ contract MultiAggregateRateLimiter_updateRateLimitTokens is MultiAggregateRateLi
 
     for (uint256 i = 0; i < removes.length; ++i) {
       vm.expectEmit();
-      emit MultiAggregateRateLimiter.TokenAggregateRateLimitRemoved(
-        CHAIN_SELECTOR_1, adds[i].remoteToken, removes[i].localToken
-      );
+      emit MultiAggregateRateLimiter.TokenAggregateRateLimitRemoved(CHAIN_SELECTOR_1, removes[i].localToken);
     }
 
     s_rateLimiter.updateRateLimitTokens(removes, new MultiAggregateRateLimiter.RateLimitTokenArgs[](0));
