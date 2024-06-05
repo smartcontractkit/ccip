@@ -21,9 +21,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
-	ccipdatamocks "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/prices"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/tokendata"
 )
 
@@ -478,6 +476,48 @@ func TestBatchingStrategies(t *testing.T) {
 				newMessageExecState(12, [32]byte{}, InvalidNonce),
 			},
 		},
+		{
+			name: "unordered messages then ordered messages",
+			reqs: []cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta{
+				{
+					EVM2EVMMessage: cciptypes.EVM2EVMMessage{
+						SequenceNumber: 9,
+						FeeTokenAmount: big.NewInt(1e9),
+						Sender:         sender1,
+						Nonce:          0,
+						GasLimit:       big.NewInt(1),
+						Data:           bytes.Repeat([]byte{'a'}, 1000),
+						FeeToken:       srcNative,
+						MessageID:      [32]byte{},
+					},
+					BlockTimestamp: time.Date(2010, 1, 1, 12, 12, 12, 0, time.UTC),
+				},
+				{
+					EVM2EVMMessage: cciptypes.EVM2EVMMessage{
+						SequenceNumber: 10,
+						FeeTokenAmount: big.NewInt(1e9),
+						Sender:         sender1,
+						Nonce:          5,
+						GasLimit:       big.NewInt(1),
+						Data:           bytes.Repeat([]byte{'a'}, 1000),
+						FeeToken:       srcNative,
+						MessageID:      [32]byte{},
+					},
+					BlockTimestamp: time.Date(2010, 1, 1, 12, 12, 12, 0, time.UTC),
+				},
+			},
+			inflight:              big.NewInt(0),
+			tokenLimit:            big.NewInt(0),
+			destGasPrice:          big.NewInt(10),
+			srcPrices:             map[cciptypes.Address]*big.Int{srcNative: big.NewInt(1)},
+			dstPrices:             map[cciptypes.Address]*big.Int{destNative: big.NewInt(1)},
+			offRampNoncesBySender: map[cciptypes.Address]uint64{sender1: 4},
+			expectedSeqNrs:        []ccip.ObservedMessage{{SeqNr: uint64(9)}, {SeqNr: uint64(10)}},
+			expectedStates: []messageExecStatus{
+				newMessageExecState(9, [32]byte{}, AddedToBatch),
+				newMessageExecState(10, [32]byte{}, AddedToBatch),
+			},
+		},
 	}
 
 	// TODO: add following scenarios
@@ -490,60 +530,60 @@ func TestBatchingStrategies(t *testing.T) {
 	// 3 messages, 1st is ZKO, 2nd is not ZKO, 3rd is not ZKO => batch with 2nd
 	// 3 messages, 1st is ZKO, 2nd is ZKO, 3rd is not ZKO => batch with 3rd
 	specificZkOverflowTestCases := []testCase{
-		// {
-		// 	name: "batch size is 1",
-		// 	reqs: []cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta{
-		// 		{
-		// 			EVM2EVMMessage: cciptypes.EVM2EVMMessage{
-		// 				SequenceNumber: 10,
-		// 				FeeTokenAmount: big.NewInt(1e9),
-		// 				Sender:         sender1,
-		// 				Nonce:          1,
-		// 				GasLimit:       big.NewInt(1),
-		// 				Data:           bytes.Repeat([]byte{'a'}, 1000),
-		// 				FeeToken:       srcNative,
-		// 				MessageID:      [32]byte{},
-		// 			},
-		// 			BlockTimestamp: time.Date(2010, 1, 1, 12, 12, 12, 0, time.UTC),
-		// 		},
-		// 		{
-		// 			EVM2EVMMessage: cciptypes.EVM2EVMMessage{
-		// 				SequenceNumber: 11,
-		// 				FeeTokenAmount: big.NewInt(1e9),
-		// 				Sender:         sender1,
-		// 				Nonce:          2,
-		// 				GasLimit:       big.NewInt(1),
-		// 				Data:           bytes.Repeat([]byte{'a'}, 1000),
-		// 				FeeToken:       srcNative,
-		// 				MessageID:      [32]byte{},
-		// 			},
-		// 			BlockTimestamp: time.Date(2010, 1, 1, 12, 12, 12, 0, time.UTC),
-		// 		},
-		// 		{
-		// 			EVM2EVMMessage: cciptypes.EVM2EVMMessage{
-		// 				SequenceNumber: 12,
-		// 				FeeTokenAmount: big.NewInt(1e9),
-		// 				Sender:         sender1,
-		// 				Nonce:          3,
-		// 				GasLimit:       big.NewInt(1),
-		// 				Data:           bytes.Repeat([]byte{'a'}, 1000),
-		// 				FeeToken:       srcNative,
-		// 				MessageID:      [32]byte{},
-		// 			},
-		// 			BlockTimestamp: time.Date(2010, 1, 1, 12, 12, 12, 0, time.UTC),
-		// 		},
-		// 	},
-		// 	inflight:              big.NewInt(0),
-		// 	tokenLimit:            big.NewInt(0),
-		// 	destGasPrice:          big.NewInt(10),
-		// 	srcPrices:             map[cciptypes.Address]*big.Int{srcNative: big.NewInt(1)},
-		// 	dstPrices:             map[cciptypes.Address]*big.Int{destNative: big.NewInt(1)},
-		// 	offRampNoncesBySender: map[cciptypes.Address]uint64{sender1: 0},
-		// 	expectedSeqNrs:        []ccip.ObservedMessage{{SeqNr: uint64(10)}},
-		// 	expectedStates: []messageExecStatus{
-		// 		newMessageExecState(10, [32]byte{}, AddedToBatch),
-		// 	},
-		// },
+		{
+			name: "batch size is 1",
+			reqs: []cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta{
+				{
+					EVM2EVMMessage: cciptypes.EVM2EVMMessage{
+						SequenceNumber: 10,
+						FeeTokenAmount: big.NewInt(1e9),
+						Sender:         sender1,
+						Nonce:          1,
+						GasLimit:       big.NewInt(1),
+						Data:           bytes.Repeat([]byte{'a'}, 1000),
+						FeeToken:       srcNative,
+						MessageID:      [32]byte{},
+					},
+					BlockTimestamp: time.Date(2010, 1, 1, 12, 12, 12, 0, time.UTC),
+				},
+				{
+					EVM2EVMMessage: cciptypes.EVM2EVMMessage{
+						SequenceNumber: 11,
+						FeeTokenAmount: big.NewInt(1e9),
+						Sender:         sender1,
+						Nonce:          2,
+						GasLimit:       big.NewInt(1),
+						Data:           bytes.Repeat([]byte{'a'}, 1000),
+						FeeToken:       srcNative,
+						MessageID:      [32]byte{},
+					},
+					BlockTimestamp: time.Date(2010, 1, 1, 12, 12, 12, 0, time.UTC),
+				},
+				{
+					EVM2EVMMessage: cciptypes.EVM2EVMMessage{
+						SequenceNumber: 12,
+						FeeTokenAmount: big.NewInt(1e9),
+						Sender:         sender1,
+						Nonce:          3,
+						GasLimit:       big.NewInt(1),
+						Data:           bytes.Repeat([]byte{'a'}, 1000),
+						FeeToken:       srcNative,
+						MessageID:      [32]byte{},
+					},
+					BlockTimestamp: time.Date(2010, 1, 1, 12, 12, 12, 0, time.UTC),
+				},
+			},
+			inflight:              big.NewInt(0),
+			tokenLimit:            big.NewInt(0),
+			destGasPrice:          big.NewInt(10),
+			srcPrices:             map[cciptypes.Address]*big.Int{srcNative: big.NewInt(1)},
+			dstPrices:             map[cciptypes.Address]*big.Int{destNative: big.NewInt(1)},
+			offRampNoncesBySender: map[cciptypes.Address]uint64{sender1: 0},
+			expectedSeqNrs:        []ccip.ObservedMessage{{SeqNr: uint64(10)}},
+			expectedStates: []messageExecStatus{
+				newMessageExecState(10, [32]byte{}, AddedToBatch),
+			},
+		},
 		{
 			name: "snooze failed message and add next message to batch",
 			reqs: []cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta{
@@ -599,6 +639,7 @@ func TestBatchingStrategies(t *testing.T) {
 				newMessageExecState(11, msgId2, AddedToBatch),
 			},
 			mockTxm: func(m *MockTxmFake) {
+				m.Mock = mock.Mock{} // reset mock
 				m.On("FindTxsByIdempotencyPrefix", mock.Anything, hexutil.Encode(msgId1[:])).Return([]status{Failed}, nil)
 				m.On("FindTxsByIdempotencyPrefix", mock.Anything, hexutil.Encode(msgId2[:])).Return([]status{}, nil)
 				m.On("FindTxsByIdempotencyPrefix", mock.Anything, hexutil.Encode(msgId3[:])).Return([]status{}, nil)
@@ -630,10 +671,7 @@ func runBatchingStrategyTests(t *testing.T, strategy BatchingStrategy, available
 	for _, tc := range testCases {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			offRamp, _ := testhelpers.NewFakeOffRamp(t)
 			lggr := logger.TestLogger(t)
-
-			offRamp.SetSenderNonces(tc.offRampNoncesBySender)
 
 			gasPriceEstimator := prices.NewMockGasPriceEstimatorExec(t)
 			if tc.expectedSeqNrs != nil {
@@ -644,12 +682,8 @@ func runBatchingStrategyTests(t *testing.T, strategy BatchingStrategy, available
 				gasPriceEstimator.On("EstimateMsgCostUSD", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(big.NewInt(0), errors.New("error"))
 			}
 
-			// Mock calls to reader.
-			mockOffRampReader := ccipdatamocks.NewOffRampReader(t)
-			mockOffRampReader.On("ListSenderNonces", mock.Anything, mock.Anything).Return(tc.offRampNoncesBySender, nil).Maybe()
-
 			// default case for ZKOverflowBatchingStrategy
-			if strategyType := reflect.TypeOf(strategy); tc.mockTxm == nil && strategyType == reflect.TypeOf(&ZKOverflowBatchingStrategy{}) && tc.expectedSeqNrs != nil {
+			if strategyType := reflect.TypeOf(strategy); tc.mockTxm == nil && strategyType == reflect.TypeOf(&ZKOverflowBatchingStrategy{}) {
 				strategy.(*ZKOverflowBatchingStrategy).txManagerFake.(*MockTxmFake).On("FindTxsByIdempotencyPrefix", mock.Anything, mock.Anything).Return([]status{}, nil)
 			}
 

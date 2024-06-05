@@ -74,7 +74,9 @@ func (s *BestEffortBatchingStrategy) BuildBatch(
 		batchCtx.availableGas -= messageMaxGas
 		batchCtx.availableDataLen -= len(msg.Data)
 		batchCtx.aggregateTokenLimit.Sub(batchCtx.aggregateTokenLimit, msgValue)
-		batchCtx.expectedNonces[msg.Sender] = msg.Nonce + 1
+		if msg.Nonce > 0 {
+			batchCtx.expectedNonces[msg.Sender] = msg.Nonce + 1
+		}
 		batchBuilder.addToBatch(msg, tokenData)
 
 		msgLggr.Infow(
@@ -168,11 +170,10 @@ func (bs *ZKOverflowBatchingStrategy) BuildBatch(
 		batchCtx.availableGas -= messageMaxGas
 		batchCtx.availableDataLen -= len(msg.Data)
 		batchCtx.aggregateTokenLimit.Sub(batchCtx.aggregateTokenLimit, msgValue)
-		batchCtx.expectedNonces[msg.Sender] = msg.Nonce + 1
 		batchBuilder.addToBatch(msg, tokenData)
 
 		msgLggr.Infow(
-			"Message added to execution batch",
+			"Message added to ZKOverflow execution batch",
 			"nonce", msg.Nonce,
 			"sender", msg.Sender,
 			"value", msgValue,
