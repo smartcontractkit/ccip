@@ -452,7 +452,7 @@ func TestSmokeCCIPSelfServeRateLimitOnRamp(t *testing.T) {
 					for i, btp := range ccipCommon.BridgeTokenPools {
 						token := ccipCommon.BridgeTokens[i]
 						err := btp.AddLiquidity(
-							token, ccipCommon.ChainClient.GetDefaultWallet(), new(big.Int).Mul(aggregateRateLimit, big.NewInt(20)),
+							token, token.OwnerWallet, new(big.Int).Mul(aggregateRateLimit, big.NewInt(20)),
 						)
 						require.NoError(t, err)
 					}
@@ -593,7 +593,7 @@ func TestSmokeCCIPSelfServeRateLimitOffRamp(t *testing.T) {
 					for i, btp := range ccipCommon.BridgeTokenPools {
 						token := ccipCommon.BridgeTokens[i]
 						err := btp.AddLiquidity(
-							token, ccipCommon.ChainClient.GetDefaultWallet(), new(big.Int).Mul(aggregateRateLimit, big.NewInt(20)),
+							token, token.OwnerWallet, new(big.Int).Mul(aggregateRateLimit, big.NewInt(20)),
 						)
 						require.NoError(t, err)
 					}
