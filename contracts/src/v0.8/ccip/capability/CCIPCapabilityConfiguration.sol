@@ -41,6 +41,7 @@ contract CCIPCapabilityConfiguration is ITypeAndVersion, ICapabilityConfiguratio
   error FChainMustBePositive();
   error FTooHigh();
   error InvalidPluginType();
+  error OfframpAddressCannotBeZero();
   error InvalidConfigLength(uint256 length);
   error InvalidConfigStateTransition(ConfigState currentState, ConfigState proposedState);
   error NonExistentConfigTransition();
@@ -89,6 +90,7 @@ contract CCIPCapabilityConfiguration is ITypeAndVersion, ICapabilityConfiguratio
     uint64 chainSelector; //         | The (remote) chain that the configuration is for.
     uint8 F; //                      | The "big F" parameter for the role DON.
     uint64 offchainConfigVersion; // ╯ The version of the offchain configuration.
+    address offramp; // The remote chain offramp+commit store address.
     bytes32[2][] signers; // An associative array that contains (onchain signer public key, p2p id) pairs.
     bytes32[2][] transmitters; // An associative array that contains (transmitter, p2p id) pairs.
     bytes offchainConfig; // The offchain configuration for the OCR3 protocol. Protobuf encoded.
@@ -359,6 +361,10 @@ contract CCIPCapabilityConfiguration is ITypeAndVersion, ICapabilityConfiguratio
       revert InvalidPluginType();
     }
 
+    if (cfg.offramp == address(0)) {
+      revert OfframpAddressCannotBeZero();
+    }
+
     // Check that the chain configuration is set.
     if (!s_chainSelectors.contains(cfg.chainSelector)) {
       revert ChainSelectorNotFound(cfg.chainSelector);
@@ -421,6 +427,7 @@ contract CCIPCapabilityConfiguration is ITypeAndVersion, ICapabilityConfiguratio
         ocr3Config.chainSelector,
         donId,
         ocr3Config.pluginType,
+        ocr3Config.offramp,
         configCount,
         ocr3Config.signers,
         ocr3Config.transmitters,
