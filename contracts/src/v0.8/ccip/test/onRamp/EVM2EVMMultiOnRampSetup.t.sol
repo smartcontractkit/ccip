@@ -283,21 +283,18 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
   }
 
   function _deployOnRamp(
-    address linkToken,
-    address rmnProxy,
-    address priceRegistry,
     uint64 sourceChainSelector,
     address sourceRouter,
     address tokenAdminRegistry
   ) internal returns (EVM2EVMMultiOnRampHelper, bytes32 metadataHash) {
     EVM2EVMMultiOnRampHelper onRamp = new EVM2EVMMultiOnRampHelper(
       EVM2EVMMultiOnRamp.StaticConfig({
-        linkToken: linkToken,
+        linkToken: s_sourceTokens[0],
         chainSelector: sourceChainSelector,
         maxNopFeesJuels: MAX_NOP_FEES_JUELS,
-        rmnProxy: rmnProxy
+        rmnProxy: address(s_mockRMN)
       }),
-      _generateDynamicMultiOnRampConfig(sourceRouter, priceRegistry, tokenAdminRegistry),
+      _generateDynamicMultiOnRampConfig(sourceRouter, address(s_priceRegistry), tokenAdminRegistry),
       _generateDestChainConfigArgs(),
       getOutboundRateLimiterConfig(),
       s_premiumMultiplierWeiPerEthArgs,
@@ -309,21 +306,6 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
     return (
       onRamp,
       keccak256(abi.encode(Internal.EVM_2_EVM_MESSAGE_HASH, sourceChainSelector, DEST_CHAIN_SELECTOR, address(onRamp)))
-    );
-  }
-
-  function _deployOnRamp(
-    uint64 sourceChainSelector,
-    address sourceRouter,
-    address tokenAdminRegistry
-  ) internal returns (EVM2EVMMultiOnRampHelper, bytes32 metadataHash) {
-    return _deployOnRamp(
-      s_sourceTokens[0],
-      address(s_mockRMN),
-      address(s_priceRegistry),
-      sourceChainSelector,
-      sourceRouter,
-      tokenAdminRegistry
     );
   }
 

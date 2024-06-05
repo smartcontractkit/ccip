@@ -90,37 +90,61 @@ contract EVM2EVMMultiOnRamp_constructor is EVM2EVMMultiOnRampSetup {
 
   function test_Constructor_InvalidConfigLinkTokenEqAddressZero_Revert() public {
     vm.expectRevert(EVM2EVMMultiOnRamp.InvalidConfig.selector);
-    _deployOnRamp(
-      address(0),
-      address(s_mockRMN),
-      address(s_priceRegistry),
-      SOURCE_CHAIN_SELECTOR,
-      address(s_sourceRouter),
-      address(s_tokenAdminRegistry)
+    new EVM2EVMMultiOnRampHelper(
+      EVM2EVMMultiOnRamp.StaticConfig({
+        linkToken: address(0),
+        chainSelector: SOURCE_CHAIN_SELECTOR,
+        maxNopFeesJuels: MAX_NOP_FEES_JUELS,
+        rmnProxy: address(s_mockRMN)
+      }),
+      _generateDynamicMultiOnRampConfig(
+        address(s_sourceRouter), address(s_priceRegistry), address(s_tokenAdminRegistry)
+      ),
+      _generateDestChainConfigArgs(),
+      getOutboundRateLimiterConfig(),
+      s_premiumMultiplierWeiPerEthArgs,
+      s_tokenTransferFeeConfigArgs,
+      _getMultiOnRampNopsAndWeights()
     );
   }
 
-  function test_Constructor_InvalidConfigLinkChainSelectorEqZero_Revert() public {
+  function test_Constructor_InvalidConfigChainSelectorEqZero_Revert() public {
     vm.expectRevert(EVM2EVMMultiOnRamp.InvalidConfig.selector);
-    _deployOnRamp(
-      address(s_sourceTokens[0]),
-      address(s_mockRMN),
-      address(s_priceRegistry),
-      0,
-      address(s_sourceRouter),
-      address(s_tokenAdminRegistry)
+    new EVM2EVMMultiOnRampHelper(
+      EVM2EVMMultiOnRamp.StaticConfig({
+        linkToken: s_sourceTokens[0],
+        chainSelector: 0,
+        maxNopFeesJuels: MAX_NOP_FEES_JUELS,
+        rmnProxy: address(s_mockRMN)
+      }),
+      _generateDynamicMultiOnRampConfig(
+        address(s_sourceRouter), address(s_priceRegistry), address(s_tokenAdminRegistry)
+      ),
+      _generateDestChainConfigArgs(),
+      getOutboundRateLimiterConfig(),
+      s_premiumMultiplierWeiPerEthArgs,
+      s_tokenTransferFeeConfigArgs,
+      _getMultiOnRampNopsAndWeights()
     );
   }
 
   function test_Constructor_InvalidConfigRMNProxyEqAddressZero_Revert() public {
     vm.expectRevert(EVM2EVMMultiOnRamp.InvalidConfig.selector);
-    _deployOnRamp(
-      address(s_sourceTokens[0]),
-      address(0),
-      address(s_priceRegistry),
-      SOURCE_CHAIN_SELECTOR,
-      address(s_sourceRouter),
-      address(s_tokenAdminRegistry)
+    new EVM2EVMMultiOnRampHelper(
+      EVM2EVMMultiOnRamp.StaticConfig({
+        linkToken: s_sourceTokens[0],
+        chainSelector: SOURCE_CHAIN_SELECTOR,
+        maxNopFeesJuels: MAX_NOP_FEES_JUELS,
+        rmnProxy: address(0)
+      }),
+      _generateDynamicMultiOnRampConfig(
+        address(s_sourceRouter), address(s_priceRegistry), address(s_tokenAdminRegistry)
+      ),
+      _generateDestChainConfigArgs(),
+      getOutboundRateLimiterConfig(),
+      s_premiumMultiplierWeiPerEthArgs,
+      s_tokenTransferFeeConfigArgs,
+      _getMultiOnRampNopsAndWeights()
     );
   }
 }
@@ -130,6 +154,7 @@ contract EVM2EVMMultiOnRamp_applyDestChainConfigUpdates is EVM2EVMMultiOnRampSet
     EVM2EVMMultiOnRamp.DestChainConfigArgs memory destChainConfigArgs
   ) public {
     vm.assume(destChainConfigArgs.destChainSelector != 0);
+    vm.assume(destChainConfigArgs.dynamicConfig.defaultTxGasLimit != 0);
     destChainConfigArgs.dynamicConfig.defaultTokenDestBytesOverhead = uint32(
       bound(
         destChainConfigArgs.dynamicConfig.defaultTokenDestBytesOverhead,
@@ -1066,6 +1091,7 @@ contract EVM2EVMMultiOnRamp_getDataAvailabilityCost is EVM2EVMMultiOnRamp_getFee
     destChainConfigArgs[0].dynamicConfig.destDataAvailabilityOverheadGas = destDataAvailabilityOverheadGas;
     destChainConfigArgs[0].dynamicConfig.destGasPerDataAvailabilityByte = destGasPerDataAvailabilityByte;
     destChainConfigArgs[0].dynamicConfig.destDataAvailabilityMultiplierBps = destDataAvailabilityMultiplierBps;
+    destChainConfigArgs[0].dynamicConfig.defaultTxGasLimit = GAS_LIMIT;
 
     s_onRamp.applyDestChainConfigUpdates(destChainConfigArgs);
 
