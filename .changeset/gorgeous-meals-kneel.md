@@ -2,4 +2,4 @@
 "ccip": patch
 ---
 
-#patch update golangci-lint with custom rules
+#updated golangci-lint with custom rules
