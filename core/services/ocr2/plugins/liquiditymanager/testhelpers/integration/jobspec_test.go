@@ -43,7 +43,7 @@ relay                                  = "evm"
 schemaVersion                          = 1
 contractID                             = "0x1234567890abcdef"
 ocrKeyBundleID                         = "0xabcdef1234567890" 
-transmitterID                          = "" 
+transmitterID                          = "0xabcdef1234567890" 
 contractConfigConfirmations            = 1
 
 contractConfigTrackerPollInterval      = "20s"
