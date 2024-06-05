@@ -4,11 +4,10 @@ go 1.21.7
 
 require (
 	github.com/deckarep/golang-set/v2 v2.6.0
-	github.com/smartcontractkit/chain-selectors v1.0.16
-	github.com/smartcontractkit/chainlink-common v0.1.7-0.20240517134904-f4446b816a28
+	github.com/smartcontractkit/chainlink-common v0.1.7-0.20240605111734-a7c799eab2d7
 	github.com/smartcontractkit/libocr v0.0.0-20240419185742-fd3cab206b2c
 	github.com/stretchr/testify v1.9.0
-	golang.org/x/crypto v0.23.0
+	golang.org/x/crypto v0.24.0
 	golang.org/x/sync v0.7.0
 	gonum.org/v1/gonum v0.15.0
 	google.golang.org/grpc v1.64.0
@@ -41,11 +40,11 @@ require (
 	github.com/wk8/go-ordered-map/v2 v2.1.8 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.27.0 // indirect
-	golang.org/x/mod v0.17.0 // indirect
-	golang.org/x/net v0.25.0 // indirect
-	golang.org/x/sys v0.20.0 // indirect
-	golang.org/x/text v0.15.0 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20240528184218-531527333157 // indirect
+	golang.org/x/mod v0.18.0 // indirect
+	golang.org/x/net v0.26.0 // indirect
+	golang.org/x/sys v0.21.0 // indirect
+	golang.org/x/text v0.16.0 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20240604185151-ef581f913117 // indirect
 	google.golang.org/protobuf v1.34.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
