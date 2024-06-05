@@ -59,7 +59,8 @@ contract MultiAggregateRateLimiterSetup is BaseTest, PriceRegistrySetup {
     s_authorizedCallers[0] = MOCK_OFFRAMP;
     s_authorizedCallers[1] = MOCK_ONRAMP;
 
-    s_rateLimiter = new MultiAggregateRateLimiterHelper(configUpdates, address(s_priceRegistry), s_authorizedCallers);
+    s_rateLimiter = new MultiAggregateRateLimiterHelper(address(s_priceRegistry), s_authorizedCallers);
+    s_rateLimiter.applyRateLimiterConfigUpdates(configUpdates);
   }
 
   function _assertConfigWithTokenBucketEquality(
@@ -85,12 +86,10 @@ contract MultiAggregateRateLimiterSetup is BaseTest, PriceRegistrySetup {
 
 contract MultiAggregateRateLimiter_constructor is MultiAggregateRateLimiterSetup {
   function test_ConstructorNoAuthorizedCallers_Success() public {
-    MultiAggregateRateLimiter.RateLimiterConfigArgs[] memory configUpdates =
-      new MultiAggregateRateLimiter.RateLimiterConfigArgs[](0);
     address[] memory authorizedCallers = new address[](0);
 
     vm.recordLogs();
-    s_rateLimiter = new MultiAggregateRateLimiterHelper(configUpdates, address(s_priceRegistry), authorizedCallers);
+    s_rateLimiter = new MultiAggregateRateLimiterHelper(address(s_priceRegistry), authorizedCallers);
 
     // PriceRegistrySet
     Vm.Log[] memory logEntries = vm.getRecordedLogs();
@@ -100,55 +99,10 @@ contract MultiAggregateRateLimiter_constructor is MultiAggregateRateLimiterSetup
     assertEq(address(s_priceRegistry), s_rateLimiter.getPriceRegistry());
   }
 
-  function test_ConstructorNoConfigs_Success() public {
-    MultiAggregateRateLimiter.RateLimiterConfigArgs[] memory configUpdates =
-      new MultiAggregateRateLimiter.RateLimiterConfigArgs[](0);
-    address[] memory authorizedCallers = new address[](2);
-    authorizedCallers[0] = MOCK_OFFRAMP;
-    authorizedCallers[1] = MOCK_ONRAMP;
-
-    vm.recordLogs();
-    s_rateLimiter = new MultiAggregateRateLimiterHelper(configUpdates, address(s_priceRegistry), authorizedCallers);
-
-    // PriceRegistrySet + 2 authorized caller sets
-    Vm.Log[] memory logEntries = vm.getRecordedLogs();
-    assertEq(logEntries.length, 3);
-
-    assertEq(OWNER, s_rateLimiter.owner());
-    assertEq(address(s_priceRegistry), s_rateLimiter.getPriceRegistry());
-  }
-
   function test_Constructor_Success() public {
-    MultiAggregateRateLimiter.RateLimiterConfigArgs[] memory configUpdates =
-      new MultiAggregateRateLimiter.RateLimiterConfigArgs[](3);
-    configUpdates[0] = MultiAggregateRateLimiter.RateLimiterConfigArgs({
-      remoteChainSelector: CHAIN_SELECTOR_1,
-      isOutgoingLane: false,
-      rateLimiterConfig: RATE_LIMITER_CONFIG_1
-    });
-    configUpdates[1] = MultiAggregateRateLimiter.RateLimiterConfigArgs({
-      remoteChainSelector: CHAIN_SELECTOR_2,
-      isOutgoingLane: false,
-      rateLimiterConfig: RATE_LIMITER_CONFIG_2
-    });
-    configUpdates[2] = MultiAggregateRateLimiter.RateLimiterConfigArgs({
-      remoteChainSelector: CHAIN_SELECTOR_1,
-      isOutgoingLane: true,
-      rateLimiterConfig: RATE_LIMITER_CONFIG_2
-    });
-
     address[] memory authorizedCallers = new address[](2);
     authorizedCallers[0] = MOCK_OFFRAMP;
     authorizedCallers[1] = MOCK_ONRAMP;
-
-    vm.expectEmit();
-    emit MultiAggregateRateLimiter.RateLimiterConfigUpdated(CHAIN_SELECTOR_1, false, RATE_LIMITER_CONFIG_1);
-
-    vm.expectEmit();
-    emit MultiAggregateRateLimiter.RateLimiterConfigUpdated(CHAIN_SELECTOR_2, false, RATE_LIMITER_CONFIG_2);
-
-    vm.expectEmit();
-    emit MultiAggregateRateLimiter.RateLimiterConfigUpdated(CHAIN_SELECTOR_1, true, RATE_LIMITER_CONFIG_2);
 
     vm.expectEmit();
     emit MultiAggregateRateLimiter.PriceRegistrySet(address(s_priceRegistry));
@@ -159,23 +113,10 @@ contract MultiAggregateRateLimiter_constructor is MultiAggregateRateLimiterSetup
     vm.expectEmit();
     emit MultiAggregateRateLimiter.AuthorizedCallerAdded(MOCK_ONRAMP);
 
-    s_rateLimiter = new MultiAggregateRateLimiterHelper(configUpdates, address(s_priceRegistry), authorizedCallers);
+    s_rateLimiter = new MultiAggregateRateLimiterHelper(address(s_priceRegistry), authorizedCallers);
 
     assertEq(OWNER, s_rateLimiter.owner());
     assertEq(address(s_priceRegistry), s_rateLimiter.getPriceRegistry());
-
-    RateLimiter.TokenBucket memory bucketSrcChain1 = s_rateLimiter.currentRateLimiterState(CHAIN_SELECTOR_1, false);
-    _assertConfigWithTokenBucketEquality(RATE_LIMITER_CONFIG_1, bucketSrcChain1);
-    assertEq(BLOCK_TIME, bucketSrcChain1.lastUpdated);
-
-    RateLimiter.TokenBucket memory bucketSrcChain2 = s_rateLimiter.currentRateLimiterState(CHAIN_SELECTOR_2, false);
-    _assertConfigWithTokenBucketEquality(RATE_LIMITER_CONFIG_2, bucketSrcChain2);
-    assertEq(BLOCK_TIME, bucketSrcChain2.lastUpdated);
-
-    RateLimiter.TokenBucket memory bucketSrcChainOutgoing =
-      s_rateLimiter.currentRateLimiterState(CHAIN_SELECTOR_1, true);
-    _assertConfigWithTokenBucketEquality(RATE_LIMITER_CONFIG_2, bucketSrcChainOutgoing);
-    assertEq(BLOCK_TIME, bucketSrcChainOutgoing.lastUpdated);
   }
 }
 
