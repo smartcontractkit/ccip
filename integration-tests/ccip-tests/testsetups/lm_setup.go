@@ -593,7 +593,6 @@ func (o *LMTestSetupOutputs) AddJobs(chainId int64, lggr zerolog.Logger) error {
 	// Add LM jobs
 	donNodes := clNodesWithKeys[1:]
 
-	//TODO: Replace this with proper LM job config generation
 	for _, node := range donNodes {
 		lmJobSpec, err := integrationtesthelpers.NewJobSpec(&integrationtesthelpers.LMJobSpecParams{
 			ChainID:                 uint64(chainId),
