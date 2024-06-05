@@ -60,10 +60,10 @@ contract EVM2EVMMultiOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSet
 
     s_maybeRevertingPool = MaybeRevertingBurnMintTokenPool(s_destPoolByToken[s_destTokens[1]]);
 
-    deployOffRamp(s_mockCommitStore, s_destRouter);
+    _deployOffRamp(s_mockCommitStore, s_destRouter);
   }
 
-  function deployOffRamp(IMultiCommitStore commitStore, Router router) internal {
+  function _deployOffRamp(IMultiCommitStore commitStore, Router router) internal {
     EVM2EVMMultiOffRamp.SourceChainConfigArgs[] memory sourceChainConfigs =
       new EVM2EVMMultiOffRamp.SourceChainConfigArgs[](0);
 
@@ -79,7 +79,7 @@ contract EVM2EVMMultiOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSet
       s_valid_signers,
       s_valid_transmitters,
       s_f,
-      abi.encode(generateDynamicMultiOffRampConfig(address(router))),
+      abi.encode(_generateDynamicMultiOffRampConfig(address(router))),
       s_offchainConfigVersion,
       abi.encode("")
     );
@@ -108,7 +108,7 @@ contract EVM2EVMMultiOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSet
       s_valid_signers,
       s_valid_transmitters,
       s_f,
-      abi.encode(generateDynamicOffRampConfig(address(router), address(s_priceRegistry))),
+      abi.encode(_generateDynamicOffRampConfig(address(router), address(s_priceRegistry))),
       s_offchainConfigVersion,
       abi.encode("")
     );
@@ -186,7 +186,7 @@ contract EVM2EVMMultiOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSet
     }
   }
 
-  function generateDynamicOffRampConfig(
+  function _generateDynamicOffRampConfig(
     address router,
     address priceRegistry
   ) internal pure returns (EVM2EVMOffRamp.DynamicConfig memory) {
@@ -200,7 +200,7 @@ contract EVM2EVMMultiOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSet
     });
   }
 
-  function generateDynamicMultiOffRampConfig(address router)
+  function _generateDynamicMultiOffRampConfig(address router)
     internal
     pure
     returns (EVM2EVMMultiOffRamp.DynamicConfig memory)

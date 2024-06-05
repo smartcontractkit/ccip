@@ -84,7 +84,7 @@ contract MultiRampsE2E is EVM2EVMMultiOnRampSetup, MultiCommitStoreSetup, EVM2EV
     s_sourceRouter2.applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), new Router.OffRamp[](0));
 
     // Deploy offramp
-    deployOffRamp(s_multiCommitStore, s_destRouter);
+    _deployOffRamp(s_multiCommitStore, s_destRouter);
 
     // Enable source chains on offramp
     EVM2EVMMultiOffRamp.SourceChainConfigArgs[] memory sourceChainConfigs =
@@ -114,10 +114,11 @@ contract MultiRampsE2E is EVM2EVMMultiOnRampSetup, MultiCommitStoreSetup, EVM2EV
 
     // Send messages
     Internal.EVM2EVMMessage[] memory messages1 = new Internal.EVM2EVMMessage[](2);
-    messages1[0] = sendRequest(1, SOURCE_CHAIN_SELECTOR, 1, s_metadataHash, s_sourceRouter, s_tokenAdminRegistry);
-    messages1[1] = sendRequest(2, SOURCE_CHAIN_SELECTOR, 2, s_metadataHash, s_sourceRouter, s_tokenAdminRegistry);
+    messages1[0] = _sendRequest(1, SOURCE_CHAIN_SELECTOR, 1, s_metadataHash, s_sourceRouter, s_tokenAdminRegistry);
+    messages1[1] = _sendRequest(2, SOURCE_CHAIN_SELECTOR, 2, s_metadataHash, s_sourceRouter, s_tokenAdminRegistry);
     Internal.EVM2EVMMessage[] memory messages2 = new Internal.EVM2EVMMessage[](1);
-    messages2[0] = sendRequest(1, SOURCE_CHAIN_SELECTOR + 1, 1, s_metadataHash2, s_sourceRouter2, s_tokenAdminRegistry2);
+    messages2[0] =
+      _sendRequest(1, SOURCE_CHAIN_SELECTOR + 1, 1, s_metadataHash2, s_sourceRouter2, s_tokenAdminRegistry2);
 
     uint256 expectedFee = s_sourceRouter.getFee(DEST_CHAIN_SELECTOR, _generateTokenMessage());
     // Asserts that the tokens have been sent and the fee has been paid.
@@ -211,7 +212,7 @@ contract MultiRampsE2E is EVM2EVMMultiOnRampSetup, MultiCommitStoreSetup, EVM2EV
     s_offRamp.batchExecute(reports, new uint256[][](0));
   }
 
-  function sendRequest(
+  function _sendRequest(
     uint64 expectedSeqNum,
     uint64 sourceChainSelector,
     uint64 nonce,

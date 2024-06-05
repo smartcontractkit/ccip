@@ -176,42 +176,6 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
       s_metadataHash,
       s_tokenAdminRegistry
     );
-    // // Slicing is only available for calldata. So we have to build a new bytes array.
-    // bytes memory args = new bytes(message.extraArgs.length - 4);
-    // for (uint256 i = 4; i < message.extraArgs.length; ++i) {
-    //   args[i - 4] = message.extraArgs[i];
-    // }
-    // uint256 numberOfTokens = message.tokenAmounts.length;
-    // Internal.EVM2EVMMessage memory messageEvent = Internal.EVM2EVMMessage({
-    //   sequenceNumber: seqNum,
-    //   feeTokenAmount: feeTokenAmount,
-    //   sender: originalSender,
-    //   nonce: nonce,
-    //   gasLimit: abi.decode(args, (Client.EVMExtraArgsV1)).gasLimit,
-    //   strict: false,
-    //   sourceChainSelector: SOURCE_CHAIN_SELECTOR,
-    //   receiver: abi.decode(message.receiver, (address)),
-    //   data: message.data,
-    //   tokenAmounts: message.tokenAmounts,
-    //   sourceTokenData: new bytes[](numberOfTokens),
-    //   feeToken: message.feeToken,
-    //   messageId: ""
-    // });
-
-    // for (uint256 i = 0; i < numberOfTokens; ++i) {
-    //   address sourcePool = s_sourcePoolByToken[message.tokenAmounts[i].token];
-    //   address destPool = s_destPoolBySourceToken[message.tokenAmounts[i].token];
-    //   messageEvent.sourceTokenData[i] = abi.encode(
-    //     Internal.SourceTokenData({
-    //       sourcePoolAddress: abi.encode(sourcePool),
-    //       destPoolAddress: abi.encode(destPool),
-    //       extraData: ""
-    //     })
-    //   );
-    // }
-
-    // messageEvent.messageId = Internal._hash(messageEvent, s_metadataHash);
-    // return messageEvent;
   }
 
   function _messageToEvent(
@@ -259,7 +223,7 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
     return messageEvent;
   }
 
-  function generateDynamicMultiOnRampConfig(
+  function _generateDynamicMultiOnRampConfig(
     address router,
     address priceRegistry,
     address tokenAdminRegistry
@@ -271,7 +235,7 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
     });
   }
 
-  function generateDestChainConfigArgs() internal pure returns (EVM2EVMMultiOnRamp.DestChainConfigArgs[] memory) {
+  function _generateDestChainConfigArgs() internal pure returns (EVM2EVMMultiOnRamp.DestChainConfigArgs[] memory) {
     EVM2EVMMultiOnRamp.DestChainConfigArgs[] memory destChainConfigs = new EVM2EVMMultiOnRamp.DestChainConfigArgs[](1);
     destChainConfigs[0] = EVM2EVMMultiOnRamp.DestChainConfigArgs({
       destChainSelector: DEST_CHAIN_SELECTOR,
@@ -297,7 +261,7 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
     return destChainConfigs;
   }
 
-  function generateTokenTransferFeeConfigArgs(
+  function _generateTokenTransferFeeConfigArgs(
     uint256 destChainSelectorLength,
     uint256 tokenLength
   ) internal pure returns (EVM2EVMMultiOnRamp.TokenTransferFeeConfigArgs[] memory) {
@@ -310,7 +274,7 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
     return tokenTransferFeeConfigArgs;
   }
 
-  function getMultiOnRampNopsAndWeights() internal pure returns (EVM2EVMMultiOnRamp.NopAndWeight[] memory) {
+  function _getMultiOnRampNopsAndWeights() internal pure returns (EVM2EVMMultiOnRamp.NopAndWeight[] memory) {
     EVM2EVMMultiOnRamp.NopAndWeight[] memory nopsAndWeights = new EVM2EVMMultiOnRamp.NopAndWeight[](3);
     nopsAndWeights[0] = EVM2EVMMultiOnRamp.NopAndWeight({nop: USER_1, weight: 19284});
     nopsAndWeights[1] = EVM2EVMMultiOnRamp.NopAndWeight({nop: USER_2, weight: 52935});
@@ -333,12 +297,12 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
         maxNopFeesJuels: MAX_NOP_FEES_JUELS,
         rmnProxy: rmnProxy
       }),
-      generateDynamicMultiOnRampConfig(sourceRouter, priceRegistry, tokenAdminRegistry),
-      generateDestChainConfigArgs(),
+      _generateDynamicMultiOnRampConfig(sourceRouter, priceRegistry, tokenAdminRegistry),
+      _generateDestChainConfigArgs(),
       getOutboundRateLimiterConfig(),
       s_premiumMultiplierWeiPerEthArgs,
       s_tokenTransferFeeConfigArgs,
-      getMultiOnRampNopsAndWeights()
+      _getMultiOnRampNopsAndWeights()
     );
     onRamp.setAdmin(ADMIN);
 
@@ -363,7 +327,7 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
     );
   }
 
-  function assertDestChainConfigsEqual(
+  function _assertDestChainConfigsEqual(
     EVM2EVMMultiOnRamp.DestChainConfig memory a,
     EVM2EVMMultiOnRamp.DestChainConfig memory b
   ) internal pure {
@@ -385,7 +349,7 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
     assertEq(a.metadataHash, b.metadataHash);
   }
 
-  function assertStaticConfigsEqual(
+  function _assertStaticConfigsEqual(
     EVM2EVMMultiOnRamp.StaticConfig memory a,
     EVM2EVMMultiOnRamp.StaticConfig memory b
   ) internal pure {
@@ -395,7 +359,7 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
     assertEq(a.rmnProxy, b.rmnProxy);
   }
 
-  function assertDynamicConfigsEqual(
+  function _assertDynamicConfigsEqual(
     EVM2EVMMultiOnRamp.DynamicConfig memory a,
     EVM2EVMMultiOnRamp.DynamicConfig memory b
   ) internal pure {
@@ -404,7 +368,7 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
     assertEq(a.tokenAdminRegistry, b.tokenAdminRegistry);
   }
 
-  function assertTokenTransferFeeConfigEqual(
+  function _assertTokenTransferFeeConfigEqual(
     EVM2EVMMultiOnRamp.TokenTransferFeeConfig memory a,
     EVM2EVMMultiOnRamp.TokenTransferFeeConfig memory b
   ) internal pure {

@@ -25,10 +25,11 @@ contract EVM2EVMMultiOnRamp_constructor is EVM2EVMMultiOnRampSetup {
       maxNopFeesJuels: MAX_NOP_FEES_JUELS,
       rmnProxy: address(s_mockRMN)
     });
-    EVM2EVMMultiOnRamp.DynamicConfig memory dynamicConfig =
-      generateDynamicMultiOnRampConfig(address(s_sourceRouter), address(s_priceRegistry), address(s_tokenAdminRegistry));
+    EVM2EVMMultiOnRamp.DynamicConfig memory dynamicConfig = _generateDynamicMultiOnRampConfig(
+      address(s_sourceRouter), address(s_priceRegistry), address(s_tokenAdminRegistry)
+    );
 
-    EVM2EVMMultiOnRamp.DestChainConfigArgs[] memory destChainConfigArgs = generateDestChainConfigArgs();
+    EVM2EVMMultiOnRamp.DestChainConfigArgs[] memory destChainConfigArgs = _generateDestChainConfigArgs();
     EVM2EVMMultiOnRamp.DestChainConfigArgs memory destChainConfigArg = destChainConfigArgs[0];
 
     vm.expectEmit();
@@ -67,13 +68,13 @@ contract EVM2EVMMultiOnRamp_constructor is EVM2EVMMultiOnRampSetup {
     });
 
     EVM2EVMMultiOnRamp.StaticConfig memory gotStaticConfig = s_onRamp.getStaticConfig();
-    assertStaticConfigsEqual(staticConfig, gotStaticConfig);
+    _assertStaticConfigsEqual(staticConfig, gotStaticConfig);
 
     EVM2EVMMultiOnRamp.DynamicConfig memory gotDynamicConfig = s_onRamp.getDynamicConfig();
-    assertDynamicConfigsEqual(dynamicConfig, gotDynamicConfig);
+    _assertDynamicConfigsEqual(dynamicConfig, gotDynamicConfig);
 
     EVM2EVMMultiOnRamp.DestChainConfig memory gotDestChainConfig = s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR);
-    assertDestChainConfigsEqual(expectedDestChainConfig, gotDestChainConfig);
+    _assertDestChainConfigsEqual(expectedDestChainConfig, gotDestChainConfig);
 
     uint64 gotFeeTokenConfig0 = s_onRamp.getPremiumMultiplierWeiPerEth(s_premiumMultiplierWeiPerEthArgs[0].token);
     assertEq(s_premiumMultiplierWeiPerEthArgs[0].premiumMultiplierWeiPerEth, gotFeeTokenConfig0);
@@ -168,7 +169,7 @@ contract EVM2EVMMultiOnRamp_applyDestChainConfigUpdates is EVM2EVMMultiOnRampSet
 
     s_onRamp.applyDestChainConfigUpdates(newDestChainConfigArgs);
 
-    assertDestChainConfigsEqual(
+    _assertDestChainConfigsEqual(
       expectedDestChainConfig, s_onRamp.getDestChainConfig(destChainConfigArgs.destChainSelector)
     );
   }
@@ -176,9 +177,9 @@ contract EVM2EVMMultiOnRamp_applyDestChainConfigUpdates is EVM2EVMMultiOnRampSet
   function test_applyDestChainConfigUpdates_Success() public {
     EVM2EVMMultiOnRamp.DestChainConfigArgs[] memory destChainConfigArgs =
       new EVM2EVMMultiOnRamp.DestChainConfigArgs[](2);
-    destChainConfigArgs[0] = generateDestChainConfigArgs()[0];
+    destChainConfigArgs[0] = _generateDestChainConfigArgs()[0];
     destChainConfigArgs[0].dynamicConfig.isEnabled = false;
-    destChainConfigArgs[1] = generateDestChainConfigArgs()[0];
+    destChainConfigArgs[1] = _generateDestChainConfigArgs()[0];
     destChainConfigArgs[1].destChainSelector = DEST_CHAIN_SELECTOR + 1;
 
     EVM2EVMMultiOnRamp.DestChainConfig memory expectedDestChainConfig0 = EVM2EVMMultiOnRamp.DestChainConfig({
@@ -221,8 +222,8 @@ contract EVM2EVMMultiOnRamp_applyDestChainConfigUpdates is EVM2EVMMultiOnRampSet
     EVM2EVMMultiOnRamp.DestChainConfig memory gotDestChainConfig1 = s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR + 1);
 
     assertEq(vm.getRecordedLogs().length, 2);
-    assertDestChainConfigsEqual(expectedDestChainConfig0, gotDestChainConfig0);
-    assertDestChainConfigsEqual(expectedDestChainConfig1, gotDestChainConfig1);
+    _assertDestChainConfigsEqual(expectedDestChainConfig0, gotDestChainConfig0);
+    _assertDestChainConfigsEqual(expectedDestChainConfig1, gotDestChainConfig1);
   }
 
   function test_applyDestChainConfigUpdatesZeroIntput() public {
@@ -236,7 +237,7 @@ contract EVM2EVMMultiOnRamp_applyDestChainConfigUpdates is EVM2EVMMultiOnRampSet
   }
 
   function test_InvalidDestChainConfigDestChainSelectorEqZero_Revert() public {
-    EVM2EVMMultiOnRamp.DestChainConfigArgs[] memory destChainConfigArgs = generateDestChainConfigArgs();
+    EVM2EVMMultiOnRamp.DestChainConfigArgs[] memory destChainConfigArgs = _generateDestChainConfigArgs();
     EVM2EVMMultiOnRamp.DestChainConfigArgs memory destChainConfigArg = destChainConfigArgs[0];
 
     // destChainSelector == address(0)
@@ -248,7 +249,7 @@ contract EVM2EVMMultiOnRamp_applyDestChainConfigUpdates is EVM2EVMMultiOnRampSet
   }
 
   function test_applyDestChainConfigUpdatesDefaultTxGasLimitEqZero() public {
-    EVM2EVMMultiOnRamp.DestChainConfigArgs[] memory destChainConfigArgs = generateDestChainConfigArgs();
+    EVM2EVMMultiOnRamp.DestChainConfigArgs[] memory destChainConfigArgs = _generateDestChainConfigArgs();
     EVM2EVMMultiOnRamp.DestChainConfigArgs memory destChainConfigArg = destChainConfigArgs[0];
 
     // destChainSelector == address(0)
@@ -260,7 +261,7 @@ contract EVM2EVMMultiOnRamp_applyDestChainConfigUpdates is EVM2EVMMultiOnRampSet
   }
 
   function test_InvalidDestChainConfigNewPrevOnRampOnExistingChain_Revert() public {
-    EVM2EVMMultiOnRamp.DestChainConfigArgs[] memory destChainConfigArgs = generateDestChainConfigArgs();
+    EVM2EVMMultiOnRamp.DestChainConfigArgs[] memory destChainConfigArgs = _generateDestChainConfigArgs();
     EVM2EVMMultiOnRamp.DestChainConfigArgs memory destChainConfigArg = destChainConfigArgs[0];
 
     // Changing prevOnRamp on already set destination chain
@@ -272,7 +273,7 @@ contract EVM2EVMMultiOnRamp_applyDestChainConfigUpdates is EVM2EVMMultiOnRampSet
   }
 
   function test_InvalidDestBytesOverhead_Revert() public {
-    EVM2EVMMultiOnRamp.DestChainConfigArgs[] memory destChainConfigArgs = generateDestChainConfigArgs();
+    EVM2EVMMultiOnRamp.DestChainConfigArgs[] memory destChainConfigArgs = _generateDestChainConfigArgs();
     EVM2EVMMultiOnRamp.DestChainConfigArgs memory destChainConfigArg = destChainConfigArgs[0];
 
     destChainConfigArg.dynamicConfig.defaultTokenDestBytesOverhead = uint32(Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES - 1);
@@ -466,7 +467,7 @@ contract EVM2EVMMultiOnRamp_forwardFromRouter is EVM2EVMMultiOnRampSetup {
 
     // Configure ARL off for token
     EVM2EVMMultiOnRamp.TokenTransferFeeConfigArgs[] memory tokenTransferFeeConfigArgs =
-      generateTokenTransferFeeConfigArgs(1, 1);
+      _generateTokenTransferFeeConfigArgs(1, 1);
     tokenTransferFeeConfigArgs[0].destChainSelector = DEST_CHAIN_SELECTOR;
     tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].token = s_sourceTokens[0];
     tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].tokenTransferFeeConfig =
@@ -490,7 +491,7 @@ contract EVM2EVMMultiOnRamp_forwardFromRouter is EVM2EVMMultiOnRampSetup {
     vm.stopPrank();
     vm.startPrank(OWNER);
     address router = address(0);
-    s_onRamp.setDynamicConfig(generateDynamicMultiOnRampConfig(router, address(2), address(s_tokenAdminRegistry)));
+    s_onRamp.setDynamicConfig(_generateDynamicMultiOnRampConfig(router, address(2), address(s_tokenAdminRegistry)));
     vm.expectRevert(EVM2EVMMultiOnRamp.MustBeCalledByRouter.selector);
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, _generateEmptyMessage(), 0, OWNER);
   }
@@ -714,7 +715,7 @@ contract EVM2EVMMultiOnRamp_forwardFromRouter is EVM2EVMMultiOnRampSetup {
     // Set token config to allow larger data
     vm.startPrank(OWNER);
     EVM2EVMMultiOnRamp.TokenTransferFeeConfigArgs[] memory tokenTransferFeeConfigArgs =
-      generateTokenTransferFeeConfigArgs(1, 1);
+      _generateTokenTransferFeeConfigArgs(1, 1);
     tokenTransferFeeConfigArgs[0].destChainSelector = DEST_CHAIN_SELECTOR;
     tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].token = sourceETH;
     tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].tokenTransferFeeConfig = EVM2EVMMultiOnRamp
@@ -817,7 +818,7 @@ contract EVM2EVMMultiOnRamp_forwardFromRouter_upgrade is EVM2EVMMultiOnRampSetup
       new EVM2EVMOnRamp.NopAndWeight[](0)
     );
 
-    EVM2EVMMultiOnRamp.DestChainConfigArgs[] memory destChainConfigArgs = generateDestChainConfigArgs();
+    EVM2EVMMultiOnRamp.DestChainConfigArgs[] memory destChainConfigArgs = _generateDestChainConfigArgs();
     destChainConfigArgs[0].prevOnRamp = address(s_prevOnRamp);
 
     s_onRamp = new EVM2EVMMultiOnRampHelper(
@@ -827,12 +828,14 @@ contract EVM2EVMMultiOnRamp_forwardFromRouter_upgrade is EVM2EVMMultiOnRampSetup
         maxNopFeesJuels: MAX_NOP_FEES_JUELS,
         rmnProxy: address(s_mockRMN)
       }),
-      generateDynamicMultiOnRampConfig(address(s_sourceRouter), address(s_priceRegistry), address(s_tokenAdminRegistry)),
+      _generateDynamicMultiOnRampConfig(
+        address(s_sourceRouter), address(s_priceRegistry), address(s_tokenAdminRegistry)
+      ),
       destChainConfigArgs,
       getOutboundRateLimiterConfig(),
       s_premiumMultiplierWeiPerEthArgs,
       s_tokenTransferFeeConfigArgs,
-      getMultiOnRampNopsAndWeights()
+      _getMultiOnRampNopsAndWeights()
     );
 
     s_metadataHash = keccak256(
@@ -984,7 +987,7 @@ contract EVM2EVMMultiOnRamp_getDataAvailabilityCost is EVM2EVMMultiOnRamp_getFee
     assertEq(expectedDataAvailabilityCostUSD, dataAvailabilityCostUSD);
 
     // Test that the cost is destnation chain specific
-    EVM2EVMMultiOnRamp.DestChainConfigArgs[] memory destChainConfigArgs = generateDestChainConfigArgs();
+    EVM2EVMMultiOnRamp.DestChainConfigArgs[] memory destChainConfigArgs = _generateDestChainConfigArgs();
     destChainConfigArgs[0].destChainSelector = DEST_CHAIN_SELECTOR + 1;
     destChainConfigArgs[0].dynamicConfig.destDataAvailabilityOverheadGas =
       destChainDynamicConfig.destDataAvailabilityOverheadGas * 2;
@@ -1459,7 +1462,7 @@ contract EVM2EVMMultiOnRamp_getTokenTransferCost is EVM2EVMMultiOnRamp_getFeeSet
 
   function test_ZeroFeeConfigChargesMinFee_Success() public {
     EVM2EVMMultiOnRamp.TokenTransferFeeConfigArgs[] memory tokenTransferFeeConfigArgs =
-      generateTokenTransferFeeConfigArgs(1, 1);
+      _generateTokenTransferFeeConfigArgs(1, 1);
     tokenTransferFeeConfigArgs[0].destChainSelector = DEST_CHAIN_SELECTOR;
     tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].token = s_sourceFeeToken;
     tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].tokenTransferFeeConfig = EVM2EVMMultiOnRamp
@@ -1657,10 +1660,10 @@ contract EVM2EVMMultiOnRamp_setDynamicConfig is EVM2EVMMultiOnRampSetup {
   function test_SetConfigOnlyOwner_Revert() public {
     vm.startPrank(STRANGER);
     vm.expectRevert("Only callable by owner");
-    s_onRamp.setDynamicConfig(generateDynamicMultiOnRampConfig(address(1), address(2), address(3)));
+    s_onRamp.setDynamicConfig(_generateDynamicMultiOnRampConfig(address(1), address(2), address(3)));
     vm.startPrank(ADMIN);
     vm.expectRevert("Only callable by owner");
-    s_onRamp.setDynamicConfig(generateDynamicMultiOnRampConfig(address(1), address(2), address(3)));
+    s_onRamp.setDynamicConfig(_generateDynamicMultiOnRampConfig(address(1), address(2), address(3)));
   }
 }
 
@@ -1779,7 +1782,7 @@ contract EVM2EVMMultiOnRamp_applyTokenTransferFeeConfigUpdates is EVM2EVMMultiOn
     EVM2EVMMultiOnRamp.TokenTransferFeeConfig[2] memory tokenTransferFeeConfigs
   ) public {
     EVM2EVMMultiOnRamp.TokenTransferFeeConfigArgs[] memory tokenTransferFeeConfigArgs =
-      generateTokenTransferFeeConfigArgs(2, 2);
+      _generateTokenTransferFeeConfigArgs(2, 2);
     tokenTransferFeeConfigArgs[0].destChainSelector = DEST_CHAIN_SELECTOR;
     tokenTransferFeeConfigArgs[1].destChainSelector = DEST_CHAIN_SELECTOR + 1;
 
@@ -1804,7 +1807,7 @@ contract EVM2EVMMultiOnRamp_applyTokenTransferFeeConfigUpdates is EVM2EVMMultiOn
     );
 
     for (uint256 i = 0; i < tokenTransferFeeConfigs.length; ++i) {
-      assertTokenTransferFeeConfigEqual(
+      _assertTokenTransferFeeConfigEqual(
         tokenTransferFeeConfigs[i],
         s_onRamp.getTokenTransferFeeConfig(
           tokenTransferFeeConfigArgs[0].destChainSelector,
@@ -1816,7 +1819,7 @@ contract EVM2EVMMultiOnRamp_applyTokenTransferFeeConfigUpdates is EVM2EVMMultiOn
 
   function test_ApplyTokenTransferFeeConfig_Success() public {
     EVM2EVMMultiOnRamp.TokenTransferFeeConfigArgs[] memory tokenTransferFeeConfigArgs =
-      generateTokenTransferFeeConfigArgs(1, 2);
+      _generateTokenTransferFeeConfigArgs(1, 2);
     tokenTransferFeeConfigArgs[0].destChainSelector = DEST_CHAIN_SELECTOR;
     tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].token = address(5);
     tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].tokenTransferFeeConfig = EVM2EVMMultiOnRamp
@@ -1865,10 +1868,10 @@ contract EVM2EVMMultiOnRamp_applyTokenTransferFeeConfigUpdates is EVM2EVMMultiOn
       tokenTransferFeeConfigArgs[0].destChainSelector, tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[1].token
     );
 
-    assertTokenTransferFeeConfigEqual(
+    _assertTokenTransferFeeConfigEqual(
       tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].tokenTransferFeeConfig, config0
     );
-    assertTokenTransferFeeConfigEqual(
+    _assertTokenTransferFeeConfigEqual(
       tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[1].tokenTransferFeeConfig, config1
     );
 
@@ -1895,8 +1898,8 @@ contract EVM2EVMMultiOnRamp_applyTokenTransferFeeConfigUpdates is EVM2EVMMultiOn
 
     EVM2EVMMultiOnRamp.TokenTransferFeeConfig memory emptyConfig;
 
-    assertTokenTransferFeeConfigEqual(emptyConfig, config0);
-    assertTokenTransferFeeConfigEqual(
+    _assertTokenTransferFeeConfigEqual(emptyConfig, config0);
+    _assertTokenTransferFeeConfigEqual(
       tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[1].tokenTransferFeeConfig, config1
     );
   }
@@ -1904,7 +1907,7 @@ contract EVM2EVMMultiOnRamp_applyTokenTransferFeeConfigUpdates is EVM2EVMMultiOn
   function test_ApplyTokenTransferFeeConfigByAdmin_Success() public {
     vm.startPrank(ADMIN);
     EVM2EVMMultiOnRamp.TokenTransferFeeConfigArgs[] memory tokenTransferFeeConfigArgs =
-      generateTokenTransferFeeConfigArgs(1, 1);
+      _generateTokenTransferFeeConfigArgs(1, 1);
     tokenTransferFeeConfigArgs[0].destChainSelector = DEST_CHAIN_SELECTOR;
     tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].token = address(5);
     tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].tokenTransferFeeConfig.destBytesOverhead =
@@ -1947,7 +1950,7 @@ contract EVM2EVMMultiOnRamp_applyTokenTransferFeeConfigUpdates is EVM2EVMMultiOn
 
   function test_InvalidDestBytesOverhead_Revert() public {
     EVM2EVMMultiOnRamp.TokenTransferFeeConfigArgs[] memory tokenTransferFeeConfigArgs =
-      generateTokenTransferFeeConfigArgs(1, 1);
+      _generateTokenTransferFeeConfigArgs(1, 1);
     tokenTransferFeeConfigArgs[0].destChainSelector = DEST_CHAIN_SELECTOR;
     tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].token = address(5);
     tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].tokenTransferFeeConfig = EVM2EVMMultiOnRamp
