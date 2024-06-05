@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"sort"
 	"sync/atomic"
 	"time"
 
@@ -46,19 +47,10 @@ func (p *Plugin) Query(ctx context.Context, outctx ocr3types.OutcomeContext) (ty
 }
 
 func getPendingExecutedReports(ctx context.Context, ccipReader cciptypes.CCIPReader, dest cciptypes.ChainSelector, ts time.Time) (cciptypes.ExecutePluginCommitObservations, time.Time, error) {
-	oldestReport := time.Time{}
-
+	latestReport := time.Time{}
 	commitReports, err := ccipReader.CommitReportsGTETimestamp(ctx, dest, ts, 1000)
 	if err != nil {
 		return nil, time.Time{}, err
-	}
-
-	// Grab the oldest report.
-	// TODO: If this is guaranteed to be in order, could grab the last one instead of checking all.
-	for _, report := range commitReports {
-		if report.Timestamp.After(oldestReport) {
-			oldestReport = report.Timestamp
-		}
 	}
 
 	groupedCommits := groupByChainSelector(commitReports)
@@ -90,7 +82,16 @@ func getPendingExecutedReports(ctx context.Context, ccipReader cciptypes.CCIPRea
 		}
 	}
 
-	return groupedCommits, oldestReport, nil
+	// Put back in a single slice
+
+	sort.Slice(commitReports, func(i, j int) bool {
+		return commitReports[i].BlockNum < commitReports[j].BlockNum
+	})
+	if len(commitReports) > 0 {
+		latestReport = commitReports[len(commitReports)-1].Timestamp
+	}
+
+	return groupedCommits, latestReport, nil
 }
 
 // Observation collects data across two phases which happen in separate rounds.
@@ -119,6 +120,9 @@ func (p *Plugin) Observation(ctx context.Context, outctx ocr3types.OutcomeContex
 		}
 		// Update timestamp to the last report.
 		p.lastReportTS.Store(oldestReport.UnixMilli())
+
+		// TODO: truncate grouped commits to a maximum observation size.
+		//       Cache everything which is not executed.
 	}
 
 	// Phase 2: Gather messages from the source chains and build the execution report.
@@ -178,23 +182,56 @@ func (p *Plugin) ObservationQuorum(outctx ocr3types.OutcomeContext, query types.
 	return ocr3types.QuorumFPlusOne, nil
 }
 
-func (p *Plugin) Outcome(outctx ocr3types.OutcomeContext, query types.Query, aos []types.AttributedObservation) (ocr3types.Outcome, error) {
-	// TODO: do we care about f_chain here? I believe only commit is needs true consensus.
-	//       if we do, it would mainly be to prevent bad participants from invalidating the proofs with bad data.
-	// Aggregate messages from the current observations
-	aggregatedMessages := make(map[cciptypes.ChainSelector]map[cciptypes.SeqNum]cciptypes.Bytes32)
+/*
+// validatedObservations merges all observations which reach the fChain threshold into a single result.
+// Any observations, or subsets of observations, which do not reach the threshold are ignored.
+func validatedObservations(aos []decodedAttributedObservation, fChain map[cciptypes.ChainSelector]int) (cciptypes.ExecutePluginObservation, error) {
+	// TODO: validate and merge decoded observations into a single observation.
+
+	// Merge commit reports.
+	// Merge messages.
+	// Ensure f_Chain observations for all.
+
+	type reportCache struct {
+		end   uint64
+		count int
+		root  cciptypes.Bytes32
+	}
+
+	// Need some sort of cache to store the reports, there could be invalid reports, so we need to keep a tally
+	// of all versions to figure out which one is the most common and whether or not there are fChain observations.
+	// TODO: this may be easier if executions were stored separately from the reports.
+	reportCache := make(map[cciptypes.ChainSelector]map[cciptypes.Bytes32][]cciptypes.ExecutePluginCommitData)
 	for _, ao := range aos {
-		obs, err := cciptypes.DecodeExecutePluginObservation(ao.Observation)
+		for selector, commitReports := range ao.Observation.CommitReports {
+
+		}
+	}
+
+	return cciptypes.ExecutePluginObservation{}, nil
+}
+*/
+
+func (p *Plugin) Outcome(outctx ocr3types.OutcomeContext, query types.Query, aos []types.AttributedObservation) (ocr3types.Outcome, error) {
+	decodedObservations, err := decodeAttributedObservations(aos)
+	if err != nil {
+		return ocr3types.Outcome{}, err
+
+	}
+	if len(decodedObservations) < p.cfg.F {
+		return ocr3types.Outcome{}, fmt.Errorf("below F threshold")
+	}
+
+	// TODO: call mergeObservations instead of taking the first observation.
+	merged := decodedObservations[0].Observation
+	/*
+		merged, err := mergeObservations(decodedObservations, p.cfg.FChain)
 		if err != nil {
 			return ocr3types.Outcome{}, err
 		}
+	*/
 
-		for selector, messages := range obs.Messages {
-			for seqNr, message := range messages {
-				aggregatedMessages[selector][seqNr] = message
-			}
-		}
-	}
+	fmt.Println(merged)
 
 	// Reports from previous outcome
 	// TODO: Build the proof

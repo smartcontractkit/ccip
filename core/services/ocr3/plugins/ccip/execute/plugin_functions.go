@@ -10,6 +10,8 @@ import (
 	"github.com/smartcontractkit/libocr/commontypes"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 )
 
 // validateObserverReadingEligibility checks if the observer is eligible to observe the messages it observed.
@@ -194,4 +196,24 @@ func filterOutExecutedMessages(reports []cciptypes.ExecutePluginCommitData, exec
 	}
 
 	return filtered, nil
+}
+
+type decodedAttributedObservation struct {
+	Observation cciptypes.ExecutePluginObservation
+	Observer    commontypes.OracleID
+}
+
+func decodeAttributedObservations(aos []types.AttributedObservation) ([]decodedAttributedObservation, error) {
+	decoded := make([]decodedAttributedObservation, len(aos))
+	for i, ao := range aos {
+		observation, err := cciptypes.DecodeExecutePluginObservation(ao.Observation)
+		if err != nil {
+			return nil, err
+		}
+		decoded[i] = decodedAttributedObservation{
+			Observation: observation,
+			Observer:    ao.Observer,
+		}
+	}
+	return decoded, nil
 }

@@ -8,6 +8,8 @@ import (
 
 	"github.com/smartcontractkit/libocr/commontypes"
 
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
 
@@ -499,6 +501,114 @@ func Test_filterOutFullyExecutedMessages(t *testing.T) {
 				return
 			}
 			assert.Equalf(t, tt.want, got, "filterOutExecutedMessages(%v, %v)", tt.args.reports, tt.args.executedMessages)
+		})
+	}
+}
+
+func Test_decodeAttributedObservations(t *testing.T) {
+	mustEncode := func(obs cciptypes.ExecutePluginObservation) []byte {
+		enc, err := obs.Encode()
+		if err != nil {
+			t.Fatal("Unable to encode")
+		}
+		return enc
+	}
+	tests := []struct {
+		name    string
+		args    []types.AttributedObservation
+		want    []decodedAttributedObservation
+		wantErr assert.ErrorAssertionFunc
+	}{
+		// TODO: Add test cases.
+		{
+			name:    "empty",
+			args:    nil,
+			want:    []decodedAttributedObservation{},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "one observation",
+			args: []types.AttributedObservation{
+				{
+					Observer: commontypes.OracleID(1),
+					Observation: mustEncode(cciptypes.ExecutePluginObservation{
+						CommitReports: cciptypes.ExecutePluginCommitObservations{
+							1: {{MerkleRoot: cciptypes.Bytes32{1}}},
+						},
+					}),
+				},
+			},
+			want: []decodedAttributedObservation{
+				{
+					Observer: commontypes.OracleID(1),
+					Observation: cciptypes.ExecutePluginObservation{
+						CommitReports: cciptypes.ExecutePluginCommitObservations{
+							1: {{MerkleRoot: cciptypes.Bytes32{1}}},
+						},
+					},
+				},
+			},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "multiple observations",
+			args: []types.AttributedObservation{
+				{
+					Observer: commontypes.OracleID(1),
+					Observation: mustEncode(cciptypes.ExecutePluginObservation{
+						CommitReports: cciptypes.ExecutePluginCommitObservations{
+							1: {{MerkleRoot: cciptypes.Bytes32{1}}},
+						},
+					}),
+				},
+				{
+					Observer: commontypes.OracleID(2),
+					Observation: mustEncode(cciptypes.ExecutePluginObservation{
+						CommitReports: cciptypes.ExecutePluginCommitObservations{
+							2: {{MerkleRoot: cciptypes.Bytes32{2}}},
+						},
+					}),
+				},
+			},
+			want: []decodedAttributedObservation{
+				{
+					Observer: commontypes.OracleID(1),
+					Observation: cciptypes.ExecutePluginObservation{
+						CommitReports: cciptypes.ExecutePluginCommitObservations{
+							1: {{MerkleRoot: cciptypes.Bytes32{1}}},
+						},
+					},
+				},
+				{
+					Observer: commontypes.OracleID(2),
+					Observation: cciptypes.ExecutePluginObservation{
+						CommitReports: cciptypes.ExecutePluginCommitObservations{
+							2: {{MerkleRoot: cciptypes.Bytes32{2}}},
+						},
+					},
+				},
+			},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "invalid observation",
+			args: []types.AttributedObservation{
+				{
+					Observer:    commontypes.OracleID(1),
+					Observation: []byte("invalid"),
+				},
+			},
+			want:    nil,
+			wantErr: assert.Error,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := decodeAttributedObservations(tt.args)
+			if !tt.wantErr(t, err, fmt.Sprintf("decodeAttributedObservations(%v)", tt.args)) {
+				return
+			}
+			assert.Equalf(t, tt.want, got, "decodeAttributedObservations(%v)", tt.args)
 		})
 	}
 }
