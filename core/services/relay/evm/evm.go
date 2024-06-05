@@ -325,8 +325,30 @@ func (r *Relayer) NewCCIPExecProvider(rargs commontypes.RelayArgs, pargs commont
 
 	versionFinder := ccip.NewEvmVersionFinder()
 
-	relayOpts := types.NewRelayOpts(rargs)
+	var execPluginConfig ccipconfig.ExecPluginConfig
+	err := json.Unmarshal(pargs.PluginConfig, &execPluginConfig)
+	if err != nil {
+		return nil, err
+	}
 
+	usdcConfig := execPluginConfig.USDCConfig
+
+	if execPluginConfig.IsSourceProvider {
+		return NewSrcExecProvider(
+			r.lggr,
+			versionFinder,
+			r.chain.Client(),
+			r.chain.LogPoller(),
+			execPluginConfig.SourceStartBlock,
+			execPluginConfig.JobID,
+			usdcConfig.AttestationAPI,
+			int(usdcConfig.AttestationAPITimeoutSeconds),
+			usdcConfig.AttestationAPIIntervalMilliseconds,
+			usdcConfig.SourceMessageTransmitterAddress,
+		)
+	}
+
+	relayOpts := types.NewRelayOpts(rargs)
 	configWatcher, err := newStandardConfigProvider(ctx, r.lggr, r.chain, relayOpts)
 	if err != nil {
 		return nil, err
@@ -348,37 +370,14 @@ func (r *Relayer) NewCCIPExecProvider(rargs commontypes.RelayArgs, pargs commont
 		return nil, err
 	}
 
-	var execPluginConfig ccipconfig.ExecPluginConfig
-	err = json.Unmarshal(pargs.PluginConfig, &execPluginConfig)
-	if err != nil {
-		return nil, err
-	}
-
-	usdcConfig := execPluginConfig.USDCConfig
-
-	if execPluginConfig.IsSourceProvider {
-		return NewSrcExecProvider(
-			r.lggr,
-			versionFinder,
-			r.chain.Client(),
-			r.chain.LogPoller(),
-			execPluginConfig.SourceStartBlock,
-			contractTransmitter,
-			configWatcher,
-			execPluginConfig.JobID,
-			usdcConfig.AttestationAPI,
-			int(usdcConfig.AttestationAPITimeoutSeconds),
-			usdcConfig.AttestationAPIIntervalMilliseconds,
-			usdcConfig.SourceMessageTransmitterAddress,
-		)
-	}
-
 	return NewDstExecProvider(
 		r.lggr,
 		versionFinder,
 		r.chain.Client(),
 		r.chain.LogPoller(),
 		execPluginConfig.DestStartBlock,
+		contractTransmitter,
+		configWatcher,
 		r.chain.GasEstimator(),
 		*r.chain.Config().EVM().GasEstimator().PriceMax().ToInt(),
 	)

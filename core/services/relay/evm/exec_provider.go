@@ -27,8 +27,6 @@ type SrcExecProvider struct {
 	client                                 client.Client
 	lp                                     logpoller.LogPoller
 	startBlock                             uint64
-	contractTransmitter                    *contractTransmitter
-	configWatcher                          *configWatcher
 	gasEstimator                           gas.EvmFeeEstimator
 	maxGasPrice                            big.Int
 	jobID                                  string
@@ -45,8 +43,6 @@ func NewSrcExecProvider(
 	client client.Client,
 	lp logpoller.LogPoller,
 	startBlock uint64,
-	contractTransmitter *contractTransmitter,
-	configWatcher *configWatcher,
 	jobID string,
 	usdcAttestationAPI string,
 	usdcAttestationAPITimeoutSeconds int,
@@ -67,8 +63,6 @@ func NewSrcExecProvider(
 		client:                                 client,
 		lp:                                     lp,
 		startBlock:                             startBlock,
-		contractTransmitter:                    contractTransmitter,
-		configWatcher:                          configWatcher,
 		usdcReader:                             *usdcReader,
 		usdcAttestationAPI:                     usdcAttestationAPI,
 		usdcAttestationAPITimeoutSeconds:       usdcAttestationAPITimeoutSeconds,
@@ -80,8 +74,7 @@ func NewSrcExecProvider(
 }
 
 func (s SrcExecProvider) Name() string {
-	//TODO implement me
-	panic("implement me")
+	return "CCIP.SrcExecProvider"
 }
 
 func (s SrcExecProvider) Start(ctx context.Context) error {
@@ -105,15 +98,15 @@ func (s SrcExecProvider) HealthReport() map[string]error {
 }
 
 func (s SrcExecProvider) OffchainConfigDigester() ocrtypes.OffchainConfigDigester {
-	return s.configWatcher.OffchainConfigDigester()
+	panic("OffchainConfigDigester called on SrcExecProvider. It should only be called on DstExecProvider")
 }
 
 func (s SrcExecProvider) ContractConfigTracker() ocrtypes.ContractConfigTracker {
-	return s.configWatcher.ContractConfigTracker()
+	panic("ContractConfigTracker called on SrcExecProvider. It should only be called on DstExecProvider")
 }
 
 func (s SrcExecProvider) ContractTransmitter() ocrtypes.ContractTransmitter {
-	return s.contractTransmitter
+	panic("ContractTransmitter called on SrcExecProvider. It should only be called on DstExecProvider")
 }
 
 func (s SrcExecProvider) ChainReader() commontypes.ChainReader {
@@ -188,13 +181,15 @@ func (s SrcExecProvider) SourceNativeToken(ctx context.Context, sourceRouterAddr
 }
 
 type DstExecProvider struct {
-	lggr          logger.Logger
-	versionFinder ccip.VersionFinder
-	client        client.Client
-	lp            logpoller.LogPoller
-	startBlock    uint64
-	gasEstimator  gas.EvmFeeEstimator
-	maxGasPrice   big.Int
+	lggr                logger.Logger
+	versionFinder       ccip.VersionFinder
+	client              client.Client
+	lp                  logpoller.LogPoller
+	startBlock          uint64
+	contractTransmitter *contractTransmitter
+	configWatcher       *configWatcher
+	gasEstimator        gas.EvmFeeEstimator
+	maxGasPrice         big.Int
 }
 
 func NewDstExecProvider(
@@ -203,17 +198,21 @@ func NewDstExecProvider(
 	client client.Client,
 	lp logpoller.LogPoller,
 	startBlock uint64,
+	contractTransmitter *contractTransmitter,
+	configWatcher *configWatcher,
 	gasEstimator gas.EvmFeeEstimator,
 	maxGasPrice big.Int,
 ) (commontypes.CCIPExecProvider, error) {
 	return &DstExecProvider{
-		lggr:          lggr,
-		versionFinder: versionFinder,
-		client:        client,
-		lp:            lp,
-		startBlock:    startBlock,
-		gasEstimator:  gasEstimator,
-		maxGasPrice:   maxGasPrice,
+		lggr:                lggr,
+		versionFinder:       versionFinder,
+		client:              client,
+		lp:                  lp,
+		startBlock:          startBlock,
+		contractTransmitter: contractTransmitter,
+		configWatcher:       configWatcher,
+		gasEstimator:        gasEstimator,
+		maxGasPrice:         maxGasPrice,
 	}, nil
 }
 
@@ -242,15 +241,15 @@ func (d DstExecProvider) HealthReport() map[string]error {
 }
 
 func (d DstExecProvider) OffchainConfigDigester() ocrtypes.OffchainConfigDigester {
-	panic("OffchainConfigDigester called on DstExecProvider. It should only be called on SrcExecProvider.")
+	return d.configWatcher.OffchainConfigDigester()
 }
 
 func (d DstExecProvider) ContractConfigTracker() ocrtypes.ContractConfigTracker {
-	panic("ContractConfigTracker called on DstExecProvider. It should only be called on SrcExecProvider.")
+	return d.configWatcher.ContractConfigTracker()
 }
 
 func (d DstExecProvider) ContractTransmitter() ocrtypes.ContractTransmitter {
-	panic("ContractTransmitter called on DstExecProvider. It should only be called on SrcExecProvider.")
+	return d.contractTransmitter
 }
 
 func (d DstExecProvider) ChainReader() commontypes.ChainReader {

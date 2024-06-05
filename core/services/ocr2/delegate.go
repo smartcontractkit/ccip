@@ -1958,7 +1958,7 @@ func (d *Delegate) newServicesCCIPExecution(ctx context.Context, lggr logger.Sug
 	if err != nil {
 		return nil, errors.Wrap(err, "get offRamp static config")
 	}
-	// Get Src Chain ID from Provider
+	// Use OffRampReader to get src chain ID and fetch the src relayer
 	offRampAddress := cciptypes.Address(common.HexToAddress(spec.ContractID).String())
 	offRampReader, err := dstProvider.NewOffRampReader(ctx, offRampAddress)
 	if err != nil {
@@ -1998,7 +1998,6 @@ func (d *Delegate) newServicesCCIPExecution(ctx context.Context, lggr logger.Sug
 	if err != nil {
 		return nil, err
 	}
-	panic(fmt.Sprintf("%v", provider.Name()))
 	srcProvider, ok := provider.(types.CCIPExecProvider)
 	if !ok {
 		return nil, errors.New("could not coerce PluginProvider to CCIPExecProvider")
@@ -2007,8 +2006,8 @@ func (d *Delegate) newServicesCCIPExecution(ctx context.Context, lggr logger.Sug
 	oracleArgsNoPlugin2 := libocr2.OCR2OracleArgs{
 		BinaryNetworkEndpointFactory: d.peerWrapper.Peer2,
 		V2Bootstrappers:              bootstrapPeers,
-		ContractTransmitter:          srcProvider.ContractTransmitter(),
-		ContractConfigTracker:        srcProvider.ContractConfigTracker(),
+		ContractTransmitter:          dstProvider.ContractTransmitter(),
+		ContractConfigTracker:        dstProvider.ContractConfigTracker(),
 		Database:                     ocrDB,
 		LocalConfig:                  lc,
 		MonitoringEndpoint: d.monitoringEndpointGen.GenMonitoringEndpoint(
@@ -2017,7 +2016,7 @@ func (d *Delegate) newServicesCCIPExecution(ctx context.Context, lggr logger.Sug
 			spec.ContractID,
 			synchronization.OCR2CCIPExec,
 		),
-		OffchainConfigDigester: srcProvider.OffchainConfigDigester(),
+		OffchainConfigDigester: dstProvider.OffchainConfigDigester(),
 		OffchainKeyring:        kb,
 		OnchainKeyring:         kb,
 		MetricsRegisterer:      prometheus.WrapRegistererWith(map[string]string{"job_name": jb.Name.ValueOrZero()}, prometheus.DefaultRegisterer),

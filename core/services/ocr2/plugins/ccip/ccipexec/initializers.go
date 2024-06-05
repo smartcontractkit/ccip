@@ -479,7 +479,7 @@ func extractJobSpecParams(lggr logger.Logger, jb job.Job, chainSet legacyevm.Leg
 		return nil, err
 	}
 
-	destChain, dstChainID, err := ccipconfig.GetChainFromSpec(spec, chainSet)
+	destChain, _, err := ccipconfig.GetChainFromSpec(spec, chainSet)
 	if err != nil {
 		return nil, err
 	}
@@ -505,8 +505,6 @@ func extractJobSpecParams(lggr logger.Logger, jb job.Job, chainSet legacyevm.Leg
 	if err != nil {
 		return nil, errors.Wrap(err, "open source chain")
 	}
-
-	panic(fmt.Sprintf("srcChainID: %v, dstChainID: %v", chainID, dstChainID))
 
 	return &jobSpecParams{
 		pluginConfig:  pluginConfig,
