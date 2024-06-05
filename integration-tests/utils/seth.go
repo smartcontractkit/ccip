@@ -1,8 +1,8 @@
 package utils
 
 import (
+	"errors"
 	"fmt"
-	"strconv"
 
 	"github.com/rs/zerolog"
 	"github.com/smartcontractkit/seth"
@@ -81,40 +81,33 @@ func MustReplaceSimulatedNetworkUrlWithK8(l zerolog.Logger, network blockchain.E
 // ValidateSethNetworkConfig validates the Seth network config
 func ValidateSethNetworkConfig(cfg *seth.Network) error {
 	if cfg == nil {
-		return fmt.Errorf("Network cannot be nil")
-	}
-	if cfg.ChainID == "" {
-		return fmt.Errorf("ChainID is required")
-	}
-	_, err := strconv.Atoi(cfg.ChainID)
-	if err != nil {
-		return fmt.Errorf("ChainID needs to be a number")
+		return errors.New("network cannot be nil")
 	}
 	if cfg.URLs == nil || len(cfg.URLs) == 0 {
-		return fmt.Errorf("URLs are required")
+		return errors.New("URLs are required")
 	}
 	if cfg.PrivateKeys == nil || len(cfg.PrivateKeys) == 0 {
-		return fmt.Errorf("PrivateKeys are required")
+		return errors.New("PrivateKeys are required")
 	}
 	if cfg.TransferGasFee == 0 {
-		return fmt.Errorf("TransferGasFee needs to be above 0. It's the gas fee for a simple transfer transaction")
+		return errors.New("TransferGasFee needs to be above 0. It's the gas fee for a simple transfer transaction")
 	}
 	if cfg.TxnTimeout.Duration() == 0 {
-		return fmt.Errorf("TxnTimeout needs to be above 0. It's the timeout for a transaction")
+		return errors.New("TxnTimeout needs to be above 0. It's the timeout for a transaction")
 	}
 	if cfg.EIP1559DynamicFees {
 		if cfg.GasFeeCap == 0 {
-			return fmt.Errorf("GasFeeCap needs to be above 0. It's the maximum fee per gas for a transaction (including tip)")
+			return errors.New("GasFeeCap needs to be above 0. It's the maximum fee per gas for a transaction (including tip)")
 		}
 		if cfg.GasTipCap == 0 {
-			return fmt.Errorf("GasTipCap needs to be above 0. It's the maximum tip per gas for a transaction")
+			return errors.New("GasTipCap needs to be above 0. It's the maximum tip per gas for a transaction")
 		}
 		if cfg.GasFeeCap <= cfg.GasTipCap {
-			return fmt.Errorf("GasFeeCap needs to be above GasTipCap (as it is base fee + tip cap)")
+			return errors.New("GasFeeCap needs to be above GasTipCap (as it is base fee + tip cap)")
 		}
 	} else {
 		if cfg.GasPrice == 0 {
-			return fmt.Errorf("GasPrice needs to be above 0. It's the price of gas for a transaction")
+			return errors.New("GasPrice needs to be above 0. It's the price of gas for a transaction")
 		}
 	}
 
