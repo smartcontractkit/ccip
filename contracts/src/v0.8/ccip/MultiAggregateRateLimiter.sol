@@ -160,14 +160,8 @@ contract MultiAggregateRateLimiter is IMessageInterceptor, OwnerIsCreator {
 
   /// @notice Applies the provided rate limiter config updates.
   /// @param rateLimiterUpdates Rate limiter updates
-  /// @dev should only be callable by the owner or token limit admin
+  /// @dev should only be callable by the owner
   function applyRateLimiterConfigUpdates(RateLimiterConfigArgs[] memory rateLimiterUpdates) external onlyOwner {
-    _applyRateLimiterConfigUpdates(rateLimiterUpdates);
-  }
-
-  /// @notice Applies the provided rate limiter config updates.
-  /// @param rateLimiterUpdates Rate limiter updates
-  function _applyRateLimiterConfigUpdates(RateLimiterConfigArgs[] memory rateLimiterUpdates) internal {
     for (uint256 i = 0; i < rateLimiterUpdates.length; ++i) {
       RateLimiterConfigArgs memory updateArgs = rateLimiterUpdates[i];
       RateLimiter.Config memory configUpdate = updateArgs.rateLimiterConfig;
