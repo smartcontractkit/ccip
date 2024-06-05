@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 
+	"github.com/avast/retry-go/v4"
 	"golang.org/x/sync/errgroup"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
@@ -115,4 +117,16 @@ func IsTxRevertError(err error) bool {
 	// Nethermind, Parity, OpenEthereum eth_call reverts with "VM execution error"
 	// See: https://github.com/ethereum/go-ethereum/issues/21886
 	return strings.Contains(err.Error(), "execution reverted") || strings.Contains(err.Error(), "VM execution error")
+}
+
+// RetryUntilSuccess repeatedly calls fn until it returns a nil error. After each failed call there is an exponential
+// backoff applied, between initialDelay and maxDelay.
+func RetryUntilSuccess[T any](fn func() (T, error), initialDelay time.Duration, maxDelay time.Duration) (T, error) {
+	return retry.DoWithData(
+		fn,
+		retry.Delay(initialDelay),
+		retry.MaxDelay(maxDelay),
+		retry.DelayType(retry.BackOffDelay),
+		retry.UntilSucceeded(),
+	)
 }
