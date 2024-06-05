@@ -648,14 +648,14 @@ func runBatchingStrategyTests(t *testing.T, strategy BatchingStrategy, available
 			mockOffRampReader := ccipdatamocks.NewOffRampReader(t)
 			mockOffRampReader.On("ListSenderNonces", mock.Anything, mock.Anything).Return(tc.offRampNoncesBySender, nil).Maybe()
 
+			// default case for ZKOverflowBatchingStrategy
+			if strategyType := reflect.TypeOf(strategy); tc.mockTxm == nil && strategyType == reflect.TypeOf(&ZKOverflowBatchingStrategy{}) && tc.expectedSeqNrs != nil {
+				strategy.(*ZKOverflowBatchingStrategy).txManagerFake.(*MockTxmFake).On("FindTxsByIdempotencyPrefix", mock.Anything, mock.Anything).Return([]status{}, nil)
+			}
+
 			// Mock calls to TXM
 			if tc.mockTxm != nil {
 				tc.mockTxm(strategy.(*ZKOverflowBatchingStrategy).txManagerFake.(*MockTxmFake))
-			}
-
-			// default case for ZKOverflowBatchingStrategy
-			if strategyType := reflect.TypeOf(strategy); tc.mockTxm == nil && strategyType == reflect.TypeOf(&ZKOverflowBatchingStrategy{}) {
-				strategy.(*ZKOverflowBatchingStrategy).txManagerFake.(*MockTxmFake).On("FindTxsByIdempotencyPrefix", mock.Anything, mock.Anything).Return([]status{}, nil)
 			}
 
 			batchContext := &BatchContext{
