@@ -71,13 +71,13 @@ func (p *LMJobSpecParams) Validate() error {
 }
 
 func (p *LMJobSpecParams) JobSpec() *OCR3TaskJobSpec {
-	pluginConfig := map[string]interface{}{
+	// NOTE: doing a workaround to specify rebalancerConfig in the pluginConfig
+	pluginConfig := job.JSONConfig{
+		"closePluginTimeoutSec":   fmt.Sprintf(`%d`, 10),
 		"liquidityManagerAddress": fmt.Sprintf(`"%s"`, p.LiquidityManagerAddress.Hex()),
-		"liquidityManagerNetwork": fmt.Sprintf(`"%d"`, p.NetworkSelector),
-		"closePluginTimeoutSec":   10,
-		"rebalancerConfig": map[string]interface{}{
-			"type": p.Type,
-		},
+		"liquidityManagerNetwork": fmt.Sprintf(`"%d"`, p.NetworkSelector) + `
+[pluginConfig.rebalancerConfig]
+type = ` + fmt.Sprintf("\"%s\"\n", p.Type),
 	}
 
 	relayCfg := map[string]interface{}{
