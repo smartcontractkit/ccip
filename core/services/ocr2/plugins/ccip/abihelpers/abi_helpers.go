@@ -131,44 +131,58 @@ func DecodeOCR2Config(encoded []byte) (*ocr2aggregator.OCR2AggregatorConfigSet, 
 
 // create const encode and decode
 const (
-	ENCODE = 1
-	DECODE = 2
+	ENCODE = iota
+	DECODE
 )
+
+type abiCache struct {
+	cache map[string]*abi.ABI
+	mu    *sync.RWMutex
+}
+
+func newAbiCache() *abiCache {
+	return &abiCache{
+		cache: make(map[string]*abi.ABI),
+		mu:    &sync.RWMutex{},
+	}
+}
 
 // Global cache for ABIs to avoid parsing the same ABI multiple times
 // As the module is already a helper module and not a service, we can keep the cache global
 // It's private to the package and can't be accessed from outside
-var abiCache = make(map[string]*abi.ABI)
-
-// Mutex to access the map in a thread safe way
-var mutex sync.Mutex
+var myAbiCache = newAbiCache()
 
 // This Function is used to get the ABI from the cache or create a new one and cache it for later use
 // operationType is used to differentiate between encoding and decoding
 // encoding uses a definition with `inputs` and decoding uses a definition with `outputs` (check inDef)
 func getABI(abiStr string, operationType uint8) (*abi.ABI, error) {
-	mutex.Lock()
-	defer mutex.Unlock()
 
 	var operationStr string
-	if operationType == ENCODE {
+	switch operationType {
+	case ENCODE:
 		operationStr = "inputs"
-	} else if operationType == DECODE {
+	case DECODE:
 		operationStr = "outputs"
-	} else {
+	default:
 		return nil, fmt.Errorf("invalid operation type")
 	}
 
 	inDef := fmt.Sprintf(`[{ "name" : "method", "type": "function", "%s": %s}]`, operationStr, abiStr)
 
-	if cachedAbi, found := abiCache[inDef]; found {
+	myAbiCache.mu.RLock()
+	if cachedAbi, found := myAbiCache.cache[inDef]; found {
+		myAbiCache.mu.RUnlock() // unlocking before returning
 		return cachedAbi, nil
 	}
+	myAbiCache.mu.RUnlock()
+
+	myAbiCache.mu.Lock()
+	defer myAbiCache.mu.Unlock()
 
 	res, err := abi.JSON(strings.NewReader(inDef))
 	if err != nil {
 		return nil, err
 	}
-	abiCache[inDef] = &res
+	myAbiCache.cache[inDef] = &res
 	return &res, nil
 }
