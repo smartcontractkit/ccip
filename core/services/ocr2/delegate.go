@@ -1884,47 +1884,12 @@ func (d *Delegate) newServicesCCIPExecution(ctx context.Context, lggr logger.Sug
 	if err != nil {
 		return nil, fmt.Errorf("ccip services; failed to get chain %s: %w", dstRid.ChainID, err)
 	}
-	ccipProvider, err2 := evmrelay.NewCCIPExecutionProvider(
-		ctx,
-		lggr.Named("CCIPExec"),
-		dstChain,
-		types.RelayArgs{
-			ExternalJobID: jb.ExternalJobID,
-			JobID:         spec.ID,
-			ContractID:    spec.ContractID,
-			RelayConfig:   spec.RelayConfig.Bytes(),
-			New:           d.isNewlyCreatedJob,
-		},
-		transmitterID,
-		d.ethKs,
-	)
-	if err2 != nil {
-		return nil, err2
-	}
-	oracleArgsNoPlugin := libocr2.OCR2OracleArgs{
-		BinaryNetworkEndpointFactory: d.peerWrapper.Peer2,
-		V2Bootstrappers:              bootstrapPeers,
-		ContractTransmitter:          ccipProvider.ContractTransmitter(),
-		ContractConfigTracker:        ccipProvider.ContractConfigTracker(),
-		Database:                     ocrDB,
-		LocalConfig:                  lc,
-		MonitoringEndpoint: d.monitoringEndpointGen.GenMonitoringEndpoint(
-			dstRid.Network,
-			dstRid.ChainID,
-			spec.ContractID,
-			synchronization.OCR2CCIPExec,
-		),
-		OffchainConfigDigester: ccipProvider.OffchainConfigDigester(),
-		OffchainKeyring:        kb,
-		OnchainKeyring:         kb,
-		MetricsRegisterer:      prometheus.WrapRegistererWith(map[string]string{"job_name": jb.Name.ValueOrZero()}, prometheus.DefaultRegisterer),
-	}
+
 	logError := func(msg string) {
 		lggr.ErrorIf(d.jobORM.RecordError(context.Background(), jb.ID, msg), "unable to record error")
 	}
 
 	// PROVIDER BASED ARG CONSTRUCTION
-
 	// Write PluginConfig bytes to send source/dest relayer provider + info outside of top level rargs/pargs over the wire
 	var pluginJobSpecConfig ccipconfig.ExecPluginJobSpecConfig
 	err = json.Unmarshal(spec.PluginConfig.Bytes(), &pluginJobSpecConfig)
@@ -2037,7 +2002,6 @@ func (d *Delegate) newServicesCCIPExecution(ctx context.Context, lggr logger.Sug
 		MetricsRegisterer:      prometheus.WrapRegistererWith(map[string]string{"job_name": jb.Name.ValueOrZero()}, prometheus.DefaultRegisterer),
 	}
 
-	ccipexec.NewExecServices(ctx, lggr, jb, d.legacyChains, d.isNewlyCreatedJob, oracleArgsNoPlugin, logError)
 	return ccipexec.NewExecServices2(ctx, lggr, jb, srcProvider, dstProvider, srcChain, dstChain, int64(srcChainID), dstChainID, d.legacyChains, d.isNewlyCreatedJob, oracleArgsNoPlugin2, logError)
 }
 
