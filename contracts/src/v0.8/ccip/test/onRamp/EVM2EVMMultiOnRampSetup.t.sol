@@ -10,6 +10,7 @@ import {Internal} from "../../libraries/Internal.sol";
 import {EVM2EVMMultiOnRamp} from "../../onRamp/EVM2EVMMultiOnRamp.sol";
 import {LockReleaseTokenPool} from "../../pools/LockReleaseTokenPool.sol";
 import {TokenPool} from "../../pools/TokenPool.sol";
+import {TokenAdminRegistry} from "../../tokenAdminRegistry/TokenAdminRegistry.sol";
 import {TokenSetup} from "../TokenSetup.t.sol";
 import {EVM2EVMMultiOnRampHelper} from "../helpers/EVM2EVMMultiOnRampHelper.sol";
 import {PriceRegistrySetup} from "../priceRegistry/PriceRegistry.t.sol";
@@ -100,25 +101,8 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
       })
     );
 
-    s_onRamp = new EVM2EVMMultiOnRampHelper(
-      EVM2EVMMultiOnRamp.StaticConfig({
-        linkToken: s_sourceTokens[0],
-        chainSelector: SOURCE_CHAIN_SELECTOR,
-        maxNopFeesJuels: MAX_NOP_FEES_JUELS,
-        rmnProxy: address(s_mockRMN)
-      }),
-      generateDynamicMultiOnRampConfig(address(s_sourceRouter), address(s_priceRegistry), address(s_tokenAdminRegistry)),
-      generateDestChainConfigArgs(),
-      getOutboundRateLimiterConfig(),
-      s_premiumMultiplierWeiPerEthArgs,
-      s_tokenTransferFeeConfigArgs,
-      getMultiOnRampNopsAndWeights()
-    );
-    s_onRamp.setAdmin(ADMIN);
-
-    s_metadataHash = keccak256(
-      abi.encode(Internal.EVM_2_EVM_MESSAGE_HASH, SOURCE_CHAIN_SELECTOR, DEST_CHAIN_SELECTOR, address(s_onRamp))
-    );
+    (s_onRamp, s_metadataHash) =
+      _deployOnRamp(SOURCE_CHAIN_SELECTOR, address(s_sourceRouter), address(s_tokenAdminRegistry));
 
     s_offRamps = new address[](2);
     s_offRamps[0] = address(10);
@@ -182,12 +166,69 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
     uint256 feeTokenAmount,
     address originalSender
   ) public view returns (Internal.EVM2EVMMessage memory) {
+    return _messageToEvent(
+      message,
+      SOURCE_CHAIN_SELECTOR,
+      seqNum,
+      nonce,
+      feeTokenAmount,
+      originalSender,
+      s_metadataHash,
+      s_tokenAdminRegistry
+    );
+    // // Slicing is only available for calldata. So we have to build a new bytes array.
+    // bytes memory args = new bytes(message.extraArgs.length - 4);
+    // for (uint256 i = 4; i < message.extraArgs.length; ++i) {
+    //   args[i - 4] = message.extraArgs[i];
+    // }
+    // uint256 numberOfTokens = message.tokenAmounts.length;
+    // Internal.EVM2EVMMessage memory messageEvent = Internal.EVM2EVMMessage({
+    //   sequenceNumber: seqNum,
+    //   feeTokenAmount: feeTokenAmount,
+    //   sender: originalSender,
+    //   nonce: nonce,
+    //   gasLimit: abi.decode(args, (Client.EVMExtraArgsV1)).gasLimit,
+    //   strict: false,
+    //   sourceChainSelector: SOURCE_CHAIN_SELECTOR,
+    //   receiver: abi.decode(message.receiver, (address)),
+    //   data: message.data,
+    //   tokenAmounts: message.tokenAmounts,
+    //   sourceTokenData: new bytes[](numberOfTokens),
+    //   feeToken: message.feeToken,
+    //   messageId: ""
+    // });
+
+    // for (uint256 i = 0; i < numberOfTokens; ++i) {
+    //   address sourcePool = s_sourcePoolByToken[message.tokenAmounts[i].token];
+    //   address destPool = s_destPoolBySourceToken[message.tokenAmounts[i].token];
+    //   messageEvent.sourceTokenData[i] = abi.encode(
+    //     Internal.SourceTokenData({
+    //       sourcePoolAddress: abi.encode(sourcePool),
+    //       destPoolAddress: abi.encode(destPool),
+    //       extraData: ""
+    //     })
+    //   );
+    // }
+
+    // messageEvent.messageId = Internal._hash(messageEvent, s_metadataHash);
+    // return messageEvent;
+  }
+
+  function _messageToEvent(
+    Client.EVM2AnyMessage memory message,
+    uint64 sourChainSelector,
+    uint64 seqNum,
+    uint64 nonce,
+    uint256 feeTokenAmount,
+    address originalSender,
+    bytes32 metadaHash,
+    TokenAdminRegistry tokenAdminRegistry
+  ) internal view returns (Internal.EVM2EVMMessage memory) {
     // Slicing is only available for calldata. So we have to build a new bytes array.
     bytes memory args = new bytes(message.extraArgs.length - 4);
     for (uint256 i = 4; i < message.extraArgs.length; ++i) {
       args[i - 4] = message.extraArgs[i];
     }
-    uint256 numberOfTokens = message.tokenAmounts.length;
     Internal.EVM2EVMMessage memory messageEvent = Internal.EVM2EVMMessage({
       sequenceNumber: seqNum,
       feeTokenAmount: feeTokenAmount,
@@ -195,28 +236,26 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
       nonce: nonce,
       gasLimit: abi.decode(args, (Client.EVMExtraArgsV1)).gasLimit,
       strict: false,
-      sourceChainSelector: SOURCE_CHAIN_SELECTOR,
+      sourceChainSelector: sourChainSelector,
       receiver: abi.decode(message.receiver, (address)),
       data: message.data,
       tokenAmounts: message.tokenAmounts,
-      sourceTokenData: new bytes[](numberOfTokens),
+      sourceTokenData: new bytes[](message.tokenAmounts.length),
       feeToken: message.feeToken,
       messageId: ""
     });
 
-    for (uint256 i = 0; i < numberOfTokens; ++i) {
-      address sourcePool = s_sourcePoolByToken[message.tokenAmounts[i].token];
-      address destPool = s_destPoolBySourceToken[message.tokenAmounts[i].token];
+    for (uint256 i = 0; i < message.tokenAmounts.length; ++i) {
       messageEvent.sourceTokenData[i] = abi.encode(
         Internal.SourceTokenData({
-          sourcePoolAddress: abi.encode(sourcePool),
-          destPoolAddress: abi.encode(destPool),
+          sourcePoolAddress: abi.encode(tokenAdminRegistry.getTokenConfig(message.tokenAmounts[i].token).tokenPool),
+          destPoolAddress: abi.encode(s_destPoolBySourceToken[message.tokenAmounts[i].token]),
           extraData: ""
         })
       );
     }
 
-    messageEvent.messageId = Internal._hash(messageEvent, s_metadataHash);
+    messageEvent.messageId = Internal._hash(messageEvent, metadaHash);
     return messageEvent;
   }
 
@@ -277,6 +316,51 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
     nopsAndWeights[1] = EVM2EVMMultiOnRamp.NopAndWeight({nop: USER_2, weight: 52935});
     nopsAndWeights[2] = EVM2EVMMultiOnRamp.NopAndWeight({nop: USER_3, weight: 8});
     return nopsAndWeights;
+  }
+
+  function _deployOnRamp(
+    address linkToken,
+    address rmnProxy,
+    address priceRegistry,
+    uint64 sourceChainSelector,
+    address sourceRouter,
+    address tokenAdminRegistry
+  ) internal returns (EVM2EVMMultiOnRampHelper, bytes32 metadataHash) {
+    EVM2EVMMultiOnRampHelper onRamp = new EVM2EVMMultiOnRampHelper(
+      EVM2EVMMultiOnRamp.StaticConfig({
+        linkToken: linkToken,
+        chainSelector: sourceChainSelector,
+        maxNopFeesJuels: MAX_NOP_FEES_JUELS,
+        rmnProxy: rmnProxy
+      }),
+      generateDynamicMultiOnRampConfig(sourceRouter, priceRegistry, tokenAdminRegistry),
+      generateDestChainConfigArgs(),
+      getOutboundRateLimiterConfig(),
+      s_premiumMultiplierWeiPerEthArgs,
+      s_tokenTransferFeeConfigArgs,
+      getMultiOnRampNopsAndWeights()
+    );
+    onRamp.setAdmin(ADMIN);
+
+    return (
+      onRamp,
+      keccak256(abi.encode(Internal.EVM_2_EVM_MESSAGE_HASH, sourceChainSelector, DEST_CHAIN_SELECTOR, address(onRamp)))
+    );
+  }
+
+  function _deployOnRamp(
+    uint64 sourceChainSelector,
+    address sourceRouter,
+    address tokenAdminRegistry
+  ) internal returns (EVM2EVMMultiOnRampHelper, bytes32 metadataHash) {
+    return _deployOnRamp(
+      s_sourceTokens[0],
+      address(s_mockRMN),
+      address(s_priceRegistry),
+      sourceChainSelector,
+      sourceRouter,
+      tokenAdminRegistry
+    );
   }
 
   function assertDestChainConfigsEqual(

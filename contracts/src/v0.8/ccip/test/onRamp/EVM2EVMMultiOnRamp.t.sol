@@ -53,15 +53,7 @@ contract EVM2EVMMultiOnRamp_constructor is EVM2EVMMultiOnRampSetup {
       s_premiumMultiplierWeiPerEthArgs[1].token, s_premiumMultiplierWeiPerEthArgs[1].premiumMultiplierWeiPerEth
     );
 
-    s_onRamp = new EVM2EVMMultiOnRampHelper(
-      staticConfig,
-      dynamicConfig,
-      destChainConfigArgs,
-      getOutboundRateLimiterConfig(),
-      s_premiumMultiplierWeiPerEthArgs,
-      s_tokenTransferFeeConfigArgs,
-      getMultiOnRampNopsAndWeights()
-    );
+    _deployOnRamp(SOURCE_CHAIN_SELECTOR, address(s_sourceRouter), address(s_tokenAdminRegistry));
 
     EVM2EVMMultiOnRamp.DestChainConfig memory expectedDestChainConfig = EVM2EVMMultiOnRamp.DestChainConfig({
       dynamicConfig: destChainConfigArg.dynamicConfig,
@@ -96,71 +88,38 @@ contract EVM2EVMMultiOnRamp_constructor is EVM2EVMMultiOnRampSetup {
   }
 
   function test_Constructor_InvalidConfigLinkTokenEqAddressZero_Revert() public {
-    EVM2EVMMultiOnRamp.DynamicConfig memory dynamicConfig =
-      generateDynamicMultiOnRampConfig(address(s_sourceRouter), address(s_priceRegistry), address(s_tokenAdminRegistry));
-    EVM2EVMMultiOnRamp.DestChainConfigArgs[] memory destChainConfigArgs = generateDestChainConfigArgs();
-    EVM2EVMMultiOnRamp.StaticConfig memory staticConfig = EVM2EVMMultiOnRamp.StaticConfig({
-      linkToken: address(0),
-      chainSelector: SOURCE_CHAIN_SELECTOR,
-      maxNopFeesJuels: MAX_NOP_FEES_JUELS,
-      rmnProxy: address(s_mockRMN)
-    });
-
     vm.expectRevert(EVM2EVMMultiOnRamp.InvalidConfig.selector);
-    s_onRamp = new EVM2EVMMultiOnRampHelper(
-      staticConfig,
-      dynamicConfig,
-      destChainConfigArgs,
-      getOutboundRateLimiterConfig(),
-      s_premiumMultiplierWeiPerEthArgs,
-      s_tokenTransferFeeConfigArgs,
-      getMultiOnRampNopsAndWeights()
+    _deployOnRamp(
+      address(0),
+      address(s_mockRMN),
+      address(s_priceRegistry),
+      SOURCE_CHAIN_SELECTOR,
+      address(s_sourceRouter),
+      address(s_tokenAdminRegistry)
     );
   }
 
   function test_Constructor_InvalidConfigLinkChainSelectorEqZero_Revert() public {
-    EVM2EVMMultiOnRamp.DynamicConfig memory dynamicConfig =
-      generateDynamicMultiOnRampConfig(address(s_sourceRouter), address(s_priceRegistry), address(s_tokenAdminRegistry));
-    EVM2EVMMultiOnRamp.DestChainConfigArgs[] memory destChainConfigArgs = generateDestChainConfigArgs();
-    EVM2EVMMultiOnRamp.StaticConfig memory staticConfig = EVM2EVMMultiOnRamp.StaticConfig({
-      linkToken: s_sourceTokens[0],
-      chainSelector: 0,
-      maxNopFeesJuels: MAX_NOP_FEES_JUELS,
-      rmnProxy: address(s_mockRMN)
-    });
-
     vm.expectRevert(EVM2EVMMultiOnRamp.InvalidConfig.selector);
-    s_onRamp = new EVM2EVMMultiOnRampHelper(
-      staticConfig,
-      dynamicConfig,
-      destChainConfigArgs,
-      getOutboundRateLimiterConfig(),
-      s_premiumMultiplierWeiPerEthArgs,
-      s_tokenTransferFeeConfigArgs,
-      getMultiOnRampNopsAndWeights()
+    _deployOnRamp(
+      address(s_sourceTokens[0]),
+      address(s_mockRMN),
+      address(s_priceRegistry),
+      0,
+      address(s_sourceRouter),
+      address(s_tokenAdminRegistry)
     );
   }
 
   function test_Constructor_InvalidConfigRMNProxyEqAddressZero_Revert() public {
-    EVM2EVMMultiOnRamp.DynamicConfig memory dynamicConfig =
-      generateDynamicMultiOnRampConfig(address(s_sourceRouter), address(s_priceRegistry), address(s_tokenAdminRegistry));
-    EVM2EVMMultiOnRamp.DestChainConfigArgs[] memory destChainConfigArgs = generateDestChainConfigArgs();
-    EVM2EVMMultiOnRamp.StaticConfig memory staticConfig = EVM2EVMMultiOnRamp.StaticConfig({
-      linkToken: s_sourceTokens[0],
-      chainSelector: SOURCE_CHAIN_SELECTOR,
-      maxNopFeesJuels: MAX_NOP_FEES_JUELS,
-      rmnProxy: address(0)
-    });
-
     vm.expectRevert(EVM2EVMMultiOnRamp.InvalidConfig.selector);
-    s_onRamp = new EVM2EVMMultiOnRampHelper(
-      staticConfig,
-      dynamicConfig,
-      destChainConfigArgs,
-      getOutboundRateLimiterConfig(),
-      s_premiumMultiplierWeiPerEthArgs,
-      s_tokenTransferFeeConfigArgs,
-      getMultiOnRampNopsAndWeights()
+    _deployOnRamp(
+      address(s_sourceTokens[0]),
+      address(0),
+      address(s_priceRegistry),
+      SOURCE_CHAIN_SELECTOR,
+      address(s_sourceRouter),
+      address(s_tokenAdminRegistry)
     );
   }
 }

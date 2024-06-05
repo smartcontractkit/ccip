@@ -43,57 +43,20 @@ contract MultiRampsE2E is EVM2EVMMultiOnRampSetup, MultiCommitStoreSetup, EVM2EV
 
       s_sourcePoolByDestPool[s_destPoolBySourceToken[token]] = pool;
 
-      s_tokenAdminRegistry2.registerAdministratorPermissioned(token, OWNER);
-      s_tokenAdminRegistry2.setPool(token, pool);
-
-      TokenPool.ChainUpdate[] memory chainUpdates = new TokenPool.ChainUpdate[](1);
-      chainUpdates[0] = TokenPool.ChainUpdate({
-        remoteChainSelector: DEST_CHAIN_SELECTOR,
-        remotePoolAddress: abi.encode(s_destPoolByToken[s_destTokens[i]]),
-        allowed: true,
-        outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
-        inboundRateLimiterConfig: getInboundRateLimiterConfig()
-      });
-
-      TokenPool(pool).applyChainUpdates(chainUpdates);
+      _setPool(s_tokenAdminRegistry2, token, pool, DEST_CHAIN_SELECTOR, s_destPoolByToken[s_destTokens[i]]);
     }
 
     for (uint256 i = 0; i < s_destTokens.length; ++i) {
       address token = s_destTokens[i];
       address pool = s_destPoolByToken[token];
 
-      TokenPool.ChainUpdate[] memory chainUpdates = new TokenPool.ChainUpdate[](1);
-      chainUpdates[0] = TokenPool.ChainUpdate({
-        remoteChainSelector: SOURCE_CHAIN_SELECTOR + 1,
-        remotePoolAddress: abi.encode(s_sourcePoolByDestPool[pool]),
-        allowed: true,
-        outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
-        inboundRateLimiterConfig: getInboundRateLimiterConfig()
-      });
-
-      TokenPool(pool).applyChainUpdates(chainUpdates);
+      _setPool(s_tokenAdminRegistry2, token, pool, SOURCE_CHAIN_SELECTOR + 1, s_sourcePoolByDestPool[pool]);
     }
 
     // Deploy the new source chain onramp
-    s_onRamp2 = new EVM2EVMMultiOnRampHelper(
-      EVM2EVMMultiOnRamp.StaticConfig({
-        linkToken: s_sourceTokens[0],
-        chainSelector: SOURCE_CHAIN_SELECTOR + 1,
-        maxNopFeesJuels: MAX_NOP_FEES_JUELS,
-        rmnProxy: address(s_mockRMN)
-      }),
-      generateDynamicMultiOnRampConfig(
-        address(s_sourceRouter2), address(s_priceRegistry), address(s_tokenAdminRegistry2)
-      ),
-      generateDestChainConfigArgs(),
-      getOutboundRateLimiterConfig(),
-      s_premiumMultiplierWeiPerEthArgs,
-      s_tokenTransferFeeConfigArgs,
-      getMultiOnRampNopsAndWeights()
-    );
-    s_metadataHash2 = keccak256(
-      abi.encode(Internal.EVM_2_EVM_MESSAGE_HASH, SOURCE_CHAIN_SELECTOR + 1, DEST_CHAIN_SELECTOR, address(s_onRamp2))
-    );
+    // Outsource to shared helper function with EVM2EVMMultiOnRampSetup
+    (s_onRamp2, s_metadataHash2) =
+      _deployOnRamp(SOURCE_CHAIN_SELECTOR + 1, address(s_sourceRouter2), address(s_tokenAdminRegistry2));
 
     // Deploy MultiCommitStore. We need to redeploy the MultiCommitStore because we need to update the first chain onramp address.
     MultiCommitStore.SourceChainConfigArgs[] memory sourceChainConfigArgs =
@@ -138,13 +101,8 @@ contract MultiRampsE2E is EVM2EVMMultiOnRampSetup, MultiCommitStoreSetup, EVM2EV
       prevOffRamp: address(0),
       onRamp: address(s_onRamp2)
     });
-    s_offRamp.applySourceChainConfigUpdates(sourceChainConfigs);
 
-    // Set offramp on destination chain router for both source chains
-    Router.OffRamp[] memory offRampUpdates = new Router.OffRamp[](2);
-    offRampUpdates[0] = Router.OffRamp({sourceChainSelector: SOURCE_CHAIN_SELECTOR, offRamp: address(s_offRamp)});
-    offRampUpdates[1] = Router.OffRamp({sourceChainSelector: SOURCE_CHAIN_SELECTOR + 1, offRamp: address(s_offRamp)});
-    s_destRouter.applyRampUpdates(new Router.OnRamp[](0), new Router.OffRamp[](0), offRampUpdates);
+    _setupMultipleOffRampsFromConfigs(sourceChainConfigs);
   }
 
   function test_E2E_3MessagesSuccess_gas() public {
@@ -268,24 +226,9 @@ contract MultiRampsE2E is EVM2EVMMultiOnRampSetup, MultiCommitStoreSetup, EVM2EV
     IERC20(s_sourceTokens[1]).approve(address(router), i_tokenAmount1);
 
     message.receiver = abi.encode(address(s_receiver));
-    Internal.EVM2EVMMessage memory msgEvent = _messageToEvent(message, expectedSeqNum, nonce, expectedFee, OWNER);
-
-    msgEvent.sourceChainSelector = sourceChainSelector;
-
-    for (uint256 i = 0; i < msgEvent.tokenAmounts.length; ++i) {
-      address token = message.tokenAmounts[i].token;
-      address sourcePool = tokenAdminRegistry.getTokenConfig(token).tokenPool;
-      address destPool = s_destPoolBySourceToken[message.tokenAmounts[i].token];
-      msgEvent.sourceTokenData[i] = abi.encode(
-        Internal.SourceTokenData({
-          sourcePoolAddress: abi.encode(sourcePool),
-          destPoolAddress: abi.encode(destPool),
-          extraData: ""
-        })
-      );
-    }
-
-    msgEvent.messageId = msgEvent._hash(metadataHash);
+    Internal.EVM2EVMMessage memory msgEvent = _messageToEvent(
+      message, sourceChainSelector, expectedSeqNum, nonce, expectedFee, OWNER, metadataHash, tokenAdminRegistry
+    );
 
     vm.expectEmit();
     emit EVM2EVMMultiOnRamp.CCIPSendRequested(msgEvent);
