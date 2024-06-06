@@ -5,9 +5,12 @@ on:
     branches:
       - ccip-develop
       - release/*
+    tags:
+      - v*
   pull_request:
     branches:
       - release/*
+
 
 jobs:
   verify-version:
@@ -27,8 +30,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          current_chain_selector_version="$(go list -m -f '{{.Version}}' github.com/smartcontractkit/chain-selectors)"
-          latest_chain_selector_version="$(gh release view -R smartcontractkit/chain-selectors --json tagName --jq '.tagName')"
+          current_chain_selector_version=$(go list -m -f '{{.Version}}' github.com/smartcontractkit/chain-selectors)
+          latest_chain_selector_version=$(gh release view -R smartcontractkit/chain-selectors --json tagName --jq '.tagName')
 
           if [ "$current_chain_selector_version" != "$latest_chain_selector_version" ]; then
             echo "::error Chain Selectors version mismatch. Current version: $current_chain_selector_version, Latest version: $latest_chain_selector_version"
