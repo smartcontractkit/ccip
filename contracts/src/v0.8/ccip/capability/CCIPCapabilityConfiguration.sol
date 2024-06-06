@@ -90,7 +90,7 @@ contract CCIPCapabilityConfiguration is ITypeAndVersion, ICapabilityConfiguratio
     uint64 chainSelector; //         | The (remote) chain that the configuration is for.
     uint8 F; //                      | The "big F" parameter for the role DON.
     uint64 offchainConfigVersion; // ╯ The version of the offchain configuration.
-    address offramp; // The remote chain offramp+commit store address.
+    bytes32 offrampAddress; // The remote chain combined (offramp|commit store) address.
     bytes32[2][] signers; // An associative array that contains (onchain signer public key, p2p id) pairs.
     bytes32[2][] transmitters; // An associative array that contains (transmitter, p2p id) pairs.
     bytes offchainConfig; // The offchain configuration for the OCR3 protocol. Protobuf encoded.
@@ -365,7 +365,7 @@ contract CCIPCapabilityConfiguration is ITypeAndVersion, ICapabilityConfiguratio
       revert InvalidPluginType();
     }
 
-    if (cfg.offramp == address(0)) {
+    if (cfg.offrampAddress == bytes32("")) {
       revert OfframpAddressCannotBeZero();
     }
 
@@ -431,7 +431,7 @@ contract CCIPCapabilityConfiguration is ITypeAndVersion, ICapabilityConfiguratio
         ocr3Config.chainSelector,
         donId,
         ocr3Config.pluginType,
-        ocr3Config.offramp,
+        ocr3Config.offrampAddress,
         configCount,
         ocr3Config.signers,
         ocr3Config.transmitters,
