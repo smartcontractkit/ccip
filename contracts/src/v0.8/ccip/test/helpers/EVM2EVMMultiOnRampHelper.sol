@@ -11,15 +11,17 @@ contract EVM2EVMMultiOnRampHelper is EVM2EVMMultiOnRamp, IgnoreContractSize {
     DestChainConfigArgs[] memory destChainConfigs,
     RateLimiter.Config memory rateLimiterConfig,
     FeeTokenConfigArgs[] memory feeTokenConfigs,
-    TokenTransferFeeConfigArgs[] memory tokenTransferFeeConfigArgs
+    TokenTransferFeeConfigArgs[] memory tokenTransferFeeConfigArgs,
+    PremiumMultiplierWeiPerEthArgs[] memory premiumMultiplierWeiPerEthArgs,
+    TokenTransferFeeConfigArgs[] memory tokenTransferFeeConfigArgs,
   )
     EVM2EVMMultiOnRamp(
       staticConfig,
       dynamicConfig,
       destChainConfigs,
       rateLimiterConfig,
-      feeTokenConfigs,
-      tokenTransferFeeConfigArgs
+      premiumMultiplierWeiPerEthArgs,
+      tokenTransferFeeConfigArgs,
     )
   {}
 
