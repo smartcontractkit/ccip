@@ -54,8 +54,4 @@ contract CCIPCapabilityConfigurationHelper is CCIPCapabilityConfiguration {
   function updatePluginConfig(uint32 donId, PluginType pluginType, OCR3Config[] memory newConfig) public {
     _updatePluginConfig(donId, pluginType, newConfig);
   }
-
-  function getPluginOCRConfig(uint32 donId, PluginType pluginType) public view returns (OCR3ConfigWithMeta[] memory) {
-    return s_ocr3Configs[donId][pluginType];
-  }
 }

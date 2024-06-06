@@ -152,6 +152,14 @@ contract CCIPCapabilityConfiguration is ITypeAndVersion, ICapabilityConfiguratio
     return chainConfigs;
   }
 
+  /// @notice Returns the OCR configuration for the given don ID and plugin type.
+  /// @param donId The DON ID.
+  /// @param pluginType The plugin type.
+  /// @return The OCR3 configurations, up to 2 (blue and green).
+  function getOCRConfig(uint32 donId, PluginType pluginType) external view returns (OCR3ConfigWithMeta[] memory) {
+    return s_ocr3Configs[donId][pluginType];
+  }
+
   // ================================================================
   // │                    Capability Configuration                  │
   // ================================================================

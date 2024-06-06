@@ -1129,7 +1129,7 @@ contract CCIPCapabilityConfiguration__updatePluginConfig is CCIPCapabilityConfig
 
     // should see the updated config in the contract state.
     CCIPCapabilityConfiguration.OCR3ConfigWithMeta[] memory storedConfig =
-      s_ccipCC.getPluginOCRConfig(donId, CCIPCapabilityConfiguration.PluginType.Commit);
+      s_ccipCC.getOCRConfig(donId, CCIPCapabilityConfiguration.PluginType.Commit);
     assertEq(storedConfig.length, 1, "don config length must be 1");
     assertEq(storedConfig[0].configCount, uint64(1), "config count must be 1");
     assertEq(uint256(storedConfig[0].config.pluginType), uint256(blueConfig.pluginType), "plugin type must match");
@@ -1173,7 +1173,7 @@ contract CCIPCapabilityConfiguration__updatePluginConfig is CCIPCapabilityConfig
 
     // should see the updated config in the contract state.
     CCIPCapabilityConfiguration.OCR3ConfigWithMeta[] memory storedConfig =
-      s_ccipCC.getPluginOCRConfig(donId, CCIPCapabilityConfiguration.PluginType.Commit);
+      s_ccipCC.getOCRConfig(donId, CCIPCapabilityConfiguration.PluginType.Commit);
     assertEq(storedConfig.length, 2, "don config length must be 2");
     // 0 index is blue config, 1 index is green config.
     assertEq(storedConfig[1].configCount, uint64(2), "config count must be 2");
@@ -1229,7 +1229,7 @@ contract CCIPCapabilityConfiguration__updatePluginConfig is CCIPCapabilityConfig
 
     // should see the updated config in the contract state.
     CCIPCapabilityConfiguration.OCR3ConfigWithMeta[] memory storedConfig =
-      s_ccipCC.getPluginOCRConfig(donId, CCIPCapabilityConfiguration.PluginType.Commit);
+      s_ccipCC.getOCRConfig(donId, CCIPCapabilityConfiguration.PluginType.Commit);
     assertEq(storedConfig.length, 2, "don config length must be 2");
     // 0 index is blue config, 1 index is green config.
     assertEq(storedConfig[1].configCount, uint64(2), "config count must be 2");
@@ -1253,7 +1253,7 @@ contract CCIPCapabilityConfiguration__updatePluginConfig is CCIPCapabilityConfig
     s_ccipCC.updatePluginConfig(donId, CCIPCapabilityConfiguration.PluginType.Commit, promote);
 
     // should see the updated config in the contract state.
-    storedConfig = s_ccipCC.getPluginOCRConfig(donId, CCIPCapabilityConfiguration.PluginType.Commit);
+    storedConfig = s_ccipCC.getOCRConfig(donId, CCIPCapabilityConfiguration.PluginType.Commit);
     assertEq(storedConfig.length, 1, "don config length must be 1");
     assertEq(storedConfig[0].configCount, uint64(2), "config count must be 2");
     assertEq(
@@ -1313,7 +1313,7 @@ contract CCIPCapabilityConfiguration_beforeCapabilityConfigSet is CCIPCapability
     s_ccipCC.beforeCapabilityConfigSet(new bytes32[](0), encoded, 1, donId);
 
     CCIPCapabilityConfiguration.OCR3ConfigWithMeta[] memory storedConfigs =
-      s_ccipCC.getPluginOCRConfig(donId, CCIPCapabilityConfiguration.PluginType.Commit);
+      s_ccipCC.getOCRConfig(donId, CCIPCapabilityConfiguration.PluginType.Commit);
     assertEq(storedConfigs.length, 1, "config length must be 1");
     assertEq(storedConfigs[0].configCount, uint64(1), "config count must be 1");
     assertEq(
@@ -1345,7 +1345,7 @@ contract CCIPCapabilityConfiguration_beforeCapabilityConfigSet is CCIPCapability
     s_ccipCC.beforeCapabilityConfigSet(new bytes32[](0), encoded, 1, donId);
 
     CCIPCapabilityConfiguration.OCR3ConfigWithMeta[] memory storedConfigs =
-      s_ccipCC.getPluginOCRConfig(donId, CCIPCapabilityConfiguration.PluginType.Execution);
+      s_ccipCC.getOCRConfig(donId, CCIPCapabilityConfiguration.PluginType.Execution);
     assertEq(storedConfigs.length, 1, "config length must be 1");
     assertEq(storedConfigs[0].configCount, uint64(1), "config count must be 1");
     assertEq(
@@ -1388,7 +1388,7 @@ contract CCIPCapabilityConfiguration_beforeCapabilityConfigSet is CCIPCapability
     s_ccipCC.beforeCapabilityConfigSet(new bytes32[](0), encoded, 1, donId);
 
     CCIPCapabilityConfiguration.OCR3ConfigWithMeta[] memory storedExecConfigs =
-      s_ccipCC.getPluginOCRConfig(donId, CCIPCapabilityConfiguration.PluginType.Execution);
+      s_ccipCC.getOCRConfig(donId, CCIPCapabilityConfiguration.PluginType.Execution);
     assertEq(storedExecConfigs.length, 1, "config length must be 1");
     assertEq(storedExecConfigs[0].configCount, uint64(1), "config count must be 1");
     assertEq(
@@ -1398,7 +1398,7 @@ contract CCIPCapabilityConfiguration_beforeCapabilityConfigSet is CCIPCapability
     );
 
     CCIPCapabilityConfiguration.OCR3ConfigWithMeta[] memory storedCommitConfigs =
-      s_ccipCC.getPluginOCRConfig(donId, CCIPCapabilityConfiguration.PluginType.Commit);
+      s_ccipCC.getOCRConfig(donId, CCIPCapabilityConfiguration.PluginType.Commit);
     assertEq(storedCommitConfigs.length, 1, "config length must be 1");
     assertEq(storedCommitConfigs[0].configCount, uint64(1), "config count must be 1");
     assertEq(
