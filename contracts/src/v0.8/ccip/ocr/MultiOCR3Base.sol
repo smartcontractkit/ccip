@@ -164,8 +164,9 @@ abstract contract MultiOCR3Base is ITypeAndVersion, OwnerIsCreator {
       address[] memory signers = ocrConfigArgs.signers;
       ocrConfig.signers = signers;
 
-      // TODO: contract size golfing - try to split this to internal function
-      uint256 signersLength = signers.length;
+      uint8 signersLength = uint8(signers.length);
+      configInfo.n = signersLength;
+
       if (signersLength > MAX_NUM_ORACLES) revert InvalidConfig(InvalidConfigErrorType.TOO_MANY_SIGNERS);
       if (signersLength <= 3 * ocrConfigArgs.F) revert InvalidConfig(InvalidConfigErrorType.F_TOO_HIGH);
 
@@ -177,7 +178,6 @@ abstract contract MultiOCR3Base is ITypeAndVersion, OwnerIsCreator {
     ocrConfig.transmitters = transmitters;
     configInfo.F = ocrConfigArgs.F;
     configInfo.configDigest = ocrConfigArgs.configDigest;
-    configInfo.n = newTransmittersLength;
 
     emit ConfigSet(
       ocrPluginType, ocrConfigArgs.configDigest, ocrConfig.signers, ocrConfigArgs.transmitters, ocrConfigArgs.F

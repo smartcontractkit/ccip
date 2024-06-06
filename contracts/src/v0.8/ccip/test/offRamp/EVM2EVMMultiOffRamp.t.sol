@@ -115,7 +115,7 @@ contract EVM2EVMMultiOffRamp_constructor is EVM2EVMMultiOffRampSetup {
       configInfo: MultiOCR3Base.ConfigInfo({
         configDigest: ocrConfigs[0].configDigest,
         F: ocrConfigs[0].F,
-        n: uint8(s_validSigners.length),
+        n: 0,
         uniqueReports: ocrConfigs[0].uniqueReports,
         isSignatureVerificationEnabled: ocrConfigs[0].isSignatureVerificationEnabled
       }),

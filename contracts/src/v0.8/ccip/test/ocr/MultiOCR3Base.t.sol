@@ -386,7 +386,7 @@ contract MultiOCR3Base_setOCR3Configs is MultiOCR3BaseSetup {
       configInfo: MultiOCR3Base.ConfigInfo({
         configDigest: ocrConfigs[0].configDigest,
         F: ocrConfigs[0].F,
-        n: uint8(s_validSigners.length),
+        n: uint8(ocrConfigs[0].signers.length),
         uniqueReports: ocrConfigs[0].uniqueReports,
         isSignatureVerificationEnabled: ocrConfigs[0].isSignatureVerificationEnabled
       }),
@@ -427,7 +427,7 @@ contract MultiOCR3Base_setOCR3Configs is MultiOCR3BaseSetup {
       configInfo: MultiOCR3Base.ConfigInfo({
         configDigest: ocrConfigs[0].configDigest,
         F: ocrConfigs[0].F,
-        n: uint8(s_validTransmitters.length),
+        n: uint8(ocrConfigs[0].signers.length),
         uniqueReports: ocrConfigs[0].uniqueReports,
         isSignatureVerificationEnabled: ocrConfigs[0].isSignatureVerificationEnabled
       }),
@@ -467,7 +467,7 @@ contract MultiOCR3Base_setOCR3Configs is MultiOCR3BaseSetup {
       configInfo: MultiOCR3Base.ConfigInfo({
         configDigest: ocrConfigs[0].configDigest,
         F: ocrConfigs[0].F,
-        n: uint8(s_validTransmitters.length),
+        n: 0,
         uniqueReports: ocrConfigs[0].uniqueReports,
         isSignatureVerificationEnabled: ocrConfigs[0].isSignatureVerificationEnabled
       }),
@@ -598,7 +598,7 @@ contract MultiOCR3Base_setOCR3Configs is MultiOCR3BaseSetup {
       configInfo: MultiOCR3Base.ConfigInfo({
         configDigest: ocrConfig.configDigest,
         F: ocrConfig.F,
-        n: uint8(ocrConfig.transmitters.length),
+        n: ocrConfig.isSignatureVerificationEnabled ? uint8(ocrConfig.signers.length) : 0,
         uniqueReports: ocrConfig.uniqueReports,
         isSignatureVerificationEnabled: ocrConfig.isSignatureVerificationEnabled
       }),
@@ -644,7 +644,7 @@ contract MultiOCR3Base_setOCR3Configs is MultiOCR3BaseSetup {
       configInfo: MultiOCR3Base.ConfigInfo({
         configDigest: ocrConfigs[0].configDigest,
         F: ocrConfigs[0].F,
-        n: uint8(newTransmitters.length),
+        n: uint8(ocrConfigs[0].signers.length),
         uniqueReports: ocrConfigs[0].uniqueReports,
         isSignatureVerificationEnabled: ocrConfigs[0].isSignatureVerificationEnabled
       }),
@@ -705,7 +705,7 @@ contract MultiOCR3Base_setOCR3Configs is MultiOCR3BaseSetup {
       configInfo: MultiOCR3Base.ConfigInfo({
         configDigest: ocrConfigs[0].configDigest,
         F: ocrConfigs[0].F,
-        n: uint8(newSigners.length),
+        n: uint8(ocrConfigs[0].signers.length),
         uniqueReports: ocrConfigs[0].uniqueReports,
         isSignatureVerificationEnabled: ocrConfigs[0].isSignatureVerificationEnabled
       }),
