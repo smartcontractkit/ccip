@@ -437,6 +437,52 @@ contract MultiOCR3Base_setOCR3Configs is MultiOCR3BaseSetup {
     _assertOCRConfigEquality(s_multiOCR3.latestConfigDetails(0), expectedConfig);
   }
 
+  function test_SetConfigIgnoreSigners_Success() public {
+    uint8 F = 1;
+
+    _assertOCRConfigUnconfigured(s_multiOCR3.latestConfigDetails(0));
+
+    MultiOCR3Base.OCRConfigArgs[] memory ocrConfigs = new MultiOCR3Base.OCRConfigArgs[](1);
+    ocrConfigs[0] = MultiOCR3Base.OCRConfigArgs({
+      ocrPluginType: 0,
+      configDigest: _getBasicConfigDigest(F, new address[](0), s_validTransmitters),
+      F: F,
+      uniqueReports: false,
+      isSignatureVerificationEnabled: false,
+      signers: s_validSigners,
+      transmitters: s_validTransmitters
+    });
+
+    vm.expectEmit();
+    emit MultiOCR3Base.ConfigSet(
+      ocrConfigs[0].ocrPluginType,
+      ocrConfigs[0].configDigest,
+      s_emptySigners,
+      ocrConfigs[0].transmitters,
+      ocrConfigs[0].F
+    );
+    s_multiOCR3.setOCR3Configs(ocrConfigs);
+
+    MultiOCR3Base.OCRConfig memory expectedConfig = MultiOCR3Base.OCRConfig({
+      configInfo: MultiOCR3Base.ConfigInfo({
+        configDigest: ocrConfigs[0].configDigest,
+        F: ocrConfigs[0].F,
+        n: uint8(s_validTransmitters.length),
+        uniqueReports: ocrConfigs[0].uniqueReports,
+        isSignatureVerificationEnabled: ocrConfigs[0].isSignatureVerificationEnabled
+      }),
+      signers: s_emptySigners,
+      transmitters: s_validTransmitters
+    });
+    _assertOCRConfigEquality(s_multiOCR3.latestConfigDetails(0), expectedConfig);
+
+    // Verify no signer role is set
+    for (uint256 i = 0; i < s_validSigners.length; ++i) {
+      MultiOCR3Base.Oracle memory signerOracle = s_multiOCR3.getOracle(0, s_validSigners[i]);
+      assertEq(uint8(signerOracle.role), uint8(MultiOCR3Base.Role.Unset));
+    }
+  }
+
   function test_SetMultipleConfigs_Success() public {
     _assertOCRConfigUnconfigured(s_multiOCR3.latestConfigDetails(0));
     _assertOCRConfigUnconfigured(s_multiOCR3.latestConfigDetails(1));
@@ -505,6 +551,7 @@ contract MultiOCR3Base_setOCR3Configs is MultiOCR3BaseSetup {
   function test_Fuzz_SetConfig_Success(MultiOCR3Base.OCRConfigArgs memory ocrConfig, uint64 randomAddressOffset) public {
     // condition: cannot assume max oracle count
     vm.assume(ocrConfig.transmitters.length <= 31);
+    vm.assume(ocrConfig.signers.length <= 31);
 
     // condition: F > 0
     ocrConfig.F = uint8(bound(ocrConfig.F, 1, 3));
@@ -523,16 +570,13 @@ contract MultiOCR3Base_setOCR3Configs is MultiOCR3BaseSetup {
     } else {
       ocrConfig.isSignatureVerificationEnabled = true;
 
-      // condition: signers length must equal transmitters length
-      if (ocrConfig.signers.length != transmittersLength) {
-        ocrConfig.signers = new address[](transmittersLength);
-      }
-
       // condition: number of signers > 3F
       vm.assume(ocrConfig.signers.length > 3 * ocrConfig.F);
 
+      uint256 signersLength = ocrConfig.signers.length;
+
       // Force addresses to be unique - continuing generation with an offset after the transmitter addresses
-      for (uint160 i = 0; i < transmittersLength; ++i) {
+      for (uint160 i = 0; i < signersLength; ++i) {
         ocrConfig.signers[i] = vm.addr(PRIVATE0 + randomAddressOffset + i + transmittersLength);
         // condition: non-zero oracle address
         vm.assume(ocrConfig.signers[i] != address(0));
@@ -882,6 +926,28 @@ contract MultiOCR3Base_setOCR3Configs is MultiOCR3BaseSetup {
     vm.expectRevert(
       abi.encodeWithSelector(
         MultiOCR3Base.InvalidConfig.selector, MultiOCR3Base.InvalidConfigErrorType.TOO_MANY_TRANSMITTERS
+      )
+    );
+    s_multiOCR3.setOCR3Configs(ocrConfigs);
+  }
+
+  function test_TooManySigners_Revert() public {
+    address[] memory signers = new address[](32);
+
+    MultiOCR3Base.OCRConfigArgs[] memory ocrConfigs = new MultiOCR3Base.OCRConfigArgs[](1);
+    ocrConfigs[0] = MultiOCR3Base.OCRConfigArgs({
+      ocrPluginType: 0,
+      configDigest: _getBasicConfigDigest(1, signers, s_validTransmitters),
+      F: 1,
+      uniqueReports: false,
+      isSignatureVerificationEnabled: true,
+      signers: signers,
+      transmitters: s_validTransmitters
+    });
+
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        MultiOCR3Base.InvalidConfig.selector, MultiOCR3Base.InvalidConfigErrorType.TOO_MANY_SIGNERS
       )
     );
     s_multiOCR3.setOCR3Configs(ocrConfigs);

@@ -156,42 +156,47 @@ abstract contract MultiOCR3Base is ITypeAndVersion, OwnerIsCreator {
 
     if (newTransmittersLength > MAX_NUM_ORACLES) revert InvalidConfig(InvalidConfigErrorType.TOO_MANY_TRANSMITTERS);
 
-    address[] memory oldTransmitters = ocrConfig.transmitters;
-    for (uint256 i = 0; i < oldTransmitters.length; ++i) {
-      delete s_oracles[ocrPluginType][oldTransmitters[i]];
-    }
+    _clearOracleRoles(ocrPluginType, ocrConfig.transmitters);
 
-    bool isSignatureVerificationEnabled = ocrConfigArgs.isSignatureVerificationEnabled;
+    if (ocrConfigArgs.isSignatureVerificationEnabled) {
+      _clearOracleRoles(ocrPluginType, ocrConfig.signers);
 
-    if (isSignatureVerificationEnabled) {
-      address[] memory oldSigners = ocrConfig.signers;
-      for (uint256 i = 0; i < oldSigners.length; ++i) {
-        delete s_oracles[ocrPluginType][oldSigners[i]];
-      }
-
-      ocrConfig.signers = ocrConfigArgs.signers;
       address[] memory signers = ocrConfigArgs.signers;
-      uint8 newSignersLength = uint8(signers.length);
+      ocrConfig.signers = signers;
 
-      if (newSignersLength > MAX_NUM_ORACLES) revert InvalidConfig(InvalidConfigErrorType.TOO_MANY_SIGNERS);
-      if (signers.length <= 3 * ocrConfigArgs.F) revert InvalidConfig(InvalidConfigErrorType.F_TOO_HIGH);
+      // TODO: contract size golfing - try to split this to internal function
+      uint256 signersLength = signers.length;
+      if (signersLength > MAX_NUM_ORACLES) revert InvalidConfig(InvalidConfigErrorType.TOO_MANY_SIGNERS);
+      if (signersLength <= 3 * ocrConfigArgs.F) revert InvalidConfig(InvalidConfigErrorType.F_TOO_HIGH);
 
       _assignOracleRoles(ocrPluginType, signers, Role.Signer);
     }
 
     _assignOracleRoles(ocrPluginType, transmitters, Role.Transmitter);
 
-    // TODO: check contract size change with a struct assignment
     ocrConfig.transmitters = transmitters;
     configInfo.F = ocrConfigArgs.F;
     configInfo.configDigest = ocrConfigArgs.configDigest;
     configInfo.n = newTransmittersLength;
 
     emit ConfigSet(
-      ocrPluginType, ocrConfigArgs.configDigest, ocrConfigArgs.signers, ocrConfigArgs.transmitters, ocrConfigArgs.F
+      ocrPluginType, ocrConfigArgs.configDigest, ocrConfig.signers, ocrConfigArgs.transmitters, ocrConfigArgs.F
     );
   }
 
+  /// @notice Clears oracle roles for the provided oracle addresses
+  /// @param ocrPluginType OCR plugin type to clear roles for
+  /// @param oracleAddresses Oracle addresses to clear roles for
+  function _clearOracleRoles(uint8 ocrPluginType, address[] memory oracleAddresses) internal {
+    for (uint256 i = 0; i < oracleAddresses.length; ++i) {
+      delete s_oracles[ocrPluginType][oracleAddresses[i]];
+    }
+  }
+
+  /// @notice Assigns oracles roles for the provided oracle addresses with uniqueness verification
+  /// @param ocrPluginType OCR plugin type to assign roles for
+  /// @param oracleAddresses Oracle addresses to assign roles to
+  /// @param role Role to assign
   function _assignOracleRoles(uint8 ocrPluginType, address[] memory oracleAddresses, Role role) internal {
     for (uint8 i = 0; i < oracleAddresses.length; ++i) {
       address oracle = oracleAddresses[i];
