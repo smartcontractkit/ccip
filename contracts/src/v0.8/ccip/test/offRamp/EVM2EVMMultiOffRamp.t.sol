@@ -89,7 +89,7 @@ contract EVM2EVMMultiOffRamp_constructor is EVM2EVMMultiOffRampSetup {
 
     MultiOCR3Base.OCRConfigArgs[] memory ocrConfigs = new MultiOCR3Base.OCRConfigArgs[](1);
     ocrConfigs[0] = MultiOCR3Base.OCRConfigArgs({
-      ocrPluginType: uint8(EVM2EVMMultiOffRamp.OCRPluginType.EXECUTION),
+      ocrPluginType: uint8(EVM2EVMMultiOffRamp.OCRPluginType.Execution),
       configDigest: s_configDigest,
       F: s_F,
       uniqueReports: false,
@@ -110,7 +110,7 @@ contract EVM2EVMMultiOffRamp_constructor is EVM2EVMMultiOffRampSetup {
     EVM2EVMMultiOffRamp.DynamicConfig memory gotDynamicConfig = s_offRamp.getDynamicConfig();
     _assertSameConfig(dynamicConfig, gotDynamicConfig);
 
-    // OCR Cobnfig
+    // OCR Config
     MultiOCR3Base.OCRConfig memory expectedOCRConfig = MultiOCR3Base.OCRConfig({
       configInfo: MultiOCR3Base.ConfigInfo({
         configDigest: ocrConfigs[0].configDigest,
@@ -123,7 +123,7 @@ contract EVM2EVMMultiOffRamp_constructor is EVM2EVMMultiOffRampSetup {
       transmitters: s_validTransmitters
     });
     MultiOCR3Base.OCRConfig memory gotOCRConfig =
-      s_offRamp.latestConfigDetails(uint8(EVM2EVMMultiOffRamp.OCRPluginType.EXECUTION));
+      s_offRamp.latestConfigDetails(uint8(EVM2EVMMultiOffRamp.OCRPluginType.Execution));
     _assertOCRConfigEquality(expectedOCRConfig, gotOCRConfig);
 
     // uint64[] memory resultSourceChainSelectors = s_offRamp.getSourceChainSelectors();
@@ -1995,6 +1995,110 @@ contract EVM2EVMMultiOffRamp_report is EVM2EVMMultiOffRampSetup {
     vm.expectRevert();
     s_offRamp.reportExec(abi.encode(report));
   }
+}
+
+contract EVM2EVMMultiOffRamp_transmitExec is EVM2EVMMultiOffRampSetup {
+  function setUp() public virtual override {
+    super.setUp();
+    _setupMultipleOffRamps();
+  }
+
+  // Asserts that execute completes
+  function test_SingleReport_Success() public {
+    bytes32[3] memory reportContext = [s_configDigest, s_configDigest, s_configDigest];
+
+    Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1);
+    Internal.ExecutionReportSingleChain[] memory reports =
+      _generateBatchReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messages);
+
+    vm.expectEmit();
+    emit EVM2EVMMultiOffRamp.ExecutionStateChanged(
+      SOURCE_CHAIN_SELECTOR_1,
+      messages[0].sequenceNumber,
+      messages[0].messageId,
+      Internal.MessageExecutionState.SUCCESS,
+      ""
+    );
+
+    vm.expectEmit();
+    emit MultiOCR3Base.Transmitted(
+      uint8(EVM2EVMMultiOffRamp.OCRPluginType.Execution), s_configDigest, uint32(uint256(s_configDigest) >> 8)
+    );
+
+    vm.startPrank(s_validTransmitters[0]);
+    s_offRamp.transmitExec(reportContext, abi.encode(reports));
+  }
+
+  // Reverts
+
+  function test_UnauthorizedTransmitter_Revert() public {
+    bytes32[3] memory reportContext = [s_configDigest, s_configDigest, s_configDigest];
+
+    Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1);
+    Internal.ExecutionReportSingleChain[] memory reports =
+      _generateBatchReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messages);
+
+    vm.expectRevert(MultiOCR3Base.UnauthorizedTransmitter.selector);
+    s_offRamp.transmitExec(reportContext, abi.encode(reports));
+  }
+
+  function test_NoConfig_Revert() public {
+    _redeployOffRampWithNoOCRConfigs();
+
+    bytes32[3] memory reportContext = [bytes32(""), s_configDigest, s_configDigest];
+
+    Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1);
+    Internal.ExecutionReportSingleChain[] memory reports =
+      _generateBatchReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messages);
+
+    vm.startPrank(s_validTransmitters[0]);
+    vm.expectRevert(MultiOCR3Base.UnauthorizedTransmitter.selector);
+    s_offRamp.transmitExec(reportContext, abi.encode(reports));
+  }
+
+  function test_WrongConfigWithSigners_Revert() public {
+    _redeployOffRampWithNoOCRConfigs();
+
+    s_configDigest = _getBasicConfigDigest(1, s_validSigners, s_validTransmitters);
+
+    MultiOCR3Base.OCRConfigArgs[] memory ocrConfigs = new MultiOCR3Base.OCRConfigArgs[](1);
+    ocrConfigs[0] = MultiOCR3Base.OCRConfigArgs({
+      ocrPluginType: uint8(EVM2EVMMultiOffRamp.OCRPluginType.Execution),
+      configDigest: s_configDigest,
+      F: s_F,
+      uniqueReports: false,
+      isSignatureVerificationEnabled: true,
+      signers: s_validSigners,
+      transmitters: s_validTransmitters
+    });
+    s_offRamp.setOCR3Configs(ocrConfigs);
+
+    bytes32[3] memory reportContext = [s_configDigest, s_configDigest, s_configDigest];
+
+    Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1);
+    Internal.ExecutionReportSingleChain[] memory reports =
+      _generateBatchReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messages);
+
+    vm.startPrank(s_validTransmitters[0]);
+    vm.expectRevert();
+    s_offRamp.transmitExec(reportContext, abi.encode(reports));
+  }
+
+  function _redeployOffRampWithNoOCRConfigs() internal {
+    s_offRamp = new EVM2EVMMultiOffRampHelper(
+      EVM2EVMMultiOffRamp.StaticConfig({
+        commitStore: address(s_mockCommitStore),
+        chainSelector: DEST_CHAIN_SELECTOR,
+        rmnProxy: address(s_mockRMN)
+      }),
+      new EVM2EVMMultiOffRamp.SourceChainConfigArgs[](0)
+    );
+
+    s_offRamp.setDynamicConfig(generateDynamicMultiOffRampConfig(address(s_destRouter)));
+    _setupMultipleOffRamps();
+  }
+
+  // TODO: add revert test when transmitting with Commit transmitter instead of Exec transmitter
 }
 
 contract EVM2EVMMultiOffRamp_getExecutionState is EVM2EVMMultiOffRampSetup {

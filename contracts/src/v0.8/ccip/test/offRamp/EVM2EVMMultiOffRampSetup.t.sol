@@ -88,7 +88,7 @@ contract EVM2EVMMultiOffRampSetup is TokenSetup, PriceRegistrySetup, MultiOCR3Ba
 
     MultiOCR3Base.OCRConfigArgs[] memory ocrConfigs = new MultiOCR3Base.OCRConfigArgs[](1);
     ocrConfigs[0] = MultiOCR3Base.OCRConfigArgs({
-      ocrPluginType: uint8(EVM2EVMMultiOffRamp.OCRPluginType.EXECUTION),
+      ocrPluginType: uint8(EVM2EVMMultiOffRamp.OCRPluginType.Execution),
       configDigest: s_configDigest,
       F: s_F,
       uniqueReports: false,

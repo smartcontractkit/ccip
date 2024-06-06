@@ -150,8 +150,8 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
 
   /// @notice OCR plugin type, used to separate execution & commit transmissions and configs
   enum OCRPluginType {
-    EXECUTION,
-    COMMIT
+    Commit,
+    Execution
   }
 
   constructor(StaticConfig memory staticConfig, SourceChainConfigArgs[] memory sourceChainConfigs) MultiOCR3Base() {
@@ -287,7 +287,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
 
     // TODO: gas / contract size saving from CONSTANT?
     bytes32[] memory emptySigs = new bytes32[](0);
-    _transmit(uint8(OCRPluginType.EXECUTION), reportContext, report, emptySigs, emptySigs, bytes32(""));
+    _transmit(uint8(OCRPluginType.Execution), reportContext, report, emptySigs, emptySigs, bytes32(""));
   }
 
   /// @notice Reporting function for the execution plugin
