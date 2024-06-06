@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/pkg/errors"
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
@@ -57,7 +56,7 @@ func NewSrcExecProvider(
 	if usdcAttestationAPI != "" {
 		usdcReader, err = ccip.NewUSDCReader(lggr, jobID, usdcSrcMsgTransmitterAddr, lp, true)
 		if err != nil {
-			return nil, errors.Wrap(err, "new usdc reader")
+			return nil, fmt.Errorf("new usdc reader: %w", err)
 		}
 	}
 
@@ -151,12 +150,12 @@ func (s SrcExecProvider) NewPriceRegistryReader(ctx context.Context, addr ccipty
 func (s SrcExecProvider) NewTokenDataReader(ctx context.Context, tokenAddress cciptypes.Address) (tokenDataReader cciptypes.TokenDataReader, err error) {
 	attestationURI, err := url.ParseRequestURI(s.usdcAttestationAPI)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to parse USDC attestation API")
+		return nil, fmt.Errorf("failed to parse USDC attestation API: %w", err)
 	}
-
+	fmt.Errorf("")
 	tokenAddr, err := ccip.GenericAddrToEvm(tokenAddress)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to parse token address")
+		return nil, fmt.Errorf("failed to parse token address: %w", err)
 	}
 	tokenDataReader = usdc.NewUSDCTokenDataReader(
 		s.lggr,
