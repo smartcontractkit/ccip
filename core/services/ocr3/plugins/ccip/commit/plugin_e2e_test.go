@@ -5,17 +5,18 @@ import (
 	"reflect"
 	"testing"
 
+	cciptypes "github.com/smartcontractkit/ccipocr3/ccipocr3-dont-merge"
+
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/smartcontractkit/ccipocr3/internal/libs/testhelpers"
 	"github.com/smartcontractkit/ccipocr3/internal/mocks"
-	"github.com/smartcontractkit/ccipocr3/internal/reader"
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+	//cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
 
 func TestPlugin(t *testing.T) {
@@ -158,19 +159,15 @@ func TestPlugin(t *testing.T) {
 
 func setupEmptyOutcome(ctx context.Context, t *testing.T, lggr logger.Logger) []nodeSetup {
 	cfg := cciptypes.CommitPluginConfig{
-		DestChain: chainC,
-		FChain: map[cciptypes.ChainSelector]int{
-			chainC: 1,
-		},
-		ObserverInfo:        map[commontypes.OracleID]cciptypes.ObserverInfo{},
+		DestChain:           chainC,
 		PricedTokens:        []types.Account{tokenX},
 		TokenPricesObserver: false,
 		NewMsgScanBatchSize: 256,
 	}
 
-	homeChainConfig := reader.HomeChainConfig{
+	homeChainConfig := cciptypes.HomeChainConfig{
 		FChain:              map[cciptypes.ChainSelector]int{chainC: 1},
-		NodeSupportedChains: map[commontypes.OracleID]reader.SupportedChains{},
+		NodeSupportedChains: map[commontypes.OracleID]cciptypes.SupportedChains{},
 	}
 
 	return []nodeSetup{
@@ -182,29 +179,19 @@ func setupEmptyOutcome(ctx context.Context, t *testing.T, lggr logger.Logger) []
 
 func setupAllNodesReadAllChains(ctx context.Context, t *testing.T, lggr logger.Logger) []nodeSetup {
 	cfg := cciptypes.CommitPluginConfig{
-		DestChain: chainC,
-		FChain: map[cciptypes.ChainSelector]int{
-			chainA: 1,
-			chainB: 1,
-			chainC: 1,
-		},
-		ObserverInfo: map[commontypes.OracleID]cciptypes.ObserverInfo{
-			1: {Writer: true, Reads: []cciptypes.ChainSelector{chainA, chainB, chainC}},
-			2: {Writer: true, Reads: []cciptypes.ChainSelector{chainA, chainB, chainC}},
-			3: {Writer: true, Reads: []cciptypes.ChainSelector{chainA, chainB, chainC}},
-		},
+		DestChain:           chainC,
 		PricedTokens:        []types.Account{tokenX},
 		TokenPricesObserver: false,
 		NewMsgScanBatchSize: 256,
 	}
 
-	homeChainConfig := reader.HomeChainConfig{
+	homeChainConfig := cciptypes.HomeChainConfig{
 		FChain: map[cciptypes.ChainSelector]int{
 			chainA: 1,
 			chainB: 1,
 			chainC: 1,
 		},
-		NodeSupportedChains: map[commontypes.OracleID]reader.SupportedChains{
+		NodeSupportedChains: map[commontypes.OracleID]cciptypes.SupportedChains{
 			1: {Supported: mapset.NewSet[cciptypes.ChainSelector](chainA, chainB, chainC)},
 			2: {Supported: mapset.NewSet[cciptypes.ChainSelector](chainA, chainB, chainC)},
 			3: {Supported: mapset.NewSet[cciptypes.ChainSelector](chainA, chainB, chainC)},
@@ -251,29 +238,19 @@ func setupAllNodesReadAllChains(ctx context.Context, t *testing.T, lggr logger.L
 
 func setupNodesDoNotAgreeOnMsgs(ctx context.Context, t *testing.T, lggr logger.Logger) []nodeSetup {
 	cfg := cciptypes.CommitPluginConfig{
-		DestChain: chainC,
-		FChain: map[cciptypes.ChainSelector]int{
-			chainA: 1,
-			chainB: 1,
-			chainC: 1,
-		},
-		ObserverInfo: map[commontypes.OracleID]cciptypes.ObserverInfo{
-			1: {Writer: true, Reads: []cciptypes.ChainSelector{chainA, chainB, chainC}},
-			2: {Writer: true, Reads: []cciptypes.ChainSelector{chainA, chainB, chainC}},
-			3: {Writer: true, Reads: []cciptypes.ChainSelector{chainA, chainB, chainC}},
-		},
+		DestChain:           chainC,
 		PricedTokens:        []types.Account{tokenX},
 		TokenPricesObserver: false,
 		NewMsgScanBatchSize: 256,
 	}
 
-	homeChainConfig := reader.HomeChainConfig{
+	homeChainConfig := cciptypes.HomeChainConfig{
 		FChain: map[cciptypes.ChainSelector]int{
 			chainA: 1,
 			chainB: 1,
 			chainC: 1,
 		},
-		NodeSupportedChains: map[commontypes.OracleID]reader.SupportedChains{
+		NodeSupportedChains: map[commontypes.OracleID]cciptypes.SupportedChains{
 			1: {Supported: mapset.NewSet[cciptypes.ChainSelector](chainA, chainB, chainC)},
 			2: {Supported: mapset.NewSet[cciptypes.ChainSelector](chainA, chainB, chainC)},
 			3: {Supported: mapset.NewSet[cciptypes.ChainSelector](chainA, chainB, chainC)},
@@ -330,7 +307,7 @@ type nodeSetup struct {
 	msgHasher   *mocks.MessageHasher
 }
 
-func newNode(ctx context.Context, t *testing.T, lggr logger.Logger, id int, cfg cciptypes.CommitPluginConfig, homeChainConfig reader.HomeChainConfig) nodeSetup {
+func newNode(ctx context.Context, t *testing.T, lggr logger.Logger, id int, cfg cciptypes.CommitPluginConfig, homeChainConfig cciptypes.HomeChainConfig) nodeSetup {
 	ccipReader := mocks.NewCCIPReader()
 	priceReader := mocks.NewTokenPricesReader()
 	reportCodec := mocks.NewCommitPluginJSONReportCodec()

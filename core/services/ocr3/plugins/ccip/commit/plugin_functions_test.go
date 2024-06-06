@@ -9,6 +9,7 @@ import (
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
+	cciptypes "github.com/smartcontractkit/ccipocr3/ccipocr3-dont-merge"
 	"github.com/smartcontractkit/ccipocr3/internal/libs/slicelib"
 	"github.com/smartcontractkit/ccipocr3/internal/mocks"
 	"github.com/smartcontractkit/libocr/commontypes"
@@ -17,7 +18,7 @@ import (
 	"github.com/stretchr/testify/mock"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+	//cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
 
 func Test_observeMaxSeqNumsPerChain(t *testing.T) {
@@ -462,11 +463,11 @@ func Test_validateObservedSequenceNumbers(t *testing.T) {
 
 func Test_validateObserverReadingEligibility(t *testing.T) {
 	testCases := []struct {
-		name         string
-		observer     commontypes.OracleID
-		msgs         []cciptypes.CCIPMsgBaseDetails
-		observerInfo map[commontypes.OracleID]cciptypes.ObserverInfo
-		expErr       bool
+		name                string
+		observer            commontypes.OracleID
+		msgs                []cciptypes.CCIPMsgBaseDetails
+		nodeSupportedChains map[commontypes.OracleID]cciptypes.SupportedChains
+		expErr              bool
 	}{
 		{
 			name:     "observer can read all chains",
@@ -477,8 +478,8 @@ func Test_validateObserverReadingEligibility(t *testing.T) {
 				{ID: cciptypes.Bytes32{1}, SourceChain: 3, SeqNum: 12},
 				{ID: cciptypes.Bytes32{2}, SourceChain: 3, SeqNum: 12},
 			},
-			observerInfo: map[commontypes.OracleID]cciptypes.ObserverInfo{
-				10: {Reads: []cciptypes.ChainSelector{1, 2, 3}},
+			nodeSupportedChains: map[commontypes.OracleID]cciptypes.SupportedChains{
+				10: {Supported: mapset.NewSet[cciptypes.ChainSelector](1, 2, 3)},
 			},
 			expErr: false,
 		},
@@ -491,8 +492,8 @@ func Test_validateObserverReadingEligibility(t *testing.T) {
 				{ID: cciptypes.Bytes32{1}, SourceChain: 3, SeqNum: 12},
 				{ID: cciptypes.Bytes32{2}, SourceChain: 3, SeqNum: 12},
 			},
-			observerInfo: map[commontypes.OracleID]cciptypes.ObserverInfo{
-				10: {Reads: []cciptypes.ChainSelector{1, 3}},
+			nodeSupportedChains: map[commontypes.OracleID]cciptypes.SupportedChains{
+				10: {Supported: mapset.NewSet[cciptypes.ChainSelector](1, 3)},
 			},
 			expErr: true,
 		},
@@ -505,23 +506,23 @@ func Test_validateObserverReadingEligibility(t *testing.T) {
 				{ID: cciptypes.Bytes32{1}, SourceChain: 3, SeqNum: 12},
 				{ID: cciptypes.Bytes32{2}, SourceChain: 3, SeqNum: 12},
 			},
-			observerInfo: map[commontypes.OracleID]cciptypes.ObserverInfo{
-				20: {Reads: []cciptypes.ChainSelector{1, 3}}, // observer 10 not found
+			nodeSupportedChains: map[commontypes.OracleID]cciptypes.SupportedChains{
+				20: {Supported: mapset.NewSet[cciptypes.ChainSelector](1, 3)}, // observer 10 not found
 			},
 			expErr: true,
 		},
 		{
-			name:         "no msgs",
-			observer:     commontypes.OracleID(10),
-			msgs:         []cciptypes.CCIPMsgBaseDetails{},
-			observerInfo: map[commontypes.OracleID]cciptypes.ObserverInfo{},
-			expErr:       false,
+			name:                "no msgs",
+			observer:            commontypes.OracleID(10),
+			msgs:                []cciptypes.CCIPMsgBaseDetails{},
+			nodeSupportedChains: map[commontypes.OracleID]cciptypes.SupportedChains{},
+			expErr:              false,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			err := validateObserverReadingEligibility(tc.observer, tc.msgs, tc.observerInfo)
+			err := validateObserverReadingEligibility(tc.observer, tc.msgs, tc.nodeSupportedChains)
 			if tc.expErr {
 				assert.Error(t, err)
 				return

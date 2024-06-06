@@ -6,6 +6,7 @@ import (
 	"sort"
 
 	mapset "github.com/deckarep/golang-set/v2"
+	cciptypes "github.com/smartcontractkit/ccipocr3/ccipocr3-dont-merge"
 	"github.com/smartcontractkit/ccipocr3/internal/libs/hashlib"
 	"github.com/smartcontractkit/ccipocr3/internal/libs/merklemulti"
 	"github.com/smartcontractkit/ccipocr3/internal/libs/slicelib"
@@ -14,7 +15,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+	//cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
 
 // observeMaxSeqNums finds the maximum committed sequence numbers for each source chain.
@@ -475,14 +476,14 @@ func gasPricesConsensus(lggr logger.Logger, observations []cciptypes.CommitPlugi
 func pluginConfigConsensus(
 	baseCfg cciptypes.CommitPluginConfig, // the config of the follower calling this function
 	observations []cciptypes.CommitPluginObservation, // observations from all followers
-) cciptypes.CommitPluginConfig {
-	consensusCfg := baseCfg
+) cciptypes.CommitConsensusConfig {
+	consensusCfg := cciptypes.CommitConsensusConfig{}
 
 	// Come to consensus on fChain.
 	// Use the fChain observed by most followers for each chain.
 	fChainCounts := make(map[cciptypes.ChainSelector]map[int]int) // {chain: {fChain: count}}
 	for _, obs := range observations {
-		for chain, fChain := range obs.PluginConfig.FChain {
+		for chain, fChain := range obs.HomeChainConfig.FChain {
 			if _, exists := fChainCounts[chain]; !exists {
 				fChainCounts[chain] = make(map[int]int)
 			}
@@ -511,37 +512,39 @@ func pluginConfigConsensus(
 	}
 	consensusFeeTokens := make([]types.Account, 0)
 	for token, count := range feeTokensCounts {
-		if count >= 2*consensusCfg.FChain[consensusCfg.DestChain]+1 {
+		if count >= 2*consensusCfg.FChain[baseCfg.DestChain]+1 {
 			consensusFeeTokens = append(consensusFeeTokens, token)
 		}
 	}
 	consensusCfg.PricedTokens = consensusFeeTokens
 
+	//TODO Do we still want to have consensus on readers given that homeChainConfig will be updated regularly with latest state anyways?
+
 	// Come to consensus on reading observers.
 	// An observer can read a chain only if at least 2f_chain+1 followers observed that.
-	observerReadChainsCounts := make(map[commontypes.OracleID]map[cciptypes.ChainSelector]int)
-	for _, obs := range observations {
-		for observer, info := range obs.PluginConfig.ObserverInfo {
-			if _, exists := observerReadChainsCounts[observer]; !exists {
-				observerReadChainsCounts[observer] = make(map[cciptypes.ChainSelector]int)
-			}
-			for _, chain := range info.Reads {
-				observerReadChainsCounts[observer][chain]++
-			}
-		}
-	}
-	consensusObserverInfo := make(map[commontypes.OracleID]cciptypes.ObserverInfo)
-	for observer, chainCounts := range observerReadChainsCounts {
-		observerReadChains := make([]cciptypes.ChainSelector, 0)
-		for chain, count := range chainCounts {
-			if count >= 2*consensusCfg.FChain[consensusCfg.DestChain]+1 {
-				observerReadChains = append(observerReadChains, chain)
-			}
-		}
-		observerInfo := consensusCfg.ObserverInfo[observer]
-		observerInfo.Reads = observerReadChains
-		consensusObserverInfo[observer] = observerInfo
-	}
+	//observerReadChainsCounts := make(map[commontypes.OracleID]map[cciptypes.ChainSelector]int)
+	//for _, obs := range observations {
+	//	for observer, info := range obs.PluginConfig.ObserverInfo {
+	//		if _, exists := observerReadChainsCounts[observer]; !exists {
+	//			observerReadChainsCounts[observer] = make(map[cciptypes.ChainSelector]int)
+	//		}
+	//		for _, chain := range info.Reads {
+	//			observerReadChainsCounts[observer][chain]++
+	//		}
+	//	}
+	//}
+	//consensusObserverInfo := make(map[commontypes.OracleID]cciptypes.ObserverInfo)
+	//for observer, chainCounts := range observerReadChainsCounts {
+	//	observerReadChains := make([]cciptypes.ChainSelector, 0)
+	//	for chain, count := range chainCounts {
+	//		if count >= 2*consensusCfg.FChain[baseCfg.DestChain]+1 {
+	//			observerReadChains = append(observerReadChains, chain)
+	//		}
+	//	}
+	//	nodeSupportedChains := consensusCfg.ObserverInfo[observer]
+	//	nodeSupportedChains.Reads = observerReadChains
+	//	consensusObserverInfo[observer] = nodeSupportedChains
+	//}
 
 	return consensusCfg
 }
@@ -589,22 +592,20 @@ func validateObservedSequenceNumbers(msgs []cciptypes.CCIPMsgBaseDetails, maxSeq
 func validateObserverReadingEligibility(
 	observer commontypes.OracleID,
 	msgs []cciptypes.CCIPMsgBaseDetails,
-	observerCfg map[commontypes.OracleID]cciptypes.ObserverInfo,
+	nodeSupportedChains map[commontypes.OracleID]cciptypes.SupportedChains,
 ) error {
 	if len(msgs) == 0 {
 		return nil
 	}
 
-	observerInfo, exists := observerCfg[observer]
+	supportedChains, exists := nodeSupportedChains[observer]
 	if !exists {
 		return fmt.Errorf("observer not found in config")
 	}
 
-	observerReadChains := mapset.NewSet(observerInfo.Reads...)
-
 	for _, msg := range msgs {
 		// Observer must be able to read the chain that the message is coming from.
-		if !observerReadChains.Contains(msg.SourceChain) {
+		if !supportedChains.IsSupported(msg.SourceChain) {
 			return fmt.Errorf("observer not allowed to read chain %d", msg.SourceChain)
 		}
 	}
