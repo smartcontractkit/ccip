@@ -50,8 +50,8 @@ contract CCIPCapabilityConfigurationSetup is Test {
       );
     }
     // Add chain selector for chain 1.
-    CCIPCapabilityConfiguration.ChainConfigUpdate[] memory adds = new CCIPCapabilityConfiguration.ChainConfigUpdate[](1);
-    adds[0] = CCIPCapabilityConfiguration.ChainConfigUpdate({
+    CCIPCapabilityConfiguration.ChainConfigInfo[] memory adds = new CCIPCapabilityConfiguration.ChainConfigInfo[](1);
+    adds[0] = CCIPCapabilityConfiguration.ChainConfigInfo({
       chainSelector: 1,
       chainConfig: CCIPCapabilityConfiguration.ChainConfig({readers: readers, fChain: 1, config: bytes("config1")})
     });
@@ -75,12 +75,12 @@ contract CCIPCapabilityConfiguration_chainConfig is CCIPCapabilityConfigurationS
   function test_applyChainConfigUpdates_addChainConfigs_Success() public {
     bytes32[] memory chainReaders = new bytes32[](1);
     chainReaders[0] = keccak256(abi.encode(1));
-    CCIPCapabilityConfiguration.ChainConfigUpdate[] memory adds = new CCIPCapabilityConfiguration.ChainConfigUpdate[](2);
-    adds[0] = CCIPCapabilityConfiguration.ChainConfigUpdate({
+    CCIPCapabilityConfiguration.ChainConfigInfo[] memory adds = new CCIPCapabilityConfiguration.ChainConfigInfo[](2);
+    adds[0] = CCIPCapabilityConfiguration.ChainConfigInfo({
       chainSelector: 1,
       chainConfig: CCIPCapabilityConfiguration.ChainConfig({readers: chainReaders, fChain: 1, config: bytes("config1")})
     });
-    adds[1] = CCIPCapabilityConfiguration.ChainConfigUpdate({
+    adds[1] = CCIPCapabilityConfiguration.ChainConfigInfo({
       chainSelector: 2,
       chainConfig: CCIPCapabilityConfiguration.ChainConfig({readers: chainReaders, fChain: 1, config: bytes("config2")})
     });
@@ -105,19 +105,21 @@ contract CCIPCapabilityConfiguration_chainConfig is CCIPCapabilityConfigurationS
     emit CCIPCapabilityConfiguration.ChainConfigSet(2, adds[1].chainConfig);
     s_ccipCC.applyChainConfigUpdates(new uint64[](0), adds);
 
-    CCIPCapabilityConfiguration.ChainConfig[] memory configs = s_ccipCC.getAllChainConfigs();
+    CCIPCapabilityConfiguration.ChainConfigInfo[] memory configs = s_ccipCC.getAllChainConfigs();
     assertEq(configs.length, 2, "chain configs length must be 2");
+    assertEq(configs[0].chainSelector, 1, "chain selector must match");
+    assertEq(configs[1].chainSelector, 2, "chain selector must match");
   }
 
   function test_applyChainConfigUpdates_removeChainConfigs_Success() public {
     bytes32[] memory chainReaders = new bytes32[](1);
     chainReaders[0] = keccak256(abi.encode(1));
-    CCIPCapabilityConfiguration.ChainConfigUpdate[] memory adds = new CCIPCapabilityConfiguration.ChainConfigUpdate[](2);
-    adds[0] = CCIPCapabilityConfiguration.ChainConfigUpdate({
+    CCIPCapabilityConfiguration.ChainConfigInfo[] memory adds = new CCIPCapabilityConfiguration.ChainConfigInfo[](2);
+    adds[0] = CCIPCapabilityConfiguration.ChainConfigInfo({
       chainSelector: 1,
       chainConfig: CCIPCapabilityConfiguration.ChainConfig({readers: chainReaders, fChain: 1, config: bytes("config1")})
     });
-    adds[1] = CCIPCapabilityConfiguration.ChainConfigUpdate({
+    adds[1] = CCIPCapabilityConfiguration.ChainConfigInfo({
       chainSelector: 2,
       chainConfig: CCIPCapabilityConfiguration.ChainConfig({readers: chainReaders, fChain: 1, config: bytes("config2")})
     });
@@ -147,7 +149,7 @@ contract CCIPCapabilityConfiguration_chainConfig is CCIPCapabilityConfigurationS
 
     vm.expectEmit();
     emit CCIPCapabilityConfiguration.ChainConfigRemoved(1);
-    s_ccipCC.applyChainConfigUpdates(removes, new CCIPCapabilityConfiguration.ChainConfigUpdate[](0));
+    s_ccipCC.applyChainConfigUpdates(removes, new CCIPCapabilityConfiguration.ChainConfigInfo[](0));
   }
 
   // Reverts.
@@ -157,14 +159,14 @@ contract CCIPCapabilityConfiguration_chainConfig is CCIPCapabilityConfigurationS
     removes[0] = uint64(1);
 
     vm.expectRevert(abi.encodeWithSelector(CCIPCapabilityConfiguration.ChainSelectorNotFound.selector, 1));
-    s_ccipCC.applyChainConfigUpdates(removes, new CCIPCapabilityConfiguration.ChainConfigUpdate[](0));
+    s_ccipCC.applyChainConfigUpdates(removes, new CCIPCapabilityConfiguration.ChainConfigInfo[](0));
   }
 
   function test_applyChainConfigUpdates_nodeNotInRegistry_Reverts() public {
     bytes32[] memory chainReaders = new bytes32[](1);
     chainReaders[0] = keccak256(abi.encode(1));
-    CCIPCapabilityConfiguration.ChainConfigUpdate[] memory adds = new CCIPCapabilityConfiguration.ChainConfigUpdate[](1);
-    adds[0] = CCIPCapabilityConfiguration.ChainConfigUpdate({
+    CCIPCapabilityConfiguration.ChainConfigInfo[] memory adds = new CCIPCapabilityConfiguration.ChainConfigInfo[](1);
+    adds[0] = CCIPCapabilityConfiguration.ChainConfigInfo({
       chainSelector: 1,
       chainConfig: CCIPCapabilityConfiguration.ChainConfig({readers: chainReaders, fChain: 1, config: abi.encode(1, 2, 3)})
     });
@@ -190,12 +192,12 @@ contract CCIPCapabilityConfiguration_chainConfig is CCIPCapabilityConfigurationS
   function test__applyChainConfigUpdates_FChainNotPositive_Reverts() public {
     bytes32[] memory chainReaders = new bytes32[](1);
     chainReaders[0] = keccak256(abi.encode(1));
-    CCIPCapabilityConfiguration.ChainConfigUpdate[] memory adds = new CCIPCapabilityConfiguration.ChainConfigUpdate[](2);
-    adds[0] = CCIPCapabilityConfiguration.ChainConfigUpdate({
+    CCIPCapabilityConfiguration.ChainConfigInfo[] memory adds = new CCIPCapabilityConfiguration.ChainConfigInfo[](2);
+    adds[0] = CCIPCapabilityConfiguration.ChainConfigInfo({
       chainSelector: 1,
       chainConfig: CCIPCapabilityConfiguration.ChainConfig({readers: chainReaders, fChain: 1, config: bytes("config1")})
     });
-    adds[1] = CCIPCapabilityConfiguration.ChainConfigUpdate({
+    adds[1] = CCIPCapabilityConfiguration.ChainConfigInfo({
       chainSelector: 2,
       chainConfig: CCIPCapabilityConfiguration.ChainConfig({readers: chainReaders, fChain: 0, config: bytes("config2")}) // bad fChain
     });

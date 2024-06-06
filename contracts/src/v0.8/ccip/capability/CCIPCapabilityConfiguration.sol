@@ -77,8 +77,8 @@ contract CCIPCapabilityConfiguration is ITypeAndVersion, ICapabilityConfiguratio
     bytes config; // The chain configuration. This is kept intentionally opaque so as to add fields in the future if needed.
   }
 
-  /// @notice Chain configuration update struct used in applyChainConfigUpdates.
-  struct ChainConfigUpdate {
+  /// @notice Chain configuration information struct used in applyChainConfigUpdates and getAllChainConfigs.
+  struct ChainConfigInfo {
     uint64 chainSelector;
     ChainConfig chainConfig;
   }
@@ -139,11 +139,15 @@ contract CCIPCapabilityConfiguration is ITypeAndVersion, ICapabilityConfiguratio
   /// @notice Returns all the chain configurations.
   /// @return The chain configurations.
   // TODO: will this eventually hit the RPC max response size limit?
-  function getAllChainConfigs() external view returns (ChainConfig[] memory) {
+  function getAllChainConfigs() external view returns (ChainConfigInfo[] memory) {
     uint256[] memory chainSelectors = s_chainSelectors.values();
-    ChainConfig[] memory chainConfigs = new ChainConfig[](s_chainSelectors.length());
+    ChainConfigInfo[] memory chainConfigs = new ChainConfigInfo[](s_chainSelectors.length());
     for (uint256 i = 0; i < chainSelectors.length; i++) {
-      chainConfigs[i] = s_chainConfigurations[uint64(chainSelectors[i])];
+      uint64 chainSelector = uint64(chainSelectors[i]);
+      chainConfigs[i] = ChainConfigInfo({
+        chainSelector: chainSelector,
+        chainConfig: s_chainConfigurations[chainSelector]
+      });
     }
     return chainConfigs;
   }
@@ -447,7 +451,7 @@ contract CCIPCapabilityConfiguration is ITypeAndVersion, ICapabilityConfiguratio
   /// @param adds The chain configurations to add.
   function applyChainConfigUpdates(
     uint64[] calldata chainSelectorRemoves,
-    ChainConfigUpdate[] calldata adds
+    ChainConfigInfo[] calldata adds
   ) external onlyOwner {
     // Process removals first.
     for (uint256 i = 0; i < chainSelectorRemoves.length; i++) {
