@@ -711,7 +711,7 @@ contract MultiOCR3Base_setOCR3Configs is MultiOCR3BaseSetup {
 
     vm.expectRevert(
       abi.encodeWithSelector(
-        MultiOCR3Base.InvalidConfig.selector, MultiOCR3Base.InvalidConfigErrorType.REPEATED_TRANSMITTER_ADDRESS
+        MultiOCR3Base.InvalidConfig.selector, MultiOCR3Base.InvalidConfigErrorType.REPEATED_ORACLE_ADDRESS
       )
     );
     s_multiOCR3.setOCR3Configs(ocrConfigs);
@@ -735,7 +735,7 @@ contract MultiOCR3Base_setOCR3Configs is MultiOCR3BaseSetup {
 
     vm.expectRevert(
       abi.encodeWithSelector(
-        MultiOCR3Base.InvalidConfig.selector, MultiOCR3Base.InvalidConfigErrorType.REPEATED_SIGNER_ADDRESS
+        MultiOCR3Base.InvalidConfig.selector, MultiOCR3Base.InvalidConfigErrorType.REPEATED_ORACLE_ADDRESS
       )
     );
     s_multiOCR3.setOCR3Configs(ocrConfigs);

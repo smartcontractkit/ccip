@@ -29,8 +29,7 @@ abstract contract MultiOCR3Base is ITypeAndVersion, OwnerIsCreator {
     TOO_MANY_TRANSMITTERS,
     TOO_MANY_SIGNERS,
     F_TOO_HIGH,
-    REPEATED_SIGNER_ADDRESS,
-    REPEATED_TRANSMITTER_ADDRESS
+    REPEATED_ORACLE_ADDRESS
   }
 
   error InvalidConfig(InvalidConfigErrorType errorType);
@@ -177,26 +176,12 @@ abstract contract MultiOCR3Base is ITypeAndVersion, OwnerIsCreator {
       if (newSignersLength > MAX_NUM_ORACLES) revert InvalidConfig(InvalidConfigErrorType.TOO_MANY_SIGNERS);
       if (signers.length <= 3 * ocrConfigArgs.F) revert InvalidConfig(InvalidConfigErrorType.F_TOO_HIGH);
 
-      for (uint8 i = 0; i < newSignersLength; ++i) {
-        // add new signer/transmitter addresses
-        address signer = signers[i];
-        if (s_oracles[ocrPluginType][signer].role != Role.Unset) {
-          revert InvalidConfig(InvalidConfigErrorType.REPEATED_SIGNER_ADDRESS);
-        }
-        if (signer == address(0)) revert OracleCannotBeZeroAddress();
-        s_oracles[ocrPluginType][signer] = Oracle(uint8(i), Role.Signer);
-      }
+      _assignOracleRoles(ocrPluginType, signers, Role.Signer);
     }
 
-    for (uint8 i = 0; i < newTransmittersLength; ++i) {
-      address transmitter = transmitters[i];
-      if (s_oracles[ocrPluginType][transmitter].role != Role.Unset) {
-        revert InvalidConfig(InvalidConfigErrorType.REPEATED_TRANSMITTER_ADDRESS);
-      }
-      if (transmitter == address(0)) revert OracleCannotBeZeroAddress();
-      s_oracles[ocrPluginType][transmitter] = Oracle(uint8(i), Role.Transmitter);
-    }
+    _assignOracleRoles(ocrPluginType, transmitters, Role.Transmitter);
 
+    // TODO: check contract size change with a struct assignment
     ocrConfig.transmitters = transmitters;
     configInfo.F = ocrConfigArgs.F;
     configInfo.configDigest = ocrConfigArgs.configDigest;
@@ -205,6 +190,17 @@ abstract contract MultiOCR3Base is ITypeAndVersion, OwnerIsCreator {
     emit ConfigSet(
       ocrPluginType, ocrConfigArgs.configDigest, ocrConfigArgs.signers, ocrConfigArgs.transmitters, ocrConfigArgs.F
     );
+  }
+
+  function _assignOracleRoles(uint8 ocrPluginType, address[] memory oracleAddresses, Role role) internal {
+    for (uint8 i = 0; i < oracleAddresses.length; ++i) {
+      address oracle = oracleAddresses[i];
+      if (s_oracles[ocrPluginType][oracle].role != Role.Unset) {
+        revert InvalidConfig(InvalidConfigErrorType.REPEATED_ORACLE_ADDRESS);
+      }
+      if (oracle == address(0)) revert OracleCannotBeZeroAddress();
+      s_oracles[ocrPluginType][oracle] = Oracle(i, role);
+    }
   }
 
   /// @notice _transmit is called to post a new report to the contract.
