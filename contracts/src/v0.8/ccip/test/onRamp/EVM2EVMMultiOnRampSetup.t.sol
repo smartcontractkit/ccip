@@ -110,7 +110,7 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
       generateDynamicMultiOnRampConfig(address(s_sourceRouter), address(s_priceRegistry), address(s_tokenAdminRegistry)),
       generateDestChainConfigArgs(),
       getOutboundRateLimiterConfig(),
-      s_feeTokenConfigArgs,
+      s_premiumMultiplierWeiPerEthArgs,
       s_tokenTransferFeeConfigArgs
     );
     s_onRamp.setAdmin(ADMIN);

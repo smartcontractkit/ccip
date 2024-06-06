@@ -56,7 +56,7 @@ contract EVM2EVMMultiOnRamp_constructor is EVM2EVMMultiOnRampSetup {
       destChainConfigArgs,
       getOutboundRateLimiterConfig(),
       s_premiumMultiplierWeiPerEthArgs,
-      s_tokenTransferFeeConfigArgs,
+      s_tokenTransferFeeConfigArgs
     );
 
     EVM2EVMMultiOnRamp.DestChainConfig memory expectedDestChainConfig = EVM2EVMMultiOnRamp.DestChainConfig({
@@ -108,7 +108,7 @@ contract EVM2EVMMultiOnRamp_constructor is EVM2EVMMultiOnRampSetup {
       dynamicConfig,
       destChainConfigArgs,
       getOutboundRateLimiterConfig(),
-      s_feeTokenConfigArgs,
+      s_premiumMultiplierWeiPerEthArgs,
       s_tokenTransferFeeConfigArgs
     );
   }
@@ -130,7 +130,7 @@ contract EVM2EVMMultiOnRamp_constructor is EVM2EVMMultiOnRampSetup {
       dynamicConfig,
       destChainConfigArgs,
       getOutboundRateLimiterConfig(),
-      s_feeTokenConfigArgs,
+      s_premiumMultiplierWeiPerEthArgs,
       s_tokenTransferFeeConfigArgs
     );
   }
@@ -152,7 +152,7 @@ contract EVM2EVMMultiOnRamp_constructor is EVM2EVMMultiOnRampSetup {
       dynamicConfig,
       destChainConfigArgs,
       getOutboundRateLimiterConfig(),
-      s_feeTokenConfigArgs,
+      s_premiumMultiplierWeiPerEthArgs,
       s_tokenTransferFeeConfigArgs
     );
   }
