@@ -42,6 +42,7 @@ contract CCIPReceiver is CCIPClientBase {
   /// @dev Extremely important to ensure only router calls this.
   function ccipReceive(Client.Any2EVMMessage calldata message)
     external
+    virtual
     onlyRouter
     validChain(message.sourceChainSelector)
   {
@@ -64,7 +65,12 @@ contract CCIPReceiver is CCIPClientBase {
   /// @dev This example just sends the tokens to the owner of this contracts. More
   /// interesting functions could be implemented.
   /// @dev It has to be external because of the try/catch.
-  function processMessage(Client.Any2EVMMessage calldata message) external onlySelf validChain(message.sourceChainSelector) {
+  function processMessage(Client.Any2EVMMessage calldata message) 
+    external
+    virtual
+    onlySelf 
+    validSender(message.sender) 
+    validChain(message.sourceChainSelector) {
     // Insert Custom logic here
   }
 
