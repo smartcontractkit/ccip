@@ -2,6 +2,7 @@ package evm
 
 import (
 	"context"
+	"fmt"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
@@ -92,15 +93,21 @@ func (P SrcCommitProvider) HealthReport() map[string]error {
 }
 
 func (P SrcCommitProvider) OffchainConfigDigester() ocrtypes.OffchainConfigDigester {
-	panic("OffchainConfigDigester called on SrcCommitProvider. Valid on DstCommitProvider.")
+	// TODO CCIP-2494
+	// "OffchainConfigDigester called on SrcCommitProvider. Valid on DstCommitProvider."
+	return nil
 }
 
 func (P SrcCommitProvider) ContractConfigTracker() ocrtypes.ContractConfigTracker {
-	panic("ContractConfigTracker called on SrcCommitProvider. Valid on DstCommitProvider.")
+	// // TODO CCIP-2494
+	// "ContractConfigTracker called on SrcCommitProvider. Valid on DstCommitProvider.")
+	return nil
 }
 
 func (P SrcCommitProvider) ContractTransmitter() ocrtypes.ContractTransmitter {
-	panic("ContractTransmitter called on SrcCommitProvider. Valid on DstCommitProvider.")
+	// // TODO CCIP-2494
+	// "ContractTransmitter called on SrcCommitProvider. Valid on DstCommitProvider."
+	return nil
 }
 
 func (P SrcCommitProvider) ChainReader() commontypes.ChainReader {
@@ -128,7 +135,6 @@ func (P DstCommitProvider) HealthReport() map[string]error {
 }
 
 func (P DstCommitProvider) OffchainConfigDigester() ocrtypes.OffchainConfigDigester {
-
 	return P.configWatcher.OffchainConfigDigester()
 }
 
@@ -165,19 +171,19 @@ func (P DstCommitProvider) Start(ctx context.Context) error {
 }
 
 func (P SrcCommitProvider) NewPriceGetter(ctx context.Context) (priceGetter cciptypes.PriceGetter, err error) {
-	panic("Can't construct a price getter from one relayer.")
+	return nil, fmt.Errorf("Can't construct a price getter from one relayer.")
 }
 
 func (P DstCommitProvider) NewPriceGetter(ctx context.Context) (priceGetter cciptypes.PriceGetter, err error) {
-	panic("Can't construct a price getter from one relayer.")
+	return nil, fmt.Errorf("Can't construct a price getter from one relayer.")
 }
 
 func (P SrcCommitProvider) NewCommitStoreReader(ctx context.Context, commitStoreAddress cciptypes.Address) (commitStoreReader cciptypes.CommitStoreReader, err error) {
-	panic("Can't construct a commit store reader from one relayer.")
+	return nil, fmt.Errorf("Can't construct a commit store reader from one relayer.")
 }
 
 func (P DstCommitProvider) NewCommitStoreReader(ctx context.Context, commitStoreAddress cciptypes.Address) (commitStoreReader cciptypes.CommitStoreReader, err error) {
-	panic("Can't construct a commit store reader from one relayer.")
+	return nil, fmt.Errorf("Can't construct a commit store reader from one relayer.")
 }
 
 func (P SrcCommitProvider) NewOnRampReader(ctx context.Context, onRampAddress cciptypes.Address, sourceChainSelector uint64, destChainSelector uint64) (onRampReader cciptypes.OnRampReader, err error) {
@@ -187,11 +193,11 @@ func (P SrcCommitProvider) NewOnRampReader(ctx context.Context, onRampAddress cc
 }
 
 func (P DstCommitProvider) NewOnRampReader(ctx context.Context, onRampAddress cciptypes.Address, sourceChainSelector uint64, destChainSelector uint64) (onRampReader cciptypes.OnRampReader, err error) {
-	panic("NewOnRampReader called for DstCommitProvider.NewOnRampReader should be called on SrcCommitProvider")
+	return nil, fmt.Errorf("NewOnRampReader called for DstCommitProvider.NewOnRampReader should be called on SrcCommitProvider")
 }
 
 func (P SrcCommitProvider) NewOffRampReader(ctx context.Context, offRampAddr cciptypes.Address) (offRampReader cciptypes.OffRampReader, err error) {
-	panic("Called NewOffRampReader for SrcCommitProvider. NewOffRampReader should be called on DstCommitProvider")
+	return nil, fmt.Errorf("Called NewOffRampReader for SrcCommitProvider. NewOffRampReader should be called on DstCommitProvider")
 }
 
 func (P DstCommitProvider) NewOffRampReader(ctx context.Context, offRampAddr cciptypes.Address) (offRampReader cciptypes.OffRampReader, err error) {
@@ -200,7 +206,7 @@ func (P DstCommitProvider) NewOffRampReader(ctx context.Context, offRampAddr cci
 }
 
 func (P SrcCommitProvider) NewPriceRegistryReader(ctx context.Context, addr cciptypes.Address) (priceRegistryReader cciptypes.PriceRegistryReader, err error) {
-	panic("Called NewPriceRegistryReader for SrcCommitProvider. NewOffRampReader should be called on DstCommitProvider")
+	return nil, fmt.Errorf("Called NewPriceRegistryReader for SrcCommitProvider. NewOffRampReader should be called on DstCommitProvider")
 }
 
 func (P DstCommitProvider) NewPriceRegistryReader(ctx context.Context, addr cciptypes.Address) (priceRegistryReader cciptypes.PriceRegistryReader, err error) {
@@ -227,5 +233,5 @@ func (P SrcCommitProvider) SourceNativeToken(ctx context.Context, sourceRouterAd
 }
 
 func (P DstCommitProvider) SourceNativeToken(ctx context.Context, sourceRouterAddr cciptypes.Address) (cciptypes.Address, error) {
-	panic("SourceNativeToken called for DstCommitProvider. SourceNativeToken should be called on SrcCommitProvider")
+	return "", fmt.Errorf("SourceNativeToken called for DstCommitProvider. SourceNativeToken should be called on SrcCommitProvider")
 }

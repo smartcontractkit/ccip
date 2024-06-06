@@ -260,6 +260,11 @@ func (r *Relayer) NewMercuryProvider(rargs commontypes.RelayArgs, pargs commonty
 	return NewMercuryProvider(cp, r.chainReader, r.codec, NewMercuryChainReader(r.chain.HeadTracker()), transmitter, reportCodecV1, reportCodecV2, reportCodecV3, lggr), nil
 }
 
+// NewCCIPCommitProvider constructs a provider of type CCIPCommitProvider. Since this is happening in the Relayer,
+// which lives in a separate process from delegate which is requesting a provider, we need to wire in through pargs
+// which *type* (impl) of CCIPCommitProvider should be created. CCIP is currently a special case where the provider has a
+// subset of implementations of the complete interface as certain contracts in a CCIP lane are only deployed on the src
+// chain or on the dst chain. This results in the two implementations of providers: a src and dst implementation.
 func (r *Relayer) NewCCIPCommitProvider(rargs commontypes.RelayArgs, pargs commontypes.PluginArgs) (commontypes.CCIPCommitProvider, error) {
 	// TODO https://smartcontract-it.atlassian.net/browse/BCF-2887
 	ctx := context.Background()
@@ -274,6 +279,8 @@ func (r *Relayer) NewCCIPCommitProvider(rargs commontypes.RelayArgs, pargs commo
 	sourceStartBlock := commitPluginConfig.SourceStartBlock
 	destStartBlock := commitPluginConfig.DestStartBlock
 
+	// The src chain implementation of this provider does not need a configWatcher or contractTransmitter;
+	// bail early.
 	if commitPluginConfig.IsSourceProvider {
 		return NewSrcCommitProvider(
 			r.lggr,
@@ -318,6 +325,11 @@ func (r *Relayer) NewCCIPCommitProvider(rargs commontypes.RelayArgs, pargs commo
 	), nil
 }
 
+// NewCCIPExecProvider constructs a provider of type CCIPExecProvider. Since this is happening in the Relayer,
+// which lives in a separate process from delegate which is requesting a provider, we need to wire in through pargs
+// which *type* (impl) of CCIPExecProvider should be created. CCIP is currently a special case where the provider has a
+// subset of implementations of the complete interface as certain contracts in a CCIP lane are only deployed on the src
+// chain or on the dst chain. This results in the two implementations of providers: a src and dst implementation.
 func (r *Relayer) NewCCIPExecProvider(rargs commontypes.RelayArgs, pargs commontypes.PluginArgs) (commontypes.CCIPExecProvider, error) {
 	// TODO https://smartcontract-it.atlassian.net/browse/BCF-2887
 	ctx := context.Background()
@@ -332,6 +344,8 @@ func (r *Relayer) NewCCIPExecProvider(rargs commontypes.RelayArgs, pargs commont
 
 	usdcConfig := execPluginConfig.USDCConfig
 
+	// The src chain implementation of this provider does not need a configWatcher or contractTransmitter;
+	// bail early.
 	if execPluginConfig.IsSourceProvider {
 		return NewSrcExecProvider(
 			r.lggr,

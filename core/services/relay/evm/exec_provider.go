@@ -102,15 +102,21 @@ func (s SrcExecProvider) HealthReport() map[string]error {
 }
 
 func (s SrcExecProvider) OffchainConfigDigester() ocrtypes.OffchainConfigDigester {
-	panic("OffchainConfigDigester called on SrcExecProvider. It should only be called on DstExecProvider")
+	// TODO CCIP-2494
+	// OffchainConfigDigester called on SrcExecProvider. It should only be called on DstExecProvider
+	return nil
 }
 
 func (s SrcExecProvider) ContractConfigTracker() ocrtypes.ContractConfigTracker {
-	panic("ContractConfigTracker called on SrcExecProvider. It should only be called on DstExecProvider")
+	// TODO CCIP-2494
+	// "ContractConfigTracker called on SrcExecProvider. It should only be called on DstExecProvider
+	return nil
 }
 
 func (s SrcExecProvider) ContractTransmitter() ocrtypes.ContractTransmitter {
-	panic("ContractTransmitter called on SrcExecProvider. It should only be called on DstExecProvider")
+	// TODO CCIP-2494
+	// "ContractTransmitter called on SrcExecProvider. It should only be called on DstExecProvider
+	return nil
 }
 
 func (s SrcExecProvider) ChainReader() commontypes.ChainReader {
@@ -122,12 +128,12 @@ func (s SrcExecProvider) Codec() commontypes.Codec {
 }
 
 func (s SrcExecProvider) NewCommitStoreReader(ctx context.Context, addr cciptypes.Address) (cciptypes.CommitStoreReader, error) {
-	//TODO implement me
-	panic("implement me")
+	// TODO CCIP-2493
+	return nil, fmt.Errorf("NewCommitStoreReader not implemented")
 }
 
 func (s SrcExecProvider) NewOffRampReader(ctx context.Context, addr cciptypes.Address) (cciptypes.OffRampReader, error) {
-	panic("NewOffRampReader called on SrcExecProvider. Valid on DstExecProvider.")
+	return nil, fmt.Errorf("NewOffRampReader called on SrcExecProvider. Valid on DstExecProvider.")
 }
 
 func (s SrcExecProvider) NewOnRampReader(ctx context.Context, onRampAddress cciptypes.Address, sourceChainSelector uint64, destChainSelector uint64) (onRampReader cciptypes.OnRampReader, err error) {
@@ -164,7 +170,7 @@ func (s SrcExecProvider) NewTokenDataReader(ctx context.Context, tokenAddress cc
 }
 
 func (s SrcExecProvider) NewTokenPoolBatchedReader(ctx context.Context, offRampAddr cciptypes.Address, sourceChainSelector uint64) (cciptypes.TokenPoolBatchedReader, error) {
-	panic("NewTokenPoolBatchedReader called on SrcExecProvider. It should only be called on DstExecProvdier")
+	return nil, fmt.Errorf("NewTokenPoolBatchedReader called on SrcExecProvider. It should only be called on DstExecProvdier")
 }
 
 func (s SrcExecProvider) SourceNativeToken(ctx context.Context, sourceRouterAddr cciptypes.Address) (cciptypes.Address, error) {
@@ -265,8 +271,8 @@ func (d DstExecProvider) Codec() commontypes.Codec {
 }
 
 func (d DstExecProvider) NewCommitStoreReader(ctx context.Context, addr cciptypes.Address) (cciptypes.CommitStoreReader, error) {
-	//TODO implement me
-	panic("implement me")
+	// TODO CCIP-2493
+	return nil, fmt.Errorf("NewCommitStoreReader not yet implemented")
 }
 
 func (d DstExecProvider) NewOffRampReader(ctx context.Context, offRampAddress cciptypes.Address) (offRampReader cciptypes.OffRampReader, err error) {
@@ -275,7 +281,7 @@ func (d DstExecProvider) NewOffRampReader(ctx context.Context, offRampAddress cc
 }
 
 func (d DstExecProvider) NewOnRampReader(ctx context.Context, addr cciptypes.Address, sourceChainSelector uint64, destChainSelector uint64) (cciptypes.OnRampReader, error) {
-	panic("NewOnRampReader called on DstExecProvider. It should only be called on SrcExecProvider")
+	return nil, fmt.Errorf("NewOnRampReader called on DstExecProvider. It should only be called on SrcExecProvider")
 }
 
 func (d DstExecProvider) NewPriceRegistryReader(ctx context.Context, addr cciptypes.Address) (priceRegistryReader cciptypes.PriceRegistryReader, err error) {
@@ -285,8 +291,7 @@ func (d DstExecProvider) NewPriceRegistryReader(ctx context.Context, addr ccipty
 }
 
 func (d DstExecProvider) NewTokenDataReader(ctx context.Context, tokenAddress cciptypes.Address) (cciptypes.TokenDataReader, error) {
-	//TODO implement me
-	panic("implement me")
+	return nil, fmt.Errorf("NewTokenDataReader called on DstExecProvider. It should only be called on SrcExecProvider")
 }
 
 func (d DstExecProvider) NewTokenPoolBatchedReader(ctx context.Context, offRampAddress cciptypes.Address, sourceChainSelector uint64) (tokenPoolBatchedReader cciptypes.TokenPoolBatchedReader, err error) {
@@ -306,6 +311,5 @@ func (d DstExecProvider) NewTokenPoolBatchedReader(ctx context.Context, offRampA
 }
 
 func (d DstExecProvider) SourceNativeToken(ctx context.Context, addr cciptypes.Address) (cciptypes.Address, error) {
-	//TODO implement me
-	panic("implement me")
+	return "", fmt.Errorf("SourceNativeToken called on DstExecProvider. It should only be called on SrcExecProvider")
 }
