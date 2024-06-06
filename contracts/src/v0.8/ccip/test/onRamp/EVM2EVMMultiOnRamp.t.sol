@@ -1204,7 +1204,7 @@ contract EVM2EVMMultiOnRamp_setDynamicConfig is EVM2EVMMultiOnRampSetup {
   }
 }
 
-contract EVM2EVMMultiOnRamp_payNops is EVM2EVMMultiOnRampSetup {
+contract EVM2EVMMultiOnRamp_withdrawFeeTokens is EVM2EVMMultiOnRampSetup {
   mapping(address => uint256) internal s_nopFees;
 
   function setUp() public virtual override {
@@ -1228,7 +1228,7 @@ contract EVM2EVMMultiOnRamp_payNops is EVM2EVMMultiOnRampSetup {
     }
   }
 
-  function test_Fuzz_PayNops_Success(uint256[5] memory amounts) public {
+  function test_Fuzz_WithdrawFeeTokens_Success(uint256[5] memory amounts) public {
     vm.startPrank(OWNER);
     address[] memory feeTokens = new address[](amounts.length);
     for (uint256 i = 0; i < amounts.length; ++i) {
@@ -1237,12 +1237,14 @@ contract EVM2EVMMultiOnRamp_payNops is EVM2EVMMultiOnRampSetup {
       IERC20(feeTokens[i]).transfer(address(s_onRamp), amounts[i]);
     }
 
+    s_priceRegistry.applyFeeTokensUpdates(feeTokens, new address[](0));
+
     for (uint256 i = 0; i < feeTokens.length; ++i) {
       vm.expectEmit();
-      emit EVM2EVMMultiOnRamp.NopsPaid(FEE_AGGREGATOR, feeTokens[i], amounts[i]);
+      emit EVM2EVMMultiOnRamp.FeeTokenWithdrawn(FEE_AGGREGATOR, feeTokens[i], amounts[i]);
     }
 
-    s_onRamp.payNops(feeTokens);
+    s_onRamp.withdrawFeeTokens();
 
     for (uint256 i = 0; i < feeTokens.length; ++i) {
       assertEq(IERC20(feeTokens[i]).balanceOf(FEE_AGGREGATOR), amounts[i]);
@@ -1250,51 +1252,13 @@ contract EVM2EVMMultiOnRamp_payNops is EVM2EVMMultiOnRampSetup {
     }
   }
 
-  function test_OwnerPayNops_Success() public {
-    vm.startPrank(OWNER);
+  function test_WithdrawFeeTokens_Success() public {
+    vm.expectEmit();
+    emit EVM2EVMMultiOnRamp.FeeTokenWithdrawn(FEE_AGGREGATOR, s_sourceFeeToken, s_nopFees[s_sourceFeeToken]);
 
-    for (uint256 i = 0; i < s_sourceFeeTokens.length; ++i) {
-      vm.expectEmit();
-      emit EVM2EVMMultiOnRamp.NopsPaid(FEE_AGGREGATOR, s_sourceFeeTokens[i], s_nopFees[s_sourceFeeTokens[i]]);
-    }
+    s_onRamp.withdrawFeeTokens();
 
-    s_onRamp.payNops(s_sourceFeeTokens);
-
-    for (uint256 i = 0; i < s_sourceFeeTokens.length; ++i) {
-      assertEq(IERC20(s_sourceFeeTokens[i]).balanceOf(FEE_AGGREGATOR), s_nopFees[s_sourceFeeTokens[i]]);
-      assertEq(IERC20(s_sourceFeeTokens[i]).balanceOf(address(s_onRamp)), 0);
-    }
-  }
-
-  function test_AdminPayNops_Success() public {
-    vm.startPrank(ADMIN);
-
-    for (uint256 i = 0; i < s_sourceFeeTokens.length; ++i) {
-      vm.expectEmit();
-      emit EVM2EVMMultiOnRamp.NopsPaid(FEE_AGGREGATOR, s_sourceFeeTokens[i], s_nopFees[s_sourceFeeTokens[i]]);
-    }
-
-    s_onRamp.payNops(s_sourceFeeTokens);
-
-    for (uint256 i = 0; i < s_sourceFeeTokens.length; ++i) {
-      assertEq(IERC20(s_sourceFeeTokens[i]).balanceOf(FEE_AGGREGATOR), s_nopFees[s_sourceFeeTokens[i]]);
-      assertEq(IERC20(s_sourceFeeTokens[i]).balanceOf(address(s_onRamp)), 0);
-    }
-  }
-
-  function test_PayNops_ZeroInput() public {
-    vm.startPrank(OWNER);
-    vm.recordLogs();
-    s_onRamp.payNops(new address[](0));
-    assertEq(vm.getRecordedLogs().length, 0);
-  }
-
-  // Reverts
-
-  function test_WrongPermissions_Revert() public {
-    vm.startPrank(STRANGER);
-
-    vm.expectRevert(EVM2EVMMultiOnRamp.OnlyCallableByOwnerOrAdmin.selector);
-    s_onRamp.payNops(s_sourceFeeTokens);
+    assertEq(IERC20(s_sourceFeeToken).balanceOf(FEE_AGGREGATOR), s_nopFees[s_sourceFeeToken]);
+    assertEq(IERC20(s_sourceFeeToken).balanceOf(address(s_onRamp)), 0);
   }
 }

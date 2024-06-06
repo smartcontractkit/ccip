@@ -55,7 +55,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, AggregateRateLimiter, ITypeA
 
   event ConfigSet(StaticConfig staticConfig, DynamicConfig dynamicConfig);
   event FeePaid(address indexed feeToken, uint256 feeValueJuels);
-  event NopsPaid(address indexed feeAggregator, address indexed feeToken, uint256 amount);
+  event FeeTokenWithdrawn(address indexed feeAggregator, address indexed feeToken, uint256 amount);
   event FeeConfigSet(FeeTokenConfigArgs[] feeConfig);
   event TokenTransferFeeConfigSet(TokenTransferFeeConfigArgs[] transferFeeConfig);
   event TokenTransferFeeConfigDeleted(address[] tokens);
@@ -170,7 +170,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, AggregateRateLimiter, ITypeA
   string public constant override typeAndVersion = "EVM2EVMMultiOnRamp 1.6.0-dev";
   /// @dev Maximum fee that can be charged for a message. This is a guard to prevent massively overcharging due to misconfiguation.
   uint96 internal immutable i_maxFeeJuelsPerMsg;
-  /// @dev The link token address - known to pay nops for their work
+  /// @dev The link token address
   address internal immutable i_linkToken;
   /// @dev The chain ID of the source chain that this contract is deployed to
   uint64 internal immutable i_chainSelector;
@@ -801,13 +801,9 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, AggregateRateLimiter, ITypeA
     }
   }
 
-  // ================================================================
-  // │                         NOP payments                         │
-  // ================================================================
-
-  /// @notice Pays the Node Ops their outstanding balances.
-  function payNops(address[] calldata feeTokens) external {
-    _onlyOwnerOrAdmin();
+  /// @notice Withdraws the outstanding fee token balances to the fee aggregator.
+  function withdrawFeeTokens() public {
+    address[] memory feeTokens = IPriceRegistry(s_dynamicConfig.priceRegistry).getFeeTokens();
     address feeAggregator = s_dynamicConfig.feeAggregator;
 
     for (uint256 i = 0; i < feeTokens.length; ++i) {
@@ -817,7 +813,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, AggregateRateLimiter, ITypeA
       if (feeTokenBalance > 0) {
         feeToken.safeTransfer(feeAggregator, feeTokenBalance);
 
-        emit NopsPaid(feeAggregator, address(feeToken), feeTokenBalance);
+        emit FeeTokenWithdrawn(feeAggregator, address(feeToken), feeTokenBalance);
       }
     }
   }
