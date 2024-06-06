@@ -8,6 +8,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/smartcontractkit/ccipocr3/execute/internal/validation"
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
@@ -182,35 +183,50 @@ func (p *Plugin) ObservationQuorum(outctx ocr3types.OutcomeContext, query types.
 	return ocr3types.QuorumFPlusOne, nil
 }
 
-/*
 // validatedObservations merges all observations which reach the fChain threshold into a single result.
 // Any observations, or subsets of observations, which do not reach the threshold are ignored.
-func validatedObservations(aos []decodedAttributedObservation, fChain map[cciptypes.ChainSelector]int) (cciptypes.ExecutePluginObservation, error) {
+func validatedObservations(aos []decodedAttributedObservation, fChain map[cciptypes.ChainSelector]int) (cciptypes.ExecutePluginCommitObservations, error) {
 	// TODO: validate and merge decoded observations into a single observation.
 
 	// Merge commit reports.
 	// Merge messages.
 	// Ensure f_Chain observations for all.
 
-	type reportCache struct {
-		end   uint64
-		count int
-		root  cciptypes.Bytes32
+	// Create a validator for each chain
+	validators := make(map[cciptypes.ChainSelector]validation.CommitReportValidator)
+	for selector, f := range fChain {
+		validators[selector] = validation.NewCommitReportValidator(2*f + 1)
 	}
 
 	// Need some sort of cache to store the reports, there could be invalid reports, so we need to keep a tally
 	// of all versions to figure out which one is the most common and whether or not there are fChain observations.
 	// TODO: this may be easier if executions were stored separately from the reports.
-	reportCache := make(map[cciptypes.ChainSelector]map[cciptypes.Bytes32][]cciptypes.ExecutePluginCommitData)
 	for _, ao := range aos {
 		for selector, commitReports := range ao.Observation.CommitReports {
-
+			validator, ok := validators[selector]
+			if !ok {
+				return cciptypes.ExecutePluginCommitObservations{}, fmt.Errorf("no validator for chain %d", selector)
+			}
+			// Add reports
+			for _, commitReport := range commitReports {
+				if err := validator.AddReport(commitReport); err != nil {
+					return cciptypes.ExecutePluginCommitObservations{}, err
+				}
+			}
 		}
 	}
 
-	return cciptypes.ExecutePluginObservation{}, nil
+	results := make(cciptypes.ExecutePluginCommitObservations)
+	for selector, validator := range validators {
+		var err error
+		results[selector], err = validator.GetValidatedReports()
+		if err != nil {
+			return cciptypes.ExecutePluginCommitObservations{}, err
+		}
+	}
+
+	return results, nil
 }
-*/
 
 func (p *Plugin) Outcome(outctx ocr3types.OutcomeContext, query types.Query, aos []types.AttributedObservation) (ocr3types.Outcome, error) {
 	decodedObservations, err := decodeAttributedObservations(aos)
@@ -223,15 +239,13 @@ func (p *Plugin) Outcome(outctx ocr3types.OutcomeContext, query types.Query, aos
 	}
 
 	// TODO: call mergeObservations instead of taking the first observation.
-	merged := decodedObservations[0].Observation
-	/*
-		merged, err := mergeObservations(decodedObservations, p.cfg.FChain)
-		if err != nil {
-			return ocr3types.Outcome{}, err
-		}
-	*/
+	//merged := decodedObservations[0].Observation
+	merged, err := validatedObservations(decodedObservations, p.cfg.FChain)
+	if err != nil {
+		return ocr3types.Outcome{}, err
+	}
 
-	fmt.Println(merged)
+	fmt.Println(merged, err)
 
 	// Reports from previous outcome
 	// TODO: Build the proof

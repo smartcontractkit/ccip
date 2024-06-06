@@ -79,6 +79,7 @@ var errOverlappingRanges = errors.New("overlapping sequence numbers in reports")
 
 // computeRanges takes a slice of reports and computes the smallest number of contiguous ranges
 // that cover all the sequence numbers in the reports.
+// Note: reports need all messages to create a proof even if some are already executed.
 func computeRanges(reports []cciptypes.ExecutePluginCommitData) ([]cciptypes.SeqNumRange, error) {
 	var ranges []cciptypes.SeqNumRange
 
