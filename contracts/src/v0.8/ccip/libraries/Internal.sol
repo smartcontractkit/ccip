@@ -81,6 +81,49 @@ library Internal {
     uint256 proofFlagBits;
   }
 
+
+  // Value bearing sub messages
+  struct EVM2AnyTokenTransfer {
+    address sourcePool; // sender for auth
+    bytes sourceData;  // restricted message size, but like a payload
+    bytes destPool;  // abi.encode(solana)
+    uint256 amount; // amount
+  }
+
+  struct EVM2AnyMessage {
+    bytes32 messageId;
+    uint64 sourceChainSelector;
+    uint64 destChainSelector;
+    address sender;
+    bytes data;
+    uint64 nonce; // Zero for unordered
+    // EVM specific destination data
+    bytes receiver; // abi.encode(solana)
+    bytes extraArgs; // abi.encode(EVMGasLimit)
+    EVM2AnyTokenTransfer[] tokenAmounts;
+  }
+
+  // Value bearing sub messages
+  struct Any2EVMTokenTransfer {
+    bytes sourcePool; // sender for auth
+    bytes sourceData;  // restricted message size, but like a payload
+    address destPool;  // receiver
+    uint256 amount; // amount
+  }
+
+  struct Any2EVMMessage {
+    bytes32 messageId;
+    uint64 sourceChainSelector;
+    uint64 destChainSelector;
+    bytes sender;
+    bytes data;
+    uint64 nonce; // Zero for unordered
+    // EVM specific destination data
+    address receiver;
+    uint256 gasLimit;
+    Any2EVMTokenTransfer[] tokenTransfers;
+  }
+
   /// @notice The cross chain message that gets committed to EVM chains.
   /// @dev RMN depends on this struct, if changing, please notify the RMN maintainers.
   struct EVM2EVMMessage {

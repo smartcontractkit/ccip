@@ -23,6 +23,29 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator, ITypeAndVersion {
     IPriceRegistry.TokenPriceFeedConfig feedConfig; // Feed config update data
   }
 
+  struct EVMDestChainExecConfig {
+    Internal.TimestampedPackedUint224 gasPrice; // Gas price for the destination chain
+    uint16 maxNumberOfTokensPerMsg; //           │ Maximum number of distinct ERC20 token transferred per message
+    uint32 maxDataBytes; //                      │ Maximum payload data size in bytes
+    uint32 maxPerMsgGasLimit; //                 │ Maximum gas limit for messages targeting EVMs
+    uint32 destGasOverhead; //                   │ Gas charged on top of the gasLimit to cover destination chain costs
+    uint16 destGasPerPayloadByte; //             │ Destination chain gas charged for passing each byte of `data` payload to receiver
+    uint32 destDataAvailabilityOverheadGas; //   | Extra data availability gas charged on top of the message, e.g. for OCR
+    uint16 destGasPerDataAvailabilityByte; //    | Amount of gas to charge per byte of message data that needs availability
+    uint16 destDataAvailabilityMultiplierBps; // │ Multiplier for data availability gas, multiples of bps, or 0.0001
+    uint32 defaultTokenDestGasOverhead; // ──────╯ Default gas charged to execute the token transfer on the destination chain
+    uint32 defaultTokenDestBytesOverhead; // ────╮ Default extra data availability bytes charged per token transfer
+    uint64 defaultTxGasLimit; //                 │ Default gas limit for a tx
+    uint64 gasMultiplierWeiPerEth; //            │ Multiplier for gas costs, 1e18 based so 11e17 = 10% extra cost.
+    bool enforceOutOfOrder;
+  }
+
+  struct EVMDestTokenExecConfig {
+    uint32 defaultTokenDestGasOverhead; //       │ Default gas charged to execute the token transfer on the destination chain
+    //                                           │ Default data availability bytes that are returned from the source pool and sent
+    uint32 defaultTokenDestBytesOverhead; //     | to the destination pool. Must be >= Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES
+  }
+
   error TokenNotSupported(address token);
   error ChainNotSupported(uint64 chain);
   error OnlyCallableByUpdaterOrOwner();
@@ -49,8 +72,11 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator, ITypeAndVersion {
   ///     Very Expensive:   1 unit of gas costs 1 USD                  -> 1e18
   ///     Expensive:        1 unit of gas costs 0.1 USD                -> 1e17
   ///     Cheap:            1 unit of gas costs 0.000001 USD           -> 1e12
-  mapping(uint64 destChainSelector => Internal.TimestampedPackedUint224 price) private
-    s_usdPerUnitGasByDestChainSelector;
+  mapping(uint64 destChainSelector => EVMDestChainExecConfig) private
+    s_evmDestChainExecConfig;
+  /// @dev The token transfer fee config that can be set by the owner or fee admin
+  mapping(uint64 destChainSelector => mapping(address token => EVMDestTokenExecConfig tokenExecConfig)) internal
+    s_evmDestTokenExecConfig;
 
   /// @dev The price, in USD with 18 decimals, per 1e18 of the smallest token denomination.
   /// @dev Price of 1e18 represents 1 USD per 1e18 token amount.
@@ -140,20 +166,96 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator, ITypeAndVersion {
     override
     returns (Internal.TimestampedPackedUint224 memory)
   {
-    return s_usdPerUnitGasByDestChainSelector[destChainSelector];
+    return s_evmDestChainExecConfig[destChainSelector];
   }
 
-  function getTokenAndGasPrices(
-    address token,
-    uint64 destChainSelector
-  ) external view override returns (uint224 tokenPrice, uint224 gasPriceValue) {
-    Internal.TimestampedPackedUint224 memory gasPrice = s_usdPerUnitGasByDestChainSelector[destChainSelector];
-    // We do allow a gas price of 0, but no stale or unset gas prices
-    if (gasPrice.timestamp == 0) revert ChainNotSupported(destChainSelector);
-    uint256 timePassed = block.timestamp - gasPrice.timestamp;
-    if (timePassed > i_stalenessThreshold) revert StaleGasPrice(destChainSelector, i_stalenessThreshold, timePassed);
+  function getEVMExecFee(uint64 destination, Client.EVM2AnyMessage message)
+    internal
+    view
+    returns (uint256)
+  {
+    // PARSE
+    // We know extraArgs are EVM.
+    bytes4 extraArgsTag = bytes4(extraArgs);
+    Client.EVMExtraArgsV2 memory extraArgs;
+    if (extraArgsTag == Client.EVM_EXTRA_ARGS_V2_TAG) {
+      extraArgs = abi.decode(extraArgs[4:], (Client.EVMExtraArgsV2));
+    } else if (extraArgsTag == Client.EVM_EXTRA_ARGS_V1_TAG) {
+      // EVMExtraArgsV1 originally included a second boolean (strict) field which has been deprecated.
+      // Clients may still include it but it will be ignored.
+      extraArgs = Client.EVMExtraArgsV2({gasLimit: abi.decode(extraArgs[4:], (uint256)), allowOutOfOrderExecution: false});
+    }
 
-    return (_getValidatedTokenPrice(token), gasPrice.value);
+    // VALIDATE
+    EVMDestChainExecConfig config = s_evmDestChainExecConfig[destination];
+    if (config.defaultTxGasLimit == 0) { // Could use some explicit enabled bool as well.
+      // Chain not supported
+      revert ChainNotSupported(destination);
+    }
+    // Validate the message with various checks
+    uint256 numberOfTokens = message.tokenAmounts.length;
+    if (message.data.length > uint256(config.maxDataBytes)) {
+      revert MessageTooLarge(uint256(config.maxDataBytes), dataLength);
+    }
+    if (extraArgs.gasLimit > uint256(config.maxPerMsgGasLimit)) revert MessageGasLimitTooHigh();
+    if (numberOfTokens > uint256(config.maxNumberOfTokensPerMsg)) revert UnsupportedNumberOfTokens();
+    // TODO: Validate receiver.
+
+    // COMPUTE
+    uint256 gasEstimate = extraArgs.gasLimit
+    uint256 tokenTransferBytesOverhead = 0;
+    for (uint256 i = 0; i < numberOfTokens; ++i) {
+        // Calculate the gas cost of the token transfer on the destination chain.
+        EVMDestTokenExecConfig tokenConfig = s_evmDestTokenExecConfig[destination][message.tokenAmounts[i].token];
+        if (tokenConfig.defaultTokenDestBytesOverhead == 0) {
+          gasEstimate += config.defaultTokenDestGasOverhead;
+          dataSize += config.defaultTokenDestBytesOverhead
+        } else {
+          gasEstimate += config.defaultTokenDestGasOverhead;
+          dataSize += config.defaultTokenDestBytesOverhead
+        }
+    }
+    // Calculate data availability cost in USD with 36 decimals. Data availability cost exists on rollups that need to post
+    // transaction calldata onto another storage layer, e.g. Eth mainnet, incurring additional storage gas costs.
+    uint256 dataAvailabilityCost = 0;
+    // Only calculate data availability cost if data availability multiplier is non-zero.
+    // The multiplier should be set to 0 if destination chain does not charge data availability cost.
+    if (destChainDynamicConfig.destDataAvailabilityMultiplierBps > 0) {
+      dataAvailabilityCost = _getDataAvailabilityCost(
+        destChainSelector,
+        // Parse the data availability gas price stored in the higher-order 112 bits of the encoded gas price.
+        uint112(packedGasPrice >> Internal.GAS_PRICE_BITS),
+        message.data.length,
+        numberOfTokens,
+        tokenTransferBytesOverhead
+      );
+    }
+
+    // Calculate execution gas fee on destination chain in USD with 36 decimals.
+    // We add the message gas limit, the overhead gas, the gas of passing message data to receiver, and token transfer gas together.
+    // We then multiply this gas total with the gas multiplier and gas price, converting it into USD with 36 decimals.
+    // uint112(packedGasPrice) = executionGasPrice
+    uint256 executionCost = uint112(config.gasPrice)
+      * (
+        gasLimit + config.destGasOverhead
+        + (message.data.length * config.destGasPerPayloadByte) + tokenTransferGas
+      ) * config.gasMultiplierWeiPerEth;
+    return executionCost + dataAvailabilityCost;
+  }
+
+  function getExecFee(uint64 destination, Client.EVM2AnyMessage message)
+    external
+    view
+    override
+    returns (uint256)
+  {
+    // ExtraArgs tells us which family of chains we are dealing with.
+    bytes4 extraArgsTag = bytes4(extraArgs);
+    if (extraArgs.length == 0 || extraArgsTag == Client.EVM_EXTRA_ARGS_V2_TAG || extraArgsTag == Client.EVM_EXTRA_ARGS_V1_TAG) {
+        return getEVMExecFee(destination, message);
+    }
+    // TODO: add other families here
+    revert InvalidExtraArgsTag();
   }
 
   /// @inheritdoc IPriceRegistry
@@ -290,7 +392,8 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator, ITypeAndVersion {
 
     for (uint256 i = 0; i < gasUpdatesLength; ++i) {
       Internal.GasPriceUpdate memory update = priceUpdates.gasPriceUpdates[i];
-      s_usdPerUnitGasByDestChainSelector[update.destChainSelector] =
+      // TODO could validate its an EVM chain
+      s_evmDestChainExecConfig[update.destChainSelector].gasPrice =
         Internal.TimestampedPackedUint224({value: update.usdPerUnitGas, timestamp: uint32(block.timestamp)});
       emit UsdPerUnitGasUpdated(update.destChainSelector, update.usdPerUnitGas, block.timestamp);
     }

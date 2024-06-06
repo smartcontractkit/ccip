@@ -57,6 +57,12 @@ interface IPriceRegistry {
     uint64 destChainSelector
   ) external view returns (uint224 tokenPrice, uint224 gasPrice);
 
+  function getExecFee(uint64 destination, Client.EVM2AnyMessage message)
+  external
+  view
+  override
+  returns (uint256);
+
   /// @notice Convert a given token amount to target token amount.
   /// @param fromToken The given token address.
   /// @param fromTokenAmount The given token amount.
