@@ -37,7 +37,8 @@ contract EVM2EVMOffRamp_constructor is EVM2EVMOffRampSetup {
       sourceChainSelector: SOURCE_CHAIN_SELECTOR,
       onRamp: ON_RAMP_ADDRESS,
       prevOffRamp: address(0),
-      rmnProxy: address(s_mockRMN)
+      rmnProxy: address(s_mockRMN),
+      tokenAdminRegistry: address(s_tokenAdminRegistry)
     });
     EVM2EVMOffRamp.DynamicConfig memory dynamicConfig =
       generateDynamicOffRampConfig(address(s_destRouter), address(s_priceRegistry));
@@ -55,6 +56,7 @@ contract EVM2EVMOffRamp_constructor is EVM2EVMOffRampSetup {
     assertEq(staticConfig.chainSelector, gotStaticConfig.chainSelector);
     assertEq(staticConfig.onRamp, gotStaticConfig.onRamp);
     assertEq(staticConfig.prevOffRamp, gotStaticConfig.prevOffRamp);
+    assertEq(staticConfig.tokenAdminRegistry, gotStaticConfig.tokenAdminRegistry);
 
     // Dynamic config
     EVM2EVMOffRamp.DynamicConfig memory gotDynamicConfig = s_offRamp.getDynamicConfig();
@@ -80,7 +82,8 @@ contract EVM2EVMOffRamp_constructor is EVM2EVMOffRampSetup {
         sourceChainSelector: SOURCE_CHAIN_SELECTOR,
         onRamp: ZERO_ADDRESS,
         prevOffRamp: address(0),
-        rmnProxy: address(s_mockRMN)
+        rmnProxy: address(s_mockRMN),
+        tokenAdminRegistry: address(s_tokenAdminRegistry)
       }),
       RateLimiter.Config({isEnabled: true, rate: 1e20, capacity: 1e20})
     );
@@ -98,7 +101,8 @@ contract EVM2EVMOffRamp_constructor is EVM2EVMOffRampSetup {
         sourceChainSelector: SOURCE_CHAIN_SELECTOR,
         onRamp: ON_RAMP_ADDRESS,
         prevOffRamp: address(0),
-        rmnProxy: address(s_mockRMN)
+        rmnProxy: address(s_mockRMN),
+        tokenAdminRegistry: address(s_tokenAdminRegistry)
       }),
       getInboundRateLimiterConfig()
     );

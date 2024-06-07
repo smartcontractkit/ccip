@@ -38,7 +38,8 @@ contract EVM2EVMMultiOffRamp_constructor is EVM2EVMMultiOffRampSetup {
     EVM2EVMMultiOffRamp.StaticConfig memory staticConfig = EVM2EVMMultiOffRamp.StaticConfig({
       commitStore: address(s_mockCommitStore),
       chainSelector: DEST_CHAIN_SELECTOR,
-      rmnProxy: address(s_mockRMN)
+      rmnProxy: address(s_mockRMN),
+      tokenAdminRegistry: address(s_tokenAdminRegistry)
     });
     EVM2EVMMultiOffRamp.DynamicConfig memory dynamicConfig = generateDynamicMultiOffRampConfig(address(s_destRouter));
 
@@ -95,6 +96,8 @@ contract EVM2EVMMultiOffRamp_constructor is EVM2EVMMultiOffRampSetup {
     EVM2EVMMultiOffRamp.StaticConfig memory gotStaticConfig = s_offRamp.getStaticConfig();
     assertEq(staticConfig.commitStore, gotStaticConfig.commitStore);
     assertEq(staticConfig.chainSelector, gotStaticConfig.chainSelector);
+    assertEq(staticConfig.rmnProxy, gotStaticConfig.rmnProxy);
+    assertEq(staticConfig.tokenAdminRegistry, gotStaticConfig.tokenAdminRegistry);
 
     // Dynamic config
     EVM2EVMMultiOffRamp.DynamicConfig memory gotDynamicConfig = s_offRamp.getDynamicConfig();
@@ -140,7 +143,8 @@ contract EVM2EVMMultiOffRamp_constructor is EVM2EVMMultiOffRampSetup {
       EVM2EVMMultiOffRamp.StaticConfig({
         commitStore: address(s_mockCommitStore),
         chainSelector: DEST_CHAIN_SELECTOR,
-        rmnProxy: address(s_mockRMN)
+        rmnProxy: address(s_mockRMN),
+        tokenAdminRegistry: address(s_tokenAdminRegistry)
       }),
       sourceChainConfigs
     );

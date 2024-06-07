@@ -79,6 +79,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
     address onRamp; // ─────────────╯  OnRamp address on the source chain
     address prevOffRamp; //            Address of previous-version OffRamp
     address rmnProxy; //               RMN proxy address
+    address tokenAdminRegistry; //     Token admin registry address
   }
 
   /// @notice Dynamic offRamp config
@@ -120,6 +121,8 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
   address internal immutable i_prevOffRamp;
   /// @dev The address of the RMN proxy
   address internal immutable i_rmnProxy;
+  /// @dev The address of the token admin registry
+  address internal immutable i_tokenAdminRegistry;
 
   // DYNAMIC CONFIG
   DynamicConfig internal s_dynamicConfig;
@@ -142,7 +145,10 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
     StaticConfig memory staticConfig,
     RateLimiter.Config memory rateLimiterConfig
   ) OCR2BaseNoChecks() AggregateRateLimiter(rateLimiterConfig) {
-    if (staticConfig.onRamp == address(0) || staticConfig.commitStore == address(0)) revert ZeroAddressNotAllowed();
+    if (
+      staticConfig.onRamp == address(0) || staticConfig.commitStore == address(0)
+        || staticConfig.tokenAdminRegistry == address(0)
+    ) revert ZeroAddressNotAllowed();
     // Ensures we can never deploy a new offRamp that points to a commitStore that
     // already has roots committed.
     if (ICommitStore(staticConfig.commitStore).getExpectedNextSequenceNumber() != 1) revert CommitStoreAlreadyInUse();
@@ -153,6 +159,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
     i_onRamp = staticConfig.onRamp;
     i_prevOffRamp = staticConfig.prevOffRamp;
     i_rmnProxy = staticConfig.rmnProxy;
+    i_tokenAdminRegistry = staticConfig.tokenAdminRegistry;
 
     i_metadataHash = _metadataHash(Internal.EVM_2_EVM_MESSAGE_HASH);
   }
@@ -486,7 +493,8 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
       sourceChainSelector: i_sourceChainSelector,
       onRamp: i_onRamp,
       prevOffRamp: i_prevOffRamp,
-      rmnProxy: i_rmnProxy
+      rmnProxy: i_rmnProxy,
+      tokenAdminRegistry: i_tokenAdminRegistry
     });
   }
 
@@ -511,7 +519,8 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
         sourceChainSelector: i_sourceChainSelector,
         onRamp: i_onRamp,
         prevOffRamp: i_prevOffRamp,
-        rmnProxy: i_rmnProxy
+        rmnProxy: i_rmnProxy,
+        tokenAdminRegistry: i_tokenAdminRegistry
       }),
       dynamicConfig
     );

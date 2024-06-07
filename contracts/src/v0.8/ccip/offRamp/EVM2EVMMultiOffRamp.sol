@@ -79,6 +79,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, OCR2BaseN
     address commitStore; // ────────╮  CommitStore address on the destination chain
     uint64 chainSelector; // ───────╯  Destination chainSelector
     address rmnProxy; //               RMN proxy address
+    address tokenAdminRegistry; //     Token admin registry address
   }
 
   /// @notice Per-chain source config (defining a lane from a Source Chain -> Dest OffRamp)
@@ -129,6 +130,8 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, OCR2BaseN
   uint64 internal immutable i_chainSelector;
   /// @dev The address of the RMN proxy
   address internal immutable i_rmnProxy;
+  /// @dev The address of the token admin registry
+  address internal immutable i_tokenAdminRegistry;
 
   // DYNAMIC CONFIG
   DynamicConfig internal s_dynamicConfig;
@@ -154,11 +157,14 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, OCR2BaseN
     s_executionStates;
 
   constructor(StaticConfig memory staticConfig, SourceChainConfigArgs[] memory sourceChainConfigs) OCR2BaseNoChecks() {
-    if (staticConfig.commitStore == address(0)) revert ZeroAddressNotAllowed();
+    if (staticConfig.commitStore == address(0) || staticConfig.tokenAdminRegistry == address(0)) {
+      revert ZeroAddressNotAllowed();
+    }
 
     i_commitStore = staticConfig.commitStore;
     i_chainSelector = staticConfig.chainSelector;
     i_rmnProxy = staticConfig.rmnProxy;
+    i_tokenAdminRegistry = staticConfig.tokenAdminRegistry;
 
     _applySourceChainConfigUpdates(sourceChainConfigs);
   }
@@ -583,7 +589,12 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, OCR2BaseN
   /// @dev This function will always return the same struct as the contents is static and can never change.
   /// RMN depends on this function, if changing, please notify the RMN maintainers.
   function getStaticConfig() external view returns (StaticConfig memory) {
-    return StaticConfig({commitStore: i_commitStore, chainSelector: i_chainSelector, rmnProxy: i_rmnProxy});
+    return StaticConfig({
+      commitStore: i_commitStore,
+      chainSelector: i_chainSelector,
+      rmnProxy: i_rmnProxy,
+      tokenAdminRegistry: i_tokenAdminRegistry
+    });
   }
 
   /// @notice Returns the current dynamic config.
@@ -669,7 +680,13 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, OCR2BaseN
     s_dynamicConfig = dynamicConfig;
 
     emit ConfigSet(
-      StaticConfig({commitStore: i_commitStore, chainSelector: i_chainSelector, rmnProxy: i_rmnProxy}), dynamicConfig
+      StaticConfig({
+        commitStore: i_commitStore,
+        chainSelector: i_chainSelector,
+        rmnProxy: i_rmnProxy,
+        tokenAdminRegistry: i_tokenAdminRegistry
+      }),
+      dynamicConfig
     );
   }
 
