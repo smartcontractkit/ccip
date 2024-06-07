@@ -434,7 +434,8 @@ contract CCIPCapabilityConfiguration is ITypeAndVersion, ICapabilityConfiguratio
     uint64 configCount,
     OCR3Config memory ocr3Config
   ) internal pure returns (bytes32) {
-    return keccak256(
+    uint256 h = uint256(
+      keccak256(
       abi.encode(
         ocr3Config.chainSelector,
         donId,
@@ -447,7 +448,10 @@ contract CCIPCapabilityConfiguration is ITypeAndVersion, ICapabilityConfiguratio
         ocr3Config.offchainConfigVersion,
         ocr3Config.offchainConfig
       )
-    );
+    ));
+    uint256 prefixMask = type(uint256).max << (256 - 16); // 0xFFFF00..00
+    uint256 prefix = 0x0001 << (256 - 16); // 0x000100..00
+    return bytes32((prefix & prefixMask) | (h & ~prefixMask));
   }
 
   // ================================================================
