@@ -615,7 +615,7 @@ func (pool *TokenPool) SyncUSDCDomain(destTokenTransmitter *TokenTransmitter, de
 	return pool.client.ProcessTransaction(tx)
 }
 
-func SendUSDCToOffRamp(destTokenTransmitter *TokenTransmitter, destPoolAddr common.Address, offRamp common.Address) error {
+func SendUSDCToUSDCPool(destTokenTransmitter *TokenTransmitter, destPoolAddr common.Address) error {
 	// Send usdc tokens to the offRamp because the mocked USDC contracts don't release them to the offRamo
 	// then they should.
 	destClient := destTokenTransmitter.client
@@ -640,7 +640,7 @@ func SendUSDCToOffRamp(destTokenTransmitter *TokenTransmitter, destPoolAddr comm
 		return fmt.Errorf("failed to get transaction opts: %w", err)
 	}
 
-	tx, err := usdcInstance.Mint(destOpts, offRamp, HundredCoins)
+	tx, err := usdcInstance.Mint(destOpts, destPoolAddr, HundredCoins)
 	if err != nil {
 		return fmt.Errorf("failed to mint usdc tokens to offRamp: %w", err)
 	}

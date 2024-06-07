@@ -57,8 +57,8 @@ contract MockE2EUSDCTransmitter is IMessageTransmitterWithRelay {
   function receiveMessage(bytes calldata message, bytes calldata) external returns (bool success) {
     address recipient = address(bytes20(message[64:84]));
 
-    // We always mint 1e18 tokens to not complicate the test.
-    i_token.mint(recipient, 1e18);
+    // We always mint 1000e18 tokens to not complicate the test.
+    i_token.mint(recipient, 1000e18);
 
     return s_shouldSucceed;
   }
