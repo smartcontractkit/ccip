@@ -2,10 +2,11 @@ package mocks
 
 import (
 	"context"
+	"time"
 
-	"github.com/smartcontractkit/ccipocr3/internal/model"
-	"github.com/smartcontractkit/ccipocr3/internal/reader"
 	"github.com/stretchr/testify/mock"
+
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
 
 type CCIPReader struct {
@@ -18,19 +19,29 @@ func NewCCIPReader() *CCIPReader {
 	}
 }
 
-func (r CCIPReader) MsgsBetweenSeqNums(ctx context.Context, chain model.ChainSelector, seqNumRange model.SeqNumRange) ([]model.CCIPMsg, error) {
+func (r CCIPReader) CommitReportsGTETimestamp(ctx context.Context, dest cciptypes.ChainSelector, ts time.Time, limit int) ([]cciptypes.CommitPluginReportWithMeta, error) {
+	args := r.Called(ctx, dest, ts, limit)
+	return args.Get(0).([]cciptypes.CommitPluginReportWithMeta), args.Error(1)
+}
+
+func (r CCIPReader) ExecutedMessageRanges(ctx context.Context, source, dest cciptypes.ChainSelector, seqNumRange cciptypes.SeqNumRange) ([]cciptypes.SeqNumRange, error) {
+	args := r.Called(ctx, source, dest, seqNumRange)
+	return args.Get(0).([]cciptypes.SeqNumRange), args.Error(1)
+}
+
+func (r CCIPReader) MsgsBetweenSeqNums(ctx context.Context, chain cciptypes.ChainSelector, seqNumRange cciptypes.SeqNumRange) ([]cciptypes.CCIPMsg, error) {
 	args := r.Called(ctx, chain, seqNumRange)
-	return args.Get(0).([]model.CCIPMsg), args.Error(1)
+	return args.Get(0).([]cciptypes.CCIPMsg), args.Error(1)
 }
 
-func (r CCIPReader) NextSeqNum(ctx context.Context, chains []model.ChainSelector) (seqNum []model.SeqNum, err error) {
+func (r CCIPReader) NextSeqNum(ctx context.Context, chains []cciptypes.ChainSelector) (seqNum []cciptypes.SeqNum, err error) {
 	args := r.Called(ctx, chains)
-	return args.Get(0).([]model.SeqNum), args.Error(1)
+	return args.Get(0).([]cciptypes.SeqNum), args.Error(1)
 }
 
-func (r CCIPReader) GasPrices(ctx context.Context, chains []model.ChainSelector) ([]model.BigInt, error) {
+func (r CCIPReader) GasPrices(ctx context.Context, chains []cciptypes.ChainSelector) ([]cciptypes.BigInt, error) {
 	args := r.Called(ctx, chains)
-	return args.Get(0).([]model.BigInt), args.Error(1)
+	return args.Get(0).([]cciptypes.BigInt), args.Error(1)
 }
 
 func (r CCIPReader) Close(ctx context.Context) error {
@@ -39,4 +50,4 @@ func (r CCIPReader) Close(ctx context.Context) error {
 }
 
 // Interface compatibility check.
-var _ reader.CCIP = (*CCIPReader)(nil)
+var _ cciptypes.CCIPReader = (*CCIPReader)(nil)
