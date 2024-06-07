@@ -616,8 +616,7 @@ func (pool *TokenPool) SyncUSDCDomain(destTokenTransmitter *TokenTransmitter, de
 }
 
 func SendUSDCToOffRamp(destTokenTransmitter *TokenTransmitter, destPoolAddr common.Address, offRamp common.Address) error {
-	// Send usdc tokens to the offRamp because the mocked USDC contracts don't release them to the offRamo
-	// then they should.
+	// Send usdc tokens to the offRamp because the mocked USDC contracts don't mint them naturally to the offRamp
 	destClient := destTokenTransmitter.client
 
 	destPool, err := usdc_token_pool.NewUSDCTokenPool(destPoolAddr, destClient.Backend())
