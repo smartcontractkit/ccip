@@ -3,14 +3,19 @@ pragma solidity 0.8.24;
 
 import {ICommitStore} from "../../interfaces/ICommitStore.sol";
 import {IMultiCommitStore} from "../../interfaces/IMultiCommitStore.sol";
+
 import {IPool} from "../../interfaces/IPool.sol";
+import {IPriceRegistry} from "../../interfaces/IPriceRegistry.sol";
+import {IRMN} from "../../interfaces/IRMN.sol";
 
 import {CallWithExactGas} from "../../../shared/call/CallWithExactGas.sol";
+import {PriceRegistry} from "../../PriceRegistry.sol";
 import {RMN} from "../../RMN.sol";
 import {Router} from "../../Router.sol";
 import {IMessageInterceptor} from "../../interfaces/IMessageInterceptor.sol";
 import {Client} from "../../libraries/Client.sol";
 import {Internal} from "../../libraries/Internal.sol";
+import {MerkleMultiProof} from "../../libraries/MerkleMultiProof.sol";
 import {Pool} from "../../libraries/Pool.sol";
 import {RateLimiter} from "../../libraries/RateLimiter.sol";
 import {MultiOCR3Base} from "../../ocr/MultiOCR3Base.sol";
@@ -35,12 +40,10 @@ import {Vm} from "forge-std/Vm.sol";
 
 contract EVM2EVMMultiOffRamp_constructor is EVM2EVMMultiOffRampSetup {
   function test_Constructor_Success() public {
-    EVM2EVMMultiOffRamp.StaticConfig memory staticConfig = EVM2EVMMultiOffRamp.StaticConfig({
-      commitStore: address(s_mockCommitStore),
-      chainSelector: DEST_CHAIN_SELECTOR,
-      rmnProxy: address(s_mockRMN)
-    });
-    EVM2EVMMultiOffRamp.DynamicConfig memory dynamicConfig = generateDynamicMultiOffRampConfig(address(s_destRouter));
+    EVM2EVMMultiOffRamp.StaticConfig memory staticConfig =
+      EVM2EVMMultiOffRamp.StaticConfig({chainSelector: DEST_CHAIN_SELECTOR, rmnProxy: address(s_mockRMN)});
+    EVM2EVMMultiOffRamp.DynamicConfig memory dynamicConfig =
+      generateDynamicMultiOffRampConfig(address(s_destRouter), address(s_priceRegistry));
 
     EVM2EVMMultiOffRamp.SourceChainConfigArgs[] memory sourceChainConfigs =
       new EVM2EVMMultiOffRamp.SourceChainConfigArgs[](2);
@@ -59,6 +62,7 @@ contract EVM2EVMMultiOffRamp_constructor is EVM2EVMMultiOffRampSetup {
 
     EVM2EVMMultiOffRamp.SourceChainConfig memory expectedSourceChainConfig1 = EVM2EVMMultiOffRamp.SourceChainConfig({
       isEnabled: true,
+      minSeqNr: 1,
       prevOffRamp: address(0),
       onRamp: sourceChainConfigs[0].onRamp,
       metadataHash: s_offRamp.metadataHash(SOURCE_CHAIN_SELECTOR_1, sourceChainConfigs[0].onRamp)
@@ -66,12 +70,11 @@ contract EVM2EVMMultiOffRamp_constructor is EVM2EVMMultiOffRampSetup {
 
     EVM2EVMMultiOffRamp.SourceChainConfig memory expectedSourceChainConfig2 = EVM2EVMMultiOffRamp.SourceChainConfig({
       isEnabled: true,
+      minSeqNr: 1,
       prevOffRamp: address(0),
       onRamp: sourceChainConfigs[1].onRamp,
       metadataHash: s_offRamp.metadataHash(SOURCE_CHAIN_SELECTOR_1 + 1, sourceChainConfigs[1].onRamp)
     });
-
-    _setupMultiCommitStoreFromOffRampConfigs(sourceChainConfigs);
 
     vm.expectEmit();
     emit EVM2EVMMultiOffRamp.SourceChainSelectorAdded(SOURCE_CHAIN_SELECTOR_1);
@@ -90,7 +93,7 @@ contract EVM2EVMMultiOffRamp_constructor is EVM2EVMMultiOffRampSetup {
     MultiOCR3Base.OCRConfigArgs[] memory ocrConfigs = new MultiOCR3Base.OCRConfigArgs[](1);
     ocrConfigs[0] = MultiOCR3Base.OCRConfigArgs({
       ocrPluginType: uint8(Internal.OCRPluginType.Execution),
-      configDigest: s_configDigest,
+      configDigest: s_configDigestExec,
       F: s_F,
       uniqueReports: false,
       isSignatureVerificationEnabled: false,
@@ -103,8 +106,8 @@ contract EVM2EVMMultiOffRamp_constructor is EVM2EVMMultiOffRampSetup {
 
     // Static config
     EVM2EVMMultiOffRamp.StaticConfig memory gotStaticConfig = s_offRamp.getStaticConfig();
-    assertEq(staticConfig.commitStore, gotStaticConfig.commitStore);
     assertEq(staticConfig.chainSelector, gotStaticConfig.chainSelector);
+    assertEq(staticConfig.rmnProxy, address(s_mockRMN));
 
     // Dynamic config
     EVM2EVMMultiOffRamp.DynamicConfig memory gotDynamicConfig = s_offRamp.getDynamicConfig();
@@ -125,10 +128,6 @@ contract EVM2EVMMultiOffRamp_constructor is EVM2EVMMultiOffRampSetup {
     MultiOCR3Base.OCRConfig memory gotOCRConfig = s_offRamp.latestConfigDetails(uint8(Internal.OCRPluginType.Execution));
     _assertOCRConfigEquality(expectedOCRConfig, gotOCRConfig);
 
-    // uint64[] memory resultSourceChainSelectors = s_offRamp.getSourceChainSelectors();
-    // assertEq(resultSourceChainSelectors.length, 2);
-    // assertEq(resultSourceChainSelectors[0], SOURCE_CHAIN_SELECTOR_1);
-    // assertEq(resultSourceChainSelectors[1], SOURCE_CHAIN_SELECTOR_1 + 1);
     _assertSourceChainConfigEquality(
       s_offRamp.getSourceChainConfig(SOURCE_CHAIN_SELECTOR_1), expectedSourceChainConfig1
     );
@@ -139,6 +138,9 @@ contract EVM2EVMMultiOffRamp_constructor is EVM2EVMMultiOffRampSetup {
     // OffRamp initial values
     assertEq("EVM2EVMMultiOffRamp 1.6.0-dev", s_offRamp.typeAndVersion());
     assertEq(OWNER, s_offRamp.owner());
+    assertEq(0, s_offRamp.getLatestPriceEpochAndRound());
+    assertTrue(s_offRamp.isUnpausedAndNotCursed(sourceChainConfigs[0].sourceChainSelector));
+    assertTrue(s_offRamp.isUnpausedAndNotCursed(sourceChainConfigs[1].sourceChainSelector));
   }
 
   // Revert
@@ -158,12 +160,57 @@ contract EVM2EVMMultiOffRamp_constructor is EVM2EVMMultiOffRampSetup {
     vm.expectRevert(EVM2EVMMultiOffRamp.ZeroAddressNotAllowed.selector);
 
     s_offRamp = new EVM2EVMMultiOffRampHelper(
-      EVM2EVMMultiOffRamp.StaticConfig({
-        commitStore: address(s_mockCommitStore),
-        chainSelector: DEST_CHAIN_SELECTOR,
-        rmnProxy: address(s_mockRMN)
-      }),
+      EVM2EVMMultiOffRamp.StaticConfig({chainSelector: DEST_CHAIN_SELECTOR, rmnProxy: address(s_mockRMN)}),
       sourceChainConfigs
+    );
+  }
+
+  function test_SourceChainSelector_Revert() public {
+    uint64[] memory sourceChainSelectors = new uint64[](1);
+    sourceChainSelectors[0] = SOURCE_CHAIN_SELECTOR_1;
+
+    EVM2EVMMultiOffRamp.SourceChainConfigArgs[] memory sourceChainConfigs =
+      new EVM2EVMMultiOffRamp.SourceChainConfigArgs[](1);
+    sourceChainConfigs[0] = EVM2EVMMultiOffRamp.SourceChainConfigArgs({
+      sourceChainSelector: 0,
+      isEnabled: true,
+      prevOffRamp: address(0),
+      onRamp: address(0)
+    });
+
+    vm.expectRevert(EVM2EVMMultiOffRamp.ZeroChainSelectorNotAllowed.selector);
+
+    s_offRamp = new EVM2EVMMultiOffRampHelper(
+      EVM2EVMMultiOffRamp.StaticConfig({chainSelector: DEST_CHAIN_SELECTOR, rmnProxy: address(s_mockRMN)}),
+      sourceChainConfigs
+    );
+  }
+
+  function test_ZeroRMNProxy_Revert() public {
+    uint64[] memory sourceChainSelectors = new uint64[](1);
+    sourceChainSelectors[0] = SOURCE_CHAIN_SELECTOR_1;
+
+    EVM2EVMMultiOffRamp.SourceChainConfigArgs[] memory sourceChainConfigs =
+      new EVM2EVMMultiOffRamp.SourceChainConfigArgs[](0);
+
+    vm.expectRevert(EVM2EVMMultiOffRamp.ZeroAddressNotAllowed.selector);
+
+    s_offRamp = new EVM2EVMMultiOffRampHelper(
+      EVM2EVMMultiOffRamp.StaticConfig({chainSelector: DEST_CHAIN_SELECTOR, rmnProxy: ZERO_ADDRESS}), sourceChainConfigs
+    );
+  }
+
+  function test_ZeroChainSelector_Revert() public {
+    uint64[] memory sourceChainSelectors = new uint64[](1);
+    sourceChainSelectors[0] = SOURCE_CHAIN_SELECTOR_1;
+
+    EVM2EVMMultiOffRamp.SourceChainConfigArgs[] memory sourceChainConfigs =
+      new EVM2EVMMultiOffRamp.SourceChainConfigArgs[](0);
+
+    vm.expectRevert(EVM2EVMMultiOffRamp.ZeroChainSelectorNotAllowed.selector);
+
+    s_offRamp = new EVM2EVMMultiOffRampHelper(
+      EVM2EVMMultiOffRamp.StaticConfig({chainSelector: 0, rmnProxy: address(s_mockRMN)}), sourceChainConfigs
     );
   }
 }
@@ -171,7 +218,8 @@ contract EVM2EVMMultiOffRamp_constructor is EVM2EVMMultiOffRampSetup {
 contract EVM2EVMMultiOffRamp_setDynamicConfig is EVM2EVMMultiOffRampSetup {
   function test_SetDynamicConfig_Success() public {
     EVM2EVMMultiOffRamp.StaticConfig memory staticConfig = s_offRamp.getStaticConfig();
-    EVM2EVMMultiOffRamp.DynamicConfig memory dynamicConfig = generateDynamicMultiOffRampConfig(USER_3);
+    EVM2EVMMultiOffRamp.DynamicConfig memory dynamicConfig =
+      generateDynamicMultiOffRampConfig(USER_3, address(s_priceRegistry));
 
     vm.expectEmit();
     emit EVM2EVMMultiOffRamp.ConfigSet(staticConfig, dynamicConfig);
@@ -184,7 +232,8 @@ contract EVM2EVMMultiOffRamp_setDynamicConfig is EVM2EVMMultiOffRampSetup {
 
   function test_SetDynamicConfigWithValidator_Success() public {
     EVM2EVMMultiOffRamp.StaticConfig memory staticConfig = s_offRamp.getStaticConfig();
-    EVM2EVMMultiOffRamp.DynamicConfig memory dynamicConfig = generateDynamicMultiOffRampConfig(USER_3);
+    EVM2EVMMultiOffRamp.DynamicConfig memory dynamicConfig =
+      generateDynamicMultiOffRampConfig(USER_3, address(s_priceRegistry));
     dynamicConfig.messageValidator = address(s_messageValidator);
 
     vm.expectEmit();
@@ -196,9 +245,12 @@ contract EVM2EVMMultiOffRamp_setDynamicConfig is EVM2EVMMultiOffRampSetup {
     _assertSameConfig(dynamicConfig, newConfig);
   }
 
+  // Reverts
+
   function test_NonOwner_Revert() public {
     vm.startPrank(STRANGER);
-    EVM2EVMMultiOffRamp.DynamicConfig memory dynamicConfig = generateDynamicMultiOffRampConfig(USER_3);
+    EVM2EVMMultiOffRamp.DynamicConfig memory dynamicConfig =
+      generateDynamicMultiOffRampConfig(USER_3, address(s_priceRegistry));
 
     vm.expectRevert("Only callable by owner");
 
@@ -206,7 +258,16 @@ contract EVM2EVMMultiOffRamp_setDynamicConfig is EVM2EVMMultiOffRampSetup {
   }
 
   function test_RouterZeroAddress_Revert() public {
-    EVM2EVMMultiOffRamp.DynamicConfig memory dynamicConfig = generateDynamicMultiOffRampConfig(ZERO_ADDRESS);
+    EVM2EVMMultiOffRamp.DynamicConfig memory dynamicConfig =
+      generateDynamicMultiOffRampConfig(ZERO_ADDRESS, address(s_priceRegistry));
+
+    vm.expectRevert(EVM2EVMMultiOffRamp.ZeroAddressNotAllowed.selector);
+
+    s_offRamp.setDynamicConfig(dynamicConfig);
+  }
+
+  function test_PriceRegistryZeroAddress_Revert() public {
+    EVM2EVMMultiOffRamp.DynamicConfig memory dynamicConfig = generateDynamicMultiOffRampConfig(USER_3, ZERO_ADDRESS);
 
     vm.expectRevert(EVM2EVMMultiOffRamp.ZeroAddressNotAllowed.selector);
 
@@ -263,6 +324,11 @@ contract EVM2EVMMultiOffRamp_metadataHash is EVM2EVMMultiOffRampSetup {
       return;
     }
 
+    // Disallow 0 source chain selectors
+    vm.assume(sourceChainSelector1 != 0);
+    vm.assume(sourceChainSelector2 != 0);
+    vm.assume(destChainSelector != 0);
+
     EVM2EVMMultiOffRamp.StaticConfig memory staticConfig = s_offRamp.getStaticConfig();
     EVM2EVMMultiOffRamp.SourceChainConfigArgs[] memory sourceChainConfigs =
       new EVM2EVMMultiOffRamp.SourceChainConfigArgs[](0);
@@ -292,6 +358,8 @@ contract EVM2EVMMultiOffRamp_execute is EVM2EVMMultiOffRampSetup {
   function setUp() public virtual override {
     super.setUp();
     _setupMultipleOffRamps();
+    s_offRamp.setVerifyOverrideResult(SOURCE_CHAIN_SELECTOR_1, 1);
+    s_offRamp.setVerifyOverrideResult(SOURCE_CHAIN_SELECTOR_3, 1);
   }
 
   function test_SingleMessageNoTokens_Success() public {
@@ -679,20 +747,18 @@ contract EVM2EVMMultiOffRamp_execute is EVM2EVMMultiOffRampSetup {
   }
 
   function test_RootNotCommitted_Revert() public {
-    vm.mockCall(address(s_mockCommitStore), abi.encodeWithSelector(IMultiCommitStore.verify.selector), abi.encode(0));
+    s_offRamp.setVerifyOverrideResult(SOURCE_CHAIN_SELECTOR_1, 0);
     vm.expectRevert(abi.encodeWithSelector(EVM2EVMMultiOffRamp.RootNotCommitted.selector, SOURCE_CHAIN_SELECTOR_1));
 
     Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1);
     s_offRamp.execute(
       _generateReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messages), _getGasLimitsFromMessages(messages)
     );
-    vm.clearMockedCalls();
   }
 
   function test_ManualExecutionNotYetEnabled_Revert() public {
-    vm.mockCall(
-      address(s_mockCommitStore), abi.encodeWithSelector(IMultiCommitStore.verify.selector), abi.encode(BLOCK_TIME)
-    );
+    s_offRamp.setVerifyOverrideResult(SOURCE_CHAIN_SELECTOR_1, BLOCK_TIME);
+
     vm.expectRevert(
       abi.encodeWithSelector(EVM2EVMMultiOffRamp.ManualExecutionNotYetEnabled.selector, SOURCE_CHAIN_SELECTOR_1)
     );
@@ -701,7 +767,6 @@ contract EVM2EVMMultiOffRamp_execute is EVM2EVMMultiOffRampSetup {
     s_offRamp.execute(
       _generateReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messages), _getGasLimitsFromMessages(messages)
     );
-    vm.clearMockedCalls();
   }
 
   function test_NonExistingSourceChain_Revert() public {
@@ -864,8 +929,10 @@ contract EVM2EVMMultiOffRamp_execute_upgrade is EVM2EVMMultiOffRampSetup {
       onRamp: ON_RAMP_ADDRESS_3
     });
 
-    _setupMultiCommitStoreFromOffRampConfigs(sourceChainConfigs);
     _setupMultipleOffRampsFromConfigs(sourceChainConfigs);
+
+    s_offRamp.setVerifyOverrideResult(SOURCE_CHAIN_SELECTOR_1, 1);
+    s_offRamp.setVerifyOverrideResult(SOURCE_CHAIN_SELECTOR_3, 1);
   }
 
   function test_Upgraded_Success() public {
@@ -1064,7 +1131,7 @@ contract EVM2EVMMultiOffRamp_execute_upgrade is EVM2EVMMultiOffRampSetup {
     s_offRamp.execute(_generateReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messages), new uint256[](0));
 
     address prevOffRamp = address(s_offRamp);
-    deployOffRamp(s_mockCommitStore, s_destRouter);
+    deployOffRamp(s_destRouter, s_mockRMN);
 
     EVM2EVMMultiOffRamp.SourceChainConfigArgs[] memory sourceChainConfigs =
       new EVM2EVMMultiOffRamp.SourceChainConfigArgs[](1);
@@ -1238,6 +1305,8 @@ contract EVM2EVMMultiOffRamp_batchExecute is EVM2EVMMultiOffRampSetup {
   function setUp() public virtual override {
     super.setUp();
     _setupMultipleOffRamps();
+    s_offRamp.setVerifyOverrideResult(SOURCE_CHAIN_SELECTOR_1, 1);
+    s_offRamp.setVerifyOverrideResult(SOURCE_CHAIN_SELECTOR_3, 1);
   }
 
   function test_SingleReport_Success() public {
@@ -1420,6 +1489,9 @@ contract EVM2EVMMultiOffRamp_manuallyExecute is EVM2EVMMultiOffRampSetup {
   function setUp() public virtual override {
     super.setUp();
     _setupMultipleOffRamps();
+
+    s_offRamp.setVerifyOverrideResult(SOURCE_CHAIN_SELECTOR_1, 1);
+    s_offRamp.setVerifyOverrideResult(SOURCE_CHAIN_SELECTOR_3, 1);
   }
 
   function test_ManualExec_Success() public {
@@ -1821,10 +1893,11 @@ contract EVM2EVMMultiOffRamp_manuallyExecute is EVM2EVMMultiOffRampSetup {
   }
 }
 
-contract EVM2EVMMultiOffRamp_report is EVM2EVMMultiOffRampSetup {
+contract EVM2EVMMultiOffRamp_reportExec is EVM2EVMMultiOffRampSetup {
   function setUp() public virtual override {
     super.setUp();
     _setupMultipleOffRamps();
+    s_offRamp.setVerifyOverrideResult(SOURCE_CHAIN_SELECTOR_1, 1);
   }
 
   // Asserts that execute completes
@@ -2000,11 +2073,12 @@ contract EVM2EVMMultiOffRamp_transmitExec is EVM2EVMMultiOffRampSetup {
   function setUp() public virtual override {
     super.setUp();
     _setupMultipleOffRamps();
+    s_offRamp.setVerifyOverrideResult(SOURCE_CHAIN_SELECTOR_1, 1);
   }
 
   // Asserts that execute completes
   function test_SingleReport_Success() public {
-    bytes32[3] memory reportContext = [s_configDigest, s_configDigest, s_configDigest];
+    bytes32[3] memory reportContext = [s_configDigestExec, s_configDigestExec, s_configDigestExec];
 
     Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1);
     Internal.ExecutionReportSingleChain[] memory reports =
@@ -2021,7 +2095,7 @@ contract EVM2EVMMultiOffRamp_transmitExec is EVM2EVMMultiOffRampSetup {
 
     vm.expectEmit();
     emit MultiOCR3Base.Transmitted(
-      uint8(Internal.OCRPluginType.Execution), s_configDigest, uint32(uint256(s_configDigest) >> 8)
+      uint8(Internal.OCRPluginType.Execution), s_configDigestExec, uint32(uint256(s_configDigestExec) >> 8)
     );
 
     vm.startPrank(s_validTransmitters[0]);
@@ -2031,7 +2105,7 @@ contract EVM2EVMMultiOffRamp_transmitExec is EVM2EVMMultiOffRampSetup {
   // Reverts
 
   function test_UnauthorizedTransmitter_Revert() public {
-    bytes32[3] memory reportContext = [s_configDigest, s_configDigest, s_configDigest];
+    bytes32[3] memory reportContext = [s_configDigestExec, s_configDigestExec, s_configDigestExec];
 
     Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1);
     Internal.ExecutionReportSingleChain[] memory reports =
@@ -2043,8 +2117,36 @@ contract EVM2EVMMultiOffRamp_transmitExec is EVM2EVMMultiOffRampSetup {
 
   function test_NoConfig_Revert() public {
     _redeployOffRampWithNoOCRConfigs();
+    s_offRamp.setVerifyOverrideResult(SOURCE_CHAIN_SELECTOR_1, 1);
 
-    bytes32[3] memory reportContext = [bytes32(""), s_configDigest, s_configDigest];
+    bytes32[3] memory reportContext = [bytes32(""), s_configDigestExec, s_configDigestExec];
+
+    Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1);
+    Internal.ExecutionReportSingleChain[] memory reports =
+      _generateBatchReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messages);
+
+    vm.startPrank(s_validTransmitters[0]);
+    vm.expectRevert(MultiOCR3Base.UnauthorizedTransmitter.selector);
+    s_offRamp.transmitExec(reportContext, abi.encode(reports));
+  }
+
+  function test_NoConfigWithOtherConfigPresent_Revert() public {
+    _redeployOffRampWithNoOCRConfigs();
+    s_offRamp.setVerifyOverrideResult(SOURCE_CHAIN_SELECTOR_1, 1);
+
+    MultiOCR3Base.OCRConfigArgs[] memory ocrConfigs = new MultiOCR3Base.OCRConfigArgs[](1);
+    ocrConfigs[0] = MultiOCR3Base.OCRConfigArgs({
+      ocrPluginType: uint8(Internal.OCRPluginType.Commit),
+      configDigest: s_configDigestCommit,
+      F: s_F,
+      uniqueReports: false,
+      isSignatureVerificationEnabled: false,
+      signers: s_emptySigners,
+      transmitters: s_validTransmitters
+    });
+    s_offRamp.setOCR3Configs(ocrConfigs);
+
+    bytes32[3] memory reportContext = [bytes32(""), s_configDigestExec, s_configDigestExec];
 
     Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1);
     Internal.ExecutionReportSingleChain[] memory reports =
@@ -2057,13 +2159,14 @@ contract EVM2EVMMultiOffRamp_transmitExec is EVM2EVMMultiOffRampSetup {
 
   function test_WrongConfigWithSigners_Revert() public {
     _redeployOffRampWithNoOCRConfigs();
+    s_offRamp.setVerifyOverrideResult(SOURCE_CHAIN_SELECTOR_1, 1);
 
-    s_configDigest = _getBasicConfigDigest(1, s_validSigners, s_validTransmitters);
+    s_configDigestExec = _getBasicConfigDigest(1, s_validSigners, s_validTransmitters);
 
     MultiOCR3Base.OCRConfigArgs[] memory ocrConfigs = new MultiOCR3Base.OCRConfigArgs[](1);
     ocrConfigs[0] = MultiOCR3Base.OCRConfigArgs({
       ocrPluginType: uint8(Internal.OCRPluginType.Execution),
-      configDigest: s_configDigest,
+      configDigest: s_configDigestExec,
       F: s_F,
       uniqueReports: false,
       isSignatureVerificationEnabled: true,
@@ -2072,7 +2175,7 @@ contract EVM2EVMMultiOffRamp_transmitExec is EVM2EVMMultiOffRampSetup {
     });
     s_offRamp.setOCR3Configs(ocrConfigs);
 
-    bytes32[3] memory reportContext = [s_configDigest, s_configDigest, s_configDigest];
+    bytes32[3] memory reportContext = [s_configDigestExec, s_configDigestExec, s_configDigestExec];
 
     Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1);
     Internal.ExecutionReportSingleChain[] memory reports =
@@ -2082,22 +2185,6 @@ contract EVM2EVMMultiOffRamp_transmitExec is EVM2EVMMultiOffRampSetup {
     vm.expectRevert();
     s_offRamp.transmitExec(reportContext, abi.encode(reports));
   }
-
-  function _redeployOffRampWithNoOCRConfigs() internal {
-    s_offRamp = new EVM2EVMMultiOffRampHelper(
-      EVM2EVMMultiOffRamp.StaticConfig({
-        commitStore: address(s_mockCommitStore),
-        chainSelector: DEST_CHAIN_SELECTOR,
-        rmnProxy: address(s_mockRMN)
-      }),
-      new EVM2EVMMultiOffRamp.SourceChainConfigArgs[](0)
-    );
-
-    s_offRamp.setDynamicConfig(generateDynamicMultiOffRampConfig(address(s_destRouter)));
-    _setupMultipleOffRamps();
-  }
-
-  // TODO: add revert test when transmitting with Commit transmitter instead of Exec transmitter
 }
 
 contract EVM2EVMMultiOffRamp_getExecutionState is EVM2EVMMultiOffRampSetup {
@@ -2690,10 +2777,10 @@ contract EVM2EVMMultiOffRamp_applySourceChainConfigUpdates is EVM2EVMMultiOffRam
       prevOffRamp: address(0),
       onRamp: ON_RAMP_ADDRESS_1
     });
-    _setupMultiCommitStoreFromOffRampConfigs(sourceChainConfigs);
 
     EVM2EVMMultiOffRamp.SourceChainConfig memory expectedSourceChainConfig = EVM2EVMMultiOffRamp.SourceChainConfig({
       isEnabled: true,
+      minSeqNr: 1,
       prevOffRamp: address(0),
       onRamp: ON_RAMP_ADDRESS_1,
       metadataHash: s_offRamp.metadataHash(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1)
@@ -2708,10 +2795,6 @@ contract EVM2EVMMultiOffRamp_applySourceChainConfigUpdates is EVM2EVMMultiOffRam
     s_offRamp.applySourceChainConfigUpdates(sourceChainConfigs);
 
     _assertSourceChainConfigEquality(s_offRamp.getSourceChainConfig(SOURCE_CHAIN_SELECTOR_1), expectedSourceChainConfig);
-
-    // uint64[] memory resultSourceChainSelectors = s_offRamp.getSourceChainSelectors();
-    // assertEq(resultSourceChainSelectors.length, 1);
-    // assertEq(resultSourceChainSelectors[0], SOURCE_CHAIN_SELECTOR_1);
   }
 
   function test_ReplaceExistingChain_Success() public {
@@ -2724,12 +2807,12 @@ contract EVM2EVMMultiOffRamp_applySourceChainConfigUpdates is EVM2EVMMultiOffRam
       onRamp: ON_RAMP_ADDRESS_1
     });
 
-    _setupMultiCommitStoreFromOffRampConfigs(sourceChainConfigs);
     s_offRamp.applySourceChainConfigUpdates(sourceChainConfigs);
 
     sourceChainConfigs[0].isEnabled = false;
     EVM2EVMMultiOffRamp.SourceChainConfig memory expectedSourceChainConfig = EVM2EVMMultiOffRamp.SourceChainConfig({
       isEnabled: false,
+      minSeqNr: 1,
       prevOffRamp: address(0),
       onRamp: sourceChainConfigs[0].onRamp,
       metadataHash: s_offRamp.metadataHash(SOURCE_CHAIN_SELECTOR_1, sourceChainConfigs[0].onRamp)
@@ -2773,13 +2856,13 @@ contract EVM2EVMMultiOffRamp_applySourceChainConfigUpdates is EVM2EVMMultiOffRam
       prevOffRamp: address(1000),
       onRamp: address(uint160(ON_RAMP_ADDRESS_1) + 42)
     });
-    _setupMultiCommitStoreFromOffRampConfigs(sourceChainConfigs);
 
     EVM2EVMMultiOffRamp.SourceChainConfig[] memory expectedSourceChainConfigs =
       new EVM2EVMMultiOffRamp.SourceChainConfig[](3);
     for (uint256 i = 0; i < 3; ++i) {
       expectedSourceChainConfigs[i] = EVM2EVMMultiOffRamp.SourceChainConfig({
         isEnabled: sourceChainConfigs[i].isEnabled,
+        minSeqNr: 1,
         prevOffRamp: sourceChainConfigs[i].prevOffRamp,
         onRamp: sourceChainConfigs[i].onRamp,
         metadataHash: s_offRamp.metadataHash(sourceChainConfigs[i].sourceChainSelector, sourceChainConfigs[i].onRamp)
@@ -2835,12 +2918,11 @@ contract EVM2EVMMultiOffRamp_applySourceChainConfigUpdates is EVM2EVMMultiOffRam
 
     EVM2EVMMultiOffRamp.SourceChainConfig memory expectedSourceChainConfig = EVM2EVMMultiOffRamp.SourceChainConfig({
       isEnabled: sourceChainConfigArgs.isEnabled,
+      minSeqNr: 1,
       prevOffRamp: sourceChainConfigArgs.prevOffRamp,
       onRamp: sourceChainConfigArgs.onRamp,
       metadataHash: s_offRamp.metadataHash(sourceChainConfigArgs.sourceChainSelector, sourceChainConfigArgs.onRamp)
     });
-
-    _setupMultiCommitStoreFromOffRampConfigs(sourceChainConfigs);
 
     if (isNewChain) {
       vm.expectEmit();
@@ -2869,7 +2951,6 @@ contract EVM2EVMMultiOffRamp_applySourceChainConfigUpdates is EVM2EVMMultiOffRam
       onRamp: address(0)
     });
 
-    _setupMultiCommitStoreFromOffRampConfigs(sourceChainConfigs);
     vm.expectRevert(EVM2EVMMultiOffRamp.ZeroAddressNotAllowed.selector);
     s_offRamp.applySourceChainConfigUpdates(sourceChainConfigs);
   }
@@ -2884,7 +2965,7 @@ contract EVM2EVMMultiOffRamp_applySourceChainConfigUpdates is EVM2EVMMultiOffRam
       onRamp: ON_RAMP_ADDRESS_1
     });
 
-    vm.expectRevert(abi.encodeWithSelector(EVM2EVMMultiOffRamp.InvalidStaticConfig.selector, 0));
+    vm.expectRevert(EVM2EVMMultiOffRamp.ZeroChainSelectorNotAllowed.selector);
     s_offRamp.applySourceChainConfigUpdates(sourceChainConfigs);
   }
 
@@ -2898,7 +2979,6 @@ contract EVM2EVMMultiOffRamp_applySourceChainConfigUpdates is EVM2EVMMultiOffRam
       onRamp: ON_RAMP_ADDRESS_1
     });
 
-    _setupMultiCommitStoreFromOffRampConfigs(sourceChainConfigs);
     s_offRamp.applySourceChainConfigUpdates(sourceChainConfigs);
 
     sourceChainConfigs[0].onRamp = address(uint160(sourceChainConfigs[0].onRamp) + 1);
@@ -2917,7 +2997,6 @@ contract EVM2EVMMultiOffRamp_applySourceChainConfigUpdates is EVM2EVMMultiOffRam
       onRamp: ON_RAMP_ADDRESS_1
     });
 
-    _setupMultiCommitStoreFromOffRampConfigs(sourceChainConfigs);
     s_offRamp.applySourceChainConfigUpdates(sourceChainConfigs);
 
     sourceChainConfigs[0].prevOffRamp = address(uint160(sourceChainConfigs[0].prevOffRamp) + 1);
@@ -2936,7 +3015,6 @@ contract EVM2EVMMultiOffRamp_applySourceChainConfigUpdates is EVM2EVMMultiOffRam
       onRamp: ON_RAMP_ADDRESS_1
     });
 
-    _setupMultiCommitStoreFromOffRampConfigs(sourceChainConfigs);
     s_offRamp.applySourceChainConfigUpdates(sourceChainConfigs);
 
     sourceChainConfigs[0].onRamp = address(uint160(sourceChainConfigs[0].onRamp) + 1);
@@ -2945,42 +3023,642 @@ contract EVM2EVMMultiOffRamp_applySourceChainConfigUpdates is EVM2EVMMultiOffRam
     vm.expectRevert(abi.encodeWithSelector(EVM2EVMMultiOffRamp.InvalidStaticConfig.selector, SOURCE_CHAIN_SELECTOR_1));
     s_offRamp.applySourceChainConfigUpdates(sourceChainConfigs);
   }
+}
 
-  function test_CommitStoreAlreadyInUse_Revert() public {
-    EVM2EVMMultiOffRamp.SourceChainConfigArgs[] memory sourceChainConfigs =
-      new EVM2EVMMultiOffRamp.SourceChainConfigArgs[](1);
-    sourceChainConfigs[0] = EVM2EVMMultiOffRamp.SourceChainConfigArgs({
-      sourceChainSelector: SOURCE_CHAIN_SELECTOR_1,
-      isEnabled: true,
-      prevOffRamp: address(0),
-      onRamp: ON_RAMP_ADDRESS_1
-    });
+contract EVM2EVMMultiOffRamp_isUnpausedAndRMNHealthy is EVM2EVMMultiOffRampSetup {
+  function test_RMN_Success() public {
+    // Test pausing
+    assertFalse(s_offRamp.paused());
+    assertTrue(s_offRamp.isUnpausedAndNotCursed(SOURCE_CHAIN_SELECTOR));
+    s_offRamp.pause();
+    assertTrue(s_offRamp.paused());
+    assertFalse(s_offRamp.isUnpausedAndNotCursed(SOURCE_CHAIN_SELECTOR));
+    s_offRamp.unpause();
+    assertFalse(s_offRamp.paused());
+    assertTrue(s_offRamp.isUnpausedAndNotCursed(SOURCE_CHAIN_SELECTOR));
+    // Test rmn
+    s_mockRMN.voteToCurse(0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff);
+    assertFalse(s_offRamp.isUnpausedAndNotCursed(SOURCE_CHAIN_SELECTOR));
+    RMN.UnvoteToCurseRecord[] memory records = new RMN.UnvoteToCurseRecord[](1);
+    records[0] = RMN.UnvoteToCurseRecord({curseVoteAddr: OWNER, cursesHash: bytes32(uint256(0)), forceUnvote: true});
+    s_mockRMN.ownerUnvoteToCurse(records);
+    assertTrue(s_offRamp.isUnpausedAndNotCursed(SOURCE_CHAIN_SELECTOR));
+    s_mockRMN.voteToCurse(0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff);
+    s_offRamp.pause();
+    assertFalse(s_offRamp.isUnpausedAndNotCursed(SOURCE_CHAIN_SELECTOR));
+  }
+}
 
-    s_mockCommitStore.setSourceChainConfig(
-      SOURCE_CHAIN_SELECTOR_1,
-      IMultiCommitStore.SourceChainConfig({isEnabled: true, minSeqNr: 1, onRamp: ON_RAMP_ADDRESS_1})
-    );
-
-    vm.expectRevert(abi.encodeWithSelector(EVM2EVMMultiOffRamp.InvalidStaticConfig.selector, SOURCE_CHAIN_SELECTOR_1));
-    s_offRamp.applySourceChainConfigUpdates(sourceChainConfigs);
+contract EVM2EVMMultiOffRamp_setLatestPriceEpochAndRound is EVM2EVMMultiOffRampSetup {
+  function test_SetLatestPriceEpochAndRound_Success() public {
+    uint40 latestRoundAndEpoch = 1782155;
+    s_offRamp.setLatestPriceEpochAndRound(latestRoundAndEpoch);
+    assertEq(s_offRamp.getLatestPriceEpochAndRound(), latestRoundAndEpoch);
   }
 
-  function test_CommitStoreMismatchingOnRamp_Revert() public {
-    EVM2EVMMultiOffRamp.SourceChainConfigArgs[] memory sourceChainConfigs =
-      new EVM2EVMMultiOffRamp.SourceChainConfigArgs[](1);
-    sourceChainConfigs[0] = EVM2EVMMultiOffRamp.SourceChainConfigArgs({
+  function test_PriceEpochCleared_Success() public {
+    // Set latest price epoch and round to non-zero.
+    uint40 latestEpochAndRound = 1782155;
+    s_offRamp.setLatestPriceEpochAndRound(latestEpochAndRound);
+    assertEq(latestEpochAndRound, s_offRamp.getLatestPriceEpochAndRound());
+
+    MultiOCR3Base.OCRConfigArgs[] memory ocrConfigs = new MultiOCR3Base.OCRConfigArgs[](1);
+    ocrConfigs[0] = MultiOCR3Base.OCRConfigArgs({
+      ocrPluginType: uint8(Internal.OCRPluginType.Execution),
+      configDigest: s_configDigestExec,
+      F: s_F,
+      uniqueReports: false,
+      isSignatureVerificationEnabled: false,
+      signers: s_emptySigners,
+      transmitters: s_validTransmitters
+    });
+    s_offRamp.setOCR3Configs(ocrConfigs);
+
+    // Execution plugin OCR config should not clear latest epoch and round
+    assertEq(latestEpochAndRound, s_offRamp.getLatestPriceEpochAndRound());
+
+    // Commit plugin config should clear latest epoch & round
+    ocrConfigs[0] = MultiOCR3Base.OCRConfigArgs({
+      ocrPluginType: uint8(Internal.OCRPluginType.Commit),
+      configDigest: s_configDigestCommit,
+      F: s_F,
+      uniqueReports: false,
+      isSignatureVerificationEnabled: true,
+      signers: s_validSigners,
+      transmitters: s_validTransmitters
+    });
+    s_offRamp.setOCR3Configs(ocrConfigs);
+
+    // Assert cleared.
+    assertEq(0, s_offRamp.getLatestPriceEpochAndRound());
+  }
+
+  // Reverts
+
+  function test_OnlyOwner_Revert() public {
+    vm.stopPrank();
+    vm.expectRevert("Only callable by owner");
+    s_offRamp.setLatestPriceEpochAndRound(6723);
+  }
+}
+
+contract EVM2EVMMultiOffRamp_reportCommit is EVM2EVMMultiOffRampSetup {
+  function setUp() public virtual override {
+    super.setUp();
+    _setupMultipleOffRamps();
+  }
+
+  function test_ReportOnlyRootSuccess_gas() public {
+    vm.pauseGasMetering();
+    uint64 max1 = 931;
+    bytes32 root = "Only a single root";
+
+    EVM2EVMMultiOffRamp.MerkleRoot[] memory roots = new EVM2EVMMultiOffRamp.MerkleRoot[](1);
+    roots[0] = EVM2EVMMultiOffRamp.MerkleRoot({
       sourceChainSelector: SOURCE_CHAIN_SELECTOR_1,
-      isEnabled: true,
-      prevOffRamp: address(0),
-      onRamp: ON_RAMP_ADDRESS_1
+      interval: EVM2EVMMultiOffRamp.Interval(1, max1),
+      merkleRoot: root
     });
 
-    s_mockCommitStore.setSourceChainConfig(
-      SOURCE_CHAIN_SELECTOR_1,
-      IMultiCommitStore.SourceChainConfig({isEnabled: true, minSeqNr: 0, onRamp: ON_RAMP_ADDRESS_2})
+    EVM2EVMMultiOffRamp.CommitReport memory report =
+      EVM2EVMMultiOffRamp.CommitReport({priceUpdates: getEmptyPriceUpdates(), merkleRoots: roots});
+
+    vm.expectEmit();
+    emit EVM2EVMMultiOffRamp.CommitReportAccepted(report);
+
+    bytes memory encodedReport = abi.encode(report);
+
+    vm.resumeGasMetering();
+    s_offRamp.reportCommit(encodedReport, ++s_latestEpochAndRound);
+    vm.pauseGasMetering();
+
+    assertEq(max1 + 1, s_offRamp.getSourceChainConfig(SOURCE_CHAIN_SELECTOR).minSeqNr);
+    assertEq(block.timestamp, s_offRamp.getMerkleRoot(SOURCE_CHAIN_SELECTOR_1, root));
+    vm.resumeGasMetering();
+  }
+
+  function test_ReportAndPriceUpdate_Success() public {
+    uint64 max1 = 12;
+
+    EVM2EVMMultiOffRamp.MerkleRoot[] memory roots = new EVM2EVMMultiOffRamp.MerkleRoot[](1);
+    roots[0] = EVM2EVMMultiOffRamp.MerkleRoot({
+      sourceChainSelector: SOURCE_CHAIN_SELECTOR_1,
+      interval: EVM2EVMMultiOffRamp.Interval(1, max1),
+      merkleRoot: "test #2"
+    });
+
+    EVM2EVMMultiOffRamp.CommitReport memory report = EVM2EVMMultiOffRamp.CommitReport({
+      priceUpdates: getSingleTokenPriceUpdateStruct(s_sourceFeeToken, 4e18),
+      merkleRoots: roots
+    });
+
+    vm.expectEmit();
+    emit EVM2EVMMultiOffRamp.CommitReportAccepted(report);
+
+    s_offRamp.reportCommit(abi.encode(report), ++s_latestEpochAndRound);
+
+    assertEq(max1 + 1, s_offRamp.getSourceChainConfig(SOURCE_CHAIN_SELECTOR).minSeqNr);
+    assertEq(s_latestEpochAndRound, s_offRamp.getLatestPriceEpochAndRound());
+  }
+
+  function test_StaleReportWithRoot_Success() public {
+    uint64 maxSeq = 12;
+    uint224 tokenStartPrice =
+      IPriceRegistry(s_offRamp.getDynamicConfig().priceRegistry).getTokenPrice(s_sourceFeeToken).value;
+
+    EVM2EVMMultiOffRamp.MerkleRoot[] memory roots = new EVM2EVMMultiOffRamp.MerkleRoot[](1);
+    roots[0] = EVM2EVMMultiOffRamp.MerkleRoot({
+      sourceChainSelector: SOURCE_CHAIN_SELECTOR_1,
+      interval: EVM2EVMMultiOffRamp.Interval(1, maxSeq),
+      merkleRoot: "stale report 1"
+    });
+    EVM2EVMMultiOffRamp.CommitReport memory report =
+      EVM2EVMMultiOffRamp.CommitReport({priceUpdates: getEmptyPriceUpdates(), merkleRoots: roots});
+
+    vm.expectEmit();
+    emit EVM2EVMMultiOffRamp.CommitReportAccepted(report);
+    s_offRamp.reportCommit(abi.encode(report), s_latestEpochAndRound);
+    assertEq(maxSeq + 1, s_offRamp.getSourceChainConfig(SOURCE_CHAIN_SELECTOR).minSeqNr);
+    assertEq(s_latestEpochAndRound, s_offRamp.getLatestPriceEpochAndRound());
+
+    report.merkleRoots[0].interval = EVM2EVMMultiOffRamp.Interval(maxSeq + 1, maxSeq * 2);
+    report.merkleRoots[0].merkleRoot = "stale report 2";
+    vm.expectEmit();
+    emit EVM2EVMMultiOffRamp.CommitReportAccepted(report);
+    s_offRamp.reportCommit(abi.encode(report), s_latestEpochAndRound);
+    assertEq(maxSeq * 2 + 1, s_offRamp.getSourceChainConfig(SOURCE_CHAIN_SELECTOR).minSeqNr);
+    assertEq(s_latestEpochAndRound, s_offRamp.getLatestPriceEpochAndRound());
+    assertEq(
+      tokenStartPrice, IPriceRegistry(s_offRamp.getDynamicConfig().priceRegistry).getTokenPrice(s_sourceFeeToken).value
+    );
+  }
+
+  function test_OnlyTokenPriceUpdates_Success() public {
+    EVM2EVMMultiOffRamp.MerkleRoot[] memory roots = new EVM2EVMMultiOffRamp.MerkleRoot[](0);
+    EVM2EVMMultiOffRamp.CommitReport memory report = EVM2EVMMultiOffRamp.CommitReport({
+      priceUpdates: getSingleTokenPriceUpdateStruct(s_sourceFeeToken, 4e18),
+      merkleRoots: roots
+    });
+    vm.expectEmit();
+    emit PriceRegistry.UsdPerTokenUpdated(s_sourceFeeToken, 4e18, block.timestamp);
+    s_offRamp.reportCommit(abi.encode(report), ++s_latestEpochAndRound);
+    assertEq(s_latestEpochAndRound, s_offRamp.getLatestPriceEpochAndRound());
+  }
+
+  function test_OnlyGasPriceUpdates_Success() public {
+    EVM2EVMMultiOffRamp.MerkleRoot[] memory roots = new EVM2EVMMultiOffRamp.MerkleRoot[](0);
+    EVM2EVMMultiOffRamp.CommitReport memory report = EVM2EVMMultiOffRamp.CommitReport({
+      priceUpdates: getSingleTokenPriceUpdateStruct(s_sourceFeeToken, 4e18),
+      merkleRoots: roots
+    });
+    vm.expectEmit();
+    emit PriceRegistry.UsdPerTokenUpdated(s_sourceFeeToken, 4e18, block.timestamp);
+    s_offRamp.reportCommit(abi.encode(report), ++s_latestEpochAndRound);
+    assertEq(s_latestEpochAndRound, s_offRamp.getLatestPriceEpochAndRound());
+  }
+
+  function test_ValidPriceUpdateThenStaleReportWithRoot_Success() public {
+    uint64 maxSeq = 12;
+    uint224 tokenPrice1 = 4e18;
+    uint224 tokenPrice2 = 5e18;
+    EVM2EVMMultiOffRamp.MerkleRoot[] memory roots = new EVM2EVMMultiOffRamp.MerkleRoot[](0);
+    EVM2EVMMultiOffRamp.CommitReport memory report = EVM2EVMMultiOffRamp.CommitReport({
+      priceUpdates: getSingleTokenPriceUpdateStruct(s_sourceFeeToken, tokenPrice1),
+      merkleRoots: roots
+    });
+    vm.expectEmit();
+    emit PriceRegistry.UsdPerTokenUpdated(s_sourceFeeToken, tokenPrice1, block.timestamp);
+    s_offRamp.reportCommit(abi.encode(report), ++s_latestEpochAndRound);
+    assertEq(s_latestEpochAndRound, s_offRamp.getLatestPriceEpochAndRound());
+
+    roots = new EVM2EVMMultiOffRamp.MerkleRoot[](1);
+    roots[0] = EVM2EVMMultiOffRamp.MerkleRoot({
+      sourceChainSelector: SOURCE_CHAIN_SELECTOR_1,
+      interval: EVM2EVMMultiOffRamp.Interval(1, maxSeq),
+      merkleRoot: "stale report"
+    });
+    report.priceUpdates = getSingleTokenPriceUpdateStruct(s_sourceFeeToken, tokenPrice2);
+    report.merkleRoots = roots;
+
+    vm.expectEmit();
+    emit EVM2EVMMultiOffRamp.CommitReportAccepted(report);
+    s_offRamp.reportCommit(abi.encode(report), s_latestEpochAndRound);
+    assertEq(maxSeq + 1, s_offRamp.getSourceChainConfig(SOURCE_CHAIN_SELECTOR).minSeqNr);
+    assertEq(
+      tokenPrice1, IPriceRegistry(s_offRamp.getDynamicConfig().priceRegistry).getTokenPrice(s_sourceFeeToken).value
+    );
+    assertEq(s_latestEpochAndRound, s_offRamp.getLatestPriceEpochAndRound());
+  }
+  // Reverts
+
+  function test_Paused_Revert() public {
+    s_offRamp.pause();
+    bytes memory report;
+    vm.expectRevert(EVM2EVMMultiOffRamp.PausedError.selector);
+    s_offRamp.reportCommit(report, ++s_latestEpochAndRound);
+  }
+
+  function test_Unhealthy_Revert() public {
+    s_mockRMN.voteToCurse(0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff);
+    EVM2EVMMultiOffRamp.MerkleRoot[] memory roots = new EVM2EVMMultiOffRamp.MerkleRoot[](1);
+    roots[0] = EVM2EVMMultiOffRamp.MerkleRoot({
+      sourceChainSelector: SOURCE_CHAIN_SELECTOR_1,
+      interval: EVM2EVMMultiOffRamp.Interval(1, 2),
+      merkleRoot: "Only a single root"
+    });
+
+    EVM2EVMMultiOffRamp.CommitReport memory report =
+      EVM2EVMMultiOffRamp.CommitReport({priceUpdates: getEmptyPriceUpdates(), merkleRoots: roots});
+    vm.expectRevert(abi.encodeWithSelector(EVM2EVMMultiOffRamp.CursedByRMN.selector, roots[0].sourceChainSelector));
+    s_offRamp.reportCommit(abi.encode(report), ++s_latestEpochAndRound);
+  }
+
+  function test_InvalidRootRevert() public {
+    EVM2EVMMultiOffRamp.MerkleRoot[] memory roots = new EVM2EVMMultiOffRamp.MerkleRoot[](1);
+    roots[0] = EVM2EVMMultiOffRamp.MerkleRoot({
+      sourceChainSelector: SOURCE_CHAIN_SELECTOR_1,
+      interval: EVM2EVMMultiOffRamp.Interval(1, 4),
+      merkleRoot: bytes32(0)
+    });
+    EVM2EVMMultiOffRamp.CommitReport memory report =
+      EVM2EVMMultiOffRamp.CommitReport({priceUpdates: getEmptyPriceUpdates(), merkleRoots: roots});
+    vm.expectRevert(EVM2EVMMultiOffRamp.InvalidRoot.selector);
+    s_offRamp.reportCommit(abi.encode(report), ++s_latestEpochAndRound);
+  }
+
+  function test_InvalidInterval_Revert() public {
+    EVM2EVMMultiOffRamp.Interval memory interval = EVM2EVMMultiOffRamp.Interval(2, 2);
+    EVM2EVMMultiOffRamp.MerkleRoot[] memory roots = new EVM2EVMMultiOffRamp.MerkleRoot[](1);
+    roots[0] = EVM2EVMMultiOffRamp.MerkleRoot({
+      sourceChainSelector: SOURCE_CHAIN_SELECTOR_1,
+      interval: interval,
+      merkleRoot: bytes32(0)
+    });
+    EVM2EVMMultiOffRamp.CommitReport memory report =
+      EVM2EVMMultiOffRamp.CommitReport({priceUpdates: getEmptyPriceUpdates(), merkleRoots: roots});
+    vm.expectRevert(
+      abi.encodeWithSelector(EVM2EVMMultiOffRamp.InvalidInterval.selector, roots[0].sourceChainSelector, interval)
+    );
+    s_offRamp.reportCommit(abi.encode(report), ++s_latestEpochAndRound);
+  }
+
+  function test_InvalidIntervalMinLargerThanMax_Revert() public {
+    s_offRamp.getSourceChainConfig(SOURCE_CHAIN_SELECTOR);
+    EVM2EVMMultiOffRamp.Interval memory interval = EVM2EVMMultiOffRamp.Interval(1, 0);
+    EVM2EVMMultiOffRamp.MerkleRoot[] memory roots = new EVM2EVMMultiOffRamp.MerkleRoot[](1);
+    roots[0] = EVM2EVMMultiOffRamp.MerkleRoot({
+      sourceChainSelector: SOURCE_CHAIN_SELECTOR_1,
+      interval: interval,
+      merkleRoot: bytes32(0)
+    });
+    EVM2EVMMultiOffRamp.CommitReport memory report =
+      EVM2EVMMultiOffRamp.CommitReport({priceUpdates: getEmptyPriceUpdates(), merkleRoots: roots});
+    vm.expectRevert(
+      abi.encodeWithSelector(EVM2EVMMultiOffRamp.InvalidInterval.selector, roots[0].sourceChainSelector, interval)
+    );
+    s_offRamp.reportCommit(abi.encode(report), ++s_latestEpochAndRound);
+  }
+
+  function test_ZeroEpochAndRound_Revert() public {
+    EVM2EVMMultiOffRamp.MerkleRoot[] memory roots = new EVM2EVMMultiOffRamp.MerkleRoot[](0);
+    EVM2EVMMultiOffRamp.CommitReport memory report = EVM2EVMMultiOffRamp.CommitReport({
+      priceUpdates: getSingleTokenPriceUpdateStruct(s_sourceFeeToken, 4e18),
+      merkleRoots: roots
+    });
+    vm.expectRevert(EVM2EVMMultiOffRamp.StaleCommitReport.selector);
+    s_offRamp.reportCommit(abi.encode(report), 0);
+  }
+
+  function test_OnlyPriceUpdateStaleReport_Revert() public {
+    EVM2EVMMultiOffRamp.MerkleRoot[] memory roots = new EVM2EVMMultiOffRamp.MerkleRoot[](0);
+    EVM2EVMMultiOffRamp.CommitReport memory report = EVM2EVMMultiOffRamp.CommitReport({
+      priceUpdates: getSingleTokenPriceUpdateStruct(s_sourceFeeToken, 4e18),
+      merkleRoots: roots
+    });
+    vm.expectEmit();
+    emit PriceRegistry.UsdPerTokenUpdated(s_sourceFeeToken, 4e18, block.timestamp);
+    s_offRamp.reportCommit(abi.encode(report), ++s_latestEpochAndRound);
+    vm.expectRevert(EVM2EVMMultiOffRamp.StaleCommitReport.selector);
+    s_offRamp.reportCommit(abi.encode(report), s_latestEpochAndRound);
+  }
+
+  function test_SourceChainNotEnabled_Revert() public {
+    EVM2EVMMultiOffRamp.MerkleRoot[] memory roots = new EVM2EVMMultiOffRamp.MerkleRoot[](1);
+    roots[0] = EVM2EVMMultiOffRamp.MerkleRoot({
+      sourceChainSelector: 0,
+      interval: EVM2EVMMultiOffRamp.Interval(1, 2),
+      merkleRoot: "Only a single root"
+    });
+
+    EVM2EVMMultiOffRamp.CommitReport memory report =
+      EVM2EVMMultiOffRamp.CommitReport({priceUpdates: getEmptyPriceUpdates(), merkleRoots: roots});
+
+    vm.expectRevert(abi.encodeWithSelector(EVM2EVMMultiOffRamp.SourceChainNotEnabled.selector, 0));
+    s_offRamp.reportCommit(abi.encode(report), ++s_latestEpochAndRound);
+  }
+
+  function test_RootAlreadyCommitted_Revert() public {
+    EVM2EVMMultiOffRamp.MerkleRoot[] memory roots = new EVM2EVMMultiOffRamp.MerkleRoot[](1);
+    roots[0] = EVM2EVMMultiOffRamp.MerkleRoot({
+      sourceChainSelector: SOURCE_CHAIN_SELECTOR_1,
+      interval: EVM2EVMMultiOffRamp.Interval(1, 2),
+      merkleRoot: "Only a single root"
+    });
+    EVM2EVMMultiOffRamp.CommitReport memory report =
+      EVM2EVMMultiOffRamp.CommitReport({priceUpdates: getEmptyPriceUpdates(), merkleRoots: roots});
+    s_offRamp.reportCommit(abi.encode(report), ++s_latestEpochAndRound);
+    report.merkleRoots[0].interval = EVM2EVMMultiOffRamp.Interval(3, 3);
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        EVM2EVMMultiOffRamp.RootAlreadyCommitted.selector, roots[0].sourceChainSelector, roots[0].merkleRoot
+      )
+    );
+    s_offRamp.reportCommit(abi.encode(report), ++s_latestEpochAndRound);
+  }
+}
+
+contract EVM2EVMMultiOffRamp_transmitCommit is EVM2EVMMultiOffRampSetup {
+  uint64 internal s_maxInterval = 12;
+
+  function setUp() public virtual override {
+    super.setUp();
+    _setupMultipleOffRamps();
+  }
+
+  function test_SingleReport_Success() public {
+    EVM2EVMMultiOffRamp.CommitReport memory commitReport = _constructCommitReport();
+    bytes32[3] memory reportContext = [s_configDigestCommit, s_configDigestCommit, s_configDigestCommit];
+
+    // F = 1, need 2 signatures
+    (bytes32[] memory rs, bytes32[] memory ss,, bytes32 rawVs) =
+      _getSignaturesForDigest(s_validSignerKeys, s_configDigestCommit, abi.encode(commitReport), 2);
+
+    vm.expectEmit();
+    emit EVM2EVMMultiOffRamp.CommitReportAccepted(commitReport);
+
+    vm.expectEmit();
+    emit MultiOCR3Base.Transmitted(
+      uint8(Internal.OCRPluginType.Commit), s_configDigestCommit, uint32(uint256(s_configDigestCommit) >> 8)
     );
 
-    vm.expectRevert(abi.encodeWithSelector(EVM2EVMMultiOffRamp.InvalidStaticConfig.selector, SOURCE_CHAIN_SELECTOR_1));
-    s_offRamp.applySourceChainConfigUpdates(sourceChainConfigs);
+    vm.startPrank(s_validTransmitters[0]);
+    s_offRamp.transmitCommit(reportContext, abi.encode(commitReport), rs, ss, rawVs);
+
+    assertEq(s_maxInterval + 1, s_offRamp.getSourceChainConfig(SOURCE_CHAIN_SELECTOR).minSeqNr);
+    assertEq(uint40(uint256(reportContext[1])), s_offRamp.getLatestPriceEpochAndRound());
+  }
+
+  // Reverts
+
+  function test_UnauthorizedTransmitter_Revert() public {
+    EVM2EVMMultiOffRamp.CommitReport memory commitReport = _constructCommitReport();
+    bytes32[3] memory reportContext = [s_configDigestCommit, s_configDigestCommit, s_configDigestCommit];
+
+    (bytes32[] memory rs, bytes32[] memory ss,, bytes32 rawVs) =
+      _getSignaturesForDigest(s_validSignerKeys, s_configDigestCommit, abi.encode(commitReport), 2);
+
+    vm.expectRevert(MultiOCR3Base.UnauthorizedTransmitter.selector);
+    s_offRamp.transmitCommit(reportContext, abi.encode(commitReport), rs, ss, rawVs);
+  }
+
+  function test_NoConfig_Revert() public {
+    _redeployOffRampWithNoOCRConfigs();
+
+    EVM2EVMMultiOffRamp.CommitReport memory commitReport = _constructCommitReport();
+    bytes32[3] memory reportContext = [bytes32(""), s_configDigestCommit, s_configDigestCommit];
+
+    (bytes32[] memory rs, bytes32[] memory ss,, bytes32 rawVs) =
+      _getSignaturesForDigest(s_validSignerKeys, s_configDigestCommit, abi.encode(commitReport), 2);
+
+    vm.startPrank(s_validTransmitters[0]);
+    vm.expectRevert();
+    s_offRamp.transmitCommit(reportContext, abi.encode(commitReport), rs, ss, rawVs);
+  }
+
+  function test_NoConfigWithOtherConfigPresent_Revert() public {
+    _redeployOffRampWithNoOCRConfigs();
+
+    MultiOCR3Base.OCRConfigArgs[] memory ocrConfigs = new MultiOCR3Base.OCRConfigArgs[](1);
+    ocrConfigs[0] = MultiOCR3Base.OCRConfigArgs({
+      ocrPluginType: uint8(Internal.OCRPluginType.Execution),
+      configDigest: s_configDigestExec,
+      F: s_F,
+      uniqueReports: false,
+      isSignatureVerificationEnabled: false,
+      signers: s_emptySigners,
+      transmitters: s_validTransmitters
+    });
+    s_offRamp.setOCR3Configs(ocrConfigs);
+
+    EVM2EVMMultiOffRamp.CommitReport memory commitReport = _constructCommitReport();
+    bytes32[3] memory reportContext = [bytes32(""), s_configDigestCommit, s_configDigestCommit];
+
+    (bytes32[] memory rs, bytes32[] memory ss,, bytes32 rawVs) =
+      _getSignaturesForDigest(s_validSignerKeys, s_configDigestCommit, abi.encode(commitReport), 2);
+
+    vm.startPrank(s_validTransmitters[0]);
+    vm.expectRevert();
+    s_offRamp.transmitCommit(reportContext, abi.encode(commitReport), rs, ss, rawVs);
+  }
+
+  function test_WrongConfigWithoutSigners_Revert() public {
+    _redeployOffRampWithNoOCRConfigs();
+
+    EVM2EVMMultiOffRamp.CommitReport memory commitReport = _constructCommitReport();
+    s_configDigestCommit = _getBasicConfigDigest(1, s_validSigners, s_validTransmitters);
+
+    MultiOCR3Base.OCRConfigArgs[] memory ocrConfigs = new MultiOCR3Base.OCRConfigArgs[](1);
+    ocrConfigs[0] = MultiOCR3Base.OCRConfigArgs({
+      ocrPluginType: uint8(Internal.OCRPluginType.Commit),
+      configDigest: s_configDigestCommit,
+      F: s_F,
+      uniqueReports: false,
+      isSignatureVerificationEnabled: false,
+      signers: s_emptySigners,
+      transmitters: s_validTransmitters
+    });
+    s_offRamp.setOCR3Configs(ocrConfigs);
+
+    bytes32[3] memory reportContext = [s_configDigestCommit, s_configDigestCommit, s_configDigestCommit];
+
+    (bytes32[] memory rs, bytes32[] memory ss,, bytes32 rawVs) =
+      _getSignaturesForDigest(s_validSignerKeys, s_configDigestCommit, abi.encode(commitReport), 2);
+
+    vm.startPrank(s_validTransmitters[0]);
+    vm.expectRevert();
+    s_offRamp.transmitCommit(reportContext, abi.encode(commitReport), rs, ss, rawVs);
+  }
+
+  function _constructCommitReport() internal returns (EVM2EVMMultiOffRamp.CommitReport memory) {
+    EVM2EVMMultiOffRamp.MerkleRoot[] memory roots = new EVM2EVMMultiOffRamp.MerkleRoot[](1);
+    roots[0] = EVM2EVMMultiOffRamp.MerkleRoot({
+      sourceChainSelector: SOURCE_CHAIN_SELECTOR_1,
+      interval: EVM2EVMMultiOffRamp.Interval(1, s_maxInterval),
+      merkleRoot: "test #2"
+    });
+
+    return EVM2EVMMultiOffRamp.CommitReport({
+      priceUpdates: getSingleTokenPriceUpdateStruct(s_sourceFeeToken, 4e18),
+      merkleRoots: roots
+    });
+  }
+}
+
+contract EVM2EVMMultiOffRamp_resetUnblessedRoots is EVM2EVMMultiOffRampSetup {
+  function setUp() public virtual override {
+    super.setUp();
+    _setupRealRMN();
+    deployOffRamp(s_destRouter, s_realRMN);
+    _setupMultipleOffRamps();
+  }
+
+  function test_ResetUnblessedRoots_Success() public {
+    EVM2EVMMultiOffRamp.UnblessedRoot[] memory rootsToReset = new EVM2EVMMultiOffRamp.UnblessedRoot[](3);
+    rootsToReset[0] = EVM2EVMMultiOffRamp.UnblessedRoot({sourceChainSelector: SOURCE_CHAIN_SELECTOR, merkleRoot: "1"});
+    rootsToReset[1] = EVM2EVMMultiOffRamp.UnblessedRoot({sourceChainSelector: SOURCE_CHAIN_SELECTOR, merkleRoot: "2"});
+    rootsToReset[2] = EVM2EVMMultiOffRamp.UnblessedRoot({sourceChainSelector: SOURCE_CHAIN_SELECTOR, merkleRoot: "3"});
+
+    EVM2EVMMultiOffRamp.MerkleRoot[] memory roots = new EVM2EVMMultiOffRamp.MerkleRoot[](3);
+    roots[0] = EVM2EVMMultiOffRamp.MerkleRoot({
+      sourceChainSelector: SOURCE_CHAIN_SELECTOR,
+      interval: EVM2EVMMultiOffRamp.Interval(1, 2),
+      merkleRoot: rootsToReset[0].merkleRoot
+    });
+    roots[1] = EVM2EVMMultiOffRamp.MerkleRoot({
+      sourceChainSelector: SOURCE_CHAIN_SELECTOR,
+      interval: EVM2EVMMultiOffRamp.Interval(3, 4),
+      merkleRoot: rootsToReset[1].merkleRoot
+    });
+    roots[2] = EVM2EVMMultiOffRamp.MerkleRoot({
+      sourceChainSelector: SOURCE_CHAIN_SELECTOR,
+      interval: EVM2EVMMultiOffRamp.Interval(5, 5),
+      merkleRoot: rootsToReset[2].merkleRoot
+    });
+
+    EVM2EVMMultiOffRamp.CommitReport memory report =
+      EVM2EVMMultiOffRamp.CommitReport({priceUpdates: getEmptyPriceUpdates(), merkleRoots: roots});
+
+    s_offRamp.reportCommit(abi.encode(report), ++s_latestEpochAndRound);
+
+    IRMN.TaggedRoot[] memory blessedTaggedRoots = new IRMN.TaggedRoot[](1);
+    blessedTaggedRoots[0] = IRMN.TaggedRoot({commitStore: address(s_offRamp), root: rootsToReset[1].merkleRoot});
+
+    vm.startPrank(BLESS_VOTE_ADDR);
+    s_realRMN.voteToBless(blessedTaggedRoots);
+
+    vm.expectEmit(false, false, false, true);
+    emit EVM2EVMMultiOffRamp.RootRemoved(rootsToReset[0].merkleRoot);
+
+    vm.expectEmit(false, false, false, true);
+    emit EVM2EVMMultiOffRamp.RootRemoved(rootsToReset[2].merkleRoot);
+
+    vm.startPrank(OWNER);
+    s_offRamp.resetUnblessedRoots(rootsToReset);
+
+    assertEq(0, s_offRamp.getMerkleRoot(SOURCE_CHAIN_SELECTOR, rootsToReset[0].merkleRoot));
+    assertEq(BLOCK_TIME, s_offRamp.getMerkleRoot(SOURCE_CHAIN_SELECTOR, rootsToReset[1].merkleRoot));
+    assertEq(0, s_offRamp.getMerkleRoot(SOURCE_CHAIN_SELECTOR, rootsToReset[2].merkleRoot));
+  }
+
+  // Reverts
+
+  function test_OnlyOwner_Revert() public {
+    vm.stopPrank();
+    vm.expectRevert("Only callable by owner");
+    EVM2EVMMultiOffRamp.UnblessedRoot[] memory rootsToReset = new EVM2EVMMultiOffRamp.UnblessedRoot[](0);
+    s_offRamp.resetUnblessedRoots(rootsToReset);
+  }
+}
+
+contract EVM2EVMMultiOffRamp_verify is EVM2EVMMultiOffRampSetup {
+  function setUp() public virtual override {
+    super.setUp();
+    _setupRealRMN();
+    deployOffRamp(s_destRouter, s_realRMN);
+    _setupMultipleOffRamps();
+  }
+
+  function test_NotBlessed_Success() public {
+    bytes32[] memory leaves = new bytes32[](1);
+    leaves[0] = "root";
+
+    EVM2EVMMultiOffRamp.MerkleRoot[] memory roots = new EVM2EVMMultiOffRamp.MerkleRoot[](1);
+    roots[0] = EVM2EVMMultiOffRamp.MerkleRoot({
+      sourceChainSelector: SOURCE_CHAIN_SELECTOR,
+      interval: EVM2EVMMultiOffRamp.Interval(1, 2),
+      merkleRoot: leaves[0]
+    });
+    EVM2EVMMultiOffRamp.CommitReport memory report =
+      EVM2EVMMultiOffRamp.CommitReport({priceUpdates: getEmptyPriceUpdates(), merkleRoots: roots});
+    s_offRamp.reportCommit(abi.encode(report), ++s_latestEpochAndRound);
+    bytes32[] memory proofs = new bytes32[](0);
+    // We have not blessed this root, should return 0.
+    uint256 timestamp = s_offRamp.verify(SOURCE_CHAIN_SELECTOR, leaves, proofs, 0);
+    assertEq(uint256(0), timestamp);
+  }
+
+  function test_Blessed_Success() public {
+    bytes32[] memory leaves = new bytes32[](1);
+    leaves[0] = "root";
+    EVM2EVMMultiOffRamp.MerkleRoot[] memory roots = new EVM2EVMMultiOffRamp.MerkleRoot[](1);
+    roots[0] = EVM2EVMMultiOffRamp.MerkleRoot({
+      sourceChainSelector: SOURCE_CHAIN_SELECTOR,
+      interval: EVM2EVMMultiOffRamp.Interval(1, 2),
+      merkleRoot: leaves[0]
+    });
+    EVM2EVMMultiOffRamp.CommitReport memory report =
+      EVM2EVMMultiOffRamp.CommitReport({priceUpdates: getEmptyPriceUpdates(), merkleRoots: roots});
+    s_offRamp.reportCommit(abi.encode(report), ++s_latestEpochAndRound);
+    // Bless that root.
+    IRMN.TaggedRoot[] memory taggedRoots = new IRMN.TaggedRoot[](1);
+    taggedRoots[0] = IRMN.TaggedRoot({commitStore: address(s_offRamp), root: leaves[0]});
+    vm.startPrank(BLESS_VOTE_ADDR);
+    s_realRMN.voteToBless(taggedRoots);
+    bytes32[] memory proofs = new bytes32[](0);
+    uint256 timestamp = s_offRamp.verify(SOURCE_CHAIN_SELECTOR, leaves, proofs, 0);
+    assertEq(BLOCK_TIME, timestamp);
+  }
+
+  function test_NotBlessedWrongChainSelector_Success() public {
+    bytes32[] memory leaves = new bytes32[](1);
+    leaves[0] = "root";
+    EVM2EVMMultiOffRamp.MerkleRoot[] memory roots = new EVM2EVMMultiOffRamp.MerkleRoot[](1);
+    roots[0] = EVM2EVMMultiOffRamp.MerkleRoot({
+      sourceChainSelector: SOURCE_CHAIN_SELECTOR,
+      interval: EVM2EVMMultiOffRamp.Interval(1, 2),
+      merkleRoot: leaves[0]
+    });
+
+    EVM2EVMMultiOffRamp.CommitReport memory report =
+      EVM2EVMMultiOffRamp.CommitReport({priceUpdates: getEmptyPriceUpdates(), merkleRoots: roots});
+    s_offRamp.reportCommit(abi.encode(report), ++s_latestEpochAndRound);
+
+    // Bless that root.
+    IRMN.TaggedRoot[] memory taggedRoots = new IRMN.TaggedRoot[](1);
+    taggedRoots[0] = IRMN.TaggedRoot({commitStore: address(s_offRamp), root: leaves[0]});
+    vm.startPrank(BLESS_VOTE_ADDR);
+    s_realRMN.voteToBless(taggedRoots);
+
+    bytes32[] memory proofs = new bytes32[](0);
+    uint256 timestamp = s_offRamp.verify(SOURCE_CHAIN_SELECTOR + 1, leaves, proofs, 0);
+    assertEq(uint256(0), timestamp);
+  }
+
+  // Reverts
+
+  function test_Paused_Revert() public {
+    s_offRamp.pause();
+    bytes32[] memory hashedLeaves = new bytes32[](0);
+    bytes32[] memory proofs = new bytes32[](0);
+    uint256 proofFlagBits = 0;
+    vm.expectRevert(EVM2EVMMultiOffRamp.PausedError.selector);
+    s_offRamp.verify(SOURCE_CHAIN_SELECTOR, hashedLeaves, proofs, proofFlagBits);
+  }
+
+  function test_TooManyLeaves_Revert() public {
+    bytes32[] memory leaves = new bytes32[](258);
+    bytes32[] memory proofs = new bytes32[](0);
+    vm.expectRevert(MerkleMultiProof.InvalidProof.selector);
+    s_offRamp.verify(SOURCE_CHAIN_SELECTOR, leaves, proofs, 0);
   }
 }

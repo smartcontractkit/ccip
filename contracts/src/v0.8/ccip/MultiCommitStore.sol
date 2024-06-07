@@ -11,6 +11,7 @@ import {Internal} from "./libraries/Internal.sol";
 import {MerkleMultiProof} from "./libraries/MerkleMultiProof.sol";
 import {OCR2Base} from "./ocr/OCR2Base.sol";
 
+// TODO: deprecate after merging MultiOffRamp + CommitStore
 contract MultiCommitStore is IMultiCommitStore, ITypeAndVersion, OCR2Base {
   error StaleReport();
   error PausedError();
@@ -18,7 +19,6 @@ contract MultiCommitStore is IMultiCommitStore, ITypeAndVersion, OCR2Base {
   error InvalidRoot();
   error InvalidCommitStoreConfig();
   error InvalidSourceChainConfig(uint64 sourceChainSelector);
-  error BadARMSignal();
   error CursedByRMN(uint64 sourceChainSelector);
   error RootAlreadyCommitted(uint64 sourceChainSelector, bytes32 merkleRoot);
   error SourceChainNotEnabled(uint64 chainSelector);
@@ -93,7 +93,7 @@ contract MultiCommitStore is IMultiCommitStore, ITypeAndVersion, OCR2Base {
   // STATE
   /// @dev The epoch and round of the last report
   uint40 private s_latestPriceEpochAndRound;
-  /// @dev Whether this OnRamp is paused or not
+  /// @dev Whether this CommitStore is paused or not
   bool private s_paused = false;
   // The source chain specific config
   mapping(uint64 sourceChainSelector => SourceChainConfig sourceChainConfig) private s_sourceChainConfigs;

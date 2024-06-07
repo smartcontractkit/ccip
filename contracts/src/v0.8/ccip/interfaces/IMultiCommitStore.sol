@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
+// TODO: deprecate after merging MultiOffRamp + CommitStore
 interface IMultiCommitStore {
   /// @notice Source chain specific config
   struct SourceChainConfig {
