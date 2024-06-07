@@ -28,14 +28,14 @@ contract ReentrantMaliciousTokenPool is TokenPool {
     returns (Pool.LockOrBurnOutV1 memory)
   {
     if (s_attacked) {
-      return Pool.LockOrBurnOutV1({destPoolAddress: getRemotePool(lockOrBurnIn.remoteChainSelector), destPoolData: ""});
+      return Pool.LockOrBurnOutV1({destTokenAddress: getRemotePool(lockOrBurnIn.remoteChainSelector), destPoolData: ""});
     }
 
     s_attacked = true;
 
     FacadeClient(i_facade).send(lockOrBurnIn.amount);
     emit Burned(msg.sender, lockOrBurnIn.amount);
-    return Pool.LockOrBurnOutV1({destPoolAddress: getRemotePool(lockOrBurnIn.remoteChainSelector), destPoolData: ""});
+    return Pool.LockOrBurnOutV1({destTokenAddress: getRemotePool(lockOrBurnIn.remoteChainSelector), destPoolData: ""});
   }
 
   function releaseOrMint(Pool.ReleaseOrMintInV1 calldata releaseOrMintIn)

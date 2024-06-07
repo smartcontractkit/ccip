@@ -20,7 +20,7 @@ contract TokenPoolHelper is TokenPool {
     override
     returns (Pool.LockOrBurnOutV1 memory)
   {
-    return Pool.LockOrBurnOutV1({destPoolAddress: getRemotePool(lockOrBurnIn.remoteChainSelector), destPoolData: ""});
+    return Pool.LockOrBurnOutV1({destTokenAddress: getRemotePool(lockOrBurnIn.remoteChainSelector), destPoolData: ""});
   }
 
   function releaseOrMint(Pool.ReleaseOrMintInV1 calldata releaseOrMintIn)

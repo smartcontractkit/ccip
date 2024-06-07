@@ -700,7 +700,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, OCR2BaseN
         abi.decode(encodedSourceTokenData[i], (Internal.SourceTokenData));
       // We need to safely decode the pool address from the sourceTokenData, as it could be wrong,
       // in which case it doesn't have to be a valid EVM address.
-      address localPoolAddress = Internal._validateEVMAddress(sourceTokenData.destPoolAddress);
+      address localPoolAddress = Internal._validateEVMAddress(sourceTokenData.destTokenAddress);
       // This will call the supportsInterface through the ERC165Checker, and not directly on the pool address.
       // This is done to prevent a pool from reverting the entire transaction if it doesn't support the interface.
       // The call gets a max or 30k gas per instance, of which there are three. This means gas estimations should

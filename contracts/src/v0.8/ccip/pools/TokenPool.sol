@@ -185,9 +185,17 @@ abstract contract TokenPool is IPool, OwnerIsCreator {
   // ================================================================
 
   /// @notice Gets the pool address on the remote chain.
-  /// @param remoteChainSelector Destination chain selector.
+  /// @param remoteChainSelector Remote chain selector.
+  /// @dev To support non-evm chains, this value is encoded into bytes
   function getRemotePool(uint64 remoteChainSelector) public view returns (bytes memory) {
     return s_remoteChainConfigs[remoteChainSelector].remotePoolAddress;
+  }
+
+  /// @notice Gets the token address on the remote chain.
+  /// @param remoteChainSelector Remote chain selector.
+  /// @dev To support non-evm chains, this value is encoded into bytes
+  function getRemoteToken(uint64 remoteChainSelector) public view returns (bytes memory) {
+    return s_remoteChainConfigs[remoteChainSelector].remoteTokenAddress;
   }
 
   /// @notice Sets the remote pool address for a given chain selector.

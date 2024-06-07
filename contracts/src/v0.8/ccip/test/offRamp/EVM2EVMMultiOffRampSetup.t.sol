@@ -229,7 +229,7 @@ contract EVM2EVMMultiOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSet
       Internal.SourceTokenData memory sourceTokenData =
         abi.decode(original.sourceTokenData[i], (Internal.SourceTokenData));
 
-      address destPoolAddress = abi.decode(sourceTokenData.destPoolAddress, (address));
+      address destPoolAddress = abi.decode(sourceTokenData.destTokenAddress, (address));
       TokenPool pool = TokenPool(destPoolAddress);
       destTokenAmounts[i].token = address(pool.getToken());
       destTokenAmounts[i].amount = original.tokenAmounts[i].amount;
@@ -293,7 +293,7 @@ contract EVM2EVMMultiOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSet
       message.sourceTokenData[i] = abi.encode(
         Internal.SourceTokenData({
           sourcePoolAddress: abi.encode(s_sourcePoolByToken[tokenAmounts[i].token]),
-          destPoolAddress: abi.encode(s_destPoolBySourceToken[tokenAmounts[i].token]),
+          destTokenAddress: abi.encode(s_destPoolBySourceToken[tokenAmounts[i].token]),
           extraData: ""
         })
       );
@@ -418,7 +418,7 @@ contract EVM2EVMMultiOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSet
       sourceTokenData[i] = abi.encode(
         Internal.SourceTokenData({
           sourcePoolAddress: abi.encode(s_sourcePoolByToken[srcTokenAmounts[i].token]),
-          destPoolAddress: abi.encode(s_destPoolBySourceToken[srcTokenAmounts[i].token]),
+          destTokenAddress: abi.encode(s_destPoolBySourceToken[srcTokenAmounts[i].token]),
           extraData: ""
         })
       );

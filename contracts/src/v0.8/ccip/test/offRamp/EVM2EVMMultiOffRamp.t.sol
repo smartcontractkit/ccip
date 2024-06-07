@@ -543,7 +543,7 @@ contract EVM2EVMMultiOffRamp_execute is EVM2EVMMultiOffRampSetup {
     messages[0].sourceTokenData[0] = abi.encode(
       Internal.SourceTokenData({
         sourcePoolAddress: abi.encode(fakePoolAddress),
-        destPoolAddress: abi.encode(s_destPoolBySourceToken[messages[0].tokenAmounts[0].token]),
+        destTokenAddress: abi.encode(s_destPoolBySourceToken[messages[0].tokenAmounts[0].token]),
         extraData: ""
       })
     );
@@ -1785,7 +1785,7 @@ contract EVM2EVMMultiOffRamp_manuallyExecute is EVM2EVMMultiOffRampSetup {
     messages[0].sourceTokenData[0] = abi.encode(
       Internal.SourceTokenData({
         sourcePoolAddress: abi.encode(s_sourcePoolByToken[s_sourceFeeToken]),
-        destPoolAddress: abi.encode(s_destPoolBySourceToken[s_sourceFeeToken]),
+        destTokenAddress: abi.encode(s_destPoolBySourceToken[s_sourceFeeToken]),
         extraData: ""
       })
     );
@@ -2234,7 +2234,7 @@ contract EVM2EVMMultiOffRamp_trialExecute is EVM2EVMMultiOffRampSetup {
     message.sourceTokenData[0] = abi.encode(
       Internal.SourceTokenData({
         sourcePoolAddress: abi.encode(address(0)),
-        destPoolAddress: abi.encode(address(0)),
+        destTokenAddress: abi.encode(address(0)),
         extraData: ""
       })
     );
@@ -2257,7 +2257,7 @@ contract EVM2EVMMultiOffRamp_trialExecute is EVM2EVMMultiOffRampSetup {
     message.sourceTokenData[0] = abi.encode(
       Internal.SourceTokenData({
         sourcePoolAddress: abi.encode(address(0)),
-        destPoolAddress: abi.encode(notAContract),
+        destTokenAddress: abi.encode(notAContract),
         extraData: ""
       })
     );
@@ -2419,7 +2419,7 @@ contract EVM2EVMMultiOffRamp_releaseOrMintTokens is EVM2EVMMultiOffRampSetup {
     sourceTokenData[0] = abi.encode(
       Internal.SourceTokenData({
         sourcePoolAddress: abi.encode(s_sourcePoolByToken[srcTokenAmounts[0].token]),
-        destPoolAddress: wrongAddress,
+        destTokenAddress: wrongAddress,
         extraData: ""
       })
     );
@@ -2468,7 +2468,7 @@ contract EVM2EVMMultiOffRamp_releaseOrMintTokens is EVM2EVMMultiOffRampSetup {
     sourceTokenData[0] = abi.encode(
       Internal.SourceTokenData({
         sourcePoolAddress: abi.encode(fakePoolAddress),
-        destPoolAddress: abi.encode(s_offRamp),
+        destTokenAddress: abi.encode(s_offRamp),
         extraData: ""
       })
     );
@@ -2484,7 +2484,7 @@ contract EVM2EVMMultiOffRamp_releaseOrMintTokens is EVM2EVMMultiOffRampSetup {
     sourceTokenData[0] = abi.encode(
       Internal.SourceTokenData({
         sourcePoolAddress: abi.encode(fakePoolAddress),
-        destPoolAddress: abi.encode(fakePoolAddress),
+        destTokenAddress: abi.encode(fakePoolAddress),
         extraData: ""
       })
     );
@@ -2541,7 +2541,7 @@ contract EVM2EVMMultiOffRamp_releaseOrMintTokens is EVM2EVMMultiOffRampSetup {
     sourceTokenData[0] = abi.encode(
       Internal.SourceTokenData({
         sourcePoolAddress: unusedVar,
-        destPoolAddress: abi.encode(destPool),
+        destTokenAddress: abi.encode(destPool),
         extraData: unusedVar
       })
     );
