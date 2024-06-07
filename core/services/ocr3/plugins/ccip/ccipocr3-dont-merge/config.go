@@ -159,3 +159,15 @@ func (sc *SupportedChains) UnmarshalJSON(data []byte) error {
 
 	return nil
 }
+
+type OnChainConfig struct {
+	Readers []Bytes32 `json:"readers"`
+	FChain  uint8     `json:"fChain"`
+	Config  []byte    `json:"config"`
+}
+type OnChainCapabilityConfig struct {
+	// Calling function https://github.com/smartcontractkit/ccip/blob/330c5e98f624cfb10108c92fe1e00ced6d345a99/contracts/src/v0.8/ccip/capability/CCIPCapabilityConfiguration.sol#L140
+	// Can I use ChainSelector cciptypes.ChainSelector?
+	ChainSelector uint64        `json:"chainSelector"`
+	ChainConfig   OnChainConfig `json:"chainConfig"`
+}

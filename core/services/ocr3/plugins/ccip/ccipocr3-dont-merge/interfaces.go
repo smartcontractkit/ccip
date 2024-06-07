@@ -56,8 +56,7 @@ type MessageHasher interface {
 
 // TODO: Addition
 type HomeChainReader interface {
-	FetchLatestConfig(ctx context.Context) (HomeChainConfig, error)
-	StartConfigAutoUpdate(ctx context.Context, config *HomeChainConfig, interval time.Duration) error
-	// Close closes any open resources.
+	GetConfig() HomeChainConfig
+	StartPolling(ctx context.Context, interval time.Duration) error
 	Close(ctx context.Context) error
 }

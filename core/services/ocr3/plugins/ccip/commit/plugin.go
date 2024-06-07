@@ -58,7 +58,7 @@ func NewPlugin(
 		knownSourceChains = knownSourceChains.Union(inf.Supported)
 	}
 
-	// TODO create homeChainReader and run StartConfigAutoUpdate with homeChainConfig
+	// TODO create homeChainReader and run StartPolling with homeChainConfig
 
 	return &Plugin{
 		nodeID:            nodeID,
