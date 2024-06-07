@@ -1,51 +1,49 @@
 package validation
 
 import (
-	"fmt"
-
-	"golang.org/x/crypto/sha3"
-
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
 
-type reportCounter struct {
-	data  cciptypes.ExecutePluginCommitData
+type counter[T any] struct {
+	data  T
 	count int
 }
 
-type CommitReportValidator interface {
-	AddReport(data cciptypes.ExecutePluginCommitData) error
-	GetValidatedReports() ([]cciptypes.ExecutePluginCommitData, error)
+type Validator[T any] interface {
+	AddReport(data T) error
+	GetValidatedReports() ([]T, error)
 }
 
-// commitValidator is a helper object to validate reports for a single chain.
+// validator is a helper object to validate reports for a single chain.
 // It keeps track of all reports and determines if they observations are consistent
 // with one another and whether they meet the required fChain threshold.
-type commitReportValidator struct {
+type validator[T any] struct {
 	minObservation int
-	cache          map[cciptypes.Bytes32]*reportCounter
+	cache          map[cciptypes.Bytes32]*counter[T]
+	idFunc         func(T) [32]byte
 }
 
-func NewCommitReportValidator(min int) *commitReportValidator {
-	return &commitReportValidator{
+func NewValidator[T any](min int, idFunc func(T) [32]byte) *validator[T] {
+	return &validator[T]{
 		minObservation: min,
-		cache:          make(map[cciptypes.Bytes32]*reportCounter),
+		cache:          make(map[cciptypes.Bytes32]*counter[T]),
+		idFunc:         idFunc,
 	}
 }
 
-func (cv *commitReportValidator) AddReport(data cciptypes.ExecutePluginCommitData) error {
+func (cv *validator[T]) AddReport(data T) error {
 	//id := sha3.Sum256(data.ToBytes())
-	id := sha3.Sum256([]byte(fmt.Sprintf("%v", data)))
+	id := cv.idFunc(data)
 	if _, ok := cv.cache[id]; ok {
 		cv.cache[id].count++
 	} else {
-		cv.cache[id] = &reportCounter{data: data, count: 1}
+		cv.cache[id] = &counter[T]{data: data, count: 1}
 	}
 	return nil
 }
 
-func (cv *commitReportValidator) GetValidatedReports() ([]cciptypes.ExecutePluginCommitData, error) {
-	var validated []cciptypes.ExecutePluginCommitData
+func (cv *validator[T]) GetValidatedReports() ([]T, error) {
+	var validated []T
 	for _, rc := range cv.cache {
 		if rc.count >= cv.minObservation {
 			validated = append(validated, rc.data)

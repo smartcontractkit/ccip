@@ -1,11 +1,13 @@
 package validation
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/crypto/sha3"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
@@ -97,7 +99,10 @@ func Test_CommitReportValidator(t *testing.T) {
 			t.Parallel()
 
 			// Initialize the validator
-			validator := NewCommitReportValidator(tt.min)
+			idFunc := func(data cciptypes.ExecutePluginCommitData) [32]byte {
+				return sha3.Sum256([]byte(fmt.Sprintf("%v", data)))
+			}
+			validator := NewValidator[cciptypes.ExecutePluginCommitData](tt.min, idFunc)
 			for _, report := range tt.reports {
 				err := validator.AddReport(report)
 				require.NoError(t, err)

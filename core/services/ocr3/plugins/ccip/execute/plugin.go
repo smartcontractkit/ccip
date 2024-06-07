@@ -8,6 +8,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"golang.org/x/crypto/sha3"
+
 	"github.com/smartcontractkit/ccipocr3/execute/internal/validation"
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
@@ -193,9 +195,12 @@ func validatedCommitObservations(aos []decodedAttributedObservation, fChain map[
 	// Ensure f_Chain observations for all.
 
 	// Create a validator for each chain
-	validators := make(map[cciptypes.ChainSelector]validation.CommitReportValidator)
+	validators := make(map[cciptypes.ChainSelector]validation.Validator[cciptypes.ExecutePluginCommitData])
+	idFunc := func(data cciptypes.ExecutePluginCommitData) [32]byte {
+		return sha3.Sum256([]byte(fmt.Sprintf("%v", data)))
+	}
 	for selector, f := range fChain {
-		validators[selector] = validation.NewCommitReportValidator(2*f + 1)
+		validators[selector] = validation.NewValidator[cciptypes.ExecutePluginCommitData](2*f+1, idFunc)
 	}
 
 	// Need some sort of cache to store the reports, there could be invalid reports, so we need to keep a tally
