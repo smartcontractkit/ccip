@@ -97,7 +97,7 @@ func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.Repor
 		batchingStrategy = &BestEffortBatchingStrategy{}
 	case 1:
 		batchingStrategy = &ZKOverflowBatchingStrategy{
-			txManager: rf.config.txManager,
+			// statuschecker: rf.config.statuschecker, TODO: add this to the factory struct
 		}
 	default:
 		batchingStrategy = &BestEffortBatchingStrategy{} // Default strategy

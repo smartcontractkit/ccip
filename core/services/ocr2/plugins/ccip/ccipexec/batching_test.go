@@ -16,13 +16,13 @@ import (
 	"github.com/stretchr/testify/mock"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
-	txmmocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/txmgr/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/prices"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/tokendata"
+	statuschecker "github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/statuschecker"
 )
 
 type testCase struct {
@@ -35,7 +35,7 @@ type testCase struct {
 	srcToDestTokens          map[cciptypes.Address]cciptypes.Address
 	expectedSeqNrs           []ccip.ObservedMessage
 	expectedStates           []messageExecStatus
-	mockTxm                  func(m *MockTxmFake)
+	statuschecker            func(m *MockStatusChecker)
 }
 
 func Test_validateSendRequests(t *testing.T) {
@@ -520,15 +520,6 @@ func TestBatchingStrategies(t *testing.T) {
 		},
 	}
 
-	// TODO: add following scenarios
-	// 1 message, no ZKO (multiple answers and none of them is ZKO) => batch with 1st
-	// 1 message, ZKO (with multiple answers and 1 is ZKO) => empty batch/no batch
-	// 1 message, no ZKO (with multiple answers and none is ZKO) => empty batch/no batch
-	// 2 messages, 1st is pending, 2nd is not ZKO => batch with 1st
-	// 2 messages, 1st is ZKO, 2nd is ZKO => empty batch/no batch
-	// 3 messages, 1st is not ZKO, 2nd is not ZKO, 3rd is not ZKO => batch with 1st
-	// 3 messages, 1st is ZKO, 2nd is not ZKO, 3rd is not ZKO => batch with 2nd
-	// 3 messages, 1st is ZKO, 2nd is ZKO, 3rd is not ZKO => batch with 3rd
 	specificZkOverflowTestCases := []testCase{
 		{
 			name: "batch size is 1",
@@ -585,7 +576,38 @@ func TestBatchingStrategies(t *testing.T) {
 			},
 		},
 		{
-			name: "snooze failed message and add next message to batch",
+			name: "snooze fatal message and return empty batch",
+			reqs: []cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta{
+				{
+					EVM2EVMMessage: cciptypes.EVM2EVMMessage{
+						SequenceNumber: 10,
+						FeeTokenAmount: big.NewInt(1e9),
+						Sender:         sender1,
+						Nonce:          0,
+						GasLimit:       big.NewInt(1),
+						Data:           bytes.Repeat([]byte{'a'}, 1000),
+						FeeToken:       srcNative,
+						MessageID:      msgId1,
+					},
+					BlockTimestamp: time.Date(2010, 1, 1, 12, 12, 12, 0, time.UTC),
+				},
+			},
+			inflight:              big.NewInt(0),
+			tokenLimit:            big.NewInt(0),
+			destGasPrice:          big.NewInt(10),
+			srcPrices:             map[cciptypes.Address]*big.Int{srcNative: big.NewInt(1)},
+			dstPrices:             map[cciptypes.Address]*big.Int{destNative: big.NewInt(1)},
+			offRampNoncesBySender: map[cciptypes.Address]uint64{sender1: 0},
+			expectedStates: []messageExecStatus{
+				newMessageExecState(10, msgId1, TXMCheckFailed),
+			},
+			statuschecker: func(m *MockStatusChecker) {
+				m.Mock = mock.Mock{} // reset mock
+				m.On("QueryTxStatuses", mock.Anything, hexutil.Encode(msgId1[:])).Return([]statuschecker.TransactionStatus{statuschecker.Fatal}, 0, nil)
+			},
+		},
+		{
+			name: "snooze fatal message and add next message to batch",
 			reqs: []cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta{
 				{
 					EVM2EVMMessage: cciptypes.EVM2EVMMessage{
@@ -635,14 +657,198 @@ func TestBatchingStrategies(t *testing.T) {
 			offRampNoncesBySender: map[cciptypes.Address]uint64{sender1: 0},
 			expectedSeqNrs:        []ccip.ObservedMessage{{SeqNr: uint64(11)}},
 			expectedStates: []messageExecStatus{
-				newMessageExecState(10, msgId1, "zk_check_failed"),
+				newMessageExecState(10, msgId1, TXMCheckFailed),
 				newMessageExecState(11, msgId2, AddedToBatch),
 			},
-			mockTxm: func(m *MockTxmFake) {
+			statuschecker: func(m *MockStatusChecker) {
 				m.Mock = mock.Mock{} // reset mock
-				m.On("FindTxsByIdempotencyPrefix", mock.Anything, hexutil.Encode(msgId1[:])).Return([]status{Failed}, nil)
-				m.On("FindTxsByIdempotencyPrefix", mock.Anything, hexutil.Encode(msgId2[:])).Return([]status{}, nil)
-				m.On("FindTxsByIdempotencyPrefix", mock.Anything, hexutil.Encode(msgId3[:])).Return([]status{}, nil)
+				m.On("QueryTxStatuses", mock.Anything, hexutil.Encode(msgId1[:])).Return([]statuschecker.TransactionStatus{statuschecker.Fatal}, 2, nil)
+				m.On("QueryTxStatuses", mock.Anything, hexutil.Encode(msgId2[:])).Return([]statuschecker.TransactionStatus{}, -1, nil)
+			},
+		},
+		{
+			name: "all messages are fatal and batch is empty",
+			reqs: []cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta{
+				{
+					EVM2EVMMessage: cciptypes.EVM2EVMMessage{
+						SequenceNumber: 10,
+						FeeTokenAmount: big.NewInt(1e9),
+						Sender:         sender1,
+						Nonce:          0,
+						GasLimit:       big.NewInt(1),
+						Data:           bytes.Repeat([]byte{'a'}, 1000),
+						FeeToken:       srcNative,
+						MessageID:      msgId1,
+					},
+					BlockTimestamp: time.Date(2010, 1, 1, 12, 12, 12, 0, time.UTC),
+				},
+				{
+					EVM2EVMMessage: cciptypes.EVM2EVMMessage{
+						SequenceNumber: 11,
+						FeeTokenAmount: big.NewInt(1e9),
+						Sender:         sender1,
+						Nonce:          0,
+						GasLimit:       big.NewInt(1),
+						Data:           bytes.Repeat([]byte{'a'}, 1000),
+						FeeToken:       srcNative,
+						MessageID:      msgId2,
+					},
+					BlockTimestamp: time.Date(2010, 1, 1, 12, 12, 12, 0, time.UTC),
+				},
+			},
+			inflight:              big.NewInt(0),
+			tokenLimit:            big.NewInt(0),
+			destGasPrice:          big.NewInt(10),
+			srcPrices:             map[cciptypes.Address]*big.Int{srcNative: big.NewInt(1)},
+			dstPrices:             map[cciptypes.Address]*big.Int{destNative: big.NewInt(1)},
+			offRampNoncesBySender: map[cciptypes.Address]uint64{sender1: 0},
+			expectedStates: []messageExecStatus{
+				newMessageExecState(10, msgId1, TXMCheckFailed),
+				newMessageExecState(11, msgId2, TXMCheckFailed),
+			},
+			statuschecker: func(m *MockStatusChecker) {
+				m.Mock = mock.Mock{} // reset mock
+				m.On("QueryTxStatuses", mock.Anything, hexutil.Encode(msgId1[:])).Return([]statuschecker.TransactionStatus{statuschecker.Fatal}, 2, nil)
+				m.On("QueryTxStatuses", mock.Anything, hexutil.Encode(msgId2[:])).Return([]statuschecker.TransactionStatus{statuschecker.Fatal}, 2, nil)
+			},
+		},
+		{
+			name: "message batched when unconfrimed or failed",
+			reqs: []cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta{
+				{
+					EVM2EVMMessage: cciptypes.EVM2EVMMessage{
+						SequenceNumber: 10,
+						FeeTokenAmount: big.NewInt(1e9),
+						Sender:         sender1,
+						Nonce:          0,
+						GasLimit:       big.NewInt(1),
+						Data:           bytes.Repeat([]byte{'a'}, 1000),
+						FeeToken:       srcNative,
+						MessageID:      msgId1,
+					},
+					BlockTimestamp: time.Date(2010, 1, 1, 12, 12, 12, 0, time.UTC),
+				},
+				{
+					EVM2EVMMessage: cciptypes.EVM2EVMMessage{
+						SequenceNumber: 11,
+						FeeTokenAmount: big.NewInt(1e9),
+						Sender:         sender1,
+						Nonce:          0,
+						GasLimit:       big.NewInt(1),
+						Data:           bytes.Repeat([]byte{'a'}, 1000),
+						FeeToken:       srcNative,
+						MessageID:      msgId2,
+					},
+					BlockTimestamp: time.Date(2010, 1, 1, 12, 12, 12, 0, time.UTC),
+				},
+			},
+			inflight:              big.NewInt(0),
+			tokenLimit:            big.NewInt(0),
+			destGasPrice:          big.NewInt(10),
+			srcPrices:             map[cciptypes.Address]*big.Int{srcNative: big.NewInt(1)},
+			dstPrices:             map[cciptypes.Address]*big.Int{destNative: big.NewInt(1)},
+			offRampNoncesBySender: map[cciptypes.Address]uint64{sender1: 0},
+			expectedSeqNrs:        []ccip.ObservedMessage{{SeqNr: uint64(10)}},
+			expectedStates: []messageExecStatus{
+				newMessageExecState(10, msgId1, AddedToBatch),
+			},
+			statuschecker: func(m *MockStatusChecker) {
+				m.Mock = mock.Mock{} // reset mock
+				m.On("QueryTxStatuses", mock.Anything, hexutil.Encode(msgId1[:])).Return([]statuschecker.TransactionStatus{statuschecker.Unconfirmed, statuschecker.Failed}, 0, nil)
+			},
+		},
+		{
+			name: "message snoozed when finalized",
+			reqs: []cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta{
+				{
+					EVM2EVMMessage: cciptypes.EVM2EVMMessage{
+						SequenceNumber: 10,
+						FeeTokenAmount: big.NewInt(1e9),
+						Sender:         sender1,
+						Nonce:          0,
+						GasLimit:       big.NewInt(1),
+						Data:           bytes.Repeat([]byte{'a'}, 1000),
+						FeeToken:       srcNative,
+						MessageID:      msgId1,
+					},
+					BlockTimestamp: time.Date(2010, 1, 1, 12, 12, 12, 0, time.UTC),
+				},
+				{
+					EVM2EVMMessage: cciptypes.EVM2EVMMessage{
+						SequenceNumber: 11,
+						FeeTokenAmount: big.NewInt(1e9),
+						Sender:         sender1,
+						Nonce:          0,
+						GasLimit:       big.NewInt(1),
+						Data:           bytes.Repeat([]byte{'a'}, 1000),
+						FeeToken:       srcNative,
+						MessageID:      msgId2,
+					},
+					BlockTimestamp: time.Date(2010, 1, 1, 12, 12, 12, 0, time.UTC),
+				},
+			},
+			inflight:              big.NewInt(0),
+			tokenLimit:            big.NewInt(0),
+			destGasPrice:          big.NewInt(10),
+			srcPrices:             map[cciptypes.Address]*big.Int{srcNative: big.NewInt(1)},
+			dstPrices:             map[cciptypes.Address]*big.Int{destNative: big.NewInt(1)},
+			offRampNoncesBySender: map[cciptypes.Address]uint64{sender1: 0},
+			expectedSeqNrs:        []ccip.ObservedMessage{{SeqNr: uint64(11)}},
+			expectedStates: []messageExecStatus{
+				newMessageExecState(10, msgId1, TXMCheckFailed),
+				newMessageExecState(11, msgId2, AddedToBatch),
+			},
+			statuschecker: func(m *MockStatusChecker) {
+				m.Mock = mock.Mock{} // reset mock
+				m.On("QueryTxStatuses", mock.Anything, hexutil.Encode(msgId1[:])).Return([]statuschecker.TransactionStatus{statuschecker.Unconfirmed, statuschecker.Failed, statuschecker.Finalized}, 2, nil)
+				m.On("QueryTxStatuses", mock.Anything, hexutil.Encode(msgId2[:])).Return([]statuschecker.TransactionStatus{}, -1, nil)
+			},
+		},
+		{
+			name: "txm return error for message",
+			reqs: []cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta{
+				{
+					EVM2EVMMessage: cciptypes.EVM2EVMMessage{
+						SequenceNumber: 10,
+						FeeTokenAmount: big.NewInt(1e9),
+						Sender:         sender1,
+						Nonce:          0,
+						GasLimit:       big.NewInt(1),
+						Data:           bytes.Repeat([]byte{'a'}, 1000),
+						FeeToken:       srcNative,
+						MessageID:      msgId1,
+					},
+					BlockTimestamp: time.Date(2010, 1, 1, 12, 12, 12, 0, time.UTC),
+				},
+				{
+					EVM2EVMMessage: cciptypes.EVM2EVMMessage{
+						SequenceNumber: 11,
+						FeeTokenAmount: big.NewInt(1e9),
+						Sender:         sender1,
+						Nonce:          0,
+						GasLimit:       big.NewInt(1),
+						Data:           bytes.Repeat([]byte{'a'}, 1000),
+						FeeToken:       srcNative,
+						MessageID:      msgId2,
+					},
+					BlockTimestamp: time.Date(2010, 1, 1, 12, 12, 12, 0, time.UTC),
+				},
+			},
+			inflight:              big.NewInt(0),
+			tokenLimit:            big.NewInt(0),
+			destGasPrice:          big.NewInt(10),
+			srcPrices:             map[cciptypes.Address]*big.Int{srcNative: big.NewInt(1)},
+			dstPrices:             map[cciptypes.Address]*big.Int{destNative: big.NewInt(1)},
+			offRampNoncesBySender: map[cciptypes.Address]uint64{sender1: 0},
+			expectedSeqNrs:        []ccip.ObservedMessage{{SeqNr: uint64(11)}},
+			expectedStates: []messageExecStatus{
+				newMessageExecState(10, msgId1, TXMCheckError),
+				newMessageExecState(11, msgId2, AddedToBatch),
+			},
+			statuschecker: func(m *MockStatusChecker) {
+				m.Mock = mock.Mock{} // reset mock
+				m.On("QueryTxStatuses", mock.Anything, hexutil.Encode(msgId1[:])).Return([]statuschecker.TransactionStatus{}, -1, errors.New("dummy txm error"))
+				m.On("QueryTxStatuses", mock.Anything, hexutil.Encode(msgId2[:])).Return([]statuschecker.TransactionStatus{}, -1, nil)
 			},
 		},
 	}
@@ -653,11 +859,9 @@ func TestBatchingStrategies(t *testing.T) {
 	})
 
 	t.Run("ZKOverflowBatchingStrategy", func(t *testing.T) {
-		mockedTxManager := new(txmmocks.MockEvmTxManager)
-		mockedTxManagerFake := new(MockTxmFake)
+		mockedStatusChecker := new(MockStatusChecker)
 		strategy := &ZKOverflowBatchingStrategy{
-			txManager:     mockedTxManager,
-			txManagerFake: mockedTxManagerFake,
+			statuschecker: mockedStatusChecker,
 		}
 		runBatchingStrategyTests(t, strategy, 1_000_000, append(testCases, specificZkOverflowTestCases...))
 	})
@@ -674,7 +878,7 @@ func runBatchingStrategyTests(t *testing.T, strategy BatchingStrategy, available
 			lggr := logger.TestLogger(t)
 
 			gasPriceEstimator := prices.NewMockGasPriceEstimatorExec(t)
-			if tc.expectedSeqNrs != nil {
+			if tc.expectedSeqNrs != nil || tc.statuschecker != nil {
 				gasPriceEstimator.On("EstimateMsgCostUSD", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(big.NewInt(0), nil)
 			}
 
@@ -683,13 +887,13 @@ func runBatchingStrategyTests(t *testing.T, strategy BatchingStrategy, available
 			}
 
 			// default case for ZKOverflowBatchingStrategy
-			if strategyType := reflect.TypeOf(strategy); tc.mockTxm == nil && strategyType == reflect.TypeOf(&ZKOverflowBatchingStrategy{}) {
-				strategy.(*ZKOverflowBatchingStrategy).txManagerFake.(*MockTxmFake).On("FindTxsByIdempotencyPrefix", mock.Anything, mock.Anything).Return([]status{}, nil)
+			if strategyType := reflect.TypeOf(strategy); tc.statuschecker == nil && strategyType == reflect.TypeOf(&ZKOverflowBatchingStrategy{}) {
+				strategy.(*ZKOverflowBatchingStrategy).statuschecker.(*MockStatusChecker).On("QueryTxStatuses", mock.Anything, mock.Anything).Return([]statuschecker.TransactionStatus{}, -1, nil)
 			}
 
 			// Mock calls to TXM
-			if tc.mockTxm != nil {
-				tc.mockTxm(strategy.(*ZKOverflowBatchingStrategy).txManagerFake.(*MockTxmFake))
+			if tc.statuschecker != nil {
+				tc.statuschecker(strategy.(*ZKOverflowBatchingStrategy).statuschecker.(*MockStatusChecker))
 			}
 
 			batchContext := &BatchContext{
@@ -765,11 +969,11 @@ func generateMessageIDFromInt(input uint32) [32]byte {
 	return messageID
 }
 
-type MockTxmFake struct {
+type MockStatusChecker struct {
 	mock.Mock
 }
 
-func (t *MockTxmFake) FindTxsByIdempotencyPrefix(ctx context.Context, msgIdPrefix string) ([]status, error) {
-	args := t.Called(ctx, msgIdPrefix)
-	return args.Get(0).([]status), args.Error(1)
+func (t *MockStatusChecker) QueryTxStatuses(ctx context.Context, msgID string) ([]statuschecker.TransactionStatus, int, error) {
+	args := t.Called(ctx, msgID)
+	return args.Get(0).([]statuschecker.TransactionStatus), args.Get(1).(int), args.Error(2)
 }

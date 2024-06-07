@@ -11,7 +11,6 @@ import (
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
 
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/txmgr"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
@@ -20,6 +19,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/pkg/merklemulti"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/prices"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/tokendata"
+	statuschecker "github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/statuschecker"
 )
 
 type BatchContext struct {
@@ -92,24 +92,9 @@ func (s *BestEffortBatchingStrategy) BuildBatch(
 	return batchBuilder.batch, batchBuilder.statuses
 }
 
-// define an enum status
-type status string
-
-// define the value
-const (
-	Failed     status = "failed"
-	Pending    status = "pending"
-	Successful status = "successful"
-)
-
-type TxManager interface {
-	FindTxsByIdempotencyPrefix(ctx context.Context, msgIdPrefix string) ([]status, error)
-}
-
 type ZKOverflowBatchingStrategy struct {
 	BaseBatchingStrategy
-	txManager     txmgr.TxManager
-	txManagerFake TxManager
+	statuschecker statuschecker.TransactionStatusChecker
 }
 
 // ZKOverflowBatchingStrategy is a batching strategy for ZK chains overflowing under certain conditions.
@@ -133,30 +118,29 @@ func (bs *ZKOverflowBatchingStrategy) BuildBatch(
 			continue
 		}
 
-		// TODO: Perform the ZK check here
-		// bs.txManager.Name()
-		statuses, err := bs.txManagerFake.FindTxsByIdempotencyPrefix(batchCtx.ctx, hexutil.Encode(msg.MessageID[:]))
-		if err != nil { // TODO: should we add the message to the batch if err?
-			msgLggr.Errorw("Failed to find txs by idempotency prefix", "err", err)
-			return []ccip.ObservedMessage{}, []messageExecStatus{}
+		// Check if the messsage is overflown using TXM
+		statuses, _, err := bs.statuschecker.QueryTxStatuses(batchCtx.ctx, hexutil.Encode(msg.MessageID[:]))
+		if err != nil {
+			batchBuilder.skip(msg, TXMCheckError)
+			continue
 		}
 
 		if len(statuses) == 0 {
-			// log that we have no status so message can be added to the batch
+			// No status found for message = first time we see it
 			msgLggr.Infow("No status found for message, adding to batch")
 		} else {
-			// need to look for a final status
+			// Status(es) found for message = check if any of them is final to decide if we should add it to the batch
 			finalStatus := false
 			for _, s := range statuses {
-				if s == Failed {
-					msgLggr.Infow("Skipping message - ZK check failed")
-					batchBuilder.skip(msg, "zk_check_failed")
+				if s == statuschecker.Fatal {
+					msgLggr.Infow("Skipping message - ZK check failed (fatal status)")
+					batchBuilder.skip(msg, TXMCheckFailed)
 					finalStatus = true
 					break
 				}
-				if s == Successful {
-					msgLggr.Infow("Skipping message - ZK check passed")
-					batchBuilder.skip(msg, "zk_check_passed")
+				if s == statuschecker.Finalized {
+					msgLggr.Infow("Skipping message - ZK check failed (final status)")
+					batchBuilder.skip(msg, TXMCheckFailed)
 					finalStatus = true
 					break
 				}
@@ -457,6 +441,8 @@ const (
 	TokenNotInSrcTokenPrices             messageStatus = "token_not_in_src_token_prices"
 	InsufficientRemainingFee             messageStatus = "insufficient_remaining_fee"
 	AddedToBatch                         messageStatus = "added_to_batch"
+	TXMCheckError                        messageStatus = "txm_check_error"
+	TXMCheckFailed                       messageStatus = "txm_check_failed"
 )
 
 type messageExecStatus struct {
