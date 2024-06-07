@@ -808,7 +808,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, AggregateRateLimiter, ITypeA
   }
 
   /// @notice Withdraws the outstanding fee token balances to the fee aggregator.
-  function withdrawFeeTokens() public {
+  function withdrawFeeTokens() external {
     address[] memory feeTokens = IPriceRegistry(s_dynamicConfig.priceRegistry).getFeeTokens();
     address feeAggregator = s_dynamicConfig.feeAggregator;
 
