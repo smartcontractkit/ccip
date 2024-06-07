@@ -69,10 +69,12 @@ contract CCIPReceiver is CCIPClientBase {
     external
     virtual
     onlySelf 
-    validSender(message.sender) 
+    validSender(message.sourceChainSelector, message.sender) 
     validChain(message.sourceChainSelector) {
     // Insert Custom logic here
   }
+
+  function _retryFailedMessage(Client.Any2EVMMessage memory message) internal virtual {}
 
   /// @notice This function is callable by the owner when a message has failed
   /// to unblock the tokens that are associated with that message.
@@ -87,11 +89,8 @@ contract CCIPReceiver is CCIPClientBase {
     // Do stuff to retry message, potentially just releasing the associated tokens
     Client.Any2EVMMessage memory message = s_messageContents[messageId];
 
-    try this.processMessage(message) {}
-    catch (bytes memory err) {
-      emit MessageFailed(message.messageId, err);
-      return;
-    }
+    // Let the user override the implementation, since different workflow may be desired for retrying a merssage
+    _retryFailedMessage(message);
     
     s_failedMessages.remove(messageId); // If retry succeeds, remove from set of failed messages.
 

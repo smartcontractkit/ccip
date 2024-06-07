@@ -14,7 +14,7 @@ contract CCIPReceiverWithACK is CCIPReceiver {
   using EnumerableMap for EnumerableMap.Bytes32ToUintMap;
 
   // Current feeToken
-  IERC20 public immutable s_feeToken;
+  IERC20 public s_feeToken;
 
   bytes public constant ackMessageMagicBytes = "MESSAGE_ACKNOWLEDGED_";
 
@@ -42,8 +42,13 @@ contract CCIPReceiverWithACK is CCIPReceiver {
     if (address(feeToken) != address(0)) {
         feeToken.safeApprove(router, type(uint256).max);
     }
+  }
 
-
+  function modifyFeeToken(address token) external onlyOwner {
+    s_feeToken = IERC20(token);
+    if (token != address(0)) {
+        s_feeToken.safeApprove(getRouter(), type(uint256).max);
+    }
   }
 
   /// @notice The entrypoint for the CCIP router to call. This function should
@@ -54,7 +59,7 @@ contract CCIPReceiverWithACK is CCIPReceiver {
     public
     override
     onlyRouter
-    validSender(message.sender)
+    validSender(message.sourceChainSelector, message.sender)
     validChain(message.sourceChainSelector)
   {
     try this.processMessage(message) {}
@@ -70,8 +75,6 @@ contract CCIPReceiverWithACK is CCIPReceiver {
     }
 
     emit MessageSucceeded(message.messageId);
-
-    _sendAck(message);
   }
 
   /// @notice Sends the acknowledgement message back through CCIP to original sender contract
@@ -106,6 +109,10 @@ contract CCIPReceiverWithACK is CCIPReceiver {
 
     if (payload.messageType == MessageType.OUTGOING) {
         // Insert Processing workflow here.
+
+
+        // If the message was outgoin, then send an ack response.
+        _sendAck(message);
     }
 
     else if (payload.messageType == MessageType.ACK) {
@@ -121,4 +128,6 @@ contract CCIPReceiverWithACK is CCIPReceiver {
         emit MessageAckReceived(messageId);
     }
   }
+
+
 }

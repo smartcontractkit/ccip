@@ -6,6 +6,8 @@ import {IRouterClient} from "../interfaces/IRouterClient.sol";
 import {OwnerIsCreator} from "../../shared/access/OwnerIsCreator.sol";
 
 import {Client} from "../libraries/Client.sol";
+
+import {ICCIPClientBase} from "./interfaces/ICCIPClientBase.sol";
 import {CCIPClientBase} from "./CCIPClientBase.sol";
 
 import {IERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
@@ -49,7 +51,7 @@ contract CCIPSender is CCIPClientBase {
       IERC20(tokenAmounts[i].token).approve(i_ccipRouter, tokenAmounts[i].amount);
     }
 
-    CCIPClientBase.Chain memory chainInfo = s_chains[destChainSelector];
+    ICCIPClientBase.ChainInfo memory chainInfo = s_chains[destChainSelector];
 
     Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
       receiver: chainInfo.recipient,

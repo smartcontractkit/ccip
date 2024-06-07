@@ -5,6 +5,8 @@ import {SafeERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/tok
 
 import {CCIPReceiverWithACK, CCIPReceiver} from "./CCIPReceiverWithACK.sol";
 import {CCIPSender} from "./CCIPSender.sol";
+
+import {ICCIPClientBase} from "./interfaces/ICCIPClientBase.sol";
 import {CCIPClientBase} from "./CCIPClientBase.sol";
 
 import {IRouterClient} from "../interfaces/IRouterClient.sol";
@@ -32,7 +34,7 @@ contract CCIPClient is CCIPReceiverWithACK {
       IERC20(tokenAmounts[i].token).approve(i_ccipRouter, tokenAmounts[i].amount);
     }
 
-    CCIPClientBase.Chain memory chainInfo = s_chains[destChainSelector];
+    ICCIPClientBase.ChainInfo memory chainInfo = s_chains[destChainSelector];
 
     Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
       receiver: chainInfo.recipient,

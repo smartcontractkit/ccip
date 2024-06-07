@@ -2,22 +2,18 @@ pragma solidity ^0.8.0;
 
 import {OwnerIsCreator} from "../../shared/access/OwnerIsCreator.sol";
 
-contract CCIPClientBase is OwnerIsCreator {
-  error InvalidRouter(address router);
-  error InvalidChain(uint64 chainSelector);
-  error InvalidSender(bytes sender);
-  error InvalidRecipient(bytes recipient);
+import {IERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
+
+import {ICCIPClientBase} from "./interfaces/ICCIPClientBase.sol";
+
+contract CCIPClientBase is ICCIPClientBase, OwnerIsCreator {
+  using SafeERC20 for IERC20;
 
   address internal immutable i_ccipRouter;
 
-  struct Chain {
-    bytes extraArgsBytes;
-    bytes recipient;
-  }
-  
-  mapping(uint64 destChainSelector => Chain chainInfo) public s_chains;
-
-  mapping(bytes sender => bool isApproved) public s_senders; // Approved addresses of which to receive messages from
+  mapping(uint64 destChainSelector => mapping(bytes sender => bool approved)) public s_approvedSenders;
+  mapping(uint64 destChainSelector => ChainInfo chainInfo) public s_chains;
 
   constructor(address router) {
     if (router == address(0)) revert InvalidRouter(address(0));
@@ -42,21 +38,32 @@ contract CCIPClientBase is OwnerIsCreator {
   // Sender/Receiver Management
   /////////////////////////////////////////////////////////////////////
 
-  function updateApprovedSenders(bytes[] calldata adds, bytes[] calldata removes) external onlyOwner {
-    for(uint256 i = 0; i < removes.length; ++i) {
-      delete s_senders[removes[i]];
+  function updateApprovedSenders(approvedSenderUpdate[] calldata adds, approvedSenderUpdate[] calldata removes) external onlyOwner {
+    for(uint256 i = 0; i < adds.length; ++i) {
+      delete s_approvedSenders[removes[i].destChainSelector][removes[i].sender];
     }
 
     for(uint256 i = 0; i < removes.length; ++i) {
-      s_senders[adds[i]] = true;
+      s_approvedSenders[adds[i].destChainSelector][adds[i].sender] = true;
     }
+  }
+
+  /////////////////////////////////////////////////////////////////////
+  // Fee Token Management
+  /////////////////////////////////////////////////////////////////////
+
+  fallback() external payable {}
+  receive() external payable {}
+
+  function withdrawTokens(address token, address to, uint256 amount) external onlyOwner {
+    IERC20(token).safeTransfer(to, amount);
   }
 
   /////////////////////////////////////////////////////////////////////
   // Chain Management
   /////////////////////////////////////////////////////////////////////
 
-  function enableChain(uint64 chainSelector, Chain calldata chainInfo) external onlyOwner {
+  function enableChain(uint64 chainSelector, ChainInfo calldata chainInfo) external onlyOwner {
     s_chains[chainSelector] = chainInfo;
   }
 
@@ -69,9 +76,11 @@ contract CCIPClientBase is OwnerIsCreator {
     _;
   }
 
-  modifier validSender(bytes calldata sender) {
-    if (!s_senders[sender]) revert InvalidSender(sender);
+  modifier validSender(uint64 chainSelector, bytes calldata sender) {
+    if (!s_approvedSenders[chainSelector][sender]) revert InvalidSender(sender);
     _;
   }
+
+
 
 }
