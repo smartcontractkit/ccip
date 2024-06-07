@@ -47,10 +47,6 @@ func (f *FakeRelayerChainInteroperators) GetIDToRelayerMap() (map[types.RelayID]
 	panic("unimplemented")
 }
 
-func (f *FakeRelayerChainInteroperators) GetAll() map[types.RelayID]loop.Relayer {
-	panic("unimplemented")
-}
-
 func (f *FakeRelayerChainInteroperators) Slice() []loop.Relayer {
 	return f.Relayers
 }

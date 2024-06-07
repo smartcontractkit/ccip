@@ -97,25 +97,25 @@ func (s SrcExecProvider) Ready() error {
 }
 
 func (s SrcExecProvider) HealthReport() map[string]error {
-	return nil
+	return make(map[string]error)
 }
 
 func (s SrcExecProvider) OffchainConfigDigester() ocrtypes.OffchainConfigDigester {
 	// TODO CCIP-2494
 	// OffchainConfigDigester called on SrcExecProvider. It should only be called on DstExecProvider
-	return nil
+	return UnimplementedOffchainConfigDigester{}
 }
 
 func (s SrcExecProvider) ContractConfigTracker() ocrtypes.ContractConfigTracker {
 	// TODO CCIP-2494
 	// "ContractConfigTracker called on SrcExecProvider. It should only be called on DstExecProvider
-	return nil
+	return UnimplementedContractConfigTracker{}
 }
 
 func (s SrcExecProvider) ContractTransmitter() ocrtypes.ContractTransmitter {
 	// TODO CCIP-2494
 	// "ContractTransmitter called on SrcExecProvider. It should only be called on DstExecProvider
-	return nil
+	return UnimplementedContractTransmitter{}
 }
 
 func (s SrcExecProvider) ChainReader() commontypes.ChainReader {

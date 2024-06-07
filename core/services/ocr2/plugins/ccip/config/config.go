@@ -32,6 +32,14 @@ type CommitPluginConfig struct {
 	SourceStartBlock, DestStartBlock uint64
 }
 
+func (c CommitPluginConfig) Encode() ([]byte, error) {
+	bytes, err := json.Marshal(c)
+	if err != nil {
+		return nil, err
+	}
+	return bytes, nil
+}
+
 // DynamicPriceGetterConfig specifies which configuration to use for getting the price of tokens (map keys).
 type DynamicPriceGetterConfig struct {
 	AggregatorPrices map[common.Address]AggregatorPriceConfig `json:"aggregatorPrices"`
@@ -116,6 +124,14 @@ type ExecPluginConfig struct {
 	IsSourceProvider                 bool
 	USDCConfig                       USDCConfig
 	JobID                            string
+}
+
+func (e ExecPluginConfig) Encode() ([]byte, error) {
+	bytes, err := json.Marshal(e)
+	if err != nil {
+		return nil, err
+	}
+	return bytes, nil
 }
 
 func (uc *USDCConfig) ValidateUSDCConfig() error {

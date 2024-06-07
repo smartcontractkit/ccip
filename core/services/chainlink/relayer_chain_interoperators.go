@@ -345,10 +345,6 @@ func (rs *CoreRelayerChainInteroperators) List(filter FilterFn) RelayerChainInte
 	}
 }
 
-func (rs *CoreRelayerChainInteroperators) GetAll() map[types.RelayID]loop.Relayer {
-	return rs.loopRelayers
-}
-
 // Returns a slice of [loop.Relayer]. A typically usage pattern to is
 // use [List(criteria)].Slice() for range based operations
 func (rs *CoreRelayerChainInteroperators) Slice() []loop.Relayer {

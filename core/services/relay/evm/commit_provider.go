@@ -89,25 +89,25 @@ func (P SrcCommitProvider) Ready() error {
 }
 
 func (P SrcCommitProvider) HealthReport() map[string]error {
-	return nil
+	return make(map[string]error)
 }
 
 func (P SrcCommitProvider) OffchainConfigDigester() ocrtypes.OffchainConfigDigester {
 	// TODO CCIP-2494
 	// "OffchainConfigDigester called on SrcCommitProvider. Valid on DstCommitProvider."
-	return nil
+	return UnimplementedOffchainConfigDigester{}
 }
 
 func (P SrcCommitProvider) ContractConfigTracker() ocrtypes.ContractConfigTracker {
 	// // TODO CCIP-2494
 	// "ContractConfigTracker called on SrcCommitProvider. Valid on DstCommitProvider.")
-	return nil
+	return UnimplementedContractConfigTracker{}
 }
 
 func (P SrcCommitProvider) ContractTransmitter() ocrtypes.ContractTransmitter {
 	// // TODO CCIP-2494
 	// "ContractTransmitter called on SrcCommitProvider. Valid on DstCommitProvider."
-	return nil
+	return UnimplementedContractTransmitter{}
 }
 
 func (P SrcCommitProvider) ChainReader() commontypes.ChainReader {

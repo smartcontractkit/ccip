@@ -69,10 +69,6 @@ type relayGetter struct {
 	r *evmrelayer.Relayer
 }
 
-func (g *relayGetter) GetAll() map[types.RelayID]loop.Relayer {
-	return map[types.RelayID]loop.Relayer{}
-}
-
 func (g *relayGetter) Get(id types.RelayID) (loop.Relayer, error) {
 	return evmrelayer.NewLoopRelayServerAdapter(g.r, g.e), nil
 }
