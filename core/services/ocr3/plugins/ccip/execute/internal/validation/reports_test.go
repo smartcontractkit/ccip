@@ -2,7 +2,6 @@ package validation
 
 import (
 	"fmt"
-	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -17,12 +16,14 @@ func Test_CommitReportValidator_ExecutePluginCommitData(t *testing.T) {
 		name    string
 		min     int
 		reports []cciptypes.ExecutePluginCommitData
-		want    []cciptypes.ExecutePluginCommitData
+		valid   []cciptypes.ExecutePluginCommitData
+		invalid []cciptypes.ExecutePluginCommitData
 		wantErr assert.ErrorAssertionFunc
 	}{
 		{
 			name:    "empty",
-			want:    nil,
+			valid:   nil,
+			invalid: nil,
 			wantErr: assert.NoError,
 		},
 		{
@@ -31,9 +32,10 @@ func Test_CommitReportValidator_ExecutePluginCommitData(t *testing.T) {
 			reports: []cciptypes.ExecutePluginCommitData{
 				{MerkleRoot: [32]byte{1}},
 			},
-			want: []cciptypes.ExecutePluginCommitData{
+			valid: []cciptypes.ExecutePluginCommitData{
 				{MerkleRoot: [32]byte{1}},
 			},
+			invalid: nil,
 			wantErr: assert.NoError,
 		},
 		{
@@ -42,7 +44,10 @@ func Test_CommitReportValidator_ExecutePluginCommitData(t *testing.T) {
 			reports: []cciptypes.ExecutePluginCommitData{
 				{MerkleRoot: [32]byte{1}},
 			},
-			want:    nil,
+			valid: nil,
+			invalid: []cciptypes.ExecutePluginCommitData{
+				{MerkleRoot: [32]byte{1}},
+			},
 			wantErr: assert.NoError,
 		},
 		{
@@ -55,9 +60,12 @@ func Test_CommitReportValidator_ExecutePluginCommitData(t *testing.T) {
 				{MerkleRoot: [32]byte{1}},
 				{MerkleRoot: [32]byte{2}},
 			},
-			want: []cciptypes.ExecutePluginCommitData{
+			valid: []cciptypes.ExecutePluginCommitData{
 				{MerkleRoot: [32]byte{1}},
 				{MerkleRoot: [32]byte{2}},
+			},
+			invalid: []cciptypes.ExecutePluginCommitData{
+				{MerkleRoot: [32]byte{3}},
 			},
 			wantErr: assert.NoError,
 		},
@@ -71,8 +79,13 @@ func Test_CommitReportValidator_ExecutePluginCommitData(t *testing.T) {
 				{MerkleRoot: [32]byte{1}, BlockNum: 4},
 				{MerkleRoot: [32]byte{1}, BlockNum: 1},
 			},
-			want: []cciptypes.ExecutePluginCommitData{
+			valid: []cciptypes.ExecutePluginCommitData{
 				{MerkleRoot: [32]byte{1}, BlockNum: 1},
+			},
+			invalid: []cciptypes.ExecutePluginCommitData{
+				{MerkleRoot: [32]byte{1}, BlockNum: 2},
+				{MerkleRoot: [32]byte{1}, BlockNum: 3},
+				{MerkleRoot: [32]byte{1}, BlockNum: 4},
 			},
 			wantErr: assert.NoError,
 		},
@@ -87,8 +100,14 @@ func Test_CommitReportValidator_ExecutePluginCommitData(t *testing.T) {
 				{MerkleRoot: [32]byte{1}, ExecutedMessages: []cciptypes.SeqNum{5, 6}},
 				{MerkleRoot: [32]byte{1}, ExecutedMessages: []cciptypes.SeqNum{1, 2}},
 			},
-			want: []cciptypes.ExecutePluginCommitData{
+			valid: []cciptypes.ExecutePluginCommitData{
 				{MerkleRoot: [32]byte{1}, ExecutedMessages: []cciptypes.SeqNum{1, 2}},
+			},
+			invalid: []cciptypes.ExecutePluginCommitData{
+				{MerkleRoot: [32]byte{1}, ExecutedMessages: []cciptypes.SeqNum{2, 3}},
+				{MerkleRoot: [32]byte{1}, ExecutedMessages: []cciptypes.SeqNum{3, 4}},
+				{MerkleRoot: [32]byte{1}, ExecutedMessages: []cciptypes.SeqNum{4, 5}},
+				{MerkleRoot: [32]byte{1}, ExecutedMessages: []cciptypes.SeqNum{5, 6}},
 			},
 			wantErr: assert.NoError,
 		},
@@ -98,55 +117,68 @@ func Test_CommitReportValidator_ExecutePluginCommitData(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			// Initialize the validator
+			// Initialize the minObservationValidator
 			idFunc := func(data cciptypes.ExecutePluginCommitData) [32]byte {
 				return sha3.Sum256([]byte(fmt.Sprintf("%v", data)))
 			}
-			validator := NewValidator[cciptypes.ExecutePluginCommitData](tt.min, idFunc)
+			validator := NewMinObservationValidator[cciptypes.ExecutePluginCommitData](tt.min, idFunc)
 			for _, report := range tt.reports {
-				err := validator.AddReport(report)
+				err := validator.Add(report)
 				require.NoError(t, err)
 			}
 
 			// Test the results
-			got, err := validator.GetValidatedReports()
-			if !tt.wantErr(t, err, "GetValidatedReports()") {
+			got, err := validator.GetValid()
+			if !tt.wantErr(t, err, "GetValid()") {
 				return
 			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("GetValidatedReports() = %v, want %v", got, tt.want)
+			if !assert.ElementsMatch(t, got, tt.valid) {
+				t.Errorf("GetValid() = %v, valid %v", got, tt.valid)
+			}
+
+			got2, err2 := validator.GetInvalid()
+			require.NoError(t, err2)
+			if !assert.ElementsMatch(t, got2, tt.invalid) {
+				t.Errorf("GetInvalid() = %v, valid %v", got2, tt.invalid)
 			}
 		})
 	}
 }
 
-// Simple test to make sure the template works
 func Test_CommitReportValidator_Generics(t *testing.T) {
 	type Generic struct {
 		number int
 	}
 
-	// Initialize the validator
+	// Initialize the minObservationValidator
 	idFunc := func(data Generic) [32]byte {
 		return sha3.Sum256([]byte(fmt.Sprintf("%v", data)))
 	}
-	validator := NewValidator[Generic](2, idFunc)
+	validator := NewMinObservationValidator[Generic](2, idFunc)
 
 	wantValue := Generic{number: 1}
+	otherValue := Generic{number: 2}
 
-	err := validator.AddReport(wantValue)
+	err := validator.Add(wantValue)
 	require.NoError(t, err)
-	err = validator.AddReport(wantValue)
+	err = validator.Add(wantValue)
 	require.NoError(t, err)
-	err = validator.AddReport(Generic{number: 2})
+	err = validator.Add(otherValue)
 	require.NoError(t, err)
 
 	// Test the results
-	got, err := validator.GetValidatedReports()
-	require.NoError(t, err)
 
-	want := []Generic{wantValue}
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("GetValidatedReports() = %v, want %v", got, want)
+	wantValid := []Generic{wantValue}
+	got, err := validator.GetValid()
+	require.NoError(t, err)
+	if !assert.ElementsMatch(t, got, wantValid) {
+		t.Errorf("GetValid() = %v, valid %v", got, wantValid)
+	}
+
+	wantInvalid := []Generic{otherValue}
+	got2, err2 := validator.GetInvalid()
+	require.NoError(t, err2)
+	if !assert.ElementsMatch(t, got2, wantInvalid) {
+		t.Errorf("GetValid() = %v, valid %v", got, wantValid)
 	}
 }

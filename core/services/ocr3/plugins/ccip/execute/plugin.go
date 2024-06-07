@@ -195,12 +195,12 @@ func validatedCommitObservations(aos []decodedAttributedObservation, fChain map[
 	// Ensure f_Chain observations for all.
 
 	// Create a validator for each chain
-	validators := make(map[cciptypes.ChainSelector]validation.Validator[cciptypes.ExecutePluginCommitData])
+	validators := make(map[cciptypes.ChainSelector]validation.MinObservationFilter[cciptypes.ExecutePluginCommitData])
 	idFunc := func(data cciptypes.ExecutePluginCommitData) [32]byte {
 		return sha3.Sum256([]byte(fmt.Sprintf("%v", data)))
 	}
 	for selector, f := range fChain {
-		validators[selector] = validation.NewValidator[cciptypes.ExecutePluginCommitData](2*f+1, idFunc)
+		validators[selector] = validation.NewMinObservationValidator[cciptypes.ExecutePluginCommitData](2*f+1, idFunc)
 	}
 
 	// Need some sort of cache to store the reports, there could be invalid reports, so we need to keep a tally
@@ -214,7 +214,7 @@ func validatedCommitObservations(aos []decodedAttributedObservation, fChain map[
 			}
 			// Add reports
 			for _, commitReport := range commitReports {
-				if err := validator.AddReport(commitReport); err != nil {
+				if err := validator.Add(commitReport); err != nil {
 					return cciptypes.ExecutePluginCommitObservations{}, err
 				}
 			}
@@ -224,7 +224,7 @@ func validatedCommitObservations(aos []decodedAttributedObservation, fChain map[
 	results := make(cciptypes.ExecutePluginCommitObservations)
 	for selector, validator := range validators {
 		var err error
-		results[selector], err = validator.GetValidatedReports()
+		results[selector], err = validator.GetValid()
 		if err != nil {
 			return cciptypes.ExecutePluginCommitObservations{}, err
 		}
