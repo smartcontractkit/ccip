@@ -238,6 +238,49 @@ func (p *PriceRegistry) GetGasPriceUpdatesCreatedAfter(ctx context.Context, chai
 	return res, nil
 }
 
+func (p *PriceRegistry) GetAllGasPriceUpdatesCreatedAfter(ctx context.Context, ts time.Time, confs int) ([]cciptypes.GasPriceUpdateWithTxMeta, error) {
+	logs, err := p.lp.LogsCreatedAfter(
+		ctx,
+		p.gasUpdated,
+		p.address,
+		ts,
+		logpoller.Confirmations(confs),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	parsedLogs, err := ccipdata.ParseLogs[cciptypes.GasPriceUpdate](
+		logs,
+		p.lggr,
+		func(log types.Log) (*cciptypes.GasPriceUpdate, error) {
+			p, err1 := p.priceRegistry.ParseUsdPerUnitGasUpdated(log)
+			if err1 != nil {
+				return nil, err1
+			}
+			return &cciptypes.GasPriceUpdate{
+				GasPrice: cciptypes.GasPrice{
+					DestChainSelector: p.DestChain,
+					Value:             p.Value,
+				},
+				TimestampUnixSec: p.Timestamp,
+			}, nil
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	res := make([]cciptypes.GasPriceUpdateWithTxMeta, 0, len(parsedLogs))
+	for _, log := range parsedLogs {
+		res = append(res, cciptypes.GasPriceUpdateWithTxMeta{
+			TxMeta:         log.TxMeta,
+			GasPriceUpdate: log.Data,
+		})
+	}
+	return res, nil
+}
+
 func (p *PriceRegistry) GetTokensDecimals(ctx context.Context, tokenAddresses []cciptypes.Address) ([]uint8, error) {
 	evmAddrs, err := ccipcalc.GenericAddrsToEvm(tokenAddresses...)
 	if err != nil {
