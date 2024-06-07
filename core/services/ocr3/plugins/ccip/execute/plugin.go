@@ -185,15 +185,52 @@ func (p *Plugin) ObservationQuorum(outctx ocr3types.OutcomeContext, query types.
 	return ocr3types.QuorumFPlusOne, nil
 }
 
+func validateMessageObservations(aos []decodedAttributedObservation, fChain map[cciptypes.ChainSelector]int) (cciptypes.ExecutePluginMessageObservations, error) {
+	// Create a validator for each chain
+	validators := make(map[cciptypes.ChainSelector]validation.MinObservationFilter[cciptypes.CCIPMsgBaseDetails])
+	idFunc := func(data cciptypes.CCIPMsgBaseDetails) [32]byte {
+		return sha3.Sum256([]byte(fmt.Sprintf("%v", data)))
+	}
+	for selector, f := range fChain {
+		validators[selector] = validation.NewMinObservationValidator[cciptypes.CCIPMsgBaseDetails](2*f+1, idFunc)
+	}
+
+	// Add messages to the validator for each chain selector.
+	for _, ao := range aos {
+		for selector, messages := range ao.Observation.Messages {
+			validator, ok := validators[selector]
+			if !ok {
+				return cciptypes.ExecutePluginMessageObservations{}, fmt.Errorf("no validator for chain %d", selector)
+			}
+			// Add reports
+			for num, msg := range messages {
+				if err := validator.Add(cciptypes.CCIPMsgBaseDetails{ID: msg, SeqNum: num}); err != nil {
+					return cciptypes.ExecutePluginMessageObservations{}, err
+				}
+			}
+		}
+	}
+
+	results := make(cciptypes.ExecutePluginMessageObservations)
+	for selector, validator := range validators {
+		msgs, err := validator.GetValid()
+		if err != nil {
+			return cciptypes.ExecutePluginMessageObservations{}, err
+		}
+		if _, ok := results[selector]; !ok {
+			results[selector] = make(map[cciptypes.SeqNum]cciptypes.Bytes32)
+		}
+		for _, msg := range msgs {
+			results[selector][msg.SeqNum] = msg.ID
+		}
+	}
+
+	return results, nil
+}
+
 // validatedCommitObservations merges all observations which reach the fChain threshold into a single result.
 // Any observations, or subsets of observations, which do not reach the threshold are ignored.
 func validatedCommitObservations(aos []decodedAttributedObservation, fChain map[cciptypes.ChainSelector]int) (cciptypes.ExecutePluginCommitObservations, error) {
-	// TODO: validate and merge decoded observations into a single observation.
-
-	// Merge commit reports.
-	// Merge messages.
-	// Ensure f_Chain observations for all.
-
 	// Create a validator for each chain
 	validators := make(map[cciptypes.ChainSelector]validation.MinObservationFilter[cciptypes.ExecutePluginCommitData])
 	idFunc := func(data cciptypes.ExecutePluginCommitData) [32]byte {
@@ -203,9 +240,7 @@ func validatedCommitObservations(aos []decodedAttributedObservation, fChain map[
 		validators[selector] = validation.NewMinObservationValidator[cciptypes.ExecutePluginCommitData](2*f+1, idFunc)
 	}
 
-	// Need some sort of cache to store the reports, there could be invalid reports, so we need to keep a tally
-	// of all versions to figure out which one is the most common and whether or not there are fChain observations.
-	// TODO: this may be easier if executions were stored separately from the reports.
+	// Add reports to the validator for each chain selector.
 	for _, ao := range aos {
 		for selector, commitReports := range ao.Observation.CommitReports {
 			validator, ok := validators[selector]
@@ -248,6 +283,11 @@ func (p *Plugin) Outcome(outctx ocr3types.OutcomeContext, query types.Query, aos
 		return ocr3types.Outcome{}, err
 	}
 
+	mergedMessageObservations, err := validateMessageObservations(decodedObservations, p.cfg.FChain)
+	if err != nil {
+		return ocr3types.Outcome{}, err
+	}
+
 	// TODO: flatten results and sort by timestamp
 
 	// TODO: validatedMessageObservations
@@ -255,6 +295,7 @@ func (p *Plugin) Outcome(outctx ocr3types.OutcomeContext, query types.Query, aos
 	// add reports one by one into the outcome until
 
 	fmt.Println(mergedCommitObservations, err)
+	fmt.Println(mergedMessageObservations, err)
 
 	// Reports from previous outcome
 	previousOutcome, err := cciptypes.DecodeExecutePluginOutcome(outctx.PreviousOutcome)
