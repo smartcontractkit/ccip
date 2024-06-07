@@ -71,7 +71,7 @@ type ObserverInfo struct {
 
 // TODO: Add all following
 
-type CommitConsensusConfig struct {
+type ConsensusObservation struct {
 	// FChain defines the FChain value for each chain. FChain is used while forming consensus based on the observations.
 	FChain map[ChainSelector]int `json:"fChain"`
 	// PricedTokens is a list of tokens that we want to submit price updates for.
@@ -80,7 +80,7 @@ type CommitConsensusConfig struct {
 	NodeSupportedChains map[commontypes.OracleID]SupportedChains `json:"nodeSupportedChains"`
 }
 
-func (c CommitConsensusConfig) Validate() error {
+func (c ConsensusObservation) Validate() error {
 	for _, inf := range c.NodeSupportedChains {
 		for ch := range inf.Supported.Iter() {
 			if _, ok := c.FChain[ch]; !ok {

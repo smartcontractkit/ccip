@@ -15,10 +15,12 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	//cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+	//cciptypes "github.com/smartcontractkit/ccipocr3/ccipocr3-dont-merge"
 )
 
 // observeMaxSeqNums finds the maximum committed sequence numbers for each source chain.
+// Plugin should be able to observe the max sequence numbers even if it can't read the source chain.
+// This will be used to reach consensus on the observed seqNums and if plugin can read dest chain it should be able to contribute to the observation.
 // If a sequence number is pending (is not on-chain yet), it will be included in the results.
 func observeMaxSeqNums(
 	ctx context.Context,
@@ -165,6 +167,8 @@ func observeTokenPrices(
 	return tokenPricesUSD, nil
 }
 
+// Plugin should be able to observe the max sequence numbers even if it can't read the source chain.
+// This will be used to reach consensus on the observed seqNums and if plugin can read dest chain it should be able to contribute to the observation.
 func observeGasPrices(ctx context.Context, ccipReader cciptypes.CCIPReader, chains []cciptypes.ChainSelector) ([]cciptypes.GasPriceChain, error) {
 	if len(chains) == 0 {
 		return nil, nil
@@ -204,6 +208,7 @@ func newMsgsConsensus(
 	// Gather all messages from all observations.
 	msgsFromObservations := make([]cciptypes.CCIPMsgBaseDetails, 0)
 	for _, obs := range observations {
+		//TODO: Make sure that the observer can read the chain
 		msgsFromObservations = append(msgsFromObservations, obs.NewMsgs...)
 	}
 	lggr.Debugw("total observed messages across all followers", "msgs", len(msgsFromObservations))
@@ -474,16 +479,16 @@ func gasPricesConsensus(lggr logger.Logger, observations []cciptypes.CommitPlugi
 // pluginConfigConsensus comes to consensus on the plugin config based on the observations.
 // We cannot trust the state of a single follower, so we need to come to consensus on the config.
 func pluginConfigConsensus(
-	baseCfg cciptypes.CommitPluginConfig, // the config of the follower calling this function
+	destinationChain cciptypes.ChainSelector,
 	observations []cciptypes.CommitPluginObservation, // observations from all followers
-) cciptypes.CommitConsensusConfig {
-	consensusCfg := cciptypes.CommitConsensusConfig{}
+) cciptypes.ConsensusObservation {
+	consensusCfg := cciptypes.ConsensusObservation{}
 
 	// Come to consensus on fChain.
 	// Use the fChain observed by most followers for each chain.
 	fChainCounts := make(map[cciptypes.ChainSelector]map[int]int) // {chain: {fChain: count}}
 	for _, obs := range observations {
-		for chain, fChain := range obs.HomeChainConfig.FChain {
+		for chain, fChain := range obs.ConsensusObservation.FChain {
 			if _, exists := fChainCounts[chain]; !exists {
 				fChainCounts[chain] = make(map[int]int)
 			}
@@ -506,46 +511,19 @@ func pluginConfigConsensus(
 	// We want to keep the tokens observed by at least 2f_chain+1 followers.
 	feeTokensCounts := make(map[types.Account]int)
 	for _, obs := range observations {
-		for _, token := range obs.PluginConfig.PricedTokens {
+		for _, token := range obs.ConsensusObservation.PricedTokens {
 			feeTokensCounts[token]++
 		}
 	}
 	consensusFeeTokens := make([]types.Account, 0)
 	for token, count := range feeTokensCounts {
-		if count >= 2*consensusCfg.FChain[baseCfg.DestChain]+1 {
+		if count >= 2*consensusCfg.FChain[destinationChain]+1 {
 			consensusFeeTokens = append(consensusFeeTokens, token)
 		}
 	}
 	consensusCfg.PricedTokens = consensusFeeTokens
 
-	//TODO Do we still want to have consensus on readers given that homeChainConfig will be updated regularly with latest state anyways?
-
-	// Come to consensus on reading observers.
-	// An observer can read a chain only if at least 2f_chain+1 followers observed that.
-	//observerReadChainsCounts := make(map[commontypes.OracleID]map[cciptypes.ChainSelector]int)
-	//for _, obs := range observations {
-	//	for observer, info := range obs.PluginConfig.ObserverInfo {
-	//		if _, exists := observerReadChainsCounts[observer]; !exists {
-	//			observerReadChainsCounts[observer] = make(map[cciptypes.ChainSelector]int)
-	//		}
-	//		for _, chain := range info.Reads {
-	//			observerReadChainsCounts[observer][chain]++
-	//		}
-	//	}
-	//}
-	//consensusObserverInfo := make(map[commontypes.OracleID]cciptypes.ObserverInfo)
-	//for observer, chainCounts := range observerReadChainsCounts {
-	//	observerReadChains := make([]cciptypes.ChainSelector, 0)
-	//	for chain, count := range chainCounts {
-	//		if count >= 2*consensusCfg.FChain[baseCfg.DestChain]+1 {
-	//			observerReadChains = append(observerReadChains, chain)
-	//		}
-	//	}
-	//	nodeSupportedChains := consensusCfg.ObserverInfo[observer]
-	//	nodeSupportedChains.Reads = observerReadChains
-	//	consensusObserverInfo[observer] = nodeSupportedChains
-	//}
-
+	// TODO: Do consensus on NodeSupportedChains
 	return consensusCfg
 }
 

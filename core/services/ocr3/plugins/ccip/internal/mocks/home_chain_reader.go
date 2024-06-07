@@ -1,6 +1,5 @@
 package mocks
 
-import "C"
 import (
 	"context"
 	"fmt"

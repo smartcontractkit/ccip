@@ -18,7 +18,7 @@ import (
 	"github.com/stretchr/testify/mock"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	//cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+	//cciptypes "github.com/smartcontractkit/ccipocr3/ccipocr3-dont-merge"
 )
 
 func Test_observeMaxSeqNumsPerChain(t *testing.T) {

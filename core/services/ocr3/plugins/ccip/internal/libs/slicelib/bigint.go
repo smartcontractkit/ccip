@@ -4,7 +4,7 @@ import (
 	"sort"
 
 	cciptypes "github.com/smartcontractkit/ccipocr3/ccipocr3-dont-merge"
-	//cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+	//cciptypes "github.com/smartcontractkit/ccipocr3/ccipocr3-dont-merge"
 )
 
 // BigIntSortedMiddle returns the middle number after sorting the provided numbers. nil is returned if the provided slice is empty.

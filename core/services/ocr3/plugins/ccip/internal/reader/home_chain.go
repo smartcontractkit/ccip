@@ -42,6 +42,10 @@ func (r *HomeChainConfigPoller) GetConfig() cciptypes.HomeChainConfig {
 	return r.homeChainConfig
 }
 
+func (r *HomeChainConfigPoller) GetSupportedChains(oracleID commontypes.OracleID) mapset.Set[cciptypes.ChainSelector] {
+	return r.homeChainConfig.NodeSupportedChains[oracleID].Supported
+}
+
 func (r *HomeChainConfigPoller) fetchLatestConfig(ctx context.Context) (cciptypes.HomeChainConfig, error) {
 	println("Fetching latest config")
 	var onChainCapabilityConfig []cciptypes.OnChainCapabilityConfig
@@ -50,7 +54,7 @@ func (r *HomeChainConfigPoller) fetchLatestConfig(ctx context.Context) (cciptype
 		return cciptypes.HomeChainConfig{}, err
 	}
 
-	homeChainConfig, err := r.ConvertOnChainConfigToHomeChainConfig(onChainCapabilityConfig)
+	homeChainConfig, err := r.convertOnChainConfigToHomeChainConfig(onChainCapabilityConfig)
 	if err != nil {
 		return cciptypes.HomeChainConfig{}, err
 	}
@@ -62,7 +66,7 @@ func (r *HomeChainConfigPoller) Close(ctx context.Context) error {
 	return nil
 }
 
-func (r *HomeChainConfigPoller) ConvertOnChainConfigToHomeChainConfig(capabilityConfigs []cciptypes.OnChainCapabilityConfig) (cciptypes.HomeChainConfig, error) {
+func (r *HomeChainConfigPoller) convertOnChainConfigToHomeChainConfig(capabilityConfigs []cciptypes.OnChainCapabilityConfig) (cciptypes.HomeChainConfig, error) {
 	var fChain = make(map[cciptypes.ChainSelector]int)
 	// NodeSupportedChains is a map of oracle IDs to SupportedChains.
 	var nodeSupportedChains = make(map[commontypes.OracleID]cciptypes.SupportedChains)

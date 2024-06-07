@@ -5,12 +5,12 @@ import (
 	"testing"
 	"time"
 
+	cciptypes "github.com/smartcontractkit/ccipocr3/ccipocr3-dont-merge"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
 	"github.com/smartcontractkit/ccipocr3/internal/mocks"
-
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+	//cciptypes "github.com/smartcontractkit/ccipocr3/ccipocr3-dont-merge"
 )
 
 func Test_getPendingExecutedReports(t *testing.T) {

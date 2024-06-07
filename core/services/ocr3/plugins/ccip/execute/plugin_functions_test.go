@@ -8,7 +8,7 @@ import (
 
 	"github.com/smartcontractkit/libocr/commontypes"
 
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+	cciptypes "github.com/smartcontractkit/ccipocr3/ccipocr3-dont-merge"
 )
 
 func Test_validateObserverReadingEligibility(t *testing.T) {

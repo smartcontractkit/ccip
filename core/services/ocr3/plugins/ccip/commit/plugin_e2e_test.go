@@ -16,7 +16,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	//cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+	//cciptypes "github.com/smartcontractkit/ccipocr3/ccipocr3-dont-merge"
 )
 
 func TestPlugin(t *testing.T) {
@@ -312,6 +312,7 @@ func newNode(ctx context.Context, t *testing.T, lggr logger.Logger, id int, cfg 
 	priceReader := mocks.NewTokenPricesReader()
 	reportCodec := mocks.NewCommitPluginJSONReportCodec()
 	msgHasher := mocks.NewMessageHasher()
+	homeChainPoller := mocks.NewHomeChainPollerMock(homeChainConfig)
 
 	node1 := NewPlugin(
 		context.Background(),
@@ -322,7 +323,7 @@ func newNode(ctx context.Context, t *testing.T, lggr logger.Logger, id int, cfg 
 		reportCodec,
 		msgHasher,
 		lggr,
-		homeChainConfig,
+		homeChainPoller,
 	)
 
 	return nodeSetup{

@@ -4,7 +4,7 @@ import (
 	"context"
 
 	cciptypes "github.com/smartcontractkit/ccipocr3/ccipocr3-dont-merge"
-	//cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+	//cciptypes "github.com/smartcontractkit/ccipocr3/ccipocr3-dont-merge"
 )
 
 type MessageHasher struct{}

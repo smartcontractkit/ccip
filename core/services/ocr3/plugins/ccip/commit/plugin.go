@@ -14,7 +14,7 @@ import (
 
 	cciptypes "github.com/smartcontractkit/ccipocr3/ccipocr3-dont-merge"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	//cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+	//cciptypes "github.com/smartcontractkit/ccipocr3/ccipocr3-dont-merge"
 )
 
 // Plugin implements the main ocr3 ccip commit plugin logic.
@@ -28,13 +28,7 @@ type Plugin struct {
 	msgHasher         cciptypes.MessageHasher
 	lggr              logger.Logger
 
-	homeChainConfig cciptypes.HomeChainConfig
-	//homeChainReader *reader.HomeChainReader
-
-	// readableChains is the set of chains that the plugin can read from.
-	readableChains mapset.Set[cciptypes.ChainSelector]
-	// knownSourceChains is the set of chains that the plugin knows about.
-	knownSourceChains mapset.Set[cciptypes.ChainSelector]
+	homeChainPoller cciptypes.HomeChainPoller
 }
 
 // TODO: background service for home chain config polling
@@ -48,17 +42,10 @@ func NewPlugin(
 	reportCodec cciptypes.CommitPluginCodec,
 	msgHasher cciptypes.MessageHasher,
 	lggr logger.Logger,
-	homeChainConfig cciptypes.HomeChainConfig,
-	// homeChainReader *reader.HomeChainReader,
+	homeChainPoller cciptypes.HomeChainPoller,
 ) *Plugin {
-	//homeChainCfg, _ := homeChainReader.FetchLatestConfig(ctx)
-
-	knownSourceChains := mapset.NewSet[cciptypes.ChainSelector]()
-	for _, inf := range homeChainConfig.NodeSupportedChains {
-		knownSourceChains = knownSourceChains.Union(inf.Supported)
-	}
-
-	// TODO create homeChainReader and run StartPolling with homeChainConfig
+	// Start polling the home chain config in the background every 6 minutes
+	go homeChainPoller.StartPolling(ctx, 360*time.Second)
 
 	return &Plugin{
 		nodeID:            nodeID,
@@ -68,10 +55,7 @@ func NewPlugin(
 		reportCodec:       reportCodec,
 		msgHasher:         msgHasher,
 		lggr:              lggr,
-		homeChainConfig:   homeChainConfig,
-
-		readableChains:    homeChainConfig.GetSupportedChains(nodeID),
-		knownSourceChains: knownSourceChains,
+		homeChainPoller:   homeChainPoller,
 	}
 }
 
@@ -104,12 +88,14 @@ func (p *Plugin) Query(_ context.Context, _ ocr3types.OutcomeContext) (types.Que
 //	We discover the token prices only for the tokens that are used to pay for ccip fees.
 //	The fee tokens are configured in the plugin config.
 func (p *Plugin) Observation(ctx context.Context, outctx ocr3types.OutcomeContext, _ types.Query) (types.Observation, error) {
+	homeChainConfig := p.homeChainPoller.GetConfig()
+	supportedChains := homeChainConfig.GetSupportedChains(p.nodeID)
 	maxSeqNumsPerChain, err := observeMaxSeqNums(
 		ctx,
 		p.lggr,
 		p.ccipReader,
 		outctx.PreviousOutcome,
-		p.readableChains,
+		supportedChains,
 		p.cfg.DestChain,
 		p.knownSourceChainsSlice(),
 	)
@@ -122,7 +108,7 @@ func (p *Plugin) Observation(ctx context.Context, outctx ocr3types.OutcomeContex
 		p.lggr,
 		p.ccipReader,
 		p.msgHasher,
-		p.readableChains,
+		supportedChains,
 		maxSeqNumsPerChain,
 		p.cfg.NewMsgScanBatchSize,
 	)
@@ -154,13 +140,19 @@ func (p *Plugin) Observation(ctx context.Context, outctx ocr3types.OutcomeContex
 		"gasPrices", len(gasPrices),
 		"tokenPrices", len(tokenPrices),
 		"maxSeqNumsPerChain", maxSeqNumsPerChain,
-		"nodeSupportedChains", p.homeChainConfig.NodeSupportedChains)
+		"nodeSupportedChains", homeChainConfig)
 
 	msgBaseDetails := make([]cciptypes.CCIPMsgBaseDetails, 0)
 	for _, msg := range newMsgs {
 		msgBaseDetails = append(msgBaseDetails, msg.CCIPMsgBaseDetails)
 	}
-	return cciptypes.NewCommitPluginObservation(msgBaseDetails, gasPrices, tokenPrices, maxSeqNumsPerChain, p.cfg, p.homeChainConfig).Encode()
+
+	consensusObservation := cciptypes.ConsensusObservation{
+		FChain:              homeChainConfig.FChain,
+		PricedTokens:        p.cfg.PricedTokens,
+		NodeSupportedChains: homeChainConfig.NodeSupportedChains,
+	}
+	return cciptypes.NewCommitPluginObservation(msgBaseDetails, gasPrices, tokenPrices, maxSeqNumsPerChain, consensusObservation).Encode()
 
 }
 
@@ -174,7 +166,10 @@ func (p *Plugin) ValidateObservation(_ ocr3types.OutcomeContext, _ types.Query, 
 		return fmt.Errorf("validate sequence numbers: %w", err)
 	}
 
-	if err := validateObserverReadingEligibility(ao.Observer, obs.NewMsgs, p.homeChainConfig.NodeSupportedChains); err != nil {
+	homeChainConfig := p.homeChainPoller.GetConfig()
+
+	// TODO: This doesn't compare consensus observation with the home chain config's NodeSupportedChains
+	if err := validateObserverReadingEligibility(ao.Observer, obs.NewMsgs, homeChainConfig.NodeSupportedChains); err != nil {
 		return fmt.Errorf("validate observer %d reading eligibility: %w", ao.Observer, err)
 	}
 
@@ -186,8 +181,8 @@ func (p *Plugin) ValidateObservation(_ ocr3types.OutcomeContext, _ types.Query, 
 		return fmt.Errorf("validate gas prices: %w", err)
 	}
 
-	if err := obs.PluginConfig.Validate(); err != nil {
-		return fmt.Errorf("validate plugin config: %w", err)
+	if err := obs.ConsensusObservation.Validate(); err != nil {
+		return fmt.Errorf("validate consensus observation: %w", err)
 	}
 
 	return nil
@@ -214,7 +209,7 @@ func (p *Plugin) Outcome(_ ocr3types.OutcomeContext, _ types.Query, aos []types.
 		decodedObservations = append(decodedObservations, obs)
 	}
 
-	consensusCfg := pluginConfigConsensus(p.cfg, decodedObservations)
+	consensusCfg := pluginConfigConsensus(p.cfg.DestChain, decodedObservations)
 	p.lggr.Debugw("plugin config follower state", "pluginConfig", p.cfg)
 	p.lggr.Debugw("plugin config after consensus", "pluginConfig", consensusCfg)
 	if err := consensusCfg.Validate(); err != nil {
@@ -240,7 +235,7 @@ func (p *Plugin) Outcome(_ ocr3types.OutcomeContext, _ types.Query, aos []types.
 		return ocr3types.Outcome{}, fmt.Errorf("token prices consensus: %w", err)
 	}
 
-	gasPrices := gasPricesConsensus(p.lggr, decodedObservations, consensusCfg.FChain[p.cfg.DestChain])
+	gasPrices := gasPricesConsensus(p.lggr, decodedObservations, fChainDest)
 	p.lggr.Debugw("gas prices consensus", "gasPrices", gasPrices)
 
 	outcome := cciptypes.NewCommitPluginOutcome(maxSeqNums, merkleRoots, tokenPrices, gasPrices)
@@ -291,7 +286,8 @@ func (p *Plugin) ShouldAcceptAttestedReport(ctx context.Context, u uint64, r ocr
 }
 
 func (p *Plugin) ShouldTransmitAcceptedReport(ctx context.Context, u uint64, r ocr3types.ReportWithInfo[[]byte]) (bool, error) {
-	if !p.homeChainConfig.IsSupported(p.nodeID, p.cfg.DestChain) {
+	homeChainConfig := p.homeChainPoller.GetConfig()
+	if !homeChainConfig.IsSupported(p.nodeID, p.cfg.DestChain) {
 		p.lggr.Debugw("not a writer, skipping report transmission")
 		return false, nil
 	}
@@ -322,8 +318,14 @@ func (p *Plugin) Close() error {
 	return nil
 }
 
+// TODO: Have a knownSourceChains field in HomeChainConfig that gets updated in the background as well
 func (p *Plugin) knownSourceChainsSlice() []cciptypes.ChainSelector {
-	knownSourceChainsSlice := p.knownSourceChains.ToSlice()
+	knownSourceChains := mapset.NewSet[cciptypes.ChainSelector]()
+	homeChainConfig := p.homeChainPoller.GetConfig()
+	for _, inf := range homeChainConfig.NodeSupportedChains {
+		knownSourceChains = knownSourceChains.Union(inf.Supported)
+	}
+	knownSourceChainsSlice := knownSourceChains.ToSlice()
 	sort.Slice(knownSourceChainsSlice, func(i, j int) bool { return knownSourceChainsSlice[i] < knownSourceChainsSlice[j] })
 	return slicelib.Filter(knownSourceChainsSlice, func(ch cciptypes.ChainSelector) bool { return ch != p.cfg.DestChain })
 }

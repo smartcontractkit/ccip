@@ -92,7 +92,7 @@ func Test_ConvertOnChainConfigToHomeChainConfig(t *testing.T) {
 			},
 		}
 		t.Run(tc.name, func(t *testing.T) {
-			resultConfig, err := configPoller.ConvertOnChainConfigToHomeChainConfig(tc.onChainConfigs)
+			resultConfig, err := configPoller.convertOnChainConfigToHomeChainConfig(tc.onChainConfigs)
 			assert.NoError(t, err)
 			assert.Equal(t, tc.homeChainConfig, resultConfig)
 		})

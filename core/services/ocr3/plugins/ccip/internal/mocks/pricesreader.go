@@ -7,7 +7,7 @@ import (
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	"github.com/stretchr/testify/mock"
 
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+	cciptypes "github.com/smartcontractkit/ccipocr3/ccipocr3-dont-merge"
 )
 
 type TokenPricesReader struct {

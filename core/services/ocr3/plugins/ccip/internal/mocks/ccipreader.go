@@ -6,7 +6,7 @@ import (
 
 	cciptypes "github.com/smartcontractkit/ccipocr3/ccipocr3-dont-merge"
 	"github.com/stretchr/testify/mock"
-	//cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+	//cciptypes "github.com/smartcontractkit/ccipocr3/ccipocr3-dont-merge"
 )
 
 type CCIPReader struct {

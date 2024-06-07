@@ -7,7 +7,7 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"google.golang.org/grpc"
 
-	//cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+	//cciptypes "github.com/smartcontractkit/ccipocr3/ccipocr3-dont-merge"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 )
 
@@ -54,7 +54,7 @@ func (p PluginFactory) NewReportingPlugin(config ocr3types.ReportingPluginConfig
 		nil,
 		nil,
 		nil,
-		cciptypes.HomeChainConfig{},
+		nil,
 	), ocr3types.ReportingPluginInfo{}, nil
 }
 
