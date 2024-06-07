@@ -617,7 +617,7 @@ func (ccipModule *CCIPCommon) UpdateTokenPricesAtRegularInterval(ctx context.Con
 // SyncUSDCDomain makes domain updates to Source usdc pool domain with -
 // 1. USDC domain from destination chain's token transmitter contract
 // 2. Destination pool address as allowed caller
-func (ccipModule *CCIPCommon) SyncUSDCDomain(destTransmitter *contracts.TokenTransmitter, destPoolAddr []common.Address, destChainID uint64) error {
+func (ccipModule *CCIPCommon) SyncUSDCDomain(destTransmitter *contracts.TokenTransmitter, destPoolAddr []common.Address, destChainID uint64, offRamp common.Address) error {
 	// if not USDC new deployment, return
 	// if existing deployment, consider that no syncing is required and return
 	if ccipModule.ExistingDeployment || !ccipModule.IsUSDCDeployment() {
@@ -637,6 +637,10 @@ func (ccipModule *CCIPCommon) SyncUSDCDomain(destTransmitter *contracts.TokenTra
 			continue
 		}
 		err = pool.SyncUSDCDomain(destTransmitter, destPoolAddr[i], destChainSelector)
+		if err != nil {
+			return err
+		}
+		err = contracts.SendUSDCToOffRamp(destTransmitter, destPoolAddr[i], offRamp)
 		if err != nil {
 			return err
 		}
@@ -3474,7 +3478,7 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 		}
 		destPools = append(destPools, pool.EthAddress)
 	}
-	err = lane.Source.Common.SyncUSDCDomain(lane.Dest.Common.TokenTransmitter, destPools, lane.Source.DestinationChainId)
+	err = lane.Source.Common.SyncUSDCDomain(lane.Dest.Common.TokenTransmitter, destPools, lane.Source.DestinationChainId, lane.Dest.OffRamp.EthAddress)
 	if err != nil {
 		return fmt.Errorf("failed to sync USDC domain: %w", err)
 	}
