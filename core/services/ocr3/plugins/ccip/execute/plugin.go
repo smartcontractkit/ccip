@@ -183,9 +183,9 @@ func (p *Plugin) ObservationQuorum(outctx ocr3types.OutcomeContext, query types.
 	return ocr3types.QuorumFPlusOne, nil
 }
 
-// validatedObservations merges all observations which reach the fChain threshold into a single result.
+// validatedCommitObservations merges all observations which reach the fChain threshold into a single result.
 // Any observations, or subsets of observations, which do not reach the threshold are ignored.
-func validatedObservations(aos []decodedAttributedObservation, fChain map[cciptypes.ChainSelector]int) (cciptypes.ExecutePluginCommitObservations, error) {
+func validatedCommitObservations(aos []decodedAttributedObservation, fChain map[cciptypes.ChainSelector]int) (cciptypes.ExecutePluginCommitObservations, error) {
 	// TODO: validate and merge decoded observations into a single observation.
 
 	// Merge commit reports.
@@ -238,26 +238,33 @@ func (p *Plugin) Outcome(outctx ocr3types.OutcomeContext, query types.Query, aos
 		return ocr3types.Outcome{}, fmt.Errorf("below F threshold")
 	}
 
-	// TODO: call mergeObservations instead of taking the first observation.
-	//merged := decodedObservations[0].Observation
-	merged, err := validatedObservations(decodedObservations, p.cfg.FChain)
+	mergedCommitObservations, err := validatedCommitObservations(decodedObservations, p.cfg.FChain)
 	if err != nil {
 		return ocr3types.Outcome{}, err
 	}
 
-	fmt.Println(merged, err)
+	// TODO: flatten results and sort by timestamp
+
+	// TODO: validatedMessageObservations
+
+	// add reports one by one into the outcome until
+
+	fmt.Println(mergedCommitObservations, err)
 
 	// Reports from previous outcome
-	// TODO: Build the proof
-	/*
-		previousOutcome, err := cciptypes.DecodeExecutePluginOutcome(outctx.PreviousOutcome)
-		if err != nil {
-			return ocr3types.Outcome{}, err
-		}
-		for selector, report := range previousOutcome.NextCommits {
-			// if we have all of the messages, build the proof.
-		}
-	*/
+	previousOutcome, err := cciptypes.DecodeExecutePluginOutcome(outctx.PreviousOutcome)
+	if err != nil {
+		return ocr3types.Outcome{}, err
+	}
+	for selector, reports := range previousOutcome.NextCommits {
+		// TODO: if we have all of the messages for the previous requested reports, build the proof.
+		fmt.Println(selector, reports)
+	}
+
+	// TODO: carry over reports which weren't executed by adding them to mergedCommitObservations.
+
+	// TODO: do messages even go into the outcome??? I don't think so. Just the Observation.
+	//       on the other hand, outcomes can be large since they aren't gossipped.
 
 	panic("implement me")
 }
