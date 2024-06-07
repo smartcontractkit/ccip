@@ -9,7 +9,7 @@ library Pool {
 
   // The number of bytes in the return data for a pool v1 releaseOrMint call.
   // This should match the size of the ReleaseOrMintOutV1 struct.
-  uint16 public constant CCIP_POOL_V1_RET_BYTES = 2 * 32;
+  uint16 public constant CCIP_POOL_V1_RET_BYTES = 32;
 
   // The default max number of bytes in the return data for a pool v1 lockOrBurn call.
   // This data can be used to send information to the destination chain token pool. Can be overwritten
@@ -49,7 +49,6 @@ library Pool {
   }
 
   struct ReleaseOrMintOutV1 {
-    address localToken; // The address of the local token
     // The number of tokens released or minted on the destination chain, denominated in  the local token's  decimals.
     // This value is expected to be equal to the ReleaseOrMintInV1.amount in the case where the source and destination
     // chain have the same number of decimals

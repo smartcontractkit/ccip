@@ -29,7 +29,7 @@ contract TokenPoolHelper is TokenPool {
     override
     returns (Pool.ReleaseOrMintOutV1 memory)
   {
-    return Pool.ReleaseOrMintOutV1({localToken: address(i_token), destinationAmount: releaseOrMintIn.amount});
+    return Pool.ReleaseOrMintOutV1({destinationAmount: releaseOrMintIn.amount});
   }
 
   function onlyOnRampModifier(uint64 remoteChainSelector) external view {

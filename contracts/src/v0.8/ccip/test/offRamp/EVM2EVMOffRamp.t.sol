@@ -1363,7 +1363,7 @@ contract EVM2EVMOffRamp__releaseOrMintTokens is EVM2EVMOffRampSetup {
           offchainTokenData: offchainTokenData[0]
         })
       ),
-      abi.encode(destToken, amount * destinationDenominationMultiplier)
+      abi.encode(amount * destinationDenominationMultiplier)
     );
 
     Client.EVMTokenAmount[] memory destTokenAmounts =
@@ -1453,11 +1453,13 @@ contract EVM2EVMOffRamp__releaseOrMintTokens is EVM2EVMOffRampSetup {
           offchainTokenData: offchainTokenData[0]
         })
       ),
-      // Includes the token twice, this will revert due to the return data being to long
-      abi.encode(s_destFeeToken, s_destFeeToken, amount)
+      // Includes the amount twice, this will revert due to the return data being to long
+      abi.encode(amount, amount)
     );
 
-    vm.expectRevert(abi.encodeWithSelector(EVM2EVMOffRamp.InvalidDataLength.selector, 64, 96));
+    vm.expectRevert(
+      abi.encodeWithSelector(EVM2EVMOffRamp.InvalidDataLength.selector, Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES, 64)
+    );
 
     s_offRamp.releaseOrMintTokens(srcTokenAmounts, originalSender, OWNER, encodedSourceTokenData, offchainTokenData);
   }

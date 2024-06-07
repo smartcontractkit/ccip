@@ -760,7 +760,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, OCR2BaseN
       if (returnData.length != Pool.CCIP_POOL_V1_RET_BYTES) {
         revert InvalidDataLength(Pool.CCIP_POOL_V1_RET_BYTES, returnData.length);
       }
-      (, uint256 amount) = abi.decode(returnData, (uint256, uint256));
+      uint256 amount = abi.decode(returnData, (uint256));
 
       (success, returnData,) = CallWithExactGas._callWithExactGasSafeReturnData(
         abi.encodeWithSelector(IERC20.transfer.selector, messageRoute.receiver, amount),

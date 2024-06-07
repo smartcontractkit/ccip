@@ -65,6 +65,6 @@ contract MaybeRevertingBurnMintTokenPool is BurnMintTokenPool {
     }
     IBurnMintERC20(address(i_token)).mint(msg.sender, releaseOrMintIn.amount);
     emit Minted(msg.sender, releaseOrMintIn.receiver, releaseOrMintIn.amount);
-    return Pool.ReleaseOrMintOutV1({localToken: address(i_token), destinationAmount: releaseOrMintIn.amount});
+    return Pool.ReleaseOrMintOutV1({destinationAmount: releaseOrMintIn.amount});
   }
 }

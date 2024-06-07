@@ -80,7 +80,7 @@ contract LockReleaseTokenPool is TokenPool, ILiquidityContainer, ITypeAndVersion
 
     emit Released(msg.sender, releaseOrMintIn.receiver, releaseOrMintIn.amount);
 
-    return Pool.ReleaseOrMintOutV1({localToken: address(i_token), destinationAmount: releaseOrMintIn.amount});
+    return Pool.ReleaseOrMintOutV1({destinationAmount: releaseOrMintIn.amount});
   }
 
   /// @notice returns the lock release interface flag used for EIP165 identification.
