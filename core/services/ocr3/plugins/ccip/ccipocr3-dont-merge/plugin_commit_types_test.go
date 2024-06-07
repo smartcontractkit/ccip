@@ -17,7 +17,7 @@ func TestCommitPluginObservation_EncodeAndDecode(t *testing.T) {
 		[]GasPriceChain{}, // todo: populate this
 		[]TokenPrice{},
 		[]SeqNumChain{},
-		CommitPluginConfig{},
+		ConsensusObservation{},
 	)
 
 	b, err := obs.Encode()

@@ -3,7 +3,6 @@ package cciptypes
 import (
 	"testing"
 
-	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	"github.com/stretchr/testify/assert"
 )
@@ -18,14 +17,6 @@ func TestCommitPluginConfigValidate(t *testing.T) {
 			name: "valid cfg",
 			input: CommitPluginConfig{
 				DestChain: ChainSelector(1),
-				FChain: map[ChainSelector]int{
-					ChainSelector(1): 1,
-				},
-				ObserverInfo: map[commontypes.OracleID]ObserverInfo{
-					commontypes.OracleID(1): {
-						Reads: []ChainSelector{ChainSelector(1)},
-					},
-				},
 				PricedTokens: []types.Account{
 					types.Account("0x123"),
 					types.Account("0x124"),
@@ -38,14 +29,6 @@ func TestCommitPluginConfigValidate(t *testing.T) {
 		{
 			name: "dest chain is empty",
 			input: CommitPluginConfig{
-				FChain: map[ChainSelector]int{
-					ChainSelector(1): 1,
-				},
-				ObserverInfo: map[commontypes.OracleID]ObserverInfo{
-					commontypes.OracleID(1): {
-						Reads: []ChainSelector{ChainSelector(1)},
-					},
-				},
 				PricedTokens: []types.Account{
 					types.Account("0x123"),
 					types.Account("0x124"),
@@ -58,15 +41,7 @@ func TestCommitPluginConfigValidate(t *testing.T) {
 		{
 			name: "zero priced tokens",
 			input: CommitPluginConfig{
-				DestChain: ChainSelector(1),
-				FChain: map[ChainSelector]int{
-					ChainSelector(1): 1,
-				},
-				ObserverInfo: map[commontypes.OracleID]ObserverInfo{
-					commontypes.OracleID(1): {
-						Reads: []ChainSelector{ChainSelector(1)},
-					},
-				},
+				DestChain:           ChainSelector(1),
 				NewMsgScanBatchSize: 256,
 				TokenPricesObserver: true,
 			},
@@ -76,14 +51,6 @@ func TestCommitPluginConfigValidate(t *testing.T) {
 			name: "empty batch scan size",
 			input: CommitPluginConfig{
 				DestChain: ChainSelector(1),
-				FChain: map[ChainSelector]int{
-					ChainSelector(1): 1,
-				},
-				ObserverInfo: map[commontypes.OracleID]ObserverInfo{
-					commontypes.OracleID(1): {
-						Reads: []ChainSelector{ChainSelector(1)},
-					},
-				},
 				PricedTokens: []types.Account{
 					types.Account("0x123"),
 					types.Account("0x124"),
@@ -96,14 +63,6 @@ func TestCommitPluginConfigValidate(t *testing.T) {
 			name: "fChain not set for dest",
 			input: CommitPluginConfig{
 				DestChain: ChainSelector(1),
-				FChain: map[ChainSelector]int{
-					ChainSelector(2): 1,
-				},
-				ObserverInfo: map[commontypes.OracleID]ObserverInfo{
-					commontypes.OracleID(1): {
-						Reads: []ChainSelector{ChainSelector(1)},
-					},
-				},
 				PricedTokens: []types.Account{
 					types.Account("0x123"),
 					types.Account("0x124"),
@@ -117,14 +76,6 @@ func TestCommitPluginConfigValidate(t *testing.T) {
 			name: "fChain not set for some chain",
 			input: CommitPluginConfig{
 				DestChain: ChainSelector(1),
-				FChain: map[ChainSelector]int{
-					ChainSelector(1): 1,
-				},
-				ObserverInfo: map[commontypes.OracleID]ObserverInfo{
-					commontypes.OracleID(1): {
-						Reads: []ChainSelector{ChainSelector(1), ChainSelector(123)}, // fChain not set for 123
-					},
-				},
 				PricedTokens: []types.Account{
 					types.Account("0x123"),
 					types.Account("0x124"),

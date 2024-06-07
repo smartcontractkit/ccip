@@ -140,7 +140,7 @@ func (p *Plugin) Observation(ctx context.Context, outctx ocr3types.OutcomeContex
 		"gasPrices", len(gasPrices),
 		"tokenPrices", len(tokenPrices),
 		"maxSeqNumsPerChain", maxSeqNumsPerChain,
-		"nodeSupportedChains", homeChainConfig)
+		"nodeSupportedChains", homeChainConfig.NodeSupportedChains)
 
 	msgBaseDetails := make([]cciptypes.CCIPMsgBaseDetails, 0)
 	for _, msg := range newMsgs {
