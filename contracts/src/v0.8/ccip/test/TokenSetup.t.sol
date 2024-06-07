@@ -116,6 +116,7 @@ contract TokenSetup is RouterSetup {
       chainUpdates[0] = TokenPool.ChainUpdate({
         remoteChainSelector: DEST_CHAIN_SELECTOR,
         remotePoolAddress: abi.encode(s_destPoolByToken[s_destTokens[i]]),
+        remoteTokenAddress: abi.encode(s_destTokens[i]),
         allowed: true,
         outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
         inboundRateLimiterConfig: getInboundRateLimiterConfig()
@@ -134,6 +135,7 @@ contract TokenSetup is RouterSetup {
       chainUpdates[0] = TokenPool.ChainUpdate({
         remoteChainSelector: SOURCE_CHAIN_SELECTOR,
         remotePoolAddress: abi.encode(s_sourcePoolByToken[s_sourceTokens[i]]),
+        remoteTokenAddress: abi.encode(s_sourceTokens[i]),
         allowed: true,
         outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
         inboundRateLimiterConfig: getInboundRateLimiterConfig()

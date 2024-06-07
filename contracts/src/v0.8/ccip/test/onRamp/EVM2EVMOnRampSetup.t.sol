@@ -30,6 +30,7 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
   address[] internal s_offRamps;
 
   address internal s_destTokenPool = makeAddr("destTokenPool");
+  address internal s_destToken = makeAddr("destToken");
 
   EVM2EVMOnRamp.FeeTokenConfigArgs[] internal s_feeTokenConfigArgs;
   EVM2EVMOnRamp.TokenTransferFeeConfigArgs[] internal s_tokenTransferFeeConfigArgs;

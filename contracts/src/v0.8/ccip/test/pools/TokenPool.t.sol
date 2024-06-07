@@ -44,6 +44,7 @@ contract TokenPool_getRemotePool is TokenPoolSetup {
   function test_getRemotePool_Success() public {
     uint64 chainSelector = 123124;
     address remotePool = makeAddr("remotePool");
+    address remoteToken = makeAddr("remoteToken");
 
     // Zero indicates nothing is set
     assertEq(0, s_tokenPool.getRemotePool(chainSelector).length);
@@ -52,6 +53,7 @@ contract TokenPool_getRemotePool is TokenPoolSetup {
     chainUpdates[0] = TokenPool.ChainUpdate({
       remoteChainSelector: chainSelector,
       remotePoolAddress: abi.encode(remotePool),
+      remoteTokenAddress: abi.encode(remoteToken),
       allowed: true,
       outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
       inboundRateLimiterConfig: getInboundRateLimiterConfig()
@@ -66,6 +68,7 @@ contract TokenPool_setRemotePool is TokenPoolSetup {
   function test_setRemotePool_Success() public {
     uint64 chainSelector = DEST_CHAIN_SELECTOR;
     address initialPool = makeAddr("remotePool");
+    address remoteToken = makeAddr("remoteToken");
     // The new pool is a non-evm pool, as it doesn't fit in the normal 160 bits
     bytes memory newPool = abi.encode(type(uint256).max);
 
@@ -73,6 +76,7 @@ contract TokenPool_setRemotePool is TokenPoolSetup {
     chainUpdates[0] = TokenPool.ChainUpdate({
       remoteChainSelector: chainSelector,
       remotePoolAddress: abi.encode(initialPool),
+      remoteTokenAddress: abi.encode(remoteToken),
       allowed: true,
       outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
       inboundRateLimiterConfig: getInboundRateLimiterConfig()
@@ -136,6 +140,7 @@ contract TokenPool_applyChainUpdates is TokenPoolSetup {
     chainUpdates[0] = TokenPool.ChainUpdate({
       remoteChainSelector: 1,
       remotePoolAddress: abi.encode(address(1)),
+      remoteTokenAddress: abi.encode(address(2)),
       allowed: true,
       outboundRateLimiterConfig: outboundRateLimit1,
       inboundRateLimiterConfig: inboundRateLimit1
@@ -143,6 +148,7 @@ contract TokenPool_applyChainUpdates is TokenPoolSetup {
     chainUpdates[1] = TokenPool.ChainUpdate({
       remoteChainSelector: 2,
       remotePoolAddress: abi.encode(address(1)),
+      remoteTokenAddress: abi.encode(address(2)),
       allowed: true,
       outboundRateLimiterConfig: outboundRateLimit2,
       inboundRateLimiterConfig: inboundRateLimit2
@@ -171,6 +177,7 @@ contract TokenPool_applyChainUpdates is TokenPoolSetup {
     chainRemoves[0] = TokenPool.ChainUpdate({
       remoteChainSelector: strangerChainSelector,
       remotePoolAddress: abi.encode(address(1)),
+      remoteTokenAddress: abi.encode(address(2)),
       allowed: false,
       outboundRateLimiterConfig: RateLimiter.Config({isEnabled: false, capacity: 0, rate: 0}),
       inboundRateLimiterConfig: RateLimiter.Config({isEnabled: false, capacity: 0, rate: 0})
@@ -215,6 +222,7 @@ contract TokenPool_applyChainUpdates is TokenPoolSetup {
     chainUpdates[0] = TokenPool.ChainUpdate({
       remoteChainSelector: 1,
       remotePoolAddress: abi.encode(address(1)),
+      remoteTokenAddress: abi.encode(address(2)),
       allowed: true,
       outboundRateLimiterConfig: outboundRateLimit,
       inboundRateLimiterConfig: inboundRateLimit
@@ -239,6 +247,7 @@ contract TokenPool_applyChainUpdates is TokenPoolSetup {
     chainUpdates[0] = TokenPool.ChainUpdate({
       remoteChainSelector: 1,
       remotePoolAddress: abi.encode(address(1)),
+      remoteTokenAddress: abi.encode(address(2)),
       allowed: false,
       outboundRateLimiterConfig: outboundRateLimit,
       inboundRateLimiterConfig: inboundRateLimit
@@ -248,11 +257,12 @@ contract TokenPool_applyChainUpdates is TokenPoolSetup {
     s_tokenPool.applyChainUpdates(chainUpdates);
   }
 
-  function test_InvalidRatelimitRate_Revert() public {
+  function test_InvalidRateLimitRate_Revert() public {
     TokenPool.ChainUpdate[] memory chainUpdates = new TokenPool.ChainUpdate[](1);
     chainUpdates[0] = TokenPool.ChainUpdate({
       remoteChainSelector: 1,
       remotePoolAddress: abi.encode(address(1)),
+      remoteTokenAddress: abi.encode(address(2)),
       allowed: true,
       outboundRateLimiterConfig: RateLimiter.Config({isEnabled: true, capacity: 0, rate: 0}),
       inboundRateLimiterConfig: RateLimiter.Config({isEnabled: true, capacity: 100e22, rate: 1e12})
@@ -326,6 +336,7 @@ contract TokenPool_setChainRateLimiterConfig is TokenPoolSetup {
     chainUpdates[0] = TokenPool.ChainUpdate({
       remoteChainSelector: s_remoteChainSelector,
       remotePoolAddress: abi.encode(address(2)),
+      remoteTokenAddress: abi.encode(address(3)),
       allowed: true,
       outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
       inboundRateLimiterConfig: getInboundRateLimiterConfig()
@@ -405,6 +416,7 @@ contract TokenPool_onlyOnRamp is TokenPoolSetup {
     chainUpdate[0] = TokenPool.ChainUpdate({
       remoteChainSelector: chainSelector,
       remotePoolAddress: abi.encode(address(1)),
+      remoteTokenAddress: abi.encode(address(2)),
       allowed: true,
       outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
       inboundRateLimiterConfig: getInboundRateLimiterConfig()
@@ -435,6 +447,7 @@ contract TokenPool_onlyOnRamp is TokenPoolSetup {
     chainUpdate[0] = TokenPool.ChainUpdate({
       remoteChainSelector: chainSelector,
       remotePoolAddress: abi.encode(address(1)),
+      remoteTokenAddress: abi.encode(address(2)),
       allowed: true,
       outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
       inboundRateLimiterConfig: getInboundRateLimiterConfig()
@@ -452,6 +465,7 @@ contract TokenPool_onlyOnRamp is TokenPoolSetup {
     chainUpdate[0] = TokenPool.ChainUpdate({
       remoteChainSelector: chainSelector,
       remotePoolAddress: abi.encode(address(1)),
+      remoteTokenAddress: abi.encode(address(2)),
       allowed: false,
       outboundRateLimiterConfig: RateLimiter.Config({isEnabled: false, capacity: 0, rate: 0}),
       inboundRateLimiterConfig: RateLimiter.Config({isEnabled: false, capacity: 0, rate: 0})
@@ -474,6 +488,7 @@ contract TokenPool_onlyOnRamp is TokenPoolSetup {
     chainUpdate[0] = TokenPool.ChainUpdate({
       remoteChainSelector: chainSelector,
       remotePoolAddress: abi.encode(address(1)),
+      remoteTokenAddress: abi.encode(address(2)),
       allowed: true,
       outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
       inboundRateLimiterConfig: getInboundRateLimiterConfig()
@@ -497,6 +512,7 @@ contract TokenPool_onlyOffRamp is TokenPoolSetup {
     chainUpdate[0] = TokenPool.ChainUpdate({
       remoteChainSelector: chainSelector,
       remotePoolAddress: abi.encode(address(1)),
+      remoteTokenAddress: abi.encode(address(2)),
       allowed: true,
       outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
       inboundRateLimiterConfig: getInboundRateLimiterConfig()
@@ -527,6 +543,7 @@ contract TokenPool_onlyOffRamp is TokenPoolSetup {
     chainUpdate[0] = TokenPool.ChainUpdate({
       remoteChainSelector: chainSelector,
       remotePoolAddress: abi.encode(address(1)),
+      remoteTokenAddress: abi.encode(address(2)),
       allowed: true,
       outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
       inboundRateLimiterConfig: getInboundRateLimiterConfig()
@@ -544,6 +561,7 @@ contract TokenPool_onlyOffRamp is TokenPoolSetup {
     chainUpdate[0] = TokenPool.ChainUpdate({
       remoteChainSelector: chainSelector,
       remotePoolAddress: abi.encode(address(1)),
+      remoteTokenAddress: abi.encode(address(2)),
       allowed: false,
       outboundRateLimiterConfig: RateLimiter.Config({isEnabled: false, capacity: 0, rate: 0}),
       inboundRateLimiterConfig: RateLimiter.Config({isEnabled: false, capacity: 0, rate: 0})
@@ -566,6 +584,7 @@ contract TokenPool_onlyOffRamp is TokenPoolSetup {
     chainUpdate[0] = TokenPool.ChainUpdate({
       remoteChainSelector: chainSelector,
       remotePoolAddress: abi.encode(address(1)),
+      remoteTokenAddress: abi.encode(address(2)),
       allowed: true,
       outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
       inboundRateLimiterConfig: getInboundRateLimiterConfig()

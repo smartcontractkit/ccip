@@ -55,7 +55,8 @@ abstract contract TokenPool is IPool, OwnerIsCreator {
   struct ChainUpdate {
     uint64 remoteChainSelector; // ──╮ Remote chain selector
     bool allowed; // ────────────────╯ Whether the chain is allowed
-    bytes remotePoolAddress; //        Address of the remote pool, ABI encoded in the case of an EVM pool.
+    bytes remotePoolAddress; //        Address of the remote pool, ABI encoded in the case of a remove EVM chain.
+    bytes remoteTokenAddress; //       Address of the remote token, ABI encoded in the case of a remote EVM chain.
     RateLimiter.Config outboundRateLimiterConfig; // Outbound rate limited config, meaning the rate limits for all of the onRamps for the given chain
     RateLimiter.Config inboundRateLimiterConfig; // Inbound rate limited config, meaning the rate limits for all of the offRamps for the given chain
   }
@@ -63,7 +64,8 @@ abstract contract TokenPool is IPool, OwnerIsCreator {
   struct RemoteChainConfig {
     RateLimiter.TokenBucket outboundRateLimiterConfig; // Outbound rate limited config, meaning the rate limits for all of the onRamps for the given chain
     RateLimiter.TokenBucket inboundRateLimiterConfig; // Inbound rate limited config, meaning the rate limits for all of the offRamps for the given chain
-    bytes remotePoolAddress; // Address of the remote pool
+    bytes remotePoolAddress; // Address of the remote pool, ABI encoded in the case of a remote EVM chain.
+    bytes remoteTokenAddress; // Address of the remote token, ABI encoded in the case of a remote EVM chain.
   }
 
   /// @dev The bridgeable token that is managed by this pool.
@@ -234,7 +236,7 @@ abstract contract TokenPool is IPool, OwnerIsCreator {
           revert ChainAlreadyExists(update.remoteChainSelector);
         }
 
-        if (update.remotePoolAddress.length == 0) {
+        if (update.remotePoolAddress.length == 0 || update.remoteTokenAddress.length == 0) {
           revert ZeroAddressNotAllowed();
         }
 
@@ -253,7 +255,8 @@ abstract contract TokenPool is IPool, OwnerIsCreator {
             lastUpdated: uint32(block.timestamp),
             isEnabled: update.inboundRateLimiterConfig.isEnabled
           }),
-          remotePoolAddress: update.remotePoolAddress
+          remotePoolAddress: update.remotePoolAddress,
+          remoteTokenAddress: update.remoteTokenAddress
         });
 
         emit ChainAdded(update.remoteChainSelector, update.outboundRateLimiterConfig, update.inboundRateLimiterConfig);
