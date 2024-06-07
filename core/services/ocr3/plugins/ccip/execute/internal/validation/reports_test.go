@@ -12,7 +12,7 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
 
-func Test_CommitReportValidator(t *testing.T) {
+func Test_CommitReportValidator_ExecutePluginCommitData(t *testing.T) {
 	tests := []struct {
 		name    string
 		min     int
@@ -117,5 +117,36 @@ func Test_CommitReportValidator(t *testing.T) {
 				t.Errorf("GetValidatedReports() = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+// Simple test to make sure the template works
+func Test_CommitReportValidator_Generics(t *testing.T) {
+	type Generic struct {
+		number int
+	}
+
+	// Initialize the validator
+	idFunc := func(data Generic) [32]byte {
+		return sha3.Sum256([]byte(fmt.Sprintf("%v", data)))
+	}
+	validator := NewValidator[Generic](2, idFunc)
+
+	wantValue := Generic{number: 1}
+
+	err := validator.AddReport(wantValue)
+	require.NoError(t, err)
+	err = validator.AddReport(wantValue)
+	require.NoError(t, err)
+	err = validator.AddReport(Generic{number: 2})
+	require.NoError(t, err)
+
+	// Test the results
+	got, err := validator.GetValidatedReports()
+	require.NoError(t, err)
+
+	want := []Generic{wantValue}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("GetValidatedReports() = %v, want %v", got, want)
 	}
 }
