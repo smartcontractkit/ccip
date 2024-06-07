@@ -142,7 +142,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
     emit Burned(msg.sender, lockOrBurnIn.amount);
 
     return Pool.LockOrBurnOutV1({
-      destTokenAddress: getRemotePool(lockOrBurnIn.remoteChainSelector),
+      destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector),
       destPoolData: abi.encode(SourceTokenDataPayload({nonce: nonce, sourceDomain: i_localDomainIdentifier}))
     });
   }

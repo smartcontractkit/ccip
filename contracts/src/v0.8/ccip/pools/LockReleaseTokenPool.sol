@@ -61,7 +61,7 @@ contract LockReleaseTokenPool is TokenPool, ILiquidityContainer, ITypeAndVersion
 
     emit Locked(msg.sender, lockOrBurnIn.amount);
 
-    return Pool.LockOrBurnOutV1({destTokenAddress: getRemotePool(lockOrBurnIn.remoteChainSelector), destPoolData: ""});
+    return Pool.LockOrBurnOutV1({destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector), destPoolData: ""});
   }
 
   /// @notice Release tokens from the pool to the recipient

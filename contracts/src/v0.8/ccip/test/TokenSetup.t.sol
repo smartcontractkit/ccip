@@ -26,6 +26,7 @@ contract TokenSetup is RouterSetup {
   mapping(address sourceToken => address sourcePool) internal s_sourcePoolByToken;
   mapping(address sourceToken => address destPool) internal s_destPoolBySourceToken;
   mapping(address destToken => address destPool) internal s_destPoolByToken;
+  mapping(address sourceToken => address destToken) internal s_destTokenBySourceToken;
 
   function _deploySourceToken(string memory tokenName, uint256 dealAmount, uint8 decimals) internal returns (address) {
     BurnMintERC677 token = new BurnMintERC677(tokenName, tokenName, decimals, 0);
@@ -97,8 +98,12 @@ contract TokenSetup is RouterSetup {
     _deployLockReleasePool(destLink, false);
     s_destFeeToken = destLink;
 
+    s_destTokenBySourceToken[sourceLink] = destLink;
+
     address destEth = _deployDestToken("dETH", 2 ** 128);
     _deployTokenAndBurnMintPool(destEth, false);
+
+    s_destTokenBySourceToken[sourceEth] = destEth;
 
     // Float the dest link lock release pool with funds
     IERC20(destLink).transfer(s_destPoolByToken[destLink], 1000 ether);

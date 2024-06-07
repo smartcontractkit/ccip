@@ -10,6 +10,7 @@ import {IMultiCommitStore} from "../interfaces/IMultiCommitStore.sol";
 import {IPool} from "../interfaces/IPool.sol";
 import {IRMN} from "../interfaces/IRMN.sol";
 import {IRouter} from "../interfaces/IRouter.sol";
+import {ITokenAdminRegistry} from "../interfaces/ITokenAdminRegistry.sol";
 
 import {CallWithExactGas} from "../../shared/call/CallWithExactGas.sol";
 import {EnumerableMapAddresses} from "../../shared/enumerable/EnumerableMapAddresses.sol";
@@ -717,12 +718,14 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, OCR2BaseN
         abi.decode(encodedSourceTokenData[i], (Internal.SourceTokenData));
       // We need to safely decode the pool address from the sourceTokenData, as it could be wrong,
       // in which case it doesn't have to be a valid EVM address.
-      address localPoolAddress = Internal._validateEVMAddress(sourceTokenData.destTokenAddress);
+      address localToken = Internal._validateEVMAddress(sourceTokenData.destTokenAddress);
+      // We check with the token admin registry if the token has a pool on this chain.
+      address localPoolAddress = ITokenAdminRegistry(i_tokenAdminRegistry).getPool(localToken);
       // This will call the supportsInterface through the ERC165Checker, and not directly on the pool address.
       // This is done to prevent a pool from reverting the entire transaction if it doesn't support the interface.
       // The call gets a max or 30k gas per instance, of which there are three. This means gas estimations should
       // account for 90k gas overhead due to the interface check.
-      if (!localPoolAddress.supportsInterface(Pool.CCIP_POOL_V1)) {
+      if (localPoolAddress == address(0) || !localPoolAddress.supportsInterface(Pool.CCIP_POOL_V1)) {
         revert NotACompatiblePool(localPoolAddress);
       }
 
@@ -757,12 +760,11 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, OCR2BaseN
       if (returnData.length != Pool.CCIP_POOL_V1_RET_BYTES) {
         revert InvalidDataLength(Pool.CCIP_POOL_V1_RET_BYTES, returnData.length);
       }
-      (uint256 decodedAddress, uint256 amount) = abi.decode(returnData, (uint256, uint256));
-      address destTokenAddress = Internal._validateEVMAddressFromUint256(decodedAddress);
+      (, uint256 amount) = abi.decode(returnData, (uint256, uint256));
 
       (success, returnData,) = CallWithExactGas._callWithExactGasSafeReturnData(
         abi.encodeWithSelector(IERC20.transfer.selector, messageRoute.receiver, amount),
-        destTokenAddress,
+        localToken,
         s_dynamicConfig.maxTokenTransferGas,
         Internal.GAS_FOR_CALL_EXACT_CHECK,
         Internal.MAX_RET_BYTES
@@ -774,7 +776,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, OCR2BaseN
         revert TokenHandlingError(returnData);
       }
 
-      destTokenAmounts[i].token = destTokenAddress;
+      destTokenAmounts[i].token = localToken;
       destTokenAmounts[i].amount = amount;
     }
 

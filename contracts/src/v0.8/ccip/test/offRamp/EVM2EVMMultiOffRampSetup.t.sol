@@ -295,7 +295,7 @@ contract EVM2EVMMultiOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSet
       message.sourceTokenData[i] = abi.encode(
         Internal.SourceTokenData({
           sourcePoolAddress: abi.encode(s_sourcePoolByToken[tokenAmounts[i].token]),
-          destTokenAddress: abi.encode(s_destPoolBySourceToken[tokenAmounts[i].token]),
+          destTokenAddress: abi.encode(s_destTokenBySourceToken[tokenAmounts[i].token]),
           extraData: ""
         })
       );
@@ -420,7 +420,7 @@ contract EVM2EVMMultiOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSet
       sourceTokenData[i] = abi.encode(
         Internal.SourceTokenData({
           sourcePoolAddress: abi.encode(s_sourcePoolByToken[srcTokenAmounts[i].token]),
-          destTokenAddress: abi.encode(s_destPoolBySourceToken[srcTokenAmounts[i].token]),
+          destTokenAddress: abi.encode(s_destTokenBySourceToken[srcTokenAmounts[i].token]),
           extraData: ""
         })
       );

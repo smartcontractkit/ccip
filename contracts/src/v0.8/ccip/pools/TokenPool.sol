@@ -174,7 +174,11 @@ abstract contract TokenPool is IPool, OwnerIsCreator {
     _onlyOffRamp(releaseOrMintIn.remoteChainSelector);
 
     // Validates that the source pool address is configured on this pool.
-    if (keccak256(releaseOrMintIn.sourcePoolAddress) != keccak256(getRemotePool(releaseOrMintIn.remoteChainSelector))) {
+    bytes memory configuredRemotePool = getRemotePool(releaseOrMintIn.remoteChainSelector);
+    if (
+      configuredRemotePool.length == 0
+        || keccak256(releaseOrMintIn.sourcePoolAddress) != keccak256(configuredRemotePool)
+    ) {
       revert InvalidSourcePoolAddress(releaseOrMintIn.sourcePoolAddress);
     }
     _consumeInboundRateLimit(releaseOrMintIn.remoteChainSelector, releaseOrMintIn.amount);

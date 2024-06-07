@@ -9,6 +9,7 @@ import {IPool} from "../interfaces/IPool.sol";
 import {IPriceRegistry} from "../interfaces/IPriceRegistry.sol";
 import {IRMN} from "../interfaces/IRMN.sol";
 import {IRouter} from "../interfaces/IRouter.sol";
+import {ITokenAdminRegistry} from "../interfaces/ITokenAdminRegistry.sol";
 
 import {CallWithExactGas} from "../../shared/call/CallWithExactGas.sol";
 import {EnumerableMapAddresses} from "../../shared/enumerable/EnumerableMapAddresses.sol";
@@ -564,6 +565,81 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
   // │                      Tokens and pools                        │
   // ================================================================
 
+  function _releaseOfMintToken(
+    Client.EVMTokenAmount memory sourceTokenAmount,
+    bytes memory originalSender,
+    address receiver,
+    bytes memory encodedSourceTokenData,
+    bytes memory offchainTokenData
+  ) internal returns (Client.EVMTokenAmount memory destTokenAmount) {
+    // This should never revert as the onRamp creates the sourceTokenData. Only the inner components from
+    // this struct come from untrusted sources.
+    Internal.SourceTokenData memory sourceTokenData = abi.decode(encodedSourceTokenData, (Internal.SourceTokenData));
+    // We need to safely decode the token address from the sourceTokenData, as it could be wrong,
+    // in which case it doesn't have to be a valid EVM address.
+    address localToken = Internal._validateEVMAddress(sourceTokenData.destTokenAddress);
+    // We check with the token admin registry if the token has a pool on this chain.
+    address localPoolAddress = ITokenAdminRegistry(i_tokenAdminRegistry).getPool(localToken);
+    // This will call the supportsInterface through the ERC165Checker, and not directly on the pool address.
+    // This is done to prevent a pool from reverting the entire transaction if it doesn't support the interface.
+    // The call gets a max or 30k gas per instance, of which there are three. This means gas estimations should
+    // account for 90k gas overhead due to the interface check.
+    if (localPoolAddress == address(0) || !localPoolAddress.supportsInterface(Pool.CCIP_POOL_V1)) {
+      revert NotACompatiblePool(localPoolAddress);
+    }
+
+    // We determined that the pool address is a valid EVM address, but that does not mean the code at this
+    // address is a (compatible) pool contract. _callWithExactGasSafeReturnData will check if the location
+    // contains a contract. If it doesn't it reverts with a known error, which we catch gracefully.
+    // We call the pool with exact gas to increase resistance against malicious tokens or token pools.
+    // We protects against return data bombs by capping the return data size at MAX_RET_BYTES.
+    (bool success, bytes memory returnData,) = CallWithExactGas._callWithExactGasSafeReturnData(
+      abi.encodeWithSelector(
+        IPool.releaseOrMint.selector,
+        Pool.ReleaseOrMintInV1({
+          originalSender: originalSender,
+          receiver: receiver,
+          amount: sourceTokenAmount.amount,
+          remoteChainSelector: i_sourceChainSelector,
+          sourcePoolAddress: sourceTokenData.sourcePoolAddress,
+          sourcePoolData: sourceTokenData.extraData,
+          offchainTokenData: offchainTokenData
+        })
+      ),
+      localPoolAddress,
+      s_dynamicConfig.maxPoolReleaseOrMintGas,
+      Internal.GAS_FOR_CALL_EXACT_CHECK,
+      Internal.MAX_RET_BYTES
+    );
+
+    // wrap and rethrow the error so we can catch it lower in the stack
+    if (!success) revert TokenHandlingError(returnData);
+
+    // If the call was successful, the returnData should be the local token address.
+    if (returnData.length != Pool.CCIP_POOL_V1_RET_BYTES) {
+      revert InvalidDataLength(Pool.CCIP_POOL_V1_RET_BYTES, returnData.length);
+    }
+    (, uint256 amount) = abi.decode(returnData, (uint256, uint256));
+    // Since token pools send the tokens to the msg.sender, which is this offRamp, we need to
+    // transfer them to the final receiver. We use the _callWithExactGasSafeReturnData function because
+    // the token contracts are not considered trusted.
+    (success, returnData,) = CallWithExactGas._callWithExactGasSafeReturnData(
+      abi.encodeWithSelector(IERC20.transfer.selector, receiver, amount),
+      localToken,
+      s_dynamicConfig.maxTokenTransferGas,
+      Internal.GAS_FOR_CALL_EXACT_CHECK,
+      Internal.MAX_RET_BYTES
+    );
+
+    // This is the same check SafeERC20 does. We validate the optional boolean return value of the transfer function.
+    // If nothing is returned, we assume success, if something is returned, it should be `true`.
+    if (!success || (returnData.length > 0 && !abi.decode(returnData, (bool)))) {
+      revert TokenHandlingError(returnData);
+    }
+
+    return Client.EVMTokenAmount({token: localToken, amount: amount});
+  }
+
   /// @notice Uses pools to release or mint a number of different tokens to a receiver address.
   /// @param sourceTokenAmounts List of tokens and amount values to be released/minted.
   /// @param originalSender The message sender.
@@ -584,76 +660,11 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
     destTokenAmounts = sourceTokenAmounts;
     uint256 value = 0;
     for (uint256 i = 0; i < sourceTokenAmounts.length; ++i) {
-      // This should never revert as the onRamp creates the sourceTokenData. Only the inner components from
-      // this struct come from untrusted sources.
-      Internal.SourceTokenData memory sourceTokenData =
-        abi.decode(encodedSourceTokenData[i], (Internal.SourceTokenData));
-      // We need to safely decode the pool address from the sourceTokenData, as it could be wrong,
-      // in which case it doesn't have to be a valid EVM address.
-      address localPoolAddress = Internal._validateEVMAddress(sourceTokenData.destTokenAddress);
-      // This will call the supportsInterface through the ERC165Checker, and not directly on the pool address.
-      // This is done to prevent a pool from reverting the entire transaction if it doesn't support the interface.
-      // The call gets a max or 30k gas per instance, of which there are three. This means gas estimations should
-      // account for 90k gas overhead due to the interface check.
-      if (!localPoolAddress.supportsInterface(Pool.CCIP_POOL_V1)) {
-        revert NotACompatiblePool(localPoolAddress);
-      }
-
-      // We determined that the pool address is a valid EVM address, but that does not mean the code at this
-      // address is a (compatible) pool contract. _callWithExactGasSafeReturnData will check if the location
-      // contains a contract. If it doesn't it reverts with a known error, which we catch gracefully.
-      // We call the pool with exact gas to increase resistance against malicious tokens or token pools.
-      // We protects against return data bombs by capping the return data size at MAX_RET_BYTES.
-      (bool success, bytes memory returnData,) = CallWithExactGas._callWithExactGasSafeReturnData(
-        abi.encodeWithSelector(
-          IPool.releaseOrMint.selector,
-          Pool.ReleaseOrMintInV1({
-            originalSender: originalSender,
-            receiver: receiver,
-            amount: sourceTokenAmounts[i].amount,
-            remoteChainSelector: i_sourceChainSelector,
-            sourcePoolAddress: sourceTokenData.sourcePoolAddress,
-            sourcePoolData: sourceTokenData.extraData,
-            offchainTokenData: offchainTokenData[i]
-          })
-        ),
-        localPoolAddress,
-        s_dynamicConfig.maxPoolReleaseOrMintGas,
-        Internal.GAS_FOR_CALL_EXACT_CHECK,
-        Internal.MAX_RET_BYTES
+      destTokenAmounts[i] = _releaseOfMintToken(
+        sourceTokenAmounts[i], originalSender, receiver, encodedSourceTokenData[i], offchainTokenData[i]
       );
 
-      // wrap and rethrow the error so we can catch it lower in the stack
-      if (!success) revert TokenHandlingError(returnData);
-
-      // If the call was successful, the returnData should be the local token address.
-      if (returnData.length != Pool.CCIP_POOL_V1_RET_BYTES) {
-        revert InvalidDataLength(Pool.CCIP_POOL_V1_RET_BYTES, returnData.length);
-      }
-      (uint256 decodedAddress, uint256 amount) = abi.decode(returnData, (uint256, uint256));
-      address destTokenAddress = Internal._validateEVMAddressFromUint256(decodedAddress);
-
-      // Since token pools send the tokens to the msg.sender, which is this offRamp, we need to
-      // transfer them to the final receiver. We use the _callWithExactGasSafeReturnData function because
-      // the token contracts are not considered trusted.
-      (success, returnData,) = CallWithExactGas._callWithExactGasSafeReturnData(
-        abi.encodeWithSelector(IERC20.transfer.selector, receiver, amount),
-        destTokenAddress,
-        s_dynamicConfig.maxTokenTransferGas,
-        Internal.GAS_FOR_CALL_EXACT_CHECK,
-        Internal.MAX_RET_BYTES
-      );
-
-      // This is the same check SafeERC20 does. We validate the optional boolean return value of the transfer function.
-      // If nothing is returned, we assume success, if something is returned, it should be `true`.
-      if (!success || (returnData.length > 0 && !abi.decode(returnData, (bool)))) {
-        revert TokenHandlingError(returnData);
-      }
-
-      destTokenAmounts[i].token = destTokenAddress;
-      destTokenAmounts[i].amount = amount;
-
-      if (s_rateLimitedTokensDestToSource.contains(destTokenAddress)) {
+      if (s_rateLimitedTokensDestToSource.contains(destTokenAmounts[i].token)) {
         value += _getTokenValue(destTokenAmounts[i], IPriceRegistry(s_dynamicConfig.priceRegistry));
       }
     }

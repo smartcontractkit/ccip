@@ -43,7 +43,7 @@ contract MaybeRevertingBurnMintTokenPool is BurnMintTokenPool {
     IBurnMintERC20(address(i_token)).burn(lockOrBurnIn.amount);
     emit Burned(msg.sender, lockOrBurnIn.amount);
     return Pool.LockOrBurnOutV1({
-      destTokenAddress: getRemotePool(lockOrBurnIn.remoteChainSelector),
+      destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector),
       destPoolData: s_sourceTokenData
     });
   }

@@ -41,6 +41,7 @@ contract USDCTokenPoolSetup is BaseTest {
   bytes32 internal constant SOURCE_CHAIN_TOKEN_SENDER = bytes32(uint256(uint160(0x01111111221)));
   address internal constant SOURCE_CHAIN_USDC_POOL = address(0x23789765456789);
   address internal constant DEST_CHAIN_USDC_POOL = address(0x987384873458734);
+  address internal constant DEST_CHAIN_USDC_TOKEN = address(0x23598918358198766);
 
   address internal s_routerAllowedOnRamp = address(3456);
   address internal s_routerAllowedOffRamp = address(234);
@@ -82,7 +83,7 @@ contract USDCTokenPoolSetup is BaseTest {
     chainUpdates[1] = TokenPool.ChainUpdate({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
       remotePoolAddress: abi.encode(DEST_CHAIN_USDC_POOL),
-      remoteTokenAddress: abi.encode(address(s_token)),
+      remoteTokenAddress: abi.encode(DEST_CHAIN_USDC_TOKEN),
       allowed: true,
       outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
       inboundRateLimiterConfig: getInboundRateLimiterConfig()
@@ -210,7 +211,7 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
 
     uint64 nonce = abi.decode(poolReturnDataV1.destPoolData, (uint64));
     assertEq(s_mockUSDC.s_nonce() - 1, nonce);
-    assertEq(poolReturnDataV1.destTokenAddress, abi.encode(DEST_CHAIN_USDC_POOL));
+    assertEq(poolReturnDataV1.destTokenAddress, abi.encode(DEST_CHAIN_USDC_TOKEN));
   }
 
   function test_Fuzz_LockOrBurnWithAllowList_Success(bytes32 destinationReceiver, uint256 amount) public {
@@ -248,7 +249,7 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
     );
     uint64 nonce = abi.decode(poolReturnDataV1.destPoolData, (uint64));
     assertEq(s_mockUSDC.s_nonce() - 1, nonce);
-    assertEq(poolReturnDataV1.destTokenAddress, abi.encode(DEST_CHAIN_USDC_POOL));
+    assertEq(poolReturnDataV1.destTokenAddress, abi.encode(DEST_CHAIN_USDC_TOKEN));
   }
 
   // Reverts
