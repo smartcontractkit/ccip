@@ -31,37 +31,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          version_mismatch=false
+          current_chain_selector_version=$(go list -m -f '{{.Version}}' github.com/smartcontractkit/chain-selectors)
           latest_chain_selector_version=$(gh release view -R smartcontractkit/chain-selectors --json tagName --jq '.tagName')
-
-          echo "Latest chain-selectors version: $latest_chain_selector_version"
-
-          directories=$(find . -name 'go.mod' -exec dirname {} \;)
-
-          set +e
-          for directory in $directories; do
-            echo "Checking $directory"
-
-            pushd "$directory" > /dev/null || return
-            chain_selector_version=$(go list -m -f '{{.Version}}' github.com/smartcontractkit/chain-selectors)
-            popd > /dev/null || return
-
-            echo "$directory - current version: $chain_selector_version"
-
-            if [[ -z "$chain_selector_version" ]]; then
-              continue
-            fi
-
-            if [[ "$chain_selector_version" != "$latest_chain_selector_version" ]]; then
-              echo "::error::Version mismatch for $directory - current version: $chain_selector_version, latest version on Github: $latest_chain_selector_version"
-              version_mismatch=true
-            fi
-          done
-          set -e
-
-          if [[ "$version_mismatch" = true ]]; then
+          if [[ "$current_chain_selector_version" != "$latest_chain_selector_version" ]]; then
+            echo "::error:: Chain Selectors version mismatch. Current version: $current_chain_selector_version, Latest version: $latest_chain_selector_version"
             exit 1
-          else
-            echo "All chain-selectors versions are up to date"
-            exit 0
           fi
