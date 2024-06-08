@@ -3,6 +3,7 @@ pragma solidity 0.8.24;
 
 import {IPool} from "../../interfaces/IPool.sol";
 
+import {NonceManager} from "../../NonceManager.sol";
 import {PriceRegistry} from "../../PriceRegistry.sol";
 import {Router} from "../../Router.sol";
 import {Client} from "../../libraries/Client.sol";
@@ -30,7 +31,7 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
 
   EVM2EVMMultiOnRampHelper internal s_onRamp;
   address[] internal s_offRamps;
-
+  NonceManager internal s_nonceManager;
   address internal s_destTokenPool = makeAddr("destTokenPool");
 
   EVM2EVMMultiOnRamp.PremiumMultiplierWeiPerEthArgs[] internal s_premiumMultiplierWeiPerEthArgs;
@@ -100,12 +101,15 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
       })
     );
 
+    s_nonceManager = new NonceManager();
+
     s_onRamp = new EVM2EVMMultiOnRampHelper(
       EVM2EVMMultiOnRamp.StaticConfig({
         linkToken: s_sourceTokens[0],
         chainSelector: SOURCE_CHAIN_SELECTOR,
         maxNopFeesJuels: MAX_NOP_FEES_JUELS,
-        rmnProxy: address(s_mockRMN)
+        rmnProxy: address(s_mockRMN),
+        nonceManager: address(s_nonceManager)
       }),
       generateDynamicMultiOnRampConfig(address(s_sourceRouter), address(s_priceRegistry), address(s_tokenAdminRegistry)),
       generateDestChainConfigArgs(),
@@ -115,6 +119,8 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
       getMultiOnRampNopsAndWeights()
     );
     s_onRamp.setAdmin(ADMIN);
+    
+    s_nonceManager.applyRampUpdates(address(s_onRamp), address(0), new NonceManager.PreviousRamp[](0), new NonceManager.PreviousRamp[](0));
 
     s_metadataHash = keccak256(
       abi.encode(Internal.EVM_2_EVM_MESSAGE_HASH, SOURCE_CHAIN_SELECTOR, DEST_CHAIN_SELECTOR, address(s_onRamp))

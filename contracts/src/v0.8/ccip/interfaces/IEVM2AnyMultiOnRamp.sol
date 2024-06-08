@@ -8,10 +8,4 @@ interface IEVM2AnyMultiOnRamp is IEVM2AnyOnRampClient {
   /// @param destChainSelector The destination chain selector
   /// @return the next sequence number to be used
   function getExpectedNextSequenceNumber(uint64 destChainSelector) external view returns (uint64);
-
-  /// @notice Returns the current nonce for a sender
-  /// @param destChainSelector The destination chain selector
-  /// @param sender The sender address
-  /// @return The sender's nonce
-  function getSenderNonce(uint64 destChainSelector, address sender) external view returns (uint64);
 }

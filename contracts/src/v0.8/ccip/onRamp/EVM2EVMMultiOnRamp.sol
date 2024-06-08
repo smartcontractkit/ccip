@@ -5,6 +5,7 @@ import {ITypeAndVersion} from "../../shared/interfaces/ITypeAndVersion.sol";
 import {IEVM2AnyMultiOnRamp} from "../interfaces/IEVM2AnyMultiOnRamp.sol";
 import {IEVM2AnyOnRamp} from "../interfaces/IEVM2AnyOnRamp.sol";
 import {IEVM2AnyOnRampClient} from "../interfaces/IEVM2AnyOnRampClient.sol";
+import {INonceManager} from "../interfaces/INonceManager.sol";
 import {IPool} from "../interfaces/IPool.sol";
 import {IPriceRegistry} from "../interfaces/IPriceRegistry.sol";
 import {IRMN} from "../interfaces/IRMN.sol";
@@ -81,6 +82,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ILinkAvailable, AggregateRat
     uint64 chainSelector; // ─────╯ Source chainSelector
     uint96 maxNopFeesJuels; // ───╮ Max nop fee balance onramp can have
     address rmnProxy; // ─────────╯ Address of RMN proxy
+    address nonceManager; // Address of the nonce manager
   }
 
   /// @dev Struct to contains the dynamic configuration
@@ -191,6 +193,8 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ILinkAvailable, AggregateRat
   uint64 internal immutable i_chainSelector;
   /// @dev The address of the rmn proxy
   address internal immutable i_rmnProxy;
+  /// @dev The address of the nonce manager
+  address internal immutable i_nonceManager;
   /// @dev the maximum number of nops that can be configured at the same time.
   /// Used to bound gas for loops over nops.
   uint256 private constant MAX_NUMBER_OF_NOPS = 64;
@@ -211,10 +215,6 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ILinkAvailable, AggregateRat
     s_tokenTransferFeeConfig;
 
   // STATE
-  /// @dev The current nonce per sender.
-  /// The offramp has a corresponding s_senderNonce mapping to ensure messages
-  /// are executed in the same order they are sent.
-  mapping(address sender => uint64 nonce) internal s_senderNonce;
   /// @dev The amount of LINK available to pay NOPS
   uint96 internal s_nopFeesJuels;
   /// @dev The combined weight of all NOPs weights
@@ -229,8 +229,10 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ILinkAvailable, AggregateRat
     TokenTransferFeeConfigArgs[] memory tokenTransferFeeConfigArgs,
     NopAndWeight[] memory nopsAndWeights
   ) AggregateRateLimiter(rateLimiterConfig) {
-    if (staticConfig.linkToken == address(0) || staticConfig.chainSelector == 0 || staticConfig.rmnProxy == address(0))
-    {
+    if (
+      staticConfig.linkToken == address(0) || staticConfig.chainSelector == 0 || staticConfig.rmnProxy == address(0)
+        || staticConfig.nonceManager == address(0)
+    ) {
       revert InvalidConfig();
     }
 
@@ -238,6 +240,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ILinkAvailable, AggregateRat
     i_chainSelector = staticConfig.chainSelector;
     i_maxNopFeesJuels = staticConfig.maxNopFeesJuels;
     i_rmnProxy = staticConfig.rmnProxy;
+    i_nonceManager = staticConfig.nonceManager;
 
     _setDynamicConfig(dynamicConfig);
     _applyDestChainConfigUpdates(destChainConfigArgs);
@@ -253,21 +256,6 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ILinkAvailable, AggregateRat
   /// @inheritdoc IEVM2AnyMultiOnRamp
   function getExpectedNextSequenceNumber(uint64 destChainSelector) external view returns (uint64) {
     return s_destChainConfig[destChainSelector].sequenceNumber + 1;
-  }
-
-  /// @inheritdoc IEVM2AnyMultiOnRamp
-  function getSenderNonce(uint64 destChainSelector, address sender) public view returns (uint64) {
-    uint64 senderNonce = s_senderNonce[sender];
-
-    if (senderNonce == 0) {
-      address prevOnRamp = s_destChainConfig[destChainSelector].prevOnRamp;
-      if (prevOnRamp != address(0)) {
-        // If OnRamp was upgraded, check if sender has a nonce from the previous OnRamp.
-        return IEVM2AnyOnRamp(prevOnRamp).getSenderNonce(sender);
-      }
-    }
-
-    return senderNonce;
   }
 
   /// @inheritdoc IEVM2AnyOnRampClient
@@ -387,9 +375,6 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ILinkAvailable, AggregateRat
     }
     if (s_nopFeesJuels > i_maxNopFeesJuels) revert MaxFeeBalanceReached();
 
-    uint64 nonce = getSenderNonce(destChainSelector, originalSender) + 1;
-    s_senderNonce[originalSender] = nonce;
-
     // We need the next available sequence number so we increment before we use the value
     return Internal.EVM2EVMMessage({
       sourceChainSelector: i_chainSelector,
@@ -400,7 +385,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ILinkAvailable, AggregateRat
       sequenceNumber: ++destChainConfig.sequenceNumber,
       gasLimit: gasLimit,
       strict: false,
-      nonce: nonce,
+      nonce: INonceManager(i_nonceManager).incrementOutboundNonce(destChainSelector, abi.encode(originalSender)),
       feeToken: message.feeToken,
       feeTokenAmount: feeTokenAmount,
       data: message.data,
@@ -454,7 +439,8 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ILinkAvailable, AggregateRat
       linkToken: i_linkToken,
       chainSelector: i_chainSelector,
       maxNopFeesJuels: i_maxNopFeesJuels,
-      rmnProxy: i_rmnProxy
+      rmnProxy: i_rmnProxy,
+      nonceManager: i_nonceManager
     });
   }
 
@@ -482,7 +468,8 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ILinkAvailable, AggregateRat
         linkToken: i_linkToken,
         chainSelector: i_chainSelector,
         maxNopFeesJuels: i_maxNopFeesJuels,
-        rmnProxy: i_rmnProxy
+        rmnProxy: i_rmnProxy,
+        nonceManager: i_nonceManager
       }),
       dynamicConfig
     );
