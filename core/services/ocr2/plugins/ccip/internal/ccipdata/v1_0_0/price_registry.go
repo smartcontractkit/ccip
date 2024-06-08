@@ -206,36 +206,7 @@ func (p *PriceRegistry) GetGasPriceUpdatesCreatedAfter(ctx context.Context, chai
 	if err != nil {
 		return nil, err
 	}
-
-	parsedLogs, err := ccipdata.ParseLogs[cciptypes.GasPriceUpdate](
-		logs,
-		p.lggr,
-		func(log types.Log) (*cciptypes.GasPriceUpdate, error) {
-			p, err1 := p.priceRegistry.ParseUsdPerUnitGasUpdated(log)
-			if err1 != nil {
-				return nil, err1
-			}
-			return &cciptypes.GasPriceUpdate{
-				GasPrice: cciptypes.GasPrice{
-					DestChainSelector: p.DestChain,
-					Value:             p.Value,
-				},
-				TimestampUnixSec: p.Timestamp,
-			}, nil
-		},
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	res := make([]cciptypes.GasPriceUpdateWithTxMeta, 0, len(parsedLogs))
-	for _, log := range parsedLogs {
-		res = append(res, cciptypes.GasPriceUpdateWithTxMeta{
-			TxMeta:         log.TxMeta,
-			GasPriceUpdate: log.Data,
-		})
-	}
-	return res, nil
+	return p.parseGasPriceUpdatesLogs(logs)
 }
 
 func (p *PriceRegistry) GetAllGasPriceUpdatesCreatedAfter(ctx context.Context, ts time.Time, confs int) ([]cciptypes.GasPriceUpdateWithTxMeta, error) {
@@ -249,7 +220,10 @@ func (p *PriceRegistry) GetAllGasPriceUpdatesCreatedAfter(ctx context.Context, t
 	if err != nil {
 		return nil, err
 	}
+	return p.parseGasPriceUpdatesLogs(logs)
+}
 
+func (p *PriceRegistry) parseGasPriceUpdatesLogs(logs []logpoller.Log) ([]cciptypes.GasPriceUpdateWithTxMeta, error) {
 	parsedLogs, err := ccipdata.ParseLogs[cciptypes.GasPriceUpdate](
 		logs,
 		p.lggr,
