@@ -1,28 +1,25 @@
 #
-# High level python specification of CCIP OCR3 commit plugin.
+# High-level Python specification for the CCIP OCR3 Commit Plugin.
 #
-# The intention of this specification is to give a reviewer a clear understanding
-# of how the plugin should work and is highly recommended to understand this spec
-# before reading the actual Go implementation.
+# This specification aims to provide a clear and comprehensive understanding
+# of the plugin's functionality. It is highly recommended for engineers working on CCIP
+# to familiarize themselves with this specification prior to reading the
+# corresponding Go implementation.
 #
 class CommitPlugin:
     def __init__(self):
-        self.cfg = {
-            "dest_chain": "chainD",
-            "f_chain": {
-                "chainA": 2,
-                "chainB": 3,
-                "chainD": 3
-            },
-            "observer_info": {
-                "nodeA": {
-                    "supported_chains": {"chainA", "chainB", "chainD"},
-                    "token_prices_observer": True,
-                }
-            },
-            "priced_tokens": {"tokenA", "tokenB"}
-        }
-        self.keep_cfg_in_sync()
+         self.cfg = {
+             "dest_chain": "chainD",
+             "f_chain": {"chainA": 2, "chainB": 3, "chainD": 3},
+             "observer_info": {
+                 "nodeA": {
+                     "supported_chains": {"chainA", "chainB", "chainD"},
+                     "token_prices_observer": True,
+                 }
+             },
+             "priced_tokens": {"tokenA", "tokenB"},
+         }
+         self.keep_cfg_in_sync()
 
     def query(self):
         pass
@@ -72,13 +69,8 @@ class CommitPlugin:
         return "2F+1"
 
     def outcome(self, observations):
-        f_chain_votes = observations["f_chain"].group_by_chain() # { chainA: [1, 1, 16, 16, 16, 16] }
-        f_chain = { ch: elem_most_occurrences(fs) for (ch, fs) in f_chain_votes.items() } # { chainA: 16 }
-
-        seq_nums = observations["seq_nums"].group_by_chain(sort="asc") # { chainA: [4, 5, 5, 5, 5, 6, 6] }
-        for chain, seq_nums in observed_seq_nums.items():
-            assert(len(seq_nums) >= 2*f_chain[chain]+1)
-            seq_nums[chain] = seq_nums[f_chain[chain]] # with f=4 { chainA: 5 }
+        f_chain = __consensus_f_chain(observations)
+        seq_nums = __consensus_seq_nums(observations, f_chain)
 
         trees = {} # { chain: (root, min_seq_num, max_seq_num) }
         for (chain, msgs) in observations["new_msgs"]:
@@ -103,6 +95,16 @@ class CommitPlugin:
         gas_prices = { chain: median(prices) for (chain, prices) in observations.group_gas_prices_by_chain() }
 
         return (seq_nums, trees, token_prices, gas_prices)
+
+    def __consensus_f_chain(observations):
+        f_chain_votes = observations["f_chain"].group_by_chain() # { chainA: [1, 1, 16, 16, 16, 16] }
+        return { ch: elem_most_occurrences(fs) for (ch, fs) in f_chain_votes.items() } # { chainA: 16 }
+
+    def __consensus_seq_nums(observations, f_chain):
+        seq_nums = observations["seq_nums"].group_by_chain(sort="asc") # { chainA: [4, 5, 5, 5, 5, 6, 6] }
+        for chain, seq_nums in observed_seq_nums.items():
+            if len(seq_nums) >= 2*f_chain[chain]+1:
+                seq_nums[chain] = seq_nums[f_chain[chain]] # with f=4 { chainA: 5 }
 
     def reports(self, outcome):
         return new_report_from_outcome(outcome)
