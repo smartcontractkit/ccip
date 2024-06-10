@@ -418,7 +418,7 @@ type TestConfigOverrideOption func(*CCIPTestConfig) string
 func WithCCIPOwnerTokens() TestConfigOverrideOption {
 	return func(c *CCIPTestConfig) string {
 		c.TestGroupInput.TokenConfig.CCIPOwnerTokens = pointer.ToBool(true)
-		return "NumberOfCCIPOwnerTokens set to true"
+		return "CCIPOwnerTokens set to true"
 	}
 }
 

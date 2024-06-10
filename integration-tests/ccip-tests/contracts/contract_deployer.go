@@ -213,6 +213,8 @@ func (e *CCIPContractsDeployer) DeployBurnMintERC677(ownerMintingAmount *big.Int
 		logger:          e.logger,
 		ContractAddress: *address,
 		instance:        instance.(*burn_mint_erc677.BurnMintERC677),
+		OwnerAddress:    common.HexToAddress(e.evmClient.GetDefaultWallet().Address()),
+		OwnerWallet:     e.evmClient.GetDefaultWallet(),
 	}
 	if ownerMintingAmount != nil {
 		// grant minter role to owner and mint tokens

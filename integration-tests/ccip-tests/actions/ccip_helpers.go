@@ -379,7 +379,7 @@ func (ccipModule *CCIPCommon) LoadContractAddresses(conf *laneconfig.LaneConfig,
 func (ccipModule *CCIPCommon) ApproveTokens() error {
 	isApproved := false
 	for _, token := range ccipModule.BridgeTokens {
-		// TODO: We send all token funds back to the CCIP Deployer account, which isn't particularly realistic.
+		// TODO: We send half of token funds back to the CCIP Deployer account, which isn't particularly realistic.
 		// See CCIP-2477
 		if token.OwnerWallet.Address() != ccipModule.ChainClient.GetDefaultWallet().Address() {
 			tokenBalance, err := token.BalanceOf(context.Background(), token.OwnerWallet.Address())
@@ -425,6 +425,7 @@ func (ccipModule *CCIPCommon) ApproveTokens() error {
 			}
 		}
 	}
+	ccipModule.Logger.Info().Msg("Tokens approved")
 
 	return nil
 }
@@ -664,11 +665,8 @@ func (ccipModule *CCIPCommon) SyncUSDCDomain(destTransmitter *contracts.TokenTra
 		if err != nil {
 			return err
 		}
-		err = contracts.SendUSDCToUSDCPool(destTransmitter, destPoolAddr[i])
-		if err != nil {
-			return err
-		}
 	}
+
 	return ccipModule.ChainClient.WaitForEvents()
 }
 
@@ -966,6 +964,10 @@ func (ccipModule *CCIPCommon) DeployContracts(
 				usdcPool, err := ccipModule.tokenDeployer.DeployUSDCTokenPoolContract(token.Address(), *ccipModule.TokenMessenger, *ccipModule.ARMContract, ccipModule.Router.Instance.Address())
 				if err != nil {
 					return fmt.Errorf("deploying bridge Token pool(usdc) shouldn't fail %w", err)
+				}
+				err = ccipModule.BridgeTokens[i].Transfer(token.OwnerWallet, usdcPool.Address(), ccipModule.poolFunds)
+				if err != nil {
+					return fmt.Errorf("error transferring USDC tokens to pool %w", err)
 				}
 
 				ccipModule.BridgeTokenPools = append(ccipModule.BridgeTokenPools, usdcPool)

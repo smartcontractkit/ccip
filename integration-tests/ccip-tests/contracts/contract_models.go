@@ -125,10 +125,12 @@ type ERC677Token struct {
 	logger          zerolog.Logger
 	instance        *burn_mint_erc677.BurnMintERC677
 	ContractAddress common.Address
+	OwnerAddress    common.Address
+	OwnerWallet     *blockchain.EthereumWallet
 }
 
 func (token *ERC677Token) GrantMintAndBurn(burnAndMinter common.Address) error {
-	opts, err := token.client.TransactionOpts(token.client.GetDefaultWallet())
+	opts, err := token.client.TransactionOpts(token.OwnerWallet)
 	if err != nil {
 		return fmt.Errorf("failed to get transaction opts: %w", err)
 	}
@@ -145,7 +147,7 @@ func (token *ERC677Token) GrantMintAndBurn(burnAndMinter common.Address) error {
 }
 
 func (token *ERC677Token) GrantMintRole(minter common.Address) error {
-	opts, err := token.client.TransactionOpts(token.client.GetDefaultWallet())
+	opts, err := token.client.TransactionOpts(token.OwnerWallet)
 	if err != nil {
 		return err
 	}
@@ -162,7 +164,7 @@ func (token *ERC677Token) GrantMintRole(minter common.Address) error {
 }
 
 func (token *ERC677Token) Mint(to common.Address, amount *big.Int) error {
-	opts, err := token.client.TransactionOpts(token.client.GetDefaultWallet())
+	opts, err := token.client.TransactionOpts(token.OwnerWallet)
 	if err != nil {
 		return err
 	}
@@ -638,38 +640,6 @@ func (pool *TokenPool) SyncUSDCDomain(destTokenTransmitter *TokenTransmitter, de
 		return fmt.Errorf("failed to set domain: %w", err)
 	}
 	return pool.client.ProcessTransaction(tx)
-}
-
-func SendUSDCToUSDCPool(destTokenTransmitter *TokenTransmitter, destPoolAddr common.Address) error {
-	// Send usdc tokens to the offRamp because the mocked USDC contracts don't release them to the offRamo
-	// then they should.
-	destClient := destTokenTransmitter.client
-
-	destPool, err := usdc_token_pool.NewUSDCTokenPool(destPoolAddr, destClient.Backend())
-	if err != nil {
-		return fmt.Errorf("failed to get dest usdc pool: %w", err)
-	}
-
-	usdcToken, err := destPool.GetToken(nil)
-	if err != nil {
-		return fmt.Errorf("failed to get dest usdc token: %w", err)
-	}
-
-	usdcInstance, err := burn_mint_erc677.NewBurnMintERC677(usdcToken, destClient.Backend())
-	if err != nil {
-		return fmt.Errorf("failed to get dest usdc token instance: %w", err)
-	}
-
-	destOpts, err := destClient.TransactionOpts(destClient.GetDefaultWallet())
-	if err != nil {
-		return fmt.Errorf("failed to get transaction opts: %w", err)
-	}
-
-	tx, err := usdcInstance.Mint(destOpts, destPoolAddr, HundredCoins)
-	if err != nil {
-		return fmt.Errorf("failed to mint usdc tokens to offRamp: %w", err)
-	}
-	return destClient.ProcessTransaction(tx)
 }
 
 func (pool *TokenPool) RemoveLiquidity(amount *big.Int) error {
