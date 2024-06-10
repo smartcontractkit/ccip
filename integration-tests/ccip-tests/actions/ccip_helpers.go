@@ -1987,8 +1987,10 @@ func (destCCIP *DestCCIPModule) DeployContracts(
 			destCCIP.CommitStore.EthAddress,
 			sourceCCIP.OnRamp.EthAddress,
 			destCCIP.Common.RateLimiterConfig,
-			[]common.Address{}, []common.Address{},
+			[]common.Address{},
+			[]common.Address{},
 			*destCCIP.Common.ARMContract,
+			destCCIP.Common.TokenAdminRegistry.EthAddress,
 		)
 		if err != nil {
 			return fmt.Errorf("deploying offramp shouldn't fail %w", err)

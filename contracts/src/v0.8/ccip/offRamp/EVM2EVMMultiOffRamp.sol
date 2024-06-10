@@ -789,8 +789,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, OCR2BaseN
 
   /// @notice Reverts as this contract should not access CCIP messages
   function ccipReceive(Client.Any2EVMMessage calldata) external pure {
-    /* solhint-disable */
+    // solhint-disable-next-line
     revert();
-    /* solhint-enable*/
   }
 }

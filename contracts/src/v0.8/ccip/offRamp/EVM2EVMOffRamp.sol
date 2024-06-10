@@ -680,8 +680,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
 
   /// @notice Reverts as this contract should not access CCIP messages
   function ccipReceive(Client.Any2EVMMessage calldata) external pure {
-    /* solhint-disable */
+    // solhint-disable-next-line
     revert();
-    /* solhint-enable*/
   }
 }

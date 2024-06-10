@@ -252,6 +252,7 @@ func (c *CCIPContracts) DeployNewOffRamp(t *testing.T) {
 			OnRamp:              c.Source.OnRamp.Address(),
 			PrevOffRamp:         prevOffRamp,
 			RmnProxy:            c.Dest.ARMProxy.Address(), // RMN formerly ARM
+			TokenAdminRegistry:  c.Dest.TokenAdminRegistry.Address(),
 		},
 		evm_2_evm_offramp.RateLimiterConfig{
 			IsEnabled: true,
@@ -884,11 +885,14 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 
 	abiEncodedDestLinkPool, err := abihelpers.EncodeAddress(destLinkPool.Address())
 	require.NoError(t, err)
+	abiEncodedDestLinkTokenAddress, err := abihelpers.EncodeAddress(destLinkToken.Address())
+	require.NoError(t, err)
 	_, err = sourceLinkPool.ApplyChainUpdates(
 		sourceUser,
 		[]lock_release_token_pool.TokenPoolChainUpdate{{
 			RemoteChainSelector: DestChainSelector,
 			RemotePoolAddress:   abiEncodedDestLinkPool,
+			RemoteTokenAddress:  abiEncodedDestLinkTokenAddress,
 			Allowed:             true,
 			OutboundRateLimiterConfig: lock_release_token_pool.RateLimiterConfig{
 				IsEnabled: true,
@@ -906,11 +910,14 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 
 	abiEncodedDestWrappedPool, err := abihelpers.EncodeAddress(destWrappedPool.Address())
 	require.NoError(t, err)
+	abiEncodedDestWrappedTokenAddr, err := abihelpers.EncodeAddress(destWeth9addr)
+	require.NoError(t, err)
 	_, err = sourceWeth9Pool.ApplyChainUpdates(
 		sourceUser,
 		[]lock_release_token_pool.TokenPoolChainUpdate{{
 			RemoteChainSelector: DestChainSelector,
 			RemotePoolAddress:   abiEncodedDestWrappedPool,
+			RemoteTokenAddress:  abiEncodedDestWrappedTokenAddr,
 			Allowed:             true,
 			OutboundRateLimiterConfig: lock_release_token_pool.RateLimiterConfig{
 				IsEnabled: true,
@@ -929,11 +936,14 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 
 	abiEncodedSourceLinkPool, err := abihelpers.EncodeAddress(sourceLinkPool.Address())
 	require.NoError(t, err)
+	abiEncodedSourceLinkTokenAddr, err := abihelpers.EncodeAddress(sourceLinkTokenAddress)
+	require.NoError(t, err)
 	_, err = destLinkPool.ApplyChainUpdates(
 		destUser,
 		[]lock_release_token_pool.TokenPoolChainUpdate{{
 			RemoteChainSelector: SourceChainSelector,
 			RemotePoolAddress:   abiEncodedSourceLinkPool,
+			RemoteTokenAddress:  abiEncodedSourceLinkTokenAddr,
 			Allowed:             true,
 			OutboundRateLimiterConfig: lock_release_token_pool.RateLimiterConfig{
 				IsEnabled: true,
@@ -951,11 +961,14 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 
 	abiEncodedSourceWrappedPool, err := abihelpers.EncodeAddress(sourceWeth9Pool.Address())
 	require.NoError(t, err)
+	abiEncodedSourceWrappedTokenAddr, err := abihelpers.EncodeAddress(sourceWrapped.Address())
+	require.NoError(t, err)
 	_, err = destWrappedPool.ApplyChainUpdates(
 		destUser,
 		[]lock_release_token_pool.TokenPoolChainUpdate{{
 			RemoteChainSelector: SourceChainSelector,
 			RemotePoolAddress:   abiEncodedSourceWrappedPool,
+			RemoteTokenAddress:  abiEncodedSourceWrappedTokenAddr,
 			Allowed:             true,
 			OutboundRateLimiterConfig: lock_release_token_pool.RateLimiterConfig{
 				IsEnabled: true,
@@ -1123,6 +1136,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 			OnRamp:              onRampAddress,
 			PrevOffRamp:         common.HexToAddress(""),
 			RmnProxy:            armProxyDestAddress, // RMN, formerly ARM
+			TokenAdminRegistry:  destTokenAdminRegistryAddress,
 		},
 		evm_2_evm_offramp.RateLimiterConfig{
 			IsEnabled: true,

@@ -1091,6 +1091,7 @@ func (e *CCIPContractsDeployer) DeployOffRamp(
 	opts RateLimiterConfig,
 	sourceTokens, pools []common.Address,
 	rmnProxy common.Address,
+	tokenAdminRegistry common.Address,
 ) (*OffRamp, error) {
 	version := VersionMap[OffRampContract]
 	e.logger.Info().Str("version", string(version)).Msg("Deploying OffRamp")
@@ -1146,6 +1147,7 @@ func (e *CCIPContractsDeployer) DeployOffRamp(
 					OnRamp:              onRamp,
 					PrevOffRamp:         common.Address{},
 					RmnProxy:            rmnProxy,
+					TokenAdminRegistry:  tokenAdminRegistry,
 				},
 				evm_2_evm_offramp.RateLimiterConfig{
 					IsEnabled: true,
