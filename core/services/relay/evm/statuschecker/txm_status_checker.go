@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-// TODO replace with actual implementation comming from "github.com/smartcontractkit/chainlink-common/pkg/types"
+// TODO replace with actual implementation coming from "github.com/smartcontractkit/chainlink-common/pkg/types"
 type TransactionStatus int
 
 const (
