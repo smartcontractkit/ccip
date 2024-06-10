@@ -828,22 +828,6 @@ contract EVM2EVMMultiOffRamp_executeSingleReport is EVM2EVMMultiOffRampSetup {
     s_offRamp.executeSingleReport(_generateReportFromMessages(SOURCE_CHAIN_SELECTOR_2, messages), new uint256[](0));
   }
 
-  function test_UnsupportedNumberOfTokens_Revert() public {
-    Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1);
-    Client.EVMTokenAmount[] memory newTokens = new Client.EVMTokenAmount[](MAX_TOKENS_LENGTH + 1);
-    messages[0].tokenAmounts = newTokens;
-    messages[0].messageId =
-      Internal._hash(messages[0], s_offRamp.metadataHash(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1));
-    Internal.ExecutionReportSingleChain memory report = _generateReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messages);
-
-    vm.expectRevert(
-      abi.encodeWithSelector(
-        EVM2EVMMultiOffRamp.UnsupportedNumberOfTokens.selector, SOURCE_CHAIN_SELECTOR_1, messages[0].sequenceNumber
-      )
-    );
-    s_offRamp.executeSingleReport(report, new uint256[](0));
-  }
-
   function test_TokenDataMismatch_Revert() public {
     Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1);
     Internal.ExecutionReportSingleChain memory report = _generateReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messages);
@@ -856,22 +840,6 @@ contract EVM2EVMMultiOffRamp_executeSingleReport is EVM2EVMMultiOffRampSetup {
       )
     );
     s_offRamp.executeSingleReport(report, new uint256[](0));
-  }
-
-  function test_MessageTooLarge_Revert() public {
-    Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1);
-    messages[0].data = new bytes(MAX_DATA_SIZE + 1);
-    messages[0].messageId =
-      Internal._hash(messages[0], s_offRamp.metadataHash(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1));
-
-    Internal.ExecutionReportSingleChain memory executionReport =
-      _generateReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messages);
-    vm.expectRevert(
-      abi.encodeWithSelector(
-        EVM2EVMMultiOffRamp.MessageTooLarge.selector, messages[0].messageId, MAX_DATA_SIZE, messages[0].data.length
-      )
-    );
-    s_offRamp.executeSingleReport(executionReport, new uint256[](0));
   }
 
   function test_RouterYULCall_Revert() public {

@@ -229,8 +229,6 @@ contract EVM2EVMMultiOffRampSetup is TokenSetup, PriceRegistrySetup, MultiOCR3Ba
       permissionLessExecutionThresholdSeconds: PERMISSION_LESS_EXECUTION_THRESHOLD_SECONDS,
       router: router,
       priceRegistry: priceRegistry,
-      maxNumberOfTokensPerMsg: MAX_TOKENS_LENGTH,
-      maxDataBytes: MAX_DATA_SIZE,
       messageValidator: address(0),
       maxPoolReleaseOrMintGas: MAX_TOKEN_POOL_RELEASE_OR_MINT_GAS,
       maxTokenTransferGas: MAX_TOKEN_POOL_TRANSFER_GAS
@@ -411,8 +409,6 @@ contract EVM2EVMMultiOffRampSetup is TokenSetup, PriceRegistrySetup, MultiOCR3Ba
   ) public pure {
     assertEq(a.permissionLessExecutionThresholdSeconds, b.permissionLessExecutionThresholdSeconds);
     assertEq(a.router, b.router);
-    assertEq(a.maxNumberOfTokensPerMsg, b.maxNumberOfTokensPerMsg);
-    assertEq(a.maxDataBytes, b.maxDataBytes);
     assertEq(a.maxPoolReleaseOrMintGas, b.maxPoolReleaseOrMintGas);
     assertEq(a.maxTokenTransferGas, b.maxTokenTransferGas);
     assertEq(a.messageValidator, b.messageValidator);

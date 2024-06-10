@@ -40,10 +40,8 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
   error ZeroChainSelectorNotAllowed();
   error ExecutionError(bytes32 messageId, bytes error);
   error SourceChainNotEnabled(uint64 sourceChainSelector);
-  error MessageTooLarge(bytes32 messageId, uint256 maxSize, uint256 actualSize);
   error TokenDataMismatch(uint64 sourceChainSelector, uint64 sequenceNumber);
   error UnexpectedTokenData();
-  error UnsupportedNumberOfTokens(uint64 sourceChainSelector, uint64 sequenceNumber);
   error ManualExecutionNotYetEnabled(uint64 sourceChainSelector);
   error ManualExecutionGasLimitMismatch();
   error InvalidManualExecutionGasLimit(uint64 sourceChainSelector, uint256 index, uint256 newLimit);
@@ -120,9 +118,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
     uint32 permissionLessExecutionThresholdSeconds; //  │ Waiting time before manual execution is enabled
     uint32 maxTokenTransferGas; //                      │ Maximum amount of gas passed on to token `transfer` call
     uint32 maxPoolReleaseOrMintGas; // ─────────────────╯ Maximum amount of gas passed on to token pool when calling releaseOrMint
-    uint16 maxNumberOfTokensPerMsg; // ──╮ Maximum number of ERC20 token transfers that can be included per message
-    uint32 maxDataBytes; //              │ Maximum payload data size in bytes
-    address messageValidator; // ────────╯ Optional message validator to validate incoming messages (zero address = no validator)
+    address messageValidator; // Optional message validator to validate incoming messages (zero address = no validator)
     address priceRegistry; // Price registry address on the local chain
   }
 
@@ -484,14 +480,9 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
       // when executing as a defense in depth measure.
       // TODO: GAS GOLF - evaluate caching sequenceNumber instead of offchainTokenData
       bytes[] memory offchainTokenData = report.offchainTokenData[i];
-      _isWellFormed(
-        message.messageId,
-        sourceChainSelector,
-        message.sequenceNumber,
-        message.tokenAmounts.length,
-        message.data.length,
-        offchainTokenData.length
-      );
+      if (message.tokenAmounts.length != offchainTokenData.length) {
+        revert TokenDataMismatch(sourceChainSelector, message.sequenceNumber);
+      }
 
       _setExecutionState(sourceChainSelector, message.sequenceNumber, Internal.MessageExecutionState.IN_PROGRESS);
       (Internal.MessageExecutionState newState, bytes memory returnData) = _trialExecute(message, offchainTokenData);
@@ -521,30 +512,6 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
       }
 
       emit ExecutionStateChanged(sourceChainSelector, message.sequenceNumber, message.messageId, newState, returnData);
-    }
-  }
-
-  /// @notice Does basic message validation. Should never fail.
-  /// @param sequenceNumber Sequence number of the message.
-  /// @param numberOfTokens Length of tokenAmounts array in the message.
-  /// @param dataLength Length of data field in the message.
-  /// @param offchainTokenDataLength Length of offchainTokenData array.
-  /// @dev reverts on validation failures.
-  function _isWellFormed(
-    bytes32 messageId,
-    uint64 sourceChainSelector,
-    uint64 sequenceNumber,
-    uint256 numberOfTokens,
-    uint256 dataLength,
-    uint256 offchainTokenDataLength
-  ) private view {
-    // TODO: move maxNumberOfTokens & data length validation offchain
-    if (numberOfTokens > uint256(s_dynamicConfig.maxNumberOfTokensPerMsg)) {
-      revert UnsupportedNumberOfTokens(sourceChainSelector, sequenceNumber);
-    }
-    if (numberOfTokens != offchainTokenDataLength) revert TokenDataMismatch(sourceChainSelector, sequenceNumber);
-    if (dataLength > uint256(s_dynamicConfig.maxDataBytes)) {
-      revert MessageTooLarge(messageId, uint256(s_dynamicConfig.maxDataBytes), dataLength);
     }
   }
 
