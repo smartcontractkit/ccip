@@ -23,8 +23,9 @@ import (
 //go:generate mockery --quiet --name PriceCleanup --filename price_cleanup_mock.go --case=underscore
 type PriceCleanup interface {
 	job.ServiceCtx
-	Cleanup(ctx context.Context) error
 }
+
+var _ PriceCleanup = (*priceCleanup)(nil)
 
 const (
 	// Prices should be cleaned up after 8 hours
@@ -48,10 +49,10 @@ type priceCleanup struct {
 	backgroundCancel context.CancelFunc
 }
 
-func NewPriceCleanup(lggr logger.Logger, jobId int32, orm cciporm.ORM, destChainSelector uint64) *priceCleanup {
+func NewPriceCleanup(lggr logger.Logger, jobId int32, orm cciporm.ORM, destChainSelector uint64) PriceCleanup {
 	ctx, cancel := context.WithCancel(context.Background())
 
-	ch := &priceCleanup{
+	pc := &priceCleanup{
 		priceExpireSec:  priceExpireSec,
 		cleanupInterval: cleanupInterval,
 
@@ -64,7 +65,7 @@ func NewPriceCleanup(lggr logger.Logger, jobId int32, orm cciporm.ORM, destChain
 		backgroundCtx:    ctx,
 		backgroundCancel: cancel,
 	}
-	return ch
+	return pc
 }
 
 func (c *priceCleanup) Start(context.Context) error {
