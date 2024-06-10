@@ -13,21 +13,32 @@ contract NonceManager is OwnerIsCreator {
   event OnRampUpdated(address onRamp);
 
   /// @dev Struct that contains a previous on/off ramp address with the associated source/dest chain selector
-  struct PreviousRamp {
+  // TODO: add prevOffRamp
+  struct PreviousRamps {
+    address prevOnRamp;
+  }
+
+  /// @dev Struct that contains the chain selector and the previous on/off ramps, same as PreviousRamps but with the chain selector
+  /// so that an array of these can be passed to the applyRampUpdates function
+  struct PreviousRampsArgs {
     uint64 chainSelector;
-    address prevRamp;
+    PreviousRamps prevRamps;
+  }
+
+  /// @dev Struct that contains a sender's outbound and inbound nonces
+  struct Nonce {
+    uint64 outbound;
+    uint64 inbound;
   }
 
   /// @dev The current onRamp address
   address private s_onRamp;
   /// TODO: add s_offRamp;
 
-  /// @dev previous onRamps
-  mapping(uint64 destChainSelector => address prevOnRamp) private s_prevOnRamps;
-  /// TODO: add previous offRamps
-  /// @dev The current outbouncNonce per sender used on the EVM2EVMMultiOnRamp
-  mapping(uint64 destChainSelector => mapping(bytes sender => uint64)) private s_outboundNonces;
-  /// TODO: add inboundNonces
+  /// @dev previous ramps
+  mapping(uint64 chainSelector => PreviousRamps prevRamps) private s_prevRamps;
+  /// @dev The current nonces per sender used on the on/off ramps
+  mapping(uint64 chainSelector => mapping(bytes sender => Nonce nonce)) private s_nonces;
 
   /// @notice Increments the outbound nonce for the given sender on the given destination chain
   /// @param destChainSelector The destination chain selector
@@ -36,16 +47,18 @@ contract NonceManager is OwnerIsCreator {
   function incrementOutboundNonce(uint64 destChainSelector, bytes calldata sender) external returns (uint64) {
     if (msg.sender != s_onRamp) revert OnlyCallableByOnRamp();
 
-    uint64 outboundNonce = s_outboundNonces[destChainSelector][sender] + 1;
+    Nonce storage nonce = s_nonces[destChainSelector][sender];
+
+    uint64 outboundNonce = nonce.outbound + 1;
 
     if (outboundNonce == 0) {
-      address prevOnRamp = s_prevOnRamps[destChainSelector];
+      address prevOnRamp = s_prevRamps[destChainSelector].prevOnRamp;
       if (prevOnRamp != address(0)) {
         outboundNonce = IEVM2AnyOnRamp(prevOnRamp).getSenderNonce(abi.decode(sender, (address))) + 1;
       }
     }
 
-    s_outboundNonces[destChainSelector][sender] = outboundNonce;
+    nonce.outbound = outboundNonce;
 
     return outboundNonce;
   }
@@ -57,10 +70,10 @@ contract NonceManager is OwnerIsCreator {
   /// @param sender The encoded sender address
   /// @return The outbound nonce
   function getOutboundNonce(uint64 destChainSelector, bytes calldata sender) external view returns (uint64) {
-    uint64 outboundNonce = s_outboundNonces[destChainSelector][sender];
+    uint64 outboundNonce = s_nonces[destChainSelector][sender].outbound;
 
     if (outboundNonce == 0) {
-      address prevOnRamp = s_prevOnRamps[destChainSelector];
+      address prevOnRamp = s_prevRamps[destChainSelector].prevOnRamp;
       if (prevOnRamp != address(0)) {
         return IEVM2AnyOnRamp(prevOnRamp).getSenderNonce(abi.decode(sender, (address)));
       }
@@ -73,23 +86,26 @@ contract NonceManager is OwnerIsCreator {
 
   /// @notice Updates the ramps and previous ramps addresses
   /// @param onRamp The new onRamp address
-  /// @param prevOnRamps The previous onRamps
-  function applyRampUpdates(address onRamp, PreviousRamp[] calldata prevOnRamps) external onlyOwner {
+  /// @param prevRampsArgs The previous onRamps
+  /// TODO: add offRamp
+  function applyRampUpdates(address onRamp, PreviousRampsArgs[] calldata prevRampsArgs) external onlyOwner {
     if (onRamp != address(0)) {
       s_onRamp = onRamp;
       emit OnRampUpdated(onRamp);
     }
 
-    for (uint256 i = 0; i < prevOnRamps.length; i++) {
-      PreviousRamp calldata prevOnRamp = prevOnRamps[i];
+    for (uint256 i = 0; i < prevRampsArgs.length; i++) {
+      PreviousRampsArgs calldata prevRampsArg = prevRampsArgs[i];
+
+      PreviousRamps storage prevRamps = s_prevRamps[prevRampsArg.chainSelector];
 
       // If the previous onRamp is already set then it should not be updated
-      if (s_prevOnRamps[prevOnRamp.chainSelector] != address(0)) {
+      if (prevRamps.prevOnRamp != address(0)) {
         revert InvalidRampUpdate();
       }
 
-      s_prevOnRamps[prevOnRamp.chainSelector] = prevOnRamp.prevRamp;
-      emit PreviousOnRampUpdated(prevOnRamp.chainSelector, prevOnRamp.prevRamp);
+      prevRamps.prevOnRamp = prevRampsArg.prevRamps.prevOnRamp;
+      emit PreviousOnRampUpdated(prevRampsArg.chainSelector, prevRamps.prevOnRamp);
     }
 
     // TODO: add offRamp logic
@@ -104,9 +120,7 @@ contract NonceManager is OwnerIsCreator {
   /// @notice Gets the previous onRamp address for the given chain selector
   /// @param chainSelector The chain selector
   /// @return The previous onRamp address
-  function getPrevOnRamp(uint64 chainSelector) external view returns (address) {
-    return s_prevOnRamps[chainSelector];
+  function getPrevRamps(uint64 chainSelector) external view returns (PreviousRamps memory) {
+    return s_prevRamps[chainSelector];
   }
-
-  // TODO: add offRamp functions
 }

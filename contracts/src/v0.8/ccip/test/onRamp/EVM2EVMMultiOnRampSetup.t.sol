@@ -120,7 +120,7 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
     );
     s_onRamp.setAdmin(ADMIN);
 
-    s_nonceManager.applyRampUpdates(address(s_onRamp), new NonceManager.PreviousRamp[](0));
+    s_nonceManager.applyRampUpdates(address(s_onRamp), new NonceManager.PreviousRampsArgs[](0));
 
     s_metadataHash = keccak256(
       abi.encode(Internal.EVM_2_EVM_MESSAGE_HASH, SOURCE_CHAIN_SELECTOR, DEST_CHAIN_SELECTOR, address(s_onRamp))
