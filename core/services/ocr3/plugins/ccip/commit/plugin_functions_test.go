@@ -17,6 +17,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
+	"github.com/smartcontractkit/ccipocr3/internal/libs/slicelib"
+	"github.com/smartcontractkit/ccipocr3/internal/mocks"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	//cciptypes "github.com/smartcontractkit/ccipocr3/ccipocr3-dont-merge"
 )
