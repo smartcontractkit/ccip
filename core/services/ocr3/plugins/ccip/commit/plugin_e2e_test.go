@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	cciptypes "github.com/smartcontractkit/ccipocr3/ccipocr3-dont-merge"
+	"github.com/stretchr/testify/mock"
 
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/smartcontractkit/ccipocr3/internal/libs/testhelpers"
@@ -313,6 +314,9 @@ func newNode(ctx context.Context, t *testing.T, lggr logger.Logger, id int, cfg 
 	reportCodec := mocks.NewCommitPluginJSONReportCodec()
 	msgHasher := mocks.NewMessageHasher()
 	homeChainPoller := mocks.NewHomeChainPollerMock(homeChainConfig)
+
+	homeChainPoller.On("StartPolling", mock.Anything, mock.Anything).Return()
+	homeChainPoller.On("GetConfig").Return(homeChainConfig)
 
 	node1 := NewPlugin(
 		context.Background(),

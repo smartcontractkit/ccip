@@ -2,7 +2,6 @@ package mocks
 
 import (
 	"context"
-	"fmt"
 
 	cciptypes "github.com/smartcontractkit/ccipocr3/ccipocr3-dont-merge"
 
@@ -25,36 +24,38 @@ func NewHomeChainContractReader(configs []cciptypes.OnChainCapabilityConfig) *Ho
 
 // GetLatestValue Returns given configs at initialization
 func (hr *HomeChainContractReaderMock) GetLatestValue(ctx context.Context, contractName, method string, params, returnVal any) error {
-	if val, ok := returnVal.(*[]cciptypes.OnChainCapabilityConfig); ok {
-		*val = hr.configs
-	} else {
-		return fmt.Errorf("unexpected type for returnVal")
-	}
-	return nil
+	args := hr.Called(ctx, contractName, method, params, returnVal)
+	return args.Error(0)
 }
 
-func (*HomeChainContractReaderMock) Bind(ctx context.Context, bindings []types.BoundContract) error {
-	return nil
+func (hr *HomeChainContractReaderMock) Bind(ctx context.Context, bindings []types.BoundContract) error {
+	args := hr.Called(ctx, bindings)
+	return args.Error(0)
 }
 
-func (*HomeChainContractReaderMock) QueryKey(ctx context.Context, contractName string, filter query.KeyFilter, limitAndSort query.LimitAndSort, sequenceDataType any) ([]types.Sequence, error) {
-	return nil, nil
+func (hr *HomeChainContractReaderMock) QueryKey(ctx context.Context, contractName string, filter query.KeyFilter, limitAndSort query.LimitAndSort, sequenceDataType any) ([]types.Sequence, error) {
+	args := hr.Called(ctx, contractName, filter, limitAndSort, sequenceDataType)
+	return args.Get(0).([]types.Sequence), args.Error(1)
 }
 
 func (hr *HomeChainContractReaderMock) Start(ctx context.Context) error {
-	return nil
+	args := hr.Called(ctx)
+	return args.Error(0)
 }
 
 func (hr *HomeChainContractReaderMock) Close() error {
-	return nil
+	args := hr.Called()
+	return args.Error(0)
 }
 
 func (hr *HomeChainContractReaderMock) Ready() error {
-	return nil
+	args := hr.Called()
+	return args.Error(0)
 }
 
 func (hr *HomeChainContractReaderMock) HealthReport() map[string]error {
-	return nil
+	args := hr.Called()
+	return args.Get(0).(map[string]error)
 }
 
 func (hr *HomeChainContractReaderMock) Name() string {

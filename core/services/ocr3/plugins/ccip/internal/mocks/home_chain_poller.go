@@ -11,23 +11,24 @@ import (
 
 type HomeChainPollerMock struct {
 	*mock.Mock
-	config cciptypes.HomeChainConfig
 }
 
 func NewHomeChainPollerMock(config cciptypes.HomeChainConfig) *HomeChainPollerMock {
 	return &HomeChainPollerMock{
-		Mock:   &mock.Mock{},
-		config: config,
+		Mock: &mock.Mock{},
 	}
 }
 
 func (hr *HomeChainPollerMock) StartPolling(ctx context.Context, interval time.Duration) {
+	hr.Called(ctx, interval)
 }
 
 func (hr *HomeChainPollerMock) GetConfig() cciptypes.HomeChainConfig {
-	return hr.config
+	args := hr.Called()
+	return args.Get(0).(cciptypes.HomeChainConfig)
 }
 
 func (hr *HomeChainPollerMock) Close(ctx context.Context) error {
-	return nil
+	args := hr.Called(ctx)
+	return args.Error(0)
 }

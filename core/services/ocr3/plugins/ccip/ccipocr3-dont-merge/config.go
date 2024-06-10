@@ -15,14 +15,6 @@ type CommitPluginConfig struct {
 	// DestChain is the ccip destination chain configured for the commit plugin DON.
 	DestChain ChainSelector `json:"destChain"`
 
-	// TODO: delete
-	// ObserverInfo is a map of oracle IDs to ObserverInfo.
-	//ObserverInfo map[commontypes.OracleID]ObserverInfo `json:"observerInfo"`
-
-	// TODO: delete
-	// FChain defines the FChain value for each chain. FChain is used while forming consensus based on the observations.
-	//FChain map[ChainSelector]int `json:"fChain"`
-
 	// PricedTokens is a list of tokens that we want to submit price updates for.
 	PricedTokens []types.Account `json:"pricedTokens"`
 
@@ -68,8 +60,6 @@ type ObserverInfo struct {
 	// Reads define the chains that the current node can read from.
 	Reads []ChainSelector `json:"reads"`
 }
-
-// TODO: Add all following
 
 type ConsensusObservation struct {
 	// FChain defines the FChain value for each chain. FChain is used while forming consensus based on the observations.
@@ -167,7 +157,6 @@ type OnChainConfig struct {
 }
 type OnChainCapabilityConfig struct {
 	// Calling function https://github.com/smartcontractkit/ccip/blob/330c5e98f624cfb10108c92fe1e00ced6d345a99/contracts/src/v0.8/ccip/capability/CCIPCapabilityConfiguration.sol#L140
-	// Can I use ChainSelector cciptypes.ChainSelector?
-	ChainSelector uint64        `json:"chainSelector"`
+	ChainSelector ChainSelector `json:"chainSelector"`
 	ChainConfig   OnChainConfig `json:"chainConfig"`
 }

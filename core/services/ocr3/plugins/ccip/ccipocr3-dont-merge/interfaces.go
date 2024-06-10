@@ -54,7 +54,6 @@ type MessageHasher interface {
 	Hash(context.Context, CCIPMsg) (Bytes32, error)
 }
 
-// TODO: Addition
 type HomeChainPoller interface {
 	GetConfig() HomeChainConfig
 	StartPolling(ctx context.Context, interval time.Duration)
