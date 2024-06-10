@@ -961,12 +961,6 @@ func (b *CommitStore) SetOCR2Config(
 	if err != nil {
 		return fmt.Errorf("error getting transaction opts: %w", err)
 	}
-
-	b.logger.Info().
-		Interface("signerAddresses", signers).
-		Interface("transmitterAddresses", transmitters).
-		Str(Network, b.client.GetNetworkConfig().Name).
-		Msg("Configuring CommitStore")
 	tx, err := b.Instance.SetOCR2Config(
 		opts,
 		signers,
@@ -976,6 +970,12 @@ func (b *CommitStore) SetOCR2Config(
 		offchainConfigVersion,
 		offchainConfig,
 	)
+	b.logger.Debug().
+		Interface("signerAddresses", signers).
+		Interface("transmitterAddresses", transmitters).
+		Str(Network, b.client.GetNetworkConfig().Name).
+		Str("Tx", tx.Hash().Hex()).
+		Msg("Configuring CommitStore")
 
 	if err != nil {
 		return fmt.Errorf("error setting OCR2 config: %w", err)
