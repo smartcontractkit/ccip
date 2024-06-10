@@ -117,14 +117,6 @@ func GetParsableObservations[O CommitObservation | ExecutionObservation](l logge
 		parseableObservations = append(parseableObservations, ob)
 		observers = append(observers, ao.Observer)
 	}
-	l.Infow(
-		"Parsed observations",
-		"observers", observers,
-		"observersLength", len(observers),
-		"observations", parseableObservations,
-		"observationsLength", len(parseableObservations),
-		"rawObservationLength", len(observations),
-	)
 	return parseableObservations
 }
 
