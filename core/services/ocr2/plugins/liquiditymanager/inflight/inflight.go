@@ -1,6 +1,7 @@
 package inflight
 
 import (
+	"fmt"
 	"sort"
 	"sync"
 
@@ -20,6 +21,18 @@ type Container interface {
 	IsInflight(t models.Transfer) bool
 }
 
+type StateContainer interface {
+	// GetState returns the state of the given transfer and whether it was confirmed.
+	GetState(tid models.TransferID) (models.TransferStatus, bool, bool)
+	// SetState set the state of the given transfer, note that the state should be also confirmed
+	// by calling ConfirmState after the transfer is confirmed on-chain.
+	// If the state is already set with higher value, an error is returned.
+	SetState(tid models.TransferID, state models.TransferStatus) error
+	// ConfirmState confirm the state of the given transfer, in case the state is different from the one
+	// set by SetState, an error is returned
+	ConfirmState(tid models.TransferID, state models.TransferStatus) error
+}
+
 // transferID uniquely identifies a transfer for a short period of time.
 type transferID struct {
 	From   models.NetworkSelector
@@ -27,8 +40,17 @@ type transferID struct {
 	Amount string
 }
 
+type stateWrapper struct {
+	state     models.TransferStatus
+	confirmed bool
+}
+
+var _ Container = &inflight{}
+var _ StateContainer = &inflight{}
+
 type inflight struct {
 	transfers map[transferID]models.Transfer
+	states    map[models.TransferID]stateWrapper
 	mu        sync.RWMutex
 }
 
@@ -108,4 +130,45 @@ func (i *inflight) IsInflight(t models.Transfer) bool {
 		Amount: t.Amount.String(),
 	}]
 	return ok
+}
+
+func (i *inflight) GetState(tid models.TransferID) (models.TransferStatus, bool, bool) {
+	i.mu.RLock()
+	defer i.mu.RUnlock()
+
+	state, ok := i.states[tid]
+	return state.state, state.confirmed, ok
+}
+
+func (i *inflight) SetState(tid models.TransferID, state models.TransferStatus) error {
+	i.mu.Lock()
+	defer i.mu.Unlock()
+
+	if s, ok := i.states[tid]; ok {
+		if s.state.Value() > state.Value() {
+			return fmt.Errorf("cannot set state %s, already set to %s", state, s.state)
+		}
+	}
+
+	i.states[tid] = stateWrapper{state: state}
+
+	return nil
+}
+
+func (i *inflight) ConfirmState(tid models.TransferID, state models.TransferStatus) error {
+	i.mu.Lock()
+	defer i.mu.Unlock()
+
+	s, ok := i.states[tid]
+	if !ok {
+		return fmt.Errorf("state not set for transfer %s", tid)
+	}
+
+	if s.state != state {
+		return fmt.Errorf("state %s does not match expected state %s", state, s.state)
+	}
+
+	i.states[tid] = stateWrapper{state: state, confirmed: true}
+
+	return nil
 }
