@@ -373,8 +373,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
     uint256[] memory manualExecGasLimits
   ) internal {
     uint64 sourceChainSelector = report.sourceChainSelector;
-    // TODO: re-use isCursed / isUnpaused check from _verify here
-    if (IRMN(i_rmnProxy).isCursed(bytes16(uint128(sourceChainSelector)))) revert CursedByRMN(sourceChainSelector);
+    _whenNotCursed(sourceChainSelector);
 
     uint256 numMsgs = report.messages.length;
     if (numMsgs == 0) revert EmptyReport();
@@ -663,8 +662,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
       MerkleRoot memory root = report.merkleRoots[i];
       uint64 sourceChainSelector = root.sourceChainSelector;
 
-      if (IRMN(i_rmnProxy).isCursed(bytes16(uint128(sourceChainSelector)))) revert CursedByRMN(sourceChainSelector);
-
+      _whenNotCursed(sourceChainSelector);
       SourceChainConfig storage sourceChainConfig = s_sourceChainConfigs[sourceChainSelector];
 
       if (!sourceChainConfig.isEnabled) revert SourceChainNotEnabled(sourceChainSelector);
@@ -946,6 +944,14 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
   /// @notice Single function to check the status of the commitStore.
   function isUnpausedAndNotCursed(uint64 sourceChainSelector) external view returns (bool) {
     return !IRMN(i_rmnProxy).isCursed(bytes16(uint128(sourceChainSelector))) && !s_paused;
+  }
+
+  /// @notice Validates that the source chain -> this chain lane, and reverts if it is cursed
+  /// @param sourceChainSelector Source chain selector to check for cursing
+  function _whenNotCursed(uint64 sourceChainSelector) internal view {
+    if (IRMN(i_rmnProxy).isCursed(bytes16(uint128(sourceChainSelector)))) {
+      revert CursedByRMN(sourceChainSelector);
+    }
   }
 
   // TODO: global pausing can be removed delegated to the i_rmnProxy
