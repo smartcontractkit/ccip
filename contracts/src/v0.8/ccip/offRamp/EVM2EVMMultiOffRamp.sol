@@ -289,8 +289,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
   /// @notice Reporting function for the execution plugin
   /// @param report encoded ExecutionReport
   function _reportExec(bytes calldata report) internal {
-    Internal.ExecutionReportSingleChain[] memory reports = abi.decode(report, (Internal.ExecutionReportSingleChain[]));
-    _batchExecute(reports, new uint256[][](0));
+    _batchExecute(abi.decode(report, (Internal.ExecutionReportSingleChain[])), new uint256[][](0));
   }
 
   /// @notice Batch executes a set of reports, each report matching one single source chain
