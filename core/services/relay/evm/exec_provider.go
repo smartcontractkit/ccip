@@ -26,9 +26,6 @@ type SrcExecProvider struct {
 	client                                 client.Client
 	lp                                     logpoller.LogPoller
 	startBlock                             uint64
-	gasEstimator                           gas.EvmFeeEstimator
-	maxGasPrice                            big.Int
-	jobID                                  string
 	usdcReader                             *ccip.USDCReaderImpl
 	usdcAttestationAPI                     string
 	usdcAttestationAPITimeoutSeconds       int
@@ -47,8 +44,6 @@ func NewSrcExecProvider(
 	usdcAttestationAPITimeoutSeconds int,
 	usdcAttestationAPIIntervalMilliseconds int,
 	usdcSrcMsgTransmitterAddr common.Address,
-	// gasEstimator gas.EvmFeeEstimator,
-	// maxGasPrice big.Int,
 ) (commontypes.CCIPExecProvider, error) {
 
 	var usdcReader *ccip.USDCReaderImpl
@@ -71,8 +66,6 @@ func NewSrcExecProvider(
 		usdcAttestationAPITimeoutSeconds:       usdcAttestationAPITimeoutSeconds,
 		usdcAttestationAPIIntervalMilliseconds: usdcAttestationAPIIntervalMilliseconds,
 		usdcSrcMsgTransmitterAddr:              usdcSrcMsgTransmitterAddr,
-		//gasEstimator:  gasEstimator,
-		//maxGasPrice:   maxGasPrice,
 	}, nil
 }
 
@@ -118,7 +111,7 @@ func (s SrcExecProvider) ContractTransmitter() ocrtypes.ContractTransmitter {
 	return UnimplementedContractTransmitter{}
 }
 
-func (s SrcExecProvider) ChainReader() commontypes.ChainReader {
+func (s SrcExecProvider) ChainReader() commontypes.ContractReader {
 	return nil
 }
 
@@ -128,11 +121,11 @@ func (s SrcExecProvider) Codec() commontypes.Codec {
 
 func (s SrcExecProvider) NewCommitStoreReader(ctx context.Context, addr cciptypes.Address) (cciptypes.CommitStoreReader, error) {
 	// TODO CCIP-2493
-	return nil, fmt.Errorf("NewCommitStoreReader not implemented")
+	return nil, fmt.Errorf("invalid: NewCommitStoreReader not implemented")
 }
 
 func (s SrcExecProvider) NewOffRampReader(ctx context.Context, addr cciptypes.Address) (cciptypes.OffRampReader, error) {
-	return nil, fmt.Errorf("NewOffRampReader called on SrcExecProvider. Valid on DstExecProvider.")
+	return nil, fmt.Errorf("invalid: NewOffRampReader called on SrcExecProvider. Valid on DstExecProvider")
 }
 
 func (s SrcExecProvider) NewOnRampReader(ctx context.Context, onRampAddress cciptypes.Address, sourceChainSelector uint64, destChainSelector uint64) (onRampReader cciptypes.OnRampReader, err error) {
@@ -148,14 +141,13 @@ func (s SrcExecProvider) NewPriceRegistryReader(ctx context.Context, addr ccipty
 }
 
 func (s SrcExecProvider) NewTokenDataReader(ctx context.Context, tokenAddress cciptypes.Address) (tokenDataReader cciptypes.TokenDataReader, err error) {
-	attestationURI, err := url.ParseRequestURI(s.usdcAttestationAPI)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse USDC attestation API: %w", err)
+	attestationURI, err2 := url.ParseRequestURI(s.usdcAttestationAPI)
+	if err2 != nil {
+		return nil, fmt.Errorf("failed to parse USDC attestation API: %w", err2)
 	}
-	fmt.Errorf("")
-	tokenAddr, err := ccip.GenericAddrToEvm(tokenAddress)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse token address: %w", err)
+	tokenAddr, err2 := ccip.GenericAddrToEvm(tokenAddress)
+	if err2 != nil {
+		return nil, fmt.Errorf("failed to parse token address: %w", err2)
 	}
 	tokenDataReader = usdc.NewUSDCTokenDataReader(
 		s.lggr,
@@ -165,11 +157,11 @@ func (s SrcExecProvider) NewTokenDataReader(ctx context.Context, tokenAddress cc
 		tokenAddr,
 		time.Duration(s.usdcAttestationAPIIntervalMilliseconds)*time.Millisecond,
 	)
-	return tokenDataReader, nil
+	return
 }
 
 func (s SrcExecProvider) NewTokenPoolBatchedReader(ctx context.Context, offRampAddr cciptypes.Address, sourceChainSelector uint64) (cciptypes.TokenPoolBatchedReader, error) {
-	return nil, fmt.Errorf("NewTokenPoolBatchedReader called on SrcExecProvider. It should only be called on DstExecProvdier")
+	return nil, fmt.Errorf("invalid: NewTokenPoolBatchedReader called on SrcExecProvider. It should only be called on DstExecProvdier")
 }
 
 func (s SrcExecProvider) SourceNativeToken(ctx context.Context, sourceRouterAddr cciptypes.Address) (cciptypes.Address, error) {
@@ -261,7 +253,7 @@ func (d DstExecProvider) ContractTransmitter() ocrtypes.ContractTransmitter {
 	return d.contractTransmitter
 }
 
-func (d DstExecProvider) ChainReader() commontypes.ChainReader {
+func (d DstExecProvider) ChainReader() commontypes.ContractReader {
 	return nil
 }
 
@@ -271,7 +263,7 @@ func (d DstExecProvider) Codec() commontypes.Codec {
 
 func (d DstExecProvider) NewCommitStoreReader(ctx context.Context, addr cciptypes.Address) (cciptypes.CommitStoreReader, error) {
 	// TODO CCIP-2493
-	return nil, fmt.Errorf("NewCommitStoreReader not yet implemented")
+	return nil, fmt.Errorf("invalid: NewCommitStoreReader not yet implemented")
 }
 
 func (d DstExecProvider) NewOffRampReader(ctx context.Context, offRampAddress cciptypes.Address) (offRampReader cciptypes.OffRampReader, err error) {
@@ -280,7 +272,7 @@ func (d DstExecProvider) NewOffRampReader(ctx context.Context, offRampAddress cc
 }
 
 func (d DstExecProvider) NewOnRampReader(ctx context.Context, addr cciptypes.Address, sourceChainSelector uint64, destChainSelector uint64) (cciptypes.OnRampReader, error) {
-	return nil, fmt.Errorf("NewOnRampReader called on DstExecProvider. It should only be called on SrcExecProvider")
+	return nil, fmt.Errorf("invalid: NewOnRampReader called on DstExecProvider. It should only be called on SrcExecProvider")
 }
 
 func (d DstExecProvider) NewPriceRegistryReader(ctx context.Context, addr cciptypes.Address) (priceRegistryReader cciptypes.PriceRegistryReader, err error) {
@@ -290,7 +282,7 @@ func (d DstExecProvider) NewPriceRegistryReader(ctx context.Context, addr ccipty
 }
 
 func (d DstExecProvider) NewTokenDataReader(ctx context.Context, tokenAddress cciptypes.Address) (cciptypes.TokenDataReader, error) {
-	return nil, fmt.Errorf("NewTokenDataReader called on DstExecProvider. It should only be called on SrcExecProvider")
+	return nil, fmt.Errorf("invalid: NewTokenDataReader called on DstExecProvider. It should only be called on SrcExecProvider")
 }
 
 func (d DstExecProvider) NewTokenPoolBatchedReader(ctx context.Context, offRampAddress cciptypes.Address, sourceChainSelector uint64) (tokenPoolBatchedReader cciptypes.TokenPoolBatchedReader, err error) {
@@ -310,5 +302,5 @@ func (d DstExecProvider) NewTokenPoolBatchedReader(ctx context.Context, offRampA
 }
 
 func (d DstExecProvider) SourceNativeToken(ctx context.Context, addr cciptypes.Address) (cciptypes.Address, error) {
-	return "", fmt.Errorf("SourceNativeToken called on DstExecProvider. It should only be called on SrcExecProvider")
+	return "", fmt.Errorf("invalid: SourceNativeToken called on DstExecProvider. It should only be called on SrcExecProvider")
 }

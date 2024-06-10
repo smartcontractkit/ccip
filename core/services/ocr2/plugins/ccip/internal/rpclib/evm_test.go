@@ -2,9 +2,10 @@ package rpclib_test
 
 import (
 	"fmt"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/rpclib"
 	"strconv"
 	"testing"
+
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/rpclib"
 
 	"github.com/cometbft/cometbft/libs/rand"
 	"github.com/ethereum/go-ethereum/accounts/abi"

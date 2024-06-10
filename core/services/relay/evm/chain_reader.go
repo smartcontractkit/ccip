@@ -39,7 +39,7 @@ type chainReader struct {
 }
 
 func (cr *chainReader) QueryKey(ctx context.Context, contractName string, filter query.KeyFilter, limitAndSort query.LimitAndSort, sequenceDataType any) ([]commontypes.Sequence, error) {
-	return nil, fmt.Errorf("QueryKey for chainReader not yet implemented.")
+	return nil, fmt.Errorf("queryKey for chainReader not yet implemented")
 }
 
 // NewChainReaderService is a constructor for ChainReader, returns nil if there is any error

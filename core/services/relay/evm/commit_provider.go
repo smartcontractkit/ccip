@@ -110,7 +110,7 @@ func (P SrcCommitProvider) ContractTransmitter() ocrtypes.ContractTransmitter {
 	return UnimplementedContractTransmitter{}
 }
 
-func (P SrcCommitProvider) ChainReader() commontypes.ChainReader {
+func (P SrcCommitProvider) ChainReader() commontypes.ContractReader {
 	return nil
 }
 
@@ -146,7 +146,7 @@ func (P DstCommitProvider) ContractTransmitter() ocrtypes.ContractTransmitter {
 	return P.contractTransmitter
 }
 
-func (P DstCommitProvider) ChainReader() commontypes.ChainReader {
+func (P DstCommitProvider) ChainReader() commontypes.ContractReader {
 	return nil
 }
 
@@ -171,19 +171,19 @@ func (P DstCommitProvider) Start(ctx context.Context) error {
 }
 
 func (P SrcCommitProvider) NewPriceGetter(ctx context.Context) (priceGetter cciptypes.PriceGetter, err error) {
-	return nil, fmt.Errorf("Can't construct a price getter from one relayer.")
+	return nil, fmt.Errorf("can't construct a price getter from one relayer")
 }
 
 func (P DstCommitProvider) NewPriceGetter(ctx context.Context) (priceGetter cciptypes.PriceGetter, err error) {
-	return nil, fmt.Errorf("Can't construct a price getter from one relayer.")
+	return nil, fmt.Errorf("can't construct a price getter from one relayer")
 }
 
 func (P SrcCommitProvider) NewCommitStoreReader(ctx context.Context, commitStoreAddress cciptypes.Address) (commitStoreReader cciptypes.CommitStoreReader, err error) {
-	return nil, fmt.Errorf("Can't construct a commit store reader from one relayer.")
+	return nil, fmt.Errorf("can't construct a commit store reader from one relayer")
 }
 
 func (P DstCommitProvider) NewCommitStoreReader(ctx context.Context, commitStoreAddress cciptypes.Address) (commitStoreReader cciptypes.CommitStoreReader, err error) {
-	return nil, fmt.Errorf("Can't construct a commit store reader from one relayer.")
+	return nil, fmt.Errorf("can't construct a commit store reader from one relayer")
 }
 
 func (P SrcCommitProvider) NewOnRampReader(ctx context.Context, onRampAddress cciptypes.Address, sourceChainSelector uint64, destChainSelector uint64) (onRampReader cciptypes.OnRampReader, err error) {
@@ -193,11 +193,11 @@ func (P SrcCommitProvider) NewOnRampReader(ctx context.Context, onRampAddress cc
 }
 
 func (P DstCommitProvider) NewOnRampReader(ctx context.Context, onRampAddress cciptypes.Address, sourceChainSelector uint64, destChainSelector uint64) (onRampReader cciptypes.OnRampReader, err error) {
-	return nil, fmt.Errorf("NewOnRampReader called for DstCommitProvider.NewOnRampReader should be called on SrcCommitProvider")
+	return nil, fmt.Errorf("invalid: NewOnRampReader called for DstCommitProvider.NewOnRampReader should be called on SrcCommitProvider")
 }
 
 func (P SrcCommitProvider) NewOffRampReader(ctx context.Context, offRampAddr cciptypes.Address) (offRampReader cciptypes.OffRampReader, err error) {
-	return nil, fmt.Errorf("Called NewOffRampReader for SrcCommitProvider. NewOffRampReader should be called on DstCommitProvider")
+	return nil, fmt.Errorf("invalid: NewOffRampReader called for SrcCommitProvider. NewOffRampReader should be called on DstCommitProvider")
 }
 
 func (P DstCommitProvider) NewOffRampReader(ctx context.Context, offRampAddr cciptypes.Address) (offRampReader cciptypes.OffRampReader, err error) {
@@ -206,7 +206,7 @@ func (P DstCommitProvider) NewOffRampReader(ctx context.Context, offRampAddr cci
 }
 
 func (P SrcCommitProvider) NewPriceRegistryReader(ctx context.Context, addr cciptypes.Address) (priceRegistryReader cciptypes.PriceRegistryReader, err error) {
-	return nil, fmt.Errorf("Called NewPriceRegistryReader for SrcCommitProvider. NewOffRampReader should be called on DstCommitProvider")
+	return nil, fmt.Errorf("invalid: NewPriceRegistryReader called for SrcCommitProvider. NewOffRampReader should be called on DstCommitProvider")
 }
 
 func (P DstCommitProvider) NewPriceRegistryReader(ctx context.Context, addr cciptypes.Address) (priceRegistryReader cciptypes.PriceRegistryReader, err error) {
@@ -233,5 +233,5 @@ func (P SrcCommitProvider) SourceNativeToken(ctx context.Context, sourceRouterAd
 }
 
 func (P DstCommitProvider) SourceNativeToken(ctx context.Context, sourceRouterAddr cciptypes.Address) (cciptypes.Address, error) {
-	return "", fmt.Errorf("SourceNativeToken called for DstCommitProvider. SourceNativeToken should be called on SrcCommitProvider")
+	return "", fmt.Errorf("invalid: SourceNativeToken called for DstCommitProvider. SourceNativeToken should be called on SrcCommitProvider")
 }

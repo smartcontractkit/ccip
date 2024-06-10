@@ -1748,6 +1748,9 @@ func (d *Delegate) newServicesCCIPCommit(ctx context.Context, lggr logger.Sugare
 	}
 
 	dstProvider, err := d.ccipCommitGetDstProvider(ctx, jb, pluginJobSpecConfig, transmitterID)
+	if err != nil {
+		return nil, err
+	}
 
 	srcProvider, srcChainID, err := d.ccipCommitGetSrcProvider(ctx, jb, pluginJobSpecConfig, transmitterID, dstProvider)
 	if err != nil {
@@ -1812,6 +1815,7 @@ func (d *Delegate) ccipCommitGetDstProvider(ctx context.Context, jb job.Job, plu
 	if err != nil {
 		return nil, err
 	}
+
 	provider, err := dstRelayer.NewPluginProvider(ctx,
 		types.RelayArgs{
 			ContractID:   spec.ContractID,
@@ -1822,6 +1826,9 @@ func (d *Delegate) ccipCommitGetDstProvider(ctx context.Context, jb job.Job, plu
 			TransmitterID: transmitterID,
 			PluginConfig:  dstConfigBytes,
 		})
+	if err != nil {
+		return nil, fmt.Errorf("unable to create ccip commit provider: %w", err)
+	}
 	dstProvider, ok := provider.(types.CCIPCommitProvider)
 	if !ok {
 		return nil, fmt.Errorf("could not coerce PluginProvider to CCIPCommitProvider")
@@ -2045,7 +2052,7 @@ func (d *Delegate) ccipExecGetSrcProvider(ctx context.Context, jb job.Job, plugi
 	}
 	srcProvider, ok := provider.(types.CCIPExecProvider)
 	if !ok {
-		return nil, 0, fmt.Errorf("could not coerce PluginProvider to CCIPExecProvider: %w, err")
+		return nil, 0, fmt.Errorf("could not coerce PluginProvider to CCIPExecProvider: %w", err)
 	}
 
 	return

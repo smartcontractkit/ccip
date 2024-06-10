@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"math/big"
-	"net/url"
 	"strconv"
 	"time"
 
@@ -23,7 +22,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
 
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/txmgr"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/legacyevm"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
@@ -35,7 +33,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/observability"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/oraclelib"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/tokendata"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/tokendata/usdc"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/promwrapper"
 )
 
@@ -78,6 +75,9 @@ func NewExecServices(ctx context.Context, lggr logger.Logger, jb job.Job, srcPro
 	}
 
 	sourceWrappedNative, err := srcProvider.SourceNativeToken(ctx, dynamicOnRampConfig.Router)
+	if err != nil {
+		return nil, fmt.Errorf("get source wrapped native token: %w", err)
+	}
 
 	versionFinder := ccip.NewEvmVersionFinder()
 	commitStoreReader, err := factory.NewCommitStoreReader(lggr, versionFinder, offRampConfig.CommitStore, dstChain.Client(), dstChain.LogPoller(), srcChain.GasEstimator(), srcChain.Config().EVM().GasEstimator().PriceMax().ToInt())
@@ -89,14 +89,14 @@ func NewExecServices(ctx context.Context, lggr logger.Logger, jb job.Job, srcPro
 	// init usdc token data provider
 	if pluginConfig.USDCConfig.AttestationAPI != "" {
 		lggr.Infof("USDC token data provider enabled")
-		err := pluginConfig.USDCConfig.ValidateUSDCConfig()
-		if err != nil {
-			return nil, err
+		err2 := pluginConfig.USDCConfig.ValidateUSDCConfig()
+		if err2 != nil {
+			return nil, err2
 		}
 
-		usdcReader, err := srcProvider.NewTokenDataReader(ctx, ccip.EvmAddrToGeneric(pluginConfig.USDCConfig.SourceTokenAddress))
-		if err != nil {
-			return nil, fmt.Errorf("new usdc reader: %w", err)
+		usdcReader, err2 := srcProvider.NewTokenDataReader(ctx, ccip.EvmAddrToGeneric(pluginConfig.USDCConfig.SourceTokenAddress))
+		if err2 != nil {
+			return nil, fmt.Errorf("new usdc reader: %w", err2)
 		}
 		tokenDataProviders[cciptypes.Address(pluginConfig.USDCConfig.SourceTokenAddress.String())] = usdcReader
 	}
@@ -107,13 +107,10 @@ func NewExecServices(ctx context.Context, lggr logger.Logger, jb job.Job, srcPro
 	offRampReader = observability.NewObservedOffRampReader(offRampReader, dstChainID, ccip.ExecPluginLabel)
 	metricsCollector := ccip.NewPluginMetricsCollector(ccip.ExecPluginLabel, srcChainID, dstChainID)
 
-	// TODO: does offRampAddress2 = offRampAddress?
-	offRampAddress2, err := offRampReader.Address(ctx)
+	tokenPoolBatchedReader, err := dstProvider.NewTokenPoolBatchedReader(ctx, offRampAddress, srcChainSelector)
 	if err != nil {
-		return nil, fmt.Errorf("get offramp reader address: %w", err)
+		return nil, fmt.Errorf("new token pool batched reader: %w", err)
 	}
-
-	tokenPoolBatchedReader, err := dstProvider.NewTokenPoolBatchedReader(ctx, offRampAddress2, srcChainSelector)
 
 	chainHealthcheck := cache.NewObservedChainHealthCheck(
 		cache.NewChainHealthcheck(
@@ -234,41 +231,6 @@ func UnregisterExecPluginLpFilters(ctx context.Context, lggr logger.Logger, jb j
 // Only MessageIDs will be populated in the TxMeta.
 func ExecReportToEthTxMeta(ctx context.Context, typ ccipconfig.ContractType, ver semver.Version) (func(report []byte) (*txmgr.TxMeta, error), error) {
 	return factory.ExecReportToEthTxMeta(ctx, typ, ver)
-}
-
-func initTokenDataProviders(lggr logger.Logger, jobID string, pluginConfig ccipconfig.ExecPluginJobSpecConfig, sourceLP logpoller.LogPoller) (map[cciptypes.Address]tokendata.Reader, error) {
-	tokenDataProviders := make(map[cciptypes.Address]tokendata.Reader)
-
-	// init usdc token data provider
-	if pluginConfig.USDCConfig.AttestationAPI != "" {
-		lggr.Infof("USDC token data provider enabled")
-		err := pluginConfig.USDCConfig.ValidateUSDCConfig()
-		if err != nil {
-			return nil, err
-		}
-
-		attestationURI, err := url.ParseRequestURI(pluginConfig.USDCConfig.AttestationAPI)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse USDC attestation API: %w", err)
-		}
-
-		usdcReader, err := ccipdata.NewUSDCReader(lggr, jobID, pluginConfig.USDCConfig.SourceMessageTransmitterAddress, sourceLP, true)
-		if err != nil {
-			return nil, fmt.Errorf("new usdc reader: %w", err)
-		}
-
-		tokenDataProviders[cciptypes.Address(pluginConfig.USDCConfig.SourceTokenAddress.String())] =
-			usdc.NewUSDCTokenDataReader(
-				lggr,
-				usdcReader,
-				attestationURI,
-				int(pluginConfig.USDCConfig.AttestationAPITimeoutSeconds),
-				pluginConfig.USDCConfig.SourceTokenAddress,
-				time.Duration(pluginConfig.USDCConfig.AttestationAPIIntervalMilliseconds)*time.Millisecond,
-			)
-	}
-
-	return tokenDataProviders, nil
 }
 
 type jobSpecParams struct {
