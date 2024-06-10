@@ -863,11 +863,11 @@ func (ccipModule *CCIPCommon) DeployContracts(
 			if len(tokenDeployerFns) != noOfTokens {
 				if ccipModule.IsUSDCDeployment() && i == 0 {
 					// if it's USDC deployment, we deploy the burn mint token 677 with decimal 6 and cast it to ERC20Token
-					usdcToken, err := cd.DeployBurnMintERC677(new(big.Int).Mul(big.NewInt(1e6), big.NewInt(1e18)))
+					usdcToken, err := ccipModule.tokenDeployer.DeployBurnMintERC677(new(big.Int).Mul(big.NewInt(1e6), big.NewInt(1e18)))
 					if err != nil {
 						return fmt.Errorf("deploying bridge usdc token contract shouldn't fail %w", err)
 					}
-					token, err = cd.NewERC20TokenContract(usdcToken.ContractAddress)
+					token, err = ccipModule.tokenDeployer.NewERC20TokenContract(usdcToken.ContractAddress)
 					if err != nil {
 						return fmt.Errorf("getting new bridge usdc token contract shouldn't fail %w", err)
 					}
@@ -877,7 +877,7 @@ func (ccipModule *CCIPCommon) DeployContracts(
 							return fmt.Errorf("error in getting USDC domain %w", err)
 						}
 
-						ccipModule.TokenTransmitter, err = cd.DeployTokenTransmitter(domain, usdcToken.ContractAddress)
+						ccipModule.TokenTransmitter, err = ccipModule.tokenDeployer.DeployTokenTransmitter(domain, usdcToken.ContractAddress)
 						if err != nil {
 							return fmt.Errorf("deploying token transmitter shouldn't fail %w", err)
 						}
@@ -886,7 +886,7 @@ func (ccipModule *CCIPCommon) DeployContracts(
 						if ccipModule.TokenTransmitter == nil {
 							return fmt.Errorf("TokenTransmitter contract address is not provided")
 						}
-						ccipModule.TokenMessenger, err = cd.DeployTokenMessenger(ccipModule.TokenTransmitter.ContractAddress)
+						ccipModule.TokenMessenger, err = ccipModule.tokenDeployer.DeployTokenMessenger(ccipModule.TokenTransmitter.ContractAddress)
 						if err != nil {
 							return fmt.Errorf("deploying token messenger shouldn't fail %w", err)
 						}
@@ -907,11 +907,11 @@ func (ccipModule *CCIPCommon) DeployContracts(
 					}
 				} else {
 					// otherwise we deploy link token and cast it to ERC20Token
-					linkToken, err := cd.DeployLinkTokenContract()
+					linkToken, err := ccipModule.tokenDeployer.DeployLinkTokenContract()
 					if err != nil {
 						return fmt.Errorf("deploying bridge token contract shouldn't fail %w", err)
 					}
-					token, err = cd.NewERC20TokenContract(common.HexToAddress(linkToken.Address()))
+					token, err = ccipModule.tokenDeployer.NewERC20TokenContract(common.HexToAddress(linkToken.Address()))
 					if err != nil {
 						return fmt.Errorf("getting new bridge token contract shouldn't fail %w", err)
 					}
@@ -921,7 +921,7 @@ func (ccipModule *CCIPCommon) DeployContracts(
 					}
 				}
 			} else {
-				token, err = cd.DeployERC20TokenContract(tokenDeployerFns[i])
+				token, err = ccipModule.tokenDeployer.DeployERC20TokenContract(tokenDeployerFns[i])
 				if err != nil {
 					return fmt.Errorf("deploying bridge token contract shouldn't fail %w", err)
 				}
