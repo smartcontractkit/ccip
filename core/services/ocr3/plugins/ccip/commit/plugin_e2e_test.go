@@ -16,9 +16,6 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/smartcontractkit/ccipocr3/internal/libs/testhelpers"
-	"github.com/smartcontractkit/ccipocr3/internal/mocks"
-
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	//cciptypes "github.com/smartcontractkit/ccipocr3/ccipocr3-dont-merge"
 )
