@@ -38,6 +38,7 @@ abstract contract TokenPool is IPool, OwnerIsCreator {
   event Minted(address indexed sender, address indexed recipient, uint256 amount);
   event ChainAdded(
     uint64 remoteChainSelector,
+    bytes remoteToken,
     RateLimiter.Config outboundRateLimiterConfig,
     RateLimiter.Config inboundRateLimiterConfig
   );
@@ -271,7 +272,12 @@ abstract contract TokenPool is IPool, OwnerIsCreator {
           remoteTokenAddress: update.remoteTokenAddress
         });
 
-        emit ChainAdded(update.remoteChainSelector, update.outboundRateLimiterConfig, update.inboundRateLimiterConfig);
+        emit ChainAdded(
+          update.remoteChainSelector,
+          update.remoteTokenAddress,
+          update.outboundRateLimiterConfig,
+          update.inboundRateLimiterConfig
+        );
       } else {
         // If the chain doesn't exist, revert
         if (!s_remoteChainSelectors.remove(update.remoteChainSelector)) {

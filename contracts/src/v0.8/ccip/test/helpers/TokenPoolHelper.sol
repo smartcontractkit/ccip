@@ -25,7 +25,7 @@ contract TokenPoolHelper is TokenPool {
 
   function releaseOrMint(Pool.ReleaseOrMintInV1 calldata releaseOrMintIn)
     external
-    view
+    pure
     override
     returns (Pool.ReleaseOrMintOutV1 memory)
   {

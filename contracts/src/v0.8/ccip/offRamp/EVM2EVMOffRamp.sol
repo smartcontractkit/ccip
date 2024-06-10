@@ -564,7 +564,19 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
   // │                      Tokens and pools                        │
   // ================================================================
 
-  function _releaseOfMintToken(
+  /// @notice Uses a pool to release or mint a token to a receiver address in two steps. First, the pool is called
+  /// to release the tokens to the offRamp, then the offRamp calls the token contract to transfer the tokens to the
+  /// receiver. This is done to ensure the exact number of tokens, the pool claims to release are actually transferred.
+  /// @dev The local token address is validated through the TokenAdminRegistry. If, due to some misconfiguration, the
+  /// token is unknown to the registry, the offRamp will revert. The tx, and the tokens, can be retrieved by
+  /// registering the token on this chain, and re-trying the msg.
+  /// @param sourceAmount The amount of tokens to be released/minted.
+  /// @param originalSender The message sender on the source chain.
+  /// @param receiver The address that will receive the tokens.
+  /// @param sourceTokenData A struct containing the local token address, the source pool address and optional data
+  /// returned from the source pool.
+  /// @param offchainTokenData Data fetched offchain by the DON.
+  function _releaseOrMintToken(
     uint256 sourceAmount,
     bytes memory originalSender,
     address receiver,
@@ -656,7 +668,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
     destTokenAmounts = sourceTokenAmounts;
     uint256 value = 0;
     for (uint256 i = 0; i < sourceTokenAmounts.length; ++i) {
-      destTokenAmounts[i] = _releaseOfMintToken(
+      destTokenAmounts[i] = _releaseOrMintToken(
         sourceTokenAmounts[i].amount,
         originalSender,
         receiver,
