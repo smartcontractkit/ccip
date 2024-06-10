@@ -6,6 +6,9 @@
 # to familiarize themselves with this specification prior to reading the
 # corresponding Go implementation.
 #
+# NOTE: Even though the specification is written in a high-level programming language, it's purpose
+# is not to be executed. It is meant to be just a reference for the Go implementation.
+#
 class CommitPlugin:
     def __init__(self):
          self.cfg = {
@@ -26,7 +29,7 @@ class CommitPlugin:
 
     def observation(self, previous_outcome):
         # Observe last msg sequence numbers for each source chain: {sourceChain: sequenceNumber}
-        observed_seq_nums = previous_outcome.get("observed_seq_nums", {})
+        observed_seq_nums = previous_outcome.get("observed_seq_nums", default={})
         if self.can_read_dest():
             on_chain_seq_nums = self.offRamp.get_sequence_numbers()
             for (chain, seq_num) in on_chain_seq_nums.items():
@@ -47,15 +50,17 @@ class CommitPlugin:
         # Observe gas prices. {chain: gasPrice}
         gas_prices = self.get_gas_prices()
 
-        # Observe fChain for each chain
+        # Observe fChain for each chain. {chain: f_chain}
         f_chain = self.cfg["f_chain"]
 
         return (observed_seq_nums, new_msgs, token_prices, gas_prices, f_chain)
 
 
-    def validate_observation(self, observation):
-        observer_supported_chains = self.cfg["observer_info"][observation.observer]["supported_chains"]
+    def validate_observation(self, attributed_observation):
+        observation = attributed_observation.observation
+        observer = attributed_observation.observer
 
+        observer_supported_chains = self.cfg["observer_info"][observer]["supported_chains"]
         for (chain, msgs) in observation["new_msgs"].items():
             assert(chain in observer_supported_chains)
 
@@ -69,8 +74,8 @@ class CommitPlugin:
         return "2F+1"
 
     def outcome(self, observations):
-        f_chain = __consensus_f_chain(observations)
-        seq_nums = __consensus_seq_nums(observations, f_chain)
+        f_chain = consensus_f_chain(observations)
+        seq_nums = consensus_seq_nums(observations, f_chain)
 
         trees = {} # { chain: (root, min_seq_num, max_seq_num) }
         for (chain, msgs) in observations["new_msgs"]:
@@ -96,18 +101,10 @@ class CommitPlugin:
 
         return (seq_nums, trees, token_prices, gas_prices)
 
-    def __consensus_f_chain(observations):
-        f_chain_votes = observations["f_chain"].group_by_chain() # { chainA: [1, 1, 16, 16, 16, 16] }
-        return { ch: elem_most_occurrences(fs) for (ch, fs) in f_chain_votes.items() } # { chainA: 16 }
-
-    def __consensus_seq_nums(observations, f_chain):
-        seq_nums = observations["seq_nums"].group_by_chain(sort="asc") # { chainA: [4, 5, 5, 5, 5, 6, 6] }
-        for chain, seq_nums in observed_seq_nums.items():
-            if len(seq_nums) >= 2*f_chain[chain]+1:
-                seq_nums[chain] = seq_nums[f_chain[chain]] # with f=4 { chainA: 5 }
-
     def reports(self, outcome):
-        return new_report_from_outcome(outcome)
+        report = report_from_outcome(outcome)
+        encoded = report.chain_encode() # abi_encode for evm chains
+        return [encoded]
 
     def should_accept(self, report):
         if report is empty or invalid:
@@ -126,3 +123,22 @@ class CommitPlugin:
                 return False
 
         return True
+
+    def keep_cfg_in_sync(self):
+        # Polling the configuration on the on-chain contract.
+        # When the config is updated on-chain, updates the plugin's local copy to the most recent version.
+        pass
+
+def consensus_f_chain(observations):
+    f_chain_votes = observations["f_chain"].group_by_chain() # { chainA: [1, 1, 16, 16, 16, 16] }
+    return { ch: elem_most_occurrences(fs) for (ch, fs) in f_chain_votes.items() } # { chainA: 16 }
+
+def consensus_seq_nums(observations, f_chain):
+    seq_nums = observations["observed_seq_nums"].group_by_chain(sort="asc") # { chainA: [4, 5, 5, 5, 5, 6, 6] }
+    seq_nums_consensus = {}
+
+    for chain, seq_nums in observed_seq_nums.items():
+        if len(seq_nums) >= 2*f_chain[chain]+1:
+            seq_nums_consensus[chain] = seq_nums[f_chain[chain]] # with f=4 { chainA: 5 }
+
+    return seq_nums_consensus
