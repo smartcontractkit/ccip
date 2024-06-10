@@ -210,6 +210,8 @@ func NewPendingTransfer(tr Transfer) PendingTransfer {
 	}
 }
 
+type TransferID string
+
 type TransferStatus string
 
 const (
@@ -227,6 +229,26 @@ const (
 	// TransferStatusExecuted indicates that the transfer has been finalized and executed. This is a terminal state.
 	TransferStatusExecuted = "executed"
 )
+
+// Value returns the integer value of the TransferStatus, used for ordering.
+func (ts TransferStatus) Value() int {
+	switch ts {
+	case TransferStatusProposed:
+		return 1
+	case TransferStatusInflight:
+		return 2
+	case TransferStatusNotReady:
+		return 3
+	case TransferStatusReady:
+		return 4
+	case TransferStatusFinalized:
+		return 5
+	case TransferStatusExecuted:
+		return 6
+	default:
+		return 0
+	}
+}
 
 type Edge struct {
 	Source NetworkSelector
