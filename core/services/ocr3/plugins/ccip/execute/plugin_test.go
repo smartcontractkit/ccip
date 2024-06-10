@@ -27,7 +27,7 @@ func TestSomethingCool(t *testing.T) {
 
 	b := []byte(`{"1":1,"18446744073709551615":1}`)
 	var bar map[cciptypes.ChainSelector]int
-	json.Unmarshal(b, &bar)
+	assert.NoError(t, json.Unmarshal(b, &bar))
 	t.Log(bar)
 }
 
