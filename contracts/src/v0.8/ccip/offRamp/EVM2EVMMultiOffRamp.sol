@@ -55,7 +55,6 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, OCR2BaseN
   error NotACompatiblePool(address notPool);
   error InvalidDataLength(uint256 expected, uint256 got);
   error InvalidNewState(uint64 sourceChainSelector, uint64 sequenceNumber, Internal.MessageExecutionState newState);
-  error IndexOutOfRange();
   error InvalidStaticConfig(uint64 sourceChainSelector);
 
   /// @dev Atlas depends on this event, if changing, please notify Atlas.

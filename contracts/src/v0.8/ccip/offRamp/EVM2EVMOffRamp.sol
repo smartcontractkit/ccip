@@ -57,7 +57,6 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
   error NotACompatiblePool(address notPool);
   error InvalidDataLength(uint256 expected, uint256 got);
   error InvalidNewState(uint64 sequenceNumber, Internal.MessageExecutionState newState);
-  error IndexOutOfRange();
 
   /// @dev Atlas depends on this event, if changing, please notify Atlas.
   event ConfigSet(StaticConfig staticConfig, DynamicConfig dynamicConfig);
@@ -566,15 +565,12 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
   // ================================================================
 
   function _releaseOfMintToken(
-    Client.EVMTokenAmount memory sourceTokenAmount,
+    uint256 sourceAmount,
     bytes memory originalSender,
     address receiver,
-    bytes memory encodedSourceTokenData,
+    Internal.SourceTokenData memory sourceTokenData,
     bytes memory offchainTokenData
   ) internal returns (Client.EVMTokenAmount memory destTokenAmount) {
-    // This should never revert as the onRamp creates the sourceTokenData. Only the inner components from
-    // this struct come from untrusted sources.
-    Internal.SourceTokenData memory sourceTokenData = abi.decode(encodedSourceTokenData, (Internal.SourceTokenData));
     // We need to safely decode the token address from the sourceTokenData, as it could be wrong,
     // in which case it doesn't have to be a valid EVM address.
     address localToken = Internal._validateEVMAddress(sourceTokenData.destTokenAddress);
@@ -599,7 +595,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
         Pool.ReleaseOrMintInV1({
           originalSender: originalSender,
           receiver: receiver,
-          amount: sourceTokenAmount.amount,
+          amount: sourceAmount,
           remoteChainSelector: i_sourceChainSelector,
           sourcePoolAddress: sourceTokenData.sourcePoolAddress,
           sourcePoolData: sourceTokenData.extraData,
@@ -619,12 +615,12 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
     if (returnData.length != Pool.CCIP_POOL_V1_RET_BYTES) {
       revert InvalidDataLength(Pool.CCIP_POOL_V1_RET_BYTES, returnData.length);
     }
-    uint256 amount = abi.decode(returnData, (uint256));
+    uint256 localAmount = abi.decode(returnData, (uint256));
     // Since token pools send the tokens to the msg.sender, which is this offRamp, we need to
     // transfer them to the final receiver. We use the _callWithExactGasSafeReturnData function because
     // the token contracts are not considered trusted.
     (success, returnData,) = CallWithExactGas._callWithExactGasSafeReturnData(
-      abi.encodeWithSelector(IERC20.transfer.selector, receiver, amount),
+      abi.encodeWithSelector(IERC20.transfer.selector, receiver, localAmount),
       localToken,
       s_dynamicConfig.maxTokenTransferGas,
       Internal.GAS_FOR_CALL_EXACT_CHECK,
@@ -637,7 +633,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
       revert TokenHandlingError(returnData);
     }
 
-    return Client.EVMTokenAmount({token: localToken, amount: amount});
+    return Client.EVMTokenAmount({token: localToken, amount: localAmount});
   }
 
   /// @notice Uses pools to release or mint a number of different tokens to a receiver address.
@@ -661,7 +657,13 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
     uint256 value = 0;
     for (uint256 i = 0; i < sourceTokenAmounts.length; ++i) {
       destTokenAmounts[i] = _releaseOfMintToken(
-        sourceTokenAmounts[i], originalSender, receiver, encodedSourceTokenData[i], offchainTokenData[i]
+        sourceTokenAmounts[i].amount,
+        originalSender,
+        receiver,
+        // This should never revert as the onRamp encodes the sourceTokenData struct. Only the inner components from
+        // this struct come from untrusted sources.
+        abi.decode(encodedSourceTokenData[i], (Internal.SourceTokenData)),
+        offchainTokenData[i]
       );
 
       if (s_rateLimitedTokensDestToSource.contains(destTokenAmounts[i].token)) {
