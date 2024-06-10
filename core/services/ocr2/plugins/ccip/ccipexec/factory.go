@@ -8,6 +8,7 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcommon"
 
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache"
@@ -60,51 +61,73 @@ func (rf *ExecutionReportingPluginFactory) UpdateDynamicReaders(ctx context.Cont
 	return nil
 }
 
+type reportingPluginAndInfo struct {
+	plugin     types.ReportingPlugin
+	pluginInfo types.ReportingPluginInfo
+}
+
+// NewReportingPlugin registers a new ReportingPlugin
 func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.ReportingPluginConfig) (types.ReportingPlugin, types.ReportingPluginInfo, error) {
-	ctx := context.Background() // todo: consider setting a timeout
+	initialRetryDelay := rf.config.newReportingPluginRetryConfig.InitialDelay
+	maxDelay := rf.config.newReportingPluginRetryConfig.MaxDelay
 
-	destPriceRegistry, destWrappedNative, err := rf.config.offRampReader.ChangeConfig(ctx, config.OnchainConfig, config.OffchainConfig)
+	pluginAndInfo, err := ccipcommon.RetryUntilSuccess(rf.NewReportingPluginFn(config), initialRetryDelay, maxDelay)
 	if err != nil {
 		return nil, types.ReportingPluginInfo{}, err
 	}
-	// Open dynamic readers
-	err = rf.UpdateDynamicReaders(ctx, destPriceRegistry)
-	if err != nil {
-		return nil, types.ReportingPluginInfo{}, err
-	}
+	return pluginAndInfo.plugin, pluginAndInfo.pluginInfo, err
+}
 
-	offchainConfig, err := rf.config.offRampReader.OffchainConfig(ctx)
-	if err != nil {
-		return nil, types.ReportingPluginInfo{}, fmt.Errorf("get offchain config from offramp: %w", err)
-	}
+// NewReportingPluginFn implements the NewReportingPlugin logic. It is defined as a function so that it can easily be
+// retried via RetryUntilSuccess. NewReportingPlugin must return successfully in order for the Exec plugin to function,
+// hence why we can only keep retrying it until it succeeds.
+func (rf *ExecutionReportingPluginFactory) NewReportingPluginFn(config types.ReportingPluginConfig) func() (reportingPluginAndInfo, error) {
+	return func() (reportingPluginAndInfo, error) {
+		ctx := context.Background() // todo: consider setting a timeout
 
-	gasPriceEstimator, err := rf.config.offRampReader.GasPriceEstimator(ctx)
-	if err != nil {
-		return nil, types.ReportingPluginInfo{}, fmt.Errorf("get gas price estimator from offramp: %w", err)
-	}
-
-	onchainConfig, err := rf.config.offRampReader.OnchainConfig(ctx)
-	if err != nil {
-		return nil, types.ReportingPluginInfo{}, fmt.Errorf("get onchain config from offramp: %w", err)
-	}
-
-	// TODO: add to ExecOffchainConfig (chainlink-common) a BatchingStrategyId field
-	// batchingStrategyId := offchainConfig.BatchingStrategyId
-	batchingStrategyId := 0 // TODO: remove this line when the above TODO is done
-	var batchingStrategy BatchingStrategy
-	switch batchingStrategyId {
-	case 0:
-		batchingStrategy = &BestEffortBatchingStrategy{}
-	case 1:
-		batchingStrategy = &ZKOverflowBatchingStrategy{
-			// statuschecker: statuschecker.NewTransactionStatusChecker(rf.config.txManager),
+		destPriceRegistry, destWrappedNative, err := rf.config.offRampReader.ChangeConfig(ctx, config.OnchainConfig, config.OffchainConfig)
+		if err != nil {
+			return reportingPluginAndInfo{}, err
 		}
-	default:
-		batchingStrategy = &BestEffortBatchingStrategy{} // Default strategy
-	}
 
-	lggr := rf.config.lggr.Named("ExecutionReportingPlugin")
-	return &ExecutionReportingPlugin{
+		// Open dynamic readers
+		err = rf.UpdateDynamicReaders(ctx, destPriceRegistry)
+		if err != nil {
+			return reportingPluginAndInfo{}, err
+		}
+
+		offchainConfig, err := rf.config.offRampReader.OffchainConfig(ctx)
+		if err != nil {
+			return reportingPluginAndInfo{}, fmt.Errorf("get offchain config from offramp: %w", err)
+		}
+
+		gasPriceEstimator, err := rf.config.offRampReader.GasPriceEstimator(ctx)
+		if err != nil {
+			return reportingPluginAndInfo{}, fmt.Errorf("get gas price estimator from offramp: %w", err)
+		}
+
+		onchainConfig, err := rf.config.offRampReader.OnchainConfig(ctx)
+		if err != nil {
+			return reportingPluginAndInfo{}, fmt.Errorf("get onchain config from offramp: %w", err)
+		}
+
+		// TODO: add to ExecOffchainConfig (chainlink-common) a BatchingStrategyId field
+		// batchingStrategyId := offchainConfig.BatchingStrategyId
+		batchingStrategyId := 0 // TODO: remove this line when the above TODO is done
+		var batchingStrategy BatchingStrategy
+		switch batchingStrategyId {
+		case 0:
+			batchingStrategy = &BestEffortBatchingStrategy{}
+		case 1:
+			batchingStrategy = &ZKOverflowBatchingStrategy{
+				// statuschecker: statuschecker.NewTransactionStatusChecker(rf.config.txManager),
+			}
+		default:
+			batchingStrategy = &BestEffortBatchingStrategy{} // Default strategy
+		}
+
+		lggr := rf.config.lggr.Named("ExecutionReportingPlugin")
+		plugin := &ExecutionReportingPlugin{
 			F:                           config.F,
 			lggr:                        lggr,
 			offchainConfig:              offchainConfig,
@@ -125,7 +148,8 @@ func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.Repor
 			metricsCollector:            rf.config.metricsCollector,
 			chainHealthcheck:            rf.config.chainHealthcheck,
 			batchingStrategy:            batchingStrategy,
-		}, types.ReportingPluginInfo{
+		}
+		pluginInfo := types.ReportingPluginInfo{
 			Name: "CCIPExecution",
 			// Setting this to false saves on calldata since OffRamp doesn't require agreement between NOPs
 			// (OffRamp is only able to execute committed messages).
@@ -134,5 +158,8 @@ func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.Repor
 				MaxObservationLength: ccip.MaxObservationLength,
 				MaxReportLength:      MaxExecutionReportLength,
 			},
-		}, nil
+		}
+
+		return reportingPluginAndInfo{plugin, pluginInfo}, nil
+	}
 }

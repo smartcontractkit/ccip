@@ -52,6 +52,7 @@ compileContractLowOpts ccip/onRamp/EVM2EVMMultiOnRamp.sol
 compileContractLowOpts ccip/onRamp/EVM2EVMOnRamp.sol
 compileContract ccip/CommitStore.sol
 compileContract ccip/MultiCommitStore.sol
+compileContract ccip/MultiAggregateRateLimiter.sol
 compileContract ccip/Router.sol
 compileContract ccip/PriceRegistry.sol
 compileContract ccip/pools/LockReleaseTokenPool.sol
@@ -70,7 +71,6 @@ compileContract ccip/tokenAdminRegistry/RegistryModuleOwnerCustom.sol
 # Test helpers
 compileContract ccip/test/helpers/BurnMintERC677Helper.sol
 compileContract ccip/test/helpers/CommitStoreHelper.sol
-compileContract ccip/test/helpers/CustomTokenPool.sol
 compileContract ccip/test/helpers/receivers/MaybeRevertMessageReceiver.sol
 compileContract ccip/test/mocks/MockRMN.sol
 compileContract ccip/test/mocks/MockE2EUSDCTokenMessenger.sol
