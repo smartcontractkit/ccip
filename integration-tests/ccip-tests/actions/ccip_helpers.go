@@ -664,6 +664,10 @@ func (ccipModule *CCIPCommon) SyncUSDCDomain(destTransmitter *contracts.TokenTra
 		if err != nil {
 			return err
 		}
+		err = contracts.SendUSDCToUSDCPool(destTransmitter, destPoolAddr[i])
+		if err != nil {
+			return err
+		}
 	}
 	return ccipModule.ChainClient.WaitForEvents()
 }
@@ -822,36 +826,6 @@ func (ccipModule *CCIPCommon) DeployContracts(
 		}
 		ccipModule.Router = r
 	}
-	// if usdc deployment ,look for token transmitter and token messenger
-	if ccipModule.IsUSDCDeployment() {
-		// if existing deployment, no need to deploy new USDC contracts, it should be considered as a generic erc20 token
-		if ccipModule.ExistingDeployment {
-			return fmt.Errorf("existing deployment and new USDC deployment cannot be done together")
-		}
-		if ccipModule.TokenTransmitter == nil {
-			domain, err := GetUSDCDomain(ccipModule.ChainClient.GetNetworkName(), ccipModule.ChainClient.NetworkSimulated())
-			if err != nil {
-				return fmt.Errorf("error in getting USDC domain %w", err)
-			}
-			ccipModule.TokenTransmitter, err = cd.DeployTokenTransmitter(domain)
-			if err != nil {
-				return fmt.Errorf("deploying token transmitter shouldn't fail %w", err)
-			}
-		}
-		if ccipModule.TokenMessenger == nil {
-			if ccipModule.TokenTransmitter == nil {
-				return fmt.Errorf("TokenTransmitter contract address is not provided")
-			}
-			ccipModule.TokenMessenger, err = cd.DeployTokenMessenger(ccipModule.TokenTransmitter.ContractAddress)
-			if err != nil {
-				return fmt.Errorf("deploying token messenger shouldn't fail %w", err)
-			}
-			err = ccipModule.ChainClient.WaitForEvents()
-			if err != nil {
-				return fmt.Errorf("error in waiting for mock TokenMessenger and Transmitter deployment %w", err)
-			}
-		}
-	}
 	if ccipModule.FeeToken == nil {
 		if ccipModule.ExistingDeployment {
 			return fmt.Errorf("FeeToken contract address is not provided in lane config")
@@ -889,21 +863,47 @@ func (ccipModule *CCIPCommon) DeployContracts(
 			if len(tokenDeployerFns) != noOfTokens {
 				if ccipModule.IsUSDCDeployment() && i == 0 {
 					// if it's USDC deployment, we deploy the burn mint token 677 with decimal 6 and cast it to ERC20Token
-					erc677Token, err := ccipModule.tokenDeployer.DeployBurnMintERC677(new(big.Int).Mul(big.NewInt(1e6), big.NewInt(1e18)))
+					usdcToken, err := ccipModule.tokenDeployer.DeployBurnMintERC677(new(big.Int).Mul(big.NewInt(1e6), big.NewInt(1e18)))
 					if err != nil {
 						return fmt.Errorf("deploying bridge usdc token contract shouldn't fail %w", err)
 					}
-					token, err = ccipModule.tokenDeployer.NewERC20TokenContract(erc677Token.ContractAddress)
+					token, err = ccipModule.tokenDeployer.NewERC20TokenContract(usdcToken.ContractAddress)
 					if err != nil {
 						return fmt.Errorf("getting new bridge usdc token contract shouldn't fail %w", err)
 					}
-					// grant minter role to token messenger
+					if ccipModule.TokenTransmitter == nil {
+						domain, err := GetUSDCDomain(ccipModule.ChainClient.GetNetworkName(), ccipModule.ChainClient.NetworkSimulated())
+						if err != nil {
+							return fmt.Errorf("error in getting USDC domain %w", err)
+						}
+
+						ccipModule.TokenTransmitter, err = cd.DeployTokenTransmitter(domain, usdcToken.ContractAddress)
+						if err != nil {
+							return fmt.Errorf("deploying token transmitter shouldn't fail %w", err)
+						}
+					}
 					if ccipModule.TokenMessenger == nil {
+						if ccipModule.TokenTransmitter == nil {
+							return fmt.Errorf("TokenTransmitter contract address is not provided")
+						}
+						ccipModule.TokenMessenger, err = cd.DeployTokenMessenger(ccipModule.TokenTransmitter.ContractAddress)
+						if err != nil {
+							return fmt.Errorf("deploying token messenger shouldn't fail %w", err)
+						}
+						err = ccipModule.ChainClient.WaitForEvents()
+						if err != nil {
+							return fmt.Errorf("error in waiting for mock TokenMessenger and Transmitter deployment %w", err)
+						}
 						return fmt.Errorf("token messenger contract address is not provided")
 					}
-					err = erc677Token.GrantMintAndBurn(*ccipModule.TokenMessenger)
+					// grant minter role to token messenger
+					err = usdcToken.GrantMintAndBurn(*ccipModule.TokenMessenger)
 					if err != nil {
 						return fmt.Errorf("granting minter role to token messenger shouldn't fail %w", err)
+					}
+					err = usdcToken.GrantMintAndBurn(ccipModule.TokenTransmitter.ContractAddress)
+					if err != nil {
+						return fmt.Errorf("granting minter role to token transmitter shouldn't fail %w", err)
 					}
 				} else {
 					// otherwise we deploy link token and cast it to ERC20Token
@@ -3726,20 +3726,26 @@ func SetOCR2Config(
 	}
 	if destCCIP.OffRamp != nil {
 		signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig, err = contracts.NewOffChainAggregatorV2ConfigForCCIPPlugin(
-			nodes, testhelpers.NewExecOffchainConfig(
+			nodes,
+			testhelpers.NewExecOffchainConfig(
 				1,
 				BatchGasLimit,
 				0.7,
 				*inflightExpiryExec,
 				*commonconfig.MustNewDuration(RootSnoozeTime),
-			), testhelpers.NewExecOnchainConfig(
+			),
+			testhelpers.NewExecOnchainConfig(
 				uint32(DefaultPermissionlessExecThreshold.Seconds()),
 				destCCIP.Common.Router.EthAddress,
 				destCCIP.Common.PriceRegistry.EthAddress,
 				DefaultMaxNoOfTokensInMsg,
 				MaxDataBytes,
 				200_000,
-			), OCR2ParamsForExec, 3*time.Minute)
+				50_000,
+			),
+			OCR2ParamsForExec,
+			3*time.Minute,
+		)
 		if err != nil {
 			return fmt.Errorf("failed to create ocr2 config params for exec: %w", err)
 		}
