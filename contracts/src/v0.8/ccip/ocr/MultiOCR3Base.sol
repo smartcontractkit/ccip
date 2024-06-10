@@ -123,6 +123,8 @@ abstract contract MultiOCR3Base is ITypeAndVersion, OwnerIsCreator {
   }
 
   /// @notice sets offchain reporting protocol configuration incl. participating oracles
+  /// NOTE: The OCR3 config must be sanity-checked against the home-chain registry configuration, to ensure
+  /// home-chain and remote-chain parity!
   /// @param ocrConfigArgs OCR config update args
   function setOCR3Configs(OCRConfigArgs[] memory ocrConfigArgs) external onlyOwner {
     for (uint256 i; i < ocrConfigArgs.length; ++i) {

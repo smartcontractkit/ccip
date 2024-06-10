@@ -89,7 +89,7 @@ contract EVM2EVMMultiOffRamp_constructor is EVM2EVMMultiOffRampSetup {
 
     MultiOCR3Base.OCRConfigArgs[] memory ocrConfigs = new MultiOCR3Base.OCRConfigArgs[](1);
     ocrConfigs[0] = MultiOCR3Base.OCRConfigArgs({
-      ocrPluginType: uint8(EVM2EVMMultiOffRamp.OCRPluginType.Execution),
+      ocrPluginType: uint8(Internal.OCRPluginType.Execution),
       configDigest: s_configDigest,
       F: s_F,
       uniqueReports: false,
@@ -122,8 +122,7 @@ contract EVM2EVMMultiOffRamp_constructor is EVM2EVMMultiOffRampSetup {
       signers: s_emptySigners,
       transmitters: s_validTransmitters
     });
-    MultiOCR3Base.OCRConfig memory gotOCRConfig =
-      s_offRamp.latestConfigDetails(uint8(EVM2EVMMultiOffRamp.OCRPluginType.Execution));
+    MultiOCR3Base.OCRConfig memory gotOCRConfig = s_offRamp.latestConfigDetails(uint8(Internal.OCRPluginType.Execution));
     _assertOCRConfigEquality(expectedOCRConfig, gotOCRConfig);
 
     // uint64[] memory resultSourceChainSelectors = s_offRamp.getSourceChainSelectors();
@@ -2022,7 +2021,7 @@ contract EVM2EVMMultiOffRamp_transmitExec is EVM2EVMMultiOffRampSetup {
 
     vm.expectEmit();
     emit MultiOCR3Base.Transmitted(
-      uint8(EVM2EVMMultiOffRamp.OCRPluginType.Execution), s_configDigest, uint32(uint256(s_configDigest) >> 8)
+      uint8(Internal.OCRPluginType.Execution), s_configDigest, uint32(uint256(s_configDigest) >> 8)
     );
 
     vm.startPrank(s_validTransmitters[0]);
@@ -2063,7 +2062,7 @@ contract EVM2EVMMultiOffRamp_transmitExec is EVM2EVMMultiOffRampSetup {
 
     MultiOCR3Base.OCRConfigArgs[] memory ocrConfigs = new MultiOCR3Base.OCRConfigArgs[](1);
     ocrConfigs[0] = MultiOCR3Base.OCRConfigArgs({
-      ocrPluginType: uint8(EVM2EVMMultiOffRamp.OCRPluginType.Execution),
+      ocrPluginType: uint8(Internal.OCRPluginType.Execution),
       configDigest: s_configDigest,
       F: s_F,
       uniqueReports: false,
