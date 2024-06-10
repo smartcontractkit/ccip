@@ -49,9 +49,9 @@ const (
 	SystemContextAddress = "0x000000000000000000000000000000000000800B"
 
 	// ZksyncGasInfo_GetL2GasPerPubDataBytes is the a hex encoded call to:
-	// `function getCurrentPubdataSpent() external view returns (uint256 currentPubdataSpent);`
+	// function gasPerPubdataByte() external view returns (uint256 gasPerPubdataByte);
 	SystemContext_gasPerPubdataByteMethod = "gasPerPubdataByte"
-	ZksyncGasInfo_getGasPerPubdataByteL2  = "0xc0d5b949"
+	ZksyncGasInfo_getGasPerPubdataByteL2  = "0x7cb9357e"
 
 	// ZksyncGasInfo_GetL2GasPrice is the a hex encoded call to:
 	// `function gasPrice() external view returns (uint256);`
@@ -72,7 +72,7 @@ func NewZkSyncL1GasOracle(lggr logger.Logger, ethClient l1OracleClient) *zkSyncL
 	return &zkSyncL1Oracle{
 		client:     ethClient,
 		pollPeriod: PollPeriod,
-		logger:     logger.Sugared(logger.Named(lggr, "L1GasOracle(arbitrum)")),
+		logger:     logger.Sugared(logger.Named(lggr, "L1GasOracle(zkSync)")),
 		chainType:  config.ChainArbitrum,
 
 		systemContextAddress:  systemContextAddress,
@@ -189,8 +189,7 @@ func (o *zkSyncL1Oracle) GasPrice(_ context.Context) (l1GasPrice *assets.Wei, er
 // Gets the L1 gas cost for the provided transaction at the specified block num
 // If block num is not provided, the value on the latest block num is used
 func (o *zkSyncL1Oracle) GetGasCost(ctx context.Context, tx *gethtypes.Transaction, blockNum *big.Int) (*assets.Wei, error) {
-	//TODO
-	// L1GasCost = L1GasPrice from GasPrice ^  * tx.Gas() (This is to TBD)
+	//Unused method, so not implemented
 	l1GasCost := common.Big0
 	return assets.NewWei(l1GasCost), nil
 }
