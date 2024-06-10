@@ -140,8 +140,6 @@ contract EVM2EVMMultiOffRamp_constructor is EVM2EVMMultiOffRampSetup {
     assertEq("EVM2EVMMultiOffRamp 1.6.0-dev", s_offRamp.typeAndVersion());
     assertEq(OWNER, s_offRamp.owner());
     assertEq(0, s_offRamp.getLatestPriceEpochAndRound());
-    assertTrue(s_offRamp.isUnpausedAndNotCursed(sourceChainConfigs[0].sourceChainSelector));
-    assertTrue(s_offRamp.isUnpausedAndNotCursed(sourceChainConfigs[1].sourceChainSelector));
   }
 
   // Revert
@@ -3029,30 +3027,6 @@ contract EVM2EVMMultiOffRamp_applySourceChainConfigUpdates is EVM2EVMMultiOffRam
   }
 }
 
-contract EVM2EVMMultiOffRamp_isUnpausedAndRMNHealthy is EVM2EVMMultiOffRampSetup {
-  function test_RMN_Success() public {
-    // Test pausing
-    assertFalse(s_offRamp.paused());
-    assertTrue(s_offRamp.isUnpausedAndNotCursed(SOURCE_CHAIN_SELECTOR));
-    s_offRamp.pause();
-    assertTrue(s_offRamp.paused());
-    assertFalse(s_offRamp.isUnpausedAndNotCursed(SOURCE_CHAIN_SELECTOR));
-    s_offRamp.unpause();
-    assertFalse(s_offRamp.paused());
-    assertTrue(s_offRamp.isUnpausedAndNotCursed(SOURCE_CHAIN_SELECTOR));
-    // Test rmn
-    s_mockRMN.voteToCurse(0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff);
-    assertFalse(s_offRamp.isUnpausedAndNotCursed(SOURCE_CHAIN_SELECTOR));
-    RMN.UnvoteToCurseRecord[] memory records = new RMN.UnvoteToCurseRecord[](1);
-    records[0] = RMN.UnvoteToCurseRecord({curseVoteAddr: OWNER, cursesHash: bytes32(uint256(0)), forceUnvote: true});
-    s_mockRMN.ownerUnvoteToCurse(records);
-    assertTrue(s_offRamp.isUnpausedAndNotCursed(SOURCE_CHAIN_SELECTOR));
-    s_mockRMN.voteToCurse(0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff);
-    s_offRamp.pause();
-    assertFalse(s_offRamp.isUnpausedAndNotCursed(SOURCE_CHAIN_SELECTOR));
-  }
-}
-
 contract EVM2EVMMultiOffRamp_setLatestPriceEpochAndRound is EVM2EVMMultiOffRampSetup {
   function test_SetLatestPriceEpochAndRound_Success() public {
     uint40 latestRoundAndEpoch = 1782155;
@@ -3254,13 +3228,6 @@ contract EVM2EVMMultiOffRamp_reportCommit is EVM2EVMMultiOffRampSetup {
     assertEq(s_latestEpochAndRound, s_offRamp.getLatestPriceEpochAndRound());
   }
   // Reverts
-
-  function test_Paused_Revert() public {
-    s_offRamp.pause();
-    bytes memory report;
-    vm.expectRevert(EVM2EVMMultiOffRamp.PausedError.selector);
-    s_offRamp.reportCommit(report, ++s_latestEpochAndRound);
-  }
 
   function test_Unhealthy_Revert() public {
     s_mockRMN.voteToCurse(0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff);
@@ -3649,15 +3616,6 @@ contract EVM2EVMMultiOffRamp_verify is EVM2EVMMultiOffRampSetup {
   }
 
   // Reverts
-
-  function test_Paused_Revert() public {
-    s_offRamp.pause();
-    bytes32[] memory hashedLeaves = new bytes32[](0);
-    bytes32[] memory proofs = new bytes32[](0);
-    uint256 proofFlagBits = 0;
-    vm.expectRevert(EVM2EVMMultiOffRamp.PausedError.selector);
-    s_offRamp.verify(SOURCE_CHAIN_SELECTOR, hashedLeaves, proofs, proofFlagBits);
-  }
 
   function test_TooManyLeaves_Revert() public {
     bytes32[] memory leaves = new bytes32[](258);

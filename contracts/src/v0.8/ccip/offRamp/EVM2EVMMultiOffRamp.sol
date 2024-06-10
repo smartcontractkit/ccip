@@ -60,7 +60,6 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
   error InvalidStaticConfig(uint64 sourceChainSelector);
   error StaleCommitReport();
   error InvalidInterval(uint64 sourceChainSelector, Interval interval);
-  error PausedError();
 
   /// @dev Atlas depends on this event, if changing, please notify Atlas.
   event ConfigSet(StaticConfig staticConfig, DynamicConfig dynamicConfig);
@@ -77,8 +76,6 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
   event SourceChainSelectorAdded(uint64 sourceChainSelector);
   event SourceChainConfigSet(uint64 indexed sourceChainSelector, SourceChainConfig sourceConfig);
   event SkippedAlreadyExecutedMessage(uint64 sourceChainSelector, uint64 sequenceNumber);
-  event Paused(address account);
-  event Unpaused(address account);
   /// @dev RMN depends on this event, if changing, please notify the RMN maintainers.
   event CommitReportAccepted(CommitReport report);
   event RootRemoved(bytes32 root);
@@ -188,8 +185,6 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
   mapping(uint64 sourceChainSelector => mapping(bytes32 merkleRoot => uint256 timestamp)) internal s_roots;
   /// @dev The epoch and round of the last report
   uint40 private s_latestPriceEpochAndRound;
-  /// @dev Whether this OffRamp is paused or not
-  bool private s_paused = false;
 
   constructor(StaticConfig memory staticConfig, SourceChainConfigArgs[] memory sourceChainConfigs) MultiOCR3Base() {
     if (staticConfig.rmnProxy == address(0) || staticConfig.tokenAdminRegistry == address(0)) {
@@ -635,7 +630,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
   /// @notice Reporting function for the commit plugin
   /// @param encodedReport encoded CommitReport
   /// @param epochAndRound Epoch and round of the report
-  function _reportCommit(bytes calldata encodedReport, uint40 epochAndRound) internal whenNotPaused {
+  function _reportCommit(bytes calldata encodedReport, uint40 epochAndRound) internal {
     CommitReport memory report = abi.decode(encodedReport, (CommitReport));
 
     // Check if the report contains price updates
@@ -739,7 +734,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
     bytes32[] memory hashedLeaves,
     bytes32[] memory proofs,
     uint256 proofFlagBits
-  ) internal view virtual whenNotPaused returns (uint256 timestamp) {
+  ) internal view virtual returns (uint256 timestamp) {
     bytes32 root = MerkleMultiProof.merkleRoot(hashedLeaves, proofs, proofFlagBits);
     // Only return non-zero if present and blessed.
     if (!isBlessed(root)) {
@@ -941,42 +936,13 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
     revert();
   }
 
-  /// @notice Single function to check the status of the commitStore.
-  function isUnpausedAndNotCursed(uint64 sourceChainSelector) external view returns (bool) {
-    return !IRMN(i_rmnProxy).isCursed(bytes16(uint128(sourceChainSelector))) && !s_paused;
-  }
-
   /// @notice Validates that the source chain -> this chain lane, and reverts if it is cursed
   /// @param sourceChainSelector Source chain selector to check for cursing
   function _whenNotCursed(uint64 sourceChainSelector) internal view {
+    // TODO: implement ManualRMN fallback if RMN is not available
+    // TODO: implement global pausing capability in RMN
     if (IRMN(i_rmnProxy).isCursed(bytes16(uint128(sourceChainSelector)))) {
       revert CursedByRMN(sourceChainSelector);
     }
-  }
-
-  // TODO: global pausing can be removed delegated to the i_rmnProxy
-  /// @notice Modifier to make a function callable only when the contract is not paused.
-  modifier whenNotPaused() {
-    if (paused()) revert PausedError();
-    _;
-  }
-
-  /// @notice Returns true if the contract is paused, and false otherwise.
-  function paused() public view returns (bool) {
-    return s_paused;
-  }
-
-  /// @notice Pause the contract
-  /// @dev only callable by the owner
-  function pause() external onlyOwner {
-    s_paused = true;
-    emit Paused(msg.sender);
-  }
-
-  /// @notice Unpause the contract
-  /// @dev only callable by the owner
-  function unpause() external onlyOwner {
-    s_paused = false;
-    emit Unpaused(msg.sender);
   }
 }
