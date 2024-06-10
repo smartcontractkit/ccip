@@ -863,11 +863,11 @@ func (ccipModule *CCIPCommon) DeployContracts(
 			if len(tokenDeployerFns) != noOfTokens {
 				if ccipModule.IsUSDCDeployment() && i == 0 {
 					// if it's USDC deployment, we deploy the burn mint token 677 with decimal 6 and cast it to ERC20Token
-					usdcToken, err := ccipModule.tokenDeployer.DeployBurnMintERC677(new(big.Int).Mul(big.NewInt(1e6), big.NewInt(1e18)))
+					usdcToken, err := cd.DeployBurnMintERC677(new(big.Int).Mul(big.NewInt(1e6), big.NewInt(1e18)))
 					if err != nil {
 						return fmt.Errorf("deploying bridge usdc token contract shouldn't fail %w", err)
 					}
-					token, err = ccipModule.tokenDeployer.NewERC20TokenContract(usdcToken.ContractAddress)
+					token, err = cd.NewERC20TokenContract(usdcToken.ContractAddress)
 					if err != nil {
 						return fmt.Errorf("getting new bridge usdc token contract shouldn't fail %w", err)
 					}
@@ -894,8 +894,8 @@ func (ccipModule *CCIPCommon) DeployContracts(
 						if err != nil {
 							return fmt.Errorf("error in waiting for mock TokenMessenger and Transmitter deployment %w", err)
 						}
-						return fmt.Errorf("token messenger contract address is not provided")
 					}
+
 					// grant minter role to token messenger
 					err = usdcToken.GrantMintAndBurn(*ccipModule.TokenMessenger)
 					if err != nil {
@@ -907,11 +907,11 @@ func (ccipModule *CCIPCommon) DeployContracts(
 					}
 				} else {
 					// otherwise we deploy link token and cast it to ERC20Token
-					linkToken, err := ccipModule.tokenDeployer.DeployLinkTokenContract()
+					linkToken, err := cd.DeployLinkTokenContract()
 					if err != nil {
 						return fmt.Errorf("deploying bridge token contract shouldn't fail %w", err)
 					}
-					token, err = ccipModule.tokenDeployer.NewERC20TokenContract(common.HexToAddress(linkToken.Address()))
+					token, err = cd.NewERC20TokenContract(common.HexToAddress(linkToken.Address()))
 					if err != nil {
 						return fmt.Errorf("getting new bridge token contract shouldn't fail %w", err)
 					}
@@ -921,7 +921,7 @@ func (ccipModule *CCIPCommon) DeployContracts(
 					}
 				}
 			} else {
-				token, err = ccipModule.tokenDeployer.DeployERC20TokenContract(tokenDeployerFns[i])
+				token, err = cd.DeployERC20TokenContract(tokenDeployerFns[i])
 				if err != nil {
 					return fmt.Errorf("deploying bridge token contract shouldn't fail %w", err)
 				}
