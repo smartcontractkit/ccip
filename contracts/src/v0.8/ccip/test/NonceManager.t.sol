@@ -21,29 +21,19 @@ contract NonceManagerTest_incrementOutboundNonce is EVM2EVMMultiOnRampSetup {
 contract NonceManager_applyRampUpdates is EVM2EVMMultiOnRampSetup {
   function test_applyRampUpdates_Success() public {
     address newOnRamp = vm.addr(1);
-    address newOffRamp = vm.addr(2);
-    address prevOnRamp = vm.addr(4);
-    address prevOffRamp = vm.addr(3);
+    address prevOnRamp = vm.addr(2);
     NonceManager.PreviousRamp[] memory prevOnRamps = new NonceManager.PreviousRamp[](1);
     prevOnRamps[0] = NonceManager.PreviousRamp(DEST_CHAIN_SELECTOR, prevOnRamp);
-    NonceManager.PreviousRamp[] memory prevOffRamps = new NonceManager.PreviousRamp[](1);
-    prevOffRamps[0] = NonceManager.PreviousRamp(SOURCE_CHAIN_SELECTOR, prevOffRamp);
 
-    vm.expectEmit();
-    emit NonceManager.PreviousOnRampUpdated(DEST_CHAIN_SELECTOR, prevOnRamp);
-    vm.expectEmit();
-    emit NonceManager.PreviousOffRampUpdated(SOURCE_CHAIN_SELECTOR, prevOffRamp);
     vm.expectEmit();
     emit NonceManager.OnRampUpdated(newOnRamp);
     vm.expectEmit();
-    emit NonceManager.OffRampUpdated(newOffRamp);
+    emit NonceManager.PreviousOnRampUpdated(DEST_CHAIN_SELECTOR, prevOnRamp);
 
-    s_nonceManager.applyRampUpdates(newOnRamp, newOffRamp, prevOnRamps, prevOffRamps);
+    s_nonceManager.applyRampUpdates(newOnRamp, prevOnRamps);
 
     assertEq(s_nonceManager.getOnRamp(), newOnRamp);
-    assertEq(s_nonceManager.getOffRamp(), newOffRamp);
     assertEq(s_nonceManager.getPrevOnRamp(DEST_CHAIN_SELECTOR), prevOnRamp);
-    assertEq(s_nonceManager.getPrevOffRamp(SOURCE_CHAIN_SELECTOR), prevOffRamp);
   }
 
   function test_applyRampUpdatesOnlyOnRampUpdate_Success() public {
@@ -52,39 +42,20 @@ contract NonceManager_applyRampUpdates is EVM2EVMMultiOnRampSetup {
     vm.expectEmit();
     emit NonceManager.OnRampUpdated(newOnRamp);
 
-    s_nonceManager.applyRampUpdates(
-      newOnRamp, address(0), new NonceManager.PreviousRamp[](0), new NonceManager.PreviousRamp[](0)
-    );
+    s_nonceManager.applyRampUpdates(newOnRamp, new NonceManager.PreviousRamp[](0));
 
     assertEq(s_nonceManager.getOnRamp(), newOnRamp);
   }
 
-  function test_applyRampUpdatesOnlyOffRampUpdate_Success() public {
-    address newOffRamp = vm.addr(1);
-
-    vm.expectEmit();
-    emit NonceManager.OffRampUpdated(newOffRamp);
-
-    s_nonceManager.applyRampUpdates(
-      address(0), newOffRamp, new NonceManager.PreviousRamp[](0), new NonceManager.PreviousRamp[](0)
-    );
-
-    assertEq(s_nonceManager.getOffRamp(), newOffRamp);
-  }
-
-  function test_InvalidRampUpdatePreviousOnRampEqAddressZero_Revert() public {
+  function test_InvalidRampUpdatePreviousOnRampAlreadySet_Revert() public {
     NonceManager.PreviousRamp[] memory prevOnRamps = new NonceManager.PreviousRamp[](1);
-    prevOnRamps[0] = NonceManager.PreviousRamp(DEST_CHAIN_SELECTOR, address(0));
+    prevOnRamps[0] = NonceManager.PreviousRamp(DEST_CHAIN_SELECTOR, address(vm.addr(1)));
+
+    s_nonceManager.applyRampUpdates(address(0), prevOnRamps);
+
+    prevOnRamps[0] = NonceManager.PreviousRamp(DEST_CHAIN_SELECTOR, address(vm.addr(2)));
 
     vm.expectRevert(NonceManager.InvalidRampUpdate.selector);
-    s_nonceManager.applyRampUpdates(address(0), address(0), prevOnRamps, new NonceManager.PreviousRamp[](0));
-  }
-
-  function test_InvalidRampUpdatePreviousOffRampEqAddressZero_Revert() public {
-    NonceManager.PreviousRamp[] memory prevOffRamps = new NonceManager.PreviousRamp[](1);
-    prevOffRamps[0] = NonceManager.PreviousRamp(SOURCE_CHAIN_SELECTOR, address(0));
-
-    vm.expectRevert(NonceManager.InvalidRampUpdate.selector);
-    s_nonceManager.applyRampUpdates(address(0), address(0), new NonceManager.PreviousRamp[](0), prevOffRamps);
+    s_nonceManager.applyRampUpdates(address(0), prevOnRamps);
   }
 }
