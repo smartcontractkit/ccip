@@ -230,19 +230,14 @@ func (p *Plugin) Outcome(outctx ocr3types.OutcomeContext, query types.Query, aos
 		}
 	}
 
-	/*
-		// TODO: carry over reports which weren't executed by adding them to mergedCommitObservations.
-
-		// TODO: do messages even go into the outcome??? I don't think so. Just the Observation.
-		//       on the other hand, outcomes can be large since they aren't gossipped.
-
-		// TODO: filter out messages which are not associated with any pending commit reports.
-	*/
+	// TODO: select reports and messages for the final exec report.
+	// TODO: may only need the proofs for the final exec report rather than the report and the messages.
 
 	return cciptypes.NewExecutePluginOutcome(reports).Encode()
 }
 
 func (p *Plugin) Reports(seqNr uint64, outcome ocr3types.Outcome) ([]ocr3types.ReportWithInfo[[]byte], error) {
+
 	panic("implement me")
 }
 
