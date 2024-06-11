@@ -615,7 +615,7 @@ func (pool *TokenPool) SyncUSDCDomain(destTokenTransmitter *TokenTransmitter, de
 	return pool.client.ProcessTransaction(tx)
 }
 
-func (pool *TokenPool) SendUSDCToUSDCPool() error {
+func (pool *TokenPool) MintUSDCToUSDCPool() error {
 	if !pool.IsUSDC() {
 		return fmt.Errorf("pool is not a USDC pool, cannot send USDC")
 	}

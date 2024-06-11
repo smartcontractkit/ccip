@@ -644,7 +644,7 @@ func (ccipModule *CCIPCommon) SyncUSDCDomain(destTransmitter *contracts.TokenTra
 		if err != nil {
 			return err
 		}
-		err = destPool.SendUSDCToUSDCPool()
+		err = destPool.MintUSDCToUSDCPool()
 		if err != nil {
 			return err
 		}
