@@ -373,8 +373,8 @@ func (ccipModule *CCIPCommon) LoadContractAddresses(conf *laneconfig.LaneConfig,
 
 // ApproveTokens approves tokens for the router to send usually a massive amount of tokens enough to cover all the ccip transfers
 // to be triggered by the test.
-// Also, if the test is using self-serve tokens and pools deployed by the non-default address, this sends the same amount of tokens
-// to the default address so that it can actually send those tokens on CCIP
+// Also, if the test is using self-serve tokens and pools deployed by a separate `tokenDeployer` address, this sends some of those tokens
+// to the default `ccipOwner` address to be used for the test.
 func (ccipModule *CCIPCommon) ApproveTokens() error {
 	isApproved := false
 	for _, token := range ccipModule.BridgeTokens {
