@@ -294,8 +294,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
     uint256[][] memory gasLimitOverrides
   ) external {
     // We do this here because the other _execute path is already covered by MultiOCR3Base.
-    // TODO: contract size golfing - split to internal function
-    if (i_chainID != block.chainid) revert MultiOCR3Base.ForkedChain(i_chainID, uint64(block.chainid));
+    _whenChainNotForked();
 
     uint256 numReports = reports.length;
     if (numReports != gasLimitOverrides.length) revert ManualExecutionGasLimitMismatch();

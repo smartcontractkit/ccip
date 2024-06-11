@@ -259,7 +259,7 @@ abstract contract MultiOCR3Base is ITypeAndVersion, OwnerIsCreator {
     // If the cached chainID at time of deployment doesn't match the current chainID, we reject all signed reports.
     // This avoids a (rare) scenario where chain A forks into chain A and A', A' still has configDigest
     // calculated from chain A and so OCR reports will be valid on both forks.
-    if (i_chainID != block.chainid) revert ForkedChain(i_chainID, block.chainid);
+    _whenChainNotForked();
 
     // Scoping this reduces stack pressure and gas usage
     {
@@ -322,6 +322,11 @@ abstract contract MultiOCR3Base is ITypeAndVersion, OwnerIsCreator {
       if (signed[oracle.index]) revert NonUniqueSignatures();
       signed[oracle.index] = true;
     }
+  }
+
+  /// @notice Validates that the chain ID has not diverged after deployment. Reverts if the chain IDs do not match
+  function _whenChainNotForked() internal {
+    if (i_chainID != block.chainid) revert ForkedChain(i_chainID, block.chainid);
   }
 
   /// @notice information about current offchain reporting protocol configuration
