@@ -227,8 +227,6 @@ abstract contract MultiOCR3Base is ITypeAndVersion, OwnerIsCreator {
     // TRANSMIT_MSGDATA_CONSTANT_LENGTH_COMPONENT need to be changed accordingly
     bytes32[3] calldata reportContext,
     bytes calldata report,
-    // TODO: revisit trade-off - converting this to calldata and using one CONSTANT_LENGTH_COMPONENT
-    //       decreases contract size by ~220B, decreasees commit gas usage by ~400 gas, but increases exec gas usage by ~3600 gas
     bytes32[] memory rs,
     bytes32[] memory ss,
     bytes32 rawVs // signatures
@@ -324,7 +322,7 @@ abstract contract MultiOCR3Base is ITypeAndVersion, OwnerIsCreator {
   }
 
   /// @notice Validates that the chain ID has not diverged after deployment. Reverts if the chain IDs do not match
-  function _whenChainNotForked() internal {
+  function _whenChainNotForked() internal view {
     if (i_chainID != block.chainid) revert ForkedChain(i_chainID, block.chainid);
   }
 

@@ -168,7 +168,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
 
   /// @notice SourceConfig per chain
   /// (forms lane configurations from sourceChainSelector => StaticConfig.chainSelector)
-  mapping(uint64 sourceChainSelector => SourceChainConfig) internal s_sourceChainConfigs;
+  mapping(uint64 sourceChainSelector => SourceChainConfig sourceChainConfig) internal s_sourceChainConfigs;
 
   // STATE
   /// @dev The expected nonce for a given sender per source chain.
@@ -472,7 +472,6 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
 
       // Although we expect only valid messages will be committed, we check again
       // when executing as a defense in depth measure.
-      // TODO: GAS GOLF - evaluate caching sequenceNumber instead of offchainTokenData
       bytes[] memory offchainTokenData = report.offchainTokenData[i];
       if (message.tokenAmounts.length != offchainTokenData.length) {
         revert TokenDataMismatch(sourceChainSelector, message.sequenceNumber);
