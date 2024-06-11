@@ -1338,8 +1338,8 @@ github.com/pelletier/go-toml v1.2.0/go.mod h1:5z9KED0ma1S8pY6P1sdut58dfprrGBbd/9
 github.com/pelletier/go-toml v1.7.0/go.mod h1:vwGMzjaWMwyfHwgIBhI2YUM4fB6nL6lVAvS1LBMMhTE=
 github.com/pelletier/go-toml v1.9.5 h1:4yBQzkHv+7BHq2PQUZF3Mx0IYxG7LsP222s7Agd3ve8=
 github.com/pelletier/go-toml v1.9.5/go.mod h1:u1nR/EPcESfeI/szUZKdtJ0xRNbUoANCkoOuaOx1Y+c=
-github.com/pelletier/go-toml/v2 v2.1.1 h1:LWAJwfNvjQZCFIDKWYQaM62NcYeYViCmWIwmOStowAI=
-github.com/pelletier/go-toml/v2 v2.1.1/go.mod h1:tJU2Z3ZkXwnxa4DPO899bsyIoywizdUvyaeZurnPPDc=
+github.com/pelletier/go-toml/v2 v2.2.2 h1:aYUidT7k73Pcl9nb2gScu7NSrKCSHIDE89b3+6Wq+LM=
+github.com/pelletier/go-toml/v2 v2.2.2/go.mod h1:1t835xjRzz80PqgE6HHgN2JOsmgYu/h4qDAS4n929Rs=
 github.com/peterbourgon/diskv v2.0.1+incompatible h1:UBdAOUP5p4RWqPBg048CAvpKN+vxiaj6gdUUzhl4XmI=
 github.com/peterbourgon/diskv v2.0.1+incompatible/go.mod h1:uqqh8zWWbv1HBMNONnaR/tNboyR3/BZd58JJSHlUSCU=
 github.com/petermattis/goid v0.0.0-20180202154549-b0b1615b78e5/go.mod h1:jvVRKCrJTQWu0XVbaOlby/2lO20uSCHEMzzplHXte1o=
@@ -1508,8 +1508,13 @@ github.com/smartcontractkit/chainlink-solana v1.0.3-0.20240422172640-59d47c73ba5
 github.com/smartcontractkit/chainlink-solana v1.0.3-0.20240422172640-59d47c73ba58/go.mod h1:oV5gIuSKrPEcjQ6uB6smBsm5kXHxyydVLNyAs4V9CoQ=
 github.com/smartcontractkit/chainlink-starknet/relayer v0.0.1-beta-test.0.20240325075535-0f7eb05ee595 h1:y6ks0HsSOhPUueOmTcoxDQ50RCS1XINlRDTemZyHjFw=
 github.com/smartcontractkit/chainlink-starknet/relayer v0.0.1-beta-test.0.20240325075535-0f7eb05ee595/go.mod h1:vV6WfnVIbK5Q1JsIru4YcTG0T1uRpLJm6t2BgCnCSsg=
+<<<<<<< HEAD
 github.com/smartcontractkit/chainlink-testing-framework v1.30.0 h1:7c3eFaZ4ZfzBnzvgvKF9fLRxPGabNZuJOfqTmofpB40=
 github.com/smartcontractkit/chainlink-testing-framework v1.30.0/go.mod h1:oEIggLGWyWfLkjWvuXLol8inUT4YbBb06fJx/S60gQ4=
+=======
+github.com/smartcontractkit/chainlink-testing-framework v1.29.1 h1:PbcWaSFd9i2Co9ketZ+1NbCkCgeuHC/nrb08mGlRT3k=
+github.com/smartcontractkit/chainlink-testing-framework v1.29.1/go.mod h1:oEIggLGWyWfLkjWvuXLol8inUT4YbBb06fJx/S60gQ4=
+>>>>>>> 0e7bbc3403e0a47db07f25063e425cf997af99d0
 github.com/smartcontractkit/chainlink-testing-framework/grafana v0.0.0-20240227164431-18a7065e23ea h1:ZdLmNAfKRjH8AYUvjiiDGUgiWQfq/7iNpxyTkvjx/ko=
 github.com/smartcontractkit/chainlink-testing-framework/grafana v0.0.0-20240227164431-18a7065e23ea/go.mod h1:gCKC9w6XpNk6jm+XIk2psrkkfxhi421N9NSiFceXW88=
 github.com/smartcontractkit/chainlink-vrf v0.0.0-20231120191722-fef03814f868 h1:FFdvEzlYwcuVHkdZ8YnZR/XomeMGbz5E2F2HZI3I3w8=
