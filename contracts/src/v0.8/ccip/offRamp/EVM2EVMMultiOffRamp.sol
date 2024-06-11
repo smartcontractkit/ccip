@@ -62,7 +62,8 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
   error InvalidInterval(uint64 sourceChainSelector, Interval interval);
 
   /// @dev Atlas depends on this event, if changing, please notify Atlas.
-  event ConfigSet(StaticConfig staticConfig, DynamicConfig dynamicConfig);
+  event StaticConfigSet(StaticConfig staticConfig);
+  event DynamicConfigSet(DynamicConfig dynamicConfig);
   event SkippedIncorrectNonce(uint64 sourceChainSelector, uint64 nonce, address sender);
   event SkippedSenderWithPreviousRampMessageInflight(uint64 sourceChainSelector, uint64 nonce, address sender);
   /// @dev RMN depends on this event, if changing, please notify the RMN maintainers.
@@ -197,6 +198,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
     i_chainSelector = staticConfig.chainSelector;
     i_rmnProxy = staticConfig.rmnProxy;
     i_tokenAdminRegistry = staticConfig.tokenAdminRegistry;
+    emit StaticConfigSet(staticConfig);
 
     _applySourceChainConfigUpdates(sourceChainConfigs);
   }
@@ -324,7 +326,6 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
   function execute(bytes32[3] calldata reportContext, bytes calldata report) external {
     _reportExec(report);
 
-    // TODO: gas / contract size saving from CONSTANT?
     bytes32[] memory emptySigs = new bytes32[](0);
     _transmit(uint8(Internal.OCRPluginType.Execution), reportContext, report, emptySigs, emptySigs, bytes32(""));
   }
@@ -829,11 +830,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
 
     s_dynamicConfig = dynamicConfig;
 
-    // TODO: contract size golfing - is StaticConfig needed in the event?
-    emit ConfigSet(
-      StaticConfig({chainSelector: i_chainSelector, rmnProxy: i_rmnProxy, tokenAdminRegistry: i_tokenAdminRegistry}),
-      dynamicConfig
-    );
+    emit DynamicConfigSet(dynamicConfig);
   }
 
   // ================================================================

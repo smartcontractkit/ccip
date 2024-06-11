@@ -77,6 +77,9 @@ contract EVM2EVMMultiOffRamp_constructor is EVM2EVMMultiOffRampSetup {
     });
 
     vm.expectEmit();
+    emit EVM2EVMMultiOffRamp.StaticConfigSet(staticConfig);
+
+    vm.expectEmit();
     emit EVM2EVMMultiOffRamp.SourceChainSelectorAdded(SOURCE_CHAIN_SELECTOR_1);
 
     vm.expectEmit();
@@ -258,7 +261,7 @@ contract EVM2EVMMultiOffRamp_setDynamicConfig is EVM2EVMMultiOffRampSetup {
       _generateDynamicMultiOffRampConfig(USER_3, address(s_priceRegistry));
 
     vm.expectEmit();
-    emit EVM2EVMMultiOffRamp.ConfigSet(staticConfig, dynamicConfig);
+    emit EVM2EVMMultiOffRamp.DynamicConfigSet(dynamicConfig);
 
     s_offRamp.setDynamicConfig(dynamicConfig);
 
@@ -273,7 +276,7 @@ contract EVM2EVMMultiOffRamp_setDynamicConfig is EVM2EVMMultiOffRampSetup {
     dynamicConfig.messageValidator = address(s_messageValidator);
 
     vm.expectEmit();
-    emit EVM2EVMMultiOffRamp.ConfigSet(staticConfig, dynamicConfig);
+    emit EVM2EVMMultiOffRamp.DynamicConfigSet(dynamicConfig);
 
     s_offRamp.setDynamicConfig(dynamicConfig);
 

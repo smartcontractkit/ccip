@@ -4,7 +4,6 @@ pragma solidity ^0.8.0;
 import {OwnerIsCreator} from "../../shared/access/OwnerIsCreator.sol";
 import {ITypeAndVersion} from "../../shared/interfaces/ITypeAndVersion.sol";
 
-// TODO: consider splitting configs & verification logic off to auth library (if size is prohibitive)
 /// @notice Onchain verification of reports from the offchain reporting protocol
 ///         with multiple OCR plugin support.
 abstract contract MultiOCR3Base is ITypeAndVersion, OwnerIsCreator {
