@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity ^0.8.24;
+pragma solidity 0.8.24;
 
 import {ITypeAndVersion} from "../../shared/interfaces/ITypeAndVersion.sol";
-
 import {ICapabilityConfiguration} from "./interfaces/ICapabilityConfiguration.sol";
 import {ICapabilityRegistry} from "./interfaces/ICapabilityRegistry.sol";
 
@@ -84,15 +83,14 @@ contract CCIPCapabilityConfiguration is ITypeAndVersion, ICapabilityConfiguratio
   }
 
   /// @notice OCR3 configuration.
-  /// @param offchainConfig The offchain configuration for the OCR3 protocol. Protobuf encoded.
   struct OCR3Config {
-    PluginType pluginType; // ───────╮ The plugin that the configuration is for.
-    uint64 chainSelector; //         | The (remote) chain that the configuration is for.
-    uint8 F; //                      | The "big F" parameter for the role DON.
-    uint64 offchainConfigVersion; // ╯ The version of the offchain configuration.
+    PluginType pluginType; // ────────╮ The plugin that the configuration is for.
+    uint64 chainSelector; //          | The (remote) chain that the configuration is for.
+    uint8 F; //                       | The "big F" parameter for the role DON.
+    uint64 offchainConfigVersion; // ─╯ The version of the offchain configuration.
     bytes32 offrampAddress; // The remote chain combined (offramp|commit store) address.
-    bytes32[2][] signers; // An associative array that contains (onchain signer public key, p2p id) pairs.
-    bytes32[2][] transmitters; // An associative array that contains (transmitter, p2p id) pairs.
+    bytes32[2][] signers; // An associative array that contains (p2p id, onchain signer public key) pairs.
+    bytes32[2][] transmitters; // An associative array that contains (p2p id, transmitter) pairs.
     bytes offchainConfig; // The offchain configuration for the OCR3 protocol. Protobuf encoded.
   }
 
@@ -142,7 +140,7 @@ contract CCIPCapabilityConfiguration is ITypeAndVersion, ICapabilityConfiguratio
   function getAllChainConfigs() external view returns (ChainConfigInfo[] memory) {
     uint256[] memory chainSelectors = s_chainSelectors.values();
     ChainConfigInfo[] memory chainConfigs = new ChainConfigInfo[](s_chainSelectors.length());
-    for (uint256 i = 0; i < chainSelectors.length; i++) {
+    for (uint256 i = 0; i < chainSelectors.length; ++i) {
       uint64 chainSelector = uint64(chainSelectors[i]);
       chainConfigs[i] = ChainConfigInfo({
         chainSelector: chainSelector,
@@ -314,7 +312,7 @@ contract CCIPCapabilityConfiguration is ITypeAndVersion, ICapabilityConfiguratio
     }
 
     OCR3ConfigWithMeta[] memory newConfigWithMeta = new OCR3ConfigWithMeta[](newConfig.length);
-    for (uint256 i = 0; i < configCounts.length; i++) {
+    for (uint256 i = 0; i < configCounts.length; ++i) {
       _validateConfig(newConfig[i]);
       newConfigWithMeta[i] = OCR3ConfigWithMeta({
         config: newConfig[i],
@@ -413,10 +411,7 @@ contract CCIPCapabilityConfiguration is ITypeAndVersion, ICapabilityConfiguratio
       // p2pId is always the RageP2P public key of the oracle.
       // signer is the onchain public key of the oracle, which is an address on EVM chains
       // but could be different on other chain families.
-      bytes32[2] memory signerP2PIdPair = cfg.signers[i];
-
-      // The provided p2pId must be in the capability registry.
-      _ensureInRegistry(signerP2PIdPair[0]);
+      _ensureInRegistry(cfg.signers[i][0]);
     }
   }
 
@@ -460,10 +455,10 @@ contract CCIPCapabilityConfiguration is ITypeAndVersion, ICapabilityConfiguratio
 
   /// @notice Sets and/or removes chain configurations.
   /// @param chainSelectorRemoves The chain configurations to remove.
-  /// @param adds The chain configurations to add.
+  /// @param chainConfigAdds The chain configurations to add.
   function applyChainConfigUpdates(
     uint64[] calldata chainSelectorRemoves,
-    ChainConfigInfo[] calldata adds
+    ChainConfigInfo[] calldata chainConfigAdds
   ) external onlyOwner {
     // Process removals first.
     for (uint256 i = 0; i < chainSelectorRemoves.length; i++) {
@@ -480,10 +475,10 @@ contract CCIPCapabilityConfiguration is ITypeAndVersion, ICapabilityConfiguratio
     }
 
     // Process additions next.
-    for (uint256 i = 0; i < adds.length; i++) {
-      ChainConfig memory chainConfig = adds[i].chainConfig;
+    for (uint256 i = 0; i < chainConfigAdds.length; i++) {
+      ChainConfig memory chainConfig = chainConfigAdds[i].chainConfig;
       bytes32[] memory readers = chainConfig.readers;
-      uint64 chainSelector = adds[i].chainSelector;
+      uint64 chainSelector = chainConfigAdds[i].chainSelector;
 
       // Verify that the provided readers are present in the capability registry.
       for (uint256 j = 0; j < readers.length; j++) {
