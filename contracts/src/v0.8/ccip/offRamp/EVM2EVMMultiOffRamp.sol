@@ -368,16 +368,11 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
     uint256[] memory manualExecGasLimits
   ) internal {
     uint64 sourceChainSelector = report.sourceChainSelector;
-    _whenNotCursed(sourceChainSelector);
+    SourceChainConfig storage sourceChainConfig = _getSourceChainConfigWithCurseCheck(sourceChainSelector);
 
     uint256 numMsgs = report.messages.length;
     if (numMsgs == 0) revert EmptyReport();
     if (numMsgs != report.offchainTokenData.length) revert UnexpectedTokenData();
-
-    SourceChainConfig storage sourceChainConfig = s_sourceChainConfigs[sourceChainSelector];
-    if (!sourceChainConfig.isEnabled) {
-      revert SourceChainNotEnabled(sourceChainSelector);
-    }
 
     bytes32[] memory hashedLeaves = new bytes32[](numMsgs);
 
@@ -656,10 +651,8 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
       MerkleRoot memory root = report.merkleRoots[i];
       uint64 sourceChainSelector = root.sourceChainSelector;
 
-      _whenNotCursed(sourceChainSelector);
-      SourceChainConfig storage sourceChainConfig = s_sourceChainConfigs[sourceChainSelector];
+      SourceChainConfig storage sourceChainConfig = _getSourceChainConfigWithCurseCheck(sourceChainSelector);
 
-      if (!sourceChainConfig.isEnabled) revert SourceChainNotEnabled(sourceChainSelector);
       // If we reached this section, the report should contain a valid root
       if (sourceChainConfig.minSeqNr != root.interval.min || root.interval.min > root.interval.max) {
         revert InvalidInterval(root.sourceChainSelector, root.interval);
@@ -931,13 +924,24 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
     revert();
   }
 
-  /// @notice Validates that the source chain -> this chain lane, and reverts if it is cursed
+  /// @notice Validates that the source chain -> this chain lane is healthy, and reverts if it is cursed or disabled
   /// @param sourceChainSelector Source chain selector to check for cursing
-  function _whenNotCursed(uint64 sourceChainSelector) internal view {
+  function _getSourceChainConfigWithCurseCheck(uint64 sourceChainSelector)
+    internal
+    view
+    returns (SourceChainConfig storage)
+  {
     // TODO: implement ManualRMN fallback if RMN is not available
     // TODO: implement global pausing capability in RMN
     if (IRMN(i_rmnProxy).isCursed(bytes16(uint128(sourceChainSelector)))) {
       revert CursedByRMN(sourceChainSelector);
     }
+
+    SourceChainConfig storage sourceChainConfig = s_sourceChainConfigs[sourceChainSelector];
+    if (!sourceChainConfig.isEnabled) {
+      revert SourceChainNotEnabled(sourceChainSelector);
+    }
+
+    return sourceChainConfig;
   }
 }
