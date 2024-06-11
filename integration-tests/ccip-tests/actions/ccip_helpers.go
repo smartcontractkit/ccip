@@ -152,9 +152,8 @@ func GetUSDCDomain(networkName string, simulated bool) (uint32, error) {
 }
 
 type CCIPCommon struct {
-	Logger          zerolog.Logger
-	TestGroupConfig *testconfig.CCIPTestGroupConfig
-	ChainClient     blockchain.EVMClient
+	Logger      *zerolog.Logger
+	ChainClient blockchain.EVMClient
 	// Deployer deploys all CCIP contracts
 	Deployer *contracts.CCIPContractsDeployer
 	// tokenDeployer is used exclusively for deploying self-serve tokens and their pools
@@ -1264,11 +1263,10 @@ func DefaultCCIPModule(
 		return nil, err
 	}
 	return &CCIPCommon{
-		Logger:          logger,
-		TestGroupConfig: testGroupConf,
-		ChainClient:     chainClient,
-		Deployer:        cd,
-		tokenDeployer:   tokenCD,
+		Logger:        &logger,
+		ChainClient:   chainClient,
+		Deployer:      cd,
+		tokenDeployer: tokenCD,
 		RateLimiterConfig: contracts.RateLimiterConfig{
 			Rate:     contracts.FiftyCoins,
 			Capacity: contracts.HundredCoins,
