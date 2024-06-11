@@ -32,7 +32,7 @@ func (o CommitObservation) Marshal() ([]byte, error) {
 	for k, v := range o.TokenPricesUSD {
 		tokenPricesUSD[cciptypes.Address(strings.ToLower(string(k)))] = v
 	}
-	o.TokenPricesUSD = tokenPricesUSD
+	o.TokenPricesUSD = tokenPricesUSD //nolint:modifies-value-receiver
 
 	return json.Marshal(&o)
 }

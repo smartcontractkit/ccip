@@ -268,5 +268,4 @@ func TestAddressEncodingBackwardsCompatibility(t *testing.T) {
 		)
 		assert.Equal(t, exp, fields)
 	})
-
 }

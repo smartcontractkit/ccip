@@ -641,7 +641,6 @@ func TestIntegration_CCIP(t *testing.T) {
 					currentNonce = uint64(currentSeqNum)
 				}
 			})
-
 		})
 	}
 }
