@@ -75,13 +75,18 @@ contract MultiRampsE2E is EVM2EVMMultiOnRampSetup, EVM2EVMMultiOffRampSetup {
       sourceChainSelector: SOURCE_CHAIN_SELECTOR,
       isEnabled: true,
       prevOffRamp: address(0),
-      onRamp: address(s_onRamp)
+      // Must match OnRamp's metadataHash
+      metadataHash: keccak256(
+        abi.encode(Internal.EVM_2_EVM_MESSAGE_HASH, SOURCE_CHAIN_SELECTOR, DEST_CHAIN_SELECTOR, address(s_onRamp))
+        )
     });
     sourceChainConfigs[1] = EVM2EVMMultiOffRamp.SourceChainConfigArgs({
       sourceChainSelector: SOURCE_CHAIN_SELECTOR + 1,
       isEnabled: true,
       prevOffRamp: address(0),
-      onRamp: address(s_onRamp2)
+      metadataHash: keccak256(
+        abi.encode(Internal.EVM_2_EVM_MESSAGE_HASH, SOURCE_CHAIN_SELECTOR + 1, DEST_CHAIN_SELECTOR, address(s_onRamp2))
+        )
     });
 
     _setupMultipleOffRampsFromConfigs(sourceChainConfigs);

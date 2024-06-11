@@ -26,10 +26,6 @@ contract EVM2EVMMultiOffRampHelper is EVM2EVMMultiOffRamp, IgnoreContractSize {
     return s_executionStates[sourceChainSelector][bitmapIndex];
   }
 
-  function metadataHash(uint64 sourceChainSelector, address onRamp) external view returns (bytes32) {
-    return _metadataHash(sourceChainSelector, onRamp, Internal.EVM_2_EVM_MESSAGE_HASH);
-  }
-
   function releaseOrMintSingleToken(
     uint256 sourceTokenAmount,
     bytes calldata originalSender,

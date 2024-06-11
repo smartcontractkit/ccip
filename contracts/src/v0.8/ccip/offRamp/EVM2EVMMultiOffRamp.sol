@@ -25,8 +25,8 @@ import {ERC165Checker} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts
 
 /// @notice EVM2EVMOffRamp enables OCR networks to execute multiple messages
 /// in an OffRamp in a single transaction.
-/// @dev The EVM2EVMOnRamp, CommitStore and EVM2EVMOffRamp form an xchain upgradeable unit. Any change to one of them
-/// results an onchain upgrade of all 3.
+/// @dev The EVM2EVMMultiOnRamp and EVM2EVMMultiOffRamp form an xchain upgradeable unit. Any change to one of them
+/// results an onchain upgrade of both contracts.
 /// @dev MultiOCR3Base is used to store multiple OCR configs for both the OffRamp and the CommitStore.
 /// The execution plugin type has to be configured without signature verification, and the commit
 /// plugin type with verification.
@@ -60,6 +60,8 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
   error StaleCommitReport();
   error InvalidInterval(uint64 sourceChainSelector, Interval interval);
   error ZeroAddressNotAllowed();
+  error DuplicateMetadataHash(bytes32 metadataHash);
+  error ZeroMetadataHashNotAllowed();
 
   /// @dev Atlas depends on this event, if changing, please notify Atlas.
   event StaticConfigSet(StaticConfig staticConfig);
@@ -94,12 +96,10 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
   struct SourceChainConfig {
     bool isEnabled; // ─────────╮  Flag whether the source chain is enabled or not
     uint64 minSeqNr; //         |  The min sequence number expected for future messages
-    address prevOffRamp; // ────╯  Address of previous-version per-lane OffRamp. Used to be able to provide sequencing continuity during a zero downtime upgrade.
-    address onRamp; //             OnRamp address on the source chain
+    address prevOffRamp; // ────╯  Address of previous-version per-lane OffRamp. Used to be able to provide seequencing continuity during a zero downtime upgrade.
     /// @dev Ensures that 2 identical messages sent to 2 different lanes will have a distinct hash.
-    /// Must match the metadataHash used in computing leaf hashes offchain for the root committed in
-    /// the commitStore and i_metadataHash in the onRamp.
-    bytes32 metadataHash; //      Source-chain specific message hash preimage to ensure global uniqueness
+    /// Must match the meatdataHash on the onRamp.
+    bytes32 metadataHash; //       Source-chain specific message hash preimage to ensure global uniqueness
   }
 
   /// @notice SourceChainConfig update args scoped to one source chain
@@ -107,7 +107,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
     uint64 sourceChainSelector; //  ───╮  Source chain selector of the config to update
     bool isEnabled; //                 │  Flag whether the source chain is enabled or not
     address prevOffRamp; // ───────────╯  Address of previous-version per-lane OffRamp. Used to be able to provide sequencing continuity during a zero downtime upgrade.
-    address onRamp; //                    OnRamp address on the source chain
+    bytes32 metadataHash; //              Source-chain specific message hash preimage to ensure global uniqueness
   }
 
   /// @notice Dynamic offRamp config
@@ -163,6 +163,8 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
   /// @notice SourceConfig per chain
   /// (forms lane configurations from sourceChainSelector => StaticConfig.chainSelector)
   mapping(uint64 sourceChainSelector => SourceChainConfig sourceChainConfig) internal s_sourceChainConfigs;
+  /// @notice Set of used metadata hashes - used to prevent configuring the same metadataHash more than once
+  mapping(bytes32 metadataHash => bool isActive) internal s_usedMetadataHashSet;
 
   // STATE
   /// @dev The expected nonce for a given sender per source chain.
@@ -591,11 +593,6 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
     if (!success) revert ReceiverError(returnData);
   }
 
-  /// @notice creates a unique hash to be used in message hashing.
-  function _metadataHash(uint64 sourceChainSelector, address onRamp, bytes32 prefix) internal view returns (bytes32) {
-    return keccak256(abi.encode(prefix, sourceChainSelector, i_chainSelector, onRamp));
-  }
-
   // ================================================================
   // │                           Commit                             │
   // ================================================================
@@ -790,23 +787,28 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
         revert ZeroChainSelectorNotAllowed();
       }
 
-      if (sourceConfigUpdate.onRamp == address(0)) {
-        revert ZeroAddressNotAllowed();
-      }
-
       SourceChainConfig storage currentConfig = s_sourceChainConfigs[sourceChainSelector];
 
       // OnRamp can never be zero - if it is, then the source chain has been added for the first time
-      if (currentConfig.onRamp == address(0)) {
-        currentConfig.metadataHash =
-          _metadataHash(sourceChainSelector, sourceConfigUpdate.onRamp, Internal.EVM_2_EVM_MESSAGE_HASH);
-        currentConfig.onRamp = sourceConfigUpdate.onRamp;
+      if (currentConfig.metadataHash == bytes32("")) {
+        bytes32 newMetadataHash = sourceConfigUpdate.metadataHash;
+
+        if (newMetadataHash == bytes32("")) {
+          revert ZeroMetadataHashNotAllowed();
+        }
+
+        if (s_usedMetadataHashSet[newMetadataHash]) {
+          revert DuplicateMetadataHash(newMetadataHash);
+        }
+        s_usedMetadataHashSet[newMetadataHash] = true;
+
+        currentConfig.metadataHash = newMetadataHash;
         currentConfig.prevOffRamp = sourceConfigUpdate.prevOffRamp;
         currentConfig.minSeqNr = 1;
-
         emit SourceChainSelectorAdded(sourceChainSelector);
       } else if (
-        currentConfig.onRamp != sourceConfigUpdate.onRamp || currentConfig.prevOffRamp != sourceConfigUpdate.prevOffRamp
+        currentConfig.metadataHash != sourceConfigUpdate.metadataHash
+          || currentConfig.prevOffRamp != sourceConfigUpdate.prevOffRamp
       ) {
         revert InvalidStaticConfig(sourceChainSelector);
       }
