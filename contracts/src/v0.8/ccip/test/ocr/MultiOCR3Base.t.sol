@@ -59,7 +59,7 @@ contract MultiOCR3Base_transmit is MultiOCR3BaseSetup {
     s_multiOCR3.setTransmitOcrPluginType(0);
 
     vm.expectEmit();
-    emit MultiOCR3Base.Transmitted(0, s_configDigest1, uint32(uint256(s_configDigest1) >> 8));
+    emit MultiOCR3Base.Transmitted(0, s_configDigest1, uint64(uint256(s_configDigest1)));
 
     vm.startPrank(s_validTransmitters[1]);
     vm.resumeGasMetering();
@@ -73,7 +73,7 @@ contract MultiOCR3Base_transmit is MultiOCR3BaseSetup {
     s_multiOCR3.setTransmitOcrPluginType(2);
 
     vm.expectEmit();
-    emit MultiOCR3Base.Transmitted(2, s_configDigest3, uint32(uint256(s_configDigest3) >> 8));
+    emit MultiOCR3Base.Transmitted(2, s_configDigest3, uint64(uint256(s_configDigest3)));
 
     vm.startPrank(s_validTransmitters[0]);
     vm.resumeGasMetering();
@@ -133,7 +133,7 @@ contract MultiOCR3Base_transmit is MultiOCR3BaseSetup {
       _getSignaturesForDigest(pickedSignerKeys, s_configDigest1, REPORT, numSignatures);
 
     vm.expectEmit();
-    emit MultiOCR3Base.Transmitted(3, s_configDigest1, uint32(uint256(s_configDigest1) >> 8));
+    emit MultiOCR3Base.Transmitted(3, s_configDigest1, uint64(uint256(s_configDigest1)));
 
     vm.resumeGasMetering();
     s_multiOCR3.transmitWithSignatures(reportContext, REPORT, rs, ss, rawVs);

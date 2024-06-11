@@ -57,7 +57,7 @@ contract EVM2EVMMultiOffRampSetup is TokenSetup, PriceRegistrySetup, MultiOCR3Ba
   uint64 internal constant s_offchainConfigVersion = 3;
   uint8 internal constant s_F = 1;
 
-  uint40 internal s_latestEpochAndRound;
+  uint64 internal s_latestSequenceNumber;
 
   function setUp() public virtual override(TokenSetup, PriceRegistrySetup, MultiOCR3BaseSetup) {
     TokenSetup.setUp();

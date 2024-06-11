@@ -50,8 +50,8 @@ contract EVM2EVMMultiOffRampHelper is EVM2EVMMultiOffRamp, IgnoreContractSize {
     _reportExec(executableReports);
   }
 
-  function reportCommit(bytes calldata commitReport, uint40 epochAndRound) external {
-    _reportCommit(commitReport, epochAndRound);
+  function reportCommit(bytes calldata commitReport, uint64 sequenceNumber) external {
+    _reportCommit(commitReport, sequenceNumber);
   }
 
   function executeSingleReport(

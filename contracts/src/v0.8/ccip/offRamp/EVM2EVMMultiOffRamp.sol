@@ -184,8 +184,8 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
 
   // sourceChainSelector => merkleRoot => timestamp when received
   mapping(uint64 sourceChainSelector => mapping(bytes32 merkleRoot => uint256 timestamp)) internal s_roots;
-  /// @dev The epoch and round of the last report
-  uint40 private s_latestPriceEpochAndRound;
+  /// @dev The sequence number of the last report
+  uint64 private s_latestPriceSequenceNumber;
 
   constructor(StaticConfig memory staticConfig, SourceChainConfigArgs[] memory sourceChainConfigs) MultiOCR3Base() {
     if (staticConfig.rmnProxy == address(0) || staticConfig.tokenAdminRegistry == address(0)) {
@@ -622,22 +622,22 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
     bytes32[] calldata ss,
     bytes32 rawVs // signatures
   ) external {
-    _reportCommit(report, uint40(uint256(reportContext[1])));
+    _reportCommit(report, uint64(uint256(reportContext[1])));
     _transmit(uint8(Internal.OCRPluginType.Commit), reportContext, report, rs, ss, rawVs);
   }
 
   /// @notice Reporting function for the commit plugin
   /// @param encodedReport encoded CommitReport
-  /// @param epochAndRound Epoch and round of the report
-  function _reportCommit(bytes calldata encodedReport, uint40 epochAndRound) internal {
+  /// @param sequenceNumber Sequence number of the report
+  function _reportCommit(bytes calldata encodedReport, uint64 sequenceNumber) internal {
     CommitReport memory report = abi.decode(encodedReport, (CommitReport));
 
     // Check if the report contains price updates
     if (report.priceUpdates.tokenPriceUpdates.length > 0 || report.priceUpdates.gasPriceUpdates.length > 0) {
       // Check for price staleness based on the epoch and round
-      if (s_latestPriceEpochAndRound < epochAndRound) {
+      if (s_latestPriceSequenceNumber < sequenceNumber) {
         // If prices are not stale, update the latest epoch and round
-        s_latestPriceEpochAndRound = epochAndRound;
+        s_latestPriceSequenceNumber = sequenceNumber;
         // And update the prices in the price registry
         IPriceRegistry(s_dynamicConfig.priceRegistry).updatePrices(report.priceUpdates);
 
@@ -680,16 +680,16 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
     emit CommitReportAccepted(report);
   }
 
-  /// @notice Returns the epoch and round of the last price update.
-  /// @return the latest price epoch and round.
-  function getLatestPriceEpochAndRound() public view returns (uint64) {
-    return s_latestPriceEpochAndRound;
+  /// @notice Returns the sequence number of the last price update.
+  /// @return the latest price sequence number.
+  function getLatestPriceSequenceNumber() public view returns (uint64) {
+    return s_latestPriceSequenceNumber;
   }
 
-  /// @notice Sets the latest epoch and round for price update.
-  /// @param latestPriceEpochAndRound The new epoch and round for prices.
-  function setLatestPriceEpochAndRound(uint40 latestPriceEpochAndRound) external onlyOwner {
-    s_latestPriceEpochAndRound = latestPriceEpochAndRound;
+  /// @notice Sets the latest sequence number for price update.
+  /// @param latestPriceSequenceNumber The new sequence number for prices
+  function setLatestPriceSequenceNumber(uint64 latestPriceSequenceNumber) external onlyOwner {
+    s_latestPriceSequenceNumber = latestPriceSequenceNumber;
   }
 
   /// @notice Returns the timestamp of a potentially previously committed merkle root.
@@ -749,7 +749,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
       // since epoch and rounds are scoped per config digest.
       // Note that s_minSeqNr/roots do not need to be reset as the roots persist
       // across reconfigurations and are de-duplicated separately.
-      s_latestPriceEpochAndRound = 0;
+      s_latestPriceSequenceNumber = 0;
     }
   }
 

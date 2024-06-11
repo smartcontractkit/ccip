@@ -227,7 +227,7 @@ abstract contract MultiOCR3Base is ITypeAndVersion, OwnerIsCreator {
   ) internal {
     // reportContext consists of:
     // reportContext[0]: ConfigDigest
-    // reportContext[1]: 27 byte padding, 4-byte epoch and 1-byte round
+    // reportContext[1]: 24 byte padding, 8 byte sequence number
     // reportContext[2]: ExtraHash
     ConfigInfo memory configInfo = s_ocrConfigs[ocrPluginType].configInfo;
     bytes32 configDigest = reportContext[0];
@@ -277,7 +277,7 @@ abstract contract MultiOCR3Base is ITypeAndVersion, OwnerIsCreator {
       _verifySignatures(ocrPluginType, h, rs, ss, rawVs);
     }
 
-    emit Transmitted(ocrPluginType, configDigest, uint32(uint256(reportContext[1]) >> 8));
+    emit Transmitted(ocrPluginType, configDigest, uint64(uint256(reportContext[1])));
   }
 
   /// @notice verifies the signatures of a hashed report value for one OCR plugin type

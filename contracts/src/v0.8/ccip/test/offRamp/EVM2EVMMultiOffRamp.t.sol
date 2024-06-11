@@ -140,7 +140,7 @@ contract EVM2EVMMultiOffRamp_constructor is EVM2EVMMultiOffRampSetup {
     // OffRamp initial values
     assertEq("EVM2EVMMultiOffRamp 1.6.0-dev", s_offRamp.typeAndVersion());
     assertEq(OWNER, s_offRamp.owner());
-    assertEq(0, s_offRamp.getLatestPriceEpochAndRound());
+    assertEq(0, s_offRamp.getLatestPriceSequenceNumber());
   }
 
   // Revert
@@ -254,7 +254,6 @@ contract EVM2EVMMultiOffRamp_constructor is EVM2EVMMultiOffRampSetup {
 
 contract EVM2EVMMultiOffRamp_setDynamicConfig is EVM2EVMMultiOffRampSetup {
   function test_SetDynamicConfig_Success() public {
-    EVM2EVMMultiOffRamp.StaticConfig memory staticConfig = s_offRamp.getStaticConfig();
     EVM2EVMMultiOffRamp.DynamicConfig memory dynamicConfig =
       _generateDynamicMultiOffRampConfig(USER_3, address(s_priceRegistry));
 
@@ -268,7 +267,6 @@ contract EVM2EVMMultiOffRamp_setDynamicConfig is EVM2EVMMultiOffRampSetup {
   }
 
   function test_SetDynamicConfigWithValidator_Success() public {
-    EVM2EVMMultiOffRamp.StaticConfig memory staticConfig = s_offRamp.getStaticConfig();
     EVM2EVMMultiOffRamp.DynamicConfig memory dynamicConfig =
       _generateDynamicMultiOffRampConfig(USER_3, address(s_priceRegistry));
     dynamicConfig.messageValidator = address(s_messageValidator);
@@ -2107,7 +2105,7 @@ contract EVM2EVMMultiOffRamp_execute is EVM2EVMMultiOffRampSetup {
 
     vm.expectEmit();
     emit MultiOCR3Base.Transmitted(
-      uint8(Internal.OCRPluginType.Execution), s_configDigestExec, uint32(uint256(s_configDigestExec) >> 8)
+      uint8(Internal.OCRPluginType.Execution), s_configDigestExec, uint64(uint256(s_configDigestExec))
     );
 
     vm.startPrank(s_validTransmitters[0]);
@@ -3026,18 +3024,18 @@ contract EVM2EVMMultiOffRamp_applySourceChainConfigUpdates is EVM2EVMMultiOffRam
   }
 }
 
-contract EVM2EVMMultiOffRamp_setLatestPriceEpochAndRound is EVM2EVMMultiOffRampSetup {
-  function test_SetLatestPriceEpochAndRound_Success() public {
-    uint40 latestRoundAndEpoch = 1782155;
-    s_offRamp.setLatestPriceEpochAndRound(latestRoundAndEpoch);
-    assertEq(s_offRamp.getLatestPriceEpochAndRound(), latestRoundAndEpoch);
+contract EVM2EVMMultiOffRamp_setLatestPriceSequenceNumber is EVM2EVMMultiOffRampSetup {
+  function test_setLatestPriceSequenceNumber_Success() public {
+    uint64 latestSequenceNumber = 1782155;
+    s_offRamp.setLatestPriceSequenceNumber(latestSequenceNumber);
+    assertEq(s_offRamp.getLatestPriceSequenceNumber(), latestSequenceNumber);
   }
 
   function test_PriceEpochCleared_Success() public {
     // Set latest price epoch and round to non-zero.
-    uint40 latestEpochAndRound = 1782155;
-    s_offRamp.setLatestPriceEpochAndRound(latestEpochAndRound);
-    assertEq(latestEpochAndRound, s_offRamp.getLatestPriceEpochAndRound());
+    uint64 latestSequenceNumber = 1782155;
+    s_offRamp.setLatestPriceSequenceNumber(latestSequenceNumber);
+    assertEq(latestSequenceNumber, s_offRamp.getLatestPriceSequenceNumber());
 
     MultiOCR3Base.OCRConfigArgs[] memory ocrConfigs = new MultiOCR3Base.OCRConfigArgs[](1);
     ocrConfigs[0] = MultiOCR3Base.OCRConfigArgs({
@@ -3051,7 +3049,7 @@ contract EVM2EVMMultiOffRamp_setLatestPriceEpochAndRound is EVM2EVMMultiOffRampS
     s_offRamp.setOCR3Configs(ocrConfigs);
 
     // Execution plugin OCR config should not clear latest epoch and round
-    assertEq(latestEpochAndRound, s_offRamp.getLatestPriceEpochAndRound());
+    assertEq(latestSequenceNumber, s_offRamp.getLatestPriceSequenceNumber());
 
     // Commit plugin config should clear latest epoch & round
     ocrConfigs[0] = MultiOCR3Base.OCRConfigArgs({
@@ -3065,7 +3063,7 @@ contract EVM2EVMMultiOffRamp_setLatestPriceEpochAndRound is EVM2EVMMultiOffRampS
     s_offRamp.setOCR3Configs(ocrConfigs);
 
     // Assert cleared.
-    assertEq(0, s_offRamp.getLatestPriceEpochAndRound());
+    assertEq(0, s_offRamp.getLatestPriceSequenceNumber());
   }
 
   // Reverts
@@ -3073,7 +3071,7 @@ contract EVM2EVMMultiOffRamp_setLatestPriceEpochAndRound is EVM2EVMMultiOffRampS
   function test_OnlyOwner_Revert() public {
     vm.stopPrank();
     vm.expectRevert("Only callable by owner");
-    s_offRamp.setLatestPriceEpochAndRound(6723);
+    s_offRamp.setLatestPriceSequenceNumber(6723);
   }
 }
 
@@ -3104,7 +3102,7 @@ contract EVM2EVMMultiOffRamp_reportCommit is EVM2EVMMultiOffRampSetup {
     bytes memory encodedReport = abi.encode(report);
 
     vm.resumeGasMetering();
-    s_offRamp.reportCommit(encodedReport, ++s_latestEpochAndRound);
+    s_offRamp.reportCommit(encodedReport, ++s_latestSequenceNumber);
     vm.pauseGasMetering();
 
     assertEq(max1 + 1, s_offRamp.getSourceChainConfig(SOURCE_CHAIN_SELECTOR).minSeqNr);
@@ -3130,10 +3128,10 @@ contract EVM2EVMMultiOffRamp_reportCommit is EVM2EVMMultiOffRampSetup {
     vm.expectEmit();
     emit EVM2EVMMultiOffRamp.CommitReportAccepted(report);
 
-    s_offRamp.reportCommit(abi.encode(report), ++s_latestEpochAndRound);
+    s_offRamp.reportCommit(abi.encode(report), ++s_latestSequenceNumber);
 
     assertEq(max1 + 1, s_offRamp.getSourceChainConfig(SOURCE_CHAIN_SELECTOR).minSeqNr);
-    assertEq(s_latestEpochAndRound, s_offRamp.getLatestPriceEpochAndRound());
+    assertEq(s_latestSequenceNumber, s_offRamp.getLatestPriceSequenceNumber());
   }
 
   function test_StaleReportWithRoot_Success() public {
@@ -3152,17 +3150,17 @@ contract EVM2EVMMultiOffRamp_reportCommit is EVM2EVMMultiOffRampSetup {
 
     vm.expectEmit();
     emit EVM2EVMMultiOffRamp.CommitReportAccepted(report);
-    s_offRamp.reportCommit(abi.encode(report), s_latestEpochAndRound);
+    s_offRamp.reportCommit(abi.encode(report), s_latestSequenceNumber);
     assertEq(maxSeq + 1, s_offRamp.getSourceChainConfig(SOURCE_CHAIN_SELECTOR).minSeqNr);
-    assertEq(s_latestEpochAndRound, s_offRamp.getLatestPriceEpochAndRound());
+    assertEq(s_latestSequenceNumber, s_offRamp.getLatestPriceSequenceNumber());
 
     report.merkleRoots[0].interval = EVM2EVMMultiOffRamp.Interval(maxSeq + 1, maxSeq * 2);
     report.merkleRoots[0].merkleRoot = "stale report 2";
     vm.expectEmit();
     emit EVM2EVMMultiOffRamp.CommitReportAccepted(report);
-    s_offRamp.reportCommit(abi.encode(report), s_latestEpochAndRound);
+    s_offRamp.reportCommit(abi.encode(report), s_latestSequenceNumber);
     assertEq(maxSeq * 2 + 1, s_offRamp.getSourceChainConfig(SOURCE_CHAIN_SELECTOR).minSeqNr);
-    assertEq(s_latestEpochAndRound, s_offRamp.getLatestPriceEpochAndRound());
+    assertEq(s_latestSequenceNumber, s_offRamp.getLatestPriceSequenceNumber());
     assertEq(
       tokenStartPrice, IPriceRegistry(s_offRamp.getDynamicConfig().priceRegistry).getTokenPrice(s_sourceFeeToken).value
     );
@@ -3176,8 +3174,8 @@ contract EVM2EVMMultiOffRamp_reportCommit is EVM2EVMMultiOffRampSetup {
     });
     vm.expectEmit();
     emit PriceRegistry.UsdPerTokenUpdated(s_sourceFeeToken, 4e18, block.timestamp);
-    s_offRamp.reportCommit(abi.encode(report), ++s_latestEpochAndRound);
-    assertEq(s_latestEpochAndRound, s_offRamp.getLatestPriceEpochAndRound());
+    s_offRamp.reportCommit(abi.encode(report), ++s_latestSequenceNumber);
+    assertEq(s_latestSequenceNumber, s_offRamp.getLatestPriceSequenceNumber());
   }
 
   function test_OnlyGasPriceUpdates_Success() public {
@@ -3188,8 +3186,8 @@ contract EVM2EVMMultiOffRamp_reportCommit is EVM2EVMMultiOffRampSetup {
     });
     vm.expectEmit();
     emit PriceRegistry.UsdPerTokenUpdated(s_sourceFeeToken, 4e18, block.timestamp);
-    s_offRamp.reportCommit(abi.encode(report), ++s_latestEpochAndRound);
-    assertEq(s_latestEpochAndRound, s_offRamp.getLatestPriceEpochAndRound());
+    s_offRamp.reportCommit(abi.encode(report), ++s_latestSequenceNumber);
+    assertEq(s_latestSequenceNumber, s_offRamp.getLatestPriceSequenceNumber());
   }
 
   function test_ValidPriceUpdateThenStaleReportWithRoot_Success() public {
@@ -3203,8 +3201,8 @@ contract EVM2EVMMultiOffRamp_reportCommit is EVM2EVMMultiOffRampSetup {
     });
     vm.expectEmit();
     emit PriceRegistry.UsdPerTokenUpdated(s_sourceFeeToken, tokenPrice1, block.timestamp);
-    s_offRamp.reportCommit(abi.encode(report), ++s_latestEpochAndRound);
-    assertEq(s_latestEpochAndRound, s_offRamp.getLatestPriceEpochAndRound());
+    s_offRamp.reportCommit(abi.encode(report), ++s_latestSequenceNumber);
+    assertEq(s_latestSequenceNumber, s_offRamp.getLatestPriceSequenceNumber());
 
     roots = new EVM2EVMMultiOffRamp.MerkleRoot[](1);
     roots[0] = EVM2EVMMultiOffRamp.MerkleRoot({
@@ -3217,12 +3215,12 @@ contract EVM2EVMMultiOffRamp_reportCommit is EVM2EVMMultiOffRampSetup {
 
     vm.expectEmit();
     emit EVM2EVMMultiOffRamp.CommitReportAccepted(report);
-    s_offRamp.reportCommit(abi.encode(report), s_latestEpochAndRound);
+    s_offRamp.reportCommit(abi.encode(report), s_latestSequenceNumber);
     assertEq(maxSeq + 1, s_offRamp.getSourceChainConfig(SOURCE_CHAIN_SELECTOR).minSeqNr);
     assertEq(
       tokenPrice1, IPriceRegistry(s_offRamp.getDynamicConfig().priceRegistry).getTokenPrice(s_sourceFeeToken).value
     );
-    assertEq(s_latestEpochAndRound, s_offRamp.getLatestPriceEpochAndRound());
+    assertEq(s_latestSequenceNumber, s_offRamp.getLatestPriceSequenceNumber());
   }
   // Reverts
 
@@ -3238,7 +3236,7 @@ contract EVM2EVMMultiOffRamp_reportCommit is EVM2EVMMultiOffRampSetup {
     EVM2EVMMultiOffRamp.CommitReport memory report =
       EVM2EVMMultiOffRamp.CommitReport({priceUpdates: getEmptyPriceUpdates(), merkleRoots: roots});
     vm.expectRevert(abi.encodeWithSelector(EVM2EVMMultiOffRamp.CursedByRMN.selector, roots[0].sourceChainSelector));
-    s_offRamp.reportCommit(abi.encode(report), ++s_latestEpochAndRound);
+    s_offRamp.reportCommit(abi.encode(report), ++s_latestSequenceNumber);
   }
 
   function test_InvalidRootRevert() public {
@@ -3251,7 +3249,7 @@ contract EVM2EVMMultiOffRamp_reportCommit is EVM2EVMMultiOffRampSetup {
     EVM2EVMMultiOffRamp.CommitReport memory report =
       EVM2EVMMultiOffRamp.CommitReport({priceUpdates: getEmptyPriceUpdates(), merkleRoots: roots});
     vm.expectRevert(EVM2EVMMultiOffRamp.InvalidRoot.selector);
-    s_offRamp.reportCommit(abi.encode(report), ++s_latestEpochAndRound);
+    s_offRamp.reportCommit(abi.encode(report), ++s_latestSequenceNumber);
   }
 
   function test_InvalidInterval_Revert() public {
@@ -3267,7 +3265,7 @@ contract EVM2EVMMultiOffRamp_reportCommit is EVM2EVMMultiOffRampSetup {
     vm.expectRevert(
       abi.encodeWithSelector(EVM2EVMMultiOffRamp.InvalidInterval.selector, roots[0].sourceChainSelector, interval)
     );
-    s_offRamp.reportCommit(abi.encode(report), ++s_latestEpochAndRound);
+    s_offRamp.reportCommit(abi.encode(report), ++s_latestSequenceNumber);
   }
 
   function test_InvalidIntervalMinLargerThanMax_Revert() public {
@@ -3284,7 +3282,7 @@ contract EVM2EVMMultiOffRamp_reportCommit is EVM2EVMMultiOffRampSetup {
     vm.expectRevert(
       abi.encodeWithSelector(EVM2EVMMultiOffRamp.InvalidInterval.selector, roots[0].sourceChainSelector, interval)
     );
-    s_offRamp.reportCommit(abi.encode(report), ++s_latestEpochAndRound);
+    s_offRamp.reportCommit(abi.encode(report), ++s_latestSequenceNumber);
   }
 
   function test_ZeroEpochAndRound_Revert() public {
@@ -3305,9 +3303,9 @@ contract EVM2EVMMultiOffRamp_reportCommit is EVM2EVMMultiOffRampSetup {
     });
     vm.expectEmit();
     emit PriceRegistry.UsdPerTokenUpdated(s_sourceFeeToken, 4e18, block.timestamp);
-    s_offRamp.reportCommit(abi.encode(report), ++s_latestEpochAndRound);
+    s_offRamp.reportCommit(abi.encode(report), ++s_latestSequenceNumber);
     vm.expectRevert(EVM2EVMMultiOffRamp.StaleCommitReport.selector);
-    s_offRamp.reportCommit(abi.encode(report), s_latestEpochAndRound);
+    s_offRamp.reportCommit(abi.encode(report), s_latestSequenceNumber);
   }
 
   function test_SourceChainNotEnabled_Revert() public {
@@ -3322,7 +3320,7 @@ contract EVM2EVMMultiOffRamp_reportCommit is EVM2EVMMultiOffRampSetup {
       EVM2EVMMultiOffRamp.CommitReport({priceUpdates: getEmptyPriceUpdates(), merkleRoots: roots});
 
     vm.expectRevert(abi.encodeWithSelector(EVM2EVMMultiOffRamp.SourceChainNotEnabled.selector, 0));
-    s_offRamp.reportCommit(abi.encode(report), ++s_latestEpochAndRound);
+    s_offRamp.reportCommit(abi.encode(report), ++s_latestSequenceNumber);
   }
 
   function test_RootAlreadyCommitted_Revert() public {
@@ -3334,14 +3332,14 @@ contract EVM2EVMMultiOffRamp_reportCommit is EVM2EVMMultiOffRampSetup {
     });
     EVM2EVMMultiOffRamp.CommitReport memory report =
       EVM2EVMMultiOffRamp.CommitReport({priceUpdates: getEmptyPriceUpdates(), merkleRoots: roots});
-    s_offRamp.reportCommit(abi.encode(report), ++s_latestEpochAndRound);
+    s_offRamp.reportCommit(abi.encode(report), ++s_latestSequenceNumber);
     report.merkleRoots[0].interval = EVM2EVMMultiOffRamp.Interval(3, 3);
     vm.expectRevert(
       abi.encodeWithSelector(
         EVM2EVMMultiOffRamp.RootAlreadyCommitted.selector, roots[0].sourceChainSelector, roots[0].merkleRoot
       )
     );
-    s_offRamp.reportCommit(abi.encode(report), ++s_latestEpochAndRound);
+    s_offRamp.reportCommit(abi.encode(report), ++s_latestSequenceNumber);
   }
 }
 
@@ -3366,14 +3364,14 @@ contract EVM2EVMMultiOffRamp_commit is EVM2EVMMultiOffRampSetup {
 
     vm.expectEmit();
     emit MultiOCR3Base.Transmitted(
-      uint8(Internal.OCRPluginType.Commit), s_configDigestCommit, uint32(uint256(s_configDigestCommit) >> 8)
+      uint8(Internal.OCRPluginType.Commit), s_configDigestCommit, uint64(uint256(s_configDigestCommit))
     );
 
     vm.startPrank(s_validTransmitters[0]);
     s_offRamp.commit(reportContext, abi.encode(commitReport), rs, ss, rawVs);
 
     assertEq(s_maxInterval + 1, s_offRamp.getSourceChainConfig(SOURCE_CHAIN_SELECTOR).minSeqNr);
-    assertEq(uint40(uint256(reportContext[1])), s_offRamp.getLatestPriceEpochAndRound());
+    assertEq(uint64(uint256(reportContext[1])), s_offRamp.getLatestPriceSequenceNumber());
   }
 
   // Reverts
@@ -3504,7 +3502,7 @@ contract EVM2EVMMultiOffRamp_resetUnblessedRoots is EVM2EVMMultiOffRampSetup {
     EVM2EVMMultiOffRamp.CommitReport memory report =
       EVM2EVMMultiOffRamp.CommitReport({priceUpdates: getEmptyPriceUpdates(), merkleRoots: roots});
 
-    s_offRamp.reportCommit(abi.encode(report), ++s_latestEpochAndRound);
+    s_offRamp.reportCommit(abi.encode(report), ++s_latestSequenceNumber);
 
     IRMN.TaggedRoot[] memory blessedTaggedRoots = new IRMN.TaggedRoot[](1);
     blessedTaggedRoots[0] = IRMN.TaggedRoot({commitStore: address(s_offRamp), root: rootsToReset[1].merkleRoot});
@@ -3556,7 +3554,7 @@ contract EVM2EVMMultiOffRamp_verify is EVM2EVMMultiOffRampSetup {
     });
     EVM2EVMMultiOffRamp.CommitReport memory report =
       EVM2EVMMultiOffRamp.CommitReport({priceUpdates: getEmptyPriceUpdates(), merkleRoots: roots});
-    s_offRamp.reportCommit(abi.encode(report), ++s_latestEpochAndRound);
+    s_offRamp.reportCommit(abi.encode(report), ++s_latestSequenceNumber);
     bytes32[] memory proofs = new bytes32[](0);
     // We have not blessed this root, should return 0.
     uint256 timestamp = s_offRamp.verify(SOURCE_CHAIN_SELECTOR, leaves, proofs, 0);
@@ -3574,7 +3572,7 @@ contract EVM2EVMMultiOffRamp_verify is EVM2EVMMultiOffRampSetup {
     });
     EVM2EVMMultiOffRamp.CommitReport memory report =
       EVM2EVMMultiOffRamp.CommitReport({priceUpdates: getEmptyPriceUpdates(), merkleRoots: roots});
-    s_offRamp.reportCommit(abi.encode(report), ++s_latestEpochAndRound);
+    s_offRamp.reportCommit(abi.encode(report), ++s_latestSequenceNumber);
     // Bless that root.
     IRMN.TaggedRoot[] memory taggedRoots = new IRMN.TaggedRoot[](1);
     taggedRoots[0] = IRMN.TaggedRoot({commitStore: address(s_offRamp), root: leaves[0]});
@@ -3597,7 +3595,7 @@ contract EVM2EVMMultiOffRamp_verify is EVM2EVMMultiOffRampSetup {
 
     EVM2EVMMultiOffRamp.CommitReport memory report =
       EVM2EVMMultiOffRamp.CommitReport({priceUpdates: getEmptyPriceUpdates(), merkleRoots: roots});
-    s_offRamp.reportCommit(abi.encode(report), ++s_latestEpochAndRound);
+    s_offRamp.reportCommit(abi.encode(report), ++s_latestSequenceNumber);
 
     // Bless that root.
     IRMN.TaggedRoot[] memory taggedRoots = new IRMN.TaggedRoot[](1);
