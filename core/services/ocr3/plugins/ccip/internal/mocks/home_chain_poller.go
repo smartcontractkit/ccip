@@ -2,7 +2,6 @@ package mocks
 
 import (
 	"context"
-	"time"
 
 	cciptypes "github.com/smartcontractkit/ccipocr3/ccipocr3-dont-merge"
 
@@ -19,8 +18,9 @@ func NewHomeChainPollerMock() *HomeChainPollerMock {
 	}
 }
 
-func (hr *HomeChainPollerMock) StartPolling(ctx context.Context, interval time.Duration) {
-	hr.Called(ctx, interval)
+func (hr *HomeChainPollerMock) Start(ctx context.Context) error {
+	args := hr.Called(ctx)
+	return args.Error(0)
 }
 
 func (hr *HomeChainPollerMock) GetConfig() cciptypes.HomeChainConfig {
@@ -28,7 +28,7 @@ func (hr *HomeChainPollerMock) GetConfig() cciptypes.HomeChainConfig {
 	return args.Get(0).(cciptypes.HomeChainConfig)
 }
 
-func (hr *HomeChainPollerMock) Close(ctx context.Context) error {
-	args := hr.Called(ctx)
+func (hr *HomeChainPollerMock) Close() error {
+	args := hr.Called()
 	return args.Error(0)
 }

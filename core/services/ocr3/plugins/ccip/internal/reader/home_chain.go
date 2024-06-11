@@ -30,19 +30,20 @@ func NewHomeChainConfigPoller(
 	}
 }
 
-func (r *HomeChainConfigPoller) StartPolling(ctx context.Context, interval time.Duration) {
+func (r *HomeChainConfigPoller) Start(ctx context.Context) error {
 
 	r.mutex.Lock()
 	if r.backgroundCancel != nil {
 		r.lggr.Errorw("Polling already started")
-		return
+		// We don't want to return an actual error here as it's already working as expected
+		return nil
 	}
 	bgCtx, cancelFunc := context.WithCancel(ctx)
 	r.backgroundCancel = cancelFunc
 	r.mutex.Unlock()
 	r.lggr.Infow("Start Polling HomeChainConfig")
 	go func() {
-		ticker := time.NewTicker(interval)
+		ticker := time.NewTicker(12 * time.Second)
 		defer ticker.Stop()
 		for {
 			select {
@@ -74,6 +75,8 @@ func (r *HomeChainConfigPoller) StartPolling(ctx context.Context, interval time.
 			}
 		}
 	}()
+
+	return nil
 }
 
 func (r *HomeChainConfigPoller) GetConfig() cciptypes.HomeChainConfig {
@@ -98,7 +101,7 @@ func (r *HomeChainConfigPoller) fetchOnChainConfig(ctx context.Context) ([]ccipt
 	return onChainCapabilityConfig, err
 }
 
-func (r *HomeChainConfigPoller) Close(ctx context.Context) error {
+func (r *HomeChainConfigPoller) Close() error {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 	if r.backgroundCancel == nil {

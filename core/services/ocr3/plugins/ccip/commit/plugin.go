@@ -2,7 +2,6 @@ package commit
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sort"
 	"time"
@@ -32,8 +31,6 @@ type Plugin struct {
 	homeChainPoller cciptypes.HomeChainPoller
 }
 
-// TODO: background service for home chain config polling
-
 func NewPlugin(
 	ctx context.Context,
 	nodeID commontypes.OracleID,
@@ -46,8 +43,8 @@ func NewPlugin(
 	lggr logger.Logger,
 	homeChainPoller cciptypes.HomeChainPoller,
 ) *Plugin {
-	// Start polling the home chain config in the background every 12 seconds
-	homeChainPoller.StartPolling(ctx, 12*time.Second)
+	// Call to Start doesn't fail if it's already started
+	homeChainPoller.Start(ctx)
 
 	return &Plugin{
 		nodeID:            nodeID,
@@ -323,18 +320,10 @@ func (p *Plugin) Close() error {
 	ctx, cf := context.WithTimeout(context.Background(), timeout)
 	defer cf()
 
-	var errs []error
-
-	if err := p.homeChainPoller.Close(ctx); err != nil {
-		errs = append(errs, fmt.Errorf("close home chain poller: %w", err))
-	}
 	if err := p.ccipReader.Close(ctx); err != nil {
-		errs = append(errs, fmt.Errorf("close ccip reader: %w", err))
+		return fmt.Errorf("close ccip reader: %w", err)
 	}
 
-	if len(errs) > 0 {
-		return errors.Join(errs...)
-	}
 	return nil
 }
 
