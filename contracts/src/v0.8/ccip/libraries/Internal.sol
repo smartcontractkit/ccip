@@ -7,6 +7,7 @@ import {Client} from "./Client.sol";
 // Library for CCIP internal definitions common to multiple contracts.
 library Internal {
   error InvalidEVMAddress(bytes encodedAddress);
+  error ZeroAddressNotAllowed();
 
   /// @dev The minimum amount of gas to perform the call with exact gas.
   /// We include this in the offramp so that we can redeploy to adjust it
@@ -173,6 +174,10 @@ library Internal {
   function _validateEVMAddressFromUint256(uint256 encodedAddress) internal pure returns (address) {
     if (encodedAddress > type(uint160).max || encodedAddress < 10) revert InvalidEVMAddress(abi.encode(encodedAddress));
     return address(uint160(encodedAddress));
+  }
+
+  function _validateNonZeroAddress(address inputAddress) internal pure {
+    if (inputAddress == address(0)) revert ZeroAddressNotAllowed();
   }
 
   /// @notice Enum listing the possible message execution states within

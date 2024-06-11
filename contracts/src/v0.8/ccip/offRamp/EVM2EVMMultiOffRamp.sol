@@ -36,7 +36,6 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
 
   error AlreadyAttempted(uint64 sourceChainSelector, uint64 sequenceNumber);
   error AlreadyExecuted(uint64 sourceChainSelector, uint64 sequenceNumber);
-  error ZeroAddressNotAllowed();
   error ZeroChainSelectorNotAllowed();
   error ExecutionError(bytes32 messageId, bytes error);
   error SourceChainNotEnabled(uint64 sourceChainSelector);
@@ -188,9 +187,9 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
   uint64 private s_latestPriceSequenceNumber;
 
   constructor(StaticConfig memory staticConfig, SourceChainConfigArgs[] memory sourceChainConfigs) MultiOCR3Base() {
-    if (staticConfig.rmnProxy == address(0) || staticConfig.tokenAdminRegistry == address(0)) {
-      revert ZeroAddressNotAllowed();
-    }
+    Internal._validateNonZeroAddress(staticConfig.rmnProxy);
+    Internal._validateNonZeroAddress(staticConfig.tokenAdminRegistry);
+
     if (staticConfig.chainSelector == 0) {
       revert ZeroChainSelectorNotAllowed();
     }
@@ -788,9 +787,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
         revert ZeroChainSelectorNotAllowed();
       }
 
-      if (sourceConfigUpdate.onRamp == address(0)) {
-        revert ZeroAddressNotAllowed();
-      }
+      Internal._validateNonZeroAddress(sourceConfigUpdate.onRamp);
 
       SourceChainConfig storage currentConfig = s_sourceChainConfigs[sourceChainSelector];
 
@@ -817,8 +814,8 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
 
   /// @notice Sets the dynamic config.
   function setDynamicConfig(DynamicConfig memory dynamicConfig) external onlyOwner {
-    if (dynamicConfig.priceRegistry == address(0)) revert ZeroAddressNotAllowed();
-    if (dynamicConfig.router == address(0)) revert ZeroAddressNotAllowed();
+    Internal._validateNonZeroAddress(dynamicConfig.priceRegistry);
+    Internal._validateNonZeroAddress(dynamicConfig.router);
 
     s_dynamicConfig = dynamicConfig;
 
