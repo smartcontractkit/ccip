@@ -49,7 +49,6 @@ abstract contract MultiOCR3Base is ITypeAndVersion, OwnerIsCreator {
     bytes32 configDigest;
     uint8 F; // ──────────────────────────────╮ maximum number of faulty/dishonest oracles the system can tolerate
     uint8 n; //                               │ number of signers / transmitters
-    bool uniqueReports; //                    │ if true, the reports should be unique
     bool isSignatureVerificationEnabled; // ──╯ if true, requires signers and verifies signatures on transmission verification
   }
 
@@ -84,7 +83,6 @@ abstract contract MultiOCR3Base is ITypeAndVersion, OwnerIsCreator {
     bytes32 configDigest; // Config digest to update to
     uint8 ocrPluginType; // ──────────────────╮ OCR plugin type to update config for
     uint8 F; //                               │ maximum number of faulty/dishonest oracles
-    bool uniqueReports; //                    │ if true, the reports should be unique
     bool isSignatureVerificationEnabled; // ──╯ if true, requires signers and verifies signatures on transmission verification
     address[] signers; // signing address of each oracle
     address[] transmitters; // transmission address of each oracle (i.e. the address the oracle actually sends transactions to the contract from)
@@ -142,12 +140,8 @@ abstract contract MultiOCR3Base is ITypeAndVersion, OwnerIsCreator {
 
     // If F is 0, then the config is not yet set
     if (configInfo.F == 0) {
-      configInfo.uniqueReports = ocrConfigArgs.uniqueReports;
       configInfo.isSignatureVerificationEnabled = ocrConfigArgs.isSignatureVerificationEnabled;
-    } else if (
-      configInfo.uniqueReports != ocrConfigArgs.uniqueReports
-        || configInfo.isSignatureVerificationEnabled != ocrConfigArgs.isSignatureVerificationEnabled
-    ) {
+    } else if (configInfo.isSignatureVerificationEnabled != ocrConfigArgs.isSignatureVerificationEnabled) {
       revert StaticConfigCannotBeChanged(ocrPluginType);
     }
 
@@ -275,13 +269,7 @@ abstract contract MultiOCR3Base is ITypeAndVersion, OwnerIsCreator {
     if (configInfo.isSignatureVerificationEnabled) {
       // Scoping to reduce stack pressure
       {
-        uint256 expectedNumSignatures;
-        if (configInfo.uniqueReports) {
-          expectedNumSignatures = (configInfo.n + configInfo.F) / 2 + 1;
-        } else {
-          expectedNumSignatures = configInfo.F + 1;
-        }
-        if (rs.length != expectedNumSignatures) revert WrongNumberOfSignatures();
+        if (rs.length != configInfo.F + 1) revert WrongNumberOfSignatures();
         if (rs.length != ss.length) revert SignaturesOutOfRegistration();
       }
 

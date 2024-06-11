@@ -98,7 +98,6 @@ contract EVM2EVMMultiOffRamp_constructor is EVM2EVMMultiOffRampSetup {
       ocrPluginType: uint8(Internal.OCRPluginType.Execution),
       configDigest: s_configDigestExec,
       F: s_F,
-      uniqueReports: false,
       isSignatureVerificationEnabled: false,
       signers: s_emptySigners,
       transmitters: s_validTransmitters
@@ -123,7 +122,6 @@ contract EVM2EVMMultiOffRamp_constructor is EVM2EVMMultiOffRampSetup {
         configDigest: ocrConfigs[0].configDigest,
         F: ocrConfigs[0].F,
         n: 0,
-        uniqueReports: ocrConfigs[0].uniqueReports,
         isSignatureVerificationEnabled: ocrConfigs[0].isSignatureVerificationEnabled
       }),
       signers: s_emptySigners,
@@ -2153,7 +2151,6 @@ contract EVM2EVMMultiOffRamp_execute is EVM2EVMMultiOffRampSetup {
       ocrPluginType: uint8(Internal.OCRPluginType.Commit),
       configDigest: s_configDigestCommit,
       F: s_F,
-      uniqueReports: false,
       isSignatureVerificationEnabled: false,
       signers: s_emptySigners,
       transmitters: s_validTransmitters
@@ -2182,7 +2179,6 @@ contract EVM2EVMMultiOffRamp_execute is EVM2EVMMultiOffRampSetup {
       ocrPluginType: uint8(Internal.OCRPluginType.Execution),
       configDigest: s_configDigestExec,
       F: s_F,
-      uniqueReports: false,
       isSignatureVerificationEnabled: true,
       signers: s_validSigners,
       transmitters: s_validTransmitters
@@ -3048,7 +3044,6 @@ contract EVM2EVMMultiOffRamp_setLatestPriceEpochAndRound is EVM2EVMMultiOffRampS
       ocrPluginType: uint8(Internal.OCRPluginType.Execution),
       configDigest: s_configDigestExec,
       F: s_F,
-      uniqueReports: false,
       isSignatureVerificationEnabled: false,
       signers: s_emptySigners,
       transmitters: s_validTransmitters
@@ -3063,7 +3058,6 @@ contract EVM2EVMMultiOffRamp_setLatestPriceEpochAndRound is EVM2EVMMultiOffRampS
       ocrPluginType: uint8(Internal.OCRPluginType.Commit),
       configDigest: s_configDigestCommit,
       F: s_F,
-      uniqueReports: false,
       isSignatureVerificationEnabled: true,
       signers: s_validSigners,
       transmitters: s_validTransmitters
@@ -3417,7 +3411,6 @@ contract EVM2EVMMultiOffRamp_commit is EVM2EVMMultiOffRampSetup {
       ocrPluginType: uint8(Internal.OCRPluginType.Execution),
       configDigest: s_configDigestExec,
       F: s_F,
-      uniqueReports: false,
       isSignatureVerificationEnabled: false,
       signers: s_emptySigners,
       transmitters: s_validTransmitters
@@ -3446,7 +3439,6 @@ contract EVM2EVMMultiOffRamp_commit is EVM2EVMMultiOffRampSetup {
       ocrPluginType: uint8(Internal.OCRPluginType.Commit),
       configDigest: s_configDigestCommit,
       F: s_F,
-      uniqueReports: false,
       isSignatureVerificationEnabled: false,
       signers: s_emptySigners,
       transmitters: s_validTransmitters

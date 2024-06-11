@@ -85,7 +85,6 @@ contract MultiOCR3BaseSetup is BaseTest {
     vm.assertEq(configA.configInfo.configDigest, configB.configInfo.configDigest);
     vm.assertEq(configA.configInfo.F, configB.configInfo.F);
     vm.assertEq(configA.configInfo.n, configB.configInfo.n);
-    vm.assertEq(configA.configInfo.uniqueReports, configB.configInfo.uniqueReports);
     vm.assertEq(configA.configInfo.isSignatureVerificationEnabled, configB.configInfo.isSignatureVerificationEnabled);
 
     vm.assertEq(configA.signers, configB.signers);

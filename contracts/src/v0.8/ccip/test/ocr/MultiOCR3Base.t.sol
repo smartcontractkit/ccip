@@ -24,7 +24,6 @@ contract MultiOCR3Base_transmit is MultiOCR3BaseSetup {
       ocrPluginType: 0,
       configDigest: s_configDigest1,
       F: 1,
-      uniqueReports: false,
       isSignatureVerificationEnabled: true,
       signers: s_validSigners,
       transmitters: s_validTransmitters
@@ -33,7 +32,6 @@ contract MultiOCR3Base_transmit is MultiOCR3BaseSetup {
       ocrPluginType: 1,
       configDigest: s_configDigest2,
       F: 2,
-      uniqueReports: true,
       isSignatureVerificationEnabled: true,
       signers: s_validSigners,
       transmitters: s_validTransmitters
@@ -42,7 +40,6 @@ contract MultiOCR3Base_transmit is MultiOCR3BaseSetup {
       ocrPluginType: 2,
       configDigest: s_configDigest3,
       F: 1,
-      uniqueReports: false,
       isSignatureVerificationEnabled: false,
       signers: s_emptySigners,
       transmitters: s_validTransmitters
@@ -51,7 +48,7 @@ contract MultiOCR3Base_transmit is MultiOCR3BaseSetup {
     s_multiOCR3.setOCR3Configs(ocrConfigs);
   }
 
-  function test_TransmitSignersNonUniqueReports_gas_Success() public {
+  function test_TransmitSigners_gas_Success() public {
     vm.pauseGasMetering();
     bytes32[3] memory reportContext = [s_configDigest1, s_configDigest1, s_configDigest1];
 
@@ -65,24 +62,6 @@ contract MultiOCR3Base_transmit is MultiOCR3BaseSetup {
     emit MultiOCR3Base.Transmitted(0, s_configDigest1, uint32(uint256(s_configDigest1) >> 8));
 
     vm.startPrank(s_validTransmitters[1]);
-    vm.resumeGasMetering();
-    s_multiOCR3.transmitWithSignatures(reportContext, REPORT, rs, ss, rawVs);
-  }
-
-  function test_TransmitUniqueReportSigners_gas_Success() public {
-    vm.pauseGasMetering();
-    bytes32[3] memory reportContext = [s_configDigest2, s_configDigest2, s_configDigest2];
-
-    // F = 1, need 5 signatures
-    (bytes32[] memory rs, bytes32[] memory ss,, bytes32 rawVs) =
-      _getSignaturesForDigest(s_validSignerKeys, s_configDigest2, REPORT, 5);
-
-    s_multiOCR3.setTransmitOcrPluginType(1);
-
-    vm.expectEmit();
-    emit MultiOCR3Base.Transmitted(1, s_configDigest2, uint32(uint256(s_configDigest2) >> 8));
-
-    vm.startPrank(s_validTransmitters[2]);
     vm.resumeGasMetering();
     s_multiOCR3.transmitWithSignatures(reportContext, REPORT, rs, ss, rawVs);
   }
@@ -101,11 +80,7 @@ contract MultiOCR3Base_transmit is MultiOCR3BaseSetup {
     s_multiOCR3.transmitWithoutSignatures(reportContext, REPORT);
   }
 
-  function test_Fuzz_TransmitSignersWithSignatures_Success(
-    uint8 F,
-    uint64 randomAddressOffset,
-    bool uniqueReports
-  ) public {
+  function test_Fuzz_TransmitSignersWithSignatures_Success(uint8 F, uint64 randomAddressOffset) public {
     vm.pauseGasMetering();
 
     F = uint8(bound(F, 1, 3));
@@ -133,7 +108,6 @@ contract MultiOCR3Base_transmit is MultiOCR3BaseSetup {
       ocrPluginType: 3,
       configDigest: s_configDigest1,
       F: F,
-      uniqueReports: uniqueReports,
       isSignatureVerificationEnabled: true,
       signers: signers,
       transmitters: transmitters
@@ -147,7 +121,7 @@ contract MultiOCR3Base_transmit is MultiOCR3BaseSetup {
     bytes32[3] memory reportContext = [s_configDigest1, s_configDigest1, s_configDigest1];
 
     // condition: matches signature expectation for transmit
-    uint8 numSignatures = uniqueReports ? ((signersLength + F) / 2 + 1) : (F + 1);
+    uint8 numSignatures = F + 1;
     uint256[] memory pickedSignerKeys = new uint256[](numSignatures);
 
     // Randomise picked signers with random offset
@@ -367,7 +341,6 @@ contract MultiOCR3Base_setOCR3Configs is MultiOCR3BaseSetup {
       ocrPluginType: 0,
       configDigest: _getBasicConfigDigest(F, s_validSigners, s_validTransmitters),
       F: F,
-      uniqueReports: false,
       isSignatureVerificationEnabled: true,
       signers: s_validSigners,
       transmitters: s_validTransmitters
@@ -392,7 +365,6 @@ contract MultiOCR3Base_setOCR3Configs is MultiOCR3BaseSetup {
         configDigest: ocrConfigs[0].configDigest,
         F: ocrConfigs[0].F,
         n: uint8(ocrConfigs[0].signers.length),
-        uniqueReports: ocrConfigs[0].uniqueReports,
         isSignatureVerificationEnabled: ocrConfigs[0].isSignatureVerificationEnabled
       }),
       signers: s_validSigners,
@@ -412,7 +384,6 @@ contract MultiOCR3Base_setOCR3Configs is MultiOCR3BaseSetup {
       ocrPluginType: 0,
       configDigest: _getBasicConfigDigest(F, signers, s_validTransmitters),
       F: F,
-      uniqueReports: false,
       isSignatureVerificationEnabled: false,
       signers: signers,
       transmitters: s_validTransmitters
@@ -437,7 +408,6 @@ contract MultiOCR3Base_setOCR3Configs is MultiOCR3BaseSetup {
         configDigest: ocrConfigs[0].configDigest,
         F: ocrConfigs[0].F,
         n: uint8(ocrConfigs[0].signers.length),
-        uniqueReports: ocrConfigs[0].uniqueReports,
         isSignatureVerificationEnabled: ocrConfigs[0].isSignatureVerificationEnabled
       }),
       signers: signers,
@@ -456,7 +426,6 @@ contract MultiOCR3Base_setOCR3Configs is MultiOCR3BaseSetup {
       ocrPluginType: 0,
       configDigest: _getBasicConfigDigest(F, new address[](0), s_validTransmitters),
       F: F,
-      uniqueReports: false,
       isSignatureVerificationEnabled: false,
       signers: s_validSigners,
       transmitters: s_validTransmitters
@@ -481,7 +450,6 @@ contract MultiOCR3Base_setOCR3Configs is MultiOCR3BaseSetup {
         configDigest: ocrConfigs[0].configDigest,
         F: ocrConfigs[0].F,
         n: 0,
-        uniqueReports: ocrConfigs[0].uniqueReports,
         isSignatureVerificationEnabled: ocrConfigs[0].isSignatureVerificationEnabled
       }),
       signers: s_emptySigners,
@@ -506,7 +474,6 @@ contract MultiOCR3Base_setOCR3Configs is MultiOCR3BaseSetup {
       ocrPluginType: 0,
       configDigest: _getBasicConfigDigest(2, s_validSigners, s_validTransmitters),
       F: 2,
-      uniqueReports: false,
       isSignatureVerificationEnabled: true,
       signers: s_validSigners,
       transmitters: s_validTransmitters
@@ -515,7 +482,6 @@ contract MultiOCR3Base_setOCR3Configs is MultiOCR3BaseSetup {
       ocrPluginType: 1,
       configDigest: _getBasicConfigDigest(1, s_validSigners, s_validTransmitters),
       F: 1,
-      uniqueReports: true,
       isSignatureVerificationEnabled: true,
       signers: s_validSigners,
       transmitters: s_validTransmitters
@@ -524,7 +490,6 @@ contract MultiOCR3Base_setOCR3Configs is MultiOCR3BaseSetup {
       ocrPluginType: 2,
       configDigest: _getBasicConfigDigest(1, s_partialSigners, s_partialTransmitters),
       F: 1,
-      uniqueReports: true,
       isSignatureVerificationEnabled: true,
       signers: s_partialSigners,
       transmitters: s_partialTransmitters
@@ -551,7 +516,6 @@ contract MultiOCR3Base_setOCR3Configs is MultiOCR3BaseSetup {
           configDigest: ocrConfigs[i].configDigest,
           F: ocrConfigs[i].F,
           n: uint8(ocrConfigs[i].signers.length),
-          uniqueReports: ocrConfigs[i].uniqueReports,
           isSignatureVerificationEnabled: ocrConfigs[i].isSignatureVerificationEnabled
         }),
         signers: ocrConfigs[i].signers,
@@ -617,7 +581,6 @@ contract MultiOCR3Base_setOCR3Configs is MultiOCR3BaseSetup {
         configDigest: ocrConfig.configDigest,
         F: ocrConfig.F,
         n: ocrConfig.isSignatureVerificationEnabled ? uint8(ocrConfig.signers.length) : 0,
-        uniqueReports: ocrConfig.uniqueReports,
         isSignatureVerificationEnabled: ocrConfig.isSignatureVerificationEnabled
       }),
       signers: ocrConfig.signers,
@@ -634,7 +597,6 @@ contract MultiOCR3Base_setOCR3Configs is MultiOCR3BaseSetup {
       ocrPluginType: 0,
       configDigest: _getBasicConfigDigest(1, s_emptySigners, s_validTransmitters),
       F: 1,
-      uniqueReports: false,
       isSignatureVerificationEnabled: false,
       signers: s_emptySigners,
       transmitters: s_validTransmitters
@@ -665,7 +627,6 @@ contract MultiOCR3Base_setOCR3Configs is MultiOCR3BaseSetup {
         configDigest: ocrConfigs[0].configDigest,
         F: ocrConfigs[0].F,
         n: uint8(ocrConfigs[0].signers.length),
-        uniqueReports: ocrConfigs[0].uniqueReports,
         isSignatureVerificationEnabled: ocrConfigs[0].isSignatureVerificationEnabled
       }),
       signers: s_emptySigners,
@@ -695,7 +656,6 @@ contract MultiOCR3Base_setOCR3Configs is MultiOCR3BaseSetup {
       ocrPluginType: 0,
       configDigest: _getBasicConfigDigest(2, s_validSigners, s_validTransmitters),
       F: 2,
-      uniqueReports: false,
       isSignatureVerificationEnabled: true,
       signers: s_validSigners,
       transmitters: s_validTransmitters
@@ -728,7 +688,6 @@ contract MultiOCR3Base_setOCR3Configs is MultiOCR3BaseSetup {
         configDigest: ocrConfigs[0].configDigest,
         F: ocrConfigs[0].F,
         n: uint8(ocrConfigs[0].signers.length),
-        uniqueReports: ocrConfigs[0].uniqueReports,
         isSignatureVerificationEnabled: ocrConfigs[0].isSignatureVerificationEnabled
       }),
       signers: newSigners,
@@ -769,7 +728,6 @@ contract MultiOCR3Base_setOCR3Configs is MultiOCR3BaseSetup {
       ocrPluginType: 0,
       configDigest: _getBasicConfigDigest(1, signers, transmitters),
       F: 1,
-      uniqueReports: false,
       isSignatureVerificationEnabled: true,
       signers: signers,
       transmitters: transmitters
@@ -793,7 +751,6 @@ contract MultiOCR3Base_setOCR3Configs is MultiOCR3BaseSetup {
       ocrPluginType: 0,
       configDigest: _getBasicConfigDigest(1, signers, transmitters),
       F: 1,
-      uniqueReports: false,
       isSignatureVerificationEnabled: true,
       signers: signers,
       transmitters: transmitters
@@ -823,7 +780,6 @@ contract MultiOCR3Base_setOCR3Configs is MultiOCR3BaseSetup {
       ocrPluginType: 0,
       configDigest: _getBasicConfigDigest(F, signers, transmitters),
       F: F,
-      uniqueReports: false,
       isSignatureVerificationEnabled: true,
       signers: signers,
       transmitters: transmitters
@@ -849,7 +805,6 @@ contract MultiOCR3Base_setOCR3Configs is MultiOCR3BaseSetup {
       ocrPluginType: 0,
       configDigest: _getBasicConfigDigest(F, signers, transmitters),
       F: F,
-      uniqueReports: false,
       isSignatureVerificationEnabled: true,
       signers: signers,
       transmitters: transmitters
@@ -869,7 +824,6 @@ contract MultiOCR3Base_setOCR3Configs is MultiOCR3BaseSetup {
       ocrPluginType: 0,
       configDigest: _getBasicConfigDigest(F, s_validSigners, s_validTransmitters),
       F: F,
-      uniqueReports: false,
       isSignatureVerificationEnabled: true,
       signers: s_validSigners,
       transmitters: s_validTransmitters
@@ -877,13 +831,7 @@ contract MultiOCR3Base_setOCR3Configs is MultiOCR3BaseSetup {
 
     s_multiOCR3.setOCR3Configs(ocrConfigs);
 
-    // uniqueReports cannot change
-    ocrConfigs[0].uniqueReports = true;
-    vm.expectRevert(abi.encodeWithSelector(MultiOCR3Base.StaticConfigCannotBeChanged.selector, 0));
-    s_multiOCR3.setOCR3Configs(ocrConfigs);
-
     // signature verification cannot change
-    ocrConfigs[0].uniqueReports = false;
     ocrConfigs[0].isSignatureVerificationEnabled = false;
     vm.expectRevert(abi.encodeWithSelector(MultiOCR3Base.StaticConfigCannotBeChanged.selector, 0));
     s_multiOCR3.setOCR3Configs(ocrConfigs);
@@ -898,7 +846,6 @@ contract MultiOCR3Base_setOCR3Configs is MultiOCR3BaseSetup {
       ocrPluginType: 0,
       configDigest: _getBasicConfigDigest(1, signers, transmitters),
       F: 1,
-      uniqueReports: false,
       isSignatureVerificationEnabled: true,
       signers: signers,
       transmitters: transmitters
@@ -916,7 +863,6 @@ contract MultiOCR3Base_setOCR3Configs is MultiOCR3BaseSetup {
       ocrPluginType: 0,
       configDigest: _getBasicConfigDigest(0, s_validSigners, s_validTransmitters),
       F: 0,
-      uniqueReports: false,
       isSignatureVerificationEnabled: true,
       signers: s_validSigners,
       transmitters: s_validTransmitters
@@ -939,7 +885,6 @@ contract MultiOCR3Base_setOCR3Configs is MultiOCR3BaseSetup {
       ocrPluginType: 0,
       configDigest: _getBasicConfigDigest(10, signers, transmitters),
       F: 10,
-      uniqueReports: false,
       isSignatureVerificationEnabled: false,
       signers: signers,
       transmitters: transmitters
@@ -961,7 +906,6 @@ contract MultiOCR3Base_setOCR3Configs is MultiOCR3BaseSetup {
       ocrPluginType: 0,
       configDigest: _getBasicConfigDigest(1, signers, s_validTransmitters),
       F: 1,
-      uniqueReports: false,
       isSignatureVerificationEnabled: true,
       signers: signers,
       transmitters: s_validTransmitters
