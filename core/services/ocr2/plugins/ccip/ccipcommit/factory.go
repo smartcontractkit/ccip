@@ -91,6 +91,11 @@ func (rf *CommitReportingPluginFactory) NewReportingPlugin(config types.Reportin
 		return nil, types.ReportingPluginInfo{}, err
 	}
 
+	err = rf.config.dbPriceWrite.UpdateDynamicConfig(gasPriceEstimator, rf.destPriceRegReader)
+	if err != nil {
+		return nil, types.ReportingPluginInfo{}, err
+	}
+
 	lggr := rf.config.lggr.Named("CommitReportingPlugin")
 	return &CommitReportingPlugin{
 			sourceChainSelector:     rf.config.sourceChainSelector,
