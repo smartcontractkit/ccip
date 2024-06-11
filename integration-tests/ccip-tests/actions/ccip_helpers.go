@@ -1249,7 +1249,7 @@ func DefaultCCIPModule(
 	}
 	if contracts.NeedTokenAdminRegistry() &&
 		!pointer.GetBool(testGroupConf.TokenConfig.CCIPOwnerTokens) &&
-		len(tokenDeployerChainClient.GetWallets()) > 1 { // If we want to deploy tokens as a non CCIP owner, we need to set the default wallet to something other than the first one
+		len(tokenDeployerChainClient.GetWallets()) > 1 { // If we want to deploy tokens as a non CCIP owner, we need to set the default wallet to something other than the first one. The first wallet is used as default CCIP owner for all other ccip contract deployment.
 		if err = tokenDeployerChainClient.SetDefaultWallet(1); err != nil {
 			return nil, errors.WithStack(fmt.Errorf("failed to set default wallet for token deployment client %s: %w", networkCfg.Name, err))
 		}
