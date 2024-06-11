@@ -821,7 +821,7 @@ func (pool *TokenPool) GetToken() (common.Address, error) {
 		return pool.Instance.V1_4_0.PoolInterface.GetToken(nil)
 	}
 	if pool.Instance.Latest != nil && pool.Instance.Latest.PoolInterface != nil {
-		pool.Instance.Latest.PoolInterface.GetToken(nil)
+		return pool.Instance.Latest.PoolInterface.GetToken(nil)
 	}
 	return common.Address{}, fmt.Errorf("no pool found to get token")
 }
