@@ -14,7 +14,6 @@ import (
 
 	cciptypes "github.com/smartcontractkit/ccipocr3/ccipocr3-dont-merge"
 	"github.com/smartcontractkit/ccipocr3/internal/libs/slicelib"
-
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 )
 
@@ -22,6 +21,7 @@ import (
 // To learn more about the plugin lifecycle, see the ocr3types.ReportingPlugin interface.
 type Plugin struct {
 	nodeID            commontypes.OracleID
+	oracleIdToP2pId   map[commontypes.OracleID]cciptypes.P2PID
 	cfg               cciptypes.CommitPluginConfig
 	ccipReader        cciptypes.CCIPReader
 	tokenPricesReader cciptypes.TokenPricesReader
@@ -37,6 +37,7 @@ type Plugin struct {
 func NewPlugin(
 	ctx context.Context,
 	nodeID commontypes.OracleID,
+	oracleIdToP2pId map[commontypes.OracleID]cciptypes.P2PID,
 	cfg cciptypes.CommitPluginConfig,
 	ccipReader cciptypes.CCIPReader,
 	tokenPricesReader cciptypes.TokenPricesReader,
@@ -45,11 +46,12 @@ func NewPlugin(
 	lggr logger.Logger,
 	homeChainPoller cciptypes.HomeChainPoller,
 ) *Plugin {
-	// Start polling the home chain config in the background every 6 minutes
+	// Start polling the home chain config in the background every 12 seconds
 	homeChainPoller.StartPolling(ctx, 12*time.Second)
 
 	return &Plugin{
 		nodeID:            nodeID,
+		oracleIdToP2pId:   oracleIdToP2pId,
 		cfg:               cfg,
 		ccipReader:        ccipReader,
 		tokenPricesReader: tokenPricesReader,
@@ -90,7 +92,11 @@ func (p *Plugin) Query(_ context.Context, _ ocr3types.OutcomeContext) (types.Que
 //	The fee tokens are configured in the plugin config.
 func (p *Plugin) Observation(ctx context.Context, outctx ocr3types.OutcomeContext, _ types.Query) (types.Observation, error) {
 	homeChainConfig := p.homeChainPoller.GetConfig()
-	supportedChains := homeChainConfig.GetSupportedChains(p.nodeID)
+	p2pId, exists := p.oracleIdToP2pId[p.nodeID]
+	if !exists {
+		return types.Observation{}, fmt.Errorf("oracle ID %d not found in oracleIdToP2pId", p.nodeID)
+	}
+	supportedChains := homeChainConfig.GetSupportedChains(p2pId)
 	maxSeqNumsPerChain, err := observeMaxSeqNums(
 		ctx,
 		p.lggr,
@@ -169,8 +175,12 @@ func (p *Plugin) ValidateObservation(_ ocr3types.OutcomeContext, _ types.Query, 
 
 	homeChainConfig := p.homeChainPoller.GetConfig()
 
-	// TODO: This doesn't compare consensus observation with the home chain config's NodeSupportedChains
-	if err := validateObserverReadingEligibility(ao.Observer, obs.NewMsgs, homeChainConfig.NodeSupportedChains); err != nil {
+	p2pId, exists := p.oracleIdToP2pId[ao.Observer]
+	if !exists {
+		return fmt.Errorf("oracle ID %d not found in oracleIdToP2pId", ao.Observer)
+	}
+
+	if err := validateObserverReadingEligibility(p2pId, obs.NewMsgs, homeChainConfig.NodeSupportedChains); err != nil {
 		return fmt.Errorf("validate observer %d reading eligibility: %w", ao.Observer, err)
 	}
 
@@ -288,7 +298,7 @@ func (p *Plugin) ShouldAcceptAttestedReport(ctx context.Context, u uint64, r ocr
 
 func (p *Plugin) ShouldTransmitAcceptedReport(ctx context.Context, u uint64, r ocr3types.ReportWithInfo[[]byte]) (bool, error) {
 	homeChainConfig := p.homeChainPoller.GetConfig()
-	if !homeChainConfig.IsSupported(p.nodeID, p.cfg.DestChain) {
+	if !homeChainConfig.IsSupported(p.oracleIdToP2pId[p.nodeID], p.cfg.DestChain) {
 		p.lggr.Debugw("not a writer, skipping report transmission")
 		return false, nil
 	}

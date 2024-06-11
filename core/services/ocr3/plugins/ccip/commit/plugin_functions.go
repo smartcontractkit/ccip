@@ -10,8 +10,6 @@ import (
 	"github.com/smartcontractkit/ccipocr3/internal/libs/hashlib"
 	"github.com/smartcontractkit/ccipocr3/internal/libs/merklemulti"
 	"github.com/smartcontractkit/ccipocr3/internal/libs/slicelib"
-
-	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	"golang.org/x/sync/errgroup"
 
@@ -569,9 +567,9 @@ func validateObservedSequenceNumbers(msgs []cciptypes.CCIPMsgBaseDetails, maxSeq
 
 // validateObserverReadingEligibility checks if the observer is eligible to observe the messages it observed.
 func validateObserverReadingEligibility(
-	observer commontypes.OracleID,
+	observer cciptypes.P2PID,
 	msgs []cciptypes.CCIPMsgBaseDetails,
-	nodeSupportedChains map[commontypes.OracleID]cciptypes.SupportedChains,
+	nodeSupportedChains map[cciptypes.P2PID]cciptypes.SupportedChains,
 ) error {
 	if len(msgs) == 0 {
 		return nil

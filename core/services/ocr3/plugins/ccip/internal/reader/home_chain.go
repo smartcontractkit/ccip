@@ -8,8 +8,6 @@ import (
 
 	mapset "github.com/deckarep/golang-set/v2"
 	cciptypes "github.com/smartcontractkit/ccipocr3/ccipocr3-dont-merge"
-	"github.com/smartcontractkit/libocr/commontypes"
-
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 )
@@ -20,18 +18,15 @@ type HomeChainConfigPoller struct {
 	lggr             logger.Logger
 	mutex            sync.RWMutex
 	backgroundCancel context.CancelFunc
-	p2pIdToOracleId  map[cciptypes.Bytes32]commontypes.OracleID
 }
 
 func NewHomeChainConfigPoller(
 	homeChainReader types.ContractReader,
 	lggr logger.Logger,
-	p2pIdToOracleId map[cciptypes.Bytes32]commontypes.OracleID,
 ) *HomeChainConfigPoller {
 	return &HomeChainConfigPoller{
 		homeChainReader: homeChainReader,
 		lggr:            lggr,
-		p2pIdToOracleId: p2pIdToOracleId,
 	}
 }
 
@@ -87,10 +82,10 @@ func (r *HomeChainConfigPoller) GetConfig() cciptypes.HomeChainConfig {
 	return r.homeChainConfig
 }
 
-func (r *HomeChainConfigPoller) GetSupportedChains(oracleID commontypes.OracleID) mapset.Set[cciptypes.ChainSelector] {
+func (r *HomeChainConfigPoller) GetSupportedChains(p2pId cciptypes.P2PID) mapset.Set[cciptypes.ChainSelector] {
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
-	return r.homeChainConfig.NodeSupportedChains[oracleID].Supported
+	return r.homeChainConfig.NodeSupportedChains[p2pId].Supported
 }
 
 func (r *HomeChainConfigPoller) fetchOnChainConfig(ctx context.Context) ([]cciptypes.OnChainCapabilityConfig, error) {
@@ -117,23 +112,22 @@ func (r *HomeChainConfigPoller) Close(ctx context.Context) error {
 func (r *HomeChainConfigPoller) convertOnChainConfigToHomeChainConfig(capabilityConfigs []cciptypes.OnChainCapabilityConfig) (cciptypes.HomeChainConfig, error) {
 	fChain := make(map[cciptypes.ChainSelector]int)
 	// NodeSupportedChains is a map of oracle IDs to SupportedChains.
-	var nodeSupportedChains = make(map[commontypes.OracleID]cciptypes.SupportedChains)
+	var nodeSupportedChains = make(map[cciptypes.P2PID]cciptypes.SupportedChains)
 	//iterate over configs
 	for _, capabilityConfig := range capabilityConfigs {
-		//iterate over readers
-		chainSelector := cciptypes.ChainSelector(capabilityConfig.ChainSelector)
+		chainSelector := capabilityConfig.ChainSelector
 		config := capabilityConfig.ChainConfig
 
 		fChain[chainSelector] = int(config.FChain)
+		//iterate over readers
 		for _, p2pId := range config.Readers {
-			oracleID := r.p2pIdToOracleId[p2pId]
-			if _, ok := nodeSupportedChains[oracleID]; !ok {
-				nodeSupportedChains[oracleID] = cciptypes.SupportedChains{
+			if _, ok := nodeSupportedChains[p2pId]; !ok {
+				nodeSupportedChains[p2pId] = cciptypes.SupportedChains{
 					Supported: mapset.NewSet[cciptypes.ChainSelector](),
 				}
 			}
 			//add chain to SupportedChains
-			nodeSupportedChains[oracleID].Supported.Add(chainSelector)
+			nodeSupportedChains[p2pId].Supported.Add(chainSelector)
 		}
 	}
 	return cciptypes.HomeChainConfig{

@@ -6,12 +6,12 @@ import (
 	"testing"
 
 	cciptypes "github.com/smartcontractkit/ccipocr3/ccipocr3-dont-merge"
+	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/stretchr/testify/mock"
 
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/smartcontractkit/ccipocr3/internal/libs/testhelpers"
 	"github.com/smartcontractkit/ccipocr3/internal/mocks"
-	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	"github.com/stretchr/testify/assert"
@@ -168,13 +168,14 @@ func setupEmptyOutcome(ctx context.Context, t *testing.T, lggr logger.Logger) []
 
 	homeChainConfig := cciptypes.HomeChainConfig{
 		FChain:              map[cciptypes.ChainSelector]int{chainC: 1},
-		NodeSupportedChains: map[commontypes.OracleID]cciptypes.SupportedChains{},
+		NodeSupportedChains: map[cciptypes.P2PID]cciptypes.SupportedChains{},
 	}
 
+	oracleIdToP2pId := GetP2pIds(1, 2, 3)
 	return []nodeSetup{
-		newNode(ctx, t, lggr, 1, cfg, homeChainConfig),
-		newNode(ctx, t, lggr, 2, cfg, homeChainConfig),
-		newNode(ctx, t, lggr, 3, cfg, homeChainConfig),
+		newNode(ctx, t, lggr, 1, cfg, homeChainConfig, oracleIdToP2pId),
+		newNode(ctx, t, lggr, 2, cfg, homeChainConfig, oracleIdToP2pId),
+		newNode(ctx, t, lggr, 3, cfg, homeChainConfig, oracleIdToP2pId),
 	}
 }
 
@@ -192,15 +193,16 @@ func setupAllNodesReadAllChains(ctx context.Context, t *testing.T, lggr logger.L
 			chainB: 1,
 			chainC: 1,
 		},
-		NodeSupportedChains: map[commontypes.OracleID]cciptypes.SupportedChains{
-			1: {Supported: mapset.NewSet[cciptypes.ChainSelector](chainA, chainB, chainC)},
-			2: {Supported: mapset.NewSet[cciptypes.ChainSelector](chainA, chainB, chainC)},
-			3: {Supported: mapset.NewSet[cciptypes.ChainSelector](chainA, chainB, chainC)},
+		NodeSupportedChains: map[cciptypes.P2PID]cciptypes.SupportedChains{
+			cciptypes.GetP2pId(1): {Supported: mapset.NewSet[cciptypes.ChainSelector](chainA, chainB, chainC)},
+			cciptypes.GetP2pId(2): {Supported: mapset.NewSet[cciptypes.ChainSelector](chainA, chainB, chainC)},
+			cciptypes.GetP2pId(3): {Supported: mapset.NewSet[cciptypes.ChainSelector](chainA, chainB, chainC)},
 		},
 	}
-	n1 := newNode(ctx, t, lggr, 1, cfg, homeChainConfig)
-	n2 := newNode(ctx, t, lggr, 2, cfg, homeChainConfig)
-	n3 := newNode(ctx, t, lggr, 3, cfg, homeChainConfig)
+	oracleIdToP2pId := GetP2pIds(1, 2, 3)
+	n1 := newNode(ctx, t, lggr, 1, cfg, homeChainConfig, oracleIdToP2pId)
+	n2 := newNode(ctx, t, lggr, 2, cfg, homeChainConfig, oracleIdToP2pId)
+	n3 := newNode(ctx, t, lggr, 3, cfg, homeChainConfig, oracleIdToP2pId)
 	nodes := []nodeSetup{n1, n2, n3}
 
 	for _, n := range nodes {
@@ -251,16 +253,17 @@ func setupNodesDoNotAgreeOnMsgs(ctx context.Context, t *testing.T, lggr logger.L
 			chainB: 1,
 			chainC: 1,
 		},
-		NodeSupportedChains: map[commontypes.OracleID]cciptypes.SupportedChains{
-			1: {Supported: mapset.NewSet[cciptypes.ChainSelector](chainA, chainB, chainC)},
-			2: {Supported: mapset.NewSet[cciptypes.ChainSelector](chainA, chainB, chainC)},
-			3: {Supported: mapset.NewSet[cciptypes.ChainSelector](chainA, chainB, chainC)},
+		NodeSupportedChains: map[cciptypes.P2PID]cciptypes.SupportedChains{
+			cciptypes.GetP2pId(1): {Supported: mapset.NewSet[cciptypes.ChainSelector](chainA, chainB, chainC)},
+			cciptypes.GetP2pId(2): {Supported: mapset.NewSet[cciptypes.ChainSelector](chainA, chainB, chainC)},
+			cciptypes.GetP2pId(3): {Supported: mapset.NewSet[cciptypes.ChainSelector](chainA, chainB, chainC)},
 		},
 	}
 
-	n1 := newNode(ctx, t, lggr, 1, cfg, homeChainConfig)
-	n2 := newNode(ctx, t, lggr, 2, cfg, homeChainConfig)
-	n3 := newNode(ctx, t, lggr, 3, cfg, homeChainConfig)
+	oracleIdToP2pId := GetP2pIds(1, 2, 3)
+	n1 := newNode(ctx, t, lggr, 1, cfg, homeChainConfig, oracleIdToP2pId)
+	n2 := newNode(ctx, t, lggr, 2, cfg, homeChainConfig, oracleIdToP2pId)
+	n3 := newNode(ctx, t, lggr, 3, cfg, homeChainConfig, oracleIdToP2pId)
 	nodes := []nodeSetup{n1, n2, n3}
 
 	for i, n := range nodes {
@@ -308,12 +311,12 @@ type nodeSetup struct {
 	msgHasher   *mocks.MessageHasher
 }
 
-func newNode(ctx context.Context, t *testing.T, lggr logger.Logger, id int, cfg cciptypes.CommitPluginConfig, homeChainConfig cciptypes.HomeChainConfig) nodeSetup {
+func newNode(ctx context.Context, t *testing.T, lggr logger.Logger, id int, cfg cciptypes.CommitPluginConfig, homeChainConfig cciptypes.HomeChainConfig, oracleIdToP2PId map[commontypes.OracleID]cciptypes.P2PID) nodeSetup {
 	ccipReader := mocks.NewCCIPReader()
 	priceReader := mocks.NewTokenPricesReader()
 	reportCodec := mocks.NewCommitPluginJSONReportCodec()
 	msgHasher := mocks.NewMessageHasher()
-	homeChainPoller := mocks.NewHomeChainPollerMock(homeChainConfig)
+	homeChainPoller := mocks.NewHomeChainPollerMock()
 
 	homeChainPoller.On("StartPolling", mock.Anything, mock.Anything).Return()
 	homeChainPoller.On("GetConfig").Return(homeChainConfig)
@@ -321,6 +324,7 @@ func newNode(ctx context.Context, t *testing.T, lggr logger.Logger, id int, cfg 
 	node1 := NewPlugin(
 		context.Background(),
 		commontypes.OracleID(id),
+		oracleIdToP2PId,
 		cfg,
 		ccipReader,
 		priceReader,
@@ -337,6 +341,13 @@ func newNode(ctx context.Context, t *testing.T, lggr logger.Logger, id int, cfg 
 		reportCodec: reportCodec,
 		msgHasher:   msgHasher,
 	}
+}
+func GetP2pIds(ids ...int) map[commontypes.OracleID]cciptypes.P2PID {
+	res := make(map[commontypes.OracleID]cciptypes.P2PID)
+	for _, id := range ids {
+		res[commontypes.OracleID(id)] = cciptypes.GetP2pId(id)
+	}
+	return res
 }
 
 var (

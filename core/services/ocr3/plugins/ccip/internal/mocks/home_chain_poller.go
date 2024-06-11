@@ -13,7 +13,7 @@ type HomeChainPollerMock struct {
 	*mock.Mock
 }
 
-func NewHomeChainPollerMock(config cciptypes.HomeChainConfig) *HomeChainPollerMock {
+func NewHomeChainPollerMock() *HomeChainPollerMock {
 	return &HomeChainPollerMock{
 		Mock: &mock.Mock{},
 	}

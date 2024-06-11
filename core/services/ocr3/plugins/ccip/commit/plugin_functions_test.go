@@ -12,7 +12,6 @@ import (
 	cciptypes "github.com/smartcontractkit/ccipocr3/ccipocr3-dont-merge"
 	"github.com/smartcontractkit/ccipocr3/internal/libs/slicelib"
 	"github.com/smartcontractkit/ccipocr3/internal/mocks"
-	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -464,58 +463,58 @@ func Test_validateObservedSequenceNumbers(t *testing.T) {
 func Test_validateObserverReadingEligibility(t *testing.T) {
 	testCases := []struct {
 		name                string
-		observer            commontypes.OracleID
+		observer            cciptypes.P2PID
 		msgs                []cciptypes.CCIPMsgBaseDetails
-		nodeSupportedChains map[commontypes.OracleID]cciptypes.SupportedChains
+		nodeSupportedChains map[cciptypes.P2PID]cciptypes.SupportedChains
 		expErr              bool
 	}{
 		{
 			name:     "observer can read all chains",
-			observer: commontypes.OracleID(10),
+			observer: cciptypes.GetP2pId(10),
 			msgs: []cciptypes.CCIPMsgBaseDetails{
 				{ID: cciptypes.Bytes32{1}, SourceChain: 1, SeqNum: 12},
 				{ID: cciptypes.Bytes32{3}, SourceChain: 2, SeqNum: 12},
 				{ID: cciptypes.Bytes32{1}, SourceChain: 3, SeqNum: 12},
 				{ID: cciptypes.Bytes32{2}, SourceChain: 3, SeqNum: 12},
 			},
-			nodeSupportedChains: map[commontypes.OracleID]cciptypes.SupportedChains{
-				10: {Supported: mapset.NewSet[cciptypes.ChainSelector](1, 2, 3)},
+			nodeSupportedChains: map[cciptypes.P2PID]cciptypes.SupportedChains{
+				cciptypes.GetP2pId(10): {Supported: mapset.NewSet[cciptypes.ChainSelector](1, 2, 3)},
 			},
 			expErr: false,
 		},
 		{
 			name:     "observer cannot read one chain",
-			observer: commontypes.OracleID(10),
+			observer: cciptypes.GetP2pId(10),
 			msgs: []cciptypes.CCIPMsgBaseDetails{
 				{ID: cciptypes.Bytes32{1}, SourceChain: 1, SeqNum: 12},
 				{ID: cciptypes.Bytes32{3}, SourceChain: 2, SeqNum: 12},
 				{ID: cciptypes.Bytes32{1}, SourceChain: 3, SeqNum: 12},
 				{ID: cciptypes.Bytes32{2}, SourceChain: 3, SeqNum: 12},
 			},
-			nodeSupportedChains: map[commontypes.OracleID]cciptypes.SupportedChains{
-				10: {Supported: mapset.NewSet[cciptypes.ChainSelector](1, 3)},
+			nodeSupportedChains: map[cciptypes.P2PID]cciptypes.SupportedChains{
+				cciptypes.GetP2pId(10): {Supported: mapset.NewSet[cciptypes.ChainSelector](1, 3)},
 			},
 			expErr: true,
 		},
 		{
 			name:     "observer cfg not found",
-			observer: commontypes.OracleID(10),
+			observer: cciptypes.GetP2pId(10),
 			msgs: []cciptypes.CCIPMsgBaseDetails{
 				{ID: cciptypes.Bytes32{1}, SourceChain: 1, SeqNum: 12},
 				{ID: cciptypes.Bytes32{3}, SourceChain: 2, SeqNum: 12},
 				{ID: cciptypes.Bytes32{1}, SourceChain: 3, SeqNum: 12},
 				{ID: cciptypes.Bytes32{2}, SourceChain: 3, SeqNum: 12},
 			},
-			nodeSupportedChains: map[commontypes.OracleID]cciptypes.SupportedChains{
-				20: {Supported: mapset.NewSet[cciptypes.ChainSelector](1, 3)}, // observer 10 not found
+			nodeSupportedChains: map[cciptypes.P2PID]cciptypes.SupportedChains{
+				cciptypes.GetP2pId(20): {Supported: mapset.NewSet[cciptypes.ChainSelector](1, 3)}, // observer 10 not found
 			},
 			expErr: true,
 		},
 		{
 			name:                "no msgs",
-			observer:            commontypes.OracleID(10),
+			observer:            cciptypes.GetP2pId(10),
 			msgs:                []cciptypes.CCIPMsgBaseDetails{},
-			nodeSupportedChains: map[commontypes.OracleID]cciptypes.SupportedChains{},
+			nodeSupportedChains: map[cciptypes.P2PID]cciptypes.SupportedChains{},
 			expErr:              false,
 		},
 	}

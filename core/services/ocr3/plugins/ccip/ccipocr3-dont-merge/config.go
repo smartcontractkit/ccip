@@ -2,6 +2,7 @@ package cciptypes
 
 import "C"
 import (
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"time"
@@ -61,13 +62,41 @@ type ObserverInfo struct {
 	Reads []ChainSelector `json:"reads"`
 }
 
+type P2PToSupportedChains map[P2PID]SupportedChains
+
+func (cm *P2PToSupportedChains) UnmarshalJSON(data []byte) error {
+	temp := make(map[string]SupportedChains)
+	if err := json.Unmarshal(data, &temp); err != nil {
+		return err
+	}
+	*cm = make(P2PToSupportedChains)
+	for k, v := range temp {
+		var key P2PID
+		decoded, err := hex.DecodeString(k)
+		if err != nil {
+			return err
+		}
+		copy(key[:], decoded)
+		(*cm)[key] = v
+	}
+	return nil
+}
+
+func (cm P2PToSupportedChains) MarshalJSON() ([]byte, error) {
+	temp := make(map[string]SupportedChains)
+	for k, v := range cm {
+		temp[hex.EncodeToString(k[:])] = v
+	}
+	return json.Marshal(temp)
+}
+
 type ConsensusObservation struct {
 	// FChain defines the FChain value for each chain. FChain is used while forming consensus based on the observations.
 	FChain map[ChainSelector]int `json:"fChain"`
 	// PricedTokens is a list of tokens that we want to submit price updates for.
 	PricedTokens []types.Account `json:"pricedTokens"`
 	// NodeSupportedChains is a map of oracle IDs to SupportedChains.
-	NodeSupportedChains map[commontypes.OracleID]SupportedChains `json:"nodeSupportedChains"`
+	NodeSupportedChains P2PToSupportedChains `json:"nodeSupportedChains"`
 }
 
 func (c ConsensusObservation) Validate() error {
@@ -88,8 +117,8 @@ func (c ConsensusObservation) Validate() error {
 type HomeChainConfig struct {
 	// FChain defines the FChain value for each chain. FChain is used while forming consensus based on the observations.
 	FChain map[ChainSelector]int `json:"fChain"`
-	// NodeSupportedChains is a map of oracle IDs to SupportedChains.
-	NodeSupportedChains map[commontypes.OracleID]SupportedChains `json:"nodeSupportedChains"`
+	// NodeSupportedChains is a map of PeerIDs to SupportedChains.
+	NodeSupportedChains P2PToSupportedChains `json:"nodeSupportedChains"`
 }
 
 func (c *HomeChainConfig) Validate() error {
@@ -106,7 +135,7 @@ func (c *HomeChainConfig) GetFChain(chain ChainSelector) int {
 	return c.FChain[chain]
 }
 
-func (c *HomeChainConfig) IsSupported(node commontypes.OracleID, chain ChainSelector) bool {
+func (c *HomeChainConfig) IsSupported(node P2PID, chain ChainSelector) bool {
 	supportedChains, ok := c.NodeSupportedChains[node]
 	if !ok {
 		return false
@@ -114,7 +143,7 @@ func (c *HomeChainConfig) IsSupported(node commontypes.OracleID, chain ChainSele
 	return supportedChains.IsSupported(chain)
 }
 
-func (c *HomeChainConfig) GetSupportedChains(node commontypes.OracleID) mapset.Set[ChainSelector] {
+func (c *HomeChainConfig) GetSupportedChains(node P2PID) mapset.Set[ChainSelector] {
 	supportedChains, ok := c.NodeSupportedChains[node]
 	if !ok {
 		return mapset.NewSet[ChainSelector]()
@@ -130,9 +159,7 @@ func (supportedChains *SupportedChains) IsSupported(chain ChainSelector) bool {
 	return supportedChains.Supported.Contains(chain)
 }
 
-// UnmarshalJSON to convert the array to Set
 func (sc *SupportedChains) UnmarshalJSON(data []byte) error {
-	// Define a temporary struct with a slice for Supported
 	temp := struct {
 		Supported []ChainSelector `json:"supported"`
 	}{}
@@ -141,7 +168,6 @@ func (sc *SupportedChains) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
-	// Convert the slice to a mapset.Set
 	sc.Supported = mapset.NewSet[ChainSelector]()
 	for _, ch := range temp.Supported {
 		sc.Supported.Add(ch)
@@ -150,10 +176,26 @@ func (sc *SupportedChains) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+func (sc SupportedChains) MarshalJSON() ([]byte, error) {
+	supportedSlice := make([]ChainSelector, 0, sc.Supported.Cardinality())
+	for ch := range sc.Supported.Iter() {
+		supportedSlice = append(supportedSlice, ch)
+	}
+
+	// Define a temporary struct with a slice for Supported
+	temp := struct {
+		Supported []ChainSelector `json:"supported"`
+	}{
+		Supported: supportedSlice,
+	}
+
+	return json.Marshal(temp)
+}
+
 type OnChainConfig struct {
-	Readers []Bytes32 `json:"readers"`
-	FChain  uint8     `json:"fChain"`
-	Config  []byte    `json:"config"`
+	Readers []P2PID `json:"readers"`
+	FChain  uint8   `json:"fChain"`
+	Config  []byte  `json:"config"`
 }
 type OnChainCapabilityConfig struct {
 	// Calling function https://github.com/smartcontractkit/ccip/blob/330c5e98f624cfb10108c92fe1e00ced6d345a99/contracts/src/v0.8/ccip/capability/CCIPCapabilityConfiguration.sol#L140

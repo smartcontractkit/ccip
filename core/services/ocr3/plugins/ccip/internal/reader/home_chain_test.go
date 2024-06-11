@@ -19,11 +19,11 @@ var (
 	chainB       = cciptypes.ChainSelector(2)
 	chainC       = cciptypes.ChainSelector(3)
 	oracleAId    = commontypes.OracleID(1)
-	p2pOracleAId = cciptypes.Bytes32{byte(oracleAId)}
+	p2pOracleAId = cciptypes.P2PID{byte(oracleAId)}
 	oracleBId    = commontypes.OracleID(2)
-	p2pOracleBId = cciptypes.Bytes32{byte(oracleBId)}
+	p2pOracleBId = cciptypes.P2PID{byte(oracleBId)}
 	oracleCId    = commontypes.OracleID(3)
-	p2pOracleCId = cciptypes.Bytes32{byte(oracleCId)}
+	p2pOracleCId = cciptypes.P2PID{byte(oracleCId)}
 )
 
 func Test_ConvertOnChainConfigToHomeChainConfig(t *testing.T) {
@@ -40,7 +40,7 @@ func Test_ConvertOnChainConfigToHomeChainConfig(t *testing.T) {
 					ChainSelector: chainA,
 					ChainConfig: cciptypes.OnChainConfig{
 						FChain: 1,
-						Readers: []cciptypes.Bytes32{
+						Readers: []cciptypes.P2PID{
 							p2pOracleAId,
 							p2pOracleBId,
 							p2pOracleCId,
@@ -52,7 +52,7 @@ func Test_ConvertOnChainConfigToHomeChainConfig(t *testing.T) {
 					ChainSelector: chainB,
 					ChainConfig: cciptypes.OnChainConfig{
 						FChain: 2,
-						Readers: []cciptypes.Bytes32{
+						Readers: []cciptypes.P2PID{
 							p2pOracleAId,
 							p2pOracleBId,
 						},
@@ -63,7 +63,7 @@ func Test_ConvertOnChainConfigToHomeChainConfig(t *testing.T) {
 					ChainSelector: chainC,
 					ChainConfig: cciptypes.OnChainConfig{
 						FChain: 3,
-						Readers: []cciptypes.Bytes32{
+						Readers: []cciptypes.P2PID{
 							p2pOracleCId,
 						},
 						Config: []byte{0},
@@ -76,10 +76,10 @@ func Test_ConvertOnChainConfigToHomeChainConfig(t *testing.T) {
 					chainB: 2,
 					chainC: 3,
 				},
-				NodeSupportedChains: map[commontypes.OracleID]cciptypes.SupportedChains{
-					oracleAId: {Supported: mapset.NewSet[cciptypes.ChainSelector](chainA, chainB)},
-					oracleBId: {Supported: mapset.NewSet[cciptypes.ChainSelector](chainA, chainB)},
-					oracleCId: {Supported: mapset.NewSet[cciptypes.ChainSelector](chainA, chainC)},
+				NodeSupportedChains: map[cciptypes.P2PID]cciptypes.SupportedChains{
+					p2pOracleAId: {Supported: mapset.NewSet[cciptypes.ChainSelector](chainA, chainB)},
+					p2pOracleBId: {Supported: mapset.NewSet[cciptypes.ChainSelector](chainA, chainB)},
+					p2pOracleCId: {Supported: mapset.NewSet[cciptypes.ChainSelector](chainA, chainC)},
 				},
 			},
 		},
@@ -88,11 +88,6 @@ func Test_ConvertOnChainConfigToHomeChainConfig(t *testing.T) {
 		configPoller := NewHomeChainConfigPoller(
 			nil,
 			logger.Test(t),
-			map[cciptypes.Bytes32]commontypes.OracleID{
-				p2pOracleAId: oracleAId,
-				p2pOracleBId: oracleBId,
-				p2pOracleCId: oracleCId,
-			},
 		)
 		t.Run(tc.name, func(t *testing.T) {
 			resultConfig, err := configPoller.convertOnChainConfigToHomeChainConfig(tc.onChainConfigs)
@@ -108,7 +103,7 @@ func Test_PollingWorking(t *testing.T) {
 			ChainSelector: chainA,
 			ChainConfig: cciptypes.OnChainConfig{
 				FChain: 1,
-				Readers: []cciptypes.Bytes32{
+				Readers: []cciptypes.P2PID{
 					p2pOracleAId,
 					p2pOracleBId,
 					p2pOracleCId,
@@ -120,7 +115,7 @@ func Test_PollingWorking(t *testing.T) {
 			ChainSelector: chainB,
 			ChainConfig: cciptypes.OnChainConfig{
 				FChain: 2,
-				Readers: []cciptypes.Bytes32{
+				Readers: []cciptypes.P2PID{
 					p2pOracleAId,
 					p2pOracleBId,
 				},
@@ -131,7 +126,7 @@ func Test_PollingWorking(t *testing.T) {
 			ChainSelector: chainC,
 			ChainConfig: cciptypes.OnChainConfig{
 				FChain: 3,
-				Readers: []cciptypes.Bytes32{
+				Readers: []cciptypes.P2PID{
 					p2pOracleCId,
 				},
 				Config: []byte{0},
@@ -144,10 +139,10 @@ func Test_PollingWorking(t *testing.T) {
 			chainB: 2,
 			chainC: 3,
 		},
-		NodeSupportedChains: map[commontypes.OracleID]cciptypes.SupportedChains{
-			oracleAId: {Supported: mapset.NewSet[cciptypes.ChainSelector](chainA, chainB)},
-			oracleBId: {Supported: mapset.NewSet[cciptypes.ChainSelector](chainA, chainB)},
-			oracleCId: {Supported: mapset.NewSet[cciptypes.ChainSelector](chainA, chainC)},
+		NodeSupportedChains: map[cciptypes.P2PID]cciptypes.SupportedChains{
+			p2pOracleAId: {Supported: mapset.NewSet[cciptypes.ChainSelector](chainA, chainB)},
+			p2pOracleBId: {Supported: mapset.NewSet[cciptypes.ChainSelector](chainA, chainB)},
+			p2pOracleCId: {Supported: mapset.NewSet[cciptypes.ChainSelector](chainA, chainC)},
 		},
 	}
 
@@ -162,12 +157,8 @@ func Test_PollingWorking(t *testing.T) {
 	configPoller := NewHomeChainConfigPoller(
 		homeChainReader,
 		logger.Test(t),
-		map[cciptypes.Bytes32]commontypes.OracleID{
-			p2pOracleAId: oracleAId,
-			p2pOracleBId: oracleBId,
-			p2pOracleCId: oracleCId,
-		},
 	)
+
 	ctx := context.Background()
 	configPoller.StartPolling(ctx, 1*time.Second)
 	// sleep for 2 seconds
