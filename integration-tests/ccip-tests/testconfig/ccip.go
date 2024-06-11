@@ -16,8 +16,6 @@ import (
 	ccipcontracts "github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/contracts"
 	testutils "github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/utils"
 	"github.com/smartcontractkit/chainlink/integration-tests/contracts"
-
-	"github.com/smartcontractkit/ccip/integration-tests/testconfig"
 )
 
 const (
@@ -403,39 +401,5 @@ func (c *CCIP) ApplyOverrides(fromCfg *CCIP) error {
 	if err != nil {
 		return err
 	}
-	return handleDefaultConfigOverride(zerolog.Logger{}, c, logBytes)
-}
-
-// handleDefaultConfigOverride is a method that overrides 2 known slices instead of merging them (default behavior of toml.Unmarshal for slices)
-// these slices are private ethereum networks and selected networks
-func handleDefaultConfigOverride(logger zerolog.Logger, target *CCIP, content []byte) error {
-	logger.Debug().Msg("Handling default config override")
-	oldConfig := testconfig.MustCopy(target)
-	newConfig := CCIP{}
-
-	err := ctfconfig.BytesToAnyTomlStruct(logger, "", "", &target, content)
-	if err != nil {
-		return err
-	}
-
-	err = ctfconfig.BytesToAnyTomlStruct(logger, "", "", &newConfig, content)
-	if err != nil {
-		return err
-	}
-
-	// override private ethereum networks instead of merging (default behavior of toml.Unmarshal for slices)
-	if (newConfig.Env != nil && len(newConfig.Env.PrivateEthereumNetworks) > 0) && (oldConfig != nil && oldConfig.Env != nil && len(oldConfig.Env.PrivateEthereumNetworks) > 0) {
-		target.Env.PrivateEthereumNetworks = map[string]*ctfconfig.EthereumNetworkConfig{}
-		for name, network := range newConfig.Env.PrivateEthereumNetworks {
-			target.Env.PrivateEthereumNetworks[name] = network
-		}
-	}
-
-	// override selected networks instead of merging (default behavior of toml.Unmarshal for slices)
-	if (newConfig.Env != nil && newConfig.Env.Network != nil && len(newConfig.Env.Network.SelectedNetworks) > 0) && (oldConfig != nil && oldConfig.Env != nil && oldConfig.Env.Network != nil && len(oldConfig.Env.Network.SelectedNetworks) > 0) {
-		target.Env.Network.SelectedNetworks = []string{}
-		target.Env.Network.SelectedNetworks = append(target.Env.Network.SelectedNetworks, newConfig.Env.Network.SelectedNetworks...)
-	}
-
-	return nil
+	return ctfconfig.BytesToAnyTomlStruct(zerolog.Logger{}, "", "", c, logBytes)
 }
