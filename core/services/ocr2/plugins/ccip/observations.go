@@ -6,6 +6,8 @@ import (
 	"math/big"
 	"strings"
 
+	"github.com/smartcontractkit/libocr/commontypes"
+
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
@@ -84,6 +86,7 @@ func (o ExecutionObservation) Marshal() ([]byte, error) {
 // GetParsableObservations MUST be used instead of raw json.Unmarshal(o) since it contains backwards compatibility changes.
 func GetParsableObservations[O CommitObservation | ExecutionObservation](l logger.Logger, observations []types.AttributedObservation) []O {
 	var parseableObservations []O
+	var observers []commontypes.OracleID
 	for _, ao := range observations {
 		if len(ao.Observation) == 0 {
 			// Empty observation
@@ -112,7 +115,15 @@ func GetParsableObservations[O CommitObservation | ExecutionObservation](l logge
 		}
 
 		parseableObservations = append(parseableObservations, ob)
+		observers = append(observers, ao.Observer)
 	}
+	l.Infow(
+		"Parsed observations",
+		"observers", observers,
+		"observersLength", len(observers),
+		"observationsLength", len(parseableObservations),
+		"rawObservationLength", len(observations),
+	)
 	return parseableObservations
 }
 
