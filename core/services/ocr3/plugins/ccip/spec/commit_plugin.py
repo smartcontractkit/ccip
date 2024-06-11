@@ -134,11 +134,11 @@ def consensus_f_chain(observations):
     return { ch: elem_most_occurrences(fs) for (ch, fs) in f_chain_votes.items() } # { chainA: 16 }
 
 def consensus_seq_nums(observations, f_chain):
-    seq_nums = observations["observed_seq_nums"].group_by_chain(sort="asc") # { chainA: [4, 5, 5, 5, 5, 6, 6] }
+    observed_seq_nums = observations["observed_seq_nums"].group_by_chain(sort="asc") # { chainA: [4, 5, 5, 5, 5, 6, 6] }
     seq_nums_consensus = {}
 
     for chain, seq_nums in observed_seq_nums.items():
-        if len(seq_nums) >= 2*f_chain[chain]+1:
-            seq_nums_consensus[chain] = seq_nums[f_chain[chain]] # with f=4 { chainA: 5 }
+        if len(observed_seq_nums) >= 2*f_chain[chain]+1:
+            seq_nums_consensus[chain] = observed_seq_nums[f_chain[chain]] # with f=4 { chainA: 5 }
 
     return seq_nums_consensus
