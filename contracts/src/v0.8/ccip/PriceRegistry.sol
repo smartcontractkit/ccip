@@ -27,7 +27,6 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator, ITypeAndVersion {
   error ChainNotSupported(uint64 chain);
   error OnlyCallableByUpdaterOrOwner();
   error StaleGasPrice(uint64 destChainSelector, uint256 threshold, uint256 timePassed);
-  error StaleTokenPrice(address token, uint256 threshold, uint256 timePassed);
   error InvalidStalenessThreshold();
   error DataFeedValueOutOfUint224Range();
 
@@ -66,7 +65,7 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator, ITypeAndVersion {
   EnumerableSet.AddressSet private s_priceUpdaters;
   // Subset of tokens which prices tracked by this registry which are fee tokens.
   EnumerableSet.AddressSet private s_feeTokens;
-  // The amount of time a price can be stale before it is considered invalid.
+  // The amount of time a gas price can be stale before it is considered invalid.
   uint32 private immutable i_stalenessThreshold;
 
   constructor(
@@ -86,23 +85,22 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator, ITypeAndVersion {
   // │                     Price calculations                       │
   // ================================================================
 
-  // @inheritdoc IPriceRegistry
+  /// @inheritdoc IPriceRegistry
   function getTokenPrice(address token) public view override returns (Internal.TimestampedPackedUint224 memory) {
     IPriceRegistry.TokenPriceFeedConfig memory priceFeedConfig = s_usdPriceFeedsPerToken[token];
     if (priceFeedConfig.dataFeedAddress == address(0)) {
       return s_usdPerToken[token];
     }
 
-    (uint224 price, uint32 timestamp) = _getTokenPriceFromDataFeed(priceFeedConfig);
-    return Internal.TimestampedPackedUint224({value: price, timestamp: timestamp});
+    return _getTokenPriceFromDataFeed(priceFeedConfig);
   }
 
-  // @inheritdoc IPriceRegistry
+  /// @inheritdoc IPriceRegistry
   function getValidatedTokenPrice(address token) external view override returns (uint224) {
     return _getValidatedTokenPrice(token);
   }
 
-  // @inheritdoc IPriceRegistry
+  /// @inheritdoc IPriceRegistry
   function getTokenPrices(address[] calldata tokens)
     external
     view
@@ -117,7 +115,7 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator, ITypeAndVersion {
     return tokenPrices;
   }
 
-  // @inheritdoc IPriceRegistry
+  /// @inheritdoc IPriceRegistry
   function getTokenPriceFeedConfig(address token)
     external
     view
@@ -133,7 +131,7 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator, ITypeAndVersion {
     return i_stalenessThreshold;
   }
 
-  // @inheritdoc IPriceRegistry
+  /// @inheritdoc IPriceRegistry
   function getDestinationChainGasPrice(uint64 destChainSelector)
     external
     view
@@ -143,6 +141,7 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator, ITypeAndVersion {
     return s_usdPerUnitGasByDestChainSelector[destChainSelector];
   }
 
+  /// @inheritdoc IPriceRegistry
   function getTokenAndGasPrices(
     address token,
     uint64 destChainSelector
@@ -173,26 +172,23 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator, ITypeAndVersion {
     return (fromTokenAmount * _getValidatedTokenPrice(fromToken)) / _getValidatedTokenPrice(toToken);
   }
 
-  /// @notice Gets the token price for a given token and revert if the token is either
-  /// not supported or the price is stale.
+  /// @notice Gets the token price for a given token and revert if the token is not supported
   /// @param token The address of the token to get the price for
   /// @return the token price
   function _getValidatedTokenPrice(address token) internal view returns (uint224) {
     Internal.TimestampedPackedUint224 memory tokenPrice = getTokenPrice(token);
+    // Token price must be set at least once
     if (tokenPrice.timestamp == 0 || tokenPrice.value == 0) revert TokenNotSupported(token);
-    uint256 timePassed = block.timestamp - tokenPrice.timestamp;
-    if (timePassed > i_stalenessThreshold) revert StaleTokenPrice(token, i_stalenessThreshold, timePassed);
     return tokenPrice.value;
   }
 
   /// @notice Gets the token price from a data feed address, rebased to the same units as s_usdPerToken
   /// @param priceFeedConfig token data feed configuration with valid data feed address (used to retrieve price & timestamp)
-  /// @return value data feed answer value (rebased to s_usdPerToken units)
-  /// @return timestamp data feed last updated timestamp
+  /// @return tokenPrice data feed price answer rebased to s_usdPerToken units, with latest block timestamp
   function _getTokenPriceFromDataFeed(IPriceRegistry.TokenPriceFeedConfig memory priceFeedConfig)
     internal
     view
-    returns (uint224 value, uint32 timestamp)
+    returns (Internal.TimestampedPackedUint224 memory tokenPrice)
   {
     AggregatorV3Interface dataFeedContract = AggregatorV3Interface(priceFeedConfig.dataFeedAddress);
     (
@@ -230,7 +226,9 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator, ITypeAndVersion {
     if (rebasedValue > type(uint224).max) {
       revert DataFeedValueOutOfUint224Range();
     }
-    return (uint224(rebasedValue), uint32(block.timestamp));
+
+    // Data feed staleness is unchecked to decouple the PriceRegistry from data feed delay issues
+    return Internal.TimestampedPackedUint224({value: uint224(rebasedValue), timestamp: uint32(block.timestamp)});
   }
 
   // ================================================================
@@ -275,7 +273,7 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator, ITypeAndVersion {
   // │                       Price updates                          │
   // ================================================================
 
-  // @inheritdoc IPriceRegistry
+  /// @inheritdoc IPriceRegistry
   function updatePrices(Internal.PriceUpdates calldata priceUpdates) external override requireUpdaterOrOwner {
     uint256 tokenUpdatesLength = priceUpdates.tokenPriceUpdates.length;
 
