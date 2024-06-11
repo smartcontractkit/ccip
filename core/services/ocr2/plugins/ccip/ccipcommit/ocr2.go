@@ -10,20 +10,20 @@ import (
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/pkg/errors"
+	"golang.org/x/sync/errgroup"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	cciporm "github.com/smartcontractkit/chainlink/v2/core/services/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcommon"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/ccipdataprovider"
+	db "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdb"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/pricegetter"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/pkg/hashlib"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/pkg/merklemulti"
@@ -69,6 +69,7 @@ type CommitPluginStaticConfig struct {
 	priceGetter      pricegetter.PriceGetter
 	metricsCollector ccip.PluginMetricsCollector
 	chainHealthcheck cache.ChainHealthcheck
+	dbPriceWrite     db.PriceWrite
 }
 
 type CommitReportingPlugin struct {
@@ -118,7 +119,7 @@ func (r *CommitReportingPlugin) Observation(ctx context.Context, epochAndRound t
 		return nil, err
 	}
 
-	sourceGasPriceUSD, tokenPricesUSD, err := r.observePriceUpdates(ctx, lggr)
+	sourceGasPriceUSD, tokenPricesUSD, err := r.observePriceUpdates(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -183,134 +184,50 @@ func (r *CommitReportingPlugin) calculateMinMaxSequenceNumbers(ctx context.Conte
 // observePriceUpdates only observes price updates if price reporting is enabled
 func (r *CommitReportingPlugin) observePriceUpdates(
 	ctx context.Context,
-	lggr logger.Logger,
 ) (sourceGasPriceUSD *big.Int, tokenPricesUSD map[cciptypes.Address]*big.Int, err error) {
-	sortedLaneTokens, filteredLaneTokens, err := ccipcommon.GetFilteredSortedLaneTokens(ctx, r.offRampReader, r.destPriceRegistryReader, r.priceGetter)
-	lggr.Debugw("Filtered bridgeable tokens with no configured price getter", "filteredLaneTokens", filteredLaneTokens)
+	eg := new(errgroup.Group)
 
-	if err != nil {
-		return nil, nil, fmt.Errorf("get destination tokens: %w", err)
-	}
+	var gasPricesInDB []cciporm.GasPrice
+	var tokenPricesInDB []cciporm.TokenPrice
 
-	gasPrice, tokenPricesUSD, err := r.generatePriceUpdates(ctx, lggr, sortedLaneTokens)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	// all lanes write prices to DB
-	// @MATT TODO consider deviation check here
-	err = r.writePricesToDB(ctx, gasPrice, tokenPricesUSD)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	// if not leader lane, no need to report prices, can return immediately
-	if r.offchainConfig.PriceReportingDisabled {
-		return nil, nil, nil
-	}
-
-	// @MATT TODO report prices from DB
-	return gasPrice, tokenPricesUSD, nil
-}
-
-func (r *CommitReportingPlugin) writePricesToDB(
-	ctx context.Context,
-	sourceGasPriceUSD *big.Int,
-	tokenPricesUSD map[cciptypes.Address]*big.Int,
-) (err error) {
-	if sourceGasPriceUSD != nil {
-		err := r.orm.InsertGasPricesForDestChain(ctx, r.destChainSelector, r.jobId, []cciporm.GasPriceUpdate{
-			{
-				SourceChainSelector: r.sourceChainSelector,
-				GasPrice:            assets.NewWei(sourceGasPriceUSD),
-			},
-		})
+	eg.Go(func() error {
+		gasPrices, err := r.orm.GetGasPricesByDestChain(ctx, r.destChainSelector)
 		if err != nil {
-			return fmt.Errorf("failed to insert gas prices to db: %w", err)
+			return fmt.Errorf("failed to get gas prices from db: %w", err)
 		}
-	}
+		gasPricesInDB = gasPrices
+		return nil
+	})
 
-	if tokenPricesUSD != nil {
-		var tokenPrices []cciporm.TokenPriceUpdate
-
-		for token, price := range tokenPricesUSD {
-			tokenPrices = append(tokenPrices, cciporm.TokenPriceUpdate{
-				TokenAddr:  string(token),
-				TokenPrice: assets.NewWei(price),
-			})
-		}
-
-		err := r.orm.InsertTokenPricesForDestChain(ctx, r.destChainSelector, r.jobId, tokenPrices)
+	eg.Go(func() error {
+		tokenPrices, err := r.orm.GetTokenPricesByDestChain(ctx, r.destChainSelector)
 		if err != nil {
-			return fmt.Errorf("failed to insert tokens prices to db: %w", err)
+			return fmt.Errorf("failed to get token prices from db: %w", err)
+		}
+		tokenPricesInDB = tokenPrices
+		return nil
+	})
+
+	if err := eg.Wait(); err != nil {
+		return nil, nil, err
+	}
+
+	for _, gasPrice := range gasPricesInDB {
+		if gasPrice.SourceChainSelector == r.sourceChainSelector {
+			sourceGasPriceUSD = gasPrice.GasPrice.ToInt()
+			break
 		}
 	}
-
-	return nil
-}
-
-// All prices are USD ($1=1e18) denominated. All prices must be not nil.
-// Return token prices should contain the exact same tokens as in tokenDecimals.
-func (r *CommitReportingPlugin) generatePriceUpdates(
-	ctx context.Context,
-	lggr logger.Logger,
-	sortedLaneTokens []cciptypes.Address,
-) (sourceGasPriceUSD *big.Int, tokenPricesUSD map[cciptypes.Address]*big.Int, err error) {
-	// Include wrapped native in our token query as way to identify the source native USD price.
-	// notice USD is in 1e18 scale, i.e. $1 = 1e18
-	queryTokens := ccipcommon.FlattenUniqueSlice([]cciptypes.Address{r.sourceNative}, sortedLaneTokens)
-
-	rawTokenPricesUSD, err := r.priceGetter.TokenPricesUSD(ctx, queryTokens)
-	if err != nil {
-		return nil, nil, err
-	}
-	lggr.Infow("Raw token prices", "rawTokenPrices", rawTokenPricesUSD)
-
-	// make sure that we got prices for all the tokens of our query
-	for _, token := range queryTokens {
-		if rawTokenPricesUSD[token] == nil {
-			return nil, nil, errors.Errorf("missing token price: %+v", token)
-		}
+	if sourceGasPriceUSD == nil {
+		return nil, nil, fmt.Errorf("missing gas price for sourceChainSelector %d", r.sourceChainSelector)
 	}
 
-	sourceNativePriceUSD, exists := rawTokenPricesUSD[r.sourceNative]
-	if !exists {
-		return nil, nil, fmt.Errorf("missing source native (%s) price", r.sourceNative)
+	tokenPricesUSD = make(map[cciptypes.Address]*big.Int, len(tokenPricesInDB))
+	for _, tokenPrice := range tokenPricesInDB {
+		tokenPricesUSD[cciptypes.Address(tokenPrice.TokenAddr)] = tokenPrice.TokenPrice.ToInt()
 	}
 
-	destTokensDecimals, err := r.destPriceRegistryReader.GetTokensDecimals(ctx, sortedLaneTokens)
-	if err != nil {
-		return nil, nil, fmt.Errorf("get tokens decimals: %w", err)
-	}
-
-	tokenPricesUSD = make(map[cciptypes.Address]*big.Int, len(rawTokenPricesUSD))
-	for i, token := range sortedLaneTokens {
-		tokenPricesUSD[token] = calculateUsdPer1e18TokenAmount(rawTokenPricesUSD[token], destTokensDecimals[i])
-	}
-
-	sourceGasPrice, err := r.gasPriceEstimator.GetGasPrice(ctx)
-	if err != nil {
-		return nil, nil, err
-	}
-	if sourceGasPrice == nil {
-		return nil, nil, errors.Errorf("missing gas price")
-	}
-	sourceGasPriceUSD, err = r.gasPriceEstimator.DenoteInUSD(sourceGasPrice, sourceNativePriceUSD)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	lggr.Infow("Observing gas price", "observedGasPriceWei", sourceGasPrice, "observedGasPriceUSD", sourceGasPriceUSD)
-	lggr.Infow("Observing token prices", "tokenPrices", tokenPricesUSD, "sourceNativePriceUSD", sourceNativePriceUSD)
 	return sourceGasPriceUSD, tokenPricesUSD, nil
-}
-
-// Input price is USD per full token, with 18 decimal precision
-// Result price is USD per 1e18 of smallest token denomination, with 18 decimal precision
-// Example: 1 USDC = 1.00 USD per full token, each full token is 6 decimals -> 1 * 1e18 * 1e18 / 1e6 = 1e30
-func calculateUsdPer1e18TokenAmount(price *big.Int, decimals uint8) *big.Int {
-	tmp := big.NewInt(0).Mul(price, big.NewInt(1e18))
-	return tmp.Div(tmp, big.NewInt(0).Exp(big.NewInt(10), big.NewInt(int64(decimals)), nil))
 }
 
 // Gets the latest token price updates based on logs within the heartbeat

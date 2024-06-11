@@ -19,8 +19,6 @@ import (
 // CCIP plugin only uses the latest prices. To make debugging and updating easier, new prices are always inserted
 // to the DB, as opposed to overwriting the old ones.
 // As a result, we need to clean up the old prices periodically. This is the service that does the cleanup.
-//
-//go:generate mockery --quiet --name PriceCleanup --filename price_cleanup_mock.go --case=underscore
 type PriceCleanup interface {
 	job.ServiceCtx
 }
@@ -39,8 +37,8 @@ type priceCleanup struct {
 	cleanupInterval time.Duration
 
 	lggr              logger.Logger
-	jobId             int32
 	orm               cciporm.ORM
+	jobId             int32
 	destChainSelector uint64
 
 	services.StateMachine
@@ -49,7 +47,7 @@ type priceCleanup struct {
 	backgroundCancel context.CancelFunc
 }
 
-func NewPriceCleanup(lggr logger.Logger, jobId int32, orm cciporm.ORM, destChainSelector uint64) PriceCleanup {
+func NewPriceCleanup(lggr logger.Logger, orm cciporm.ORM, jobId int32, destChainSelector uint64) PriceCleanup {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	pc := &priceCleanup{
@@ -57,8 +55,8 @@ func NewPriceCleanup(lggr logger.Logger, jobId int32, orm cciporm.ORM, destChain
 		cleanupInterval: cleanupInterval,
 
 		lggr:              lggr,
-		jobId:             jobId,
 		orm:               orm,
+		jobId:             jobId,
 		destChainSelector: destChainSelector,
 
 		wg:               new(sync.WaitGroup),
