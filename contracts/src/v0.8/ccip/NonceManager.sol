@@ -11,14 +11,14 @@ contract NonceManager is AuthorizedCallers {
 
   event PreviousOnRampUpdated(uint64 indexed destChainSelector, address prevOnRamp);
 
-  /// @dev Struct that contains a previous on/off ramp addresses
+  /// @dev Struct that contains the previous on/off ramp addresses
   // TODO: add prevOffRamp
   struct PreviousRamps {
     address prevOnRamp;
   }
 
   /// @dev Struct that contains the chain selector and the previous on/off ramps, same as PreviousRamps but with the chain selector
-  /// so that an array of these can be passed to the applyRampUpdates function
+  /// so that an array of these can be passed to the applyPreviousRampsUpdates function
   struct PreviousRampsArgs {
     uint64 chainSelector;
     PreviousRamps prevRamps;
@@ -82,8 +82,8 @@ contract NonceManager is AuthorizedCallers {
 
   /// TODO: add getInboundNonce
 
-  /// @notice Updates the ramps and previous ramps addresses
-  /// @param prevRampsArgs The previous onRamps
+  /// @notice Updates the previous ramps addresses
+  /// @param prevRampsArgs The previous on/off ramps addresses
   function applyPreviousRampsUpdates(PreviousRampsArgs[] calldata prevRampsArgs) external onlyOwner {
     for (uint256 i = 0; i < prevRampsArgs.length; i++) {
       PreviousRampsArgs calldata prevRampsArg = prevRampsArgs[i];
@@ -98,5 +98,12 @@ contract NonceManager is AuthorizedCallers {
       prevRamps.prevOnRamp = prevRampsArg.prevRamps.prevOnRamp;
       emit PreviousOnRampUpdated(prevRampsArg.chainSelector, prevRamps.prevOnRamp);
     }
+  }
+
+  /// @notice Gets the previous onRamp address for the given chain selector
+  /// @param chainSelector The chain selector
+  /// @return The previous onRamp address
+  function getPrevRamps(uint64 chainSelector) external view returns (PreviousRamps memory) {
+    return s_prevRamps[chainSelector];
   }
 }

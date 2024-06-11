@@ -21,14 +21,8 @@ contract AuthorizedCallers is OwnerIsCreator {
     address[] removedCallers;
   }
 
+  /// @dev Set of authorized callers
   EnumerableSet.AddressSet internal s_authorizedCallers;
-
-  modifier onlyAuthorizedCallers() {
-    if (!s_authorizedCallers.contains(msg.sender)) {
-      revert UnauthorizedCaller(msg.sender);
-    }
-    _;
-  }
 
   /// @param authorizedCallers the authorized callers to set
   constructor(address[] memory authorizedCallers) {
@@ -42,13 +36,13 @@ contract AuthorizedCallers is OwnerIsCreator {
     return s_authorizedCallers.values();
   }
 
-  /// @notice Updates the callers that are authorized to call the message validation functions
+  /// @notice Updates the list of authorized callers
   /// @param authorizedCallerArgs Callers to add and remove
   function applyAuthorizedCallerUpdates(AuthorizedCallerArgs memory authorizedCallerArgs) external onlyOwner {
     _applyAuthorizedCallerUpdates(authorizedCallerArgs);
   }
 
-  /// @notice Updates the callers that are authorized to call the message validation functions
+  /// @notice Updates the list of authorized callers
   /// @param authorizedCallerArgs Callers to add and remove
   function _applyAuthorizedCallerUpdates(AuthorizedCallerArgs memory authorizedCallerArgs) internal {
     address[] memory removedCallers = authorizedCallerArgs.removedCallers;
@@ -71,5 +65,12 @@ contract AuthorizedCallers is OwnerIsCreator {
       s_authorizedCallers.add(caller);
       emit AuthorizedCallerAdded(caller);
     }
+  }
+
+  modifier onlyAuthorizedCallers() {
+    if (!s_authorizedCallers.contains(msg.sender)) {
+      revert UnauthorizedCaller(msg.sender);
+    }
+    _;
   }
 }
