@@ -127,12 +127,12 @@ func (p *Plugin) Observation(ctx context.Context, outctx ocr3types.OutcomeContex
 
 	// Phase 2: Gather messages from the source chains and build the execution report.
 	messages := make(cciptypes.ExecutePluginMessageObservations)
-	if len(previousOutcome.Messages) == 0 {
-		fmt.Println("TODO: No messages to execute. This is expected after a cold start.")
-		// No messages to execute.
+	if len(previousOutcome.PendingCommitReports) == 0 {
+		fmt.Println("TODO: No reports to execute. This is expected after a cold start.")
+		// No reports to execute.
 		// This is expected after a cold start.
 	} else {
-		commitReportCache := make(map[cciptypes.ChainSelector][]cciptypes.ExecutePluginCommitData)
+		commitReportCache := make(map[cciptypes.ChainSelector][]cciptypes.ExecutePluginCommitDataWithMessages)
 		for _, report := range previousOutcome.PendingCommitReports {
 			commitReportCache[report.Selector] = append(commitReportCache[report.Selector], report)
 		}
@@ -154,7 +154,7 @@ func (p *Plugin) Observation(ctx context.Context, outctx ocr3types.OutcomeContex
 					return nil, err
 				}
 				for _, msg := range msgs {
-					messages[selector][msg.SeqNum] = msg.ID
+					messages[selector][msg.SeqNum] = msg
 				}
 			}
 		}
@@ -197,40 +197,49 @@ func (p *Plugin) Outcome(outctx ocr3types.OutcomeContext, query types.Query, aos
 		return ocr3types.Outcome{}, fmt.Errorf("below F threshold")
 	}
 
-	mergedCommitObservations, err := validateCommitObservations(decodedObservations, p.cfg.FChain)
+	mergedCommitObservations, err := mergeCommitObservations(decodedObservations, p.cfg.FChain)
 	if err != nil {
 		return ocr3types.Outcome{}, err
 	}
 
-	mergedMessageObservations, err := validateMessageObservations(decodedObservations, p.cfg.FChain)
+	mergedMessageObservations, err := mergeMessageObservations(decodedObservations, p.cfg.FChain)
 	if err != nil {
 		return ocr3types.Outcome{}, err
 	}
 
-	// TODO: flatten commit reports and sort by timestamp.
-	// TODO: flatten messages and sort by commit reports.
+	observation := cciptypes.NewExecutePluginObservation(
+		mergedCommitObservations,
+		mergedMessageObservations)
 
-	// add reports one by one into the outcome until
-
-	fmt.Println(mergedCommitObservations, err)
-	fmt.Println(mergedMessageObservations, err)
-
-	// Reports from previous outcome
-	previousOutcome, err := cciptypes.DecodeExecutePluginOutcome(outctx.PreviousOutcome)
-	if err != nil {
-		return ocr3types.Outcome{}, err
+	// flatten commit reports and sort by timestamp.
+	var reports []cciptypes.ExecutePluginCommitDataWithMessages
+	for _, report := range observation.CommitReports {
+		reports = append(reports, report...)
 	}
-	for selector, reports := range previousOutcome.PendingCommitReports {
-		// TODO: if we have all of the messages for the previous requested reports, build the proof.
-		fmt.Println(selector, reports)
+	sort.Slice(reports, func(i, j int) bool {
+		return reports[i].Timestamp.Before(reports[j].Timestamp)
+	})
+
+	// flatten messages and sort by commit reports.
+	var messages []cciptypes.CCIPMsg
+	for _, report := range reports {
+		for i := report.SequenceNumberRange.Start(); i <= report.SequenceNumberRange.End(); i++ {
+			if msg, ok := observation.Messages[report.Selector][i]; ok {
+				messages = append(messages, msg)
+			}
+		}
 	}
 
-	// TODO: carry over reports which weren't executed by adding them to mergedCommitObservations.
+	/*
+		// TODO: carry over reports which weren't executed by adding them to mergedCommitObservations.
 
-	// TODO: do messages even go into the outcome??? I don't think so. Just the Observation.
-	//       on the other hand, outcomes can be large since they aren't gossipped.
+		// TODO: do messages even go into the outcome??? I don't think so. Just the Observation.
+		//       on the other hand, outcomes can be large since they aren't gossipped.
 
-	panic("implement me")
+		// TODO: filter out messages which are not associated with any pending commit reports.
+	*/
+
+	return cciptypes.NewExecutePluginOutcome(reports).Encode()
 }
 
 func (p *Plugin) Reports(seqNr uint64, outcome ocr3types.Outcome) ([]ocr3types.ReportWithInfo[[]byte], error) {
