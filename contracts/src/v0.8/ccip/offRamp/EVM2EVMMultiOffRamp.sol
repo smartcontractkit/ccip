@@ -17,7 +17,7 @@ import {EnumerableMapAddresses} from "../../shared/enumerable/EnumerableMapAddre
 import {Client} from "../libraries/Client.sol";
 import {Internal} from "../libraries/Internal.sol";
 import {Pool} from "../libraries/Pool.sol";
-import {OCR2BaseNoChecks} from "../ocr/OCR2BaseNoChecks.sol";
+import {MultiOCR3Base} from "../ocr/MultiOCR3Base.sol";
 
 import {IERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {ERC165Checker} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/introspection/ERC165Checker.sol";
@@ -26,10 +26,11 @@ import {ERC165Checker} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts
 /// in an OffRamp in a single transaction.
 /// @dev The EVM2EVMOnRamp, CommitStore and EVM2EVMOffRamp form an xchain upgradeable unit. Any change to one of them
 /// results an onchain upgrade of all 3.
-/// @dev OCR2BaseNoChecks is used to save gas, signatures are not required as the offramp can only execute
-/// messages which are committed in the commitStore. We still make use of OCR2 as an executor whitelist
-/// and turn-taking mechanism.
-contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, OCR2BaseNoChecks {
+/// @dev MultiOCR3Base is used to store multiple OCR configs for both the OffRamp and the CommitStore.
+/// The execution plugin type has to be configured without signature verification, and the commit
+/// plugin type with verification.
+// TODO: merge with MultiCommitStore
+contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3Base {
   using ERC165Checker for address;
   using EnumerableMapAddresses for EnumerableMapAddresses.AddressToAddressMap;
 
@@ -136,10 +137,6 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, OCR2BaseN
   // DYNAMIC CONFIG
   DynamicConfig internal s_dynamicConfig;
 
-  // TODO: evaluate whether this should be pulled in (since this can be inferred from SourceChainSelectorAdded events instead)
-  /// @notice all source chains available in s_sourceChainConfigs
-  // uint64[] internal s_sourceChainSelectors;
-
   /// @notice SourceConfig per chain
   /// (forms lane configurations from sourceChainSelector => StaticConfig.chainSelector)
   mapping(uint64 sourceChainSelector => SourceChainConfig) internal s_sourceChainConfigs;
@@ -156,7 +153,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, OCR2BaseN
   mapping(uint64 sourceChainSelector => mapping(uint64 seqNum => uint256 executionStateBitmap)) internal
     s_executionStates;
 
-  constructor(StaticConfig memory staticConfig, SourceChainConfigArgs[] memory sourceChainConfigs) OCR2BaseNoChecks() {
+  constructor(StaticConfig memory staticConfig, SourceChainConfigArgs[] memory sourceChainConfigs) MultiOCR3Base() {
     if (staticConfig.commitStore == address(0) || staticConfig.tokenAdminRegistry == address(0)) {
       revert ZeroAddressNotAllowed();
     }
@@ -258,8 +255,9 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, OCR2BaseN
     Internal.ExecutionReportSingleChain[] memory reports,
     uint256[][] memory gasLimitOverrides
   ) external {
-    // We do this here because the other _execute path is already covered OCR2BaseXXX.
-    if (i_chainID != block.chainid) revert OCR2BaseNoChecks.ForkedChain(i_chainID, uint64(block.chainid));
+    // We do this here because the other _execute path is already covered by MultiOCR3Base.
+    // TODO: contract size golfing - split to internal function
+    if (i_chainID != block.chainid) revert MultiOCR3Base.ForkedChain(i_chainID, uint64(block.chainid));
 
     uint256 numReports = reports.length;
     if (numReports != gasLimitOverrides.length) revert ManualExecutionGasLimitMismatch();
@@ -283,12 +281,21 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, OCR2BaseN
     _batchExecute(reports, gasLimitOverrides);
   }
 
-  /// @notice Entrypoint for execution, called by the OCR network
-  /// @dev Expects an encoded ExecutionReport
-  function _report(bytes calldata report) internal override {
-    Internal.ExecutionReportSingleChain[] memory reports = abi.decode(report, (Internal.ExecutionReportSingleChain[]));
+  /// @notice Transmit function for execution reports. The function takes no signatures,
+  /// and expects the exec plugin type to be configured with no signatures.
+  /// @param report serialized execution report
+  function transmitExec(bytes32[3] calldata reportContext, bytes calldata report) external {
+    _reportExec(report);
 
-    _batchExecute(reports, new uint256[][](0));
+    // TODO: gas / contract size saving from CONSTANT?
+    bytes32[] memory emptySigs = new bytes32[](0);
+    _transmit(uint8(Internal.OCRPluginType.Execution), reportContext, report, emptySigs, emptySigs, bytes32(""));
+  }
+
+  /// @notice Reporting function for the execution plugin
+  /// @param report encoded ExecutionReport
+  function _reportExec(bytes calldata report) internal {
+    _batchExecute(abi.decode(report, (Internal.ExecutionReportSingleChain[])), new uint256[][](0));
   }
 
   /// @notice Batch executes a set of reports, each report matching one single source chain
@@ -610,12 +617,6 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, OCR2BaseN
     return s_sourceChainConfigs[sourceChainSelector];
   }
 
-  /// @notice Returns all configured source chain selectors
-  /// @return sourceChainSelectors source chain selectors
-  // function getSourceChainSelectors() external view returns (uint64[] memory) {
-  //   return s_sourceChainSelectors;
-  // }
-
   /// @notice Updates source configs
   /// @param sourceChainConfigUpdates Source chain configs
   function applySourceChainConfigUpdates(SourceChainConfigArgs[] memory sourceChainConfigUpdates) external onlyOwner {
@@ -656,7 +657,6 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, OCR2BaseN
         currentConfig.onRamp = sourceConfigUpdate.onRamp;
         currentConfig.prevOffRamp = sourceConfigUpdate.prevOffRamp;
 
-        // s_sourceChainSelectors.push(sourceChainSelector);
         emit SourceChainSelectorAdded(sourceChainSelector);
       } else if (
         currentConfig.onRamp != sourceConfigUpdate.onRamp || currentConfig.prevOffRamp != sourceConfigUpdate.prevOffRamp
@@ -670,15 +670,13 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, OCR2BaseN
     }
   }
 
-  // TODO: _beforeSetConfig is no longer used in OCR3 - replace this with an external onlyOwner function
-  /// @notice Sets the dynamic config. This function is called during `setOCR2Config` flow
-  function _beforeSetConfig(bytes memory onchainConfig) internal override {
-    DynamicConfig memory dynamicConfig = abi.decode(onchainConfig, (DynamicConfig));
-
+  /// @notice Sets the dynamic config.
+  function setDynamicConfig(DynamicConfig memory dynamicConfig) external onlyOwner {
     if (dynamicConfig.router == address(0)) revert ZeroAddressNotAllowed();
 
     s_dynamicConfig = dynamicConfig;
 
+    // TODO: contract size golfing - is StaticConfig needed in the event?
     emit ConfigSet(
       StaticConfig({
         commitStore: i_commitStore,
