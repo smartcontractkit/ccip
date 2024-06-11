@@ -1,3 +1,8 @@
+AuthorizedCallers_applyAuthorizedCallerUpdates:test_OnlyCallableByOwner_Revert() (gas: 12349)
+AuthorizedCallers_applyAuthorizedCallerUpdates:test_ZeroAddressNotAllowed_Revert() (gas: 64517)
+AuthorizedCallers_applyAuthorizedCallerUpdates:test_applyAuthorizedCallerUpdates_Success() (gas: 67958)
+AuthorizedCallers_constructor:test_ZeroAddressNotAllowed_Revert() (gas: 64473)
+AuthorizedCallers_constructor:test_constructor_Success() (gas: 721167)
 BurnMintERC677_approve:testApproveSuccess() (gas: 55512)
 BurnMintERC677_approve:testInvalidAddressReverts() (gas: 10663)
 BurnMintERC677_burn:testBasicBurnSuccess() (gas: 173939)
