@@ -46,12 +46,12 @@ func NewPluginFactory() *PluginFactory {
 
 func (p PluginFactory) NewReportingPlugin(config ocr3types.ReportingPluginConfig,
 ) (ocr3types.ReportingPlugin[[]byte], ocr3types.ReportingPluginInfo, error) {
-	var oracleIdToP2pId map[commontypes.OracleID]cciptypes.P2PID // TODO: Get this from ocr config, it's the mapping of the oracleId index in the DON https://docs.google.com/document/d/1nyGUeterqc9P4ztGmoy2EZCWQzxS5scJ_fQQJyCId7s/edit?disco=AAABLcXrUnA
-	//TODO: Make sure that the oracleIdToP2pId map contains config.OracleID
+	var oracleIDToP2pID map[commontypes.OracleID]cciptypes.P2PID // TODO: Get this from ocr config, it's the mapping of the oracleId index in the DON https://docs.google.com/document/d/1nyGUeterqc9P4ztGmoy2EZCWQzxS5scJ_fQQJyCId7s/edit?disco=AAABLcXrUnA
+	//TODO: Make sure that the oracleIDToP2pID map contains config.OracleID
 	return NewPlugin(
 		context.Background(),
 		config.OracleID,
-		oracleIdToP2pId,
+		oracleIDToP2pID,
 		cciptypes.CommitPluginConfig{},
 		nil,
 		nil,

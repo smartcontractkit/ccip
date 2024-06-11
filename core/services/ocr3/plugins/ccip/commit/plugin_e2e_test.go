@@ -171,11 +171,11 @@ func setupEmptyOutcome(ctx context.Context, t *testing.T, lggr logger.Logger) []
 		NodeSupportedChains: map[cciptypes.P2PID]cciptypes.SupportedChains{},
 	}
 
-	oracleIdToP2pId := GetP2pIds(1, 2, 3)
+	oracleIDToP2pID := GetP2pIDs(1, 2, 3)
 	return []nodeSetup{
-		newNode(ctx, t, lggr, 1, cfg, homeChainConfig, oracleIdToP2pId),
-		newNode(ctx, t, lggr, 2, cfg, homeChainConfig, oracleIdToP2pId),
-		newNode(ctx, t, lggr, 3, cfg, homeChainConfig, oracleIdToP2pId),
+		newNode(ctx, t, lggr, 1, cfg, homeChainConfig, oracleIDToP2pID),
+		newNode(ctx, t, lggr, 2, cfg, homeChainConfig, oracleIDToP2pID),
+		newNode(ctx, t, lggr, 3, cfg, homeChainConfig, oracleIDToP2pID),
 	}
 }
 
@@ -199,10 +199,10 @@ func setupAllNodesReadAllChains(ctx context.Context, t *testing.T, lggr logger.L
 			cciptypes.GetP2pId(3): {Supported: mapset.NewSet[cciptypes.ChainSelector](chainA, chainB, chainC)},
 		},
 	}
-	oracleIdToP2pId := GetP2pIds(1, 2, 3)
-	n1 := newNode(ctx, t, lggr, 1, cfg, homeChainConfig, oracleIdToP2pId)
-	n2 := newNode(ctx, t, lggr, 2, cfg, homeChainConfig, oracleIdToP2pId)
-	n3 := newNode(ctx, t, lggr, 3, cfg, homeChainConfig, oracleIdToP2pId)
+	oracleIDToP2pID := GetP2pIDs(1, 2, 3)
+	n1 := newNode(ctx, t, lggr, 1, cfg, homeChainConfig, oracleIDToP2pID)
+	n2 := newNode(ctx, t, lggr, 2, cfg, homeChainConfig, oracleIDToP2pID)
+	n3 := newNode(ctx, t, lggr, 3, cfg, homeChainConfig, oracleIDToP2pID)
 	nodes := []nodeSetup{n1, n2, n3}
 
 	for _, n := range nodes {
@@ -260,10 +260,10 @@ func setupNodesDoNotAgreeOnMsgs(ctx context.Context, t *testing.T, lggr logger.L
 		},
 	}
 
-	oracleIdToP2pId := GetP2pIds(1, 2, 3)
-	n1 := newNode(ctx, t, lggr, 1, cfg, homeChainConfig, oracleIdToP2pId)
-	n2 := newNode(ctx, t, lggr, 2, cfg, homeChainConfig, oracleIdToP2pId)
-	n3 := newNode(ctx, t, lggr, 3, cfg, homeChainConfig, oracleIdToP2pId)
+	oracleIDToP2pID := GetP2pIDs(1, 2, 3)
+	n1 := newNode(ctx, t, lggr, 1, cfg, homeChainConfig, oracleIDToP2pID)
+	n2 := newNode(ctx, t, lggr, 2, cfg, homeChainConfig, oracleIDToP2pID)
+	n3 := newNode(ctx, t, lggr, 3, cfg, homeChainConfig, oracleIDToP2pID)
 	nodes := []nodeSetup{n1, n2, n3}
 
 	for i, n := range nodes {
@@ -311,7 +311,7 @@ type nodeSetup struct {
 	msgHasher   *mocks.MessageHasher
 }
 
-func newNode(ctx context.Context, t *testing.T, lggr logger.Logger, id int, cfg cciptypes.CommitPluginConfig, homeChainConfig cciptypes.HomeChainConfig, oracleIdToP2PId map[commontypes.OracleID]cciptypes.P2PID) nodeSetup {
+func newNode(ctx context.Context, t *testing.T, lggr logger.Logger, id int, cfg cciptypes.CommitPluginConfig, homeChainConfig cciptypes.HomeChainConfig, oracleIDToP2pID map[commontypes.OracleID]cciptypes.P2PID) nodeSetup {
 	ccipReader := mocks.NewCCIPReader()
 	priceReader := mocks.NewTokenPricesReader()
 	reportCodec := mocks.NewCommitPluginJSONReportCodec()
@@ -324,7 +324,7 @@ func newNode(ctx context.Context, t *testing.T, lggr logger.Logger, id int, cfg 
 	node1 := NewPlugin(
 		context.Background(),
 		commontypes.OracleID(id),
-		oracleIdToP2PId,
+		oracleIDToP2pID,
 		cfg,
 		ccipReader,
 		priceReader,
@@ -342,7 +342,7 @@ func newNode(ctx context.Context, t *testing.T, lggr logger.Logger, id int, cfg 
 		msgHasher:   msgHasher,
 	}
 }
-func GetP2pIds(ids ...int) map[commontypes.OracleID]cciptypes.P2PID {
+func GetP2pIDs(ids ...int) map[commontypes.OracleID]cciptypes.P2PID {
 	res := make(map[commontypes.OracleID]cciptypes.P2PID)
 	for _, id := range ids {
 		res[commontypes.OracleID(id)] = cciptypes.GetP2pId(id)

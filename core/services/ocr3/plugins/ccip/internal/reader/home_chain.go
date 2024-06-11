@@ -85,10 +85,10 @@ func (r *HomeChainConfigPoller) GetConfig() cciptypes.HomeChainConfig {
 	return r.homeChainConfig
 }
 
-func (r *HomeChainConfigPoller) GetSupportedChains(p2pId cciptypes.P2PID) mapset.Set[cciptypes.ChainSelector] {
+func (r *HomeChainConfigPoller) GetSupportedChains(p2pID cciptypes.P2PID) mapset.Set[cciptypes.ChainSelector] {
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
-	return r.homeChainConfig.NodeSupportedChains[p2pId].Supported
+	return r.homeChainConfig.NodeSupportedChains[p2pID].Supported
 }
 
 func (r *HomeChainConfigPoller) fetchOnChainConfig(ctx context.Context) ([]cciptypes.OnChainCapabilityConfig, error) {
@@ -123,14 +123,14 @@ func (r *HomeChainConfigPoller) convertOnChainConfigToHomeChainConfig(capability
 
 		fChain[chainSelector] = int(config.FChain)
 		//iterate over readers
-		for _, p2pId := range config.Readers {
-			if _, ok := nodeSupportedChains[p2pId]; !ok {
-				nodeSupportedChains[p2pId] = cciptypes.SupportedChains{
+		for _, p2pID := range config.Readers {
+			if _, ok := nodeSupportedChains[p2pID]; !ok {
+				nodeSupportedChains[p2pID] = cciptypes.SupportedChains{
 					Supported: mapset.NewSet[cciptypes.ChainSelector](),
 				}
 			}
 			//add chain to SupportedChains
-			nodeSupportedChains[p2pId].Supported.Add(chainSelector)
+			nodeSupportedChains[p2pID].Supported.Add(chainSelector)
 		}
 	}
 	return cciptypes.HomeChainConfig{

@@ -160,10 +160,10 @@ func Test_PollingWorking(t *testing.T) {
 	)
 
 	ctx := context.Background()
-	configPoller.StartPolling(ctx, 1*time.Second)
+	configPoller.Start(ctx)
 	// sleep for 2 seconds
 	time.Sleep(2 * time.Second)
-	_ = configPoller.Close(ctx)
+	_ = configPoller.Close()
 
 	assert.Equal(t, homeChainConfig, configPoller.GetConfig())
 }

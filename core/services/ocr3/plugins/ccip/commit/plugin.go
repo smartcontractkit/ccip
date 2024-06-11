@@ -20,7 +20,7 @@ import (
 // To learn more about the plugin lifecycle, see the ocr3types.ReportingPlugin interface.
 type Plugin struct {
 	nodeID            commontypes.OracleID
-	oracleIdToP2pId   map[commontypes.OracleID]cciptypes.P2PID
+	oracleIDToP2pID   map[commontypes.OracleID]cciptypes.P2PID
 	cfg               cciptypes.CommitPluginConfig
 	ccipReader        cciptypes.CCIPReader
 	tokenPricesReader cciptypes.TokenPricesReader
@@ -34,7 +34,7 @@ type Plugin struct {
 func NewPlugin(
 	ctx context.Context,
 	nodeID commontypes.OracleID,
-	oracleIdToP2pId map[commontypes.OracleID]cciptypes.P2PID,
+	oracleIDToP2pID map[commontypes.OracleID]cciptypes.P2PID,
 	cfg cciptypes.CommitPluginConfig,
 	ccipReader cciptypes.CCIPReader,
 	tokenPricesReader cciptypes.TokenPricesReader,
@@ -48,7 +48,7 @@ func NewPlugin(
 
 	return &Plugin{
 		nodeID:            nodeID,
-		oracleIdToP2pId:   oracleIdToP2pId,
+		oracleIDToP2pID:   oracleIDToP2pID,
 		cfg:               cfg,
 		ccipReader:        ccipReader,
 		tokenPricesReader: tokenPricesReader,
@@ -89,11 +89,11 @@ func (p *Plugin) Query(_ context.Context, _ ocr3types.OutcomeContext) (types.Que
 //	The fee tokens are configured in the plugin config.
 func (p *Plugin) Observation(ctx context.Context, outctx ocr3types.OutcomeContext, _ types.Query) (types.Observation, error) {
 	homeChainConfig := p.homeChainPoller.GetConfig()
-	p2pId, exists := p.oracleIdToP2pId[p.nodeID]
+	p2pID, exists := p.oracleIDToP2pID[p.nodeID]
 	if !exists {
-		return types.Observation{}, fmt.Errorf("oracle ID %d not found in oracleIdToP2pId", p.nodeID)
+		return types.Observation{}, fmt.Errorf("oracle ID %d not found in oracleIDToP2pID", p.nodeID)
 	}
-	supportedChains := homeChainConfig.GetSupportedChains(p2pId)
+	supportedChains := homeChainConfig.GetSupportedChains(p2pID)
 	maxSeqNumsPerChain, err := observeMaxSeqNums(
 		ctx,
 		p.lggr,
@@ -172,12 +172,12 @@ func (p *Plugin) ValidateObservation(_ ocr3types.OutcomeContext, _ types.Query, 
 
 	homeChainConfig := p.homeChainPoller.GetConfig()
 
-	p2pId, exists := p.oracleIdToP2pId[ao.Observer]
+	p2pID, exists := p.oracleIDToP2pID[ao.Observer]
 	if !exists {
-		return fmt.Errorf("oracle ID %d not found in oracleIdToP2pId", ao.Observer)
+		return fmt.Errorf("oracle ID %d not found in oracleIDToP2pID", ao.Observer)
 	}
 
-	if err := validateObserverReadingEligibility(p2pId, obs.NewMsgs, homeChainConfig.NodeSupportedChains); err != nil {
+	if err := validateObserverReadingEligibility(p2pID, obs.NewMsgs, homeChainConfig.NodeSupportedChains); err != nil {
 		return fmt.Errorf("validate observer %d reading eligibility: %w", ao.Observer, err)
 	}
 
@@ -295,7 +295,7 @@ func (p *Plugin) ShouldAcceptAttestedReport(ctx context.Context, u uint64, r ocr
 
 func (p *Plugin) ShouldTransmitAcceptedReport(ctx context.Context, u uint64, r ocr3types.ReportWithInfo[[]byte]) (bool, error) {
 	homeChainConfig := p.homeChainPoller.GetConfig()
-	if !homeChainConfig.IsSupported(p.oracleIdToP2pId[p.nodeID], p.cfg.DestChain) {
+	if !homeChainConfig.IsSupported(p.oracleIDToP2pID[p.nodeID], p.cfg.DestChain) {
 		p.lggr.Debugw("not a writer, skipping report transmission")
 		return false, nil
 	}
