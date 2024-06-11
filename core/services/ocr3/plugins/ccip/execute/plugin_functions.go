@@ -6,7 +6,9 @@ import (
 	"sort"
 
 	mapset "github.com/deckarep/golang-set/v2"
+	"golang.org/x/crypto/sha3"
 
+	"github.com/smartcontractkit/ccipocr3/execute/internal/validation"
 	"github.com/smartcontractkit/libocr/commontypes"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
@@ -115,6 +117,7 @@ func groupByChainSelector(reports []cciptypes.CommitPluginReportWithMeta) ccipty
 	for _, report := range reports {
 		for _, singleReport := range report.Report.MerkleRoots {
 			commitReportCache[singleReport.ChainSel] = append(commitReportCache[singleReport.ChainSel], cciptypes.ExecutePluginCommitData{
+				Selector:            singleReport.ChainSel,
 				Timestamp:           report.Timestamp,
 				BlockNum:            report.BlockNum,
 				MerkleRoot:          singleReport.MerkleRoot,
@@ -217,4 +220,87 @@ func decodeAttributedObservations(aos []types.AttributedObservation) ([]decodedA
 		}
 	}
 	return decoded, nil
+}
+
+func validateMessageObservations(aos []decodedAttributedObservation, fChain map[cciptypes.ChainSelector]int) (cciptypes.ExecutePluginMessageObservations, error) {
+	// Create a validator for each chain
+	validators := make(map[cciptypes.ChainSelector]validation.MinObservationFilter[cciptypes.CCIPMsgBaseDetails])
+	idFunc := func(data cciptypes.CCIPMsgBaseDetails) [32]byte {
+		return sha3.Sum256([]byte(fmt.Sprintf("%v", data)))
+	}
+	for selector, f := range fChain {
+		validators[selector] = validation.NewMinObservationValidator[cciptypes.CCIPMsgBaseDetails](2*f+1, idFunc)
+	}
+
+	// Add messages to the validator for each chain selector.
+	for _, ao := range aos {
+		for selector, messages := range ao.Observation.Messages {
+			validator, ok := validators[selector]
+			if !ok {
+				return cciptypes.ExecutePluginMessageObservations{}, fmt.Errorf("no validator for chain %d", selector)
+			}
+			// Add reports
+			for num, msg := range messages {
+				if err := validator.Add(cciptypes.CCIPMsgBaseDetails{ID: msg, SeqNum: num}); err != nil {
+					return cciptypes.ExecutePluginMessageObservations{}, err
+				}
+			}
+		}
+	}
+
+	results := make(cciptypes.ExecutePluginMessageObservations)
+	for selector, validator := range validators {
+		msgs, err := validator.GetValid()
+		if err != nil {
+			return cciptypes.ExecutePluginMessageObservations{}, err
+		}
+		if _, ok := results[selector]; !ok {
+			results[selector] = make(map[cciptypes.SeqNum]cciptypes.Bytes32)
+		}
+		for _, msg := range msgs {
+			results[selector][msg.SeqNum] = msg.ID
+		}
+	}
+
+	return results, nil
+}
+
+// validateCommitObservations merges all observations which reach the fChain threshold into a single result.
+// Any observations, or subsets of observations, which do not reach the threshold are ignored.
+func validateCommitObservations(aos []decodedAttributedObservation, fChain map[cciptypes.ChainSelector]int) (cciptypes.ExecutePluginCommitObservations, error) {
+	// Create a validator for each chain
+	validators := make(map[cciptypes.ChainSelector]validation.MinObservationFilter[cciptypes.ExecutePluginCommitData])
+	idFunc := func(data cciptypes.ExecutePluginCommitData) [32]byte {
+		return sha3.Sum256([]byte(fmt.Sprintf("%v", data)))
+	}
+	for selector, f := range fChain {
+		validators[selector] = validation.NewMinObservationValidator[cciptypes.ExecutePluginCommitData](2*f+1, idFunc)
+	}
+
+	// Add reports to the validator for each chain selector.
+	for _, ao := range aos {
+		for selector, commitReports := range ao.Observation.CommitReports {
+			validator, ok := validators[selector]
+			if !ok {
+				return cciptypes.ExecutePluginCommitObservations{}, fmt.Errorf("no validator for chain %d", selector)
+			}
+			// Add reports
+			for _, commitReport := range commitReports {
+				if err := validator.Add(commitReport); err != nil {
+					return cciptypes.ExecutePluginCommitObservations{}, err
+				}
+			}
+		}
+	}
+
+	results := make(cciptypes.ExecutePluginCommitObservations)
+	for selector, validator := range validators {
+		var err error
+		results[selector], err = validator.GetValid()
+		if err != nil {
+			return cciptypes.ExecutePluginCommitObservations{}, err
+		}
+	}
+
+	return results, nil
 }

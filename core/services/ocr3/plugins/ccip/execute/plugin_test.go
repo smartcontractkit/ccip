@@ -71,6 +71,7 @@ func Test_getPendingExecutedReports(t *testing.T) {
 			want: cciptypes.ExecutePluginCommitObservations{
 				1: []cciptypes.ExecutePluginCommitData{
 					{
+						Selector:            1,
 						SequenceNumberRange: cciptypes.NewSeqNumRange(1, 10),
 						ExecutedMessages:    nil,
 						Timestamp:           time.UnixMilli(10101010101),
@@ -106,6 +107,7 @@ func Test_getPendingExecutedReports(t *testing.T) {
 			want: cciptypes.ExecutePluginCommitObservations{
 				1: []cciptypes.ExecutePluginCommitData{
 					{
+						Selector:            1,
 						SequenceNumberRange: cciptypes.NewSeqNumRange(1, 10),
 						Timestamp:           time.UnixMilli(10101010101),
 						BlockNum:            999,
