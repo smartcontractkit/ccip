@@ -28,12 +28,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/lib/pq"
-	"github.com/smartcontractkit/ccip/integration-tests/client"
-	"gopkg.in/guregu/null.v4"
 
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/liquiditymanager/generated/liquiditymanager"
-	"github.com/smartcontractkit/chainlink/v2/core/services/job"
-	"github.com/smartcontractkit/chainlink/v2/core/store/models"
 
 	"github.com/AlekSi/pointer"
 	"github.com/pkg/errors"
@@ -52,6 +48,8 @@ import (
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/actions"
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/contracts"
 	"github.com/smartcontractkit/chainlink/integration-tests/docker/test_env"
+
+	integrationtesthelpers "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/testhelpers/integration"
 )
 
 type LMTestSetupOutputs struct {
@@ -238,13 +236,12 @@ func (o *LMTestSetupOutputs) CreateLMEnvironment(
 
 func (o *LMTestSetupOutputs) DeployLMChainContracts(
 	lggr zerolog.Logger,
-	chainClient blockchain.EVMClient,
 	networkCfg blockchain.EVMNetwork,
-	chainSelectors []uint64,
 	lmCommon actions.LMCommon,
 ) error {
 	var k8Env *environment.Environment
 	ccipEnv := o.Env
+	chainClient := lmCommon.ChainClient
 	if ccipEnv != nil {
 		k8Env = ccipEnv.K8Env
 	}
@@ -312,7 +309,7 @@ func (o *LMTestSetupOutputs) DeployLMChainContracts(
 
 	// Deploy Liquidity Manager contract
 	lggr.Info().Msg("Deploying Liquidity Manager contract")
-	liquidityManager, err := cd.DeployLiquidityManager(*lmCommon.WrapperNative, chainSelectors[0], lmCommon.TokenPool.EthAddress, lmCommon.MinimumLiquidity)
+	liquidityManager, err := cd.DeployLiquidityManager(*lmCommon.WrapperNative, lmCommon.ChainSelectror, lmCommon.TokenPool.EthAddress, lmCommon.MinimumLiquidity)
 	if err != nil {
 		return errors.WithStack(fmt.Errorf("failed to deploy Liquidity Manager contract: %w", err))
 	}
@@ -341,23 +338,24 @@ func (o *LMTestSetupOutputs) DeployLMChainContracts(
 		return errors.WithStack(fmt.Errorf("onchainRebalancer doesn not match the deployed Liquidity Manager"))
 	}
 
-	// Deploy Bridge Adapter contracts
-	if lmCommon.IsL2 {
-		lggr.Info().Msg("Deploying Mock L2 Bridge Adapter contract")
-		l2bridgeAdapter, err := cd.DeployMockL2BridgeAdapter()
-		if err != nil {
-			return errors.WithStack(fmt.Errorf("failed to deploy Mock L2 Bridge Adapter contract: %w", err))
-		}
-		lggr.Info().Str("Address", l2bridgeAdapter.EthAddress.String()).Msg("Deployed Mock L2 Bridge Adapter contract")
-		lmCommon.BridgeAdapterAddr = l2bridgeAdapter.EthAddress
-	} else {
+	// Deploy Bridge Adapter contracts if simulated chain
+	switch lmCommon.ChainSelectror {
+	case chainselectors.GETH_TESTNET.Selector:
 		lggr.Info().Msg("Deploying Mock L1 Bridge Adapter contract")
-		l1bridgeAdapter, err := cd.DeployMockL1BridgeAdapter(*lmCommon.WrapperNative, true)
+		bridgeAdapter, err := cd.DeployMockL1BridgeAdapter(*lmCommon.WrapperNative, true)
 		if err != nil {
 			return errors.WithStack(fmt.Errorf("failed to deploy Mock L1 Bridge Adapter contract: %w", err))
 		}
-		lggr.Info().Str("Address", l1bridgeAdapter.EthAddress.String()).Msg("Deployed Mock L1 Bridge Adapter contract")
-		lmCommon.BridgeAdapterAddr = l1bridgeAdapter.EthAddress
+		lggr.Info().Str("Address", bridgeAdapter.EthAddress.String()).Msg("Deployed Mock L1 Bridge Adapter contract")
+		lmCommon.BridgeAdapterAddr = bridgeAdapter.EthAddress
+	case chainselectors.TEST_2337.Selector:
+		lggr.Info().Msg("Deploying Mock L2 Bridge Adapter contract")
+		bridgeAdapter, err := cd.DeployMockL2BridgeAdapter()
+		if err != nil {
+			return errors.WithStack(fmt.Errorf("failed to deploy Mock L2 Bridge Adapter contract: %w", err))
+		}
+		lggr.Info().Str("Address", bridgeAdapter.EthAddress.String()).Msg("Deployed Mock L2 Bridge Adapter contract")
+		lmCommon.BridgeAdapterAddr = bridgeAdapter.EthAddress
 	}
 
 	lggr.Debug().Interface("lmCommon", lmCommon).Msg("lmCommon")
@@ -575,19 +573,14 @@ func (o *LMTestSetupOutputs) AddJobs(chainId int64, lggr zerolog.Logger) error {
 	// Add bootstrap job
 	clNodesWithKeys := o.Env.CLNodesWithKeys[strconv.FormatInt(chainId, 10)]
 	bootstrapNode := clNodesWithKeys[0]
-	bootstrapSpec := &client.OCR2TaskJobSpec{
-		Name:    "ocr2 bootstrap node " + o.LMModules[chainId].LM.EthAddress.String(),
-		JobType: "bootstrap",
-		OCR2OracleSpec: job.OCR2OracleSpec{
-			ContractID: o.LMModules[chainId].LM.EthAddress.String(),
-			Relay:      "evm",
-			RelayConfig: map[string]interface{}{
-				"chainID": int(chainId),
-			},
-			ContractConfigTrackerPollInterval: *models.NewInterval(time.Second * 15),
-		},
+	bootstrapSpec, err := integrationtesthelpers.NewBootsrapJobSpec(&integrationtesthelpers.LMJobSpecParams{
+		ChainID:            uint64(chainId),
+		ContractID:         o.LMModules[chainId].LM.EthAddress.String(),
+		CfgTrackerInterval: 15 * time.Second,
+	})
+	if err != nil {
+		return errors.WithStack(fmt.Errorf("failed to create bootstrap job spec: %w", err))
 	}
-
 	lggr.Info().Msg("Adding bootstrap job")
 	j, err := bootstrapNode.Node.MustCreateJob(bootstrapSpec)
 	if err != nil {
@@ -600,32 +593,20 @@ func (o *LMTestSetupOutputs) AddJobs(chainId int64, lggr zerolog.Logger) error {
 	// Add LM jobs
 	donNodes := clNodesWithKeys[1:]
 
-	//TODO: Replace this with proper LM job config generation
 	for _, node := range donNodes {
-		lmPluginConf := job.JSONConfig{
-			"closePluginTimeoutSec":   10,
-			"liquidityManagerAddress": "\"" + o.LMModules[chainId].LM.EthAddress.String() + "\"",
-			"liquidityManagerNetwork": "\"" + strconv.FormatUint(o.LMModules[chainId].ChainSelectror, 10) +
-				"\"" + "\n[pluginConfig.rebalancerConfig]\n type = \"ping-pong\"\n",
-		}
-
-		lmJobSpec := &client.OCR2TaskJobSpec{
-			Name:    "lm " + o.LMModules[chainId].LM.EthAddress.String(),
-			JobType: "offchainreporting2",
-			OCR2OracleSpec: job.OCR2OracleSpec{
-				PluginType: "liquiditymanager",
-				Relay:      "evm",
-				RelayConfig: map[string]interface{}{
-					"chainID": int(chainId),
-				},
-				PluginConfig: lmPluginConf,
-
-				ContractConfigTrackerPollInterval: *models.NewInterval(time.Second * 15),
-				ContractID:                        o.LMModules[chainId].LM.EthAddress.String(),      // registryAddr
-				OCRKeyBundleID:                    null.StringFrom(node.KeysBundle.OCR2Key.Data.ID), // get node ocr2config.ID
-				TransmitterID:                     null.StringFrom(node.KeysBundle.EthAddress),      // node addr
-				P2PV2Bootstrappers:                pq.StringArray{P2Pv2Bootstrapper},                // bootstrap node key and address <p2p-key>@bootstrap:8000
-			},
+		lmJobSpec, err := integrationtesthelpers.NewJobSpec(&integrationtesthelpers.LMJobSpecParams{
+			ChainID:                 uint64(chainId),
+			ContractID:              o.LMModules[chainId].LM.EthAddress.String(),
+			OCRKeyBundleID:          node.KeysBundle.OCR2Key.Data.ID,
+			TransmitterID:           node.KeysBundle.EthAddress,
+			P2PV2Bootstrappers:      pq.StringArray{P2Pv2Bootstrapper},
+			CfgTrackerInterval:      15 * time.Second,
+			LiquidityManagerAddress: *o.LMModules[chainId].LM.EthAddress,
+			NetworkSelector:         o.LMModules[chainId].ChainSelectror,
+			Type:                    "ping-pong",
+		})
+		if err != nil {
+			return errors.WithStack(fmt.Errorf("failed to create LM job spec: %w", err))
 		}
 		lggr.Debug().Interface("lmJobSpec", lmJobSpec).Msg("lmJobSpec")
 		lggr.Info().Str("Node URL", node.Node.URL()).Msg("Adding LM job")
@@ -678,8 +659,6 @@ func LMDefaultTestSetup(
 		}
 	}
 
-	//TODO: Refactor this to detect if the chain is L1 or L2 based on a config
-	i := 0
 	for _, net := range testConfig.AllNetworks {
 		chain := chainByChainID[net.ChainID]
 		net := net
@@ -694,14 +673,12 @@ func LMDefaultTestSetup(
 		lmCommon, err := actions.DefaultLMModule(
 			chain,
 			big.NewInt(0),
-			i == 1,
 			selectors[0],
 		)
 		require.NoError(t, err)
 		chainAddGrp.Go(func() error {
-			return setUpArgs.DeployLMChainContracts(lggr, chain, net, selectors, *lmCommon)
+			return setUpArgs.DeployLMChainContracts(lggr, net, *lmCommon)
 		})
-		i++
 	}
 	require.NoError(t, chainAddGrp.Wait(), "Deploying common contracts shouldn't fail")
 

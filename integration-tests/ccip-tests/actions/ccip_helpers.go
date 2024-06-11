@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"dario.cat/mergo"
 	"github.com/AlekSi/pointer"
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum"
@@ -639,6 +640,10 @@ func (ccipModule *CCIPCommon) SyncUSDCDomain(destTransmitter *contracts.TokenTra
 		if err != nil {
 			return err
 		}
+		err = contracts.SendUSDCToUSDCPool(destTransmitter, destPoolAddr[i])
+		if err != nil {
+			return err
+		}
 	}
 	return ccipModule.ChainClient.WaitForEvents()
 }
@@ -808,36 +813,6 @@ func (ccipModule *CCIPCommon) DeployContracts(noOfTokens int,
 		}
 		ccipModule.Router = r
 	}
-	// if usdc deployment ,look for token transmitter and token messenger
-	if ccipModule.IsUSDCDeployment() {
-		// if existing deployment, no need to deploy new USDC contracts, it should be considered as a generic erc20 token
-		if ccipModule.ExistingDeployment {
-			return fmt.Errorf("existing deployment and new USDC deployment cannot be done together")
-		}
-		if ccipModule.TokenTransmitter == nil {
-			domain, err := GetUSDCDomain(ccipModule.ChainClient.GetNetworkName(), ccipModule.ChainClient.NetworkSimulated())
-			if err != nil {
-				return fmt.Errorf("error in getting USDC domain %w", err)
-			}
-			ccipModule.TokenTransmitter, err = cd.DeployTokenTransmitter(domain)
-			if err != nil {
-				return fmt.Errorf("deploying token transmitter shouldn't fail %w", err)
-			}
-		}
-		if ccipModule.TokenMessenger == nil {
-			if ccipModule.TokenTransmitter == nil {
-				return fmt.Errorf("TokenTransmitter contract address is not provided")
-			}
-			ccipModule.TokenMessenger, err = cd.DeployTokenMessenger(ccipModule.TokenTransmitter.ContractAddress)
-			if err != nil {
-				return fmt.Errorf("deploying token messenger shouldn't fail %w", err)
-			}
-			err = ccipModule.ChainClient.WaitForEvents()
-			if err != nil {
-				return fmt.Errorf("error in waiting for mock TokenMessenger and Transmitter deployment %w", err)
-			}
-		}
-	}
 	if ccipModule.FeeToken == nil {
 		if ccipModule.ExistingDeployment {
 			return fmt.Errorf("FeeToken contract address is not provided in lane config")
@@ -877,21 +852,47 @@ func (ccipModule *CCIPCommon) DeployContracts(noOfTokens int,
 				if len(tokenDeployerFns) != noOfTokens {
 					if ccipModule.IsUSDCDeployment() && i == 0 {
 						// if it's USDC deployment, we deploy the burn mint token 677 with decimal 6 and cast it to ERC20Token
-						erc677Token, err := cd.DeployBurnMintERC677(new(big.Int).Mul(big.NewInt(1e6), big.NewInt(1e18)))
+						usdcToken, err := cd.DeployBurnMintERC677(new(big.Int).Mul(big.NewInt(1e6), big.NewInt(1e18)))
 						if err != nil {
 							return fmt.Errorf("deploying bridge usdc token contract shouldn't fail %w", err)
 						}
-						token, err = cd.NewERC20TokenContract(erc677Token.ContractAddress)
+						token, err = cd.NewERC20TokenContract(usdcToken.ContractAddress)
 						if err != nil {
 							return fmt.Errorf("getting new bridge usdc token contract shouldn't fail %w", err)
 						}
-						// grant minter role to token messenger
-						if ccipModule.TokenMessenger == nil {
-							return fmt.Errorf("token messenger contract address is not provided")
+						if ccipModule.TokenTransmitter == nil {
+							domain, err := GetUSDCDomain(ccipModule.ChainClient.GetNetworkName(), ccipModule.ChainClient.NetworkSimulated())
+							if err != nil {
+								return fmt.Errorf("error in getting USDC domain %w", err)
+							}
+
+							ccipModule.TokenTransmitter, err = cd.DeployTokenTransmitter(domain, usdcToken.ContractAddress)
+							if err != nil {
+								return fmt.Errorf("deploying token transmitter shouldn't fail %w", err)
+							}
 						}
-						err = erc677Token.GrantMintAndBurn(*ccipModule.TokenMessenger)
+						if ccipModule.TokenMessenger == nil {
+							if ccipModule.TokenTransmitter == nil {
+								return fmt.Errorf("TokenTransmitter contract address is not provided")
+							}
+							ccipModule.TokenMessenger, err = cd.DeployTokenMessenger(ccipModule.TokenTransmitter.ContractAddress)
+							if err != nil {
+								return fmt.Errorf("deploying token messenger shouldn't fail %w", err)
+							}
+							err = ccipModule.ChainClient.WaitForEvents()
+							if err != nil {
+								return fmt.Errorf("error in waiting for mock TokenMessenger and Transmitter deployment %w", err)
+							}
+						}
+
+						// grant minter role to token messenger
+						err = usdcToken.GrantMintAndBurn(*ccipModule.TokenMessenger)
 						if err != nil {
 							return fmt.Errorf("granting minter role to token messenger shouldn't fail %w", err)
+						}
+						err = usdcToken.GrantMintAndBurn(ccipModule.TokenTransmitter.ContractAddress)
+						if err != nil {
+							return fmt.Errorf("granting minter role to token transmitter shouldn't fail %w", err)
 						}
 					} else {
 						// otherwise we deploy link token and cast it to ERC20Token
@@ -1055,6 +1056,10 @@ func (ccipModule *CCIPCommon) DeployContracts(noOfTokens int,
 	log.Info().Msg("finished deploying common contracts")
 	// approve router to spend fee token
 	return ccipModule.ApproveTokens()
+}
+
+func (ccipModule *CCIPCommon) AvgBlockTime(ctx context.Context) (time.Duration, error) {
+	return ccipModule.ChainClient.AvgBlockTime(ctx)
 }
 
 // DynamicPriceGetterConfig specifies the configuration for the price getter in price pipeline.
@@ -2597,6 +2602,9 @@ func (lane *CCIPLane) TokenPricesConfig() (string, error) {
 }
 
 func (lane *CCIPLane) SetRemoteChainsOnPool() error {
+	if lane.Source.Common.ExistingDeployment {
+		return nil
+	}
 	if len(lane.Source.Common.BridgeTokenPools) != len(lane.Dest.Common.BridgeTokenPools) {
 		return fmt.Errorf("source (%d) and dest (%d) bridge token pools length should be same", len(lane.Source.Common.BridgeTokenPools), len(lane.Dest.Common.BridgeTokenPools))
 	}
@@ -3594,7 +3602,7 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 
 	jobParams.P2PV2Bootstrappers = []string{p2pBootstrappersCommit.P2PV2Bootstrapper()}
 
-	err = SetOCR2Config(commitNodes, execNodes, *lane.Dest)
+	err = SetOCR2Config(lane.Context, lane.Logger, *testConf, commitNodes, execNodes, *lane.Dest)
 	if err != nil {
 		return fmt.Errorf("failed to set ocr2 config: %w", err)
 	}
@@ -3626,13 +3634,41 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 
 // SetOCR2Config sets the oracle config in ocr2 contracts. If execNodes is nil, commit and execution jobs are set up in same DON
 func SetOCR2Config(
+	ctx context.Context,
+	lggr zerolog.Logger,
+	testConf testconfig.CCIPTestConfig,
 	commitNodes,
 	execNodes []*client.CLNodesWithKeys,
 	destCCIP DestCCIPModule,
 ) error {
 	inflightExpiryExec := commonconfig.MustNewDuration(InflightExpiryExec)
 	inflightExpiryCommit := commonconfig.MustNewDuration(InflightExpiryCommit)
+	blockTime, err := destCCIP.Common.AvgBlockTime(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get avg block time: %w", err)
+	}
 
+	OCR2ParamsForCommit := contracts.OCR2ParamsForCommit(blockTime)
+	OCR2ParamsForExec := contracts.OCR2ParamsForExec(blockTime)
+	// if test config has custom ocr2 params, merge them with default params to replace default with custom ocr2 params provided in config
+	// for commit and exec
+	if testConf.CommitOCRParams != nil {
+		err := mergo.Merge(&OCR2ParamsForCommit, testConf.CommitOCRParams, mergo.WithOverride)
+		if err != nil {
+			return err
+		}
+	}
+	if testConf.ExecOCRParams != nil {
+		err := mergo.Merge(&OCR2ParamsForExec, testConf.ExecOCRParams, mergo.WithOverride)
+		if err != nil {
+			return err
+		}
+	}
+	lggr.Info().
+		Dur("AvgBlockTimeOnDest", blockTime).
+		Interface("OCRParmsForCommit", OCR2ParamsForCommit).
+		Interface("OCRParmsForExec", OCR2ParamsForExec).
+		Msg("Setting OCR2 config")
 	signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig, err := contracts.NewOffChainAggregatorV2ConfigForCCIPPlugin(
 		commitNodes, testhelpers.NewCommitOffchainConfig(
 			*commonconfig.MustNewDuration(5 * time.Second),
@@ -3643,7 +3679,7 @@ func SetOCR2Config(
 			*inflightExpiryCommit,
 		), testhelpers.NewCommitOnchainConfig(
 			destCCIP.Common.PriceRegistry.EthAddress,
-		), contracts.OCR2ParamsForCommit, 3*time.Minute)
+		), OCR2ParamsForCommit, 3*time.Minute)
 	if err != nil {
 		return fmt.Errorf("failed to create ocr2 config params for commit: %w", err)
 	}
@@ -3660,20 +3696,26 @@ func SetOCR2Config(
 	}
 	if destCCIP.OffRamp != nil {
 		signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig, err = contracts.NewOffChainAggregatorV2ConfigForCCIPPlugin(
-			nodes, testhelpers.NewExecOffchainConfig(
+			nodes,
+			testhelpers.NewExecOffchainConfig(
 				1,
 				BatchGasLimit,
 				0.7,
 				*inflightExpiryExec,
 				*commonconfig.MustNewDuration(RootSnoozeTime),
-			), testhelpers.NewExecOnchainConfig(
+			),
+			testhelpers.NewExecOnchainConfig(
 				uint32(DefaultPermissionlessExecThreshold.Seconds()),
 				destCCIP.Common.Router.EthAddress,
 				destCCIP.Common.PriceRegistry.EthAddress,
 				DefaultMaxNoOfTokensInMsg,
 				MaxDataBytes,
 				200_000,
-			), contracts.OCR2ParamsForExec, 3*time.Minute)
+				50_000,
+			),
+			OCR2ParamsForExec,
+			3*time.Minute,
+		)
 		if err != nil {
 			return fmt.Errorf("failed to create ocr2 config params for exec: %w", err)
 		}
