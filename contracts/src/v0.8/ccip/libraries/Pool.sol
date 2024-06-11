@@ -37,8 +37,8 @@ library Pool {
   struct ReleaseOrMintInV1 {
     bytes originalSender; //          The original sender of the tx on the source chain
     uint64 remoteChainSelector; // ─╮ The chain ID of the source chain
-    // TODO remove?
-    address receiver; // ───────────╯ The recipient of the tokens on the destination chain
+    address receiver; // ───────────╯ The recipient of the tokens on the destination chain. This is *NOT* the address to
+    // send the tokens to, but the address that will receive the tokens via the offRamp.
     uint256 amount; //                The amount of tokens to release or mint, denominated in the source token's decimals
     /// @dev WARNING: sourcePoolAddress should be checked prior to any processing of funds. Make sure it matches the
     /// expected pool address for the given remoteChainSelector.

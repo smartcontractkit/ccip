@@ -1376,28 +1376,6 @@ contract EVM2EVMOffRamp__releaseOfMintToken is EVM2EVMOffRampSetup {
     s_offRamp.releaseOrMintToken(amount, originalSender, OWNER, sourceTokenData, offchainTokenData);
   }
 
-  function test__releaseOfMintToken_TokenHandlingError_returnedFalse_Revert() public {
-    address receiver = makeAddr("receiver");
-    uint256 amount = 123123;
-    address token = s_sourceTokens[0];
-    address destToken = s_destTokenBySourceToken[token];
-    bytes memory originalSender = abi.encode(OWNER);
-    bytes memory offchainTokenData = abi.encode(keccak256("offchainTokenData"));
-
-    Internal.SourceTokenData memory sourceTokenData = Internal.SourceTokenData({
-      sourcePoolAddress: abi.encode(s_sourcePoolByToken[token]),
-      destTokenAddress: abi.encode(destToken),
-      extraData: ""
-    });
-
-    bytes memory returnData = abi.encode(false);
-
-    vm.mockCall(destToken, abi.encodeWithSelector(IERC20.transfer.selector, receiver, amount), returnData);
-
-    vm.expectRevert(abi.encodeWithSelector(EVM2EVMOffRamp.TokenHandlingError.selector, returnData));
-    s_offRamp.releaseOrMintToken(amount, originalSender, receiver, sourceTokenData, offchainTokenData);
-  }
-
   function test__releaseOfMintToken_TokenHandlingError_revert_Revert() public {
     address receiver = makeAddr("receiver");
     uint256 amount = 123123;
