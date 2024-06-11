@@ -108,7 +108,7 @@ func Test_l1ToL2Bridge_Close(t *testing.T) {
 		l2FilterName string
 	}
 	type args struct {
-		ctx context.Context
+		ctx context.Context //nolint:containedctx
 	}
 	tests := []struct {
 		name       string
