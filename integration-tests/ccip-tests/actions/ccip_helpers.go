@@ -641,7 +641,10 @@ func (ccipModule *CCIPCommon) SyncUSDCDomain(destTransmitter *contracts.TokenTra
 			return err
 		}
 		destPool, err := ccipModule.Deployer.NewUSDCTokenPoolContract(destPoolAddr[i])
-		err = destPool.SendUSDCToUSDCPool(destTransmitter)
+		if err != nil {
+			return err
+		}
+		err = destPool.SendUSDCToUSDCPool()
 		if err != nil {
 			return err
 		}
