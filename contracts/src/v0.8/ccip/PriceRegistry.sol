@@ -4,7 +4,7 @@ pragma solidity 0.8.24;
 import {ITypeAndVersion} from "../shared/interfaces/ITypeAndVersion.sol";
 import {IPriceRegistry} from "./interfaces/IPriceRegistry.sol";
 
-import {OwnerIsCreator} from "./../shared/access/OwnerIsCreator.sol";
+import {AuthorizedCallers} from "../shared/access/AuthorizedCallers.sol";
 import {AggregatorV3Interface} from "./../shared/interfaces/AggregatorV3Interface.sol";
 import {Internal} from "./libraries/Internal.sol";
 import {USDPriceWith18Decimals} from "./libraries/USDPriceWith18Decimals.sol";
@@ -13,7 +13,7 @@ import {EnumerableSet} from "../vendor/openzeppelin-solidity/v4.8.3/contracts/ut
 
 /// @notice The PriceRegistry contract responsibility is to store the current gas price in USD for a given destination chain,
 /// and the price of a token in USD allowing the owner or priceUpdater to update this value.
-contract PriceRegistry is IPriceRegistry, OwnerIsCreator, ITypeAndVersion {
+contract PriceRegistry is IPriceRegistry, AuthorizedCallers, ITypeAndVersion {
   using EnumerableSet for EnumerableSet.AddressSet;
   using USDPriceWith18Decimals for uint224;
 
@@ -25,14 +25,11 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator, ITypeAndVersion {
 
   error TokenNotSupported(address token);
   error ChainNotSupported(uint64 chain);
-  error OnlyCallableByUpdaterOrOwner();
   error StaleGasPrice(uint64 destChainSelector, uint256 threshold, uint256 timePassed);
   error StaleTokenPrice(address token, uint256 threshold, uint256 timePassed);
   error InvalidStalenessThreshold();
   error DataFeedValueOutOfUint224Range();
 
-  event PriceUpdaterSet(address indexed priceUpdater);
-  event PriceUpdaterRemoved(address indexed priceUpdater);
   event FeeTokenAdded(address indexed feeToken);
   event FeeTokenRemoved(address indexed feeToken);
   event UsdPerUnitGasUpdated(uint64 indexed destChain, uint256 value, uint256 timestamp);
@@ -62,20 +59,17 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator, ITypeAndVersion {
   /// @dev Stores the price data feed configurations per token.
   mapping(address token => IPriceRegistry.TokenPriceFeedConfig dataFeedAddress) private s_usdPriceFeedsPerToken;
 
-  // Price updaters are allowed to update the prices.
-  EnumerableSet.AddressSet private s_priceUpdaters;
   // Subset of tokens which prices tracked by this registry which are fee tokens.
   EnumerableSet.AddressSet private s_feeTokens;
   // The amount of time a price can be stale before it is considered invalid.
   uint32 private immutable i_stalenessThreshold;
 
   constructor(
-    address[] memory priceUpdaters,
+    address[] memory authorizedCallers,
     address[] memory feeTokens,
     uint32 stalenessThreshold,
     TokenPriceFeedUpdate[] memory tokenPriceFeeds
-  ) {
-    _applyPriceUpdatersUpdates(priceUpdaters, new address[](0));
+  ) AuthorizedCallers(authorizedCallers) {
     _applyFeeTokensUpdates(feeTokens, new address[](0));
     _updateTokenPriceFeeds(tokenPriceFeeds);
     if (stalenessThreshold == 0) revert InvalidStalenessThreshold();
@@ -276,7 +270,7 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator, ITypeAndVersion {
   // ================================================================
 
   // @inheritdoc IPriceRegistry
-  function updatePrices(Internal.PriceUpdates calldata priceUpdates) external override requireUpdaterOrOwner {
+  function updatePrices(Internal.PriceUpdates calldata priceUpdates) external override onlyAuthorizedCallers {
     uint256 tokenUpdatesLength = priceUpdates.tokenPriceUpdates.length;
 
     for (uint256 i = 0; i < tokenUpdatesLength; ++i) {
@@ -313,54 +307,5 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator, ITypeAndVersion {
       s_usdPriceFeedsPerToken[sourceToken] = tokenPriceFeedConfig;
       emit PriceFeedPerTokenUpdated(sourceToken, tokenPriceFeedConfig);
     }
-  }
-
-  // ================================================================
-  // │                           Access                             │
-  // ================================================================
-
-  /// @notice Get the list of price updaters.
-  /// @return The price updaters.
-  function getPriceUpdaters() external view returns (address[] memory) {
-    return s_priceUpdaters.values();
-  }
-
-  /// @notice Adds new priceUpdaters and remove existing ones.
-  /// @param priceUpdatersToAdd The addresses of the priceUpdaters that are now allowed
-  /// to send fee updates.
-  /// @param priceUpdatersToRemove The addresses of the priceUpdaters that are no longer allowed
-  /// to send fee updates.
-  function applyPriceUpdatersUpdates(
-    address[] memory priceUpdatersToAdd,
-    address[] memory priceUpdatersToRemove
-  ) external onlyOwner {
-    _applyPriceUpdatersUpdates(priceUpdatersToAdd, priceUpdatersToRemove);
-  }
-
-  /// @notice Adds new priceUpdaters and remove existing ones.
-  /// @param priceUpdatersToAdd The addresses of the priceUpdaters that are now allowed
-  /// to send fee updates.
-  /// @param priceUpdatersToRemove The addresses of the priceUpdaters that are no longer allowed
-  /// to send fee updates.
-  function _applyPriceUpdatersUpdates(
-    address[] memory priceUpdatersToAdd,
-    address[] memory priceUpdatersToRemove
-  ) private {
-    for (uint256 i = 0; i < priceUpdatersToAdd.length; ++i) {
-      if (s_priceUpdaters.add(priceUpdatersToAdd[i])) {
-        emit PriceUpdaterSet(priceUpdatersToAdd[i]);
-      }
-    }
-    for (uint256 i = 0; i < priceUpdatersToRemove.length; ++i) {
-      if (s_priceUpdaters.remove(priceUpdatersToRemove[i])) {
-        emit PriceUpdaterRemoved(priceUpdatersToRemove[i]);
-      }
-    }
-  }
-
-  /// @notice Require that the caller is the owner or a fee updater.
-  modifier requireUpdaterOrOwner() {
-    if (msg.sender != owner() && !s_priceUpdaters.contains(msg.sender)) revert OnlyCallableByUpdaterOrOwner();
-    _;
   }
 }

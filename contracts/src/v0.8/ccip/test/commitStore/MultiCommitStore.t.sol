@@ -5,6 +5,7 @@ import {IMultiCommitStore} from "../../interfaces/IMultiCommitStore.sol";
 import {IPriceRegistry} from "../../interfaces/IPriceRegistry.sol";
 import {IRMN} from "../../interfaces/IRMN.sol";
 
+import {AuthorizedCallers} from "../../../shared/access/AuthorizedCallers.sol";
 import {MultiCommitStore} from "../../MultiCommitStore.sol";
 import {PriceRegistry} from "../../PriceRegistry.sol";
 import {RMN} from "../../RMN.sol";
@@ -41,7 +42,9 @@ contract MultiCommitStoreSetup is PriceRegistrySetup, OCR2BaseSetup {
 
     address[] memory priceUpdaters = new address[](1);
     priceUpdaters[0] = address(s_multiCommitStore);
-    s_priceRegistry.applyPriceUpdatersUpdates(priceUpdaters, new address[](0));
+    s_priceRegistry.applyAuthorizedCallerUpdates(
+      AuthorizedCallers.AuthorizedCallerArgs(priceUpdaters, new address[](0))
+    );
   }
 }
 

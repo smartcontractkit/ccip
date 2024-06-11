@@ -3,6 +3,7 @@ pragma solidity 0.8.24;
 
 import {Vm} from "forge-std/Vm.sol";
 
+import {AuthorizedCallers} from "../../../shared/access/AuthorizedCallers.sol";
 import {MultiAggregateRateLimiter} from "../../MultiAggregateRateLimiter.sol";
 import {Client} from "../../libraries/Client.sol";
 import {Internal} from "../../libraries/Internal.sol";
@@ -107,12 +108,6 @@ contract MultiAggregateRateLimiter_constructor is MultiAggregateRateLimiterSetup
     vm.expectEmit();
     emit MultiAggregateRateLimiter.PriceRegistrySet(address(s_priceRegistry));
 
-    vm.expectEmit();
-    emit MultiAggregateRateLimiter.AuthorizedCallerAdded(MOCK_OFFRAMP);
-
-    vm.expectEmit();
-    emit MultiAggregateRateLimiter.AuthorizedCallerAdded(MOCK_ONRAMP);
-
     s_rateLimiter = new MultiAggregateRateLimiterHelper(address(s_priceRegistry), authorizedCallers);
 
     assertEq(OWNER, s_rateLimiter.owner());
@@ -141,159 +136,8 @@ contract MultiAggregateRateLimiter_setPriceRegistry is MultiAggregateRateLimiter
   }
 
   function test_ZeroAddress_Revert() public {
-    vm.expectRevert(MultiAggregateRateLimiter.ZeroAddressNotAllowed.selector);
+    vm.expectRevert(AuthorizedCallers.ZeroAddressNotAllowed.selector);
     s_rateLimiter.setPriceRegistry(address(0));
-  }
-}
-
-contract MultiAggregateRateLimiter_setAuthorizedCallers is MultiAggregateRateLimiterSetup {
-  function test_OnlyAdd_Success() public {
-    address[] memory addedCallers = new address[](2);
-    addedCallers[0] = address(42);
-    addedCallers[1] = address(43);
-
-    address[] memory removedCallers = new address[](0);
-
-    assertEq(s_rateLimiter.getAllAuthorizedCallers(), s_authorizedCallers);
-
-    vm.expectEmit();
-    emit MultiAggregateRateLimiter.AuthorizedCallerAdded(addedCallers[0]);
-    vm.expectEmit();
-    emit MultiAggregateRateLimiter.AuthorizedCallerAdded(addedCallers[1]);
-
-    s_rateLimiter.applyAuthorizedCallerUpdates(
-      MultiAggregateRateLimiter.AuthorizedCallerArgs({addedCallers: addedCallers, removedCallers: removedCallers})
-    );
-
-    address[] memory expectedCallers = new address[](4);
-    expectedCallers[0] = s_authorizedCallers[0];
-    expectedCallers[1] = s_authorizedCallers[1];
-    expectedCallers[2] = addedCallers[0];
-    expectedCallers[3] = addedCallers[1];
-
-    assertEq(s_rateLimiter.getAllAuthorizedCallers(), expectedCallers);
-  }
-
-  function test_OnlyRemove_Success() public {
-    address[] memory addedCallers = new address[](0);
-
-    address[] memory removedCallers = new address[](1);
-    removedCallers[0] = s_authorizedCallers[0];
-
-    assertEq(s_rateLimiter.getAllAuthorizedCallers(), s_authorizedCallers);
-
-    vm.expectEmit();
-    emit MultiAggregateRateLimiter.AuthorizedCallerRemoved(removedCallers[0]);
-
-    s_rateLimiter.applyAuthorizedCallerUpdates(
-      MultiAggregateRateLimiter.AuthorizedCallerArgs({addedCallers: addedCallers, removedCallers: removedCallers})
-    );
-
-    address[] memory expectedCallers = new address[](1);
-    expectedCallers[0] = s_authorizedCallers[1];
-
-    assertEq(s_rateLimiter.getAllAuthorizedCallers(), expectedCallers);
-  }
-
-  function test_AddAndRemove_Success() public {
-    address[] memory addedCallers = new address[](2);
-    addedCallers[0] = address(42);
-    addedCallers[1] = address(43);
-
-    address[] memory removedCallers = new address[](1);
-    removedCallers[0] = s_authorizedCallers[0];
-
-    assertEq(s_rateLimiter.getAllAuthorizedCallers(), s_authorizedCallers);
-
-    vm.expectEmit();
-    emit MultiAggregateRateLimiter.AuthorizedCallerRemoved(removedCallers[0]);
-    vm.expectEmit();
-    emit MultiAggregateRateLimiter.AuthorizedCallerAdded(addedCallers[0]);
-    vm.expectEmit();
-    emit MultiAggregateRateLimiter.AuthorizedCallerAdded(addedCallers[1]);
-
-    s_rateLimiter.applyAuthorizedCallerUpdates(
-      MultiAggregateRateLimiter.AuthorizedCallerArgs({addedCallers: addedCallers, removedCallers: removedCallers})
-    );
-
-    // Order of the set changes on removal
-    address[] memory expectedCallers = new address[](3);
-    expectedCallers[0] = s_authorizedCallers[1];
-    expectedCallers[1] = addedCallers[0];
-    expectedCallers[2] = addedCallers[1];
-
-    assertEq(s_rateLimiter.getAllAuthorizedCallers(), expectedCallers);
-  }
-
-  function test_RemoveThenAdd_Success() public {
-    address[] memory addedCallers = new address[](1);
-    addedCallers[0] = s_authorizedCallers[0];
-
-    address[] memory removedCallers = new address[](1);
-    removedCallers[0] = s_authorizedCallers[0];
-
-    assertEq(s_rateLimiter.getAllAuthorizedCallers(), s_authorizedCallers);
-
-    vm.expectEmit();
-    emit MultiAggregateRateLimiter.AuthorizedCallerRemoved(removedCallers[0]);
-
-    vm.expectEmit();
-    emit MultiAggregateRateLimiter.AuthorizedCallerAdded(addedCallers[0]);
-
-    s_rateLimiter.applyAuthorizedCallerUpdates(
-      MultiAggregateRateLimiter.AuthorizedCallerArgs({addedCallers: addedCallers, removedCallers: removedCallers})
-    );
-
-    address[] memory expectedCallers = new address[](2);
-    expectedCallers[0] = s_authorizedCallers[1];
-    expectedCallers[1] = s_authorizedCallers[0];
-
-    assertEq(s_rateLimiter.getAllAuthorizedCallers(), expectedCallers);
-  }
-
-  function test_SkipRemove_Success() public {
-    address[] memory addedCallers = new address[](0);
-
-    address[] memory removedCallers = new address[](1);
-    removedCallers[0] = address(42);
-
-    vm.recordLogs();
-    s_rateLimiter.applyAuthorizedCallerUpdates(
-      MultiAggregateRateLimiter.AuthorizedCallerArgs({addedCallers: addedCallers, removedCallers: removedCallers})
-    );
-
-    assertEq(s_rateLimiter.getAllAuthorizedCallers(), s_authorizedCallers);
-
-    Vm.Log[] memory logEntries = vm.getRecordedLogs();
-    assertEq(logEntries.length, 0);
-  }
-
-  // Reverts
-
-  function test_OnlyOwner_Revert() public {
-    vm.startPrank(STRANGER);
-    vm.expectRevert(bytes("Only callable by owner"));
-
-    address[] memory addedCallers = new address[](2);
-    addedCallers[0] = address(42);
-    addedCallers[1] = address(43);
-
-    address[] memory removedCallers = new address[](0);
-
-    s_rateLimiter.applyAuthorizedCallerUpdates(
-      MultiAggregateRateLimiter.AuthorizedCallerArgs({addedCallers: addedCallers, removedCallers: removedCallers})
-    );
-  }
-
-  function test_ZeroAddressAdd_Revert() public {
-    address[] memory addedCallers = new address[](1);
-    addedCallers[0] = address(0);
-    address[] memory removedCallers = new address[](0);
-
-    vm.expectRevert(MultiAggregateRateLimiter.ZeroAddressNotAllowed.selector);
-    s_rateLimiter.applyAuthorizedCallerUpdates(
-      MultiAggregateRateLimiter.AuthorizedCallerArgs({addedCallers: addedCallers, removedCallers: removedCallers})
-    );
   }
 }
 
@@ -771,7 +615,7 @@ contract MultiAggregateRateLimiter_updateRateLimitTokens is MultiAggregateRateLi
       remoteToken: bytes32(bytes20(address(0)))
     });
 
-    vm.expectRevert(MultiAggregateRateLimiter.ZeroAddressNotAllowed.selector);
+    vm.expectRevert(AuthorizedCallers.ZeroAddressNotAllowed.selector);
     s_rateLimiter.updateRateLimitTokens(new MultiAggregateRateLimiter.LocalRateLimitToken[](0), adds);
   }
 
@@ -785,7 +629,7 @@ contract MultiAggregateRateLimiter_updateRateLimitTokens is MultiAggregateRateLi
       remoteToken: bytes32(bytes20(s_destTokens[0]))
     });
 
-    vm.expectRevert(MultiAggregateRateLimiter.ZeroAddressNotAllowed.selector);
+    vm.expectRevert(AuthorizedCallers.ZeroAddressNotAllowed.selector);
     s_rateLimiter.updateRateLimitTokens(new MultiAggregateRateLimiter.LocalRateLimitToken[](0), adds);
   }
 
@@ -1032,7 +876,7 @@ contract MultiAggregateRateLimiter_onIncomingMessage is MultiAggregateRateLimite
   function test_ValidateMessageFromUnauthorizedCaller_Revert() public {
     vm.startPrank(STRANGER);
 
-    vm.expectRevert(abi.encodeWithSelector(MultiAggregateRateLimiter.UnauthorizedCaller.selector, STRANGER));
+    vm.expectRevert(abi.encodeWithSelector(AuthorizedCallers.UnauthorizedCaller.selector, STRANGER));
     s_rateLimiter.onIncomingMessage(_generateAny2EVMMessageNoTokens(CHAIN_SELECTOR_1));
   }
 

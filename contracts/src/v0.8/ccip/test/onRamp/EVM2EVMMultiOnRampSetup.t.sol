@@ -3,6 +3,7 @@ pragma solidity 0.8.24;
 
 import {IPool} from "../../interfaces/IPool.sol";
 
+import {AuthorizedCallers} from "../../../shared/access/AuthorizedCallers.sol";
 import {NonceManager} from "../../NonceManager.sol";
 import {PriceRegistry} from "../../PriceRegistry.sol";
 import {Router} from "../../Router.sol";
@@ -101,7 +102,7 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
       })
     );
 
-    s_nonceManager = new NonceManager();
+    s_nonceManager = new NonceManager(new address[](0));
 
     s_onRamp = new EVM2EVMMultiOnRampHelper(
       EVM2EVMMultiOnRamp.StaticConfig({
@@ -120,7 +121,11 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
     );
     s_onRamp.setAdmin(ADMIN);
 
-    s_nonceManager.applyRampUpdates(address(s_onRamp), new NonceManager.PreviousRampsArgs[](0));
+    address[] memory authorizedCallers = new address[](1);
+    authorizedCallers[0] = address(s_onRamp);
+    s_nonceManager.applyAuthorizedCallerUpdates(
+      AuthorizedCallers.AuthorizedCallerArgs({addedCallers: authorizedCallers, removedCallers: new address[](0)})
+    );
 
     s_metadataHash = keccak256(
       abi.encode(Internal.EVM_2_EVM_MESSAGE_HASH, SOURCE_CHAIN_SELECTOR, DEST_CHAIN_SELECTOR, address(s_onRamp))

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.24;
 
+import {AuthorizedCallers} from "../../../shared/access/AuthorizedCallers.sol";
 import {MockV3Aggregator} from "../../../tests/MockV3Aggregator.sol";
 import {PriceRegistry} from "../../PriceRegistry.sol";
 import {IPriceRegistry} from "../../interfaces/IPriceRegistry.sol";
@@ -80,13 +81,14 @@ contract PriceRegistrySetup is TokenSetup {
 
     s_encodedInitialPriceUpdates = abi.encode(priceUpdates);
 
-    address[] memory priceUpdaters = new address[](0);
+    address[] memory authorizedCallers = new address[](1);
+    authorizedCallers[0] = OWNER;
     address[] memory feeTokens = new address[](2);
     feeTokens[0] = s_sourceTokens[0];
     feeTokens[1] = s_weth;
     PriceRegistry.TokenPriceFeedUpdate[] memory tokenPriceFeedUpdates = new PriceRegistry.TokenPriceFeedUpdate[](0);
 
-    s_priceRegistry = new PriceRegistry(priceUpdaters, feeTokens, uint32(TWELVE_HOURS), tokenPriceFeedUpdates);
+    s_priceRegistry = new PriceRegistry(authorizedCallers, feeTokens, uint32(TWELVE_HOURS), tokenPriceFeedUpdates);
     s_priceRegistry.updatePrices(priceUpdates);
   }
 
@@ -159,9 +161,6 @@ contract PriceRegistrySetup is TokenSetup {
 
 contract PriceRegistry_constructor is PriceRegistrySetup {
   function test_Setup_Success() public virtual {
-    address[] memory priceUpdaters = new address[](2);
-    priceUpdaters[0] = STRANGER;
-    priceUpdaters[1] = OWNER;
     address[] memory feeTokens = new address[](2);
     feeTokens[0] = s_sourceTokens[0];
     feeTokens[1] = s_sourceTokens[1];
@@ -171,11 +170,10 @@ contract PriceRegistry_constructor is PriceRegistrySetup {
     tokenPriceFeedUpdates[1] =
       getSingleTokenPriceFeedUpdateStruct(s_sourceTokens[1], s_dataFeedByToken[s_sourceTokens[1]], 6);
 
-    s_priceRegistry = new PriceRegistry(priceUpdaters, feeTokens, uint32(TWELVE_HOURS), tokenPriceFeedUpdates);
+    s_priceRegistry = new PriceRegistry(new address[](0), feeTokens, uint32(TWELVE_HOURS), tokenPriceFeedUpdates);
 
     assertEq(feeTokens, s_priceRegistry.getFeeTokens());
     assertEq(uint32(TWELVE_HOURS), s_priceRegistry.getStalenessThreshold());
-    assertEq(priceUpdaters, s_priceRegistry.getPriceUpdaters());
     assertEq(s_priceRegistry.typeAndVersion(), "PriceRegistry 1.6.0-dev");
 
     _assertTokenPriceFeedConfigEquality(
@@ -395,43 +393,6 @@ contract PriceRegistry_getValidatedTokenPrice is PriceRegistrySetup {
   }
 }
 
-contract PriceRegistry_applyPriceUpdatersUpdates is PriceRegistrySetup {
-  function test_ApplyPriceUpdaterUpdates_Success() public {
-    address[] memory priceUpdaters = new address[](1);
-    priceUpdaters[0] = STRANGER;
-
-    vm.expectEmit();
-    emit PriceRegistry.PriceUpdaterSet(STRANGER);
-
-    s_priceRegistry.applyPriceUpdatersUpdates(priceUpdaters, new address[](0));
-    assertEq(s_priceRegistry.getPriceUpdaters().length, 1);
-    assertEq(s_priceRegistry.getPriceUpdaters()[0], STRANGER);
-
-    // add same priceUpdater is no-op
-    s_priceRegistry.applyPriceUpdatersUpdates(priceUpdaters, new address[](0));
-    assertEq(s_priceRegistry.getPriceUpdaters().length, 1);
-    assertEq(s_priceRegistry.getPriceUpdaters()[0], STRANGER);
-
-    vm.expectEmit();
-    emit PriceRegistry.PriceUpdaterRemoved(STRANGER);
-
-    s_priceRegistry.applyPriceUpdatersUpdates(new address[](0), priceUpdaters);
-    assertEq(s_priceRegistry.getPriceUpdaters().length, 0);
-
-    // removing already removed priceUpdater is no-op
-    s_priceRegistry.applyPriceUpdatersUpdates(new address[](0), priceUpdaters);
-    assertEq(s_priceRegistry.getPriceUpdaters().length, 0);
-  }
-
-  function test_OnlyCallableByOwner_Revert() public {
-    address[] memory priceUpdaters = new address[](1);
-    priceUpdaters[0] = STRANGER;
-    vm.startPrank(STRANGER);
-    vm.expectRevert("Only callable by owner");
-    s_priceRegistry.applyPriceUpdatersUpdates(priceUpdaters, new address[](0));
-  }
-}
-
 contract PriceRegistry_applyFeeTokensUpdates is PriceRegistrySetup {
   function test_ApplyFeeTokensUpdates_Success() public {
     address[] memory feeTokens = new address[](1);
@@ -558,7 +519,7 @@ contract PriceRegistry_updatePrices is PriceRegistrySetup {
     });
 
     vm.startPrank(STRANGER);
-    vm.expectRevert(abi.encodeWithSelector(PriceRegistry.OnlyCallableByUpdaterOrOwner.selector));
+    vm.expectRevert(abi.encodeWithSelector(AuthorizedCallers.UnauthorizedCaller.selector, STRANGER));
     s_priceRegistry.updatePrices(priceUpdates);
   }
 }

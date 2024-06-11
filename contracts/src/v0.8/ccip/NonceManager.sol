@@ -3,16 +3,15 @@ pragma solidity 0.8.24;
 
 import {IEVM2AnyOnRamp} from "./interfaces/IEVM2AnyOnRamp.sol";
 
-import {OwnerIsCreator} from "../shared/access/OwnerIsCreator.sol";
+import {AuthorizedCallers} from "../shared/access/AuthorizedCallers.sol";
+import {EnumerableSet} from "./../vendor/openzeppelin-solidity/v4.7.3/contracts/utils/structs/EnumerableSet.sol";
 
-contract NonceManager is OwnerIsCreator {
-  error OnlyCallableByOnRamp();
+contract NonceManager is AuthorizedCallers {
   error InvalidRampUpdate();
 
   event PreviousOnRampUpdated(uint64 indexed destChainSelector, address prevOnRamp);
-  event OnRampUpdated(address onRamp);
 
-  /// @dev Struct that contains a previous on/off ramp address with the associated source/dest chain selector
+  /// @dev Struct that contains a previous on/off ramp addresses
   // TODO: add prevOffRamp
   struct PreviousRamps {
     address prevOnRamp;
@@ -31,22 +30,21 @@ contract NonceManager is OwnerIsCreator {
     uint64 inbound;
   }
 
-  /// @dev The current onRamp address
-  address private s_onRamp;
-  /// TODO: add s_offRamp;
-
   /// @dev previous ramps
   mapping(uint64 chainSelector => PreviousRamps prevRamps) private s_prevRamps;
   /// @dev The current nonces per sender used on the on/off ramps
   mapping(uint64 chainSelector => mapping(bytes sender => Nonce nonce)) private s_nonces;
 
+  constructor(address[] memory authorizedCallers) AuthorizedCallers(authorizedCallers) {}
+
   /// @notice Increments the outbound nonce for the given sender on the given destination chain
   /// @param destChainSelector The destination chain selector
   /// @param sender The encoded sender address
   /// @return The new outbound nonce
-  function incrementOutboundNonce(uint64 destChainSelector, bytes calldata sender) external returns (uint64) {
-    if (msg.sender != s_onRamp) revert OnlyCallableByOnRamp();
-
+  function incrementOutboundNonce(
+    uint64 destChainSelector,
+    bytes calldata sender
+  ) external onlyAuthorizedCallers returns (uint64) {
     Nonce storage nonce = s_nonces[destChainSelector][sender];
 
     uint64 outboundNonce = nonce.outbound + 1;
@@ -85,15 +83,8 @@ contract NonceManager is OwnerIsCreator {
   /// TODO: add getInboundNonce
 
   /// @notice Updates the ramps and previous ramps addresses
-  /// @param onRamp The new onRamp address
   /// @param prevRampsArgs The previous onRamps
-  /// TODO: add offRamp
-  function applyRampUpdates(address onRamp, PreviousRampsArgs[] calldata prevRampsArgs) external onlyOwner {
-    if (onRamp != address(0)) {
-      s_onRamp = onRamp;
-      emit OnRampUpdated(onRamp);
-    }
-
+  function applyPreviousRampsUpdates(PreviousRampsArgs[] calldata prevRampsArgs) external onlyOwner {
     for (uint256 i = 0; i < prevRampsArgs.length; i++) {
       PreviousRampsArgs calldata prevRampsArg = prevRampsArgs[i];
 
@@ -107,20 +98,5 @@ contract NonceManager is OwnerIsCreator {
       prevRamps.prevOnRamp = prevRampsArg.prevRamps.prevOnRamp;
       emit PreviousOnRampUpdated(prevRampsArg.chainSelector, prevRamps.prevOnRamp);
     }
-
-    // TODO: add offRamp logic
-  }
-
-  /// @notice Gets the current onRamp address
-  /// @return The onRamp address
-  function getOnRamp() external view returns (address) {
-    return s_onRamp;
-  }
-
-  /// @notice Gets the previous onRamp address for the given chain selector
-  /// @param chainSelector The chain selector
-  /// @return The previous onRamp address
-  function getPrevRamps(uint64 chainSelector) external view returns (PreviousRamps memory) {
-    return s_prevRamps[chainSelector];
   }
 }

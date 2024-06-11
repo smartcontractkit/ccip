@@ -30,6 +30,11 @@ var (
 	_ = abi.ConvertType
 )
 
+type AuthorizedCallersAuthorizedCallerArgs struct {
+	AddedCallers   []common.Address
+	RemovedCallers []common.Address
+}
+
 type NonceManagerPreviousRamps struct {
 	PrevOnRamp common.Address
 }
@@ -40,15 +45,15 @@ type NonceManagerPreviousRampsArgs struct {
 }
 
 var NonceManagerMetaData = &bind.MetaData{
-	ABI: "[{\"inputs\":[],\"name\":\"InvalidRampUpdate\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"OnlyCallableByOnRamp\",\"type\":\"error\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"address\",\"name\":\"onRamp\",\"type\":\"address\"}],\"name\":\"OnRampUpdated\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"from\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"}],\"name\":\"OwnershipTransferRequested\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"from\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"}],\"name\":\"OwnershipTransferred\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"uint64\",\"name\":\"destChainSelector\",\"type\":\"uint64\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"prevOnRamp\",\"type\":\"address\"}],\"name\":\"PreviousOnRampUpdated\",\"type\":\"event\"},{\"inputs\":[],\"name\":\"acceptOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"onRamp\",\"type\":\"address\"},{\"components\":[{\"internalType\":\"uint64\",\"name\":\"chainSelector\",\"type\":\"uint64\"},{\"components\":[{\"internalType\":\"address\",\"name\":\"prevOnRamp\",\"type\":\"address\"}],\"internalType\":\"structNonceManager.PreviousRamps\",\"name\":\"prevRamps\",\"type\":\"tuple\"}],\"internalType\":\"structNonceManager.PreviousRampsArgs[]\",\"name\":\"prevRampsArgs\",\"type\":\"tuple[]\"}],\"name\":\"applyRampUpdates\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getOnRamp\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"destChainSelector\",\"type\":\"uint64\"},{\"internalType\":\"bytes\",\"name\":\"sender\",\"type\":\"bytes\"}],\"name\":\"getOutboundNonce\",\"outputs\":[{\"internalType\":\"uint64\",\"name\":\"\",\"type\":\"uint64\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"chainSelector\",\"type\":\"uint64\"}],\"name\":\"getPrevRamps\",\"outputs\":[{\"components\":[{\"internalType\":\"address\",\"name\":\"prevOnRamp\",\"type\":\"address\"}],\"internalType\":\"structNonceManager.PreviousRamps\",\"name\":\"\",\"type\":\"tuple\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"destChainSelector\",\"type\":\"uint64\"},{\"internalType\":\"bytes\",\"name\":\"sender\",\"type\":\"bytes\"}],\"name\":\"incrementOutboundNonce\",\"outputs\":[{\"internalType\":\"uint64\",\"name\":\"\",\"type\":\"uint64\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"owner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"}],\"name\":\"transferOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]",
-	Bin: "0x608060405234801561001057600080fd5b5033806000816100675760405162461bcd60e51b815260206004820152601860248201527f43616e6e6f7420736574206f776e657220746f207a65726f000000000000000060448201526064015b60405180910390fd5b600080546001600160a01b0319166001600160a01b0384811691909117909155811615610097576100978161009f565b505050610148565b336001600160a01b038216036100f75760405162461bcd60e51b815260206004820152601760248201527f43616e6e6f74207472616e7366657220746f2073656c66000000000000000000604482015260640161005e565b600180546001600160a01b0319166001600160a01b0383811691821790925560008054604051929316917fed8889f560326eb138920d842192f0eb3dd22b4f139c87a2c57538e05bae12789190a350565b610bdb806101576000396000f3fe608060405234801561001057600080fd5b50600436106100885760003560e01c80637a2dbcbc1161005b5780637a2dbcbc146101855780638da5cb5b146101985780638f1eb7e6146101b6578063f2fde38b146101c957600080fd5b806322d94aa71461008d57806331b89ff3146101105780634ce927231461013c57806379ba50971461017b575b600080fd5b6100e661009b3660046109cd565b604080516020808201835260009182905267ffffffffffffffff9390931681526003835281902081519283019091525473ffffffffffffffffffffffffffffffffffffffff16815290565b604051905173ffffffffffffffffffffffffffffffffffffffff1681526020015b60405180910390f35b61012361011e3660046109ea565b6101dc565b60405167ffffffffffffffff9091168152602001610107565b60025473ffffffffffffffffffffffffffffffffffffffff165b60405173ffffffffffffffffffffffffffffffffffffffff9091168152602001610107565b61018361032d565b005b6101236101933660046109ea565b61042f565b60005473ffffffffffffffffffffffffffffffffffffffff16610156565b6101836101c4366004610a91565b610622565b6101836101d7366004610b06565b61082b565b67ffffffffffffffff831660009081526004602052604080822090518291906102089086908690610b23565b9081526040519081900360200190205467ffffffffffffffff16905060008190036103235767ffffffffffffffff851660009081526003602052604090205473ffffffffffffffffffffffffffffffffffffffff1680156103215773ffffffffffffffffffffffffffffffffffffffff811663856c824761028b86880188610b06565b6040517fffffffff0000000000000000000000000000000000000000000000000000000060e084901b16815273ffffffffffffffffffffffffffffffffffffffff9091166004820152602401602060405180830381865afa1580156102f4573d6000803e3d6000fd5b505050506040513d601f19601f820116820180604052508101906103189190610b33565b92505050610326565b505b90505b9392505050565b60015473ffffffffffffffffffffffffffffffffffffffff1633146103b3576040517f08c379a000000000000000000000000000000000000000000000000000000000815260206004820152601660248201527f4d7573742062652070726f706f736564206f776e65720000000000000000000060448201526064015b60405180910390fd5b60008054337fffffffffffffffffffffffff00000000000000000000000000000000000000008083168217845560018054909116905560405173ffffffffffffffffffffffffffffffffffffffff90921692909183917f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e091a350565b60025460009073ffffffffffffffffffffffffffffffffffffffff163314610483576040517fdaee2fdc00000000000000000000000000000000000000000000000000000000815260040160405180910390fd5b67ffffffffffffffff841660009081526004602052604080822090516104ac9086908690610b23565b90815260405190819003602001902080549091506000906104d89067ffffffffffffffff166001610b50565b90508067ffffffffffffffff166000036105e75767ffffffffffffffff861660009081526003602052604090205473ffffffffffffffffffffffffffffffffffffffff1680156105e55773ffffffffffffffffffffffffffffffffffffffff811663856c824761054a87890189610b06565b6040517fffffffff0000000000000000000000000000000000000000000000000000000060e084901b16815273ffffffffffffffffffffffffffffffffffffffff9091166004820152602401602060405180830381865afa1580156105b3573d6000803e3d6000fd5b505050506040513d601f19601f820116820180604052508101906105d79190610b33565b6105e2906001610b50565b91505b505b81547fffffffffffffffffffffffffffffffffffffffffffffffff00000000000000001667ffffffffffffffff821617909155949350505050565b61062a61083f565b73ffffffffffffffffffffffffffffffffffffffff8316156106bd57600280547fffffffffffffffffffffffff00000000000000000000000000000000000000001673ffffffffffffffffffffffffffffffffffffffff85169081179091556040519081527fb3d81ef1b70b9650b688ffeba63e1b58c36aa4c936ba7d84a295f3b16045b3149060200160405180910390a15b60005b8181101561082557368383838181106106db576106db610b9f565b604002919091019150600090506003816106f860208501856109cd565b67ffffffffffffffff1681526020810191909152604001600020805490915073ffffffffffffffffffffffffffffffffffffffff1615610764576040517fbb16aec100000000000000000000000000000000000000000000000000000000815260040160405180910390fd5b6107746040830160208401610b06565b81547fffffffffffffffffffffffff00000000000000000000000000000000000000001673ffffffffffffffffffffffffffffffffffffffff919091161781556107c160208301836109cd565b815460405173ffffffffffffffffffffffffffffffffffffffff909116815267ffffffffffffffff91909116907f89d2355e2829b1e15855fec87fb400638aebc9f03728949d702d3b5d4ea999549060200160405180910390a250506001016106c0565b50505050565b61083361083f565b61083c816108c2565b50565b60005473ffffffffffffffffffffffffffffffffffffffff1633146108c0576040517f08c379a000000000000000000000000000000000000000000000000000000000815260206004820152601660248201527f4f6e6c792063616c6c61626c65206279206f776e65720000000000000000000060448201526064016103aa565b565b3373ffffffffffffffffffffffffffffffffffffffff821603610941576040517f08c379a000000000000000000000000000000000000000000000000000000000815260206004820152601760248201527f43616e6e6f74207472616e7366657220746f2073656c6600000000000000000060448201526064016103aa565b600180547fffffffffffffffffffffffff00000000000000000000000000000000000000001673ffffffffffffffffffffffffffffffffffffffff83811691821790925560008054604051929316917fed8889f560326eb138920d842192f0eb3dd22b4f139c87a2c57538e05bae12789190a350565b67ffffffffffffffff8116811461083c57600080fd5b6000602082840312156109df57600080fd5b8135610326816109b7565b6000806000604084860312156109ff57600080fd5b8335610a0a816109b7565b9250602084013567ffffffffffffffff80821115610a2757600080fd5b818601915086601f830112610a3b57600080fd5b813581811115610a4a57600080fd5b876020828501011115610a5c57600080fd5b6020830194508093505050509250925092565b73ffffffffffffffffffffffffffffffffffffffff8116811461083c57600080fd5b600080600060408486031215610aa657600080fd5b8335610ab181610a6f565b9250602084013567ffffffffffffffff80821115610ace57600080fd5b818601915086601f830112610ae257600080fd5b813581811115610af157600080fd5b8760208260061b8501011115610a5c57600080fd5b600060208284031215610b1857600080fd5b813561032681610a6f565b8183823760009101908152919050565b600060208284031215610b4557600080fd5b8151610326816109b7565b67ffffffffffffffff818116838216019080821115610b98577f4e487b7100000000000000000000000000000000000000000000000000000000600052601160045260246000fd5b5092915050565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052603260045260246000fdfea164736f6c6343000818000a",
+	ABI: "[{\"inputs\":[{\"internalType\":\"address[]\",\"name\":\"authorizedCallers\",\"type\":\"address[]\"}],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"inputs\":[],\"name\":\"InvalidRampUpdate\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"caller\",\"type\":\"address\"}],\"name\":\"UnauthorizedCaller\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"ZeroAddressNotAllowed\",\"type\":\"error\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"address\",\"name\":\"caller\",\"type\":\"address\"}],\"name\":\"AuthorizedCallerAdded\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"address\",\"name\":\"caller\",\"type\":\"address\"}],\"name\":\"AuthorizedCallerRemoved\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"from\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"}],\"name\":\"OwnershipTransferRequested\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"from\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"}],\"name\":\"OwnershipTransferred\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"uint64\",\"name\":\"destChainSelector\",\"type\":\"uint64\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"prevOnRamp\",\"type\":\"address\"}],\"name\":\"PreviousOnRampUpdated\",\"type\":\"event\"},{\"inputs\":[],\"name\":\"acceptOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"components\":[{\"internalType\":\"address[]\",\"name\":\"addedCallers\",\"type\":\"address[]\"},{\"internalType\":\"address[]\",\"name\":\"removedCallers\",\"type\":\"address[]\"}],\"internalType\":\"structAuthorizedCallers.AuthorizedCallerArgs\",\"name\":\"authorizedCallerArgs\",\"type\":\"tuple\"}],\"name\":\"applyAuthorizedCallerUpdates\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"components\":[{\"internalType\":\"uint64\",\"name\":\"chainSelector\",\"type\":\"uint64\"},{\"components\":[{\"internalType\":\"address\",\"name\":\"prevOnRamp\",\"type\":\"address\"}],\"internalType\":\"structNonceManager.PreviousRamps\",\"name\":\"prevRamps\",\"type\":\"tuple\"}],\"internalType\":\"structNonceManager.PreviousRampsArgs[]\",\"name\":\"prevRampsArgs\",\"type\":\"tuple[]\"}],\"name\":\"applyPreviousRampsUpdates\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getAllAuthorizedCallers\",\"outputs\":[{\"internalType\":\"address[]\",\"name\":\"\",\"type\":\"address[]\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"destChainSelector\",\"type\":\"uint64\"},{\"internalType\":\"bytes\",\"name\":\"sender\",\"type\":\"bytes\"}],\"name\":\"getOutboundNonce\",\"outputs\":[{\"internalType\":\"uint64\",\"name\":\"\",\"type\":\"uint64\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"destChainSelector\",\"type\":\"uint64\"},{\"internalType\":\"bytes\",\"name\":\"sender\",\"type\":\"bytes\"}],\"name\":\"incrementOutboundNonce\",\"outputs\":[{\"internalType\":\"uint64\",\"name\":\"\",\"type\":\"uint64\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"owner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"}],\"name\":\"transferOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]",
+	Bin: "0x60806040523480156200001157600080fd5b50604051620016a7380380620016a78339810160408190526200003491620004b0565b8033806000816200008c5760405162461bcd60e51b815260206004820152601860248201527f43616e6e6f7420736574206f776e657220746f207a65726f000000000000000060448201526064015b60405180910390fd5b600080546001600160a01b0319166001600160a01b0384811691909117909155811615620000bf57620000bf81620000f6565b5050604080518082018252838152815160008152602080820190935291810191909152620000ee9150620001a1565b5050620005d0565b336001600160a01b03821603620001505760405162461bcd60e51b815260206004820152601760248201527f43616e6e6f74207472616e7366657220746f2073656c66000000000000000000604482015260640162000083565b600180546001600160a01b0319166001600160a01b0383811691821790925560008054604051929316917fed8889f560326eb138920d842192f0eb3dd22b4f139c87a2c57538e05bae12789190a350565b602081015160005b815181101562000231576000828281518110620001ca57620001ca62000582565b60209081029190910101519050620001e4600282620002f0565b1562000227576040516001600160a01b03821681527fc3803387881faad271c47728894e3e36fac830ffc8602ca6fc07733cbda775809060200160405180910390a15b50600101620001a9565b50815160005b8151811015620002ea57600082828151811062000258576200025862000582565b6020026020010151905060006001600160a01b0316816001600160a01b03160362000296576040516342bcdf7f60e11b815260040160405180910390fd5b620002a360028262000310565b506040516001600160a01b03821681527feb1b9b92e50b7f88f9ff25d56765095ac6e91540eee214906f4036a908ffbdef9060200160405180910390a15060010162000237565b50505050565b600062000307836001600160a01b03841662000327565b90505b92915050565b600062000307836001600160a01b0384166200042b565b60008181526001830160205260408120548015620004205760006200034e60018362000598565b8554909150600090620003649060019062000598565b9050818114620003d057600086600001828154811062000388576200038862000582565b9060005260206000200154905080876000018481548110620003ae57620003ae62000582565b6000918252602080832090910192909255918252600188019052604090208390555b8554869080620003e457620003e4620005ba565b6001900381819060005260206000200160009055905585600101600086815260200190815260200160002060009055600193505050506200030a565b60009150506200030a565b600081815260018301602052604081205462000474575081546001818101845560008481526020808220909301849055845484825282860190935260409020919091556200030a565b5060006200030a565b634e487b7160e01b600052604160045260246000fd5b80516001600160a01b0381168114620004ab57600080fd5b919050565b60006020808385031215620004c457600080fd5b82516001600160401b0380821115620004dc57600080fd5b818501915085601f830112620004f157600080fd5b8151818111156200050657620005066200047d565b8060051b604051601f19603f830116810181811085821117156200052e576200052e6200047d565b6040529182528482019250838101850191888311156200054d57600080fd5b938501935b828510156200057657620005668562000493565b8452938501939285019262000552565b98975050505050505050565b634e487b7160e01b600052603260045260246000fd5b818103818111156200030a57634e487b7160e01b600052601160045260246000fd5b634e487b7160e01b600052603160045260246000fd5b6110c780620005e06000396000f3fe608060405234801561001057600080fd5b50600436106100885760003560e01c80637a2dbcbc1161005b5780637a2dbcbc146100f45780638da5cb5b1461010757806391a2749a1461012f578063f2fde38b1461014257600080fd5b80631ce2b1421461008d5780632451a627146100a257806331b89ff3146100c057806379ba5097146100ec575b600080fd5b6100a061009b366004610c6b565b610155565b005b6100aa6102ca565b6040516100b79190610ce0565b60405180910390f35b6100d36100ce366004610d50565b6102db565b60405167ffffffffffffffff90911681526020016100b7565b6100a061042c565b6100d3610102366004610d50565b61052e565b60005460405173ffffffffffffffffffffffffffffffffffffffff90911681526020016100b7565b6100a061013d366004610eeb565b610712565b6100a0610150366004610f92565b610726565b61015d610737565b60005b818110156102c5573683838381811061017b5761017b610faf565b604002919091019150600090506004816101986020850185610fde565b67ffffffffffffffff1681526020810191909152604001600020805490915073ffffffffffffffffffffffffffffffffffffffff1615610204576040517fbb16aec100000000000000000000000000000000000000000000000000000000815260040160405180910390fd5b6102146040830160208401610f92565b81547fffffffffffffffffffffffff00000000000000000000000000000000000000001673ffffffffffffffffffffffffffffffffffffffff919091161781556102616020830183610fde565b815460405173ffffffffffffffffffffffffffffffffffffffff909116815267ffffffffffffffff91909116907f89d2355e2829b1e15855fec87fb400638aebc9f03728949d702d3b5d4ea999549060200160405180910390a25050600101610160565b505050565b60606102d660026107ba565b905090565b67ffffffffffffffff831660009081526005602052604080822090518291906103079086908690610ffb565b9081526040519081900360200190205467ffffffffffffffff16905060008190036104225767ffffffffffffffff851660009081526004602052604090205473ffffffffffffffffffffffffffffffffffffffff1680156104205773ffffffffffffffffffffffffffffffffffffffff811663856c824761038a86880188610f92565b6040517fffffffff0000000000000000000000000000000000000000000000000000000060e084901b16815273ffffffffffffffffffffffffffffffffffffffff9091166004820152602401602060405180830381865afa1580156103f3573d6000803e3d6000fd5b505050506040513d601f19601f82011682018060405250810190610417919061100b565b92505050610425565b505b90505b9392505050565b60015473ffffffffffffffffffffffffffffffffffffffff1633146104b2576040517f08c379a000000000000000000000000000000000000000000000000000000000815260206004820152601660248201527f4d7573742062652070726f706f736564206f776e65720000000000000000000060448201526064015b60405180910390fd5b60008054337fffffffffffffffffffffffff00000000000000000000000000000000000000008083168217845560018054909116905560405173ffffffffffffffffffffffffffffffffffffffff90921692909183917f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e091a350565b600061053b6002336107c7565b610573576040517fd86ad9cf0000000000000000000000000000000000000000000000000000000081523360048201526024016104a9565b67ffffffffffffffff8416600090815260056020526040808220905161059c9086908690610ffb565b90815260405190819003602001902080549091506000906105c89067ffffffffffffffff166001611057565b90508067ffffffffffffffff166000036106d75767ffffffffffffffff861660009081526004602052604090205473ffffffffffffffffffffffffffffffffffffffff1680156106d55773ffffffffffffffffffffffffffffffffffffffff811663856c824761063a87890189610f92565b6040517fffffffff0000000000000000000000000000000000000000000000000000000060e084901b16815273ffffffffffffffffffffffffffffffffffffffff9091166004820152602401602060405180830381865afa1580156106a3573d6000803e3d6000fd5b505050506040513d601f19601f820116820180604052508101906106c7919061100b565b6106d2906001611057565b91505b505b81547fffffffffffffffffffffffffffffffffffffffffffffffff00000000000000001667ffffffffffffffff821617909155949350505050565b61071a610737565b610723816107fb565b50565b61072e610737565b6107238161098d565b60005473ffffffffffffffffffffffffffffffffffffffff1633146107b8576040517f08c379a000000000000000000000000000000000000000000000000000000000815260206004820152601660248201527f4f6e6c792063616c6c61626c65206279206f776e65720000000000000000000060448201526064016104a9565b565b6060600061042583610a82565b73ffffffffffffffffffffffffffffffffffffffff8116600090815260018301602052604081205415155b90505b92915050565b602081015160005b815181101561089657600082828151811061082057610820610faf565b6020026020010151905061083e816002610ade90919063ffffffff16565b1561088d5760405173ffffffffffffffffffffffffffffffffffffffff821681527fc3803387881faad271c47728894e3e36fac830ffc8602ca6fc07733cbda775809060200160405180910390a15b50600101610803565b50815160005b81518110156109875760008282815181106108b9576108b9610faf565b60200260200101519050600073ffffffffffffffffffffffffffffffffffffffff168173ffffffffffffffffffffffffffffffffffffffff1603610929576040517f8579befe00000000000000000000000000000000000000000000000000000000815260040160405180910390fd5b610934600282610b00565b5060405173ffffffffffffffffffffffffffffffffffffffff821681527feb1b9b92e50b7f88f9ff25d56765095ac6e91540eee214906f4036a908ffbdef9060200160405180910390a15060010161089c565b50505050565b3373ffffffffffffffffffffffffffffffffffffffff821603610a0c576040517f08c379a000000000000000000000000000000000000000000000000000000000815260206004820152601760248201527f43616e6e6f74207472616e7366657220746f2073656c6600000000000000000060448201526064016104a9565b600180547fffffffffffffffffffffffff00000000000000000000000000000000000000001673ffffffffffffffffffffffffffffffffffffffff83811691821790925560008054604051929316917fed8889f560326eb138920d842192f0eb3dd22b4f139c87a2c57538e05bae12789190a350565b606081600001805480602002602001604051908101604052809291908181526020018280548015610ad257602002820191906000526020600020905b815481526020019060010190808311610abe575b50505050509050919050565b60006107f28373ffffffffffffffffffffffffffffffffffffffff8416610b22565b60006107f28373ffffffffffffffffffffffffffffffffffffffff8416610c1c565b60008181526001830160205260408120548015610c0b576000610b46600183611078565b8554909150600090610b5a90600190611078565b9050818114610bbf576000866000018281548110610b7a57610b7a610faf565b9060005260206000200154905080876000018481548110610b9d57610b9d610faf565b6000918252602080832090910192909255918252600188019052604090208390555b8554869080610bd057610bd061108b565b6001900381819060005260206000200160009055905585600101600086815260200190815260200160002060009055600193505050506107f5565b60009150506107f5565b5092915050565b6000818152600183016020526040812054610c63575081546001818101845560008481526020808220909301849055845484825282860190935260409020919091556107f5565b5060006107f5565b60008060208385031215610c7e57600080fd5b823567ffffffffffffffff80821115610c9657600080fd5b818501915085601f830112610caa57600080fd5b813581811115610cb957600080fd5b8660208260061b8501011115610cce57600080fd5b60209290920196919550909350505050565b6020808252825182820181905260009190848201906040850190845b81811015610d2e57835173ffffffffffffffffffffffffffffffffffffffff1683529284019291840191600101610cfc565b50909695505050505050565b67ffffffffffffffff8116811461072357600080fd5b600080600060408486031215610d6557600080fd5b8335610d7081610d3a565b9250602084013567ffffffffffffffff80821115610d8d57600080fd5b818601915086601f830112610da157600080fd5b813581811115610db057600080fd5b876020828501011115610dc257600080fd5b6020830194508093505050509250925092565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052604160045260246000fd5b73ffffffffffffffffffffffffffffffffffffffff8116811461072357600080fd5b600082601f830112610e3757600080fd5b8135602067ffffffffffffffff80831115610e5457610e54610dd5565b8260051b6040517fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe0603f83011681018181108482111715610e9757610e97610dd5565b6040529384526020818701810194908101925087851115610eb757600080fd5b6020870191505b84821015610ee0578135610ed181610e04565b83529183019190830190610ebe565b979650505050505050565b600060208284031215610efd57600080fd5b813567ffffffffffffffff80821115610f1557600080fd5b9083019060408286031215610f2957600080fd5b604051604081018181108382111715610f4457610f44610dd5565b604052823582811115610f5657600080fd5b610f6287828601610e26565b825250602083013582811115610f7757600080fd5b610f8387828601610e26565b60208301525095945050505050565b600060208284031215610fa457600080fd5b813561042581610e04565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052603260045260246000fd5b600060208284031215610ff057600080fd5b813561042581610d3a565b8183823760009101908152919050565b60006020828403121561101d57600080fd5b815161042581610d3a565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052601160045260246000fd5b67ffffffffffffffff818116838216019080821115610c1557610c15611028565b818103818111156107f5576107f5611028565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052603160045260246000fdfea164736f6c6343000818000a",
 }
 
 var NonceManagerABI = NonceManagerMetaData.ABI
 
 var NonceManagerBin = NonceManagerMetaData.Bin
 
-func DeployNonceManager(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *types.Transaction, *NonceManager, error) {
+func DeployNonceManager(auth *bind.TransactOpts, backend bind.ContractBackend, authorizedCallers []common.Address) (common.Address, *types.Transaction, *NonceManager, error) {
 	parsed, err := NonceManagerMetaData.GetAbi()
 	if err != nil {
 		return common.Address{}, nil, nil, err
@@ -57,7 +62,7 @@ func DeployNonceManager(auth *bind.TransactOpts, backend bind.ContractBackend) (
 		return common.Address{}, nil, nil, errors.New("GetABI returned nil")
 	}
 
-	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(NonceManagerBin), backend)
+	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(NonceManagerBin), backend, authorizedCallers)
 	if err != nil {
 		return common.Address{}, nil, nil, err
 	}
@@ -180,26 +185,26 @@ func (_NonceManager *NonceManagerTransactorRaw) Transact(opts *bind.TransactOpts
 	return _NonceManager.Contract.contract.Transact(opts, method, params...)
 }
 
-func (_NonceManager *NonceManagerCaller) GetOnRamp(opts *bind.CallOpts) (common.Address, error) {
+func (_NonceManager *NonceManagerCaller) GetAllAuthorizedCallers(opts *bind.CallOpts) ([]common.Address, error) {
 	var out []interface{}
-	err := _NonceManager.contract.Call(opts, &out, "getOnRamp")
+	err := _NonceManager.contract.Call(opts, &out, "getAllAuthorizedCallers")
 
 	if err != nil {
-		return *new(common.Address), err
+		return *new([]common.Address), err
 	}
 
-	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
+	out0 := *abi.ConvertType(out[0], new([]common.Address)).(*[]common.Address)
 
 	return out0, err
 
 }
 
-func (_NonceManager *NonceManagerSession) GetOnRamp() (common.Address, error) {
-	return _NonceManager.Contract.GetOnRamp(&_NonceManager.CallOpts)
+func (_NonceManager *NonceManagerSession) GetAllAuthorizedCallers() ([]common.Address, error) {
+	return _NonceManager.Contract.GetAllAuthorizedCallers(&_NonceManager.CallOpts)
 }
 
-func (_NonceManager *NonceManagerCallerSession) GetOnRamp() (common.Address, error) {
-	return _NonceManager.Contract.GetOnRamp(&_NonceManager.CallOpts)
+func (_NonceManager *NonceManagerCallerSession) GetAllAuthorizedCallers() ([]common.Address, error) {
+	return _NonceManager.Contract.GetAllAuthorizedCallers(&_NonceManager.CallOpts)
 }
 
 func (_NonceManager *NonceManagerCaller) GetOutboundNonce(opts *bind.CallOpts, destChainSelector uint64, sender []byte) (uint64, error) {
@@ -222,28 +227,6 @@ func (_NonceManager *NonceManagerSession) GetOutboundNonce(destChainSelector uin
 
 func (_NonceManager *NonceManagerCallerSession) GetOutboundNonce(destChainSelector uint64, sender []byte) (uint64, error) {
 	return _NonceManager.Contract.GetOutboundNonce(&_NonceManager.CallOpts, destChainSelector, sender)
-}
-
-func (_NonceManager *NonceManagerCaller) GetPrevRamps(opts *bind.CallOpts, chainSelector uint64) (NonceManagerPreviousRamps, error) {
-	var out []interface{}
-	err := _NonceManager.contract.Call(opts, &out, "getPrevRamps", chainSelector)
-
-	if err != nil {
-		return *new(NonceManagerPreviousRamps), err
-	}
-
-	out0 := *abi.ConvertType(out[0], new(NonceManagerPreviousRamps)).(*NonceManagerPreviousRamps)
-
-	return out0, err
-
-}
-
-func (_NonceManager *NonceManagerSession) GetPrevRamps(chainSelector uint64) (NonceManagerPreviousRamps, error) {
-	return _NonceManager.Contract.GetPrevRamps(&_NonceManager.CallOpts, chainSelector)
-}
-
-func (_NonceManager *NonceManagerCallerSession) GetPrevRamps(chainSelector uint64) (NonceManagerPreviousRamps, error) {
-	return _NonceManager.Contract.GetPrevRamps(&_NonceManager.CallOpts, chainSelector)
 }
 
 func (_NonceManager *NonceManagerCaller) Owner(opts *bind.CallOpts) (common.Address, error) {
@@ -280,16 +263,28 @@ func (_NonceManager *NonceManagerTransactorSession) AcceptOwnership() (*types.Tr
 	return _NonceManager.Contract.AcceptOwnership(&_NonceManager.TransactOpts)
 }
 
-func (_NonceManager *NonceManagerTransactor) ApplyRampUpdates(opts *bind.TransactOpts, onRamp common.Address, prevRampsArgs []NonceManagerPreviousRampsArgs) (*types.Transaction, error) {
-	return _NonceManager.contract.Transact(opts, "applyRampUpdates", onRamp, prevRampsArgs)
+func (_NonceManager *NonceManagerTransactor) ApplyAuthorizedCallerUpdates(opts *bind.TransactOpts, authorizedCallerArgs AuthorizedCallersAuthorizedCallerArgs) (*types.Transaction, error) {
+	return _NonceManager.contract.Transact(opts, "applyAuthorizedCallerUpdates", authorizedCallerArgs)
 }
 
-func (_NonceManager *NonceManagerSession) ApplyRampUpdates(onRamp common.Address, prevRampsArgs []NonceManagerPreviousRampsArgs) (*types.Transaction, error) {
-	return _NonceManager.Contract.ApplyRampUpdates(&_NonceManager.TransactOpts, onRamp, prevRampsArgs)
+func (_NonceManager *NonceManagerSession) ApplyAuthorizedCallerUpdates(authorizedCallerArgs AuthorizedCallersAuthorizedCallerArgs) (*types.Transaction, error) {
+	return _NonceManager.Contract.ApplyAuthorizedCallerUpdates(&_NonceManager.TransactOpts, authorizedCallerArgs)
 }
 
-func (_NonceManager *NonceManagerTransactorSession) ApplyRampUpdates(onRamp common.Address, prevRampsArgs []NonceManagerPreviousRampsArgs) (*types.Transaction, error) {
-	return _NonceManager.Contract.ApplyRampUpdates(&_NonceManager.TransactOpts, onRamp, prevRampsArgs)
+func (_NonceManager *NonceManagerTransactorSession) ApplyAuthorizedCallerUpdates(authorizedCallerArgs AuthorizedCallersAuthorizedCallerArgs) (*types.Transaction, error) {
+	return _NonceManager.Contract.ApplyAuthorizedCallerUpdates(&_NonceManager.TransactOpts, authorizedCallerArgs)
+}
+
+func (_NonceManager *NonceManagerTransactor) ApplyPreviousRampsUpdates(opts *bind.TransactOpts, prevRampsArgs []NonceManagerPreviousRampsArgs) (*types.Transaction, error) {
+	return _NonceManager.contract.Transact(opts, "applyPreviousRampsUpdates", prevRampsArgs)
+}
+
+func (_NonceManager *NonceManagerSession) ApplyPreviousRampsUpdates(prevRampsArgs []NonceManagerPreviousRampsArgs) (*types.Transaction, error) {
+	return _NonceManager.Contract.ApplyPreviousRampsUpdates(&_NonceManager.TransactOpts, prevRampsArgs)
+}
+
+func (_NonceManager *NonceManagerTransactorSession) ApplyPreviousRampsUpdates(prevRampsArgs []NonceManagerPreviousRampsArgs) (*types.Transaction, error) {
+	return _NonceManager.Contract.ApplyPreviousRampsUpdates(&_NonceManager.TransactOpts, prevRampsArgs)
 }
 
 func (_NonceManager *NonceManagerTransactor) IncrementOutboundNonce(opts *bind.TransactOpts, destChainSelector uint64, sender []byte) (*types.Transaction, error) {
@@ -316,8 +311,8 @@ func (_NonceManager *NonceManagerTransactorSession) TransferOwnership(to common.
 	return _NonceManager.Contract.TransferOwnership(&_NonceManager.TransactOpts, to)
 }
 
-type NonceManagerOnRampUpdatedIterator struct {
-	Event *NonceManagerOnRampUpdated
+type NonceManagerAuthorizedCallerAddedIterator struct {
+	Event *NonceManagerAuthorizedCallerAdded
 
 	contract *bind.BoundContract
 	event    string
@@ -328,7 +323,7 @@ type NonceManagerOnRampUpdatedIterator struct {
 	fail error
 }
 
-func (it *NonceManagerOnRampUpdatedIterator) Next() bool {
+func (it *NonceManagerAuthorizedCallerAddedIterator) Next() bool {
 
 	if it.fail != nil {
 		return false
@@ -337,7 +332,7 @@ func (it *NonceManagerOnRampUpdatedIterator) Next() bool {
 	if it.done {
 		select {
 		case log := <-it.logs:
-			it.Event = new(NonceManagerOnRampUpdated)
+			it.Event = new(NonceManagerAuthorizedCallerAdded)
 			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
 				it.fail = err
 				return false
@@ -352,7 +347,7 @@ func (it *NonceManagerOnRampUpdatedIterator) Next() bool {
 
 	select {
 	case log := <-it.logs:
-		it.Event = new(NonceManagerOnRampUpdated)
+		it.Event = new(NonceManagerAuthorizedCallerAdded)
 		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
 			it.fail = err
 			return false
@@ -367,32 +362,32 @@ func (it *NonceManagerOnRampUpdatedIterator) Next() bool {
 	}
 }
 
-func (it *NonceManagerOnRampUpdatedIterator) Error() error {
+func (it *NonceManagerAuthorizedCallerAddedIterator) Error() error {
 	return it.fail
 }
 
-func (it *NonceManagerOnRampUpdatedIterator) Close() error {
+func (it *NonceManagerAuthorizedCallerAddedIterator) Close() error {
 	it.sub.Unsubscribe()
 	return nil
 }
 
-type NonceManagerOnRampUpdated struct {
-	OnRamp common.Address
+type NonceManagerAuthorizedCallerAdded struct {
+	Caller common.Address
 	Raw    types.Log
 }
 
-func (_NonceManager *NonceManagerFilterer) FilterOnRampUpdated(opts *bind.FilterOpts) (*NonceManagerOnRampUpdatedIterator, error) {
+func (_NonceManager *NonceManagerFilterer) FilterAuthorizedCallerAdded(opts *bind.FilterOpts) (*NonceManagerAuthorizedCallerAddedIterator, error) {
 
-	logs, sub, err := _NonceManager.contract.FilterLogs(opts, "OnRampUpdated")
+	logs, sub, err := _NonceManager.contract.FilterLogs(opts, "AuthorizedCallerAdded")
 	if err != nil {
 		return nil, err
 	}
-	return &NonceManagerOnRampUpdatedIterator{contract: _NonceManager.contract, event: "OnRampUpdated", logs: logs, sub: sub}, nil
+	return &NonceManagerAuthorizedCallerAddedIterator{contract: _NonceManager.contract, event: "AuthorizedCallerAdded", logs: logs, sub: sub}, nil
 }
 
-func (_NonceManager *NonceManagerFilterer) WatchOnRampUpdated(opts *bind.WatchOpts, sink chan<- *NonceManagerOnRampUpdated) (event.Subscription, error) {
+func (_NonceManager *NonceManagerFilterer) WatchAuthorizedCallerAdded(opts *bind.WatchOpts, sink chan<- *NonceManagerAuthorizedCallerAdded) (event.Subscription, error) {
 
-	logs, sub, err := _NonceManager.contract.WatchLogs(opts, "OnRampUpdated")
+	logs, sub, err := _NonceManager.contract.WatchLogs(opts, "AuthorizedCallerAdded")
 	if err != nil {
 		return nil, err
 	}
@@ -402,8 +397,8 @@ func (_NonceManager *NonceManagerFilterer) WatchOnRampUpdated(opts *bind.WatchOp
 			select {
 			case log := <-logs:
 
-				event := new(NonceManagerOnRampUpdated)
-				if err := _NonceManager.contract.UnpackLog(event, "OnRampUpdated", log); err != nil {
+				event := new(NonceManagerAuthorizedCallerAdded)
+				if err := _NonceManager.contract.UnpackLog(event, "AuthorizedCallerAdded", log); err != nil {
 					return err
 				}
 				event.Raw = log
@@ -424,9 +419,126 @@ func (_NonceManager *NonceManagerFilterer) WatchOnRampUpdated(opts *bind.WatchOp
 	}), nil
 }
 
-func (_NonceManager *NonceManagerFilterer) ParseOnRampUpdated(log types.Log) (*NonceManagerOnRampUpdated, error) {
-	event := new(NonceManagerOnRampUpdated)
-	if err := _NonceManager.contract.UnpackLog(event, "OnRampUpdated", log); err != nil {
+func (_NonceManager *NonceManagerFilterer) ParseAuthorizedCallerAdded(log types.Log) (*NonceManagerAuthorizedCallerAdded, error) {
+	event := new(NonceManagerAuthorizedCallerAdded)
+	if err := _NonceManager.contract.UnpackLog(event, "AuthorizedCallerAdded", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+type NonceManagerAuthorizedCallerRemovedIterator struct {
+	Event *NonceManagerAuthorizedCallerRemoved
+
+	contract *bind.BoundContract
+	event    string
+
+	logs chan types.Log
+	sub  ethereum.Subscription
+	done bool
+	fail error
+}
+
+func (it *NonceManagerAuthorizedCallerRemovedIterator) Next() bool {
+
+	if it.fail != nil {
+		return false
+	}
+
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(NonceManagerAuthorizedCallerRemoved)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+
+	select {
+	case log := <-it.logs:
+		it.Event = new(NonceManagerAuthorizedCallerRemoved)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+func (it *NonceManagerAuthorizedCallerRemovedIterator) Error() error {
+	return it.fail
+}
+
+func (it *NonceManagerAuthorizedCallerRemovedIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+type NonceManagerAuthorizedCallerRemoved struct {
+	Caller common.Address
+	Raw    types.Log
+}
+
+func (_NonceManager *NonceManagerFilterer) FilterAuthorizedCallerRemoved(opts *bind.FilterOpts) (*NonceManagerAuthorizedCallerRemovedIterator, error) {
+
+	logs, sub, err := _NonceManager.contract.FilterLogs(opts, "AuthorizedCallerRemoved")
+	if err != nil {
+		return nil, err
+	}
+	return &NonceManagerAuthorizedCallerRemovedIterator{contract: _NonceManager.contract, event: "AuthorizedCallerRemoved", logs: logs, sub: sub}, nil
+}
+
+func (_NonceManager *NonceManagerFilterer) WatchAuthorizedCallerRemoved(opts *bind.WatchOpts, sink chan<- *NonceManagerAuthorizedCallerRemoved) (event.Subscription, error) {
+
+	logs, sub, err := _NonceManager.contract.WatchLogs(opts, "AuthorizedCallerRemoved")
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+
+				event := new(NonceManagerAuthorizedCallerRemoved)
+				if err := _NonceManager.contract.UnpackLog(event, "AuthorizedCallerRemoved", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+func (_NonceManager *NonceManagerFilterer) ParseAuthorizedCallerRemoved(log types.Log) (*NonceManagerAuthorizedCallerRemoved, error) {
+	event := new(NonceManagerAuthorizedCallerRemoved)
+	if err := _NonceManager.contract.UnpackLog(event, "AuthorizedCallerRemoved", log); err != nil {
 		return nil, err
 	}
 	event.Raw = log
@@ -835,8 +947,10 @@ func (_NonceManager *NonceManagerFilterer) ParsePreviousOnRampUpdated(log types.
 
 func (_NonceManager *NonceManager) ParseLog(log types.Log) (generated.AbigenLog, error) {
 	switch log.Topics[0] {
-	case _NonceManager.abi.Events["OnRampUpdated"].ID:
-		return _NonceManager.ParseOnRampUpdated(log)
+	case _NonceManager.abi.Events["AuthorizedCallerAdded"].ID:
+		return _NonceManager.ParseAuthorizedCallerAdded(log)
+	case _NonceManager.abi.Events["AuthorizedCallerRemoved"].ID:
+		return _NonceManager.ParseAuthorizedCallerRemoved(log)
 	case _NonceManager.abi.Events["OwnershipTransferRequested"].ID:
 		return _NonceManager.ParseOwnershipTransferRequested(log)
 	case _NonceManager.abi.Events["OwnershipTransferred"].ID:
@@ -849,8 +963,12 @@ func (_NonceManager *NonceManager) ParseLog(log types.Log) (generated.AbigenLog,
 	}
 }
 
-func (NonceManagerOnRampUpdated) Topic() common.Hash {
-	return common.HexToHash("0xb3d81ef1b70b9650b688ffeba63e1b58c36aa4c936ba7d84a295f3b16045b314")
+func (NonceManagerAuthorizedCallerAdded) Topic() common.Hash {
+	return common.HexToHash("0xeb1b9b92e50b7f88f9ff25d56765095ac6e91540eee214906f4036a908ffbdef")
+}
+
+func (NonceManagerAuthorizedCallerRemoved) Topic() common.Hash {
+	return common.HexToHash("0xc3803387881faad271c47728894e3e36fac830ffc8602ca6fc07733cbda77580")
 }
 
 func (NonceManagerOwnershipTransferRequested) Topic() common.Hash {
@@ -870,27 +988,33 @@ func (_NonceManager *NonceManager) Address() common.Address {
 }
 
 type NonceManagerInterface interface {
-	GetOnRamp(opts *bind.CallOpts) (common.Address, error)
+	GetAllAuthorizedCallers(opts *bind.CallOpts) ([]common.Address, error)
 
 	GetOutboundNonce(opts *bind.CallOpts, destChainSelector uint64, sender []byte) (uint64, error)
-
-	GetPrevRamps(opts *bind.CallOpts, chainSelector uint64) (NonceManagerPreviousRamps, error)
 
 	Owner(opts *bind.CallOpts) (common.Address, error)
 
 	AcceptOwnership(opts *bind.TransactOpts) (*types.Transaction, error)
 
-	ApplyRampUpdates(opts *bind.TransactOpts, onRamp common.Address, prevRampsArgs []NonceManagerPreviousRampsArgs) (*types.Transaction, error)
+	ApplyAuthorizedCallerUpdates(opts *bind.TransactOpts, authorizedCallerArgs AuthorizedCallersAuthorizedCallerArgs) (*types.Transaction, error)
+
+	ApplyPreviousRampsUpdates(opts *bind.TransactOpts, prevRampsArgs []NonceManagerPreviousRampsArgs) (*types.Transaction, error)
 
 	IncrementOutboundNonce(opts *bind.TransactOpts, destChainSelector uint64, sender []byte) (*types.Transaction, error)
 
 	TransferOwnership(opts *bind.TransactOpts, to common.Address) (*types.Transaction, error)
 
-	FilterOnRampUpdated(opts *bind.FilterOpts) (*NonceManagerOnRampUpdatedIterator, error)
+	FilterAuthorizedCallerAdded(opts *bind.FilterOpts) (*NonceManagerAuthorizedCallerAddedIterator, error)
 
-	WatchOnRampUpdated(opts *bind.WatchOpts, sink chan<- *NonceManagerOnRampUpdated) (event.Subscription, error)
+	WatchAuthorizedCallerAdded(opts *bind.WatchOpts, sink chan<- *NonceManagerAuthorizedCallerAdded) (event.Subscription, error)
 
-	ParseOnRampUpdated(log types.Log) (*NonceManagerOnRampUpdated, error)
+	ParseAuthorizedCallerAdded(log types.Log) (*NonceManagerAuthorizedCallerAdded, error)
+
+	FilterAuthorizedCallerRemoved(opts *bind.FilterOpts) (*NonceManagerAuthorizedCallerRemovedIterator, error)
+
+	WatchAuthorizedCallerRemoved(opts *bind.WatchOpts, sink chan<- *NonceManagerAuthorizedCallerRemoved) (event.Subscription, error)
+
+	ParseAuthorizedCallerRemoved(log types.Log) (*NonceManagerAuthorizedCallerRemoved, error)
 
 	FilterOwnershipTransferRequested(opts *bind.FilterOpts, from []common.Address, to []common.Address) (*NonceManagerOwnershipTransferRequestedIterator, error)
 
