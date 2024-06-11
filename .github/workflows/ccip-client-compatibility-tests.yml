@@ -4,8 +4,8 @@ on:
     tags:
       - '*'
   # TODO: Uncomment when CCIP-2255 is resolved
-  # schedule:
-  #   - cron: "30 5 * * *"
+   schedule:
+     - cron: "30 5 * * *"
   workflow_dispatch:
 
 env:
