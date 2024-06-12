@@ -54,6 +54,7 @@ contract EVM2EVMMultiOffRampSetup is TokenSetup, PriceRegistrySetup, MultiOCR3Ba
 
   bytes32 internal s_configDigestExec;
   bytes32 internal s_configDigestCommit;
+  uint64 internal constant s_offchainConfigVersion = 3;
   uint8 internal constant s_F = 1;
 
   uint40 internal s_latestEpochAndRound;
