@@ -670,14 +670,6 @@ func (ccipModule *CCIPCommon) SyncUSDCDomain(destTransmitter *contracts.TokenTra
 		if err != nil {
 			return err
 		}
-<<<<<<< HEAD
-=======
-
-		err = destPools[i].MintUSDCToUSDCPool()
-		if err != nil {
-			return err
-		}
->>>>>>> b556a07a46199ff61e915aa1bf9ef616e9d71e3a
 	}
 
 	return ccipModule.ChainClient.WaitForEvents()
