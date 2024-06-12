@@ -2788,7 +2788,7 @@ func (lane *CCIPLane) Multicall(noOfRequests int, multiSendAddr common.Address) 
 			if j < len(lane.Source.Common.BridgeTokens) {
 				token = lane.Source.Common.BridgeTokens[j]
 			}
-			err = token.Transfer(token.OwnerWallet, multiSendAddr.Hex(), amount)
+			err = token.Transfer(lane.SourceChain.GetDefaultWallet(), multiSendAddr.Hex(), amount)
 			if err != nil {
 				return err
 			}

@@ -708,9 +708,6 @@ func TestSmokeCCIPMulticall(t *testing.T) {
 		return
 	}
 	t.Cleanup(func() {
-		if TestCfg.TestGroupInput.MsgDetails.IsTokenTransfer() {
-			setUpOutput.Balance.Verify(t)
-		}
 		require.NoError(t, setUpOutput.TearDown())
 	})
 

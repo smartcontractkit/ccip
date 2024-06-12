@@ -347,6 +347,18 @@ func (c *CCIPTestConfig) SetOCRParams() error {
 	return nil
 }
 
+// TestConfigOverrideOption is a function that modifies the test config and overrides any values passed in by test files
+// This is useful for setting up test specific configurations.
+type TestConfigOverrideOption func(*CCIPTestConfig) string
+
+// WithCCIPOwnerTokens sets the number of tokens to be deployed and owned by the same account that owns all CCIP contracts
+func WithCCIPOwnerTokens() TestConfigOverrideOption {
+	return func(c *CCIPTestConfig) string {
+		c.TestGroupInput.TokenConfig.CCIPOwnerTokens = pointer.ToBool(true)
+		return "CCIPOwnerTokens set to true"
+	}
+}
+
 // NewCCIPTestConfig reads the CCIP test config from TOML files, applies any overrides, and configures the test environment
 func NewCCIPTestConfig(t *testing.T, lggr zerolog.Logger, tType string, overrides ...TestConfigOverrideOption) *CCIPTestConfig {
 	testCfg := ccipconfig.GlobalTestConfig()
@@ -408,18 +420,6 @@ func NewCCIPTestConfig(t *testing.T, lggr zerolog.Logger, tType string, override
 	}
 
 	return ccipTestConfig
-}
-
-// TestConfigOverrideOption is a function that modifies the test config and overrides any values passed in by test files
-// This is useful for setting up test specific configurations.
-type TestConfigOverrideOption func(*CCIPTestConfig) string
-
-// WithCCIPOwnerTokens sets the number of tokens to be deployed and owned by the same account that owns all CCIP contracts
-func WithCCIPOwnerTokens() TestConfigOverrideOption {
-	return func(c *CCIPTestConfig) string {
-		c.TestGroupInput.TokenConfig.CCIPOwnerTokens = pointer.ToBool(true)
-		return "CCIPOwnerTokens set to true"
-	}
 }
 
 type BiDirectionalLaneConfig struct {
