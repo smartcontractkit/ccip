@@ -1002,10 +1002,8 @@ func (ccipModule *CCIPCommon) DeployContracts(
 		ccipModule.BridgeTokenPools = pools
 	}
 
-	if ccipModule.PriceRegistry == nil {
-		if ccipModule.ExistingDeployment {
-			return fmt.Errorf("price registry contract address is not provided in lane config")
-		}
+	// no need to have price registry for existing deployment, we consider that it's already deployed
+	if ccipModule.PriceRegistry == nil && !ccipModule.ExistingDeployment {
 		// we will update the price updates later based on source and dest PriceUpdates
 		ccipModule.PriceRegistry, err = cd.DeployPriceRegistry(
 			[]common.Address{
@@ -1033,11 +1031,9 @@ func (ccipModule *CCIPCommon) DeployContracts(
 	}
 
 	// if the version is after 1.4.0, we need to deploy TokenAdminRegistry
-	if contracts.NeedTokenAdminRegistry() {
+	// no need to have token admin registry for existing deployment, we consider that it's already deployed
+	if contracts.NeedTokenAdminRegistry() && !ccipModule.ExistingDeployment {
 		if ccipModule.TokenAdminRegistry == nil {
-			if ccipModule.ExistingDeployment {
-				return fmt.Errorf("token admin registry contract address is not provided in lane config")
-			}
 			// deploy token admin registry
 			ccipModule.TokenAdminRegistry, err = cd.DeployTokenAdminRegistry()
 			if err != nil {
