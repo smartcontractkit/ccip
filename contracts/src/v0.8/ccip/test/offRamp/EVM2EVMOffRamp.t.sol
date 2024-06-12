@@ -813,6 +813,7 @@ contract EVM2EVMOffRamp_executeSingleMessage is EVM2EVMOffRampSetup {
           originalSender: abi.encode(message.sender),
           receiver: message.receiver,
           amount: message.tokenAmounts[0].amount,
+          localToken: s_destTokenBySourceToken[message.tokenAmounts[0].token],
           remoteChainSelector: SOURCE_CHAIN_SELECTOR,
           sourcePoolAddress: sourceTokenData.sourcePoolAddress,
           sourcePoolData: sourceTokenData.extraData,
@@ -1298,8 +1299,8 @@ contract EVM2EVMOffRamp__trialExecute is EVM2EVMOffRampSetup {
   }
 }
 
-contract EVM2EVMOffRamp__releaseOfMintToken is EVM2EVMOffRampSetup {
-  function test__releaseOfMintToken_Success() public {
+contract EVM2EVMOffRamp__releaseOrMintToken is EVM2EVMOffRampSetup {
+  function test__releaseOrMintToken_Success() public {
     uint256 amount = 123123;
     address token = s_sourceTokens[0];
     bytes memory originalSender = abi.encode(OWNER);
@@ -1322,6 +1323,7 @@ contract EVM2EVMOffRamp__releaseOfMintToken is EVM2EVMOffRampSetup {
           originalSender: originalSender,
           receiver: OWNER,
           amount: amount,
+          localToken: s_destTokenBySourceToken[token],
           remoteChainSelector: SOURCE_CHAIN_SELECTOR,
           sourcePoolAddress: sourceTokenData.sourcePoolAddress,
           sourcePoolData: sourceTokenData.extraData,
@@ -1335,7 +1337,7 @@ contract EVM2EVMOffRamp__releaseOfMintToken is EVM2EVMOffRampSetup {
     assertEq(startingBalance + amount, dstToken1.balanceOf(OWNER));
   }
 
-  function test__releaseOfMintToken_NotACompatiblePool_Revert() public {
+  function test__releaseOrMintToken_NotACompatiblePool_Revert() public {
     uint256 amount = 123123;
     address token = s_sourceTokens[0];
     address destToken = s_destTokenBySourceToken[token];
@@ -1376,7 +1378,7 @@ contract EVM2EVMOffRamp__releaseOfMintToken is EVM2EVMOffRampSetup {
     s_offRamp.releaseOrMintToken(amount, originalSender, OWNER, sourceTokenData, offchainTokenData);
   }
 
-  function test__releaseOfMintToken_TokenHandlingError_revert_Revert() public {
+  function test__releaseOrMintToken_TokenHandlingError_revert_Revert() public {
     address receiver = makeAddr("receiver");
     uint256 amount = 123123;
     address token = s_sourceTokens[0];
@@ -1423,6 +1425,7 @@ contract EVM2EVMOffRamp__releaseOrMintTokens is EVM2EVMOffRampSetup {
           originalSender: originalSender,
           receiver: OWNER,
           amount: srcTokenAmounts[0].amount,
+          localToken: s_destTokenBySourceToken[srcTokenAmounts[0].token],
           remoteChainSelector: SOURCE_CHAIN_SELECTOR,
           sourcePoolAddress: sourceTokenData.sourcePoolAddress,
           sourcePoolData: sourceTokenData.extraData,
@@ -1459,6 +1462,7 @@ contract EVM2EVMOffRamp__releaseOrMintTokens is EVM2EVMOffRampSetup {
           originalSender: originalSender,
           receiver: OWNER,
           amount: amount,
+          localToken: s_destTokenBySourceToken[srcTokenAmounts[0].token],
           remoteChainSelector: SOURCE_CHAIN_SELECTOR,
           sourcePoolAddress: sourceTokenData.sourcePoolAddress,
           sourcePoolData: sourceTokenData.extraData,
@@ -1549,6 +1553,7 @@ contract EVM2EVMOffRamp__releaseOrMintTokens is EVM2EVMOffRampSetup {
           originalSender: originalSender,
           receiver: OWNER,
           amount: amount,
+          localToken: s_destTokenBySourceToken[srcTokenAmounts[0].token],
           remoteChainSelector: SOURCE_CHAIN_SELECTOR,
           sourcePoolAddress: sourceTokenData.sourcePoolAddress,
           sourcePoolData: sourceTokenData.extraData,

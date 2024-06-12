@@ -738,6 +738,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
             originalSender: messageRoute.sender,
             receiver: messageRoute.receiver,
             amount: sourceTokenAmounts[i].amount,
+            localToken: localToken,
             remoteChainSelector: messageRoute.sourceChainSelector,
             sourcePoolAddress: sourceTokenData.sourcePoolAddress,
             sourcePoolData: sourceTokenData.extraData,

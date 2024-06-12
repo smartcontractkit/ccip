@@ -42,6 +42,7 @@ library Pool {
     uint256 amount; //                The amount of tokens to release or mint, denominated in the source token's decimals
     /// @dev WARNING: sourcePoolAddress should be checked prior to any processing of funds. Make sure it matches the
     /// expected pool address for the given remoteChainSelector.
+    address localToken; //            The address on this chain of the token to release or mint
     bytes sourcePoolAddress; //       The address of the source pool, abi encoded in the case of EVM chains
     bytes sourcePoolData; //          The data received from the source pool to process the release or mint
     /// @dev WARNING: offchainTokenData is untrusted data.

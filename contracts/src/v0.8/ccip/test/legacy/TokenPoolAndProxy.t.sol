@@ -236,6 +236,7 @@ contract TokenPoolAndProxyMigration is EVM2EVMOnRampSetup {
         remoteChainSelector: SOURCE_CHAIN_SELECTOR,
         receiver: OWNER,
         amount: AMOUNT,
+        localToken: address(s_token),
         sourcePoolAddress: abi.encode(s_sourcePool),
         sourcePoolData: "",
         offchainTokenData: ""
@@ -458,6 +459,7 @@ contract TokenPoolAndProxy is EVM2EVMOnRampSetup {
         remoteChainSelector: DEST_CHAIN_SELECTOR,
         originalSender: abi.encode(OWNER),
         amount: amount,
+        localToken: address(s_token),
         sourcePoolAddress: abi.encode(s_destPool),
         sourcePoolData: "",
         offchainTokenData: ""
@@ -482,6 +484,7 @@ contract TokenPoolAndProxy is EVM2EVMOnRampSetup {
         remoteChainSelector: DEST_CHAIN_SELECTOR,
         originalSender: abi.encode(OWNER),
         amount: amount,
+        localToken: address(s_token),
         sourcePoolAddress: abi.encode(s_destPool),
         sourcePoolData: "",
         offchainTokenData: ""

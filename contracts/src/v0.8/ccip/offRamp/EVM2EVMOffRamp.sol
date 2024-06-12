@@ -608,6 +608,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
           originalSender: originalSender,
           receiver: receiver,
           amount: sourceAmount,
+          localToken: localToken,
           remoteChainSelector: i_sourceChainSelector,
           sourcePoolAddress: sourceTokenData.sourcePoolAddress,
           sourcePoolData: sourceTokenData.extraData,

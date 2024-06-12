@@ -108,7 +108,7 @@ abstract contract TokenPool is IPool, OwnerIsCreator {
   }
 
   /// @inheritdoc IPool
-  function isSupportedToken(address token) external view virtual returns (bool) {
+  function isSupportedToken(address token) public view virtual returns (bool) {
     return token == address(i_token);
   }
 
@@ -154,7 +154,7 @@ abstract contract TokenPool is IPool, OwnerIsCreator {
   /// @dev This function should always be called before executing a lock or burn. Not doing so would allow
   /// for various exploits.
   function _validateLockOrBurn(Pool.LockOrBurnInV1 memory lockOrBurnIn) internal {
-    if (lockOrBurnIn.localToken != address(i_token)) revert InvalidToken(lockOrBurnIn.localToken);
+    if (!isSupportedToken(lockOrBurnIn.localToken)) revert InvalidToken(lockOrBurnIn.localToken);
     if (IRMN(i_rmnProxy).isCursed(bytes32(uint256(lockOrBurnIn.remoteChainSelector)))) revert CursedByRMN();
     _checkAllowList(lockOrBurnIn.originalSender);
 
@@ -163,6 +163,7 @@ abstract contract TokenPool is IPool, OwnerIsCreator {
   }
 
   /// @notice Validates the release or mint input for correctness on
+  /// - token to be released or minted
   /// - RMN curse status
   /// - if the sender is a valid offRamp
   /// - if the source pool is valid
@@ -171,6 +172,7 @@ abstract contract TokenPool is IPool, OwnerIsCreator {
   /// @dev This function should always be called before executing a lock or burn. Not doing so would allow
   /// for various exploits.
   function _validateReleaseOrMint(Pool.ReleaseOrMintInV1 memory releaseOrMintIn) internal {
+    if (!isSupportedToken(releaseOrMintIn.localToken)) revert InvalidToken(releaseOrMintIn.localToken);
     if (IRMN(i_rmnProxy).isCursed(bytes32(uint256(releaseOrMintIn.remoteChainSelector)))) revert CursedByRMN();
     _onlyOffRamp(releaseOrMintIn.remoteChainSelector);
 
