@@ -816,7 +816,13 @@ func (pool *TokenPool) GetRouter() (common.Address, error) {
 }
 
 func (pool *TokenPool) GetToken() (common.Address, error) {
-	return pool.Instance.Latest.PoolInterface.GetToken(nil)
+	if pool.Instance.V1_4_0 != nil && pool.Instance.V1_4_0.PoolInterface != nil {
+		return pool.Instance.V1_4_0.PoolInterface.GetToken(nil)
+	}
+	if pool.Instance.Latest != nil && pool.Instance.Latest.PoolInterface != nil {
+		return pool.Instance.Latest.PoolInterface.GetToken(nil)
+	}
+	return common.Address{}, fmt.Errorf("no pool found to get token")
 }
 
 func (pool *TokenPool) SetRebalancer(rebalancerAddress common.Address) error {
