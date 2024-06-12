@@ -83,7 +83,6 @@ func getPendingExecutedReports(ctx context.Context, ccipReader cciptypes.CCIPRea
 	}
 
 	// Put back in a single slice
-
 	sort.Slice(commitReports, func(i, j int) bool {
 		return commitReports[i].BlockNum < commitReports[j].BlockNum
 	})

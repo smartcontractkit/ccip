@@ -9,6 +9,9 @@ type counter[T any] struct {
 	count int
 }
 
+// MinObservationFilter provides a way to ensure a minimum number of observations for
+// some piece of data have occurred. It maintains an internal cache and provides a list
+// of valid or invalid data points.
 type MinObservationFilter[T any] interface {
 	Add(data T) error
 	GetValid() ([]T, error)
@@ -24,6 +27,8 @@ type minObservationValidator[T any] struct {
 	idFunc         func(T) [32]byte
 }
 
+// NewMinObservationValidator constructs a concrete MinObservationFilter object. The
+// supplied idFunc is used to generate a uniqueID for the type being observed.
 func NewMinObservationValidator[T any](min int, idFunc func(T) [32]byte) *minObservationValidator[T] {
 	return &minObservationValidator[T]{
 		minObservation: min,
@@ -33,7 +38,6 @@ func NewMinObservationValidator[T any](min int, idFunc func(T) [32]byte) *minObs
 }
 
 func (cv *minObservationValidator[T]) Add(data T) error {
-	//id := sha3.Sum256(data.ToBytes())
 	id := cv.idFunc(data)
 	if _, ok := cv.cache[id]; ok {
 		cv.cache[id].count++
