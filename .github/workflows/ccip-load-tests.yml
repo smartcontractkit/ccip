@@ -273,8 +273,10 @@ jobs:
       matrix:
         network: [CCIP]
     steps:
+      - name: Debug Result0
+        run: echo "${{  needs.*.result }}"
       - name: Debug Result
-        run: echo ${{  needs.*.result != 'skipped' }}
+        run: echo ${{  needs.*.result == 'skipped' }}
       - name: Debug Result2
         run: echo ${{  needs.*.result != 'cancelled' }}
       - name: Checkout the repo
