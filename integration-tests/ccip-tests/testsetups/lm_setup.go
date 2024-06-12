@@ -309,7 +309,8 @@ func (o *LMTestSetupOutputs) DeployLMChainContracts(
 			lmCommon.BridgeAdapterAddr = bridgeAdapter.EthAddress
 		}
 		if l2ChainID == int64(chainselectors.ETHEREUM_TESTNET_SEPOLIA_OPTIMISM_1.EvmChainID) {
-			*lmCommon.WrapperNative = common.HexToAddress("0x7b79995e5f793a07bc00c21412e50ecae098e7f9")
+			wethAddress := common.HexToAddress("0x7b79995e5f793a07bc00c21412e50ecae098e7f9")
+			lmCommon.WrapperNative = &wethAddress
 			lggr.Info().Msg("Deploying Optimism L1 Bridge Adapter contract")
 			bridgeAdapter, err := cd.DeployOptimismL1BridgeAdapter(
 				common.HexToAddress("0xFBb0621E0B23b5478B630BD55a5f21f67730B0F1"),
@@ -333,7 +334,8 @@ func (o *LMTestSetupOutputs) DeployLMChainContracts(
 		lggr.Info().Str("Address", bridgeAdapter.EthAddress.String()).Msg("Deployed Arbitrum L2 Bridge Adapter contract")
 		lmCommon.BridgeAdapterAddr = bridgeAdapter.EthAddress
 	case chainselectors.ETHEREUM_TESTNET_SEPOLIA_OPTIMISM_1.Selector:
-		*lmCommon.WrapperNative = common.HexToAddress("0x4200000000000000000000000000000000000006")
+		wethAddress := common.HexToAddress("0x4200000000000000000000000000000000000006")
+		lmCommon.WrapperNative = &wethAddress
 		lggr.Info().Msg("Deploying Optimism L2 Bridge Adapter contract")
 		bridgeAdapter, err := cd.DeployOptimismL2BridgeAdapter(*lmCommon.WrapperNative)
 		if err != nil {
