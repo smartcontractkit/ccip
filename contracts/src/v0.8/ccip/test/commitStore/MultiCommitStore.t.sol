@@ -42,9 +42,7 @@ contract MultiCommitStoreSetup is PriceRegistrySetup, OCR2BaseSetup {
 
     address[] memory priceUpdaters = new address[](1);
     priceUpdaters[0] = address(s_multiCommitStore);
-    s_priceRegistry.applyAuthorizedCallerUpdates(
-      AuthorizedCallers.AuthorizedCallerArgs(priceUpdaters, new address[](0))
-    );
+    s_priceRegistry.applyPriceUpdatersUpdates(priceUpdaters, new address[](0));
   }
 }
 

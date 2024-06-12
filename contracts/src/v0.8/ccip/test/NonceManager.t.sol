@@ -44,7 +44,10 @@ contract NonceManager_applyPreviousRampsUpdates is EVM2EVMMultiOnRampSetup {
     s_nonceManager.applyPreviousRampsUpdates(previousRamps);
   }
 
-  function _assertPreviousRampsEqual(NonceManager.PreviousRamps memory a, NonceManager.PreviousRamps memory b) internal {
+  function _assertPreviousRampsEqual(
+    NonceManager.PreviousRamps memory a,
+    NonceManager.PreviousRamps memory b
+  ) internal pure {
     assertEq(a.prevOnRamp, b.prevOnRamp);
   }
 }
