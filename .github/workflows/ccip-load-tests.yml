@@ -207,7 +207,7 @@ jobs:
   # Reporting Jobs
   start-slack-thread:
     name: Start Slack Thread
-    if: ${{ failure() && needs.*.result != 'skipped' && needs.*.result != 'cancelled' }}
+    if: ${{ failure() && needs.ccip-load-test.result != 'skipped' && needs.ccip-load-test.result != 'cancelled' }}
     environment: integration
     outputs:
       thread_ts: ${{ steps.slack.outputs.thread_ts }}
@@ -259,7 +259,7 @@ jobs:
 
   post-test-results-to-slack:
     name: Post Test Results for ${{ matrix.network }}
-    if: ${{ always() && needs.*.result != 'skipped' && needs.*.result != 'cancelled' }}
+    if: ${{ failure() && needs.start-slack-thread.result != 'skipped' && needs.start-slack-thread.result != 'cancelled' }}
     environment: integration
     permissions:
       checks: write
