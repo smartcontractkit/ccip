@@ -160,7 +160,7 @@ jobs:
         env:
           SLACK_BOT_TOKEN: ${{ secrets.QA_SLACK_API_KEY }}
         with:
-          channel-id: "#ccip-testing"
+          channel-id: "#test_notif"
           slack-message: ":x: :mild-panic-intensifies: CCIP chaos tests failed: \n${{ format('https://github.com/{0}/actions/runs/{1}', github.repository, github.run_id) }}"
       ## Run Cleanup if the job succeeds
       - name: cleanup
@@ -241,7 +241,7 @@ jobs:
         env:
           SLACK_BOT_TOKEN: ${{ secrets.QA_SLACK_API_KEY }}
         with:
-          channel-id: "#ccip-testing"
+          channel-id: "#test_notif"
           slack-message: ":x: :mild-panic-intensifies: CCIP chaos with load tests failed: \n${{ format('https://github.com/{0}/actions/runs/{1}', github.repository, github.run_id) }}"
       ## Run Cleanup if the job succeeds
       - name: cleanup
