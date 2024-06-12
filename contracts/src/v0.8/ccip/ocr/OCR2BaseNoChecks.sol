@@ -107,11 +107,13 @@ abstract contract OCR2BaseNoChecks is OwnerIsCreator, OCR2Abstract {
     bytes memory offchainConfig
   ) external override checkConfigValid(transmitters.length, f) onlyOwner {
     _beforeSetConfig(onchainConfig);
-    uint256 oldTransmitterLength = s_transmitters.length;
-    for (uint256 i = 0; i < oldTransmitterLength; ++i) {
-      delete s_oracles[s_transmitters[i]];
+    // Scoped to reduce contract size
+    {
+      uint256 oldTransmitterLength = s_transmitters.length;
+      for (uint256 i = 0; i < oldTransmitterLength; ++i) {
+        delete s_oracles[s_transmitters[i]];
+      }
     }
-
     uint256 newTransmitterLength = transmitters.length;
     for (uint256 i = 0; i < newTransmitterLength; ++i) {
       address transmitter = transmitters[i];

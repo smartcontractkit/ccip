@@ -533,10 +533,11 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
   /// @dev the order of IDs in the list is **not guaranteed**, therefore, if ordering matters when
   /// making successive calls, one should keep the block height constant to ensure a consistent result.
   function getAllRateLimitTokens() external view returns (address[] memory sourceTokens, address[] memory destTokens) {
-    sourceTokens = new address[](s_rateLimitedTokensDestToSource.length());
-    destTokens = new address[](s_rateLimitedTokensDestToSource.length());
+    uint256 numRateLimitedTokens = s_rateLimitedTokensDestToSource.length();
+    sourceTokens = new address[](numRateLimitedTokens);
+    destTokens = new address[](numRateLimitedTokens);
 
-    for (uint256 i = 0; i < s_rateLimitedTokensDestToSource.length(); ++i) {
+    for (uint256 i = 0; i < numRateLimitedTokens; ++i) {
       (address destToken, address sourceToken) = s_rateLimitedTokensDestToSource.at(i);
       sourceTokens[i] = sourceToken;
       destTokens[i] = destToken;
