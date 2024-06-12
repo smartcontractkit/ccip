@@ -65,8 +65,10 @@ contract AuthorizedCallers_applyAuthorizedCallerUpdates is AuthorizedCallers_set
     vm.expectEmit();
     emit AuthorizedCallerAdded(vm.addr(3));
 
-    AuthorizedCallers.AuthorizedCallerArgs memory authorizedCallerArgs =
-      AuthorizedCallers.AuthorizedCallerArgs({addedCallers: addedCallers, removedCallers: s_callers});
+    AuthorizedCallers.AuthorizedCallerArgs memory authorizedCallerArgs = AuthorizedCallers.AuthorizedCallerArgs({
+      addedCallers: addedCallers,
+      removedCallers: s_callers
+    });
 
     s_authorizedCallers.applyAuthorizedCallerUpdates(authorizedCallerArgs);
 
@@ -76,8 +78,10 @@ contract AuthorizedCallers_applyAuthorizedCallerUpdates is AuthorizedCallers_set
   function test_OnlyCallableByOwner_Revert() public {
     vm.stopPrank();
 
-    AuthorizedCallers.AuthorizedCallerArgs memory authorizedCallerArgs =
-      AuthorizedCallers.AuthorizedCallerArgs({addedCallers: new address[](0), removedCallers: new address[](0)});
+    AuthorizedCallers.AuthorizedCallerArgs memory authorizedCallerArgs = AuthorizedCallers.AuthorizedCallerArgs({
+      addedCallers: new address[](0),
+      removedCallers: new address[](0)
+    });
 
     vm.expectRevert("Only callable by owner");
 
