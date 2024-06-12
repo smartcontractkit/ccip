@@ -159,7 +159,7 @@ abstract contract MultiTokenPool is IPool, OwnerIsCreator {
   /// for various exploits.
   function _validateLockOrBurn(Pool.LockOrBurnInV1 memory lockOrBurnIn) internal {
     if (!isSupportedToken(lockOrBurnIn.localToken)) revert InvalidToken(lockOrBurnIn.localToken);
-    if (IRMN(i_rmnProxy).isCursed(bytes32(uint256(lockOrBurnIn.remoteChainSelector)))) revert CursedByRMN();
+    if (IRMN(i_rmnProxy).isCursed(bytes16(uint128(lockOrBurnIn.remoteChainSelector)))) revert CursedByRMN();
     _checkAllowList(lockOrBurnIn.originalSender);
 
     _onlyOnRamp(lockOrBurnIn.remoteChainSelector);
@@ -177,7 +177,7 @@ abstract contract MultiTokenPool is IPool, OwnerIsCreator {
   /// for various exploits.
   function _validateReleaseOrMint(Pool.ReleaseOrMintInV1 memory releaseOrMintIn) internal {
     if (!isSupportedToken(releaseOrMintIn.localToken)) revert InvalidToken(releaseOrMintIn.localToken);
-    if (IRMN(i_rmnProxy).isCursed(bytes32(uint256(releaseOrMintIn.remoteChainSelector)))) revert CursedByRMN();
+    if (IRMN(i_rmnProxy).isCursed(bytes16(uint128(releaseOrMintIn.remoteChainSelector)))) revert CursedByRMN();
     _onlyOffRamp(releaseOrMintIn.remoteChainSelector);
 
     // Validates that the source pool address is configured on this pool.

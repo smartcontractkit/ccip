@@ -186,20 +186,15 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
     uint64 nonce,
     uint256 feeTokenAmount,
     address originalSender,
-    bytes32 metadaHash,
+    bytes32 metadataHash,
     TokenAdminRegistry tokenAdminRegistry
   ) internal view returns (Internal.EVM2EVMMessage memory) {
-    // Slicing is only available for calldata. So we have to build a new bytes array.
-    bytes memory args = new bytes(message.extraArgs.length - 4);
-    for (uint256 i = 4; i < message.extraArgs.length; ++i) {
-      args[i - 4] = message.extraArgs[i];
-    }
     Internal.EVM2EVMMessage memory messageEvent = Internal.EVM2EVMMessage({
       sequenceNumber: seqNum,
       feeTokenAmount: feeTokenAmount,
       sender: originalSender,
       nonce: nonce,
-      gasLimit: abi.decode(args, (Client.EVMExtraArgsV1)).gasLimit,
+      gasLimit: abi.decode(_removeFirst4Bytes(message.extraArgs), (Client.EVMExtraArgsV1)).gasLimit,
       strict: false,
       sourceChainSelector: sourChainSelector,
       receiver: abi.decode(message.receiver, (address)),
@@ -222,8 +217,17 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
       );
     }
 
-    messageEvent.messageId = Internal._hash(messageEvent, metadaHash);
+    messageEvent.messageId = Internal._hash(messageEvent, metadataHash);
     return messageEvent;
+  }
+
+  // Slicing is only available for calldata. So we have to build a new bytes array.
+  function _removeFirst4Bytes(bytes memory data) internal pure returns (bytes memory) {
+    bytes memory result = new bytes(data.length - 4);
+    for (uint256 i = 4; i < data.length; ++i) {
+      result[i - 4] = data[i];
+    }
+    return result;
   }
 
   function _generateDynamicMultiOnRampConfig(

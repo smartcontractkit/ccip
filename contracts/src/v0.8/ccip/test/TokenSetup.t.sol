@@ -115,7 +115,9 @@ contract TokenSetup is RouterSetup {
       address token = s_sourceTokens[i];
       address pool = s_sourcePoolByToken[token];
 
-      _setPool(s_tokenAdminRegistry, token, pool, DEST_CHAIN_SELECTOR, s_destPoolByToken[s_destTokens[i]], s_destTokens[i]);
+      _setPool(
+        s_tokenAdminRegistry, token, pool, DEST_CHAIN_SELECTOR, s_destPoolByToken[s_destTokens[i]], s_destTokens[i]
+      );
     }
 
     for (uint256 i = 0; i < s_destTokens.length; ++i) {
@@ -124,7 +126,14 @@ contract TokenSetup is RouterSetup {
       s_tokenAdminRegistry.registerAdministratorPermissioned(token, OWNER);
       s_tokenAdminRegistry.setPool(token, pool);
 
-      _setPool(s_tokenAdminRegistry, token, pool, SOURCE_CHAIN_SELECTOR, s_sourcePoolByToken[s_sourceTokens[i]], s_sourceTokens[i]);
+      _setPool(
+        s_tokenAdminRegistry,
+        token,
+        pool,
+        SOURCE_CHAIN_SELECTOR,
+        s_sourcePoolByToken[s_sourceTokens[i]],
+        s_sourceTokens[i]
+      );
     }
   }
 
@@ -144,7 +153,8 @@ contract TokenSetup is RouterSetup {
     address token,
     address pool,
     uint64 remoteChainSelector,
-    address remotePoolAddress
+    address remotePoolAddress,
+    address remoteToken
   ) internal {
     if (!tokenAdminRegistry.isAdministrator(token, OWNER)) {
       tokenAdminRegistry.registerAdministratorPermissioned(token, OWNER);
@@ -156,6 +166,7 @@ contract TokenSetup is RouterSetup {
     chainUpdates[0] = TokenPool.ChainUpdate({
       remoteChainSelector: remoteChainSelector,
       remotePoolAddress: abi.encode(remotePoolAddress),
+      remoteTokenAddress: abi.encode(remoteToken),
       allowed: true,
       outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
       inboundRateLimiterConfig: getInboundRateLimiterConfig()
