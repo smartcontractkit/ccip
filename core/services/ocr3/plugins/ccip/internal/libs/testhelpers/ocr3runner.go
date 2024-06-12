@@ -2,16 +2,17 @@ package testhelpers
 
 import (
 	"context"
-	"crypto/sha1"
+	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"fmt"
 	"math/rand"
 
-	"github.com/smartcontractkit/ccipocr3/internal/libs/slicelib"
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+
+	"github.com/smartcontractkit/ccipocr3/internal/libs/slicelib"
 )
 
 var (
@@ -19,6 +20,7 @@ var (
 	ErrObservation                  = errors.New("error in observation phase")
 	ErrValidateObservation          = errors.New("error in validate observation phase")
 	ErrOutcome                      = errors.New("error in outcome phase")
+	ErrEmptyOutcome                 = errors.New("outcome is empty")
 	ErrReports                      = errors.New("error in reports phase")
 	ErrShouldAcceptAttestedReport   = errors.New("error in should accept attested report phase")
 	ErrShouldTransmitAcceptedReport = errors.New("error in should transmit accepted report phase")
@@ -29,14 +31,16 @@ var (
 // TODO: move to a shared repository.
 type OCR3Runner[RI any] struct {
 	nodes           []ocr3types.ReportingPlugin[RI]
+	nodeIDs         []commontypes.OracleID
 	round           int
 	previousOutcome ocr3types.Outcome
 }
 
-func NewOCR3Runner[RI any](nodes []ocr3types.ReportingPlugin[RI]) *OCR3Runner[RI] {
+func NewOCR3Runner[RI any](nodes []ocr3types.ReportingPlugin[RI], nodeIDs []commontypes.OracleID) *OCR3Runner[RI] {
 	return &OCR3Runner[RI]{
-		nodes: nodes,
-		round: 0,
+		nodes:   nodes,
+		nodeIDs: nodeIDs,
+		round:   0,
 	}
 }
 
@@ -52,20 +56,20 @@ func (r *OCR3Runner[RI]) RunRound(ctx context.Context) (result RoundResult[RI], 
 
 	q, err := leaderNode.Query(ctx, outcomeCtx)
 	if err != nil {
-		return RoundResult[RI]{}, fmt.Errorf("%s: %w", err, ErrQuery)
+		return RoundResult[RI]{}, fmt.Errorf("%w: %w", err, ErrQuery)
 	}
 
 	attributedObservations := make([]types.AttributedObservation, len(r.nodes))
 	for i, n := range r.nodes {
 		obs, err2 := n.Observation(ctx, outcomeCtx, q)
 		if err2 != nil {
-			return RoundResult[RI]{}, fmt.Errorf("%s: %w", err2, ErrObservation)
+			return RoundResult[RI]{}, fmt.Errorf("%w: %w", err2, ErrObservation)
 		}
 
-		attrObs := types.AttributedObservation{Observation: obs, Observer: commontypes.OracleID(i)}
+		attrObs := types.AttributedObservation{Observation: obs, Observer: r.nodeIDs[i]}
 		err = leaderNode.ValidateObservation(outcomeCtx, q, attrObs)
 		if err != nil {
-			return RoundResult[RI]{}, fmt.Errorf("%s: %w", err, ErrValidateObservation)
+			return RoundResult[RI]{}, fmt.Errorf("%w: %w", err, ErrValidateObservation)
 		}
 
 		attributedObservations[i] = attrObs
@@ -75,7 +79,10 @@ func (r *OCR3Runner[RI]) RunRound(ctx context.Context) (result RoundResult[RI], 
 	for i, n := range r.nodes {
 		outcome, err2 := n.Outcome(outcomeCtx, q, attributedObservations)
 		if err2 != nil {
-			return RoundResult[RI]{}, fmt.Errorf("%s: %w", err2, ErrOutcome)
+			return RoundResult[RI]{}, fmt.Errorf("%w: %w", err2, ErrOutcome)
+		}
+		if len(outcome) == 0 {
+			return RoundResult[RI]{}, ErrEmptyOutcome
 		}
 
 		outcomes[i] = outcome
@@ -92,7 +99,7 @@ func (r *OCR3Runner[RI]) RunRound(ctx context.Context) (result RoundResult[RI], 
 	for i, n := range r.nodes {
 		reportsWithInfo, err2 := n.Reports(seqNr, outcomes[0])
 		if err2 != nil {
-			return RoundResult[RI]{}, fmt.Errorf("%s: %w", err2, ErrReports)
+			return RoundResult[RI]{}, fmt.Errorf("%w: %w", err2, ErrReports)
 		}
 
 		allReports[i] = reportsWithInfo
@@ -112,7 +119,7 @@ func (r *OCR3Runner[RI]) RunRound(ctx context.Context) (result RoundResult[RI], 
 		for i, n := range r.nodes {
 			shouldAccept, err2 := n.ShouldAcceptAttestedReport(ctx, seqNr, report)
 			if err2 != nil {
-				return RoundResult[RI]{}, fmt.Errorf("%s: %w", err2, ErrShouldAcceptAttestedReport)
+				return RoundResult[RI]{}, fmt.Errorf("%w: %w", err2, ErrShouldAcceptAttestedReport)
 			}
 
 			allShouldAccept[i] = shouldAccept
@@ -130,7 +137,7 @@ func (r *OCR3Runner[RI]) RunRound(ctx context.Context) (result RoundResult[RI], 
 		for i, n := range r.nodes {
 			shouldTransmit, err2 := n.ShouldTransmitAcceptedReport(ctx, seqNr, report)
 			if err2 != nil {
-				return RoundResult[RI]{}, fmt.Errorf("%s: %w", err2, ErrShouldTransmitAcceptedReport)
+				return RoundResult[RI]{}, fmt.Errorf("%w: %w", err2, ErrShouldTransmitAcceptedReport)
 			}
 
 			allShouldTransmit[i] = shouldTransmit
@@ -173,7 +180,7 @@ type RoundResult[RI any] struct {
 func countUniqueOutcomes(outcomes []ocr3types.Outcome) int {
 	flattenedHashes := make([]string, 0, len(outcomes))
 	for _, o := range outcomes {
-		h := sha1.New()
+		h := sha256.New()
 		h.Write(o)
 		flattenedHashes = append(flattenedHashes, hex.EncodeToString(h.Sum(nil)))
 	}
@@ -183,7 +190,7 @@ func countUniqueOutcomes(outcomes []ocr3types.Outcome) int {
 func countUniqueReports[RI any](reports []ocr3types.ReportWithInfo[RI]) int {
 	flattenedHashes := make([]string, 0, len(reports))
 	for _, report := range reports {
-		h := sha1.New()
+		h := sha256.New()
 		h.Write(report.Report)
 		flattenedHashes = append(flattenedHashes, hex.EncodeToString(h.Sum(nil)))
 	}

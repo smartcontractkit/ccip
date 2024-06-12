@@ -304,13 +304,12 @@ jobs:
             os: ubuntu-latest
             file: ccip
             run: -run ^TestSmokeCCIPRateLimit$
-# This test will be fixed in a follow-up PR
-#          - name: ccip-smoke-multicall
-#            nodes: 1
-#            dir: ccip-tests/smoke
-#            os: ubuntu-latest
-#            file: ccip
-#            run: -run ^TestSmokeCCIPMulticall$
+          - name: ccip-smoke-multicall
+            nodes: 1
+            dir: ccip-tests/smoke
+            os: ubuntu-latest
+            file: ccip
+            run: -run ^TestSmokeCCIPMulticall$
           - name: ccip-smoke-manual-exec
             nodes: 1
             dir: ccip-tests/smoke
@@ -800,4 +799,4 @@ jobs:
           SLACK_BOT_TOKEN: ${{ secrets.QA_SLACK_API_KEY }}
         with:
           channel-id: "#team-test-tooling-internal"
-          slack-message: ":x: :mild-panic-intensifies: Node Migration Tests Failed: ${{ job.html_url }}\n${{ format('https://github.com/smartcontractkit/chainlink/actions/runs/{0}', github.run_id) }}"
+          slack-message: ":x: :mild-panic-intensifies: Node Migration Tests Failed: \n${{ format('https://github.com/{0}/actions/runs/{1}', github.repository, github.run_id) }}"
