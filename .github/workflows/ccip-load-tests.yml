@@ -259,7 +259,7 @@ jobs:
 
   post-test-results-to-slack:
     name: Post Test Results for ${{ matrix.network }}
-    if: ${{ needs.start-slack-thread.result != 'skipped' && needs.start-slack-thread.result != 'cancelled' && always() }}
+    if: ${{ contains(join(needs.*.result, ','), 'skipped') && contains(join(needs.*.result, ','), 'cancelled') && always() }}
     environment: integration
     permissions:
       checks: write
