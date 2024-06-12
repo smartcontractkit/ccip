@@ -327,7 +327,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
   /// @dev If called from manual execution, this array is always same length as messages.
   function _execute(Internal.ExecutionReportSingleChain memory report, uint256[] memory manualExecGasLimits) internal {
     uint64 sourceChainSelector = report.sourceChainSelector;
-    if (IRMN(i_rmnProxy).isCursed(bytes32(uint256(sourceChainSelector)))) revert CursedByRMN(sourceChainSelector);
+    if (IRMN(i_rmnProxy).isCursed(bytes16(uint128(sourceChainSelector)))) revert CursedByRMN(sourceChainSelector);
 
     uint256 numMsgs = report.messages.length;
     if (numMsgs == 0) revert EmptyReport();
@@ -648,7 +648,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
         // Ensures we can never deploy a new offRamp that points to a commitStore that
         // already has roots committed for the target source chain. Also ensures that the onRamps are in sync.
         // TODO: revisit this on commit store / ramp merge
-        if (commitStoreConfig.onRamp != sourceConfigUpdate.onRamp || commitStoreConfig.minSeqNr != 0) {
+        if (commitStoreConfig.onRamp != sourceConfigUpdate.onRamp || commitStoreConfig.minSeqNr > 1) {
           revert InvalidStaticConfig(sourceChainSelector);
         }
 

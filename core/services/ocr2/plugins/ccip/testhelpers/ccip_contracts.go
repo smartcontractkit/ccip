@@ -166,7 +166,6 @@ func NewExecOffchainConfig(
 		InflightCacheExpiry:         InflightCacheExpiry,
 		RootSnoozeTime:              RootSnoozeTime,
 	}}
-
 }
 
 type MaybeRevertReceiver struct {
@@ -653,7 +652,6 @@ func SetAdminAndRegisterPool(t *testing.T,
 	tokenAdminRegistry *token_admin_registry.TokenAdminRegistry,
 	tokenAddress common.Address,
 	poolAddress common.Address) {
-
 	_, err := tokenAdminRegistry.RegisterAdministratorPermissioned(user, tokenAddress, user.From)
 	require.NoError(t, err)
 
