@@ -642,6 +642,33 @@ func (pool *TokenPool) SyncUSDCDomain(destTokenTransmitter *TokenTransmitter, de
 	return pool.client.ProcessTransaction(tx)
 }
 
+// MintUSDCToUSDCPool mints 100 USDC tokens to the pool if it is a USDC pool.
+// This helps provide liquidity to the pool which is necessary for USDC tests to function properly.
+func (pool *TokenPool) MintUSDCToUSDCPool() error {
+	if !pool.IsUSDC() {
+		return fmt.Errorf("pool is not a USDC pool, cannot send USDC")
+	}
+	usdcToken, err := pool.GetToken()
+	if err != nil {
+		return fmt.Errorf("failed to get dest usdc token: %w", err)
+	}
+	usdcInstance, err := burn_mint_erc677.NewBurnMintERC677(usdcToken, pool.client.Backend())
+	if err != nil {
+		return fmt.Errorf("failed to get dest usdc token instance: %w", err)
+	}
+
+	opts, err := pool.client.TransactionOpts(pool.client.GetDefaultWallet())
+	if err != nil {
+		return fmt.Errorf("failed to get transaction opts: %w", err)
+	}
+
+	tx, err := usdcInstance.Mint(opts, pool.EthAddress, HundredCoins)
+	if err != nil {
+		return fmt.Errorf("failed to mint usdc tokens to destPool: %w", err)
+	}
+	return pool.client.ProcessTransaction(tx)
+}
+
 func (pool *TokenPool) RemoveLiquidity(amount *big.Int) error {
 	if !pool.IsLockRelease() {
 		return fmt.Errorf("pool is not a lock release pool, cannot remove liquidity")
