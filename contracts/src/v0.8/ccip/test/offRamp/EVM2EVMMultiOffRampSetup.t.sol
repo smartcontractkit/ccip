@@ -51,8 +51,6 @@ contract EVM2EVMMultiOffRampSetup is TokenSetup, PriceRegistrySetup, MultiOCR3Ba
   address internal s_sourceTokenPool = makeAddr("sourceTokenPool");
 
   bytes32 internal s_configDigest;
-  // Used for single-lane offramp
-  uint64 internal constant s_offchainConfigVersion = 3;
   uint8 internal constant s_F = 1;
 
   function setUp() public virtual override(TokenSetup, PriceRegistrySetup, MultiOCR3BaseSetup) {
