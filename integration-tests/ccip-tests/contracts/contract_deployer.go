@@ -1133,6 +1133,15 @@ func (e *CCIPContractsDeployer) DeployOffRamp(
 			EthAddress: *address,
 		}, err
 	case Latest:
+		staticConfig := evm_2_evm_offramp.EVM2EVMOffRampStaticConfig{
+			CommitStore:         commitStore,
+			ChainSelector:       destChainSelector,
+			SourceChainSelector: sourceChainSelector,
+			OnRamp:              onRamp,
+			PrevOffRamp:         common.Address{},
+			RmnProxy:            rmnProxy,
+			TokenAdminRegistry:  tokenAdminRegistry,
+		}
 		address, _, instance, err := e.evmClient.DeployContract("OffRamp Contract", func(
 			auth *bind.TransactOpts,
 			_ bind.ContractBackend,
@@ -1140,15 +1149,7 @@ func (e *CCIPContractsDeployer) DeployOffRamp(
 			return evm_2_evm_offramp.DeployEVM2EVMOffRamp(
 				auth,
 				wrappers.MustNewWrappedContractBackend(e.evmClient, nil),
-				evm_2_evm_offramp.EVM2EVMOffRampStaticConfig{
-					CommitStore:         commitStore,
-					ChainSelector:       destChainSelector,
-					SourceChainSelector: sourceChainSelector,
-					OnRamp:              onRamp,
-					PrevOffRamp:         common.Address{},
-					RmnProxy:            rmnProxy,
-					TokenAdminRegistry:  tokenAdminRegistry,
-				},
+				staticConfig,
 				evm_2_evm_offramp.RateLimiterConfig{
 					IsEnabled: true,
 					Capacity:  opts.Capacity,
@@ -1156,6 +1157,8 @@ func (e *CCIPContractsDeployer) DeployOffRamp(
 				},
 			)
 		})
+		e.logger.Info().Msg(fmt.Sprintf("deploying offramp with static config: %+v", staticConfig))
+
 		if err != nil {
 			return nil, err
 		}
