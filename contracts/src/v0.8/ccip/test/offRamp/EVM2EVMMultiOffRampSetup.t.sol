@@ -5,7 +5,6 @@ import {IAny2EVMMessageReceiver} from "../../interfaces/IAny2EVMMessageReceiver.
 
 import {IAny2EVMOffRamp} from "../../interfaces/IAny2EVMOffRamp.sol";
 import {ICommitStore} from "../../interfaces/ICommitStore.sol";
-import {IMultiCommitStore} from "../../interfaces/IMultiCommitStore.sol";
 import {IRMN} from "../../interfaces/IRMN.sol";
 
 import {RMN} from "../../RMN.sol";
@@ -26,7 +25,6 @@ import {MaybeRevertingBurnMintTokenPool} from "../helpers/MaybeRevertingBurnMint
 import {MessageInterceptorHelper} from "../helpers/MessageInterceptorHelper.sol";
 import {MaybeRevertMessageReceiver} from "../helpers/receivers/MaybeRevertMessageReceiver.sol";
 import {MockCommitStore} from "../mocks/MockCommitStore.sol";
-import {MockMultiCommitStore} from "../mocks/MockMultiCommitStore.sol";
 import {MultiOCR3BaseSetup} from "../ocr/MultiOCR3BaseSetup.t.sol";
 import {PriceRegistrySetup} from "../priceRegistry/PriceRegistry.t.sol";
 
@@ -43,7 +41,6 @@ contract EVM2EVMMultiOffRampSetup is TokenSetup, PriceRegistrySetup, MultiOCR3Ba
 
   address internal constant BLESS_VOTE_ADDR = address(8888);
 
-  MockMultiCommitStore internal s_mockCommitStore;
   IAny2EVMMessageReceiver internal s_receiver;
   IAny2EVMMessageReceiver internal s_secondary_receiver;
   MaybeRevertMessageReceiver internal s_reverting_receiver;
@@ -69,7 +66,6 @@ contract EVM2EVMMultiOffRampSetup is TokenSetup, PriceRegistrySetup, MultiOCR3Ba
     MultiOCR3BaseSetup.setUp();
 
     s_messageValidator = new MessageInterceptorHelper();
-    s_mockCommitStore = new MockMultiCommitStore();
     s_receiver = new MaybeRevertMessageReceiver(false);
     s_secondary_receiver = new MaybeRevertMessageReceiver(false);
     s_reverting_receiver = new MaybeRevertMessageReceiver(true);

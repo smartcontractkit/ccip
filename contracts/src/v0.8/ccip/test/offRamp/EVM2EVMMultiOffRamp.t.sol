@@ -2,7 +2,6 @@
 pragma solidity 0.8.24;
 
 import {ICommitStore} from "../../interfaces/ICommitStore.sol";
-import {IMultiCommitStore} from "../../interfaces/IMultiCommitStore.sol";
 
 import {IPool} from "../../interfaces/IPool.sol";
 import {IPriceRegistry} from "../../interfaces/IPriceRegistry.sol";
@@ -3383,7 +3382,7 @@ contract EVM2EVMMultiOffRamp_reportCommit is EVM2EVMMultiOffRampSetup {
   }
 }
 
-contract EVM2EVMMultiOffRamp_transmitCommit is EVM2EVMMultiOffRampSetup {
+contract EVM2EVMMultiOffRamp_commit is EVM2EVMMultiOffRampSetup {
   uint64 internal s_maxInterval = 12;
 
   function setUp() public virtual override {
