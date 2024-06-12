@@ -274,7 +274,9 @@ jobs:
         network: [CCIP]
     steps:
       - name: Debug Result
-        run: echo ${{ join(needs.*.result, ',') }}
+        run: echo ${{  needs.*.result != 'skipped' }}
+      - name: Debug Result2
+        run: echo ${{  needs.*.result != 'cancelled' }}
       - name: Checkout the repo
         uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
         with:
