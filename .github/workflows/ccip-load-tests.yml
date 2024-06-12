@@ -259,7 +259,7 @@ jobs:
 
   post-test-results-to-slack:
     name: Post Test Results for ${{ matrix.network }}
-    if: ${{ needs.*.result != 'skipped' && needs.*.result != 'cancelled' && always() }}
+    if: ${{ needs.start-slack-thread.result != 'skipped' && needs.start-slack-thread.result != 'cancelled' && always() }}
     environment: integration
     permissions:
       checks: write
@@ -276,9 +276,9 @@ jobs:
       - name: Debug Result0
         run: echo "${{  needs.*.result }}"
       - name: Debug Result
-        run: echo ${{  needs.*.result == 'skipped' }}
+        run: echo ${{  contains(join(needs.*.result, ','), 'skipped') }}
       - name: Debug Result2
-        run: echo ${{  needs.*.result != 'cancelled' }}
+        run: echo ${{  contains(join(needs.*.result, ','), 'skipped') && contains(join(needs.*.result, ','), 'cancelled') }}
       - name: Checkout the repo
         uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
         with:
