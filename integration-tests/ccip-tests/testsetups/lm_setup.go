@@ -36,10 +36,11 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	chainselectors "github.com/smartcontractkit/chain-selectors"
-	integrationactions "github.com/smartcontractkit/chainlink/integration-tests/actions"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
 	"golang.org/x/sync/errgroup"
+
+	integrationactions "github.com/smartcontractkit/chainlink/integration-tests/actions"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
 	ctfClient "github.com/smartcontractkit/chainlink-testing-framework/client"
