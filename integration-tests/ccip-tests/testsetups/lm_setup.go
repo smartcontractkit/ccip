@@ -413,6 +413,26 @@ func (o *LMTestSetupOutputs) DeployLMChainContracts(
 		return errors.WithStack(fmt.Errorf("onchainRebalancer doesn not match the deployed Liquidity Manager"))
 	}
 
+	// Deploy Bridge Adapter contracts if simulated chain
+	switch lmCommon.ChainSelectror {
+	case chainselectors.GETH_TESTNET.Selector:
+		lggr.Info().Msg("Deploying Mock L1 Bridge Adapter contract")
+		bridgeAdapter, err := cd.DeployMockL1BridgeAdapter(*lmCommon.WrapperNative, true)
+		if err != nil {
+			return errors.WithStack(fmt.Errorf("failed to deploy Mock L1 Bridge Adapter contract: %w", err))
+		}
+		lggr.Info().Str("Address", bridgeAdapter.EthAddress.String()).Msg("Deployed Mock L1 Bridge Adapter contract")
+		lmCommon.BridgeAdapterAddr = bridgeAdapter.EthAddress
+	case chainselectors.GETH_DEVNET_2.Selector:
+		lggr.Info().Msg("Deploying Mock L2 Bridge Adapter contract")
+		bridgeAdapter, err := cd.DeployMockL2BridgeAdapter()
+		if err != nil {
+			return errors.WithStack(fmt.Errorf("failed to deploy Mock L2 Bridge Adapter contract: %w", err))
+		}
+		lggr.Info().Str("Address", bridgeAdapter.EthAddress.String()).Msg("Deployed Mock L2 Bridge Adapter contract")
+		lmCommon.BridgeAdapterAddr = bridgeAdapter.EthAddress
+	}
+
 	lggr.Debug().Interface("lmCommon", lmCommon).Msg("lmCommon")
 	o.LMModules[chainClient.GetChainID().Int64()] = &lmCommon
 
