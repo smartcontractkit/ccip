@@ -232,7 +232,7 @@ contract MultiRampsE2E is EVM2EVMMultiOnRampSetup, MultiCommitStoreSetup, EVM2EV
     );
 
     vm.expectEmit();
-    emit EVM2EVMMultiOnRamp.CCIPSendRequested(msgEvent);
+    emit EVM2EVMMultiOnRamp.CCIPSendRequested(DEST_CHAIN_SELECTOR, msgEvent);
 
     vm.resumeGasMetering();
     router.ccipSend(DEST_CHAIN_SELECTOR, message);

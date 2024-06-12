@@ -68,7 +68,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ILinkAvailable, AggregateRat
   );
   event TokenTransferFeeConfigDeleted(uint256 indexed destChainSelector, address indexed token);
   /// RMN depends on this event, if changing, please notify the RMN maintainers.
-  event CCIPSendRequested(Internal.EVM2EVMMessage message);
+  event CCIPSendRequested(uint64 indexed destChainSelector, Internal.EVM2EVMMessage message);
   event NopsSet(uint256 nopWeightsTotal, NopAndWeight[] nopsAndWeights);
   event DestChainAdded(uint64 indexed destChainSelector, DestChainConfig destChainConfig);
   event DestChainDynamicConfigUpdated(uint64 indexed destChainSelector, DestChainDynamicConfig dynamicConfig);
@@ -331,7 +331,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ILinkAvailable, AggregateRat
     // Emit message request
     // This must happen after any pool events as some tokens (e.g. USDC) emit events that we expect to precede this
     // event in the offchain code.
-    emit CCIPSendRequested(newMessage);
+    emit CCIPSendRequested(destChainSelector, newMessage);
     return newMessage.messageId;
   }
 

@@ -338,7 +338,7 @@ contract EVM2EVMMultiOnRamp_forwardFromRouter is EVM2EVMMultiOnRampSetup {
     IERC20(s_sourceFeeToken).transferFrom(OWNER, address(s_onRamp), feeAmount);
 
     vm.expectEmit();
-    emit EVM2EVMMultiOnRamp.CCIPSendRequested(_messageToEvent(message, 1, 1, feeAmount, OWNER));
+    emit EVM2EVMMultiOnRamp.CCIPSendRequested(DEST_CHAIN_SELECTOR, _messageToEvent(message, 1, 1, feeAmount, OWNER));
 
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, feeAmount, OWNER);
   }
@@ -352,7 +352,7 @@ contract EVM2EVMMultiOnRamp_forwardFromRouter is EVM2EVMMultiOnRampSetup {
 
     vm.expectEmit();
     // We expect the message to be emitted with strict = false.
-    emit EVM2EVMMultiOnRamp.CCIPSendRequested(_messageToEvent(message, 1, 1, feeAmount, OWNER));
+    emit EVM2EVMMultiOnRamp.CCIPSendRequested(DEST_CHAIN_SELECTOR, _messageToEvent(message, 1, 1, feeAmount, OWNER));
 
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, feeAmount, OWNER);
   }
@@ -367,7 +367,9 @@ contract EVM2EVMMultiOnRamp_forwardFromRouter is EVM2EVMMultiOnRampSetup {
     expectedMessage.extraArgs = Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: GAS_LIMIT}));
     vm.expectEmit();
     // We expect the message to be emitted with strict = false.
-    emit EVM2EVMMultiOnRamp.CCIPSendRequested(_messageToEvent(expectedMessage, 1, 1, feeAmount, OWNER));
+    emit EVM2EVMMultiOnRamp.CCIPSendRequested(
+      DEST_CHAIN_SELECTOR, _messageToEvent(expectedMessage, 1, 1, feeAmount, OWNER)
+    );
 
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, feeAmount, OWNER);
   }
@@ -379,7 +381,7 @@ contract EVM2EVMMultiOnRamp_forwardFromRouter is EVM2EVMMultiOnRampSetup {
     IERC20(s_sourceFeeToken).transferFrom(OWNER, address(s_onRamp), feeAmount);
 
     vm.expectEmit();
-    emit EVM2EVMMultiOnRamp.CCIPSendRequested(_messageToEvent(message, 1, 1, feeAmount, OWNER));
+    emit EVM2EVMMultiOnRamp.CCIPSendRequested(DEST_CHAIN_SELECTOR, _messageToEvent(message, 1, 1, feeAmount, OWNER));
 
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, feeAmount, OWNER);
   }
@@ -391,7 +393,7 @@ contract EVM2EVMMultiOnRamp_forwardFromRouter is EVM2EVMMultiOnRampSetup {
       uint64 nonceBefore = s_onRamp.getSenderNonce(DEST_CHAIN_SELECTOR, OWNER);
 
       vm.expectEmit();
-      emit EVM2EVMMultiOnRamp.CCIPSendRequested(_messageToEvent(message, i, i, 0, OWNER));
+      emit EVM2EVMMultiOnRamp.CCIPSendRequested(DEST_CHAIN_SELECTOR, _messageToEvent(message, i, i, 0, OWNER));
 
       s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 0, OWNER);
 
@@ -452,7 +454,7 @@ contract EVM2EVMMultiOnRamp_forwardFromRouter is EVM2EVMMultiOnRampSetup {
     Internal.EVM2EVMMessage memory expectedEvent = _messageToEvent(message, 1, 1, feeTokenAmount, originalSender);
 
     vm.expectEmit(false, false, false, true);
-    emit EVM2EVMMultiOnRamp.CCIPSendRequested(expectedEvent);
+    emit EVM2EVMMultiOnRamp.CCIPSendRequested(DEST_CHAIN_SELECTOR, expectedEvent);
 
     // Assert the message Id is correct
     assertEq(
@@ -871,7 +873,7 @@ contract EVM2EVMMultiOnRamp_forwardFromRouter_upgrade is EVM2EVMMultiOnRampSetup
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
 
     vm.expectEmit();
-    emit EVM2EVMMultiOnRamp.CCIPSendRequested(_messageToEvent(message, 1, 1, FEE_AMOUNT, OWNER));
+    emit EVM2EVMMultiOnRamp.CCIPSendRequested(DEST_CHAIN_SELECTOR, _messageToEvent(message, 1, 1, FEE_AMOUNT, OWNER));
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, FEE_AMOUNT, OWNER);
   }
 
@@ -898,14 +900,18 @@ contract EVM2EVMMultiOnRamp_forwardFromRouter_upgrade is EVM2EVMMultiOnRampSetup
 
     // new onramp nonce should start from 2, while sequence number start from 1
     vm.expectEmit();
-    emit EVM2EVMMultiOnRamp.CCIPSendRequested(_messageToEvent(message, 1, startNonce + 2, FEE_AMOUNT, OWNER));
+    emit EVM2EVMMultiOnRamp.CCIPSendRequested(
+      DEST_CHAIN_SELECTOR, _messageToEvent(message, 1, startNonce + 2, FEE_AMOUNT, OWNER)
+    );
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, FEE_AMOUNT, OWNER);
 
     assertEq(startNonce + 2, s_onRamp.getSenderNonce(DEST_CHAIN_SELECTOR, OWNER));
 
     // after another send, nonce should be 3, and sequence number be 2
     vm.expectEmit();
-    emit EVM2EVMMultiOnRamp.CCIPSendRequested(_messageToEvent(message, 2, startNonce + 3, FEE_AMOUNT, OWNER));
+    emit EVM2EVMMultiOnRamp.CCIPSendRequested(
+      DEST_CHAIN_SELECTOR, _messageToEvent(message, 2, startNonce + 3, FEE_AMOUNT, OWNER)
+    );
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, FEE_AMOUNT, OWNER);
 
     assertEq(startNonce + 3, s_onRamp.getSenderNonce(DEST_CHAIN_SELECTOR, OWNER));
@@ -920,7 +926,9 @@ contract EVM2EVMMultiOnRamp_forwardFromRouter_upgrade is EVM2EVMMultiOnRampSetup
     address newSender = address(1234567);
     // new onramp nonce should start from 1 for new sender
     vm.expectEmit();
-    emit EVM2EVMMultiOnRamp.CCIPSendRequested(_messageToEvent(message, 1, 1, FEE_AMOUNT, newSender));
+    emit EVM2EVMMultiOnRamp.CCIPSendRequested(
+      DEST_CHAIN_SELECTOR, _messageToEvent(message, 1, 1, FEE_AMOUNT, newSender)
+    );
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, FEE_AMOUNT, newSender);
   }
 }
