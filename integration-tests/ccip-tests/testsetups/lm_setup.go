@@ -266,7 +266,7 @@ func (o *LMTestSetupOutputs) DeployLMChainContracts(
 
 	// Deploy Wrapped Native contract only on private geth networks
 	if lmCommon.ChainSelectror == chainselectors.GETH_TESTNET.Selector ||
-		lmCommon.ChainSelectror == chainselectors.TEST_2337.Selector {
+		lmCommon.ChainSelectror == chainselectors.GETH_DEVNET_2.Selector {
 		lggr.Info().Msg("Deploying Wrapped Native contract")
 		wrapperNative, err := cd.DeployWrappedNative()
 		if err != nil {
@@ -286,7 +286,7 @@ func (o *LMTestSetupOutputs) DeployLMChainContracts(
 		}
 		lggr.Info().Str("Address", bridgeAdapter.EthAddress.String()).Msg("Deployed Mock L1 Bridge Adapter contract")
 		lmCommon.BridgeAdapterAddr = bridgeAdapter.EthAddress
-	case chainselectors.TEST_2337.Selector:
+	case chainselectors.GETH_DEVNET_2.Selector:
 		lggr.Info().Msg("Deploying Mock L2 Bridge Adapter contract")
 		bridgeAdapter, err := cd.DeployMockL2BridgeAdapter()
 		if err != nil {
@@ -411,26 +411,6 @@ func (o *LMTestSetupOutputs) DeployLMChainContracts(
 	}
 	if onchainRebalancer != *liquidityManager.EthAddress {
 		return errors.WithStack(fmt.Errorf("onchainRebalancer doesn not match the deployed Liquidity Manager"))
-	}
-
-	// Deploy Bridge Adapter contracts if simulated chain
-	switch lmCommon.ChainSelectror {
-	case chainselectors.GETH_TESTNET.Selector:
-		lggr.Info().Msg("Deploying Mock L1 Bridge Adapter contract")
-		bridgeAdapter, err := cd.DeployMockL1BridgeAdapter(*lmCommon.WrapperNative, true)
-		if err != nil {
-			return errors.WithStack(fmt.Errorf("failed to deploy Mock L1 Bridge Adapter contract: %w", err))
-		}
-		lggr.Info().Str("Address", bridgeAdapter.EthAddress.String()).Msg("Deployed Mock L1 Bridge Adapter contract")
-		lmCommon.BridgeAdapterAddr = bridgeAdapter.EthAddress
-	case chainselectors.GETH_DEVNET_2.Selector:
-		lggr.Info().Msg("Deploying Mock L2 Bridge Adapter contract")
-		bridgeAdapter, err := cd.DeployMockL2BridgeAdapter()
-		if err != nil {
-			return errors.WithStack(fmt.Errorf("failed to deploy Mock L2 Bridge Adapter contract: %w", err))
-		}
-		lggr.Info().Str("Address", bridgeAdapter.EthAddress.String()).Msg("Deployed Mock L2 Bridge Adapter contract")
-		lmCommon.BridgeAdapterAddr = bridgeAdapter.EthAddress
 	}
 
 	lggr.Debug().Interface("lmCommon", lmCommon).Msg("lmCommon")
