@@ -30,8 +30,6 @@ import {MaybeRevertMessageReceiver} from "../helpers/receivers/MaybeRevertMessag
 import {MaybeRevertMessageReceiverNo165} from "../helpers/receivers/MaybeRevertMessageReceiverNo165.sol";
 import {ReentrancyAbuserMultiRamp} from "../helpers/receivers/ReentrancyAbuserMultiRamp.sol";
 import {MockCommitStore} from "../mocks/MockCommitStore.sol";
-import {OCR2Base} from "../ocr/OCR2Base.t.sol";
-import {OCR2BaseNoChecks} from "../ocr/OCR2BaseNoChecks.t.sol";
 import {EVM2EVMMultiOffRampSetup} from "./EVM2EVMMultiOffRampSetup.t.sol";
 
 import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
@@ -42,7 +40,7 @@ contract EVM2EVMMultiOffRamp_constructor is EVM2EVMMultiOffRampSetup {
     EVM2EVMMultiOffRamp.StaticConfig memory staticConfig =
       EVM2EVMMultiOffRamp.StaticConfig({chainSelector: DEST_CHAIN_SELECTOR, rmnProxy: address(s_mockRMN)});
     EVM2EVMMultiOffRamp.DynamicConfig memory dynamicConfig =
-      generateDynamicMultiOffRampConfig(address(s_destRouter), address(s_priceRegistry));
+      _generateDynamicMultiOffRampConfig(address(s_destRouter), address(s_priceRegistry));
 
     EVM2EVMMultiOffRamp.SourceChainConfigArgs[] memory sourceChainConfigs =
       new EVM2EVMMultiOffRamp.SourceChainConfigArgs[](2);
@@ -218,7 +216,7 @@ contract EVM2EVMMultiOffRamp_setDynamicConfig is EVM2EVMMultiOffRampSetup {
   function test_SetDynamicConfig_Success() public {
     EVM2EVMMultiOffRamp.StaticConfig memory staticConfig = s_offRamp.getStaticConfig();
     EVM2EVMMultiOffRamp.DynamicConfig memory dynamicConfig =
-      generateDynamicMultiOffRampConfig(USER_3, address(s_priceRegistry));
+      _generateDynamicMultiOffRampConfig(USER_3, address(s_priceRegistry));
 
     vm.expectEmit();
     emit EVM2EVMMultiOffRamp.ConfigSet(staticConfig, dynamicConfig);
@@ -232,7 +230,7 @@ contract EVM2EVMMultiOffRamp_setDynamicConfig is EVM2EVMMultiOffRampSetup {
   function test_SetDynamicConfigWithValidator_Success() public {
     EVM2EVMMultiOffRamp.StaticConfig memory staticConfig = s_offRamp.getStaticConfig();
     EVM2EVMMultiOffRamp.DynamicConfig memory dynamicConfig =
-      generateDynamicMultiOffRampConfig(USER_3, address(s_priceRegistry));
+      _generateDynamicMultiOffRampConfig(USER_3, address(s_priceRegistry));
     dynamicConfig.messageValidator = address(s_messageValidator);
 
     vm.expectEmit();
@@ -249,7 +247,7 @@ contract EVM2EVMMultiOffRamp_setDynamicConfig is EVM2EVMMultiOffRampSetup {
   function test_NonOwner_Revert() public {
     vm.startPrank(STRANGER);
     EVM2EVMMultiOffRamp.DynamicConfig memory dynamicConfig =
-      generateDynamicMultiOffRampConfig(USER_3, address(s_priceRegistry));
+      _generateDynamicMultiOffRampConfig(USER_3, address(s_priceRegistry));
 
     vm.expectRevert("Only callable by owner");
 
@@ -258,7 +256,7 @@ contract EVM2EVMMultiOffRamp_setDynamicConfig is EVM2EVMMultiOffRampSetup {
 
   function test_RouterZeroAddress_Revert() public {
     EVM2EVMMultiOffRamp.DynamicConfig memory dynamicConfig =
-      generateDynamicMultiOffRampConfig(ZERO_ADDRESS, address(s_priceRegistry));
+      _generateDynamicMultiOffRampConfig(ZERO_ADDRESS, address(s_priceRegistry));
 
     vm.expectRevert(EVM2EVMMultiOffRamp.ZeroAddressNotAllowed.selector);
 
@@ -266,7 +264,7 @@ contract EVM2EVMMultiOffRamp_setDynamicConfig is EVM2EVMMultiOffRampSetup {
   }
 
   function test_PriceRegistryZeroAddress_Revert() public {
-    EVM2EVMMultiOffRamp.DynamicConfig memory dynamicConfig = generateDynamicMultiOffRampConfig(USER_3, ZERO_ADDRESS);
+    EVM2EVMMultiOffRamp.DynamicConfig memory dynamicConfig = _generateDynamicMultiOffRampConfig(USER_3, ZERO_ADDRESS);
 
     vm.expectRevert(EVM2EVMMultiOffRamp.ZeroAddressNotAllowed.selector);
 
@@ -1136,7 +1134,7 @@ contract EVM2EVMMultiOffRamp_execute_upgrade is EVM2EVMMultiOffRampSetup {
     s_offRamp.executeSingleReport(_generateReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messages), new uint256[](0));
 
     address prevOffRamp = address(s_offRamp);
-    deployOffRamp(s_destRouter, s_mockRMN);
+    _deployOffRamp(s_destRouter, s_mockRMN);
 
     EVM2EVMMultiOffRamp.SourceChainConfigArgs[] memory sourceChainConfigs =
       new EVM2EVMMultiOffRamp.SourceChainConfigArgs[](1);
@@ -1715,7 +1713,7 @@ contract EVM2EVMMultiOffRamp_manuallyExecute is EVM2EVMMultiOffRampSetup {
     uint256 chain1 = block.chainid;
     uint256 chain2 = chain1 + 1;
     vm.chainId(chain2);
-    vm.expectRevert(abi.encodeWithSelector(OCR2BaseNoChecks.ForkedChain.selector, chain1, chain2));
+    vm.expectRevert(abi.encodeWithSelector(MultiOCR3Base.ForkedChain.selector, chain1, chain2));
 
     uint256[][] memory gasLimitOverrides = new uint256[][](1);
     gasLimitOverrides[0] = _getGasLimitsFromMessages(messages);
@@ -3513,7 +3511,7 @@ contract EVM2EVMMultiOffRamp_resetUnblessedRoots is EVM2EVMMultiOffRampSetup {
   function setUp() public virtual override {
     super.setUp();
     _setupRealRMN();
-    deployOffRamp(s_destRouter, s_realRMN);
+    _deployOffRamp(s_destRouter, s_realRMN);
     _setupMultipleOffRamps();
   }
 
@@ -3579,7 +3577,7 @@ contract EVM2EVMMultiOffRamp_verify is EVM2EVMMultiOffRampSetup {
   function setUp() public virtual override {
     super.setUp();
     _setupRealRMN();
-    deployOffRamp(s_destRouter, s_realRMN);
+    _deployOffRamp(s_destRouter, s_realRMN);
     _setupMultipleOffRamps();
   }
 

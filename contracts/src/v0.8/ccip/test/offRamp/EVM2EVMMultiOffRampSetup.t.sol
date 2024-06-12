@@ -54,8 +54,6 @@ contract EVM2EVMMultiOffRampSetup is TokenSetup, PriceRegistrySetup, MultiOCR3Ba
 
   bytes32 internal s_configDigestExec;
   bytes32 internal s_configDigestCommit;
-  // Used for single-lane offramp
-  uint64 internal constant s_offchainConfigVersion = 3;
   uint8 internal constant s_F = 1;
 
   uint40 internal s_latestEpochAndRound;
@@ -72,10 +70,10 @@ contract EVM2EVMMultiOffRampSetup is TokenSetup, PriceRegistrySetup, MultiOCR3Ba
 
     s_maybeRevertingPool = MaybeRevertingBurnMintTokenPool(s_destPoolByToken[s_destTokens[1]]);
 
-    deployOffRamp(s_destRouter, s_mockRMN);
+    _deployOffRamp(s_destRouter, s_mockRMN);
   }
 
-  function deployOffRamp(Router router, IRMN rmnProxy) internal {
+  function _deployOffRamp(Router router, IRMN rmnProxy) internal {
     EVM2EVMMultiOffRamp.SourceChainConfigArgs[] memory sourceChainConfigs =
       new EVM2EVMMultiOffRamp.SourceChainConfigArgs[](0);
 
@@ -107,7 +105,7 @@ contract EVM2EVMMultiOffRampSetup is TokenSetup, PriceRegistrySetup, MultiOCR3Ba
       transmitters: s_validTransmitters
     });
 
-    s_offRamp.setDynamicConfig(generateDynamicMultiOffRampConfig(address(router), address(s_priceRegistry)));
+    s_offRamp.setDynamicConfig(_generateDynamicMultiOffRampConfig(address(router), address(s_priceRegistry)));
     s_offRamp.setOCR3Configs(ocrConfigs);
 
     address[] memory priceUpdaters = new address[](1);
@@ -138,7 +136,7 @@ contract EVM2EVMMultiOffRampSetup is TokenSetup, PriceRegistrySetup, MultiOCR3Ba
       s_validSigners,
       s_validTransmitters,
       s_F,
-      abi.encode(generateDynamicOffRampConfig(address(router), address(s_priceRegistry))),
+      abi.encode(_generateDynamicOffRampConfig(address(router), address(s_priceRegistry))),
       s_offchainConfigVersion,
       abi.encode("")
     );
@@ -202,7 +200,7 @@ contract EVM2EVMMultiOffRampSetup is TokenSetup, PriceRegistrySetup, MultiOCR3Ba
     s_destRouter.applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), offRampUpdates);
   }
 
-  function generateDynamicOffRampConfig(
+  function _generateDynamicOffRampConfig(
     address router,
     address priceRegistry
   ) internal pure returns (EVM2EVMOffRamp.DynamicConfig memory) {
@@ -217,7 +215,7 @@ contract EVM2EVMMultiOffRampSetup is TokenSetup, PriceRegistrySetup, MultiOCR3Ba
     });
   }
 
-  function generateDynamicMultiOffRampConfig(
+  function _generateDynamicMultiOffRampConfig(
     address router,
     address priceRegistry
   ) internal pure returns (EVM2EVMMultiOffRamp.DynamicConfig memory) {
@@ -456,7 +454,7 @@ contract EVM2EVMMultiOffRampSetup is TokenSetup, PriceRegistrySetup, MultiOCR3Ba
       new EVM2EVMMultiOffRamp.SourceChainConfigArgs[](0)
     );
 
-    s_offRamp.setDynamicConfig(generateDynamicMultiOffRampConfig(address(s_destRouter), address(s_priceRegistry)));
+    s_offRamp.setDynamicConfig(_generateDynamicMultiOffRampConfig(address(s_destRouter), address(s_priceRegistry)));
     _setupMultipleOffRamps();
 
     address[] memory priceUpdaters = new address[](1);
