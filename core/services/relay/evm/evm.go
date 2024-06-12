@@ -1,7 +1,9 @@
 package evm
 
 import (
+	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -9,6 +11,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/ccipcommit"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/ccipexec"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
+	"math/big"
 	"strings"
 	"sync"
 	"time"
@@ -309,6 +312,18 @@ func (r *Relayer) NewMercuryProvider(rargs commontypes.RelayArgs, pargs commonty
 	transmitter := mercury.NewTransmitter(lggr, r.transmitterCfg, clients, privKey.PublicKey, rargs.JobID, *relayConfig.FeedID, r.mercuryORM, transmitterCodec)
 
 	return NewMercuryProvider(cp, r.chainReader, r.codec, NewMercuryChainReader(r.chain.HeadTracker()), transmitter, reportCodecV1, reportCodecV2, reportCodecV3, lggr), nil
+}
+
+func chainToUUID(chainID *big.Int) uuid.UUID {
+	// See https://www.rfc-editor.org/rfc/rfc4122.html#section-4.1.3 for the list of supported versions.
+	const VersionSHA1 = 5
+	var buf bytes.Buffer
+	buf.WriteString("CCIP:")
+	buf.Write(chainID.Bytes())
+	// We use SHA-256 instead of SHA-1 because the former has better collision resistance.
+	// The UUID will contain only the first 16 bytes of the hash.
+	// You can't say which algorithms was used just by looking at the UUID bytes.
+	return uuid.NewHash(sha256.New(), uuid.NameSpaceOID, buf.Bytes(), VersionSHA1)
 }
 
 // NewCCIPCommitProvider constructs a provider of type CCIPCommitProvider. Since this is happening in the Relayer,
