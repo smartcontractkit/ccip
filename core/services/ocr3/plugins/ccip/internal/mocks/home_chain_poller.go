@@ -4,7 +4,6 @@ import (
 	"context"
 
 	cciptypes "github.com/smartcontractkit/ccipocr3/ccipocr3-dont-merge"
-
 	"github.com/stretchr/testify/mock"
 )
 
@@ -32,3 +31,6 @@ func (hr *HomeChainPollerMock) Close() error {
 	args := hr.Called()
 	return args.Error(0)
 }
+
+// Interface compatibility check.
+var _ cciptypes.HomeChainPoller = (*HomeChainPollerMock)(nil)

@@ -5,7 +5,6 @@ go 1.21.7
 require (
 	github.com/deckarep/golang-set/v2 v2.6.0
 	github.com/smartcontractkit/chainlink-common v0.1.7-0.20240605111734-a7c799eab2d7
-	github.com/smartcontractkit/chainlink/v2 v2.12.0
 	github.com/smartcontractkit/libocr v0.0.0-20240419185742-fd3cab206b2c
 	github.com/stretchr/testify v1.9.0
 	golang.org/x/crypto v0.24.0
@@ -32,6 +31,7 @@ require (
 	github.com/prometheus/client_model v0.6.1 // indirect
 	github.com/prometheus/common v0.54.0 // indirect
 	github.com/prometheus/procfs v0.15.1 // indirect
+	github.com/rogpeppe/go-internal v1.11.0 // indirect
 	github.com/santhosh-tekuri/jsonschema/v5 v5.3.1 // indirect
 	github.com/shopspring/decimal v1.4.0 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect

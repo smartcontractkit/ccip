@@ -46,7 +46,10 @@ func NewPlugin(
 	homeChainPoller cciptypes.HomeChainPoller,
 ) *Plugin {
 	// Call to Start doesn't fail if it's already started
-	homeChainPoller.Start(ctx)
+	err := homeChainPoller.Start(ctx)
+	if err != nil {
+		return nil
+	}
 
 	return &Plugin{
 		nodeID:            nodeID,

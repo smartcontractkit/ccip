@@ -318,7 +318,7 @@ func newNode(ctx context.Context, t *testing.T, lggr logger.Logger, id int, cfg 
 	msgHasher := mocks.NewMessageHasher()
 	homeChainPoller := mocks.NewHomeChainPollerMock()
 
-	homeChainPoller.On("StartPolling", mock.Anything, mock.Anything).Return()
+	homeChainPoller.On("Start", mock.Anything).Return(nil)
 	homeChainPoller.On("GetConfig").Return(homeChainConfig)
 
 	node1 := NewPlugin(
