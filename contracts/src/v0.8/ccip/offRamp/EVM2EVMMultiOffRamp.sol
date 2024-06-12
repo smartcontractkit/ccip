@@ -115,12 +115,12 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
   /// @notice Dynamic offRamp config
   /// @dev since OffRampConfig is part of OffRampConfigChanged event, if changing it, we should update the ABI on Atlas
   struct DynamicConfig {
-    uint32 permissionLessExecutionThresholdSeconds; // ─╮ Waiting time before manual execution is enabled
+    address router; // ─────────────────────────────────╮ Router address
+    uint32 permissionLessExecutionThresholdSeconds; //  │ Waiting time before manual execution is enabled
     uint32 maxTokenTransferGas; //                      │ Maximum amount of gas passed on to token `transfer` call
-    address router; // ─────────────────────────────────╯ Router address
+    uint32 maxPoolReleaseOrMintGas; // ─────────────────╯ Maximum amount of gas passed on to token pool when calling releaseOrMint
     uint16 maxNumberOfTokensPerMsg; // ──╮ Maximum number of ERC20 token transfers that can be included per message
     uint32 maxDataBytes; //              │ Maximum payload data size in bytes
-    uint32 maxPoolReleaseOrMintGas; //   │ Maximum amount of gas passed on to token pool when calling releaseOrMint
     address messageValidator; // ────────╯ Optional message validator to validate incoming messages (zero address = no validator)
     address priceRegistry; // Price registry address on the local chain
   }
@@ -141,22 +141,22 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
 
   /// @dev Struct to hold a merkle root and an interval for a source chain so that an array of these can be passed in the CommitReport.
   struct MerkleRoot {
-    uint64 sourceChainSelector;
-    Interval interval;
-    bytes32 merkleRoot;
+    uint64 sourceChainSelector; // Remote source chain selector that the Merkle Root is scoped to
+    Interval interval; // Report interval of the merkle root
+    bytes32 merkleRoot; // Merkle root covering the interval & source chain messages
   }
 
   /// @notice Report that is committed by the observing DON at the committing phase
   /// @dev RMN depends on this struct, if changing, please notify the RMN maintainers.
   struct CommitReport {
-    Internal.PriceUpdates priceUpdates;
-    MerkleRoot[] merkleRoots;
+    Internal.PriceUpdates priceUpdates; // Collection of gas and price updates to commit
+    MerkleRoot[] merkleRoots; // Collection of merkle roots per source chain to commit
   }
 
   /// @dev Struct to hold a merkle root for a source chain so that an array of these can be passed in the resetUblessedRoots function.
   struct UnblessedRoot {
-    uint64 sourceChainSelector;
-    bytes32 merkleRoot;
+    uint64 sourceChainSelector; // Remote source chain selector that the Merkle Root is scoped to
+    bytes32 merkleRoot; // Merkle root of a single remote source chain
   }
 
   // STATIC CONFIG
@@ -327,7 +327,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
   /// @notice Transmit function for execution reports. The function takes no signatures,
   /// and expects the exec plugin type to be configured with no signatures.
   /// @param report serialized execution report
-  function transmitExec(bytes32[3] calldata reportContext, bytes calldata report) external {
+  function execute(bytes32[3] calldata reportContext, bytes calldata report) external {
     _reportExec(report);
 
     // TODO: gas / contract size saving from CONSTANT?
@@ -359,7 +359,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
     uint256[] memory emptyGasLimits = new uint256[](0);
 
     for (uint256 i = 0; i < reports.length; ++i) {
-      _execute(reports[i], areManualGasLimitsEmpty ? emptyGasLimits : manualExecGasLimits[i]);
+      _executeSingleReport(reports[i], areManualGasLimitsEmpty ? emptyGasLimits : manualExecGasLimits[i]);
     }
   }
 
@@ -368,7 +368,10 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
   /// @param manualExecGasLimits An array of gas limits to use for manual execution.
   /// @dev If called from the DON, this array is always empty.
   /// @dev If called from manual execution, this array is always same length as messages.
-  function _execute(Internal.ExecutionReportSingleChain memory report, uint256[] memory manualExecGasLimits) internal {
+  function _executeSingleReport(
+    Internal.ExecutionReportSingleChain memory report,
+    uint256[] memory manualExecGasLimits
+  ) internal {
     uint64 sourceChainSelector = report.sourceChainSelector;
     // TODO: re-use isCursed / isUnpaused check from _verify here
     if (IRMN(i_rmnProxy).isCursed(bytes32(uint256(sourceChainSelector)))) revert CursedByRMN(sourceChainSelector);
@@ -648,7 +651,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
   /// and should not be rejected. When a report with a stale root but valid price updates is submitted,
   /// we are OK to revert to preserve the invariant that we always revert on invalid sequence number ranges.
   /// If that happens, prices will be updates in later rounds.
-  function transmitCommit(
+  function commit(
     bytes32[3] calldata reportContext,
     bytes calldata report,
     bytes32[] calldata rs,

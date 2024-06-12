@@ -54,8 +54,11 @@ contract EVM2EVMMultiOffRampHelper is EVM2EVMMultiOffRamp, IgnoreContractSize {
     _reportCommit(commitReport, epochAndRound);
   }
 
-  function execute(Internal.ExecutionReportSingleChain memory rep, uint256[] memory manualExecGasLimits) external {
-    _execute(rep, manualExecGasLimits);
+  function executeSingleReport(
+    Internal.ExecutionReportSingleChain memory rep,
+    uint256[] memory manualExecGasLimits
+  ) external {
+    _executeSingleReport(rep, manualExecGasLimits);
   }
 
   function batchExecute(
