@@ -1057,12 +1057,9 @@ func (ccipModule *CCIPCommon) DeployContracts(noOfTokens int,
 		}
 	}
 	log.Info().Msg("finished deploying common contracts")
-	// if noOfTokens > 0, approve fee token
-	if noOfTokens > 0 {
-		// approve router to spend fee token
-		return ccipModule.ApproveTokens()
-	}
-	return nil
+
+	// approve router to spend fee token
+	return ccipModule.ApproveTokens()
 }
 
 func (ccipModule *CCIPCommon) AvgBlockTime(ctx context.Context) (time.Duration, error) {
