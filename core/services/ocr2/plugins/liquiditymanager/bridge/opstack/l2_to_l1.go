@@ -199,6 +199,7 @@ func (l *l2ToL1Bridge) GetTransfers(
 		parsedSent,
 		parsedProveFinalizationSteps,
 		parsedReceived,
+		lggr,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("partition transfers: %w", err)
@@ -207,7 +208,7 @@ func (l *l2ToL1Bridge) GetTransfers(
 		l.lggr.Errorw("missing sent logs", "missingSent", missingSent)
 	}
 
-	return l.toPendingTransfers(ctx, localToken, remoteToken, needsToBeProven, needsToBeFinalized, parsedToLp)
+	return l.toPendingTransfers(ctx, lggr, localToken, remoteToken, needsToBeProven, needsToBeFinalized, parsedToLp)
 }
 
 /**
@@ -227,6 +228,7 @@ func partitionWithdrawalTransfers(
 	sentLogs []*liquiditymanager.LiquidityManagerLiquidityTransferred,
 	proveFinalizationStepLogs []*liquiditymanager.LiquidityManagerFinalizationStepCompleted,
 	receivedLogs []*liquiditymanager.LiquidityManagerLiquidityTransferred,
+	lggr logger.Logger,
 ) (
 	needsToBeProven,
 	needsToBeFinalized []*liquiditymanager.LiquidityManagerLiquidityTransferred,
@@ -237,9 +239,11 @@ func partitionWithdrawalTransfers(
 	foundMatchingProveFinalizationStepMap := make(map[string]bool)
 	for _, sentLog := range sentLogs {
 		if sentLog.To != l1LiquidityManagerAddress {
+			lggr.Warnw("skipping sent log with mismatched 'To' address", "sentLog", sentLog)
 			continue
 		}
 		if sentLog.FromChainSelector != uint64(localSelector) {
+			lggr.Warnw("skipping sent log with mismatched 'FromChainSelector'", "sentLog", sentLog)
 			continue
 		}
 		var transferNonce *big.Int
@@ -256,6 +260,7 @@ func partitionWithdrawalTransfers(
 	for _, proveStep := range proveFinalizationStepLogs {
 		// L1's prove finalization step log's remote chain selector should be L2
 		if proveStep.RemoteChainSelector != uint64(localSelector) {
+			lggr.Warnw("skipping prove finalization step log with mismatched 'RemoteChainSelector'", "proveStep", proveStep)
 			continue
 		}
 		var transferNonce *big.Int
@@ -338,7 +343,7 @@ func (l *l2ToL1Bridge) getLogs(ctx context.Context) (sendLogs, proveFinalization
 			bridgecommon.NetworkSelectorToHash(l.remoteSelector),
 		},
 		time.Now().Add(-bridgecommon.DurationMonth/2),
-		evmtypes.Finalized,
+		1,
 	)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("get L2 -> L1 transfers from log poller on L2: %w", err)
@@ -369,7 +374,7 @@ func (l *l2ToL1Bridge) getLogs(ctx context.Context) (sendLogs, proveFinalization
 			bridgecommon.NetworkSelectorToHash(l.localSelector),
 		},
 		time.Now().Add(-bridgecommon.DurationMonth/2),
-		evmtypes.Finalized,
+		1,
 	)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("get L1 -> L2 transfers from log poller on L1: %w", err)
@@ -380,13 +385,14 @@ func (l *l2ToL1Bridge) getLogs(ctx context.Context) (sendLogs, proveFinalization
 
 func (l *l2ToL1Bridge) toPendingTransfers(
 	ctx context.Context,
+	lggr logger.Logger,
 	localToken, remoteToken models.Address,
 	needsToBeProven, needsToBeFinalized []*liquiditymanager.LiquidityManagerLiquidityTransferred,
 	parsedToLP map[bridgecommon.LogKey]logpoller.Log,
 ) ([]models.PendingTransfer, error) {
 	var transfers []models.PendingTransfer
 	for _, transfer := range needsToBeProven {
-		provePayload, err := l.generateTransferBridgeDataForProve(ctx, transfer)
+		provePayload, err := l.generateTransferBridgeDataForProve(ctx, lggr, transfer)
 		if err != nil {
 			return nil, fmt.Errorf("generate transfer bridge data for prove: %w", err)
 		}
@@ -440,13 +446,23 @@ func (l *l2ToL1Bridge) toPendingTransfers(
 
 func (l *l2ToL1Bridge) generateTransferBridgeDataForProve(
 	ctx context.Context,
+	lggr logger.Logger,
 	transfer *liquiditymanager.LiquidityManagerLiquidityTransferred,
 ) ([]byte, error) {
+	// Portal and Proxy addresses are kept on Eth L1
+	optimismPortalProxyAddress := OptimismContractsByChainSelector[uint64(l.remoteSelector)]["OptimismPortalProxy"]
+	optimismL2OutputOracleAddress := OptimismContractsByChainSelector[uint64(l.remoteSelector)]["L2OutputOracle"]
+	lggr.Infow("Generating transfer bridge data for prove, address check",
+		"remoteSelector", uint64(l.remoteSelector),
+		"OptimismPortalProxy", optimismPortalProxyAddress,
+		"L2OutputOracle", optimismL2OutputOracleAddress,
+	)
+
 	prover, err := withdrawprover.New(
 		l.l1Client,
 		l.l2Client,
-		OptimismContracts[uint64(l.localSelector)]["L2OutputOracle"],
-		OptimismContracts[uint64(l.localSelector)]["OptimismPortal"],
+		optimismPortalProxyAddress,
+		optimismL2OutputOracleAddress,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("instantiate withdraw prover: %w", err)
