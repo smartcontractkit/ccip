@@ -17,13 +17,11 @@ func Test_CommitReportValidator_ExecutePluginCommitData(t *testing.T) {
 		min     int
 		reports []cciptypes.ExecutePluginCommitData
 		valid   []cciptypes.ExecutePluginCommitData
-		invalid []cciptypes.ExecutePluginCommitData
 		wantErr assert.ErrorAssertionFunc
 	}{
 		{
 			name:    "empty",
 			valid:   nil,
-			invalid: nil,
 			wantErr: assert.NoError,
 		},
 		{
@@ -35,7 +33,6 @@ func Test_CommitReportValidator_ExecutePluginCommitData(t *testing.T) {
 			valid: []cciptypes.ExecutePluginCommitData{
 				{MerkleRoot: [32]byte{1}},
 			},
-			invalid: nil,
 			wantErr: assert.NoError,
 		},
 		{
@@ -45,7 +42,6 @@ func Test_CommitReportValidator_ExecutePluginCommitData(t *testing.T) {
 				{MerkleRoot: [32]byte{1}},
 			},
 			valid: nil,
-			invalid: []cciptypes.ExecutePluginCommitData{
 				{MerkleRoot: [32]byte{1}},
 			},
 			wantErr: assert.NoError,
@@ -64,7 +60,6 @@ func Test_CommitReportValidator_ExecutePluginCommitData(t *testing.T) {
 				{MerkleRoot: [32]byte{1}},
 				{MerkleRoot: [32]byte{2}},
 			},
-			invalid: []cciptypes.ExecutePluginCommitData{
 				{MerkleRoot: [32]byte{3}},
 			},
 			wantErr: assert.NoError,
@@ -82,11 +77,6 @@ func Test_CommitReportValidator_ExecutePluginCommitData(t *testing.T) {
 			valid: []cciptypes.ExecutePluginCommitData{
 				{MerkleRoot: [32]byte{1}, BlockNum: 1},
 			},
-			invalid: []cciptypes.ExecutePluginCommitData{
-				{MerkleRoot: [32]byte{1}, BlockNum: 2},
-				{MerkleRoot: [32]byte{1}, BlockNum: 3},
-				{MerkleRoot: [32]byte{1}, BlockNum: 4},
-			},
 			wantErr: assert.NoError,
 		},
 		{
@@ -102,12 +92,6 @@ func Test_CommitReportValidator_ExecutePluginCommitData(t *testing.T) {
 			},
 			valid: []cciptypes.ExecutePluginCommitData{
 				{MerkleRoot: [32]byte{1}, ExecutedMessages: []cciptypes.SeqNum{1, 2}},
-			},
-			invalid: []cciptypes.ExecutePluginCommitData{
-				{MerkleRoot: [32]byte{1}, ExecutedMessages: []cciptypes.SeqNum{2, 3}},
-				{MerkleRoot: [32]byte{1}, ExecutedMessages: []cciptypes.SeqNum{3, 4}},
-				{MerkleRoot: [32]byte{1}, ExecutedMessages: []cciptypes.SeqNum{4, 5}},
-				{MerkleRoot: [32]byte{1}, ExecutedMessages: []cciptypes.SeqNum{5, 6}},
 			},
 			wantErr: assert.NoError,
 		},
@@ -134,12 +118,6 @@ func Test_CommitReportValidator_ExecutePluginCommitData(t *testing.T) {
 			}
 			if !assert.ElementsMatch(t, got, tt.valid) {
 				t.Errorf("GetValid() = %v, valid %v", got, tt.valid)
-			}
-
-			got2, err2 := validator.GetInvalid()
-			require.NoError(t, err2)
-			if !assert.ElementsMatch(t, got2, tt.invalid) {
-				t.Errorf("GetInvalid() = %v, valid %v", got2, tt.invalid)
 			}
 		})
 	}
@@ -172,13 +150,6 @@ func Test_CommitReportValidator_Generics(t *testing.T) {
 	got, err := validator.GetValid()
 	require.NoError(t, err)
 	if !assert.ElementsMatch(t, got, wantValid) {
-		t.Errorf("GetValid() = %v, valid %v", got, wantValid)
-	}
-
-	wantInvalid := []Generic{otherValue}
-	got2, err2 := validator.GetInvalid()
-	require.NoError(t, err2)
-	if !assert.ElementsMatch(t, got2, wantInvalid) {
 		t.Errorf("GetValid() = %v, valid %v", got, wantValid)
 	}
 }

@@ -15,7 +15,6 @@ type counter[T any] struct {
 type MinObservationFilter[T any] interface {
 	Add(data T) error
 	GetValid() ([]T, error)
-	GetInvalid() ([]T, error)
 }
 
 // minObservationValidator is a helper object to validate reports for a single chain.
@@ -56,15 +55,4 @@ func (cv *minObservationValidator[T]) GetValid() ([]T, error) {
 		}
 	}
 	return validated, nil
-}
-
-func (cv *minObservationValidator[T]) GetInvalid() ([]T, error) {
-	var invalid []T
-	for _, rc := range cv.cache {
-		if rc.count < cv.minObservation {
-			rc := rc
-			invalid = append(invalid, rc.data)
-		}
-	}
-	return invalid, nil
 }
