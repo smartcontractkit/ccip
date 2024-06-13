@@ -323,16 +323,10 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
   /// and expects the exec plugin type to be configured with no signatures.
   /// @param report serialized execution report
   function execute(bytes32[3] calldata reportContext, bytes calldata report) external {
-    _reportExec(report);
+    _batchExecute(abi.decode(report, (Internal.ExecutionReportSingleChain[])), new uint256[][](0));
 
     bytes32[] memory emptySigs = new bytes32[](0);
     _transmit(uint8(Internal.OCRPluginType.Execution), reportContext, report, emptySigs, emptySigs, bytes32(""));
-  }
-
-  /// @notice Reporting function for the execution plugin
-  /// @param encodedReport encoded ExecutionReport
-  function _reportExec(bytes calldata encodedReport) internal {
-    _batchExecute(abi.decode(encodedReport, (Internal.ExecutionReportSingleChain[])), new uint256[][](0));
   }
 
   /// @notice Batch executes a set of reports, each report matching one single source chain
@@ -616,38 +610,32 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
     bytes32[] calldata ss,
     bytes32 rawVs // signatures
   ) external {
-    _reportCommit(report, uint64(uint256(reportContext[1])));
-    _transmit(uint8(Internal.OCRPluginType.Commit), reportContext, report, rs, ss, rawVs);
-  }
-
-  /// @notice Reporting function for the commit plugin
-  /// @param encodedReport encoded CommitReport
-  /// @param sequenceNumber Sequence number of the report
-  function _reportCommit(bytes calldata encodedReport, uint64 sequenceNumber) internal {
-    CommitReport memory report = abi.decode(encodedReport, (CommitReport));
+    uint64 sequenceNumber = uint64(uint256(reportContext[1]));
+    CommitReport memory commitReport = abi.decode(report, (CommitReport));
 
     // Check if the report contains price updates
-    if (report.priceUpdates.tokenPriceUpdates.length > 0 || report.priceUpdates.gasPriceUpdates.length > 0) {
+    if (commitReport.priceUpdates.tokenPriceUpdates.length > 0 || commitReport.priceUpdates.gasPriceUpdates.length > 0)
+    {
       // Check for price staleness based on the epoch and round
       if (s_latestPriceSequenceNumber < sequenceNumber) {
         // If prices are not stale, update the latest epoch and round
         s_latestPriceSequenceNumber = sequenceNumber;
         // And update the prices in the price registry
-        IPriceRegistry(s_dynamicConfig.priceRegistry).updatePrices(report.priceUpdates);
+        IPriceRegistry(s_dynamicConfig.priceRegistry).updatePrices(commitReport.priceUpdates);
 
         // If there is no root, the report only contained fee updated and
         // we return to not revert on the empty root check below.
-        if (report.merkleRoots.length == 0) return;
+        if (commitReport.merkleRoots.length == 0) return;
       } else {
         // If prices are stale and the report doesn't contain a root, this report
         // does not have any valid information and we revert.
         // If it does contain a merkle root, continue to the root checking section.
-        if (report.merkleRoots.length == 0) revert StaleCommitReport();
+        if (commitReport.merkleRoots.length == 0) revert StaleCommitReport();
       }
     }
 
-    for (uint256 i = 0; i < report.merkleRoots.length; ++i) {
-      MerkleRoot memory root = report.merkleRoots[i];
+    for (uint256 i = 0; i < commitReport.merkleRoots.length; ++i) {
+      MerkleRoot memory root = commitReport.merkleRoots[i];
       uint64 sourceChainSelector = root.sourceChainSelector;
 
       SourceChainConfig storage sourceChainConfig = _getSourceChainConfigWithCurseCheck(sourceChainSelector);
@@ -669,7 +657,9 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
       s_roots[root.sourceChainSelector][root.merkleRoot] = block.timestamp;
     }
 
-    emit CommitReportAccepted(report);
+    emit CommitReportAccepted(commitReport);
+
+    _transmit(uint8(Internal.OCRPluginType.Commit), reportContext, report, rs, ss, rawVs);
   }
 
   /// @notice Returns the sequence number of the last price update.

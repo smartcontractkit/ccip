@@ -478,4 +478,21 @@ contract EVM2EVMMultiOffRampSetup is TokenSetup, PriceRegistrySetup, MultiOCR3Ba
     // Overwrite base mock rmn with real.
     s_realRMN = new RMN(RMN.Config({voters: voters, blessWeightThreshold: 1, curseWeightThreshold: 1}));
   }
+
+  function _commit(EVM2EVMMultiOffRamp.CommitReport memory commitReport, uint64 sequenceNumber) internal {
+    bytes32[3] memory reportContext = [s_configDigestCommit, bytes32(uint256(sequenceNumber)), s_configDigestCommit];
+
+    (bytes32[] memory rs, bytes32[] memory ss,, bytes32 rawVs) =
+      _getSignaturesForDigest(s_validSignerKeys, s_configDigestCommit, abi.encode(commitReport), reportContext, s_F + 1);
+
+    vm.startPrank(s_validTransmitters[0]);
+    s_offRamp.commit(reportContext, abi.encode(commitReport), rs, ss, rawVs);
+  }
+
+  function _execute(Internal.ExecutionReportSingleChain[] memory reports) internal {
+    bytes32[3] memory reportContext = [s_configDigestExec, s_configDigestExec, s_configDigestExec];
+
+    vm.startPrank(s_validTransmitters[0]);
+    s_offRamp.execute(reportContext, abi.encode(reports));
+  }
 }
