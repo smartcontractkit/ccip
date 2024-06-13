@@ -118,7 +118,7 @@ func groupByChainSelector(reports []cciptypes.CommitPluginReportWithMeta) ccipty
 		for _, singleReport := range report.Report.MerkleRoots {
 			commitReportCache[singleReport.ChainSel] = append(commitReportCache[singleReport.ChainSel], cciptypes.ExecutePluginCommitDataWithMessages{
 				ExecutePluginCommitData: cciptypes.ExecutePluginCommitData{
-					Selector:            singleReport.ChainSel,
+					SourceChain:         singleReport.ChainSel,
 					Timestamp:           report.Timestamp,
 					BlockNum:            report.BlockNum,
 					MerkleRoot:          singleReport.MerkleRoot,

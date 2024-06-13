@@ -8,7 +8,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
@@ -17,9 +16,9 @@ import (
 
 // Plugin implements the main ocr3 plugin logic.
 type Plugin struct {
-	nodeID     commontypes.OracleID
-	cfg        cciptypes.ExecutePluginConfig
-	ccipReader cciptypes.CCIPReader
+	reportingCfg ocr3types.ReportingPluginConfig
+	cfg          cciptypes.ExecutePluginConfig
+	ccipReader   cciptypes.CCIPReader
 
 	//commitRootsCache cache.CommitsRootsCache
 	lastReportTS *atomic.Int64
@@ -27,7 +26,7 @@ type Plugin struct {
 
 func NewPlugin(
 	_ context.Context,
-	nodeID commontypes.OracleID,
+	reportingCfg ocr3types.ReportingPluginConfig,
 	cfg cciptypes.ExecutePluginConfig,
 	ccipReader cciptypes.CCIPReader,
 ) *Plugin {
@@ -35,7 +34,7 @@ func NewPlugin(
 	lastReportTS.Store(time.Now().Add(-cfg.MessageVisibilityInterval).UnixMilli())
 
 	return &Plugin{
-		nodeID:       nodeID,
+		reportingCfg: reportingCfg,
 		cfg:          cfg,
 		ccipReader:   ccipReader,
 		lastReportTS: lastReportTS,
@@ -109,7 +108,7 @@ func (p *Plugin) Observation(ctx context.Context, outctx ocr3types.OutcomeContex
 	}
 
 	// Phase 1: Gather commit reports from the destination chain and determine which messages are required to build a valid execution report.
-	ownConfig := p.cfg.ObserverInfo[p.nodeID]
+	ownConfig := p.cfg.ObserverInfo[p.reportingCfg.OracleID]
 	var groupedCommits cciptypes.ExecutePluginCommitObservations
 	if slices.Contains(ownConfig.Reads, p.cfg.DestChain) {
 		var oldestReport time.Time
@@ -133,7 +132,7 @@ func (p *Plugin) Observation(ctx context.Context, outctx ocr3types.OutcomeContex
 	} else {
 		commitReportCache := make(map[cciptypes.ChainSelector][]cciptypes.ExecutePluginCommitDataWithMessages)
 		for _, report := range previousOutcome.PendingCommitReports {
-			commitReportCache[report.Selector] = append(commitReportCache[report.Selector], report)
+			commitReportCache[report.SourceChain] = append(commitReportCache[report.SourceChain], report)
 		}
 
 		for selector, reports := range commitReportCache {
@@ -170,7 +169,7 @@ func (p *Plugin) ValidateObservation(outctx ocr3types.OutcomeContext, query type
 		return fmt.Errorf("decode observation: %w", err)
 	}
 
-	if err := validateObserverReadingEligibility(p.nodeID, p.cfg.ObserverInfo, decodedObservation.Messages); err != nil {
+	if err := validateObserverReadingEligibility(p.reportingCfg.OracleID, p.cfg.ObserverInfo, decodedObservation.Messages); err != nil {
 		return fmt.Errorf("validate observer reading eligibility: %w", err)
 	}
 
@@ -192,7 +191,7 @@ func (p *Plugin) Outcome(outctx ocr3types.OutcomeContext, query types.Query, aos
 		return ocr3types.Outcome{}, err
 
 	}
-	if len(decodedObservations) < p.cfg.F {
+	if len(decodedObservations) < p.reportingCfg.F {
 		return ocr3types.Outcome{}, fmt.Errorf("below F threshold")
 	}
 
@@ -223,7 +222,7 @@ func (p *Plugin) Outcome(outctx ocr3types.OutcomeContext, query types.Query, aos
 	var messages []cciptypes.CCIPMsg
 	for _, report := range reports {
 		for i := report.SequenceNumberRange.Start(); i <= report.SequenceNumberRange.End(); i++ {
-			if msg, ok := observation.Messages[report.Selector][i]; ok {
+			if msg, ok := observation.Messages[report.SourceChain][i]; ok {
 				messages = append(messages, msg)
 			}
 		}

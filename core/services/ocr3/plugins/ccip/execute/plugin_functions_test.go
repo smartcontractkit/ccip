@@ -304,7 +304,7 @@ func Test_groupByChainSelector(t *testing.T) {
 				1: {
 					{
 						ExecutePluginCommitData: cciptypes.ExecutePluginCommitData{
-							Selector:            1,
+							SourceChain:         1,
 							MerkleRoot:          cciptypes.Bytes32{1},
 							SequenceNumberRange: cciptypes.NewSeqNumRange(10, 20),
 							ExecutedMessages:    nil,
@@ -314,7 +314,7 @@ func Test_groupByChainSelector(t *testing.T) {
 				2: {
 					{
 						ExecutePluginCommitData: cciptypes.ExecutePluginCommitData{
-							Selector:            2,
+							SourceChain:         2,
 							MerkleRoot:          cciptypes.Bytes32{2},
 							SequenceNumberRange: cciptypes.NewSeqNumRange(30, 40),
 							ExecutedMessages:    nil,
