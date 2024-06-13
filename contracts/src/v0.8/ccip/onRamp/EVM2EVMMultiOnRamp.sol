@@ -47,7 +47,6 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ILinkAvailable, AggregateRat
   error MustBeCalledByRouter();
   error RouterMustSetOriginalSender();
   error InvalidConfig();
-  error InvalidAddress(bytes encodedAddress);
   error CursedByRMN(uint64 sourceChainSelector);
   error LinkBalanceNotSettled();
   error InvalidNopAddress(address nop);

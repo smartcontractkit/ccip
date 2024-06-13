@@ -47,7 +47,6 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   error MustBeCalledByRouter();
   error RouterMustSetOriginalSender();
   error InvalidConfig();
-  error InvalidAddress(bytes encodedAddress);
   error CursedByRMN();
   error LinkBalanceNotSettled();
   error InvalidNopAddress(address nop);
