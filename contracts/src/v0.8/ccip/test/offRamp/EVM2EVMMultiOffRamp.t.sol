@@ -42,7 +42,8 @@ contract EVM2EVMMultiOffRamp_constructor is EVM2EVMMultiOffRampSetup {
       rmnProxy: address(s_mockRMN),
       tokenAdminRegistry: address(s_tokenAdminRegistry)
     });
-    EVM2EVMMultiOffRamp.DynamicConfig memory dynamicConfig = _generateDynamicMultiOffRampConfig(address(s_destRouter), address(s_priceRegistry));
+    EVM2EVMMultiOffRamp.DynamicConfig memory dynamicConfig =
+      _generateDynamicMultiOffRampConfig(address(s_destRouter), address(s_priceRegistry));
 
     EVM2EVMMultiOffRamp.SourceChainConfigArgs[] memory sourceChainConfigs =
       new EVM2EVMMultiOffRamp.SourceChainConfigArgs[](2);
@@ -185,7 +186,11 @@ contract EVM2EVMMultiOffRamp_constructor is EVM2EVMMultiOffRampSetup {
     vm.expectRevert(EVM2EVMMultiOffRamp.ZeroChainSelectorNotAllowed.selector);
 
     s_offRamp = new EVM2EVMMultiOffRampHelper(
-      EVM2EVMMultiOffRamp.StaticConfig({chainSelector: DEST_CHAIN_SELECTOR, rmnProxy: address(s_mockRMN)}),
+      EVM2EVMMultiOffRamp.StaticConfig({
+        chainSelector: DEST_CHAIN_SELECTOR,
+        rmnProxy: address(s_mockRMN),
+        tokenAdminRegistry: address(s_tokenAdminRegistry)
+      }),
       sourceChainConfigs
     );
   }
@@ -200,7 +205,12 @@ contract EVM2EVMMultiOffRamp_constructor is EVM2EVMMultiOffRampSetup {
     vm.expectRevert(EVM2EVMMultiOffRamp.ZeroAddressNotAllowed.selector);
 
     s_offRamp = new EVM2EVMMultiOffRampHelper(
-      EVM2EVMMultiOffRamp.StaticConfig({chainSelector: DEST_CHAIN_SELECTOR, rmnProxy: ZERO_ADDRESS}), sourceChainConfigs
+      EVM2EVMMultiOffRamp.StaticConfig({
+        chainSelector: DEST_CHAIN_SELECTOR,
+        rmnProxy: ZERO_ADDRESS,
+        tokenAdminRegistry: address(s_tokenAdminRegistry)
+      }),
+      sourceChainConfigs
     );
   }
 
@@ -214,7 +224,31 @@ contract EVM2EVMMultiOffRamp_constructor is EVM2EVMMultiOffRampSetup {
     vm.expectRevert(EVM2EVMMultiOffRamp.ZeroChainSelectorNotAllowed.selector);
 
     s_offRamp = new EVM2EVMMultiOffRampHelper(
-      EVM2EVMMultiOffRamp.StaticConfig({chainSelector: 0, rmnProxy: address(s_mockRMN)}), sourceChainConfigs
+      EVM2EVMMultiOffRamp.StaticConfig({
+        chainSelector: 0,
+        rmnProxy: address(s_mockRMN),
+        tokenAdminRegistry: address(s_tokenAdminRegistry)
+      }),
+      sourceChainConfigs
+    );
+  }
+
+  function test_ZeroTokenAdminRegistry_Revert() public {
+    uint64[] memory sourceChainSelectors = new uint64[](1);
+    sourceChainSelectors[0] = SOURCE_CHAIN_SELECTOR_1;
+
+    EVM2EVMMultiOffRamp.SourceChainConfigArgs[] memory sourceChainConfigs =
+      new EVM2EVMMultiOffRamp.SourceChainConfigArgs[](0);
+
+    vm.expectRevert(EVM2EVMMultiOffRamp.ZeroAddressNotAllowed.selector);
+
+    s_offRamp = new EVM2EVMMultiOffRampHelper(
+      EVM2EVMMultiOffRamp.StaticConfig({
+        chainSelector: DEST_CHAIN_SELECTOR,
+        rmnProxy: address(s_mockRMN),
+        tokenAdminRegistry: ZERO_ADDRESS
+      }),
+      sourceChainConfigs
     );
   }
 }

@@ -456,7 +456,11 @@ contract EVM2EVMMultiOffRampSetup is TokenSetup, PriceRegistrySetup, MultiOCR3Ba
 
   function _redeployOffRampWithNoOCRConfigs() internal {
     s_offRamp = new EVM2EVMMultiOffRampHelper(
-      EVM2EVMMultiOffRamp.StaticConfig({chainSelector: DEST_CHAIN_SELECTOR, rmnProxy: address(s_mockRMN)}),
+      EVM2EVMMultiOffRamp.StaticConfig({
+        chainSelector: DEST_CHAIN_SELECTOR,
+        rmnProxy: address(s_mockRMN),
+        tokenAdminRegistry: address(s_tokenAdminRegistry)
+      }),
       new EVM2EVMMultiOffRamp.SourceChainConfigArgs[](0)
     );
 

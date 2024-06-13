@@ -188,9 +188,19 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
   mapping(uint64 sourceChainSelector => mapping(uint64 seqNum => uint256 executionStateBitmap)) internal
     s_executionStates;
 
+  // sourceChainSelector => merkleRoot => timestamp when received
+  mapping(uint64 sourceChainSelector => mapping(bytes32 merkleRoot => uint256 timestamp)) internal s_roots;
+  /// @dev The epoch and round of the last report
+  uint40 private s_latestPriceEpochAndRound;
+  /// @dev Whether this OffRamp is paused or not
+  bool private s_paused = false;
+
   constructor(StaticConfig memory staticConfig, SourceChainConfigArgs[] memory sourceChainConfigs) MultiOCR3Base() {
-    if (staticConfig.commitStore == address(0) || staticConfig.tokenAdminRegistry == address(0)) {
+    if (staticConfig.rmnProxy == address(0) || staticConfig.tokenAdminRegistry == address(0)) {
       revert ZeroAddressNotAllowed();
+    }
+    if (staticConfig.chainSelector == 0) {
+      revert ZeroChainSelectorNotAllowed();
     }
 
     i_chainSelector = staticConfig.chainSelector;
@@ -686,7 +696,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
       MerkleRoot memory root = report.merkleRoots[i];
       uint64 sourceChainSelector = root.sourceChainSelector;
 
-      if (IRMN(i_rmnProxy).isCursed(bytes32(uint256(sourceChainSelector)))) revert CursedByRMN(sourceChainSelector);
+      if (IRMN(i_rmnProxy).isCursed(bytes16(uint128(sourceChainSelector)))) revert CursedByRMN(sourceChainSelector);
 
       SourceChainConfig storage sourceChainConfig = s_sourceChainConfigs[sourceChainSelector];
 
@@ -792,11 +802,8 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
   /// @dev This function will always return the same struct as the contents is static and can never change.
   /// RMN depends on this function, if changing, please notify the RMN maintainers.
   function getStaticConfig() external view returns (StaticConfig memory) {
-    return StaticConfig({
-      chainSelector: i_chainSelector,
-      rmnProxy: i_rmnProxy,
-      tokenAdminRegistry: i_tokenAdminRegistry
-    });
+    return
+      StaticConfig({chainSelector: i_chainSelector, rmnProxy: i_rmnProxy, tokenAdminRegistry: i_tokenAdminRegistry});
   }
 
   /// @notice Returns the current dynamic config.
@@ -865,11 +872,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
 
     // TODO: contract size golfing - is StaticConfig needed in the event?
     emit ConfigSet(
-      StaticConfig({
-        chainSelector: i_chainSelector,
-        rmnProxy: i_rmnProxy,
-        tokenAdminRegistry: i_tokenAdminRegistry
-      }),
+      StaticConfig({chainSelector: i_chainSelector, rmnProxy: i_rmnProxy, tokenAdminRegistry: i_tokenAdminRegistry}),
       dynamicConfig
     );
   }
@@ -975,7 +978,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
 
   /// @notice Single function to check the status of the commitStore.
   function isUnpausedAndNotCursed(uint64 sourceChainSelector) external view returns (bool) {
-    return !IRMN(i_rmnProxy).isCursed(bytes32(uint256(sourceChainSelector))) && !s_paused;
+    return !IRMN(i_rmnProxy).isCursed(bytes16(uint128(sourceChainSelector))) && !s_paused;
   }
 
   // TODO: global pausing can be removed delegated to the i_rmnProxy
