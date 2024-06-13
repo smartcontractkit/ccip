@@ -58,6 +58,13 @@ func getPendingExecutedReports(ctx context.Context, ccipReader cciptypes.CCIPRea
 		}
 	}
 
+	// TODO: this could be more efficient. commitReports is also traversed in 'groupByChainSelector'.
+	for _, report := range commitReports {
+		if report.Timestamp.After(latestReportTS) {
+			latestReportTS = report.Timestamp
+		}
+	}
+
 	groupedCommits := groupByChainSelector(commitReports)
 
 	// Remove fully executed reports.
