@@ -141,7 +141,7 @@ contract MultiRampsE2E is EVM2EVMMultiOnRampSetup, EVM2EVMMultiOffRampSetup {
     bytes memory commitReport = abi.encode(report);
 
     vm.resumeGasMetering();
-    s_offRamp.reportCommit(commitReport, ++s_latestEpochAndRound);
+    s_offRamp.reportCommit(commitReport, ++s_latestSequenceNumber);
     vm.pauseGasMetering();
 
     bytes32[] memory proofs = new bytes32[](0);

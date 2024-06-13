@@ -239,7 +239,7 @@ contract EVM2EVMMultiOffRamp_constructor is EVM2EVMMultiOffRampSetup {
     EVM2EVMMultiOffRamp.SourceChainConfigArgs[] memory sourceChainConfigs =
       new EVM2EVMMultiOffRamp.SourceChainConfigArgs[](0);
 
-    vm.expectRevert(EVM2EVMMultiOffRamp.ZeroAddressNotAllowed.selector);
+    vm.expectRevert(Internal.ZeroAddressNotAllowed.selector);
 
     s_offRamp = new EVM2EVMMultiOffRampHelper(
       EVM2EVMMultiOffRamp.StaticConfig({
