@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/pelletier/go-toml/v2"
 	"github.com/smartcontractkit/chainlink-common/pkg/loop"
 	"github.com/smartcontractkit/chainlink-common/pkg/loop/adapters/relay"
 	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil"
@@ -16,6 +17,7 @@ import (
 	starkchain "github.com/smartcontractkit/chainlink-starknet/relayer/pkg/chainlink/chain"
 	"github.com/smartcontractkit/chainlink-starknet/relayer/pkg/chainlink/config"
 
+	"github.com/smartcontractkit/chainlink/v2/core/capabilities"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/legacyevm"
 	coreconfig "github.com/smartcontractkit/chainlink/v2/core/config"
 	"github.com/smartcontractkit/chainlink/v2/core/config/env"
@@ -24,15 +26,14 @@ import (
 	evmrelay "github.com/smartcontractkit/chainlink/v2/core/services/relay/evm"
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/mercury/wsrpc"
 	"github.com/smartcontractkit/chainlink/v2/plugins"
-
-	"github.com/pelletier/go-toml/v2"
 )
 
 type RelayerFactory struct {
 	logger.Logger
 	*plugins.LoopRegistry
 	loop.GRPCOpts
-	MercuryPool wsrpc.Pool
+	MercuryPool          wsrpc.Pool
+	CapabilitiesRegistry *capabilities.Registry
 }
 
 type EVMFactoryConfig struct {
@@ -68,10 +69,11 @@ func (r *RelayerFactory) NewEVM(ctx context.Context, config EVMFactoryConfig) (m
 		}
 
 		relayerOpts := evmrelay.RelayerOpts{
-			DS:                ccOpts.DS,
-			CSAETHKeystore:    config.CSAETHKeystore,
-			MercuryPool:       r.MercuryPool,
-			TransmitterConfig: config.MercuryTransmitter,
+			DS:                   ccOpts.DS,
+			CSAETHKeystore:       config.CSAETHKeystore,
+			MercuryPool:          r.MercuryPool,
+			TransmitterConfig:    config.MercuryTransmitter,
+			CapabilitiesRegistry: r.CapabilitiesRegistry,
 		}
 		relayer, err2 := evmrelay.NewRelayer(lggr.Named(relayID.ChainID), chain, relayerOpts)
 		if err2 != nil {
@@ -101,7 +103,6 @@ func (r *RelayerFactory) NewSolana(ks keystore.Solana, chainCfgs solcfg.TOMLConf
 	unique := make(map[string]struct{})
 	// create one relayer per chain id
 	for _, chainCfg := range chainCfgs {
-
 		relayID := types.RelayID{Network: types.NetworkSolana, ChainID: *chainCfg.ChainID}
 		_, alreadyExists := unique[relayID.Name()]
 		if alreadyExists {
@@ -118,7 +119,6 @@ func (r *RelayerFactory) NewSolana(ks keystore.Solana, chainCfgs solcfg.TOMLConf
 		lggr := solLggr.Named(relayID.ChainID)
 
 		if cmdName := env.SolanaPlugin.Cmd.Get(); cmdName != "" {
-
 			// setup the solana relayer to be a LOOP
 			cfgTOML, err := toml.Marshal(struct {
 				Solana solcfg.TOMLConfig
@@ -141,7 +141,6 @@ func (r *RelayerFactory) NewSolana(ks keystore.Solana, chainCfgs solcfg.TOMLConf
 			}
 
 			solanaRelayers[relayID] = loop.NewRelayerService(lggr, r.GRPCOpts, solCmdFn, string(cfgTOML), signer)
-
 		} else {
 			// fallback to embedded chain
 			opts := pkgsolana.ChainOpts{
@@ -232,7 +231,6 @@ func (r *RelayerFactory) NewStarkNet(ks keystore.StarkNet, chainCfgs config.TOML
 		}
 	}
 	return starknetRelayers, nil
-
 }
 
 type CosmosFactoryConfig struct {
@@ -289,8 +287,6 @@ func (r *RelayerFactory) NewCosmos(config CosmosFactoryConfig) (map[types.RelayI
 		}
 
 		relayers[relayID] = NewCosmosLoopRelayerChain(cosmos.NewRelayer(lggr, chain), chain)
-
 	}
 	return relayers, nil
-
 }

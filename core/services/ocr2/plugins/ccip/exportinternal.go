@@ -64,7 +64,7 @@ func NewDynamicPriceGetter(cfg config.DynamicPriceGetterConfig, evmClients map[u
 }
 
 func NewDynamicLimitedBatchCaller(
-	lggr logger.Logger, batchSender client.BatchSender, batchSizeLimit, backOffMultiplier, parallelRpcCallsLimit uint,
+	lggr logger.Logger, batchSender rpclib.BatchSender, batchSizeLimit, backOffMultiplier, parallelRpcCallsLimit uint,
 ) *rpclib.DynamicLimitedBatchCaller {
 	return rpclib.NewDynamicLimitedBatchCaller(lggr, batchSender, batchSizeLimit, backOffMultiplier, parallelRpcCallsLimit)
 }

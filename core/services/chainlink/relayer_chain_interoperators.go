@@ -212,7 +212,6 @@ func (rs *CoreRelayerChainInteroperators) LegacyCosmosChains() LegacyCosmosConta
 
 // ChainStatus gets [types.ChainStatus]
 func (rs *CoreRelayerChainInteroperators) ChainStatus(ctx context.Context, id types.RelayID) (types.ChainStatus, error) {
-
 	lr, err := rs.Get(id)
 	if err != nil {
 		return types.ChainStatus{}, fmt.Errorf("%w: error getting chain status: %w", chains.ErrNotFound, err)
@@ -222,7 +221,6 @@ func (rs *CoreRelayerChainInteroperators) ChainStatus(ctx context.Context, id ty
 }
 
 func (rs *CoreRelayerChainInteroperators) ChainStatuses(ctx context.Context, offset, limit int) ([]types.ChainStatus, int, error) {
-
 	var (
 		stats    []types.ChainStatus
 		totalErr error

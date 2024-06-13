@@ -57,6 +57,7 @@ ComputeUnitPriceMax = 1000
 ComputeUnitPriceMin = 0
 ComputeUnitPriceDefault = 0
 FeeBumpPeriod = '3s'
+BlockHistoryPollPeriod = '5s'
 Nodes = []
 `,
 				}
@@ -116,6 +117,7 @@ func Test_SolanaChainsController_Index(t *testing.T) {
 			TxTimeout: commoncfg.MustNewDuration(time.Hour),
 		},
 	}
+
 	chainB := &solcfg.TOMLConfig{
 		ChainID: ptr(fmt.Sprintf("ChainlinktestB-%d", rand.Int31n(999999))),
 		Chain: solcfg.Chain{
