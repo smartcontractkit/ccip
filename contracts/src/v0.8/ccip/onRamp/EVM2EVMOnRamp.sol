@@ -69,6 +69,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
 
   /// @dev Struct that contains the static configuration
   /// RMN depends on this struct, if changing, please notify the RMN maintainers.
+  //solhint-disable gas-struct-packing
   struct StaticConfig {
     address linkToken; // ────────╮ Link token address
     uint64 chainSelector; // ─────╯ Source chainSelector
@@ -261,7 +262,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     uint256 feeTokenAmount,
     address originalSender
   ) external returns (bytes32) {
-    if (IRMN(i_rmnProxy).isCursed(bytes32(uint256(destChainSelector)))) revert CursedByRMN();
+    if (IRMN(i_rmnProxy).isCursed(bytes16(uint128(destChainSelector)))) revert CursedByRMN();
     // Validate message sender is set and allowed. Not validated in `getFee` since it is not user-driven.
     if (originalSender == address(0)) revert RouterMustSetOriginalSender();
     // Router address may be zero intentionally to pause.
@@ -356,13 +357,13 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
       ) {
         revert SourceTokenDataTooLarge(tokenAndAmount.token);
       }
-      // We validate the pool address to ensure it is a valid EVM address
-      Internal._validateEVMAddress(poolReturnData.destPoolAddress);
+      // We validate the token address to ensure it is a valid EVM address
+      Internal._validateEVMAddress(poolReturnData.destTokenAddress);
 
       newMessage.sourceTokenData[i] = abi.encode(
         Internal.SourceTokenData({
           sourcePoolAddress: abi.encode(sourcePool),
-          destPoolAddress: poolReturnData.destPoolAddress,
+          destTokenAddress: poolReturnData.destTokenAddress,
           extraData: poolReturnData.destPoolData
         })
       );
