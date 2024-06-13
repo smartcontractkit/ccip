@@ -437,7 +437,12 @@ func TestSmokeCCIPSelfServeRateLimitOnRamp(t *testing.T) {
 		})
 	}
 
-	aggregateRateLimit := big.NewInt(1e16)
+	var (
+		aggregateRateLimit = big.NewInt(1e16)
+		overLimitAmount    = new(big.Int).Add(aggregateRateLimit, big.NewInt(1))
+		freeTokenIndex     = 0
+		limitedTokenIndex  = 1
+	)
 
 	for _, tc := range tests {
 		t.Run(fmt.Sprintf("%s - Self Serve Rate Limit OnRamp", tc.testName), func(t *testing.T) {
@@ -464,14 +469,10 @@ func TestSmokeCCIPSelfServeRateLimitOnRamp(t *testing.T) {
 			}
 
 			var (
-				freeTokenIndex    = 0
-				limitedTokenIndex = 1
-
 				freeSrcToken     = src.Common.BridgeTokens[freeTokenIndex]
 				freeDestToken    = dest.Common.BridgeTokens[freeTokenIndex]
 				limitedSrcToken  = src.Common.BridgeTokens[limitedTokenIndex]
 				limitedDestToken = dest.Common.BridgeTokens[limitedTokenIndex]
-				overLimitAmount  = new(big.Int).Add(aggregateRateLimit, big.NewInt(1))
 			)
 			tc.lane.Logger.Info().
 				Str("Free Source Token", freeSrcToken.Address()).
@@ -585,7 +586,12 @@ func TestSmokeCCIPSelfServeRateLimitOffRamp(t *testing.T) {
 		})
 	}
 
-	aggregateRateLimit := big.NewInt(1e16)
+	var (
+		aggregateRateLimit = big.NewInt(1e16)
+		overLimitAmount    = new(big.Int).Add(aggregateRateLimit, big.NewInt(1))
+		freeTokenIndex     = 0
+		limitedTokenIndex  = 1
+	)
 
 	for _, tc := range tests {
 		t.Run(fmt.Sprintf("%s - Self Serve Rate Limit OffRamp", tc.testName), func(t *testing.T) {
@@ -612,9 +618,6 @@ func TestSmokeCCIPSelfServeRateLimitOffRamp(t *testing.T) {
 			}
 
 			var (
-				freeTokenIndex    = 0
-				limitedTokenIndex = 1
-
 				freeSrcToken     = src.Common.BridgeTokens[freeTokenIndex]
 				freeDestToken    = dest.Common.BridgeTokens[freeTokenIndex]
 				limitedSrcToken  = src.Common.BridgeTokens[limitedTokenIndex]
@@ -631,7 +634,6 @@ func TestSmokeCCIPSelfServeRateLimitOffRamp(t *testing.T) {
 			require.NoError(t, err, "Error disabling rate limits")
 
 			// Send both tokens with no rate limits and ensure they succeed
-			overLimitAmount := new(big.Int).Add(aggregateRateLimit, big.NewInt(1))
 			src.TransferAmount[freeTokenIndex] = overLimitAmount
 			src.TransferAmount[limitedTokenIndex] = overLimitAmount
 			tc.lane.RecordStateBeforeTransfer()
@@ -810,6 +812,115 @@ func TestSmokeCCIPManuallyExecuteAfterExecutionFailingDueToInsufficientGas(t *te
 				tc.lane.Source.UpdateBalance(int64(tc.lane.NumberOfReq), tc.lane.TotalFee, tc.lane.Balance)
 				tc.lane.Dest.UpdateBalance(tc.lane.Source.TransferAmount, int64(tc.lane.NumberOfReq), tc.lane.Balance)
 			}
+		})
+	}
+}
+
+func TestSmokeCCIPTransferConfig(t *testing.T) {
+	t.Parallel()
+
+	log := logging.GetTestLogger(t)
+	TestCfg := testsetups.NewCCIPTestConfig(t, log, testconfig.Smoke, testsetups.WithTokensPerChain(4))
+	if onRampVersion, exists := TestCfg.VersionInput[contracts.OnRampContract]; exists {
+		require.NotEqual(t, onRampVersion, contracts.V1_2_0, "Provided OnRamp contract version '%s' is not supported for this test", onRampVersion)
+	} else {
+		require.FailNow(t, "OnRamp contract version not found in test config")
+	}
+
+	setUpOutput := testsetups.CCIPDefaultTestSetUp(t, log, "smoke-ccip", nil, TestCfg)
+	if len(setUpOutput.Lanes) == 0 {
+		return
+	}
+	t.Cleanup(func() {
+		require.NoError(t, setUpOutput.TearDown())
+	})
+
+	var tests []testDefinition
+	for _, lane := range setUpOutput.Lanes {
+		tests = append(tests, testDefinition{
+			testName: fmt.Sprintf("Network %s to network %s",
+				lane.ForwardLane.SourceNetworkName, lane.ForwardLane.DestNetworkName),
+			lane: lane.ForwardLane,
+		})
+	}
+
+	var (
+		aggregateRateLimit = big.NewInt(1e16)
+		overLimitAmount    = new(big.Int).Add(aggregateRateLimit, big.NewInt(1))
+
+		// token without any transfer config
+		noConfigTokenIndex = 0
+		// token with bps non-zero, no agg rate limit
+		bpsTokenIndex = 1
+		// token with bps zero, with agg rate limit on
+		aggRateTokenIndex = 2
+		// token with both bps and agg rate limit
+		bpsAndAggTokenIndex = 3
+	)
+
+	for _, tc := range tests {
+		t.Run(fmt.Sprintf("%s - Transfer Fee Config", tc.testName), func(t *testing.T) {
+			tc.lane.Test = t
+			src := tc.lane.Source
+			dest := tc.lane.Dest
+			// add liquidity to pools on both networks
+			if !pointer.GetBool(TestCfg.TestGroupInput.ExistingDeployment) {
+				addFund := func(ccipCommon *actions.CCIPCommon) {
+					for i, btp := range ccipCommon.BridgeTokenPools {
+						token := ccipCommon.BridgeTokens[i]
+						err := btp.AddLiquidity(
+							token, token.OwnerWallet, new(big.Int).Mul(aggregateRateLimit, big.NewInt(20)),
+						)
+						require.NoError(t, err)
+					}
+				}
+				addFund(src.Common)
+				addFund(dest.Common)
+			}
+			err := tc.lane.DisableAllRateLimiting()
+			require.NoError(t, err, "Error disabling rate limits")
+
+			var (
+				// noConfigToken  = src.Common.BridgeTokens[noConfigTokenIndex]
+				bpsToken       = src.Common.BridgeTokens[bpsTokenIndex]
+				aggRateToken   = src.Common.BridgeTokens[aggRateTokenIndex]
+				bpsAndAggToken = src.Common.BridgeTokens[bpsAndAggTokenIndex]
+			)
+
+			// Set valid transfer fee configs for all tokens
+			err = src.OnRamp.SetTokenTransferFeeConfig([]evm_2_evm_onramp.EVM2EVMOnRampTokenTransferFeeConfigArgs{
+				{
+					Token:                     bpsToken.ContractAddress,
+					AggregateRateLimitEnabled: false,
+					DeciBps:                   1000,
+				},
+				{
+					Token:                     aggRateToken.ContractAddress,
+					AggregateRateLimitEnabled: true,
+				},
+				{
+					Token:                     bpsAndAggToken.ContractAddress,
+					AggregateRateLimitEnabled: true,
+					DeciBps:                   1000,
+				},
+			})
+			require.NoError(t, err, "Error setting OnRamp transfer fee configs")
+
+			err = src.OnRamp.SetRateLimit(evm_2_evm_onramp.RateLimiterConfig{
+				IsEnabled: true,
+				Capacity:  aggregateRateLimit,
+				Rate:      aggregateRateLimit,
+			})
+			require.NoError(t, err, "Error enabling OnRamp aggregate rate limit")
+
+			src.TransferAmount[noConfigTokenIndex] = overLimitAmount
+			src.TransferAmount[bpsTokenIndex] = overLimitAmount
+			src.TransferAmount[aggRateTokenIndex] = big.NewInt(1)
+			src.TransferAmount[bpsAndAggTokenIndex] = big.NewInt(1)
+			tc.lane.RecordStateBeforeTransfer()
+			err = tc.lane.SendRequests(1, big.NewInt(actions.DefaultRequestGasLimit))
+			require.NoError(t, err)
+			tc.lane.ValidateRequests()
 		})
 	}
 }
