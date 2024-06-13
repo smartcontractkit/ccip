@@ -7,13 +7,14 @@ import {SafeERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/tok
 
 import {ICCIPClientBase} from "./interfaces/ICCIPClientBase.sol";
 
-contract CCIPClientBase is ICCIPClientBase, OwnerIsCreator {
+abstract contract CCIPClientBase is ICCIPClientBase, OwnerIsCreator {
   using SafeERC20 for IERC20;
 
   address internal immutable i_ccipRouter;
 
   mapping(uint64 destChainSelector => mapping(bytes sender => bool approved)) public s_approvedSenders;
-  mapping(uint64 destChainSelector => ChainInfo chainInfo) public s_chains;
+  mapping(uint64 destChainSelector => bytes recipient) public s_chains;
+  mapping(uint64 destChainselector => bytes extraArgsBytes) public s_extraArgsBytes;
 
   constructor(address router) {
     if (router == address(0)) revert InvalidRouter(address(0));
@@ -39,11 +40,11 @@ contract CCIPClientBase is ICCIPClientBase, OwnerIsCreator {
   /////////////////////////////////////////////////////////////////////
 
   function updateApprovedSenders(approvedSenderUpdate[] calldata adds, approvedSenderUpdate[] calldata removes) external onlyOwner {
-    for(uint256 i = 0; i < adds.length; ++i) {
+    for(uint256 i = 0; i < removes.length; ++i) {
       delete s_approvedSenders[removes[i].destChainSelector][removes[i].sender];
     }
 
-    for(uint256 i = 0; i < removes.length; ++i) {
+    for(uint256 i = 0; i < adds.length; ++i) {
       s_approvedSenders[adds[i].destChainSelector][adds[i].sender] = true;
     }
   }
@@ -63,24 +64,25 @@ contract CCIPClientBase is ICCIPClientBase, OwnerIsCreator {
   // Chain Management
   /////////////////////////////////////////////////////////////////////
 
-  function enableChain(uint64 chainSelector, ChainInfo calldata chainInfo) external onlyOwner {
-    s_chains[chainSelector] = chainInfo;
+  function enableChain(uint64 chainSelector, bytes calldata recipient, bytes calldata extraArgsBytes) external onlyOwner {
+    s_chains[chainSelector] = recipient;
+
+    if (extraArgsBytes.length != 0) s_extraArgsBytes[chainSelector] = extraArgsBytes;
   }
 
   function disableChain(uint64 chainSelector) external onlyOwner {
     delete s_chains[chainSelector];
+    delete s_extraArgsBytes[chainSelector];
   }
 
   modifier validChain(uint64 chainSelector) {
-    if (s_chains[chainSelector].extraArgsBytes.length == 0) revert InvalidChain(chainSelector);
+    if (s_chains[chainSelector].length == 0) revert InvalidChain(chainSelector);
     _;
   }
 
-  modifier validSender(uint64 chainSelector, bytes calldata sender) {
+  modifier validSender(uint64 chainSelector, bytes memory sender) {
     if (!s_approvedSenders[chainSelector][sender]) revert InvalidSender(sender);
     _;
   }
-
-
 
 }

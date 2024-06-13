@@ -20,9 +20,11 @@ contract CCIPReceiverWithACK is CCIPReceiver {
 
   mapping(bytes32 messageId => bool ackReceived) public s_messageAckReceived;
 
+  event MessageAckSent(bytes32 incomingMessageId);
   event MessageSent(bytes32);
   event MessageAckReceived(bytes32);
   error InvalidMagicBytes();
+  event FeeTokenModified(address indexed oldToken, address indexed newToken);
 
    enum MessageType {
     OUTGOING,
@@ -45,10 +47,21 @@ contract CCIPReceiverWithACK is CCIPReceiver {
   }
 
   function modifyFeeToken(address token) external onlyOwner {
-    s_feeToken = IERC20(token);
-    if (token != address(0)) {
-        s_feeToken.safeApprove(getRouter(), type(uint256).max);
+    // If the current fee token is not-native, zero out the allowance to the router for safety
+    if (address(s_feeToken) != address(0)) {
+      s_feeToken.safeApprove(getRouter(), 0);
     }
+
+    address oldFeeToken = address(s_feeToken);
+    s_feeToken = IERC20(token);
+
+    // Approve the router to spend the new fee token
+    if (token != address(0)) {
+      s_feeToken.safeApprove(getRouter(), type(uint256).max);
+    }
+
+    emit FeeTokenModified(oldFeeToken, token);
+
   }
 
   /// @notice The entrypoint for the CCIP router to call. This function should
@@ -66,7 +79,7 @@ contract CCIPReceiverWithACK is CCIPReceiver {
     catch (bytes memory err) {
       // Could set different error codes based on the caught error. Each could be
       // handled differently.
-      s_failedMessages.set(message.messageId, uint256(ErrorCode.BASIC));
+      s_failedMessages.set(message.messageId, uint256(ErrorCode.FAILED));
       s_messageContents[message.messageId] = message;
       // Don't revert so CCIP doesn't revert. Emit event instead.
       // The message can be retried later without having to do manual execution of CCIP.
@@ -95,21 +108,21 @@ contract CCIPReceiverWithACK is CCIPReceiver {
       value: address(s_feeToken) == address(0) ? feeAmount : 0
     }(incomingMessage.sourceChainSelector, outgoingMessage);
 
+    emit MessageAckSent(incomingMessage.messageId);
     emit MessageSent(messageId);
   }
 
   /// @notice overrides CCIPReceiver processMessage to make easier to modify
   function processMessage(Client.Any2EVMMessage calldata message)
     external
+    virtual
     override
     onlySelf
   {
-
     (MessagePayload memory payload) = abi.decode(message.data, (MessagePayload));
 
     if (payload.messageType == MessageType.OUTGOING) {
         // Insert Processing workflow here.
-
 
         // If the message was outgoin, then send an ack response.
         _sendAck(message);
@@ -128,6 +141,5 @@ contract CCIPReceiverWithACK is CCIPReceiver {
         emit MessageAckReceived(messageId);
     }
   }
-
 
 }

@@ -34,7 +34,6 @@ contract CCIPSender is CCIPClientBase {
 
   event MessageSent(bytes32 messageId);
   event MessageReceived(bytes32 messageId);
-
  
   constructor(address router) CCIPClientBase(router) {}
 
@@ -43,33 +42,34 @@ contract CCIPSender is CCIPClientBase {
     Client.EVMTokenAmount[] memory tokenAmounts,
     bytes calldata data,
     address feeToken
-  ) public payable validChain(destChainSelector) {
-
+  ) public payable validChain(destChainSelector) returns (bytes32 messageId) {
     // TODO: Decide whether workflow should assume contract is funded with tokens to send already
     for (uint256 i = 0; i < tokenAmounts.length; ++i) {
       IERC20(tokenAmounts[i].token).transferFrom(msg.sender, address(this), tokenAmounts[i].amount);
-      IERC20(tokenAmounts[i].token).approve(i_ccipRouter, tokenAmounts[i].amount);
+      IERC20(tokenAmounts[i].token).safeApprove(i_ccipRouter, tokenAmounts[i].amount);
     }
 
-    ICCIPClientBase.ChainInfo memory chainInfo = s_chains[destChainSelector];
-
     Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
-      receiver: chainInfo.recipient,
+      receiver: s_chains[destChainSelector],
       data: data,
       tokenAmounts: tokenAmounts,
-      extraArgs: chainInfo.extraArgsBytes,
-      feeToken: feeToken
+      feeToken: feeToken,
+      extraArgs: s_extraArgsBytes[destChainSelector]
     });
 
     uint256 fee = IRouterClient(i_ccipRouter).getFee(destChainSelector, message);
 
     // Transfer fee token from sender and approve router to pay for message
-    if (feeToken != address(0)) {
+    if (feeToken != address(0) && fee != 0) {
       IERC20(feeToken).safeTransferFrom(msg.sender, address(this), fee);
-      IERC20(feeToken).safeApprove(i_ccipRouter, fee);
+
+      // Use increaseAllowance in case the user is transfering the feeToken in tokenAmounts
+      IERC20(feeToken).safeIncreaseAllowance(i_ccipRouter, fee);
     }
 
-    bytes32 messageId = IRouterClient(i_ccipRouter).ccipSend{
+    else if (msg.value < fee) revert IRouterClient.InsufficientFeeTokenAmount();
+
+    messageId = IRouterClient(i_ccipRouter).ccipSend{
       value: feeToken == address(0) ? fee : 0
     } (destChainSelector, message);
 

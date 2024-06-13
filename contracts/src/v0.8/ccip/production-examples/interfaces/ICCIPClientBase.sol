@@ -11,10 +11,5 @@ interface ICCIPClientBase {
         bytes sender;
     }
 
-    struct ChainInfo {
-        bytes extraArgsBytes;
-        bytes recipient;
-    }
-
     function getRouter() external view returns (address);
 }
