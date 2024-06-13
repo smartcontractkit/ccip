@@ -489,7 +489,7 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
   function test_Fuzz_ForwardFromRouter_Success(address originalSender, address receiver, uint96 feeTokenAmount) public {
     // To avoid RouterMustSetOriginalSender
     vm.assume(originalSender != address(0));
-    vm.assume(uint160(receiver) >= 10);
+    vm.assume(uint160(receiver) >= Internal.PRECOMPILE_SPACE);
     vm.assume(feeTokenAmount <= MAX_NOP_FEES_JUELS);
 
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
