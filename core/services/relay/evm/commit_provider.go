@@ -131,7 +131,7 @@ func (P DstCommitProvider) Ready() error {
 }
 
 func (P DstCommitProvider) HealthReport() map[string]error {
-	return nil
+	return make(map[string]error)
 }
 
 func (P DstCommitProvider) OffchainConfigDigester() ocrtypes.OffchainConfigDigester {

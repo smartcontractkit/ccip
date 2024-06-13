@@ -238,7 +238,7 @@ func (d DstExecProvider) Ready() error {
 }
 
 func (d DstExecProvider) HealthReport() map[string]error {
-	return nil
+	return make(map[string]error)
 }
 
 func (d DstExecProvider) OffchainConfigDigester() ocrtypes.OffchainConfigDigester {
