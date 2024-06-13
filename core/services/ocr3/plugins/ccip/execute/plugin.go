@@ -51,6 +51,12 @@ func getPendingExecutedReports(ctx context.Context, ccipReader cciptypes.CCIPRea
 	if err != nil {
 		return nil, time.Time{}, err
 	}
+	// TODO: this could be more efficient. reports is also traversed in 'filterOutExecutedMessages' function.
+	for _, report := range commitReports {
+		if report.Timestamp.After(latestReportTS) {
+			latestReportTS = report.Timestamp
+		}
+	}
 
 	groupedCommits := groupByChainSelector(commitReports)
 
@@ -72,13 +78,6 @@ func getPendingExecutedReports(ctx context.Context, ccipReader cciptypes.CCIPRea
 				return nil, time.Time{}, err2
 			}
 			executedMessages = append(executedMessages, executedMessagesForRange...)
-		}
-
-		// TODO: this could be more efficient. reports is also traversed in 'filterOutExecutedMessages' function.
-		for _, report := range reports {
-			if report.Timestamp.After(latestReportTS) {
-				latestReportTS = report.Timestamp
-			}
 		}
 
 		// Remove fully executed reports.
