@@ -2,9 +2,11 @@ package chaos
 
 import (
 	"fmt"
-	"github.com/rs/zerolog"
-	"github.com/smartcontractkit/chainlink-testing-framework/grafana"
 	"strings"
+
+	"github.com/rs/zerolog"
+
+	"github.com/smartcontractkit/chainlink-testing-framework/grafana"
 )
 
 // GrafanaConfig is a basic Grafana client configuration

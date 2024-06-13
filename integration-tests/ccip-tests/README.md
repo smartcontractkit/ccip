@@ -131,7 +131,9 @@ Running different load + chaos tests
 ```
 # reorgs, we simulate chain reorganization by rewinding head below or above LogPoller threshold
 make test_load_ccip testimage="" testname=TestLoadCCIPStableRPSReorgsBelowFinality  override_toml=./testconfig/tomls/ccip-reorg.toml secret_toml=./load/secrets.toml
+make test_load_ccip testimage="" testname=TestLoadCCIPStableRPSReorgsBelowFinality  override_toml=./testconfig/tomls/ccip-reorg-finality-tag.toml secret_toml=./load/secrets.toml
 make test_load_ccip testimage="" testname=TestLoadCCIPStableRPSReorgsAboveFinality  override_toml=./testconfig/tomls/ccip-reorg.toml secret_toml=./load/secrets.toml
+make test_load_ccip testimage="" testname=TestLoadCCIPStableRPSReorgsAboveFinality  override_toml=./testconfig/tomls/ccip-reorg-finality-tag.toml secret_toml=./load/secrets.toml
 
 # gas spikes, we simulate slow and fast gas spikes on source/dest chains
 make test_load_ccip testimage="" testname=TestLoadCCIPStableRPSGasSpike  override_toml=./testconfig/tomls/ccip-gas-spikes-fast-dst.toml secret_toml=./load/secrets.toml

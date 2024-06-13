@@ -3,10 +3,11 @@ package chaos
 import (
 	"context"
 	"fmt"
-	"github.com/ethereum/go-ethereum/ethclient"
 	"math"
 	"testing"
 	"time"
+
+	"github.com/ethereum/go-ethereum/ethclient"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
