@@ -111,6 +111,11 @@ runs:
           else
             execution_layer="geth"
         fi
+        
+        grafana_bearer_token=""
+        if [ -n "$GRAFANA_BEARER_TOKEN" ]; then
+          grafana_bearer_token="bearer_token_secret=\"$GRAFANA_BEARER_TOKEN\""
+        fi 
 
         grafana_bearer_token=""
         if [ -n "$GRAFANA_BEARER_TOKEN" ]; then
@@ -157,5 +162,5 @@ runs:
         EOF
 
         BASE64_CONFIG_OVERRIDE=$(cat config.toml | base64 -w 0)
-        echo ::add-mask::$BASE64_CONFIG_OVERRIDE
+        echo ::add-mask::$BASE64_CONFIG_OVERRIDE  
         echo "BASE64_CONFIG_OVERRIDE=$BASE64_CONFIG_OVERRIDE" >> $GITHUB_ENV
