@@ -3101,6 +3101,9 @@ contract EVM2EVMMultiOffRamp_commit is EVM2EVMMultiOffRampSetup {
     vm.expectEmit();
     emit EVM2EVMMultiOffRamp.CommitReportAccepted(commitReport);
 
+    vm.expectEmit();
+    emit MultiOCR3Base.Transmitted(uint8(Internal.OCRPluginType.Commit), s_configDigestCommit, s_latestSequenceNumber);
+
     _commit(commitReport, s_latestSequenceNumber);
 
     assertEq(maxSeq + 1, s_offRamp.getSourceChainConfig(SOURCE_CHAIN_SELECTOR).minSeqNr);
@@ -3111,6 +3114,9 @@ contract EVM2EVMMultiOffRamp_commit is EVM2EVMMultiOffRampSetup {
 
     vm.expectEmit();
     emit EVM2EVMMultiOffRamp.CommitReportAccepted(commitReport);
+
+    vm.expectEmit();
+    emit MultiOCR3Base.Transmitted(uint8(Internal.OCRPluginType.Commit), s_configDigestCommit, s_latestSequenceNumber);
 
     _commit(commitReport, s_latestSequenceNumber);
 
@@ -3131,6 +3137,9 @@ contract EVM2EVMMultiOffRamp_commit is EVM2EVMMultiOffRampSetup {
     vm.expectEmit();
     emit PriceRegistry.UsdPerTokenUpdated(s_sourceFeeToken, 4e18, block.timestamp);
 
+    vm.expectEmit();
+    emit MultiOCR3Base.Transmitted(uint8(Internal.OCRPluginType.Commit), s_configDigestCommit, s_latestSequenceNumber);
+
     _commit(commitReport, s_latestSequenceNumber);
 
     assertEq(s_latestSequenceNumber, s_offRamp.getLatestPriceSequenceNumber());
@@ -3145,6 +3154,9 @@ contract EVM2EVMMultiOffRamp_commit is EVM2EVMMultiOffRampSetup {
 
     vm.expectEmit();
     emit PriceRegistry.UsdPerTokenUpdated(s_sourceFeeToken, 4e18, block.timestamp);
+
+    vm.expectEmit();
+    emit MultiOCR3Base.Transmitted(uint8(Internal.OCRPluginType.Commit), s_configDigestCommit, s_latestSequenceNumber);
 
     _commit(commitReport, s_latestSequenceNumber);
     assertEq(s_latestSequenceNumber, s_offRamp.getLatestPriceSequenceNumber());
@@ -3163,6 +3175,9 @@ contract EVM2EVMMultiOffRamp_commit is EVM2EVMMultiOffRampSetup {
     vm.expectEmit();
     emit PriceRegistry.UsdPerTokenUpdated(s_sourceFeeToken, tokenPrice1, block.timestamp);
 
+    vm.expectEmit();
+    emit MultiOCR3Base.Transmitted(uint8(Internal.OCRPluginType.Commit), s_configDigestCommit, s_latestSequenceNumber);
+
     _commit(commitReport, s_latestSequenceNumber);
     assertEq(s_latestSequenceNumber, s_offRamp.getLatestPriceSequenceNumber());
 
@@ -3177,6 +3192,9 @@ contract EVM2EVMMultiOffRamp_commit is EVM2EVMMultiOffRampSetup {
 
     vm.expectEmit();
     emit EVM2EVMMultiOffRamp.CommitReportAccepted(commitReport);
+
+    vm.expectEmit();
+    emit MultiOCR3Base.Transmitted(uint8(Internal.OCRPluginType.Commit), s_configDigestCommit, s_latestSequenceNumber);
 
     _commit(commitReport, s_latestSequenceNumber);
 

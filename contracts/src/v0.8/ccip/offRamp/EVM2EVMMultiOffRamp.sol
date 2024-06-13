@@ -632,10 +632,6 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
         s_latestPriceSequenceNumber = sequenceNumber;
         // And update the prices in the price registry
         IPriceRegistry(s_dynamicConfig.priceRegistry).updatePrices(commitReport.priceUpdates);
-
-        // If there is no root, the report only contained fee updated and
-        // we return to not revert on the empty root check below.
-        if (commitReport.merkleRoots.length == 0) return;
       } else {
         // If prices are stale and the report doesn't contain a root, this report
         // does not have any valid information and we revert.
@@ -656,15 +652,16 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
       }
 
       // TODO: confirm how RMN offchain blessing impacts commit report
-      if (root.merkleRoot == bytes32(0)) revert InvalidRoot();
+      bytes32 merkleRoot = root.merkleRoot;
+      if (merkleRoot == bytes32(0)) revert InvalidRoot();
       // Disallow duplicate roots as that would reset the timestamp and
       // delay potential manual execution.
-      if (s_roots[root.sourceChainSelector][root.merkleRoot] != 0) {
-        revert RootAlreadyCommitted(root.sourceChainSelector, root.merkleRoot);
+      if (s_roots[root.sourceChainSelector][merkleRoot] != 0) {
+        revert RootAlreadyCommitted(root.sourceChainSelector, merkleRoot);
       }
 
       sourceChainConfig.minSeqNr = root.interval.max + 1;
-      s_roots[root.sourceChainSelector][root.merkleRoot] = block.timestamp;
+      s_roots[root.sourceChainSelector][merkleRoot] = block.timestamp;
     }
 
     emit CommitReportAccepted(commitReport);
@@ -904,6 +901,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
 
       if (!success) revert TokenHandlingError(returnData);
 
+      // TODO: CONTRACT SIZE - investigate splitting into helper func (as in OffRamp)
       destTokenAmounts[i].token = localToken;
       destTokenAmounts[i].amount = amount;
     }
