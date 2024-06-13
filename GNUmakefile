@@ -33,7 +33,6 @@ gomodtidy: ## Run go mod tidy on all modules.
 	cd ./integration-tests && go mod tidy
 	cd ./integration-tests/load && go mod tidy
 	cd ./dashboard-lib && go mod tidy
-	cd ./crib && go mod tidy
 
 .PHONY: docs
 docs: ## Install and run pkgsite to view Go docs
