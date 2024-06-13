@@ -4,16 +4,18 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math/big"
+	"strings"
+
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
+	libocr2 "github.com/smartcontractkit/libocr/offchainreporting2plus"
+	"go.uber.org/multierr"
+
 	commonlogger "github.com/smartcontractkit/chainlink-common/pkg/logger"
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/rpclib"
-	libocr2 "github.com/smartcontractkit/libocr/offchainreporting2plus"
-	"go.uber.org/multierr"
-	"math/big"
-	"strings"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
 

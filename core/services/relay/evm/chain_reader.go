@@ -4,10 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 	"reflect"
 	"strings"
 	"time"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/google/uuid"

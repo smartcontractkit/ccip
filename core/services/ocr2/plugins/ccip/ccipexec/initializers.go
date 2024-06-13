@@ -4,10 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"math/big"
 	"strconv"
 	"time"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/types"
 
 	"github.com/Masterminds/semver/v3"
 	"go.uber.org/multierr"

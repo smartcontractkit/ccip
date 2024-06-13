@@ -3,7 +3,11 @@ package evm
 import (
 	"context"
 	"fmt"
+	"math/big"
+
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
@@ -12,8 +16,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
-	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
-	"math/big"
 )
 
 var _ commontypes.CCIPCommitProvider = (*SrcCommitProvider)(nil)
