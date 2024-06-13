@@ -46,7 +46,7 @@ func (p *Plugin) Query(ctx context.Context, outctx ocr3types.OutcomeContext) (ty
 }
 
 func getPendingExecutedReports(ctx context.Context, ccipReader cciptypes.CCIPReader, dest cciptypes.ChainSelector, ts time.Time) (cciptypes.ExecutePluginCommitObservations, time.Time, error) {
-	latestReport := time.Time{}
+	latestReportTS := time.Time{}
 	commitReports, err := ccipReader.CommitReportsGTETimestamp(ctx, dest, ts, 1000)
 	if err != nil {
 		return nil, time.Time{}, err
@@ -86,10 +86,10 @@ func getPendingExecutedReports(ctx context.Context, ccipReader cciptypes.CCIPRea
 		return commitReports[i].BlockNum < commitReports[j].BlockNum
 	})
 	if len(commitReports) > 0 {
-		latestReport = commitReports[len(commitReports)-1].Timestamp
+		latestReportTS = commitReports[len(commitReports)-1].Timestamp
 	}
 
-	return groupedCommits, latestReport, nil
+	return groupedCommits, latestReportTS, nil
 }
 
 // Observation collects data across two phases which happen in separate rounds.
@@ -111,13 +111,13 @@ func (p *Plugin) Observation(ctx context.Context, outctx ocr3types.OutcomeContex
 	ownConfig := p.cfg.ObserverInfo[p.reportingCfg.OracleID]
 	var groupedCommits cciptypes.ExecutePluginCommitObservations
 	if slices.Contains(ownConfig.Reads, p.cfg.DestChain) {
-		var oldestReport time.Time
-		groupedCommits, oldestReport, err = getPendingExecutedReports(ctx, p.ccipReader, p.cfg.DestChain, time.UnixMilli(p.lastReportTS.Load()))
+		var latestReportTS time.Time
+		groupedCommits, latestReportTS, err = getPendingExecutedReports(ctx, p.ccipReader, p.cfg.DestChain, time.UnixMilli(p.lastReportTS.Load()))
 		if err != nil {
 			return types.Observation{}, err
 		}
 		// Update timestamp to the last report.
-		p.lastReportTS.Store(oldestReport.UnixMilli())
+		p.lastReportTS.Store(latestReportTS.UnixMilli())
 
 		// TODO: truncate grouped commits to a maximum observation size.
 		//       Cache everything which is not executed.
