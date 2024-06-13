@@ -224,12 +224,12 @@ func decodeAttributedObservations(aos []types.AttributedObservation) ([]decodedA
 
 func mergeMessageObservations(aos []decodedAttributedObservation, fChain map[cciptypes.ChainSelector]int) (cciptypes.ExecutePluginMessageObservations, error) {
 	// Create a validator for each chain
-	validators := make(map[cciptypes.ChainSelector]validation.MinObservationFilter[cciptypes.CCIPMsgBaseDetails])
-	idFunc := func(data cciptypes.CCIPMsgBaseDetails) [32]byte {
+	validators := make(map[cciptypes.ChainSelector]validation.MinObservationFilter[cciptypes.CCIPMsg])
+	idFunc := func(data cciptypes.CCIPMsg) [32]byte {
 		return sha3.Sum256([]byte(fmt.Sprintf("%v", data)))
 	}
 	for selector, f := range fChain {
-		validators[selector] = validation.NewMinObservationValidator[cciptypes.CCIPMsgBaseDetails](2*f+1, idFunc)
+		validators[selector] = validation.NewMinObservationValidator[cciptypes.CCIPMsg](f+1, idFunc)
 	}
 
 	// Add messages to the validator for each chain selector.
@@ -241,7 +241,7 @@ func mergeMessageObservations(aos []decodedAttributedObservation, fChain map[cci
 			}
 			// Add reports
 			for _, msg := range messages {
-				if err := validator.Add(msg.CCIPMsgBaseDetails); err != nil {
+				if err := validator.Add(msg); err != nil {
 					return cciptypes.ExecutePluginMessageObservations{}, err
 				}
 			}
@@ -258,7 +258,7 @@ func mergeMessageObservations(aos []decodedAttributedObservation, fChain map[cci
 			results[selector] = make(map[cciptypes.SeqNum]cciptypes.CCIPMsg)
 		}
 		for _, msg := range msgs {
-			results[selector][msg.SeqNum] = cciptypes.CCIPMsg{CCIPMsgBaseDetails: msg}
+			results[selector][msg.SeqNum] = msg
 		}
 	}
 
@@ -274,7 +274,7 @@ func mergeCommitObservations(aos []decodedAttributedObservation, fChain map[ccip
 		return sha3.Sum256([]byte(fmt.Sprintf("%v", data)))
 	}
 	for selector, f := range fChain {
-		validators[selector] = validation.NewMinObservationValidator[cciptypes.ExecutePluginCommitDataWithMessages](2*f+1, idFunc)
+		validators[selector] = validation.NewMinObservationValidator[cciptypes.ExecutePluginCommitDataWithMessages](f+1, idFunc)
 	}
 
 	// Add reports to the validator for each chain selector.
