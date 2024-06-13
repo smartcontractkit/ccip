@@ -230,35 +230,35 @@ func Test_computeRanges(t *testing.T) {
 		{
 			name: "overlapping ranges",
 			args: args{reports: []cciptypes.ExecutePluginCommitDataWithMessages{
-				{cciptypes.ExecutePluginCommitData{SequenceNumberRange: cciptypes.NewSeqNumRange(10, 20)}, nil},
-				{cciptypes.ExecutePluginCommitData{SequenceNumberRange: cciptypes.NewSeqNumRange(15, 25)}, nil}},
+				{ExecutePluginCommitData: cciptypes.ExecutePluginCommitData{SequenceNumberRange: cciptypes.NewSeqNumRange(10, 20)}},
+				{ExecutePluginCommitData: cciptypes.ExecutePluginCommitData{SequenceNumberRange: cciptypes.NewSeqNumRange(15, 25)}}},
 			},
 			err: errOverlappingRanges,
 		},
 		{
 			name: "simple ranges collapsed",
 			args: args{reports: []cciptypes.ExecutePluginCommitDataWithMessages{
-				{cciptypes.ExecutePluginCommitData{SequenceNumberRange: cciptypes.NewSeqNumRange(10, 20)}, nil},
-				{cciptypes.ExecutePluginCommitData{SequenceNumberRange: cciptypes.NewSeqNumRange(21, 40)}, nil},
-				{cciptypes.ExecutePluginCommitData{SequenceNumberRange: cciptypes.NewSeqNumRange(41, 60)}, nil}},
+				{ExecutePluginCommitData: cciptypes.ExecutePluginCommitData{SequenceNumberRange: cciptypes.NewSeqNumRange(10, 20)}},
+				{ExecutePluginCommitData: cciptypes.ExecutePluginCommitData{SequenceNumberRange: cciptypes.NewSeqNumRange(21, 40)}},
+				{ExecutePluginCommitData: cciptypes.ExecutePluginCommitData{SequenceNumberRange: cciptypes.NewSeqNumRange(41, 60)}}},
 			},
 			want: []cciptypes.SeqNumRange{{10, 60}},
 		},
 		{
 			name: "non-contiguous ranges",
 			args: args{reports: []cciptypes.ExecutePluginCommitDataWithMessages{
-				{cciptypes.ExecutePluginCommitData{SequenceNumberRange: cciptypes.NewSeqNumRange(10, 20)}, nil},
-				{cciptypes.ExecutePluginCommitData{SequenceNumberRange: cciptypes.NewSeqNumRange(30, 40)}, nil},
-				{cciptypes.ExecutePluginCommitData{SequenceNumberRange: cciptypes.NewSeqNumRange(50, 60)}, nil}},
+				{ExecutePluginCommitData: cciptypes.ExecutePluginCommitData{SequenceNumberRange: cciptypes.NewSeqNumRange(10, 20)}},
+				{ExecutePluginCommitData: cciptypes.ExecutePluginCommitData{SequenceNumberRange: cciptypes.NewSeqNumRange(30, 40)}},
+				{ExecutePluginCommitData: cciptypes.ExecutePluginCommitData{SequenceNumberRange: cciptypes.NewSeqNumRange(50, 60)}}},
 			},
 			want: []cciptypes.SeqNumRange{{10, 20}, {30, 40}, {50, 60}},
 		},
 		{
 			name: "contiguous and non-contiguous ranges",
 			args: args{reports: []cciptypes.ExecutePluginCommitDataWithMessages{
-				{cciptypes.ExecutePluginCommitData{SequenceNumberRange: cciptypes.NewSeqNumRange(10, 20)}, nil},
-				{cciptypes.ExecutePluginCommitData{SequenceNumberRange: cciptypes.NewSeqNumRange(21, 40)}, nil},
-				{cciptypes.ExecutePluginCommitData{SequenceNumberRange: cciptypes.NewSeqNumRange(50, 60)}, nil}},
+				{ExecutePluginCommitData: cciptypes.ExecutePluginCommitData{SequenceNumberRange: cciptypes.NewSeqNumRange(10, 20)}},
+				{ExecutePluginCommitData: cciptypes.ExecutePluginCommitData{SequenceNumberRange: cciptypes.NewSeqNumRange(21, 40)}},
+				{ExecutePluginCommitData: cciptypes.ExecutePluginCommitData{SequenceNumberRange: cciptypes.NewSeqNumRange(50, 60)}}},
 			},
 			want: []cciptypes.SeqNumRange{{10, 40}, {50, 60}},
 		},

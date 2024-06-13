@@ -218,12 +218,12 @@ func (p *Plugin) Outcome(outctx ocr3types.OutcomeContext, query types.Query, aos
 		return reports[i].Timestamp.Before(reports[j].Timestamp)
 	})
 
-	// flatten messages and sort by commit reports.
-	var messages []cciptypes.CCIPMsg
+	// add messages to their reports.
 	for _, report := range reports {
+		report.Messages = nil
 		for i := report.SequenceNumberRange.Start(); i <= report.SequenceNumberRange.End(); i++ {
 			if msg, ok := observation.Messages[report.SourceChain][i]; ok {
-				messages = append(messages, msg)
+				report.Messages = append(report.Messages, msg)
 			}
 		}
 	}

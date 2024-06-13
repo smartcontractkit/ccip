@@ -8,12 +8,11 @@ import (
 	mapset "github.com/deckarep/golang-set/v2"
 	"golang.org/x/crypto/sha3"
 
-	"github.com/smartcontractkit/ccipocr3/execute/internal/validation"
-	"github.com/smartcontractkit/libocr/commontypes"
-
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
-
+	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+
+	"github.com/smartcontractkit/ccipocr3/execute/internal/validation"
 )
 
 // validateObserverReadingEligibility checks if the observer is eligible to observe the messages it observed.

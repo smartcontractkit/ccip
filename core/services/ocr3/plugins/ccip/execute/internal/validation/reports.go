@@ -29,7 +29,7 @@ type minObservationValidator[T any] struct {
 
 // NewMinObservationValidator constructs a concrete MinObservationFilter object. The
 // supplied idFunc is used to generate a uniqueID for the type being observed.
-func NewMinObservationValidator[T any](min int, idFunc func(T) [32]byte) *minObservationValidator[T] {
+func NewMinObservationValidator[T any](min int, idFunc func(T) [32]byte) MinObservationFilter[T] {
 	return &minObservationValidator[T]{
 		minObservation: min,
 		cache:          make(map[cciptypes.Bytes32]*counter[T]),
