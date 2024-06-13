@@ -359,6 +359,13 @@ func WithCCIPOwnerTokens() TestConfigOverrideOption {
 	}
 }
 
+func WithTokensPerChain(count int) TestConfigOverrideOption {
+	return func(c *CCIPTestConfig) string {
+		c.TestGroupInput.TokenConfig.NoOfTokensPerChain = pointer.ToInt(count)
+		return fmt.Sprintf("Token count set to %d", count)
+	}
+}
+
 // NewCCIPTestConfig reads the CCIP test config from TOML files, applies any overrides, and configures the test environment
 func NewCCIPTestConfig(t *testing.T, lggr zerolog.Logger, tType string, overrides ...TestConfigOverrideOption) *CCIPTestConfig {
 	testCfg := ccipconfig.GlobalTestConfig()
