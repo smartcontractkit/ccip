@@ -2,10 +2,10 @@
 pragma solidity 0.8.24;
 
 import {ICommitStore} from "../../interfaces/ICommitStore.sol";
-
 import {IPool} from "../../interfaces/IPool.sol";
 import {IPriceRegistry} from "../../interfaces/IPriceRegistry.sol";
 import {IRMN} from "../../interfaces/IRMN.sol";
+import {ITokenAdminRegistry} from "../../interfaces/ITokenAdminRegistry.sol";
 
 import {CallWithExactGas} from "../../../shared/call/CallWithExactGas.sol";
 import {PriceRegistry} from "../../PriceRegistry.sol";
@@ -2461,18 +2461,125 @@ contract EVM2EVMMultiOffRamp_trialExecute is EVM2EVMMultiOffRampSetup {
   }
 }
 
-contract EVM2EVMMultiOffRamp_releaseOrMintTokens is EVM2EVMMultiOffRampSetup {
-  EVM2EVMMultiOffRamp.Any2EVMMessageRoute internal MESSAGE_ROUTE;
-
+contract EVM2EVMMultiOffRamp__releaseOrMintToken is EVM2EVMMultiOffRampSetup {
   function setUp() public virtual override {
     super.setUp();
     _setupMultipleOffRamps();
+  }
 
-    MESSAGE_ROUTE = EVM2EVMMultiOffRamp.Any2EVMMessageRoute({
-      sender: abi.encode(OWNER),
-      sourceChainSelector: SOURCE_CHAIN_SELECTOR_1,
-      receiver: OWNER
+  function test__releaseOrMintToken_Success() public {
+    uint256 amount = 123123;
+    address token = s_sourceTokens[0];
+    bytes memory originalSender = abi.encode(OWNER);
+    bytes memory offchainTokenData = abi.encode(keccak256("offchainTokenData"));
+
+    IERC20 dstToken1 = IERC20(s_destTokenBySourceToken[token]);
+    uint256 startingBalance = dstToken1.balanceOf(OWNER);
+
+    Internal.SourceTokenData memory sourceTokenData = Internal.SourceTokenData({
+      sourcePoolAddress: abi.encode(s_sourcePoolByToken[token]),
+      destTokenAddress: abi.encode(s_destTokenBySourceToken[token]),
+      extraData: ""
     });
+
+    vm.expectCall(
+      s_destPoolBySourceToken[token],
+      abi.encodeWithSelector(
+        LockReleaseTokenPool.releaseOrMint.selector,
+        Pool.ReleaseOrMintInV1({
+          originalSender: originalSender,
+          receiver: OWNER,
+          amount: amount,
+          localToken: s_destTokenBySourceToken[token],
+          remoteChainSelector: SOURCE_CHAIN_SELECTOR_1,
+          sourcePoolAddress: sourceTokenData.sourcePoolAddress,
+          sourcePoolData: sourceTokenData.extraData,
+          offchainTokenData: offchainTokenData
+        })
+      )
+    );
+
+    s_offRamp.releaseOrMintToken(
+      amount, originalSender, OWNER, SOURCE_CHAIN_SELECTOR_1, sourceTokenData, offchainTokenData
+    );
+
+    assertEq(startingBalance + amount, dstToken1.balanceOf(OWNER));
+  }
+
+  function test__releaseOrMintToken_NotACompatiblePool_Revert() public {
+    uint256 amount = 123123;
+    address token = s_sourceTokens[0];
+    address destToken = s_destTokenBySourceToken[token];
+    vm.label(destToken, "destToken");
+    bytes memory originalSender = abi.encode(OWNER);
+    bytes memory offchainTokenData = abi.encode(keccak256("offchainTokenData"));
+
+    Internal.SourceTokenData memory sourceTokenData = Internal.SourceTokenData({
+      sourcePoolAddress: abi.encode(s_sourcePoolByToken[token]),
+      destTokenAddress: abi.encode(destToken),
+      extraData: ""
+    });
+
+    // Address(0) should always revert
+    address returnedPool = address(0);
+
+    vm.mockCall(
+      address(s_tokenAdminRegistry),
+      abi.encodeWithSelector(ITokenAdminRegistry.getPool.selector, destToken),
+      abi.encode(returnedPool)
+    );
+
+    vm.expectRevert(abi.encodeWithSelector(EVM2EVMMultiOffRamp.NotACompatiblePool.selector, returnedPool));
+
+    s_offRamp.releaseOrMintToken(
+      amount, originalSender, OWNER, SOURCE_CHAIN_SELECTOR_1, sourceTokenData, offchainTokenData
+    );
+
+    // A contract that doesn't support the interface should also revert
+    returnedPool = address(s_offRamp);
+
+    vm.mockCall(
+      address(s_tokenAdminRegistry),
+      abi.encodeWithSelector(ITokenAdminRegistry.getPool.selector, destToken),
+      abi.encode(returnedPool)
+    );
+
+    vm.expectRevert(abi.encodeWithSelector(EVM2EVMMultiOffRamp.NotACompatiblePool.selector, returnedPool));
+
+    s_offRamp.releaseOrMintToken(
+      amount, originalSender, OWNER, SOURCE_CHAIN_SELECTOR_1, sourceTokenData, offchainTokenData
+    );
+  }
+
+  function test__releaseOrMintToken_TokenHandlingError_revert_Revert() public {
+    address receiver = makeAddr("receiver");
+    uint256 amount = 123123;
+    address token = s_sourceTokens[0];
+    address destToken = s_destTokenBySourceToken[token];
+    bytes memory originalSender = abi.encode(OWNER);
+    bytes memory offchainTokenData = abi.encode(keccak256("offchainTokenData"));
+
+    Internal.SourceTokenData memory sourceTokenData = Internal.SourceTokenData({
+      sourcePoolAddress: abi.encode(s_sourcePoolByToken[token]),
+      destTokenAddress: abi.encode(destToken),
+      extraData: ""
+    });
+
+    bytes memory revertData = "call reverted :o";
+
+    vm.mockCallRevert(destToken, abi.encodeWithSelector(IERC20.transfer.selector, receiver, amount), revertData);
+
+    vm.expectRevert(abi.encodeWithSelector(EVM2EVMMultiOffRamp.TokenHandlingError.selector, revertData));
+    s_offRamp.releaseOrMintToken(
+      amount, originalSender, receiver, SOURCE_CHAIN_SELECTOR_1, sourceTokenData, offchainTokenData
+    );
+  }
+}
+
+contract EVM2EVMMultiOffRamp_releaseOrMintTokens is EVM2EVMMultiOffRampSetup {
+  function setUp() public virtual override {
+    super.setUp();
+    _setupMultipleOffRamps();
   }
 
   function test_releaseOrMintTokens_Success() public {
@@ -2493,11 +2600,11 @@ contract EVM2EVMMultiOffRamp_releaseOrMintTokens is EVM2EVMMultiOffRampSetup {
       abi.encodeWithSelector(
         LockReleaseTokenPool.releaseOrMint.selector,
         Pool.ReleaseOrMintInV1({
-          originalSender: MESSAGE_ROUTE.sender,
-          receiver: MESSAGE_ROUTE.receiver,
+          originalSender: abi.encode(OWNER),
+          receiver: OWNER,
           amount: srcTokenAmounts[0].amount,
           localToken: s_destTokenBySourceToken[srcTokenAmounts[0].token],
-          remoteChainSelector: MESSAGE_ROUTE.sourceChainSelector,
+          remoteChainSelector: SOURCE_CHAIN_SELECTOR_1,
           sourcePoolAddress: sourceTokenData.sourcePoolAddress,
           sourcePoolData: sourceTokenData.extraData,
           offchainTokenData: offchainTokenData[0]
@@ -2505,7 +2612,9 @@ contract EVM2EVMMultiOffRamp_releaseOrMintTokens is EVM2EVMMultiOffRampSetup {
       )
     );
 
-    s_offRamp.releaseOrMintTokens(srcTokenAmounts, MESSAGE_ROUTE, encodedSourceTokenData, offchainTokenData);
+    s_offRamp.releaseOrMintTokens(
+      srcTokenAmounts, abi.encode(OWNER), OWNER, SOURCE_CHAIN_SELECTOR_1, encodedSourceTokenData, offchainTokenData
+    );
 
     assertEq(startingBalance + amount1, dstToken1.balanceOf(OWNER));
   }
@@ -2529,11 +2638,11 @@ contract EVM2EVMMultiOffRamp_releaseOrMintTokens is EVM2EVMMultiOffRampSetup {
       abi.encodeWithSelector(
         LockReleaseTokenPool.releaseOrMint.selector,
         Pool.ReleaseOrMintInV1({
-          originalSender: MESSAGE_ROUTE.sender,
-          receiver: MESSAGE_ROUTE.receiver,
+          originalSender: abi.encode(OWNER),
+          receiver: OWNER,
           amount: amount,
           localToken: s_destTokenBySourceToken[srcTokenAmounts[0].token],
-          remoteChainSelector: MESSAGE_ROUTE.sourceChainSelector,
+          remoteChainSelector: SOURCE_CHAIN_SELECTOR_1,
           sourcePoolAddress: sourceTokenData.sourcePoolAddress,
           sourcePoolData: sourceTokenData.extraData,
           offchainTokenData: offchainTokenData[0]
@@ -2542,8 +2651,9 @@ contract EVM2EVMMultiOffRamp_releaseOrMintTokens is EVM2EVMMultiOffRampSetup {
       abi.encode(amount * destinationDenominationMultiplier)
     );
 
-    Client.EVMTokenAmount[] memory destTokenAmounts =
-      s_offRamp.releaseOrMintTokens(srcTokenAmounts, MESSAGE_ROUTE, encodedSourceTokenData, offchainTokenData);
+    Client.EVMTokenAmount[] memory destTokenAmounts = s_offRamp.releaseOrMintTokens(
+      srcTokenAmounts, abi.encode(OWNER), OWNER, SOURCE_CHAIN_SELECTOR_1, encodedSourceTokenData, offchainTokenData
+    );
 
     assertEq(destTokenAmounts[0].amount, amount * destinationDenominationMultiplier);
     assertEq(destTokenAmounts[0].token, destToken);
@@ -2560,7 +2670,12 @@ contract EVM2EVMMultiOffRamp_releaseOrMintTokens is EVM2EVMMultiOffRampSetup {
     vm.expectRevert(abi.encodeWithSelector(EVM2EVMMultiOffRamp.TokenHandlingError.selector, unknownError));
 
     s_offRamp.releaseOrMintTokens(
-      srcTokenAmounts, MESSAGE_ROUTE, _getDefaultSourceTokenData(srcTokenAmounts), new bytes[](srcTokenAmounts.length)
+      srcTokenAmounts,
+      abi.encode(OWNER),
+      OWNER,
+      SOURCE_CHAIN_SELECTOR_1,
+      _getDefaultSourceTokenData(srcTokenAmounts),
+      new bytes[](srcTokenAmounts.length)
     );
   }
 
@@ -2578,11 +2693,11 @@ contract EVM2EVMMultiOffRamp_releaseOrMintTokens is EVM2EVMMultiOffRampSetup {
       abi.encodeWithSelector(
         LockReleaseTokenPool.releaseOrMint.selector,
         Pool.ReleaseOrMintInV1({
-          originalSender: MESSAGE_ROUTE.sender,
-          receiver: MESSAGE_ROUTE.receiver,
+          originalSender: abi.encode(OWNER),
+          receiver: OWNER,
           amount: amount,
           localToken: s_destTokenBySourceToken[srcTokenAmounts[0].token],
-          remoteChainSelector: MESSAGE_ROUTE.sourceChainSelector,
+          remoteChainSelector: SOURCE_CHAIN_SELECTOR_1,
           sourcePoolAddress: sourceTokenData.sourcePoolAddress,
           sourcePoolData: sourceTokenData.extraData,
           offchainTokenData: offchainTokenData[0]
@@ -2596,7 +2711,9 @@ contract EVM2EVMMultiOffRamp_releaseOrMintTokens is EVM2EVMMultiOffRampSetup {
       abi.encodeWithSelector(EVM2EVMMultiOffRamp.InvalidDataLength.selector, Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES, 64)
     );
 
-    s_offRamp.releaseOrMintTokens(srcTokenAmounts, MESSAGE_ROUTE, encodedSourceTokenData, offchainTokenData);
+    s_offRamp.releaseOrMintTokens(
+      srcTokenAmounts, abi.encode(OWNER), OWNER, SOURCE_CHAIN_SELECTOR_1, encodedSourceTokenData, offchainTokenData
+    );
   }
 
   function test_releaseOrMintTokens_InvalidEVMAddress_Revert() public {
@@ -2616,7 +2733,9 @@ contract EVM2EVMMultiOffRamp_releaseOrMintTokens is EVM2EVMMultiOffRampSetup {
 
     vm.expectRevert(abi.encodeWithSelector(Internal.InvalidEVMAddress.selector, wrongAddress));
 
-    s_offRamp.releaseOrMintTokens(srcTokenAmounts, MESSAGE_ROUTE, sourceTokenData, offchainTokenData);
+    s_offRamp.releaseOrMintTokens(
+      srcTokenAmounts, abi.encode(OWNER), OWNER, SOURCE_CHAIN_SELECTOR_1, sourceTokenData, offchainTokenData
+    );
   }
 
   function test__releaseOrMintTokens_PoolIsNotAPool_Reverts() public {
@@ -2633,7 +2752,9 @@ contract EVM2EVMMultiOffRamp_releaseOrMintTokens is EVM2EVMMultiOffRampSetup {
     );
 
     vm.expectRevert(abi.encodeWithSelector(EVM2EVMMultiOffRamp.NotACompatiblePool.selector, address(0)));
-    s_offRamp.releaseOrMintTokens(new Client.EVMTokenAmount[](1), MESSAGE_ROUTE, sourceTokenData, new bytes[](1));
+    s_offRamp.releaseOrMintTokens(
+      new Client.EVMTokenAmount[](1), abi.encode(OWNER), OWNER, SOURCE_CHAIN_SELECTOR_1, sourceTokenData, new bytes[](1)
+    );
   }
 
   function test_releaseOrMintTokens_PoolDoesNotSupportDest_Reverts() public {
@@ -2647,22 +2768,16 @@ contract EVM2EVMMultiOffRamp_releaseOrMintTokens is EVM2EVMMultiOffRampSetup {
     bytes[] memory encodedSourceTokenData = _getDefaultSourceTokenData(srcTokenAmounts);
     Internal.SourceTokenData memory sourceTokenData = abi.decode(encodedSourceTokenData[0], (Internal.SourceTokenData));
 
-    EVM2EVMMultiOffRamp.Any2EVMMessageRoute memory messageRouteChain3 = EVM2EVMMultiOffRamp.Any2EVMMessageRoute({
-      sender: abi.encode(OWNER),
-      sourceChainSelector: SOURCE_CHAIN_SELECTOR_3,
-      receiver: OWNER
-    });
-
     vm.expectCall(
       s_destPoolBySourceToken[srcTokenAmounts[0].token],
       abi.encodeWithSelector(
         LockReleaseTokenPool.releaseOrMint.selector,
         Pool.ReleaseOrMintInV1({
-          originalSender: messageRouteChain3.sender,
-          receiver: messageRouteChain3.receiver,
+          originalSender: abi.encode(OWNER),
+          receiver: OWNER,
           amount: srcTokenAmounts[0].amount,
           localToken: s_destTokenBySourceToken[srcTokenAmounts[0].token],
-          remoteChainSelector: messageRouteChain3.sourceChainSelector,
+          remoteChainSelector: SOURCE_CHAIN_SELECTOR_3,
           sourcePoolAddress: sourceTokenData.sourcePoolAddress,
           sourcePoolData: sourceTokenData.extraData,
           offchainTokenData: offchainTokenData[0]
@@ -2670,7 +2785,9 @@ contract EVM2EVMMultiOffRamp_releaseOrMintTokens is EVM2EVMMultiOffRampSetup {
       )
     );
     vm.expectRevert();
-    s_offRamp.releaseOrMintTokens(srcTokenAmounts, messageRouteChain3, encodedSourceTokenData, offchainTokenData);
+    s_offRamp.releaseOrMintTokens(
+      srcTokenAmounts, abi.encode(OWNER), OWNER, SOURCE_CHAIN_SELECTOR_3, encodedSourceTokenData, offchainTokenData
+    );
   }
 
   /// forge-config: default.fuzz.runs = 32
@@ -2690,8 +2807,9 @@ contract EVM2EVMMultiOffRamp_releaseOrMintTokens is EVM2EVMMultiOffRampSetup {
       })
     );
 
-    try s_offRamp.releaseOrMintTokens(new Client.EVMTokenAmount[](1), MESSAGE_ROUTE, sourceTokenData, new bytes[](1)) {}
-    catch (bytes memory reason) {
+    try s_offRamp.releaseOrMintTokens(
+      new Client.EVMTokenAmount[](1), abi.encode(OWNER), OWNER, SOURCE_CHAIN_SELECTOR_1, sourceTokenData, new bytes[](1)
+    ) {} catch (bytes memory reason) {
       // Any revert should be a TokenHandlingError, InvalidEVMAddress, InvalidDataLength or NoContract as those are caught by the offramp
       assertTrue(
         bytes4(reason) == EVM2EVMMultiOffRamp.TokenHandlingError.selector
