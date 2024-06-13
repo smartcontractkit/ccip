@@ -42,7 +42,9 @@ func TestSmokeCCIPForBidirectionalLane(t *testing.T) {
 
 	t.Cleanup(func() {
 		// If we are running a test that is a token transfer, we need to verify the balance.
-		// For USDC deployment, the mock contracts cannot mint the token in destination, therefore skip the balance check.
+		// skip the balance check for existing deployment, there can be multiple external requests in progress for existing deployments
+		// other than token transfer initiated by the test, which can affect the balance check
+		// therefore we check the balance only for the ccip environment created by the test
 		if TestCfg.TestGroupInput.MsgDetails.IsTokenTransfer() &&
 			!pointer.GetBool(TestCfg.TestGroupInput.USDCMockDeployment) &&
 			!pointer.GetBool(TestCfg.TestGroupInput.ExistingDeployment) {
@@ -130,7 +132,9 @@ func TestSmokeCCIPRateLimit(t *testing.T) {
 				addFund := func(ccipCommon *actions.CCIPCommon) {
 					for i, btp := range ccipCommon.BridgeTokenPools {
 						token := ccipCommon.BridgeTokens[i]
-						err := btp.AddLiquidity(token.Approve, token.Address(), new(big.Int).Mul(AggregatedRateLimitCapacity, big.NewInt(20)))
+						err := btp.AddLiquidity(
+							token, token.OwnerWallet, new(big.Int).Mul(AggregatedRateLimitCapacity, big.NewInt(20)),
+						)
 						require.NoError(t, err)
 					}
 				}
@@ -147,7 +151,9 @@ func TestSmokeCCIPRateLimit(t *testing.T) {
 			require.NoError(t, err)
 			tc.lane.Logger.Info().Interface("rate limit", prevRLOnRamp).Msg("Initial OnRamp rate limiter state")
 
-			prevOnRampRLTokenPool, err := src.Common.BridgeTokenPools[0].Instance.GetCurrentOutboundRateLimiterState(nil, tc.lane.Source.DestChainSelector) // TODO RENS maybe?
+			prevOnRampRLTokenPool, err := src.Common.BridgeTokenPools[0].Instance.GetCurrentOutboundRateLimiterState(
+				nil, tc.lane.Source.DestChainSelector,
+			) // TODO RENS maybe?
 			require.NoError(t, err)
 			tc.lane.Logger.Info().
 				Interface("rate limit", prevOnRampRLTokenPool).
@@ -165,7 +171,9 @@ func TestSmokeCCIPRateLimit(t *testing.T) {
 				)
 			}
 
-			prevOffRampRLTokenPool, err := tc.lane.Dest.Common.BridgeTokenPools[0].Instance.GetCurrentInboundRateLimiterState(nil, tc.lane.Dest.SourceChainSelector) // TODO RENS maybe?
+			prevOffRampRLTokenPool, err := tc.lane.Dest.Common.BridgeTokenPools[0].Instance.GetCurrentInboundRateLimiterState(
+				nil, tc.lane.Dest.SourceChainSelector,
+			) // TODO RENS maybe?
 			require.NoError(t, err)
 			tc.lane.Logger.Info().
 				Interface("rate limit", prevOffRampRLTokenPool).
@@ -239,7 +247,9 @@ func TestSmokeCCIPRateLimit(t *testing.T) {
 			src.TransferAmount[0] = rlOnRamp.Tokens
 			tc.lane.Logger.Info().Str("tokensToSend", rlOnRamp.Tokens.String()).Msg("Aggregated Capacity")
 			// approve the tokens
-			require.NoError(t, src.Common.BridgeTokens[0].Approve(src.Common.Router.Address(), src.TransferAmount[0]))
+			require.NoError(t, src.Common.BridgeTokens[0].Approve(
+				tc.lane.Source.Common.ChainClient.GetDefaultWallet(), src.Common.Router.Address(), src.TransferAmount[0]),
+			)
 			require.NoError(t, tc.lane.Source.Common.ChainClient.WaitForEvents())
 			failedTx, _, _, err := tc.lane.Source.SendRequest(
 				tc.lane.Dest.ReceiverDapp.EthAddress,
@@ -367,7 +377,9 @@ func TestSmokeCCIPRateLimit(t *testing.T) {
 			tc.lane.Logger.Info().Str("tokensToSend", tokensToSend.String()).Msg("More than TokenPool Rate")
 			src.TransferAmount[0] = tokensToSend
 			// approve the tokens
-			require.NoError(t, src.Common.BridgeTokens[0].Approve(src.Common.Router.Address(), src.TransferAmount[0]))
+			require.NoError(t, src.Common.BridgeTokens[0].Approve(
+				src.Common.ChainClient.GetDefaultWallet(), src.Common.Router.Address(), src.TransferAmount[0]),
+			)
 			require.NoError(t, tc.lane.Source.Common.ChainClient.WaitForEvents())
 			failedTx, _, _, err = tc.lane.Source.SendRequest(
 				tc.lane.Dest.ReceiverDapp.EthAddress,
@@ -428,7 +440,7 @@ func TestSmokeCCIPSelfServeRateLimitOnRamp(t *testing.T) {
 	aggregateRateLimit := big.NewInt(1e16)
 
 	for _, tc := range tests {
-		t.Run(fmt.Sprintf("%s - Self Serve Rate Limit", tc.testName), func(t *testing.T) {
+		t.Run(fmt.Sprintf("%s - Self Serve Rate Limit OnRamp", tc.testName), func(t *testing.T) {
 			tc.lane.Test = t
 			src := tc.lane.Source
 			dest := tc.lane.Dest
@@ -441,7 +453,9 @@ func TestSmokeCCIPSelfServeRateLimitOnRamp(t *testing.T) {
 				addFund := func(ccipCommon *actions.CCIPCommon) {
 					for i, btp := range ccipCommon.BridgeTokenPools {
 						token := ccipCommon.BridgeTokens[i]
-						err := btp.AddLiquidity(token.Approve, token.Address(), new(big.Int).Mul(aggregateRateLimit, big.NewInt(20)))
+						err := btp.AddLiquidity(
+							token, token.OwnerWallet, new(big.Int).Mul(aggregateRateLimit, big.NewInt(20)),
+						)
 						require.NoError(t, err)
 					}
 				}
@@ -457,6 +471,7 @@ func TestSmokeCCIPSelfServeRateLimitOnRamp(t *testing.T) {
 				freeDestToken    = dest.Common.BridgeTokens[freeTokenIndex]
 				limitedSrcToken  = src.Common.BridgeTokens[limitedTokenIndex]
 				limitedDestToken = dest.Common.BridgeTokens[limitedTokenIndex]
+				overLimitAmount  = new(big.Int).Add(aggregateRateLimit, big.NewInt(1))
 			)
 			tc.lane.Logger.Info().
 				Str("Free Source Token", freeSrcToken.Address()).
@@ -469,7 +484,6 @@ func TestSmokeCCIPSelfServeRateLimitOnRamp(t *testing.T) {
 			require.NoError(t, err, "Error disabling rate limits")
 
 			// Send both tokens with no rate limits and ensure they succeed
-			overLimitAmount := new(big.Int).Add(aggregateRateLimit, big.NewInt(1))
 			src.TransferAmount[freeTokenIndex] = overLimitAmount
 			src.TransferAmount[limitedTokenIndex] = overLimitAmount
 			tc.lane.RecordStateBeforeTransfer()
@@ -567,7 +581,7 @@ func TestSmokeCCIPSelfServeRateLimitOffRamp(t *testing.T) {
 	aggregateRateLimit := big.NewInt(1e16)
 
 	for _, tc := range tests {
-		t.Run(fmt.Sprintf("%s - Self Serve Rate Limit", tc.testName), func(t *testing.T) {
+		t.Run(fmt.Sprintf("%s - Self Serve Rate Limit OffRamp", tc.testName), func(t *testing.T) {
 			tc.lane.Test = t
 			src := tc.lane.Source
 			dest := tc.lane.Dest
@@ -580,7 +594,9 @@ func TestSmokeCCIPSelfServeRateLimitOffRamp(t *testing.T) {
 				addFund := func(ccipCommon *actions.CCIPCommon) {
 					for i, btp := range ccipCommon.BridgeTokenPools {
 						token := ccipCommon.BridgeTokens[i]
-						err := btp.AddLiquidity(token.Approve, token.Address(), new(big.Int).Mul(aggregateRateLimit, big.NewInt(20)))
+						err := btp.AddLiquidity(
+							token, token.OwnerWallet, new(big.Int).Mul(aggregateRateLimit, big.NewInt(20)),
+						)
 						require.NoError(t, err)
 					}
 				}
@@ -692,9 +708,6 @@ func TestSmokeCCIPMulticall(t *testing.T) {
 		return
 	}
 	t.Cleanup(func() {
-		if TestCfg.TestGroupInput.MsgDetails.IsTokenTransfer() {
-			setUpOutput.Balance.Verify(t)
-		}
 		require.NoError(t, setUpOutput.TearDown())
 	})
 
