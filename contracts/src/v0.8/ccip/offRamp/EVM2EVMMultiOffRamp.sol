@@ -226,7 +226,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
   ) public view returns (Internal.MessageExecutionState) {
     return Internal.MessageExecutionState(
       (
-        s_executionStates[sourceChainSelector][sequenceNumber / 128]
+        _getSequenceNumberBitmap(sourceChainSelector, sequenceNumber)
           >> ((sequenceNumber % 128) * MESSAGE_EXECUTION_STATE_BIT_WIDTH)
       ) & MESSAGE_EXECUTION_STATE_MASK
     );
@@ -243,7 +243,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
     Internal.MessageExecutionState newState
   ) internal {
     uint256 offset = (sequenceNumber % 128) * MESSAGE_EXECUTION_STATE_BIT_WIDTH;
-    uint256 bitmap = s_executionStates[sourceChainSelector][sequenceNumber / 128];
+    uint256 bitmap = _getSequenceNumberBitmap(sourceChainSelector, sequenceNumber);
     // to unset any potential existing state we zero the bits of the section the state occupies,
     // then we do an AND operation to blank out any existing state for the section.
     bitmap &= ~(MESSAGE_EXECUTION_STATE_MASK << offset);
@@ -251,6 +251,16 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
     bitmap |= uint256(newState) << offset;
 
     s_executionStates[sourceChainSelector][sequenceNumber / 128] = bitmap;
+  }
+
+  /// @param sourceChainSelector remote source chain selector to get sequence number bitmap for
+  /// @param sequenceNumber sequence number to get bitmap for
+  /// @return bitmap Bitmap of the given sequence number for the provided source chain selector. One bitmap represents 128 sequence numbers
+  function _getSequenceNumberBitmap(
+    uint64 sourceChainSelector,
+    uint64 sequenceNumber
+  ) internal view returns (uint256 bitmap) {
+    return s_executionStates[sourceChainSelector][sequenceNumber / 128];
   }
 
   /// @inheritdoc IAny2EVMMultiOffRamp
