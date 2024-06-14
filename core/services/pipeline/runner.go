@@ -232,6 +232,23 @@ func init() {
 	}
 }
 
+// overtimeContext returns a modified context for overtime work, since tasks are expected to keep running and return
+// results, even after context cancellation.
+func overtimeContext(ctx context.Context) (context.Context, context.CancelFunc) {
+	if d, ok := ctx.Deadline(); ok {
+		// We do not use context.WithDeadline/Timeout in order to prevent the monitor hook from logging noisily, since
+		// we expect and want these operations to use most of their allotted time.
+		// TODO replace with custom thresholds: https://smartcontract-it.atlassian.net/browse/BCF-3252
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithCancel(context.WithoutCancel(ctx))
+		t := time.AfterFunc(time.Until(d.Add(overtime)), cancel)
+		stop := context.AfterFunc(ctx, func() { t.Stop() })
+		return ctx, func() { cancel(); stop() }
+	}
+	// do not propagate cancellation in any case
+	return context.WithoutCancel(ctx), func() {}
+}
+
 func (r *runner) ExecuteRun(
 	ctx context.Context,
 	spec Spec,
@@ -457,18 +474,14 @@ func (r *runner) run(ctx context.Context, pipeline *Pipeline, run *Run, vars Var
 			"run.Inputs", run.Inputs,
 		)
 	}
-	if run.HasFatalErrors() {
-		l = l.With("run.FatalErrors", run.FatalErrors)
-	}
-	if run.HasErrors() {
-		l = l.With("run.AllErrors", run.AllErrors)
-	}
 	l = l.With("run.State", run.State, "fatal", run.HasFatalErrors(), "runTime", runTime)
 	if run.HasFatalErrors() {
 		// This will also log at error level in OCR if it fails Observe so the
 		// level is appropriate
-		l.Errorw("Completed pipeline run with fatal errors")
+		l = l.With("run.FatalErrors", run.FatalErrors)
+		l.Debugw("Completed pipeline run with fatal errors")
 	} else if run.HasErrors() {
+		l = l.With("run.AllErrors", run.AllErrors)
 		l.Debugw("Completed pipeline run with errors")
 	} else {
 		l.Debugw("Completed pipeline run successfully")
