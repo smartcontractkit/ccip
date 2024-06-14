@@ -101,7 +101,6 @@ func NewOCRContractTransmitterWithRetention(
 	reportToEvmTxMeta ReportToEthMetadata,
 	retention time.Duration,
 ) (*contractTransmitter, error) {
-
 	fields, err2 := validateAndCreateContractTransmitterFields(ctx, address, caller, contractABI, transmitter, lp, lggr, reportToEvmTxMeta, retention)
 	if err2 != nil {
 		return nil, err2
@@ -190,7 +189,6 @@ func (oc *contractTransmitter) Transmit(ctx context.Context, reportCtx ocrtypes.
 }
 
 func (oc contractTransmitterNoSignatures) Transmit(ctx context.Context, reportCtx ocrtypes.ReportContext, report ocrtypes.Report, signatures []ocrtypes.AttributedOnchainSignature) error {
-
 	if len(signatures) > 32 {
 		return errors.New("too many signatures, maximum is 32")
 	}
