@@ -1781,7 +1781,6 @@ func (sourceCCIP *SourceCCIPModule) SendRequest(
 func DefaultSourceCCIPModule(
 	logger zerolog.Logger,
 	testConf *testconfig.CCIPTestGroupConfig,
-	testEnv *CCIPTestEnv,
 	chainClient blockchain.EVMClient,
 	destChainId uint64,
 	destChain string,
@@ -2528,7 +2527,6 @@ func (destCCIP *DestCCIPModule) AssertSeqNumberExecuted(
 func DefaultDestinationCCIPModule(
 	logger zerolog.Logger,
 	testConf *testconfig.CCIPTestGroupConfig,
-	testEnv *CCIPTestEnv,
 	chainClient blockchain.EVMClient,
 	sourceChainId uint64,
 	sourceChain string,
@@ -3466,7 +3464,6 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 	lane.Source, err = DefaultSourceCCIPModule(
 		lane.Logger,
 		testConf,
-		env,
 		sourceChainClient, destChainClient.GetChainID().Uint64(),
 		destChainClient.GetNetworkName(),
 		srcConf,
@@ -3475,7 +3472,7 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 		return fmt.Errorf("failed to create source module: %w", err)
 	}
 	lane.Dest, err = DefaultDestinationCCIPModule(
-		lane.Logger, testConf, env,
+		lane.Logger, testConf,
 		destChainClient, sourceChainClient.GetChainID().Uint64(),
 		sourceChainClient.GetNetworkName(), destConf,
 	)
