@@ -553,6 +553,12 @@ func pluginConfigConsensus(
 // validateObservedSequenceNumbers checks if the sequence numbers of the provided messages are unique for each chain and
 // that they match the observed max sequence numbers.
 func validateObservedSequenceNumbers(msgs []cciptypes.CCIPMsgBaseDetails, maxSeqNums []cciptypes.SeqNumChain) error {
+	// If the observer did not include sequence numbers it means that it's not a destination chain reader.
+	// In that case we cannot do any msg sequence number validations.
+	if len(maxSeqNums) == 0 {
+		return nil
+	}
+
 	// MaxSeqNums must be unique for each chain.
 	maxSeqNumsMap := make(map[cciptypes.ChainSelector]cciptypes.SeqNum)
 	for _, maxSeqNum := range maxSeqNums {
@@ -593,18 +599,22 @@ func validateObservedSequenceNumbers(msgs []cciptypes.CCIPMsgBaseDetails, maxSeq
 func validateObserverReadingEligibility(
 	observer commontypes.OracleID,
 	msgs []cciptypes.CCIPMsgBaseDetails,
+	seqNums []cciptypes.SeqNumChain,
 	observerCfg map[commontypes.OracleID]cciptypes.ObserverInfo,
 ) error {
-	if len(msgs) == 0 {
-		return nil
-	}
-
 	observerInfo, exists := observerCfg[observer]
 	if !exists {
 		return fmt.Errorf("observer not found in config")
 	}
-
 	observerReadChains := mapset.NewSet(observerInfo.Reads...)
+
+	if len(seqNums) > 0 && !observerInfo.Writer {
+		return fmt.Errorf("observer must be a writer if it observes sequence numbers")
+	}
+
+	if len(msgs) == 0 {
+		return nil
+	}
 
 	for _, msg := range msgs {
 		// Observer must be able to read the chain that the message is coming from.

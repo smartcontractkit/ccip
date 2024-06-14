@@ -171,7 +171,7 @@ func (p *Plugin) ValidateObservation(_ ocr3types.OutcomeContext, _ types.Query, 
 		return fmt.Errorf("validate sequence numbers: %w", err)
 	}
 
-	if err := validateObserverReadingEligibility(ao.Observer, obs.NewMsgs, p.cfg.ObserverInfo); err != nil {
+	if err := validateObserverReadingEligibility(ao.Observer, obs.NewMsgs, obs.MaxSeqNums, p.cfg.ObserverInfo); err != nil {
 		return fmt.Errorf("validate observer %d reading eligibility: %w", ao.Observer, err)
 	}
 
@@ -304,7 +304,7 @@ func (p *Plugin) ShouldTransmitAcceptedReport(ctx context.Context, u uint64, r o
 		"gasPriceUpdates", len(decodedReport.PriceUpdates.GasPriceUpdates),
 	)
 
-	// todo: if report is stale -> do not transmit
+	// todo: if report is stale -> do not transmit (check the spec for the exact condition)
 	return true, nil
 }
 
