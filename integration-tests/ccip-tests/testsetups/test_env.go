@@ -442,6 +442,10 @@ func UpgradeNodes(
 	return nil
 }
 
+func anvilNetworkName(networkName string) string {
+	return fmt.Sprintf("network-%s", actions.NetworkName(networkName))
+}
+
 // DeployEnvironments deploys K8 env for CCIP tests. For tests running on simulated geth it deploys -
 // 1. two simulated geth network in non-dev mode
 // 2. mockserver ( to set mock price feed details)
@@ -463,7 +467,7 @@ func DeployEnvironments(
 				testEnvironment.
 					AddHelm(foundry.New(&foundry.Props{
 						Values: map[string]interface{}{
-							"fullnameOverride": fmt.Sprintf("network-%s", network.Name),
+							"fullnameOverride": anvilNetworkName(network.Name),
 							"anvil": map[string]interface{}{
 								"chainId":                   fmt.Sprintf("%d", network.ChainID),
 								"blockTime":                 anvilConfig.BlockTime,
@@ -528,12 +532,12 @@ func DeployEnvironments(
 		if !network.Simulated {
 			return network.URLs, network.HTTPURLs
 		}
-		networkName := strings.ReplaceAll(strings.ToLower(network.Name), " ", "-")
+		networkName := actions.NetworkName(network.Name)
 		var internalWsURLs, internalHttpURLs []string
 		switch chart {
 		case foundry.ChartName:
-			internalWsURLs = append(internalWsURLs, fmt.Sprintf("ws://%s-%s:8545", networkName, foundry.ChartName))
-			internalHttpURLs = append(internalHttpURLs, fmt.Sprintf("http://%s-%s:8545", networkName, foundry.ChartName))
+			internalWsURLs = append(internalWsURLs, fmt.Sprintf("ws://%s:8545", anvilNetworkName(networkName)))
+			internalHttpURLs = append(internalHttpURLs, fmt.Sprintf("http://%s:8545", anvilNetworkName(networkName)))
 		case networkName:
 			for i := 0; i < numOfTxNodes; i++ {
 				internalWsURLs = append(internalWsURLs, fmt.Sprintf("ws://%s-ethereum-geth:8546", networkName))
