@@ -562,7 +562,7 @@ jobs:
 
   start-slack-thread:
     name: Start Slack Thread
-    if: ${{ always() && needs.*.result != 'skipped' && needs.*.result != 'cancelled' && github.event_name != 'workflow_dispatch' }}
+    if: ${{ always() && needs.*.result != 'skipped' && needs.*.result != 'cancelled' && needs.should-run.outputs.should_run == 'true' }}
     environment: integration
     outputs:
       thread_ts: ${{ steps.slack.outputs.thread_ts }}
@@ -621,7 +621,7 @@ jobs:
 
   post-test-results-to-slack:
     name: Post Test Results
-    if: ${{ always() && needs.*.result != 'skipped' && needs.*.result != 'cancelled' && github.event_name != 'workflow_dispatch' }}
+    if: ${{ always() && needs.*.result != 'skipped' && needs.*.result != 'cancelled' && needs.should-run.outputs.should_run == 'true' }}
     environment: integration
     permissions:
       checks: write
