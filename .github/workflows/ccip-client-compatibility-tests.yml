@@ -438,8 +438,8 @@ jobs:
             echo "Will not test compatibility with nethermind"
           fi
           
-          JOB_MATRIX_JSON=$(cat compatibility_test_list.json)
-          echo "$JOB_MATRIX_JSON" | jq .
+          jq . compatibility_test_list.json
+          JOB_MATRIX_JSON=$(jq -c . compatibility_test_list.json)
           echo "JOB_MATRIX_JSON=${JOB_MATRIX_JSON}" >> $GITHUB_ENV   
 
   run-client-compatibility-matrix:
