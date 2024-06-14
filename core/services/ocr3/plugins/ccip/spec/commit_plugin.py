@@ -53,6 +53,11 @@ class CommitPlugin:
         # Observe fChain for each chain. {chain: f_chain}
         f_chain = self.cfg["f_chain"]
 
+        if not self.can_read_dest():
+            # If node is not able to read updated sequence numbers from the destination,
+            # it should not observe the outdated ones that are coming from the previous outcome.
+            observed_seq_nums = {}
+
         return (observed_seq_nums, new_msgs, token_prices, gas_prices, f_chain)
 
 
@@ -60,12 +65,16 @@ class CommitPlugin:
         observation = attributed_observation.observation
         observer = attributed_observation.observer
 
+        if "seq_nums" in observation:
+            assert observer.can_read_dest()
+
         observer_supported_chains = self.cfg["observer_info"][observer]["supported_chains"]
         for (chain, msgs) in observation["new_msgs"].items():
             assert(chain in observer_supported_chains)
 
-            for msg in msgs:
-                assert(msg.seq_num > observation["observed_seq_nums"][msg.source_chain])
+            if "seq_nums" in observation:
+                for msg in msgs:
+                    assert(msg.seq_num > observation["observed_seq_nums"][msg.source_chain])
 
             assert(len(msgs) == len(set([msg.seq_num for msg in msgs])))
             assert(len(msgs) == len(set([msg.id for msg in msgs])))
@@ -77,14 +86,18 @@ class CommitPlugin:
         f_chain = consensus_f_chain(observations)
         seq_nums = consensus_seq_nums(observations, f_chain)
 
+        # all_msgs contains all messages from all observations, grouped by source chain
+        all_msgs = [observation["new_msgs"] for observation in observations].group_by_source_chain()
+
         trees = {} # { chain: (root, min_seq_num, max_seq_num) }
-        for (chain, msgs) in observations["new_msgs"]:
-            # filter out msgs with seq nums not matching consensus seq nums
-            msgs = [msg for msg in msgs if msg.seq_num >= observed_seq_nums[chain]]
+        for (chain, msgs) in all_msgs:
+            # keep only msgs with seq nums greater than the consensus max commited seq nums
+            msgs = [msg for msg in msgs if msg.seq_num > seq_nums[chain]]
 
             msgs_by_seq_num = msgs.group_by_seq_num() # { 423: [0x1, 0x1, 0x2] }
                                                       # 2 nodes say that msg id is 0x1 and 1 node says it's 0x2
-            msg_ids = { seq_num: elem_most_occurrences(ids) for (seq_num, ids) in f_chain_votes.items() }
+
+            msg_ids = { seq_num: elem_most_occurrences(ids) for (seq_num, ids) in msgs_by_seq_num.items() }
             for (seq_num, id) in msg_ids.items(): # require at least 2f+1 observations of the voted id
                 assert(msgs_by_seq_num[seq_num].count(id) >= 2*f_chain[chain]+1)
 
@@ -119,7 +132,7 @@ class CommitPlugin:
 
         on_chain_seq_nums = self.offRamp.get_sequence_numbers()
         for (chain, tree) in report.trees():
-            if on_chain_seq_nums[chain] >= tree.min_seq_num:
+            if not (on_chain_seq_nums[chain]+1 == tree.min_seq_num):
                 return False
 
         return True

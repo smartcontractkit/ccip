@@ -73,9 +73,9 @@ contract MultiOCR3BaseSetup is BaseTest {
 
   /// @dev returns a hash value in the same format as the h value on which the signature verified
   ///      in the _transmit function
-  function _getTestReportDigest(bytes32 configDigest) internal pure returns (bytes32) {
+  function _getReportDigest(bytes32 configDigest, bytes memory report) internal pure returns (bytes32) {
     bytes32[3] memory reportContext = [configDigest, configDigest, configDigest];
-    return keccak256(abi.encodePacked(keccak256(REPORT), reportContext));
+    return keccak256(abi.encodePacked(keccak256(report), reportContext));
   }
 
   function _assertOCRConfigEquality(
@@ -101,6 +101,7 @@ contract MultiOCR3BaseSetup is BaseTest {
   function _getSignaturesForDigest(
     uint256[] memory signerPrivateKeys,
     bytes32 configDigest,
+    bytes memory report,
     uint8 signatureCount
   ) internal pure returns (bytes32[] memory rs, bytes32[] memory ss, uint8[] memory vs, bytes32 rawVs) {
     rs = new bytes32[](signatureCount);
@@ -109,7 +110,7 @@ contract MultiOCR3BaseSetup is BaseTest {
 
     // Calculate signatures
     for (uint256 i; i < signatureCount; ++i) {
-      (vs[i], rs[i], ss[i]) = vm.sign(signerPrivateKeys[i], _getTestReportDigest(configDigest));
+      (vs[i], rs[i], ss[i]) = vm.sign(signerPrivateKeys[i], _getReportDigest(configDigest, report));
       rawVs = rawVs | (bytes32(bytes1(vs[i] - 27)) >> (8 * i));
     }
 
