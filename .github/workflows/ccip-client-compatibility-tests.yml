@@ -410,14 +410,14 @@ jobs:
           
           if [[ "$ETH_IMPLEMENTATIONS" == *"geth"* ]]; then
             echo "Will test compatibility with geth"
-            testlistgenerator -o compatibility_test_list.json -p ccip -r TestSmokeCCIPForBidirectionalLane -f './ccip-tests/smoke/ccip_test.go' -e geth -d "${{ needs.get-latest-available-images.outputs.geth_images }}" -t "ccip-geth-compatibility-test" -w "SIMULATED_1,SIMULATED_2" -c 1337,2337
+            testlistgenerator -o compatibility_test_list.json -p ccip -r TestSmokeCCIPForBidirectionalLane -f './ccip-tests/smoke/ccip_test.go' -e geth -d "${{ needs.get-latest-available-images.outputs.geth_images }}" -t "ccip-geth-compatibility-test" -w "SIMULATED_1,SIMULATED_2" -c 1337,2337 -n ubuntu-latest
           else
             echo "Will not test compatibility with geth"
           fi
           
           if [[ "$ETH_IMPLEMENTATIONS" == *"besu"* ]]; then
             echo "Will test compatibility with besu"
-            testlistgenerator -o compatibility_test_list.json -p ccip -r TestSmokeCCIPForBidirectionalLane -f './ccip-tests/smoke/ccip_test.go' -e besu -d "${{ needs.get-latest-available-images.outputs.besu_images }}" -t "ccip-besu-compatibility-test" -w "SIMULATED_BESU_NONDEV_1,SIMULATED_BESU_NONDEV_2" -c 1337,2337
+            testlistgenerator -o compatibility_test_list.json -p ccip -r TestSmokeCCIPForBidirectionalLane -f './ccip-tests/smoke/ccip_test.go' -e besu -d "${{ needs.get-latest-available-images.outputs.besu_images }}" -t "ccip-besu-compatibility-test" -w "SIMULATED_BESU_NONDEV_1,SIMULATED_BESU_NONDEV_2" -c 1337,2337 -n ubuntu-latest
           else
             echo "Will not test compatibility with besu"
           fi
@@ -425,7 +425,7 @@ jobs:
           # TODO: Waiting for CCIP-2255 to be resolved
           if [[ "$ETH_IMPLEMENTATIONS" == *"erigon"* ]]; then
             echo "Will test compatibility with erigon"
-            testlistgenerator -o compatibility_test_list.json -p ccip -r TestSmokeCCIPForBidirectionalLane -f './ccip-tests/smoke/ccip_test.go' -e erigon -d "${{ needs.get-latest-available-images.outputs.erigon_images }}" -t "ccip-besu-compatibility-test" -w "SIMULATED_1,SIMULATED_2" -c 1337,2337
+            testlistgenerator -o compatibility_test_list.json -p ccip -r TestSmokeCCIPForBidirectionalLane -f './ccip-tests/smoke/ccip_test.go' -e erigon -d "${{ needs.get-latest-available-images.outputs.erigon_images }}" -t "ccip-besu-compatibility-test" -w "SIMULATED_1,SIMULATED_2" -c 1337,2337 -n ubuntu-latest
           else
             echo "Will not test compatibility with erigon"
           fi
@@ -433,7 +433,7 @@ jobs:
           # TODO: uncomment when nethermind flake reason is addressed
           if [[ "$ETH_IMPLEMENTATIONS" == *"nethermind"* ]]; then
             echo "Will test compatibility with nethermind"
-            testlistgenerator -o compatibility_test_list.json -p ccip -r TestSmokeCCIPForBidirectionalLane -f './ccip-tests/smoke/ccip_test.go' -e nethermind -d "${{ needs.get-latest-available-images.outputs.nethermind_images }}" -t "ccip-nethermind-compatibility-test" -w "SIMULATED_1,SIMULATED_2" -c 1337,2337
+            testlistgenerator -o compatibility_test_list.json -p ccip -r TestSmokeCCIPForBidirectionalLane -f './ccip-tests/smoke/ccip_test.go' -e nethermind -d "${{ needs.get-latest-available-images.outputs.nethermind_images }}" -t "ccip-nethermind-compatibility-test" -w "SIMULATED_1,SIMULATED_2" -c 1337,2337 -n ubuntu-latest
           else
             echo "Will not test compatibility with nethermind"
           fi
