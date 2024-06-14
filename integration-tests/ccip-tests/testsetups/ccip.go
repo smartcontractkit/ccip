@@ -481,7 +481,7 @@ func (o *CCIPTestSetUpOutputs) DeployChainContracts(
 	mainChainClient.ParallelTransactions(true)
 	defer mainChainClient.Close()
 	ccipCommon, err := actions.DefaultCCIPModule(
-		lggr, o.Cfg.TestGroupInput, o.Env, mainChainClient,
+		lggr, o.Cfg.TestGroupInput, mainChainClient,
 	)
 	if err != nil {
 		return errors.WithStack(fmt.Errorf("failed to create ccip common module for %s: %w", networkCfg.Name, err))

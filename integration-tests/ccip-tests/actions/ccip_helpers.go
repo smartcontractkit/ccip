@@ -1150,11 +1150,10 @@ type StaticPriceConfig struct {
 func NewCCIPCommonFromConfig(
 	logger zerolog.Logger,
 	testGroupConf *testconfig.CCIPTestGroupConfig,
-	testEnv *CCIPTestEnv,
 	chainClient blockchain.EVMClient,
 	laneConfig *laneconfig.LaneConfig,
 ) (*CCIPCommon, error) {
-	newCCIPModule, err := DefaultCCIPModule(logger, testGroupConf, testEnv, chainClient)
+	newCCIPModule, err := DefaultCCIPModule(logger, testGroupConf, chainClient)
 	if err != nil {
 		return nil, err
 	}
@@ -1234,18 +1233,10 @@ func NewCCIPCommonFromConfig(
 func DefaultCCIPModule(
 	logger zerolog.Logger,
 	testGroupConf *testconfig.CCIPTestGroupConfig,
-	testEnv *CCIPTestEnv,
 	chainClient blockchain.EVMClient,
 ) (*CCIPCommon, error) {
 	networkCfg := chainClient.GetNetworkConfig()
-	var k8Env *environment.Environment
-	if testEnv != nil {
-		k8Env = testEnv.K8Env
-	}
-	if k8Env != nil && chainClient.NetworkSimulated() {
-		networkCfg.URLs = k8Env.URLs[chainClient.GetNetworkConfig().Name]
-	}
-	tokenDeployerChainClient, err := blockchain.ConcurrentEVMClient(*networkCfg, k8Env, chainClient, logger)
+	tokenDeployerChainClient, err := blockchain.ConcurrentEVMClient(*networkCfg, nil, chainClient, logger)
 	if err != nil {
 		return nil, errors.WithStack(fmt.Errorf("failed to create token deployment chain client for %s: %w", networkCfg.Name, err))
 	}
@@ -1797,7 +1788,7 @@ func DefaultSourceCCIPModule(
 	laneConf *laneconfig.LaneConfig,
 ) (*SourceCCIPModule, error) {
 	cmn, err := NewCCIPCommonFromConfig(
-		logger, testConf, testEnv, chainClient, laneConf,
+		logger, testConf, chainClient, laneConf,
 	)
 	if err != nil {
 		return nil, err
@@ -2544,7 +2535,7 @@ func DefaultDestinationCCIPModule(
 	laneConf *laneconfig.LaneConfig,
 ) (*DestCCIPModule, error) {
 	cmn, err := NewCCIPCommonFromConfig(
-		logger, testConf, testEnv, chainClient, laneConf,
+		logger, testConf, chainClient, laneConf,
 	)
 	if err != nil {
 		return nil, err
