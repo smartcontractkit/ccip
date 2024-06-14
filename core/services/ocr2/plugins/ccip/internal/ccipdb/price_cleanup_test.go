@@ -12,7 +12,7 @@ import (
 	ccipmocks "github.com/smartcontractkit/chainlink/v2/core/services/ccip/mocks"
 )
 
-func Test_Cleanup(t *testing.T) {
+func Test_priceCleanup(t *testing.T) {
 	lggr := logger.TestLogger(t)
 	destChainSelector := uint64(12345)
 
@@ -76,7 +76,7 @@ func Test_Cleanup(t *testing.T) {
 	}
 }
 
-func Test_CleanupInBackground(t *testing.T) {
+func Test_priceCleanupInBackground(t *testing.T) {
 	lggr := logger.TestLogger(t)
 	destChainSelector := uint64(12345)
 
@@ -103,58 +103,3 @@ func Test_CleanupInBackground(t *testing.T) {
 	// No more calls after closing
 	time.Sleep(expectedCleanupInterval)
 }
-
-//func assertHealthy(t *testing.T, ch *chainHealthcheck, expected bool) {
-//	assert.Eventually(t, func() bool {
-//		healthy, err := ch.IsHealthy(testutils.Context(t))
-//		return err == nil && healthy == expected
-//	}, testutils.WaitTimeout(t), testutils.TestInterval)
-//}
-//
-//func assertError(t *testing.T, ch *chainHealthcheck) {
-//	assert.Eventually(t, func() bool {
-//		_, err := ch.IsHealthy(testutils.Context(t))
-//		return err != nil
-//	}, testutils.WaitTimeout(t), testutils.TestInterval)
-//}
-//
-//func newCommitStoreWrapper(t *testing.T, healthy bool, err error) *fakeStatusWrapper {
-//	return &fakeStatusWrapper{
-//		CommitStoreReader: mocks.NewCommitStoreReader(t),
-//		healthy:           healthy,
-//		err:               err,
-//		mu:                new(sync.Mutex),
-//	}
-//}
-//
-//func newOnRampWrapper(t *testing.T, healthy bool, err error) *fakeStatusWrapper {
-//	return &fakeStatusWrapper{
-//		OnRampReader: mocks.NewOnRampReader(t),
-//		healthy:      healthy,
-//		err:          err,
-//		mu:           new(sync.Mutex),
-//	}
-//}
-//
-//func (f *fakeStatusWrapper) IsDown(context.Context) (bool, error) {
-//	f.mu.Lock()
-//	defer f.mu.Unlock()
-//	return !f.healthy, f.err
-//}
-//
-//func (f *fakeStatusWrapper) IsSourceCursed(context.Context) (bool, error) {
-//	f.mu.Lock()
-//	defer f.mu.Unlock()
-//	return !f.healthy, f.err
-//}
-//
-//func (f *fakeStatusWrapper) Close() error {
-//	return nil
-//}
-//
-//func (f *fakeStatusWrapper) set(healthy bool, err error) {
-//	f.mu.Lock()
-//	defer f.mu.Unlock()
-//	f.healthy = healthy
-//	f.err = err
-//}

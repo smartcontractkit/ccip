@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"sort"
 	"sync"
 	"time"
 
@@ -266,7 +267,14 @@ func (c *priceWrite) writePricesToDB(
 			})
 		}
 
-		return c.orm.InsertTokenPricesForDestChain(ctx, c.destChainSelector, c.jobId, tokenPrices)
+		// Sort token by addr to make price updates ordering deterministic, easier to testing and debugging
+		sort.Slice(tokenPrices, func(i, j int) bool {
+			return tokenPrices[i].TokenAddr < tokenPrices[j].TokenAddr
+		})
+
+		eg.Go(func() error {
+			return c.orm.InsertTokenPricesForDestChain(ctx, c.destChainSelector, c.jobId, tokenPrices)
+		})
 	}
 
 	return eg.Wait()
