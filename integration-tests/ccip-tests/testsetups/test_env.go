@@ -462,6 +462,7 @@ func DeployEnvironments(
 				charts = append(charts, foundry.ChartName)
 				testEnvironment.
 					AddHelm(foundry.New(&foundry.Props{
+						NetworkName: network.Name,
 						Values: map[string]interface{}{
 							"fullnameOverride": actions.NetworkName(network.Name),
 							"anvil": map[string]interface{}{
