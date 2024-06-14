@@ -23,12 +23,10 @@ contract CCIPReceiverTest is EVM2EVMOnRampSetup {
     s_receiver = new CCIPReceiver(address(s_destRouter));
     s_receiver.enableChain(sourceChainSelector, abi.encode(address(1)), "");
 
-
     ICCIPClientBase.approvedSenderUpdate[] memory senderUpdates = new ICCIPClientBase.approvedSenderUpdate[](1);
-    senderUpdates[0] = ICCIPClientBase.approvedSenderUpdate
-    ({
-        destChainSelector: sourceChainSelector,
-        sender: abi.encode(address(s_receiver))
+    senderUpdates[0] = ICCIPClientBase.approvedSenderUpdate({
+      destChainSelector: sourceChainSelector,
+      sender: abi.encode(address(s_receiver))
     });
 
     s_receiver.updateApprovedSenders(senderUpdates, new ICCIPClientBase.approvedSenderUpdate[](0));
@@ -76,8 +74,12 @@ contract CCIPReceiverTest is EVM2EVMOnRampSetup {
     s_receiver.retryFailedMessage(messageId);
 
     // Assert the tokens have successfully been rescued from the contract.
-    assertEq(IERC20(token).balanceOf(tokenReceiver), tokenReceiverBalancePre + amount, "tokens not sent to tokenReceiver");
-    assertEq(IERC20(token).balanceOf(address(s_receiver)), receiverBalancePre - amount, "tokens not subtracted from receiver");
+    assertEq(
+      IERC20(token).balanceOf(tokenReceiver), tokenReceiverBalancePre + amount, "tokens not sent to tokenReceiver"
+    );
+    assertEq(
+      IERC20(token).balanceOf(address(s_receiver)), receiverBalancePre - amount, "tokens not subtracted from receiver"
+    );
   }
 
   function test_Recovery_from_invalid_sender() public {
@@ -94,7 +96,9 @@ contract CCIPReceiverTest is EVM2EVMOnRampSetup {
     vm.startPrank(address(s_destRouter));
 
     vm.expectEmit();
-    emit MessageFailed(messageId, abi.encodeWithSelector(bytes4(ICCIPClientBase.InvalidSender.selector), abi.encode(address(1))));
+    emit MessageFailed(
+      messageId, abi.encodeWithSelector(bytes4(ICCIPClientBase.InvalidSender.selector), abi.encode(address(1)))
+    );
 
     s_receiver.ccipReceive(
       Client.Any2EVMMessage({
@@ -115,7 +119,7 @@ contract CCIPReceiverTest is EVM2EVMOnRampSetup {
     assertEq(failedMessage.sourceChainSelector, sourceChainSelector);
     assertEq(failedMessage.destTokenAmounts[0].token, token);
     assertEq(failedMessage.destTokenAmounts[0].amount, amount);
-  
+
     // Check that message status is failed
     assertEq(s_receiver.getMessageStatus(messageId), 1);
 
@@ -184,44 +188,44 @@ contract CCIPReceiverTest is EVM2EVMOnRampSetup {
         destTokenAmounts: destTokenAmounts
       })
     );
-    
   }
 
   function test_removeSender_from_approvedList_and_revert() public {
-      ICCIPClientBase.approvedSenderUpdate[] memory senderUpdates = new ICCIPClientBase.approvedSenderUpdate[](1);
-      senderUpdates[0] = ICCIPClientBase.approvedSenderUpdate
-      ({
-          destChainSelector: sourceChainSelector,
-          sender: abi.encode(address(s_receiver))
-      });
+    ICCIPClientBase.approvedSenderUpdate[] memory senderUpdates = new ICCIPClientBase.approvedSenderUpdate[](1);
+    senderUpdates[0] = ICCIPClientBase.approvedSenderUpdate({
+      destChainSelector: sourceChainSelector,
+      sender: abi.encode(address(s_receiver))
+    });
 
-      s_receiver.updateApprovedSenders(new ICCIPClientBase.approvedSenderUpdate[](0), senderUpdates);
+    s_receiver.updateApprovedSenders(new ICCIPClientBase.approvedSenderUpdate[](0), senderUpdates);
 
-      assertFalse(s_receiver.s_approvedSenders(sourceChainSelector, abi.encode(address(s_receiver))));
+    assertFalse(s_receiver.s_approvedSenders(sourceChainSelector, abi.encode(address(s_receiver))));
 
-      bytes32 messageId = keccak256("messageId");
-      address token = address(s_destFeeToken);
-      uint256 amount = 111333333777;
-      Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](1);
-      destTokenAmounts[0] = Client.EVMTokenAmount({token: token, amount: amount});
+    bytes32 messageId = keccak256("messageId");
+    address token = address(s_destFeeToken);
+    uint256 amount = 111333333777;
+    Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](1);
+    destTokenAmounts[0] = Client.EVMTokenAmount({token: token, amount: amount});
 
-      // Make sure we give the receiver contract enough tokens like CCIP would.
-      deal(token, address(s_receiver), amount);
+    // Make sure we give the receiver contract enough tokens like CCIP would.
+    deal(token, address(s_receiver), amount);
 
-      // The receiver contract will revert if the router is not the sender.
-      vm.startPrank(address(s_destRouter));
+    // The receiver contract will revert if the router is not the sender.
+    vm.startPrank(address(s_destRouter));
 
-      vm.expectEmit();
-      emit MessageFailed(messageId, abi.encodeWithSelector(bytes4(ICCIPClientBase.InvalidSender.selector), abi.encode(address(s_receiver))));
+    vm.expectEmit();
+    emit MessageFailed(
+      messageId, abi.encodeWithSelector(bytes4(ICCIPClientBase.InvalidSender.selector), abi.encode(address(s_receiver)))
+    );
 
-      s_receiver.ccipReceive(
-        Client.Any2EVMMessage({
-          messageId: messageId,
-          sourceChainSelector: sourceChainSelector,
-          sender: abi.encode(address(s_receiver)),
-          data: "",
-          destTokenAmounts: destTokenAmounts
-        })
-      );
+    s_receiver.ccipReceive(
+      Client.Any2EVMMessage({
+        messageId: messageId,
+        sourceChainSelector: sourceChainSelector,
+        sender: abi.encode(address(s_receiver)),
+        data: "",
+        destTokenAmounts: destTokenAmounts
+      })
+    );
   }
 }

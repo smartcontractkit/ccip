@@ -39,12 +39,15 @@ abstract contract CCIPClientBase is ICCIPClientBase, OwnerIsCreator {
   // Sender/Receiver Management
   /////////////////////////////////////////////////////////////////////
 
-  function updateApprovedSenders(approvedSenderUpdate[] calldata adds, approvedSenderUpdate[] calldata removes) external onlyOwner {
-    for(uint256 i = 0; i < removes.length; ++i) {
+  function updateApprovedSenders(
+    approvedSenderUpdate[] calldata adds,
+    approvedSenderUpdate[] calldata removes
+  ) external onlyOwner {
+    for (uint256 i = 0; i < removes.length; ++i) {
       delete s_approvedSenders[removes[i].destChainSelector][removes[i].sender];
     }
 
-    for(uint256 i = 0; i < adds.length; ++i) {
+    for (uint256 i = 0; i < adds.length; ++i) {
       s_approvedSenders[adds[i].destChainSelector][adds[i].sender] = true;
     }
   }
@@ -64,7 +67,11 @@ abstract contract CCIPClientBase is ICCIPClientBase, OwnerIsCreator {
   // Chain Management
   /////////////////////////////////////////////////////////////////////
 
-  function enableChain(uint64 chainSelector, bytes calldata recipient, bytes calldata extraArgsBytes) external onlyOwner {
+  function enableChain(
+    uint64 chainSelector,
+    bytes calldata recipient,
+    bytes calldata extraArgsBytes
+  ) external onlyOwner {
     s_chains[chainSelector] = recipient;
 
     if (extraArgsBytes.length != 0) s_extraArgsBytes[chainSelector] = extraArgsBytes;
@@ -84,5 +91,4 @@ abstract contract CCIPClientBase is ICCIPClientBase, OwnerIsCreator {
     if (!s_approvedSenders[chainSelector][sender]) revert InvalidSender(sender);
     _;
   }
-
 }

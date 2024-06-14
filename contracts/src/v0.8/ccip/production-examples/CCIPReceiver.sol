@@ -1,15 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {IRouterClient} from "../interfaces/IRouterClient.sol";
-
-import {OwnerIsCreator} from "../../shared/access/OwnerIsCreator.sol";
 import {Client} from "../libraries/Client.sol";
 import {CCIPClientBase} from "./CCIPClientBase.sol";
 
-import {EnumerableMap} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/structs/EnumerableMap.sol";
 import {IERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
+import {EnumerableMap} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/structs/EnumerableMap.sol";
 
 contract CCIPReceiver is CCIPClientBase {
   using SafeERC20 for IERC20;
@@ -58,7 +55,7 @@ contract CCIPReceiver is CCIPClientBase {
       s_failedMessages.set(message.messageId, uint256(ErrorCode.FAILED));
 
       s_messageContents[message.messageId] = message;
-      
+
       // Don't revert so CCIP doesn't revert. Emit event instead.
       // The message can be retried later without having to do manual execution of CCIP.
       emit MessageFailed(message.messageId, err);
@@ -73,19 +70,19 @@ contract CCIPReceiver is CCIPClientBase {
   /// @dev This example just sends the tokens to the owner of this contracts. More
   /// interesting functions could be implemented.
   /// @dev It has to be external because of the try/catch.
-  function processMessage(Client.Any2EVMMessage calldata message) 
+  function processMessage(Client.Any2EVMMessage calldata message)
     external
     virtual
-    onlySelf 
-    validSender(message.sourceChainSelector, message.sender) 
-    {
+    onlySelf
+    validSender(message.sourceChainSelector, message.sender)
+  {
     // Insert Custom logic here
     if (s_simRevert) revert ErrorCase();
   }
 
   function _retryFailedMessage(Client.Any2EVMMessage memory message) internal virtual {
     // Owner rescues tokens sent with a failed message
-    for(uint256 i = 0; i < message.destTokenAmounts.length; ++i) {
+    for (uint256 i = 0; i < message.destTokenAmounts.length; ++i) {
       uint256 amount = message.destTokenAmounts[i].amount;
       address token = message.destTokenAmounts[i].token;
 
@@ -108,7 +105,7 @@ contract CCIPReceiver is CCIPClientBase {
 
     // Let the user override the implementation, since different workflow may be desired for retrying a merssage
     _retryFailedMessage(message);
-    
+
     s_failedMessages.remove(messageId); // If retry succeeds, remove from set of failed messages.
 
     emit MessageRecovered(messageId);
@@ -117,17 +114,17 @@ contract CCIPReceiver is CCIPClientBase {
   function getMessageContents(bytes32 messageId) public view returns (Client.Any2EVMMessage memory) {
     return s_messageContents[messageId];
   }
-  
+
   function getMessageStatus(bytes32 messageId) public view returns (uint256) {
     return s_failedMessages.get(messageId);
   }
 
-   // An example function to demonstrate recovery
-    function setSimRevert(bool simRevert) external onlyOwner {
-        s_simRevert = simRevert;
-    }
+  // An example function to demonstrate recovery
+  function setSimRevert(bool simRevert) external onlyOwner {
+    s_simRevert = simRevert;
+  }
 
-  modifier onlySelf {
+  modifier onlySelf() {
     if (msg.sender != address(this)) revert OnlySelf();
     _;
   }

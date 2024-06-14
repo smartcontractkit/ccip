@@ -3,11 +3,7 @@ pragma solidity ^0.8.0;
 
 import {IRouterClient} from "../interfaces/IRouterClient.sol";
 
-import {OwnerIsCreator} from "../../shared/access/OwnerIsCreator.sol";
-
 import {Client} from "../libraries/Client.sol";
-
-import {ICCIPClientBase} from "./interfaces/ICCIPClientBase.sol";
 import {CCIPClientBase} from "./CCIPClientBase.sol";
 
 import {IERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
@@ -28,13 +24,13 @@ import {SafeERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/tok
 // new chain family receivers (e.g. a solana encoded receiver address) without upgrading.
 contract CCIPSender is CCIPClientBase {
   using SafeERC20 for IERC20;
-  
+
   error InvalidConfig();
   error InsufficientNativeFeeTokenAmount();
 
   event MessageSent(bytes32 messageId);
   event MessageReceived(bytes32 messageId);
- 
+
   constructor(address router) CCIPClientBase(router) {}
 
   function ccipSend(
@@ -43,12 +39,6 @@ contract CCIPSender is CCIPClientBase {
     bytes calldata data,
     address feeToken
   ) public payable validChain(destChainSelector) returns (bytes32 messageId) {
-    // TODO: Decide whether workflow should assume contract is funded with tokens to send already
-    for (uint256 i = 0; i < tokenAmounts.length; ++i) {
-      IERC20(tokenAmounts[i].token).transferFrom(msg.sender, address(this), tokenAmounts[i].amount);
-      IERC20(tokenAmounts[i].token).safeApprove(i_ccipRouter, tokenAmounts[i].amount);
-    }
-
     Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
       receiver: s_chains[destChainSelector],
       data: data,
@@ -59,21 +49,35 @@ contract CCIPSender is CCIPClientBase {
 
     uint256 fee = IRouterClient(i_ccipRouter).getFee(destChainSelector, message);
 
-    // Transfer fee token from sender and approve router to pay for message
-    if (feeToken != address(0) && fee != 0) {
-      IERC20(feeToken).safeTransferFrom(msg.sender, address(this), fee);
+    // TODO: Decide whether workflow should assume contract is funded with tokens to send already
+    for (uint256 i = 0; i < tokenAmounts.length; ++i) {
+      // Transfer the tokens to pay for tokens in tokenAmounts
+      IERC20(tokenAmounts[i].token).transferFrom(msg.sender, address(this), tokenAmounts[i].amount);
 
-      // Use increaseAllowance in case the user is transfering the feeToken in tokenAmounts
-      IERC20(feeToken).safeIncreaseAllowance(i_ccipRouter, fee);
+      // If they're not sending the fee token, then go ahead and approve
+      if (tokenAmounts[i].token != feeToken) {
+        IERC20(tokenAmounts[i].token).safeApprove(i_ccipRouter, tokenAmounts[i].amount);
+      }
+      // If they are sending the feeToken through, and also paying in it, then approve the router for both tokenAmount and the fee()
+      else if (tokenAmounts[i].token == feeToken && feeToken != address(0)) {
+        IERC20(tokenAmounts[i].token).transferFrom(msg.sender, address(this), fee);
+        IERC20(tokenAmounts[i].token).safeApprove(i_ccipRouter, tokenAmounts[i].amount + fee);
+      }
     }
 
-    else if (msg.value < fee) revert IRouterClient.InsufficientFeeTokenAmount();
+    // If the user is paying in the fee token, and is NOT sending it through the bridge, then allowance() should be zero
+    // and we can send just transferFrom the sender and approve the router. This is because we only approve the router
+    // for the amount of tokens needed for this transaction, one at a time.
+    if (feeToken != address(0) && IERC20(feeToken).allowance(address(this), i_ccipRouter) == 0) {
+      IERC20(feeToken).safeTransferFrom(msg.sender, address(this), fee);
+      IERC20(feeToken).safeApprove(i_ccipRouter, fee);
+    } else if (feeToken == address(0) && msg.value < fee) {
+      revert IRouterClient.InsufficientFeeTokenAmount();
+    }
 
-    messageId = IRouterClient(i_ccipRouter).ccipSend{
-      value: feeToken == address(0) ? fee : 0
-    } (destChainSelector, message);
+    messageId =
+      IRouterClient(i_ccipRouter).ccipSend{value: feeToken == address(0) ? fee : 0}(destChainSelector, message);
 
     emit MessageSent(messageId);
   }
-
 }

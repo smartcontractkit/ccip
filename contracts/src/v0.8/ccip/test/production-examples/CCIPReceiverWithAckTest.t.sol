@@ -10,166 +10,160 @@ import {EVM2EVMOnRampSetup} from "../onRamp/EVM2EVMOnRampSetup.t.sol";
 import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 
 contract CCIPReceiverWithAckTest is EVM2EVMOnRampSetup {
-    event MessageFailed(bytes32 indexed messageId, bytes reason);
-    event MessageSucceeded(bytes32 indexed messageId);
-    event MessageRecovered(bytes32 indexed messageId);
-    event MessageSent(bytes32);
-    event MessageAckSent(bytes32 incomingMessageId);
-    event MessageAckReceived(bytes32);
+  event MessageFailed(bytes32 indexed messageId, bytes reason);
+  event MessageSucceeded(bytes32 indexed messageId);
+  event MessageRecovered(bytes32 indexed messageId);
+  event MessageSent(bytes32);
+  event MessageAckSent(bytes32 incomingMessageId);
+  event MessageAckReceived(bytes32);
 
+  CCIPReceiverWithACK internal s_receiver;
+  uint64 internal destChainSelector = DEST_CHAIN_SELECTOR;
 
-    CCIPReceiverWithACK internal s_receiver;
-    uint64 internal destChainSelector = DEST_CHAIN_SELECTOR;
+  function setUp() public virtual override {
+    EVM2EVMOnRampSetup.setUp();
 
-    function setUp() public virtual override {
-        EVM2EVMOnRampSetup.setUp();
+    s_receiver = new CCIPReceiverWithACK(address(s_sourceRouter), IERC20(s_sourceFeeToken));
+    s_receiver.enableChain(destChainSelector, abi.encode(address(s_receiver)), "");
 
-        s_receiver = new CCIPReceiverWithACK(address(s_sourceRouter), IERC20(s_sourceFeeToken));
-        s_receiver.enableChain(destChainSelector, abi.encode(address(s_receiver)), "");
+    ICCIPClientBase.approvedSenderUpdate[] memory senderUpdates = new ICCIPClientBase.approvedSenderUpdate[](1);
+    senderUpdates[0] = ICCIPClientBase.approvedSenderUpdate({
+      destChainSelector: destChainSelector,
+      sender: abi.encode(address(s_receiver))
+    });
 
-        ICCIPClientBase.approvedSenderUpdate[] memory senderUpdates = new ICCIPClientBase.approvedSenderUpdate[](1);
-        senderUpdates[0] = ICCIPClientBase.approvedSenderUpdate
-        ({
-            destChainSelector: destChainSelector,
-            sender: abi.encode(address(s_receiver))
-        });
+    s_receiver.updateApprovedSenders(senderUpdates, new ICCIPClientBase.approvedSenderUpdate[](0));
+  }
 
-        s_receiver.updateApprovedSenders(senderUpdates, new ICCIPClientBase.approvedSenderUpdate[](0));
-    }
+  function test_ccipReceive_and_respond_with_ack() public {
+    bytes32 messageId = keccak256("messageId");
+    address token = address(s_sourceFeeToken);
+    uint256 amount = 111333333777;
+    Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](0);
 
-    function test_ccipReceive_and_respond_with_ack() public {
-        bytes32 messageId = keccak256("messageId");
-        address token = address(s_sourceFeeToken);
-        uint256 amount = 111333333777;
-        Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](0);
+    // Make sure we give the receiver contract enough tokens like CCIP would.
+    deal(token, address(s_receiver), 1e24);
 
-        // Make sure we give the receiver contract enough tokens like CCIP would.
-        deal(token, address(s_receiver), 1e24);
+    // The receiver contract will revert if the router is not the sender.
+    vm.startPrank(address(s_sourceRouter));
 
-        // The receiver contract will revert if the router is not the sender.
-        vm.startPrank(address(s_sourceRouter));
+    CCIPReceiverWithACK.MessagePayload memory payload = CCIPReceiverWithACK.MessagePayload({
+      version: "",
+      data: "FAKE_DATA",
+      messageType: CCIPReceiverWithACK.MessageType.OUTGOING
+    });
 
-        CCIPReceiverWithACK.MessagePayload memory payload = CCIPReceiverWithACK.MessagePayload({
-            version: "",
-            data: "FAKE_DATA",
-            messageType: CCIPReceiverWithACK.MessageType.OUTGOING
-        });
+    Client.EVM2AnyMessage memory ackMessage = Client.EVM2AnyMessage({
+      receiver: abi.encode(address(s_receiver)),
+      data: abi.encode(s_receiver.ackMessageMagicBytes(), messageId),
+      tokenAmounts: destTokenAmounts,
+      feeToken: s_sourceFeeToken,
+      extraArgs: ""
+    });
 
-        Client.EVM2AnyMessage memory ackMessage = Client.EVM2AnyMessage({
-            receiver: abi.encode(address(s_receiver)),
-            data: abi.encode(s_receiver.ackMessageMagicBytes(), messageId),
-            tokenAmounts: destTokenAmounts,
-            feeToken: s_sourceFeeToken,
-            extraArgs: ""
-        });
+    uint256 feeTokenAmount = s_sourceRouter.getFee(destChainSelector, ackMessage);
 
-        uint256 feeTokenAmount = s_sourceRouter.getFee(destChainSelector, ackMessage);
-        console.log("feeTokenAmount: %s", feeTokenAmount);
+    uint256 receiverBalanceBefore = IERC20(s_sourceFeeToken).balanceOf(address(s_receiver));
 
-        uint256 receiverBalanceBefore = IERC20(s_sourceFeeToken).balanceOf(address(s_receiver));
+    vm.expectEmit();
+    emit MessageAckSent(messageId);
 
-        vm.expectEmit();
-        emit MessageAckSent(messageId);
+    s_receiver.ccipReceive(
+      Client.Any2EVMMessage({
+        messageId: messageId,
+        sourceChainSelector: destChainSelector,
+        sender: abi.encode(address(s_receiver)),
+        data: abi.encode(payload),
+        destTokenAmounts: destTokenAmounts
+      })
+    );
 
-        s_receiver.ccipReceive(
-            Client.Any2EVMMessage({
-                messageId: messageId,
-                sourceChainSelector: destChainSelector,
-                sender: abi.encode(address(s_receiver)),
-                data: abi.encode(payload),
-                destTokenAmounts: destTokenAmounts
-            })
-        );
+    // Check that fee token is properly subtracted from balance to pay for ack message
+    assertEq(IERC20(s_sourceFeeToken).balanceOf(address(s_receiver)), receiverBalanceBefore - feeTokenAmount);
+  }
 
-        // Check that fee token is properly subtracted from balance to pay for ack message
-        assertEq(IERC20(s_sourceFeeToken).balanceOf(address(s_receiver)), receiverBalanceBefore - feeTokenAmount);
-    }
+  function test_ccipReceive_ack_message() public {
+    bytes32 messageId = keccak256("messageId");
+    Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](0);
 
-    function test_ccipReceive_ack_message() public {
-        bytes32 messageId = keccak256("messageId");
-        Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](0);
+    // The receiver contract will revert if the router is not the sender.
+    vm.startPrank(address(s_sourceRouter));
 
-        // The receiver contract will revert if the router is not the sender.
-        vm.startPrank(address(s_sourceRouter));
+    CCIPReceiverWithACK.MessagePayload memory payload = CCIPReceiverWithACK.MessagePayload({
+      version: "",
+      data: abi.encode(s_receiver.ackMessageMagicBytes(), messageId),
+      messageType: CCIPReceiverWithACK.MessageType.ACK
+    });
 
-        CCIPReceiverWithACK.MessagePayload memory payload = CCIPReceiverWithACK.MessagePayload({
-            version: "",
-            data: abi.encode(s_receiver.ackMessageMagicBytes(), messageId),
-            messageType: CCIPReceiverWithACK.MessageType.ACK
-        });
+    vm.expectEmit();
+    emit MessageAckReceived(messageId);
 
-        vm.expectEmit();
-        emit MessageAckReceived(messageId);
+    s_receiver.ccipReceive(
+      Client.Any2EVMMessage({
+        messageId: messageId,
+        sourceChainSelector: destChainSelector,
+        sender: abi.encode(address(s_receiver)),
+        data: abi.encode(payload),
+        destTokenAmounts: destTokenAmounts
+      })
+    );
 
-        s_receiver.ccipReceive(
-            Client.Any2EVMMessage({
-                messageId: messageId,
-                sourceChainSelector: destChainSelector,
-                sender: abi.encode(address(s_receiver)),
-                data: abi.encode(payload),
-                destTokenAmounts: destTokenAmounts
-            })
-        );
+    assertTrue(s_receiver.s_messageAckReceived(messageId), "Ack message was not properly received");
+  }
 
-        assertTrue(s_receiver.s_messageAckReceived(messageId), "Ack message was not properly received");
-    }
+  function test_ccipReceiver_ack_with_invalidMagicBytes_REVERT() public {
+    bytes32 messageId = keccak256("messageId");
+    Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](0);
 
-    function test_ccipReceiver_ack_with_invalidMagicBytes_REVERT() public {
-        bytes32 messageId = keccak256("messageId");
-        Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](0);
+    // The receiver contract will revert if the router is not the sender.
+    vm.startPrank(address(s_sourceRouter));
 
-        // The receiver contract will revert if the router is not the sender.
-        vm.startPrank(address(s_sourceRouter));
+    // Payload with incorrect magic bytes should revert
+    CCIPReceiverWithACK.MessagePayload memory payload = CCIPReceiverWithACK.MessagePayload({
+      version: "",
+      data: abi.encode("RANDOM_BYTES", messageId),
+      messageType: CCIPReceiverWithACK.MessageType.ACK
+    });
 
-        // Payload with incorrect magic bytes should revert
-        CCIPReceiverWithACK.MessagePayload memory payload = CCIPReceiverWithACK.MessagePayload({
-            version: "",
-            data: abi.encode("RANDOM_BYTES", messageId),
-            messageType: CCIPReceiverWithACK.MessageType.ACK
-        });
+    // Expect the processing to revert from invalid magic bytes
+    vm.expectEmit();
+    emit MessageFailed(messageId, abi.encodeWithSelector(bytes4(CCIPReceiverWithACK.InvalidMagicBytes.selector)));
 
-        // Expect the processing to revert from invalid magic bytes
-        vm.expectEmit();
-        emit MessageFailed(messageId, abi.encodeWithSelector(bytes4(CCIPReceiverWithACK.InvalidMagicBytes.selector)));
+    s_receiver.ccipReceive(
+      Client.Any2EVMMessage({
+        messageId: messageId,
+        sourceChainSelector: destChainSelector,
+        sender: abi.encode(address(s_receiver)),
+        data: abi.encode(payload),
+        destTokenAmounts: destTokenAmounts
+      })
+    );
 
-        s_receiver.ccipReceive(
-            Client.Any2EVMMessage({
-                messageId: messageId,
-                sourceChainSelector: destChainSelector,
-                sender: abi.encode(address(s_receiver)),
-                data: abi.encode(payload),
-                destTokenAmounts: destTokenAmounts
-            })
-        );
+    // Check that message status is failed
+    assertEq(s_receiver.getMessageStatus(messageId), 1);
+  }
 
+  function test_modifyFeeToken() public {
+    // WETH is used as a placeholder for any ERC20 token
+    address WETH = s_sourceRouter.getWrappedNative();
 
-        // Check that message status is failed
-        assertEq(s_receiver.getMessageStatus(messageId), 1);
-    }
+    vm.expectEmit();
+    emit IERC20.Approval(address(s_receiver), address(s_sourceRouter), 0);
 
-    function test_modifyFeeToken() public {
-        // WETH is used as a placeholder for any ERC20 token
-        address WETH = s_sourceRouter.getWrappedNative();
+    vm.expectEmit();
+    emit CCIPReceiverWithACK.FeeTokenModified(s_sourceFeeToken, WETH);
 
-        vm.expectEmit();
-        emit IERC20.Approval(address(s_receiver), address(s_sourceRouter), 0);
+    s_receiver.modifyFeeToken(WETH);
 
-        vm.expectEmit();
-        emit CCIPReceiverWithACK.FeeTokenModified(s_sourceFeeToken, WETH);
+    IERC20 newFeeToken = s_receiver.s_feeToken();
+    assertEq(address(newFeeToken), WETH);
+    assertEq(newFeeToken.allowance(address(s_receiver), address(s_sourceRouter)), type(uint256).max);
+    assertEq(IERC20(s_sourceFeeToken).allowance(address(s_receiver), address(s_sourceRouter)), 0);
+  }
 
-        s_receiver.modifyFeeToken(WETH);
+  function test_feeTokenApproval_in_constructor() public {
+    CCIPReceiverWithACK newReceiver = new CCIPReceiverWithACK(address(s_sourceRouter), IERC20(s_sourceFeeToken));
 
-        IERC20 newFeeToken = s_receiver.s_feeToken();
-        assertEq(address(newFeeToken), WETH);
-        assertEq(newFeeToken.allowance(address(s_receiver), address(s_sourceRouter)), type(uint).max);
-        assertEq(IERC20(s_sourceFeeToken).allowance(address(s_receiver), address(s_sourceRouter)), 0);
-    }
-
-    function test_feeTokenApproval_in_constructor() public {
-        CCIPReceiverWithACK newReceiver = new CCIPReceiverWithACK(address(s_sourceRouter), IERC20(s_sourceFeeToken));
-
-        assertEq(IERC20(s_sourceFeeToken).allowance(address(newReceiver), address(s_sourceRouter)), type(uint).max);
-    }
-
-
+    assertEq(IERC20(s_sourceFeeToken).allowance(address(newReceiver), address(s_sourceRouter)), type(uint256).max);
+  }
 }

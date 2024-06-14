@@ -23,10 +23,12 @@ contract CCIPReceiverWithACK is CCIPReceiver {
   event MessageAckSent(bytes32 incomingMessageId);
   event MessageSent(bytes32);
   event MessageAckReceived(bytes32);
+
   error InvalidMagicBytes();
+
   event FeeTokenModified(address indexed oldToken, address indexed newToken);
 
-   enum MessageType {
+  enum MessageType {
     OUTGOING,
     ACK
   }
@@ -42,7 +44,7 @@ contract CCIPReceiverWithACK is CCIPReceiver {
 
     // If fee token is in LINK, then approve router to transfer
     if (address(feeToken) != address(0)) {
-        feeToken.safeApprove(router, type(uint256).max);
+      feeToken.safeApprove(router, type(uint256).max);
     }
   }
 
@@ -61,7 +63,6 @@ contract CCIPReceiverWithACK is CCIPReceiver {
     }
 
     emit FeeTokenModified(oldFeeToken, token);
-
   }
 
   /// @notice The entrypoint for the CCIP router to call. This function should
@@ -104,42 +105,34 @@ contract CCIPReceiverWithACK is CCIPReceiver {
 
     uint256 feeAmount = IRouterClient(i_ccipRouter).getFee(incomingMessage.sourceChainSelector, outgoingMessage);
 
-    bytes32 messageId = IRouterClient(i_ccipRouter).ccipSend{
-      value: address(s_feeToken) == address(0) ? feeAmount : 0
-    }(incomingMessage.sourceChainSelector, outgoingMessage);
+    bytes32 messageId = IRouterClient(i_ccipRouter).ccipSend{value: address(s_feeToken) == address(0) ? feeAmount : 0}(
+      incomingMessage.sourceChainSelector, outgoingMessage
+    );
 
     emit MessageAckSent(incomingMessage.messageId);
     emit MessageSent(messageId);
   }
 
   /// @notice overrides CCIPReceiver processMessage to make easier to modify
-  function processMessage(Client.Any2EVMMessage calldata message)
-    external
-    virtual
-    override
-    onlySelf
-  {
+  function processMessage(Client.Any2EVMMessage calldata message) external virtual override onlySelf {
     (MessagePayload memory payload) = abi.decode(message.data, (MessagePayload));
 
     if (payload.messageType == MessageType.OUTGOING) {
-        // Insert Processing workflow here.
+      // Insert Processing workflow here.
 
-        // If the message was outgoin, then send an ack response.
-        _sendAck(message);
-    }
+      // If the message was outgoin, then send an ack response.
+      _sendAck(message);
+    } else if (payload.messageType == MessageType.ACK) {
+      // Decode message into the magic-bytes and the messageId to ensure the message is encoded correctly
+      (bytes memory magicBytes, bytes32 messageId) = abi.decode(payload.data, (bytes, bytes32));
 
-    else if (payload.messageType == MessageType.ACK) {
-        // Decode message into the magic-bytes and the messageId to ensure the message is encoded correctly
-        (bytes memory magicBytes, bytes32 messageId) = abi.decode(payload.data, (bytes, bytes32));
+      // Ensure Ack Message contains proper magic-bytes
+      if (keccak256(magicBytes) != keccak256(ackMessageMagicBytes)) revert InvalidMagicBytes();
 
-        // Ensure Ack Message contains proper magic-bytes
-        if (keccak256(magicBytes) != keccak256(ackMessageMagicBytes)) revert InvalidMagicBytes();
+      // Mark the message has finalized from a proper ack-message.
+      s_messageAckReceived[messageId] = true;
 
-        // Mark the message has finalized from a proper ack-message.
-        s_messageAckReceived[messageId] = true;
-
-        emit MessageAckReceived(messageId);
+      emit MessageAckReceived(messageId);
     }
   }
-
 }

@@ -3,15 +3,10 @@ pragma solidity ^0.8.0;
 import {IERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import {CCIPReceiverWithACK, CCIPReceiver} from "./CCIPReceiverWithACK.sol";
-import {CCIPSender} from "./CCIPSender.sol";
-
-import {ICCIPClientBase} from "./interfaces/ICCIPClientBase.sol";
-import {CCIPClientBase} from "./CCIPClientBase.sol";
+import {CCIPReceiverWithACK} from "./CCIPReceiverWithACK.sol";
 
 import {IRouterClient} from "../interfaces/IRouterClient.sol";
 import {Client} from "../libraries/Client.sol";
-import {EnumerableMap} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/structs/EnumerableMap.sol";
 
 contract CCIPClient is CCIPReceiverWithACK {
   using SafeERC20 for IERC20;
@@ -27,13 +22,6 @@ contract CCIPClient is CCIPReceiverWithACK {
     bytes memory data,
     address feeToken
   ) public payable validChain(destChainSelector) {
-
-    // TODO: Decide whether workflow should assume contract is funded with tokens to send already
-    for (uint256 i = 0; i < tokenAmounts.length; ++i) {
-      IERC20(tokenAmounts[i].token).transferFrom(msg.sender, address(this), tokenAmounts[i].amount);
-      IERC20(tokenAmounts[i].token).safeApprove(i_ccipRouter, tokenAmounts[i].amount);
-    }
-
     Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
       receiver: s_chains[destChainSelector],
       data: data,
@@ -44,19 +32,36 @@ contract CCIPClient is CCIPReceiverWithACK {
 
     uint256 fee = IRouterClient(i_ccipRouter).getFee(destChainSelector, message);
 
-    // Transfer fee token from sender and approve router to pay for message
-    if (feeToken != address(0) && fee != 0) {
+    // TODO: Decide whether workflow should assume contract is funded with tokens to send already
+    for (uint256 i = 0; i < tokenAmounts.length; ++i) {
+      // Transfer the tokens to pay for tokens in tokenAmounts
+      IERC20(tokenAmounts[i].token).transferFrom(msg.sender, address(this), tokenAmounts[i].amount);
+
+      // If they're not sending the fee token, then go ahead and approve
+      if (tokenAmounts[i].token != feeToken) {
+        IERC20(tokenAmounts[i].token).safeApprove(i_ccipRouter, tokenAmounts[i].amount);
+      }
+      // If they are sending the feeToken through, and also paying in it, then approve the router for both tokenAmount and the fee()
+      else if (tokenAmounts[i].token == feeToken && feeToken != address(0)) {
+        IERC20(tokenAmounts[i].token).transferFrom(msg.sender, address(this), fee);
+        IERC20(tokenAmounts[i].token).safeApprove(i_ccipRouter, tokenAmounts[i].amount + fee);
+      }
+    }
+
+    // If the user is paying in the fee token, and is NOT sending it through the bridge, then allowance() should be zero
+    // and we can send just transferFrom the sender and approve the router. This is because we only approve the router
+    // for the amount of tokens needed for this transaction, one at a time.
+    if (feeToken != address(0) && IERC20(feeToken).allowance(address(this), i_ccipRouter) == 0) {
       IERC20(feeToken).safeTransferFrom(msg.sender, address(this), fee);
 
       // Use increaseAllowance in case the user is transfering the feeToken in tokenAmounts
-      IERC20(feeToken).safeIncreaseAllowance(i_ccipRouter, fee);
+      IERC20(feeToken).safeApprove(i_ccipRouter, fee);
+    } else if (feeToken == address(0) && msg.value < fee) {
+      revert IRouterClient.InsufficientFeeTokenAmount();
     }
 
-    else if (msg.value < fee) revert IRouterClient.InsufficientFeeTokenAmount();
-
-    bytes32 messageId = IRouterClient(i_ccipRouter).ccipSend{
-      value: feeToken == address(0) ? fee : 0
-    } (destChainSelector, message);
+    bytes32 messageId =
+      IRouterClient(i_ccipRouter).ccipSend{value: feeToken == address(0) ? fee : 0}(destChainSelector, message);
 
     emit MessageSent(messageId);
   }

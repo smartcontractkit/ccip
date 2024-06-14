@@ -2,12 +2,9 @@
 pragma solidity ^0.8.0;
 
 import {ITypeAndVersion} from "../../shared/interfaces/ITypeAndVersion.sol";
-import {IRouterClient} from "../interfaces/IRouterClient.sol";
 
-import {OwnerIsCreator} from "../../shared/access/OwnerIsCreator.sol";
 import {Client} from "../libraries/Client.sol";
 import {CCIPClient} from "./CCIPClient.sol";
-import {ICCIPClientBase} from "./interfaces/ICCIPClientBase.sol";
 
 import {IERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -64,20 +61,20 @@ contract PingPongDemo is CCIPClient, ITypeAndVersion {
   /// @dev This example just sends the tokens to the owner of this contracts. More
   /// interesting functions could be implemented.
   /// @dev It has to be external because of the try/catch.
-  function processMessage(Client.Any2EVMMessage calldata message) 
+  function processMessage(Client.Any2EVMMessage calldata message)
     external
     override
-    onlySelf 
-    validSender(message.sourceChainSelector, message.sender) 
-    validChain(message.sourceChainSelector) {
-
+    onlySelf
+    validSender(message.sourceChainSelector, message.sender)
+    validChain(message.sourceChainSelector)
+  {
     uint256 pingPongCount = abi.decode(message.data, (uint256));
     if (!s_isPaused) {
       _respond(pingPongCount + 1);
     }
   }
 
-  ///////////////////////////////////////////////////////////////////// 
+  /////////////////////////////////////////////////////////////////////
   // Admin Functions
   /////////////////////////////////////////////////////////////////////
 
@@ -102,7 +99,7 @@ contract PingPongDemo is CCIPClient, ITypeAndVersion {
     s_chains[s_counterpartChainSelector] = abi.encode(counterpartAddress);
   }
 
-  ///////////////////////////////////////////////////////////////////// 
+  /////////////////////////////////////////////////////////////////////
   // Plumbing
   /////////////////////////////////////////////////////////////////////
 

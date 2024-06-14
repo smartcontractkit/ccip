@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.24;
 
-import {PingPongDemo} from "../../production-examples/PingPongDemo.sol";
 import {Client} from "../../libraries/Client.sol";
+import {PingPongDemo} from "../../production-examples/PingPongDemo.sol";
 import "../onRamp/EVM2EVMOnRampSetup.t.sol";
 
 // setup
@@ -24,7 +24,7 @@ contract PingPongDappSetup is EVM2EVMOnRampSetup {
     // Fund the contract with LINK tokens
     s_feeToken.transfer(address(s_pingPong), fundingAmount);
 
-    IERC20(s_feeToken).approve(address(s_pingPong), type(uint).max);
+    IERC20(s_feeToken).approve(address(s_pingPong), type(uint256).max);
   }
 }
 
@@ -59,7 +59,6 @@ contract PingPong_example_startPingPong is PingPongDappSetup {
       messageId: ""
     });
     message.messageId = Internal._hash(message, s_metadataHash);
-
 
     vm.expectEmit();
     emit PingPongDemo.Ping(pingPongNumber);
