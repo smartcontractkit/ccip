@@ -500,7 +500,7 @@ func TestSmokeCCIPSelfServeRateLimitOnRamp(t *testing.T) {
 			require.NoError(t, err, "Error setting destination rate limits")
 			err = dest.OffRamp.SetRateLimit(contracts.RateLimiterConfig{
 				IsEnabled: true,
-				Capacity:  aggregateRateLimit,
+				Capacity:  new(big.Int).Mul(aggregateRateLimit, big.NewInt(100)), // We set a high capacity to avoid it getting in the way
 				Rate:      aggregateRateLimit,
 			})
 			require.NoError(t, err, "Error setting destination rate limits")
@@ -521,7 +521,7 @@ func TestSmokeCCIPSelfServeRateLimitOnRamp(t *testing.T) {
 			require.NoError(t, err, "Error setting OnRamp rate limits")
 			err = src.OnRamp.SetRateLimit(evm_2_evm_onramp.RateLimiterConfig{
 				IsEnabled: true,
-				Capacity:  aggregateRateLimit,
+				Capacity:  new(big.Int).Mul(aggregateRateLimit, big.NewInt(100)), // We set a high capacity to avoid it getting in the way
 				Rate:      aggregateRateLimit,
 			})
 			require.NoError(t, err, "Error setting OnRamp rate limits")
@@ -646,7 +646,7 @@ func TestSmokeCCIPSelfServeRateLimitOffRamp(t *testing.T) {
 			require.NoError(t, err, "Error setting destination rate limits")
 			err = dest.OffRamp.SetRateLimit(contracts.RateLimiterConfig{
 				IsEnabled: true,
-				Capacity:  aggregateRateLimit,
+				Capacity:  new(big.Int).Mul(aggregateRateLimit, big.NewInt(100)), // We set a high capacity to avoid it getting in the way
 				Rate:      aggregateRateLimit,
 			})
 			require.NoError(t, err, "Error setting destination rate limits")
@@ -691,8 +691,8 @@ func TestSmokeCCIPSelfServeRateLimitOffRamp(t *testing.T) {
 			// Change rate limit to make it viable
 			err = dest.OffRamp.SetRateLimit(contracts.RateLimiterConfig{
 				IsEnabled: true,
-				Capacity:  big.NewInt(0).Mul(aggregateRateLimit, big.NewInt(100)),
-				Rate:      big.NewInt(0).Mul(aggregateRateLimit, big.NewInt(100)),
+				Capacity:  new(big.Int).Mul(aggregateRateLimit, big.NewInt(100)),
+				Rate:      new(big.Int).Mul(aggregateRateLimit, big.NewInt(100)),
 			})
 			require.NoError(t, err, "Error setting destination rate limits")
 			err = dest.Common.ChainClient.WaitForEvents()
@@ -908,10 +908,12 @@ func TestSmokeCCIPTransferConfig(t *testing.T) {
 
 			err = src.OnRamp.SetRateLimit(evm_2_evm_onramp.RateLimiterConfig{
 				IsEnabled: true,
-				Capacity:  aggregateRateLimit,
+				Capacity:  new(big.Int).Mul(aggregateRateLimit, big.NewInt(100)), // We set a high capacity to avoid it getting in the way
 				Rate:      aggregateRateLimit,
 			})
 			require.NoError(t, err, "Error enabling OnRamp aggregate rate limit")
+			err = src.Common.ChainClient.WaitForEvents()
+			require.NoError(t, err, "Error configuring OnRamp")
 
 			src.TransferAmount[noConfigTokenIndex] = overLimitAmount
 			src.TransferAmount[bpsTokenIndex] = overLimitAmount

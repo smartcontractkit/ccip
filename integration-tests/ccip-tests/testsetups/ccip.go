@@ -362,8 +362,16 @@ func WithCCIPOwnerTokens() TestConfigOverrideOption {
 func WithTokensPerChain(count int) TestConfigOverrideOption {
 	return func(c *CCIPTestConfig) string {
 		c.TestGroupInput.TokenConfig.NoOfTokensPerChain = pointer.ToInt(count)
-		return fmt.Sprintf("Token count set to %d", count)
+		return fmt.Sprintf("NoOfTokensPerChain set to %d", count)
 	}
+}
+
+func WithMsgDetails(details *testconfig.MsgDetails) TestConfigOverrideOption {
+	return func(c *CCIPTestConfig) string {
+		c.TestGroupInput.MsgDetails = details
+		return "Message set"
+	}
+
 }
 
 // NewCCIPTestConfig reads the CCIP test config from TOML files, applies any overrides, and configures the test environment
@@ -910,12 +918,13 @@ func CCIPDefaultTestSetUp(
 	// If we have a token admin registry, we need to create a new wallet to deploy our test tokens from so that the tokens
 	// are not owned by the same account that owns the other CCIP contracts. This emulates self-serve token setups where
 	// the token owner is different from the CCIP contract owner.
-	if contracts.NeedTokenAdminRegistry() && !pointer.GetBool(testConfig.TestGroupInput.TokenConfig.CCIPOwnerTokens) {
+	if contracts.NeedTokenAdminRegistry() && !pointer.GetBool(testConfig.TestGroupInput.TokenConfig.CCIPOwnerTokens) && !testConfig.useExistingDeployment() {
 		for _, net := range testConfig.AllNetworks {
 			chainClient := chainClientByChainID[net.ChainID]
 			// TODO: This is a total guess at how much funds we need to deploy the tokens. This could be way off, especially on live chains.
 			// There aren't a lot of good ways to estimate this though. See CCIP-2471.
-			_, err = chainClient.NewWallet(big.NewFloat(0.1))
+			fundingAmount := new(big.Float).Mul(big.NewFloat(0.05), big.NewFloat(0).SetInt64(int64(*testConfig.TestGroupInput.TokenConfig.NoOfTokensPerChain)))
+			_, err = chainClient.NewWallet(fundingAmount)
 			require.NoError(t, err, "failed to create new wallet to deploy tokens from")
 			err = chainClient.WaitForEvents()
 			require.NoError(t, err, "failed to wait for events after creating new wallet")
