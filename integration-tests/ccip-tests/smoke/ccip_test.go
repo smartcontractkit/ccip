@@ -129,17 +129,8 @@ func TestSmokeCCIPRateLimit(t *testing.T) {
 			src := tc.lane.Source
 			// add liquidity to pools on both networks
 			if !pointer.GetBool(TestCfg.TestGroupInput.ExistingDeployment) {
-				addFund := func(ccipCommon *actions.CCIPCommon) {
-					for i, btp := range ccipCommon.BridgeTokenPools {
-						token := ccipCommon.BridgeTokens[i]
-						err := btp.AddLiquidity(
-							token, token.OwnerWallet, new(big.Int).Mul(AggregatedRateLimitCapacity, big.NewInt(20)),
-						)
-						require.NoError(t, err)
-					}
-				}
-				addFund(src.Common)
-				addFund(tc.lane.Dest.Common)
+				addLiquidity(t, src.Common, new(big.Int).Mul(AggregatedRateLimitCapacity, big.NewInt(20)))
+				addLiquidity(t, tc.lane.Dest.Common, new(big.Int).Mul(AggregatedRateLimitCapacity, big.NewInt(20)))
 			}
 			log.Info().
 				Str("Source", tc.lane.SourceNetworkName).
@@ -454,20 +445,8 @@ func TestSmokeCCIPSelfServeRateLimitOnRamp(t *testing.T) {
 			require.GreaterOrEqual(t, len(src.Common.BridgeTokenPools), 2, "At least two bridge token pools needed for test")
 			require.GreaterOrEqual(t, len(dest.Common.BridgeTokens), 2, "At least two bridge tokens needed for test")
 			require.GreaterOrEqual(t, len(dest.Common.BridgeTokenPools), 2, "At least two bridge token pools needed for test")
-			// add liquidity to pools on both networks
-			if !pointer.GetBool(TestCfg.TestGroupInput.ExistingDeployment) {
-				addFund := func(ccipCommon *actions.CCIPCommon) {
-					for i, btp := range ccipCommon.BridgeTokenPools {
-						token := ccipCommon.BridgeTokens[i]
-						err := btp.AddLiquidity(
-							token, token.OwnerWallet, new(big.Int).Mul(aggregateRateLimit, big.NewInt(20)),
-						)
-						require.NoError(t, err)
-					}
-				}
-				addFund(src.Common)
-				addFund(dest.Common)
-			}
+			addLiquidity(t, src.Common, new(big.Int).Mul(aggregateRateLimit, big.NewInt(20)))
+			addLiquidity(t, dest.Common, new(big.Int).Mul(aggregateRateLimit, big.NewInt(20)))
 
 			var (
 				freeSrcToken     = src.Common.BridgeTokens[freeTokenIndex]
@@ -604,20 +583,8 @@ func TestSmokeCCIPSelfServeRateLimitOffRamp(t *testing.T) {
 			require.GreaterOrEqual(t, len(src.Common.BridgeTokenPools), 2, "At least two bridge token pools needed for test")
 			require.GreaterOrEqual(t, len(dest.Common.BridgeTokens), 2, "At least two bridge tokens needed for test")
 			require.GreaterOrEqual(t, len(dest.Common.BridgeTokenPools), 2, "At least two bridge token pools needed for test")
-			// add liquidity to pools on both networks
-			if !pointer.GetBool(TestCfg.TestGroupInput.ExistingDeployment) {
-				addFund := func(ccipCommon *actions.CCIPCommon) {
-					for i, btp := range ccipCommon.BridgeTokenPools {
-						token := ccipCommon.BridgeTokens[i]
-						err := btp.AddLiquidity(
-							token, token.OwnerWallet, new(big.Int).Mul(aggregateRateLimit, big.NewInt(20)),
-						)
-						require.NoError(t, err)
-					}
-				}
-				addFund(src.Common)
-				addFund(dest.Common)
-			}
+			addLiquidity(t, src.Common, new(big.Int).Mul(aggregateRateLimit, big.NewInt(20)))
+			addLiquidity(t, dest.Common, new(big.Int).Mul(aggregateRateLimit, big.NewInt(20)))
 
 			var (
 				freeSrcToken     = src.Common.BridgeTokens[freeTokenIndex]
@@ -828,6 +795,7 @@ func TestSmokeCCIPTransferConfig(t *testing.T) {
 	} else {
 		require.FailNow(t, "OnRamp contract version not found in test config")
 	}
+	require.False(t, pointer.GetBool(TestCfg.TestGroupInput.ExistingDeployment), "This test modifies contract state and cannot be run on existing deployments")
 
 	setUpOutput := testsetups.CCIPDefaultTestSetUp(t, log, "smoke-ccip", nil, TestCfg)
 	if len(setUpOutput.Lanes) == 0 {
@@ -866,19 +834,8 @@ func TestSmokeCCIPTransferConfig(t *testing.T) {
 			src := tc.lane.Source
 			dest := tc.lane.Dest
 			// add liquidity to pools on both networks
-			if !pointer.GetBool(TestCfg.TestGroupInput.ExistingDeployment) {
-				addFund := func(ccipCommon *actions.CCIPCommon) {
-					for i, btp := range ccipCommon.BridgeTokenPools {
-						token := ccipCommon.BridgeTokens[i]
-						err := btp.AddLiquidity(
-							token, token.OwnerWallet, new(big.Int).Mul(aggregateRateLimit, big.NewInt(20)),
-						)
-						require.NoError(t, err)
-					}
-				}
-				addFund(src.Common)
-				addFund(dest.Common)
-			}
+			addLiquidity(t, src.Common, new(big.Int).Mul(aggregateRateLimit, big.NewInt(20)))
+			addLiquidity(t, dest.Common, new(big.Int).Mul(aggregateRateLimit, big.NewInt(20)))
 			err := tc.lane.DisableAllRateLimiting()
 			require.NoError(t, err, "Error disabling rate limits")
 
@@ -926,5 +883,18 @@ func TestSmokeCCIPTransferConfig(t *testing.T) {
 			require.NoError(t, err)
 			tc.lane.ValidateRequests()
 		})
+	}
+}
+
+// add liquidity to pools on both networks
+func addLiquidity(t *testing.T, ccipCommon *actions.CCIPCommon, amount *big.Int) {
+	t.Helper()
+
+	for i, btp := range ccipCommon.BridgeTokenPools {
+		token := ccipCommon.BridgeTokens[i]
+		err := btp.AddLiquidity(
+			token, token.OwnerWallet, amount,
+		)
+		require.NoError(t, err)
 	}
 }

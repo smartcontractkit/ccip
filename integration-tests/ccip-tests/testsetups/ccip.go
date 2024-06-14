@@ -371,7 +371,6 @@ func WithMsgDetails(details *testconfig.MsgDetails) TestConfigOverrideOption {
 		c.TestGroupInput.MsgDetails = details
 		return "Message set"
 	}
-
 }
 
 // NewCCIPTestConfig reads the CCIP test config from TOML files, applies any overrides, and configures the test environment
