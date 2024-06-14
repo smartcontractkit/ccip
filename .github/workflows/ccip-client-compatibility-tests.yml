@@ -410,14 +410,14 @@ jobs:
           
           if [[ "$ETH_IMPLEMENTATIONS" == *"geth"* ]]; then
             echo "Will test compatibility with geth"
-            testlistgenerator -o compatibility_test_list.json -p ccip -r TestSmokeCCIPForBidirectionalLane -f './ccip-tests/smoke/ccip_test.go' -e geth -d "${{ needs.get-latest-available-images.outputs.geth_images }}" -t "ccip-evm-implementation-compatibility-test" -w "SIMULATED_1,SIMULATED_2" -c 1337,2337
+            testlistgenerator -o compatibility_test_list.json -p ccip -r TestSmokeCCIPForBidirectionalLane -f './ccip-tests/smoke/ccip_test.go' -e geth -d "${{ needs.get-latest-available-images.outputs.geth_images }}" -t "ccip-geth-compatibility-test" -w "SIMULATED_1,SIMULATED_2" -c 1337,2337
           else
             echo "Will not test compatibility with geth"
           fi
           
           if [[ "$ETH_IMPLEMENTATIONS" == *"besu"* ]]; then
             echo "Will test compatibility with besu"
-            testlistgenerator -o compatibility_test_list.json -p ccip -r TestSmokeCCIPForBidirectionalLane -f './ccip-tests/smoke/ccip_test.go' -e besu -d "${{ needs.get-latest-available-images.outputs.besu_images }}" -t "ccip-evm-implementation-compatibility-test" -w "SIMULATED_BESU_NONDEV_1,SIMULATED_BESU_NONDEV_2" -c 1337,2337
+            testlistgenerator -o compatibility_test_list.json -p ccip -r TestSmokeCCIPForBidirectionalLane -f './ccip-tests/smoke/ccip_test.go' -e besu -d "${{ needs.get-latest-available-images.outputs.besu_images }}" -t "ccip-besu-compatibility-test" -w "SIMULATED_BESU_NONDEV_1,SIMULATED_BESU_NONDEV_2" -c 1337,2337
           else
             echo "Will not test compatibility with besu"
           fi
@@ -425,7 +425,7 @@ jobs:
           # TODO: Waiting for CCIP-2255 to be resolved
           if [[ "$ETH_IMPLEMENTATIONS" == *"erigon"* ]]; then
             echo "Will test compatibility with erigon"
-            testlistgenerator -o compatibility_test_list.json -p ccip -r TestSmokeCCIPForBidirectionalLane -f './ccip-tests/smoke/ccip_test.go' -e erigon -d "${{ needs.get-latest-available-images.outputs.erigon_images }}" -t "ccip-evm-implementation-compatibility-test" -w "SIMULATED_1,SIMULATED_2" -c 1337,2337
+            testlistgenerator -o compatibility_test_list.json -p ccip -r TestSmokeCCIPForBidirectionalLane -f './ccip-tests/smoke/ccip_test.go' -e erigon -d "${{ needs.get-latest-available-images.outputs.erigon_images }}" -t "ccip-besu-compatibility-test" -w "SIMULATED_1,SIMULATED_2" -c 1337,2337
           else
             echo "Will not test compatibility with erigon"
           fi
@@ -433,7 +433,7 @@ jobs:
           # TODO: uncomment when nethermind flake reason is addressed
           if [[ "$ETH_IMPLEMENTATIONS" == *"nethermind"* ]]; then
             echo "Will test compatibility with nethermind"
-            testlistgenerator -o compatibility_test_list.json -p ccip -r TestSmokeCCIPForBidirectionalLane -f './ccip-tests/smoke/ccip_test.go' -e nethermind -d "${{ needs.get-latest-available-images.outputs.nethermind_images }}" -t "ccip-evm-implementation-compatibility-test" -w "SIMULATED_1,SIMULATED_2" -c 1337,2337
+            testlistgenerator -o compatibility_test_list.json -p ccip -r TestSmokeCCIPForBidirectionalLane -f './ccip-tests/smoke/ccip_test.go' -e nethermind -d "${{ needs.get-latest-available-images.outputs.nethermind_images }}" -t "ccip-nethermind-compatibility-test" -w "SIMULATED_1,SIMULATED_2" -c 1337,2337
           else
             echo "Will not test compatibility with nethermind"
           fi
@@ -443,7 +443,7 @@ jobs:
           echo "JOB_MATRIX_JSON=${JOB_MATRIX_JSON}" >> $GITHUB_ENV   
 
   run-client-compatibility-matrix:
-    name: CCIP EVM Implementation Compatibility with ${{ matrix.evm_node.docker_image }}
+    name: CCIP EVM Implementation Compatibility with ${{ matrix.evm_node.name }}
     if: always() && needs.should-run.outputs.should_run == 'true'
     environment: integration
     permissions:
@@ -466,11 +466,11 @@ jobs:
         id: collect-gha-metrics
         uses: smartcontractkit/push-gha-metrics-action@dea9b546553cb4ca936607c2267a09c004e4ab3f # v3.0.0
         with:
-          id: ccip-client-compatibility-test-${{ matrix.evm_node.eth_implementation }}
+          id: ccip-client-compatibility-test-${{ matrix.evm_node.name }}
           org-id: ${{ secrets.GRAFANA_INTERNAL_TENANT_ID }}
           basic-auth: ${{ secrets.GRAFANA_INTERNAL_BASIC_AUTH }}
           hostname: ${{ secrets.GRAFANA_INTERNAL_HOST }}
-          this-job-name: CCIP ${{ matrix.evm_node.product }} compatibility with ${{ matrix.evm_node.docker_image }}
+          this-job-name: CCIP ${{ matrix.evm_node.product }} compatibility with ${{ matrix.evm_node.name }}
           test-results-file: '{"testType":"go","filePath":"/tmp/gotest.log"}'
       - name: Checkout the repo
         uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
@@ -486,7 +486,7 @@ jobs:
           chainlinkImage: ${{ env.CHAINLINK_IMAGE }}
           chainlinkVersion: ${{ needs.select-versions.outputs.chainlink_version }}
           pyroscopeServer: ${{ !startsWith(github.ref, 'refs/tags/') && '' || secrets.QA_PYROSCOPE_INSTANCE }} # Avoid sending blank envs https://github.com/orgs/community/discussions/25725
-          pyroscopeEnvironment: ci-ccip-bidirectional-lane-${{ matrix.evm_node.eth_implementation }}
+          pyroscopeEnvironment: ci-ccip-bidirectional-lane-${{ matrix.evm_node.name }}
           pyroscopeKey: ${{ secrets.QA_PYROSCOPE_KEY }}
           lokiEndpoint: ${{ secrets.LOKI_URL_CI }}
           lokiTenantId: ${{ vars.LOKI_TENANT_ID }}
@@ -531,7 +531,7 @@ jobs:
 
             echo "$modified_string"
           }
-          echo "TEST_LOG_NAME=$(replace_special_chars "${{ matrix.evm_node.product }}-${{ matrix.evm_node.docker_image }}-test-logs")" >> $GITHUB_ENV
+          echo "TEST_LOG_NAME=$(replace_special_chars "ccip-${{ matrix.evm_node.name }}-test-logs")" >> $GITHUB_ENV
       - name: Run Tests
         uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@b49a9d04744b0237908831730f8553f26d73a94b # v2.3.17
         with:
@@ -545,7 +545,7 @@ jobs:
             ./integration-tests/smoke/logs/
             ./integration-tests/ccip-tests/smoke/logs/*
             /tmp/gotest.log
-          publish_check_name:  ${{ matrix.evm_node.product }}-${{ matrix.evm_node.eth_implementation }}
+          publish_check_name:  ${{ matrix.evm_node.name }}
           token: ${{ secrets.GITHUB_TOKEN }}
           go_mod_path: ./integration-tests/go.mod
           cache_key_id: core-e2e-${{ env.MOD_CACHE_VERSION }}
