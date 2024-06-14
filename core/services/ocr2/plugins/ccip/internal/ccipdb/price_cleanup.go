@@ -38,7 +38,6 @@ type priceCleanup struct {
 
 	lggr              logger.Logger
 	orm               cciporm.ORM
-	jobId             int32
 	destChainSelector uint64
 
 	services.StateMachine
@@ -47,7 +46,7 @@ type priceCleanup struct {
 	backgroundCancel context.CancelFunc
 }
 
-func NewPriceCleanup(lggr logger.Logger, orm cciporm.ORM, jobId int32, destChainSelector uint64) PriceCleanup {
+func NewPriceCleanup(lggr logger.Logger, orm cciporm.ORM, destChainSelector uint64) PriceCleanup {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	pc := &priceCleanup{
@@ -56,7 +55,6 @@ func NewPriceCleanup(lggr logger.Logger, orm cciporm.ORM, jobId int32, destChain
 
 		lggr:              lggr,
 		orm:               orm,
-		jobId:             jobId,
 		destChainSelector: destChainSelector,
 
 		wg:               new(sync.WaitGroup),

@@ -242,7 +242,7 @@ func jobSpecToCommitPluginConfig(ctx context.Context, orm cciporm.ORM, lggr logg
 		onrampAddress,
 	)
 
-	priceCleanup := db.NewPriceCleanup(lggr, orm, jb.ID, params.commitStoreStaticCfg.ChainSelector)
+	priceCleanup := db.NewPriceCleanup(lggr, orm, params.commitStoreStaticCfg.ChainSelector)
 
 	priceWrite := db.NewPriceWrite(
 		lggr,
