@@ -433,8 +433,8 @@ jobs:
           # TODO: uncomment when nethermind flake reason is addressed
           if [[ "$ETH_IMPLEMENTATIONS" == *"nethermind"* ]]; then
              echo "Will not test compatibility with nethermind due to flakiness"
-#            echo "Will test compatibility with nethermind"
-#            testlistgenerator -o compatibility_test_list.json -p ccip -r TestSmokeCCIPForBidirectionalLane -f './ccip-tests/smoke/ccip_test.go' -e nethermind -d "${{ needs.get-latest-available-images.outputs.nethermind_images }}" -t "ccip-nethermind-compatibility-test" -w "SIMULATED_1,SIMULATED_2" -c 1337,2337 -n ubuntu-latest
+            # echo "Will test compatibility with nethermind"
+            # testlistgenerator -o compatibility_test_list.json -p ccip -r TestSmokeCCIPForBidirectionalLane -f './ccip-tests/smoke/ccip_test.go' -e nethermind -d "${{ needs.get-latest-available-images.outputs.nethermind_images }}" -t "ccip-nethermind-compatibility-test" -w "SIMULATED_1,SIMULATED_2" -c 1337,2337 -n ubuntu-latest
           else
             echo "Will not test compatibility with nethermind"
           fi
