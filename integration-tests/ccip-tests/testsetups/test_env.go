@@ -532,13 +532,15 @@ func DeployEnvironments(
 		var internalWsURLs, internalHttpURLs []string
 		switch chart {
 		case foundry.ChartName:
-			internalWsURLs = append(internalWsURLs, fmt.Sprintf("ws://%s-%s:8545", networkName, foundry.ChartName))
-			internalHttpURLs = append(internalHttpURLs, fmt.Sprintf("http://%s-%s:8545", networkName, foundry.ChartName))
+			internalWsURLs = append(internalWsURLs, fmt.Sprintf("ws://%s:8545", networkName))
+			internalHttpURLs = append(internalHttpURLs, fmt.Sprintf("http://%s:8545", networkName))
 		case networkName:
 			for i := 0; i < numOfTxNodes; i++ {
 				internalWsURLs = append(internalWsURLs, fmt.Sprintf("ws://%s-ethereum-geth:8546", networkName))
 				internalHttpURLs = append(internalHttpURLs, fmt.Sprintf("http://%s-ethereum-geth:8544", networkName))
 			}
+		default:
+			return network.URLs, network.HTTPURLs
 		}
 
 		return internalWsURLs, internalHttpURLs
