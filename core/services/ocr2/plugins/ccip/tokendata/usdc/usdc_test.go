@@ -260,6 +260,7 @@ func TestUSDCReader_rateLimiting(t *testing.T) {
 		rateConfig   time.Duration
 		testDuration time.Duration
 		timeout      time.Duration
+		errorCount   int
 		err          string
 	}{
 		{
@@ -286,6 +287,7 @@ func TestUSDCReader_rateLimiting(t *testing.T) {
 			rateConfig:   100 * time.Millisecond,
 			testDuration: 1 * time.Millisecond,
 			timeout:      1 * time.Millisecond,
+			errorCount:   4,
 			err:          "usdc rate limiting error: rate: Wait(n=1) would exceed context deadline",
 		},
 		{
@@ -294,6 +296,7 @@ func TestUSDCReader_rateLimiting(t *testing.T) {
 			rateConfig:   100 * time.Millisecond,
 			testDuration: 100 * time.Millisecond,
 			timeout:      150 * time.Millisecond,
+			errorCount:   3,
 			err:          "usdc rate limiting error: rate: Wait(n=1) would exceed context deadline",
 		},
 	}
@@ -356,18 +359,16 @@ func TestUSDCReader_rateLimiting(t *testing.T) {
 			close(errorChan)
 
 			// Collect errors
-			errorFound := false
+			numErrors := 0
 			for err := range errorChan {
 				if err == nil {
 					continue
 				}
-				if tc.err != "" && !strings.Contains(err.Error(), tc.err) {
-					errorFound = true
+				if tc.err != "" && strings.Contains(err.Error(), tc.err) {
+					numErrors++
 				}
 			}
-			if tc.err != "" {
-				assert.True(t, errorFound)
-			}
+			assert.Equalf(t, tc.errorCount, numErrors, "expected %d errors, got %d", tc.errorCount, numErrors)
 			assert.WithinDuration(t, start.Add(tc.testDuration), finish, 50*time.Millisecond)
 		})
 	}
