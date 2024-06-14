@@ -7,22 +7,22 @@ import (
 	"sync"
 
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
-	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+	ocr2types "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 )
 
 type TokenPriceConfig struct {
 	// This is mainly used for tokens on testnet to give them a price
-	StaticPrices map[ocrtypes.Account]*big.Int `json:"staticPrice"`
+	StaticPrices map[ocr2types.Account]*big.Int `json:"staticPrice"`
 }
 
 type OnchainTokenPricesReader struct {
 	TokenPriceConfig TokenPriceConfig
 	// Reader for the chain that will have the token prices on-chain
-	contractReader commontypes.ContractReader
+	ContractReader commontypes.ContractReader
 }
 
 // GetTokenPricesUSD TODO: Update interface to return cciptypes.BigInt
-func (pr *OnchainTokenPricesReader) GetTokenPricesUSD(ctx context.Context, tokens []ocrtypes.Account) ([]*big.Int, error) {
+func (pr *OnchainTokenPricesReader) GetTokenPricesUSD(ctx context.Context, tokens []ocr2types.Account) ([]*big.Int, error) {
 	const (
 		contractName = "PriceAggregator"
 		functionName = "getTokenPrice"
@@ -37,13 +37,13 @@ func (pr *OnchainTokenPricesReader) GetTokenPricesUSD(ctx context.Context, token
 	wg.Add(len(tokens))
 
 	for idx, token := range tokens {
-		go func(idx int, token ocrtypes.Account) {
+		go func(idx int, token ocr2types.Account) {
 			defer wg.Done()
 			var price *big.Int
 			if staticPrice, exists := pr.TokenPriceConfig.StaticPrices[token]; exists {
 				price = staticPrice
 			} else {
-				if err := pr.contractReader.GetLatestValue(ctx, contractName, functionName, token, &price); err != nil {
+				if err := pr.ContractReader.GetLatestValue(ctx, contractName, functionName, token, &price); err != nil {
 					select {
 					case errChan <- err:
 					default:
