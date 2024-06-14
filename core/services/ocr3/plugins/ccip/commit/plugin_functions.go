@@ -28,14 +28,16 @@ func observeMaxSeqNums(
 	readableChains mapset.Set[cciptypes.ChainSelector],
 	destChain cciptypes.ChainSelector,
 	knownSourceChains []cciptypes.ChainSelector,
-) ([]cciptypes.SeqNumChain, error) {
+) ([]cciptypes.SeqNumChain, bool, error) {
+	seqNumsInSync := false
+
 	// If there is a previous outcome, start with the sequence numbers of it.
 	seqNumPerChain := make(map[cciptypes.ChainSelector]cciptypes.SeqNum)
 	if previousOutcomeBytes != nil {
 		lggr.Debugw("observing based on previous outcome")
 		prevOutcome, err := cciptypes.DecodeCommitPluginOutcome(previousOutcomeBytes)
 		if err != nil {
-			return nil, fmt.Errorf("decode commit plugin previous outcome: %w", err)
+			return nil, false, fmt.Errorf("decode commit plugin previous outcome: %w", err)
 		}
 		lggr.Debugw("previous outcome decoded", "outcome", prevOutcome.String())
 
@@ -52,7 +54,7 @@ func observeMaxSeqNums(
 		lggr.Debugw("reading sequence numbers from destination")
 		onChainSeqNums, err := ccipReader.NextSeqNum(ctx, knownSourceChains)
 		if err != nil {
-			return nil, fmt.Errorf("get next seq nums: %w", err)
+			return nil, false, fmt.Errorf("get next seq nums: %w", err)
 		}
 		lggr.Debugw("discovered sequence numbers from destination", "onChainSeqNums", onChainSeqNums)
 
@@ -63,6 +65,7 @@ func observeMaxSeqNums(
 				lggr.Debugw("updated sequence number", "chain", ch, "seqNum", onChainSeqNums[i])
 			}
 		}
+		seqNumsInSync = true
 	}
 
 	maxChainSeqNums := make([]cciptypes.SeqNumChain, 0)
@@ -71,7 +74,7 @@ func observeMaxSeqNums(
 	}
 
 	sort.Slice(maxChainSeqNums, func(i, j int) bool { return maxChainSeqNums[i].ChainSel < maxChainSeqNums[j].ChainSel })
-	return maxChainSeqNums, nil
+	return maxChainSeqNums, seqNumsInSync, nil
 }
 
 // observeNewMsgs finds the new messages for each supported chain based on the provided max sequence numbers.

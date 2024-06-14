@@ -53,6 +53,11 @@ class CommitPlugin:
         # Observe fChain for each chain. {chain: f_chain}
         f_chain = self.cfg["f_chain"]
 
+        if not self.can_read_dest():
+            # If node is not able to read updated sequence numbers from the destination,
+            # it should not observe the outdated ones that are coming from the previous outcome.
+            observed_seq_nums = {}
+
         return (observed_seq_nums, new_msgs, token_prices, gas_prices, f_chain)
 
 

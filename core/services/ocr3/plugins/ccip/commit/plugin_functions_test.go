@@ -23,13 +23,14 @@ import (
 
 func Test_observeMaxSeqNumsPerChain(t *testing.T) {
 	testCases := []struct {
-		name           string
-		prevOutcome    cciptypes.CommitPluginOutcome
-		onChainSeqNums map[cciptypes.ChainSelector]cciptypes.SeqNum
-		readChains     []cciptypes.ChainSelector
-		destChain      cciptypes.ChainSelector
-		expErr         bool
-		expMaxSeqNums  []cciptypes.SeqNumChain
+		name             string
+		prevOutcome      cciptypes.CommitPluginOutcome
+		onChainSeqNums   map[cciptypes.ChainSelector]cciptypes.SeqNum
+		readChains       []cciptypes.ChainSelector
+		destChain        cciptypes.ChainSelector
+		expErr           bool
+		expSeqNumsInSync bool
+		expMaxSeqNums    []cciptypes.SeqNumChain
 	}{
 		{
 			name:        "report on chain seq num when no previous outcome and can read dest",
@@ -38,9 +39,10 @@ func Test_observeMaxSeqNumsPerChain(t *testing.T) {
 				1: 10,
 				2: 20,
 			},
-			readChains: []cciptypes.ChainSelector{1, 2, 3},
-			destChain:  3,
-			expErr:     false,
+			readChains:       []cciptypes.ChainSelector{1, 2, 3},
+			destChain:        3,
+			expErr:           false,
+			expSeqNumsInSync: true,
 			expMaxSeqNums: []cciptypes.SeqNumChain{
 				{ChainSel: 1, SeqNum: 10},
 				{ChainSel: 2, SeqNum: 20},
@@ -53,10 +55,11 @@ func Test_observeMaxSeqNumsPerChain(t *testing.T) {
 				1: 10,
 				2: 20,
 			},
-			readChains:    []cciptypes.ChainSelector{1, 2},
-			destChain:     3,
-			expErr:        false,
-			expMaxSeqNums: []cciptypes.SeqNumChain{},
+			readChains:       []cciptypes.ChainSelector{1, 2},
+			destChain:        3,
+			expErr:           false,
+			expSeqNumsInSync: false,
+			expMaxSeqNums:    []cciptypes.SeqNumChain{},
 		},
 		{
 			name: "report previous outcome seq nums and override when on chain is higher if can read dest",
@@ -70,12 +73,34 @@ func Test_observeMaxSeqNumsPerChain(t *testing.T) {
 				1: 10,
 				2: 20,
 			},
-			readChains: []cciptypes.ChainSelector{1, 2, 3},
-			destChain:  3,
-			expErr:     false,
+			readChains:       []cciptypes.ChainSelector{1, 2, 3},
+			destChain:        3,
+			expErr:           false,
+			expSeqNumsInSync: true,
 			expMaxSeqNums: []cciptypes.SeqNumChain{
 				{ChainSel: 1, SeqNum: 11},
 				{ChainSel: 2, SeqNum: 20},
+			},
+		},
+		{
+			name: "report previous outcome seq nums and mark as non synced if cannot read dest",
+			prevOutcome: cciptypes.CommitPluginOutcome{
+				MaxSeqNums: []cciptypes.SeqNumChain{
+					{ChainSel: 1, SeqNum: 11}, // for chain 1 previous outcome is higher than on-chain state
+					{ChainSel: 2, SeqNum: 19}, // for chain 2 previous outcome is behind on-chain state
+				},
+			},
+			onChainSeqNums: map[cciptypes.ChainSelector]cciptypes.SeqNum{
+				1: 10,
+				2: 20,
+			},
+			readChains:       []cciptypes.ChainSelector{1, 2},
+			destChain:        3,
+			expErr:           false,
+			expSeqNumsInSync: false,
+			expMaxSeqNums: []cciptypes.SeqNumChain{
+				{ChainSel: 1, SeqNum: 11},
+				{ChainSel: 2, SeqNum: 19},
 			},
 		},
 	}
@@ -104,7 +129,7 @@ func Test_observeMaxSeqNumsPerChain(t *testing.T) {
 			}
 			mockReader.On("NextSeqNum", ctx, knownSourceChains).Return(onChainSeqNums, nil)
 
-			seqNums, err := observeMaxSeqNums(
+			seqNums, synced, err := observeMaxSeqNums(
 				ctx,
 				lggr,
 				mockReader,
@@ -120,6 +145,7 @@ func Test_observeMaxSeqNumsPerChain(t *testing.T) {
 			}
 			assert.NoError(t, err)
 			assert.Equal(t, tc.expMaxSeqNums, seqNums)
+			assert.Equal(t, tc.expSeqNumsInSync, synced)
 		})
 	}
 }
