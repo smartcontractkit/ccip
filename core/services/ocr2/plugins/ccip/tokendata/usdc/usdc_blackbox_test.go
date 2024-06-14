@@ -9,7 +9,6 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -82,16 +81,11 @@ func TestUSDCReader_ReadTokenData(t *testing.T) {
 
 			defer ts.Close()
 
-			seqNum := uint64(23825)
-			txHash := utils.RandomBytes32()
-			logIndex := int64(4)
-
+			nonce := utils.RandomBytes32()
 			usdcReader := ccipdatamocks.USDCReader{}
-			usdcReader.On("GetUSDCMessagePriorToLogIndexInTx",
+			usdcReader.On("GetUSDCMessageWithNonce",
 				mock.Anything,
-				logIndex,
-				0,
-				common.Hash(txHash).String(),
+				nonce,
 			).Return(hexutil.MustDecode(message), nil)
 			attestationURI, err := url.ParseRequestURI(ts.URL)
 			require.NoError(t, err)
@@ -100,11 +94,9 @@ func TestUSDCReader_ReadTokenData(t *testing.T) {
 			usdcService := usdc.NewUSDCTokenDataReader(lggr, &usdcReader, attestationURI, 0, addr, usdc.APIIntervalRateLimitDisabled)
 			msgAndAttestation, err := usdcService.ReadTokenData(context.Background(), cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta{
 				EVM2EVMMessage: cciptypes.EVM2EVMMessage{
-					SequenceNumber: seqNum,
-					TokenAmounts:   []cciptypes.TokenAmount{{Token: ccipcalc.EvmAddrToGeneric(addr), Amount: nil}},
+					TokenAmounts:    []cciptypes.TokenAmount{{Token: ccipcalc.EvmAddrToGeneric(addr), Amount: nil}},
+					SourceTokenData: [][]byte{nonce[:]},
 				},
-				TxHash:   cciptypes.Hash(txHash).String(),
-				LogIndex: uint(logIndex),
 			}, 0)
 			if test.expectedError != nil {
 				require.Error(t, err)

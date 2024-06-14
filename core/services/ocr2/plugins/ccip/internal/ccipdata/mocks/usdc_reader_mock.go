@@ -13,29 +13,29 @@ type USDCReader struct {
 	mock.Mock
 }
 
-// GetUSDCMessagePriorToLogIndexInTx provides a mock function with given fields: ctx, logIndex, usdcTokenIndexOffset, txHash
-func (_m *USDCReader) GetUSDCMessagePriorToLogIndexInTx(ctx context.Context, logIndex int64, usdcTokenIndexOffset int, txHash string) ([]byte, error) {
-	ret := _m.Called(ctx, logIndex, usdcTokenIndexOffset, txHash)
+// GetUSDCMessageWithNonce provides a mock function with given fields: ctx, nonce
+func (_m *USDCReader) GetUSDCMessageWithNonce(ctx context.Context, nonce [32]byte) ([]byte, error) {
+	ret := _m.Called(ctx, nonce)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetUSDCMessagePriorToLogIndexInTx")
+		panic("no return value specified for GetUSDCMessageWithNonce")
 	}
 
 	var r0 []byte
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, int64, int, string) ([]byte, error)); ok {
-		return rf(ctx, logIndex, usdcTokenIndexOffset, txHash)
+	if rf, ok := ret.Get(0).(func(context.Context, [32]byte) ([]byte, error)); ok {
+		return rf(ctx, nonce)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, int64, int, string) []byte); ok {
-		r0 = rf(ctx, logIndex, usdcTokenIndexOffset, txHash)
+	if rf, ok := ret.Get(0).(func(context.Context, [32]byte) []byte); ok {
+		r0 = rf(ctx, nonce)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]byte)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, int64, int, string) error); ok {
-		r1 = rf(ctx, logIndex, usdcTokenIndexOffset, txHash)
+	if rf, ok := ret.Get(1).(func(context.Context, [32]byte) error); ok {
+		r1 = rf(ctx, nonce)
 	} else {
 		r1 = ret.Error(1)
 	}

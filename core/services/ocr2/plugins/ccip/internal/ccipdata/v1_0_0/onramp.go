@@ -2,7 +2,6 @@ package v1_0_0
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -191,10 +190,6 @@ func (o *OnRamp) IsSourceCursed(ctx context.Context) (bool, error) {
 		return false, fmt.Errorf("checking if source Arm is cursed: %w", err)
 	}
 	return cursed, nil
-}
-
-func (o *OnRamp) GetUSDCMessagePriorToLogIndexInTx(ctx context.Context, logIndex, offsetFromFinal int64, txHash common.Hash) ([]byte, error) {
-	return nil, errors.New("USDC not supported in < 1.2.0")
 }
 
 func (o *OnRamp) Close() error {

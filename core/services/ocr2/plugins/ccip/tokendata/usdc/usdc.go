@@ -22,7 +22,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/tokendata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/tokendata/http"
@@ -41,7 +40,7 @@ const (
 	maxCoolDownDuration = 10 * time.Minute
 
 	// defaultRequestInterval defines the rate in requests per second that the attestation API can be called.
-	// this is set according to the APIs documentated 10 requests per second rate limit.
+	// this is set according to the APIs documented 10 requests per second rate limit.
 	defaultRequestInterval = 100 * time.Millisecond
 
 	// APIIntervalRateLimitDisabled is a special value to disable the rate limiting.
@@ -177,7 +176,7 @@ func (s *TokenDataReader) ReadTokenData(ctx context.Context, msg cciptypes.EVM2E
 	if s.rate != nil {
 		// Wait blocks until it the attestation API can be called or the
 		// context is Done.
-		if waitErr := s.rate.Wait(ctx); err != nil {
+		if waitErr := s.rate.Wait(ctx); waitErr != nil {
 			return nil, fmt.Errorf("usdc rate limiting error: %w", waitErr)
 		}
 	}
@@ -229,42 +228,22 @@ func (s *TokenDataReader) getUSDCMessageBody(
 	msg cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta,
 	tokenIndex int,
 ) ([]byte, error) {
-	usdcTokenEndOffset, err := s.getUsdcTokenEndOffset(msg, tokenIndex)
-	if err != nil {
-		return nil, fmt.Errorf("get usdc token %d end offset: %w", tokenIndex, err)
+	if tokenIndex >= len(msg.EVM2EVMMessage.SourceTokenData) || tokenIndex < 0 {
+		return []byte{}, fmt.Errorf("invalid token index %d for msg with %d source token data", tokenIndex, len(msg.EVM2EVMMessage.SourceTokenData))
+	}
+	nonce := msg.EVM2EVMMessage.SourceTokenData[tokenIndex]
+
+	if len(nonce) != 32 {
+		return []byte{}, fmt.Errorf("invalid nonce length %d", len(nonce))
 	}
 
-	parsedMsgBody, err := s.usdcReader.GetUSDCMessagePriorToLogIndexInTx(ctx, int64(msg.LogIndex), usdcTokenEndOffset, msg.TxHash)
+	parsedMsgBody, err := s.usdcReader.GetUSDCMessageWithNonce(ctx, [32]byte(nonce))
 	if err != nil {
 		return []byte{}, err
 	}
 
 	s.lggr.Infow("Got USDC message body", "messageBody", hexutil.Encode(parsedMsgBody), "messageID", hexutil.Encode(msg.MessageID[:]))
 	return parsedMsgBody, nil
-}
-
-func (s *TokenDataReader) getUsdcTokenEndOffset(msg cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta, tokenIndex int) (int, error) {
-	if tokenIndex >= len(msg.TokenAmounts) || tokenIndex < 0 {
-		return 0, fmt.Errorf("invalid token index %d for msg with %d tokens", tokenIndex, len(msg.TokenAmounts))
-	}
-
-	if msg.TokenAmounts[tokenIndex].Token != ccipcalc.EvmAddrToGeneric(s.usdcTokenAddress) {
-		return 0, fmt.Errorf("the specified token index %d is not a usdc token", tokenIndex)
-	}
-
-	usdcTokenEndOffset := 0
-	for i := tokenIndex + 1; i < len(msg.TokenAmounts); i++ {
-		evmTokenAddr, err := ccipcalc.GenericAddrToEvm(msg.TokenAmounts[i].Token)
-		if err != nil {
-			continue
-		}
-
-		if evmTokenAddr == s.usdcTokenAddress {
-			usdcTokenEndOffset++
-		}
-	}
-
-	return usdcTokenEndOffset, nil
 }
 
 // callAttestationApi calls the USDC attestation API with the given USDC message hash.

@@ -206,6 +206,7 @@ abstract contract TokenPool is IPool, OwnerIsCreator {
   }
 
   /// @notice Sets the remote pool address for a given chain selector.
+  /// @dev The chain should first be enabled through applyChainUpdates
   /// @param remoteChainSelector The remote chain selector for which the remote pool address is being set.
   /// @param remotePoolAddress The address of the remote pool.
   function setRemotePool(uint64 remoteChainSelector, bytes calldata remotePoolAddress) external onlyOwner {
@@ -237,6 +238,10 @@ abstract contract TokenPool is IPool, OwnerIsCreator {
   /// @notice Sets the permissions for a list of chains selectors. Actual senders for these chains
   /// need to be allowed on the Router to interact with this pool.
   /// @dev Only callable by the owner
+  /// @dev This function is used to enable or disable chains, to update rate limits or the remote pool
+  /// use the specific functions for those. There is no specific function to update the remote token,
+  /// this is because the remote token is not expected to ever change. If it does, the chain can be removed
+  /// using this function, and then added back with the updated token.
   /// @param chains A list of chains and their new permission status & rate limits. Rate limits
   /// are only used when the chain is being added through `allowed` being true.
   function applyChainUpdates(ChainUpdate[] calldata chains) external virtual onlyOwner {
