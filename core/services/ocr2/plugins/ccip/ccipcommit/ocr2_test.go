@@ -41,12 +41,10 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache"
 	ccipcachemocks "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcommon"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/factory"
 	ccipdatamocks "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_0_0"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_2_0"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/pricegetter"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/pkg/hashlib"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/pkg/merklemulti"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/prices"
@@ -54,6 +52,8 @@ import (
 
 func TestCommitReportingPlugin_Observation(t *testing.T) {
 	sourceNativeTokenAddr := ccipcalc.HexToAddress("1000")
+	destChainSelector := uint64(1)
+	sourceChainSelector := uint64(2)
 
 	bridgedTokens := []cciptypes.Address{
 		ccipcalc.HexToAddress("2000"),
@@ -146,57 +146,39 @@ func TestCommitReportingPlugin_Observation(t *testing.T) {
 					Return(tc.sendReqs, nil)
 			}
 
-			var destTokens []cciptypes.Address
-			for tk := range tc.tokenDecimals {
-				destTokens = append(destTokens, tk)
-			}
-			// ensure destTokens and destDecimals are in the same order, avoid flaky test from unordered map iteration
-			sort.Slice(destTokens, func(i, j int) bool {
-				return destTokens[i] < destTokens[j]
-			})
-			var destDecimals []uint8
-			for _, token := range destTokens {
-				destDecimals = append(destDecimals, tc.tokenDecimals[token])
-			}
-
-			priceGet := pricegetter.NewMockPriceGetter(t)
-			if len(tc.tokenPrices) > 0 {
-				queryTokens := ccipcommon.FlattenUniqueSlice([]cciptypes.Address{sourceNativeTokenAddr}, destTokens)
-				priceGet.On("TokenPricesUSD", mock.Anything, queryTokens).Return(tc.tokenPrices, nil)
-				priceGet.On("FilterConfiguredTokens", mock.Anything, destTokens).Return([]cciptypes.Address{
-					bridgedTokens[0],
-					bridgedTokens[1],
-				}, []cciptypes.Address{}, nil)
-			}
-
-			gasPriceEstimator := prices.NewMockGasPriceEstimatorCommit(t)
+			mockOrm := ccipmocks.NewORM(t)
 			if tc.fee != nil {
-				var p = tc.fee
-				var pUSD = ccipcalc.CalculateUsdPerUnitGas(p, tc.tokenPrices[sourceNativeTokenAddr])
-				gasPriceEstimator.On("GetGasPrice", ctx).Return(p, nil)
-				gasPriceEstimator.On("DenoteInUSD", p, tc.tokenPrices[sourceNativeTokenAddr]).Return(pUSD, nil)
+				pUSD := ccipcalc.CalculateUsdPerUnitGas(tc.fee, tc.tokenPrices[sourceNativeTokenAddr])
+				mockOrm.On("GetGasPricesByDestChain", ctx, destChainSelector).Return([]cciporm.GasPrice{
+					{
+						SourceChainSelector: sourceChainSelector,
+						GasPrice:            assets.NewWei(pUSD),
+					},
+				}, nil).Maybe()
 			}
-
-			offRampReader := ccipdatamocks.NewOffRampReader(t)
-			offRampReader.On("GetTokens", ctx).Return(cciptypes.OffRampTokens{
-				DestinationTokens: destTokens,
-			}, nil).Maybe()
-
-			destPriceRegReader := ccipdatamocks.NewPriceRegistryReader(t)
-			destPriceRegReader.On("GetFeeTokens", ctx).Return(nil, nil).Maybe()
-			destPriceRegReader.On("GetTokensDecimals", ctx, destTokens).Return(destDecimals, nil).Maybe()
+			if len(tc.tokenPrices) > 0 {
+				mockOrm.On("GetTokenPricesByDestChain", ctx, destChainSelector).Return([]cciporm.TokenPrice{
+					{
+						TokenAddr:  string(bridgedTokens[0]),
+						TokenPrice: assets.NewWei(expectedEncodedTokenPrice[bridgedTokens[0]]),
+					},
+					{
+						TokenAddr:  string(bridgedTokens[1]),
+						TokenPrice: assets.NewWei(expectedEncodedTokenPrice[bridgedTokens[1]]),
+					},
+				}, nil).Maybe()
+			}
 
 			p := &CommitReportingPlugin{}
 			p.lggr = logger.TestLogger(t)
 			p.commitStoreReader = commitStoreReader
 			p.onRampReader = onRampReader
-			p.offRampReader = offRampReader
-			p.destPriceRegistryReader = destPriceRegReader
-			p.priceGetter = priceGet
 			p.sourceNative = sourceNativeTokenAddr
-			p.gasPriceEstimator = gasPriceEstimator
 			p.metricsCollector = ccip.NoopMetricsCollector
 			p.chainHealthcheck = cache.NewChainHealthcheck(p.lggr, onRampReader, commitStoreReader)
+			p.orm = mockOrm
+			p.destChainSelector = destChainSelector
+			p.sourceChainSelector = sourceChainSelector
 
 			obs, err := p.Observation(ctx, tc.epochAndRound, types.Query{})
 
