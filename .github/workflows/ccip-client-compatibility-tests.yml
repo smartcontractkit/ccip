@@ -532,8 +532,13 @@ jobs:
             echo "$modified_string"
           }
           echo "TEST_LOG_NAME=$(replace_special_chars "ccip-${{ matrix.evm_node.name }}-test-logs")" >> $GITHUB_ENV
+      - name: Print Test details - ${{ matrix.evm_node.docker_image }}
+        run: |
+          echo "EVM Implementation: ${{ matrix.evm_node.name }}"
+          echo "EVM Implementation Docker Image: ${{ matrix.evm_node.docker_image }}"
+          echo "EVM Implementation Networks: ${{ matrix.evm_node.networks }}"
       - name: Run Tests
-        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@b49a9d04744b0237908831730f8553f26d73a94b # v2.3.17
+        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@fc3e0df622521019f50d772726d6bf8dc919dd38 # v2.3.19
         with:
           test_command_to_run: cd ./integration-tests && go test -timeout 30m -count=1 -json -test.parallel=2 ${{ matrix.evm_node.run }} 2>&1 | tee /tmp/gotest.log | gotestloghelper -ci
           test_download_vendor_packages_command: cd ./integration-tests && go mod download
