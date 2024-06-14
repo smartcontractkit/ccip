@@ -19,7 +19,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/pkg/merklemulti"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/prices"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/tokendata"
-	statuschecker "github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/statuschecker"
+	"github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/statuschecker"
 )
 
 type BatchContext struct {
@@ -94,7 +94,7 @@ func (s *BestEffortBatchingStrategy) BuildBatch(
 
 type ZKOverflowBatchingStrategy struct {
 	BaseBatchingStrategy
-	statuschecker statuschecker.TransactionStatusChecker
+	statuschecker statuschecker.CCIPTransactionStatusChecker
 }
 
 // ZKOverflowBatchingStrategy is a batching strategy for ZK chains overflowing under certain conditions.
@@ -119,7 +119,7 @@ func (bs *ZKOverflowBatchingStrategy) BuildBatch(
 		}
 
 		// Check if the messsage is overflown using TXM
-		statuses, _, err := bs.statuschecker.QueryTxStatuses(batchCtx.ctx, hexutil.Encode(msg.MessageID[:]))
+		statuses, _, err := bs.statuschecker.CheckMessageStatus(batchCtx.ctx, hexutil.Encode(msg.MessageID[:]))
 		if err != nil {
 			batchBuilder.skip(msg, TXMCheckError)
 			continue
