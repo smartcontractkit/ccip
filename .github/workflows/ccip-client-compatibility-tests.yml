@@ -443,7 +443,7 @@ jobs:
           echo "JOB_MATRIX_JSON=${JOB_MATRIX_JSON}" >> $GITHUB_ENV   
 
   run-client-compatibility-matrix:
-    name: CCIP EVM Implementation Compatibility with ${{ matrix.evm_node.name }}
+    name: CCIP Compatibility with ${{ matrix.evm_node.name }}
     if: always() && needs.should-run.outputs.should_run == 'true'
     environment: integration
     permissions:
@@ -462,16 +462,6 @@ jobs:
         evm_node: ${{fromJson(needs.prepare-compatibility-matrix.outputs.matrix)}}
     runs-on: ubuntu-latest
     steps:
-      - name: Collect Metrics
-        id: collect-gha-metrics
-        uses: smartcontractkit/push-gha-metrics-action@dea9b546553cb4ca936607c2267a09c004e4ab3f # v3.0.0
-        with:
-          id: ccip-client-compatibility-test-${{ matrix.evm_node.name }}
-          org-id: ${{ secrets.GRAFANA_INTERNAL_TENANT_ID }}
-          basic-auth: ${{ secrets.GRAFANA_INTERNAL_BASIC_AUTH }}
-          hostname: ${{ secrets.GRAFANA_INTERNAL_HOST }}
-          this-job-name: CCIP ${{ matrix.evm_node.product }} compatibility with ${{ matrix.evm_node.name }}
-          test-results-file: '{"testType":"go","filePath":"/tmp/gotest.log"}'
       - name: Checkout the repo
         uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
         with:
@@ -534,7 +524,6 @@ jobs:
           echo "TEST_LOG_NAME=$(replace_special_chars "ccip-${{ matrix.evm_node.name }}-test-logs")" >> $GITHUB_ENV
       - name: Print Test details - ${{ matrix.evm_node.docker_image }}
         run: |
-          echo "EVM Implementation: ${{ matrix.evm_node.name }}"
           echo "EVM Implementation Docker Image: ${{ matrix.evm_node.docker_image }}"
           echo "EVM Implementation Networks: ${{ matrix.evm_node.networks }}"
       - name: Run Tests
@@ -596,7 +585,7 @@ jobs:
                       "type": "header",
                       "text": {
                         "type": "plain_text",
-                        "text": "CCIP EVM Implementation Compatibility Test Results ${{ contains(join(needs.*.result, ','), 'failure') && ':x:' || ':white_check_mark:'}}",
+                        "text": "CCIP Compatibility Test Results ${{ contains(join(needs.*.result, ','), 'failure') && ':x:' || ':white_check_mark:'}}",
                         "emoji": true
                       }
                     },
@@ -646,8 +635,8 @@ jobs:
           github_token: ${{ github.token }}
           github_repository: ${{ github.repository }}
           workflow_run_id: ${{ github.run_id }}
-          github_job_name_regex: ^CCIP EVM Implementation Compatibility with (?<cap>.*?)$
-          message_title: CCIP EVM Implementation Compatibility Test Results
+          github_job_name_regex: ^CCIP Compatibility with (?<cap>.*?)$
+          message_title: CCIP Compatibility Test Results
           slack_channel_id: ${{ secrets.QA_CCIP_SLACK_CHANNEL }}
           slack_bot_token: ${{ secrets.QA_SLACK_API_KEY }}
           slack_thread_ts: ${{ needs.start-slack-thread.outputs.thread_ts }}
