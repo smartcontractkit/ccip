@@ -419,6 +419,7 @@ func TestSmokeCCIPSelfServeRateLimitOnRamp(t *testing.T) {
 	} else {
 		require.FailNow(t, "OnRamp contract version not found in test config")
 	}
+	require.False(t, pointer.GetBool(TestCfg.TestGroupInput.ExistingDeployment), "This test modifies contract state and cannot be run on existing deployments")
 
 	setUpOutput := testsetups.CCIPDefaultTestSetUp(t, log, "smoke-ccip", nil, TestCfg)
 	if len(setUpOutput.Lanes) == 0 {
@@ -565,6 +566,7 @@ func TestSmokeCCIPSelfServeRateLimitOffRamp(t *testing.T) {
 		require.FailNow(t, "OffRamp contract version not found in test config")
 	}
 	require.True(t, TestCfg.SelectedNetworks[0].Simulated, "This test relies on timing assumptions and should only be run on simulated networks")
+	require.False(t, pointer.GetBool(TestCfg.TestGroupInput.ExistingDeployment), "This test modifies contract state and cannot be run on existing deployments")
 
 	// Set the default permissionless exec threshold lower so that we can manually execute the transactions faster
 	// Tuning this too low stops any transactions from being realistically executed
