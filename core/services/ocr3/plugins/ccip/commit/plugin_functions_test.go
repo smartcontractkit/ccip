@@ -492,6 +492,7 @@ func Test_validateObserverReadingEligibility(t *testing.T) {
 		name         string
 		observer     commontypes.OracleID
 		msgs         []cciptypes.CCIPMsgBaseDetails
+		seqNums      []cciptypes.SeqNumChain
 		observerInfo map[commontypes.OracleID]cciptypes.ObserverInfo
 		expErr       bool
 	}{
@@ -510,16 +511,26 @@ func Test_validateObserverReadingEligibility(t *testing.T) {
 			expErr: false,
 		},
 		{
-			name:     "observer cannot read one chain",
+			name:     "observer is a writer so can observe seq nums",
 			observer: commontypes.OracleID(10),
-			msgs: []cciptypes.CCIPMsgBaseDetails{
-				{ID: cciptypes.Bytes32{1}, SourceChain: 1, SeqNum: 12},
-				{ID: cciptypes.Bytes32{3}, SourceChain: 2, SeqNum: 12},
-				{ID: cciptypes.Bytes32{1}, SourceChain: 3, SeqNum: 12},
-				{ID: cciptypes.Bytes32{2}, SourceChain: 3, SeqNum: 12},
+			msgs:     []cciptypes.CCIPMsgBaseDetails{},
+			seqNums: []cciptypes.SeqNumChain{
+				{ChainSel: 1, SeqNum: 12},
 			},
 			observerInfo: map[commontypes.OracleID]cciptypes.ObserverInfo{
-				10: {Reads: []cciptypes.ChainSelector{1, 3}},
+				10: {Reads: []cciptypes.ChainSelector{1, 3}, Writer: true},
+			},
+			expErr: false,
+		},
+		{
+			name:     "observer is not a writer so cannot observe seq nums",
+			observer: commontypes.OracleID(10),
+			msgs:     []cciptypes.CCIPMsgBaseDetails{},
+			seqNums: []cciptypes.SeqNumChain{
+				{ChainSel: 1, SeqNum: 12},
+			},
+			observerInfo: map[commontypes.OracleID]cciptypes.ObserverInfo{
+				10: {Reads: []cciptypes.ChainSelector{1, 3}, Writer: false},
 			},
 			expErr: true,
 		},
@@ -538,17 +549,19 @@ func Test_validateObserverReadingEligibility(t *testing.T) {
 			expErr: true,
 		},
 		{
-			name:         "no msgs",
-			observer:     commontypes.OracleID(10),
-			msgs:         []cciptypes.CCIPMsgBaseDetails{},
-			observerInfo: map[commontypes.OracleID]cciptypes.ObserverInfo{},
-			expErr:       false,
+			name:     "no msgs",
+			observer: commontypes.OracleID(10),
+			msgs:     []cciptypes.CCIPMsgBaseDetails{},
+			observerInfo: map[commontypes.OracleID]cciptypes.ObserverInfo{
+				10: {Reads: []cciptypes.ChainSelector{1, 3}},
+			},
+			expErr: false,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			err := validateObserverReadingEligibility(tc.observer, tc.msgs, tc.observerInfo)
+			err := validateObserverReadingEligibility(tc.observer, tc.msgs, tc.seqNums, tc.observerInfo)
 			if tc.expErr {
 				assert.Error(t, err)
 				return
