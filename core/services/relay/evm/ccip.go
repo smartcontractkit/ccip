@@ -33,7 +33,7 @@ type CCIPExecutionProvider interface {
 
 type ccipCommitProvider struct {
 	*configWatcher
-	contractTransmitter *contractTransmitter
+	contractTransmitter *contractTransmitterNoSignatures
 }
 
 func chainToUUID(chainID *big.Int) uuid.UUID {
@@ -64,7 +64,8 @@ func NewCCIPCommitProvider(ctx context.Context, lggr logger.Logger, chainSet leg
 		return nil, err
 	}
 	subjectID := chainToUUID(configWatcher.chain.ID())
-	contractTransmitter, err := newOnChainContractTransmitter(ctx, lggr, rargs, transmitterID, ks, configWatcher, configTransmitterOpts{
+	// Avoid sending the signatures as it is not validated onchain
+	contractTransmitter, err := newOnChainContractTransmitterNoSignatures(ctx, lggr, rargs, transmitterID, ks, configWatcher, configTransmitterOpts{
 		subjectID: &subjectID,
 	}, OCR2AggregatorTransmissionContractABI, fn, 0)
 	if err != nil {

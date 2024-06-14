@@ -549,6 +549,83 @@ func newOnChainContractTransmitter(ctx context.Context, lggr logger.Logger, rarg
 	)
 }
 
+// newOnChainContractTransmitter creates a new contract transmitter.
+func newOnChainContractTransmitterNoSignatures(ctx context.Context, lggr logger.Logger, rargs commontypes.RelayArgs, transmitterID string, ethKeystore keystore.Eth, configWatcher *configWatcher, opts configTransmitterOpts, transmissionContractABI abi.ABI, reportToEvmTxMeta ReportToEthMetadata, transmissionContractRetention time.Duration) (*contractTransmitterNoSignatures, error) {
+	var relayConfig types.RelayConfig
+	if err := json.Unmarshal(rargs.RelayConfig, &relayConfig); err != nil {
+		return nil, err
+	}
+	var fromAddresses []common.Address
+	sendingKeys := relayConfig.SendingKeys
+	if !relayConfig.EffectiveTransmitterID.Valid {
+		return nil, pkgerrors.New("EffectiveTransmitterID must be specified")
+	}
+	effectiveTransmitterAddress := common.HexToAddress(relayConfig.EffectiveTransmitterID.String)
+
+	sendingKeysLength := len(sendingKeys)
+	if sendingKeysLength == 0 {
+		return nil, pkgerrors.New("no sending keys provided")
+	}
+
+	// If we are using multiple sending keys, then a forwarder is needed to rotate transmissions.
+	// Ensure that this forwarder is not set to a local sending key, and ensure our sending keys are enabled.
+	for _, s := range sendingKeys {
+		if sendingKeysLength > 1 && s == effectiveTransmitterAddress.String() {
+			return nil, pkgerrors.New("the transmitter is a local sending key with transaction forwarding enabled")
+		}
+		if err := ethKeystore.CheckEnabled(ctx, common.HexToAddress(s), configWatcher.chain.Config().EVM().ChainID()); err != nil {
+			return nil, pkgerrors.Wrap(err, "one of the sending keys given is not enabled")
+		}
+		fromAddresses = append(fromAddresses, common.HexToAddress(s))
+	}
+
+	subject := rargs.ExternalJobID
+	if opts.subjectID != nil {
+		subject = *opts.subjectID
+	}
+	strategy := txmgrcommon.NewQueueingTxStrategy(subject, relayConfig.DefaultTransactionQueueDepth)
+
+	var checker txm.TransmitCheckerSpec
+	if relayConfig.SimulateTransactions {
+		checker.CheckerType = txm.TransmitCheckerTypeSimulate
+	}
+
+	gasLimit := configWatcher.chain.Config().EVM().GasEstimator().LimitDefault()
+	ocr2Limit := configWatcher.chain.Config().EVM().GasEstimator().LimitJobType().OCR2()
+	if ocr2Limit != nil {
+		gasLimit = uint64(*ocr2Limit)
+	}
+	if opts.pluginGasLimit != nil {
+		gasLimit = uint64(*opts.pluginGasLimit)
+	}
+
+	transmitter, err := ocrcommon.NewTransmitter(
+		configWatcher.chain.TxManager(),
+		fromAddresses,
+		gasLimit,
+		effectiveTransmitterAddress,
+		strategy,
+		checker,
+		configWatcher.chain.ID(),
+		ethKeystore,
+	)
+	if err != nil {
+		return nil, pkgerrors.Wrap(err, "failed to create transmitter")
+	}
+
+	return NewOCRContractTransmitterNoSignaturesWithRetention(
+		ctx,
+		configWatcher.contractAddress,
+		configWatcher.chain.Client(),
+		transmissionContractABI,
+		transmitter,
+		configWatcher.chain.LogPoller(),
+		lggr,
+		reportToEvmTxMeta,
+		transmissionContractRetention,
+	)
+}
+
 func (r *Relayer) NewMedianProvider(rargs commontypes.RelayArgs, pargs commontypes.PluginArgs) (commontypes.MedianProvider, error) {
 	// TODO https://smartcontract-it.atlassian.net/browse/BCF-2887
 	ctx := context.Background()

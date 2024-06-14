@@ -27,7 +27,13 @@ type ContractTransmitter interface {
 	ocrtypes.ContractTransmitter
 }
 
-var _ ContractTransmitter = &contractTransmitter{}
+type DefaultContractTransmitter interface {
+	ContractTransmitter
+	GetFields() contractTransmitterFields
+}
+
+var _ DefaultContractTransmitter = &contractTransmitter{}
+var _ DefaultContractTransmitter = &contractTransmitterNoSignatures{}
 
 type Transmitter interface {
 	CreateEthTransaction(ctx context.Context, toAddress gethcommon.Address, payload []byte, txMeta *txmgr.TxMeta) error
@@ -40,7 +46,7 @@ func reportToEvmTxMetaNoop([]byte) (*txmgr.TxMeta, error) {
 	return nil, nil
 }
 
-type contractTransmitter struct {
+type contractTransmitterFields struct {
 	contractAddress     gethcommon.Address
 	contractABI         abi.ABI
 	transmitter         Transmitter
@@ -49,6 +55,22 @@ type contractTransmitter struct {
 	lp                  logpoller.LogPoller
 	lggr                logger.Logger
 	reportToEvmTxMeta   ReportToEthMetadata
+}
+
+type contractTransmitter struct {
+	contractTransmitterFields
+}
+
+func (oc *contractTransmitter) GetFields() contractTransmitterFields {
+	return oc.contractTransmitterFields
+}
+
+func (oc *contractTransmitterNoSignatures) GetFields() contractTransmitterFields {
+	return oc.contractTransmitterFields
+}
+
+type contractTransmitterNoSignatures struct {
+	contractTransmitterFields
 }
 
 func transmitterFilterName(addr common.Address) string {
@@ -79,21 +101,48 @@ func NewOCRContractTransmitterWithRetention(
 	reportToEvmTxMeta ReportToEthMetadata,
 	retention time.Duration,
 ) (*contractTransmitter, error) {
+
+	fields, err2 := validateAndCreateContractTransmitterFields(ctx, address, caller, contractABI, transmitter, lp, lggr, reportToEvmTxMeta, retention)
+	if err2 != nil {
+		return nil, err2
+	}
+	return &contractTransmitter{fields}, nil
+}
+
+func NewOCRContractTransmitterNoSignaturesWithRetention(
+	ctx context.Context,
+	address gethcommon.Address,
+	caller contractReader,
+	contractABI abi.ABI,
+	transmitter Transmitter,
+	lp logpoller.LogPoller,
+	lggr logger.Logger,
+	reportToEvmTxMeta ReportToEthMetadata,
+	retention time.Duration,
+) (*contractTransmitterNoSignatures, error) {
+	fields, err2 := validateAndCreateContractTransmitterFields(ctx, address, caller, contractABI, transmitter, lp, lggr, reportToEvmTxMeta, retention)
+	if err2 != nil {
+		return nil, err2
+	}
+	return &contractTransmitterNoSignatures{fields}, nil
+}
+
+func validateAndCreateContractTransmitterFields(ctx context.Context, address gethcommon.Address, caller contractReader, contractABI abi.ABI, transmitter Transmitter, lp logpoller.LogPoller, lggr logger.Logger, reportToEvmTxMeta ReportToEthMetadata, retention time.Duration) (contractTransmitterFields, error) {
 	transmitted, ok := contractABI.Events["Transmitted"]
 	if !ok {
-		return nil, errors.New("invalid ABI, missing transmitted")
+		return contractTransmitterFields{}, errors.New("invalid ABI, missing transmitted")
 	}
 
 	// TODO It would be better to keep MaxLogsKept = 1 for the OCR contract transmitter instead of Retention. We are always interested only in the latest log.
 	// Although MaxLogsKept is present in the Filter struct, it is not supported by LogPoller yet.
 	err := lp.RegisterFilter(ctx, logpoller.Filter{Name: transmitterFilterName(address), EventSigs: []common.Hash{transmitted.ID}, Addresses: []common.Address{address}, Retention: retention})
 	if err != nil {
-		return nil, err
+		return contractTransmitterFields{}, err
 	}
 	if reportToEvmTxMeta == nil {
 		reportToEvmTxMeta = reportToEvmTxMetaNoop
 	}
-	return &contractTransmitter{
+	fields := contractTransmitterFields{
 		contractAddress:     address,
 		contractABI:         contractABI,
 		transmitter:         transmitter,
@@ -102,7 +151,8 @@ func NewOCRContractTransmitterWithRetention(
 		contractReader:      caller,
 		lggr:                lggr.Named("OCRContractTransmitter"),
 		reportToEvmTxMeta:   reportToEvmTxMeta,
-	}, nil
+	}
+	return fields, nil
 }
 
 // Transmit sends the report to the on-chain smart contract's Transmit method.
@@ -132,6 +182,34 @@ func (oc *contractTransmitter) Transmit(ctx context.Context, reportCtx ocrtypes.
 	oc.lggr.Debugw("Transmitting report", "report", hex.EncodeToString(report), "rawReportCtx", rawReportCtx, "contractAddress", oc.contractAddress, "txMeta", txMeta)
 
 	payload, err := oc.contractABI.Pack("transmit", rawReportCtx, []byte(report), rs, ss, vs)
+	if err != nil {
+		return errors.Wrap(err, "abi.Pack failed")
+	}
+
+	return errors.Wrap(oc.transmitter.CreateEthTransaction(ctx, oc.contractAddress, payload, txMeta), "failed to send Eth transaction")
+}
+
+func (oc contractTransmitterNoSignatures) Transmit(ctx context.Context, reportCtx ocrtypes.ReportContext, report ocrtypes.Report, signatures []ocrtypes.AttributedOnchainSignature) error {
+
+	if len(signatures) > 32 {
+		return errors.New("too many signatures, maximum is 32")
+	}
+	for _, as := range signatures {
+		_, _, _, err := evmutil.SplitSignature(as.Signature)
+		if err != nil {
+			panic("eventTransmit(ev): error in SplitSignature")
+		}
+	}
+	rawReportCtx := evmutil.RawReportContext(reportCtx)
+
+	txMeta, err := oc.reportToEvmTxMeta(report)
+	if err != nil {
+		oc.lggr.Warnw("failed to generate tx metadata for report", "err", err)
+	}
+
+	oc.lggr.Debugw("Transmitting report", "report", hex.EncodeToString(report), "rawReportCtx", rawReportCtx, "contractAddress", oc.contractAddress, "txMeta", txMeta)
+
+	payload, err := oc.contractABI.Pack("transmit", rawReportCtx, []byte(report), nil, nil, nil)
 	if err != nil {
 		return errors.Wrap(err, "abi.Pack failed")
 	}
@@ -182,7 +260,15 @@ func callContract(ctx context.Context, addr common.Address, contractABI abi.ABI,
 // It is plugin independent, in particular avoids use of the plugin specific generated evm wrappers
 // by using the evm client Call directly for functions/events that are part of OCR2Abstract.
 func (oc *contractTransmitter) LatestConfigDigestAndEpoch(ctx context.Context) (ocrtypes.ConfigDigest, uint32, error) {
-	latestConfigDigestAndEpoch, err := callContract(ctx, oc.contractAddress, oc.contractABI, "latestConfigDigestAndEpoch", nil, oc.contractReader)
+	return extractLatestConfigDigestAndEpoch(ctx, oc)
+}
+
+func (oc *contractTransmitterNoSignatures) LatestConfigDigestAndEpoch(ctx context.Context) (configDigest ocrtypes.ConfigDigest, epoch uint32, err error) {
+	return extractLatestConfigDigestAndEpoch(ctx, oc)
+}
+
+func extractLatestConfigDigestAndEpoch(ctx context.Context, oc DefaultContractTransmitter) (ocrtypes.ConfigDigest, uint32, error) {
+	latestConfigDigestAndEpoch, err := callContract(ctx, oc.GetFields().contractAddress, oc.GetFields().contractABI, "latestConfigDigestAndEpoch", nil, oc.GetFields().contractReader)
 	if err != nil {
 		return ocrtypes.ConfigDigest{}, 0, err
 	}
@@ -198,7 +284,7 @@ func (oc *contractTransmitter) LatestConfigDigestAndEpoch(ctx context.Context) (
 	if err != nil {
 		return ocrtypes.ConfigDigest{}, 0, err
 	}
-	latest, err := oc.lp.LatestLogByEventSigWithConfs(ctx, oc.transmittedEventSig, oc.contractAddress, 1)
+	latest, err := oc.GetFields().lp.LatestLogByEventSigWithConfs(ctx, oc.GetFields().transmittedEventSig, oc.GetFields().contractAddress, 1)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			// No transmissions yet
@@ -223,3 +309,17 @@ func (oc *contractTransmitter) HealthReport() map[string]error {
 	return map[string]error{oc.Name(): nil}
 }
 func (oc *contractTransmitter) Name() string { return oc.lggr.Name() }
+
+func (oc *contractTransmitterNoSignatures) FromAccount() (ocrtypes.Account, error) {
+	return ocrtypes.Account(oc.transmitter.FromAddress().String()), nil
+}
+
+func (oc *contractTransmitterNoSignatures) Start(ctx context.Context) error { return nil }
+func (oc *contractTransmitterNoSignatures) Close() error                    { return nil }
+
+// Has no state/lifecycle so it's always healthy and ready
+func (oc *contractTransmitterNoSignatures) Ready() error { return nil }
+func (oc *contractTransmitterNoSignatures) HealthReport() map[string]error {
+	return map[string]error{oc.Name(): nil}
+}
+func (oc *contractTransmitterNoSignatures) Name() string { return oc.lggr.Name() }
