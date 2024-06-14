@@ -3,6 +3,7 @@ package ccipcommit
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"math/big"
 	"math/rand"
 	"slices"
@@ -15,6 +16,7 @@ import (
 	"github.com/leanovate/gopter/gen"
 	"github.com/leanovate/gopter/prop"
 	"github.com/pkg/errors"
+	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -24,12 +26,15 @@ import (
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas/mocks"
 	mocks2 "github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
+	cciporm "github.com/smartcontractkit/chainlink/v2/core/services/ccip"
+	ccipmocks "github.com/smartcontractkit/chainlink/v2/core/services/ccip/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
@@ -585,6 +590,139 @@ func TestCommitReportingPlugin_ShouldTransmitAcceptedReport(t *testing.T) {
 		_, err := p.ShouldTransmitAcceptedReport(ctx, types.ReportTimestamp{}, reportBytes)
 		assert.Error(t, err)
 	})
+}
+
+func TestCommitReportingPlugin_observePriceUpdates(t *testing.T) {
+	destChainSelector := uint64(12345)
+	sourceChainSelector := uint64(67890)
+
+	token1 := ccipcalc.HexToAddress("0x123")
+	token2 := ccipcalc.HexToAddress("0x234")
+
+	gasPrice := big.NewInt(1e18)
+	tokenPrices := map[cciptypes.Address]*big.Int{
+		token1: big.NewInt(2e18),
+		token2: big.NewInt(3e18),
+	}
+
+	testCases := []struct {
+		name                 string
+		ormGasPricesResult   []cciporm.GasPrice
+		ormTokenPricesResult []cciporm.TokenPrice
+
+		expectedGasPrice    *big.Int
+		expectedTokenPrices map[cciptypes.Address]*big.Int
+
+		gasPriceError   bool
+		tokenPriceError bool
+		expectedErr     bool
+	}{
+		{
+			name: "ORM called successfully",
+			ormGasPricesResult: []cciporm.GasPrice{
+				{
+					SourceChainSelector: sourceChainSelector,
+					GasPrice:            assets.NewWei(gasPrice),
+				},
+			},
+			ormTokenPricesResult: []cciporm.TokenPrice{
+				{
+					TokenAddr:  string(token1),
+					TokenPrice: assets.NewWei(tokenPrices[token1]),
+				},
+				{
+					TokenAddr:  string(token2),
+					TokenPrice: assets.NewWei(tokenPrices[token2]),
+				},
+			},
+			expectedGasPrice:    gasPrice,
+			expectedTokenPrices: tokenPrices,
+			gasPriceError:       false,
+			tokenPriceError:     false,
+			expectedErr:         false,
+		},
+		{
+			name: "multiple gas prices",
+			ormGasPricesResult: []cciporm.GasPrice{
+				{
+					SourceChainSelector: sourceChainSelector,
+					GasPrice:            assets.NewWei(gasPrice),
+				},
+				{
+					SourceChainSelector: sourceChainSelector + 1,
+					GasPrice:            assets.NewWei(big.NewInt(200)),
+				},
+				{
+					SourceChainSelector: sourceChainSelector + 2,
+					GasPrice:            assets.NewWei(big.NewInt(300)),
+				},
+			},
+			ormTokenPricesResult: nil,
+			expectedGasPrice:     gasPrice,
+			expectedTokenPrices:  map[cciptypes.Address]*big.Int{},
+			gasPriceError:        false,
+			tokenPriceError:      false,
+			expectedErr:          false,
+		},
+		{
+			name:                 "nil gas prices errors",
+			ormGasPricesResult:   nil,
+			ormTokenPricesResult: nil,
+			gasPriceError:        false,
+			tokenPriceError:      false,
+			expectedErr:          true,
+		},
+		{
+			name:            "gasPrice clear failed",
+			gasPriceError:   true,
+			tokenPriceError: false,
+			expectedErr:     true,
+		},
+		{
+			name:            "tokenPrice clear failed",
+			gasPriceError:   false,
+			tokenPriceError: true,
+			expectedErr:     true,
+		},
+		{
+			name:            "both ORM calls failed",
+			gasPriceError:   true,
+			tokenPriceError: true,
+			expectedErr:     true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := tests.Context(t)
+
+			mockOrm := ccipmocks.NewORM(t)
+			if tc.gasPriceError {
+				mockOrm.On("GetGasPricesByDestChain", ctx, destChainSelector).Return(nil, fmt.Errorf("gas prices error")).Once()
+			} else {
+				mockOrm.On("GetGasPricesByDestChain", ctx, destChainSelector).Return(tc.ormGasPricesResult, nil).Once()
+			}
+			if tc.tokenPriceError {
+				mockOrm.On("GetTokenPricesByDestChain", ctx, destChainSelector).Return(nil, fmt.Errorf("token prices error")).Once()
+			} else {
+				mockOrm.On("GetTokenPricesByDestChain", ctx, destChainSelector).Return(tc.ormTokenPricesResult, nil).Once()
+			}
+
+			p := &CommitReportingPlugin{
+				destChainSelector:   destChainSelector,
+				sourceChainSelector: sourceChainSelector,
+				orm:                 mockOrm,
+			}
+			sourceGasPriceUSD, tokenPricesUSD, err := p.observePriceUpdates(ctx)
+			if tc.expectedErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tc.expectedGasPrice, sourceGasPriceUSD)
+				assert.Equal(t, tc.expectedTokenPrices, tokenPricesUSD)
+			}
+		})
+	}
 }
 
 func TestCommitReportingPlugin_extractObservationData(t *testing.T) {

@@ -181,7 +181,6 @@ func (r *CommitReportingPlugin) calculateMinMaxSequenceNumbers(ctx context.Conte
 	return minSeqNr, maxSeqNr, messageIDs, nil
 }
 
-// observePriceUpdates only observes price updates if price reporting is enabled
 func (r *CommitReportingPlugin) observePriceUpdates(
 	ctx context.Context,
 ) (sourceGasPriceUSD *big.Int, tokenPricesUSD map[cciptypes.Address]*big.Int, err error) {
