@@ -68,7 +68,7 @@ func (pr *OnchainTokenPricesReader) GetTokenPricesUSD(ctx context.Context, token
 	}()
 
 	if err, ok := <-errChan; ok {
-		return nil, fmt.Errorf("failed to get all token prices successfully: %v", err)
+		return nil, fmt.Errorf("failed to get all token prices successfully: %w", err)
 	}
 
 	if len(prices) != len(tokens) {
