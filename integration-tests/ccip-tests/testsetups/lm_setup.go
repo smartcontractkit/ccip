@@ -35,16 +35,18 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	integrationactions "github.com/smartcontractkit/ccip/integration-tests/actions"
 	chainselectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
 	"golang.org/x/sync/errgroup"
 
+	integrationactions "github.com/smartcontractkit/ccip/integration-tests/actions"
+
 	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
 	ctfClient "github.com/smartcontractkit/chainlink-testing-framework/client"
 	"github.com/smartcontractkit/chainlink-testing-framework/k8s/config"
 	"github.com/smartcontractkit/chainlink-testing-framework/k8s/environment"
+
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/actions"
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/contracts"
 	"github.com/smartcontractkit/chainlink/integration-tests/docker/test_env"
@@ -348,7 +350,7 @@ func (o *LMTestSetupOutputs) DeployLMChainContracts(
 		}
 		lggr.Info().Str("Address", bridgeAdapter.EthAddress.String()).Msg("Deployed Mock L1 Bridge Adapter contract")
 		lmCommon.BridgeAdapterAddr = bridgeAdapter.EthAddress
-	case chainselectors.TEST_2337.Selector:
+	case chainselectors.GETH_DEVNET_2.Selector:
 		lggr.Info().Msg("Deploying Mock L2 Bridge Adapter contract")
 		bridgeAdapter, err := cd.DeployMockL2BridgeAdapter()
 		if err != nil {

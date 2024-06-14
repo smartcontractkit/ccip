@@ -540,15 +540,16 @@ func newOnChainContractTransmitter(ctx context.Context, lggr logger.Logger, rarg
 		)
 	default:
 		transmitter, err = ocrcommon.NewTransmitter(
-		configWatcher.chain.TxManager(),
-		fromAddresses,
-		gasLimit,
-		effectiveTransmitterAddress,
-		strategy,
-		checker,
-		configWatcher.chain.ID(),
-		ethKeystore,
-	)}
+			configWatcher.chain.TxManager(),
+			fromAddresses,
+			gasLimit,
+			effectiveTransmitterAddress,
+			strategy,
+			checker,
+			configWatcher.chain.ID(),
+			ethKeystore,
+		)
+	}
 	if err != nil {
 		return nil, pkgerrors.Wrap(err, "failed to create transmitter")
 	}
