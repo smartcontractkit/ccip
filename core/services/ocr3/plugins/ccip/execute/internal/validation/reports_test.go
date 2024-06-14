@@ -41,9 +41,7 @@ func Test_CommitReportValidator_ExecutePluginCommitData(t *testing.T) {
 			reports: []cciptypes.ExecutePluginCommitData{
 				{MerkleRoot: [32]byte{1}},
 			},
-			valid: nil,
-				{MerkleRoot: [32]byte{1}},
-			},
+			valid:   nil,
 			wantErr: assert.NoError,
 		},
 		{
@@ -59,8 +57,6 @@ func Test_CommitReportValidator_ExecutePluginCommitData(t *testing.T) {
 			valid: []cciptypes.ExecutePluginCommitData{
 				{MerkleRoot: [32]byte{1}},
 				{MerkleRoot: [32]byte{2}},
-			},
-				{MerkleRoot: [32]byte{3}},
 			},
 			wantErr: assert.NoError,
 		},
