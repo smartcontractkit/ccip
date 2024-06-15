@@ -124,7 +124,7 @@ func (c *priceWrite) run() {
 			case <-c.backgroundCtx.Done():
 				return
 			case <-ticker.C:
-				err := c.updatePrices(c.backgroundCtx)
+				err := c.executeUpdate(c.backgroundCtx)
 				if err != nil {
 					c.lggr.Errorw("Failed to write in-db prices in the background", "err", err)
 				}
@@ -139,10 +139,32 @@ func (c *priceWrite) UpdateDynamicConfig(gasPriceEstimator prices.GasPriceEstima
 
 	c.gasPriceEstimator = gasPriceEstimator
 	c.destPriceRegistryReader = destPriceRegistryReader
+
+	// Config update may substantially change the prices, refresh the prices immediately, this also makes testing easier
+	// for not having to wait to the full update interval.
+	err := c.updatePrices(c.backgroundCtx)
+	if err != nil {
+		c.lggr.Errorw("Failed to write in-db prices after config update", "err", err)
+	}
+
 	return nil
 }
 
+func (c *priceWrite) executeUpdate(ctx context.Context) error {
+	// Price updates happen infrequently - once every `priceUpdateInterval` seconds or DynamicConfig update.
+	// It does not happen on any code path that is performance sensitive.
+	// We can afford to have non-performant concurrency protection here that is simple and safe.
+	c.dynamicConfigMu.Lock()
+	defer c.dynamicConfigMu.Unlock()
+
+	return c.updatePrices(ctx)
+}
+
 func (c *priceWrite) updatePrices(ctx context.Context) error {
+	if c.gasPriceEstimator == nil || c.destPriceRegistryReader == nil {
+		return fmt.Errorf("PriceWrite ORM skipping price update, gasPriceEstimator and/or destPriceRegistry is not set yet")
+	}
+
 	sourceGasPriceUSD, tokenPricesUSD, err := c.observePriceUpdates(ctx, c.lggr)
 	if err != nil {
 		return err
@@ -160,14 +182,12 @@ func (c *priceWrite) observePriceUpdates(
 	ctx context.Context,
 	lggr logger.Logger,
 ) (sourceGasPriceUSD *big.Int, tokenPricesUSD map[cciptypes.Address]*big.Int, err error) {
-	c.dynamicConfigMu.Lock()
 	if c.destPriceRegistryReader == nil {
 		return nil, nil, fmt.Errorf("skipping price update, destPriceRegistryReader not set yet")
 	}
 	// It is ok to lock/unlock here for a shorter critical section, the follow-up use for PriceRegistryReader is a call to decimals.
 	// If a new PriceRegistryReader is set in between, either it continues to work or errors, both are acceptable
 	sortedLaneTokens, filteredLaneTokens, err := ccipcommon.GetFilteredSortedLaneTokens(ctx, c.offRampReader, c.destPriceRegistryReader, c.priceGetter)
-	c.dynamicConfigMu.Unlock()
 
 	lggr.Debugw("Filtered bridgeable tokens with no configured price getter", "filteredLaneTokens", filteredLaneTokens)
 
@@ -207,7 +227,6 @@ func (c *priceWrite) generatePriceUpdates(
 		return nil, nil, fmt.Errorf("missing source native (%s) price", c.sourceNative)
 	}
 
-	c.dynamicConfigMu.Lock()
 	destTokensDecimals, err := c.destPriceRegistryReader.GetTokensDecimals(ctx, sortedLaneTokens)
 	if err != nil {
 		return nil, nil, fmt.Errorf("get tokens decimals: %w", err)
@@ -229,7 +248,6 @@ func (c *priceWrite) generatePriceUpdates(
 		return nil, nil, fmt.Errorf("missing gas price")
 	}
 	sourceGasPriceUSD, err = c.gasPriceEstimator.DenoteInUSD(sourceGasPrice, sourceNativePriceUSD)
-	c.dynamicConfigMu.Unlock()
 	if err != nil {
 		return nil, nil, err
 	}

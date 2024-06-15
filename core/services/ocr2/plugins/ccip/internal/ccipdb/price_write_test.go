@@ -311,6 +311,9 @@ func Test_generatePriceUpdates(t *testing.T) {
 				}
 			}
 
+			destPriceReg := ccipdatamocks.NewPriceRegistryReader(t)
+			destPriceReg.On("GetTokensDecimals", mock.Anything, destTokens).Return(destDecimals, nil).Maybe()
+
 			priceWrite := NewPriceWrite(
 				lggr,
 				nil,
@@ -320,14 +323,9 @@ func Test_generatePriceUpdates(t *testing.T) {
 				tc.sourceNativeToken,
 				priceGetter,
 				nil,
-				nil,
-				nil,
+				gasPriceEstimator,
+				destPriceReg,
 			).(*priceWrite)
-
-			destPriceReg := ccipdatamocks.NewPriceRegistryReader(t)
-			destPriceReg.On("GetTokensDecimals", mock.Anything, destTokens).Return(destDecimals, nil).Maybe()
-			err := priceWrite.UpdateDynamicConfig(gasPriceEstimator, destPriceReg)
-			assert.NoError(t, err)
 
 			sourceGasPriceUSD, tokenPricesUSD, err := priceWrite.generatePriceUpdates(context.Background(), lggr, destTokens)
 			if tc.expErr {
@@ -423,10 +421,12 @@ func Test_priceWriteInBackground(t *testing.T) {
 	).(*priceWrite)
 	priceWrite.updateInterval = expectedPriceUpdateInterval
 
+	assert.NoError(t, priceWrite.Start(tests.Context(t)))
+
+	mockOrm.On("InsertGasPricesForDestChain", priceWrite.backgroundCtx, destChainSelector, jobId, expectedGasPriceUpdate).Return(nil).Once()
+	mockOrm.On("InsertTokenPricesForDestChain", priceWrite.backgroundCtx, destChainSelector, jobId, expectedTokenPriceUpdate).Return(nil).Once()
 	err := priceWrite.UpdateDynamicConfig(gasPriceEstimator, destPriceReg)
 	assert.NoError(t, err)
-
-	assert.NoError(t, priceWrite.Start(tests.Context(t)))
 
 	for i := 0; i < 10; i++ {
 		mockOrm.On("InsertGasPricesForDestChain", priceWrite.backgroundCtx, destChainSelector, jobId, expectedGasPriceUpdate).Return(nil).Once()
