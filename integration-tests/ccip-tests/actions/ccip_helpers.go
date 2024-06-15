@@ -2009,6 +2009,13 @@ func (destCCIP *DestCCIPModule) DeployContracts(
 		if destCCIP.Common.ExistingDeployment {
 			return fmt.Errorf("offramp address not provided in lane config")
 		}
+		var tokenAdminReg common.Address
+		if contracts.NeedTokenAdminRegistry() {
+			if destCCIP.Common.TokenAdminRegistry == nil {
+				return fmt.Errorf("token admin registry contract address is not provided in lane config")
+			}
+			tokenAdminReg = destCCIP.Common.TokenAdminRegistry.EthAddress
+		}
 		destCCIP.OffRamp, err = contractDeployer.DeployOffRamp(
 			destCCIP.SourceChainSelector,
 			destChainSelector,
@@ -2018,7 +2025,7 @@ func (destCCIP *DestCCIPModule) DeployContracts(
 			[]common.Address{},
 			[]common.Address{},
 			*destCCIP.Common.ARMContract,
-			destCCIP.Common.TokenAdminRegistry.EthAddress,
+			tokenAdminReg,
 		)
 		if err != nil {
 			return fmt.Errorf("deploying offramp shouldn't fail %w", err)
