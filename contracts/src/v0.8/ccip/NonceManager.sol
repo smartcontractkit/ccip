@@ -28,8 +28,8 @@ contract NonceManager is INonceManager, AuthorizedCallers {
 
   /// @dev Struct that contains a sender's outbound and inbound nonces
   struct Nonce {
-    uint64 outboundNonce;
-    uint64 inboundNonce;
+    uint64 outboundNonce; // ──╮ Outbound nonce used by the onramp
+    uint64 inboundNonce; // ───╯ Inbound nonce used by the offramp
   }
 
   /// @dev previous ramps
