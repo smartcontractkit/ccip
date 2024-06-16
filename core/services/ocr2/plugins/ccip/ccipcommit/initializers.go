@@ -12,9 +12,10 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
 	chainselectors "github.com/smartcontractkit/chain-selectors"
-	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil"
 	libocr2 "github.com/smartcontractkit/libocr/offchainreporting2plus"
 	"go.uber.org/multierr"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil"
 
 	commonlogger "github.com/smartcontractkit/chainlink-common/pkg/logger"
 

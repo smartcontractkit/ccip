@@ -43,7 +43,7 @@ type priceCleanup struct {
 
 	services.StateMachine
 	wg               *sync.WaitGroup
-	backgroundCtx    context.Context
+	backgroundCtx    context.Context //nolint:containedctx
 	backgroundCancel context.CancelFunc
 }
 
