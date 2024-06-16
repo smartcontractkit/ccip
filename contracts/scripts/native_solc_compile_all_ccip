@@ -8,7 +8,7 @@ echo " └───────────────────────�
 
 SOLC_VERSION="0.8.24"
 OPTIMIZE_RUNS=26000
-OPTIMIZE_RUNS_OFFRAMP=21000
+OPTIMIZE_RUNS_OFFRAMP=19500
 OPTIMIZE_RUNS_ONRAMP=3600
 
 
@@ -55,7 +55,6 @@ compileContract ccip/applications/EtherSenderReceiver.sol
 compileContract ccip/onRamp/EVM2EVMMultiOnRamp.sol
 compileContract ccip/onRamp/EVM2EVMOnRamp.sol
 compileContract ccip/CommitStore.sol
-compileContract ccip/MultiCommitStore.sol
 compileContract ccip/MultiAggregateRateLimiter.sol
 compileContract ccip/Router.sol
 compileContract ccip/PriceRegistry.sol

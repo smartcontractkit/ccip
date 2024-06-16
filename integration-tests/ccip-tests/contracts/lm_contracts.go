@@ -8,9 +8,11 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/rs/zerolog"
-	"github.com/smartcontractkit/ccip/integration-tests/wrappers"
+
+	"github.com/smartcontractkit/chainlink/integration-tests/wrappers"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
+
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/arm_proxy_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/liquiditymanager/generated/arbitrum_l1_bridge_adapter"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/liquiditymanager/generated/arbitrum_l2_bridge_adapter"
@@ -241,7 +243,7 @@ type OptimismL2BridgeAdapter struct {
 	EthAddress *common.Address
 }
 
-func (e *CCIPContractsDeployer) DeployOptimismL2BridgeAdapter(l2GatewayRouter common.Address) (*OptimismL2BridgeAdapter, error) {
+func (e *CCIPContractsDeployer) DeployOptimismL2BridgeAdapter(wrappedNative common.Address) (*OptimismL2BridgeAdapter, error) {
 	address, _, instance, err := e.evmClient.DeployContract("OptimismL2BridgeAdapter", func(
 		auth *bind.TransactOpts,
 		_ bind.ContractBackend,
@@ -249,7 +251,7 @@ func (e *CCIPContractsDeployer) DeployOptimismL2BridgeAdapter(l2GatewayRouter co
 		return optimism_l2_bridge_adapter.DeployOptimismL2BridgeAdapter(
 			auth,
 			wrappers.MustNewWrappedContractBackend(e.evmClient, nil),
-			l2GatewayRouter,
+			wrappedNative,
 		)
 	})
 	if err != nil {

@@ -22,9 +22,9 @@ import {IERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/
 import {SafeERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
 import {EnumerableMap} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/structs/EnumerableMap.sol";
 
-/// @notice The onRamp is a contract that handles lane-specific fee logic, NOP payments and
+/// @notice The EVM2EVMMultiOnRamp is a contract that handles lane-specific fee logic, NOP payments and
 /// bridgeable token support.
-/// @dev The EVM2EVMOnRamp, CommitStore and EVM2EVMOffRamp form an xchain upgradeable unit. Any change to one of them
+/// @dev The EVM2EVMMultiOnRamp, MultiCommitStore and EVM2EVMMultiOffRamp form an xchain upgradeable unit. Any change to one of them
 /// results an onchain upgrade of all 3.
 contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ILinkAvailable, AggregateRateLimiter, ITypeAndVersion {
   using SafeERC20 for IERC20;
@@ -47,7 +47,6 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ILinkAvailable, AggregateRa
   error MustBeCalledByRouter();
   error RouterMustSetOriginalSender();
   error InvalidConfig();
-  error InvalidAddress(bytes encodedAddress);
   error CursedByRMN(uint64 sourceChainSelector);
   error LinkBalanceNotSettled();
   error InvalidNopAddress(address nop);
@@ -68,7 +67,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ILinkAvailable, AggregateRa
   );
   event TokenTransferFeeConfigDeleted(uint256 indexed destChainSelector, address indexed token);
   /// RMN depends on this event, if changing, please notify the RMN maintainers.
-  event CCIPSendRequested(Internal.EVM2EVMMessage message);
+  event CCIPSendRequested(uint64 indexed destChainSelector, Internal.EVM2EVMMessage message);
   event NopsSet(uint256 nopWeightsTotal, NopAndWeight[] nopsAndWeights);
   event DestChainAdded(uint64 indexed destChainSelector, DestChainConfig destChainConfig);
   event DestChainDynamicConfigUpdated(uint64 indexed destChainSelector, DestChainDynamicConfig dynamicConfig);
@@ -82,6 +81,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ILinkAvailable, AggregateRa
     uint96 maxNopFeesJuels; // ───╮ Max nop fee balance onramp can have
     address rmnProxy; // ─────────╯ Address of RMN proxy
     address nonceManager; // Address of the nonce manager
+    address tokenAdminRegistry; // Token admin registry address
   }
 
   /// @dev Struct to contains the dynamic configuration
@@ -89,7 +89,6 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ILinkAvailable, AggregateRa
   struct DynamicConfig {
     address router; // Router address
     address priceRegistry; // Price registry address
-    address tokenAdminRegistry; // Token admin registry address
   }
 
   /// @dev Struct to hold the fee token configuration for a token, same as the s_premiumMultiplierWeiPerEth but with
@@ -170,6 +169,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ILinkAvailable, AggregateRa
   /// @dev Struct to hold the dynamic configs, its destination chain selector and previous onRamp.
   /// Same as DestChainConfig but with the destChainSelector and the prevOnRamp so that an array of these
   /// can be passed in the constructor and the applyDestChainConfigUpdates function
+  //solhint-disable gas-struct-packing
   struct DestChainConfigArgs {
     uint64 destChainSelector; // Destination chain selector
     DestChainDynamicConfig dynamicConfig; // struct to hold the configs for a destination chain
@@ -194,6 +194,8 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ILinkAvailable, AggregateRa
   address internal immutable i_rmnProxy;
   /// @dev The address of the nonce manager
   address internal immutable i_nonceManager;
+  /// @dev The address of the token admin registry
+  address internal immutable i_tokenAdminRegistry;
   /// @dev the maximum number of nops that can be configured at the same time.
   /// Used to bound gas for loops over nops.
   uint256 private constant MAX_NUMBER_OF_NOPS = 64;
@@ -230,7 +232,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ILinkAvailable, AggregateRa
   ) AggregateRateLimiter(rateLimiterConfig) {
     if (
       staticConfig.linkToken == address(0) || staticConfig.chainSelector == 0 || staticConfig.rmnProxy == address(0)
-        || staticConfig.nonceManager == address(0)
+        || staticConfig.nonceManager == address(0) || staticConfig.tokenAdminRegistry == address(0)
     ) {
       revert InvalidConfig();
     }
@@ -240,6 +242,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ILinkAvailable, AggregateRa
     i_maxNopFeesJuels = staticConfig.maxNopFeesJuels;
     i_rmnProxy = staticConfig.rmnProxy;
     i_nonceManager = staticConfig.nonceManager;
+    i_tokenAdminRegistry = staticConfig.tokenAdminRegistry;
 
     _setDynamicConfig(dynamicConfig);
     _applyDestChainConfigUpdates(destChainConfigArgs);
@@ -302,13 +305,13 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ILinkAvailable, AggregateRa
       ) {
         revert SourceTokenDataTooLarge(tokenAndAmount.token);
       }
-      // We validate the pool address to ensure it is a valid EVM address
-      Internal._validateEVMAddress(poolReturnData.destPoolAddress);
+      // We validate the token address to ensure it is a valid EVM address
+      Internal._validateEVMAddress(poolReturnData.destTokenAddress);
 
       newMessage.sourceTokenData[i] = abi.encode(
         Internal.SourceTokenData({
           sourcePoolAddress: abi.encode(sourcePool),
-          destPoolAddress: poolReturnData.destPoolAddress,
+          destTokenAddress: poolReturnData.destTokenAddress,
           extraData: poolReturnData.destPoolData
         })
       );
@@ -320,7 +323,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ILinkAvailable, AggregateRa
     // Emit message request
     // This must happen after any pool events as some tokens (e.g. USDC) emit events that we expect to precede this
     // event in the offchain code.
-    emit CCIPSendRequested(newMessage);
+    emit CCIPSendRequested(destChainSelector, newMessage);
     return newMessage.messageId;
   }
 
@@ -337,7 +340,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ILinkAvailable, AggregateRa
     uint256 feeTokenAmount,
     address originalSender
   ) internal returns (Internal.EVM2EVMMessage memory) {
-    if (IRMN(i_rmnProxy).isCursed(bytes32(uint256(destChainSelector)))) revert CursedByRMN(destChainSelector);
+    if (IRMN(i_rmnProxy).isCursed(bytes16(uint128(destChainSelector)))) revert CursedByRMN(destChainSelector);
     // Validate message sender is set and allowed. Not validated in `getFee` since it is not user-driven.
     if (originalSender == address(0)) revert RouterMustSetOriginalSender();
     // Router address may be zero intentionally to pause.
@@ -441,7 +444,8 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ILinkAvailable, AggregateRa
       chainSelector: i_chainSelector,
       maxNopFeesJuels: i_maxNopFeesJuels,
       rmnProxy: i_rmnProxy,
-      nonceManager: i_nonceManager
+      nonceManager: i_nonceManager,
+      tokenAdminRegistry: i_tokenAdminRegistry
     });
   }
 
@@ -470,7 +474,8 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ILinkAvailable, AggregateRa
         chainSelector: i_chainSelector,
         maxNopFeesJuels: i_maxNopFeesJuels,
         rmnProxy: i_rmnProxy,
-        nonceManager: i_nonceManager
+        nonceManager: i_nonceManager,
+        tokenAdminRegistry: i_tokenAdminRegistry
       }),
       dynamicConfig
     );
@@ -482,7 +487,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ILinkAvailable, AggregateRa
 
   /// @inheritdoc IEVM2AnyOnRampClient
   function getPoolBySourceToken(uint64, /*destChainSelector*/ IERC20 sourceToken) public view returns (IPool) {
-    return IPool(ITokenAdminRegistry(s_dynamicConfig.tokenAdminRegistry).getPool(address(sourceToken)));
+    return IPool(ITokenAdminRegistry(i_tokenAdminRegistry).getPool(address(sourceToken)));
   }
 
   /// @inheritdoc IEVM2AnyOnRampClient
@@ -692,7 +697,9 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ILinkAvailable, AggregateRa
       DestChainConfigArgs memory destChainConfigArg = destChainConfigArgs[i];
       uint64 destChainSelector = destChainConfigArgs[i].destChainSelector;
 
-      if (destChainSelector == 0) revert InvalidDestChainConfig(destChainSelector);
+      if (destChainSelector == 0 || destChainConfigArg.dynamicConfig.defaultTxGasLimit == 0) {
+        revert InvalidDestChainConfig(destChainSelector);
+      }
 
       DestChainConfig storage destChainConfig = s_destChainConfig[destChainSelector];
       address prevOnRamp = destChainConfigArg.prevOnRamp;
