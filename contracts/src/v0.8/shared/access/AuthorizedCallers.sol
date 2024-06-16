@@ -31,7 +31,7 @@ contract AuthorizedCallers is OwnerIsCreator {
     );
   }
 
-  /// @return authorizedCallers Returns all callers that are authorized to call the validation functions
+  /// @return authorizedCallers Returns all authorized callers
   function getAllAuthorizedCallers() external view returns (address[] memory) {
     return s_authorizedCallers.values();
   }
@@ -67,10 +67,16 @@ contract AuthorizedCallers is OwnerIsCreator {
     }
   }
 
-  modifier onlyAuthorizedCallers() {
+  /// @notice validate access
+  function _validateCaller() internal view {
     if (!s_authorizedCallers.contains(msg.sender)) {
       revert UnauthorizedCaller(msg.sender);
     }
+  }
+
+  /// @notice Reverts if called by anyone other than a listed authorized caller.
+  modifier onlyAuthorizedCallers() {
+    _validateCaller();
     _;
   }
 }

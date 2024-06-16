@@ -12,7 +12,6 @@ import {EVM2EVMMultiOnRamp} from "../../onRamp/EVM2EVMMultiOnRamp.sol";
 import {TokenAdminRegistry} from "../../tokenAdminRegistry/TokenAdminRegistry.sol";
 import {MaybeRevertingBurnMintTokenPool} from "../helpers/MaybeRevertingBurnMintTokenPool.sol";
 import "./EVM2EVMMultiOnRampSetup.t.sol";
-import {Vm} from "forge-std/Vm.sol";
 
 contract EVM2EVMMultiOnRamp_constructor is EVM2EVMMultiOnRampSetup {
   function test_Constructor_Success() public {

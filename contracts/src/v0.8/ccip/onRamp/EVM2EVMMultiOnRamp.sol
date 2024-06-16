@@ -2,7 +2,6 @@
 pragma solidity 0.8.24;
 
 import {ITypeAndVersion} from "../../shared/interfaces/ITypeAndVersion.sol";
-import {IEVM2AnyMultiOnRamp} from "../interfaces/IEVM2AnyMultiOnRamp.sol";
 import {IEVM2AnyOnRamp} from "../interfaces/IEVM2AnyOnRamp.sol";
 import {IEVM2AnyOnRampClient} from "../interfaces/IEVM2AnyOnRampClient.sol";
 import {INonceManager} from "../interfaces/INonceManager.sol";
@@ -27,7 +26,7 @@ import {EnumerableMap} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts
 /// bridgeable token support.
 /// @dev The EVM2EVMOnRamp, CommitStore and EVM2EVMOffRamp form an xchain upgradeable unit. Any change to one of them
 /// results an onchain upgrade of all 3.
-contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ILinkAvailable, AggregateRateLimiter, ITypeAndVersion {
+contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ILinkAvailable, AggregateRateLimiter, ITypeAndVersion {
   using SafeERC20 for IERC20;
   using EnumerableMap for EnumerableMap.AddressToUintMap;
   using USDPriceWith18Decimals for uint224;
@@ -253,7 +252,9 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ILinkAvailable, AggregateRat
   // │                          Messaging                           │
   // ================================================================
 
-  /// @inheritdoc IEVM2AnyMultiOnRamp
+  /// @notice Gets the next sequence number to be used in the onRamp
+  /// @param destChainSelector The destination chain selector
+  /// @return the next sequence number to be used
   function getExpectedNextSequenceNumber(uint64 destChainSelector) external view returns (uint64) {
     return s_destChainConfig[destChainSelector].sequenceNumber + 1;
   }

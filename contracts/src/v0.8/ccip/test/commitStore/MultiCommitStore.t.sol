@@ -5,7 +5,6 @@ import {IMultiCommitStore} from "../../interfaces/IMultiCommitStore.sol";
 import {IPriceRegistry} from "../../interfaces/IPriceRegistry.sol";
 import {IRMN} from "../../interfaces/IRMN.sol";
 
-import {AuthorizedCallers} from "../../../shared/access/AuthorizedCallers.sol";
 import {MultiCommitStore} from "../../MultiCommitStore.sol";
 import {PriceRegistry} from "../../PriceRegistry.sol";
 import {RMN} from "../../RMN.sol";
