@@ -6,9 +6,10 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/sync/errgroup"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
-	"golang.org/x/sync/errgroup"
 
 	cciporm "github.com/smartcontractkit/chainlink/v2/core/services/ccip"
 
