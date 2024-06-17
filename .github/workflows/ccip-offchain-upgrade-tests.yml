@@ -101,7 +101,7 @@ jobs:
     permissions:
       id-token: write
       contents: read
-    name: Build Test Image with Current Sha
+    name: Build Test Image
     runs-on: ubuntu-latest
     steps:
       - name: Collect Metrics
@@ -176,7 +176,7 @@ jobs:
       pull-requests: write
       id-token: write
       contents: read
-    needs: [ changes, last-release-info ]
+    needs: [ changes, last-release-info, build-test-image ]
     outputs:
       existing_namespace: ${{ steps.fetch_namespace.outputs.existing_namespace }}
       triggered_by: ${{ steps.fetch_namespace.outputs.triggered_by }}
