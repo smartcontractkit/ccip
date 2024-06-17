@@ -3693,17 +3693,26 @@ func SetOCR2Config(
 		Interface("OCRParmsForCommit", OCR2ParamsForCommit).
 		Interface("OCRParmsForExec", OCR2ParamsForExec).
 		Msg("Setting OCR2 config")
+	commitOffchainCfg, err := contracts.NewCommitOffchainConfig(
+		*commonconfig.MustNewDuration(5 * time.Second),
+		1e6,
+		1e6,
+		*commonconfig.MustNewDuration(5 * time.Second),
+		1e6,
+		*inflightExpiryCommit,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create commit offchain config: %w", err)
+	}
+
+	commitOnchainCfg, err := contracts.NewCommitOnchainConfig(
+		destCCIP.Common.PriceRegistry.EthAddress,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create commit onchain config: %w", err)
+	}
 	signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig, err := contracts.NewOffChainAggregatorV2ConfigForCCIPPlugin(
-		commitNodes, testhelpers.NewCommitOffchainConfig(
-			*commonconfig.MustNewDuration(5 * time.Second),
-			1e6,
-			1e6,
-			*commonconfig.MustNewDuration(5 * time.Second),
-			1e6,
-			*inflightExpiryCommit,
-		), testhelpers.NewCommitOnchainConfig(
-			destCCIP.Common.PriceRegistry.EthAddress,
-		), OCR2ParamsForCommit, 3*time.Minute)
+		commitNodes, commitOffchainCfg, commitOnchainCfg, OCR2ParamsForCommit, 3*time.Minute)
 	if err != nil {
 		return fmt.Errorf("failed to create ocr2 config params for commit: %w", err)
 	}
@@ -3719,24 +3728,32 @@ func SetOCR2Config(
 		nodes = execNodes
 	}
 	if destCCIP.OffRamp != nil {
+		execOffchainCfg, err := contracts.NewExecOffchainConfig(
+			1,
+			BatchGasLimit,
+			0.7,
+			*inflightExpiryExec,
+			*commonconfig.MustNewDuration(RootSnoozeTime),
+		)
+		if err != nil {
+			return fmt.Errorf("failed to create exec offchain config: %w", err)
+		}
+		execOnchainCfg, err := contracts.NewExecOnchainConfig(
+			uint32(DefaultPermissionlessExecThreshold.Seconds()),
+			destCCIP.Common.Router.EthAddress,
+			destCCIP.Common.PriceRegistry.EthAddress,
+			DefaultMaxNoOfTokensInMsg,
+			MaxDataBytes,
+			200_000,
+			50_000,
+		)
+		if err != nil {
+			return fmt.Errorf("failed to create exec onchain config: %w", err)
+		}
 		signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig, err = contracts.NewOffChainAggregatorV2ConfigForCCIPPlugin(
 			nodes,
-			testhelpers.NewExecOffchainConfig(
-				1,
-				BatchGasLimit,
-				0.7,
-				*inflightExpiryExec,
-				*commonconfig.MustNewDuration(RootSnoozeTime),
-			),
-			testhelpers.NewExecOnchainConfig(
-				uint32(DefaultPermissionlessExecThreshold.Seconds()),
-				destCCIP.Common.Router.EthAddress,
-				destCCIP.Common.PriceRegistry.EthAddress,
-				DefaultMaxNoOfTokensInMsg,
-				MaxDataBytes,
-				200_000,
-				50_000,
-			),
+			execOffchainCfg,
+			execOnchainCfg,
 			OCR2ParamsForExec,
 			3*time.Minute,
 		)
