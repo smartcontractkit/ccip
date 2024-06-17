@@ -341,23 +341,13 @@ func newMsgsConsensusForChain(
 		seqNumConsensusRange.SetEnd(seqNum)
 	}
 
-	msgsBySeqNum := make(map[cciptypes.SeqNum]cciptypes.CCIPMsgBaseDetails)
-	for _, msg := range observedMsgs {
-		h, ok := msgSeqNumToHash[msg.SeqNum]
-		if !ok {
-			continue
-		}
-		msg.MsgHash = h
-		msgsBySeqNum[msg.SeqNum] = msg
-	}
-
 	treeLeaves := make([][32]byte, 0)
 	for seqNum := seqNumConsensusRange.Start(); seqNum <= seqNumConsensusRange.End(); seqNum++ {
-		msg, ok := msgsBySeqNum[seqNum]
+		msgHash, ok := msgSeqNumToHash[seqNum]
 		if !ok {
-			return observedMsgsConsensus{}, fmt.Errorf("msg not found in map for seq num %d", seqNum)
+			return observedMsgsConsensus{}, fmt.Errorf("msg hash not found for seq num %d", seqNum)
 		}
-		treeLeaves = append(treeLeaves, msg.MsgHash)
+		treeLeaves = append(treeLeaves, msgHash)
 	}
 
 	lggr.Debugw("constructing merkle tree", "chain", chainSel, "treeLeaves", len(treeLeaves))
