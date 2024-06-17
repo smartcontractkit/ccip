@@ -72,10 +72,6 @@ func (d ExecOnchainConfig) Validate() error {
 	return nil
 }
 
-func (d ExecOnchainConfig) PermissionLessExecutionThresholdDuration() time.Duration {
-	return time.Duration(d.PermissionLessExecutionThresholdSeconds) * time.Second
-}
-
 // JSONExecOffchainConfig is the configuration for nodes executing committed CCIP messages (v1.2).
 // It comes from the OffchainConfig field of the corresponding OCR2 plugin configuration.
 // NOTE: do not change the JSON format of this struct without consulting with the RDD people first.
