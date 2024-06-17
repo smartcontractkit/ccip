@@ -35,7 +35,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	cciporm "github.com/smartcontractkit/chainlink/v2/core/services/ccip"
-	ccipmocks "github.com/smartcontractkit/chainlink/v2/core/services/ccip/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
@@ -46,6 +45,7 @@ import (
 	ccipdatamocks "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_0_0"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_2_0"
+	ccipdbmocks "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdb/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/pkg/hashlib"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/pkg/merklemulti"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/prices"
@@ -147,18 +147,20 @@ func TestCommitReportingPlugin_Observation(t *testing.T) {
 					Return(tc.sendReqs, nil)
 			}
 
-			mockOrm := ccipmocks.NewORM(t)
+			mockPriceService := ccipdbmocks.NewPriceService(t)
+			var priceServiceGasResult []cciporm.GasPrice
+			var priceServiceTokenResult []cciporm.TokenPrice
 			if tc.fee != nil {
 				pUSD := ccipcalc.CalculateUsdPerUnitGas(tc.fee, tc.tokenPrices[sourceNativeTokenAddr])
-				mockOrm.On("GetGasPricesByDestChain", ctx, destChainSelector).Return([]cciporm.GasPrice{
+				priceServiceGasResult = []cciporm.GasPrice{
 					{
 						SourceChainSelector: sourceChainSelector,
 						GasPrice:            assets.NewWei(pUSD),
 					},
-				}, nil).Maybe()
+				}
 			}
 			if len(tc.tokenPrices) > 0 {
-				mockOrm.On("GetTokenPricesByDestChain", ctx, destChainSelector).Return([]cciporm.TokenPrice{
+				priceServiceTokenResult = []cciporm.TokenPrice{
 					{
 						TokenAddr:  string(bridgedTokens[0]),
 						TokenPrice: assets.NewWei(expectedEncodedTokenPrice[bridgedTokens[0]]),
@@ -167,8 +169,13 @@ func TestCommitReportingPlugin_Observation(t *testing.T) {
 						TokenAddr:  string(bridgedTokens[1]),
 						TokenPrice: assets.NewWei(expectedEncodedTokenPrice[bridgedTokens[1]]),
 					},
-				}, nil).Maybe()
+				}
 			}
+			mockPriceService.On("GetGasAndTokenPrices", ctx, destChainSelector).Return(
+				priceServiceGasResult,
+				priceServiceTokenResult,
+				nil,
+			).Maybe()
 
 			p := &CommitReportingPlugin{}
 			p.lggr = logger.TestLogger(t)
@@ -177,7 +184,7 @@ func TestCommitReportingPlugin_Observation(t *testing.T) {
 			p.sourceNative = sourceNativeTokenAddr
 			p.metricsCollector = ccip.NoopMetricsCollector
 			p.chainHealthcheck = cache.NewChainHealthcheck(p.lggr, onRampReader, commitStoreReader)
-			p.orm = mockOrm
+			p.priceService = mockPriceService
 			p.destChainSelector = destChainSelector
 			p.sourceChainSelector = sourceChainSelector
 
@@ -589,26 +596,25 @@ func TestCommitReportingPlugin_observePriceUpdates(t *testing.T) {
 	}
 
 	testCases := []struct {
-		name                 string
-		ormGasPricesResult   []cciporm.GasPrice
-		ormTokenPricesResult []cciporm.TokenPrice
+		name                string
+		psGasPricesResult   []cciporm.GasPrice
+		psTokenPricesResult []cciporm.TokenPrice
 
 		expectedGasPrice    *big.Int
 		expectedTokenPrices map[cciptypes.Address]*big.Int
 
-		gasPriceError   bool
-		tokenPriceError bool
-		expectedErr     bool
+		psError     bool
+		expectedErr bool
 	}{
 		{
 			name: "ORM called successfully",
-			ormGasPricesResult: []cciporm.GasPrice{
+			psGasPricesResult: []cciporm.GasPrice{
 				{
 					SourceChainSelector: sourceChainSelector,
 					GasPrice:            assets.NewWei(gasPrice),
 				},
 			},
-			ormTokenPricesResult: []cciporm.TokenPrice{
+			psTokenPricesResult: []cciporm.TokenPrice{
 				{
 					TokenAddr:  string(token1),
 					TokenPrice: assets.NewWei(tokenPrices[token1]),
@@ -620,13 +626,12 @@ func TestCommitReportingPlugin_observePriceUpdates(t *testing.T) {
 			},
 			expectedGasPrice:    gasPrice,
 			expectedTokenPrices: tokenPrices,
-			gasPriceError:       false,
-			tokenPriceError:     false,
+			psError:             false,
 			expectedErr:         false,
 		},
 		{
 			name: "multiple gas prices",
-			ormGasPricesResult: []cciporm.GasPrice{
+			psGasPricesResult: []cciporm.GasPrice{
 				{
 					SourceChainSelector: sourceChainSelector,
 					GasPrice:            assets.NewWei(gasPrice),
@@ -640,38 +645,48 @@ func TestCommitReportingPlugin_observePriceUpdates(t *testing.T) {
 					GasPrice:            assets.NewWei(big.NewInt(300)),
 				},
 			},
-			ormTokenPricesResult: nil,
-			expectedGasPrice:     gasPrice,
-			expectedTokenPrices:  map[cciptypes.Address]*big.Int{},
-			gasPriceError:        false,
-			tokenPriceError:      false,
-			expectedErr:          false,
+			psTokenPricesResult: nil,
+			expectedGasPrice:    gasPrice,
+			expectedTokenPrices: map[cciptypes.Address]*big.Int{},
+			psError:             false,
+			expectedErr:         false,
 		},
 		{
-			name:                 "nil gas prices errors",
-			ormGasPricesResult:   nil,
-			ormTokenPricesResult: nil,
-			gasPriceError:        false,
-			tokenPriceError:      false,
-			expectedErr:          true,
+			name: "nil token price is filtered",
+			psGasPricesResult: []cciporm.GasPrice{
+				{
+					SourceChainSelector: sourceChainSelector,
+					GasPrice:            assets.NewWei(gasPrice),
+				},
+			},
+			psTokenPricesResult: []cciporm.TokenPrice{
+				{
+					TokenAddr:  string(token1),
+					TokenPrice: assets.NewWei(tokenPrices[token1]),
+				},
+				{
+					TokenAddr:  string(token2),
+					TokenPrice: nil,
+				},
+			},
+			expectedGasPrice: gasPrice,
+			expectedTokenPrices: map[cciptypes.Address]*big.Int{
+				token1: tokenPrices[token1],
+			},
+			psError:     false,
+			expectedErr: false,
 		},
 		{
-			name:            "gasPrice clear failed",
-			gasPriceError:   true,
-			tokenPriceError: false,
-			expectedErr:     true,
+			name:                "nil gas prices errors",
+			psGasPricesResult:   nil,
+			psTokenPricesResult: nil,
+			psError:             false,
+			expectedErr:         true,
 		},
 		{
-			name:            "tokenPrice clear failed",
-			gasPriceError:   false,
-			tokenPriceError: true,
-			expectedErr:     true,
-		},
-		{
-			name:            "both ORM calls failed",
-			gasPriceError:   true,
-			tokenPriceError: true,
-			expectedErr:     true,
+			name:        "price service failed",
+			psError:     true,
+			expectedErr: true,
 		},
 	}
 
@@ -679,22 +694,21 @@ func TestCommitReportingPlugin_observePriceUpdates(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := tests.Context(t)
 
-			mockOrm := ccipmocks.NewORM(t)
-			if tc.gasPriceError {
-				mockOrm.On("GetGasPricesByDestChain", ctx, destChainSelector).Return(nil, fmt.Errorf("gas prices error")).Once()
-			} else {
-				mockOrm.On("GetGasPricesByDestChain", ctx, destChainSelector).Return(tc.ormGasPricesResult, nil).Once()
+			mockPriceService := ccipdbmocks.NewPriceService(t)
+			var psError error
+			if tc.psError {
+				psError = fmt.Errorf("price service error")
 			}
-			if tc.tokenPriceError {
-				mockOrm.On("GetTokenPricesByDestChain", ctx, destChainSelector).Return(nil, fmt.Errorf("token prices error")).Once()
-			} else {
-				mockOrm.On("GetTokenPricesByDestChain", ctx, destChainSelector).Return(tc.ormTokenPricesResult, nil).Once()
-			}
+			mockPriceService.On("GetGasAndTokenPrices", ctx, destChainSelector).Return(
+				tc.psGasPricesResult,
+				tc.psTokenPricesResult,
+				psError,
+			).Maybe()
 
 			p := &CommitReportingPlugin{
 				destChainSelector:   destChainSelector,
 				sourceChainSelector: sourceChainSelector,
-				orm:                 mockOrm,
+				priceService:        mockPriceService,
 			}
 			sourceGasPriceUSD, tokenPricesUSD, err := p.observePriceUpdates(ctx)
 			if tc.expectedErr {

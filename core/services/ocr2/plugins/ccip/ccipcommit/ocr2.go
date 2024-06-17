@@ -10,8 +10,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/pkg/errors"
-	"golang.org/x/sync/errgroup"
-
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
@@ -69,12 +67,11 @@ type CommitPluginStaticConfig struct {
 	priceGetter      pricegetter.PriceGetter
 	metricsCollector ccip.PluginMetricsCollector
 	chainHealthcheck cache.ChainHealthcheck
-	dbPriceWrite     db.PriceWrite
+	priceService     db.PriceService
 }
 
 type CommitReportingPlugin struct {
 	jobId int32
-	orm   cciporm.ORM
 	lggr  logger.Logger
 	// Source
 	onRampReader        ccipdata.OnRampReader
@@ -93,6 +90,8 @@ type CommitReportingPlugin struct {
 	metricsCollector ccip.PluginMetricsCollector
 	// State
 	chainHealthcheck cache.ChainHealthcheck
+	// DB
+	priceService db.PriceService
 }
 
 // Query is not used by the CCIP Commit plugin.
@@ -184,35 +183,10 @@ func (r *CommitReportingPlugin) calculateMinMaxSequenceNumbers(ctx context.Conte
 func (r *CommitReportingPlugin) observePriceUpdates(
 	ctx context.Context,
 ) (sourceGasPriceUSD *big.Int, tokenPricesUSD map[cciptypes.Address]*big.Int, err error) {
-	eg := new(errgroup.Group)
-
-	var gasPricesInDB []cciporm.GasPrice
-	var tokenPricesInDB []cciporm.TokenPrice
-
-	eg.Go(func() error {
-		gasPrices, err := r.orm.GetGasPricesByDestChain(ctx, r.destChainSelector)
-		if err != nil {
-			return fmt.Errorf("failed to get gas prices from db: %w", err)
-		}
-		gasPricesInDB = gasPrices
-		return nil
-	})
-
-	eg.Go(func() error {
-		tokenPrices, err := r.orm.GetTokenPricesByDestChain(ctx, r.destChainSelector)
-		if err != nil {
-			return fmt.Errorf("failed to get token prices from db: %w", err)
-		}
-		tokenPricesInDB = tokenPrices
-		return nil
-	})
-
-	if err := eg.Wait(); err != nil {
-		return nil, nil, err
-	}
+	gasPricesInDB, tokenPricesInDB, err := r.priceService.GetGasAndTokenPrices(ctx, r.destChainSelector)
 
 	for _, gasPrice := range gasPricesInDB {
-		if gasPrice.SourceChainSelector == r.sourceChainSelector {
+		if gasPrice.SourceChainSelector == r.sourceChainSelector && gasPrice.GasPrice != nil {
 			sourceGasPriceUSD = gasPrice.GasPrice.ToInt()
 			break
 		}
@@ -223,7 +197,9 @@ func (r *CommitReportingPlugin) observePriceUpdates(
 
 	tokenPricesUSD = make(map[cciptypes.Address]*big.Int, len(tokenPricesInDB))
 	for _, tokenPrice := range tokenPricesInDB {
-		tokenPricesUSD[cciptypes.Address(tokenPrice.TokenAddr)] = tokenPrice.TokenPrice.ToInt()
+		if tokenPrice.TokenPrice != nil {
+			tokenPricesUSD[cciptypes.Address(tokenPrice.TokenAddr)] = tokenPrice.TokenPrice.ToInt()
+		}
 	}
 
 	return sourceGasPriceUSD, tokenPricesUSD, nil
