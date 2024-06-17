@@ -152,9 +152,6 @@ func (rf *ExecutionReportingPluginFactory) NewReportingPluginFn(config types.Rep
 			},
 		}
 
-		return reportingPluginAndInfo{
-			plugin:     plugin,
-			pluginInfo: pluginInfo,
-		}, nil
+		return reportingPluginAndInfo{plugin, pluginInfo}, nil
 	}
 }

@@ -46,7 +46,10 @@ import (
 )
 
 var (
-	tokenDataWorkerTimeout    = 5 * time.Second
+	// tokenDataWorkerTimeout defines 1) The timeout while waiting for a bg call to the token data 3P provider.
+	// 2) When a client requests token data and does not specify a timeout this value is used as a default.
+	tokenDataWorkerTimeout = 5 * time.Second
+	// tokenDataWorkerNumWorkers is the number of workers that will be processing token data in parallel.
 	tokenDataWorkerNumWorkers = 5
 )
 
