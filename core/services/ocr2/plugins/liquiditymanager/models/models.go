@@ -54,11 +54,24 @@ func (n NetworkSelector) Type() NetworkType {
 
 type NetworkType string
 
+func (n NetworkSelector) Chain() (chainsel.Chain, bool) {
+	return chainsel.ChainBySelector(uint64(n))
+}
+
+func (n NetworkSelector) String() string {
+	chain, b := chainsel.ChainBySelector(uint64(n))
+	if !b {
+		return fmt.Sprintf("Unknown(%d)", n)
+	}
+	return chain.Name
+}
+
 // ProposedTransfer is a transfer that is proposed by the rebalancing algorithm.
 type ProposedTransfer struct {
 	From   NetworkSelector
 	To     NetworkSelector
 	Amount *ubig.Big
+	Status TransferStatus
 }
 
 func (p ProposedTransfer) FromNetwork() NetworkSelector {
@@ -74,11 +87,25 @@ func (p ProposedTransfer) TransferAmount() *big.Int {
 }
 
 func (p ProposedTransfer) TransferStatus() TransferStatus {
+	if p.Status != "" {
+		return p.Status
+	}
 	return TransferStatusProposed
 }
 
 func (p ProposedTransfer) String() string {
-	return fmt.Sprintf("from:%d to:%d amount:%s", p.From, p.To, p.Amount.String())
+	return fmt.Sprintf("from:%v to:%v amount:%s", p.From, p.To, p.Amount.String())
+}
+
+type ProposedTransfers []ProposedTransfer
+
+func (p ProposedTransfers) Len() int      { return len(p) }
+func (p ProposedTransfers) Swap(i, j int) { p[i], p[j] = p[j], p[i] }
+func (p ProposedTransfers) Less(i, j int) bool {
+	if p[i].From == p[j].From {
+		return p[i].To < p[j].To
+	}
+	return p[i].From < p[j].From
 }
 
 // Transfer is a ProposedTransfer that has had a lot of its information resolved.
@@ -154,9 +181,9 @@ func (t Transfer) Equals(other Transfer) bool {
 }
 
 func (t Transfer) String() string {
-	return fmt.Sprintf("{From: %d, To: %d, Amount: %s, Sender: %s, Receiver: %s, LocalTokenAddress: %s, RemoteTokenAddress: %s, BridgeData: %s, NativeBridgeFee: %s, Stage: %d}",
-		t.From,
-		t.To,
+	return fmt.Sprintf("{From: %s, To: %s, Amount: %s, Sender: %s, Receiver: %s, LocalTokenAddress: %s, RemoteTokenAddress: %s, BridgeData: %s, NativeBridgeFee: %s, Stage: %d}",
+		t.From.String(),
+		t.To.String(),
 		t.Amount.String(),
 		t.Sender.String(),
 		t.Receiver.String(),
@@ -212,11 +239,16 @@ func NewPendingTransfer(tr Transfer) PendingTransfer {
 
 type TransferStatus string
 
+// Proposed and Inflight are used for transfers that are not yet on-chain. (not deducted from the sender on chain)
 const (
 	// TransferStatusProposed indicates that the transfer has been proposed by the rebalancing algorithm.
 	TransferStatusProposed = "proposed"
 	// TransferStatusInflight indicates that the transfer is in-flight, but has not yet been included on-chain.
 	TransferStatusInflight = "inflight"
+)
+
+// the below statuses represent transfers that would have already been started on-chain. (already deducted from the sender on chain)
+const (
 	// TransferStatusNotReady indicates that the transfer is in-flight, but has either not been auto-finalized (e.g L1 -> L2 transfers)
 	// or is not ready to finalize on-chain (e.g L2 -> L1 transfers).
 	TransferStatusNotReady = "not-ready"
