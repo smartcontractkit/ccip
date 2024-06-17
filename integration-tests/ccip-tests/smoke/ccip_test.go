@@ -492,17 +492,6 @@ func TestSmokeCCIPSelfServeRateLimitOnRamp(t *testing.T) {
 			tc.lane.ValidateRequests()
 
 			// Enable aggregate rate limiting on the source chains for the limited token
-			// err = dest.AddRateLimitTokens([]*contracts.ERC20Token{limitedSrcToken}) //, []*contracts.ERC20Token{limitedDestToken})
-			// require.NoError(t, err, "Error adding rate limit tokens")
-			// err = dest.OffRamp.SetRateLimit(contracts.RateLimiterConfig{
-			// 	IsEnabled: true,
-			// 	Capacity:  aggregateRateLimit,
-			// 	Rate:      aggregateRateLimit,
-			// })
-			// require.NoError(t, err, "Error setting destination rate limits")
-			// err = dest.Common.ChainClient.WaitForEvents()
-			// require.NoError(t, err, "Error waiting for events")
-
 			err = src.OnRamp.SetTokenTransferFeeConfig([]evm_2_evm_onramp.EVM2EVMOnRampTokenTransferFeeConfigArgs{
 				{
 					Token:                     limitedSrcToken.ContractAddress,
