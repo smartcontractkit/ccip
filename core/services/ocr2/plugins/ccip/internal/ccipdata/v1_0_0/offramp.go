@@ -184,10 +184,6 @@ func (o *OffRamp) GetExecutionState(ctx context.Context, sequenceNumber uint64) 
 	return o.offRampV100.GetExecutionState(&bind.CallOpts{Context: ctx}, sequenceNumber)
 }
 
-func (o *OffRamp) GetMessageVisibilityInterval() time.Duration {
-	return o.onchainConfig.PermissionLessExecutionThresholdSeconds
-}
-
 func (o *OffRamp) GetSenderNonce(ctx context.Context, sender cciptypes.Address) (uint64, error) {
 	evmAddr, err := ccipcalc.GenericAddrToEvm(sender)
 	if err != nil {
