@@ -2,7 +2,7 @@
 pragma solidity 0.8.24;
 
 import {ITypeAndVersion} from "../../shared/interfaces/ITypeAndVersion.sol";
-import {IPool} from "../interfaces/IPool.sol";
+import {IPoolV1} from "../interfaces/IPool.sol";
 import {ITokenAdminRegistry} from "../interfaces/ITokenAdminRegistry.sol";
 
 import {OwnerIsCreator} from "../../shared/access/OwnerIsCreator.sol";
@@ -68,21 +68,6 @@ contract TokenAdminRegistry is ITokenAdminRegistry, ITypeAndVersion, OwnerIsCrea
     return s_tokenConfig[token].tokenPool;
   }
 
-  /// @notice Returns whether the given token can be sent to the given chain.
-  /// @param token The token to check.
-  /// @param remoteChainSelector The chain selector of the remote chain.
-  /// @return True if the token can be sent to the given chain, false otherwise.
-  /// @dev Due to the permissionless nature of the token pools, this function could return true even
-  /// when any actual CCIP transaction containing this token to the given chain would fail. If the
-  /// pool is properly written and configured, this function should be accurate.
-  function isTokenSupportedOnRemoteChain(address token, uint64 remoteChainSelector) external view returns (bool) {
-    address pool = s_tokenConfig[token].tokenPool;
-    if (pool == address(0)) {
-      return false;
-    }
-    return IPool(pool).isSupportedChain(remoteChainSelector);
-  }
-
   /// @notice Returns the configuration for a token.
   /// @param token The token to get the configuration for.
   /// @return config The configuration for the token.
@@ -127,7 +112,7 @@ contract TokenAdminRegistry is ITokenAdminRegistry, ITypeAndVersion, OwnerIsCrea
   function setPool(address localToken, address pool) external onlyTokenAdmin(localToken) {
     // The pool has to support the token, but we want to allow removing the pool, so we only check
     // if the pool supports the token if it is not address(0).
-    if (pool != address(0) && !IPool(pool).isSupportedToken(localToken)) {
+    if (pool != address(0) && !IPoolV1(pool).isSupportedToken(localToken)) {
       revert InvalidTokenPoolToken(localToken);
     }
 

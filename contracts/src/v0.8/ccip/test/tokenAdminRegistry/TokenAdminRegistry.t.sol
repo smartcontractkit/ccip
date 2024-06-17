@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.0;
 
-import {IPool} from "../../interfaces/IPool.sol";
+import {IPoolV1} from "../../interfaces/IPool.sol";
 
 import {TokenAdminRegistry} from "../../tokenAdminRegistry/TokenAdminRegistry.sol";
 import {TokenSetup} from "../TokenSetup.t.sol";
@@ -46,23 +46,10 @@ contract TokenAdminRegistry_getPool is TokenAdminRegistrySetup {
   }
 }
 
-contract TokenAdminRegistry_isTokenSupportedOnRemoteChain is TokenAdminRegistrySetup {
-  function test_isTokenSupportedOnRemoteChain_Success() public {
-    uint64 nonExistentChainSelector = 2523356;
-
-    assertTrue(s_tokenAdminRegistry.isTokenSupportedOnRemoteChain(s_sourceTokens[0], DEST_CHAIN_SELECTOR));
-    assertFalse(s_tokenAdminRegistry.isTokenSupportedOnRemoteChain(s_sourceTokens[0], nonExistentChainSelector));
-
-    address nonExistentToken = makeAddr("nonExistentToken");
-
-    assertFalse(s_tokenAdminRegistry.isTokenSupportedOnRemoteChain(nonExistentToken, DEST_CHAIN_SELECTOR));
-  }
-}
-
 contract TokenAdminRegistry_setPool is TokenAdminRegistrySetup {
   function test_setPool_Success() public {
     address pool = makeAddr("pool");
-    vm.mockCall(pool, abi.encodeWithSelector(IPool.isSupportedToken.selector), abi.encode(true));
+    vm.mockCall(pool, abi.encodeWithSelector(IPoolV1.isSupportedToken.selector), abi.encode(true));
 
     vm.expectEmit();
     emit TokenAdminRegistry.PoolSet(s_sourceTokens[0], s_sourcePoolByToken[s_sourceTokens[0]], pool);
@@ -80,7 +67,7 @@ contract TokenAdminRegistry_setPool is TokenAdminRegistrySetup {
 
   function test_setPool_ZeroAddressRemovesPool_Success() public {
     address pool = makeAddr("pool");
-    vm.mockCall(pool, abi.encodeWithSelector(IPool.isSupportedToken.selector), abi.encode(true));
+    vm.mockCall(pool, abi.encodeWithSelector(IPoolV1.isSupportedToken.selector), abi.encode(true));
     s_tokenAdminRegistry.setPool(s_sourceTokens[0], pool);
 
     assertEq(s_tokenAdminRegistry.getPool(s_sourceTokens[0]), pool);
@@ -95,7 +82,7 @@ contract TokenAdminRegistry_setPool is TokenAdminRegistrySetup {
 
   function test_setPool_InvalidTokenPoolToken_Revert() public {
     address pool = makeAddr("pool");
-    vm.mockCall(pool, abi.encodeWithSelector(IPool.isSupportedToken.selector), abi.encode(false));
+    vm.mockCall(pool, abi.encodeWithSelector(IPoolV1.isSupportedToken.selector), abi.encode(false));
 
     vm.expectRevert(abi.encodeWithSelector(TokenAdminRegistry.InvalidTokenPoolToken.selector, s_sourceTokens[0]));
     s_tokenAdminRegistry.setPool(s_sourceTokens[0], pool);
