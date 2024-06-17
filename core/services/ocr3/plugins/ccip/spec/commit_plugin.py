@@ -36,13 +36,11 @@ class CommitPlugin:
                 if chain not in observed_seq_nums or seq_num > observed_seq_nums[chain]:
                     observed_seq_nums[chain] = seq_num
 
-        # Observe new msgs: {sourceChain: [(id, seq_num)]}
+        # Observe new msgs: {sourceChain: [(id, seq_num, hash)]}
         new_msgs = {}
         for (chain, seq_num) in observed_seq_nums.items():
             if self.can_read(chain):
                 new_msgs[chain] = self.onRamp(chain).get_msgs(chain, start=seq_num+1, limit=256)
-                for msg in new_msgs[chain]:
-                    assert(msg.id == msg.compute_id())
 
         # Observe token prices. {token: price}
         token_prices = self.get_token_prices()
@@ -78,6 +76,7 @@ class CommitPlugin:
 
             assert(len(msgs) == len(set([msg.seq_num for msg in msgs])))
             assert(len(msgs) == len(set([msg.id for msg in msgs])))
+            assert(len(msgs) == len(set([msg.hash for msg in msgs])))
 
     def observation_quorum(self):
         return "2F+1"
@@ -95,19 +94,19 @@ class CommitPlugin:
             msgs = [msg for msg in msgs if msg.seq_num > seq_nums[chain]]
 
             msgs_by_seq_num = msgs.group_by_seq_num() # { 423: [0x1, 0x1, 0x2] }
-                                                      # 2 nodes say that msg id is 0x1 and 1 node says it's 0x2
+                                                      # 2 nodes say that msg hash is 0x1 and 1 node says it's 0x2
 
-            msg_ids = { seq_num: elem_most_occurrences(ids) for (seq_num, ids) in msgs_by_seq_num.items() }
-            for (seq_num, id) in msg_ids.items(): # require at least 2f+1 observations of the voted id
+            msg_hashes = { seq_num: elem_most_occurrences(hashes) for (seq_num, hashes) in msgs_by_seq_num.items() }
+            for (seq_num, hash) in msg_ids.items(): # require at least 2f+1 observations of the voted id
                 assert(msgs_by_seq_num[seq_num].count(id) >= 2*f_chain[chain]+1)
 
-            msgs_for_tree = [] # [ (seq_num, id) ]
-            for (seq_num, id) in msg_ids.ordered_by_seq_num():
+            msgs_for_tree = [] # [ (seq_num, hash) ]
+            for (seq_num, hash) in msg_hashes.ordered_by_seq_num():
                 if len(msgs_for_tree) > 0 and msgs_for_tree[-1].seq_num+1 != seq_num:
                     break # gap in sequence numbers, stop here
-                msgs_for_tree.append((seq_num, id))
+                msgs_for_tree.append((seq_num, hash))
 
-            trees[chain] = build_merkle_tree(msgs_for_tree, leaves="ids")
+            trees[chain] = build_merkle_tree(msgs_for_tree, leaves="hashes")
 
         token_prices = { tk: median(prices) for (tk, prices) in observations.group_token_prices_by_token() }
         gas_prices = { chain: median(prices) for (chain, prices) in observations.group_gas_prices_by_chain() }

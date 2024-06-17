@@ -119,14 +119,9 @@ func observeNewMsgs(
 			}
 
 			for _, msg := range newMsgs {
-				msgHash, err := msgHasher.Hash(ctx, msg)
+				msg.MsgHash, err = msgHasher.Hash(ctx, msg)
 				if err != nil {
 					return fmt.Errorf("hash message: %w", err)
-				}
-
-				if msgHash != msg.ID {
-					lggr.Warnw("invalid message discovered", "msg", msg, "err", err)
-					continue
 				}
 			}
 
@@ -277,52 +272,52 @@ func newMsgsConsensusForChain(
 	lggr.Debugw("observed messages consensus",
 		"chain", chainSel, "fChain", fChain, "observedMsgs", len(observedMsgs))
 
-	// First come to consensus about the (sequence number, id) pairs.
-	// For each sequence number consider correct the ID with the most votes.
-	msgSeqNumToIDCounts := make(map[cciptypes.SeqNum]map[string]int) // seqNum -> msgID -> count
+	// First come to consensus about the (sequence number, msg hash) pairs.
+	// For each sequence number consider correct the Hash with the most votes.
+	msgSeqNumToHashCounts := make(map[cciptypes.SeqNum]map[string]int) // seqNum -> msgHash -> count
 	for _, msg := range observedMsgs {
-		if _, exists := msgSeqNumToIDCounts[msg.SeqNum]; !exists {
-			msgSeqNumToIDCounts[msg.SeqNum] = make(map[string]int)
+		if _, exists := msgSeqNumToHashCounts[msg.SeqNum]; !exists {
+			msgSeqNumToHashCounts[msg.SeqNum] = make(map[string]int)
 		}
-		msgSeqNumToIDCounts[msg.SeqNum][msg.ID.String()]++
+		msgSeqNumToHashCounts[msg.SeqNum][msg.MsgHash.String()]++
 	}
-	lggr.Debugw("observed message counts", "chain", chainSel, "msgSeqNumToIdCounts", msgSeqNumToIDCounts)
+	lggr.Debugw("observed message counts", "chain", chainSel, "msgSeqNumToHashCounts", msgSeqNumToHashCounts)
 
 	msgObservationsCount := make(map[cciptypes.SeqNum]int)
-	msgSeqNumToID := make(map[cciptypes.SeqNum]cciptypes.Bytes32)
-	for seqNum, idCounts := range msgSeqNumToIDCounts {
-		if len(idCounts) == 0 {
-			lggr.Errorw("critical error id counts should never be empty", "seqNum", seqNum)
+	msgSeqNumToHash := make(map[cciptypes.SeqNum]cciptypes.Bytes32)
+	for seqNum, hashCounts := range msgSeqNumToHashCounts {
+		if len(hashCounts) == 0 {
+			lggr.Errorw("critical error hash counts should never be empty", "seqNum", seqNum)
 			continue
 		}
 
-		// Find the ID with the most votes for each sequence number.
-		idsSlice := make([]string, 0, len(idCounts))
-		for id := range idCounts {
-			idsSlice = append(idsSlice, id)
+		// Find the MsgHash with the most votes for each sequence number.
+		hashesSlice := make([]string, 0, len(hashCounts))
+		for h := range hashCounts {
+			hashesSlice = append(hashesSlice, h)
 		}
-		// determinism in case we have the same count for different ids
-		sort.Slice(idsSlice, func(i, j int) bool { return idsSlice[i] < idsSlice[j] })
+		// determinism in case we have the same count for different hashes
+		sort.Slice(hashesSlice, func(i, j int) bool { return hashesSlice[i] < hashesSlice[j] })
 
-		maxCnt := idCounts[idsSlice[0]]
-		mostVotedID := idsSlice[0]
-		for _, id := range idsSlice[1:] {
-			cnt := idCounts[id]
+		maxCnt := hashCounts[hashesSlice[0]]
+		mostVotedHash := hashesSlice[0]
+		for _, h := range hashesSlice[1:] {
+			cnt := hashCounts[h]
 			if cnt > maxCnt {
 				maxCnt = cnt
-				mostVotedID = id
+				mostVotedHash = h
 			}
 		}
 
 		msgObservationsCount[seqNum] = maxCnt
-		idBytes, err := cciptypes.NewBytes32FromString(mostVotedID)
+		hashBytes, err := cciptypes.NewBytes32FromString(mostVotedHash)
 		if err != nil {
-			return observedMsgsConsensus{}, fmt.Errorf("critical issue converting id '%s' to bytes32: %w",
-				mostVotedID, err)
+			return observedMsgsConsensus{}, fmt.Errorf("critical issue converting hash '%s' to bytes32: %w",
+				mostVotedHash, err)
 		}
-		msgSeqNumToID[seqNum] = idBytes
+		msgSeqNumToHash[seqNum] = hashBytes
 	}
-	lggr.Debugw("observed message consensus", "chain", chainSel, "msgSeqNumToId", msgSeqNumToID)
+	lggr.Debugw("observed message consensus", "chain", chainSel, "msgSeqNumToHash", msgSeqNumToHash)
 
 	// Filter out msgs not observed by at least 2f_chain+1 followers.
 	msgSeqNumsQuorum := mapset.NewSet[cciptypes.SeqNum]()
@@ -348,10 +343,11 @@ func newMsgsConsensusForChain(
 
 	msgsBySeqNum := make(map[cciptypes.SeqNum]cciptypes.CCIPMsgBaseDetails)
 	for _, msg := range observedMsgs {
-		consensusMsgID, ok := msgSeqNumToID[msg.SeqNum]
-		if !ok || consensusMsgID != msg.ID {
+		h, ok := msgSeqNumToHash[msg.SeqNum]
+		if !ok {
 			continue
 		}
+		msg.MsgHash = h
 		msgsBySeqNum[msg.SeqNum] = msg
 	}
 
@@ -361,7 +357,7 @@ func newMsgsConsensusForChain(
 		if !ok {
 			return observedMsgsConsensus{}, fmt.Errorf("msg not found in map for seq num %d", seqNum)
 		}
-		treeLeaves = append(treeLeaves, msg.ID)
+		treeLeaves = append(treeLeaves, msg.MsgHash)
 	}
 
 	lggr.Debugw("constructing merkle tree", "chain", chainSel, "treeLeaves", len(treeLeaves))

@@ -5,6 +5,7 @@ import (
 	"math/big"
 	"reflect"
 	"slices"
+	"strconv"
 	"testing"
 	"time"
 
@@ -186,17 +187,17 @@ func Test_observeNewMsgs(t *testing.T) {
 			msgScanBatchSize: 256,
 			newMsgs: map[cciptypes.ChainSelector][]cciptypes.CCIPMsg{
 				1: {
-					{CCIPMsgBaseDetails: cciptypes.CCIPMsgBaseDetails{ID: [32]byte{1}, SourceChain: 1, SeqNum: 11}},
+					{CCIPMsgBaseDetails: cciptypes.CCIPMsgBaseDetails{ID: "1", SourceChain: 1, SeqNum: 11}},
 				},
 				2: {
-					{CCIPMsgBaseDetails: cciptypes.CCIPMsgBaseDetails{ID: [32]byte{2}, SourceChain: 2, SeqNum: 21}},
-					{CCIPMsgBaseDetails: cciptypes.CCIPMsgBaseDetails{ID: [32]byte{3}, SourceChain: 2, SeqNum: 22}},
+					{CCIPMsgBaseDetails: cciptypes.CCIPMsgBaseDetails{ID: "2", SourceChain: 2, SeqNum: 21}},
+					{CCIPMsgBaseDetails: cciptypes.CCIPMsgBaseDetails{ID: "3", SourceChain: 2, SeqNum: 22}},
 				},
 			},
 			expMsgs: []cciptypes.CCIPMsg{
-				{CCIPMsgBaseDetails: cciptypes.CCIPMsgBaseDetails{ID: [32]byte{1}, SourceChain: 1, SeqNum: 11}},
-				{CCIPMsgBaseDetails: cciptypes.CCIPMsgBaseDetails{ID: [32]byte{2}, SourceChain: 2, SeqNum: 21}},
-				{CCIPMsgBaseDetails: cciptypes.CCIPMsgBaseDetails{ID: [32]byte{3}, SourceChain: 2, SeqNum: 22}},
+				{CCIPMsgBaseDetails: cciptypes.CCIPMsgBaseDetails{ID: "1", SourceChain: 1, SeqNum: 11}},
+				{CCIPMsgBaseDetails: cciptypes.CCIPMsgBaseDetails{ID: "2", SourceChain: 2, SeqNum: 21}},
+				{CCIPMsgBaseDetails: cciptypes.CCIPMsgBaseDetails{ID: "3", SourceChain: 2, SeqNum: 22}},
 			},
 			expErr: false,
 		},
@@ -210,13 +211,13 @@ func Test_observeNewMsgs(t *testing.T) {
 			msgScanBatchSize: 256,
 			newMsgs: map[cciptypes.ChainSelector][]cciptypes.CCIPMsg{
 				2: {
-					{CCIPMsgBaseDetails: cciptypes.CCIPMsgBaseDetails{ID: [32]byte{2}, SourceChain: 2, SeqNum: 21}},
-					{CCIPMsgBaseDetails: cciptypes.CCIPMsgBaseDetails{ID: [32]byte{3}, SourceChain: 2, SeqNum: 22}},
+					{CCIPMsgBaseDetails: cciptypes.CCIPMsgBaseDetails{ID: "2", SourceChain: 2, SeqNum: 21}},
+					{CCIPMsgBaseDetails: cciptypes.CCIPMsgBaseDetails{ID: "3", SourceChain: 2, SeqNum: 22}},
 				},
 			},
 			expMsgs: []cciptypes.CCIPMsg{
-				{CCIPMsgBaseDetails: cciptypes.CCIPMsgBaseDetails{ID: [32]byte{2}, SourceChain: 2, SeqNum: 21}},
-				{CCIPMsgBaseDetails: cciptypes.CCIPMsgBaseDetails{ID: [32]byte{3}, SourceChain: 2, SeqNum: 22}},
+				{CCIPMsgBaseDetails: cciptypes.CCIPMsgBaseDetails{ID: "2", SourceChain: 2, SeqNum: 21}},
+				{CCIPMsgBaseDetails: cciptypes.CCIPMsgBaseDetails{ID: "3", SourceChain: 2, SeqNum: 22}},
 			},
 			expErr: false,
 		},
@@ -286,7 +287,7 @@ func Benchmark_observeNewMsgs(b *testing.B) {
 			for msgSeqNum := 1; msgSeqNum <= newMsgsPerChain; msgSeqNum++ {
 				newMsgs = append(newMsgs, cciptypes.CCIPMsg{
 					CCIPMsgBaseDetails: cciptypes.CCIPMsgBaseDetails{
-						ID:          cciptypes.Bytes32{byte(msgSeqNum)},
+						ID:          strconv.Itoa(msgSeqNum),
 						SourceChain: seqNumChain.ChainSel,
 						SeqNum:      cciptypes.SeqNum(msgSeqNum),
 					},
@@ -421,10 +422,10 @@ func Test_validateObservedSequenceNumbers(t *testing.T) {
 		{
 			name: "dup msg seq num",
 			msgs: []cciptypes.CCIPMsgBaseDetails{
-				{ID: cciptypes.Bytes32{1}, SourceChain: 1, SeqNum: 12},
-				{ID: cciptypes.Bytes32{1}, SourceChain: 1, SeqNum: 13},
-				{ID: cciptypes.Bytes32{1}, SourceChain: 1, SeqNum: 14},
-				{ID: cciptypes.Bytes32{1}, SourceChain: 1, SeqNum: 13}, // dup
+				{ID: "1", SourceChain: 1, SeqNum: 12},
+				{ID: "1", SourceChain: 1, SeqNum: 13},
+				{ID: "1", SourceChain: 1, SeqNum: 14},
+				{ID: "1", SourceChain: 1, SeqNum: 13}, // dup
 			},
 			maxSeqNums: []cciptypes.SeqNumChain{
 				{ChainSel: 1, SeqNum: 10},
@@ -435,10 +436,10 @@ func Test_validateObservedSequenceNumbers(t *testing.T) {
 		{
 			name: "msg seq nums ok",
 			msgs: []cciptypes.CCIPMsgBaseDetails{
-				{ID: cciptypes.Bytes32{1}, SourceChain: 1, SeqNum: 12},
-				{ID: cciptypes.Bytes32{1}, SourceChain: 1, SeqNum: 13},
-				{ID: cciptypes.Bytes32{1}, SourceChain: 1, SeqNum: 14},
-				{ID: cciptypes.Bytes32{1}, SourceChain: 2, SeqNum: 21},
+				{ID: "1", SourceChain: 1, SeqNum: 12},
+				{ID: "1", SourceChain: 1, SeqNum: 13},
+				{ID: "1", SourceChain: 1, SeqNum: 14},
+				{ID: "1", SourceChain: 2, SeqNum: 21},
 			},
 			maxSeqNums: []cciptypes.SeqNumChain{
 				{ChainSel: 1, SeqNum: 10},
@@ -449,10 +450,10 @@ func Test_validateObservedSequenceNumbers(t *testing.T) {
 		{
 			name: "msg seq nums does not match observed max seq num",
 			msgs: []cciptypes.CCIPMsgBaseDetails{
-				{ID: cciptypes.Bytes32{1}, SourceChain: 1, SeqNum: 12},
-				{ID: cciptypes.Bytes32{1}, SourceChain: 1, SeqNum: 13},
-				{ID: cciptypes.Bytes32{1}, SourceChain: 1, SeqNum: 10}, // max seq num is already 10
-				{ID: cciptypes.Bytes32{1}, SourceChain: 2, SeqNum: 21},
+				{ID: "1", SourceChain: 1, SeqNum: 12},
+				{ID: "1", SourceChain: 1, SeqNum: 13},
+				{ID: "1", SourceChain: 1, SeqNum: 10}, // max seq num is already 10
+				{ID: "1", SourceChain: 2, SeqNum: 21},
 			},
 			maxSeqNums: []cciptypes.SeqNumChain{
 				{ChainSel: 1, SeqNum: 10},
@@ -463,10 +464,10 @@ func Test_validateObservedSequenceNumbers(t *testing.T) {
 		{
 			name: "max seq num not found",
 			msgs: []cciptypes.CCIPMsgBaseDetails{
-				{ID: cciptypes.Bytes32{1}, SourceChain: 1, SeqNum: 12},
-				{ID: cciptypes.Bytes32{1}, SourceChain: 1, SeqNum: 13},
-				{ID: cciptypes.Bytes32{1}, SourceChain: 1, SeqNum: 14},
-				{ID: cciptypes.Bytes32{1}, SourceChain: 2, SeqNum: 21}, // max seq num not reported
+				{ID: "1", SourceChain: 1, SeqNum: 12},
+				{ID: "1", SourceChain: 1, SeqNum: 13},
+				{ID: "1", SourceChain: 1, SeqNum: 14},
+				{ID: "1", SourceChain: 2, SeqNum: 21}, // max seq num not reported
 			},
 			maxSeqNums: []cciptypes.SeqNumChain{
 				{ChainSel: 1, SeqNum: 10},
@@ -500,10 +501,10 @@ func Test_validateObserverReadingEligibility(t *testing.T) {
 			name:     "observer can read all chains",
 			observer: commontypes.OracleID(10),
 			msgs: []cciptypes.CCIPMsgBaseDetails{
-				{ID: cciptypes.Bytes32{1}, SourceChain: 1, SeqNum: 12},
-				{ID: cciptypes.Bytes32{3}, SourceChain: 2, SeqNum: 12},
-				{ID: cciptypes.Bytes32{1}, SourceChain: 3, SeqNum: 12},
-				{ID: cciptypes.Bytes32{2}, SourceChain: 3, SeqNum: 12},
+				{ID: "1", SourceChain: 1, SeqNum: 12},
+				{ID: "3", SourceChain: 2, SeqNum: 12},
+				{ID: "1", SourceChain: 3, SeqNum: 12},
+				{ID: "2", SourceChain: 3, SeqNum: 12},
 			},
 			observerInfo: map[commontypes.OracleID]cciptypes.ObserverInfo{
 				10: {Reads: []cciptypes.ChainSelector{1, 2, 3}},
@@ -538,10 +539,10 @@ func Test_validateObserverReadingEligibility(t *testing.T) {
 			name:     "observer cfg not found",
 			observer: commontypes.OracleID(10),
 			msgs: []cciptypes.CCIPMsgBaseDetails{
-				{ID: cciptypes.Bytes32{1}, SourceChain: 1, SeqNum: 12},
-				{ID: cciptypes.Bytes32{3}, SourceChain: 2, SeqNum: 12},
-				{ID: cciptypes.Bytes32{1}, SourceChain: 3, SeqNum: 12},
-				{ID: cciptypes.Bytes32{2}, SourceChain: 3, SeqNum: 12},
+				{ID: "1", SourceChain: 1, SeqNum: 12},
+				{ID: "3", SourceChain: 2, SeqNum: 12},
+				{ID: "1", SourceChain: 3, SeqNum: 12},
+				{ID: "2", SourceChain: 3, SeqNum: 12},
 			},
 			observerInfo: map[commontypes.OracleID]cciptypes.ObserverInfo{
 				20: {Reads: []cciptypes.ChainSelector{1, 3}}, // observer 10 not found
@@ -704,9 +705,9 @@ func Test_newMsgsConsensusForChain(t *testing.T) {
 				{ChainSel: 1, SeqNum: 10},
 			},
 			observations: []cciptypes.CommitPluginObservation{
-				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: [32]byte{1}, SourceChain: 1, SeqNum: 11}}},
-				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: [32]byte{1}, SourceChain: 1, SeqNum: 11}}},
-				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: [32]byte{1}, SourceChain: 1, SeqNum: 11}}},
+				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "1", SourceChain: 1, SeqNum: 11}}},
+				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "1", SourceChain: 1, SeqNum: 11}}},
+				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "1", SourceChain: 1, SeqNum: 11}}},
 			},
 			expMerkleRoots: []cciptypes.MerkleRootChain{},
 			expErr:         false,
@@ -720,11 +721,11 @@ func Test_newMsgsConsensusForChain(t *testing.T) {
 				{ChainSel: 1, SeqNum: 10},
 			},
 			observations: []cciptypes.CommitPluginObservation{
-				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: [32]byte{1}, SourceChain: 1, SeqNum: 11}}},
-				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: [32]byte{1}, SourceChain: 1, SeqNum: 11}}},
-				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: [32]byte{1}, SourceChain: 1, SeqNum: 11}}},
-				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: [32]byte{1}, SourceChain: 1, SeqNum: 11}}},
-				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: [32]byte{1}, SourceChain: 1, SeqNum: 11}}},
+				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "1", SourceChain: 1, SeqNum: 11}}},
+				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "1", SourceChain: 1, SeqNum: 11}}},
+				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "1", SourceChain: 1, SeqNum: 11}}},
+				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "1", SourceChain: 1, SeqNum: 11}}},
+				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "1", SourceChain: 1, SeqNum: 11}}},
 			},
 			expMerkleRoots: []cciptypes.MerkleRootChain{
 				{
@@ -743,23 +744,21 @@ func Test_newMsgsConsensusForChain(t *testing.T) {
 				{ChainSel: 1, SeqNum: 10},
 			},
 			observations: []cciptypes.CommitPluginObservation{
-				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: [32]byte{1}, SourceChain: 1, SeqNum: 11}}},
-				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: [32]byte{1}, SourceChain: 1, SeqNum: 11}}},
-				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: [32]byte{1}, SourceChain: 1, SeqNum: 11}}},
-				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: [32]byte{1}, SourceChain: 1, SeqNum: 11}}},
-				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: [32]byte{1}, SourceChain: 1, SeqNum: 11}}},
-
-				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: [32]byte{2}, SourceChain: 1, SeqNum: 12}}},
-				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: [32]byte{2}, SourceChain: 1, SeqNum: 12}}},
-				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: [32]byte{2}, SourceChain: 1, SeqNum: 12}}},
-				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: [32]byte{2}, SourceChain: 1, SeqNum: 12}}},
-				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: [32]byte{2}, SourceChain: 1, SeqNum: 12}}},
-
-				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: [32]byte{3}, SourceChain: 1, SeqNum: 13}}},
-				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: [32]byte{3}, SourceChain: 1, SeqNum: 13}}},
-				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: [32]byte{3}, SourceChain: 1, SeqNum: 13}}},
-				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: [32]byte{3}, SourceChain: 1, SeqNum: 13}}},
-				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: [32]byte{3}, SourceChain: 1, SeqNum: 13}}},
+				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "1", SourceChain: 1, SeqNum: 11}}},
+				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "1", SourceChain: 1, SeqNum: 11}}},
+				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "1", SourceChain: 1, SeqNum: 11}}},
+				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "1", SourceChain: 1, SeqNum: 11}}},
+				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "1", SourceChain: 1, SeqNum: 11}}},
+				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "2", SourceChain: 1, SeqNum: 12}}},
+				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "2", SourceChain: 1, SeqNum: 12}}},
+				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "2", SourceChain: 1, SeqNum: 12}}},
+				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "2", SourceChain: 1, SeqNum: 12}}},
+				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "2", SourceChain: 1, SeqNum: 12}}},
+				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "3", SourceChain: 1, SeqNum: 13}}},
+				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "3", SourceChain: 1, SeqNum: 13}}},
+				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "3", SourceChain: 1, SeqNum: 13}}},
+				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "3", SourceChain: 1, SeqNum: 13}}},
+				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "3", SourceChain: 1, SeqNum: 13}}},
 			},
 			expMerkleRoots: []cciptypes.MerkleRootChain{
 				{
@@ -778,23 +777,21 @@ func Test_newMsgsConsensusForChain(t *testing.T) {
 				{ChainSel: 1, SeqNum: 10},
 			},
 			observations: []cciptypes.CommitPluginObservation{
-				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: [32]byte{1}, SourceChain: 1, SeqNum: 10}}},
-				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: [32]byte{1}, SourceChain: 1, SeqNum: 10}}},
-				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: [32]byte{1}, SourceChain: 1, SeqNum: 10}}},
-				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: [32]byte{1}, SourceChain: 1, SeqNum: 10}}},
-				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: [32]byte{1}, SourceChain: 1, SeqNum: 10}}},
-
-				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: [32]byte{2}, SourceChain: 1, SeqNum: 12}}},
-				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: [32]byte{2}, SourceChain: 1, SeqNum: 12}}},
-				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: [32]byte{2}, SourceChain: 1, SeqNum: 12}}},
-				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: [32]byte{2}, SourceChain: 1, SeqNum: 12}}},
-				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: [32]byte{2}, SourceChain: 1, SeqNum: 12}}},
-
-				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: [32]byte{3}, SourceChain: 1, SeqNum: 13}}},
-				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: [32]byte{3}, SourceChain: 1, SeqNum: 13}}},
-				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: [32]byte{3}, SourceChain: 1, SeqNum: 13}}},
-				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: [32]byte{3}, SourceChain: 1, SeqNum: 13}}},
-				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: [32]byte{3}, SourceChain: 1, SeqNum: 13}}},
+				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "1", SourceChain: 1, SeqNum: 10}}},
+				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "1", SourceChain: 1, SeqNum: 10}}},
+				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "1", SourceChain: 1, SeqNum: 10}}},
+				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "1", SourceChain: 1, SeqNum: 10}}},
+				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "1", SourceChain: 1, SeqNum: 10}}},
+				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "2", SourceChain: 1, SeqNum: 12}}},
+				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "2", SourceChain: 1, SeqNum: 12}}},
+				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "2", SourceChain: 1, SeqNum: 12}}},
+				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "2", SourceChain: 1, SeqNum: 12}}},
+				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "2", SourceChain: 1, SeqNum: 12}}},
+				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "3", SourceChain: 1, SeqNum: 13}}},
+				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "3", SourceChain: 1, SeqNum: 13}}},
+				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "3", SourceChain: 1, SeqNum: 13}}},
+				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "3", SourceChain: 1, SeqNum: 13}}},
+				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "3", SourceChain: 1, SeqNum: 13}}},
 			},
 			expMerkleRoots: []cciptypes.MerkleRootChain{
 				{
@@ -813,20 +810,18 @@ func Test_newMsgsConsensusForChain(t *testing.T) {
 				{ChainSel: 1, SeqNum: 10},
 			},
 			observations: []cciptypes.CommitPluginObservation{
-				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: [32]byte{1}, SourceChain: 1, SeqNum: 11}}},
-				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: [32]byte{1}, SourceChain: 1, SeqNum: 11}}},
-				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: [32]byte{1}, SourceChain: 1, SeqNum: 11}}},
-				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: [32]byte{1}, SourceChain: 1, SeqNum: 11}}},
-				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: [32]byte{1}, SourceChain: 1, SeqNum: 11}}},
-
-				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: [32]byte{2}, SourceChain: 1, SeqNum: 12}}},
-				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: [32]byte{2}, SourceChain: 1, SeqNum: 12}}},
-
-				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: [32]byte{3}, SourceChain: 1, SeqNum: 13}}},
-				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: [32]byte{3}, SourceChain: 1, SeqNum: 13}}},
-				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: [32]byte{3}, SourceChain: 1, SeqNum: 13}}},
-				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: [32]byte{3}, SourceChain: 1, SeqNum: 13}}},
-				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: [32]byte{3}, SourceChain: 1, SeqNum: 13}}},
+				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "1", SourceChain: 1, SeqNum: 11}}},
+				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "1", SourceChain: 1, SeqNum: 11}}},
+				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "1", SourceChain: 1, SeqNum: 11}}},
+				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "1", SourceChain: 1, SeqNum: 11}}},
+				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "1", SourceChain: 1, SeqNum: 11}}},
+				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "2", SourceChain: 1, SeqNum: 12}}},
+				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "2", SourceChain: 1, SeqNum: 12}}},
+				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "3", SourceChain: 1, SeqNum: 13}}},
+				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "3", SourceChain: 1, SeqNum: 13}}},
+				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "3", SourceChain: 1, SeqNum: 13}}},
+				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "3", SourceChain: 1, SeqNum: 13}}},
+				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "3", SourceChain: 1, SeqNum: 13}}},
 			},
 			expMerkleRoots: []cciptypes.MerkleRootChain{
 				{
@@ -847,19 +842,17 @@ func Test_newMsgsConsensusForChain(t *testing.T) {
 				{ChainSel: 2, SeqNum: 20},
 			},
 			observations: []cciptypes.CommitPluginObservation{
-				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: [32]byte{1}, SourceChain: 1, SeqNum: 11}}},
-				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: [32]byte{1}, SourceChain: 1, SeqNum: 11}}},
-				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: [32]byte{1}, SourceChain: 1, SeqNum: 11}}},
-				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: [32]byte{1}, SourceChain: 1, SeqNum: 11}}},
-				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: [32]byte{1}, SourceChain: 1, SeqNum: 11}}},
-
-				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: [32]byte{3}, SourceChain: 2, SeqNum: 21}}},
-				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: [32]byte{3}, SourceChain: 2, SeqNum: 21}}},
-				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: [32]byte{3}, SourceChain: 2, SeqNum: 21}}},
-
-				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: [32]byte{4}, SourceChain: 2, SeqNum: 22}}},
-				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: [32]byte{4}, SourceChain: 2, SeqNum: 22}}},
-				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: [32]byte{4}, SourceChain: 2, SeqNum: 22}}},
+				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "1", SourceChain: 1, SeqNum: 11}}},
+				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "1", SourceChain: 1, SeqNum: 11}}},
+				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "1", SourceChain: 1, SeqNum: 11}}},
+				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "1", SourceChain: 1, SeqNum: 11}}},
+				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "1", SourceChain: 1, SeqNum: 11}}},
+				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "3", SourceChain: 2, SeqNum: 21}}},
+				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "3", SourceChain: 2, SeqNum: 21}}},
+				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "3", SourceChain: 2, SeqNum: 21}}},
+				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "4", SourceChain: 2, SeqNum: 22}}},
+				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "4", SourceChain: 2, SeqNum: 22}}},
+				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "4", SourceChain: 2, SeqNum: 22}}},
 			},
 			expMerkleRoots: []cciptypes.MerkleRootChain{
 				{
@@ -882,23 +875,21 @@ func Test_newMsgsConsensusForChain(t *testing.T) {
 				{ChainSel: 1, SeqNum: 10},
 			},
 			observations: []cciptypes.CommitPluginObservation{
-				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: [32]byte{1}, SourceChain: 1, SeqNum: 11}}},
-				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: [32]byte{1}, SourceChain: 1, SeqNum: 11}}},
-				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: [32]byte{1}, SourceChain: 1, SeqNum: 11}}},
-				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: [32]byte{1}, SourceChain: 1, SeqNum: 11}}},
-				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: [32]byte{1}, SourceChain: 1, SeqNum: 11}}},
-
-				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: [32]byte{10}, SourceChain: 1, SeqNum: 11}}},
-				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: [32]byte{10}, SourceChain: 1, SeqNum: 11}}},
-				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: [32]byte{111}, SourceChain: 1, SeqNum: 11}}},
-				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: [32]byte{111}, SourceChain: 1, SeqNum: 11}}},
-				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: [32]byte{3}, SourceChain: 1, SeqNum: 11}}},
-
-				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: [32]byte{2}, SourceChain: 1, SeqNum: 11}}},
-				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: [32]byte{2}, SourceChain: 1, SeqNum: 11}}},
-				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: [32]byte{2}, SourceChain: 1, SeqNum: 11}}},
-				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: [32]byte{2}, SourceChain: 1, SeqNum: 11}}},
-				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: [32]byte{2}, SourceChain: 1, SeqNum: 11}}},
+				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "1", SourceChain: 1, SeqNum: 11}}},
+				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "1", SourceChain: 1, SeqNum: 11}}},
+				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "1", SourceChain: 1, SeqNum: 11}}},
+				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "1", SourceChain: 1, SeqNum: 11}}},
+				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "1", SourceChain: 1, SeqNum: 11}}},
+				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "10", SourceChain: 1, SeqNum: 11}}},
+				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "10", SourceChain: 1, SeqNum: 11}}},
+				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "111", SourceChain: 1, SeqNum: 11}}},
+				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "111", SourceChain: 1, SeqNum: 11}}},
+				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "3", SourceChain: 1, SeqNum: 11}}},
+				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "2", SourceChain: 1, SeqNum: 11}}},
+				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "2", SourceChain: 1, SeqNum: 11}}},
+				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "2", SourceChain: 1, SeqNum: 11}}},
+				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "2", SourceChain: 1, SeqNum: 11}}},
+				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "2", SourceChain: 1, SeqNum: 11}}},
 			},
 			expMerkleRoots: []cciptypes.MerkleRootChain{
 				{
