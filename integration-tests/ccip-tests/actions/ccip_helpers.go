@@ -381,7 +381,8 @@ func (ccipModule *CCIPCommon) ApproveTokens() error {
 	for _, token := range ccipModule.BridgeTokens {
 		// TODO: We send half of token funds back to the CCIP Deployer account, which isn't particularly realistic.
 		// See CCIP-2477
-		if token.OwnerWallet.Address() != ccipModule.ChainClient.GetDefaultWallet().Address() {
+		if token.OwnerWallet.Address() != ccipModule.ChainClient.GetDefaultWallet().Address() &&
+			!ccipModule.ExistingDeployment {
 			tokenBalance, err := token.BalanceOf(context.Background(), token.OwnerWallet.Address())
 			if err != nil {
 				return fmt.Errorf("failed to get balance of token %s: %w", token.ContractAddress.Hex(), err)
