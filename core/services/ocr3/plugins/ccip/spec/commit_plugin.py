@@ -75,7 +75,6 @@ class CommitPlugin:
                     assert(msg.seq_num > observation["observed_seq_nums"][msg.source_chain])
 
             assert(len(msgs) == len(set([msg.seq_num for msg in msgs])))
-            assert(len(msgs) == len(set([msg.id for msg in msgs])))
             assert(len(msgs) == len(set([msg.hash for msg in msgs])))
 
     def observation_quorum(self):
@@ -97,8 +96,8 @@ class CommitPlugin:
                                                       # 2 nodes say that msg hash is 0x1 and 1 node says it's 0x2
 
             msg_hashes = { seq_num: elem_most_occurrences(hashes) for (seq_num, hashes) in msgs_by_seq_num.items() }
-            for (seq_num, hash) in msg_ids.items(): # require at least 2f+1 observations of the voted id
-                assert(msgs_by_seq_num[seq_num].count(id) >= 2*f_chain[chain]+1)
+            for (seq_num, hash) in msg_hashes.items(): # require at least 2f+1 observations of the voted hash
+                assert(msgs_by_seq_num[seq_num].count(hash) >= 2*f_chain[chain]+1)
 
             msgs_for_tree = [] # [ (seq_num, hash) ]
             for (seq_num, hash) in msg_hashes.ordered_by_seq_num():
