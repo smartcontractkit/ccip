@@ -134,9 +134,6 @@ func (c ExecOffchainConfig) Validate() error {
 	if c.RootSnoozeTime.Duration() == 0 {
 		return errors.New("must set RootSnoozeTime")
 	}
-	if c.MessageVisibilityInterval.Duration() == 0 {
-		return errors.New("must set MessageVisibilityInterval")
-	}
 
 	return nil
 }

@@ -93,7 +93,6 @@ func TestExecOffchainConfig100_AllFieldsRequired(t *testing.T) {
 		RelativeBoostPerWaitHour:    0.07,
 		InflightCacheExpiry:         *config.MustNewDuration(64 * time.Second),
 		RootSnoozeTime:              *config.MustNewDuration(128 * time.Minute),
-		MessageVisibilityInterval:   *config.MustNewDuration(6 * time.Hour),
 	}
 	encoded, err := ccipconfig.EncodeOffchainConfig(&cfg)
 	require.NoError(t, err)
@@ -102,6 +101,10 @@ func TestExecOffchainConfig100_AllFieldsRequired(t *testing.T) {
 	err = json.Unmarshal(encoded, &configAsMap)
 	require.NoError(t, err)
 	for keyToDelete := range configAsMap {
+		if keyToDelete == "MessageVisibilityInterval" {
+			continue // this field is optional
+		}
+
 		partialConfig := make(map[string]any)
 		for k, v := range configAsMap {
 			if k != keyToDelete {

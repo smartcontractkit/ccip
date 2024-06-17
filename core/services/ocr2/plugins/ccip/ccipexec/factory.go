@@ -113,9 +113,10 @@ func (rf *ExecutionReportingPluginFactory) NewReportingPluginFn(config types.Rep
 
 		msgVisibilityInterval := offchainConfig.MessageVisibilityInterval.Duration()
 		if msgVisibilityInterval == 0 {
-			// fallback to onchain config if offchain config is not set
-			msgVisibilityInterval = onchainConfig.PermissionLessExecutionThresholdSeconds
+			rf.config.lggr.Info("MessageVisibilityInterval not set, falling back to default")
+			msgVisibilityInterval = ccipdata.DefaultMsgVisibilityInterval
 		}
+		rf.config.lggr.Infof("MessageVisibilityInterval set to: %s", msgVisibilityInterval)
 
 		lggr := rf.config.lggr.Named("ExecutionReportingPlugin")
 		plugin := &ExecutionReportingPlugin{
