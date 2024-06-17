@@ -117,11 +117,12 @@ var (
 
 	RootSnoozeTime = 3 * time.Minute
 	GethLabel      = func(name string) string {
+		name = NetworkName(name)
 		switch NetworkChart {
 		case reorg.TXNodesAppLabel:
 			return fmt.Sprintf("%s-ethereum-geth", name)
 		case foundry.ChartName:
-			return fmt.Sprintf("%s-foundry", name)
+			return name
 		}
 		return ""
 	}
