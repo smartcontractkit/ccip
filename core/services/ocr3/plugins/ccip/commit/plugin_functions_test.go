@@ -436,10 +436,10 @@ func Test_validateObservedSequenceNumbers(t *testing.T) {
 		{
 			name: "msg seq nums ok",
 			msgs: []cciptypes.CCIPMsgBaseDetails{
-				{ID: "1", SourceChain: 1, SeqNum: 12},
-				{ID: "1", SourceChain: 1, SeqNum: 13},
-				{ID: "1", SourceChain: 1, SeqNum: 14},
-				{ID: "1", SourceChain: 2, SeqNum: 21},
+				{MsgHash: cciptypes.Bytes32{1}, ID: "1", SourceChain: 1, SeqNum: 12},
+				{MsgHash: cciptypes.Bytes32{2}, ID: "1", SourceChain: 1, SeqNum: 13},
+				{MsgHash: cciptypes.Bytes32{3}, ID: "1", SourceChain: 1, SeqNum: 14},
+				{MsgHash: cciptypes.Bytes32{4}, ID: "1", SourceChain: 2, SeqNum: 21},
 			},
 			maxSeqNums: []cciptypes.SeqNumChain{
 				{ChainSel: 1, SeqNum: 10},
@@ -471,6 +471,34 @@ func Test_validateObservedSequenceNumbers(t *testing.T) {
 			},
 			maxSeqNums: []cciptypes.SeqNumChain{
 				{ChainSel: 1, SeqNum: 10},
+			},
+			expErr: true,
+		},
+		{
+			name: "msg hashes ok",
+			msgs: []cciptypes.CCIPMsgBaseDetails{
+				{MsgHash: cciptypes.Bytes32{123}, ID: "1", SourceChain: 1, SeqNum: 12},
+				{MsgHash: cciptypes.Bytes32{99}, ID: "1", SourceChain: 1, SeqNum: 13},
+				{MsgHash: cciptypes.Bytes32{12}, ID: "1", SourceChain: 300, SeqNum: 23},
+			},
+			maxSeqNums: []cciptypes.SeqNumChain{
+				{ChainSel: 1, SeqNum: 10},
+				{ChainSel: 2, SeqNum: 20},
+				{ChainSel: 300, SeqNum: 22},
+			},
+			expErr: false,
+		},
+		{
+			name: "dup msg hashes",
+			msgs: []cciptypes.CCIPMsgBaseDetails{
+				{MsgHash: cciptypes.Bytes32{123}, ID: "1", SourceChain: 1, SeqNum: 12},
+				{MsgHash: cciptypes.Bytes32{99}, ID: "1", SourceChain: 1, SeqNum: 13},
+				{MsgHash: cciptypes.Bytes32{123}, ID: "1", SourceChain: 300, SeqNum: 23}, // dup hash
+			},
+			maxSeqNums: []cciptypes.SeqNumChain{
+				{ChainSel: 1, SeqNum: 10},
+				{ChainSel: 2, SeqNum: 20},
+				{ChainSel: 300, SeqNum: 22},
 			},
 			expErr: true,
 		},

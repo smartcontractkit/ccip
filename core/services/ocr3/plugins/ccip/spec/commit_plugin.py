@@ -36,7 +36,7 @@ class CommitPlugin:
                 if chain not in observed_seq_nums or seq_num > observed_seq_nums[chain]:
                     observed_seq_nums[chain] = seq_num
 
-        # Observe new msgs: {sourceChain: [(id, seq_num, hash)]}
+        # Observe new msgs: {sourceChain: [(seq_num, hash)]}
         new_msgs = {}
         for (chain, seq_num) in observed_seq_nums.items():
             if self.can_read(chain):

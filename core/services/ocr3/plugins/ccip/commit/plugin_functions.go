@@ -556,17 +556,23 @@ func validateObservedSequenceNumbers(msgs []cciptypes.CCIPMsgBaseDetails, maxSeq
 	}
 
 	seqNums := make(map[cciptypes.ChainSelector]mapset.Set[cciptypes.SeqNum], len(msgs))
+	hashes := mapset.NewSet[string]()
 	for _, msg := range msgs {
-		// The same sequence number must not appear more than once for the same chain and must be valid.
-
 		if _, exists := seqNums[msg.SourceChain]; !exists {
 			seqNums[msg.SourceChain] = mapset.NewSet[cciptypes.SeqNum]()
 		}
 
+		// The same sequence number must not appear more than once for the same chain and must be valid.
 		if seqNums[msg.SourceChain].Contains(msg.SeqNum) {
 			return fmt.Errorf("duplicate sequence number %d for chain %d", msg.SeqNum, msg.SourceChain)
 		}
 		seqNums[msg.SourceChain].Add(msg.SeqNum)
+
+		// The observed msg hash cannot appear twice for different msgs.
+		if hashes.Contains(msg.MsgHash.String()) {
+			return fmt.Errorf("duplicate msg hash %s", msg.MsgHash.String())
+		}
+		hashes.Add(msg.MsgHash.String())
 
 		// The observed msg sequence number cannot be less than or equal to the max observed sequence number.
 		maxSeqNum, exists := maxSeqNumsMap[msg.SourceChain]
