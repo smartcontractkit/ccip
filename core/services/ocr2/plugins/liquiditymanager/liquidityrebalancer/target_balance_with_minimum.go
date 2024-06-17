@@ -134,23 +134,31 @@ func (r *TargetMinBalancer) findNetworksRequiringFunding(graphNow, graphLater gr
 }
 
 func (r *TargetMinBalancer) oneHopTransfers(graphLater graph.Graph, targetNetwork models.NetworkSelector, networkFunds map[models.NetworkSelector]*Funds) ([]models.ProposedTransfer, error) {
+	allEdges, err := graphLater.GetEdges()
+	if err != nil {
+		return nil, fmt.Errorf("get edges: %w", err)
+	}
+
 	potentialTransfers := make([]models.ProposedTransfer, 0)
 	seenNetworks := mapset.NewSet[models.NetworkSelector]()
 
-	graphLater.GetNetworks()
+	for _, edge := range allEdges {
+		if edge.Dest != targetNetwork {
+			// we only care about the target network
+			continue
+		}
 
-	neighbors, hasNeighbors := graphLater.GetNeighbors(targetNetwork, false)
-	if !hasNeighbors {
-		return nil, fmt.Errorf("no neighbors for target network %v", targetNetwork)
-	}
+		if seenNetworks.Contains(edge.Source) {
+			// cannot have the same sender twice
+			continue
+		}
 
-	for _, neighbor := range neighbors {
-		destDiffLater := networkFunds[targetNetwork].LiqDiffLater
+		destDiffLater := networkFunds[edge.Dest].LiqDiffLater
 
-		r.lggr.Debugf("checking transfer from %v to %v", neighbor, targetNetwork)
+		r.lggr.Debugf("checking transfer from %v to %v", edge.Source, edge.Dest)
 
 		//source network available transferable amount
-		srcData, dErr := graphLater.GetData(neighbor)
+		srcData, dErr := graphLater.GetData(edge.Source)
 		if dErr != nil {
 			return nil, fmt.Errorf("error during GetData for %v in graphLater: %v", targetNetwork, dErr)
 		}
@@ -158,36 +166,35 @@ func (r *TargetMinBalancer) oneHopTransfers(graphLater graph.Graph, targetNetwor
 		srcAmountToTarget := big.NewInt(0).Sub(srcData.Liquidity, srcData.TargetLiquidity)
 
 		if srcAmountToTarget.Cmp(big.NewInt(0)) < 0 || srcAvailableAmount.Cmp(big.NewInt(0)) < 0 {
-			//r.lggr.Debugf("source network %v is too low, skipping transfer: srcAmountToTarget %v, srcAvailableAmount %v", neighbor, srcAmountToTarget, srcAvailableAmount)
+			//r.lggr.Debugf("source network %v is too low, skipping transfer: srcAmountToTarget %v, srcAvailableAmount %v", edge.Source, srcAmountToTarget, srcAvailableAmount)
 			continue
 		}
 
-		//MAYBE: switch to allow for transfer that take the source below target so we can balance faster?
 		transferAmount := destDiffLater
 		if transferAmount.Cmp(srcAmountToTarget) > 0 {
 			// if transferAmount > srcAmountToTarget take less
-			r.lggr.Debugf("source network %v doesn't have %v, taking the available %v instead", neighbor, transferAmount, srcAmountToTarget)
+			r.lggr.Debugf("source network %v doesn't have %v, taking the available %v instead", edge.Source, transferAmount, srcAmountToTarget)
 			transferAmount = srcAmountToTarget
 		}
 		if transferAmount.Cmp(big.NewInt(0)) <= 0 {
-			//r.lggr.Debugf("transfer %v->%v amount is 0 or less, skipping transfer: %v", neighbor, targetNetwork, transferAmount)
+			//r.lggr.Debugf("transfer %v->%v amount is 0 or less, skipping transfer: %v", edge.Source, targetNetwork, transferAmount)
 			continue
 		}
 		if srcAmountToTarget.Cmp(transferAmount) < 0 || srcAvailableAmount.Cmp(transferAmount) < 0 {
 			// source network doesn't have enough to cover
-			//r.lggr.Debugf("source network %v liquidity too low, skipping transfer: srcAmountToTarget %v, srcAvailableAmount %v", neighbor, srcAmountToTarget, srcAvailableAmount)
+			//r.lggr.Debugf("source network %v liquidity too low, skipping transfer: srcAmountToTarget %v, srcAvailableAmount %v", edge.Source, srcAmountToTarget, srcAvailableAmount)
 			continue
 		}
 
-		newAmount := big.NewInt(0).Sub(networkFunds[neighbor].AvailableAmount, transferAmount)
+		newAmount := big.NewInt(0).Sub(networkFunds[edge.Source].AvailableAmount, transferAmount)
 		if newAmount.Cmp(big.NewInt(0)) < 0 {
-			r.lggr.Debugf("source network %v doesn't have enough available liquidity, skipping transfer %v only have %v available", neighbor, transferAmount, networkFunds[neighbor].AvailableAmount)
+			r.lggr.Debugf("source network %v doesn't have enough available liquidity, skipping transfer %v only have %v available", edge.Source, transferAmount, networkFunds[edge.Source].AvailableAmount)
 			continue
 		} else {
-			networkFunds[neighbor].AvailableAmount = newAmount
+			networkFunds[edge.Source].AvailableAmount = newAmount
 		}
-		potentialTransfers = append(potentialTransfers, newTransfer(neighbor, targetNetwork, transferAmount))
-		seenNetworks.Add(neighbor)
+		potentialTransfers = append(potentialTransfers, newTransfer(edge.Source, targetNetwork, transferAmount))
+		seenNetworks.Add(edge.Source)
 	}
 
 	return potentialTransfers, nil

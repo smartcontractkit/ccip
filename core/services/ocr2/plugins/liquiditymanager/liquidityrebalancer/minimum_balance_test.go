@@ -17,6 +17,7 @@ var eth = models.NetworkSelector(5009297550715157269)
 var opt = models.NetworkSelector(3734403246176062136)
 var arb = models.NetworkSelector(4949039107694359620)
 var base = models.NetworkSelector(15971525489660198786)
+var celo = models.NetworkSelector(1346049177634351622)
 
 func TestTargetBalanceRebalancer_ComputeTransfersToBalance_arb_eth_opt(t *testing.T) {
 	type transfer struct {

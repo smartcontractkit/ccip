@@ -21,26 +21,7 @@ func (f *Funds) String() string {
 
 // getExpectedGraph returns a copy of the graph instance with all the non-executed transfers applied.
 func getExpectedGraph(g graph.Graph, nonExecutedTransfers []UnexecutedTransfer) (graph.Graph, error) {
-	edges, err := g.GetEdges()
-	if err != nil {
-		return nil, err
-	}
-
-	expG := graph.NewGraph()
-	for _, edge := range edges {
-		sourceData, err := g.GetData(edge.Source)
-		if err != nil {
-			return nil, err
-		}
-
-		destData, err := g.GetData(edge.Dest)
-		if err != nil {
-			return nil, err
-		}
-		if err := expG.Add(sourceData, destData); err != nil {
-			return nil, err
-		}
-	}
+	expG := g.Clone()
 
 	for _, tr := range nonExecutedTransfers {
 		liqTo, err := expG.GetLiquidity(tr.ToNetwork())
@@ -119,13 +100,6 @@ func availableTransferableAmount(graphNow, graphLater graph.Graph, net models.Ne
 // If the target liquidity is set to 0, automated rebalancing is disabled for that network.
 // The liquidity differences are calculated by subtracting the liquidity from the target liquidity.
 // The function uses the models.NetworkSelector type to identify networks.
-// Arguments:
-// - graphNow: The initial graph instance.
-// - graphLater: The updated graph instance.
-// Returns:
-// - liqDiffsNow: A map containing the liquidity differences for each network in the initial graph.
-// - liqDiffsLater: A map containing the liquidity differences for each network in the updated graph.
-// - err: An error if there was a problem fetching the data for any network.
 func getTargetLiquidityDifferences(graphNow, graphLater graph.Graph) (liqDiffsNow, liqDiffsLater map[models.NetworkSelector]*big.Int, err error) {
 	liqDiffsNow = make(map[models.NetworkSelector]*big.Int)
 	liqDiffsLater = make(map[models.NetworkSelector]*big.Int)

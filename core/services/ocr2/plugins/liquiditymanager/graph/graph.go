@@ -57,6 +57,8 @@ type Graph interface {
 	String() string
 	// Reset resets the graph to it's empty state.
 	Reset()
+	// Clone creates a deep copy of the graph.
+	Clone() Graph
 }
 
 // GraphTest provides testing functionality for the graph.
@@ -145,4 +147,26 @@ func (g *liquidityGraph) Reset() {
 
 	g.adj = make(map[models.NetworkSelector][]models.NetworkSelector)
 	g.data = make(map[models.NetworkSelector]Data)
+}
+
+func (g *liquidityGraph) Clone() Graph {
+	g.lock.RLock()
+	defer g.lock.RUnlock()
+
+	clone := &liquidityGraph{
+		adj:  make(map[models.NetworkSelector][]models.NetworkSelector, len(g.adj)),
+		data: make(map[models.NetworkSelector]Data, len(g.data)),
+	}
+
+	for k, v := range g.adj {
+		adjCopy := make([]models.NetworkSelector, len(v))
+		copy(adjCopy, v)
+		clone.adj[k] = adjCopy
+	}
+
+	for k, v := range g.data {
+		clone.data[k] = v.Clone()
+	}
+
+	return clone
 }

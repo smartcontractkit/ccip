@@ -523,3 +523,115 @@ func TestTargetMinBalancer_ComputeTransfersToBalance_arb_eth_opt_base(t *testing
 		})
 	}
 }
+
+func TestTargetMinBalancer_ComputeTransfersToBalance_islands_in_graph(t *testing.T) {
+
+	// these test have 4 networks in a spoke graph with an island node (celo) that does not have connections to the rest of the graph
+
+	testCases := []struct {
+		name             string
+		balances         map[models.NetworkSelector]int64
+		minimums         map[models.NetworkSelector]int64
+		targets          map[models.NetworkSelector]int64
+		pendingTransfers []models.ProposedTransfer
+		expTransfers     []models.ProposedTransfer
+	}{
+		{
+			name:             "all above targets",
+			balances:         map[models.NetworkSelector]int64{eth: 1100, arb: 1000, opt: 1100, base: 1000, celo: 1000},
+			minimums:         map[models.NetworkSelector]int64{eth: 500, arb: 500, opt: 500, base: 500, celo: 500},
+			targets:          map[models.NetworkSelector]int64{eth: 1000, arb: 1000, opt: 1000, base: 1000, celo: 1000},
+			pendingTransfers: []models.ProposedTransfer{},
+			expTransfers:     []models.ProposedTransfer{},
+		},
+		{
+			name: "eth and arb below: inflight transfer from eth to celo",
+			// because celo is not connected to anything then nothing is done.
+			balances: map[models.NetworkSelector]int64{eth: 700, arb: 900, opt: 1000, base: 1000, celo: 1000},
+			minimums: map[models.NetworkSelector]int64{eth: 500, arb: 500, opt: 500, base: 500, celo: 500},
+			targets:  map[models.NetworkSelector]int64{eth: 1000, arb: 1000, opt: 1000, base: 1000, celo: 0},
+			pendingTransfers: []models.ProposedTransfer{
+				{From: eth, To: celo, Amount: ubig.New(big.NewInt(300)), Status: models.TransferStatusNotReady},
+			},
+			expTransfers: []models.ProposedTransfer{},
+		},
+		{
+			name:             "celo stole all our liquidity, so we can't transfer anywhere cause everyone is below target",
+			balances:         map[models.NetworkSelector]int64{eth: 700, arb: 900, opt: 800, base: 900, celo: 1700},
+			minimums:         map[models.NetworkSelector]int64{eth: 500, arb: 500, opt: 500, base: 500, celo: 500},
+			targets:          map[models.NetworkSelector]int64{eth: 1000, arb: 1000, opt: 1000, base: 1000, celo: 0},
+			pendingTransfers: []models.ProposedTransfer{},
+			expTransfers:     []models.ProposedTransfer{},
+		},
+		{
+			name: "celo stole some of our liquidity: base sends surplus to eth",
+			// base sends it surplus to eth but nothing else can happen because eth is below target
+			balances:         map[models.NetworkSelector]int64{eth: 700, arb: 900, opt: 700, base: 1100, celo: 1600},
+			minimums:         map[models.NetworkSelector]int64{eth: 500, arb: 500, opt: 500, base: 500, celo: 500},
+			targets:          map[models.NetworkSelector]int64{eth: 1000, arb: 1000, opt: 1000, base: 1000, celo: 0},
+			pendingTransfers: []models.ProposedTransfer{},
+			expTransfers: []models.ProposedTransfer{
+				{From: base, To: eth, Amount: ubig.New(big.NewInt(100))},
+			},
+		},
+		{
+			name:             "all below targets",
+			balances:         map[models.NetworkSelector]int64{eth: 1100, arb: 1000, opt: 1100, base: 1000, celo: 1000},
+			minimums:         map[models.NetworkSelector]int64{eth: 500, arb: 500, opt: 500, base: 500, celo: 500},
+			targets:          map[models.NetworkSelector]int64{eth: 5000, arb: 5000, opt: 5000, base: 5000, celo: 5000},
+			pendingTransfers: []models.ProposedTransfer{},
+			expTransfers:     []models.ProposedTransfer{},
+		},
+	}
+
+	lggr := logger.TestLogger(t)
+	lggr.SetLogLevel(zapcore.DebugLevel)
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			g := graph.NewGraph()
+			for net, b := range tc.balances {
+				g.(graph.GraphTest).AddNetwork(net, graph.Data{
+					Liquidity:        big.NewInt(b),
+					NetworkSelector:  net,
+					MinimumLiquidity: big.NewInt(tc.minimums[net]),
+					TargetLiquidity:  big.NewInt(tc.targets[net]),
+				})
+			}
+			assert.NoError(t, g.(graph.GraphTest).AddConnection(eth, arb))
+			assert.NoError(t, g.(graph.GraphTest).AddConnection(arb, eth))
+			assert.NoError(t, g.(graph.GraphTest).AddConnection(eth, opt))
+			assert.NoError(t, g.(graph.GraphTest).AddConnection(opt, eth))
+			assert.NoError(t, g.(graph.GraphTest).AddConnection(eth, base))
+			assert.NoError(t, g.(graph.GraphTest).AddConnection(base, eth))
+
+			r := NewTargetMinBalancer(lggr)
+
+			unexecuted := make([]UnexecutedTransfer, 0, len(tc.pendingTransfers))
+			for _, tr := range tc.pendingTransfers {
+				unexecuted = append(unexecuted, models.PendingTransfer{
+					Transfer: models.Transfer{
+						From:   tr.From,
+						To:     tr.To,
+						Amount: tr.Amount,
+					},
+					Status: tr.Status,
+				})
+			}
+			transfersToBalance, err := r.ComputeTransfersToBalance(g, unexecuted)
+			assert.NoError(t, err)
+
+			for _, tr := range transfersToBalance {
+				t.Logf("actual transfer: %s -> %s = %s", tr.From, tr.To, tr.Amount)
+			}
+			sort.Sort(models.ProposedTransfers(tc.expTransfers))
+			require.Len(t, transfersToBalance, len(tc.expTransfers))
+			for i, tr := range tc.expTransfers {
+				t.Logf("expected transfer: %s -> %s = %s", tr.From, tr.To, tr.Amount)
+				assert.Equal(t, tr.From, transfersToBalance[i].From)
+				assert.Equal(t, tr.To, transfersToBalance[i].To)
+				assert.Equal(t, tr.Amount.Int64(), transfersToBalance[i].Amount.Int64())
+			}
+		})
+	}
+}
