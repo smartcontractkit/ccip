@@ -124,7 +124,6 @@ func TestExecOnchainConfig120(t *testing.T) {
 }
 
 func TestOffRampReaderInit(t *testing.T) {
-
 	tests := []struct {
 		name    string
 		version string
@@ -239,7 +238,6 @@ func setupOffRampV1_0_0(t *testing.T, user *bind.TransactOpts, bc *client.Simula
 }
 
 func setupOffRampV1_2_0(t *testing.T, user *bind.TransactOpts, bc *client.SimulatedBackendClient) common.Address {
-
 	onRampAddr := utils.RandomAddress()
 	armAddr := deployMockArm(t, user, bc)
 	csAddr := deployCommitStore(t, user, bc, onRampAddr, armAddr)
@@ -277,6 +275,7 @@ func setupOffRampV1_2_0(t *testing.T, user *bind.TransactOpts, bc *client.Simula
 
 func setupOffRampV1_5_0(t *testing.T, user *bind.TransactOpts, bc *client.SimulatedBackendClient) common.Address {
 	onRampAddr := utils.RandomAddress()
+	tokenAdminRegAddr := utils.RandomAddress()
 	rmnAddr := deployMockArm(t, user, bc)
 	csAddr := deployCommitStore(t, user, bc, onRampAddr, rmnAddr)
 
@@ -288,6 +287,7 @@ func setupOffRampV1_5_0(t *testing.T, user *bind.TransactOpts, bc *client.Simula
 		OnRamp:              onRampAddr,
 		PrevOffRamp:         common.Address{},
 		RmnProxy:            rmnAddr,
+		TokenAdminRegistry:  tokenAdminRegAddr,
 	}
 	rateLimiterConfig := evm_2_evm_offramp.RateLimiterConfig{
 		IsEnabled: false,
@@ -366,7 +366,6 @@ func testOffRampReader(t *testing.T, th offRampReaderTH) {
 	require.Empty(t, sourceToDestTokens)
 
 	require.NoError(t, err)
-	require.Empty(t, tokens.DestinationPool)
 }
 
 func TestNewOffRampReader(t *testing.T) {

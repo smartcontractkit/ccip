@@ -1,11 +1,13 @@
 name: CCIP Load Test
-on:
+on: 
   push:
     branches:
       - ccip-develop
+    tags:
+      - '*'
   workflow_dispatch:
     inputs:
-      base64_test_input : # base64 encoded toml for test input
+      base64_test_input: # base64 encoded toml for test input
         description: 'Base64 encoded toml test input'
         required: false
 
@@ -21,6 +23,7 @@ env:
   ENV_JOB_IMAGE: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink-ccip-tests:${{ github.sha }}
   INTERNAL_DOCKER_REPO: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com
   AWS_ECR_REPO_PUBLIC_REGISTRY: public.ecr.aws
+  MOD_CACHE_VERSION: 1
 
 jobs:
   build-chainlink:
@@ -35,7 +38,7 @@ jobs:
         uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
       - name: Check if image exists
         id: check-image
-        uses: smartcontractkit/chainlink-github-actions/docker/image-exists@5dd916d08c03cb5f9a97304f4f174820421bb946 # v2.3.11
+        uses: smartcontractkit/chainlink-github-actions/docker/image-exists@b49a9d04744b0237908831730f8553f26d73a94b # v2.3.17
         with:
           repository: chainlink
           tag: ${{ env.CHAINLINK_VERSION }}
@@ -43,7 +46,7 @@ jobs:
           AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
       - name: Build Image
         if: steps.check-image.outputs.exists == 'false'
-        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/build-image@5dd916d08c03cb5f9a97304f4f174820421bb946 # v2.3.11
+        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/build-image@b49a9d04744b0237908831730f8553f26d73a94b # v2.3.17
         env:
           GH_TOKEN: ${{ github.token }}
         with:
@@ -132,7 +135,8 @@ jobs:
           org-id: ${{ secrets.GRAFANA_INTERNAL_TENANT_ID }}
           basic-auth: ${{ secrets.GRAFANA_INTERNAL_BASIC_AUTH }}
           hostname: ${{ secrets.GRAFANA_INTERNAL_HOST }}
-          this-job-name: CCIP Load Test
+          this-job-name: CCIP ${{ matrix.type.name }}
+          test-results-file: '{"testType":"go","filePath":"/tmp/gotest.log"}'
         continue-on-error: true
       - name: Checkout the repo
         uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
@@ -174,7 +178,7 @@ jobs:
           grafanaUrl: ${{ vars.GRAFANA_URL }}
           grafanaDashboardUrl: "/d/6vjVx-1V8/ccip-long-running-tests"
       - name: Run Tests
-        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@5dd916d08c03cb5f9a97304f4f174820421bb946 # v2.3.11
+        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@b49a9d04744b0237908831730f8553f26d73a94b # v2.3.17
         env:
           TEST_SUITE: load
           TEST_ARGS: -test.timeout 900h
@@ -183,7 +187,7 @@ jobs:
           RR_CPU: 4
           TEST_TRIGGERED_BY: ccip-load-test-ci-${{ matrix.type.name }}
         with:
-          test_command_to_run: cd ./integration-tests/ccip-tests && go test -v -timeout 70m -count=1 -json -run ${{ matrix.type.run }} ./load 2>&1 | tee /tmp/gotest.log | gotestfmt
+          test_command_to_run: cd ./integration-tests/ccip-tests && go test -v -timeout 70m -count=1 -json -run ${{ matrix.type.run }} ./load 2>&1 | tee /tmp/gotest.log | gotestloghelper -ci
           test_download_vendor_packages_command: cd ./integration-tests && go mod download
           cl_repo: ${{ env.CHAINLINK_IMAGE }}
           cl_image_tag: ${{ env.CHAINLINK_VERSION }}
@@ -199,3 +203,90 @@ jobs:
           cache_key_id: ccip-load-${{ env.MOD_CACHE_VERSION }}
           cache_restore_only: "true"
           should_cleanup: "true"
+
+  # Reporting Jobs
+  start-slack-thread:
+    name: Start Slack Thread
+    if: ${{ failure() && needs.ccip-load-test.result != 'skipped' && needs.ccip-load-test.result != 'cancelled' }}
+    environment: integration
+    outputs:
+      thread_ts: ${{ steps.slack.outputs.thread_ts }}
+    permissions:
+      checks: write
+      pull-requests: write
+      id-token: write
+      contents: read
+    runs-on: ubuntu-latest
+    needs: [ccip-load-test]
+    steps:
+      - name: Debug Result
+        run: echo ${{ join(needs.*.result, ',') }}
+      - name: Main Slack Notification
+        uses: slackapi/slack-github-action@6c661ce58804a1a20f6dc5fbee7f0381b469e001 # v1.25.0
+        id: slack
+        with:
+          channel-id: "#ccip-testing"
+          payload: |
+            {
+              "attachments": [
+                {
+                  "color": "${{ contains(join(needs.*.result, ','), 'failure') && '#C62828' || '#2E7D32' }}",
+                  "blocks": [
+                    {
+                      "type": "header",
+                      "text": {
+                        "type": "plain_text",
+                        "text": "CCIP load tests results ${{ contains(join(needs.*.result, ','), 'failure') && ':x:' || ':white_check_mark:'}}",
+                        "emoji": true
+                      }
+                    },
+                    {
+                      "type": "divider"
+                    },
+                    {
+                      "type": "section",
+                      "text": {
+                        "type": "mrkdwn",
+                        "text": "<${{ github.server_url }}/${{ github.repository }}/${{contains(github.ref_name, 'release') && 'releases/tag' || 'tree'}}/${{ github.ref_name }}|${{ github.ref_name }}> | <${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}|${{ github.sha }}> | <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|Run>"
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.QA_SLACK_API_KEY }}
+
+  post-test-results-to-slack:
+    name: Post Test Results for ${{ matrix.network }}
+    if: ${{ failure() && needs.start-slack-thread.result != 'skipped' && needs.start-slack-thread.result != 'cancelled' }}
+    environment: integration
+    permissions:
+      checks: write
+      pull-requests: write
+      id-token: write
+      contents: read
+    runs-on: ubuntu-latest
+    needs: start-slack-thread
+    strategy:
+      fail-fast: false
+      matrix:
+        network: [CCIP]
+    steps:
+      - name: Checkout the repo
+        uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
+      - name: Post Test Results
+        uses: ./.github/actions/notify-slack-jobs-result
+        with:
+          github_token: ${{ github.token }}
+          github_repository: ${{ github.repository }}
+          workflow_run_id: ${{ github.run_id }}
+          github_job_name_regex: ^${{ matrix.network }} (?<cap>.?*)$
+          message_title: ${{ matrix.network }}
+          slack_channel_id: "#ccip-testing"
+          slack_bot_token: ${{ secrets.QA_SLACK_API_KEY }}
+          slack_thread_ts: ${{ needs.start-slack-thread.outputs.thread_ts }}
+
+  # End Reporting Jobs

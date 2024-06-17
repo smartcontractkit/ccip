@@ -103,13 +103,16 @@ func TestLoadCCIPStableRequestTriggeringWithNetworkChaos(t *testing.T) {
 		gethNetworksLabels = append(gethNetworksLabels, actions.GethLabel(net.Name))
 	}
 	testEnv.ChaosLabelForAllGeth(t, gethNetworksLabels)
+	if testArgs.TestCfg.TestGroupInput.LoadProfile.NetworkChaosDelay == nil {
+		testArgs.TestCfg.TestGroupInput.LoadProfile.NetworkChaosDelay = config.MustNewDuration(200 * time.Millisecond)
+	}
 	chaosId, err := testEnv.K8Env.Chaos.Run(
 		chaos.NewNetworkLatency(
 			testEnv.K8Env.Cfg.Namespace, &chaos.Props{
 				FromLabels:  &map[string]*string{"geth": ptr.Ptr(actions.ChaosGroupCCIPGeth)},
 				ToLabels:    &map[string]*string{"app": ptr.Ptr("chainlink-0")},
 				DurationStr: testArgs.TestCfg.TestGroupInput.LoadProfile.TestDuration.String(),
-				Delay:       "200ms",
+				Delay:       testArgs.TestCfg.TestGroupInput.LoadProfile.NetworkChaosDelay.Duration().String(),
 			}))
 	require.NoError(t, err)
 
@@ -280,6 +283,7 @@ func TestLoadCCIPStableWithPodChaosDiffCommitAndExec(t *testing.T) {
 			testArgs.TestCfg.TestGroupInput.LoadProfile.TestDuration = config.MustNewDuration(5 * time.Minute)
 			testArgs.TestCfg.TestGroupInput.LoadProfile.TimeUnit = config.MustNewDuration(1 * time.Second)
 			testArgs.TestCfg.TestGroupInput.LoadProfile.RequestPerUnitTime = []int64{2}
+			testArgs.TestCfg.TestGroupInput.PhaseTimeout = config.MustNewDuration(15 * time.Minute)
 
 			testArgs.Setup()
 			// if the test runs on remote runner

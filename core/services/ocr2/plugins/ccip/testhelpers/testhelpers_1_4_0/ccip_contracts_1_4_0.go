@@ -29,7 +29,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/arm_proxy_contract"
 	burn_mint_token_pool "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/burn_mint_token_pool_1_4_0"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store_1_2_0"
-	custom_token_pool "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/custom_token_pool_1_4_0"
 	evm_2_evm_offramp "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp_1_2_0"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp_1_2_0"
 	evm_2_evm_onramp "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp_1_2_0"
@@ -164,7 +163,6 @@ func NewExecOffchainConfig(
 		InflightCacheExpiry:         InflightCacheExpiry,
 		RootSnoozeTime:              RootSnoozeTime,
 	}}
-
 }
 
 type MaybeRevertReceiver struct {
@@ -179,7 +177,6 @@ type Common struct {
 	Chain             *backends.SimulatedBackend
 	LinkToken         *link_token_interface.LinkToken
 	LinkTokenPool     *lock_release_token_pool.LockReleaseTokenPool
-	CustomPool        *custom_token_pool.CustomTokenPool
 	CustomToken       *link_token_interface.LinkToken
 	WrappedNative     *weth9.WETH9
 	WrappedNativePool *lock_release_token_pool_1_0_0.LockReleaseTokenPool
@@ -355,7 +352,7 @@ func (c *CCIPContracts) DeployNewOnRamp(t *testing.T) {
 				MaxFeeUSDCents:    1_000_000_00, // $ 1 million
 				DeciBps:           5_0,          // 5 bps
 				DestGasOverhead:   34_000,
-				DestBytesOverhead: 0,
+				DestBytesOverhead: 32,
 			},
 		},
 		[]evm_2_evm_onramp.EVM2EVMOnRampNopAndWeight{},
@@ -979,7 +976,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 				MaxFeeUSDCents:    1_000_000_00, // $ 1 million
 				DeciBps:           5_0,          // 5 bps
 				DestGasOverhead:   34_000,
-				DestBytesOverhead: 0,
+				DestBytesOverhead: 32,
 			},
 		},
 		[]evm_2_evm_onramp.EVM2EVMOnRampNopAndWeight{},
@@ -1203,7 +1200,6 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 			Chain:             sourceChain,
 			LinkToken:         sourceLinkToken,
 			LinkTokenPool:     sourcePool,
-			CustomPool:        nil,
 			CustomToken:       sourceCustomToken,
 			ARM:               sourceARM,
 			ARMProxy:          sourceARMProxy,
@@ -1222,7 +1218,6 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 			Chain:             destChain,
 			LinkToken:         destLinkToken,
 			LinkTokenPool:     destPool,
-			CustomPool:        nil,
 			CustomToken:       destCustomToken,
 			ARM:               destARM,
 			ARMProxy:          destARMProxy,

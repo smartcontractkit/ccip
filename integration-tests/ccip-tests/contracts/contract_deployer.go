@@ -59,9 +59,23 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay/evm"
 )
 
+// NeedTokenAdminRegistry checks if token admin registry is needed for the current version of ccip
+// if the version is less than 1.5.0-dev, then token admin registry is not needed
+func NeedTokenAdminRegistry() bool {
+	// find out the pool version
+	version := VersionMap[TokenPoolContract]
+	if version == Latest {
+		return true
+	}
+	currentSemver := semver.MustParse(string(version))
+	tokenAdminEnabledVersion := semver.MustParse("1.5.0-dev")
+	return currentSemver.Compare(tokenAdminEnabledVersion) >= 0
+}
+
 // CCIPContractsDeployer provides the implementations for deploying CCIP ETH contracts
 type CCIPContractsDeployer struct {
 	evmClient   blockchain.EVMClient
+	logger      zerolog.Logger
 	EthDeployer *contracts.EthereumContractDeployer
 }
 
@@ -69,6 +83,7 @@ type CCIPContractsDeployer struct {
 func NewCCIPContractsDeployer(logger zerolog.Logger, bcClient blockchain.EVMClient) (*CCIPContractsDeployer, error) {
 	return &CCIPContractsDeployer{
 		evmClient:   bcClient,
+		logger:      logger,
 		EthDeployer: contracts.NewEthereumContractDeployer(bcClient, logger),
 	}, nil
 }
@@ -126,7 +141,7 @@ func (e *CCIPContractsDeployer) NewTokenTransmitter(addr common.Address) (*Token
 	if err != nil {
 		return nil, err
 	}
-	log.Info().
+	e.logger.Info().
 		Str("Contract Address", addr.Hex()).
 		Str("Contract Name", "Mock USDC Token Transmitter").
 		Str("From", e.evmClient.GetDefaultWallet().Address()).
@@ -139,17 +154,21 @@ func (e *CCIPContractsDeployer) NewTokenTransmitter(addr common.Address) (*Token
 	}, err
 }
 
-func (e *CCIPContractsDeployer) DeployTokenTransmitter(domain uint32) (*TokenTransmitter, error) {
+func (e *CCIPContractsDeployer) DeployTokenTransmitter(domain uint32, usdcToken common.Address) (*TokenTransmitter, error) {
 	address, _, instance, err := e.evmClient.DeployContract("Mock Token Transmitter", func(
 		auth *bind.TransactOpts,
 		_ bind.ContractBackend,
 	) (common.Address, *types.Transaction, interface{}, error) {
-		address, tx, contract, err := mock_usdc_token_transmitter.DeployMockE2EUSDCTransmitter(auth, wrappers.MustNewWrappedContractBackend(e.evmClient, nil), 0, domain)
+		address, tx, contract, err := mock_usdc_token_transmitter.DeployMockE2EUSDCTransmitter(auth, wrappers.MustNewWrappedContractBackend(e.evmClient, nil), 0, domain, usdcToken)
 		if err != nil {
 			return common.Address{}, nil, nil, err
 		}
 		return address, tx, contract, err
 	})
+
+	if err != nil {
+		return nil, fmt.Errorf("error in deploying usdc token transmitter: %w", err)
+	}
 
 	return &TokenTransmitter{
 		client:          e.evmClient,
@@ -171,6 +190,7 @@ func (e *CCIPContractsDeployer) DeployLinkTokenContract() (*LinkToken, error) {
 	}
 	return &LinkToken{
 		client:     e.evmClient,
+		logger:     e.logger,
 		instance:   instance.(*link_token_interface.LinkToken),
 		EthAddress: *address,
 	}, err
@@ -190,8 +210,11 @@ func (e *CCIPContractsDeployer) DeployBurnMintERC677(ownerMintingAmount *big.Int
 
 	token := &ERC677Token{
 		client:          e.evmClient,
+		logger:          e.logger,
 		ContractAddress: *address,
 		instance:        instance.(*burn_mint_erc677.BurnMintERC677),
+		OwnerAddress:    common.HexToAddress(e.evmClient.GetDefaultWallet().Address()),
+		OwnerWallet:     e.evmClient.GetDefaultWallet(),
 	}
 	if ownerMintingAmount != nil {
 		// grant minter role to owner and mint tokens
@@ -229,7 +252,7 @@ func (e *CCIPContractsDeployer) NewLinkTokenContract(addr common.Address) (*Link
 	if err != nil {
 		return nil, err
 	}
-	log.Info().
+	e.logger.Info().
 		Str("Contract Address", addr.Hex()).
 		Str("Contract Name", "Link Token").
 		Str("From", e.evmClient.GetDefaultWallet().Address()).
@@ -237,6 +260,7 @@ func (e *CCIPContractsDeployer) NewLinkTokenContract(addr common.Address) (*Link
 		Msg("New contract")
 	return &LinkToken{
 		client:     e.evmClient,
+		logger:     e.logger,
 		instance:   token,
 		EthAddress: addr,
 	}, err
@@ -248,7 +272,7 @@ func (e *CCIPContractsDeployer) NewERC20TokenContract(addr common.Address) (*ERC
 	if err != nil {
 		return nil, err
 	}
-	log.Info().
+	e.logger.Info().
 		Str("Contract Address", addr.Hex()).
 		Str("Contract Name", "ERC20 Token").
 		Str("From", e.evmClient.GetDefaultWallet().Address()).
@@ -256,8 +280,11 @@ func (e *CCIPContractsDeployer) NewERC20TokenContract(addr common.Address) (*ERC
 		Msg("New contract")
 	return &ERC20Token{
 		client:          e.evmClient,
+		logger:          e.logger,
 		instance:        token,
 		ContractAddress: addr,
+		OwnerAddress:    common.HexToAddress(e.evmClient.GetDefaultWallet().Address()),
+		OwnerWallet:     e.evmClient.GetDefaultWallet(),
 	}, err
 }
 
@@ -266,7 +293,7 @@ func (e *CCIPContractsDeployer) NewLockReleaseTokenPoolContract(addr common.Addr
 	error,
 ) {
 	version := VersionMap[TokenPoolContract]
-	log.Info().Str("version", string(version)).Msg("New LockRelease Token Pool")
+	e.logger.Info().Str("version", string(version)).Msg("New LockRelease Token Pool")
 	switch version {
 	case Latest:
 		pool, err := lock_release_token_pool.NewLockReleaseTokenPool(addr, wrappers.MustNewWrappedContractBackend(e.evmClient, nil))
@@ -274,7 +301,7 @@ func (e *CCIPContractsDeployer) NewLockReleaseTokenPoolContract(addr common.Addr
 		if err != nil {
 			return nil, err
 		}
-		log.Info().
+		e.logger.Info().
 			Str("Contract Address", addr.Hex()).
 			Str("Contract Name", "Native Token Pool").
 			Str("From", e.evmClient.GetDefaultWallet().Address()).
@@ -286,20 +313,23 @@ func (e *CCIPContractsDeployer) NewLockReleaseTokenPoolContract(addr common.Addr
 		}
 		return &TokenPool{
 			client: e.evmClient,
+			logger: e.logger,
 			Instance: &TokenPoolWrapper{
 				Latest: &LatestPool{
 					PoolInterface:   poolInstance,
 					LockReleasePool: pool,
 				},
 			},
-			EthAddress: addr,
+			EthAddress:   addr,
+			OwnerAddress: common.HexToAddress(e.evmClient.GetDefaultWallet().Address()),
+			OwnerWallet:  e.evmClient.GetDefaultWallet(),
 		}, err
 	case V1_4_0:
 		pool, err := lock_release_token_pool_1_4_0.NewLockReleaseTokenPool(addr, wrappers.MustNewWrappedContractBackend(e.evmClient, nil))
 		if err != nil {
 			return nil, err
 		}
-		log.Info().
+		e.logger.Info().
 			Str("Contract Address", addr.Hex()).
 			Str("Contract Name", "Native Token Pool").
 			Str("From", e.evmClient.GetDefaultWallet().Address()).
@@ -311,13 +341,16 @@ func (e *CCIPContractsDeployer) NewLockReleaseTokenPoolContract(addr common.Addr
 		}
 		return &TokenPool{
 			client: e.evmClient,
+			logger: e.logger,
 			Instance: &TokenPoolWrapper{
 				V1_4_0: &V1_4_0Pool{
 					PoolInterface:   poolInstance,
 					LockReleasePool: pool,
 				},
 			},
-			EthAddress: addr,
+			EthAddress:   addr,
+			OwnerAddress: common.HexToAddress(e.evmClient.GetDefaultWallet().Address()),
+			OwnerWallet:  e.evmClient.GetDefaultWallet(),
 		}, err
 	default:
 		return nil, fmt.Errorf("version not supported: %s", version)
@@ -329,7 +362,7 @@ func (e *CCIPContractsDeployer) NewUSDCTokenPoolContract(addr common.Address) (
 	error,
 ) {
 	version := VersionMap[TokenPoolContract]
-	log.Info().Str("version", string(version)).Msg("New USDC Token Pool")
+	e.logger.Info().Str("version", string(version)).Msg("New USDC Token Pool")
 	switch version {
 	case Latest:
 		pool, err := usdc_token_pool.NewUSDCTokenPool(addr, wrappers.MustNewWrappedContractBackend(e.evmClient, nil))
@@ -337,7 +370,7 @@ func (e *CCIPContractsDeployer) NewUSDCTokenPoolContract(addr common.Address) (
 		if err != nil {
 			return nil, err
 		}
-		log.Info().
+		e.logger.Info().
 			Str("Contract Address", addr.Hex()).
 			Str("Contract Name", "USDC Token Pool").
 			Str("From", e.evmClient.GetDefaultWallet().Address()).
@@ -349,13 +382,16 @@ func (e *CCIPContractsDeployer) NewUSDCTokenPoolContract(addr common.Address) (
 		}
 		return &TokenPool{
 			client: e.evmClient,
+			logger: e.logger,
 			Instance: &TokenPoolWrapper{
 				Latest: &LatestPool{
 					PoolInterface: poolInterface,
 					USDCPool:      pool,
 				},
 			},
-			EthAddress: addr,
+			EthAddress:   addr,
+			OwnerAddress: common.HexToAddress(e.evmClient.GetDefaultWallet().Address()),
+			OwnerWallet:  e.evmClient.GetDefaultWallet(),
 		}, err
 	case V1_4_0:
 		pool, err := usdc_token_pool_1_4_0.NewUSDCTokenPool(addr, wrappers.MustNewWrappedContractBackend(e.evmClient, nil))
@@ -363,7 +399,7 @@ func (e *CCIPContractsDeployer) NewUSDCTokenPoolContract(addr common.Address) (
 		if err != nil {
 			return nil, err
 		}
-		log.Info().
+		e.logger.Info().
 			Str("Contract Address", addr.Hex()).
 			Str("Contract Name", "USDC Token Pool").
 			Str("From", e.evmClient.GetDefaultWallet().Address()).
@@ -375,13 +411,16 @@ func (e *CCIPContractsDeployer) NewUSDCTokenPoolContract(addr common.Address) (
 		}
 		return &TokenPool{
 			client: e.evmClient,
+			logger: e.logger,
 			Instance: &TokenPoolWrapper{
 				V1_4_0: &V1_4_0Pool{
 					PoolInterface: poolInterface,
 					USDCPool:      pool,
 				},
 			},
-			EthAddress: addr,
+			EthAddress:   addr,
+			OwnerAddress: common.HexToAddress(e.evmClient.GetDefaultWallet().Address()),
+			OwnerWallet:  e.evmClient.GetDefaultWallet(),
 		}, err
 	default:
 		return nil, fmt.Errorf("version not supported: %s", version)
@@ -394,7 +433,7 @@ func (e *CCIPContractsDeployer) DeployUSDCTokenPoolContract(tokenAddr string, to
 	error,
 ) {
 	version := VersionMap[TokenPoolContract]
-	log.Debug().Str("token", tokenAddr).Msg("Deploying usdc token pool")
+	e.logger.Debug().Str("Token", tokenAddr).Msg("Deploying USDC token pool")
 	token := common.HexToAddress(tokenAddr)
 	switch version {
 	case Latest:
@@ -447,7 +486,7 @@ func (e *CCIPContractsDeployer) DeployLockReleaseTokenPoolContract(tokenAddr str
 	error,
 ) {
 	version := VersionMap[TokenPoolContract]
-	log.Info().Str("version", string(version)).Msg("Deploying LockRelease Token Pool")
+	e.logger.Info().Str("version", string(version)).Msg("Deploying LockRelease Token Pool")
 	token := common.HexToAddress(tokenAddr)
 	switch version {
 	case Latest:
@@ -462,7 +501,8 @@ func (e *CCIPContractsDeployer) DeployLockReleaseTokenPoolContract(tokenAddr str
 				[]common.Address{},
 				rmnProxy,
 				true,
-				router)
+				router,
+			)
 		})
 
 		if err != nil {
@@ -481,7 +521,8 @@ func (e *CCIPContractsDeployer) DeployLockReleaseTokenPoolContract(tokenAddr str
 				[]common.Address{},
 				rmnProxy,
 				true,
-				router)
+				router,
+			)
 		})
 
 		if err != nil {
@@ -508,7 +549,7 @@ func (e *CCIPContractsDeployer) NewARMContract(addr common.Address) (*ARM, error
 	if err != nil {
 		return nil, err
 	}
-	log.Info().
+	e.logger.Info().
 		Str("Contract Address", addr.Hex()).
 		Str("Contract Name", "Mock ARM Contract").
 		Str("From", e.evmClient.GetDefaultWallet().Address()).
@@ -527,11 +568,11 @@ func (e *CCIPContractsDeployer) NewCommitStore(addr common.Address) (
 	error,
 ) {
 	version := VersionMap[CommitStoreContract]
-	log.Info().Str("version", string(version)).Msg("New CommitStore")
+	e.logger.Info().Str("version", string(version)).Msg("New CommitStore")
 	switch version {
 	case Latest:
 		ins, err := commit_store.NewCommitStore(addr, wrappers.MustNewWrappedContractBackend(e.evmClient, nil))
-		log.Info().
+		e.logger.Info().
 			Str("Contract Address", addr.Hex()).
 			Str("Contract Name", "CommitStore").
 			Str("From", e.evmClient.GetDefaultWallet().Address()).
@@ -539,6 +580,7 @@ func (e *CCIPContractsDeployer) NewCommitStore(addr common.Address) (
 			Msg("New contract")
 		return &CommitStore{
 			client: e.evmClient,
+			logger: e.logger,
 			Instance: &CommitStoreWrapper{
 				Latest: ins,
 			},
@@ -546,7 +588,7 @@ func (e *CCIPContractsDeployer) NewCommitStore(addr common.Address) (
 		}, err
 	case V1_2_0:
 		ins, err := commit_store_1_2_0.NewCommitStore(addr, wrappers.MustNewWrappedContractBackend(e.evmClient, nil))
-		log.Info().
+		e.logger.Info().
 			Str("Contract Address", addr.Hex()).
 			Str("Contract Name", "CommitStore").
 			Str("From", e.evmClient.GetDefaultWallet().Address()).
@@ -554,6 +596,7 @@ func (e *CCIPContractsDeployer) NewCommitStore(addr common.Address) (
 			Msg("New contract")
 		return &CommitStore{
 			client: e.evmClient,
+			logger: e.logger,
 			Instance: &CommitStoreWrapper{
 				V1_2_0: ins,
 			},
@@ -569,7 +612,7 @@ func (e *CCIPContractsDeployer) DeployCommitStore(sourceChainSelector, destChain
 	if !ok {
 		return nil, fmt.Errorf("versioning not supported: %s", version)
 	}
-	log.Info().Str("version", string(version)).Msg("Deploying CommitStore")
+	e.logger.Info().Str("version", string(version)).Msg("Deploying CommitStore")
 	switch version {
 	case Latest:
 		address, _, instance, err := e.evmClient.DeployContract("CommitStore Contract", func(
@@ -592,6 +635,7 @@ func (e *CCIPContractsDeployer) DeployCommitStore(sourceChainSelector, destChain
 		}
 		return &CommitStore{
 			client: e.evmClient,
+			logger: e.logger,
 			Instance: &CommitStoreWrapper{
 				Latest: instance.(*commit_store.CommitStore),
 			},
@@ -618,6 +662,7 @@ func (e *CCIPContractsDeployer) DeployCommitStore(sourceChainSelector, destChain
 		}
 		return &CommitStore{
 			client: e.evmClient,
+			logger: e.logger,
 			Instance: &CommitStoreWrapper{
 				V1_2_0: instance.(*commit_store_1_2_0.CommitStore),
 			},
@@ -643,6 +688,7 @@ func (e *CCIPContractsDeployer) DeployReceiverDapp(revert bool) (
 	}
 	return &ReceiverDapp{
 		client:     e.evmClient,
+		logger:     e.logger,
 		instance:   instance.(*maybe_revert_message_receiver.MaybeRevertMessageReceiver),
 		EthAddress: *address,
 	}, err
@@ -653,7 +699,7 @@ func (e *CCIPContractsDeployer) NewReceiverDapp(addr common.Address) (
 	error,
 ) {
 	ins, err := maybe_revert_message_receiver.NewMaybeRevertMessageReceiver(addr, wrappers.MustNewWrappedContractBackend(e.evmClient, nil))
-	log.Info().
+	e.logger.Info().
 		Str("Contract Address", addr.Hex()).
 		Str("Contract Name", "ReceiverDapp").
 		Str("From", e.evmClient.GetDefaultWallet().Address()).
@@ -661,6 +707,7 @@ func (e *CCIPContractsDeployer) NewReceiverDapp(addr common.Address) (
 		Msg("New contract")
 	return &ReceiverDapp{
 		client:     e.evmClient,
+		logger:     e.logger,
 		instance:   ins,
 		EthAddress: addr,
 	}, err
@@ -681,6 +728,7 @@ func (e *CCIPContractsDeployer) DeployRouter(wrappedNative common.Address, armAd
 	}
 	return &Router{
 		client:     e.evmClient,
+		logger:     e.logger,
 		Instance:   instance.(*router.Router),
 		EthAddress: *address,
 	}, err
@@ -691,7 +739,7 @@ func (e *CCIPContractsDeployer) NewRouter(addr common.Address) (
 	error,
 ) {
 	r, err := router.NewRouter(addr, wrappers.MustNewWrappedContractBackend(e.evmClient, nil))
-	log.Info().
+	e.logger.Info().
 		Str("Contract Address", addr.Hex()).
 		Str("Contract Name", "Router").
 		Str("From", e.evmClient.GetDefaultWallet().Address()).
@@ -702,6 +750,7 @@ func (e *CCIPContractsDeployer) NewRouter(addr common.Address) (
 	}
 	return &Router{
 		client:     e.evmClient,
+		logger:     e.logger,
 		Instance:   r,
 		EthAddress: addr,
 	}, err
@@ -711,16 +760,16 @@ func (e *CCIPContractsDeployer) NewPriceRegistry(addr common.Address) (
 	*PriceRegistry,
 	error,
 ) {
-	var wrapper *PriceRegistryWrappers
+	var wrapper *PriceRegistryWrapper
 	version := VersionMap[PriceRegistryContract]
-	log.Info().Str("version", string(version)).Msg("New PriceRegistry")
+	e.logger.Info().Str("version", string(version)).Msg("New PriceRegistry")
 	switch version {
 	case Latest:
 		ins, err := price_registry.NewPriceRegistry(addr, wrappers.MustNewWrappedContractBackend(e.evmClient, nil))
 		if err != nil {
 			return nil, fmt.Errorf("error in creating price registry instance: %w", err)
 		}
-		wrapper = &PriceRegistryWrappers{
+		wrapper = &PriceRegistryWrapper{
 			Latest: ins,
 		}
 	case V1_2_0:
@@ -728,13 +777,13 @@ func (e *CCIPContractsDeployer) NewPriceRegistry(addr common.Address) (
 		if err != nil {
 			return nil, fmt.Errorf("error in creating price registry instance: %w", err)
 		}
-		wrapper = &PriceRegistryWrappers{
+		wrapper = &PriceRegistryWrapper{
 			V1_2_0: ins,
 		}
 	default:
 		return nil, fmt.Errorf("version not supported: %s", version)
 	}
-	log.Info().
+	e.logger.Info().
 		Str("Contract Address", addr.Hex()).
 		Str("Contract Name", "PriceRegistry").
 		Str("From", e.evmClient.GetDefaultWallet().Address()).
@@ -742,6 +791,7 @@ func (e *CCIPContractsDeployer) NewPriceRegistry(addr common.Address) (
 		Msg("New contract")
 	return &PriceRegistry{
 		client:     e.evmClient,
+		logger:     e.logger,
 		Instance:   wrapper,
 		EthAddress: addr,
 	}, nil
@@ -749,11 +799,11 @@ func (e *CCIPContractsDeployer) NewPriceRegistry(addr common.Address) (
 
 func (e *CCIPContractsDeployer) DeployPriceRegistry(tokens []common.Address) (*PriceRegistry, error) {
 	var address *common.Address
-	var wrapper *PriceRegistryWrappers
+	var wrapper *PriceRegistryWrapper
 	var err error
 	var instance interface{}
 	version := VersionMap[PriceRegistryContract]
-	log.Info().Str("version", string(version)).Msg("Deploying PriceRegistry")
+	e.logger.Info().Str("version", string(version)).Msg("Deploying PriceRegistry")
 	switch version {
 	case Latest:
 		address, _, instance, err = e.evmClient.DeployContract("PriceRegistry", func(
@@ -765,7 +815,7 @@ func (e *CCIPContractsDeployer) DeployPriceRegistry(tokens []common.Address) (*P
 		if err != nil {
 			return nil, err
 		}
-		wrapper = &PriceRegistryWrappers{
+		wrapper = &PriceRegistryWrapper{
 			Latest: instance.(*price_registry.PriceRegistry),
 		}
 	case V1_2_0:
@@ -778,7 +828,7 @@ func (e *CCIPContractsDeployer) DeployPriceRegistry(tokens []common.Address) (*P
 		if err != nil {
 			return nil, err
 		}
-		wrapper = &PriceRegistryWrappers{
+		wrapper = &PriceRegistryWrapper{
 			V1_2_0: instance.(*price_registry_1_2_0.PriceRegistry),
 		}
 	default:
@@ -786,6 +836,7 @@ func (e *CCIPContractsDeployer) DeployPriceRegistry(tokens []common.Address) (*P
 	}
 	reg := &PriceRegistry{
 		client:     e.evmClient,
+		logger:     e.logger,
 		EthAddress: *address,
 		Instance:   wrapper,
 	}
@@ -804,6 +855,7 @@ func (e *CCIPContractsDeployer) DeployTokenAdminRegistry() (*TokenAdminRegistry,
 	}
 	return &TokenAdminRegistry{
 		client:     e.evmClient,
+		logger:     e.logger,
 		Instance:   instance.(*token_admin_registry.TokenAdminRegistry),
 		EthAddress: *address,
 	}, err
@@ -814,7 +866,7 @@ func (e *CCIPContractsDeployer) NewTokenAdminRegistry(addr common.Address) (
 	error,
 ) {
 	ins, err := token_admin_registry.NewTokenAdminRegistry(addr, wrappers.MustNewWrappedContractBackend(e.evmClient, nil))
-	log.Info().
+	e.logger.Info().
 		Str("Contract Address", addr.Hex()).
 		Str("Contract Name", "TokenAdminRegistry").
 		Str("From", e.evmClient.GetDefaultWallet().Address()).
@@ -822,6 +874,7 @@ func (e *CCIPContractsDeployer) NewTokenAdminRegistry(addr common.Address) (
 		Msg("New contract")
 	return &TokenAdminRegistry{
 		client:     e.evmClient,
+		logger:     e.logger,
 		Instance:   ins,
 		EthAddress: addr,
 	}, err
@@ -832,8 +885,8 @@ func (e *CCIPContractsDeployer) NewOnRamp(addr common.Address) (
 	error,
 ) {
 	version := VersionMap[OnRampContract]
-	log.Info().Str("version", string(version)).Msg("New OnRamp")
-	log.Info().
+	e.logger.Info().Str("version", string(version)).Msg("New OnRamp")
+	e.logger.Info().
 		Str("Contract Address", addr.Hex()).
 		Str("Contract Name", "OnRamp").
 		Str("From", e.evmClient.GetDefaultWallet().Address()).
@@ -847,6 +900,7 @@ func (e *CCIPContractsDeployer) NewOnRamp(addr common.Address) (
 		}
 		return &OnRamp{
 			client:     e.evmClient,
+			logger:     e.logger,
 			Instance:   &OnRampWrapper{V1_2_0: ins},
 			EthAddress: addr,
 		}, err
@@ -857,6 +911,7 @@ func (e *CCIPContractsDeployer) NewOnRamp(addr common.Address) (
 		}
 		return &OnRamp{
 			client:     e.evmClient,
+			logger:     e.logger,
 			Instance:   &OnRampWrapper{Latest: ins},
 			EthAddress: addr,
 		}, nil
@@ -878,7 +933,7 @@ func (e *CCIPContractsDeployer) DeployOnRamp(
 	linkTokenAddress common.Address,
 ) (*OnRamp, error) {
 	version := VersionMap[OnRampContract]
-	log.Info().Str("version", string(version)).Msg("Deploying OnRamp")
+	e.logger.Info().Str("version", string(version)).Msg("Deploying OnRamp")
 	switch version {
 	case V1_2_0:
 		feeTokenConfigV1_2_0 := make([]evm_2_evm_onramp_1_2_0.EVM2EVMOnRampFeeTokenConfigArgs, len(feeTokenConfig))
@@ -945,6 +1000,7 @@ func (e *CCIPContractsDeployer) DeployOnRamp(
 		}
 		return &OnRamp{
 			client: e.evmClient,
+			logger: e.logger,
 			Instance: &OnRampWrapper{
 				V1_2_0: instance.(*evm_2_evm_onramp_1_2_0.EVM2EVMOnRamp),
 			},
@@ -959,13 +1015,14 @@ func (e *CCIPContractsDeployer) DeployOnRamp(
 				auth,
 				wrappers.MustNewWrappedContractBackend(e.evmClient, nil),
 				evm_2_evm_onramp.EVM2EVMOnRampStaticConfig{
-					LinkToken:         linkTokenAddress,
-					ChainSelector:     sourceChainSelector, // source chain id
-					DestChainSelector: destChainSelector,   // destinationChainSelector
-					DefaultTxGasLimit: 200_000,
-					MaxNopFeesJuels:   big.NewInt(0).Mul(big.NewInt(100_000_000), big.NewInt(1e18)),
-					PrevOnRamp:        common.HexToAddress(""),
-					RmnProxy:          rmn,
+					LinkToken:          linkTokenAddress,
+					ChainSelector:      sourceChainSelector, // source chain id
+					DestChainSelector:  destChainSelector,   // destinationChainSelector
+					DefaultTxGasLimit:  200_000,
+					MaxNopFeesJuels:    big.NewInt(0).Mul(big.NewInt(100_000_000), big.NewInt(1e18)),
+					PrevOnRamp:         common.HexToAddress(""),
+					RmnProxy:           rmn,
+					TokenAdminRegistry: tokenAdminRegistry,
 				},
 				evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig{
 					Router:                            router,
@@ -978,7 +1035,6 @@ func (e *CCIPContractsDeployer) DeployOnRamp(
 					PriceRegistry:                     priceRegistry,
 					MaxDataBytes:                      50000,
 					MaxPerMsgGasLimit:                 4_000_000,
-					TokenAdminRegistry:                tokenAdminRegistry,
 					DefaultTokenFeeUSDCents:           50,
 					DefaultTokenDestGasOverhead:       34_000,
 					DefaultTokenDestBytesOverhead:     500,
@@ -997,6 +1053,7 @@ func (e *CCIPContractsDeployer) DeployOnRamp(
 		}
 		return &OnRamp{
 			client: e.evmClient,
+			logger: e.logger,
 			Instance: &OnRampWrapper{
 				Latest: instance.(*evm_2_evm_onramp.EVM2EVMOnRamp),
 			},
@@ -1012,14 +1069,14 @@ func (e *CCIPContractsDeployer) NewOffRamp(addr common.Address) (
 	error,
 ) {
 	version := VersionMap[OffRampContract]
-	log.Info().Str("version", string(version)).Msg("New OffRamp")
+	e.logger.Info().Str("version", string(version)).Msg("New OffRamp")
 	switch version {
 	case V1_2_0:
 		ins, err := evm_2_evm_offramp_1_2_0.NewEVM2EVMOffRamp(addr, wrappers.MustNewWrappedContractBackend(e.evmClient, nil))
 		if err != nil {
 			return nil, err
 		}
-		log.Info().
+		e.logger.Info().
 			Str("Contract Address", addr.Hex()).
 			Str("Contract Name", "OffRamp").
 			Str("From", e.evmClient.GetDefaultWallet().Address()).
@@ -1027,6 +1084,7 @@ func (e *CCIPContractsDeployer) NewOffRamp(addr common.Address) (
 			Msg("New contract")
 		return &OffRamp{
 			client:     e.evmClient,
+			logger:     e.logger,
 			Instance:   &OffRampWrapper{V1_2_0: ins},
 			EthAddress: addr,
 		}, err
@@ -1035,7 +1093,7 @@ func (e *CCIPContractsDeployer) NewOffRamp(addr common.Address) (
 		if err != nil {
 			return nil, err
 		}
-		log.Info().
+		e.logger.Info().
 			Str("Contract Address", addr.Hex()).
 			Str("Contract Name", "OffRamp").
 			Str("From", e.evmClient.GetDefaultWallet().Address()).
@@ -1043,6 +1101,7 @@ func (e *CCIPContractsDeployer) NewOffRamp(addr common.Address) (
 			Msg("New contract")
 		return &OffRamp{
 			client:     e.evmClient,
+			logger:     e.logger,
 			Instance:   &OffRampWrapper{Latest: ins},
 			EthAddress: addr,
 		}, err
@@ -1057,9 +1116,10 @@ func (e *CCIPContractsDeployer) DeployOffRamp(
 	opts RateLimiterConfig,
 	sourceTokens, pools []common.Address,
 	rmnProxy common.Address,
+	tokenAdminRegistry common.Address,
 ) (*OffRamp, error) {
 	version := VersionMap[OffRampContract]
-	log.Info().Str("version", string(version)).Msg("Deploying OffRamp")
+	e.logger.Info().Str("version", string(version)).Msg("Deploying OffRamp")
 	switch version {
 	case V1_2_0:
 		address, _, instance, err := e.evmClient.DeployContract("OffRamp Contract", func(
@@ -1091,12 +1151,22 @@ func (e *CCIPContractsDeployer) DeployOffRamp(
 		}
 		return &OffRamp{
 			client: e.evmClient,
+			logger: e.logger,
 			Instance: &OffRampWrapper{
 				V1_2_0: instance.(*evm_2_evm_offramp_1_2_0.EVM2EVMOffRamp),
 			},
 			EthAddress: *address,
 		}, err
 	case Latest:
+		staticConfig := evm_2_evm_offramp.EVM2EVMOffRampStaticConfig{
+			CommitStore:         commitStore,
+			ChainSelector:       destChainSelector,
+			SourceChainSelector: sourceChainSelector,
+			OnRamp:              onRamp,
+			PrevOffRamp:         common.Address{},
+			RmnProxy:            rmnProxy,
+			TokenAdminRegistry:  tokenAdminRegistry,
+		}
 		address, _, instance, err := e.evmClient.DeployContract("OffRamp Contract", func(
 			auth *bind.TransactOpts,
 			_ bind.ContractBackend,
@@ -1104,14 +1174,7 @@ func (e *CCIPContractsDeployer) DeployOffRamp(
 			return evm_2_evm_offramp.DeployEVM2EVMOffRamp(
 				auth,
 				wrappers.MustNewWrappedContractBackend(e.evmClient, nil),
-				evm_2_evm_offramp.EVM2EVMOffRampStaticConfig{
-					CommitStore:         commitStore,
-					ChainSelector:       destChainSelector,
-					SourceChainSelector: sourceChainSelector,
-					OnRamp:              onRamp,
-					PrevOffRamp:         common.Address{},
-					RmnProxy:            rmnProxy,
-				},
+				staticConfig,
 				evm_2_evm_offramp.RateLimiterConfig{
 					IsEnabled: true,
 					Capacity:  opts.Capacity,
@@ -1119,11 +1182,14 @@ func (e *CCIPContractsDeployer) DeployOffRamp(
 				},
 			)
 		})
+		e.logger.Info().Msg(fmt.Sprintf("deploying offramp with static config: %+v", staticConfig))
+
 		if err != nil {
 			return nil, err
 		}
 		return &OffRamp{
 			client: e.evmClient,
+			logger: e.logger,
 			Instance: &OffRampWrapper{
 				Latest: instance.(*evm_2_evm_offramp.EVM2EVMOffRamp),
 			},
@@ -1157,7 +1223,7 @@ func (e *CCIPContractsDeployer) DeployMockAggregator(decimals uint8, initialAns 
 	if err != nil {
 		return nil, fmt.Errorf("deploying mock aggregator: %w", err)
 	}
-	log.Info().
+	e.logger.Info().
 		Str("Contract Address", address.Hex()).
 		Str("Contract Name", "MockAggregator").
 		Str("From", e.evmClient.GetDefaultWallet().Address()).
@@ -1165,6 +1231,7 @@ func (e *CCIPContractsDeployer) DeployMockAggregator(decimals uint8, initialAns 
 		Msg("New contract")
 	return &MockAggregator{
 		client:          e.evmClient,
+		logger:          e.logger,
 		Instance:        instance.(*mock_v3_aggregator_contract.MockV3Aggregator),
 		ContractAddress: *address,
 	}, nil
@@ -1177,6 +1244,7 @@ func (e *CCIPContractsDeployer) NewMockAggregator(addr common.Address) (*MockAgg
 	}
 	return &MockAggregator{
 		client:          e.evmClient,
+		logger:          e.logger,
 		Instance:        ins,
 		ContractAddress: addr,
 	}, nil
@@ -1191,7 +1259,7 @@ func (e *CCIPContractsDeployer) TypeAndVersion(addr common.Address) (string, err
 	if err != nil {
 		return "", fmt.Errorf("error calling typeAndVersion on addr: %s %w", addr.Hex(), err)
 	}
-	log.Info().
+	e.logger.Info().
 		Str("TypeAndVersion", tvStr).
 		Str("Contract Address", addr.Hex()).
 		Msg("TypeAndVersion")
@@ -1207,28 +1275,69 @@ func (e *CCIPContractsDeployer) TypeAndVersion(addr common.Address) (string, err
 	return v.String(), nil
 }
 
-var OCR2ParamsForCommit = contracts.OffChainAggregatorV2Config{
-	DeltaProgress:                           config.MustNewDuration(2 * time.Minute),
-	DeltaResend:                             config.MustNewDuration(5 * time.Second),
-	DeltaRound:                              config.MustNewDuration(75 * time.Second),
-	DeltaGrace:                              config.MustNewDuration(5 * time.Second),
-	MaxDurationQuery:                        config.MustNewDuration(100 * time.Millisecond),
-	MaxDurationObservation:                  config.MustNewDuration(35 * time.Second),
-	MaxDurationReport:                       config.MustNewDuration(10 * time.Second),
-	MaxDurationShouldAcceptFinalizedReport:  config.MustNewDuration(5 * time.Second),
-	MaxDurationShouldTransmitAcceptedReport: config.MustNewDuration(10 * time.Second),
+// OCR2ParamsForCommit and OCR2ParamsForExec -
+// These functions return the default OCR2 parameters for Commit and Exec respectively.
+// Refer to CommitOCRParams and ExecOCRParams in CCIPTestConfig located in testconfig/ccip.go to override these values with custom param values.
+func OCR2ParamsForCommit(blockTime time.Duration) contracts.OffChainAggregatorV2Config {
+	// slow blocktime chains like Ethereum
+	if blockTime >= 10*time.Second {
+		return contracts.OffChainAggregatorV2Config{
+			DeltaProgress:                           config.MustNewDuration(2 * time.Minute),
+			DeltaResend:                             config.MustNewDuration(5 * time.Second),
+			DeltaRound:                              config.MustNewDuration(90 * time.Second),
+			DeltaGrace:                              config.MustNewDuration(5 * time.Second),
+			DeltaStage:                              config.MustNewDuration(60 * time.Second),
+			MaxDurationQuery:                        config.MustNewDuration(100 * time.Millisecond),
+			MaxDurationObservation:                  config.MustNewDuration(35 * time.Second),
+			MaxDurationReport:                       config.MustNewDuration(10 * time.Second),
+			MaxDurationShouldAcceptFinalizedReport:  config.MustNewDuration(5 * time.Second),
+			MaxDurationShouldTransmitAcceptedReport: config.MustNewDuration(10 * time.Second),
+		}
+	}
+	// fast blocktime chains like Avalanche
+	return contracts.OffChainAggregatorV2Config{
+		DeltaProgress:                           config.MustNewDuration(2 * time.Minute),
+		DeltaResend:                             config.MustNewDuration(5 * time.Second),
+		DeltaRound:                              config.MustNewDuration(60 * time.Second),
+		DeltaGrace:                              config.MustNewDuration(5 * time.Second),
+		DeltaStage:                              config.MustNewDuration(25 * time.Second),
+		MaxDurationQuery:                        config.MustNewDuration(100 * time.Millisecond),
+		MaxDurationObservation:                  config.MustNewDuration(35 * time.Second),
+		MaxDurationReport:                       config.MustNewDuration(10 * time.Second),
+		MaxDurationShouldAcceptFinalizedReport:  config.MustNewDuration(5 * time.Second),
+		MaxDurationShouldTransmitAcceptedReport: config.MustNewDuration(10 * time.Second),
+	}
 }
 
-var OCR2ParamsForExec = contracts.OffChainAggregatorV2Config{
-	DeltaProgress:                           config.MustNewDuration(100 * time.Second),
-	DeltaResend:                             config.MustNewDuration(5 * time.Second),
-	DeltaRound:                              config.MustNewDuration(40 * time.Second),
-	DeltaGrace:                              config.MustNewDuration(5 * time.Second),
-	MaxDurationQuery:                        config.MustNewDuration(100 * time.Millisecond),
-	MaxDurationObservation:                  config.MustNewDuration(20 * time.Second),
-	MaxDurationReport:                       config.MustNewDuration(8 * time.Second),
-	MaxDurationShouldAcceptFinalizedReport:  config.MustNewDuration(5 * time.Second),
-	MaxDurationShouldTransmitAcceptedReport: config.MustNewDuration(8 * time.Second),
+func OCR2ParamsForExec(blockTime time.Duration) contracts.OffChainAggregatorV2Config {
+	// slow blocktime chains like Ethereum
+	if blockTime >= 10*time.Second {
+		return contracts.OffChainAggregatorV2Config{
+			DeltaProgress:                           config.MustNewDuration(2 * time.Minute),
+			DeltaResend:                             config.MustNewDuration(5 * time.Second),
+			DeltaRound:                              config.MustNewDuration(90 * time.Second),
+			DeltaGrace:                              config.MustNewDuration(5 * time.Second),
+			DeltaStage:                              config.MustNewDuration(60 * time.Second),
+			MaxDurationQuery:                        config.MustNewDuration(100 * time.Millisecond),
+			MaxDurationObservation:                  config.MustNewDuration(35 * time.Second),
+			MaxDurationReport:                       config.MustNewDuration(10 * time.Second),
+			MaxDurationShouldAcceptFinalizedReport:  config.MustNewDuration(5 * time.Second),
+			MaxDurationShouldTransmitAcceptedReport: config.MustNewDuration(10 * time.Second),
+		}
+	}
+	// fast blocktime chains like Avalanche
+	return contracts.OffChainAggregatorV2Config{
+		DeltaProgress:                           config.MustNewDuration(120 * time.Second),
+		DeltaResend:                             config.MustNewDuration(5 * time.Second),
+		DeltaRound:                              config.MustNewDuration(30 * time.Second),
+		DeltaGrace:                              config.MustNewDuration(5 * time.Second),
+		DeltaStage:                              config.MustNewDuration(10 * time.Second),
+		MaxDurationQuery:                        config.MustNewDuration(100 * time.Millisecond),
+		MaxDurationObservation:                  config.MustNewDuration(35 * time.Second),
+		MaxDurationReport:                       config.MustNewDuration(10 * time.Second),
+		MaxDurationShouldAcceptFinalizedReport:  config.MustNewDuration(5 * time.Second),
+		MaxDurationShouldTransmitAcceptedReport: config.MustNewDuration(10 * time.Second),
+	}
 }
 
 func OffChainAggregatorV2ConfigWithNodes(numberNodes int, inflightExpiry time.Duration, cfg contracts.OffChainAggregatorV2Config) contracts.OffChainAggregatorV2Config {

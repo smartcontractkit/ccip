@@ -19,18 +19,15 @@ abstract contract BurnMintTokenPoolAbstract is TokenPool {
     external
     virtual
     override
-    whenNotCursed(lockOrBurnIn.remoteChainSelector)
     returns (Pool.LockOrBurnOutV1 memory)
   {
-    _checkAllowList(lockOrBurnIn.originalSender);
-    _onlyOnRamp(lockOrBurnIn.remoteChainSelector);
-    _consumeOutboundRateLimit(lockOrBurnIn.remoteChainSelector, lockOrBurnIn.amount);
+    _validateLockOrBurn(lockOrBurnIn);
 
     _burn(lockOrBurnIn.amount);
 
     emit Burned(msg.sender, lockOrBurnIn.amount);
 
-    return Pool.LockOrBurnOutV1({destPoolAddress: getRemotePool(lockOrBurnIn.remoteChainSelector), destPoolData: ""});
+    return Pool.LockOrBurnOutV1({destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector), destPoolData: ""});
   }
 
   /// @notice Mint tokens from the pool to the recipient
@@ -40,17 +37,15 @@ abstract contract BurnMintTokenPoolAbstract is TokenPool {
     external
     virtual
     override
-    whenNotCursed(releaseOrMintIn.remoteChainSelector)
     returns (Pool.ReleaseOrMintOutV1 memory)
   {
-    _onlyOffRamp(releaseOrMintIn.remoteChainSelector);
-    _validateSourceCaller(releaseOrMintIn.remoteChainSelector, releaseOrMintIn.sourcePoolAddress);
-    _consumeInboundRateLimit(releaseOrMintIn.remoteChainSelector, releaseOrMintIn.amount);
+    _validateReleaseOrMint(releaseOrMintIn);
 
-    IBurnMintERC20(address(i_token)).mint(releaseOrMintIn.receiver, releaseOrMintIn.amount);
+    // Mint to the offRamp, which forwards it to the recipient
+    IBurnMintERC20(address(i_token)).mint(msg.sender, releaseOrMintIn.amount);
 
     emit Minted(msg.sender, releaseOrMintIn.receiver, releaseOrMintIn.amount);
 
-    return Pool.ReleaseOrMintOutV1({localToken: address(i_token), destinationAmount: releaseOrMintIn.amount});
+    return Pool.ReleaseOrMintOutV1({destinationAmount: releaseOrMintIn.amount});
   }
 }

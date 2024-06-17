@@ -24,9 +24,6 @@ contract LockReleaseTokenPoolAndProxy is LegacyPoolWrapper, ILiquidityContainer,
 
   string public constant override typeAndVersion = "LockReleaseTokenPoolAndProxy 1.5.0-dev";
 
-  /// @dev The unique lock release pool flag to signal through EIP 165.
-  bytes4 private constant LOCK_RELEASE_INTERFACE_ID = bytes4(keccak256("LockReleaseTokenPool"));
-
   /// @dev Whether or not the pool accepts liquidity.
   /// External liquidity is not required when there is one canonical token deployed to a chain,
   /// and CCIP is facilitating mint/burn on all the other chains, in which case the invariant
@@ -55,12 +52,9 @@ contract LockReleaseTokenPoolAndProxy is LegacyPoolWrapper, ILiquidityContainer,
     external
     virtual
     override
-    whenNotCursed(lockOrBurnIn.remoteChainSelector)
     returns (Pool.LockOrBurnOutV1 memory)
   {
-    _checkAllowList(lockOrBurnIn.originalSender);
-    _onlyOnRamp(lockOrBurnIn.remoteChainSelector);
-    _consumeOutboundRateLimit(lockOrBurnIn.remoteChainSelector, lockOrBurnIn.amount);
+    _validateLockOrBurn(lockOrBurnIn);
 
     if (_hasLegacyPool()) {
       _lockOrBurnLegacy(lockOrBurnIn);
@@ -68,7 +62,7 @@ contract LockReleaseTokenPoolAndProxy is LegacyPoolWrapper, ILiquidityContainer,
 
     emit Locked(msg.sender, lockOrBurnIn.amount);
 
-    return Pool.LockOrBurnOutV1({destPoolAddress: getRemotePool(lockOrBurnIn.remoteChainSelector), destPoolData: ""});
+    return Pool.LockOrBurnOutV1({destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector), destPoolData: ""});
   }
 
   /// @notice Release tokens from the pool to the recipient
@@ -78,33 +72,25 @@ contract LockReleaseTokenPoolAndProxy is LegacyPoolWrapper, ILiquidityContainer,
     external
     virtual
     override
-    whenNotCursed(releaseOrMintIn.remoteChainSelector)
     returns (Pool.ReleaseOrMintOutV1 memory)
   {
-    _onlyOffRamp(releaseOrMintIn.remoteChainSelector);
-    _validateSourceCaller(releaseOrMintIn.remoteChainSelector, releaseOrMintIn.sourcePoolAddress);
-    _consumeInboundRateLimit(releaseOrMintIn.remoteChainSelector, releaseOrMintIn.amount);
+    _validateReleaseOrMint(releaseOrMintIn);
 
     if (!_hasLegacyPool()) {
-      getToken().safeTransfer(releaseOrMintIn.receiver, releaseOrMintIn.amount);
+      // Release to the offRamp, which forwards it to the recipient
+      getToken().safeTransfer(msg.sender, releaseOrMintIn.amount);
     } else {
       _releaseOrMintLegacy(releaseOrMintIn);
     }
 
     emit Released(msg.sender, releaseOrMintIn.receiver, releaseOrMintIn.amount);
 
-    return Pool.ReleaseOrMintOutV1({localToken: address(i_token), destinationAmount: releaseOrMintIn.amount});
-  }
-
-  /// @notice returns the lock release interface flag used for EIP165 identification.
-  function getLockReleaseInterfaceId() public pure returns (bytes4) {
-    return LOCK_RELEASE_INTERFACE_ID;
+    return Pool.ReleaseOrMintOutV1({destinationAmount: releaseOrMintIn.amount});
   }
 
   // @inheritdoc IERC165
   function supportsInterface(bytes4 interfaceId) public pure virtual override returns (bool) {
-    return interfaceId == LOCK_RELEASE_INTERFACE_ID || interfaceId == type(ILiquidityContainer).interfaceId
-      || super.supportsInterface(interfaceId);
+    return interfaceId == type(ILiquidityContainer).interfaceId || super.supportsInterface(interfaceId);
   }
 
   /// @notice Gets LiquidityManager, can be address(0) if none is configured.

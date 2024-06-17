@@ -176,6 +176,14 @@ type Common struct {
 	Logging                 *ctfconfig.LoggingConfig                    `toml:",omitempty"`
 }
 
+func (p *Common) GetNodeConfig() *ctfconfig.NodeConfig {
+	return &ctfconfig.NodeConfig{
+		BaseConfigTOML:           p.NewCLCluster.Common.BaseConfigTOML,
+		CommonChainConfigTOML:    p.NewCLCluster.Common.CommonChainConfigTOML,
+		ChainConfigTOMLByChainID: p.NewCLCluster.Common.ChainConfigTOMLByChain,
+	}
+}
+
 func (p *Common) GetSethConfig() *seth.Config {
 	return nil
 }

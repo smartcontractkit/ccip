@@ -49,6 +49,7 @@ runs:
       id: base64-config-override
       env:
         RUN_ID: ${{ inputs.runId }}
+        SELECTED_NETWORKS: ${{ inputs.selectedNetworks }}
         EXISTING_NAMESPACE: ${{ inputs.existingNamespace }}
         TEST_LOG_COLLECT: ${{ inputs.testLogCollect }}
         CHAINLINK_IMAGE: ${{ inputs.chainlinkImage }}
@@ -79,7 +80,8 @@ runs:
           echo "$toml_array_format"
         }
 
-        log_targets=$(convert_to_toml_array "$LOGSTREAM_LOG_TARGETS")
+        selected_networks=$(convert_to_toml_array "$SELECTED_NETWORKS")
+        log_targets=$(convert_to_toml_array "$LOGSTREAM_LOG_TARGETS")      
 
         if [ -n "$TEST_LOG_COLLECT" ]; then
           test_log_collect=true
@@ -131,10 +133,17 @@ runs:
           fi
         fi
 
+        grafana_bearer_token=""
+        if [ -n "$GRAFANA_BEARER_TOKEN" ]; then
+          grafana_bearer_token="bearer_token_secret=\"$GRAFANA_BEARER_TOKEN\""
+        fi
+
         cat << EOF > config.toml
         [CCIP]
         [CCIP.Env]
         EnvToConnect="$EXISTING_NAMESPACE"
+        [CCIP.Env.Network]
+        selected_networks = $selected_networks
         [CCIP.Env.NewCLCluster]
         [CCIP.Env.NewCLCluster.Common]
         [CCIP.Env.NewCLCluster.Common.ChainlinkImage]
@@ -162,7 +171,7 @@ runs:
         [CCIP.Env.Logging.Grafana]
         base_url="$GRAFANA_URL"
         dashboard_url="$GRAFANA_DASHBOARD_URL"
-        bearer_token_secret="$GRAFANA_BEARER_TOKEN"
+        $grafana_bearer_token
 
         [CCIP.Groups.load]
         TestRunName = '$EXISTING_NAMESPACE'

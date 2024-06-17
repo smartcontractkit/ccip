@@ -8,15 +8,12 @@ import {TokenPool} from "../../pools/TokenPool.sol";
 import {RouterSetup} from "../router/RouterSetup.t.sol";
 
 contract BurnMintSetup is RouterSetup {
-  event Transfer(address indexed from, address indexed to, uint256 value);
-  event TokensConsumed(uint256 tokens);
-  event Burned(address indexed sender, uint256 amount);
-
   BurnMintERC677 internal s_burnMintERC677;
   address internal s_burnMintOffRamp = makeAddr("burn_mint_offRamp");
   address internal s_burnMintOnRamp = makeAddr("burn_mint_onRamp");
 
   address internal s_remoteBurnMintPool = makeAddr("remote_burn_mint_pool");
+  address internal s_remoteToken = makeAddr("remote_token");
 
   function setUp() public virtual override {
     RouterSetup.setUp();
@@ -29,6 +26,7 @@ contract BurnMintSetup is RouterSetup {
     chains[0] = TokenPool.ChainUpdate({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
       remotePoolAddress: abi.encode(s_remoteBurnMintPool),
+      remoteTokenAddress: abi.encode(s_remoteToken),
       allowed: true,
       outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
       inboundRateLimiterConfig: getInboundRateLimiterConfig()

@@ -7,6 +7,7 @@ import {PriceRegistry} from "../../PriceRegistry.sol";
 import {Router} from "../../Router.sol";
 import {Client} from "../../libraries/Client.sol";
 import {Internal} from "../../libraries/Internal.sol";
+import {Pool} from "../../libraries/Pool.sol";
 import {EVM2EVMOnRamp} from "../../onRamp/EVM2EVMOnRamp.sol";
 import {LockReleaseTokenPool} from "../../pools/LockReleaseTokenPool.sol";
 import {TokenPool} from "../../pools/TokenPool.sol";
@@ -17,9 +18,6 @@ import {PriceRegistrySetup} from "../priceRegistry/PriceRegistry.t.sol";
 import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 
 contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
-  // Duplicate event of the CCIPSendRequested in the IOnRamp
-  event CCIPSendRequested(Internal.EVM2EVMMessage message);
-
   address internal constant CUSTOM_TOKEN = address(12345);
   uint224 internal constant CUSTOM_TOKEN_PRICE = 1e17; // $0.1 CUSTOM
 
@@ -32,6 +30,7 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
   address[] internal s_offRamps;
 
   address internal s_destTokenPool = makeAddr("destTokenPool");
+  address internal s_destToken = makeAddr("destToken");
 
   EVM2EVMOnRamp.FeeTokenConfigArgs[] internal s_feeTokenConfigArgs;
   EVM2EVMOnRamp.TokenTransferFeeConfigArgs[] internal s_tokenTransferFeeConfigArgs;
@@ -70,7 +69,7 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
         maxFeeUSDCents: 1000_00, // 1,000 USD
         deciBps: 2_5, // 2.5 bps, or 0.025%
         destGasOverhead: 40_000,
-        destBytesOverhead: 0,
+        destBytesOverhead: uint32(Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES),
         aggregateRateLimitEnabled: true
       })
     );
@@ -105,9 +104,10 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
         defaultTxGasLimit: GAS_LIMIT,
         maxNopFeesJuels: MAX_NOP_FEES_JUELS,
         prevOnRamp: address(0),
-        rmnProxy: address(s_mockRMN)
+        rmnProxy: address(s_mockRMN),
+        tokenAdminRegistry: address(s_tokenAdminRegistry)
       }),
-      generateDynamicOnRampConfig(address(s_sourceRouter), address(s_priceRegistry), address(s_tokenAdminRegistry)),
+      generateDynamicOnRampConfig(address(s_sourceRouter), address(s_priceRegistry)),
       getOutboundRateLimiterConfig(),
       s_feeTokenConfigArgs,
       s_tokenTransferFeeConfigArgs,
@@ -145,8 +145,7 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
 
   function generateDynamicOnRampConfig(
     address router,
-    address priceRegistry,
-    address tokenAdminRegistry
+    address priceRegistry
   ) internal pure returns (EVM2EVMOnRamp.DynamicConfig memory) {
     return EVM2EVMOnRamp.DynamicConfig({
       router: router,
@@ -159,7 +158,6 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
       priceRegistry: priceRegistry,
       maxDataBytes: MAX_DATA_SIZE,
       maxPerMsgGasLimit: MAX_GAS_LIMIT,
-      tokenAdminRegistry: tokenAdminRegistry,
       defaultTokenFeeUSDCents: DEFAULT_TOKEN_FEE_USD_CENTS,
       defaultTokenDestGasOverhead: DEFAULT_TOKEN_DEST_GAS_OVERHEAD,
       defaultTokenDestBytesOverhead: DEFAULT_TOKEN_BYTES_OVERHEAD,
@@ -237,12 +235,10 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
     });
 
     for (uint256 i = 0; i < numberOfTokens; ++i) {
-      address sourcePool = s_sourcePoolByToken[message.tokenAmounts[i].token];
-      address destPool = s_destPoolBySourceToken[message.tokenAmounts[i].token];
       messageEvent.sourceTokenData[i] = abi.encode(
         Internal.SourceTokenData({
-          sourcePoolAddress: abi.encode(sourcePool),
-          destPoolAddress: abi.encode(destPool),
+          sourcePoolAddress: abi.encode(s_sourcePoolByToken[message.tokenAmounts[i].token]),
+          destTokenAddress: abi.encode(s_destTokenBySourceToken[message.tokenAmounts[i].token]),
           extraData: ""
         })
       );

@@ -24,6 +24,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
+	evmtypes "github.com/smartcontractkit/chainlink/v2/core/chains/evm/types"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp_1_0_0"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
@@ -349,20 +350,10 @@ func (o *OffRamp) GetTokens(ctx context.Context) (cciptypes.OffRampTokens, error
 		if err != nil {
 			return cciptypes.OffRampTokens{}, err
 		}
-		destPools, err := o.getPoolsByDestTokens(ctx, destTokens)
-		if err != nil {
-			return cciptypes.OffRampTokens{}, fmt.Errorf("get pools by dest tokens: %w", err)
-		}
-
-		tokenToPool := make(map[cciptypes.Address]cciptypes.Address, len(destTokens))
-		for i := range destTokens {
-			tokenToPool[cciptypes.Address(destTokens[i].String())] = cciptypes.Address(destPools[i].String())
-		}
 
 		return cciptypes.OffRampTokens{
 			DestinationTokens: ccipcalc.EvmAddrsToGeneric(destTokens...),
 			SourceTokens:      ccipcalc.EvmAddrsToGeneric(sourceTokens...),
-			DestinationPool:   tokenToPool,
 		}, nil
 	})
 }
@@ -373,32 +364,6 @@ func (o *OffRamp) GetRouter(ctx context.Context) (cciptypes.Address, error) {
 		return "", err
 	}
 	return ccipcalc.EvmAddrToGeneric(dynamicConfig.Router), nil
-}
-
-func (o *OffRamp) getPoolsByDestTokens(ctx context.Context, tokenAddrs []common.Address) ([]common.Address, error) {
-	evmCalls := make([]rpclib.EvmCall, 0, len(tokenAddrs))
-	for _, tk := range tokenAddrs {
-		evmCalls = append(evmCalls, rpclib.NewEvmCall(
-			abiOffRamp,
-			"getPoolByDestToken",
-			o.addr,
-			tk,
-		))
-	}
-
-	results, err := o.evmBatchCaller.BatchCall(ctx, 0, evmCalls)
-	if err != nil {
-		return nil, fmt.Errorf("batch call limit: %w", err)
-	}
-
-	destPools, err := rpclib.ParseOutputs[common.Address](results, func(d rpclib.DataAndErr) (common.Address, error) {
-		return rpclib.ParseOutput[common.Address](d, 0)
-	})
-	if err != nil {
-		return nil, fmt.Errorf("parse outputs: %w", err)
-	}
-
-	return destPools, nil
 }
 
 func (o *OffRamp) OffchainConfig(ctx context.Context) (cciptypes.ExecOffchainConfig, error) {
@@ -490,7 +455,7 @@ func (o *OffRamp) GetExecutionStateChangesBetweenSeqNums(ctx context.Context, se
 		o.eventIndex,
 		logpoller.EvmWord(seqNumMin),
 		logpoller.EvmWord(seqNumMax),
-		logpoller.Confirmations(confs),
+		evmtypes.Confirmations(confs),
 	)
 	if err != nil {
 		return nil, err
@@ -656,7 +621,6 @@ func DecodeExecReport(ctx context.Context, args abi.Arguments, report []byte) (c
 		Proofs:            erStruct.Proofs,
 		ProofFlagBits:     new(big.Int).SetBytes(erStruct.ProofFlagBits.Bytes()),
 	}, nil
-
 }
 
 func (o *OffRamp) DecodeExecutionReport(ctx context.Context, report []byte) (cciptypes.ExecReport, error) {

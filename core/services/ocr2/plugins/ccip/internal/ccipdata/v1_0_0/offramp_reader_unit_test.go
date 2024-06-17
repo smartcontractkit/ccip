@@ -16,6 +16,7 @@ import (
 	evmclimocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/client/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller/mocks"
+	evmtypes "github.com/smartcontractkit/chainlink/v2/core/chains/evm/types"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp_1_0_0"
 	mock_contracts "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/mocks/v1_0_0"
@@ -99,7 +100,7 @@ func TestOffRampGetDestinationTokensFromSourceTokens(t *testing.T) {
 
 func TestCachedOffRampTokens(t *testing.T) {
 	// Test data.
-	srcTks, dstTks, outputs := generateTokensAndOutputs(3)
+	srcTks, dstTks, _ := generateTokensAndOutputs(3)
 
 	// Mock contract wrapper.
 	mockOffRamp := mock_contracts.NewEVM2EVMOffRampInterface(t)
@@ -110,17 +111,12 @@ func TestCachedOffRampTokens(t *testing.T) {
 	lp := mocks.NewLogPoller(t)
 	lp.On("LatestBlock", mock.Anything).Return(logpoller.LogPollerBlock{BlockNumber: rand.Int63()}, nil)
 
-	ec := evmclimocks.NewClient(t)
-
-	batchCaller := rpclibmocks.NewEvmBatchCaller(t)
-	batchCaller.On("BatchCall", mock.Anything, mock.Anything, mock.Anything).Return(outputs, nil)
-
 	offRamp := OffRamp{
 		offRampV100:    mockOffRamp,
 		lp:             lp,
 		Logger:         logger.TestLogger(t),
-		Client:         ec,
-		evmBatchCaller: batchCaller,
+		Client:         evmclimocks.NewClient(t),
+		evmBatchCaller: rpclibmocks.NewEvmBatchCaller(t),
 		cachedOffRampTokens: cache.NewLogpollerEventsBased[cciptypes.OffRampTokens](
 			lp,
 			offRamp_poolAddedPoolRemovedEvents,
@@ -140,7 +136,6 @@ func TestCachedOffRampTokens(t *testing.T) {
 	require.Equal(t, cciptypes.OffRampTokens{
 		DestinationTokens: ccipcalc.EvmAddrsToGeneric(dstTks...),
 		SourceTokens:      ccipcalc.EvmAddrsToGeneric(srcTks...),
-		DestinationPool:   expectedPools,
 	}, tokens)
 }
 
@@ -197,7 +192,7 @@ func Test_LogsAreProperlyMarkedAsFinalized(t *testing.T) {
 			lp := mocks.NewLogPoller(t)
 			lp.On("LatestBlock", mock.Anything).
 				Return(logpoller.LogPollerBlock{FinalizedBlockNumber: int64(tt.lastFinalizedBlock)}, nil)
-			lp.On("IndexedLogsTopicRange", mock.Anything, ExecutionStateChangedEvent, offrampAddress, 1, logpoller.EvmWord(minSeqNr), logpoller.EvmWord(maxSeqNr), logpoller.Confirmations(0)).
+			lp.On("IndexedLogsTopicRange", mock.Anything, ExecutionStateChangedEvent, offrampAddress, 1, logpoller.EvmWord(minSeqNr), logpoller.EvmWord(maxSeqNr), evmtypes.Confirmations(0)).
 				Return(inputLogs, nil)
 
 			offRamp, err := NewOffRamp(logger.TestLogger(t), offrampAddress, evmclimocks.NewClient(t), lp, nil, nil)

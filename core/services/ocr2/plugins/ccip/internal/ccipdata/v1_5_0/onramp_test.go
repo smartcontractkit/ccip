@@ -14,6 +14,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller/mocks"
+	evmtypes "github.com/smartcontractkit/chainlink/v2/core/chains/evm/types"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_arm_contract"
@@ -33,10 +34,10 @@ func TestLogPollerClient_GetSendRequestsBetweenSeqNums1_4_0(t *testing.T) {
 	tests := []struct {
 		name          string
 		finalized     bool
-		confirmations logpoller.Confirmations
+		confirmations evmtypes.Confirmations
 	}{
-		{"finalized", true, logpoller.Finalized},
-		{"unfinalized", false, logpoller.Confirmations(0)},
+		{"finalized", true, evmtypes.Finalized},
+		{"unfinalized", false, evmtypes.Confirmations(0)},
 	}
 
 	for _, tt := range tests {
@@ -113,7 +114,22 @@ func Test_ProperlyRecognizesPerLaneCurses(t *testing.T) {
 	assert.False(t, isCursed)
 }
 
-func setupOnRampV1_5_0(t *testing.T, user *bind.TransactOpts, bc *client.SimulatedBackendClient) (common.Address, *mock_arm_contract.MockARMContract, common.Address) {
+// This is written to benchmark before and after the caching of StaticConfig and RMNContract
+func BenchmarkIsSourceCursedWithCache(b *testing.B) {
+	user, bc := ccipdata.NewSimulation(b)
+	ctx := testutils.Context(b)
+	destChainSelector := uint64(100)
+	onRampAddress, _, _ := setupOnRampV1_5_0(b, user, bc)
+
+	onRamp, err := NewOnRamp(logger.TestLogger(b), 1, destChainSelector, onRampAddress, mocks.NewLogPoller(b), bc)
+	require.NoError(b, err)
+
+	for i := 0; i < b.N; i++ {
+		_, _ = onRamp.IsSourceCursed(ctx)
+	}
+}
+
+func setupOnRampV1_5_0(t testing.TB, user *bind.TransactOpts, bc *client.SimulatedBackendClient) (common.Address, *mock_arm_contract.MockARMContract, common.Address) {
 	rmnAddress, transaction, rmnContract, err := mock_arm_contract.DeployMockARMContract(user, bc)
 	bc.Commit()
 	require.NoError(t, err)
@@ -121,13 +137,14 @@ func setupOnRampV1_5_0(t *testing.T, user *bind.TransactOpts, bc *client.Simulat
 
 	linkTokenAddress := common.HexToAddress("0x000011")
 	staticConfig := evm_2_evm_onramp.EVM2EVMOnRampStaticConfig{
-		LinkToken:         linkTokenAddress,
-		ChainSelector:     testutils.SimulatedChainID.Uint64(),
-		DestChainSelector: testutils.SimulatedChainID.Uint64(),
-		DefaultTxGasLimit: 30000,
-		MaxNopFeesJuels:   big.NewInt(1000000),
-		PrevOnRamp:        common.Address{},
-		RmnProxy:          rmnAddress,
+		LinkToken:          linkTokenAddress,
+		ChainSelector:      testutils.SimulatedChainID.Uint64(),
+		DestChainSelector:  testutils.SimulatedChainID.Uint64(),
+		DefaultTxGasLimit:  30000,
+		MaxNopFeesJuels:    big.NewInt(1000000),
+		PrevOnRamp:         common.Address{},
+		RmnProxy:           rmnAddress,
+		TokenAdminRegistry: utils.RandomAddress(),
 	}
 	dynamicConfig := evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig{
 		Router:                            common.HexToAddress("0x0000000000000000000000000000000000000150"),
@@ -165,7 +182,7 @@ func setupOnRampV1_5_0(t *testing.T, user *bind.TransactOpts, bc *client.Simulat
 			MaxFeeUSDCents:            0,
 			DeciBps:                   0,
 			DestGasOverhead:           0,
-			DestBytesOverhead:         0,
+			DestBytesOverhead:         32,
 			AggregateRateLimitEnabled: true,
 		},
 	}

@@ -15,6 +15,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
+	evmtypes "github.com/smartcontractkit/chainlink/v2/core/chains/evm/types"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/price_registry_1_0_0"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/erc20"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
@@ -156,7 +157,7 @@ func (p *PriceRegistry) GetTokenPriceUpdatesCreatedAfter(ctx context.Context, ts
 		p.tokenUpdated,
 		p.address,
 		ts,
-		logpoller.Confirmations(confs),
+		evmtypes.Confirmations(confs),
 	)
 	if err != nil {
 		return nil, err
@@ -201,12 +202,29 @@ func (p *PriceRegistry) GetGasPriceUpdatesCreatedAfter(ctx context.Context, chai
 		1,
 		[]common.Hash{abihelpers.EvmWord(chainSelector)},
 		ts,
-		logpoller.Confirmations(confs),
+		evmtypes.Confirmations(confs),
 	)
 	if err != nil {
 		return nil, err
 	}
+	return p.parseGasPriceUpdatesLogs(logs)
+}
 
+func (p *PriceRegistry) GetAllGasPriceUpdatesCreatedAfter(ctx context.Context, ts time.Time, confs int) ([]cciptypes.GasPriceUpdateWithTxMeta, error) {
+	logs, err := p.lp.LogsCreatedAfter(
+		ctx,
+		p.gasUpdated,
+		p.address,
+		ts,
+		evmtypes.Confirmations(confs),
+	)
+	if err != nil {
+		return nil, err
+	}
+	return p.parseGasPriceUpdatesLogs(logs)
+}
+
+func (p *PriceRegistry) parseGasPriceUpdatesLogs(logs []logpoller.Log) ([]cciptypes.GasPriceUpdateWithTxMeta, error) {
 	parsedLogs, err := ccipdata.ParseLogs[cciptypes.GasPriceUpdate](
 		logs,
 		p.lggr,
