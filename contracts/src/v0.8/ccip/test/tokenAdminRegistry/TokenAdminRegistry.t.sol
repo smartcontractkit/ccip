@@ -247,6 +247,8 @@ contract TokenAdminRegistry_isAdministrator is TokenAdminRegistrySetup {
     assertFalse(s_tokenAdminRegistry.isAdministrator(newToken, OWNER));
 
     s_tokenAdminRegistry.registerAdministratorPermissioned(newToken, newOwner);
+    changePrank(newOwner);
+    s_tokenAdminRegistry.acceptAdminRole(newToken);
 
     assertTrue(s_tokenAdminRegistry.isAdministrator(newToken, newOwner));
     assertFalse(s_tokenAdminRegistry.isAdministrator(newToken, OWNER));
@@ -260,9 +262,18 @@ contract TokenAdminRegistry_registerAdministrator is TokenAdminRegistrySetup {
     address newToken = makeAddr("newToken");
 
     vm.expectEmit();
-    emit TokenAdminRegistry.AdministratorRegistered(newToken, newOwner);
+    emit TokenAdminRegistry.PendingAdministratorRegistered(newToken, newOwner);
 
     s_tokenAdminRegistry.registerAdministrator(newToken, newOwner);
+
+    assertFalse(s_tokenAdminRegistry.getTokenConfig(newToken).isRegistered);
+    assertEq(s_tokenAdminRegistry.getTokenConfig(newToken).pendingAdministrator, newOwner);
+    assertFalse(s_tokenAdminRegistry.getTokenConfig(newToken).disableReRegistration);
+    assertEq(s_tokenAdminRegistry.getTokenConfig(newToken).administrator, address(0));
+    assertEq(s_tokenAdminRegistry.getTokenConfig(newToken).tokenPool, address(0));
+
+    changePrank(newOwner);
+    s_tokenAdminRegistry.acceptAdminRole(newToken);
 
     assertTrue(s_tokenAdminRegistry.isAdministrator(newToken, newOwner));
   }
@@ -275,6 +286,8 @@ contract TokenAdminRegistry_registerAdministrator is TokenAdminRegistrySetup {
     s_tokenAdminRegistry.registerAdministrator(newToken, newOwner);
 
     vm.startPrank(newOwner);
+
+    s_tokenAdminRegistry.acceptAdminRole(newToken);
 
     s_tokenAdminRegistry.setDisableReRegistration(newToken, true);
 
@@ -299,12 +312,18 @@ contract TokenAdminRegistry_registerAdministratorPermissioned is TokenAdminRegis
     address newToken = makeAddr("newToken");
 
     vm.expectEmit();
-    emit TokenAdminRegistry.AdministratorRegistered(newToken, newAdmin);
+    emit TokenAdminRegistry.PendingAdministratorRegistered(newToken, newAdmin);
 
     s_tokenAdminRegistry.registerAdministratorPermissioned(newToken, newAdmin);
 
+    assertEq(s_tokenAdminRegistry.getTokenConfig(newToken).pendingAdministrator, newAdmin);
+    assertFalse(s_tokenAdminRegistry.getTokenConfig(newToken).isRegistered);
+
+    changePrank(newAdmin);
+    s_tokenAdminRegistry.acceptAdminRole(newToken);
+
     assertTrue(s_tokenAdminRegistry.isAdministrator(newToken, newAdmin));
-    assertEq(s_tokenAdminRegistry.getTokenConfig(newToken).isRegistered, true);
+    assertTrue(s_tokenAdminRegistry.getTokenConfig(newToken).isRegistered);
   }
 
   mapping(address token => address admin) internal s_AdminByToken;
@@ -326,7 +345,7 @@ contract TokenAdminRegistry_registerAdministratorPermissioned is TokenAdminRegis
     }
 
     for (uint256 i = 0; i < tokens.length; i++) {
-      assertTrue(cleanTokenAdminRegistry.isAdministrator(tokens[i], s_AdminByToken[tokens[i]]));
+      assertEq(cleanTokenAdminRegistry.getTokenConfig(tokens[i]).pendingAdministrator, s_AdminByToken[tokens[i]]);
     }
   }
 
@@ -342,6 +361,10 @@ contract TokenAdminRegistry_registerAdministratorPermissioned is TokenAdminRegis
     address newToken = makeAddr("newToken");
 
     s_tokenAdminRegistry.registerAdministratorPermissioned(newToken, newAdmin);
+    changePrank(newAdmin);
+    s_tokenAdminRegistry.acceptAdminRole(newToken);
+
+    changePrank(OWNER);
 
     vm.expectRevert(abi.encodeWithSelector(TokenAdminRegistry.AlreadyRegistered.selector, newToken));
     s_tokenAdminRegistry.registerAdministratorPermissioned(newToken, newAdmin);

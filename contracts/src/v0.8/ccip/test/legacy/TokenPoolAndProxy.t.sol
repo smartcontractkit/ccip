@@ -320,6 +320,8 @@ contract TokenPoolAndProxyMigration is EVM2EVMOnRampSetup {
 
     // Register the token on the token admin registry
     s_tokenAdminRegistry.registerAdministratorPermissioned(address(s_token), OWNER);
+    // Accept ownership of the token
+    s_tokenAdminRegistry.acceptAdminRole(address(s_token));
     // Set the pool on the admin registry
     s_tokenAdminRegistry.setPool(address(s_token), address(s_newPool));
   }

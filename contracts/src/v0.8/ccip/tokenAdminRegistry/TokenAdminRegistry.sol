@@ -23,7 +23,7 @@ contract TokenAdminRegistry is ITokenAdminRegistry, ITypeAndVersion, OwnerIsCrea
   error ZeroAddress();
   error InvalidTokenPoolToken(address token);
 
-  event AdministratorRegistered(address indexed token, address indexed administrator);
+  event PendingAdministratorRegistered(address indexed token, address indexed pendingAdministrator);
   event PoolSet(address indexed token, address indexed previousPool, address indexed newPool);
   event AdministratorTransferRequested(address indexed token, address indexed currentAdmin, address indexed newAdmin);
   event AdministratorTransferred(address indexed token, address indexed newAdmin);
@@ -164,6 +164,7 @@ contract TokenAdminRegistry is ITokenAdminRegistry, ITypeAndVersion, OwnerIsCrea
 
     config.administrator = msg.sender;
     config.pendingAdministrator = address(0);
+    config.isRegistered = true;
 
     emit AdministratorTransferred(localToken, msg.sender);
   }
@@ -203,8 +204,9 @@ contract TokenAdminRegistry is ITokenAdminRegistry, ITypeAndVersion, OwnerIsCrea
     _registerToken(config, localToken, administrator);
   }
 
-  /// @notice Registers a local administrator for a token. This will overwrite any potential current administrator
-  /// and set the permissionedAdmin to true.
+  /// @notice Registers a local administrator for a token by setting the pendingAdministrator to the given address.
+  /// This function is used as a fallback when the permissionless methods don't work for a token. It only sets the
+  /// pending administrator
   /// @param localToken The token to register the administrator for.
   /// @param administrator The address of the new administrator.
   /// @dev Can only be called by the owner.
@@ -221,13 +223,15 @@ contract TokenAdminRegistry is ITokenAdminRegistry, ITypeAndVersion, OwnerIsCrea
     _registerToken(config, localToken, administrator);
   }
 
+  /// @notice Sets the given administrator as pendingAdministrator for the token. We don't set it as
+  /// administrator as this could lead to a state where the administrator is wrongly set and cannot be
+  /// recovered. Using a 2-step process ensures the new administrator is able to interact with this contract.
   function _registerToken(TokenConfig storage config, address localToken, address administrator) internal {
-    config.administrator = administrator;
-    config.isRegistered = true;
+    config.pendingAdministrator = administrator;
 
     s_tokens.add(localToken);
 
-    emit AdministratorRegistered(localToken, administrator);
+    emit PendingAdministratorRegistered(localToken, administrator);
   }
 
   // ================================================================

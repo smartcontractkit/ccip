@@ -45,7 +45,7 @@ contract RegistryModuleOwnerCustom_registerAdminViaGetCCIPAdmin is RegistryModul
 
     s_registryModuleOwnerCustom.registerAdminViaGetCCIPAdmin(s_token);
 
-    assertEq(s_tokenAdminRegistry.getTokenConfig(s_token).administrator, OWNER);
+    assertEq(s_tokenAdminRegistry.getTokenConfig(s_token).pendingAdministrator, OWNER);
   }
 
   function test_registerAdminViaGetCCIPAdmin_Revert() public {
@@ -79,7 +79,7 @@ contract RegistryModuleOwnerCustom_registerAdminViaOwner is RegistryModuleOwnerC
 
     s_registryModuleOwnerCustom.registerAdminViaOwner(s_token);
 
-    assertEq(s_tokenAdminRegistry.getTokenConfig(s_token).administrator, OWNER);
+    assertEq(s_tokenAdminRegistry.getTokenConfig(s_token).pendingAdministrator, OWNER);
   }
 
   function test_registerAdminViaOwner_Revert() public {

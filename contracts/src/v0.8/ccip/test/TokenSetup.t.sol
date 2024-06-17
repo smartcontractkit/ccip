@@ -124,6 +124,7 @@ contract TokenSetup is RouterSetup {
       address token = s_destTokens[i];
       address pool = s_destPoolByToken[token];
       s_tokenAdminRegistry.registerAdministratorPermissioned(token, OWNER);
+      s_tokenAdminRegistry.acceptAdminRole(token);
       s_tokenAdminRegistry.setPool(token, pool);
 
       _setPool(
@@ -158,6 +159,7 @@ contract TokenSetup is RouterSetup {
   ) internal {
     if (!tokenAdminRegistry.isAdministrator(token, OWNER)) {
       tokenAdminRegistry.registerAdministratorPermissioned(token, OWNER);
+      tokenAdminRegistry.acceptAdminRole(token);
     }
 
     tokenAdminRegistry.setPool(token, pool);
