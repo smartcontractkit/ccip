@@ -10,12 +10,12 @@ import (
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/pkg/errors"
+
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
-	cciporm "github.com/smartcontractkit/chainlink/v2/core/services/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
@@ -52,7 +52,6 @@ type update struct {
 
 type CommitPluginStaticConfig struct {
 	jobId int32
-	orm   cciporm.ORM
 	lggr  logger.Logger
 	// Source
 	onRampReader        ccipdata.OnRampReader
@@ -184,6 +183,10 @@ func (r *CommitReportingPlugin) observePriceUpdates(
 	ctx context.Context,
 ) (sourceGasPriceUSD *big.Int, tokenPricesUSD map[cciptypes.Address]*big.Int, err error) {
 	gasPricesInDB, tokenPricesInDB, err := r.priceService.GetGasAndTokenPrices(ctx, r.destChainSelector)
+	if err != nil {
+		return nil, nil, err
+
+	}
 
 	for _, gasPrice := range gasPricesInDB {
 		if gasPrice.SourceChainSelector == r.sourceChainSelector && gasPrice.GasPrice != nil {

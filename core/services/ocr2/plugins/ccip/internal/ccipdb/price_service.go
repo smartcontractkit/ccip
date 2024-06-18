@@ -8,11 +8,12 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/sync/errgroup"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils"
-	"golang.org/x/sync/errgroup"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets"
 	cciporm "github.com/smartcontractkit/chainlink/v2/core/services/ccip"
@@ -23,6 +24,11 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/prices"
 )
 
+// PriceService manages DB access for gas and token price data.
+// In the background, PriceService periodically inserts latest gas and token prices into the DB.
+// During `Observation` phase, Commit plugin calls PriceService to fetch the latest prices from DB.
+// This enables all lanes connected to a chain to feed price data to the leader lane's Commit plugin for that chain.
+//
 //go:generate mockery --quiet --name PriceService --filename price_service_mock.go --case=underscore
 type PriceService interface {
 	job.ServiceCtx
@@ -33,11 +39,11 @@ type PriceService interface {
 var _ PriceService = (*priceService)(nil)
 
 const (
-	// Prices can be cleaned up every 30 minutes
+	// Prices can be cleaned up every 10 minutes
 	priceExpireSec       = 600
 	priceCleanupInterval = priceExpireSec * time.Second
 
-	// Prices can be refreshed every 1 minute, they will be sufficiently accurate
+	// Prices can be refreshed every 1 minute, they are sufficiently accurate
 	priceUpdateInterval = 60 * time.Second
 )
 
@@ -80,7 +86,7 @@ func NewPriceService(
 
 	pw := &priceService{
 		priceExpireSec:  priceExpireSec,
-		cleanupInterval: utils.WithJitter(priceCleanupInterval), // use WithJitter to avoid services impacting DB at same time
+		cleanupInterval: utils.WithJitter(priceCleanupInterval), // use WithJitter to avoid multiple services impacting DB at same time
 		updateInterval:  utils.WithJitter(priceUpdateInterval),
 
 		lggr:              lggr,

@@ -9,11 +9,12 @@ import (
 	"testing"
 	"time"
 
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
+	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
@@ -611,12 +612,23 @@ func setupORM(t *testing.T) cciporm.ORM {
 	return orm
 }
 
-func assertResultLen(t *testing.T, priceService PriceService, destChainSelector uint64, l int) {
+func assertResultLen(t *testing.T, priceService PriceService, destChainSelector uint64, gasCount int, tokenCount int) {
 	ctx := tests.Context(t)
 	dbGasResult, dbTokenResult, err := priceService.GetGasAndTokenPrices(ctx, destChainSelector)
 	assert.NoError(t, err)
-	assert.Len(t, dbGasResult, l)
-	assert.Len(t, dbTokenResult, l)
+	assert.Len(t, dbGasResult, gasCount)
+	assert.Len(t, dbTokenResult, tokenCount)
+	if gasCount > 0 {
+		assert.Equal(t, dbGasResult[0].SourceChainSelector, uint64(67890))
+		assert.Equal(t, dbGasResult[0].GasPrice.ToInt(), big.NewInt(20))
+
+		assert.Equal(t, dbTokenResult[0].TokenAddr, "0x234")
+		assert.Equal(t, dbTokenResult[0].TokenPrice.ToInt(), big.NewInt(3e18))
+
+		assert.Equal(t, dbTokenResult[1].TokenAddr, "0x345")
+		assert.Equal(t, dbTokenResult[1].TokenPrice.ToInt(), big.NewInt(4e18))
+	}
+
 }
 
 func TestPriceService_priceWriteAndCleanupInBackground(t *testing.T) {
@@ -688,26 +700,35 @@ func TestPriceService_priceWriteAndCleanupInBackground(t *testing.T) {
 	// expire all prices during every cleanup
 	priceService.priceExpireSec = 0
 
-	assertResultLen(t, priceService, destChainSelector, 0)
+	// initially, db is empty
+	assertResultLen(t, priceService, destChainSelector, 0, 0)
 
+	// starts PriceService in the background
 	assert.NoError(t, priceService.Start(ctx))
 
+	// setting dynamicConfig triggers initial price update
 	err := priceService.UpdateDynamicConfig(ctx, gasPriceEstimator, destPriceReg)
 	assert.NoError(t, err)
-	assertResultLen(t, priceService, destChainSelector, 1)
+	assertResultLen(t, priceService, destChainSelector, 1, len(laneTokens))
 
+	// running cleanup removes all prices
 	err = priceService.runCleanup(ctx)
 	assert.NoError(t, err)
-	assertResultLen(t, priceService, destChainSelector, 0)
+	assertResultLen(t, priceService, destChainSelector, 0, 0)
 
-	time.Sleep(updateInterval + 100*time.Millisecond)
-	assertResultLen(t, priceService, destChainSelector, 1)
+	// updateInterval triggers price update
+	time.Sleep(updateInterval + 200*time.Millisecond)
+	assertResultLen(t, priceService, destChainSelector, 1, len(laneTokens))
 
+	// cleanupInterval triggers cleanup
 	time.Sleep(cleanupInterval - updateInterval)
-	assertResultLen(t, priceService, destChainSelector, 0)
+	assertResultLen(t, priceService, destChainSelector, 0, 0)
 
 	assert.NoError(t, priceService.Close())
 
-	time.Sleep(updateInterval*2 - cleanupInterval)
-	assertResultLen(t, priceService, destChainSelector, 0)
+	// after stopping PriceService, no more updates are triggered
+	for i := 0; i < 5; i++ {
+		time.Sleep(time.Second)
+		assertResultLen(t, priceService, destChainSelector, 0, 0)
+	}
 }

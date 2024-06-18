@@ -261,7 +261,6 @@ func jobSpecToCommitPluginConfig(ctx context.Context, orm cciporm.ORM, lggr logg
 		"sourceRouter", sourceRouter.Address())
 	return &CommitPluginStaticConfig{
 			jobId:                 jb.ID,
-			orm:                   orm,
 			lggr:                  commitLggr,
 			onRampReader:          onRampReader,
 			offRamp:               offRampReader,
