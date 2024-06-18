@@ -253,7 +253,6 @@ contract TokenAdminRegistry_registerAdministrator is TokenAdminRegistrySetup {
 
     s_tokenAdminRegistry.registerAdministrator(newToken, newOwner);
 
-    assertFalse(s_tokenAdminRegistry.getTokenConfig(newToken).isRegistered);
     assertEq(s_tokenAdminRegistry.getTokenConfig(newToken).pendingAdministrator, newOwner);
     assertFalse(s_tokenAdminRegistry.getTokenConfig(newToken).disableReRegistration);
     assertEq(s_tokenAdminRegistry.getTokenConfig(newToken).administrator, address(0));
@@ -304,13 +303,11 @@ contract TokenAdminRegistry_registerAdministratorPermissioned is TokenAdminRegis
     s_tokenAdminRegistry.registerAdministratorPermissioned(newToken, newAdmin);
 
     assertEq(s_tokenAdminRegistry.getTokenConfig(newToken).pendingAdministrator, newAdmin);
-    assertFalse(s_tokenAdminRegistry.getTokenConfig(newToken).isRegistered);
 
     changePrank(newAdmin);
     s_tokenAdminRegistry.acceptAdminRole(newToken);
 
     assertTrue(s_tokenAdminRegistry.isAdministrator(newToken, newAdmin));
-    assertTrue(s_tokenAdminRegistry.getTokenConfig(newToken).isRegistered);
   }
 
   function test_registerAdministratorPermissioned_reRegisterWhileUnclaimed_Success() public {
@@ -323,7 +320,6 @@ contract TokenAdminRegistry_registerAdministratorPermissioned is TokenAdminRegis
     s_tokenAdminRegistry.registerAdministratorPermissioned(newToken, newAdmin);
 
     assertEq(s_tokenAdminRegistry.getTokenConfig(newToken).pendingAdministrator, newAdmin);
-    assertFalse(s_tokenAdminRegistry.getTokenConfig(newToken).isRegistered);
 
     newAdmin = makeAddr("correctAddress");
 
@@ -337,7 +333,6 @@ contract TokenAdminRegistry_registerAdministratorPermissioned is TokenAdminRegis
     s_tokenAdminRegistry.acceptAdminRole(newToken);
 
     assertTrue(s_tokenAdminRegistry.isAdministrator(newToken, newAdmin));
-    assertTrue(s_tokenAdminRegistry.getTokenConfig(newToken).isRegistered);
   }
 
   mapping(address token => address admin) internal s_AdminByToken;
@@ -351,7 +346,7 @@ contract TokenAdminRegistry_registerAdministratorPermissioned is TokenAdminRegis
       if (admins[i] == address(0)) {
         continue;
       }
-      if (cleanTokenAdminRegistry.getTokenConfig(tokens[i]).isRegistered) {
+      if (cleanTokenAdminRegistry.getTokenConfig(tokens[i]).administrator != address(0)) {
         continue;
       }
       cleanTokenAdminRegistry.registerAdministratorPermissioned(tokens[i], admins[i]);

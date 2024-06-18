@@ -35,8 +35,7 @@ contract TokenAdminRegistry is ITokenAdminRegistry, ITypeAndVersion, OwnerIsCrea
   // The struct is packed in a way that optimizes the attributes that are accessed together.
   // solhint-disable-next-line gas-struct-packing
   struct TokenConfig {
-    bool isRegistered; //  ─────────╮ if true, the token is registered in the registry
-    bool disableReRegistration; //  │ if true, the token cannot be permissionlessly re-registered
+    bool disableReRegistration; // ─╮ if true, the token cannot be permissionlessly re-registered
     address administrator; // ──────╯ the current administrator of the token
     address pendingAdministrator; //  the address that is pending to become the new owner
     address tokenPool; // the token pool for this token. Can be address(0) if not deployed or not configured.
@@ -149,7 +148,6 @@ contract TokenAdminRegistry is ITokenAdminRegistry, ITypeAndVersion, OwnerIsCrea
 
     config.administrator = msg.sender;
     config.pendingAdministrator = address(0);
-    config.isRegistered = true;
 
     emit AdministratorTransferred(localToken, msg.sender);
   }
@@ -201,7 +199,7 @@ contract TokenAdminRegistry is ITokenAdminRegistry, ITypeAndVersion, OwnerIsCrea
     }
     TokenConfig storage config = s_tokenConfig[localToken];
 
-    if (config.isRegistered) {
+    if (config.administrator != address(0)) {
       revert AlreadyRegistered(localToken);
     }
 
