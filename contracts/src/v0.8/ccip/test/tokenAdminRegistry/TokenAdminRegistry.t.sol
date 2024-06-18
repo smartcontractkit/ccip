@@ -313,6 +313,33 @@ contract TokenAdminRegistry_registerAdministratorPermissioned is TokenAdminRegis
     assertTrue(s_tokenAdminRegistry.getTokenConfig(newToken).isRegistered);
   }
 
+  function test_registerAdministratorPermissioned_reRegisterWhileUnclaimed_Success() public {
+    address newAdmin = makeAddr("wrongAddress");
+    address newToken = makeAddr("newToken");
+
+    vm.expectEmit();
+    emit TokenAdminRegistry.PendingAdministratorRegistered(newToken, newAdmin);
+
+    s_tokenAdminRegistry.registerAdministratorPermissioned(newToken, newAdmin);
+
+    assertEq(s_tokenAdminRegistry.getTokenConfig(newToken).pendingAdministrator, newAdmin);
+    assertFalse(s_tokenAdminRegistry.getTokenConfig(newToken).isRegistered);
+
+    newAdmin = makeAddr("correctAddress");
+
+    vm.expectEmit();
+    emit TokenAdminRegistry.PendingAdministratorRegistered(newToken, newAdmin);
+
+    // Ensure we can still register the correct admin while the previous admin is unclaimed.
+    s_tokenAdminRegistry.registerAdministratorPermissioned(newToken, newAdmin);
+
+    changePrank(newAdmin);
+    s_tokenAdminRegistry.acceptAdminRole(newToken);
+
+    assertTrue(s_tokenAdminRegistry.isAdministrator(newToken, newAdmin));
+    assertTrue(s_tokenAdminRegistry.getTokenConfig(newToken).isRegistered);
+  }
+
   mapping(address token => address admin) internal s_AdminByToken;
 
   function test_Fuzz_registerAdministratorPermissioned_Success(
