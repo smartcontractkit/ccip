@@ -50,7 +50,6 @@ func (r *TargetMinBalancer) ComputeTransfersToBalance(graphNow graph.Graph, nonE
 			nonExecutedTransfers = append(nonExecutedTransfers, t)
 		}
 		proposedTransfers = append(proposedTransfers, currentProposed...)
-
 	}
 
 	r.lggr.Debugf("merging proposed transfers")
@@ -190,9 +189,9 @@ func (r *TargetMinBalancer) oneHopTransfers(graphLater graph.Graph, targetNetwor
 		if newAmount.Cmp(big.NewInt(0)) < 0 {
 			r.lggr.Debugf("source network %v doesn't have enough available liquidity, skipping transfer %v only have %v available", edge.Source, transferAmount, networkFunds[edge.Source].AvailableAmount)
 			continue
-		} else {
-			networkFunds[edge.Source].AvailableAmount = newAmount
 		}
+		networkFunds[edge.Source].AvailableAmount = newAmount
+
 		potentialTransfers = append(potentialTransfers, newTransfer(edge.Source, targetNetwork, transferAmount))
 		seenNetworks.Add(edge.Source)
 	}

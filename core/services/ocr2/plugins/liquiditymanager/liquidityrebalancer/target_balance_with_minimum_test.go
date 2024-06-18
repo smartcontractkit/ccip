@@ -382,7 +382,6 @@ func TestTargetMinBalancer_ComputeTransfersToBalance_arb_eth_opt_pending_status_
 }
 
 func TestTargetMinBalancer_ComputeTransfersToBalance_arb_eth_opt_base(t *testing.T) {
-
 	testCases := []struct {
 		name             string
 		balances         map[models.NetworkSelector]int64
@@ -525,9 +524,7 @@ func TestTargetMinBalancer_ComputeTransfersToBalance_arb_eth_opt_base(t *testing
 }
 
 func TestTargetMinBalancer_ComputeTransfersToBalance_islands_in_graph(t *testing.T) {
-
 	// these test have 4 networks in a spoke graph with an island node (celo) that does not have connections to the rest of the graph
-
 	testCases := []struct {
 		name             string
 		balances         map[models.NetworkSelector]int64
