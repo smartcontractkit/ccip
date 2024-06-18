@@ -228,6 +228,12 @@ func Test_observeNewMsgs(t *testing.T) {
 			ctx := context.Background()
 			mockReader := mocks.NewCCIPReader()
 			msgHasher := mocks.NewMessageHasher()
+			for i := range tc.expMsgs { // make sure the hashes are populated
+				h, err := msgHasher.Hash(ctx, tc.expMsgs[i])
+				assert.NoError(t, err)
+				tc.expMsgs[i].MsgHash = h
+			}
+
 			lggr := logger.Test(t)
 
 			for _, seqNumChain := range tc.maxSeqNumsPerChain {

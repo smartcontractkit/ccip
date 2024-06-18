@@ -118,11 +118,12 @@ func observeNewMsgs(
 				lggr.Debugw("no new messages discovered", "chain", seqNumChain.ChainSel)
 			}
 
-			for _, msg := range newMsgs {
-				msg.MsgHash, err = msgHasher.Hash(ctx, msg)
+			for i := range newMsgs {
+				h, err := msgHasher.Hash(ctx, newMsgs[i])
 				if err != nil {
 					return fmt.Errorf("hash message: %w", err)
 				}
+				newMsgs[i].MsgHash = h // populate msgHash field
 			}
 
 			newMsgsPerChain[chainIdx] = newMsgs
@@ -557,7 +558,12 @@ func validateObservedSequenceNumbers(msgs []cciptypes.CCIPMsgBaseDetails, maxSeq
 
 	seqNums := make(map[cciptypes.ChainSelector]mapset.Set[cciptypes.SeqNum], len(msgs))
 	hashes := mapset.NewSet[string]()
+	emptyHash := cciptypes.Bytes32{}.String()
 	for _, msg := range msgs {
+		if msg.MsgHash.String() == emptyHash {
+			return fmt.Errorf("observed msg hash must not be empty")
+		}
+
 		if _, exists := seqNums[msg.SourceChain]; !exists {
 			seqNums[msg.SourceChain] = mapset.NewSet[cciptypes.SeqNum]()
 		}

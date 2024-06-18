@@ -41,6 +41,7 @@ class CommitPlugin:
         for (chain, seq_num) in observed_seq_nums.items():
             if self.can_read(chain):
                 new_msgs[chain] = self.onRamp(chain).get_msgs(chain, start=seq_num+1, limit=256)
+                new_msgs.fill_hashes() # computes and populates the hash of each message
 
         # Observe token prices. {token: price}
         token_prices = self.get_token_prices()
@@ -76,6 +77,7 @@ class CommitPlugin:
 
             assert(len(msgs) == len(set([msg.seq_num for msg in msgs])))
             assert(len(msgs) == len(set([msg.hash for msg in msgs])))
+            assert(all([msg.hash != "" for msg in msgs]))
 
     def observation_quorum(self):
         return "2F+1"
@@ -94,6 +96,8 @@ class CommitPlugin:
 
             msgs_by_seq_num = msgs.group_by_seq_num() # { 423: [0x1, 0x1, 0x2] }
                                                       # 2 nodes say that msg hash is 0x1 and 1 node says it's 0x2
+                                                      # if different hashes have the same number of votes, we select the
+                                                      # hash with the lowest lexicographic order
 
             msg_hashes = { seq_num: elem_most_occurrences(hashes) for (seq_num, hashes) in msgs_by_seq_num.items() }
             for (seq_num, hash) in msg_hashes.items(): # require at least 2f+1 observations of the voted hash
