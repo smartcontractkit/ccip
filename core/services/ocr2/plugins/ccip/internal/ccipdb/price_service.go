@@ -32,7 +32,12 @@ import (
 //go:generate mockery --quiet --name PriceService --filename price_service_mock.go --case=underscore
 type PriceService interface {
 	job.ServiceCtx
+
+	// UpdateDynamicConfig updates gasPriceEstimator and destPriceRegistryReader during Commit plugin dynamic config change.
 	UpdateDynamicConfig(ctx context.Context, gasPriceEstimator prices.GasPriceEstimatorCommit, destPriceRegistryReader ccipdata.PriceRegistryReader) error
+
+	// GetGasAndTokenPrices fetches source chain gas prices and relevant token prices from all lanes that touch the given dest chain.
+	// The prices have been written into the DB by each lane's PriceService in the background. The prices are denoted in USD.
 	GetGasAndTokenPrices(ctx context.Context, destChainSelector uint64) (map[uint64]*big.Int, map[cciptypes.Address]*big.Int, error)
 }
 
