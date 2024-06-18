@@ -61,8 +61,15 @@ func NewL2ToL1Bridge(
 	if !ok {
 		return nil, fmt.Errorf("unknown chain selector for remote chain: %d", remoteSelector)
 	}
-	l2FilterName := fmt.Sprintf("OptimismL2ToL1Bridge-L2-LiquidityManager:%s-Local:%s-Remote:%s",
-		l2LiquidityManagerAddress.Hex(), localChain.Name, remoteChain.Name)
+
+	l2FilterName := bridgecommon.GetBridgeFilterName(
+		"OptimismL2ToL1Bridge",
+		"L2",
+		l2LiquidityManagerAddress,
+		localChain.Name,
+		remoteChain.Name,
+		"",
+	)
 	// TODO (ogtownsend): pass context from above
 	ctx := context.Background()
 	err := l2LogPoller.RegisterFilter(
@@ -79,8 +86,15 @@ func NewL2ToL1Bridge(
 		return nil, fmt.Errorf("register L2 LM filter for Optimism L2 to L1 bridge: %w", err)
 	}
 
-	l1FilterName := fmt.Sprintf("OptimismL2ToL1Bridge-L1-LiquidityManager:%s-Local:%s-Remote:%s",
-		l1LiquidityManagerAddress.Hex(), localChain.Name, remoteChain.Name)
+	l1FilterName := bridgecommon.GetBridgeFilterName(
+		"OptimismL2ToL1Bridge",
+		"L1",
+		l1LiquidityManagerAddress,
+		localChain.Name,
+		remoteChain.Name,
+		"",
+	)
+
 	err = l1LogPoller.RegisterFilter(
 		ctx,
 		logpoller.Filter{
@@ -120,10 +134,6 @@ func NewL2ToL1Bridge(
 	lggr = lggr.Named("OptimismL2ToL1Bridge").With(
 		"localSelector", localSelector,
 		"remoteSelector", remoteSelector,
-		"localChainID", localChain.EvmChainID,
-		"remoteChainID", remoteChain.EvmChainID,
-		"localChainName", localChain.Name,
-		"remoteChainName", remoteChain.Name,
 		"l1LiquidityManager", l1LiquidityManagerAddress.Hex(),
 		"l2LiquidityManager", l2LiquidityManagerAddress.Hex(),
 		"l1Token", l1Token.Hex(),
@@ -343,7 +353,7 @@ func (l *l2ToL1Bridge) getLogs(ctx context.Context) (sendLogs, proveFinalization
 			bridgecommon.NetworkSelectorToHash(l.remoteSelector),
 		},
 		time.Now().Add(-bridgecommon.DurationMonth/2),
-		1,
+		evmtypes.Finalized,
 	)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("get L2 -> L1 transfers from log poller on L2: %w", err)
@@ -359,7 +369,7 @@ func (l *l2ToL1Bridge) getLogs(ctx context.Context) (sendLogs, proveFinalization
 			bridgecommon.NetworkSelectorToHash(l.remoteSelector),
 		},
 		time.Now().Add(-bridgecommon.DurationMonth/2),
-		evmtypes.Finalized, // TODO: confirm if we actually need this to be finalized
+		evmtypes.Finalized,
 	)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("get L1 -> L2 transfers from log poller on L1: %w", err)
@@ -374,7 +384,7 @@ func (l *l2ToL1Bridge) getLogs(ctx context.Context) (sendLogs, proveFinalization
 			bridgecommon.NetworkSelectorToHash(l.localSelector),
 		},
 		time.Now().Add(-bridgecommon.DurationMonth/2),
-		1,
+		evmtypes.Finalized,
 	)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("get L1 -> L2 transfers from log poller on L1: %w", err)
