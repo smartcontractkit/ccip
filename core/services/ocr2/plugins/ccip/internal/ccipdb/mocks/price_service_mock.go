@@ -3,10 +3,12 @@
 package mocks
 
 import (
-	context "context"
+	big "math/big"
 
-	ccip "github.com/smartcontractkit/chainlink/v2/core/services/ccip"
+	ccip "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
 	ccipdata "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
+
+	context "context"
 
 	mock "github.com/stretchr/testify/mock"
 
@@ -37,32 +39,32 @@ func (_m *PriceService) Close() error {
 }
 
 // GetGasAndTokenPrices provides a mock function with given fields: ctx, destChainSelector
-func (_m *PriceService) GetGasAndTokenPrices(ctx context.Context, destChainSelector uint64) ([]ccip.GasPrice, []ccip.TokenPrice, error) {
+func (_m *PriceService) GetGasAndTokenPrices(ctx context.Context, destChainSelector uint64) (map[uint64]*big.Int, map[ccip.Address]*big.Int, error) {
 	ret := _m.Called(ctx, destChainSelector)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetGasAndTokenPrices")
 	}
 
-	var r0 []ccip.GasPrice
-	var r1 []ccip.TokenPrice
+	var r0 map[uint64]*big.Int
+	var r1 map[ccip.Address]*big.Int
 	var r2 error
-	if rf, ok := ret.Get(0).(func(context.Context, uint64) ([]ccip.GasPrice, []ccip.TokenPrice, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, uint64) (map[uint64]*big.Int, map[ccip.Address]*big.Int, error)); ok {
 		return rf(ctx, destChainSelector)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, uint64) []ccip.GasPrice); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, uint64) map[uint64]*big.Int); ok {
 		r0 = rf(ctx, destChainSelector)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]ccip.GasPrice)
+			r0 = ret.Get(0).(map[uint64]*big.Int)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, uint64) []ccip.TokenPrice); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, uint64) map[ccip.Address]*big.Int); ok {
 		r1 = rf(ctx, destChainSelector)
 	} else {
 		if ret.Get(1) != nil {
-			r1 = ret.Get(1).([]ccip.TokenPrice)
+			r1 = ret.Get(1).(map[ccip.Address]*big.Int)
 		}
 	}
 

@@ -33,7 +33,7 @@ import (
 type PriceService interface {
 	job.ServiceCtx
 	UpdateDynamicConfig(ctx context.Context, gasPriceEstimator prices.GasPriceEstimatorCommit, destPriceRegistryReader ccipdata.PriceRegistryReader) error
-	GetGasAndTokenPrices(ctx context.Context, destChainSelector uint64) ([]cciporm.GasPrice, []cciporm.TokenPrice, error)
+	GetGasAndTokenPrices(ctx context.Context, destChainSelector uint64) (map[uint64]*big.Int, map[cciptypes.Address]*big.Int, error)
 }
 
 var _ PriceService = (*priceService)(nil)
@@ -171,7 +171,7 @@ func (p *priceService) UpdateDynamicConfig(ctx context.Context, gasPriceEstimato
 	return nil
 }
 
-func (p *priceService) GetGasAndTokenPrices(ctx context.Context, destChainSelector uint64) ([]cciporm.GasPrice, []cciporm.TokenPrice, error) {
+func (p *priceService) GetGasAndTokenPrices(ctx context.Context, destChainSelector uint64) (map[uint64]*big.Int, map[cciptypes.Address]*big.Int, error) {
 	eg := new(errgroup.Group)
 
 	var gasPricesInDB []cciporm.GasPrice
@@ -199,7 +199,22 @@ func (p *priceService) GetGasAndTokenPrices(ctx context.Context, destChainSelect
 		return nil, nil, err
 	}
 
-	return gasPricesInDB, tokenPricesInDB, nil
+	gasPrices := make(map[uint64]*big.Int, len(gasPricesInDB))
+	tokenPrices := make(map[cciptypes.Address]*big.Int, len(tokenPricesInDB))
+
+	for _, gasPrice := range gasPricesInDB {
+		if gasPrice.GasPrice != nil {
+			gasPrices[gasPrice.SourceChainSelector] = gasPrice.GasPrice.ToInt()
+		}
+	}
+
+	for _, tokenPrice := range tokenPricesInDB {
+		if tokenPrice.TokenPrice != nil {
+			tokenPrices[cciptypes.Address(tokenPrice.TokenAddr)] = tokenPrice.TokenPrice.ToInt()
+		}
+	}
+
+	return gasPrices, tokenPrices, nil
 }
 
 func (p *priceService) runCleanup(ctx context.Context) error {

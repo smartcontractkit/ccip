@@ -27,14 +27,12 @@ import (
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas/mocks"
 	mocks2 "github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
-	cciporm "github.com/smartcontractkit/chainlink/v2/core/services/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
@@ -148,28 +146,16 @@ func TestCommitReportingPlugin_Observation(t *testing.T) {
 			}
 
 			mockPriceService := ccipdbmocks.NewPriceService(t)
-			var priceServiceGasResult []cciporm.GasPrice
-			var priceServiceTokenResult []cciporm.TokenPrice
+			var priceServiceGasResult map[uint64]*big.Int
+			var priceServiceTokenResult map[cciptypes.Address]*big.Int
 			if tc.fee != nil {
 				pUSD := ccipcalc.CalculateUsdPerUnitGas(tc.fee, tc.tokenPrices[sourceNativeTokenAddr])
-				priceServiceGasResult = []cciporm.GasPrice{
-					{
-						SourceChainSelector: sourceChainSelector,
-						GasPrice:            assets.NewWei(pUSD),
-					},
+				priceServiceGasResult = map[uint64]*big.Int{
+					sourceChainSelector: pUSD,
 				}
 			}
 			if len(tc.tokenPrices) > 0 {
-				priceServiceTokenResult = []cciporm.TokenPrice{
-					{
-						TokenAddr:  string(bridgedTokens[0]),
-						TokenPrice: assets.NewWei(expectedEncodedTokenPrice[bridgedTokens[0]]),
-					},
-					{
-						TokenAddr:  string(bridgedTokens[1]),
-						TokenPrice: assets.NewWei(expectedEncodedTokenPrice[bridgedTokens[1]]),
-					},
-				}
+				priceServiceTokenResult = expectedEncodedTokenPrice
 			}
 			mockPriceService.On("GetGasAndTokenPrices", ctx, destChainSelector).Return(
 				priceServiceGasResult,
@@ -597,8 +583,8 @@ func TestCommitReportingPlugin_observePriceUpdates(t *testing.T) {
 
 	testCases := []struct {
 		name                string
-		psGasPricesResult   []cciporm.GasPrice
-		psTokenPricesResult []cciporm.TokenPrice
+		psGasPricesResult   map[uint64]*big.Int
+		psTokenPricesResult map[cciptypes.Address]*big.Int
 
 		expectedGasPrice    *big.Int
 		expectedTokenPrices map[cciptypes.Address]*big.Int
@@ -608,22 +594,10 @@ func TestCommitReportingPlugin_observePriceUpdates(t *testing.T) {
 	}{
 		{
 			name: "ORM called successfully",
-			psGasPricesResult: []cciporm.GasPrice{
-				{
-					SourceChainSelector: sourceChainSelector,
-					GasPrice:            assets.NewWei(gasPrice),
-				},
+			psGasPricesResult: map[uint64]*big.Int{
+				sourceChainSelector: gasPrice,
 			},
-			psTokenPricesResult: []cciporm.TokenPrice{
-				{
-					TokenAddr:  string(token1),
-					TokenPrice: assets.NewWei(tokenPrices[token1]),
-				},
-				{
-					TokenAddr:  string(token2),
-					TokenPrice: assets.NewWei(tokenPrices[token2]),
-				},
-			},
+			psTokenPricesResult: tokenPrices,
 			expectedGasPrice:    gasPrice,
 			expectedTokenPrices: tokenPrices,
 			psError:             false,
@@ -631,55 +605,30 @@ func TestCommitReportingPlugin_observePriceUpdates(t *testing.T) {
 		},
 		{
 			name: "multiple gas prices",
-			psGasPricesResult: []cciporm.GasPrice{
-				{
-					SourceChainSelector: sourceChainSelector,
-					GasPrice:            assets.NewWei(gasPrice),
-				},
-				{
-					SourceChainSelector: sourceChainSelector + 1,
-					GasPrice:            assets.NewWei(big.NewInt(200)),
-				},
-				{
-					SourceChainSelector: sourceChainSelector + 2,
-					GasPrice:            assets.NewWei(big.NewInt(300)),
-				},
+			psGasPricesResult: map[uint64]*big.Int{
+				sourceChainSelector:     gasPrice,
+				sourceChainSelector + 1: big.NewInt(200),
+				sourceChainSelector + 2: big.NewInt(300),
 			},
-			psTokenPricesResult: nil,
+			psTokenPricesResult: map[cciptypes.Address]*big.Int{},
 			expectedGasPrice:    gasPrice,
 			expectedTokenPrices: map[cciptypes.Address]*big.Int{},
 			psError:             false,
 			expectedErr:         false,
 		},
 		{
-			name: "nil token price is filtered",
-			psGasPricesResult: []cciporm.GasPrice{
-				{
-					SourceChainSelector: sourceChainSelector,
-					GasPrice:            assets.NewWei(gasPrice),
-				},
+			name: "mismatched gas prices errors",
+			psGasPricesResult: map[uint64]*big.Int{
+				sourceChainSelector + 2: big.NewInt(300),
 			},
-			psTokenPricesResult: []cciporm.TokenPrice{
-				{
-					TokenAddr:  string(token1),
-					TokenPrice: assets.NewWei(tokenPrices[token1]),
-				},
-				{
-					TokenAddr:  string(token2),
-					TokenPrice: nil,
-				},
-			},
-			expectedGasPrice: gasPrice,
-			expectedTokenPrices: map[cciptypes.Address]*big.Int{
-				token1: tokenPrices[token1],
-			},
-			psError:     false,
-			expectedErr: false,
+			psTokenPricesResult: map[cciptypes.Address]*big.Int{},
+			psError:             false,
+			expectedErr:         true,
 		},
 		{
-			name:                "nil gas prices errors",
-			psGasPricesResult:   nil,
-			psTokenPricesResult: nil,
+			name:                "empty gas prices errors",
+			psGasPricesResult:   map[uint64]*big.Int{},
+			psTokenPricesResult: map[cciptypes.Address]*big.Int{},
 			psError:             false,
 			expectedErr:         true,
 		},

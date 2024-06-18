@@ -476,6 +476,9 @@ func TestPriceService_GetGasAndTokenPrices(t *testing.T) {
 		ormGasPricesResult   []cciporm.GasPrice
 		ormTokenPricesResult []cciporm.TokenPrice
 
+		expectedGasPrices   map[uint64]*big.Int
+		expectedTokenPrices map[cciptypes.Address]*big.Int
+
 		gasPriceError   bool
 		tokenPriceError bool
 		expectedErr     bool
@@ -498,9 +501,13 @@ func TestPriceService_GetGasAndTokenPrices(t *testing.T) {
 					TokenPrice: assets.NewWei(tokenPrices[token2]),
 				},
 			},
-			gasPriceError:   false,
-			tokenPriceError: false,
-			expectedErr:     false,
+			expectedGasPrices: map[uint64]*big.Int{
+				sourceChainSelector: gasPrice,
+			},
+			expectedTokenPrices: tokenPrices,
+			gasPriceError:       false,
+			tokenPriceError:     false,
+			expectedErr:         false,
 		},
 		{
 			name: "multiple gas prices with nil token price",
@@ -519,9 +526,15 @@ func TestPriceService_GetGasAndTokenPrices(t *testing.T) {
 				},
 			},
 			ormTokenPricesResult: nil,
-			gasPriceError:        false,
-			tokenPriceError:      false,
-			expectedErr:          false,
+			expectedGasPrices: map[uint64]*big.Int{
+				sourceChainSelector:     gasPrice,
+				sourceChainSelector + 1: big.NewInt(200),
+				sourceChainSelector + 2: big.NewInt(300),
+			},
+			expectedTokenPrices: map[cciptypes.Address]*big.Int{},
+			gasPriceError:       false,
+			tokenPriceError:     false,
+			expectedErr:         false,
 		},
 		{
 			name:               "multiple token prices with nil gas price",
@@ -535,6 +548,40 @@ func TestPriceService_GetGasAndTokenPrices(t *testing.T) {
 					TokenAddr:  string(token2),
 					TokenPrice: assets.NewWei(tokenPrices[token2]),
 				},
+			},
+			expectedGasPrices:   map[uint64]*big.Int{},
+			expectedTokenPrices: tokenPrices,
+			gasPriceError:       false,
+			tokenPriceError:     false,
+			expectedErr:         false,
+		},
+		{
+			name: "nil prices filtered out",
+			ormGasPricesResult: []cciporm.GasPrice{
+				{
+					SourceChainSelector: sourceChainSelector,
+					GasPrice:            nil,
+				},
+				{
+					SourceChainSelector: sourceChainSelector + 1,
+					GasPrice:            assets.NewWei(gasPrice),
+				},
+			},
+			ormTokenPricesResult: []cciporm.TokenPrice{
+				{
+					TokenAddr:  string(token1),
+					TokenPrice: assets.NewWei(tokenPrices[token1]),
+				},
+				{
+					TokenAddr:  string(token2),
+					TokenPrice: nil,
+				},
+			},
+			expectedGasPrices: map[uint64]*big.Int{
+				sourceChainSelector + 1: gasPrice,
+			},
+			expectedTokenPrices: map[cciptypes.Address]*big.Int{
+				token1: tokenPrices[token1],
 			},
 			gasPriceError:   false,
 			tokenPriceError: false,
@@ -591,8 +638,8 @@ func TestPriceService_GetGasAndTokenPrices(t *testing.T) {
 				assert.Error(t, err)
 			} else {
 				assert.NoError(t, err)
-				assert.Equal(t, tc.ormGasPricesResult, gasPricesResult)
-				assert.Equal(t, tc.ormTokenPricesResult, tokenPricesResult)
+				assert.Equal(t, tc.expectedGasPrices, gasPricesResult)
+				assert.Equal(t, tc.expectedTokenPrices, tokenPricesResult)
 			}
 		})
 	}

@@ -182,27 +182,15 @@ func (r *CommitReportingPlugin) calculateMinMaxSequenceNumbers(ctx context.Conte
 func (r *CommitReportingPlugin) observePriceUpdates(
 	ctx context.Context,
 ) (sourceGasPriceUSD *big.Int, tokenPricesUSD map[cciptypes.Address]*big.Int, err error) {
-	gasPricesInDB, tokenPricesInDB, err := r.priceService.GetGasAndTokenPrices(ctx, r.destChainSelector)
+	gasPricesUSD, tokenPricesUSD, err := r.priceService.GetGasAndTokenPrices(ctx, r.destChainSelector)
 	if err != nil {
 		return nil, nil, err
-
 	}
 
-	for _, gasPrice := range gasPricesInDB {
-		if gasPrice.SourceChainSelector == r.sourceChainSelector && gasPrice.GasPrice != nil {
-			sourceGasPriceUSD = gasPrice.GasPrice.ToInt()
-			break
-		}
-	}
+	// Reduce to single gas price for compatibility. In a followup PR, Commit plugin will make use of all source chain gas prices.
+	sourceGasPriceUSD = gasPricesUSD[r.sourceChainSelector]
 	if sourceGasPriceUSD == nil {
 		return nil, nil, fmt.Errorf("missing gas price for sourceChainSelector %d", r.sourceChainSelector)
-	}
-
-	tokenPricesUSD = make(map[cciptypes.Address]*big.Int, len(tokenPricesInDB))
-	for _, tokenPrice := range tokenPricesInDB {
-		if tokenPrice.TokenPrice != nil {
-			tokenPricesUSD[cciptypes.Address(tokenPrice.TokenAddr)] = tokenPrice.TokenPrice.ToInt()
-		}
 	}
 
 	return sourceGasPriceUSD, tokenPricesUSD, nil
