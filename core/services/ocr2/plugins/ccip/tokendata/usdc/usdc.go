@@ -2,6 +2,7 @@ package usdc
 
 import (
 	"context"
+	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -231,13 +232,15 @@ func (s *TokenDataReader) getUSDCMessageBody(
 	if tokenIndex >= len(msg.EVM2EVMMessage.SourceTokenData) || tokenIndex < 0 {
 		return []byte{}, fmt.Errorf("invalid token index %d for msg with %d source token data", tokenIndex, len(msg.EVM2EVMMessage.SourceTokenData))
 	}
-	nonce := msg.EVM2EVMMessage.SourceTokenData[tokenIndex]
+	nonceBytes := msg.EVM2EVMMessage.SourceTokenData[tokenIndex]
 
-	if len(nonce) != 32 {
-		return []byte{}, fmt.Errorf("invalid nonce length %d", len(nonce))
+	if len(nonceBytes) != 32 {
+		return []byte{}, fmt.Errorf("invalid nonce length %d", len(nonceBytes))
 	}
 
-	parsedMsgBody, err := s.usdcReader.GetUSDCMessageWithNonce(ctx, [32]byte(nonce))
+	nonce := binary.BigEndian.Uint64(nonceBytes)
+
+	parsedMsgBody, err := s.usdcReader.GetUSDCMessageWithNonce(ctx, nonce)
 	if err != nil {
 		return []byte{}, err
 	}

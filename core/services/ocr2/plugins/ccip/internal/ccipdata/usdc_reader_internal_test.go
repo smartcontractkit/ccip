@@ -1,6 +1,8 @@
 package ccipdata
 
 import (
+	"encoding/hex"
+	"strconv"
 	"testing"
 	"time"
 
@@ -67,5 +69,28 @@ func TestFilters(t *testing.T) {
 		assert.NoError(t, err)
 		assert.True(t, lp.HasFilter(f1))
 		assert.False(t, lp.HasFilter(f2))
+	})
+}
+
+func TestEncoding(t *testing.T) {
+	t.Run("encode expectedSlot", func(t *testing.T) {
+		sourceDomainHex := "e0f516f1"
+		destDomainHex := "f516f1ee"
+		nonceHex := "f56f101748232938"
+		version := "00000000"
+		sender := "000000000000000000000000"
+
+		sourceDomain, err := strconv.ParseUint(sourceDomainHex, 16, 32)
+		require.NoError(t, err)
+		destDomain, err := strconv.ParseUint(destDomainHex, 16, 32)
+		require.NoError(t, err)
+		nonce, err := strconv.ParseUint(nonceHex, 16, 64)
+		require.NoError(t, err)
+
+		expected := version + sourceDomainHex + destDomainHex + nonceHex + sender
+
+		actualSlot := GetExpectedNonceSlotData(uint32(sourceDomain), uint32(destDomain), nonce)
+
+		assert.Equal(t, expected, hex.EncodeToString(actualSlot[:]))
 	})
 }

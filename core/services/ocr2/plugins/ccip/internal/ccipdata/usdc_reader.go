@@ -2,6 +2,7 @@ package ccipdata
 
 import (
 	"context"
+	"encoding/binary"
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -16,14 +17,15 @@ import (
 
 const (
 	MESSAGE_SENT_FILTER_NAME = "USDC message sent"
-	USDC_MESSAGE_NONCE_INDEX = 2
+	USDC_MESSAGE_NONCE_INDEX = 3
+	USDC_MESSAGE_VERSION     = uint32(0)
 )
 
 var _ USDCReader = &USDCReaderImpl{}
 
 //go:generate mockery --quiet --name USDCReader --filename usdc_reader_mock.go --case=underscore
 type USDCReader interface {
-	GetUSDCMessageWithNonce(ctx context.Context, nonce [32]byte) ([]byte, error)
+	GetUSDCMessageWithNonce(ctx context.Context, nonce uint64) ([]byte, error)
 }
 
 type USDCReaderImpl struct {
@@ -32,6 +34,8 @@ type USDCReaderImpl struct {
 	filter             logpoller.Filter
 	lggr               logger.Logger
 	transmitterAddress common.Address
+	sourceDomain       uint32
+	destDomain         uint32
 }
 
 func (u *USDCReaderImpl) Close() error {
@@ -66,14 +70,46 @@ func parseUSDCMessageSent(logData []byte) ([]byte, error) {
 	return decodeAbiStruct, nil
 }
 
-func (u *USDCReaderImpl) GetUSDCMessageWithNonce(ctx context.Context, nonce [32]byte) ([]byte, error) {
+func GetExpectedNonceSlotData(sourceDomain, destDomain uint32, nonce uint64) [32]byte {
+	// USDC message payload:
+	// uint32 _msgVersion,
+	// uint32 _msgSourceDomain,
+	// uint32 _msgDestinationDomain,
+	// uint64 _msgNonce,
+	// bytes32 _msgSender,
+	// Since it's packed, all of these values contribute to the first slot
+
+	msgVersionBytes := [4]byte{}
+	binary.BigEndian.PutUint32(msgVersionBytes[:], USDC_MESSAGE_VERSION)
+
+	sourceDomainBytes := [4]byte{}
+	binary.BigEndian.PutUint32(sourceDomainBytes[:], sourceDomain)
+
+	destDomainBytes := [4]byte{}
+	binary.BigEndian.PutUint32(destDomainBytes[:], destDomain)
+
+	nonceBytes := [8]byte{}
+	binary.BigEndian.PutUint64(nonceBytes[:], nonce)
+
+	senderBytes := [12]byte{}
+
+	return [32]byte(append(append(append(append(
+		msgVersionBytes[:],
+		sourceDomainBytes[:]...),
+		destDomainBytes[:]...),
+		nonceBytes[:]...),
+		senderBytes[:]...))
+}
+
+func (u *USDCReaderImpl) GetUSDCMessageWithNonce(ctx context.Context, nonce uint64) ([]byte, error) {
+	expectedSlotData := GetExpectedNonceSlotData(u.sourceDomain, u.destDomain, nonce)
 	logs, err := u.lp.IndexedLogsTopicRange(
 		ctx,
 		u.usdcMessageSent,
 		u.transmitterAddress,
 		USDC_MESSAGE_NONCE_INDEX,
-		nonce,
-		nonce,
+		expectedSlotData,
+		expectedSlotData,
 		types.Finalized,
 	)
 	if err != nil {
@@ -105,6 +141,8 @@ func NewUSDCReader(lggr logger.Logger, jobID string, transmitter common.Address,
 			Retention: CommitExecLogsRetention,
 		},
 		transmitterAddress: transmitter,
+		sourceDomain:       0, // TODO
+		destDomain:         1, // TODO
 	}
 
 	if registerFilters {
