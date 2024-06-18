@@ -32,14 +32,14 @@ class Commit:
 
 @dataclass
 class CommitOutcome:
-    max_committed_seq_nums: Dict[ChainSelector, int]
+    latest_committed_seq_nums: Dict[ChainSelector, int]
     commits: Dict[ChainSelector, Commit]
     token_prices: Dict[str, int]
     gas_prices: Dict[ChainSelector, int]
 
 @dataclass
 class CommitObservation:
-    max_committed_seq_nums: Dict[ChainSelector, int]
+    latest_committed_seq_nums: Dict[ChainSelector, int]
     new_msgs: Dict[ChainSelector, List[Message]]
     token_prices: Dict[str, int]
     gas_prices: Dict[ChainSelector, int]
@@ -87,11 +87,10 @@ class CommitPlugin:
         # Provided by the nodes that can read from the destination on the previous round.
         # Observe msgs for our supported chains since the prev outcome.
         new_msgs = {}
-        for (chain, seq_num) in previous_outcome.max_committed_seq_nums:
+        for (chain, seq_num) in previous_outcome.latest_committed_seq_nums:
             if chain in self.cfg.oracle_info[self.cfg.oracle]:
                 new_msgs[chain] = self.onRamp(chain).get_msgs(chain, start=seq_num+1, limit=256)
                 for msg in new_msgs[chain]:
-                    # Offchain defense in depth?
                     assert(msg.id == msg.compute_id())
 
         # Observe token prices. {token: price}
@@ -108,11 +107,11 @@ class CommitPlugin:
 
         # If we support the destination chain, then we contribute an observation of the max committed seq nums.
         # We use these in outcome to filter out messages that have already been committed.
-        max_committed_seq_nrs = {}
+        latest_committed_seq_nums = {}
         if self.cfg.dest_chain in self.cfg.oracle_info[self.cfg.oracle]:
-            max_committed_seq_nrs = self.offRamp.max_committed_seq_nrs()
+            latest_committed_seq_nums = self.offRamp.latest_committed_seq_nums()
 
-        return CommitObservation(max_committed_seq_nrs, new_msgs, token_prices, gas_prices, f_chain)
+        return CommitObservation(latest_committed_seq_nums, new_msgs, token_prices, gas_prices, f_chain)
 
 
     def validate_observation(self, attributed_observation):
@@ -120,13 +119,13 @@ class CommitPlugin:
         oracle = attributed_observation.oracle
 
         # Only accept dest observations from nodes that support the dest chain
-        if observation.max_committed_seq_nrs is not None:
+        if observation.latest_committed_seq_nums is not None:
             assert self.cfg.dest_chain in self.cfg.oracle_info[oracle]
 
         # Only accept source observations from nodes which support those sources.
         for (chain, msgs) in observation.new_msgs.items():
             assert(chain in self.cfg.oracle_info[oracle])
-            # Don't allow duplicates by seqNr or id. Defense in depth?
+            # Don't allow duplicates by seqNr or id. Required to prevent double counting.
             assert(len(msgs) == len(set([msg.seq_num for msg in msgs])))
             assert(len(msgs) == len(set([msg.id for msg in msgs])))
 
@@ -135,7 +134,7 @@ class CommitPlugin:
 
     def outcome(self, observations: List[CommitObservation])->CommitOutcome:
         f_chain = consensus_f_chain(observations)
-        max_committed_seq_nums = consensus_max_committed_seq_nums(observations, f_chain)
+        latest_committed_seq_nums = consensus_latest_committed_seq_nums(observations, f_chain)
 
         # all_msgs contains all messages from all observations, grouped by source chain
         all_msgs = [observation.new_msgs for observation in observations].group_by_source_chain()
@@ -146,7 +145,7 @@ class CommitPlugin:
             # Note right after a report has been submitted, we'll expect those same messages
             # to appear in the next observation, because the message observations are built
             # on the previous max committed seq nums.
-            msgs = [msg for msg in msgs if msg.seq_num > max_committed_seq_nums[chain]]
+            msgs = [msg for msg in msgs if msg.seq_num > latest_committed_seq_nums[chain]]
 
             msgs_by_seq_num = msgs.group_by_seq_num() # { 423: [0x1, 0x1, 0x2] }
                                                       # 2 nodes say that msg id is 0x1 and 1 node says it's 0x2
@@ -168,7 +167,7 @@ class CommitPlugin:
         token_prices = { tk: median(prices) for (tk, prices) in observations.group_token_prices_by_token() }
         gas_prices = { chain: median(prices) for (chain, prices) in observations.group_gas_prices_by_chain() }
 
-        return CommitOutcome(max_committed_seq_nums=max_committed_seq_nums, commits=commits, token_price=token_prices, gas_prices=gas_prices)
+        return CommitOutcome(latest_committed_seq_nums=latest_committed_seq_nums, commits=commits, token_price=token_prices, gas_prices=gas_prices)
 
     def reports(self, outcome):
         report = report_from_outcome(outcome)
@@ -205,21 +204,21 @@ def consensus_f_chain(observations):
     f_chain_votes = observations["f_chain"].group_by_chain() # { chainA: [1, 1, 16, 16, 16, 16] }
     return { ch: elem_most_occurrences(fs) for (ch, fs) in f_chain_votes.items() } # { chainA: 16 }
 
-def consensus_max_committed_seq_nums(observations, f_chains):
-    all_max_committed_seq_nrs = {}
+def consensus_latest_committed_seq_nums(observations, f_chains):
+    all_latest_committed_seq_nums = {}
     for observation in observations:
-        for (chain, seq_num) in observation.max_committed_seq_nrs.items():
-            if chain not in all_max_committed_seq_nrs:
-                all_max_committed_seq_nrs[chain] = []
-            all_max_committed_seq_nrs[chain].append(seq_num)
+        for (chain, seq_num) in observation.latest_committed_seq_nums.items():
+            if chain not in all_latest_committed_seq_nums:
+                all_latest_committed_seq_nums[chain] = []
+            all_latest_committed_seq_nums[chain].append(seq_num)
 
-    max_committed_seq_nums_consensus = {}
+    latest_committed_seq_nums_consensus = {}
     # { chainA: [4, 5, 5, 5, 5, 6, 6] }
-    for (chain, max_committed_seq_nrs) in all_max_committed_seq_nrs.items():
-        if len(max_committed_seq_nrs) >= 2*f_chains[chain]+1:
-             # 2f+1 = 2*16+1 = 33
-             max_committed_seq_nums_consensus[chain] = sorted(max_committed_seq_nrs)[f_chains[chain]]# with f=4 { chainA: 5 }
-    return max_committed_seq_nums_consensus
+    for (chain, latest_committed_seq_nums) in all_latest_committed_seq_nums.items():
+        if len(latest_committed_seq_nums) >= 2*f_chains[chain]+1:
+             # 2f+1 = 2*5+1 = 11
+             latest_committed_seq_nums_consensus[chain] = sorted(latest_committed_seq_nums)[f_chains[chain]]# with f=4 { chainA: 5 }
+    return latest_committed_seq_nums_consensus
 
 def elem_most_occurrences(lst):
     pass
