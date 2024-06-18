@@ -734,8 +734,8 @@ func TestPriceService_priceWriteAndCleanupInBackground(t *testing.T) {
 		offRampReader,
 	).(*priceService)
 
-	updateInterval := 1000 * time.Millisecond
-	cleanupInterval := 1500 * time.Millisecond
+	updateInterval := 2000 * time.Millisecond
+	cleanupInterval := 3000 * time.Millisecond
 
 	// run write task every 2 second
 	priceService.updateInterval = updateInterval

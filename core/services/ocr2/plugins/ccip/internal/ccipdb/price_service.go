@@ -44,8 +44,8 @@ type PriceService interface {
 var _ PriceService = (*priceService)(nil)
 
 const (
-	// Prices should expire after 10 minutes in DB. Prices should be fresh in the CommitDON.
-	// 10 min provides sufficient buffer for the CommitDON to withstand transient price update outages, while
+	// Prices should expire after 10 minutes in DB. Prices should be fresh in the Commit plugin.
+	// 10 min provides sufficient buffer for the Commit plugin to withstand transient price update outages, while
 	// surfacing price update outages quickly enough.
 	priceExpireSec = 600
 	// Cleanups are called every 10 minutes. For a given job, on average we may expect 3 token prices and 1 gas price.
