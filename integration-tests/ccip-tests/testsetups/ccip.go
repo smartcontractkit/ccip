@@ -351,11 +351,11 @@ func (c *CCIPTestConfig) SetOCRParams() error {
 // This is useful for setting up test specific configurations.
 type TestConfigOverrideOption func(*CCIPTestConfig) string
 
-// WithCCIPOwnerTokens sets the number of tokens to be deployed and owned by the same account that owns all CCIP contracts
-func WithCCIPOwnerTokens() TestConfigOverrideOption {
+// UseCCIPOwnerTokens defines whether all tokens are deployed by the same address as the CCIP owner
+func UseCCIPOwnerTokens(yes bool) TestConfigOverrideOption {
 	return func(c *CCIPTestConfig) string {
-		c.TestGroupInput.TokenConfig.CCIPOwnerTokens = pointer.ToBool(true)
-		return "CCIPOwnerTokens set to true"
+		c.TestGroupInput.TokenConfig.CCIPOwnerTokens = pointer.ToBool(yes)
+		return fmt.Sprintf("CCIPOwnerTokens set to %t", yes)
 	}
 }
 
