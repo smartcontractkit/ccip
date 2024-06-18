@@ -44,11 +44,16 @@ type PriceService interface {
 var _ PriceService = (*priceService)(nil)
 
 const (
-	// Prices can be cleaned up every 10 minutes
-	priceExpireSec       = 600
-	priceCleanupInterval = priceExpireSec * time.Second
+	// Prices should expire after 10 minutes in DB. Prices should be fresh in the CommitDON.
+	// 10 min provides sufficient buffer for the CommitDON to withstand transient price update outages, while
+	// surfacing price update outages quickly enough.
+	priceExpireSec = 600
+	// Cleanups are called every 10 minutes. For a given job, on average we may expect 3 token prices and 1 gas price.
+	// 10 minutes should result in 40 rows being cleaned up per job, it is not a heavy load on DB, so there is no need
+	// to run cleanup more frequently. We shouldn't clean up less frequently than `priceExpireSec`.
+	priceCleanupInterval = 600 * time.Second
 
-	// Prices can be refreshed every 1 minute, they are sufficiently accurate
+	// Prices are refreshed every 1 minute, they are sufficiently accurate, and consistent with Commit OCR round time.
 	priceUpdateInterval = 60 * time.Second
 )
 
@@ -99,12 +104,10 @@ func NewPriceService(
 		jobId:             jobId,
 		destChainSelector: destChainSelector,
 
-		sourceChainSelector:     sourceChainSelector,
-		sourceNative:            sourceNative,
-		priceGetter:             priceGetter,
-		offRampReader:           offRampReader,
-		gasPriceEstimator:       nil,
-		destPriceRegistryReader: nil,
+		sourceChainSelector: sourceChainSelector,
+		sourceNative:        sourceNative,
+		priceGetter:         priceGetter,
+		offRampReader:       offRampReader,
 
 		wg:               new(sync.WaitGroup),
 		backgroundCtx:    ctx,
@@ -138,8 +141,6 @@ func (p *priceService) run() {
 
 	go func() {
 		defer p.wg.Done()
-		// Do the first cleanup immediately upon starting the service, cleanup early to limit DB impact
-		_ = p.runCleanup(p.backgroundCtx)
 
 		for {
 			select {
@@ -168,8 +169,7 @@ func (p *priceService) UpdateDynamicConfig(ctx context.Context, gasPriceEstimato
 
 	// Config update may substantially change the prices, refresh the prices immediately, this also makes testing easier
 	// for not having to wait to the full update interval.
-	err := p.runUpdate(ctx)
-	if err != nil {
+	if err := p.runUpdate(ctx); err != nil {
 		p.lggr.Errorw("Error when updating prices after dynamic config update", "err", err)
 	}
 
