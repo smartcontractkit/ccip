@@ -56,27 +56,44 @@ class ExecutePlugin:
     def observation_quorum(self):
         return "F+1"
 
+    def select_report_data(reports_with_messages):
+        """select oldest (front of list) reports and build as many proofs as we
+        can fit for the execute report"""
+        proofs = []
+        proofs_bytes = 0
+        index = 0
+        for report in reports_with_messages:
+            # build a report to execute as many messages as will fit in the
+            # remaining transmit size.
+            proof, fully_execute = report.build_proof(MAX_REPORT_SIZE - report_data_bytes)
+            if not proof.empty():
+                proofs.append(proof)
+
+            if fully_execute:
+                index++
+            else:
+                return proofs, reports_with_messages[index:]
+
     def outcome(self, previous_outcome, observations):
         # merge observations, removing any which do not reach f_chain threshold.
         commit_reports = merge_commit_observations(observations, self.cfg["f_chain"])
         messages = merge_message_observations(observations, self.cfg["f_chain"])
 
-        # flatten report map and sort by timestamp
-        flattened_reports = flattenReports(commit_reports)
+        # flatten report map and sort by timestamp/sequence number
+        flattened_reports = flatten_reports(commit_reports)
 
-        # flatten messages map and sort by report timestamp/sequence number
-        flattened_messages = []
+        # add messages to report object
         for report in flattened_reports:
             for i in (report.seq_num_range.start, report.seq_num_range.end+1):
                 if i in messages[report.chain]:
-                    flattened_messages.append(messages[report.chain][i])
+                    report.messages.append(messages[report.chain][i])
 
 
-        # merge new observations with pending data from previous outcome
-        pending_reports = mergeReports(flattened_messages, previous_outcome.pending_reports, messages)
+        # take the new flattened reports and merge with the previous pending reports
+        pending_reports = merge_reports(flattened_messages, previous_outcome.pending_reports)
 
         # select reports from pending data to include in the final report
-        report_data, pending_reports = selectReportData(pending_reports)
+        report_data, pending_reports = select_report_data(pending_reports)
 
         return (report_data, pending_reports)
 
