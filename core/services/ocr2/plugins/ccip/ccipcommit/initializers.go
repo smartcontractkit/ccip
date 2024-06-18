@@ -96,7 +96,7 @@ func UnregisterCommitPluginLpFilters(ctx context.Context, lggr logger.Logger, jb
 	versionFinder := factory.NewEvmVersionFinder()
 	unregisterFuncs := []func() error{
 		func() error {
-			return factory.CloseCommitStoreReader(lggr, versionFinder, params.commitStoreAddress, params.destChain.Client(), params.destChain.LogPoller(), params.sourceChain.GasEstimator(), params.sourceChain.Config().EVM().GasEstimator().PriceMax().ToInt())
+			return factory.CloseCommitStoreReader(lggr, versionFinder, params.commitStoreAddress, params.destChain.Client(), params.destChain.LogPoller())
 		},
 		func() error {
 			return factory.CloseOnRampReader(lggr, versionFinder, params.commitStoreStaticCfg.SourceChainSelector, params.commitStoreStaticCfg.ChainSelector, cciptypes.Address(params.commitStoreStaticCfg.OnRamp.String()), params.sourceChain.LogPoller(), params.sourceChain.Client())
@@ -130,7 +130,18 @@ func jobSpecToCommitPluginConfig(ctx context.Context, lggr logger.Logger, jb job
 		"DestChainSelector", params.commitStoreStaticCfg.ChainSelector)
 
 	versionFinder := factory.NewEvmVersionFinder()
-	commitStoreReader, err := factory.NewCommitStoreReader(lggr, versionFinder, params.commitStoreAddress, params.destChain.Client(), params.destChain.LogPoller(), params.sourceChain.GasEstimator(), params.sourceChain.Config().EVM().GasEstimator().PriceMax().ToInt())
+	commitStoreReader, err := factory.NewCommitStoreReader(lggr, versionFinder, params.commitStoreAddress, params.destChain.Client(), params.destChain.LogPoller())
+
+	err = commitStoreReader.SetGasEstimator(ctx, params.sourceChain.GasEstimator())
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("could not set gas estimator: %w", err)
+	}
+
+	err = commitStoreReader.SetSourceMaxGasPrice(ctx, params.sourceChain.Config().EVM().GasEstimator().PriceMax().ToInt())
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("could not set source max gas price: %w", err)
+	}
+
 	if err != nil {
 		return nil, nil, nil, errors.Wrap(err, "could not create commitStore reader")
 	}
