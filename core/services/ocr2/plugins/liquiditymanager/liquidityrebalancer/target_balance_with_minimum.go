@@ -166,7 +166,7 @@ func (r *TargetMinBalancer) oneHopTransfers(graphLater graph.Graph, targetNetwor
 		srcAmountToTarget := big.NewInt(0).Sub(srcData.Liquidity, srcData.TargetLiquidity)
 
 		if srcAmountToTarget.Cmp(big.NewInt(0)) < 0 || srcAvailableAmount.Cmp(big.NewInt(0)) < 0 {
-			//r.lggr.Debugf("source network %v is too low, skipping transfer: srcAmountToTarget %v, srcAvailableAmount %v", edge.Source, srcAmountToTarget, srcAvailableAmount)
+			r.lggr.Debugf("source network %v does not have a surplus to transfer, skipping transfer: srcAmountToTarget %v", edge.Source, srcAmountToTarget)
 			continue
 		}
 
