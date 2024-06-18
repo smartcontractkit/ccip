@@ -48,6 +48,9 @@ import (
 var (
 	// tokenDataWorkerTimeout defines 1) The timeout while waiting for a bg call to the token data 3P provider.
 	// 2) When a client requests token data and does not specify a timeout this value is used as a default.
+	// 5 seconds is a reasonable value for a timeout.
+	// At this moment, minimum OCR Delta Round is set to 30s and deltaGrace to 5s. Based on this configuration
+	// 5s for token data worker timeout is a reasonable default.
 	tokenDataWorkerTimeout = 5 * time.Second
 	// tokenDataWorkerNumWorkers is the number of workers that will be processing token data in parallel.
 	tokenDataWorkerNumWorkers = 5
