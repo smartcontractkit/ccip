@@ -60,3 +60,17 @@ func ParseLiquidityTransferred(parseFunc func(gethtypes.Log) (*liquiditymanager.
 	}
 	return transferred, toLP, nil
 }
+
+func GetBridgeFilterName(bridgeName, filterLayer string, liquidityManagerAddress common.Address, localChain, remoteChain, extra string) string {
+	filterName := fmt.Sprintf("%s-%s_LiquidityManager:%s_LocalChain:%s_RemoteChain:%s",
+		filterLayer,
+		bridgeName,
+		liquidityManagerAddress.Hex(),
+		localChain,
+		remoteChain,
+	)
+	if extra != "" {
+		filterName = fmt.Sprintf("%s_%s", filterName, extra)
+	}
+	return filterName
+}

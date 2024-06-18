@@ -87,8 +87,14 @@ func NewL1ToL2Bridge(
 		return nil, fmt.Errorf("instantiate L1 inbox at %s: %w", l1InboxAddress, err)
 	}
 
-	l1FilterName := fmt.Sprintf("ArbitrumL1ToL2Bridge-L1-LiquidityManager:%s-Local:%s-Remote:%s",
-		l1LiquidityManagerAddress.String(), localChain.Name, remoteChain.Name)
+	l1FilterName := bridgecommon.GetBridgeFilterName(
+		"ArbitrumL1ToL2Bridge",
+		"L1",
+		l1LiquidityManagerAddress,
+		localChain.Name,
+		remoteChain.Name,
+		"",
+	)
 	// FIXME Makram please pass the valid context
 	ctx := context.Background()
 	err = l1LogPoller.RegisterFilter(ctx, logpoller.Filter{
@@ -141,8 +147,14 @@ func NewL1ToL2Bridge(
 		return nil, fmt.Errorf("get counterpart gateway for gateway %s: %w", l1TokenGateway, err)
 	}
 
-	l2FilterName := fmt.Sprintf("ArbitrumL1ToL2Bridge-L2-L2Gateway:%s-LiquidityManager:%s-Local:%s-Remote:%s",
-		l2Gateway.Hex(), l2LiquidityManagerAddress.Hex(), localChain.Name, remoteChain.Name)
+	l2FilterName := bridgecommon.GetBridgeFilterName(
+		"ArbitrumL1ToL2Bridge",
+		"L2",
+		l2LiquidityManagerAddress,
+		localChain.Name,
+		remoteChain.Name,
+		fmt.Sprintf("L2Gateway:%s", l2Gateway.Hex()),
+	)
 	err = l2LogPoller.RegisterFilter(ctx, logpoller.Filter{
 		Addresses: []common.Address{
 			l2Gateway,                 // emits DepositFinalized

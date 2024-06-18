@@ -69,8 +69,14 @@ func NewL1ToL2Bridge(
 		return nil, fmt.Errorf("unknown chain selector for remote chain: %d", remoteSelector)
 	}
 
-	l1FilterName := fmt.Sprintf("OptimismL1ToL2Bridge-L1-LiquidityManager:%s-Local:%s-Remote:%s",
-		l1LiquidityManagerAddress.String(), localChain.Name, remoteChain.Name)
+	l1FilterName := bridgecommon.GetBridgeFilterName(
+		"OptimismL1ToL2Bridge",
+		"L1",
+		l1LiquidityManagerAddress,
+		localChain.Name,
+		remoteChain.Name,
+		"",
+	)
 
 	// TODO: FIXME pass valid context
 	ctx := context.Background()
@@ -127,8 +133,14 @@ func NewL1ToL2Bridge(
 		return nil, fmt.Errorf("get local token from L2 LiquidityManager: %w", err)
 	}
 
-	l2FilterName := fmt.Sprintf("OptimismL1ToL2Bridge-L2-OPStandardBridge:%s-LiquidityManager:%s-Local:%s-Remote:%s",
-		l2StandardBridgeAddress, l2LiquidityManagerAddress.String(), localChain.Name, remoteChain.Name)
+	l2FilterName := bridgecommon.GetBridgeFilterName(
+		"OptimismL1ToL2Bridge",
+		"L2",
+		l2LiquidityManagerAddress,
+		localChain.Name,
+		remoteChain.Name,
+		"",
+	)
 	err = l2LogPoller.RegisterFilter(ctx, logpoller.Filter{
 		Addresses: []common.Address{
 			l2StandardBridgeAddress,   // emits ERC20BridgeFinalized
@@ -241,7 +253,7 @@ func (l *l1ToL2Bridge) GetBridgePayloadAndFee(
 	// TODO: maybe add check if this is a native transfer or ERC20 transfer
 	calldata, err := l1standardBridgeABI.Pack(
 		// If we're sending WETH, the bridge adapter unwraps it and calls depositETHTo on the native bridge
-		"depositETHTo",
+		DepositETHToFunction,
 		transfer.Receiver,   // 'to'
 		0,                   // 'l2Gas': hardcoded to 0 in the OptimismL1BridgeAdapter contract
 		transfer.BridgeData, // 'data'
