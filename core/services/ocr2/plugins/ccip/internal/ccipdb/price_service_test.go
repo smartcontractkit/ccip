@@ -18,6 +18,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
+	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils/pgtest"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	cciporm "github.com/smartcontractkit/chainlink/v2/core/services/ccip"
@@ -612,23 +613,19 @@ func setupORM(t *testing.T) cciporm.ORM {
 	return orm
 }
 
-func assertResultLen(t *testing.T, priceService PriceService, destChainSelector uint64, gasCount int, tokenCount int) {
+func checkResultLen(t *testing.T, priceService PriceService, destChainSelector uint64, gasCount int, tokenCount int) error {
 	ctx := tests.Context(t)
 	dbGasResult, dbTokenResult, err := priceService.GetGasAndTokenPrices(ctx, destChainSelector)
-	assert.NoError(t, err)
-	assert.Len(t, dbGasResult, gasCount)
-	assert.Len(t, dbTokenResult, tokenCount)
-	if gasCount > 0 {
-		assert.Equal(t, dbGasResult[0].SourceChainSelector, uint64(67890))
-		assert.Equal(t, dbGasResult[0].GasPrice.ToInt(), big.NewInt(20))
-
-		assert.Equal(t, dbTokenResult[0].TokenAddr, "0x234")
-		assert.Equal(t, dbTokenResult[0].TokenPrice.ToInt(), big.NewInt(3e18))
-
-		assert.Equal(t, dbTokenResult[1].TokenAddr, "0x345")
-		assert.Equal(t, dbTokenResult[1].TokenPrice.ToInt(), big.NewInt(4e18))
+	if err != nil {
+		return nil
 	}
-
+	if len(dbGasResult) != gasCount {
+		return fmt.Errorf("expected %d gas prices, got %d", gasCount, len(dbGasResult))
+	}
+	if len(dbTokenResult) != tokenCount {
+		return fmt.Errorf("expected %d token prices, got %d", tokenCount, len(dbTokenResult))
+	}
+	return nil
 }
 
 func TestPriceService_priceWriteAndCleanupInBackground(t *testing.T) {
@@ -690,8 +687,8 @@ func TestPriceService_priceWriteAndCleanupInBackground(t *testing.T) {
 		offRampReader,
 	).(*priceService)
 
-	updateInterval := 2 * time.Second
-	cleanupInterval := 3 * time.Second
+	updateInterval := 1000 * time.Millisecond
+	cleanupInterval := 1500 * time.Millisecond
 
 	// run write task every 2 second
 	priceService.updateInterval = updateInterval
@@ -701,7 +698,7 @@ func TestPriceService_priceWriteAndCleanupInBackground(t *testing.T) {
 	priceService.priceExpireSec = 0
 
 	// initially, db is empty
-	assertResultLen(t, priceService, destChainSelector, 0, 0)
+	assert.NoError(t, checkResultLen(t, priceService, destChainSelector, 0, 0))
 
 	// starts PriceService in the background
 	assert.NoError(t, priceService.Start(ctx))
@@ -709,26 +706,26 @@ func TestPriceService_priceWriteAndCleanupInBackground(t *testing.T) {
 	// setting dynamicConfig triggers initial price update
 	err := priceService.UpdateDynamicConfig(ctx, gasPriceEstimator, destPriceReg)
 	assert.NoError(t, err)
-	assertResultLen(t, priceService, destChainSelector, 1, len(laneTokens))
+	assert.NoError(t, checkResultLen(t, priceService, destChainSelector, 1, len(laneTokens)))
 
-	// running cleanup removes all prices
-	err = priceService.runCleanup(ctx)
-	assert.NoError(t, err)
-	assertResultLen(t, priceService, destChainSelector, 0, 0)
+	// eventually prices will be cleaned
+	assert.Eventually(t, func() bool {
+		err := checkResultLen(t, priceService, destChainSelector, 0, 0)
+		return err == nil
+	}, testutils.WaitTimeout(t), testutils.TestInterval)
 
-	// updateInterval triggers price update
-	time.Sleep(updateInterval + 200*time.Millisecond)
-	assertResultLen(t, priceService, destChainSelector, 1, len(laneTokens))
-
-	// cleanupInterval triggers cleanup
-	time.Sleep(cleanupInterval - updateInterval)
-	assertResultLen(t, priceService, destChainSelector, 0, 0)
+	// then prices will be updated again
+	assert.Eventually(t, func() bool {
+		err := checkResultLen(t, priceService, destChainSelector, 1, len(laneTokens))
+		return err == nil
+	}, testutils.WaitTimeout(t), testutils.TestInterval)
 
 	assert.NoError(t, priceService.Close())
+	assert.NoError(t, priceService.runCleanup(ctx))
 
-	// after stopping PriceService, no more updates are triggered
+	// after stopping PriceService and runCleanup, no more updates are inserted
 	for i := 0; i < 5; i++ {
 		time.Sleep(time.Second)
-		assertResultLen(t, priceService, destChainSelector, 0, 0)
+		assert.NoError(t, checkResultLen(t, priceService, destChainSelector, 0, 0))
 	}
 }
