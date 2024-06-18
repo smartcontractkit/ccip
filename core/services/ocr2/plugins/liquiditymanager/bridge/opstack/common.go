@@ -21,6 +21,9 @@ const (
 	// StageFinalizeConfirmed is set as the transfer stage when the finalization is confirmed onchain.
 	// This is a terminal stage.
 	StageFinalizeConfirmed = 3
+
+	// Function calls
+	DepositETHToFunction = "depositETHTo"
 )
 
 var (

@@ -73,8 +73,14 @@ func NewL2ToL1Bridge(
 	if !ok {
 		return nil, fmt.Errorf("unknown chain selector for remote chain: %d", remoteSelector)
 	}
-	l2FilterName := fmt.Sprintf("ArbitrumL2ToL1Bridge-L2-LiquidityManager:%s-Local:%s-Remote:%s",
-		l2LiquidityManagerAddress.Hex(), localChain.Name, remoteChain.Name)
+	l2FilterName := bridgecommon.GetBridgeFilterName(
+		"ArbitrumL2ToL1Bridge",
+		"L2",
+		l2LiquidityManagerAddress,
+		localChain.Name,
+		remoteChain.Name,
+		"",
+	)
 	// FIXME Makram fix the context plax
 	ctx := context.Background()
 	err := l2LogPoller.RegisterFilter(
@@ -91,8 +97,14 @@ func NewL2ToL1Bridge(
 		return nil, fmt.Errorf("register filter for Arbitrum L2 to L1 bridge: %w", err)
 	}
 
-	l1FilterName := fmt.Sprintf("ArbitrumL2ToL1Bridge-L1-Rollup:%s-LiquidityManager:%s-Local:%s-Remote:%s",
-		l1RollupAddress.Hex(), l1LiquidityManagerAddress.Hex(), localChain.Name, remoteChain.Name)
+	l1FilterName := bridgecommon.GetBridgeFilterName(
+		"ArbitrumL2ToL1Bridge",
+		"L1",
+		l1LiquidityManagerAddress,
+		localChain.Name,
+		remoteChain.Name,
+		fmt.Sprintf("Rollup:%s", l1RollupAddress.Hex()),
+	)
 	err = l1LogPoller.RegisterFilter(
 		ctx,
 		logpoller.Filter{
