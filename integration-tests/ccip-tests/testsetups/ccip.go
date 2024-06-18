@@ -237,10 +237,13 @@ func (c *CCIPTestConfig) SetNetworkPairs(lggr zerolog.Logger) error {
 			}
 			name := fmt.Sprintf("private-chain-%d", len(c.SelectedNetworks)+1)
 			c.SelectedNetworks = append(c.SelectedNetworks, blockchain.EVMNetwork{
-				Name:                      name,
-				ChainID:                   chainID,
-				Simulated:                 true,
-				PrivateKeys:               []string{networks.AdditionalSimulatedPvtKeys[i]},
+				Name:      name,
+				ChainID:   chainID,
+				Simulated: true,
+				PrivateKeys: []string{
+					networks.AdditionalSimulatedPvtKeys[i],
+					"ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80", // second key for token deployments
+				},
 				ChainlinkTransactionLimit: n.ChainlinkTransactionLimit,
 				Timeout:                   n.Timeout,
 				MinimumConfirmations:      n.MinimumConfirmations,
@@ -913,7 +916,7 @@ func CCIPDefaultTestSetUp(
 	if testConfig.useSeparateTokenDeployer() {
 		for _, net := range testConfig.AllNetworks {
 			chainClient := chainClientByChainID[net.ChainID]
-			require.GreaterOrEqual(t, len(chainClient.GetWallets()), 2, "The test is using a TokenAdminRegistry, and has CCIPOwnerTokens set to 'false'. The test needs a second wallet to deploy token contracts from.")
+			require.GreaterOrEqual(t, len(chainClient.GetWallets()), 2, "The test is using a TokenAdminRegistry, and has CCIPOwnerTokens set to 'false'. The test needs a second wallet to deploy token contracts from. Please add a second wallet to the 'evm_clients' config option.")
 			tokenDeployerWallet := chainClient.GetWallets()[1]
 			// TODO: This is a total guess at how much funds we need to deploy the tokens. This could be way off, especially on live chains.
 			// There aren't a lot of good ways to estimate this though. See CCIP-2471.
