@@ -59,7 +59,7 @@ class ExecutePlugin:
     def outcome(self, previous_outcome, observations):
         # merge observations, removing any which do not reach f_chain threshold.
         commit_reports = merge_commit_observations(observations, self.cfg["f_chain"])
-        messages = merge_commit_observations(observations, self.cfg["f_chain"])
+        messages = merge_message_observations(observations, self.cfg["f_chain"])
 
         # flatten report map and sort by timestamp
         flattened_reports = flattenReports(commit_reports)
