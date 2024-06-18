@@ -131,6 +131,9 @@ func jobSpecToCommitPluginConfig(ctx context.Context, lggr logger.Logger, jb job
 
 	versionFinder := factory.NewEvmVersionFinder()
 	commitStoreReader, err := factory.NewCommitStoreReader(lggr, versionFinder, params.commitStoreAddress, params.destChain.Client(), params.destChain.LogPoller())
+	if err != nil {
+		return nil, nil, nil, errors.Wrap(err, "could not create commitStore reader")
+	}
 
 	err = commitStoreReader.SetGasEstimator(ctx, params.sourceChain.GasEstimator())
 	if err != nil {
@@ -142,9 +145,6 @@ func jobSpecToCommitPluginConfig(ctx context.Context, lggr logger.Logger, jb job
 		return nil, nil, nil, fmt.Errorf("could not set source max gas price: %w", err)
 	}
 
-	if err != nil {
-		return nil, nil, nil, errors.Wrap(err, "could not create commitStore reader")
-	}
 	sourceChainName, destChainName, err := ccipconfig.ResolveChainNames(params.sourceChain.ID().Int64(), params.destChain.ID().Int64())
 	if err != nil {
 		return nil, nil, nil, err
