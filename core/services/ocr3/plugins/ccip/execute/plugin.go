@@ -7,11 +7,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	cciptypes "github.com/smartcontractkit/ccipocr3/ccipocr3-dont-merge"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
-	//cciptypes "github.com/smartcontractkit/ccipocr3/ccipocr3-dont-merge"
 )
 
 // Plugin implements the main ocr3 plugin logic.

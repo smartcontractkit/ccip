@@ -5,7 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	cciptypes "github.com/smartcontractkit/ccipocr3/ccipocr3-dont-merge"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
 
 func TestBigIntSortedMiddle(t *testing.T) {

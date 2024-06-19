@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"testing"
 
-	cciptypes "github.com/smartcontractkit/ccipocr3/ccipocr3-dont-merge"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/stretchr/testify/mock"
 
@@ -17,7 +17,6 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	//cciptypes "github.com/smartcontractkit/ccipocr3/ccipocr3-dont-merge"
 )
 
 func TestPlugin(t *testing.T) {

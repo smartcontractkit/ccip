@@ -9,7 +9,7 @@ import (
 
 	"github.com/smartcontractkit/libocr/commontypes"
 
-	cciptypes "github.com/smartcontractkit/ccipocr3/ccipocr3-dont-merge"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
 
 // validateObserverReadingEligibility checks if the observer is eligible to observe the messages it observed.

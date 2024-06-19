@@ -7,9 +7,9 @@ import (
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
-	cciptypes "github.com/smartcontractkit/ccipocr3/ccipocr3-dont-merge"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
 
 type HomeChainConfigPoller struct {

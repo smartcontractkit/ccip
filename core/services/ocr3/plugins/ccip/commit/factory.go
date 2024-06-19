@@ -3,12 +3,11 @@ package commit
 import (
 	"context"
 
-	cciptypes "github.com/smartcontractkit/ccipocr3/ccipocr3-dont-merge"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"google.golang.org/grpc"
 
-	//cciptypes "github.com/smartcontractkit/ccipocr3/ccipocr3-dont-merge"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 )
 
