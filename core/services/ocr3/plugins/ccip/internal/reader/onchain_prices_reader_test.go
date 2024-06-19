@@ -2,6 +2,7 @@ package reader
 
 import (
 	"context"
+	"fmt"
 	"math/big"
 	"testing"
 
@@ -24,14 +25,14 @@ var (
 )
 
 func TestOnchainTokenPricesReader_GetTokenPricesUSD(t *testing.T) {
-
 	testCases := []struct {
-		name         string
-		staticPrices map[ocr2types.Account]big.Int
-		inputTokens  []ocr2types.Account
-		mockPrices   map[ocr2types.Account]*big.Int
-		want         []*big.Int
-		wantErr      bool
+		name          string
+		staticPrices  map[ocr2types.Account]big.Int
+		inputTokens   []ocr2types.Account
+		mockPrices    map[ocr2types.Account]*big.Int
+		want          []*big.Int
+		errorAccounts []ocr2types.Account
+		wantErr       bool
 	}{
 		{
 			name:         "Static price only",
@@ -51,13 +52,22 @@ func TestOnchainTokenPricesReader_GetTokenPricesUSD(t *testing.T) {
 			name:         "Mix of static price and onchain price",
 			staticPrices: map[ocr2types.Account]big.Int{ETH_ACC: *ETH_PRICE},
 			inputTokens:  []ocr2types.Account{ETH_ACC, OP_ACC, ARB_ACC},
-			mockPrices:   map[ocr2types.Account]*big.Int{OP_ACC: OP_PRICE, ARB_ACC: ARB_PRICE},
+			mockPrices:   map[ocr2types.Account]*big.Int{ARB_ACC: ARB_PRICE, OP_ACC: OP_PRICE},
 			want:         []*big.Int{ETH_PRICE, OP_PRICE, ARB_PRICE},
+		},
+		{
+			name:          "Missing price should error",
+			staticPrices:  map[ocr2types.Account]big.Int{},
+			inputTokens:   []ocr2types.Account{ARB_ACC, OP_ACC, ETH_ACC},
+			mockPrices:    map[ocr2types.Account]*big.Int{OP_ACC: OP_PRICE, ARB_ACC: ARB_PRICE},
+			errorAccounts: []ocr2types.Account{ETH_ACC},
+			want:          nil,
+			wantErr:       true,
 		},
 	}
 
 	for _, tc := range testCases {
-		contractReader := createMockReader(tc.mockPrices)
+		contractReader := createMockReader(tc.mockPrices, tc.errorAccounts)
 		tokenPricesReader := OnchainTokenPricesReader{
 			TokenPriceConfig: TokenPriceConfig{StaticPrices: tc.staticPrices},
 			ContractReader:   contractReader,
@@ -78,15 +88,20 @@ func TestOnchainTokenPricesReader_GetTokenPricesUSD(t *testing.T) {
 
 }
 
-func createMockReader(mockPrices map[ocr2types.Account]*big.Int) *mocks.ContractReaderMock {
+func createMockReader(mockPrices map[ocr2types.Account]*big.Int, errorAccounts []ocr2types.Account) *mocks.ContractReaderMock {
 	reader := mocks.NewContractReaderMock()
+	for _, acc := range errorAccounts {
+		acc := acc
+		reader.On("GetLatestValue", mock.Anything, "PriceAggregator", "getTokenPrice", acc, mock.Anything).Return(fmt.Errorf("error"))
+	}
 	for acc, price := range mockPrices {
+		acc := acc
+		price := price
 		reader.On("GetLatestValue", mock.Anything, "PriceAggregator", "getTokenPrice", acc, mock.Anything).Run(
 			func(args mock.Arguments) {
 				arg := args.Get(4).(*big.Int)
 				arg.Set(price)
 			}).Return(nil)
 	}
-
 	return reader
 }

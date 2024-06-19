@@ -32,19 +32,15 @@ func (pr *OnchainTokenPricesReader) GetTokenPricesUSD(ctx context.Context, token
 		idx := idx
 		token := token
 		eg.Go(func() error {
-			//print("token: ", token, "\n")
 			price := new(big.Int)
 			if staticPrice, exists := pr.TokenPriceConfig.StaticPrices[token]; exists {
-				println("staticPrice: ", staticPrice.String(), "\n")
 				price.Set(&staticPrice)
 			} else {
 				if err := pr.ContractReader.GetLatestValue(ctx, contractName, functionName, token, price); err != nil {
 					return fmt.Errorf("failed to get token price for %s: %w", token, err)
 				}
-				println("token: ", token, "returned price: ", price.String())
 			}
-			//prices[idx] = price
-			prices[idx] = new(big.Int).Set(price)
+			prices[idx] = price
 			return nil
 		})
 	}
