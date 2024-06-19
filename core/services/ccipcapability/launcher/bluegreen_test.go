@@ -101,7 +101,7 @@ func Test_commitExecDeployment_Shutdown(t *testing.T) {
 	}
 }
 
-func Test_commitExecDeployment_NumCommitInstances(t *testing.T) {
+func Test_commitExecDeployment_HasGreenCommitInstance(t *testing.T) {
 	type fields struct {
 		commit blueGreenDeployment
 		exec   blueGreenDeployment
@@ -109,7 +109,7 @@ func Test_commitExecDeployment_NumCommitInstances(t *testing.T) {
 	tests := []struct {
 		name   string
 		fields fields
-		want   int
+		want   bool
 	}{
 		{
 			name: "only commit blue is present",
@@ -118,7 +118,7 @@ func Test_commitExecDeployment_NumCommitInstances(t *testing.T) {
 					blue: mocktypes.NewCCIPOracle(t),
 				},
 			},
-			want: 1,
+			want: false,
 		},
 		{
 			name: "both commit blue and green are present",
@@ -128,7 +128,7 @@ func Test_commitExecDeployment_NumCommitInstances(t *testing.T) {
 					green: mocktypes.NewCCIPOracle(t),
 				},
 			},
-			want: 2,
+			want: true,
 		},
 	}
 	for _, tt := range tests {
@@ -137,8 +137,8 @@ func Test_commitExecDeployment_NumCommitInstances(t *testing.T) {
 				commit: tt.fields.commit,
 				exec:   tt.fields.exec,
 			}
-			if got := c.NumCommitInstances(); got != tt.want {
-				t.Errorf("commitExecDeployment.NumCommitInstances() = %v, want %v", got, tt.want)
+			if got := c.HasGreenCommitInstance(); got != tt.want {
+				t.Errorf("commitExecDeployment.HasGreenCommitInstance() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -152,7 +152,7 @@ func Test_commitExecDeployment_NumExecInstances(t *testing.T) {
 	tests := []struct {
 		name   string
 		fields fields
-		want   int
+		want   bool
 	}{
 		{
 			name: "only exec blue is present",
@@ -161,7 +161,7 @@ func Test_commitExecDeployment_NumExecInstances(t *testing.T) {
 					blue: mocktypes.NewCCIPOracle(t),
 				},
 			},
-			want: 1,
+			want: false,
 		},
 		{
 			name: "both exec blue and green are present",
@@ -171,7 +171,7 @@ func Test_commitExecDeployment_NumExecInstances(t *testing.T) {
 					green: mocktypes.NewCCIPOracle(t),
 				},
 			},
-			want: 2,
+			want: true,
 		},
 	}
 	for _, tt := range tests {
@@ -180,7 +180,7 @@ func Test_commitExecDeployment_NumExecInstances(t *testing.T) {
 				commit: tt.fields.commit,
 				exec:   tt.fields.exec,
 			}
-			if got := c.NumExecInstances(); got != tt.want {
+			if got := c.HasGreenExecInstance(); got != tt.want {
 				t.Errorf("commitExecDeployment.NumExecInstances() = %v, want %v", got, tt.want)
 			}
 		})

@@ -55,19 +55,19 @@ func Test_compareDONs(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotAdded, gotRemoved, gotUpdated, err := compareDONs(tt.args.currCCIPDONs, tt.args.newCCIPDONs)
+			dr, err := compareDONs(tt.args.currCCIPDONs, tt.args.newCCIPDONs)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("compareDONs() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if !reflect.DeepEqual(gotAdded, tt.wantAdded) {
-				t.Errorf("compareDONs() gotAdded = %v, want %v", gotAdded, tt.wantAdded)
+			if !reflect.DeepEqual(dr.added, tt.wantAdded) {
+				t.Errorf("compareDONs() gotAdded = %v, want %v", dr.added, tt.wantAdded)
 			}
-			if !reflect.DeepEqual(gotRemoved, tt.wantRemoved) {
-				t.Errorf("compareDONs() gotRemoved = %v, want %v", gotRemoved, tt.wantRemoved)
+			if !reflect.DeepEqual(dr.removed, tt.wantRemoved) {
+				t.Errorf("compareDONs() gotRemoved = %v, want %v", dr.removed, tt.wantRemoved)
 			}
-			if !reflect.DeepEqual(gotUpdated, tt.wantUpdated) {
-				t.Errorf("compareDONs() gotUpdated = %v, want %v", gotUpdated, tt.wantUpdated)
+			if !reflect.DeepEqual(dr.updated, tt.wantUpdated) {
+				t.Errorf("compareDONs() gotUpdated = %v, want %v", dr.updated, tt.wantUpdated)
 			}
 		})
 	}

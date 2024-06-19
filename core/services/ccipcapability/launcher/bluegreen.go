@@ -42,18 +42,12 @@ func (c *ccipDeployment) Shutdown() error {
 	return err
 }
 
-// NumCommitInstances returns the number of commit OCR instances in the deployment.
-func (c *ccipDeployment) NumCommitInstances() int {
-	if c.commit.green != nil {
-		return 2
-	}
-	return 1
+// HasGreenCommitInstance returns true if and only if the green commit instance is not nil.
+func (c *ccipDeployment) HasGreenCommitInstance() bool {
+	return c.commit.green != nil
 }
 
-// NumExecInstances returns the number of exec OCR instances in the deployment.
-func (c *ccipDeployment) NumExecInstances() int {
-	if c.exec.green != nil {
-		return 2
-	}
-	return 1
+// HasGreenExecInstance returns true if and only if the green exec instance is not nil.
+func (c *ccipDeployment) HasGreenExecInstance() bool {
+	return c.exec.green != nil
 }

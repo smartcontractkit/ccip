@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/pkg/errors"
-
 	"github.com/smartcontractkit/chainlink-common/pkg/loop"
 	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
@@ -77,93 +75,27 @@ func (d *Delegate) ServicesForSpec(ctx context.Context, spec job.Job) (services 
 	// The job spec should specify the correct P2P key to use.
 	peerID, err := p2pkey.MakePeerID(spec.CCIPSpec.P2PKeyID)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to make peer ID from provided spec p2p id: %s", spec.CCIPSpec.P2PKeyID)
+		return nil, fmt.Errorf("failed to make peer ID from provided spec p2p id (%s): %w", spec.CCIPSpec.P2PKeyID, err)
 	}
 
 	p2pID, err := d.keystore.P2P().Get(peerID)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to get all p2p keys")
+		return nil, fmt.Errorf("failed to get all p2p keys: %w", err)
 	}
 
-	ocrKeys := make(map[chaintype.ChainType]ocr2key.KeyBundle)
-	for chainType, bundleAny := range spec.CCIPSpec.OCRKeyBundleIDs {
-		ct := chaintype.ChainType(chainType)
-		if !chaintype.IsSupportedChainType(ct) {
-			return nil, errors.Errorf("unsupported chain type: %s", chainType)
-		}
-
-		bundleID, ok := bundleAny.(string)
-		if !ok {
-			return nil, errors.New("OCRKeyBundleIDs must be a map of chain types to OCR key bundle IDs")
-		}
-
-		bundle, err2 := d.keystore.OCR2().Get(bundleID)
-		if err2 != nil {
-			return nil, errors.Wrapf(err2, "OCR key bundle with ID %s not found", bundleID)
-		}
-
-		ocrKeys[ct] = bundle
+	ocrKeys, err := d.getOCRKeys(spec.CCIPSpec.OCRKeyBundleIDs)
+	if err != nil {
+		return nil, err
 	}
 
 	relayers, err := d.relayGetter.GetIDToRelayerMap()
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to get all relayers")
+		return nil, fmt.Errorf("failed to get all relayers: %w", err)
 	}
 
-	transmitterKeys := make(map[types.RelayID][]string)
-	for relayID := range relayers {
-		switch relayID.Network {
-		case types.NetworkEVM:
-			ethKeys, err2 := d.keystore.Eth().GetAll(ctx)
-			if err2 != nil {
-				return nil, fmt.Errorf("error getting all eth keys: %w", err2)
-			}
-
-			transmitterKeys[relayID] = func() (r []string) {
-				for _, key := range ethKeys {
-					r = append(r, key.String())
-				}
-				return
-			}()
-		case types.NetworkCosmos:
-			cosmosKeys, err2 := d.keystore.Cosmos().GetAll()
-			if err2 != nil {
-				return nil, fmt.Errorf("error getting all cosmos keys: %w", err2)
-			}
-
-			transmitterKeys[relayID] = func() (r []string) {
-				for _, key := range cosmosKeys {
-					r = append(r, key.String())
-				}
-				return
-			}()
-		case types.NetworkSolana:
-			solKey, err2 := d.keystore.Solana().GetAll()
-			if err2 != nil {
-				return nil, fmt.Errorf("error getting all solana keys: %w", err2)
-			}
-
-			transmitterKeys[relayID] = func() (r []string) {
-				for _, key := range solKey {
-					r = append(r, key.String())
-				}
-				return
-			}()
-		case types.NetworkStarkNet:
-			starkKey, err2 := d.keystore.StarkNet().GetAll()
-			if err2 != nil {
-				return nil, fmt.Errorf("error getting all stark keys: %w", err2)
-			}
-
-			transmitterKeys[relayID] = func() (r []string) {
-				for _, key := range starkKey {
-					r = append(r, key.String())
-				}
-				return
-			}()
-		default:
-			return nil, errors.Errorf("unsupported network: %s", relayID.Network)
-		}
+	transmitterKeys, err := d.getTransmitterKeys(ctx, relayers)
+	if err != nil {
+		return nil, err
 	}
 
 	// NOTE: we can use the same DB for all plugin instances,
@@ -207,4 +139,50 @@ func (d *Delegate) BeforeJobDeleted(spec job.Job) {}
 func (d *Delegate) OnDeleteJob(ctx context.Context, spec job.Job) error {
 	// TODO: shut down needed services?
 	return nil
+}
+
+func (d *Delegate) getOCRKeys(ocrKeyBundleIDs job.JSONConfig) (map[chaintype.ChainType]ocr2key.KeyBundle, error) {
+	ocrKeys := make(map[chaintype.ChainType]ocr2key.KeyBundle)
+	for chainType, bundleIDRaw := range ocrKeyBundleIDs {
+		ct := chaintype.ChainType(chainType)
+		if !chaintype.IsSupportedChainType(ct) {
+			return nil, fmt.Errorf("unsupported chain type: %s", chainType)
+		}
+
+		bundleID, ok := bundleIDRaw.(string)
+		if !ok {
+			return nil, fmt.Errorf("OCRKeyBundleIDs must be a map of chain types to OCR key bundle IDs, got: %T", bundleIDRaw)
+		}
+
+		bundle, err2 := d.keystore.OCR2().Get(bundleID)
+		if err2 != nil {
+			return nil, fmt.Errorf("OCR key bundle with ID %s not found: %w", bundleID, err2)
+		}
+
+		ocrKeys[ct] = bundle
+	}
+	return ocrKeys, nil
+}
+
+func (d *Delegate) getTransmitterKeys(ctx context.Context, relayers map[types.RelayID]loop.Relayer) (map[types.RelayID][]string, error) {
+	transmitterKeys := make(map[types.RelayID][]string)
+	for relayID := range relayers {
+		switch relayID.Network {
+		case types.NetworkEVM:
+			ethKeys, err2 := d.keystore.Eth().GetAll(ctx)
+			if err2 != nil {
+				return nil, fmt.Errorf("error getting all eth keys: %w", err2)
+			}
+
+			transmitterKeys[relayID] = func() (r []string) {
+				for _, key := range ethKeys {
+					r = append(r, key.String())
+				}
+				return
+			}()
+		default:
+			return nil, fmt.Errorf("unsupported network: %s", relayID.Network)
+		}
+	}
+	return transmitterKeys, nil
 }

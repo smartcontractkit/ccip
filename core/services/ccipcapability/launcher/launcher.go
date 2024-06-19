@@ -8,6 +8,7 @@ import (
 	"go.uber.org/multierr"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/keystone_capability_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	cctypes "github.com/smartcontractkit/chainlink/v2/core/services/ccipcapability/types"
@@ -47,6 +48,8 @@ func New(
 
 // launcher manages the lifecycles of the CCIP capability on all chains.
 type launcher struct {
+	utils.StartStopOnce
+
 	capabilityVersion      string
 	capabilityLabelledName string
 	p2pID                  p2pkey.KeyV2
@@ -65,23 +68,27 @@ type launcher struct {
 
 // Close implements job.ServiceCtx.
 func (l *launcher) Close() error {
-	// shut down the monitor goroutine.
-	close(l.stopChan)
+	return l.StartStopOnce.StopOnce("launcher", func() error {
+		// shut down the monitor goroutine.
+		close(l.stopChan)
 
-	// shut down all running oracles.
-	var err error
-	for _, ceDep := range l.dons {
-		err = multierr.Append(err, ceDep.Shutdown())
-	}
+		// shut down all running oracles.
+		var err error
+		for _, ceDep := range l.dons {
+			err = multierr.Append(err, ceDep.Shutdown())
+		}
 
-	return err
+		return err
+	})
 }
 
 // Start implements job.ServiceCtx.
 func (l *launcher) Start(context.Context) error {
-	l.stopChan = make(chan struct{})
-	go l.monitor()
-	return nil
+	return l.StartOnce("launcher", func() error {
+		l.stopChan = make(chan struct{})
+		go l.monitor()
+		return nil
+	})
 }
 
 func (l *launcher) monitor() {
@@ -206,7 +213,7 @@ func (l *launcher) updateDON(don keystone_capability_registry.CapabilityRegistry
 	// a) len(commitOCRConfigs) == 2 && ceDep.NumCommitInstances() == 2: this is an invariant violation.
 	// b) len(commitOCRConfigs) == 1 && ceDep.NumCommitInstances() == 1: this is an invariant violation.
 	// same thing applies to exec.
-	if len(commitOCRConfigs) == 2 && ceDep.NumCommitInstances() == 1 {
+	if len(commitOCRConfigs) == 2 && !ceDep.HasGreenCommitInstance() {
 		// this is a new green instance.
 		greenOracle, err := l.oracleCreator.CreateCommitOracle(commitOCRConfigs[1])
 		if err != nil {
@@ -219,7 +226,7 @@ func (l *launcher) updateDON(don keystone_capability_registry.CapabilityRegistry
 		ceDep.commit.green = greenOracle
 		l.lggr.Infow("Started green commit oracle",
 			"donId", don.Id, "ocrConfig", commitOCRConfigs[1].String())
-	} else if len(commitOCRConfigs) == 1 && ceDep.NumCommitInstances() == 2 {
+	} else if len(commitOCRConfigs) == 1 && ceDep.HasGreenCommitInstance() {
 		// this is a promotion of green->blue.
 		// swap the green oracle with the blue oracle in the ceDep struct.
 		oldBlue := ceDep.commit.blue
@@ -235,7 +242,7 @@ func (l *launcher) updateDON(don keystone_capability_registry.CapabilityRegistry
 		return fmt.Errorf("invariant violation: expected 1 or 2 OCR configs for CCIP commit plugin (don id: %d), got %d", don.Id, len(commitOCRConfigs))
 	}
 
-	if len(execOCRConfigs) == 2 && ceDep.NumExecInstances() == 1 {
+	if len(execOCRConfigs) == 2 && !ceDep.HasGreenExecInstance() {
 		// this is a new green instance.
 		greenOracle, err := l.oracleCreator.CreateExecOracle(execOCRConfigs[1])
 		if err != nil {
@@ -248,7 +255,7 @@ func (l *launcher) updateDON(don keystone_capability_registry.CapabilityRegistry
 		ceDep.exec.green = greenOracle
 		l.lggr.Infow("Started green exec oracle",
 			"donId", don.Id, "ocrConfig", execOCRConfigs[1].String())
-	} else if len(execOCRConfigs) == 1 && ceDep.NumExecInstances() == 2 {
+	} else if len(execOCRConfigs) == 1 && ceDep.HasGreenExecInstance() {
 		// this is a promotion of green->blue.
 		// swap the green oracle with the blue oracle in the ceDep struct.
 		oldBlue := ceDep.exec.blue

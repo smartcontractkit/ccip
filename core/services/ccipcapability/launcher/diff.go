@@ -5,15 +5,17 @@ import (
 
 	"github.com/ethereum/go-ethereum/crypto"
 
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/keystone_capability_registry"
+	kcr "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/keystone_capability_registry"
 	cctypes "github.com/smartcontractkit/chainlink/v2/core/services/ccipcapability/types"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/p2pkey"
 )
 
+type DonID = uint32
+
 type diffResult struct {
-	added   map[uint32]keystone_capability_registry.CapabilityRegistryDONInfo
-	removed map[uint32]keystone_capability_registry.CapabilityRegistryDONInfo
-	updated map[uint32]keystone_capability_registry.CapabilityRegistryDONInfo
+	added   map[DonID]kcr.CapabilityRegistryDONInfo
+	removed map[DonID]kcr.CapabilityRegistryDONInfo
+	updated map[DonID]kcr.CapabilityRegistryDONInfo
 }
 
 func diff(
@@ -24,42 +26,38 @@ func diff(
 ) (diffResult, error) {
 	ccipCapability, err := checkCapabilityPresence(capabilityVersion, capabilityLabelledName, newState)
 	if err != nil {
-		return diffResult{}, err
+		return diffResult{}, fmt.Errorf("failed to check capability presence: %w", err)
 	}
 
 	newCCIPDONs, err := filterCCIPDONs(ccipCapability, newState)
 	if err != nil {
-		return diffResult{}, err
+		return diffResult{}, fmt.Errorf("failed to filter CCIP DONs from new state: %w", err)
 	}
 
 	currCCIPDONs, err := filterCCIPDONs(ccipCapability, oldState)
 	if err != nil {
-		return diffResult{}, err
+		return diffResult{}, fmt.Errorf("failed to filter CCIP DONs from old state: %w", err)
 	}
 
 	// compare curr with new and launch or update OCR instances as needed
-	added, removed, updated, err := compareDONs(currCCIPDONs, newCCIPDONs)
+	diffRes, err := compareDONs(currCCIPDONs, newCCIPDONs)
 	if err != nil {
-		return diffResult{}, err
+		return diffResult{}, fmt.Errorf("failed to compare CCIP DONs: %w", err)
 	}
 
-	return diffResult{
-		added:   added,
-		removed: removed,
-		updated: updated,
-	}, nil
+	return diffRes, nil
 }
 
 func compareDONs(
 	currCCIPDONs,
-	newCCIPDONs map[uint32]keystone_capability_registry.CapabilityRegistryDONInfo,
+	newCCIPDONs map[DonID]kcr.CapabilityRegistryDONInfo,
 ) (
-	added, removed, updated map[uint32]keystone_capability_registry.CapabilityRegistryDONInfo,
+	dr diffResult,
 	err error,
 ) {
-	added = make(map[uint32]keystone_capability_registry.CapabilityRegistryDONInfo)
-	removed = make(map[uint32]keystone_capability_registry.CapabilityRegistryDONInfo)
-	updated = make(map[uint32]keystone_capability_registry.CapabilityRegistryDONInfo)
+	added := make(map[DonID]kcr.CapabilityRegistryDONInfo)
+	removed := make(map[DonID]kcr.CapabilityRegistryDONInfo)
+	updated := make(map[DonID]kcr.CapabilityRegistryDONInfo)
 
 	for id, don := range newCCIPDONs {
 		if currDONState, ok := currCCIPDONs[id]; !ok {
@@ -81,14 +79,18 @@ func compareDONs(
 		}
 	}
 
-	return added, removed, updated, nil
+	return diffResult{
+		added:   added,
+		removed: removed,
+		updated: updated,
+	}, nil
 }
 
 func filterCCIPDONs(
-	ccipCapability keystone_capability_registry.CapabilityRegistryCapability,
+	ccipCapability kcr.CapabilityRegistryCapability,
 	state cctypes.RegistryState,
-) (map[uint32]keystone_capability_registry.CapabilityRegistryDONInfo, error) {
-	ccipDONs := make(map[uint32]keystone_capability_registry.CapabilityRegistryDONInfo)
+) (map[DonID]kcr.CapabilityRegistryDONInfo, error) {
+	ccipDONs := make(map[DonID]kcr.CapabilityRegistryDONInfo)
 	for _, don := range state.DONs {
 		// CCIP DONs should only have one capability, CCIP.
 		var found bool
@@ -111,9 +113,9 @@ func checkCapabilityPresence(
 	capabilityVersion,
 	capabilityLabelledName string,
 	state cctypes.RegistryState,
-) (keystone_capability_registry.CapabilityRegistryCapability, error) {
+) (kcr.CapabilityRegistryCapability, error) {
 	// Sanity check to make sure the capability registry has the capability we are looking for.
-	var ccipCapability keystone_capability_registry.CapabilityRegistryCapability
+	var ccipCapability kcr.CapabilityRegistryCapability
 	for _, capability := range state.Capabilities {
 		if capability.LabelledName == capabilityLabelledName &&
 			capability.Version == capabilityVersion {
@@ -123,7 +125,7 @@ func checkCapabilityPresence(
 	}
 
 	if ccipCapability.LabelledName == "" {
-		return keystone_capability_registry.CapabilityRegistryCapability{},
+		return kcr.CapabilityRegistryCapability{},
 			fmt.Errorf("unable to find capability with name %s and version %s in capability registry state",
 				capabilityLabelledName, capabilityVersion)
 	}
@@ -143,13 +145,11 @@ func hashedCapabilityId(capabilityVersion, capabilityLabelledName string) (r [32
 }
 
 // isMemberOfDON returns true if and only if the given p2pID is a member of the given DON.
-func isMemberOfDON(don keystone_capability_registry.CapabilityRegistryDONInfo, p2pID p2pkey.KeyV2) bool {
-	var found bool
+func isMemberOfDON(don kcr.CapabilityRegistryDONInfo, p2pID p2pkey.KeyV2) bool {
 	for _, node := range don.NodeP2PIds {
 		if node == p2pID.PeerID() {
-			found = true
-			break
+			return true
 		}
 	}
-	return found
+	return false
 }
