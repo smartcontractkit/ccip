@@ -191,7 +191,7 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
   function test_SingleMessageNoTokens_Success() public {
     Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages();
     vm.expectEmit();
-    emit ExecutionStateChanged(
+    emit EVM2EVMOffRamp.ExecutionStateChanged(
       messages[0].sequenceNumber, messages[0].messageId, Internal.MessageExecutionState.SUCCESS, ""
     );
 
@@ -202,7 +202,7 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     messages[0].messageId = Internal._hash(messages[0], s_offRamp.metadataHash());
 
     vm.expectEmit();
-    emit ExecutionStateChanged(
+    emit EVM2EVMOffRamp.ExecutionStateChanged(
       messages[0].sequenceNumber, messages[0].messageId, Internal.MessageExecutionState.SUCCESS, ""
     );
 
@@ -217,7 +217,7 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     messages[0].messageId = Internal._hash(messages[0], s_offRamp.metadataHash());
 
     vm.expectEmit();
-    emit ExecutionStateChanged(
+    emit EVM2EVMOffRamp.ExecutionStateChanged(
       messages[0].sequenceNumber, messages[0].messageId, Internal.MessageExecutionState.SUCCESS, ""
     );
 
@@ -232,7 +232,7 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     messages[0].messageId = Internal._hash(messages[0], s_offRamp.metadataHash());
 
     vm.expectEmit();
-    emit ExecutionStateChanged(
+    emit EVM2EVMOffRamp.ExecutionStateChanged(
       messages[0].sequenceNumber, messages[0].messageId, Internal.MessageExecutionState.SUCCESS, ""
     );
 
@@ -256,7 +256,7 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     messages[0].messageId = Internal._hash(messages[0], s_offRamp.metadataHash());
 
     vm.expectEmit();
-    emit ExecutionStateChanged(
+    emit EVM2EVMOffRamp.ExecutionStateChanged(
       messages[0].sequenceNumber,
       messages[0].messageId,
       Internal.MessageExecutionState.FAILURE,
@@ -279,7 +279,7 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     messages[0].messageId = Internal._hash(messages[0], s_offRamp.metadataHash());
 
     vm.expectEmit();
-    emit ExecutionStateChanged(
+    emit EVM2EVMOffRamp.ExecutionStateChanged(
       messages[0].sequenceNumber, messages[0].messageId, Internal.MessageExecutionState.SUCCESS, ""
     );
     // Nonce should increment on a strict untouched -> success.
@@ -295,7 +295,7 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     messages[0].messageId = Internal._hash(messages[0], s_offRamp.metadataHash());
 
     vm.expectEmit();
-    emit SkippedIncorrectNonce(messages[0].nonce, messages[0].sender);
+    emit EVM2EVMOffRamp.SkippedIncorrectNonce(messages[0].nonce, messages[0].sender);
 
     s_offRamp.execute(_generateReportFromMessages(messages), new uint256[](0));
   }
@@ -307,12 +307,12 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     messages[1].messageId = Internal._hash(messages[1], s_offRamp.metadataHash());
 
     vm.expectEmit();
-    emit ExecutionStateChanged(
+    emit EVM2EVMOffRamp.ExecutionStateChanged(
       messages[0].sequenceNumber, messages[0].messageId, Internal.MessageExecutionState.SUCCESS, ""
     );
 
     vm.expectEmit();
-    emit SkippedIncorrectNonce(messages[1].nonce, messages[1].sender);
+    emit EVM2EVMOffRamp.SkippedIncorrectNonce(messages[1].nonce, messages[1].sender);
 
     s_offRamp.execute(_generateReportFromMessages(messages), new uint256[](0));
   }
@@ -321,7 +321,7 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages();
 
     vm.expectEmit();
-    emit ExecutionStateChanged(
+    emit EVM2EVMOffRamp.ExecutionStateChanged(
       messages[0].sequenceNumber, messages[0].messageId, Internal.MessageExecutionState.SUCCESS, ""
     );
 
@@ -339,7 +339,7 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     messages[0].messageId = Internal._hash(messages[0], s_offRamp.metadataHash());
 
     vm.expectEmit();
-    emit ExecutionStateChanged(
+    emit EVM2EVMOffRamp.ExecutionStateChanged(
       messages[0].sequenceNumber, messages[0].messageId, Internal.MessageExecutionState.SUCCESS, ""
     );
 
@@ -360,7 +360,7 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     messages[0].messageId = Internal._hash(messages[0], s_offRamp.metadataHash());
 
     vm.expectEmit();
-    emit ExecutionStateChanged(
+    emit EVM2EVMOffRamp.ExecutionStateChanged(
       messages[0].sequenceNumber, messages[0].messageId, Internal.MessageExecutionState.SUCCESS, ""
     );
 
@@ -372,7 +372,7 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages();
 
     vm.expectEmit();
-    emit ExecutionStateChanged(
+    emit EVM2EVMOffRamp.ExecutionStateChanged(
       messages[0].sequenceNumber, messages[0].messageId, Internal.MessageExecutionState.SUCCESS, ""
     );
 
@@ -390,12 +390,12 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     messages[1].messageId = Internal._hash(messages[1], s_offRamp.metadataHash());
 
     vm.expectEmit();
-    emit ExecutionStateChanged(
+    emit EVM2EVMOffRamp.ExecutionStateChanged(
       messages[0].sequenceNumber, messages[0].messageId, Internal.MessageExecutionState.SUCCESS, ""
     );
 
     vm.expectEmit();
-    emit ExecutionStateChanged(
+    emit EVM2EVMOffRamp.ExecutionStateChanged(
       messages[1].sequenceNumber, messages[1].messageId, Internal.MessageExecutionState.SUCCESS, ""
     );
 
@@ -412,12 +412,12 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     messages[1].messageId = Internal._hash(messages[1], s_offRamp.metadataHash());
 
     vm.expectEmit();
-    emit ExecutionStateChanged(
+    emit EVM2EVMOffRamp.ExecutionStateChanged(
       messages[0].sequenceNumber, messages[0].messageId, Internal.MessageExecutionState.SUCCESS, ""
     );
 
     vm.expectEmit();
-    emit ExecutionStateChanged(
+    emit EVM2EVMOffRamp.ExecutionStateChanged(
       messages[1].sequenceNumber, messages[1].messageId, Internal.MessageExecutionState.SUCCESS, ""
     );
 
@@ -443,7 +443,7 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
       messages[i].messageId = Internal._hash(messages[i], s_offRamp.metadataHash());
 
       vm.expectEmit();
-      emit ExecutionStateChanged(
+      emit EVM2EVMOffRamp.ExecutionStateChanged(
         messages[i].sequenceNumber, messages[i].messageId, Internal.MessageExecutionState.SUCCESS, ""
       );
     }
@@ -477,7 +477,7 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     messages[1].messageId = Internal._hash(messages[1], s_offRamp.metadataHash());
 
     vm.expectEmit();
-    emit ExecutionStateChanged(
+    emit EVM2EVMOffRamp.ExecutionStateChanged(
       messages[0].sequenceNumber,
       messages[0].messageId,
       Internal.MessageExecutionState.FAILURE,
@@ -634,7 +634,7 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     messages[0].messageId = Internal._hash(messages[0], s_offRamp.metadataHash());
 
     vm.expectEmit();
-    emit ExecutionStateChanged(
+    emit EVM2EVMOffRamp.ExecutionStateChanged(
       messages[0].sequenceNumber,
       messages[0].messageId,
       Internal.MessageExecutionState.FAILURE,
@@ -664,7 +664,7 @@ contract EVM2EVMOffRamp_execute_upgrade is EVM2EVMOffRampSetup {
   function test_V2_Success() public {
     Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages();
     vm.expectEmit();
-    emit ExecutionStateChanged(
+    emit EVM2EVMOffRamp.ExecutionStateChanged(
       messages[0].sequenceNumber, messages[0].messageId, Internal.MessageExecutionState.SUCCESS, ""
     );
 
@@ -689,7 +689,7 @@ contract EVM2EVMOffRamp_execute_upgrade is EVM2EVMOffRampSetup {
   function test_V2NonceStartsAtV1Nonce_Success() public {
     Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages();
     vm.expectEmit();
-    emit ExecutionStateChanged(
+    emit EVM2EVMOffRamp.ExecutionStateChanged(
       messages[0].sequenceNumber, messages[0].messageId, Internal.MessageExecutionState.SUCCESS, ""
     );
 
@@ -703,7 +703,7 @@ contract EVM2EVMOffRamp_execute_upgrade is EVM2EVMOffRampSetup {
     messages[0].messageId = Internal._hash(messages[0], s_offRamp.metadataHash());
 
     vm.expectEmit();
-    emit ExecutionStateChanged(
+    emit EVM2EVMOffRamp.ExecutionStateChanged(
       messages[0].sequenceNumber, messages[0].messageId, Internal.MessageExecutionState.SUCCESS, ""
     );
 
@@ -715,7 +715,7 @@ contract EVM2EVMOffRamp_execute_upgrade is EVM2EVMOffRampSetup {
     messages[0].messageId = Internal._hash(messages[0], s_offRamp.metadataHash());
 
     vm.expectEmit();
-    emit ExecutionStateChanged(
+    emit EVM2EVMOffRamp.ExecutionStateChanged(
       messages[0].sequenceNumber, messages[0].messageId, Internal.MessageExecutionState.SUCCESS, ""
     );
 
@@ -726,7 +726,7 @@ contract EVM2EVMOffRamp_execute_upgrade is EVM2EVMOffRampSetup {
   function test_V2NonceNewSenderStartsAtZero_Success() public {
     Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages();
     vm.expectEmit();
-    emit ExecutionStateChanged(
+    emit EVM2EVMOffRamp.ExecutionStateChanged(
       messages[0].sequenceNumber, messages[0].messageId, Internal.MessageExecutionState.SUCCESS, ""
     );
 
@@ -737,7 +737,7 @@ contract EVM2EVMOffRamp_execute_upgrade is EVM2EVMOffRampSetup {
     messages[0].messageId = Internal._hash(messages[0], s_offRamp.metadataHash());
 
     vm.expectEmit();
-    emit ExecutionStateChanged(
+    emit EVM2EVMOffRamp.ExecutionStateChanged(
       messages[0].sequenceNumber, messages[0].messageId, Internal.MessageExecutionState.SUCCESS, ""
     );
 
@@ -769,7 +769,7 @@ contract EVM2EVMOffRamp_execute_upgrade is EVM2EVMOffRampSetup {
 
     // previous offramp executes msg and increases nonce
     vm.expectEmit();
-    emit ExecutionStateChanged(
+    emit EVM2EVMOffRamp.ExecutionStateChanged(
       messages[0].sequenceNumber, messages[0].messageId, Internal.MessageExecutionState.SUCCESS, ""
     );
     s_prevOffRamp.execute(_generateReportFromMessages(messages), new uint256[](0));
@@ -780,7 +780,7 @@ contract EVM2EVMOffRamp_execute_upgrade is EVM2EVMOffRampSetup {
 
     // new offramp is able to execute
     vm.expectEmit();
-    emit ExecutionStateChanged(
+    emit EVM2EVMOffRamp.ExecutionStateChanged(
       messages[0].sequenceNumber, messages[0].messageId, Internal.MessageExecutionState.SUCCESS, ""
     );
 
@@ -926,7 +926,7 @@ contract EVM2EVMOffRamp__report is EVM2EVMOffRampSetup {
     Internal.ExecutionReport memory report = _generateReportFromMessages(messages);
 
     vm.expectEmit();
-    emit ExecutionStateChanged(
+    emit EVM2EVMOffRamp.ExecutionStateChanged(
       messages[0].sequenceNumber, messages[0].messageId, Internal.MessageExecutionState.SUCCESS, ""
     );
     s_offRamp.report(abi.encode(report));
@@ -943,7 +943,7 @@ contract EVM2EVMOffRamp_manuallyExecute is EVM2EVMOffRampSetup {
     s_reverting_receiver.setRevert(false);
 
     vm.expectEmit();
-    emit ExecutionStateChanged(
+    emit EVM2EVMOffRamp.ExecutionStateChanged(
       messages[0].sequenceNumber, messages[0].messageId, Internal.MessageExecutionState.SUCCESS, ""
     );
     s_offRamp.manuallyExecute(_generateReportFromMessages(messages), new uint256[](messages.length));
@@ -958,7 +958,7 @@ contract EVM2EVMOffRamp_manuallyExecute is EVM2EVMOffRampSetup {
     s_reverting_receiver.setRevert(false);
 
     vm.expectEmit();
-    emit ExecutionStateChanged(
+    emit EVM2EVMOffRamp.ExecutionStateChanged(
       messages[0].sequenceNumber, messages[0].messageId, Internal.MessageExecutionState.SUCCESS, ""
     );
 
@@ -975,7 +975,7 @@ contract EVM2EVMOffRamp_manuallyExecute is EVM2EVMOffRampSetup {
     messages[0].messageId = Internal._hash(messages[0], s_offRamp.metadataHash());
 
     vm.expectEmit();
-    emit ExecutionStateChanged(
+    emit EVM2EVMOffRamp.ExecutionStateChanged(
       messages[0].sequenceNumber,
       messages[0].messageId,
       Internal.MessageExecutionState.FAILURE,
@@ -990,7 +990,7 @@ contract EVM2EVMOffRamp_manuallyExecute is EVM2EVMOffRampSetup {
     emit MaybeRevertMessageReceiver.MessageReceived();
 
     vm.expectEmit();
-    emit ExecutionStateChanged(
+    emit EVM2EVMOffRamp.ExecutionStateChanged(
       messages[0].sequenceNumber, messages[0].messageId, Internal.MessageExecutionState.SUCCESS, ""
     );
     s_offRamp.manuallyExecute(_generateReportFromMessages(messages), gasLimitOverrides);
@@ -1087,14 +1087,15 @@ contract EVM2EVMOffRamp_manuallyExecute is EVM2EVMOffRampSetup {
 
     // The first entry should be fine and triggers the second entry. This one fails
     // but since it's an inner tx of the first one it is caught in the try-catch.
-    // Since this is manual exec, the entire tx fails on any failure.
-    vm.expectRevert(
+    // This means the first tx is marked `FAILURE` with the error message of the second tx.
+    vm.expectEmit();
+    emit EVM2EVMOffRamp.ExecutionStateChanged(
+      messages[0].sequenceNumber,
+      messages[0].messageId,
+      Internal.MessageExecutionState.FAILURE,
       abi.encodeWithSelector(
-        EVM2EVMOffRamp.ExecutionError.selector,
-        abi.encodeWithSelector(
-          EVM2EVMOffRamp.ReceiverError.selector,
-          abi.encodeWithSelector(EVM2EVMOffRamp.AlreadyExecuted.selector, messages[0].sequenceNumber)
-        )
+        EVM2EVMOffRamp.ReceiverError.selector,
+        abi.encodeWithSelector(EVM2EVMOffRamp.AlreadyExecuted.selector, messages[0].sequenceNumber)
       )
     );
 

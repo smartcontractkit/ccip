@@ -1917,16 +1917,17 @@ contract EVM2EVMMultiOffRamp_manuallyExecute is EVM2EVMMultiOffRampSetup {
 
     // The first entry should be fine and triggers the second entry. This one fails
     // but since it's an inner tx of the first one it is caught in the try-catch.
-    // Since this is manual exec, the entire tx fails on any failure.
-    vm.expectRevert(
+    // This means the first tx is marked `FAILURE` with the error message of the second tx.
+    vm.expectEmit();
+    emit EVM2EVMMultiOffRamp.ExecutionStateChanged(
+      messages[0].sourceChainSelector,
+      messages[0].sequenceNumber,
+      messages[0].messageId,
+      Internal.MessageExecutionState.FAILURE,
       abi.encodeWithSelector(
-        EVM2EVMMultiOffRamp.ExecutionError.selector,
-        messages[0].messageId,
+        EVM2EVMMultiOffRamp.ReceiverError.selector,
         abi.encodeWithSelector(
-          EVM2EVMMultiOffRamp.ReceiverError.selector,
-          abi.encodeWithSelector(
-            EVM2EVMMultiOffRamp.AlreadyExecuted.selector, SOURCE_CHAIN_SELECTOR_1, messages[0].sequenceNumber
-          )
+          EVM2EVMMultiOffRamp.AlreadyExecuted.selector, messages[0].sourceChainSelector, messages[0].sequenceNumber
         )
       )
     );
