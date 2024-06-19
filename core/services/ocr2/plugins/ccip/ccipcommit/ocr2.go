@@ -112,7 +112,8 @@ func (r *CommitReportingPlugin) Observation(ctx context.Context, epochAndRound t
 		return nil, err
 	}
 
-	sourceGasPriceUSD, tokenPricesUSD, err := r.observePriceUpdates(ctx)
+	// Fetches multi-lane gas prices and token prices, for the given dest chain
+	gasPricesUSD, tokenPricesUSD, err := r.priceService.GetGasAndTokenPrices(ctx, r.destChainSelector)
 	if err != nil {
 		return nil, err
 	}
@@ -120,7 +121,7 @@ func (r *CommitReportingPlugin) Observation(ctx context.Context, epochAndRound t
 	lggr.Infow("Observation",
 		"minSeqNr", minSeqNr,
 		"maxSeqNr", maxSeqNr,
-		"sourceGasPriceUSD", sourceGasPriceUSD,
+		"gasPricesUSD", gasPricesUSD,
 		"tokenPricesUSD", tokenPricesUSD,
 		"epochAndRound", epochAndRound,
 		"messageIDs", messageIDs,
@@ -134,8 +135,9 @@ func (r *CommitReportingPlugin) Observation(ctx context.Context, epochAndRound t
 			Min: minSeqNr,
 			Max: maxSeqNr,
 		},
-		TokenPricesUSD:    tokenPricesUSD,
-		SourceGasPriceUSD: sourceGasPriceUSD,
+		TokenPricesUSD:            tokenPricesUSD,
+		SourceGasPriceUSD:         gasPricesUSD[r.sourceChainSelector], // for backwards compatibility during phased rollout
+		GasPriceUSDPerSourceChain: gasPricesUSD,
 	}.Marshal()
 }
 
@@ -172,23 +174,6 @@ func (r *CommitReportingPlugin) calculateMinMaxSequenceNumbers(ctx context.Conte
 		return 0, 0, []cciptypes.Hash{}, errors.New("unexpected gap in seq nums")
 	}
 	return minSeqNr, maxSeqNr, messageIDs, nil
-}
-
-func (r *CommitReportingPlugin) observePriceUpdates(
-	ctx context.Context,
-) (sourceGasPriceUSD *big.Int, tokenPricesUSD map[cciptypes.Address]*big.Int, err error) {
-	gasPricesUSD, tokenPricesUSD, err := r.priceService.GetGasAndTokenPrices(ctx, r.destChainSelector)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	// Reduce to single gas price for compatibility. In a followup PR, Commit plugin will make use of all source chain gas prices.
-	sourceGasPriceUSD = gasPricesUSD[r.sourceChainSelector]
-	if sourceGasPriceUSD == nil {
-		return nil, nil, fmt.Errorf("missing gas price for sourceChainSelector %d", r.sourceChainSelector)
-	}
-
-	return sourceGasPriceUSD, tokenPricesUSD, nil
 }
 
 // Gets the latest token price updates based on logs within the heartbeat
@@ -269,6 +254,7 @@ func (r *CommitReportingPlugin) Report(ctx context.Context, epochAndRound types.
 		return false, nil, err
 	}
 
+	// @Matt TODO
 	gasPrices, tokenPrices, err := r.selectPriceUpdates(ctx, now, gasPriceObs, tokenPriceObs)
 	if err != nil {
 		return false, nil, err
@@ -363,12 +349,13 @@ func calculateIntervalConsensus(intervals []cciptypes.CommitStoreInterval, f int
 
 // extractObservationData extracts observation fields into their own slices
 // and filters out observation data that are invalid
-func extractObservationData(lggr logger.Logger, f int, observations []ccip.CommitObservation) (intervals []cciptypes.CommitStoreInterval, gasPrices []*big.Int, tokenPrices map[cciptypes.Address][]*big.Int, err error) {
-	// We require at least f+1 observations to each consensus. Checking to ensure there are at least f+1 parsed observations.
+func extractObservationData(lggr logger.Logger, f int, observations []ccip.CommitObservation) (intervals []cciptypes.CommitStoreInterval, gasPrices map[uint64][]*big.Int, tokenPrices map[cciptypes.Address][]*big.Int, err error) {
+	// We require at least f+1 observations to reach consensus. Checking to ensure there are at least f+1 parsed observations.
 	if len(observations) <= f {
 		return nil, nil, nil, fmt.Errorf("not enough observations to form consensus: #obs=%d, f=%d", len(observations), f)
 	}
 
+	gasPriceObservations := make(map[uint64][]*big.Int)
 	tokenPriceObservations := make(map[cciptypes.Address][]*big.Int)
 	for _, obs := range observations {
 		intervals = append(intervals, obs.Interval)

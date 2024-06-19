@@ -3,7 +3,6 @@ package ccipcommit
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"math/big"
 	"math/rand"
 	"slices"
@@ -24,8 +23,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/hashutil"
 	"github.com/smartcontractkit/chainlink-common/pkg/merklemulti"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
-
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas/mocks"
@@ -566,109 +563,6 @@ func TestCommitReportingPlugin_ShouldTransmitAcceptedReport(t *testing.T) {
 		_, err := p.ShouldTransmitAcceptedReport(ctx, types.ReportTimestamp{}, reportBytes)
 		assert.Error(t, err)
 	})
-}
-
-func TestCommitReportingPlugin_observePriceUpdates(t *testing.T) {
-	destChainSelector := uint64(12345)
-	sourceChainSelector := uint64(67890)
-
-	token1 := ccipcalc.HexToAddress("0x123")
-	token2 := ccipcalc.HexToAddress("0x234")
-
-	gasPrice := big.NewInt(1e18)
-	tokenPrices := map[cciptypes.Address]*big.Int{
-		token1: big.NewInt(2e18),
-		token2: big.NewInt(3e18),
-	}
-
-	testCases := []struct {
-		name                string
-		psGasPricesResult   map[uint64]*big.Int
-		psTokenPricesResult map[cciptypes.Address]*big.Int
-
-		expectedGasPrice    *big.Int
-		expectedTokenPrices map[cciptypes.Address]*big.Int
-
-		psError     bool
-		expectedErr bool
-	}{
-		{
-			name: "ORM called successfully",
-			psGasPricesResult: map[uint64]*big.Int{
-				sourceChainSelector: gasPrice,
-			},
-			psTokenPricesResult: tokenPrices,
-			expectedGasPrice:    gasPrice,
-			expectedTokenPrices: tokenPrices,
-			psError:             false,
-			expectedErr:         false,
-		},
-		{
-			name: "multiple gas prices",
-			psGasPricesResult: map[uint64]*big.Int{
-				sourceChainSelector:     gasPrice,
-				sourceChainSelector + 1: big.NewInt(200),
-				sourceChainSelector + 2: big.NewInt(300),
-			},
-			psTokenPricesResult: map[cciptypes.Address]*big.Int{},
-			expectedGasPrice:    gasPrice,
-			expectedTokenPrices: map[cciptypes.Address]*big.Int{},
-			psError:             false,
-			expectedErr:         false,
-		},
-		{
-			name: "mismatched gas prices errors",
-			psGasPricesResult: map[uint64]*big.Int{
-				sourceChainSelector + 2: big.NewInt(300),
-			},
-			psTokenPricesResult: map[cciptypes.Address]*big.Int{},
-			psError:             false,
-			expectedErr:         true,
-		},
-		{
-			name:                "empty gas prices errors",
-			psGasPricesResult:   map[uint64]*big.Int{},
-			psTokenPricesResult: map[cciptypes.Address]*big.Int{},
-			psError:             false,
-			expectedErr:         true,
-		},
-		{
-			name:        "price service failed",
-			psError:     true,
-			expectedErr: true,
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			ctx := tests.Context(t)
-
-			mockPriceService := ccipdbmocks.NewPriceService(t)
-			var psError error
-			if tc.psError {
-				psError = fmt.Errorf("price service error")
-			}
-			mockPriceService.On("GetGasAndTokenPrices", ctx, destChainSelector).Return(
-				tc.psGasPricesResult,
-				tc.psTokenPricesResult,
-				psError,
-			).Maybe()
-
-			p := &CommitReportingPlugin{
-				destChainSelector:   destChainSelector,
-				sourceChainSelector: sourceChainSelector,
-				priceService:        mockPriceService,
-			}
-			sourceGasPriceUSD, tokenPricesUSD, err := p.observePriceUpdates(ctx)
-			if tc.expectedErr {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-				assert.Equal(t, tc.expectedGasPrice, sourceGasPriceUSD)
-				assert.Equal(t, tc.expectedTokenPrices, tokenPricesUSD)
-			}
-		})
-	}
 }
 
 func TestCommitReportingPlugin_extractObservationData(t *testing.T) {
