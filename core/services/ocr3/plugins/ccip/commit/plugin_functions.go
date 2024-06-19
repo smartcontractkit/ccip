@@ -288,7 +288,7 @@ func newMsgsConsensusForChain(
 	msgSeqNumToHash := make(map[cciptypes.SeqNum]cciptypes.Bytes32)
 	for seqNum, hashCounts := range msgSeqNumToHashCounts {
 		if len(hashCounts) == 0 {
-			lggr.Errorw("critical error hash counts should never be empty", "seqNum", seqNum)
+			lggr.Fatalw("hash counts should never be empty", "seqNum", seqNum)
 			continue
 		}
 
@@ -558,9 +558,8 @@ func validateObservedSequenceNumbers(msgs []cciptypes.CCIPMsgBaseDetails, maxSeq
 
 	seqNums := make(map[cciptypes.ChainSelector]mapset.Set[cciptypes.SeqNum], len(msgs))
 	hashes := mapset.NewSet[string]()
-	emptyHash := cciptypes.Bytes32{}.String()
 	for _, msg := range msgs {
-		if msg.MsgHash.String() == emptyHash {
+		if msg.MsgHash.IsEmpty() {
 			return fmt.Errorf("observed msg hash must not be empty")
 		}
 
