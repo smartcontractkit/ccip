@@ -1278,7 +1278,7 @@ func (r *TokenAdminRegistry) SetAdminAndRegisterPool(tokenAddr, poolAddr common.
 	if err != nil {
 		return fmt.Errorf("error getting transaction opts: %w", err)
 	}
-	tx, err := r.Instance.RegisterAdministratorPermissioned(opts, tokenAddr, opts.From)
+	tx, err := r.Instance.ProposeAdministrator(opts, tokenAddr, opts.From)
 	if err != nil {
 		return fmt.Errorf("error setting admin for token %s : %w", tokenAddr.Hex(), err)
 	}

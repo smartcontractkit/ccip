@@ -941,9 +941,9 @@ contract EVM2EVMMultiOnRamp_getFeeSetup is EVM2EVMMultiOnRampSetup {
     EVM2EVMMultiOnRampSetup.setUp();
 
     // Add additional pool addresses for test tokens to mark them as supported
-    s_tokenAdminRegistry.registerAdministratorPermissioned(s_sourceRouter.getWrappedNative(), OWNER);
+    s_tokenAdminRegistry.proposeAdministrator(s_sourceRouter.getWrappedNative(), OWNER);
     s_tokenAdminRegistry.acceptAdminRole(s_sourceRouter.getWrappedNative());
-    s_tokenAdminRegistry.registerAdministratorPermissioned(CUSTOM_TOKEN, OWNER);
+    s_tokenAdminRegistry.proposeAdministrator(CUSTOM_TOKEN, OWNER);
     s_tokenAdminRegistry.acceptAdminRole(CUSTOM_TOKEN);
 
     LockReleaseTokenPool wrappedNativePool = new LockReleaseTokenPool(

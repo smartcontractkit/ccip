@@ -36,7 +36,7 @@ contract RegistryModuleOwnerCustom_registerAdminViaGetCCIPAdmin is RegistryModul
     vm.expectCall(s_token, abi.encodeWithSelector(IGetCCIPAdmin.getCCIPAdmin.selector), 1);
     vm.expectCall(
       address(s_tokenAdminRegistry),
-      abi.encodeWithSelector(TokenAdminRegistry.registerAdministrator.selector, s_token, expectedOwner),
+      abi.encodeWithSelector(TokenAdminRegistry.proposeAdministrator.selector, s_token, expectedOwner),
       1
     );
 
@@ -70,7 +70,7 @@ contract RegistryModuleOwnerCustom_registerAdminViaOwner is RegistryModuleOwnerC
     vm.expectCall(s_token, abi.encodeWithSelector(IOwner.owner.selector), 1);
     vm.expectCall(
       address(s_tokenAdminRegistry),
-      abi.encodeWithSelector(TokenAdminRegistry.registerAdministrator.selector, s_token, expectedOwner),
+      abi.encodeWithSelector(TokenAdminRegistry.proposeAdministrator.selector, s_token, expectedOwner),
       1
     );
 

@@ -16,7 +16,7 @@ import {EnumerableSet} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts
 contract TokenAdminRegistry is ITokenAdminRegistry, ITypeAndVersion, OwnerIsCreator {
   using EnumerableSet for EnumerableSet.AddressSet;
 
-  error OnlyRegistryModule(address sender);
+  error OnlyRegistryModuleOrOwner(address sender);
   error OnlyAdministrator(address sender, address token);
   error OnlyPendingAdministrator(address sender, address token);
   error AlreadyRegistered(address token);
@@ -35,9 +35,8 @@ contract TokenAdminRegistry is ITokenAdminRegistry, ITypeAndVersion, OwnerIsCrea
   // The struct is packed in a way that optimizes the attributes that are accessed together.
   // solhint-disable-next-line gas-struct-packing
   struct TokenConfig {
-    bool disableReRegistration; // ─╮ if true, the token cannot be permissionlessly re-registered
-    address administrator; // ──────╯ the current administrator of the token
-    address pendingAdministrator; //  the address that is pending to become the new owner
+    address administrator; // the current administrator of the token
+    address pendingAdministrator; // the address that is pending to become the new administrator
     address tokenPool; // the token pool for this token. Can be address(0) if not deployed or not configured.
   }
 
@@ -152,15 +151,6 @@ contract TokenAdminRegistry is ITokenAdminRegistry, ITypeAndVersion, OwnerIsCrea
     emit AdministratorTransferred(localToken, msg.sender);
   }
 
-  /// @notice Disables the re-registration of a token.
-  /// @param localToken The token to disable re-registration for.
-  /// @param disabled True to disable re-registration, false to enable it.
-  function setDisableReRegistration(address localToken, bool disabled) external onlyTokenAdmin(localToken) {
-    s_tokenConfig[localToken].disableReRegistration = disabled;
-
-    emit DisableReRegistrationSet(localToken, disabled);
-  }
-
   // ================================================================
   // │                    Administrator config                      │
   // ================================================================
@@ -172,28 +162,10 @@ contract TokenAdminRegistry is ITokenAdminRegistry, ITypeAndVersion, OwnerIsCrea
 
   /// @inheritdoc ITokenAdminRegistry
   /// @dev Can only be called by a registry module.
-  function registerAdministrator(address localToken, address administrator) external {
-    // Only allow permissioned registry modules to register administrators
-    if (!isRegistryModule(msg.sender)) {
-      revert OnlyRegistryModule(msg.sender);
+  function proposeAdministrator(address localToken, address administrator) external {
+    if (!isRegistryModule(msg.sender) && msg.sender != owner()) {
+      revert OnlyRegistryModuleOrOwner(msg.sender);
     }
-    TokenConfig storage config = s_tokenConfig[localToken];
-
-    // disableReRegistration can only be true if the token is already registered
-    if (config.disableReRegistration) {
-      revert AlreadyRegistered(localToken);
-    }
-
-    _registerToken(config, localToken, administrator);
-  }
-
-  /// @notice Registers a local administrator for a token by setting the pendingAdministrator to the given address.
-  /// This function is used as a fallback when the permissionless methods don't work for a token. It only sets the
-  /// pending administrator
-  /// @param localToken The token to register the administrator for.
-  /// @param administrator The address of the new administrator.
-  /// @dev Can only be called by the owner.
-  function registerAdministratorPermissioned(address localToken, address administrator) external onlyOwner {
     if (administrator == address(0)) {
       revert ZeroAddress();
     }
@@ -203,15 +175,9 @@ contract TokenAdminRegistry is ITokenAdminRegistry, ITypeAndVersion, OwnerIsCrea
       revert AlreadyRegistered(localToken);
     }
 
-    _registerToken(config, localToken, administrator);
-  }
-
-  /// @notice Sets the given administrator as pendingAdministrator for the token. We don't set it as
-  /// administrator as this could lead to a state where the administrator is wrongly set and cannot be
-  /// recovered. Using a 2-step process ensures the new administrator is able to interact with this contract.
-  function _registerToken(TokenConfig storage config, address localToken, address administrator) internal {
     config.pendingAdministrator = administrator;
 
+    // We don't care if it's already in the set, as it's a no-op.
     s_tokens.add(localToken);
 
     emit PendingAdministratorRegistered(localToken, administrator);
