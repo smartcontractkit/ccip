@@ -35,7 +35,7 @@ contract CCIPSender is CCIPClientBase {
 
   function ccipSend(
     uint64 destChainSelector,
-    Client.EVMTokenAmount[] memory tokenAmounts,
+    Client.EVMTokenAmount[] calldata tokenAmounts,
     bytes calldata data,
     address feeToken
   ) public payable validChain(destChainSelector) returns (bytes32 messageId) {
@@ -52,7 +52,7 @@ contract CCIPSender is CCIPClientBase {
     // TODO: Decide whether workflow should assume contract is funded with tokens to send already
     for (uint256 i = 0; i < tokenAmounts.length; ++i) {
       // Transfer the tokens to pay for tokens in tokenAmounts
-      IERC20(tokenAmounts[i].token).transferFrom(msg.sender, address(this), tokenAmounts[i].amount);
+      IERC20(tokenAmounts[i].token).safeTransferFrom(msg.sender, address(this), tokenAmounts[i].amount);
 
       // If they're not sending the fee token, then go ahead and approve
       if (tokenAmounts[i].token != feeToken) {
@@ -60,7 +60,7 @@ contract CCIPSender is CCIPClientBase {
       }
       // If they are sending the feeToken through, and also paying in it, then approve the router for both tokenAmount and the fee()
       else if (tokenAmounts[i].token == feeToken && feeToken != address(0)) {
-        IERC20(tokenAmounts[i].token).transferFrom(msg.sender, address(this), fee);
+        IERC20(tokenAmounts[i].token).safeTransferFrom(msg.sender, address(this), fee);
         IERC20(tokenAmounts[i].token).safeApprove(i_ccipRouter, tokenAmounts[i].amount + fee);
       }
     }
@@ -79,5 +79,7 @@ contract CCIPSender is CCIPClientBase {
       IRouterClient(i_ccipRouter).ccipSend{value: feeToken == address(0) ? fee : 0}(destChainSelector, message);
 
     emit MessageSent(messageId);
+
+    return messageId;
   }
 }

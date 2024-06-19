@@ -228,4 +228,17 @@ contract CCIPReceiverTest is EVM2EVMOnRampSetup {
       })
     );
   }
+
+  function test_withdraw_nativeToken_to_owner() public {
+    uint256 amount = 100 ether;
+    deal(address(s_receiver), amount);
+
+    uint256 balanceBefore = OWNER.balance;
+
+    vm.startPrank(OWNER);
+
+    s_receiver.withdrawNativeToken(payable(OWNER), amount);
+
+    assertEq(OWNER.balance, balanceBefore + amount);
+  }
 }

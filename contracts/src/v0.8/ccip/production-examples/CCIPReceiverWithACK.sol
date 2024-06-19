@@ -16,21 +16,29 @@ contract CCIPReceiverWithACK is CCIPReceiver {
   // Current feeToken
   IERC20 public s_feeToken;
 
-  bytes public constant ackMessageMagicBytes = "MESSAGE_ACKNOWLEDGED_";
+  bytes public constant ACKMESSAGEMAGICBYTES = "MESSAGE_ACKNOWLEDGED_";
 
-  mapping(bytes32 messageId => bool ackReceived) public s_messageAckReceived;
+  // mapping(bytes32 messageId => bool ackReceived) public s_messageAckReceived;
+  mapping(bytes32 messageId => MessageStatus status) public s_messageStatus;
 
   event MessageAckSent(bytes32 incomingMessageId);
-  event MessageSent(bytes32);
+  event MessageSent(bytes32 indexed incomingMessageId, bytes32 indexed ACKMessageId);
   event MessageAckReceived(bytes32);
 
   error InvalidMagicBytes();
+  error MessageAlreadyAcknowledged(bytes32 messageId);
 
   event FeeTokenModified(address indexed oldToken, address indexed newToken);
 
   enum MessageType {
     OUTGOING,
     ACK
+  }
+
+  enum MessageStatus {
+    QUIET,
+    SENT,
+    ACKNOWLEDGED
   }
 
   struct MessagePayload {
@@ -97,40 +105,43 @@ contract CCIPReceiverWithACK is CCIPReceiver {
 
     Client.EVM2AnyMessage memory outgoingMessage = Client.EVM2AnyMessage({
       receiver: incomingMessage.sender,
-      data: abi.encode(ackMessageMagicBytes, incomingMessage.messageId),
+      data: abi.encode(ACKMESSAGEMAGICBYTES, incomingMessage.messageId),
       tokenAmounts: tokenAmounts,
-      extraArgs: "",
-      feeToken: address(s_feeToken) // We leave the feeToken empty indicating we'll pay raw native.
+      extraArgs: s_extraArgsBytes[incomingMessage.sourceChainSelector],
+      feeToken: address(s_feeToken)
     });
 
     uint256 feeAmount = IRouterClient(i_ccipRouter).getFee(incomingMessage.sourceChainSelector, outgoingMessage);
 
-    bytes32 messageId = IRouterClient(i_ccipRouter).ccipSend{value: address(s_feeToken) == address(0) ? feeAmount : 0}(
-      incomingMessage.sourceChainSelector, outgoingMessage
-    );
+    bytes32 ACKmessageId = IRouterClient(i_ccipRouter).ccipSend{
+      value: address(s_feeToken) == address(0) ? feeAmount : 0
+    }(incomingMessage.sourceChainSelector, outgoingMessage);
 
-    emit MessageAckSent(incomingMessage.messageId);
-    emit MessageSent(messageId);
+    emit MessageSent(incomingMessage.messageId, ACKmessageId);
   }
 
-  /// @notice overrides CCIPReceiver processMessage to make easier to modify
+  /// CCIPReceiver processMessage to make easier to modify
+  /// @notice Function does NOT require the status of an incoming ACK be "sent" because this implementation does not send, only receives
   function processMessage(Client.Any2EVMMessage calldata message) external virtual override onlySelf {
     (MessagePayload memory payload) = abi.decode(message.data, (MessagePayload));
 
     if (payload.messageType == MessageType.OUTGOING) {
       // Insert Processing workflow here.
 
-      // If the message was outgoin, then send an ack response.
+      // If the message was outgoing, then send an ack response.
       _sendAck(message);
     } else if (payload.messageType == MessageType.ACK) {
       // Decode message into the magic-bytes and the messageId to ensure the message is encoded correctly
       (bytes memory magicBytes, bytes32 messageId) = abi.decode(payload.data, (bytes, bytes32));
 
       // Ensure Ack Message contains proper magic-bytes
-      if (keccak256(magicBytes) != keccak256(ackMessageMagicBytes)) revert InvalidMagicBytes();
+      if (keccak256(magicBytes) != keccak256(ACKMESSAGEMAGICBYTES)) revert InvalidMagicBytes();
+
+      // Make sure the ACK message has not already been acknowledged
+      if (s_messageStatus[messageId] == MessageStatus.ACKNOWLEDGED) revert MessageAlreadyAcknowledged(messageId);
 
       // Mark the message has finalized from a proper ack-message.
-      s_messageAckReceived[messageId] = true;
+      s_messageStatus[messageId] = MessageStatus.ACKNOWLEDGED;
 
       emit MessageAckReceived(messageId);
     }

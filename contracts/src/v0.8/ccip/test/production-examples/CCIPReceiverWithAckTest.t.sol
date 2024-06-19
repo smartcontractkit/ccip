@@ -13,7 +13,7 @@ contract CCIPReceiverWithAckTest is EVM2EVMOnRampSetup {
   event MessageFailed(bytes32 indexed messageId, bytes reason);
   event MessageSucceeded(bytes32 indexed messageId);
   event MessageRecovered(bytes32 indexed messageId);
-  event MessageSent(bytes32);
+  event MessageSent(bytes32 indexed incomingmessageId, bytes32 indexed ackmessageId);
   event MessageAckSent(bytes32 incomingMessageId);
   event MessageAckReceived(bytes32);
 
@@ -37,8 +37,8 @@ contract CCIPReceiverWithAckTest is EVM2EVMOnRampSetup {
 
   function test_ccipReceive_and_respond_with_ack() public {
     bytes32 messageId = keccak256("messageId");
+    bytes32 ackMessageId = 0x37ddbb21a51d4e07877b0de816905ea806b958e7607d951d307030631db076bd;
     address token = address(s_sourceFeeToken);
-    uint256 amount = 111333333777;
     Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](0);
 
     // Make sure we give the receiver contract enough tokens like CCIP would.
@@ -55,7 +55,7 @@ contract CCIPReceiverWithAckTest is EVM2EVMOnRampSetup {
 
     Client.EVM2AnyMessage memory ackMessage = Client.EVM2AnyMessage({
       receiver: abi.encode(address(s_receiver)),
-      data: abi.encode(s_receiver.ackMessageMagicBytes(), messageId),
+      data: abi.encode(s_receiver.ACKMESSAGEMAGICBYTES(), messageId),
       tokenAmounts: destTokenAmounts,
       feeToken: s_sourceFeeToken,
       extraArgs: ""
@@ -66,7 +66,7 @@ contract CCIPReceiverWithAckTest is EVM2EVMOnRampSetup {
     uint256 receiverBalanceBefore = IERC20(s_sourceFeeToken).balanceOf(address(s_receiver));
 
     vm.expectEmit();
-    emit MessageAckSent(messageId);
+    emit MessageSent(messageId, ackMessageId);
 
     s_receiver.ccipReceive(
       Client.Any2EVMMessage({
@@ -91,7 +91,7 @@ contract CCIPReceiverWithAckTest is EVM2EVMOnRampSetup {
 
     CCIPReceiverWithACK.MessagePayload memory payload = CCIPReceiverWithACK.MessagePayload({
       version: "",
-      data: abi.encode(s_receiver.ackMessageMagicBytes(), messageId),
+      data: abi.encode(s_receiver.ACKMESSAGEMAGICBYTES(), messageId),
       messageType: CCIPReceiverWithACK.MessageType.ACK
     });
 
@@ -108,7 +108,11 @@ contract CCIPReceiverWithAckTest is EVM2EVMOnRampSetup {
       })
     );
 
-    assertTrue(s_receiver.s_messageAckReceived(messageId), "Ack message was not properly received");
+    assertEq(
+      uint256(s_receiver.s_messageStatus(messageId)),
+      uint256(CCIPReceiverWithACK.MessageStatus.ACKNOWLEDGED),
+      "Ack message was not properly received"
+    );
   }
 
   function test_ccipReceiver_ack_with_invalidMagicBytes_REVERT() public {

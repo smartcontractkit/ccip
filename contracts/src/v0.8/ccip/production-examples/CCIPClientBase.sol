@@ -4,11 +4,13 @@ import {OwnerIsCreator} from "../../shared/access/OwnerIsCreator.sol";
 
 import {IERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
+import {Address} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/Address.sol";
 
 import {ICCIPClientBase} from "./interfaces/ICCIPClientBase.sol";
 
 abstract contract CCIPClientBase is ICCIPClientBase, OwnerIsCreator {
   using SafeERC20 for IERC20;
+  using Address for address;
 
   address internal immutable i_ccipRouter;
 
@@ -58,6 +60,10 @@ abstract contract CCIPClientBase is ICCIPClientBase, OwnerIsCreator {
 
   fallback() external payable {}
   receive() external payable {}
+
+  function withdrawNativeToken(address payable to, uint256 amount) external onlyOwner {
+    Address.sendValue(to, amount);
+  }
 
   function withdrawTokens(address token, address to, uint256 amount) external onlyOwner {
     IERC20(token).safeTransfer(to, amount);

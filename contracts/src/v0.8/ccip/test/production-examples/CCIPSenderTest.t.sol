@@ -55,6 +55,35 @@ contract CCIPSenderTest is EVM2EVMOnRampSetup {
     assertEq(IERC20(token).balanceOf(OWNER), feeTokenBalanceBefore - amount - feeTokenAmount);
   }
 
+  function test_ccipSend_withNonNativeFeetoken_andNoDestTokens() public {
+    address token = address(s_sourceFeeToken);
+    Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](0);
+
+    // Make sure we give the receiver contract enough tokens like CCIP would.
+    IERC20(token).approve(address(s_sender), type(uint256).max);
+
+    Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
+      receiver: abi.encode(address(s_sender)),
+      data: "",
+      tokenAmounts: destTokenAmounts,
+      feeToken: s_sourceFeeToken,
+      extraArgs: ""
+    });
+
+    uint256 feeTokenAmount = s_sourceRouter.getFee(DEST_CHAIN_SELECTOR, message);
+    uint256 feeTokenBalanceBefore = IERC20(s_sourceFeeToken).balanceOf(OWNER);
+
+    s_sender.ccipSend({
+      destChainSelector: DEST_CHAIN_SELECTOR,
+      tokenAmounts: destTokenAmounts,
+      data: "",
+      feeToken: address(s_sourceFeeToken)
+    });
+
+    // Assert that tokens were transfered for bridging + fees
+    assertEq(IERC20(token).balanceOf(OWNER), feeTokenBalanceBefore - feeTokenAmount);
+  }
+
   function test_ccipSend_with_NativeFeeToken_andDestTokens() public {
     address token = address(s_sourceFeeToken);
     uint256 amount = 111333333777;
@@ -89,8 +118,6 @@ contract CCIPSenderTest is EVM2EVMOnRampSetup {
   }
 
   function test_ccipSend_withNativeFeeToken_butInsufficientMsgValue_REVERT() public {
-    address token = address(s_sourceFeeToken);
-    uint256 amount = 111333333777;
     Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](0);
 
     Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
