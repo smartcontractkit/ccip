@@ -210,16 +210,16 @@ contract TokenAdminRegistry_acceptAdminRole is TokenAdminRegistrySetup {
 
 contract TokenAdminRegistry_isAdministrator is TokenAdminRegistrySetup {
   function test_isAdministrator_Success() public {
-    address newOwner = makeAddr("newOwner");
+    address newAdmin = makeAddr("newAdmin");
     address newToken = makeAddr("newToken");
-    assertFalse(s_tokenAdminRegistry.isAdministrator(newToken, newOwner));
+    assertFalse(s_tokenAdminRegistry.isAdministrator(newToken, newAdmin));
     assertFalse(s_tokenAdminRegistry.isAdministrator(newToken, OWNER));
 
-    s_tokenAdminRegistry.proposeAdministrator(newToken, newOwner);
-    changePrank(newOwner);
+    s_tokenAdminRegistry.proposeAdministrator(newToken, newAdmin);
+    changePrank(newAdmin);
     s_tokenAdminRegistry.acceptAdminRole(newToken);
 
-    assertTrue(s_tokenAdminRegistry.isAdministrator(newToken, newOwner));
+    assertTrue(s_tokenAdminRegistry.isAdministrator(newToken, newAdmin));
     assertFalse(s_tokenAdminRegistry.isAdministrator(newToken, OWNER));
   }
 }
@@ -227,22 +227,22 @@ contract TokenAdminRegistry_isAdministrator is TokenAdminRegistrySetup {
 contract TokenAdminRegistry_proposeAdministrator is TokenAdminRegistrySetup {
   function test_proposeAdministrator_module_Success() public {
     vm.startPrank(s_registryModule);
-    address newOwner = makeAddr("newOwner");
+    address newAdmin = makeAddr("newAdmin");
     address newToken = makeAddr("newToken");
 
     vm.expectEmit();
-    emit TokenAdminRegistry.PendingAdministratorRegistered(newToken, newOwner);
+    emit TokenAdminRegistry.AdministratorTransferRequested(newToken, address(0), newAdmin);
 
-    s_tokenAdminRegistry.proposeAdministrator(newToken, newOwner);
+    s_tokenAdminRegistry.proposeAdministrator(newToken, newAdmin);
 
-    assertEq(s_tokenAdminRegistry.getTokenConfig(newToken).pendingAdministrator, newOwner);
+    assertEq(s_tokenAdminRegistry.getTokenConfig(newToken).pendingAdministrator, newAdmin);
     assertEq(s_tokenAdminRegistry.getTokenConfig(newToken).administrator, address(0));
     assertEq(s_tokenAdminRegistry.getTokenConfig(newToken).tokenPool, address(0));
 
-    changePrank(newOwner);
+    changePrank(newAdmin);
     s_tokenAdminRegistry.acceptAdminRole(newToken);
 
-    assertTrue(s_tokenAdminRegistry.isAdministrator(newToken, newOwner));
+    assertTrue(s_tokenAdminRegistry.isAdministrator(newToken, newAdmin));
   }
 
   function test_proposeAdministrator_owner_Success() public {
@@ -250,7 +250,7 @@ contract TokenAdminRegistry_proposeAdministrator is TokenAdminRegistrySetup {
     address newToken = makeAddr("newToken");
 
     vm.expectEmit();
-    emit TokenAdminRegistry.PendingAdministratorRegistered(newToken, newAdmin);
+    emit TokenAdminRegistry.AdministratorTransferRequested(newToken, address(0), newAdmin);
 
     s_tokenAdminRegistry.proposeAdministrator(newToken, newAdmin);
 
@@ -267,7 +267,7 @@ contract TokenAdminRegistry_proposeAdministrator is TokenAdminRegistrySetup {
     address newToken = makeAddr("newToken");
 
     vm.expectEmit();
-    emit TokenAdminRegistry.PendingAdministratorRegistered(newToken, newAdmin);
+    emit TokenAdminRegistry.AdministratorTransferRequested(newToken, address(0), newAdmin);
 
     s_tokenAdminRegistry.proposeAdministrator(newToken, newAdmin);
 
@@ -276,7 +276,7 @@ contract TokenAdminRegistry_proposeAdministrator is TokenAdminRegistrySetup {
     newAdmin = makeAddr("correctAddress");
 
     vm.expectEmit();
-    emit TokenAdminRegistry.PendingAdministratorRegistered(newToken, newAdmin);
+    emit TokenAdminRegistry.AdministratorTransferRequested(newToken, address(0), newAdmin);
 
     // Ensure we can still register the correct admin while the previous admin is unclaimed.
     s_tokenAdminRegistry.proposeAdministrator(newToken, newAdmin);

@@ -23,7 +23,6 @@ contract TokenAdminRegistry is ITokenAdminRegistry, ITypeAndVersion, OwnerIsCrea
   error ZeroAddress();
   error InvalidTokenPoolToken(address token);
 
-  event PendingAdministratorRegistered(address indexed token, address indexed pendingAdministrator);
   event PoolSet(address indexed token, address indexed previousPool, address indexed newPool);
   event AdministratorTransferRequested(address indexed token, address indexed currentAdmin, address indexed newAdmin);
   event AdministratorTransferred(address indexed token, address indexed newAdmin);
@@ -180,7 +179,7 @@ contract TokenAdminRegistry is ITokenAdminRegistry, ITypeAndVersion, OwnerIsCrea
     // We don't care if it's already in the set, as it's a no-op.
     s_tokens.add(localToken);
 
-    emit PendingAdministratorRegistered(localToken, administrator);
+    emit AdministratorTransferRequested(localToken, address(0), administrator);
   }
 
   // ================================================================
