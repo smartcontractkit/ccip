@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-/// @notice Application contracts that intend to receive messages from
-/// the router should implement this interface.
+/// @notice Contract interface that allows managing sender nonces
 interface INonceManager {
   /// @notice Increments the outbound nonce for the given sender on the given destination chain
   /// @param destChainSelector The destination chain selector

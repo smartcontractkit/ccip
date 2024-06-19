@@ -35,7 +35,7 @@ contract NonceManager is INonceManager, AuthorizedCallers {
   /// @dev previous ramps
   mapping(uint64 chainSelector => PreviousRamps previousRamps) private s_previousRamps;
   /// @dev The current nonces per sender used on the on/off ramps
-  mapping(uint64 remotChainSelector => mapping(bytes sender => Nonce nonce)) private s_nonces;
+  mapping(uint64 remoteChainSelector => mapping(bytes sender => Nonce nonce)) private s_nonces;
 
   constructor(address[] memory authorizedCallers) AuthorizedCallers(authorizedCallers) {}
 

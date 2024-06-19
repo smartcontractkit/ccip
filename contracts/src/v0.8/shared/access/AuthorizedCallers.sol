@@ -67,14 +67,14 @@ contract AuthorizedCallers is OwnerIsCreator {
     }
   }
 
-  /// @notice validate access
+  /// @notice Checks the sender and reverts if it is anyone other than a listed authorized caller.
   function _validateCaller() internal view {
     if (!s_authorizedCallers.contains(msg.sender)) {
       revert UnauthorizedCaller(msg.sender);
     }
   }
 
-  /// @notice Reverts if called by anyone other than a listed authorized caller.
+  /// @notice Checks the sender and reverts if it is anyone other than a listed authorized caller.
   modifier onlyAuthorizedCallers() {
     _validateCaller();
     _;
