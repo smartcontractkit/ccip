@@ -954,6 +954,8 @@ contract EVM2EVMOffRamp_manuallyExecute is EVM2EVMOffRampSetup {
     messages[0].receiver = address(s_reverting_receiver);
     messages[0].messageId = Internal._hash(messages[0], s_offRamp.metadataHash());
 
+    assertEq(messages[0].nonce - 1, s_offRamp.getSenderNonce(messages[0].sender));
+
     s_reverting_receiver.setRevert(true);
 
     vm.expectEmit();
@@ -968,6 +970,8 @@ contract EVM2EVMOffRamp_manuallyExecute is EVM2EVMOffRampSetup {
     );
 
     s_offRamp.manuallyExecute(_generateReportFromMessages(messages), new uint256[](1));
+
+    assertEq(messages[0].nonce, s_offRamp.getSenderNonce(messages[0].sender));
   }
 
   function test_ManualExecWithGasOverride_Success() public {

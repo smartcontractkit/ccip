@@ -1596,6 +1596,8 @@ contract EVM2EVMMultiOffRamp_manuallyExecute is EVM2EVMMultiOffRampSetup {
     messages[0].messageId =
       Internal._hash(messages[0], s_offRamp.metadataHash(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1));
 
+    assertEq(messages[0].nonce - 1, s_offRamp.getSenderNonce(SOURCE_CHAIN_SELECTOR_1, messages[0].sender));
+
     s_reverting_receiver.setRevert(true);
 
     vm.expectEmit();
@@ -1614,6 +1616,8 @@ contract EVM2EVMMultiOffRamp_manuallyExecute is EVM2EVMMultiOffRampSetup {
     gasLimitOverrides[0] = _getGasLimitsFromMessages(messages);
 
     s_offRamp.manuallyExecute(_generateBatchReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messages), gasLimitOverrides);
+
+    assertEq(messages[0].nonce, s_offRamp.getSenderNonce(SOURCE_CHAIN_SELECTOR_1, messages[0].sender));
   }
 
   function test_manuallyExecute_WithMultiReportGasOverride_Success() public {
