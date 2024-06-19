@@ -6,9 +6,7 @@ import {IGetCCIPAdmin} from "../interfaces/IGetCCIPAdmin.sol";
 import {IOwner} from "../interfaces/IOwner.sol";
 import {ITokenAdminRegistry} from "../interfaces/ITokenAdminRegistry.sol";
 
-import {OwnerIsCreator} from "../../shared/access/OwnerIsCreator.sol";
-
-contract RegistryModuleOwnerCustom is ITypeAndVersion, OwnerIsCreator {
+contract RegistryModuleOwnerCustom is ITypeAndVersion {
   error CanOnlySelfRegister(address admin, address token);
 
   event AdministratorRegistered(address indexed token, address indexed administrator);
@@ -16,10 +14,10 @@ contract RegistryModuleOwnerCustom is ITypeAndVersion, OwnerIsCreator {
   string public constant override typeAndVersion = "RegistryModuleOwnerCustom 1.5.0-dev";
 
   // The TokenAdminRegistry contract
-  ITokenAdminRegistry internal s_tokenAdminRegistry;
+  ITokenAdminRegistry internal immutable i_tokenAdminRegistry;
 
   constructor(address tokenAdminRegistry) {
-    s_tokenAdminRegistry = ITokenAdminRegistry(tokenAdminRegistry);
+    i_tokenAdminRegistry = ITokenAdminRegistry(tokenAdminRegistry);
   }
 
   /// @notice Registers the admin of the token using the `getCCIPAdmin` method.
@@ -45,7 +43,7 @@ contract RegistryModuleOwnerCustom is ITypeAndVersion, OwnerIsCreator {
       revert CanOnlySelfRegister(admin, token);
     }
 
-    s_tokenAdminRegistry.registerAdministrator(token, admin);
+    i_tokenAdminRegistry.registerAdministrator(token, admin);
 
     emit AdministratorRegistered(token, admin);
   }

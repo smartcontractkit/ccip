@@ -1765,6 +1765,9 @@ ReaperInterval = '1h0m0s'
 ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
 
+[Transactions.AutoPurge]
+Enabled = false
+
 [BalanceMonitor]
 Enabled = true
 
@@ -1796,6 +1799,8 @@ TransactionPercentile = 50
 HistoryDepth = 100
 MaxBufferSize = 3
 SamplingInterval = '1s'
+MaxAllowedFinalityDepth = 10000
+FinalityTagBypass = true
 
 [NodePool]
 PollFailureThreshold = 5
@@ -1850,6 +1855,9 @@ ReaperInterval = '1h0m0s'
 ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
 
+[Transactions.AutoPurge]
+Enabled = false
+
 [BalanceMonitor]
 Enabled = true
 
@@ -1881,6 +1889,8 @@ TransactionPercentile = 50
 HistoryDepth = 100
 MaxBufferSize = 3
 SamplingInterval = '1s'
+MaxAllowedFinalityDepth = 10000
+FinalityTagBypass = true
 
 [NodePool]
 PollFailureThreshold = 5
@@ -1935,6 +1945,9 @@ ReaperInterval = '1h0m0s'
 ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
 
+[Transactions.AutoPurge]
+Enabled = false
+
 [BalanceMonitor]
 Enabled = true
 
@@ -1966,6 +1979,8 @@ TransactionPercentile = 50
 HistoryDepth = 100
 MaxBufferSize = 3
 SamplingInterval = '1s'
+MaxAllowedFinalityDepth = 10000
+FinalityTagBypass = true
 
 [NodePool]
 PollFailureThreshold = 5
@@ -2020,6 +2035,9 @@ ReaperInterval = '1h0m0s'
 ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
 
+[Transactions.AutoPurge]
+Enabled = false
+
 [BalanceMonitor]
 Enabled = true
 
@@ -2051,6 +2069,8 @@ TransactionPercentile = 50
 HistoryDepth = 100
 MaxBufferSize = 3
 SamplingInterval = '1s'
+MaxAllowedFinalityDepth = 10000
+FinalityTagBypass = true
 
 [NodePool]
 PollFailureThreshold = 5
@@ -2106,6 +2126,9 @@ ReaperInterval = '1h0m0s'
 ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '30s'
 
+[Transactions.AutoPurge]
+Enabled = false
+
 [BalanceMonitor]
 Enabled = true
 
@@ -2137,6 +2160,8 @@ TransactionPercentile = 60
 HistoryDepth = 300
 MaxBufferSize = 3
 SamplingInterval = '1s'
+MaxAllowedFinalityDepth = 10000
+FinalityTagBypass = true
 
 [NodePool]
 PollFailureThreshold = 5
@@ -2191,6 +2216,9 @@ ReaperInterval = '1h0m0s'
 ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
 
+[Transactions.AutoPurge]
+Enabled = false
+
 [BalanceMonitor]
 Enabled = true
 
@@ -2222,6 +2250,8 @@ TransactionPercentile = 60
 HistoryDepth = 100
 MaxBufferSize = 3
 SamplingInterval = '1s'
+MaxAllowedFinalityDepth = 10000
+FinalityTagBypass = true
 
 [NodePool]
 PollFailureThreshold = 5
@@ -2276,6 +2306,9 @@ ReaperInterval = '1h0m0s'
 ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
 
+[Transactions.AutoPurge]
+Enabled = false
+
 [BalanceMonitor]
 Enabled = true
 
@@ -2307,6 +2340,8 @@ TransactionPercentile = 60
 HistoryDepth = 100
 MaxBufferSize = 3
 SamplingInterval = '1s'
+MaxAllowedFinalityDepth = 10000
+FinalityTagBypass = true
 
 [NodePool]
 PollFailureThreshold = 5
@@ -2362,6 +2397,9 @@ ReaperInterval = '1h0m0s'
 ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
 
+[Transactions.AutoPurge]
+Enabled = false
+
 [BalanceMonitor]
 Enabled = true
 
@@ -2393,6 +2431,8 @@ TransactionPercentile = 50
 HistoryDepth = 100
 MaxBufferSize = 3
 SamplingInterval = '1s'
+MaxAllowedFinalityDepth = 10000
+FinalityTagBypass = true
 
 [NodePool]
 PollFailureThreshold = 5
@@ -2447,6 +2487,9 @@ ReaperInterval = '1h0m0s'
 ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
 
+[Transactions.AutoPurge]
+Enabled = false
+
 [BalanceMonitor]
 Enabled = true
 
@@ -2478,6 +2521,8 @@ TransactionPercentile = 60
 HistoryDepth = 100
 MaxBufferSize = 3
 SamplingInterval = '1s'
+MaxAllowedFinalityDepth = 10000
+FinalityTagBypass = true
 
 [NodePool]
 PollFailureThreshold = 5
@@ -2531,6 +2576,9 @@ ReaperInterval = '1h0m0s'
 ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
 
+[Transactions.AutoPurge]
+Enabled = false
+
 [BalanceMonitor]
 Enabled = true
 
@@ -2562,6 +2610,8 @@ TransactionPercentile = 60
 HistoryDepth = 100
 MaxBufferSize = 3
 SamplingInterval = '1s'
+MaxAllowedFinalityDepth = 10000
+FinalityTagBypass = true
 
 [NodePool]
 PollFailureThreshold = 5
@@ -2615,6 +2665,9 @@ ReaperInterval = '1h0m0s'
 ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
 
+[Transactions.AutoPurge]
+Enabled = false
+
 [BalanceMonitor]
 Enabled = true
 
@@ -2646,6 +2699,8 @@ TransactionPercentile = 60
 HistoryDepth = 100
 MaxBufferSize = 3
 SamplingInterval = '1s'
+MaxAllowedFinalityDepth = 10000
+FinalityTagBypass = true
 
 [NodePool]
 PollFailureThreshold = 5
@@ -2700,6 +2755,9 @@ ReaperInterval = '1h0m0s'
 ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
 
+[Transactions.AutoPurge]
+Enabled = false
+
 [BalanceMonitor]
 Enabled = true
 
@@ -2731,6 +2789,8 @@ TransactionPercentile = 60
 HistoryDepth = 100
 MaxBufferSize = 3
 SamplingInterval = '1s'
+MaxAllowedFinalityDepth = 10000
+FinalityTagBypass = false
 
 [NodePool]
 PollFailureThreshold = 5
@@ -2786,6 +2846,9 @@ ReaperInterval = '1h0m0s'
 ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
 
+[Transactions.AutoPurge]
+Enabled = false
+
 [BalanceMonitor]
 Enabled = true
 
@@ -2817,6 +2880,8 @@ TransactionPercentile = 60
 HistoryDepth = 100
 MaxBufferSize = 3
 SamplingInterval = '1s'
+MaxAllowedFinalityDepth = 10000
+FinalityTagBypass = true
 
 [NodePool]
 PollFailureThreshold = 5
@@ -2871,6 +2936,9 @@ ReaperInterval = '1h0m0s'
 ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
 
+[Transactions.AutoPurge]
+Enabled = false
+
 [BalanceMonitor]
 Enabled = true
 
@@ -2902,6 +2970,8 @@ TransactionPercentile = 60
 HistoryDepth = 100
 MaxBufferSize = 3
 SamplingInterval = '1s'
+MaxAllowedFinalityDepth = 10000
+FinalityTagBypass = true
 
 [NodePool]
 PollFailureThreshold = 5
@@ -2956,6 +3026,9 @@ ReaperInterval = '1h0m0s'
 ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
 
+[Transactions.AutoPurge]
+Enabled = false
+
 [BalanceMonitor]
 Enabled = true
 
@@ -2987,6 +3060,8 @@ TransactionPercentile = 60
 HistoryDepth = 2000
 MaxBufferSize = 3
 SamplingInterval = '1s'
+MaxAllowedFinalityDepth = 10000
+FinalityTagBypass = true
 
 [NodePool]
 PollFailureThreshold = 5
@@ -3041,6 +3116,9 @@ ReaperInterval = '1h0m0s'
 ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '3m0s'
 
+[Transactions.AutoPurge]
+Enabled = false
+
 [BalanceMonitor]
 Enabled = true
 
@@ -3072,6 +3150,8 @@ TransactionPercentile = 60
 HistoryDepth = 2000
 MaxBufferSize = 3
 SamplingInterval = '1s'
+MaxAllowedFinalityDepth = 10000
+FinalityTagBypass = true
 
 [NodePool]
 PollFailureThreshold = 5
@@ -3126,6 +3206,9 @@ ReaperInterval = '1h0m0s'
 ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '3m0s'
 
+[Transactions.AutoPurge]
+Enabled = false
+
 [BalanceMonitor]
 Enabled = true
 
@@ -3157,6 +3240,8 @@ TransactionPercentile = 60
 HistoryDepth = 2000
 MaxBufferSize = 3
 SamplingInterval = '1s'
+MaxAllowedFinalityDepth = 10000
+FinalityTagBypass = true
 
 [NodePool]
 PollFailureThreshold = 5
@@ -3211,6 +3296,9 @@ ReaperInterval = '1h0m0s'
 ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
 
+[Transactions.AutoPurge]
+Enabled = false
+
 [BalanceMonitor]
 Enabled = true
 
@@ -3242,6 +3330,8 @@ TransactionPercentile = 60
 HistoryDepth = 100
 MaxBufferSize = 3
 SamplingInterval = '1s'
+MaxAllowedFinalityDepth = 10000
+FinalityTagBypass = true
 
 [NodePool]
 PollFailureThreshold = 5
@@ -3296,6 +3386,9 @@ ReaperInterval = '1h0m0s'
 ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '30s'
 
+[Transactions.AutoPurge]
+Enabled = false
+
 [BalanceMonitor]
 Enabled = true
 
@@ -3327,6 +3420,8 @@ TransactionPercentile = 60
 HistoryDepth = 400
 MaxBufferSize = 3
 SamplingInterval = '1s'
+MaxAllowedFinalityDepth = 10000
+FinalityTagBypass = true
 
 [NodePool]
 PollFailureThreshold = 5
@@ -3359,7 +3454,7 @@ AutoCreateKey = true
 BlockBackfillDepth = 10
 BlockBackfillSkip = false
 ChainType = 'zksync'
-FinalityDepth = 1
+FinalityDepth = 10
 FinalityTagEnabled = false
 LogBackfillBatchSize = 1000
 LogPollInterval = '5s'
@@ -3380,6 +3475,9 @@ MaxQueued = 250
 ReaperInterval = '1h0m0s'
 ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
+
+[Transactions.AutoPurge]
+Enabled = false
 
 [BalanceMonitor]
 Enabled = true
@@ -3409,9 +3507,11 @@ CheckInclusionPercentile = 90
 TransactionPercentile = 60
 
 [HeadTracker]
-HistoryDepth = 5
+HistoryDepth = 50
 MaxBufferSize = 3
 SamplingInterval = '1s'
+MaxAllowedFinalityDepth = 10000
+FinalityTagBypass = true
 
 [NodePool]
 PollFailureThreshold = 5
@@ -3444,7 +3544,7 @@ AutoCreateKey = true
 BlockBackfillDepth = 10
 BlockBackfillSkip = false
 ChainType = 'zksync'
-FinalityDepth = 1
+FinalityDepth = 10
 FinalityTagEnabled = false
 LogBackfillBatchSize = 1000
 LogPollInterval = '5s'
@@ -3465,6 +3565,9 @@ MaxQueued = 250
 ReaperInterval = '1h0m0s'
 ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
+
+[Transactions.AutoPurge]
+Enabled = false
 
 [BalanceMonitor]
 Enabled = true
@@ -3494,9 +3597,11 @@ CheckInclusionPercentile = 90
 TransactionPercentile = 60
 
 [HeadTracker]
-HistoryDepth = 5
+HistoryDepth = 50
 MaxBufferSize = 3
 SamplingInterval = '1s'
+MaxAllowedFinalityDepth = 10000
+FinalityTagBypass = true
 
 [NodePool]
 PollFailureThreshold = 5
@@ -3529,7 +3634,7 @@ AutoCreateKey = true
 BlockBackfillDepth = 10
 BlockBackfillSkip = false
 ChainType = 'zksync'
-FinalityDepth = 1
+FinalityDepth = 10
 FinalityTagEnabled = false
 LogBackfillBatchSize = 1000
 LogPollInterval = '5s'
@@ -3550,6 +3655,9 @@ MaxQueued = 250
 ReaperInterval = '1h0m0s'
 ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
+
+[Transactions.AutoPurge]
+Enabled = false
 
 [BalanceMonitor]
 Enabled = true
@@ -3579,9 +3687,11 @@ CheckInclusionPercentile = 90
 TransactionPercentile = 60
 
 [HeadTracker]
-HistoryDepth = 5
+HistoryDepth = 50
 MaxBufferSize = 3
 SamplingInterval = '1s'
+MaxAllowedFinalityDepth = 10000
+FinalityTagBypass = true
 
 [NodePool]
 PollFailureThreshold = 5
@@ -3637,6 +3747,9 @@ ReaperInterval = '1h0m0s'
 ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '30s'
 
+[Transactions.AutoPurge]
+Enabled = false
+
 [BalanceMonitor]
 Enabled = true
 
@@ -3668,6 +3781,8 @@ TransactionPercentile = 60
 HistoryDepth = 300
 MaxBufferSize = 3
 SamplingInterval = '1s'
+MaxAllowedFinalityDepth = 10000
+FinalityTagBypass = true
 
 [NodePool]
 PollFailureThreshold = 5
@@ -3700,7 +3815,7 @@ AutoCreateKey = true
 BlockBackfillDepth = 10
 BlockBackfillSkip = false
 ChainType = 'metis'
-FinalityDepth = 1
+FinalityDepth = 10
 FinalityTagEnabled = false
 LogBackfillBatchSize = 1000
 LogPollInterval = '15s'
@@ -3722,6 +3837,9 @@ ReaperInterval = '1h0m0s'
 ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
 
+[Transactions.AutoPurge]
+Enabled = false
+
 [BalanceMonitor]
 Enabled = true
 
@@ -3736,7 +3854,7 @@ LimitMultiplier = '1'
 LimitTransfer = 21000
 BumpMin = '5 gwei'
 BumpPercent = 20
-BumpThreshold = 0
+BumpThreshold = 3
 EIP1559DynamicFees = false
 FeeCapDefault = '100 gwei'
 TipCapDefault = '1 wei'
@@ -3753,6 +3871,8 @@ TransactionPercentile = 60
 HistoryDepth = 100
 MaxBufferSize = 3
 SamplingInterval = '1s'
+MaxAllowedFinalityDepth = 10000
+FinalityTagBypass = true
 
 [NodePool]
 PollFailureThreshold = 5
@@ -3778,13 +3898,104 @@ GasLimit = 5400000
 
 </p></details>
 
+<details><summary>Mode Sepolia (919)</summary><p>
+
+```toml
+AutoCreateKey = true
+BlockBackfillDepth = 10
+BlockBackfillSkip = false
+ChainType = 'optimismBedrock'
+FinalityDepth = 200
+FinalityTagEnabled = true
+LogBackfillBatchSize = 1000
+LogPollInterval = '15s'
+LogKeepBlocksDepth = 100000
+LogPrunePageSize = 10000
+BackupLogPollerBlockDelay = 100
+MinIncomingConfirmations = 3
+MinContractPayment = '0.00001 link'
+NonceAutoSync = true
+NoNewHeadsThreshold = '3m0s'
+RPCDefaultBatchSize = 250
+RPCBlockQueryDelay = 1
+
+[Transactions]
+ForwardersEnabled = false
+MaxInFlight = 16
+MaxQueued = 250
+ReaperInterval = '1h0m0s'
+ReaperThreshold = '168h0m0s'
+ResendAfterThreshold = '1m0s'
+
+[Transactions.AutoPurge]
+Enabled = false
+
+[BalanceMonitor]
+Enabled = true
+
+[GasEstimator]
+Mode = 'BlockHistory'
+PriceDefault = '20 gwei'
+PriceMax = '120 gwei'
+PriceMin = '1 gwei'
+LimitDefault = 8000000
+LimitMax = 500000
+LimitMultiplier = '1'
+LimitTransfer = 21000
+BumpMin = '100 wei'
+BumpPercent = 20
+BumpThreshold = 60
+EIP1559DynamicFees = true
+FeeCapDefault = '120 gwei'
+TipCapDefault = '1 wei'
+TipCapMin = '1 wei'
+
+[GasEstimator.BlockHistory]
+BatchSize = 25
+BlockHistorySize = 200
+CheckInclusionBlocks = 12
+CheckInclusionPercentile = 90
+EIP1559FeeCapBufferBlocks = 0
+TransactionPercentile = 60
+
+[HeadTracker]
+HistoryDepth = 300
+MaxBufferSize = 3
+SamplingInterval = '1s'
+MaxAllowedFinalityDepth = 10000
+FinalityTagBypass = true
+
+[NodePool]
+PollFailureThreshold = 2
+PollInterval = '3s'
+SelectionMode = 'HighestHead'
+SyncThreshold = 5
+LeaseDuration = '0s'
+NodeIsSyncingEnabled = false
+FinalizedBlockPollInterval = '5s'
+
+[OCR]
+ContractConfirmations = 4
+ContractTransmitterTransmitTimeout = '10s'
+DatabaseTimeout = '10s'
+DeltaCOverride = '168h0m0s'
+DeltaCJitterOverride = '1h0m0s'
+ObservationGracePeriod = '1s'
+
+[OCR2]
+[OCR2.Automation]
+GasLimit = 5400000
+```
+
+</p></details>
+
 <details><summary>Klaytn Testnet (1001)</summary><p>
 
 ```toml
 AutoCreateKey = true
 BlockBackfillDepth = 10
 BlockBackfillSkip = false
-FinalityDepth = 1
+FinalityDepth = 10
 FinalityTagEnabled = false
 LogBackfillBatchSize = 1000
 LogPollInterval = '15s'
@@ -3806,6 +4017,9 @@ ReaperInterval = '1h0m0s'
 ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
 
+[Transactions.AutoPurge]
+Enabled = false
+
 [BalanceMonitor]
 Enabled = true
 
@@ -3820,7 +4034,7 @@ LimitMultiplier = '1'
 LimitTransfer = 21000
 BumpMin = '5 gwei'
 BumpPercent = 20
-BumpThreshold = 0
+BumpThreshold = 5
 EIP1559DynamicFees = false
 FeeCapDefault = '100 gwei'
 TipCapDefault = '1 wei'
@@ -3837,6 +4051,8 @@ TransactionPercentile = 60
 HistoryDepth = 100
 MaxBufferSize = 3
 SamplingInterval = '1s'
+MaxAllowedFinalityDepth = 10000
+FinalityTagBypass = true
 
 [NodePool]
 PollFailureThreshold = 5
@@ -3869,8 +4085,8 @@ AutoCreateKey = true
 BlockBackfillDepth = 10
 BlockBackfillSkip = false
 ChainType = 'metis'
-FinalityDepth = 1
-FinalityTagEnabled = false
+FinalityDepth = 10
+FinalityTagEnabled = true
 LogBackfillBatchSize = 1000
 LogPollInterval = '15s'
 LogKeepBlocksDepth = 100000
@@ -3891,6 +4107,9 @@ ReaperInterval = '1h0m0s'
 ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
 
+[Transactions.AutoPurge]
+Enabled = false
+
 [BalanceMonitor]
 Enabled = true
 
@@ -3905,7 +4124,7 @@ LimitMultiplier = '1'
 LimitTransfer = 21000
 BumpMin = '5 gwei'
 BumpPercent = 20
-BumpThreshold = 0
+BumpThreshold = 3
 EIP1559DynamicFees = false
 FeeCapDefault = '100 gwei'
 TipCapDefault = '1 wei'
@@ -3922,6 +4141,8 @@ TransactionPercentile = 60
 HistoryDepth = 100
 MaxBufferSize = 3
 SamplingInterval = '1s'
+MaxAllowedFinalityDepth = 10000
+FinalityTagBypass = true
 
 [NodePool]
 PollFailureThreshold = 5
@@ -3953,6 +4174,7 @@ GasLimit = 5400000
 AutoCreateKey = true
 BlockBackfillDepth = 10
 BlockBackfillSkip = false
+ChainType = 'zkevm'
 FinalityDepth = 500
 FinalityTagEnabled = false
 LogBackfillBatchSize = 1000
@@ -3974,6 +4196,9 @@ MaxQueued = 250
 ReaperInterval = '1h0m0s'
 ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '3m0s'
+
+[Transactions.AutoPurge]
+Enabled = false
 
 [BalanceMonitor]
 Enabled = true
@@ -4006,6 +4231,8 @@ TransactionPercentile = 60
 HistoryDepth = 2000
 MaxBufferSize = 3
 SamplingInterval = '1s'
+MaxAllowedFinalityDepth = 10000
+FinalityTagBypass = true
 
 [NodePool]
 PollFailureThreshold = 5
@@ -4060,6 +4287,9 @@ ReaperInterval = '1h0m0s'
 ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
 
+[Transactions.AutoPurge]
+Enabled = false
+
 [BalanceMonitor]
 Enabled = true
 
@@ -4091,6 +4321,8 @@ TransactionPercentile = 60
 HistoryDepth = 100
 MaxBufferSize = 3
 SamplingInterval = '1s'
+MaxAllowedFinalityDepth = 10000
+FinalityTagBypass = true
 
 [NodePool]
 PollFailureThreshold = 5
@@ -4145,6 +4377,9 @@ ReaperInterval = '1h0m0s'
 ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
 
+[Transactions.AutoPurge]
+Enabled = false
+
 [BalanceMonitor]
 Enabled = true
 
@@ -4176,6 +4411,8 @@ TransactionPercentile = 60
 HistoryDepth = 100
 MaxBufferSize = 3
 SamplingInterval = '1s'
+MaxAllowedFinalityDepth = 10000
+FinalityTagBypass = false
 
 [NodePool]
 PollFailureThreshold = 5
@@ -4207,7 +4444,7 @@ GasLimit = 5400000
 AutoCreateKey = true
 BlockBackfillDepth = 10
 BlockBackfillSkip = false
-FinalityDepth = 1
+FinalityDepth = 10
 FinalityTagEnabled = false
 LogBackfillBatchSize = 1000
 LogPollInterval = '15s'
@@ -4228,6 +4465,9 @@ MaxQueued = 250
 ReaperInterval = '1h0m0s'
 ReaperThreshold = '0s'
 ResendAfterThreshold = '0s'
+
+[Transactions.AutoPurge]
+Enabled = false
 
 [BalanceMonitor]
 Enabled = true
@@ -4260,6 +4500,8 @@ TransactionPercentile = 60
 HistoryDepth = 10
 MaxBufferSize = 100
 SamplingInterval = '0s'
+MaxAllowedFinalityDepth = 10000
+FinalityTagBypass = true
 
 [NodePool]
 PollFailureThreshold = 5
@@ -4291,6 +4533,7 @@ GasLimit = 5400000
 AutoCreateKey = true
 BlockBackfillDepth = 10
 BlockBackfillSkip = false
+ChainType = 'zkevm'
 FinalityDepth = 500
 FinalityTagEnabled = false
 LogBackfillBatchSize = 1000
@@ -4312,6 +4555,9 @@ MaxQueued = 250
 ReaperInterval = '1h0m0s'
 ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '3m0s'
+
+[Transactions.AutoPurge]
+Enabled = false
 
 [BalanceMonitor]
 Enabled = true
@@ -4344,6 +4590,8 @@ TransactionPercentile = 60
 HistoryDepth = 2000
 MaxBufferSize = 3
 SamplingInterval = '1s'
+MaxAllowedFinalityDepth = 10000
+FinalityTagBypass = true
 
 [NodePool]
 PollFailureThreshold = 5
@@ -4398,6 +4646,9 @@ ReaperInterval = '1h0m0s'
 ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '30s'
 
+[Transactions.AutoPurge]
+Enabled = false
+
 [BalanceMonitor]
 Enabled = true
 
@@ -4429,6 +4680,8 @@ TransactionPercentile = 60
 HistoryDepth = 400
 MaxBufferSize = 3
 SamplingInterval = '1s'
+MaxAllowedFinalityDepth = 10000
+FinalityTagBypass = true
 
 [NodePool]
 PollFailureThreshold = 5
@@ -4460,6 +4713,7 @@ GasLimit = 5400000
 AutoCreateKey = true
 BlockBackfillDepth = 10
 BlockBackfillSkip = false
+ChainType = 'zkevm'
 FinalityDepth = 500
 FinalityTagEnabled = false
 LogBackfillBatchSize = 1000
@@ -4481,6 +4735,9 @@ MaxQueued = 250
 ReaperInterval = '1h0m0s'
 ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '3m0s'
+
+[Transactions.AutoPurge]
+Enabled = false
 
 [BalanceMonitor]
 Enabled = true
@@ -4513,6 +4770,8 @@ TransactionPercentile = 60
 HistoryDepth = 2000
 MaxBufferSize = 3
 SamplingInterval = '1s'
+MaxAllowedFinalityDepth = 10000
+FinalityTagBypass = true
 
 [NodePool]
 PollFailureThreshold = 5
@@ -4567,6 +4826,9 @@ ReaperInterval = '1h0m0s'
 ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
 
+[Transactions.AutoPurge]
+Enabled = false
+
 [BalanceMonitor]
 Enabled = true
 
@@ -4598,6 +4860,8 @@ TransactionPercentile = 60
 HistoryDepth = 100
 MaxBufferSize = 3
 SamplingInterval = '1s'
+MaxAllowedFinalityDepth = 10000
+FinalityTagBypass = true
 
 [NodePool]
 PollFailureThreshold = 5
@@ -4652,6 +4916,9 @@ ReaperInterval = '1h0m0s'
 ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
 
+[Transactions.AutoPurge]
+Enabled = false
+
 [BalanceMonitor]
 Enabled = true
 
@@ -4684,6 +4951,8 @@ TransactionPercentile = 60
 HistoryDepth = 600
 MaxBufferSize = 3
 SamplingInterval = '1s'
+MaxAllowedFinalityDepth = 10000
+FinalityTagBypass = true
 
 [NodePool]
 PollFailureThreshold = 5
@@ -4715,7 +4984,7 @@ GasLimit = 5400000
 AutoCreateKey = true
 BlockBackfillDepth = 10
 BlockBackfillSkip = false
-FinalityDepth = 1
+FinalityDepth = 10
 FinalityTagEnabled = false
 LogBackfillBatchSize = 1000
 LogPollInterval = '15s'
@@ -4737,6 +5006,9 @@ ReaperInterval = '1h0m0s'
 ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
 
+[Transactions.AutoPurge]
+Enabled = false
+
 [BalanceMonitor]
 Enabled = true
 
@@ -4751,7 +5023,7 @@ LimitMultiplier = '1'
 LimitTransfer = 21000
 BumpMin = '5 gwei'
 BumpPercent = 20
-BumpThreshold = 0
+BumpThreshold = 5
 EIP1559DynamicFees = false
 FeeCapDefault = '100 gwei'
 TipCapDefault = '1 wei'
@@ -4768,6 +5040,8 @@ TransactionPercentile = 60
 HistoryDepth = 100
 MaxBufferSize = 3
 SamplingInterval = '1s'
+MaxAllowedFinalityDepth = 10000
+FinalityTagBypass = true
 
 [NodePool]
 PollFailureThreshold = 5
@@ -4822,6 +5096,9 @@ ReaperInterval = '1h0m0s'
 ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '30s'
 
+[Transactions.AutoPurge]
+Enabled = false
+
 [BalanceMonitor]
 Enabled = true
 
@@ -4853,6 +5130,8 @@ TransactionPercentile = 60
 HistoryDepth = 300
 MaxBufferSize = 3
 SamplingInterval = '1s'
+MaxAllowedFinalityDepth = 10000
+FinalityTagBypass = true
 
 [NodePool]
 PollFailureThreshold = 5
@@ -4907,6 +5186,9 @@ ReaperInterval = '1h0m0s'
 ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
 
+[Transactions.AutoPurge]
+Enabled = false
+
 [BalanceMonitor]
 Enabled = true
 
@@ -4938,10 +5220,103 @@ TransactionPercentile = 60
 HistoryDepth = 100
 MaxBufferSize = 3
 SamplingInterval = '1s'
+MaxAllowedFinalityDepth = 10000
+FinalityTagBypass = true
 
 [NodePool]
 PollFailureThreshold = 5
 PollInterval = '10s'
+SelectionMode = 'HighestHead'
+SyncThreshold = 5
+LeaseDuration = '0s'
+NodeIsSyncingEnabled = false
+FinalizedBlockPollInterval = '5s'
+
+[OCR]
+ContractConfirmations = 4
+ContractTransmitterTransmitTimeout = '10s'
+DatabaseTimeout = '10s'
+DeltaCOverride = '168h0m0s'
+DeltaCJitterOverride = '1h0m0s'
+ObservationGracePeriod = '1s'
+
+[OCR2]
+[OCR2.Automation]
+GasLimit = 5400000
+```
+
+</p></details>
+
+<details><summary>Mode Mainnet (34443)</summary><p>
+
+```toml
+AutoCreateKey = true
+BlockBackfillDepth = 10
+BlockBackfillSkip = false
+ChainType = 'optimismBedrock'
+FinalityDepth = 200
+FinalityTagEnabled = true
+LogBackfillBatchSize = 1000
+LogPollInterval = '15s'
+LogKeepBlocksDepth = 100000
+LogPrunePageSize = 10000
+BackupLogPollerBlockDelay = 100
+MinIncomingConfirmations = 3
+MinContractPayment = '0.00001 link'
+NonceAutoSync = true
+NoNewHeadsThreshold = '3m0s'
+RPCDefaultBatchSize = 250
+RPCBlockQueryDelay = 1
+
+[Transactions]
+ForwardersEnabled = false
+MaxInFlight = 16
+MaxQueued = 250
+ReaperInterval = '1h0m0s'
+ReaperThreshold = '168h0m0s'
+ResendAfterThreshold = '1m0s'
+
+[Transactions.AutoPurge]
+Enabled = false
+
+[BalanceMonitor]
+Enabled = true
+
+[GasEstimator]
+Mode = 'BlockHistory'
+PriceDefault = '20 gwei'
+PriceMax = '120 gwei'
+PriceMin = '1 gwei'
+LimitDefault = 8000000
+LimitMax = 500000
+LimitMultiplier = '1'
+LimitTransfer = 21000
+BumpMin = '100 wei'
+BumpPercent = 20
+BumpThreshold = 60
+EIP1559DynamicFees = true
+FeeCapDefault = '120 gwei'
+TipCapDefault = '1 wei'
+TipCapMin = '1 wei'
+
+[GasEstimator.BlockHistory]
+BatchSize = 25
+BlockHistorySize = 200
+CheckInclusionBlocks = 12
+CheckInclusionPercentile = 90
+EIP1559FeeCapBufferBlocks = 0
+TransactionPercentile = 60
+
+[HeadTracker]
+HistoryDepth = 300
+MaxBufferSize = 3
+SamplingInterval = '1s'
+MaxAllowedFinalityDepth = 10000
+FinalityTagBypass = true
+
+[NodePool]
+PollFailureThreshold = 2
+PollInterval = '3s'
 SelectionMode = 'HighestHead'
 SyncThreshold = 5
 LeaseDuration = '0s'
@@ -4993,6 +5368,9 @@ ReaperInterval = '1h0m0s'
 ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
 
+[Transactions.AutoPurge]
+Enabled = false
+
 [BalanceMonitor]
 Enabled = true
 
@@ -5007,7 +5385,7 @@ LimitMultiplier = '1'
 LimitTransfer = 21000
 BumpMin = '5 gwei'
 BumpPercent = 20
-BumpThreshold = 0
+BumpThreshold = 5
 EIP1559DynamicFees = false
 FeeCapDefault = '1 micro'
 TipCapDefault = '1 wei'
@@ -5024,6 +5402,8 @@ TransactionPercentile = 60
 HistoryDepth = 100
 MaxBufferSize = 3
 SamplingInterval = '1s'
+MaxAllowedFinalityDepth = 10000
+FinalityTagBypass = true
 
 [NodePool]
 PollFailureThreshold = 5
@@ -5056,7 +5436,7 @@ AutoCreateKey = true
 BlockBackfillDepth = 10
 BlockBackfillSkip = false
 ChainType = 'celo'
-FinalityDepth = 1
+FinalityDepth = 10
 FinalityTagEnabled = false
 LogBackfillBatchSize = 1000
 LogPollInterval = '5s'
@@ -5077,6 +5457,9 @@ MaxQueued = 250
 ReaperInterval = '1h0m0s'
 ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
+
+[Transactions.AutoPurge]
+Enabled = false
 
 [BalanceMonitor]
 Enabled = true
@@ -5109,6 +5492,8 @@ TransactionPercentile = 60
 HistoryDepth = 50
 MaxBufferSize = 3
 SamplingInterval = '1s'
+MaxAllowedFinalityDepth = 10000
+FinalityTagBypass = true
 
 [NodePool]
 PollFailureThreshold = 5
@@ -5163,6 +5548,9 @@ ReaperInterval = '1h0m0s'
 ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
 
+[Transactions.AutoPurge]
+Enabled = false
+
 [BalanceMonitor]
 Enabled = true
 
@@ -5194,6 +5582,8 @@ TransactionPercentile = 60
 HistoryDepth = 100
 MaxBufferSize = 3
 SamplingInterval = '1s'
+MaxAllowedFinalityDepth = 10000
+FinalityTagBypass = false
 
 [NodePool]
 PollFailureThreshold = 5
@@ -5248,6 +5638,9 @@ ReaperInterval = '1h0m0s'
 ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
 
+[Transactions.AutoPurge]
+Enabled = false
+
 [BalanceMonitor]
 Enabled = true
 
@@ -5279,6 +5672,8 @@ TransactionPercentile = 60
 HistoryDepth = 100
 MaxBufferSize = 3
 SamplingInterval = '1s'
+MaxAllowedFinalityDepth = 10000
+FinalityTagBypass = true
 
 [NodePool]
 PollFailureThreshold = 5
@@ -5311,7 +5706,7 @@ AutoCreateKey = true
 BlockBackfillDepth = 10
 BlockBackfillSkip = false
 ChainType = 'celo'
-FinalityDepth = 1
+FinalityDepth = 10
 FinalityTagEnabled = false
 LogBackfillBatchSize = 1000
 LogPollInterval = '5s'
@@ -5332,6 +5727,9 @@ MaxQueued = 250
 ReaperInterval = '1h0m0s'
 ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
+
+[Transactions.AutoPurge]
+Enabled = false
 
 [BalanceMonitor]
 Enabled = true
@@ -5364,6 +5762,8 @@ TransactionPercentile = 60
 HistoryDepth = 50
 MaxBufferSize = 3
 SamplingInterval = '1s'
+MaxAllowedFinalityDepth = 10000
+FinalityTagBypass = true
 
 [NodePool]
 PollFailureThreshold = 5
@@ -5417,6 +5817,9 @@ ReaperInterval = '1h0m0s'
 ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '3m0s'
 
+[Transactions.AutoPurge]
+Enabled = false
+
 [BalanceMonitor]
 Enabled = true
 
@@ -5448,6 +5851,8 @@ TransactionPercentile = 60
 HistoryDepth = 100
 MaxBufferSize = 3
 SamplingInterval = '1s'
+MaxAllowedFinalityDepth = 10000
+FinalityTagBypass = true
 
 [NodePool]
 PollFailureThreshold = 5
@@ -5501,6 +5906,9 @@ ReaperInterval = '1h0m0s'
 ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '3m0s'
 
+[Transactions.AutoPurge]
+Enabled = false
+
 [BalanceMonitor]
 Enabled = true
 
@@ -5532,6 +5940,8 @@ TransactionPercentile = 60
 HistoryDepth = 1000
 MaxBufferSize = 3
 SamplingInterval = '1s'
+MaxAllowedFinalityDepth = 10000
+FinalityTagBypass = true
 
 [NodePool]
 PollFailureThreshold = 5
@@ -5585,6 +5995,9 @@ ReaperInterval = '1h0m0s'
 ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '3m0s'
 
+[Transactions.AutoPurge]
+Enabled = false
+
 [BalanceMonitor]
 Enabled = true
 
@@ -5616,6 +6029,8 @@ TransactionPercentile = 60
 HistoryDepth = 350
 MaxBufferSize = 3
 SamplingInterval = '1s'
+MaxAllowedFinalityDepth = 10000
+FinalityTagBypass = true
 
 [NodePool]
 PollFailureThreshold = 5
@@ -5648,8 +6063,8 @@ AutoCreateKey = true
 BlockBackfillDepth = 10
 BlockBackfillSkip = false
 ChainType = 'metis'
-FinalityDepth = 1
-FinalityTagEnabled = false
+FinalityDepth = 10
+FinalityTagEnabled = true
 LogBackfillBatchSize = 1000
 LogPollInterval = '15s'
 LogKeepBlocksDepth = 100000
@@ -5670,6 +6085,9 @@ ReaperInterval = '1h0m0s'
 ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
 
+[Transactions.AutoPurge]
+Enabled = false
+
 [BalanceMonitor]
 Enabled = true
 
@@ -5684,7 +6102,7 @@ LimitMultiplier = '1'
 LimitTransfer = 21000
 BumpMin = '5 gwei'
 BumpPercent = 20
-BumpThreshold = 0
+BumpThreshold = 3
 EIP1559DynamicFees = false
 FeeCapDefault = '100 gwei'
 TipCapDefault = '1 wei'
@@ -5701,6 +6119,8 @@ TransactionPercentile = 60
 HistoryDepth = 100
 MaxBufferSize = 3
 SamplingInterval = '1s'
+MaxAllowedFinalityDepth = 10000
+FinalityTagBypass = true
 
 [NodePool]
 PollFailureThreshold = 5
@@ -5755,6 +6175,9 @@ ReaperInterval = '1h0m0s'
 ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
 
+[Transactions.AutoPurge]
+Enabled = false
+
 [BalanceMonitor]
 Enabled = true
 
@@ -5786,6 +6209,8 @@ TransactionPercentile = 60
 HistoryDepth = 100
 MaxBufferSize = 3
 SamplingInterval = '1s'
+MaxAllowedFinalityDepth = 10000
+FinalityTagBypass = true
 
 [NodePool]
 PollFailureThreshold = 5
@@ -5840,6 +6265,9 @@ ReaperInterval = '1h0m0s'
 ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
 
+[Transactions.AutoPurge]
+Enabled = false
+
 [BalanceMonitor]
 Enabled = true
 
@@ -5871,6 +6299,8 @@ TransactionPercentile = 60
 HistoryDepth = 2000
 MaxBufferSize = 3
 SamplingInterval = '1s'
+MaxAllowedFinalityDepth = 10000
+FinalityTagBypass = true
 
 [NodePool]
 PollFailureThreshold = 5
@@ -5924,6 +6354,9 @@ ReaperInterval = '1h0m0s'
 ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
 
+[Transactions.AutoPurge]
+Enabled = false
+
 [BalanceMonitor]
 Enabled = true
 
@@ -5955,12 +6388,105 @@ TransactionPercentile = 60
 HistoryDepth = 2000
 MaxBufferSize = 3
 SamplingInterval = '1s'
+MaxAllowedFinalityDepth = 10000
+FinalityTagBypass = true
 
 [NodePool]
 PollFailureThreshold = 5
 PollInterval = '10s'
 SelectionMode = 'HighestHead'
 SyncThreshold = 10
+LeaseDuration = '0s'
+NodeIsSyncingEnabled = false
+FinalizedBlockPollInterval = '5s'
+
+[OCR]
+ContractConfirmations = 4
+ContractTransmitterTransmitTimeout = '10s'
+DatabaseTimeout = '10s'
+DeltaCOverride = '168h0m0s'
+DeltaCJitterOverride = '1h0m0s'
+ObservationGracePeriod = '1s'
+
+[OCR2]
+[OCR2.Automation]
+GasLimit = 5400000
+```
+
+</p></details>
+
+<details><summary>Blast Mainnet (81457)</summary><p>
+
+```toml
+AutoCreateKey = true
+BlockBackfillDepth = 10
+BlockBackfillSkip = false
+ChainType = 'optimismBedrock'
+FinalityDepth = 200
+FinalityTagEnabled = true
+LogBackfillBatchSize = 1000
+LogPollInterval = '2s'
+LogKeepBlocksDepth = 100000
+LogPrunePageSize = 10000
+BackupLogPollerBlockDelay = 100
+MinIncomingConfirmations = 3
+MinContractPayment = '0.00001 link'
+NonceAutoSync = true
+NoNewHeadsThreshold = '3m0s'
+RPCDefaultBatchSize = 250
+RPCBlockQueryDelay = 1
+
+[Transactions]
+ForwardersEnabled = false
+MaxInFlight = 16
+MaxQueued = 250
+ReaperInterval = '1h0m0s'
+ReaperThreshold = '168h0m0s'
+ResendAfterThreshold = '1m0s'
+
+[Transactions.AutoPurge]
+Enabled = false
+
+[BalanceMonitor]
+Enabled = true
+
+[GasEstimator]
+Mode = 'BlockHistory'
+PriceDefault = '20 gwei'
+PriceMax = '120 gwei'
+PriceMin = '1 gwei'
+LimitDefault = 8000000
+LimitMax = 500000
+LimitMultiplier = '1'
+LimitTransfer = 21000
+BumpMin = '100 wei'
+BumpPercent = 20
+BumpThreshold = 60
+EIP1559DynamicFees = true
+FeeCapDefault = '120 gwei'
+TipCapDefault = '1 wei'
+TipCapMin = '1 wei'
+
+[GasEstimator.BlockHistory]
+BatchSize = 25
+BlockHistorySize = 200
+CheckInclusionBlocks = 12
+CheckInclusionPercentile = 90
+EIP1559FeeCapBufferBlocks = 0
+TransactionPercentile = 60
+
+[HeadTracker]
+HistoryDepth = 300
+MaxBufferSize = 3
+SamplingInterval = '1s'
+MaxAllowedFinalityDepth = 10000
+FinalityTagBypass = true
+
+[NodePool]
+PollFailureThreshold = 4
+PollInterval = '4s'
+SelectionMode = 'HighestHead'
+SyncThreshold = 5
 LeaseDuration = '0s'
 NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
@@ -6009,6 +6535,9 @@ ReaperInterval = '1h0m0s'
 ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '30s'
 
+[Transactions.AutoPurge]
+Enabled = false
+
 [BalanceMonitor]
 Enabled = true
 
@@ -6040,6 +6569,8 @@ TransactionPercentile = 60
 HistoryDepth = 300
 MaxBufferSize = 3
 SamplingInterval = '1s'
+MaxAllowedFinalityDepth = 10000
+FinalityTagBypass = true
 
 [NodePool]
 PollFailureThreshold = 5
@@ -6095,6 +6626,9 @@ ReaperInterval = '1h0m0s'
 ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '30s'
 
+[Transactions.AutoPurge]
+Enabled = false
+
 [BalanceMonitor]
 Enabled = true
 
@@ -6126,6 +6660,8 @@ TransactionPercentile = 60
 HistoryDepth = 300
 MaxBufferSize = 3
 SamplingInterval = '1s'
+MaxAllowedFinalityDepth = 10000
+FinalityTagBypass = true
 
 [NodePool]
 PollFailureThreshold = 5
@@ -6181,6 +6717,9 @@ ReaperInterval = '1h0m0s'
 ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
 
+[Transactions.AutoPurge]
+Enabled = false
+
 [BalanceMonitor]
 Enabled = true
 
@@ -6195,7 +6734,7 @@ LimitMultiplier = '1'
 LimitTransfer = 21000
 BumpMin = '5 gwei'
 BumpPercent = 20
-BumpThreshold = 0
+BumpThreshold = 5
 EIP1559DynamicFees = false
 FeeCapDefault = '1 micro'
 TipCapDefault = '1 wei'
@@ -6212,6 +6751,8 @@ TransactionPercentile = 60
 HistoryDepth = 100
 MaxBufferSize = 3
 SamplingInterval = '1s'
+MaxAllowedFinalityDepth = 10000
+FinalityTagBypass = true
 
 [NodePool]
 PollFailureThreshold = 5
@@ -6267,6 +6808,9 @@ ReaperInterval = '1h0m0s'
 ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
 
+[Transactions.AutoPurge]
+Enabled = false
+
 [BalanceMonitor]
 Enabled = true
 
@@ -6281,7 +6825,7 @@ LimitMultiplier = '1'
 LimitTransfer = 21000
 BumpMin = '5 gwei'
 BumpPercent = 20
-BumpThreshold = 0
+BumpThreshold = 5
 EIP1559DynamicFees = false
 FeeCapDefault = '1 micro'
 TipCapDefault = '1 wei'
@@ -6298,6 +6842,8 @@ TransactionPercentile = 60
 HistoryDepth = 100
 MaxBufferSize = 3
 SamplingInterval = '1s'
+MaxAllowedFinalityDepth = 10000
+FinalityTagBypass = true
 
 [NodePool]
 PollFailureThreshold = 5
@@ -6353,6 +6899,9 @@ ReaperInterval = '1h0m0s'
 ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
 
+[Transactions.AutoPurge]
+Enabled = false
+
 [BalanceMonitor]
 Enabled = true
 
@@ -6367,7 +6916,7 @@ LimitMultiplier = '1'
 LimitTransfer = 21000
 BumpMin = '5 gwei'
 BumpPercent = 20
-BumpThreshold = 0
+BumpThreshold = 5
 EIP1559DynamicFees = false
 FeeCapDefault = '1 micro'
 TipCapDefault = '1 wei'
@@ -6384,6 +6933,8 @@ TransactionPercentile = 60
 HistoryDepth = 100
 MaxBufferSize = 3
 SamplingInterval = '1s'
+MaxAllowedFinalityDepth = 10000
+FinalityTagBypass = true
 
 [NodePool]
 PollFailureThreshold = 5
@@ -6416,7 +6967,7 @@ AutoCreateKey = true
 BlockBackfillDepth = 10
 BlockBackfillSkip = false
 ChainType = 'scroll'
-FinalityDepth = 1
+FinalityDepth = 10
 FinalityTagEnabled = false
 LogBackfillBatchSize = 1000
 LogPollInterval = '3s'
@@ -6438,6 +6989,9 @@ ReaperInterval = '1h0m0s'
 ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
 
+[Transactions.AutoPurge]
+Enabled = false
+
 [BalanceMonitor]
 Enabled = true
 
@@ -6452,7 +7006,7 @@ LimitMultiplier = '1'
 LimitTransfer = 21000
 BumpMin = '5 gwei'
 BumpPercent = 20
-BumpThreshold = 0
+BumpThreshold = 3
 EIP1559DynamicFees = false
 FeeCapDefault = '100 gwei'
 TipCapDefault = '1 wei'
@@ -6469,6 +7023,8 @@ TransactionPercentile = 60
 HistoryDepth = 50
 MaxBufferSize = 3
 SamplingInterval = '1s'
+MaxAllowedFinalityDepth = 10000
+FinalityTagBypass = true
 
 [NodePool]
 PollFailureThreshold = 5
@@ -6501,7 +7057,7 @@ AutoCreateKey = true
 BlockBackfillDepth = 10
 BlockBackfillSkip = false
 ChainType = 'scroll'
-FinalityDepth = 1
+FinalityDepth = 10
 FinalityTagEnabled = false
 LogBackfillBatchSize = 1000
 LogPollInterval = '3s'
@@ -6523,6 +7079,9 @@ ReaperInterval = '1h0m0s'
 ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
 
+[Transactions.AutoPurge]
+Enabled = false
+
 [BalanceMonitor]
 Enabled = true
 
@@ -6537,7 +7096,7 @@ LimitMultiplier = '1'
 LimitTransfer = 21000
 BumpMin = '5 gwei'
 BumpPercent = 20
-BumpThreshold = 0
+BumpThreshold = 3
 EIP1559DynamicFees = false
 FeeCapDefault = '100 gwei'
 TipCapDefault = '1 wei'
@@ -6554,6 +7113,8 @@ TransactionPercentile = 60
 HistoryDepth = 50
 MaxBufferSize = 3
 SamplingInterval = '1s'
+MaxAllowedFinalityDepth = 10000
+FinalityTagBypass = true
 
 [NodePool]
 PollFailureThreshold = 5
@@ -6608,6 +7169,9 @@ ReaperInterval = '1h0m0s'
 ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
 
+[Transactions.AutoPurge]
+Enabled = false
+
 [BalanceMonitor]
 Enabled = true
 
@@ -6639,6 +7203,8 @@ TransactionPercentile = 50
 HistoryDepth = 100
 MaxBufferSize = 3
 SamplingInterval = '1s'
+MaxAllowedFinalityDepth = 10000
+FinalityTagBypass = false
 
 [NodePool]
 PollFailureThreshold = 5
@@ -6693,6 +7259,9 @@ ReaperInterval = '1h0m0s'
 ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '30s'
 
+[Transactions.AutoPurge]
+Enabled = false
+
 [BalanceMonitor]
 Enabled = true
 
@@ -6724,6 +7293,8 @@ TransactionPercentile = 60
 HistoryDepth = 300
 MaxBufferSize = 3
 SamplingInterval = '1s'
+MaxAllowedFinalityDepth = 10000
+FinalityTagBypass = true
 
 [NodePool]
 PollFailureThreshold = 5
@@ -6745,6 +7316,97 @@ ObservationGracePeriod = '1s'
 [OCR2]
 [OCR2.Automation]
 GasLimit = 6500000
+```
+
+</p></details>
+
+<details><summary>Blast Sepolia (168587773)</summary><p>
+
+```toml
+AutoCreateKey = true
+BlockBackfillDepth = 10
+BlockBackfillSkip = false
+ChainType = 'optimismBedrock'
+FinalityDepth = 200
+FinalityTagEnabled = true
+LogBackfillBatchSize = 1000
+LogPollInterval = '2s'
+LogKeepBlocksDepth = 100000
+LogPrunePageSize = 10000
+BackupLogPollerBlockDelay = 100
+MinIncomingConfirmations = 3
+MinContractPayment = '0.00001 link'
+NonceAutoSync = true
+NoNewHeadsThreshold = '3m0s'
+RPCDefaultBatchSize = 250
+RPCBlockQueryDelay = 1
+
+[Transactions]
+ForwardersEnabled = false
+MaxInFlight = 16
+MaxQueued = 250
+ReaperInterval = '1h0m0s'
+ReaperThreshold = '168h0m0s'
+ResendAfterThreshold = '1m0s'
+
+[Transactions.AutoPurge]
+Enabled = false
+
+[BalanceMonitor]
+Enabled = true
+
+[GasEstimator]
+Mode = 'BlockHistory'
+PriceDefault = '20 gwei'
+PriceMax = '120 gwei'
+PriceMin = '1 gwei'
+LimitDefault = 8000000
+LimitMax = 500000
+LimitMultiplier = '1'
+LimitTransfer = 21000
+BumpMin = '100 wei'
+BumpPercent = 20
+BumpThreshold = 60
+EIP1559DynamicFees = true
+FeeCapDefault = '120 gwei'
+TipCapDefault = '1 wei'
+TipCapMin = '1 wei'
+
+[GasEstimator.BlockHistory]
+BatchSize = 25
+BlockHistorySize = 200
+CheckInclusionBlocks = 12
+CheckInclusionPercentile = 90
+EIP1559FeeCapBufferBlocks = 0
+TransactionPercentile = 60
+
+[HeadTracker]
+HistoryDepth = 300
+MaxBufferSize = 3
+SamplingInterval = '1s'
+MaxAllowedFinalityDepth = 10000
+FinalityTagBypass = true
+
+[NodePool]
+PollFailureThreshold = 4
+PollInterval = '4s'
+SelectionMode = 'HighestHead'
+SyncThreshold = 5
+LeaseDuration = '0s'
+NodeIsSyncingEnabled = false
+FinalizedBlockPollInterval = '5s'
+
+[OCR]
+ContractConfirmations = 4
+ContractTransmitterTransmitTimeout = '10s'
+DatabaseTimeout = '10s'
+DeltaCOverride = '168h0m0s'
+DeltaCJitterOverride = '1h0m0s'
+ObservationGracePeriod = '1s'
+
+[OCR2]
+[OCR2.Automation]
+GasLimit = 5400000
 ```
 
 </p></details>
@@ -6778,6 +7440,9 @@ ReaperInterval = '1h0m0s'
 ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
 
+[Transactions.AutoPurge]
+Enabled = false
+
 [BalanceMonitor]
 Enabled = true
 
@@ -6809,6 +7474,8 @@ TransactionPercentile = 60
 HistoryDepth = 100
 MaxBufferSize = 3
 SamplingInterval = '1s'
+MaxAllowedFinalityDepth = 10000
+FinalityTagBypass = true
 
 [NodePool]
 PollFailureThreshold = 5
@@ -6863,6 +7530,9 @@ ReaperInterval = '1h0m0s'
 ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
 
+[Transactions.AutoPurge]
+Enabled = false
+
 [BalanceMonitor]
 Enabled = true
 
@@ -6894,6 +7564,8 @@ TransactionPercentile = 60
 HistoryDepth = 100
 MaxBufferSize = 3
 SamplingInterval = '1s'
+MaxAllowedFinalityDepth = 10000
+FinalityTagBypass = true
 
 [NodePool]
 PollFailureThreshold = 5
@@ -6957,8 +7629,6 @@ ChainType = 'arbitrum' # Example
 ```
 ChainType is automatically detected from chain ID. Set this to force a certain chain type regardless of chain ID.
 Available types: `arbitrum`, `celo`, `gnosis`, `kroma`, `metis`, `optimismBedrock`, `scroll`, `wemix`, `xlayer`, `zksync`
-
-`xdai` has been deprecated and will be removed in v2.13.0, use `gnosis` instead.
 
 ### FinalityDepth
 ```toml
@@ -7151,6 +7821,40 @@ ReaperThreshold indicates how old an EthTx ought to be before it can be reaped.
 ResendAfterThreshold = '1m' # Default
 ```
 ResendAfterThreshold controls how long to wait before re-broadcasting a transaction that has not yet been confirmed.
+
+## EVM.Transactions.AutoPurge
+```toml
+[EVM.Transactions.AutoPurge]
+Enabled = false # Default
+DetectionApiUrl = 'https://example.api.io' # Example
+Threshold = 5 # Example
+MinAttempts = 3 # Example
+```
+
+
+### Enabled
+```toml
+Enabled = false # Default
+```
+Enabled enables or disables automatically purging transactions that have been idenitified as terminally stuck (will never be included on-chain). This feature is only expected to be used by ZK chains.
+
+### DetectionApiUrl
+```toml
+DetectionApiUrl = 'https://example.api.io' # Example
+```
+DetectionApiUrl configures the base url of a custom endpoint used to identify terminally stuck transactions.
+
+### Threshold
+```toml
+Threshold = 5 # Example
+```
+Threshold configures the number of blocks a transaction has to remain unconfirmed before it is evaluated for being terminally stuck. This threshold is only applied if there is no custom API to identify stuck transactions provided by the chain.
+
+### MinAttempts
+```toml
+MinAttempts = 3 # Example
+```
+MinAttempts configures the minimum number of broadcasted attempts a transaction has to have before it is evaluated further for being terminally stuck. This threshold is only applied if there is no custom API to identify stuck transactions provided by the chain. Ensure the gas estimator configs take more bump attempts before reaching the configured max gas price.
 
 ## EVM.BalanceMonitor
 ```toml
@@ -7489,6 +8193,8 @@ Setting it lower will tend to set lower gas prices.
 HistoryDepth = 100 # Default
 MaxBufferSize = 3 # Default
 SamplingInterval = '1s' # Default
+FinalityTagBypass = true # Default
+MaxAllowedFinalityDepth = 10000 # Default
 ```
 The head tracker continually listens for new heads from the chain.
 
@@ -7518,6 +8224,22 @@ for the head tracker before we start dropping heads to keep up.
 SamplingInterval = '1s' # Default
 ```
 SamplingInterval means that head tracker callbacks will at maximum be made once in every window of this duration. This is a performance optimisation for fast chains. Set to 0 to disable sampling entirely.
+
+### FinalityTagBypass
+```toml
+FinalityTagBypass = true # Default
+```
+FinalityTagBypass disables FinalityTag support in HeadTracker and makes it track blocks up to FinalityDepth from the most recent head.
+It should only be used on chains with an extremely large actual finality depth (the number of blocks between the most recent head and the latest finalized block).
+Has no effect if `FinalityTagsEnabled` = false
+
+### MaxAllowedFinalityDepth
+```toml
+MaxAllowedFinalityDepth = 10000 # Default
+```
+MaxAllowedFinalityDepth - defines maximum number of blocks between the most recent head and the latest finalized block.
+If actual finality depth exceeds this number, HeadTracker aborts backfill and returns an error.
+Has no effect if `FinalityTagsEnabled` = false
 
 ## EVM.KeySpecific
 ```toml
@@ -7833,9 +8555,9 @@ GasLimit = 5400000 # Default
 ```
 GasLimit controls the gas limit for transmit transactions from ocr2automation job.
 
-## EVM.ChainWriter
+## EVM.Workflow
 ```toml
-[EVM.ChainWriter]
+[EVM.Workflow]
 FromAddress = '0x2a3e23c6f242F5345320814aC8a1b4E58707D292' # Example
 ForwarderAddress = '0x2a3e23c6f242F5345320814aC8a1b4E58707D292' # Example
 ```
@@ -7990,6 +8712,7 @@ ComputeUnitPriceMax = 1000 # Default
 ComputeUnitPriceMin = 0 # Default
 ComputeUnitPriceDefault = 0 # Default
 FeeBumpPeriod = '3s' # Default
+BlockHistoryPollPeriod = '5s' # Default
 ```
 
 
@@ -8095,6 +8818,12 @@ ComputeUnitPriceDefault is the default price per compute unit price, and the sta
 FeeBumpPeriod = '3s' # Default
 ```
 FeeBumpPeriod is the amount of time before a tx is retried with a fee bump
+
+### BlockHistoryPollPeriod
+```toml
+BlockHistoryPollPeriod = '5s' # Default
+```
+BlockHistoryPollPeriod is the rate to poll for blocks in the block history fee estimator
 
 ## Solana.Nodes
 ```toml

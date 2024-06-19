@@ -9,6 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/hashutil"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
@@ -19,7 +20,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/logpollerutil"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/pkg/hashlib"
 )
 
 const (
@@ -43,6 +43,7 @@ type OnRamp struct {
 	// Static config can be cached, because it's never expected to change.
 	// The only way to change that is through the contract's constructor (redeployment)
 	cachedStaticConfig cache.OnceCtxFunction[evm_2_evm_onramp_1_0_0.EVM2EVMOnRampStaticConfig]
+	cachedRmnContract  cache.OnceCtxFunction[*arm_contract.ARMContract]
 }
 
 func NewOnRamp(lggr logger.Logger, sourceSelector, destSelector uint64, onRampAddress common.Address, sourceLP logpoller.LogPoller, source client.Client) (*OnRamp, error) {
@@ -70,6 +71,14 @@ func NewOnRamp(lggr logger.Logger, sourceSelector, destSelector uint64, onRampAd
 	cachedStaticConfig := cache.OnceCtxFunction[evm_2_evm_onramp_1_0_0.EVM2EVMOnRampStaticConfig](func(ctx context.Context) (evm_2_evm_onramp_1_0_0.EVM2EVMOnRampStaticConfig, error) {
 		return onRamp.GetStaticConfig(&bind.CallOpts{Context: ctx})
 	})
+	cachedRmnContract := cache.OnceCtxFunction[*arm_contract.ARMContract](func(ctx context.Context) (*arm_contract.ARMContract, error) {
+		staticConfig, err := cachedStaticConfig(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		return arm_contract.NewARMContract(staticConfig.ArmProxy, source)
+	})
 	return &OnRamp{
 		lggr:       lggr,
 		address:    onRampAddress,
@@ -77,7 +86,7 @@ func NewOnRamp(lggr logger.Logger, sourceSelector, destSelector uint64, onRampAd
 		client:     source,
 		filters:    filters,
 		lp:         sourceLP,
-		leafHasher: NewLeafHasher(sourceSelector, destSelector, onRampAddress, hashlib.NewKeccakCtx(), onRamp),
+		leafHasher: NewLeafHasher(sourceSelector, destSelector, onRampAddress, hashutil.NewKeccak(), onRamp),
 		// offset || sourceChainID || seqNum || ...
 		sendRequestedSeqNumberWord: 2,
 		sendRequestedEventSig:      eventSig,
@@ -86,7 +95,8 @@ func NewOnRamp(lggr logger.Logger, sourceSelector, destSelector uint64, onRampAd
 			[]common.Hash{configSetEventSig},
 			onRampAddress,
 		),
-		cachedStaticConfig: cachedStaticConfig,
+		cachedStaticConfig: cache.CallOnceOnNoError(cachedStaticConfig),
+		cachedRmnContract:  cache.CallOnceOnNoError(cachedRmnContract),
 	}, nil
 }
 
@@ -171,17 +181,12 @@ func (o *OnRamp) IsSourceChainHealthy(context.Context) (bool, error) {
 }
 
 func (o *OnRamp) IsSourceCursed(ctx context.Context) (bool, error) {
-	staticConfig, err := o.cachedStaticConfig(ctx)
-	if err != nil {
-		return false, err
-	}
-
-	arm, err := arm_contract.NewARMContract(staticConfig.ArmProxy, o.client)
+	arm, err := o.cachedRmnContract(ctx)
 	if err != nil {
 		return false, fmt.Errorf("intializing Arm contract through the ArmProxy: %w", err)
 	}
 
-	cursed, err := arm.IsCursed(&bind.CallOpts{Context: ctx})
+	cursed, err := arm.IsCursed0(&bind.CallOpts{Context: ctx})
 	if err != nil {
 		return false, fmt.Errorf("checking if source Arm is cursed: %w", err)
 	}

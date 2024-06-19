@@ -10,7 +10,6 @@ import {TokenPool} from "../TokenPool.sol";
 
 import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
-import {IERC165} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/introspection/IERC165.sol";
 
 /// @notice This pool mints and burns USDC tokens through the Cross Chain Transfer
 /// Protocol (CCTP).
@@ -61,9 +60,6 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
   IMessageTransmitter public immutable i_messageTransmitter;
   uint32 public immutable i_localDomainIdentifier;
 
-  // The unique USDC pool flag to signal through EIP 165 that this is a USDC token pool.
-  bytes4 private constant USDC_INTERFACE_ID = bytes4(keccak256("USDC"));
-
   /// A domain is a USDC representation of a destination chain.
   /// @dev Zero is a valid domain identifier.
   /// @dev The address to mint on the destination chain is the corresponding USDC pool.
@@ -97,16 +93,6 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
     emit ConfigSet(address(tokenMessenger));
   }
 
-  /// @notice returns the USDC interface flag used for EIP165 identification.
-  function getUSDCInterfaceId() public pure returns (bytes4) {
-    return USDC_INTERFACE_ID;
-  }
-
-  /// @inheritdoc IERC165
-  function supportsInterface(bytes4 interfaceId) public pure override returns (bool) {
-    return interfaceId == USDC_INTERFACE_ID || super.supportsInterface(interfaceId);
-  }
-
   /// @notice Burn the token in the pool
   /// @dev Burn is not rate limited at per-pool level. Burn does not contribute to honey pot risk.
   /// Benefits of rate limiting here does not justify the extra gas cost.
@@ -126,18 +112,23 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
       revert InvalidReceiver(lockOrBurnIn.receiver);
     }
 
-    bytes32 receiver = abi.decode(lockOrBurnIn.receiver, (bytes32));
     // Since this pool is the msg sender of the CCTP transaction, only this contract
     // is able to call replaceDepositForBurn. Since this contract does not implement
     // replaceDepositForBurn, the tokens cannot be maliciously re-routed to another address.
     uint64 nonce = i_tokenMessenger.depositForBurnWithCaller(
-      lockOrBurnIn.amount, domain.domainIdentifier, receiver, address(i_token), domain.allowedCaller
+      // We set the domain.allowedCaller as the receiver of the funds, as this is the token pool. Since 1.5 the
+      // token pools receiver the funds to hop them through the offRamps.
+      lockOrBurnIn.amount,
+      domain.domainIdentifier,
+      domain.allowedCaller,
+      address(i_token),
+      domain.allowedCaller
     );
 
     emit Burned(msg.sender, lockOrBurnIn.amount);
 
     return Pool.LockOrBurnOutV1({
-      destPoolAddress: getRemotePool(lockOrBurnIn.remoteChainSelector),
+      destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector),
       destPoolData: abi.encode(SourceTokenDataPayload({nonce: nonce, sourceDomain: i_localDomainIdentifier}))
     });
   }
@@ -169,8 +160,11 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
     if (!i_messageTransmitter.receiveMessage(msgAndAttestation.message, msgAndAttestation.attestation)) {
       revert UnlockingUSDCFailed();
     }
+    // Since the tokens are minted to the pool, the pool has to send it to the offRamp
+    getToken().safeTransfer(msg.sender, releaseOrMintIn.amount);
+
     emit Minted(msg.sender, releaseOrMintIn.receiver, releaseOrMintIn.amount);
-    return Pool.ReleaseOrMintOutV1({localToken: address(i_token), destinationAmount: releaseOrMintIn.amount});
+    return Pool.ReleaseOrMintOutV1({destinationAmount: releaseOrMintIn.amount});
   }
 
   /// @notice Validates the USDC encoded message against the given parameters.
