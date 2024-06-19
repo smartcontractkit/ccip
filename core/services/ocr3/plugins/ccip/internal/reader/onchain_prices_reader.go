@@ -11,8 +11,8 @@ import (
 )
 
 type TokenPriceConfig struct {
-	// This is mainly used for tokens on testnet to give them a price
-	StaticPrices map[ocr2types.Account]*big.Int `json:"staticPrice"`
+	// This is mainly used for inputTokens on testnet to give them a price
+	StaticPrices map[ocr2types.Account]big.Int `json:"staticPrice"`
 }
 
 type OnchainTokenPricesReader struct {
@@ -26,20 +26,25 @@ func (pr *OnchainTokenPricesReader) GetTokenPricesUSD(ctx context.Context, token
 		contractName = "PriceAggregator"
 		functionName = "getTokenPrice"
 	)
-
-	prices := make([]*big.Int, 0, len(tokens))
+	prices := make([]*big.Int, len(tokens))
 	eg := new(errgroup.Group)
 	for idx, token := range tokens {
+		idx := idx
+		token := token
 		eg.Go(func() error {
-			var price *big.Int
+			//print("token: ", token, "\n")
+			price := new(big.Int)
 			if staticPrice, exists := pr.TokenPriceConfig.StaticPrices[token]; exists {
-				price = staticPrice
+				println("staticPrice: ", staticPrice.String(), "\n")
+				price.Set(&staticPrice)
 			} else {
-				if err := pr.ContractReader.GetLatestValue(ctx, contractName, functionName, token, &price); err != nil {
+				if err := pr.ContractReader.GetLatestValue(ctx, contractName, functionName, token, price); err != nil {
 					return fmt.Errorf("failed to get token price for %s: %w", token, err)
 				}
+				println("token: ", token, "returned price: ", price.String())
 			}
-			prices[idx] = price
+			//prices[idx] = price
+			prices[idx] = new(big.Int).Set(price)
 			return nil
 		})
 	}
