@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"go.uber.org/multierr"
-	"golang.org/x/sync/errgroup"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/keystone_capability_registry"
@@ -130,8 +129,6 @@ func (l *launcher) tick() error {
 		return fmt.Errorf("failed to process diff: %w", err)
 	}
 
-	// if diff is correctly processed, update latest state.
-	l.regState = latestState
 	return nil
 }
 
@@ -146,16 +143,56 @@ func (l *launcher) processDiff(diff diffResult) error {
 		}
 	}
 
+	var addedDeployments = make(map[DonID]*ccipDeployment)
 	for _, don := range diff.added {
-		if err := l.addDON(don); err != nil {
+		if dep, err := l.addDON(don); err != nil {
 			return err
+		} else {
+			addedDeployments[don.Id] = dep
 		}
 	}
 
-	for _, don := range diff.updated {
-		if err := l.updateDON(don); err != nil {
-			return err
+	for donID, dep := range addedDeployments {
+		if err := dep.StartBlue(); err != nil {
+			if shutdownErr := dep.ShutdownBlue(); shutdownErr != nil {
+				l.lggr.Errorw("Failed to shutdown blue instance after failed start", "donId", donID, "err", shutdownErr)
+			}
+			return fmt.Errorf("failed to start oracles for CCIP DON %d: %w", donID, err)
 		}
+		// update state.
+		l.dons[donID] = dep
+		// update the state with the latest config.
+		// this way if one of the starts errors, we don't retry all of them.
+		l.regState.DONs[donID] = diff.added[donID]
+	}
+
+	var updatedDeployments = make(map[DonID]struct {
+		depBefore, depAfter *ccipDeployment
+	})
+	for _, don := range diff.updated {
+		if depBefore, depAfter, err := l.updateDON(don); err != nil {
+			return err
+		} else {
+			updatedDeployments[don.Id] = struct {
+				depBefore, depAfter *ccipDeployment
+			}{
+				depBefore: depBefore,
+				depAfter:  depAfter,
+			}
+		}
+	}
+
+	for donID, depPair := range updatedDeployments {
+		if err := depPair.depAfter.HandleBlueGreen(depPair.depBefore); err != nil {
+			// TODO: how to handle a failed blue-green deployment?
+			return fmt.Errorf("failed to handle blue-green deployment for CCIP DON %d: %w", donID, err)
+		}
+
+		// update state.
+		l.dons[donID] = depPair.depAfter
+		// update the state with the latest config.
+		// this way if one of the starts errors, we don't retry all of them.
+		l.regState.DONs[donID] = diff.updated[donID]
 	}
 
 	return nil
@@ -181,167 +218,119 @@ func (l *launcher) removeDON(id uint32) error {
 // In the case of CCIP, which follows blue-green deployment, we either:
 // 1. Create a new oracle (the green instance) and start it.
 // 2. Shut down the blue instance, making the green instance the new blue instance.
-func (l *launcher) updateDON(don keystone_capability_registry.CapabilityRegistryDONInfo) error {
+func (l *launcher) updateDON(don keystone_capability_registry.CapabilityRegistryDONInfo) (depBefore, depAfter *ccipDeployment, err error) {
 	if !isMemberOfDON(don, l.p2pID) {
 		l.lggr.Infow("Not a member of this DON, skipping", "donId", don.Id, "p2pId", l.p2pID.ID())
-		return nil
+		return nil, nil, nil
 	}
 
-	ceDep, ok := l.dons[don.Id]
+	var ok bool
+	depBefore, ok = l.dons[don.Id]
 	if !ok {
 		// This should never happen.
-		return fmt.Errorf("no deployment found for CCIP DON %d", don.Id)
+		return nil, nil, fmt.Errorf("no deployment found for CCIP DON %d", don.Id)
 	}
 
 	// this should be a retryable error.
 	commitOCRConfigs, err := l.homeChainReader.GetOCRConfigs(context.Background(), don.Id, cctypes.PluginTypeCCIPCommit)
 	if err != nil {
-		return fmt.Errorf("failed to fetch OCR configs for CCIP commit plugin (don id: %d) from home chain config contract: %w",
+		return nil, nil, fmt.Errorf("failed to fetch OCR configs for CCIP commit plugin (don id: %d) from home chain config contract: %w",
 			don.Id, err)
 	}
 
 	execOCRConfigs, err := l.homeChainReader.GetOCRConfigs(context.Background(), don.Id, cctypes.PluginTypeCCIPExec)
 	if err != nil {
-		return fmt.Errorf("failed to fetch OCR configs for CCIP exec plugin (don id: %d) from home chain config contract: %w",
+		return nil, nil, fmt.Errorf("failed to fetch OCR configs for CCIP exec plugin (don id: %d) from home chain config contract: %w",
 			don.Id, err)
 	}
 
 	// valid cases:
-	// a) len(commitOCRConfigs) == 2 && ceDep.NumCommitInstances() == 1: this is a new green instance.
-	// b) len(commitOCRConfigs) == 1 && ceDep.NumCommitInstances() == 2: this is a promotion of green->blue.
+	// a) len(commitOCRConfigs) == 2 && depBefore.NumCommitInstances() == 1: this is a new green instance.
+	// b) len(commitOCRConfigs) == 1 && depBefore.NumCommitInstances() == 2: this is a promotion of green->blue.
 	// invalid cases (enforced in the config contract):
-	// a) len(commitOCRConfigs) == 2 && ceDep.NumCommitInstances() == 2: this is an invariant violation.
-	// b) len(commitOCRConfigs) == 1 && ceDep.NumCommitInstances() == 1: this is an invariant violation.
+	// a) len(commitOCRConfigs) == 2 && depBefore.NumCommitInstances() == 2: this is an invariant violation.
+	// b) len(commitOCRConfigs) == 1 && depBefore.NumCommitInstances() == 1: this is an invariant violation.
 	// same thing applies to exec.
-	if len(commitOCRConfigs) == 2 && !ceDep.HasGreenCommitInstance() {
+	depAfter = &ccipDeployment{}
+	if len(commitOCRConfigs) == 2 && !depBefore.HasGreenCommitInstance() {
 		// this is a new green instance.
 		greenOracle, err := l.oracleCreator.CreateCommitOracle(commitOCRConfigs[1])
 		if err != nil {
-			return fmt.Errorf("failed to create CCIP commit oracle: %w", err)
+			return nil, nil, fmt.Errorf("failed to create CCIP commit oracle: %w", err)
 		}
 
-		if err := greenOracle.Start(); err != nil {
-			return fmt.Errorf("failed to start green commit oracle: %w", err)
-		}
-		ceDep.commit.green = greenOracle
-		l.lggr.Infow("Started green commit oracle",
-			"donId", don.Id, "ocrConfig", commitOCRConfigs[1].String())
-	} else if len(commitOCRConfigs) == 1 && ceDep.HasGreenCommitInstance() {
+		depAfter.commit.blue = depBefore.commit.blue
+		depAfter.commit.green = greenOracle
+	} else if len(commitOCRConfigs) == 1 && depBefore.HasGreenCommitInstance() {
 		// this is a promotion of green->blue.
-		// swap the green oracle with the blue oracle in the ceDep struct.
-		oldBlue := ceDep.commit.blue
-		ceDep.commit.blue = ceDep.commit.green
-		ceDep.commit.green = nil
-
-		// shut down blue oracle.
-		if err := oldBlue.Shutdown(); err != nil {
-			// we can't really roll back here, so we just log the error.
-			l.lggr.Errorw("Failed to shutdown blue oracle", "err", err)
-		}
+		depAfter.commit.blue = depBefore.commit.green
 	} else {
-		return fmt.Errorf("invariant violation: expected 1 or 2 OCR configs for CCIP commit plugin (don id: %d), got %d", don.Id, len(commitOCRConfigs))
+		return nil, nil, fmt.Errorf("invariant violation: expected 1 or 2 OCR configs for CCIP commit plugin (don id: %d), got %d", don.Id, len(commitOCRConfigs))
 	}
 
-	if len(execOCRConfigs) == 2 && !ceDep.HasGreenExecInstance() {
+	if len(execOCRConfigs) == 2 && !depBefore.HasGreenExecInstance() {
 		// this is a new green instance.
 		greenOracle, err := l.oracleCreator.CreateExecOracle(execOCRConfigs[1])
 		if err != nil {
-			return fmt.Errorf("failed to create CCIP exec oracle: %w", err)
+			return nil, nil, fmt.Errorf("failed to create CCIP exec oracle: %w", err)
 		}
 
-		if err := greenOracle.Start(); err != nil {
-			return fmt.Errorf("failed to start green exec oracle: %w", err)
-		}
-		ceDep.exec.green = greenOracle
-		l.lggr.Infow("Started green exec oracle",
-			"donId", don.Id, "ocrConfig", execOCRConfigs[1].String())
-	} else if len(execOCRConfigs) == 1 && ceDep.HasGreenExecInstance() {
+		depAfter.exec.blue = depBefore.exec.blue
+		depAfter.exec.green = greenOracle
+	} else if len(execOCRConfigs) == 1 && depBefore.HasGreenExecInstance() {
 		// this is a promotion of green->blue.
-		// swap the green oracle with the blue oracle in the ceDep struct.
-		oldBlue := ceDep.exec.blue
-		ceDep.exec.blue = ceDep.exec.green
-		ceDep.exec.green = nil
-
-		// shut down blue oracle.
-		if err := oldBlue.Shutdown(); err != nil {
-			// we can't really roll back here, so we just log the error.
-			l.lggr.Errorw("Failed to shutdown blue oracle", "err", err)
-		}
+		depAfter.exec.blue = depBefore.exec.green
 	} else {
-		return fmt.Errorf("invariant violation: expected 1 or 2 OCR configs for CCIP exec plugin (don id: %d), got %d", don.Id, len(execOCRConfigs))
+		return nil, nil, fmt.Errorf("invariant violation: expected 1 or 2 OCR configs for CCIP exec plugin (don id: %d), got %d", don.Id, len(execOCRConfigs))
 	}
 
-	return nil
+	return depBefore, depAfter, nil
 }
 
-func (l *launcher) addDON(don keystone_capability_registry.CapabilityRegistryDONInfo) error {
+func (l *launcher) addDON(don keystone_capability_registry.CapabilityRegistryDONInfo) (*ccipDeployment, error) {
 	if !isMemberOfDON(don, l.p2pID) {
 		l.lggr.Infow("Not a member of this DON, skipping", "donId", don.Id, "p2pId", l.p2pID.ID())
-		return nil
+		return nil, nil
 	}
 
 	// this should be a retryable error.
 	commitOCRConfigs, err := l.homeChainReader.GetOCRConfigs(context.Background(), don.Id, cctypes.PluginTypeCCIPCommit)
 	if err != nil {
-		return fmt.Errorf("failed to fetch OCR configs for CCIP commit plugin (don id: %d) from home chain config contract: %w",
+		return nil, fmt.Errorf("failed to fetch OCR configs for CCIP commit plugin (don id: %d) from home chain config contract: %w",
 			don.Id, err)
 	}
 
 	execOCRConfigs, err := l.homeChainReader.GetOCRConfigs(context.Background(), don.Id, cctypes.PluginTypeCCIPExec)
 	if err != nil {
-		return fmt.Errorf("failed to fetch OCR configs for CCIP exec plugin (don id: %d) from home chain config contract: %w",
+		return nil, fmt.Errorf("failed to fetch OCR configs for CCIP exec plugin (don id: %d) from home chain config contract: %w",
 			don.Id, err)
 	}
 
 	// upon creation we should only have one OCR config per plugin type.
 	if len(commitOCRConfigs) != 1 {
-		return fmt.Errorf("expected exactly one OCR config for CCIP commit plugin (don id: %d), got %d", don.Id, len(commitOCRConfigs))
+		return nil, fmt.Errorf("expected exactly one OCR config for CCIP commit plugin (don id: %d), got %d", don.Id, len(commitOCRConfigs))
 	}
 
 	if len(execOCRConfigs) != 1 {
-		return fmt.Errorf("expected exactly one OCR config for CCIP exec plugin (don id: %d), got %d", don.Id, len(execOCRConfigs))
+		return nil, fmt.Errorf("expected exactly one OCR config for CCIP exec plugin (don id: %d), got %d", don.Id, len(execOCRConfigs))
 	}
 
 	commitOracle, err := l.oracleCreator.CreateCommitOracle(commitOCRConfigs[0])
 	if err != nil {
-		return fmt.Errorf("failed to create CCIP commit oracle: %w", err)
+		return nil, fmt.Errorf("failed to create CCIP commit oracle: %w", err)
 	}
 
 	execOracle, err := l.oracleCreator.CreateExecOracle(execOCRConfigs[0])
 	if err != nil {
-		return fmt.Errorf("failed to create CCIP exec oracle: %w", err)
+		return nil, fmt.Errorf("failed to create CCIP exec oracle: %w", err)
 	}
 
-	var errGroup errgroup.Group
-	errGroup.Go(func() error {
-		return commitOracle.Start()
-	})
-	errGroup.Go(func() error {
-		return execOracle.Start()
-	})
-	err = errGroup.Wait()
-	if err != nil {
-		// shut down the oracles if we failed to start them.
-		errShutdown := commitOracle.Shutdown()
-		if errShutdown != nil {
-			l.lggr.Errorw("Failed to shutdown commit oracle", "err", err)
-		}
-		errShutdown = execOracle.Shutdown()
-		if errShutdown != nil {
-			l.lggr.Errorw("Failed to shutdown exec oracle", "err", err)
-		}
-		return fmt.Errorf("failed to start oracles for CCIP DON %d: %w, err shutdown (could be nil): %w", don.Id, err, errShutdown)
-	}
-
-	// update the dons map with the new deployment.
-	l.dons[don.Id] = &ccipDeployment{
+	return &ccipDeployment{
 		commit: blueGreenDeployment{
 			blue: commitOracle,
 		},
 		exec: blueGreenDeployment{
 			blue: execOracle,
 		},
-	}
-
-	return nil
+	}, nil
 }

@@ -1,6 +1,8 @@
 package launcher
 
 import (
+	"fmt"
+
 	"go.uber.org/multierr"
 
 	cctypes "github.com/smartcontractkit/chainlink/v2/core/services/ccipcapability/types"
@@ -39,6 +41,66 @@ func (c *ccipDeployment) Shutdown() error {
 	if c.exec.green != nil {
 		err = multierr.Append(err, c.exec.green.Shutdown())
 	}
+	return err
+}
+
+func (c *ccipDeployment) StartBlue() error {
+	var err error
+
+	err = multierr.Append(err, c.commit.blue.Start())
+	err = multierr.Append(err, c.exec.blue.Start())
+
+	return err
+}
+
+func (c *ccipDeployment) ShutdownBlue() error {
+	var err error
+
+	err = multierr.Append(err, c.commit.blue.Shutdown())
+	err = multierr.Append(err, c.exec.blue.Shutdown())
+
+	return err
+}
+
+func (c *ccipDeployment) HandleBlueGreen(prevDeployment *ccipDeployment) error {
+	if prevDeployment == nil {
+		return fmt.Errorf("previous deployment is nil")
+	}
+
+	// two possible cases:
+	// 1. both blue and green are present in prevDeployment, only blue is present in c.
+	// this is a promotion of green to blue, so we need to shut down the blue deployment
+	// and make green the new blue.
+	// 2. only blue is present in prevDeployment, both blue and green are present in c
+	var err error
+	if prevDeployment.commit.green != nil && c.commit.green == nil {
+		// case 1
+		// green is already running so no need to start it.
+		// shutdown blue.
+		err = multierr.Append(err, prevDeployment.commit.blue.Shutdown())
+	} else if prevDeployment.commit.green == nil && c.commit.green != nil {
+		// case 2
+		// blue is already running so no need to start it.
+		// start green.
+		err = multierr.Append(err, c.commit.green.Start())
+	} else {
+		return fmt.Errorf("invalid blue-green deployment transition")
+	}
+
+	if prevDeployment.exec.green != nil && c.exec.green == nil {
+		// case 1
+		// green is already running so no need to start it.
+		// shutdown blue.
+		err = multierr.Append(err, prevDeployment.exec.blue.Shutdown())
+	} else if prevDeployment.exec.green == nil && c.exec.green != nil {
+		// case 2
+		// blue is already running so no need to start it.
+		// start green.
+		err = multierr.Append(err, c.exec.green.Start())
+	} else {
+		return fmt.Errorf("invalid blue-green deployment transition")
+	}
+
 	return err
 }
 
