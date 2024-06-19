@@ -117,7 +117,7 @@ contract CommitStore is ICommitStore, ITypeAndVersion, OCR2Base {
 
   /// @notice Returns the epoch and round of the last price update.
   /// @return the latest price epoch and round.
-  function getLatestPriceEpochAndRound() public view returns (uint64) {
+  function getLatestPriceEpochAndRound() external view returns (uint64) {
     return s_latestPriceEpochAndRound;
   }
 
