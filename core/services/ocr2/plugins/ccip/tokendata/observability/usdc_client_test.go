@@ -83,7 +83,8 @@ func testMonitoring(t *testing.T, name string, server *httptest.Server, requests
 	// Mock USDC reader.
 	usdcReader := mocks.NewUSDCReader(t)
 	msgBody := []byte{0xb0, 0xd1}
-	usdcReader.On("GetUSDCMessagePriorToLogIndexInTx", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(msgBody, nil)
+	nonce := utils.RandomBytes32()
+	usdcReader.On("GetUSDCMessageWithNonce", mock.Anything, nonce).Return(msgBody, nil)
 
 	// Service with monitored http client.
 	usdcTokenAddr := utils.RandomAddress()
@@ -101,6 +102,7 @@ func testMonitoring(t *testing.T, name string, server *httptest.Server, requests
 						Amount: big.NewInt(rand.Int63()),
 					},
 				},
+				SourceTokenData: [][]byte{nonce[:]},
 			},
 		}, 0)
 	}

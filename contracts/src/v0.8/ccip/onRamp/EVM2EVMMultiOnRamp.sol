@@ -317,8 +317,6 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, AggregateRateLimiter, ITypeA
     newMessage.messageId = Internal._hash(newMessage, destChainConfig.metadataHash);
 
     // Emit message request
-    // This must happen after any pool events as some tokens (e.g. USDC) emit events that we expect to precede this
-    // event in the offchain code.
     emit CCIPSendRequested(destChainSelector, newMessage);
     return newMessage.messageId;
   }

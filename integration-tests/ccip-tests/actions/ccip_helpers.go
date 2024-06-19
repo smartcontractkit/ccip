@@ -892,9 +892,6 @@ func (ccipModule *CCIPCommon) DeployContracts(
 						}
 					}
 					if ccipModule.TokenMessenger == nil {
-						if ccipModule.TokenTransmitter == nil {
-							return fmt.Errorf("TokenTransmitter contract address is not provided")
-						}
 						ccipModule.TokenMessenger, err = ccipModule.tokenDeployer.DeployTokenMessenger(ccipModule.TokenTransmitter.ContractAddress)
 						if err != nil {
 							return fmt.Errorf("deploying token messenger shouldn't fail %w", err)

@@ -20,13 +20,13 @@ import (
 	"github.com/stretchr/testify/require"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
-
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	ccipdatamocks "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/mocks"
+	ccipmocks "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/tokendata"
 )
 
@@ -227,7 +227,9 @@ func getMockUSDCEndpoint(t *testing.T, response attestationResponse) *httptest.S
 func TestGetUSDCMessageBody(t *testing.T) {
 	expectedBody := []byte("0x0000000000000001000000020000000000048d71000000000000000000000000eb08f243e5d3fcff26a9e38ae5520a669f4019d000000000000000000000000023a04d5935ed8bc8e3eb78db3541f0abfb001c6e0000000000000000000000006cb3ed9b441eb674b58495c8b3324b59faff5243000000000000000000000000000000005425890298aed601595a70ab815c96711a31bc65000000000000000000000000ab4f961939bfe6a93567cc57c59eed7084ce2131000000000000000000000000000000000000000000000000000000000000271000000000000000000000000035e08285cfed1ef159236728f843286c55fc0861")
 	usdcReader := ccipdatamocks.USDCReader{}
-	usdcReader.On("GetUSDCMessagePriorToLogIndexInTx", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(expectedBody, nil)
+	nonce := utils.RandomBytes32()
+
+	usdcReader.On("GetUSDCMessageWithNonce", mock.Anything, nonce).Return(expectedBody, nil)
 
 	usdcTokenAddr := utils.RandomAddress()
 	lggr := logger.TestLogger(t)
@@ -242,64 +244,13 @@ func TestGetUSDCMessageBody(t *testing.T) {
 					Amount: big.NewInt(rand.Int63()),
 				},
 			},
+			SourceTokenData: [][]byte{nonce[:]},
 		},
 	}, 0)
 	require.NoError(t, err)
 	require.Equal(t, body, expectedBody)
 
-	usdcReader.AssertNumberOfCalls(t, "GetUSDCMessagePriorToLogIndexInTx", 1)
-}
-
-func TestTokenDataReader_getUsdcTokenEndOffset(t *testing.T) {
-	usdcToken := utils.RandomAddress()
-	nonUsdcToken := utils.RandomAddress()
-
-	multipleTokens := []common.Address{
-		usdcToken, // 2
-		nonUsdcToken,
-		nonUsdcToken,
-		usdcToken, // 1
-		usdcToken, // 0
-		nonUsdcToken,
-	}
-
-	testCases := []struct {
-		name       string
-		tokens     []common.Address
-		tokenIndex int
-		expOffset  int
-		expErr     bool
-	}{
-		{name: "one non usdc token", tokens: []common.Address{nonUsdcToken}, tokenIndex: 0, expOffset: 0, expErr: true},
-		{name: "one usdc token", tokens: []common.Address{usdcToken}, tokenIndex: 0, expOffset: 0, expErr: false},
-		{name: "one usdc token wrong index", tokens: []common.Address{usdcToken}, tokenIndex: 1, expOffset: 0, expErr: true},
-		{name: "multiple tokens 1", tokens: multipleTokens, tokenIndex: 0, expOffset: 2},
-		{name: "multiple tokens - non usdc selected", tokens: multipleTokens, tokenIndex: 2, expErr: true},
-		{name: "multiple tokens 2", tokens: multipleTokens, tokenIndex: 3, expOffset: 1},
-		{name: "multiple tokens 3", tokens: multipleTokens, tokenIndex: 4, expOffset: 0},
-		{name: "multiple tokens not found", tokens: multipleTokens, tokenIndex: 5, expErr: true},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			r := &TokenDataReader{usdcTokenAddress: usdcToken}
-			tokenAmounts := make([]cciptypes.TokenAmount, len(tc.tokens))
-			for i := range tokenAmounts {
-				tokenAmounts[i] = cciptypes.TokenAmount{
-					Token:  ccipcalc.EvmAddrToGeneric(tc.tokens[i]),
-					Amount: big.NewInt(rand.Int63()),
-				}
-			}
-			msg := cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta{EVM2EVMMessage: cciptypes.EVM2EVMMessage{TokenAmounts: tokenAmounts}}
-			offset, err := r.getUsdcTokenEndOffset(msg, tc.tokenIndex)
-			if tc.expErr {
-				assert.Error(t, err)
-				return
-			}
-			assert.NoError(t, err)
-			assert.Equal(t, tc.expOffset, offset)
-		})
-	}
+	usdcReader.AssertNumberOfCalls(t, "GetUSDCMessageWithNonce", 1)
 }
 
 func TestUSDCReader_rateLimiting(t *testing.T) {
@@ -309,6 +260,7 @@ func TestUSDCReader_rateLimiting(t *testing.T) {
 		rateConfig   time.Duration
 		testDuration time.Duration
 		timeout      time.Duration
+		errorCount   int
 		err          string
 	}{
 		{
@@ -335,6 +287,7 @@ func TestUSDCReader_rateLimiting(t *testing.T) {
 			rateConfig:   100 * time.Millisecond,
 			testDuration: 1 * time.Millisecond,
 			timeout:      1 * time.Millisecond,
+			errorCount:   4,
 			err:          "usdc rate limiting error: rate: Wait(n=1) would exceed context deadline",
 		},
 		{
@@ -343,6 +296,7 @@ func TestUSDCReader_rateLimiting(t *testing.T) {
 			rateConfig:   100 * time.Millisecond,
 			testDuration: 100 * time.Millisecond,
 			timeout:      150 * time.Millisecond,
+			errorCount:   3,
 			err:          "usdc rate limiting error: rate: Wait(n=1) would exceed context deadline",
 		},
 	}
@@ -362,9 +316,10 @@ func TestUSDCReader_rateLimiting(t *testing.T) {
 			attestationURI, err := url.ParseRequestURI(ts.URL)
 			require.NoError(t, err)
 
+			nonce := utils.RandomBytes32()
 			lggr := logger.TestLogger(t)
-			lp := mocks.NewLogPoller(t)
-			usdcReader, _ := ccipdata.NewUSDCReader(lggr, "job_123", mockMsgTransmitter, lp, false)
+			usdcReader := ccipmocks.NewUSDCReader(t)
+			usdcReader.On("GetUSDCMessageWithNonce", mock.Anything, nonce).Return([]byte{}, nil)
 			usdcService := NewUSDCTokenDataReader(lggr, usdcReader, attestationURI, 0, utils.RandomAddress(), tc.rateConfig)
 
 			ctx := context.Background()
@@ -385,7 +340,8 @@ func TestUSDCReader_rateLimiting(t *testing.T) {
 					<-trigger
 					_, err := usdcService.ReadTokenData(ctx, cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta{
 						EVM2EVMMessage: cciptypes.EVM2EVMMessage{
-							TokenAmounts: []cciptypes.TokenAmount{{Token: ccipcalc.EvmAddrToGeneric(utils.ZeroAddress), Amount: nil}}, // trigger failure due to wrong address
+							TokenAmounts:    []cciptypes.TokenAmount{{Token: ccipcalc.EvmAddrToGeneric(utils.ZeroAddress), Amount: nil}}, // trigger failure due to wrong address
+							SourceTokenData: [][]byte{nonce[:]},
 						},
 					}, 0)
 
@@ -403,19 +359,16 @@ func TestUSDCReader_rateLimiting(t *testing.T) {
 			close(errorChan)
 
 			// Collect errors
-			errorFound := false
+			numErrors := 0
 			for err := range errorChan {
-				if tc.err != "" && !strings.Contains(err.Error(), tc.err) {
-					errorFound = true
-				} else if err != nil && !strings.Contains(err.Error(), "get usdc token 0 end offset") {
-					// Ignore that one error, it's expected because of how mocking is used.
-					// Anything else is unexpected.
-					require.Fail(t, "unexpected error", err)
+				if err == nil {
+					continue
+				}
+				if tc.err != "" && strings.Contains(err.Error(), tc.err) {
+					numErrors++
 				}
 			}
-			if tc.err != "" {
-				assert.True(t, errorFound)
-			}
+			assert.Equalf(t, tc.errorCount, numErrors, "expected %d errors, got %d", tc.errorCount, numErrors)
 			assert.WithinDuration(t, start.Add(tc.testDuration), finish, 50*time.Millisecond)
 		})
 	}
