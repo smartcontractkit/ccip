@@ -46,7 +46,7 @@ const (
 	PollPeriod = 6 * time.Second
 )
 
-var supportedChainTypes = []config.ChainType{config.ChainArbitrum, config.ChainOptimismBedrock, config.ChainKroma, config.ChainScroll}
+var supportedChainTypes = []config.ChainType{config.ChainArbitrum, config.ChainOptimismBedrock, config.ChainKroma, config.ChainScroll, config.ChainZkSync}
 
 func IsRollupWithL1Support(chainType config.ChainType) bool {
 	return slices.Contains(supportedChainTypes, chainType)
@@ -62,6 +62,8 @@ func NewL1GasOracle(lggr logger.Logger, ethClient l1OracleClient, chainType conf
 		l1Oracle = NewOpStackL1GasOracle(lggr, ethClient, chainType)
 	case config.ChainArbitrum:
 		l1Oracle = NewArbitrumL1GasOracle(lggr, ethClient)
+	case config.ChainZkSync:
+		l1Oracle = NewZkSyncL1GasOracle(lggr, ethClient)
 	default:
 		panic(fmt.Sprintf("Received unspported chaintype %s", chainType))
 	}
