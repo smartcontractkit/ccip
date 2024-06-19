@@ -32,10 +32,6 @@ const (
 
 	// Function calls
 	DepositETHToFunction = "depositETHTo"
-
-	// L2 to L1 finalize withdrawal actions (used for generating the LM's finalization payload so the LM contract knows which action to take)
-	FinalizationActionProveWithdrawal    uint8 = 0
-	FinalizationActionFinalizeWithdrawal uint8 = 1
 )
 
 var (

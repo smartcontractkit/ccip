@@ -482,52 +482,22 @@ func (l *l2ToL1Bridge) generateTransferBridgeDataForProve(
 	if err != nil {
 		return nil, fmt.Errorf("prove message: %w", err)
 	}
-	fmt.Println("Calling proveWithdrawalTransaction on bridge adapter, nonce:", messageProof.LowLevelMessage.Nonce, "\n",
-		"sender:", messageProof.LowLevelMessage.Sender.String(), "\n",
-		"target:", messageProof.LowLevelMessage.Target.String(), "\n",
-		"value:", messageProof.LowLevelMessage.Value.String(), "\n",
-		"gasLimit:", messageProof.LowLevelMessage.GasLimit.String(), "\n",
-		"data:", hexutil.Encode(messageProof.LowLevelMessage.Data), "\n",
-		"l2OutputIndex:", messageProof.L2OutputIndex, "\n",
-		"outputRootProof version:", hexutil.Encode(messageProof.OutputRootProof.Version[:]), "\n",
-		"outputRootProof stateRoot:", hexutil.Encode(messageProof.OutputRootProof.StateRoot[:]), "\n",
-		"outputRootProof messagePasserStorageRoot:", hexutil.Encode(messageProof.OutputRootProof.MessagePasserStorageRoot[:]), "\n",
-		"outputRootProof latestBlockHash:", hexutil.Encode(messageProof.OutputRootProof.LatestBlockHash[:]), "\n",
-		"withdrawalProof:", formatWithdrawalProof(messageProof.WithdrawalProof))
+	lggr.Infow("Calling proveWithdrawalTransaction on bridge adapter", "nonce", messageProof.LowLevelMessage.Nonce,
+		"sender", messageProof.LowLevelMessage.Sender.String(),
+		"target", messageProof.LowLevelMessage.Target.String(),
+		"value", messageProof.LowLevelMessage.Value.String(),
+		"gasLimit", messageProof.LowLevelMessage.GasLimit.String(),
+		"data", hexutil.Encode(messageProof.LowLevelMessage.Data),
+		"l2OutputIndex", messageProof.L2OutputIndex,
+		"outputRootProof version", hexutil.Encode(messageProof.OutputRootProof.Version[:]),
+		"outputRootProof stateRoot", hexutil.Encode(messageProof.OutputRootProof.StateRoot[:]),
+		"outputRootProof messagePasserStorageRoot", hexutil.Encode(messageProof.OutputRootProof.MessagePasserStorageRoot[:]),
+		"outputRootProof latestBlockHash", hexutil.Encode(messageProof.OutputRootProof.LatestBlockHash[:]),
+		"withdrawalProof", formatWithdrawalProof(messageProof.WithdrawalProof))
 
-	encodedProveWithdrawal, err := l1OPBridgeAdapterEncoderABI.Methods["encodeOptimismProveWithdrawalPayload"].Inputs.Pack(
-		optimism_l1_bridge_adapter_encoder.OptimismL1BridgeAdapterOptimismProveWithdrawalPayload{
-			WithdrawalTransaction: optimism_l1_bridge_adapter_encoder.TypesWithdrawalTransaction{
-				Nonce:    messageProof.LowLevelMessage.Nonce,
-				Sender:   messageProof.LowLevelMessage.Sender,
-				Target:   messageProof.LowLevelMessage.Target,
-				Value:    messageProof.LowLevelMessage.Value,
-				GasLimit: messageProof.LowLevelMessage.GasLimit,
-				Data:     messageProof.LowLevelMessage.Data,
-			},
-			L2OutputIndex: messageProof.L2OutputIndex,
-			OutputRootProof: optimism_l1_bridge_adapter_encoder.TypesOutputRootProof{
-				Version:                  messageProof.OutputRootProof.Version,
-				StateRoot:                messageProof.OutputRootProof.StateRoot,
-				MessagePasserStorageRoot: messageProof.OutputRootProof.MessagePasserStorageRoot,
-				LatestBlockhash:          messageProof.OutputRootProof.LatestBlockHash,
-			},
-			WithdrawalProof: messageProof.WithdrawalProof,
-		},
-	)
+	encodedPayload, err := withdrawprover.EncodeProveWithdrawalPayload(l1OPBridgeAdapterEncoderABI, messageProof)
 	if err != nil {
-		return nil, fmt.Errorf("encodeOptimismProveWithdrawalPayload: %w", err)
-	}
-
-	// Then encode the finalize withdraw ERC 20 payload
-	encodedPayload, err := l1OPBridgeAdapterEncoderABI.Methods["encodeFinalizeWithdrawalERC20Payload"].Inputs.Pack(
-		optimism_l1_bridge_adapter_encoder.OptimismL1BridgeAdapterFinalizeWithdrawERC20Payload{
-			Action: FinalizationActionProveWithdrawal,
-			Data:   encodedProveWithdrawal,
-		},
-	)
-	if err != nil {
-		return nil, fmt.Errorf("encodeFinalizeWithdrawalERC20Payload: %w", err)
+		return nil, fmt.Errorf("EncodeProveWithdrawalPayload: %w", err)
 	}
 
 	return encodedPayload, nil
@@ -552,34 +522,12 @@ func (l *l2ToL1Bridge) generateTransferBridgeDataForFinalize(
 		return nil, fmt.Errorf("parse message passed log: %w", err)
 	}
 
-	encodedFinalizeWithdrawal, err := l1OPBridgeAdapterEncoderABI.Methods["encodeOptimismFinalizationPayload"].Inputs.Pack(
-		optimism_l1_bridge_adapter_encoder.OptimismL1BridgeAdapterOptimismFinalizationPayload{
-			WithdrawalTransaction: optimism_l1_bridge_adapter_encoder.TypesWithdrawalTransaction{
-				Nonce:    messagePassed.Nonce,
-				Sender:   messagePassed.Sender,
-				Target:   messagePassed.Target,
-				Value:    messagePassed.Value,
-				GasLimit: messagePassed.GasLimit,
-				Data:     messagePassed.Data,
-			},
-		},
-	)
+	encodedFinalizeWithdrawal, err := withdrawprover.EncodeFinalizeWithdrawalPayload(l1OPBridgeAdapterEncoderABI, messagePassed)
 	if err != nil {
-		return nil, fmt.Errorf("encodeOptimismFinalizationPayload: %w", err)
+		return nil, fmt.Errorf("EncodeFinalizeWithdrawalPayload: %w", err)
 	}
 
-	// then encode the finalize withdraw erc20 payload next.
-	encodedPayload, err := l1OPBridgeAdapterEncoderABI.Methods["encodeFinalizeWithdrawalERC20Payload"].Inputs.Pack(
-		optimism_l1_bridge_adapter_encoder.OptimismL1BridgeAdapterFinalizeWithdrawERC20Payload{
-			Action: FinalizationActionFinalizeWithdrawal,
-			Data:   encodedFinalizeWithdrawal,
-		},
-	)
-	if err != nil {
-		return nil, fmt.Errorf("encodeFinalizeWithdrawalERC20Payload: %w", err)
-	}
-
-	return encodedPayload, nil
+	return encodedFinalizeWithdrawal, nil
 }
 
 // GetBridgePayloadAndFee implements bridge.Bridge.

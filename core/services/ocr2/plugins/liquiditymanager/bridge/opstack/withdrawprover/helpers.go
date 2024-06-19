@@ -10,11 +10,18 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/liquiditymanager/generated/optimism_l1_bridge_adapter_encoder"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/liquiditymanager/generated/optimism_l2_to_l1_message_passer"
 )
 
 var (
 	l2ToL1MessagePasserABI *abi.ABI
+)
+
+const (
+	// L2 to L1 finalize withdrawal actions (used for generating the LM's finalization payload so the LM contract knows which action to take)
+	FinalizationActionProveWithdrawal    uint8 = 0
+	FinalizationActionFinalizeWithdrawal uint8 = 1
 )
 
 func init() {
@@ -95,4 +102,84 @@ func toProofBytes(proof []hexutil.Bytes) [][]byte {
 		proofBytes[i] = p
 	}
 	return proofBytes
+}
+
+func EncodeProveWithdrawalPayload(opBridgeAdapterEncoderABI abi.ABI, messageProof BedrockMessageProof) ([]byte, error) {
+	encodedProveWithdrawal, err := opBridgeAdapterEncoderABI.Methods["encodeOptimismProveWithdrawalPayload"].Inputs.Pack(
+		optimism_l1_bridge_adapter_encoder.OptimismL1BridgeAdapterOptimismProveWithdrawalPayload{
+			WithdrawalTransaction: optimism_l1_bridge_adapter_encoder.TypesWithdrawalTransaction{
+				Nonce:    messageProof.LowLevelMessage.Nonce,
+				Sender:   messageProof.LowLevelMessage.Sender,
+				Target:   messageProof.LowLevelMessage.Target,
+				Value:    messageProof.LowLevelMessage.Value,
+				GasLimit: messageProof.LowLevelMessage.GasLimit,
+				Data:     messageProof.LowLevelMessage.Data,
+			},
+			L2OutputIndex: messageProof.L2OutputIndex,
+			OutputRootProof: optimism_l1_bridge_adapter_encoder.TypesOutputRootProof{
+				Version:                  messageProof.OutputRootProof.Version,
+				StateRoot:                messageProof.OutputRootProof.StateRoot,
+				MessagePasserStorageRoot: messageProof.OutputRootProof.MessagePasserStorageRoot,
+				LatestBlockhash:          messageProof.OutputRootProof.LatestBlockHash,
+			},
+			WithdrawalProof: messageProof.WithdrawalProof,
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("encodeOptimismProveWithdrawalPayload: %w", err)
+	}
+
+	// Then encode the finalize withdraw ERC 20 payload
+	encodedPayload, err := encodeFinalizeWithdrawalBridgeAdapterPayload(
+		opBridgeAdapterEncoderABI,
+		FinalizationActionProveWithdrawal,
+		encodedProveWithdrawal,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("encodeFinalizeWithdrawalERC20Payload: %w", err)
+	}
+
+	return encodedPayload, nil
+}
+
+func EncodeFinalizeWithdrawalPayload(opBridgeAdapterEncoderABI abi.ABI, messagePassed *optimism_l2_to_l1_message_passer.OptimismL2ToL1MessagePasserMessagePassed) ([]byte, error) {
+	encodedFinalizeWithdrawal, err := opBridgeAdapterEncoderABI.Methods["encodeOptimismFinalizationPayload"].Inputs.Pack(
+		optimism_l1_bridge_adapter_encoder.OptimismL1BridgeAdapterOptimismFinalizationPayload{
+			WithdrawalTransaction: optimism_l1_bridge_adapter_encoder.TypesWithdrawalTransaction{
+				Nonce:    messagePassed.Nonce,
+				Sender:   messagePassed.Sender,
+				Target:   messagePassed.Target,
+				Value:    messagePassed.Value,
+				GasLimit: messagePassed.GasLimit,
+				Data:     messagePassed.Data,
+			},
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("encodeOptimismFinalizationPayload: %w", err)
+	}
+
+	// then encode the finalize withdraw erc20 payload next.
+	encodedPayload, err := encodeFinalizeWithdrawalBridgeAdapterPayload(
+		opBridgeAdapterEncoderABI,
+		FinalizationActionFinalizeWithdrawal,
+		encodedFinalizeWithdrawal,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("encodeFinalizeWithdrawalERC20Payload: %w", err)
+	}
+	return encodedPayload, nil
+}
+
+func encodeFinalizeWithdrawalBridgeAdapterPayload(opBridgeAdapterEncoderABI abi.ABI, action uint8, data []byte) ([]byte, error) {
+	encodedPayload, err := opBridgeAdapterEncoderABI.Methods["encodeFinalizeWithdrawalERC20Payload"].Inputs.Pack(
+		optimism_l1_bridge_adapter_encoder.OptimismL1BridgeAdapterFinalizeWithdrawERC20Payload{
+			Action: action,
+			Data:   data,
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("encodeFinalizeWithdrawalERC20Payload: %w", err)
+	}
+	return encodedPayload, nil
 }
