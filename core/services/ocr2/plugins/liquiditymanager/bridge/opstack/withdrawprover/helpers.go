@@ -2,6 +2,7 @@ package withdrawprover
 
 import (
 	"fmt"
+	"math/big"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
@@ -10,8 +11,10 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/liquiditymanager/generated/liquiditymanager"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/liquiditymanager/generated/optimism_l1_bridge_adapter_encoder"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/liquiditymanager/generated/optimism_l2_to_l1_message_passer"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/abiutils"
 )
 
 var (
@@ -169,6 +172,45 @@ func EncodeFinalizeWithdrawalPayload(opBridgeAdapterEncoderABI abi.ABI, messageP
 		return nil, fmt.Errorf("encodeFinalizeWithdrawalERC20Payload: %w", err)
 	}
 	return encodedPayload, nil
+}
+
+func UnpackNonceFromFinalizationStepBridgeSpecificData(
+	proveStep *liquiditymanager.LiquidityManagerFinalizationStepCompleted,
+	l1OPBridgeAdapterEncoderABI abi.ABI,
+	opCrossDomainMessengerABI abi.ABI,
+	opStandardBridgeABI abi.ABI,
+) (*big.Int, error) {
+	encodedPayload := proveStep.BridgeSpecificData
+
+	// Unpack outermost finalize withdraw erc20 payload
+	unpackedFinalizeWithdrawERC20Payload, err := l1OPBridgeAdapterEncoderABI.Methods["encodeFinalizeWithdrawalERC20Payload"].Inputs.Unpack(encodedPayload)
+	if err != nil {
+		return nil, fmt.Errorf("unpack finalizeWithdrawalERC20Payload: %w", err)
+	}
+	outFinalizeWithdrawERC20Payload := *abi.ConvertType(unpackedFinalizeWithdrawERC20Payload[0], new(optimism_l1_bridge_adapter_encoder.OptimismL1BridgeAdapterFinalizeWithdrawERC20Payload)).(*optimism_l1_bridge_adapter_encoder.OptimismL1BridgeAdapterFinalizeWithdrawERC20Payload)
+
+	// Unpack optimism prove withdrawal payload
+	unpackedOptimismProveWithdrawalPayload, err := l1OPBridgeAdapterEncoderABI.Methods["encodeOptimismProveWithdrawalPayload"].Inputs.Unpack(outFinalizeWithdrawERC20Payload.Data)
+	if err != nil {
+		return nil, fmt.Errorf("unpack optimismProveWithdrawalPayload: %w", err)
+	}
+	outOptimismProveWithdrawalPayload := *abi.ConvertType(unpackedOptimismProveWithdrawalPayload[0], new(optimism_l1_bridge_adapter_encoder.OptimismL1BridgeAdapterOptimismProveWithdrawalPayload)).(*optimism_l1_bridge_adapter_encoder.OptimismL1BridgeAdapterOptimismProveWithdrawalPayload)
+
+	// Unpack withdrawal transaction's data from relayMessage data. Trim the first 4 bytes since this was encoded with
+	// the function selector: https://github.com/ethereum-optimism/optimism/blob/f707883038d527cbf1e9f8ea513fe33255deadbc/packages/contracts-bedrock/src/universal/CrossDomainMessenger.sol#L186
+	decodedRelayMessage, err := opCrossDomainMessengerABI.Methods["relayMessage"].Inputs.Unpack(outOptimismProveWithdrawalPayload.WithdrawalTransaction.Data[4:])
+	if err != nil {
+		return nil, fmt.Errorf("unpack relayMessage data: %w", err)
+	}
+
+	// Unpack relay message Message field into StandardBridge's finalizeBridgeERC20 params. Trim the first 4 bytes since
+	// this was encoded with the function selector. The nonce is the 6th parameter.
+	unpackedFinalizeBridgeParams, err := opStandardBridgeABI.Methods["finalizeBridgeERC20"].Inputs.Unpack(decodedRelayMessage[5].([]byte)[4:])
+	if err != nil {
+		return nil, fmt.Errorf("unpack finalizeBridgeERC20 params: %w", err)
+	}
+
+	return abiutils.UnpackUint256(unpackedFinalizeBridgeParams[5].([]byte))
 }
 
 func encodeFinalizeWithdrawalBridgeAdapterPayload(opBridgeAdapterEncoderABI abi.ABI, action uint8, data []byte) ([]byte, error) {

@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	chainsel "github.com/smartcontractkit/chain-selectors"
@@ -15,7 +14,6 @@ import (
 
 	evmtypes "github.com/smartcontractkit/chainlink/v2/core/chains/evm/types"
 	ubig "github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils/big"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/liquiditymanager/generated/optimism_l1_bridge_adapter_encoder"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/abiutils"
 	bridgecommon "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/bridge/common"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/bridge/opstack/withdrawprover"
@@ -274,11 +272,12 @@ func partitionWithdrawalTransfers(
 			continue
 		}
 		var transferNonce *big.Int
-		transferNonce, err = getTransferNonceFromFinalizationStep(proveStep)
+		transferNonce, err = withdrawprover.UnpackNonceFromFinalizationStepBridgeSpecificData(proveStep, l1OPBridgeAdapterEncoderABI, opCrossDomainMessengerABI, opStandardBridgeABI)
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("get transfer nonce from L1 FinalizationStepCompleted log. Log tx: %s. Err: %w",
 				proveStep.Raw.TxHash, err)
 		}
+		lggr.Infow("Unpacked transfer nonce from finalization step", "transferNonce", transferNonce.String())
 		if sentLog, exists := transferNonceToSentLogMap[transferNonce.String()]; exists {
 			// If a corresponding sentLog exists for this proveFinalizationStep, append to needsToBeFinalized and
 			// mark it as found
@@ -304,42 +303,6 @@ func partitionWithdrawalTransfers(
 	// Filter out from needsToBeFinalized any entries that have already been receivedLogs by the L1 LM
 	needsToBeFinalized, err = filterExecuted(needsToBeFinalized, receivedLogs)
 	return
-}
-
-func getTransferNonceFromFinalizationStep(proveStep *liquiditymanager.LiquidityManagerFinalizationStepCompleted) (*big.Int, error) {
-	encodedPayload := proveStep.BridgeSpecificData
-
-	// Unpack outermost finalize withdraw erc20 payload
-	unpackedFinalizeWithdrawERC20Payload, err := l1OPBridgeAdapterEncoderABI.Methods["encodeFinalizeWithdrawalERC20Payload"].Inputs.Unpack(encodedPayload)
-	if err != nil {
-		return nil, fmt.Errorf("unpack finalizeWithdrawalERC20Payload: %w", err)
-	}
-	outFinalizeWithdrawERC20Payload := *abi.ConvertType(unpackedFinalizeWithdrawERC20Payload[0], new(optimism_l1_bridge_adapter_encoder.OptimismL1BridgeAdapterFinalizeWithdrawERC20Payload)).(*optimism_l1_bridge_adapter_encoder.OptimismL1BridgeAdapterFinalizeWithdrawERC20Payload)
-
-	// Unpack optimism prove withdrawal payload
-	unpackedOptimismProveWithdrawalPayload, err := l1OPBridgeAdapterEncoderABI.Methods["encodeOptimismProveWithdrawalPayload"].Inputs.Unpack(outFinalizeWithdrawERC20Payload.Data)
-	if err != nil {
-		return nil, fmt.Errorf("unpack optimismProveWithdrawalPayload: %w", err)
-	}
-	outOptimismProveWithdrawalPayload := *abi.ConvertType(unpackedOptimismProveWithdrawalPayload[0], new(optimism_l1_bridge_adapter_encoder.OptimismL1BridgeAdapterOptimismProveWithdrawalPayload)).(*optimism_l1_bridge_adapter_encoder.OptimismL1BridgeAdapterOptimismProveWithdrawalPayload)
-
-	// Unpack withdrawal transaction's data from relayMessage data. Trim the first 4 bytes since this was encoded with
-	// the function selector: https://github.com/ethereum-optimism/optimism/blob/f707883038d527cbf1e9f8ea513fe33255deadbc/packages/contracts-bedrock/src/universal/CrossDomainMessenger.sol#L186
-	decodedRelayMessage, err := opCrossDomainMessengerABI.Methods["relayMessage"].Inputs.Unpack(outOptimismProveWithdrawalPayload.WithdrawalTransaction.Data[4:])
-	if err != nil {
-		return nil, fmt.Errorf("unpack relayMessage data: %w", err)
-	}
-
-	// Unpack relay message Message field into StandardBridge's finalizeBridgeERC20 params. Trim the first 4 bytes since
-	// this was encoded with the function selector. The nonce is the 6th parameter.
-	unpackedFinalizeBridgeParams, err := opStandardBridgeABI.Methods["finalizeBridgeERC20"].Inputs.Unpack(decodedRelayMessage[5].([]byte)[4:])
-	if err != nil {
-		return nil, fmt.Errorf("unpack finalizeBridgeERC20 params: %w", err)
-	}
-
-	fmt.Println("Finalize bridge params decoded bridgeReturnData nonce:", hexutil.Encode(unpackedFinalizeBridgeParams[5].([]byte)))
-
-	return abiutils.UnpackUint256(unpackedFinalizeBridgeParams[5].([]byte))
 }
 
 func (l *l2ToL1Bridge) getLogs(ctx context.Context) (sendLogs, proveFinalizationStepLogs, receivedLogs []logpoller.Log, err error) {
