@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.0;
 
-import {EnumerableSet} from "../../vendor/openzeppelin-solidity/v4.7.3/contracts/utils/structs/EnumerableSet.sol";
 import {OwnerIsCreator} from "./OwnerIsCreator.sol";
+import {EnumerableSet} from "../../vendor/openzeppelin-solidity/v4.7.3/contracts/utils/structs/EnumerableSet.sol";
 
 /// @title The AuthorizedCallers contract
-/// @notice A contract that manages multiple authorized callers
+/// @notice A contract that manages multiple authorized callers. Enables restricting access to certain functions to a set of addresses.
 contract AuthorizedCallers is OwnerIsCreator {
   using EnumerableSet for EnumerableSet.AddressSet;
 
@@ -37,13 +37,13 @@ contract AuthorizedCallers is OwnerIsCreator {
   }
 
   /// @notice Updates the list of authorized callers
-  /// @param authorizedCallerArgs Callers to add and remove
+  /// @param authorizedCallerArgs Callers to add and remove. Removals are performed first.
   function applyAuthorizedCallerUpdates(AuthorizedCallerArgs memory authorizedCallerArgs) external onlyOwner {
     _applyAuthorizedCallerUpdates(authorizedCallerArgs);
   }
 
   /// @notice Updates the list of authorized callers
-  /// @param authorizedCallerArgs Callers to add and remove
+  /// @param authorizedCallerArgs Callers to add and remove. Removals are performed first.
   function _applyAuthorizedCallerUpdates(AuthorizedCallerArgs memory authorizedCallerArgs) internal {
     address[] memory removedCallers = authorizedCallerArgs.removedCallers;
     for (uint256 i = 0; i < removedCallers.length; ++i) {
