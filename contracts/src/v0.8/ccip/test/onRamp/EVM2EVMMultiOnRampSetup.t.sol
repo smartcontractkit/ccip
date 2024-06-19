@@ -225,6 +225,14 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
     return messageEvent;
   }
 
+  function _generateDynamicMultiOnRampConfig(
+    address router,
+    address priceRegistry
+  ) internal pure returns (EVM2EVMMultiOnRamp.DynamicConfig memory) {
+    return
+      EVM2EVMMultiOnRamp.DynamicConfig({router: router, priceRegistry: priceRegistry, feeAggregator: FEE_AGGREGATOR});
+  }
+
   // Slicing is only available for calldata. So we have to build a new bytes array.
   function _removeFirst4Bytes(bytes memory data) internal pure returns (bytes memory) {
     bytes memory result = new bytes(data.length - 4);
@@ -232,13 +240,6 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
       result[i - 4] = data[i];
     }
     return result;
-  }
-
-  function _generateDynamicMultiOnRampConfig(
-    address router,
-    address priceRegistry
-  ) internal pure returns (EVM2EVMMultiOnRamp.DynamicConfig memory) {
-    return EVM2EVMMultiOnRamp.DynamicConfig({router: router, priceRegistry: priceRegistry});
   }
 
   function _generateDestChainConfigArgs() internal pure returns (EVM2EVMMultiOnRamp.DestChainConfigArgs[] memory) {
@@ -280,14 +281,6 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
     return tokenTransferFeeConfigArgs;
   }
 
-  function _getMultiOnRampNopsAndWeights() internal pure returns (EVM2EVMMultiOnRamp.NopAndWeight[] memory) {
-    EVM2EVMMultiOnRamp.NopAndWeight[] memory nopsAndWeights = new EVM2EVMMultiOnRamp.NopAndWeight[](3);
-    nopsAndWeights[0] = EVM2EVMMultiOnRamp.NopAndWeight({nop: USER_1, weight: 19284});
-    nopsAndWeights[1] = EVM2EVMMultiOnRamp.NopAndWeight({nop: USER_2, weight: 52935});
-    nopsAndWeights[2] = EVM2EVMMultiOnRamp.NopAndWeight({nop: USER_3, weight: 8});
-    return nopsAndWeights;
-  }
-
   function _deployOnRamp(
     uint64 sourceChainSelector,
     address sourceRouter,
@@ -298,7 +291,7 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
       EVM2EVMMultiOnRamp.StaticConfig({
         linkToken: s_sourceTokens[0],
         chainSelector: sourceChainSelector,
-        maxNopFeesJuels: MAX_NOP_FEES_JUELS,
+        maxFeeJuelsPerMsg: MAX_MSG_FEES_JUELS,
         rmnProxy: address(s_mockRMN),
         nonceManager: nonceManager,
         tokenAdminRegistry: tokenAdminRegistry
@@ -307,8 +300,7 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
       _generateDestChainConfigArgs(),
       getOutboundRateLimiterConfig(),
       s_premiumMultiplierWeiPerEthArgs,
-      s_tokenTransferFeeConfigArgs,
-      _getMultiOnRampNopsAndWeights()
+      s_tokenTransferFeeConfigArgs
     );
     onRamp.setAdmin(ADMIN);
 
@@ -353,7 +345,7 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
   ) internal pure {
     assertEq(a.linkToken, b.linkToken);
     assertEq(a.chainSelector, b.chainSelector);
-    assertEq(a.maxNopFeesJuels, b.maxNopFeesJuels);
+    assertEq(a.maxFeeJuelsPerMsg, b.maxFeeJuelsPerMsg);
     assertEq(a.rmnProxy, b.rmnProxy);
     assertEq(a.tokenAdminRegistry, b.tokenAdminRegistry);
   }
