@@ -185,7 +185,7 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSetup {
     return message;
   }
 
-  function _generateBasicMessages() internal view returns (Internal.EVM2EVMMessage[] memory) {
+  function _generateSingleBasicMessage() internal view returns (Internal.EVM2EVMMessage[] memory) {
     Internal.EVM2EVMMessage[] memory messages = new Internal.EVM2EVMMessage[](1);
     messages[0] = _generateAny2EVMMessageNoTokens(1);
     return messages;
