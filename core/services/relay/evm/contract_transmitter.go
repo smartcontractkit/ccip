@@ -86,10 +86,12 @@ func NewOCRContractTransmitterWithRetention(
 
 	// TODO It would be better to keep MaxLogsKept = 1 for the OCR contract transmitter instead of Retention. We are always interested only in the latest log.
 	// Although MaxLogsKept is present in the Filter struct, it is not supported by LogPoller yet.
-	err := lp.RegisterFilter(ctx, logpoller.Filter{Name: transmitterFilterName(address), EventSigs: []common.Hash{transmitted.ID}, Addresses: []common.Address{address}, Retention: retention})
-	if err != nil {
-		return nil, err
-	}
+
+	// Commenting out to better understand the impact of Transmitted logs on the database
+	//err := lp.RegisterFilter(ctx, logpoller.Filter{Name: transmitterFilterName(address), EventSigs: []common.Hash{transmitted.ID}, Addresses: []common.Address{address}, Retention: retention})
+	//if err != nil {
+	//	return nil, err
+	//}
 	if reportToEvmTxMeta == nil {
 		reportToEvmTxMeta = reportToEvmTxMetaNoop
 	}
