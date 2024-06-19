@@ -70,7 +70,7 @@ contract BurnMintTokenPool_lockOrBurn is BurnMintTokenPoolSetup {
 
   // Should not burn tokens if cursed.
   function test_PoolBurnRevertNotHealthy_Revert() public {
-    s_mockRMN.voteToCurse(bytes32(0));
+    s_mockRMN.voteToCurse(bytes16(0));
     uint256 before = s_burnMintERC677.balanceOf(address(s_pool));
     vm.startPrank(s_burnMintOnRamp);
 
@@ -111,12 +111,13 @@ contract BurnMintTokenPool_releaseOrMint is BurnMintTokenPoolSetup {
     vm.startPrank(s_burnMintOffRamp);
 
     vm.expectEmit();
-    emit IERC20.Transfer(address(0), OWNER, amount);
+    emit IERC20.Transfer(address(0), address(s_burnMintOffRamp), amount);
     s_pool.releaseOrMint(
       Pool.ReleaseOrMintInV1({
         originalSender: bytes(""),
         receiver: OWNER,
         amount: amount,
+        localToken: address(s_burnMintERC677),
         remoteChainSelector: DEST_CHAIN_SELECTOR,
         sourcePoolAddress: abi.encode(s_remoteBurnMintPool),
         sourcePoolData: "",
@@ -124,12 +125,12 @@ contract BurnMintTokenPool_releaseOrMint is BurnMintTokenPoolSetup {
       })
     );
 
-    assertEq(s_burnMintERC677.balanceOf(OWNER), amount);
+    assertEq(s_burnMintERC677.balanceOf(s_burnMintOffRamp), amount);
   }
 
   function test_PoolMintNotHealthy_Revert() public {
     // Should not mint tokens if cursed.
-    s_mockRMN.voteToCurse(bytes32(0));
+    s_mockRMN.voteToCurse(bytes16(0));
     uint256 before = s_burnMintERC677.balanceOf(OWNER);
     vm.startPrank(s_burnMintOffRamp);
 
@@ -139,6 +140,7 @@ contract BurnMintTokenPool_releaseOrMint is BurnMintTokenPoolSetup {
         originalSender: bytes(""),
         receiver: OWNER,
         amount: 1e5,
+        localToken: address(s_burnMintERC677),
         remoteChainSelector: DEST_CHAIN_SELECTOR,
         sourcePoolAddress: generateSourceTokenData().sourcePoolAddress,
         sourcePoolData: generateSourceTokenData().extraData,
@@ -158,6 +160,7 @@ contract BurnMintTokenPool_releaseOrMint is BurnMintTokenPoolSetup {
         originalSender: bytes(""),
         receiver: OWNER,
         amount: 1,
+        localToken: address(s_burnMintERC677),
         remoteChainSelector: wrongChainSelector,
         sourcePoolAddress: generateSourceTokenData().sourcePoolAddress,
         sourcePoolData: generateSourceTokenData().extraData,

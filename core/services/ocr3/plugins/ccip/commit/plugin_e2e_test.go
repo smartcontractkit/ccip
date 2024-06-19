@@ -5,10 +5,11 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
-	"github.com/stretchr/testify/assert"
 
 	"github.com/smartcontractkit/ccipocr3/internal/libs/testhelpers"
 	"github.com/smartcontractkit/ccipocr3/internal/mocks"
@@ -59,7 +60,7 @@ func TestPlugin(t *testing.T) {
 					MerkleRoots: []cciptypes.MerkleRootChain{
 						{ChainSel: chainB, SeqNumsRange: cciptypes.NewSeqNumRange(21, 22)},
 					},
-					PriceUpdates: cciptypes.PriceUpdate{
+					PriceUpdates: cciptypes.PriceUpdates{
 						TokenPriceUpdates: []cciptypes.TokenPrice{},
 						GasPriceUpdates: []cciptypes.GasPriceChain{
 							{ChainSel: chainA, GasPrice: cciptypes.NewBigIntFromInt64(1000)},
@@ -88,7 +89,7 @@ func TestPlugin(t *testing.T) {
 			expTransmittedReports: []cciptypes.CommitPluginReport{
 				{
 					MerkleRoots: []cciptypes.MerkleRootChain{},
-					PriceUpdates: cciptypes.PriceUpdate{
+					PriceUpdates: cciptypes.PriceUpdates{
 						TokenPriceUpdates: []cciptypes.TokenPrice{},
 						GasPriceUpdates: []cciptypes.GasPriceChain{
 							{ChainSel: chainA, GasPrice: cciptypes.NewBigIntFromInt64(1000)},
@@ -161,7 +162,11 @@ func setupEmptyOutcome(ctx context.Context, t *testing.T, lggr logger.Logger) []
 		FChain: map[cciptypes.ChainSelector]int{
 			chainC: 1,
 		},
-		ObserverInfo:        map[commontypes.OracleID]cciptypes.ObserverInfo{},
+		ObserverInfo: map[commontypes.OracleID]cciptypes.ObserverInfo{
+			1: {Writer: false, Reads: []cciptypes.ChainSelector{}},
+			2: {Writer: false, Reads: []cciptypes.ChainSelector{}},
+			3: {Writer: false, Reads: []cciptypes.ChainSelector{}},
+		},
 		PricedTokens:        []types.Account{tokenX},
 		TokenPricesObserver: false,
 		NewMsgScanBatchSize: 256,
