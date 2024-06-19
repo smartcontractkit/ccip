@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 	"math/big"
-	"sync"
 
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	ocr2types "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+	"golang.org/x/sync/errgroup"
 )
 
 type TokenPriceConfig struct {
@@ -21,7 +21,6 @@ type OnchainTokenPricesReader struct {
 	ContractReader commontypes.ContractReader
 }
 
-// GetTokenPricesUSD TODO: Update interface to return cciptypes.BigInt
 func (pr *OnchainTokenPricesReader) GetTokenPricesUSD(ctx context.Context, tokens []ocr2types.Account) ([]*big.Int, error) {
 	const (
 		contractName = "PriceAggregator"
@@ -29,50 +28,28 @@ func (pr *OnchainTokenPricesReader) GetTokenPricesUSD(ctx context.Context, token
 	)
 
 	prices := make([]*big.Int, 0, len(tokens))
-	errChan := make(chan error, 1)
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
-	var wg sync.WaitGroup
-	wg.Add(len(tokens))
-
+	eg := new(errgroup.Group)
 	for idx, token := range tokens {
-		go func(idx int, token ocr2types.Account) {
-			defer wg.Done()
+		eg.Go(func() error {
 			var price *big.Int
 			if staticPrice, exists := pr.TokenPriceConfig.StaticPrices[token]; exists {
 				price = staticPrice
 			} else {
 				if err := pr.ContractReader.GetLatestValue(ctx, contractName, functionName, token, &price); err != nil {
-					select {
-					case errChan <- err:
-					default:
-					}
-					cancel()
-					return
+					return fmt.Errorf("failed to get token price for %s: %w", token, err)
 				}
 			}
-			select {
-			case <-ctx.Done():
-				return
-			default:
-				prices[idx] = price
-			}
-		}(idx, token)
+			prices[idx] = price
+			return nil
+		})
 	}
 
-	// Wait for all goroutines to complete
-	go func() {
-		wg.Wait()
-		close(errChan)
-	}()
-
-	if err, ok := <-errChan; ok {
+	if err := eg.Wait(); err != nil {
 		return nil, fmt.Errorf("failed to get all token prices successfully: %w", err)
 	}
 
 	if len(prices) != len(tokens) {
-		return nil, fmt.Errorf("failed to get all token prices successfully")
+		return nil, fmt.Errorf("failed to get all token prices successfully, lengths are different")
 	}
 
 	return prices, nil
