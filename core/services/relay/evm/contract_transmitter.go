@@ -69,10 +69,11 @@ func NewOCRContractTransmitter(
 		return nil, errors.New("invalid ABI, missing transmitted")
 	}
 
-	err := lp.RegisterFilter(ctx, logpoller.Filter{Name: transmitterFilterName(address), EventSigs: []common.Hash{transmitted.ID}, Addresses: []common.Address{address}})
-	if err != nil {
-		return nil, err
-	}
+	// Commenting out to better understand the impact of Transmitted logs on the database
+	//err := lp.RegisterFilter(ctx, logpoller.Filter{Name: transmitterFilterName(address), EventSigs: []common.Hash{transmitted.ID}, Addresses: []common.Address{address}, Retention: retention})
+	//if err != nil {
+	//	return nil, err
+	//}
 	if reportToEvmTxMeta == nil {
 		reportToEvmTxMeta = reportToEvmTxMetaNoop
 	}
