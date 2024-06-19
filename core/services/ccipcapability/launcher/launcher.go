@@ -145,11 +145,11 @@ func (l *launcher) processDiff(diff diffResult) error {
 
 	var addedDeployments = make(map[DonID]*ccipDeployment)
 	for _, don := range diff.added {
-		if dep, err := l.addDON(don); err != nil {
+		dep, err := l.addDON(don)
+		if err != nil {
 			return err
-		} else {
-			addedDeployments[don.Id] = dep
 		}
+		addedDeployments[don.Id] = dep
 	}
 
 	for donID, dep := range addedDeployments {
@@ -170,15 +170,15 @@ func (l *launcher) processDiff(diff diffResult) error {
 		depBefore, depAfter *ccipDeployment
 	})
 	for _, don := range diff.updated {
-		if depBefore, depAfter, err := l.updateDON(don); err != nil {
+		depBefore, depAfter, err := l.updateDON(don)
+		if err != nil {
 			return err
-		} else {
-			updatedDeployments[don.Id] = struct {
-				depBefore, depAfter *ccipDeployment
-			}{
-				depBefore: depBefore,
-				depAfter:  depAfter,
-			}
+		}
+		updatedDeployments[don.Id] = struct {
+			depBefore, depAfter *ccipDeployment
+		}{
+			depBefore: depBefore,
+			depAfter:  depAfter,
 		}
 	}
 
