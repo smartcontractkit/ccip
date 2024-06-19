@@ -383,7 +383,7 @@ func DeployLocalCluster(
 // startIndex and endIndex are inclusive
 func UpgradeNodes(
 	t *testing.T,
-	lggr zerolog.Logger,
+	lggr *zerolog.Logger,
 	testInputs *CCIPTestConfig,
 	ccipEnv *actions.CCIPTestEnv,
 ) error {
@@ -474,6 +474,7 @@ func DeployEnvironments(
 								"forkTimeout":               anvilConfig.Timeout,
 								"forkComputeUnitsPerSecond": anvilConfig.ComputePerSecond,
 								"forkNoRateLimit":           anvilConfig.RateLimitDisabled,
+								"blocksToKeepInMemory":      anvilConfig.BlocksToKeepInMem,
 							},
 							"resources": testInputs.GethResourceProfile,
 						},
