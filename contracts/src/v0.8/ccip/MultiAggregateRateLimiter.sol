@@ -27,7 +27,7 @@ contract MultiAggregateRateLimiter is IMessageInterceptor, AuthorizedCallers {
   error UpdateLengthMismatch();
   error ZeroChainSelectorNotAllowed();
 
-  event RateLimiterConfigUpdated(uint64 indexed remoteChainSelector, bool isOutgoingLane, RateLimiter.Config config);
+  event RateLimiterConfigUpdated(uint64 indexed remoteChainSelector, bool isOutboundLane, RateLimiter.Config config);
   event PriceRegistrySet(address newPriceRegistry);
   event TokenAggregateRateLimitAdded(uint64 remoteChainSelector, bytes32 remoteToken, address localToken);
   event TokenAggregateRateLimitRemoved(uint64 remoteChainSelector, address localToken);
@@ -48,14 +48,14 @@ contract MultiAggregateRateLimiter is IMessageInterceptor, AuthorizedCallers {
   /// @notice Update args for a single rate limiter config update
   struct RateLimiterConfigArgs {
     uint64 remoteChainSelector; // ────╮ Chain selector to set config for
-    bool isOutgoingLane; // ───────────╯ If set to true, represents the outgoing message lane (OnRamp), and the incoming message lane otherwise (OffRamp)
+    bool isOutboundLane; // ───────────╯ If set to true, represents the outbound message lane (OnRamp), and the inbound message lane otherwise (OffRamp)
     RateLimiter.Config rateLimiterConfig; // Rate limiter config to set
   }
 
   /// @notice Struct to store rate limit token buckets for both lane directions
   struct RateLimiterBuckets {
-    RateLimiter.TokenBucket incomingLaneBucket; // Bucket for the incoming lane (remote -> local)
-    RateLimiter.TokenBucket outgoingLaneBucket; // Bucket for the outgoing lane (local -> remote)
+    RateLimiter.TokenBucket inboundLaneBucket; // Bucket for the inbound lane (remote -> local)
+    RateLimiter.TokenBucket outboundLaneBucket; // Bucket for the outbound lane (local -> remote)
   }
 
   /// @dev Tokens that should be included in Aggregate Rate Limiting (from local chain (this chain) -> remote),
@@ -66,7 +66,7 @@ contract MultiAggregateRateLimiter is IMessageInterceptor, AuthorizedCallers {
   /// @notice The address of the PriceRegistry used to query token values for ratelimiting
   address internal s_priceRegistry;
 
-  /// @notice Rate limiter token bucket states per chain, with separate buckets for incoming and outgoing lanes.
+  /// @notice Rate limiter token bucket states per chain, with separate buckets for inbound and outbound lanes.
   mapping(uint64 remoteChainSelector => RateLimiterBuckets buckets) internal s_rateLimitersByChainSelector;
 
   /// @param priceRegistry the price registry to set
@@ -76,7 +76,7 @@ contract MultiAggregateRateLimiter is IMessageInterceptor, AuthorizedCallers {
   }
 
   /// @inheritdoc IMessageInterceptor
-  function onIncomingMessage(Client.Any2EVMMessage memory message) external onlyAuthorizedCallers {
+  function onInboundMessage(Client.Any2EVMMessage memory message) external onlyAuthorizedCallers {
     uint64 remoteChainSelector = message.sourceChainSelector;
     RateLimiter.TokenBucket storage tokenBucket = _getTokenBucket(remoteChainSelector, false);
 
@@ -95,23 +95,23 @@ contract MultiAggregateRateLimiter is IMessageInterceptor, AuthorizedCallers {
   }
 
   /// @inheritdoc IMessageInterceptor
-  function onOutgoingMessage(Client.EVM2AnyMessage memory message, uint64 destChainSelector) external {
-    // TODO: to be implemented (assuming the same rate limiter states are shared for incoming and outgoing messages)
+  function onOutboundMessage(Client.EVM2AnyMessage memory message, uint64 destChainSelector) external {
+    // TODO: to be implemented (assuming the same rate limiter states are shared for inbound and outbound messages)
   }
 
   /// @param remoteChainSelector chain selector to retrieve token bucket for
-  /// @param isOutgoingLane if set to true, fetches the bucket for the outgoing message lane (OnRamp).
-  /// Otherwise fetches for the incoming message lane (OffRamp).
+  /// @param isOutboundLane if set to true, fetches the bucket for the outbound message lane (OnRamp).
+  /// Otherwise fetches for the inbound message lane (OffRamp).
   /// @return bucket Storage pointer to the token bucket representing a specific lane
   function _getTokenBucket(
     uint64 remoteChainSelector,
-    bool isOutgoingLane
+    bool isOutboundLane
   ) internal view returns (RateLimiter.TokenBucket storage) {
     RateLimiterBuckets storage rateLimiterBuckets = s_rateLimitersByChainSelector[remoteChainSelector];
-    if (isOutgoingLane) {
-      return rateLimiterBuckets.outgoingLaneBucket;
+    if (isOutboundLane) {
+      return rateLimiterBuckets.outboundLaneBucket;
     } else {
-      return rateLimiterBuckets.incomingLaneBucket;
+      return rateLimiterBuckets.inboundLaneBucket;
     }
   }
 
@@ -127,15 +127,15 @@ contract MultiAggregateRateLimiter is IMessageInterceptor, AuthorizedCallers {
 
   /// @notice Gets the token bucket with its values for the block it was requested at.
   /// @param remoteChainSelector chain selector to retrieve state for
-  /// @param isOutgoingLane if set to true, fetches the rate limit state for the outgoing message lane (OnRamp).
-  /// Otherwise fetches for the incoming message lane (OffRamp).
-  /// The outgoing and incoming message rate limit state is completely separated.
+  /// @param isOutboundLane if set to true, fetches the rate limit state for the outbound message lane (OnRamp).
+  /// Otherwise fetches for the inbound message lane (OffRamp).
+  /// The outbound and inbound message rate limit state is completely separated.
   /// @return The token bucket.
   function currentRateLimiterState(
     uint64 remoteChainSelector,
-    bool isOutgoingLane
+    bool isOutboundLane
   ) external view returns (RateLimiter.TokenBucket memory) {
-    return _getTokenBucket(remoteChainSelector, isOutgoingLane)._currentTokenBucketState();
+    return _getTokenBucket(remoteChainSelector, isOutboundLane)._currentTokenBucketState();
   }
 
   /// @notice Applies the provided rate limiter config updates.
@@ -151,9 +151,9 @@ contract MultiAggregateRateLimiter is IMessageInterceptor, AuthorizedCallers {
         revert ZeroChainSelectorNotAllowed();
       }
 
-      bool isOutgoingLane = updateArgs.isOutgoingLane;
+      bool isOutboundLane = updateArgs.isOutboundLane;
 
-      RateLimiter.TokenBucket storage tokenBucket = _getTokenBucket(remoteChainSelector, isOutgoingLane);
+      RateLimiter.TokenBucket storage tokenBucket = _getTokenBucket(remoteChainSelector, isOutboundLane);
 
       if (tokenBucket.lastUpdated == 0) {
         // Token bucket needs to be newly added
@@ -165,15 +165,15 @@ contract MultiAggregateRateLimiter is IMessageInterceptor, AuthorizedCallers {
           isEnabled: configUpdate.isEnabled
         });
 
-        if (isOutgoingLane) {
-          s_rateLimitersByChainSelector[remoteChainSelector].outgoingLaneBucket = newTokenBucket;
+        if (isOutboundLane) {
+          s_rateLimitersByChainSelector[remoteChainSelector].outboundLaneBucket = newTokenBucket;
         } else {
-          s_rateLimitersByChainSelector[remoteChainSelector].incomingLaneBucket = newTokenBucket;
+          s_rateLimitersByChainSelector[remoteChainSelector].inboundLaneBucket = newTokenBucket;
         }
       } else {
         tokenBucket._setTokenBucketConfig(configUpdate);
       }
-      emit RateLimiterConfigUpdated(remoteChainSelector, isOutgoingLane, configUpdate);
+      emit RateLimiterConfigUpdated(remoteChainSelector, isOutboundLane, configUpdate);
     }
   }
 
