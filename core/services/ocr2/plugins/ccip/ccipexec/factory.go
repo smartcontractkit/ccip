@@ -167,6 +167,6 @@ func (rf *ExecutionReportingPluginFactory) msgVisibilityIntervalFallbackValue(pe
 	return permissionlessExecThreshold
 }
 
-// MinimumMessageVisibilityInterval defines the minimum time that a message MUST be visible before it can be executed.
+// MinimumMessageVisibilityInterval defines the minimum time that a message MUST be visible before plugins ignores it.
 // This prevents any kind of wrong configuration that would lead to messages not being seen by the plugins.
 var MinimumMessageVisibilityInterval = 4 * time.Hour
