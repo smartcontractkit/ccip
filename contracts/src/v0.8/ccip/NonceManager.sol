@@ -78,7 +78,7 @@ contract NonceManager is INonceManager, AuthorizedCallers {
   /// @notice Updates the previous ramps addresses
   /// @param previousRampsArgs The previous on/off ramps addresses
   function applyPreviousRampsUpdates(PreviousRampsArgs[] calldata previousRampsArgs) external onlyOwner {
-    for (uint256 i = 0; i < previousRampsArgs.length; i++) {
+    for (uint256 i = 0; i < previousRampsArgs.length; ++i) {
       PreviousRampsArgs calldata previousRampsArg = previousRampsArgs[i];
 
       PreviousRamps storage prevRamps = s_previousRamps[previousRampsArg.remotChainSelector];
