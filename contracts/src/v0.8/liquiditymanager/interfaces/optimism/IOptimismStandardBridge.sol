@@ -18,4 +18,23 @@ interface IOptimismStandardBridge {
     uint256 amount,
     bytes extraData
   );
+
+  /// @notice Finalizes an ERC20 bridge on this chain. Can only be triggered by the other
+  ///         StandardBridge contract on the remote chain.
+  /// @param _localToken  Address of the ERC20 on this chain.
+  /// @param _remoteToken Address of the corresponding token on the remote chain.
+  /// @param _from        Address of the sender.
+  /// @param _to          Address of the receiver.
+  /// @param _amount      Amount of the ERC20 being bridged.
+  /// @param _extraData   Extra data to be sent with the transaction. Note that the recipient will
+  ///                     not be triggered with this data, but it will be emitted and can be used
+  ///                     to identify the transaction.
+  function finalizeBridgeERC20(
+    address _localToken,
+    address _remoteToken,
+    address _from,
+    address _to,
+    uint256 _amount,
+    bytes calldata _extraData
+  ) external;
 }

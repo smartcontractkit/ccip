@@ -1,10 +1,8 @@
 package opstack
 
 import (
-	"encoding/hex"
 	"errors"
 	"math/big"
-	"sort"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -96,12 +94,6 @@ func Test_l1ToL2Bridge_QuorumizedBridgePayload(t *testing.T) {
 			}
 		})
 	}
-}
-
-func mustPackBridgeTransferNonce(t *testing.T, bridgeDataHex string) []byte {
-	packed, err := hex.DecodeString(bridgeDataHex[2:])
-	require.NoError(t, err)
-	return packed
 }
 
 func Test_partitionTransfers(t *testing.T) {
@@ -365,34 +357,6 @@ func Test_partitionTransfers(t *testing.T) {
 			}
 		})
 	}
-}
-
-func assertLiquidityTransferredEventSlicesEqual(
-	t *testing.T,
-	expected,
-	actual []*liquiditymanager.LiquidityManagerLiquidityTransferred,
-	sortComparator func(a, b *liquiditymanager.LiquidityManagerLiquidityTransferred) bool,
-) {
-	require.Equal(t, len(expected), len(actual))
-	sort.Slice(expected, func(i, j int) bool {
-		return sortComparator(expected[i], expected[j])
-	})
-	sort.Slice(actual, func(i, j int) bool {
-		return sortComparator(actual[i], actual[j])
-	})
-	for i := range expected {
-		assert.Equal(t, expected[i].OcrSeqNum, actual[i].OcrSeqNum)
-		assert.Equal(t, expected[i].FromChainSelector, actual[i].FromChainSelector)
-		assert.Equal(t, expected[i].ToChainSelector, actual[i].ToChainSelector)
-		assert.Equal(t, expected[i].To, actual[i].To)
-		assert.Equal(t, expected[i].Amount, actual[i].Amount)
-		assert.Equal(t, expected[i].BridgeSpecificData, actual[i].BridgeSpecificData)
-		assert.Equal(t, expected[i].BridgeReturnData, actual[i].BridgeReturnData)
-	}
-}
-
-func sortByBridgeReturnData(a, b *liquiditymanager.LiquidityManagerLiquidityTransferred) bool {
-	return hex.EncodeToString(a.BridgeReturnData) < hex.EncodeToString(b.BridgeReturnData)
 }
 
 func Test_l1ToL2Bridge_Close(t *testing.T) {

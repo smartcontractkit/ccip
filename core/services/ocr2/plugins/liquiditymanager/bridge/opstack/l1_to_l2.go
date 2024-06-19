@@ -475,52 +475,6 @@ func partitionTransfers(
 	return
 }
 
-func filterExecuted(
-	readyCandidates []*liquiditymanager.LiquidityManagerLiquidityTransferred,
-	receivedLogs []*liquiditymanager.LiquidityManagerLiquidityTransferred,
-) (
-	ready []*liquiditymanager.LiquidityManagerLiquidityTransferred,
-	err error,
-) {
-	for _, readyCandidate := range readyCandidates {
-		exists, err := matchingExecutionExists(readyCandidate, receivedLogs)
-		if err != nil {
-			return nil, fmt.Errorf("error checking if ready candidate has been executed: %w", err)
-		}
-		if !exists {
-			ready = append(ready, readyCandidate)
-		}
-	}
-	return
-}
-
-// We encode the nonce (which is used as a unique ID for identifying a given transfer) in the bridgeSpecificData field
-// of the receiving LiquidityTransferred log. We can use this to match the sent and received logs.
-// sent_LiquidityTransferred.bridgeReturnData == ERC20BridgeFinalized.extraData == received_LiquidityTransferred.bridgeSpecificData
-func matchingExecutionExists(
-	readyCandidate *liquiditymanager.LiquidityManagerLiquidityTransferred,
-	receivedLogs []*liquiditymanager.LiquidityManagerLiquidityTransferred,
-) (bool, error) {
-	// The nonce is included in the bridgeReturnData when it is emitted as a sent LiquidityTransferred event.
-	sendL1ToL2NonceID, err := abiutils.UnpackUint256(readyCandidate.BridgeReturnData)
-	if err != nil {
-		return false, fmt.Errorf("unpack L1 to L2 nonce ID from L1 LiquidityTransferred log (%s): %w, BridgeReturnData: %s",
-			readyCandidate.Raw.TxHash, err, hexutil.Encode(readyCandidate.BridgeReturnData))
-	}
-	// On the receiving side, the nonce is stored in the BridgeSpecificData field instead
-	for _, receivedLog := range receivedLogs {
-		receiveL1ToL2NonceID, err := abiutils.UnpackUint256(receivedLog.BridgeSpecificData)
-		if err != nil {
-			return false, fmt.Errorf("unpack L1 to L2 nonce ID from L2 LiquidityTransferred log (%s): %w, BridgeSpecificData: %s",
-				receivedLog.Raw.TxHash, err, hexutil.Encode(receivedLog.BridgeSpecificData))
-		}
-		if sendL1ToL2NonceID.Cmp(receiveL1ToL2NonceID) == 0 {
-			return true, nil
-		}
-	}
-	return false, nil
-}
-
 func (l *l1ToL2Bridge) toPendingTransfers(
 	localToken,
 	remoteToken models.Address,
@@ -544,7 +498,7 @@ func (l *l1ToL2Bridge) toPendingTransfers(
 					LogIndex: int64(transfer.Raw.Index),
 				}].BlockTimestamp,
 				BridgeData: transfer.BridgeReturnData, // unique nonce from the OP Bridge Adapter
-				Stage:      StageRebalanceConfirmed,
+				Stage:      bridgecommon.StageRebalanceConfirmed,
 			},
 			Status: models.TransferStatusNotReady,
 			ID:     fmt.Sprintf("%s-%d", transfer.Raw.TxHash.Hex(), transfer.Raw.Index),
@@ -565,7 +519,7 @@ func (l *l1ToL2Bridge) toPendingTransfers(
 					LogIndex: int64(transfer.Raw.Index),
 				}].BlockTimestamp,
 				BridgeData: transfer.BridgeReturnData, // unique nonce from the OP Bridge Adapter
-				Stage:      StageFinalizeReady,
+				Stage:      bridgecommon.StageFinalizeReady,
 			},
 			Status: models.TransferStatusReady, // ready == finalized for L1 -> L2 transfers due to auto-finalization by the native bridge
 			ID:     fmt.Sprintf("%s-%d", transfer.Raw.TxHash.Hex(), transfer.Raw.Index),
