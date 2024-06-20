@@ -147,12 +147,12 @@ func jobSpecToCommitPluginConfig(ctx context.Context, orm cciporm.ORM, lggr logg
 
 	err = commitStoreReader.SetGasEstimator(ctx, params.sourceChain.GasEstimator())
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("could not set gas estimator: %w", err)
+		return nil, nil, nil, nil, fmt.Errorf("could not set gas estimator: %w", err)
 	}
 
 	err = commitStoreReader.SetSourceMaxGasPrice(ctx, params.sourceChain.Config().EVM().GasEstimator().PriceMax().ToInt())
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("could not set source max gas price: %w", err)
+		return nil, nil, nil, nil, fmt.Errorf("could not set source max gas price: %w", err)
 	}
 
 	sourceChainName, destChainName, err := ccipconfig.ResolveChainNames(params.sourceChain.ID().Int64(), params.destChain.ID().Int64())
