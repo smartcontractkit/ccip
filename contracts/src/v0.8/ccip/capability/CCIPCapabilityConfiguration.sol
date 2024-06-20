@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.24;
 
+import {ICapabilityConfiguration} from "../../keystone/interfaces/ICapabilityConfiguration.sol";
 import {ITypeAndVersion} from "../../shared/interfaces/ITypeAndVersion.sol";
-import {ICapabilityConfiguration} from "./interfaces/ICapabilityConfiguration.sol";
 import {ICapabilityRegistry} from "./interfaces/ICapabilityRegistry.sol";
 
 import {OwnerIsCreator} from "../../shared/access/OwnerIsCreator.sol";
@@ -87,7 +87,7 @@ contract CCIPCapabilityConfiguration is ITypeAndVersion, ICapabilityConfiguratio
     uint64 chainSelector; //          | The (remote) chain that the configuration is for.
     uint8 F; //                       | The "big F" parameter for the role DON.
     uint64 offchainConfigVersion; // ─╯ The version of the offchain configuration.
-    bytes32 offrampAddress; // The remote chain combined (offramp|commit store) address.
+    bytes32 offrampAddress; // The remote chain offramp address.
     // len(p2pIds) == len(signers) == len(transmitters) == 3 * F + 1
     // NOTE: indexes matter here! The p2p ID at index i corresponds to the signer at index i and the transmitter at index i.
     // This is crucial in order to build the oracle ID <-> peer ID mapping offchain.
@@ -105,7 +105,7 @@ contract CCIPCapabilityConfiguration is ITypeAndVersion, ICapabilityConfiguratio
   }
 
   /// @notice Type and version override.
-  string public constant override typeAndVersion = "CCIPCapabilityConfiguration 1.0.0-dev";
+  string public constant override typeAndVersion = "CCIPCapabilityConfiguration 1.6.0-dev";
 
   /// @notice The canonical capability registry address.
   address internal immutable i_capabilityRegistry;
@@ -114,7 +114,7 @@ contract CCIPCapabilityConfiguration is ITypeAndVersion, ICapabilityConfiguratio
   mapping(uint64 chainSelector => ChainConfig chainConfig) internal s_chainConfigurations;
 
   /// @notice All chains that are configured.
-  EnumerableSet.UintSet internal s_chainSelectors;
+  EnumerableSet.UintSet internal s_remoteChainSelectors;
 
   /// @notice OCR3 configurations for each DON.
   /// Each CR DON will have a commit and execution configuration.
@@ -141,8 +141,8 @@ contract CCIPCapabilityConfiguration is ITypeAndVersion, ICapabilityConfiguratio
   /// @return The chain configurations.
   // TODO: will this eventually hit the RPC max response size limit?
   function getAllChainConfigs() external view returns (ChainConfigInfo[] memory) {
-    uint256[] memory chainSelectors = s_chainSelectors.values();
-    ChainConfigInfo[] memory chainConfigs = new ChainConfigInfo[](s_chainSelectors.length());
+    uint256[] memory chainSelectors = s_remoteChainSelectors.values();
+    ChainConfigInfo[] memory chainConfigs = new ChainConfigInfo[](s_remoteChainSelectors.length());
     for (uint256 i = 0; i < chainSelectors.length; ++i) {
       uint64 chainSelector = uint64(chainSelectors[i]);
       chainConfigs[i] =
@@ -166,7 +166,7 @@ contract CCIPCapabilityConfiguration is ITypeAndVersion, ICapabilityConfiguratio
   /// @inheritdoc ICapabilityConfiguration
   /// @dev The CCIP capability will fetch the configuration needed directly from this contract.
   /// The offchain syncer will call this function, however, so its important that it doesn't revert.
-  function getCapabilityConfiguration(uint256 /* donId */ ) external pure override returns (bytes memory configuration) {
+  function getCapabilityConfiguration(uint32 /* donId */ ) external pure override returns (bytes memory configuration) {
     return bytes("");
   }
 
@@ -221,14 +221,10 @@ contract CCIPCapabilityConfiguration is ITypeAndVersion, ICapabilityConfiguratio
   /// @param configLen The length of the configuration.
   /// @return The config state.
   function _stateFromConfigLength(uint256 configLen) internal pure returns (ConfigState) {
-    if (configLen == 0) {
-      return ConfigState.Init;
-    } else if (configLen == 1) {
-      return ConfigState.Running;
-    } else if (configLen == 2) {
-      return ConfigState.Staging;
+    if (configLen > 2) {
+      revert InvalidConfigLength(configLen);
     }
-    revert InvalidConfigLength(configLen);
+    return ConfigState(configLen);
   }
 
   // the only valid state transitions are the following:
@@ -377,7 +373,7 @@ contract CCIPCapabilityConfiguration is ITypeAndVersion, ICapabilityConfiguratio
     }
 
     // Check that the chain configuration is set.
-    if (!s_chainSelectors.contains(cfg.chainSelector)) {
+    if (!s_remoteChainSelectors.contains(cfg.chainSelector)) {
       revert ChainSelectorNotFound(cfg.chainSelector);
     }
 
@@ -460,14 +456,13 @@ contract CCIPCapabilityConfiguration is ITypeAndVersion, ICapabilityConfiguratio
   ) external onlyOwner {
     // Process removals first.
     for (uint256 i = 0; i < chainSelectorRemoves.length; i++) {
-      // check if the chain selector is in s_chainSelectors first.
-      bool present = s_chainSelectors.contains(chainSelectorRemoves[i]);
-      if (!present) {
+      // check if the chain selector is in s_remoteChainSelectors first.
+      if (!s_remoteChainSelectors.contains(chainSelectorRemoves[i])) {
         revert ChainSelectorNotFound(chainSelectorRemoves[i]);
       }
 
       delete s_chainConfigurations[chainSelectorRemoves[i]];
-      s_chainSelectors.remove(chainSelectorRemoves[i]);
+      s_remoteChainSelectors.remove(chainSelectorRemoves[i]);
 
       emit ChainConfigRemoved(chainSelectorRemoves[i]);
     }
@@ -489,7 +484,7 @@ contract CCIPCapabilityConfiguration is ITypeAndVersion, ICapabilityConfiguratio
       }
 
       s_chainConfigurations[chainSelector] = chainConfig;
-      s_chainSelectors.add(chainSelector);
+      s_remoteChainSelectors.add(chainSelector);
 
       emit ChainConfigSet(chainSelector, chainConfig);
     }
