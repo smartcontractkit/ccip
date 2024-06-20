@@ -49,7 +49,7 @@ class ExecutePlugin:
     def observation(self, previous_outcome):
         # Observe commit reports
         if self.can_read_dest():
-            pending_reports = pending_reports + self.offRamp.get_pending_commit_reports(self.latest_report)
+            pending_reports = self.offRamp.get_pending_commit_reports(self.lookback)
             self.latest_report = pendingReport[-1].timestamp
 
         # Observe messages from previous outcome
