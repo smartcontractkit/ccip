@@ -71,7 +71,6 @@ func (r *TargetMinBalancer) rebalancingRound(graphNow graph.Graph, nonExecutedTr
 	if err != nil {
 		return nil, fmt.Errorf("find networks that require funding: %w", err)
 	}
-	r.lggr.Debugf("networks requiring funding: %v", networksRequiringFunding)
 
 	proposedTransfers := make([]models.ProposedTransfer, 0)
 	for _, net := range networksRequiringFunding {
