@@ -20,7 +20,7 @@ type TargetMinBalancer struct {
 
 func NewTargetMinBalancer(lggr logger.Logger) *TargetMinBalancer {
 	return &TargetMinBalancer{
-		lggr: lggr,
+		lggr: lggr.With("service", "TargetMinBalancer"),
 	}
 }
 
@@ -30,11 +30,10 @@ func (r *TargetMinBalancer) ComputeTransfersToBalance(graphNow graph.Graph, nonE
 	nonExecutedTransfers = filterUnexecutedTransfers(nonExecutedTransfers)
 
 	var proposedTransfers []models.ProposedTransfer
-	// 4 rounds of rebalancing alternate between 1 hop and 2 hop transfers
+	// 4 rounds of rebalancing alternate between 1 hop and 2 hop transfers.
+	// this allows us to have multistep transaction initiated at the same time.
 	for i := 0; i < 5; i++ {
-		fmt.Println()
-		r.lggr.Debug("Round ", i)
-		r.lggr.Debugf("nonExecutedTransfers: %v", nonExecutedTransfers)
+		r.lggr.Debugf("Round %d: nonExecutedTransfers: %v", i, nonExecutedTransfers)
 		var currentProposed []models.ProposedTransfer
 		transfersFunc := r.oneHopTransfers
 		if i%2 != 0 {
@@ -44,7 +43,7 @@ func (r *TargetMinBalancer) ComputeTransfersToBalance(graphNow graph.Graph, nonE
 		if err != nil {
 			return nil, err
 		}
-		r.lggr.Debugf("current round proposed transfers: %v", currentProposed)
+		r.lggr.Debugf("Round %d: proposed transfers: %v", i, currentProposed)
 		for _, t := range currentProposed {
 			// put proposed in nonExecutedTransfers to carryover to next round
 			nonExecutedTransfers = append(nonExecutedTransfers, t)
@@ -72,6 +71,7 @@ func (r *TargetMinBalancer) rebalancingRound(graphNow graph.Graph, nonExecutedTr
 	if err != nil {
 		return nil, fmt.Errorf("find networks that require funding: %w", err)
 	}
+	r.lggr.Debugf("networks requiring funding: %v", networksRequiringFunding)
 
 	proposedTransfers := make([]models.ProposedTransfer, 0)
 	for _, net := range networksRequiringFunding {
@@ -110,8 +110,7 @@ func (r *TargetMinBalancer) findNetworksRequiringFunding(graphNow, graphLater gr
 		//use min here for transferable. because we don't know when the transfers will complete and want to avoid issues
 		transferableAmount, ataErr := availableTransferableAmount(graphNow, graphLater, net)
 		if ataErr != nil {
-			r.lggr.Debugf("error getting available transferrable amount for net %d: %v", net, ataErr)
-			continue
+			return nil, nil, fmt.Errorf("getting available transferrable amount for net %d: %v", net, ataErr)
 		}
 		mapNetworkFunds[net] = &Funds{
 			LiqDiffNow:      liqDiffsNow[net],
@@ -120,11 +119,11 @@ func (r *TargetMinBalancer) findNetworksRequiringFunding(graphNow, graphLater gr
 		}
 
 		if diffLater.Cmp(big.NewInt(0)) <= 0 {
-			r.lggr.Debugf("net %v does not require funding, transferrable tokens: %d", net, transferableAmount)
+			r.lggr.Debugf("funding not required for %v, transferrable tokens: %d", net, transferableAmount)
 			continue
 		}
 
-		r.lggr.Debugf("net %v requires funding, %s tokens to reach target, transferrable tokens: %d", net, diffLater, transferableAmount)
+		r.lggr.Debugf("funding required for %v, tokens to reach target: %s , transferrable tokens: %d", net, diffLater, transferableAmount)
 		res = append(res, net)
 	}
 
@@ -153,8 +152,8 @@ func (r *TargetMinBalancer) oneHopTransfers(graphLater graph.Graph, targetNetwor
 		}
 
 		destDiffLater := networkFunds[edge.Dest].LiqDiffLater
-
-		r.lggr.Debugf("checking transfer from %v to %v", edge.Source, edge.Dest)
+		transferAmount := destDiffLater
+		r.lggr.Debugf("checking transfer from %v to %v for amount %v", edge.Source, edge.Dest, transferAmount)
 
 		//source network available transferable amount
 		srcData, dErr := graphLater.GetData(edge.Source)
@@ -165,14 +164,13 @@ func (r *TargetMinBalancer) oneHopTransfers(graphLater graph.Graph, targetNetwor
 		srcAmountToTarget := big.NewInt(0).Sub(srcData.Liquidity, srcData.TargetLiquidity)
 
 		if srcAmountToTarget.Cmp(big.NewInt(0)) < 0 || srcAvailableAmount.Cmp(big.NewInt(0)) < 0 {
-			r.lggr.Debugf("source network %v does not have a surplus to transfer, skipping transfer: srcAmountToTarget %v", edge.Source, srcAmountToTarget)
+			r.lggr.Debugf("source network %v does not have a surplus to transfer so skipping transfer, source amount to target %v", edge.Source, srcAmountToTarget)
 			continue
 		}
 
-		transferAmount := destDiffLater
 		if transferAmount.Cmp(srcAmountToTarget) > 0 {
 			// if transferAmount > srcAmountToTarget take less
-			r.lggr.Debugf("source network %v doesn't have %v, taking the available %v instead", edge.Source, transferAmount, srcAmountToTarget)
+			r.lggr.Debugf("source network %v does not have the desired amount, desired amount %v taking available %v", edge.Source, transferAmount, srcAmountToTarget)
 			transferAmount = srcAmountToTarget
 		}
 		if transferAmount.Cmp(big.NewInt(0)) <= 0 {
@@ -187,7 +185,7 @@ func (r *TargetMinBalancer) oneHopTransfers(graphLater graph.Graph, targetNetwor
 
 		newAmount := big.NewInt(0).Sub(networkFunds[edge.Source].AvailableAmount, transferAmount)
 		if newAmount.Cmp(big.NewInt(0)) < 0 {
-			r.lggr.Debugf("source network %v doesn't have enough available liquidity, skipping transfer %v only have %v available", edge.Source, transferAmount, networkFunds[edge.Source].AvailableAmount)
+			r.lggr.Debugf("source network %v doesn't have enough available liquidity so skipping transfer, desired amount %v but only have %v available", edge.Source, transferAmount, networkFunds[edge.Source].AvailableAmount)
 			continue
 		}
 		networkFunds[edge.Source].AvailableAmount = newAmount
@@ -229,11 +227,10 @@ func (r *TargetMinBalancer) twoHopTransfers(graphLater graph.Graph, targetNetwor
 				return nil, fmt.Errorf("get intermediate neighbors of %d failed", src)
 			}
 			finalNeighborsSet := mapset.NewSet[models.NetworkSelector](intermediateNeighbors...)
-			r.lggr.Debugf("checking transfer from %v to %v to %v", src, middle, targetNetwork)
+			transferAmount := networkFunds[targetNetwork].LiqDiffLater
+			r.lggr.Debugf("checking transfer from %v to %v to %v for amount %v", src, middle, targetNetwork, transferAmount)
 
 			if finalNeighborsSet.Contains(targetNetwork) {
-				fundingDest := networkFunds[targetNetwork].LiqDiffLater
-
 				//source network available transferable amount
 				srcData, dErr := graphLater.GetData(src)
 				if dErr != nil {
@@ -250,7 +247,6 @@ func (r *TargetMinBalancer) twoHopTransfers(graphLater graph.Graph, targetNetwor
 				middleAvailableAmount := big.NewInt(0).Sub(middleData.Liquidity, middleData.MinimumLiquidity)
 				middleAmountToTarget := big.NewInt(0).Sub(middleData.Liquidity, middleData.TargetLiquidity)
 
-				transferAmount := fundingDest
 				if transferAmount.Cmp(srcAmountToTarget) > 0 {
 					// if transferAmount > srcAmountToTarget take less
 					transferAmount = srcAmountToTarget
