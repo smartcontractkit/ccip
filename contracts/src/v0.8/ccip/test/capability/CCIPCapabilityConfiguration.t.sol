@@ -433,7 +433,11 @@ contract CCIPCapabilityConfiguration_validateConfig is CCIPCapabilityConfigurati
       offchainConfig: bytes("offchainConfig")
     });
 
-    vm.expectRevert(abi.encodeWithSelector(CCIPCapabilityConfiguration.P2PIdsLengthNotMatching.selector, uint256(3), uint256(4), uint256(4)));
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        CCIPCapabilityConfiguration.P2PIdsLengthNotMatching.selector, uint256(3), uint256(4), uint256(4)
+      )
+    );
     s_ccipCC.validateConfig(config);
   }
 
