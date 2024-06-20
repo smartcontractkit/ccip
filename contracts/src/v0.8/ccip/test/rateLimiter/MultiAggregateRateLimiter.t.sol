@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.24;
 
-import {Vm} from "forge-std/Vm.sol";
-
 import {MultiAggregateRateLimiter} from "../../MultiAggregateRateLimiter.sol";
 import {Client} from "../../libraries/Client.sol";
 import {Internal} from "../../libraries/Internal.sol";
@@ -10,8 +8,8 @@ import {RateLimiter} from "../../libraries/RateLimiter.sol";
 import {BaseTest} from "../BaseTest.t.sol";
 import {MultiAggregateRateLimiterHelper} from "../helpers/MultiAggregateRateLimiterHelper.sol";
 import {PriceRegistrySetup} from "../priceRegistry/PriceRegistry.t.sol";
-
 import {stdError} from "forge-std/Test.sol";
+import {Vm} from "forge-std/Vm.sol";
 
 contract MultiAggregateRateLimiterSetup is BaseTest, PriceRegistrySetup {
   MultiAggregateRateLimiterHelper internal s_rateLimiter;
