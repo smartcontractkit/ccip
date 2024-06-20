@@ -3,13 +3,15 @@ package reader
 import (
 	"context"
 	"testing"
-	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
+
 	"github.com/smartcontractkit/ccipocr3/internal/mocks"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/libocr/commontypes"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -146,7 +148,7 @@ func Test_PollingWorking(t *testing.T) {
 		},
 	}
 
-	homeChainReader := mocks.NewHomeChainContractReader(onChainConfigs)
+	homeChainReader := mocks.NewContractReaderMock()
 	homeChainReader.On(
 		"GetLatestValue", mock.Anything, "CCIPCapabilityConfiguration", "getAllChainConfigs", mock.Anything, mock.Anything).Run(
 		func(args mock.Arguments) {
@@ -160,9 +162,7 @@ func Test_PollingWorking(t *testing.T) {
 	)
 
 	ctx := context.Background()
-	configPoller.Start(ctx)
-	// sleep for 2 seconds
-	time.Sleep(2 * time.Second)
+	_ = configPoller.Start(ctx)
 	_ = configPoller.Close()
 
 	assert.Equal(t, homeChainConfig, configPoller.GetConfig())

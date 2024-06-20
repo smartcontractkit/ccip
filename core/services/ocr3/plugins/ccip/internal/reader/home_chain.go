@@ -3,6 +3,7 @@ package reader
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 
@@ -41,6 +42,12 @@ func (r *HomeChainConfigPoller) Start(ctx context.Context) error {
 	bgCtx, cancelFunc := context.WithCancel(ctx)
 	r.backgroundCancel = cancelFunc
 	r.mutex.Unlock()
+
+	err := r.fetchAndSetConfig(ctx)
+	if err != nil {
+		r.lggr.Errorw("Initial fetch of on-chain configs failed", "err", err)
+	}
+
 	r.lggr.Infow("Start Polling HomeChainConfig")
 	go func() {
 		ticker := time.NewTicker(12 * time.Second)
@@ -54,28 +61,33 @@ func (r *HomeChainConfigPoller) Start(ctx context.Context) error {
 				r.lggr.Infow("Polling stopped")
 				return
 			case <-ticker.C:
-				onChainCapabilityConfigs, err := r.fetchOnChainConfig(ctx)
-				if err != nil {
-					r.lggr.Errorw("Fetching on chain configs failed", "err", err)
-					continue
-				}
-				if onChainCapabilityConfigs == nil || len(onChainCapabilityConfigs) == 0 {
-					r.lggr.Errorw("No on chain configs found")
-					continue
-				}
-				homeChainConfig, err := r.convertOnChainConfigToHomeChainConfig(onChainCapabilityConfigs)
-				if err != nil {
-					r.lggr.Errorw("error converting OnChainConfigs to HomeChainConfig", "err", err)
-					continue
-				}
-				r.lggr.Infow("Setting HomeChainConfig")
-				r.mutex.Lock()
-				r.homeChainConfig = homeChainConfig
-				r.mutex.Unlock()
+				_ = r.fetchAndSetConfig(ctx)
 			}
 		}
 	}()
 
+	return nil
+}
+
+func (r *HomeChainConfigPoller) fetchAndSetConfig(ctx context.Context) error {
+	onChainCapabilityConfigs, err := r.fetchOnChainConfig(ctx)
+	if err != nil {
+		r.lggr.Errorw("Fetching on-chain configs failed", "err", err)
+		return err
+	}
+	if len(onChainCapabilityConfigs) == 0 {
+		r.lggr.Errorw("no on chain configs found")
+		return fmt.Errorf("no on chain configs found")
+	}
+	homeChainConfig, err := r.convertOnChainConfigToHomeChainConfig(onChainCapabilityConfigs)
+	if err != nil {
+		r.lggr.Errorw("error converting OnChainConfigs to HomeChainConfig", "err", err)
+		return err
+	}
+	r.lggr.Infow("Setting HomeChainConfig")
+	r.mutex.Lock()
+	r.homeChainConfig = homeChainConfig
+	r.mutex.Unlock()
 	return nil
 }
 
