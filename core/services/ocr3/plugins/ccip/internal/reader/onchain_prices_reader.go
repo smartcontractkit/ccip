@@ -56,8 +56,10 @@ func (pr *OnchainTokenPricesReader) GetTokenPricesUSD(ctx context.Context, token
 		return nil, fmt.Errorf("failed to get all token prices successfully: %w", err)
 	}
 
-	if len(prices) != len(tokens) {
-		return nil, fmt.Errorf("failed to get all token prices successfully, lengths are different")
+	for _, price := range prices {
+		if price == nil {
+			return nil, fmt.Errorf("failed to get all token prices successfully, some prices are nil")
+		}
 	}
 
 	return prices, nil
