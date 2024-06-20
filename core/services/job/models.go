@@ -51,6 +51,7 @@ const (
 	Workflow                Type = (Type)(pipeline.WorkflowJobType)
 	StandardCapabilities    Type = (Type)(pipeline.StandardCapabilitiesJobType)
 	CCIP                    Type = (Type)(pipeline.CCIPJobType)
+	CCIPBootstrap           Type = (Type)(pipeline.CCIPBootstrapJobType)
 )
 
 //revive:disable:redefines-builtin-id
