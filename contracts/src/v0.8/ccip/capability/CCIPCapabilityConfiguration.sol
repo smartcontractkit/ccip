@@ -34,6 +34,7 @@ contract CCIPCapabilityConfiguration is ITypeAndVersion, ICapabilityConfiguratio
   error TooManyOCR3Configs();
   error TooManySigners();
   error TooManyTransmitters();
+  error TooManyBootstrapP2PIds();
   error P2PIdsLengthNotMatching(uint256 p2pIdsLength, uint256 signersLength, uint256 transmittersLength);
   error NotEnoughTransmitters(uint256 got, uint256 minimum);
   error FMustBePositive();
@@ -89,6 +90,7 @@ contract CCIPCapabilityConfiguration is ITypeAndVersion, ICapabilityConfiguratio
     uint8 F; //                       | The "big F" parameter for the role DON.
     uint64 offchainConfigVersion; // ─╯ The version of the offchain configuration.
     bytes32 offrampAddress; // The remote chain offramp address.
+    bytes32[] bootstrapP2PIds; // The bootstrap P2P IDs of the oracles that are part of the role DON.
     // len(p2pIds) == len(signers) == len(transmitters) == 3 * F + 1
     // NOTE: indexes matter here! The p2p ID at index i corresponds to the signer at index i and the transmitter at index i.
     // This is crucial in order to build the oracle ID <-> peer ID mapping offchain.
@@ -413,8 +415,13 @@ contract CCIPCapabilityConfiguration is ITypeAndVersion, ICapabilityConfiguratio
       revert P2PIdsLengthNotMatching(cfg.p2pIds.length, cfg.signers.length, cfg.transmitters.length);
     }
 
+    if (cfg.bootstrapP2PIds.length > cfg.p2pIds.length) {
+      revert TooManyBootstrapP2PIds();
+    }
+
     // Check that the readers are in the capability registry.
     // TODO: check for duplicate signers, duplicate p2p ids, etc.
+    // TODO: check that p2p ids in cfg.bootstrapP2PIds are included in cfg.p2pIds.
     for (uint256 i = 0; i < cfg.signers.length; ++i) {
       _ensureInRegistry(cfg.p2pIds[i]);
     }
@@ -442,6 +449,8 @@ contract CCIPCapabilityConfiguration is ITypeAndVersion, ICapabilityConfiguratio
           ocr3Config.pluginType,
           ocr3Config.offrampAddress,
           configCount,
+          ocr3Config.bootstrapP2PIds,
+          ocr3Config.p2pIds,
           ocr3Config.signers,
           ocr3Config.transmitters,
           ocr3Config.F,
