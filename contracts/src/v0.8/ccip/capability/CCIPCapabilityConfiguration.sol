@@ -255,7 +255,10 @@ contract CCIPCapabilityConfiguration is ITypeAndVersion, ICapabilityConfiguratio
       if (newConfigWithMeta[0].configCount != 1) {
         revert WrongConfigCount(newConfigWithMeta[0].configCount, 1);
       }
-    } else if (currentConfigLen == 1 && newConfigLen == 2) {
+      return;
+    }
+
+    if (currentConfigLen == 1 && newConfigLen == 2) {
       // On a blue/green proposal:
       // * the config digest of the blue config must remain unchanged.
       // * the green config count must be the blue config count + 1.
@@ -265,14 +268,18 @@ contract CCIPCapabilityConfiguration is ITypeAndVersion, ICapabilityConfiguratio
       if (newConfigWithMeta[1].configCount != currentConfig[0].configCount + 1) {
         revert WrongConfigCount(newConfigWithMeta[1].configCount, currentConfig[0].configCount + 1);
       }
-    } else if (currentConfigLen == 2 && newConfigLen == 1) {
+      return;
+    }
+
+    if (currentConfigLen == 2 && newConfigLen == 1) {
       // On a promotion, the green config digest must become the blue config digest.
       if (newConfigWithMeta[0].configDigest != currentConfig[1].configDigest) {
         revert WrongConfigDigest(newConfigWithMeta[0].configDigest, currentConfig[1].configDigest);
       }
-    } else {
-      revert NonExistentConfigTransition();
+      return;
     }
+
+    revert NonExistentConfigTransition();
   }
 
   /// @notice Computes a new configuration with metadata based on the current configuration and the new configuration.
