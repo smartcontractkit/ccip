@@ -31,7 +31,6 @@ contract CCIPCapabilityConfiguration is ITypeAndVersion, ICapabilityConfiguratio
   error OnlyCapabilityRegistryCanCall();
   error ChainSelectorNotFound(uint64 chainSelector);
   error ChainSelectorNotSet();
-  error SignerP2PIdPairMustBeLengthTwo(uint256 gotLength);
   error TooManyOCR3Configs();
   error TooManySigners();
   error TooManyTransmitters();
@@ -89,8 +88,12 @@ contract CCIPCapabilityConfiguration is ITypeAndVersion, ICapabilityConfiguratio
     uint8 F; //                       | The "big F" parameter for the role DON.
     uint64 offchainConfigVersion; // ─╯ The version of the offchain configuration.
     bytes32 offrampAddress; // The remote chain combined (offramp|commit store) address.
-    bytes32[2][] signers; // An associative array that contains (p2p id, onchain signer public key) pairs.
-    bytes32[2][] transmitters; // An associative array that contains (p2p id, transmitter) pairs.
+    // len(p2pIds) == len(signers) == len(transmitters) == 3 * F + 1
+    // NOTE: indexes matter here! The p2p ID at index i corresponds to the signer at index i and the transmitter at index i.
+    // This is crucial in order to build the oracle ID <-> peer ID mapping offchain.
+    bytes32[] p2pIds; // The P2P IDs of the oracles that are part of the role DON.
+    bytes32[] signers; // The onchain signing keys of nodes in the don.
+    bytes32[] transmitters; // The onchain transmitter keys of nodes in the don.
     bytes offchainConfig; // The offchain configuration for the OCR3 protocol. Protobuf encoded.
   }
 
@@ -142,10 +145,8 @@ contract CCIPCapabilityConfiguration is ITypeAndVersion, ICapabilityConfiguratio
     ChainConfigInfo[] memory chainConfigs = new ChainConfigInfo[](s_chainSelectors.length());
     for (uint256 i = 0; i < chainSelectors.length; ++i) {
       uint64 chainSelector = uint64(chainSelectors[i]);
-      chainConfigs[i] = ChainConfigInfo({
-        chainSelector: chainSelector,
-        chainConfig: s_chainConfigurations[chainSelector]
-      });
+      chainConfigs[i] =
+        ChainConfigInfo({chainSelector: chainSelector, chainConfig: s_chainConfigurations[chainSelector]});
     }
     return chainConfigs;
   }
@@ -407,11 +408,7 @@ contract CCIPCapabilityConfiguration is ITypeAndVersion, ICapabilityConfiguratio
     // Check that the readers are in the capability registry.
     // TODO: check for duplicate signers, duplicate p2p ids, etc.
     for (uint256 i; i < cfg.signers.length; ++i) {
-      // We expect a pair of (p2pId, signer) for each element in the signers array.
-      // p2pId is always the RageP2P public key of the oracle.
-      // signer is the onchain public key of the oracle, which is an address on EVM chains
-      // but could be different on other chain families.
-      _ensureInRegistry(cfg.signers[i][0]);
+      _ensureInRegistry(cfg.p2pIds[i]);
     }
   }
 
@@ -431,19 +428,20 @@ contract CCIPCapabilityConfiguration is ITypeAndVersion, ICapabilityConfiguratio
   ) internal pure returns (bytes32) {
     uint256 h = uint256(
       keccak256(
-      abi.encode(
-        ocr3Config.chainSelector,
-        donId,
-        ocr3Config.pluginType,
-        ocr3Config.offrampAddress,
-        configCount,
-        ocr3Config.signers,
-        ocr3Config.transmitters,
-        ocr3Config.F,
-        ocr3Config.offchainConfigVersion,
-        ocr3Config.offchainConfig
+        abi.encode(
+          ocr3Config.chainSelector,
+          donId,
+          ocr3Config.pluginType,
+          ocr3Config.offrampAddress,
+          configCount,
+          ocr3Config.signers,
+          ocr3Config.transmitters,
+          ocr3Config.F,
+          ocr3Config.offchainConfigVersion,
+          ocr3Config.offchainConfig
+        )
       )
-    ));
+    );
     uint256 prefixMask = type(uint256).max << (256 - 16); // 0xFFFF00..00
     uint256 prefix = 0x000a << (256 - 16); // 0x000a00..00
     return bytes32((prefix & prefixMask) | (h & ~prefixMask));
