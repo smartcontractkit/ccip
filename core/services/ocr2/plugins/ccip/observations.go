@@ -23,7 +23,7 @@ type CommitObservation struct {
 	Interval                  cciptypes.CommitStoreInterval  `json:"interval"`
 	TokenPricesUSD            map[cciptypes.Address]*big.Int `json:"tokensPerFeeCoin"`
 	SourceGasPriceUSD         *big.Int                       `json:"sourceGasPrice"`
-	GasPriceUSDPerSourceChain map[uint64]*big.Int            `json:"gasPriceUSDPerSourceChain"`
+	SourceGasPriceUSDPerChain map[uint64]*big.Int            `json:"sourceGasPriceUSDPerChain"`
 }
 
 // Marshal MUST be used instead of raw json.Marshal(o) since it contains backwards compatibility related changes.
