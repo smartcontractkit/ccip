@@ -173,12 +173,9 @@ func (r *TargetMinBalancer) oneHopTransfers(graphLater graph.Graph, targetNetwor
 			transferAmount = srcAmountToTarget
 		}
 		if transferAmount.Cmp(big.NewInt(0)) <= 0 {
-			//r.lggr.Debugf("transfer %v->%v amount is 0 or less, skipping transfer: %v", edge.Source, targetNetwork, transferAmount)
 			continue
 		}
 		if srcAmountToTarget.Cmp(transferAmount) < 0 || srcAvailableAmount.Cmp(transferAmount) < 0 {
-			// source network doesn't have enough to cover
-			//r.lggr.Debugf("source network %v liquidity too low, skipping transfer: srcAmountToTarget %v, srcAvailableAmount %v", edge.Source, srcAmountToTarget, srcAvailableAmount)
 			continue
 		}
 
@@ -251,13 +248,10 @@ func (r *TargetMinBalancer) twoHopTransfers(graphLater graph.Graph, targetNetwor
 					transferAmount = srcAmountToTarget
 				}
 				if transferAmount.Cmp(big.NewInt(0)) <= 0 {
-					//r.lggr.Debugf("transfer %v->%v amount is 0 or less, skipping transfer: %v", src, targetNetwork, transferAmount)
 					continue
 				}
 
 				if srcAmountToTarget.Cmp(transferAmount) < 0 || srcAvailableAmount.Cmp(transferAmount) < 0 {
-					// source network doesn't have enough to cover
-					//r.lggr.Debugf("source network %v liquidity too low, skipping transfer: srcAmountToTarget %v, srcAvailableAmount %v", src, srcAmountToTarget, srcAvailableAmount)
 					continue
 				}
 				if middleAvailableAmount.Cmp(transferAmount) < 0 {
