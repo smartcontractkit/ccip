@@ -38,6 +38,14 @@ contract CCIPReceiver is CCIPClientBase {
 
   constructor(address router) CCIPClientBase(router) {}
 
+  function typeAndVersion() external pure virtual returns (string memory) {
+    return "CCIPReceiver 1.0.0-dev";
+  }
+
+  // ================================================================
+  // │                  Incoming Message Processing                 |
+  // ================================================================
+
   /// @notice The entrypoint for the CCIP router to call. This function should
   /// never revert, all errors should be handled internally in this contract.
   /// @param message The message to process.
@@ -80,15 +88,9 @@ contract CCIPReceiver is CCIPClientBase {
     if (s_simRevert) revert ErrorCase();
   }
 
-  function _retryFailedMessage(Client.Any2EVMMessage memory message) internal virtual {
-    // Owner rescues tokens sent with a failed message
-    for (uint256 i = 0; i < message.destTokenAmounts.length; ++i) {
-      uint256 amount = message.destTokenAmounts[i].amount;
-      address token = message.destTokenAmounts[i].token;
-
-      IERC20(token).safeTransfer(owner(), amount);
-    }
-  }
+  // ================================================================
+  // │                  Failed Message Processing                   |
+  // ================================================================
 
   /// @notice This function is callable by the owner when a message has failed
   /// to unblock the tokens that are associated with that message.
@@ -110,6 +112,20 @@ contract CCIPReceiver is CCIPClientBase {
 
     emit MessageRecovered(messageId);
   }
+
+  function _retryFailedMessage(Client.Any2EVMMessage memory message) internal virtual {
+    // Owner rescues tokens sent with a failed message
+    for (uint256 i = 0; i < message.destTokenAmounts.length; ++i) {
+      uint256 amount = message.destTokenAmounts[i].amount;
+      address token = message.destTokenAmounts[i].token;
+
+      IERC20(token).safeTransfer(owner(), amount);
+    }
+  }
+
+  // ================================================================
+  // │                  Message Tracking                            │
+  // ================================================================
 
   function getMessageContents(bytes32 messageId) public view returns (Client.Any2EVMMessage memory) {
     return s_messageContents[messageId];

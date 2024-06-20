@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {ITypeAndVersion} from "../../shared/interfaces/ITypeAndVersion.sol";
-
 import {Client} from "../libraries/Client.sol";
 import {CCIPClient} from "./CCIPClient.sol";
 
@@ -10,7 +8,7 @@ import {IERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/
 import {SafeERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /// @title PingPongDemo - A simple ping-pong contract for demonstrating cross-chain communication
-contract PingPongDemo is CCIPClient, ITypeAndVersion {
+contract PingPongDemo is CCIPClient {
   using SafeERC20 for IERC20;
 
   event Ping(uint256 pingPongCount);
@@ -28,7 +26,7 @@ contract PingPongDemo is CCIPClient, ITypeAndVersion {
   // CCIPClient will handle the token approval so there's no need to do it here
   constructor(address router, IERC20 feeToken) CCIPClient(router, feeToken) {}
 
-  function typeAndVersion() external pure virtual returns (string memory) {
+  function typeAndVersion() external pure virtual override returns (string memory) {
     return "PingPongDemo 1.3.0";
   }
 
@@ -74,9 +72,9 @@ contract PingPongDemo is CCIPClient, ITypeAndVersion {
     }
   }
 
-  /////////////////////////////////////////////////////////////////////
-  // Admin Functions
-  /////////////////////////////////////////////////////////////////////
+  // ================================================================
+  // │                     Admin Functions                          │
+  // ================================================================
 
   function setCounterpart(uint64 counterpartChainSelector, address counterpartAddress) external onlyOwner {
     s_counterpartChainSelector = counterpartChainSelector;
@@ -99,9 +97,13 @@ contract PingPongDemo is CCIPClient, ITypeAndVersion {
     s_chains[s_counterpartChainSelector] = abi.encode(counterpartAddress);
   }
 
-  /////////////////////////////////////////////////////////////////////
-  // Plumbing
-  /////////////////////////////////////////////////////////////////////
+  function setPaused(bool pause) external onlyOwner {
+    s_isPaused = pause;
+  }
+
+  // ================================================================
+  // │                      State Management                        │
+  // ================================================================
 
   function getCounterpartChainSelector() external view returns (uint64) {
     return s_counterpartChainSelector;
@@ -113,9 +115,5 @@ contract PingPongDemo is CCIPClient, ITypeAndVersion {
 
   function isPaused() external view returns (bool) {
     return s_isPaused;
-  }
-
-  function setPaused(bool pause) external onlyOwner {
-    s_isPaused = pause;
   }
 }

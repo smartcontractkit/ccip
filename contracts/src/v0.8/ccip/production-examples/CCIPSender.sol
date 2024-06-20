@@ -33,6 +33,10 @@ contract CCIPSender is CCIPClientBase {
 
   constructor(address router) CCIPClientBase(router) {}
 
+  function typeAndVersion() external pure override returns (string memory) {
+    return "CCIPSender 1.0.0-dev";
+  }
+
   function ccipSend(
     uint64 destChainSelector,
     Client.EVMTokenAmount[] calldata tokenAmounts,

@@ -17,6 +17,10 @@ contract CCIPClient is CCIPReceiverWithACK {
   /// @notice You can't import CCIPReceiver and Sender due to similar parents so functionality of CCIPSender is duplicated here
   constructor(address router, IERC20 feeToken) CCIPReceiverWithACK(router, feeToken) {}
 
+  function typeAndVersion() external pure virtual override returns (string memory) {
+    return "CCIPReceiverWithACK 1.0.0-dev";
+  }
+
   function ccipSend(
     uint64 destChainSelector,
     Client.EVMTokenAmount[] memory tokenAmounts,

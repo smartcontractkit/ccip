@@ -56,6 +56,10 @@ contract CCIPReceiverWithACK is CCIPReceiver {
     }
   }
 
+  function typeAndVersion() external pure virtual override returns (string memory) {
+    return "CCIPReceiverWithACK 1.0.0-dev";
+  }
+
   function modifyFeeToken(address token) external onlyOwner {
     // If the current fee token is not-native, zero out the allowance to the router for safety
     if (address(s_feeToken) != address(0)) {
@@ -99,27 +103,6 @@ contract CCIPReceiverWithACK is CCIPReceiver {
     emit MessageSucceeded(message.messageId);
   }
 
-  /// @notice Sends the acknowledgement message back through CCIP to original sender contract
-  function _sendAck(Client.Any2EVMMessage calldata incomingMessage) internal {
-    Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](0);
-
-    Client.EVM2AnyMessage memory outgoingMessage = Client.EVM2AnyMessage({
-      receiver: incomingMessage.sender,
-      data: abi.encode(ACKMESSAGEMAGICBYTES, incomingMessage.messageId),
-      tokenAmounts: tokenAmounts,
-      extraArgs: s_extraArgsBytes[incomingMessage.sourceChainSelector],
-      feeToken: address(s_feeToken)
-    });
-
-    uint256 feeAmount = IRouterClient(i_ccipRouter).getFee(incomingMessage.sourceChainSelector, outgoingMessage);
-
-    bytes32 ACKmessageId = IRouterClient(i_ccipRouter).ccipSend{
-      value: address(s_feeToken) == address(0) ? feeAmount : 0
-    }(incomingMessage.sourceChainSelector, outgoingMessage);
-
-    emit MessageSent(incomingMessage.messageId, ACKmessageId);
-  }
-
   /// CCIPReceiver processMessage to make easier to modify
   /// @notice Function does NOT require the status of an incoming ACK be "sent" because this implementation does not send, only receives
   function processMessage(Client.Any2EVMMessage calldata message) external virtual override onlySelf {
@@ -145,5 +128,26 @@ contract CCIPReceiverWithACK is CCIPReceiver {
 
       emit MessageAckReceived(messageId);
     }
+  }
+
+  /// @notice Sends the acknowledgement message back through CCIP to original sender contract
+  function _sendAck(Client.Any2EVMMessage calldata incomingMessage) internal {
+    Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](0);
+
+    Client.EVM2AnyMessage memory outgoingMessage = Client.EVM2AnyMessage({
+      receiver: incomingMessage.sender,
+      data: abi.encode(ACKMESSAGEMAGICBYTES, incomingMessage.messageId),
+      tokenAmounts: tokenAmounts,
+      extraArgs: s_extraArgsBytes[incomingMessage.sourceChainSelector],
+      feeToken: address(s_feeToken)
+    });
+
+    uint256 feeAmount = IRouterClient(i_ccipRouter).getFee(incomingMessage.sourceChainSelector, outgoingMessage);
+
+    bytes32 ACKmessageId = IRouterClient(i_ccipRouter).ccipSend{
+      value: address(s_feeToken) == address(0) ? feeAmount : 0
+    }(incomingMessage.sourceChainSelector, outgoingMessage);
+
+    emit MessageSent(incomingMessage.messageId, ACKmessageId);
   }
 }

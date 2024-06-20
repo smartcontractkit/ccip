@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
+import {ICCIPClientBase} from "../../interfaces/ICCIPClientBase.sol";
 import {CCIPSender} from "../../production-examples/CCIPSender.sol";
-import {ICCIPClientBase} from "../../production-examples/interfaces/ICCIPClientBase.sol";
 
 import {Client} from "../../libraries/Client.sol";
 import {EVM2EVMOnRampSetup} from "../onRamp/EVM2EVMOnRampSetup.t.sol";

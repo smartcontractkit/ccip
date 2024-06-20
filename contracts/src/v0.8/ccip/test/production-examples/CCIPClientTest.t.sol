@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
+import {ICCIPClientBase} from "../../interfaces/ICCIPClientBase.sol";
 import {IRouterClient} from "../../interfaces/IRouterClient.sol";
 import {CCIPClient} from "../../production-examples/CCIPClient.sol";
 import {CCIPReceiverWithACK} from "../../production-examples/CCIPClient.sol";
-import {ICCIPClientBase} from "../../production-examples/interfaces/ICCIPClientBase.sol";
 
 import {Client} from "../../libraries/Client.sol";
 import {EVM2EVMOnRampSetup} from "../onRamp/EVM2EVMOnRampSetup.t.sol";
@@ -202,6 +202,7 @@ contract CCIPClientTest is EVM2EVMOnRampSetup {
 
     uint256 feeTokenAmount = s_sourceRouter.getFee(DEST_CHAIN_SELECTOR, message);
     uint256 tokenBalanceBefore = IERC20(token).balanceOf(OWNER);
+    uint256 feeTokenBalanceBefore = IERC20(s_sourceFeeToken).balanceOf(OWNER);
 
     s_sender.ccipSend({
       destChainSelector: DEST_CHAIN_SELECTOR,
@@ -212,5 +213,6 @@ contract CCIPClientTest is EVM2EVMOnRampSetup {
 
     // Assert that tokens were transfered for bridging + fees
     assertEq(IERC20(token).balanceOf(OWNER), tokenBalanceBefore - amount);
+    assertEq(IERC20(s_sourceFeeToken).balanceOf(OWNER), feeTokenBalanceBefore - feeTokenAmount);
   }
 }

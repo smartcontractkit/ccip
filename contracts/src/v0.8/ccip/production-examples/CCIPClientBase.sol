@@ -1,14 +1,15 @@
 pragma solidity ^0.8.0;
 
 import {OwnerIsCreator} from "../../shared/access/OwnerIsCreator.sol";
+import {ITypeAndVersion} from "../../shared/interfaces/ITypeAndVersion.sol";
 
 import {IERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Address} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/Address.sol";
 
-import {ICCIPClientBase} from "./interfaces/ICCIPClientBase.sol";
+import {ICCIPClientBase} from "../interfaces/ICCIPClientBase.sol";
 
-abstract contract CCIPClientBase is ICCIPClientBase, OwnerIsCreator {
+abstract contract CCIPClientBase is ICCIPClientBase, OwnerIsCreator, ITypeAndVersion {
   using SafeERC20 for IERC20;
   using Address for address;
 
@@ -23,9 +24,9 @@ abstract contract CCIPClientBase is ICCIPClientBase, OwnerIsCreator {
     i_ccipRouter = router;
   }
 
-  /////////////////////////////////////////////////////////////////////
-  // Router Management
-  /////////////////////////////////////////////////////////////////////
+  // ================================================================
+  // │                      Router Management                       │
+  // ================================================================
 
   function getRouter() public view returns (address) {
     return i_ccipRouter;
@@ -37,9 +38,9 @@ abstract contract CCIPClientBase is ICCIPClientBase, OwnerIsCreator {
     _;
   }
 
-  /////////////////////////////////////////////////////////////////////
-  // Sender/Receiver Management
-  /////////////////////////////////////////////////////////////////////
+  // ================================================================
+  // │                  Sender/Receiver Management                  │
+  // ================================================================
 
   function updateApprovedSenders(
     approvedSenderUpdate[] calldata adds,
@@ -54,9 +55,9 @@ abstract contract CCIPClientBase is ICCIPClientBase, OwnerIsCreator {
     }
   }
 
-  /////////////////////////////////////////////////////////////////////
-  // Fee Token Management
-  /////////////////////////////////////////////////////////////////////
+  // ================================================================
+  // │                  Fee Token Management                       │
+  // ===============================================================
 
   fallback() external payable {}
   receive() external payable {}
@@ -69,9 +70,9 @@ abstract contract CCIPClientBase is ICCIPClientBase, OwnerIsCreator {
     IERC20(token).safeTransfer(to, amount);
   }
 
-  /////////////////////////////////////////////////////////////////////
-  // Chain Management
-  /////////////////////////////////////////////////////////////////////
+  // ================================================================
+  // │                      Chain Management                        │
+  // ================================================================
 
   function enableChain(
     uint64 chainSelector,
