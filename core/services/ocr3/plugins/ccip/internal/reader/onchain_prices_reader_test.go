@@ -7,21 +7,23 @@ import (
 	"testing"
 
 	"github.com/smartcontractkit/ccipocr3/internal/mocks"
+
 	ocr2types "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
 const (
-	ETH_ACC = ocr2types.Account("ETH")
-	OP_ACC  = ocr2types.Account("OP")
-	ARB_ACC = ocr2types.Account("ARB")
+	EthAcc = ocr2types.Account("ETH")
+	OpAcc  = ocr2types.Account("OP")
+	ArbAcc = ocr2types.Account("ARB")
 )
 
 var (
-	ETH_PRICE = big.NewInt(100)
-	OP_PRICE  = big.NewInt(10)
-	ARB_PRICE = big.NewInt(1)
+	EthPrice = big.NewInt(100)
+	OpPrice  = big.NewInt(10)
+	ArbPrice = big.NewInt(1)
 )
 
 func TestOnchainTokenPricesReader_GetTokenPricesUSD(t *testing.T) {
@@ -36,31 +38,31 @@ func TestOnchainTokenPricesReader_GetTokenPricesUSD(t *testing.T) {
 	}{
 		{
 			name:         "Static price only",
-			staticPrices: map[ocr2types.Account]big.Int{ETH_ACC: *ETH_PRICE, OP_ACC: *OP_PRICE},
-			inputTokens:  []ocr2types.Account{ETH_ACC, OP_ACC},
+			staticPrices: map[ocr2types.Account]big.Int{EthAcc: *EthPrice, OpAcc: *OpPrice},
+			inputTokens:  []ocr2types.Account{EthAcc, OpAcc},
 			mockPrices:   map[ocr2types.Account]*big.Int{},
-			want:         []*big.Int{ETH_PRICE, OP_PRICE},
+			want:         []*big.Int{EthPrice, OpPrice},
 		},
 		{
 			name:         "On-chain price only",
 			staticPrices: map[ocr2types.Account]big.Int{},
-			inputTokens:  []ocr2types.Account{ARB_ACC, OP_ACC, ETH_ACC},
-			mockPrices:   map[ocr2types.Account]*big.Int{OP_ACC: OP_PRICE, ARB_ACC: ARB_PRICE, ETH_ACC: ETH_PRICE},
-			want:         []*big.Int{ARB_PRICE, OP_PRICE, ETH_PRICE},
+			inputTokens:  []ocr2types.Account{ArbAcc, OpAcc, EthAcc},
+			mockPrices:   map[ocr2types.Account]*big.Int{OpAcc: OpPrice, ArbAcc: ArbPrice, EthAcc: EthPrice},
+			want:         []*big.Int{ArbPrice, OpPrice, EthPrice},
 		},
 		{
 			name:         "Mix of static price and onchain price",
-			staticPrices: map[ocr2types.Account]big.Int{ETH_ACC: *ETH_PRICE},
-			inputTokens:  []ocr2types.Account{ETH_ACC, OP_ACC, ARB_ACC},
-			mockPrices:   map[ocr2types.Account]*big.Int{ARB_ACC: ARB_PRICE, OP_ACC: OP_PRICE},
-			want:         []*big.Int{ETH_PRICE, OP_PRICE, ARB_PRICE},
+			staticPrices: map[ocr2types.Account]big.Int{EthAcc: *EthPrice},
+			inputTokens:  []ocr2types.Account{EthAcc, OpAcc, ArbAcc},
+			mockPrices:   map[ocr2types.Account]*big.Int{ArbAcc: ArbPrice, OpAcc: OpPrice},
+			want:         []*big.Int{EthPrice, OpPrice, ArbPrice},
 		},
 		{
 			name:          "Missing price should error",
 			staticPrices:  map[ocr2types.Account]big.Int{},
-			inputTokens:   []ocr2types.Account{ARB_ACC, OP_ACC, ETH_ACC},
-			mockPrices:    map[ocr2types.Account]*big.Int{OP_ACC: OP_PRICE, ARB_ACC: ARB_PRICE},
-			errorAccounts: []ocr2types.Account{ETH_ACC},
+			inputTokens:   []ocr2types.Account{ArbAcc, OpAcc, EthAcc},
+			mockPrices:    map[ocr2types.Account]*big.Int{OpAcc: OpPrice, ArbAcc: ArbPrice},
+			errorAccounts: []ocr2types.Account{EthAcc},
 			want:          nil,
 			wantErr:       true,
 		},
