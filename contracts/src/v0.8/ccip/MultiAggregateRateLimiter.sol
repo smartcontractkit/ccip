@@ -24,7 +24,6 @@ contract MultiAggregateRateLimiter is IMessageInterceptor, AuthorizedCallers {
   using EnumerableSet for EnumerableSet.AddressSet;
 
   error PriceNotFoundForToken(address token);
-  error UpdateLengthMismatch();
   error ZeroChainSelectorNotAllowed();
 
   event RateLimiterConfigUpdated(uint64 indexed remoteChainSelector, bool isOutboundLane, RateLimiter.Config config);
