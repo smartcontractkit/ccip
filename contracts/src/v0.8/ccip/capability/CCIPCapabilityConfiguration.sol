@@ -93,8 +93,8 @@ contract CCIPCapabilityConfiguration is ITypeAndVersion, ICapabilityConfiguratio
     // NOTE: indexes matter here! The p2p ID at index i corresponds to the signer at index i and the transmitter at index i.
     // This is crucial in order to build the oracle ID <-> peer ID mapping offchain.
     bytes32[] p2pIds; // The P2P IDs of the oracles that are part of the role DON.
-    bytes32[] signers; // The onchain signing keys of nodes in the don.
-    bytes32[] transmitters; // The onchain transmitter keys of nodes in the don.
+    bytes[] signers; // The onchain signing keys of nodes in the don.
+    bytes[] transmitters; // The onchain transmitter keys of nodes in the don.
     bytes offchainConfig; // The offchain configuration for the OCR3 protocol. Protobuf encoded.
   }
 
