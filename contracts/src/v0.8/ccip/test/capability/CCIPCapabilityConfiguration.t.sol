@@ -245,7 +245,7 @@ contract CCIPCapabilityConfiguration_validateConfig is CCIPCapabilityConfigurati
     // Config is for 4 nodes, so f == 1.
     CCIPCapabilityConfiguration.OCR3Config memory config = CCIPCapabilityConfiguration.OCR3Config({
       pluginType: CCIPCapabilityConfiguration.PluginType.Commit,
-      offrampAddress: keccak256(abi.encode("offramp")),
+      offrampAddress: abi.encodePacked(keccak256(abi.encode("offramp"))),
       chainSelector: 1,
       bootstrapP2PIds: _subset(p2pIds, 0, 1),
       p2pIds: p2pIds,
@@ -266,7 +266,7 @@ contract CCIPCapabilityConfiguration_validateConfig is CCIPCapabilityConfigurati
     // Config is for 4 nodes, so f == 1.
     CCIPCapabilityConfiguration.OCR3Config memory config = CCIPCapabilityConfiguration.OCR3Config({
       pluginType: CCIPCapabilityConfiguration.PluginType.Commit,
-      offrampAddress: keccak256(abi.encode("offramp")),
+      offrampAddress: abi.encodePacked(keccak256(abi.encode("offramp"))),
       chainSelector: 0, // invalid
       bootstrapP2PIds: _subset(p2pIds, 0, 1),
       p2pIds: p2pIds,
@@ -287,7 +287,7 @@ contract CCIPCapabilityConfiguration_validateConfig is CCIPCapabilityConfigurati
     // Config is for 4 nodes, so f == 1.
     CCIPCapabilityConfiguration.OCR3Config memory config = CCIPCapabilityConfiguration.OCR3Config({
       pluginType: CCIPCapabilityConfiguration.PluginType.Commit,
-      offrampAddress: bytes32(uint256(0)), // invalid
+      offrampAddress: bytes(""), // invalid
       chainSelector: 1,
       bootstrapP2PIds: _subset(p2pIds, 0, 1),
       p2pIds: p2pIds,
@@ -308,7 +308,7 @@ contract CCIPCapabilityConfiguration_validateConfig is CCIPCapabilityConfigurati
     // Config is for 4 nodes, so f == 1.
     CCIPCapabilityConfiguration.OCR3Config memory config = CCIPCapabilityConfiguration.OCR3Config({
       pluginType: CCIPCapabilityConfiguration.PluginType.Commit,
-      offrampAddress: keccak256(abi.encode("offramp")),
+      offrampAddress: abi.encodePacked(keccak256(abi.encode("offramp"))),
       chainSelector: 2, // not set
       bootstrapP2PIds: _subset(p2pIds, 0, 1),
       p2pIds: p2pIds,
@@ -329,7 +329,7 @@ contract CCIPCapabilityConfiguration_validateConfig is CCIPCapabilityConfigurati
 
     CCIPCapabilityConfiguration.OCR3Config memory config = CCIPCapabilityConfiguration.OCR3Config({
       pluginType: CCIPCapabilityConfiguration.PluginType.Commit,
-      offrampAddress: keccak256(abi.encode("offramp")),
+      offrampAddress: abi.encodePacked(keccak256(abi.encode("offramp"))),
       chainSelector: 1,
       bootstrapP2PIds: _subset(p2pIds, 0, 1),
       p2pIds: p2pIds,
@@ -355,7 +355,7 @@ contract CCIPCapabilityConfiguration_validateConfig is CCIPCapabilityConfigurati
 
     CCIPCapabilityConfiguration.OCR3Config memory config = CCIPCapabilityConfiguration.OCR3Config({
       pluginType: CCIPCapabilityConfiguration.PluginType.Commit,
-      offrampAddress: keccak256(abi.encode("offramp")),
+      offrampAddress: abi.encodePacked(keccak256(abi.encode("offramp"))),
       chainSelector: 1,
       bootstrapP2PIds: _subset(p2pIds, 0, 1),
       p2pIds: p2pIds,
@@ -382,7 +382,7 @@ contract CCIPCapabilityConfiguration_validateConfig is CCIPCapabilityConfigurati
 
     CCIPCapabilityConfiguration.OCR3Config memory config = CCIPCapabilityConfiguration.OCR3Config({
       pluginType: CCIPCapabilityConfiguration.PluginType.Commit,
-      offrampAddress: keccak256(abi.encode("offramp")),
+      offrampAddress: abi.encodePacked(keccak256(abi.encode("offramp"))),
       chainSelector: 1,
       bootstrapP2PIds: _subset(p2pIds, 0, 1),
       p2pIds: p2pIds,
@@ -403,7 +403,7 @@ contract CCIPCapabilityConfiguration_validateConfig is CCIPCapabilityConfigurati
     // Config is for 4 nodes, so f == 1.
     CCIPCapabilityConfiguration.OCR3Config memory config = CCIPCapabilityConfiguration.OCR3Config({
       pluginType: CCIPCapabilityConfiguration.PluginType.Commit,
-      offrampAddress: keccak256(abi.encode("offramp")),
+      offrampAddress: abi.encodePacked(keccak256(abi.encode("offramp"))),
       chainSelector: 1,
       bootstrapP2PIds: _subset(p2pIds, 0, 1),
       p2pIds: p2pIds,
@@ -423,7 +423,7 @@ contract CCIPCapabilityConfiguration_validateConfig is CCIPCapabilityConfigurati
 
     CCIPCapabilityConfiguration.OCR3Config memory config = CCIPCapabilityConfiguration.OCR3Config({
       pluginType: CCIPCapabilityConfiguration.PluginType.Commit,
-      offrampAddress: keccak256(abi.encode("offramp")),
+      offrampAddress: abi.encodePacked(keccak256(abi.encode("offramp"))),
       chainSelector: 1,
       bootstrapP2PIds: _subset(p2pIds, 0, 1),
       p2pIds: p2pIds,
@@ -448,7 +448,7 @@ contract CCIPCapabilityConfiguration_validateConfig is CCIPCapabilityConfigurati
     // Config is for 4 nodes, so f == 1.
     CCIPCapabilityConfiguration.OCR3Config memory config = CCIPCapabilityConfiguration.OCR3Config({
       pluginType: CCIPCapabilityConfiguration.PluginType.Commit,
-      offrampAddress: keccak256(abi.encode("offramp")),
+      offrampAddress: abi.encodePacked(keccak256(abi.encode("offramp"))),
       chainSelector: 1,
       bootstrapP2PIds: _subset(p2pIds, 0, 1),
       p2pIds: p2pIds,
@@ -473,7 +473,7 @@ contract CCIPCapabilityConfiguration_validateConfig is CCIPCapabilityConfigurati
     // Config is for 4 nodes, so f == 1.
     CCIPCapabilityConfiguration.OCR3Config memory config = CCIPCapabilityConfiguration.OCR3Config({
       pluginType: CCIPCapabilityConfiguration.PluginType.Commit,
-      offrampAddress: keccak256(abi.encode("offramp")),
+      offrampAddress: abi.encodePacked(keccak256(abi.encode("offramp"))),
       chainSelector: 1,
       bootstrapP2PIds: _makeBytes32Array(5, 0), // too many bootstrap p2pIds, 5 > 4
       p2pIds: p2pIds,
@@ -510,7 +510,7 @@ contract CCIPCapabilityConfiguration_validateConfig is CCIPCapabilityConfigurati
     // Config is for 4 nodes, so f == 1.
     CCIPCapabilityConfiguration.OCR3Config memory config = CCIPCapabilityConfiguration.OCR3Config({
       pluginType: CCIPCapabilityConfiguration.PluginType.Commit,
-      offrampAddress: keccak256(abi.encode("offramp")),
+      offrampAddress: abi.encodePacked(keccak256(abi.encode("offramp"))),
       chainSelector: 1,
       bootstrapP2PIds: _subset(p2pIds, 0, 1),
       p2pIds: p2pIds,
@@ -567,7 +567,7 @@ contract CCIPCapabilityConfiguration_ConfigStateMachine is CCIPCapabilityConfigu
     bytes[] memory transmitters = _makeBytesArray(2, 20);
     CCIPCapabilityConfiguration.OCR3Config memory config = CCIPCapabilityConfiguration.OCR3Config({
       pluginType: CCIPCapabilityConfiguration.PluginType.Commit,
-      offrampAddress: keccak256(abi.encode("offramp")),
+      offrampAddress: abi.encodePacked(keccak256(abi.encode("offramp"))),
       chainSelector: 1,
       bootstrapP2PIds: _subset(p2pIds, 0, 1),
       p2pIds: p2pIds,
@@ -613,7 +613,7 @@ contract CCIPCapabilityConfiguration_ConfigStateMachine is CCIPCapabilityConfigu
     for (uint256 i = 0; i < numCommitCfgs; i++) {
       cfgs[i] = CCIPCapabilityConfiguration.OCR3Config({
         pluginType: CCIPCapabilityConfiguration.PluginType.Commit,
-        offrampAddress: keccak256(abi.encode("offramp")),
+        offrampAddress: abi.encodePacked(keccak256(abi.encode("offramp"))),
         chainSelector: 1,
         bootstrapP2PIds: _subset(p2pIds, 0, 1),
         p2pIds: p2pIds,
@@ -627,7 +627,7 @@ contract CCIPCapabilityConfiguration_ConfigStateMachine is CCIPCapabilityConfigu
     for (uint256 i = 0; i < numExecCfgs; i++) {
       cfgs[numCommitCfgs + i] = CCIPCapabilityConfiguration.OCR3Config({
         pluginType: CCIPCapabilityConfiguration.PluginType.Execution,
-        offrampAddress: keccak256(abi.encode("offramp")),
+        offrampAddress: abi.encodePacked(keccak256(abi.encode("offramp"))),
         chainSelector: 1,
         bootstrapP2PIds: _subset(p2pIds, 0, 1),
         p2pIds: p2pIds,
@@ -671,7 +671,7 @@ contract CCIPCapabilityConfiguration_ConfigStateMachine is CCIPCapabilityConfigu
     CCIPCapabilityConfiguration.OCR3Config[] memory newConfig = new CCIPCapabilityConfiguration.OCR3Config[](1);
     newConfig[0] = CCIPCapabilityConfiguration.OCR3Config({
       pluginType: CCIPCapabilityConfiguration.PluginType.Commit,
-      offrampAddress: keccak256(abi.encode("offramp")),
+      offrampAddress: abi.encodePacked(keccak256(abi.encode("offramp"))),
       chainSelector: 1,
       bootstrapP2PIds: _subset(p2pIds, 0, 1),
       p2pIds: p2pIds,
@@ -704,7 +704,7 @@ contract CCIPCapabilityConfiguration_ConfigStateMachine is CCIPCapabilityConfigu
     uint32 donId = 1;
     CCIPCapabilityConfiguration.OCR3Config memory blueConfig = CCIPCapabilityConfiguration.OCR3Config({
       pluginType: CCIPCapabilityConfiguration.PluginType.Commit,
-      offrampAddress: keccak256(abi.encode("offramp")),
+      offrampAddress: abi.encodePacked(keccak256(abi.encode("offramp"))),
       chainSelector: 1,
       bootstrapP2PIds: _subset(p2pIds, 0, 1),
       p2pIds: p2pIds,
@@ -716,7 +716,7 @@ contract CCIPCapabilityConfiguration_ConfigStateMachine is CCIPCapabilityConfigu
     });
     CCIPCapabilityConfiguration.OCR3Config memory greenConfig = CCIPCapabilityConfiguration.OCR3Config({
       pluginType: CCIPCapabilityConfiguration.PluginType.Commit,
-      offrampAddress: keccak256(abi.encode("offramp")),
+      offrampAddress: abi.encodePacked(keccak256(abi.encode("offramp"))),
       chainSelector: 1,
       bootstrapP2PIds: _subset(p2pIds, 0, 1),
       p2pIds: p2pIds,
@@ -783,7 +783,7 @@ contract CCIPCapabilityConfiguration_ConfigStateMachine is CCIPCapabilityConfigu
     uint32 donId = 1;
     CCIPCapabilityConfiguration.OCR3Config memory blueConfig = CCIPCapabilityConfiguration.OCR3Config({
       pluginType: CCIPCapabilityConfiguration.PluginType.Commit,
-      offrampAddress: keccak256(abi.encode("offramp")),
+      offrampAddress: abi.encodePacked(keccak256(abi.encode("offramp"))),
       chainSelector: 1,
       bootstrapP2PIds: _subset(p2pIds, 0, 1),
       p2pIds: p2pIds,
@@ -795,7 +795,7 @@ contract CCIPCapabilityConfiguration_ConfigStateMachine is CCIPCapabilityConfigu
     });
     CCIPCapabilityConfiguration.OCR3Config memory greenConfig = CCIPCapabilityConfiguration.OCR3Config({
       pluginType: CCIPCapabilityConfiguration.PluginType.Commit,
-      offrampAddress: keccak256(abi.encode("offramp")),
+      offrampAddress: abi.encodePacked(keccak256(abi.encode("offramp"))),
       chainSelector: 1,
       bootstrapP2PIds: _subset(p2pIds, 0, 1),
       p2pIds: p2pIds,
@@ -844,7 +844,7 @@ contract CCIPCapabilityConfiguration_ConfigStateMachine is CCIPCapabilityConfigu
     uint32 donId = 1;
     CCIPCapabilityConfiguration.OCR3Config memory blueConfig = CCIPCapabilityConfiguration.OCR3Config({
       pluginType: CCIPCapabilityConfiguration.PluginType.Commit,
-      offrampAddress: keccak256(abi.encode("offramp")),
+      offrampAddress: abi.encodePacked(keccak256(abi.encode("offramp"))),
       chainSelector: 1,
       bootstrapP2PIds: _subset(p2pIds, 0, 1),
       p2pIds: p2pIds,
@@ -873,7 +873,7 @@ contract CCIPCapabilityConfiguration_ConfigStateMachine is CCIPCapabilityConfigu
     uint32 donId = 1;
     CCIPCapabilityConfiguration.OCR3Config memory blueConfig = CCIPCapabilityConfiguration.OCR3Config({
       pluginType: CCIPCapabilityConfiguration.PluginType.Commit,
-      offrampAddress: keccak256(abi.encode("offramp")),
+      offrampAddress: abi.encodePacked(keccak256(abi.encode("offramp"))),
       chainSelector: 1,
       bootstrapP2PIds: _subset(p2pIds, 0, 1),
       p2pIds: p2pIds,
@@ -885,7 +885,7 @@ contract CCIPCapabilityConfiguration_ConfigStateMachine is CCIPCapabilityConfigu
     });
     CCIPCapabilityConfiguration.OCR3Config memory greenConfig = CCIPCapabilityConfiguration.OCR3Config({
       pluginType: CCIPCapabilityConfiguration.PluginType.Commit,
-      offrampAddress: keccak256(abi.encode("offramp")),
+      offrampAddress: abi.encodePacked(keccak256(abi.encode("offramp"))),
       chainSelector: 1,
       bootstrapP2PIds: _subset(p2pIds, 0, 1),
       p2pIds: p2pIds,
@@ -925,7 +925,7 @@ contract CCIPCapabilityConfiguration_ConfigStateMachine is CCIPCapabilityConfigu
     uint32 donId = 1;
     CCIPCapabilityConfiguration.OCR3Config memory blueConfig = CCIPCapabilityConfiguration.OCR3Config({
       pluginType: CCIPCapabilityConfiguration.PluginType.Commit,
-      offrampAddress: keccak256(abi.encode("offramp")),
+      offrampAddress: abi.encodePacked(keccak256(abi.encode("offramp"))),
       chainSelector: 1,
       bootstrapP2PIds: _subset(p2pIds, 0, 1),
       p2pIds: p2pIds,
@@ -937,7 +937,7 @@ contract CCIPCapabilityConfiguration_ConfigStateMachine is CCIPCapabilityConfigu
     });
     CCIPCapabilityConfiguration.OCR3Config memory greenConfig = CCIPCapabilityConfiguration.OCR3Config({
       pluginType: CCIPCapabilityConfiguration.PluginType.Commit,
-      offrampAddress: keccak256(abi.encode("offramp")),
+      offrampAddress: abi.encodePacked(keccak256(abi.encode("offramp"))),
       chainSelector: 1,
       bootstrapP2PIds: _subset(p2pIds, 0, 1),
       p2pIds: p2pIds,
@@ -988,7 +988,7 @@ contract CCIPCapabilityConfiguration_ConfigStateMachine is CCIPCapabilityConfigu
     for (uint256 i = 0; i < 3; i++) {
       cfgs[i] = CCIPCapabilityConfiguration.OCR3Config({
         pluginType: CCIPCapabilityConfiguration.PluginType.Commit,
-        offrampAddress: keccak256(abi.encode("offramp")),
+        offrampAddress: abi.encodePacked(keccak256(abi.encode("offramp"))),
         chainSelector: 1,
         bootstrapP2PIds: _subset(p2pIds, 0, 1),
         p2pIds: p2pIds,
@@ -1011,7 +1011,7 @@ contract CCIPCapabilityConfiguration_ConfigStateMachine is CCIPCapabilityConfigu
     for (uint256 i = 0; i < 3; i++) {
       cfgs[i] = CCIPCapabilityConfiguration.OCR3Config({
         pluginType: CCIPCapabilityConfiguration.PluginType.Execution,
-        offrampAddress: keccak256(abi.encode("offramp")),
+        offrampAddress: abi.encodePacked(keccak256(abi.encode("offramp"))),
         chainSelector: 1,
         bootstrapP2PIds: _subset(p2pIds, 0, 1),
         p2pIds: p2pIds,
@@ -1036,7 +1036,7 @@ contract CCIPCapabilityConfiguration_ConfigStateMachine is CCIPCapabilityConfigu
     uint32 donId = 1;
     CCIPCapabilityConfiguration.OCR3Config memory blueConfig = CCIPCapabilityConfiguration.OCR3Config({
       pluginType: CCIPCapabilityConfiguration.PluginType.Commit,
-      offrampAddress: keccak256(abi.encode("offramp")),
+      offrampAddress: abi.encodePacked(keccak256(abi.encode("offramp"))),
       chainSelector: 1,
       bootstrapP2PIds: _subset(_makeBytes32Array(4, 0), 0, 1),
       p2pIds: _makeBytes32Array(4, 0),
@@ -1065,7 +1065,7 @@ contract CCIPCapabilityConfiguration_ConfigStateMachine is CCIPCapabilityConfigu
     uint32 donId = 1;
     CCIPCapabilityConfiguration.OCR3Config memory blueConfig = CCIPCapabilityConfiguration.OCR3Config({
       pluginType: CCIPCapabilityConfiguration.PluginType.Commit,
-      offrampAddress: keccak256(abi.encode("offramp")),
+      offrampAddress: abi.encodePacked(keccak256(abi.encode("offramp"))),
       chainSelector: 1,
       bootstrapP2PIds: _subset(_makeBytes32Array(4, 0), 0, 1),
       p2pIds: _makeBytes32Array(4, 0),
@@ -1077,7 +1077,7 @@ contract CCIPCapabilityConfiguration_ConfigStateMachine is CCIPCapabilityConfigu
     });
     CCIPCapabilityConfiguration.OCR3Config memory greenConfig = CCIPCapabilityConfiguration.OCR3Config({
       pluginType: CCIPCapabilityConfiguration.PluginType.Commit,
-      offrampAddress: keccak256(abi.encode("offramp")),
+      offrampAddress: abi.encodePacked(keccak256(abi.encode("offramp"))),
       chainSelector: 1,
       bootstrapP2PIds: _subset(_makeBytes32Array(4, 0), 0, 1),
       p2pIds: _makeBytes32Array(4, 0),
@@ -1123,7 +1123,7 @@ contract CCIPCapabilityConfiguration_ConfigStateMachine is CCIPCapabilityConfigu
     uint32 donId = 1;
     CCIPCapabilityConfiguration.OCR3Config memory blueConfig = CCIPCapabilityConfiguration.OCR3Config({
       pluginType: CCIPCapabilityConfiguration.PluginType.Commit,
-      offrampAddress: keccak256(abi.encode("offramp")),
+      offrampAddress: abi.encodePacked(keccak256(abi.encode("offramp"))),
       chainSelector: 1,
       bootstrapP2PIds: _subset(_makeBytes32Array(4, 0), 0, 1),
       p2pIds: _makeBytes32Array(4, 0),
@@ -1135,7 +1135,7 @@ contract CCIPCapabilityConfiguration_ConfigStateMachine is CCIPCapabilityConfigu
     });
     CCIPCapabilityConfiguration.OCR3Config memory greenConfig = CCIPCapabilityConfiguration.OCR3Config({
       pluginType: CCIPCapabilityConfiguration.PluginType.Commit,
-      offrampAddress: keccak256(abi.encode("offramp")),
+      offrampAddress: abi.encodePacked(keccak256(abi.encode("offramp"))),
       chainSelector: 1,
       bootstrapP2PIds: _subset(_makeBytes32Array(4, 0), 0, 1),
       p2pIds: _makeBytes32Array(4, 0),
@@ -1175,7 +1175,7 @@ contract CCIPCapabilityConfiguration_ConfigStateMachine is CCIPCapabilityConfigu
     uint32 donId = 1;
     CCIPCapabilityConfiguration.OCR3Config memory blueConfig = CCIPCapabilityConfiguration.OCR3Config({
       pluginType: CCIPCapabilityConfiguration.PluginType.Commit,
-      offrampAddress: keccak256(abi.encode("offramp")),
+      offrampAddress: abi.encodePacked(keccak256(abi.encode("offramp"))),
       chainSelector: 1,
       bootstrapP2PIds: _subset(_makeBytes32Array(4, 0), 0, 1),
       p2pIds: _makeBytes32Array(4, 0),
@@ -1187,7 +1187,7 @@ contract CCIPCapabilityConfiguration_ConfigStateMachine is CCIPCapabilityConfigu
     });
     CCIPCapabilityConfiguration.OCR3Config memory greenConfig = CCIPCapabilityConfiguration.OCR3Config({
       pluginType: CCIPCapabilityConfiguration.PluginType.Commit,
-      offrampAddress: keccak256(abi.encode("offramp")),
+      offrampAddress: abi.encodePacked(keccak256(abi.encode("offramp"))),
       chainSelector: 1,
       bootstrapP2PIds: _subset(_makeBytes32Array(4, 0), 0, 1),
       p2pIds: _makeBytes32Array(4, 0),
@@ -1247,7 +1247,7 @@ contract CCIPCapabilityConfiguration__updatePluginConfig is CCIPCapabilityConfig
     uint32 donId = 1;
     CCIPCapabilityConfiguration.OCR3Config memory blueConfig = CCIPCapabilityConfiguration.OCR3Config({
       pluginType: CCIPCapabilityConfiguration.PluginType.Commit,
-      offrampAddress: keccak256(abi.encode("offramp")),
+      offrampAddress: abi.encodePacked(keccak256(abi.encode("offramp"))),
       chainSelector: 1,
       bootstrapP2PIds: _subset(p2pIds, 0, 1),
       p2pIds: p2pIds,
@@ -1277,7 +1277,7 @@ contract CCIPCapabilityConfiguration__updatePluginConfig is CCIPCapabilityConfig
     CCIPCapabilityConfiguration.PluginType pluginType = CCIPCapabilityConfiguration.PluginType.Commit;
     CCIPCapabilityConfiguration.OCR3Config memory blueConfig = CCIPCapabilityConfiguration.OCR3Config({
       pluginType: CCIPCapabilityConfiguration.PluginType.Commit,
-      offrampAddress: keccak256(abi.encode("offramp")),
+      offrampAddress: abi.encodePacked(keccak256(abi.encode("offramp"))),
       chainSelector: 1,
       bootstrapP2PIds: _subset(p2pIds, 0, 1),
       p2pIds: p2pIds,
@@ -1294,7 +1294,7 @@ contract CCIPCapabilityConfiguration__updatePluginConfig is CCIPCapabilityConfig
     s_ccipCC.updatePluginConfig(donId, CCIPCapabilityConfiguration.PluginType.Commit, startConfigs);
     CCIPCapabilityConfiguration.OCR3Config memory greenConfig = CCIPCapabilityConfiguration.OCR3Config({
       pluginType: CCIPCapabilityConfiguration.PluginType.Commit,
-      offrampAddress: keccak256(abi.encode("offramp")),
+      offrampAddress: abi.encodePacked(keccak256(abi.encode("offramp"))),
       chainSelector: 1,
       bootstrapP2PIds: _subset(p2pIds, 0, 1),
       p2pIds: p2pIds,
@@ -1337,7 +1337,7 @@ contract CCIPCapabilityConfiguration__updatePluginConfig is CCIPCapabilityConfig
     CCIPCapabilityConfiguration.PluginType pluginType = CCIPCapabilityConfiguration.PluginType.Commit;
     CCIPCapabilityConfiguration.OCR3Config memory blueConfig = CCIPCapabilityConfiguration.OCR3Config({
       pluginType: CCIPCapabilityConfiguration.PluginType.Commit,
-      offrampAddress: keccak256(abi.encode("offramp")),
+      offrampAddress: abi.encodePacked(keccak256(abi.encode("offramp"))),
       chainSelector: 1,
       bootstrapP2PIds: _subset(p2pIds, 0, 1),
       p2pIds: p2pIds,
@@ -1354,7 +1354,7 @@ contract CCIPCapabilityConfiguration__updatePluginConfig is CCIPCapabilityConfig
     s_ccipCC.updatePluginConfig(donId, CCIPCapabilityConfiguration.PluginType.Commit, startConfigs);
     CCIPCapabilityConfiguration.OCR3Config memory greenConfig = CCIPCapabilityConfiguration.OCR3Config({
       pluginType: CCIPCapabilityConfiguration.PluginType.Commit,
-      offrampAddress: keccak256(abi.encode("offramp")),
+      offrampAddress: abi.encodePacked(keccak256(abi.encode("offramp"))),
       chainSelector: 1,
       bootstrapP2PIds: _subset(p2pIds, 0, 1),
       p2pIds: p2pIds,
@@ -1441,7 +1441,7 @@ contract CCIPCapabilityConfiguration_beforeCapabilityConfigSet is CCIPCapability
     uint32 donId = 1;
     CCIPCapabilityConfiguration.OCR3Config memory blueConfig = CCIPCapabilityConfiguration.OCR3Config({
       pluginType: CCIPCapabilityConfiguration.PluginType.Commit,
-      offrampAddress: keccak256(abi.encode("offramp")),
+      offrampAddress: abi.encodePacked(keccak256(abi.encode("offramp"))),
       chainSelector: 1,
       bootstrapP2PIds: _subset(p2pIds, 0, 1),
       p2pIds: p2pIds,
@@ -1475,7 +1475,7 @@ contract CCIPCapabilityConfiguration_beforeCapabilityConfigSet is CCIPCapability
     uint32 donId = 1;
     CCIPCapabilityConfiguration.OCR3Config memory blueConfig = CCIPCapabilityConfiguration.OCR3Config({
       pluginType: CCIPCapabilityConfiguration.PluginType.Execution,
-      offrampAddress: keccak256(abi.encode("offramp")),
+      offrampAddress: abi.encodePacked(keccak256(abi.encode("offramp"))),
       chainSelector: 1,
       bootstrapP2PIds: _subset(p2pIds, 0, 1),
       p2pIds: p2pIds,
@@ -1509,7 +1509,7 @@ contract CCIPCapabilityConfiguration_beforeCapabilityConfigSet is CCIPCapability
     uint32 donId = 1;
     CCIPCapabilityConfiguration.OCR3Config memory blueCommitConfig = CCIPCapabilityConfiguration.OCR3Config({
       pluginType: CCIPCapabilityConfiguration.PluginType.Commit,
-      offrampAddress: keccak256(abi.encode("offramp")),
+      offrampAddress: abi.encodePacked(keccak256(abi.encode("offramp"))),
       chainSelector: 1,
       bootstrapP2PIds: _subset(p2pIds, 0, 1),
       p2pIds: p2pIds,
@@ -1521,7 +1521,7 @@ contract CCIPCapabilityConfiguration_beforeCapabilityConfigSet is CCIPCapability
     });
     CCIPCapabilityConfiguration.OCR3Config memory blueExecConfig = CCIPCapabilityConfiguration.OCR3Config({
       pluginType: CCIPCapabilityConfiguration.PluginType.Execution,
-      offrampAddress: keccak256(abi.encode("offramp")),
+      offrampAddress: abi.encodePacked(keccak256(abi.encode("offramp"))),
       chainSelector: 1,
       bootstrapP2PIds: _subset(p2pIds, 0, 1),
       p2pIds: p2pIds,

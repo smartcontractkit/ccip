@@ -89,7 +89,7 @@ contract CCIPCapabilityConfiguration is ITypeAndVersion, ICapabilityConfiguratio
     uint64 chainSelector; //          | The (remote) chain that the configuration is for.
     uint8 F; //                       | The "big F" parameter for the role DON.
     uint64 offchainConfigVersion; // ─╯ The version of the offchain configuration.
-    bytes32 offrampAddress; // The remote chain offramp address.
+    bytes offrampAddress; // The remote chain offramp address.
     bytes32[] bootstrapP2PIds; // The bootstrap P2P IDs of the oracles that are part of the role DON.
     // len(p2pIds) == len(signers) == len(transmitters) == 3 * F + 1
     // NOTE: indexes matter here! The p2p ID at index i corresponds to the signer at index i and the transmitter at index i.
@@ -378,7 +378,8 @@ contract CCIPCapabilityConfiguration is ITypeAndVersion, ICapabilityConfiguratio
       revert InvalidPluginType();
     }
 
-    if (cfg.offrampAddress == bytes32("")) {
+    // TODO: can we do more sophisticated validation than this?
+    if (cfg.offrampAddress.length == 0) {
       revert OfframpAddressCannotBeZero();
     }
 
