@@ -59,6 +59,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
   error InvalidStaticConfig(uint64 sourceChainSelector);
   error StaleCommitReport();
   error InvalidInterval(uint64 sourceChainSelector, Interval interval);
+  error ZeroAddressNotAllowed();
 
   /// @dev Atlas depends on this event, if changing, please notify Atlas.
   event StaticConfigSet(StaticConfig staticConfig);
@@ -181,8 +182,9 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
   uint64 private s_latestPriceSequenceNumber;
 
   constructor(StaticConfig memory staticConfig, SourceChainConfigArgs[] memory sourceChainConfigs) MultiOCR3Base() {
-    Internal._validateNonZeroAddress(staticConfig.rmnProxy);
-    Internal._validateNonZeroAddress(staticConfig.tokenAdminRegistry);
+    if (staticConfig.rmnProxy == address(0) || staticConfig.tokenAdminRegistry == address(0)) {
+      revert ZeroAddressNotAllowed();
+    }
 
     if (staticConfig.chainSelector == 0) {
       revert ZeroChainSelectorNotAllowed();
@@ -787,7 +789,9 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
         revert ZeroChainSelectorNotAllowed();
       }
 
-      Internal._validateNonZeroAddress(sourceConfigUpdate.onRamp);
+      if (sourceConfigUpdate.onRamp == address(0)) {
+        revert ZeroAddressNotAllowed();
+      }
 
       SourceChainConfig storage currentConfig = s_sourceChainConfigs[sourceChainSelector];
 
@@ -814,8 +818,9 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
 
   /// @notice Sets the dynamic config.
   function setDynamicConfig(DynamicConfig memory dynamicConfig) external onlyOwner {
-    Internal._validateNonZeroAddress(dynamicConfig.priceRegistry);
-    Internal._validateNonZeroAddress(dynamicConfig.router);
+    if (dynamicConfig.priceRegistry == address(0) || dynamicConfig.router == address(0)) {
+      revert ZeroAddressNotAllowed();
+    }
 
     s_dynamicConfig = dynamicConfig;
 

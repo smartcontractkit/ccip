@@ -157,7 +157,7 @@ contract EVM2EVMMultiOffRamp_constructor is EVM2EVMMultiOffRampSetup {
       onRamp: address(0)
     });
 
-    vm.expectRevert(Internal.ZeroAddressNotAllowed.selector);
+    vm.expectRevert(EVM2EVMMultiOffRamp.ZeroAddressNotAllowed.selector);
 
     s_offRamp = new EVM2EVMMultiOffRampHelper(
       EVM2EVMMultiOffRamp.StaticConfig({
@@ -201,7 +201,7 @@ contract EVM2EVMMultiOffRamp_constructor is EVM2EVMMultiOffRampSetup {
     EVM2EVMMultiOffRamp.SourceChainConfigArgs[] memory sourceChainConfigs =
       new EVM2EVMMultiOffRamp.SourceChainConfigArgs[](0);
 
-    vm.expectRevert(Internal.ZeroAddressNotAllowed.selector);
+    vm.expectRevert(EVM2EVMMultiOffRamp.ZeroAddressNotAllowed.selector);
 
     s_offRamp = new EVM2EVMMultiOffRampHelper(
       EVM2EVMMultiOffRamp.StaticConfig({
@@ -239,7 +239,7 @@ contract EVM2EVMMultiOffRamp_constructor is EVM2EVMMultiOffRampSetup {
     EVM2EVMMultiOffRamp.SourceChainConfigArgs[] memory sourceChainConfigs =
       new EVM2EVMMultiOffRamp.SourceChainConfigArgs[](0);
 
-    vm.expectRevert(Internal.ZeroAddressNotAllowed.selector);
+    vm.expectRevert(EVM2EVMMultiOffRamp.ZeroAddressNotAllowed.selector);
 
     s_offRamp = new EVM2EVMMultiOffRampHelper(
       EVM2EVMMultiOffRamp.StaticConfig({
@@ -296,7 +296,7 @@ contract EVM2EVMMultiOffRamp_setDynamicConfig is EVM2EVMMultiOffRampSetup {
     EVM2EVMMultiOffRamp.DynamicConfig memory dynamicConfig =
       _generateDynamicMultiOffRampConfig(ZERO_ADDRESS, address(s_priceRegistry));
 
-    vm.expectRevert(Internal.ZeroAddressNotAllowed.selector);
+    vm.expectRevert(EVM2EVMMultiOffRamp.ZeroAddressNotAllowed.selector);
 
     s_offRamp.setDynamicConfig(dynamicConfig);
   }
@@ -304,7 +304,7 @@ contract EVM2EVMMultiOffRamp_setDynamicConfig is EVM2EVMMultiOffRampSetup {
   function test_PriceRegistryZeroAddress_Revert() public {
     EVM2EVMMultiOffRamp.DynamicConfig memory dynamicConfig = _generateDynamicMultiOffRampConfig(USER_3, ZERO_ADDRESS);
 
-    vm.expectRevert(Internal.ZeroAddressNotAllowed.selector);
+    vm.expectRevert(EVM2EVMMultiOffRamp.ZeroAddressNotAllowed.selector);
 
     s_offRamp.setDynamicConfig(dynamicConfig);
   }
@@ -3059,7 +3059,7 @@ contract EVM2EVMMultiOffRamp_applySourceChainConfigUpdates is EVM2EVMMultiOffRam
       onRamp: address(0)
     });
 
-    vm.expectRevert(Internal.ZeroAddressNotAllowed.selector);
+    vm.expectRevert(EVM2EVMMultiOffRamp.ZeroAddressNotAllowed.selector);
     s_offRamp.applySourceChainConfigUpdates(sourceChainConfigs);
   }
 
