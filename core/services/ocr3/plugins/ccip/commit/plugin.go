@@ -12,6 +12,7 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	"github.com/smartcontractkit/ccipocr3/internal/libs/slicelib"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
@@ -99,30 +100,11 @@ func (p *Plugin) Observation(ctx context.Context, outctx ocr3types.OutcomeContex
 		return types.Observation{}, fmt.Errorf("oracle ID %d not found in oracleIDToP2pID", p.nodeID)
 	}
 	supportedChains := homeChainConfig.GetSupportedChains(p2pID)
-	maxSeqNumsPerChain, err := observeMaxSeqNums(
-		ctx,
-		p.lggr,
-		p.ccipReader,
-		outctx.PreviousOutcome,
-		supportedChains,
-		p.cfg.DestChain,
-		p.knownSourceChainsSlice(),
-	)
-	if err != nil {
-		return types.Observation{}, fmt.Errorf("observe max sequence numbers per chain: %w", err)
-	}
 
-	newMsgs, err := observeNewMsgs(
-		ctx,
-		p.lggr,
-		p.ccipReader,
-		p.msgHasher,
-		supportedChains,
-		maxSeqNumsPerChain,
-		p.cfg.NewMsgScanBatchSize,
-	)
+	msgBaseDetails := make([]cciptypes.CCIPMsgBaseDetails, 0)
+	latestCommittedSeqNumsObservation, err := observeLatestCommittedSeqNums(ctx, p.lggr, p.ccipReader, supportedChains, p.cfg.DestChain, p.knownSourceChainsSlice())
 	if err != nil {
-		return types.Observation{}, fmt.Errorf("observe new messages: %w", err)
+		return types.Observation{}, fmt.Errorf("observe latest committed sequence numbers: %w", err)
 	}
 
 	var tokenPrices []cciptypes.TokenPrice
@@ -143,25 +125,50 @@ func (p *Plugin) Observation(ctx context.Context, outctx ocr3types.OutcomeContex
 	if err != nil {
 		return types.Observation{}, fmt.Errorf("observe gas prices: %w", err)
 	}
-
-	p.lggr.Infow("submitting observation",
-		"observedNewMsgs", len(newMsgs),
-		"gasPrices", len(gasPrices),
-		"tokenPrices", len(tokenPrices),
-		"maxSeqNumsPerChain", maxSeqNumsPerChain,
-		"nodeSupportedChains", homeChainConfig.NodeSupportedChains)
-
-	msgBaseDetails := make([]cciptypes.CCIPMsgBaseDetails, 0)
-	for _, msg := range newMsgs {
-		msgBaseDetails = append(msgBaseDetails, msg.CCIPMsgBaseDetails)
-	}
-
 	consensusObservation := cciptypes.ConsensusObservation{
 		FChain:              homeChainConfig.FChain,
 		PricedTokens:        p.cfg.PricedTokens,
 		NodeSupportedChains: homeChainConfig.NodeSupportedChains,
 	}
-	return cciptypes.NewCommitPluginObservation(msgBaseDetails, gasPrices, tokenPrices, maxSeqNumsPerChain, consensusObservation).Encode()
+	// If there's no previous outcome (first round ever), we only observe the latest committed sequence numbers.
+	// and on the next round we use those to look for messages.
+	if outctx.PreviousOutcome == nil {
+		p.lggr.Debugw("first round ever, can't observe new messages yet")
+		return cciptypes.NewCommitPluginObservation(msgBaseDetails, gasPrices, tokenPrices, latestCommittedSeqNumsObservation, consensusObservation).Encode()
+	}
+
+	prevOutcome, err := cciptypes.DecodeCommitPluginOutcome(outctx.PreviousOutcome)
+	if err != nil {
+		return types.Observation{}, fmt.Errorf("decode commit plugin previous outcome: %w", err)
+	}
+	p.lggr.Debugw("previous outcome decoded", "outcome", prevOutcome.String())
+
+	// Always observe based on previous outcome. We'll filter out stale messages in the outcome phase.
+	newMsgs, err := observeNewMsgs(
+		ctx,
+		p.lggr,
+		p.ccipReader,
+		p.msgHasher,
+		supportedChains,
+		prevOutcome.MaxSeqNums, // TODO: Chainlink common PR to rename.
+		p.cfg.NewMsgScanBatchSize,
+	)
+	if err != nil {
+		return types.Observation{}, fmt.Errorf("observe new messages: %w", err)
+	}
+
+	p.lggr.Infow("submitting observation",
+		"observedNewMsgs", len(newMsgs),
+		"gasPrices", len(gasPrices),
+		"tokenPrices", len(tokenPrices),
+		"latestCommittedSeqNums", latestCommittedSeqNumsObservation,
+		"nodeSupportedChains", homeChainConfig.NodeSupportedChains)
+
+	for _, msg := range newMsgs {
+		msgBaseDetails = append(msgBaseDetails, msg.CCIPMsgBaseDetails)
+	}
+
+	return cciptypes.NewCommitPluginObservation(msgBaseDetails, gasPrices, tokenPrices, latestCommittedSeqNumsObservation, consensusObservation).Encode()
 
 }
 
@@ -182,7 +189,7 @@ func (p *Plugin) ValidateObservation(_ ocr3types.OutcomeContext, _ types.Query, 
 		return fmt.Errorf("oracle ID %d not found in oracleIDToP2pID", ao.Observer)
 	}
 
-	if err := validateObserverReadingEligibility(p2pID, obs.NewMsgs, homeChainConfig.NodeSupportedChains); err != nil {
+	if err := validateObserverReadingEligibility(p2pID, obs.NewMsgs, obs.MaxSeqNums, homeChainConfig.NodeSupportedChains, p.cfg.DestChain); err != nil {
 		return fmt.Errorf("validate observer %d reading eligibility: %w", ao.Observer, err)
 	}
 
@@ -316,7 +323,7 @@ func (p *Plugin) ShouldTransmitAcceptedReport(ctx context.Context, u uint64, r o
 		"gasPriceUpdates", len(decodedReport.PriceUpdates.GasPriceUpdates),
 	)
 
-	// todo: if report is stale -> do not transmit
+	// todo: if report is stale -> do not transmit (check the spec for the exact condition)
 	return true, nil
 }
 
@@ -328,7 +335,6 @@ func (p *Plugin) Close() error {
 	if err := p.ccipReader.Close(ctx); err != nil {
 		return fmt.Errorf("close ccip reader: %w", err)
 	}
-
 	return nil
 }
 

@@ -6,6 +6,10 @@ import (
 	"testing"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+	"github.com/stretchr/testify/require"
+
+	"github.com/stretchr/testify/assert"
+
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/stretchr/testify/mock"
 
@@ -14,7 +18,6 @@ import (
 	"github.com/smartcontractkit/ccipocr3/internal/mocks"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
-	"github.com/stretchr/testify/assert"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 )
@@ -30,6 +33,7 @@ func TestPlugin(t *testing.T) {
 		expErr                func(*testing.T, error)
 		expOutcome            cciptypes.CommitPluginOutcome
 		expTransmittedReports []cciptypes.CommitPluginReport
+		initialOutcome        cciptypes.CommitPluginOutcome
 	}{
 		{
 			name:        "EmptyOutcome",
@@ -61,7 +65,7 @@ func TestPlugin(t *testing.T) {
 					MerkleRoots: []cciptypes.MerkleRootChain{
 						{ChainSel: chainB, SeqNumsRange: cciptypes.NewSeqNumRange(21, 22)},
 					},
-					PriceUpdates: cciptypes.PriceUpdate{
+					PriceUpdates: cciptypes.PriceUpdates{
 						TokenPriceUpdates: []cciptypes.TokenPrice{},
 						GasPriceUpdates: []cciptypes.GasPriceChain{
 							{ChainSel: chainA, GasPrice: cciptypes.NewBigIntFromInt64(1000)},
@@ -69,6 +73,15 @@ func TestPlugin(t *testing.T) {
 						},
 					},
 				},
+			},
+			initialOutcome: cciptypes.CommitPluginOutcome{
+				MaxSeqNums: []cciptypes.SeqNumChain{
+					{ChainSel: chainA, SeqNum: 10},
+					{ChainSel: chainB, SeqNum: 20},
+				},
+				MerkleRoots: []cciptypes.MerkleRootChain{},
+				TokenPrices: []cciptypes.TokenPrice{},
+				GasPrices:   []cciptypes.GasPriceChain{},
 			},
 		},
 		{
@@ -90,7 +103,7 @@ func TestPlugin(t *testing.T) {
 			expTransmittedReports: []cciptypes.CommitPluginReport{
 				{
 					MerkleRoots: []cciptypes.MerkleRootChain{},
-					PriceUpdates: cciptypes.PriceUpdate{
+					PriceUpdates: cciptypes.PriceUpdates{
 						TokenPriceUpdates: []cciptypes.TokenPrice{},
 						GasPriceUpdates: []cciptypes.GasPriceChain{
 							{ChainSel: chainA, GasPrice: cciptypes.NewBigIntFromInt64(1000)},
@@ -98,6 +111,15 @@ func TestPlugin(t *testing.T) {
 						},
 					},
 				},
+			},
+			initialOutcome: cciptypes.CommitPluginOutcome{
+				MaxSeqNums: []cciptypes.SeqNumChain{
+					{ChainSel: chainA, SeqNum: 10},
+					{ChainSel: chainB, SeqNum: 20},
+				},
+				MerkleRoots: []cciptypes.MerkleRootChain{},
+				TokenPrices: []cciptypes.TokenPrice{},
+				GasPrices:   []cciptypes.GasPriceChain{},
 			},
 		},
 	}
@@ -119,7 +141,9 @@ func TestPlugin(t *testing.T) {
 			for _, n := range nodesSetup {
 				nodeIDs = append(nodeIDs, n.node.nodeID)
 			}
-			runner := testhelpers.NewOCR3Runner(nodes, nodeIDs)
+			o, err := tc.initialOutcome.Encode()
+			require.NoError(t, err)
+			runner := testhelpers.NewOCR3Runner(nodes, nodeIDs, o)
 
 			res, err := runner.RunRound(ctx)
 			if tc.expErr != nil {
@@ -205,10 +229,6 @@ func setupAllNodesReadAllChains(ctx context.Context, t *testing.T, lggr logger.L
 	nodes := []nodeSetup{n1, n2, n3}
 
 	for _, n := range nodes {
-		// all nodes observe the same sequence numbers 10 for chainA and 20 for chainB
-		n.ccipReader.On("NextSeqNum", ctx, []cciptypes.ChainSelector{chainA, chainB}).
-			Return([]cciptypes.SeqNum{10, 20}, nil)
-
 		// then they fetch new msgs, there is nothing new on chainA
 		n.ccipReader.On(
 			"MsgsBetweenSeqNums",
@@ -233,6 +253,11 @@ func setupAllNodesReadAllChains(ctx context.Context, t *testing.T, lggr logger.L
 				cciptypes.NewBigIntFromInt64(1000),
 				cciptypes.NewBigIntFromInt64(20_000),
 			}, nil)
+
+		// all nodes observe the same sequence numbers 10 for chainA and 20 for chainB
+		n.ccipReader.On("NextSeqNum", ctx, []cciptypes.ChainSelector{chainA, chainB}).
+			Return([]cciptypes.SeqNum{10, 20}, nil)
+
 	}
 
 	return nodes
@@ -344,7 +369,7 @@ func newNode(ctx context.Context, t *testing.T, lggr logger.Logger, id int, cfg 
 func GetP2pIDs(ids ...int) map[commontypes.OracleID]cciptypes.P2PID {
 	res := make(map[commontypes.OracleID]cciptypes.P2PID)
 	for _, id := range ids {
-		res[commontypes.OracleID(id)] = cciptypes.GetP2pId(id)
+		res[commontypes.OracleID(id)] = cciptypes.GetP2pID(id)
 	}
 	return res
 }
