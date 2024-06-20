@@ -15,10 +15,21 @@ from typing import Dict, List, Set
 type ChainSelector = int
 type SequenceNumber = int
 
-class ExecutePluginCommitData:
+class CCIPMsg:
     pass
 
-class CCIPMsg:
+class SeqNumRange:
+    start: int
+    end: int
+
+class ExecutePluginCommitData:
+    root: [32]byte
+    range: SeqNumRange
+    pass
+
+class ExecutePluginCommitDataWithMessages:
+    data: ExecutePluginCommitData
+    messages: List[CCIPMsg]
     pass
 
 class ExecuteObservation:
@@ -140,9 +151,13 @@ class ExecutePlugin:
         return [encoded]
 
     def should_accept(self, report):
+        """ocr2 logic checks has two main checks:
+            * dest chain is healthy
+            * reads the first report to see if it is executed/stale"""
         pass
 
     def should_transmit(self, report):
+        """very similar to should_accept"""
         pass
 
     def keep_cfg_in_sync(self):
