@@ -25,6 +25,7 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana"
 	solcfg "github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	stkcfg "github.com/smartcontractkit/chainlink-starknet/relayer/pkg/chainlink/config"
+
 	commonconfig "github.com/smartcontractkit/chainlink/v2/common/config"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets"
 
@@ -571,9 +572,11 @@ func TestConfig_Marshal(t *testing.T) {
 				},
 
 				HeadTracker: evmcfg.HeadTracker{
-					HistoryDepth:     ptr[uint32](15),
-					MaxBufferSize:    ptr[uint32](17),
-					SamplingInterval: &hour,
+					HistoryDepth:            ptr[uint32](15),
+					MaxBufferSize:           ptr[uint32](17),
+					SamplingInterval:        &hour,
+					FinalityTagBypass:       ptr[bool](false),
+					MaxAllowedFinalityDepth: ptr[uint32](1500),
 				},
 
 				NodePool: evmcfg.NodePool{
@@ -1031,6 +1034,8 @@ TransactionPercentile = 15
 HistoryDepth = 15
 MaxBufferSize = 17
 SamplingInterval = '1h0m0s'
+MaxAllowedFinalityDepth = 1500
+FinalityTagBypass = false
 
 [[EVM.KeySpecific]]
 Key = '0x2a3e23c6f242F5345320814aC8a1b4E58707D292'
@@ -1263,7 +1268,7 @@ func TestConfig_Validate(t *testing.T) {
 					- WSURL: missing: required for primary nodes
 					- HTTPURL: missing: required for all nodes
 				- 1.HTTPURL: missing: required for all nodes
-		- 1: 6 errors:
+		- 1: 7 errors:
 			- ChainType: invalid value (Foo): must not be set with this chain id
 			- Nodes: missing: must have at least one node
 			- ChainType: invalid value (Foo): must be one of arbitrum, celo, gnosis, kroma, metis, optimismBedrock, scroll, wemix, xlayer, zksync or omitted
@@ -1271,6 +1276,7 @@ func TestConfig_Validate(t *testing.T) {
 			- GasEstimator: 2 errors:
 				- FeeCapDefault: invalid value (101 wei): must be equal to PriceMax (99 wei) since you are using FixedPrice estimation with gas bumping disabled in EIP1559 mode - PriceMax will be used as the FeeCap for transactions instead of FeeCapDefault
 				- PriceMax: invalid value (1 gwei): must be greater than or equal to PriceDefault
+			- HeadTracker.MaxAllowedFinalityDepth: invalid value (0): must be greater than or equal to 1
 			- KeySpecific.Key: invalid value (0xde709f2102306220921060314715629080e2fb77): duplicate - must be unique
 		- 2: 5 errors:
 			- ChainType: invalid value (Arbitrum): only "optimismBedrock" can be used with this chain id
