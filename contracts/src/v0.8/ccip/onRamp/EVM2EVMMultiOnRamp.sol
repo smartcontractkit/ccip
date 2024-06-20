@@ -5,17 +5,17 @@ import {ITypeAndVersion} from "../../shared/interfaces/ITypeAndVersion.sol";
 import {IEVM2AnyMultiOnRamp} from "../interfaces/IEVM2AnyMultiOnRamp.sol";
 import {IEVM2AnyOnRamp} from "../interfaces/IEVM2AnyOnRamp.sol";
 import {IEVM2AnyOnRampClient} from "../interfaces/IEVM2AnyOnRampClient.sol";
+import {IMessageInterceptor} from "../interfaces/IMessageInterceptor.sol";
 import {IPool} from "../interfaces/IPool.sol";
 import {IPriceRegistry} from "../interfaces/IPriceRegistry.sol";
 import {IRMN} from "../interfaces/IRMN.sol";
 import {ITokenAdminRegistry} from "../interfaces/ITokenAdminRegistry.sol";
 import {ILinkAvailable} from "../interfaces/automation/ILinkAvailable.sol";
 
-import {AggregateRateLimiter} from "../AggregateRateLimiter.sol";
+import {OwnerIsCreator} from "../../shared/access/OwnerIsCreator.sol";
 import {Client} from "../libraries/Client.sol";
 import {Internal} from "../libraries/Internal.sol";
 import {Pool} from "../libraries/Pool.sol";
-import {RateLimiter} from "../libraries/RateLimiter.sol";
 import {USDPriceWith18Decimals} from "../libraries/USDPriceWith18Decimals.sol";
 
 import {IERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
@@ -26,11 +26,12 @@ import {EnumerableMap} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts
 /// bridgeable token support.
 /// @dev The EVM2EVMMultiOnRamp, MultiCommitStore and EVM2EVMMultiOffRamp form an xchain upgradeable unit. Any change to one of them
 /// results an onchain upgrade of all 3.
-contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ILinkAvailable, AggregateRateLimiter, ITypeAndVersion {
+contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ILinkAvailable, ITypeAndVersion, OwnerIsCreator {
   using SafeERC20 for IERC20;
   using EnumerableMap for EnumerableMap.AddressToUintMap;
   using USDPriceWith18Decimals for uint224;
 
+  error CannotSendZeroTokens();
   error InvalidExtraArgsTag();
   error OnlyCallableByOwnerOrAdmin();
   error OnlyCallableByOwnerOrAdminOrNop();
@@ -51,7 +52,6 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ILinkAvailable, AggregateRat
   error LinkBalanceNotSettled();
   error InvalidNopAddress(address nop);
   error NotAFeeToken(address token);
-  error CannotSendZeroTokens();
   error SourceTokenDataTooLarge(address token);
   error InvalidChainSelector(uint64 chainSelector);
   error GetSupportedTokensFunctionalityRemovedCheckAdminRegistry();
@@ -59,6 +59,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ILinkAvailable, AggregateRat
   error DestinationChainNotEnabled(uint64 destChainSelector);
   error InvalidDestBytesOverhead(address token, uint32 destBytesOverhead);
 
+  event AdminSet(address newAdmin);
   event ConfigSet(StaticConfig staticConfig, DynamicConfig dynamicConfig);
   event NopPaid(address indexed nop, uint256 amount);
   event PremiumMultiplierWeiPerEthUpdated(address indexed token, uint64 premiumMultiplierWeiPerEth);
@@ -88,6 +89,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ILinkAvailable, AggregateRat
   struct DynamicConfig {
     address router; // Router address
     address priceRegistry; // Price registry address
+    address messageValidator; // Optional message validator to validate incoming messages (zero address = no validator)
   }
 
   /// @dev Struct to hold the fee token configuration for a token, same as the s_premiumMultiplierWeiPerEth but with
@@ -106,7 +108,6 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ILinkAvailable, AggregateRat
     uint32 destGasOverhead; //          │ Gas charged to execute the token transfer on the destination chain
     //                                  │ Extra data availability bytes that are returned from the source pool and sent
     uint32 destBytesOverhead; //        │ to the destination pool. Must be >= Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES
-    bool aggregateRateLimitEnabled; //  │ Whether this transfer token is to be included in Aggregate Rate Limiting
     bool isEnabled; // ─────────────────╯ Whether this token has custom transfer fees
   }
 
@@ -217,6 +218,8 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ILinkAvailable, AggregateRat
   /// The offramp has a corresponding s_senderNonce mapping to ensure messages
   /// are executed in the same order they are sent.
   mapping(uint64 destChainSelector => mapping(address sender => uint64 nonce)) internal s_senderNonce;
+  /// @dev The address of the token limit admin that has the same permissions as the owner.
+  address internal s_admin;
   /// @dev The amount of LINK available to pay NOPS
   uint96 internal s_nopFeesJuels;
   /// @dev The combined weight of all NOPs weights
@@ -226,11 +229,10 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ILinkAvailable, AggregateRat
     StaticConfig memory staticConfig,
     DynamicConfig memory dynamicConfig,
     DestChainConfigArgs[] memory destChainConfigArgs,
-    RateLimiter.Config memory rateLimiterConfig,
     PremiumMultiplierWeiPerEthArgs[] memory premiumMultiplierWeiPerEthArgs,
     TokenTransferFeeConfigArgs[] memory tokenTransferFeeConfigArgs,
     NopAndWeight[] memory nopsAndWeights
-  ) AggregateRateLimiter(rateLimiterConfig) {
+  ) {
     if (
       staticConfig.linkToken == address(0) || staticConfig.chainSelector == 0 || staticConfig.rmnProxy == address(0)
         || staticConfig.tokenAdminRegistry == address(0)
@@ -290,6 +292,9 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ILinkAvailable, AggregateRat
     // There should be no state changes after external call to TokenPools.
     for (uint256 i = 0; i < newMessage.tokenAmounts.length; ++i) {
       Client.EVMTokenAmount memory tokenAndAmount = message.tokenAmounts[i];
+
+      if (tokenAndAmount.amount == 0) revert CannotSendZeroTokens();
+
       IPool sourcePool = getPoolBySourceToken(destChainSelector, IERC20(tokenAndAmount.token));
       // We don't have to check if it supports the pool version in a non-reverting way here because
       // if we revert here, there is no effect on CCIP. Therefore we directly call the supportsInterface
@@ -369,15 +374,13 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ILinkAvailable, AggregateRat
 
     // Only check token value if there are tokens
     if (numberOfTokens > 0) {
-      uint256 value;
-      for (uint256 i = 0; i < numberOfTokens; ++i) {
-        if (message.tokenAmounts[i].amount == 0) revert CannotSendZeroTokens();
-        if (s_tokenTransferFeeConfig[destChainSelector][message.tokenAmounts[i].token].aggregateRateLimitEnabled) {
-          value += _getTokenValue(message.tokenAmounts[i], IPriceRegistry(s_dynamicConfig.priceRegistry));
+      address messageValidator = s_dynamicConfig.messageValidator;
+      if (messageValidator != address(0)) {
+        try IMessageInterceptor(s_dynamicConfig.messageValidator).onOutgoingMessage(destChainSelector, message) {}
+        catch (bytes memory err) {
+          revert IMessageInterceptor.MessageValidationError(err);
         }
       }
-      // Rate limit on aggregated token value
-      if (value > 0) _rateLimitValue(value);
     }
 
     // Convert feeToken to link if not already in link
@@ -911,7 +914,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ILinkAvailable, AggregateRat
   /// of the weight of all nops. Since nop weights are uint16s and we can have at
   /// most MAX_NUMBER_OF_NOPS NOPs, the highest possible value is 2**22 or 0.04 gjuels.
   function payNops() public {
-    if (msg.sender != owner() && msg.sender != s_admin && !s_nops.contains(msg.sender)) {
+    if (msg.sender != owner() && !s_nops.contains(msg.sender)) {
       revert OnlyCallableByOwnerOrAdminOrNop();
     }
     uint256 weightsTotal = s_nopWeightsTotal;
@@ -972,6 +975,15 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ILinkAvailable, AggregateRat
   // ================================================================
   // │                           Access                             │
   // ================================================================
+
+  /// @notice Sets the token limit admin address.
+  /// @param newAdmin the address of the new admin.
+  /// @dev setting this to address(0) indicates there is no active admin.
+  function setAdmin(address newAdmin) external {
+    _onlyOwnerOrAdmin();
+    s_admin = newAdmin;
+    emit AdminSet(newAdmin);
+  }
 
   /// @dev Require that the sender is the owner or the fee admin
   /// Not a modifier to save on contract size
