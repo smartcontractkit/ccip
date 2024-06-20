@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"sync"
-	"time"
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
@@ -113,8 +112,9 @@ func (rf *ExecutionReportingPluginFactory) NewReportingPluginFn(config types.Rep
 		}
 
 		msgVisibilityInterval := offchainConfig.MessageVisibilityInterval.Duration()
-		if msgVisibilityInterval < MinimumMessageVisibilityInterval {
-			msgVisibilityInterval = rf.msgVisibilityIntervalFallbackValue(onchainConfig.PermissionLessExecutionThresholdSeconds)
+		if msgVisibilityInterval.Seconds() == 0 {
+			rf.config.lggr.Info("MessageVisibilityInterval not set, falling back to PermissionLessExecutionThreshold")
+			msgVisibilityInterval = onchainConfig.PermissionLessExecutionThresholdSeconds
 		}
 		rf.config.lggr.Infof("MessageVisibilityInterval set to: %s", msgVisibilityInterval)
 
@@ -155,18 +155,3 @@ func (rf *ExecutionReportingPluginFactory) NewReportingPluginFn(config types.Rep
 		return reportingPluginAndInfo{plugin, pluginInfo}, nil
 	}
 }
-
-func (rf *ExecutionReportingPluginFactory) msgVisibilityIntervalFallbackValue(permissionlessExecThreshold time.Duration) time.Duration {
-	rf.config.lggr.Info("MessageVisibilityInterval not set, falling back to PermissionLessExecutionThreshold")
-
-	if permissionlessExecThreshold < MinimumMessageVisibilityInterval {
-		rf.config.lggr.Warnf("PermissionLessExecutionThresholdSeconds is less than MinimumMessageVisibilityInterval, using MinimumMessageVisibilityInterval")
-		return MinimumMessageVisibilityInterval
-	}
-
-	return permissionlessExecThreshold
-}
-
-// MinimumMessageVisibilityInterval defines the minimum time that a message MUST be visible before plugins ignores it.
-// This prevents any kind of wrong configuration that would lead to messages not being seen by the plugins.
-var MinimumMessageVisibilityInterval = 4 * time.Hour
