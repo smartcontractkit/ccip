@@ -413,6 +413,30 @@ contract CCIPCapabilityConfiguration_validateConfig is CCIPCapabilityConfigurati
     s_ccipCC.validateConfig(config);
   }
 
+  function test__validateConfig_P2PIdsLengthNotMatching_Reverts() public {
+    (bytes32[] memory p2pIds, bytes32[] memory signers, bytes32[] memory transmitters) = _addChainConfig(4);
+    // truncate the p2pIds length
+    assembly {
+      mstore(p2pIds, 3)
+    }
+
+    // Config is for 4 nodes, so f == 1.
+    CCIPCapabilityConfiguration.OCR3Config memory config = CCIPCapabilityConfiguration.OCR3Config({
+      pluginType: CCIPCapabilityConfiguration.PluginType.Commit,
+      offrampAddress: keccak256(abi.encode("offramp")),
+      chainSelector: 1,
+      p2pIds: p2pIds,
+      signers: signers,
+      transmitters: transmitters,
+      F: 1,
+      offchainConfigVersion: 30,
+      offchainConfig: bytes("offchainConfig")
+    });
+
+    vm.expectRevert(abi.encodeWithSelector(CCIPCapabilityConfiguration.P2PIdsLengthNotMatching.selector, uint256(3), uint256(4), uint256(4)));
+    s_ccipCC.validateConfig(config);
+  }
+
   function test__validateConfig_NodeNotInRegistry_Reverts() public {
     (bytes32[] memory p2pIds, bytes32[] memory signers, bytes32[] memory transmitters) = _addChainConfig(4);
     bytes32 nonExistentP2PId = keccak256("notInRegistry");

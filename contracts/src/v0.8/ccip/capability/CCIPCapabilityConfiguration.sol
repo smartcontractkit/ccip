@@ -34,6 +34,7 @@ contract CCIPCapabilityConfiguration is ITypeAndVersion, ICapabilityConfiguratio
   error TooManyOCR3Configs();
   error TooManySigners();
   error TooManyTransmitters();
+  error P2PIdsLengthNotMatching(uint256 p2pIdsLength, uint256 signersLength, uint256 transmittersLength);
   error NotEnoughTransmitters(uint256 got, uint256 minimum);
   error FMustBePositive();
   error FChainMustBePositive();
@@ -340,7 +341,7 @@ contract CCIPCapabilityConfiguration is ITypeAndVersion, ICapabilityConfiguratio
     execConfigs = new OCR3Config[](MAX_OCR3_CONFIGS_PER_PLUGIN);
     uint8 commitCount;
     uint8 execCount;
-    for (uint256 i; i < ocr3Configs.length; ++i) {
+    for (uint256 i = 0; i < ocr3Configs.length; ++i) {
       if (ocr3Configs[i].pluginType == PluginType.Commit) {
         commitConfigs[commitCount] = ocr3Configs[i];
         ++commitCount;
@@ -401,9 +402,13 @@ contract CCIPCapabilityConfiguration is ITypeAndVersion, ICapabilityConfiguratio
       revert FTooHigh();
     }
 
+    if (cfg.p2pIds.length != cfg.signers.length || cfg.p2pIds.length != cfg.transmitters.length) {
+      revert P2PIdsLengthNotMatching(cfg.p2pIds.length, cfg.signers.length, cfg.transmitters.length);
+    }
+
     // Check that the readers are in the capability registry.
     // TODO: check for duplicate signers, duplicate p2p ids, etc.
-    for (uint256 i; i < cfg.signers.length; ++i) {
+    for (uint256 i = 0; i < cfg.signers.length; ++i) {
       _ensureInRegistry(cfg.p2pIds[i]);
     }
   }
