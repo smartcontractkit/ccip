@@ -8,11 +8,15 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/hashutil"
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/merklemulti"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
-
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
+
+const maxReportSize = 123456 // todo:
 
 // Plugin implements the main ocr3 plugin logic.
 type Plugin struct {
@@ -22,6 +26,8 @@ type Plugin struct {
 
 	//commitRootsCache cache.CommitsRootsCache
 	lastReportTS *atomic.Int64
+
+	lggr logger.Logger
 }
 
 func NewPlugin(
@@ -29,6 +35,7 @@ func NewPlugin(
 	reportingCfg ocr3types.ReportingPluginConfig,
 	cfg cciptypes.ExecutePluginConfig,
 	ccipReader cciptypes.CCIPReader,
+	lggr logger.Logger,
 ) *Plugin {
 	lastReportTS := &atomic.Int64{}
 	lastReportTS.Store(time.Now().Add(-cfg.MessageVisibilityInterval).UnixMilli())
@@ -38,6 +45,7 @@ func NewPlugin(
 		cfg:          cfg,
 		ccipReader:   ccipReader,
 		lastReportTS: lastReportTS,
+		lggr:         lggr,
 	}
 }
 
@@ -199,6 +207,63 @@ func (p *Plugin) ObservationQuorum(outctx ocr3types.OutcomeContext, query types.
 	return ocr3types.QuorumFPlusOne, nil
 }
 
+// selectReport takes an ordered list of reports and selects the first reports that fit within the maxReportSize.
+func selectReport(lggr logger.Logger, reports []cciptypes.ExecutePluginCommitDataWithMessages, maxReportSize int) ([]merklemulti.Proof[[32]byte], []cciptypes.ExecutePluginCommitDataWithMessages, error) {
+	size := 0
+	var proofs []merklemulti.Proof[[32]byte]
+	for _, report := range reports {
+		numMsg := int(report.SequenceNumberRange.End() - report.SequenceNumberRange.Start() + 1)
+		if numMsg != len(report.Messages) {
+			return nil, nil, fmt.Errorf("malformed report %s, unexpected number of messages: expected %d , got %d", report.MerkleRoot.String(), numMsg, len(report.Messages))
+		}
+
+		treeLeaves := make([][32]byte, 0)
+		for _, msg := range report.Messages {
+			if !report.SequenceNumberRange.Contains(msg.SeqNum) {
+				return nil, nil, fmt.Errorf("malformed report %s, message with sequence number %d outside of report range %s", report.MerkleRoot.String(), msg.SeqNum, report.SequenceNumberRange)
+			}
+			// TODO: pass in a hasher to construct the chain specific merkle tree.
+			treeLeaves = append(treeLeaves, msg.ID)
+		}
+
+		lggr.Debugw("constructing merkle tree", "sourceChain", report.SourceChain, "treeLeaves", len(treeLeaves))
+		tree, err := merklemulti.NewTree(hashutil.NewKeccak(), treeLeaves)
+		if err != nil {
+			return nil, nil, fmt.Errorf("unable to constructing merkle tree from messages: %w", err)
+		}
+
+		// Iterate sequence range and executed messages to select messages to execute.
+		var toExecute []int
+		executedIdx := 0
+		for i := report.SequenceNumberRange.Start(); i <= report.SequenceNumberRange.End(); i++ {
+			// Skip messages which are already executed
+			if executedIdx < len(report.ExecutedMessages) && report.ExecutedMessages[executedIdx] == i {
+				executedIdx++
+			} else {
+				toExecute = append(toExecute, int(i))
+			}
+		}
+		proof, err := tree.Prove(toExecute)
+		if err != nil {
+			return nil, nil, fmt.Errorf("unable to prove messages for report %s: %w", report.MerkleRoot.String(), err)
+		}
+
+		proofs = append(proofs, proof)
+
+		// TODO: figure out exact report format and measure size correctly
+		size += 32 * len(proof.Hashes)
+
+		if size >= maxReportSize {
+			break
+		}
+	}
+
+	// Remove reports that are about to be executed.
+	reports = reports[len(proofs):]
+
+	return proofs, reports, nil
+}
+
 func (p *Plugin) Outcome(
 	outctx ocr3types.OutcomeContext, query types.Query, aos []types.AttributedObservation,
 ) (ocr3types.Outcome, error) {
@@ -244,10 +309,12 @@ func (p *Plugin) Outcome(
 		}
 	}
 
-	// TODO: select reports and messages for the final exec report.
-	// TODO: may only need the proofs for the final exec report rather than the report and the messages.
+	proofs, reports, err := selectReport(p.lggr, reports, maxReportSize)
+	if err != nil {
+		return ocr3types.Outcome{}, fmt.Errorf("unable to extract proofs: %w", err)
+	}
 
-	return cciptypes.NewExecutePluginOutcome(reports).Encode()
+	return cciptypes.NewExecutePluginOutcome(reports, proofs).Encode()
 }
 
 func (p *Plugin) Reports(seqNr uint64, outcome ocr3types.Outcome) ([]ocr3types.ReportWithInfo[[]byte], error) {
