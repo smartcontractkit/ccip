@@ -10,13 +10,24 @@
 # is not to be executed. It is meant to be just a reference for the Go implementation.
 #
 
+from typing import Dict, List, Set
+
+type ChainSelector = int
+type SequenceNumber = int
+
+class ExecutePluginCommitData:
+    pass
+
+class CCIPMsg:
+    pass
+
 class ExecuteObservation:
-    reports map[ChainSelector][]ExecutePluginCommitData
-    messages map[ChainSelector]map[ChainSelector]CCIPMsg
+    reports:   Dict[ChainSelector, List[ExecutePluginCommitData]]
+    messages:  Dict[ChainSelector, Dict[SequenceNumber, CCIPMsg]]
 
 class ExecuteOutcome:
-    report_data []ExecutePluginCommitDataWithMessages
-    pending_reports []ExecutePluginCommitDataWithMessages
+    report_data:     List[ExecutePluginCommitDataWithMessages]
+    pending_reports: List[ExecutePluginCommitDataWithMessages]
 
 class ExecutePlugin:
     def __init__(self):
@@ -52,6 +63,32 @@ class ExecutePlugin:
 
 
     def validate_observation(self, attributed_observation):
+
+        # Validate observations are allowed by configuration
+        observation = attributed_observation.observation
+        observer = attributed_observation.observer
+
+        if "reports" in observation:
+            assert observer.can_read_dest()
+
+        observer_supported_chains = self.cfg["observer_info"][observer]["supported_chains"]
+        for (chain, msgs) in observation["new_msgs"].items():
+            assert(chain in observer_supported_chains)
+
+        # validate reports do not contain duplicates or overlapping ranges
+        for (chain, reports) in observation["reports"].items():
+            roots = Set[string]
+            ranges = List[SeqNumRange]
+
+          for report in reports:
+            assert(not report.root.string() in roots.values)
+            roots.add(report.root.string())
+
+            for r in ranges:
+                assert(not seq_range_overlaps(report.seqNumRange, r))
+
+            for seqNum in report.ExecutedMessages:
+                assert(seqNum >= report.seqNumRange.start && seqNum <= report.seqNumRange.end)
 
     def observation_quorum(self):
         return "F+1"
@@ -103,8 +140,10 @@ class ExecutePlugin:
         return [encoded]
 
     def should_accept(self, report):
+        pass
 
     def should_transmit(self, report):
+        pass
 
     def keep_cfg_in_sync(self):
         # Polling the configuration on the on-chain contract.
