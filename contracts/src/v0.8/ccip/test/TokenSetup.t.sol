@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.24;
 
-import {IPool} from "../interfaces/IPool.sol";
+import {IPoolV1} from "../interfaces/IPool.sol";
 
 import {BurnMintERC677} from "../../shared/token/ERC677/BurnMintERC677.sol";
 import {Client} from "../libraries/Client.sol";
@@ -26,6 +26,7 @@ contract TokenSetup is RouterSetup {
   mapping(address sourceToken => address sourcePool) internal s_sourcePoolByToken;
   mapping(address sourceToken => address destPool) internal s_destPoolBySourceToken;
   mapping(address destToken => address destPool) internal s_destPoolByToken;
+  mapping(address sourceToken => address destToken) internal s_destTokenBySourceToken;
 
   function _deploySourceToken(string memory tokenName, uint256 dealAmount, uint8 decimals) internal returns (address) {
     BurnMintERC677 token = new BurnMintERC677(tokenName, tokenName, decimals, 0);
@@ -97,8 +98,12 @@ contract TokenSetup is RouterSetup {
     _deployLockReleasePool(destLink, false);
     s_destFeeToken = destLink;
 
+    s_destTokenBySourceToken[sourceLink] = destLink;
+
     address destEth = _deployDestToken("dETH", 2 ** 128);
     _deployTokenAndBurnMintPool(destEth, false);
+
+    s_destTokenBySourceToken[sourceEth] = destEth;
 
     // Float the dest link lock release pool with funds
     IERC20(destLink).transfer(s_destPoolByToken[destLink], 1000 ether);
@@ -109,37 +114,27 @@ contract TokenSetup is RouterSetup {
     for (uint256 i = 0; i < s_sourceTokens.length; ++i) {
       address token = s_sourceTokens[i];
       address pool = s_sourcePoolByToken[token];
-      s_tokenAdminRegistry.registerAdministratorPermissioned(token, OWNER);
-      s_tokenAdminRegistry.setPool(token, pool);
 
-      TokenPool.ChainUpdate[] memory chainUpdates = new TokenPool.ChainUpdate[](1);
-      chainUpdates[0] = TokenPool.ChainUpdate({
-        remoteChainSelector: DEST_CHAIN_SELECTOR,
-        remotePoolAddress: abi.encode(s_destPoolByToken[s_destTokens[i]]),
-        allowed: true,
-        outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
-        inboundRateLimiterConfig: getInboundRateLimiterConfig()
-      });
-
-      TokenPool(pool).applyChainUpdates(chainUpdates);
+      _setPool(
+        s_tokenAdminRegistry, token, pool, DEST_CHAIN_SELECTOR, s_destPoolByToken[s_destTokens[i]], s_destTokens[i]
+      );
     }
 
     for (uint256 i = 0; i < s_destTokens.length; ++i) {
       address token = s_destTokens[i];
       address pool = s_destPoolByToken[token];
-      s_tokenAdminRegistry.registerAdministratorPermissioned(token, OWNER);
+      s_tokenAdminRegistry.proposeAdministrator(token, OWNER);
+      s_tokenAdminRegistry.acceptAdminRole(token);
       s_tokenAdminRegistry.setPool(token, pool);
 
-      TokenPool.ChainUpdate[] memory chainUpdates = new TokenPool.ChainUpdate[](1);
-      chainUpdates[0] = TokenPool.ChainUpdate({
-        remoteChainSelector: SOURCE_CHAIN_SELECTOR,
-        remotePoolAddress: abi.encode(s_sourcePoolByToken[s_sourceTokens[i]]),
-        allowed: true,
-        outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
-        inboundRateLimiterConfig: getInboundRateLimiterConfig()
-      });
-
-      TokenPool(pool).applyChainUpdates(chainUpdates);
+      _setPool(
+        s_tokenAdminRegistry,
+        token,
+        pool,
+        SOURCE_CHAIN_SELECTOR,
+        s_sourcePoolByToken[s_sourceTokens[i]],
+        s_sourceTokens[i]
+      );
     }
   }
 
@@ -152,5 +147,33 @@ contract TokenSetup is RouterSetup {
     for (uint256 i = 0; i < tokenAmounts.length; ++i) {
       tokenAmounts[i].token = s_sourceTokens[i];
     }
+  }
+
+  function _setPool(
+    TokenAdminRegistry tokenAdminRegistry,
+    address token,
+    address pool,
+    uint64 remoteChainSelector,
+    address remotePoolAddress,
+    address remoteToken
+  ) internal {
+    if (!tokenAdminRegistry.isAdministrator(token, OWNER)) {
+      tokenAdminRegistry.proposeAdministrator(token, OWNER);
+      tokenAdminRegistry.acceptAdminRole(token);
+    }
+
+    tokenAdminRegistry.setPool(token, pool);
+
+    TokenPool.ChainUpdate[] memory chainUpdates = new TokenPool.ChainUpdate[](1);
+    chainUpdates[0] = TokenPool.ChainUpdate({
+      remoteChainSelector: remoteChainSelector,
+      remotePoolAddress: abi.encode(remotePoolAddress),
+      remoteTokenAddress: abi.encode(remoteToken),
+      allowed: true,
+      outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
+      inboundRateLimiterConfig: getInboundRateLimiterConfig()
+    });
+
+    TokenPool(pool).applyChainUpdates(chainUpdates);
   }
 }

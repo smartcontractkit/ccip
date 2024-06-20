@@ -1,7 +1,9 @@
-package commit
+package execute
 
 import (
 	"context"
+	"encoding/json"
+	"math"
 	"testing"
 	"time"
 
@@ -12,6 +14,22 @@ import (
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
+
+func TestSomethingCool(t *testing.T) {
+
+	foo := map[cciptypes.ChainSelector]int{
+		cciptypes.ChainSelector(1):              1,
+		cciptypes.ChainSelector(math.MaxUint64): 1,
+	}
+
+	js, _ := json.Marshal(foo)
+	t.Log(string(js))
+
+	b := []byte(`{"1":1,"18446744073709551615":1}`)
+	var bar map[cciptypes.ChainSelector]int
+	assert.NoError(t, json.Unmarshal(b, &bar))
+	t.Log(bar)
+}
 
 func Test_getPendingExecutedReports(t *testing.T) {
 	tests := []struct {
@@ -51,13 +69,14 @@ func Test_getPendingExecutedReports(t *testing.T) {
 				1: nil,
 			},
 			want: cciptypes.ExecutePluginCommitObservations{
-				1: []cciptypes.ExecutePluginCommitData{
-					{
+				1: []cciptypes.ExecutePluginCommitDataWithMessages{
+					{ExecutePluginCommitData: cciptypes.ExecutePluginCommitData{
+						SourceChain:         1,
 						SequenceNumberRange: cciptypes.NewSeqNumRange(1, 10),
 						ExecutedMessages:    nil,
 						Timestamp:           time.UnixMilli(10101010101),
 						BlockNum:            999,
-					},
+					}},
 				},
 			},
 			want1:   time.UnixMilli(10101010101),
@@ -86,13 +105,14 @@ func Test_getPendingExecutedReports(t *testing.T) {
 				},
 			},
 			want: cciptypes.ExecutePluginCommitObservations{
-				1: []cciptypes.ExecutePluginCommitData{
-					{
+				1: []cciptypes.ExecutePluginCommitDataWithMessages{
+					{ExecutePluginCommitData: cciptypes.ExecutePluginCommitData{
+						SourceChain:         1,
 						SequenceNumberRange: cciptypes.NewSeqNumRange(1, 10),
 						Timestamp:           time.UnixMilli(10101010101),
 						BlockNum:            999,
 						ExecutedMessages:    []cciptypes.SeqNum{1, 2, 3, 7, 8},
-					},
+					}},
 				},
 			},
 			want1:   time.UnixMilli(10101010101),

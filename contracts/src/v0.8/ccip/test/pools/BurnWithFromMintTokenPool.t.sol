@@ -68,7 +68,7 @@ contract BurnWithFromMintTokenPool_lockOrBurn is BurnWithFromMintTokenPoolSetup 
 
   // Should not burn tokens if cursed.
   function test_PoolBurnRevertNotHealthy_Revert() public {
-    s_mockRMN.voteToCurse(bytes32(0));
+    s_mockRMN.voteToCurse(bytes16(0));
     uint256 before = s_burnMintERC677.balanceOf(address(s_pool));
     vm.startPrank(s_burnMintOnRamp);
 
@@ -94,6 +94,7 @@ contract BurnWithFromMintTokenPool_lockOrBurn is BurnWithFromMintTokenPoolSetup 
         originalSender: bytes(""),
         receiver: OWNER,
         amount: 1,
+        localToken: address(s_burnMintERC677),
         remoteChainSelector: wrongChainSelector,
         sourcePoolAddress: generateSourceTokenData().sourcePoolAddress,
         sourcePoolData: generateSourceTokenData().extraData,

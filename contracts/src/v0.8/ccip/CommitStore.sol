@@ -25,9 +25,12 @@ contract CommitStore is ICommitStore, ITypeAndVersion, OCR2Base {
   event ReportAccepted(CommitReport report);
   event ConfigSet(StaticConfig staticConfig, DynamicConfig dynamicConfig);
   event RootRemoved(bytes32 root);
+  event SequenceNumberSet(uint64 oldSeqNum, uint64 newSeqNum);
+  event LatestPriceEpochAndRoundSet(uint40 oldEpochAndRound, uint40 newEpochAndRound);
 
   /// @notice Static commit store config
   /// @dev RMN depends on this struct, if changing, please notify the RMN maintainers.
+  //solhint-disable gas-struct-packing
   struct StaticConfig {
     uint64 chainSelector; // ───────╮  Destination chainSelector
     uint64 sourceChainSelector; // ─╯  Source chainSelector
@@ -75,7 +78,7 @@ contract CommitStore is ICommitStore, ITypeAndVersion, OCR2Base {
   uint64 private s_minSeqNr = 1;
   /// @dev The epoch and round of the last report
   uint40 private s_latestPriceEpochAndRound;
-  /// @dev Whether this OnRamp is paused or not
+  /// @dev Whether this CommitStore is paused or not
   bool private s_paused = false;
   // merkleRoot => timestamp when received
   mapping(bytes32 merkleRoot => uint256 timestamp) private s_roots;
@@ -111,19 +114,27 @@ contract CommitStore is ICommitStore, ITypeAndVersion, OCR2Base {
   /// @notice Sets the minimum sequence number.
   /// @param minSeqNr The new minimum sequence number.
   function setMinSeqNr(uint64 minSeqNr) external onlyOwner {
+    uint64 oldSeqNum = s_minSeqNr;
+
     s_minSeqNr = minSeqNr;
+
+    emit SequenceNumberSet(oldSeqNum, minSeqNr);
   }
 
   /// @notice Returns the epoch and round of the last price update.
   /// @return the latest price epoch and round.
-  function getLatestPriceEpochAndRound() public view returns (uint64) {
+  function getLatestPriceEpochAndRound() external view returns (uint64) {
     return s_latestPriceEpochAndRound;
   }
 
   /// @notice Sets the latest epoch and round for price update.
   /// @param latestPriceEpochAndRound The new epoch and round for prices.
   function setLatestPriceEpochAndRound(uint40 latestPriceEpochAndRound) external onlyOwner {
+    uint40 oldEpochAndRound = s_latestPriceEpochAndRound;
+
     s_latestPriceEpochAndRound = latestPriceEpochAndRound;
+
+    emit LatestPriceEpochAndRoundSet(oldEpochAndRound, latestPriceEpochAndRound);
   }
 
   /// @notice Returns the timestamp of a potentially previously committed merkle root.
@@ -182,7 +193,7 @@ contract CommitStore is ICommitStore, ITypeAndVersion, OCR2Base {
   /// we are OK to revert to preserve the invariant that we always revert on invalid sequence number ranges.
   /// If that happens, prices will be updates in later rounds.
   function _report(bytes calldata encodedReport, uint40 epochAndRound) internal override whenNotPaused {
-    if (IRMN(i_rmnProxy).isCursed(bytes32(uint256(i_sourceChainSelector)))) revert CursedByRMN();
+    if (IRMN(i_rmnProxy).isCursed(bytes16(uint128(i_sourceChainSelector)))) revert CursedByRMN();
 
     CommitReport memory report = abi.decode(encodedReport, (CommitReport));
 
@@ -273,7 +284,7 @@ contract CommitStore is ICommitStore, ITypeAndVersion, OCR2Base {
 
   /// @notice Single function to check the status of the commitStore.
   function isUnpausedAndNotCursed() external view returns (bool) {
-    return !IRMN(i_rmnProxy).isCursed(bytes32(uint256(i_sourceChainSelector))) && !s_paused;
+    return !IRMN(i_rmnProxy).isCursed(bytes16(uint128(i_sourceChainSelector))) && !s_paused;
   }
 
   /// @notice Modifier to make a function callable only when the contract is not paused.
