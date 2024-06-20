@@ -192,9 +192,9 @@ func setupEmptyOutcome(ctx context.Context, t *testing.T, lggr logger.Logger) []
 	homeChainConfig := cciptypes.HomeChainConfig{
 		FChain: map[cciptypes.ChainSelector]int{chainC: 1},
 		NodeSupportedChains: map[cciptypes.P2PID]cciptypes.SupportedChains{
-			cciptypes.GetP2pID(1): {Supported: mapset.NewSet[cciptypes.ChainSelector](chainC)},
-			cciptypes.GetP2pID(2): {Supported: mapset.NewSet[cciptypes.ChainSelector](chainC)},
-			cciptypes.GetP2pID(3): {Supported: mapset.NewSet[cciptypes.ChainSelector](chainC)},
+			cciptypes.GetP2pID(1): {Supported: mapset.NewSet[cciptypes.ChainSelector]()},
+			cciptypes.GetP2pID(2): {Supported: mapset.NewSet[cciptypes.ChainSelector]()},
+			cciptypes.GetP2pID(3): {Supported: mapset.NewSet[cciptypes.ChainSelector]()},
 		},
 	}
 
