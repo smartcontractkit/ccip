@@ -14,6 +14,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/bridge/arb"
+	bridgecommon "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/bridge/common"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/bridge/opstack"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/bridge/testonlybridge"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/models"
@@ -128,16 +129,8 @@ func (f *factory) initBridge(source, dest models.NetworkSelector) (Bridge, error
 	// Arbitrum L2 --> Ethereum L1 bridge
 	case models.NetworkSelector(chainsel.ETHEREUM_MAINNET_ARBITRUM_1.Selector),
 		models.NetworkSelector(chainsel.ETHEREUM_TESTNET_SEPOLIA_ARBITRUM_1.Selector):
-		// source: arbitrum l2 -> dest: ethereum l1
-		// only dest that is supported is eth mainnet if source == arb mainnet
-		// only dest that is supported is eth sepolia if source == arb sepolia
-		if source == models.NetworkSelector(chainsel.ETHEREUM_MAINNET_ARBITRUM_1.Selector) &&
-			dest != models.NetworkSelector(chainsel.ETHEREUM_MAINNET.Selector) {
-			return nil, fmt.Errorf("unsupported destination for arbitrum mainnet L2 -> L1 bridge: %d, must be eth mainnet", dest)
-		}
-		if source == models.NetworkSelector(chainsel.ETHEREUM_TESTNET_SEPOLIA_ARBITRUM_1.Selector) &&
-			dest != models.NetworkSelector(chainsel.ETHEREUM_TESTNET_SEPOLIA.Selector) {
-			return nil, fmt.Errorf("unsupported destination for arbitrum sepolia L2 -> L1 bridge: %d, must be eth sepolia", dest)
+		if !bridgecommon.Supports(source, dest) {
+			return nil, fmt.Errorf("unsupported destination for arbitrum l2 -> l1 bridge: %d", dest)
 		}
 		l2Deps, ok := f.evmDeps[source]
 		if !ok {
@@ -177,16 +170,8 @@ func (f *factory) initBridge(source, dest models.NetworkSelector) (Bridge, error
 	// Optimism L2 --> Ethereum L1 bridge
 	case models.NetworkSelector(chainsel.ETHEREUM_MAINNET_OPTIMISM_1.Selector),
 		models.NetworkSelector(chainsel.ETHEREUM_TESTNET_SEPOLIA_OPTIMISM_1.Selector):
-		// source: optimism l2 -> dest: ethereum l1
-		// only dest that is supported is eth mainnet if source == OP mainnet
-		// only dest that is supported is eth sepolia if source == OP sepolia
-		if source == models.NetworkSelector(chainsel.ETHEREUM_MAINNET_OPTIMISM_1.Selector) &&
-			dest != models.NetworkSelector(chainsel.ETHEREUM_MAINNET.Selector) {
-			return nil, fmt.Errorf("unsupported destination for optimism mainnet L2 -> L1 bridge: %d, must be eth mainnet", dest)
-		}
-		if source == models.NetworkSelector(chainsel.ETHEREUM_TESTNET_SEPOLIA_OPTIMISM_1.Selector) &&
-			dest != models.NetworkSelector(chainsel.ETHEREUM_TESTNET_SEPOLIA.Selector) {
-			return nil, fmt.Errorf("unsupported destination for optimism sepolia L2 -> L1 bridge: %d, must be eth sepolia", dest)
+		if !bridgecommon.Supports(source, dest) {
+			return nil, fmt.Errorf("unsupported destination for optimism l2 -> l1 bridge: %d", dest)
 		}
 		l2Deps, ok := f.evmDeps[source]
 		if !ok {
@@ -227,17 +212,8 @@ func (f *factory) initBridge(source, dest models.NetworkSelector) (Bridge, error
 	// Ethereum L1 --> Optimism L2 bridge
 	case models.NetworkSelector(chainsel.ETHEREUM_MAINNET.Selector),
 		models.NetworkSelector(chainsel.ETHEREUM_TESTNET_SEPOLIA.Selector):
-		// only dests that are supported are arbitrum mainnet and OP mainnet if source == eth mainnet
-		// only dests that are supported are arbitrum sepolia and OP sepolia if source == eth sepolia
-		if source == models.NetworkSelector(chainsel.ETHEREUM_MAINNET.Selector) &&
-			dest != models.NetworkSelector(chainsel.ETHEREUM_MAINNET_ARBITRUM_1.Selector) &&
-			dest != models.NetworkSelector(chainsel.ETHEREUM_MAINNET_OPTIMISM_1.Selector) {
-			return nil, fmt.Errorf("unsupported destination for eth mainnet l1 -> l2 bridge: %d, must be arb or OP mainnet", dest)
-		}
-		if source == models.NetworkSelector(chainsel.ETHEREUM_TESTNET_SEPOLIA.Selector) &&
-			dest != models.NetworkSelector(chainsel.ETHEREUM_TESTNET_SEPOLIA_ARBITRUM_1.Selector) &&
-			dest != models.NetworkSelector(chainsel.ETHEREUM_TESTNET_SEPOLIA_OPTIMISM_1.Selector) {
-			return nil, fmt.Errorf("unsupported destination for eth sepolia l1 -> l2 bridge: %d, must be arb or OP sepolia", dest)
+		if !bridgecommon.Supports(source, dest) {
+			return nil, fmt.Errorf("unsupported destination for eth l1 -> l2 bridge: %d", dest)
 		}
 		l1Deps, ok := f.evmDeps[source]
 		if !ok {
