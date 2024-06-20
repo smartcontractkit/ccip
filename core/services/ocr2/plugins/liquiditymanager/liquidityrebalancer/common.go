@@ -10,13 +10,7 @@ import (
 )
 
 type Funds struct {
-	LiqDiffNow      *big.Int
-	LiqDiffLater    *big.Int
 	AvailableAmount *big.Int
-}
-
-func (f *Funds) String() string {
-	return fmt.Sprintf("{LiqDiffNow: %s, LiqDiffLater: %s, AvailableAmount: %s}", f.LiqDiffNow, f.LiqDiffLater, f.AvailableAmount)
 }
 
 // getExpectedGraph returns a copy of the graph instance with all the non-executed transfers applied.
