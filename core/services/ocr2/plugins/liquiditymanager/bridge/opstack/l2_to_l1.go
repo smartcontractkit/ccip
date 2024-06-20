@@ -385,7 +385,9 @@ func (l *l2ToL1Bridge) toPendingTransfers(
 				BridgeData: provePayload,
 				Stage:      bridgecommon.StageRebalanceConfirmed,
 			},
-			Status: models.TransferStatusNotReady, // Needs to be proved before it can be finalized
+			// Both "prove" and "finalize" are handled by the "finalizeWithdrawalERC20" call in the
+			// OptimismL1BridgeAdapter, therefore we set the status to "Ready"
+			Status: models.TransferStatusReady,
 			ID:     fmt.Sprintf("%s-%d", transfer.Raw.TxHash.Hex(), transfer.Raw.Index),
 		})
 	}
