@@ -447,7 +447,7 @@ func Test_validateObserverReadingEligibility(t *testing.T) {
 	}{
 		{
 			name:     "observer can read all chains",
-			observer: cciptypes.GetP2pId(10),
+			observer: cciptypes.GetP2pID(10),
 			msgs: []cciptypes.CCIPMsgBaseDetails{
 				{ID: cciptypes.Bytes32{1}, SourceChain: 1, SeqNum: 12},
 				{ID: cciptypes.Bytes32{3}, SourceChain: 2, SeqNum: 12},
@@ -455,40 +455,40 @@ func Test_validateObserverReadingEligibility(t *testing.T) {
 				{ID: cciptypes.Bytes32{2}, SourceChain: 3, SeqNum: 12},
 			},
 			nodeSupportedChains: map[cciptypes.P2PID]cciptypes.SupportedChains{
-				cciptypes.GetP2pId(10): {Supported: mapset.NewSet[cciptypes.ChainSelector](1, 2, 3)},
+				cciptypes.GetP2pID(10): {Supported: mapset.NewSet[cciptypes.ChainSelector](1, 2, 3)},
 			},
 			destChain: 1,
 			expErr:    false,
 		},
 		{
 			name:     "observer is a writer so can observe seq nums",
-			observer: cciptypes.GetP2pId(10),
+			observer: cciptypes.GetP2pID(10),
 			msgs:     []cciptypes.CCIPMsgBaseDetails{},
 			seqNums: []cciptypes.SeqNumChain{
 				{ChainSel: 1, SeqNum: 12},
 			},
 			nodeSupportedChains: map[cciptypes.P2PID]cciptypes.SupportedChains{
-				cciptypes.GetP2pId(10): {Supported: mapset.NewSet[cciptypes.ChainSelector](1, 3)},
+				cciptypes.GetP2pID(10): {Supported: mapset.NewSet[cciptypes.ChainSelector](1, 3)},
 			},
 			destChain: 1,
 			expErr:    false,
 		},
 		{
 			name:     "observer is not a writer so cannot observe seq nums",
-			observer: cciptypes.GetP2pId(10),
+			observer: cciptypes.GetP2pID(10),
 			msgs:     []cciptypes.CCIPMsgBaseDetails{},
 			seqNums: []cciptypes.SeqNumChain{
 				{ChainSel: 1, SeqNum: 12},
 			},
 			nodeSupportedChains: map[cciptypes.P2PID]cciptypes.SupportedChains{
-				cciptypes.GetP2pId(10): {Supported: mapset.NewSet[cciptypes.ChainSelector](3)},
+				cciptypes.GetP2pID(10): {Supported: mapset.NewSet[cciptypes.ChainSelector](3)},
 			},
 			destChain: 1,
 			expErr:    true,
 		},
 		{
 			name:     "observer cfg not found",
-			observer: cciptypes.GetP2pId(10),
+			observer: cciptypes.GetP2pID(10),
 			msgs: []cciptypes.CCIPMsgBaseDetails{
 				{ID: cciptypes.Bytes32{1}, SourceChain: 1, SeqNum: 12},
 				{ID: cciptypes.Bytes32{3}, SourceChain: 2, SeqNum: 12},
@@ -496,17 +496,17 @@ func Test_validateObserverReadingEligibility(t *testing.T) {
 				{ID: cciptypes.Bytes32{2}, SourceChain: 3, SeqNum: 12},
 			},
 			nodeSupportedChains: map[cciptypes.P2PID]cciptypes.SupportedChains{
-				cciptypes.GetP2pId(20): {Supported: mapset.NewSet[cciptypes.ChainSelector](1, 3)}, // observer 10 not found
+				cciptypes.GetP2pID(20): {Supported: mapset.NewSet[cciptypes.ChainSelector](1, 3)}, // observer 10 not found
 			},
 			destChain: 1,
 			expErr:    true,
 		},
 		{
 			name:     "no msgs",
-			observer: cciptypes.GetP2pId(10),
+			observer: cciptypes.GetP2pID(10),
 			msgs:     []cciptypes.CCIPMsgBaseDetails{},
 			nodeSupportedChains: map[cciptypes.P2PID]cciptypes.SupportedChains{
-				cciptypes.GetP2pId(10): {Supported: mapset.NewSet[cciptypes.ChainSelector](1, 3)},
+				cciptypes.GetP2pID(10): {Supported: mapset.NewSet[cciptypes.ChainSelector](1, 3)},
 			},
 			expErr: false,
 		},

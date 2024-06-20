@@ -190,8 +190,12 @@ func setupEmptyOutcome(ctx context.Context, t *testing.T, lggr logger.Logger) []
 	}
 
 	homeChainConfig := cciptypes.HomeChainConfig{
-		FChain:              map[cciptypes.ChainSelector]int{chainC: 1},
-		NodeSupportedChains: map[cciptypes.P2PID]cciptypes.SupportedChains{},
+		FChain: map[cciptypes.ChainSelector]int{chainC: 1},
+		NodeSupportedChains: map[cciptypes.P2PID]cciptypes.SupportedChains{
+			cciptypes.GetP2pID(1): {Supported: mapset.NewSet[cciptypes.ChainSelector](chainC)},
+			cciptypes.GetP2pID(2): {Supported: mapset.NewSet[cciptypes.ChainSelector](chainC)},
+			cciptypes.GetP2pID(3): {Supported: mapset.NewSet[cciptypes.ChainSelector](chainC)},
+		},
 	}
 
 	oracleIDToP2pID := GetP2pIDs(1, 2, 3)
@@ -217,9 +221,9 @@ func setupAllNodesReadAllChains(ctx context.Context, t *testing.T, lggr logger.L
 			chainC: 1,
 		},
 		NodeSupportedChains: map[cciptypes.P2PID]cciptypes.SupportedChains{
-			cciptypes.GetP2pId(1): {Supported: mapset.NewSet[cciptypes.ChainSelector](chainA, chainB, chainC)},
-			cciptypes.GetP2pId(2): {Supported: mapset.NewSet[cciptypes.ChainSelector](chainA, chainB, chainC)},
-			cciptypes.GetP2pId(3): {Supported: mapset.NewSet[cciptypes.ChainSelector](chainA, chainB, chainC)},
+			cciptypes.GetP2pID(1): {Supported: mapset.NewSet[cciptypes.ChainSelector](chainA, chainB, chainC)},
+			cciptypes.GetP2pID(2): {Supported: mapset.NewSet[cciptypes.ChainSelector](chainA, chainB, chainC)},
+			cciptypes.GetP2pID(3): {Supported: mapset.NewSet[cciptypes.ChainSelector](chainA, chainB, chainC)},
 		},
 	}
 	oracleIDToP2pID := GetP2pIDs(1, 2, 3)
@@ -278,9 +282,9 @@ func setupNodesDoNotAgreeOnMsgs(ctx context.Context, t *testing.T, lggr logger.L
 			chainC: 1,
 		},
 		NodeSupportedChains: map[cciptypes.P2PID]cciptypes.SupportedChains{
-			cciptypes.GetP2pId(1): {Supported: mapset.NewSet[cciptypes.ChainSelector](chainA, chainB, chainC)},
-			cciptypes.GetP2pId(2): {Supported: mapset.NewSet[cciptypes.ChainSelector](chainA, chainB, chainC)},
-			cciptypes.GetP2pId(3): {Supported: mapset.NewSet[cciptypes.ChainSelector](chainA, chainB, chainC)},
+			cciptypes.GetP2pID(1): {Supported: mapset.NewSet[cciptypes.ChainSelector](chainA, chainB, chainC)},
+			cciptypes.GetP2pID(2): {Supported: mapset.NewSet[cciptypes.ChainSelector](chainA, chainB, chainC)},
+			cciptypes.GetP2pID(3): {Supported: mapset.NewSet[cciptypes.ChainSelector](chainA, chainB, chainC)},
 		},
 	}
 

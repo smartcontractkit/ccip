@@ -550,9 +550,6 @@ func validateObserverReadingEligibility(
 	nodeSupportedChains map[cciptypes.P2PID]cciptypes.SupportedChains,
 	destChain cciptypes.ChainSelector,
 ) error {
-	if len(msgs) == 0 {
-		return nil
-	}
 
 	supportedChains, exists := nodeSupportedChains[observer]
 	if !exists {
