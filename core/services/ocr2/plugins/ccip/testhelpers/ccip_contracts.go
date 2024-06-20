@@ -23,6 +23,8 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/hashutil"
+	"github.com/smartcontractkit/chainlink-common/pkg/merklemulti"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
@@ -48,8 +50,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_2_0"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_5_0"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/pkg/hashlib"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/pkg/merklemulti"
 )
 
 var (
@@ -302,13 +302,14 @@ func (c *CCIPContracts) DeployNewOnRamp(t *testing.T) {
 		c.Source.User,  // user
 		c.Source.Chain, // client
 		evm_2_evm_onramp.EVM2EVMOnRampStaticConfig{
-			LinkToken:         c.Source.LinkToken.Address(),
-			ChainSelector:     c.Source.ChainSelector,
-			DestChainSelector: c.Dest.ChainSelector,
-			DefaultTxGasLimit: 200_000,
-			MaxNopFeesJuels:   big.NewInt(0).Mul(big.NewInt(100_000_000), big.NewInt(1e18)),
-			PrevOnRamp:        prevOnRamp,
-			RmnProxy:          c.Source.ARM.Address(), // RMN, formerly ARM
+			LinkToken:          c.Source.LinkToken.Address(),
+			ChainSelector:      c.Source.ChainSelector,
+			DestChainSelector:  c.Dest.ChainSelector,
+			DefaultTxGasLimit:  200_000,
+			MaxNopFeesJuels:    big.NewInt(0).Mul(big.NewInt(100_000_000), big.NewInt(1e18)),
+			PrevOnRamp:         prevOnRamp,
+			RmnProxy:           c.Source.ARM.Address(), // RMN, formerly ARM
+			TokenAdminRegistry: c.Source.TokenAdminRegistry.Address(),
 		},
 		evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig{
 			Router:                            c.Source.Router.Address(),
@@ -321,7 +322,6 @@ func (c *CCIPContracts) DeployNewOnRamp(t *testing.T) {
 			PriceRegistry:                     c.Source.PriceRegistry.Address(),
 			MaxDataBytes:                      1e5,
 			MaxPerMsgGasLimit:                 4_000_000,
-			TokenAdminRegistry:                c.Source.TokenAdminRegistry.Address(),
 			DefaultTokenFeeUSDCents:           50,
 			DefaultTokenDestGasOverhead:       34_000,
 			DefaultTokenDestBytesOverhead:     500,
@@ -1028,13 +1028,14 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 		sourceUser,  // user
 		sourceChain, // client
 		evm_2_evm_onramp.EVM2EVMOnRampStaticConfig{
-			LinkToken:         sourceLinkTokenAddress,
-			ChainSelector:     sourceChainSelector,
-			DestChainSelector: destChainSelector,
-			DefaultTxGasLimit: 200_000,
-			MaxNopFeesJuels:   big.NewInt(0).Mul(big.NewInt(100_000_000), big.NewInt(1e18)),
-			PrevOnRamp:        common.HexToAddress(""),
-			RmnProxy:          armProxySourceAddress, // RMN, formerly ARM
+			LinkToken:          sourceLinkTokenAddress,
+			ChainSelector:      sourceChainSelector,
+			DestChainSelector:  destChainSelector,
+			DefaultTxGasLimit:  200_000,
+			MaxNopFeesJuels:    big.NewInt(0).Mul(big.NewInt(100_000_000), big.NewInt(1e18)),
+			PrevOnRamp:         common.HexToAddress(""),
+			RmnProxy:           armProxySourceAddress, // RMN, formerly ARM
+			TokenAdminRegistry: sourceTokenAdminRegistry.Address(),
 		},
 		evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig{
 			Router:                            sourceRouterAddress,
@@ -1047,7 +1048,6 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 			PriceRegistry:                     sourcePricesAddress,
 			MaxDataBytes:                      1e5,
 			MaxPerMsgGasLimit:                 4_000_000,
-			TokenAdminRegistry:                sourceTokenAdminRegistry.Address(),
 			DefaultTokenFeeUSDCents:           50,
 			DefaultTokenDestGasOverhead:       34_000,
 			DefaultTokenDestBytesOverhead:     500,
@@ -1437,7 +1437,7 @@ func (args *ManualExecArgs) execute(report *commit_store.CommitStoreCommitReport
 	log.Info().Msg("Executing request manually")
 	seqNr := args.SeqNr
 	// Build a merkle tree for the report
-	mctx := hashlib.NewKeccakCtx()
+	mctx := hashutil.NewKeccak()
 	onRampContract, err := evm_2_evm_onramp_1_2_0.NewEVM2EVMOnRamp(common.HexToAddress(args.OnRamp), args.SourceChain)
 	if err != nil {
 		return nil, err
