@@ -50,7 +50,13 @@ func NewPlugin(
 ) *Plugin {
 	knownSourceChains := mapset.NewSet[cciptypes.ChainSelector]()
 	for _, inf := range cfg.ObserverInfo {
-		knownSourceChains = knownSourceChains.Union(mapset.NewSet(inf.Reads...))
+		var sources []cciptypes.ChainSelector
+		for _, chain := range inf.Reads {
+			if chain != cfg.DestChain {
+				sources = append(sources, chain)
+			}
+		}
+		knownSourceChains = knownSourceChains.Union(mapset.NewSet(sources...))
 	}
 
 	return &Plugin{
@@ -96,30 +102,10 @@ func (p *Plugin) Query(_ context.Context, _ ocr3types.OutcomeContext) (types.Que
 //	We discover the token prices only for the tokens that are used to pay for ccip fees.
 //	The fee tokens are configured in the plugin config.
 func (p *Plugin) Observation(ctx context.Context, outctx ocr3types.OutcomeContext, _ types.Query) (types.Observation, error) {
-	maxSeqNumsPerChain, err := observeMaxSeqNums(
-		ctx,
-		p.lggr,
-		p.ccipReader,
-		outctx.PreviousOutcome,
-		p.readableChains,
-		p.cfg.DestChain,
-		p.knownSourceChainsSlice(),
-	)
+	msgBaseDetails := make([]cciptypes.CCIPMsgBaseDetails, 0)
+	latestCommittedSeqNumsObservation, err := observeLatestCommittedSeqNums(ctx, p.lggr, p.ccipReader, p.readableChains, p.cfg.DestChain, p.knownSourceChains.ToSlice())
 	if err != nil {
-		return types.Observation{}, fmt.Errorf("observe max sequence numbers per chain: %w", err)
-	}
-
-	newMsgs, err := observeNewMsgs(
-		ctx,
-		p.lggr,
-		p.ccipReader,
-		p.msgHasher,
-		p.readableChains,
-		maxSeqNumsPerChain,
-		p.cfg.NewMsgScanBatchSize,
-	)
-	if err != nil {
-		return types.Observation{}, fmt.Errorf("observe new messages: %w", err)
+		return types.Observation{}, fmt.Errorf("observe latest committed sequence numbers: %w", err)
 	}
 
 	var tokenPrices []cciptypes.TokenPrice
@@ -140,20 +126,44 @@ func (p *Plugin) Observation(ctx context.Context, outctx ocr3types.OutcomeContex
 	if err != nil {
 		return types.Observation{}, fmt.Errorf("observe gas prices: %w", err)
 	}
+	// If there's no previous outcome (first round ever), we only observe the latest committed sequence numbers.
+	// and on the next round we use those to look for messages.
+	if outctx.PreviousOutcome == nil {
+		p.lggr.Debugw("first round ever, can't observe new messages yet")
+		return cciptypes.NewCommitPluginObservation(msgBaseDetails, gasPrices, tokenPrices, latestCommittedSeqNumsObservation, p.cfg).Encode()
+	}
+
+	prevOutcome, err := cciptypes.DecodeCommitPluginOutcome(outctx.PreviousOutcome)
+	if err != nil {
+		return types.Observation{}, fmt.Errorf("decode commit plugin previous outcome: %w", err)
+	}
+	p.lggr.Debugw("previous outcome decoded", "outcome", prevOutcome.String())
+
+	// Always observe based on previous outcome. We'll filter out stale messages in the outcome phase.
+	newMsgs, err := observeNewMsgs(
+		ctx,
+		p.lggr,
+		p.ccipReader,
+		p.msgHasher,
+		p.readableChains,
+		prevOutcome.MaxSeqNums, // TODO: Chainlink common PR to rename.
+		p.cfg.NewMsgScanBatchSize,
+	)
+	if err != nil {
+		return types.Observation{}, fmt.Errorf("observe new messages: %w", err)
+	}
 
 	p.lggr.Infow("submitting observation",
 		"observedNewMsgs", len(newMsgs),
 		"gasPrices", len(gasPrices),
 		"tokenPrices", len(tokenPrices),
-		"maxSeqNumsPerChain", maxSeqNumsPerChain,
+		"latestCommittedSeqNums", latestCommittedSeqNumsObservation,
 		"observerInfo", p.cfg.ObserverInfo)
 
-	msgBaseDetails := make([]cciptypes.CCIPMsgBaseDetails, 0)
 	for _, msg := range newMsgs {
 		msgBaseDetails = append(msgBaseDetails, msg.CCIPMsgBaseDetails)
 	}
-	return cciptypes.NewCommitPluginObservation(msgBaseDetails, gasPrices, tokenPrices, maxSeqNumsPerChain, p.cfg).Encode()
-
+	return cciptypes.NewCommitPluginObservation(msgBaseDetails, gasPrices, tokenPrices, latestCommittedSeqNumsObservation, p.cfg).Encode()
 }
 
 func (p *Plugin) ValidateObservation(_ ocr3types.OutcomeContext, _ types.Query, ao types.AttributedObservation) error {
@@ -166,7 +176,7 @@ func (p *Plugin) ValidateObservation(_ ocr3types.OutcomeContext, _ types.Query, 
 		return fmt.Errorf("validate sequence numbers: %w", err)
 	}
 
-	if err := validateObserverReadingEligibility(ao.Observer, obs.NewMsgs, p.cfg.ObserverInfo); err != nil {
+	if err := validateObserverReadingEligibility(ao.Observer, obs.NewMsgs, obs.MaxSeqNums, p.cfg.ObserverInfo); err != nil {
 		return fmt.Errorf("validate observer %d reading eligibility: %w", ao.Observer, err)
 	}
 
@@ -299,7 +309,7 @@ func (p *Plugin) ShouldTransmitAcceptedReport(ctx context.Context, u uint64, r o
 		"gasPriceUpdates", len(decodedReport.PriceUpdates.GasPriceUpdates),
 	)
 
-	// todo: if report is stale -> do not transmit
+	// todo: if report is stale -> do not transmit (check the spec for the exact condition)
 	return true, nil
 }
 
