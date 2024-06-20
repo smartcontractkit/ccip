@@ -135,6 +135,60 @@ func (g *liquidityGraph) Len() int {
 	return g.len()
 }
 
+func (g *liquidityGraph) HasNeighbor(from, to models.NetworkSelector) bool {
+	g.lock.RLock()
+	defer g.lock.RUnlock()
+
+	neibs, exist := g.adj[from]
+	if !exist {
+		return false
+	}
+	for _, n := range neibs {
+		if n == to {
+			return true
+		}
+	}
+	return false
+}
+
+func (g *liquidityGraph) FindPath(from, to models.NetworkSelector, hops int, iterator func(nodes ...Data) bool) []models.NetworkSelector {
+	g.lock.RLock()
+	defer g.lock.RUnlock()
+
+	return g.findPath(from, to, hops, iterator)
+}
+
+func (g *liquidityGraph) findPath(from, to models.NetworkSelector, hops int, iterator func(nodes ...Data) bool) []models.NetworkSelector {
+	neibs, exist := g.adj[from]
+	if !exist {
+		return nil
+	}
+	for _, n := range neibs {
+		if n == to {
+			if !iterator(g.data[to]) {
+				continue
+			}
+			return []models.NetworkSelector{n}
+		}
+	}
+	if hops == 0 {
+		return nil
+	}
+	for _, n := range neibs {
+		if p := g.findPath(n, to, hops-1, iterator); len(p) > 0 {
+			data := []Data{g.data[n]}
+			for _, d := range p {
+				data = append(data, g.data[d])
+			}
+			if !iterator(data...) {
+				continue
+			}
+			return append([]models.NetworkSelector{n}, p...)
+		}
+	}
+	return nil
+}
+
 func (g *liquidityGraph) getData(n models.NetworkSelector) (Data, bool) {
 	data, exists := g.data[n]
 	return data, exists
