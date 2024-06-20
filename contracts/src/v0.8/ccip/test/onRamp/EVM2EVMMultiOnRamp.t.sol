@@ -2059,3 +2059,22 @@ contract EVM2EVMMultiOnRamp_getTokenPool is EVM2EVMMultiOnRampSetup {
     assertEq(address(0), nonExistentPool);
   }
 }
+
+contract EVM2EVMMultiOnRamp_setAdmin is EVM2EVMMultiOnRampSetup {
+  function test_Owner_Success() public {
+    vm.expectEmit();
+    emit EVM2EVMMultiOnRamp.AdminSet(STRANGER);
+
+    s_onRamp.setAdmin(STRANGER);
+    assertEq(STRANGER, s_onRamp.getAdmin());
+  }
+
+  // Reverts
+
+  function test_OnlyOwnerOrAdmin_Revert() public {
+    vm.startPrank(STRANGER);
+    vm.expectRevert(EVM2EVMMultiOnRamp.OnlyCallableByOwnerOrAdmin.selector);
+
+    s_onRamp.setAdmin(STRANGER);
+  }
+}

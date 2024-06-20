@@ -838,6 +838,11 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ITypeAndVersion, OwnerIsCrea
   // ================================================================
   // │                           Access                             │
   // ================================================================
+  /// @notice Gets admin address.
+  /// @return the admin address.
+  function getAdmin() external view returns (address) {
+    return s_admin;
+  }
 
   /// @notice Sets the token limit admin address.
   /// @param newAdmin the address of the new admin.
