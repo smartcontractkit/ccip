@@ -6,7 +6,7 @@ import {IAny2EVMMessageReceiver} from "../interfaces/IAny2EVMMessageReceiver.sol
 import {IAny2EVMMultiOffRamp} from "../interfaces/IAny2EVMMultiOffRamp.sol";
 import {IAny2EVMOffRamp} from "../interfaces/IAny2EVMOffRamp.sol";
 import {IMessageInterceptor} from "../interfaces/IMessageInterceptor.sol";
-import {IPool} from "../interfaces/IPool.sol";
+import {IPoolV1} from "../interfaces/IPool.sol";
 import {IPriceRegistry} from "../interfaces/IPriceRegistry.sol";
 import {IRMN} from "../interfaces/IRMN.sol";
 import {IRouter} from "../interfaces/IRouter.sol";
@@ -500,8 +500,12 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
       // Since it's hard to estimate whether manual execution will succeed, we
       // revert the entire transaction if it fails. This will show the user if
       // their manual exec will fail before they submit it.
-      if (manualExecution && newState == Internal.MessageExecutionState.FAILURE) {
-        // If manual execution fails, we revert the entire transaction.
+      if (
+        manualExecution && newState == Internal.MessageExecutionState.FAILURE
+          && originalState != Internal.MessageExecutionState.UNTOUCHED
+      ) {
+        // If manual execution fails, we revert the entire transaction, unless the originalState is UNTOUCHED as we
+        // would still be making progress by changing the state from UNTOUCHED to FAILURE.
         revert ExecutionError(message.messageId, returnData);
       }
 
@@ -922,7 +926,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
       // We protects against return data bombs by capping the return data size at MAX_RET_BYTES.
       (bool success, bytes memory returnData,) = CallWithExactGas._callWithExactGasSafeReturnData(
         abi.encodeWithSelector(
-          IPool.releaseOrMint.selector,
+          IPoolV1.releaseOrMint.selector,
           Pool.ReleaseOrMintInV1({
             originalSender: messageRoute.sender,
             receiver: messageRoute.receiver,
