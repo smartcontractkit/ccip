@@ -506,14 +506,14 @@ func (p *Plugin) loadPendingTransfers(ctx context.Context, lggr logger.Logger) (
 		return nil, fmt.Errorf("get edges: %w", err)
 	}
 	for _, edge := range edges {
-		lggr := lggr.With("sourceNetwork", edge.Source, "sourceChainID", edge.Source.ChainID(), "destNetwork", edge.Dest, "destChainID", edge.Dest.ChainID())
+		logger := lggr.With("sourceNetwork", edge.Source, "sourceChainID", edge.Source.ChainID(), "destNetwork", edge.Dest, "destChainID", edge.Dest.ChainID())
 		bridge, err := p.bridgeFactory.NewBridge(edge.Source, edge.Dest)
 		if err != nil {
 			return nil, fmt.Errorf("init bridge: %w", err)
 		}
 
 		if bridge == nil {
-			lggr.Warnw("no bridge found for network pair")
+			logger.Warn("no bridge found for network pair")
 			continue
 		}
 
@@ -531,7 +531,7 @@ func (p *Plugin) loadPendingTransfers(ctx context.Context, lggr logger.Logger) (
 			return nil, fmt.Errorf("get pending transfers: %w", err)
 		}
 
-		lggr.Infow("loaded pending transfers for network", "pendingTransfers", netPendingTransfers)
+		logger.Infow("loaded pending transfers for network", "pendingTransfers", netPendingTransfers)
 		pendingTransfers = append(pendingTransfers, netPendingTransfers...)
 	}
 
