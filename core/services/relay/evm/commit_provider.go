@@ -181,11 +181,15 @@ func (P DstCommitProvider) NewPriceGetter(ctx context.Context) (priceGetter ccip
 }
 
 func (P SrcCommitProvider) NewCommitStoreReader(ctx context.Context, commitStoreAddress cciptypes.Address) (commitStoreReader cciptypes.CommitStoreReader, err error) {
-	return nil, fmt.Errorf("can't construct a commit store reader from one relayer")
+	versionFinder := ccip.NewEvmVersionFinder()
+	commitStoreReader, err = ccip.NewCommitStoreReader(P.lggr, versionFinder, commitStoreAddress, P.client, P.lp)
+	return
 }
 
 func (P DstCommitProvider) NewCommitStoreReader(ctx context.Context, commitStoreAddress cciptypes.Address) (commitStoreReader cciptypes.CommitStoreReader, err error) {
-	return nil, fmt.Errorf("can't construct a commit store reader from one relayer")
+	versionFinder := ccip.NewEvmVersionFinder()
+	commitStoreReader, err = ccip.NewCommitStoreReader(P.lggr, versionFinder, commitStoreAddress, P.client, P.lp)
+	return
 }
 
 func (P SrcCommitProvider) NewOnRampReader(ctx context.Context, onRampAddress cciptypes.Address, sourceChainSelector uint64, destChainSelector uint64) (onRampReader cciptypes.OnRampReader, err error) {

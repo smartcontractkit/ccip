@@ -51,6 +51,10 @@ func NewOnRampReader(lggr logger.Logger, versionFinder VersionFinder, sourceSele
 	return factory.NewOnRampReader(lggr, versionFinder, sourceSelector, destSelector, onRampAddress, sourceLP, source)
 }
 
+func NewCommitStoreReader(lggr logger.Logger, versionFinder VersionFinder, address ccip.Address, destClient client.Client, lp logpoller.LogPoller) (ccipdata.CommitStoreReader, error) {
+	return factory.NewCommitStoreReader(lggr, versionFinder, address, destClient, lp)
+}
+
 type OffRampReader = ccipdata.OffRampReader
 
 type DynamicPriceGetterClient = pricegetter.DynamicPriceGetterClient
