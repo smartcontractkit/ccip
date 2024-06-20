@@ -55,8 +55,15 @@ library Internal {
   }
 
   struct SourceTokenData {
+    // The source pool address, abi encoded. This value is trusted as it was obtained through the onRamp. It can be
+    // relied upon by the destination pool to validate the source pool.
     bytes sourcePoolAddress;
-    bytes destPoolAddress;
+    // The address of the destination token pool, abi encoded in the case of EVM chains
+    // This value is UNTRUSTED as any pool owner can return whatever value they want.
+    bytes destTokenAddress;
+    // Optional pool data to be transferred to the destination chain. Be default this is capped at
+    // CCIP_LOCK_OR_BURN_V1_RET_BYTES bytes. If more data is required, the TokenTransferFeeConfig.destBytesOverhead
+    // has to be set for the specific token.
     bytes extraData;
   }
 
@@ -160,11 +167,17 @@ library Internal {
     return _validateEVMAddressFromUint256(abi.decode(encodedAddress, (uint256)));
   }
 
+  /// @dev We disallow the first 1024 addresses to never allow calling precompiles. It is extremely unlikely that
+  /// anyone would ever be able to generate an address in this range.
+  uint256 public constant PRECOMPILE_SPACE = 1024;
+
   /// @notice This method provides a safe way to convert a uint256 to an address.
   /// It will revert if the uint256 is not a valid EVM address, or a precompile address.
   /// @return The address if it is valid, the function will revert otherwise.
   function _validateEVMAddressFromUint256(uint256 encodedAddress) internal pure returns (address) {
-    if (encodedAddress > type(uint160).max || encodedAddress < 10) revert InvalidEVMAddress(abi.encode(encodedAddress));
+    if (encodedAddress > type(uint160).max || encodedAddress < PRECOMPILE_SPACE) {
+      revert InvalidEVMAddress(abi.encode(encodedAddress));
+    }
     return address(uint160(encodedAddress));
   }
 

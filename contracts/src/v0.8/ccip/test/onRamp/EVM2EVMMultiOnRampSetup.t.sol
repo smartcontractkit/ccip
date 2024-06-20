@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.24;
 
-import {IPool} from "../../interfaces/IPool.sol";
+import {IPoolV1} from "../../interfaces/IPool.sol";
 
 import {PriceRegistry} from "../../PriceRegistry.sol";
 import {Router} from "../../Router.sol";
@@ -33,6 +33,7 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
   address[] internal s_offRamps;
 
   address internal s_destTokenPool = makeAddr("destTokenPool");
+  address internal s_destToken = makeAddr("destToken");
 
   EVM2EVMMultiOnRamp.PremiumMultiplierWeiPerEthArgs[] internal s_premiumMultiplierWeiPerEthArgs;
   EVM2EVMMultiOnRamp.TokenTransferFeeConfigArgs[] internal s_tokenTransferFeeConfigArgs;
@@ -185,20 +186,15 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
     uint64 nonce,
     uint256 feeTokenAmount,
     address originalSender,
-    bytes32 metadaHash,
+    bytes32 metadataHash,
     TokenAdminRegistry tokenAdminRegistry
   ) internal view returns (Internal.EVM2EVMMessage memory) {
-    // Slicing is only available for calldata. So we have to build a new bytes array.
-    bytes memory args = new bytes(message.extraArgs.length - 4);
-    for (uint256 i = 4; i < message.extraArgs.length; ++i) {
-      args[i - 4] = message.extraArgs[i];
-    }
     Internal.EVM2EVMMessage memory messageEvent = Internal.EVM2EVMMessage({
       sequenceNumber: seqNum,
       feeTokenAmount: feeTokenAmount,
       sender: originalSender,
       nonce: nonce,
-      gasLimit: abi.decode(args, (Client.EVMExtraArgsV1)).gasLimit,
+      gasLimit: abi.decode(_removeFirst4Bytes(message.extraArgs), (Client.EVMExtraArgsV1)).gasLimit,
       strict: false,
       sourceChainSelector: sourChainSelector,
       receiver: abi.decode(message.receiver, (address)),
@@ -210,29 +206,36 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
     });
 
     for (uint256 i = 0; i < message.tokenAmounts.length; ++i) {
+      address destToken = s_destTokenBySourceToken[message.tokenAmounts[i].token];
+
       messageEvent.sourceTokenData[i] = abi.encode(
         Internal.SourceTokenData({
           sourcePoolAddress: abi.encode(tokenAdminRegistry.getTokenConfig(message.tokenAmounts[i].token).tokenPool),
-          destPoolAddress: abi.encode(s_destPoolBySourceToken[message.tokenAmounts[i].token]),
+          destTokenAddress: abi.encode(destToken),
           extraData: ""
         })
       );
     }
 
-    messageEvent.messageId = Internal._hash(messageEvent, metadaHash);
+    messageEvent.messageId = Internal._hash(messageEvent, metadataHash);
     return messageEvent;
   }
 
   function _generateDynamicMultiOnRampConfig(
     address router,
-    address priceRegistry,
-    address tokenAdminRegistry
+    address priceRegistry
   ) internal pure returns (EVM2EVMMultiOnRamp.DynamicConfig memory) {
-    return EVM2EVMMultiOnRamp.DynamicConfig({
-      router: router,
-      priceRegistry: priceRegistry,
-      tokenAdminRegistry: tokenAdminRegistry
-    });
+    return
+      EVM2EVMMultiOnRamp.DynamicConfig({router: router, priceRegistry: priceRegistry, feeAggregator: FEE_AGGREGATOR});
+  }
+
+  // Slicing is only available for calldata. So we have to build a new bytes array.
+  function _removeFirst4Bytes(bytes memory data) internal pure returns (bytes memory) {
+    bytes memory result = new bytes(data.length - 4);
+    for (uint256 i = 4; i < data.length; ++i) {
+      result[i - 4] = data[i];
+    }
+    return result;
   }
 
   function _generateDestChainConfigArgs() internal pure returns (EVM2EVMMultiOnRamp.DestChainConfigArgs[] memory) {
@@ -274,14 +277,6 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
     return tokenTransferFeeConfigArgs;
   }
 
-  function _getMultiOnRampNopsAndWeights() internal pure returns (EVM2EVMMultiOnRamp.NopAndWeight[] memory) {
-    EVM2EVMMultiOnRamp.NopAndWeight[] memory nopsAndWeights = new EVM2EVMMultiOnRamp.NopAndWeight[](3);
-    nopsAndWeights[0] = EVM2EVMMultiOnRamp.NopAndWeight({nop: USER_1, weight: 19284});
-    nopsAndWeights[1] = EVM2EVMMultiOnRamp.NopAndWeight({nop: USER_2, weight: 52935});
-    nopsAndWeights[2] = EVM2EVMMultiOnRamp.NopAndWeight({nop: USER_3, weight: 8});
-    return nopsAndWeights;
-  }
-
   function _deployOnRamp(
     uint64 sourceChainSelector,
     address sourceRouter,
@@ -291,15 +286,15 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
       EVM2EVMMultiOnRamp.StaticConfig({
         linkToken: s_sourceTokens[0],
         chainSelector: sourceChainSelector,
-        maxNopFeesJuels: MAX_NOP_FEES_JUELS,
-        rmnProxy: address(s_mockRMN)
+        maxFeeJuelsPerMsg: MAX_MSG_FEES_JUELS,
+        rmnProxy: address(s_mockRMN),
+        tokenAdminRegistry: tokenAdminRegistry
       }),
-      _generateDynamicMultiOnRampConfig(sourceRouter, address(s_priceRegistry), tokenAdminRegistry),
+      _generateDynamicMultiOnRampConfig(sourceRouter, address(s_priceRegistry)),
       _generateDestChainConfigArgs(),
       getOutboundRateLimiterConfig(),
       s_premiumMultiplierWeiPerEthArgs,
-      s_tokenTransferFeeConfigArgs,
-      _getMultiOnRampNopsAndWeights()
+      s_tokenTransferFeeConfigArgs
     );
     onRamp.setAdmin(ADMIN);
 
@@ -337,8 +332,9 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
   ) internal pure {
     assertEq(a.linkToken, b.linkToken);
     assertEq(a.chainSelector, b.chainSelector);
-    assertEq(a.maxNopFeesJuels, b.maxNopFeesJuels);
+    assertEq(a.maxFeeJuelsPerMsg, b.maxFeeJuelsPerMsg);
     assertEq(a.rmnProxy, b.rmnProxy);
+    assertEq(a.tokenAdminRegistry, b.tokenAdminRegistry);
   }
 
   function _assertDynamicConfigsEqual(
@@ -347,7 +343,6 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
   ) internal pure {
     assertEq(a.router, b.router);
     assertEq(a.priceRegistry, b.priceRegistry);
-    assertEq(a.tokenAdminRegistry, b.tokenAdminRegistry);
   }
 
   function _assertTokenTransferFeeConfigEqual(

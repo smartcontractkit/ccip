@@ -17,7 +17,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
 
-	"github.com/smartcontractkit/ccip/integration-tests/wrappers"
+	"github.com/smartcontractkit/chainlink/integration-tests/wrappers"
 
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/arm_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store"
@@ -122,13 +122,15 @@ type TokenTransmitter struct {
 
 type ERC677Token struct {
 	client          blockchain.EVMClient
-	logger          zerolog.Logger
+	logger          *zerolog.Logger
 	instance        *burn_mint_erc677.BurnMintERC677
 	ContractAddress common.Address
+	OwnerAddress    common.Address
+	OwnerWallet     *blockchain.EthereumWallet
 }
 
 func (token *ERC677Token) GrantMintAndBurn(burnAndMinter common.Address) error {
-	opts, err := token.client.TransactionOpts(token.client.GetDefaultWallet())
+	opts, err := token.client.TransactionOpts(token.OwnerWallet)
 	if err != nil {
 		return fmt.Errorf("failed to get transaction opts: %w", err)
 	}
@@ -145,7 +147,7 @@ func (token *ERC677Token) GrantMintAndBurn(burnAndMinter common.Address) error {
 }
 
 func (token *ERC677Token) GrantMintRole(minter common.Address) error {
-	opts, err := token.client.TransactionOpts(token.client.GetDefaultWallet())
+	opts, err := token.client.TransactionOpts(token.OwnerWallet)
 	if err != nil {
 		return err
 	}
@@ -162,7 +164,7 @@ func (token *ERC677Token) GrantMintRole(minter common.Address) error {
 }
 
 func (token *ERC677Token) Mint(to common.Address, amount *big.Int) error {
-	opts, err := token.client.TransactionOpts(token.client.GetDefaultWallet())
+	opts, err := token.client.TransactionOpts(token.OwnerWallet)
 	if err != nil {
 		return err
 	}
@@ -181,9 +183,11 @@ func (token *ERC677Token) Mint(to common.Address, amount *big.Int) error {
 
 type ERC20Token struct {
 	client          blockchain.EVMClient
-	logger          zerolog.Logger
+	logger          *zerolog.Logger
 	instance        *erc20.ERC20
 	ContractAddress common.Address
+	OwnerAddress    common.Address
+	OwnerWallet     *blockchain.EthereumWallet
 }
 
 func (token *ERC20Token) Address() string {
@@ -202,6 +206,8 @@ func (token *ERC20Token) BalanceOf(ctx context.Context, addr string) (*big.Int, 
 	return balance, nil
 }
 
+// Allowance returns the amount which spender is still allowed to withdraw from owner
+// https://docs.openzeppelin.com/contracts/2.x/api/token/erc20#IERC20-allowance-address-address-
 func (token *ERC20Token) Allowance(owner, spender string) (*big.Int, error) {
 	allowance, err := token.instance.Allowance(nil, common.HexToAddress(owner), common.HexToAddress(spender))
 	if err != nil {
@@ -210,33 +216,49 @@ func (token *ERC20Token) Allowance(owner, spender string) (*big.Int, error) {
 	return allowance, nil
 }
 
-func (token *ERC20Token) Approve(to string, amount *big.Int) error {
-	opts, err := token.client.TransactionOpts(token.client.GetDefaultWallet())
+// Approve approves the spender to spend the given amount of tokens on behalf of another account
+// https://docs.openzeppelin.com/contracts/2.x/api/token/erc20#IERC20-approve-address-uint256-
+func (token *ERC20Token) Approve(onBehalf *blockchain.EthereumWallet, spender string, amount *big.Int) error {
+	onBehalfBalance, err := token.BalanceOf(context.Background(), onBehalf.Address())
+	if err != nil {
+		return fmt.Errorf("failed to get balance of onBehalf: %w", err)
+	}
+	if onBehalfBalance.Cmp(amount) < 0 {
+		return fmt.Errorf("onBehalf '%s' does not have enough balance to approve", onBehalf.Address())
+	}
+	currentAllowance, err := token.Allowance(onBehalf.Address(), spender)
+	if err != nil {
+		return fmt.Errorf("failed to get current allowance for '%s' on behalf of '%s': %w", spender, onBehalf.Address(), err)
+	}
+	opts, err := token.client.TransactionOpts(onBehalf)
 	if err != nil {
 		return fmt.Errorf("failed to get transaction options: %w", err)
 	}
-	token.logger.Info().
-		Str("From", token.client.GetDefaultWallet().Address()).
-		Str("To", to).
+	log := token.logger.Info().
+		Str("On Behalf Of", onBehalf.Address()).
+		Str("On Behalf Of Balance", onBehalfBalance.String()).
+		Str("Spender", spender).
+		Str("Spender Current Allowance", currentAllowance.String()).
 		Str("Token", token.Address()).
 		Str("Amount", amount.String()).
 		Uint64("Nonce", opts.Nonce.Uint64()).
-		Str(Network, token.client.GetNetworkConfig().Name).
-		Msg("Approving ERC20 Transfer")
-	tx, err := token.instance.Approve(opts, common.HexToAddress(to), amount)
+		Str(Network, token.client.GetNetworkConfig().Name)
+	tx, err := token.instance.Approve(opts, common.HexToAddress(spender), amount)
 	if err != nil {
+		log.Err(err).Msg("Error Approving ERC20 Transfer")
 		return fmt.Errorf("failed to approve ERC20: %w", err)
 	}
+	log.Str("Hash", tx.Hash().Hex()).Msg("Approving ERC20 Transfer")
 	return token.client.ProcessTransaction(tx)
 }
 
-func (token *ERC20Token) Transfer(to string, amount *big.Int) error {
-	opts, err := token.client.TransactionOpts(token.client.GetDefaultWallet())
+func (token *ERC20Token) Transfer(from *blockchain.EthereumWallet, to string, amount *big.Int) error {
+	opts, err := token.client.TransactionOpts(from)
 	if err != nil {
 		return fmt.Errorf("failed to get transaction options: %w", err)
 	}
 	token.logger.Info().
-		Str("From", token.client.GetDefaultWallet().Address()).
+		Str("From", from.Address()).
 		Str("To", to).
 		Str("Amount", amount.String()).
 		Uint64("Nonce", opts.Nonce.Uint64()).
@@ -251,7 +273,7 @@ func (token *ERC20Token) Transfer(to string, amount *big.Int) error {
 
 type LinkToken struct {
 	client     blockchain.EVMClient
-	logger     zerolog.Logger
+	logger     *zerolog.Logger
 	instance   *link_token_interface.LinkToken
 	EthAddress common.Address
 }
@@ -545,10 +567,12 @@ func (w TokenPoolWrapper) GetRebalancer(opts *bind.CallOpts) (common.Address, er
 
 // TokenPool represents a TokenPool address
 type TokenPool struct {
-	client     blockchain.EVMClient
-	logger     zerolog.Logger
-	Instance   *TokenPoolWrapper
-	EthAddress common.Address
+	client       blockchain.EVMClient
+	logger       *zerolog.Logger
+	Instance     *TokenPoolWrapper
+	EthAddress   common.Address
+	OwnerAddress common.Address
+	OwnerWallet  *blockchain.EthereumWallet
 }
 
 func (pool *TokenPool) Address() string {
@@ -582,7 +606,9 @@ func (pool *TokenPool) SyncUSDCDomain(destTokenTransmitter *TokenTransmitter, de
 
 	var allowedCallerBytes [32]byte
 	copy(allowedCallerBytes[12:], destPoolAddr.Bytes())
-	destTokenTransmitterIns, err := mock_usdc_token_transmitter.NewMockE2EUSDCTransmitter(destTokenTransmitter.ContractAddress, destTokenTransmitter.client.Backend())
+	destTokenTransmitterIns, err := mock_usdc_token_transmitter.NewMockE2EUSDCTransmitter(
+		destTokenTransmitter.ContractAddress, destTokenTransmitter.client.Backend(),
+	)
 	if err != nil {
 		return fmt.Errorf("failed to create mock USDC token transmitter: %w", err)
 	}
@@ -590,12 +616,13 @@ func (pool *TokenPool) SyncUSDCDomain(destTokenTransmitter *TokenTransmitter, de
 	if err != nil {
 		return fmt.Errorf("failed to get local domain: %w", err)
 	}
-	opts, err := pool.client.TransactionOpts(pool.client.GetDefaultWallet())
+	opts, err := pool.client.TransactionOpts(pool.OwnerWallet)
 	if err != nil {
 		return fmt.Errorf("failed to get transaction opts: %w", err)
 	}
 	pool.logger.Info().
 		Str("Token Pool", pool.Address()).
+		Str("From", pool.OwnerAddress.Hex()).
 		Str(Network, pool.client.GetNetworkName()).
 		Uint32("Domain", domain).
 		Str("Allowed Caller", destPoolAddr.Hex()).
@@ -615,6 +642,8 @@ func (pool *TokenPool) SyncUSDCDomain(destTokenTransmitter *TokenTransmitter, de
 	return pool.client.ProcessTransaction(tx)
 }
 
+// MintUSDCToUSDCPool mints 100 USDC tokens to the pool if it is a USDC pool.
+// This helps provide liquidity to the pool which is necessary for USDC tests to function properly.
 func (pool *TokenPool) MintUSDCToUSDCPool() error {
 	if !pool.IsUSDC() {
 		return fmt.Errorf("pool is not a USDC pool, cannot send USDC")
@@ -644,7 +673,7 @@ func (pool *TokenPool) RemoveLiquidity(amount *big.Int) error {
 	if !pool.IsLockRelease() {
 		return fmt.Errorf("pool is not a lock release pool, cannot remove liquidity")
 	}
-	opts, err := pool.client.TransactionOpts(pool.client.GetDefaultWallet())
+	opts, err := pool.client.TransactionOpts(pool.OwnerWallet)
 	if err != nil {
 		return fmt.Errorf("failed to get transaction opts: %w", err)
 	}
@@ -664,17 +693,16 @@ func (pool *TokenPool) RemoveLiquidity(amount *big.Int) error {
 	return pool.client.ProcessTransaction(tx)
 }
 
-type tokenApproveFn func(string, *big.Int) error
-
-func (pool *TokenPool) AddLiquidity(approveFn tokenApproveFn, tokenAddr string, amount *big.Int) error {
+// AddLiquidity approves the token pool to spend the given amount of tokens from the given wallet
+func (pool *TokenPool) AddLiquidity(token *ERC20Token, fromWallet *blockchain.EthereumWallet, amount *big.Int) error {
 	if !pool.IsLockRelease() {
 		return fmt.Errorf("pool is not a lock release pool, cannot add liquidity")
 	}
 	pool.logger.Info().
-		Str("Link Token", tokenAddr).
+		Str("Token", token.Address()).
 		Str("Token Pool", pool.Address()).
-		Msg("Initiating transferring of token to token pool")
-	err := approveFn(pool.Address(), amount)
+		Msg("Initiating adding liquidity to token pool")
+	err := token.Approve(fromWallet, pool.Address(), amount)
 	if err != nil {
 		return fmt.Errorf("failed to approve token transfer: %w", err)
 	}
@@ -682,7 +710,7 @@ func (pool *TokenPool) AddLiquidity(approveFn tokenApproveFn, tokenAddr string, 
 	if err != nil {
 		return fmt.Errorf("failed to wait for events: %w", err)
 	}
-	opts, err := pool.client.TransactionOpts(pool.client.GetDefaultWallet())
+	opts, err := pool.client.TransactionOpts(pool.OwnerWallet)
 	if err != nil {
 		return fmt.Errorf("failed to get transaction opts: %w", err)
 	}
@@ -690,7 +718,7 @@ func (pool *TokenPool) AddLiquidity(approveFn tokenApproveFn, tokenAddr string, 
 	if err != nil {
 		return fmt.Errorf("failed to set rebalancer: %w", err)
 	}
-	opts, err = pool.client.TransactionOpts(pool.client.GetDefaultWallet())
+	opts, err = pool.client.TransactionOpts(pool.OwnerWallet)
 	if err != nil {
 		return fmt.Errorf("failed to get transaction opts: %w", err)
 	}
@@ -703,13 +731,13 @@ func (pool *TokenPool) AddLiquidity(approveFn tokenApproveFn, tokenAddr string, 
 	}
 	pool.logger.Info().
 		Str("Token Pool", pool.Address()).
-		Str("Link Token", tokenAddr).
+		Str("Token", token.Address()).
 		Str(Network, pool.client.GetNetworkConfig().Name).
 		Msg("Liquidity added")
 	return pool.client.ProcessTransaction(tx)
 }
 
-func (pool *TokenPool) SetRemoteChainOnPool(remoteChainSelector uint64, remotePoolAddresses common.Address) error {
+func (pool *TokenPool) SetRemoteChainOnPool(remoteChainSelector uint64, remotePoolAddresses common.Address, remoteTokenAddress common.Address) error {
 	pool.logger.Info().
 		Str("Token Pool", pool.Address()).
 		Msg("Setting remote chain on pool")
@@ -719,7 +747,7 @@ func (pool *TokenPool) SetRemoteChainOnPool(remoteChainSelector uint64, remotePo
 	if err != nil {
 		return fmt.Errorf("failed to get if chain is supported: %w", err)
 	}
-	// Check if remote chain is already supported , if yes return
+	// Check if remote chain is already supported, if yes return
 	if isSupported {
 		pool.logger.Info().
 			Str("Token Pool", pool.Address()).
@@ -728,14 +756,21 @@ func (pool *TokenPool) SetRemoteChainOnPool(remoteChainSelector uint64, remotePo
 			Msg("Remote chain is already supported")
 		return nil
 	}
-	encodedAddress, err := abihelpers.EncodeAddress(remotePoolAddresses)
+	// if not, add it
+	encodedPoolAddress, err := abihelpers.EncodeAddress(remotePoolAddresses)
 	if err != nil {
 		return fmt.Errorf("failed to encode address: %w", err)
 	}
 
+	encodedTokenAddress, err := abihelpers.EncodeAddress(remoteTokenAddress)
+	if err != nil {
+		return fmt.Errorf("failed to encode token address: %w", err)
+	}
+
 	selectorsToUpdate = append(selectorsToUpdate, token_pool.TokenPoolChainUpdate{
 		RemoteChainSelector: remoteChainSelector,
-		RemotePoolAddress:   encodedAddress,
+		RemotePoolAddress:   encodedPoolAddress,
+		RemoteTokenAddress:  encodedTokenAddress,
 		Allowed:             true,
 		InboundRateLimiterConfig: token_pool.RateLimiterConfig{
 			IsEnabled: true,
@@ -748,13 +783,11 @@ func (pool *TokenPool) SetRemoteChainOnPool(remoteChainSelector uint64, remotePo
 			Rate:      new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e5)),
 		},
 	})
-	// If remote chain is not supported , add it
-	opts, err := pool.client.TransactionOpts(pool.client.GetDefaultWallet())
+	opts, err := pool.client.TransactionOpts(pool.OwnerWallet)
 	if err != nil {
 		return fmt.Errorf("failed to get transaction opts: %w", err)
 	}
 	tx, err := pool.Instance.ApplyChainUpdates(opts, selectorsToUpdate)
-
 	if err != nil {
 		return fmt.Errorf("failed to set chain updates on token pool: %w", err)
 	}
@@ -769,7 +802,7 @@ func (pool *TokenPool) SetRemoteChainOnPool(remoteChainSelector uint64, remotePo
 
 // SetRemoteChainRateLimits sets the rate limits for the token pool on the remote chain
 func (pool *TokenPool) SetRemoteChainRateLimits(remoteChainSelector uint64, rl token_pool.RateLimiterConfig) error {
-	opts, err := pool.client.TransactionOpts(pool.client.GetDefaultWallet())
+	opts, err := pool.client.TransactionOpts(pool.OwnerWallet)
 	if err != nil {
 		return fmt.Errorf("error getting transaction opts: %w", err)
 	}
@@ -796,7 +829,7 @@ func (pool *TokenPool) SetRouter(routerAddr common.Address) error {
 	pool.logger.Info().
 		Str("Token Pool", pool.Address()).
 		Msg("Setting router on pool")
-	opts, err := pool.client.TransactionOpts(pool.client.GetDefaultWallet())
+	opts, err := pool.client.TransactionOpts(pool.OwnerWallet)
 	if err != nil {
 		return fmt.Errorf("failed to get transaction opts: %w", err)
 	}
@@ -830,7 +863,7 @@ func (pool *TokenPool) SetRebalancer(rebalancerAddress common.Address) error {
 	pool.logger.Info().
 		Str("Token Pool", pool.Address()).
 		Msg("Setting rebalancer on pool")
-	opts, err := pool.client.TransactionOpts(pool.client.GetDefaultWallet())
+	opts, err := pool.client.TransactionOpts(pool.OwnerWallet)
 	if err != nil {
 		return fmt.Errorf("failed to get transaction opts: %w", err)
 	}
@@ -914,7 +947,7 @@ func (w CommitStoreWrapper) GetExpectedNextSequenceNumber(opts *bind.CallOpts) (
 
 type CommitStore struct {
 	client     blockchain.EVMClient
-	logger     zerolog.Logger
+	logger     *zerolog.Logger
 	Instance   *CommitStoreWrapper
 	EthAddress common.Address
 }
@@ -938,12 +971,6 @@ func (b *CommitStore) SetOCR2Config(
 	if err != nil {
 		return fmt.Errorf("error getting transaction opts: %w", err)
 	}
-
-	b.logger.Info().
-		Interface("signerAddresses", signers).
-		Interface("transmitterAddresses", transmitters).
-		Str(Network, b.client.GetNetworkConfig().Name).
-		Msg("Configuring CommitStore")
 	tx, err := b.Instance.SetOCR2Config(
 		opts,
 		signers,
@@ -953,6 +980,12 @@ func (b *CommitStore) SetOCR2Config(
 		offchainConfigVersion,
 		offchainConfig,
 	)
+	b.logger.Debug().
+		Interface("signerAddresses", signers).
+		Interface("transmitterAddresses", transmitters).
+		Str(Network, b.client.GetNetworkConfig().Name).
+		Str("Tx", tx.Hash().Hex()).
+		Msg("Configuring CommitStore")
 
 	if err != nil {
 		return fmt.Errorf("error setting OCR2 config: %w", err)
@@ -979,7 +1012,7 @@ func (b *CommitStore) WatchReportAccepted(opts *bind.WatchOpts, acceptedEvent ch
 
 type ReceiverDapp struct {
 	client     blockchain.EVMClient
-	logger     zerolog.Logger
+	logger     *zerolog.Logger
 	instance   *maybe_revert_message_receiver.MaybeRevertMessageReceiver
 	EthAddress common.Address
 }
@@ -1098,7 +1131,7 @@ type InternalTokenPriceUpdate struct {
 type PriceRegistry struct {
 	client     blockchain.EVMClient
 	Instance   *PriceRegistryWrapper
-	logger     zerolog.Logger
+	logger     *zerolog.Logger
 	EthAddress common.Address
 }
 
@@ -1231,7 +1264,7 @@ func (c *PriceRegistry) WatchUsdPerTokenUpdated(opts *bind.WatchOpts, latest cha
 
 type TokenAdminRegistry struct {
 	client     blockchain.EVMClient
-	logger     zerolog.Logger
+	logger     *zerolog.Logger
 	Instance   *token_admin_registry.TokenAdminRegistry
 	EthAddress common.Address
 }
@@ -1245,7 +1278,7 @@ func (r *TokenAdminRegistry) SetAdminAndRegisterPool(tokenAddr, poolAddr common.
 	if err != nil {
 		return fmt.Errorf("error getting transaction opts: %w", err)
 	}
-	tx, err := r.Instance.RegisterAdministratorPermissioned(opts, tokenAddr, opts.From)
+	tx, err := r.Instance.ProposeAdministrator(opts, tokenAddr, opts.From)
 	if err != nil {
 		return fmt.Errorf("error setting admin for token %s : %w", tokenAddr.Hex(), err)
 	}
@@ -1266,12 +1299,32 @@ func (r *TokenAdminRegistry) SetAdminAndRegisterPool(tokenAddr, poolAddr common.
 	if err != nil {
 		return fmt.Errorf("error getting transaction opts: %w", err)
 	}
+	tx, err = r.Instance.AcceptAdminRole(opts, tokenAddr)
+	if err != nil {
+		return fmt.Errorf("error accepting admin role for token %s : %w", tokenAddr.Hex(), err)
+	}
+	err = r.client.ProcessTransaction(tx)
+	if err != nil {
+		return fmt.Errorf("error processing tx for accepting admin role for token %w", err)
+	}
+	r.logger.Info().
+		Str("Token", tokenAddr.Hex()).
+		Str("TokenAdminRegistry", r.Address()).
+		Msg("Admin role is accepted for token on TokenAdminRegistry")
+	err = r.client.WaitForEvents()
+	if err != nil {
+		return fmt.Errorf("error waiting for tx for accepting admin role for token %w", err)
+	}
+	opts, err = r.client.TransactionOpts(r.client.GetDefaultWallet())
+	if err != nil {
+		return fmt.Errorf("error getting transaction opts: %w", err)
+	}
 	tx, err = r.Instance.SetPool(opts, tokenAddr, poolAddr)
 	if err != nil {
 		return fmt.Errorf("error setting token %s and pool %s : %w", tokenAddr.Hex(), poolAddr.Hex(), err)
 	}
 	r.logger.Info().
-		Str("token", tokenAddr.Hex()).
+		Str("Token", tokenAddr.Hex()).
 		Str("Pool", poolAddr.Hex()).
 		Str("TokenAdminRegistry", r.Address()).
 		Msg("token and pool are set on TokenAdminRegistry")
@@ -1284,7 +1337,7 @@ func (r *TokenAdminRegistry) SetAdminAndRegisterPool(tokenAddr, poolAddr common.
 
 type Router struct {
 	client     blockchain.EVMClient
-	logger     zerolog.Logger
+	logger     *zerolog.Logger
 	Instance   *router.Router
 	EthAddress common.Address
 }
@@ -1566,7 +1619,7 @@ func (w OnRampWrapper) CurrentRateLimiterState(opts *bind.CallOpts) (*RateLimite
 
 type OnRamp struct {
 	client     blockchain.EVMClient
-	logger     zerolog.Logger
+	logger     *zerolog.Logger
 	Instance   *OnRampWrapper
 	EthAddress common.Address
 }
@@ -1703,7 +1756,7 @@ func (onRamp *OnRamp) ApplyPoolUpdates(tokens []common.Address, pools []common.A
 // OffRamp represents the OffRamp CCIP contract on the destination chain
 type OffRamp struct {
 	client     blockchain.EVMClient
-	logger     zerolog.Logger
+	logger     *zerolog.Logger
 	Instance   *OffRampWrapper
 	EthAddress common.Address
 }
@@ -2050,7 +2103,7 @@ type EVM2EVMOffRampExecutionStateChanged struct {
 
 type MockAggregator struct {
 	client          blockchain.EVMClient
-	logger          zerolog.Logger
+	logger          *zerolog.Logger
 	Instance        *mock_v3_aggregator_contract.MockV3Aggregator
 	ContractAddress common.Address
 	RoundId         *big.Int

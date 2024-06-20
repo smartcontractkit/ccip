@@ -7,20 +7,26 @@ import (
 	"math/big"
 	"strings"
 
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/pricegetter"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/rpclib"
+
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
 	libocr2 "github.com/smartcontractkit/libocr/offchainreporting2plus"
 	"go.uber.org/multierr"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil"
+
 	commonlogger "github.com/smartcontractkit/chainlink-common/pkg/logger"
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/rpclib"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
 
+	cciporm "github.com/smartcontractkit/chainlink/v2/core/services/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
+	db "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdb"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/txmgr"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/legacyevm"
@@ -33,12 +39,11 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/factory"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/observability"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/oraclelib"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/pricegetter"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/promwrapper"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pipeline"
 )
 
-func NewCommitServices(ctx context.Context, srcProvider commontypes.CCIPCommitProvider, dstProvider commontypes.CCIPCommitProvider, srcChain legacyevm.Chain, dstChain legacyevm.Chain, chainSet legacyevm.LegacyChainContainer, jb job.Job, lggr logger.Logger, pr pipeline.Runner, argsNoPlugin libocr2.OCR2OracleArgs, new bool, sourceChainID int64, destChainID int64, logError func(string)) ([]job.ServiceCtx, error) {
+func NewCommitServices(ctx context.Context, ds sqlutil.DataSource, srcProvider commontypes.CCIPCommitProvider, dstProvider commontypes.CCIPCommitProvider, srcChain legacyevm.Chain, dstChain legacyevm.Chain, chainSet legacyevm.LegacyChainContainer, jb job.Job, lggr logger.Logger, pr pipeline.Runner, argsNoPlugin libocr2.OCR2OracleArgs, new bool, sourceChainID int64, destChainID int64, logError func(string)) ([]job.ServiceCtx, error) {
 	spec := jb.OCR2OracleSpec
 
 	var pluginConfig ccipconfig.CommitPluginJobSpecConfig
@@ -143,6 +148,23 @@ func NewCommitServices(ctx context.Context, srcProvider commontypes.CCIPCommitPr
 		destChainID,
 		onRampAddress,
 	)
+
+	orm, err := cciporm.NewORM(ds)
+	if err != nil {
+		return nil, err
+	}
+
+	priceService := db.NewPriceService(
+		lggr,
+		orm,
+		jb.ID,
+		staticConfig.ChainSelector,
+		staticConfig.SourceChainSelector,
+		sourceNative,
+		priceGetter,
+		offRampReader,
+	)
+
 	wrappedPluginFactory := NewCommitReportingPluginFactory(CommitPluginStaticConfig{
 		lggr:                  lggr,
 		onRampReader:          onRampReader,
@@ -152,7 +174,6 @@ func NewCommitServices(ctx context.Context, srcProvider commontypes.CCIPCommitPr
 		commitStore:           commitStoreReader,
 		destChainSelector:     staticConfig.ChainSelector,
 		priceRegistryProvider: ccip.NewChainAgnosticPriceRegistry(dstProvider),
-		priceGetter:           priceGetter,
 		metricsCollector:      metricsCollector,
 		chainHealthcheck:      chainHealthCheck,
 	})
@@ -172,11 +193,13 @@ func NewCommitServices(ctx context.Context, srcProvider commontypes.CCIPCommitPr
 				job.NewServiceAdapter(oracle),
 			),
 			chainHealthCheck,
+			priceService,
 		}, nil
 	}
 	return []job.ServiceCtx{
 		job.NewServiceAdapter(oracle),
 		chainHealthCheck,
+		priceService,
 	}, nil
 
 }
