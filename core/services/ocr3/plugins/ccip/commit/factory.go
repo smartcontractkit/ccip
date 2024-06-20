@@ -47,19 +47,19 @@ func NewPluginFactory() *PluginFactory {
 
 func (p PluginFactory) NewReportingPlugin(config ocr3types.ReportingPluginConfig,
 ) (ocr3types.ReportingPlugin[[]byte], ocr3types.ReportingPluginInfo, error) {
-	onChainTokenPricesReader := reader.OnchainTokenPricesReader{
-		TokenPriceConfig: reader.TokenPriceConfig{ // TODO: Inject config
+	onChainTokenPricesReader := reader.NewOnchainTokenPricesReader(
+		reader.TokenPriceConfig{ // TODO: Inject config
 			StaticPrices: map[ocr2types.Account]big.Int{},
 		},
-		ContractReader: nil, // TODO: Inject this
-	}
+		nil, // TODO: Inject this
+	)
 
 	return NewPlugin(
 		context.Background(),
 		config.OracleID,
 		cciptypes.CommitPluginConfig{},
 		nil,
-		&onChainTokenPricesReader,
+		onChainTokenPricesReader,
 		nil,
 		nil,
 		nil,

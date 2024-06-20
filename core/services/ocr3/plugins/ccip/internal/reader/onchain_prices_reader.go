@@ -12,13 +12,20 @@ import (
 
 type TokenPriceConfig struct {
 	// This is mainly used for inputTokens on testnet to give them a price
-	StaticPrices map[ocr2types.Account]big.Int `json:"staticPrice"`
+	StaticPrices map[ocr2types.Account]big.Int `json:"staticPrices"`
 }
 
 type OnchainTokenPricesReader struct {
 	TokenPriceConfig TokenPriceConfig
 	// Reader for the chain that will have the token prices on-chain
 	ContractReader commontypes.ContractReader
+}
+
+func NewOnchainTokenPricesReader(tokenPriceConfig TokenPriceConfig, contractReader commontypes.ContractReader) *OnchainTokenPricesReader {
+	return &OnchainTokenPricesReader{
+		TokenPriceConfig: tokenPriceConfig,
+		ContractReader:   contractReader,
+	}
 }
 
 func (pr *OnchainTokenPricesReader) GetTokenPricesUSD(ctx context.Context, tokens []ocr2types.Account) ([]*big.Int, error) {
