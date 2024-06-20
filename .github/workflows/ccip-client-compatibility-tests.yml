@@ -28,9 +28,6 @@ on:
         required: false
         type: string
 
-# Tag, schedule and workflow dispatch -- always
-# merge queue and pull request -- only if go-ethereum dependency was bumped
-
 env:
   CHAINLINK_IMAGE: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink
   INTERNAL_DOCKER_REPO: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com
@@ -293,6 +290,7 @@ jobs:
           tag_suffix: ""
           dockerfile: core/chainlink.Dockerfile
           git_commit_sha: ${{ needs.select-versions.outputs.chainlink_version }}
+          check_image_exists: 'true'
           AWS_REGION: ${{ secrets.QA_AWS_REGION }}
           AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
 
@@ -393,6 +391,24 @@ jobs:
           DECODED_BASE64_TEST_LIST=$(echo $BASE64_TEST_LIST | base64 -d)
           echo "Decoded input:"
           echo "$DECODED_BASE64_TEST_LIST"
+          is_valid=$(echo "$DECODED_BASE64_TEST_LIST" | jq . > /dev/null 2>&1; echo $?)
+          if [ "$is_valid" -ne 0 ]; then
+              echo "Invalid base64 input. Please provide a valid base64 encoded JSON list of tests."
+              echo "Here is an example of valid JSON:"
+              cat <<EOF
+              [
+                {
+                  "name": "evm-implementation-compatibility-test-1",
+                  "os": "ubuntu-latest",
+                  "product": "runlog",
+                  "eth_implementation": "erigon",
+                  "docker_image": "thorax/erigon:v2.59.2",
+                  "run": "-run 'TestSmokeCCIPForBidirectionalLane' ./smoke/ccip-tests/ccip_test.go"
+                }
+              ]
+          EOF
+              exit 1
+          fi          
           JOB_MATRIX_JSON=$(echo $DECODED_BASE64_TEST_LIST)
           echo "JOB_MATRIX_JSON=${JOB_MATRIX_JSON}" >> $GITHUB_ENV
       # testlistgenerator is a tool that builds a matrix of tests to run
@@ -613,6 +629,72 @@ jobs:
         env:
           SLACK_BOT_TOKEN: ${{ secrets.QA_SLACK_API_KEY }}
 
+  parse-test-results:
+    name: Parse Test Results
+    if: always() && needs.*.result != 'skipped' && needs.*.result != 'cancelled' && needs.should-run.outputs.should_run == 'true'
+    environment: integration
+    permissions:
+      checks: write
+      pull-requests: write
+      id-token: write
+      contents: read
+    runs-on: ubuntu-latest
+    needs: [run-client-compatibility-matrix,should-run]
+    outputs:
+      base64_parsed_results: ${{ steps.get-test-results.outputs.base64_parsed_results }}
+    steps:
+      # workflowresultparser is a tool to get job results from a workflow run
+      - name: Set Up workflowresultparser
+        shell: bash
+        run: |
+          go install github.com/smartcontractkit/chainlink-testing-framework/tools/workflowresultparser@v1.0.0
+      - name: Get and parse Test Results
+        shell: bash
+        id: get-test-results
+        run: |
+          PATH=$PATH:$(go env GOPATH)/bin
+          export PATH
+          
+          workflowresultparser -workflowRunID ${{ github.run_id }} -githubToken ${{ github.token }} -githubRepo "${{ github.repository }}" -jobNameRegex "^CCIP Compatibility with (.*?)$" -namedKey="CCIP" -outputFile=output.json
+          
+          echo "base64_parsed_results=$(base64 -w 0 output.json)" >> $GITHUB_OUTPUT
+
+  display-test-results:
+    name: Aggregated test results
+    if:  always() && needs.*.result != 'skipped' && needs.*.result != 'cancelled' && needs.should-run.outputs.should_run == 'true' && needs.parse-test-results.result == 'success'
+    environment: integration
+    permissions:
+      checks: write
+      pull-requests: write
+      id-token: write
+      contents: read
+    runs-on: ubuntu-latest
+    needs: [start-slack-thread, should-run, select-versions, parse-test-results]
+    steps:
+      # asciitable is a tool that prints results in a nice ASCII table
+      - name: Set Up asciitable
+        shell: bash
+        run: |
+          go install github.com/smartcontractkit/chainlink-testing-framework/tools/asciitable@v1.0.2
+      - name: Print aggregated test results
+        shell: bash
+        run: |
+          PATH=$PATH:$(go env GOPATH)/bin
+          export PATH
+          
+          raw_results="$(echo ${{ needs.parse-test-results.outputs.base64_parsed_results }} | base64 -d)"
+          echo $raw_results > input.json
+          asciitable --firstColumn "EVM Implementation" --secondColumn Result --jsonfile input.json --outputFile output.txt --section "CCIP" --namedKey "CCIP" 
+          
+          echo
+          echo "AGGREGATED RESULTS"
+          cat output.txt
+          
+          echo "## Aggregated EVM Implementations compatibility results summary" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          cat output.txt >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY          
+
   post-test-results-to-slack:
     name: Post Test Results
     if: ${{ always() && needs.*.result != 'skipped' && needs.*.result != 'cancelled' && needs.should-run.outputs.should_run == 'true' }}
@@ -629,14 +711,28 @@ jobs:
         uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
         with:
           ref: ${{ needs.select-versions.outputs.chainlink_version }}
+      - name: Get test results for CCIP
+        id: get-product-results
+        shell: bash
+        run: |
+          raw_results="$(echo ${{ needs.parse-test-results.outputs.base64_parsed_results }} | base64 -d)"
+          product_result=$(echo "$raw_results" | jq -c "select(has(\"CCIP\")) | .CCIP[]")
+          if [ -n "$product_result" ]; then
+            base64_result=$(echo $product_result | base64 -w 0)
+            echo "base64_result=$base64_result" >> $GITHUB_OUTPUT
+          else
+            echo "No results found for CCIP"
+            echo "base64_result=" >> $GITHUB_OUTPUT
+          fi
       - name: Post Test Results to Slack
         uses: ./.github/actions/notify-slack-jobs-result
         with:
           github_token: ${{ github.token }}
           github_repository: ${{ github.repository }}
           workflow_run_id: ${{ github.run_id }}
-          github_job_name_regex: ^CCIP Compatibility with (?<cap>.*?)$
+          github_job_name_regex: ^CCIP Compatibility with (.*?)$
           message_title: CCIP Compatibility Test Results
           slack_channel_id: ${{ secrets.QA_SLACK_CHANNEL }}
           slack_bot_token: ${{ secrets.QA_SLACK_API_KEY }}
           slack_thread_ts: ${{ needs.start-slack-thread.outputs.thread_ts }}
+          base64_parsed_results: ${{ steps.get-product-results.outputs.base64_result }}
