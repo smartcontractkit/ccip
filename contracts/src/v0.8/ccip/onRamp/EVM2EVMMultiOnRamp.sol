@@ -30,9 +30,6 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ITypeAndVersion, OwnerIsCrea
   error CannotSendZeroTokens();
   error InvalidExtraArgsTag();
   error OnlyCallableByOwnerOrAdmin();
-  error InvalidWithdrawParams();
-  error NoFeesToPay();
-  error MaxFeeBalanceReached();
   error MessageTooLarge(uint256 maxSize, uint256 actualSize);
   error MessageGasLimitTooHigh();
   error MessageFeeTooHigh(uint256 msgFeeJuels, uint256 maxFeeJuelsPerMsg);
@@ -42,10 +39,8 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ITypeAndVersion, OwnerIsCrea
   error RouterMustSetOriginalSender();
   error InvalidConfig();
   error CursedByRMN(uint64 sourceChainSelector);
-  error LinkBalanceNotSettled();
   error NotAFeeToken(address token);
   error SourceTokenDataTooLarge(address token);
-  error InvalidChainSelector(uint64 chainSelector);
   error GetSupportedTokensFunctionalityRemovedCheckAdminRegistry();
   error InvalidDestChainConfig(uint64 destChainSelector);
   error DestinationChainNotEnabled(uint64 destChainSelector);
