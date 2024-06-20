@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.24;
 
-import {IPool} from "../../interfaces/IPool.sol";
+import {IPoolV1} from "../../interfaces/IPool.sol";
 
+import {MultiAggregateRateLimiter} from "../../MultiAggregateRateLimiter.sol";
 import {PriceRegistry} from "../../PriceRegistry.sol";
 import {Router} from "../../Router.sol";
 import {Client} from "../../libraries/Client.sol";
@@ -15,7 +16,6 @@ import {TokenSetup} from "../TokenSetup.t.sol";
 import {EVM2EVMMultiOnRampHelper} from "../helpers/EVM2EVMMultiOnRampHelper.sol";
 import {MessageInterceptorHelper} from "../helpers/MessageInterceptorHelper.sol";
 import {PriceRegistrySetup} from "../priceRegistry/PriceRegistry.t.sol";
-import {MultiAggregateRateLimiter} from "../../MultiAggregateRateLimiter.sol";
 
 import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 
@@ -223,6 +223,18 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
     return messageEvent;
   }
 
+  function _generateDynamicMultiOnRampConfig(
+    address router,
+    address priceRegistry
+  ) internal pure returns (EVM2EVMMultiOnRamp.DynamicConfig memory) {
+    return EVM2EVMMultiOnRamp.DynamicConfig({
+      router: router,
+      priceRegistry: priceRegistry,
+      messageValidator: address(0),
+      feeAggregator: FEE_AGGREGATOR
+    });
+  }
+
   // Slicing is only available for calldata. So we have to build a new bytes array.
   function _removeFirst4Bytes(bytes memory data) internal pure returns (bytes memory) {
     bytes memory result = new bytes(data.length - 4);
@@ -230,14 +242,6 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
       result[i - 4] = data[i];
     }
     return result;
-  }
-
-  function _generateDynamicMultiOnRampConfig(
-    address router,
-    address priceRegistry
-  ) internal pure returns (EVM2EVMMultiOnRamp.DynamicConfig memory) {
-    return
-      EVM2EVMMultiOnRamp.DynamicConfig({router: router, priceRegistry: priceRegistry, messageValidator: address(0)});
   }
 
   function _generateDestChainConfigArgs() internal pure returns (EVM2EVMMultiOnRamp.DestChainConfigArgs[] memory) {
@@ -279,14 +283,6 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
     return tokenTransferFeeConfigArgs;
   }
 
-  function _getMultiOnRampNopsAndWeights() internal pure returns (EVM2EVMMultiOnRamp.NopAndWeight[] memory) {
-    EVM2EVMMultiOnRamp.NopAndWeight[] memory nopsAndWeights = new EVM2EVMMultiOnRamp.NopAndWeight[](3);
-    nopsAndWeights[0] = EVM2EVMMultiOnRamp.NopAndWeight({nop: USER_1, weight: 19284});
-    nopsAndWeights[1] = EVM2EVMMultiOnRamp.NopAndWeight({nop: USER_2, weight: 52935});
-    nopsAndWeights[2] = EVM2EVMMultiOnRamp.NopAndWeight({nop: USER_3, weight: 8});
-    return nopsAndWeights;
-  }
-
   function _deployOnRamp(
     uint64 sourceChainSelector,
     address sourceRouter,
@@ -296,15 +292,14 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
       EVM2EVMMultiOnRamp.StaticConfig({
         linkToken: s_sourceTokens[0],
         chainSelector: sourceChainSelector,
-        maxNopFeesJuels: MAX_NOP_FEES_JUELS,
+        maxFeeJuelsPerMsg: MAX_MSG_FEES_JUELS,
         rmnProxy: address(s_mockRMN),
         tokenAdminRegistry: tokenAdminRegistry
       }),
       _generateDynamicMultiOnRampConfig(sourceRouter, address(s_priceRegistry)),
       _generateDestChainConfigArgs(),
       s_premiumMultiplierWeiPerEthArgs,
-      s_tokenTransferFeeConfigArgs,
-      _getMultiOnRampNopsAndWeights()
+      s_tokenTransferFeeConfigArgs
     );
     onRamp.setAdmin(ADMIN);
 
@@ -316,7 +311,7 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
 
   function _enableOutboundMessageValidator() internal {
     (, address msgSender,) = vm.readCallers();
-    
+
     bool resetPrank = false;
 
     if (msgSender != OWNER) {
@@ -324,7 +319,7 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
       vm.startPrank(OWNER);
       resetPrank = true;
     }
-  
+
     EVM2EVMMultiOnRamp.DynamicConfig memory dynamicConfig = s_onRamp.getDynamicConfig();
     dynamicConfig.messageValidator = address(s_outboundMessageValidator);
     s_onRamp.setDynamicConfig(dynamicConfig);
@@ -363,7 +358,7 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
   ) internal pure {
     assertEq(a.linkToken, b.linkToken);
     assertEq(a.chainSelector, b.chainSelector);
-    assertEq(a.maxNopFeesJuels, b.maxNopFeesJuels);
+    assertEq(a.maxFeeJuelsPerMsg, b.maxFeeJuelsPerMsg);
     assertEq(a.rmnProxy, b.rmnProxy);
     assertEq(a.tokenAdminRegistry, b.tokenAdminRegistry);
   }
