@@ -364,7 +364,9 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
     uint256[] memory manualExecGasLimits
   ) internal {
     uint64 sourceChainSelector = report.sourceChainSelector;
-    SourceChainConfig storage sourceChainConfig = _getSourceChainConfigWithCurseCheck(sourceChainSelector);
+    _whenNotCursed(sourceChainSelector);
+
+    SourceChainConfig storage sourceChainConfig = _getEnabledSourceChainConfig(sourceChainSelector);
 
     uint256 numMsgs = report.messages.length;
     if (numMsgs == 0) revert EmptyReport();
@@ -635,7 +637,8 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
       MerkleRoot memory root = commitReport.merkleRoots[i];
       uint64 sourceChainSelector = root.sourceChainSelector;
 
-      SourceChainConfig storage sourceChainConfig = _getSourceChainConfigWithCurseCheck(sourceChainSelector);
+      _whenNotCursed(sourceChainSelector);
+      SourceChainConfig storage sourceChainConfig = _getEnabledSourceChainConfig(sourceChainSelector);
 
       // If we reached this section, the report should contain a valid root
       if (sourceChainConfig.minSeqNr != root.interval.min || root.interval.min > root.interval.max) {
@@ -810,6 +813,18 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
     emit DynamicConfigSet(dynamicConfig);
   }
 
+  /// @notice Returns a source chain config with a check that the config is enabled
+  /// @param sourceChainSelector Source chain selector to check for cursing
+  /// @return sourceChainConfig Source chain config
+  function _getEnabledSourceChainConfig(uint64 sourceChainSelector) internal view returns (SourceChainConfig storage) {
+    SourceChainConfig storage sourceChainConfig = s_sourceChainConfigs[sourceChainSelector];
+    if (!sourceChainConfig.isEnabled) {
+      revert SourceChainNotEnabled(sourceChainSelector);
+    }
+
+    return sourceChainConfig;
+  }
+
   // ================================================================
   // │                      Tokens and pools                        │
   // ================================================================
@@ -928,7 +943,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
   }
 
   // ================================================================
-  // │                            Access                            │
+  // │                            Access and RMN                    │
   // ================================================================
 
   /// @notice Reverts as this contract should not access CCIP messages
@@ -937,24 +952,11 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
     revert();
   }
 
-  /// @notice Validates that the source chain -> this chain lane is healthy, and reverts if it is cursed or disabled
+  /// @notice Validates that the source chain -> this chain lane, and reverts if it is cursed
   /// @param sourceChainSelector Source chain selector to check for cursing
-  function _getSourceChainConfigWithCurseCheck(uint64 sourceChainSelector)
-    internal
-    view
-    returns (SourceChainConfig storage)
-  {
-    // TODO: implement ManualRMN fallback if RMN is not available
-    // TODO: implement global pausing capability in RMN
+  function _whenNotCursed(uint64 sourceChainSelector) internal view {
     if (IRMN(i_rmnProxy).isCursed(bytes16(uint128(sourceChainSelector)))) {
       revert CursedByRMN(sourceChainSelector);
     }
-
-    SourceChainConfig storage sourceChainConfig = s_sourceChainConfigs[sourceChainSelector];
-    if (!sourceChainConfig.isEnabled) {
-      revert SourceChainNotEnabled(sourceChainSelector);
-    }
-
-    return sourceChainConfig;
   }
 }
