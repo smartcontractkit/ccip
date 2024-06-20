@@ -84,6 +84,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
   /// @dev RMN depends on this event, if changing, please notify the RMN maintainers.
   event CommitReportAccepted(CommitReport report);
   event RootRemoved(bytes32 root);
+  event LatestPriceEpochAndRoundSet(uint40 oldEpochAndRound, uint40 newEpochAndRound);
 
   /// @notice Static offRamp config
   /// @dev RMN depends on this struct, if changing, please notify the RMN maintainers.
@@ -97,7 +98,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
   struct SourceChainConfig {
     bool isEnabled; // ─────────╮  Flag whether the source chain is enabled or not
     uint64 minSeqNr; //         |  The min sequence number expected for future messages
-    address prevOffRamp; // ────╯  Address of previous-version per-lane OffRamp. Used to be able to provide seequencing continuity during a zero downtime upgrade.
+    address prevOffRamp; // ────╯  Address of previous-version per-lane OffRamp. Used to be able to provide sequencing continuity during a zero downtime upgrade.
     address onRamp; //             OnRamp address on the source chain
     /// @dev Ensures that 2 identical messages sent to 2 different lanes will have a distinct hash.
     /// Must match the metadataHash used in computing leaf hashes offchain for the root committed in
@@ -734,7 +735,11 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
   /// @notice Sets the latest epoch and round for price update.
   /// @param latestPriceEpochAndRound The new epoch and round for prices.
   function setLatestPriceEpochAndRound(uint40 latestPriceEpochAndRound) external onlyOwner {
+    uint40 oldEpochAndRound = s_latestPriceEpochAndRound;
+
     s_latestPriceEpochAndRound = latestPriceEpochAndRound;
+
+    emit LatestPriceEpochAndRoundSet(oldEpochAndRound, latestPriceEpochAndRound);
   }
 
   /// @notice Returns the timestamp of a potentially previously committed merkle root.
