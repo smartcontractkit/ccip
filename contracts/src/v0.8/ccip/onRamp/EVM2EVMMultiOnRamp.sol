@@ -76,7 +76,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ITypeAndVersion, OwnerIsCrea
   struct DynamicConfig {
     address router; // Router address
     address priceRegistry; // Price registry address
-    address messageValidator; // Optional message validator to validate incoming messages (zero address = no validator)
+    address messageValidator; // Optional message validator to validate outbound messages (zero address = no validator)
     address feeAggregator; // Fee aggregator address
   }
 
@@ -198,7 +198,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ITypeAndVersion, OwnerIsCrea
   /// The offramp has a corresponding s_senderNonce mapping to ensure messages
   /// are executed in the same order they are sent.
   mapping(uint64 destChainSelector => mapping(address sender => uint64 nonce)) internal s_senderNonce;
-  /// @dev The address of the token limit admin that has the same permissions as the owner.
+  /// @dev The address of the admin
   address internal s_admin;
   /// @dev The amount of LINK available to pay NOPS
   uint96 internal s_nopFeesJuels;
@@ -838,13 +838,13 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ITypeAndVersion, OwnerIsCrea
   // ================================================================
   // │                           Access                             │
   // ================================================================
-  /// @notice Gets admin address.
+  /// @notice Gets the admin address.
   /// @return the admin address.
   function getAdmin() external view returns (address) {
     return s_admin;
   }
 
-  /// @notice Sets the token limit admin address.
+  /// @notice Sets the admin address.
   /// @param newAdmin the address of the new admin.
   /// @dev setting this to address(0) indicates there is no active admin.
   function setAdmin(address newAdmin) external {
