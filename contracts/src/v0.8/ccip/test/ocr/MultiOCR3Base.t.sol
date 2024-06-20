@@ -54,7 +54,7 @@ contract MultiOCR3Base_transmit is MultiOCR3BaseSetup {
 
     // F = 2, need 2 signatures
     (bytes32[] memory rs, bytes32[] memory ss,, bytes32 rawVs) =
-      _getSignaturesForDigest(s_validSignerKeys, s_configDigest1, REPORT, reportContext, 2);
+      _getSignaturesForDigest(s_validSignerKeys, REPORT, reportContext, 2);
 
     s_multiOCR3.setTransmitOcrPluginType(0);
 
@@ -130,7 +130,7 @@ contract MultiOCR3Base_transmit is MultiOCR3BaseSetup {
     }
 
     (bytes32[] memory rs, bytes32[] memory ss,, bytes32 rawVs) =
-      _getSignaturesForDigest(pickedSignerKeys, s_configDigest1, REPORT, reportContext, numSignatures);
+      _getSignaturesForDigest(pickedSignerKeys, REPORT, reportContext, numSignatures);
 
     vm.expectEmit();
     emit MultiOCR3Base.Transmitted(3, s_configDigest1, uint64(uint256(s_configDigest1)));
@@ -144,7 +144,7 @@ contract MultiOCR3Base_transmit is MultiOCR3BaseSetup {
     bytes32[3] memory reportContext = [s_configDigest1, s_configDigest1, s_configDigest1];
 
     (bytes32[] memory rs, bytes32[] memory ss,, bytes32 rawVs) =
-      _getSignaturesForDigest(s_validSignerKeys, s_configDigest1, REPORT, reportContext, 2);
+      _getSignaturesForDigest(s_validSignerKeys, REPORT, reportContext, 2);
 
     s_multiOCR3.setTransmitOcrPluginType(0);
 
@@ -172,7 +172,7 @@ contract MultiOCR3Base_transmit is MultiOCR3BaseSetup {
 
     // 1 signature too many
     (bytes32[] memory rs, bytes32[] memory ss,, bytes32 rawVs) =
-      _getSignaturesForDigest(s_validSignerKeys, s_configDigest2, REPORT, reportContext, 6);
+      _getSignaturesForDigest(s_validSignerKeys, REPORT, reportContext, 6);
 
     s_multiOCR3.setTransmitOcrPluginType(1);
 
@@ -186,7 +186,7 @@ contract MultiOCR3Base_transmit is MultiOCR3BaseSetup {
 
     // Missing 1 signature for unique report
     (bytes32[] memory rs, bytes32[] memory ss,, bytes32 rawVs) =
-      _getSignaturesForDigest(s_validSignerKeys, s_configDigest2, REPORT, reportContext, 4);
+      _getSignaturesForDigest(s_validSignerKeys, REPORT, reportContext, 4);
 
     s_multiOCR3.setTransmitOcrPluginType(1);
 
@@ -199,7 +199,7 @@ contract MultiOCR3Base_transmit is MultiOCR3BaseSetup {
     bytes32 configDigest;
     bytes32[3] memory reportContext = [configDigest, configDigest, configDigest];
 
-    (,,, bytes32 rawVs) = _getSignaturesForDigest(s_validSignerKeys, s_configDigest1, REPORT, reportContext, 2);
+    (,,, bytes32 rawVs) = _getSignaturesForDigest(s_validSignerKeys, REPORT, reportContext, 2);
 
     s_multiOCR3.setTransmitOcrPluginType(0);
 
@@ -235,7 +235,7 @@ contract MultiOCR3Base_transmit is MultiOCR3BaseSetup {
     bytes32[3] memory reportContext = [s_configDigest1, s_configDigest1, s_configDigest1];
 
     (bytes32[] memory rs, bytes32[] memory ss, uint8[] memory vs, bytes32 rawVs) =
-      _getSignaturesForDigest(s_validSignerKeys, s_configDigest1, REPORT, reportContext, 2);
+      _getSignaturesForDigest(s_validSignerKeys, REPORT, reportContext, 2);
 
     rs[1] = rs[0];
     ss[1] = ss[0];
@@ -253,7 +253,7 @@ contract MultiOCR3Base_transmit is MultiOCR3BaseSetup {
     bytes32[3] memory reportContext = [s_configDigest1, s_configDigest1, s_configDigest1];
 
     (bytes32[] memory rs, bytes32[] memory ss,, bytes32 rawVs) =
-      _getSignaturesForDigest(s_validSignerKeys, s_configDigest1, REPORT, reportContext, 2);
+      _getSignaturesForDigest(s_validSignerKeys, REPORT, reportContext, 2);
 
     rs[0] = s_configDigest1;
     ss = rs;

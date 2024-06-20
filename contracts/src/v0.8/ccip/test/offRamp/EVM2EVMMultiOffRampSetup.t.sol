@@ -322,7 +322,7 @@ contract EVM2EVMMultiOffRampSetup is TokenSetup, PriceRegistrySetup, MultiOCR3Ba
     return message;
   }
 
-  function _generateBasicMessages(
+  function _generateSingleBasicMessage(
     uint64 sourceChainSelector,
     address onRamp
   ) internal view returns (Internal.EVM2EVMMessage[] memory) {
@@ -483,7 +483,7 @@ contract EVM2EVMMultiOffRampSetup is TokenSetup, PriceRegistrySetup, MultiOCR3Ba
     bytes32[3] memory reportContext = [s_configDigestCommit, bytes32(uint256(sequenceNumber)), s_configDigestCommit];
 
     (bytes32[] memory rs, bytes32[] memory ss,, bytes32 rawVs) =
-      _getSignaturesForDigest(s_validSignerKeys, s_configDigestCommit, abi.encode(commitReport), reportContext, s_F + 1);
+      _getSignaturesForDigest(s_validSignerKeys, abi.encode(commitReport), reportContext, s_F + 1);
 
     vm.startPrank(s_validTransmitters[0]);
     s_offRamp.commit(reportContext, abi.encode(commitReport), rs, ss, rawVs);

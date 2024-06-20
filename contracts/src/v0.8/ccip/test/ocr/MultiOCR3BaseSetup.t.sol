@@ -92,7 +92,6 @@ contract MultiOCR3BaseSetup is BaseTest {
 
   function _getSignaturesForDigest(
     uint256[] memory signerPrivateKeys,
-    bytes32 configDigest,
     bytes memory report,
     bytes32[3] memory reportContext,
     uint8 signatureCount
