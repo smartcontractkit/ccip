@@ -211,7 +211,7 @@ contract CCIPCapabilityConfiguration is ITypeAndVersion, ICapabilityConfiguratio
     // Update contract state with new configuration if its valid.
     // We won't run out of gas from this delete since the array is at most 2 elements long.
     delete s_ocr3Configs[donId][pluginType];
-    for (uint256 i = 0; i < newConfigWithMeta.length; i++) {
+    for (uint256 i = 0; i < newConfigWithMeta.length; ++i) {
       s_ocr3Configs[donId][pluginType].push(newConfigWithMeta[i]);
     }
   }
@@ -348,8 +348,8 @@ contract CCIPCapabilityConfiguration is ITypeAndVersion, ICapabilityConfiguratio
     // access in the for loop below.
     commitConfigs = new OCR3Config[](MAX_OCR3_CONFIGS_PER_PLUGIN);
     execConfigs = new OCR3Config[](MAX_OCR3_CONFIGS_PER_PLUGIN);
-    uint8 commitCount;
-    uint8 execCount;
+    uint256 commitCount;
+    uint256 execCount;
     for (uint256 i = 0; i < ocr3Configs.length; ++i) {
       if (ocr3Configs[i].pluginType == PluginType.Commit) {
         commitConfigs[commitCount] = ocr3Configs[i];
@@ -370,55 +370,29 @@ contract CCIPCapabilityConfiguration is ITypeAndVersion, ICapabilityConfiguratio
   }
 
   function _validateConfig(OCR3Config memory cfg) internal view {
-    if (cfg.chainSelector == 0) {
-      revert ChainSelectorNotSet();
-    }
-
-    if (cfg.pluginType != PluginType.Commit && cfg.pluginType != PluginType.Execution) {
-      revert InvalidPluginType();
-    }
-
+    if (cfg.chainSelector == 0) revert ChainSelectorNotSet();
+    if (cfg.pluginType != PluginType.Commit && cfg.pluginType != PluginType.Execution) revert InvalidPluginType();
     // TODO: can we do more sophisticated validation than this?
-    if (cfg.offrampAddress.length == 0) {
-      revert OfframpAddressCannotBeZero();
-    }
-
-    // Check that the chain configuration is set.
-    if (!s_remoteChainSelectors.contains(cfg.chainSelector)) {
-      revert ChainSelectorNotFound(cfg.chainSelector);
-    }
+    if (cfg.offrampAddress.length == 0) revert OfframpAddressCannotBeZero();
+    if (!s_remoteChainSelectors.contains(cfg.chainSelector)) revert ChainSelectorNotFound(cfg.chainSelector);
 
     // Some of these checks below are done in OCR2/3Base config validation, so we do them again here.
     // Role DON OCR configs will have all the Role DON signers but only a subset of transmitters.
-    if (cfg.signers.length > MAX_NUM_ORACLES) {
-      revert TooManySigners();
-    }
-
-    if (cfg.transmitters.length > MAX_NUM_ORACLES) {
-      revert TooManyTransmitters();
-    }
+    if (cfg.signers.length > MAX_NUM_ORACLES) revert TooManySigners();
+    if (cfg.transmitters.length > MAX_NUM_ORACLES) revert TooManyTransmitters();
 
     // We check for chain config presence above, so fChain here must be non-zero.
     uint256 minTransmittersLength = 3 * s_chainConfigurations[cfg.chainSelector].fChain + 1;
     if (cfg.transmitters.length < minTransmittersLength) {
       revert NotEnoughTransmitters(cfg.transmitters.length, minTransmittersLength);
     }
-
-    if (cfg.F == 0) {
-      revert FMustBePositive();
-    }
-
-    if (cfg.signers.length <= 3 * cfg.F) {
-      revert FTooHigh();
-    }
+    if (cfg.F == 0) revert FMustBePositive();
+    if (cfg.signers.length <= 3 * cfg.F) revert FTooHigh();
 
     if (cfg.p2pIds.length != cfg.signers.length || cfg.p2pIds.length != cfg.transmitters.length) {
       revert P2PIdsLengthNotMatching(cfg.p2pIds.length, cfg.signers.length, cfg.transmitters.length);
     }
-
-    if (cfg.bootstrapP2PIds.length > cfg.p2pIds.length) {
-      revert TooManyBootstrapP2PIds();
-    }
+    if (cfg.bootstrapP2PIds.length > cfg.p2pIds.length) revert TooManyBootstrapP2PIds();
 
     // Check that the readers are in the capability registry.
     // TODO: check for duplicate signers, duplicate p2p ids, etc.
@@ -477,7 +451,7 @@ contract CCIPCapabilityConfiguration is ITypeAndVersion, ICapabilityConfiguratio
     ChainConfigInfo[] calldata chainConfigAdds
   ) external onlyOwner {
     // Process removals first.
-    for (uint256 i = 0; i < chainSelectorRemoves.length; i++) {
+    for (uint256 i = 0; i < chainSelectorRemoves.length; ++i) {
       // check if the chain selector is in s_remoteChainSelectors first.
       if (!s_remoteChainSelectors.contains(chainSelectorRemoves[i])) {
         revert ChainSelectorNotFound(chainSelectorRemoves[i]);
@@ -490,7 +464,7 @@ contract CCIPCapabilityConfiguration is ITypeAndVersion, ICapabilityConfiguratio
     }
 
     // Process additions next.
-    for (uint256 i = 0; i < chainConfigAdds.length; i++) {
+    for (uint256 i = 0; i < chainConfigAdds.length; ++i) {
       ChainConfig memory chainConfig = chainConfigAdds[i].chainConfig;
       bytes32[] memory readers = chainConfig.readers;
       uint64 chainSelector = chainConfigAdds[i].chainSelector;
