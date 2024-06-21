@@ -323,8 +323,8 @@ func NewApplication(opts ApplicationOpts) (Application, error) {
 
 	srvcs = append(srvcs, mailMon)
 	srvcs = append(srvcs, relayerChainInterops.Services()...)
-	promReporter := promreporter.NewPromReporter(opts.DS, legacyEVMChains, globalLogger)
-	srvcs = append(srvcs, promReporter)
+	headReporter := headreporter.NewHeadReporterService(cfg.HeadReport(), opts.DS, legacyEVMChains, globalLogger, telemetryManager)
+	srvcs = append(srvcs, headReporter)
 
 	// Initialize Local Users ORM and Authentication Provider specified in config
 	// BasicAdminUsersORM is initialized and required regardless of separate Authentication Provider
