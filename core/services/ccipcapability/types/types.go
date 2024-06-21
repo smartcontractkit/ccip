@@ -52,7 +52,7 @@ type OCRConfig interface {
 //
 //go:generate mockery --name CCIPOracle --output ./mocks/ --case underscore
 type CCIPOracle interface {
-	Shutdown() error
+	Close() error
 	Start() error
 }
 

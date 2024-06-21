@@ -19,6 +19,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocrcommon"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pipeline"
+	"github.com/smartcontractkit/chainlink/v2/core/services/telemetry"
 	"github.com/smartcontractkit/chainlink/v2/plugins"
 )
 
@@ -27,14 +28,15 @@ type RelayGetter interface {
 }
 
 type Delegate struct {
-	lggr            logger.Logger
-	registrarConfig plugins.RegistrarConfig
-	pipelineRunner  pipeline.Runner
-	relayGetter     RelayGetter
-	capRegistry     cctypes.CapabilityRegistry
-	keystore        keystore.Master
-	ds              sqlutil.DataSource
-	peerWrapper     *ocrcommon.SingletonPeerWrapper
+	lggr                  logger.Logger
+	registrarConfig       plugins.RegistrarConfig
+	pipelineRunner        pipeline.Runner
+	relayGetter           RelayGetter
+	capRegistry           cctypes.CapabilityRegistry
+	keystore              keystore.Master
+	ds                    sqlutil.DataSource
+	peerWrapper           *ocrcommon.SingletonPeerWrapper
+	monitoringEndpointGen telemetry.MonitoringEndpointGenerator
 
 	isNewlyCreatedJob bool
 }
@@ -48,16 +50,18 @@ func NewDelegate(
 	keystore keystore.Master,
 	ds sqlutil.DataSource,
 	peerWrapper *ocrcommon.SingletonPeerWrapper,
+	monitoringEndpointGen telemetry.MonitoringEndpointGenerator,
 ) *Delegate {
 	return &Delegate{
-		lggr:            lggr,
-		registrarConfig: registrarConfig,
-		pipelineRunner:  pipelineRunner,
-		relayGetter:     relayGetter,
-		capRegistry:     registrySyncer,
-		ds:              ds,
-		keystore:        keystore,
-		peerWrapper:     peerWrapper,
+		lggr:                  lggr,
+		registrarConfig:       registrarConfig,
+		pipelineRunner:        pipelineRunner,
+		relayGetter:           relayGetter,
+		capRegistry:           registrySyncer,
+		ds:                    ds,
+		keystore:              keystore,
+		peerWrapper:           peerWrapper,
+		monitoringEndpointGen: monitoringEndpointGen,
 	}
 }
 
@@ -116,6 +120,8 @@ func (d *Delegate) ServicesForSpec(ctx context.Context, spec job.Job) (services 
 		spec.CCIPSpec.RelayConfigs,
 		spec.CCIPSpec.PluginConfig,
 		ocrDB,
+		d.lggr,
+		d.monitoringEndpointGen,
 	)
 
 	return []job.ServiceCtx{

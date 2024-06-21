@@ -9,12 +9,12 @@ type CCIPOracle struct {
 	mock.Mock
 }
 
-// Shutdown provides a mock function with given fields:
-func (_m *CCIPOracle) Shutdown() error {
+// Close provides a mock function with given fields:
+func (_m *CCIPOracle) Close() error {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
-		panic("no return value specified for Shutdown")
+		panic("no return value specified for Close")
 	}
 
 	var r0 error

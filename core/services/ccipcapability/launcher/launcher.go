@@ -80,7 +80,7 @@ func (l *launcher) Close() error {
 		// shut down all running oracles.
 		var err error
 		for _, ceDep := range l.dons {
-			err = multierr.Append(err, ceDep.Shutdown())
+			err = multierr.Append(err, ceDep.Close())
 		}
 
 		return err
@@ -213,7 +213,7 @@ func (l *launcher) removeDON(id uint32) error {
 		return nil
 	}
 
-	if err := ceDep.Shutdown(); err != nil {
+	if err := ceDep.Close(); err != nil {
 		return fmt.Errorf("failed to shutdown oracles for CCIP DON %d: %w", id, err)
 	}
 

@@ -27,8 +27,8 @@ func Test_commitExecDeployment_Shutdown(t *testing.T) {
 			execBlue:    mocktypes.NewCCIPOracle(t),
 			execGreen:   nil,
 			expect: func(t *testing.T, commitBlue, commitGreen, execBlue, execGreen *mocktypes.CCIPOracle) {
-				commitBlue.On("Shutdown").Return(nil).Once()
-				execBlue.On("Shutdown").Return(nil).Once()
+				commitBlue.On("Close").Return(nil).Once()
+				execBlue.On("Close").Return(nil).Once()
 			},
 			asserts: func(t *testing.T, commitBlue, commitGreen, execBlue, execGreen *mocktypes.CCIPOracle) {
 				commitBlue.AssertExpectations(t)
@@ -43,10 +43,10 @@ func Test_commitExecDeployment_Shutdown(t *testing.T) {
 			execBlue:    mocktypes.NewCCIPOracle(t),
 			execGreen:   mocktypes.NewCCIPOracle(t),
 			expect: func(t *testing.T, commitBlue, commitGreen, execBlue, execGreen *mocktypes.CCIPOracle) {
-				commitBlue.On("Shutdown").Return(nil).Once()
-				commitGreen.On("Shutdown").Return(nil).Once()
-				execBlue.On("Shutdown").Return(nil).Once()
-				execGreen.On("Shutdown").Return(nil).Once()
+				commitBlue.On("Close").Return(nil).Once()
+				commitGreen.On("Close").Return(nil).Once()
+				execBlue.On("Close").Return(nil).Once()
+				execGreen.On("Close").Return(nil).Once()
 			},
 			asserts: func(t *testing.T, commitBlue, commitGreen, execBlue, execGreen *mocktypes.CCIPOracle) {
 				commitBlue.AssertExpectations(t)
@@ -63,8 +63,8 @@ func Test_commitExecDeployment_Shutdown(t *testing.T) {
 			execBlue:    mocktypes.NewCCIPOracle(t),
 			execGreen:   nil,
 			expect: func(t *testing.T, commitBlue, commitGreen, execBlue, execGreen *mocktypes.CCIPOracle) {
-				commitBlue.On("Shutdown").Return(errors.New("failed")).Once()
-				execBlue.On("Shutdown").Return(nil).Once()
+				commitBlue.On("Close").Return(errors.New("failed")).Once()
+				execBlue.On("Close").Return(nil).Once()
 			},
 			asserts: func(t *testing.T, commitBlue, commitGreen, execBlue, execGreen *mocktypes.CCIPOracle) {
 				commitBlue.AssertExpectations(t)
@@ -91,7 +91,7 @@ func Test_commitExecDeployment_Shutdown(t *testing.T) {
 			}
 			tt.expect(t, tt.commitBlue, tt.commitGreen, tt.execBlue, tt.execGreen)
 			defer tt.asserts(t, tt.commitBlue, tt.commitGreen, tt.execBlue, tt.execGreen)
-			err := c.Shutdown()
+			err := c.Close()
 			if tt.wantErr {
 				require.Error(t, err)
 			} else {

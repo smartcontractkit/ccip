@@ -38,36 +38,36 @@ type ccipDeployment struct {
 	exec   blueGreenDeployment
 }
 
-// Shutdown shuts down all OCR instances in the deployment.
-func (c *ccipDeployment) Shutdown() error {
+// Close shuts down all OCR instances in the deployment.
+func (c *ccipDeployment) Close() error {
 	var err error
 
 	// shutdown blue commit instances.
-	err = multierr.Append(err, c.commit.blue.Shutdown())
+	err = multierr.Append(err, c.commit.blue.Close())
 	if c.commit.bootstrapBlue != nil {
-		err = multierr.Append(err, c.commit.bootstrapBlue.Shutdown())
+		err = multierr.Append(err, c.commit.bootstrapBlue.Close())
 	}
 
 	// shutdown green commit instances.
 	if c.commit.green != nil {
-		err = multierr.Append(err, c.commit.green.Shutdown())
+		err = multierr.Append(err, c.commit.green.Close())
 	}
 	if c.commit.bootstrapGreen != nil {
-		err = multierr.Append(err, c.commit.bootstrapGreen.Shutdown())
+		err = multierr.Append(err, c.commit.bootstrapGreen.Close())
 	}
 
 	// shutdown blue exec instances.
-	err = multierr.Append(err, c.exec.blue.Shutdown())
+	err = multierr.Append(err, c.exec.blue.Close())
 	if c.exec.bootstrapBlue != nil {
-		err = multierr.Append(err, c.exec.bootstrapBlue.Shutdown())
+		err = multierr.Append(err, c.exec.bootstrapBlue.Close())
 	}
 
 	// shutdown green exec instances.
 	if c.exec.green != nil {
-		err = multierr.Append(err, c.exec.green.Shutdown())
+		err = multierr.Append(err, c.exec.green.Close())
 	}
 	if c.exec.bootstrapGreen != nil {
-		err = multierr.Append(err, c.exec.bootstrapGreen.Shutdown())
+		err = multierr.Append(err, c.exec.bootstrapGreen.Close())
 	}
 
 	return err
@@ -91,13 +91,13 @@ func (c *ccipDeployment) StartBlue() error {
 func (c *ccipDeployment) ShutdownBlue() error {
 	var err error
 
-	err = multierr.Append(err, c.commit.blue.Shutdown())
+	err = multierr.Append(err, c.commit.blue.Close())
 	if c.commit.bootstrapBlue != nil {
-		err = multierr.Append(err, c.commit.bootstrapBlue.Shutdown())
+		err = multierr.Append(err, c.commit.bootstrapBlue.Close())
 	}
-	err = multierr.Append(err, c.exec.blue.Shutdown())
+	err = multierr.Append(err, c.exec.blue.Close())
 	if c.exec.bootstrapBlue != nil {
-		err = multierr.Append(err, c.exec.bootstrapBlue.Shutdown())
+		err = multierr.Append(err, c.exec.bootstrapBlue.Close())
 	}
 
 	return err
@@ -118,9 +118,9 @@ func (c *ccipDeployment) HandleBlueGreen(prevDeployment *ccipDeployment) error {
 		// case 1
 		// green is already running so no need to start it.
 		// shutdown blue.
-		err = multierr.Append(err, prevDeployment.commit.blue.Shutdown())
+		err = multierr.Append(err, prevDeployment.commit.blue.Close())
 		if prevDeployment.commit.bootstrapBlue != nil {
-			err = multierr.Append(err, prevDeployment.commit.bootstrapBlue.Shutdown())
+			err = multierr.Append(err, prevDeployment.commit.bootstrapBlue.Close())
 		}
 	} else if prevDeployment.commit.green == nil && c.commit.green != nil {
 		// case 2
@@ -138,9 +138,9 @@ func (c *ccipDeployment) HandleBlueGreen(prevDeployment *ccipDeployment) error {
 		// case 1
 		// green is already running so no need to start it.
 		// shutdown blue.
-		err = multierr.Append(err, prevDeployment.exec.blue.Shutdown())
+		err = multierr.Append(err, prevDeployment.exec.blue.Close())
 		if prevDeployment.exec.bootstrapBlue != nil {
-			err = multierr.Append(err, prevDeployment.exec.bootstrapBlue.Shutdown())
+			err = multierr.Append(err, prevDeployment.exec.bootstrapBlue.Close())
 		}
 	} else if prevDeployment.exec.green == nil && c.exec.green != nil {
 		// case 2
