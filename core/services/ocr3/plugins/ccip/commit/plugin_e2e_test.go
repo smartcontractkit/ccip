@@ -37,13 +37,12 @@ func TestPlugin(t *testing.T) {
 		expTransmittedReports []cciptypes.CommitPluginReport
 		initialOutcome        cciptypes.CommitPluginOutcome
 	}{
-		//TODO: Fix making the mocks return empty observations correctly
-		//{
-		//	name:        "EmptyOutcome",
-		//	description: "Empty observations are returned by all nodes which leads to an empty outcome.",
-		//	nodes:       setupEmptyOutcome(ctx, t, lggr),
-		//	expErr:      func(t *testing.T, err error) { assert.Equal(t, testhelpers.ErrEmptyOutcome, err) },
-		//},
+		{
+			name:        "EmptyOutcome",
+			description: "Empty observations are returned by all nodes which leads to an empty outcome.",
+			nodes:       setupEmptyOutcome(ctx, t, lggr),
+			expErr:      func(t *testing.T, err error) { assert.Equal(t, testhelpers.ErrEmptyOutcome, err) },
+		},
 		{
 			name: "AllNodesReadAllChains",
 			description: "Nodes observe the latest sequence numbers and new messages after those sequence numbers. " +
@@ -196,9 +195,11 @@ func setupEmptyOutcome(ctx context.Context, t *testing.T, lggr logger.Logger) []
 		{
 			ChainSelector: chainC,
 			ChainConfig: reader.OnChainConfig{
-				FChain:  1,
-				Readers: []libocrtypes.PeerID{},
-				Config:  []byte{0},
+				FChain: 1,
+				Readers: []libocrtypes.PeerID{
+					{1}, {2}, {3},
+				},
+				Config: []byte{0},
 			},
 		},
 	}
@@ -210,11 +211,22 @@ func setupEmptyOutcome(ctx context.Context, t *testing.T, lggr logger.Logger) []
 	}
 
 	oracleIDToP2pID := GetP2pIDs(1, 2, 3)
-	return []nodeSetup{
+	nodes := []nodeSetup{
 		newNode(ctx, t, lggr, 1, cfg, homeChainPoller, oracleIDToP2pID),
 		newNode(ctx, t, lggr, 2, cfg, homeChainPoller, oracleIDToP2pID),
 		newNode(ctx, t, lggr, 3, cfg, homeChainPoller, oracleIDToP2pID),
 	}
+
+	for _, n := range nodes {
+		// All nodes have issue reading the latest sequence number, should lead to empty outcomes
+		n.ccipReader.On(
+			"NextSeqNum",
+			ctx,
+			mock.Anything,
+		).Return([]cciptypes.SeqNum{}, nil)
+	}
+
+	return nodes
 }
 
 func setupAllNodesReadAllChains(ctx context.Context, t *testing.T, lggr logger.Logger) []nodeSetup {

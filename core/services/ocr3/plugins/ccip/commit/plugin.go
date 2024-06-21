@@ -89,13 +89,13 @@ func (p *Plugin) Query(_ context.Context, _ ocr3types.OutcomeContext) (types.Que
 //	We discover the token prices only for the tokens that are used to pay for ccip fees.
 //	The fee tokens are configured in the plugin config.
 func (p *Plugin) Observation(ctx context.Context, outctx ocr3types.OutcomeContext, _ types.Query) (types.Observation, error) {
-	supportedChains, err := p.supportedChains()
+	destSupportedChains, err := p.supportedChains()
 	if err != nil {
 		return types.Observation{}, fmt.Errorf("error finding supported chains by node: %w", err)
 	}
 
 	msgBaseDetails := make([]cciptypes.CCIPMsgBaseDetails, 0)
-	latestCommittedSeqNumsObservation, err := observeLatestCommittedSeqNums(ctx, p.lggr, p.ccipReader, supportedChains, p.cfg.DestChain, p.knownSourceChainsSlice())
+	latestCommittedSeqNumsObservation, err := observeLatestCommittedSeqNums(ctx, p.lggr, p.ccipReader, destSupportedChains, p.cfg.DestChain, p.knownSourceChainsSlice())
 	if err != nil {
 		return types.Observation{}, fmt.Errorf("observe latest committed sequence numbers: %w", err)
 	}
@@ -143,7 +143,7 @@ func (p *Plugin) Observation(ctx context.Context, outctx ocr3types.OutcomeContex
 		p.lggr,
 		p.ccipReader,
 		p.msgHasher,
-		supportedChains,
+		destSupportedChains,
 		prevOutcome.MaxSeqNums, // TODO: Chainlink common PR to rename.
 		p.cfg.NewMsgScanBatchSize,
 	)
@@ -176,12 +176,12 @@ func (p *Plugin) ValidateObservation(_ ocr3types.OutcomeContext, _ types.Query, 
 		return fmt.Errorf("validate sequence numbers: %w", err)
 	}
 
-	supportedChains, err := p.supportedChains()
+	destSupportedChains, err := p.supportedChains()
 	if err != nil {
 		return fmt.Errorf("error finding supported chains by node: %w", err)
 	}
 
-	if err := validateObserverReadingEligibility(obs.NewMsgs, obs.MaxSeqNums, supportedChains, p.cfg.DestChain); err != nil {
+	if err := validateObserverReadingEligibility(obs.NewMsgs, obs.MaxSeqNums, destSupportedChains, p.cfg.DestChain); err != nil {
 		return fmt.Errorf("validate observer %d reading eligibility: %w", ao.Observer, err)
 	}
 
@@ -342,8 +342,12 @@ func (p *Plugin) supportedChains() (mapset.Set[cciptypes.ChainSelector], error) 
 	}
 	supportedChains, err := p.homeChainPoller.GetSupportedChainsForPeer(p2pID)
 	if err != nil {
-		return nil, fmt.Errorf("get supported chains: %w", err)
+		p.lggr.Warnf("error getting supported chains: %w", err)
+		// Return empty set
+		// TODO: Should we completely fail?
+		return mapset.NewSet[cciptypes.ChainSelector](), nil
 	}
+
 	return supportedChains, nil
 }
 
