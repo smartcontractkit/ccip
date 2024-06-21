@@ -33,7 +33,7 @@ func Test_ConvertOnChainConfigToHomeChainConfig(t *testing.T) {
 	var tests = []struct {
 		name            string
 		onChainConfigs  []ChainConfigInfo
-		homeChainConfig map[cciptypes.ChainSelector]cciptypes.ChainConfig
+		homeChainConfig map[cciptypes.ChainSelector]reader.ChainConfig
 		expErr          string
 	}{
 		{
@@ -73,7 +73,7 @@ func Test_ConvertOnChainConfigToHomeChainConfig(t *testing.T) {
 					},
 				},
 			},
-			homeChainConfig: map[cciptypes.ChainSelector]cciptypes.ChainConfig{
+			homeChainConfig: map[cciptypes.ChainSelector]reader.ChainConfig{
 				chainA: {
 					FChain:         1,
 					SupportedNodes: mapset.NewSet(p2pOracleAId, p2pOracleBId, p2pOracleCId),
@@ -139,7 +139,7 @@ func Test_PollingWorking(t *testing.T) {
 			},
 		},
 	}
-	homeChainConfig := map[cciptypes.ChainSelector]cciptypes.ChainConfig{
+	homeChainConfig := map[cciptypes.ChainSelector]reader.ChainConfig{
 		chainA: {
 			FChain:         1,
 			SupportedNodes: mapset.NewSet(p2pOracleAId, p2pOracleBId, p2pOracleCId),

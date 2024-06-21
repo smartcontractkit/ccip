@@ -352,10 +352,10 @@ func (p *Plugin) supportedChains() (mapset.Set[cciptypes.ChainSelector], error) 
 	return supportedChains, nil
 }
 
-func (p *Plugin) getDestChainConfig() (cciptypes.ChainConfig, error) {
+func (p *Plugin) getDestChainConfig() (reader.ChainConfig, error) {
 	cfg, err := p.homeChainPoller.GetChainConfig(p.cfg.DestChain)
 	if err != nil {
-		return cciptypes.ChainConfig{}, fmt.Errorf("get chain config: %w", err)
+		return reader.ChainConfig{}, fmt.Errorf("get chain config: %w", err)
 	}
 	return cfg, nil
 }
