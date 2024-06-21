@@ -27,7 +27,9 @@ type HomeChainConfigPoller struct {
 	lggr             logger.Logger
 	mutex            *sync.RWMutex
 	backgroundCancel context.CancelFunc
-	pollingInterval  time.Duration
+	backgroundCtx    context.Context
+	// How frequent will the poller fetch the chain configs
+	pollingInterval time.Duration
 }
 
 func NewHomeChainConfigPoller(
@@ -35,6 +37,7 @@ func NewHomeChainConfigPoller(
 	lggr logger.Logger,
 	pollingInterval time.Duration,
 ) *HomeChainConfigPoller {
+	//bgCtx, cancelFunc := context.WithCancel(context.Background())
 	return &HomeChainConfigPoller{
 		homeChainReader:     homeChainReader,
 		lggr:                lggr,
@@ -43,8 +46,9 @@ func NewHomeChainConfigPoller(
 		nodeSupportedChains: map[libocrtypes.PeerID]mapset.Set[cciptypes.ChainSelector]{},
 		knownSourceChains:   mapset.NewSet[cciptypes.ChainSelector](),
 		fChain:              map[cciptypes.ChainSelector]int{},
-		backgroundCancel:    nil,
-		pollingInterval:     pollingInterval,
+		//backgroundCancel:    cancelFunc,
+		//backgroundCtx:       bgCtx,
+		pollingInterval: pollingInterval,
 	}
 }
 
@@ -60,33 +64,31 @@ func (r *HomeChainConfigPoller) Start(ctx context.Context) error {
 	r.backgroundCancel = cancelFunc
 	r.mutex.Unlock()
 
-	err := r.fetchAndSetConfig(ctx)
+	err := r.fetchAndSetConfigs(ctx)
 	if err != nil {
 		r.lggr.Errorw("Initial fetch of on-chain configs failed", "err", err)
 	}
 
 	r.lggr.Infow("Start Polling ChainConfig")
-	go func() {
-		ticker := time.NewTicker(r.pollingInterval * time.Second)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-bgCtx.Done():
-				r.lggr.Infow("Polling stopped")
-				return
-			case <-ticker.C:
-				_ = r.fetchAndSetConfig(ctx)
-			}
-		}
-	}()
-
+	go r.poll(bgCtx)
 	return nil
 }
 
-//func (r *HomeChainConfigPoller) poll() {
-//}
+func (r *HomeChainConfigPoller) poll(ctx context.Context) {
+	ticker := time.NewTicker(r.pollingInterval * time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			r.lggr.Infow("Polling stopped")
+			return
+		case <-ticker.C:
+			_ = r.fetchAndSetConfigs(ctx)
+		}
+	}
+}
 
-func (r *HomeChainConfigPoller) fetchAndSetConfig(ctx context.Context) error {
+func (r *HomeChainConfigPoller) fetchAndSetConfigs(ctx context.Context) error {
 	chainConfigInfos, err := r.fetchOnChainConfig(ctx)
 	if err != nil {
 		r.lggr.Errorw("Fetching on-chain configs failed", "err", err)

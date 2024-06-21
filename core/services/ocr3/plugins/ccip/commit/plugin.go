@@ -47,12 +47,6 @@ func NewPlugin(
 	lggr logger.Logger,
 	homeChainPoller cciptypes.HomeChainPoller,
 ) *Plugin {
-	// Call to Start doesn't fail if it's already started
-	err := homeChainPoller.Start(ctx)
-	if err != nil {
-		return nil
-	}
-
 	return &Plugin{
 		nodeID:            nodeID,
 		oracleIDToP2pID:   oracleIDToP2pID,

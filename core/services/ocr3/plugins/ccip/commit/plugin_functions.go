@@ -20,9 +20,6 @@ import (
 
 // observeLatestCommittedSeqNums finds the maximum committed sequence numbers for each source chain.
 // If we cannot observe the dest we return an empty slice and no error..
-// Plugin should be able to observe the max sequence numbers even if it can't read the source chain.
-// This will be used to reach consensus on the observed seqNums and if plugin can read dest chain it should be able to contribute to the observation.
-// If a sequence number is pending (is not on-chain yet), it will be included in the results.
 func observeLatestCommittedSeqNums(
 	ctx context.Context,
 	lggr logger.Logger,

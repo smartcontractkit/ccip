@@ -405,6 +405,12 @@ func newNode(ctx context.Context, t *testing.T, lggr logger.Logger, id int, cfg 
 		1,
 	)
 
+	err := homeChainPoller.Start(ctx)
+	if err != nil {
+		lggr.Errorw("Failed to start home chain poller", "err", err)
+		return nodeSetup{}
+	}
+
 	node1 := NewPlugin(
 		context.Background(),
 		commontypes.OracleID(id),
