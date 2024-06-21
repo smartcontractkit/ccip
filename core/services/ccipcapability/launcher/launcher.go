@@ -8,11 +8,13 @@ import (
 	"go.uber.org/multierr"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/utils"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/keystone_capability_registry"
+
+	kcr "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/keystone_capability_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	cctypes "github.com/smartcontractkit/chainlink/v2/core/services/ccipcapability/types"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/p2pkey"
+	p2ptypes "github.com/smartcontractkit/chainlink/v2/core/services/p2p/types"
 )
 
 var (
@@ -39,9 +41,13 @@ func New(
 		capRegistry:            capRegistry,
 		lggr:                   lggr,
 		homeChainReader:        homeChainReader,
-		regState:               cctypes.RegistryState{},
-		oracleCreator:          oracleCreator,
-		dons:                   make(map[uint32]*ccipDeployment),
+		regState: cctypes.RegistryState{
+			IDsToDONs:         make(map[cctypes.DonID]kcr.CapabilityRegistryDONInfo),
+			IDsToNodes:        make(map[p2ptypes.PeerID]kcr.CapabilityRegistryNodeInfo),
+			IDsToCapabilities: make(map[cctypes.HashedCapabilityID]kcr.CapabilityRegistryCapability),
+		},
+		oracleCreator: oracleCreator,
+		dons:          make(map[uint32]*ccipDeployment),
 	}
 }
 
@@ -141,9 +147,11 @@ func (l *launcher) processDiff(diff diffResult) error {
 		if err := l.removeDON(id); err != nil {
 			return err
 		}
+
+		delete(l.regState.IDsToDONs, id)
 	}
 
-	var addedDeployments = make(map[DonID]*ccipDeployment)
+	var addedDeployments = make(map[cctypes.DonID]*ccipDeployment)
 	for _, don := range diff.added {
 		dep, err := l.addDON(don)
 		if err != nil {
@@ -163,10 +171,10 @@ func (l *launcher) processDiff(diff diffResult) error {
 		l.dons[donID] = dep
 		// update the state with the latest config.
 		// this way if one of the starts errors, we don't retry all of them.
-		l.regState.DONs[donID] = diff.added[donID]
+		l.regState.IDsToDONs[donID] = diff.added[donID]
 	}
 
-	var updatedDeployments = make(map[DonID]struct {
+	var updatedDeployments = make(map[cctypes.DonID]struct {
 		depBefore, depAfter *ccipDeployment
 	})
 	for _, don := range diff.updated {
@@ -192,7 +200,7 @@ func (l *launcher) processDiff(diff diffResult) error {
 		l.dons[donID] = depPair.depAfter
 		// update the state with the latest config.
 		// this way if one of the starts errors, we don't retry all of them.
-		l.regState.DONs[donID] = diff.updated[donID]
+		l.regState.IDsToDONs[donID] = diff.updated[donID]
 	}
 
 	return nil
@@ -218,7 +226,7 @@ func (l *launcher) removeDON(id uint32) error {
 // In the case of CCIP, which follows blue-green deployment, we either:
 // 1. Create a new oracle (the green instance) and start it.
 // 2. Shut down the blue instance, making the green instance the new blue instance.
-func (l *launcher) updateDON(don keystone_capability_registry.CapabilityRegistryDONInfo) (depBefore, depAfter *ccipDeployment, err error) {
+func (l *launcher) updateDON(don kcr.CapabilityRegistryDONInfo) (depBefore, depAfter *ccipDeployment, err error) {
 	if !isMemberOfDON(don, l.p2pID) {
 		l.lggr.Infow("Not a member of this DON, skipping", "donId", don.Id, "p2pId", l.p2pID.ID())
 		return nil, nil, nil
@@ -287,7 +295,7 @@ func (l *launcher) updateDON(don keystone_capability_registry.CapabilityRegistry
 	return depBefore, depAfter, nil
 }
 
-func (l *launcher) addDON(don keystone_capability_registry.CapabilityRegistryDONInfo) (*ccipDeployment, error) {
+func (l *launcher) addDON(don kcr.CapabilityRegistryDONInfo) (*ccipDeployment, error) {
 	if !isMemberOfDON(don, l.p2pID) {
 		l.lggr.Infow("Not a member of this DON, skipping", "donId", don.Id, "p2pId", l.p2pID.ID())
 		return nil, nil
@@ -320,17 +328,35 @@ func (l *launcher) addDON(don keystone_capability_registry.CapabilityRegistryDON
 		return nil, fmt.Errorf("failed to create CCIP commit oracle: %w", err)
 	}
 
+	var commitBootstrap cctypes.CCIPOracle
+	if isMemberOfBootstrapSubcommittee(commitOCRConfigs[0].BootstrapP2PIDs(), l.p2pID) {
+		commitBootstrap, err = l.oracleCreator.CreateBootstrapOracle(commitOCRConfigs[0])
+		if err != nil {
+			return nil, fmt.Errorf("failed to create CCIP bootstrap oracle: %w", err)
+		}
+	}
+
 	execOracle, err := l.oracleCreator.CreateExecOracle(execOCRConfigs[0])
 	if err != nil {
 		return nil, fmt.Errorf("failed to create CCIP exec oracle: %w", err)
 	}
 
+	var execBootstrap cctypes.CCIPOracle
+	if isMemberOfBootstrapSubcommittee(execOCRConfigs[0].BootstrapP2PIDs(), l.p2pID) {
+		execBootstrap, err = l.oracleCreator.CreateBootstrapOracle(execOCRConfigs[0])
+		if err != nil {
+			return nil, fmt.Errorf("failed to create CCIP bootstrap oracle: %w", err)
+		}
+	}
+
 	return &ccipDeployment{
 		commit: blueGreenDeployment{
-			blue: commitOracle,
+			blue:          commitOracle,
+			bootstrapBlue: commitBootstrap,
 		},
 		exec: blueGreenDeployment{
-			blue: execOracle,
+			blue:          execOracle,
+			bootstrapBlue: execBootstrap,
 		},
 	}, nil
 }

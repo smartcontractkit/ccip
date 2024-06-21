@@ -8,14 +8,15 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/hashicorp/consul/sdk/freeport"
+	confighelper2 "github.com/smartcontractkit/libocr/offchainreporting2plus/confighelper"
+	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+	"github.com/stretchr/testify/require"
+
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/keystone_capability_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ccipcapability"
 	"github.com/smartcontractkit/chainlink/v2/core/services/chainlink"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/p2pkey"
-	confighelper2 "github.com/smartcontractkit/libocr/offchainreporting2plus/confighelper"
-	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
-	"github.com/stretchr/testify/require"
 )
 
 func TestIntegration_CCIPCapability(t *testing.T) {

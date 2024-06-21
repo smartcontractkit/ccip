@@ -15,6 +15,12 @@ import (
 	gethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/jmoiron/sqlx"
 	chainsel "github.com/smartcontractkit/chain-selectors"
+	confighelper2 "github.com/smartcontractkit/libocr/offchainreporting2plus/confighelper"
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3confighelper"
+	"github.com/stretchr/testify/require"
+	"go.uber.org/zap/zapcore"
+	"golang.org/x/exp/maps"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-common/pkg/loop"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/mailbox"
@@ -44,11 +50,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/ocr2key"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
 	"github.com/smartcontractkit/chainlink/v2/plugins"
-	confighelper2 "github.com/smartcontractkit/libocr/offchainreporting2plus/confighelper"
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3confighelper"
-	"github.com/stretchr/testify/require"
-	"go.uber.org/zap/zapcore"
-	"golang.org/x/exp/maps"
 )
 
 var (

@@ -14,11 +14,21 @@ type blueGreenDeployment struct {
 	// blue must always be present.
 	blue cctypes.CCIPOracle
 
+	// bootstrapBlue is the bootstrap node of the blue OCR instance.
+	// Only a subset of the DON will be running bootstrap instances,
+	// so this may be nil.
+	bootstrapBlue cctypes.CCIPOracle
+
 	// green is the green OCR instance.
 	// green may or may not be present.
 	// green must never be present if blue is not present.
 	// TODO: should we enforce this invariant somehow?
 	green cctypes.CCIPOracle
+
+	// bootstrapGreen is the bootstrap node of the green OCR instance.
+	// Only a subset of the DON will be running bootstrap instances,
+	// so this may be nil, even when green is not nil.
+	bootstrapGreen cctypes.CCIPOracle
 }
 
 // ccipDeployment represents blue-green deployments of both commit and exec
@@ -32,15 +42,34 @@ type ccipDeployment struct {
 func (c *ccipDeployment) Shutdown() error {
 	var err error
 
+	// shutdown blue commit instances.
 	err = multierr.Append(err, c.commit.blue.Shutdown())
+	if c.commit.bootstrapBlue != nil {
+		err = multierr.Append(err, c.commit.bootstrapBlue.Shutdown())
+	}
+
+	// shutdown green commit instances.
 	if c.commit.green != nil {
 		err = multierr.Append(err, c.commit.green.Shutdown())
 	}
+	if c.commit.bootstrapGreen != nil {
+		err = multierr.Append(err, c.commit.bootstrapGreen.Shutdown())
+	}
 
+	// shutdown blue exec instances.
 	err = multierr.Append(err, c.exec.blue.Shutdown())
+	if c.exec.bootstrapBlue != nil {
+		err = multierr.Append(err, c.exec.bootstrapBlue.Shutdown())
+	}
+
+	// shutdown green exec instances.
 	if c.exec.green != nil {
 		err = multierr.Append(err, c.exec.green.Shutdown())
 	}
+	if c.exec.bootstrapGreen != nil {
+		err = multierr.Append(err, c.exec.bootstrapGreen.Shutdown())
+	}
+
 	return err
 }
 
@@ -48,7 +77,13 @@ func (c *ccipDeployment) StartBlue() error {
 	var err error
 
 	err = multierr.Append(err, c.commit.blue.Start())
+	if c.commit.bootstrapBlue != nil {
+		err = multierr.Append(err, c.commit.bootstrapBlue.Start())
+	}
 	err = multierr.Append(err, c.exec.blue.Start())
+	if c.exec.bootstrapBlue != nil {
+		err = multierr.Append(err, c.exec.bootstrapBlue.Start())
+	}
 
 	return err
 }
@@ -57,7 +92,13 @@ func (c *ccipDeployment) ShutdownBlue() error {
 	var err error
 
 	err = multierr.Append(err, c.commit.blue.Shutdown())
+	if c.commit.bootstrapBlue != nil {
+		err = multierr.Append(err, c.commit.bootstrapBlue.Shutdown())
+	}
 	err = multierr.Append(err, c.exec.blue.Shutdown())
+	if c.exec.bootstrapBlue != nil {
+		err = multierr.Append(err, c.exec.bootstrapBlue.Shutdown())
+	}
 
 	return err
 }
@@ -78,11 +119,17 @@ func (c *ccipDeployment) HandleBlueGreen(prevDeployment *ccipDeployment) error {
 		// green is already running so no need to start it.
 		// shutdown blue.
 		err = multierr.Append(err, prevDeployment.commit.blue.Shutdown())
+		if prevDeployment.commit.bootstrapBlue != nil {
+			err = multierr.Append(err, prevDeployment.commit.bootstrapBlue.Shutdown())
+		}
 	} else if prevDeployment.commit.green == nil && c.commit.green != nil {
 		// case 2
 		// blue is already running so no need to start it.
 		// start green.
 		err = multierr.Append(err, c.commit.green.Start())
+		if c.commit.bootstrapGreen != nil {
+			err = multierr.Append(err, c.commit.bootstrapGreen.Start())
+		}
 	} else {
 		return fmt.Errorf("invalid blue-green deployment transition")
 	}
@@ -92,11 +139,17 @@ func (c *ccipDeployment) HandleBlueGreen(prevDeployment *ccipDeployment) error {
 		// green is already running so no need to start it.
 		// shutdown blue.
 		err = multierr.Append(err, prevDeployment.exec.blue.Shutdown())
+		if prevDeployment.exec.bootstrapBlue != nil {
+			err = multierr.Append(err, prevDeployment.exec.bootstrapBlue.Shutdown())
+		}
 	} else if prevDeployment.exec.green == nil && c.exec.green != nil {
 		// case 2
 		// blue is already running so no need to start it.
 		// start green.
 		err = multierr.Append(err, c.exec.green.Start())
+		if c.exec.bootstrapGreen != nil {
+			err = multierr.Append(err, c.exec.bootstrapGreen.Start())
+		}
 	} else {
 		return fmt.Errorf("invalid blue-green deployment transition")
 	}

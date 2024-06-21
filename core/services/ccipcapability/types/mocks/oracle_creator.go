@@ -12,6 +12,36 @@ type OracleCreator struct {
 	mock.Mock
 }
 
+// CreateBootstrapOracle provides a mock function with given fields: config
+func (_m *OracleCreator) CreateBootstrapOracle(config types.OCRConfig) (types.CCIPOracle, error) {
+	ret := _m.Called(config)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CreateBootstrapOracle")
+	}
+
+	var r0 types.CCIPOracle
+	var r1 error
+	if rf, ok := ret.Get(0).(func(types.OCRConfig) (types.CCIPOracle, error)); ok {
+		return rf(config)
+	}
+	if rf, ok := ret.Get(0).(func(types.OCRConfig) types.CCIPOracle); ok {
+		r0 = rf(config)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(types.CCIPOracle)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(types.OCRConfig) error); ok {
+		r1 = rf(config)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // CreateCommitOracle provides a mock function with given fields: config
 func (_m *OracleCreator) CreateCommitOracle(config types.OCRConfig) (types.CCIPOracle, error) {
 	ret := _m.Called(config)

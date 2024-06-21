@@ -62,3 +62,8 @@ func (o *oracleCreator) CreateCommitOracle(config cctypes.OCRConfig) (cctypes.CC
 func (o *oracleCreator) CreateExecOracle(config cctypes.OCRConfig) (cctypes.CCIPOracle, error) {
 	panic("unimplemented")
 }
+
+// CreateBootstrapOracle implements types.OracleCreator.
+func (o *oracleCreator) CreateBootstrapOracle(config cctypes.OCRConfig) (cctypes.CCIPOracle, error) {
+	panic("unimplemented")
+}

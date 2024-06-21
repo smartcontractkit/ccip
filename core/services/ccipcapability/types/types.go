@@ -3,13 +3,17 @@ package types
 import (
 	"context"
 
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/keystone_capability_registry"
+	kcr "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/keystone_capability_registry"
+	p2ptypes "github.com/smartcontractkit/chainlink/v2/core/services/p2p/types"
 )
 
+type DonID = uint32
+type HashedCapabilityID = [32]byte
+
 type RegistryState struct {
-	DONs         []keystone_capability_registry.CapabilityRegistryDONInfo
-	Capabilities []keystone_capability_registry.CapabilityRegistryCapability
-	Nodes        []keystone_capability_registry.CapabilityRegistryNodeInfo
+	IDsToDONs         map[DonID]kcr.CapabilityRegistryDONInfo
+	IDsToNodes        map[p2ptypes.PeerID]kcr.CapabilityRegistryNodeInfo
+	IDsToCapabilities map[HashedCapabilityID]kcr.CapabilityRegistryCapability
 }
 
 type CapabilityRegistry interface {
@@ -44,6 +48,8 @@ type OCRConfig interface {
 	String() string
 }
 
+// CCIPOracle represents either a CCIP commit or exec oracle or a bootstrap node.
+//
 //go:generate mockery --name CCIPOracle --output ./mocks/ --case underscore
 type CCIPOracle interface {
 	Shutdown() error
@@ -62,6 +68,10 @@ type OracleCreator interface {
 	// CreateExecOracle creates a new oracle that will run the CCIP exec plugin.
 	// The oracle must be returned unstarted.
 	CreateExecOracle(config OCRConfig) (CCIPOracle, error)
+
+	// CreateBootstrapOracle creates a new bootstrap node with the given OCR config.
+	// The oracle must be returned unstarted.
+	CreateBootstrapOracle(config OCRConfig) (CCIPOracle, error)
 }
 
 // HomeChainReader is an interface for reading CCIP chain and OCR configurations from the home chain.

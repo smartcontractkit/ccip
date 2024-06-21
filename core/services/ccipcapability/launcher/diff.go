@@ -10,12 +10,10 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/p2pkey"
 )
 
-type DonID = uint32
-
 type diffResult struct {
-	added   map[DonID]kcr.CapabilityRegistryDONInfo
-	removed map[DonID]kcr.CapabilityRegistryDONInfo
-	updated map[DonID]kcr.CapabilityRegistryDONInfo
+	added   map[cctypes.DonID]kcr.CapabilityRegistryDONInfo
+	removed map[cctypes.DonID]kcr.CapabilityRegistryDONInfo
+	updated map[cctypes.DonID]kcr.CapabilityRegistryDONInfo
 }
 
 func diff(
@@ -50,14 +48,14 @@ func diff(
 
 func compareDONs(
 	currCCIPDONs,
-	newCCIPDONs map[DonID]kcr.CapabilityRegistryDONInfo,
+	newCCIPDONs map[cctypes.DonID]kcr.CapabilityRegistryDONInfo,
 ) (
 	dr diffResult,
 	err error,
 ) {
-	added := make(map[DonID]kcr.CapabilityRegistryDONInfo)
-	removed := make(map[DonID]kcr.CapabilityRegistryDONInfo)
-	updated := make(map[DonID]kcr.CapabilityRegistryDONInfo)
+	added := make(map[cctypes.DonID]kcr.CapabilityRegistryDONInfo)
+	removed := make(map[cctypes.DonID]kcr.CapabilityRegistryDONInfo)
+	updated := make(map[cctypes.DonID]kcr.CapabilityRegistryDONInfo)
 
 	for id, don := range newCCIPDONs {
 		if currDONState, ok := currCCIPDONs[id]; !ok {
@@ -89,9 +87,9 @@ func compareDONs(
 func filterCCIPDONs(
 	ccipCapability kcr.CapabilityRegistryCapability,
 	state cctypes.RegistryState,
-) (map[DonID]kcr.CapabilityRegistryDONInfo, error) {
-	ccipDONs := make(map[DonID]kcr.CapabilityRegistryDONInfo)
-	for _, don := range state.DONs {
+) (map[cctypes.DonID]kcr.CapabilityRegistryDONInfo, error) {
+	ccipDONs := make(map[cctypes.DonID]kcr.CapabilityRegistryDONInfo)
+	for _, don := range state.IDsToDONs {
 		// CCIP DONs should only have one capability, CCIP.
 		var found bool
 		for _, donCapabilities := range don.CapabilityConfigurations {
@@ -116,7 +114,7 @@ func checkCapabilityPresence(
 ) (kcr.CapabilityRegistryCapability, error) {
 	// Sanity check to make sure the capability registry has the capability we are looking for.
 	var ccipCapability kcr.CapabilityRegistryCapability
-	for _, capability := range state.Capabilities {
+	for _, capability := range state.IDsToCapabilities {
 		if capability.LabelledName == capabilityLabelledName &&
 			capability.Version == capabilityVersion {
 			ccipCapability = capability
@@ -148,6 +146,18 @@ func hashedCapabilityId(capabilityVersion, capabilityLabelledName string) (r [32
 func isMemberOfDON(don kcr.CapabilityRegistryDONInfo, p2pID p2pkey.KeyV2) bool {
 	for _, node := range don.NodeP2PIds {
 		if node == p2pID.PeerID() {
+			return true
+		}
+	}
+	return false
+}
+
+func isMemberOfBootstrapSubcommittee(
+	bootstrapP2PIDs [][32]byte,
+	p2pID p2pkey.KeyV2,
+) bool {
+	for _, id := range bootstrapP2PIDs {
+		if p2pID.PeerID() == id {
 			return true
 		}
 	}
