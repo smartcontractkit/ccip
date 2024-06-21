@@ -201,7 +201,6 @@ func NewCommitServices(ctx context.Context, ds sqlutil.DataSource, srcProvider c
 		chainHealthCheck,
 		priceService,
 	}, nil
-
 }
 
 func CommitReportToEthTxMeta(typ ccipconfig.ContractType, ver semver.Version) (func(report []byte) (*txmgr.TxMeta, error), error) {

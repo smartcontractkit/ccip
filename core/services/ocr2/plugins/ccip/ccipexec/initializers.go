@@ -187,7 +187,6 @@ func NewExecServices(ctx context.Context, lggr logger.Logger, jb job.Job, srcPro
 		chainHealthcheck,
 		tokenBackgroundWorker,
 	}, nil
-
 }
 
 // UnregisterExecPluginLpFilters unregisters all the registered filters for both source and dest chains.

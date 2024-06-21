@@ -47,7 +47,6 @@ func NewSrcExecProvider(
 	usdcAttestationAPIIntervalMilliseconds int,
 	usdcSrcMsgTransmitterAddr common.Address,
 ) (commontypes.CCIPExecProvider, error) {
-
 	var usdcReader *ccip.USDCReaderImpl
 	var err error
 	if usdcAttestationAPI != "" {
