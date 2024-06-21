@@ -455,11 +455,14 @@ jobs:
           fi
           
           jq . compatibility_test_list.json
-          JOB_MATRIX_JSON=$(jq -c . compatibility_test_list.json)
+          echo "Adding human-readable name"
+          jq 'map(. + {visible_name: (.docker_image | split(",")[0] | split("=")[1])})' compatibility_test_list.json > compatibility_test_list_modified.json
+          jq . compatibility_test_list_modified.json
+          JOB_MATRIX_JSON=$(jq -c . compatibility_test_list_modified.json)
           echo "JOB_MATRIX_JSON=${JOB_MATRIX_JSON}" >> $GITHUB_ENV
 
   run-client-compatibility-matrix:
-    name: CCIP Compatibility with ${{ matrix.evm_node.name }}
+    name: CCIP Compatibility with ${{ matrix.evm_node.visible_name }}
     if: always() && needs.should-run.outputs.should_run == 'true'
     environment: integration
     permissions:
@@ -542,6 +545,7 @@ jobs:
         run: |
           echo "EVM Implementation Docker Image: ${{ matrix.evm_node.docker_image }}"
           echo "EVM Implementation Networks: ${{ matrix.evm_node.networks }}"
+          echo "Test identifier: ${{ matrix.evm_node.name }}"
       - name: Run Tests
         uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@fc3e0df622521019f50d772726d6bf8dc919dd38 # v2.3.19
         with:
