@@ -7,5 +7,5 @@ interface INonceManager {
   /// @param destChainSelector The destination chain selector
   /// @param sender The encoded sender address
   /// @return The new outbound nonce
-  function incrementOutboundNonce(uint64 destChainSelector, bytes calldata sender) external returns (uint64);
+  function getIncrementedOutboundNonce(uint64 destChainSelector, bytes calldata sender) external returns (uint64);
 }

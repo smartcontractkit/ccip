@@ -367,7 +367,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, AggregateRateLimiter, IType
       sequenceNumber: ++destChainConfig.sequenceNumber,
       gasLimit: gasLimit,
       strict: false,
-      nonce: INonceManager(i_nonceManager).incrementOutboundNonce(destChainSelector, abi.encode(originalSender)),
+      nonce: INonceManager(i_nonceManager).getIncrementedOutboundNonce(destChainSelector, abi.encode(originalSender)),
       feeToken: message.feeToken,
       feeTokenAmount: feeTokenAmount,
       data: message.data,

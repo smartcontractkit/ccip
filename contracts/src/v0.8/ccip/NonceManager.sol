@@ -40,7 +40,7 @@ contract NonceManager is INonceManager, AuthorizedCallers {
   constructor(address[] memory authorizedCallers) AuthorizedCallers(authorizedCallers) {}
 
   /// @inheritdoc INonceManager
-  function incrementOutboundNonce(
+  function getIncrementedOutboundNonce(
     uint64 destChainSelector,
     bytes calldata sender
   ) external onlyAuthorizedCallers returns (uint64) {

@@ -12,14 +12,14 @@ import {EVM2EVMMultiOnRampHelper} from "./helpers/EVM2EVMMultiOnRampHelper.sol";
 import {EVM2EVMOnRampHelper} from "./helpers/EVM2EVMOnRampHelper.sol";
 import {EVM2EVMMultiOnRampSetup} from "./onRamp/EVM2EVMMultiOnRampSetup.t.sol";
 
-contract NonceManagerTest_incrementOutboundNonce is EVM2EVMMultiOnRampSetup {
-  function test_incrementOutboundNonce_Success() public {
+contract NonceManagerTest_getIncrementedOutboundNonce is EVM2EVMMultiOnRampSetup {
+  function test_getIncrementedOutboundNonce_Success() public {
     vm.startPrank(address(s_onRamp));
     bytes memory sender = abi.encode(address(this));
 
     assertEq(s_nonceManager.getOutboundNonce(DEST_CHAIN_SELECTOR, sender), 0);
 
-    uint64 outboundNonce = s_nonceManager.incrementOutboundNonce(DEST_CHAIN_SELECTOR, sender);
+    uint64 outboundNonce = s_nonceManager.getIncrementedOutboundNonce(DEST_CHAIN_SELECTOR, sender);
     assertEq(outboundNonce, 1);
   }
 }
