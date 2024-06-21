@@ -76,8 +76,7 @@ func (r *HomeChainConfigPoller) poll() {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			err := r.fetchAndSetConfigs(ctx)
-			if err != nil {
+			if err := r.fetchAndSetConfigs(ctx); err != nil {
 				r.lggr.Errorw("Fetching and setting configs failed", "err", err)
 			}
 		}
