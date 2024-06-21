@@ -38,6 +38,7 @@ type PriceService interface {
 
 	// GetGasAndTokenPrices fetches source chain gas prices and relevant token prices from all lanes that touch the given dest chain.
 	// The prices have been written into the DB by each lane's PriceService in the background. The prices are denoted in USD.
+	// If the results are empty, they are in the form of empty maps, as opposed to being nil.
 	GetGasAndTokenPrices(ctx context.Context, destChainSelector uint64) (map[uint64]*big.Int, map[cciptypes.Address]*big.Int, error)
 }
 

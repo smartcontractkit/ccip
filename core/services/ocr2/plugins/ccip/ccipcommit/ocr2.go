@@ -112,8 +112,8 @@ func (r *CommitReportingPlugin) Observation(ctx context.Context, epochAndRound t
 		return nil, err
 	}
 
-	// Fetches multi-lane gas prices and token prices, for the given dest chain
-	gasPricesUSD, tokenPricesUSD, err := r.priceService.GetGasAndTokenPrices(ctx, r.destChainSelector)
+	// Fetches multi-lane gasPricesUSD and tokenPricesUSD for the same dest chain; resulting maps are not nil
+	gasPricesUSD, tokenPricesUSD, err := r.observePriceUpdates(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -139,6 +139,23 @@ func (r *CommitReportingPlugin) Observation(ctx context.Context, epochAndRound t
 		SourceGasPriceUSD:         gasPricesUSD[r.sourceChainSelector], // for backwards compatibility during phased rollout
 		SourceGasPriceUSDPerChain: gasPricesUSD,
 	}.Marshal()
+}
+
+// observePriceUpdates only observes price updates if price reporting is enabled
+func (r *CommitReportingPlugin) observePriceUpdates(
+	ctx context.Context,
+) (gasPricesUSD map[uint64]*big.Int, tokenPricesUSD map[cciptypes.Address]*big.Int, err error) {
+	if r.offchainConfig.PriceReportingDisabled {
+		return map[uint64]*big.Int{}, map[cciptypes.Address]*big.Int{}, nil
+	}
+
+	// Fetches multi-lane gas prices and token prices, for the given dest chain
+	gasPricesUSD, tokenPricesUSD, err = r.priceService.GetGasAndTokenPrices(ctx, r.destChainSelector)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return gasPricesUSD, tokenPricesUSD, nil
 }
 
 func (r *CommitReportingPlugin) calculateMinMaxSequenceNumbers(ctx context.Context, lggr logger.Logger) (uint64, uint64, []cciptypes.Hash, error) {
@@ -365,7 +382,8 @@ func extractObservationData(lggr logger.Logger, f int, sourceChainSelector uint6
 				gasPriceObservations[selector] = append(gasPriceObservations[selector], price)
 			}
 		}
-		// During phased rollout, NOPs running old release only reports SourceGasPriceUSD
+		// During phased rollout, NOPs running old release only report SourceGasPriceUSD.
+		// An empty `SourceGasPriceUSDPerChain` with a non-nil `SourceGasPriceUSD` can only happen with old release.
 		if len(obs.SourceGasPriceUSDPerChain) == 0 && obs.SourceGasPriceUSD != nil {
 			gasPriceObservations[sourceChainSelector] = append(gasPriceObservations[sourceChainSelector], obs.SourceGasPriceUSD)
 		}
@@ -404,6 +422,11 @@ func extractObservationData(lggr logger.Logger, f int, sourceChainSelector uint6
 
 // selectPriceUpdates filters out gas and token price updates that are already inflight
 func (r *CommitReportingPlugin) selectPriceUpdates(ctx context.Context, now time.Time, gasPriceObs map[uint64][]*big.Int, tokenPriceObs map[cciptypes.Address][]*big.Int) ([]cciptypes.GasPrice, []cciptypes.TokenPrice, error) {
+	// If price reporting is disabled, there is no need to select price updates.
+	if r.offchainConfig.PriceReportingDisabled {
+		return nil, nil, nil
+	}
+
 	latestGasPrice, err := r.getLatestGasPriceUpdate(ctx, now)
 	if err != nil {
 		return nil, nil, err
