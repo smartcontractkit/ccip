@@ -189,6 +189,23 @@ func (oc *contractTransmitter) Transmit(ctx context.Context, reportCtx ocrtypes.
 }
 
 func (oc contractTransmitterNoSignatures) Transmit(ctx context.Context, reportCtx ocrtypes.ReportContext, report ocrtypes.Report, signatures []ocrtypes.AttributedOnchainSignature) error {
+	var rs [][32]byte
+	var ss [][32]byte
+	var vs [32]byte
+
+	var r [32]byte
+	var s [32]byte
+
+	rs = append(rs, r)
+	ss = append(ss, s)
+
+	//// Set rs and ss to empty slices of [32]byte arrays
+	//rs = make([][32]byte, 0)
+	//ss = make([][32]byte, 0)
+
+	// Set vs to a default value, e.g., all zeros
+	//vs = [32]byte{} // This initializes vs with all elements set to zero
+
 	if len(signatures) > 32 {
 		return errors.New("too many signatures, maximum is 32")
 	}
@@ -207,7 +224,7 @@ func (oc contractTransmitterNoSignatures) Transmit(ctx context.Context, reportCt
 
 	oc.lggr.Debugw("Transmitting report", "report", hex.EncodeToString(report), "rawReportCtx", rawReportCtx, "contractAddress", oc.contractAddress, "txMeta", txMeta)
 
-	payload, err := oc.contractABI.Pack("transmit", rawReportCtx, []byte(report), nil, nil, nil)
+	payload, err := oc.contractABI.Pack("transmit", rawReportCtx, []byte(report), rs, ss, vs)
 	if err != nil {
 		return errors.Wrap(err, "abi.Pack failed")
 	}
