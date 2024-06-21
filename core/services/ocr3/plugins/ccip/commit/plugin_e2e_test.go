@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/smartcontractkit/ccipocr3/internal/reader"
+
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
 	"github.com/stretchr/testify/mock"

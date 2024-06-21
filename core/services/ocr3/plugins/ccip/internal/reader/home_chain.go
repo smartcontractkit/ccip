@@ -142,7 +142,7 @@ func (r *HomeChainConfigPoller) GetKnownCCIPChains() (mapset.Set[cciptypes.Chain
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
 	knownSourceChains := mapset.NewSet[cciptypes.ChainSelector]()
-	for chain, _ := range r.chainConfigs {
+	for chain := range r.chainConfigs {
 		knownSourceChains.Add(chain)
 	}
 	if knownSourceChains.Cardinality() == 0 {
@@ -200,7 +200,7 @@ func createFChain(chainConfigs map[cciptypes.ChainSelector]cciptypes.ChainConfig
 
 func createKnownChains(chainConfigs map[cciptypes.ChainSelector]cciptypes.ChainConfig) mapset.Set[cciptypes.ChainSelector] {
 	knownChains := mapset.NewSet[cciptypes.ChainSelector]()
-	for chain, _ := range chainConfigs {
+	for chain := range chainConfigs {
 		knownChains.Add(chain)
 	}
 	return knownChains
