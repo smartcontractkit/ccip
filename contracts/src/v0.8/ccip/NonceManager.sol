@@ -30,8 +30,6 @@ contract NonceManager is INonceManager, AuthorizedCallers {
   mapping(uint64 chainSelector => PreviousRamps previousRamps) private s_previousRamps;
   /// @dev The current outbound nonce per sender used on the onramp
   mapping(uint64 destChainSelector => mapping(address sender => uint64 outboundNonce)) private s_outboundNonces;
-  /// @dev The current inbound nonce per sender used on the offramp
-  mapping(uint64 sourceChainSelector => mapping(bytes sender => uint64 inboundNonce)) private s_inboundNonces;
 
   constructor(address[] memory authorizedCallers) AuthorizedCallers(authorizedCallers) {}
 
