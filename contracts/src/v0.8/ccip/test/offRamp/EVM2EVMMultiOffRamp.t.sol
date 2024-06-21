@@ -2495,13 +2495,13 @@ contract EVM2EVMMultiOffRamp_trialExecute is EVM2EVMMultiOffRampSetup {
   }
 }
 
-contract EVM2EVMMultiOffRamp__releaseOrMintToken is EVM2EVMMultiOffRampSetup {
+contract EVM2EVMMultiOffRamp__releaseOrMintSingleToken is EVM2EVMMultiOffRampSetup {
   function setUp() public virtual override {
     super.setUp();
     _setupMultipleOffRamps();
   }
 
-  function test__releaseOrMintToken_Success() public {
+  function test__releaseOrMintSingleToken_Success() public {
     uint256 amount = 123123;
     address token = s_sourceTokens[0];
     bytes memory originalSender = abi.encode(OWNER);
@@ -2533,14 +2533,14 @@ contract EVM2EVMMultiOffRamp__releaseOrMintToken is EVM2EVMMultiOffRampSetup {
       )
     );
 
-    s_offRamp.releaseOrMintToken(
+    s_offRamp.releaseOrMintSingleToken(
       amount, originalSender, OWNER, SOURCE_CHAIN_SELECTOR_1, sourceTokenData, offchainTokenData
     );
 
     assertEq(startingBalance + amount, dstToken1.balanceOf(OWNER));
   }
 
-  function test__releaseOrMintToken_NotACompatiblePool_Revert() public {
+  function test__releaseOrMintSingleToken_NotACompatiblePool_Revert() public {
     uint256 amount = 123123;
     address token = s_sourceTokens[0];
     address destToken = s_destTokenBySourceToken[token];
@@ -2565,7 +2565,7 @@ contract EVM2EVMMultiOffRamp__releaseOrMintToken is EVM2EVMMultiOffRampSetup {
 
     vm.expectRevert(abi.encodeWithSelector(EVM2EVMMultiOffRamp.NotACompatiblePool.selector, returnedPool));
 
-    s_offRamp.releaseOrMintToken(
+    s_offRamp.releaseOrMintSingleToken(
       amount, originalSender, OWNER, SOURCE_CHAIN_SELECTOR_1, sourceTokenData, offchainTokenData
     );
 
@@ -2580,12 +2580,12 @@ contract EVM2EVMMultiOffRamp__releaseOrMintToken is EVM2EVMMultiOffRampSetup {
 
     vm.expectRevert(abi.encodeWithSelector(EVM2EVMMultiOffRamp.NotACompatiblePool.selector, returnedPool));
 
-    s_offRamp.releaseOrMintToken(
+    s_offRamp.releaseOrMintSingleToken(
       amount, originalSender, OWNER, SOURCE_CHAIN_SELECTOR_1, sourceTokenData, offchainTokenData
     );
   }
 
-  function test__releaseOrMintToken_TokenHandlingError_revert_Revert() public {
+  function test__releaseOrMintSingleToken_TokenHandlingError_revert_Revert() public {
     address receiver = makeAddr("receiver");
     uint256 amount = 123123;
     address token = s_sourceTokens[0];
@@ -2604,7 +2604,7 @@ contract EVM2EVMMultiOffRamp__releaseOrMintToken is EVM2EVMMultiOffRampSetup {
     vm.mockCallRevert(destToken, abi.encodeWithSelector(IERC20.transfer.selector, receiver, amount), revertData);
 
     vm.expectRevert(abi.encodeWithSelector(EVM2EVMMultiOffRamp.TokenHandlingError.selector, revertData));
-    s_offRamp.releaseOrMintToken(
+    s_offRamp.releaseOrMintSingleToken(
       amount, originalSender, receiver, SOURCE_CHAIN_SELECTOR_1, sourceTokenData, offchainTokenData
     );
   }

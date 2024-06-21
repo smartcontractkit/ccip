@@ -620,12 +620,13 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
     bytes32[] calldata ss,
     bytes32 rawVs // signatures
   ) external {
-    uint64 sequenceNumber = uint64(uint256(reportContext[1]));
     CommitReport memory commitReport = abi.decode(report, (CommitReport));
 
     // Check if the report contains price updates
     if (commitReport.priceUpdates.tokenPriceUpdates.length > 0 || commitReport.priceUpdates.gasPriceUpdates.length > 0)
     {
+      uint64 sequenceNumber = uint64(uint256(reportContext[1]));
+
       // Check for price staleness based on the epoch and round
       if (s_latestPriceSequenceNumber < sequenceNumber) {
         // If prices are not stale, update the latest epoch and round
@@ -855,7 +856,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
   /// @param sourceTokenData A struct containing the local token address, the source pool address and optional data
   /// returned from the source pool.
   /// @param offchainTokenData Data fetched offchain by the DON.
-  function _releaseOrMintToken(
+  function _releaseOrMintSingleToken(
     uint256 sourceAmount,
     bytes memory originalSender,
     address receiver,
@@ -943,7 +944,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
     // Creating a copy is more gas efficient than initializing a new array.
     destTokenAmounts = sourceTokenAmounts;
     for (uint256 i = 0; i < sourceTokenAmounts.length; ++i) {
-      destTokenAmounts[i] = _releaseOrMintToken(
+      destTokenAmounts[i] = _releaseOrMintSingleToken(
         sourceTokenAmounts[i].amount,
         originalSender,
         receiver,

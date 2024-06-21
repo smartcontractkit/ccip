@@ -30,7 +30,7 @@ contract EVM2EVMMultiOffRampHelper is EVM2EVMMultiOffRamp, IgnoreContractSize {
     return _metadataHash(sourceChainSelector, onRamp, Internal.EVM_2_EVM_MESSAGE_HASH);
   }
 
-  function releaseOrMintToken(
+  function releaseOrMintSingleToken(
     uint256 sourceTokenAmount,
     bytes calldata originalSender,
     address receiver,
@@ -38,7 +38,7 @@ contract EVM2EVMMultiOffRampHelper is EVM2EVMMultiOffRamp, IgnoreContractSize {
     Internal.SourceTokenData calldata sourceTokenData,
     bytes calldata offchainTokenData
   ) external returns (Client.EVMTokenAmount memory) {
-    return _releaseOrMintToken(
+    return _releaseOrMintSingleToken(
       sourceTokenAmount, originalSender, receiver, sourceChainSelector, sourceTokenData, offchainTokenData
     );
   }
