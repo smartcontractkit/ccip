@@ -56,22 +56,35 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/erc20"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers/testhelpers_1_4_0"
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay/evm"
 )
 
+// NeedTokenAdminRegistry checks if token admin registry is needed for the current version of ccip
+// if the version is less than 1.5.0-dev, then token admin registry is not needed
+func NeedTokenAdminRegistry() bool {
+	// find out the pool version
+	version := VersionMap[TokenPoolContract]
+	if version == Latest {
+		return true
+	}
+	currentSemver := semver.MustParse(string(version))
+	tokenAdminEnabledVersion := semver.MustParse("1.5.0-dev")
+	return currentSemver.Compare(tokenAdminEnabledVersion) >= 0
+}
+
 // CCIPContractsDeployer provides the implementations for deploying CCIP ETH contracts
 type CCIPContractsDeployer struct {
-	evmClient   blockchain.EVMClient
-	logger      zerolog.Logger
-	EthDeployer *contracts.EthereumContractDeployer
+	evmClient blockchain.EVMClient
+	logger    *zerolog.Logger
 }
 
 // NewCCIPContractsDeployer returns an instance of a contract deployer for CCIP
-func NewCCIPContractsDeployer(logger zerolog.Logger, bcClient blockchain.EVMClient) (*CCIPContractsDeployer, error) {
+func NewCCIPContractsDeployer(logger *zerolog.Logger, bcClient blockchain.EVMClient) (*CCIPContractsDeployer, error) {
 	return &CCIPContractsDeployer{
-		evmClient:   bcClient,
-		logger:      logger,
-		EthDeployer: contracts.NewEthereumContractDeployer(bcClient, logger),
+		evmClient: bcClient,
+		logger:    logger,
 	}, nil
 }
 
@@ -200,6 +213,8 @@ func (e *CCIPContractsDeployer) DeployBurnMintERC677(ownerMintingAmount *big.Int
 		logger:          e.logger,
 		ContractAddress: *address,
 		instance:        instance.(*burn_mint_erc677.BurnMintERC677),
+		OwnerAddress:    common.HexToAddress(e.evmClient.GetDefaultWallet().Address()),
+		OwnerWallet:     e.evmClient.GetDefaultWallet(),
 	}
 	if ownerMintingAmount != nil {
 		// grant minter role to owner and mint tokens
@@ -268,6 +283,8 @@ func (e *CCIPContractsDeployer) NewERC20TokenContract(addr common.Address) (*ERC
 		logger:          e.logger,
 		instance:        token,
 		ContractAddress: addr,
+		OwnerAddress:    common.HexToAddress(e.evmClient.GetDefaultWallet().Address()),
+		OwnerWallet:     e.evmClient.GetDefaultWallet(),
 	}, err
 }
 
@@ -303,7 +320,9 @@ func (e *CCIPContractsDeployer) NewLockReleaseTokenPoolContract(addr common.Addr
 					LockReleasePool: pool,
 				},
 			},
-			EthAddress: addr,
+			EthAddress:   addr,
+			OwnerAddress: common.HexToAddress(e.evmClient.GetDefaultWallet().Address()),
+			OwnerWallet:  e.evmClient.GetDefaultWallet(),
 		}, err
 	case V1_4_0:
 		pool, err := lock_release_token_pool_1_4_0.NewLockReleaseTokenPool(addr, wrappers.MustNewWrappedContractBackend(e.evmClient, nil))
@@ -329,7 +348,9 @@ func (e *CCIPContractsDeployer) NewLockReleaseTokenPoolContract(addr common.Addr
 					LockReleasePool: pool,
 				},
 			},
-			EthAddress: addr,
+			EthAddress:   addr,
+			OwnerAddress: common.HexToAddress(e.evmClient.GetDefaultWallet().Address()),
+			OwnerWallet:  e.evmClient.GetDefaultWallet(),
 		}, err
 	default:
 		return nil, fmt.Errorf("version not supported: %s", version)
@@ -368,7 +389,9 @@ func (e *CCIPContractsDeployer) NewUSDCTokenPoolContract(addr common.Address) (
 					USDCPool:      pool,
 				},
 			},
-			EthAddress: addr,
+			EthAddress:   addr,
+			OwnerAddress: common.HexToAddress(e.evmClient.GetDefaultWallet().Address()),
+			OwnerWallet:  e.evmClient.GetDefaultWallet(),
 		}, err
 	case V1_4_0:
 		pool, err := usdc_token_pool_1_4_0.NewUSDCTokenPool(addr, wrappers.MustNewWrappedContractBackend(e.evmClient, nil))
@@ -395,7 +418,9 @@ func (e *CCIPContractsDeployer) NewUSDCTokenPoolContract(addr common.Address) (
 					USDCPool:      pool,
 				},
 			},
-			EthAddress: addr,
+			EthAddress:   addr,
+			OwnerAddress: common.HexToAddress(e.evmClient.GetDefaultWallet().Address()),
+			OwnerWallet:  e.evmClient.GetDefaultWallet(),
 		}, err
 	default:
 		return nil, fmt.Errorf("version not supported: %s", version)
@@ -408,7 +433,7 @@ func (e *CCIPContractsDeployer) DeployUSDCTokenPoolContract(tokenAddr string, to
 	error,
 ) {
 	version := VersionMap[TokenPoolContract]
-	e.logger.Debug().Str("token", tokenAddr).Msg("Deploying usdc token pool")
+	e.logger.Debug().Str("Token", tokenAddr).Msg("Deploying USDC token pool")
 	token := common.HexToAddress(tokenAddr)
 	switch version {
 	case Latest:
@@ -990,13 +1015,14 @@ func (e *CCIPContractsDeployer) DeployOnRamp(
 				auth,
 				wrappers.MustNewWrappedContractBackend(e.evmClient, nil),
 				evm_2_evm_onramp.EVM2EVMOnRampStaticConfig{
-					LinkToken:         linkTokenAddress,
-					ChainSelector:     sourceChainSelector, // source chain id
-					DestChainSelector: destChainSelector,   // destinationChainSelector
-					DefaultTxGasLimit: 200_000,
-					MaxNopFeesJuels:   big.NewInt(0).Mul(big.NewInt(100_000_000), big.NewInt(1e18)),
-					PrevOnRamp:        common.HexToAddress(""),
-					RmnProxy:          rmn,
+					LinkToken:          linkTokenAddress,
+					ChainSelector:      sourceChainSelector, // source chain id
+					DestChainSelector:  destChainSelector,   // destinationChainSelector
+					DefaultTxGasLimit:  200_000,
+					MaxNopFeesJuels:    big.NewInt(0).Mul(big.NewInt(100_000_000), big.NewInt(1e18)),
+					PrevOnRamp:         common.HexToAddress(""),
+					RmnProxy:           rmn,
+					TokenAdminRegistry: tokenAdminRegistry,
 				},
 				evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig{
 					Router:                            router,
@@ -1009,7 +1035,6 @@ func (e *CCIPContractsDeployer) DeployOnRamp(
 					PriceRegistry:                     priceRegistry,
 					MaxDataBytes:                      50000,
 					MaxPerMsgGasLimit:                 4_000_000,
-					TokenAdminRegistry:                tokenAdminRegistry,
 					DefaultTokenFeeUSDCents:           50,
 					DefaultTokenDestGasOverhead:       34_000,
 					DefaultTokenDestBytesOverhead:     500,
@@ -1091,6 +1116,7 @@ func (e *CCIPContractsDeployer) DeployOffRamp(
 	opts RateLimiterConfig,
 	sourceTokens, pools []common.Address,
 	rmnProxy common.Address,
+	tokenAdminRegistry common.Address,
 ) (*OffRamp, error) {
 	version := VersionMap[OffRampContract]
 	e.logger.Info().Str("version", string(version)).Msg("Deploying OffRamp")
@@ -1132,6 +1158,15 @@ func (e *CCIPContractsDeployer) DeployOffRamp(
 			EthAddress: *address,
 		}, err
 	case Latest:
+		staticConfig := evm_2_evm_offramp.EVM2EVMOffRampStaticConfig{
+			CommitStore:         commitStore,
+			ChainSelector:       destChainSelector,
+			SourceChainSelector: sourceChainSelector,
+			OnRamp:              onRamp,
+			PrevOffRamp:         common.Address{},
+			RmnProxy:            rmnProxy,
+			TokenAdminRegistry:  tokenAdminRegistry,
+		}
 		address, _, instance, err := e.evmClient.DeployContract("OffRamp Contract", func(
 			auth *bind.TransactOpts,
 			_ bind.ContractBackend,
@@ -1139,14 +1174,7 @@ func (e *CCIPContractsDeployer) DeployOffRamp(
 			return evm_2_evm_offramp.DeployEVM2EVMOffRamp(
 				auth,
 				wrappers.MustNewWrappedContractBackend(e.evmClient, nil),
-				evm_2_evm_offramp.EVM2EVMOffRampStaticConfig{
-					CommitStore:         commitStore,
-					ChainSelector:       destChainSelector,
-					SourceChainSelector: sourceChainSelector,
-					OnRamp:              onRamp,
-					PrevOffRamp:         common.Address{},
-					RmnProxy:            rmnProxy,
-				},
+				staticConfig,
 				evm_2_evm_offramp.RateLimiterConfig{
 					IsEnabled: true,
 					Capacity:  opts.Capacity,
@@ -1154,6 +1182,8 @@ func (e *CCIPContractsDeployer) DeployOffRamp(
 				},
 			)
 		})
+		e.logger.Info().Msg(fmt.Sprintf("deploying offramp with static config: %+v", staticConfig))
+
 		if err != nil {
 			return nil, err
 		}
@@ -1355,6 +1385,113 @@ func stripKeyPrefix(key string) string {
 		return chunks[2]
 	}
 	return key
+}
+
+func NewCommitOffchainConfig(
+	GasPriceHeartBeat config.Duration,
+	DAGasPriceDeviationPPB uint32,
+	ExecGasPriceDeviationPPB uint32,
+	TokenPriceHeartBeat config.Duration,
+	TokenPriceDeviationPPB uint32,
+	InflightCacheExpiry config.Duration) (ccipconfig.OffchainConfig, error) {
+	switch VersionMap[CommitStoreContract] {
+	case Latest:
+		return testhelpers.NewCommitOffchainConfig(
+			GasPriceHeartBeat,
+			DAGasPriceDeviationPPB,
+			ExecGasPriceDeviationPPB,
+			TokenPriceHeartBeat,
+			TokenPriceDeviationPPB,
+			InflightCacheExpiry,
+		), nil
+	case V1_2_0:
+		return testhelpers_1_4_0.NewCommitOffchainConfig(
+			GasPriceHeartBeat,
+			DAGasPriceDeviationPPB,
+			ExecGasPriceDeviationPPB,
+			TokenPriceHeartBeat,
+			TokenPriceDeviationPPB,
+			InflightCacheExpiry,
+		), nil
+	default:
+		return nil, fmt.Errorf("version not supported: %s", VersionMap[CommitStoreContract])
+	}
+}
+
+func NewCommitOnchainConfig(
+	PriceRegistry common.Address,
+) (abihelpers.AbiDefined, error) {
+	switch VersionMap[CommitStoreContract] {
+	case Latest:
+		return testhelpers.NewCommitOnchainConfig(PriceRegistry), nil
+	case V1_2_0:
+		return testhelpers_1_4_0.NewCommitOnchainConfig(PriceRegistry), nil
+	default:
+		return nil, fmt.Errorf("version not supported: %s", VersionMap[CommitStoreContract])
+	}
+}
+
+func NewExecOnchainConfig(
+	PermissionLessExecutionThresholdSeconds uint32,
+	Router common.Address,
+	PriceRegistry common.Address,
+	MaxNumberOfTokensPerMsg uint16,
+	MaxDataBytes uint32,
+	MaxPoolReleaseOrMintGas uint32,
+	MaxTokenTransferGas uint32,
+) (abihelpers.AbiDefined, error) {
+	switch VersionMap[OffRampContract] {
+	case Latest:
+		return testhelpers.NewExecOnchainConfig(
+			PermissionLessExecutionThresholdSeconds,
+			Router,
+			PriceRegistry,
+			MaxNumberOfTokensPerMsg,
+			MaxDataBytes,
+			MaxPoolReleaseOrMintGas,
+			MaxTokenTransferGas,
+		), nil
+	case V1_2_0:
+		return testhelpers_1_4_0.NewExecOnchainConfig(
+			PermissionLessExecutionThresholdSeconds,
+			Router,
+			PriceRegistry,
+			MaxNumberOfTokensPerMsg,
+			MaxDataBytes,
+			MaxPoolReleaseOrMintGas,
+		), nil
+	default:
+		return nil, fmt.Errorf("version not supported: %s", VersionMap[OffRampContract])
+	}
+}
+
+func NewExecOffchainConfig(
+	destOptimisticConfirmations uint32,
+	batchGasLimit uint32,
+	relativeBoostPerWaitHour float64,
+	inflightCacheExpiry config.Duration,
+	rootSnoozeTime config.Duration,
+) (ccipconfig.OffchainConfig, error) {
+	switch VersionMap[OffRampContract] {
+	case Latest:
+		return testhelpers.NewExecOffchainConfig(
+			destOptimisticConfirmations,
+			batchGasLimit,
+			relativeBoostPerWaitHour,
+			inflightCacheExpiry,
+			rootSnoozeTime,
+		), nil
+	case V1_2_0:
+		return testhelpers_1_4_0.NewExecOffchainConfig(
+			destOptimisticConfirmations,
+			batchGasLimit,
+			relativeBoostPerWaitHour,
+			inflightCacheExpiry,
+			rootSnoozeTime,
+		), nil
+	default:
+		return nil, fmt.Errorf("version not supported: %s", VersionMap[OffRampContract])
+	}
 }
 
 func NewOffChainAggregatorV2ConfigForCCIPPlugin[T ccipconfig.OffchainConfig](

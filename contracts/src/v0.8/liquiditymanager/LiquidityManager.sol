@@ -85,6 +85,11 @@ contract LiquidityManager is ILiquidityManager, OCR3Base {
   /// @param newBalance The new minimum liquidity.
   event MinimumLiquiditySet(uint256 oldBalance, uint256 newBalance);
 
+  /// @notice Emitted when someone sends native to this contract
+  /// @param amount The amount of native deposited
+  /// @param depositor The address that deposited the native
+  event NativeDeposited(uint256 amount, address depositor);
+
   /// @notice Emitted when native balance is withdrawn by contract owner
   /// @param amount The amount of native withdrawn
   /// @param destination The address the native is sent to
@@ -167,7 +172,9 @@ contract LiquidityManager is ILiquidityManager, OCR3Base {
   // │                      Native Management                       │
   // ================================================================
 
-  receive() external payable {}
+  receive() external payable {
+    emit NativeDeposited(msg.value, msg.sender);
+  }
 
   /// @notice withdraw native balance
   function withdrawNative(uint256 amount, address payable destination) external onlyOwner {
@@ -197,7 +204,7 @@ contract LiquidityManager is ILiquidityManager, OCR3Base {
 
     // Make sure this is tether compatible, as they have strange approval requirements
     // Should be good since all approvals are always immediately used.
-    i_localToken.approve(address(s_localLiquidityContainer), amount);
+    i_localToken.safeApprove(address(s_localLiquidityContainer), amount);
     s_localLiquidityContainer.provideLiquidity(amount);
 
     emit LiquidityAddedToContainer(msg.sender, amount);
@@ -268,7 +275,7 @@ contract LiquidityManager is ILiquidityManager, OCR3Base {
 
     // XXX: Could be optimized by withdrawing once and then sending to all destinations
     s_localLiquidityContainer.withdrawLiquidity(tokenAmount);
-    i_localToken.approve(address(remoteLiqManager.localBridge), tokenAmount);
+    i_localToken.safeApprove(address(remoteLiqManager.localBridge), tokenAmount);
 
     bytes memory bridgeReturnData = remoteLiqManager.localBridge.sendERC20{value: nativeBridgeFee}(
       address(i_localToken),
