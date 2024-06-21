@@ -460,7 +460,7 @@ func (ccipModule *CCIPCommon) CleanUp() error {
 
 func (ccipModule *CCIPCommon) WaitForPriceUpdates(
 	ctx context.Context,
-	lggr zerolog.Logger,
+	lggr *zerolog.Logger,
 	timeout time.Duration,
 	destChainId uint64,
 	allTokens []common.Address,
@@ -530,7 +530,7 @@ func (ccipModule *CCIPCommon) WaitForPriceUpdates(
 	}
 }
 
-func (ccipModule *CCIPCommon) WatchForPriceUpdates(ctx context.Context, lggr zerolog.Logger) error {
+func (ccipModule *CCIPCommon) WatchForPriceUpdates(ctx context.Context, lggr *zerolog.Logger) error {
 	gasUpdateEventLatest := make(chan *price_registry.PriceRegistryUsdPerUnitGasUpdated)
 	tokenUpdateEvent := make(chan *price_registry.PriceRegistryUsdPerTokenUpdated)
 	sub := event.Resubscribe(DefaultResubscriptionTimeout, func(_ context.Context) (event.Subscription, error) {
@@ -608,7 +608,7 @@ func (ccipModule *CCIPCommon) WatchForPriceUpdates(ctx context.Context, lggr zer
 
 // UpdateTokenPricesAtRegularInterval updates aggregator contract with updated answer at regular interval.
 // At each iteration of ticker it chooses one of the aggregator contracts and updates its round answer.
-func (ccipModule *CCIPCommon) UpdateTokenPricesAtRegularInterval(ctx context.Context, lggr zerolog.Logger, interval time.Duration, conf *laneconfig.LaneConfig) error {
+func (ccipModule *CCIPCommon) UpdateTokenPricesAtRegularInterval(ctx context.Context, lggr *zerolog.Logger, interval time.Duration, conf *laneconfig.LaneConfig) error {
 	if ccipModule.ExistingDeployment {
 		return nil
 	}
@@ -682,7 +682,7 @@ func (ccipModule *CCIPCommon) SyncUSDCDomain(destTransmitter *contracts.TokenTra
 	return ccipModule.ChainClient.WaitForEvents()
 }
 
-func (ccipModule *CCIPCommon) PollRPCConnection(ctx context.Context, lggr zerolog.Logger) {
+func (ccipModule *CCIPCommon) PollRPCConnection(ctx context.Context, lggr *zerolog.Logger) {
 	for {
 		select {
 		case reconnectTime := <-ccipModule.ChainClient.ConnectionRestored():
@@ -1151,7 +1151,7 @@ type StaticPriceConfig struct {
 }
 
 func NewCCIPCommonFromConfig(
-	logger zerolog.Logger,
+	logger *zerolog.Logger,
 	testGroupConf *testconfig.CCIPTestGroupConfig,
 	chainClient blockchain.EVMClient,
 	laneConfig *laneconfig.LaneConfig,
@@ -1234,12 +1234,12 @@ func NewCCIPCommonFromConfig(
 }
 
 func DefaultCCIPModule(
-	logger zerolog.Logger,
+	logger *zerolog.Logger,
 	testGroupConf *testconfig.CCIPTestGroupConfig,
 	chainClient blockchain.EVMClient,
 ) (*CCIPCommon, error) {
 	networkCfg := chainClient.GetNetworkConfig()
-	tokenDeployerChainClient, err := blockchain.ConcurrentEVMClient(*networkCfg, nil, chainClient, logger)
+	tokenDeployerChainClient, err := blockchain.ConcurrentEVMClient(*networkCfg, nil, chainClient, *logger)
 	if err != nil {
 		return nil, errors.WithStack(fmt.Errorf("failed to create token deployment chain client for %s: %w", networkCfg.Name, err))
 	}
@@ -1262,7 +1262,7 @@ func DefaultCCIPModule(
 		return nil, err
 	}
 	return &CCIPCommon{
-		Logger:        &logger,
+		Logger:        logger,
 		ChainClient:   chainClient,
 		Deployer:      cd,
 		tokenDeployer: tokenCD,
@@ -1559,7 +1559,7 @@ func (sourceCCIP *SourceCCIPModule) UpdateBalance(
 }
 
 func (sourceCCIP *SourceCCIPModule) AssertSendRequestedLogFinalized(
-	lggr zerolog.Logger,
+	lggr *zerolog.Logger,
 	txHash common.Hash,
 	prevEventAt time.Time,
 	reqStats []*testreporters.RequestStat,
@@ -1608,7 +1608,7 @@ func (sourceCCIP *SourceCCIPModule) IsRequestTriggeredWithinTimeframe(timeframe 
 }
 
 func (sourceCCIP *SourceCCIPModule) AssertEventCCIPSendRequested(
-	lggr zerolog.Logger,
+	lggr *zerolog.Logger,
 	txHash string,
 	timeout time.Duration,
 	prevEventAt time.Time,
@@ -1631,6 +1631,10 @@ func (sourceCCIP *SourceCCIPModule) AssertEventCCIPSendRequested(
 					sourceCCIP.CCIPSendRequestedWatcher.Delete(txHash)
 					for i, sendRequestedEvent := range sendRequestedEvents {
 						seqNum := sendRequestedEvent.SequenceNumber
+						lggr = ptr.Ptr(lggr.With().
+							Uint64("SequenceNumber", seqNum).
+							Str("msgId ", fmt.Sprintf("0x%x", sendRequestedEvent.MessageId[:])).
+							Logger())
 						// prevEventAt is the time when the message was successful, this should be same as the time when the event was emitted
 						reqStat[i].UpdateState(lggr, seqNum, testreporters.CCIPSendRe, 0, testreporters.Success,
 							testreporters.TransactionStats{
@@ -1785,7 +1789,7 @@ func (sourceCCIP *SourceCCIPModule) SendRequest(
 }
 
 func DefaultSourceCCIPModule(
-	logger zerolog.Logger,
+	logger *zerolog.Logger,
 	testConf *testconfig.CCIPTestGroupConfig,
 	chainClient blockchain.EVMClient,
 	destChainId uint64,
@@ -2164,7 +2168,7 @@ func (destCCIP *DestCCIPModule) UpdateBalance(
 }
 
 // AssertNoReportAcceptedEventReceived validates that no ExecutionStateChangedEvent is emitted for mentioned timeRange after lastSeenTimestamp
-func (destCCIP *DestCCIPModule) AssertNoReportAcceptedEventReceived(lggr zerolog.Logger, timeRange time.Duration, lastSeenTimestamp time.Time) error {
+func (destCCIP *DestCCIPModule) AssertNoReportAcceptedEventReceived(lggr *zerolog.Logger, timeRange time.Duration, lastSeenTimestamp time.Time) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeRange)
 	defer cancel()
 	ticker := time.NewTicker(time.Second)
@@ -2201,7 +2205,7 @@ func (destCCIP *DestCCIPModule) AssertNoReportAcceptedEventReceived(lggr zerolog
 
 // AssertNoExecutionStateChangedEventReceived validates that no ExecutionStateChangedEvent is emitted for mentioned timeRange after lastSeenTimestamp
 func (destCCIP *DestCCIPModule) AssertNoExecutionStateChangedEventReceived(
-	lggr zerolog.Logger,
+	lggr *zerolog.Logger,
 	timeRange time.Duration,
 	lastSeenTimestamp time.Time,
 ) error {
@@ -2241,7 +2245,7 @@ func (destCCIP *DestCCIPModule) AssertNoExecutionStateChangedEventReceived(
 }
 
 func (destCCIP *DestCCIPModule) AssertEventExecutionStateChanged(
-	lggr zerolog.Logger,
+	lggr *zerolog.Logger,
 	seqNum uint64,
 	timeout time.Duration,
 	timeNow time.Time,
@@ -2317,7 +2321,7 @@ func (destCCIP *DestCCIPModule) AssertEventExecutionStateChanged(
 }
 
 func (destCCIP *DestCCIPModule) AssertEventReportAccepted(
-	lggr zerolog.Logger,
+	lggr *zerolog.Logger,
 	seqNum uint64,
 	timeout time.Duration,
 	prevEventAt time.Time,
@@ -2396,7 +2400,7 @@ func (destCCIP *DestCCIPModule) AssertEventReportAccepted(
 }
 
 func (destCCIP *DestCCIPModule) AssertReportBlessed(
-	lggr zerolog.Logger,
+	lggr *zerolog.Logger,
 	seqNum uint64,
 	timeout time.Duration,
 	CommitReport contracts.CommitStoreReportAccepted,
@@ -2490,7 +2494,7 @@ func (destCCIP *DestCCIPModule) AssertReportBlessed(
 }
 
 func (destCCIP *DestCCIPModule) AssertSeqNumberExecuted(
-	lggr zerolog.Logger,
+	lggr *zerolog.Logger,
 	seqNumberBefore uint64,
 	timeout time.Duration,
 	timeNow time.Time,
@@ -2538,7 +2542,7 @@ func (destCCIP *DestCCIPModule) AssertSeqNumberExecuted(
 }
 
 func DefaultDestinationCCIPModule(
-	logger zerolog.Logger,
+	logger *zerolog.Logger,
 	testConf *testconfig.CCIPTestGroupConfig,
 	chainClient blockchain.EVMClient,
 	sourceChainId uint64,
@@ -2596,7 +2600,7 @@ func CCIPRequestFromTxHash(txHash common.Hash, chainClient blockchain.EVMClient)
 
 type CCIPLane struct {
 	Test              *testing.T
-	Logger            zerolog.Logger
+	Logger            *zerolog.Logger
 	SourceNetworkName string
 	DestNetworkName   string
 	SourceChain       blockchain.EVMClient
@@ -3023,7 +3027,7 @@ type validationOptions struct {
 }
 
 // ValidationOptionFunc is a function that can be passed to ValidateRequests to specify which phase is expected to fail
-type ValidationOptionFunc func(logger zerolog.Logger, opts *validationOptions)
+type ValidationOptionFunc func(logger *zerolog.Logger, opts *validationOptions)
 
 // PhaseSpecificValidationOptionFunc can specify how exactly you want a phase to fail
 type PhaseSpecificValidationOptionFunc func(*validationOptions)
@@ -3055,7 +3059,7 @@ func ShouldExist() PhaseSpecificValidationOptionFunc {
 // If you expect the `ExecStateChanged` events to be there, but in a "failed" state, set this to true.
 // It will otherwise be ignored.
 func ExpectPhaseToFail(phase testreporters.Phase, phaseSpecificOptions ...PhaseSpecificValidationOptionFunc) ValidationOptionFunc {
-	return func(logger zerolog.Logger, opts *validationOptions) {
+	return func(logger *zerolog.Logger, opts *validationOptions) {
 		opts.phaseExpectedToFail = phase
 		for _, f := range phaseSpecificOptions {
 			if f != nil {
@@ -3140,6 +3144,7 @@ func (lane *CCIPLane) ValidateRequestByTxHash(txHash common.Hash, opts validatio
 	}
 	for _, msgLog := range msgLogs {
 		seqNumber := msgLog.SequenceNumber
+		lane.Logger = ptr.Ptr(lane.Logger.With().Str("msgId ", fmt.Sprintf("0x%x", msgLog.MessageId[:])).Logger())
 		var reqStat *testreporters.RequestStat
 		for _, stat := range reqStats {
 			if stat.SeqNum == seqNumber {
@@ -3196,7 +3201,7 @@ func (lane *CCIPLane) ValidateRequestByTxHash(txHash common.Hash, opts validatio
 // isPhaseValid checks if the phase is in a valid state or not given expectations.
 // If `shouldComplete` is true, it means that the phase validation is meant to end and we should return from the calling function.
 func isPhaseValid(
-	logger zerolog.Logger,
+	logger *zerolog.Logger,
 	currentPhase testreporters.Phase,
 	opts validationOptions,
 	err error,
@@ -3665,7 +3670,7 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 // SetOCR2Config sets the oracle config in ocr2 contracts. If execNodes is nil, commit and execution jobs are set up in same DON
 func SetOCR2Config(
 	ctx context.Context,
-	lggr zerolog.Logger,
+	lggr *zerolog.Logger,
 	testConf testconfig.CCIPTestGroupConfig,
 	commitNodes,
 	execNodes []*client.CLNodesWithKeys,
@@ -3793,7 +3798,7 @@ func CreateBootstrapJob(
 }
 
 func CreateOCR2CCIPCommitJobs(
-	lggr zerolog.Logger,
+	lggr *zerolog.Logger,
 	jobParams integrationtesthelpers.CCIPJobSpecParams,
 	commitNodes []*client.CLNodesWithKeys,
 	mutexes []*sync.Mutex,
@@ -3832,7 +3837,7 @@ func CreateOCR2CCIPCommitJobs(
 }
 
 func CreateOCR2CCIPExecutionJobs(
-	lggr zerolog.Logger,
+	lggr *zerolog.Logger,
 	jobParams integrationtesthelpers.CCIPJobSpecParams,
 	execNodes []*client.CLNodesWithKeys,
 	mutexes []*sync.Mutex,
@@ -4041,7 +4046,7 @@ func (c *CCIPTestEnv) ConnectToDeployedNodes() error {
 
 // SetUpNodeKeysAndFund creates node keys and funds the nodes
 func (c *CCIPTestEnv) SetUpNodeKeysAndFund(
-	logger zerolog.Logger,
+	logger *zerolog.Logger,
 	nodeFund *big.Float,
 	chains []blockchain.EVMClient,
 ) error {
@@ -4073,7 +4078,7 @@ func (c *CCIPTestEnv) SetUpNodeKeysAndFund(
 		if cfg == nil {
 			return fmt.Errorf("blank network config")
 		}
-		c1, err := blockchain.ConcurrentEVMClient(*cfg, c.K8Env, ec, logger)
+		c1, err := blockchain.ConcurrentEVMClient(*cfg, c.K8Env, ec, *logger)
 		if err != nil {
 			return fmt.Errorf("getting concurrent evmclient chain %s %w", ec.GetNetworkName(), err)
 		}
