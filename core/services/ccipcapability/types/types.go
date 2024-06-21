@@ -35,9 +35,11 @@ type OCRConfig interface {
 	ChainSelector() uint64
 	F() uint8
 	OffchainConfigVersion() uint64
-	OfframpAddress() string
-	Signers() [][2][32]byte
-	Transmitters() [][2][32]byte
+	OfframpAddress() []byte
+	BootstrapP2PIDs() [][32]byte
+	P2PIDs() [][32]byte
+	Signers() [][]byte
+	Transmitters() [][]byte
 	OffchainConfig() []byte
 	String() string
 }
