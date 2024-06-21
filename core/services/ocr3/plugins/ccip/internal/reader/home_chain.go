@@ -16,6 +16,9 @@ import (
 )
 
 type HomeChainConfigPoller struct {
+	stopCh services.StopChan
+	services.StateMachine
+
 	homeChainReader types.ContractReader
 	// gets updated by the polling loop
 	chainConfigs map[cciptypes.ChainSelector]cciptypes.ChainConfig
@@ -27,10 +30,6 @@ type HomeChainConfigPoller struct {
 	fChain map[cciptypes.ChainSelector]int
 	lggr   logger.Logger
 	mutex  *sync.RWMutex
-
-	stopCh services.StopChan
-	services.StateMachine
-
 	// How frequent will the poller fetch the chain configs
 	pollingInterval time.Duration
 }
@@ -56,8 +55,8 @@ func NewHomeChainConfigPoller(
 func (r *HomeChainConfigPoller) Start(ctx context.Context) error {
 	err := r.fetchAndSetConfigs(ctx)
 	if err != nil {
+		// Just log, don't return error as we want to keep polling
 		r.lggr.Errorw("Initial fetch of on-chain configs failed", "err", err)
-		return fmt.Errorf("initial fetch of on-chain configs failed")
 	}
 	r.lggr.Infow("Start Polling ChainConfig")
 	return r.StartOnce(r.Name(), func() error {
@@ -90,8 +89,8 @@ func (r *HomeChainConfigPoller) fetchAndSetConfigs(ctx context.Context) error {
 		return err
 	}
 	if len(chainConfigInfos) == 0 {
-		r.lggr.Errorw("no on chain configs found")
-		return fmt.Errorf("no on chain configs found")
+		// That's a legitimate case if there are no chain configs on chain yet
+		r.lggr.Warnw("no on chain configs found")
 	}
 	homeChainConfigs, err := r.convertOnChainConfigToHomeChainConfig(chainConfigInfos)
 	if err != nil {
@@ -99,13 +98,17 @@ func (r *HomeChainConfigPoller) fetchAndSetConfigs(ctx context.Context) error {
 		return err
 	}
 	r.lggr.Infow("Setting ChainConfig")
-	r.mutex.Lock()
-	r.chainConfigs = homeChainConfigs
-	r.nodeSupportedChains = createNodesSupportedChains(homeChainConfigs)
-	r.knownSourceChains = createKnownChains(homeChainConfigs)
-	r.fChain = createFChain(homeChainConfigs)
-	r.mutex.Unlock()
+	r.setChainConfigs(homeChainConfigs)
 	return nil
+}
+
+func (r *HomeChainConfigPoller) setChainConfigs(chainConfigs map[cciptypes.ChainSelector]cciptypes.ChainConfig) {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+	r.chainConfigs = chainConfigs
+	r.nodeSupportedChains = createNodesSupportedChains(chainConfigs)
+	r.knownSourceChains = createKnownChains(chainConfigs)
+	r.fChain = createFChain(chainConfigs)
 }
 
 func (r *HomeChainConfigPoller) GetChainConfig(chainSelector cciptypes.ChainSelector) (cciptypes.ChainConfig, error) {
@@ -120,9 +123,6 @@ func (r *HomeChainConfigPoller) GetChainConfig(chainSelector cciptypes.ChainSele
 func (r *HomeChainConfigPoller) GetAllChainConfigs() (map[cciptypes.ChainSelector]cciptypes.ChainConfig, error) {
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
-	if len(r.chainConfigs) == 0 {
-		return nil, errors.New("no chain configs found")
-	}
 	return r.chainConfigs, nil
 
 }
@@ -131,7 +131,8 @@ func (r *HomeChainConfigPoller) GetSupportedChainsForPeer(id libocrtypes.PeerID)
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
 	if _, ok := r.nodeSupportedChains[id]; !ok {
-		return nil, fmt.Errorf("node %v not found", id)
+		// empty set to denote no chains supported
+		return mapset.NewSet[cciptypes.ChainSelector](), nil
 	}
 	return r.nodeSupportedChains[id], nil
 }
@@ -143,9 +144,6 @@ func (r *HomeChainConfigPoller) GetKnownCCIPChains() (mapset.Set[cciptypes.Chain
 	for chain := range r.chainConfigs {
 		knownSourceChains.Add(chain)
 	}
-	if knownSourceChains.Cardinality() == 0 {
-		return nil, fmt.Errorf("no known chain configs")
-	}
 
 	return knownSourceChains, nil
 }
@@ -153,9 +151,6 @@ func (r *HomeChainConfigPoller) GetKnownCCIPChains() (mapset.Set[cciptypes.Chain
 func (r *HomeChainConfigPoller) GetFChain() (map[cciptypes.ChainSelector]int, error) {
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
-	if len(r.fChain) == 0 {
-		return nil, fmt.Errorf("no FChain values found")
-	}
 	return r.fChain, nil
 }
 
@@ -167,11 +162,6 @@ func (r *HomeChainConfigPoller) Close() error {
 }
 
 func (r *HomeChainConfigPoller) Ready() error {
-	r.mutex.RLock()
-	defer r.mutex.RUnlock()
-	if len(r.chainConfigs) == 0 {
-		return errors.New("no chain configs found")
-	}
 	return nil
 }
 
@@ -230,7 +220,6 @@ func (r *HomeChainConfigPoller) fetchOnChainConfig(ctx context.Context) ([]Chain
 
 func (r *HomeChainConfigPoller) convertOnChainConfigToHomeChainConfig(capabilityConfigs []ChainConfigInfo) (map[cciptypes.ChainSelector]cciptypes.ChainConfig, error) {
 	chainConfigs := make(map[cciptypes.ChainSelector]cciptypes.ChainConfig)
-	//iterate over configs
 	for _, capabilityConfig := range capabilityConfigs {
 		chainSelector := capabilityConfig.ChainSelector
 		config := capabilityConfig.ChainConfig

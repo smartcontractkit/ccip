@@ -342,10 +342,8 @@ func (p *Plugin) supportedChains() (mapset.Set[cciptypes.ChainSelector], error) 
 	}
 	supportedChains, err := p.homeChainPoller.GetSupportedChainsForPeer(p2pID)
 	if err != nil {
-		p.lggr.Warnf("error getting supported chains: %w", err)
-		// Return empty set
-		// TODO: Should we completely fail?
-		return mapset.NewSet[cciptypes.ChainSelector](), nil
+		p.lggr.Warnw("error getting supported chains", err)
+		return mapset.NewSet[cciptypes.ChainSelector](), fmt.Errorf("error getting supported chains: %w", err)
 	}
 
 	return supportedChains, nil
