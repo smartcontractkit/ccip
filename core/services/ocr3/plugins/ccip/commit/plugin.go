@@ -349,7 +349,7 @@ func (p *Plugin) supportedChains() (mapset.Set[cciptypes.ChainSelector], error) 
 	return supportedChains, nil
 }
 
-func (p *Plugin) getChainConfig() (cciptypes.ChainConfig, error) {
+func (p *Plugin) getDestChainConfig() (cciptypes.ChainConfig, error) {
 	cfg, err := p.homeChainPoller.GetChainConfig(p.cfg.DestChain)
 	if err != nil {
 		return cciptypes.ChainConfig{}, fmt.Errorf("get chain config: %w", err)
@@ -358,7 +358,7 @@ func (p *Plugin) getChainConfig() (cciptypes.ChainConfig, error) {
 }
 
 func (p *Plugin) supportsDestChain() (bool, error) {
-	destChainConfig, err := p.getChainConfig()
+	destChainConfig, err := p.getDestChainConfig()
 	if err != nil {
 		return false, fmt.Errorf("error getting chain config: %w", err)
 	}
