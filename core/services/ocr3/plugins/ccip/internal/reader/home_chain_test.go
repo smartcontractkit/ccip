@@ -41,7 +41,7 @@ func Test_ConvertOnChainConfigToHomeChainConfig(t *testing.T) {
 			onChainConfigs: []ChainConfigInfo{
 				{
 					ChainSelector: chainA,
-					ChainConfig: OnChainConfig{
+					ChainConfig: HomeChainConfigMapper{
 						FChain: 1,
 						Readers: []libocrtypes.PeerID{
 							p2pOracleAId,
@@ -53,7 +53,7 @@ func Test_ConvertOnChainConfigToHomeChainConfig(t *testing.T) {
 				},
 				{
 					ChainSelector: chainB,
-					ChainConfig: OnChainConfig{
+					ChainConfig: HomeChainConfigMapper{
 						FChain: 2,
 						Readers: []libocrtypes.PeerID{
 							p2pOracleAId,
@@ -64,7 +64,7 @@ func Test_ConvertOnChainConfigToHomeChainConfig(t *testing.T) {
 				},
 				{
 					ChainSelector: chainC,
-					ChainConfig: OnChainConfig{
+					ChainConfig: HomeChainConfigMapper{
 						FChain: 3,
 						Readers: []libocrtypes.PeerID{
 							p2pOracleCId,
@@ -107,7 +107,7 @@ func Test_PollingWorking(t *testing.T) {
 	onChainConfigs := []ChainConfigInfo{
 		{
 			ChainSelector: chainA,
-			ChainConfig: OnChainConfig{
+			ChainConfig: HomeChainConfigMapper{
 				FChain: 1,
 				Readers: []libocrtypes.PeerID{
 					p2pOracleAId,
@@ -119,7 +119,7 @@ func Test_PollingWorking(t *testing.T) {
 		},
 		{
 			ChainSelector: chainB,
-			ChainConfig: OnChainConfig{
+			ChainConfig: HomeChainConfigMapper{
 				FChain: 2,
 				Readers: []libocrtypes.PeerID{
 					p2pOracleAId,
@@ -130,7 +130,7 @@ func Test_PollingWorking(t *testing.T) {
 		},
 		{
 			ChainSelector: chainC,
-			ChainConfig: OnChainConfig{
+			ChainConfig: HomeChainConfigMapper{
 				FChain: 3,
 				Readers: []libocrtypes.PeerID{
 					p2pOracleCId,

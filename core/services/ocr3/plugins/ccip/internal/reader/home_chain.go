@@ -15,6 +15,18 @@ import (
 	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
 )
 
+type HomeChainPoller interface {
+	GetChainConfig(chainSelector cciptypes.ChainSelector) (cciptypes.ChainConfig, error)
+	GetAllChainConfigs() (map[cciptypes.ChainSelector]cciptypes.ChainConfig, error)
+	// GetSupportedChainsForPeer Gets all chain selectors that the peerID can read/write from/to
+	GetSupportedChainsForPeer(id libocrtypes.PeerID) (mapset.Set[cciptypes.ChainSelector], error)
+	// GetKnownCCIPChains Gets all chain selectors that are known to CCIP
+	GetKnownCCIPChains() (mapset.Set[cciptypes.ChainSelector], error)
+	// GetFChain Gets the FChain value for each chain
+	GetFChain() (map[cciptypes.ChainSelector]int, error)
+	services.Service
+}
+
 type HomeChainConfigPoller struct {
 	stopCh services.StopChan
 	services.StateMachine
@@ -209,7 +221,7 @@ func createNodesSupportedChains(chainConfigs map[cciptypes.ChainSelector]cciptyp
 }
 
 func (r *HomeChainConfigPoller) fetchOnChainConfig(ctx context.Context) ([]ChainConfigInfo, error) {
-	r.lggr.Infow("Fetching OnChainConfig")
+	r.lggr.Infow("Fetching HomeChainConfigMapper")
 	var chainConfigInfo []ChainConfigInfo
 	err := r.homeChainReader.GetLatestValue(ctx, "CCIPCapabilityConfiguration", "getAllChainConfigs", nil, &chainConfigInfo)
 	if err != nil {
@@ -232,15 +244,18 @@ func (r *HomeChainConfigPoller) convertOnChainConfigToHomeChainConfig(capability
 	return chainConfigs, nil
 }
 
-type OnChainConfig struct {
+// HomeChainConfigMapper This is a 1-1 mapping between the config that we get from the contract to make se/deserializing easier
+type HomeChainConfigMapper struct {
 	Readers []libocrtypes.PeerID `json:"readers"`
 	FChain  uint8                `json:"fChain"`
 	Config  []byte               `json:"config"`
 }
+
+// ChainConfigInfo This is a 1-1 mapping between the config that we get from the contract to make se/deserializing easier
 type ChainConfigInfo struct {
 	// Calling function https://github.com/smartcontractkit/ccip/blob/330c5e98f624cfb10108c92fe1e00ced6d345a99/contracts/src/v0.8/ccip/capability/CCIPCapabilityConfiguration.sol#L140
 	ChainSelector cciptypes.ChainSelector `json:"chainSelector"`
-	ChainConfig   OnChainConfig           `json:"chainConfig"`
+	ChainConfig   HomeChainConfigMapper   `json:"chainConfig"`
 }
 
-var _ cciptypes.HomeChainPoller = (*HomeChainConfigPoller)(nil)
+var _ HomeChainPoller = (*HomeChainConfigPoller)(nil)

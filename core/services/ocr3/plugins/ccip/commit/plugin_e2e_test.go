@@ -195,7 +195,7 @@ func setupEmptyOutcome(ctx context.Context, t *testing.T, lggr logger.Logger) []
 	chainConfigInfos := []reader.ChainConfigInfo{
 		{
 			ChainSelector: chainC,
-			ChainConfig: reader.OnChainConfig{
+			ChainConfig: reader.HomeChainConfigMapper{
 				FChain: 1,
 				Readers: []libocrtypes.PeerID{
 					{1}, {2}, {3},
@@ -241,7 +241,7 @@ func setupAllNodesReadAllChains(ctx context.Context, t *testing.T, lggr logger.L
 	chainConfigInfos := []reader.ChainConfigInfo{
 		{
 			ChainSelector: chainA,
-			ChainConfig: reader.OnChainConfig{
+			ChainConfig: reader.HomeChainConfigMapper{
 				FChain: 1,
 				Readers: []libocrtypes.PeerID{
 					{1}, {2}, {3},
@@ -251,7 +251,7 @@ func setupAllNodesReadAllChains(ctx context.Context, t *testing.T, lggr logger.L
 		},
 		{
 			ChainSelector: chainB,
-			ChainConfig: reader.OnChainConfig{
+			ChainConfig: reader.HomeChainConfigMapper{
 				FChain: 1,
 				Readers: []libocrtypes.PeerID{
 					{1}, {2}, {3},
@@ -261,7 +261,7 @@ func setupAllNodesReadAllChains(ctx context.Context, t *testing.T, lggr logger.L
 		},
 		{
 			ChainSelector: chainC,
-			ChainConfig: reader.OnChainConfig{
+			ChainConfig: reader.HomeChainConfigMapper{
 				FChain: 1,
 				Readers: []libocrtypes.PeerID{
 					{1}, {2}, {3},
@@ -328,7 +328,7 @@ func setupNodesDoNotAgreeOnMsgs(ctx context.Context, t *testing.T, lggr logger.L
 	chainConfigInfos := []reader.ChainConfigInfo{
 		{
 			ChainSelector: chainA,
-			ChainConfig: reader.OnChainConfig{
+			ChainConfig: reader.HomeChainConfigMapper{
 				FChain: 1,
 				Readers: []libocrtypes.PeerID{
 					{1}, {2}, {3},
@@ -338,7 +338,7 @@ func setupNodesDoNotAgreeOnMsgs(ctx context.Context, t *testing.T, lggr logger.L
 		},
 		{
 			ChainSelector: chainB,
-			ChainConfig: reader.OnChainConfig{
+			ChainConfig: reader.HomeChainConfigMapper{
 				FChain: 1,
 				Readers: []libocrtypes.PeerID{
 					{1}, {2}, {3},
@@ -348,7 +348,7 @@ func setupNodesDoNotAgreeOnMsgs(ctx context.Context, t *testing.T, lggr logger.L
 		},
 		{
 			ChainSelector: chainC,
-			ChainConfig: reader.OnChainConfig{
+			ChainConfig: reader.HomeChainConfigMapper{
 				FChain: 1,
 				Readers: []libocrtypes.PeerID{
 					{1}, {2}, {3},
@@ -411,7 +411,7 @@ type nodeSetup struct {
 	msgHasher   *mocks.MessageHasher
 }
 
-func newNode(ctx context.Context, t *testing.T, lggr logger.Logger, id int, cfg cciptypes.CommitPluginConfig, homeChainPoller cciptypes.HomeChainPoller, oracleIDToP2pID map[commontypes.OracleID]libocrtypes.PeerID) nodeSetup {
+func newNode(ctx context.Context, t *testing.T, lggr logger.Logger, id int, cfg cciptypes.CommitPluginConfig, homeChainPoller reader.HomeChainPoller, oracleIDToP2pID map[commontypes.OracleID]libocrtypes.PeerID) nodeSetup {
 	ccipReader := mocks.NewCCIPReader()
 	priceReader := mocks.NewTokenPricesReader()
 	reportCodec := mocks.NewCommitPluginJSONReportCodec()
