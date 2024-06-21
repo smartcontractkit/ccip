@@ -117,11 +117,12 @@ var (
 
 	RootSnoozeTime = 3 * time.Minute
 	GethLabel      = func(name string) string {
+		name = NetworkName(name)
 		switch NetworkChart {
 		case reorg.TXNodesAppLabel:
 			return fmt.Sprintf("%s-ethereum-geth", name)
 		case foundry.ChartName:
-			return fmt.Sprintf("%s-foundry", name)
+			return name
 		}
 		return ""
 	}
@@ -380,7 +381,8 @@ func (ccipModule *CCIPCommon) ApproveTokens() error {
 	for _, token := range ccipModule.BridgeTokens {
 		// TODO: We send half of token funds back to the CCIP Deployer account, which isn't particularly realistic.
 		// See CCIP-2477
-		if token.OwnerWallet.Address() != ccipModule.ChainClient.GetDefaultWallet().Address() {
+		if token.OwnerWallet.Address() != ccipModule.ChainClient.GetDefaultWallet().Address() &&
+			!ccipModule.ExistingDeployment {
 			tokenBalance, err := token.BalanceOf(context.Background(), token.OwnerWallet.Address())
 			if err != nil {
 				return fmt.Errorf("failed to get balance of token %s: %w", token.ContractAddress.Hex(), err)
@@ -457,7 +459,7 @@ func (ccipModule *CCIPCommon) CleanUp() error {
 
 func (ccipModule *CCIPCommon) WaitForPriceUpdates(
 	ctx context.Context,
-	lggr zerolog.Logger,
+	lggr *zerolog.Logger,
 	timeout time.Duration,
 	destChainId uint64,
 	allTokens []common.Address,
@@ -527,7 +529,7 @@ func (ccipModule *CCIPCommon) WaitForPriceUpdates(
 	}
 }
 
-func (ccipModule *CCIPCommon) WatchForPriceUpdates(ctx context.Context, lggr zerolog.Logger) error {
+func (ccipModule *CCIPCommon) WatchForPriceUpdates(ctx context.Context, lggr *zerolog.Logger) error {
 	gasUpdateEventLatest := make(chan *price_registry.PriceRegistryUsdPerUnitGasUpdated)
 	tokenUpdateEvent := make(chan *price_registry.PriceRegistryUsdPerTokenUpdated)
 	sub := event.Resubscribe(DefaultResubscriptionTimeout, func(_ context.Context) (event.Subscription, error) {
@@ -605,7 +607,7 @@ func (ccipModule *CCIPCommon) WatchForPriceUpdates(ctx context.Context, lggr zer
 
 // UpdateTokenPricesAtRegularInterval updates aggregator contract with updated answer at regular interval.
 // At each iteration of ticker it chooses one of the aggregator contracts and updates its round answer.
-func (ccipModule *CCIPCommon) UpdateTokenPricesAtRegularInterval(ctx context.Context, lggr zerolog.Logger, interval time.Duration, conf *laneconfig.LaneConfig) error {
+func (ccipModule *CCIPCommon) UpdateTokenPricesAtRegularInterval(ctx context.Context, lggr *zerolog.Logger, interval time.Duration, conf *laneconfig.LaneConfig) error {
 	if ccipModule.ExistingDeployment {
 		return nil
 	}
@@ -679,7 +681,7 @@ func (ccipModule *CCIPCommon) SyncUSDCDomain(destTransmitter *contracts.TokenTra
 	return ccipModule.ChainClient.WaitForEvents()
 }
 
-func (ccipModule *CCIPCommon) PollRPCConnection(ctx context.Context, lggr zerolog.Logger) {
+func (ccipModule *CCIPCommon) PollRPCConnection(ctx context.Context, lggr *zerolog.Logger) {
 	for {
 		select {
 		case reconnectTime := <-ccipModule.ChainClient.ConnectionRestored():
@@ -1148,13 +1150,12 @@ type StaticPriceConfig struct {
 }
 
 func NewCCIPCommonFromConfig(
-	logger zerolog.Logger,
+	logger *zerolog.Logger,
 	testGroupConf *testconfig.CCIPTestGroupConfig,
-	testEnv *CCIPTestEnv,
 	chainClient blockchain.EVMClient,
 	laneConfig *laneconfig.LaneConfig,
 ) (*CCIPCommon, error) {
-	newCCIPModule, err := DefaultCCIPModule(logger, testGroupConf, testEnv, chainClient)
+	newCCIPModule, err := DefaultCCIPModule(logger, testGroupConf, chainClient)
 	if err != nil {
 		return nil, err
 	}
@@ -1232,26 +1233,21 @@ func NewCCIPCommonFromConfig(
 }
 
 func DefaultCCIPModule(
-	logger zerolog.Logger,
+	logger *zerolog.Logger,
 	testGroupConf *testconfig.CCIPTestGroupConfig,
-	testEnv *CCIPTestEnv,
 	chainClient blockchain.EVMClient,
 ) (*CCIPCommon, error) {
 	networkCfg := chainClient.GetNetworkConfig()
-	var k8Env *environment.Environment
-	if testEnv != nil {
-		k8Env = testEnv.K8Env
-	}
-	if k8Env != nil && chainClient.NetworkSimulated() {
-		networkCfg.URLs = k8Env.URLs[chainClient.GetNetworkConfig().Name]
-	}
-	tokenDeployerChainClient, err := blockchain.ConcurrentEVMClient(*networkCfg, k8Env, chainClient, logger)
+	tokenDeployerChainClient, err := blockchain.ConcurrentEVMClient(*networkCfg, nil, chainClient, *logger)
 	if err != nil {
 		return nil, errors.WithStack(fmt.Errorf("failed to create token deployment chain client for %s: %w", networkCfg.Name, err))
 	}
+	// If we want to deploy tokens as a non CCIP owner, we need to set the default wallet to something other than the first one. The first wallet is used as default CCIP owner for all other ccip contract deployment.
+	// This is not needed for existing deployment as the tokens and pools are already deployed.
 	if contracts.NeedTokenAdminRegistry() &&
 		!pointer.GetBool(testGroupConf.TokenConfig.CCIPOwnerTokens) &&
-		len(tokenDeployerChainClient.GetWallets()) > 1 { // If we want to deploy tokens as a non CCIP owner, we need to set the default wallet to something other than the first one. The first wallet is used as default CCIP owner for all other ccip contract deployment.
+		!pointer.GetBool(testGroupConf.ExistingDeployment) &&
+		len(tokenDeployerChainClient.GetWallets()) > 1 {
 		if err = tokenDeployerChainClient.SetDefaultWallet(1); err != nil {
 			return nil, errors.WithStack(fmt.Errorf("failed to set default wallet for token deployment client %s: %w", networkCfg.Name, err))
 		}
@@ -1265,7 +1261,7 @@ func DefaultCCIPModule(
 		return nil, err
 	}
 	return &CCIPCommon{
-		Logger:        &logger,
+		Logger:        logger,
 		ChainClient:   chainClient,
 		Deployer:      cd,
 		tokenDeployer: tokenCD,
@@ -1562,7 +1558,7 @@ func (sourceCCIP *SourceCCIPModule) UpdateBalance(
 }
 
 func (sourceCCIP *SourceCCIPModule) AssertSendRequestedLogFinalized(
-	lggr zerolog.Logger,
+	lggr *zerolog.Logger,
 	txHash common.Hash,
 	prevEventAt time.Time,
 	reqStats []*testreporters.RequestStat,
@@ -1611,7 +1607,7 @@ func (sourceCCIP *SourceCCIPModule) IsRequestTriggeredWithinTimeframe(timeframe 
 }
 
 func (sourceCCIP *SourceCCIPModule) AssertEventCCIPSendRequested(
-	lggr zerolog.Logger,
+	lggr *zerolog.Logger,
 	txHash string,
 	timeout time.Duration,
 	prevEventAt time.Time,
@@ -1634,6 +1630,10 @@ func (sourceCCIP *SourceCCIPModule) AssertEventCCIPSendRequested(
 					sourceCCIP.CCIPSendRequestedWatcher.Delete(txHash)
 					for i, sendRequestedEvent := range sendRequestedEvents {
 						seqNum := sendRequestedEvent.SequenceNumber
+						lggr = ptr.Ptr(lggr.With().
+							Uint64("SequenceNumber", seqNum).
+							Str("msgId ", fmt.Sprintf("0x%x", sendRequestedEvent.MessageId[:])).
+							Logger())
 						// prevEventAt is the time when the message was successful, this should be same as the time when the event was emitted
 						reqStat[i].UpdateState(lggr, seqNum, testreporters.CCIPSendRe, 0, testreporters.Success,
 							testreporters.TransactionStats{
@@ -1788,16 +1788,15 @@ func (sourceCCIP *SourceCCIPModule) SendRequest(
 }
 
 func DefaultSourceCCIPModule(
-	logger zerolog.Logger,
+	logger *zerolog.Logger,
 	testConf *testconfig.CCIPTestGroupConfig,
-	testEnv *CCIPTestEnv,
 	chainClient blockchain.EVMClient,
 	destChainId uint64,
 	destChain string,
 	laneConf *laneconfig.LaneConfig,
 ) (*SourceCCIPModule, error) {
 	cmn, err := NewCCIPCommonFromConfig(
-		logger, testConf, testEnv, chainClient, laneConf,
+		logger, testConf, chainClient, laneConf,
 	)
 	if err != nil {
 		return nil, err
@@ -2019,6 +2018,13 @@ func (destCCIP *DestCCIPModule) DeployContracts(
 		if destCCIP.Common.ExistingDeployment {
 			return fmt.Errorf("offramp address not provided in lane config")
 		}
+		var tokenAdminReg common.Address
+		if contracts.NeedTokenAdminRegistry() {
+			if destCCIP.Common.TokenAdminRegistry == nil {
+				return fmt.Errorf("token admin registry contract address is not provided in lane config")
+			}
+			tokenAdminReg = destCCIP.Common.TokenAdminRegistry.EthAddress
+		}
 		destCCIP.OffRamp, err = contractDeployer.DeployOffRamp(
 			destCCIP.SourceChainSelector,
 			destChainSelector,
@@ -2028,7 +2034,7 @@ func (destCCIP *DestCCIPModule) DeployContracts(
 			[]common.Address{},
 			[]common.Address{},
 			*destCCIP.Common.ARMContract,
-			destCCIP.Common.TokenAdminRegistry.EthAddress,
+			tokenAdminReg,
 		)
 		if err != nil {
 			return fmt.Errorf("deploying offramp shouldn't fail %w", err)
@@ -2161,7 +2167,7 @@ func (destCCIP *DestCCIPModule) UpdateBalance(
 }
 
 // AssertNoReportAcceptedEventReceived validates that no ExecutionStateChangedEvent is emitted for mentioned timeRange after lastSeenTimestamp
-func (destCCIP *DestCCIPModule) AssertNoReportAcceptedEventReceived(lggr zerolog.Logger, timeRange time.Duration, lastSeenTimestamp time.Time) error {
+func (destCCIP *DestCCIPModule) AssertNoReportAcceptedEventReceived(lggr *zerolog.Logger, timeRange time.Duration, lastSeenTimestamp time.Time) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeRange)
 	defer cancel()
 	ticker := time.NewTicker(time.Second)
@@ -2198,7 +2204,7 @@ func (destCCIP *DestCCIPModule) AssertNoReportAcceptedEventReceived(lggr zerolog
 
 // AssertNoExecutionStateChangedEventReceived validates that no ExecutionStateChangedEvent is emitted for mentioned timeRange after lastSeenTimestamp
 func (destCCIP *DestCCIPModule) AssertNoExecutionStateChangedEventReceived(
-	lggr zerolog.Logger,
+	lggr *zerolog.Logger,
 	timeRange time.Duration,
 	lastSeenTimestamp time.Time,
 ) error {
@@ -2238,7 +2244,7 @@ func (destCCIP *DestCCIPModule) AssertNoExecutionStateChangedEventReceived(
 }
 
 func (destCCIP *DestCCIPModule) AssertEventExecutionStateChanged(
-	lggr zerolog.Logger,
+	lggr *zerolog.Logger,
 	seqNum uint64,
 	timeout time.Duration,
 	timeNow time.Time,
@@ -2314,7 +2320,7 @@ func (destCCIP *DestCCIPModule) AssertEventExecutionStateChanged(
 }
 
 func (destCCIP *DestCCIPModule) AssertEventReportAccepted(
-	lggr zerolog.Logger,
+	lggr *zerolog.Logger,
 	seqNum uint64,
 	timeout time.Duration,
 	prevEventAt time.Time,
@@ -2393,7 +2399,7 @@ func (destCCIP *DestCCIPModule) AssertEventReportAccepted(
 }
 
 func (destCCIP *DestCCIPModule) AssertReportBlessed(
-	lggr zerolog.Logger,
+	lggr *zerolog.Logger,
 	seqNum uint64,
 	timeout time.Duration,
 	CommitReport contracts.CommitStoreReportAccepted,
@@ -2487,7 +2493,7 @@ func (destCCIP *DestCCIPModule) AssertReportBlessed(
 }
 
 func (destCCIP *DestCCIPModule) AssertSeqNumberExecuted(
-	lggr zerolog.Logger,
+	lggr *zerolog.Logger,
 	seqNumberBefore uint64,
 	timeout time.Duration,
 	timeNow time.Time,
@@ -2535,16 +2541,15 @@ func (destCCIP *DestCCIPModule) AssertSeqNumberExecuted(
 }
 
 func DefaultDestinationCCIPModule(
-	logger zerolog.Logger,
+	logger *zerolog.Logger,
 	testConf *testconfig.CCIPTestGroupConfig,
-	testEnv *CCIPTestEnv,
 	chainClient blockchain.EVMClient,
 	sourceChainId uint64,
 	sourceChain string,
 	laneConf *laneconfig.LaneConfig,
 ) (*DestCCIPModule, error) {
 	cmn, err := NewCCIPCommonFromConfig(
-		logger, testConf, testEnv, chainClient, laneConf,
+		logger, testConf, chainClient, laneConf,
 	)
 	if err != nil {
 		return nil, err
@@ -2594,7 +2599,7 @@ func CCIPRequestFromTxHash(txHash common.Hash, chainClient blockchain.EVMClient)
 
 type CCIPLane struct {
 	Test              *testing.T
-	Logger            zerolog.Logger
+	Logger            *zerolog.Logger
 	SourceNetworkName string
 	DestNetworkName   string
 	SourceChain       blockchain.EVMClient
@@ -3021,7 +3026,7 @@ type validationOptions struct {
 }
 
 // ValidationOptionFunc is a function that can be passed to ValidateRequests to specify which phase is expected to fail
-type ValidationOptionFunc func(logger zerolog.Logger, opts *validationOptions)
+type ValidationOptionFunc func(logger *zerolog.Logger, opts *validationOptions)
 
 // PhaseSpecificValidationOptionFunc can specify how exactly you want a phase to fail
 type PhaseSpecificValidationOptionFunc func(*validationOptions)
@@ -3053,7 +3058,7 @@ func ShouldExist() PhaseSpecificValidationOptionFunc {
 // If you expect the `ExecStateChanged` events to be there, but in a "failed" state, set this to true.
 // It will otherwise be ignored.
 func ExpectPhaseToFail(phase testreporters.Phase, phaseSpecificOptions ...PhaseSpecificValidationOptionFunc) ValidationOptionFunc {
-	return func(logger zerolog.Logger, opts *validationOptions) {
+	return func(logger *zerolog.Logger, opts *validationOptions) {
 		opts.phaseExpectedToFail = phase
 		for _, f := range phaseSpecificOptions {
 			if f != nil {
@@ -3138,6 +3143,7 @@ func (lane *CCIPLane) ValidateRequestByTxHash(txHash common.Hash, opts validatio
 	}
 	for _, msgLog := range msgLogs {
 		seqNumber := msgLog.SequenceNumber
+		lane.Logger = ptr.Ptr(lane.Logger.With().Str("msgId ", fmt.Sprintf("0x%x", msgLog.MessageId[:])).Logger())
 		var reqStat *testreporters.RequestStat
 		for _, stat := range reqStats {
 			if stat.SeqNum == seqNumber {
@@ -3194,7 +3200,7 @@ func (lane *CCIPLane) ValidateRequestByTxHash(txHash common.Hash, opts validatio
 // isPhaseValid checks if the phase is in a valid state or not given expectations.
 // If `shouldComplete` is true, it means that the phase validation is meant to end and we should return from the calling function.
 func isPhaseValid(
-	logger zerolog.Logger,
+	logger *zerolog.Logger,
 	currentPhase testreporters.Phase,
 	opts validationOptions,
 	err error,
@@ -3475,7 +3481,6 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 	lane.Source, err = DefaultSourceCCIPModule(
 		lane.Logger,
 		testConf,
-		env,
 		sourceChainClient, destChainClient.GetChainID().Uint64(),
 		destChainClient.GetNetworkName(),
 		srcConf,
@@ -3484,7 +3489,7 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 		return fmt.Errorf("failed to create source module: %w", err)
 	}
 	lane.Dest, err = DefaultDestinationCCIPModule(
-		lane.Logger, testConf, env,
+		lane.Logger, testConf,
 		destChainClient, sourceChainClient.GetChainID().Uint64(),
 		sourceChainClient.GetNetworkName(), destConf,
 	)
@@ -3664,7 +3669,7 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 // SetOCR2Config sets the oracle config in ocr2 contracts. If execNodes is nil, commit and execution jobs are set up in same DON
 func SetOCR2Config(
 	ctx context.Context,
-	lggr zerolog.Logger,
+	lggr *zerolog.Logger,
 	testConf testconfig.CCIPTestGroupConfig,
 	commitNodes,
 	execNodes []*client.CLNodesWithKeys,
@@ -3698,17 +3703,26 @@ func SetOCR2Config(
 		Interface("OCRParmsForCommit", OCR2ParamsForCommit).
 		Interface("OCRParmsForExec", OCR2ParamsForExec).
 		Msg("Setting OCR2 config")
+	commitOffchainCfg, err := contracts.NewCommitOffchainConfig(
+		*commonconfig.MustNewDuration(5 * time.Second),
+		1e6,
+		1e6,
+		*commonconfig.MustNewDuration(5 * time.Second),
+		1e6,
+		*inflightExpiryCommit,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create commit offchain config: %w", err)
+	}
+
+	commitOnchainCfg, err := contracts.NewCommitOnchainConfig(
+		destCCIP.Common.PriceRegistry.EthAddress,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create commit onchain config: %w", err)
+	}
 	signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig, err := contracts.NewOffChainAggregatorV2ConfigForCCIPPlugin(
-		commitNodes, testhelpers.NewCommitOffchainConfig(
-			*commonconfig.MustNewDuration(5 * time.Second),
-			1e6,
-			1e6,
-			*commonconfig.MustNewDuration(5 * time.Second),
-			1e6,
-			*inflightExpiryCommit,
-		), testhelpers.NewCommitOnchainConfig(
-			destCCIP.Common.PriceRegistry.EthAddress,
-		), OCR2ParamsForCommit, 3*time.Minute)
+		commitNodes, commitOffchainCfg, commitOnchainCfg, OCR2ParamsForCommit, 3*time.Minute)
 	if err != nil {
 		return fmt.Errorf("failed to create ocr2 config params for commit: %w", err)
 	}
@@ -3724,24 +3738,32 @@ func SetOCR2Config(
 		nodes = execNodes
 	}
 	if destCCIP.OffRamp != nil {
+		execOffchainCfg, err := contracts.NewExecOffchainConfig(
+			1,
+			BatchGasLimit,
+			0.7,
+			*inflightExpiryExec,
+			*commonconfig.MustNewDuration(RootSnoozeTime),
+		)
+		if err != nil {
+			return fmt.Errorf("failed to create exec offchain config: %w", err)
+		}
+		execOnchainCfg, err := contracts.NewExecOnchainConfig(
+			uint32(DefaultPermissionlessExecThreshold.Seconds()),
+			destCCIP.Common.Router.EthAddress,
+			destCCIP.Common.PriceRegistry.EthAddress,
+			DefaultMaxNoOfTokensInMsg,
+			MaxDataBytes,
+			200_000,
+			50_000,
+		)
+		if err != nil {
+			return fmt.Errorf("failed to create exec onchain config: %w", err)
+		}
 		signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig, err = contracts.NewOffChainAggregatorV2ConfigForCCIPPlugin(
 			nodes,
-			testhelpers.NewExecOffchainConfig(
-				1,
-				BatchGasLimit,
-				0.7,
-				*inflightExpiryExec,
-				*commonconfig.MustNewDuration(RootSnoozeTime),
-			),
-			testhelpers.NewExecOnchainConfig(
-				uint32(DefaultPermissionlessExecThreshold.Seconds()),
-				destCCIP.Common.Router.EthAddress,
-				destCCIP.Common.PriceRegistry.EthAddress,
-				DefaultMaxNoOfTokensInMsg,
-				MaxDataBytes,
-				200_000,
-				50_000,
-			),
+			execOffchainCfg,
+			execOnchainCfg,
 			OCR2ParamsForExec,
 			3*time.Minute,
 		)
@@ -3775,7 +3797,7 @@ func CreateBootstrapJob(
 }
 
 func CreateOCR2CCIPCommitJobs(
-	lggr zerolog.Logger,
+	lggr *zerolog.Logger,
 	jobParams integrationtesthelpers.CCIPJobSpecParams,
 	commitNodes []*client.CLNodesWithKeys,
 	mutexes []*sync.Mutex,
@@ -3814,7 +3836,7 @@ func CreateOCR2CCIPCommitJobs(
 }
 
 func CreateOCR2CCIPExecutionJobs(
-	lggr zerolog.Logger,
+	lggr *zerolog.Logger,
 	jobParams integrationtesthelpers.CCIPJobSpecParams,
 	execNodes []*client.CLNodesWithKeys,
 	mutexes []*sync.Mutex,
@@ -4023,7 +4045,7 @@ func (c *CCIPTestEnv) ConnectToDeployedNodes() error {
 
 // SetUpNodeKeysAndFund creates node keys and funds the nodes
 func (c *CCIPTestEnv) SetUpNodeKeysAndFund(
-	logger zerolog.Logger,
+	logger *zerolog.Logger,
 	nodeFund *big.Float,
 	chains []blockchain.EVMClient,
 ) error {
@@ -4055,7 +4077,7 @@ func (c *CCIPTestEnv) SetUpNodeKeysAndFund(
 		if cfg == nil {
 			return fmt.Errorf("blank network config")
 		}
-		c1, err := blockchain.ConcurrentEVMClient(*cfg, c.K8Env, ec, logger)
+		c1, err := blockchain.ConcurrentEVMClient(*cfg, c.K8Env, ec, *logger)
 		if err != nil {
 			return fmt.Errorf("getting concurrent evmclient chain %s %w", ec.GetNetworkName(), err)
 		}
