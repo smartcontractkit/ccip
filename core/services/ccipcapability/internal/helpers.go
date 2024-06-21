@@ -13,6 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
 	gethtypes "github.com/ethereum/go-ethereum/core/types"
+	"github.com/jmoiron/sqlx"
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-common/pkg/loop"
@@ -43,7 +44,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/ocr2key"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
 	"github.com/smartcontractkit/chainlink/v2/plugins"
-	"github.com/smartcontractkit/libocr/commontypes"
 	confighelper2 "github.com/smartcontractkit/libocr/offchainreporting2plus/confighelper"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3confighelper"
 	"github.com/stretchr/testify/require"
@@ -60,6 +60,7 @@ type ocr3Node struct {
 	peerID       string
 	transmitters map[int64]common.Address
 	keybundle    ocr2key.KeyBundle
+	db           *sqlx.DB
 }
 
 type homeChain struct {
@@ -325,12 +326,13 @@ func filter[T any](s []T, cond func(arg T) bool) (r []T) {
 	return
 }
 
+// setupNodeOCR3 creates a chainlink node and any associated keys in order to run
+// ccip.
 func setupNodeOCR3(
 	t *testing.T,
 	owner *bind.TransactOpts,
 	port int,
 	chainIDToBackend map[int64]*backends.SimulatedBackend,
-	p2pV2Bootstrappers []commontypes.BootstrapperLocator,
 ) *ocr3Node {
 	// Do not want to load fixtures as they contain a dummy chainID.
 	config, db := heavyweight.FullTestDBNoFixturesV2(t, func(c *chainlink.Config, s *chainlink.Secrets) {
@@ -343,9 +345,6 @@ func setupNodeOCR3(
 		c.P2P.V2.DeltaDial = config.MustNewDuration(500 * time.Millisecond)
 		c.P2P.V2.DeltaReconcile = config.MustNewDuration(5 * time.Second)
 		c.P2P.V2.ListenAddresses = &[]string{fmt.Sprintf("127.0.0.1:%d", port)}
-		if len(p2pV2Bootstrappers) > 0 {
-			c.P2P.V2.DefaultBootstrappers = &p2pV2Bootstrappers
-		}
 
 		// OCR configs
 		c.OCR.Enabled = ptr(false)
@@ -383,7 +382,7 @@ func setupNodeOCR3(
 		},
 		csa: master.CSA(),
 	}
-	mailMon := mailbox.NewMonitor("LiquidityManager", lggr.Named("mailbox"))
+	mailMon := mailbox.NewMonitor("ccip", lggr.Named("mailbox"))
 	evmOpts := chainlink.EVMFactoryConfig{
 		ChainOpts: legacyevm.ChainOpts{
 			AppConfig: config,
@@ -459,10 +458,13 @@ func setupNodeOCR3(
 	require.NoError(t, err)
 
 	return &ocr3Node{
-		app:          app,
+		// can't use this app because it doesn't have the right toml config
+		// missing bootstrapp
+		// app:          app,
 		peerID:       peerID.Raw(),
 		transmitters: transmitters,
 		keybundle:    keybundle,
+		db:           db,
 	}
 }
 
@@ -638,7 +640,27 @@ func donOCRConfig(t *testing.T, uni onchainUniverse, oracles []confighelper2.Ora
 	return commitConfig
 }
 
-func donBootstrapConfig(_ *testing.T) []byte {
-	// TODO: implement
-	return nil
+func createCCIPSpecToml(nodeP2PID, bootstrapP2PID string, bootstrapPort int, ocrKeyBundleID string) string {
+	return fmt.Sprintf(`
+type = "ccip"
+capabilityVersion = "v1.0.0"
+capabilityLabelledName = "ccip"
+p2pKeyID = "%s"
+p2pV2Bootstrappers = ["%s"]
+[ocrKeyBundleIDs]
+evm = "%s"
+[relayConfigs.evm.chainReaderConfig.contracts.Offramp]
+contractABI = "the abi"
+
+[relayConfigs.evm.chainReaderConfig.contracts.Offramp.configs.getStuff]
+chainSpecificName = "getStuffEVM"
+
+[pluginConfig]
+tokenPricesPipeline = "the pipeline"`,
+		nodeP2PID,
+		fmt.Sprintf("%s@127.0.0.1:%d", bootstrapP2PID,
+			bootstrapPort,
+		),
+		ocrKeyBundleID,
+	)
 }

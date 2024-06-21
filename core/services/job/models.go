@@ -180,8 +180,6 @@ type Job struct {
 	StandardCapabilitiesSpec      *StandardCapabilitiesSpec
 	CCIPSpecID                    *int32
 	CCIPSpec                      *CCIPSpec
-	CCIPBootstrapSpecID           *int32
-	CCIPBootstrapSpec             *CCIPBootstrapSpec
 	JobSpecErrors                 []SpecError
 	Type                          Type          `toml:"type"`
 	SchemaVersion                 uint32        `toml:"schemaVersion"`
@@ -968,26 +966,4 @@ type CCIPSpec struct {
 	// The job spec will have to be updated once a new token needs its price posted.
 	// TODO: might get axed in favor of workflows' ccip price posting.
 	PluginConfig JSONConfig `toml:"pluginConfig"`
-}
-
-// CCIPBootstrapSpec is the spec for the CCIP role don bootstrap job.
-// This job launches a bootstrap node for each new CCIP role DON OCR instance.
-type CCIPBootstrapSpec struct {
-	ID        int32
-	CreatedAt time.Time `toml:"-"`
-	UpdatedAt time.Time `toml:"-"`
-
-	// CapabilityVersion is the semantic version of the CCIP capability.
-	// This capability version must exist in the onchain capability registry.
-	// Bootstrap nodes will be launched based on DONs with this capability version.
-	CapabilityVersion string `toml:"capabilityVersion" db:"capability_version"`
-
-	// CapabilityLabelledName is the labelled name of the CCIP capability.
-	// Corresponds to the labelled name of the capability in the onchain capability registry.
-	// Bootstrap nodes will be launched based on DONs with this capability labelled name.
-	CapabilityLabelledName string `toml:"capabilityLabelledName" db:"capability_labelled_name"`
-
-	// RelayConfig defines the chain reader configurations for the bootstrap node.
-	// Note that it must be EVM, since home chain is EVM.
-	RelayConfig JSONConfig `toml:"relayConfig" db:"relay_config"`
 }

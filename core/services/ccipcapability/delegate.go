@@ -122,7 +122,7 @@ func (d *Delegate) ServicesForSpec(ctx context.Context, spec job.Job) (services 
 		hcr,
 		launcher.New(
 			spec.CCIPSpec.CapabilityVersion,
-			spec.CCIPBootstrapSpec.CapabilityLabelledName,
+			spec.CCIPSpec.CapabilityLabelledName,
 			p2pID,
 			d.capRegistry,
 			d.lggr,
