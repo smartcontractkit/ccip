@@ -139,8 +139,6 @@ func observeTokenPrices(
 	return tokenPricesUSD, nil
 }
 
-// Plugin should be able to observe the max sequence numbers even if it can't read the source chain.
-// This will be used to reach consensus on the observed seqNums and if plugin can read dest chain it should be able to contribute to the observation.
 func observeGasPrices(ctx context.Context, ccipReader cciptypes.CCIPReader, chains []cciptypes.ChainSelector) ([]cciptypes.GasPriceChain, error) {
 	if len(chains) == 0 {
 		return nil, nil
@@ -180,7 +178,6 @@ func newMsgsConsensus(
 	// Gather all messages from all observations.
 	msgsFromObservations := make([]cciptypes.CCIPMsgBaseDetails, 0)
 	for _, obs := range observations {
-		//TODO: Make sure that the observer can read the chain
 		msgsFromObservations = append(msgsFromObservations, obs.NewMsgs...)
 	}
 	lggr.Debugw("total observed messages across all followers", "msgs", len(msgsFromObservations))
@@ -448,19 +445,16 @@ func gasPricesConsensus(lggr logger.Logger, observations []cciptypes.CommitPlugi
 	return consensusGasPrices
 }
 
-// pluginConfigConsensus comes to consensus on the plugin config based on the observations.
+// fChainConsensus comes to consensus on the plugin config based on the observations.
 // We cannot trust the state of a single follower, so we need to come to consensus on the config.
-func pluginConfigConsensus(
-	destinationChain cciptypes.ChainSelector,
+func fChainConsensus(
 	observations []cciptypes.CommitPluginObservation, // observations from all followers
-) cciptypes.ConsensusObservation {
-	consensusCfg := cciptypes.ConsensusObservation{}
-
+) map[cciptypes.ChainSelector]int {
 	// Come to consensus on fChain.
 	// Use the fChain observed by most followers for each chain.
 	fChainCounts := make(map[cciptypes.ChainSelector]map[int]int) // {chain: {fChain: count}}
 	for _, obs := range observations {
-		for chain, fChain := range obs.ConsensusObservation.FChain {
+		for chain, fChain := range obs.FChain {
 			if _, exists := fChainCounts[chain]; !exists {
 				fChainCounts[chain] = make(map[int]int)
 			}
@@ -477,24 +471,8 @@ func pluginConfigConsensus(
 			}
 		}
 	}
-	consensusCfg.FChain = consensusFChain
 
-	// Come to consensus on what the feeTokens are.
-	// We want to keep the tokens observed by at least 2f_chain+1 followers.
-	feeTokensCounts := make(map[types.Account]int)
-	for _, obs := range observations {
-		for _, token := range obs.ConsensusObservation.PricedTokens {
-			feeTokensCounts[token]++
-		}
-	}
-	consensusFeeTokens := make([]types.Account, 0)
-	for token, count := range feeTokensCounts {
-		if count >= 2*consensusCfg.FChain[destinationChain]+1 {
-			consensusFeeTokens = append(consensusFeeTokens, token)
-		}
-	}
-	consensusCfg.PricedTokens = consensusFeeTokens
-	return consensusCfg
+	return consensusFChain
 }
 
 // validateObservedSequenceNumbers checks if the sequence numbers of the provided messages are unique for each chain and
@@ -544,19 +522,13 @@ func validateObservedSequenceNumbers(msgs []cciptypes.CCIPMsgBaseDetails, maxSeq
 
 // validateObserverReadingEligibility checks if the observer is eligible to observe the messages it observed.
 func validateObserverReadingEligibility(
-	observer cciptypes.P2PID,
 	msgs []cciptypes.CCIPMsgBaseDetails,
 	seqNums []cciptypes.SeqNumChain,
-	nodeSupportedChains map[cciptypes.P2PID]cciptypes.SupportedChains,
+	nodeSupportedChains mapset.Set[cciptypes.ChainSelector],
 	destChain cciptypes.ChainSelector,
 ) error {
 
-	supportedChains, exists := nodeSupportedChains[observer]
-	if !exists {
-		return fmt.Errorf("observer not found in config")
-	}
-
-	if len(seqNums) > 0 && !supportedChains.IsSupported(destChain) {
+	if len(seqNums) > 0 && !nodeSupportedChains.Contains(destChain) {
 		return fmt.Errorf("observer must be a writer if it observes sequence numbers")
 	}
 
@@ -566,7 +538,7 @@ func validateObserverReadingEligibility(
 
 	for _, msg := range msgs {
 		// Observer must be able to read the chain that the message is coming from.
-		if !supportedChains.IsSupported(msg.SourceChain) {
+		if !nodeSupportedChains.Contains(msg.SourceChain) {
 			return fmt.Errorf("observer not allowed to read chain %d", msg.SourceChain)
 		}
 	}

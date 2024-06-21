@@ -11,35 +11,50 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
 )
 
 type HomeChainConfigPoller struct {
-	homeChainReader  types.ContractReader
-	homeChainConfig  cciptypes.HomeChainConfig
+	homeChainReader types.ContractReader
+	// gets updated by the polling loop
+	chainConfigs map[cciptypes.ChainSelector]cciptypes.ChainConfig
+	// mapping between each node's peerID and the chains it supports. derived from chainConfigs
+	nodeSupportedChains map[libocrtypes.PeerID]mapset.Set[cciptypes.ChainSelector]
+	// set of chains that are known to CCIP, derived from chainConfigs
+	knownSourceChains mapset.Set[cciptypes.ChainSelector]
+	// map of chain to FChain value, derived from chainConfigs
+	fChain           map[cciptypes.ChainSelector]int
 	lggr             logger.Logger
-	mutex            sync.RWMutex
+	mutex            *sync.RWMutex
 	backgroundCancel context.CancelFunc
+	pollingInterval  time.Duration
 }
 
 func NewHomeChainConfigPoller(
 	homeChainReader types.ContractReader,
 	lggr logger.Logger,
+	pollingInterval time.Duration,
 ) *HomeChainConfigPoller {
 	return &HomeChainConfigPoller{
-		homeChainReader: homeChainReader,
-		lggr:            lggr,
+		homeChainReader:     homeChainReader,
+		lggr:                lggr,
+		chainConfigs:        map[cciptypes.ChainSelector]cciptypes.ChainConfig{},
+		mutex:               &sync.RWMutex{},
+		nodeSupportedChains: map[libocrtypes.PeerID]mapset.Set[cciptypes.ChainSelector]{},
+		backgroundCancel:    nil,
+		pollingInterval:     pollingInterval,
 	}
 }
 
 func (r *HomeChainConfigPoller) Start(ctx context.Context) error {
-
 	r.mutex.Lock()
 	if r.backgroundCancel != nil {
 		r.lggr.Errorw("Polling already started")
 		// We don't want to return an actual error here as it's already working as expected
-		return nil
+		r.mutex.Unlock()
+		return fmt.Errorf("polling already started")
 	}
-	bgCtx, cancelFunc := context.WithCancel(ctx)
+	bgCtx, cancelFunc := context.WithCancel(context.Background())
 	r.backgroundCancel = cancelFunc
 	r.mutex.Unlock()
 
@@ -48,15 +63,12 @@ func (r *HomeChainConfigPoller) Start(ctx context.Context) error {
 		r.lggr.Errorw("Initial fetch of on-chain configs failed", "err", err)
 	}
 
-	r.lggr.Infow("Start Polling HomeChainConfig")
+	r.lggr.Infow("Start Polling ChainConfig")
 	go func() {
-		ticker := time.NewTicker(12 * time.Second)
+		ticker := time.NewTicker(r.pollingInterval * time.Second)
 		defer ticker.Stop()
 		for {
 			select {
-			case <-ctx.Done():
-				r.lggr.Infow("Polling stopped")
-				return
 			case <-bgCtx.Done():
 				r.lggr.Infow("Polling stopped")
 				return
@@ -69,6 +81,9 @@ func (r *HomeChainConfigPoller) Start(ctx context.Context) error {
 	return nil
 }
 
+//func (r *HomeChainConfigPoller) poll() {
+//}
+
 func (r *HomeChainConfigPoller) fetchAndSetConfig(ctx context.Context) error {
 	onChainCapabilityConfigs, err := r.fetchOnChainConfig(ctx)
 	if err != nil {
@@ -79,74 +94,158 @@ func (r *HomeChainConfigPoller) fetchAndSetConfig(ctx context.Context) error {
 		r.lggr.Errorw("no on chain configs found")
 		return fmt.Errorf("no on chain configs found")
 	}
-	homeChainConfig, err := r.convertOnChainConfigToHomeChainConfig(onChainCapabilityConfigs)
+	homeChainConfigs, err := r.convertOnChainConfigToHomeChainConfig(onChainCapabilityConfigs)
 	if err != nil {
-		r.lggr.Errorw("error converting OnChainConfigs to HomeChainConfig", "err", err)
+		r.lggr.Errorw("error converting OnChainConfigs to ChainConfig", "err", err)
 		return err
 	}
-	r.lggr.Infow("Setting HomeChainConfig")
+	r.lggr.Infow("Setting ChainConfig")
 	r.mutex.Lock()
-	r.homeChainConfig = homeChainConfig
+	r.chainConfigs = homeChainConfigs
+	r.nodeSupportedChains = createNodesSupportedChains(homeChainConfigs)
+	r.knownSourceChains = createKnownChains(homeChainConfigs)
+	r.fChain = createFChain(homeChainConfigs)
 	r.mutex.Unlock()
 	return nil
 }
 
-func (r *HomeChainConfigPoller) GetConfig() cciptypes.HomeChainConfig {
+func (r *HomeChainConfigPoller) GetChainConfig(chainSelector cciptypes.ChainSelector) (cciptypes.ChainConfig, error) {
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
-	return r.homeChainConfig
-}
-
-func (r *HomeChainConfigPoller) GetSupportedChains(p2pID cciptypes.P2PID) mapset.Set[cciptypes.ChainSelector] {
-	r.mutex.RLock()
-	defer r.mutex.RUnlock()
-	return r.homeChainConfig.NodeSupportedChains[p2pID].Supported
-}
-
-func (r *HomeChainConfigPoller) fetchOnChainConfig(ctx context.Context) ([]cciptypes.OnChainCapabilityConfig, error) {
-	r.lggr.Infow("Fetching OnChainConfig")
-	var onChainCapabilityConfig []cciptypes.OnChainCapabilityConfig
-	err := r.homeChainReader.GetLatestValue(ctx, "CCIPCapabilityConfiguration", "getAllChainConfigs", nil, &onChainCapabilityConfig)
-	if err != nil {
-		return nil, err
+	if _, ok := r.chainConfigs[chainSelector]; !ok {
+		return cciptypes.ChainConfig{}, fmt.Errorf("chain config not found for chain %v", chainSelector)
 	}
-	return onChainCapabilityConfig, err
+	return r.chainConfigs[chainSelector], nil
+}
+
+func (r *HomeChainConfigPoller) GetAllChainConfigs() (map[cciptypes.ChainSelector]cciptypes.ChainConfig, error) {
+	r.mutex.RLock()
+	defer r.mutex.RUnlock()
+	if len(r.chainConfigs) == 0 {
+		return nil, errors.New("no chain configs found")
+	}
+	return r.chainConfigs, nil
+
+}
+
+func (r *HomeChainConfigPoller) GetSupportedChains(id libocrtypes.PeerID) mapset.Set[cciptypes.ChainSelector] {
+	r.mutex.RLock()
+	defer r.mutex.RUnlock()
+	return r.nodeSupportedChains[id]
+}
+
+func (r *HomeChainConfigPoller) GetKnownChains() mapset.Set[cciptypes.ChainSelector] {
+	r.mutex.RLock()
+	defer r.mutex.RUnlock()
+	knownSourceChains := mapset.NewSet[cciptypes.ChainSelector]()
+	for chain, _ := range r.chainConfigs {
+		knownSourceChains.Add(chain)
+	}
+	return knownSourceChains
+}
+
+func (r *HomeChainConfigPoller) GetFChain() map[cciptypes.ChainSelector]int {
+	r.mutex.RLock()
+	defer r.mutex.RUnlock()
+	return r.fChain
 }
 
 func (r *HomeChainConfigPoller) Close() error {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 	if r.backgroundCancel == nil {
-		return errors.New("Cancel function not set")
-
+		return errors.New("cancel function not set")
 	}
 	r.backgroundCancel()
 	return nil
 }
 
-func (r *HomeChainConfigPoller) convertOnChainConfigToHomeChainConfig(capabilityConfigs []cciptypes.OnChainCapabilityConfig) (cciptypes.HomeChainConfig, error) {
+func (r *HomeChainConfigPoller) Ready() error {
+	r.mutex.RLock()
+	defer r.mutex.RUnlock()
+	if len(r.chainConfigs) == 0 {
+		return errors.New("no chain configs found")
+	}
+	return nil
+}
+
+func (r *HomeChainConfigPoller) HealthReport() map[string]error {
+	r.mutex.RLock()
+	defer r.mutex.RUnlock()
+	if len(r.chainConfigs) == 0 {
+		return map[string]error{"ChainConfig": errors.New("no chain configs found")}
+	}
+	return nil
+}
+
+func (r *HomeChainConfigPoller) Name() string {
+	return "HomeChainConfigPoller"
+}
+
+func createFChain(chainConfigs map[cciptypes.ChainSelector]cciptypes.ChainConfig) map[cciptypes.ChainSelector]int {
 	fChain := make(map[cciptypes.ChainSelector]int)
-	// NodeSupportedChains is a map of oracle IDs to SupportedChains.
-	var nodeSupportedChains = make(map[cciptypes.P2PID]cciptypes.SupportedChains)
+	for chain, config := range chainConfigs {
+		fChain[chain] = config.FChain
+	}
+	return fChain
+}
+
+func createKnownChains(chainConfigs map[cciptypes.ChainSelector]cciptypes.ChainConfig) mapset.Set[cciptypes.ChainSelector] {
+	knownChains := mapset.NewSet[cciptypes.ChainSelector]()
+	for chain, _ := range chainConfigs {
+		knownChains.Add(chain)
+	}
+	return knownChains
+}
+
+func createNodesSupportedChains(chainConfigs map[cciptypes.ChainSelector]cciptypes.ChainConfig) map[libocrtypes.PeerID]mapset.Set[cciptypes.ChainSelector] {
+	nodeSupportedChains := make(map[libocrtypes.PeerID]mapset.Set[cciptypes.ChainSelector])
+	for chainSelector, config := range chainConfigs {
+		for _, p2pID := range config.SupportedNodes.ToSlice() {
+			if _, ok := nodeSupportedChains[p2pID]; !ok {
+				nodeSupportedChains[p2pID] = mapset.NewSet[cciptypes.ChainSelector]()
+			}
+			//add chain to SupportedChains
+			nodeSupportedChains[p2pID].Add(chainSelector)
+		}
+	}
+	return nodeSupportedChains
+}
+
+func (r *HomeChainConfigPoller) fetchOnChainConfig(ctx context.Context) ([]ChainConfigInfo, error) {
+	r.lggr.Infow("Fetching OnChainConfig")
+	var chainConfigInfo []ChainConfigInfo
+	err := r.homeChainReader.GetLatestValue(ctx, "CCIPCapabilityConfiguration", "getAllChainConfigs", nil, &chainConfigInfo)
+	if err != nil {
+		return nil, err
+	}
+	return chainConfigInfo, err
+}
+
+func (r *HomeChainConfigPoller) convertOnChainConfigToHomeChainConfig(capabilityConfigs []ChainConfigInfo) (map[cciptypes.ChainSelector]cciptypes.ChainConfig, error) {
+	chainConfigs := make(map[cciptypes.ChainSelector]cciptypes.ChainConfig)
 	//iterate over configs
 	for _, capabilityConfig := range capabilityConfigs {
 		chainSelector := capabilityConfig.ChainSelector
 		config := capabilityConfig.ChainConfig
 
-		fChain[chainSelector] = int(config.FChain)
-		//iterate over readers
-		for _, p2pID := range config.Readers {
-			if _, ok := nodeSupportedChains[p2pID]; !ok {
-				nodeSupportedChains[p2pID] = cciptypes.SupportedChains{
-					Supported: mapset.NewSet[cciptypes.ChainSelector](),
-				}
-			}
-			//add chain to SupportedChains
-			nodeSupportedChains[p2pID].Supported.Add(chainSelector)
+		chainConfigs[chainSelector] = cciptypes.ChainConfig{
+			FChain:         int(config.FChain),
+			SupportedNodes: mapset.NewSet(config.Readers...),
 		}
 	}
-	return cciptypes.HomeChainConfig{
-		FChain:              fChain,
-		NodeSupportedChains: nodeSupportedChains,
-	}, nil
+	return chainConfigs, nil
 }
+
+type onChainConfig struct {
+	Readers []libocrtypes.PeerID `json:"readers"`
+	FChain  uint8                `json:"fChain"`
+	Config  []byte               `json:"config"`
+}
+type ChainConfigInfo struct {
+	// Calling function https://github.com/smartcontractkit/ccip/blob/330c5e98f624cfb10108c92fe1e00ced6d345a99/contracts/src/v0.8/ccip/capability/CCIPCapabilityConfiguration.sol#L140
+	ChainSelector cciptypes.ChainSelector `json:"chainSelector"`
+	ChainConfig   onChainConfig           `json:"chainConfig"`
+}
+
+var _ cciptypes.HomeChainPoller = (*HomeChainConfigPoller)(nil)

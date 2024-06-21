@@ -8,6 +8,7 @@ import (
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
+	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
 	"github.com/smartcontractkit/ccipocr3/internal/libs/slicelib"
 	"github.com/smartcontractkit/ccipocr3/internal/mocks"
@@ -440,75 +441,75 @@ func Test_validateObservedSequenceNumbers(t *testing.T) {
 func Test_validateObserverReadingEligibility(t *testing.T) {
 	testCases := []struct {
 		name                string
-		observer            cciptypes.P2PID
+		observer            libocrtypes.PeerID
 		msgs                []cciptypes.CCIPMsgBaseDetails
 		seqNums             []cciptypes.SeqNumChain
-		nodeSupportedChains map[cciptypes.P2PID]cciptypes.SupportedChains
+		nodeSupportedChains map[libocrtypes.PeerID]cciptypes.SupportedChains
 		destChain           cciptypes.ChainSelector
 		expErr              bool
 	}{
 		{
 			name:     "observer can read all chains",
-			observer: cciptypes.GetP2pID(10),
+			observer: libocrtypes.PeerID{10},
 			msgs: []cciptypes.CCIPMsgBaseDetails{
 				{ID: cciptypes.Bytes32{1}, SourceChain: 1, SeqNum: 12},
 				{ID: cciptypes.Bytes32{3}, SourceChain: 2, SeqNum: 12},
 				{ID: cciptypes.Bytes32{1}, SourceChain: 3, SeqNum: 12},
 				{ID: cciptypes.Bytes32{2}, SourceChain: 3, SeqNum: 12},
 			},
-			nodeSupportedChains: map[cciptypes.P2PID]cciptypes.SupportedChains{
-				cciptypes.GetP2pID(10): {Supported: mapset.NewSet[cciptypes.ChainSelector](1, 2, 3)},
+			nodeSupportedChains: map[libocrtypes.PeerID]cciptypes.SupportedChains{
+				libocrtypes.PeerID{10}: {Supported: mapset.NewSet[cciptypes.ChainSelector](1, 2, 3)},
 			},
 			destChain: 1,
 			expErr:    false,
 		},
 		{
 			name:     "observer is a writer so can observe seq nums",
-			observer: cciptypes.GetP2pID(10),
+			observer: libocrtypes.PeerID{10},
 			msgs:     []cciptypes.CCIPMsgBaseDetails{},
 			seqNums: []cciptypes.SeqNumChain{
 				{ChainSel: 1, SeqNum: 12},
 			},
-			nodeSupportedChains: map[cciptypes.P2PID]cciptypes.SupportedChains{
-				cciptypes.GetP2pID(10): {Supported: mapset.NewSet[cciptypes.ChainSelector](1, 3)},
+			nodeSupportedChains: map[libocrtypes.PeerID]cciptypes.SupportedChains{
+				libocrtypes.PeerID{10}: {Supported: mapset.NewSet[cciptypes.ChainSelector](1, 3)},
 			},
 			destChain: 1,
 			expErr:    false,
 		},
 		{
 			name:     "observer is not a writer so cannot observe seq nums",
-			observer: cciptypes.GetP2pID(10),
+			observer: libocrtypes.PeerID{10},
 			msgs:     []cciptypes.CCIPMsgBaseDetails{},
 			seqNums: []cciptypes.SeqNumChain{
 				{ChainSel: 1, SeqNum: 12},
 			},
-			nodeSupportedChains: map[cciptypes.P2PID]cciptypes.SupportedChains{
-				cciptypes.GetP2pID(10): {Supported: mapset.NewSet[cciptypes.ChainSelector](3)},
+			nodeSupportedChains: map[libocrtypes.PeerID]cciptypes.SupportedChains{
+				libocrtypes.PeerID{10}: {Supported: mapset.NewSet[cciptypes.ChainSelector](3)},
 			},
 			destChain: 1,
 			expErr:    true,
 		},
 		{
 			name:     "observer cfg not found",
-			observer: cciptypes.GetP2pID(10),
+			observer: libocrtypes.PeerID{10},
 			msgs: []cciptypes.CCIPMsgBaseDetails{
 				{ID: cciptypes.Bytes32{1}, SourceChain: 1, SeqNum: 12},
 				{ID: cciptypes.Bytes32{3}, SourceChain: 2, SeqNum: 12},
 				{ID: cciptypes.Bytes32{1}, SourceChain: 3, SeqNum: 12},
 				{ID: cciptypes.Bytes32{2}, SourceChain: 3, SeqNum: 12},
 			},
-			nodeSupportedChains: map[cciptypes.P2PID]cciptypes.SupportedChains{
-				cciptypes.GetP2pID(20): {Supported: mapset.NewSet[cciptypes.ChainSelector](1, 3)}, // observer 10 not found
+			nodeSupportedChains: map[libocrtypes.PeerID]cciptypes.SupportedChains{
+				libocrtypes.PeerID{20}: {Supported: mapset.NewSet[cciptypes.ChainSelector](1, 3)}, // observer 10 not found
 			},
 			destChain: 1,
 			expErr:    true,
 		},
 		{
 			name:     "no msgs",
-			observer: cciptypes.GetP2pID(10),
+			observer: libocrtypes.PeerID{10},
 			msgs:     []cciptypes.CCIPMsgBaseDetails{},
-			nodeSupportedChains: map[cciptypes.P2PID]cciptypes.SupportedChains{
-				cciptypes.GetP2pID(10): {Supported: mapset.NewSet[cciptypes.ChainSelector](1, 3)},
+			nodeSupportedChains: map[libocrtypes.PeerID]cciptypes.SupportedChains{
+				libocrtypes.PeerID{10}: {Supported: mapset.NewSet[cciptypes.ChainSelector](1, 3)},
 			},
 			expErr: false,
 		},

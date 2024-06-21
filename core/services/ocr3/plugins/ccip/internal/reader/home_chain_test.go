@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	mapset "github.com/deckarep/golang-set/v2"
+	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
 	"github.com/smartcontractkit/ccipocr3/internal/mocks"
 
@@ -21,18 +22,18 @@ var (
 	chainB       = cciptypes.ChainSelector(2)
 	chainC       = cciptypes.ChainSelector(3)
 	oracleAId    = commontypes.OracleID(1)
-	p2pOracleAId = cciptypes.P2PID{byte(oracleAId)}
+	p2pOracleAId = libocrtypes.PeerID{byte(oracleAId)}
 	oracleBId    = commontypes.OracleID(2)
-	p2pOracleBId = cciptypes.P2PID{byte(oracleBId)}
+	p2pOracleBId = libocrtypes.PeerID{byte(oracleBId)}
 	oracleCId    = commontypes.OracleID(3)
-	p2pOracleCId = cciptypes.P2PID{byte(oracleCId)}
+	p2pOracleCId = libocrtypes.PeerID{byte(oracleCId)}
 )
 
 func Test_ConvertOnChainConfigToHomeChainConfig(t *testing.T) {
 	var tests = []struct {
 		name            string
 		onChainConfigs  []cciptypes.OnChainCapabilityConfig
-		homeChainConfig cciptypes.HomeChainConfig
+		homeChainConfig cciptypes.ChainConfig
 		expErr          string
 	}{
 		{
@@ -42,7 +43,7 @@ func Test_ConvertOnChainConfigToHomeChainConfig(t *testing.T) {
 					ChainSelector: chainA,
 					ChainConfig: cciptypes.OnChainConfig{
 						FChain: 1,
-						Readers: []cciptypes.P2PID{
+						Readers: []libocrtypes.PeerID{
 							p2pOracleAId,
 							p2pOracleBId,
 							p2pOracleCId,
@@ -54,7 +55,7 @@ func Test_ConvertOnChainConfigToHomeChainConfig(t *testing.T) {
 					ChainSelector: chainB,
 					ChainConfig: cciptypes.OnChainConfig{
 						FChain: 2,
-						Readers: []cciptypes.P2PID{
+						Readers: []libocrtypes.PeerID{
 							p2pOracleAId,
 							p2pOracleBId,
 						},
@@ -65,20 +66,20 @@ func Test_ConvertOnChainConfigToHomeChainConfig(t *testing.T) {
 					ChainSelector: chainC,
 					ChainConfig: cciptypes.OnChainConfig{
 						FChain: 3,
-						Readers: []cciptypes.P2PID{
+						Readers: []libocrtypes.PeerID{
 							p2pOracleCId,
 						},
 						Config: []byte{0},
 					},
 				},
 			},
-			homeChainConfig: cciptypes.HomeChainConfig{
+			homeChainConfig: cciptypes.ChainConfig{
 				FChain: map[cciptypes.ChainSelector]int{
 					chainA: 1,
 					chainB: 2,
 					chainC: 3,
 				},
-				NodeSupportedChains: map[cciptypes.P2PID]cciptypes.SupportedChains{
+				NodeSupportedChains: map[libocrtypes.PeerID]cciptypes.SupportedChains{
 					p2pOracleAId: {Supported: mapset.NewSet[cciptypes.ChainSelector](chainA, chainB)},
 					p2pOracleBId: {Supported: mapset.NewSet[cciptypes.ChainSelector](chainA, chainB)},
 					p2pOracleCId: {Supported: mapset.NewSet[cciptypes.ChainSelector](chainA, chainC)},
@@ -105,7 +106,7 @@ func Test_PollingWorking(t *testing.T) {
 			ChainSelector: chainA,
 			ChainConfig: cciptypes.OnChainConfig{
 				FChain: 1,
-				Readers: []cciptypes.P2PID{
+				Readers: []libocrtypes.PeerID{
 					p2pOracleAId,
 					p2pOracleBId,
 					p2pOracleCId,
@@ -117,7 +118,7 @@ func Test_PollingWorking(t *testing.T) {
 			ChainSelector: chainB,
 			ChainConfig: cciptypes.OnChainConfig{
 				FChain: 2,
-				Readers: []cciptypes.P2PID{
+				Readers: []libocrtypes.PeerID{
 					p2pOracleAId,
 					p2pOracleBId,
 				},
@@ -128,20 +129,20 @@ func Test_PollingWorking(t *testing.T) {
 			ChainSelector: chainC,
 			ChainConfig: cciptypes.OnChainConfig{
 				FChain: 3,
-				Readers: []cciptypes.P2PID{
+				Readers: []libocrtypes.PeerID{
 					p2pOracleCId,
 				},
 				Config: []byte{0},
 			},
 		},
 	}
-	homeChainConfig := cciptypes.HomeChainConfig{
+	homeChainConfig := cciptypes.ChainConfig{
 		FChain: map[cciptypes.ChainSelector]int{
 			chainA: 1,
 			chainB: 2,
 			chainC: 3,
 		},
-		NodeSupportedChains: map[cciptypes.P2PID]cciptypes.SupportedChains{
+		NodeSupportedChains: map[libocrtypes.PeerID]cciptypes.SupportedChains{
 			p2pOracleAId: {Supported: mapset.NewSet[cciptypes.ChainSelector](chainA, chainB)},
 			p2pOracleBId: {Supported: mapset.NewSet[cciptypes.ChainSelector](chainA, chainB)},
 			p2pOracleCId: {Supported: mapset.NewSet[cciptypes.ChainSelector](chainA, chainC)},

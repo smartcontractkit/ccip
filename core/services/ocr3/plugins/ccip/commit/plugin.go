@@ -10,6 +10,7 @@ import (
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
 	"github.com/smartcontractkit/ccipocr3/internal/libs/slicelib"
 
@@ -23,7 +24,7 @@ import (
 // NOTE: If you are changing core plugin logic, you should also update the commit plugin python spec.
 type Plugin struct {
 	nodeID            commontypes.OracleID
-	oracleIDToP2pID   map[commontypes.OracleID]cciptypes.P2PID
+	oracleIDToP2pID   map[commontypes.OracleID]libocrtypes.PeerID
 	cfg               cciptypes.CommitPluginConfig
 	ccipReader        cciptypes.CCIPReader
 	tokenPricesReader cciptypes.TokenPricesReader
@@ -37,7 +38,7 @@ type Plugin struct {
 func NewPlugin(
 	ctx context.Context,
 	nodeID commontypes.OracleID,
-	oracleIDToP2pID map[commontypes.OracleID]cciptypes.P2PID,
+	oracleIDToP2pID map[commontypes.OracleID]libocrtypes.PeerID,
 	cfg cciptypes.CommitPluginConfig,
 	ccipReader cciptypes.CCIPReader,
 	tokenPricesReader cciptypes.TokenPricesReader,
@@ -94,12 +95,10 @@ func (p *Plugin) Query(_ context.Context, _ ocr3types.OutcomeContext) (types.Que
 //	We discover the token prices only for the tokens that are used to pay for ccip fees.
 //	The fee tokens are configured in the plugin config.
 func (p *Plugin) Observation(ctx context.Context, outctx ocr3types.OutcomeContext, _ types.Query) (types.Observation, error) {
-	homeChainConfig := p.homeChainPoller.GetConfig()
-	p2pID, exists := p.oracleIDToP2pID[p.nodeID]
-	if !exists {
-		return types.Observation{}, fmt.Errorf("oracle ID %d not found in oracleIDToP2pID", p.nodeID)
+	supportedChains, err := p.supportedChains()
+	if err != nil {
+		return types.Observation{}, fmt.Errorf("error finding supported chains by node: %w", err)
 	}
-	supportedChains := homeChainConfig.GetSupportedChains(p2pID)
 
 	msgBaseDetails := make([]cciptypes.CCIPMsgBaseDetails, 0)
 	latestCommittedSeqNumsObservation, err := observeLatestCommittedSeqNums(ctx, p.lggr, p.ccipReader, supportedChains, p.cfg.DestChain, p.knownSourceChainsSlice())
@@ -125,16 +124,14 @@ func (p *Plugin) Observation(ctx context.Context, outctx ocr3types.OutcomeContex
 	if err != nil {
 		return types.Observation{}, fmt.Errorf("observe gas prices: %w", err)
 	}
-	consensusObservation := cciptypes.ConsensusObservation{
-		FChain:              homeChainConfig.FChain,
-		PricedTokens:        p.cfg.PricedTokens,
-		NodeSupportedChains: homeChainConfig.NodeSupportedChains,
-	}
+
+	fChain := p.homeChainPoller.GetFChain()
+
 	// If there's no previous outcome (first round ever), we only observe the latest committed sequence numbers.
 	// and on the next round we use those to look for messages.
 	if outctx.PreviousOutcome == nil {
 		p.lggr.Debugw("first round ever, can't observe new messages yet")
-		return cciptypes.NewCommitPluginObservation(msgBaseDetails, gasPrices, tokenPrices, latestCommittedSeqNumsObservation, consensusObservation).Encode()
+		return cciptypes.NewCommitPluginObservation(msgBaseDetails, gasPrices, tokenPrices, latestCommittedSeqNumsObservation, fChain).Encode()
 	}
 
 	prevOutcome, err := cciptypes.DecodeCommitPluginOutcome(outctx.PreviousOutcome)
@@ -162,13 +159,13 @@ func (p *Plugin) Observation(ctx context.Context, outctx ocr3types.OutcomeContex
 		"gasPrices", len(gasPrices),
 		"tokenPrices", len(tokenPrices),
 		"latestCommittedSeqNums", latestCommittedSeqNumsObservation,
-		"nodeSupportedChains", homeChainConfig.NodeSupportedChains)
+		"fChain", fChain)
 
 	for _, msg := range newMsgs {
 		msgBaseDetails = append(msgBaseDetails, msg.CCIPMsgBaseDetails)
 	}
 
-	return cciptypes.NewCommitPluginObservation(msgBaseDetails, gasPrices, tokenPrices, latestCommittedSeqNumsObservation, consensusObservation).Encode()
+	return cciptypes.NewCommitPluginObservation(msgBaseDetails, gasPrices, tokenPrices, latestCommittedSeqNumsObservation, fChain).Encode()
 
 }
 
@@ -182,14 +179,12 @@ func (p *Plugin) ValidateObservation(_ ocr3types.OutcomeContext, _ types.Query, 
 		return fmt.Errorf("validate sequence numbers: %w", err)
 	}
 
-	homeChainConfig := p.homeChainPoller.GetConfig()
-
-	p2pID, exists := p.oracleIDToP2pID[ao.Observer]
-	if !exists {
-		return fmt.Errorf("oracle ID %d not found in oracleIDToP2pID", ao.Observer)
+	supportedChains, err := p.supportedChains()
+	if err != nil {
+		return fmt.Errorf("error finding supported chains by node: %w", err)
 	}
 
-	if err := validateObserverReadingEligibility(p2pID, obs.NewMsgs, obs.MaxSeqNums, homeChainConfig.NodeSupportedChains, p.cfg.DestChain); err != nil {
+	if err := validateObserverReadingEligibility(obs.NewMsgs, obs.MaxSeqNums, supportedChains, p.cfg.DestChain); err != nil {
 		return fmt.Errorf("validate observer %d reading eligibility: %w", ao.Observer, err)
 	}
 
@@ -199,10 +194,6 @@ func (p *Plugin) ValidateObservation(_ ocr3types.OutcomeContext, _ types.Query, 
 
 	if err := validateObservedGasPrices(obs.GasPrices); err != nil {
 		return fmt.Errorf("validate gas prices: %w", err)
-	}
-
-	if err := obs.ConsensusObservation.Validate(); err != nil {
-		return fmt.Errorf("validate consensus observation: %w", err)
 	}
 
 	return nil
@@ -229,14 +220,9 @@ func (p *Plugin) Outcome(_ ocr3types.OutcomeContext, _ types.Query, aos []types.
 		decodedObservations = append(decodedObservations, obs)
 	}
 
-	consensusCfg := pluginConfigConsensus(p.cfg.DestChain, decodedObservations)
-	p.lggr.Debugw("plugin config follower state", "pluginConfig", p.cfg)
-	p.lggr.Debugw("plugin config after consensus", "pluginConfig", consensusCfg)
-	if err := consensusCfg.Validate(); err != nil {
-		return ocr3types.Outcome{}, fmt.Errorf("no consensus on plugin config: %w", err)
-	}
+	fChains := fChainConsensus(decodedObservations)
 
-	fChainDest, ok := consensusCfg.FChain[p.cfg.DestChain]
+	fChainDest, ok := fChains[p.cfg.DestChain]
 	if !ok {
 		return ocr3types.Outcome{}, fmt.Errorf("missing destination chain %d in fChain config", p.cfg.DestChain)
 	}
@@ -244,7 +230,7 @@ func (p *Plugin) Outcome(_ ocr3types.OutcomeContext, _ types.Query, aos []types.
 	maxSeqNums := maxSeqNumsConsensus(p.lggr, fChainDest, decodedObservations)
 	p.lggr.Debugw("max sequence numbers consensus", "maxSeqNumsConsensus", maxSeqNums)
 
-	merkleRoots, err := newMsgsConsensus(p.lggr, maxSeqNums, decodedObservations, consensusCfg.FChain)
+	merkleRoots, err := newMsgsConsensus(p.lggr, maxSeqNums, decodedObservations, fChains)
 	if err != nil {
 		return ocr3types.Outcome{}, fmt.Errorf("new messages consensus: %w", err)
 	}
@@ -306,8 +292,11 @@ func (p *Plugin) ShouldAcceptAttestedReport(ctx context.Context, u uint64, r ocr
 }
 
 func (p *Plugin) ShouldTransmitAcceptedReport(ctx context.Context, u uint64, r ocr3types.ReportWithInfo[[]byte]) (bool, error) {
-	homeChainConfig := p.homeChainPoller.GetConfig()
-	if !homeChainConfig.IsSupported(p.oracleIDToP2pID[p.nodeID], p.cfg.DestChain) {
+	isWriter, err := p.supportsDestChain()
+	if err != nil {
+		return false, fmt.Errorf("can't know if it's a writer: %w", err)
+	}
+	if !isWriter {
 		p.lggr.Debugw("not a writer, skipping report transmission")
 		return false, nil
 	}
@@ -338,16 +327,35 @@ func (p *Plugin) Close() error {
 	return nil
 }
 
-// TODO: Have a knownSourceChains field in HomeChainConfig that gets updated in the background as well
 func (p *Plugin) knownSourceChainsSlice() []cciptypes.ChainSelector {
-	knownSourceChains := mapset.NewSet[cciptypes.ChainSelector]()
-	homeChainConfig := p.homeChainPoller.GetConfig()
-	for _, inf := range homeChainConfig.NodeSupportedChains {
-		knownSourceChains = knownSourceChains.Union(inf.Supported)
-	}
-	knownSourceChainsSlice := knownSourceChains.ToSlice()
+	knownSourceChainsSlice := p.homeChainPoller.GetKnownChains().ToSlice()
 	sort.Slice(knownSourceChainsSlice, func(i, j int) bool { return knownSourceChainsSlice[i] < knownSourceChainsSlice[j] })
 	return slicelib.Filter(knownSourceChainsSlice, func(ch cciptypes.ChainSelector) bool { return ch != p.cfg.DestChain })
+}
+
+func (p *Plugin) supportedChains() (mapset.Set[cciptypes.ChainSelector], error) {
+	p2pID, exists := p.oracleIDToP2pID[p.nodeID]
+	if !exists {
+		return nil, fmt.Errorf("oracle ID %d not found in oracleIDToP2pID", p.nodeID)
+	}
+	supportedChains := p.homeChainPoller.GetSupportedChains(p2pID)
+	return supportedChains, nil
+}
+
+func (p *Plugin) getChainConfig() (cciptypes.ChainConfig, error) {
+	cfg, err := p.homeChainPoller.GetChainConfig(p.cfg.DestChain)
+	if err != nil {
+		return cciptypes.ChainConfig{}, fmt.Errorf("get chain config: %w", err)
+	}
+	return cfg, nil
+}
+
+func (p *Plugin) supportsDestChain() (bool, error) {
+	destChainConfig, err := p.getChainConfig()
+	if err != nil {
+		return false, fmt.Errorf("error getting chain config: %w", err)
+	}
+	return destChainConfig.SupportedNodes.Contains(p.oracleIDToP2pID[p.nodeID]), nil
 }
 
 // Interface compatibility checks.

@@ -8,6 +8,8 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"google.golang.org/grpc"
 
+	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 )
 
@@ -45,7 +47,7 @@ func NewPluginFactory() *PluginFactory {
 
 func (p PluginFactory) NewReportingPlugin(config ocr3types.ReportingPluginConfig,
 ) (ocr3types.ReportingPlugin[[]byte], ocr3types.ReportingPluginInfo, error) {
-	var oracleIDToP2pID map[commontypes.OracleID]cciptypes.P2PID // TODO: Get this from ocr config, it's the mapping of the oracleId index in the DON https://docs.google.com/document/d/1nyGUeterqc9P4ztGmoy2EZCWQzxS5scJ_fQQJyCId7s/edit?disco=AAABLcXrUnA
+	var oracleIDToP2pID map[commontypes.OracleID]libocrtypes.PeerID // TODO: Get this from ocr config, it's the mapping of the oracleId index in the DON https://docs.google.com/document/d/1nyGUeterqc9P4ztGmoy2EZCWQzxS5scJ_fQQJyCId7s/edit?disco=AAABLcXrUnA
 	//TODO: Make sure that the oracleIDToP2pID map contains config.OracleID
 	return NewPlugin(
 		context.Background(),

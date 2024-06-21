@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
 	"github.com/stretchr/testify/require"
 
 	"github.com/stretchr/testify/assert"
@@ -191,12 +192,12 @@ func setupEmptyOutcome(ctx context.Context, t *testing.T, lggr logger.Logger) []
 		NewMsgScanBatchSize: 256,
 	}
 
-	homeChainConfig := cciptypes.HomeChainConfig{
+	homeChainConfig := cciptypes.ChainConfig{
 		FChain: map[cciptypes.ChainSelector]int{chainC: 1},
-		NodeSupportedChains: map[cciptypes.P2PID]cciptypes.SupportedChains{
-			cciptypes.GetP2pID(1): {Supported: mapset.NewSet[cciptypes.ChainSelector]()},
-			cciptypes.GetP2pID(2): {Supported: mapset.NewSet[cciptypes.ChainSelector]()},
-			cciptypes.GetP2pID(3): {Supported: mapset.NewSet[cciptypes.ChainSelector]()},
+		NodeSupportedChains: map[libocrtypes.PeerID]cciptypes.SupportedChains{
+			libocrtypes.PeerID{1}: {Supported: mapset.NewSet[cciptypes.ChainSelector]()},
+			libocrtypes.PeerID{2}: {Supported: mapset.NewSet[cciptypes.ChainSelector]()},
+			libocrtypes.PeerID{3}: {Supported: mapset.NewSet[cciptypes.ChainSelector]()},
 		},
 	}
 
@@ -216,16 +217,16 @@ func setupAllNodesReadAllChains(ctx context.Context, t *testing.T, lggr logger.L
 		NewMsgScanBatchSize: 256,
 	}
 
-	homeChainConfig := cciptypes.HomeChainConfig{
+	homeChainConfig := cciptypes.ChainConfig{
 		FChain: map[cciptypes.ChainSelector]int{
 			chainA: 1,
 			chainB: 1,
 			chainC: 1,
 		},
-		NodeSupportedChains: map[cciptypes.P2PID]cciptypes.SupportedChains{
-			cciptypes.GetP2pID(1): {Supported: mapset.NewSet[cciptypes.ChainSelector](chainA, chainB, chainC)},
-			cciptypes.GetP2pID(2): {Supported: mapset.NewSet[cciptypes.ChainSelector](chainA, chainB, chainC)},
-			cciptypes.GetP2pID(3): {Supported: mapset.NewSet[cciptypes.ChainSelector](chainA, chainB, chainC)},
+		NodeSupportedChains: map[libocrtypes.PeerID]cciptypes.SupportedChains{
+			libocrtypes.PeerID{1}: {Supported: mapset.NewSet[cciptypes.ChainSelector](chainA, chainB, chainC)},
+			libocrtypes.PeerID{2}: {Supported: mapset.NewSet[cciptypes.ChainSelector](chainA, chainB, chainC)},
+			libocrtypes.PeerID{3}: {Supported: mapset.NewSet[cciptypes.ChainSelector](chainA, chainB, chainC)},
 		},
 	}
 	oracleIDToP2pID := GetP2pIDs(1, 2, 3)
@@ -277,16 +278,16 @@ func setupNodesDoNotAgreeOnMsgs(ctx context.Context, t *testing.T, lggr logger.L
 		NewMsgScanBatchSize: 256,
 	}
 
-	homeChainConfig := cciptypes.HomeChainConfig{
+	homeChainConfig := cciptypes.ChainConfig{
 		FChain: map[cciptypes.ChainSelector]int{
 			chainA: 1,
 			chainB: 1,
 			chainC: 1,
 		},
-		NodeSupportedChains: map[cciptypes.P2PID]cciptypes.SupportedChains{
-			cciptypes.GetP2pID(1): {Supported: mapset.NewSet[cciptypes.ChainSelector](chainA, chainB, chainC)},
-			cciptypes.GetP2pID(2): {Supported: mapset.NewSet[cciptypes.ChainSelector](chainA, chainB, chainC)},
-			cciptypes.GetP2pID(3): {Supported: mapset.NewSet[cciptypes.ChainSelector](chainA, chainB, chainC)},
+		NodeSupportedChains: map[libocrtypes.PeerID]cciptypes.SupportedChains{
+			libocrtypes.PeerID{1}: {Supported: mapset.NewSet[cciptypes.ChainSelector](chainA, chainB, chainC)},
+			libocrtypes.PeerID{2}: {Supported: mapset.NewSet[cciptypes.ChainSelector](chainA, chainB, chainC)},
+			libocrtypes.PeerID{3}: {Supported: mapset.NewSet[cciptypes.ChainSelector](chainA, chainB, chainC)},
 		},
 	}
 
@@ -341,7 +342,7 @@ type nodeSetup struct {
 	msgHasher   *mocks.MessageHasher
 }
 
-func newNode(ctx context.Context, t *testing.T, lggr logger.Logger, id int, cfg cciptypes.CommitPluginConfig, homeChainConfig cciptypes.HomeChainConfig, oracleIDToP2pID map[commontypes.OracleID]cciptypes.P2PID) nodeSetup {
+func newNode(ctx context.Context, t *testing.T, lggr logger.Logger, id int, cfg cciptypes.CommitPluginConfig, homeChainConfig cciptypes.ChainConfig, oracleIDToP2pID map[commontypes.OracleID]libocrtypes.PeerID) nodeSetup {
 	ccipReader := mocks.NewCCIPReader()
 	priceReader := mocks.NewTokenPricesReader()
 	reportCodec := mocks.NewCommitPluginJSONReportCodec()
@@ -372,10 +373,10 @@ func newNode(ctx context.Context, t *testing.T, lggr logger.Logger, id int, cfg 
 		msgHasher:   msgHasher,
 	}
 }
-func GetP2pIDs(ids ...int) map[commontypes.OracleID]cciptypes.P2PID {
-	res := make(map[commontypes.OracleID]cciptypes.P2PID)
+func GetP2pIDs(ids ...int) map[commontypes.OracleID]libocrtypes.PeerID {
+	res := make(map[commontypes.OracleID]libocrtypes.PeerID)
 	for _, id := range ids {
-		res[commontypes.OracleID(id)] = cciptypes.GetP2pID(id)
+		res[commontypes.OracleID(id)] = libocrtypes.PeerID{byte(id)}
 	}
 	return res
 }
