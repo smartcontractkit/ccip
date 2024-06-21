@@ -346,10 +346,7 @@ func setupNodesDoNotAgreeOnMsgs(ctx context.Context, t *testing.T, lggr logger.L
 	}
 
 	homeChainPoller := setupHomeChainPoller(lggr, chainConfigInfos)
-	err := homeChainPoller.Start(ctx)
-	if err != nil {
-		return nil
-	}
+	_ = homeChainPoller.Start(ctx)
 	oracleIDToP2pID := GetP2pIDs(1, 2, 3)
 	n1 := newNode(ctx, t, lggr, 1, cfg, homeChainPoller, oracleIDToP2pID)
 	n2 := newNode(ctx, t, lggr, 2, cfg, homeChainPoller, oracleIDToP2pID)

@@ -9,6 +9,7 @@ import (
 
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
@@ -23,11 +24,13 @@ type HomeChainConfigPoller struct {
 	// set of chains that are known to CCIP, derived from chainConfigs
 	knownSourceChains mapset.Set[cciptypes.ChainSelector]
 	// map of chain to FChain value, derived from chainConfigs
-	fChain           map[cciptypes.ChainSelector]int
-	lggr             logger.Logger
-	mutex            *sync.RWMutex
-	backgroundCancel context.CancelFunc
-	backgroundCtx    context.Context
+	fChain map[cciptypes.ChainSelector]int
+	lggr   logger.Logger
+	mutex  *sync.RWMutex
+
+	stopCh services.StopChan
+	services.StateMachine
+
 	// How frequent will the poller fetch the chain configs
 	pollingInterval time.Duration
 }
@@ -37,8 +40,8 @@ func NewHomeChainConfigPoller(
 	lggr logger.Logger,
 	pollingInterval time.Duration,
 ) *HomeChainConfigPoller {
-	ctx, cancel := context.WithCancel(context.Background())
 	return &HomeChainConfigPoller{
+		stopCh:              make(chan struct{}),
 		homeChainReader:     homeChainReader,
 		lggr:                lggr,
 		chainConfigs:        map[cciptypes.ChainSelector]cciptypes.ChainConfig{},
@@ -46,40 +49,26 @@ func NewHomeChainConfigPoller(
 		nodeSupportedChains: map[libocrtypes.PeerID]mapset.Set[cciptypes.ChainSelector]{},
 		knownSourceChains:   mapset.NewSet[cciptypes.ChainSelector](),
 		fChain:              map[cciptypes.ChainSelector]int{},
-		backgroundCancel:    cancel,
-		backgroundCtx:       ctx,
 		pollingInterval:     pollingInterval,
 	}
 }
 
 func (r *HomeChainConfigPoller) Start(ctx context.Context) error {
-	r.mutex.Lock()
-	if r.backgroundCancel != nil {
-		r.lggr.Errorw("Polling already started")
-		// We don't want to return an actual error here as it's already working as expected
-		r.mutex.Unlock()
-		return fmt.Errorf("polling already started")
-	}
-	if r.backgroundCtx == nil {
-		return fmt.Errorf("backgroundCtx not set")
-	}
-	//bgCtx, cancelFunc := context.WithCancel(context.Background())
-	//r.backgroundCancel = cancelFunc
-	r.mutex.Unlock()
-
-	err := r.fetchAndSetConfigs(r.backgroundCtx)
+	err := r.fetchAndSetConfigs(ctx)
 	if err != nil {
 		r.lggr.Errorw("Initial fetch of on-chain configs failed", "err", err)
 		return fmt.Errorf("initial fetch of on-chain configs failed")
 	}
-
 	r.lggr.Infow("Start Polling ChainConfig")
-	go r.poll(r.backgroundCtx)
-	//go r.poll(bgCtx)
-	return nil
+	return r.StartOnce(r.Name(), func() error {
+		go r.poll()
+		return nil
+	})
 }
 
-func (r *HomeChainConfigPoller) poll(ctx context.Context) {
+func (r *HomeChainConfigPoller) poll() {
+	ctx, cancel := r.stopCh.NewCtx()
+	defer cancel()
 	ticker := time.NewTicker(r.pollingInterval * time.Second)
 	defer ticker.Stop()
 	for {
@@ -140,7 +129,7 @@ func (r *HomeChainConfigPoller) GetAllChainConfigs() (map[cciptypes.ChainSelecto
 
 }
 
-func (r *HomeChainConfigPoller) GetSupportedChains(id libocrtypes.PeerID) (mapset.Set[cciptypes.ChainSelector], error) {
+func (r *HomeChainConfigPoller) GetSupportedChainsForPeer(id libocrtypes.PeerID) (mapset.Set[cciptypes.ChainSelector], error) {
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
 	if _, ok := r.nodeSupportedChains[id]; !ok {
@@ -149,7 +138,7 @@ func (r *HomeChainConfigPoller) GetSupportedChains(id libocrtypes.PeerID) (mapse
 	return r.nodeSupportedChains[id], nil
 }
 
-func (r *HomeChainConfigPoller) GetKnownChains() (mapset.Set[cciptypes.ChainSelector], error) {
+func (r *HomeChainConfigPoller) GetKnownCCIPChains() (mapset.Set[cciptypes.ChainSelector], error) {
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
 	knownSourceChains := mapset.NewSet[cciptypes.ChainSelector]()
@@ -173,13 +162,10 @@ func (r *HomeChainConfigPoller) GetFChain() (map[cciptypes.ChainSelector]int, er
 }
 
 func (r *HomeChainConfigPoller) Close() error {
-	r.mutex.Lock()
-	defer r.mutex.Unlock()
-	if r.backgroundCancel == nil {
-		return errors.New("cancel function not set")
-	}
-	r.backgroundCancel()
-	return nil
+	return r.StopOnce(r.Name(), func() error {
+		close(r.stopCh)
+		return nil
+	})
 }
 
 func (r *HomeChainConfigPoller) Ready() error {

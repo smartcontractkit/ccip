@@ -325,7 +325,7 @@ func (p *Plugin) Close() error {
 }
 
 func (p *Plugin) knownSourceChainsSlice() []cciptypes.ChainSelector {
-	knownSourceChains, err := p.homeChainPoller.GetKnownChains()
+	knownSourceChains, err := p.homeChainPoller.GetKnownCCIPChains()
 	if err != nil {
 		p.lggr.Errorw("error getting known chains", "err", err)
 		return nil
@@ -340,7 +340,7 @@ func (p *Plugin) supportedChains() (mapset.Set[cciptypes.ChainSelector], error) 
 	if !exists {
 		return nil, fmt.Errorf("oracle ID %d not found in oracleIDToP2pID", p.nodeID)
 	}
-	supportedChains, err := p.homeChainPoller.GetSupportedChains(p2pID)
+	supportedChains, err := p.homeChainPoller.GetSupportedChainsForPeer(p2pID)
 	if err != nil {
 		return nil, fmt.Errorf("get supported chains: %w", err)
 	}
