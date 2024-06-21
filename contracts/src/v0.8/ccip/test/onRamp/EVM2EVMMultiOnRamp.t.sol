@@ -424,14 +424,14 @@ contract EVM2EVMMultiOnRamp_forwardFromRouter is EVM2EVMMultiOnRampSetup {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
 
     for (uint64 i = 1; i < 4; ++i) {
-      uint64 nonceBefore = s_nonceManager.getOutboundNonce(DEST_CHAIN_SELECTOR, abi.encode(OWNER));
+      uint64 nonceBefore = s_nonceManager.getOutboundNonce(DEST_CHAIN_SELECTOR, OWNER);
 
       vm.expectEmit();
       emit EVM2EVMMultiOnRamp.CCIPSendRequested(DEST_CHAIN_SELECTOR, _messageToEvent(message, i, i, 0, OWNER));
 
       s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 0, OWNER);
 
-      uint64 nonceAfter = s_nonceManager.getOutboundNonce(DEST_CHAIN_SELECTOR, abi.encode(OWNER));
+      uint64 nonceAfter = s_nonceManager.getOutboundNonce(DEST_CHAIN_SELECTOR, OWNER);
       assertEq(nonceAfter, nonceBefore + 1);
     }
   }

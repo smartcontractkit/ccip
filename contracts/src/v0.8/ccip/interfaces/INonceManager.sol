@@ -5,7 +5,7 @@ pragma solidity ^0.8.0;
 interface INonceManager {
   /// @notice Increments the outbound nonce for the given sender on the given destination chain
   /// @param destChainSelector The destination chain selector
-  /// @param sender The encoded sender address
+  /// @param sender The sender address
   /// @return The new outbound nonce
-  function getIncrementedOutboundNonce(uint64 destChainSelector, bytes calldata sender) external returns (uint64);
+  function getIncrementedOutboundNonce(uint64 destChainSelector, address sender) external returns (uint64);
 }

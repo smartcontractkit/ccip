@@ -29,7 +29,7 @@ contract NonceManager is INonceManager, AuthorizedCallers {
   /// @dev previous ramps
   mapping(uint64 chainSelector => PreviousRamps previousRamps) private s_previousRamps;
   /// @dev The current outbound nonce per sender used on the onramp
-  mapping(uint64 destChainSelector => mapping(bytes sender => uint64 outboundNonce)) private s_outboundNonces;
+  mapping(uint64 destChainSelector => mapping(address sender => uint64 outboundNonce)) private s_outboundNonces;
   /// @dev The current inbound nonce per sender used on the offramp
   mapping(uint64 sourceChainSelector => mapping(bytes sender => uint64 inboundNonce)) private s_inboundNonces;
 
@@ -38,7 +38,7 @@ contract NonceManager is INonceManager, AuthorizedCallers {
   /// @inheritdoc INonceManager
   function getIncrementedOutboundNonce(
     uint64 destChainSelector,
-    bytes calldata sender
+    address sender
   ) external onlyAuthorizedCallers returns (uint64) {
     uint64 outboundNonce = _getOutboundNonce(destChainSelector, sender) + 1;
     s_outboundNonces[destChainSelector][sender] = outboundNonce;
@@ -50,19 +50,19 @@ contract NonceManager is INonceManager, AuthorizedCallers {
 
   /// @notice Returns the outbound nonce for the given sender on the given destination chain
   /// @param destChainSelector The destination chain selector
-  /// @param sender The encoded sender address
+  /// @param sender The sender address
   /// @return The outbound nonce
-  function getOutboundNonce(uint64 destChainSelector, bytes calldata sender) external view returns (uint64) {
+  function getOutboundNonce(uint64 destChainSelector, address sender) external view returns (uint64) {
     return _getOutboundNonce(destChainSelector, sender);
   }
 
-  function _getOutboundNonce(uint64 destChainSelector, bytes calldata sender) private view returns (uint64) {
+  function _getOutboundNonce(uint64 destChainSelector, address sender) private view returns (uint64) {
     uint64 outboundNonce = s_outboundNonces[destChainSelector][sender];
 
     if (outboundNonce == 0) {
       address prevOnRamp = s_previousRamps[destChainSelector].prevOnRamp;
       if (prevOnRamp != address(0)) {
-        return IEVM2AnyOnRamp(prevOnRamp).getSenderNonce(abi.decode(sender, (address)));
+        return IEVM2AnyOnRamp(prevOnRamp).getSenderNonce(sender);
       }
     }
 

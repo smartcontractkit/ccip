@@ -15,7 +15,7 @@ import {EVM2EVMMultiOnRampSetup} from "./onRamp/EVM2EVMMultiOnRampSetup.t.sol";
 contract NonceManagerTest_getIncrementedOutboundNonce is EVM2EVMMultiOnRampSetup {
   function test_getIncrementedOutboundNonce_Success() public {
     vm.startPrank(address(s_onRamp));
-    bytes memory sender = abi.encode(address(this));
+    address sender = address(this);
 
     assertEq(s_nonceManager.getOutboundNonce(DEST_CHAIN_SELECTOR, sender), 0);
 
@@ -172,24 +172,24 @@ contract NonceManager_onRampUpgrade is EVM2EVMMultiOnRampSetup {
 
   function test_UpgradeSenderNoncesReadsPreviousRamp_Success() public {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
-    uint64 startNonce = s_nonceManager.getOutboundNonce(DEST_CHAIN_SELECTOR, abi.encode(OWNER));
+    uint64 startNonce = s_nonceManager.getOutboundNonce(DEST_CHAIN_SELECTOR, OWNER);
 
     for (uint64 i = 1; i < 4; ++i) {
       s_prevOnRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 0, OWNER);
 
-      assertEq(startNonce + i, s_nonceManager.getOutboundNonce(DEST_CHAIN_SELECTOR, abi.encode(OWNER)));
+      assertEq(startNonce + i, s_nonceManager.getOutboundNonce(DEST_CHAIN_SELECTOR, OWNER));
     }
   }
 
   function test_UpgradeNonceStartsAtV1Nonce_Success() public {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
 
-    uint64 startNonce = s_nonceManager.getOutboundNonce(DEST_CHAIN_SELECTOR, abi.encode(OWNER));
+    uint64 startNonce = s_nonceManager.getOutboundNonce(DEST_CHAIN_SELECTOR, OWNER);
 
     // send 1 message from previous onramp
     s_prevOnRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, FEE_AMOUNT, OWNER);
 
-    assertEq(startNonce + 1, s_nonceManager.getOutboundNonce(DEST_CHAIN_SELECTOR, abi.encode(OWNER)));
+    assertEq(startNonce + 1, s_nonceManager.getOutboundNonce(DEST_CHAIN_SELECTOR, OWNER));
 
     // new onramp nonce should start from 2, while sequence number start from 1
     vm.expectEmit();
@@ -198,7 +198,7 @@ contract NonceManager_onRampUpgrade is EVM2EVMMultiOnRampSetup {
     );
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, FEE_AMOUNT, OWNER);
 
-    assertEq(startNonce + 2, s_nonceManager.getOutboundNonce(DEST_CHAIN_SELECTOR, abi.encode(OWNER)));
+    assertEq(startNonce + 2, s_nonceManager.getOutboundNonce(DEST_CHAIN_SELECTOR, OWNER));
 
     // after another send, nonce should be 3, and sequence number be 2
     vm.expectEmit();
@@ -207,7 +207,7 @@ contract NonceManager_onRampUpgrade is EVM2EVMMultiOnRampSetup {
     );
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, FEE_AMOUNT, OWNER);
 
-    assertEq(startNonce + 3, s_nonceManager.getOutboundNonce(DEST_CHAIN_SELECTOR, abi.encode(OWNER)));
+    assertEq(startNonce + 3, s_nonceManager.getOutboundNonce(DEST_CHAIN_SELECTOR, OWNER));
   }
 
   function test_UpgradeNonceNewSenderStartsAtZero_Success() public {
