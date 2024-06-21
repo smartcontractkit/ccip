@@ -7516,8 +7516,8 @@ Mode = 'BlockHistory' # Default
 PriceDefault = '20 gwei' # Default
 PriceMax = '115792089237316195423570985008687907853269984665.640564039457584007913129639935 tether' # Default
 PriceMin = '1 gwei' # Default
-LimitDefault = 8000000 # Default
-LimitMax = 8000000 # Default
+LimitDefault = 8_000_000 # Default
+LimitMax = 8_000_000 # Default
 LimitMultiplier = '1.0' # Default
 LimitTransfer = 21_000 # Default
 BumpMin = '5 gwei' # Default
@@ -7589,14 +7589,14 @@ Mode = 'FixedPrice'
 
 ### LimitDefault
 ```toml
-LimitDefault = 8000000 # Default
+LimitDefault = 8_000_000 # Default
 ```
 LimitDefault sets default gas limit for outgoing transactions. This should not need to be changed in most cases.
 Some job types, such as Keeper jobs, might set their own gas limit unrelated to this value.
 
 ### LimitMax
 ```toml
-LimitMax = 8000000 # Default
+LimitMax = 8_000_000 # Default
 ```
 LimitMax sets a maximum for _estimated_ gas limits. This currently only applies to `Arbitrum` `GasEstimatorMode`.
 
