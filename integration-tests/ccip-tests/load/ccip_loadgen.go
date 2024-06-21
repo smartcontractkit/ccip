@@ -293,20 +293,22 @@ func (c *CCIPE2ELoad) Call(_ *wasp.Generator) *wasp.Response {
 		res.Data = stats.StatusByPhase
 		return res
 	}
+	if rcpt == nil {
+		res.Error = "ccip-send request tx not mined, receipt is nil"
+		res.Failed = true
+		res.Data = stats.StatusByPhase
+		return res
+	}
 	hdr, err := c.Lane.Source.Common.ChainClient.HeaderByNumber(context.Background(), rcpt.BlockNumber)
-	if err == nil {
+	if err == nil && hdr != nil {
 		txConfirmationTime = hdr.Timestamp
 	}
 	lggr = lggr.With().Str("Msg Tx", sendTx.Hash().String()).Logger()
-	var gasUsed uint64
-	if rcpt != nil {
-		gasUsed = rcpt.GasUsed
-	}
 	if rcpt.Status != types.ReceiptStatusSuccessful {
 		stats.UpdateState(&lggr, 0, testreporters.TX, txConfirmationTime.Sub(startTime), testreporters.Failure,
 			testreporters.TransactionStats{
 				Fee:                fee.String(),
-				GasUsed:            gasUsed,
+				GasUsed:            rcpt.GasUsed,
 				TxHash:             sendTx.Hash().Hex(),
 				NoOfTokensSent:     len(msg.TokenAmounts),
 				MessageBytesLength: int64(len(msg.Data)),
@@ -323,7 +325,7 @@ func (c *CCIPE2ELoad) Call(_ *wasp.Generator) *wasp.Response {
 	stats.UpdateState(&lggr, 0, testreporters.TX, txConfirmationTime.Sub(startTime), testreporters.Success,
 		testreporters.TransactionStats{
 			Fee:                fee.String(),
-			GasUsed:            gasUsed,
+			GasUsed:            rcpt.GasUsed,
 			TxHash:             sendTx.Hash().Hex(),
 			NoOfTokensSent:     len(msg.TokenAmounts),
 			MessageBytesLength: int64(len(msg.Data)),
