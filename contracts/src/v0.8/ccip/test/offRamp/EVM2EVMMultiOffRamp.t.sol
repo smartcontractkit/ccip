@@ -2,7 +2,7 @@
 pragma solidity 0.8.24;
 
 import {ICommitStore} from "../../interfaces/ICommitStore.sol";
-
+import {IMessageInterceptor} from "../../interfaces/IMessageInterceptor.sol";
 import {IPoolV1} from "../../interfaces/IPool.sol";
 import {IPriceRegistry} from "../../interfaces/IPriceRegistry.sol";
 import {IRMN} from "../../interfaces/IRMN.sol";
@@ -11,7 +11,6 @@ import {CallWithExactGas} from "../../../shared/call/CallWithExactGas.sol";
 import {PriceRegistry} from "../../PriceRegistry.sol";
 import {RMN} from "../../RMN.sol";
 import {Router} from "../../Router.sol";
-import {IMessageInterceptor} from "../../interfaces/IMessageInterceptor.sol";
 import {Client} from "../../libraries/Client.sol";
 import {Internal} from "../../libraries/Internal.sol";
 import {MerkleMultiProof} from "../../libraries/MerkleMultiProof.sol";
@@ -1314,9 +1313,7 @@ contract EVM2EVMMultiOffRamp_executeSingleMessage is EVM2EVMMultiOffRampSetup {
     vm.expectRevert(
       abi.encodeWithSelector(
         IMessageInterceptor.MessageValidationError.selector,
-        abi.encodeWithSelector(
-          MessageInterceptorHelper.IncomingMessageValidationError.selector, bytes("Invalid message")
-        )
+        abi.encodeWithSelector(IMessageInterceptor.MessageValidationError.selector, bytes("Invalid message"))
       )
     );
     s_offRamp.executeSingleMessage(message, new bytes[](message.tokenAmounts.length));
@@ -1340,9 +1337,7 @@ contract EVM2EVMMultiOffRamp_executeSingleMessage is EVM2EVMMultiOffRampSetup {
     vm.expectRevert(
       abi.encodeWithSelector(
         IMessageInterceptor.MessageValidationError.selector,
-        abi.encodeWithSelector(
-          MessageInterceptorHelper.IncomingMessageValidationError.selector, bytes("Invalid message")
-        )
+        abi.encodeWithSelector(IMessageInterceptor.MessageValidationError.selector, bytes("Invalid message"))
       )
     );
     s_offRamp.executeSingleMessage(message, new bytes[](message.tokenAmounts.length));
@@ -2090,9 +2085,7 @@ contract EVM2EVMMultiOffRamp_reportExec is EVM2EVMMultiOffRampSetup {
       Internal.MessageExecutionState.FAILURE,
       abi.encodeWithSelector(
         IMessageInterceptor.MessageValidationError.selector,
-        abi.encodeWithSelector(
-          MessageInterceptorHelper.IncomingMessageValidationError.selector, bytes("Invalid message")
-        )
+        abi.encodeWithSelector(IMessageInterceptor.MessageValidationError.selector, bytes("Invalid message"))
       )
     );
 
@@ -2113,9 +2106,7 @@ contract EVM2EVMMultiOffRamp_reportExec is EVM2EVMMultiOffRampSetup {
       Internal.MessageExecutionState.FAILURE,
       abi.encodeWithSelector(
         IMessageInterceptor.MessageValidationError.selector,
-        abi.encodeWithSelector(
-          MessageInterceptorHelper.IncomingMessageValidationError.selector, bytes("Invalid message")
-        )
+        abi.encodeWithSelector(IMessageInterceptor.MessageValidationError.selector, bytes("Invalid message"))
       )
     );
 

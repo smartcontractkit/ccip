@@ -548,9 +548,7 @@ contract EVM2EVMMultiOnRamp_forwardFromRouter is EVM2EVMMultiOnRampSetup {
     vm.expectRevert(
       abi.encodeWithSelector(
         IMessageInterceptor.MessageValidationError.selector,
-        abi.encodeWithSelector(
-          MessageInterceptorHelper.IncomingMessageValidationError.selector, bytes("Invalid message")
-        )
+        abi.encodeWithSelector(IMessageInterceptor.MessageValidationError.selector, bytes("Invalid message"))
       )
     );
 

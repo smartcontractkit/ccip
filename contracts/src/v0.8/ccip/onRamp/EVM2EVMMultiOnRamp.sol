@@ -354,7 +354,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyMultiOnRamp, ITypeAndVersion, OwnerIsCrea
     if (numberOfTokens > 0) {
       address messageValidator = s_dynamicConfig.messageValidator;
       if (messageValidator != address(0)) {
-        try IMessageInterceptor(s_dynamicConfig.messageValidator).onOutgoingMessage(destChainSelector, message) {}
+        try IMessageInterceptor(messageValidator).onOutgoingMessage(destChainSelector, message) {}
         catch (bytes memory err) {
           revert IMessageInterceptor.MessageValidationError(err);
         }

@@ -85,6 +85,27 @@ contract MultiAggregateRateLimiterSetup is BaseTest, PriceRegistrySetup {
     assertEq(tokenBucketA.tokens, tokenBucketB.tokens);
     assertEq(tokenBucketA.isEnabled, tokenBucketB.isEnabled);
   }
+
+  function _generateAny2EVMMessage(
+    uint64 sourceChainSelector,
+    Client.EVMTokenAmount[] memory tokenAmounts
+  ) internal pure returns (Client.Any2EVMMessage memory) {
+    return Client.Any2EVMMessage({
+      messageId: keccak256(bytes("messageId")),
+      sourceChainSelector: sourceChainSelector,
+      sender: abi.encode(OWNER),
+      data: abi.encode(0),
+      destTokenAmounts: tokenAmounts
+    });
+  }
+
+  function _generateAny2EVMMessageNoTokens(uint64 sourceChainSelector)
+    internal
+    pure
+    returns (Client.Any2EVMMessage memory)
+  {
+    return _generateAny2EVMMessage(sourceChainSelector, new Client.EVMTokenAmount[](0));
+  }
 }
 
 contract MultiAggregateRateLimiter_constructor is MultiAggregateRateLimiterSetup {
@@ -1038,69 +1059,6 @@ contract MultiAggregateRateLimiter_onIncomingMessage is MultiAggregateRateLimite
     vm.expectRevert(abi.encodeWithSelector(MultiAggregateRateLimiter.UnauthorizedCaller.selector, STRANGER));
     s_rateLimiter.onIncomingMessage(_generateAny2EVMMessageNoTokens(CHAIN_SELECTOR_1));
   }
-
-  // TODO: add a test case similar to this one to verify that onIncomingMessage / onOutgoingMessage rate limits
-  // are applied to 2 different buckets
-  // function test_RateLimitValueDifferentLanes_Success() public {
-  //   vm.pauseGasMetering();
-  //   // start from blocktime that does not equal rate limiter init timestamp
-  //   vm.warp(BLOCK_TIME + 1);
-
-  //   // 15 (tokens) * 4 (price) * 2 (number of times) > 100 (capacity)
-  //   uint256 numberOfTokens = 15;
-  //   uint256 value = (numberOfTokens * TOKEN_PRICE) / 1e18;
-
-  //   vm.expectEmit();
-  //   emit RateLimiter.TokensConsumed(value);
-
-  //   vm.resumeGasMetering();
-  //   s_rateLimiter.rateLimitValue(CHAIN_SELECTOR_1, false, value);
-  //   vm.pauseGasMetering();
-
-  //   // Get the updated bucket status
-  //   RateLimiter.TokenBucket memory bucket1 = s_rateLimiter.currentRateLimiterState(CHAIN_SELECTOR_1, false);
-  //   RateLimiter.TokenBucket memory bucket2 = s_rateLimiter.currentRateLimiterState(CHAIN_SELECTOR_1, true);
-
-  //   // Assert the proper value has been taken out of the bucket
-  //   assertEq(bucket1.capacity - value, bucket1.tokens);
-  //   // Outgoing lane should remain unchanged
-  //   assertEq(bucket2.capacity, bucket2.tokens);
-
-  //   vm.expectEmit();
-  //   emit RateLimiter.TokensConsumed(value);
-
-  //   vm.resumeGasMetering();
-  //   s_rateLimiter.rateLimitValue(CHAIN_SELECTOR_1, true, value);
-  //   vm.pauseGasMetering();
-
-  //   bucket1 = s_rateLimiter.currentRateLimiterState(CHAIN_SELECTOR_1, false);
-  //   bucket2 = s_rateLimiter.currentRateLimiterState(CHAIN_SELECTOR_1, true);
-
-  //   assertEq(bucket2.capacity - value, bucket2.tokens);
-  //   // Incoming lane should remain unchanged
-  //   assertEq(bucket1.capacity - value, bucket1.tokens);
-  // }
-
-  function _generateAny2EVMMessageNoTokens(uint64 sourceChainSelector)
-    internal
-    pure
-    returns (Client.Any2EVMMessage memory)
-  {
-    return _generateAny2EVMMessage(sourceChainSelector, new Client.EVMTokenAmount[](0));
-  }
-
-  function _generateAny2EVMMessage(
-    uint64 sourceChainSelector,
-    Client.EVMTokenAmount[] memory tokenAmounts
-  ) internal pure returns (Client.Any2EVMMessage memory) {
-    return Client.Any2EVMMessage({
-      messageId: keccak256(bytes("messageId")),
-      sourceChainSelector: sourceChainSelector,
-      sender: abi.encode(OWNER),
-      data: abi.encode(0),
-      destTokenAmounts: tokenAmounts
-    });
-  }
 }
 
 contract MultiAggregateRateLimiter_onOutgoingMessage is MultiAggregateRateLimiterSetup {
@@ -1313,6 +1271,49 @@ contract MultiAggregateRateLimiter_onOutgoingMessage is MultiAggregateRateLimite
     // Remaining capacity: 35 -> 80 (can fit exactly 80)
     vm.warp(BLOCK_TIME + 12);
     s_rateLimiter.onOutgoingMessage(CHAIN_SELECTOR_1, _generateEVM2AnyMessage(tokenAmounts));
+  }
+
+  function test_RateLimitValueDifferentLanes_Success() public {
+    vm.pauseGasMetering();
+    // start from blocktime that does not equal rate limiter init timestamp
+    vm.warp(BLOCK_TIME + 1);
+
+    // 10 (tokens) * 4 (price) * 2 (number of times) = 80 < 100 (capacity)
+    uint256 numberOfTokens = 10;
+    Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
+    tokenAmounts[0] = Client.EVMTokenAmount({token: s_sourceTokens[0], amount: numberOfTokens});
+    uint256 value = (numberOfTokens * TOKEN_PRICE) / 1e18;
+
+    vm.expectEmit();
+    emit RateLimiter.TokensConsumed(value);
+
+    vm.resumeGasMetering();
+    vm.startPrank(MOCK_ONRAMP);
+    s_rateLimiter.onOutgoingMessage(CHAIN_SELECTOR_1, _generateEVM2AnyMessage(tokenAmounts));
+    vm.pauseGasMetering();
+
+    // Get the updated bucket status
+    RateLimiter.TokenBucket memory bucket1 = s_rateLimiter.currentRateLimiterState(CHAIN_SELECTOR_1, true);
+    RateLimiter.TokenBucket memory bucket2 = s_rateLimiter.currentRateLimiterState(CHAIN_SELECTOR_1, false);
+
+    // Assert the proper value has been taken out of the bucket
+    assertEq(bucket1.capacity - value, bucket1.tokens);
+    // Inbound lane should remain unchanged
+    assertEq(bucket2.capacity, bucket2.tokens);
+
+    vm.expectEmit();
+    emit RateLimiter.TokensConsumed(value);
+
+    vm.resumeGasMetering();
+    s_rateLimiter.onIncomingMessage(_generateAny2EVMMessage(CHAIN_SELECTOR_1, tokenAmounts));
+    vm.pauseGasMetering();
+
+    bucket1 = s_rateLimiter.currentRateLimiterState(CHAIN_SELECTOR_1, true);
+    bucket2 = s_rateLimiter.currentRateLimiterState(CHAIN_SELECTOR_1, false);
+
+    // Inbound lane should remain unchanged
+    assertEq(bucket1.capacity - value, bucket1.tokens);
+    assertEq(bucket2.capacity - value, bucket2.tokens);
   }
 
   // Reverts
