@@ -93,6 +93,8 @@ DataFile = '<path/to/deployment.json>'
 
 ## CCIP.Env 
 Specifies the environment details for the test to be run on.
+Mandatory fields are:
+- **Networks**: [CCIP.Env.Networks](#ccipenvnetworks)
 
 Test needs network/chain details to be set through configuration. This configuration is mandatory for running the tests.
 you have option to set the network details in two ways:
@@ -128,11 +130,21 @@ If the test needs to run on chains created using Anvil, then the AnvilConfigs ca
 It is a map of network name to `AnvilConfig` where key is network name specified under `CCIP.Env.Networks.selected_networks` and value is `AnvilConfig`. 
 The AnvilConfig is imported from [AnvilConfig](https://github.com/smartcontractkit/chainlink-testing-framework/blob/main/config/network.go#L20) in chainlink-testing-framework.
 
+
+**The following network configs are required for tests running on live networks. It can be ignored if the tests are running on simulated networks.**
+Refer to [secrets.toml.example](/integration-tests/ccip-tests/testconfig/examples/secrets.toml.example) for details.
+
 #### CCIP.ENV.Network.RpcHttpUrls
-RpcHttpUrls is the RPC HTTP endpoints for each network,
-// key is the network name as declared in selected_networks slice
+RpcHttpUrls is the RPC HTTP endpoints for each network, key is the network name as declared in selected_networks slice.
+
+#### CCIP.ENV.Network.RpcWsUrls
+RpcWsUrls is the RPC WS endpoints for each network, key is the network name as declared in selected_networks slice.
+
+#### CCIP.ENV.Network.WalletKeys
+WalletKeys is the private keys for each network, key is the network name as declared in selected_networks slice.
 
 Example Usage of Network Config:
+
 ```toml
 [CCIP.Env.Network]
 selected_networks= ['PRIVATE-CHAIN-1', 'PRIVATE-CHAIN-2']
@@ -171,7 +183,10 @@ evm_finality_depth = 400
 
 [CCIP.Env.Network.AnvilConfigs.PRIVATE-CHAIN-1]
 block_time = 1
-#
+
 [CCIP.Env.Network.AnvilConfigs.PRIVATE-CHAIN-2]
 block_time = 1
 ```
+
+### CCIP.Env.NewCLCluster
+Specifies the details of the new Chainlink cluster to be created for the test.
