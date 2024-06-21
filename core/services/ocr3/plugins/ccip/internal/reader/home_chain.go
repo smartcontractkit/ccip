@@ -74,7 +74,6 @@ func (r *HomeChainConfigPoller) poll() {
 	for {
 		select {
 		case <-ctx.Done():
-			r.lggr.Infow("Polling stopped")
 			return
 		case <-ticker.C:
 			err := r.fetchAndSetConfigs(ctx)
