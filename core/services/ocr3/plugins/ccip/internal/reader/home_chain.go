@@ -41,6 +41,8 @@ func NewHomeChainConfigPoller(
 		chainConfigs:        map[cciptypes.ChainSelector]cciptypes.ChainConfig{},
 		mutex:               &sync.RWMutex{},
 		nodeSupportedChains: map[libocrtypes.PeerID]mapset.Set[cciptypes.ChainSelector]{},
+		knownSourceChains:   mapset.NewSet[cciptypes.ChainSelector](),
+		fChain:              map[cciptypes.ChainSelector]int{},
 		backgroundCancel:    nil,
 		pollingInterval:     pollingInterval,
 	}
@@ -85,16 +87,16 @@ func (r *HomeChainConfigPoller) Start(ctx context.Context) error {
 //}
 
 func (r *HomeChainConfigPoller) fetchAndSetConfig(ctx context.Context) error {
-	onChainCapabilityConfigs, err := r.fetchOnChainConfig(ctx)
+	chainConfigInfos, err := r.fetchOnChainConfig(ctx)
 	if err != nil {
 		r.lggr.Errorw("Fetching on-chain configs failed", "err", err)
 		return err
 	}
-	if len(onChainCapabilityConfigs) == 0 {
+	if len(chainConfigInfos) == 0 {
 		r.lggr.Errorw("no on chain configs found")
 		return fmt.Errorf("no on chain configs found")
 	}
-	homeChainConfigs, err := r.convertOnChainConfigToHomeChainConfig(onChainCapabilityConfigs)
+	homeChainConfigs, err := r.convertOnChainConfigToHomeChainConfig(chainConfigInfos)
 	if err != nil {
 		r.lggr.Errorw("error converting OnChainConfigs to ChainConfig", "err", err)
 		return err
@@ -128,26 +130,36 @@ func (r *HomeChainConfigPoller) GetAllChainConfigs() (map[cciptypes.ChainSelecto
 
 }
 
-func (r *HomeChainConfigPoller) GetSupportedChains(id libocrtypes.PeerID) mapset.Set[cciptypes.ChainSelector] {
+func (r *HomeChainConfigPoller) GetSupportedChains(id libocrtypes.PeerID) (mapset.Set[cciptypes.ChainSelector], error) {
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
-	return r.nodeSupportedChains[id]
+	if _, ok := r.nodeSupportedChains[id]; !ok {
+		return nil, fmt.Errorf("node %v not found", id)
+	}
+	return r.nodeSupportedChains[id], nil
 }
 
-func (r *HomeChainConfigPoller) GetKnownChains() mapset.Set[cciptypes.ChainSelector] {
+func (r *HomeChainConfigPoller) GetKnownChains() (mapset.Set[cciptypes.ChainSelector], error) {
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
 	knownSourceChains := mapset.NewSet[cciptypes.ChainSelector]()
 	for chain, _ := range r.chainConfigs {
 		knownSourceChains.Add(chain)
 	}
-	return knownSourceChains
+	if knownSourceChains.Cardinality() == 0 {
+		return nil, fmt.Errorf("no known chain configs")
+	}
+
+	return knownSourceChains, nil
 }
 
-func (r *HomeChainConfigPoller) GetFChain() map[cciptypes.ChainSelector]int {
+func (r *HomeChainConfigPoller) GetFChain() (map[cciptypes.ChainSelector]int, error) {
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
-	return r.fChain
+	if len(r.fChain) == 0 {
+		return nil, fmt.Errorf("no FChain values found")
+	}
+	return r.fChain, nil
 }
 
 func (r *HomeChainConfigPoller) Close() error {
@@ -183,7 +195,7 @@ func (r *HomeChainConfigPoller) Name() string {
 }
 
 func createFChain(chainConfigs map[cciptypes.ChainSelector]cciptypes.ChainConfig) map[cciptypes.ChainSelector]int {
-	fChain := make(map[cciptypes.ChainSelector]int)
+	fChain := map[cciptypes.ChainSelector]int{}
 	for chain, config := range chainConfigs {
 		fChain[chain] = config.FChain
 	}
@@ -199,7 +211,7 @@ func createKnownChains(chainConfigs map[cciptypes.ChainSelector]cciptypes.ChainC
 }
 
 func createNodesSupportedChains(chainConfigs map[cciptypes.ChainSelector]cciptypes.ChainConfig) map[libocrtypes.PeerID]mapset.Set[cciptypes.ChainSelector] {
-	nodeSupportedChains := make(map[libocrtypes.PeerID]mapset.Set[cciptypes.ChainSelector])
+	nodeSupportedChains := map[libocrtypes.PeerID]mapset.Set[cciptypes.ChainSelector]{}
 	for chainSelector, config := range chainConfigs {
 		for _, p2pID := range config.SupportedNodes.ToSlice() {
 			if _, ok := nodeSupportedChains[p2pID]; !ok {
@@ -237,7 +249,7 @@ func (r *HomeChainConfigPoller) convertOnChainConfigToHomeChainConfig(capability
 	return chainConfigs, nil
 }
 
-type onChainConfig struct {
+type OnChainConfig struct {
 	Readers []libocrtypes.PeerID `json:"readers"`
 	FChain  uint8                `json:"fChain"`
 	Config  []byte               `json:"config"`
@@ -245,7 +257,7 @@ type onChainConfig struct {
 type ChainConfigInfo struct {
 	// Calling function https://github.com/smartcontractkit/ccip/blob/330c5e98f624cfb10108c92fe1e00ced6d345a99/contracts/src/v0.8/ccip/capability/CCIPCapabilityConfiguration.sol#L140
 	ChainSelector cciptypes.ChainSelector `json:"chainSelector"`
-	ChainConfig   onChainConfig           `json:"chainConfig"`
+	ChainConfig   OnChainConfig           `json:"chainConfig"`
 }
 
 var _ cciptypes.HomeChainPoller = (*HomeChainConfigPoller)(nil)

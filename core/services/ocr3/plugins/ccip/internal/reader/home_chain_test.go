@@ -32,16 +32,16 @@ var (
 func Test_ConvertOnChainConfigToHomeChainConfig(t *testing.T) {
 	var tests = []struct {
 		name            string
-		onChainConfigs  []cciptypes.OnChainCapabilityConfig
-		homeChainConfig cciptypes.ChainConfig
+		onChainConfigs  []ChainConfigInfo
+		homeChainConfig map[cciptypes.ChainSelector]cciptypes.ChainConfig
 		expErr          string
 	}{
 		{
 			name: "Convert",
-			onChainConfigs: []cciptypes.OnChainCapabilityConfig{
+			onChainConfigs: []ChainConfigInfo{
 				{
 					ChainSelector: chainA,
-					ChainConfig: cciptypes.OnChainConfig{
+					ChainConfig: OnChainConfig{
 						FChain: 1,
 						Readers: []libocrtypes.PeerID{
 							p2pOracleAId,
@@ -53,7 +53,7 @@ func Test_ConvertOnChainConfigToHomeChainConfig(t *testing.T) {
 				},
 				{
 					ChainSelector: chainB,
-					ChainConfig: cciptypes.OnChainConfig{
+					ChainConfig: OnChainConfig{
 						FChain: 2,
 						Readers: []libocrtypes.PeerID{
 							p2pOracleAId,
@@ -64,7 +64,7 @@ func Test_ConvertOnChainConfigToHomeChainConfig(t *testing.T) {
 				},
 				{
 					ChainSelector: chainC,
-					ChainConfig: cciptypes.OnChainConfig{
+					ChainConfig: OnChainConfig{
 						FChain: 3,
 						Readers: []libocrtypes.PeerID{
 							p2pOracleCId,
@@ -73,16 +73,18 @@ func Test_ConvertOnChainConfigToHomeChainConfig(t *testing.T) {
 					},
 				},
 			},
-			homeChainConfig: cciptypes.ChainConfig{
-				FChain: map[cciptypes.ChainSelector]int{
-					chainA: 1,
-					chainB: 2,
-					chainC: 3,
+			homeChainConfig: map[cciptypes.ChainSelector]cciptypes.ChainConfig{
+				chainA: {
+					FChain:         1,
+					SupportedNodes: mapset.NewSet(p2pOracleAId, p2pOracleBId, p2pOracleCId),
 				},
-				NodeSupportedChains: map[libocrtypes.PeerID]cciptypes.SupportedChains{
-					p2pOracleAId: {Supported: mapset.NewSet[cciptypes.ChainSelector](chainA, chainB)},
-					p2pOracleBId: {Supported: mapset.NewSet[cciptypes.ChainSelector](chainA, chainB)},
-					p2pOracleCId: {Supported: mapset.NewSet[cciptypes.ChainSelector](chainA, chainC)},
+				chainB: {
+					FChain:         2,
+					SupportedNodes: mapset.NewSet(p2pOracleAId, p2pOracleBId),
+				},
+				chainC: {
+					FChain:         3,
+					SupportedNodes: mapset.NewSet(p2pOracleCId),
 				},
 			},
 		},
@@ -91,6 +93,7 @@ func Test_ConvertOnChainConfigToHomeChainConfig(t *testing.T) {
 		configPoller := NewHomeChainConfigPoller(
 			nil,
 			logger.Test(t),
+			1,
 		)
 		t.Run(tc.name, func(t *testing.T) {
 			resultConfig, err := configPoller.convertOnChainConfigToHomeChainConfig(tc.onChainConfigs)
@@ -101,10 +104,10 @@ func Test_ConvertOnChainConfigToHomeChainConfig(t *testing.T) {
 }
 
 func Test_PollingWorking(t *testing.T) {
-	onChainConfigs := []cciptypes.OnChainCapabilityConfig{
+	onChainConfigs := []ChainConfigInfo{
 		{
 			ChainSelector: chainA,
-			ChainConfig: cciptypes.OnChainConfig{
+			ChainConfig: OnChainConfig{
 				FChain: 1,
 				Readers: []libocrtypes.PeerID{
 					p2pOracleAId,
@@ -116,7 +119,7 @@ func Test_PollingWorking(t *testing.T) {
 		},
 		{
 			ChainSelector: chainB,
-			ChainConfig: cciptypes.OnChainConfig{
+			ChainConfig: OnChainConfig{
 				FChain: 2,
 				Readers: []libocrtypes.PeerID{
 					p2pOracleAId,
@@ -127,7 +130,7 @@ func Test_PollingWorking(t *testing.T) {
 		},
 		{
 			ChainSelector: chainC,
-			ChainConfig: cciptypes.OnChainConfig{
+			ChainConfig: OnChainConfig{
 				FChain: 3,
 				Readers: []libocrtypes.PeerID{
 					p2pOracleCId,
@@ -136,16 +139,18 @@ func Test_PollingWorking(t *testing.T) {
 			},
 		},
 	}
-	homeChainConfig := cciptypes.ChainConfig{
-		FChain: map[cciptypes.ChainSelector]int{
-			chainA: 1,
-			chainB: 2,
-			chainC: 3,
+	homeChainConfig := map[cciptypes.ChainSelector]cciptypes.ChainConfig{
+		chainA: {
+			FChain:         1,
+			SupportedNodes: mapset.NewSet(p2pOracleAId, p2pOracleBId, p2pOracleCId),
 		},
-		NodeSupportedChains: map[libocrtypes.PeerID]cciptypes.SupportedChains{
-			p2pOracleAId: {Supported: mapset.NewSet[cciptypes.ChainSelector](chainA, chainB)},
-			p2pOracleBId: {Supported: mapset.NewSet[cciptypes.ChainSelector](chainA, chainB)},
-			p2pOracleCId: {Supported: mapset.NewSet[cciptypes.ChainSelector](chainA, chainC)},
+		chainB: {
+			FChain:         2,
+			SupportedNodes: mapset.NewSet(p2pOracleAId, p2pOracleBId),
+		},
+		chainC: {
+			FChain:         3,
+			SupportedNodes: mapset.NewSet(p2pOracleCId),
 		},
 	}
 
@@ -153,18 +158,21 @@ func Test_PollingWorking(t *testing.T) {
 	homeChainReader.On(
 		"GetLatestValue", mock.Anything, "CCIPCapabilityConfiguration", "getAllChainConfigs", mock.Anything, mock.Anything).Run(
 		func(args mock.Arguments) {
-			arg := args.Get(4).(*[]cciptypes.OnChainCapabilityConfig)
+			arg := args.Get(4).(*[]ChainConfigInfo)
 			*arg = onChainConfigs
 		}).Return(nil)
 
 	configPoller := NewHomeChainConfigPoller(
 		homeChainReader,
 		logger.Test(t),
+		1,
 	)
 
 	ctx := context.Background()
 	_ = configPoller.Start(ctx)
 	_ = configPoller.Close()
 
-	assert.Equal(t, homeChainConfig, configPoller.GetConfig())
+	configs, err := configPoller.GetAllChainConfigs()
+	assert.NoError(t, err)
+	assert.Equal(t, homeChainConfig, configs)
 }

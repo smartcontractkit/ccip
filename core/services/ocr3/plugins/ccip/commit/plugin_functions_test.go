@@ -444,7 +444,7 @@ func Test_validateObserverReadingEligibility(t *testing.T) {
 		observer            libocrtypes.PeerID
 		msgs                []cciptypes.CCIPMsgBaseDetails
 		seqNums             []cciptypes.SeqNumChain
-		nodeSupportedChains map[libocrtypes.PeerID]cciptypes.SupportedChains
+		nodeSupportedChains mapset.Set[cciptypes.ChainSelector]
 		destChain           cciptypes.ChainSelector
 		expErr              bool
 	}{
@@ -457,11 +457,9 @@ func Test_validateObserverReadingEligibility(t *testing.T) {
 				{ID: cciptypes.Bytes32{1}, SourceChain: 3, SeqNum: 12},
 				{ID: cciptypes.Bytes32{2}, SourceChain: 3, SeqNum: 12},
 			},
-			nodeSupportedChains: map[libocrtypes.PeerID]cciptypes.SupportedChains{
-				libocrtypes.PeerID{10}: {Supported: mapset.NewSet[cciptypes.ChainSelector](1, 2, 3)},
-			},
-			destChain: 1,
-			expErr:    false,
+			nodeSupportedChains: mapset.NewSet[cciptypes.ChainSelector](1, 2, 3),
+			destChain:           1,
+			expErr:              false,
 		},
 		{
 			name:     "observer is a writer so can observe seq nums",
@@ -470,11 +468,9 @@ func Test_validateObserverReadingEligibility(t *testing.T) {
 			seqNums: []cciptypes.SeqNumChain{
 				{ChainSel: 1, SeqNum: 12},
 			},
-			nodeSupportedChains: map[libocrtypes.PeerID]cciptypes.SupportedChains{
-				libocrtypes.PeerID{10}: {Supported: mapset.NewSet[cciptypes.ChainSelector](1, 3)},
-			},
-			destChain: 1,
-			expErr:    false,
+			nodeSupportedChains: mapset.NewSet[cciptypes.ChainSelector](1, 3),
+			destChain:           1,
+			expErr:              false,
 		},
 		{
 			name:     "observer is not a writer so cannot observe seq nums",
@@ -483,11 +479,9 @@ func Test_validateObserverReadingEligibility(t *testing.T) {
 			seqNums: []cciptypes.SeqNumChain{
 				{ChainSel: 1, SeqNum: 12},
 			},
-			nodeSupportedChains: map[libocrtypes.PeerID]cciptypes.SupportedChains{
-				libocrtypes.PeerID{10}: {Supported: mapset.NewSet[cciptypes.ChainSelector](3)},
-			},
-			destChain: 1,
-			expErr:    true,
+			nodeSupportedChains: mapset.NewSet[cciptypes.ChainSelector](3),
+			destChain:           1,
+			expErr:              true,
 		},
 		{
 			name:     "observer cfg not found",
@@ -498,26 +492,22 @@ func Test_validateObserverReadingEligibility(t *testing.T) {
 				{ID: cciptypes.Bytes32{1}, SourceChain: 3, SeqNum: 12},
 				{ID: cciptypes.Bytes32{2}, SourceChain: 3, SeqNum: 12},
 			},
-			nodeSupportedChains: map[libocrtypes.PeerID]cciptypes.SupportedChains{
-				libocrtypes.PeerID{20}: {Supported: mapset.NewSet[cciptypes.ChainSelector](1, 3)}, // observer 10 not found
-			},
-			destChain: 1,
-			expErr:    true,
+			nodeSupportedChains: mapset.NewSet[cciptypes.ChainSelector](1, 3), // observer 10 not found
+			destChain:           1,
+			expErr:              true,
 		},
 		{
-			name:     "no msgs",
-			observer: libocrtypes.PeerID{10},
-			msgs:     []cciptypes.CCIPMsgBaseDetails{},
-			nodeSupportedChains: map[libocrtypes.PeerID]cciptypes.SupportedChains{
-				libocrtypes.PeerID{10}: {Supported: mapset.NewSet[cciptypes.ChainSelector](1, 3)},
-			},
-			expErr: false,
+			name:                "no msgs",
+			observer:            libocrtypes.PeerID{10},
+			msgs:                []cciptypes.CCIPMsgBaseDetails{},
+			nodeSupportedChains: mapset.NewSet[cciptypes.ChainSelector](1, 3),
+			expErr:              false,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			err := validateObserverReadingEligibility(tc.observer, tc.msgs, tc.seqNums, tc.nodeSupportedChains, tc.destChain)
+			err := validateObserverReadingEligibility(tc.msgs, tc.seqNums, tc.nodeSupportedChains, tc.destChain)
 			if tc.expErr {
 				assert.Error(t, err)
 				return

@@ -125,7 +125,10 @@ func (p *Plugin) Observation(ctx context.Context, outctx ocr3types.OutcomeContex
 		return types.Observation{}, fmt.Errorf("observe gas prices: %w", err)
 	}
 
-	fChain := p.homeChainPoller.GetFChain()
+	fChain, err := p.homeChainPoller.GetFChain()
+	if err != nil {
+		return types.Observation{}, fmt.Errorf("get f chain: %w", err)
+	}
 
 	// If there's no previous outcome (first round ever), we only observe the latest committed sequence numbers.
 	// and on the next round we use those to look for messages.
@@ -328,7 +331,12 @@ func (p *Plugin) Close() error {
 }
 
 func (p *Plugin) knownSourceChainsSlice() []cciptypes.ChainSelector {
-	knownSourceChainsSlice := p.homeChainPoller.GetKnownChains().ToSlice()
+	knownSourceChains, err := p.homeChainPoller.GetKnownChains()
+	if err != nil {
+		p.lggr.Errorw("error getting known chains", "err", err)
+		return nil
+	}
+	knownSourceChainsSlice := knownSourceChains.ToSlice()
 	sort.Slice(knownSourceChainsSlice, func(i, j int) bool { return knownSourceChainsSlice[i] < knownSourceChainsSlice[j] })
 	return slicelib.Filter(knownSourceChainsSlice, func(ch cciptypes.ChainSelector) bool { return ch != p.cfg.DestChain })
 }
@@ -338,7 +346,10 @@ func (p *Plugin) supportedChains() (mapset.Set[cciptypes.ChainSelector], error) 
 	if !exists {
 		return nil, fmt.Errorf("oracle ID %d not found in oracleIDToP2pID", p.nodeID)
 	}
-	supportedChains := p.homeChainPoller.GetSupportedChains(p2pID)
+	supportedChains, err := p.homeChainPoller.GetSupportedChains(p2pID)
+	if err != nil {
+		return nil, fmt.Errorf("get supported chains: %w", err)
+	}
 	return supportedChains, nil
 }
 
