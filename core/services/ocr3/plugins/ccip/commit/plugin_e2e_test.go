@@ -37,7 +37,7 @@ func TestPlugin(t *testing.T) {
 		expTransmittedReports []cciptypes.CommitPluginReport
 		initialOutcome        cciptypes.CommitPluginOutcome
 	}{
-		//TODO: I think this test is not correct, it should error because no readers are set up for it.
+		//TODO: Fix making the mocks return empty observations correctly
 		//{
 		//	name:        "EmptyOutcome",
 		//	description: "Empty observations are returned by all nodes which leads to an empty outcome.",
@@ -203,11 +203,17 @@ func setupEmptyOutcome(ctx context.Context, t *testing.T, lggr logger.Logger) []
 		},
 	}
 
+	homeChainPoller := setupHomeChainPoller(lggr, chainConfigInfos)
+	err := homeChainPoller.Start(ctx)
+	if err != nil {
+		return nil
+	}
+
 	oracleIDToP2pID := GetP2pIDs(1, 2, 3)
 	return []nodeSetup{
-		newNode(ctx, t, lggr, 1, cfg, chainConfigInfos, oracleIDToP2pID),
-		newNode(ctx, t, lggr, 2, cfg, chainConfigInfos, oracleIDToP2pID),
-		newNode(ctx, t, lggr, 3, cfg, chainConfigInfos, oracleIDToP2pID),
+		newNode(ctx, t, lggr, 1, cfg, homeChainPoller, oracleIDToP2pID),
+		newNode(ctx, t, lggr, 2, cfg, homeChainPoller, oracleIDToP2pID),
+		newNode(ctx, t, lggr, 3, cfg, homeChainPoller, oracleIDToP2pID),
 	}
 }
 
@@ -252,10 +258,15 @@ func setupAllNodesReadAllChains(ctx context.Context, t *testing.T, lggr logger.L
 		},
 	}
 
+	homeChainPoller := setupHomeChainPoller(lggr, chainConfigInfos)
+	err := homeChainPoller.Start(ctx)
+	if err != nil {
+		return nil
+	}
 	oracleIDToP2pID := GetP2pIDs(1, 2, 3)
-	n1 := newNode(ctx, t, lggr, 1, cfg, chainConfigInfos, oracleIDToP2pID)
-	n2 := newNode(ctx, t, lggr, 2, cfg, chainConfigInfos, oracleIDToP2pID)
-	n3 := newNode(ctx, t, lggr, 3, cfg, chainConfigInfos, oracleIDToP2pID)
+	n1 := newNode(ctx, t, lggr, 1, cfg, homeChainPoller, oracleIDToP2pID)
+	n2 := newNode(ctx, t, lggr, 2, cfg, homeChainPoller, oracleIDToP2pID)
+	n3 := newNode(ctx, t, lggr, 3, cfg, homeChainPoller, oracleIDToP2pID)
 	nodes := []nodeSetup{n1, n2, n3}
 
 	for _, n := range nodes {
@@ -334,10 +345,15 @@ func setupNodesDoNotAgreeOnMsgs(ctx context.Context, t *testing.T, lggr logger.L
 		},
 	}
 
+	homeChainPoller := setupHomeChainPoller(lggr, chainConfigInfos)
+	err := homeChainPoller.Start(ctx)
+	if err != nil {
+		return nil
+	}
 	oracleIDToP2pID := GetP2pIDs(1, 2, 3)
-	n1 := newNode(ctx, t, lggr, 1, cfg, chainConfigInfos, oracleIDToP2pID)
-	n2 := newNode(ctx, t, lggr, 2, cfg, chainConfigInfos, oracleIDToP2pID)
-	n3 := newNode(ctx, t, lggr, 3, cfg, chainConfigInfos, oracleIDToP2pID)
+	n1 := newNode(ctx, t, lggr, 1, cfg, homeChainPoller, oracleIDToP2pID)
+	n2 := newNode(ctx, t, lggr, 2, cfg, homeChainPoller, oracleIDToP2pID)
+	n3 := newNode(ctx, t, lggr, 3, cfg, homeChainPoller, oracleIDToP2pID)
 	nodes := []nodeSetup{n1, n2, n3}
 
 	for i, n := range nodes {
@@ -385,31 +401,11 @@ type nodeSetup struct {
 	msgHasher   *mocks.MessageHasher
 }
 
-func newNode(ctx context.Context, t *testing.T, lggr logger.Logger, id int, cfg cciptypes.CommitPluginConfig, chainConfigInfos []reader.ChainConfigInfo, oracleIDToP2pID map[commontypes.OracleID]libocrtypes.PeerID) nodeSetup {
+func newNode(ctx context.Context, t *testing.T, lggr logger.Logger, id int, cfg cciptypes.CommitPluginConfig, homeChainPoller cciptypes.HomeChainPoller, oracleIDToP2pID map[commontypes.OracleID]libocrtypes.PeerID) nodeSetup {
 	ccipReader := mocks.NewCCIPReader()
 	priceReader := mocks.NewTokenPricesReader()
 	reportCodec := mocks.NewCommitPluginJSONReportCodec()
 	msgHasher := mocks.NewMessageHasher()
-	homeChainReader := mocks.NewContractReaderMock()
-
-	homeChainReader.On(
-		"GetLatestValue", mock.Anything, "CCIPCapabilityConfiguration", "getAllChainConfigs", mock.Anything, mock.Anything).Run(
-		func(args mock.Arguments) {
-			arg := args.Get(4).(*[]reader.ChainConfigInfo)
-			*arg = chainConfigInfos
-		}).Return(nil)
-
-	homeChainPoller := reader.NewHomeChainConfigPoller(
-		homeChainReader,
-		lggr,
-		1,
-	)
-
-	err := homeChainPoller.Start(ctx)
-	if err != nil {
-		lggr.Errorw("Failed to start home chain poller", "err", err)
-		return nodeSetup{}
-	}
 
 	node1 := NewPlugin(
 		context.Background(),
@@ -431,6 +427,24 @@ func newNode(ctx context.Context, t *testing.T, lggr logger.Logger, id int, cfg 
 		reportCodec: reportCodec,
 		msgHasher:   msgHasher,
 	}
+}
+
+func setupHomeChainPoller(lggr logger.Logger, chainConfigInfos []reader.ChainConfigInfo) *reader.HomeChainConfigPoller {
+	homeChainReader := mocks.NewContractReaderMock()
+	homeChainReader.On(
+		"GetLatestValue", mock.Anything, "CCIPCapabilityConfiguration", "getAllChainConfigs", mock.Anything, mock.Anything).Run(
+		func(args mock.Arguments) {
+			arg := args.Get(4).(*[]reader.ChainConfigInfo)
+			*arg = chainConfigInfos
+		}).Return(nil)
+
+	homeChainPoller := reader.NewHomeChainConfigPoller(
+		homeChainReader,
+		lggr,
+		1,
+	)
+
+	return homeChainPoller
 }
 func GetP2pIDs(ids ...int) map[commontypes.OracleID]libocrtypes.PeerID {
 	res := make(map[commontypes.OracleID]libocrtypes.PeerID)

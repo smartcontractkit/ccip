@@ -36,7 +36,7 @@ type Plugin struct {
 }
 
 func NewPlugin(
-	ctx context.Context,
+	_ context.Context,
 	nodeID commontypes.OracleID,
 	oracleIDToP2pID map[commontypes.OracleID]libocrtypes.PeerID,
 	cfg cciptypes.CommitPluginConfig,

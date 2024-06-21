@@ -37,7 +37,7 @@ func NewHomeChainConfigPoller(
 	lggr logger.Logger,
 	pollingInterval time.Duration,
 ) *HomeChainConfigPoller {
-	//bgCtx, cancelFunc := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(context.Background())
 	return &HomeChainConfigPoller{
 		homeChainReader:     homeChainReader,
 		lggr:                lggr,
@@ -46,9 +46,9 @@ func NewHomeChainConfigPoller(
 		nodeSupportedChains: map[libocrtypes.PeerID]mapset.Set[cciptypes.ChainSelector]{},
 		knownSourceChains:   mapset.NewSet[cciptypes.ChainSelector](),
 		fChain:              map[cciptypes.ChainSelector]int{},
-		//backgroundCancel:    cancelFunc,
-		//backgroundCtx:       bgCtx,
-		pollingInterval: pollingInterval,
+		backgroundCancel:    cancel,
+		backgroundCtx:       ctx,
+		pollingInterval:     pollingInterval,
 	}
 }
 
@@ -60,17 +60,22 @@ func (r *HomeChainConfigPoller) Start(ctx context.Context) error {
 		r.mutex.Unlock()
 		return fmt.Errorf("polling already started")
 	}
-	bgCtx, cancelFunc := context.WithCancel(context.Background())
-	r.backgroundCancel = cancelFunc
+	if r.backgroundCtx == nil {
+		return fmt.Errorf("backgroundCtx not set")
+	}
+	//bgCtx, cancelFunc := context.WithCancel(context.Background())
+	//r.backgroundCancel = cancelFunc
 	r.mutex.Unlock()
 
-	err := r.fetchAndSetConfigs(ctx)
+	err := r.fetchAndSetConfigs(r.backgroundCtx)
 	if err != nil {
 		r.lggr.Errorw("Initial fetch of on-chain configs failed", "err", err)
+		return fmt.Errorf("initial fetch of on-chain configs failed")
 	}
 
 	r.lggr.Infow("Start Polling ChainConfig")
-	go r.poll(bgCtx)
+	go r.poll(r.backgroundCtx)
+	//go r.poll(bgCtx)
 	return nil
 }
 
@@ -83,7 +88,10 @@ func (r *HomeChainConfigPoller) poll(ctx context.Context) {
 			r.lggr.Infow("Polling stopped")
 			return
 		case <-ticker.C:
-			_ = r.fetchAndSetConfigs(ctx)
+			err := r.fetchAndSetConfigs(ctx)
+			if err != nil {
+				r.lggr.Errorw("Fetching and setting configs failed", "err", err)
+			}
 		}
 	}
 }
