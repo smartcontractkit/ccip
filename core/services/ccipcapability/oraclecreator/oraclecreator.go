@@ -3,8 +3,10 @@ package oraclecreator
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/google/uuid"
 	"github.com/prometheus/client_golang/prometheus"
 	chainsel "github.com/smartcontractkit/chain-selectors"
@@ -12,10 +14,14 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
+	ccipocr3commit "github.com/smartcontractkit/ccipocr3/commit"
+	ccipocr3exec "github.com/smartcontractkit/ccipocr3/execute"
 	"github.com/smartcontractkit/chainlink-common/pkg/loop"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ccipcapability/ocrimpls"
 	cctypes "github.com/smartcontractkit/chainlink/v2/core/services/ccipcapability/types"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/chaintype"
@@ -77,6 +83,8 @@ func (o *oracleCreator) CreateCommitOracle(config cctypes.OCRConfig) (cctypes.CC
 	// for now we assume that we have a relayer for the destination chain.
 	// this is so that we can use the msg hasher and report encoder from that dest chain relayer's provider.
 	providers := make(map[types.RelayID]types.CCIPOCR3CommitProvider)
+	contractReaders := make(map[cciptypes.ChainSelector]types.ContractReader)
+	contractWriters := make(map[cciptypes.ChainSelector]types.ChainWriter)
 	for relayID, relayer := range o.relayers {
 		provider, err := relayer.NewPluginProvider(context.Background(), types.RelayArgs{
 			ExternalJobID: o.externalJobID,
@@ -99,6 +107,18 @@ func (o *oracleCreator) CreateCommitOracle(config cctypes.OCRConfig) (cctypes.CC
 		}
 
 		providers[relayID] = commitProvider
+
+		chainIDInt, err := strconv.ParseInt(relayID.ChainID, 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse chain ID %s: %w", relayID.ChainID, err)
+		}
+		chainSel, ok := chainsel.EvmChainIdToChainSelector()[uint64(chainIDInt)]
+		if !ok {
+			return nil, fmt.Errorf("failed to get chain selector from chain ID %d", chainIDInt)
+		}
+		contractReaders[cciptypes.ChainSelector(chainSel)] = commitProvider.ChainReader()
+		// TODO: uncomment when chain writer is available on the provider.
+		// contractWriters[cciptypes.ChainSelector(chainSel)] = commitProvider.ChainWriter()
 	}
 
 	// Assuming that the chain selector is referring to an evm chain for now.
@@ -132,9 +152,15 @@ func (o *oracleCreator) CreateCommitOracle(config cctypes.OCRConfig) (cctypes.CC
 	}
 	onchainKeyring := ocrcommon.NewOCR3OnchainKeyringAdapter(keybundle)
 
-	ocrLogger := ocrcommon.NewOCRWrapper(o.lggr, false /* traceLogging */, func(ctx context.Context, msg string) {
-		// o.lggr.ErrorIf(d.jobORM.RecordError(ctx, jb.ID, msg), "unable to record error") // TODO
-	})
+	reportCodec, err := destProvider.ReportCodec(context.Background())
+	if err != nil {
+		return nil, fmt.Errorf("failed to get report codec: %w", err)
+	}
+
+	msgHasher, err := destProvider.MsgHasher(context.Background())
+	if err != nil {
+		return nil, fmt.Errorf("failed to get message hasher: %w", err)
+	}
 	oracleArgs := libocr3.OCR3OracleArgs[[]byte]{
 		BinaryNetworkEndpointFactory: o.peerWrapper.Peer2,
 		Database:                     o.db,
@@ -142,16 +168,26 @@ func (o *oracleCreator) CreateCommitOracle(config cctypes.OCRConfig) (cctypes.CC
 		ContractConfigTracker:        nil, // TODO
 		ContractTransmitter:          contractTransmitter,
 		LocalConfig: ocrtypes.LocalConfig{
-			BlockchainTimeout:                  10 * time.Second,
+			BlockchainTimeout: 10 * time.Second,
+
+			// Config tracking is handled by the launcher, since we're doing blue-green
+			// deployments we're not going to be using OCR's built-in config switching,
+			// which always shuts down the previous instance.
 			ContractConfigConfirmations:        0,
-			SkipContractConfigConfirmations:    false,
+			SkipContractConfigConfirmations:    true,
 			ContractConfigTrackerPollInterval:  10 * time.Second,
 			ContractTransmitterTransmitTimeout: 10 * time.Second,
 			DatabaseTimeout:                    10 * time.Second,
 			MinOCR2MaxDurationQuery:            1 * time.Second,
 			DevelopmentMode:                    "false",
 		},
-		Logger:            ocrLogger,
+		Logger: ocrcommon.NewOCRWrapper(
+			o.lggr.
+				Named("CCIPCommit").
+				Named(destRelayID.String()).
+				Named(hexutil.Encode(config.OfframpAddress())),
+			false, /* traceLogging */
+			func(ctx context.Context, msg string) {}),
 		MetricsRegisterer: prometheus.WrapRegistererWith(map[string]string{"name": fmt.Sprintf("commit-%d", config.ChainSelector())}, prometheus.DefaultRegisterer),
 		MonitoringEndpoint: o.monitoringEndpointGen.GenMonitoringEndpoint(
 			string(destChainFamily),
@@ -159,10 +195,20 @@ func (o *oracleCreator) CreateCommitOracle(config cctypes.OCRConfig) (cctypes.CC
 			string(config.OfframpAddress()),
 			synchronization.OCR3CCIPCommit,
 		),
-		OffchainConfigDigester: nil, // TODO
+		OffchainConfigDigester: ocrimpls.NewConfigDigester(config.ConfigDigest()),
 		OffchainKeyring:        keybundle,
 		OnchainKeyring:         onchainKeyring,
-		ReportingPluginFactory: nil, // TODO
+		ReportingPluginFactory: ccipocr3commit.NewPluginFactory(
+			contractReaders, // contract readers
+			contractWriters, // contract writers
+			cciptypes.ChainSelector(config.ChainSelector()), // dest chain selector
+			reportCodec, // dest chain report codec
+			msgHasher,   // dest chain msg hasher
+			o.lggr.
+				Named("CCIPCommitPlugin").
+				Named(destRelayID.String()).
+				Named(hexutil.Encode(config.OfframpAddress())),
+		),
 	}
 	oracle, err := libocr3.NewOracle(oracleArgs)
 	if err != nil {
@@ -176,6 +222,8 @@ func (o *oracleCreator) CreateExecOracle(config cctypes.OCRConfig) (cctypes.CCIP
 	// for now we assume that we have a relayer for the destination chain.
 	// this is so that we can use the msg hasher and report encoder from that dest chain relayer's provider.
 	providers := make(map[types.RelayID]types.CCIPOCR3ExecuteProvider)
+	contractReaders := make(map[cciptypes.ChainSelector]types.ContractReader)
+	contractWriters := make(map[cciptypes.ChainSelector]types.ChainWriter)
 	for relayID, relayer := range o.relayers {
 		provider, err := relayer.NewPluginProvider(context.Background(), types.RelayArgs{
 			ExternalJobID: o.externalJobID,
@@ -198,6 +246,18 @@ func (o *oracleCreator) CreateExecOracle(config cctypes.OCRConfig) (cctypes.CCIP
 		}
 
 		providers[relayID] = execProvider
+
+		chainIDInt, err := strconv.ParseInt(relayID.ChainID, 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse chain ID %s: %w", relayID.ChainID, err)
+		}
+		chainSel, ok := chainsel.EvmChainIdToChainSelector()[uint64(chainIDInt)]
+		if !ok {
+			return nil, fmt.Errorf("failed to get chain selector from chain ID %d", chainIDInt)
+		}
+		contractReaders[cciptypes.ChainSelector(chainSel)] = execProvider.ChainReader()
+		// TODO: uncomment when chain writer is available on the provider.
+		// contractWriters[cciptypes.ChainSelector(chainSel)] = commitProvider.ChainWriter()
 	}
 
 	// Assuming that the chain selector is referring to an evm chain for now.
@@ -231,26 +291,42 @@ func (o *oracleCreator) CreateExecOracle(config cctypes.OCRConfig) (cctypes.CCIP
 	}
 	onchainKeyring := ocrcommon.NewOCR3OnchainKeyringAdapter(keybundle)
 
-	ocrLogger := ocrcommon.NewOCRWrapper(o.lggr, false /* traceLogging */, func(ctx context.Context, msg string) {
-		// o.lggr.ErrorIf(d.jobORM.RecordError(ctx, jb.ID, msg), "unable to record error") // TODO
-	})
+	reportCodec, err := destProvider.ReportCodec(context.Background())
+	if err != nil {
+		return nil, fmt.Errorf("failed to get report codec: %w", err)
+	}
+
+	msgHasher, err := destProvider.MsgHasher(context.Background())
+	if err != nil {
+		return nil, fmt.Errorf("failed to get message hasher: %w", err)
+	}
 	oracleArgs := libocr3.OCR3OracleArgs[[]byte]{
 		BinaryNetworkEndpointFactory: o.peerWrapper.Peer2,
 		Database:                     o.db,
 		V2Bootstrappers:              o.bootstrapperLocators,
-		ContractConfigTracker:        nil, // TODO
+		ContractConfigTracker:        ocrimpls.NewConfigTracker(config),
 		ContractTransmitter:          contractTransmitter,
 		LocalConfig: ocrtypes.LocalConfig{
-			BlockchainTimeout:                  10 * time.Second,
+			BlockchainTimeout: 10 * time.Second,
+
+			// Config tracking is handled by the launcher, since we're doing blue-green
+			// deployments we're not going to be using OCR's built-in config switching,
+			// which always shuts down the previous instance.
 			ContractConfigConfirmations:        0,
-			SkipContractConfigConfirmations:    false,
+			SkipContractConfigConfirmations:    true,
 			ContractConfigTrackerPollInterval:  10 * time.Second,
 			ContractTransmitterTransmitTimeout: 10 * time.Second,
 			DatabaseTimeout:                    10 * time.Second,
 			MinOCR2MaxDurationQuery:            1 * time.Second,
 			DevelopmentMode:                    "false",
 		},
-		Logger:            ocrLogger,
+		Logger: ocrcommon.NewOCRWrapper(
+			o.lggr.
+				Named("CCIPExec").
+				Named(destRelayID.String()).
+				Named(hexutil.Encode(config.OfframpAddress())),
+			false, /* traceLogging */
+			func(ctx context.Context, msg string) {}),
 		MetricsRegisterer: prometheus.WrapRegistererWith(map[string]string{"name": fmt.Sprintf("exec-%d", config.ChainSelector())}, prometheus.DefaultRegisterer),
 		MonitoringEndpoint: o.monitoringEndpointGen.GenMonitoringEndpoint(
 			string(destChainFamily),
@@ -258,10 +334,17 @@ func (o *oracleCreator) CreateExecOracle(config cctypes.OCRConfig) (cctypes.CCIP
 			string(config.OfframpAddress()),
 			synchronization.OCR3CCIPExec,
 		),
-		OffchainConfigDigester: nil, // TODO
+		OffchainConfigDigester: ocrimpls.NewConfigDigester(config.ConfigDigest()),
 		OffchainKeyring:        keybundle,
 		OnchainKeyring:         onchainKeyring,
-		ReportingPluginFactory: nil, // TODO
+		ReportingPluginFactory: ccipocr3exec.NewPluginFactory(
+			contractReaders,
+			contractWriters,
+			cciptypes.ChainSelector(config.ChainSelector()),
+			reportCodec,
+			msgHasher,
+			o.lggr.Named("CCIPExecPlugin").Named(destRelayID.String()).Named(hexutil.Encode(config.OfframpAddress())),
+		),
 	}
 	oracle, err := libocr3.NewOracle(oracleArgs)
 	if err != nil {
@@ -285,28 +368,36 @@ func (o *oracleCreator) CreateBootstrapOracle(config cctypes.OCRConfig) (cctypes
 	bootstrapperArgs := libocr3.BootstrapperArgs{
 		BootstrapperFactory:   o.peerWrapper.Peer2,
 		V2Bootstrappers:       o.bootstrapperLocators,
-		ContractConfigTracker: nil, // TODO
+		ContractConfigTracker: ocrimpls.NewConfigTracker(config),
 		Database:              o.db,
 		LocalConfig: ocrtypes.LocalConfig{
-			BlockchainTimeout:                  10 * time.Second,
+			BlockchainTimeout: 10 * time.Second,
+
+			// Config tracking is handled by the launcher, since we're doing blue-green
+			// deployments we're not going to be using OCR's built-in config switching,
+			// which always shuts down the previous instance.
 			ContractConfigConfirmations:        0,
-			SkipContractConfigConfirmations:    false,
+			SkipContractConfigConfirmations:    true,
 			ContractConfigTrackerPollInterval:  10 * time.Second,
 			ContractTransmitterTransmitTimeout: 10 * time.Second,
 			DatabaseTimeout:                    10 * time.Second,
 			MinOCR2MaxDurationQuery:            1 * time.Second,
 			DevelopmentMode:                    "false",
 		},
-		Logger: ocrcommon.NewOCRWrapper(o.lggr, false /* traceLogging */, func(ctx context.Context, msg string) {
-			// o.lggr.ErrorIf(d.jobORM.RecordError(ctx, jb.ID, msg), "unable to record error") // TODO
-		}),
+		Logger: ocrcommon.NewOCRWrapper(
+			o.lggr.
+				Named("CCIPBootstrap").
+				Named(destRelayID.String()).
+				Named(hexutil.Encode(config.OfframpAddress())),
+			false, /* traceLogging */
+			func(ctx context.Context, msg string) {}),
 		MonitoringEndpoint: o.monitoringEndpointGen.GenMonitoringEndpoint(
 			string(destChainFamily),
 			destRelayID.ChainID,
 			string(config.OfframpAddress()),
 			synchronization.OCR3CCIPBootstrap,
 		),
-		OffchainConfigDigester: nil, // TODO
+		OffchainConfigDigester: ocrimpls.NewConfigDigester(config.ConfigDigest()),
 	}
 	bootstrapper, err := libocr3.NewBootstrapper(bootstrapperArgs)
 	if err != nil {

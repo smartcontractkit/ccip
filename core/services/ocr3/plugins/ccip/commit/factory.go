@@ -9,6 +9,8 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"google.golang.org/grpc"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 	ocr2types "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
@@ -32,7 +34,7 @@ func (p PluginFactoryConstructor) NewReportingPluginFactory(
 	keyValueStore core.KeyValueStore,
 	relayerSet core.RelayerSet,
 ) (core.OCR3ReportingPluginFactory, error) {
-	return NewPluginFactory(), nil
+	return nil, nil
 }
 
 func (p PluginFactoryConstructor) NewValidationService(ctx context.Context) (core.ValidationService, error) {
@@ -40,10 +42,31 @@ func (p PluginFactoryConstructor) NewValidationService(ctx context.Context) (cor
 }
 
 // PluginFactory implements common ReportingPluginFactory and is used for (re-)initializing commit plugin instances.
-type PluginFactory struct{}
+type PluginFactory struct {
+	contractReaders map[cciptypes.ChainSelector]types.ContractReader
+	contractWriters map[cciptypes.ChainSelector]types.ChainWriter
+	destChain       cciptypes.ChainSelector
+	destChainCodec  cciptypes.CommitPluginCodec
+	destChainHasher cciptypes.MessageHasher
+	lggr            logger.Logger
+}
 
-func NewPluginFactory() *PluginFactory {
-	return &PluginFactory{}
+func NewPluginFactory(
+	contractReaders map[cciptypes.ChainSelector]types.ContractReader,
+	contractWriters map[cciptypes.ChainSelector]types.ChainWriter,
+	destChain cciptypes.ChainSelector,
+	destChainCodec cciptypes.CommitPluginCodec,
+	destChainHasher cciptypes.MessageHasher,
+	lggr logger.Logger,
+) *PluginFactory {
+	return &PluginFactory{
+		contractReaders: contractReaders,
+		contractWriters: contractWriters,
+		destChain:       destChain,
+		destChainCodec:  destChainCodec,
+		destChainHasher: destChainHasher,
+		lggr:            lggr,
+	}
 }
 
 func (p PluginFactory) NewReportingPlugin(config ocr3types.ReportingPluginConfig,
@@ -56,15 +79,28 @@ func (p PluginFactory) NewReportingPlugin(config ocr3types.ReportingPluginConfig
 	)
 
 	return NewPlugin(
-		context.Background(),
-		config.OracleID,
-		cciptypes.CommitPluginConfig{},
-		nil,
-		onChainTokenPricesReader,
-		nil,
-		nil,
-		nil,
-	), ocr3types.ReportingPluginInfo{}, nil
+			context.Background(),
+			config.OracleID,
+			cciptypes.CommitPluginConfig{},
+			reader.NewCCIPChainReader(
+				p.contractReaders,
+				p.contractWriters,
+				p.destChain,
+			),
+			onChainTokenPricesReader,
+			p.destChainCodec,
+			p.destChainHasher,
+			p.lggr,
+		), ocr3types.ReportingPluginInfo{
+			Name: "CCIPCommitOCR3",
+			Limits: ocr3types.ReportingPluginLimits{
+				MaxQueryLength:       0, // no query for commit (yet)
+				MaxObservationLength: 2048,
+				MaxOutcomeLength:     2048,
+				MaxReportLength:      2048,
+				MaxReportCount:       50,
+			},
+		}, nil
 }
 
 func (p PluginFactory) Name() string {

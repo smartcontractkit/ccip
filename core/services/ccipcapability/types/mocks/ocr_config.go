@@ -50,6 +50,44 @@ func (_m *OCRConfig) ChainSelector() uint64 {
 	return r0
 }
 
+// ConfigCount provides a mock function with given fields:
+func (_m *OCRConfig) ConfigCount() uint64 {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for ConfigCount")
+	}
+
+	var r0 uint64
+	if rf, ok := ret.Get(0).(func() uint64); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(uint64)
+	}
+
+	return r0
+}
+
+// ConfigDigest provides a mock function with given fields:
+func (_m *OCRConfig) ConfigDigest() [32]byte {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for ConfigDigest")
+	}
+
+	var r0 [32]byte
+	if rf, ok := ret.Get(0).(func() [32]byte); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([32]byte)
+		}
+	}
+
+	return r0
+}
+
 // F provides a mock function with given fields:
 func (_m *OCRConfig) F() uint8 {
 	ret := _m.Called()

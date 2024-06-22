@@ -180,9 +180,8 @@ func deployContracts(
 				RmnProxy:      rmnProxyAddr,
 			},
 			evm_2_evm_multi_onramp.EVM2EVMMultiOnRampDynamicConfig{
-				Router:             routerAddr,
-				PriceRegistry:      priceRegistryAddr,
-				TokenAdminRegistry: tarAddr,
+				Router:        routerAddr,
+				PriceRegistry: priceRegistryAddr,
 			},
 			// can set this later once all chains are deployed
 			[]evm_2_evm_multi_onramp.EVM2EVMMultiOnRampDestChainConfigArgs{},
@@ -192,7 +191,6 @@ func deployContracts(
 			},
 			[]evm_2_evm_multi_onramp.EVM2EVMMultiOnRampPremiumMultiplierWeiPerEthArgs{},
 			[]evm_2_evm_multi_onramp.EVM2EVMMultiOnRampTokenTransferFeeConfigArgs{},
-			[]evm_2_evm_multi_onramp.EVM2EVMMultiOnRampNopAndWeight{},
 		)
 		require.NoErrorf(t, err, "failed to deploy onramp on chain id %d", chainID)
 		backend.Commit()

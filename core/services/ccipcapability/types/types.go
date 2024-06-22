@@ -45,6 +45,8 @@ type OCRConfig interface {
 	Signers() [][]byte
 	Transmitters() [][]byte
 	OffchainConfig() []byte
+	ConfigCount() uint64
+	ConfigDigest() [32]byte
 	String() string
 }
 
