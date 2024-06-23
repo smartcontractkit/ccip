@@ -1503,6 +1503,9 @@ func (sourceCCIP *SourceCCIPModule) UpdateBalance(
 ) {
 	if len(sourceCCIP.TransferAmount) > 0 {
 		for i := range sourceCCIP.TransferAmount {
+			if sourceCCIP.TransferAmount[i] == nil { // nil transfer amount means no transfer for this token
+				continue
+			}
 			// if length of sourceCCIP.TransferAmount is more than available bridge token use first bridge token
 			token := sourceCCIP.Common.BridgeTokens[0]
 			if i < len(sourceCCIP.Common.BridgeTokens) {
@@ -1633,7 +1636,7 @@ func (sourceCCIP *SourceCCIPModule) AssertEventCCIPSendRequested(
 						seqNum := sendRequestedEvent.SequenceNumber
 						lggr = ptr.Ptr(lggr.With().
 							Uint64("SequenceNumber", seqNum).
-							Str("msgId ", fmt.Sprintf("0x%x", sendRequestedEvent.MessageId[:])).
+							Str("MsgID", fmt.Sprintf("0x%x", sendRequestedEvent.MessageId[:])).
 							Logger())
 						// prevEventAt is the time when the message was successful, this should be same as the time when the event was emitted
 						reqStat[i].UpdateState(lggr, seqNum, testreporters.CCIPSendRe, 0, testreporters.Success,
@@ -1692,6 +1695,9 @@ func (sourceCCIP *SourceCCIPModule) CCIPMsg(
 
 	tokenAndAmounts := []router.ClientEVMTokenAmount{}
 	for i, amount := range sourceCCIP.TransferAmount {
+		if amount == nil { // make nil transfer amount 0 to avoid panics
+			sourceCCIP.TransferAmount[i] = big.NewInt(0)
+		}
 		token := sourceCCIP.Common.BridgeTokens[0]
 		// if length of sourceCCIP.TransferAmount is more than available bridge token use first bridge token
 		if i < len(sourceCCIP.Common.BridgeTokens) {

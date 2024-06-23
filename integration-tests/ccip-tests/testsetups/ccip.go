@@ -368,6 +368,7 @@ func UseCCIPOwnerTokens(yes bool) TestConfigOverrideOption {
 	}
 }
 
+// WithTokensPerChain sets the number of tokens to deploy on each chain
 func WithTokensPerChain(count int) TestConfigOverrideOption {
 	return func(c *CCIPTestConfig) string {
 		c.TestGroupInput.TokenConfig.NoOfTokensPerChain = pointer.ToInt(count)
@@ -375,10 +376,19 @@ func WithTokensPerChain(count int) TestConfigOverrideOption {
 	}
 }
 
+// WithMsgDetails sets the message details for the test
 func WithMsgDetails(details *testconfig.MsgDetails) TestConfigOverrideOption {
 	return func(c *CCIPTestConfig) string {
 		c.TestGroupInput.MsgDetails = details
 		return "Message set"
+	}
+}
+
+// WithNoTokensPerMessage sets how many tokens can be sent in a single message
+func WithNoTokensPerMessage(noOfTokens int) TestConfigOverrideOption {
+	return func(c *CCIPTestConfig) string {
+		c.TestGroupInput.MsgDetails.NoOfTokens = pointer.ToInt(noOfTokens)
+		return fmt.Sprintf("MsgDetails.NoOfTokens set to %d", noOfTokens)
 	}
 }
 
