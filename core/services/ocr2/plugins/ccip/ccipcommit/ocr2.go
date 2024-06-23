@@ -112,10 +112,16 @@ func (r *CommitReportingPlugin) Observation(ctx context.Context, epochAndRound t
 		return nil, err
 	}
 
-	// Fetches multi-lane gasPricesUSD and tokenPricesUSD for the same dest chain; resulting maps are not nil
+	// Fetches multi-lane gasPricesUSD and tokenPricesUSD for the same dest chain
 	gasPricesUSD, tokenPricesUSD, err := r.observePriceUpdates(ctx)
 	if err != nil {
 		return nil, err
+	}
+
+	// For backwards compatibility with the order release during phased rollout, include the default gas price on this lane
+	var defaultGasPricesUSD *big.Int
+	if len(gasPricesUSD) > 0 {
+		defaultGasPricesUSD = gasPricesUSD[r.sourceChainSelector]
 	}
 
 	lggr.Infow("Observation",
@@ -136,7 +142,7 @@ func (r *CommitReportingPlugin) Observation(ctx context.Context, epochAndRound t
 			Max: maxSeqNr,
 		},
 		TokenPricesUSD:            tokenPricesUSD,
-		SourceGasPriceUSD:         gasPricesUSD[r.sourceChainSelector], // for backwards compatibility during phased rollout
+		SourceGasPriceUSD:         defaultGasPricesUSD,
 		SourceGasPriceUSDPerChain: gasPricesUSD,
 	}.Marshal()
 }

@@ -230,6 +230,7 @@ func TestCommitReportingPlugin_Report(t *testing.T) {
 	ctx := testutils.Context(t)
 	sourceChainSelector := uint64(rand.Int())
 	var gasPrice = big.NewInt(1)
+	var gasPrice2 = big.NewInt(2)
 	gasPriceHeartBeat := *config.MustNewDuration(time.Hour)
 
 	t.Run("not enough observations", func(t *testing.T) {
@@ -268,8 +269,8 @@ func TestCommitReportingPlugin_Report(t *testing.T) {
 		{
 			name: "base",
 			observations: []ccip.CommitObservation{
-				{Interval: cciptypes.CommitStoreInterval{Min: 1, Max: 1}, SourceGasPriceUSD: gasPrice},
-				{Interval: cciptypes.CommitStoreInterval{Min: 1, Max: 1}, SourceGasPriceUSD: gasPrice},
+				{Interval: cciptypes.CommitStoreInterval{Min: 1, Max: 1}, SourceGasPriceUSDPerChain: map[uint64]*big.Int{sourceChainSelector: gasPrice}},
+				{Interval: cciptypes.CommitStoreInterval{Min: 1, Max: 1}, SourceGasPriceUSDPerChain: map[uint64]*big.Int{sourceChainSelector: gasPrice}},
 			},
 			f: 1,
 			sendRequests: []cciptypes.EVM2EVMMessageWithTxMeta{
@@ -300,6 +301,68 @@ func TestCommitReportingPlugin_Report(t *testing.T) {
 			expErr: false,
 		},
 		{
+			name: "observations with mix gas price formats",
+			observations: []ccip.CommitObservation{
+				{
+					Interval: cciptypes.CommitStoreInterval{Min: 1, Max: 1},
+					SourceGasPriceUSDPerChain: map[uint64]*big.Int{
+						sourceChainSelector:     gasPrice,
+						sourceChainSelector + 1: gasPrice2,
+						sourceChainSelector + 2: gasPrice2,
+					},
+				},
+				{
+					Interval: cciptypes.CommitStoreInterval{Min: 1, Max: 1},
+					SourceGasPriceUSDPerChain: map[uint64]*big.Int{
+						sourceChainSelector:     gasPrice,
+						sourceChainSelector + 1: gasPrice2,
+						sourceChainSelector + 2: gasPrice2,
+					},
+				},
+				{
+					Interval: cciptypes.CommitStoreInterval{Min: 1, Max: 1},
+					SourceGasPriceUSDPerChain: map[uint64]*big.Int{
+						sourceChainSelector:     gasPrice,
+						sourceChainSelector + 1: gasPrice2,
+					},
+				},
+				{
+					Interval:          cciptypes.CommitStoreInterval{Min: 1, Max: 1},
+					SourceGasPriceUSD: gasPrice,
+				},
+			},
+			f: 2,
+			sendRequests: []cciptypes.EVM2EVMMessageWithTxMeta{
+				{
+					EVM2EVMMessage: cciptypes.EVM2EVMMessage{
+						SequenceNumber: 1,
+					},
+				},
+			},
+			gasPriceUpdates: []cciptypes.GasPriceUpdateWithTxMeta{
+				{
+					GasPriceUpdate: cciptypes.GasPriceUpdate{
+						GasPrice: cciptypes.GasPrice{
+							DestChainSelector: sourceChainSelector,
+							Value:             big.NewInt(1),
+						},
+						TimestampUnixSec: big.NewInt(time.Now().Add(-2 * gasPriceHeartBeat.Duration()).Unix()),
+					},
+				},
+			},
+			expSeqNumRange: cciptypes.CommitStoreInterval{Min: 1, Max: 1},
+			expCommitReport: &cciptypes.CommitStoreReport{
+				MerkleRoot:  [32]byte{},
+				Interval:    cciptypes.CommitStoreInterval{Min: 1, Max: 1},
+				TokenPrices: nil,
+				GasPrices: []cciptypes.GasPrice{
+					{DestChainSelector: sourceChainSelector, Value: gasPrice},
+					{DestChainSelector: sourceChainSelector + 1, Value: gasPrice2},
+				},
+			},
+			expErr: false,
+		},
+		{
 			name: "empty",
 			observations: []ccip.CommitObservation{
 				{Interval: cciptypes.CommitStoreInterval{Min: 0, Max: 0}, SourceGasPriceUSD: big.NewInt(0)},
@@ -310,7 +373,7 @@ func TestCommitReportingPlugin_Report(t *testing.T) {
 					GasPriceUpdate: cciptypes.GasPriceUpdate{
 						GasPrice: cciptypes.GasPrice{
 							DestChainSelector: sourceChainSelector,
-							Value:             big.NewInt(1),
+							Value:             big.NewInt(0),
 						},
 						TimestampUnixSec: big.NewInt(time.Now().Add(-gasPriceHeartBeat.Duration() / 2).Unix()),
 					},
@@ -335,7 +398,7 @@ func TestCommitReportingPlugin_Report(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			destPriceRegistryReader := ccipdatamocks.NewPriceRegistryReader(t)
-			destPriceRegistryReader.On("GetGasPriceUpdatesCreatedAfter", ctx, sourceChainSelector, mock.Anything, 0).Return(tc.gasPriceUpdates, nil)
+			destPriceRegistryReader.On("GetAllGasPriceUpdatesCreatedAfter", ctx, mock.Anything, 0).Return(tc.gasPriceUpdates, nil)
 			destPriceRegistryReader.On("GetTokenPriceUpdatesCreatedAfter", ctx, mock.Anything, 0).Return(tc.tokenPriceUpdates, nil)
 
 			onRampReader := ccipdatamocks.NewOnRampReader(t)
@@ -343,13 +406,11 @@ func TestCommitReportingPlugin_Report(t *testing.T) {
 				onRampReader.On("GetSendRequestsBetweenSeqNums", ctx, tc.expSeqNumRange.Min, tc.expSeqNumRange.Max, true).Return(tc.sendRequests, nil)
 			}
 
-			gasPriceEstimator := prices.NewMockGasPriceEstimatorCommit(t)
-			gasPriceEstimator.On("Median", mock.Anything).Return(gasPrice, nil)
-			if tc.gasPriceUpdates != nil {
-				gasPriceEstimator.On("Deviates", mock.Anything, mock.Anything, mock.Anything).Return(false, nil)
-			}
+			evmEstimator := mocks.NewEvmFeeEstimator(t)
+			evmEstimator.On("L1Oracle").Return(nil)
+			gasPriceEstimator := prices.NewDAGasPriceEstimator(evmEstimator, nil, 2e9, 2e9) // 200% deviation
 
-			destTokens := []cciptypes.Address{}
+			var destTokens []cciptypes.Address
 			for tk := range tc.tokenDecimals {
 				destTokens = append(destTokens, tk)
 			}
