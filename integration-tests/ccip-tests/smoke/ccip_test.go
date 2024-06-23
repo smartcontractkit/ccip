@@ -548,7 +548,7 @@ func TestSmokeCCIPOffRampCapacityLimit(t *testing.T) {
 	capacityLimited := contracts.RateLimiterConfig{
 		IsEnabled: true,
 		Capacity:  big.NewInt(1e16),
-		Rate:      new(big.Int).Mul(big.NewInt(1e16), big.NewInt(100)), // Set a high rate limit to avoid it getting in the way
+		Rate:      new(big.Int).Mul(big.NewInt(1e16), big.NewInt(10)), // Set a high rate limit to avoid it getting in the way
 	}
 	testOffRampRateLimits(t, capacityLimited)
 }
@@ -558,7 +558,7 @@ func TestSmokeCCIPOffRampAggRateLimit(t *testing.T) {
 
 	aggRateLimited := contracts.RateLimiterConfig{
 		IsEnabled: true,
-		Capacity:  new(big.Int).Mul(big.NewInt(1e16), big.NewInt(100)), // Set a high capacity limit to avoid it getting in the way
+		Capacity:  new(big.Int).Mul(big.NewInt(1e16), big.NewInt(10)), // Set a high capacity limit to avoid it getting in the way
 		Rate:      big.NewInt(1),
 	}
 	testOffRampRateLimits(t, aggRateLimited)
@@ -777,8 +777,6 @@ func TestSmokeCCIPTransferConfig(t *testing.T) {
 			err = tc.lane.SendRequests(1, big.NewInt(actions.DefaultRequestGasLimit))
 			require.NoError(t, err)
 			tc.lane.ValidateRequests()
-
-			// TODO: Ensure billing is happening as expected
 
 			// Ensure aggregate rate limiting is working as expected
 			src.TransferAmount[noConfigTokenIndex] = nil
