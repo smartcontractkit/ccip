@@ -330,14 +330,20 @@ jobs:
             os: ubuntu-latest
             file: ccip
             run: -run ^TestSmokeCCIPOnRampLimits$
-          - name: ccip-smoke-off-ramp-limits
-            nodes: 2
+          - name: ccip-smoke-off-ramp-capacity
+            nodes: 1
             dir: ccip-tests/smoke
             os: ubuntu-latest
             file: ccip
-            run: -run ^TestSmokeCCIPOffRampLimits$
+            run: -run ^TestSmokeCCIPOffRampCapacityLimit$
+          - name: ccip-smoke-off-ramp-agg-rate-limit
+            nodes: 1
+            dir: ccip-tests/smoke
+            os: ubuntu-latest
+            file: ccip
+            run: -run ^TestSmokeCCIPOffRampAggRateLimit$
           - name: ccip-smoke-transfer-config
-            nodes: 2
+            nodes: 1
             dir: ccip-tests/smoke
             os: ubuntu-latest
             file: ccip

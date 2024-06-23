@@ -542,159 +542,26 @@ func TestSmokeCCIPOnRampLimits(t *testing.T) {
 	}
 }
 
-func TestSmokeCCIPOffRampLimits(t *testing.T) {
+func TestSmokeCCIPOffRampCapacityLimit(t *testing.T) {
 	t.Parallel()
 
-	log := logging.GetTestLogger(t)
-	TestCfg := testsetups.NewCCIPTestConfig(t, log, testconfig.Smoke)
-	if offRampVersion, exists := TestCfg.VersionInput[contracts.OffRampContract]; exists {
-		require.NotEqual(t, offRampVersion, contracts.V1_2_0, "Provided OffRamp contract version '%s' is not supported for this test", offRampVersion)
-	} else {
-		require.FailNow(t, "OffRamp contract version not found in test config")
+	capacityLimited := contracts.RateLimiterConfig{
+		IsEnabled: true,
+		Capacity:  big.NewInt(1e16),
+		Rate:      new(big.Int).Mul(big.NewInt(1e16), big.NewInt(100)), // Set a high rate limit to avoid it getting in the way
 	}
-	require.True(t, TestCfg.SelectedNetworks[0].Simulated, "This test relies on timing assumptions and should only be run on simulated networks")
-	require.False(t, pointer.GetBool(TestCfg.TestGroupInput.ExistingDeployment), "This test modifies contract state and cannot be run on existing deployments")
+	testOffRampRateLimits(t, capacityLimited)
+}
 
-	// Set the default permissionless exec threshold lower so that we can manually execute the transactions faster
-	// Tuning this too low stops any transactions from being realistically executed
-	actions.DefaultPermissionlessExecThreshold = 1 * time.Minute
-	setUpOutput := testsetups.CCIPDefaultTestSetUp(t, &log, "smoke-ccip", nil, TestCfg)
-	if len(setUpOutput.Lanes) == 0 {
-		return
+func TestSmokeCCIPOffRampAggRateLimit(t *testing.T) {
+	t.Parallel()
+
+	aggRateLimited := contracts.RateLimiterConfig{
+		IsEnabled: true,
+		Capacity:  new(big.Int).Mul(big.NewInt(1e16), big.NewInt(100)), // Set a high capacity limit to avoid it getting in the way
+		Rate:      big.NewInt(1),
 	}
-	t.Cleanup(func() {
-		require.NoError(t, setUpOutput.TearDown())
-	})
-
-	var tests []testDefinition
-	for _, lane := range setUpOutput.Lanes {
-		tests = append(tests, testDefinition{
-			testName: fmt.Sprintf("Network %s to network %s",
-				lane.ForwardLane.SourceNetworkName, lane.ForwardLane.DestNetworkName),
-			lane: lane.ForwardLane,
-		})
-	}
-
-	var (
-		capacityLimit      = big.NewInt(1e16)
-		overLimitAmount    = new(big.Int).Add(capacityLimit, big.NewInt(1))
-		freeTokenIndex     = 0
-		limitedTokenIndex  = 1
-		rateLimiterConfigs = []contracts.RateLimiterConfig{
-			{
-				IsEnabled: true,
-				Capacity:  capacityLimit,
-				Rate:      new(big.Int).Mul(capacityLimit, big.NewInt(20)), // We set a large rate limit to avoid it getting in the way
-			},
-			{
-				IsEnabled: true,
-				Capacity:  new(big.Int).Mul(capacityLimit, big.NewInt(20)),
-				Rate:      big.NewInt(1), // We set a large rate limit to avoid it getting in the way
-			},
-		}
-	)
-
-	for _, tc := range tests {
-		for _, rc := range rateLimiterConfigs {
-			rateLimiterConfig := rc
-			configName := "Capacity Limited"
-			if rateLimiterConfig.Rate.Cmp(big.NewInt(1)) == 0 {
-				configName = "Aggregate Rate Limited"
-			}
-			t.Run(fmt.Sprintf("%s - OffRamp Limits %s", tc.testName, configName), func(t *testing.T) {
-				tc.lane.Test = t
-				src := tc.lane.Source
-				dest := tc.lane.Dest
-				require.GreaterOrEqual(t, len(src.Common.BridgeTokens), 2, "At least two bridge tokens needed for test")
-				require.GreaterOrEqual(t, len(src.Common.BridgeTokenPools), 2, "At least two bridge token pools needed for test")
-				require.GreaterOrEqual(t, len(dest.Common.BridgeTokens), 2, "At least two bridge tokens needed for test")
-				require.GreaterOrEqual(t, len(dest.Common.BridgeTokenPools), 2, "At least two bridge token pools needed for test")
-				addLiquidity(t, src.Common, new(big.Int).Mul(capacityLimit, big.NewInt(20)))
-				addLiquidity(t, dest.Common, new(big.Int).Mul(capacityLimit, big.NewInt(20)))
-
-				var (
-					freeSrcToken     = src.Common.BridgeTokens[freeTokenIndex]
-					freeDestToken    = dest.Common.BridgeTokens[freeTokenIndex]
-					limitedSrcToken  = src.Common.BridgeTokens[limitedTokenIndex]
-					limitedDestToken = dest.Common.BridgeTokens[limitedTokenIndex]
-				)
-				tc.lane.Logger.Info().
-					Str("Free Source Token", freeSrcToken.Address()).
-					Str("Free Dest Token", freeDestToken.Address()).
-					Str("Limited Source Token", limitedSrcToken.Address()).
-					Str("Limited Dest Token", limitedDestToken.Address()).
-					Msg("Tokens for rate limit testing")
-
-				err := tc.lane.DisableAllRateLimiting()
-				require.NoError(t, err, "Error disabling rate limits")
-
-				// Send both tokens with no rate limits and ensure they succeed
-				src.TransferAmount[freeTokenIndex] = overLimitAmount
-				src.TransferAmount[limitedTokenIndex] = overLimitAmount
-				tc.lane.RecordStateBeforeTransfer()
-				err = tc.lane.SendRequests(1, big.NewInt(actions.DefaultRequestGasLimit))
-				require.NoError(t, err)
-				tc.lane.ValidateRequests()
-
-				// Enable capacity limiting on the destination chain for the limited token
-				err = dest.AddRateLimitTokens([]*contracts.ERC20Token{limitedSrcToken}, []*contracts.ERC20Token{limitedDestToken})
-				require.NoError(t, err, "Error setting destination rate limits")
-				err = dest.OffRamp.SetRateLimit(rateLimiterConfig)
-				require.NoError(t, err, "Error setting destination rate limits")
-				err = dest.Common.ChainClient.WaitForEvents()
-				require.NoError(t, err, "Error waiting for events")
-				tc.lane.Logger.Debug().Str("Token", limitedSrcToken.ContractAddress.Hex()).Msg("Enabled capacity limit on destination chain")
-
-				// Send free token that should not have a rate limit and should succeed
-				src.TransferAmount[freeTokenIndex] = overLimitAmount
-				src.TransferAmount[limitedTokenIndex] = big.NewInt(0)
-				tc.lane.RecordStateBeforeTransfer()
-				err = tc.lane.SendRequests(1, big.NewInt(actions.DefaultRequestGasLimit))
-				require.NoError(t, err, "Free token transfer failed")
-				tc.lane.ValidateRequests()
-				tc.lane.Logger.Info().Str("Token", freeSrcToken.ContractAddress.Hex()).Msg("Free token transfer succeeded")
-
-				// Send limited token with rate limit that should fail on the destination chain
-				src.TransferAmount[freeTokenIndex] = big.NewInt(0)
-				src.TransferAmount[limitedTokenIndex] = overLimitAmount
-				tc.lane.RecordStateBeforeTransfer()
-				err = tc.lane.SendRequests(1, big.NewInt(actions.DefaultRequestGasLimit))
-				require.NoError(t, err, "Failed to send rate limited token transfer")
-				// Expect the ExecutionStateChanged event to never show up
-				// Since we're looking to confirm that an event has NOT occurred, this can lead to some imperfect assumptions and results
-				// We set the timeout to stop waiting for the event after a minute
-				// 99% of transactions occur in under a minute in ideal simulated conditions, so this is an okay assumption there
-				// but on real chains this risks false negatives
-				// If we don't set this timeout, this test can take a long time and hold up CI
-				tc.lane.ValidateRequests(actions.ExpectPhaseToFail(testreporters.ExecStateChanged, actions.WithTimeout(time.Minute)))
-				tc.lane.Logger.Info().
-					Str("Token", limitedSrcToken.ContractAddress.Hex()).
-					Msg("Limited token transfer failed on destination chain (a good thing in this context)")
-
-				// Manually execute the rate limited token transfer and expect a similar error
-				tc.lane.Logger.Info().Str("Wait Time", actions.DefaultPermissionlessExecThreshold.String()).Msg("Waiting for Exec Threshold to Expire")
-				time.Sleep(actions.DefaultPermissionlessExecThreshold) // Give time to exit the window
-				// See above comment on timeout
-				err = tc.lane.ExecuteManually(actions.WithConfirmationTimeout(time.Minute))
-				require.Error(t, err, "There should be errors executing manually at this point")
-				tc.lane.Logger.Debug().Str("Error", err.Error()).Msg("Manually executed rate limited token transfer failed as expected")
-
-				// Change limits to make it viable
-				err = dest.OffRamp.SetRateLimit(contracts.RateLimiterConfig{
-					IsEnabled: true,
-					Capacity:  new(big.Int).Mul(capacityLimit, big.NewInt(100)),
-					Rate:      new(big.Int).Mul(capacityLimit, big.NewInt(100)),
-				})
-				require.NoError(t, err, "Error setting destination rate limits")
-				err = dest.Common.ChainClient.WaitForEvents()
-				require.NoError(t, err, "Error waiting for events")
-
-				// Execute again manually and expect a pass
-				err = tc.lane.ExecuteManually()
-				require.NoError(t, err, "Error manually executing transaction after rate limit is lifted")
-			})
-		}
-	}
+	testOffRampRateLimits(t, aggRateLimited)
 }
 
 func TestSmokeCCIPMulticall(t *testing.T) {
@@ -954,4 +821,146 @@ func addLiquidity(t *testing.T, ccipCommon *actions.CCIPCommon, amount *big.Int)
 		)
 		require.NoError(t, err)
 	}
+}
+
+// testOffRampRateLimits tests the rate limiting functionality of the OffRamp contract
+// it's broken into a helper to help parallelize and keep the tests DRY
+func testOffRampRateLimits(t *testing.T, rateLimiterConfig contracts.RateLimiterConfig) {
+	t.Helper()
+
+	log := logging.GetTestLogger(t)
+	TestCfg := testsetups.NewCCIPTestConfig(t, log, testconfig.Smoke)
+	if offRampVersion, exists := TestCfg.VersionInput[contracts.OffRampContract]; exists {
+		require.NotEqual(t, offRampVersion, contracts.V1_2_0, "Provided OffRamp contract version '%s' is not supported for this test", offRampVersion)
+	} else {
+		require.FailNow(t, "OffRamp contract version not found in test config")
+	}
+	require.True(t, TestCfg.SelectedNetworks[0].Simulated, "This test relies on timing assumptions and should only be run on simulated networks")
+	require.False(t, pointer.GetBool(TestCfg.TestGroupInput.ExistingDeployment), "This test modifies contract state and cannot be run on existing deployments")
+
+	// Set the default permissionless exec threshold lower so that we can manually execute the transactions faster
+	// Tuning this too low stops any transactions from being realistically executed
+	actions.DefaultPermissionlessExecThreshold = 1 * time.Minute
+
+	setUpOutput := testsetups.CCIPDefaultTestSetUp(t, &log, "smoke-ccip", nil, TestCfg)
+	if len(setUpOutput.Lanes) == 0 {
+		return
+	}
+	t.Cleanup(func() {
+		require.NoError(t, setUpOutput.TearDown())
+	})
+
+	var tests []testDefinition
+	for _, lane := range setUpOutput.Lanes {
+		tests = append(tests, testDefinition{
+			testName: fmt.Sprintf("Network %s to network %s",
+				lane.ForwardLane.SourceNetworkName, lane.ForwardLane.DestNetworkName),
+			lane: lane.ForwardLane,
+		})
+	}
+
+	var (
+		freeTokenIndex    = 0
+		limitedTokenIndex = 1
+	)
+
+	for _, tc := range tests {
+		t.Run(fmt.Sprintf("%s - OffRamp Limits", tc.testName), func(t *testing.T) {
+			tc.lane.Test = t
+			src := tc.lane.Source
+			dest := tc.lane.Dest
+			var (
+				capacityLimit   = rateLimiterConfig.Capacity
+				overLimitAmount = new(big.Int).Add(capacityLimit, big.NewInt(1))
+			)
+			require.GreaterOrEqual(t, len(src.Common.BridgeTokens), 2, "At least two bridge tokens needed for test")
+			require.GreaterOrEqual(t, len(src.Common.BridgeTokenPools), 2, "At least two bridge token pools needed for test")
+			require.GreaterOrEqual(t, len(dest.Common.BridgeTokens), 2, "At least two bridge tokens needed for test")
+			require.GreaterOrEqual(t, len(dest.Common.BridgeTokenPools), 2, "At least two bridge token pools needed for test")
+			addLiquidity(t, src.Common, new(big.Int).Mul(capacityLimit, big.NewInt(20)))
+			addLiquidity(t, dest.Common, new(big.Int).Mul(capacityLimit, big.NewInt(20)))
+
+			var (
+				freeSrcToken     = src.Common.BridgeTokens[freeTokenIndex]
+				freeDestToken    = dest.Common.BridgeTokens[freeTokenIndex]
+				limitedSrcToken  = src.Common.BridgeTokens[limitedTokenIndex]
+				limitedDestToken = dest.Common.BridgeTokens[limitedTokenIndex]
+			)
+			tc.lane.Logger.Info().
+				Str("Free Source Token", freeSrcToken.Address()).
+				Str("Free Dest Token", freeDestToken.Address()).
+				Str("Limited Source Token", limitedSrcToken.Address()).
+				Str("Limited Dest Token", limitedDestToken.Address()).
+				Msg("Tokens for rate limit testing")
+
+			err := tc.lane.DisableAllRateLimiting()
+			require.NoError(t, err, "Error disabling rate limits")
+
+			// Send both tokens with no rate limits and ensure they succeed
+			src.TransferAmount[freeTokenIndex] = overLimitAmount
+			src.TransferAmount[limitedTokenIndex] = overLimitAmount
+			tc.lane.RecordStateBeforeTransfer()
+			err = tc.lane.SendRequests(1, big.NewInt(actions.DefaultRequestGasLimit))
+			require.NoError(t, err)
+			tc.lane.ValidateRequests()
+
+			// Enable capacity limiting on the destination chain for the limited token
+			err = dest.AddRateLimitTokens([]*contracts.ERC20Token{limitedSrcToken}, []*contracts.ERC20Token{limitedDestToken})
+			require.NoError(t, err, "Error setting destination rate limits")
+			err = dest.OffRamp.SetRateLimit(rateLimiterConfig)
+			require.NoError(t, err, "Error setting destination rate limits")
+			err = dest.Common.ChainClient.WaitForEvents()
+			require.NoError(t, err, "Error waiting for events")
+			tc.lane.Logger.Debug().Str("Token", limitedSrcToken.ContractAddress.Hex()).Msg("Enabled capacity limit on destination chain")
+
+			// Send free token that should not have a rate limit and should succeed
+			src.TransferAmount[freeTokenIndex] = overLimitAmount
+			src.TransferAmount[limitedTokenIndex] = big.NewInt(0)
+			tc.lane.RecordStateBeforeTransfer()
+			err = tc.lane.SendRequests(1, big.NewInt(actions.DefaultRequestGasLimit))
+			require.NoError(t, err, "Free token transfer failed")
+			tc.lane.ValidateRequests()
+			tc.lane.Logger.Info().Str("Token", freeSrcToken.ContractAddress.Hex()).Msg("Free token transfer succeeded")
+
+			// Send limited token with rate limit that should fail on the destination chain
+			src.TransferAmount[freeTokenIndex] = big.NewInt(0)
+			src.TransferAmount[limitedTokenIndex] = overLimitAmount
+			tc.lane.RecordStateBeforeTransfer()
+			err = tc.lane.SendRequests(1, big.NewInt(actions.DefaultRequestGasLimit))
+			require.NoError(t, err, "Failed to send rate limited token transfer")
+			// Expect the ExecutionStateChanged event to never show up
+			// Since we're looking to confirm that an event has NOT occurred, this can lead to some imperfect assumptions and results
+			// We set the timeout to stop waiting for the event after a minute
+			// 99% of transactions occur in under a minute in ideal simulated conditions, so this is an okay assumption there
+			// but on real chains this risks false negatives
+			// If we don't set this timeout, this test can take a long time and hold up CI
+			tc.lane.ValidateRequests(actions.ExpectPhaseToFail(testreporters.ExecStateChanged, actions.WithTimeout(time.Minute)))
+			tc.lane.Logger.Info().
+				Str("Token", limitedSrcToken.ContractAddress.Hex()).
+				Msg("Limited token transfer failed on destination chain (a good thing in this context)")
+
+			// Manually execute the rate limited token transfer and expect a similar error
+			tc.lane.Logger.Info().Str("Wait Time", actions.DefaultPermissionlessExecThreshold.String()).Msg("Waiting for Exec Threshold to Expire")
+			time.Sleep(actions.DefaultPermissionlessExecThreshold) // Give time to exit the window
+			// See above comment on timeout
+			err = tc.lane.ExecuteManually(actions.WithConfirmationTimeout(time.Minute))
+			require.Error(t, err, "There should be errors executing manually at this point")
+			tc.lane.Logger.Debug().Str("Error", err.Error()).Msg("Manually executed rate limited token transfer failed as expected")
+
+			// Change limits to make it viable
+			err = dest.OffRamp.SetRateLimit(contracts.RateLimiterConfig{
+				IsEnabled: true,
+				Capacity:  new(big.Int).Mul(capacityLimit, big.NewInt(100)),
+				Rate:      new(big.Int).Mul(capacityLimit, big.NewInt(100)),
+			})
+			require.NoError(t, err, "Error setting destination rate limits")
+			err = dest.Common.ChainClient.WaitForEvents()
+			require.NoError(t, err, "Error waiting for events")
+
+			// Execute again manually and expect a pass
+			err = tc.lane.ExecuteManually()
+			require.NoError(t, err, "Error manually executing transaction after rate limit is lifted")
+		})
+	}
+
 }
