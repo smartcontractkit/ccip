@@ -225,6 +225,11 @@ func setupEmptyOutcome(ctx context.Context, t *testing.T, lggr logger.Logger) []
 			mock.Anything,
 		).Return([]cciptypes.SeqNum{}, nil)
 	}
+
+	err = homeChainPoller.Close()
+	if err != nil {
+		return nil
+	}
 	return nodes
 }
 
@@ -311,6 +316,13 @@ func setupAllNodesReadAllChains(ctx context.Context, t *testing.T, lggr logger.L
 			Return([]cciptypes.SeqNum{10, 20}, nil)
 
 	}
+
+	// No need to keep it running in the background anymore for this test
+	err = homeChainPoller.Close()
+	if err != nil {
+		return nil
+	}
+
 	return nodes
 }
 
@@ -399,6 +411,13 @@ func setupNodesDoNotAgreeOnMsgs(ctx context.Context, t *testing.T, lggr logger.L
 				cciptypes.NewBigIntFromInt64(20_000),
 			}, nil)
 	}
+
+	// No need to keep it running in the background anymore for this test
+	err = homeChainPoller.Close()
+	if err != nil {
+		return nil
+	}
+
 	return nodes
 }
 
@@ -450,7 +469,7 @@ func setupHomeChainPoller(lggr logger.Logger, chainConfigInfos []reader.ChainCon
 	homeChainPoller := reader.NewHomeChainConfigPoller(
 		homeChainReader,
 		lggr,
-		1*time.Second,
+		10*time.Millisecond, // to prevent linting error because of logging after finishing tests, we close the poller after each test, having lower polling interval make it catch up faster
 	)
 
 	return homeChainPoller
