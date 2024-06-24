@@ -2,7 +2,9 @@ package reader
 
 import (
 	"context"
+	"fmt"
 	"testing"
+	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
 	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
@@ -29,11 +31,41 @@ var (
 	p2pOracleCId = libocrtypes.PeerID{byte(oracleCId)}
 )
 
+func TestHomeChainConfigPoller_HealthReport(t *testing.T) {
+	homeChainReader := mocks.NewContractReaderMock()
+	homeChainReader.On(
+		"GetLatestValue",
+		mock.Anything,
+		"CCIPCapabilityConfiguration",
+		"getAllChainConfigs",
+		mock.Anything,
+		mock.Anything).Return(fmt.Errorf("error"))
+
+	configPoller := NewHomeChainConfigPoller(
+		homeChainReader,
+		logger.Test(t),
+		50*time.Millisecond,
+	)
+	_ = configPoller.Start(context.Background())
+
+	// Initially it's healthy
+	healthy := configPoller.HealthReport()
+	assert.Equal(t, map[string]error{"HomeChainConfigPoller": error(nil)}, healthy)
+
+	// After one second it will try polling 10 times and fail
+	time.Sleep(1 * time.Second)
+
+	errors := configPoller.HealthReport()
+	_ = configPoller.Close()
+	time.Sleep(150 * time.Millisecond)
+	assert.Equal(t, 1, len(errors))
+	assert.Errorf(t, errors["HomeChainConfigPoller"], "polling failed %d times in a row", MaxFailedPolls)
+}
 func Test_ConvertOnChainConfigToHomeChainConfig(t *testing.T) {
 	var tests = []struct {
 		name            string
 		onChainConfigs  []ChainConfigInfo
-		homeChainConfig map[cciptypes.ChainSelector]reader.ChainConfig
+		homeChainConfig map[cciptypes.ChainSelector]ChainConfig
 		expErr          string
 	}{
 		{
@@ -73,7 +105,7 @@ func Test_ConvertOnChainConfigToHomeChainConfig(t *testing.T) {
 					},
 				},
 			},
-			homeChainConfig: map[cciptypes.ChainSelector]reader.ChainConfig{
+			homeChainConfig: map[cciptypes.ChainSelector]ChainConfig{
 				chainA: {
 					FChain:         1,
 					SupportedNodes: mapset.NewSet(p2pOracleAId, p2pOracleBId, p2pOracleCId),
@@ -93,7 +125,7 @@ func Test_ConvertOnChainConfigToHomeChainConfig(t *testing.T) {
 		configPoller := NewHomeChainConfigPoller(
 			nil,
 			logger.Test(t),
-			1,
+			1*time.Second,
 		)
 		t.Run(tc.name, func(t *testing.T) {
 			resultConfig, err := configPoller.convertOnChainConfigToHomeChainConfig(tc.onChainConfigs)
@@ -139,7 +171,7 @@ func Test_PollingWorking(t *testing.T) {
 			},
 		},
 	}
-	homeChainConfig := map[cciptypes.ChainSelector]reader.ChainConfig{
+	homeChainConfig := map[cciptypes.ChainSelector]ChainConfig{
 		chainA: {
 			FChain:         1,
 			SupportedNodes: mapset.NewSet(p2pOracleAId, p2pOracleBId, p2pOracleCId),
@@ -165,12 +197,13 @@ func Test_PollingWorking(t *testing.T) {
 	configPoller := NewHomeChainConfigPoller(
 		homeChainReader,
 		logger.Test(t),
-		1,
+		1*time.Second,
 	)
 
 	ctx := context.Background()
 	_ = configPoller.Start(ctx)
 	_ = configPoller.Close()
+	time.Sleep(100 * time.Millisecond)
 
 	configs, err := configPoller.GetAllChainConfigs()
 	assert.NoError(t, err)

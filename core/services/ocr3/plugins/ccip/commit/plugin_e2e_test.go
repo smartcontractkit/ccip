@@ -4,25 +4,24 @@ import (
 	"context"
 	"reflect"
 	"testing"
-
-	"github.com/smartcontractkit/ccipocr3/internal/reader"
-
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
-	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
+	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/libocr/commontypes"
 
 	"github.com/smartcontractkit/ccipocr3/internal/libs/testhelpers"
 	"github.com/smartcontractkit/ccipocr3/internal/mocks"
+	"github.com/smartcontractkit/ccipocr3/internal/reader"
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
 
 func TestPlugin(t *testing.T) {
@@ -227,6 +226,10 @@ func setupEmptyOutcome(ctx context.Context, t *testing.T, lggr logger.Logger) []
 		).Return([]cciptypes.SeqNum{}, nil)
 	}
 
+	err = homeChainPoller.Close()
+	if err != nil {
+		return nil
+	}
 	return nodes
 }
 
@@ -314,6 +317,12 @@ func setupAllNodesReadAllChains(ctx context.Context, t *testing.T, lggr logger.L
 
 	}
 
+	// No need to keep it running in the background anymore for this test
+	err = homeChainPoller.Close()
+	if err != nil {
+		return nil
+	}
+
 	return nodes
 }
 
@@ -359,7 +368,10 @@ func setupNodesDoNotAgreeOnMsgs(ctx context.Context, t *testing.T, lggr logger.L
 	}
 
 	homeChainPoller := setupHomeChainPoller(lggr, chainConfigInfos)
-	_ = homeChainPoller.Start(ctx)
+	err := homeChainPoller.Start(ctx)
+	if err != nil {
+		return nil
+	}
 	oracleIDToP2pID := GetP2pIDs(1, 2, 3)
 	n1 := newNode(ctx, t, lggr, 1, cfg, homeChainPoller, oracleIDToP2pID)
 	n2 := newNode(ctx, t, lggr, 2, cfg, homeChainPoller, oracleIDToP2pID)
@@ -398,6 +410,12 @@ func setupNodesDoNotAgreeOnMsgs(ctx context.Context, t *testing.T, lggr logger.L
 				cciptypes.NewBigIntFromInt64(1000),
 				cciptypes.NewBigIntFromInt64(20_000),
 			}, nil)
+	}
+
+	// No need to keep it running in the background anymore for this test
+	err = homeChainPoller.Close()
+	if err != nil {
+		return nil
 	}
 
 	return nodes
@@ -451,7 +469,7 @@ func setupHomeChainPoller(lggr logger.Logger, chainConfigInfos []reader.ChainCon
 	homeChainPoller := reader.NewHomeChainConfigPoller(
 		homeChainReader,
 		lggr,
-		1,
+		10*time.Millisecond, // to prevent linting errors when closing the poller while running tests
 	)
 
 	return homeChainPoller

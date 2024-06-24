@@ -6,15 +6,15 @@ import (
 
 	"github.com/smartcontractkit/ccipocr3/internal/reader"
 
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
-	"github.com/smartcontractkit/libocr/commontypes"
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"google.golang.org/grpc"
 
-	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
-
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
+
+	"github.com/smartcontractkit/libocr/commontypes"
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	ocr2types "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
 )
 
 // PluginFactoryConstructor implements common OCR3ReportingPluginClient and is used for initializing a plugin factory
@@ -63,12 +63,12 @@ func (p PluginFactory) NewReportingPlugin(config ocr3types.ReportingPluginConfig
 		config.OracleID,
 		oracleIDToP2pID,
 		cciptypes.CommitPluginConfig{},
-		nil,
+		nil, //ccipReader
 		onChainTokenPricesReader,
-		nil,
-		nil,
-		nil,
-		nil,
+		nil, //reportCodec
+		nil, //msgHasher
+		nil, // lggr
+		nil, //homeChainPoller
 	), ocr3types.ReportingPluginInfo{}, nil
 }
 

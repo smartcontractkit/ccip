@@ -92,13 +92,13 @@ func (p *Plugin) Query(_ context.Context, _ ocr3types.OutcomeContext) (types.Que
 //	We discover the token prices only for the tokens that are used to pay for ccip fees.
 //	The fee tokens are configured in the plugin config.
 func (p *Plugin) Observation(ctx context.Context, outctx ocr3types.OutcomeContext, _ types.Query) (types.Observation, error) {
-	destSupportedChains, err := p.supportedChains()
+	supportedChains, err := p.supportedChains()
 	if err != nil {
 		return types.Observation{}, fmt.Errorf("error finding supported chains by node: %w", err)
 	}
 
 	msgBaseDetails := make([]cciptypes.CCIPMsgBaseDetails, 0)
-	latestCommittedSeqNumsObservation, err := observeLatestCommittedSeqNums(ctx, p.lggr, p.ccipReader, destSupportedChains, p.cfg.DestChain, p.knownSourceChainsSlice())
+	latestCommittedSeqNumsObservation, err := observeLatestCommittedSeqNums(ctx, p.lggr, p.ccipReader, supportedChains, p.cfg.DestChain, p.knownSourceChainsSlice())
 	if err != nil {
 		return types.Observation{}, fmt.Errorf("observe latest committed sequence numbers: %w", err)
 	}
@@ -146,7 +146,7 @@ func (p *Plugin) Observation(ctx context.Context, outctx ocr3types.OutcomeContex
 		p.lggr,
 		p.ccipReader,
 		p.msgHasher,
-		destSupportedChains,
+		supportedChains,
 		prevOutcome.MaxSeqNums, // TODO: Chainlink common PR to rename.
 		p.cfg.NewMsgScanBatchSize,
 	)

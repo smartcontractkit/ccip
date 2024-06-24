@@ -2,7 +2,6 @@ package reader
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -27,11 +26,7 @@ type HomeChainPoller interface {
 	services.Service
 }
 
-type HomeChainConfigPoller struct {
-	stopCh services.StopChan
-	services.StateMachine
-
-	homeChainReader types.ContractReader
+type state struct {
 	// gets updated by the polling loop
 	chainConfigs map[cciptypes.ChainSelector]ChainConfig
 	// mapping between each node's peerID and the chains it supports. derived from chainConfigs
@@ -40,11 +35,21 @@ type HomeChainConfigPoller struct {
 	knownSourceChains mapset.Set[cciptypes.ChainSelector]
 	// map of chain to FChain value, derived from chainConfigs
 	fChain map[cciptypes.ChainSelector]int
-	lggr   logger.Logger
-	mutex  *sync.RWMutex
-	// How frequently the poller fetches the chain configs
-	pollingInterval time.Duration
 }
+
+type HomeChainConfigPoller struct {
+	stopCh          services.StopChan
+	sync            services.StateMachine
+	homeChainReader types.ContractReader
+	lggr            logger.Logger
+	mutex           *sync.RWMutex
+	state           state
+	failedPolls     uint
+	// How frequently the poller fetches the chain configs
+	pollingDuration time.Duration
+}
+
+const MaxFailedPolls = 10
 
 func NewHomeChainConfigPoller(
 	homeChainReader types.ContractReader,
@@ -52,15 +57,13 @@ func NewHomeChainConfigPoller(
 	pollingInterval time.Duration,
 ) *HomeChainConfigPoller {
 	return &HomeChainConfigPoller{
-		stopCh:              make(chan struct{}),
-		homeChainReader:     homeChainReader,
-		lggr:                lggr,
-		chainConfigs:        map[cciptypes.ChainSelector]ChainConfig{},
-		mutex:               &sync.RWMutex{},
-		nodeSupportedChains: map[libocrtypes.PeerID]mapset.Set[cciptypes.ChainSelector]{},
-		knownSourceChains:   mapset.NewSet[cciptypes.ChainSelector](),
-		fChain:              map[cciptypes.ChainSelector]int{},
-		pollingInterval:     pollingInterval,
+		stopCh:          make(chan struct{}),
+		homeChainReader: homeChainReader,
+		state:           state{},
+		mutex:           &sync.RWMutex{},
+		failedPolls:     0,
+		lggr:            lggr,
+		pollingDuration: pollingInterval,
 	}
 }
 
@@ -71,7 +74,7 @@ func (r *HomeChainConfigPoller) Start(ctx context.Context) error {
 		r.lggr.Errorw("Initial fetch of on-chain configs failed", "err", err)
 	}
 	r.lggr.Infow("Start Polling ChainConfig")
-	return r.StartOnce(r.Name(), func() error {
+	return r.sync.StartOnce(r.Name(), func() error {
 		go r.poll()
 		return nil
 	})
@@ -80,14 +83,16 @@ func (r *HomeChainConfigPoller) Start(ctx context.Context) error {
 func (r *HomeChainConfigPoller) poll() {
 	ctx, cancel := r.stopCh.NewCtx()
 	defer cancel()
-	ticker := time.NewTicker(r.pollingInterval * time.Second)
+	ticker := time.NewTicker(r.pollingDuration)
 	defer ticker.Stop()
 	for {
 		select {
 		case <-ctx.Done():
+			r.failedPolls = 0
 			return
 		case <-ticker.C:
 			if err := r.fetchAndSetConfigs(ctx); err != nil {
+				r.failedPolls++
 				r.lggr.Errorw("Fetching and setting configs failed", "err", err)
 			}
 		}
@@ -103,6 +108,7 @@ func (r *HomeChainConfigPoller) fetchAndSetConfigs(ctx context.Context) error {
 	if len(chainConfigInfos) == 0 {
 		// That's a legitimate case if there are no chain configs on chain yet
 		r.lggr.Warnw("no on chain configs found")
+		return nil
 	}
 	homeChainConfigs, err := r.convertOnChainConfigToHomeChainConfig(chainConfigInfos)
 	if err != nil {
@@ -110,50 +116,52 @@ func (r *HomeChainConfigPoller) fetchAndSetConfigs(ctx context.Context) error {
 		return err
 	}
 	r.lggr.Infow("Setting ChainConfig")
-	r.setChainConfigs(homeChainConfigs)
+	r.setState(homeChainConfigs)
 	return nil
 }
 
-func (r *HomeChainConfigPoller) setChainConfigs(chainConfigs map[cciptypes.ChainSelector]ChainConfig) {
+func (r *HomeChainConfigPoller) setState(chainConfigs map[cciptypes.ChainSelector]ChainConfig) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
-	r.chainConfigs = chainConfigs
-	r.nodeSupportedChains = createNodesSupportedChains(chainConfigs)
-	r.knownSourceChains = createKnownChains(chainConfigs)
-	r.fChain = createFChain(chainConfigs)
+	s := &r.state
+	s.chainConfigs = chainConfigs
+	s.nodeSupportedChains = createNodesSupportedChains(chainConfigs)
+	s.knownSourceChains = createKnownChains(chainConfigs)
+	s.fChain = createFChain(chainConfigs)
 }
 
 func (r *HomeChainConfigPoller) GetChainConfig(chainSelector cciptypes.ChainSelector) (ChainConfig, error) {
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
-	if _, ok := r.chainConfigs[chainSelector]; !ok {
+	s := r.state
+	if _, ok := s.chainConfigs[chainSelector]; !ok {
 		return ChainConfig{}, fmt.Errorf("chain config not found for chain %v", chainSelector)
 	}
-	return r.chainConfigs[chainSelector], nil
+	return s.chainConfigs[chainSelector], nil
 }
 
 func (r *HomeChainConfigPoller) GetAllChainConfigs() (map[cciptypes.ChainSelector]ChainConfig, error) {
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
-	return r.chainConfigs, nil
-
+	return r.state.chainConfigs, nil
 }
 
 func (r *HomeChainConfigPoller) GetSupportedChainsForPeer(id libocrtypes.PeerID) (mapset.Set[cciptypes.ChainSelector], error) {
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
-	if _, ok := r.nodeSupportedChains[id]; !ok {
+	s := r.state
+	if _, ok := s.nodeSupportedChains[id]; !ok {
 		// empty set to denote no chains supported
 		return mapset.NewSet[cciptypes.ChainSelector](), nil
 	}
-	return r.nodeSupportedChains[id], nil
+	return s.nodeSupportedChains[id], nil
 }
 
 func (r *HomeChainConfigPoller) GetKnownCCIPChains() (mapset.Set[cciptypes.ChainSelector], error) {
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
 	knownSourceChains := mapset.NewSet[cciptypes.ChainSelector]()
-	for chain := range r.chainConfigs {
+	for chain := range r.state.chainConfigs {
 		knownSourceChains.Add(chain)
 	}
 
@@ -163,27 +171,29 @@ func (r *HomeChainConfigPoller) GetKnownCCIPChains() (mapset.Set[cciptypes.Chain
 func (r *HomeChainConfigPoller) GetFChain() (map[cciptypes.ChainSelector]int, error) {
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
-	return r.fChain, nil
+	return r.state.fChain, nil
 }
 
 func (r *HomeChainConfigPoller) Close() error {
-	return r.StopOnce(r.Name(), func() error {
+	return r.sync.StopOnce(r.Name(), func() error {
 		close(r.stopCh)
 		return nil
 	})
 }
 
 func (r *HomeChainConfigPoller) Ready() error {
-	return nil
+	r.mutex.RLock()
+	defer r.mutex.RUnlock()
+	return r.sync.Ready()
 }
 
 func (r *HomeChainConfigPoller) HealthReport() map[string]error {
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
-	if len(r.chainConfigs) == 0 {
-		return map[string]error{"ChainConfig": errors.New("no chain configs found")}
+	if r.failedPolls >= MaxFailedPolls {
+		r.sync.SvcErrBuffer.Append(fmt.Errorf("polling failed %d times in a row", MaxFailedPolls))
 	}
-	return nil
+	return map[string]error{r.Name(): r.sync.Healthy()}
 }
 
 func (r *HomeChainConfigPoller) Name() string {
