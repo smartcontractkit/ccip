@@ -42,7 +42,7 @@ type HomeChainConfigPoller struct {
 	fChain map[cciptypes.ChainSelector]int
 	lggr   logger.Logger
 	mutex  *sync.RWMutex
-	// How frequent will the poller fetch the chain configs
+	// How frequently the poller fetches the chain configs
 	pollingInterval time.Duration
 }
 
