@@ -300,7 +300,7 @@ type OperatorContracts struct {
 func setupOperatorContracts(t *testing.T) OperatorContracts {
 	user := testutils.MustNewSimTransactor(t)
 	genesisData := core.GenesisAlloc{
-		user.From: {Balance: assets.Ether(1000).ToInt()},
+		user.From: {Balance: assets.Ether(10000).ToInt()},
 	}
 	gasLimit := uint32(ethconfig.Defaults.Miner.GasCeil * 2)
 	b := cltest.NewSimulatedBackend(t, genesisData, gasLimit)
