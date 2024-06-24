@@ -746,13 +746,22 @@ func TestCommitReportingPlugin_observePriceUpdates(t *testing.T) {
 	}
 }
 
+type CommitObservationLegacy struct {
+	Interval          cciptypes.CommitStoreInterval  `json:"interval"`
+	TokenPricesUSD    map[cciptypes.Address]*big.Int `json:"tokensPerFeeCoin"`
+	SourceGasPriceUSD *big.Int                       `json:"sourceGasPrice"`
+}
+
 func TestCommitReportingPlugin_extractObservationData(t *testing.T) {
 	token1 := ccipcalc.HexToAddress("0xa")
 	token2 := ccipcalc.HexToAddress("0xb")
 	token1Price := big.NewInt(1)
 	token2Price := big.NewInt(2)
 	unsupportedToken := ccipcalc.HexToAddress("0xc")
-	gasPrice := big.NewInt(100)
+	gasPrice1 := big.NewInt(100)
+	gasPrice2 := big.NewInt(100)
+	var sourceChainSelector1 uint64 = 10
+	var sourceChainSelector2 uint64 = 20
 
 	tokenDecimals := make(map[cciptypes.Address]uint8)
 	tokenDecimals[token1] = 18
@@ -761,24 +770,41 @@ func TestCommitReportingPlugin_extractObservationData(t *testing.T) {
 	validInterval := cciptypes.CommitStoreInterval{Min: 1, Max: 2}
 	zeroInterval := cciptypes.CommitStoreInterval{Min: 0, Max: 0}
 
-	ob1 := ccip.CommitObservation{
+	// mix legacy commit observations with new commit observations to ensure they can work together
+	legacyObsRaw := CommitObservationLegacy{
 		Interval: validInterval,
 		TokenPricesUSD: map[cciptypes.Address]*big.Int{
 			token1: token1Price,
 			token2: token2Price,
 		},
-		SourceGasPriceUSD: gasPrice,
+		SourceGasPriceUSD: gasPrice1,
 	}
-	ob1Bytes, err := ob1.Marshal()
+	legacyObsBytes, err := json.Marshal(&legacyObsRaw)
 	assert.NoError(t, err)
+
+	newObsRaw := ccip.CommitObservation{
+		Interval: validInterval,
+		TokenPricesUSD: map[cciptypes.Address]*big.Int{
+			token1: token1Price,
+			token2: token2Price,
+		},
+		SourceGasPriceUSD: gasPrice1,
+		SourceGasPriceUSDPerChain: map[uint64]*big.Int{
+			sourceChainSelector1: gasPrice1,
+			sourceChainSelector2: gasPrice2,
+		},
+	}
+	newObsBytes, err := newObsRaw.Marshal()
+	assert.NoError(t, err)
+
 	lggr := logger.TestLogger(t)
 	observations := ccip.GetParsableObservations[ccip.CommitObservation](lggr, []types.AttributedObservation{
-		{Observation: ob1Bytes},
-		{Observation: ob1Bytes},
+		{Observation: legacyObsBytes},
+		{Observation: newObsBytes},
 	})
 	assert.Len(t, observations, 2)
-	ob2 := observations[0]
-	ob3 := observations[1]
+	legacyObs := observations[0]
+	newObs := observations[1]
 
 	obWithNilGasPrice := ccip.CommitObservation{
 		Interval: zeroInterval,
@@ -786,7 +812,8 @@ func TestCommitReportingPlugin_extractObservationData(t *testing.T) {
 			token1: token1Price,
 			token2: token2Price,
 		},
-		SourceGasPriceUSD: nil,
+		SourceGasPriceUSD:         nil,
+		SourceGasPriceUSDPerChain: map[uint64]*big.Int{},
 	}
 	obWithNilTokenPrice := ccip.CommitObservation{
 		Interval: zeroInterval,
@@ -794,12 +821,20 @@ func TestCommitReportingPlugin_extractObservationData(t *testing.T) {
 			token1: token1Price,
 			token2: nil,
 		},
-		SourceGasPriceUSD: gasPrice,
+		SourceGasPriceUSD: gasPrice1,
+		SourceGasPriceUSDPerChain: map[uint64]*big.Int{
+			sourceChainSelector1: gasPrice1,
+			sourceChainSelector2: gasPrice2,
+		},
 	}
 	obMissingTokenPrices := ccip.CommitObservation{
 		Interval:          zeroInterval,
 		TokenPricesUSD:    map[cciptypes.Address]*big.Int{},
-		SourceGasPriceUSD: gasPrice,
+		SourceGasPriceUSD: gasPrice1,
+		SourceGasPriceUSDPerChain: map[uint64]*big.Int{
+			sourceChainSelector1: gasPrice1,
+			sourceChainSelector2: gasPrice2,
+		},
 	}
 	obWithUnsupportedToken := ccip.CommitObservation{
 		Interval: zeroInterval,
@@ -808,12 +843,17 @@ func TestCommitReportingPlugin_extractObservationData(t *testing.T) {
 			token2:           token2Price,
 			unsupportedToken: token2Price,
 		},
-		SourceGasPriceUSD: gasPrice,
+		SourceGasPriceUSD: gasPrice1,
+		SourceGasPriceUSDPerChain: map[uint64]*big.Int{
+			sourceChainSelector1: gasPrice1,
+			sourceChainSelector2: gasPrice2,
+		},
 	}
 	obEmpty := ccip.CommitObservation{
-		Interval:          zeroInterval,
-		TokenPricesUSD:    nil,
-		SourceGasPriceUSD: nil,
+		Interval:                  zeroInterval,
+		TokenPricesUSD:            nil,
+		SourceGasPriceUSD:         nil,
+		SourceGasPriceUSDPerChain: nil,
 	}
 
 	testCases := []struct {
@@ -821,29 +861,19 @@ func TestCommitReportingPlugin_extractObservationData(t *testing.T) {
 		commitObservations []ccip.CommitObservation
 		f                  int
 		expIntervals       []cciptypes.CommitStoreInterval
-		expGasPriceObs     []*big.Int
+		expGasPriceObs     map[uint64][]*big.Int
 		expTokenPriceObs   map[cciptypes.Address][]*big.Int
-		expValidObs        []ccip.CommitObservation
 		expError           bool
 	}{
 		{
 			name:               "base",
-			commitObservations: []ccip.CommitObservation{ob1, ob2},
-			f:                  1,
-			expIntervals:       []cciptypes.CommitStoreInterval{validInterval, validInterval},
-			expGasPriceObs:     []*big.Int{ob1.SourceGasPriceUSD, ob2.SourceGasPriceUSD},
-			expTokenPriceObs: map[cciptypes.Address][]*big.Int{
-				token1: {token1Price, token1Price},
-				token2: {token2Price, token2Price},
-			},
-			expError: false,
-		},
-		{
-			name:               "pass with f=2",
-			commitObservations: []ccip.CommitObservation{ob1, ob2, ob3},
+			commitObservations: []ccip.CommitObservation{newObs, newObs, newObs},
 			f:                  2,
 			expIntervals:       []cciptypes.CommitStoreInterval{validInterval, validInterval, validInterval},
-			expGasPriceObs:     []*big.Int{ob1.SourceGasPriceUSD, ob2.SourceGasPriceUSD, ob3.SourceGasPriceUSD},
+			expGasPriceObs: map[uint64][]*big.Int{
+				sourceChainSelector1: {gasPrice1, gasPrice1, gasPrice1},
+				sourceChainSelector2: {gasPrice2, gasPrice2, gasPrice2},
+			},
 			expTokenPriceObs: map[cciptypes.Address][]*big.Int{
 				token1: {token1Price, token1Price, token1Price},
 				token2: {token2Price, token2Price, token2Price},
@@ -851,11 +881,42 @@ func TestCommitReportingPlugin_extractObservationData(t *testing.T) {
 			expError: false,
 		},
 		{
+			name:               "pass with f=2 and mixed observations",
+			commitObservations: []ccip.CommitObservation{legacyObs, newObs, legacyObs, newObs, newObs, obWithNilGasPrice},
+			f:                  2,
+			expIntervals:       []cciptypes.CommitStoreInterval{validInterval, validInterval, validInterval, validInterval, validInterval, zeroInterval},
+			expGasPriceObs: map[uint64][]*big.Int{
+				sourceChainSelector1: {gasPrice1, gasPrice1, gasPrice1, gasPrice1, gasPrice1},
+				sourceChainSelector2: {gasPrice2, gasPrice2, gasPrice2},
+			},
+			expTokenPriceObs: map[cciptypes.Address][]*big.Int{
+				token1: {token1Price, token1Price, token1Price, token1Price, token1Price, token1Price},
+				token2: {token2Price, token2Price, token2Price, token2Price, token2Price, token2Price},
+			},
+			expError: false,
+		},
+		{
+			name:               "pass with f=2 and mixed observations with mostly legacy observations",
+			commitObservations: []ccip.CommitObservation{legacyObs, legacyObs, legacyObs, legacyObs, newObs},
+			f:                  2,
+			expIntervals:       []cciptypes.CommitStoreInterval{validInterval, validInterval, validInterval, validInterval, validInterval},
+			expGasPriceObs: map[uint64][]*big.Int{
+				sourceChainSelector1: {gasPrice1, gasPrice1, gasPrice1, gasPrice1, gasPrice1},
+			},
+			expTokenPriceObs: map[cciptypes.Address][]*big.Int{
+				token1: {token1Price, token1Price, token1Price, token1Price, token1Price},
+				token2: {token2Price, token2Price, token2Price, token2Price, token2Price},
+			},
+			expError: false,
+		},
+		{
 			name:               "tolerate 1 faulty obs with f=2",
-			commitObservations: []ccip.CommitObservation{ob1, ob2, ob3, obWithNilGasPrice},
+			commitObservations: []ccip.CommitObservation{legacyObs, newObs, legacyObs, obWithNilGasPrice},
 			f:                  2,
 			expIntervals:       []cciptypes.CommitStoreInterval{validInterval, validInterval, validInterval, zeroInterval},
-			expGasPriceObs:     []*big.Int{ob1.SourceGasPriceUSD, ob2.SourceGasPriceUSD, ob3.SourceGasPriceUSD},
+			expGasPriceObs: map[uint64][]*big.Int{
+				sourceChainSelector1: {gasPrice1, gasPrice1, gasPrice1},
+			},
 			expTokenPriceObs: map[cciptypes.Address][]*big.Int{
 				token1: {token1Price, token1Price, token1Price, token1Price},
 				token2: {token2Price, token2Price, token2Price, token2Price},
@@ -864,10 +925,13 @@ func TestCommitReportingPlugin_extractObservationData(t *testing.T) {
 		},
 		{
 			name:               "tolerate 1 nil token price with f=1",
-			commitObservations: []ccip.CommitObservation{ob1, ob2, obWithNilTokenPrice},
+			commitObservations: []ccip.CommitObservation{legacyObs, newObs, obWithNilTokenPrice},
 			f:                  1,
 			expIntervals:       []cciptypes.CommitStoreInterval{validInterval, validInterval, zeroInterval},
-			expGasPriceObs:     []*big.Int{ob1.SourceGasPriceUSD, ob2.SourceGasPriceUSD, obWithNilTokenPrice.SourceGasPriceUSD},
+			expGasPriceObs: map[uint64][]*big.Int{
+				sourceChainSelector1: {gasPrice1, gasPrice1, gasPrice1},
+				sourceChainSelector2: {gasPrice2, gasPrice2},
+			},
 			expTokenPriceObs: map[cciptypes.Address][]*big.Int{
 				token1: {token1Price, token1Price, token1Price},
 				token2: {token2Price, token2Price},
@@ -876,10 +940,13 @@ func TestCommitReportingPlugin_extractObservationData(t *testing.T) {
 		},
 		{
 			name:               "tolerate 1 missing token prices with f=1",
-			commitObservations: []ccip.CommitObservation{ob1, ob2, obMissingTokenPrices},
+			commitObservations: []ccip.CommitObservation{legacyObs, newObs, obMissingTokenPrices},
 			f:                  1,
 			expIntervals:       []cciptypes.CommitStoreInterval{validInterval, validInterval, zeroInterval},
-			expGasPriceObs:     []*big.Int{ob1.SourceGasPriceUSD, ob2.SourceGasPriceUSD, obMissingTokenPrices.SourceGasPriceUSD},
+			expGasPriceObs: map[uint64][]*big.Int{
+				sourceChainSelector1: {gasPrice1, gasPrice1, gasPrice1},
+				sourceChainSelector2: {gasPrice2, gasPrice2},
+			},
 			expTokenPriceObs: map[cciptypes.Address][]*big.Int{
 				token1: {token1Price, token1Price},
 				token2: {token2Price, token2Price},
@@ -888,10 +955,12 @@ func TestCommitReportingPlugin_extractObservationData(t *testing.T) {
 		},
 		{
 			name:               "tolerate 1 unsupported token with f=2",
-			commitObservations: []ccip.CommitObservation{ob1, ob2, obWithUnsupportedToken},
+			commitObservations: []ccip.CommitObservation{legacyObs, newObs, obWithUnsupportedToken},
 			f:                  2,
 			expIntervals:       []cciptypes.CommitStoreInterval{validInterval, validInterval, zeroInterval},
-			expGasPriceObs:     []*big.Int{ob1.SourceGasPriceUSD, ob2.SourceGasPriceUSD, obWithUnsupportedToken.SourceGasPriceUSD},
+			expGasPriceObs: map[uint64][]*big.Int{
+				sourceChainSelector1: {gasPrice1, gasPrice1, gasPrice1},
+			},
 			expTokenPriceObs: map[cciptypes.Address][]*big.Int{
 				token1: {token1Price, token1Price, token1Price},
 				token2: {token2Price, token2Price, token2Price},
@@ -900,21 +969,13 @@ func TestCommitReportingPlugin_extractObservationData(t *testing.T) {
 		},
 		{
 			name:               "tolerate mis-matched token observations with f=2",
-			commitObservations: []ccip.CommitObservation{ob1, ob2, obWithNilTokenPrice, obMissingTokenPrices},
+			commitObservations: []ccip.CommitObservation{legacyObs, newObs, obWithNilTokenPrice, obMissingTokenPrices},
 			f:                  2,
 			expIntervals:       []cciptypes.CommitStoreInterval{validInterval, validInterval, zeroInterval, zeroInterval},
-			expGasPriceObs:     []*big.Int{ob1.SourceGasPriceUSD, ob2.SourceGasPriceUSD, obWithNilTokenPrice.SourceGasPriceUSD, obMissingTokenPrices.SourceGasPriceUSD},
-			expTokenPriceObs: map[cciptypes.Address][]*big.Int{
-				token1: {token1Price, token1Price, token1Price},
+			expGasPriceObs: map[uint64][]*big.Int{
+				sourceChainSelector1: {gasPrice1, gasPrice1, gasPrice1, gasPrice1},
+				sourceChainSelector2: {gasPrice2, gasPrice2, gasPrice2},
 			},
-			expError: false,
-		},
-		{
-			name:               "tolerate mis-matched token observations with f=2",
-			commitObservations: []ccip.CommitObservation{ob1, obWithNilTokenPrice, obWithNilTokenPrice},
-			f:                  2,
-			expIntervals:       []cciptypes.CommitStoreInterval{validInterval, zeroInterval, zeroInterval},
-			expGasPriceObs:     []*big.Int{ob1.SourceGasPriceUSD, obWithNilTokenPrice.SourceGasPriceUSD, obWithNilTokenPrice.SourceGasPriceUSD},
 			expTokenPriceObs: map[cciptypes.Address][]*big.Int{
 				token1: {token1Price, token1Price, token1Price},
 			},
@@ -922,33 +983,36 @@ func TestCommitReportingPlugin_extractObservationData(t *testing.T) {
 		},
 		{
 			name:               "tolerate all tokens filtered out with f=2",
-			commitObservations: []ccip.CommitObservation{ob1, obMissingTokenPrices, obMissingTokenPrices},
+			commitObservations: []ccip.CommitObservation{newObs, obMissingTokenPrices, obMissingTokenPrices},
 			f:                  2,
 			expIntervals:       []cciptypes.CommitStoreInterval{validInterval, zeroInterval, zeroInterval},
-			expGasPriceObs:     []*big.Int{ob1.SourceGasPriceUSD, obMissingTokenPrices.SourceGasPriceUSD, obMissingTokenPrices.SourceGasPriceUSD},
-			expTokenPriceObs:   map[cciptypes.Address][]*big.Int{},
-			expError:           false,
+			expGasPriceObs: map[uint64][]*big.Int{
+				sourceChainSelector1: {gasPrice1, gasPrice1, gasPrice1},
+				sourceChainSelector2: {gasPrice2, gasPrice2, gasPrice2},
+			},
+			expTokenPriceObs: map[cciptypes.Address][]*big.Int{},
+			expError:         false,
 		},
 		{
 			name:               "not enough observations",
-			commitObservations: []ccip.CommitObservation{ob1, ob2},
+			commitObservations: []ccip.CommitObservation{legacyObs, newObs},
 			f:                  2,
-			expValidObs:        nil,
 			expError:           true,
 		},
 		{
-			name:               "too many faulty observations",
+			name:               "too many empty observations",
 			commitObservations: []ccip.CommitObservation{obWithNilGasPrice, obWithNilTokenPrice, obEmpty, obEmpty, obEmpty},
-			f:                  1,
-			expValidObs:        nil,
-			expError:           true,
+			f:                  2,
+			expIntervals:       []cciptypes.CommitStoreInterval{zeroInterval, zeroInterval, zeroInterval, zeroInterval, zeroInterval},
+			expGasPriceObs:     map[uint64][]*big.Int{},
+			expTokenPriceObs:   map[cciptypes.Address][]*big.Int{},
+			expError:           false,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			// TODO Matt
-			intervals, gasPriceOps, tokenPriceOps, err := extractObservationData(logger.TestLogger(t), tc.f, 0, tc.commitObservations)
+			intervals, gasPriceOps, tokenPriceOps, err := extractObservationData(logger.TestLogger(t), tc.f, sourceChainSelector1, tc.commitObservations)
 
 			if tc.expError {
 				assert.Error(t, err)

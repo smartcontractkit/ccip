@@ -147,10 +147,10 @@ func (r *CommitReportingPlugin) Observation(ctx context.Context, epochAndRound t
 	}.Marshal()
 }
 
-// observePriceUpdates only observes price updates if price reporting is enabled
 func (r *CommitReportingPlugin) observePriceUpdates(
 	ctx context.Context,
 ) (gasPricesUSD map[uint64]*big.Int, tokenPricesUSD map[cciptypes.Address]*big.Int, err error) {
+	// Do not observe prices if price reporting is disabled. Price reporting will be disabled for lanes that are not leader lanes.
 	if r.offchainConfig.PriceReportingDisabled {
 		return map[uint64]*big.Int{}, map[cciptypes.Address]*big.Int{}, nil
 	}
@@ -415,7 +415,7 @@ func extractObservationData(lggr logger.Logger, f int, sourceChainSelector uint6
 
 	tokenPrices = make(map[cciptypes.Address][]*big.Int)
 	for token, perTokenPriceObservations := range tokenPriceObservations {
-		// Token price filter follows the same logic as gas price above.
+		// Token price filter follows the same logic as gas price above. If there are insufficient observations, the token is ignored.
 		if len(perTokenPriceObservations) < (2*(f-1) + 1) {
 			lggr.Warnf("Skipping token %s due to not enough valid observations: #obs=%d, f=%d", string(token), len(perTokenPriceObservations), f)
 			continue
