@@ -3,7 +3,8 @@ pragma solidity 0.8.24;
 
 import {IPoolV1} from "../../interfaces/IPool.sol";
 
-import {MultiAggregateRateLimiter} from "../../MultiAggregateRateLimiter.sol";
+import {AuthorizedCallers} from "../../../shared/access/AuthorizedCallers.sol";
+import {NonceManager} from "../../NonceManager.sol";
 import {PriceRegistry} from "../../PriceRegistry.sol";
 import {Router} from "../../Router.sol";
 import {Client} from "../../libraries/Client.sol";
@@ -34,7 +35,7 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
   EVM2EVMMultiOnRampHelper internal s_onRamp;
   MessageInterceptorHelper internal s_outboundMessageValidator;
   address[] internal s_offRamps;
-
+  NonceManager internal s_nonceManager;
   address internal s_destTokenPool = makeAddr("destTokenPool");
   address internal s_destToken = makeAddr("destToken");
 
@@ -103,9 +104,10 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
     );
 
     s_outboundMessageValidator = new MessageInterceptorHelper();
-
-    (s_onRamp, s_metadataHash) =
-      _deployOnRamp(SOURCE_CHAIN_SELECTOR, address(s_sourceRouter), address(s_tokenAdminRegistry));
+    s_nonceManager = new NonceManager(new address[](0));
+    (s_onRamp, s_metadataHash) = _deployOnRamp(
+      SOURCE_CHAIN_SELECTOR, address(s_sourceRouter), address(s_nonceManager), address(s_tokenAdminRegistry)
+    );
 
     s_offRamps = new address[](2);
     s_offRamps[0] = address(10);
@@ -286,6 +288,7 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
   function _deployOnRamp(
     uint64 sourceChainSelector,
     address sourceRouter,
+    address nonceManager,
     address tokenAdminRegistry
   ) internal returns (EVM2EVMMultiOnRampHelper, bytes32 metadataHash) {
     EVM2EVMMultiOnRampHelper onRamp = new EVM2EVMMultiOnRampHelper(
@@ -294,6 +297,7 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
         chainSelector: sourceChainSelector,
         maxFeeJuelsPerMsg: MAX_MSG_FEES_JUELS,
         rmnProxy: address(s_mockRMN),
+        nonceManager: nonceManager,
         tokenAdminRegistry: tokenAdminRegistry
       }),
       _generateDynamicMultiOnRampConfig(sourceRouter, address(s_priceRegistry)),
@@ -301,7 +305,13 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
       s_premiumMultiplierWeiPerEthArgs,
       s_tokenTransferFeeConfigArgs
     );
-    onRamp.setAdmin(ADMIN);
+
+    address[] memory authorizedCallers = new address[](1);
+    authorizedCallers[0] = address(onRamp);
+
+    NonceManager(nonceManager).applyAuthorizedCallerUpdates(
+      AuthorizedCallers.AuthorizedCallerArgs({addedCallers: authorizedCallers, removedCallers: new address[](0)})
+    );
 
     return (
       onRamp,

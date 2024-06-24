@@ -13,10 +13,10 @@ interface IMessageInterceptor {
 
   /// @notice Intercepts & validates the given OffRamp message. Reverts on validation failure
   /// @param message to validate
-  function onIncomingMessage(Client.Any2EVMMessage memory message) external;
+  function onInboundMessage(Client.Any2EVMMessage memory message) external;
 
   /// @notice Intercepts & validates the given OnRamp message. Reverts on validation failure
   /// @param destChainSelector remote destination chain selector where the message is being sent to
   /// @param message to validate
-  function onOutgoingMessage(uint64 destChainSelector, Client.EVM2AnyMessage memory message) external;
+  function onOutboundMessage(uint64 destChainSelector, Client.EVM2AnyMessage memory message) external;
 }

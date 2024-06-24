@@ -14,14 +14,14 @@ contract MessageInterceptorHelper is IMessageInterceptor {
   }
 
   /// @inheritdoc IMessageInterceptor
-  function onIncomingMessage(Client.Any2EVMMessage calldata message) external view {
+  function onInboundMessage(Client.Any2EVMMessage memory message) external view {
     if (s_invalidMessageIds[message.messageId]) {
       revert MessageValidationError(bytes("Invalid message"));
     }
   }
 
   /// @inheritdoc IMessageInterceptor
-  function onOutgoingMessage(uint64, Client.EVM2AnyMessage calldata message) external view {
+  function onOutboundMessage(uint64, Client.EVM2AnyMessage calldata message) external view {
     if (s_invalidMessageIds[keccak256(abi.encode(message))]) {
       revert MessageValidationError(bytes("Invalid message"));
     }
