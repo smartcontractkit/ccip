@@ -88,11 +88,15 @@ func (r *HomeChainConfigPoller) poll() {
 	for {
 		select {
 		case <-ctx.Done():
+			r.mutex.Lock()
 			r.failedPolls = 0
+			r.mutex.Unlock()
 			return
 		case <-ticker.C:
 			if err := r.fetchAndSetConfigs(ctx); err != nil {
+				r.mutex.Lock()
 				r.failedPolls++
+				r.mutex.Unlock()
 				r.lggr.Errorw("Fetching and setting configs failed", "err", err)
 			}
 		}

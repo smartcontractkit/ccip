@@ -57,7 +57,6 @@ func TestHomeChainConfigPoller_HealthReport(t *testing.T) {
 
 	errors := configPoller.HealthReport()
 	_ = configPoller.Close()
-	time.Sleep(150 * time.Millisecond)
 	assert.Equal(t, 1, len(errors))
 	assert.Errorf(t, errors["HomeChainConfigPoller"], "polling failed %d times in a row", MaxFailedPolls)
 }
