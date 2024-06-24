@@ -193,18 +193,8 @@ func (oc contractTransmitterNoSignatures) Transmit(ctx context.Context, reportCt
 	var ss [][32]byte
 	var vs [32]byte
 
-	var r [32]byte
-	var s [32]byte
-
-	rs = append(rs, r)
-	ss = append(ss, s)
-
-	//// Set rs and ss to empty slices of [32]byte arrays
-	//rs = make([][32]byte, 0)
-	//ss = make([][32]byte, 0)
-
-	// Set vs to a default value, e.g., all zeros
-	//vs = [32]byte{} // This initializes vs with all elements set to zero
+	rs = append(rs, [32]byte{})
+	ss = append(ss, [32]byte{})
 
 	if len(signatures) > 32 {
 		return errors.New("too many signatures, maximum is 32")
