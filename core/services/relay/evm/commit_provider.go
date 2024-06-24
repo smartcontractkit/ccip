@@ -27,7 +27,7 @@ type SrcCommitProvider struct {
 	client      client.Client
 	lp          logpoller.LogPoller
 	estimator   gas.EvmFeeEstimator
-	maxGasPrice big.Int
+	maxGasPrice *big.Int
 }
 
 func NewSrcCommitProvider(
@@ -36,13 +36,15 @@ func NewSrcCommitProvider(
 	client client.Client,
 	lp logpoller.LogPoller,
 	srcEstimator gas.EvmFeeEstimator,
+	maxGasPrice *big.Int,
 ) commontypes.CCIPCommitProvider {
 	return &SrcCommitProvider{
-		lggr:       lggr,
-		startBlock: startBlock,
-		client:     client,
-		lp:         lp,
-		estimator:  srcEstimator,
+		lggr:        lggr,
+		startBlock:  startBlock,
+		client:      client,
+		lp:          lp,
+		estimator:   srcEstimator,
+		maxGasPrice: maxGasPrice,
 	}
 }
 
@@ -185,7 +187,7 @@ func (P DstCommitProvider) NewPriceGetter(ctx context.Context) (priceGetter ccip
 }
 
 func (P SrcCommitProvider) NewCommitStoreReader(ctx context.Context, commitStoreAddress cciptypes.Address) (commitStoreReader cciptypes.CommitStoreReader, err error) {
-	commitStoreReader = NewIncompleteSourceCommitStoreReader(P.estimator, &P.maxGasPrice)
+	commitStoreReader = NewIncompleteSourceCommitStoreReader(P.estimator, P.maxGasPrice)
 	return
 }
 
