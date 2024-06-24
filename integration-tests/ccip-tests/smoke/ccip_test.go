@@ -507,10 +507,10 @@ func TestSmokeCCIPOnRampLimits(t *testing.T) {
 			tc.lane.ValidateRequests()
 
 			// Check that capacity limits are enforced
-			src.TransferAmount[freeTokenIndex] big.NewInt(0)
-			src.TransferAmount[bpsTokenIndex] big.NewInt(0)
+			src.TransferAmount[freeTokenIndex] = big.NewInt(0)
+			src.TransferAmount[bpsTokenIndex] = big.NewInt(0)
 			src.TransferAmount[aggRateTokenIndex] = overCapacityAmount
-			src.TransferAmount[bpsAndAggTokenIndex] big.NewInt(0)
+			src.TransferAmount[bpsAndAggTokenIndex] = big.NewInt(0)
 			failedTx, _, _, err := tc.lane.Source.SendRequest(tc.lane.Dest.ReceiverDapp.EthAddress, big.NewInt(actions.DefaultRequestGasLimit))
 			require.Error(t, err, "Limited token transfer should immediately revert")
 			errReason, _, err := src.Common.ChainClient.RevertReasonFromTx(failedTx, evm_2_evm_onramp.EVM2EVMOnRampABI)
@@ -521,7 +521,7 @@ func TestSmokeCCIPOnRampLimits(t *testing.T) {
 				Str("Token", aggRateToken.ContractAddress.Hex()).
 				Msg("Limited token transfer failed on source chain (a good thing in this context)")
 
-			src.TransferAmount[aggRateTokenIndex] big.NewInt(0)
+			src.TransferAmount[aggRateTokenIndex] = big.NewInt(0)
 			src.TransferAmount[bpsAndAggTokenIndex] = overCapacityAmount
 			failedTx, _, _, err = tc.lane.Source.SendRequest(tc.lane.Dest.ReceiverDapp.EthAddress, big.NewInt(actions.DefaultRequestGasLimit))
 			require.Error(t, err, "Limited token transfer should immediately revert")
@@ -544,18 +544,18 @@ func TestSmokeCCIPOnRampLimits(t *testing.T) {
 			// Send aggregate unlimited tokens and ensure they succeed
 			src.TransferAmount[freeTokenIndex] = overCapacityAmount
 			src.TransferAmount[bpsTokenIndex] = overCapacityAmount
-			src.TransferAmount[aggRateTokenIndex] big.NewInt(0)
-			src.TransferAmount[bpsAndAggTokenIndex] big.NewInt(0)
+			src.TransferAmount[aggRateTokenIndex] = big.NewInt(0)
+			src.TransferAmount[bpsAndAggTokenIndex] = big.NewInt(0)
 			tc.lane.RecordStateBeforeTransfer()
 			err = tc.lane.SendRequests(1, big.NewInt(actions.DefaultRequestGasLimit))
 			require.NoError(t, err)
 			tc.lane.ValidateRequests()
 
 			// Check that aggregate rate limits are enforced on limited tokens
-			src.TransferAmount[freeTokenIndex] big.NewInt(0)
-			src.TransferAmount[bpsTokenIndex] big.NewInt(0)
+			src.TransferAmount[freeTokenIndex] = big.NewInt(0)
+			src.TransferAmount[bpsTokenIndex] = big.NewInt(0)
 			src.TransferAmount[aggRateTokenIndex] = overCapacityAmount
-			src.TransferAmount[bpsAndAggTokenIndex] big.NewInt(0)
+			src.TransferAmount[bpsAndAggTokenIndex] = big.NewInt(0)
 			failedTx, _, _, err = tc.lane.Source.SendRequest(tc.lane.Dest.ReceiverDapp.EthAddress, big.NewInt(actions.DefaultRequestGasLimit))
 			require.Error(t, err, "Aggregate rate limited token transfer should immediately revert")
 			errReason, _, err = src.Common.ChainClient.RevertReasonFromTx(failedTx, evm_2_evm_onramp.EVM2EVMOnRampABI)
@@ -566,7 +566,7 @@ func TestSmokeCCIPOnRampLimits(t *testing.T) {
 				Str("Token", aggRateToken.ContractAddress.Hex()).
 				Msg("Limited token transfer failed on source chain (a good thing in this context)")
 
-			src.TransferAmount[aggRateTokenIndex] big.NewInt(0)
+			src.TransferAmount[aggRateTokenIndex] = nil
 			src.TransferAmount[bpsAndAggTokenIndex] = overCapacityAmount
 			failedTx, _, _, err = tc.lane.Source.SendRequest(tc.lane.Dest.ReceiverDapp.EthAddress, big.NewInt(actions.DefaultRequestGasLimit))
 			require.Error(t, err, "Aggregate rate limited token transfer should immediately revert")
