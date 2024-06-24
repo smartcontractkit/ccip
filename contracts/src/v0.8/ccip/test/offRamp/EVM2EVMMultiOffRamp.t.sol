@@ -140,7 +140,7 @@ contract EVM2EVMMultiOffRamp_constructor is EVM2EVMMultiOffRampSetup {
     // OffRamp initial values
     assertEq("EVM2EVMMultiOffRamp 1.6.0-dev", s_offRamp.typeAndVersion());
     assertEq(OWNER, s_offRamp.owner());
-    assertEq(0, s_offRamp.getLatestPriceSequenceNumber());
+    assertEq(0, s_offRamp.getLatestCommitSequenceNumber());
   }
 
   // Revert
@@ -3133,63 +3133,6 @@ contract EVM2EVMMultiOffRamp_applySourceChainConfigUpdates is EVM2EVMMultiOffRam
   }
 }
 
-contract EVM2EVMMultiOffRamp_setLatestPriceSequenceNumber is EVM2EVMMultiOffRampSetup {
-  function test_setLatestPriceSequenceNumber_Success() public {
-    uint64 latestSequenceNumber = 1782155;
-
-    vm.expectEmit();
-    emit EVM2EVMMultiOffRamp.LatestPriceSequenceNumberSet(
-      s_offRamp.getLatestPriceSequenceNumber(), latestSequenceNumber
-    );
-
-    s_offRamp.setLatestPriceSequenceNumber(latestSequenceNumber);
-    assertEq(s_offRamp.getLatestPriceSequenceNumber(), latestSequenceNumber);
-  }
-
-  function test_PriceEpochCleared_Success() public {
-    // Set latest price epoch and round to non-zero.
-    uint64 latestSequenceNumber = 1782155;
-    s_offRamp.setLatestPriceSequenceNumber(latestSequenceNumber);
-    assertEq(latestSequenceNumber, s_offRamp.getLatestPriceSequenceNumber());
-
-    MultiOCR3Base.OCRConfigArgs[] memory ocrConfigs = new MultiOCR3Base.OCRConfigArgs[](1);
-    ocrConfigs[0] = MultiOCR3Base.OCRConfigArgs({
-      ocrPluginType: uint8(Internal.OCRPluginType.Execution),
-      configDigest: s_configDigestExec,
-      F: s_F,
-      isSignatureVerificationEnabled: false,
-      signers: s_emptySigners,
-      transmitters: s_validTransmitters
-    });
-    s_offRamp.setOCR3Configs(ocrConfigs);
-
-    // Execution plugin OCR config should not clear latest epoch and round
-    assertEq(latestSequenceNumber, s_offRamp.getLatestPriceSequenceNumber());
-
-    // Commit plugin config should clear latest epoch & round
-    ocrConfigs[0] = MultiOCR3Base.OCRConfigArgs({
-      ocrPluginType: uint8(Internal.OCRPluginType.Commit),
-      configDigest: s_configDigestCommit,
-      F: s_F,
-      isSignatureVerificationEnabled: true,
-      signers: s_validSigners,
-      transmitters: s_validTransmitters
-    });
-    s_offRamp.setOCR3Configs(ocrConfigs);
-
-    // Assert cleared.
-    assertEq(0, s_offRamp.getLatestPriceSequenceNumber());
-  }
-
-  // Reverts
-
-  function test_OnlyOwner_Revert() public {
-    vm.stopPrank();
-    vm.expectRevert("Only callable by owner");
-    s_offRamp.setLatestPriceSequenceNumber(6723);
-  }
-}
-
 contract EVM2EVMMultiOffRamp_commit is EVM2EVMMultiOffRampSetup {
   uint64 internal s_maxInterval = 12;
 
@@ -3197,7 +3140,7 @@ contract EVM2EVMMultiOffRamp_commit is EVM2EVMMultiOffRampSetup {
     super.setUp();
     _setupMultipleOffRamps();
 
-    s_latestSequenceNumber = uint64(uint256(s_configDigestCommit));
+    s_latestSequenceNumber = uint64(uint256(s_configDigestCommit)) - 1;
   }
 
   function test_ReportAndPriceUpdate_Success() public {
@@ -3212,7 +3155,22 @@ contract EVM2EVMMultiOffRamp_commit is EVM2EVMMultiOffRampSetup {
     _commit(commitReport, s_latestSequenceNumber);
 
     assertEq(s_maxInterval + 1, s_offRamp.getSourceChainConfig(SOURCE_CHAIN_SELECTOR).minSeqNr);
-    assertEq(s_latestSequenceNumber, s_offRamp.getLatestPriceSequenceNumber());
+    assertEq(s_latestSequenceNumber, s_offRamp.getLatestCommitSequenceNumber());
+  }
+
+  function test_ReportAndPriceUpdateInitSequenceNumber_Success() public {
+    EVM2EVMMultiOffRamp.CommitReport memory commitReport = _constructCommitReport();
+
+    vm.expectEmit();
+    emit EVM2EVMMultiOffRamp.CommitReportAccepted(commitReport);
+
+    vm.expectEmit();
+    emit MultiOCR3Base.Transmitted(uint8(Internal.OCRPluginType.Commit), s_configDigestCommit, 1);
+
+    _commit(commitReport, 1);
+
+    assertEq(s_maxInterval + 1, s_offRamp.getSourceChainConfig(SOURCE_CHAIN_SELECTOR).minSeqNr);
+    assertEq(1, s_offRamp.getLatestCommitSequenceNumber());
   }
 
   function test_ReportOnlyRootSuccess_gas() public {
@@ -3238,51 +3196,8 @@ contract EVM2EVMMultiOffRamp_commit is EVM2EVMMultiOffRampSetup {
     _commit(commitReport, s_latestSequenceNumber);
 
     assertEq(max1 + 1, s_offRamp.getSourceChainConfig(SOURCE_CHAIN_SELECTOR).minSeqNr);
-    assertEq(0, s_offRamp.getLatestPriceSequenceNumber());
+    assertEq(s_latestSequenceNumber, s_offRamp.getLatestCommitSequenceNumber());
     assertEq(block.timestamp, s_offRamp.getMerkleRoot(SOURCE_CHAIN_SELECTOR_1, root));
-  }
-
-  function test_StaleReportWithRoot_Success() public {
-    uint64 maxSeq = 12;
-    uint224 tokenStartPrice =
-      IPriceRegistry(s_offRamp.getDynamicConfig().priceRegistry).getTokenPrice(s_sourceFeeToken).value;
-
-    EVM2EVMMultiOffRamp.MerkleRoot[] memory roots = new EVM2EVMMultiOffRamp.MerkleRoot[](1);
-    roots[0] = EVM2EVMMultiOffRamp.MerkleRoot({
-      sourceChainSelector: SOURCE_CHAIN_SELECTOR_1,
-      interval: EVM2EVMMultiOffRamp.Interval(1, maxSeq),
-      merkleRoot: "stale report 1"
-    });
-    EVM2EVMMultiOffRamp.CommitReport memory commitReport =
-      EVM2EVMMultiOffRamp.CommitReport({priceUpdates: getEmptyPriceUpdates(), merkleRoots: roots});
-
-    vm.expectEmit();
-    emit EVM2EVMMultiOffRamp.CommitReportAccepted(commitReport);
-
-    vm.expectEmit();
-    emit MultiOCR3Base.Transmitted(uint8(Internal.OCRPluginType.Commit), s_configDigestCommit, s_latestSequenceNumber);
-
-    _commit(commitReport, s_latestSequenceNumber);
-
-    assertEq(maxSeq + 1, s_offRamp.getSourceChainConfig(SOURCE_CHAIN_SELECTOR).minSeqNr);
-    assertEq(0, s_offRamp.getLatestPriceSequenceNumber());
-
-    commitReport.merkleRoots[0].interval = EVM2EVMMultiOffRamp.Interval(maxSeq + 1, maxSeq * 2);
-    commitReport.merkleRoots[0].merkleRoot = "stale report 2";
-
-    vm.expectEmit();
-    emit EVM2EVMMultiOffRamp.CommitReportAccepted(commitReport);
-
-    vm.expectEmit();
-    emit MultiOCR3Base.Transmitted(uint8(Internal.OCRPluginType.Commit), s_configDigestCommit, s_latestSequenceNumber);
-
-    _commit(commitReport, s_latestSequenceNumber);
-
-    assertEq(maxSeq * 2 + 1, s_offRamp.getSourceChainConfig(SOURCE_CHAIN_SELECTOR).minSeqNr);
-    assertEq(0, s_offRamp.getLatestPriceSequenceNumber());
-    assertEq(
-      tokenStartPrice, IPriceRegistry(s_offRamp.getDynamicConfig().priceRegistry).getTokenPrice(s_sourceFeeToken).value
-    );
   }
 
   function test_OnlyTokenPriceUpdates_Success() public {
@@ -3300,7 +3215,7 @@ contract EVM2EVMMultiOffRamp_commit is EVM2EVMMultiOffRampSetup {
 
     _commit(commitReport, s_latestSequenceNumber);
 
-    assertEq(s_latestSequenceNumber, s_offRamp.getLatestPriceSequenceNumber());
+    assertEq(s_latestSequenceNumber, s_offRamp.getLatestCommitSequenceNumber());
   }
 
   function test_OnlyGasPriceUpdates_Success() public {
@@ -3317,50 +3232,55 @@ contract EVM2EVMMultiOffRamp_commit is EVM2EVMMultiOffRampSetup {
     emit MultiOCR3Base.Transmitted(uint8(Internal.OCRPluginType.Commit), s_configDigestCommit, s_latestSequenceNumber);
 
     _commit(commitReport, s_latestSequenceNumber);
-    assertEq(s_latestSequenceNumber, s_offRamp.getLatestPriceSequenceNumber());
+    assertEq(s_latestSequenceNumber, s_offRamp.getLatestCommitSequenceNumber());
   }
 
-  function test_ValidPriceUpdateThenStaleReportWithRoot_Success() public {
-    uint64 maxSeq = 12;
-    uint224 tokenPrice1 = 4e18;
-    uint224 tokenPrice2 = 5e18;
+  function test_PriceSequenceNumberCleared_Success() public {
     EVM2EVMMultiOffRamp.MerkleRoot[] memory roots = new EVM2EVMMultiOffRamp.MerkleRoot[](0);
     EVM2EVMMultiOffRamp.CommitReport memory commitReport = EVM2EVMMultiOffRamp.CommitReport({
-      priceUpdates: getSingleTokenPriceUpdateStruct(s_sourceFeeToken, tokenPrice1),
+      priceUpdates: getSingleTokenPriceUpdateStruct(s_sourceFeeToken, 4e18),
       merkleRoots: roots
     });
 
     vm.expectEmit();
-    emit PriceRegistry.UsdPerTokenUpdated(s_sourceFeeToken, tokenPrice1, block.timestamp);
-
-    vm.expectEmit();
-    emit MultiOCR3Base.Transmitted(uint8(Internal.OCRPluginType.Commit), s_configDigestCommit, s_latestSequenceNumber);
-
+    emit PriceRegistry.UsdPerTokenUpdated(s_sourceFeeToken, 4e18, block.timestamp);
     _commit(commitReport, s_latestSequenceNumber);
-    assertEq(s_latestSequenceNumber, s_offRamp.getLatestPriceSequenceNumber());
 
-    roots = new EVM2EVMMultiOffRamp.MerkleRoot[](1);
-    roots[0] = EVM2EVMMultiOffRamp.MerkleRoot({
-      sourceChainSelector: SOURCE_CHAIN_SELECTOR_1,
-      interval: EVM2EVMMultiOffRamp.Interval(1, maxSeq),
-      merkleRoot: "stale report"
+    assertEq(s_latestSequenceNumber, s_offRamp.getLatestCommitSequenceNumber());
+
+    vm.startPrank(OWNER);
+    MultiOCR3Base.OCRConfigArgs[] memory ocrConfigs = new MultiOCR3Base.OCRConfigArgs[](1);
+    ocrConfigs[0] = MultiOCR3Base.OCRConfigArgs({
+      ocrPluginType: uint8(Internal.OCRPluginType.Execution),
+      configDigest: s_configDigestExec,
+      F: s_F,
+      isSignatureVerificationEnabled: false,
+      signers: s_emptySigners,
+      transmitters: s_validTransmitters
     });
-    commitReport.priceUpdates = getSingleTokenPriceUpdateStruct(s_sourceFeeToken, tokenPrice2);
-    commitReport.merkleRoots = roots;
+    s_offRamp.setOCR3Configs(ocrConfigs);
 
+    // Execution plugin OCR config should not clear latest epoch and round
+    assertEq(s_latestSequenceNumber, s_offRamp.getLatestCommitSequenceNumber());
+
+    // Commit plugin config should clear latest epoch & round
+    ocrConfigs[0] = MultiOCR3Base.OCRConfigArgs({
+      ocrPluginType: uint8(Internal.OCRPluginType.Commit),
+      configDigest: s_configDigestCommit,
+      F: s_F,
+      isSignatureVerificationEnabled: true,
+      signers: s_validSigners,
+      transmitters: s_validTransmitters
+    });
+    s_offRamp.setOCR3Configs(ocrConfigs);
+
+    // Assert cleared.
+    assertEq(0, s_offRamp.getLatestCommitSequenceNumber());
+
+    // The same sequence number can be reported again
     vm.expectEmit();
-    emit EVM2EVMMultiOffRamp.CommitReportAccepted(commitReport);
-
-    vm.expectEmit();
-    emit MultiOCR3Base.Transmitted(uint8(Internal.OCRPluginType.Commit), s_configDigestCommit, s_latestSequenceNumber);
-
+    emit PriceRegistry.UsdPerTokenUpdated(s_sourceFeeToken, 4e18, block.timestamp);
     _commit(commitReport, s_latestSequenceNumber);
-
-    assertEq(maxSeq + 1, s_offRamp.getSourceChainConfig(SOURCE_CHAIN_SELECTOR).minSeqNr);
-    assertEq(
-      tokenPrice1, IPriceRegistry(s_offRamp.getDynamicConfig().priceRegistry).getTokenPrice(s_sourceFeeToken).value
-    );
-    assertEq(s_latestSequenceNumber, s_offRamp.getLatestPriceSequenceNumber());
   }
 
   // Reverts
@@ -3523,6 +3443,70 @@ contract EVM2EVMMultiOffRamp_commit is EVM2EVMMultiOffRampSetup {
     vm.expectEmit();
     emit PriceRegistry.UsdPerTokenUpdated(s_sourceFeeToken, 4e18, block.timestamp);
     _commit(commitReport, s_latestSequenceNumber);
+
+    vm.expectRevert(EVM2EVMMultiOffRamp.StaleCommitReport.selector);
+    _commit(commitReport, s_latestSequenceNumber);
+  }
+
+  function test_StaleReportWithRoot_Revert() public {
+    uint64 maxSeq = 12;
+    uint224 tokenStartPrice =
+      IPriceRegistry(s_offRamp.getDynamicConfig().priceRegistry).getTokenPrice(s_sourceFeeToken).value;
+
+    EVM2EVMMultiOffRamp.MerkleRoot[] memory roots = new EVM2EVMMultiOffRamp.MerkleRoot[](1);
+    roots[0] = EVM2EVMMultiOffRamp.MerkleRoot({
+      sourceChainSelector: SOURCE_CHAIN_SELECTOR_1,
+      interval: EVM2EVMMultiOffRamp.Interval(1, maxSeq),
+      merkleRoot: "stale report 1"
+    });
+    EVM2EVMMultiOffRamp.CommitReport memory commitReport =
+      EVM2EVMMultiOffRamp.CommitReport({priceUpdates: getEmptyPriceUpdates(), merkleRoots: roots});
+
+    vm.expectEmit();
+    emit EVM2EVMMultiOffRamp.CommitReportAccepted(commitReport);
+
+    vm.expectEmit();
+    emit MultiOCR3Base.Transmitted(uint8(Internal.OCRPluginType.Commit), s_configDigestCommit, s_latestSequenceNumber);
+
+    _commit(commitReport, s_latestSequenceNumber);
+
+    assertEq(maxSeq + 1, s_offRamp.getSourceChainConfig(SOURCE_CHAIN_SELECTOR).minSeqNr);
+    assertEq(s_latestSequenceNumber, s_offRamp.getLatestCommitSequenceNumber());
+
+    commitReport.merkleRoots[0].interval = EVM2EVMMultiOffRamp.Interval(maxSeq + 1, maxSeq * 2);
+    commitReport.merkleRoots[0].merkleRoot = "stale report 2";
+
+    vm.expectRevert(EVM2EVMMultiOffRamp.StaleCommitReport.selector);
+    _commit(commitReport, s_latestSequenceNumber);
+  }
+
+  function test_ValidPriceUpdateThenStaleReportWithRoot_Revert() public {
+    uint64 maxSeq = 12;
+    uint224 tokenPrice1 = 4e18;
+    uint224 tokenPrice2 = 5e18;
+    EVM2EVMMultiOffRamp.MerkleRoot[] memory roots = new EVM2EVMMultiOffRamp.MerkleRoot[](0);
+    EVM2EVMMultiOffRamp.CommitReport memory commitReport = EVM2EVMMultiOffRamp.CommitReport({
+      priceUpdates: getSingleTokenPriceUpdateStruct(s_sourceFeeToken, tokenPrice1),
+      merkleRoots: roots
+    });
+
+    vm.expectEmit();
+    emit PriceRegistry.UsdPerTokenUpdated(s_sourceFeeToken, tokenPrice1, block.timestamp);
+
+    vm.expectEmit();
+    emit MultiOCR3Base.Transmitted(uint8(Internal.OCRPluginType.Commit), s_configDigestCommit, s_latestSequenceNumber);
+
+    _commit(commitReport, s_latestSequenceNumber);
+    assertEq(s_latestSequenceNumber, s_offRamp.getLatestCommitSequenceNumber());
+
+    roots = new EVM2EVMMultiOffRamp.MerkleRoot[](1);
+    roots[0] = EVM2EVMMultiOffRamp.MerkleRoot({
+      sourceChainSelector: SOURCE_CHAIN_SELECTOR_1,
+      interval: EVM2EVMMultiOffRamp.Interval(1, maxSeq),
+      merkleRoot: "stale report"
+    });
+    commitReport.priceUpdates = getSingleTokenPriceUpdateStruct(s_sourceFeeToken, tokenPrice2);
+    commitReport.merkleRoots = roots;
 
     vm.expectRevert(EVM2EVMMultiOffRamp.StaleCommitReport.selector);
     _commit(commitReport, s_latestSequenceNumber);
