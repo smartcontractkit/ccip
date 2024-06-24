@@ -62,11 +62,12 @@ import (
 )
 
 func HaveRequiredContractVersions(requiredContractVersions map[Name]Version) error {
-	for contractName, requiredVersion := range requiredContractVersions {
+	for contractName, r := range requiredContractVersions {
+		required := r
 		if contractVersion, ok := VersionMap[contractName]; !ok {
 			return fmt.Errorf("contract %s not found in version map", contractName)
-		} else if contractVersion.Compare(requiredVersion.Version) < 0 {
-			return fmt.Errorf("contract %s version %s is less than required version %s", contractName, contractVersion, requiredVersion)
+		} else if contractVersion.Compare(&required.Version) < 0 {
+			return fmt.Errorf("contract %s version %s is less than required version %s", contractName, contractVersion, required.Version)
 		}
 	}
 	return nil

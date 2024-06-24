@@ -53,13 +53,13 @@ type Name string
 
 // Version wraps a semver.Version object to provide some custom unmarshalling
 type Version struct {
-	*semver.Version
+	semver.Version
 }
 
 // MustVersion creates a new Version object from a semver string and panics if it fails
 func MustVersion(version string) Version {
 	v := semver.MustParse(version)
-	return Version{Version: v}
+	return Version{Version: *v}
 }
 
 // UnmarshalTOML unmarshals TOML data into a Version object
@@ -74,13 +74,13 @@ func (v *Version) UnmarshalText(data []byte) error {
 	if err != nil {
 		return fmt.Errorf("failed to parse version from '%s': %w", str, err)
 	}
-	*v.Version = *ver
+	v.Version = *ver
 	return nil
 }
 
 // Latest returns true if the version is the latest version
 func (v *Version) Latest() bool {
-	return v.Version.Equal(Latest.Version)
+	return v.Version.Equal(&Latest.Version)
 }
 
 const (
@@ -108,32 +108,46 @@ var (
 		CommitStoreContract:   Latest,
 		TokenPoolContract:     Latest,
 	}
-	SupportedContracts = map[Name]map[Version]bool{
+	SupportedContracts = map[Name]map[string]bool{
 		PriceRegistryContract: {
-			Latest: true,
-			V1_2_0: true,
+			Latest.String(): true,
+			V1_2_0.String(): true,
 		},
 		OffRampContract: {
-			Latest: true,
-			V1_2_0: true,
+			Latest.String(): true,
+			V1_2_0.String(): true,
 		},
 		OnRampContract: {
-			Latest: true,
-			V1_2_0: true,
+			Latest.String(): true,
+			V1_2_0.String(): true,
 		},
 		CommitStoreContract: {
-			Latest: true,
-			V1_2_0: true,
+			Latest.String(): true,
+			V1_2_0.String(): true,
 		},
 		TokenPoolContract: {
-			Latest: true,
-			V1_4_0: true,
+			Latest.String(): true,
+			V1_4_0.String(): true,
 		},
 	}
 
 	FiftyCoins   = new(big.Int).Mul(big.NewInt(1e18), big.NewInt(50))
 	HundredCoins = new(big.Int).Mul(big.NewInt(1e18), big.NewInt(100))
 )
+
+// CheckVersionSupported checks if a given version is supported for a given contract
+func CheckVersionSupported(name Name, version Version) error {
+	if contract, ok := SupportedContracts[name]; ok {
+		if isSupported, ok := contract[version.String()]; ok {
+			if isSupported {
+				return nil
+			}
+			return fmt.Errorf("version %s is not supported for contract %s", version.String(), name)
+		}
+		return fmt.Errorf("version %s is not supported for contract %s", version.String(), name)
+	}
+	return fmt.Errorf("contract %s is not supported", name)
+}
 
 type RateLimiterConfig struct {
 	IsEnabled bool

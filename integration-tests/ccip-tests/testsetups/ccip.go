@@ -313,18 +313,9 @@ func (c *CCIPTestConfig) SetContractVersion() error {
 		return nil
 	}
 	for contractName, version := range c.VersionInput {
-		if _, ok := contracts.VersionMap[contractName]; !ok {
-			return fmt.Errorf("contract versioning is not supported for %s, versioning is supported for %v",
-				contractName, contracts.SupportedContracts)
-		}
-		supportedVersions, ok := contracts.SupportedContracts[contractName]
-		if !ok {
-			return fmt.Errorf("contract %s is not supported, versioning is supported for %v",
-				contractName, contracts.SupportedContracts)
-		}
-		if valid, exists := supportedVersions[version]; !exists || !valid {
-			return fmt.Errorf("contract %s does not support version %s, versioning is supported for %v",
-				contractName, version.String(), supportedVersions)
+		err := contracts.CheckVersionSupported(contractName, version)
+		if err != nil {
+			return err
 		}
 		contracts.VersionMap[contractName] = version
 	}
