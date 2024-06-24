@@ -90,9 +90,19 @@ func NewExecServices(ctx context.Context, lggr logger.Logger, jb job.Job, srcPro
 	}
 
 	versionFinder := ccip.NewEvmVersionFinder()
-	commitStoreReader, err := factory.NewCommitStoreReader(lggr, versionFinder, offRampConfig.CommitStore, dstChain.Client(), dstChain.LogPoller(), srcChain.GasEstimator(), srcChain.Config().EVM().GasEstimator().PriceMax().ToInt())
+	commitStoreReader, err := factory.NewCommitStoreReader(lggr, versionFinder, offRampConfig.CommitStore, dstChain.Client(), dstChain.LogPoller())
 	if err != nil {
 		return nil, fmt.Errorf("could not load commitStoreReader reader: %w", err)
+	}
+
+	err = commitStoreReader.SetGasEstimator(ctx, srcChain.GasEstimator())
+	if err != nil {
+		return nil, fmt.Errorf("could not set gas estimator: %w", err)
+	}
+
+	err = commitStoreReader.SetSourceMaxGasPrice(ctx, srcChain.Config().EVM().GasEstimator().PriceMax().ToInt())
+	if err != nil {
+		return nil, fmt.Errorf("could not set source max gas price: %w", err)
 	}
 
 	tokenDataProviders := make(map[cciptypes.Address]tokendata.Reader)
@@ -206,7 +216,7 @@ func UnregisterExecPluginLpFilters(ctx context.Context, lggr logger.Logger, jb j
 	versionFinder := factory.NewEvmVersionFinder()
 	unregisterFuncs := []func() error{
 		func() error {
-			return factory.CloseCommitStoreReader(lggr, versionFinder, params.offRampConfig.CommitStore, params.destChain.Client(), params.destChain.LogPoller(), params.sourceChain.GasEstimator(), params.sourceChain.Config().EVM().GasEstimator().PriceMax().ToInt())
+			return factory.CloseCommitStoreReader(lggr, versionFinder, params.offRampConfig.CommitStore, params.destChain.Client(), params.destChain.LogPoller())
 		},
 		func() error {
 			return factory.CloseOnRampReader(lggr, versionFinder, params.offRampConfig.SourceChainSelector, params.offRampConfig.ChainSelector, params.offRampConfig.OnRamp, params.sourceChain.LogPoller(), params.sourceChain.Client())

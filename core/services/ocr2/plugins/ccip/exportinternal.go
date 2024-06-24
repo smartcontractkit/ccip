@@ -35,8 +35,8 @@ func NewEvmPriceRegistry(lp logpoller.LogPoller, ec client.Client, lggr logger.L
 
 type VersionFinder = factory.VersionFinder
 
-func NewCommitStoreReader(lggr logger.Logger, versionFinder VersionFinder, address ccip.Address, ec client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator, sourceMaxGasPrice *big.Int) (ccipdata.CommitStoreReader, error) {
-	return factory.NewCommitStoreReader(lggr, versionFinder, address, ec, lp, estimator, sourceMaxGasPrice)
+func NewCommitStoreReader(lggr logger.Logger, versionFinder VersionFinder, address ccip.Address, ec client.Client, lp logpoller.LogPoller) (ccipdata.CommitStoreReader, error) {
+	return factory.NewCommitStoreReader(lggr, versionFinder, address, ec, lp)
 }
 
 func NewOffRampReader(lggr logger.Logger, versionFinder VersionFinder, addr ccip.Address, destClient client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator, destMaxGasPrice *big.Int, registerFilters bool) (ccipdata.OffRampReader, error) {

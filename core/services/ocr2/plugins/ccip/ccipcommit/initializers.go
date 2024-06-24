@@ -56,7 +56,17 @@ func NewCommitServices(ctx context.Context, ds sqlutil.DataSource, srcProvider c
 	versionFinder := factory.NewEvmVersionFinder()
 	commitStoreAddress := common.HexToAddress(spec.ContractID)
 	sourceMaxGasPrice := srcChain.Config().EVM().GasEstimator().PriceMax().ToInt()
-	commitStoreReader, err := ccip.NewCommitStoreReader(lggr, versionFinder, ccipcalc.EvmAddrToGeneric(commitStoreAddress), dstChain.Client(), dstChain.LogPoller(), srcChain.GasEstimator(), sourceMaxGasPrice)
+	commitStoreReader, err := ccip.NewCommitStoreReader(lggr, versionFinder, ccipcalc.EvmAddrToGeneric(commitStoreAddress), dstChain.Client(), dstChain.LogPoller())
+	if err != nil {
+		return nil, err
+	}
+
+	err = commitStoreReader.SetGasEstimator(ctx, srcChain.GasEstimator())
+	if err != nil {
+		return nil, err
+	}
+
+	err = commitStoreReader.SetSourceMaxGasPrice(ctx, sourceMaxGasPrice)
 	if err != nil {
 		return nil, err
 	}
@@ -221,7 +231,7 @@ func UnregisterCommitPluginLpFilters(ctx context.Context, lggr logger.Logger, jb
 	// TODO CCIP-2498 Use provider to close
 	unregisterFuncs := []func() error{
 		func() error {
-			return factory.CloseCommitStoreReader(lggr, versionFinder, params.commitStoreAddress, params.destChain.Client(), params.destChain.LogPoller(), params.sourceChain.GasEstimator(), params.sourceChain.Config().EVM().GasEstimator().PriceMax().ToInt())
+			return factory.CloseCommitStoreReader(lggr, versionFinder, params.commitStoreAddress, params.destChain.Client(), params.destChain.LogPoller())
 		},
 		func() error {
 			return factory.CloseOnRampReader(lggr, versionFinder, params.commitStoreStaticCfg.SourceChainSelector, params.commitStoreStaticCfg.ChainSelector, cciptypes.Address(params.commitStoreStaticCfg.OnRamp.String()), params.sourceChain.LogPoller(), params.sourceChain.Client())
