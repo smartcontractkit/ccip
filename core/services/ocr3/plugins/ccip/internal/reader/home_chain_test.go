@@ -50,15 +50,15 @@ func TestHomeChainConfigPoller_HealthReport(t *testing.T) {
 
 	// Initially it's healthy
 	healthy := configPoller.HealthReport()
-	assert.Equal(t, map[string]error{"homeChainPoller": error(nil)}, healthy)
+	assert.Equal(t, map[string]error{configPoller.Name(): error(nil)}, healthy)
 
 	// After one second it will try polling 10 times and fail
 	time.Sleep(1 * time.Second)
+	_ = configPoller.Close()
 
 	errors := configPoller.HealthReport()
-	_ = configPoller.Close()
 	assert.Equal(t, 1, len(errors))
-	assert.Errorf(t, errors["homeChainPoller"], "polling failed %d times in a row", MaxFailedPolls)
+	assert.Errorf(t, errors[configPoller.Name()], "polling failed %d times in a row", MaxFailedPolls)
 }
 
 func Test_PollingWorking(t *testing.T) {
@@ -129,7 +129,7 @@ func Test_PollingWorking(t *testing.T) {
 	ctx := context.Background()
 	_ = configPoller.Start(ctx)
 	_ = configPoller.Close()
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(2 * time.Second)
 
 	configs, err := configPoller.GetAllChainConfigs()
 	assert.NoError(t, err)

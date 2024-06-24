@@ -97,16 +97,17 @@ func (r *homeChainPoller) poll() {
 				r.mutex.Lock()
 				r.failedPolls++
 				r.mutex.Unlock()
-				r.lggr.Errorw("Fetching and setting configs failed", "err", err)
+				r.lggr.Errorw("fetching and setting configs failed", "failedPolls", r.failedPolls, "err", err)
 			}
 		}
 	}
 }
 
 func (r *homeChainPoller) fetchAndSetConfigs(ctx context.Context) error {
-	chainConfigInfos, err := r.fetchOnChainConfig(ctx)
+	var chainConfigInfos []ChainConfigInfo
+	err := r.homeChainReader.GetLatestValue(ctx, "CCIPCapabilityConfiguration", "getAllChainConfigs", nil, &chainConfigInfos)
 	if err != nil {
-		r.lggr.Errorw("Fetching on-chain configs failed", "err", err)
+		r.lggr.Errorw("fetching on-chain configs failed", "err", err)
 		return err
 	}
 	if len(chainConfigInfos) == 0 {
@@ -114,7 +115,7 @@ func (r *homeChainPoller) fetchAndSetConfigs(ctx context.Context) error {
 		r.lggr.Warnw("no on chain configs found")
 		return nil
 	}
-	homeChainConfigs, err := r.convertOnChainConfigToHomeChainConfig(chainConfigInfos)
+	homeChainConfigs, err := convertOnChainConfigToHomeChainConfig(chainConfigInfos)
 	if err != nil {
 		r.lggr.Errorw("error converting OnChainConfigs to ChainConfig", "err", err)
 		return err
@@ -234,17 +235,7 @@ func createNodesSupportedChains(chainConfigs map[cciptypes.ChainSelector]ChainCo
 	return nodeSupportedChains
 }
 
-func (r *homeChainPoller) fetchOnChainConfig(ctx context.Context) ([]ChainConfigInfo, error) {
-	r.lggr.Infow("Fetching HomeChainConfigMapper")
-	var chainConfigInfo []ChainConfigInfo
-	err := r.homeChainReader.GetLatestValue(ctx, "CCIPCapabilityConfiguration", "getAllChainConfigs", nil, &chainConfigInfo)
-	if err != nil {
-		return nil, err
-	}
-	return chainConfigInfo, err
-}
-
-func (r *homeChainPoller) convertOnChainConfigToHomeChainConfig(capabilityConfigs []ChainConfigInfo) (map[cciptypes.ChainSelector]ChainConfig, error) {
+func convertOnChainConfigToHomeChainConfig(capabilityConfigs []ChainConfigInfo) (map[cciptypes.ChainSelector]ChainConfig, error) {
 	chainConfigs := make(map[cciptypes.ChainSelector]ChainConfig)
 	for _, capabilityConfig := range capabilityConfigs {
 		chainSelector := capabilityConfig.ChainSelector

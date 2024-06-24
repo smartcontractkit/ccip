@@ -352,18 +352,10 @@ func (p *Plugin) supportedChains() (mapset.Set[cciptypes.ChainSelector], error) 
 	return supportedChains, nil
 }
 
-func (p *Plugin) getDestChainConfig() (reader.ChainConfig, error) {
-	cfg, err := p.homeChain.GetChainConfig(p.cfg.DestChain)
-	if err != nil {
-		return reader.ChainConfig{}, fmt.Errorf("get chain config: %w", err)
-	}
-	return cfg, nil
-}
-
 func (p *Plugin) supportsDestChain() (bool, error) {
-	destChainConfig, err := p.getDestChainConfig()
+	destChainConfig, err := p.homeChain.GetChainConfig(p.cfg.DestChain)
 	if err != nil {
-		return false, fmt.Errorf("error getting chain config: %w", err)
+		return false, fmt.Errorf("get chain config: %w", err)
 	}
 	return destChainConfig.SupportedNodes.Contains(p.oracleIDToP2pID[p.nodeID]), nil
 }
