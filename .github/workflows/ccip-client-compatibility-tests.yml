@@ -570,7 +570,7 @@ jobs:
           should_tidy: "false"
       - name: Print failed test summary
         if: always()
-        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/show-test-summary@e3639409e2e77747ef355ad4b8740676679139a8 # v2.4
+        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/show-test-summary@b0bbaffeb970fab3b08663b31b7adde4272271ba # v2.4
         with:
           test_directories: ./integration-tests/smoke/,./integration-tests/ccip-tests/smoke/
 
