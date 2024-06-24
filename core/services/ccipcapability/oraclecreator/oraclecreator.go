@@ -14,8 +14,6 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
-	ccipocr3commit "github.com/smartcontractkit/ccipocr3/commit"
-	ccipocr3exec "github.com/smartcontractkit/ccipocr3/execute"
 	"github.com/smartcontractkit/chainlink-common/pkg/loop"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
@@ -84,7 +82,7 @@ func (o *oracleCreator) CreateCommitOracle(config cctypes.OCRConfig) (cctypes.CC
 	// this is so that we can use the msg hasher and report encoder from that dest chain relayer's provider.
 	providers := make(map[types.RelayID]types.CCIPOCR3CommitProvider)
 	contractReaders := make(map[cciptypes.ChainSelector]types.ContractReader)
-	contractWriters := make(map[cciptypes.ChainSelector]types.ChainWriter)
+	// contractWriters := make(map[cciptypes.ChainSelector]types.ChainWriter)
 	for relayID, relayer := range o.relayers {
 		provider, err := relayer.NewPluginProvider(context.Background(), types.RelayArgs{
 			ExternalJobID: o.externalJobID,
@@ -152,15 +150,15 @@ func (o *oracleCreator) CreateCommitOracle(config cctypes.OCRConfig) (cctypes.CC
 	}
 	onchainKeyring := ocrcommon.NewOCR3OnchainKeyringAdapter(keybundle)
 
-	reportCodec, err := destProvider.ReportCodec(context.Background())
-	if err != nil {
-		return nil, fmt.Errorf("failed to get report codec: %w", err)
-	}
+	// reportCodec, err := destProvider.ReportCodec(context.Background())
+	// if err != nil {
+	// 	return nil, fmt.Errorf("failed to get report codec: %w", err)
+	// }
 
-	msgHasher, err := destProvider.MsgHasher(context.Background())
-	if err != nil {
-		return nil, fmt.Errorf("failed to get message hasher: %w", err)
-	}
+	// msgHasher, err := destProvider.MsgHasher(context.Background())
+	// if err != nil {
+	// 	return nil, fmt.Errorf("failed to get message hasher: %w", err)
+	// }
 	oracleArgs := libocr3.OCR3OracleArgs[[]byte]{
 		BinaryNetworkEndpointFactory: o.peerWrapper.Peer2,
 		Database:                     o.db,
@@ -198,17 +196,7 @@ func (o *oracleCreator) CreateCommitOracle(config cctypes.OCRConfig) (cctypes.CC
 		OffchainConfigDigester: ocrimpls.NewConfigDigester(config.ConfigDigest()),
 		OffchainKeyring:        keybundle,
 		OnchainKeyring:         onchainKeyring,
-		ReportingPluginFactory: ccipocr3commit.NewPluginFactory(
-			contractReaders, // contract readers
-			contractWriters, // contract writers
-			cciptypes.ChainSelector(config.ChainSelector()), // dest chain selector
-			reportCodec, // dest chain report codec
-			msgHasher,   // dest chain msg hasher
-			o.lggr.
-				Named("CCIPCommitPlugin").
-				Named(destRelayID.String()).
-				Named(hexutil.Encode(config.OfframpAddress())),
-		),
+		ReportingPluginFactory: nil, // TODO: set after fixing chainlink-common regression
 	}
 	oracle, err := libocr3.NewOracle(oracleArgs)
 	if err != nil {
@@ -223,7 +211,7 @@ func (o *oracleCreator) CreateExecOracle(config cctypes.OCRConfig) (cctypes.CCIP
 	// this is so that we can use the msg hasher and report encoder from that dest chain relayer's provider.
 	providers := make(map[types.RelayID]types.CCIPOCR3ExecuteProvider)
 	contractReaders := make(map[cciptypes.ChainSelector]types.ContractReader)
-	contractWriters := make(map[cciptypes.ChainSelector]types.ChainWriter)
+	// contractWriters := make(map[cciptypes.ChainSelector]types.ChainWriter)
 	for relayID, relayer := range o.relayers {
 		provider, err := relayer.NewPluginProvider(context.Background(), types.RelayArgs{
 			ExternalJobID: o.externalJobID,
@@ -291,15 +279,15 @@ func (o *oracleCreator) CreateExecOracle(config cctypes.OCRConfig) (cctypes.CCIP
 	}
 	onchainKeyring := ocrcommon.NewOCR3OnchainKeyringAdapter(keybundle)
 
-	reportCodec, err := destProvider.ReportCodec(context.Background())
-	if err != nil {
-		return nil, fmt.Errorf("failed to get report codec: %w", err)
-	}
+	// reportCodec, err := destProvider.ReportCodec(context.Background())
+	// if err != nil {
+	// 	return nil, fmt.Errorf("failed to get report codec: %w", err)
+	// }
 
-	msgHasher, err := destProvider.MsgHasher(context.Background())
-	if err != nil {
-		return nil, fmt.Errorf("failed to get message hasher: %w", err)
-	}
+	// msgHasher, err := destProvider.MsgHasher(context.Background())
+	// if err != nil {
+	// 	return nil, fmt.Errorf("failed to get message hasher: %w", err)
+	// }
 	oracleArgs := libocr3.OCR3OracleArgs[[]byte]{
 		BinaryNetworkEndpointFactory: o.peerWrapper.Peer2,
 		Database:                     o.db,
@@ -337,14 +325,7 @@ func (o *oracleCreator) CreateExecOracle(config cctypes.OCRConfig) (cctypes.CCIP
 		OffchainConfigDigester: ocrimpls.NewConfigDigester(config.ConfigDigest()),
 		OffchainKeyring:        keybundle,
 		OnchainKeyring:         onchainKeyring,
-		ReportingPluginFactory: ccipocr3exec.NewPluginFactory(
-			contractReaders,
-			contractWriters,
-			cciptypes.ChainSelector(config.ChainSelector()),
-			reportCodec,
-			msgHasher,
-			o.lggr.Named("CCIPExecPlugin").Named(destRelayID.String()).Named(hexutil.Encode(config.OfframpAddress())),
-		),
+		ReportingPluginFactory: nil, // TODO set after fixing chainlink-common regression
 	}
 	oracle, err := libocr3.NewOracle(oracleArgs)
 	if err != nil {

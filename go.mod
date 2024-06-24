@@ -74,7 +74,7 @@ require (
 	github.com/shopspring/decimal v1.4.0
 	github.com/smartcontractkit/chain-selectors v1.0.17
 	github.com/smartcontractkit/chainlink-automation v1.0.3
-	github.com/smartcontractkit/chainlink-common v0.1.7-0.20240613201342-a855825f87bb
+	github.com/smartcontractkit/chainlink-common v0.1.7-0.20240607135320-c9bc0a2ac0ce
 	github.com/smartcontractkit/chainlink-cosmos v0.4.1-0.20240524214833-c362c2ebbd2d
 	github.com/smartcontractkit/chainlink-data-streams v0.0.0-20240220203239-09be0ea34540
 	github.com/smartcontractkit/chainlink-feeds v0.0.0-20240522213638-159fb2d99917
@@ -290,7 +290,6 @@ require (
 	github.com/sethvargo/go-retry v0.2.4 // indirect
 	github.com/shirou/gopsutil v3.21.11+incompatible // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
-	github.com/smartcontractkit/ccipocr3 v0.0.0-00010101000000-000000000000 // indirect
 	github.com/spf13/afero v1.9.5 // indirect
 	github.com/spf13/cobra v1.8.0 // indirect
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
