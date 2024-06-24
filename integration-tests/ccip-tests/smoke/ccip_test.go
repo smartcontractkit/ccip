@@ -745,7 +745,7 @@ func TestSmokeCCIPTransferConfig(t *testing.T) {
 				{
 					Token:                     bpsToken.ContractAddress,
 					AggregateRateLimitEnabled: false,
-					DeciBps:                   1000,
+					DeciBps:                   10,
 				},
 				{
 					Token:                     aggRateToken.ContractAddress,
@@ -754,7 +754,7 @@ func TestSmokeCCIPTransferConfig(t *testing.T) {
 				{
 					Token:                     bpsAndAggToken.ContractAddress,
 					AggregateRateLimitEnabled: true,
-					DeciBps:                   1000,
+					DeciBps:                   10,
 				},
 			})
 			require.NoError(t, err, "Error setting OnRamp transfer fee configs")
@@ -792,7 +792,6 @@ func TestSmokeCCIPTransferConfig(t *testing.T) {
 				Info().
 				Str("Token", aggRateToken.ContractAddress.Hex()).
 				Msg("Limited token transfer failed on source chain (a good thing in this context)")
-
 			src.TransferAmount[aggRateTokenIndex] = nil
 			src.TransferAmount[bpsAndAggTokenIndex] = sendAmount
 			failedTx, _, _, err = tc.lane.Source.SendRequest(tc.lane.Dest.ReceiverDapp.EthAddress, big.NewInt(actions.DefaultRequestGasLimit))
