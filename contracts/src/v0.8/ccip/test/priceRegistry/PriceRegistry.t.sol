@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.24;
 
+import {AuthorizedCallers} from "../../../shared/access/AuthorizedCallers.sol";
 import {MockV3Aggregator} from "../../../tests/MockV3Aggregator.sol";
 import {PriceRegistry} from "../../PriceRegistry.sol";
 import {IPriceRegistry} from "../../interfaces/IPriceRegistry.sol";
 import {Internal} from "../../libraries/Internal.sol";
 import {TokenSetup} from "../TokenSetup.t.sol";
 import {Vm} from "forge-std/Vm.sol";
+import {console} from "forge-std/console.sol";
 
 contract PriceRegistrySetup is TokenSetup {
   uint112 internal constant USD_PER_GAS = 1e6; // 0.001 gwei
@@ -175,7 +177,7 @@ contract PriceRegistry_constructor is PriceRegistrySetup {
 
     assertEq(feeTokens, s_priceRegistry.getFeeTokens());
     assertEq(uint32(TWELVE_HOURS), s_priceRegistry.getStalenessThreshold());
-    assertEq(priceUpdaters, s_priceRegistry.getPriceUpdaters());
+    assertEq(priceUpdaters, s_priceRegistry.getAllAuthorizedCallers());
     assertEq(s_priceRegistry.typeAndVersion(), "PriceRegistry 1.6.0-dev");
 
     _assertTokenPriceFeedConfigEquality(
@@ -399,43 +401,6 @@ contract PriceRegistry_getValidatedTokenPrice is PriceRegistrySetup {
   }
 }
 
-contract PriceRegistry_applyPriceUpdatersUpdates is PriceRegistrySetup {
-  function test_ApplyPriceUpdaterUpdates_Success() public {
-    address[] memory priceUpdaters = new address[](1);
-    priceUpdaters[0] = STRANGER;
-
-    vm.expectEmit();
-    emit PriceRegistry.PriceUpdaterSet(STRANGER);
-
-    s_priceRegistry.applyPriceUpdatersUpdates(priceUpdaters, new address[](0));
-    assertEq(s_priceRegistry.getPriceUpdaters().length, 1);
-    assertEq(s_priceRegistry.getPriceUpdaters()[0], STRANGER);
-
-    // add same priceUpdater is no-op
-    s_priceRegistry.applyPriceUpdatersUpdates(priceUpdaters, new address[](0));
-    assertEq(s_priceRegistry.getPriceUpdaters().length, 1);
-    assertEq(s_priceRegistry.getPriceUpdaters()[0], STRANGER);
-
-    vm.expectEmit();
-    emit PriceRegistry.PriceUpdaterRemoved(STRANGER);
-
-    s_priceRegistry.applyPriceUpdatersUpdates(new address[](0), priceUpdaters);
-    assertEq(s_priceRegistry.getPriceUpdaters().length, 0);
-
-    // removing already removed priceUpdater is no-op
-    s_priceRegistry.applyPriceUpdatersUpdates(new address[](0), priceUpdaters);
-    assertEq(s_priceRegistry.getPriceUpdaters().length, 0);
-  }
-
-  function test_OnlyCallableByOwner_Revert() public {
-    address[] memory priceUpdaters = new address[](1);
-    priceUpdaters[0] = STRANGER;
-    vm.startPrank(STRANGER);
-    vm.expectRevert("Only callable by owner");
-    s_priceRegistry.applyPriceUpdatersUpdates(priceUpdaters, new address[](0));
-  }
-}
-
 contract PriceRegistry_applyFeeTokensUpdates is PriceRegistrySetup {
   function test_ApplyFeeTokensUpdates_Success() public {
     address[] memory feeTokens = new address[](1);
@@ -553,6 +518,45 @@ contract PriceRegistry_updatePrices is PriceRegistrySetup {
     }
   }
 
+  function test_UpdatableByAuthorizedCaller_Success() public {
+    Internal.PriceUpdates memory priceUpdates = Internal.PriceUpdates({
+      tokenPriceUpdates: new Internal.TokenPriceUpdate[](1),
+      gasPriceUpdates: new Internal.GasPriceUpdate[](0)
+    });
+    priceUpdates.tokenPriceUpdates[0] = Internal.TokenPriceUpdate({sourceToken: s_sourceTokens[0], usdPerToken: 4e18});
+
+    // Revert when caller is not authorized
+    vm.startPrank(STRANGER);
+    vm.expectRevert(abi.encodeWithSelector(AuthorizedCallers.UnauthorizedCaller.selector, STRANGER));
+    s_priceRegistry.updatePrices(priceUpdates);
+
+    address[] memory priceUpdaters = new address[](1);
+    priceUpdaters[0] = STRANGER;
+    vm.startPrank(OWNER);
+    s_priceRegistry.applyAuthorizedCallerUpdates(
+      AuthorizedCallers.AuthorizedCallerArgs({addedCallers: priceUpdaters, removedCallers: new address[](0)})
+    );
+
+    // Stranger is now an authorized caller to update prices
+    vm.expectEmit();
+    emit PriceRegistry.UsdPerTokenUpdated(
+      priceUpdates.tokenPriceUpdates[0].sourceToken, priceUpdates.tokenPriceUpdates[0].usdPerToken, block.timestamp
+    );
+    s_priceRegistry.updatePrices(priceUpdates);
+
+    assertEq(s_priceRegistry.getTokenPrice(s_sourceTokens[0]).value, priceUpdates.tokenPriceUpdates[0].usdPerToken);
+
+    vm.startPrank(OWNER);
+    s_priceRegistry.applyAuthorizedCallerUpdates(
+      AuthorizedCallers.AuthorizedCallerArgs({addedCallers: new address[](0), removedCallers: priceUpdaters})
+    );
+
+    // Revert when authorized caller is removed
+    vm.startPrank(STRANGER);
+    vm.expectRevert(abi.encodeWithSelector(AuthorizedCallers.UnauthorizedCaller.selector, STRANGER));
+    s_priceRegistry.updatePrices(priceUpdates);
+  }
+
   // Reverts
 
   function test_OnlyCallableByUpdaterOrOwner_Revert() public {
@@ -562,7 +566,7 @@ contract PriceRegistry_updatePrices is PriceRegistrySetup {
     });
 
     vm.startPrank(STRANGER);
-    vm.expectRevert(abi.encodeWithSelector(PriceRegistry.OnlyCallableByUpdaterOrOwner.selector));
+    vm.expectRevert(abi.encodeWithSelector(AuthorizedCallers.UnauthorizedCaller.selector, STRANGER));
     s_priceRegistry.updatePrices(priceUpdates);
   }
 }
