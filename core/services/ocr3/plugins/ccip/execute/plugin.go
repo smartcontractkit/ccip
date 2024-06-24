@@ -8,6 +8,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/smartcontractkit/ccipocr3/internal/libs/slicelib"
 	"github.com/smartcontractkit/chainlink-common/pkg/hashutil"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/merklemulti"
@@ -20,9 +21,13 @@ const maxReportSize = 123456 // todo:
 
 // Plugin implements the main ocr3 plugin logic.
 type Plugin struct {
-	reportingCfg ocr3types.ReportingPluginConfig
-	cfg          cciptypes.ExecutePluginConfig
-	ccipReader   cciptypes.CCIPReader
+	ctx             context.Context
+	reportingCfg    ocr3types.ReportingPluginConfig
+	cfg             cciptypes.ExecutePluginConfig
+	ccipReader      cciptypes.CCIPReader
+	reportCodec     cciptypes.ExecutePluginCodec
+	msgHasher       cciptypes.MessageHasher
+	tokenDataReader TokenDataReader
 
 	//commitRootsCache cache.CommitsRootsCache
 	lastReportTS *atomic.Int64
@@ -31,19 +36,26 @@ type Plugin struct {
 }
 
 func NewPlugin(
-	_ context.Context,
+	ctx context.Context,
 	reportingCfg ocr3types.ReportingPluginConfig,
 	cfg cciptypes.ExecutePluginConfig,
 	ccipReader cciptypes.CCIPReader,
+	reportCodec cciptypes.ExecutePluginCodec,
+	msgHasher cciptypes.MessageHasher,
 	lggr logger.Logger,
 ) *Plugin {
 	lastReportTS := &atomic.Int64{}
 	lastReportTS.Store(time.Now().Add(-cfg.MessageVisibilityInterval).UnixMilli())
 
+	// TODO: initialize tokenDataReader.
+
 	return &Plugin{
+		ctx:          ctx,
 		reportingCfg: reportingCfg,
 		cfg:          cfg,
 		ccipReader:   ccipReader,
+		reportCodec:  reportCodec,
+		msgHasher:    msgHasher,
 		lastReportTS: lastReportTS,
 		lggr:         lggr,
 	}
@@ -207,10 +219,19 @@ func (p *Plugin) ObservationQuorum(outctx ocr3types.OutcomeContext, query types.
 	return ocr3types.QuorumFPlusOne, nil
 }
 
+// TokenDataReader is an interface for reading extra token data from an async process.
+// TODO: Build a token data reading process.
+type TokenDataReader interface {
+	ReadTokenData(ctx context.Context, srcChain cciptypes.ChainSelector, num cciptypes.SeqNum) ([][]byte, error)
+}
+
 // selectReport takes an ordered list of reports and selects the first reports that fit within the maxReportSize.
-func selectReport(lggr logger.Logger, reports []cciptypes.ExecutePluginCommitDataWithMessages, maxReportSize int) ([]merklemulti.Proof[[32]byte], []cciptypes.ExecutePluginCommitDataWithMessages, error) {
+func selectReport(ctx context.Context, lggr logger.Logger, codec cciptypes.ExecutePluginCodec, tokenDataReader TokenDataReader, reports []cciptypes.ExecutePluginCommitDataWithMessages, maxReportSize int) ([]cciptypes.ExecutionPluginReportSingleChain, []cciptypes.ExecutePluginCommitDataWithMessages, error) {
+	// TODO: It may be desirable for this entire function to be an interface so that
+	//       different selection algorithms can be used.
+
 	size := 0
-	var proofs []merklemulti.Proof[[32]byte]
+	var finalReports []cciptypes.ExecutionPluginReportSingleChain
 	for _, report := range reports {
 		numMsg := int(report.SequenceNumberRange.End() - report.SequenceNumberRange.Start() + 1)
 		if numMsg != len(report.Messages) {
@@ -234,12 +255,22 @@ func selectReport(lggr logger.Logger, reports []cciptypes.ExecutePluginCommitDat
 
 		// Iterate sequence range and executed messages to select messages to execute.
 		var toExecute []int
+		var offchainTokenData [][][]byte
 		executedIdx := 0
 		for i := report.SequenceNumberRange.Start(); i <= report.SequenceNumberRange.End(); i++ {
 			// Skip messages which are already executed
 			if executedIdx < len(report.ExecutedMessages) && report.ExecutedMessages[executedIdx] == i {
 				executedIdx++
 			} else {
+				msg := report.Messages[i-report.SequenceNumberRange.Start()]
+				tokenData, err := tokenDataReader.ReadTokenData(context.Background(), report.SourceChain, msg.SeqNum)
+				if err != nil {
+					lggr.Info("unable to read token data", "source-chain", report.SourceChain, "seq-num", msg.SeqNum, "error", err)
+					offchainTokenData = append(offchainTokenData, nil)
+				} else {
+					lggr.Debugw("read token data", "source-chain", report.SourceChain, "seq-num", msg.SeqNum, "data")
+					offchainTokenData = append(offchainTokenData, tokenData)
+				}
 				toExecute = append(toExecute, int(i))
 			}
 		}
@@ -248,10 +279,31 @@ func selectReport(lggr logger.Logger, reports []cciptypes.ExecutePluginCommitDat
 			return nil, nil, fmt.Errorf("unable to prove messages for report %s: %w", report.MerkleRoot.String(), err)
 		}
 
-		proofs = append(proofs, proof)
+		var proofsCast []cciptypes.Bytes32
+		for _, p := range proof.Hashes {
+			proofsCast = append(proofsCast, p)
+		}
 
-		// TODO: figure out exact report format and measure size correctly
-		size += 32 * len(proof.Hashes)
+		finalReport := cciptypes.ExecutionPluginReportSingleChain{
+			SourceChainSelector: report.SourceChain,
+			Messages:            report.Messages,
+			OffchainTokenData:   offchainTokenData,
+			Proofs:              proofsCast,
+			ProofFlagBits:       cciptypes.BigInt{Int: slicelib.BoolsToBitFlags(proof.SourceFlags)},
+		}
+
+		finalReports = append(finalReports, finalReport)
+
+		// Note: ExecutePluginReport is a strict array of data, so wrapping the final report
+		//       does not add any additional overhead to the size being computed here.
+
+		// Compute the size of the encoded report.
+		encoded, err := codec.Encode(ctx, cciptypes.ExecutePluginReport{ChainReports: []cciptypes.ExecutionPluginReportSingleChain{finalReport}})
+		if err != nil {
+			lggr.Errorw("unable to encode report", "err", err, "report", finalReport)
+			return nil, nil, fmt.Errorf("unable to encode report: %w", err)
+		}
+		size += len(encoded)
 
 		if size >= maxReportSize {
 			break
@@ -259,9 +311,9 @@ func selectReport(lggr logger.Logger, reports []cciptypes.ExecutePluginCommitDat
 	}
 
 	// Remove reports that are about to be executed.
-	reports = reports[len(proofs):]
+	reports = reports[len(finalReports):]
 
-	return proofs, reports, nil
+	return finalReports, reports, nil
 }
 
 func (p *Plugin) Outcome(
@@ -291,16 +343,16 @@ func (p *Plugin) Outcome(
 		mergedMessageObservations)
 
 	// flatten commit reports and sort by timestamp.
-	var reports []cciptypes.ExecutePluginCommitDataWithMessages
+	var commitReports []cciptypes.ExecutePluginCommitDataWithMessages
 	for _, report := range observation.CommitReports {
-		reports = append(reports, report...)
+		commitReports = append(commitReports, report...)
 	}
-	sort.Slice(reports, func(i, j int) bool {
-		return reports[i].Timestamp.Before(reports[j].Timestamp)
+	sort.Slice(commitReports, func(i, j int) bool {
+		return commitReports[i].Timestamp.Before(commitReports[j].Timestamp)
 	})
 
-	// add messages to their reports.
-	for _, report := range reports {
+	// add messages to their commitReports.
+	for _, report := range commitReports {
 		report.Messages = nil
 		for i := report.SequenceNumberRange.Start(); i <= report.SequenceNumberRange.End(); i++ {
 			if msg, ok := observation.Messages[report.SourceChain][i]; ok {
@@ -309,12 +361,16 @@ func (p *Plugin) Outcome(
 		}
 	}
 
-	proofs, reports, err := selectReport(p.lggr, reports, maxReportSize)
+	outcomeReports, commitReports, err := selectReport(p.ctx, p.lggr, p.reportCodec, nil, commitReports, maxReportSize)
 	if err != nil {
 		return ocr3types.Outcome{}, fmt.Errorf("unable to extract proofs: %w", err)
 	}
 
-	return cciptypes.NewExecutePluginOutcome(reports, proofs).Encode()
+	execReport := cciptypes.ExecutePluginReport{
+		ChainReports: outcomeReports,
+	}
+
+	return cciptypes.NewExecutePluginOutcome(commitReports, execReport).Encode()
 }
 
 func (p *Plugin) Reports(seqNr uint64, outcome ocr3types.Outcome) ([]ocr3types.ReportWithInfo[[]byte], error) {

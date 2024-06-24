@@ -22,3 +22,19 @@ func (c CommitPluginJSONReportCodec) Decode(ctx context.Context, bytes []byte) (
 	err := json.Unmarshal(bytes, &report)
 	return report, err
 }
+
+type ExecutePluginJSONReportCodec struct{}
+
+func NewExecutePluginJSONReportCodec() *ExecutePluginJSONReportCodec {
+	return &ExecutePluginJSONReportCodec{}
+}
+
+func (c ExecutePluginJSONReportCodec) Encode(ctx context.Context, report cciptypes.ExecutePluginReport) ([]byte, error) {
+	return json.Marshal(report)
+}
+
+func (c ExecutePluginJSONReportCodec) Decode(ctx context.Context, bytes []byte) (cciptypes.ExecutePluginReport, error) {
+	report := cciptypes.ExecutePluginReport{}
+	err := json.Unmarshal(bytes, &report)
+	return report, err
+}
