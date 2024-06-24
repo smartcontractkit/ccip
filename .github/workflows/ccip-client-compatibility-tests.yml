@@ -570,7 +570,7 @@ jobs:
           should_tidy: "false"
       - name: Print failed test summary
         if: always()
-        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/show-test-summary@c56265d4dc5b154dd309b165fb896822ec548aa7 # v2.4
+        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/show-test-summary@1587f59bfd626b668d303abbc90fee41b12397e6 # v2.3.23
         with:
           test_directories: ./integration-tests/smoke/,./integration-tests/ccip-tests/smoke/
 
@@ -594,7 +594,7 @@ jobs:
         uses: slackapi/slack-github-action@6c661ce58804a1a20f6dc5fbee7f0381b469e001 # v1.25.0
         id: slack
         with:
-          channel-id: ${{ secrets.QA_SLACK_CHANNEL }}
+          channel-id: ${{ secrets.QA_CCIP_SLACK_CHANNEL }}
           payload: |
             {
               "attachments": [
@@ -736,7 +736,7 @@ jobs:
           workflow_run_id: ${{ github.run_id }}
           github_job_name_regex: ^CCIP Compatibility with (.*?)$
           message_title: CCIP Compatibility Test Results
-          slack_channel_id: ${{ secrets.QA_SLACK_CHANNEL }}
+          slack_channel_id: ${{ secrets.QA_CCIP_SLACK_CHANNEL }}
           slack_bot_token: ${{ secrets.QA_SLACK_API_KEY }}
           slack_thread_ts: ${{ needs.start-slack-thread.outputs.thread_ts }}
           base64_parsed_results: ${{ steps.get-product-results.outputs.base64_result }}
