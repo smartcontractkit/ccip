@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"math/big"
-	"sync"
 	"time"
 
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
@@ -32,7 +31,6 @@ type IncompleteSourceCommitStoreReader struct {
 	sourceMaxGasPrice        *big.Int
 	execGasPriceDeviationPPB int64
 	daGasPriceDeviationPPB   int64
-	configMu                 sync.Mutex
 	offchainConfig           cciptypes.CommitOffchainConfig
 }
 
@@ -70,7 +68,6 @@ func (i IncompleteSourceCommitStoreReader) ChangeConfig(ctx context.Context, onc
 		offchainConfigParsed.InflightCacheExpiry.Duration(),
 		offchainConfigParsed.PriceReportingDisabled,
 	)
-	i.configMu.Unlock()
 
 	return cciptypes.Address(onchainConfigParsed.PriceRegistry.String()), nil
 }
