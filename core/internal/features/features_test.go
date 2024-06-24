@@ -631,7 +631,7 @@ observationSource   = """
 		output := outputs[0]
 		receipt := output.(map[string]interface{})
 		assert.Equal(t, "0x11", receipt["blockNumber"])
-		assert.Equal(t, "0x7a120", receipt["gasUsed"])
+		assert.Equal(t, "0x7a1200", receipt["gasUsed"])
 		assert.Equal(t, "0x0", receipt["status"])
 	})
 }
