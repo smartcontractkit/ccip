@@ -342,12 +342,6 @@ jobs:
             os: ubuntu-latest
             file: ccip
             run: -run ^TestSmokeCCIPOffRampAggRateLimit$
-          - name: ccip-smoke-transfer-config
-            nodes: 1
-            dir: ccip-tests/smoke
-            os: ubuntu-latest
-            file: ccip
-            run: -run ^TestSmokeCCIPTransferConfig$
           - name: runlog
             id: runlog
             nodes: 2
