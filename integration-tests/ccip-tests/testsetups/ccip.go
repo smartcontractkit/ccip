@@ -358,6 +358,8 @@ func (c *CCIPTestConfig) SetOCRParams() error {
 
 // TestConfigOverrideOption is a function that modifies the test config and overrides any values passed in by test files
 // This is useful for setting up test specific configurations.
+// The return should be a short, explanatory string that describes the change made by the override.
+// This is logged at the beginning of the test run.
 type TestConfigOverrideOption func(*CCIPTestConfig) string
 
 // UseCCIPOwnerTokens defines whether all tokens are deployed by the same address as the CCIP owner

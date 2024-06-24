@@ -243,7 +243,7 @@ func TestSmokeCCIPRateLimit(t *testing.T) {
 			require.NoError(t, tc.lane.Source.Common.ChainClient.WaitForEvents())
 			failedTx, _, _, err := tc.lane.Source.SendRequest(
 				tc.lane.Dest.ReceiverDapp.EthAddress,
-				big.NewInt(actions.DefaultRequestGasLimit), // gas limit
+				big.NewInt(actions.DefaultDestinationGasLimit), // gas limit
 			)
 			require.NoError(t, err)
 			require.Error(t, tc.lane.Source.Common.ChainClient.WaitForEvents())
@@ -263,7 +263,7 @@ func TestSmokeCCIPRateLimit(t *testing.T) {
 			tc.lane.Logger.Info().Str("tokensToSend", tokensToSend.String()).Msg("99% of Aggregated Capacity")
 			tc.lane.RecordStateBeforeTransfer()
 			src.TransferAmount[0] = tokensToSend
-			err = tc.lane.SendRequests(1, big.NewInt(actions.DefaultRequestGasLimit))
+			err = tc.lane.SendRequests(1, big.NewInt(actions.DefaultDestinationGasLimit))
 			require.NoError(t, err)
 
 			// try to send again with amount more than the amount refilled by rate and
@@ -271,7 +271,7 @@ func TestSmokeCCIPRateLimit(t *testing.T) {
 			src.TransferAmount[0] = new(big.Int).Mul(AggregatedRateLimitRate, big.NewInt(10))
 			failedTx, _, _, err = tc.lane.Source.SendRequest(
 				tc.lane.Dest.ReceiverDapp.EthAddress,
-				big.NewInt(actions.DefaultRequestGasLimit), // gas limit
+				big.NewInt(actions.DefaultDestinationGasLimit), // gas limit
 			)
 			tc.lane.Logger.Info().Str("tokensToSend", src.TransferAmount[0].String()).Msg("More than Aggregated Rate")
 			require.NoError(t, err)
@@ -338,7 +338,7 @@ func TestSmokeCCIPRateLimit(t *testing.T) {
 
 			failedTx, _, _, err = tc.lane.Source.SendRequest(
 				tc.lane.Dest.ReceiverDapp.EthAddress,
-				big.NewInt(actions.DefaultRequestGasLimit), // gas limit
+				big.NewInt(actions.DefaultDestinationGasLimit), // gas limit
 			)
 			require.NoError(t, err)
 			require.Error(t, tc.lane.Source.Common.ChainClient.WaitForEvents())
@@ -358,7 +358,7 @@ func TestSmokeCCIPRateLimit(t *testing.T) {
 			src.TransferAmount[0] = tokensToSend
 			tc.lane.Logger.Info().Str("tokensToSend", tokensToSend.String()).Msg("99% of Token Pool Capacity")
 			tc.lane.RecordStateBeforeTransfer()
-			err = tc.lane.SendRequests(1, big.NewInt(actions.DefaultRequestGasLimit))
+			err = tc.lane.SendRequests(1, big.NewInt(actions.DefaultDestinationGasLimit))
 			require.NoError(t, err)
 
 			// try to send again with amount more than the amount refilled by token pool rate and
@@ -373,7 +373,7 @@ func TestSmokeCCIPRateLimit(t *testing.T) {
 			require.NoError(t, tc.lane.Source.Common.ChainClient.WaitForEvents())
 			failedTx, _, _, err = tc.lane.Source.SendRequest(
 				tc.lane.Dest.ReceiverDapp.EthAddress,
-				big.NewInt(actions.DefaultRequestGasLimit),
+				big.NewInt(actions.DefaultDestinationGasLimit),
 			)
 			require.NoError(t, err)
 			require.Error(t, tc.lane.Source.Common.ChainClient.WaitForEvents())
@@ -502,7 +502,7 @@ func TestSmokeCCIPOnRampLimits(t *testing.T) {
 			src.TransferAmount[aggRateTokenIndex] = big.NewInt(1)
 			src.TransferAmount[bpsAndAggTokenIndex] = big.NewInt(1)
 			tc.lane.RecordStateBeforeTransfer()
-			err = tc.lane.SendRequests(1, big.NewInt(actions.DefaultRequestGasLimit))
+			err = tc.lane.SendRequests(1, big.NewInt(actions.DefaultDestinationGasLimit))
 			require.NoError(t, err)
 			tc.lane.ValidateRequests()
 
@@ -511,7 +511,7 @@ func TestSmokeCCIPOnRampLimits(t *testing.T) {
 			src.TransferAmount[bpsTokenIndex] = big.NewInt(0)
 			src.TransferAmount[aggRateTokenIndex] = overCapacityAmount
 			src.TransferAmount[bpsAndAggTokenIndex] = big.NewInt(0)
-			failedTx, _, _, err := tc.lane.Source.SendRequest(tc.lane.Dest.ReceiverDapp.EthAddress, big.NewInt(actions.DefaultRequestGasLimit))
+			failedTx, _, _, err := tc.lane.Source.SendRequest(tc.lane.Dest.ReceiverDapp.EthAddress, big.NewInt(actions.DefaultDestinationGasLimit))
 			require.Error(t, err, "Limited token transfer should immediately revert")
 			errReason, _, err := src.Common.ChainClient.RevertReasonFromTx(failedTx, evm_2_evm_onramp.EVM2EVMOnRampABI)
 			require.NoError(t, err)
@@ -523,7 +523,7 @@ func TestSmokeCCIPOnRampLimits(t *testing.T) {
 
 			src.TransferAmount[aggRateTokenIndex] = big.NewInt(0)
 			src.TransferAmount[bpsAndAggTokenIndex] = overCapacityAmount
-			failedTx, _, _, err = tc.lane.Source.SendRequest(tc.lane.Dest.ReceiverDapp.EthAddress, big.NewInt(actions.DefaultRequestGasLimit))
+			failedTx, _, _, err = tc.lane.Source.SendRequest(tc.lane.Dest.ReceiverDapp.EthAddress, big.NewInt(actions.DefaultDestinationGasLimit))
 			require.Error(t, err, "Limited token transfer should immediately revert")
 			errReason, _, err = src.Common.ChainClient.RevertReasonFromTx(failedTx, evm_2_evm_onramp.EVM2EVMOnRampABI)
 			require.NoError(t, err)
@@ -547,7 +547,7 @@ func TestSmokeCCIPOnRampLimits(t *testing.T) {
 			src.TransferAmount[aggRateTokenIndex] = big.NewInt(0)
 			src.TransferAmount[bpsAndAggTokenIndex] = big.NewInt(0)
 			tc.lane.RecordStateBeforeTransfer()
-			err = tc.lane.SendRequests(1, big.NewInt(actions.DefaultRequestGasLimit))
+			err = tc.lane.SendRequests(1, big.NewInt(actions.DefaultDestinationGasLimit))
 			require.NoError(t, err)
 			tc.lane.ValidateRequests()
 
@@ -556,7 +556,7 @@ func TestSmokeCCIPOnRampLimits(t *testing.T) {
 			src.TransferAmount[bpsTokenIndex] = big.NewInt(0)
 			src.TransferAmount[aggRateTokenIndex] = overCapacityAmount
 			src.TransferAmount[bpsAndAggTokenIndex] = big.NewInt(0)
-			failedTx, _, _, err = tc.lane.Source.SendRequest(tc.lane.Dest.ReceiverDapp.EthAddress, big.NewInt(actions.DefaultRequestGasLimit))
+			failedTx, _, _, err = tc.lane.Source.SendRequest(tc.lane.Dest.ReceiverDapp.EthAddress, big.NewInt(actions.DefaultDestinationGasLimit))
 			require.Error(t, err, "Aggregate rate limited token transfer should immediately revert")
 			errReason, _, err = src.Common.ChainClient.RevertReasonFromTx(failedTx, evm_2_evm_onramp.EVM2EVMOnRampABI)
 			require.NoError(t, err)
@@ -568,7 +568,7 @@ func TestSmokeCCIPOnRampLimits(t *testing.T) {
 
 			src.TransferAmount[aggRateTokenIndex] = nil
 			src.TransferAmount[bpsAndAggTokenIndex] = overCapacityAmount
-			failedTx, _, _, err = tc.lane.Source.SendRequest(tc.lane.Dest.ReceiverDapp.EthAddress, big.NewInt(actions.DefaultRequestGasLimit))
+			failedTx, _, _, err = tc.lane.Source.SendRequest(tc.lane.Dest.ReceiverDapp.EthAddress, big.NewInt(actions.DefaultDestinationGasLimit))
 			require.Error(t, err, "Aggregate rate limited token transfer should immediately revert")
 			errReason, _, err = src.Common.ChainClient.RevertReasonFromTx(failedTx, evm_2_evm_onramp.EVM2EVMOnRampABI)
 			require.NoError(t, err)
@@ -803,7 +803,7 @@ func testOffRampRateLimits(t *testing.T, rateLimiterConfig contracts.RateLimiter
 			src.TransferAmount[freeTokenIndex] = overLimitAmount
 			src.TransferAmount[limitedTokenIndex] = overLimitAmount
 			tc.lane.RecordStateBeforeTransfer()
-			err = tc.lane.SendRequests(1, big.NewInt(actions.DefaultRequestGasLimit))
+			err = tc.lane.SendRequests(1, big.NewInt(actions.DefaultDestinationGasLimit))
 			require.NoError(t, err)
 			tc.lane.ValidateRequests()
 
@@ -820,7 +820,7 @@ func testOffRampRateLimits(t *testing.T, rateLimiterConfig contracts.RateLimiter
 			src.TransferAmount[freeTokenIndex] = overLimitAmount
 			src.TransferAmount[limitedTokenIndex] = big.NewInt(0)
 			tc.lane.RecordStateBeforeTransfer()
-			err = tc.lane.SendRequests(1, big.NewInt(actions.DefaultRequestGasLimit))
+			err = tc.lane.SendRequests(1, big.NewInt(actions.DefaultDestinationGasLimit))
 			require.NoError(t, err, "Free token transfer failed")
 			tc.lane.ValidateRequests()
 			tc.lane.Logger.Info().Str("Token", freeSrcToken.ContractAddress.Hex()).Msg("Free token transfer succeeded")
@@ -829,7 +829,7 @@ func testOffRampRateLimits(t *testing.T, rateLimiterConfig contracts.RateLimiter
 			src.TransferAmount[freeTokenIndex] = big.NewInt(0)
 			src.TransferAmount[limitedTokenIndex] = overLimitAmount
 			tc.lane.RecordStateBeforeTransfer()
-			err = tc.lane.SendRequests(1, big.NewInt(actions.DefaultRequestGasLimit))
+			err = tc.lane.SendRequests(1, big.NewInt(actions.DefaultDestinationGasLimit))
 			require.NoError(t, err, "Failed to send rate limited token transfer")
 			// Expect the ExecutionStateChanged event to never show up
 			// Since we're looking to confirm that an event has NOT occurred, this can lead to some imperfect assumptions and results

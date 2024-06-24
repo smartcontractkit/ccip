@@ -84,7 +84,7 @@ const (
 
 	defaultUSDCDestBytesOverhead = 640
 	defaultUSDCDestGasOverhead   = 120_000
-	DefaultRequestGasLimit       = 600_000
+	DefaultDestinationGasLimit   = 600_000
 	// DefaultResubscriptionTimeout denotes the max backoff duration for resubscription for various watch events
 	// if the subscription keeps failing even after this duration, the test will fail
 	DefaultResubscriptionTimeout = 2 * time.Hour
@@ -2762,7 +2762,7 @@ func (lane *CCIPLane) AddToSentReqs(txHash common.Hash, reqStats []*testreporter
 func (lane *CCIPLane) Multicall(noOfRequests int, multiSendAddr common.Address) error {
 	var ccipMultipleMsg []contracts.CCIPMsgData
 	feeToken := common.HexToAddress(lane.Source.Common.FeeToken.Address())
-	genericMsg, err := lane.Source.CCIPMsg(lane.Dest.ReceiverDapp.EthAddress, big.NewInt(DefaultRequestGasLimit))
+	genericMsg, err := lane.Source.CCIPMsg(lane.Dest.ReceiverDapp.EthAddress, big.NewInt(DefaultDestinationGasLimit))
 	if err != nil {
 		return fmt.Errorf("failed to form the ccip message: %w", err)
 	}
@@ -2991,7 +2991,7 @@ func (lane *CCIPLane) ExecuteManually(options ...ManualExecutionOption) error {
 				OnRamp:           lane.Source.OnRamp.Address(),
 				OffRamp:          lane.Dest.OffRamp.Address(),
 				SendReqLogIndex:  logIndex,
-				GasLimit:         big.NewInt(DefaultRequestGasLimit),
+				GasLimit:         big.NewInt(DefaultDestinationGasLimit),
 			}
 			timeNow := time.Now().UTC()
 			tx, err := args.ExecuteManually()
