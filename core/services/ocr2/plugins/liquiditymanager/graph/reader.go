@@ -151,6 +151,10 @@ func (g *liquidityGraph) HasNeighbor(from, to models.NetworkSelector) bool {
 	return false
 }
 
+// FindPath finds a path from the source network to the destination network with the given number of hops.
+// hops is how many edges can be traversed in the path. 'from' --> b --> 'to' is a path with 2 hops. 'from' --> b --> c --> 'to' is a path with 3 hops.
+// It calls the iterator function with each individual node in the path.
+// It returns the list of network selectors representing the path from source to destination (including the destination node).
 func (g *liquidityGraph) FindPath(from, to models.NetworkSelector, hops int, iterator func(nodes ...Data) bool) []models.NetworkSelector {
 	g.lock.RLock()
 	defer g.lock.RUnlock()
@@ -159,9 +163,12 @@ func (g *liquidityGraph) FindPath(from, to models.NetworkSelector, hops int, ite
 }
 
 func (g *liquidityGraph) findPath(from, to models.NetworkSelector, hops int, iterator func(nodes ...Data) bool) []models.NetworkSelector {
+	if hops == 0 {
+		return []models.NetworkSelector{}
+	}
 	neibs, exist := g.adj[from]
 	if !exist {
-		return nil
+		return []models.NetworkSelector{}
 	}
 	for _, n := range neibs {
 		if n == to {
@@ -170,9 +177,6 @@ func (g *liquidityGraph) findPath(from, to models.NetworkSelector, hops int, ite
 			}
 			return []models.NetworkSelector{n}
 		}
-	}
-	if hops == 0 {
-		return nil
 	}
 	for _, n := range neibs {
 		if p := g.findPath(n, to, hops-1, iterator); len(p) > 0 {
@@ -186,7 +190,7 @@ func (g *liquidityGraph) findPath(from, to models.NetworkSelector, hops int, ite
 			return append([]models.NetworkSelector{n}, p...)
 		}
 	}
-	return nil
+	return []models.NetworkSelector{}
 }
 
 func (g *liquidityGraph) getData(n models.NetworkSelector) (Data, bool) {

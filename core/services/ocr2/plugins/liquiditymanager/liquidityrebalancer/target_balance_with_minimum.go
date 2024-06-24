@@ -75,20 +75,19 @@ func (r *TargetMinBalancer) rebalancingRound(graphNow graph.Graph, nonExecutedTr
 	proposedTransfers := make([]models.ProposedTransfer, 0)
 	for _, net := range networksRequiringFunding {
 		r.lggr.Debugf("finding transfers for network %v", net)
-		var potentialTransfers []models.ProposedTransfer
-		potentialTransfers, err = transfersFunc(graphLater, net, networkFunds)
-		if err != nil {
-			return nil, fmt.Errorf("finding transfers for network %v: %w", net, err)
+		potentialTransfers, err1 := transfersFunc(graphLater, net, networkFunds)
+		if err1 != nil {
+			return nil, fmt.Errorf("finding transfers for network %v: %w", net, err1)
 		}
 
-		dataLater, err := graphLater.GetData(net)
-		if err != nil {
-			return nil, fmt.Errorf("get data later of net %v: %w", net, err)
+		dataLater, err2 := graphLater.GetData(net)
+		if err2 != nil {
+			return nil, fmt.Errorf("get data later of net %v: %w", net, err2)
 		}
 		liqDiffLater := new(big.Int).Sub(dataLater.TargetLiquidity, dataLater.Liquidity)
-		netProposedTransfers, err := r.applyProposedTransfers(graphLater, potentialTransfers, liqDiffLater)
-		if err != nil {
-			return nil, fmt.Errorf("applying transfers: %w", err)
+		netProposedTransfers, err3 := r.applyProposedTransfers(graphLater, potentialTransfers, liqDiffLater)
+		if err3 != nil {
+			return nil, fmt.Errorf("applying transfers: %w", err3)
 		}
 		proposedTransfers = append(proposedTransfers, netProposedTransfers...)
 	}
