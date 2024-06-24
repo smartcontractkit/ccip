@@ -162,7 +162,7 @@ func (l *launcher) processDiff(diff diffResult) error {
 
 	for donID, dep := range addedDeployments {
 		if err := dep.StartBlue(); err != nil {
-			if shutdownErr := dep.ShutdownBlue(); shutdownErr != nil {
+			if shutdownErr := dep.CloseBlue(); shutdownErr != nil {
 				l.lggr.Errorw("Failed to shutdown blue instance after failed start", "donId", donID, "err", shutdownErr)
 			}
 			return fmt.Errorf("failed to start oracles for CCIP DON %d: %w", donID, err)

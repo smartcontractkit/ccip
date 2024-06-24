@@ -88,7 +88,7 @@ func (c *ccipDeployment) StartBlue() error {
 	return err
 }
 
-func (c *ccipDeployment) ShutdownBlue() error {
+func (c *ccipDeployment) CloseBlue() error {
 	var err error
 
 	err = multierr.Append(err, c.commit.blue.Close())
