@@ -697,8 +697,8 @@ func TestCommitReportingPlugin_observePriceUpdates(t *testing.T) {
 			psGasPricesResult:      gasPrices,
 			psTokenPricesResult:    tokenPrices,
 			PriceReportingDisabled: true,
-			expectedGasPrice:       map[uint64]*big.Int{},
-			expectedTokenPrices:    map[cciptypes.Address]*big.Int{},
+			expectedGasPrice:       nil,
+			expectedTokenPrices:    nil,
 			psError:                false,
 			expectedErr:            false,
 		},
@@ -729,6 +729,7 @@ func TestCommitReportingPlugin_observePriceUpdates(t *testing.T) {
 			).Maybe()
 
 			p := &CommitReportingPlugin{
+				lggr:                logger.TestLogger(t),
 				destChainSelector:   destChainSelector,
 				sourceChainSelector: sourceChainSelector,
 				priceService:        mockPriceService,

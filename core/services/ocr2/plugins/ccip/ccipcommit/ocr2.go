@@ -117,12 +117,15 @@ func (r *CommitReportingPlugin) Observation(ctx context.Context, epochAndRound t
 	if err != nil {
 		return nil, err
 	}
-
-	// For backwards compatibility with the order release during phased rollout, include the default gas price on this lane
-	var defaultGasPricesUSD *big.Int
-	if len(gasPricesUSD) > 0 {
-		defaultGasPricesUSD = gasPricesUSD[r.sourceChainSelector]
+	// Set prices to empty maps if nil to be friendlier to JSON encoding
+	if gasPricesUSD == nil {
+		gasPricesUSD = map[uint64]*big.Int{}
 	}
+	if tokenPricesUSD == nil {
+		tokenPricesUSD = map[cciptypes.Address]*big.Int{}
+	}
+	// For backwards compatibility with the older release during phased rollout, set the default gas price on this lane
+	defaultGasPricesUSD := gasPricesUSD[r.sourceChainSelector]
 
 	lggr.Infow("Observation",
 		"minSeqNr", minSeqNr,
@@ -147,12 +150,15 @@ func (r *CommitReportingPlugin) Observation(ctx context.Context, epochAndRound t
 	}.Marshal()
 }
 
+// observePriceUpdates fetches latest gas and token prices from DB as long as price reporting is not disabled.
+// The prices are aggregated for all lanes for the same destination chain.
 func (r *CommitReportingPlugin) observePriceUpdates(
 	ctx context.Context,
 ) (gasPricesUSD map[uint64]*big.Int, tokenPricesUSD map[cciptypes.Address]*big.Int, err error) {
 	// Do not observe prices if price reporting is disabled. Price reporting will be disabled for lanes that are not leader lanes.
 	if r.offchainConfig.PriceReportingDisabled {
-		return map[uint64]*big.Int{}, map[cciptypes.Address]*big.Int{}, nil
+		r.lggr.Infow("Price reporting disabled, skipping gas and token price reads")
+		return nil, nil, nil
 	}
 
 	// Fetches multi-lane gas prices and token prices, for the given dest chain
@@ -401,13 +407,15 @@ func extractObservationData(lggr logger.Logger, f int, sourceChainSelector uint6
 		}
 	}
 
+	// Price is dropped if there are not enough valid observations. With a threshold of 2*(f-1) + 1, we achieve a balance between safety and liveness.
+	// During phased-rollout where some honest nodes may not have started observing the token yet, it requires 5 malicious node with 1 being the leader to successfully alter price.
+	// During regular operation, it requires 3 malicious nodes with 1 being the leader to temporarily delay price update for the token.
+	priceReportingThreshold := 2*(f-1) + 1
+
 	gasPrices = make(map[uint64][]*big.Int)
 	for selector, perChainPriceObservations := range gasPriceObservations {
-		// Price is dropped if there are not enough valid observations. With a threshold of 2*(f-1) + 1, we achieve a balance between safety and liveness.
-		// During phased-rollout where some honest nodes may not have started observing the token yet, it requires 5 malicious node with 1 being the leader to successfully alter price.
-		// During regular operation, it requires 3 malicious nodes with 1 being the leader to temporarily delay price update for the token.
-		if len(perChainPriceObservations) < (2*(f-1) + 1) {
-			lggr.Warnf("Skipping chain with selector %d due to not enough valid observations: #obs=%d, f=%d", selector, len(perChainPriceObservations), f)
+		if len(perChainPriceObservations) < priceReportingThreshold {
+			lggr.Warnf("Skipping chain with selector %d due to not enough valid observations: #obs=%d, f=%d, threshold=%d", selector, len(perChainPriceObservations), f, priceReportingThreshold)
 			continue
 		}
 		gasPrices[selector] = perChainPriceObservations
@@ -415,9 +423,8 @@ func extractObservationData(lggr logger.Logger, f int, sourceChainSelector uint6
 
 	tokenPrices = make(map[cciptypes.Address][]*big.Int)
 	for token, perTokenPriceObservations := range tokenPriceObservations {
-		// Token price filter follows the same logic as gas price above. If there are insufficient observations, the token is ignored.
-		if len(perTokenPriceObservations) < (2*(f-1) + 1) {
-			lggr.Warnf("Skipping token %s due to not enough valid observations: #obs=%d, f=%d", string(token), len(perTokenPriceObservations), f)
+		if len(perTokenPriceObservations) < priceReportingThreshold {
+			lggr.Warnf("Skipping token %s due to not enough valid observations: #obs=%d, f=%d, threshold=%d", string(token), len(perTokenPriceObservations), f, priceReportingThreshold)
 			continue
 		}
 		tokenPrices[token] = perTokenPriceObservations
@@ -480,7 +487,7 @@ func (r *CommitReportingPlugin) calculatePriceUpdates(gasPriceObs map[uint64][]*
 	for chainSelector, gasPriceObservations := range gasPriceObs {
 		newGasPrice, err := r.gasPriceEstimator.Median(gasPriceObservations) // Compute the median price
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, fmt.Errorf("failed to calculate median gas price for chain selector %d: %w", chainSelector, err)
 		}
 
 		// Default to updating so that we update if there are no prior updates.
@@ -492,7 +499,7 @@ func (r *CommitReportingPlugin) calculatePriceUpdates(gasPriceObs map[uint64][]*
 				return nil, nil, err
 			}
 			if gasPriceUpdatedRecently && !gasPriceDeviated {
-				r.lggr.Debugw("gas price was updated recently, skipping the update",
+				r.lggr.Debugw("gas price was updated recently and not deviated sufficiently, skipping the update",
 					"chainSelector", chainSelector, "newPrice", newGasPrice, "existingPrice", latestGasPrice.value)
 				continue
 			}
