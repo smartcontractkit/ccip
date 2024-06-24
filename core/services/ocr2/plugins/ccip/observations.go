@@ -22,7 +22,7 @@ import (
 type CommitObservation struct {
 	Interval                  cciptypes.CommitStoreInterval  `json:"interval"`
 	TokenPricesUSD            map[cciptypes.Address]*big.Int `json:"tokensPerFeeCoin"`
-	SourceGasPriceUSD         *big.Int                       `json:"sourceGasPrice"`
+	SourceGasPriceUSD         *big.Int                       `json:"sourceGasPrice"` // Deprecated
 	SourceGasPriceUSDPerChain map[uint64]*big.Int            `json:"sourceGasPriceUSDPerChain"`
 }
 
