@@ -228,7 +228,6 @@ func (c JSONCommitOffchainConfig) Validate() error {
 	return nil
 }
 
-// TODO: Pass a Gas Estimator through to the plugin directly
 func (c *CommitStore) ChangeConfig(_ context.Context, onchainConfig []byte, offchainConfig []byte) (cciptypes.Address, error) {
 	onchainConfigParsed, err := abihelpers.DecodeAbiStruct[ccipdata.CommitOnchainConfig](onchainConfig)
 	if err != nil {

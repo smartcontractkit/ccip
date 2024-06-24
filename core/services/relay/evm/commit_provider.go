@@ -22,10 +22,12 @@ var _ commontypes.CCIPCommitProvider = (*SrcCommitProvider)(nil)
 var _ commontypes.CCIPCommitProvider = (*DstCommitProvider)(nil)
 
 type SrcCommitProvider struct {
-	lggr       logger.Logger
-	startBlock uint64
-	client     client.Client
-	lp         logpoller.LogPoller
+	lggr        logger.Logger
+	startBlock  uint64
+	client      client.Client
+	lp          logpoller.LogPoller
+	estimator   gas.EvmFeeEstimator
+	maxGasPrice big.Int
 }
 
 func NewSrcCommitProvider(
@@ -33,12 +35,14 @@ func NewSrcCommitProvider(
 	startBlock uint64,
 	client client.Client,
 	lp logpoller.LogPoller,
+	srcEstimator gas.EvmFeeEstimator,
 ) commontypes.CCIPCommitProvider {
 	return &SrcCommitProvider{
 		lggr:       lggr,
 		startBlock: startBlock,
 		client:     client,
 		lp:         lp,
+		estimator:  srcEstimator,
 	}
 }
 
@@ -181,14 +185,13 @@ func (P DstCommitProvider) NewPriceGetter(ctx context.Context) (priceGetter ccip
 }
 
 func (P SrcCommitProvider) NewCommitStoreReader(ctx context.Context, commitStoreAddress cciptypes.Address) (commitStoreReader cciptypes.CommitStoreReader, err error) {
-	versionFinder := ccip.NewEvmVersionFinder()
-	commitStoreReader, err = ccip.NewCommitStoreReader(P.lggr, versionFinder, commitStoreAddress, P.client, P.lp)
+	commitStoreReader = NewIncompleteSourceCommitStoreReader(P.estimator, &P.maxGasPrice)
 	return
 }
 
 func (P DstCommitProvider) NewCommitStoreReader(ctx context.Context, commitStoreAddress cciptypes.Address) (commitStoreReader cciptypes.CommitStoreReader, err error) {
 	versionFinder := ccip.NewEvmVersionFinder()
-	commitStoreReader, err = ccip.NewCommitStoreReader(P.lggr, versionFinder, commitStoreAddress, P.client, P.lp)
+	commitStoreReader, err = NewIncompleteDestCommitStoreReader(P.lggr, versionFinder, commitStoreAddress, P.client, P.lp)
 	return
 }
 

@@ -52,15 +52,19 @@ func NewCommitServices(ctx context.Context, ds sqlutil.DataSource, srcProvider c
 		return nil, err
 	}
 
-	// TODO CCIP-2493 EVM family specific behavior leaked for CommitStore, which requires access to two relayers
-	versionFinder := factory.NewEvmVersionFinder()
 	commitStoreAddress := common.HexToAddress(spec.ContractID)
-	sourceMaxGasPrice := srcChain.Config().EVM().GasEstimator().PriceMax().ToInt()
-	commitStoreReader, err := ccip.NewCommitStoreReader(lggr, versionFinder, ccipcalc.EvmAddrToGeneric(commitStoreAddress), dstChain.Client(), dstChain.LogPoller(), srcChain.GasEstimator(), sourceMaxGasPrice)
+	srcCommitStore, err := srcProvider.NewCommitStoreReader(ctx, ccipcalc.EvmAddrToGeneric(commitStoreAddress))
 	if err != nil {
 		return nil, err
 	}
 
+	dstCommitStore, err := dstProvider.NewCommitStoreReader(ctx, ccipcalc.EvmAddrToGeneric(commitStoreAddress))
+	if err != nil {
+		return nil, err
+	}
+
+	var commitStoreReader ccipdata.CommitStoreReader
+	commitStoreReader = ccip.NewProviderProxyCommitStoreReader(srcCommitStore, dstCommitStore)
 	commitLggr := lggr.Named("CCIPCommit").With("sourceChain", sourceChainID, "destChain", destChainID)
 
 	var priceGetter pricegetter.PriceGetter
