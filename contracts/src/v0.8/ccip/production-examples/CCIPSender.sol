@@ -33,7 +33,7 @@ contract CCIPSender is CCIPClientBase {
 
   constructor(address router) CCIPClientBase(router) {}
 
-  function typeAndVersion() external pure override returns (string memory) {
+  function typeAndVersion() external pure virtual override returns (string memory) {
     return "CCIPSender 1.0.0-dev";
   }
 
