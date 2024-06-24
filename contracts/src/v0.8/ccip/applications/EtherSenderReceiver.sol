@@ -12,6 +12,7 @@ import {CCIPReceiver} from "./CCIPReceiver.sol";
 import {IERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
 
+//solhint-disable interface-starts-with-i
 interface CCIPRouter {
   function getWrappedNative() external view returns (address);
 }
@@ -34,9 +35,6 @@ contract EtherSenderReceiver is CCIPReceiver, ITypeAndVersion {
   error InvalidTokenAmounts(uint256 gotAmounts);
   error InvalidToken(address gotToken, address expectedToken);
   error TokenAmountNotEqualToMsgValue(uint256 gotAmount, uint256 msgValue);
-  error InsufficientMsgValue(uint256 gotAmount, uint256 msgValue);
-  error InsufficientFee(uint256 gotFee, uint256 fee);
-  error GasLimitTooLow(uint256 minLimit, uint256 gotLimit);
 
   string public constant override typeAndVersion = "EtherSenderReceiver 1.5.0";
 
