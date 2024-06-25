@@ -78,6 +78,8 @@ func TestHomeChainReader(t *testing.T) {
 	//setupConfigInfo(chainB, []byte{'a', 'b'}, fChainB, []byte{}),
 	//setupConfigInfo(chainC, []byte{}, fChainC, []byte{}),
 	//}
+
+	//d.Auth.GasLimit = 50000
 	_, err := d.Contract.ApplyChainConfigUpdates(d.Auth, nil, inputConfig)
 	d.SimulatedBE.Commit()
 	assert.NoError(t, err)
@@ -100,6 +102,7 @@ func setupConfigInfo() []capcfg.CCIPCapabilityConfigurationChainConfigInfo {
 		{
 			ChainSelector: 1,
 			ChainConfig: capcfg.CCIPCapabilityConfigurationChainConfig{
+				//Readers: [][32]byte{{1}, {2}, {3}},
 				Readers: [][32]byte{},
 				FChain:  2,
 				Config:  []byte{1, 2, 3},
