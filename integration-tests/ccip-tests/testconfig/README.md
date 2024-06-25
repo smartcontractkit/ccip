@@ -33,7 +33,7 @@ CommitStore = "1.2.0"
 ```
 
 ## CCIP.Deployments
-CCIP Deployment contains all necessary contract addresses for various networks. This is mandatory if the test are to be run for [existing deployments](#ccipgroupstesttypeexistingdeployment) 
+CCIP Deployment contains all necessary contract addresses for various networks. This is mandatory if the test are to be run for [existing deployments](#ccipgroupstestgroupexistingdeployment) 
 The deployment data can be specified -
  - Under `CCIP.Deployments.Data` field with value as stringify format of json. 
  - Under `CCIP.Deployments.DataFile` field with value as the path of the file containing the deployment data in json format.
@@ -126,7 +126,7 @@ It denotes the network names in which tests will be run. These networks are used
 If more than 2 networks are specified, then lanes will be set up between all possible pairs of networks.
 
 For example , if `selected_networks = ['SIMULATED_1', 'SIMULATED_2', 'SIMULATED_3']`, it denotes that lanes will be set up between SIMULATED_1 and SIMULATED_2, SIMULATED_1 and SIMULATED_3, SIMULATED_2 and SIMULATED_3
-This behaviour can be varied based on [NoOfNetworks](#ccipgroupstesttypenoofnetworks), [NetworkPairs](#ccipgroupstesttypenetworkpairs), [MaxNoOfLanes](#ccipgroupstesttypemaxnooflanes) fields in test config.
+This behaviour can be varied based on [NoOfNetworks](#ccipgroupstestgroupnoofnetworks), [NetworkPairs](#ccipgroupstestgroupnetworkpairs), [MaxNoOfLanes](#ccipgroupstestgroupmaxnooflanes) fields in test config.
 
 The name of the networks are taken from [known_networks](https://github.com/smartcontractkit/chainlink-testing-framework/blob/main/networks/known_networks.go#L884) in chainlink-testing-framework
 If the network is not present in known_networks, then the network details can be specified in the config file itself under the following `EVMNetworks` key.
@@ -399,39 +399,39 @@ Specifies the test config specific to each test type. Available test types are:
 - **CCIP.Groups.smoke**
 - **CCIP.Groups.chaos**
 
-### CCIP.Groups.<testtype>.KeepEnvAlive
+### CCIP.Groups.[testgroup].KeepEnvAlive
 Specifies whether to keep the k8 namespace alive after the test is run. This is only valid if the tests are run on k8s.
 
-### CCIP.Groups.<testtype>.BiDirectionalLane
+### CCIP.Groups.[testgroup].BiDirectionalLane
 Specifies whether to set up bi-directional lanes between networks. 
 
-### CCIP.Groups.<testtype>.CommitAndExecuteOnSameDON
+### CCIP.Groups.[testgroup].CommitAndExecuteOnSameDON
 Specifies whether commit and execution jobs are to be run on the same Chainlink node.
 
-### CCIP.Groups.<testtype>.NoOfCommitNodes
+### CCIP.Groups.[testgroup].NoOfCommitNodes
 Specifies the number of nodes on which commit jobs are to be run. This needs to be lesser than the total number of nodes mentioned in [CCIP.Env.NewCLCluster.NoOfNodes](#ccipenvnewclclusternoofnodes) or [CCIP.Env.ExistingCLCluster.NoOfNodes](#ccipenvexistingclclusternoofnodes).
 If the value of total nodes is `n`, then the max value of NoOfCommitNodes should be less than `n-1`. As the first node is used for bootstrap job.
-If the NoOfCommitNodes is lesser than `n-1`, then the remaining nodes are used for execution jobs if `CCIP.Groups.<testtype>.CommitAndExecuteOnSameDON` is set to false.
+If the NoOfCommitNodes is lesser than `n-1`, then the remaining nodes are used for execution jobs if `CCIP.Groups.[testgroup].CommitAndExecuteOnSameDON` is set to false.
 
-### CCIP.Groups.<testtype>.TokenConfig
+### CCIP.Groups.[testgroup].TokenConfig
 Specifies the token configuration for the test. The token configuration is used to set up tokens and token pools for all chains.
 
-#### CCIP.Groups.<testtype>.TokenConfig.NoOfTokensPerChain
+#### CCIP.Groups.[testgroup].TokenConfig.NoOfTokensPerChain
 Specifies the number of tokens to be set up for each chain.
 
-#### CCIP.Groups.<testtype>.TokenConfig.WithPipeline
+#### CCIP.Groups.[testgroup].TokenConfig.WithPipeline
 Specifies whether to set up token pipelines in commit jobspec. If set to false, the token prices will be set with DynamicPriceGetterConfig. 
 
-#### CCIP.Groups.<testtype>.TokenConfig.TimeoutForPriceUpdate
+#### CCIP.Groups.[testgroup].TokenConfig.TimeoutForPriceUpdate
 Specifies the timeout to wait for token and gas price updates to be available in price registry for each chain. 
 
-#### CCIP.Groups.<testtype>.TokenConfig.NoOfTokensWithDynamicPrice
-Specifies the number of tokens to be set up with dynamic price update. The rest of the tokens will be set up with static price. This is only valid if [WithPipeline](#ccipgroupstesttypetokenconfigwithpipeline) is set to false.
+#### CCIP.Groups.[testgroup].TokenConfig.NoOfTokensWithDynamicPrice
+Specifies the number of tokens to be set up with dynamic price update. The rest of the tokens will be set up with static price. This is only valid if [WithPipeline](#ccipgroupstestgrouptokenconfigwithpipeline) is set to false.
 
-#### CCIP.Groups.<testtype>.TokenConfig.DynamicPriceUpdateInterval
-Specifies the interval for dynamic price update for tokens. This is only valid if [NoOfTokensWithDynamicPrice](#ccipgroupstesttypetokenconfignooftokenswithdynamicprice) is set to value greater tha zero.
+#### CCIP.Groups.[testgroup].TokenConfig.DynamicPriceUpdateInterval
+Specifies the interval for dynamic price update for tokens. This is only valid if [NoOfTokensWithDynamicPrice](#ccipgroupstestgrouptokenconfignooftokenswithdynamicprice) is set to value greater tha zero.
 
-#### CCIP.Groups.<testtype>.TokenConfig.CCIPOwnerTokens
+#### CCIP.Groups.[testgroup].TokenConfig.CCIPOwnerTokens
 Specifies the tokens to be owned by the CCIP owner. If this is false, the tokens and pools will be owned by an address other than rest of CCIP contract admin addresses.
 This is applicable only if the contract versions are '1.5' or higher.
 
@@ -446,26 +446,26 @@ DynamicPriceUpdateInterval ='15s'
 CCIPOwnerTokens = true
 ```
 
-### CCIP.Groups.<testtype>.MsgDetails
+### CCIP.Groups.[testgroup].MsgDetails
 Specifies the ccip message details to be sent by the test. 
-#### CCIP.Groups.<testtype>.MsgDetails.MsgType
+#### CCIP.Groups.[testgroup].MsgDetails.MsgType
 Specifies the type of message to be sent. The supported message types are:
 - **Token**
 - **Data**
 - **DataWithToken**
 
-#### CCIP.Groups.<testtype>.MsgDetails.DestGasLimit
+#### CCIP.Groups.[testgroup].MsgDetails.DestGasLimit
 Specifies the gas limit for the destination chain. This is used to in `ExtraArgs` field of CCIPMessage. Change this to 0, if you are doing ccip-send to an EOA in the destination chain.
 
-#### CCIP.Groups.<testtype>.MsgDetails.DataLength
-Specifies the length of data to be sent in the message. This is only valid if [MsgType](#ccipgroupstesttypemsgdetailsmsgtype) is set to 'Data' or 'DataWithToken'.
+#### CCIP.Groups.[testgroup].MsgDetails.DataLength
+Specifies the length of data to be sent in the message. This is only valid if [MsgType](#ccipgroupstestgroupmsgdetailsmsgtype) is set to 'Data' or 'DataWithToken'.
 
-#### CCIP.Groups.<testtype>.MsgDetails.NoOfTokens
-Specifies the number of tokens to be sent in the message. This is only valid if [MsgType](#ccipgroupstesttypemsgdetailsmsgtype) is set to 'Token' or 'DataWithToken'.
-It needs to be less than or equal to [NoOfTokensPerChain](#ccipgroupstesttypetokenconfignooftokensperchain) specified in the test config.
+#### CCIP.Groups.[testgroup].MsgDetails.NoOfTokens
+Specifies the number of tokens to be sent in the message. This is only valid if [MsgType](#ccipgroupstestgroupmsgdetailsmsgtype) is set to 'Token' or 'DataWithToken'.
+It needs to be less than or equal to [NoOfTokensPerChain](#ccipgroupstestgrouptokenconfignooftokensperchain) specified in the test config.
 
-#### CCIP.Groups.<testtype>.MsgDetails.TokenAmount
-Specifies the amount for each token to be sent in the message. This is only valid if [MsgType](#ccipgroupstesttypemsgdetailsmsgtype) is set to 'Token' or 'DataWithToken'.
+#### CCIP.Groups.[testgroup].MsgDetails.TokenAmount
+Specifies the amount for each token to be sent in the message. This is only valid if [MsgType](#ccipgroupstestgroupmsgdetailsmsgtype) is set to 'Token' or 'DataWithToken'.
 
 Example Usage:
 ```toml
@@ -477,13 +477,13 @@ NoOfTokens = 2
 AmountPerToken = 1
 ```
 
-### CCIP.Groups.<testtype>.MulticallInOneTx
+### CCIP.Groups.[testgroup].MulticallInOneTx
 Specifies whether to send multiple ccip messages in a single transaction.
 
-### CCIP.Groups.<testtype>.NoOfSendsInMulticall
-Specifies the number of ccip messages to be sent in a single transaction. This is only valid if [MulticallInOneTx](#ccipgroupstesttypemulticallinonetx) is set to true.
+### CCIP.Groups.[testgroup].NoOfSendsInMulticall
+Specifies the number of ccip messages to be sent in a single transaction. This is only valid if [MulticallInOneTx](#ccipgroupstestgroupmulticallinonetx) is set to true.
 
-### CCIP.Groups.<testtype>.PhaseTimeout
+### CCIP.Groups.[testgroup].PhaseTimeout
 The test validates various events in a ccip request lifecycle, like commit, execute, etc. This field specifies the timeout for each phase in the lifecycle.
 The timeout is calculated from the time the previous phase event is received.
 The following contract events are validated:
@@ -493,61 +493,61 @@ The following contract events are validated:
 - **TaggedRootBlessed on ARM/RMN**
 - **ExecutionStateChanged on OffRamp**
 
-### CCIP.Groups.<testtype>.LocalCluster
+### CCIP.Groups.[testgroup].LocalCluster
 Specifies whether the test is to be run on a local docker. If set to true, the test environment will be set up on a local docker.
 
-### CCIP.Groups.<testtype>.ExistingDeployment
+### CCIP.Groups.[testgroup].ExistingDeployment
 Specifies whether the test is to be run on existing deployments. If set to true, the test will use the deployment data specified in [CCIP.Deployments](#ccipdeployments) for interacting with the ccip contracts.
 If the deployment data does not contain the required contract addresses, the test will fail.
 
-### CCIP.Groups.<testtype>.ReuseContracts
-Test loads contract/lane config from [contracts.json](/integration-tests/ccip-tests/contracts/laneconfig/contracts.json) if no lane config is specified in [CCIP.Deployments](#ccipdeployments)
+### CCIP.Groups.[testgroup].ReuseContracts
+Test loads contract/lane config from [contracts.json](../contracts/laneconfig/contracts.json) if no lane config is specified in [CCIP.Deployments](#ccipdeployments)
 If a certain contract is present in the contracts.json, the test will use the contract address from the contracts.json.
-This field specifies whether to reuse the contracts from [contracts.json](/integration-tests/ccip-tests/contracts/laneconfig/contracts.json)
+This field specifies whether to reuse the contracts from [contracts.json](../contracts/laneconfig/contracts.json)
 For example if the contracts.json contains the contract address for PriceRegistry for `Arbitrum Mainnet`, the test by default will use the contract address from contracts.json instead of redeploying the contract.
 If `ReuseContracts` is set to false, the test will redeploy the contract instead of using the contract address from contracts.json.
 
-### CCIP.Groups.<testtype>.NodeFunding
+### CCIP.Groups.[testgroup].NodeFunding
 Specified the native token funding for each Chainlink node. It assumes that the native token decimals is 18.
 The funding is done by the private key specified in [CCIP.Env.Networks](#ccipenvnetworks) for each network.
-The funding is done only if the test is run on local docker or k8s. This is not applicable for [existing deployments](#ccipgroupstesttypeexistingdeployment) is set to true.
+The funding is done only if the test is run on local docker or k8s. This is not applicable for [existing deployments](#ccipgroupstestgroupexistingdeployment) is set to true.
 
-### CCIP.Groups.<testtype>.NetworkPairs
+### CCIP.Groups.[testgroup].NetworkPairs
 Specifies the network pairs for which the test is to be run. The test will set up lanes only between the specified network pairs. 
 If the network pairs are not specified, the test will set up lanes between all possible pairs of networks mentioned in selected_networks in [CCIP.Env.Networks](#ccipenvnetworksselectednetworks)
 
-### CCIP.Groups.<testtype>.NoOfNetworks
+### CCIP.Groups.[testgroup].NoOfNetworks
 Specifies the number of networks to be used for the test. 
 If the number of networks is greater than the total number of networks specified in [CCIP.Env.Networks.selected_networks](#ccipenvnetworksselectednetworks) :
 - the test will fail if the networks are live networks.
 - the test will create equal number of replicas of the first network with a new chain id if the networks are simulated networks. 
   For example, if the `selected_networks` is ['SIMULATED_1','SIMULATED_2'] and `NoOfNetworks` is 3, the test will create 1 more network config by copying the network config of `SIMULATED_1` with a different chain id and use that as 3rd network.
 
-### CCIP.Groups.<testtype>.NoOfRoutersPerPair
+### CCIP.Groups.[testgroup].NoOfRoutersPerPair
 Specifies the number of routers to be set up for each network.
 
-### CCIP.Groups.<testtype>.MaxNoOfLanes
+### CCIP.Groups.[testgroup].MaxNoOfLanes
 Specifies the maximum number of lanes to be set up between networks. If this values is not set, the test will set up lanes between all possible pairs of networks mentioned in `selected_networks` in [CCIP.Env.Networks](#ccipenvnetworksselectednetworks).
 For example, if `selected_networks = ['SIMULATED_1', 'SIMULATED_2', 'SIMULATED_3']`, and `MaxNoOfLanes` is set to 3, it denotes that the test will randomly select 3 lanes between all possible pairs `SIMULATED_1`, `SIMULATED_2`, and `SIMULATED_3` for the test run.
 
-### CCIP.Groups.<testtype>.ChaosDuration
+### CCIP.Groups.[testgroup].ChaosDuration
 Specifies the duration for which the chaos experiment is to be run. This is only valid if the test type is 'chaos'.
 
-### CCIP.Groups.<testtype>.USDCMockDeployment
-Specifies whether to deploy USDC mock contract for the test. This is only valid if the test is not run on [existing deployments](#ccipgroupstesttypeexistingdeployment).
+### CCIP.Groups.[testgroup].USDCMockDeployment
+Specifies whether to deploy USDC mock contract for the test. This is only valid if the test is not run on [existing deployments](#ccipgroupstestgroupexistingdeployment).
 
-The following fields are used for various parameters in OCR2 commit and execution jobspecs. All of these are only valid if the test is not run on [existing deployments](#ccipgroupstesttypeexistingdeployment).
-### CCIP.Groups.<testtype>.CommitOCRParams
-Specifies the OCR parameters for the commit job. This is only valid if the test is not run on [existing deployments](#ccipgroupstesttypeexistingdeployment).
+The following fields are used for various parameters in OCR2 commit and execution jobspecs. All of these are only valid if the test is not run on [existing deployments](#ccipgroupstestgroupexistingdeployment).
+### CCIP.Groups.[testgroup].CommitOCRParams
+Specifies the OCR parameters for the commit job. This is only valid if the test is not run on [existing deployments](#ccipgroupstestgroupexistingdeployment).
 
-### CCIP.Groups.<testtype>.ExecuteOCRParams
-Specifies the OCR parameters for the execute job. This is only valid if the test is not run on [existing deployments](#ccipgroupstesttypeexistingdeployment).
+### CCIP.Groups.[testgroup].ExecuteOCRParams
+Specifies the OCR parameters for the execute job. This is only valid if the test is not run on [existing deployments](#ccipgroupstestgroupexistingdeployment).
 
-### CCIP.Groups.<testtype>.CommitInflightExpiry
-Specifies the value for the `InflightExpiry` in commit job's offchain config. This is only valid if the test is not run on [existing deployments](#ccipgroupstesttypeexistingdeployment).
+### CCIP.Groups.[testgroup].CommitInflightExpiry
+Specifies the value for the `InflightExpiry` in commit job's offchain config. This is only valid if the test is not run on [existing deployments](#ccipgroupstestgroupexistingdeployment).
 
-### CCIP.Groups.<testtype>.OffRampConfig
-Specifies the offramp configuration for the execution job. This is only valid if the test is not run on [existing deployments](#ccipgroupstesttypeexistingdeployment).
+### CCIP.Groups.[testgroup].OffRampConfig
+Specifies the offramp configuration for the execution job. This is only valid if the test is not run on [existing deployments](#ccipgroupstestgroupexistingdeployment).
 This is used to set values for following fields in execution jobspec's offchain and onchain config:
 - **OffRampConfig.MaxDataBytes**
 - **OffRampConfig.BatchGasLimit**
@@ -589,35 +589,35 @@ RootSnooze = '5m'
 
 ```
 
-### CCIP.Groups.<testtype>.StoreLaneConfig
+### CCIP.Groups.[testgroup].StoreLaneConfig
 This is only valid if the tests are run on remote runners in k8s. If set to true, the test will store the lane config in the remote runner.
 
-### CCIP.Groups.<testtype>.LoadProfile
-Specifies the load profile for the test. Only valid if the testtype is 'load'. 
+### CCIP.Groups.[testgroup].LoadProfile
+Specifies the load profile for the test. Only valid if the testgroup is 'load'. 
 
-#### CCIP.Groups.<testtype>.LoadProfile.RequestPerUnitTime
+#### CCIP.Groups.[testgroup].LoadProfile.RequestPerUnitTime
 Specifies the number of requests to be sent per unit time.
 
-#### CCIP.Groups.<testtype>.LoadProfile.TimeUnit
+#### CCIP.Groups.[testgroup].LoadProfile.TimeUnit
 Specifies the unit of time for the load profile.
 
-#### CCIP.Groups.<testtype>.LoadProfile.StepDuration
+#### CCIP.Groups.[testgroup].LoadProfile.StepDuration
 Specifies the duration for each step in the load profile.
 
-#### CCIP.Groups.<testtype>.LoadProfile.TestDuration
+#### CCIP.Groups.[testgroup].LoadProfile.TestDuration
 Specifies the total duration for the load test.
 
-#### CCIP.Groups.<testtype>.LoadProfile.NetworkChaosDelay
-Specifies the duration network delay used for `NetworkChaos` experiment. This is only valid if the test is run on k8s and not on [existing deployments](#ccipgroupstesttypeexistingdeployment).
+#### CCIP.Groups.[testgroup].LoadProfile.NetworkChaosDelay
+Specifies the duration network delay used for `NetworkChaos` experiment. This is only valid if the test is run on k8s and not on [existing deployments](#ccipgroupstestgroupexistingdeployment).
 
-#### CCIP.Groups.<testtype>.LoadProfile.WaitBetweenChaosDuringLoad
-If there are multiple chaos experiments, this specifies the duration to wait between each chaos experiment. This is only valid if the test is run on k8s and not on [existing deployments](#ccipgroupstesttypeexistingdeployment).
+#### CCIP.Groups.[testgroup].LoadProfile.WaitBetweenChaosDuringLoad
+If there are multiple chaos experiments, this specifies the duration to wait between each chaos experiment. This is only valid if the test is run on k8s and not on [existing deployments](#ccipgroupstestgroupexistingdeployment).
 
-#### CCIP.Groups.<testtype>.LoadProfile.SkipRequestIfAnotherRequestTriggeredWithin
+#### CCIP.Groups.[testgroup].LoadProfile.SkipRequestIfAnotherRequestTriggeredWithin
 If a request is triggered within this duration, the test will skip sending another request during load run. For Example, if `SkipRequestIfAnotherRequestTriggeredWithin` is set to `40m`, and a request is triggered at 0th second, the test will skip sending another request for another 40m.
 This particular field is used to avoid sending multiple requests in a short duration during load run.
 
-#### CCIP.Groups.<testtype>.LoadProfile.OptimizeSpace
+#### CCIP.Groups.[testgroup].LoadProfile.OptimizeSpace
 This is used internally to optimize memory usage during load run. If set to true, after the initial lane set up is over the test will discard the lane config to save memory. 
 The test will only store contract addresses strictly necessary to trigger/validate ccip-send requests. 
 Except for following contracts all other contract addresses will be discarded after the initial lane set up -
@@ -627,21 +627,21 @@ Except for following contracts all other contract addresses will be discarded af
 - OffRamp
 - OnRamp
 
-#### CCIP.Groups.<testtype>.LoadProfile.FailOnFirstErrorInLoad
+#### CCIP.Groups.[testgroup].LoadProfile.FailOnFirstErrorInLoad
 If set to true, the test will fail on the first error encountered during load run. If set to false, the test will continue to run even if there are errors during load run.
 
-#### CCIP.Groups.<testtype>.LoadProfile.SendMaxDataInEveryMsgCount
+#### CCIP.Groups.[testgroup].LoadProfile.SendMaxDataInEveryMsgCount
 Specifies the number of requests to send with maximum data in every mentioned count iteration. 
 For example, if `SendMaxDataInEveryMsgCount` is set to 5, the test will send ccip message with max allowable data length(as set in onRamp config) in every 5th request.
 
-#### CCIP.Groups.<testtype>.LoadProfile.TestRunName
+#### CCIP.Groups.[testgroup].LoadProfile.TestRunName
 Specifies the name of the test run. This is used to identify the test run in CCIP test dashboard or logs. If multiple tests are run with same `TestRunName`, the test results will be aggregated under the same test run in grafana dashboard.
 This is used when multiple iterations of tests are run against same release version to aggregate the results under same dashboard view.
 
-#### CCIP.Groups.<testtype>.LoadProfile.MsgProfile
+#### CCIP.Groups.[testgroup].LoadProfile.MsgProfile
 Specifies the message profile for the test. The message profile is used to set up multiple ccip message details during load test.
 
-##### CCIP.Groups.<testtype>.LoadProfile.MsgProfile.Frequencies
+##### CCIP.Groups.[testgroup].LoadProfile.MsgProfile.Frequencies
 Specifies the frequency of each message profile. 
 For example, if `Frequencies` is set to [1, 2, 3], the test will send 1st message profile 1 time, 2nd message profile 2 times, and 3rd message profile 3 times in each iteration. Each iteration will be defined by (1+2+3) = 6 requests.
 Example Breakdown:
@@ -655,8 +655,8 @@ Example Breakdown:
  These percentages reflect how often each message type should appear in the total set of messages.
  Please note - if the total set of messages is not equal to the multiple of sum of frequencies, the percentages will not be accurate.
 
-##### CCIP.Groups.<testtype>.LoadProfile.MsgProfile.MsgDetails
-Specifies the message details for each message profile. The fields are the same as [CCIP.Groups.<testtype>.MsgDetails](#ccipgroupstesttypemsgdetails).
+##### CCIP.Groups.[testgroup].LoadProfile.MsgProfile.MsgDetails
+Specifies the message details for each message profile. The fields are the same as [CCIP.Groups.[testgroup].MsgDetails](#ccipgroupstestgroupmsgdetails).
 
 example usage:
 ```toml
