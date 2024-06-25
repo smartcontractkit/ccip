@@ -6,7 +6,6 @@ import (
 	"sort"
 
 	mapset "github.com/deckarep/golang-set/v2"
-	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	"golang.org/x/sync/errgroup"
 
@@ -19,80 +18,48 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/merklemulti"
 )
 
-// observeMaxSeqNums finds the maximum committed sequence numbers for each source chain.
-// If a sequence number is pending (is not on-chain yet), it will be included in the results.
-func observeMaxSeqNums(
+// observeLatestCommittedSeqNums finds the maximum committed sequence numbers for each source chain.
+// If we cannot observe the dest we return an empty slice and no error..
+func observeLatestCommittedSeqNums(
 	ctx context.Context,
 	lggr logger.Logger,
 	ccipReader cciptypes.CCIPReader,
-	previousOutcomeBytes []byte,
 	readableChains mapset.Set[cciptypes.ChainSelector],
 	destChain cciptypes.ChainSelector,
 	knownSourceChains []cciptypes.ChainSelector,
-) ([]cciptypes.SeqNumChain, bool, error) {
-	seqNumsInSync := false
-
-	// If there is a previous outcome, start with the sequence numbers of it.
-	seqNumPerChain := make(map[cciptypes.ChainSelector]cciptypes.SeqNum)
-	if previousOutcomeBytes != nil {
-		lggr.Debugw("observing based on previous outcome")
-		prevOutcome, err := cciptypes.DecodeCommitPluginOutcome(previousOutcomeBytes)
-		if err != nil {
-			return nil, false, fmt.Errorf("decode commit plugin previous outcome: %w", err)
-		}
-		lggr.Debugw("previous outcome decoded", "outcome", prevOutcome.String())
-
-		for _, seqNumChain := range prevOutcome.MaxSeqNums {
-			if seqNumChain.SeqNum > seqNumPerChain[seqNumChain.ChainSel] {
-				seqNumPerChain[seqNumChain.ChainSel] = seqNumChain.SeqNum
-			}
-		}
-		lggr.Debugw("discovered sequence numbers from prev outcome", "seqNumPerChain", seqNumPerChain)
-	}
-
-	// If reading destination chain is supported find the latest sequence numbers per chain from the onchain state.
+) ([]cciptypes.SeqNumChain, error) {
+	sort.Slice(knownSourceChains, func(i, j int) bool { return knownSourceChains[i] < knownSourceChains[j] })
+	latestCommittedSeqNumsObservation := make([]cciptypes.SeqNumChain, 0)
 	if readableChains.Contains(destChain) {
-		lggr.Debugw("reading sequence numbers from destination")
-		onChainSeqNums, err := ccipReader.NextSeqNum(ctx, knownSourceChains)
+		lggr.Debugw("reading latest committed sequence from destination")
+		onChainLatestCommittedSeqNums, err := ccipReader.NextSeqNum(ctx, knownSourceChains)
 		if err != nil {
-			return nil, false, fmt.Errorf("get next seq nums: %w", err)
+			return latestCommittedSeqNumsObservation, fmt.Errorf("get next seq nums: %w", err)
 		}
-		lggr.Debugw("discovered sequence numbers from destination", "onChainSeqNums", onChainSeqNums)
-
-		// Update the seq nums if the on-chain sequence number is greater than previous outcome.
+		lggr.Debugw("observed latest committed sequence numbers on destination", "latestCommittedSeqNumsObservation", onChainLatestCommittedSeqNums)
 		for i, ch := range knownSourceChains {
-			if onChainSeqNums[i] > seqNumPerChain[ch] {
-				seqNumPerChain[ch] = onChainSeqNums[i]
-				lggr.Debugw("updated sequence number", "chain", ch, "seqNum", onChainSeqNums[i])
-			}
+			latestCommittedSeqNumsObservation = append(latestCommittedSeqNumsObservation, cciptypes.NewSeqNumChain(ch, onChainLatestCommittedSeqNums[i]))
 		}
-		seqNumsInSync = true
 	}
-
-	maxChainSeqNums := make([]cciptypes.SeqNumChain, 0)
-	for ch, seqNum := range seqNumPerChain {
-		maxChainSeqNums = append(maxChainSeqNums, cciptypes.NewSeqNumChain(ch, seqNum))
-	}
-
-	sort.Slice(maxChainSeqNums, func(i, j int) bool { return maxChainSeqNums[i].ChainSel < maxChainSeqNums[j].ChainSel })
-	return maxChainSeqNums, seqNumsInSync, nil
+	return latestCommittedSeqNumsObservation, nil
 }
 
 // observeNewMsgs finds the new messages for each supported chain based on the provided max sequence numbers.
+// If latestCommitSeqNums is empty (first ever OCR round), it will return an empty slice.
 func observeNewMsgs(
 	ctx context.Context,
 	lggr logger.Logger,
 	ccipReader cciptypes.CCIPReader,
 	msgHasher cciptypes.MessageHasher,
 	readableChains mapset.Set[cciptypes.ChainSelector],
-	maxSeqNumsPerChain []cciptypes.SeqNumChain,
+	latestCommittedSeqNums []cciptypes.SeqNumChain,
 	msgScanBatchSize int,
 ) ([]cciptypes.CCIPMsg, error) {
 	// Find the new msgs for each supported chain based on the discovered max sequence numbers.
-	newMsgsPerChain := make([][]cciptypes.CCIPMsg, len(maxSeqNumsPerChain))
+	newMsgsPerChain := make([][]cciptypes.CCIPMsg, len(latestCommittedSeqNums))
 	eg := new(errgroup.Group)
 
-	for chainIdx, seqNumChain := range maxSeqNumsPerChain {
+	for chainIdx, seqNumChain := range latestCommittedSeqNums {
 		if !readableChains.Contains(seqNumChain.ChainSel) {
 			lggr.Debugw("reading chain is not supported", "chain", seqNumChain.ChainSel)
 			continue
@@ -136,7 +103,7 @@ func observeNewMsgs(
 	}
 
 	observedNewMsgs := make([]cciptypes.CCIPMsg, 0)
-	for chainIdx := range maxSeqNumsPerChain {
+	for chainIdx := range latestCommittedSeqNums {
 		observedNewMsgs = append(observedNewMsgs, newMsgsPerChain[chainIdx]...)
 	}
 	return observedNewMsgs, nil
@@ -462,19 +429,16 @@ func gasPricesConsensus(lggr logger.Logger, observations []cciptypes.CommitPlugi
 	return consensusGasPrices
 }
 
-// pluginConfigConsensus comes to consensus on the plugin config based on the observations.
+// fChainConsensus comes to consensus on the plugin config based on the observations.
 // We cannot trust the state of a single follower, so we need to come to consensus on the config.
-func pluginConfigConsensus(
-	baseCfg cciptypes.CommitPluginConfig, // the config of the follower calling this function
+func fChainConsensus(
 	observations []cciptypes.CommitPluginObservation, // observations from all followers
-) cciptypes.CommitPluginConfig {
-	consensusCfg := baseCfg
-
+) map[cciptypes.ChainSelector]int {
 	// Come to consensus on fChain.
 	// Use the fChain observed by most followers for each chain.
 	fChainCounts := make(map[cciptypes.ChainSelector]map[int]int) // {chain: {fChain: count}}
 	for _, obs := range observations {
-		for chain, fChain := range obs.PluginConfig.FChain {
+		for chain, fChain := range obs.FChain {
 			if _, exists := fChainCounts[chain]; !exists {
 				fChainCounts[chain] = make(map[int]int)
 			}
@@ -491,51 +455,8 @@ func pluginConfigConsensus(
 			}
 		}
 	}
-	consensusCfg.FChain = consensusFChain
 
-	// Come to consensus on what the feeTokens are.
-	// We want to keep the tokens observed by at least 2f_chain+1 followers.
-	feeTokensCounts := make(map[types.Account]int)
-	for _, obs := range observations {
-		for _, token := range obs.PluginConfig.PricedTokens {
-			feeTokensCounts[token]++
-		}
-	}
-	consensusFeeTokens := make([]types.Account, 0)
-	for token, count := range feeTokensCounts {
-		if count >= 2*consensusCfg.FChain[consensusCfg.DestChain]+1 {
-			consensusFeeTokens = append(consensusFeeTokens, token)
-		}
-	}
-	consensusCfg.PricedTokens = consensusFeeTokens
-
-	// Come to consensus on reading observers.
-	// An observer can read a chain only if at least 2f_chain+1 followers observed that.
-	observerReadChainsCounts := make(map[commontypes.OracleID]map[cciptypes.ChainSelector]int)
-	for _, obs := range observations {
-		for observer, info := range obs.PluginConfig.ObserverInfo {
-			if _, exists := observerReadChainsCounts[observer]; !exists {
-				observerReadChainsCounts[observer] = make(map[cciptypes.ChainSelector]int)
-			}
-			for _, chain := range info.Reads {
-				observerReadChainsCounts[observer][chain]++
-			}
-		}
-	}
-	consensusObserverInfo := make(map[commontypes.OracleID]cciptypes.ObserverInfo)
-	for observer, chainCounts := range observerReadChainsCounts {
-		observerReadChains := make([]cciptypes.ChainSelector, 0)
-		for chain, count := range chainCounts {
-			if count >= 2*consensusCfg.FChain[consensusCfg.DestChain]+1 {
-				observerReadChains = append(observerReadChains, chain)
-			}
-		}
-		observerInfo := consensusCfg.ObserverInfo[observer]
-		observerInfo.Reads = observerReadChains
-		consensusObserverInfo[observer] = observerInfo
-	}
-
-	return consensusCfg
+	return consensusFChain
 }
 
 // validateObservedSequenceNumbers checks if the sequence numbers of the provided messages are unique for each chain and
@@ -595,18 +516,13 @@ func validateObservedSequenceNumbers(msgs []cciptypes.CCIPMsgBaseDetails, maxSeq
 
 // validateObserverReadingEligibility checks if the observer is eligible to observe the messages it observed.
 func validateObserverReadingEligibility(
-	observer commontypes.OracleID,
 	msgs []cciptypes.CCIPMsgBaseDetails,
 	seqNums []cciptypes.SeqNumChain,
-	observerCfg map[commontypes.OracleID]cciptypes.ObserverInfo,
+	nodeSupportedChains mapset.Set[cciptypes.ChainSelector],
+	destChain cciptypes.ChainSelector,
 ) error {
-	observerInfo, exists := observerCfg[observer]
-	if !exists {
-		return fmt.Errorf("observer not found in config")
-	}
-	observerReadChains := mapset.NewSet(observerInfo.Reads...)
 
-	if len(seqNums) > 0 && !observerInfo.Writer {
+	if len(seqNums) > 0 && !nodeSupportedChains.Contains(destChain) {
 		return fmt.Errorf("observer must be a writer if it observes sequence numbers")
 	}
 
@@ -616,7 +532,7 @@ func validateObserverReadingEligibility(
 
 	for _, msg := range msgs {
 		// Observer must be able to read the chain that the message is coming from.
-		if !observerReadChains.Contains(msg.SourceChain) {
+		if !nodeSupportedChains.Contains(msg.SourceChain) {
 			return fmt.Errorf("observer not allowed to read chain %d", msg.SourceChain)
 		}
 	}

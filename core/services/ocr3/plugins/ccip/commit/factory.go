@@ -2,12 +2,19 @@ package commit
 
 import (
 	"context"
+	"math/big"
 
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
+	"github.com/smartcontractkit/ccipocr3/internal/reader"
+
 	"google.golang.org/grpc"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
+
+	"github.com/smartcontractkit/libocr/commontypes"
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
+	ocr2types "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
 )
 
 // PluginFactoryConstructor implements common OCR3ReportingPluginClient and is used for initializing a plugin factory
@@ -44,15 +51,24 @@ func NewPluginFactory() *PluginFactory {
 
 func (p PluginFactory) NewReportingPlugin(config ocr3types.ReportingPluginConfig,
 ) (ocr3types.ReportingPlugin[[]byte], ocr3types.ReportingPluginInfo, error) {
+	var oracleIDToP2pID map[commontypes.OracleID]libocrtypes.PeerID // TODO: Get this from ocr config, it's the mapping of the oracleId index in the DON
+	onChainTokenPricesReader := reader.NewOnchainTokenPricesReader(
+		reader.TokenPriceConfig{ // TODO: Inject config
+			StaticPrices: map[ocr2types.Account]big.Int{},
+		},
+		nil, // TODO: Inject this
+	)
 	return NewPlugin(
 		context.Background(),
 		config.OracleID,
+		oracleIDToP2pID,
 		cciptypes.CommitPluginConfig{},
-		nil,
-		nil,
-		nil,
-		nil,
-		nil,
+		nil, //ccipReader
+		onChainTokenPricesReader,
+		nil, //reportCodec
+		nil, //msgHasher
+		nil, // lggr
+		nil, //homeChainPoller
 	), ocr3types.ReportingPluginInfo{}, nil
 }
 
