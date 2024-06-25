@@ -1,6 +1,3 @@
-//go:build playground
-// +build playground
-
 package chainreader
 
 import (
@@ -12,12 +9,8 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum"
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
-	"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/smartcontractkit/chainlink-common/pkg/codec"
 	types2 "github.com/smartcontractkit/chainlink-common/pkg/types"
 	query2 "github.com/smartcontractkit/chainlink-common/pkg/types/query"
@@ -26,6 +19,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils/pgtest"
 	logger2 "github.com/smartcontractkit/chainlink/v2/core/logger"
+	helpers "github.com/smartcontractkit/chainlink/v2/core/services/ocr3/plugins/ccip_integration_tests"
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay/evm"
 	evmtypes "github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/types"
 	"github.com/stretchr/testify/assert"
@@ -33,18 +27,10 @@ import (
 
 const chainID = 1337
 
-type testSetupData struct {
-	contractAddr common.Address
-	contract     *Chainreader
-	sb           *backends.SimulatedBackend
-	auth         *bind.TransactOpts
-}
-
 func TestChainReader(t *testing.T) {
 	ctx := testutils.Context(t)
 	lggr := logger2.NullLogger
-	d := testSetup(t, ctx)
-
+	d := helpers.SetupTest[Chainreader](t, ctx, DeployChainreader, NewChainreader)
 	db := pgtest.NewSqlxDB(t)
 	lpOpts := logpoller.Opts{
 		PollPeriod:               time.Millisecond,
@@ -53,7 +39,7 @@ func TestChainReader(t *testing.T) {
 		RpcBatchSize:             10,
 		KeepFinalizedBlocksDepth: 100000,
 	}
-	cl := client.NewSimulatedBackendClient(t, d.sb, big.NewInt(chainID))
+	cl := client.NewSimulatedBackendClient(t, d.SimulatedBE, big.NewInt(chainID))
 	lp := logpoller.NewLogPoller(logpoller.NewORM(big.NewInt(chainID), db, lggr), cl, lggr, lpOpts)
 	assert.NoError(t, lp.Start(ctx))
 
@@ -108,7 +94,7 @@ func TestChainReader(t *testing.T) {
 	assert.NoError(t, err)
 	err = cr.Bind(ctx, []types2.BoundContract{
 		{
-			Address: d.contractAddr.String(),
+			Address: d.ContractAddr.String(),
 			Name:    ContractNameAlias,
 			Pending: false,
 		},
@@ -127,7 +113,7 @@ func TestChainReader(t *testing.T) {
 
 	// (hack) Sometimes LP logs are missing, commit several times and wait few seconds to make it work.
 	for i := 0; i < 100; i++ {
-		d.sb.Commit()
+		d.SimulatedBE.Commit()
 	}
 	time.Sleep(5 * time.Second)
 
@@ -179,40 +165,7 @@ func TestChainReader(t *testing.T) {
 	})
 }
 
-func testSetup(t *testing.T, ctx context.Context) *testSetupData {
-	// Generate a new key pair for the simulated account
-	privateKey, err := crypto.GenerateKey()
-	assert.NoError(t, err)
-	// Set up the genesis account with balance
-	blnc, ok := big.NewInt(0).SetString("999999999999999999999999999999999999", 10)
-	assert.True(t, ok)
-	alloc := map[common.Address]core.GenesisAccount{crypto.PubkeyToAddress(privateKey.PublicKey): {Balance: blnc}}
-	simulatedBackend := backends.NewSimulatedBackend(alloc, 0)
-	// Create a transactor
-
-	auth, err := bind.NewKeyedTransactorWithChainID(privateKey, big.NewInt(chainID))
-	assert.NoError(t, err)
-	auth.GasLimit = uint64(0)
-
-	// Deploy the contract
-	address, tx, _, err := DeployChainreader(auth, simulatedBackend)
-	assert.NoError(t, err)
-	simulatedBackend.Commit()
-	t.Logf("contract deployed: addr=%s tx=%s", address.Hex(), tx.Hash())
-
-	// Setup contract client
-	contract, err := NewChainreader(address, simulatedBackend)
-	assert.NoError(t, err)
-
-	return &testSetupData{
-		contractAddr: address,
-		contract:     contract,
-		sb:           simulatedBackend,
-		auth:         auth,
-	}
-}
-
-func emitEvents(t *testing.T, d *testSetupData, ctx context.Context) {
+func emitEvents(t *testing.T, d *helpers.TestSetupData[Chainreader], ctx context.Context) {
 	var wg sync.WaitGroup
 	wg.Add(2)
 
@@ -220,9 +173,10 @@ func emitEvents(t *testing.T, d *testSetupData, ctx context.Context) {
 	go func() {
 		defer wg.Done()
 		for i := 0; i < 10; i++ {
-			_, err := d.contract.EmitEvent(d.auth)
+			contract := d.Contract
+			_, err := contract.EmitEvent(d.Auth)
 			assert.NoError(t, err)
-			d.sb.Commit()
+			d.SimulatedBE.Commit()
 		}
 	}()
 
@@ -230,10 +184,10 @@ func emitEvents(t *testing.T, d *testSetupData, ctx context.Context) {
 	go func() {
 		query := ethereum.FilterQuery{
 			FromBlock: big.NewInt(0),
-			Addresses: []common.Address{d.contractAddr},
+			Addresses: []common.Address{d.ContractAddr},
 		}
 		logs := make(chan types.Log)
-		sub, err := d.sb.SubscribeFilterLogs(ctx, query, logs)
+		sub, err := d.SimulatedBE.SubscribeFilterLogs(ctx, query, logs)
 		assert.NoError(t, err)
 
 		numLogs := 0
@@ -244,7 +198,7 @@ func emitEvents(t *testing.T, d *testSetupData, ctx context.Context) {
 			case err := <-sub.Err():
 				assert.NoError(t, err, "got an unexpected error")
 			case vLog := <-logs:
-				assert.Equal(t, d.contractAddr, vLog.Address, "got an unexpected address")
+				assert.Equal(t, d.ContractAddr, vLog.Address, "got an unexpected address")
 				t.Logf("(geth) got new log (cnt=%d) (data=%x) (topics=%s)", numLogs, vLog.Data, vLog.Topics)
 				numLogs++
 				if numLogs == 10 {
