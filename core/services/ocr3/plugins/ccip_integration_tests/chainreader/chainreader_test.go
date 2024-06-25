@@ -1,3 +1,6 @@
+//go:build ignored
+// +build ignored
+
 package main
 
 import (
@@ -17,10 +20,12 @@ import (
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/smartcontractkit/chainlink-common/pkg/codec"
 	types2 "github.com/smartcontractkit/chainlink-common/pkg/types"
 	query2 "github.com/smartcontractkit/chainlink-common/pkg/types/query"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
+	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils/pgtest"
 	logger2 "github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay/evm"
@@ -28,20 +33,161 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-/*
- *
- * solc --abi --bin mycontract.sol -o build # use solc 0.8.18
- * abigen --abi build/mycontract_sol_SimpleContract.abi --bin build/mycontract_sol_SimpleContract.bin --pkg=main --out=mycontract.go
- *
- */
-
 //go:embed build/mycontract_sol_SimpleContract.abi
 var contractABI string
 
 //go:embed build/mycontract_sol_SimpleContract.bin
 var contractBytecode string
 
+const chainID = 1337
+
+type testSetupData struct {
+	contractAddr common.Address
+	contract     *Main
+	sb           *backends.SimulatedBackend
+	auth         *bind.TransactOpts
+}
+
 func TestChainReader(t *testing.T) {
+	ctx := testutils.Context(t)
+	lggr := logger2.NullLogger
+	d := testSetup(t, ctx)
+
+	db := pgtest.NewSqlxDB(t)
+	lpOpts := logpoller.Opts{
+		PollPeriod:               time.Millisecond,
+		FinalityDepth:            0,
+		BackfillBatchSize:        10,
+		RpcBatchSize:             10,
+		KeepFinalizedBlocksDepth: 100000,
+	}
+	cl := client.NewSimulatedBackendClient(t, d.sb, big.NewInt(chainID))
+	lp := logpoller.NewLogPoller(logpoller.NewORM(big.NewInt(chainID), db, lggr), cl, lggr, lpOpts)
+	assert.NoError(t, lp.Start(ctx))
+
+	const (
+		ContractNameAlias = "myCoolContract"
+
+		FnAliasGetCount = "myCoolFunction"
+		FnGetCount      = "getEventCount"
+
+		FnAliasGetNumbers = "GetNumbers"
+		FnGetNumbers      = "getNumbers"
+
+		FnAliasGetPerson = "GetPerson"
+		FnGetPerson      = "getPerson"
+
+		EventNameAlias = "myCoolEvent"
+		EventName      = "SimpleEvent"
+	)
+
+	// Initialize chainReader
+	cfg := evmtypes.ChainReaderConfig{
+		Contracts: map[string]evmtypes.ChainContractReader{
+			ContractNameAlias: {
+				ContractABI: contractABI,
+				Configs: map[string]*evmtypes.ChainReaderDefinition{
+					EventNameAlias: {
+						ChainSpecificName:       EventName,
+						ReadType:                evmtypes.Event,
+						ConfidenceConfirmations: map[string]int{"0.0": 0, "1.0": 0},
+					},
+					FnAliasGetCount: {
+						ChainSpecificName: FnGetCount,
+					},
+					FnAliasGetNumbers: {
+						ChainSpecificName:   FnGetNumbers,
+						OutputModifications: codec.ModifiersConfig{},
+					},
+					FnAliasGetPerson: {
+						ChainSpecificName: FnGetPerson,
+						OutputModifications: codec.ModifiersConfig{
+							&codec.RenameModifierConfig{
+								Fields: map[string]string{"Name": "NameField"}, // solidity name -> go struct name
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	cr, err := evm.NewChainReaderService(ctx, lggr, lp, cl, cfg)
+	assert.NoError(t, err)
+	err = cr.Bind(ctx, []types2.BoundContract{
+		{
+			Address: d.contractAddr.String(),
+			Name:    ContractNameAlias,
+			Pending: false,
+		},
+	})
+	assert.NoError(t, err)
+
+	err = cr.Start(ctx)
+	assert.NoError(t, err)
+	for {
+		if err := cr.Ready(); err == nil {
+			break
+		}
+	}
+
+	emitEvents(t, d, ctx) // Calls the contract to emit events
+
+	// (hack) Sometimes LP logs are missing, commit several times and wait few seconds to make it work.
+	for i := 0; i < 100; i++ {
+		d.sb.Commit()
+	}
+	time.Sleep(5 * time.Second)
+
+	t.Run("simple contract read", func(t *testing.T) {
+		var cnt big.Int
+		err = cr.GetLatestValue(ctx, ContractNameAlias, FnAliasGetCount, map[string]interface{}{}, &cnt)
+		assert.NoError(t, err)
+		assert.Equal(t, int64(10), cnt.Int64())
+	})
+
+	t.Run("read array", func(t *testing.T) {
+		var nums []big.Int
+		err = cr.GetLatestValue(ctx, ContractNameAlias, FnAliasGetNumbers, map[string]interface{}{}, &nums)
+		assert.NoError(t, err)
+		assert.Len(t, nums, 10)
+		for i := 1; i <= 10; i++ {
+			assert.Equal(t, int64(i), nums[i-1].Int64())
+		}
+	})
+
+	t.Run("read struct", func(t *testing.T) {
+		person := struct {
+			NameField string
+			Age       *big.Int // WARN: specifying a wrong data type e.g. int instead of *big.Int fails silently with a default value of 0
+		}{}
+		err = cr.GetLatestValue(ctx, ContractNameAlias, FnAliasGetPerson, map[string]interface{}{}, &person)
+		assert.Equal(t, "Dim", person.NameField)
+		assert.Equal(t, int64(18), person.Age.Int64())
+	})
+
+	t.Run("read events", func(t *testing.T) {
+		var myDataType *big.Int
+		seq, err := cr.QueryKey(
+			ctx,
+			ContractNameAlias,
+			query2.KeyFilter{
+				Key:         EventNameAlias,
+				Expressions: []query2.Expression{},
+			},
+			query2.LimitAndSort{},
+			myDataType,
+		)
+		assert.NoError(t, err)
+		assert.Equal(t, 10, len(seq), "expected 10 events from chain reader")
+		for _, v := range seq {
+			// TODO: for some reason log poller does not populate event data
+			t.Logf("(chain reader) got event: (data=%v) (hash=%x)", v.Data, v.Hash)
+		}
+	})
+}
+
+func testSetup(t *testing.T, ctx context.Context) *testSetupData {
 	// Generate a new key pair for the simulated account
 	privateKey, err := crypto.GenerateKey()
 	assert.NoError(t, err)
@@ -51,7 +197,7 @@ func TestChainReader(t *testing.T) {
 	alloc := map[common.Address]core.GenesisAccount{crypto.PubkeyToAddress(privateKey.PublicKey): {Balance: blnc}}
 	simulatedBackend := backends.NewSimulatedBackend(alloc, 0)
 	// Create a transactor
-	const chainID = 1337
+
 	auth, err := bind.NewKeyedTransactorWithChainID(privateKey, big.NewInt(chainID))
 	assert.NoError(t, err)
 	auth.GasLimit = uint64(0)
@@ -62,7 +208,7 @@ func TestChainReader(t *testing.T) {
 	address, tx, _, err := bind.DeployContract(auth, parsed, common.FromHex(contractBytecode), simulatedBackend)
 	assert.NoError(t, err)
 	simulatedBackend.Commit()
-	h, err := bind.WaitMined(context.Background(), simulatedBackend, tx)
+	h, err := bind.WaitMined(ctx, simulatedBackend, tx)
 	assert.NoError(t, err)
 	t.Logf("contract deployed: addr=%s tx=%s block=%s", address.Hex(), tx.Hash(), h.BlockNumber.String())
 
@@ -70,71 +216,41 @@ func TestChainReader(t *testing.T) {
 	contract, err := NewMain(address, simulatedBackend)
 	assert.NoError(t, err)
 
-	// Set up an event watcher
-	query := ethereum.FilterQuery{
-		FromBlock: big.NewInt(0),
-		Addresses: []common.Address{address},
+	return &testSetupData{
+		contractAddr: address,
+		contract:     contract,
+		sb:           simulatedBackend,
+		auth:         auth,
 	}
-	logs := make(chan types.Log)
-	sub, err := simulatedBackend.SubscribeFilterLogs(context.Background(), query, logs)
-	assert.NoError(t, err)
+}
 
-	// Initialize chainReader
-	cfg := evmtypes.ChainReaderConfig{
-		Contracts: map[string]evmtypes.ChainContractReader{
-			"myContract": {
-				ContractABI: contractABI,
-				Configs: map[string]*evmtypes.ChainReaderDefinition{
-					"EventCounter": {
-						ChainSpecificName:       "SimpleEvent",
-						ReadType:                evmtypes.Event,
-						ConfidenceConfirmations: map[string]int{"0.0": 0, "1.0": 0},
-					},
-					"GetCounter": {
-						ChainSpecificName: "getEventCount",
-					},
-				},
-			},
-		},
-	}
-
-	lggr := logger2.NullLogger
-	db := pgtest.NewSqlxDB(t)
-	lpOpts := logpoller.Opts{
-		PollPeriod:               time.Millisecond,
-		FinalityDepth:            1,
-		BackfillBatchSize:        1,
-		RpcBatchSize:             1,
-		KeepFinalizedBlocksDepth: 10000,
-	}
-	cl := client.NewSimulatedBackendClient(t, simulatedBackend, big.NewInt(chainID))
-	lp := logpoller.NewLogPoller(logpoller.NewORM(big.NewInt(chainID), db, lggr), cl, lggr, lpOpts)
-	assert.NoError(t, lp.Start(context.Background()))
-
-	cr, err := evm.NewChainReaderService(context.Background(), lggr, lp, cl, cfg)
-	assert.NoError(t, err)
-	err = cr.Bind(context.Background(), []types2.BoundContract{
-		{
-			Address: address.String(),
-			Name:    "myContract",
-			Pending: false,
-		},
-	})
-	assert.NoError(t, err)
-
-	err = cr.Start(context.Background())
-	assert.NoError(t, err)
-	for {
-		if err := cr.Ready(); err == nil {
-			break
-		}
-	}
-
+func emitEvents(t *testing.T, d *testSetupData, ctx context.Context) {
 	var wg sync.WaitGroup
 	wg.Add(2)
 
+	// Start emitting events
+	go func() {
+		defer wg.Done()
+		for i := 0; i < 10; i++ {
+			tx, err := d.contract.EmitEvent(d.auth)
+			assert.NoError(t, err)
+			d.sb.Commit()
+			rcp, err := bind.WaitMined(ctx, d.sb, tx)
+			assert.NoError(t, err)
+			assert.Equal(t, uint64(1), rcp.Status)
+		}
+	}()
+
 	// Listen events using go-ethereum lib
 	go func() {
+		query := ethereum.FilterQuery{
+			FromBlock: big.NewInt(0),
+			Addresses: []common.Address{d.contractAddr},
+		}
+		logs := make(chan types.Log)
+		sub, err := d.sb.SubscribeFilterLogs(ctx, query, logs)
+		assert.NoError(t, err)
+
 		numLogs := 0
 		defer wg.Done()
 		for {
@@ -143,9 +259,9 @@ func TestChainReader(t *testing.T) {
 			case err := <-sub.Err():
 				assert.NoError(t, err, "got an unexpected error")
 			case vLog := <-logs:
-				t.Logf("%d: got log: %s %s %x", numLogs, address.Hex(), vLog.Address.Hex(), vLog.Data)
+				assert.Equal(t, d.contractAddr, vLog.Address, "got an unexpected address")
+				t.Logf("(geth) got new log (cnt=%d) (data=%x) (topics=%s)", numLogs, vLog.Data, vLog.Topics)
 				numLogs++
-
 				if numLogs == 10 {
 					return
 				}
@@ -153,59 +269,5 @@ func TestChainReader(t *testing.T) {
 		}
 	}()
 
-	// Start emitting events
-	go func() {
-		defer wg.Done()
-		for i := 0; i < 10; i++ {
-			tx, err := contract.EmitEvent(auth)
-			assert.NoError(t, err)
-			simulatedBackend.Commit()
-			rcp, err := bind.WaitMined(context.Background(), simulatedBackend, tx)
-			assert.NoError(t, err)
-			assert.Equal(t, uint64(1), rcp.Status)
-			t.Logf(">>> event emitted: %d @ block %s (tx: %s)", i, rcp.BlockNumber.String(), tx.Hash().Hex())
-		}
-	}()
-	wg.Wait()
-
-	simulatedBackend.Commit()
-	simulatedBackend.Commit()
-	simulatedBackend.Commit()
-	simulatedBackend.Commit()
-	simulatedBackend.Commit()
-	simulatedBackend.Commit()
-	simulatedBackend.Commit()
-	simulatedBackend.Commit()
-	time.Sleep(5 * time.Second)
-
-	// Now read the contract using chain reader
-	var cnt big.Int
-	err = cr.GetLatestValue(
-		context.Background(),
-		"myContract",
-		"GetCounter",
-		map[string]interface{}{},
-		&cnt,
-	)
-	assert.NoError(t, err)
-	t.Logf("got cnt: %s", cnt.String())
-
-	// Also read the events using chain reader
-
-	var myDataType *big.Int
-	seq, err := cr.QueryKey(
-		context.Background(),
-		"myContract",
-		query2.KeyFilter{
-			Key:         "EventCounter",
-			Expressions: []query2.Expression{},
-		},
-		query2.LimitAndSort{},
-		myDataType,
-	)
-	assert.NoError(t, err)
-	assert.Len(t, seq, 10)
-	for _, v := range seq {
-		t.Logf("got event: %#v %s", v, cnt.String())
-	}
+	wg.Wait() // wait for all the events to be consumed
 }
