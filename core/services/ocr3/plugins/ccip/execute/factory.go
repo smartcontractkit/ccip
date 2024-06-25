@@ -52,6 +52,8 @@ func (p PluginFactory) NewReportingPlugin(
 		cciptypes.ExecutePluginConfig{},
 		nil,
 		nil,
+		nil,
+		nil,
 	), ocr3types.ReportingPluginInfo{}, nil
 }
 

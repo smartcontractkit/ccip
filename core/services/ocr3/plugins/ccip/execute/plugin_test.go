@@ -7,10 +7,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cometbft/cometbft/crypto"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
 	"github.com/smartcontractkit/ccipocr3/internal/mocks"
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
@@ -163,6 +165,94 @@ func Test_getPendingExecutedReports(t *testing.T) {
 			}
 			assert.Equalf(t, tt.want, got, "getPendingExecutedReports(...)")
 			assert.Equalf(t, tt.want1, got1, "getPendingExecutedReports(...)")
+		})
+	}
+}
+
+// TODO: better than this
+type tdr int
+
+func (t tdr) ReadTokenData(ctx context.Context, srcChain cciptypes.ChainSelector, num cciptypes.SeqNum) ([][]byte, error) {
+	return nil, nil
+}
+
+func makeTestMessage(numMessages, srcChain, firstSeqNum, block int, timestamp int64, executed []cciptypes.SeqNum) cciptypes.ExecutePluginCommitDataWithMessages {
+	var messages []cciptypes.CCIPMsg
+	for i := 0; i < numMessages; i++ {
+		messages = append(messages, cciptypes.CCIPMsg{
+			CCIPMsgBaseDetails: cciptypes.CCIPMsgBaseDetails{
+				ID:          crypto.CRandHex(32),
+				SourceChain: cciptypes.ChainSelector(srcChain),
+				SeqNum:      cciptypes.SeqNum(i + firstSeqNum),
+				MsgHash:     cciptypes.Bytes32{},
+			},
+			//ChainFeeLimit:      cciptypes.BigInt{},
+			Nonce: uint64(i),
+			//Sender:             "0xGrovor",
+			//Receiver:           "0xOscar",
+			//Strict:             false,
+			//FeeToken:           "",
+			//FeeTokenAmount:     cciptypes.BigInt{},
+			//Data:               nil,
+			//TokenAmounts:       nil,
+			//SourceTokenData:    nil,
+			//Metadata:           cciptypes.CCIPMsgMetadata{},
+		})
+	}
+
+	return cciptypes.ExecutePluginCommitDataWithMessages{
+		ExecutePluginCommitData: cciptypes.ExecutePluginCommitData{
+			SourceChain:         cciptypes.ChainSelector(srcChain),
+			SequenceNumberRange: cciptypes.NewSeqNumRange(cciptypes.SeqNum(firstSeqNum), cciptypes.SeqNum(firstSeqNum+numMessages-1)),
+			Timestamp:           time.UnixMilli(timestamp),
+			BlockNum:            uint64(block),
+			ExecutedMessages:    executed,
+		},
+		Messages: messages,
+	}
+
+}
+
+func Test_selectReport(t *testing.T) {
+	hasher := mocks.NewMessageHasher()
+	codec := mocks.NewExecutePluginJSONReportCodec()
+	lggr := logger.Test(t)
+	var tokenDataReader tdr
+
+	type args struct {
+		reports       []cciptypes.ExecutePluginCommitDataWithMessages
+		maxReportSize int
+	}
+	tests := []struct {
+		name           string
+		args           args
+		expectedThings []int
+		want           []cciptypes.ExecutePluginReportSingleChain
+		want1          []cciptypes.ExecutePluginCommitDataWithMessages
+		wantErr        string
+	}{
+		{
+			name: "empty",
+			args: args{
+				maxReportSize: 2000,
+				reports: []cciptypes.ExecutePluginCommitDataWithMessages{
+					makeTestMessage(10, 1, 100, 999, 10101010101, nil),
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			ctx := context.Background()
+			got, got1, err := selectReport(ctx, lggr, hasher, codec, tokenDataReader, tt.args.reports, tt.args.maxReportSize)
+			if tt.wantErr != "" {
+				assert.Contains(t, err.Error(), tt.wantErr)
+				return
+			}
+			assert.Equalf(t, tt.want, got, "selectReport(...)")
+			assert.Equalf(t, tt.want1, got1, "selectReport(...)")
 		})
 	}
 }

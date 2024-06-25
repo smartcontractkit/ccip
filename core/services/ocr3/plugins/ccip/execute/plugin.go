@@ -17,7 +17,8 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 )
 
-const maxReportSize = 123456 // todo:
+// maxReportSize that should be returned as an execution report payload.
+const maxReportSize = 250_000
 
 // Plugin implements the main ocr3 plugin logic.
 type Plugin struct {
@@ -29,7 +30,6 @@ type Plugin struct {
 	msgHasher       cciptypes.MessageHasher
 	tokenDataReader TokenDataReader
 
-	//commitRootsCache cache.CommitsRootsCache
 	lastReportTS *atomic.Int64
 
 	lggr logger.Logger
@@ -260,24 +260,29 @@ func selectReport(ctx context.Context, lggr logger.Logger, hasher cciptypes.Mess
 		// Iterate sequence range and executed messages to select messages to execute.
 		var toExecute []int
 		var offchainTokenData [][][]byte
+		var msgInRoot []cciptypes.CCIPMsg
 		executedIdx := 0
-		for i := report.SequenceNumberRange.Start(); i <= report.SequenceNumberRange.End(); i++ {
+		for i := 0; i < numMsg; i++ {
+			seqNum := report.SequenceNumberRange.Start() + cciptypes.SeqNum(i)
 			// Skip messages which are already executed
-			if executedIdx < len(report.ExecutedMessages) && report.ExecutedMessages[executedIdx] == i {
+			if executedIdx < len(report.ExecutedMessages) && report.ExecutedMessages[executedIdx] == seqNum {
 				executedIdx++
 			} else {
-				msg := report.Messages[i-report.SequenceNumberRange.Start()]
+				msg := report.Messages[i]
 				tokenData, err := tokenDataReader.ReadTokenData(context.Background(), report.SourceChain, msg.SeqNum)
 				if err != nil {
 					lggr.Info("unable to read token data", "source-chain", report.SourceChain, "seq-num", msg.SeqNum, "error", err)
 					offchainTokenData = append(offchainTokenData, nil)
 				} else {
-					lggr.Debugw("read token data", "source-chain", report.SourceChain, "seq-num", msg.SeqNum, "data")
+					lggr.Debugw("read token data", "source-chain", report.SourceChain, "seq-num", msg.SeqNum, "data", tokenData)
 					offchainTokenData = append(offchainTokenData, tokenData)
 				}
-				toExecute = append(toExecute, int(i))
+				toExecute = append(toExecute, i)
+				msgInRoot = append(msgInRoot, msg)
 			}
 		}
+
+		lggr.Infow("selected messages from commit report for execution", "sourceChain", report.SourceChain, "commitRoot", report.MerkleRoot.String(), "numMessages", len(toExecute), "totalMessages", numMsg, "toExecuteu", len(toExecute))
 		proof, err := tree.Prove(toExecute)
 		if err != nil {
 			return nil, nil, fmt.Errorf("unable to prove messages for report %s: %w", report.MerkleRoot.String(), err)
@@ -290,13 +295,11 @@ func selectReport(ctx context.Context, lggr logger.Logger, hasher cciptypes.Mess
 
 		finalReport := cciptypes.ExecutePluginReportSingleChain{
 			SourceChainSelector: report.SourceChain,
-			Messages:            report.Messages,
+			Messages:            msgInRoot,
 			OffchainTokenData:   offchainTokenData,
 			Proofs:              proofsCast,
 			ProofFlagBits:       cciptypes.BigInt{Int: slicelib.BoolsToBitFlags(proof.SourceFlags)},
 		}
-
-		finalReports = append(finalReports, finalReport)
 
 		// Note: ExecutePluginReport is a strict array of data, so wrapping the final report
 		//       does not add any additional overhead to the size being computed here.
@@ -307,15 +310,23 @@ func selectReport(ctx context.Context, lggr logger.Logger, hasher cciptypes.Mess
 			lggr.Errorw("unable to encode report", "err", err, "report", finalReport)
 			return nil, nil, fmt.Errorf("unable to encode report: %w", err)
 		}
-		size += len(encoded)
-
-		if size >= maxReportSize {
+		// Break out of loop if this would cause the report to be oversized.
+		if (size + len(encoded)) >= maxReportSize {
 			break
 		}
+
+		size += len(encoded)
+		finalReports = append(finalReports, finalReport)
 	}
 
 	// Remove reports that are about to be executed.
-	reports = reports[len(finalReports):]
+	if len(finalReports) == len(reports) {
+		reports = nil
+	} else {
+		reports = reports[len(finalReports):]
+	}
+
+	lggr.Infow("selected commit reports for execution report", "numReports", len(finalReports), "size", size, "incompleteReports", len(reports), "maxSize", maxReportSize)
 
 	return finalReports, reports, nil
 }
