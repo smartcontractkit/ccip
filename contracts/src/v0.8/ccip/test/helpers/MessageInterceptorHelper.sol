@@ -5,8 +5,6 @@ import {IMessageInterceptor} from "../../interfaces/IMessageInterceptor.sol";
 import {Client} from "../../libraries/Client.sol";
 
 contract MessageInterceptorHelper is IMessageInterceptor {
-  error IncomingMessageValidationError(bytes errorReason);
-
   mapping(bytes32 messageId => bool isInvalid) internal s_invalidMessageIds;
 
   constructor() {}
@@ -16,15 +14,17 @@ contract MessageInterceptorHelper is IMessageInterceptor {
   }
 
   /// @inheritdoc IMessageInterceptor
-  function onIncomingMessage(Client.Any2EVMMessage memory message) external view {
+  function onInboundMessage(Client.Any2EVMMessage memory message) external view {
     if (s_invalidMessageIds[message.messageId]) {
-      revert IncomingMessageValidationError(bytes("Invalid message"));
+      revert MessageValidationError(bytes("Invalid message"));
     }
   }
 
   /// @inheritdoc IMessageInterceptor
-  function onOutgoingMessage(Client.EVM2AnyMessage memory, uint64) external pure {
-    // TODO: to be implemented
+  function onOutboundMessage(uint64, Client.EVM2AnyMessage calldata message) external view {
+    if (s_invalidMessageIds[keccak256(abi.encode(message))]) {
+      revert MessageValidationError(bytes("Invalid message"));
+    }
     return;
   }
 }
