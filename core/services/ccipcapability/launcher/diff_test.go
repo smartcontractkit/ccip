@@ -1,12 +1,14 @@
 package launcher
 
 import (
+	"math/big"
 	"reflect"
 	"testing"
 
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/keystone_capability_registry"
 	cctypes "github.com/smartcontractkit/chainlink/v2/core/services/ccipcapability/types"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/p2pkey"
+	"github.com/stretchr/testify/require"
 )
 
 func Test_diff(t *testing.T) {
@@ -168,4 +170,13 @@ func Test_isMemberOfDON(t *testing.T) {
 			}
 		})
 	}
+}
+
+func Test_isMemberOfBootstrapSubcommittee(t *testing.T) {
+	var bootstrapKeys [][32]byte
+	for i := range [4]struct{}{} {
+		bootstrapKeys = append(bootstrapKeys, p2pkey.MustNewV2XXXTestingOnly(big.NewInt(int64(i+1))).PeerID())
+	}
+	require.True(t, isMemberOfBootstrapSubcommittee(bootstrapKeys, p2pkey.MustNewV2XXXTestingOnly(big.NewInt(1))))
+	require.False(t, isMemberOfBootstrapSubcommittee(bootstrapKeys, p2pkey.MustNewV2XXXTestingOnly(big.NewInt(5))))
 }
