@@ -179,7 +179,19 @@ func (t tdr) ReadTokenData(ctx context.Context, srcChain cciptypes.ChainSelector
 	return nil, nil
 }
 
-func makeTestMessage(numMessages, srcChain, firstSeqNum, block int, timestamp int64, executed []cciptypes.SeqNum) cciptypes.ExecutePluginCommitDataWithMessages {
+func breakCommitReport(commitReport cciptypes.ExecutePluginCommitDataWithMessages) cciptypes.ExecutePluginCommitDataWithMessages {
+	commitReport.Messages = append(commitReport.Messages, cciptypes.CCIPMsg{
+		CCIPMsgBaseDetails: cciptypes.CCIPMsgBaseDetails{
+			ID:          crypto.CRandHex(32),
+			SourceChain: cciptypes.ChainSelector(1),
+			SeqNum:      cciptypes.SeqNum(999),
+			MsgHash:     cciptypes.Bytes32{},
+		},
+	})
+	return commitReport
+}
+
+func makeTestCommitReport(numMessages, srcChain, firstSeqNum, block int, timestamp int64, executed []cciptypes.SeqNum) cciptypes.ExecutePluginCommitDataWithMessages {
 	for _, e := range executed {
 		if e < cciptypes.SeqNum(firstSeqNum) || e > cciptypes.SeqNum(firstSeqNum+numMessages-1) {
 			panic("executed message out of range")
@@ -281,11 +293,19 @@ func Test_selectReport(t *testing.T) {
 		wantErr               string
 	}{
 		{
+			name: "empty report",
+			args: args{
+				reports: []cciptypes.ExecutePluginCommitDataWithMessages{},
+			},
+			expectedExecReports:   0,
+			expectedCommitReports: 0,
+		},
+		{
 			name: "half report",
 			args: args{
 				maxReportSize: 2200,
 				reports: []cciptypes.ExecutePluginCommitDataWithMessages{
-					makeTestMessage(10, 1, 100, 999, 10101010101, nil),
+					makeTestCommitReport(10, 1, 100, 999, 10101010101, nil),
 				},
 			},
 			expectedExecReports:   1,
@@ -298,7 +318,7 @@ func Test_selectReport(t *testing.T) {
 			args: args{
 				maxReportSize: 10000,
 				reports: []cciptypes.ExecutePluginCommitDataWithMessages{
-					makeTestMessage(10, 1, 100, 999, 10101010101, nil),
+					makeTestCommitReport(10, 1, 100, 999, 10101010101, nil),
 				},
 			},
 			expectedExecReports:   1,
@@ -310,8 +330,8 @@ func Test_selectReport(t *testing.T) {
 			args: args{
 				maxReportSize: 15000,
 				reports: []cciptypes.ExecutePluginCommitDataWithMessages{
-					makeTestMessage(10, 1, 100, 999, 10101010101, nil),
-					makeTestMessage(20, 2, 100, 999, 10101010101, nil),
+					makeTestCommitReport(10, 1, 100, 999, 10101010101, nil),
+					makeTestCommitReport(20, 2, 100, 999, 10101010101, nil),
 				},
 			},
 			expectedExecReports:   2,
@@ -323,8 +343,8 @@ func Test_selectReport(t *testing.T) {
 			args: args{
 				maxReportSize: 8000,
 				reports: []cciptypes.ExecutePluginCommitDataWithMessages{
-					makeTestMessage(10, 1, 100, 999, 10101010101, nil),
-					makeTestMessage(20, 2, 100, 999, 10101010101, nil),
+					makeTestCommitReport(10, 1, 100, 999, 10101010101, nil),
+					makeTestCommitReport(20, 2, 100, 999, 10101010101, nil),
 				},
 			},
 			expectedExecReports:   2,
@@ -337,8 +357,8 @@ func Test_selectReport(t *testing.T) {
 			args: args{
 				maxReportSize: 3900,
 				reports: []cciptypes.ExecutePluginCommitDataWithMessages{
-					makeTestMessage(10, 1, 100, 999, 10101010101, nil),
-					makeTestMessage(20, 2, 100, 999, 10101010101, nil),
+					makeTestCommitReport(10, 1, 100, 999, 10101010101, nil),
+					makeTestCommitReport(20, 2, 100, 999, 10101010101, nil),
 				},
 			},
 			expectedExecReports:   1,
@@ -351,7 +371,7 @@ func Test_selectReport(t *testing.T) {
 			args: args{
 				maxReportSize: 2500,
 				reports: []cciptypes.ExecutePluginCommitDataWithMessages{
-					makeTestMessage(10, 1, 100, 999, 10101010101, []cciptypes.SeqNum{100, 101, 102, 103, 104}),
+					makeTestCommitReport(10, 1, 100, 999, 10101010101, []cciptypes.SeqNum{100, 101, 102, 103, 104}),
 				},
 			},
 			expectedExecReports:   1,
@@ -363,7 +383,7 @@ func Test_selectReport(t *testing.T) {
 			args: args{
 				maxReportSize: 2000,
 				reports: []cciptypes.ExecutePluginCommitDataWithMessages{
-					makeTestMessage(10, 1, 100, 999, 10101010101, []cciptypes.SeqNum{100, 101, 102, 103, 104}),
+					makeTestCommitReport(10, 1, 100, 999, 10101010101, []cciptypes.SeqNum{100, 101, 102, 103, 104}),
 				},
 			},
 			expectedExecReports:   1,
@@ -376,7 +396,7 @@ func Test_selectReport(t *testing.T) {
 			args: args{
 				maxReportSize: 2500,
 				reports: []cciptypes.ExecutePluginCommitDataWithMessages{
-					makeTestMessage(10, 1, 100, 999, 10101010101, []cciptypes.SeqNum{100, 102, 104, 106, 108}),
+					makeTestCommitReport(10, 1, 100, 999, 10101010101, []cciptypes.SeqNum{100, 102, 104, 106, 108}),
 				},
 			},
 			expectedExecReports:   1,
@@ -388,7 +408,7 @@ func Test_selectReport(t *testing.T) {
 			args: args{
 				maxReportSize: 2000,
 				reports: []cciptypes.ExecutePluginCommitDataWithMessages{
-					makeTestMessage(10, 1, 100, 999, 10101010101, []cciptypes.SeqNum{100, 102, 104, 106, 108}),
+					makeTestCommitReport(10, 1, 100, 999, 10101010101, []cciptypes.SeqNum{100, 102, 104, 106, 108}),
 				},
 			},
 			expectedExecReports:   1,
@@ -396,7 +416,16 @@ func Test_selectReport(t *testing.T) {
 			expectedExecThings:    []int{4},
 			lastReportExecuted:    []cciptypes.SeqNum{100, 101, 102, 103, 104, 105, 106, 107, 108},
 		},
-		// TODO: error cases
+		{
+			name: "broken report",
+			args: args{
+				maxReportSize: 10000,
+				reports: []cciptypes.ExecutePluginCommitDataWithMessages{
+					breakCommitReport(makeTestCommitReport(10, 1, 100, 999, 10101010101, nil)),
+				},
+			},
+			wantErr: "unable to build a single chain report",
+		},
 	}
 	for _, tt := range tests {
 		tt := tt
@@ -408,6 +437,7 @@ func Test_selectReport(t *testing.T) {
 				assert.Contains(t, err.Error(), tt.wantErr)
 				return
 			}
+			require.NoError(t, err)
 			require.Len(t, execReports, tt.expectedExecReports)
 			require.Len(t, commitReports, tt.expectedCommitReports)
 			for i, execReport := range execReports {
@@ -416,6 +446,7 @@ func Test_selectReport(t *testing.T) {
 				assert.NotEmptyf(t, execReport.Proofs, "Proof should not be empty.")
 				assertMerkleRoot(t, hasher, execReport, tt.args.reports[i])
 			}
+			// If the last report is partially executed, the executed messages can be checked.
 			if len(execReports) > 0 && len(tt.lastReportExecuted) > 0 {
 				lastReport := commitReports[len(commitReports)-1]
 				assert.ElementsMatch(t, tt.lastReportExecuted, lastReport.ExecutedMessages)
