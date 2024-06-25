@@ -12,3 +12,11 @@ func BoolsToBitFlags(bools []bool) *big.Int {
 	}
 	return encodedFlags
 }
+
+func BitFlagsToBools(encodedFlags *big.Int, size int) []bool {
+	var bools []bool
+	for i := 0; i < size; i++ {
+		bools = append(bools, encodedFlags.Bit(i) == 1)
+	}
+	return bools
+}

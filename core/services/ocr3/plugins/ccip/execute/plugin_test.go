@@ -12,9 +12,11 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/ccipocr3/internal/libs/slicelib"
 	"github.com/smartcontractkit/ccipocr3/internal/mocks"
+	"github.com/smartcontractkit/chainlink-common/pkg/hashutil"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-
+	"github.com/smartcontractkit/chainlink-common/pkg/merklemulti"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
 
@@ -214,6 +216,46 @@ func makeTestMessage(numMessages, srcChain, firstSeqNum, block int, timestamp in
 
 }
 
+// assertMerkleRoot computes the source messages merkle root, then computes a verification with the proof, then compares the roots.
+func assertMerkleRoot(t *testing.T, hasher cciptypes.MessageHasher, execReport cciptypes.ExecutePluginReportSingleChain, commitReport cciptypes.ExecutePluginCommitDataWithMessages) {
+	keccak := hashutil.NewKeccak()
+	// Generate merkle root from commit report messages
+	var leafHashes [][32]byte
+	for _, msg := range commitReport.Messages {
+		hash, err := hasher.Hash(context.Background(), msg)
+		require.NoError(t, err)
+		leafHashes = append(leafHashes, hash)
+	}
+	tree, err := merklemulti.NewTree(keccak, leafHashes)
+	require.NoError(t, err)
+	merkleRoot := tree.Root()
+
+	// Generate merkle root from exec report messages and proofj
+	ctx := context.Background()
+	var leaves [][32]byte
+	for _, msg := range execReport.Messages {
+		hash, err := hasher.Hash(ctx, msg)
+		require.NoError(t, err)
+		leaves = append(leaves, hash)
+	}
+	proofCast := make([][32]byte, len(execReport.Proofs))
+	for i, p := range execReport.Proofs {
+		copy(proofCast[i][:], p[:32])
+		proofCast[i][2] = proofCast[i][2]
+	}
+	var proof merklemulti.Proof[[32]byte]
+	proof.Hashes = proofCast
+	proof.SourceFlags = slicelib.BitFlagsToBools(execReport.ProofFlagBits.Int, len(leaves)+len(proofCast)-1)
+	recomputedMerkleRoot, err := merklemulti.VerifyComputeRoot(hashutil.NewKeccak(),
+		leaves,
+		proof)
+	assert.NoError(t, err)
+	assert.NotNil(t, recomputedMerkleRoot)
+
+	// Compare them
+	assert.Equal(t, merkleRoot, recomputedMerkleRoot)
+}
+
 func Test_selectReport(t *testing.T) {
 	hasher := mocks.NewMessageHasher()
 	codec := mocks.NewExecutePluginJSONReportCodec()
@@ -262,8 +304,8 @@ func Test_selectReport(t *testing.T) {
 			for i, execReport := range execReports {
 				assert.Len(t, execReport.Messages, tt.expectedExecThings[i])
 				assert.Len(t, execReport.OffchainTokenData, tt.expectedExecThings[i])
-				// Proofs do not need a hash for every message.
 				assert.NotEmptyf(t, execReport.Proofs, "Proof should not be empty.")
+				assertMerkleRoot(t, hasher, execReport, tt.args.reports[i])
 			}
 			if len(execReports) > 0 {
 				lastReport := commitReports[len(commitReports)-1]
