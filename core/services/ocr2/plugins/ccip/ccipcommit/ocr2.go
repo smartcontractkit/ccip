@@ -640,19 +640,14 @@ func (r *CommitReportingPlugin) isStaleMerkleRoot(ctx context.Context, lggr logg
 		return true
 	}
 
-	if nextSeqNum > reportInterval.Min {
-		// If the next min is already greater than this reports min, this report is stale.
-		lggr.Infow("Report is stale because of root", "onchain min", nextSeqNum, "report min", reportInterval.Min)
-		return true
-	} else if nextSeqNum < reportInterval.Min {
-		// If the nextSeqNum is lower than this report min, the nextSeqNum is incorrect.
-		lggr.Infow("The report is stale because the next onchain sequence number is incorrect",
-			"onchain min", nextSeqNum, "report min", reportInterval.Min)
+	// The report is not stale and correct only if nextSeqNum == reportInterval.Min.
+	// Mark it stale if the condition isn't met.
+	if nextSeqNum != reportInterval.Min {
+		lggr.Infow("Report is stale because of root", "nextSeqNum", nextSeqNum, "reportIntervalMin", reportInterval.Min)
 		return true
 	}
 
-	// The report is not stale and correct only if nextSeqNum == reportInterval.Min.
-	lggr.Infow("Report root is not stale", "onchain min", nextSeqNum, "report min", reportInterval.Min)
+	lggr.Infow("Report root is not stale", "nextSeqNum", nextSeqNum, "reportIntervalMin", reportInterval.Min)
 
 	// If a report has root and valid sequence number, the report should be submitted, regardless of price staleness
 	return false
