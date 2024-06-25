@@ -66,7 +66,7 @@ class ExecutePlugin:
         # Observe messages from previous outcome
         for (selector, reports) in previous_outcome.pending_reports:
             for report in reports:
-                messages = self.onRamp.get_messages(report.seq_num_range)
+                messages = self.onRamp.get_messages(selector, report.seq_num_range)
                 for (seq_num, msg) in messages:
                     messages[selector][seq_num] = msg
 
