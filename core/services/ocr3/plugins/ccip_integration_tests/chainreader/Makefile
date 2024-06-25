@@ -1,7 +1,7 @@
 
 SHELL := /opt/homebrew/bin/fish
 
-# IMPORTANT: Use solc 0.8.18 and abigen 1.14.5
+# IMPORTANT: If you encounter any issues try using solc 0.8.18 and abigen 1.14.5
 
 .PHONY: build
 build:
