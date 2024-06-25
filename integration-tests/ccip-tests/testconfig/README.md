@@ -614,7 +614,7 @@ Specifies the duration network delay used for `NetworkChaos` experiment. This is
 If there are multiple chaos experiments, this specifies the duration to wait between each chaos experiment. This is only valid if the test is run on k8s and not on [existing deployments](#ccipgroupstesttypeexistingdeployment).
 
 #### CCIP.Groups.<testtype>.LoadProfile.SkipRequestIfAnotherRequestTriggeredWithin
-If a request is triggered within this duration, the test will skip sending another request during load run. For Example, if `SkipRequestIfAnotherRequestTriggeredWithin` is set to `40m`, and a request is triggered at 0th s, the test will skip sending another request for another 40m.
+If a request is triggered within this duration, the test will skip sending another request during load run. For Example, if `SkipRequestIfAnotherRequestTriggeredWithin` is set to `40m`, and a request is triggered at 0th second, the test will skip sending another request for another 40m.
 This particular field is used to avoid sending multiple requests in a short duration during load run.
 
 #### CCIP.Groups.<testtype>.LoadProfile.OptimizeSpace
