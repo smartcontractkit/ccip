@@ -1,5 +1,5 @@
-This package contains EVM specific CCIP dependencies. It is placed outside `ccipocr3` module in order to keep
-it clean and not to have any EVM specific dependencies.
+This package contains EVM specific CCIP dependencies. It should be placed outside `ccipocr3` module in order to keep
+it clean and not to have any EVM specific dependencies before merging this PR.
 
 This implementations should be moved after provider designs are finalized.
 Currently there is a limitation, if a node does not support the destination chain,
