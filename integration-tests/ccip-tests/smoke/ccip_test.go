@@ -34,7 +34,7 @@ func TestSmokeCCIPForBidirectionalLane(t *testing.T) {
 	TestCfg := testsetups.NewCCIPTestConfig(t, log, testconfig.Smoke)
 	require.NotNil(t, TestCfg.TestGroupInput.MsgDetails.DestGasLimit)
 	gasLimit := big.NewInt(*TestCfg.TestGroupInput.MsgDetails.DestGasLimit)
-	setUpOutput := testsetups.CCIPDefaultTestSetUp(t, log, "smoke-ccip", nil, TestCfg)
+	setUpOutput := testsetups.CCIPDefaultTestSetUp(t, &log, "smoke-ccip", nil, TestCfg)
 	if len(setUpOutput.Lanes) == 0 {
 		log.Info().Msg("No lanes found")
 		return
@@ -92,11 +92,10 @@ func TestSmokeCCIPForBidirectionalLane(t *testing.T) {
 
 func TestSmokeCCIPRateLimit(t *testing.T) {
 	t.Parallel()
-
 	log := logging.GetTestLogger(t)
 	TestCfg := testsetups.NewCCIPTestConfig(t, log, testconfig.Smoke)
 	require.True(t, TestCfg.TestGroupInput.MsgDetails.IsTokenTransfer(), "Test config should have token transfer message type")
-	setUpOutput := testsetups.CCIPDefaultTestSetUp(t, log, "smoke-ccip", nil, TestCfg)
+	setUpOutput := testsetups.CCIPDefaultTestSetUp(t, &log, "smoke-ccip", nil, TestCfg)
 	if len(setUpOutput.Lanes) == 0 {
 		return
 	}
@@ -420,7 +419,7 @@ func TestSmokeCCIPSelfServeRateLimitOnRamp(t *testing.T) {
 		require.FailNow(t, "OnRamp contract version not found in test config")
 	}
 
-	setUpOutput := testsetups.CCIPDefaultTestSetUp(t, log, "smoke-ccip", nil, TestCfg)
+	setUpOutput := testsetups.CCIPDefaultTestSetUp(t, &log, "smoke-ccip", nil, TestCfg)
 	if len(setUpOutput.Lanes) == 0 {
 		return
 	}
@@ -448,6 +447,7 @@ func TestSmokeCCIPSelfServeRateLimitOnRamp(t *testing.T) {
 			require.GreaterOrEqual(t, len(src.Common.BridgeTokenPools), 2, "At least two bridge token pools needed for test")
 			require.GreaterOrEqual(t, len(dest.Common.BridgeTokens), 2, "At least two bridge tokens needed for test")
 			require.GreaterOrEqual(t, len(dest.Common.BridgeTokenPools), 2, "At least two bridge token pools needed for test")
+			require.NotEqualValues(t, src.Common.ChainClient.GetDefaultWallet().Address(), src.Common.BridgeTokens[0].OwnerAddress.Hex(), "Token owner and CCIP wallet should be different")
 			// add liquidity to pools on both networks
 			if !pointer.GetBool(TestCfg.TestGroupInput.ExistingDeployment) {
 				addFund := func(ccipCommon *actions.CCIPCommon) {
@@ -491,19 +491,7 @@ func TestSmokeCCIPSelfServeRateLimitOnRamp(t *testing.T) {
 			require.NoError(t, err)
 			tc.lane.ValidateRequests()
 
-			// Enable aggregate rate limiting on the destination and source chains for the limited token
-			err = dest.AddRateLimitTokens([]*contracts.ERC20Token{limitedSrcToken}, []*contracts.ERC20Token{limitedDestToken})
-			require.NoError(t, err, "Error setting destination rate limits")
-			err = dest.OffRamp.SetRateLimit(contracts.RateLimiterConfig{
-				IsEnabled: true,
-				Capacity:  aggregateRateLimit,
-				Rate:      aggregateRateLimit,
-			})
-			require.NoError(t, err, "Error setting destination rate limits")
-			err = dest.Common.ChainClient.WaitForEvents()
-			require.NoError(t, err, "Error waiting for events")
-			tc.lane.Logger.Debug().Str("Token", limitedSrcToken.ContractAddress.Hex()).Msg("Enabled aggregate rate limit on destination chain")
-
+			// Enable aggregate rate limiting on the source chains for the limited token
 			err = src.OnRamp.SetTokenTransferFeeConfig([]evm_2_evm_onramp.EVM2EVMOnRampTokenTransferFeeConfigArgs{
 				{
 					Token:                     limitedSrcToken.ContractAddress,
@@ -519,7 +507,7 @@ func TestSmokeCCIPSelfServeRateLimitOnRamp(t *testing.T) {
 			require.NoError(t, err, "Error setting OnRamp rate limits")
 			err = src.Common.ChainClient.WaitForEvents()
 			require.NoError(t, err, "Error waiting for events")
-
+			tc.lane.Logger.Debug().Str("Token", limitedSrcToken.ContractAddress.Hex()).Msg("Enabled aggregate rate limit on source chain")
 			// Send free token that should not have a rate limit and should succeed
 			src.TransferAmount[freeTokenIndex] = overLimitAmount
 			src.TransferAmount[limitedTokenIndex] = big.NewInt(0)
@@ -561,7 +549,7 @@ func TestSmokeCCIPSelfServeRateLimitOffRamp(t *testing.T) {
 	// Set the default permissionless exec threshold lower so that we can manually execute the transactions faster
 	// Tuning this too low stops any transactions from being realistically executed
 	actions.DefaultPermissionlessExecThreshold = 1 * time.Minute
-	setUpOutput := testsetups.CCIPDefaultTestSetUp(t, log, "smoke-ccip", nil, TestCfg)
+	setUpOutput := testsetups.CCIPDefaultTestSetUp(t, &log, "smoke-ccip", nil, TestCfg)
 	if len(setUpOutput.Lanes) == 0 {
 		return
 	}
@@ -589,6 +577,7 @@ func TestSmokeCCIPSelfServeRateLimitOffRamp(t *testing.T) {
 			require.GreaterOrEqual(t, len(src.Common.BridgeTokenPools), 2, "At least two bridge token pools needed for test")
 			require.GreaterOrEqual(t, len(dest.Common.BridgeTokens), 2, "At least two bridge tokens needed for test")
 			require.GreaterOrEqual(t, len(dest.Common.BridgeTokenPools), 2, "At least two bridge token pools needed for test")
+			require.NotEqualValues(t, src.Common.ChainClient.GetDefaultWallet().Address(), src.Common.BridgeTokens[0].OwnerAddress.Hex(), "Token owner and CCIP wallet should be different")
 			// add liquidity to pools on both networks
 			if !pointer.GetBool(TestCfg.TestGroupInput.ExistingDeployment) {
 				addFund := func(ccipCommon *actions.CCIPCommon) {
@@ -703,7 +692,7 @@ func TestSmokeCCIPMulticall(t *testing.T) {
 	TestCfg := testsetups.NewCCIPTestConfig(t, log, testconfig.Smoke)
 	// enable multicall in one tx for this test
 	TestCfg.TestGroupInput.MulticallInOneTx = ptr.Ptr(true)
-	setUpOutput := testsetups.CCIPDefaultTestSetUp(t, log, "smoke-ccip", nil, TestCfg)
+	setUpOutput := testsetups.CCIPDefaultTestSetUp(t, &log, "smoke-ccip", nil, TestCfg)
 	if len(setUpOutput.Lanes) == 0 {
 		return
 	}
@@ -750,7 +739,7 @@ func TestSmokeCCIPManuallyExecuteAfterExecutionFailingDueToInsufficientGas(t *te
 	t.Parallel()
 	log := logging.GetTestLogger(t)
 	TestCfg := testsetups.NewCCIPTestConfig(t, log, testconfig.Smoke)
-	setUpOutput := testsetups.CCIPDefaultTestSetUp(t, log, "smoke-ccip", nil, TestCfg)
+	setUpOutput := testsetups.CCIPDefaultTestSetUp(t, &log, "smoke-ccip", nil, TestCfg)
 	if len(setUpOutput.Lanes) == 0 {
 		return
 	}

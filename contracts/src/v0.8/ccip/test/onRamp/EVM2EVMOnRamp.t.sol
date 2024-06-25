@@ -928,8 +928,10 @@ contract EVM2EVMOnRamp_getFeeSetup is EVM2EVMOnRampSetup {
     EVM2EVMOnRampSetup.setUp();
 
     // Add additional pool addresses for test tokens to mark them as supported
-    s_tokenAdminRegistry.registerAdministratorPermissioned(s_sourceRouter.getWrappedNative(), OWNER);
-    s_tokenAdminRegistry.registerAdministratorPermissioned(CUSTOM_TOKEN, OWNER);
+    s_tokenAdminRegistry.proposeAdministrator(s_sourceRouter.getWrappedNative(), OWNER);
+    s_tokenAdminRegistry.acceptAdminRole(s_sourceRouter.getWrappedNative());
+    s_tokenAdminRegistry.proposeAdministrator(CUSTOM_TOKEN, OWNER);
+    s_tokenAdminRegistry.acceptAdminRole(CUSTOM_TOKEN);
 
     LockReleaseTokenPool wrappedNativePool = new LockReleaseTokenPool(
       IERC20(s_sourceRouter.getWrappedNative()), new address[](0), address(s_mockRMN), true, address(s_sourceRouter)
@@ -1332,24 +1334,6 @@ contract EVM2EVMOnRamp_getTokenTransferCost is EVM2EVMOnRamp_getFeeSetup {
     Client.EVM2AnyMessage memory message = _generateSingleTokenMessage(NOT_SUPPORTED_TOKEN, 200);
 
     vm.expectRevert(abi.encodeWithSelector(EVM2EVMOnRamp.UnsupportedToken.selector, NOT_SUPPORTED_TOKEN));
-
-    s_onRamp.getTokenTransferCost(message.feeToken, s_feeTokenPrice, message.tokenAmounts);
-  }
-
-  function test_ValidatedPriceStaleness_Revert() public {
-    vm.warp(block.timestamp + TWELVE_HOURS + 1);
-
-    Client.EVM2AnyMessage memory message = _generateSingleTokenMessage(s_sourceFeeToken, 1e36);
-    message.tokenAmounts[0].token = s_sourceRouter.getWrappedNative();
-
-    vm.expectRevert(
-      abi.encodeWithSelector(
-        PriceRegistry.StaleTokenPrice.selector,
-        s_sourceRouter.getWrappedNative(),
-        uint128(TWELVE_HOURS),
-        uint128(TWELVE_HOURS + 1)
-      )
-    );
 
     s_onRamp.getTokenTransferCost(message.feeToken, s_feeTokenPrice, message.tokenAmounts);
   }

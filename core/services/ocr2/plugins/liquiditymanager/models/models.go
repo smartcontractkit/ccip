@@ -52,6 +52,11 @@ func (n NetworkSelector) Type() NetworkType {
 	return NetworkTypeUnknown
 }
 
+func (n NetworkSelector) ChainID() uint64 {
+	chainID, _ := chainsel.ChainIdFromSelector(uint64(n))
+	return chainID
+}
+
 type NetworkType string
 
 func (n NetworkSelector) Chain() (chainsel.Chain, bool) {
