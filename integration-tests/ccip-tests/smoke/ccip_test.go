@@ -398,18 +398,12 @@ func TestSmokeCCIPOnRampLimits(t *testing.T) {
 	t.Parallel()
 
 	log := logging.GetTestLogger(t)
-	TestCfg := testsetups.NewCCIPTestConfig(t, log, testconfig.Smoke, testsetups.WithTokensPerChain(4), testsetups.WithNoTokensPerMessage(4))
-	if offRampVersion, exists := TestCfg.VersionInput[contracts.OffRampContract]; exists {
-		require.NotEqual(t, offRampVersion, contracts.V1_2_0, "Provided OffRamp contract version '%s' is not supported for this test", offRampVersion)
-	} else {
-		require.FailNow(t, "OffRamp contract version not found in test config")
-	}
-	if onRampVersion, exists := TestCfg.VersionInput[contracts.OnRampContract]; exists {
-		require.NotEqual(t, onRampVersion, contracts.V1_2_0, "Provided OnRamp contract version '%s' is not supported for this test", onRampVersion)
-	} else {
-		require.FailNow(t, "OnRamp contract version not found in test config")
-	}
-	require.False(t, pointer.GetBool(TestCfg.TestGroupInput.ExistingDeployment), "This test modifies contract state and cannot be run on existing deployments")
+	TestCfg := testsetups.NewCCIPTestConfig(t, log, testconfig.Smoke)
+	err := contracts.MatchContractVersionsOrAbove(map[contracts.Name]contracts.Version{
+		contracts.OffRampContract: contracts.V1_5_0_dev,
+		contracts.OnRampContract:  contracts.V1_5_0_dev,
+	})
+	require.NoError(t, err, "Required contract versions not met")
 
 	setUpOutput := testsetups.CCIPDefaultTestSetUp(t, &log, "smoke-ccip", nil, TestCfg)
 	if len(setUpOutput.Lanes) == 0 {
@@ -733,11 +727,10 @@ func testOffRampRateLimits(t *testing.T, rateLimiterConfig contracts.RateLimiter
 
 	log := logging.GetTestLogger(t)
 	TestCfg := testsetups.NewCCIPTestConfig(t, log, testconfig.Smoke)
-	if offRampVersion, exists := TestCfg.VersionInput[contracts.OffRampContract]; exists {
-		require.NotEqual(t, offRampVersion, contracts.V1_2_0, "Provided OffRamp contract version '%s' is not supported for this test", offRampVersion)
-	} else {
-		require.FailNow(t, "OffRamp contract version not found in test config")
-	}
+	err := contracts.MatchContractVersionsOrAbove(map[contracts.Name]contracts.Version{
+		contracts.OffRampContract: contracts.V1_5_0_dev,
+	})
+	require.NoError(t, err, "Required contract versions not met")
 	require.True(t, TestCfg.SelectedNetworks[0].Simulated, "This test relies on timing assumptions and should only be run on simulated networks")
 	require.False(t, pointer.GetBool(TestCfg.TestGroupInput.ExistingDeployment), "This test modifies contract state and cannot be run on existing deployments")
 
