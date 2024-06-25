@@ -1,4 +1,4 @@
-package liquidityrebalancer
+package rebalalgo
 
 import (
 	"math/big"
@@ -18,7 +18,7 @@ type UnexecutedTransfer interface {
 }
 
 //go:generate mockery --quiet --name Rebalancer --output ../mocks --filename rebalancer_mock.go --case=underscore
-type Rebalancer interface {
+type LiquidityBalancer interface {
 	// ComputeTransfersToBalance computes the transfers needed to balance the
 	// liquidity across the provided graph. The rebalancer will also take into account
 	// currently unexecuted transfers to avoid proposing transfers that would be
