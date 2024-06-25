@@ -351,9 +351,14 @@ func selectReport(ctx context.Context, lggr logger.Logger, hasher cciptypes.Mess
 				}
 			}
 
+			if high == 0 {
+				// No messages could fit in the report.
+				break
+			}
+
 			// Mark new messages executed.
 			for i := 0; i < len(finalReport.Messages); i++ {
-				reports[reportIdx].ExecutedMessages = append(reports[reportIdx].ExecutedMessages, report.Messages[i].SeqNum-report.SequenceNumberRange.Start())
+				reports[reportIdx].ExecutedMessages = append(reports[reportIdx].ExecutedMessages, finalReport.Messages[i].SeqNum)
 			}
 			sort.Slice(report.ExecutedMessages, func(i, j int) bool { return report.ExecutedMessages[i] < report.ExecutedMessages[j] })
 		} else {
