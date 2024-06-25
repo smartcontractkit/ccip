@@ -135,35 +135,18 @@ func (g *liquidityGraph) Len() int {
 	return g.len()
 }
 
-func (g *liquidityGraph) HasNeighbor(from, to models.NetworkSelector) bool {
-	g.lock.RLock()
-	defer g.lock.RUnlock()
-
-	neibs, exist := g.adj[from]
-	if !exist {
-		return false
-	}
-	for _, n := range neibs {
-		if n == to {
-			return true
-		}
-	}
-	return false
-}
-
-// FindPath finds a path from the source network to the destination network with the given number of hops.
-// hops is how many edges can be traversed in the path. 'from' --> b --> 'to' is a path with 2 hops. 'from' --> b --> c --> 'to' is a path with 3 hops.
+// FindPath finds a path from the source network to the destination network with the given number of edges that are allow to be traversed.
 // It calls the iterator function with each individual node in the path.
 // It returns the list of network selectors representing the path from source to destination (including the destination node).
-func (g *liquidityGraph) FindPath(from, to models.NetworkSelector, hops int, iterator func(nodes ...Data) bool) []models.NetworkSelector {
+func (g *liquidityGraph) FindPath(from, to models.NetworkSelector, maxEdgesTraversed int, iterator func(nodes ...Data) bool) []models.NetworkSelector {
 	g.lock.RLock()
 	defer g.lock.RUnlock()
 
-	return g.findPath(from, to, hops, iterator)
+	return g.findPath(from, to, maxEdgesTraversed, iterator)
 }
 
-func (g *liquidityGraph) findPath(from, to models.NetworkSelector, hops int, iterator func(nodes ...Data) bool) []models.NetworkSelector {
-	if hops == 0 {
+func (g *liquidityGraph) findPath(from, to models.NetworkSelector, maxEdgesTraversed int, iterator func(nodes ...Data) bool) []models.NetworkSelector {
+	if maxEdgesTraversed == 0 {
 		return []models.NetworkSelector{}
 	}
 	neibs, exist := g.adj[from]
@@ -179,7 +162,7 @@ func (g *liquidityGraph) findPath(from, to models.NetworkSelector, hops int, ite
 		}
 	}
 	for _, n := range neibs {
-		if p := g.findPath(n, to, hops-1, iterator); len(p) > 0 {
+		if p := g.findPath(n, to, maxEdgesTraversed-1, iterator); len(p) > 0 {
 			data := []Data{g.data[n]}
 			for _, d := range p {
 				data = append(data, g.data[d])

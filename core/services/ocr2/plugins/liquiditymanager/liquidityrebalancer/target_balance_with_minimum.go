@@ -144,12 +144,6 @@ func (r *TargetMinBalancer) oneHopTransfers(graphLater graph.Graph, targetNetwor
 	}
 
 	for _, source := range neighbors {
-		pathExists := graphLater.HasNeighbor(source, targetNetwork)
-		if !pathExists {
-			// no path from source to target
-			continue
-		}
-
 		transferAmount := new(big.Int).Sub(targetLater.TargetLiquidity, targetLater.Liquidity)
 		r.lggr.Debugf("checking transfer from %v to %v for amount %v", source, targetNetwork, transferAmount)
 

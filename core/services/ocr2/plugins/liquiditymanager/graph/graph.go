@@ -46,9 +46,7 @@ type GraphReader interface {
 	Len() int
 	// FindPath returns the path from the source to the destination network.
 	// The iterator function is called for each node in the path with the data of the node.
-	FindPath(from, to models.NetworkSelector, hops int, iterator func(nodes ...Data) bool) []models.NetworkSelector
-	// HasNeighbor returns true when the source network has a direct connection with the destination network.
-	HasNeighbor(from, to models.NetworkSelector) bool
+	FindPath(from, to models.NetworkSelector, maxEdgesTraversed int, iterator func(nodes ...Data) bool) []models.NetworkSelector
 }
 
 // Graph contains graphs functionality for networks and liquidity
