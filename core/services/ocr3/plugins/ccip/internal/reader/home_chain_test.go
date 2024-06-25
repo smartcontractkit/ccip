@@ -126,15 +126,18 @@ func Test_PollingWorking(t *testing.T) {
 	configPoller := NewHomeChainConfigPoller(
 		homeChainReader,
 		logger.Test(t),
-		1*time.Second,
+		400*time.Millisecond,
 	)
 
 	ctx := context.Background()
 	err := configPoller.Start(ctx)
 	assert.NoError(t, err)
+	time.Sleep(1 * time.Second)
 	err = configPoller.Close()
 	assert.NoError(t, err)
-	time.Sleep(2 * time.Second)
+
+	// called 3 times, once when it's started, and 2 times when it's polling
+	homeChainReader.AssertNumberOfCalls(t, "GetLatestValue", 3)
 
 	configs, err := configPoller.GetAllChainConfigs()
 	assert.NoError(t, err)
