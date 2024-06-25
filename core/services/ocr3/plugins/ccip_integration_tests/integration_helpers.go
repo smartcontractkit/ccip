@@ -39,7 +39,7 @@ type DeployFuncWithCapabilities[T any] func(auth *bind.TransactOpts, backend bin
 
 type NewFunc[T any] func(address common.Address, backend bind.ContractBackend) (*T, error)
 
-func SetupChainReaderTest[T any](t *testing.T, _ context.Context, deployFunc DeployFunc[T], newFunc NewFunc[T], chainReaderConfig evmtypes.ChainReaderConfig) *TestSetupData[T] {
+func SetupChainReaderTest[T any](t *testing.T, _ context.Context, deployFunc DeployFunc[T], newFunc NewFunc[T], chainReaderConfig evmtypes.ChainReaderConfig, contractName string) *TestSetupData[T] {
 	// Generate a new key pair for the simulated account
 	privateKey, err := crypto.GenerateKey()
 	assert.NoError(t, err)
@@ -82,7 +82,7 @@ func SetupChainReaderTest[T any](t *testing.T, _ context.Context, deployFunc Dep
 	err = cr.Bind(context.Background(), []types2.BoundContract{
 		{
 			Address: address.String(),
-			Name:    "CCIPCapabilityConfiguration",
+			Name:    contractName,
 			Pending: false,
 		},
 	})
