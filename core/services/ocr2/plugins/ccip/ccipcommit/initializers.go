@@ -180,6 +180,7 @@ func NewCommitServices(ctx context.Context, ds sqlutil.DataSource, srcProvider c
 		priceRegistryProvider: ccip.NewChainAgnosticPriceRegistry(dstProvider),
 		metricsCollector:      metricsCollector,
 		chainHealthcheck:      chainHealthCheck,
+		priceService:          priceService,
 	})
 	argsNoPlugin.ReportingPluginFactory = promwrapper.NewPromFactory(wrappedPluginFactory, "CCIPCommit", jb.OCR2OracleSpec.Relay, big.NewInt(0).SetInt64(destChainID))
 	argsNoPlugin.Logger = commonlogger.NewOCRWrapper(commitLggr, true, logError)

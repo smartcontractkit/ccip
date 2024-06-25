@@ -239,6 +239,15 @@ func (c *CommitStore) ChangeConfig(_ context.Context, onchainConfig []byte, offc
 		return "", err
 	}
 	c.configMu.Lock()
+	defer c.configMu.Unlock()
+
+	if c.estimator == nil {
+		return "", fmt.Errorf("this CommitStore estimator is nil. SetGasEstimator should be called before ChangeConfig")
+	}
+
+	if c.sourceMaxGasPrice == nil {
+		return "", fmt.Errorf("this CommitStore sourceMaxGasPrice is nil. SetSourceMaxGasPrice should be called before ChangeConfig")
+	}
 
 	if c.estimator == nil {
 		defer c.configMu.Unlock()
@@ -264,7 +273,6 @@ func (c *CommitStore) ChangeConfig(_ context.Context, onchainConfig []byte, offc
 		offchainConfigParsed.InflightCacheExpiry.Duration(),
 		offchainConfigParsed.PriceReportingDisabled,
 	)
-	c.configMu.Unlock()
 
 	c.lggr.Infow("ChangeConfig",
 		"offchainConfig", offchainConfigParsed,
