@@ -8,7 +8,9 @@ echo " └───────────────────────�
 
 SOLC_VERSION="0.8.24"
 OPTIMIZE_RUNS=26000
-OPTIMIZE_RUNS_LOW=3600
+OPTIMIZE_RUNS_OFFRAMP=18000
+OPTIMIZE_RUNS_ONRAMP=3600
+OPTIMIZE_RUNS_MULTI_OFFRAMP=1800
 
 
 SCRIPTPATH="$( cd "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
@@ -23,23 +25,30 @@ compileContract () {
   local contract
   contract=$(basename "$1" ".sol")
 
-  solc --overwrite --optimize --optimize-runs $OPTIMIZE_RUNS --metadata-hash none \
+  local optimize_runs=$OPTIMIZE_RUNS
+
+  case $1 in
+    "ccip/offRamp/EVM2EVMOffRamp.sol")
+    echo "OffRamp uses $OPTIMIZE_RUNS_OFFRAMP optimizer runs."
+      optimize_runs=$OPTIMIZE_RUNS_OFFRAMP
+      ;;
+    "ccip/offRamp/EVM2EVMMultiOffRamp.sol")
+    echo "MultiOffRamp uses $OPTIMIZE_RUNS_MULTI_OFFRAMP optimizer runs."
+      optimize_runs=$OPTIMIZE_RUNS_MULTI_OFFRAMP
+      ;;
+    "ccip/onRamp/EVM2EVMMultiOnRamp.sol" | "ccip/onRamp/EVM2EVMOnRamp.sol")
+    echo "OnRamp uses $OPTIMIZE_RUNS_ONRAMP optimizer runs."
+      optimize_runs=$OPTIMIZE_RUNS_ONRAMP
+      ;;
+  esac
+
+  solc --overwrite --optimize --optimize-runs $optimize_runs --metadata-hash none \
       -o "$ROOT"/contracts/solc/v$SOLC_VERSION/"$contract" \
       --abi --bin --allow-paths "$ROOT"/contracts/src/v0.8 \
       --evm-version paris \
       "$ROOT"/contracts/src/v0.8/"$1"
 }
 
-compileContractLowOpts () {
-  local contract
-  contract=$(basename "$1" ".sol")
-
-  solc --overwrite --optimize --optimize-runs $OPTIMIZE_RUNS_LOW --metadata-hash none \
-      -o "$ROOT"/contracts/solc/v$SOLC_VERSION/"$contract" \
-      --abi --bin --allow-paths "$ROOT"/contracts/src/v0.8 \
-      --evm-version paris \
-      "$ROOT"/contracts/src/v0.8/"$1"
-}
 
 # Solc produces and overwrites intermediary contracts.
 # Contracts should be ordered in reverse-import-complexity-order to minimize overwrite risks.
@@ -48,10 +57,10 @@ compileContract ccip/offRamp/EVM2EVMMultiOffRamp.sol
 compileContract ccip/applications/PingPongDemo.sol
 compileContract ccip/applications/SelfFundedPingPong.sol
 compileContract ccip/applications/EtherSenderReceiver.sol
-compileContractLowOpts ccip/onRamp/EVM2EVMMultiOnRamp.sol
-compileContractLowOpts ccip/onRamp/EVM2EVMOnRamp.sol
+compileContract ccip/onRamp/EVM2EVMMultiOnRamp.sol
+compileContract ccip/onRamp/EVM2EVMOnRamp.sol
 compileContract ccip/CommitStore.sol
-compileContract ccip/MultiCommitStore.sol
+compileContract ccip/MultiAggregateRateLimiter.sol
 compileContract ccip/Router.sol
 compileContract ccip/PriceRegistry.sol
 compileContract ccip/pools/LockReleaseTokenPool.sol
@@ -66,6 +75,7 @@ compileContract ccip/RMN.sol
 compileContract ccip/ARMProxy.sol
 compileContract ccip/tokenAdminRegistry/TokenAdminRegistry.sol
 compileContract ccip/tokenAdminRegistry/RegistryModuleOwnerCustom.sol
+compileContract ccip/capability/CCIPCapabilityConfiguration.sol
 
 # Test helpers
 compileContract ccip/test/helpers/BurnMintERC677Helper.sol

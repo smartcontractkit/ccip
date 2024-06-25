@@ -16,18 +16,20 @@ contract TokenPoolHelper is TokenPool {
 
   function lockOrBurn(Pool.LockOrBurnInV1 calldata lockOrBurnIn)
     external
+    view
     override
     returns (Pool.LockOrBurnOutV1 memory)
   {
-    return Pool.LockOrBurnOutV1({destPoolAddress: getRemotePool(lockOrBurnIn.remoteChainSelector), destPoolData: ""});
+    return Pool.LockOrBurnOutV1({destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector), destPoolData: ""});
   }
 
   function releaseOrMint(Pool.ReleaseOrMintInV1 calldata releaseOrMintIn)
     external
+    pure
     override
     returns (Pool.ReleaseOrMintOutV1 memory)
   {
-    return Pool.ReleaseOrMintOutV1({localToken: address(i_token), destinationAmount: releaseOrMintIn.amount});
+    return Pool.ReleaseOrMintOutV1({destinationAmount: releaseOrMintIn.amount});
   }
 
   function onlyOnRampModifier(uint64 remoteChainSelector) external view {

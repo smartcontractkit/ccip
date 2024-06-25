@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.0;
 
-import {IPool} from "../../interfaces/IPool.sol";
+import {IPoolV1} from "../../interfaces/IPool.sol";
 import {IPoolPriorTo1_5} from "../../interfaces/IPoolPriorTo1_5.sol";
 
 import {BurnMintERC677} from "../../../shared/token/ERC677/BurnMintERC677.sol";
@@ -30,7 +30,7 @@ contract TokenPoolAndProxyMigration is EVM2EVMOnRampSetup {
 
   address internal s_offRamp;
   address internal s_sourcePool = makeAddr("source_pool");
-  address internal s_destPool = makeAddr("dest_pool");
+  address internal s_sourceToken = makeAddr("source_token");
   uint256 internal constant AMOUNT = 1;
 
   function setUp() public virtual override {
@@ -236,6 +236,7 @@ contract TokenPoolAndProxyMigration is EVM2EVMOnRampSetup {
         remoteChainSelector: SOURCE_CHAIN_SELECTOR,
         receiver: OWNER,
         amount: AMOUNT,
+        localToken: address(s_token),
         sourcePoolAddress: abi.encode(s_sourcePool),
         sourcePoolData: "",
         offchainTokenData: ""
@@ -301,7 +302,8 @@ contract TokenPoolAndProxyMigration is EVM2EVMOnRampSetup {
     TokenPool.ChainUpdate[] memory chainUpdates = new TokenPool.ChainUpdate[](2);
     chainUpdates[0] = TokenPool.ChainUpdate({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
-      remotePoolAddress: abi.encode(s_destPool),
+      remotePoolAddress: abi.encode(s_destTokenPool),
+      remoteTokenAddress: abi.encode(s_destToken),
       allowed: true,
       outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
       inboundRateLimiterConfig: getInboundRateLimiterConfig()
@@ -309,6 +311,7 @@ contract TokenPoolAndProxyMigration is EVM2EVMOnRampSetup {
     chainUpdates[1] = TokenPool.ChainUpdate({
       remoteChainSelector: SOURCE_CHAIN_SELECTOR,
       remotePoolAddress: abi.encode(s_sourcePool),
+      remoteTokenAddress: abi.encode(s_sourceToken),
       allowed: true,
       outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
       inboundRateLimiterConfig: getInboundRateLimiterConfig()
@@ -316,7 +319,9 @@ contract TokenPoolAndProxyMigration is EVM2EVMOnRampSetup {
     s_newPool.applyChainUpdates(chainUpdates);
 
     // Register the token on the token admin registry
-    s_tokenAdminRegistry.registerAdministratorPermissioned(address(s_token), OWNER);
+    s_tokenAdminRegistry.proposeAdministrator(address(s_token), OWNER);
+    // Accept ownership of the token
+    s_tokenAdminRegistry.acceptAdminRole(address(s_token));
     // Set the pool on the admin registry
     s_tokenAdminRegistry.setPool(address(s_token), address(s_newPool));
   }
@@ -326,7 +331,7 @@ contract TokenPoolAndProxy is EVM2EVMOnRampSetup {
   event Burned(address indexed sender, uint256 amount);
   event Minted(address indexed sender, address indexed recipient, uint256 amount);
 
-  IPool internal s_pool;
+  IPoolV1 internal s_pool;
   BurnMintERC677 internal s_token;
   IPoolPriorTo1_5 internal s_legacyPool;
   address internal s_fakeOffRamp = makeAddr("off_ramp");
@@ -388,6 +393,7 @@ contract TokenPoolAndProxy is EVM2EVMOnRampSetup {
     chains[0] = TokenPool.ChainUpdate({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
       remotePoolAddress: abi.encode(s_destPool),
+      remoteTokenAddress: abi.encode(s_destToken),
       allowed: true,
       outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
       inboundRateLimiterConfig: getInboundRateLimiterConfig()
@@ -455,6 +461,7 @@ contract TokenPoolAndProxy is EVM2EVMOnRampSetup {
         remoteChainSelector: DEST_CHAIN_SELECTOR,
         originalSender: abi.encode(OWNER),
         amount: amount,
+        localToken: address(s_token),
         sourcePoolAddress: abi.encode(s_destPool),
         sourcePoolData: "",
         offchainTokenData: ""
@@ -471,7 +478,7 @@ contract TokenPoolAndProxy is EVM2EVMOnRampSetup {
     vm.startPrank(address(s_fakeOffRamp));
 
     vm.expectEmit(address(s_legacyPool));
-    emit Minted(address(s_pool), OWNER, amount);
+    emit Minted(address(s_pool), s_fakeOffRamp, amount);
 
     s_pool.releaseOrMint(
       Pool.ReleaseOrMintInV1({
@@ -479,6 +486,7 @@ contract TokenPoolAndProxy is EVM2EVMOnRampSetup {
         remoteChainSelector: DEST_CHAIN_SELECTOR,
         originalSender: abi.encode(OWNER),
         amount: amount,
+        localToken: address(s_token),
         sourcePoolAddress: abi.encode(s_destPool),
         sourcePoolData: "",
         offchainTokenData: ""
@@ -519,6 +527,7 @@ contract LockReleaseTokenPoolAndProxySetup is RouterSetup {
     chainUpdate[0] = TokenPool.ChainUpdate({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
       remotePoolAddress: abi.encode(s_destPoolAddress),
+      remoteTokenAddress: abi.encode(address(s_token)),
       allowed: true,
       outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
       inboundRateLimiterConfig: getInboundRateLimiterConfig()
@@ -632,10 +641,7 @@ contract LockReleaseTokenPoolPoolAndProxy_withdrawalLiquidity is LockReleaseToke
 
 contract LockReleaseTokenPoolPoolAndProxy_supportsInterface is LockReleaseTokenPoolAndProxySetup {
   function test_SupportsInterface_Success() public view {
-    assertTrue(
-      s_lockReleaseTokenPoolAndProxy.supportsInterface(s_lockReleaseTokenPoolAndProxy.getLockReleaseInterfaceId())
-    );
-    assertTrue(s_lockReleaseTokenPoolAndProxy.supportsInterface(type(IPool).interfaceId));
+    assertTrue(s_lockReleaseTokenPoolAndProxy.supportsInterface(type(IPoolV1).interfaceId));
     assertTrue(s_lockReleaseTokenPoolAndProxy.supportsInterface(type(IERC165).interfaceId));
   }
 }
@@ -655,6 +661,7 @@ contract LockReleaseTokenPoolPoolAndProxy_setChainRateLimiterConfig is LockRelea
     chainUpdates[0] = TokenPool.ChainUpdate({
       remoteChainSelector: s_remoteChainSelector,
       remotePoolAddress: abi.encode(address(1)),
+      remoteTokenAddress: abi.encode(address(2)),
       allowed: true,
       outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
       inboundRateLimiterConfig: getInboundRateLimiterConfig()

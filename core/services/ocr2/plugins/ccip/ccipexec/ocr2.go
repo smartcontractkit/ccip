@@ -15,6 +15,7 @@ import (
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/hashutil"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
 
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
@@ -24,7 +25,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/batchreader"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/ccipdataprovider"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/pkg/hashlib"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/prices"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/tokendata"
 )
@@ -50,18 +50,19 @@ var (
 )
 
 type ExecutionPluginStaticConfig struct {
-	lggr                        logger.Logger
-	onRampReader                ccipdata.OnRampReader
-	offRampReader               ccipdata.OffRampReader
-	commitStoreReader           ccipdata.CommitStoreReader
-	sourcePriceRegistryProvider ccipdataprovider.PriceRegistry
-	sourceWrappedNativeToken    cciptypes.Address
-	tokenDataWorker             tokendata.Worker
-	destChainSelector           uint64
-	priceRegistryProvider       ccipdataprovider.PriceRegistry // destination price registry provider.
-	tokenPoolBatchedReader      batchreader.TokenPoolBatchedReader
-	metricsCollector            ccip.PluginMetricsCollector
-	chainHealthcheck            cache.ChainHealthcheck
+	lggr                          logger.Logger
+	onRampReader                  ccipdata.OnRampReader
+	offRampReader                 ccipdata.OffRampReader
+	commitStoreReader             ccipdata.CommitStoreReader
+	sourcePriceRegistryProvider   ccipdataprovider.PriceRegistry
+	sourceWrappedNativeToken      cciptypes.Address
+	tokenDataWorker               tokendata.Worker
+	destChainSelector             uint64
+	priceRegistryProvider         ccipdataprovider.PriceRegistry // destination price registry provider.
+	tokenPoolBatchedReader        batchreader.TokenPoolBatchedReader
+	metricsCollector              ccip.PluginMetricsCollector
+	chainHealthcheck              cache.ChainHealthcheck
+	newReportingPluginRetryConfig ccipdata.RetryConfig
 }
 
 type ExecutionReportingPlugin struct {
@@ -667,7 +668,7 @@ func calculateObservedMessagesConsensus(observations []ccip.ExecutionObservation
 	tally := make(map[tallyKey]tallyVal)
 	for _, obs := range observations {
 		for seqNr, msgData := range obs.Messages {
-			tokenDataHash, err := hashlib.BytesOfBytesKeccak(msgData.TokenData)
+			tokenDataHash, err := hashutil.BytesOfBytesKeccak(msgData.TokenData)
 			if err != nil {
 				return nil, fmt.Errorf("bytes of bytes keccak: %w", err)
 			}

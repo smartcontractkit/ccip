@@ -19,13 +19,12 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/mock_v3_aggregator_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_2_0"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_5_0"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers"
 	integrationtesthelpers "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers/integration"
 )
 
 func TestIntegration_CCIP(t *testing.T) {
-
 	// Run the batches of tests for both pipeline and dynamic price getter setups.
 	// We will remove the pipeline batch once the feature is deleted from the code.
 	tests := []struct {
@@ -47,7 +46,6 @@ func TestIntegration_CCIP(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-
 			ccipTH := integrationtesthelpers.SetupCCIPIntegrationTH(t, testhelpers.SourceChainID, testhelpers.SourceChainSelector, testhelpers.DestChainID, testhelpers.DestChainSelector)
 
 			tokenPricesUSDPipeline := ""
@@ -625,13 +623,14 @@ func TestIntegration_CCIP(t *testing.T) {
 					node.EventuallyNodeUsesNewCommitConfig(t, ccipTH, ccipdata.CommitOnchainConfig{
 						PriceRegistry: ccipTH.Dest.PriceRegistry.Address(),
 					})
-					node.EventuallyNodeUsesNewExecConfig(t, ccipTH, v1_2_0.ExecOnchainConfig{
+					node.EventuallyNodeUsesNewExecConfig(t, ccipTH, v1_5_0.ExecOnchainConfig{
 						PermissionLessExecutionThresholdSeconds: testhelpers.PermissionLessExecutionThresholdSeconds,
 						Router:                                  ccipTH.Dest.Router.Address(),
 						PriceRegistry:                           ccipTH.Dest.PriceRegistry.Address(),
 						MaxDataBytes:                            1e5,
 						MaxNumberOfTokensPerMsg:                 5,
 						MaxPoolReleaseOrMintGas:                 200_000,
+						MaxTokenTransferGas:                     100_000,
 					})
 					node.EventuallyNodeUsesUpdatedPriceRegistry(t, ccipTH)
 				}
@@ -640,7 +639,6 @@ func TestIntegration_CCIP(t *testing.T) {
 					currentNonce = uint64(currentSeqNum)
 				}
 			})
-
 		})
 	}
 }

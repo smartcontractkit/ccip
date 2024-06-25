@@ -25,8 +25,10 @@ package ccip
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/EVM2EVMMultiOnRamp/EVM2EVMMultiOnRamp.abi ../../../contracts/solc/v0.8.24/EVM2EVMMultiOnRamp/EVM2EVMMultiOnRamp.bin EVM2EVMMultiOnRamp evm_2_evm_multi_onramp
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/EVM2EVMOffRamp/EVM2EVMOffRamp.abi ../../../contracts/solc/v0.8.24/EVM2EVMOffRamp/EVM2EVMOffRamp.bin EVM2EVMOffRamp evm_2_evm_offramp
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/EVM2EVMMultiOffRamp/EVM2EVMMultiOffRamp.abi ../../../contracts/solc/v0.8.24/EVM2EVMMultiOffRamp/EVM2EVMMultiOffRamp.bin EVM2EVMMultiOffRamp evm_2_evm_multi_offramp
+//go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/MultiAggregateRateLimiter/MultiAggregateRateLimiter.abi ../../../contracts/solc/v0.8.24/MultiAggregateRateLimiter/MultiAggregateRateLimiter.bin MultiAggregateRateLimiter multi_aggregate_rate_limiter
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/Router/Router.abi ../../../contracts/solc/v0.8.24/Router/Router.bin Router router
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/PriceRegistry/PriceRegistry.abi ../../../contracts/solc/v0.8.24/PriceRegistry/PriceRegistry.bin PriceRegistry price_registry
+//go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/CCIPCapabilityConfiguration/CCIPCapabilityConfiguration.abi ../../../contracts/solc/v0.8.24/CCIPCapabilityConfiguration/CCIPCapabilityConfiguration.bin CCIPCapabilityConfiguration ccip_capability_configuration
 
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/MaybeRevertMessageReceiver/MaybeRevertMessageReceiver.abi ../../../contracts/solc/v0.8.24/MaybeRevertMessageReceiver/MaybeRevertMessageReceiver.bin MaybeRevertMessageReceiver maybe_revert_message_receiver
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/PingPongDemo/PingPongDemo.abi ../../../contracts/solc/v0.8.24/PingPongDemo/PingPongDemo.bin PingPongDemo ping_pong_demo

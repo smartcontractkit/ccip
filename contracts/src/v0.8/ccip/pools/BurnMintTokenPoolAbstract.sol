@@ -27,7 +27,7 @@ abstract contract BurnMintTokenPoolAbstract is TokenPool {
 
     emit Burned(msg.sender, lockOrBurnIn.amount);
 
-    return Pool.LockOrBurnOutV1({destPoolAddress: getRemotePool(lockOrBurnIn.remoteChainSelector), destPoolData: ""});
+    return Pool.LockOrBurnOutV1({destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector), destPoolData: ""});
   }
 
   /// @notice Mint tokens from the pool to the recipient
@@ -41,10 +41,11 @@ abstract contract BurnMintTokenPoolAbstract is TokenPool {
   {
     _validateReleaseOrMint(releaseOrMintIn);
 
-    IBurnMintERC20(address(i_token)).mint(releaseOrMintIn.receiver, releaseOrMintIn.amount);
+    // Mint to the offRamp, which forwards it to the recipient
+    IBurnMintERC20(address(i_token)).mint(msg.sender, releaseOrMintIn.amount);
 
     emit Minted(msg.sender, releaseOrMintIn.receiver, releaseOrMintIn.amount);
 
-    return Pool.ReleaseOrMintOutV1({localToken: address(i_token), destinationAmount: releaseOrMintIn.amount});
+    return Pool.ReleaseOrMintOutV1({destinationAmount: releaseOrMintIn.amount});
   }
 }

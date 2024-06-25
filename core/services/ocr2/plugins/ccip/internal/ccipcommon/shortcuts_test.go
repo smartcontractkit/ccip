@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
@@ -123,7 +124,6 @@ func TestGetFilteredChainTokens(t *testing.T) {
 	ctx := testutils.Context(t)
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-
 			priceRegistry := ccipdatamocks.NewPriceRegistryReader(t)
 			priceRegistry.On("GetFeeTokens", ctx).Return(tc.feeTokens, nil).Once()
 
@@ -162,4 +162,35 @@ func TestIsTxRevertError(t *testing.T) {
 			assert.Equal(t, tc.expectedOutput, IsTxRevertError(tc.inputError))
 		})
 	}
+}
+
+func TestRetryUntilSuccess(t *testing.T) {
+	// Set delays to 0 for tests
+	initialDelay := 0 * time.Nanosecond
+	maxDelay := 0 * time.Nanosecond
+
+	numAttempts := 5
+	numCalls := 0
+	// A function that returns success only after numAttempts calls. RetryUntilSuccess will repeatedly call this
+	// function until it succeeds.
+	fn := func() (int, error) {
+		numCalls++
+		numAttempts--
+		if numAttempts > 0 {
+			return numCalls, fmt.Errorf("")
+		}
+		return numCalls, nil
+	}
+
+	// Assert that RetryUntilSuccess returns the expected value when fn returns success on the 5th attempt
+	numCalls, err := RetryUntilSuccess(fn, initialDelay, maxDelay)
+	assert.Nil(t, err)
+	assert.Equal(t, 5, numCalls)
+
+	// Assert that RetryUntilSuccess returns the expected value when fn returns success on the 8th attempt
+	numAttempts = 8
+	numCalls = 0
+	numCalls, err = RetryUntilSuccess(fn, initialDelay, maxDelay)
+	assert.Nil(t, err)
+	assert.Equal(t, 8, numCalls)
 }

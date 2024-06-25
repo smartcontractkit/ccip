@@ -161,7 +161,7 @@ jobs:
           SLACK_BOT_TOKEN: ${{ secrets.QA_SLACK_API_KEY }}
         with:
           channel-id: "#ccip-testing"
-          slack-message: ":x: :mild-panic-intensifies: CCIP chaos tests failed: ${{ job.html_url }}\n${{ format('https://github.com/smartcontractkit/chainlink/actions/runs/{0}', github.run_id) }}"
+          slack-message: ":x: :mild-panic-intensifies: CCIP chaos tests failed: \n${{ format('https://github.com/{0}/actions/runs/{1}', github.repository, github.run_id) }}"
       ## Run Cleanup if the job succeeds
       - name: cleanup
         if: always()
@@ -177,7 +177,8 @@ jobs:
       pull-requests: write
       id-token: write
       contents: read
-    name: ccip-load-with-chaos-tests
+    name: CCIP Load With Chaos Tests
+    if: false # Disabled until CCIP-2555 is resolved
     runs-on: ubuntu-latest
     needs: [ build-chainlink, build-test-image ]
     env:
@@ -242,7 +243,7 @@ jobs:
           SLACK_BOT_TOKEN: ${{ secrets.QA_SLACK_API_KEY }}
         with:
           channel-id: "#ccip-testing"
-          slack-message: ":x: :mild-panic-intensifies: CCIP chaos with load tests failed: ${{ job.html_url }}\n${{ format('https://github.com/smartcontractkit/chainlink/actions/runs/{0}', github.run_id) }}"
+          slack-message: ":x: :mild-panic-intensifies: CCIP chaos with load tests failed: \n${{ format('https://github.com/{0}/actions/runs/{1}', github.repository, github.run_id) }}"
       ## Run Cleanup if the job succeeds
       - name: cleanup
         if: always()

@@ -51,6 +51,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/chaintype"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/ocr2key"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/bridge/testonlybridge"
+	integrationtesthelpers "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/testhelpers/integration"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/validate"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocrbootstrap"
 
@@ -119,7 +120,6 @@ func setupNodeOCR3(
 		}
 		c.EVM = chains
 		c.OCR2.ContractPollInterval = config.MustNewDuration(5 * time.Second)
-
 	})
 
 	lggr := logger.TestLogger(t)
@@ -322,20 +322,16 @@ func newTestUniverse(t *testing.T, numChains int, adapterHoldNative bool) {
 	evmChains := bootstrapNode.app.GetRelayers().LegacyEVMChains()
 	require.NotNil(t, evmChains)
 	require.Len(t, evmChains.Slice(), numChains)
-	bootstrapJobSpec := fmt.Sprintf(
-		`
-type = "bootstrap"
-name = "bootstrap"
-contractConfigTrackerPollInterval = "1s"
-relay = "evm"
-schemaVersion = 1
-contractID = "%s"
-[relayConfig]
-chainID = 1337
-fromBlock = %d
-`, mainContract.Hex(), mainFromBlock)
-	t.Log("creating bootstrap job with spec:\n", bootstrapJobSpec)
-	ocrJob, err := ocrbootstrap.ValidatedBootstrapSpecToml(bootstrapJobSpec)
+	bootstrapJobSpec, err := integrationtesthelpers.NewBootsrapJobSpec(&integrationtesthelpers.LMJobSpecParams{
+		ChainID:        1337,
+		ContractID:     mainContract.Hex(),
+		RelayFromBlock: mainFromBlock,
+	})
+	require.NoError(t, err, "failed to create bootstrap job spec")
+	bootstrapJobSpecStr, err := bootstrapJobSpec.String()
+	require.NoError(t, err, "failed to convert bootstrap job spec to string")
+	t.Log("creating bootstrap job with spec:\n", bootstrapJobSpecStr)
+	ocrJob, err := ocrbootstrap.ValidatedBootstrapSpecToml(bootstrapJobSpecStr)
 	require.NoError(t, err, "failed to validate bootstrap job")
 	err = bootstrapNode.app.AddJobV2(testutils.Context(t), &ocrJob)
 	require.NoError(t, err, "failed to add bootstrap job")
@@ -350,49 +346,27 @@ fromBlock = %d
 		})
 
 		mainChain := mustGetChainByEvmID(t, testutils.SimulatedChainID.Int64())
-
-		jobSpec := fmt.Sprintf(
-			`
-type                 	= "offchainreporting2"
-schemaVersion        	= 1
-name                 	= "liquiditymanager-integration-test"
-maxTaskDuration      	= "30s"
-contractID           	= "%s"
-ocrKeyBundleID       	= "%s"
-relay                	= "evm"
-pluginType           	= "liquiditymanager"
-transmitterID        	= "%s"
-forwardingAllowed       = false
-contractConfigTrackerPollInterval = "5s"
-
-[relayConfig]
-chainID              	= 1337
-# This is the fromBlock for the main chain
-fromBlock               = %d
-[relayConfig.fromBlocks]
-# these are the fromBlock values for the follower chains
-%s
-
-[pluginConfig]
-liquidityManagerAddress = "%s"
-liquidityManagerNetwork = "%d"
-closePluginTimeoutSec = 10
-[pluginConfig.rebalancerConfig]
-type = "ping-pong"
-`,
-			mainContract.Hex(),
-			kbs[i].ID(),
-			nodes[i].transmitters[1337].Hex(),
-			mainFromBlock,
-			buildFollowerChainsFromBlocksToml(blocksBeforeConfig),
-			mainContract.Hex(),
-			mainChain.Selector)
-		t.Log("Creating liquidityManager job with spec:\n", jobSpec)
+		jobSpec, err := integrationtesthelpers.NewJobSpec(&integrationtesthelpers.LMJobSpecParams{
+			Name:                    "liquiditymanager-integration-test",
+			Type:                    "ping-pong",
+			ChainID:                 1337,
+			ContractID:              mainContract.Hex(),
+			OCRKeyBundleID:          kbs[i].ID(),
+			TransmitterID:           nodes[i].transmitters[1337].Hex(),
+			RelayFromBlock:          mainFromBlock,
+			FollowerChains:          buildFollowerChainsFromBlocksToml(blocksBeforeConfig),
+			LiquidityManagerAddress: mainContract,
+			NetworkSelector:         mainChain.Selector,
+		})
+		require.NoError(t, err, "failed to create job spec")
+		jobSpecStr, err := jobSpec.String()
+		require.NoError(t, err, "failed to convert job spec to string")
+		t.Log("Creating liquidityManager job with spec:\n", jobSpecStr)
 		ocrJob2, err2 := validate.ValidatedOracleSpecToml(
 			testutils.Context(t),
 			apps[i].GetConfig().OCR2(),
 			apps[i].GetConfig().Insecure(),
-			jobSpec,
+			jobSpecStr,
 			nil,
 		)
 		require.NoError(t, err2, "failed to validate liquidityManager job")
@@ -690,7 +664,7 @@ func deployContracts(
 
 		// deploy the liquidityManager and set the liquidity container to be the lock release pool
 		ch := mustGetChainByEvmID(t, chainID)
-		liquidityManagerAddr, _, _, err := liquiditymanager.DeployLiquidityManager(owner, backend, wethAddress, ch.Selector, lockReleasePoolAddress, big.NewInt(0))
+		liquidityManagerAddr, _, _, err := liquiditymanager.DeployLiquidityManager(owner, backend, wethAddress, ch.Selector, lockReleasePoolAddress, big.NewInt(0), common.Address{})
 		require.NoError(t, err, "failed to deploy LiquidityManager contract")
 		liquidityManager, err := liquiditymanager.NewLiquidityManager(liquidityManagerAddr, backend)
 		require.NoError(t, err, "failed to create LiquidityManager wrapper")

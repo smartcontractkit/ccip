@@ -5,10 +5,11 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
+	"github.com/smartcontractkit/chainlink-common/pkg/hashutil"
+
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_0_0"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/pkg/hashlib"
 )
 
 const (
@@ -17,11 +18,11 @@ const (
 
 type LeafHasher struct {
 	metaDataHash [32]byte
-	ctx          hashlib.Ctx[[32]byte]
+	ctx          hashutil.Hasher[[32]byte]
 	onRamp       *evm_2_evm_onramp.EVM2EVMOnRamp
 }
 
-func NewLeafHasher(sourceChainSelector uint64, destChainSelector uint64, onRampId common.Address, ctx hashlib.Ctx[[32]byte], onRamp *evm_2_evm_onramp.EVM2EVMOnRamp) *LeafHasher {
+func NewLeafHasher(sourceChainSelector uint64, destChainSelector uint64, onRampId common.Address, ctx hashutil.Hasher[[32]byte], onRamp *evm_2_evm_onramp.EVM2EVMOnRamp) *LeafHasher {
 	return &LeafHasher{
 		metaDataHash: v1_0_0.GetMetaDataHash(ctx, ctx.Hash([]byte(MetaDataHashPrefix)), sourceChainSelector, onRampId, destChainSelector),
 		ctx:          ctx,
@@ -35,7 +36,7 @@ func (t *LeafHasher) HashLeaf(log types.Log) ([32]byte, error) {
 		return [32]byte{}, err
 	}
 	message := msg.Message
-	encodedTokens, err := utils.ABIEncode(
+	encodedTokens, err := abihelpers.ABIEncode(
 		`[
 {"components": [{"name":"token","type":"address"},{"name":"amount","type":"uint256"}], "type":"tuple[]"}]`, message.TokenAmounts)
 	if err != nil {
@@ -52,7 +53,7 @@ func (t *LeafHasher) HashLeaf(log types.Log) ([32]byte, error) {
 		return [32]byte{}, err
 	}
 
-	packedFixedSizeValues, err := utils.ABIEncode(
+	packedFixedSizeValues, err := abihelpers.ABIEncode(
 		`[
 {"name": "sender", "type":"address"},
 {"name": "receiver", "type":"address"},
@@ -77,7 +78,7 @@ func (t *LeafHasher) HashLeaf(log types.Log) ([32]byte, error) {
 	}
 	fixedSizeValuesHash := t.ctx.Hash(packedFixedSizeValues)
 
-	packedValues, err := utils.ABIEncode(
+	packedValues, err := abihelpers.ABIEncode(
 		`[
 {"name": "leafDomainSeparator","type":"bytes1"},
 {"name": "metadataHash", "type":"bytes32"},

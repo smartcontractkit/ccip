@@ -1,4 +1,4 @@
-package commit
+package execute
 
 import (
 	"context"
@@ -7,6 +7,7 @@ import (
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 )
 
@@ -43,7 +44,12 @@ func NewPluginFactory() *PluginFactory {
 }
 
 func (p PluginFactory) NewReportingPlugin(config ocr3types.ReportingPluginConfig) (ocr3types.ReportingPlugin[[]byte], ocr3types.ReportingPluginInfo, error) {
-	return NewPlugin(), ocr3types.ReportingPluginInfo{}, nil
+	return NewPlugin(
+		context.Background(),
+		config,
+		cciptypes.ExecutePluginConfig{},
+		nil,
+	), ocr3types.ReportingPluginInfo{}, nil
 }
 
 func (p PluginFactory) Name() string {

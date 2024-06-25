@@ -28,30 +28,30 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/lib/pq"
-	"github.com/smartcontractkit/ccip/integration-tests/client"
-	"gopkg.in/guregu/null.v4"
 
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/liquiditymanager/generated/liquiditymanager"
-	"github.com/smartcontractkit/chainlink/v2/core/services/job"
-	"github.com/smartcontractkit/chainlink/v2/core/store/models"
 
 	"github.com/AlekSi/pointer"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	integrationactions "github.com/smartcontractkit/ccip/integration-tests/actions"
 	chainselectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
 	"golang.org/x/sync/errgroup"
 
+	integrationactions "github.com/smartcontractkit/chainlink/integration-tests/actions"
+
 	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
 	ctfClient "github.com/smartcontractkit/chainlink-testing-framework/client"
 	"github.com/smartcontractkit/chainlink-testing-framework/k8s/config"
 	"github.com/smartcontractkit/chainlink-testing-framework/k8s/environment"
+
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/actions"
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/contracts"
 	"github.com/smartcontractkit/chainlink/integration-tests/docker/test_env"
+
+	integrationtesthelpers "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/testhelpers/integration"
 )
 
 type LMTestSetupOutputs struct {
@@ -61,7 +61,7 @@ type LMTestSetupOutputs struct {
 
 // TODO - Copied over from ccip tests as such. Refactor and remove unused code
 func (o *LMTestSetupOutputs) CreateLMEnvironment(
-	lggr zerolog.Logger,
+	lggr *zerolog.Logger,
 	envName string,
 	reportPath string,
 ) map[int64]blockchain.EVMClient {
@@ -136,7 +136,7 @@ func (o *LMTestSetupOutputs) CreateLMEnvironment(
 	if pointer.GetBool(testConfig.TestGroupInput.LocalCluster) {
 		require.NotNil(t, ccipEnv.LocalCluster, "Local cluster shouldn't be nil")
 		for _, n := range ccipEnv.LocalCluster.EVMNetworks {
-			if evmClient, err := blockchain.NewEVMClientFromNetwork(*n, lggr); err == nil {
+			if evmClient, err := blockchain.NewEVMClientFromNetwork(*n, *lggr); err == nil {
 				chainByChainID[evmClient.GetChainID().Int64()] = evmClient
 				chains = append(chains, evmClient)
 			} else {
@@ -150,10 +150,10 @@ func (o *LMTestSetupOutputs) CreateLMEnvironment(
 			}
 			var ec blockchain.EVMClient
 			if k8Env == nil {
-				ec, err = blockchain.ConnectEVMClient(n, lggr)
+				ec, err = blockchain.ConnectEVMClient(n, *lggr)
 			} else {
 				log.Info().Interface("urls", k8Env.URLs).Msg("URLs")
-				ec, err = blockchain.NewEVMClient(n, k8Env, lggr)
+				ec, err = blockchain.NewEVMClient(n, k8Env, *lggr)
 			}
 			require.NoError(t, err, "Connecting to blockchain nodes shouldn't fail")
 			chains = append(chains, ec)
@@ -237,14 +237,14 @@ func (o *LMTestSetupOutputs) CreateLMEnvironment(
 }
 
 func (o *LMTestSetupOutputs) DeployLMChainContracts(
-	lggr zerolog.Logger,
-	chainClient blockchain.EVMClient,
+	lggr *zerolog.Logger,
 	networkCfg blockchain.EVMNetwork,
-	chainSelectors []uint64,
 	lmCommon actions.LMCommon,
+	l2ChainID int64,
 ) error {
 	var k8Env *environment.Environment
 	ccipEnv := o.Env
+	chainClient := lmCommon.ChainClient
 	if ccipEnv != nil {
 		k8Env = ccipEnv.K8Env
 	}
@@ -252,7 +252,7 @@ func (o *LMTestSetupOutputs) DeployLMChainContracts(
 		networkCfg.URLs = k8Env.URLs[chainClient.GetNetworkConfig().Name]
 	}
 
-	chain, err := blockchain.ConcurrentEVMClient(networkCfg, k8Env, chainClient, lggr)
+	chain, err := blockchain.ConcurrentEVMClient(networkCfg, k8Env, chainClient, *lggr)
 	if err != nil {
 		return errors.WithStack(fmt.Errorf("failed to create chain client for %s: %w", networkCfg.Name, err))
 	}
@@ -263,6 +263,88 @@ func (o *LMTestSetupOutputs) DeployLMChainContracts(
 	cd, err := contracts.NewCCIPContractsDeployer(lggr, chain)
 	if err != nil {
 		return errors.WithStack(fmt.Errorf("failed to create contract deployer: %w", err))
+	}
+
+	// Deploy Wrapped Native contract only on private geth networks
+	if lmCommon.ChainSelectror == chainselectors.GETH_TESTNET.Selector ||
+		lmCommon.ChainSelectror == chainselectors.GETH_DEVNET_2.Selector {
+		lggr.Info().Msg("Deploying Wrapped Native contract")
+		wrapperNative, err := cd.DeployWrappedNative()
+		if err != nil {
+			return errors.WithStack(fmt.Errorf("failed to deploy Wrapped Native contract: %w", err))
+		}
+		lggr.Info().Str("Address", wrapperNative.String()).Msg("Deployed Wrapped Native contract")
+		lmCommon.WrapperNative = wrapperNative
+	}
+
+	// Deploy Bridge Adapter contracts
+	switch lmCommon.ChainSelectror {
+	case chainselectors.GETH_TESTNET.Selector:
+		lggr.Info().Msg("Deploying Mock L1 Bridge Adapter contract")
+		bridgeAdapter, err := cd.DeployMockL1BridgeAdapter(*lmCommon.WrapperNative, true)
+		if err != nil {
+			return errors.WithStack(fmt.Errorf("failed to deploy Mock L1 Bridge Adapter contract: %w", err))
+		}
+		lggr.Info().Str("Address", bridgeAdapter.EthAddress.String()).Msg("Deployed Mock L1 Bridge Adapter contract")
+		lmCommon.BridgeAdapterAddr = bridgeAdapter.EthAddress
+	case chainselectors.GETH_DEVNET_2.Selector:
+		lggr.Info().Msg("Deploying Mock L2 Bridge Adapter contract")
+		bridgeAdapter, err := cd.DeployMockL2BridgeAdapter()
+		if err != nil {
+			return errors.WithStack(fmt.Errorf("failed to deploy Mock L2 Bridge Adapter contract: %w", err))
+		}
+		lggr.Info().Str("Address", bridgeAdapter.EthAddress.String()).Msg("Deployed Mock L2 Bridge Adapter contract")
+		lmCommon.BridgeAdapterAddr = bridgeAdapter.EthAddress
+	case chainselectors.ETHEREUM_TESTNET_SEPOLIA.Selector:
+		if l2ChainID == int64(chainselectors.ETHEREUM_TESTNET_SEPOLIA_ARBITRUM_1.EvmChainID) {
+			wethAddress := common.HexToAddress("0x7b79995e5f793A07Bc00c21412e50Ecae098E7f9")
+			lmCommon.WrapperNative = &wethAddress
+			lggr.Info().Msg("Deploying Arbitrum L1 Bridge Adapter contract")
+			bridgeAdapter, err := cd.DeployArbitrumL1BridgeAdapter(
+				common.HexToAddress("0xcE18836b233C83325Cc8848CA4487e94C6288264"),
+				common.HexToAddress("0x65f07C7D521164a4d5DaC6eB8Fac8DA067A3B78F"),
+			)
+			if err != nil {
+				return errors.WithStack(fmt.Errorf("failed to deploy Arbitrum L1 Bridge Adapter contract: %w", err))
+			}
+			lggr.Info().Str("Address", bridgeAdapter.EthAddress.String()).Msg("Deployed Arbitrum L1 Bridge Adapter contract")
+			lmCommon.BridgeAdapterAddr = bridgeAdapter.EthAddress
+		}
+		if l2ChainID == int64(chainselectors.ETHEREUM_TESTNET_SEPOLIA_OPTIMISM_1.EvmChainID) {
+			wethAddress := common.HexToAddress("0x7b79995e5f793a07bc00c21412e50ecae098e7f9")
+			lmCommon.WrapperNative = &wethAddress
+			lggr.Info().Msg("Deploying Optimism L1 Bridge Adapter contract")
+			bridgeAdapter, err := cd.DeployOptimismL1BridgeAdapter(
+				common.HexToAddress("0xFBb0621E0B23b5478B630BD55a5f21f67730B0F1"),
+				*lmCommon.WrapperNative,
+				common.HexToAddress("0x16Fc5058F25648194471939df75CF27A2fdC48BC"),
+			)
+			if err != nil {
+				return errors.WithStack(fmt.Errorf("failed to deploy Optimism L1 Bridge Adapter contract: %w", err))
+			}
+			lggr.Info().Str("Address", bridgeAdapter.EthAddress.String()).Msg("Deployed Optimism L1 Bridge Adapter contract")
+			lmCommon.BridgeAdapterAddr = bridgeAdapter.EthAddress
+		}
+	case chainselectors.ETHEREUM_TESTNET_SEPOLIA_ARBITRUM_1.Selector:
+		wethAddress := common.HexToAddress("0x980B62Da83eFf3D4576C647993b0c1D7faf17c73")
+		lmCommon.WrapperNative = &wethAddress
+		lggr.Info().Msg("Deploying Arbitrum L2 Bridge Adapter contract")
+		bridgeAdapter, err := cd.DeployArbitrumL2BridgeAdapter(common.HexToAddress("0x9fDD1C4E4AA24EEc1d913FABea925594a20d43C7"))
+		if err != nil {
+			return errors.WithStack(fmt.Errorf("failed to deploy Arbitrum L2 Bridge Adapter contract: %w", err))
+		}
+		lggr.Info().Str("Address", bridgeAdapter.EthAddress.String()).Msg("Deployed Arbitrum L2 Bridge Adapter contract")
+		lmCommon.BridgeAdapterAddr = bridgeAdapter.EthAddress
+	case chainselectors.ETHEREUM_TESTNET_SEPOLIA_OPTIMISM_1.Selector:
+		wethAddress := common.HexToAddress("0x4200000000000000000000000000000000000006")
+		lmCommon.WrapperNative = &wethAddress
+		lggr.Info().Msg("Deploying Optimism L2 Bridge Adapter contract")
+		bridgeAdapter, err := cd.DeployOptimismL2BridgeAdapter(*lmCommon.WrapperNative)
+		if err != nil {
+			return errors.WithStack(fmt.Errorf("failed to deploy Optimism L2 Bridge Adapter contract: %w", err))
+		}
+		lggr.Info().Str("Address", bridgeAdapter.EthAddress.String()).Msg("Deployed Optimism L2 Bridge Adapter contract")
+		lmCommon.BridgeAdapterAddr = bridgeAdapter.EthAddress
 	}
 
 	// Deploy Mock ARM contract
@@ -282,15 +364,6 @@ func (o *LMTestSetupOutputs) DeployLMChainContracts(
 	}
 	lggr.Info().Str("Address", armProxyContract.EthAddress.String()).Msg("Deployed ARM Proxy contract")
 	lmCommon.ArmProxy = armProxyContract
-
-	// Deploy Wrapped Native contract
-	lggr.Info().Msg("Deploying Wrapped Native contract")
-	wrapperNative, err := cd.DeployWrappedNative()
-	if err != nil {
-		return errors.WithStack(fmt.Errorf("failed to deploy Wrapped Native contract: %w", err))
-	}
-	lggr.Info().Str("Address", wrapperNative.String()).Msg("Deployed Wrapped Native contract")
-	lmCommon.WrapperNative = wrapperNative
 
 	// Deploy CCIP Router contract
 	lggr.Info().Msg("Deploying CCIP Router contract")
@@ -312,7 +385,7 @@ func (o *LMTestSetupOutputs) DeployLMChainContracts(
 
 	// Deploy Liquidity Manager contract
 	lggr.Info().Msg("Deploying Liquidity Manager contract")
-	liquidityManager, err := cd.DeployLiquidityManager(*lmCommon.WrapperNative, chainSelectors[0], lmCommon.TokenPool.EthAddress, lmCommon.MinimumLiquidity)
+	liquidityManager, err := cd.DeployLiquidityManager(*lmCommon.WrapperNative, lmCommon.ChainSelectror, lmCommon.TokenPool.EthAddress, lmCommon.MinimumLiquidity)
 	if err != nil {
 		return errors.WithStack(fmt.Errorf("failed to deploy Liquidity Manager contract: %w", err))
 	}
@@ -339,25 +412,6 @@ func (o *LMTestSetupOutputs) DeployLMChainContracts(
 	}
 	if onchainRebalancer != *liquidityManager.EthAddress {
 		return errors.WithStack(fmt.Errorf("onchainRebalancer doesn not match the deployed Liquidity Manager"))
-	}
-
-	// Deploy Bridge Adapter contracts
-	if lmCommon.IsL2 {
-		lggr.Info().Msg("Deploying Mock L2 Bridge Adapter contract")
-		l2bridgeAdapter, err := cd.DeployMockL2BridgeAdapter()
-		if err != nil {
-			return errors.WithStack(fmt.Errorf("failed to deploy Mock L2 Bridge Adapter contract: %w", err))
-		}
-		lggr.Info().Str("Address", l2bridgeAdapter.EthAddress.String()).Msg("Deployed Mock L2 Bridge Adapter contract")
-		lmCommon.BridgeAdapterAddr = l2bridgeAdapter.EthAddress
-	} else {
-		lggr.Info().Msg("Deploying Mock L1 Bridge Adapter contract")
-		l1bridgeAdapter, err := cd.DeployMockL1BridgeAdapter(*lmCommon.WrapperNative, true)
-		if err != nil {
-			return errors.WithStack(fmt.Errorf("failed to deploy Mock L1 Bridge Adapter contract: %w", err))
-		}
-		lggr.Info().Str("Address", l1bridgeAdapter.EthAddress.String()).Msg("Deployed Mock L1 Bridge Adapter contract")
-		lmCommon.BridgeAdapterAddr = l1bridgeAdapter.EthAddress
 	}
 
 	lggr.Debug().Interface("lmCommon", lmCommon).Msg("lmCommon")
@@ -450,7 +504,7 @@ func (o *LMTestSetupOutputs) SetOCR3Config(chainId int64) error {
 	return nil
 }
 
-func (o *LMTestSetupOutputs) FundPool(chainId int64, lggr zerolog.Logger, fundingAmount *big.Int) error {
+func (o *LMTestSetupOutputs) FundPool(chainId int64, lggr *zerolog.Logger, fundingAmount *big.Int) error {
 	token, err := erc20.NewERC20(*o.LMModules[chainId].WrapperNative, o.LMModules[chainId].ChainClient.Backend())
 	if err != nil {
 		return errors.WithStack(fmt.Errorf("failed to create ERC20 contract instance: %w", err))
@@ -519,7 +573,7 @@ func (o *LMTestSetupOutputs) FundPool(chainId int64, lggr zerolog.Logger, fundin
 	return nil
 }
 
-func (o *LMTestSetupOutputs) FundLM(chainId int64, lggr zerolog.Logger, fundingAmount *big.Int) error {
+func (o *LMTestSetupOutputs) FundLM(chainId int64, lggr *zerolog.Logger, fundingAmount *big.Int) error {
 	transactor, err := o.LMModules[chainId].ChainClient.TransactionOpts(o.LMModules[chainId].ChainClient.GetDefaultWallet())
 	if err != nil {
 		return errors.WithStack(fmt.Errorf("failed to get transaction options: %w", err))
@@ -571,23 +625,18 @@ func (o *LMTestSetupOutputs) FundLM(chainId int64, lggr zerolog.Logger, fundingA
 	return nil
 }
 
-func (o *LMTestSetupOutputs) AddJobs(chainId int64, lggr zerolog.Logger) error {
+func (o *LMTestSetupOutputs) AddJobs(chainId int64, lggr *zerolog.Logger) error {
 	// Add bootstrap job
 	clNodesWithKeys := o.Env.CLNodesWithKeys[strconv.FormatInt(chainId, 10)]
 	bootstrapNode := clNodesWithKeys[0]
-	bootstrapSpec := &client.OCR2TaskJobSpec{
-		Name:    "ocr2 bootstrap node " + o.LMModules[chainId].LM.EthAddress.String(),
-		JobType: "bootstrap",
-		OCR2OracleSpec: job.OCR2OracleSpec{
-			ContractID: o.LMModules[chainId].LM.EthAddress.String(),
-			Relay:      "evm",
-			RelayConfig: map[string]interface{}{
-				"chainID": int(chainId),
-			},
-			ContractConfigTrackerPollInterval: *models.NewInterval(time.Second * 15),
-		},
+	bootstrapSpec, err := integrationtesthelpers.NewBootsrapJobSpec(&integrationtesthelpers.LMJobSpecParams{
+		ChainID:            uint64(chainId),
+		ContractID:         o.LMModules[chainId].LM.EthAddress.String(),
+		CfgTrackerInterval: 15 * time.Second,
+	})
+	if err != nil {
+		return errors.WithStack(fmt.Errorf("failed to create bootstrap job spec: %w", err))
 	}
-
 	lggr.Info().Msg("Adding bootstrap job")
 	j, err := bootstrapNode.Node.MustCreateJob(bootstrapSpec)
 	if err != nil {
@@ -600,32 +649,20 @@ func (o *LMTestSetupOutputs) AddJobs(chainId int64, lggr zerolog.Logger) error {
 	// Add LM jobs
 	donNodes := clNodesWithKeys[1:]
 
-	//TODO: Replace this with proper LM job config generation
 	for _, node := range donNodes {
-		lmPluginConf := job.JSONConfig{
-			"closePluginTimeoutSec":   10,
-			"liquidityManagerAddress": "\"" + o.LMModules[chainId].LM.EthAddress.String() + "\"",
-			"liquidityManagerNetwork": "\"" + strconv.FormatUint(o.LMModules[chainId].ChainSelectror, 10) +
-				"\"" + "\n[pluginConfig.rebalancerConfig]\n type = \"ping-pong\"\n",
-		}
-
-		lmJobSpec := &client.OCR2TaskJobSpec{
-			Name:    "lm " + o.LMModules[chainId].LM.EthAddress.String(),
-			JobType: "offchainreporting2",
-			OCR2OracleSpec: job.OCR2OracleSpec{
-				PluginType: "liquiditymanager",
-				Relay:      "evm",
-				RelayConfig: map[string]interface{}{
-					"chainID": int(chainId),
-				},
-				PluginConfig: lmPluginConf,
-
-				ContractConfigTrackerPollInterval: *models.NewInterval(time.Second * 15),
-				ContractID:                        o.LMModules[chainId].LM.EthAddress.String(),      // registryAddr
-				OCRKeyBundleID:                    null.StringFrom(node.KeysBundle.OCR2Key.Data.ID), // get node ocr2config.ID
-				TransmitterID:                     null.StringFrom(node.KeysBundle.EthAddress),      // node addr
-				P2PV2Bootstrappers:                pq.StringArray{P2Pv2Bootstrapper},                // bootstrap node key and address <p2p-key>@bootstrap:8000
-			},
+		lmJobSpec, err := integrationtesthelpers.NewJobSpec(&integrationtesthelpers.LMJobSpecParams{
+			ChainID:                 uint64(chainId),
+			ContractID:              o.LMModules[chainId].LM.EthAddress.String(),
+			OCRKeyBundleID:          node.KeysBundle.OCR2Key.Data.ID,
+			TransmitterID:           node.KeysBundle.EthAddress,
+			P2PV2Bootstrappers:      pq.StringArray{P2Pv2Bootstrapper},
+			CfgTrackerInterval:      15 * time.Second,
+			LiquidityManagerAddress: *o.LMModules[chainId].LM.EthAddress,
+			NetworkSelector:         o.LMModules[chainId].ChainSelectror,
+			Type:                    "ping-pong",
+		})
+		if err != nil {
+			return errors.WithStack(fmt.Errorf("failed to create LM job spec: %w", err))
 		}
 		lggr.Debug().Interface("lmJobSpec", lmJobSpec).Msg("lmJobSpec")
 		lggr.Info().Str("Node URL", node.Node.URL()).Msg("Adding LM job")
@@ -641,7 +678,7 @@ func (o *LMTestSetupOutputs) AddJobs(chainId int64, lggr zerolog.Logger) error {
 
 func LMDefaultTestSetup(
 	t *testing.T,
-	lggr zerolog.Logger,
+	lggr *zerolog.Logger,
 	envName string,
 	testConfig *CCIPTestConfig,
 ) *LMTestSetupOutputs {
@@ -678,8 +715,9 @@ func LMDefaultTestSetup(
 		}
 	}
 
-	//TODO: Refactor this to detect if the chain is L1 or L2 based on a config
-	i := 0
+	l1ChainId := testConfig.SelectedNetworks[0].ChainID
+	l2ChainId := testConfig.SelectedNetworks[1].ChainID
+
 	for _, net := range testConfig.AllNetworks {
 		chain := chainByChainID[net.ChainID]
 		net := net
@@ -694,21 +732,16 @@ func LMDefaultTestSetup(
 		lmCommon, err := actions.DefaultLMModule(
 			chain,
 			big.NewInt(0),
-			i == 1,
 			selectors[0],
 		)
 		require.NoError(t, err)
 		chainAddGrp.Go(func() error {
-			return setUpArgs.DeployLMChainContracts(lggr, chain, net, selectors, *lmCommon)
+			return setUpArgs.DeployLMChainContracts(lggr, net, *lmCommon, l2ChainId)
 		})
-		i++
 	}
 	require.NoError(t, chainAddGrp.Wait(), "Deploying common contracts shouldn't fail")
 
 	lggr.Debug().Interface("lmModules", lmModules).Msg("lmModules")
-
-	l1ChainId := testConfig.SelectedNetworks[0].ChainID
-	l2ChainId := testConfig.SelectedNetworks[1].ChainID
 
 	//Set Cross Chain Rebalancer on L1 Rebalancer
 	err = lmModules[l1ChainId].LM.SetCrossChainRebalancer(

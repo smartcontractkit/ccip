@@ -45,7 +45,18 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/promwrapper"
 )
 
-const numTokenDataWorkers = 5
+var (
+	// tokenDataWorkerTimeout defines 1) The timeout while waiting for a bg call to the token data 3P provider.
+	// 2) When a client requests token data and does not specify a timeout this value is used as a default.
+	// 5 seconds is a reasonable value for a timeout.
+	// At this moment, minimum OCR Delta Round is set to 30s and deltaGrace to 5s. Based on this configuration
+	// 5s for token data worker timeout is a reasonable default.
+	tokenDataWorkerTimeout = 5 * time.Second
+	// tokenDataWorkerNumWorkers is the number of workers that will be processing token data in parallel.
+	tokenDataWorkerNumWorkers = 5
+)
+
+var defaultNewReportingPluginRetryConfig = ccipdata.RetryConfig{InitialDelay: time.Second, MaxDelay: 5 * time.Minute}
 
 func NewExecutionServices(ctx context.Context, lggr logger.Logger, jb job.Job, chainSet legacyevm.LegacyChainContainer, new bool, argsNoPlugin libocr2.OCR2OracleArgs, logError func(string)) ([]job.ServiceCtx, error) {
 	execPluginConfig, backfillArgs, chainHealthcheck, tokenWorker, err := jobSpecToExecPluginConfig(ctx, lggr, jb, chainSet)
@@ -102,7 +113,7 @@ func UnregisterExecPluginLpFilters(ctx context.Context, lggr logger.Logger, jb j
 	versionFinder := factory.NewEvmVersionFinder()
 	unregisterFuncs := []func() error{
 		func() error {
-			return factory.CloseCommitStoreReader(lggr, versionFinder, params.offRampConfig.CommitStore, params.destChain.Client(), params.destChain.LogPoller(), params.sourceChain.GasEstimator(), params.sourceChain.Config().EVM().GasEstimator().PriceMax().ToInt())
+			return factory.CloseCommitStoreReader(lggr, versionFinder, params.offRampConfig.CommitStore, params.destChain.Client(), params.destChain.LogPoller())
 		},
 		func() error {
 			return factory.CloseOnRampReader(lggr, versionFinder, params.offRampConfig.SourceChainSelector, params.offRampConfig.ChainSelector, params.offRampConfig.OnRamp, params.sourceChain.LogPoller(), params.sourceChain.Client())
@@ -212,9 +223,19 @@ func jobSpecToExecPluginConfig(ctx context.Context, lggr logger.Logger, jb job.J
 		return nil, nil, nil, nil, errors.Wrap(err, "could not get source native token")
 	}
 
-	commitStoreReader, err := factory.NewCommitStoreReader(lggr, versionFinder, params.offRampConfig.CommitStore, params.destChain.Client(), params.destChain.LogPoller(), params.sourceChain.GasEstimator(), params.sourceChain.Config().EVM().GasEstimator().PriceMax().ToInt())
+	commitStoreReader, err := factory.NewCommitStoreReader(lggr, versionFinder, params.offRampConfig.CommitStore, params.destChain.Client(), params.destChain.LogPoller())
 	if err != nil {
 		return nil, nil, nil, nil, errors.Wrap(err, "could not load commitStoreReader reader")
+	}
+
+	err = commitStoreReader.SetGasEstimator(ctx, params.sourceChain.GasEstimator())
+	if err != nil {
+		return nil, nil, nil, nil, fmt.Errorf("could not set gas estimator: %w", err)
+	}
+
+	err = commitStoreReader.SetSourceMaxGasPrice(ctx, params.sourceChain.Config().EVM().GasEstimator().PriceMax().ToInt())
+	if err != nil {
+		return nil, nil, nil, nil, fmt.Errorf("could not set source max gas price: %w", err)
 	}
 
 	tokenDataProviders, err := initTokenDataProviders(lggr, jobIDToString(jb.ID), params.pluginConfig, params.sourceChain.LogPoller())
@@ -280,30 +301,26 @@ func jobSpecToExecPluginConfig(ctx context.Context, lggr logger.Logger, jb job.J
 		params.offRampConfig.OnRamp,
 	)
 
-	onchainConfig, err := offRampReader.OnchainConfig(ctx)
-	if err != nil {
-		return nil, nil, nil, nil, fmt.Errorf("get onchain config from offramp reader: %w", err)
-	}
-
 	tokenBackgroundWorker := tokendata.NewBackgroundWorker(
 		tokenDataProviders,
-		numTokenDataWorkers,
-		5*time.Second,
-		onchainConfig.PermissionLessExecutionThresholdSeconds,
+		tokenDataWorkerNumWorkers,
+		tokenDataWorkerTimeout,
+		2*tokenDataWorkerTimeout,
 	)
 	return &ExecutionPluginStaticConfig{
-			lggr:                        execLggr,
-			onRampReader:                onRampReader,
-			commitStoreReader:           commitStoreReader,
-			offRampReader:               offRampReader,
-			sourcePriceRegistryProvider: ccipdataprovider.NewEvmPriceRegistry(params.sourceChain.LogPoller(), params.sourceChain.Client(), execLggr, ccip.ExecPluginLabel),
-			sourceWrappedNativeToken:    cciptypes.Address(sourceWrappedNative.String()),
-			destChainSelector:           destChainSelector,
-			priceRegistryProvider:       ccipdataprovider.NewEvmPriceRegistry(params.destChain.LogPoller(), params.destChain.Client(), execLggr, ccip.ExecPluginLabel),
-			tokenPoolBatchedReader:      tokenPoolBatchedReader,
-			tokenDataWorker:             tokenBackgroundWorker,
-			metricsCollector:            metricsCollector,
-			chainHealthcheck:            chainHealthcheck,
+			lggr:                          execLggr,
+			onRampReader:                  onRampReader,
+			commitStoreReader:             commitStoreReader,
+			offRampReader:                 offRampReader,
+			sourcePriceRegistryProvider:   ccipdataprovider.NewEvmPriceRegistry(params.sourceChain.LogPoller(), params.sourceChain.Client(), execLggr, ccip.ExecPluginLabel),
+			sourceWrappedNativeToken:      cciptypes.Address(sourceWrappedNative.String()),
+			destChainSelector:             destChainSelector,
+			priceRegistryProvider:         ccipdataprovider.NewEvmPriceRegistry(params.destChain.LogPoller(), params.destChain.Client(), execLggr, ccip.ExecPluginLabel),
+			tokenPoolBatchedReader:        tokenPoolBatchedReader,
+			tokenDataWorker:               tokenBackgroundWorker,
+			metricsCollector:              metricsCollector,
+			chainHealthcheck:              chainHealthcheck,
+			newReportingPluginRetryConfig: defaultNewReportingPluginRetryConfig,
 		}, &ccipcommon.BackfillArgs{
 			SourceLP:         params.sourceChain.LogPoller(),
 			DestLP:           params.destChain.LogPoller(),
