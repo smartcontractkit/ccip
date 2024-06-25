@@ -241,7 +241,6 @@ func buildSingleChainReport(ctx context.Context, lggr logger.Logger, hasher ccip
 		if !report.SequenceNumberRange.Contains(msg.SeqNum) {
 			return cciptypes.ExecutePluginReportSingleChain{}, 0, fmt.Errorf("malformed report %s, message with sequence number %d outside of report range %s", report.MerkleRoot.String(), msg.SeqNum, report.SequenceNumberRange)
 		}
-		// TODO: pass in a hasher to construct the chain specific merkle tree.
 		leaf, err := hasher.Hash(ctx, msg)
 		if err != nil {
 			return cciptypes.ExecutePluginReportSingleChain{}, 0, fmt.Errorf("unable to hash message (%d, %d): %w", msg.SourceChain, msg.SeqNum, err)

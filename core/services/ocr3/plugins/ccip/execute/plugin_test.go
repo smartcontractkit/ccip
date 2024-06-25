@@ -371,6 +371,31 @@ func Test_selectReport(t *testing.T) {
 			expectedExecThings:    []int{4},
 			lastReportExecuted:    []cciptypes.SeqNum{100, 101, 102, 103, 104, 105, 106, 107, 108},
 		},
+		{
+			name: "execute remainder of sparsely executed report",
+			args: args{
+				maxReportSize: 2500,
+				reports: []cciptypes.ExecutePluginCommitDataWithMessages{
+					makeTestMessage(10, 1, 100, 999, 10101010101, []cciptypes.SeqNum{100, 102, 104, 106, 108}),
+				},
+			},
+			expectedExecReports:   1,
+			expectedCommitReports: 0,
+			expectedExecThings:    []int{5},
+		},
+		{
+			name: "partially execute remainder of partially executed sparse report",
+			args: args{
+				maxReportSize: 2000,
+				reports: []cciptypes.ExecutePluginCommitDataWithMessages{
+					makeTestMessage(10, 1, 100, 999, 10101010101, []cciptypes.SeqNum{100, 102, 104, 106, 108}),
+				},
+			},
+			expectedExecReports:   1,
+			expectedCommitReports: 1,
+			expectedExecThings:    []int{4},
+			lastReportExecuted:    []cciptypes.SeqNum{100, 101, 102, 103, 104, 105, 106, 107, 108},
+		},
 		// TODO: error cases
 	}
 	for _, tt := range tests {
