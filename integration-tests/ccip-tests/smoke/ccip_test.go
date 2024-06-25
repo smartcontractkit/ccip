@@ -408,7 +408,7 @@ func TestSmokeCCIPSelfServeRateLimitOnRamp(t *testing.T) {
 
 	log := logging.GetTestLogger(t)
 	TestCfg := testsetups.NewCCIPTestConfig(t, log, testconfig.Smoke)
-	err := contracts.HaveRequiredContractVersions(map[contracts.Name]contracts.Version{
+	err := contracts.MatchContractVersionsOrAbove(map[contracts.Name]contracts.Version{
 		contracts.OffRampContract: contracts.V1_5_0_dev,
 		contracts.OnRampContract:  contracts.V1_5_0_dev,
 	})
@@ -534,7 +534,7 @@ func TestSmokeCCIPSelfServeRateLimitOffRamp(t *testing.T) {
 
 	log := logging.GetTestLogger(t)
 	TestCfg := testsetups.NewCCIPTestConfig(t, log, testconfig.Smoke)
-	err := contracts.HaveRequiredContractVersions(map[contracts.Name]contracts.Version{
+	err := contracts.MatchContractVersionsOrAbove(map[contracts.Name]contracts.Version{
 		contracts.OffRampContract: contracts.V1_5_0_dev,
 	})
 	require.NoError(t, err, "Required contract versions not met")

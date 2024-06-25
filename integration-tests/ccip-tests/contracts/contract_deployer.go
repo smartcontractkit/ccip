@@ -61,7 +61,8 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay/evm"
 )
 
-func HaveRequiredContractVersions(requiredContractVersions map[Name]Version) error {
+// MatchContractVersionsOrAbove checks if the current contract versions for the test match or exceed the provided contract versions
+func MatchContractVersionsOrAbove(requiredContractVersions map[Name]Version) error {
 	for contractName, r := range requiredContractVersions {
 		required := r
 		if contractVersion, ok := VersionMap[contractName]; !ok {
@@ -76,7 +77,7 @@ func HaveRequiredContractVersions(requiredContractVersions map[Name]Version) err
 // NeedTokenAdminRegistry checks if token admin registry is needed for the current version of ccip
 // if the version is less than 1.5.0-dev, then token admin registry is not needed
 func NeedTokenAdminRegistry() bool {
-	return HaveRequiredContractVersions(map[Name]Version{
+	return MatchContractVersionsOrAbove(map[Name]Version{
 		TokenPoolContract: V1_5_0_dev,
 	}) == nil
 }
