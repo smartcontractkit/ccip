@@ -226,20 +226,23 @@ type TokenDataReader interface {
 }
 
 // buildSingleChainReport constructs a single chain report from a commit report.
-func buildSingleChainReport(ctx context.Context, lggr logger.Logger, hasher cciptypes.MessageHasher, codec cciptypes.ExecutePluginCodec, tokenDataReader TokenDataReader, report cciptypes.ExecutePluginCommitDataWithMessages, maxReportSize, maxMessages int) (cciptypes.ExecutePluginReportSingleChain /* encoded size */, int, error) {
+func buildSingleChainReport(ctx context.Context, lggr logger.Logger, hasher cciptypes.MessageHasher, tokenDataReader TokenDataReader, codec cciptypes.ExecutePluginCodec, report cciptypes.ExecutePluginCommitDataWithMessages, maxReportSize, maxMessages int) (cciptypes.ExecutePluginReportSingleChain, int, error) {
 	if maxMessages == 0 {
 		maxMessages = len(report.Messages)
 	}
 
 	numMsg := int(report.SequenceNumberRange.End() - report.SequenceNumberRange.Start() + 1)
 	if numMsg != len(report.Messages) {
-		return cciptypes.ExecutePluginReportSingleChain{}, 0, fmt.Errorf("malformed report %s, unexpected number of messages: expected %d , got %d", report.MerkleRoot.String(), numMsg, len(report.Messages))
+		return cciptypes.ExecutePluginReportSingleChain{}, 0, fmt.Errorf("malformed report %s, unexpected number of messages: expected %d, got %d", report.MerkleRoot.String(), numMsg, len(report.Messages))
 	}
 
 	treeLeaves := make([][32]byte, 0)
 	for _, msg := range report.Messages {
 		if !report.SequenceNumberRange.Contains(msg.SeqNum) {
-			return cciptypes.ExecutePluginReportSingleChain{}, 0, fmt.Errorf("malformed report %s, message with sequence number %d outside of report range %s", report.MerkleRoot.String(), msg.SeqNum, report.SequenceNumberRange)
+			return cciptypes.ExecutePluginReportSingleChain{}, 0, fmt.Errorf("malformed message %s, message with sequence number %d outside of report range %s", report.MerkleRoot.String(), msg.SeqNum, report.SequenceNumberRange)
+		}
+		if report.SourceChain != msg.SourceChain {
+			return cciptypes.ExecutePluginReportSingleChain{}, 0, fmt.Errorf("malformed message %s, unexpected source chain: expected %d, got %d", report.MerkleRoot.String(), report.SourceChain, msg.SourceChain)
 		}
 		leaf, err := hasher.Hash(ctx, msg)
 		if err != nil {
@@ -321,7 +324,7 @@ func selectReport(ctx context.Context, lggr logger.Logger, hasher cciptypes.Mess
 	partialReport := false
 	var finalReports []cciptypes.ExecutePluginReportSingleChain
 	for reportIdx, report := range reports {
-		finalReport, encodedSize, err := buildSingleChainReport(ctx, lggr, hasher, codec, tokenDataReader, report, maxReportSize, 0)
+		finalReport, encodedSize, err := buildSingleChainReport(ctx, lggr, hasher, tokenDataReader, codec, report, maxReportSize, 0)
 		if err != nil {
 			return nil, nil, fmt.Errorf("unable to build a single chain report (max): %w", err)
 		}
@@ -334,7 +337,7 @@ func selectReport(ctx context.Context, lggr logger.Logger, hasher cciptypes.Mess
 			for low <= high {
 				mid := low + ((high - low) / 2)
 
-				finalReport2, encodedSize2, err2 := buildSingleChainReport(ctx, lggr, hasher, codec, tokenDataReader, report, maxReportSize, mid)
+				finalReport2, encodedSize2, err2 := buildSingleChainReport(ctx, lggr, hasher, tokenDataReader, codec, report, maxReportSize, mid)
 				if err2 != nil {
 					return nil, nil, fmt.Errorf("unable to build a single chain report (messages %d): %w", mid, err2)
 				}
