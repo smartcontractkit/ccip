@@ -241,7 +241,7 @@ func newMsgsConsensusForChain(
 		"chain", chainSel, "fChain", fChain, "observedMsgs", len(observedMsgs))
 
 	// First come to consensus about the (sequence number, msg hash) pairs.
-	// For each sequence number consider correct the Hash with the most votes.
+	// For each sequence number consider the Hash with the most votes.
 	msgSeqNumToHashCounts := make(map[cciptypes.SeqNum]map[string]int) // seqNum -> msgHash -> count
 	for _, msg := range observedMsgs {
 		if _, exists := msgSeqNumToHashCounts[msg.SeqNum]; !exists {
