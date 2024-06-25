@@ -193,9 +193,6 @@ func (oc contractTransmitterNoSignatures) Transmit(ctx context.Context, reportCt
 	var ss [][32]byte
 	var vs [32]byte
 
-	rs = append(rs, [32]byte{})
-	ss = append(ss, [32]byte{})
-
 	if len(signatures) > 32 {
 		return errors.New("too many signatures, maximum is 32")
 	}
