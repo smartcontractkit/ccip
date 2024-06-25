@@ -22,8 +22,8 @@ class Interval:
 @dataclass
 class Message:
     seq_nr: int
-    message_id: bytes
-    message_hash: bytes
+    message_id: bytes    # a unique message identifier computed on the source chain
+    message_hash: bytes  # hash of message body computed on the destination chain and used on merkle tree
     # TODO:
 
 @dataclass
@@ -125,7 +125,8 @@ class CommitPlugin:
             assert self.cfg.dest_chain in self.cfg.oracle_info[oracle]
 
         # Only accept source observations from nodes which support those sources.
-        msg_ids = msg_hashes = set()
+        msg_ids = set()
+        msg_hashes = set()
         for (chain, msgs) in observation.new_msgs.items():
             assert(chain in self.cfg.oracle_info[oracle])
             # Don't allow duplicates of (chain, seqNr), (id) and (hash). Required to prevent double counting.
@@ -134,7 +135,7 @@ class CommitPlugin:
                 assert msg.message_id not in msg_ids
                 assert msg.message_hash not in msg_hashes
                 msg_ids.add(msg.message_id)
-                msg_ids.add(msg.message_hash)
+                msg_hashes.add(msg.message_hash)
 
     def observation_quorum(self):
         return "2F+1"
