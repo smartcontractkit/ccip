@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.24;
 
-import {Client} from "../../libraries/Client.sol";
-import {PingPongDemo} from "../../production-examples/PingPongDemo.sol";
-import "../onRamp/EVM2EVMOnRampSetup.t.sol";
+import {PingPongDemo} from "../../../applications/internal/PingPongDemo.sol";
+import {Client} from "../../../libraries/Client.sol";
+import "../../onRamp/EVM2EVMOnRampSetup.t.sol";
 
 // setup
 contract PingPongDappSetup is EVM2EVMOnRampSetup {

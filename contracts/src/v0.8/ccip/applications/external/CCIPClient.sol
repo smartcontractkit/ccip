@@ -1,12 +1,12 @@
 pragma solidity ^0.8.0;
 
-import {IERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {CCIPReceiverWithACK} from "./CCIPReceiverWithACK.sol";
 
-import {IRouterClient} from "../interfaces/IRouterClient.sol";
-import {Client} from "../libraries/Client.sol";
+import {IRouterClient} from "../../interfaces/IRouterClient.sol";
+import {Client} from "../../libraries/Client.sol";
 
 contract CCIPClient is CCIPReceiverWithACK {
   using SafeERC20 for IERC20;
@@ -58,7 +58,11 @@ contract CCIPClient is CCIPReceiverWithACK {
     // Since the fee token was already set in the ReceiverWithACK parent, we don't need to approve it to spend, only to ensure we have enough
     // funds for the transfer
     if (!sendingFeeTokenNormally && feeToken == address(s_feeToken) && feeToken != address(0)) {
-      IERC20(feeToken).safeTransferFrom(msg.sender, address(this), fee);
+      // Support pre-funding the contract with fee token by checking that not enough exists to pay the fee already
+      // msg.sender checks that the function was not called in a _sendACK() call or as a result of processMessage(), which would require pre-funding the contract
+      if (IERC20(feeToken).balanceOf(address(this)) < fee && msg.sender != address(this)) {
+        IERC20(feeToken).safeTransferFrom(msg.sender, address(this), fee);
+      }
     } else if (feeToken == address(0) && msg.value < fee) {
       revert IRouterClient.InsufficientFeeTokenAmount();
     }

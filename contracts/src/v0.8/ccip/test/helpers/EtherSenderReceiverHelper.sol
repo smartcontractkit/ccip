@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.24;
 
+import {CCIPSender} from "../../applications/external/CCIPSender.sol";
 import {Client} from "../../libraries/Client.sol";
-import {CCIPReceiverBasic} from "../../production-examples/CCIPReceiverBasic.sol";
-import {CCIPSender} from "../../production-examples/CCIPSender.sol";
+import {CCIPReceiverBasic} from "./receivers/CCIPReceiverBasic.sol";
 
 import {IWrappedNative} from "../../interfaces/IWrappedNative.sol";
 
@@ -60,16 +60,16 @@ contract EtherSenderReceiverHelper is CCIPSender {
     view
     returns (Client.EVM2AnyMessage memory)
   {
-    Client.EVM2AnyMessage memory validatedMessage = message;
+    Client.EVM2AnyMessage memory validMessage = message;
 
-    if (validatedMessage.tokenAmounts.length != 1) {
-      revert InvalidTokenAmounts(validatedMessage.tokenAmounts.length);
+    if (validMessage.tokenAmounts.length != 1) {
+      revert InvalidTokenAmounts(validMessage.tokenAmounts.length);
     }
 
-    validatedMessage.data = abi.encode(msg.sender);
-    validatedMessage.tokenAmounts[0].token = address(i_weth);
+    validMessage.data = abi.encode(msg.sender);
+    validMessage.tokenAmounts[0].token = address(i_weth);
 
-    return validatedMessage;
+    return validMessage;
   }
 
   function publicCcipReceive(Client.Any2EVMMessage memory message) public {

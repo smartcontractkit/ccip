@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {ICCIPClientBase} from "../../interfaces/ICCIPClientBase.sol";
-import {IRouterClient} from "../../interfaces/IRouterClient.sol";
-import {CCIPClient} from "../../production-examples/CCIPClient.sol";
-import {CCIPReceiverWithACK} from "../../production-examples/CCIPClient.sol";
+import {CCIPClient} from "../../../applications/external/CCIPClient.sol";
+import {CCIPReceiverWithACK} from "../../../applications/external/CCIPClient.sol";
+import {ICCIPClientBase} from "../../../interfaces/ICCIPClientBase.sol";
+import {IRouterClient} from "../../../interfaces/IRouterClient.sol";
 
-import {Client} from "../../libraries/Client.sol";
-import {EVM2EVMOnRampSetup} from "../onRamp/EVM2EVMOnRampSetup.t.sol";
+import {Client} from "../../../libraries/Client.sol";
+import {EVM2EVMOnRampSetup} from "../../onRamp/EVM2EVMOnRampSetup.t.sol";
 
-import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
+import {IERC20} from "../../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 
 contract CCIPClientTest is EVM2EVMOnRampSetup {
   event MessageFailed(bytes32 indexed messageId, bytes reason);

@@ -2,7 +2,7 @@
 pragma solidity 0.8.24;
 
 import {Client} from "../../../libraries/Client.sol";
-import {CCIPReceiverBasic} from "../../../production-examples/CCIPReceiverBasic.sol";
+import {CCIPReceiverBasic} from "./CCIPReceiverBasic.sol";
 
 contract ConformingReceiver is CCIPReceiverBasic {
   event MessageReceived();

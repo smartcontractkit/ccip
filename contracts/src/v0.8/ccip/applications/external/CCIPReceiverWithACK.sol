@@ -1,13 +1,13 @@
 pragma solidity ^0.8.0;
 
-import {IRouterClient} from "../interfaces/IRouterClient.sol";
-import {Client} from "../libraries/Client.sol";
+import {IRouterClient} from "../../interfaces/IRouterClient.sol";
+import {Client} from "../../libraries/Client.sol";
 import {CCIPReceiver} from "./CCIPReceiver.sol";
 
-import {IERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import {EnumerableMap} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/structs/EnumerableMap.sol";
+import {EnumerableMap} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/structs/EnumerableMap.sol";
 
 contract CCIPReceiverWithACK is CCIPReceiver {
   using SafeERC20 for IERC20;

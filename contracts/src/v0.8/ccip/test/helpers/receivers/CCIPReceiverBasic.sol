@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {IAny2EVMMessageReceiver} from "../interfaces/IAny2EVMMessageReceiver.sol";
+import {IAny2EVMMessageReceiver} from "../../../interfaces/IAny2EVMMessageReceiver.sol";
 
-import {IERC165} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/introspection/IERC165.sol";
-import {Client} from "../libraries/Client.sol";
-import {CCIPClientBase} from "./CCIPClientBase.sol";
+import {IERC165} from "../../../../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/introspection/IERC165.sol";
+
+import {CCIPClientBase} from "../../../applications/external/CCIPClientBase.sol";
+import {Client} from "../../../libraries/Client.sol";
 
 /// @title CCIPReceiver - Base contract for CCIP applications that can receive messages.
 contract CCIPReceiverBasic is CCIPClientBase, IAny2EVMMessageReceiver, IERC165 {

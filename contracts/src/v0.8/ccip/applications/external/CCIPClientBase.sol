@@ -1,13 +1,13 @@
 pragma solidity ^0.8.0;
 
-import {OwnerIsCreator} from "../../shared/access/OwnerIsCreator.sol";
-import {ITypeAndVersion} from "../../shared/interfaces/ITypeAndVersion.sol";
+import {OwnerIsCreator} from "../../../shared/access/OwnerIsCreator.sol";
+import {ITypeAndVersion} from "../../../shared/interfaces/ITypeAndVersion.sol";
 
-import {IERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
-import {Address} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/Address.sol";
+import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
+import {Address} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/Address.sol";
 
-import {ICCIPClientBase} from "../interfaces/ICCIPClientBase.sol";
+import {ICCIPClientBase} from "../../interfaces/ICCIPClientBase.sol";
 
 abstract contract CCIPClientBase is ICCIPClientBase, OwnerIsCreator, ITypeAndVersion {
   using SafeERC20 for IERC20;
