@@ -643,7 +643,7 @@ func (r *CommitReportingPlugin) isStaleMerkleRoot(ctx context.Context, lggr logg
 	// The report is not stale and correct only if nextSeqNum == reportInterval.Min.
 	// Mark it stale if the condition isn't met.
 	if nextSeqNum != reportInterval.Min {
-		lggr.Infow("The report is stale because of sequence number mismatch with the commit store interval Min value",
+		lggr.Infow("The report is stale because of sequence number mismatch with the commit store interval min value",
 			"nextSeqNum", nextSeqNum, "reportIntervalMin", reportInterval.Min)
 		return true
 	}
