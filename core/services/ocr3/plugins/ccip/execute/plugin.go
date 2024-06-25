@@ -271,8 +271,10 @@ func buildSingleChainReport(ctx context.Context, lggr logger.Logger, hasher ccip
 			msg := report.Messages[i]
 			tokenData, err := tokenDataReader.ReadTokenData(context.Background(), report.SourceChain, msg.SeqNum)
 			if err != nil {
+				// TODO: skip message instead of failing the whole thing.
+				//       that might mean moving the token data reading out of the loop.
 				lggr.Info("unable to read token data", "source-chain", report.SourceChain, "seq-num", msg.SeqNum, "error", err)
-				offchainTokenData = append(offchainTokenData, nil)
+				return cciptypes.ExecutePluginReportSingleChain{}, 0, fmt.Errorf("unable to read token data for message %d: %w", msg.SeqNum, err)
 			} else {
 				lggr.Debugw("read token data", "source-chain", report.SourceChain, "seq-num", msg.SeqNum, "data", tokenData)
 				offchainTokenData = append(offchainTokenData, tokenData)

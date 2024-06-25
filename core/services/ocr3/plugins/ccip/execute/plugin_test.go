@@ -3,6 +3,7 @@ package execute
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"math"
 	"testing"
 	"time"
@@ -173,7 +174,7 @@ func Test_getPendingExecutedReports(t *testing.T) {
 }
 
 // TODO: better than this
-type tdr int
+type tdr struct{}
 
 func (t tdr) ReadTokenData(ctx context.Context, srcChain cciptypes.ChainSelector, num cciptypes.SeqNum) ([][]byte, error) {
 	return nil, nil
@@ -451,6 +452,203 @@ func Test_selectReport(t *testing.T) {
 				lastReport := commitReports[len(commitReports)-1]
 				assert.ElementsMatch(t, tt.lastReportExecuted, lastReport.ExecutedMessages)
 			}
+		})
+	}
+}
+
+type badHasher struct{}
+
+func (bh badHasher) Hash(context.Context, cciptypes.CCIPMsg) (cciptypes.Bytes32, error) {
+	return cciptypes.Bytes32{}, fmt.Errorf("bad hasher")
+}
+
+type badTokenDataReader struct{}
+
+func (btdr badTokenDataReader) ReadTokenData(ctx context.Context, srcChain cciptypes.ChainSelector, num cciptypes.SeqNum) ([][]byte, error) {
+	return nil, fmt.Errorf("bad token data reader")
+}
+
+type badCodec struct{}
+
+func (bc badCodec) Encode(ctx context.Context, report cciptypes.ExecutePluginReport) ([]byte, error) {
+	return nil, fmt.Errorf("bad codec")
+}
+
+func (bc badCodec) Decode(ctx context.Context, bytes []byte) (cciptypes.ExecutePluginReport, error) {
+	return cciptypes.ExecutePluginReport{}, fmt.Errorf("bad codec")
+}
+
+func Test_buildSingleChainReport_Errors(t *testing.T) {
+	lggr := logger.Test(t)
+
+	type args struct {
+		report          cciptypes.ExecutePluginCommitDataWithMessages
+		maxReportSize   int
+		maxMessages     int
+		hasher          cciptypes.MessageHasher
+		tokenDataReader TokenDataReader
+		codec           cciptypes.ExecutePluginCodec
+	}
+	tests := []struct {
+		name string
+		args args
+		// TODO: assertions
+		wantErr string
+	}{
+		// TODO: Add test cases.
+		{
+			name:    "wrong number of messages",
+			wantErr: "unexpected number of messages: expected 1, got 2",
+			args: args{
+				report: cciptypes.ExecutePluginCommitDataWithMessages{
+					ExecutePluginCommitData: cciptypes.ExecutePluginCommitData{
+						SequenceNumberRange: cciptypes.NewSeqNumRange(cciptypes.SeqNum(100), cciptypes.SeqNum(100)),
+					},
+					Messages: []cciptypes.CCIPMsg{
+						{CCIPMsgBaseDetails: cciptypes.CCIPMsgBaseDetails{}},
+						{CCIPMsgBaseDetails: cciptypes.CCIPMsgBaseDetails{}},
+					},
+				},
+			},
+		},
+		{
+			name:    "wrong sequence numbers",
+			wantErr: "message with sequence number 102 outside of report range [100 -> 101]",
+			args: args{
+				report: cciptypes.ExecutePluginCommitDataWithMessages{
+					ExecutePluginCommitData: cciptypes.ExecutePluginCommitData{
+						SequenceNumberRange: cciptypes.NewSeqNumRange(cciptypes.SeqNum(100), cciptypes.SeqNum(101)),
+					},
+					Messages: []cciptypes.CCIPMsg{
+						{
+							CCIPMsgBaseDetails: cciptypes.CCIPMsgBaseDetails{
+								SeqNum: cciptypes.SeqNum(100),
+							},
+						},
+						{
+							CCIPMsgBaseDetails: cciptypes.CCIPMsgBaseDetails{
+								SeqNum: cciptypes.SeqNum(102),
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:    "source mismatch",
+			wantErr: "unexpected source chain: expected 1111, got 2222",
+			args: args{
+				report: cciptypes.ExecutePluginCommitDataWithMessages{
+					ExecutePluginCommitData: cciptypes.ExecutePluginCommitData{
+						SourceChain:         1111,
+						SequenceNumberRange: cciptypes.NewSeqNumRange(cciptypes.SeqNum(100), cciptypes.SeqNum(100)),
+					},
+					Messages: []cciptypes.CCIPMsg{
+						{CCIPMsgBaseDetails: cciptypes.CCIPMsgBaseDetails{
+							SourceChain: 2222,
+							SeqNum:      cciptypes.SeqNum(100),
+						}},
+					},
+				},
+				hasher: badHasher{},
+			},
+		},
+		{
+			name:    "bad hasher",
+			wantErr: "unable to hash message (1234567, 100): bad hasher",
+			args: args{
+				report: cciptypes.ExecutePluginCommitDataWithMessages{
+					ExecutePluginCommitData: cciptypes.ExecutePluginCommitData{
+						SourceChain:         1234567,
+						SequenceNumberRange: cciptypes.NewSeqNumRange(cciptypes.SeqNum(100), cciptypes.SeqNum(100)),
+					},
+					Messages: []cciptypes.CCIPMsg{
+						{CCIPMsgBaseDetails: cciptypes.CCIPMsgBaseDetails{
+							SourceChain: 1234567,
+							SeqNum:      cciptypes.SeqNum(100),
+						}},
+					},
+				},
+				hasher: badHasher{},
+			},
+		},
+		{
+			name:    "bad token data reader",
+			wantErr: "unable to read token data for message 100: bad token data reader",
+			args: args{
+				report: cciptypes.ExecutePluginCommitDataWithMessages{
+					ExecutePluginCommitData: cciptypes.ExecutePluginCommitData{
+						SourceChain:         1234567,
+						SequenceNumberRange: cciptypes.NewSeqNumRange(cciptypes.SeqNum(100), cciptypes.SeqNum(100)),
+					},
+					Messages: []cciptypes.CCIPMsg{
+						{CCIPMsgBaseDetails: cciptypes.CCIPMsgBaseDetails{
+							SourceChain: 1234567,
+							SeqNum:      cciptypes.SeqNum(100),
+						}},
+					},
+				},
+				tokenDataReader: badTokenDataReader{},
+			},
+		},
+		{
+			name:    "bad codec",
+			wantErr: "unable to encode report: bad codec",
+			args: args{
+				report: cciptypes.ExecutePluginCommitDataWithMessages{
+					ExecutePluginCommitData: cciptypes.ExecutePluginCommitData{
+						SourceChain:         1234567,
+						SequenceNumberRange: cciptypes.NewSeqNumRange(cciptypes.SeqNum(100), cciptypes.SeqNum(100)),
+					},
+					Messages: []cciptypes.CCIPMsg{
+						{CCIPMsgBaseDetails: cciptypes.CCIPMsgBaseDetails{
+							SourceChain: 1234567,
+							SeqNum:      cciptypes.SeqNum(100),
+						}},
+					},
+				},
+				codec: badCodec{},
+			},
+		},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			// Select hasher mock.
+			var resolvedHasher cciptypes.MessageHasher
+			if tt.args.hasher != nil {
+				resolvedHasher = tt.args.hasher
+			} else {
+				resolvedHasher = mocks.NewMessageHasher()
+			}
+
+			// Select token data reader mock.
+			var resolvedTokenDataReader TokenDataReader
+			if tt.args.tokenDataReader != nil {
+				resolvedTokenDataReader = tt.args.tokenDataReader
+			} else {
+				resolvedTokenDataReader = tdr{}
+			}
+
+			// Select codec mock.
+			var resolvedCodec cciptypes.ExecutePluginCodec
+			if tt.args.codec != nil {
+				resolvedCodec = tt.args.codec
+			} else {
+				resolvedCodec = mocks.NewExecutePluginJSONReportCodec()
+			}
+
+			ctx := context.Background()
+			execReport, size, err := buildSingleChainReport(ctx, lggr, resolvedHasher, resolvedTokenDataReader, resolvedCodec, tt.args.report, tt.args.maxReportSize, tt.args.maxMessages)
+			if tt.wantErr != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			fmt.Println(execReport, size, err)
 		})
 	}
 }
