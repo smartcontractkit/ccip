@@ -6,7 +6,6 @@ import (
 	"sort"
 
 	mapset "github.com/deckarep/golang-set/v2"
-	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	"golang.org/x/sync/errgroup"
 
@@ -20,7 +19,7 @@ import (
 )
 
 // observeLatestCommittedSeqNums finds the maximum committed sequence numbers for each source chain.
-// If we cannot observe the dest we return an empty slice and no error..
+// If we cannot observe the dest we return an empty slice and no error.
 func observeLatestCommittedSeqNums(
 	ctx context.Context,
 	lggr logger.Logger,
@@ -86,16 +85,12 @@ func observeNewMsgs(
 				lggr.Debugw("no new messages discovered", "chain", seqNumChain.ChainSel)
 			}
 
-			for _, msg := range newMsgs {
-				msgHash, err := msgHasher.Hash(ctx, msg)
+			for i := range newMsgs {
+				h, err := msgHasher.Hash(ctx, newMsgs[i])
 				if err != nil {
 					return fmt.Errorf("hash message: %w", err)
 				}
-
-				if msgHash != msg.ID {
-					lggr.Warnw("invalid message discovered", "msg", msg, "err", err)
-					continue
-				}
+				newMsgs[i].MsgHash = h // populate msgHash field
 			}
 
 			newMsgsPerChain[chainIdx] = newMsgs
@@ -245,52 +240,52 @@ func newMsgsConsensusForChain(
 	lggr.Debugw("observed messages consensus",
 		"chain", chainSel, "fChain", fChain, "observedMsgs", len(observedMsgs))
 
-	// First come to consensus about the (sequence number, id) pairs.
-	// For each sequence number consider correct the ID with the most votes.
-	msgSeqNumToIDCounts := make(map[cciptypes.SeqNum]map[string]int) // seqNum -> msgID -> count
+	// First come to consensus about the (sequence number, msg hash) pairs.
+	// For each sequence number consider the Hash with the most votes.
+	msgSeqNumToHashCounts := make(map[cciptypes.SeqNum]map[string]int) // seqNum -> msgHash -> count
 	for _, msg := range observedMsgs {
-		if _, exists := msgSeqNumToIDCounts[msg.SeqNum]; !exists {
-			msgSeqNumToIDCounts[msg.SeqNum] = make(map[string]int)
+		if _, exists := msgSeqNumToHashCounts[msg.SeqNum]; !exists {
+			msgSeqNumToHashCounts[msg.SeqNum] = make(map[string]int)
 		}
-		msgSeqNumToIDCounts[msg.SeqNum][msg.ID.String()]++
+		msgSeqNumToHashCounts[msg.SeqNum][msg.MsgHash.String()]++
 	}
-	lggr.Debugw("observed message counts", "chain", chainSel, "msgSeqNumToIdCounts", msgSeqNumToIDCounts)
+	lggr.Debugw("observed message counts", "chain", chainSel, "msgSeqNumToHashCounts", msgSeqNumToHashCounts)
 
 	msgObservationsCount := make(map[cciptypes.SeqNum]int)
-	msgSeqNumToID := make(map[cciptypes.SeqNum]cciptypes.Bytes32)
-	for seqNum, idCounts := range msgSeqNumToIDCounts {
-		if len(idCounts) == 0 {
-			lggr.Errorw("critical error id counts should never be empty", "seqNum", seqNum)
+	msgSeqNumToHash := make(map[cciptypes.SeqNum]cciptypes.Bytes32)
+	for seqNum, hashCounts := range msgSeqNumToHashCounts {
+		if len(hashCounts) == 0 {
+			lggr.Fatalw("hash counts should never be empty", "seqNum", seqNum)
 			continue
 		}
 
-		// Find the ID with the most votes for each sequence number.
-		idsSlice := make([]string, 0, len(idCounts))
-		for id := range idCounts {
-			idsSlice = append(idsSlice, id)
+		// Find the MsgHash with the most votes for each sequence number.
+		hashesSlice := make([]string, 0, len(hashCounts))
+		for h := range hashCounts {
+			hashesSlice = append(hashesSlice, h)
 		}
-		// determinism in case we have the same count for different ids
-		sort.Slice(idsSlice, func(i, j int) bool { return idsSlice[i] < idsSlice[j] })
+		// determinism in case we have the same count for different hashes
+		sort.Slice(hashesSlice, func(i, j int) bool { return hashesSlice[i] < hashesSlice[j] })
 
-		maxCnt := idCounts[idsSlice[0]]
-		mostVotedID := idsSlice[0]
-		for _, id := range idsSlice[1:] {
-			cnt := idCounts[id]
+		maxCnt := hashCounts[hashesSlice[0]]
+		mostVotedHash := hashesSlice[0]
+		for _, h := range hashesSlice[1:] {
+			cnt := hashCounts[h]
 			if cnt > maxCnt {
 				maxCnt = cnt
-				mostVotedID = id
+				mostVotedHash = h
 			}
 		}
 
 		msgObservationsCount[seqNum] = maxCnt
-		idBytes, err := cciptypes.NewBytes32FromString(mostVotedID)
+		hashBytes, err := cciptypes.NewBytes32FromString(mostVotedHash)
 		if err != nil {
-			return observedMsgsConsensus{}, fmt.Errorf("critical issue converting id '%s' to bytes32: %w",
-				mostVotedID, err)
+			return observedMsgsConsensus{}, fmt.Errorf("critical issue converting hash '%s' to bytes32: %w",
+				mostVotedHash, err)
 		}
-		msgSeqNumToID[seqNum] = idBytes
+		msgSeqNumToHash[seqNum] = hashBytes
 	}
-	lggr.Debugw("observed message consensus", "chain", chainSel, "msgSeqNumToId", msgSeqNumToID)
+	lggr.Debugw("observed message consensus", "chain", chainSel, "msgSeqNumToHash", msgSeqNumToHash)
 
 	// Filter out msgs not observed by at least 2f_chain+1 followers.
 	msgSeqNumsQuorum := mapset.NewSet[cciptypes.SeqNum]()
@@ -314,22 +309,13 @@ func newMsgsConsensusForChain(
 		seqNumConsensusRange.SetEnd(seqNum)
 	}
 
-	msgsBySeqNum := make(map[cciptypes.SeqNum]cciptypes.CCIPMsgBaseDetails)
-	for _, msg := range observedMsgs {
-		consensusMsgID, ok := msgSeqNumToID[msg.SeqNum]
-		if !ok || consensusMsgID != msg.ID {
-			continue
-		}
-		msgsBySeqNum[msg.SeqNum] = msg
-	}
-
 	treeLeaves := make([][32]byte, 0)
 	for seqNum := seqNumConsensusRange.Start(); seqNum <= seqNumConsensusRange.End(); seqNum++ {
-		msg, ok := msgsBySeqNum[seqNum]
+		msgHash, ok := msgSeqNumToHash[seqNum]
 		if !ok {
-			return observedMsgsConsensus{}, fmt.Errorf("msg not found in map for seq num %d", seqNum)
+			return observedMsgsConsensus{}, fmt.Errorf("msg hash not found for seq num %d", seqNum)
 		}
-		treeLeaves = append(treeLeaves, msg.ID)
+		treeLeaves = append(treeLeaves, msgHash)
 	}
 
 	lggr.Debugw("constructing merkle tree", "chain", chainSel, "treeLeaves", len(treeLeaves))
@@ -443,19 +429,16 @@ func gasPricesConsensus(lggr logger.Logger, observations []cciptypes.CommitPlugi
 	return consensusGasPrices
 }
 
-// pluginConfigConsensus comes to consensus on the plugin config based on the observations.
+// fChainConsensus comes to consensus on the plugin config based on the observations.
 // We cannot trust the state of a single follower, so we need to come to consensus on the config.
-func pluginConfigConsensus(
-	baseCfg cciptypes.CommitPluginConfig, // the config of the follower calling this function
+func fChainConsensus(
 	observations []cciptypes.CommitPluginObservation, // observations from all followers
-) cciptypes.CommitPluginConfig {
-	consensusCfg := baseCfg
-
+) map[cciptypes.ChainSelector]int {
 	// Come to consensus on fChain.
 	// Use the fChain observed by most followers for each chain.
 	fChainCounts := make(map[cciptypes.ChainSelector]map[int]int) // {chain: {fChain: count}}
 	for _, obs := range observations {
-		for chain, fChain := range obs.PluginConfig.FChain {
+		for chain, fChain := range obs.FChain {
 			if _, exists := fChainCounts[chain]; !exists {
 				fChainCounts[chain] = make(map[int]int)
 			}
@@ -472,51 +455,8 @@ func pluginConfigConsensus(
 			}
 		}
 	}
-	consensusCfg.FChain = consensusFChain
 
-	// Come to consensus on what the feeTokens are.
-	// We want to keep the tokens observed by at least 2f_chain+1 followers.
-	feeTokensCounts := make(map[types.Account]int)
-	for _, obs := range observations {
-		for _, token := range obs.PluginConfig.PricedTokens {
-			feeTokensCounts[token]++
-		}
-	}
-	consensusFeeTokens := make([]types.Account, 0)
-	for token, count := range feeTokensCounts {
-		if count >= 2*consensusCfg.FChain[consensusCfg.DestChain]+1 {
-			consensusFeeTokens = append(consensusFeeTokens, token)
-		}
-	}
-	consensusCfg.PricedTokens = consensusFeeTokens
-
-	// Come to consensus on reading observers.
-	// An observer can read a chain only if at least 2f_chain+1 followers observed that.
-	observerReadChainsCounts := make(map[commontypes.OracleID]map[cciptypes.ChainSelector]int)
-	for _, obs := range observations {
-		for observer, info := range obs.PluginConfig.ObserverInfo {
-			if _, exists := observerReadChainsCounts[observer]; !exists {
-				observerReadChainsCounts[observer] = make(map[cciptypes.ChainSelector]int)
-			}
-			for _, chain := range info.Reads {
-				observerReadChainsCounts[observer][chain]++
-			}
-		}
-	}
-	consensusObserverInfo := make(map[commontypes.OracleID]cciptypes.ObserverInfo)
-	for observer, chainCounts := range observerReadChainsCounts {
-		observerReadChains := make([]cciptypes.ChainSelector, 0)
-		for chain, count := range chainCounts {
-			if count >= 2*consensusCfg.FChain[consensusCfg.DestChain]+1 {
-				observerReadChains = append(observerReadChains, chain)
-			}
-		}
-		observerInfo := consensusCfg.ObserverInfo[observer]
-		observerInfo.Reads = observerReadChains
-		consensusObserverInfo[observer] = observerInfo
-	}
-
-	return consensusCfg
+	return consensusFChain
 }
 
 // validateObservedSequenceNumbers checks if the sequence numbers of the provided messages are unique for each chain and
@@ -538,17 +478,27 @@ func validateObservedSequenceNumbers(msgs []cciptypes.CCIPMsgBaseDetails, maxSeq
 	}
 
 	seqNums := make(map[cciptypes.ChainSelector]mapset.Set[cciptypes.SeqNum], len(msgs))
+	hashes := mapset.NewSet[string]()
 	for _, msg := range msgs {
-		// The same sequence number must not appear more than once for the same chain and must be valid.
+		if msg.MsgHash.IsEmpty() {
+			return fmt.Errorf("observed msg hash must not be empty")
+		}
 
 		if _, exists := seqNums[msg.SourceChain]; !exists {
 			seqNums[msg.SourceChain] = mapset.NewSet[cciptypes.SeqNum]()
 		}
 
+		// The same sequence number must not appear more than once for the same chain and must be valid.
 		if seqNums[msg.SourceChain].Contains(msg.SeqNum) {
 			return fmt.Errorf("duplicate sequence number %d for chain %d", msg.SeqNum, msg.SourceChain)
 		}
 		seqNums[msg.SourceChain].Add(msg.SeqNum)
+
+		// The observed msg hash cannot appear twice for different msgs.
+		if hashes.Contains(msg.MsgHash.String()) {
+			return fmt.Errorf("duplicate msg hash %s", msg.MsgHash.String())
+		}
+		hashes.Add(msg.MsgHash.String())
 
 		// The observed msg sequence number cannot be less than or equal to the max observed sequence number.
 		maxSeqNum, exists := maxSeqNumsMap[msg.SourceChain]
@@ -566,18 +516,13 @@ func validateObservedSequenceNumbers(msgs []cciptypes.CCIPMsgBaseDetails, maxSeq
 
 // validateObserverReadingEligibility checks if the observer is eligible to observe the messages it observed.
 func validateObserverReadingEligibility(
-	observer commontypes.OracleID,
 	msgs []cciptypes.CCIPMsgBaseDetails,
 	seqNums []cciptypes.SeqNumChain,
-	observerCfg map[commontypes.OracleID]cciptypes.ObserverInfo,
+	nodeSupportedChains mapset.Set[cciptypes.ChainSelector],
+	destChain cciptypes.ChainSelector,
 ) error {
-	observerInfo, exists := observerCfg[observer]
-	if !exists {
-		return fmt.Errorf("observer not found in config")
-	}
-	observerReadChains := mapset.NewSet(observerInfo.Reads...)
 
-	if len(seqNums) > 0 && !observerInfo.Writer {
+	if len(seqNums) > 0 && !nodeSupportedChains.Contains(destChain) {
 		return fmt.Errorf("observer must be a writer if it observes sequence numbers")
 	}
 
@@ -587,7 +532,7 @@ func validateObserverReadingEligibility(
 
 	for _, msg := range msgs {
 		// Observer must be able to read the chain that the message is coming from.
-		if !observerReadChains.Contains(msg.SourceChain) {
+		if !nodeSupportedChains.Contains(msg.SourceChain) {
 			return fmt.Errorf("observer not allowed to read chain %d", msg.SourceChain)
 		}
 	}
