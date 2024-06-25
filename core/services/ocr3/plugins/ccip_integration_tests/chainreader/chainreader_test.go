@@ -7,13 +7,11 @@ import (
 	"context"
 	_ "embed"
 	"math/big"
-	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/ethereum/go-ethereum"
-	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
 	"github.com/ethereum/go-ethereum/common"
@@ -197,9 +195,7 @@ func testSetup(t *testing.T, ctx context.Context) *testSetupData {
 	auth.GasLimit = uint64(0)
 
 	// Deploy the contract
-	parsed, err := abi.JSON(strings.NewReader(ChainreaderMetaData.ABI))
-	assert.NoError(t, err)
-	address, tx, _, err := bind.DeployContract(auth, parsed, common.FromHex(ChainreaderMetaData.Bin), simulatedBackend)
+	address, tx, _, err := DeployChainreader(auth, simulatedBackend)
 	assert.NoError(t, err)
 	simulatedBackend.Commit()
 	t.Logf("contract deployed: addr=%s tx=%s", address.Hex(), tx.Hash())
