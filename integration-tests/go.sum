@@ -1437,6 +1437,7 @@ github.com/smartcontractkit/chainlink-solana v1.0.3-0.20240621151551-885054fb0f0
 github.com/smartcontractkit/chainlink-solana v1.0.3-0.20240621151551-885054fb0f0e/go.mod h1:rJ4+TwNMciU2pvx6dsnUNnh4sPI5bUqgmYfhSrYhQ8Y=
 github.com/smartcontractkit/chainlink-starknet/relayer v0.0.1-beta-test.0.20240531182416-d2f9937354bf h1:OlrGYZmM2hOdl0jDGraDONIvlobzl2UPzam8SPZnx0g=
 github.com/smartcontractkit/chainlink-starknet/relayer v0.0.1-beta-test.0.20240531182416-d2f9937354bf/go.mod h1:OiWUTrrpSLLTMh7FINWjEh6mmDJCVPaC4yEsDCVaWdU=
+github.com/smartcontractkit/chainlink-starknet/relayer v0.0.1-beta-test.0.20240621143321-7e5949418911/go.mod h1:OiWUTrrpSLLTMh7FINWjEh6mmDJCVPaC4yEsDCVaWdU=
 github.com/smartcontractkit/chainlink-testing-framework v1.31.0 h1:7xge1hsbIhvqIZmvXiqiRlvLFrZ271Tzg3Scj68Ru7w=
 github.com/smartcontractkit/chainlink-testing-framework v1.31.0/go.mod h1:E6uNEZhZZid9PHv6/Kq5Vn63GlO61ZcKB+/f0DKo3Q4=
 github.com/smartcontractkit/chainlink-testing-framework/grafana v0.0.0-20240328204215-ac91f55f1449 h1:fX/xmGm1GBsD1ZZnooNT+eWA0hiTAqFlHzOC5CY4dy8=
