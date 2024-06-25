@@ -7,7 +7,7 @@ SHELL := /opt/homebrew/bin/fish
 build:
 	rm -rf build/
 	solc --abi --bin mycontract.sol -o build
-	abigen --abi build/mycontract_sol_SimpleContract.abi --bin build/mycontract_sol_SimpleContract.bin --pkg=main --out=mycontract.go
+	abigen --abi build/mycontract_sol_SimpleContract.abi --bin build/mycontract_sol_SimpleContract.bin --pkg=chainreader --out=mycontract.go
 
 .PHONY: test
 test: build

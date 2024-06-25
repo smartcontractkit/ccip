@@ -1,7 +1,7 @@
 //go:build playground
 // +build playground
 
-package main
+package chainreader
 
 import (
 	"context"
@@ -37,7 +37,7 @@ const chainID = 1337
 
 type testSetupData struct {
 	contractAddr common.Address
-	contract     *Main
+	contract     *Chainreader
 	sb           *backends.SimulatedBackend
 	auth         *bind.TransactOpts
 }
@@ -79,7 +79,7 @@ func TestChainReader(t *testing.T) {
 	cfg := evmtypes.ChainReaderConfig{
 		Contracts: map[string]evmtypes.ChainContractReader{
 			ContractNameAlias: {
-				ContractABI: MainMetaData.ABI,
+				ContractABI: ChainreaderMetaData.ABI,
 				Configs: map[string]*evmtypes.ChainReaderDefinition{
 					EventNameAlias: {
 						ChainSpecificName:       EventName,
@@ -197,15 +197,15 @@ func testSetup(t *testing.T, ctx context.Context) *testSetupData {
 	auth.GasLimit = uint64(0)
 
 	// Deploy the contract
-	parsed, err := abi.JSON(strings.NewReader(MainMetaData.ABI))
+	parsed, err := abi.JSON(strings.NewReader(ChainreaderMetaData.ABI))
 	assert.NoError(t, err)
-	address, tx, _, err := bind.DeployContract(auth, parsed, common.FromHex(MainMetaData.Bin), simulatedBackend)
+	address, tx, _, err := bind.DeployContract(auth, parsed, common.FromHex(ChainreaderMetaData.Bin), simulatedBackend)
 	assert.NoError(t, err)
 	simulatedBackend.Commit()
 	t.Logf("contract deployed: addr=%s tx=%s", address.Hex(), tx.Hash())
 
 	// Setup contract client
-	contract, err := NewMain(address, simulatedBackend)
+	contract, err := NewChainreader(address, simulatedBackend)
 	assert.NoError(t, err)
 
 	return &testSetupData{
