@@ -7,7 +7,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
+
 	types2 "github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
@@ -30,31 +33,10 @@ const (
 )
 
 func TestHomeChainReader(t *testing.T) {
-	// Generate a new key pair for the simulated account
-	//privateKey, err := crypto.GenerateKey()
-	//assert.NoError(t, err)
-	//// Set up the genesis account with balance
-	//blnc, ok := big.NewInt(0).SetString("999999999999999999999999999999999999", 10)
-	//assert.True(t, ok)
-	//alloc := map[common.Address]core.GenesisAccount{crypto.PubkeyToAddress(privateKey.PublicKey): {Balance: blnc}}
-	//simulatedBackend := backends.NewSimulatedBackend(alloc, 0)
-	//// Create a transactor
-	//
-	//auth, err := bind.NewKeyedTransactorWithChainID(privateKey, big.NewInt(chainID))
-	//assert.NoError(t, err)
-	//auth.GasLimit = uint64(0)
-	//
-	//// Deploy the contract
-	//address, tx, _, err := capcfg.DeployCCIPCapabilityConfiguration(auth, simulatedBackend, common.Address{})
-	//assert.NoError(t, err)
-	//simulatedBackend.Commit()
-	//t.Logf("contract deployed: addr=%s tx=%s", address.Hex(), tx.Hash())
-	//
-	//// Setup contract client
-	//contract, err := capcfg.NewCCIPCapabilityConfiguration(address, simulatedBackend)
-	//assert.NoError(t, err)
-
-	d := helpers.SetupTestWithCapability[capcfg.CCIPCapabilityConfiguration](t, context.Background(), capcfg.DeployCCIPCapabilityConfiguration, capcfg.NewCCIPCapabilityConfiguration, common.Address{})
+	deployFunc := func(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *types.Transaction, *capcfg.CCIPCapabilityConfiguration, error) {
+		return capcfg.DeployCCIPCapabilityConfiguration(auth, backend, common.Address{})
+	}
+	d := helpers.SetupTest[capcfg.CCIPCapabilityConfiguration](t, context.Background(), deployFunc, capcfg.NewCCIPCapabilityConfiguration)
 	// Initialize chainReader
 	cfg := evmtypes.ChainReaderConfig{
 		Contracts: map[string]evmtypes.ChainContractReader{
