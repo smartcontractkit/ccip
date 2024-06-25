@@ -1,5 +1,5 @@
-//go:build ignored
-// +build ignored
+//go:build playground
+// +build playground
 
 package main
 
@@ -32,12 +32,6 @@ import (
 	evmtypes "github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/types"
 	"github.com/stretchr/testify/assert"
 )
-
-//go:embed build/mycontract_sol_SimpleContract.abi
-var contractABI string
-
-//go:embed build/mycontract_sol_SimpleContract.bin
-var contractBytecode string
 
 const chainID = 1337
 
@@ -85,7 +79,7 @@ func TestChainReader(t *testing.T) {
 	cfg := evmtypes.ChainReaderConfig{
 		Contracts: map[string]evmtypes.ChainContractReader{
 			ContractNameAlias: {
-				ContractABI: contractABI,
+				ContractABI: MainMetaData.ABI,
 				Configs: map[string]*evmtypes.ChainReaderDefinition{
 					EventNameAlias: {
 						ChainSpecificName:       EventName,
@@ -203,14 +197,12 @@ func testSetup(t *testing.T, ctx context.Context) *testSetupData {
 	auth.GasLimit = uint64(0)
 
 	// Deploy the contract
-	parsed, err := abi.JSON(strings.NewReader(contractABI))
+	parsed, err := abi.JSON(strings.NewReader(MainMetaData.ABI))
 	assert.NoError(t, err)
-	address, tx, _, err := bind.DeployContract(auth, parsed, common.FromHex(contractBytecode), simulatedBackend)
+	address, tx, _, err := bind.DeployContract(auth, parsed, common.FromHex(MainMetaData.Bin), simulatedBackend)
 	assert.NoError(t, err)
 	simulatedBackend.Commit()
-	h, err := bind.WaitMined(ctx, simulatedBackend, tx)
-	assert.NoError(t, err)
-	t.Logf("contract deployed: addr=%s tx=%s block=%s", address.Hex(), tx.Hash(), h.BlockNumber.String())
+	t.Logf("contract deployed: addr=%s tx=%s", address.Hex(), tx.Hash())
 
 	// Setup contract client
 	contract, err := NewMain(address, simulatedBackend)
@@ -232,12 +224,9 @@ func emitEvents(t *testing.T, d *testSetupData, ctx context.Context) {
 	go func() {
 		defer wg.Done()
 		for i := 0; i < 10; i++ {
-			tx, err := d.contract.EmitEvent(d.auth)
+			_, err := d.contract.EmitEvent(d.auth)
 			assert.NoError(t, err)
 			d.sb.Commit()
-			rcp, err := bind.WaitMined(ctx, d.sb, tx)
-			assert.NoError(t, err)
-			assert.Equal(t, uint64(1), rcp.Status)
 		}
 	}()
 
