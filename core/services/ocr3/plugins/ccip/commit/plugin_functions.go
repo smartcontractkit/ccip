@@ -19,7 +19,7 @@ import (
 )
 
 // observeLatestCommittedSeqNums finds the maximum committed sequence numbers for each source chain.
-// If we cannot observe the dest we return an empty slice and no error..
+// If we cannot observe the dest we return an empty slice and no error.
 func observeLatestCommittedSeqNums(
 	ctx context.Context,
 	lggr logger.Logger,
