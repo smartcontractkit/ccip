@@ -10,6 +10,7 @@ import (
 	"github.com/cometbft/cometbft/crypto"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/ccipocr3/internal/mocks"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -224,21 +225,26 @@ func Test_selectReport(t *testing.T) {
 		maxReportSize int
 	}
 	tests := []struct {
-		name           string
-		args           args
-		expectedThings []int
-		want           []cciptypes.ExecutePluginReportSingleChain
-		want1          []cciptypes.ExecutePluginCommitDataWithMessages
-		wantErr        string
+		name                  string
+		args                  args
+		expectedExecReports   int
+		expectedCommitReports int
+		expectedExecThings    []int
+		lastReportExecuted    []cciptypes.SeqNum
+		wantErr               string
 	}{
 		{
-			name: "empty",
+			name: "half report",
 			args: args{
-				maxReportSize: 2000,
+				maxReportSize: 2200,
 				reports: []cciptypes.ExecutePluginCommitDataWithMessages{
 					makeTestMessage(10, 1, 100, 999, 10101010101, nil),
 				},
 			},
+			expectedExecReports:   1,
+			expectedCommitReports: 1,
+			expectedExecThings:    []int{5},
+			lastReportExecuted:    []cciptypes.SeqNum{0, 1, 2, 3, 4},
 		},
 	}
 	for _, tt := range tests {
@@ -246,13 +252,23 @@ func Test_selectReport(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			ctx := context.Background()
-			got, got1, err := selectReport(ctx, lggr, hasher, codec, tokenDataReader, tt.args.reports, tt.args.maxReportSize)
+			execReports, commitReports, err := selectReport(ctx, lggr, hasher, codec, tokenDataReader, tt.args.reports, tt.args.maxReportSize)
 			if tt.wantErr != "" {
 				assert.Contains(t, err.Error(), tt.wantErr)
 				return
 			}
-			assert.Equalf(t, tt.want, got, "selectReport(...)")
-			assert.Equalf(t, tt.want1, got1, "selectReport(...)")
+			require.Len(t, execReports, tt.expectedExecReports)
+			require.Len(t, commitReports, tt.expectedCommitReports)
+			for i, execReport := range execReports {
+				assert.Len(t, execReport.Messages, tt.expectedExecThings[i])
+				assert.Len(t, execReport.OffchainTokenData, tt.expectedExecThings[i])
+				// Proofs do not need a hash for every message.
+				assert.NotEmptyf(t, execReport.Proofs, "Proof should not be empty.")
+			}
+			if len(execReports) > 0 {
+				lastReport := commitReports[len(commitReports)-1]
+				assert.ElementsMatch(t, tt.lastReportExecuted, lastReport.ExecutedMessages)
+			}
 		})
 	}
 }
