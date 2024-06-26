@@ -226,35 +226,54 @@ type TokenDataReader interface {
 }
 
 // buildSingleChainReport constructs a single chain report from a commit report.
-func buildSingleChainReport(ctx context.Context, lggr logger.Logger, hasher cciptypes.MessageHasher, tokenDataReader TokenDataReader, codec cciptypes.ExecutePluginCodec, report cciptypes.ExecutePluginCommitDataWithMessages, maxReportSize, maxMessages int) (cciptypes.ExecutePluginReportSingleChain, int, error) {
+func buildSingleChainReport(
+	ctx context.Context,
+	lggr logger.Logger,
+	hasher cciptypes.MessageHasher,
+	tokenDataReader TokenDataReader,
+	codec cciptypes.ExecutePluginCodec,
+	report cciptypes.ExecutePluginCommitDataWithMessages,
+	maxMessages int,
+) (cciptypes.ExecutePluginReportSingleChain, int, error) {
 	if maxMessages == 0 {
 		maxMessages = len(report.Messages)
 	}
 
 	numMsg := int(report.SequenceNumberRange.End() - report.SequenceNumberRange.Start() + 1)
 	if numMsg != len(report.Messages) {
-		return cciptypes.ExecutePluginReportSingleChain{}, 0, fmt.Errorf("malformed report %s, unexpected number of messages: expected %d, got %d", report.MerkleRoot.String(), numMsg, len(report.Messages))
+		return cciptypes.ExecutePluginReportSingleChain{}, 0, fmt.Errorf(
+			"malformed report %s, unexpected number of messages: expected %d, got %d",
+			report.MerkleRoot.String(), numMsg, len(report.Messages))
 	}
 
 	treeLeaves := make([][32]byte, 0)
 	for _, msg := range report.Messages {
 		if !report.SequenceNumberRange.Contains(msg.SeqNum) {
-			return cciptypes.ExecutePluginReportSingleChain{}, 0, fmt.Errorf("malformed message %s, message with sequence number %d outside of report range %s", report.MerkleRoot.String(), msg.SeqNum, report.SequenceNumberRange)
+			return cciptypes.ExecutePluginReportSingleChain{}, 0, fmt.Errorf(
+				"malformed message %s, message with sequence number %d outside of report range %s",
+				report.MerkleRoot.String(), msg.SeqNum, report.SequenceNumberRange)
 		}
 		if report.SourceChain != msg.SourceChain {
-			return cciptypes.ExecutePluginReportSingleChain{}, 0, fmt.Errorf("malformed message %s, unexpected source chain: expected %d, got %d", report.MerkleRoot.String(), report.SourceChain, msg.SourceChain)
+			return cciptypes.ExecutePluginReportSingleChain{}, 0, fmt.Errorf(
+				"malformed message %s, unexpected source chain: expected %d, got %d",
+				report.MerkleRoot.String(), report.SourceChain, msg.SourceChain)
 		}
 		leaf, err := hasher.Hash(ctx, msg)
 		if err != nil {
-			return cciptypes.ExecutePluginReportSingleChain{}, 0, fmt.Errorf("unable to hash message (%d, %d): %w", msg.SourceChain, msg.SeqNum, err)
+			return cciptypes.ExecutePluginReportSingleChain{}, 0, fmt.Errorf(
+				"unable to hash message (%d, %d): %w", msg.SourceChain, msg.SeqNum, err)
 		}
 		treeLeaves = append(treeLeaves, leaf)
 	}
 
-	lggr.Debugw("constructing merkle tree", "sourceChain", report.SourceChain, "treeLeaves", len(treeLeaves))
+	lggr.Debugw(
+		"constructing merkle tree",
+		"sourceChain", report.SourceChain,
+		"treeLeaves", len(treeLeaves))
 	tree, err := merklemulti.NewTree(hashutil.NewKeccak(), treeLeaves)
 	if err != nil {
-		return cciptypes.ExecutePluginReportSingleChain{}, 0, fmt.Errorf("unable to constructing merkle tree from messages: %w", err)
+		return cciptypes.ExecutePluginReportSingleChain{}, 0, fmt.Errorf(
+			"unable to constructing merkle tree from messages: %w", err)
 	}
 
 	// Iterate sequence range and executed messages to select messages to execute.
@@ -273,10 +292,19 @@ func buildSingleChainReport(ctx context.Context, lggr logger.Logger, hasher ccip
 			if err != nil {
 				// TODO: skip message instead of failing the whole thing.
 				//       that might mean moving the token data reading out of the loop.
-				lggr.Info("unable to read token data", "source-chain", report.SourceChain, "seq-num", msg.SeqNum, "error", err)
-				return cciptypes.ExecutePluginReportSingleChain{}, 0, fmt.Errorf("unable to read token data for message %d: %w", msg.SeqNum, err)
+				lggr.Infow(
+					"unable to read token data",
+					"source-chain", report.SourceChain,
+					"seq-num", msg.SeqNum,
+					"error", err)
+				return cciptypes.ExecutePluginReportSingleChain{}, 0, fmt.Errorf(
+					"unable to read token data for message %d: %w", msg.SeqNum, err)
 			} else {
-				lggr.Debugw("read token data", "source-chain", report.SourceChain, "seq-num", msg.SeqNum, "data", tokenData)
+				lggr.Debugw(
+					"read token data",
+					"source-chain", report.SourceChain,
+					"seq-num", msg.SeqNum,
+					"data", tokenData)
 				offchainTokenData = append(offchainTokenData, tokenData)
 			}
 			toExecute = append(toExecute, i)
@@ -284,10 +312,17 @@ func buildSingleChainReport(ctx context.Context, lggr logger.Logger, hasher ccip
 		}
 	}
 
-	lggr.Infow("selected messages from commit report for execution", "sourceChain", report.SourceChain, "commitRoot", report.MerkleRoot.String(), "numMessages", len(toExecute), "totalMessages", numMsg, "toExecuteu", len(toExecute))
+	lggr.Infow(
+		"selected messages from commit report for execution",
+		"sourceChain", report.SourceChain,
+		"commitRoot", report.MerkleRoot.String(),
+		"numMessages", len(toExecute),
+		"totalMessages", numMsg,
+		"toExecute", len(toExecute))
 	proof, err := tree.Prove(toExecute)
 	if err != nil {
-		return cciptypes.ExecutePluginReportSingleChain{}, 0, fmt.Errorf("unable to prove messages for report %s: %w", report.MerkleRoot.String(), err)
+		return cciptypes.ExecutePluginReportSingleChain{}, 0,
+			fmt.Errorf("unable to prove messages for report %s: %w", report.MerkleRoot.String(), err)
 	}
 
 	var proofsCast []cciptypes.Bytes32
@@ -307,7 +342,12 @@ func buildSingleChainReport(ctx context.Context, lggr logger.Logger, hasher ccip
 	//       does not add any additional overhead to the size being computed here.
 
 	// Compute the size of the encoded report.
-	encoded, err := codec.Encode(ctx, cciptypes.ExecutePluginReport{ChainReports: []cciptypes.ExecutePluginReportSingleChain{finalReport}})
+	encoded, err := codec.Encode(
+		ctx,
+		cciptypes.ExecutePluginReport{
+			ChainReports: []cciptypes.ExecutePluginReportSingleChain{finalReport},
+		},
+	)
 	if err != nil {
 		lggr.Errorw("unable to encode report", "err", err, "report", finalReport)
 		return cciptypes.ExecutePluginReportSingleChain{}, 0, fmt.Errorf("unable to encode report: %w", err)
@@ -317,7 +357,15 @@ func buildSingleChainReport(ctx context.Context, lggr logger.Logger, hasher ccip
 }
 
 // selectReport takes an ordered list of reports and selects the first reports that fit within the maxReportSizeBytes.
-func selectReport(ctx context.Context, lggr logger.Logger, hasher cciptypes.MessageHasher, codec cciptypes.ExecutePluginCodec, tokenDataReader TokenDataReader, reports []cciptypes.ExecutePluginCommitDataWithMessages, maxReportSizeBytes int) ([]cciptypes.ExecutePluginReportSingleChain, []cciptypes.ExecutePluginCommitDataWithMessages, error) {
+func selectReport(
+	ctx context.Context,
+	lggr logger.Logger,
+	hasher cciptypes.MessageHasher,
+	codec cciptypes.ExecutePluginCodec,
+	tokenDataReader TokenDataReader,
+	reports []cciptypes.ExecutePluginCommitDataWithMessages,
+	maxReportSizeBytes int,
+) ([]cciptypes.ExecutePluginReportSingleChain, []cciptypes.ExecutePluginCommitDataWithMessages, error) {
 	// TODO: It may be desirable for this entire function to be an interface so that
 	//       different selection algorithms can be used.
 
@@ -326,7 +374,8 @@ func selectReport(ctx context.Context, lggr logger.Logger, hasher cciptypes.Mess
 	partialReport := false
 	var finalReports []cciptypes.ExecutePluginReportSingleChain
 	for reportIdx, report := range reports {
-		finalReport, encodedSize, err := buildSingleChainReport(ctx, lggr, hasher, tokenDataReader, codec, report, maxReportSizeBytes, 0)
+		finalReport, encodedSize, err :=
+			buildSingleChainReport(ctx, lggr, hasher, tokenDataReader, codec, report, 0)
 		if err != nil {
 			return nil, nil, fmt.Errorf("unable to build a single chain report (max): %w", err)
 		}
@@ -339,9 +388,11 @@ func selectReport(ctx context.Context, lggr logger.Logger, hasher cciptypes.Mess
 			for low <= high {
 				mid := low + ((high - low) / 2)
 
-				finalReport2, encodedSize2, err2 := buildSingleChainReport(ctx, lggr, hasher, tokenDataReader, codec, report, maxReportSizeBytes, mid)
+				finalReport2, encodedSize2, err2 :=
+					buildSingleChainReport(ctx, lggr, hasher, tokenDataReader, codec, report, mid)
 				if err2 != nil {
-					return nil, nil, fmt.Errorf("unable to build a single chain report (messages %d): %w", mid, err2)
+					return nil, nil, fmt.Errorf(
+						"unable to build a single chain report (messages %d): %w", mid, err2)
 				}
 
 				if (size + encodedSize2) <= maxReportSizeBytes {
@@ -362,9 +413,12 @@ func selectReport(ctx context.Context, lggr logger.Logger, hasher cciptypes.Mess
 
 			// Mark new messages executed.
 			for i := 0; i < len(finalReport.Messages); i++ {
-				reports[reportIdx].ExecutedMessages = append(reports[reportIdx].ExecutedMessages, finalReport.Messages[i].SeqNum)
+				reports[reportIdx].ExecutedMessages =
+					append(reports[reportIdx].ExecutedMessages, finalReport.Messages[i].SeqNum)
 			}
-			sort.Slice(report.ExecutedMessages, func(i, j int) bool { return report.ExecutedMessages[i] < report.ExecutedMessages[j] })
+			sort.Slice(
+				report.ExecutedMessages,
+				func(i, j int) bool { return report.ExecutedMessages[i] < report.ExecutedMessages[j] })
 		} else {
 			fullyExecuted++
 		}
@@ -383,7 +437,12 @@ func selectReport(ctx context.Context, lggr logger.Logger, hasher cciptypes.Mess
 		reports = reports[fullyExecuted:]
 	}
 
-	lggr.Infow("selected commit reports for execution report", "numReports", len(finalReports), "size", size, "incompleteReports", len(reports), "maxSize", maxReportSizeBytes)
+	lggr.Infow(
+		"selected commit reports for execution report",
+		"numReports", len(finalReports),
+		"size", size,
+		"incompleteReports", len(reports),
+		"maxSize", maxReportSizeBytes)
 
 	return finalReports, reports, nil
 }
