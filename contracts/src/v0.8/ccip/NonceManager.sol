@@ -1,22 +1,23 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.24;
 
+import {AuthorizedCallers} from "../shared/access/AuthorizedCallers.sol";
 import {IEVM2AnyOnRamp} from "./interfaces/IEVM2AnyOnRamp.sol";
 import {INonceManager} from "./interfaces/INonceManager.sol";
-
-import {AuthorizedCallers} from "../shared/access/AuthorizedCallers.sol";
 
 /// @title NonceManager
 /// @notice NonceManager contract that manages sender nonces for the on/off ramps
 contract NonceManager is INonceManager, AuthorizedCallers {
   error PreviousRampAlreadySet();
 
-  event PreviousOnRampUpdated(uint64 indexed destChainSelector, address prevOnRamp);
+  event PreviousRampsUpdated(uint64 indexed remoteChainSelector, PreviousRamps prevRamp);
+  event SkippedIncorrectNonce(uint64 sourceChainSelector, uint64 nonce, bytes sender);
 
   /// @dev Struct that contains the previous on/off ramp addresses
   // TODO: add prevOffRamp
   struct PreviousRamps {
     address prevOnRamp; // Previous onRamp
+    address prevOffRamp; // Previous offRamp
   }
 
   /// @dev Struct that contains the chain selector and the previous on/off ramps, same as PreviousRamps but with the chain selector
@@ -30,6 +31,12 @@ contract NonceManager is INonceManager, AuthorizedCallers {
   mapping(uint64 chainSelector => PreviousRamps previousRamps) private s_previousRamps;
   /// @dev The current outbound nonce per sender used on the onramp
   mapping(uint64 destChainSelector => mapping(address sender => uint64 outboundNonce)) private s_outboundNonces;
+  /// @dev The current inbound nonce per sender used on the offramp
+  /// @dev The expected nonce for a given sender per source chain.
+  /// Corresponds to s_senderNonce in the OnRamp for a lane, used to enforce that messages are
+  /// executed in the same order they are sent (assuming they are DON). Note that re-execution
+  /// of FAILED messages however, can be out of order.
+  mapping(uint64 sourceChainSelector => mapping(bytes sender => uint64 outboundNonce)) private s_inboundNonces;
 
   constructor(address[] memory authorizedCallers) AuthorizedCallers(authorizedCallers) {}
 
@@ -43,8 +50,6 @@ contract NonceManager is INonceManager, AuthorizedCallers {
 
     return outboundNonce;
   }
-
-  /// TODO: add incrementInboundNonce
 
   /// @notice Returns the outbound nonce for the given sender on the given destination chain
   /// @param destChainSelector The destination chain selector
@@ -67,7 +72,44 @@ contract NonceManager is INonceManager, AuthorizedCallers {
     return outboundNonce;
   }
 
-  /// TODO: add getInboundNonce
+  /// @inheritdoc INonceManager
+  function incrementInboundNonce(
+    uint64 sourceChainSelector,
+    uint64 expectedNonce,
+    bytes calldata sender
+  ) external onlyAuthorizedCallers returns (bool) {
+    uint64 inboundNonce = _getInboundNonce(sourceChainSelector, sender) + 1;
+
+    if (inboundNonce != expectedNonce) {
+      emit SkippedIncorrectNonce(sourceChainSelector, expectedNonce, sender);
+      return (false);
+    }
+
+    s_inboundNonces[sourceChainSelector][sender] = inboundNonce;
+
+    return (true);
+  }
+
+  /// @notice Returns the inbound nonce for the given sender on the given source chain
+  /// @param sourceChainSelector The source chain selector
+  /// @param sender The encoded sender address
+  /// @return The inbound nonce
+  function getInboundNonce(uint64 sourceChainSelector, bytes calldata sender) external view returns (uint64) {
+    return _getInboundNonce(sourceChainSelector, sender);
+  }
+
+  function _getInboundNonce(uint64 sourceChainSelector, bytes calldata sender) private view returns (uint64) {
+    uint64 inboundNonce = s_inboundNonces[sourceChainSelector][sender];
+
+    if (inboundNonce == 0) {
+      address prevOffRamp = s_previousRamps[sourceChainSelector].prevOffRamp;
+      if (prevOffRamp != address(0)) {
+        return IEVM2AnyOnRamp(prevOffRamp).getSenderNonce(abi.decode(sender, (address)));
+      }
+    }
+
+    return inboundNonce;
+  }
 
   /// @notice Updates the previous ramps addresses
   /// @param previousRampsArgs The previous on/off ramps addresses
@@ -78,12 +120,14 @@ contract NonceManager is INonceManager, AuthorizedCallers {
       PreviousRamps storage prevRamps = s_previousRamps[previousRampsArg.remoteChainSelector];
 
       // If the previous onRamp is already set then it should not be updated
-      if (prevRamps.prevOnRamp != address(0)) {
+      if (prevRamps.prevOnRamp != address(0) || prevRamps.prevOffRamp != address(0)) {
         revert PreviousRampAlreadySet();
       }
 
       prevRamps.prevOnRamp = previousRampsArg.prevRamps.prevOnRamp;
-      emit PreviousOnRampUpdated(previousRampsArg.remoteChainSelector, prevRamps.prevOnRamp);
+      prevRamps.prevOffRamp = previousRampsArg.prevRamps.prevOffRamp;
+
+      emit PreviousRampsUpdated(previousRampsArg.remoteChainSelector, previousRampsArg.prevRamps);
     }
   }
 

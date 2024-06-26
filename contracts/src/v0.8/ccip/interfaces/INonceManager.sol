@@ -8,4 +8,14 @@ interface INonceManager {
   /// @param sender The sender address
   /// @return The new outbound nonce
   function getIncrementedOutboundNonce(uint64 destChainSelector, address sender) external returns (uint64);
+
+  /// @notice Increments the inbound nonce for the given sender on the given source chain
+  /// @param sourceChainSelector The destination chain selector
+  /// @param sender The encoded sender address
+  /// @return True if the nonce was incremented, false otherwise
+  function incrementInboundNonce(
+    uint64 sourceChainSelector,
+    uint64 expectedNonce,
+    bytes calldata sender
+  ) external returns (bool);
 }
