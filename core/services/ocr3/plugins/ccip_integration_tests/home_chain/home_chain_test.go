@@ -22,32 +22,21 @@ import (
 	logger2 "github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/p2pkey"
 	helpers "github.com/smartcontractkit/chainlink/v2/core/services/ocr3/plugins/ccip_integration_tests"
-	"github.com/smartcontractkit/libocr/commontypes"
 	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
 	evmtypes "github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/types"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 var (
-	chainA       uint64 = 1
-	nodeAID      uint8  = 1
-	fChainA      uint8  = 1
-	oracleAID           = commontypes.OracleID(nodeAID)
-	peerAID             = "12D3KooWPjceQrSwdWXPyLLeABRXmuqt69Rg3sBYbU1Nft9HyQ6X"
-	p2pOracleAID        = libocrtypes.PeerID{byte(nodeAID)}
+	chainA  uint64 = 1
+	fChainA uint8  = 1
 
-	chainB       uint64 = 2
-	nodeBID      uint8  = 2
-	fChainB      uint8  = 2
-	oracleBID           = commontypes.OracleID(nodeBID)
-	p2pOracleBID        = libocrtypes.PeerID{byte(nodeBID)}
+	chainB  uint64 = 2
+	fChainB uint8  = 2
 
-	chainC       uint64 = 3
-	nodeCID      uint8  = 3
-	fChainC      uint8  = 3
-	oracleCID           = commontypes.OracleID(nodeCID)
-	p2pOracleCID        = libocrtypes.PeerID{byte(nodeCID)}
+	chainC  uint64 = 3
+	fChainC uint8  = 3
 )
 
 func TestHomeChainReader(t *testing.T) {
@@ -68,55 +57,75 @@ func TestHomeChainReader(t *testing.T) {
 			},
 		},
 	}
-	//===============================================================
+	//============================Setup Backend===================================
 	transactor := testutils.MustNewSimTransactor(t)
 	backend := backends.NewSimulatedBackend(core.GenesisAlloc{
 		transactor.From: {Balance: assets.Ether(1000).ToInt()},
 	}, 30e6)
-	//==============================Setup Contracts - with capabilities=================================
+	//==============================Setup Contracts - Add capabilities=================================
 	capRegAddress, capRegContract, err := prepareCapabilityRegistry(t, backend, transactor)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	capConfAddress, capConfContract, err := prepareCCIPCapabilityConfig(t, backend, transactor, capRegAddress)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	p2pIDS := addCapabilities(t, backend, transactor, capRegContract, capConfAddress)
 	//==============================Apply configs to Capability Contract=================================
 	chainAConf := setupConfigInfo(chainA, p2pIDS, fChainA, []byte{})
 	chainBConf := setupConfigInfo(chainB, p2pIDS[1:], fChainB, []byte{})
 	chainCConf := setupConfigInfo(chainC, p2pIDS[2:], fChainC, []byte{})
-
 	inputConfig := []capcfg.CCIPCapabilityConfigurationChainConfigInfo{
 		chainAConf,
 		chainBConf,
 		chainCConf,
 	}
 	_, err = capConfContract.ApplyChainConfigUpdates(transactor, nil, inputConfig)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	backend.Commit()
 	//================================Setup HomeChainReader===============================
 	chainReader := *helpers.SetupChainReader(t, backend, capConfAddress, cfg, ContractName)
-	var ccipConfigResults []ccipreader.CCIPCapabilityConfigurationChainConfigInfo
-	err = chainReader.GetLatestValue(
-		context.Background(),
-		ContractName,
-		FnGetChainConfigs,
-		map[string]interface{}{},
-		&ccipConfigResults,
-	)
-	assert.NoError(t, err)
-	homeChain := ccipreader.NewHomeChainReader(chainReader, logger2.NullLogger, 1*time.Second)
+	require.NoError(t, err)
+	homeChain := ccipreader.NewHomeChainReader(chainReader, logger2.NullLogger, 1*time.Millisecond)
 	err = homeChain.Start(context.Background())
-	assert.NoError(t, err)
-	//===============================================================
-	expectedChainConfigs := map[cciptypes.ChainSelector]ccipreader.CCIPCapabilityConfigurationChainConfig{}
+	require.NoError(t, err)
+	//================================Test HomeChain Reader===============================
+	expectedChainConfigs := map[cciptypes.ChainSelector]ccipreader.ChainConfig{}
 	for _, c := range inputConfig {
-		expectedChainConfigs[cciptypes.ChainSelector(c.ChainSelector)] = ccipreader.CCIPCapabilityConfigurationChainConfig{
+		expectedChainConfigs[cciptypes.ChainSelector(c.ChainSelector)] = ccipreader.ChainConfig{
 			FChain:         int(c.ChainConfig.FChain),
 			SupportedNodes: toPeerIDs(c.ChainConfig.Readers),
 		}
 	}
 	configs, err := homeChain.GetAllChainConfigs()
-	assert.NoError(t, err)
-	assert.Equal(t, expectedChainConfigs, configs)
+	require.NoError(t, err)
+	require.Equal(t, expectedChainConfigs, configs)
+	//=================================Remove ChainC from OnChainConfig=========================================
+	_, err = capConfContract.ApplyChainConfigUpdates(transactor, []uint64{chainC}, nil)
+	require.NoError(t, err)
+	backend.Commit()
+	time.Sleep(10 * time.Millisecond) // Wait for the chain reader to update
+	configs, err = homeChain.GetAllChainConfigs()
+	require.NoError(t, err)
+	delete(expectedChainConfigs, cciptypes.ChainSelector(chainC))
+	require.Equal(t, expectedChainConfigs, configs)
+	//================================Close HomeChain Reader===============================
+	closGracefully(t, homeChain)
+}
+
+func closGracefully(t *testing.T, homeChain ccipreader.HomeChain) {
+	err := homeChain.Close()
+	require.NoError(t, err)
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+	for {
+		// Make sure it's closed gracefully, give it 2 seconds to do so or fail
+		err := homeChain.Ready()
+		if err != nil {
+			return
+		}
+		select {
+		case <-ticker.C:
+			t.Fatal("HomeChainReader did not close gracefully")
+		}
+	}
 }
 
 func toPeerIDs(readers [][32]byte) mapset.Set[libocrtypes.PeerID] {
@@ -138,22 +147,22 @@ func setupConfigInfo(chainSelector uint64, readers [][32]byte, fChain uint8, cfg
 }
 func prepareCCIPCapabilityConfig(t *testing.T, backend *backends.SimulatedBackend, transactor *bind.TransactOpts, capRegAddress common.Address) (common.Address, *capcfg.CCIPCapabilityConfiguration, error) {
 	ccAddress, _, _, err := capcfg.DeployCCIPCapabilityConfiguration(transactor, backend, capRegAddress)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	backend.Commit()
 
 	contract, err := capcfg.NewCCIPCapabilityConfiguration(ccAddress, backend)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	backend.Commit()
 
 	return ccAddress, contract, nil
 }
 func prepareCapabilityRegistry(t *testing.T, backend *backends.SimulatedBackend, transactor *bind.TransactOpts) (common.Address, *capabilities_registry.CapabilitiesRegistry, error) {
 	crAddress, _, _, err := capabilities_registry.DeployCapabilitiesRegistry(transactor, backend)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	backend.Commit()
 
 	capReg, err := capabilities_registry.NewCapabilitiesRegistry(crAddress, backend)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	backend.Commit()
 
 	return crAddress, capReg, nil
@@ -175,11 +184,11 @@ func addCapabilities(
 			ConfigurationContract: capConfAddress,
 		},
 	})
-	assert.NoError(t, err, "failed to add capability to registry")
+	require.NoError(t, err, "failed to add capability to registry")
 	backend.Commit()
 
 	ccipCapabilityID, err := capReg.GetHashedCapabilityId(nil, "ccip", "v1.0")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Add the p2p ids of the ccip nodes
 	var p2pIDs [][32]byte
@@ -192,12 +201,12 @@ func addCapabilities(
 				Name:  fmt.Sprintf("nop-%d", i),
 			},
 		})
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		backend.Commit()
 
 		// get the node operator id from the event
 		it, err := capReg.FilterNodeOperatorAdded(nil, nil, nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		var nodeOperatorID uint32
 		for it.Next() {
 			if it.Event.Name == fmt.Sprintf("nop-%d", i) {
@@ -205,7 +214,7 @@ func addCapabilities(
 				break
 			}
 		}
-		assert.NotZero(t, nodeOperatorID)
+		require.NotZero(t, nodeOperatorID)
 
 		_, err = capReg.AddNodes(transactor, []capabilities_registry.CapabilitiesRegistryNodeParams{
 			{
@@ -215,15 +224,15 @@ func addCapabilities(
 				HashedCapabilityIds: [][32]byte{ccipCapabilityID},
 			},
 		})
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		backend.Commit()
 
 		// verify that the node was added successfully
 		nodeInfo, err := capReg.GetNode(nil, p2pID)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
-		assert.Equal(t, nodeOperatorID, nodeInfo.NodeOperatorId)
-		assert.Equal(t, p2pID[:], nodeInfo.P2pId[:])
+		require.Equal(t, nodeOperatorID, nodeInfo.NodeOperatorId)
+		require.Equal(t, p2pID[:], nodeInfo.P2pId[:])
 	}
 	return p2pIDs
 }

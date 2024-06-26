@@ -9,9 +9,6 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core"
-	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/crypto"
 	types2 "github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
@@ -31,27 +28,6 @@ type TestSetupData[T any] struct {
 	Auth         *bind.TransactOpts
 	ChainReader  *evm.ChainReaderService
 	ChainID      int
-}
-
-type DeployFunc[T any] func(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *types.Transaction, *T, error)
-
-type NewFunc[T any] func(address common.Address, backend bind.ContractBackend) (*T, error)
-
-func SetupBackendWithAuth(t *testing.T) (*backends.SimulatedBackend, *bind.TransactOpts) {
-	// Generate a new key pair for the simulated account
-	privateKey, err := crypto.GenerateKey()
-	assert.NoError(t, err)
-	// Set up the genesis account with balance
-	blnc, ok := big.NewInt(0).SetString("999999999999999999999999999999999999", 10)
-	assert.True(t, ok)
-	alloc := map[common.Address]core.GenesisAccount{crypto.PubkeyToAddress(privateKey.PublicKey): {Balance: blnc}}
-	simulatedBackend := backends.NewSimulatedBackend(alloc, 0)
-	// Create a transactor
-	auth, err := bind.NewKeyedTransactorWithChainID(privateKey, big.NewInt(chainID))
-	assert.NoError(t, err)
-	auth.GasLimit = uint64(0)
-
-	return simulatedBackend, auth
 }
 
 func SetupChainReader(t *testing.T, simulatedBackend *backends.SimulatedBackend, address common.Address, chainReaderConfig evmtypes.ChainReaderConfig, contractName string) *evm.ChainReaderService {

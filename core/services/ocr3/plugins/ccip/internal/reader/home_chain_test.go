@@ -15,8 +15,8 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/libocr/commontypes"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 var (
@@ -42,35 +42,29 @@ func TestHomeChainConfigPoller_HealthReport(t *testing.T) {
 		mock.Anything).Return(fmt.Errorf("error"))
 
 	var (
-		tickTime       = 10 * time.Millisecond
-		totalSleepTime = 11 * tickTime
+		tickTime       = 1 * time.Millisecond
+		totalSleepTime = 11 * tickTime // to allow it to fail 10 times at least
 	)
-
 	configPoller := NewHomeChainConfigPoller(
 		homeChainReader,
 		logger.Test(t),
 		tickTime,
 	)
 	_ = configPoller.Start(context.Background())
-
 	// Initially it's healthy
 	healthy := configPoller.HealthReport()
-	assert.Equal(t, map[string]error{configPoller.Name(): error(nil)}, healthy)
-
+	require.Equal(t, map[string]error{configPoller.Name(): error(nil)}, healthy)
 	// After one second it will try polling 10 times and fail
 	time.Sleep(totalSleepTime)
-
 	errors := configPoller.HealthReport()
+	require.Equal(t, 1, len(errors))
+	require.Errorf(t, errors[configPoller.Name()], "polling failed %d times in a row", MaxFailedPolls)
 
-	err := configPoller.Close()
-	time.Sleep(tickTime)
-	assert.NoError(t, err)
-	assert.Equal(t, 1, len(errors))
-	assert.Errorf(t, errors[configPoller.Name()], "polling failed %d times in a row", MaxFailedPolls)
+	closGracefully(t, configPoller)
 }
 
 func Test_PollingWorking(t *testing.T) {
-	onChainConfigs := []CCIPCapabilityConfigurationChainConfigInfo{
+	onChainConfigs := []ChainConfigInfo{
 		{
 			ChainSelector: chainA,
 			ChainConfig: HomeChainConfigMapper{
@@ -105,7 +99,7 @@ func Test_PollingWorking(t *testing.T) {
 			},
 		},
 	}
-	homeChainConfig := map[cciptypes.ChainSelector]CCIPCapabilityConfigurationChainConfig{
+	homeChainConfig := map[cciptypes.ChainSelector]ChainConfig{
 		chainA: {
 			FChain:         1,
 			SupportedNodes: mapset.NewSet(p2pOracleAId, p2pOracleBId, p2pOracleCId),
@@ -124,12 +118,12 @@ func Test_PollingWorking(t *testing.T) {
 	homeChainReader.On(
 		"GetLatestValue", mock.Anything, "CCIPCapabilityConfiguration", "getAllChainConfigs", mock.Anything, mock.Anything).Run(
 		func(args mock.Arguments) {
-			arg := args.Get(4).(*[]CCIPCapabilityConfigurationChainConfigInfo)
+			arg := args.Get(4).(*[]ChainConfigInfo)
 			*arg = onChainConfigs
 		}).Return(nil)
 
 	var (
-		tickTime       = 20 * time.Millisecond
+		tickTime       = 2 * time.Millisecond
 		totalSleepTime = (tickTime * 2) + (10 * time.Millisecond)
 		expNumCalls    = int(totalSleepTime/tickTime) + 1 // +1 for the initial call
 	)
@@ -142,15 +136,33 @@ func Test_PollingWorking(t *testing.T) {
 
 	ctx := context.Background()
 	err := configPoller.Start(ctx)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	time.Sleep(totalSleepTime)
 	err = configPoller.Close()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// called 3 times, once when it's started, and 2 times when it's polling
 	homeChainReader.AssertNumberOfCalls(t, "GetLatestValue", expNumCalls)
 
 	configs, err := configPoller.GetAllChainConfigs()
-	assert.NoError(t, err)
-	assert.Equal(t, homeChainConfig, configs)
+	require.NoError(t, err)
+	require.Equal(t, homeChainConfig, configs)
+}
+
+func closGracefully(t *testing.T, homeChain HomeChain) {
+	err := homeChain.Close()
+	require.NoError(t, err)
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+	for {
+		// Make sure it's closed gracefully, give it 2 seconds to do so or fail
+		err := homeChain.Ready()
+		if err != nil {
+			return
+		}
+		select {
+		case <-ticker.C:
+			t.Fatal("HomeChainReader did not close gracefully")
+		}
+	}
 }

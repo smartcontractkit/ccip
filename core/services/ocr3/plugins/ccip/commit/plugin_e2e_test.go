@@ -192,7 +192,7 @@ func setupEmptyOutcome(ctx context.Context, t *testing.T, lggr logger.Logger) []
 		NewMsgScanBatchSize: 256,
 	}
 
-	chainConfigInfos := []reader.CCIPCapabilityConfigurationChainConfigInfo{
+	chainConfigInfos := []reader.ChainConfigInfo{
 		{
 			ChainSelector: chainC,
 			ChainConfig: reader.HomeChainConfigMapper{
@@ -242,7 +242,7 @@ func setupAllNodesReadAllChains(ctx context.Context, t *testing.T, lggr logger.L
 		NewMsgScanBatchSize: 256,
 	}
 
-	chainConfigInfos := []reader.CCIPCapabilityConfigurationChainConfigInfo{
+	chainConfigInfos := []reader.ChainConfigInfo{
 		{
 			ChainSelector: chainA,
 			ChainConfig: reader.HomeChainConfigMapper{
@@ -335,7 +335,7 @@ func setupNodesDoNotAgreeOnMsgs(ctx context.Context, t *testing.T, lggr logger.L
 		NewMsgScanBatchSize: 256,
 	}
 
-	chainConfigInfos := []reader.CCIPCapabilityConfigurationChainConfigInfo{
+	chainConfigInfos := []reader.ChainConfigInfo{
 		{
 			ChainSelector: chainA,
 			ChainConfig: reader.HomeChainConfigMapper{
@@ -458,12 +458,12 @@ func newNode(ctx context.Context, t *testing.T, lggr logger.Logger, id int, cfg 
 	}
 }
 
-func setupHomeChainPoller(lggr logger.Logger, chainConfigInfos []reader.CCIPCapabilityConfigurationChainConfigInfo) reader.HomeChain {
+func setupHomeChainPoller(lggr logger.Logger, chainConfigInfos []reader.ChainConfigInfo) reader.HomeChain {
 	homeChainReader := mocks.NewContractReaderMock()
 	homeChainReader.On(
 		"GetLatestValue", mock.Anything, "CCIPCapabilityConfiguration", "getAllChainConfigs", mock.Anything, mock.Anything).Run(
 		func(args mock.Arguments) {
-			arg := args.Get(4).(*[]reader.CCIPCapabilityConfigurationChainConfigInfo)
+			arg := args.Get(4).(*[]reader.ChainConfigInfo)
 			*arg = chainConfigInfos
 		}).Return(nil)
 
