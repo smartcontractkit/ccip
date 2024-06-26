@@ -27,6 +27,14 @@ func TestMessageHasher_Hash(t *testing.T) {
 		"6b9a996f53bd80b8365f832be80000000000000000000000000000000000000000000000000000000000000000")
 	assert.NoError(t, err)
 
+	sourceTokenData2, err := hex.DecodeString("000000000000000000000000000000000000000000000000000000000000002" +
+		"00000000000000000000000000000000000000000000000000000000000000060000000000000000000000000000000000000000" +
+		"00000000000000000000000a000000000000000000000000000000000000000000000000000000000000000e00000000000000000" +
+		"000000000000000000000000000000000000000000000020000000000000000000000000e2c2bb2f43b91f65b5519708e34031039" +
+		"4c72d8f0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000bd2f7046d10" +
+		"59abfe5316b48f050684a4676710f0000000000000000000000000000000000000000000000000000000000000000")
+	assert.NoError(t, err)
+
 	// metadataHash used in this test is copied from on-chain tests
 	metadataHash := [32]byte{39, 130, 244, 70, 94, 31, 113, 169, 251, 136, 123, 6, 255, 77, 50, 91, 73,
 		144, 94, 70, 13, 16, 47, 1, 171, 201, 40, 185, 144, 12, 103, 129}
@@ -93,6 +101,37 @@ func TestMessageHasher_Hash(t *testing.T) {
 				Metadata:        cciptypes.CCIPMsgMetadata{},
 			},
 			exp:    "0xe04ade4e6a1121155ca1e89f17c9df6c9236fdcfdf38b97594594d0540345d60",
+			expErr: false,
+		},
+		{
+			name: "full msg 2 - two source token data items",
+			msg: cciptypes.CCIPMsg{
+				CCIPMsgBaseDetails: cciptypes.CCIPMsgBaseDetails{
+					SourceChain: 1,
+					SeqNum:      1,
+				},
+				ChainFeeLimit:  cciptypes.NewBigIntFromInt64(400000),
+				Nonce:          1,
+				Sender:         "0x00007e64E1fB0C487F25dd6D3601ff6aF8d32e4e",
+				Receiver:       "0x00007e64E1fB0C487F25dd6D3601ff6aF8d32e4e",
+				Strict:         false,
+				FeeToken:       "0xcE4ec7b524851E51d5C55eeFbBb8E58E8Ce2515F",
+				FeeTokenAmount: cciptypes.NewBigIntFromInt64(1234567890),
+				Data:           msgData,
+				TokenAmounts: []cciptypes.TokenAmount{
+					{
+						Token:  "0xcE4ec7b524851E51d5C55eeFbBb8E58E8Ce2515F",
+						Amount: largeNumber,
+					},
+					{
+						Token:  "0x3c78e47de47B765dcEE2F30F31B3CF5F10B42d1F",
+						Amount: largeNumber,
+					},
+				},
+				SourceTokenData: [][]byte{sourceTokenData1, sourceTokenData2},
+				Metadata:        cciptypes.CCIPMsgMetadata{},
+			},
+			exp:    "0x30123234e5d9e0cd94610e83be2e0128167b9ab072e8e9450f1f7704b9901589",
 			expErr: false,
 		},
 	}
