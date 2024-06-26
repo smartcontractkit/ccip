@@ -534,6 +534,8 @@ func TestSmokeCCIPOnRampLimits(t *testing.T) {
 				Rate:      big.NewInt(1),
 			})
 			require.NoError(t, err, "Error setting OnRamp rate limits")
+			err = src.Common.ChainClient.WaitForEvents()
+			require.NoError(t, err, "Error waiting for events")
 
 			// Send aggregate unlimited tokens and ensure they succeed
 			src.TransferAmount[freeTokenIndex] = overCapacityAmount
