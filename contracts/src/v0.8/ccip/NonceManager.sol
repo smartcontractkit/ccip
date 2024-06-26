@@ -14,7 +14,6 @@ contract NonceManager is INonceManager, AuthorizedCallers {
   event SkippedIncorrectNonce(uint64 sourceChainSelector, uint64 nonce, bytes sender);
 
   /// @dev Struct that contains the previous on/off ramp addresses
-  // TODO: add prevOffRamp
   struct PreviousRamps {
     address prevOnRamp; // Previous onRamp
     address prevOffRamp; // Previous offRamp
@@ -33,7 +32,7 @@ contract NonceManager is INonceManager, AuthorizedCallers {
   mapping(uint64 destChainSelector => mapping(address sender => uint64 outboundNonce)) private s_outboundNonces;
   /// @dev The current inbound nonce per sender used on the offramp
   /// Corresponds to the outbound nonce in the source chain NonceManager, used to enforce that messages are
-  /// executed in the same order they are sent (assuming they are DON).
+  /// executed in the same order they are sent (assuming they are DON)
   mapping(uint64 sourceChainSelector => mapping(bytes sender => uint64 outboundNonce)) private s_inboundNonces;
 
   constructor(address[] memory authorizedCallers) AuthorizedCallers(authorizedCallers) {}
