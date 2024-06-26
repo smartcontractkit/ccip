@@ -215,6 +215,10 @@ func (l *l2ToL1Bridge) GetTransfers(
 	if len(missingSent) > 0 {
 		l.lggr.Errorw("missing sent logs", "missingSent", missingSent)
 	}
+	l.lggr.Infow("partitioned withdrawal transfers",
+		"needsToBeProven", needsToBeProven,
+		"needsToBeFinalized", needsToBeFinalized,
+	)
 
 	return l.toPendingTransfers(ctx, lggr, localToken, remoteToken, needsToBeProven, needsToBeFinalized, parsedToLp)
 }
