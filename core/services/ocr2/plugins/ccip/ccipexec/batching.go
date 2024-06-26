@@ -24,7 +24,6 @@ import (
 )
 
 type BatchContext struct {
-	ctx                        context.Context
 	report                     commitReportWithSendRequests
 	lggr                       logger.Logger
 	availableDataLen           int
@@ -47,7 +46,7 @@ type BatchContext struct {
 type BaseBatchingStrategy struct{}
 
 type BatchingStrategy interface {
-	BuildBatch(batchCtx *BatchContext) ([]ccip.ObservedMessage, []messageExecStatus)
+	BuildBatch(ctx context.Context, batchCtx *BatchContext) ([]ccip.ObservedMessage, []messageExecStatus)
 }
 
 type BestEffortBatchingStrategy struct {
@@ -56,12 +55,13 @@ type BestEffortBatchingStrategy struct {
 
 // BestEffortBatchingStrategy is a batching strategy that tries to batch as many messages as possible (up to certain limits).
 func (s *BestEffortBatchingStrategy) BuildBatch(
+	ctx context.Context,
 	batchCtx *BatchContext,
 ) ([]ccip.ObservedMessage, []messageExecStatus) {
 	batchBuilder := newBatchBuildContainer(len(batchCtx.report.sendRequestsWithMeta))
 	for _, msg := range batchCtx.report.sendRequestsWithMeta {
 		msgLggr := batchCtx.lggr.With("messageID", hexutil.Encode(msg.MessageID[:]), "seqNr", msg.SequenceNumber)
-		shouldAdd, status, messageMaxGas, tokenData, msgValue, err := s.performCommonChecks(batchCtx, msg, msgLggr)
+		shouldAdd, status, messageMaxGas, tokenData, msgValue, err := s.performCommonChecks(ctx, batchCtx, msg, msgLggr)
 
 		if err != nil {
 			return []ccip.ObservedMessage{}, []messageExecStatus{}
@@ -102,13 +102,14 @@ type ZKOverflowBatchingStrategy struct {
 // It is a simple batching strategy that only allows one message to be added to the batch.
 // TXM is used to perform the ZK check: if the message failed the check, it will be skipped.
 func (bs *ZKOverflowBatchingStrategy) BuildBatch(
+	ctx context.Context,
 	batchCtx *BatchContext,
 ) ([]ccip.ObservedMessage, []messageExecStatus) {
 	batchBuilder := newBatchBuildContainer(1)
 
 	for _, msg := range batchCtx.report.sendRequestsWithMeta {
 		msgLggr := batchCtx.lggr.With("messageID", hexutil.Encode(msg.MessageID[:]), "seqNr", msg.SequenceNumber)
-		shouldAdd, status, messageMaxGas, tokenData, msgValue, err := bs.performCommonChecks(batchCtx, msg, msgLggr)
+		shouldAdd, status, messageMaxGas, tokenData, msgValue, err := bs.performCommonChecks(ctx, batchCtx, msg, msgLggr)
 
 		if err != nil {
 			return []ccip.ObservedMessage{}, []messageExecStatus{}
@@ -120,7 +121,7 @@ func (bs *ZKOverflowBatchingStrategy) BuildBatch(
 		}
 
 		// Check if the messsage is overflown using TXM
-		statuses, _, err := bs.statuschecker.CheckMessageStatus(batchCtx.ctx, hexutil.Encode(msg.MessageID[:]))
+		statuses, _, err := bs.statuschecker.CheckMessageStatus(ctx, hexutil.Encode(msg.MessageID[:]))
 		if err != nil {
 			batchBuilder.skip(msg, TXMCheckError)
 			continue
@@ -174,7 +175,8 @@ func (bs *ZKOverflowBatchingStrategy) BuildBatch(
 }
 
 func (bs *BaseBatchingStrategy) performCommonChecks(
-	ctx *BatchContext,
+	ctx context.Context,
+	batchContext *BatchContext,
 	msg cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta,
 	msgLggr logger.Logger,
 ) (bool, messageStatus, uint64, [][]byte, *big.Int, error) {
@@ -183,14 +185,14 @@ func (bs *BaseBatchingStrategy) performCommonChecks(
 		return false, AlreadyExecuted, 0, nil, nil, nil
 	}
 
-	if len(msg.Data) > ctx.availableDataLen {
-		msgLggr.Infow("Skipping message - insufficient remaining batch data length", "msgDataLen", len(msg.Data), "availableBatchDataLen", ctx.availableDataLen)
+	if len(msg.Data) > batchContext.availableDataLen {
+		msgLggr.Infow("Skipping message - insufficient remaining batch data length", "msgDataLen", len(msg.Data), "availableBatchDataLen", batchContext.availableDataLen)
 		return false, InsufficientRemainingBatchDataLength, 0, nil, nil, nil
 	}
 
 	messageMaxGas, err1 := calculateMessageMaxGas(
 		msg.GasLimit,
-		len(ctx.report.sendRequestsWithMeta),
+		len(batchContext.report.sendRequestsWithMeta),
 		len(msg.Data),
 		len(msg.TokenAmounts),
 	)
@@ -200,41 +202,41 @@ func (bs *BaseBatchingStrategy) performCommonChecks(
 	}
 
 	// Check sufficient gas in batch
-	if ctx.availableGas < messageMaxGas {
-		msgLggr.Infow("Skipping message - insufficient remaining batch gas limit", "availableGas", ctx.availableGas, "messageMaxGas", messageMaxGas)
+	if batchContext.availableGas < messageMaxGas {
+		msgLggr.Infow("Skipping message - insufficient remaining batch gas limit", "availableGas", batchContext.availableGas, "messageMaxGas", messageMaxGas)
 		return false, InsufficientRemainingBatchGas, 0, nil, nil, nil
 	}
 
-	if _, ok := ctx.expectedNonces[msg.Sender]; !ok {
-		nonce, ok1 := ctx.sendersNonce[msg.Sender]
+	if _, ok := batchContext.expectedNonces[msg.Sender]; !ok {
+		nonce, ok1 := batchContext.sendersNonce[msg.Sender]
 		if !ok1 {
 			msgLggr.Errorw("Skipping message - missing nonce", "sender", msg.Sender)
 			return false, MissingNonce, 0, nil, nil, nil
 		}
-		ctx.expectedNonces[msg.Sender] = nonce + 1
+		batchContext.expectedNonces[msg.Sender] = nonce + 1
 	}
 
 	// Check expected nonce is valid for sequenced messages.
 	// Sequenced messages have non-zero nonces.
-	if msg.Nonce > 0 && msg.Nonce != ctx.expectedNonces[msg.Sender] {
-		msgLggr.Warnw("Skipping message - invalid nonce", "have", msg.Nonce, "want", ctx.expectedNonces[msg.Sender])
+	if msg.Nonce > 0 && msg.Nonce != batchContext.expectedNonces[msg.Sender] {
+		msgLggr.Warnw("Skipping message - invalid nonce", "have", msg.Nonce, "want", batchContext.expectedNonces[msg.Sender])
 		return false, InvalidNonce, 0, nil, nil, nil
 	}
 
-	msgValue, err1 := aggregateTokenValue(ctx.lggr, ctx.destTokenPricesUSD, ctx.sourceToDestToken, msg.TokenAmounts)
+	msgValue, err1 := aggregateTokenValue(batchContext.lggr, batchContext.destTokenPricesUSD, batchContext.sourceToDestToken, msg.TokenAmounts)
 	if err1 != nil {
 		msgLggr.Errorw("Skipping message - aggregate token value compute error", "err", err1)
 		return false, AggregateTokenValueComputeError, 0, nil, nil, nil
 	}
 
 	// if token limit is smaller than message value skip message
-	if tokensLeft, hasCapacity := hasEnoughTokens(ctx.aggregateTokenLimit, msgValue, ctx.inflightAggregateValue); !hasCapacity {
+	if tokensLeft, hasCapacity := hasEnoughTokens(batchContext.aggregateTokenLimit, msgValue, batchContext.inflightAggregateValue); !hasCapacity {
 		msgLggr.Warnw("Skipping message - aggregate token limit exceeded", "aggregateTokenLimit", tokensLeft.String(), "msgValue", msgValue.String())
 		return false, AggregateTokenLimitExceeded, 0, nil, nil, nil
 	}
 
-	tokenData, elapsed, err1 := bs.getTokenDataWithTimeout(ctx.ctx, msg, ctx.tokenDataRemainingDuration, ctx.tokenDataWorker)
-	ctx.tokenDataRemainingDuration -= elapsed
+	tokenData, elapsed, err1 := bs.getTokenDataWithTimeout(ctx, msg, batchContext.tokenDataRemainingDuration, batchContext.tokenDataWorker)
+	batchContext.tokenDataRemainingDuration -= elapsed
 	if err1 != nil {
 		if errors.Is(err1, tokendata.ErrNotReady) {
 			msgLggr.Warnw("Skipping message - token data not ready", "err", err1)
@@ -244,9 +246,9 @@ func (bs *BaseBatchingStrategy) performCommonChecks(
 		return false, TokenDataFetchError, 0, nil, nil, nil
 	}
 
-	dstWrappedNativePrice, exists := ctx.destTokenPricesUSD[ctx.destWrappedNative]
+	dstWrappedNativePrice, exists := batchContext.destTokenPricesUSD[batchContext.destWrappedNative]
 	if !exists {
-		msgLggr.Errorw("Skipping message - token not in destination token prices", "token", ctx.destWrappedNative)
+		msgLggr.Errorw("Skipping message - token not in destination token prices", "token", batchContext.destWrappedNative)
 		return false, TokenNotInDestTokenPrices, 0, nil, nil, nil
 	}
 
@@ -254,14 +256,14 @@ func (bs *BaseBatchingStrategy) performCommonChecks(
 	// For example:
 	// FeeToken=link; FeeTokenAmount=1e17 i.e. 0.1 link, price is 6e18 USD/link (1 USD = 1e18),
 	// availableFee is 1e17*6e18/1e18 = 6e17 = 0.6 USD
-	sourceFeeTokenPrice, exists := ctx.sourceTokenPricesUSD[msg.FeeToken]
+	sourceFeeTokenPrice, exists := batchContext.sourceTokenPricesUSD[msg.FeeToken]
 	if !exists {
 		msgLggr.Errorw("Skipping message - token not in source token prices", "token", msg.FeeToken)
 		return false, TokenNotInSrcTokenPrices, 0, nil, nil, nil
 	}
 
 	// Fee boosting
-	execCostUsd, err1 := ctx.gasPriceEstimator.EstimateMsgCostUSD(ctx.gasPrice, dstWrappedNativePrice, msg)
+	execCostUsd, err1 := batchContext.gasPriceEstimator.EstimateMsgCostUSD(batchContext.gasPrice, dstWrappedNativePrice, msg)
 	if err1 != nil {
 		msgLggr.Errorw("Failed to estimate message cost USD", "err", err1)
 		return false, "", 0, nil, nil, errors.New("failed to estimate message cost USD")
@@ -269,7 +271,7 @@ func (bs *BaseBatchingStrategy) performCommonChecks(
 
 	availableFee := big.NewInt(0).Mul(msg.FeeTokenAmount, sourceFeeTokenPrice)
 	availableFee = availableFee.Div(availableFee, big.NewInt(1e18))
-	availableFeeUsd := waitBoostedFee(time.Since(msg.BlockTimestamp), availableFee, ctx.offchainConfig.RelativeBoostPerWaitHour)
+	availableFeeUsd := waitBoostedFee(time.Since(msg.BlockTimestamp), availableFee, batchContext.offchainConfig.RelativeBoostPerWaitHour)
 	if availableFeeUsd.Cmp(execCostUsd) < 0 {
 		msgLggr.Infow(
 			"Skipping message - insufficient remaining fee",
@@ -277,7 +279,7 @@ func (bs *BaseBatchingStrategy) performCommonChecks(
 			"execCostUsd", execCostUsd,
 			"sourceBlockTimestamp", msg.BlockTimestamp,
 			"waitTime", time.Since(msg.BlockTimestamp),
-			"boost", ctx.offchainConfig.RelativeBoostPerWaitHour,
+			"boost", batchContext.offchainConfig.RelativeBoostPerWaitHour,
 		)
 		return false, InsufficientRemainingFee, 0, nil, nil, nil
 	}

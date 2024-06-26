@@ -282,7 +282,6 @@ func (r *ExecutionReportingPlugin) buildBatch(
 	}
 
 	batchCtx := &BatchContext{
-		ctx,
 		report,
 		lggr,
 		MaxDataLenPerBatch,
@@ -302,7 +301,7 @@ func (r *ExecutionReportingPlugin) buildBatch(
 		r.offchainConfig,
 	}
 
-	return r.batchingStrategy.BuildBatch(batchCtx)
+	return r.batchingStrategy.BuildBatch(ctx, batchCtx)
 }
 
 func hasEnoughTokens(tokenLimit *big.Int, msgValue *big.Int, inflightValue *big.Int) (*big.Int, bool) {

@@ -158,7 +158,6 @@ func TestExecOffchainConfig120_ParseRawJson(t *testing.T) {
 					RootSnoozeTime:              *config.MustNewDuration(128 * time.Minute),
 					BatchingStrategyId:          1, // Actual value
 				}, decoded)
-				return
 			} else {
 				require.Equal(t, JSONExecOffchainConfig{
 					DestOptimisticConfirmations: 6,

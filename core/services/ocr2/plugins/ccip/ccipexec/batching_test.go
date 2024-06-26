@@ -870,7 +870,6 @@ func TestBatchingStrategies(t *testing.T) {
 
 // Function to set up and run tests for a given batching strategy
 func runBatchingStrategyTests(t *testing.T, strategy BatchingStrategy, availableGas uint64, testCases []testCase) {
-
 	destNative := ccipcalc.HexToAddress("0xb")
 
 	for _, tc := range testCases {
@@ -898,7 +897,6 @@ func runBatchingStrategyTests(t *testing.T, strategy BatchingStrategy, available
 			}
 
 			batchContext := &BatchContext{
-				ctx:                        context.Background(),
 				report:                     commitReportWithSendRequests{sendRequestsWithMeta: tc.reqs},
 				lggr:                       lggr,
 				availableDataLen:           MaxDataLenPerBatch,
@@ -922,7 +920,7 @@ func runBatchingStrategyTests(t *testing.T, strategy BatchingStrategy, available
 				},
 			}
 
-			seqNrs, execStates := strategy.BuildBatch(batchContext)
+			seqNrs, execStates := strategy.BuildBatch(context.Background(), batchContext)
 
 			runAssertions(t, tc, seqNrs, execStates)
 		})
