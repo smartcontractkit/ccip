@@ -60,7 +60,7 @@ func NewPluginFactory(
 	}, nil
 }
 
-func (p PluginFactory) buildRebalancer() (rebalalgo.LiquidityBalancer, error) {
+func (p PluginFactory) buildRebalancer() (rebalalgo.RebalancingAlgo, error) {
 	switch p.config.RebalancerConfig.Type {
 	case models.RebalancerTypePingPong:
 		return rebalalgo.NewPingPong(), nil

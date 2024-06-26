@@ -33,7 +33,7 @@ type Plugin struct {
 	bridgeFactory           bridge.Factory
 	mu                      sync.RWMutex
 	liquidityGraph          graph.Graph
-	liquidityRebalancer     rebalalgo.LiquidityBalancer
+	liquidityRebalancer     rebalalgo.RebalancingAlgo
 	inflight                inflight.Container
 	lggr                    logger.Logger
 	reportCodec             evmliquiditymanager.OnchainReportCodec
@@ -47,7 +47,7 @@ func NewPlugin(
 	liquidityManagerFactory evmliquiditymanager.Factory,
 	discoverer discoverer.Discoverer,
 	bridgeFactory bridge.Factory,
-	liquidityRebalancer rebalalgo.LiquidityBalancer,
+	liquidityRebalancer rebalalgo.RebalancingAlgo,
 	reportCodec evmliquiditymanager.OnchainReportCodec,
 	lggr logger.Logger,
 ) *Plugin {
