@@ -72,7 +72,6 @@ type EVM2EVMMultiOffRampSourceChainConfig struct {
 	IsEnabled    bool
 	MinSeqNr     uint64
 	PrevOffRamp  common.Address
-	OnRamp       common.Address
 	MetadataHash [32]byte
 }
 
@@ -80,7 +79,7 @@ type EVM2EVMMultiOffRampSourceChainConfigArgs struct {
 	SourceChainSelector uint64
 	IsEnabled           bool
 	PrevOffRamp         common.Address
-	OnRamp              common.Address
+	MetadataHash        [32]byte
 }
 
 type EVM2EVMMultiOffRampStaticConfig struct {
@@ -2493,7 +2492,7 @@ func (EVM2EVMMultiOffRampSkippedSenderWithPreviousRampMessageInflight) Topic() c
 }
 
 func (EVM2EVMMultiOffRampSourceChainConfigSet) Topic() common.Hash {
-	return common.HexToHash("0xa73c588738263db34ef8c1942db8f99559bc6696f6a812d42e76bafb4c0e8d30")
+	return common.HexToHash("0xb8f0c74385134334c728fcac437ec6c6397c9f2c1440532b0c44175a090b1401")
 }
 
 func (EVM2EVMMultiOffRampSourceChainSelectorAdded) Topic() common.Hash {
