@@ -157,11 +157,15 @@ func Test_getPendingExecutedReports(t *testing.T) {
 // TODO: better than this
 type tdr struct{}
 
-func (t tdr) ReadTokenData(ctx context.Context, srcChain cciptypes.ChainSelector, num cciptypes.SeqNum) ([][]byte, error) {
+func (t tdr) ReadTokenData(
+	ctx context.Context, srcChain cciptypes.ChainSelector, num cciptypes.SeqNum) ([][]byte, error,
+) {
 	return nil, nil
 }
 
-func breakCommitReport(commitReport cciptypes.ExecutePluginCommitDataWithMessages) cciptypes.ExecutePluginCommitDataWithMessages {
+func breakCommitReport(
+	commitReport cciptypes.ExecutePluginCommitDataWithMessages,
+) cciptypes.ExecutePluginCommitDataWithMessages {
 	commitReport.Messages = append(commitReport.Messages, cciptypes.CCIPMsg{
 		CCIPMsgBaseDetails: cciptypes.CCIPMsgBaseDetails{
 			ID:          crypto.CRandHex(32),
@@ -173,7 +177,9 @@ func breakCommitReport(commitReport cciptypes.ExecutePluginCommitDataWithMessage
 	return commitReport
 }
 
-func makeTestCommitReport(numMessages, srcChain, firstSeqNum, block int, timestamp int64, executed []cciptypes.SeqNum) cciptypes.ExecutePluginCommitDataWithMessages {
+func makeTestCommitReport(
+	numMessages, srcChain, firstSeqNum, block int, timestamp int64, executed []cciptypes.SeqNum,
+) cciptypes.ExecutePluginCommitDataWithMessages {
 	for _, e := range executed {
 		if e < cciptypes.SeqNum(firstSeqNum) || e > cciptypes.SeqNum(firstSeqNum+numMessages-1) {
 			panic("executed message out of range")
@@ -188,24 +194,16 @@ func makeTestCommitReport(numMessages, srcChain, firstSeqNum, block int, timesta
 				SeqNum:      cciptypes.SeqNum(i + firstSeqNum),
 				MsgHash:     cciptypes.Bytes32{},
 			},
-			//ChainFeeLimit:      cciptypes.BigInt{},
 			Nonce: uint64(i),
-			//Sender:             "0xGrovor",
-			//Receiver:           "0xOscar",
-			//Strict:             false,
-			//FeeToken:           "",
-			//FeeTokenAmount:     cciptypes.BigInt{},
-			//Data:               nil,
-			//TokenAmounts:       nil,
-			//SourceTokenData:    nil,
-			//Metadata:           cciptypes.CCIPMsgMetadata{},
 		})
 	}
 
+	sequenceNumberRange :=
+		cciptypes.NewSeqNumRange(cciptypes.SeqNum(firstSeqNum), cciptypes.SeqNum(firstSeqNum+numMessages-1))
 	return cciptypes.ExecutePluginCommitDataWithMessages{
 		ExecutePluginCommitData: cciptypes.ExecutePluginCommitData{
 			SourceChain:         cciptypes.ChainSelector(srcChain),
-			SequenceNumberRange: cciptypes.NewSeqNumRange(cciptypes.SeqNum(firstSeqNum), cciptypes.SeqNum(firstSeqNum+numMessages-1)),
+			SequenceNumberRange: sequenceNumberRange,
 			Timestamp:           time.UnixMilli(timestamp),
 			BlockNum:            uint64(block),
 			ExecutedMessages:    executed,
@@ -215,8 +213,14 @@ func makeTestCommitReport(numMessages, srcChain, firstSeqNum, block int, timesta
 
 }
 
-// assertMerkleRoot computes the source messages merkle root, then computes a verification with the proof, then compares the roots.
-func assertMerkleRoot(t *testing.T, hasher cciptypes.MessageHasher, execReport cciptypes.ExecutePluginReportSingleChain, commitReport cciptypes.ExecutePluginCommitDataWithMessages) {
+// assertMerkleRoot computes the source messages merkle root, then computes a verification with the proof, then compares
+// the roots.
+func assertMerkleRoot(
+	t *testing.T,
+	hasher cciptypes.MessageHasher,
+	execReport cciptypes.ExecutePluginReportSingleChain,
+	commitReport cciptypes.ExecutePluginCommitDataWithMessages
+) {
 	keccak := hashutil.NewKeccak()
 	// Generate merkle root from commit report messages
 	var leafHashes [][32]byte
@@ -414,7 +418,8 @@ func Test_selectReport(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			ctx := context.Background()
-			execReports, commitReports, err := selectReport(ctx, lggr, hasher, codec, tokenDataReader, tt.args.reports, tt.args.maxReportSize)
+			execReports, commitReports, err :=
+				 selectReport(ctx, lggr, hasher, codec, tokenDataReader, tt.args.reports, tt.args.maxReportSize)
 			if tt.wantErr != "" {
 				assert.Contains(t, err.Error(), tt.wantErr)
 				return
@@ -445,7 +450,9 @@ func (bh badHasher) Hash(context.Context, cciptypes.CCIPMsg) (cciptypes.Bytes32,
 
 type badTokenDataReader struct{}
 
-func (btdr badTokenDataReader) ReadTokenData(ctx context.Context, srcChain cciptypes.ChainSelector, num cciptypes.SeqNum) ([][]byte, error) {
+func (btdr badTokenDataReader) ReadTokenData(
+	_ context.Context, _ cciptypes.ChainSelector, _ cciptypes.SeqNum,
+) ([][]byte, error) {
 	return nil, fmt.Errorf("bad token data reader")
 }
 
@@ -464,7 +471,6 @@ func Test_buildSingleChainReport_Errors(t *testing.T) {
 
 	type args struct {
 		report          cciptypes.ExecutePluginCommitDataWithMessages
-		maxReportSize   int
 		maxMessages     int
 		hasher          cciptypes.MessageHasher
 		tokenDataReader TokenDataReader
@@ -473,10 +479,8 @@ func Test_buildSingleChainReport_Errors(t *testing.T) {
 	tests := []struct {
 		name string
 		args args
-		// TODO: assertions
 		wantErr string
 	}{
-		// TODO: Add test cases.
 		{
 			name:    "wrong number of messages",
 			wantErr: "unexpected number of messages: expected 1, got 2",
@@ -622,7 +626,8 @@ func Test_buildSingleChainReport_Errors(t *testing.T) {
 			}
 
 			ctx := context.Background()
-			execReport, size, err := buildSingleChainReport(ctx, lggr, resolvedHasher, resolvedTokenDataReader, resolvedCodec, tt.args.report, tt.args.maxReportSize, tt.args.maxMessages)
+			execReport, size, err := buildSingleChainReport(
+				ctx, lggr, resolvedHasher, resolvedTokenDataReader, resolvedCodec, tt.args.report, tt.args.maxMessages)
 			if tt.wantErr != "" {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.wantErr)

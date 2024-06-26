@@ -492,7 +492,8 @@ func (p *Plugin) Outcome(
 		}
 	}
 
-	outcomeReports, commitReports, err := selectReport(p.ctx, p.lggr, p.msgHasher, p.reportCodec, nil, commitReports, maxReportSizeBytes)
+	outcomeReports, commitReports, err :=
+		selectReport(p.ctx, p.lggr, p.msgHasher, p.reportCodec, nil, commitReports, maxReportSizeBytes)
 	if err != nil {
 		return ocr3types.Outcome{}, fmt.Errorf("unable to extract proofs: %w", err)
 	}
