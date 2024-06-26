@@ -3,12 +3,14 @@ package evm
 import (
 	"context"
 	"encoding/hex"
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	"strings"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/libocr/gethwrappers2/ocr2aggregator"
+	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -74,4 +76,36 @@ func TestContractTransmitter(t *testing.T) {
 	from, err := ot.FromAccount()
 	require.NoError(t, err)
 	assert.Equal(t, sampleAddress.String(), string(from))
+}
+
+func Test_contractTransmitterNoSignatures_Transmit_SignaturesAreNotTransmitted(t *testing.T) {
+	t.Parallel()
+
+	transmitter := mockTransmitter{}
+
+	ctx := context.Background()
+	reportCtx := types.ReportContext{}
+	report := types.Report{}
+	var signatures []ocrtypes.AttributedOnchainSignature
+
+	oc := createContractTransmitterNoSignatures(t, transmitter)
+
+	err := oc.Transmit(ctx, reportCtx, report, signatures)
+	require.NoError(t, err)
+}
+
+func createContractTransmitterNoSignatures(t *testing.T, transmitter Transmitter) contractTransmitterNoSignatures {
+	contractABI, _ := abi.JSON(strings.NewReader(ocr2aggregator.OCR2AggregatorABI))
+	fields := contractTransmitterFields{
+		contractAddress:     gethcommon.Address{},
+		contractABI:         contractABI,
+		transmitter:         transmitter,
+		transmittedEventSig: gethcommon.Hash{},
+		lp:                  lpmocks.NewLogPoller(t),
+		contractReader:      evmclimocks.NewClient(t),
+		lggr:                logger.TestLogger(t),
+		reportToEvmTxMeta:   reportToEvmTxMetaNoop,
+	}
+	oc := contractTransmitterNoSignatures{fields}
+	return oc
 }
