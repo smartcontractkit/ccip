@@ -398,7 +398,7 @@ func TestSmokeCCIPOnRampLimits(t *testing.T) {
 	t.Parallel()
 
 	log := logging.GetTestLogger(t)
-	TestCfg := testsetups.NewCCIPTestConfig(t, log, testconfig.Smoke)
+	TestCfg := testsetups.NewCCIPTestConfig(t, log, testconfig.Smoke, testsetups.WithNoTokensPerMessage(4), testsetups.WithTokensPerChain(4))
 	err := contracts.MatchContractVersionsOrAbove(map[contracts.Name]contracts.Version{
 		contracts.OffRampContract: contracts.V1_5_0_dev,
 		contracts.OnRampContract:  contracts.V1_5_0_dev,
