@@ -247,7 +247,7 @@ func TestBatchingStrategies(t *testing.T) {
 			reqs:         []cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta{msg4},
 			inflight:     big.NewInt(0),
 			tokenLimit:   big.NewInt(2),
-			destGasPrice: big.NewInt(10),
+			destGasPrice: big.NewInt(1),
 			srcPrices:    map[cciptypes.Address]*big.Int{srcNative: big.NewInt(1e18)},
 			dstPrices:    map[cciptypes.Address]*big.Int{destNative: big.NewInt(1e18)},
 			srcToDestTokens: map[cciptypes.Address]cciptypes.Address{
@@ -856,7 +856,7 @@ func TestBatchingStrategies(t *testing.T) {
 
 	t.Run("BestEffortBatchingStrategy", func(t *testing.T) {
 		strategy := &BestEffortBatchingStrategy{}
-		runBatchingStrategyTests(t, strategy, 300_000, append(testCases, bestEffortTestCases...))
+		runBatchingStrategyTests(t, strategy, 1_000_000, append(testCases, bestEffortTestCases...))
 	})
 
 	t.Run("ZKOverflowBatchingStrategy", func(t *testing.T) {
@@ -888,7 +888,7 @@ func runBatchingStrategyTests(t *testing.T, strategy BatchingStrategy, available
 
 			// default case for ZKOverflowBatchingStrategy
 			if strategyType := reflect.TypeOf(strategy); tc.statuschecker == nil && strategyType == reflect.TypeOf(&ZKOverflowBatchingStrategy{}) {
-				strategy.(*ZKOverflowBatchingStrategy).statuschecker.(*mockstatuschecker.CCIPTransactionStatusChecker).On("QueryTxStatuses", mock.Anything, mock.Anything).Return([]types.TransactionStatus{}, -1, nil)
+				strategy.(*ZKOverflowBatchingStrategy).statuschecker.(*mockstatuschecker.CCIPTransactionStatusChecker).On("CheckMessageStatus", mock.Anything, mock.Anything).Return([]types.TransactionStatus{}, -1, nil)
 			}
 
 			// Mock calls to TXM
