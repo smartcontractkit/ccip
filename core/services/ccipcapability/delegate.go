@@ -136,6 +136,7 @@ func (d *Delegate) ServicesForSpec(ctx context.Context, spec job.Job) (services 
 
 	return []job.ServiceCtx{
 		// hcr, // TODO: add home chain reader
+		capLauncher,
 	}, nil
 }
 
