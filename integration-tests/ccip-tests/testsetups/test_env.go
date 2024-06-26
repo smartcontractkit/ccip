@@ -334,11 +334,13 @@ func DeployLocalCluster(
 				ccipNode, err := test_env.NewClNode(
 					[]string{env.DockerNetwork.Name},
 					pointer.GetString(clNode.ChainlinkImage.Image),
-					pointer.GetString(clNode.ChainlinkImage.Version), toml,
+					pointer.GetString(clNode.ChainlinkImage.Version),
+					toml,
+					env.LogStream,
 					test_env.WithPgDBOptions(
 						ctftestenv.WithPostgresImageName(clNode.DBImage),
-						ctftestenv.WithPostgresImageVersion(clNode.DBTag)),
-					test_env.WithLogStream(env.LogStream),
+						ctftestenv.WithPostgresImageVersion(clNode.DBTag),
+					),
 				)
 				if err != nil {
 					return err
@@ -362,10 +364,12 @@ func DeployLocalCluster(
 					[]string{env.DockerNetwork.Name},
 					pointer.GetString(testInputs.EnvInput.NewCLCluster.Common.ChainlinkImage.Image),
 					pointer.GetString(testInputs.EnvInput.NewCLCluster.Common.ChainlinkImage.Version),
-					toml, test_env.WithPgDBOptions(
+					toml,
+					env.LogStream,
+					test_env.WithPgDBOptions(
 						ctftestenv.WithPostgresImageName(testInputs.EnvInput.NewCLCluster.Common.DBImage),
-						ctftestenv.WithPostgresImageVersion(testInputs.EnvInput.NewCLCluster.Common.DBTag)),
-					test_env.WithLogStream(env.LogStream),
+						ctftestenv.WithPostgresImageVersion(testInputs.EnvInput.NewCLCluster.Common.DBTag),
+					),
 				)
 				if err != nil {
 					return err
@@ -383,7 +387,7 @@ func DeployLocalCluster(
 // startIndex and endIndex are inclusive
 func UpgradeNodes(
 	t *testing.T,
-	lggr zerolog.Logger,
+	lggr *zerolog.Logger,
 	testInputs *CCIPTestConfig,
 	ccipEnv *actions.CCIPTestEnv,
 ) error {
@@ -462,8 +466,9 @@ func DeployEnvironments(
 				charts = append(charts, foundry.ChartName)
 				testEnvironment.
 					AddHelm(foundry.New(&foundry.Props{
+						NetworkName: network.Name,
 						Values: map[string]interface{}{
-							"fullnameOverride": fmt.Sprintf("network-%s", network.Name),
+							"fullnameOverride": actions.NetworkName(network.Name),
 							"anvil": map[string]interface{}{
 								"chainId":                   fmt.Sprintf("%d", network.ChainID),
 								"blockTime":                 anvilConfig.BlockTime,
@@ -473,6 +478,7 @@ func DeployEnvironments(
 								"forkTimeout":               anvilConfig.Timeout,
 								"forkComputeUnitsPerSecond": anvilConfig.ComputePerSecond,
 								"forkNoRateLimit":           anvilConfig.RateLimitDisabled,
+								"blocksToKeepInMemory":      anvilConfig.BlocksToKeepInMem,
 							},
 							"resources": testInputs.GethResourceProfile,
 						},
@@ -528,17 +534,19 @@ func DeployEnvironments(
 		if !network.Simulated {
 			return network.URLs, network.HTTPURLs
 		}
-		networkName := strings.ReplaceAll(strings.ToLower(network.Name), " ", "-")
+		networkName := actions.NetworkName(network.Name)
 		var internalWsURLs, internalHttpURLs []string
 		switch chart {
 		case foundry.ChartName:
-			internalWsURLs = append(internalWsURLs, fmt.Sprintf("ws://%s-%s:8545", networkName, foundry.ChartName))
-			internalHttpURLs = append(internalHttpURLs, fmt.Sprintf("http://%s-%s:8545", networkName, foundry.ChartName))
+			internalWsURLs = append(internalWsURLs, fmt.Sprintf("ws://%s:8545", networkName))
+			internalHttpURLs = append(internalHttpURLs, fmt.Sprintf("http://%s:8545", networkName))
 		case networkName:
 			for i := 0; i < numOfTxNodes; i++ {
 				internalWsURLs = append(internalWsURLs, fmt.Sprintf("ws://%s-ethereum-geth:8546", networkName))
 				internalHttpURLs = append(internalHttpURLs, fmt.Sprintf("http://%s-ethereum-geth:8544", networkName))
 			}
+		default:
+			return network.URLs, network.HTTPURLs
 		}
 
 		return internalWsURLs, internalHttpURLs

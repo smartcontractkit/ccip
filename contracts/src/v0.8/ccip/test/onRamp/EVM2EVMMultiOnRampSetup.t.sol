@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.24;
 
-import {IPool} from "../../interfaces/IPool.sol";
+import {IPoolV1} from "../../interfaces/IPool.sol";
 
+import {AuthorizedCallers} from "../../../shared/access/AuthorizedCallers.sol";
+import {NonceManager} from "../../NonceManager.sol";
 import {PriceRegistry} from "../../PriceRegistry.sol";
 import {Router} from "../../Router.sol";
 import {Client} from "../../libraries/Client.sol";
@@ -13,6 +15,7 @@ import {TokenPool} from "../../pools/TokenPool.sol";
 import {TokenAdminRegistry} from "../../tokenAdminRegistry/TokenAdminRegistry.sol";
 import {TokenSetup} from "../TokenSetup.t.sol";
 import {EVM2EVMMultiOnRampHelper} from "../helpers/EVM2EVMMultiOnRampHelper.sol";
+import {MessageInterceptorHelper} from "../helpers/MessageInterceptorHelper.sol";
 import {PriceRegistrySetup} from "../priceRegistry/PriceRegistry.t.sol";
 
 import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
@@ -30,8 +33,9 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
   bytes32 internal s_metadataHash;
 
   EVM2EVMMultiOnRampHelper internal s_onRamp;
+  MessageInterceptorHelper internal s_outboundMessageValidator;
   address[] internal s_offRamps;
-
+  NonceManager internal s_nonceManager;
   address internal s_destTokenPool = makeAddr("destTokenPool");
   address internal s_destToken = makeAddr("destToken");
 
@@ -68,7 +72,6 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
           deciBps: 2_5, // 2.5 bps, or 0.025%
           destGasOverhead: 40_000,
           destBytesOverhead: 32,
-          aggregateRateLimitEnabled: true,
           isEnabled: true
         })
       })
@@ -82,7 +85,6 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
           deciBps: 5_0, // 5 bps, or 0.05%
           destGasOverhead: 10_000,
           destBytesOverhead: 100,
-          aggregateRateLimitEnabled: true,
           isEnabled: true
         })
       })
@@ -96,14 +98,16 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
           deciBps: 10_0, // 10 bps, or 0.1%
           destGasOverhead: 1,
           destBytesOverhead: 200,
-          aggregateRateLimitEnabled: true,
           isEnabled: true
         })
       })
     );
 
-    (s_onRamp, s_metadataHash) =
-      _deployOnRamp(SOURCE_CHAIN_SELECTOR, address(s_sourceRouter), address(s_tokenAdminRegistry));
+    s_outboundMessageValidator = new MessageInterceptorHelper();
+    s_nonceManager = new NonceManager(new address[](0));
+    (s_onRamp, s_metadataHash) = _deployOnRamp(
+      SOURCE_CHAIN_SELECTOR, address(s_sourceRouter), address(s_nonceManager), address(s_tokenAdminRegistry)
+    );
 
     s_offRamps = new address[](2);
     s_offRamps[0] = address(10);
@@ -221,6 +225,18 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
     return messageEvent;
   }
 
+  function _generateDynamicMultiOnRampConfig(
+    address router,
+    address priceRegistry
+  ) internal pure returns (EVM2EVMMultiOnRamp.DynamicConfig memory) {
+    return EVM2EVMMultiOnRamp.DynamicConfig({
+      router: router,
+      priceRegistry: priceRegistry,
+      messageValidator: address(0),
+      feeAggregator: FEE_AGGREGATOR
+    });
+  }
+
   // Slicing is only available for calldata. So we have to build a new bytes array.
   function _removeFirst4Bytes(bytes memory data) internal pure returns (bytes memory) {
     bytes memory result = new bytes(data.length - 4);
@@ -228,18 +244,6 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
       result[i - 4] = data[i];
     }
     return result;
-  }
-
-  function _generateDynamicMultiOnRampConfig(
-    address router,
-    address priceRegistry,
-    address tokenAdminRegistry
-  ) internal pure returns (EVM2EVMMultiOnRamp.DynamicConfig memory) {
-    return EVM2EVMMultiOnRamp.DynamicConfig({
-      router: router,
-      priceRegistry: priceRegistry,
-      tokenAdminRegistry: tokenAdminRegistry
-    });
   }
 
   function _generateDestChainConfigArgs() internal pure returns (EVM2EVMMultiOnRamp.DestChainConfigArgs[] memory) {
@@ -281,39 +285,59 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
     return tokenTransferFeeConfigArgs;
   }
 
-  function _getMultiOnRampNopsAndWeights() internal pure returns (EVM2EVMMultiOnRamp.NopAndWeight[] memory) {
-    EVM2EVMMultiOnRamp.NopAndWeight[] memory nopsAndWeights = new EVM2EVMMultiOnRamp.NopAndWeight[](3);
-    nopsAndWeights[0] = EVM2EVMMultiOnRamp.NopAndWeight({nop: USER_1, weight: 19284});
-    nopsAndWeights[1] = EVM2EVMMultiOnRamp.NopAndWeight({nop: USER_2, weight: 52935});
-    nopsAndWeights[2] = EVM2EVMMultiOnRamp.NopAndWeight({nop: USER_3, weight: 8});
-    return nopsAndWeights;
-  }
-
   function _deployOnRamp(
     uint64 sourceChainSelector,
     address sourceRouter,
+    address nonceManager,
     address tokenAdminRegistry
   ) internal returns (EVM2EVMMultiOnRampHelper, bytes32 metadataHash) {
     EVM2EVMMultiOnRampHelper onRamp = new EVM2EVMMultiOnRampHelper(
       EVM2EVMMultiOnRamp.StaticConfig({
         linkToken: s_sourceTokens[0],
         chainSelector: sourceChainSelector,
-        maxNopFeesJuels: MAX_NOP_FEES_JUELS,
-        rmnProxy: address(s_mockRMN)
+        maxFeeJuelsPerMsg: MAX_MSG_FEES_JUELS,
+        rmnProxy: address(s_mockRMN),
+        nonceManager: nonceManager,
+        tokenAdminRegistry: tokenAdminRegistry
       }),
-      _generateDynamicMultiOnRampConfig(sourceRouter, address(s_priceRegistry), tokenAdminRegistry),
+      _generateDynamicMultiOnRampConfig(sourceRouter, address(s_priceRegistry)),
       _generateDestChainConfigArgs(),
-      getOutboundRateLimiterConfig(),
       s_premiumMultiplierWeiPerEthArgs,
-      s_tokenTransferFeeConfigArgs,
-      _getMultiOnRampNopsAndWeights()
+      s_tokenTransferFeeConfigArgs
     );
-    onRamp.setAdmin(ADMIN);
+
+    address[] memory authorizedCallers = new address[](1);
+    authorizedCallers[0] = address(onRamp);
+
+    NonceManager(nonceManager).applyAuthorizedCallerUpdates(
+      AuthorizedCallers.AuthorizedCallerArgs({addedCallers: authorizedCallers, removedCallers: new address[](0)})
+    );
 
     return (
       onRamp,
       keccak256(abi.encode(Internal.EVM_2_EVM_MESSAGE_HASH, sourceChainSelector, DEST_CHAIN_SELECTOR, address(onRamp)))
     );
+  }
+
+  function _enableOutboundMessageValidator() internal {
+    (, address msgSender,) = vm.readCallers();
+
+    bool resetPrank = false;
+
+    if (msgSender != OWNER) {
+      vm.stopPrank();
+      vm.startPrank(OWNER);
+      resetPrank = true;
+    }
+
+    EVM2EVMMultiOnRamp.DynamicConfig memory dynamicConfig = s_onRamp.getDynamicConfig();
+    dynamicConfig.messageValidator = address(s_outboundMessageValidator);
+    s_onRamp.setDynamicConfig(dynamicConfig);
+
+    if (resetPrank) {
+      vm.stopPrank();
+      vm.startPrank(msgSender);
+    }
   }
 
   function _assertDestChainConfigsEqual(
@@ -344,8 +368,9 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
   ) internal pure {
     assertEq(a.linkToken, b.linkToken);
     assertEq(a.chainSelector, b.chainSelector);
-    assertEq(a.maxNopFeesJuels, b.maxNopFeesJuels);
+    assertEq(a.maxFeeJuelsPerMsg, b.maxFeeJuelsPerMsg);
     assertEq(a.rmnProxy, b.rmnProxy);
+    assertEq(a.tokenAdminRegistry, b.tokenAdminRegistry);
   }
 
   function _assertDynamicConfigsEqual(
@@ -354,7 +379,6 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
   ) internal pure {
     assertEq(a.router, b.router);
     assertEq(a.priceRegistry, b.priceRegistry);
-    assertEq(a.tokenAdminRegistry, b.tokenAdminRegistry);
   }
 
   function _assertTokenTransferFeeConfigEqual(
@@ -366,7 +390,6 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
     assertEq(a.deciBps, b.deciBps);
     assertEq(a.destGasOverhead, b.destGasOverhead);
     assertEq(a.destBytesOverhead, b.destBytesOverhead);
-    assertEq(a.aggregateRateLimitEnabled, b.aggregateRateLimitEnabled);
     assertEq(a.isEnabled, b.isEnabled);
   }
 }

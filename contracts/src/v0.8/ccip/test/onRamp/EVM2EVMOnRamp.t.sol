@@ -22,10 +22,11 @@ contract EVM2EVMOnRamp_constructor is EVM2EVMOnRampSetup {
       defaultTxGasLimit: GAS_LIMIT,
       maxNopFeesJuels: MAX_NOP_FEES_JUELS,
       prevOnRamp: address(0),
-      rmnProxy: address(s_mockRMN)
+      rmnProxy: address(s_mockRMN),
+      tokenAdminRegistry: address(s_tokenAdminRegistry)
     });
     EVM2EVMOnRamp.DynamicConfig memory dynamicConfig =
-      generateDynamicOnRampConfig(address(s_sourceRouter), address(s_priceRegistry), address(s_tokenAdminRegistry));
+      generateDynamicOnRampConfig(address(s_sourceRouter), address(s_priceRegistry));
 
     vm.expectEmit();
     emit EVM2EVMOnRamp.ConfigSet(staticConfig, dynamicConfig);
@@ -336,7 +337,6 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
         priceRegistry: dynamicConfig.priceRegistry,
         maxDataBytes: dynamicConfig.maxDataBytes,
         maxPerMsgGasLimit: dynamicConfig.maxPerMsgGasLimit,
-        tokenAdminRegistry: dynamicConfig.tokenAdminRegistry,
         defaultTokenFeeUSDCents: dynamicConfig.defaultTokenFeeUSDCents,
         defaultTokenDestGasOverhead: dynamicConfig.defaultTokenDestGasOverhead,
         defaultTokenDestBytesOverhead: dynamicConfig.defaultTokenDestBytesOverhead,
@@ -373,7 +373,6 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
         priceRegistry: dynamicConfig.priceRegistry,
         maxDataBytes: dynamicConfig.maxDataBytes,
         maxPerMsgGasLimit: dynamicConfig.maxPerMsgGasLimit,
-        tokenAdminRegistry: dynamicConfig.tokenAdminRegistry,
         defaultTokenFeeUSDCents: dynamicConfig.defaultTokenFeeUSDCents,
         defaultTokenDestGasOverhead: dynamicConfig.defaultTokenDestGasOverhead,
         defaultTokenDestBytesOverhead: dynamicConfig.defaultTokenDestBytesOverhead,
@@ -490,7 +489,7 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
   function test_Fuzz_ForwardFromRouter_Success(address originalSender, address receiver, uint96 feeTokenAmount) public {
     // To avoid RouterMustSetOriginalSender
     vm.assume(originalSender != address(0));
-    vm.assume(uint160(receiver) >= 10);
+    vm.assume(uint160(receiver) >= Internal.PRECOMPILE_SPACE);
     vm.assume(feeTokenAmount <= MAX_NOP_FEES_JUELS);
 
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
@@ -566,7 +565,7 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
     vm.stopPrank();
     vm.startPrank(OWNER);
     address router = address(0);
-    s_onRamp.setDynamicConfig(generateDynamicOnRampConfig(router, address(2), address(s_tokenAdminRegistry)));
+    s_onRamp.setDynamicConfig(generateDynamicOnRampConfig(router, address(2)));
     vm.expectRevert(EVM2EVMOnRamp.MustBeCalledByRouter.selector);
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, _generateEmptyMessage(), 0, OWNER);
   }
@@ -842,9 +841,10 @@ contract EVM2EVMOnRamp_forwardFromRouter_upgrade is EVM2EVMOnRampSetup {
         defaultTxGasLimit: GAS_LIMIT,
         maxNopFeesJuels: MAX_NOP_FEES_JUELS,
         prevOnRamp: address(s_prevOnRamp),
-        rmnProxy: address(s_mockRMN)
+        rmnProxy: address(s_mockRMN),
+        tokenAdminRegistry: address(s_tokenAdminRegistry)
       }),
-      generateDynamicOnRampConfig(address(s_sourceRouter), address(s_priceRegistry), address(s_tokenAdminRegistry)),
+      generateDynamicOnRampConfig(address(s_sourceRouter), address(s_priceRegistry)),
       getOutboundRateLimiterConfig(),
       s_feeTokenConfigArgs,
       s_tokenTransferFeeConfigArgs,
@@ -928,8 +928,10 @@ contract EVM2EVMOnRamp_getFeeSetup is EVM2EVMOnRampSetup {
     EVM2EVMOnRampSetup.setUp();
 
     // Add additional pool addresses for test tokens to mark them as supported
-    s_tokenAdminRegistry.registerAdministratorPermissioned(s_sourceRouter.getWrappedNative(), OWNER);
-    s_tokenAdminRegistry.registerAdministratorPermissioned(CUSTOM_TOKEN, OWNER);
+    s_tokenAdminRegistry.proposeAdministrator(s_sourceRouter.getWrappedNative(), OWNER);
+    s_tokenAdminRegistry.acceptAdminRole(s_sourceRouter.getWrappedNative());
+    s_tokenAdminRegistry.proposeAdministrator(CUSTOM_TOKEN, OWNER);
+    s_tokenAdminRegistry.acceptAdminRole(CUSTOM_TOKEN);
 
     LockReleaseTokenPool wrappedNativePool = new LockReleaseTokenPool(
       IERC20(s_sourceRouter.getWrappedNative()), new address[](0), address(s_mockRMN), true, address(s_sourceRouter)
@@ -1332,24 +1334,6 @@ contract EVM2EVMOnRamp_getTokenTransferCost is EVM2EVMOnRamp_getFeeSetup {
     Client.EVM2AnyMessage memory message = _generateSingleTokenMessage(NOT_SUPPORTED_TOKEN, 200);
 
     vm.expectRevert(abi.encodeWithSelector(EVM2EVMOnRamp.UnsupportedToken.selector, NOT_SUPPORTED_TOKEN));
-
-    s_onRamp.getTokenTransferCost(message.feeToken, s_feeTokenPrice, message.tokenAmounts);
-  }
-
-  function test_ValidatedPriceStaleness_Revert() public {
-    vm.warp(block.timestamp + TWELVE_HOURS + 1);
-
-    Client.EVM2AnyMessage memory message = _generateSingleTokenMessage(s_sourceFeeToken, 1e36);
-    message.tokenAmounts[0].token = s_sourceRouter.getWrappedNative();
-
-    vm.expectRevert(
-      abi.encodeWithSelector(
-        PriceRegistry.StaleTokenPrice.selector,
-        s_sourceRouter.getWrappedNative(),
-        uint128(TWELVE_HOURS),
-        uint128(TWELVE_HOURS + 1)
-      )
-    );
 
     s_onRamp.getTokenTransferCost(message.feeToken, s_feeTokenPrice, message.tokenAmounts);
   }
@@ -1940,7 +1924,6 @@ contract EVM2EVMOnRamp_setDynamicConfig is EVM2EVMOnRampSetup {
       priceRegistry: address(23423),
       maxDataBytes: 400,
       maxPerMsgGasLimit: MAX_GAS_LIMIT / 2,
-      tokenAdminRegistry: address(s_tokenAdminRegistry),
       defaultTokenFeeUSDCents: DEFAULT_TOKEN_FEE_USD_CENTS,
       defaultTokenDestGasOverhead: DEFAULT_TOKEN_DEST_GAS_OVERHEAD,
       defaultTokenDestBytesOverhead: DEFAULT_TOKEN_BYTES_OVERHEAD,
@@ -1976,7 +1959,6 @@ contract EVM2EVMOnRamp_setDynamicConfig is EVM2EVMOnRampSetup {
       priceRegistry: address(23423),
       maxDataBytes: 400,
       maxPerMsgGasLimit: MAX_GAS_LIMIT / 2,
-      tokenAdminRegistry: address(s_tokenAdminRegistry),
       defaultTokenFeeUSDCents: DEFAULT_TOKEN_FEE_USD_CENTS,
       defaultTokenDestGasOverhead: DEFAULT_TOKEN_DEST_GAS_OVERHEAD,
       defaultTokenDestBytesOverhead: DEFAULT_TOKEN_BYTES_OVERHEAD,
@@ -1996,9 +1978,9 @@ contract EVM2EVMOnRamp_setDynamicConfig is EVM2EVMOnRampSetup {
   function test_SetConfigOnlyOwner_Revert() public {
     vm.startPrank(STRANGER);
     vm.expectRevert("Only callable by owner");
-    s_onRamp.setDynamicConfig(generateDynamicOnRampConfig(address(1), address(2), address(3)));
+    s_onRamp.setDynamicConfig(generateDynamicOnRampConfig(address(1), address(2)));
     vm.startPrank(ADMIN);
     vm.expectRevert("Only callable by owner");
-    s_onRamp.setDynamicConfig(generateDynamicOnRampConfig(address(1), address(2), address(3)));
+    s_onRamp.setDynamicConfig(generateDynamicOnRampConfig(address(1), address(2)));
   }
 }

@@ -17,6 +17,19 @@ import (
 
 const (
 	PluginName = "LiquidityManager"
+
+	// OCR limits
+
+	// maxQueryLength should be 0 as no queries are performed
+	maxQueryLength = 0
+	// maxObservationLength should be 1M bytes
+	maxObservationLength = 1_000_000
+	// maxOutcomeLength should be 1M bytes
+	maxOutcomeLength = 1_000_000
+	// maxReportLength should be 1M bytes
+	maxReportLength = 1_000_000
+	// maxReportCount should be 100
+	maxReportCount = 100
 )
 
 type PluginFactory struct {
@@ -53,6 +66,8 @@ func (p PluginFactory) buildRebalancer() (liquidityrebalancer.Rebalancer, error)
 		return liquidityrebalancer.NewPingPong(), nil
 	case models.RebalancerTypeMinLiquidity:
 		return liquidityrebalancer.NewMinLiquidityRebalancer(p.lggr), nil
+	case models.RebalancerTypeTargetAndMin:
+		return liquidityrebalancer.NewTargetMinBalancer(p.lggr), nil
 	default:
 		return nil, fmt.Errorf("invalid rebalancer type %s", p.config.RebalancerConfig.Type)
 	}
@@ -98,16 +113,3 @@ func (p PluginFactory) NewReportingPlugin(config ocr3types.ReportingPluginConfig
 		},
 		nil
 }
-
-const (
-	// maxQueryLength should be 0 as no queries are performed
-	maxQueryLength = 0
-	// maxObservationLength should be 10 kilobytes
-	maxObservationLength = 10 * 1024
-	// maxOutcomeLength should be 10 kilobytes
-	maxOutcomeLength = 10 * 1024
-	// maxReportLength should be 10 kilobytes
-	maxReportLength = 10 * 1024
-	// maxReportCount should be 100
-	maxReportCount = 100
-)

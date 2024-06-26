@@ -803,19 +803,19 @@ func Test_calculateMessageMaxGas(t *testing.T) {
 		{
 			name:    "base",
 			args:    args{gasLimit: big.NewInt(1000), numRequests: 5, dataLen: 5, numTokens: 2},
-			want:    203836,
+			want:    826_336,
 			wantErr: false,
 		},
 		{
 			name:    "large",
 			args:    args{gasLimit: big.NewInt(1000), numRequests: 1000, dataLen: 1000, numTokens: 1000},
-			want:    36482676,
+			want:    346_485_176,
 			wantErr: false,
 		},
 		{
 			name:    "gas limit overflow",
 			args:    args{gasLimit: big.NewInt(0).Mul(big.NewInt(math.MaxInt64), big.NewInt(math.MaxInt64))},
-			want:    36391540,
+			want:    36_391_540,
 			wantErr: true,
 		},
 	}

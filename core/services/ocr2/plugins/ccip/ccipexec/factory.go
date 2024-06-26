@@ -126,6 +126,13 @@ func (rf *ExecutionReportingPluginFactory) NewReportingPluginFn(config types.Rep
 			batchingStrategy = &BestEffortBatchingStrategy{} // Default strategy
 		}
 
+		msgVisibilityInterval := offchainConfig.MessageVisibilityInterval.Duration()
+		if msgVisibilityInterval.Seconds() == 0 {
+			rf.config.lggr.Info("MessageVisibilityInterval not set, falling back to PermissionLessExecutionThreshold")
+			msgVisibilityInterval = onchainConfig.PermissionLessExecutionThresholdSeconds
+		}
+		rf.config.lggr.Infof("MessageVisibilityInterval set to: %s", msgVisibilityInterval)
+
 		lggr := rf.config.lggr.Named("ExecutionReportingPlugin")
 		plugin := &ExecutionReportingPlugin{
 			F:                           config.F,
@@ -144,11 +151,12 @@ func (rf *ExecutionReportingPluginFactory) NewReportingPluginFn(config types.Rep
 			offRampReader:               rf.config.offRampReader,
 			tokenPoolBatchedReader:      rf.config.tokenPoolBatchedReader,
 			inflightReports:             newInflightExecReportsContainer(offchainConfig.InflightCacheExpiry.Duration()),
-			commitRootsCache:            cache.NewCommitRootsCache(lggr, onchainConfig.PermissionLessExecutionThresholdSeconds, offchainConfig.RootSnoozeTime.Duration()),
+			commitRootsCache:            cache.NewCommitRootsCache(lggr, msgVisibilityInterval, offchainConfig.RootSnoozeTime.Duration()),
 			metricsCollector:            rf.config.metricsCollector,
 			chainHealthcheck:            rf.config.chainHealthcheck,
 			batchingStrategy:            batchingStrategy,
 		}
+
 		pluginInfo := types.ReportingPluginInfo{
 			Name: "CCIPExecution",
 			// Setting this to false saves on calldata since OffRamp doesn't require agreement between NOPs
