@@ -60,8 +60,6 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
   error StaleCommitReport();
   error InvalidInterval(uint64 sourceChainSelector, Interval interval);
   error ZeroAddressNotAllowed();
-  error DuplicateMetadataHash(bytes32 metadataHash);
-  error ZeroMetadataHashNotAllowed();
 
   /// @dev Atlas depends on this event, if changing, please notify Atlas.
   event StaticConfigSet(StaticConfig staticConfig);
@@ -96,9 +94,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
     bool isEnabled; // ─────────╮  Flag whether the source chain is enabled or not
     uint64 minSeqNr; //         |  The min sequence number expected for future messages
     address prevOffRamp; // ────╯  Address of previous-version per-lane OffRamp. Used to be able to provide seequencing continuity during a zero downtime upgrade.
-    /// @dev Ensures that 2 identical messages sent to 2 different lanes will have a distinct hash.
-    /// Must match the meatdataHash on the onRamp.
-    bytes32 metadataHash; //       Source-chain specific message hash preimage to ensure global uniqueness
+    bytes onRamp; // OnRamp address on the source chain
   }
 
   /// @notice SourceChainConfig update args scoped to one source chain
@@ -106,7 +102,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
     uint64 sourceChainSelector; //  ───╮  Source chain selector of the config to update
     bool isEnabled; //                 │  Flag whether the source chain is enabled or not
     address prevOffRamp; // ───────────╯  Address of previous-version per-lane OffRamp. Used to be able to provide sequencing continuity during a zero downtime upgrade.
-    bytes32 metadataHash; //              Source-chain specific message hash preimage to ensure global uniqueness
+    bytes onRamp; // OnRamp address on the source chain
   }
 
   /// @notice Dynamic offRamp config
@@ -162,8 +158,6 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
   /// @notice SourceConfig per chain
   /// (forms lane configurations from sourceChainSelector => StaticConfig.chainSelector)
   mapping(uint64 sourceChainSelector => SourceChainConfig sourceChainConfig) internal s_sourceChainConfigs;
-  /// @notice Set of used metadata hashes - used to prevent configuring the same metadataHash more than once
-  mapping(bytes32 metadataHash => bool isActive) internal s_usedMetadataHashSet;
 
   // STATE
   /// @dev The expected nonce for a given sender per source chain.
@@ -370,7 +364,9 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
     uint64 sourceChainSelector = report.sourceChainSelector;
     _whenNotCursed(sourceChainSelector);
 
-    SourceChainConfig storage sourceChainConfig = _getEnabledSourceChainConfig(sourceChainSelector);
+    // TODO: currently unused - but should not be removed - it will be used once the message signature changes
+    // SourceChainConfig storage sourceChainConfig = _getEnabledSourceChainConfig(sourceChainSelector);
+    _getEnabledSourceChainConfig(sourceChainSelector);
 
     uint256 numMsgs = report.messages.length;
     if (numMsgs == 0) revert EmptyReport();
@@ -382,7 +378,9 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
       Internal.EVM2EVMMessage memory message = report.messages[i];
       // We do this hash here instead of in _verifyMessages to avoid two separate loops
       // over the same data, which increases gas cost
-      hashedLeaves[i] = Internal._hash(message, sourceChainConfig.metadataHash);
+      // TODO: verify message.onRamp == config.onRamp
+      // TODO: verify message.destChainSelector == config.destChainSelector
+      hashedLeaves[i] = Internal._hash(message);
       // For EVM2EVM offramps, the messageID is the leaf hash.
       // Asserting that this is true ensures we don't accidentally commit and then execute
       // a message with an unexpected hash.
@@ -780,27 +778,21 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
       }
 
       SourceChainConfig storage currentConfig = s_sourceChainConfigs[sourceChainSelector];
+      bytes memory currentOnRamp = currentConfig.onRamp;
+      bytes memory newOnRamp = sourceConfigUpdate.onRamp;
 
       // OnRamp can never be zero - if it is, then the source chain has been added for the first time
-      if (currentConfig.metadataHash == bytes32("")) {
-        bytes32 newMetadataHash = sourceConfigUpdate.metadataHash;
-
-        if (newMetadataHash == bytes32("")) {
-          revert ZeroMetadataHashNotAllowed();
+      if (currentOnRamp.length == 0) {
+        if (newOnRamp.length == 0) {
+          revert ZeroAddressNotAllowed();
         }
 
-        if (s_usedMetadataHashSet[newMetadataHash]) {
-          revert DuplicateMetadataHash(newMetadataHash);
-        }
-        s_usedMetadataHashSet[newMetadataHash] = true;
-
-        currentConfig.metadataHash = newMetadataHash;
+        currentConfig.onRamp = newOnRamp;
         currentConfig.prevOffRamp = sourceConfigUpdate.prevOffRamp;
         currentConfig.minSeqNr = 1;
         emit SourceChainSelectorAdded(sourceChainSelector);
       } else if (
-        currentConfig.metadataHash != sourceConfigUpdate.metadataHash
-          || currentConfig.prevOffRamp != sourceConfigUpdate.prevOffRamp
+        keccak256(currentOnRamp) != keccak256(newOnRamp) || currentConfig.prevOffRamp != sourceConfigUpdate.prevOffRamp
       ) {
         revert InvalidStaticConfig(sourceChainSelector);
       }

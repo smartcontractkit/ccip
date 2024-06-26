@@ -90,18 +90,14 @@ contract MultiRampsE2E is EVM2EVMMultiOnRampSetup, EVM2EVMMultiOffRampSetup {
       sourceChainSelector: SOURCE_CHAIN_SELECTOR,
       isEnabled: true,
       prevOffRamp: address(0),
-      // Must match OnRamp's metadataHash
-      metadataHash: keccak256(
-        abi.encode(Internal.EVM_2_EVM_MESSAGE_HASH, SOURCE_CHAIN_SELECTOR, DEST_CHAIN_SELECTOR, address(s_onRamp))
-        )
+      // Must match OnRamp address
+      onRamp: abi.encode(address(s_onRamp))
     });
     sourceChainConfigs[1] = EVM2EVMMultiOffRamp.SourceChainConfigArgs({
       sourceChainSelector: SOURCE_CHAIN_SELECTOR + 1,
       isEnabled: true,
       prevOffRamp: address(0),
-      metadataHash: keccak256(
-        abi.encode(Internal.EVM_2_EVM_MESSAGE_HASH, SOURCE_CHAIN_SELECTOR + 1, DEST_CHAIN_SELECTOR, address(s_onRamp2))
-        )
+      onRamp: abi.encode(address(s_onRamp2))
     });
 
     _setupMultipleOffRampsFromConfigs(sourceChainConfigs);
@@ -131,12 +127,12 @@ contract MultiRampsE2E is EVM2EVMMultiOnRampSetup, EVM2EVMMultiOffRampSetup {
 
     // Commit
     bytes32[] memory hashedMessages1 = new bytes32[](2);
-    hashedMessages1[0] = messages1[0]._hash(s_metadataHash);
+    hashedMessages1[0] = messages1[0]._hash();
     messages1[0].messageId = hashedMessages1[0];
-    hashedMessages1[1] = messages1[1]._hash(s_metadataHash);
+    hashedMessages1[1] = messages1[1]._hash();
     messages1[1].messageId = hashedMessages1[1];
     bytes32[] memory hashedMessages2 = new bytes32[](1);
-    hashedMessages2[0] = messages2[0]._hash(s_metadataHash2);
+    hashedMessages2[0] = messages2[0]._hash();
     messages2[0].messageId = hashedMessages2[0];
 
     bytes32[] memory merkleRoots = new bytes32[](2);

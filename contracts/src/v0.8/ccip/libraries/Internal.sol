@@ -158,6 +158,36 @@ library Internal {
     );
   }
 
+  // TODO: this function is incomplete and should not yet be used - it is intended for Any2EVM / EVM2Any messages
+  function _hash(EVM2EVMMessage memory original) internal pure returns (bytes32) {
+    // Fixed-size message fields are included in nested hash to reduce stack pressure.
+    // This hashing scheme is also used by RMN. If changing it, please notify the RMN maintainers.
+    return keccak256(
+      abi.encode(
+        MerkleMultiProof.LEAF_DOMAIN_SEPARATOR,
+        // TODO: include prefix message hash
+        // TODO: include OnRamp address
+        // TODO: include destChainSelector
+        keccak256(
+          abi.encode(
+            original.sourceChainSelector,
+            original.sender,
+            original.receiver,
+            original.sequenceNumber,
+            original.gasLimit,
+            original.strict,
+            original.nonce,
+            original.feeToken,
+            original.feeTokenAmount
+          )
+        ),
+        keccak256(original.data),
+        keccak256(abi.encode(original.tokenAmounts)),
+        keccak256(abi.encode(original.sourceTokenData))
+      )
+    );
+  }
+
   /// @notice This methods provides validation for parsing abi encoded addresses by ensuring the
   /// address is within the EVM address space. If it isn't it will revert with an InvalidEVMAddress error, which
   /// we can catch and handle more gracefully than a revert from abi.decode.
