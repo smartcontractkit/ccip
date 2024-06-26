@@ -6,16 +6,20 @@ import (
 	"fmt"
 	"math/big"
 	"testing"
+	"time"
 
+	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
 	ccipreader "github.com/smartcontractkit/ccipocr3/pkg/reader"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets"
 	capcfg "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/ccip_capability_configuration"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/capabilities_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
+	logger2 "github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/p2pkey"
 	helpers "github.com/smartcontractkit/chainlink/v2/core/services/ocr3/plugins/ccip_integration_tests"
 	"github.com/smartcontractkit/libocr/commontypes"
@@ -64,36 +68,32 @@ func TestHomeChainReader(t *testing.T) {
 			},
 		},
 	}
-
+	//===============================================================
 	transactor := testutils.MustNewSimTransactor(t)
 	backend := backends.NewSimulatedBackend(core.GenesisAlloc{
 		transactor.From: {Balance: assets.Ether(1000).ToInt()},
 	}, 30e6)
-	//backend, transactor := helpers.SetupBackendWithAuth(t)
-
+	//==============================Setup Contracts - with capabilities=================================
 	capRegAddress, capRegContract, err := prepareCapabilityRegistry(t, backend, transactor)
+	assert.NoError(t, err)
 	capConfAddress, capConfContract, err := prepareCCIPCapabilityConfig(t, backend, transactor, capRegAddress)
-	addCapabilities(t, backend, transactor, capRegContract, capConfAddress)
-	chainReader := *helpers.SetupChainReader(t, backend, capConfAddress, cfg, ContractName)
+	assert.NoError(t, err)
+	p2pIDS := addCapabilities(t, backend, transactor, capRegContract, capConfAddress)
+	//==============================Apply configs to Capability Contract=================================
+	chainAConf := setupConfigInfo(chainA, p2pIDS, fChainA, []byte{})
+	chainBConf := setupConfigInfo(chainB, p2pIDS[1:], fChainB, []byte{})
+	chainCConf := setupConfigInfo(chainC, p2pIDS[2:], fChainC, []byte{})
 
-	// Apply chain configs to the capConfContract
-	inputConfig := setupConfigInfo()
-	//[]capcfg.CCIPCapabilityConfigurationChainConfigInfo{
-	//	setupConfigInfo(chainA, []uint8{nodeAID, nodeBID, nodeCID}, fChainA, []byte{}),
-	//	setupConfigInfo(chainB, []uint8{nodeAID, nodeBID}, fChainB, []byte{}),
-	//	setupConfigInfo(chainC, []uint8{nodeCID}, fChainC, []byte{}),
-	//}
-
+	inputConfig := []capcfg.CCIPCapabilityConfigurationChainConfigInfo{
+		chainAConf,
+		chainBConf,
+		chainCConf,
+	}
 	_, err = capConfContract.ApplyChainConfigUpdates(transactor, nil, inputConfig)
 	assert.NoError(t, err)
 	backend.Commit()
-
-	var configs []capcfg.CCIPCapabilityConfigurationChainConfigInfo
-	configs, err = capConfContract.GetAllChainConfigs(nil)
-	assert.NoError(t, err)
-	assert.Equal(t, inputConfig, configs)
-
-	// Now read the capConfContract using chain reader into ccipreader type
+	//================================Setup HomeChainReader===============================
+	chainReader := *helpers.SetupChainReader(t, backend, capConfAddress, cfg, ContractName)
 	var ccipConfigResults []ccipreader.CCIPCapabilityConfigurationChainConfigInfo
 	err = chainReader.GetLatestValue(
 		context.Background(),
@@ -103,33 +103,39 @@ func TestHomeChainReader(t *testing.T) {
 		&ccipConfigResults,
 	)
 	assert.NoError(t, err)
-	for i, c := range ccipConfigResults {
-		assert.Equal(t, inputConfig[i].ChainSelector, uint64(c.ChainSelector))
-		assert.Equal(t, inputConfig[i].ChainConfig.Config, c.ChainConfig.Config)
-		assert.Equal(t, inputConfig[i].ChainConfig.FChain, c.ChainConfig.FChain)
-		for j, r := range inputConfig[i].ChainConfig.Readers {
-			assert.Equal(t, r, c.ChainConfig.Readers[j])
+	homeChain := ccipreader.NewHomeChainReader(chainReader, logger2.NullLogger, 1*time.Second)
+	err = homeChain.Start(context.Background())
+	assert.NoError(t, err)
+	//===============================================================
+	expectedChainConfigs := map[cciptypes.ChainSelector]ccipreader.CCIPCapabilityConfigurationChainConfig{}
+	for _, c := range inputConfig {
+		expectedChainConfigs[cciptypes.ChainSelector(c.ChainSelector)] = ccipreader.CCIPCapabilityConfigurationChainConfig{
+			FChain:         int(c.ChainConfig.FChain),
+			SupportedNodes: toPeerIDs(c.ChainConfig.Readers),
 		}
-
 	}
-	//homeChain := ccipreader.NewHomeChainReader(chainReader, logger2.NullLogger, 1*time.Second)
+	configs, err := homeChain.GetAllChainConfigs()
+	assert.NoError(t, err)
+	assert.Equal(t, expectedChainConfigs, configs)
 }
 
-//func randomBytes(n int) []byte {
-//	b := make([]byte, n)
-//	_, err := rand.Read(b)
-//	if err != nil {
-//		panic(err)
-//	}
-//	return b
-//}
-//
-//// Random32Byte returns a random [32]byte
-//func Random32Byte() (b [32]byte) {
-//	copy(b[:], randomBytes(32))
-//	return b
-//}
-
+func toPeerIDs(readers [][32]byte) mapset.Set[libocrtypes.PeerID] {
+	peerIDs := mapset.NewSet[libocrtypes.PeerID]()
+	for _, r := range readers {
+		peerIDs.Add(r)
+	}
+	return peerIDs
+}
+func setupConfigInfo(chainSelector uint64, readers [][32]byte, fChain uint8, cfg []byte) capcfg.CCIPCapabilityConfigurationChainConfigInfo {
+	return capcfg.CCIPCapabilityConfigurationChainConfigInfo{
+		ChainSelector: chainSelector,
+		ChainConfig: capcfg.CCIPCapabilityConfigurationChainConfig{
+			Readers: readers,
+			FChain:  fChain,
+			Config:  cfg,
+		},
+	}
+}
 func prepareCCIPCapabilityConfig(t *testing.T, backend *backends.SimulatedBackend, transactor *bind.TransactOpts, capRegAddress common.Address) (common.Address, *capcfg.CCIPCapabilityConfiguration, error) {
 	ccAddress, _, _, err := capcfg.DeployCCIPCapabilityConfiguration(transactor, backend, capRegAddress)
 	assert.NoError(t, err)
@@ -153,7 +159,12 @@ func prepareCapabilityRegistry(t *testing.T, backend *backends.SimulatedBackend,
 	return crAddress, capReg, nil
 }
 
-func addCapabilities(t *testing.T, backend *backends.SimulatedBackend, transactor *bind.TransactOpts, capReg *capabilities_registry.CapabilitiesRegistry, capConfAddress common.Address) {
+func addCapabilities(
+	t *testing.T,
+	backend *backends.SimulatedBackend,
+	transactor *bind.TransactOpts,
+	capReg *capabilities_registry.CapabilitiesRegistry,
+	capConfAddress common.Address) [][32]byte {
 	// add the CCIP capability to the registry
 	_, err := capReg.AddCapabilities(transactor, []capabilities_registry.CapabilitiesRegistryCapability{
 		{
@@ -214,27 +225,5 @@ func addCapabilities(t *testing.T, backend *backends.SimulatedBackend, transacto
 		assert.Equal(t, nodeOperatorID, nodeInfo.NodeOperatorId)
 		assert.Equal(t, p2pID[:], nodeInfo.P2pId[:])
 	}
-}
-
-func setupConfigInfo() []capcfg.CCIPCapabilityConfigurationChainConfigInfo {
-	return []capcfg.CCIPCapabilityConfigurationChainConfigInfo{
-		{
-			ChainSelector: 1,
-			ChainConfig: capcfg.CCIPCapabilityConfigurationChainConfig{
-				//Readers: [][32]byte{[32]byte{1}},
-				//Readers: [][32]byte{Random32Byte()},
-				Readers: [][32]byte{},
-				FChain:  11,
-				Config:  []byte{1, 2, 3, 5, 6, 7},
-			},
-		},
-		{
-			ChainSelector: 2,
-			ChainConfig: capcfg.CCIPCapabilityConfigurationChainConfig{
-				Readers: [][32]byte{},
-				FChain:  22,
-				Config:  []byte{1, 2, 3, 5, 6, 7},
-			},
-		},
-	}
+	return p2pIDs
 }
