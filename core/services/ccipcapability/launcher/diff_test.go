@@ -5,9 +5,9 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/keystone_capability_registry"
-	cctypes "github.com/smartcontractkit/chainlink/v2/core/services/ccipcapability/types"
+	kcr "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/capabilities_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/p2pkey"
+	"github.com/smartcontractkit/chainlink/v2/core/services/registrysyncer"
 	"github.com/stretchr/testify/require"
 )
 
@@ -15,8 +15,8 @@ func Test_diff(t *testing.T) {
 	type args struct {
 		capabilityVersion      string
 		capabilityLabelledName string
-		oldState               cctypes.RegistryState
-		newState               cctypes.RegistryState
+		oldState               registrysyncer.State
+		newState               registrysyncer.State
 	}
 	tests := []struct {
 		name    string
@@ -42,15 +42,15 @@ func Test_diff(t *testing.T) {
 
 func Test_compareDONs(t *testing.T) {
 	type args struct {
-		currCCIPDONs map[uint32]keystone_capability_registry.CapabilityRegistryDONInfo
-		newCCIPDONs  map[uint32]keystone_capability_registry.CapabilityRegistryDONInfo
+		currCCIPDONs map[registrysyncer.DonID]kcr.CapabilitiesRegistryDONInfo
+		newCCIPDONs  map[registrysyncer.DonID]kcr.CapabilitiesRegistryDONInfo
 	}
 	tests := []struct {
 		name        string
 		args        args
-		wantAdded   map[uint32]keystone_capability_registry.CapabilityRegistryDONInfo
-		wantRemoved map[uint32]keystone_capability_registry.CapabilityRegistryDONInfo
-		wantUpdated map[uint32]keystone_capability_registry.CapabilityRegistryDONInfo
+		wantAdded   map[registrysyncer.DonID]kcr.CapabilitiesRegistryDONInfo
+		wantRemoved map[registrysyncer.DonID]kcr.CapabilitiesRegistryDONInfo
+		wantUpdated map[registrysyncer.DonID]kcr.CapabilitiesRegistryDONInfo
 		wantErr     bool
 	}{
 		// TODO: Add test cases.
@@ -77,13 +77,13 @@ func Test_compareDONs(t *testing.T) {
 
 func Test_filterCCIPDONs(t *testing.T) {
 	type args struct {
-		ccipCapability keystone_capability_registry.CapabilityRegistryCapability
-		state          cctypes.RegistryState
+		ccipCapability kcr.CapabilitiesRegistryCapabilityInfo
+		state          registrysyncer.State
 	}
 	tests := []struct {
 		name    string
 		args    args
-		want    map[uint32]keystone_capability_registry.CapabilityRegistryDONInfo
+		want    map[uint32]kcr.CapabilitiesRegistryDONInfo
 		wantErr bool
 	}{
 		// TODO: Add test cases.
@@ -106,12 +106,12 @@ func Test_checkCapabilityPresence(t *testing.T) {
 	type args struct {
 		capabilityVersion      string
 		capabilityLabelledName string
-		state                  cctypes.RegistryState
+		state                  registrysyncer.State
 	}
 	tests := []struct {
 		name    string
 		args    args
-		want    keystone_capability_registry.CapabilityRegistryCapability
+		want    kcr.CapabilitiesRegistryCapabilityInfo
 		wantErr bool
 	}{
 		// TODO: Add test cases.
@@ -153,7 +153,7 @@ func Test_hashedCapabilityId(t *testing.T) {
 
 func Test_isMemberOfDON(t *testing.T) {
 	type args struct {
-		don   keystone_capability_registry.CapabilityRegistryDONInfo
+		don   kcr.CapabilitiesRegistryDONInfo
 		p2pID p2pkey.KeyV2
 	}
 	tests := []struct {

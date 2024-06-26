@@ -38,7 +38,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/token_admin_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/weth9"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/keystone_capability_registry"
+	kcr "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/capabilities_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/link_token"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/cltest/heavyweight"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
@@ -67,7 +67,7 @@ type ocr3Node struct {
 type homeChain struct {
 	backend            *backends.SimulatedBackend
 	chainID            uint64
-	capabilityRegistry *keystone_capability_registry.CapabilityRegistry
+	capabilityRegistry *kcr.CapabilitiesRegistry
 	ccipConfigContract common.Address // TODO: deploy
 }
 
@@ -96,11 +96,11 @@ func deployContracts(
 	homeChainBackend, ok := chains[homeChainID]
 	require.True(t, ok, "home chain backend not available")
 
-	addr, _, _, err := keystone_capability_registry.DeployCapabilityRegistry(owner, homeChainBackend)
+	addr, _, _, err := kcr.DeployCapabilitiesRegistry(owner, homeChainBackend)
 	require.NoError(t, err, "failed to deploy capability registry on home chain")
 	homeChainBackend.Commit()
 
-	capabilityRegistry, err := keystone_capability_registry.NewCapabilityRegistry(addr, homeChainBackend)
+	capabilityRegistry, err := kcr.NewCapabilitiesRegistry(addr, homeChainBackend)
 	require.NoError(t, err)
 
 	// deploy the ccip contracts on the non-home-chain chains (total of 3).
@@ -186,9 +186,6 @@ func deployContracts(
 			// can set this later once all chains are deployed
 			[]evm_2_evm_multi_onramp.EVM2EVMMultiOnRampDestChainConfigArgs{},
 			// disabled for simplicity
-			evm_2_evm_multi_onramp.RateLimiterConfig{
-				IsEnabled: false,
-			},
 			[]evm_2_evm_multi_onramp.EVM2EVMMultiOnRampPremiumMultiplierWeiPerEthArgs{},
 			[]evm_2_evm_multi_onramp.EVM2EVMMultiOnRampTokenTransferFeeConfigArgs{},
 		)

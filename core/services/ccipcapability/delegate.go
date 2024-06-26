@@ -10,7 +10,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ccipcapability/launcher"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ccipcapability/oraclecreator"
-	cctypes "github.com/smartcontractkit/chainlink/v2/core/services/ccipcapability/types"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/chaintype"
@@ -19,6 +18,8 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocrcommon"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pipeline"
+	"github.com/smartcontractkit/chainlink/v2/core/services/registrysyncer"
+	"github.com/smartcontractkit/chainlink/v2/core/services/relay"
 	"github.com/smartcontractkit/chainlink/v2/core/services/telemetry"
 	"github.com/smartcontractkit/chainlink/v2/plugins"
 )
@@ -32,11 +33,11 @@ type Delegate struct {
 	registrarConfig       plugins.RegistrarConfig
 	pipelineRunner        pipeline.Runner
 	relayGetter           RelayGetter
-	capRegistry           cctypes.CapabilityRegistry
 	keystore              keystore.Master
 	ds                    sqlutil.DataSource
 	peerWrapper           *ocrcommon.SingletonPeerWrapper
 	monitoringEndpointGen telemetry.MonitoringEndpointGenerator
+	registrySyncer        registrysyncer.Syncer
 
 	isNewlyCreatedJob bool
 }
@@ -46,7 +47,7 @@ func NewDelegate(
 	registrarConfig plugins.RegistrarConfig,
 	pipelineRunner pipeline.Runner,
 	relayGetter RelayGetter,
-	registrySyncer cctypes.CapabilityRegistry,
+	registrySyncer registrysyncer.Syncer,
 	keystore keystore.Master,
 	ds sqlutil.DataSource,
 	peerWrapper *ocrcommon.SingletonPeerWrapper,
@@ -57,7 +58,7 @@ func NewDelegate(
 		registrarConfig:       registrarConfig,
 		pipelineRunner:        pipelineRunner,
 		relayGetter:           relayGetter,
-		capRegistry:           registrySyncer,
+		registrySyncer:        registrySyncer,
 		ds:                    ds,
 		keystore:              keystore,
 		peerWrapper:           peerWrapper,
@@ -106,9 +107,6 @@ func (d *Delegate) ServicesForSpec(ctx context.Context, spec job.Job) (services 
 	// since all queries are scoped by config digest.
 	ocrDB := ocr2.NewDB(d.ds, spec.ID, 0, d.lggr)
 
-	// TODO: implement
-	hcr := &homeChainReader{}
-
 	oracleCreator := oraclecreator.New(
 		ocrKeys,
 		transmitterKeys,
@@ -124,17 +122,20 @@ func (d *Delegate) ServicesForSpec(ctx context.Context, spec job.Job) (services 
 		d.monitoringEndpointGen,
 	)
 
+	capLauncher := launcher.New(
+		spec.CCIPSpec.CapabilityVersion,
+		spec.CCIPSpec.CapabilityLabelledName,
+		p2pID,
+		d.lggr,
+		nil, // todo: add home chain reader
+		oracleCreator,
+	)
+
+	// register the capability launcher with the registry syncer
+	d.registrySyncer.AddLauncher(capLauncher)
+
 	return []job.ServiceCtx{
-		hcr,
-		launcher.New(
-			spec.CCIPSpec.CapabilityVersion,
-			spec.CCIPSpec.CapabilityLabelledName,
-			p2pID,
-			d.capRegistry,
-			d.lggr,
-			hcr,
-			oracleCreator,
-		),
+		// hcr, // TODO: add home chain reader
 	}, nil
 }
 
@@ -174,7 +175,7 @@ func (d *Delegate) getTransmitterKeys(ctx context.Context, relayers map[types.Re
 	transmitterKeys := make(map[types.RelayID][]string)
 	for relayID := range relayers {
 		switch relayID.Network {
-		case types.NetworkEVM:
+		case relay.NetworkEVM:
 			ethKeys, err2 := d.keystore.Eth().GetAll(ctx)
 			if err2 != nil {
 				return nil, fmt.Errorf("error getting all eth keys: %w", err2)

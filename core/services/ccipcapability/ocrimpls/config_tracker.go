@@ -4,15 +4,15 @@ import (
 	"context"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	cctypes "github.com/smartcontractkit/chainlink/v2/core/services/ccipcapability/types"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/ccip_capability_configuration"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 )
 
 type configTracker struct {
-	cfg cctypes.OCRConfig
+	cfg ccip_capability_configuration.CCIPCapabilityConfigurationOCR3ConfigWithMeta
 }
 
-func NewConfigTracker(cfg cctypes.OCRConfig) *configTracker {
+func NewConfigTracker(cfg ccip_capability_configuration.CCIPCapabilityConfigurationOCR3ConfigWithMeta) *configTracker {
 	return &configTracker{cfg: cfg}
 }
 
@@ -24,14 +24,14 @@ func (c *configTracker) LatestBlockHeight(ctx context.Context) (blockHeight uint
 // LatestConfig implements types.ContractConfigTracker.
 func (c *configTracker) LatestConfig(ctx context.Context, changedInBlock uint64) (types.ContractConfig, error) {
 	return types.ContractConfig{
-		ConfigDigest:          c.cfg.ConfigDigest(),
-		ConfigCount:           c.cfg.ConfigCount(),
-		Signers:               toOnchainPublicKeys(c.cfg.Signers()),
-		Transmitters:          toOCRAccounts(c.cfg.Transmitters()),
-		F:                     c.cfg.F(),
+		ConfigDigest:          c.cfg.ConfigDigest,
+		ConfigCount:           c.cfg.ConfigCount,
+		Signers:               toOnchainPublicKeys(c.cfg.Config.Signers),
+		Transmitters:          toOCRAccounts(c.cfg.Config.Transmitters),
+		F:                     c.cfg.Config.F,
 		OnchainConfig:         []byte{},
-		OffchainConfigVersion: c.cfg.OffchainConfigVersion(),
-		OffchainConfig:        c.cfg.OffchainConfig(),
+		OffchainConfigVersion: c.cfg.Config.OffchainConfigVersion,
+		OffchainConfig:        c.cfg.Config.OffchainConfig,
 	}, nil
 }
 

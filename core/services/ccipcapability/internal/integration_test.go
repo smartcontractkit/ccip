@@ -12,7 +12,7 @@ import (
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/keystone_capability_registry"
+	kcr "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/capabilities_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ccipcapability"
 	"github.com/smartcontractkit/chainlink/v2/core/services/chainlink"
@@ -28,7 +28,7 @@ func TestIntegration_CCIPCapability(t *testing.T) {
 	fullyConnectCCIPContracts(t, owner, universes)
 
 	// add the ccip capability to the capability registry.
-	_, err := homeChainUni.capabilityRegistry.AddCapabilities(owner, []keystone_capability_registry.CapabilityRegistryCapability{
+	_, err := homeChainUni.capabilityRegistry.AddCapabilities(owner, []kcr.CapabilitiesRegistryCapability{
 		{
 			LabelledName:          "ccip",
 			Version:               "v1.0.0",
@@ -132,7 +132,7 @@ func TestIntegration_CCIPCapability(t *testing.T) {
 	require.NoError(t, err, "failed to get hashed capability id for ccip")
 	// create a DON for each chain
 	for _, uni := range universes {
-		homeChainUni.capabilityRegistry.AddDON(owner, p2pIDs, []keystone_capability_registry.CapabilityRegistryCapabilityConfiguration{
+		homeChainUni.capabilityRegistry.AddDON(owner, p2pIDs, []kcr.CapabilitiesRegistryCapabilityConfiguration{
 			{
 				CapabilityId: ccipCapabilityID,
 				Config:       donOCRConfig(t, uni, oracles[int64(uni.chainID)]),

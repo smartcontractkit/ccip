@@ -15,6 +15,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/loop"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/ccip_capability_configuration"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ccipcapability/ocrimpls"
 	cctypes "github.com/smartcontractkit/chainlink/v2/core/services/ccipcapability/types"
@@ -74,20 +75,20 @@ func New(
 }
 
 // CreateCommitOracle implements types.OracleCreator.
-func (o *oracleCreator) CreateCommitOracle(config cctypes.OCRConfig) (cctypes.CCIPOracle, error) {
+func (o *oracleCreator) CreateCommitOracle(config ccip_capability_configuration.CCIPCapabilityConfigurationOCR3ConfigWithMeta) (cctypes.CCIPOracle, error) {
 	panic("unimplemented")
 }
 
 // CreateExecOracle implements types.OracleCreator.
-func (o *oracleCreator) CreateExecOracle(config cctypes.OCRConfig) (cctypes.CCIPOracle, error) {
+func (o *oracleCreator) CreateExecOracle(config ccip_capability_configuration.CCIPCapabilityConfigurationOCR3ConfigWithMeta) (cctypes.CCIPOracle, error) {
 	panic("unimplemented")
 }
 
 // CreateBootstrapOracle implements types.OracleCreator.
-func (o *oracleCreator) CreateBootstrapOracle(config cctypes.OCRConfig) (cctypes.CCIPOracle, error) {
+func (o *oracleCreator) CreateBootstrapOracle(config ccip_capability_configuration.CCIPCapabilityConfigurationOCR3ConfigWithMeta) (cctypes.CCIPOracle, error) {
 	// Assuming that the chain selector is referring to an evm chain for now.
 	// TODO: add an api that returns chain family.
-	chainID, err := chainsel.ChainIdFromSelector(config.ChainSelector())
+	chainID, err := chainsel.ChainIdFromSelector(config.Config.ChainSelector)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get chain ID from selector: %w", err)
 	}
@@ -118,16 +119,16 @@ func (o *oracleCreator) CreateBootstrapOracle(config cctypes.OCRConfig) (cctypes
 			o.lggr.
 				Named("CCIPBootstrap").
 				Named(destRelayID.String()).
-				Named(hexutil.Encode(config.OfframpAddress())),
+				Named(hexutil.Encode(config.Config.OfframpAddress)),
 			false, /* traceLogging */
 			func(ctx context.Context, msg string) {}),
 		MonitoringEndpoint: o.monitoringEndpointGen.GenMonitoringEndpoint(
 			string(destChainFamily),
 			destRelayID.ChainID,
-			string(config.OfframpAddress()),
+			hexutil.Encode(config.Config.OfframpAddress),
 			synchronization.OCR3CCIPBootstrap,
 		),
-		OffchainConfigDigester: ocrimpls.NewConfigDigester(config.ConfigDigest()),
+		OffchainConfigDigester: ocrimpls.NewConfigDigester(config.ConfigDigest),
 	}
 	bootstrapper, err := libocr3.NewBootstrapper(bootstrapperArgs)
 	if err != nil {

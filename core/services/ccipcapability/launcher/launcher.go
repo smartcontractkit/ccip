@@ -3,22 +3,25 @@ package launcher
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"go.uber.org/multierr"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/utils"
 
-	kcr "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/keystone_capability_registry"
+	kcr "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/capabilities_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	cctypes "github.com/smartcontractkit/chainlink/v2/core/services/ccipcapability/types"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/p2pkey"
 	p2ptypes "github.com/smartcontractkit/chainlink/v2/core/services/p2p/types"
+	"github.com/smartcontractkit/chainlink/v2/core/services/registrysyncer"
 )
 
 var (
-	_ job.ServiceCtx = (*launcher)(nil)
+	_ job.ServiceCtx          = (*launcher)(nil)
+	_ registrysyncer.Launcher = (*launcher)(nil)
 )
 
 const (
@@ -29,25 +32,23 @@ func New(
 	capabilityVersion,
 	capabilityLabelledName string,
 	p2pID p2pkey.KeyV2,
-	capRegistry cctypes.CapabilityRegistry,
 	lggr logger.Logger,
 	homeChainReader cctypes.HomeChainReader,
 	oracleCreator cctypes.OracleCreator,
-) job.ServiceCtx {
+) *launcher {
 	return &launcher{
 		capabilityVersion:      capabilityVersion,
 		capabilityLabelledName: capabilityLabelledName,
 		p2pID:                  p2pID,
-		capRegistry:            capRegistry,
 		lggr:                   lggr,
 		homeChainReader:        homeChainReader,
-		regState: cctypes.RegistryState{
-			IDsToDONs:         make(map[cctypes.DonID]kcr.CapabilityRegistryDONInfo),
-			IDsToNodes:        make(map[p2ptypes.PeerID]kcr.CapabilityRegistryNodeInfo),
-			IDsToCapabilities: make(map[cctypes.HashedCapabilityID]kcr.CapabilityRegistryCapability),
+		regState: registrysyncer.State{
+			IDsToDONs:         make(map[registrysyncer.DonID]kcr.CapabilitiesRegistryDONInfo),
+			IDsToNodes:        make(map[p2ptypes.PeerID]kcr.CapabilitiesRegistryNodeInfo),
+			IDsToCapabilities: make(map[registrysyncer.HashedCapabilityID]kcr.CapabilitiesRegistryCapabilityInfo),
 		},
 		oracleCreator: oracleCreator,
-		dons:          make(map[uint32]*ccipDeployment),
+		dons:          make(map[registrysyncer.DonID]*ccipDeployment),
 	}
 }
 
@@ -58,17 +59,34 @@ type launcher struct {
 	capabilityVersion      string
 	capabilityLabelledName string
 	p2pID                  p2pkey.KeyV2
-	capRegistry            cctypes.CapabilityRegistry
 	lggr                   logger.Logger
 	homeChainReader        cctypes.HomeChainReader
 	stopChan               chan struct{}
-	regState               cctypes.RegistryState
-	oracleCreator          cctypes.OracleCreator
+	// latestState is the latest capability registry state received from the syncer.
+	latestState registrysyncer.State
+	// regState is the latest capability registry state that we have successfully processed.
+	regState      registrysyncer.State
+	oracleCreator cctypes.OracleCreator
+	lock          sync.RWMutex
 
 	// dons is a map of CCIP DON IDs to the OCR instances that are running on them.
 	// we can have up to two OCR instances per CCIP plugin, since we are running two plugins,
 	// thats four OCR instances per CCIP DON maximum.
-	dons map[uint32]*ccipDeployment
+	dons map[registrysyncer.DonID]*ccipDeployment
+}
+
+// Launch implements registrysyncer.Launcher.
+func (l *launcher) Launch(ctx context.Context, state registrysyncer.State) error {
+	l.lock.Lock()
+	defer l.lock.Unlock()
+	l.latestState = state
+	return nil
+}
+
+func (l *launcher) getLatestState() registrysyncer.State {
+	l.lock.RLock()
+	defer l.lock.RUnlock()
+	return l.latestState
 }
 
 // Close implements job.ServiceCtx.
@@ -120,10 +138,7 @@ func (l *launcher) tick() error {
 
 	// Fetch the latest state from the capability registry and determine if we need to
 	// launch or update any OCR instances.
-	latestState, err := l.capRegistry.LatestState()
-	if err != nil {
-		return fmt.Errorf("failed to fetch latest state from capability registry: %w", err)
-	}
+	latestState := l.getLatestState()
 
 	diffRes, err := diff(l.capabilityVersion, l.capabilityLabelledName, l.regState, latestState)
 	if err != nil {
@@ -151,13 +166,13 @@ func (l *launcher) processDiff(diff diffResult) error {
 		delete(l.regState.IDsToDONs, id)
 	}
 
-	var addedDeployments = make(map[cctypes.DonID]*ccipDeployment)
+	var addedDeployments = make(map[registrysyncer.DonID]*ccipDeployment)
 	for _, don := range diff.added {
 		dep, err := l.addDON(don)
 		if err != nil {
 			return err
 		}
-		addedDeployments[don.Id] = dep
+		addedDeployments[registrysyncer.DonID(don.Id)] = dep
 	}
 
 	for donID, dep := range addedDeployments {
@@ -174,7 +189,7 @@ func (l *launcher) processDiff(diff diffResult) error {
 		l.regState.IDsToDONs[donID] = diff.added[donID]
 	}
 
-	var updatedDeployments = make(map[cctypes.DonID]struct {
+	var updatedDeployments = make(map[registrysyncer.DonID]struct {
 		depBefore, depAfter *ccipDeployment
 	})
 	for _, don := range diff.updated {
@@ -182,7 +197,7 @@ func (l *launcher) processDiff(diff diffResult) error {
 		if err != nil {
 			return err
 		}
-		updatedDeployments[don.Id] = struct {
+		updatedDeployments[registrysyncer.DonID(don.Id)] = struct {
 			depBefore, depAfter *ccipDeployment
 		}{
 			depBefore: depBefore,
@@ -206,7 +221,7 @@ func (l *launcher) processDiff(diff diffResult) error {
 	return nil
 }
 
-func (l *launcher) removeDON(id uint32) error {
+func (l *launcher) removeDON(id registrysyncer.DonID) error {
 	ceDep, ok := l.dons[id]
 	if !ok {
 		// not running this particular DON.
@@ -226,14 +241,14 @@ func (l *launcher) removeDON(id uint32) error {
 // In the case of CCIP, which follows blue-green deployment, we either:
 // 1. Create a new oracle (the green instance) and start it.
 // 2. Shut down the blue instance, making the green instance the new blue instance.
-func (l *launcher) updateDON(don kcr.CapabilityRegistryDONInfo) (depBefore, depAfter *ccipDeployment, err error) {
+func (l *launcher) updateDON(don kcr.CapabilitiesRegistryDONInfo) (depBefore, depAfter *ccipDeployment, err error) {
 	if !isMemberOfDON(don, l.p2pID) {
 		l.lggr.Infow("Not a member of this DON, skipping", "donId", don.Id, "p2pId", l.p2pID.ID())
 		return nil, nil, nil
 	}
 
 	var ok bool
-	depBefore, ok = l.dons[don.Id]
+	depBefore, ok = l.dons[registrysyncer.DonID(don.Id)]
 	if !ok {
 		// This should never happen.
 		return nil, nil, fmt.Errorf("no deployment found for CCIP DON %d", don.Id)
@@ -295,7 +310,7 @@ func (l *launcher) updateDON(don kcr.CapabilityRegistryDONInfo) (depBefore, depA
 	return depBefore, depAfter, nil
 }
 
-func (l *launcher) addDON(don kcr.CapabilityRegistryDONInfo) (*ccipDeployment, error) {
+func (l *launcher) addDON(don kcr.CapabilitiesRegistryDONInfo) (*ccipDeployment, error) {
 	if !isMemberOfDON(don, l.p2pID) {
 		l.lggr.Infow("Not a member of this DON, skipping", "donId", don.Id, "p2pId", l.p2pID.ID())
 		return nil, nil
@@ -329,7 +344,7 @@ func (l *launcher) addDON(don kcr.CapabilityRegistryDONInfo) (*ccipDeployment, e
 	}
 
 	var commitBootstrap cctypes.CCIPOracle
-	if isMemberOfBootstrapSubcommittee(commitOCRConfigs[0].BootstrapP2PIDs(), l.p2pID) {
+	if isMemberOfBootstrapSubcommittee(commitOCRConfigs[0].Config.BootstrapP2PIds, l.p2pID) {
 		commitBootstrap, err = l.oracleCreator.CreateBootstrapOracle(commitOCRConfigs[0])
 		if err != nil {
 			return nil, fmt.Errorf("failed to create CCIP bootstrap oracle: %w", err)
@@ -342,7 +357,7 @@ func (l *launcher) addDON(don kcr.CapabilityRegistryDONInfo) (*ccipDeployment, e
 	}
 
 	var execBootstrap cctypes.CCIPOracle
-	if isMemberOfBootstrapSubcommittee(execOCRConfigs[0].BootstrapP2PIDs(), l.p2pID) {
+	if isMemberOfBootstrapSubcommittee(execOCRConfigs[0].Config.BootstrapP2PIds, l.p2pID) {
 		execBootstrap, err = l.oracleCreator.CreateBootstrapOracle(execOCRConfigs[0])
 		if err != nil {
 			return nil, fmt.Errorf("failed to create CCIP bootstrap oracle: %w", err)

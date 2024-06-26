@@ -3,28 +3,8 @@ package types
 import (
 	"context"
 
-	kcr "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/keystone_capability_registry"
-	p2ptypes "github.com/smartcontractkit/chainlink/v2/core/services/p2p/types"
+	ccc "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/ccip_capability_configuration"
 )
-
-type DonID = uint32
-type HashedCapabilityID = [32]byte
-
-type RegistryState struct {
-	IDsToDONs         map[DonID]kcr.CapabilityRegistryDONInfo
-	IDsToNodes        map[p2ptypes.PeerID]kcr.CapabilityRegistryNodeInfo
-	IDsToCapabilities map[HashedCapabilityID]kcr.CapabilityRegistryCapability
-}
-
-type CapabilityRegistry interface {
-	// LatestState returns the latest state of the on-chain capability registry.
-	LatestState() (RegistryState, error)
-}
-
-type ChainConfig interface {
-	Readers() [][32]byte
-	FChain() uint8
-}
 
 type PluginType uint8
 
@@ -32,23 +12,6 @@ const (
 	PluginTypeCCIPCommit PluginType = 0
 	PluginTypeCCIPExec   PluginType = 1
 )
-
-//go:generate mockery --name OCRConfig --output ./mocks/ --case underscore
-type OCRConfig interface {
-	PluginType() PluginType
-	ChainSelector() uint64
-	F() uint8
-	OffchainConfigVersion() uint64
-	OfframpAddress() []byte
-	BootstrapP2PIDs() [][32]byte
-	P2PIDs() [][32]byte
-	Signers() [][]byte
-	Transmitters() [][]byte
-	OffchainConfig() []byte
-	ConfigCount() uint64
-	ConfigDigest() [32]byte
-	String() string
-}
 
 // CCIPOracle represents either a CCIP commit or exec oracle or a bootstrap node.
 //
@@ -65,15 +28,15 @@ type CCIPOracle interface {
 type OracleCreator interface {
 	// CreateCommitOracle creates a new oracle that will run the CCIP commit plugin.
 	// The oracle must be returned unstarted.
-	CreateCommitOracle(config OCRConfig) (CCIPOracle, error)
+	CreateCommitOracle(config ccc.CCIPCapabilityConfigurationOCR3ConfigWithMeta) (CCIPOracle, error)
 
 	// CreateExecOracle creates a new oracle that will run the CCIP exec plugin.
 	// The oracle must be returned unstarted.
-	CreateExecOracle(config OCRConfig) (CCIPOracle, error)
+	CreateExecOracle(config ccc.CCIPCapabilityConfigurationOCR3ConfigWithMeta) (CCIPOracle, error)
 
 	// CreateBootstrapOracle creates a new bootstrap node with the given OCR config.
 	// The oracle must be returned unstarted.
-	CreateBootstrapOracle(config OCRConfig) (CCIPOracle, error)
+	CreateBootstrapOracle(config ccc.CCIPCapabilityConfigurationOCR3ConfigWithMeta) (CCIPOracle, error)
 }
 
 // HomeChainReader is an interface for reading CCIP chain and OCR configurations from the home chain.
@@ -82,10 +45,10 @@ type OracleCreator interface {
 type HomeChainReader interface {
 	// GetAllChainConfigs returns all chain configurations defined on the home chain.
 	// The key is the chain selector.
-	GetAllChainConfigs(ctx context.Context) (map[uint64]ChainConfig, error)
+	GetAllChainConfigs(ctx context.Context) (map[uint64]ccc.CCIPCapabilityConfigurationChainConfigInfo, error)
 
 	// GetOCRConfigs returns all OCR configurations for a given DON ID and plugin type.
-	GetOCRConfigs(ctx context.Context, donID uint32, pluginType PluginType) ([]OCRConfig, error)
+	GetOCRConfigs(ctx context.Context, donID uint32, pluginType PluginType) ([]ccc.CCIPCapabilityConfigurationOCR3ConfigWithMeta, error)
 
 	// IsHealthy returns true if the home chain reader is healthy.
 	IsHealthy() bool
