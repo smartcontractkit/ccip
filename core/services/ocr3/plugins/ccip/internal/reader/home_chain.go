@@ -185,7 +185,9 @@ func (r *homeChainPoller) GetFChain() (map[cciptypes.ChainSelector]int, error) {
 	return r.state.fChain, nil
 }
 
-func (r *homeChainPoller) GetOCRConfigs(ctx context.Context, donID uint32, pluginType uint8) ([]OCR3ConfigWithMeta, error) {
+func (r *homeChainPoller) GetOCRConfigs(
+	ctx context.Context, donID uint32, pluginType uint8,
+) ([]OCR3ConfigWithMeta, error) {
 	var ocrConfigs []OCR3ConfigWithMeta
 	err := r.homeChainReader.GetLatestValue(ctx, "CCIPCapabilityConfiguration", "getOCRConfig", map[string]any{
 		"donId":      donID,
