@@ -7,6 +7,7 @@ import {IAny2EVMOffRamp} from "../../interfaces/IAny2EVMOffRamp.sol";
 import {ICommitStore} from "../../interfaces/ICommitStore.sol";
 import {IRMN} from "../../interfaces/IRMN.sol";
 
+import {AuthorizedCallers} from "../../../shared/access/AuthorizedCallers.sol";
 import {RMN} from "../../RMN.sol";
 import {Router} from "../../Router.sol";
 import {Client} from "../../libraries/Client.sol";
@@ -48,7 +49,7 @@ contract EVM2EVMMultiOffRampSetup is TokenSetup, PriceRegistrySetup, MultiOCR3Ba
   MaybeRevertingBurnMintTokenPool internal s_maybeRevertingPool;
 
   EVM2EVMMultiOffRampHelper internal s_offRamp;
-  MessageInterceptorHelper internal s_messageValidator;
+  MessageInterceptorHelper internal s_inboundMessageValidator;
   RMN internal s_realRMN;
   address internal s_sourceTokenPool = makeAddr("sourceTokenPool");
 
@@ -64,7 +65,7 @@ contract EVM2EVMMultiOffRampSetup is TokenSetup, PriceRegistrySetup, MultiOCR3Ba
     PriceRegistrySetup.setUp();
     MultiOCR3BaseSetup.setUp();
 
-    s_messageValidator = new MessageInterceptorHelper();
+    s_inboundMessageValidator = new MessageInterceptorHelper();
     s_receiver = new MaybeRevertMessageReceiver(false);
     s_secondary_receiver = new MaybeRevertMessageReceiver(false);
     s_reverting_receiver = new MaybeRevertMessageReceiver(true);
@@ -113,7 +114,9 @@ contract EVM2EVMMultiOffRampSetup is TokenSetup, PriceRegistrySetup, MultiOCR3Ba
 
     address[] memory priceUpdaters = new address[](1);
     priceUpdaters[0] = address(s_offRamp);
-    s_priceRegistry.applyPriceUpdatersUpdates(priceUpdaters, new address[](0));
+    s_priceRegistry.applyAuthorizedCallerUpdates(
+      AuthorizedCallers.AuthorizedCallerArgs({addedCallers: priceUpdaters, removedCallers: new address[](0)})
+    );
   }
 
   // TODO: function can be made common across OffRampSetup and MultiOffRampSetup
@@ -442,9 +445,9 @@ contract EVM2EVMMultiOffRampSetup is TokenSetup, PriceRegistrySetup, MultiOCR3Ba
     return sourceTokenData;
   }
 
-  function _enableMessageValidator() internal {
+  function _enableInboundMessageValidator() internal {
     EVM2EVMMultiOffRamp.DynamicConfig memory dynamicConfig = s_offRamp.getDynamicConfig();
-    dynamicConfig.messageValidator = address(s_messageValidator);
+    dynamicConfig.messageValidator = address(s_inboundMessageValidator);
     s_offRamp.setDynamicConfig(dynamicConfig);
   }
 
@@ -463,7 +466,9 @@ contract EVM2EVMMultiOffRampSetup is TokenSetup, PriceRegistrySetup, MultiOCR3Ba
 
     address[] memory priceUpdaters = new address[](1);
     priceUpdaters[0] = address(s_offRamp);
-    s_priceRegistry.applyPriceUpdatersUpdates(priceUpdaters, new address[](0));
+    s_priceRegistry.applyAuthorizedCallerUpdates(
+      AuthorizedCallers.AuthorizedCallerArgs({addedCallers: priceUpdaters, removedCallers: new address[](0)})
+    );
   }
 
   function _setupRealRMN() internal {
