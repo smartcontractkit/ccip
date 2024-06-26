@@ -82,7 +82,6 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
   /// @dev RMN depends on this event, if changing, please notify the RMN maintainers.
   event CommitReportAccepted(CommitReport report);
   event RootRemoved(bytes32 root);
-  event LatestPriceSequenceNumberSet(uint64 oldSequenceNumber, uint64 newSequenceNumber);
 
   /// @notice Static offRamp config
   /// @dev RMN depends on this struct, if changing, please notify the RMN maintainers.
@@ -180,7 +179,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
 
   // sourceChainSelector => merkleRoot => timestamp when received
   mapping(uint64 sourceChainSelector => mapping(bytes32 merkleRoot => uint256 timestamp)) internal s_roots;
-  /// @dev The sequence number of the last report
+  /// @dev The sequence number of the last price update
   uint64 private s_latestPriceSequenceNumber;
 
   constructor(StaticConfig memory staticConfig, SourceChainConfigArgs[] memory sourceChainConfigs) MultiOCR3Base() {
@@ -439,32 +438,34 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
         }
       }
 
-      // In the scenario where we upgrade offRamps, we still want to have sequential nonces.
-      // Referencing the old offRamp to check the expected nonce if none is set for a
-      // given sender allows us to skip the current message if it would not be the next according
-      // to the old offRamp. This preserves sequencing between updates.
-      (uint64 prevNonce, bool isFromPrevRamp) = _getSenderNonce(sourceChainSelector, message.sender);
-      if (isFromPrevRamp) {
-        if (prevNonce + 1 != message.nonce) {
-          // the starting v2 onramp nonce, i.e. the 1st message nonce v2 offramp is expected to receive,
-          // is guaranteed to equal (largest v1 onramp nonce + 1).
-          // if this message's nonce isn't (v1 offramp nonce + 1), then v1 offramp nonce != largest v1 onramp nonce,
-          // it tells us there are still messages inflight for v1 offramp
-          emit SkippedSenderWithPreviousRampMessageInflight(sourceChainSelector, message.nonce, message.sender);
-          continue;
+      if (message.nonce > 0) {
+        // In the scenario where we upgrade offRamps, we still want to have sequential nonces.
+        // Referencing the old offRamp to check the expected nonce if none is set for a
+        // given sender allows us to skip the current message if it would not be the next according
+        // to the old offRamp. This preserves sequencing between updates.
+        (uint64 prevNonce, bool isFromPrevRamp) = _getSenderNonce(sourceChainSelector, message.sender);
+        if (isFromPrevRamp) {
+          if (prevNonce + 1 != message.nonce) {
+            // the starting v2 onramp nonce, i.e. the 1st message nonce v2 offramp is expected to receive,
+            // is guaranteed to equal (largest v1 onramp nonce + 1).
+            // if this message's nonce isn't (v1 offramp nonce + 1), then v1 offramp nonce != largest v1 onramp nonce,
+            // it tells us there are still messages inflight for v1 offramp
+            emit SkippedSenderWithPreviousRampMessageInflight(sourceChainSelector, message.nonce, message.sender);
+            continue;
+          }
+          // Otherwise this nonce is indeed the "transitional nonce", that is
+          // all messages sent to v1 ramp have been executed by the DON and the sequence can resume in V2.
+          // Note if first time user in V2, then prevNonce will be 0, and message.nonce = 1, so this will be a no-op.
+          s_senderNonce[sourceChainSelector][message.sender] = prevNonce;
         }
-        // Otherwise this nonce is indeed the "transitional nonce", that is
-        // all messages sent to v1 ramp have been executed by the DON and the sequence can resume in V2.
-        // Note if first time user in V2, then prevNonce will be 0, and message.nonce = 1, so this will be a no-op.
-        s_senderNonce[sourceChainSelector][message.sender] = prevNonce;
-      }
 
-      // UNTOUCHED messages MUST be executed in order always
-      if (originalState == Internal.MessageExecutionState.UNTOUCHED) {
-        if (prevNonce + 1 != message.nonce) {
-          // We skip the message if the nonce is incorrect
-          emit SkippedIncorrectNonce(sourceChainSelector, message.nonce, message.sender);
-          continue;
+        // UNTOUCHED messages MUST be executed in order always IF message.nonce > 0.
+        if (originalState == Internal.MessageExecutionState.UNTOUCHED) {
+          if (prevNonce + 1 != message.nonce) {
+            // We skip the message if the nonce is incorrect, since message.nonce > 0.
+            emit SkippedIncorrectNonce(sourceChainSelector, message.nonce, message.sender);
+            continue;
+          }
         }
       }
 
@@ -497,12 +498,13 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
         revert InvalidNewState(sourceChainSelector, message.sequenceNumber, newState);
       }
 
-      // Nonce changes per state transition
+      // Nonce changes per state transition.
+      // These only apply for ordered messages.
       // UNTOUCHED -> FAILURE  nonce bump
       // UNTOUCHED -> SUCCESS  nonce bump
       // FAILURE   -> FAILURE  no nonce bump
       // FAILURE   -> SUCCESS  no nonce bump
-      if (originalState == Internal.MessageExecutionState.UNTOUCHED) {
+      if (message.nonce > 0 && originalState == Internal.MessageExecutionState.UNTOUCHED) {
         s_senderNonce[sourceChainSelector][message.sender]++;
       }
 
@@ -566,7 +568,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
 
     address messageValidator = s_dynamicConfig.messageValidator;
     if (messageValidator != address(0)) {
-      try IMessageInterceptor(messageValidator).onIncomingMessage(any2EvmMessage) {}
+      try IMessageInterceptor(messageValidator).onInboundMessage(any2EvmMessage) {}
       catch (bytes memory err) {
         revert IMessageInterceptor.MessageValidationError(err);
       }
@@ -669,19 +671,9 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
   }
 
   /// @notice Returns the sequence number of the last price update.
-  /// @return the latest price sequence number.
+  /// @return the latest price update sequence number.
   function getLatestPriceSequenceNumber() public view returns (uint64) {
     return s_latestPriceSequenceNumber;
-  }
-
-  /// @notice Sets the latest sequence number for price update.
-  /// @param latestPriceSequenceNumber The new sequence number for prices
-  function setLatestPriceSequenceNumber(uint64 latestPriceSequenceNumber) external onlyOwner {
-    uint64 oldPriceSequenceNumber = s_latestPriceSequenceNumber;
-
-    s_latestPriceSequenceNumber = latestPriceSequenceNumber;
-
-    emit LatestPriceSequenceNumberSet(oldPriceSequenceNumber, latestPriceSequenceNumber);
   }
 
   /// @notice Returns the timestamp of a potentially previously committed merkle root.
@@ -737,8 +729,8 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
   /// @inheritdoc MultiOCR3Base
   function _afterOCR3ConfigSet(uint8 ocrPluginType) internal override {
     if (ocrPluginType == uint8(Internal.OCRPluginType.Commit)) {
-      // When the OCR config changes, we reset the price epoch and round
-      // since epoch and rounds are scoped per config digest.
+      // When the OCR config changes, we reset the sequence number
+      // since it is scoped per config digest.
       // Note that s_minSeqNr/roots do not need to be reset as the roots persist
       // across reconfigurations and are de-duplicated separately.
       s_latestPriceSequenceNumber = 0;
