@@ -7,6 +7,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/google/uuid"
+	ocr3reader "github.com/smartcontractkit/ccipocr3/pkg/reader"
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
@@ -15,7 +16,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/loop"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/ccip_capability_configuration"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ccipcapability/ocrimpls"
 	cctypes "github.com/smartcontractkit/chainlink/v2/core/services/ccipcapability/types"
@@ -75,17 +75,17 @@ func New(
 }
 
 // CreateCommitOracle implements types.OracleCreator.
-func (o *oracleCreator) CreateCommitOracle(config ccip_capability_configuration.CCIPCapabilityConfigurationOCR3ConfigWithMeta) (cctypes.CCIPOracle, error) {
+func (o *oracleCreator) CreateCommitOracle(config ocr3reader.OCR3ConfigWithMeta) (cctypes.CCIPOracle, error) {
 	panic("unimplemented")
 }
 
 // CreateExecOracle implements types.OracleCreator.
-func (o *oracleCreator) CreateExecOracle(config ccip_capability_configuration.CCIPCapabilityConfigurationOCR3ConfigWithMeta) (cctypes.CCIPOracle, error) {
+func (o *oracleCreator) CreateExecOracle(config ocr3reader.OCR3ConfigWithMeta) (cctypes.CCIPOracle, error) {
 	panic("unimplemented")
 }
 
 // CreateBootstrapOracle implements types.OracleCreator.
-func (o *oracleCreator) CreateBootstrapOracle(config ccip_capability_configuration.CCIPCapabilityConfigurationOCR3ConfigWithMeta) (cctypes.CCIPOracle, error) {
+func (o *oracleCreator) CreateBootstrapOracle(config ocr3reader.OCR3ConfigWithMeta) (cctypes.CCIPOracle, error) {
 	// Assuming that the chain selector is referring to an evm chain for now.
 	// TODO: add an api that returns chain family.
 	chainID, err := chainsel.ChainIdFromSelector(config.Config.ChainSelector)

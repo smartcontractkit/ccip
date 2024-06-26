@@ -2,11 +2,20 @@ package ccipcapability
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"time"
 
+	"github.com/ethereum/go-ethereum/crypto"
+	ocr3reader "github.com/smartcontractkit/ccipocr3/pkg/reader"
 	"github.com/smartcontractkit/chainlink-common/pkg/loop"
 	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
+
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
+	"github.com/smartcontractkit/chainlink/v2/core/config"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/ccip_capability_configuration"
+	kcr "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/capabilities_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ccipcapability/launcher"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ccipcapability/oraclecreator"
@@ -20,6 +29,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/pipeline"
 	"github.com/smartcontractkit/chainlink/v2/core/services/registrysyncer"
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay"
+	evmrelaytypes "github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/types"
 	"github.com/smartcontractkit/chainlink/v2/core/services/telemetry"
 	"github.com/smartcontractkit/chainlink/v2/plugins"
 )
@@ -38,6 +48,7 @@ type Delegate struct {
 	peerWrapper           *ocrcommon.SingletonPeerWrapper
 	monitoringEndpointGen telemetry.MonitoringEndpointGenerator
 	registrySyncer        registrysyncer.Syncer
+	capabilityConfig      config.Capabilities
 
 	isNewlyCreatedJob bool
 }
@@ -122,12 +133,25 @@ func (d *Delegate) ServicesForSpec(ctx context.Context, spec job.Job) (services 
 		d.monitoringEndpointGen,
 	)
 
+	homeChainContractReader, err := d.getHomeChainContractReader(relayers,
+		spec.CCIPSpec.CapabilityLabelledName,
+		spec.CCIPSpec.CapabilityVersion)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get home chain contract reader: %w", err)
+	}
+
+	hcr := ocr3reader.NewHomeChainReader(
+		homeChainContractReader,
+		d.lggr.Named("HomeChainReader"),
+		12*time.Second,
+	)
+
 	capLauncher := launcher.New(
 		spec.CCIPSpec.CapabilityVersion,
 		spec.CCIPSpec.CapabilityLabelledName,
 		p2pID,
 		d.lggr,
-		nil, // todo: add home chain reader
+		hcr,
 		oracleCreator,
 	)
 
@@ -135,7 +159,7 @@ func (d *Delegate) ServicesForSpec(ctx context.Context, spec job.Job) (services 
 	d.registrySyncer.AddLauncher(capLauncher)
 
 	return []job.ServiceCtx{
-		// hcr, // TODO: add home chain reader
+		hcr,
 		capLauncher,
 	}, nil
 }
@@ -193,4 +217,112 @@ func (d *Delegate) getTransmitterKeys(ctx context.Context, relayers map[types.Re
 		}
 	}
 	return transmitterKeys, nil
+}
+
+func (d *Delegate) getHomeChainContractReader(
+	relayers map[types.RelayID]loop.Relayer,
+	capabilityLabelledName,
+	capabilityVersion string,
+) (types.ContractReader, error) {
+	// home chain is where the capability registry is deployed,
+	// which should be set correctly in toml config.
+	homeChainRelayID := d.capabilityConfig.ExternalRegistry().RelayID()
+	homeChainRelayer, ok := relayers[homeChainRelayID]
+	if !ok {
+		return nil, fmt.Errorf("home chain relayer not found, chain id: %s", homeChainRelayID.String())
+	}
+
+	cccChainReaderConfig := homeChainReaderConfig()
+	encoded, err := json.Marshal(cccChainReaderConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal CCC chain reader config: %w", err)
+	}
+
+	reader, err := homeChainRelayer.NewContractReader(context.Background(), encoded)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create home chain contract reader: %w", err)
+	}
+
+	reader, err = bindReader(reader, d.capabilityConfig.ExternalRegistry().Address(), capabilityLabelledName, capabilityVersion)
+	if err != nil {
+		return nil, fmt.Errorf("failed to bind home chain contract reader: %w", err)
+	}
+
+	return reader, nil
+}
+
+func hashedCapabilityId(capabilityLabelledName, capabilityVersion string) (r [32]byte, err error) {
+	tabi := `[{"type": "string"}, {"type": "string"}]`
+	abiEncoded, err := utils.ABIEncode(tabi, capabilityLabelledName, capabilityVersion)
+	if err != nil {
+		return r, fmt.Errorf("failed to ABI encode capability version and labelled name: %w", err)
+	}
+
+	h := crypto.Keccak256(abiEncoded)
+	copy(r[:], h)
+	return r, nil
+}
+
+func bindReader(reader types.ContractReader, capRegAddress, capabilityLabelledName, capabilityVersion string) (types.ContractReader, error) {
+	err := reader.Bind(context.Background(), []types.BoundContract{
+		{
+			Address: capRegAddress,
+			Name:    "CapabilitiesRegistry",
+		},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to bind home chain contract reader: %w", err)
+	}
+
+	hid, err := hashedCapabilityId(capabilityLabelledName, capabilityVersion)
+	if err != nil {
+		return nil, fmt.Errorf("failed to hash capability id: %w", err)
+	}
+
+	var ccipCapabilityInfo kcr.CapabilitiesRegistryCapabilityInfo
+	err = reader.GetLatestValue(context.Background(), "CapabilitiesRegistry", "getCapability", map[string]any{
+		"hashedId": hid,
+	}, &ccipCapabilityInfo)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get CCIP capability info from chain reader: %w", err)
+	}
+
+	// bind the ccip capability configuration contract
+	err = reader.Bind(context.Background(), []types.BoundContract{
+		{
+			Address: ccipCapabilityInfo.ConfigurationContract.String(),
+			Name:    "CCIPCapabilityConfiguration",
+		},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to bind CCIP capability configuration contract: %w", err)
+	}
+
+	return reader, nil
+}
+
+func homeChainReaderConfig() evmrelaytypes.ChainReaderConfig {
+	return evmrelaytypes.ChainReaderConfig{
+		Contracts: map[string]evmrelaytypes.ChainContractReader{
+			"CapabilitiesRegistry": {
+				ContractABI: kcr.CapabilitiesRegistryABI,
+				Configs: map[string]*evmrelaytypes.ChainReaderDefinition{
+					"getCapability": {
+						ChainSpecificName: "getCapability",
+					},
+				},
+			},
+			"CCIPCapabilityConfiguration": {
+				ContractABI: ccip_capability_configuration.CCIPCapabilityConfigurationABI,
+				Configs: map[string]*evmrelaytypes.ChainReaderDefinition{
+					"getAllChainConfigs": {
+						ChainSpecificName: "getAllChainConfigs",
+					},
+					"getOCRConfig": {
+						ChainSpecificName: "getOCRConfig",
+					},
+				},
+			},
+		},
+	}
 }

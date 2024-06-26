@@ -8,6 +8,7 @@ import (
 
 	"go.uber.org/multierr"
 
+	ocr3reader "github.com/smartcontractkit/ccipocr3/pkg/reader"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils"
 
 	kcr "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/capabilities_registry"
@@ -33,7 +34,7 @@ func New(
 	capabilityLabelledName string,
 	p2pID p2pkey.KeyV2,
 	lggr logger.Logger,
-	homeChainReader cctypes.HomeChainReader,
+	homeChainReader ocr3reader.HomeChain,
 	oracleCreator cctypes.OracleCreator,
 ) *launcher {
 	return &launcher{
@@ -60,7 +61,7 @@ type launcher struct {
 	capabilityLabelledName string
 	p2pID                  p2pkey.KeyV2
 	lggr                   logger.Logger
-	homeChainReader        cctypes.HomeChainReader
+	homeChainReader        ocr3reader.HomeChain
 	stopChan               chan struct{}
 	// latestState is the latest capability registry state received from the syncer.
 	latestState registrysyncer.State
@@ -132,8 +133,8 @@ func (l *launcher) tick() error {
 	// Ensure that the home chain reader is healthy.
 	// For new jobs it may be possible that the home chain reader is not yet ready
 	// so we won't be able to fetch configs and start any OCR instances.
-	if !l.homeChainReader.IsHealthy() {
-		return fmt.Errorf("home chain reader is unhealthy")
+	if ready := l.homeChainReader.Ready(); ready != nil {
+		return fmt.Errorf("home chain reader is not ready: %w", ready)
 	}
 
 	// Fetch the latest state from the capability registry and determine if we need to
@@ -255,13 +256,13 @@ func (l *launcher) updateDON(don kcr.CapabilitiesRegistryDONInfo) (depBefore, de
 	}
 
 	// this should be a retryable error.
-	commitOCRConfigs, err := l.homeChainReader.GetOCRConfigs(context.Background(), don.Id, cctypes.PluginTypeCCIPCommit)
+	commitOCRConfigs, err := l.homeChainReader.GetOCRConfigs(don.Id, uint8(cctypes.PluginTypeCCIPCommit))
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to fetch OCR configs for CCIP commit plugin (don id: %d) from home chain config contract: %w",
 			don.Id, err)
 	}
 
-	execOCRConfigs, err := l.homeChainReader.GetOCRConfigs(context.Background(), don.Id, cctypes.PluginTypeCCIPExec)
+	execOCRConfigs, err := l.homeChainReader.GetOCRConfigs(don.Id, uint8(cctypes.PluginTypeCCIPExec))
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to fetch OCR configs for CCIP exec plugin (don id: %d) from home chain config contract: %w",
 			don.Id, err)
@@ -317,13 +318,13 @@ func (l *launcher) addDON(don kcr.CapabilitiesRegistryDONInfo) (*ccipDeployment,
 	}
 
 	// this should be a retryable error.
-	commitOCRConfigs, err := l.homeChainReader.GetOCRConfigs(context.Background(), don.Id, cctypes.PluginTypeCCIPCommit)
+	commitOCRConfigs, err := l.homeChainReader.GetOCRConfigs(don.Id, uint8(cctypes.PluginTypeCCIPCommit))
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch OCR configs for CCIP commit plugin (don id: %d) from home chain config contract: %w",
 			don.Id, err)
 	}
 
-	execOCRConfigs, err := l.homeChainReader.GetOCRConfigs(context.Background(), don.Id, cctypes.PluginTypeCCIPExec)
+	execOCRConfigs, err := l.homeChainReader.GetOCRConfigs(don.Id, uint8(cctypes.PluginTypeCCIPExec))
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch OCR configs for CCIP exec plugin (don id: %d) from home chain config contract: %w",
 			don.Id, err)

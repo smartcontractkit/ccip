@@ -4,15 +4,16 @@ import (
 	"context"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/ccip_capability_configuration"
+	ocr3reader "github.com/smartcontractkit/ccipocr3/pkg/reader"
+
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 )
 
 type configTracker struct {
-	cfg ccip_capability_configuration.CCIPCapabilityConfigurationOCR3ConfigWithMeta
+	cfg ocr3reader.OCR3ConfigWithMeta
 }
 
-func NewConfigTracker(cfg ccip_capability_configuration.CCIPCapabilityConfigurationOCR3ConfigWithMeta) *configTracker {
+func NewConfigTracker(cfg ocr3reader.OCR3ConfigWithMeta) *configTracker {
 	return &configTracker{cfg: cfg}
 }
 
