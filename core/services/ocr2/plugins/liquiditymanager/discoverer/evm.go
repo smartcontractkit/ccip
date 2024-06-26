@@ -140,22 +140,24 @@ func (e *evmDiscoverer) getVertexData(ctx context.Context, v graph.Vertex) (grap
 		}
 	}
 
-	configDigestAndEpoch, err := lm.LatestConfigDigestAndEpoch(&bind.CallOpts{Context: ctx})
+	configDetails, err := lm.LatestConfigDetails(&bind.CallOpts{Context: ctx})
 	if err != nil {
-		return graph.Data{}, nil, fmt.Errorf("latest config digest and epoch: %w", err)
+		return graph.Data{}, nil, fmt.Errorf("latest config details: %w", err)
 	}
 
 	minimumLiquidity, err := lm.GetMinimumLiquidity(&bind.CallOpts{Context: ctx})
 	if err != nil {
-		return graph.Data{}, nil, fmt.Errorf("get target balance: %w", err)
+		return graph.Data{}, nil, fmt.Errorf("get minimum liquidity balance: %w", err)
 	}
+
+	//Do we want to add TargetLiquidity to the contract?
 
 	data := graph.Data{
 		Liquidity:               liquidity,
 		TokenAddress:            models.Address(token),
 		LiquidityManagerAddress: lmAddress,
 		XChainLiquidityManagers: xchainRebalancerData,
-		ConfigDigest:            models.ConfigDigest{ConfigDigest: configDigestAndEpoch.ConfigDigest},
+		ConfigDigest:            models.ConfigDigest{ConfigDigest: configDetails.ConfigDigest},
 		NetworkSelector:         selector,
 		MinimumLiquidity:        minimumLiquidity,
 	}
