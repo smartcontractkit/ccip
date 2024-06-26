@@ -28,7 +28,6 @@ func Test_getPendingExecutedReports(t *testing.T) {
 		want1   time.Time
 		wantErr assert.ErrorAssertionFunc
 	}{
-		// TODO: Add test cases.
 		{
 			name:    "empty",
 			reports: nil,
