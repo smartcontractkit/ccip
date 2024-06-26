@@ -199,7 +199,8 @@ contract CCIPReceiverTest is EVM2EVMOnRampSetup {
 
     s_receiver.updateApprovedSenders(new ICCIPClientBase.approvedSenderUpdate[](0), senderUpdates);
 
-    assertFalse(s_receiver.s_approvedSenders(sourceChainSelector, abi.encode(address(s_receiver))));
+    // assertFalse(s_receiver.s_approvedSenders(sourceChainSelector, abi.encode(address(s_receiver))));
+    assertFalse(s_receiver.isApprovedSender(sourceChainSelector, abi.encode(address(s_receiver))));
 
     bytes32 messageId = keccak256("messageId");
     address token = address(s_destFeeToken);

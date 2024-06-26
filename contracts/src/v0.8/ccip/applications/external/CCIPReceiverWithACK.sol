@@ -138,7 +138,7 @@ contract CCIPReceiverWithACK is CCIPReceiver {
       receiver: incomingMessage.sender,
       data: abi.encode(ACKMESSAGEMAGICBYTES, incomingMessage.messageId),
       tokenAmounts: tokenAmounts,
-      extraArgs: s_extraArgsBytes[incomingMessage.sourceChainSelector],
+      extraArgs: s_chains[incomingMessage.sourceChainSelector].extraArgsBytes, //s_extraArgsBytes[incomingMessage.sourceChainSelector],
       feeToken: address(s_feeToken)
     });
 

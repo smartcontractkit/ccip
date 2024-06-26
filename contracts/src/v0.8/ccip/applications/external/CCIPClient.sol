@@ -1,12 +1,12 @@
 pragma solidity ^0.8.0;
 
-import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IRouterClient} from "../../interfaces/IRouterClient.sol";
 
+import {Client} from "../../libraries/Client.sol";
 import {CCIPReceiverWithACK} from "./CCIPReceiverWithACK.sol";
 
-import {IRouterClient} from "../../interfaces/IRouterClient.sol";
-import {Client} from "../../libraries/Client.sol";
+import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
 
 contract CCIPClient is CCIPReceiverWithACK {
   using SafeERC20 for IERC20;
@@ -28,10 +28,10 @@ contract CCIPClient is CCIPReceiverWithACK {
     address feeToken
   ) public payable validChain(destChainSelector) returns (bytes32 messageId) {
     Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
-      receiver: s_chains[destChainSelector],
+      receiver: s_chains[destChainSelector].recipient,
       data: data,
       tokenAmounts: tokenAmounts,
-      extraArgs: s_extraArgsBytes[destChainSelector],
+      extraArgs: s_chains[destChainSelector].extraArgsBytes,
       feeToken: feeToken
     });
 

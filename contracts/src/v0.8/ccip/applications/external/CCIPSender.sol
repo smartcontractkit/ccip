@@ -44,11 +44,11 @@ contract CCIPSender is CCIPClientBase {
     address feeToken
   ) public payable validChain(destChainSelector) returns (bytes32 messageId) {
     Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
-      receiver: s_chains[destChainSelector],
+      receiver: s_chains[destChainSelector].recipient,
       data: data,
       tokenAmounts: tokenAmounts,
       feeToken: feeToken,
-      extraArgs: s_extraArgsBytes[destChainSelector]
+      extraArgs: s_chains[destChainSelector].extraArgsBytes
     });
 
     uint256 fee = IRouterClient(i_ccipRouter).getFee(destChainSelector, message);
