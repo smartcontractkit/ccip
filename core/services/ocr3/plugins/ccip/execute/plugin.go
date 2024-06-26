@@ -317,8 +317,7 @@ func buildSingleChainReport(
 		"selected messages from commit report for execution",
 		"sourceChain", report.SourceChain,
 		"commitRoot", report.MerkleRoot.String(),
-		"numMessages", len(toExecute),
-		"totalMessages", numMsgs,
+		"numMessages", numMsgs,
 		"toExecute", len(toExecute))
 	proof, err := tree.Prove(toExecute)
 	if err != nil {
