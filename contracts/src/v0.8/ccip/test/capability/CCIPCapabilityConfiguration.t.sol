@@ -4,18 +4,18 @@ pragma solidity ^0.8.24;
 import {Test} from "forge-std/Test.sol";
 
 import {CCIPCapabilityConfiguration} from "../../capability/CCIPCapabilityConfiguration.sol";
-import {ICapabilityRegistry} from "../../capability/interfaces/ICapabilityRegistry.sol";
+import {ICapabilitiesRegistry} from "../../capability/interfaces/ICapabilitiesRegistry.sol";
 import {CCIPCapabilityConfigurationHelper} from "../helpers/CCIPCapabilityConfigurationHelper.sol";
 
 contract CCIPCapabilityConfigurationSetup is Test {
   address public constant OWNER = 0x82ae2B4F57CA5C1CBF8f744ADbD3697aD1a35AFe;
-  address public constant CAPABILITY_REGISTRY = 0x272aF4BF7FBFc4944Ed59F914Cd864DfD912D55e;
+  address public constant CAPABILITIES_REGISTRY = 0x272aF4BF7FBFc4944Ed59F914Cd864DfD912D55e;
 
   CCIPCapabilityConfigurationHelper public s_ccipCC;
 
   function setUp() public {
     changePrank(OWNER);
-    s_ccipCC = new CCIPCapabilityConfigurationHelper(CAPABILITY_REGISTRY);
+    s_ccipCC = new CCIPCapabilityConfigurationHelper(CAPABILITIES_REGISTRY);
   }
 
   function _makeBytes32Array(uint256 length, uint256 seed) internal pure returns (bytes32[] memory arr) {
@@ -51,16 +51,18 @@ contract CCIPCapabilityConfigurationSetup is Test {
     transmitters = _makeBytesArray(numNodes, 20);
     for (uint256 i = 0; i < numNodes; i++) {
       vm.mockCall(
-        CAPABILITY_REGISTRY,
-        abi.encodeWithSelector(ICapabilityRegistry.getNode.selector, p2pIds[i]),
+        CAPABILITIES_REGISTRY,
+        abi.encodeWithSelector(ICapabilitiesRegistry.getNode.selector, p2pIds[i]),
         abi.encode(
-          ICapabilityRegistry.NodeInfo({
+          ICapabilitiesRegistry.NodeInfo({
             nodeOperatorId: 1,
             signer: bytes32(signers[i]),
             p2pId: p2pIds[i],
-            hashedCapabilityIds: new bytes32[](0)
-          }),
-          uint32(1)
+            hashedCapabilityIds: new bytes32[](0),
+            configCount: uint32(1),
+            workflowDONId: uint32(1),
+            capabilitiesDONIds: new uint256[](0)
+          })
         )
       );
     }
@@ -101,16 +103,18 @@ contract CCIPCapabilityConfiguration_chainConfig is CCIPCapabilityConfigurationS
     });
 
     vm.mockCall(
-      CAPABILITY_REGISTRY,
-      abi.encodeWithSelector(ICapabilityRegistry.getNode.selector, chainReaders[0]),
+      CAPABILITIES_REGISTRY,
+      abi.encodeWithSelector(ICapabilitiesRegistry.getNode.selector, chainReaders[0]),
       abi.encode(
-        ICapabilityRegistry.NodeInfo({
+        ICapabilitiesRegistry.NodeInfo({
           nodeOperatorId: 1,
           signer: bytes32(uint256(1)),
           p2pId: chainReaders[0],
-          hashedCapabilityIds: new bytes32[](0)
-        }),
-        uint32(1)
+          hashedCapabilityIds: new bytes32[](0),
+          configCount: uint32(1),
+          workflowDONId: uint32(1),
+          capabilitiesDONIds: new uint256[](0)
+        })
       )
     );
 
@@ -140,16 +144,18 @@ contract CCIPCapabilityConfiguration_chainConfig is CCIPCapabilityConfigurationS
     });
 
     vm.mockCall(
-      CAPABILITY_REGISTRY,
-      abi.encodeWithSelector(ICapabilityRegistry.getNode.selector, chainReaders[0]),
+      CAPABILITIES_REGISTRY,
+      abi.encodeWithSelector(ICapabilitiesRegistry.getNode.selector, chainReaders[0]),
       abi.encode(
-        ICapabilityRegistry.NodeInfo({
+        ICapabilitiesRegistry.NodeInfo({
           nodeOperatorId: 1,
           signer: bytes32(uint256(1)),
           p2pId: chainReaders[0],
-          hashedCapabilityIds: new bytes32[](0)
-        }),
-        uint32(1)
+          hashedCapabilityIds: new bytes32[](0),
+          configCount: uint32(1),
+          workflowDONId: uint32(1),
+          capabilitiesDONIds: new uint256[](0)
+        })
       )
     );
 
@@ -187,16 +193,18 @@ contract CCIPCapabilityConfiguration_chainConfig is CCIPCapabilityConfigurationS
     });
 
     vm.mockCall(
-      CAPABILITY_REGISTRY,
-      abi.encodeWithSelector(ICapabilityRegistry.getNode.selector, chainReaders[0]),
+      CAPABILITIES_REGISTRY,
+      abi.encodeWithSelector(ICapabilitiesRegistry.getNode.selector, chainReaders[0]),
       abi.encode(
-        ICapabilityRegistry.NodeInfo({
+        ICapabilitiesRegistry.NodeInfo({
           nodeOperatorId: 0,
           signer: bytes32(0),
           p2pId: bytes32(uint256(0)),
-          hashedCapabilityIds: new bytes32[](0)
-        }),
-        uint32(1)
+          hashedCapabilityIds: new bytes32[](0),
+          configCount: uint32(1),
+          workflowDONId: uint32(1),
+          capabilitiesDONIds: new uint256[](0)
+        })
       )
     );
 
@@ -218,16 +226,18 @@ contract CCIPCapabilityConfiguration_chainConfig is CCIPCapabilityConfigurationS
     });
 
     vm.mockCall(
-      CAPABILITY_REGISTRY,
-      abi.encodeWithSelector(ICapabilityRegistry.getNode.selector, chainReaders[0]),
+      CAPABILITIES_REGISTRY,
+      abi.encodeWithSelector(ICapabilitiesRegistry.getNode.selector, chainReaders[0]),
       abi.encode(
-        ICapabilityRegistry.NodeInfo({
+        ICapabilitiesRegistry.NodeInfo({
           nodeOperatorId: 1,
           signer: bytes32(uint256(1)),
           p2pId: chainReaders[0],
-          hashedCapabilityIds: new bytes32[](0)
-        }),
-        uint32(1)
+          hashedCapabilityIds: new bytes32[](0),
+          configCount: uint32(1),
+          workflowDONId: uint32(1),
+          capabilitiesDONIds: new uint256[](0)
+        })
       )
     );
 
@@ -494,16 +504,18 @@ contract CCIPCapabilityConfiguration_validateConfig is CCIPCapabilityConfigurati
     p2pIds[0] = nonExistentP2PId;
 
     vm.mockCall(
-      CAPABILITY_REGISTRY,
-      abi.encodeWithSelector(ICapabilityRegistry.getNode.selector, nonExistentP2PId),
+      CAPABILITIES_REGISTRY,
+      abi.encodeWithSelector(ICapabilitiesRegistry.getNode.selector, nonExistentP2PId),
       abi.encode(
-        ICapabilityRegistry.NodeInfo({
+        ICapabilitiesRegistry.NodeInfo({
           nodeOperatorId: 0,
           signer: bytes32(0),
           p2pId: bytes32(uint256(0)),
-          hashedCapabilityIds: new bytes32[](0)
-        }),
-        uint32(1)
+          hashedCapabilityIds: new bytes32[](0),
+          configCount: uint32(1),
+          workflowDONId: uint32(1),
+          capabilitiesDONIds: new uint256[](0)
+        })
       )
     );
 
@@ -1427,7 +1439,7 @@ contract CCIPCapabilityConfiguration__updatePluginConfig is CCIPCapabilityConfig
 contract CCIPCapabilityConfiguration_beforeCapabilityConfigSet is CCIPCapabilityConfigurationSetup {
   // Successes.
   function test_beforeCapabilityConfigSet_ZeroLengthConfig_Success() public {
-    changePrank(CAPABILITY_REGISTRY);
+    changePrank(CAPABILITIES_REGISTRY);
 
     CCIPCapabilityConfiguration.OCR3Config[] memory configs = new CCIPCapabilityConfiguration.OCR3Config[](0);
     bytes memory encodedConfigs = abi.encode(configs);
@@ -1436,7 +1448,7 @@ contract CCIPCapabilityConfiguration_beforeCapabilityConfigSet is CCIPCapability
 
   function test_beforeCapabilityConfigSet_CommitConfigOnly_Success() public {
     (bytes32[] memory p2pIds, bytes[] memory signers, bytes[] memory transmitters) = _addChainConfig(4);
-    changePrank(CAPABILITY_REGISTRY);
+    changePrank(CAPABILITIES_REGISTRY);
 
     uint32 donId = 1;
     CCIPCapabilityConfiguration.OCR3Config memory blueConfig = CCIPCapabilityConfiguration.OCR3Config({
@@ -1470,7 +1482,7 @@ contract CCIPCapabilityConfiguration_beforeCapabilityConfigSet is CCIPCapability
 
   function test_beforeCapabilityConfigSet_ExecConfigOnly_Success() public {
     (bytes32[] memory p2pIds, bytes[] memory signers, bytes[] memory transmitters) = _addChainConfig(4);
-    changePrank(CAPABILITY_REGISTRY);
+    changePrank(CAPABILITIES_REGISTRY);
 
     uint32 donId = 1;
     CCIPCapabilityConfiguration.OCR3Config memory blueConfig = CCIPCapabilityConfiguration.OCR3Config({
@@ -1504,7 +1516,7 @@ contract CCIPCapabilityConfiguration_beforeCapabilityConfigSet is CCIPCapability
 
   function test_beforeCapabilityConfigSet_CommitAndExecConfig_Success() public {
     (bytes32[] memory p2pIds, bytes[] memory signers, bytes[] memory transmitters) = _addChainConfig(4);
-    changePrank(CAPABILITY_REGISTRY);
+    changePrank(CAPABILITIES_REGISTRY);
 
     uint32 donId = 1;
     CCIPCapabilityConfiguration.OCR3Config memory blueCommitConfig = CCIPCapabilityConfiguration.OCR3Config({
@@ -1566,7 +1578,7 @@ contract CCIPCapabilityConfiguration_beforeCapabilityConfigSet is CCIPCapability
     bytes memory config = bytes("");
     uint64 configCount = 1;
     uint32 donId = 1;
-    vm.expectRevert(CCIPCapabilityConfiguration.OnlyCapabilityRegistryCanCall.selector);
+    vm.expectRevert(CCIPCapabilityConfiguration.OnlyCapabilitiesRegistryCanCall.selector);
     s_ccipCC.beforeCapabilityConfigSet(nodes, config, configCount, donId);
   }
 }
