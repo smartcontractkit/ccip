@@ -17,8 +17,8 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 )
 
-// maxReportSize that should be returned as an execution report payload.
-const maxReportSize = 250_000
+// maxReportSizeBytes that should be returned as an execution report payload.
+const maxReportSizeBytes = 250_000
 
 // Plugin implements the main ocr3 plugin logic.
 type Plugin struct {
@@ -316,8 +316,8 @@ func buildSingleChainReport(ctx context.Context, lggr logger.Logger, hasher ccip
 	return finalReport, len(encoded), nil
 }
 
-// selectReport takes an ordered list of reports and selects the first reports that fit within the maxReportSize.
-func selectReport(ctx context.Context, lggr logger.Logger, hasher cciptypes.MessageHasher, codec cciptypes.ExecutePluginCodec, tokenDataReader TokenDataReader, reports []cciptypes.ExecutePluginCommitDataWithMessages, maxReportSize int) ([]cciptypes.ExecutePluginReportSingleChain, []cciptypes.ExecutePluginCommitDataWithMessages, error) {
+// selectReport takes an ordered list of reports and selects the first reports that fit within the maxReportSizeBytes.
+func selectReport(ctx context.Context, lggr logger.Logger, hasher cciptypes.MessageHasher, codec cciptypes.ExecutePluginCodec, tokenDataReader TokenDataReader, reports []cciptypes.ExecutePluginCommitDataWithMessages, maxReportSizeBytes int) ([]cciptypes.ExecutePluginReportSingleChain, []cciptypes.ExecutePluginCommitDataWithMessages, error) {
 	// TODO: It may be desirable for this entire function to be an interface so that
 	//       different selection algorithms can be used.
 
@@ -326,25 +326,25 @@ func selectReport(ctx context.Context, lggr logger.Logger, hasher cciptypes.Mess
 	partialReport := false
 	var finalReports []cciptypes.ExecutePluginReportSingleChain
 	for reportIdx, report := range reports {
-		finalReport, encodedSize, err := buildSingleChainReport(ctx, lggr, hasher, tokenDataReader, codec, report, maxReportSize, 0)
+		finalReport, encodedSize, err := buildSingleChainReport(ctx, lggr, hasher, tokenDataReader, codec, report, maxReportSizeBytes, 0)
 		if err != nil {
 			return nil, nil, fmt.Errorf("unable to build a single chain report (max): %w", err)
 		}
 
 		// The full report is too large, binary search for best report size
-		if (size + encodedSize) >= maxReportSize {
+		if (size + encodedSize) >= maxReportSizeBytes {
 			partialReport = true
 			low := 1
 			high := len(report.Messages) - 1
 			for low <= high {
 				mid := low + ((high - low) / 2)
 
-				finalReport2, encodedSize2, err2 := buildSingleChainReport(ctx, lggr, hasher, tokenDataReader, codec, report, maxReportSize, mid)
+				finalReport2, encodedSize2, err2 := buildSingleChainReport(ctx, lggr, hasher, tokenDataReader, codec, report, maxReportSizeBytes, mid)
 				if err2 != nil {
 					return nil, nil, fmt.Errorf("unable to build a single chain report (messages %d): %w", mid, err2)
 				}
 
-				if (size + encodedSize2) <= maxReportSize {
+				if (size + encodedSize2) <= maxReportSizeBytes {
 					// mid is a valid report size, try something bigger next iteration.
 					finalReport = finalReport2
 					encodedSize = encodedSize2
@@ -383,7 +383,7 @@ func selectReport(ctx context.Context, lggr logger.Logger, hasher cciptypes.Mess
 		reports = reports[fullyExecuted:]
 	}
 
-	lggr.Infow("selected commit reports for execution report", "numReports", len(finalReports), "size", size, "incompleteReports", len(reports), "maxSize", maxReportSize)
+	lggr.Infow("selected commit reports for execution report", "numReports", len(finalReports), "size", size, "incompleteReports", len(reports), "maxSize", maxReportSizeBytes)
 
 	return finalReports, reports, nil
 }
@@ -433,7 +433,7 @@ func (p *Plugin) Outcome(
 		}
 	}
 
-	outcomeReports, commitReports, err := selectReport(p.ctx, p.lggr, p.msgHasher, p.reportCodec, nil, commitReports, maxReportSize)
+	outcomeReports, commitReports, err := selectReport(p.ctx, p.lggr, p.msgHasher, p.reportCodec, nil, commitReports, maxReportSizeBytes)
 	if err != nil {
 		return ocr3types.Outcome{}, fmt.Errorf("unable to extract proofs: %w", err)
 	}
