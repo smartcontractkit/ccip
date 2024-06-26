@@ -3,6 +3,7 @@ package ccipevm
 import (
 	"context"
 	"fmt"
+	"math/big"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
@@ -15,18 +16,33 @@ var (
 	LeafDomainSeparator = [1]byte{0x00}
 )
 
-type MessageHasher struct {
+// MessageHasherV1 implements the MessageHasher interface.
+// Compatible with:
+// - "EVM2EVMMultiOnRamp 1.6.0-dev"
+type MessageHasherV1 struct {
 	metaDataHash [32]byte
 }
 
-func NewMessageHasher(metaDataHash [32]byte) *MessageHasher {
-	return &MessageHasher{
+func NewMessageHasherV1(metaDataHash [32]byte) *MessageHasherV1 {
+	return &MessageHasherV1{
 		metaDataHash: metaDataHash,
 	}
 }
 
-func (h *MessageHasher) Hash(_ context.Context, msg cciptypes.CCIPMsg) (cciptypes.Bytes32, error) {
-	encodedTokens, err := h.abiEncode(`[{"components": [{"name":"token","type":"address"},{"name":"amount","type":"uint256"}], "type":"tuple[]"}]`, msg.TokenAmounts)
+func (h *MessageHasherV1) Hash(_ context.Context, msg cciptypes.CCIPMsg) (cciptypes.Bytes32, error) {
+	type tokenAmount struct {
+		Token  common.Address
+		Amount *big.Int
+	}
+	tokenAmounts := make([]tokenAmount, len(msg.TokenAmounts))
+	for i, ta := range msg.TokenAmounts {
+		tokenAmounts[i] = tokenAmount{
+			Token:  common.HexToAddress(string(ta.Token)),
+			Amount: ta.Amount,
+		}
+	}
+	encodedTokens, err := h.abiEncode(`[{"components": [{"name":"token","type":"address"},
+		{"name":"amount","type":"uint256"}], "type":"tuple[]"}]`, tokenAmounts)
 	if err != nil {
 		return [32]byte{}, fmt.Errorf("abi encode token amounts: %w", err)
 	}
@@ -42,16 +58,14 @@ func (h *MessageHasher) Hash(_ context.Context, msg cciptypes.CCIPMsg) (cciptype
 	}
 
 	packedFixedSizeValues, err := h.abiEncode(
-		`[
-{"name": "sender", "type":"address"},
-{"name": "receiver", "type":"address"},
-{"name": "sequenceNumber", "type":"uint64"},
-{"name": "gasLimit", "type":"uint256"},
-{"name": "strict", "type":"bool"},
-{"name": "nonce", "type":"uint64"},
-{"name": "feeToken","type": "address"},
-{"name": "feeTokenAmount","type": "uint256"}
-]`,
+		`[{"name": "sender", "type":"address"},
+			{"name": "receiver", "type":"address"},
+			{"name": "sequenceNumber", "type":"uint64"},
+			{"name": "gasLimit", "type":"uint256"},
+			{"name": "strict", "type":"bool"},
+			{"name": "nonce", "type":"uint64"},
+			{"name": "feeToken","type": "address"},
+			{"name": "feeTokenAmount","type": "uint256"}]`,
 		common.HexToAddress(string(msg.Sender)),
 		common.HexToAddress(string(msg.Receiver)),
 		uint64(msg.SeqNum),
@@ -67,14 +81,12 @@ func (h *MessageHasher) Hash(_ context.Context, msg cciptypes.CCIPMsg) (cciptype
 	fixedSizeValuesHash := h.keccak256Fixed(packedFixedSizeValues)
 
 	packedValues, err := h.abiEncode(
-		`[
-{"name": "leafDomainSeparator","type":"bytes1"},
-{"name": "metadataHash", "type":"bytes32"},
-{"name": "fixedSizeValuesHash", "type":"bytes32"},
-{"name": "dataHash", "type":"bytes32"},
-{"name": "tokenAmountsHash", "type":"bytes32"},
-{"name": "sourceTokenDataHash", "type":"bytes32"}
-]`,
+		`[{"name": "leafDomainSeparator","type":"bytes1"},
+			{"name": "metadataHash", "type":"bytes32"},
+			{"name": "fixedSizeValuesHash", "type":"bytes32"},
+			{"name": "dataHash", "type":"bytes32"},
+			{"name": "tokenAmountsHash", "type":"bytes32"},
+			{"name": "sourceTokenDataHash", "type":"bytes32"}]`,
 		LeafDomainSeparator,
 		h.metaDataHash,
 		fixedSizeValuesHash,
@@ -89,7 +101,7 @@ func (h *MessageHasher) Hash(_ context.Context, msg cciptypes.CCIPMsg) (cciptype
 	return h.keccak256Fixed(packedValues), nil
 }
 
-func (h *MessageHasher) abiEncode(abiStr string, values ...interface{}) ([]byte, error) {
+func (h *MessageHasherV1) abiEncode(abiStr string, values ...interface{}) ([]byte, error) {
 	inDef := fmt.Sprintf(`[{ "name" : "method", "type": "function", "inputs": %s}]`, abiStr)
 	inAbi, err := abi.JSON(strings.NewReader(inDef))
 	if err != nil {
@@ -102,7 +114,7 @@ func (h *MessageHasher) abiEncode(abiStr string, values ...interface{}) ([]byte,
 	return res[4:], nil
 }
 
-func (h *MessageHasher) keccak256Fixed(in []byte) [32]byte {
+func (h *MessageHasherV1) keccak256Fixed(in []byte) [32]byte {
 	hash := sha3.NewLegacyKeccak256()
 	hash.Write(in)
 	var hs [32]byte
@@ -111,4 +123,4 @@ func (h *MessageHasher) keccak256Fixed(in []byte) [32]byte {
 }
 
 // Interface compliance check
-var _ cciptypes.MessageHasher = (*MessageHasher)(nil)
+var _ cciptypes.MessageHasher = (*MessageHasherV1)(nil)
