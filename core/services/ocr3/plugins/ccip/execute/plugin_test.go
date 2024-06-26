@@ -2,9 +2,7 @@ package execute
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"math"
 	"testing"
 	"time"
 
@@ -20,22 +18,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/merklemulti"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
-
-func TestSomethingCool(t *testing.T) {
-
-	foo := map[cciptypes.ChainSelector]int{
-		cciptypes.ChainSelector(1):              1,
-		cciptypes.ChainSelector(math.MaxUint64): 1,
-	}
-
-	js, _ := json.Marshal(foo)
-	t.Log(string(js))
-
-	b := []byte(`{"1":1,"18446744073709551615":1}`)
-	var bar map[cciptypes.ChainSelector]int
-	assert.NoError(t, json.Unmarshal(b, &bar))
-	t.Log(bar)
-}
 
 func Test_getPendingExecutedReports(t *testing.T) {
 	tests := []struct {
