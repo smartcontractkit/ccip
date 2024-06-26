@@ -9,7 +9,6 @@ contract EVM2EVMMultiOnRampHelper is EVM2EVMMultiOnRamp, IgnoreContractSize {
     StaticConfig memory staticConfig,
     DynamicConfig memory dynamicConfig,
     DestChainConfigArgs[] memory destChainConfigs,
-    RateLimiter.Config memory rateLimiterConfig,
     PremiumMultiplierWeiPerEthArgs[] memory premiumMultiplierWeiPerEthArgs,
     TokenTransferFeeConfigArgs[] memory tokenTransferFeeConfigArgs
   )
@@ -17,7 +16,6 @@ contract EVM2EVMMultiOnRampHelper is EVM2EVMMultiOnRamp, IgnoreContractSize {
       staticConfig,
       dynamicConfig,
       destChainConfigs,
-      rateLimiterConfig,
       premiumMultiplierWeiPerEthArgs,
       tokenTransferFeeConfigArgs
     )
@@ -42,5 +40,12 @@ contract EVM2EVMMultiOnRampHelper is EVM2EVMMultiOnRamp, IgnoreContractSize {
     Client.EVMTokenAmount[] calldata tokenAmounts
   ) external view returns (uint256, uint32, uint32) {
     return _getTokenTransferCost(destChainSelector, feeToken, feeTokenPrice, tokenAmounts);
+  }
+
+  function extraArgsFromBytes(
+    bytes calldata extraArgs,
+    uint64 destChainSelector
+  ) external view returns (Client.EVMExtraArgsV2 memory) {
+    return _extraArgsFromBytes(extraArgs, s_destChainConfig[destChainSelector].dynamicConfig.defaultTxGasLimit);
   }
 }

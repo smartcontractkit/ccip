@@ -320,42 +320,6 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, feeAmount, OWNER);
   }
 
-  function test_EnforceOutOfOrder_Success() public {
-    // Update dynamic config to enforce allowOutOfOrderExecution = true.
-    vm.stopPrank();
-    vm.startPrank(OWNER);
-    EVM2EVMOnRamp.DynamicConfig memory dynamicConfig = s_onRamp.getDynamicConfig();
-    s_onRamp.setDynamicConfig(
-      EVM2EVMOnRamp.DynamicConfig({
-        router: dynamicConfig.router,
-        maxNumberOfTokensPerMsg: dynamicConfig.maxNumberOfTokensPerMsg,
-        destGasOverhead: dynamicConfig.destGasOverhead,
-        destGasPerPayloadByte: dynamicConfig.destGasPerPayloadByte,
-        destDataAvailabilityOverheadGas: dynamicConfig.destDataAvailabilityOverheadGas,
-        destGasPerDataAvailabilityByte: dynamicConfig.destGasPerDataAvailabilityByte,
-        destDataAvailabilityMultiplierBps: dynamicConfig.destDataAvailabilityMultiplierBps,
-        priceRegistry: dynamicConfig.priceRegistry,
-        maxDataBytes: dynamicConfig.maxDataBytes,
-        maxPerMsgGasLimit: dynamicConfig.maxPerMsgGasLimit,
-        defaultTokenFeeUSDCents: dynamicConfig.defaultTokenFeeUSDCents,
-        defaultTokenDestGasOverhead: dynamicConfig.defaultTokenDestGasOverhead,
-        defaultTokenDestBytesOverhead: dynamicConfig.defaultTokenDestBytesOverhead,
-        enforceOutOfOrder: true
-      })
-    );
-    vm.stopPrank();
-
-    vm.startPrank(address(s_sourceRouter));
-    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
-    // Empty extraArgs to should revert since it enforceOutOfOrder is true.
-    message.extraArgs = "";
-    uint256 feeAmount = 1234567890;
-    IERC20(s_sourceFeeToken).transferFrom(OWNER, address(s_onRamp), feeAmount);
-
-    vm.expectRevert(EVM2EVMOnRamp.ExtraArgOutOfOrderExecutionMustBeTrue.selector);
-    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, feeAmount, OWNER);
-  }
-
   function test_Fuzz_EnforceOutOfOrder(bool enforce, bool allowOutOfOrderExecution) public {
     // Update dynamic config to enforce allowOutOfOrderExecution = defaultVal.
     vm.stopPrank();
@@ -822,6 +786,42 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
 
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 0, OWNER);
   }
+
+  function test_EnforceOutOfOrder_Revert() public {
+    // Update dynamic config to enforce allowOutOfOrderExecution = true.
+    vm.stopPrank();
+    vm.startPrank(OWNER);
+    EVM2EVMOnRamp.DynamicConfig memory dynamicConfig = s_onRamp.getDynamicConfig();
+    s_onRamp.setDynamicConfig(
+      EVM2EVMOnRamp.DynamicConfig({
+        router: dynamicConfig.router,
+        maxNumberOfTokensPerMsg: dynamicConfig.maxNumberOfTokensPerMsg,
+        destGasOverhead: dynamicConfig.destGasOverhead,
+        destGasPerPayloadByte: dynamicConfig.destGasPerPayloadByte,
+        destDataAvailabilityOverheadGas: dynamicConfig.destDataAvailabilityOverheadGas,
+        destGasPerDataAvailabilityByte: dynamicConfig.destGasPerDataAvailabilityByte,
+        destDataAvailabilityMultiplierBps: dynamicConfig.destDataAvailabilityMultiplierBps,
+        priceRegistry: dynamicConfig.priceRegistry,
+        maxDataBytes: dynamicConfig.maxDataBytes,
+        maxPerMsgGasLimit: dynamicConfig.maxPerMsgGasLimit,
+        defaultTokenFeeUSDCents: dynamicConfig.defaultTokenFeeUSDCents,
+        defaultTokenDestGasOverhead: dynamicConfig.defaultTokenDestGasOverhead,
+        defaultTokenDestBytesOverhead: dynamicConfig.defaultTokenDestBytesOverhead,
+        enforceOutOfOrder: true
+      })
+    );
+    vm.stopPrank();
+
+    vm.startPrank(address(s_sourceRouter));
+    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
+    // Empty extraArgs to should revert since it enforceOutOfOrder is true.
+    message.extraArgs = "";
+    uint256 feeAmount = 1234567890;
+    IERC20(s_sourceFeeToken).transferFrom(OWNER, address(s_onRamp), feeAmount);
+
+    vm.expectRevert(EVM2EVMOnRamp.ExtraArgOutOfOrderExecutionMustBeTrue.selector);
+    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, feeAmount, OWNER);
+  }
 }
 
 contract EVM2EVMOnRamp_forwardFromRouter_upgrade is EVM2EVMOnRampSetup {
@@ -928,8 +928,10 @@ contract EVM2EVMOnRamp_getFeeSetup is EVM2EVMOnRampSetup {
     EVM2EVMOnRampSetup.setUp();
 
     // Add additional pool addresses for test tokens to mark them as supported
-    s_tokenAdminRegistry.registerAdministratorPermissioned(s_sourceRouter.getWrappedNative(), OWNER);
-    s_tokenAdminRegistry.registerAdministratorPermissioned(CUSTOM_TOKEN, OWNER);
+    s_tokenAdminRegistry.proposeAdministrator(s_sourceRouter.getWrappedNative(), OWNER);
+    s_tokenAdminRegistry.acceptAdminRole(s_sourceRouter.getWrappedNative());
+    s_tokenAdminRegistry.proposeAdministrator(CUSTOM_TOKEN, OWNER);
+    s_tokenAdminRegistry.acceptAdminRole(CUSTOM_TOKEN);
 
     LockReleaseTokenPool wrappedNativePool = new LockReleaseTokenPool(
       IERC20(s_sourceRouter.getWrappedNative()), new address[](0), address(s_mockRMN), true, address(s_sourceRouter)
@@ -1332,24 +1334,6 @@ contract EVM2EVMOnRamp_getTokenTransferCost is EVM2EVMOnRamp_getFeeSetup {
     Client.EVM2AnyMessage memory message = _generateSingleTokenMessage(NOT_SUPPORTED_TOKEN, 200);
 
     vm.expectRevert(abi.encodeWithSelector(EVM2EVMOnRamp.UnsupportedToken.selector, NOT_SUPPORTED_TOKEN));
-
-    s_onRamp.getTokenTransferCost(message.feeToken, s_feeTokenPrice, message.tokenAmounts);
-  }
-
-  function test_ValidatedPriceStaleness_Revert() public {
-    vm.warp(block.timestamp + TWELVE_HOURS + 1);
-
-    Client.EVM2AnyMessage memory message = _generateSingleTokenMessage(s_sourceFeeToken, 1e36);
-    message.tokenAmounts[0].token = s_sourceRouter.getWrappedNative();
-
-    vm.expectRevert(
-      abi.encodeWithSelector(
-        PriceRegistry.StaleTokenPrice.selector,
-        s_sourceRouter.getWrappedNative(),
-        uint128(TWELVE_HOURS),
-        uint128(TWELVE_HOURS + 1)
-      )
-    );
 
     s_onRamp.getTokenTransferCost(message.feeToken, s_feeTokenPrice, message.tokenAmounts);
   }
