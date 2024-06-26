@@ -70,7 +70,7 @@ func TestHomeChainConfigPoller_HealthReport(t *testing.T) {
 }
 
 func Test_PollingWorking(t *testing.T) {
-	onChainConfigs := []ChainConfigInfo{
+	onChainConfigs := []CCIPCapabilityConfigurationChainConfigInfo{
 		{
 			ChainSelector: chainA,
 			ChainConfig: HomeChainConfigMapper{
@@ -105,7 +105,7 @@ func Test_PollingWorking(t *testing.T) {
 			},
 		},
 	}
-	homeChainConfig := map[cciptypes.ChainSelector]ChainConfig{
+	homeChainConfig := map[cciptypes.ChainSelector]CCIPCapabilityConfigurationChainConfig{
 		chainA: {
 			FChain:         1,
 			SupportedNodes: mapset.NewSet(p2pOracleAId, p2pOracleBId, p2pOracleCId),
@@ -124,7 +124,7 @@ func Test_PollingWorking(t *testing.T) {
 	homeChainReader.On(
 		"GetLatestValue", mock.Anything, "CCIPCapabilityConfiguration", "getAllChainConfigs", mock.Anything, mock.Anything).Run(
 		func(args mock.Arguments) {
-			arg := args.Get(4).(*[]ChainConfigInfo)
+			arg := args.Get(4).(*[]CCIPCapabilityConfigurationChainConfigInfo)
 			*arg = onChainConfigs
 		}).Return(nil)
 

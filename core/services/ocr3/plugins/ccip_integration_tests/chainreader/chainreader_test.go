@@ -68,7 +68,7 @@ func TestChainReader(t *testing.T) {
 		},
 	}
 
-	d := helpers.SetupChainReaderTest[Chainreader](t, ctx, DeployChainreader, NewChainreader, cfg, ContractNameAlias)
+	d := helpers.SetupChainReader[Chainreader](t, ctx, DeployChainreader, NewChainreader, cfg, ContractNameAlias)
 	cr := *d.ChainReader
 
 	emitEvents(t, d, ctx) // Calls the contract to emit events

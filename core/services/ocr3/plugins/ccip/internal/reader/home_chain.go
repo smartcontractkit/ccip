@@ -15,8 +15,8 @@ import (
 )
 
 type HomeChain interface {
-	GetChainConfig(chainSelector cciptypes.ChainSelector) (ChainConfig, error)
-	GetAllChainConfigs() (map[cciptypes.ChainSelector]ChainConfig, error)
+	GetChainConfig(chainSelector cciptypes.ChainSelector) (CCIPCapabilityConfigurationChainConfig, error)
+	GetAllChainConfigs() (map[cciptypes.ChainSelector]CCIPCapabilityConfigurationChainConfig, error)
 	// GetSupportedChainsForPeer Gets all chain selectors that the peerID can read/write from/to
 	GetSupportedChainsForPeer(id libocrtypes.PeerID) (mapset.Set[cciptypes.ChainSelector], error)
 	// GetKnownCCIPChains Gets all chain selectors that are known to CCIP
@@ -28,7 +28,7 @@ type HomeChain interface {
 
 type state struct {
 	// gets updated by the polling loop
-	chainConfigs map[cciptypes.ChainSelector]ChainConfig
+	chainConfigs map[cciptypes.ChainSelector]CCIPCapabilityConfigurationChainConfig
 	// mapping between each node's peerID and the chains it supports. derived from chainConfigs
 	nodeSupportedChains map[libocrtypes.PeerID]mapset.Set[cciptypes.ChainSelector]
 	// set of chains that are known to CCIP, derived from chainConfigs
@@ -73,7 +73,7 @@ func (r *homeChainPoller) Start(ctx context.Context) error {
 		// Just log, don't return error as we want to keep polling
 		r.lggr.Errorw("Initial fetch of on-chain configs failed", "err", err)
 	}
-	r.lggr.Infow("Start Polling ChainConfig")
+	r.lggr.Infow("Start Polling CCIPCapabilityConfigurationChainConfig")
 	return r.sync.StartOnce(r.Name(), func() error {
 		go r.poll()
 		return nil
@@ -104,7 +104,7 @@ func (r *homeChainPoller) poll() {
 }
 
 func (r *homeChainPoller) fetchAndSetConfigs(ctx context.Context) error {
-	var chainConfigInfos []ChainConfigInfo
+	var chainConfigInfos []CCIPCapabilityConfigurationChainConfigInfo
 	err := r.homeChainReader.GetLatestValue(ctx, "CCIPCapabilityConfiguration", "getAllChainConfigs", nil, &chainConfigInfos)
 	if err != nil {
 		r.lggr.Errorw("fetching on-chain configs failed", "err", err)
@@ -117,15 +117,15 @@ func (r *homeChainPoller) fetchAndSetConfigs(ctx context.Context) error {
 	}
 	homeChainConfigs, err := convertOnChainConfigToHomeChainConfig(chainConfigInfos)
 	if err != nil {
-		r.lggr.Errorw("error converting OnChainConfigs to ChainConfig", "err", err)
+		r.lggr.Errorw("error converting OnChainConfigs to CCIPCapabilityConfigurationChainConfig", "err", err)
 		return err
 	}
-	r.lggr.Infow("Setting ChainConfig")
+	r.lggr.Infow("Setting CCIPCapabilityConfigurationChainConfig")
 	r.setState(homeChainConfigs)
 	return nil
 }
 
-func (r *homeChainPoller) setState(chainConfigs map[cciptypes.ChainSelector]ChainConfig) {
+func (r *homeChainPoller) setState(chainConfigs map[cciptypes.ChainSelector]CCIPCapabilityConfigurationChainConfig) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 	s := &r.state
@@ -135,17 +135,17 @@ func (r *homeChainPoller) setState(chainConfigs map[cciptypes.ChainSelector]Chai
 	s.fChain = createFChain(chainConfigs)
 }
 
-func (r *homeChainPoller) GetChainConfig(chainSelector cciptypes.ChainSelector) (ChainConfig, error) {
+func (r *homeChainPoller) GetChainConfig(chainSelector cciptypes.ChainSelector) (CCIPCapabilityConfigurationChainConfig, error) {
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
 	s := r.state
 	if chainConfig, ok := s.chainConfigs[chainSelector]; ok {
 		return chainConfig, nil
 	}
-	return ChainConfig{}, fmt.Errorf("chain config not found for chain %v", chainSelector)
+	return CCIPCapabilityConfigurationChainConfig{}, fmt.Errorf("chain config not found for chain %v", chainSelector)
 }
 
-func (r *homeChainPoller) GetAllChainConfigs() (map[cciptypes.ChainSelector]ChainConfig, error) {
+func (r *homeChainPoller) GetAllChainConfigs() (map[cciptypes.ChainSelector]CCIPCapabilityConfigurationChainConfig, error) {
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
 	return r.state.chainConfigs, nil
@@ -205,7 +205,7 @@ func (r *homeChainPoller) Name() string {
 	return "homeChainPoller"
 }
 
-func createFChain(chainConfigs map[cciptypes.ChainSelector]ChainConfig) map[cciptypes.ChainSelector]int {
+func createFChain(chainConfigs map[cciptypes.ChainSelector]CCIPCapabilityConfigurationChainConfig) map[cciptypes.ChainSelector]int {
 	fChain := map[cciptypes.ChainSelector]int{}
 	for chain, config := range chainConfigs {
 		fChain[chain] = config.FChain
@@ -213,7 +213,7 @@ func createFChain(chainConfigs map[cciptypes.ChainSelector]ChainConfig) map[ccip
 	return fChain
 }
 
-func createKnownChains(chainConfigs map[cciptypes.ChainSelector]ChainConfig) mapset.Set[cciptypes.ChainSelector] {
+func createKnownChains(chainConfigs map[cciptypes.ChainSelector]CCIPCapabilityConfigurationChainConfig) mapset.Set[cciptypes.ChainSelector] {
 	knownChains := mapset.NewSet[cciptypes.ChainSelector]()
 	for chain := range chainConfigs {
 		knownChains.Add(chain)
@@ -221,7 +221,7 @@ func createKnownChains(chainConfigs map[cciptypes.ChainSelector]ChainConfig) map
 	return knownChains
 }
 
-func createNodesSupportedChains(chainConfigs map[cciptypes.ChainSelector]ChainConfig) map[libocrtypes.PeerID]mapset.Set[cciptypes.ChainSelector] {
+func createNodesSupportedChains(chainConfigs map[cciptypes.ChainSelector]CCIPCapabilityConfigurationChainConfig) map[libocrtypes.PeerID]mapset.Set[cciptypes.ChainSelector] {
 	nodeSupportedChains := map[libocrtypes.PeerID]mapset.Set[cciptypes.ChainSelector]{}
 	for chainSelector, config := range chainConfigs {
 		for _, p2pID := range config.SupportedNodes.ToSlice() {
@@ -235,13 +235,13 @@ func createNodesSupportedChains(chainConfigs map[cciptypes.ChainSelector]ChainCo
 	return nodeSupportedChains
 }
 
-func convertOnChainConfigToHomeChainConfig(capabilityConfigs []ChainConfigInfo) (map[cciptypes.ChainSelector]ChainConfig, error) {
-	chainConfigs := make(map[cciptypes.ChainSelector]ChainConfig)
+func convertOnChainConfigToHomeChainConfig(capabilityConfigs []CCIPCapabilityConfigurationChainConfigInfo) (map[cciptypes.ChainSelector]CCIPCapabilityConfigurationChainConfig, error) {
+	chainConfigs := make(map[cciptypes.ChainSelector]CCIPCapabilityConfigurationChainConfig)
 	for _, capabilityConfig := range capabilityConfigs {
 		chainSelector := capabilityConfig.ChainSelector
 		config := capabilityConfig.ChainConfig
 
-		chainConfigs[chainSelector] = ChainConfig{
+		chainConfigs[chainSelector] = CCIPCapabilityConfigurationChainConfig{
 			FChain:         int(config.FChain),
 			SupportedNodes: mapset.NewSet(config.Readers...),
 		}
@@ -256,15 +256,15 @@ type HomeChainConfigMapper struct {
 	Config  []byte               `json:"config"`
 }
 
-// ChainConfigInfo This is a 1-1 mapping between the config that we get from the contract to make se/deserializing easier
-type ChainConfigInfo struct {
+// CCIPCapabilityConfigurationChainConfigInfo This is a 1-1 mapping between the config that we get from the contract to make se/deserializing easier
+type CCIPCapabilityConfigurationChainConfigInfo struct {
 	// Calling function https://github.com/smartcontractkit/ccip/blob/330c5e98f624cfb10108c92fe1e00ced6d345a99/contracts/src/v0.8/ccip/capability/CCIPCapabilityConfiguration.sol#L140
 	ChainSelector cciptypes.ChainSelector `json:"chainSelector"`
 	ChainConfig   HomeChainConfigMapper   `json:"chainConfig"`
 }
 
-// ChainConfig will live on the home chain and will be used to update chain configuration like F value and supported nodes dynamically.
-type ChainConfig struct {
+// CCIPCapabilityConfigurationChainConfig will live on the home chain and will be used to update chain configuration like F value and supported nodes dynamically.
+type CCIPCapabilityConfigurationChainConfig struct {
 	// FChain defines the FChain value for the chain. FChain is used while forming consensus based on the observations.
 	FChain int `json:"fChain"`
 	// SupportedNodes is a map of PeerIDs to SupportedChains.

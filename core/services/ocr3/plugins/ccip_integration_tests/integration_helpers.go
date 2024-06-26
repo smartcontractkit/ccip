@@ -35,11 +35,9 @@ type TestSetupData[T any] struct {
 
 type DeployFunc[T any] func(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *types.Transaction, *T, error)
 
-type DeployFuncWithCapabilities[T any] func(auth *bind.TransactOpts, backend bind.ContractBackend, capabilityRegistry common.Address) (common.Address, *types.Transaction, *T, error)
-
 type NewFunc[T any] func(address common.Address, backend bind.ContractBackend) (*T, error)
 
-func SetupChainReaderTest[T any](t *testing.T, _ context.Context, deployFunc DeployFunc[T], newFunc NewFunc[T], chainReaderConfig evmtypes.ChainReaderConfig, contractName string) *TestSetupData[T] {
+func SetupBackendWithAuth(t *testing.T) (*backends.SimulatedBackend, *bind.TransactOpts) {
 	// Generate a new key pair for the simulated account
 	privateKey, err := crypto.GenerateKey()
 	assert.NoError(t, err)
@@ -53,17 +51,10 @@ func SetupChainReaderTest[T any](t *testing.T, _ context.Context, deployFunc Dep
 	assert.NoError(t, err)
 	auth.GasLimit = uint64(0)
 
-	// Deploy the contract using the provided deployFunc
-	address, tx, _, err := deployFunc(auth, simulatedBackend)
-	assert.NoError(t, err)
-	simulatedBackend.Commit()
+	return simulatedBackend, auth
+}
 
-	t.Logf("contract deployed: addr=%s tx=%s", address.Hex(), tx.Hash())
-
-	// Setup contract client using the provided newFunc
-	contract, err := newFunc(address, simulatedBackend)
-	assert.NoError(t, err)
-
+func SetupChainReader(t *testing.T, simulatedBackend *backends.SimulatedBackend, address common.Address, chainReaderConfig evmtypes.ChainReaderConfig, contractName string) *evm.ChainReaderService {
 	lggr := logger2.NullLogger
 	db := pgtest.NewSqlxDB(t)
 	lpOpts := logpoller.Opts{
@@ -95,15 +86,6 @@ func SetupChainReaderTest[T any](t *testing.T, _ context.Context, deployFunc Dep
 			break
 		}
 	}
-
 	simulatedBackend.Commit()
-
-	return &TestSetupData[T]{
-		ContractAddr: address,
-		Contract:     contract,
-		SimulatedBE:  simulatedBackend,
-		Auth:         auth,
-		ChainReader:  &cr,
-		ChainID:      chainID,
-	}
+	return &cr
 }

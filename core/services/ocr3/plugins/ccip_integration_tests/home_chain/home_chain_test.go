@@ -5,9 +5,8 @@ import (
 	_ "embed"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
+	ccipreader "github.com/smartcontractkit/ccipocr3/pkg/reader"
 	capcfg "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/ccip_capability_configuration"
 	helpers "github.com/smartcontractkit/chainlink/v2/core/services/ocr3/plugins/ccip_integration_tests"
 	"github.com/smartcontractkit/libocr/commontypes"
@@ -39,9 +38,7 @@ var (
 )
 
 func TestHomeChainReader(t *testing.T) {
-	deployFunc := func(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *types.Transaction, *capcfg.CCIPCapabilityConfiguration, error) {
-		return capcfg.DeployCCIPCapabilityConfiguration(auth, backend, common.Address{})
-	}
+
 	const (
 		ContractName      = "CCIPCapabilityConfiguration"
 		FnGetChainConfigs = "getAllChainConfigs"
@@ -52,11 +49,6 @@ func TestHomeChainReader(t *testing.T) {
 			ContractName: {
 				ContractABI: capcfg.CCIPCapabilityConfigurationMetaData.ABI,
 				Configs: map[string]*evmtypes.ChainReaderDefinition{
-					"ChainConfigSet": {
-						ChainSpecificName:       "ChainConfigSet",
-						ReadType:                evmtypes.Event,
-						ConfidenceConfirmations: map[string]int{"0.0": 0, "1.0": 0},
-					},
 					FnGetChainConfigs: {
 						ChainSpecificName: FnGetChainConfigs,
 					},
@@ -65,8 +57,18 @@ func TestHomeChainReader(t *testing.T) {
 		},
 	}
 
-	d := helpers.SetupChainReaderTest[capcfg.CCIPCapabilityConfiguration](t, context.Background(), deployFunc, capcfg.NewCCIPCapabilityConfiguration, cfg, ContractName)
-	chainReader := *d.ChainReader
+	simulatedBackend, auth := helpers.SetupBackendWithAuth(t)
+	// Deploy the contract using the provided deployFunc
+	address, tx, _, err := capcfg.DeployCCIPCapabilityConfiguration(auth, simulatedBackend, common.Address{})
+	assert.NoError(t, err)
+	simulatedBackend.Commit()
+	t.Logf("contract deployed: addr=%s tx=%s", address.Hex(), tx.Hash())
+
+	// Setup contract client using the provided newFunc
+	contract, err := capcfg.NewCCIPCapabilityConfiguration(address, simulatedBackend)
+	assert.NoError(t, err)
+
+	chainReader := *helpers.SetupChainReader(t, simulatedBackend, address, cfg, ContractName)
 
 	// Apply chain configs to the contract
 	inputConfig := setupConfigInfo()
@@ -79,33 +81,73 @@ func TestHomeChainReader(t *testing.T) {
 	//setupConfigInfo(chainC, []byte{}, fChainC, []byte{}),
 	//}
 
-	//d.Auth.GasLimit = 50000
-	_, err := d.Contract.ApplyChainConfigUpdates(d.Auth, nil, inputConfig)
-	d.SimulatedBE.Commit()
+	auth.GasLimit = 3518659
+	_, err = contract.ApplyChainConfigUpdates(auth, nil, inputConfig)
 	assert.NoError(t, err)
+	simulatedBackend.Commit()
 
-	// Now read the contract using chain reader
-	var allConfigs []capcfg.CCIPCapabilityConfigurationChainConfigInfo
+	var configs []capcfg.CCIPCapabilityConfigurationChainConfigInfo
+	configs, err = contract.GetAllChainConfigs(nil)
+	assert.NoError(t, err)
+	assert.Equal(t, inputConfig, configs)
+
+	// Now read the contract using chain reader into ccipreader type
+	var ccipConfigResults []ccipreader.CCIPCapabilityConfigurationChainConfigInfo
 	err = chainReader.GetLatestValue(
 		context.Background(),
 		ContractName,
 		FnGetChainConfigs,
 		map[string]interface{}{},
-		&allConfigs,
+		&ccipConfigResults,
 	)
 	assert.NoError(t, err)
-	assert.Equal(t, inputConfig, allConfigs)
+	for i, c := range ccipConfigResults {
+		assert.Equal(t, inputConfig[i].ChainSelector, uint64(c.ChainSelector))
+		assert.Equal(t, inputConfig[i].ChainConfig.Config, c.ChainConfig.Config)
+		assert.Equal(t, inputConfig[i].ChainConfig.FChain, c.ChainConfig.FChain)
+		for j, r := range inputConfig[i].ChainConfig.Readers {
+			assert.Equal(t, r, c.ChainConfig.Readers[j])
+		}
+
+	}
+	//homeChain := ccipreader.NewHomeChainReader(chainReader, logger2.NullLogger, 1*time.Second)
 }
+
+//func randomBytes(n int) []byte {
+//	b := make([]byte, n)
+//	_, err := rand.Read(b)
+//	if err != nil {
+//		panic(err)
+//	}
+//	return b
+//}
+//
+//// Random32Byte returns a random [32]byte
+//func Random32Byte() (b [32]byte) {
+//	copy(b[:], randomBytes(32))
+//	return b
+//}
 
 func setupConfigInfo() []capcfg.CCIPCapabilityConfigurationChainConfigInfo {
 	return []capcfg.CCIPCapabilityConfigurationChainConfigInfo{
 		{
 			ChainSelector: 1,
 			ChainConfig: capcfg.CCIPCapabilityConfigurationChainConfig{
-				//Readers: [][32]byte{{1}, {2}, {3}},
+				//Readers: [][32]byte{[32]byte{1}},
+				//Readers: [][32]byte{Random32Byte()},
 				Readers: [][32]byte{},
-				FChain:  2,
-				Config:  []byte{1, 2, 3},
+				FChain:  11,
+				Config:  []byte{1, 2, 3, 5, 6, 7},
+			},
+		},
+		{
+			ChainSelector: 2,
+			ChainConfig: capcfg.CCIPCapabilityConfigurationChainConfig{
+				Readers: [][32]byte{
+					//[32]byte{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+				},
+				FChain: 22,
+				Config: []byte{1, 2, 3, 5, 6, 7},
 			},
 		},
 	}

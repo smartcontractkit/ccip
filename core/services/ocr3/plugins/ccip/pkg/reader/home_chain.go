@@ -11,9 +11,9 @@ import (
 
 type HomeChain = reader_internal.HomeChain
 
-type ChainConfig = reader_internal.ChainConfig
+type CCIPCapabilityConfigurationChainConfig = reader_internal.CCIPCapabilityConfigurationChainConfig
 
-type ChainConfigInfo = reader_internal.ChainConfigInfo
+type CCIPCapabilityConfigurationChainConfigInfo = reader_internal.CCIPCapabilityConfigurationChainConfigInfo
 
 func NewHomeChainReader(
 	homeChainReader types.ContractReader,
