@@ -256,13 +256,13 @@ func (l *launcher) updateDON(don kcr.CapabilitiesRegistryDONInfo) (depBefore, de
 	}
 
 	// this should be a retryable error.
-	commitOCRConfigs, err := l.homeChainReader.GetOCRConfigs(don.Id, uint8(cctypes.PluginTypeCCIPCommit))
+	commitOCRConfigs, err := l.homeChainReader.GetOCRConfigs(context.Background(), don.Id, uint8(cctypes.PluginTypeCCIPCommit))
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to fetch OCR configs for CCIP commit plugin (don id: %d) from home chain config contract: %w",
 			don.Id, err)
 	}
 
-	execOCRConfigs, err := l.homeChainReader.GetOCRConfigs(don.Id, uint8(cctypes.PluginTypeCCIPExec))
+	execOCRConfigs, err := l.homeChainReader.GetOCRConfigs(context.Background(), don.Id, uint8(cctypes.PluginTypeCCIPExec))
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to fetch OCR configs for CCIP exec plugin (don id: %d) from home chain config contract: %w",
 			don.Id, err)
@@ -318,13 +318,13 @@ func (l *launcher) addDON(don kcr.CapabilitiesRegistryDONInfo) (*ccipDeployment,
 	}
 
 	// this should be a retryable error.
-	commitOCRConfigs, err := l.homeChainReader.GetOCRConfigs(don.Id, uint8(cctypes.PluginTypeCCIPCommit))
+	commitOCRConfigs, err := l.homeChainReader.GetOCRConfigs(context.Background(), don.Id, uint8(cctypes.PluginTypeCCIPCommit))
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch OCR configs for CCIP commit plugin (don id: %d) from home chain config contract: %w",
 			don.Id, err)
 	}
 
-	execOCRConfigs, err := l.homeChainReader.GetOCRConfigs(don.Id, uint8(cctypes.PluginTypeCCIPExec))
+	execOCRConfigs, err := l.homeChainReader.GetOCRConfigs(context.Background(), don.Id, uint8(cctypes.PluginTypeCCIPExec))
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch OCR configs for CCIP exec plugin (don id: %d) from home chain config contract: %w",
 			don.Id, err)

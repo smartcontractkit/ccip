@@ -5,6 +5,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/crypto"
 
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	kcr "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/capabilities_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/p2pkey"
 	"github.com/smartcontractkit/chainlink/v2/core/services/registrysyncer"
@@ -93,7 +94,11 @@ func filterCCIPDONs(
 		// CCIP DONs should only have one capability, CCIP.
 		var found bool
 		for _, donCapabilities := range don.CapabilityConfigurations {
-			if donCapabilities.CapabilityId == hashedCapabilityId(ccipCapability.Version, ccipCapability.LabelledName) {
+			hid, err := hashedCapabilityId(ccipCapability.LabelledName, ccipCapability.Version)
+			if err != nil {
+				return nil, fmt.Errorf("failed to hash capability id: %w", err)
+			}
+			if donCapabilities.CapabilityId == hid {
 				ccipDONs[registrysyncer.DonID(don.Id)] = don
 				found = true
 			}
@@ -113,32 +118,37 @@ func checkCapabilityPresence(
 	state registrysyncer.State,
 ) (kcr.CapabilitiesRegistryCapabilityInfo, error) {
 	// Sanity check to make sure the capability registry has the capability we are looking for.
-	var ccipCapability kcr.CapabilitiesRegistryCapabilityInfo
-	for _, capability := range state.IDsToCapabilities {
-		if capability.LabelledName == capabilityLabelledName &&
-			capability.Version == capabilityVersion {
-			ccipCapability = capability
-			break
-		}
+	hid, err := hashedCapabilityId(capabilityLabelledName, capabilityVersion)
+	if err != nil {
+		return kcr.CapabilitiesRegistryCapabilityInfo{}, fmt.Errorf("failed to hash capability id: %w", err)
 	}
-
-	if ccipCapability.LabelledName == "" {
+	ccipCapability, ok := state.IDsToCapabilities[hid]
+	if !ok {
 		return kcr.CapabilitiesRegistryCapabilityInfo{},
-			fmt.Errorf("unable to find capability with name %s and version %s in capability registry state",
+			fmt.Errorf("failed to find capability with name %s and version %s in capability registry state",
 				capabilityLabelledName, capabilityVersion)
 	}
 
 	return ccipCapability, nil
 }
 
-func hashedCapabilityId(capabilityVersion, capabilityLabelledName string) (r [32]byte) {
-	capVersionBytes := []byte(capabilityVersion)
-	capLabelledNameBytes := []byte(capabilityLabelledName)
-	var capVersionBytes32, capLabelledNameBytes32 [32]byte
-	copy(capVersionBytes32[:], capVersionBytes)
-	copy(capLabelledNameBytes32[:], capLabelledNameBytes)
-	h := crypto.Keccak256(capVersionBytes32[:], capLabelledNameBytes32[:])
+func hashedCapabilityId(capabilityLabelledName, capabilityVersion string) (r [32]byte, err error) {
+	tabi := `[{"type": "string"}, {"type": "string"}]`
+	abiEncoded, err := utils.ABIEncode(tabi, capabilityLabelledName, capabilityVersion)
+	if err != nil {
+		return r, fmt.Errorf("failed to ABI encode capability version and labelled name: %w", err)
+	}
+
+	h := crypto.Keccak256(abiEncoded)
 	copy(r[:], h)
+	return r, nil
+}
+
+func mustHashedCapabilityId(capabilityLabelledName, capabilityVersion string) [32]byte {
+	r, err := hashedCapabilityId(capabilityLabelledName, capabilityVersion)
+	if err != nil {
+		panic(err)
+	}
 	return r
 }
 
