@@ -385,7 +385,7 @@ func TestIntegration_DirectRequest(t *testing.T) {
 			// Fund node account with ETH.
 			n, err := b.NonceAt(testutils.Context(t), operatorContracts.user.From, nil)
 			require.NoError(t, err)
-			tx = cltest.NewLegacyTransaction(n, sendingKeys[0].Address, assets.Ether(801).ToInt(), 21000, big.NewInt(1000000000), nil)
+			tx = cltest.NewLegacyTransaction(n, sendingKeys[0].Address, assets.Ether(1000).ToInt(), 21000, big.NewInt(1000000000), nil)
 			signedTx, err := operatorContracts.user.Signer(operatorContracts.user.From, tx)
 			require.NoError(t, err)
 			err = b.SendTransaction(testutils.Context(t), signedTx)
@@ -484,7 +484,7 @@ func setupAppForEthTx(t *testing.T, operatorContracts OperatorContracts) (app *c
 	// Fund node account with ETH.
 	n, err := b.NonceAt(testutils.Context(t), operatorContracts.user.From, nil)
 	require.NoError(t, err)
-	tx := cltest.NewLegacyTransaction(n, sendingKeys[0].Address, assets.Ether(801).ToInt(), 21000, big.NewInt(1000000000), nil)
+	tx := cltest.NewLegacyTransaction(n, sendingKeys[0].Address, assets.Ether(1000).ToInt(), 21000, big.NewInt(1000000000), nil)
 	signedTx, err := operatorContracts.user.Signer(operatorContracts.user.From, tx)
 	require.NoError(t, err)
 	err = b.SendTransaction(testutils.Context(t), signedTx)
@@ -715,7 +715,7 @@ func setupNode(t *testing.T, owner *bind.TransactOpts, portV2 int,
 	n, err := b.NonceAt(testutils.Context(t), owner.From, nil)
 	require.NoError(t, err)
 
-	tx := cltest.NewLegacyTransaction(n, transmitter, assets.Ether(801).ToInt(), 21000, big.NewInt(1000000000), nil)
+	tx := cltest.NewLegacyTransaction(n, transmitter, assets.Ether(1000).ToInt(), 21000, big.NewInt(1000000000), nil)
 	signedTx, err := owner.Signer(owner.From, tx)
 	require.NoError(t, err)
 	err = b.SendTransaction(testutils.Context(t), signedTx)
@@ -758,7 +758,7 @@ func setupForwarderEnabledNode(t *testing.T, owner *bind.TransactOpts, portV2 in
 	n, err := b.NonceAt(testutils.Context(t), owner.From, nil)
 	require.NoError(t, err)
 
-	tx := cltest.NewLegacyTransaction(n, transmitter, assets.Ether(801).ToInt(), 21000, big.NewInt(1000000000), nil)
+	tx := cltest.NewLegacyTransaction(n, transmitter, assets.Ether(1000).ToInt(), 21000, big.NewInt(1000000000), nil)
 	signedTx, err := owner.Signer(owner.From, tx)
 	require.NoError(t, err)
 	err = b.SendTransaction(testutils.Context(t), signedTx)
