@@ -23,6 +23,8 @@ type HomeChain interface {
 	GetKnownCCIPChains() (mapset.Set[cciptypes.ChainSelector], error)
 	// GetFChain Gets the FChain value for each chain
 	GetFChain() (map[cciptypes.ChainSelector]int, error)
+	// GetOCRConfigs gets all the OCR configurations for the given don ID and plugin type.
+	GetOCRConfigs(donId uint32, pluginType uint8) ([]OCR3ConfigWithMeta, error)
 	services.Service
 }
 
@@ -179,6 +181,19 @@ func (r *homeChainPoller) GetFChain() (map[cciptypes.ChainSelector]int, error) {
 	return r.state.fChain, nil
 }
 
+func (r *homeChainPoller) GetOCRConfigs(donId uint32, pluginType uint8) ([]OCR3ConfigWithMeta, error) {
+	var ocrConfigs []OCR3ConfigWithMeta
+	err := r.homeChainReader.GetLatestValue(context.Background(), "CCIPCapabilityConfiguration", "getOCRConfig", map[string]any{
+		"donId":      donId,
+		"pluginType": pluginType,
+	}, &ocrConfigs)
+	if err != nil {
+		return nil, fmt.Errorf("error fetching OCR configs: %v", err)
+	}
+
+	return ocrConfigs, nil
+}
+
 func (r *homeChainPoller) Close() error {
 	return r.sync.StopOnce(r.Name(), func() error {
 		close(r.stopCh)
@@ -271,6 +286,51 @@ type ChainConfig struct {
 	SupportedNodes mapset.Set[libocrtypes.PeerID] `json:"supportedNodes"`
 	// Config is the chain specific configuration.
 	Config []byte `json:"config"`
+}
+
+/*
+	struct OCR3Config {
+	  PluginType pluginType; // ────────╮ The plugin that the configuration is for.
+	  uint64 chainSelector; //          | The (remote) chain that the configuration is for.
+	  uint8 F; //                       | The "big F" parameter for the role DON.
+	  uint64 offchainConfigVersion; // ─╯ The version of the offchain configuration.
+	  bytes offrampAddress; // The remote chain offramp address.
+	  bytes32[] bootstrapP2PIds; // The bootstrap P2P IDs of the oracles that are part of the role DON.
+	  // len(p2pIds) == len(signers) == len(transmitters) == 3 * F + 1
+	  // NOTE: indexes matter here! The p2p ID at index i corresponds to the signer at index i and the transmitter at index i.
+	  // This is crucial in order to build the oracle ID <-> peer ID mapping offchain.
+	  bytes32[] p2pIds; // The P2P IDs of the oracles that are part of the role DON.
+	  bytes[] signers; // The onchain signing keys of nodes in the don.
+	  bytes[] transmitters; // The onchain transmitter keys of nodes in the don.
+	  bytes offchainConfig; // The offchain configuration for the OCR3 protocol. Protobuf encoded.
+	}
+*/
+type OCR3Config struct {
+	PluginType            uint8      `json:"pluginType"`
+	ChainSelector         uint64     `json:"chainSelector"`
+	F                     uint8      `json:"F"`
+	OffchainConfigVersion uint64     `json:"offchainConfigVersion"`
+	OfframpAddress        []byte     `json:"offrampAddress"`
+	BootstrapP2PIds       [][32]byte `json:"bootstrapP2PIds"`
+	P2PIds                [][32]byte `json:"p2pIds"`
+	Signers               [][]byte   `json:"signers"`
+	Transmitters          [][]byte   `json:"transmitters"`
+	OffchainConfig        []byte     `json:"offchainConfig"`
+}
+
+/*
+/// @notice OCR3 configuration with metadata, specifically the config count and the config digest.
+
+	struct OCR3ConfigWithMeta {
+	  OCR3Config config; // The OCR3 configuration.
+	  uint64 configCount; // The config count used to compute the config digest.
+	  bytes32 configDigest; // The config digest of the OCR3 configuration.
+	}
+*/
+type OCR3ConfigWithMeta struct {
+	Config       OCR3Config `json:"config"`
+	ConfigCount  uint64     `json:"configCount"`
+	ConfigDigest [32]byte   `json:"configDigest"`
 }
 
 var _ HomeChain = (*homeChainPoller)(nil)
