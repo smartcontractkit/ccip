@@ -463,10 +463,10 @@ contract EVM2EVMMultiOffRamp_executeSingleReport is EVM2EVMMultiOffRampSetup {
     );
 
     // Nonce never increments on unordered messages.
-    uint64 nonceBefore = s_offRamp.getSenderNonce(SOURCE_CHAIN_SELECTOR_1, messages[0].sender);
+    uint64 nonceBefore = s_inboundNonceManager.getInboundNonce(SOURCE_CHAIN_SELECTOR_1, abi.encode(messages[0].sender));
     s_offRamp.executeSingleReport(_generateReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messages), new uint256[](0));
     assertEq(
-      s_offRamp.getSenderNonce(SOURCE_CHAIN_SELECTOR_1, messages[0].sender),
+      s_inboundNonceManager.getInboundNonce(SOURCE_CHAIN_SELECTOR_1, abi.encode(messages[0].sender)),
       nonceBefore,
       "nonce must remain unchanged on unordered messages"
     );
@@ -485,10 +485,10 @@ contract EVM2EVMMultiOffRamp_executeSingleReport is EVM2EVMMultiOffRampSetup {
     );
 
     // Nonce never increments on unordered messages.
-    nonceBefore = s_offRamp.getSenderNonce(SOURCE_CHAIN_SELECTOR_1, messages[0].sender);
+    nonceBefore = s_inboundNonceManager.getInboundNonce(SOURCE_CHAIN_SELECTOR_1, abi.encode(messages[0].sender));
     s_offRamp.executeSingleReport(_generateReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messages), new uint256[](0));
     assertEq(
-      s_offRamp.getSenderNonce(SOURCE_CHAIN_SELECTOR_1, messages[0].sender),
+      s_inboundNonceManager.getInboundNonce(SOURCE_CHAIN_SELECTOR_1, abi.encode(messages[0].sender)),
       nonceBefore,
       "nonce must remain unchanged on unordered messages"
     );
@@ -761,7 +761,7 @@ contract EVM2EVMMultiOffRamp_executeSingleReport is EVM2EVMMultiOffRampSetup {
       );
     }
 
-    uint64 nonceBefore = s_offRamp.getSenderNonce(SOURCE_CHAIN_SELECTOR_1, OWNER);
+    uint64 nonceBefore = s_inboundNonceManager.getInboundNonce(SOURCE_CHAIN_SELECTOR_1, abi.encode(OWNER));
     assertEq(uint64(0), nonceBefore, "nonce before exec should be 0");
     s_offRamp.executeSingleReport(
       _generateReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messages), _getGasLimitsFromMessages(messages)
@@ -773,7 +773,9 @@ contract EVM2EVMMultiOffRamp_executeSingleReport is EVM2EVMMultiOffRampSetup {
         uint256(Internal.MessageExecutionState.SUCCESS)
       );
     }
-    assertEq(nonceBefore + expectedNonce, s_offRamp.getSenderNonce(SOURCE_CHAIN_SELECTOR_1, OWNER));
+    assertEq(
+      nonceBefore + expectedNonce, s_inboundNonceManager.getInboundNonce(SOURCE_CHAIN_SELECTOR_1, abi.encode(OWNER))
+    );
   }
 
   function test_InvalidSourcePoolAddress_Success() public {

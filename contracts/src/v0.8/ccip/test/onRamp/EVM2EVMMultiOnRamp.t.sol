@@ -511,7 +511,7 @@ contract EVM2EVMMultiOnRamp_forwardFromRouter is EVM2EVMMultiOnRampSetup {
     );
 
     for (uint64 i = 1; i < 4; ++i) {
-      uint64 nonceBefore = s_nonceManager.getOutboundNonce(DEST_CHAIN_SELECTOR, OWNER);
+      uint64 nonceBefore = s_outboundNonceManager.getOutboundNonce(DEST_CHAIN_SELECTOR, OWNER);
       uint64 sequenceNumberBefore = s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR).sequenceNumber;
 
       vm.expectEmit();
@@ -519,7 +519,7 @@ contract EVM2EVMMultiOnRamp_forwardFromRouter is EVM2EVMMultiOnRampSetup {
 
       s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 0, OWNER);
 
-      uint64 nonceAfter = s_nonceManager.getOutboundNonce(DEST_CHAIN_SELECTOR, OWNER);
+      uint64 nonceAfter = s_outboundNonceManager.getOutboundNonce(DEST_CHAIN_SELECTOR, OWNER);
       uint64 sequenceNumberAfter = s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR).sequenceNumber;
       assertEq(nonceAfter, nonceBefore);
       assertEq(sequenceNumberAfter, sequenceNumberBefore + 1);
