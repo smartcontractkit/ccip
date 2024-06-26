@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - ccip-develop
+      - ccip-2642
     tags:
       - '*'
   workflow_dispatch:
@@ -207,7 +208,7 @@ jobs:
   # Reporting Jobs
   start-slack-thread:
     name: Start Slack Thread
-    if: ${{ failure() && needs.ccip-load-test.result != 'skipped' && needs.ccip-load-test.result != 'cancelled' }}
+    if: ${{ always() && needs.ccip-load-test.result != 'skipped' && needs.ccip-load-test.result != 'cancelled' }}
     environment: integration
     outputs:
       thread_ts: ${{ steps.slack.outputs.thread_ts }}
@@ -225,7 +226,7 @@ jobs:
         uses: slackapi/slack-github-action@6c661ce58804a1a20f6dc5fbee7f0381b469e001 # v1.25.0
         id: slack
         with:
-          channel-id: "#ccip-testing"
+          channel-id: "#test_notif"
           payload: |
             {
               "attachments": [
@@ -258,8 +259,8 @@ jobs:
           SLACK_BOT_TOKEN: ${{ secrets.QA_SLACK_API_KEY }}
 
   post-test-results-to-slack:
-    name: Post Test Results for ${{ matrix.network }}
-    if: ${{ failure() && needs.start-slack-thread.result != 'skipped' && needs.start-slack-thread.result != 'cancelled' }}
+    name: Post Test Results
+    if: ${{ always() && needs.start-slack-thread.result != 'skipped' && needs.start-slack-thread.result != 'cancelled' }}
     environment: integration
     permissions:
       checks: write
@@ -268,10 +269,6 @@ jobs:
       contents: read
     runs-on: ubuntu-latest
     needs: start-slack-thread
-    strategy:
-      fail-fast: false
-      matrix:
-        network: [CCIP]
     steps:
       - name: Checkout the repo
         uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
@@ -283,9 +280,9 @@ jobs:
           github_token: ${{ github.token }}
           github_repository: ${{ github.repository }}
           workflow_run_id: ${{ github.run_id }}
-          github_job_name_regex: ^${{ matrix.network }} (.*?)$
-          message_title: ${{ matrix.network }}
-          slack_channel_id: "#ccip-testing"
+          github_job_name_regex: ^CCIP (.*)$
+          message_title: CCIP
+          slack_channel_id: "#test_notif"
           slack_bot_token: ${{ secrets.QA_SLACK_API_KEY }}
           slack_thread_ts: ${{ needs.start-slack-thread.outputs.thread_ts }}
 
