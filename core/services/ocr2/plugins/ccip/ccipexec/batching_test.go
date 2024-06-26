@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
@@ -22,7 +23,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/prices"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/tokendata"
-	statuschecker "github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/statuschecker"
 )
 
 type testCase struct {
@@ -603,7 +603,7 @@ func TestBatchingStrategies(t *testing.T) {
 			},
 			statuschecker: func(m *MockStatusChecker) {
 				m.Mock = mock.Mock{} // reset mock
-				m.On("QueryTxStatuses", mock.Anything, hexutil.Encode(msgId1[:])).Return([]statuschecker.TransactionStatus{statuschecker.Fatal}, 0, nil)
+				m.On("QueryTxStatuses", mock.Anything, hexutil.Encode(msgId1[:])).Return([]types.TransactionStatus{types.Fatal}, 0, nil)
 			},
 		},
 		{
@@ -662,8 +662,8 @@ func TestBatchingStrategies(t *testing.T) {
 			},
 			statuschecker: func(m *MockStatusChecker) {
 				m.Mock = mock.Mock{} // reset mock
-				m.On("QueryTxStatuses", mock.Anything, hexutil.Encode(msgId1[:])).Return([]statuschecker.TransactionStatus{statuschecker.Fatal}, 2, nil)
-				m.On("QueryTxStatuses", mock.Anything, hexutil.Encode(msgId2[:])).Return([]statuschecker.TransactionStatus{}, -1, nil)
+				m.On("QueryTxStatuses", mock.Anything, hexutil.Encode(msgId1[:])).Return([]types.TransactionStatus{types.Fatal}, 2, nil)
+				m.On("QueryTxStatuses", mock.Anything, hexutil.Encode(msgId2[:])).Return([]types.TransactionStatus{}, -1, nil)
 			},
 		},
 		{
@@ -708,8 +708,8 @@ func TestBatchingStrategies(t *testing.T) {
 			},
 			statuschecker: func(m *MockStatusChecker) {
 				m.Mock = mock.Mock{} // reset mock
-				m.On("QueryTxStatuses", mock.Anything, hexutil.Encode(msgId1[:])).Return([]statuschecker.TransactionStatus{statuschecker.Fatal}, 2, nil)
-				m.On("QueryTxStatuses", mock.Anything, hexutil.Encode(msgId2[:])).Return([]statuschecker.TransactionStatus{statuschecker.Fatal}, 2, nil)
+				m.On("QueryTxStatuses", mock.Anything, hexutil.Encode(msgId1[:])).Return([]types.TransactionStatus{types.Fatal}, 2, nil)
+				m.On("QueryTxStatuses", mock.Anything, hexutil.Encode(msgId2[:])).Return([]types.TransactionStatus{types.Fatal}, 2, nil)
 			},
 		},
 		{
@@ -754,7 +754,7 @@ func TestBatchingStrategies(t *testing.T) {
 			},
 			statuschecker: func(m *MockStatusChecker) {
 				m.Mock = mock.Mock{} // reset mock
-				m.On("QueryTxStatuses", mock.Anything, hexutil.Encode(msgId1[:])).Return([]statuschecker.TransactionStatus{statuschecker.Unconfirmed, statuschecker.Failed}, 0, nil)
+				m.On("QueryTxStatuses", mock.Anything, hexutil.Encode(msgId1[:])).Return([]types.TransactionStatus{types.Unconfirmed, types.Failed}, 0, nil)
 			},
 		},
 		{
@@ -800,8 +800,8 @@ func TestBatchingStrategies(t *testing.T) {
 			},
 			statuschecker: func(m *MockStatusChecker) {
 				m.Mock = mock.Mock{} // reset mock
-				m.On("QueryTxStatuses", mock.Anything, hexutil.Encode(msgId1[:])).Return([]statuschecker.TransactionStatus{statuschecker.Unconfirmed, statuschecker.Failed, statuschecker.Finalized}, 2, nil)
-				m.On("QueryTxStatuses", mock.Anything, hexutil.Encode(msgId2[:])).Return([]statuschecker.TransactionStatus{}, -1, nil)
+				m.On("QueryTxStatuses", mock.Anything, hexutil.Encode(msgId1[:])).Return([]types.TransactionStatus{types.Unconfirmed, types.Failed, types.Finalized}, 2, nil)
+				m.On("QueryTxStatuses", mock.Anything, hexutil.Encode(msgId2[:])).Return([]types.TransactionStatus{}, -1, nil)
 			},
 		},
 		{
@@ -847,8 +847,8 @@ func TestBatchingStrategies(t *testing.T) {
 			},
 			statuschecker: func(m *MockStatusChecker) {
 				m.Mock = mock.Mock{} // reset mock
-				m.On("QueryTxStatuses", mock.Anything, hexutil.Encode(msgId1[:])).Return([]statuschecker.TransactionStatus{}, -1, errors.New("dummy txm error"))
-				m.On("QueryTxStatuses", mock.Anything, hexutil.Encode(msgId2[:])).Return([]statuschecker.TransactionStatus{}, -1, nil)
+				m.On("QueryTxStatuses", mock.Anything, hexutil.Encode(msgId1[:])).Return([]types.TransactionStatus{}, -1, errors.New("dummy txm error"))
+				m.On("QueryTxStatuses", mock.Anything, hexutil.Encode(msgId2[:])).Return([]types.TransactionStatus{}, -1, nil)
 			},
 		},
 	}
@@ -888,7 +888,7 @@ func runBatchingStrategyTests(t *testing.T, strategy BatchingStrategy, available
 
 			// default case for ZKOverflowBatchingStrategy
 			if strategyType := reflect.TypeOf(strategy); tc.statuschecker == nil && strategyType == reflect.TypeOf(&ZKOverflowBatchingStrategy{}) {
-				strategy.(*ZKOverflowBatchingStrategy).statuschecker.(*MockStatusChecker).On("QueryTxStatuses", mock.Anything, mock.Anything).Return([]statuschecker.TransactionStatus{}, -1, nil)
+				strategy.(*ZKOverflowBatchingStrategy).statuschecker.(*MockStatusChecker).On("QueryTxStatuses", mock.Anything, mock.Anything).Return([]types.TransactionStatus{}, -1, nil)
 			}
 
 			// Mock calls to TXM
@@ -973,7 +973,7 @@ type MockStatusChecker struct {
 	mock.Mock
 }
 
-func (t *MockStatusChecker) QueryTxStatuses(ctx context.Context, msgID string) ([]statuschecker.TransactionStatus, int, error) {
+func (t *MockStatusChecker) QueryTxStatuses(ctx context.Context, msgID string) ([]types.TransactionStatus, int, error) {
 	args := t.Called(ctx, msgID)
-	return args.Get(0).([]statuschecker.TransactionStatus), args.Get(1).(int), args.Error(2)
+	return args.Get(0).([]types.TransactionStatus), args.Get(1).(int), args.Error(2)
 }

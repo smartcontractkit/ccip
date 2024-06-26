@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil"
+	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	commontxmmocks "github.com/smartcontractkit/chainlink/v2/common/txmgr/types/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/txmgr"
 	txmmocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/txmgr/mocks"
@@ -20,7 +21,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/ethkey"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocrcommon"
 
-	statuschecker "github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/statuschecker"
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/statuschecker/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
@@ -215,7 +215,7 @@ func Test_Transmitter_With_StatusChecker_CreateEthTransaction(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	statusChecker.On("CheckMessageStatus", mock.Anything, "1").Return([]statuschecker.TransactionStatus{}, -1, nil).Once()
+	statusChecker.On("CheckMessageStatus", mock.Anything, "1").Return([]types.TransactionStatus{}, -1, nil).Once()
 
 	txm.On("CreateTransaction", mock.Anything, txmgr.TxRequest{
 		IdempotencyKey:   &idempotencyKey,
