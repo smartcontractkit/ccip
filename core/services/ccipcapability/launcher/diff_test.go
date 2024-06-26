@@ -107,6 +107,55 @@ func Test_diff(t *testing.T) {
 			diffResult{},
 			true,
 		},
+		{
+			"diff present, new don",
+			args{
+				capabilityVersion:      "v1.0.0",
+				capabilityLabelledName: "ccip",
+				oldState: registrysyncer.State{
+					IDsToCapabilities: map[registrysyncer.HashedCapabilityID]kcr.CapabilitiesRegistryCapabilityInfo{
+						mustHashedCapabilityId("ccip", "v1.0.0"): {
+							LabelledName: "ccip",
+							Version:      "v1.0.0",
+						},
+					},
+					IDsToDONs: map[registrysyncer.DonID]kcr.CapabilitiesRegistryDONInfo{},
+				},
+				newState: registrysyncer.State{
+					IDsToCapabilities: map[registrysyncer.HashedCapabilityID]kcr.CapabilitiesRegistryCapabilityInfo{
+						mustHashedCapabilityId("ccip", "v1.0.0"): {
+							LabelledName: "ccip",
+							Version:      "v1.0.0",
+						},
+					},
+					IDsToDONs: map[registrysyncer.DonID]kcr.CapabilitiesRegistryDONInfo{
+						1: {
+							Id: 1,
+							CapabilityConfigurations: []kcr.CapabilitiesRegistryCapabilityConfiguration{
+								{
+									CapabilityId: mustHashedCapabilityId("ccip", "v1.0.0"),
+								},
+							},
+						},
+					},
+				},
+			},
+			diffResult{
+				added: map[registrysyncer.DonID]kcr.CapabilitiesRegistryDONInfo{
+					1: {
+						Id: 1,
+						CapabilityConfigurations: []kcr.CapabilitiesRegistryCapabilityConfiguration{
+							{
+								CapabilityId: mustHashedCapabilityId("ccip", "v1.0.0"),
+							},
+						},
+					},
+				},
+				removed: map[registrysyncer.DonID]kcr.CapabilitiesRegistryDONInfo{},
+				updated: map[registrysyncer.DonID]kcr.CapabilitiesRegistryDONInfo{},
+			},
+			false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
