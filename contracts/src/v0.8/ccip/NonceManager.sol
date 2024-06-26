@@ -49,7 +49,7 @@ contract NonceManager is INonceManager, AuthorizedCallers {
     return outboundNonce;
   }
 
-  /// @notice Returns the outbound nonce for the given sender on the given destination chain
+  /// @notice Returns the outbound nonce for a given sender on a given destination chain
   /// @param destChainSelector The destination chain selector
   /// @param sender The sender address
   /// @return The outbound nonce
@@ -80,15 +80,15 @@ contract NonceManager is INonceManager, AuthorizedCallers {
 
     if (inboundNonce != expectedNonce) {
       emit SkippedIncorrectNonce(sourceChainSelector, expectedNonce, sender);
-      return (false);
+      return false;
     }
 
     s_inboundNonces[sourceChainSelector][sender] = inboundNonce;
 
-    return (true);
+    return true;
   }
 
-  /// @notice Returns the inbound nonce for the given sender on the given source chain
+  /// @notice Returns the inbound nonce for a given sender on a given source chain
   /// @param sourceChainSelector The source chain selector
   /// @param sender The encoded sender address
   /// @return The inbound nonce
