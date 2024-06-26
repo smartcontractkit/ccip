@@ -3,9 +3,10 @@ package reader
 import (
 	"time"
 
-	reader_internal "github.com/smartcontractkit/ccipocr3/internal/reader"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
+
+	reader_internal "github.com/smartcontractkit/ccipocr3/internal/reader"
 )
 
 type HomeChain = reader_internal.HomeChain
