@@ -8,6 +8,7 @@ import {IRMN} from "../../interfaces/IRMN.sol";
 import {ITokenAdminRegistry} from "../../interfaces/ITokenAdminRegistry.sol";
 
 import {CallWithExactGas} from "../../../shared/call/CallWithExactGas.sol";
+import {NonceManager} from "../../NonceManager.sol";
 import {PriceRegistry} from "../../PriceRegistry.sol";
 import {RMN} from "../../RMN.sol";
 import {Router} from "../../Router.sol";
@@ -501,40 +502,42 @@ contract EVM2EVMMultiOffRamp_executeSingleReport is EVM2EVMMultiOffRampSetup {
     assertEq(uint64(1), s_inboundNonceManager.getInboundNonce(SOURCE_CHAIN_SELECTOR_1, abi.encode(OWNER)));
   }
 
-  // function test_SkippedIncorrectNonce_Success() public {
-  //   Internal.EVM2EVMMessage[] memory messages = _generateSingleBasicMessage(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1);
+  function test_SkippedIncorrectNonce_Success() public {
+    Internal.EVM2EVMMessage[] memory messages = _generateSingleBasicMessage(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1);
 
-  //   messages[0].nonce++;
-  //   messages[0].messageId =
-  //     Internal._hash(messages[0], s_offRamp.metadataHash(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1));
+    messages[0].nonce++;
+    messages[0].messageId =
+      Internal._hash(messages[0], s_offRamp.metadataHash(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1));
 
-  //   vm.expectEmit();
-  //   emit NonceManager.SkippedIncorrectNonce(messages[0].sourceChainSelector, messages[0].nonce, messages[0].sender);
+    vm.expectEmit();
+    emit NonceManager.SkippedIncorrectNonce(
+      messages[0].sourceChainSelector, messages[0].nonce, abi.encode(messages[0].sender)
+    );
 
-  //   s_offRamp.executeSingleReport(_generateReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messages), new uint256[](0));
-  // }
+    s_offRamp.executeSingleReport(_generateReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messages), new uint256[](0));
+  }
 
-  // function test_SkippedIncorrectNonceStillExecutes_Success() public {
-  //   Internal.EVM2EVMMessage[] memory messages = _generateMessagesWithTokens(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1);
+  function test_SkippedIncorrectNonceStillExecutes_Success() public {
+    Internal.EVM2EVMMessage[] memory messages = _generateMessagesWithTokens(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1);
 
-  //   messages[1].nonce++;
-  //   messages[1].messageId =
-  //     Internal._hash(messages[1], s_offRamp.metadataHash(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1));
+    messages[1].nonce++;
+    messages[1].messageId =
+      Internal._hash(messages[1], s_offRamp.metadataHash(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1));
 
-  //   vm.expectEmit();
-  //   emit EVM2EVMMultiOffRamp.ExecutionStateChanged(
-  //     SOURCE_CHAIN_SELECTOR_1,
-  //     messages[0].sequenceNumber,
-  //     messages[0].messageId,
-  //     Internal.MessageExecutionState.SUCCESS,
-  //     ""
-  //   );
+    vm.expectEmit();
+    emit EVM2EVMMultiOffRamp.ExecutionStateChanged(
+      SOURCE_CHAIN_SELECTOR_1,
+      messages[0].sequenceNumber,
+      messages[0].messageId,
+      Internal.MessageExecutionState.SUCCESS,
+      ""
+    );
 
-  //   vm.expectEmit();
-  //   emit EVM2EVMMultiOffRamp.SkippedIncorrectNonce(SOURCE_CHAIN_SELECTOR_1, messages[1].nonce, messages[1].sender);
+    vm.expectEmit();
+    emit NonceManager.SkippedIncorrectNonce(SOURCE_CHAIN_SELECTOR_1, messages[1].nonce, abi.encode(messages[1].sender));
 
-  //   s_offRamp.executeSingleReport(_generateReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messages), new uint256[](0));
-  // }
+    s_offRamp.executeSingleReport(_generateReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messages), new uint256[](0));
+  }
 
   function test_execute_SkippedAlreadyExecutedMessage_Success() public {
     Internal.EVM2EVMMessage[] memory messages = _generateSingleBasicMessage(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1);

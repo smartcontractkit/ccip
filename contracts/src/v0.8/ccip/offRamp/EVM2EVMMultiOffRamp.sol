@@ -103,7 +103,7 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
   struct SourceChainConfigArgs {
     uint64 sourceChainSelector; //  ───╮  Source chain selector of the config to update
     bool isEnabled; //                 │  Flag whether the source chain is enabled or not
-    address onRamp; // ────────────────╯                    OnRamp address on the source chain
+    address onRamp; // ────────────────╯  OnRamp address on the source chain
   }
 
   /// @notice Dynamic offRamp config
