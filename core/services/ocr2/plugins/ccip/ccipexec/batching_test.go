@@ -23,6 +23,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/prices"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/tokendata"
+	mockstatuschecker "github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/statuschecker/mocks"
 )
 
 type testCase struct {
@@ -35,7 +36,7 @@ type testCase struct {
 	srcToDestTokens          map[cciptypes.Address]cciptypes.Address
 	expectedSeqNrs           []ccip.ObservedMessage
 	expectedStates           []messageExecStatus
-	statuschecker            func(m *MockStatusChecker)
+	statuschecker            func(m *mockstatuschecker.CCIPTransactionStatusChecker)
 }
 
 func Test_validateSendRequests(t *testing.T) {
@@ -601,9 +602,9 @@ func TestBatchingStrategies(t *testing.T) {
 			expectedStates: []messageExecStatus{
 				newMessageExecState(10, msgId1, TXMCheckFailed),
 			},
-			statuschecker: func(m *MockStatusChecker) {
+			statuschecker: func(m *mockstatuschecker.CCIPTransactionStatusChecker) {
 				m.Mock = mock.Mock{} // reset mock
-				m.On("QueryTxStatuses", mock.Anything, hexutil.Encode(msgId1[:])).Return([]types.TransactionStatus{types.Fatal}, 0, nil)
+				m.On("CheckMessageStatus", mock.Anything, hexutil.Encode(msgId1[:])).Return([]types.TransactionStatus{types.Fatal}, 0, nil)
 			},
 		},
 		{
@@ -660,10 +661,10 @@ func TestBatchingStrategies(t *testing.T) {
 				newMessageExecState(10, msgId1, TXMCheckFailed),
 				newMessageExecState(11, msgId2, AddedToBatch),
 			},
-			statuschecker: func(m *MockStatusChecker) {
+			statuschecker: func(m *mockstatuschecker.CCIPTransactionStatusChecker) {
 				m.Mock = mock.Mock{} // reset mock
-				m.On("QueryTxStatuses", mock.Anything, hexutil.Encode(msgId1[:])).Return([]types.TransactionStatus{types.Fatal}, 2, nil)
-				m.On("QueryTxStatuses", mock.Anything, hexutil.Encode(msgId2[:])).Return([]types.TransactionStatus{}, -1, nil)
+				m.On("CheckMessageStatus", mock.Anything, hexutil.Encode(msgId1[:])).Return([]types.TransactionStatus{types.Fatal}, 2, nil)
+				m.On("CheckMessageStatus", mock.Anything, hexutil.Encode(msgId2[:])).Return([]types.TransactionStatus{}, -1, nil)
 			},
 		},
 		{
@@ -706,10 +707,10 @@ func TestBatchingStrategies(t *testing.T) {
 				newMessageExecState(10, msgId1, TXMCheckFailed),
 				newMessageExecState(11, msgId2, TXMCheckFailed),
 			},
-			statuschecker: func(m *MockStatusChecker) {
+			statuschecker: func(m *mockstatuschecker.CCIPTransactionStatusChecker) {
 				m.Mock = mock.Mock{} // reset mock
-				m.On("QueryTxStatuses", mock.Anything, hexutil.Encode(msgId1[:])).Return([]types.TransactionStatus{types.Fatal}, 2, nil)
-				m.On("QueryTxStatuses", mock.Anything, hexutil.Encode(msgId2[:])).Return([]types.TransactionStatus{types.Fatal}, 2, nil)
+				m.On("CheckMessageStatus", mock.Anything, hexutil.Encode(msgId1[:])).Return([]types.TransactionStatus{types.Fatal}, 2, nil)
+				m.On("CheckMessageStatus", mock.Anything, hexutil.Encode(msgId2[:])).Return([]types.TransactionStatus{types.Fatal}, 2, nil)
 			},
 		},
 		{
@@ -752,9 +753,9 @@ func TestBatchingStrategies(t *testing.T) {
 			expectedStates: []messageExecStatus{
 				newMessageExecState(10, msgId1, AddedToBatch),
 			},
-			statuschecker: func(m *MockStatusChecker) {
+			statuschecker: func(m *mockstatuschecker.CCIPTransactionStatusChecker) {
 				m.Mock = mock.Mock{} // reset mock
-				m.On("QueryTxStatuses", mock.Anything, hexutil.Encode(msgId1[:])).Return([]types.TransactionStatus{types.Unconfirmed, types.Failed}, 0, nil)
+				m.On("CheckMessageStatus", mock.Anything, hexutil.Encode(msgId1[:])).Return([]types.TransactionStatus{types.Unconfirmed, types.Failed}, 0, nil)
 			},
 		},
 		{
@@ -798,10 +799,10 @@ func TestBatchingStrategies(t *testing.T) {
 				newMessageExecState(10, msgId1, TXMCheckFailed),
 				newMessageExecState(11, msgId2, AddedToBatch),
 			},
-			statuschecker: func(m *MockStatusChecker) {
+			statuschecker: func(m *mockstatuschecker.CCIPTransactionStatusChecker) {
 				m.Mock = mock.Mock{} // reset mock
-				m.On("QueryTxStatuses", mock.Anything, hexutil.Encode(msgId1[:])).Return([]types.TransactionStatus{types.Unconfirmed, types.Failed, types.Finalized}, 2, nil)
-				m.On("QueryTxStatuses", mock.Anything, hexutil.Encode(msgId2[:])).Return([]types.TransactionStatus{}, -1, nil)
+				m.On("CheckMessageStatus", mock.Anything, hexutil.Encode(msgId1[:])).Return([]types.TransactionStatus{types.Unconfirmed, types.Failed, types.Finalized}, 2, nil)
+				m.On("CheckMessageStatus", mock.Anything, hexutil.Encode(msgId2[:])).Return([]types.TransactionStatus{}, -1, nil)
 			},
 		},
 		{
@@ -845,10 +846,10 @@ func TestBatchingStrategies(t *testing.T) {
 				newMessageExecState(10, msgId1, TXMCheckError),
 				newMessageExecState(11, msgId2, AddedToBatch),
 			},
-			statuschecker: func(m *MockStatusChecker) {
+			statuschecker: func(m *mockstatuschecker.CCIPTransactionStatusChecker) {
 				m.Mock = mock.Mock{} // reset mock
-				m.On("QueryTxStatuses", mock.Anything, hexutil.Encode(msgId1[:])).Return([]types.TransactionStatus{}, -1, errors.New("dummy txm error"))
-				m.On("QueryTxStatuses", mock.Anything, hexutil.Encode(msgId2[:])).Return([]types.TransactionStatus{}, -1, nil)
+				m.On("CheckMessageStatus", mock.Anything, hexutil.Encode(msgId1[:])).Return([]types.TransactionStatus{}, -1, errors.New("dummy txm error"))
+				m.On("CheckMessageStatus", mock.Anything, hexutil.Encode(msgId2[:])).Return([]types.TransactionStatus{}, -1, nil)
 			},
 		},
 	}
@@ -859,7 +860,7 @@ func TestBatchingStrategies(t *testing.T) {
 	})
 
 	t.Run("ZKOverflowBatchingStrategy", func(t *testing.T) {
-		mockedStatusChecker := new(MockStatusChecker)
+		mockedStatusChecker := mockstatuschecker.NewCCIPTransactionStatusChecker(t)
 		strategy := &ZKOverflowBatchingStrategy{
 			statuschecker: mockedStatusChecker,
 		}
@@ -888,12 +889,12 @@ func runBatchingStrategyTests(t *testing.T, strategy BatchingStrategy, available
 
 			// default case for ZKOverflowBatchingStrategy
 			if strategyType := reflect.TypeOf(strategy); tc.statuschecker == nil && strategyType == reflect.TypeOf(&ZKOverflowBatchingStrategy{}) {
-				strategy.(*ZKOverflowBatchingStrategy).statuschecker.(*MockStatusChecker).On("QueryTxStatuses", mock.Anything, mock.Anything).Return([]types.TransactionStatus{}, -1, nil)
+				strategy.(*ZKOverflowBatchingStrategy).statuschecker.(*mockstatuschecker.CCIPTransactionStatusChecker).On("QueryTxStatuses", mock.Anything, mock.Anything).Return([]types.TransactionStatus{}, -1, nil)
 			}
 
 			// Mock calls to TXM
 			if tc.statuschecker != nil {
-				tc.statuschecker(strategy.(*ZKOverflowBatchingStrategy).statuschecker.(*MockStatusChecker))
+				tc.statuschecker(strategy.(*ZKOverflowBatchingStrategy).statuschecker.(*mockstatuschecker.CCIPTransactionStatusChecker))
 			}
 
 			batchContext := &BatchContext{
@@ -967,13 +968,4 @@ func generateMessageIDFromInt(input uint32) [32]byte {
 	var messageID [32]byte
 	binary.LittleEndian.PutUint32(messageID[:], input)
 	return messageID
-}
-
-type MockStatusChecker struct {
-	mock.Mock
-}
-
-func (t *MockStatusChecker) QueryTxStatuses(ctx context.Context, msgID string) ([]types.TransactionStatus, int, error) {
-	args := t.Called(ctx, msgID)
-	return args.Get(0).([]types.TransactionStatus), args.Get(1).(int), args.Error(2)
 }
