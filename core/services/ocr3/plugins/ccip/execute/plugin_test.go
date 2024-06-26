@@ -11,12 +11,13 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/ccipocr3/internal/libs/slicelib"
-	"github.com/smartcontractkit/ccipocr3/internal/mocks"
 	"github.com/smartcontractkit/chainlink-common/pkg/hashutil"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/merklemulti"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
+	"github.com/smartcontractkit/ccipocr3/internal/libs/slicelib"
+	"github.com/smartcontractkit/ccipocr3/internal/mocks"
 )
 
 func Test_getPendingExecutedReports(t *testing.T) {
@@ -244,7 +245,6 @@ func assertMerkleRoot(
 	proofCast := make([][32]byte, len(execReport.Proofs))
 	for i, p := range execReport.Proofs {
 		copy(proofCast[i][:], p[:32])
-		proofCast[i][2] = proofCast[i][2]
 	}
 	var proof merklemulti.Proof[[32]byte]
 	proof.Hashes = proofCast

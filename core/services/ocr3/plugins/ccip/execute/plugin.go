@@ -8,13 +8,14 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/smartcontractkit/ccipocr3/internal/libs/slicelib"
 	"github.com/smartcontractkit/chainlink-common/pkg/hashutil"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/merklemulti"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+
+	"github.com/smartcontractkit/ccipocr3/internal/libs/slicelib"
 )
 
 // maxReportSizeBytes that should be returned as an execution report payload.
@@ -299,14 +300,14 @@ func buildSingleChainReport(
 					"error", err)
 				return cciptypes.ExecutePluginReportSingleChain{}, 0, fmt.Errorf(
 					"unable to read token data for message %d: %w", msg.SeqNum, err)
-			} else {
-				lggr.Debugw(
-					"read token data",
-					"source-chain", report.SourceChain,
-					"seq-num", msg.SeqNum,
-					"data", tokenData)
-				offchainTokenData = append(offchainTokenData, tokenData)
 			}
+
+			lggr.Debugw(
+				"read token data",
+				"source-chain", report.SourceChain,
+				"seq-num", msg.SeqNum,
+				"data", tokenData)
+			offchainTokenData = append(offchainTokenData, tokenData)
 			toExecute = append(toExecute, i)
 			msgInRoot = append(msgInRoot, msg)
 		}
@@ -493,7 +494,7 @@ func (p *Plugin) Outcome(
 	}
 
 	outcomeReports, commitReports, err :=
-		selectReport(p.ctx, p.lggr, p.msgHasher, p.reportCodec, nil, commitReports, maxReportSizeBytes)
+		selectReport(p.ctx, p.lggr, p.msgHasher, p.reportCodec, p.tokenDataReader, commitReports, maxReportSizeBytes)
 	if err != nil {
 		return ocr3types.Outcome{}, fmt.Errorf("unable to extract proofs: %w", err)
 	}
