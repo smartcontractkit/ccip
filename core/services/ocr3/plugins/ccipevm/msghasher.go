@@ -12,20 +12,18 @@ import (
 	"golang.org/x/crypto/sha3"
 )
 
-var (
-	LeafDomainSeparator = [1]byte{0x00}
-)
-
 // MessageHasherV1 implements the MessageHasher interface.
 // Compatible with:
 // - "EVM2EVMMultiOnRamp 1.6.0-dev"
 type MessageHasherV1 struct {
-	metaDataHash [32]byte
+	metaDataHash        [32]byte
+	leafDomainSeparator [1]byte
 }
 
 func NewMessageHasherV1(metaDataHash [32]byte) *MessageHasherV1 {
 	return &MessageHasherV1{
-		metaDataHash: metaDataHash,
+		metaDataHash:        metaDataHash,
+		leafDomainSeparator: [1]byte{0x00},
 	}
 }
 
@@ -87,7 +85,7 @@ func (h *MessageHasherV1) Hash(_ context.Context, msg cciptypes.CCIPMsg) (ccipty
 			{"name": "dataHash", "type":"bytes32"},
 			{"name": "tokenAmountsHash", "type":"bytes32"},
 			{"name": "sourceTokenDataHash", "type":"bytes32"}]`,
-		LeafDomainSeparator,
+		h.leafDomainSeparator,
 		h.metaDataHash,
 		fixedSizeValuesHash,
 		h.keccak256Fixed(msg.Data),
