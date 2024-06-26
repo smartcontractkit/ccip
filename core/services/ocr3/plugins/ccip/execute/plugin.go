@@ -239,11 +239,11 @@ func buildSingleChainReport(
 		maxMessages = len(report.Messages)
 	}
 
-	numMsg := int(report.SequenceNumberRange.End() - report.SequenceNumberRange.Start() + 1)
-	if numMsg != len(report.Messages) {
+	numMsgs := int(report.SequenceNumberRange.End() - report.SequenceNumberRange.Start() + 1)
+	if numMsgs != len(report.Messages) {
 		return cciptypes.ExecutePluginReportSingleChain{}, 0, fmt.Errorf(
 			"malformed report %s, unexpected number of messages: expected %d, got %d",
-			report.MerkleRoot.String(), numMsg, len(report.Messages))
+			report.MerkleRoot.String(), numMsgs, len(report.Messages))
 	}
 
 	treeLeaves := make([][32]byte, 0)
@@ -281,7 +281,7 @@ func buildSingleChainReport(
 	var offchainTokenData [][][]byte
 	var msgInRoot []cciptypes.CCIPMsg
 	executedIdx := 0
-	for i := 0; i < numMsg && len(toExecute) <= maxMessages; i++ {
+	for i := 0; i < numMsgs && len(toExecute) <= maxMessages; i++ {
 		seqNum := report.SequenceNumberRange.Start() + cciptypes.SeqNum(i)
 		// Skip messages which are already executed
 		if executedIdx < len(report.ExecutedMessages) && report.ExecutedMessages[executedIdx] == seqNum {
@@ -317,7 +317,7 @@ func buildSingleChainReport(
 		"sourceChain", report.SourceChain,
 		"commitRoot", report.MerkleRoot.String(),
 		"numMessages", len(toExecute),
-		"totalMessages", numMsg,
+		"totalMessages", numMsgs,
 		"toExecute", len(toExecute))
 	proof, err := tree.Prove(toExecute)
 	if err != nil {

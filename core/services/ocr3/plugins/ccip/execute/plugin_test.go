@@ -219,7 +219,7 @@ func assertMerkleRoot(
 	t *testing.T,
 	hasher cciptypes.MessageHasher,
 	execReport cciptypes.ExecutePluginReportSingleChain,
-	commitReport cciptypes.ExecutePluginCommitDataWithMessages
+	commitReport cciptypes.ExecutePluginCommitDataWithMessages,
 ) {
 	keccak := hashutil.NewKeccak()
 	// Generate merkle root from commit report messages
@@ -419,7 +419,7 @@ func Test_selectReport(t *testing.T) {
 			t.Parallel()
 			ctx := context.Background()
 			execReports, commitReports, err :=
-				 selectReport(ctx, lggr, hasher, codec, tokenDataReader, tt.args.reports, tt.args.maxReportSize)
+				selectReport(ctx, lggr, hasher, codec, tokenDataReader, tt.args.reports, tt.args.maxReportSize)
 			if tt.wantErr != "" {
 				assert.Contains(t, err.Error(), tt.wantErr)
 				return
@@ -477,8 +477,8 @@ func Test_buildSingleChainReport_Errors(t *testing.T) {
 		codec           cciptypes.ExecutePluginCodec
 	}
 	tests := []struct {
-		name string
-		args args
+		name    string
+		args    args
 		wantErr string
 	}{
 		{
