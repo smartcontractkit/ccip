@@ -458,10 +458,10 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
           s_senderNonce[sourceChainSelector][message.sender] = prevNonce;
         }
 
-        // UNTOUCHED messages MUST be executed in order always
+        // UNTOUCHED messages MUST be executed in order always IF message.nonce > 0.
         if (originalState == Internal.MessageExecutionState.UNTOUCHED) {
           if (prevNonce + 1 != message.nonce) {
-            // We skip the message if the nonce is incorrect
+            // We skip the message if the nonce is incorrect, since message.nonce > 0.
             emit SkippedIncorrectNonce(sourceChainSelector, message.nonce, message.sender);
             continue;
           }
@@ -497,7 +497,8 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
         revert InvalidNewState(sourceChainSelector, message.sequenceNumber, newState);
       }
 
-      // Nonce changes per state transition. Only applies for ordered messages
+      // Nonce changes per state transition.
+      // These only apply for ordered messages.
       // UNTOUCHED -> FAILURE  nonce bump
       // UNTOUCHED -> SUCCESS  nonce bump
       // FAILURE   -> FAILURE  no nonce bump
