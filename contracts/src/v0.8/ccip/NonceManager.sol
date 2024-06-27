@@ -33,7 +33,7 @@ contract NonceManager is INonceManager, AuthorizedCallers {
   /// @dev The current inbound nonce per sender used on the offramp
   /// Corresponds to the outbound nonce in the source chain NonceManager, used to enforce that messages are
   /// executed in the same order they are sent (assuming they are DON)
-  mapping(uint64 sourceChainSelector => mapping(bytes sender => uint64 outboundNonce)) private s_inboundNonces;
+  mapping(uint64 sourceChainSelector => mapping(bytes sender => uint64 inboundNonce)) private s_inboundNonces;
 
   constructor(address[] memory authorizedCallers) AuthorizedCallers(authorizedCallers) {}
 
