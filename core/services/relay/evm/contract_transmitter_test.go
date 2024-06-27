@@ -18,19 +18,27 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/txmgr"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
+
+	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/gethwrappers2/ocr2aggregator"
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/chains/evmutil"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+	libocr "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 )
 
 var sampleAddress = testutils.NewAddress()
 
-type mockTransmitter struct{}
+type mockTransmitter struct {
+	lastPayload []byte
+}
 
-func (mockTransmitter) CreateEthTransaction(ctx context.Context, toAddress gethcommon.Address, payload []byte, _ *txmgr.TxMeta) error {
+func (m *mockTransmitter) CreateEthTransaction(ctx context.Context, toAddress gethcommon.Address, payload []byte, _ *txmgr.TxMeta) error {
+	m.lastPayload = payload
 	return nil
 }
-func (mockTransmitter) FromAddress() gethcommon.Address { return sampleAddress }
+
+func (*mockTransmitter) FromAddress() gethcommon.Address { return sampleAddress }
 
 func TestContractTransmitter(t *testing.T) {
 	t.Parallel()
@@ -45,9 +53,9 @@ func TestContractTransmitter(t *testing.T) {
 			"000130da6b9315bd59af6b0a3f5463c0d0a39e92eaa34cbcbdbace7b3bfcc776" + // config digest
 			"0000000000000000000000000000000000000000000000000000000000000002") // epoch
 	c.On("CallContract", mock.Anything, mock.Anything, mock.Anything).Return(digestAndEpochDontScanLogs, nil).Once()
-	contractABI, _ := abi.JSON(strings.NewReader(ocr2aggregator.OCR2AggregatorABI))
+	contractABI, _ := abi.JSON(strings.NewReader(ocr2aggregator.OCR2AggregatorMetaData.ABI))
 	lp.On("RegisterFilter", mock.Anything, mock.Anything).Return(nil)
-	ot, err := NewOCRContractTransmitter(ctx, gethcommon.Address{}, c, contractABI, mockTransmitter{}, lp, lggr, func(b []byte) (*txmgr.TxMeta, error) {
+	ot, err := NewOCRContractTransmitter(ctx, gethcommon.Address{}, c, contractABI, &mockTransmitter{}, lp, lggr, func(b []byte) (*txmgr.TxMeta, error) {
 		return &txmgr.TxMeta{}, nil
 	})
 	require.NoError(t, err)
@@ -81,21 +89,68 @@ func TestContractTransmitter(t *testing.T) {
 func Test_contractTransmitterNoSignatures_Transmit_SignaturesAreNotTransmitted(t *testing.T) {
 	t.Parallel()
 
-	transmitter := mockTransmitter{}
+	transmitter := &mockTransmitter{}
 
 	ctx := context.Background()
 	reportCtx := types.ReportContext{}
 	report := types.Report{}
-	var signatures []ocrtypes.AttributedOnchainSignature
+	var signatures = oneSignature()
 
-	oc := createContractTransmitterNoSignatures(t, transmitter)
+	oc := contractTransmitterNoSignatures{createContractTransmitterFields(t, transmitter)}
 
 	err := oc.Transmit(ctx, reportCtx, report, signatures)
 	require.NoError(t, err)
+
+	var emptyRs [][32]byte
+	var emptySs [][32]byte
+	var emptyVs [32]byte
+	emptySignaturesPayload, err := oc.contractABI.Pack("transmit", evmutil.RawReportContext(reportCtx), []byte(report), emptyRs, emptySs, emptyVs)
+	require.NoError(t, err)
+	require.Equal(t, transmitter.lastPayload, emptySignaturesPayload)
 }
 
-func createContractTransmitterNoSignatures(t *testing.T, transmitter Transmitter) contractTransmitterNoSignatures {
-	contractABI, _ := abi.JSON(strings.NewReader(ocr2aggregator.OCR2AggregatorABI))
+func Test_contractTransmitter_Transmit_SignaturesAreTransmitted(t *testing.T) {
+	t.Parallel()
+
+	transmitter := &mockTransmitter{}
+
+	ctx := context.Background()
+	reportCtx := types.ReportContext{}
+	report := types.Report{}
+	var signatures = oneSignature()
+
+	oc := contractTransmitter{createContractTransmitterFields(t, transmitter)}
+
+	err := oc.Transmit(ctx, reportCtx, report, signatures)
+	require.NoError(t, err)
+
+	rs, ss, vs := signaturesAsPayload(t, signatures)
+	withSignaturesPayload, err := oc.contractABI.Pack("transmit", evmutil.RawReportContext(reportCtx), []byte(report), rs, ss, vs)
+	require.NoError(t, err)
+	require.Equal(t, transmitter.lastPayload, withSignaturesPayload)
+}
+
+func signaturesAsPayload(t *testing.T, signatures []ocrtypes.AttributedOnchainSignature) ([][32]byte, [][32]byte, [32]byte) {
+	var rs [][32]byte
+	var ss [][32]byte
+	var vs [32]byte
+	r, s, v, err := evmutil.SplitSignature(signatures[0].Signature)
+	require.NoError(t, err)
+	rs = append(rs, r)
+	ss = append(ss, s)
+	vs[0] = v
+	return rs, ss, vs
+}
+
+func oneSignature() []ocrtypes.AttributedOnchainSignature {
+	signaturesData := make([]byte, 65)
+	signaturesData[9] = 8
+	signaturesData[7] = 6
+	return []libocr.AttributedOnchainSignature{{Signature: signaturesData, Signer: commontypes.OracleID(54)}}
+}
+
+func createContractTransmitterFields(t *testing.T, transmitter Transmitter) contractTransmitterFields {
+	contractABI, _ := abi.JSON(strings.NewReader(ocr2aggregator.OCR2AggregatorMetaData.ABI))
 	fields := contractTransmitterFields{
 		contractAddress:     gethcommon.Address{},
 		contractABI:         contractABI,
@@ -106,6 +161,5 @@ func createContractTransmitterNoSignatures(t *testing.T, transmitter Transmitter
 		lggr:                logger.TestLogger(t),
 		reportToEvmTxMeta:   reportToEvmTxMetaNoop,
 	}
-	oc := contractTransmitterNoSignatures{fields}
-	return oc
+	return fields
 }
