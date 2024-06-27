@@ -485,6 +485,7 @@ contract RMN is IRMN, OwnerIsCreator, ITypeAndVersion {
       } else if (priv == Privilege.Voter) {
         tag = RecordedCurseRelatedOpTag.UnvoteToCurse;
       } else {
+        // solhint-disable-next-line gas-custom-errors, reason-string
         revert(); // assumption violation
       }
       s_recordedCurseRelatedOps.push(
@@ -621,6 +622,7 @@ contract RMN is IRMN, OwnerIsCreator, ITypeAndVersion {
   // Set curseVoteAddr=LIFT_CURSE_VOTE_ADDR, cursesHash=bytes28(0), to reset curseActive if it can be reset. Useful if
   // all voters have unvoted to curse on their own and the curse can now be lifted without any individual votes that can
   // be unvoted.
+  // solhint-disable-next-line gas-struct-packing
   struct OwnerUnvoteToCurseRequest {
     address curseVoteAddr;
     UnvoteToCurseRequest unit;
@@ -802,6 +804,7 @@ contract RMN is IRMN, OwnerIsCreator, ITypeAndVersion {
             curseVoteAddrs[numCursers] = curseVoteAddr;
             cursesHashes[numCursers] = cvch.cursesHash;
           } else {
+            // solhint-disable-next-line gas-custom-errors, reason-string
             revert(); // assumption violation
           }
         }
