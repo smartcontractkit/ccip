@@ -697,8 +697,8 @@ func TestCommitReportingPlugin_observePriceUpdates(t *testing.T) {
 			psGasPricesResult:      gasPrices,
 			psTokenPricesResult:    tokenPrices,
 			PriceReportingDisabled: true,
-			expectedGasPrice:       nil,
-			expectedTokenPrices:    nil,
+			expectedGasPrice:       map[uint64]*big.Int{},
+			expectedTokenPrices:    map[cciptypes.Address]*big.Int{},
 			psError:                false,
 			expectedErr:            false,
 		},
@@ -737,13 +737,16 @@ func TestCommitReportingPlugin_observePriceUpdates(t *testing.T) {
 					PriceReportingDisabled: tc.PriceReportingDisabled,
 				},
 			}
-			sourceGasPriceUSD, tokenPricesUSD, err := p.observePriceUpdates(ctx)
+			gasPricesUSD, sourceGasPriceUSD, tokenPricesUSD, err := p.observePriceUpdates(ctx)
 			if tc.expectedErr {
 				assert.Error(t, err)
 			} else {
 				assert.NoError(t, err)
-				assert.Equal(t, tc.expectedGasPrice, sourceGasPriceUSD)
+				assert.Equal(t, tc.expectedGasPrice, gasPricesUSD)
 				assert.Equal(t, tc.expectedTokenPrices, tokenPricesUSD)
+				if tc.expectedGasPrice != nil {
+					assert.Equal(t, tc.expectedGasPrice[sourceChainSelector], sourceGasPriceUSD)
+				}
 			}
 		})
 	}

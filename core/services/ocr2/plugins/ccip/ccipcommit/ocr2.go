@@ -113,19 +113,10 @@ func (r *CommitReportingPlugin) Observation(ctx context.Context, epochAndRound t
 	}
 
 	// Fetches multi-lane gasPricesUSD and tokenPricesUSD for the same dest chain
-	gasPricesUSD, tokenPricesUSD, err := r.observePriceUpdates(ctx)
+	gasPricesUSD, sourceGasPriceUSD, tokenPricesUSD, err := r.observePriceUpdates(ctx)
 	if err != nil {
 		return nil, err
 	}
-	// Set prices to empty maps if nil to be friendlier to JSON encoding
-	if gasPricesUSD == nil {
-		gasPricesUSD = map[uint64]*big.Int{}
-	}
-	if tokenPricesUSD == nil {
-		tokenPricesUSD = map[cciptypes.Address]*big.Int{}
-	}
-	// For backwards compatibility with the older release during phased rollout, set the default gas price on this lane
-	defaultGasPricesUSD := gasPricesUSD[r.sourceChainSelector]
 
 	lggr.Infow("Observation",
 		"minSeqNr", minSeqNr,
@@ -145,7 +136,7 @@ func (r *CommitReportingPlugin) Observation(ctx context.Context, epochAndRound t
 			Max: maxSeqNr,
 		},
 		TokenPricesUSD:            tokenPricesUSD,
-		SourceGasPriceUSD:         defaultGasPricesUSD,
+		SourceGasPriceUSD:         sourceGasPriceUSD,
 		SourceGasPriceUSDPerChain: gasPricesUSD,
 	}.Marshal()
 }
@@ -154,20 +145,31 @@ func (r *CommitReportingPlugin) Observation(ctx context.Context, epochAndRound t
 // The prices are aggregated for all lanes for the same destination chain.
 func (r *CommitReportingPlugin) observePriceUpdates(
 	ctx context.Context,
-) (gasPricesUSD map[uint64]*big.Int, tokenPricesUSD map[cciptypes.Address]*big.Int, err error) {
+) (gasPricesUSD map[uint64]*big.Int, sourceGasPriceUSD *big.Int, tokenPricesUSD map[cciptypes.Address]*big.Int, err error) {
 	// Do not observe prices if price reporting is disabled. Price reporting will be disabled for lanes that are not leader lanes.
 	if r.offchainConfig.PriceReportingDisabled {
 		r.lggr.Infow("Price reporting disabled, skipping gas and token price reads")
-		return nil, nil, nil
+		return map[uint64]*big.Int{}, nil, map[cciptypes.Address]*big.Int{}, nil
 	}
 
 	// Fetches multi-lane gas prices and token prices, for the given dest chain
 	gasPricesUSD, tokenPricesUSD, err = r.priceService.GetGasAndTokenPrices(ctx, r.destChainSelector)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, fmt.Errorf("failed to get prices from PriceService: %w", err)
 	}
 
-	return gasPricesUSD, tokenPricesUSD, nil
+	// Set prices to empty maps if nil to be friendlier to JSON encoding
+	if gasPricesUSD == nil {
+		gasPricesUSD = map[uint64]*big.Int{}
+	}
+	if tokenPricesUSD == nil {
+		tokenPricesUSD = map[cciptypes.Address]*big.Int{}
+	}
+
+	// For backwards compatibility with the older release during phased rollout, set the default gas price on this lane
+	sourceGasPriceUSD = gasPricesUSD[r.sourceChainSelector]
+
+	return gasPricesUSD, sourceGasPriceUSD, tokenPricesUSD, nil
 }
 
 func (r *CommitReportingPlugin) calculateMinMaxSequenceNumbers(ctx context.Context, lggr logger.Logger) (uint64, uint64, []cciptypes.Hash, error) {
