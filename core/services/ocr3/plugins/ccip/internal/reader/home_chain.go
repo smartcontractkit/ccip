@@ -111,7 +111,6 @@ func (r *homeChainPoller) fetchAndSetConfigs(ctx context.Context) error {
 		ctx, "CCIPCapabilityConfiguration", "getAllChainConfigs", nil, &chainConfigInfos,
 	)
 	if err != nil {
-		r.lggr.Errorw("fetching on-chain configs failed", "err", err)
 		return err
 	}
 	if len(chainConfigInfos) == 0 {
