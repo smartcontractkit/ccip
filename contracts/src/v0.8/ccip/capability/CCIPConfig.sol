@@ -139,9 +139,7 @@ contract CCIPConfig is ITypeAndVersion, ICapabilityConfiguration, OwnerIsCreator
 
   /// @inheritdoc IERC165
   function supportsInterface(bytes4 interfaceId) external pure override returns (bool) {
-    return interfaceId
-      == ICapabilityConfiguration.getCapabilityConfiguration.selector
-        ^ ICapabilityConfiguration.beforeCapabilityConfigSet.selector;
+    return interfaceId == type(ICapabilityConfiguration).interfaceId || interfaceId == type(IERC165).interfaceId;
   }
 
   // ================================================================
