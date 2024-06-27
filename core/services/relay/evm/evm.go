@@ -740,7 +740,7 @@ type configTransmitterOpts struct {
 
 // newOnChainContractTransmitter creates a new contract transmitter.
 func newOnChainContractTransmitter(ctx context.Context, lggr logger.Logger, rargs commontypes.RelayArgs, ethKeystore keystore.Eth, configWatcher *configWatcher, opts configTransmitterOpts, transmissionContractABI abi.ABI, reportToEvmTxMeta ReportToEthMetadata, transmissionContractRetention time.Duration) (*contractTransmitter, error) {
-	transmitter, err2, done := generateContractTransmitterFields(ctx, rargs, ethKeystore, configWatcher, opts)
+	transmitter, done, err2 := generateContractTransmitterFields(ctx, rargs, ethKeystore, configWatcher, opts)
 	if done {
 		return nil, err2
 	}
@@ -760,7 +760,7 @@ func newOnChainContractTransmitter(ctx context.Context, lggr logger.Logger, rarg
 
 // newOnChainContractTransmitterNoSignatures creates a new contract transmitter that avoids sending the signatures as they are validated offchain.
 func newOnChainContractTransmitterNoSignatures(ctx context.Context, lggr logger.Logger, rargs commontypes.RelayArgs, ethKeystore keystore.Eth, configWatcher *configWatcher, opts configTransmitterOpts, transmissionContractABI abi.ABI, reportToEvmTxMeta ReportToEthMetadata, transmissionContractRetention time.Duration) (*contractTransmitterNoSignatures, error) {
-	transmitter, err2, done := generateContractTransmitterFields(ctx, rargs, ethKeystore, configWatcher, opts)
+	transmitter, done, err2 := generateContractTransmitterFields(ctx, rargs, ethKeystore, configWatcher, opts)
 	if done {
 		return nil, err2
 	}
@@ -778,31 +778,31 @@ func newOnChainContractTransmitterNoSignatures(ctx context.Context, lggr logger.
 	)
 }
 
-func generateContractTransmitterFields(ctx context.Context, rargs commontypes.RelayArgs, ethKeystore keystore.Eth, configWatcher *configWatcher, opts configTransmitterOpts) (Transmitter, error, bool) {
+func generateContractTransmitterFields(ctx context.Context, rargs commontypes.RelayArgs, ethKeystore keystore.Eth, configWatcher *configWatcher, opts configTransmitterOpts) (Transmitter, bool, error) {
 	var relayConfig types.RelayConfig
 	if err := json.Unmarshal(rargs.RelayConfig, &relayConfig); err != nil {
-		return nil, err, true
+		return nil, true, err
 	}
 	var fromAddresses []common.Address
 	sendingKeys := relayConfig.SendingKeys
 	if !relayConfig.EffectiveTransmitterID.Valid {
-		return nil, pkgerrors.New("EffectiveTransmitterID must be specified"), true
+		return nil, true, pkgerrors.New("EffectiveTransmitterID must be specified")
 	}
 	effectiveTransmitterAddress := common.HexToAddress(relayConfig.EffectiveTransmitterID.String)
 
 	sendingKeysLength := len(sendingKeys)
 	if sendingKeysLength == 0 {
-		return nil, pkgerrors.New("no sending keys provided"), true
+		return nil, true, pkgerrors.New("no sending keys provided")
 	}
 
 	// If we are using multiple sending keys, then a forwarder is needed to rotate transmissions.
 	// Ensure that this forwarder is not set to a local sending key, and ensure our sending keys are enabled.
 	for _, s := range sendingKeys {
 		if sendingKeysLength > 1 && s == effectiveTransmitterAddress.String() {
-			return nil, pkgerrors.New("the transmitter is a local sending key with transaction forwarding enabled"), true
+			return nil, true, pkgerrors.New("the transmitter is a local sending key with transaction forwarding enabled")
 		}
 		if err := ethKeystore.CheckEnabled(ctx, common.HexToAddress(s), configWatcher.chain.Config().EVM().ChainID()); err != nil {
-			return nil, pkgerrors.Wrap(err, "one of the sending keys given is not enabled"), true
+			return nil, true, pkgerrors.Wrap(err, "one of the sending keys given is not enabled")
 		}
 		fromAddresses = append(fromAddresses, common.HexToAddress(s))
 	}
@@ -856,9 +856,9 @@ func generateContractTransmitterFields(ctx context.Context, rargs commontypes.Re
 		)
 	}
 	if err != nil {
-		return nil, pkgerrors.Wrap(err, "failed to create transmitter"), true
+		return nil, true, pkgerrors.Wrap(err, "failed to create transmitter")
 	}
-	return transmitter, nil, false
+	return transmitter, false, nil
 }
 
 func (r *Relayer) NewContractReader(chainReaderConfig []byte) (commontypes.ContractReader, error) {
