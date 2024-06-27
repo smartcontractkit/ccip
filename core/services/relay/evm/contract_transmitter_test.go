@@ -3,14 +3,11 @@ package evm
 import (
 	"context"
 	"encoding/hex"
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	"strings"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	gethcommon "github.com/ethereum/go-ethereum/common"
-	"github.com/smartcontractkit/libocr/gethwrappers2/ocr2aggregator"
-	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -21,6 +18,9 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/txmgr"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
+	"github.com/smartcontractkit/libocr/gethwrappers2/ocr2aggregator"
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 )
 
 var sampleAddress = testutils.NewAddress()
