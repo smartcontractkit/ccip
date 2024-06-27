@@ -1,4 +1,4 @@
-name: CCIP On-Demand Live Testnet Tests
+name: CCIP On-Demand Live Mainnet Tests
 on:
   schedule:
     - cron: '0 */6 * * *'
