@@ -7,31 +7,31 @@ import {Test} from "forge-std/Test.sol";
 contract ARMProxyStandaloneTest is Test {
   address internal constant EMPTY_ADDRESS = address(0x1);
   address internal constant OWNER_ADDRESS = 0xC0ffeeEeC0fFeeeEc0ffeEeEc0ffEEEEC0FfEEee;
-  address internal constant MOCK_ARM_ADDRESS = 0x1337133713371337133713371337133713371337;
+  address internal constant MOCK_RMN_ADDRESS = 0x1337133713371337133713371337133713371337;
 
   ARMProxy internal s_armProxy;
 
   function setUp() public virtual {
     // needed so that the extcodesize check in ARMProxy.fallback doesn't revert
-    vm.etch(MOCK_ARM_ADDRESS, bytes("fake bytecode"));
+    vm.etch(MOCK_RMN_ADDRESS, bytes("fake bytecode"));
 
     vm.prank(OWNER_ADDRESS);
-    s_armProxy = new ARMProxy(MOCK_ARM_ADDRESS);
+    s_armProxy = new ARMProxy(MOCK_RMN_ADDRESS);
   }
 
   function test_Constructor() public {
     vm.expectEmit();
-    emit ARMProxy.ARMSet(MOCK_ARM_ADDRESS);
-    ARMProxy proxy = new ARMProxy(MOCK_ARM_ADDRESS);
-    assertEq(proxy.getARM(), MOCK_ARM_ADDRESS);
+    emit ARMProxy.ARMSet(MOCK_RMN_ADDRESS);
+    ARMProxy proxy = new ARMProxy(MOCK_RMN_ADDRESS);
+    assertEq(proxy.getARM(), MOCK_RMN_ADDRESS);
   }
 
   function test_SetARM() public {
     vm.expectEmit();
-    emit ARMProxy.ARMSet(MOCK_ARM_ADDRESS);
+    emit ARMProxy.ARMSet(MOCK_RMN_ADDRESS);
     vm.prank(OWNER_ADDRESS);
-    s_armProxy.setARM(MOCK_ARM_ADDRESS);
-    assertEq(s_armProxy.getARM(), MOCK_ARM_ADDRESS);
+    s_armProxy.setARM(MOCK_RMN_ADDRESS);
+    assertEq(s_armProxy.getARM(), MOCK_RMN_ADDRESS);
   }
 
   function test_SetARMzero() public {
@@ -55,9 +55,9 @@ contract ARMProxyStandaloneTest is Test {
     );
 
     if (expectedSuccess) {
-      vm.mockCall(MOCK_ARM_ADDRESS, 0, call, ret);
+      vm.mockCall(MOCK_RMN_ADDRESS, 0, call, ret);
     } else {
-      vm.mockCallRevert(MOCK_ARM_ADDRESS, 0, call, ret);
+      vm.mockCallRevert(MOCK_RMN_ADDRESS, 0, call, ret);
     }
     (bool actualSuccess, bytes memory result) = address(s_armProxy).call(call);
     vm.clearMockedCalls();
