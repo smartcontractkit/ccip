@@ -59,8 +59,7 @@ func TestHomeChainConfigPoller_HealthReport(t *testing.T) {
 	errors := configPoller.HealthReport()
 	require.Equal(t, 1, len(errors))
 	require.Errorf(t, errors[configPoller.Name()], "polling failed %d times in a row", MaxFailedPolls)
-
-	closGracefully(t, configPoller)
+	require.NoError(t, configPoller.Close())
 }
 
 func Test_PollingWorking(t *testing.T) {
@@ -147,22 +146,4 @@ func Test_PollingWorking(t *testing.T) {
 	configs, err := configPoller.GetAllChainConfigs()
 	require.NoError(t, err)
 	require.Equal(t, homeChainConfig, configs)
-}
-
-func closGracefully(t *testing.T, homeChain HomeChain) {
-	err := homeChain.Close()
-	require.NoError(t, err)
-	ticker := time.NewTicker(1 * time.Second)
-	defer ticker.Stop()
-	for {
-		// Make sure it's closed gracefully, give it 2 seconds to do so or fail
-		err := homeChain.Ready()
-		if err != nil {
-			return
-		}
-		select {
-		case <-ticker.C:
-			t.Fatal("HomeChainReader did not close gracefully")
-		}
-	}
 }

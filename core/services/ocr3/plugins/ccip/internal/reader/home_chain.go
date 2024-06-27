@@ -180,10 +180,26 @@ func (r *homeChainPoller) GetFChain() (map[cciptypes.ChainSelector]int, error) {
 }
 
 func (r *homeChainPoller) Close() error {
-	return r.sync.StopOnce(r.Name(), func() error {
+	err := r.sync.StopOnce(r.Name(), func() error {
 		close(r.stopCh)
 		return nil
 	})
+	if err != nil {
+		return fmt.Errorf("failed to stop %s: %w", r.Name(), err)
+	}
+	ticker := time.NewTicker(r.pollingDuration * 2) // give it twice the polling duration to ensure the poller is caught up and stopped
+	defer ticker.Stop()
+	for {
+		// Make sure it's closed gracefully, give it 2 seconds to do so or fail
+		err := r.Ready()
+		if err != nil {
+			return nil
+		}
+		select {
+		case <-ticker.C:
+			return fmt.Errorf("HomeChainReader did not close gracefully")
+		}
+	}
 }
 
 func (r *homeChainPoller) Ready() error {
