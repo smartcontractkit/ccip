@@ -1518,7 +1518,7 @@ contract CCIPConfig_beforeCapabilityConfigSet is CCIPConfigSetup {
 
   // Reverts.
 
-  function test_beforeCapabilityConfigSet_OnlyCapabilityRegistryCanCall_Reverts() public {
+  function test_beforeCapabilityConfigSet_OnlyCapabilitiesRegistryCanCall_Reverts() public {
     bytes32[] memory nodes = new bytes32[](0);
     bytes memory config = bytes("");
     uint64 configCount = 1;
