@@ -42,7 +42,7 @@ func SetupChainReader(t *testing.T, simulatedBackend *backends.SimulatedBackend,
 	}
 	cl := client.NewSimulatedBackendClient(t, simulatedBackend, big.NewInt(chainID))
 	lp := logpoller.NewLogPoller(logpoller.NewORM(big.NewInt(chainID), db, lggr), cl, lggr, lpOpts)
-	assert.NoError(t, lp.Start(context.Background()))
+	require.NoError(t, lp.Start(testutils.Context(t)))
 
 	cr, err := evm.NewChainReaderService(context.Background(), lggr, lp, cl, chainReaderConfig)
 	assert.NoError(t, err)
