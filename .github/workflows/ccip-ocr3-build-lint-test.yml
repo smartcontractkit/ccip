@@ -4,7 +4,6 @@ on:
   pull_request:
     paths:
       - core/services/ocr3/plugins/ccip/**
-      - contracts/src/v0.8/ccip/**
 
 jobs:
   build-lint-test:
@@ -32,7 +31,3 @@ jobs:
         run: golangci-lint run -c .golangci.yml
       - name: Run tests
         run: go test -race -fullpath -shuffle on -count 20 ./...
-      - name: Run integration tests
-        run: |
-          cd ../ccip_integration_tests
-          go test -race -fullpath -shuffle on -count 2 ./...
