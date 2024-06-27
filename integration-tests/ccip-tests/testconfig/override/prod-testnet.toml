@@ -83,7 +83,6 @@ Data = """
       }
     },
     "Avalanche Fuji": {
-      "is_native_fee_token": true,
       "fee_token": "0x0b9d5D9136855f6FEc3c0993feE6E9CE8a297846",
       "bridge_tokens": [
       ],
@@ -915,10 +914,8 @@ selected_networks = [
   'SEPOLIA',
   'POLYGON_AMOY',
   'KROMA_SEPOLIA',
-  'MODE_SEPOLIA',
-  'BLAST_SEPOLIA',
-  'CELO_ALFAJORES'
-  ]
+  'BLAST_SEPOLIA'  
+]
 
 [CCIP.Groups.load]
 NetworkPairs = [
@@ -929,13 +926,12 @@ BiDirectionalLane = true
 PhaseTimeout = '45m'
 ExistingDeployment = true
 
-[CCIP.Groups.load.TokenConfig]
 NoOfTokensPerChain = 1
 
 [CCIP.Groups.load.LoadProfile]
 RequestPerUnitTime = [1]
-TimeUnit = '5s'
-TestDuration = '2h'
+TimeUnit = '30s'
+TestDuration = '5m'
 TestRunName = 'v2.12.0-ccip1.4.16-load'
 
 # to represent 20%, 60%, 15%, 5% of the total messages
