@@ -1,18 +1,18 @@
 package ccipevm
 
 import (
-	"context"
 	"encoding/hex"
 	"math/big"
 	"testing"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestMessageHasher_Hash(t *testing.T) {
-	ctx := context.Background()
+	ctx := testutils.Context(t)
 
 	largeNumber, ok := big.NewInt(0).SetString("1000000000000000000", 10) //1e18
 	require.True(t, ok)
