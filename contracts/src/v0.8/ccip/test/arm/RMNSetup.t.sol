@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.24;
 
-import {RMN} from "src/RMN.sol";
-import {IRMN} from "src/IRMN.sol";
+import {RMN} from "../../RMN.sol";
+import {IRMN} from "../../interfaces/IRMN.sol";
 
-import {Test} from "lib/forge-std/src/Test.sol";
+import {Test} from "forge-std/Test.sol";
 
 function makeSubjects(bytes16 a) pure returns (bytes16[] memory) {
   bytes16[] memory subjects = new bytes16[](1);

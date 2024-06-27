@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.24;
 
-import {RMN, GLOBAL_CURSE_SUBJECT, OWNER_CURSE_VOTE_ADDR} from "src/RMN.sol";
-import {RMNSetup, makeCursesHash, makeSubjects} from "test/RMNSetup.t.sol";
+import {GLOBAL_CURSE_SUBJECT, OWNER_CURSE_VOTE_ADDR, RMN} from "../../RMN.sol";
+import {RMNSetup, makeCursesHash, makeSubjects} from "./RMNSetup.t.sol";
 
 contract RMN_voteToBless_Benchmark is RMNSetup {
   function test_RootSuccess_gas(uint256 n) internal {

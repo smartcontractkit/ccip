@@ -1,13 +1,12 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.24;
 
-import {IRMN} from "src/IRMN.sol";
+import {IRMN} from "../../interfaces/IRMN.sol";
 
-import {ARMProxy} from "src/ARMProxy.sol";
-import {RMN} from "src/RMN.sol";
-
-import {MockRMN} from "test/MockRMN.t.sol";
-import {RMNSetup, makeSubjects} from "test/RMNSetup.t.sol";
+import {ARMProxy} from "../../ARMProxy.sol";
+import {RMN} from "../../RMN.sol";
+import {MockRMN} from "../mocks/MockRMN.sol";
+import {RMNSetup, makeSubjects} from "./RMNSetup.t.sol";
 
 contract ARMProxyTest is RMNSetup {
   MockRMN internal s_mockRMN;

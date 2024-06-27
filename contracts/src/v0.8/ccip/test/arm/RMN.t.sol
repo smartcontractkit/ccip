@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.24;
 
-import {IRMN} from "src/IRMN.sol";
+import {IRMN} from "../../interfaces/IRMN.sol";
 
-import {RMN, GLOBAL_CURSE_SUBJECT, LIFT_CURSE_VOTE_ADDR, OWNER_CURSE_VOTE_ADDR} from "src/RMN.sol";
-import {RMNSetup, makeCursesHash, makeSubjects} from "test/RMNSetup.t.sol";
+import {GLOBAL_CURSE_SUBJECT, LIFT_CURSE_VOTE_ADDR, OWNER_CURSE_VOTE_ADDR, RMN} from "../../RMN.sol";
+import {RMNSetup, makeCursesHash, makeSubjects} from "./RMNSetup.t.sol";
 
-import {Test} from "lib/forge-std/src/Test.sol";
+import {Test} from "forge-std/Test.sol";
 
 bytes28 constant GARBAGE_CURSES_HASH = bytes28(keccak256("GARBAGE_CURSES_HASH"));
 

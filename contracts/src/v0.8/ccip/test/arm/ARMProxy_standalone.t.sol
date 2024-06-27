@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.24;
 
-import {Test} from "lib/forge-std/src/Test.sol";
-import {ARMProxy} from "src/ARMProxy.sol";
+import {ARMProxy} from "../../ARMProxy.sol";
+import {Test} from "forge-std/Test.sol";
 
 contract ARMProxyStandaloneTest is Test {
   address internal constant EMPTY_ADDRESS = address(0x1);
