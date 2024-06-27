@@ -23,7 +23,6 @@ const maxReportSizeBytes = 250_000
 
 // Plugin implements the main ocr3 plugin logic.
 type Plugin struct {
-	ctx             context.Context
 	reportingCfg    ocr3types.ReportingPluginConfig
 	cfg             cciptypes.ExecutePluginConfig
 	ccipReader      cciptypes.CCIPReader
@@ -37,7 +36,6 @@ type Plugin struct {
 }
 
 func NewPlugin(
-	ctx context.Context,
 	reportingCfg ocr3types.ReportingPluginConfig,
 	cfg cciptypes.ExecutePluginConfig,
 	ccipReader cciptypes.CCIPReader,
@@ -51,7 +49,6 @@ func NewPlugin(
 	// TODO: initialize tokenDataReader.
 
 	return &Plugin{
-		ctx:          ctx,
 		reportingCfg: reportingCfg,
 		cfg:          cfg,
 		ccipReader:   ccipReader,
@@ -492,8 +489,9 @@ func (p *Plugin) Outcome(
 		}
 	}
 
+	// TODO: this function should be pure, a context should not be needed.
 	outcomeReports, commitReports, err :=
-		selectReport(p.ctx, p.lggr, p.msgHasher, p.reportCodec, p.tokenDataReader, commitReports, maxReportSizeBytes)
+		selectReport(context.Background(), p.lggr, p.msgHasher, p.reportCodec, p.tokenDataReader, commitReports, maxReportSizeBytes)
 	if err != nil {
 		return ocr3types.Outcome{}, fmt.Errorf("unable to extract proofs: %w", err)
 	}
@@ -511,7 +509,8 @@ func (p *Plugin) Reports(seqNr uint64, outcome ocr3types.Outcome) ([]ocr3types.R
 		return nil, err
 	}
 
-	encoded, err := p.reportCodec.Encode(p.ctx, decodedOutcome.Report)
+	// TODO: this function should be pure, a context should not be needed.
+	encoded, err := p.reportCodec.Encode(context.Background(), decodedOutcome.Report)
 	if err != nil {
 		return nil, err
 	}
