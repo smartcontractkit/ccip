@@ -5,7 +5,7 @@ FinalityDepth = 50
 FinalityTagEnabled = false
 LogBackfillBatchSize = 1000
 LogPollInterval = '15s'
-LogKeepBlocksDepth = 100_000
+LogKeepBlocksDepth = 100000
 # CCIP uses paging when removing logs to avoid pushing too much pressure on the database
 LogPrunePageSize = 10000
 BackupLogPollerBlockDelay = 100
