@@ -223,16 +223,24 @@ type TokenDataReader interface {
 	ReadTokenData(ctx context.Context, srcChain cciptypes.ChainSelector, num cciptypes.SeqNum) ([][]byte, error)
 }
 
-// buildSingleChainReport constructs a single chain report from a commit report.
+// buildSingleChainReport converts the on-chain event data stored in cciptypes.ExecutePluginCommitDataWithMessages into
+// the final on-chain report format.
+//
+// The hasher and encoding codec are provided as arguments to allow for chain-specific formats to be used.
+//
+// The maxMessages argument is used to limit the number of messages that are included in the report. If maxMessages is
+// set to 0, all messages will be included. This allows the caller to create smaller reports if needed.
 func buildSingleChainReport(
 	ctx context.Context,
 	lggr logger.Logger,
 	hasher cciptypes.MessageHasher,
 	tokenDataReader TokenDataReader,
-	codec cciptypes.ExecutePluginCodec,
+	encoder cciptypes.ExecutePluginCodec,
 	report cciptypes.ExecutePluginCommitDataWithMessages,
 	maxMessages int,
 ) (cciptypes.ExecutePluginReportSingleChain, int, error) {
+	// TODO: maxMessages selects messages in FIFO order which may not yield the optimal message size. One message with a
+	//       maximum data size could push the report over a size limit even if several smaller messages could have fit.
 	if maxMessages == 0 {
 		maxMessages = len(report.Messages)
 	}
@@ -339,7 +347,7 @@ func buildSingleChainReport(
 	//       does not add any additional overhead to the size being computed here.
 
 	// Compute the size of the encoded report.
-	encoded, err := codec.Encode(
+	encoded, err := encoder.Encode(
 		ctx,
 		cciptypes.ExecutePluginReport{
 			ChainReports: []cciptypes.ExecutePluginReportSingleChain{finalReport},
@@ -353,7 +361,11 @@ func buildSingleChainReport(
 	return finalReport, len(encoded), nil
 }
 
-// selectReport takes an ordered list of reports and selects the first reports that fit within the maxReportSizeBytes.
+// selectReport takes a list of reports in execution order and selects the first reports that fit within the
+// maxReportSizeBytes. Individual messages in a commit report may be skipped for various reasons, for example if an
+// out-of-order execution is detected or the message requires additional off-chain metadata which is not yet available.
+// If there is not enough space in the final report, it may be partially executed by searching for a subset of messages
+// which can fit in the final report.
 func selectReport(
 	ctx context.Context,
 	lggr logger.Logger,
@@ -444,6 +456,8 @@ func selectReport(
 	return finalReports, reports, nil
 }
 
+// Outcome collects the reports from the two phases and constructs the final outcome. Part of the outcome is a fully
+// formed report that will be encoded for final transmission in the reporting phase.
 func (p *Plugin) Outcome(
 	outctx ocr3types.OutcomeContext, query types.Query, aos []types.AttributedObservation,
 ) (ocr3types.Outcome, error) {
