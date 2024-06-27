@@ -198,6 +198,7 @@ func (r *homeChainPoller) Close() error {
 		select {
 		case <-ticker.C:
 			return fmt.Errorf("HomeChainReader did not close gracefully")
+		default:
 		}
 	}
 }
