@@ -2,6 +2,7 @@ package execute
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 	"sort"
@@ -223,6 +224,68 @@ type TokenDataReader interface {
 	ReadTokenData(ctx context.Context, srcChain cciptypes.ChainSelector, num cciptypes.SeqNum) ([][]byte, error)
 }
 
+// buildSingleChainReportMaxSize generates the largest report which fits into maxSizeBytes.
+// See buildSingleChainReport for more details about how a report is built.
+func buildSingleChainReportMaxSize(
+	ctx context.Context,
+	lggr logger.Logger,
+	hasher cciptypes.MessageHasher,
+	tokenDataReader TokenDataReader,
+	encoder cciptypes.ExecutePluginCodec,
+	report cciptypes.ExecutePluginCommitDataWithMessages,
+	maxSizeBytes int,
+) (cciptypes.ExecutePluginReportSingleChain, int, cciptypes.ExecutePluginCommitDataWithMessages, error) {
+	finalReport, encodedSize, err :=
+		buildSingleChainReport(ctx, lggr, hasher, tokenDataReader, encoder, report, 0)
+	if err != nil {
+		return cciptypes.ExecutePluginReportSingleChain{},
+			0,
+			cciptypes.ExecutePluginCommitDataWithMessages{},
+			fmt.Errorf("unable to build a single chain report (max): %w", err)
+	}
+
+	// return fully executed report
+	if encodedSize <= maxSizeBytes {
+		report = markNewMessagesExecuted(finalReport, report)
+		return finalReport, encodedSize, report, nil
+	}
+
+	// The full report is too large, binary search to find the maximum in-order messages which fit.
+	low := 1
+	high := len(report.Messages) - 1
+	for low <= high {
+		mid := low + ((high - low) / 2)
+
+		finalReport2, encodedSize2, err2 :=
+			buildSingleChainReport(ctx, lggr, hasher, tokenDataReader, encoder, report, mid)
+		if err2 != nil {
+			return cciptypes.ExecutePluginReportSingleChain{}, 0, cciptypes.ExecutePluginCommitDataWithMessages{}, fmt.Errorf(
+				"unable to build a single chain report (messages %d): %w", mid, err2)
+		}
+
+		if (encodedSize2) <= maxSizeBytes {
+			// mid is a valid report size, try something bigger next iteration.
+			finalReport = finalReport2
+			encodedSize = encodedSize2
+			low = mid + 1
+		} else {
+			// mid is invalid, try something smaller next iteration.
+			high = mid - 1
+		}
+	}
+
+	if high == 0 {
+		// No messages fit into the report.
+		return cciptypes.ExecutePluginReportSingleChain{},
+			0,
+			cciptypes.ExecutePluginCommitDataWithMessages{},
+			errNothingExecuted
+	}
+
+	report = markNewMessagesExecuted(finalReport, report)
+	return finalReport, encodedSize, report, nil
+}
+
 // buildSingleChainReport converts the on-chain event data stored in cciptypes.ExecutePluginCommitDataWithMessages into
 // the final on-chain report format.
 //
@@ -370,7 +433,7 @@ func selectReport(
 	ctx context.Context,
 	lggr logger.Logger,
 	hasher cciptypes.MessageHasher,
-	codec cciptypes.ExecutePluginCodec,
+	encoder cciptypes.ExecutePluginCodec,
 	tokenDataReader TokenDataReader,
 	reports []cciptypes.ExecutePluginCommitDataWithMessages,
 	maxReportSizeBytes int,
@@ -378,65 +441,31 @@ func selectReport(
 	// TODO: It may be desirable for this entire function to be an interface so that
 	//       different selection algorithms can be used.
 
-	size := 0
+	// count number of fully executed reports so that they can be removed after iterating the reports.
 	fullyExecuted := 0
-	partialReport := false
+	accumulatedSize := 0
 	var finalReports []cciptypes.ExecutePluginReportSingleChain
 	for reportIdx, report := range reports {
-		finalReport, encodedSize, err :=
-			buildSingleChainReport(ctx, lggr, hasher, tokenDataReader, codec, report, 0)
-		if err != nil {
-			return nil, nil, fmt.Errorf("unable to build a single chain report (max): %w", err)
-		}
-
-		// The full report is too large, binary search for best report size
-		if (size + encodedSize) >= maxReportSizeBytes {
-			partialReport = true
-			low := 1
-			high := len(report.Messages) - 1
-			for low <= high {
-				mid := low + ((high - low) / 2)
-
-				finalReport2, encodedSize2, err2 :=
-					buildSingleChainReport(ctx, lggr, hasher, tokenDataReader, codec, report, mid)
-				if err2 != nil {
-					return nil, nil, fmt.Errorf(
-						"unable to build a single chain report (messages %d): %w", mid, err2)
-				}
-
-				if (size + encodedSize2) <= maxReportSizeBytes {
-					// mid is a valid report size, try something bigger next iteration.
-					finalReport = finalReport2
-					encodedSize = encodedSize2
-					low = mid + 1
-				} else {
-					// mid is invalid, try something smaller next iteration.
-					high = mid - 1
-				}
-			}
-
-			if high == 0 {
-				// No messages could fit in the report.
-				break
-			}
-
-			// Mark new messages executed.
-			for i := 0; i < len(finalReport.Messages); i++ {
-				reports[reportIdx].ExecutedMessages =
-					append(reports[reportIdx].ExecutedMessages, finalReport.Messages[i].SeqNum)
-			}
-			sort.Slice(
-				report.ExecutedMessages,
-				func(i, j int) bool { return report.ExecutedMessages[i] < report.ExecutedMessages[j] })
-		} else {
-			fullyExecuted++
-		}
-
-		size += encodedSize
-		finalReports = append(finalReports, finalReport)
-		if partialReport {
+		execReport, encodedSize, updatedReport, err :=
+			buildSingleChainReportMaxSize(ctx, lggr, hasher, tokenDataReader, encoder,
+				report, maxReportSizeBytes-accumulatedSize)
+		// No messages fit into the report, stop adding more reports.
+		if errors.Is(err, errNothingExecuted) {
 			break
 		}
+		if err != nil {
+			return nil, nil, fmt.Errorf("unable to build single chain report: %w", err)
+		}
+		reports[reportIdx] = updatedReport
+		accumulatedSize += encodedSize
+		finalReports = append(finalReports, execReport)
+
+		// partially executed report detected, stop adding more reports.
+		// TODO: do not break if messages were intentionally skipped.
+		if len(updatedReport.Messages) != len(updatedReport.ExecutedMessages) {
+			break
+		}
+		fullyExecuted++
 	}
 
 	// Remove reports that are about to be executed.
@@ -449,7 +478,7 @@ func selectReport(
 	lggr.Infow(
 		"selected commit reports for execution report",
 		"numReports", len(finalReports),
-		"size", size,
+		"size", accumulatedSize,
 		"incompleteReports", len(reports),
 		"maxSize", maxReportSizeBytes)
 
@@ -505,7 +534,8 @@ func (p *Plugin) Outcome(
 
 	// TODO: this function should be pure, a context should not be needed.
 	outcomeReports, commitReports, err :=
-		selectReport(context.Background(), p.lggr, p.msgHasher, p.reportCodec, p.tokenDataReader, commitReports, maxReportSizeBytes)
+		selectReport(context.Background(), p.lggr, p.msgHasher, p.reportCodec, p.tokenDataReader,
+			commitReports, maxReportSizeBytes)
 	if err != nil {
 		return ocr3types.Outcome{}, fmt.Errorf("unable to extract proofs: %w", err)
 	}
