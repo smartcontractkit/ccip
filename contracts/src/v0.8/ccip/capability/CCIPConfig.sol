@@ -10,12 +10,12 @@ import {OwnerIsCreator} from "../../shared/access/OwnerIsCreator.sol";
 import {IERC165} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/interfaces/IERC165.sol";
 import {EnumerableSet} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/structs/EnumerableSet.sol";
 
-/// @notice CCIPCapabilityConfiguration stores the configuration for the CCIP capability.
+/// @notice CCIPConfig stores the configuration for the CCIP capability.
 /// We have two classes of configuration: chain configuration and DON (in the CapabilitiesRegistry sense) configuration.
 /// Each chain will have a single configuration which includes information like the router address.
 /// Each CR DON will have up to four configurations: for each of (commit, exec), one blue and one green configuration.
 /// This is done in order to achieve "blue-green" deployments.
-contract CCIPCapabilityConfiguration is ITypeAndVersion, ICapabilityConfiguration, OwnerIsCreator, IERC165 {
+contract CCIPConfig is ITypeAndVersion, ICapabilityConfiguration, OwnerIsCreator, IERC165 {
   using EnumerableSet for EnumerableSet.UintSet;
 
   /// @notice Emitted when a chain's configuration is set.
@@ -109,7 +109,7 @@ contract CCIPCapabilityConfiguration is ITypeAndVersion, ICapabilityConfiguratio
   }
 
   /// @notice Type and version override.
-  string public constant override typeAndVersion = "CCIPCapabilityConfiguration 1.6.0-dev";
+  string public constant override typeAndVersion = "CCIPConfig 1.6.0-dev";
 
   /// @notice The canonical capabilities registry address.
   address internal immutable i_capabilitiesRegistry;
@@ -139,9 +139,7 @@ contract CCIPCapabilityConfiguration is ITypeAndVersion, ICapabilityConfiguratio
 
   /// @inheritdoc IERC165
   function supportsInterface(bytes4 interfaceId) external pure override returns (bool) {
-    return interfaceId
-      == ICapabilityConfiguration.getCapabilityConfiguration.selector
-        ^ ICapabilityConfiguration.beforeCapabilityConfigSet.selector;
+    return interfaceId == type(ICapabilityConfiguration).interfaceId || interfaceId == type(IERC165).interfaceId;
   }
 
   // ================================================================
