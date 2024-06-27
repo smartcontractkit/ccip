@@ -15,6 +15,7 @@ import {TokenPool} from "../../pools/TokenPool.sol";
 import {TokenAdminRegistry} from "../../tokenAdminRegistry/TokenAdminRegistry.sol";
 import {TokenSetup} from "../TokenSetup.t.sol";
 import {EVM2EVMMultiOnRampHelper} from "../helpers/EVM2EVMMultiOnRampHelper.sol";
+import {MessageInterceptorHelper} from "../helpers/MessageInterceptorHelper.sol";
 import {PriceRegistrySetup} from "../priceRegistry/PriceRegistry.t.sol";
 
 import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
@@ -32,6 +33,7 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
   bytes32 internal s_metadataHash;
 
   EVM2EVMMultiOnRampHelper internal s_onRamp;
+  MessageInterceptorHelper internal s_outboundMessageValidator;
   address[] internal s_offRamps;
   NonceManager internal s_nonceManager;
   address internal s_destTokenPool = makeAddr("destTokenPool");
@@ -70,7 +72,6 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
           deciBps: 2_5, // 2.5 bps, or 0.025%
           destGasOverhead: 40_000,
           destBytesOverhead: 32,
-          aggregateRateLimitEnabled: true,
           isEnabled: true
         })
       })
@@ -84,7 +85,6 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
           deciBps: 5_0, // 5 bps, or 0.05%
           destGasOverhead: 10_000,
           destBytesOverhead: 100,
-          aggregateRateLimitEnabled: true,
           isEnabled: true
         })
       })
@@ -98,12 +98,12 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
           deciBps: 10_0, // 10 bps, or 0.1%
           destGasOverhead: 1,
           destBytesOverhead: 200,
-          aggregateRateLimitEnabled: true,
           isEnabled: true
         })
       })
     );
 
+    s_outboundMessageValidator = new MessageInterceptorHelper();
     s_nonceManager = new NonceManager(new address[](0));
     (s_onRamp, s_metadataHash) = _deployOnRamp(
       SOURCE_CHAIN_SELECTOR, address(s_sourceRouter), address(s_nonceManager), address(s_tokenAdminRegistry)
@@ -174,6 +174,7 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
     return _messageToEvent(
       message,
       SOURCE_CHAIN_SELECTOR,
+      DEST_CHAIN_SELECTOR,
       seqNum,
       nonce,
       feeTokenAmount,
@@ -185,7 +186,8 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
 
   function _messageToEvent(
     Client.EVM2AnyMessage memory message,
-    uint64 sourChainSelector,
+    uint64 sourceChainSelector,
+    uint64 destChainSelector,
     uint64 seqNum,
     uint64 nonce,
     uint256 feeTokenAmount,
@@ -193,14 +195,16 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
     bytes32 metadataHash,
     TokenAdminRegistry tokenAdminRegistry
   ) internal view returns (Internal.EVM2EVMMessage memory) {
+    Client.EVMExtraArgsV2 memory extraArgs = s_onRamp.extraArgsFromBytes(message.extraArgs, destChainSelector);
+
     Internal.EVM2EVMMessage memory messageEvent = Internal.EVM2EVMMessage({
       sequenceNumber: seqNum,
       feeTokenAmount: feeTokenAmount,
       sender: originalSender,
-      nonce: nonce,
-      gasLimit: abi.decode(_removeFirst4Bytes(message.extraArgs), (Client.EVMExtraArgsV1)).gasLimit,
+      nonce: extraArgs.allowOutOfOrderExecution ? 0 : nonce,
+      gasLimit: extraArgs.gasLimit,
       strict: false,
-      sourceChainSelector: sourChainSelector,
+      sourceChainSelector: sourceChainSelector,
       receiver: abi.decode(message.receiver, (address)),
       data: message.data,
       tokenAmounts: message.tokenAmounts,
@@ -210,27 +214,38 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
     });
 
     for (uint256 i = 0; i < message.tokenAmounts.length; ++i) {
-      address destToken = s_destTokenBySourceToken[message.tokenAmounts[i].token];
-
-      messageEvent.sourceTokenData[i] = abi.encode(
-        Internal.SourceTokenData({
-          sourcePoolAddress: abi.encode(tokenAdminRegistry.getTokenConfig(message.tokenAmounts[i].token).tokenPool),
-          destTokenAddress: abi.encode(destToken),
-          extraData: ""
-        })
-      );
+      messageEvent.sourceTokenData[i] = _getSourceTokenData(message.tokenAmounts[i], tokenAdminRegistry);
     }
 
     messageEvent.messageId = Internal._hash(messageEvent, metadataHash);
     return messageEvent;
   }
 
+  function _getSourceTokenData(
+    Client.EVMTokenAmount memory tokenAmount,
+    TokenAdminRegistry tokenAdminRegistry
+  ) internal view returns (bytes memory) {
+    address destToken = s_destTokenBySourceToken[tokenAmount.token];
+
+    return abi.encode(
+      Internal.SourceTokenData({
+        sourcePoolAddress: abi.encode(tokenAdminRegistry.getTokenConfig(tokenAmount.token).tokenPool),
+        destTokenAddress: abi.encode(destToken),
+        extraData: ""
+      })
+    );
+  }
+
   function _generateDynamicMultiOnRampConfig(
     address router,
     address priceRegistry
   ) internal pure returns (EVM2EVMMultiOnRamp.DynamicConfig memory) {
-    return
-      EVM2EVMMultiOnRamp.DynamicConfig({router: router, priceRegistry: priceRegistry, feeAggregator: FEE_AGGREGATOR});
+    return EVM2EVMMultiOnRamp.DynamicConfig({
+      router: router,
+      priceRegistry: priceRegistry,
+      messageValidator: address(0),
+      feeAggregator: FEE_AGGREGATOR
+    });
   }
 
   // Slicing is only available for calldata. So we have to build a new bytes array.
@@ -261,7 +276,8 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
         defaultTokenDestBytesOverhead: DEFAULT_TOKEN_BYTES_OVERHEAD,
         defaultTxGasLimit: GAS_LIMIT,
         gasMultiplierWeiPerEth: 5e17,
-        networkFeeUSDCents: 1_00
+        networkFeeUSDCents: 1_00,
+        enforceOutOfOrder: false
       }),
       prevOnRamp: address(0)
     });
@@ -298,11 +314,9 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
       }),
       _generateDynamicMultiOnRampConfig(sourceRouter, address(s_priceRegistry)),
       _generateDestChainConfigArgs(),
-      getOutboundRateLimiterConfig(),
       s_premiumMultiplierWeiPerEthArgs,
       s_tokenTransferFeeConfigArgs
     );
-    onRamp.setAdmin(ADMIN);
 
     address[] memory authorizedCallers = new address[](1);
     authorizedCallers[0] = address(onRamp);
@@ -315,6 +329,27 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
       onRamp,
       keccak256(abi.encode(Internal.EVM_2_EVM_MESSAGE_HASH, sourceChainSelector, DEST_CHAIN_SELECTOR, address(onRamp)))
     );
+  }
+
+  function _enableOutboundMessageValidator() internal {
+    (, address msgSender,) = vm.readCallers();
+
+    bool resetPrank = false;
+
+    if (msgSender != OWNER) {
+      vm.stopPrank();
+      vm.startPrank(OWNER);
+      resetPrank = true;
+    }
+
+    EVM2EVMMultiOnRamp.DynamicConfig memory dynamicConfig = s_onRamp.getDynamicConfig();
+    dynamicConfig.messageValidator = address(s_outboundMessageValidator);
+    s_onRamp.setDynamicConfig(dynamicConfig);
+
+    if (resetPrank) {
+      vm.stopPrank();
+      vm.startPrank(msgSender);
+    }
   }
 
   function _assertDestChainConfigsEqual(
@@ -367,7 +402,6 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
     assertEq(a.deciBps, b.deciBps);
     assertEq(a.destGasOverhead, b.destGasOverhead);
     assertEq(a.destBytesOverhead, b.destBytesOverhead);
-    assertEq(a.aggregateRateLimitEnabled, b.aggregateRateLimitEnabled);
     assertEq(a.isEnabled, b.isEnabled);
   }
 }

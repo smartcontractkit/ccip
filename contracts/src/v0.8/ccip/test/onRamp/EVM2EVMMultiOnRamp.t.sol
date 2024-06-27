@@ -1,16 +1,20 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.24;
 
-import {BurnMintERC677} from "../../../shared/token/ERC677/BurnMintERC677.sol";
-import {AggregateRateLimiter} from "../../AggregateRateLimiter.sol";
+import {IMessageInterceptor} from "../../interfaces/IMessageInterceptor.sol";
 import {ITokenAdminRegistry} from "../../interfaces/ITokenAdminRegistry.sol";
+
+import {BurnMintERC677} from "../../../shared/token/ERC677/BurnMintERC677.sol";
+import {MultiAggregateRateLimiter} from "../../MultiAggregateRateLimiter.sol";
 import {Pool} from "../../libraries/Pool.sol";
 import {RateLimiter} from "../../libraries/RateLimiter.sol";
 import {USDPriceWith18Decimals} from "../../libraries/USDPriceWith18Decimals.sol";
 import {EVM2EVMMultiOnRamp} from "../../onRamp/EVM2EVMMultiOnRamp.sol";
-import {EVM2EVMMultiOnRamp} from "../../onRamp/EVM2EVMMultiOnRamp.sol";
+import {EVM2EVMOnRamp} from "../../onRamp/EVM2EVMOnRamp.sol";
 import {TokenAdminRegistry} from "../../tokenAdminRegistry/TokenAdminRegistry.sol";
+import {EVM2EVMOnRampHelper} from "../helpers/EVM2EVMOnRampHelper.sol";
 import {MaybeRevertingBurnMintTokenPool} from "../helpers/MaybeRevertingBurnMintTokenPool.sol";
+import {MessageInterceptorHelper} from "../helpers/MessageInterceptorHelper.sol";
 import "./EVM2EVMMultiOnRampSetup.t.sol";
 
 contract EVM2EVMMultiOnRamp_constructor is EVM2EVMMultiOnRampSetup {
@@ -100,7 +104,6 @@ contract EVM2EVMMultiOnRamp_constructor is EVM2EVMMultiOnRampSetup {
       }),
       _generateDynamicMultiOnRampConfig(address(s_sourceRouter), address(s_priceRegistry)),
       _generateDestChainConfigArgs(),
-      getOutboundRateLimiterConfig(),
       s_premiumMultiplierWeiPerEthArgs,
       s_tokenTransferFeeConfigArgs
     );
@@ -119,7 +122,6 @@ contract EVM2EVMMultiOnRamp_constructor is EVM2EVMMultiOnRampSetup {
       }),
       _generateDynamicMultiOnRampConfig(address(s_sourceRouter), address(s_priceRegistry)),
       _generateDestChainConfigArgs(),
-      getOutboundRateLimiterConfig(),
       s_premiumMultiplierWeiPerEthArgs,
       s_tokenTransferFeeConfigArgs
     );
@@ -138,7 +140,6 @@ contract EVM2EVMMultiOnRamp_constructor is EVM2EVMMultiOnRampSetup {
       }),
       _generateDynamicMultiOnRampConfig(address(s_sourceRouter), address(s_priceRegistry)),
       _generateDestChainConfigArgs(),
-      getOutboundRateLimiterConfig(),
       s_premiumMultiplierWeiPerEthArgs,
       s_tokenTransferFeeConfigArgs
     );
@@ -157,7 +158,6 @@ contract EVM2EVMMultiOnRamp_constructor is EVM2EVMMultiOnRampSetup {
       }),
       _generateDynamicMultiOnRampConfig(address(s_sourceRouter), address(s_priceRegistry)),
       _generateDestChainConfigArgs(),
-      getOutboundRateLimiterConfig(),
       s_premiumMultiplierWeiPerEthArgs,
       s_tokenTransferFeeConfigArgs
     );
@@ -176,7 +176,6 @@ contract EVM2EVMMultiOnRamp_constructor is EVM2EVMMultiOnRampSetup {
       }),
       _generateDynamicMultiOnRampConfig(address(s_sourceRouter), address(s_priceRegistry)),
       _generateDestChainConfigArgs(),
-      getOutboundRateLimiterConfig(),
       s_premiumMultiplierWeiPerEthArgs,
       s_tokenTransferFeeConfigArgs
     );
@@ -420,11 +419,78 @@ contract EVM2EVMMultiOnRamp_forwardFromRouter is EVM2EVMMultiOnRampSetup {
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, feeAmount, OWNER);
   }
 
+  function test_ForwardFromRouterExtraArgsV2_Success() public {
+    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
+    message.extraArgs = abi.encodeWithSelector(
+      Client.EVM_EXTRA_ARGS_V2_TAG, Client.EVMExtraArgsV2({gasLimit: GAS_LIMIT * 2, allowOutOfOrderExecution: false})
+    );
+    uint256 feeAmount = 1234567890;
+    IERC20(s_sourceFeeToken).transferFrom(OWNER, address(s_onRamp), feeAmount);
+
+    vm.expectEmit();
+    emit EVM2EVMMultiOnRamp.CCIPSendRequested(DEST_CHAIN_SELECTOR, _messageToEvent(message, 1, 1, feeAmount, OWNER));
+
+    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, feeAmount, OWNER);
+  }
+
+  function test_ForwardFromRouterExtraArgsV2AllowOutOfOrderTrue_Success() public {
+    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
+    message.extraArgs = abi.encodeWithSelector(
+      Client.EVM_EXTRA_ARGS_V2_TAG, Client.EVMExtraArgsV2({gasLimit: GAS_LIMIT * 2, allowOutOfOrderExecution: true})
+    );
+    uint256 feeAmount = 1234567890;
+    IERC20(s_sourceFeeToken).transferFrom(OWNER, address(s_onRamp), feeAmount);
+
+    vm.expectEmit();
+    emit EVM2EVMMultiOnRamp.CCIPSendRequested(DEST_CHAIN_SELECTOR, _messageToEvent(message, 1, 1, feeAmount, OWNER));
+
+    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, feeAmount, OWNER);
+  }
+
+  function test_Fuzz_EnforceOutOfOrder(bool enforce, bool allowOutOfOrderExecution) public {
+    // Update dynamic config to enforce allowOutOfOrderExecution = defaultVal.
+    vm.stopPrank();
+    vm.startPrank(OWNER);
+
+    EVM2EVMMultiOnRamp.DestChainConfigArgs[] memory destChainConfigArgs = _generateDestChainConfigArgs();
+    destChainConfigArgs[0].dynamicConfig.enforceOutOfOrder = enforce;
+    s_onRamp.applyDestChainConfigUpdates(destChainConfigArgs);
+
+    vm.stopPrank();
+
+    vm.startPrank(address(s_sourceRouter));
+    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
+    message.extraArgs = abi.encodeWithSelector(
+      Client.EVM_EXTRA_ARGS_V2_TAG,
+      Client.EVMExtraArgsV2({gasLimit: GAS_LIMIT * 2, allowOutOfOrderExecution: allowOutOfOrderExecution})
+    );
+    uint256 feeAmount = 1234567890;
+    IERC20(s_sourceFeeToken).transferFrom(OWNER, address(s_onRamp), feeAmount);
+
+    if (enforce) {
+      // If enforcement is on, only true should be allowed.
+      if (allowOutOfOrderExecution) {
+        vm.expectEmit();
+        emit EVM2EVMMultiOnRamp.CCIPSendRequested(DEST_CHAIN_SELECTOR, _messageToEvent(message, 1, 1, feeAmount, OWNER));
+        s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, feeAmount, OWNER);
+      } else {
+        vm.expectRevert(EVM2EVMMultiOnRamp.ExtraArgOutOfOrderExecutionMustBeTrue.selector);
+        s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, feeAmount, OWNER);
+      }
+    } else {
+      // no enforcement should allow any value.
+      vm.expectEmit();
+      emit EVM2EVMMultiOnRamp.CCIPSendRequested(DEST_CHAIN_SELECTOR, _messageToEvent(message, 1, 1, feeAmount, OWNER));
+      s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, feeAmount, OWNER);
+    }
+  }
+
   function test_ShouldIncrementSeqNumAndNonce_Success() public {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
 
     for (uint64 i = 1; i < 4; ++i) {
       uint64 nonceBefore = s_nonceManager.getOutboundNonce(DEST_CHAIN_SELECTOR, OWNER);
+      uint64 sequenceNumberBefore = s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR).sequenceNumber;
 
       vm.expectEmit();
       emit EVM2EVMMultiOnRamp.CCIPSendRequested(DEST_CHAIN_SELECTOR, _messageToEvent(message, i, i, 0, OWNER));
@@ -432,7 +498,31 @@ contract EVM2EVMMultiOnRamp_forwardFromRouter is EVM2EVMMultiOnRampSetup {
       s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 0, OWNER);
 
       uint64 nonceAfter = s_nonceManager.getOutboundNonce(DEST_CHAIN_SELECTOR, OWNER);
+      uint64 sequenceNumberAfter = s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR).sequenceNumber;
       assertEq(nonceAfter, nonceBefore + 1);
+      assertEq(sequenceNumberAfter, sequenceNumberBefore + 1);
+    }
+  }
+
+  function test_ShouldIncrementNonceOnlyOnOrdered_Success() public {
+    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
+    message.extraArgs = abi.encodeWithSelector(
+      Client.EVM_EXTRA_ARGS_V2_TAG, Client.EVMExtraArgsV2({gasLimit: GAS_LIMIT * 2, allowOutOfOrderExecution: true})
+    );
+
+    for (uint64 i = 1; i < 4; ++i) {
+      uint64 nonceBefore = s_nonceManager.getOutboundNonce(DEST_CHAIN_SELECTOR, OWNER);
+      uint64 sequenceNumberBefore = s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR).sequenceNumber;
+
+      vm.expectEmit();
+      emit EVM2EVMMultiOnRamp.CCIPSendRequested(DEST_CHAIN_SELECTOR, _messageToEvent(message, i, i, 0, OWNER));
+
+      s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 0, OWNER);
+
+      uint64 nonceAfter = s_nonceManager.getOutboundNonce(DEST_CHAIN_SELECTOR, OWNER);
+      uint64 sequenceNumberAfter = s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR).sequenceNumber;
+      assertEq(nonceAfter, nonceBefore);
+      assertEq(sequenceNumberAfter, sequenceNumberBefore + 1);
     }
   }
 
@@ -499,48 +589,22 @@ contract EVM2EVMMultiOnRamp_forwardFromRouter is EVM2EVMMultiOnRampSetup {
     );
   }
 
-  function test_OverValueWithARLOff_Success() public {
+  function test_forwardFromRouter_WithValidation_Success() public {
+    _enableOutboundMessageValidator();
+
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
+    message.extraArgs = Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: GAS_LIMIT * 2}));
+    uint256 feeAmount = 1234567890;
     message.tokenAmounts = new Client.EVMTokenAmount[](1);
-    message.tokenAmounts[0].amount = 10;
+    message.tokenAmounts[0].amount = 1e18;
     message.tokenAmounts[0].token = s_sourceTokens[0];
+    IERC20(s_sourceFeeToken).transferFrom(OWNER, address(s_onRamp), feeAmount);
+    s_outboundMessageValidator.setMessageIdValidationState(keccak256(abi.encode(message)), false);
 
-    IERC20(s_sourceTokens[0]).approve(address(s_onRamp), 10);
+    vm.expectEmit();
+    emit EVM2EVMMultiOnRamp.CCIPSendRequested(DEST_CHAIN_SELECTOR, _messageToEvent(message, 1, 1, feeAmount, OWNER));
 
-    vm.startPrank(OWNER);
-    // Set a high price to trip the ARL
-    uint224 tokenPrice = 3 ** 128;
-    Internal.PriceUpdates memory priceUpdates = getSingleTokenPriceUpdateStruct(s_sourceTokens[0], tokenPrice);
-    s_priceRegistry.updatePrices(priceUpdates);
-    vm.startPrank(address(s_sourceRouter));
-
-    vm.expectRevert(
-      abi.encodeWithSelector(
-        RateLimiter.AggregateValueMaxCapacityExceeded.selector,
-        getOutboundRateLimiterConfig().capacity,
-        (message.tokenAmounts[0].amount * tokenPrice) / 1e18
-      )
-    );
-    // Expect to fail from ARL
-    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 0, OWNER);
-
-    // Configure ARL off for token
-    EVM2EVMMultiOnRamp.TokenTransferFeeConfigArgs[] memory tokenTransferFeeConfigArgs =
-      _generateTokenTransferFeeConfigArgs(1, 1);
-    tokenTransferFeeConfigArgs[0].destChainSelector = DEST_CHAIN_SELECTOR;
-    tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].token = s_sourceTokens[0];
-    tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].tokenTransferFeeConfig =
-      s_onRamp.getTokenTransferFeeConfig(DEST_CHAIN_SELECTOR, s_sourceTokens[0]);
-    tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].tokenTransferFeeConfig.aggregateRateLimitEnabled = false;
-
-    vm.startPrank(OWNER);
-    s_onRamp.applyTokenTransferFeeConfigUpdates(
-      tokenTransferFeeConfigArgs, new EVM2EVMMultiOnRamp.TokenTransferFeeConfigRemoveArgs[](0)
-    );
-
-    vm.startPrank(address(s_sourceRouter));
-    // Expect the call now succeeds
-    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 0, OWNER);
+    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, feeAmount, OWNER);
   }
 
   // Reverts
@@ -600,6 +664,28 @@ contract EVM2EVMMultiOnRamp_forwardFromRouter is EVM2EVMMultiOnRampSetup {
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 0, STRANGER);
   }
 
+  function test_MessageValidationError_Revert() public {
+    _enableOutboundMessageValidator();
+
+    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
+    message.extraArgs = Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: GAS_LIMIT * 2}));
+    uint256 feeAmount = 1234567890;
+    message.tokenAmounts = new Client.EVMTokenAmount[](1);
+    message.tokenAmounts[0].amount = 1e18;
+    message.tokenAmounts[0].token = s_sourceTokens[0];
+    IERC20(s_sourceFeeToken).transferFrom(OWNER, address(s_onRamp), feeAmount);
+    s_outboundMessageValidator.setMessageIdValidationState(keccak256(abi.encode(message)), true);
+
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        IMessageInterceptor.MessageValidationError.selector,
+        abi.encodeWithSelector(IMessageInterceptor.MessageValidationError.selector, bytes("Invalid message"))
+      )
+    );
+
+    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, feeAmount, OWNER);
+  }
+
   function test_CannotSendZeroTokens_Revert() public {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
     message.tokenAmounts = new Client.EVMTokenAmount[](1);
@@ -628,43 +714,6 @@ contract EVM2EVMMultiOnRamp_forwardFromRouter is EVM2EVMMultiOnRampSetup {
     // Change back to the router
     vm.startPrank(address(s_sourceRouter));
     vm.expectRevert(abi.encodeWithSelector(EVM2EVMMultiOnRamp.UnsupportedToken.selector, wrongToken));
-
-    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 0, OWNER);
-  }
-
-  function test_MaxCapacityExceeded_Revert() public {
-    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
-    message.tokenAmounts = new Client.EVMTokenAmount[](1);
-    message.tokenAmounts[0].amount = 2 ** 128;
-    message.tokenAmounts[0].token = s_sourceTokens[0];
-
-    IERC20(s_sourceTokens[0]).approve(address(s_onRamp), 2 ** 128);
-
-    vm.expectRevert(
-      abi.encodeWithSelector(
-        RateLimiter.AggregateValueMaxCapacityExceeded.selector,
-        getOutboundRateLimiterConfig().capacity,
-        (message.tokenAmounts[0].amount * s_sourceTokenPrices[0]) / 1e18
-      )
-    );
-
-    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 0, OWNER);
-  }
-
-  function test_PriceNotFoundForToken_Revert() public {
-    // Set token price to 0
-    vm.stopPrank();
-    vm.startPrank(OWNER);
-    s_priceRegistry.updatePrices(getSingleTokenPriceUpdateStruct(CUSTOM_TOKEN, 0));
-
-    vm.startPrank(address(s_sourceRouter));
-
-    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
-    message.tokenAmounts = new Client.EVMTokenAmount[](1);
-    message.tokenAmounts[0].token = CUSTOM_TOKEN;
-    message.tokenAmounts[0].amount = 1;
-
-    vm.expectRevert(abi.encodeWithSelector(AggregateRateLimiter.PriceNotFoundForToken.selector, CUSTOM_TOKEN));
 
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 0, OWNER);
   }
@@ -787,7 +836,6 @@ contract EVM2EVMMultiOnRamp_forwardFromRouter is EVM2EVMMultiOnRampSetup {
       deciBps: 0,
       destGasOverhead: 0,
       destBytesOverhead: uint32(Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES) + 32,
-      aggregateRateLimitEnabled: false,
       isEnabled: true
     });
     s_onRamp.applyTokenTransferFeeConfigUpdates(
@@ -815,6 +863,27 @@ contract EVM2EVMMultiOnRamp_forwardFromRouter is EVM2EVMMultiOnRampSetup {
     vm.expectRevert(abi.encodeWithSelector(EVM2EVMMultiOnRamp.UnsupportedToken.selector, message.tokenAmounts[0].token));
 
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 0, OWNER);
+  }
+
+  function test_EnforceOutOfOrder_Revert() public {
+    // Update dynamic config to enforce allowOutOfOrderExecution = true.
+    vm.stopPrank();
+    vm.startPrank(OWNER);
+
+    EVM2EVMMultiOnRamp.DestChainConfigArgs[] memory destChainConfigArgs = _generateDestChainConfigArgs();
+    destChainConfigArgs[0].dynamicConfig.enforceOutOfOrder = true;
+    s_onRamp.applyDestChainConfigUpdates(destChainConfigArgs);
+    vm.stopPrank();
+
+    vm.startPrank(address(s_sourceRouter));
+    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
+    // Empty extraArgs to should revert since it enforceOutOfOrder is true.
+    message.extraArgs = "";
+    uint256 feeAmount = 1234567890;
+    IERC20(s_sourceFeeToken).transferFrom(OWNER, address(s_onRamp), feeAmount);
+
+    vm.expectRevert(EVM2EVMMultiOnRamp.ExtraArgOutOfOrderExecutionMustBeTrue.selector);
+    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, feeAmount, OWNER);
   }
 }
 
@@ -1392,7 +1461,6 @@ contract EVM2EVMMultiOnRamp_getTokenTransferCost is EVM2EVMMultiOnRamp_getFeeSet
       deciBps: 0,
       destGasOverhead: 0,
       destBytesOverhead: uint32(Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES),
-      aggregateRateLimitEnabled: true,
       isEnabled: true
     });
     s_onRamp.applyTokenTransferFeeConfigUpdates(
@@ -1518,24 +1586,6 @@ contract EVM2EVMMultiOnRamp_getTokenTransferCost is EVM2EVMMultiOnRamp_getFeeSet
 
     s_onRamp.getTokenTransferCost(DEST_CHAIN_SELECTOR, message.feeToken, s_feeTokenPrice, message.tokenAmounts);
   }
-
-  function test_ValidatedPriceStaleness_Revert() public {
-    vm.warp(block.timestamp + TWELVE_HOURS + 1);
-
-    Client.EVM2AnyMessage memory message = _generateSingleTokenMessage(s_sourceFeeToken, 1e36);
-    message.tokenAmounts[0].token = s_sourceRouter.getWrappedNative();
-
-    vm.expectRevert(
-      abi.encodeWithSelector(
-        PriceRegistry.StaleTokenPrice.selector,
-        s_sourceRouter.getWrappedNative(),
-        uint128(TWELVE_HOURS),
-        uint128(TWELVE_HOURS + 1)
-      )
-    );
-
-    s_onRamp.getTokenTransferCost(DEST_CHAIN_SELECTOR, message.feeToken, s_feeTokenPrice, message.tokenAmounts);
-  }
 }
 
 contract EVM2EVMMultiOnRamp_setDynamicConfig is EVM2EVMMultiOnRampSetup {
@@ -1544,6 +1594,7 @@ contract EVM2EVMMultiOnRamp_setDynamicConfig is EVM2EVMMultiOnRampSetup {
     EVM2EVMMultiOnRamp.DynamicConfig memory newConfig = EVM2EVMMultiOnRamp.DynamicConfig({
       router: address(2134),
       priceRegistry: address(23423),
+      messageValidator: makeAddr("messageValidator"),
       feeAggregator: FEE_AGGREGATOR
     });
 
@@ -1563,7 +1614,8 @@ contract EVM2EVMMultiOnRamp_setDynamicConfig is EVM2EVMMultiOnRampSetup {
     EVM2EVMMultiOnRamp.DynamicConfig memory newConfig = EVM2EVMMultiOnRamp.DynamicConfig({
       router: address(2134),
       priceRegistry: address(0),
-      feeAggregator: FEE_AGGREGATOR
+      feeAggregator: FEE_AGGREGATOR,
+      messageValidator: makeAddr("messageValidator")
     });
 
     vm.expectRevert(EVM2EVMMultiOnRamp.InvalidConfig.selector);
@@ -1574,6 +1626,7 @@ contract EVM2EVMMultiOnRamp_setDynamicConfig is EVM2EVMMultiOnRampSetup {
     EVM2EVMMultiOnRamp.DynamicConfig memory newConfig = EVM2EVMMultiOnRamp.DynamicConfig({
       router: address(1),
       priceRegistry: address(23423),
+      messageValidator: address(0),
       feeAggregator: FEE_AGGREGATOR
     });
 
@@ -1587,6 +1640,7 @@ contract EVM2EVMMultiOnRamp_setDynamicConfig is EVM2EVMMultiOnRampSetup {
     EVM2EVMMultiOnRamp.DynamicConfig memory newConfig = EVM2EVMMultiOnRamp.DynamicConfig({
       router: address(2134),
       priceRegistry: address(23423),
+      messageValidator: address(0),
       feeAggregator: address(0)
     });
     vm.expectRevert(EVM2EVMMultiOnRamp.InvalidConfig.selector);
@@ -1727,32 +1781,6 @@ contract EVM2EVMOnRamp_applyPremiumMultiplierWeiPerEthUpdates is EVM2EVMMultiOnR
     );
   }
 
-  function test_applyPremiumMultiplierWeiPerEthUpdatesByAdmin_Success() public {
-    s_premiumMultiplierWeiPerEthArgs[0] = s_premiumMultiplierWeiPerEthArgs[0];
-    s_premiumMultiplierWeiPerEthArgs[0].token = vm.addr(1);
-    s_premiumMultiplierWeiPerEthArgs[1].token = vm.addr(2);
-
-    vm.startPrank(ADMIN);
-
-    vm.expectEmit();
-    emit EVM2EVMMultiOnRamp.PremiumMultiplierWeiPerEthUpdated(
-      vm.addr(1), s_premiumMultiplierWeiPerEthArgs[0].premiumMultiplierWeiPerEth
-    );
-    vm.expectEmit();
-    emit EVM2EVMMultiOnRamp.PremiumMultiplierWeiPerEthUpdated(
-      vm.addr(2), s_premiumMultiplierWeiPerEthArgs[1].premiumMultiplierWeiPerEth
-    );
-
-    s_onRamp.applyPremiumMultiplierWeiPerEthUpdates(s_premiumMultiplierWeiPerEthArgs);
-
-    assertEq(
-      s_premiumMultiplierWeiPerEthArgs[0].premiumMultiplierWeiPerEth, s_onRamp.getPremiumMultiplierWeiPerEth(vm.addr(1))
-    );
-    assertEq(
-      s_premiumMultiplierWeiPerEthArgs[1].premiumMultiplierWeiPerEth, s_onRamp.getPremiumMultiplierWeiPerEth(vm.addr(2))
-    );
-  }
-
   function test_applyPremiumMultiplierWeiPerEthUpdatesZeroInput() public {
     vm.recordLogs();
     s_onRamp.applyPremiumMultiplierWeiPerEthUpdates(new EVM2EVMMultiOnRamp.PremiumMultiplierWeiPerEthArgs[](0));
@@ -1766,7 +1794,7 @@ contract EVM2EVMOnRamp_applyPremiumMultiplierWeiPerEthUpdates is EVM2EVMMultiOnR
     EVM2EVMMultiOnRamp.PremiumMultiplierWeiPerEthArgs[] memory premiumMultiplierWeiPerEthArgs;
     vm.startPrank(STRANGER);
 
-    vm.expectRevert(EVM2EVMMultiOnRamp.OnlyCallableByOwnerOrAdmin.selector);
+    vm.expectRevert("Only callable by owner");
 
     s_onRamp.applyPremiumMultiplierWeiPerEthUpdates(premiumMultiplierWeiPerEthArgs);
   }
@@ -1824,7 +1852,6 @@ contract EVM2EVMMultiOnRamp_applyTokenTransferFeeConfigUpdates is EVM2EVMMultiOn
       deciBps: 8,
       destGasOverhead: 9,
       destBytesOverhead: 312,
-      aggregateRateLimitEnabled: true,
       isEnabled: true
     });
     tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[1].token = address(11);
@@ -1835,7 +1862,6 @@ contract EVM2EVMMultiOnRamp_applyTokenTransferFeeConfigUpdates is EVM2EVMMultiOn
       deciBps: 14,
       destGasOverhead: 15,
       destBytesOverhead: 394,
-      aggregateRateLimitEnabled: false,
       isEnabled: true
     });
 
@@ -1899,27 +1925,6 @@ contract EVM2EVMMultiOnRamp_applyTokenTransferFeeConfigUpdates is EVM2EVMMultiOn
     );
   }
 
-  function test_ApplyTokenTransferFeeConfigByAdmin_Success() public {
-    vm.startPrank(ADMIN);
-    EVM2EVMMultiOnRamp.TokenTransferFeeConfigArgs[] memory tokenTransferFeeConfigArgs =
-      _generateTokenTransferFeeConfigArgs(1, 1);
-    tokenTransferFeeConfigArgs[0].destChainSelector = DEST_CHAIN_SELECTOR;
-    tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].token = address(5);
-    tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].tokenTransferFeeConfig.destBytesOverhead =
-      DEFAULT_TOKEN_BYTES_OVERHEAD;
-
-    vm.expectEmit();
-    emit EVM2EVMMultiOnRamp.TokenTransferFeeConfigUpdated(
-      tokenTransferFeeConfigArgs[0].destChainSelector,
-      tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].token,
-      tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].tokenTransferFeeConfig
-    );
-
-    s_onRamp.applyTokenTransferFeeConfigUpdates(
-      tokenTransferFeeConfigArgs, new EVM2EVMMultiOnRamp.TokenTransferFeeConfigRemoveArgs[](0)
-    );
-  }
-
   function test_ApplyTokenTransferFeeZeroInput() public {
     vm.recordLogs();
     s_onRamp.applyTokenTransferFeeConfigUpdates(
@@ -1936,7 +1941,7 @@ contract EVM2EVMMultiOnRamp_applyTokenTransferFeeConfigUpdates is EVM2EVMMultiOn
     vm.startPrank(STRANGER);
     EVM2EVMMultiOnRamp.TokenTransferFeeConfigArgs[] memory tokenTransferFeeConfigArgs;
 
-    vm.expectRevert(EVM2EVMMultiOnRamp.OnlyCallableByOwnerOrAdmin.selector);
+    vm.expectRevert("Only callable by owner");
 
     s_onRamp.applyTokenTransferFeeConfigUpdates(
       tokenTransferFeeConfigArgs, new EVM2EVMMultiOnRamp.TokenTransferFeeConfigRemoveArgs[](0)
@@ -1955,7 +1960,6 @@ contract EVM2EVMMultiOnRamp_applyTokenTransferFeeConfigUpdates is EVM2EVMMultiOn
       deciBps: 8,
       destGasOverhead: 9,
       destBytesOverhead: uint32(Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES - 1),
-      aggregateRateLimitEnabled: true,
       isEnabled: true
     });
 
