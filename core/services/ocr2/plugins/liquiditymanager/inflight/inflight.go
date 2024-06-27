@@ -22,9 +22,8 @@ type Container interface {
 
 // transferID uniquely identifies a transfer for a short period of time.
 type transferID struct {
-	From   models.NetworkSelector
-	To     models.NetworkSelector
-	Amount string
+	From models.NetworkSelector
+	To   models.NetworkSelector
 }
 
 type inflight struct {
@@ -43,9 +42,8 @@ func (i *inflight) Add(t models.Transfer) {
 	defer i.mu.Unlock()
 
 	i.transfers[transferID{
-		From:   t.From,
-		To:     t.To,
-		Amount: t.Amount.String(),
+		From: t.From,
+		To:   t.To,
 	}] = t
 }
 
@@ -56,9 +54,8 @@ func (i *inflight) Expire(pending []models.PendingTransfer) int {
 	var numExpired int
 	for _, p := range pending {
 		k := transferID{
-			From:   p.From,
-			To:     p.To,
-			Amount: p.Amount.String(),
+			From: p.From,
+			To:   p.To,
 		}
 		t, ok := i.transfers[k]
 		// This check handles scenarios where the same transfer can be in-flight multiple times.
@@ -103,9 +100,8 @@ func (i *inflight) IsInflight(t models.Transfer) bool {
 	defer i.mu.RUnlock()
 
 	_, ok := i.transfers[transferID{
-		From:   t.From,
-		To:     t.To,
-		Amount: t.Amount.String(),
+		From: t.From,
+		To:   t.To,
 	}]
 	return ok
 }

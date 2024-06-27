@@ -35,7 +35,7 @@ func Test_inflight_Add(t *testing.T) {
 				},
 			},
 			func(t *testing.T, i *inflight) {
-				item, ok := i.transfers[transferID{From: 1, To: 2, Amount: "1"}]
+				item, ok := i.transfers[transferID{From: 1, To: 2}]
 				require.True(t, ok)
 				require.Equal(t, models.Transfer{
 					From:   1,
@@ -48,7 +48,7 @@ func Test_inflight_Add(t *testing.T) {
 			"transfer in map",
 			fields{
 				items: map[transferID]models.Transfer{
-					{From: 1, To: 2, Amount: "1"}: {
+					{From: 1, To: 2}: {
 						From:   1,
 						To:     2,
 						Amount: ubig.NewI(1),
@@ -64,7 +64,7 @@ func Test_inflight_Add(t *testing.T) {
 			},
 			func(t *testing.T, i *inflight) {
 				require.Len(t, i.transfers, 1)
-				item, ok := i.transfers[transferID{From: 1, To: 2, Amount: "1"}]
+				item, ok := i.transfers[transferID{From: 1, To: 2}]
 				require.True(t, ok)
 				require.Equal(t, models.Transfer{
 					From:   1,
@@ -103,7 +103,7 @@ func Test_inflight_Expire(t *testing.T) {
 			"no pending transfers",
 			fields{
 				items: map[transferID]models.Transfer{
-					{From: 1, To: 2, Amount: "1"}: {
+					{From: 1, To: 2}: {
 						From:   1,
 						To:     2,
 						Amount: ubig.NewI(1),
@@ -125,7 +125,7 @@ func Test_inflight_Expire(t *testing.T) {
 			"pending transfer with larger stage",
 			fields{
 				items: map[transferID]models.Transfer{
-					{From: 1, To: 2, Amount: "1"}: {
+					{From: 1, To: 2}: {
 						From:   1,
 						To:     2,
 						Amount: ubig.NewI(1),
@@ -156,7 +156,7 @@ func Test_inflight_Expire(t *testing.T) {
 			"pending transfer with equal stage",
 			fields{
 				items: map[transferID]models.Transfer{
-					{From: 1, To: 2, Amount: "1"}: {
+					{From: 1, To: 2}: {
 						From:   1,
 						To:     2,
 						Amount: ubig.NewI(1),
@@ -216,7 +216,7 @@ func Test_inflight_GetAll(t *testing.T) {
 			"not empty",
 			fields{
 				items: map[transferID]models.Transfer{
-					{From: 1, To: 2, Amount: "1"}: {
+					{From: 1, To: 2}: {
 						From:   1,
 						To:     2,
 						Amount: ubig.NewI(1),
@@ -235,12 +235,12 @@ func Test_inflight_GetAll(t *testing.T) {
 			"multiple",
 			fields{
 				items: map[transferID]models.Transfer{
-					{From: 1, To: 2, Amount: "1"}: {
+					{From: 1, To: 2}: {
 						From:   1,
 						To:     2,
 						Amount: ubig.NewI(1),
 					},
-					{From: 2, To: 3, Amount: "2"}: {
+					{From: 2, To: 3}: {
 						From:   2,
 						To:     3,
 						Amount: ubig.NewI(2),
@@ -303,7 +303,7 @@ func Test_inflight_IsInflight(t *testing.T) {
 			"inflight",
 			fields{
 				items: map[transferID]models.Transfer{
-					{From: 1, To: 2, Amount: "1"}: {
+					{From: 1, To: 2}: {
 						From:   1,
 						To:     2,
 						Amount: ubig.NewI(1),
