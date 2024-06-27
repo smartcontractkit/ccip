@@ -740,7 +740,7 @@ type configTransmitterOpts struct {
 
 // newOnChainContractTransmitter creates a new contract transmitter.
 func newOnChainContractTransmitter(ctx context.Context, lggr logger.Logger, rargs commontypes.RelayArgs, ethKeystore keystore.Eth, configWatcher *configWatcher, opts configTransmitterOpts, transmissionContractABI abi.ABI, reportToEvmTxMeta ReportToEthMetadata, transmissionContractRetention time.Duration) (*contractTransmitter, error) {
-	transmitter, err := generateContractTransmitterFields(ctx, rargs, ethKeystore, configWatcher, opts)
+	transmitter, err := generateTransmitterFrom(ctx, rargs, ethKeystore, configWatcher, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -760,7 +760,7 @@ func newOnChainContractTransmitter(ctx context.Context, lggr logger.Logger, rarg
 
 // newOnChainContractTransmitterNoSignatures creates a new contract transmitter that avoids sending the signatures as they are validated offchain.
 func newOnChainContractTransmitterNoSignatures(ctx context.Context, lggr logger.Logger, rargs commontypes.RelayArgs, ethKeystore keystore.Eth, configWatcher *configWatcher, opts configTransmitterOpts, transmissionContractABI abi.ABI, reportToEvmTxMeta ReportToEthMetadata, transmissionContractRetention time.Duration) (*contractTransmitterNoSignatures, error) {
-	transmitter, err := generateContractTransmitterFields(ctx, rargs, ethKeystore, configWatcher, opts)
+	transmitter, err := generateTransmitterFrom(ctx, rargs, ethKeystore, configWatcher, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -778,7 +778,7 @@ func newOnChainContractTransmitterNoSignatures(ctx context.Context, lggr logger.
 	)
 }
 
-func generateContractTransmitterFields(ctx context.Context, rargs commontypes.RelayArgs, ethKeystore keystore.Eth, configWatcher *configWatcher, opts configTransmitterOpts) (Transmitter, error) {
+func generateTransmitterFrom(ctx context.Context, rargs commontypes.RelayArgs, ethKeystore keystore.Eth, configWatcher *configWatcher, opts configTransmitterOpts) (Transmitter, error) {
 	var relayConfig types.RelayConfig
 	if err := json.Unmarshal(rargs.RelayConfig, &relayConfig); err != nil {
 		return nil, err
