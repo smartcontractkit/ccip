@@ -501,7 +501,7 @@ func (r *Relayer) NewCCIPExecProvider(rargs commontypes.RelayArgs, pargs commont
 		return nil, err
 	}
 	subjectID := chainToUUID(configWatcher.chain.ID())
-	contractTransmitter, err := newOnChainContractTransmitter(ctx, r.lggr, rargs, r.ks.Eth(), configWatcher, configTransmitterOpts{
+	contractTransmitter, err := newOnChainContractTransmitterNoSignatures(ctx, r.lggr, rargs, r.ks.Eth(), configWatcher, configTransmitterOpts{
 		subjectID: &subjectID,
 	}, OCR2AggregatorTransmissionContractABI, fn, 0)
 	if err != nil {
@@ -740,30 +740,69 @@ type configTransmitterOpts struct {
 
 // newOnChainContractTransmitter creates a new contract transmitter.
 func newOnChainContractTransmitter(ctx context.Context, lggr logger.Logger, rargs commontypes.RelayArgs, ethKeystore keystore.Eth, configWatcher *configWatcher, opts configTransmitterOpts, transmissionContractABI abi.ABI, reportToEvmTxMeta ReportToEthMetadata, transmissionContractRetention time.Duration) (*contractTransmitter, error) {
+	transmitter, err2, done := generateContractTransmitterFields(ctx, rargs, ethKeystore, configWatcher, opts)
+	if done {
+		return nil, err2
+	}
+
+	return NewOCRContractTransmitterWithRetention(
+		ctx,
+		configWatcher.contractAddress,
+		configWatcher.chain.Client(),
+		transmissionContractABI,
+		transmitter,
+		configWatcher.chain.LogPoller(),
+		lggr,
+		reportToEvmTxMeta,
+		transmissionContractRetention,
+	)
+}
+
+// newOnChainContractTransmitterNoSignatures creates a new contract transmitter that avoids sending the signatures as they are validated offchain.
+func newOnChainContractTransmitterNoSignatures(ctx context.Context, lggr logger.Logger, rargs commontypes.RelayArgs, ethKeystore keystore.Eth, configWatcher *configWatcher, opts configTransmitterOpts, transmissionContractABI abi.ABI, reportToEvmTxMeta ReportToEthMetadata, transmissionContractRetention time.Duration) (*contractTransmitterNoSignatures, error) {
+	transmitter, err2, done := generateContractTransmitterFields(ctx, rargs, ethKeystore, configWatcher, opts)
+	if done {
+		return nil, err2
+	}
+
+	return NewOCRContractTransmitterNoSignaturesWithRetention(
+		ctx,
+		configWatcher.contractAddress,
+		configWatcher.chain.Client(),
+		transmissionContractABI,
+		transmitter,
+		configWatcher.chain.LogPoller(),
+		lggr,
+		reportToEvmTxMeta,
+		transmissionContractRetention,
+	)
+}
+
+func generateContractTransmitterFields(ctx context.Context, rargs commontypes.RelayArgs, ethKeystore keystore.Eth, configWatcher *configWatcher, opts configTransmitterOpts) (Transmitter, error, bool) {
 	var relayConfig types.RelayConfig
 	if err := json.Unmarshal(rargs.RelayConfig, &relayConfig); err != nil {
-		return nil, err
+		return nil, err, true
 	}
 	var fromAddresses []common.Address
 	sendingKeys := relayConfig.SendingKeys
 	if !relayConfig.EffectiveTransmitterID.Valid {
-		return nil, pkgerrors.New("EffectiveTransmitterID must be specified")
+		return nil, pkgerrors.New("EffectiveTransmitterID must be specified"), true
 	}
 	effectiveTransmitterAddress := common.HexToAddress(relayConfig.EffectiveTransmitterID.String)
 
 	sendingKeysLength := len(sendingKeys)
 	if sendingKeysLength == 0 {
-		return nil, pkgerrors.New("no sending keys provided")
+		return nil, pkgerrors.New("no sending keys provided"), true
 	}
 
 	// If we are using multiple sending keys, then a forwarder is needed to rotate transmissions.
 	// Ensure that this forwarder is not set to a local sending key, and ensure our sending keys are enabled.
 	for _, s := range sendingKeys {
 		if sendingKeysLength > 1 && s == effectiveTransmitterAddress.String() {
-			return nil, pkgerrors.New("the transmitter is a local sending key with transaction forwarding enabled")
+			return nil, pkgerrors.New("the transmitter is a local sending key with transaction forwarding enabled"), true
 		}
 		if err := ethKeystore.CheckEnabled(ctx, common.HexToAddress(s), configWatcher.chain.Config().EVM().ChainID()); err != nil {
-			return nil, pkgerrors.Wrap(err, "one of the sending keys given is not enabled")
+			return nil, pkgerrors.Wrap(err, "one of the sending keys given is not enabled"), true
 		}
 		fromAddresses = append(fromAddresses, common.HexToAddress(s))
 	}
@@ -817,97 +856,9 @@ func newOnChainContractTransmitter(ctx context.Context, lggr logger.Logger, rarg
 		)
 	}
 	if err != nil {
-		return nil, pkgerrors.Wrap(err, "failed to create transmitter")
+		return nil, pkgerrors.Wrap(err, "failed to create transmitter"), true
 	}
-
-	return NewOCRContractTransmitterWithRetention(
-		ctx,
-		configWatcher.contractAddress,
-		configWatcher.chain.Client(),
-		transmissionContractABI,
-		transmitter,
-		configWatcher.chain.LogPoller(),
-		lggr,
-		reportToEvmTxMeta,
-		transmissionContractRetention,
-	)
-}
-
-// newOnChainContractTransmitterNoSignatures creates a new contract transmitter that avoids sending the signatures as they are validated offchain.
-func newOnChainContractTransmitterNoSignatures(ctx context.Context, lggr logger.Logger, rargs commontypes.RelayArgs, transmitterID string, ethKeystore keystore.Eth, configWatcher *configWatcher, opts configTransmitterOpts, transmissionContractABI abi.ABI, reportToEvmTxMeta ReportToEthMetadata, transmissionContractRetention time.Duration) (*contractTransmitterNoSignatures, error) {
-	var relayConfig types.RelayConfig
-	if err := json.Unmarshal(rargs.RelayConfig, &relayConfig); err != nil {
-		return nil, err
-	}
-	var fromAddresses []common.Address
-	sendingKeys := relayConfig.SendingKeys
-	if !relayConfig.EffectiveTransmitterID.Valid {
-		return nil, pkgerrors.New("EffectiveTransmitterID must be specified")
-	}
-	effectiveTransmitterAddress := common.HexToAddress(relayConfig.EffectiveTransmitterID.String)
-
-	sendingKeysLength := len(sendingKeys)
-	if sendingKeysLength == 0 {
-		return nil, pkgerrors.New("no sending keys provided")
-	}
-
-	// If we are using multiple sending keys, then a forwarder is needed to rotate transmissions.
-	// Ensure that this forwarder is not set to a local sending key, and ensure our sending keys are enabled.
-	for _, s := range sendingKeys {
-		if sendingKeysLength > 1 && s == effectiveTransmitterAddress.String() {
-			return nil, pkgerrors.New("the transmitter is a local sending key with transaction forwarding enabled")
-		}
-		if err := ethKeystore.CheckEnabled(ctx, common.HexToAddress(s), configWatcher.chain.Config().EVM().ChainID()); err != nil {
-			return nil, pkgerrors.Wrap(err, "one of the sending keys given is not enabled")
-		}
-		fromAddresses = append(fromAddresses, common.HexToAddress(s))
-	}
-
-	subject := rargs.ExternalJobID
-	if opts.subjectID != nil {
-		subject = *opts.subjectID
-	}
-	strategy := txmgrcommon.NewQueueingTxStrategy(subject, relayConfig.DefaultTransactionQueueDepth)
-
-	var checker txm.TransmitCheckerSpec
-	if relayConfig.SimulateTransactions {
-		checker.CheckerType = txm.TransmitCheckerTypeSimulate
-	}
-
-	gasLimit := configWatcher.chain.Config().EVM().GasEstimator().LimitDefault()
-	ocr2Limit := configWatcher.chain.Config().EVM().GasEstimator().LimitJobType().OCR2()
-	if ocr2Limit != nil {
-		gasLimit = uint64(*ocr2Limit)
-	}
-	if opts.pluginGasLimit != nil {
-		gasLimit = uint64(*opts.pluginGasLimit)
-	}
-
-	transmitter, err := ocrcommon.NewTransmitter(
-		configWatcher.chain.TxManager(),
-		fromAddresses,
-		gasLimit,
-		effectiveTransmitterAddress,
-		strategy,
-		checker,
-		configWatcher.chain.ID(),
-		ethKeystore,
-	)
-	if err != nil {
-		return nil, pkgerrors.Wrap(err, "failed to create transmitter")
-	}
-
-	return NewOCRContractTransmitterNoSignaturesWithRetention(
-		ctx,
-		configWatcher.contractAddress,
-		configWatcher.chain.Client(),
-		transmissionContractABI,
-		transmitter,
-		configWatcher.chain.LogPoller(),
-		lggr,
-		reportToEvmTxMeta,
-		transmissionContractRetention,
-	)
+	return transmitter, nil, false
 }
 
 func (r *Relayer) NewContractReader(chainReaderConfig []byte) (commontypes.ContractReader, error) {
