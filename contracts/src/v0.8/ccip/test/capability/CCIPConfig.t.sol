@@ -124,10 +124,22 @@ contract CCIPConfig_chainConfig is CCIPConfigSetup {
     emit CCIPConfig.ChainConfigSet(2, adds[1].chainConfig);
     s_ccipCC.applyChainConfigUpdates(new uint64[](0), adds);
 
-    CCIPConfig.ChainConfigInfo[] memory configs = s_ccipCC.getAllChainConfigs();
+    CCIPCapabilityConfiguration.ChainConfigInfo[] memory configs = s_ccipCC.getAllChainConfigs(0, 2);
     assertEq(configs.length, 2, "chain configs length must be 2");
     assertEq(configs[0].chainSelector, 1, "chain selector must match");
     assertEq(configs[1].chainSelector, 2, "chain selector must match");
+
+    configs = s_ccipCC.getAllChainConfigs(0, 1);
+    assertEq(configs.length, 1, "chain configs length must be 1");
+    assertEq(configs[0].chainSelector, 1, "chain selector must match");
+
+    configs = s_ccipCC.getAllChainConfigs(0, 10);
+    assertEq(configs.length, 2, "chain configs length must be 2");
+    assertEq(configs[0].chainSelector, 1, "chain selector must match");
+    assertEq(configs[1].chainSelector, 2, "chain selector must match");
+
+    configs = s_ccipCC.getAllChainConfigs(1, 1);
+    assertEq(configs.length, 0, "chain configs length must be 0");
   }
 
   function test_applyChainConfigUpdates_removeChainConfigs_Success() public {
