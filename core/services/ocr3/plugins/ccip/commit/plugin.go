@@ -35,7 +35,7 @@ type Plugin struct {
 	msgHasher         cciptypes.MessageHasher
 	lggr              logger.Logger
 
-	homeChainPoller reader.HomeChainPoller
+	homeChain reader.HomeChain
 }
 
 func NewPlugin(
@@ -48,7 +48,7 @@ func NewPlugin(
 	reportCodec cciptypes.CommitPluginCodec,
 	msgHasher cciptypes.MessageHasher,
 	lggr logger.Logger,
-	homeChainPoller reader.HomeChainPoller,
+	homeChain reader.HomeChain,
 ) *Plugin {
 	return &Plugin{
 		nodeID:            nodeID,
@@ -59,7 +59,7 @@ func NewPlugin(
 		reportCodec:       reportCodec,
 		msgHasher:         msgHasher,
 		lggr:              lggr,
-		homeChainPoller:   homeChainPoller,
+		homeChain:         homeChain,
 	}
 }
 
@@ -91,14 +91,18 @@ func (p *Plugin) Query(_ context.Context, _ ocr3types.OutcomeContext) (types.Que
 //
 //	We discover the token prices only for the tokens that are used to pay for ccip fees.
 //	The fee tokens are configured in the plugin config.
-func (p *Plugin) Observation(ctx context.Context, outctx ocr3types.OutcomeContext, _ types.Query) (types.Observation, error) {
+func (p *Plugin) Observation(
+	ctx context.Context, outctx ocr3types.OutcomeContext, _ types.Query,
+) (types.Observation, error) {
 	supportedChains, err := p.supportedChains()
 	if err != nil {
 		return types.Observation{}, fmt.Errorf("error finding supported chains by node: %w", err)
 	}
 
 	msgBaseDetails := make([]cciptypes.CCIPMsgBaseDetails, 0)
-	latestCommittedSeqNumsObservation, err := observeLatestCommittedSeqNums(ctx, p.lggr, p.ccipReader, supportedChains, p.cfg.DestChain, p.knownSourceChainsSlice())
+	latestCommittedSeqNumsObservation, err := observeLatestCommittedSeqNums(
+		ctx, p.lggr, p.ccipReader, supportedChains, p.cfg.DestChain, p.knownSourceChainsSlice(),
+	)
 	if err != nil {
 		return types.Observation{}, fmt.Errorf("observe latest committed sequence numbers: %w", err)
 	}
@@ -122,7 +126,7 @@ func (p *Plugin) Observation(ctx context.Context, outctx ocr3types.OutcomeContex
 		return types.Observation{}, fmt.Errorf("observe gas prices: %w", err)
 	}
 
-	fChain, err := p.homeChainPoller.GetFChain()
+	fChain, err := p.homeChain.GetFChain()
 	if err != nil {
 		return types.Observation{}, fmt.Errorf("get f chain: %w", err)
 	}
@@ -131,7 +135,9 @@ func (p *Plugin) Observation(ctx context.Context, outctx ocr3types.OutcomeContex
 	// and on the next round we use those to look for messages.
 	if outctx.PreviousOutcome == nil {
 		p.lggr.Debugw("first round ever, can't observe new messages yet")
-		return cciptypes.NewCommitPluginObservation(msgBaseDetails, gasPrices, tokenPrices, latestCommittedSeqNumsObservation, fChain).Encode()
+		return cciptypes.NewCommitPluginObservation(
+			msgBaseDetails, gasPrices, tokenPrices, latestCommittedSeqNumsObservation, fChain,
+		).Encode()
 	}
 
 	prevOutcome, err := cciptypes.DecodeCommitPluginOutcome(outctx.PreviousOutcome)
@@ -165,7 +171,9 @@ func (p *Plugin) Observation(ctx context.Context, outctx ocr3types.OutcomeContex
 		msgBaseDetails = append(msgBaseDetails, msg.CCIPMsgBaseDetails)
 	}
 
-	return cciptypes.NewCommitPluginObservation(msgBaseDetails, gasPrices, tokenPrices, latestCommittedSeqNumsObservation, fChain).Encode()
+	return cciptypes.NewCommitPluginObservation(
+		msgBaseDetails, gasPrices, tokenPrices, latestCommittedSeqNumsObservation, fChain,
+	).Encode()
 
 }
 
@@ -184,7 +192,8 @@ func (p *Plugin) ValidateObservation(_ ocr3types.OutcomeContext, _ types.Query, 
 		return fmt.Errorf("error finding supported chains by node: %w", err)
 	}
 
-	if err := validateObserverReadingEligibility(obs.NewMsgs, obs.MaxSeqNums, destSupportedChains, p.cfg.DestChain); err != nil {
+	err = validateObserverReadingEligibility(obs.NewMsgs, obs.MaxSeqNums, destSupportedChains, p.cfg.DestChain)
+	if err != nil {
 		return fmt.Errorf("validate observer %d reading eligibility: %w", ao.Observer, err)
 	}
 
@@ -210,7 +219,9 @@ func (p *Plugin) ObservationQuorum(_ ocr3types.OutcomeContext, _ types.Query) (o
 //   - Max Sequence Numbers: The max sequence number for each source chain.
 //   - Merkle Roots: One merkle tree root per source chain. The leaves of the tree are the IDs of the observed messages.
 //     The merkle root data type contains information about the chain and the sequence numbers range.
-func (p *Plugin) Outcome(_ ocr3types.OutcomeContext, _ types.Query, aos []types.AttributedObservation) (ocr3types.Outcome, error) {
+func (p *Plugin) Outcome(
+	_ ocr3types.OutcomeContext, _ types.Query, aos []types.AttributedObservation,
+) (ocr3types.Outcome, error) {
 	decodedObservations := make([]cciptypes.CommitPluginObservation, 0)
 	for _, ao := range aos {
 		obs, err := cciptypes.DecodeCommitPluginObservation(ao.Observation)
@@ -276,7 +287,9 @@ func (p *Plugin) Reports(seqNr uint64, outcome ocr3types.Outcome) ([]ocr3types.R
 	return []ocr3types.ReportWithInfo[[]byte]{{Report: encodedReport, Info: nil}}, nil
 }
 
-func (p *Plugin) ShouldAcceptAttestedReport(ctx context.Context, u uint64, r ocr3types.ReportWithInfo[[]byte]) (bool, error) {
+func (p *Plugin) ShouldAcceptAttestedReport(
+	ctx context.Context, u uint64, r ocr3types.ReportWithInfo[[]byte],
+) (bool, error) {
 	decodedReport, err := p.reportCodec.Decode(ctx, r.Report)
 	if err != nil {
 		return false, fmt.Errorf("decode commit plugin report: %w", err)
@@ -291,7 +304,9 @@ func (p *Plugin) ShouldAcceptAttestedReport(ctx context.Context, u uint64, r ocr
 	return true, nil
 }
 
-func (p *Plugin) ShouldTransmitAcceptedReport(ctx context.Context, u uint64, r ocr3types.ReportWithInfo[[]byte]) (bool, error) {
+func (p *Plugin) ShouldTransmitAcceptedReport(
+	ctx context.Context, u uint64, r ocr3types.ReportWithInfo[[]byte],
+) (bool, error) {
 	isWriter, err := p.supportsDestChain()
 	if err != nil {
 		return false, fmt.Errorf("can't know if it's a writer: %w", err)
@@ -328,13 +343,16 @@ func (p *Plugin) Close() error {
 }
 
 func (p *Plugin) knownSourceChainsSlice() []cciptypes.ChainSelector {
-	knownSourceChains, err := p.homeChainPoller.GetKnownCCIPChains()
+	knownSourceChains, err := p.homeChain.GetKnownCCIPChains()
 	if err != nil {
 		p.lggr.Errorw("error getting known chains", "err", err)
 		return nil
 	}
 	knownSourceChainsSlice := knownSourceChains.ToSlice()
-	sort.Slice(knownSourceChainsSlice, func(i, j int) bool { return knownSourceChainsSlice[i] < knownSourceChainsSlice[j] })
+	sort.Slice(
+		knownSourceChainsSlice,
+		func(i, j int) bool { return knownSourceChainsSlice[i] < knownSourceChainsSlice[j] },
+	)
 	return slicelib.Filter(knownSourceChainsSlice, func(ch cciptypes.ChainSelector) bool { return ch != p.cfg.DestChain })
 }
 
@@ -343,7 +361,7 @@ func (p *Plugin) supportedChains() (mapset.Set[cciptypes.ChainSelector], error) 
 	if !exists {
 		return nil, fmt.Errorf("oracle ID %d not found in oracleIDToP2pID", p.nodeID)
 	}
-	supportedChains, err := p.homeChainPoller.GetSupportedChainsForPeer(p2pID)
+	supportedChains, err := p.homeChain.GetSupportedChainsForPeer(p2pID)
 	if err != nil {
 		p.lggr.Warnw("error getting supported chains", err)
 		return mapset.NewSet[cciptypes.ChainSelector](), fmt.Errorf("error getting supported chains: %w", err)
@@ -352,18 +370,10 @@ func (p *Plugin) supportedChains() (mapset.Set[cciptypes.ChainSelector], error) 
 	return supportedChains, nil
 }
 
-func (p *Plugin) getDestChainConfig() (reader.ChainConfig, error) {
-	cfg, err := p.homeChainPoller.GetChainConfig(p.cfg.DestChain)
-	if err != nil {
-		return reader.ChainConfig{}, fmt.Errorf("get chain config: %w", err)
-	}
-	return cfg, nil
-}
-
 func (p *Plugin) supportsDestChain() (bool, error) {
-	destChainConfig, err := p.getDestChainConfig()
+	destChainConfig, err := p.homeChain.GetChainConfig(p.cfg.DestChain)
 	if err != nil {
-		return false, fmt.Errorf("error getting chain config: %w", err)
+		return false, fmt.Errorf("get chain config: %w", err)
 	}
 	return destChainConfig.SupportedNodes.Contains(p.oracleIDToP2pID[p.nodeID]), nil
 }

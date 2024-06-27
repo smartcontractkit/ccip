@@ -51,7 +51,8 @@ func NewPluginFactory() *PluginFactory {
 
 func (p PluginFactory) NewReportingPlugin(config ocr3types.ReportingPluginConfig,
 ) (ocr3types.ReportingPlugin[[]byte], ocr3types.ReportingPluginInfo, error) {
-	var oracleIDToP2pID map[commontypes.OracleID]libocrtypes.PeerID // TODO: Get this from ocr config, it's the mapping of the oracleId index in the DON
+	// TODO: Get this from ocr config, it's the mapping of the oracleId index in the DON
+	var oracleIDToP2pID map[commontypes.OracleID]libocrtypes.PeerID
 	onChainTokenPricesReader := reader.NewOnchainTokenPricesReader(
 		reader.TokenPriceConfig{ // TODO: Inject config
 			StaticPrices: map[ocr2types.Account]big.Int{},
@@ -68,7 +69,7 @@ func (p PluginFactory) NewReportingPlugin(config ocr3types.ReportingPluginConfig
 		nil, //reportCodec
 		nil, //msgHasher
 		nil, // lggr
-		nil, //homeChainPoller
+		nil, //homeChain
 	), ocr3types.ReportingPluginInfo{}, nil
 }
 

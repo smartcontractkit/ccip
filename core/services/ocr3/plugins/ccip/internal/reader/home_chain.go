@@ -14,7 +14,7 @@ import (
 	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
 )
 
-type HomeChainPoller interface {
+type HomeChain interface {
 	GetChainConfig(chainSelector cciptypes.ChainSelector) (ChainConfig, error)
 	GetAllChainConfigs() (map[cciptypes.ChainSelector]ChainConfig, error)
 	// GetSupportedChainsForPeer Gets all chain selectors that the peerID can read/write from/to
@@ -23,6 +23,8 @@ type HomeChainPoller interface {
 	GetKnownCCIPChains() (mapset.Set[cciptypes.ChainSelector], error)
 	// GetFChain Gets the FChain value for each chain
 	GetFChain() (map[cciptypes.ChainSelector]int, error)
+	// GetOCRConfigs Gets the OCR3Configs for a given donID and pluginType
+	GetOCRConfigs(ctx context.Context, donID uint32, pluginType uint8) ([]OCR3ConfigWithMeta, error)
 	services.Service
 }
 
@@ -37,7 +39,7 @@ type state struct {
 	fChain map[cciptypes.ChainSelector]int
 }
 
-type HomeChainConfigPoller struct {
+type homeChainPoller struct {
 	stopCh          services.StopChan
 	sync            services.StateMachine
 	homeChainReader types.ContractReader
@@ -55,8 +57,8 @@ func NewHomeChainConfigPoller(
 	homeChainReader types.ContractReader,
 	lggr logger.Logger,
 	pollingInterval time.Duration,
-) *HomeChainConfigPoller {
-	return &HomeChainConfigPoller{
+) HomeChain {
+	return &homeChainPoller{
 		stopCh:          make(chan struct{}),
 		homeChainReader: homeChainReader,
 		state:           state{},
@@ -67,7 +69,7 @@ func NewHomeChainConfigPoller(
 	}
 }
 
-func (r *HomeChainConfigPoller) Start(ctx context.Context) error {
+func (r *homeChainPoller) Start(ctx context.Context) error {
 	err := r.fetchAndSetConfigs(ctx)
 	if err != nil {
 		// Just log, don't return error as we want to keep polling
@@ -80,7 +82,7 @@ func (r *HomeChainConfigPoller) Start(ctx context.Context) error {
 	})
 }
 
-func (r *HomeChainConfigPoller) poll() {
+func (r *homeChainPoller) poll() {
 	ctx, cancel := r.stopCh.NewCtx()
 	defer cancel()
 	ticker := time.NewTicker(r.pollingDuration)
@@ -97,16 +99,19 @@ func (r *HomeChainConfigPoller) poll() {
 				r.mutex.Lock()
 				r.failedPolls++
 				r.mutex.Unlock()
-				r.lggr.Errorw("Fetching and setting configs failed", "err", err)
+				r.lggr.Errorw("fetching and setting configs failed", "failedPolls", r.failedPolls, "err", err)
 			}
 		}
 	}
 }
 
-func (r *HomeChainConfigPoller) fetchAndSetConfigs(ctx context.Context) error {
-	chainConfigInfos, err := r.fetchOnChainConfig(ctx)
+func (r *homeChainPoller) fetchAndSetConfigs(ctx context.Context) error {
+	var chainConfigInfos []ChainConfigInfo
+	err := r.homeChainReader.GetLatestValue(
+		ctx, "CCIPCapabilityConfiguration", "getAllChainConfigs", nil, &chainConfigInfos,
+	)
 	if err != nil {
-		r.lggr.Errorw("Fetching on-chain configs failed", "err", err)
+		r.lggr.Errorw("fetching on-chain configs failed", "err", err)
 		return err
 	}
 	if len(chainConfigInfos) == 0 {
@@ -114,7 +119,7 @@ func (r *HomeChainConfigPoller) fetchAndSetConfigs(ctx context.Context) error {
 		r.lggr.Warnw("no on chain configs found")
 		return nil
 	}
-	homeChainConfigs, err := r.convertOnChainConfigToHomeChainConfig(chainConfigInfos)
+	homeChainConfigs, err := convertOnChainConfigToHomeChainConfig(chainConfigInfos)
 	if err != nil {
 		r.lggr.Errorw("error converting OnChainConfigs to ChainConfig", "err", err)
 		return err
@@ -124,7 +129,7 @@ func (r *HomeChainConfigPoller) fetchAndSetConfigs(ctx context.Context) error {
 	return nil
 }
 
-func (r *HomeChainConfigPoller) setState(chainConfigs map[cciptypes.ChainSelector]ChainConfig) {
+func (r *homeChainPoller) setState(chainConfigs map[cciptypes.ChainSelector]ChainConfig) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 	s := &r.state
@@ -134,23 +139,25 @@ func (r *HomeChainConfigPoller) setState(chainConfigs map[cciptypes.ChainSelecto
 	s.fChain = createFChain(chainConfigs)
 }
 
-func (r *HomeChainConfigPoller) GetChainConfig(chainSelector cciptypes.ChainSelector) (ChainConfig, error) {
+func (r *homeChainPoller) GetChainConfig(chainSelector cciptypes.ChainSelector) (ChainConfig, error) {
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
 	s := r.state
-	if _, ok := s.chainConfigs[chainSelector]; !ok {
-		return ChainConfig{}, fmt.Errorf("chain config not found for chain %v", chainSelector)
+	if chainConfig, ok := s.chainConfigs[chainSelector]; ok {
+		return chainConfig, nil
 	}
-	return s.chainConfigs[chainSelector], nil
+	return ChainConfig{}, fmt.Errorf("chain config not found for chain %v", chainSelector)
 }
 
-func (r *HomeChainConfigPoller) GetAllChainConfigs() (map[cciptypes.ChainSelector]ChainConfig, error) {
+func (r *homeChainPoller) GetAllChainConfigs() (map[cciptypes.ChainSelector]ChainConfig, error) {
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
 	return r.state.chainConfigs, nil
 }
 
-func (r *HomeChainConfigPoller) GetSupportedChainsForPeer(id libocrtypes.PeerID) (mapset.Set[cciptypes.ChainSelector], error) {
+func (r *homeChainPoller) GetSupportedChainsForPeer(
+	id libocrtypes.PeerID,
+) (mapset.Set[cciptypes.ChainSelector], error) {
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
 	s := r.state
@@ -161,7 +168,7 @@ func (r *HomeChainConfigPoller) GetSupportedChainsForPeer(id libocrtypes.PeerID)
 	return s.nodeSupportedChains[id], nil
 }
 
-func (r *HomeChainConfigPoller) GetKnownCCIPChains() (mapset.Set[cciptypes.ChainSelector], error) {
+func (r *homeChainPoller) GetKnownCCIPChains() (mapset.Set[cciptypes.ChainSelector], error) {
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
 	knownSourceChains := mapset.NewSet[cciptypes.ChainSelector]()
@@ -172,26 +179,41 @@ func (r *HomeChainConfigPoller) GetKnownCCIPChains() (mapset.Set[cciptypes.Chain
 	return knownSourceChains, nil
 }
 
-func (r *HomeChainConfigPoller) GetFChain() (map[cciptypes.ChainSelector]int, error) {
+func (r *homeChainPoller) GetFChain() (map[cciptypes.ChainSelector]int, error) {
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
 	return r.state.fChain, nil
 }
 
-func (r *HomeChainConfigPoller) Close() error {
+func (r *homeChainPoller) GetOCRConfigs(
+	ctx context.Context, donID uint32, pluginType uint8,
+) ([]OCR3ConfigWithMeta, error) {
+	var ocrConfigs []OCR3ConfigWithMeta
+	err := r.homeChainReader.GetLatestValue(ctx, "CCIPCapabilityConfiguration", "getOCRConfig", map[string]any{
+		"donId":      donID,
+		"pluginType": pluginType,
+	}, &ocrConfigs)
+	if err != nil {
+		return nil, fmt.Errorf("error fetching OCR configs: %w", err)
+	}
+
+	return ocrConfigs, nil
+}
+
+func (r *homeChainPoller) Close() error {
 	return r.sync.StopOnce(r.Name(), func() error {
 		close(r.stopCh)
 		return nil
 	})
 }
 
-func (r *HomeChainConfigPoller) Ready() error {
+func (r *homeChainPoller) Ready() error {
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
 	return r.sync.Ready()
 }
 
-func (r *HomeChainConfigPoller) HealthReport() map[string]error {
+func (r *homeChainPoller) HealthReport() map[string]error {
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
 	if r.failedPolls >= MaxFailedPolls {
@@ -200,8 +222,8 @@ func (r *HomeChainConfigPoller) HealthReport() map[string]error {
 	return map[string]error{r.Name(): r.sync.Healthy()}
 }
 
-func (r *HomeChainConfigPoller) Name() string {
-	return "HomeChainConfigPoller"
+func (r *homeChainPoller) Name() string {
+	return "homeChainPoller"
 }
 
 func createFChain(chainConfigs map[cciptypes.ChainSelector]ChainConfig) map[cciptypes.ChainSelector]int {
@@ -220,7 +242,9 @@ func createKnownChains(chainConfigs map[cciptypes.ChainSelector]ChainConfig) map
 	return knownChains
 }
 
-func createNodesSupportedChains(chainConfigs map[cciptypes.ChainSelector]ChainConfig) map[libocrtypes.PeerID]mapset.Set[cciptypes.ChainSelector] {
+func createNodesSupportedChains(
+	chainConfigs map[cciptypes.ChainSelector]ChainConfig,
+) map[libocrtypes.PeerID]mapset.Set[cciptypes.ChainSelector] {
 	nodeSupportedChains := map[libocrtypes.PeerID]mapset.Set[cciptypes.ChainSelector]{}
 	for chainSelector, config := range chainConfigs {
 		for _, p2pID := range config.SupportedNodes.ToSlice() {
@@ -234,17 +258,9 @@ func createNodesSupportedChains(chainConfigs map[cciptypes.ChainSelector]ChainCo
 	return nodeSupportedChains
 }
 
-func (r *HomeChainConfigPoller) fetchOnChainConfig(ctx context.Context) ([]ChainConfigInfo, error) {
-	r.lggr.Infow("Fetching HomeChainConfigMapper")
-	var chainConfigInfo []ChainConfigInfo
-	err := r.homeChainReader.GetLatestValue(ctx, "CCIPCapabilityConfiguration", "getAllChainConfigs", nil, &chainConfigInfo)
-	if err != nil {
-		return nil, err
-	}
-	return chainConfigInfo, err
-}
-
-func (r *HomeChainConfigPoller) convertOnChainConfigToHomeChainConfig(capabilityConfigs []ChainConfigInfo) (map[cciptypes.ChainSelector]ChainConfig, error) {
+func convertOnChainConfigToHomeChainConfig(
+	capabilityConfigs []ChainConfigInfo,
+) (map[cciptypes.ChainSelector]ChainConfig, error) {
 	chainConfigs := make(map[cciptypes.ChainSelector]ChainConfig)
 	for _, capabilityConfig := range capabilityConfigs {
 		chainSelector := capabilityConfig.ChainSelector
@@ -258,21 +274,25 @@ func (r *HomeChainConfigPoller) convertOnChainConfigToHomeChainConfig(capability
 	return chainConfigs, nil
 }
 
-// HomeChainConfigMapper This is a 1-1 mapping between the config that we get from the contract to make se/deserializing easier
+// HomeChainConfigMapper This is a 1-1 mapping between the config that we get from the contract to make
+// se/deserializing easier
 type HomeChainConfigMapper struct {
 	Readers []libocrtypes.PeerID `json:"readers"`
 	FChain  uint8                `json:"fChain"`
 	Config  []byte               `json:"config"`
 }
 
-// ChainConfigInfo This is a 1-1 mapping between the config that we get from the contract to make se/deserializing easier
+// ChainConfigInfo This is a 1-1 mapping between the config that we get from the contract to make
+// se/deserializing easier
 type ChainConfigInfo struct {
+	// nolint:lll // don't split up the long url
 	// Calling function https://github.com/smartcontractkit/ccip/blob/330c5e98f624cfb10108c92fe1e00ced6d345a99/contracts/src/v0.8/ccip/capability/CCIPCapabilityConfiguration.sol#L140
 	ChainSelector cciptypes.ChainSelector `json:"chainSelector"`
 	ChainConfig   HomeChainConfigMapper   `json:"chainConfig"`
 }
 
-// ChainConfig will live on the home chain and will be used to update chain configuration like F value and supported nodes dynamically.
+// ChainConfig will live on the home chain and will be used to update chain configuration like F value and supported
+// nodes dynamically.
 type ChainConfig struct {
 	// FChain defines the FChain value for the chain. FChain is used while forming consensus based on the observations.
 	FChain int `json:"fChain"`
@@ -282,4 +302,25 @@ type ChainConfig struct {
 	Config []byte `json:"config"`
 }
 
-var _ HomeChainPoller = (*HomeChainConfigPoller)(nil)
+// OCR3Config mirrors CCIPCapabilityConfiguration.sol's OCR3Config struct
+type OCR3Config struct {
+	PluginType            uint8                   `json:"pluginType"`
+	ChainSelector         cciptypes.ChainSelector `json:"chainSelector"`
+	F                     uint8                   `json:"F"`
+	OffchainConfigVersion uint64                  `json:"offchainConfigVersion"`
+	OfframpAddress        []byte                  `json:"offrampAddress"`
+	BootstrapP2PIds       [][32]byte              `json:"bootstrapP2PIds"`
+	P2PIds                [][32]byte              `json:"p2pIds"`
+	Signers               [][]byte                `json:"signers"`
+	Transmitters          [][]byte                `json:"transmitters"`
+	OffchainConfig        []byte                  `json:"offchainConfig"`
+}
+
+// OCR3ConfigWithmeta mirrors CCIPCapabilityConfiguration.sol's OCR3ConfigWithMeta struct
+type OCR3ConfigWithMeta struct {
+	Config       OCR3Config `json:"config"`
+	ConfigCount  uint64     `json:"configCount"`
+	ConfigDigest [32]byte   `json:"configDigest"`
+}
+
+var _ HomeChain = (*homeChainPoller)(nil)
