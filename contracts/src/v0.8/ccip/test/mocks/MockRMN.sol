@@ -5,7 +5,8 @@ import {RMN} from "../../RMN.sol";
 import {IRMN} from "../../interfaces/IRMN.sol";
 import {OwnerIsCreator} from "./../../../shared/access/OwnerIsCreator.sol";
 
-contract MockRMN is IRMN, OwnerIsCreator {
+/// @notice WARNING: This contract is to be only used for testing, all methods are unprotected.
+contract MockRMN is IRMN {
   error CustomError(bytes err);
 
   bytes private s_isCursedRevert;
