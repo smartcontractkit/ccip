@@ -61,6 +61,7 @@ type Bridge interface {
 //go:generate mockery --name Factory --output ./mocks --filename bridge_factory_mock.go --case=underscore
 type Factory interface {
 	NewBridge(ctx context.Context, source, dest models.NetworkSelector) (Bridge, error)
+	GetBridge(source, dest models.NetworkSelector) (Bridge, error)
 }
 
 type Opt func(c *factory)

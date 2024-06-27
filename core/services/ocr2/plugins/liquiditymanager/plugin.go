@@ -607,8 +607,7 @@ func (p *Plugin) computeResolvedTransfersQuorum(observations []models.Observatio
 			}
 			medianizedNativeFee := rebalcalc.BigIntSortedMiddle(bridgeFees)
 			medianizedDateUnix := rebalcalc.BigIntSortedMiddle(datesUnix)
-			// TODO (ogtownsend): should we set an explicit timeout on this context?
-			bridge, err := p.bridgeFactory.NewBridge(context.Background(), k.From, k.To)
+			bridge, err := p.bridgeFactory.GetBridge(k.From, k.To)
 			if err != nil {
 				return nil, fmt.Errorf("init bridge: %w", err)
 			}

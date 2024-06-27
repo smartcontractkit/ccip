@@ -660,7 +660,7 @@ func TestPlugin_Outcome(t *testing.T) {
 			for sourceDest, bridgeFn := range tc.bridges {
 				br, err := bridgeFn(t)
 				p.bridgeFactory.
-					On("NewBridge", mock.Anything /* cancelContext */, sourceDest[0], sourceDest[1]).
+					On("GetBridge", sourceDest[0], sourceDest[1]).
 					Return(br, err)
 			}
 
@@ -1136,6 +1136,7 @@ func TestPlugin_E2EWithMocks(t *testing.T) {
 						br, ok := n.bridges[[2]models.NetworkSelector{edge.Source, edge.Dest}]
 						require.True(t, ok, "the test case is wrong, bridge is not defined %d->%d", edge.Source, edge.Dest)
 						n.bridgeFactory.On("NewBridge", mock.Anything /* cancelContext */, edge.Source, edge.Dest).Return(br, nil).Maybe()
+						n.bridgeFactory.On("GetBridge", edge.Source, edge.Dest).Return(br, nil).Maybe()
 
 						pendingTransfers := make([]models.PendingTransfer, 0)
 						for _, tr := range round.pendingTransfersPerNode[i] {

@@ -17,6 +17,36 @@ type Factory struct {
 	mock.Mock
 }
 
+// GetBridge provides a mock function with given fields: source, dest
+func (_m *Factory) GetBridge(source models.NetworkSelector, dest models.NetworkSelector) (bridge.Bridge, error) {
+	ret := _m.Called(source, dest)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetBridge")
+	}
+
+	var r0 bridge.Bridge
+	var r1 error
+	if rf, ok := ret.Get(0).(func(models.NetworkSelector, models.NetworkSelector) (bridge.Bridge, error)); ok {
+		return rf(source, dest)
+	}
+	if rf, ok := ret.Get(0).(func(models.NetworkSelector, models.NetworkSelector) bridge.Bridge); ok {
+		r0 = rf(source, dest)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(bridge.Bridge)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(models.NetworkSelector, models.NetworkSelector) error); ok {
+		r1 = rf(source, dest)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // NewBridge provides a mock function with given fields: ctx, source, dest
 func (_m *Factory) NewBridge(ctx context.Context, source models.NetworkSelector, dest models.NetworkSelector) (bridge.Bridge, error) {
 	ret := _m.Called(ctx, source, dest)
