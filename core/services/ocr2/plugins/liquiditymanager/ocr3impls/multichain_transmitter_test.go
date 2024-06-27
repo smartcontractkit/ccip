@@ -14,6 +14,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/ocr3impls"
+	"github.com/smartcontractkit/chainlink/v2/core/services/relay"
 )
 
 func TestMultichainTransmitter(t *testing.T) {
@@ -27,20 +28,20 @@ func TestMultichainTransmitter(t *testing.T) {
 
 	mct, err := ocr3impls.NewMultichainTransmitterOCR3[multichainMeta](
 		map[commontypes.RelayID]ocr3types.ContractTransmitter[multichainMeta]{
-			commontypes.NewRelayID(commontypes.NetworkEVM, "0"): unis[0].ocr3Transmitter,
-			commontypes.NewRelayID(commontypes.NetworkEVM, "1"): unis[1].ocr3Transmitter,
-			commontypes.NewRelayID(commontypes.NetworkEVM, "2"): unis[2].ocr3Transmitter,
-			commontypes.NewRelayID(commontypes.NetworkEVM, "3"): unis[3].ocr3Transmitter,
+			commontypes.NewRelayID(relay.NetworkEVM, "0"): unis[0].ocr3Transmitter,
+			commontypes.NewRelayID(relay.NetworkEVM, "1"): unis[1].ocr3Transmitter,
+			commontypes.NewRelayID(relay.NetworkEVM, "2"): unis[2].ocr3Transmitter,
+			commontypes.NewRelayID(relay.NetworkEVM, "3"): unis[3].ocr3Transmitter,
 		},
 		logger.TestLogger(t),
 	)
 	require.NoError(t, err)
 
 	expectedTransmitters := []string{
-		ocr3impls.EncodeTransmitter(commontypes.NewRelayID(commontypes.NetworkEVM, "0"), ocrtypes.Account(unis[0].transmitters[0].From.String())),
-		ocr3impls.EncodeTransmitter(commontypes.NewRelayID(commontypes.NetworkEVM, "1"), ocrtypes.Account(unis[1].transmitters[0].From.String())),
-		ocr3impls.EncodeTransmitter(commontypes.NewRelayID(commontypes.NetworkEVM, "2"), ocrtypes.Account(unis[2].transmitters[0].From.String())),
-		ocr3impls.EncodeTransmitter(commontypes.NewRelayID(commontypes.NetworkEVM, "3"), ocrtypes.Account(unis[3].transmitters[0].From.String())),
+		ocr3impls.EncodeTransmitter(commontypes.NewRelayID(relay.NetworkEVM, "0"), ocrtypes.Account(unis[0].transmitters[0].From.String())),
+		ocr3impls.EncodeTransmitter(commontypes.NewRelayID(relay.NetworkEVM, "1"), ocrtypes.Account(unis[1].transmitters[0].From.String())),
+		ocr3impls.EncodeTransmitter(commontypes.NewRelayID(relay.NetworkEVM, "2"), ocrtypes.Account(unis[2].transmitters[0].From.String())),
+		ocr3impls.EncodeTransmitter(commontypes.NewRelayID(relay.NetworkEVM, "3"), ocrtypes.Account(unis[3].transmitters[0].From.String())),
 	}
 	slices.Sort(expectedTransmitters)
 	expectedFromAccount := strings.Join(expectedTransmitters, ",")
@@ -54,8 +55,8 @@ func TestMultichainTransmitter(t *testing.T) {
 	// in actuality the same signers will be used across all chains
 	var reports []ocr3types.ReportWithInfo[multichainMeta]
 	for i := 0; i < numChains; i++ {
-		c, err2 := unis[i].wrapper.LatestConfigDigestAndEpoch(nil)
-		require.NoError(t, err2, "failed to get latest config digest and epoch")
+		c, err2 := unis[i].wrapper.LatestConfigDetails(nil)
+		require.NoError(t, err2, "failed to get latest config details")
 		report := ocr3types.ReportWithInfo[multichainMeta]{
 			Info:   multichainMeta{destChainIndex: i, configDigest: c.ConfigDigest},
 			Report: []byte{},
@@ -64,8 +65,8 @@ func TestMultichainTransmitter(t *testing.T) {
 	}
 	seqNum := uint64(1)
 	for i := range reports {
-		c, err2 := unis[i].wrapper.LatestConfigDigestAndEpoch(nil)
-		require.NoError(t, err2, "failed to get latest config digest and epoch")
+		c, err2 := unis[i].wrapper.LatestConfigDetails(nil)
+		require.NoError(t, err2, "failed to get latest config details")
 		attributedSigs := unis[i].SignReport(t, c.ConfigDigest, reports[i], seqNum)
 		err = mct.Transmit(testutils.Context(t), c.ConfigDigest, seqNum, reports[i], attributedSigs)
 		require.NoError(t, err)
@@ -84,7 +85,7 @@ type multichainMeta struct {
 }
 
 func (m multichainMeta) GetDestinationChain() commontypes.RelayID {
-	return commontypes.NewRelayID(commontypes.NetworkEVM, fmt.Sprintf("%d", m.destChainIndex))
+	return commontypes.NewRelayID(relay.NetworkEVM, fmt.Sprintf("%d", m.destChainIndex))
 }
 
 func (m multichainMeta) GetDestinationConfigDigest() ocrtypes.ConfigDigest {

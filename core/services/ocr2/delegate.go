@@ -18,13 +18,11 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
-	"google.golang.org/grpc"
-	"gopkg.in/guregu/null.v4"
-
 	"github.com/smartcontractkit/libocr/commontypes"
 	libocr2 "github.com/smartcontractkit/libocr/offchainreporting2plus"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+	"google.golang.org/grpc"
 
 	ocr2keepers20 "github.com/smartcontractkit/chainlink-automation/pkg/v2"
 	ocr2keepers20config "github.com/smartcontractkit/chainlink-automation/pkg/v2/config"
@@ -33,25 +31,24 @@ import (
 	ocr2keepers20runner "github.com/smartcontractkit/chainlink-automation/pkg/v2/runner"
 	ocr2keepers21config "github.com/smartcontractkit/chainlink-automation/pkg/v3/config"
 	ocr2keepers21 "github.com/smartcontractkit/chainlink-automation/pkg/v3/plugin"
-	"github.com/smartcontractkit/chainlink-common/pkg/loop/reportingplugins/ocr3"
-
-	"github.com/smartcontractkit/chainlink/v2/core/config/env"
-
-	"github.com/smartcontractkit/chainlink-vrf/altbn_128"
-	dkgpkg "github.com/smartcontractkit/chainlink-vrf/dkg"
-	"github.com/smartcontractkit/chainlink-vrf/ocr2vrf"
 
 	commonlogger "github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/loop"
 	"github.com/smartcontractkit/chainlink-common/pkg/loop/reportingplugins"
+	"github.com/smartcontractkit/chainlink-common/pkg/loop/reportingplugins/ocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	llotypes "github.com/smartcontractkit/chainlink-common/pkg/types/llo"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/mailbox"
 
+	"github.com/smartcontractkit/chainlink-vrf/altbn_128"
+	dkgpkg "github.com/smartcontractkit/chainlink-vrf/dkg"
+	"github.com/smartcontractkit/chainlink-vrf/ocr2vrf"
+
 	"github.com/smartcontractkit/chainlink/v2/core/bridges"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/legacyevm"
 	coreconfig "github.com/smartcontractkit/chainlink/v2/core/config"
+	"github.com/smartcontractkit/chainlink/v2/core/config/env"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore"
@@ -84,6 +81,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/validate"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocrcommon"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pipeline"
+	"github.com/smartcontractkit/chainlink/v2/core/services/relay"
 	evmrelay "github.com/smartcontractkit/chainlink/v2/core/services/relay/evm"
 	functionsRelay "github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/functions"
 	evmmercury "github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/mercury"
@@ -302,7 +300,7 @@ func (d *Delegate) OnDeleteJob(ctx context.Context, jb job.Job) error {
 		return nil
 	}
 	// we only have clean to do for the EVM
-	if rid.Network == types.NetworkEVM {
+	if rid.Network == relay.NetworkEVM {
 		return d.cleanupEVM(ctx, jb, rid)
 	}
 	return nil
@@ -413,7 +411,7 @@ func (d *Delegate) ServicesForSpec(ctx context.Context, jb job.Job) ([]job.Servi
 		return nil, ErrJobSpecNoRelayer{Err: err, PluginName: string(spec.PluginType)}
 	}
 
-	if rid.Network == types.NetworkEVM {
+	if rid.Network == relay.NetworkEVM {
 		lggr = logger.Sugared(lggr.With("evmChainID", rid.ChainID))
 
 		chain, err2 := d.legacyChains.Get(rid.ChainID)
@@ -834,7 +832,7 @@ func (d *Delegate) newServicesMercury(
 	if err != nil {
 		return nil, ErrJobSpecNoRelayer{Err: err, PluginName: "mercury"}
 	}
-	if rid.Network != types.NetworkEVM {
+	if rid.Network != relay.NetworkEVM {
 		return nil, fmt.Errorf("mercury services: expected EVM relayer got %s", rid.Network)
 	}
 	relayer, err := d.RelayGetter.Get(rid)
@@ -928,7 +926,7 @@ func (d *Delegate) newServicesLLO(
 	if err != nil {
 		return nil, ErrJobSpecNoRelayer{Err: err, PluginName: "streams"}
 	}
-	if rid.Network != types.NetworkEVM {
+	if rid.Network != relay.NetworkEVM {
 		return nil, fmt.Errorf("streams services: expected EVM relayer got %s", rid.Network)
 	}
 	relayer, err := d.RelayGetter.Get(rid)
@@ -1111,7 +1109,7 @@ func (d *Delegate) newServicesDKG(
 	if err != nil {
 		return nil, ErrJobSpecNoRelayer{Err: err, PluginName: "DKG"}
 	}
-	if rid.Network != types.NetworkEVM {
+	if rid.Network != relay.NetworkEVM {
 		return nil, fmt.Errorf("DKG services: expected EVM relayer got %s", rid.Network)
 	}
 
@@ -1176,7 +1174,7 @@ func (d *Delegate) newServicesOCR2VRF(
 	if err != nil {
 		return nil, ErrJobSpecNoRelayer{Err: err, PluginName: "VRF"}
 	}
-	if rid.Network != types.NetworkEVM {
+	if rid.Network != relay.NetworkEVM {
 		return nil, fmt.Errorf("VRF services: expected EVM relayer got %s", rid.Network)
 	}
 	chain, err2 := d.legacyChains.Get(rid.ChainID)
@@ -1288,10 +1286,10 @@ func (d *Delegate) newServicesOCR2VRF(
 		lggr.ErrorIf(d.jobORM.RecordError(ctx, jb.ID, msg), "unable to record error")
 	})
 	dkgReportingPluginFactoryDecorator := func(wrapped ocrtypes.ReportingPluginFactory) ocrtypes.ReportingPluginFactory {
-		return promwrapper.NewPromFactory(wrapped, "DKG", string(types.NetworkEVM), chain.ID())
+		return promwrapper.NewPromFactory(wrapped, "DKG", string(relay.NetworkEVM), chain.ID())
 	}
 	vrfReportingPluginFactoryDecorator := func(wrapped ocrtypes.ReportingPluginFactory) ocrtypes.ReportingPluginFactory {
-		return promwrapper.NewPromFactory(wrapped, "OCR2VRF", string(types.NetworkEVM), chain.ID())
+		return promwrapper.NewPromFactory(wrapped, "OCR2VRF", string(relay.NetworkEVM), chain.ID())
 	}
 	noopMonitoringEndpoint := telemetry.NoopAgent{}
 	oracles, err2 := ocr2vrf.NewOCR2VRF(ocr2vrf.DKGVRFArgs{
@@ -1390,7 +1388,7 @@ func (d *Delegate) newServicesOCR2Keepers21(
 	if err != nil {
 		return nil, ErrJobSpecNoRelayer{Err: err, PluginName: "keeper2"}
 	}
-	if rid.Network != types.NetworkEVM {
+	if rid.Network != relay.NetworkEVM {
 		return nil, fmt.Errorf("keeper2 services: expected EVM relayer got %s", rid.Network)
 	}
 
@@ -1543,7 +1541,7 @@ func (d *Delegate) newServicesOCR2Keepers20(
 	if err != nil {
 		return nil, ErrJobSpecNoRelayer{Err: err, PluginName: "keepers2.0"}
 	}
-	if rid.Network != types.NetworkEVM {
+	if rid.Network != relay.NetworkEVM {
 		return nil, fmt.Errorf("keepers2.0 services: expected EVM relayer got %s", rid.Network)
 	}
 	chain, err2 := d.legacyChains.Get(rid.ChainID)
@@ -1671,7 +1669,7 @@ func (d *Delegate) newServicesOCR2Functions(
 	if err != nil {
 		return nil, ErrJobSpecNoRelayer{Err: err, PluginName: "functions"}
 	}
-	if rid.Network != types.NetworkEVM {
+	if rid.Network != relay.NetworkEVM {
 		return nil, fmt.Errorf("functions services: expected EVM relayer got %s", rid.Network)
 	}
 	chain, err := d.legacyChains.Get(rid.ChainID)
@@ -1808,8 +1806,8 @@ func (d *Delegate) newServicesOCR2Functions(
 
 func (d *Delegate) newServicesCCIPCommit(ctx context.Context, lggr logger.SugaredLogger, jb job.Job, bootstrapPeers []commontypes.BootstrapperLocator, kb ocr2key.KeyBundle, ocrDB *db, lc ocrtypes.LocalConfig, transmitterID string) ([]job.ServiceCtx, error) {
 	spec := jb.OCR2OracleSpec
-	if spec.Relay != types.NetworkEVM {
-		return nil, fmt.Errorf("non evm chains are not supported for CCIP commit")
+	if spec.Relay != relay.NetworkEVM {
+		return nil, errors.New("Non evm chains are not supported for CCIP commit")
 	}
 	dstRid, err := spec.RelayID()
 	if err != nil {
@@ -1985,8 +1983,8 @@ func (d *Delegate) ccipCommitGetSrcProvider(ctx context.Context, jb job.Job, plu
 
 func (d *Delegate) newServicesCCIPExecution(ctx context.Context, lggr logger.SugaredLogger, jb job.Job, bootstrapPeers []commontypes.BootstrapperLocator, kb ocr2key.KeyBundle, ocrDB *db, lc ocrtypes.LocalConfig, transmitterID string) ([]job.ServiceCtx, error) {
 	spec := jb.OCR2OracleSpec
-	if spec.Relay != types.NetworkEVM {
-		return nil, fmt.Errorf("Non evm chains are not supported for CCIP execution")
+	if spec.Relay != relay.NetworkEVM {
+		return nil, fmt.Errorf("non evm chains are not supported for CCIP execution")
 	}
 	dstRid, err := spec.RelayID()
 
@@ -2160,7 +2158,7 @@ func newExecPluginConfig(isSourceProvider bool, srcStartBlock uint64, dstStartBl
 
 func (d *Delegate) newServicesLiquidityManager(ctx context.Context, lggr logger.SugaredLogger, jb job.Job, bootstrapPeers []commontypes.BootstrapperLocator, kb ocr2key.KeyBundle, ocrDB *db, lc ocrtypes.LocalConfig) ([]job.ServiceCtx, error) {
 	spec := jb.OCR2OracleSpec
-	if spec.Relay != types.NetworkEVM {
+	if spec.Relay != relay.NetworkEVM {
 		return nil, errors.New("Non evm chains are not supported for rebalancer execution")
 	}
 	// the relay ID specified in the spec will be that of the main/master chain

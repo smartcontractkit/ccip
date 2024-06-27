@@ -19,12 +19,10 @@ import (
 )
 
 const (
-	CONTRACTS_OVERRIDE_CONFIG        = "BASE64_CCIP_CONFIG_OVERRIDE_CONTRACTS"
+	CONTRACTS_OVERRIDE_CONFIG string = "BASE64_CCIP_CONFIG_OVERRIDE_CONTRACTS"
 	TokenOnlyTransfer         string = "Token"
-
-	DataOnlyTransfer string = "Data"
-
-	DataAndTokenTransfer string = "DataWithToken"
+	DataOnlyTransfer          string = "Data"
+	DataAndTokenTransfer      string = "DataWithToken"
 )
 
 type OffRampConfig struct {
@@ -375,10 +373,10 @@ func (c *CCIPContractConfig) ContractsData() ([]byte, error) {
 }
 
 type CCIP struct {
-	Env              *Common                                   `toml:",omitempty"`
-	ContractVersions map[string]*ccipcontracts.ContractVersion `toml:",omitempty"`
-	Deployments      *CCIPContractConfig                       `toml:",omitempty"`
-	Groups           map[string]*CCIPTestGroupConfig           `toml:",omitempty"`
+	Env              *Common                                      `toml:",omitempty"`
+	ContractVersions map[ccipcontracts.Name]ccipcontracts.Version `toml:",omitempty"`
+	Deployments      *CCIPContractConfig                          `toml:",omitempty"`
+	Groups           map[string]*CCIPTestGroupConfig              `toml:",omitempty"`
 }
 
 func (c *CCIP) Validate() error {
