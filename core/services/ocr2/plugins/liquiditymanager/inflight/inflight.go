@@ -21,6 +21,7 @@ type Container interface {
 }
 
 // transferID uniquely identifies a transfer for a short period of time.
+// At any point in time, we allow a single transfer per lane.
 type transferID struct {
 	From models.NetworkSelector
 	To   models.NetworkSelector
