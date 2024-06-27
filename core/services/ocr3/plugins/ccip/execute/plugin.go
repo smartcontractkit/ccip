@@ -286,6 +286,32 @@ func buildSingleChainReportMaxSize(
 	return finalReport, encodedSize, report, nil
 }
 
+func constructMerkleTree(
+	ctx context.Context,
+	hasher cciptypes.MessageHasher,
+	report cciptypes.ExecutePluginCommitDataWithMessages,
+) (*merklemulti.Tree[[32]byte], error) {
+	treeLeaves := make([][32]byte, 0)
+	for _, msg := range report.Messages {
+		if !report.SequenceNumberRange.Contains(msg.SeqNum) {
+			return nil, fmt.Errorf(
+				"malformed message %s, message with sequence number %d outside of report range %s",
+				report.MerkleRoot.String(), msg.SeqNum, report.SequenceNumberRange)
+		}
+		if report.SourceChain != msg.SourceChain {
+			return nil, fmt.Errorf("malformed message %s, unexpected source chain: expected %d, got %d",
+				report.MerkleRoot.String(), report.SourceChain, msg.SourceChain)
+		}
+		leaf, err := hasher.Hash(ctx, msg)
+		if err != nil {
+			return nil, fmt.Errorf("unable to hash message (%d, %d): %w", msg.SourceChain, msg.SeqNum, err)
+		}
+		treeLeaves = append(treeLeaves, leaf)
+	}
+
+	return merklemulti.NewTree(hashutil.NewKeccak(), treeLeaves)
+}
+
 // buildSingleChainReport converts the on-chain event data stored in cciptypes.ExecutePluginCommitDataWithMessages into
 // the final on-chain report format.
 //
@@ -315,35 +341,18 @@ func buildSingleChainReport(
 			report.MerkleRoot.String(), numMsgs, len(report.Messages))
 	}
 
-	treeLeaves := make([][32]byte, 0)
-	for _, msg := range report.Messages {
-		if !report.SequenceNumberRange.Contains(msg.SeqNum) {
-			return cciptypes.ExecutePluginReportSingleChain{}, 0, fmt.Errorf(
-				"malformed message %s, message with sequence number %d outside of report range %s",
-				report.MerkleRoot.String(), msg.SeqNum, report.SequenceNumberRange)
-		}
-		if report.SourceChain != msg.SourceChain {
-			return cciptypes.ExecutePluginReportSingleChain{}, 0, fmt.Errorf(
-				"malformed message %s, unexpected source chain: expected %d, got %d",
-				report.MerkleRoot.String(), report.SourceChain, msg.SourceChain)
-		}
-		leaf, err := hasher.Hash(ctx, msg)
-		if err != nil {
-			return cciptypes.ExecutePluginReportSingleChain{}, 0, fmt.Errorf(
-				"unable to hash message (%d, %d): %w", msg.SourceChain, msg.SeqNum, err)
-		}
-		treeLeaves = append(treeLeaves, leaf)
+	tree, err := constructMerkleTree(ctx, hasher, report)
+	if err != nil {
+		return cciptypes.ExecutePluginReportSingleChain{}, 0,
+			fmt.Errorf("unable to constructing merkle tree from messages: %w", err)
 	}
-
+	if err != nil {
+		return cciptypes.ExecutePluginReportSingleChain{}, 0, err
+	}
 	lggr.Debugw(
 		"constructing merkle tree",
 		"sourceChain", report.SourceChain,
-		"treeLeaves", len(treeLeaves))
-	tree, err := merklemulti.NewTree(hashutil.NewKeccak(), treeLeaves)
-	if err != nil {
-		return cciptypes.ExecutePluginReportSingleChain{}, 0, fmt.Errorf(
-			"unable to constructing merkle tree from messages: %w", err)
-	}
+		"treeLeaves", len(report.Messages))
 
 	// Iterate sequence range and executed messages to select messages to execute.
 	var toExecute []int
