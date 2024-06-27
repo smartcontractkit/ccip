@@ -1,37 +1,40 @@
 package messagehasher
 
 import (
-	"context"
+	cryptorand "crypto/rand"
 	"fmt"
 	"math/big"
 	"math/rand"
 	"strings"
 	"testing"
 
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/message_hasher"
+	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr3/plugins/ccipevm"
+
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/crypto"
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/message_hasher"
-	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr3/plugins/ccipevm"
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+
 	"github.com/stretchr/testify/assert"
 )
 
 func TestMessageHasher(t *testing.T) {
 	// Deploy messageHasher contract
 	ctx := testutils.Context(t)
-	d := testSetup(t, ctx)
+	d := testSetup(t)
 
 	// Setup random msg data
 	metadataHash := utils.RandomBytes32()
 
 	sourceTokenData := make([]byte, rand.Intn(2048))
-	_, err := rand.Read(sourceTokenData)
+	_, err := cryptorand.Read(sourceTokenData)
 	assert.NoError(t, err)
 
 	sourceChain := rand.Uint64()
@@ -42,7 +45,7 @@ func TestMessageHasher(t *testing.T) {
 	feeTokenAmount := rand.Uint64()
 
 	data := make([]byte, rand.Intn(2048))
-	_, err = rand.Read(data)
+	_, err = cryptorand.Read(data)
 	assert.NoError(t, err)
 
 	sourceTokenDatas := make([][]byte, rand.Intn(10))
@@ -116,7 +119,7 @@ type testSetupData struct {
 
 const chainID = 1337
 
-func testSetup(t *testing.T, ctx context.Context) *testSetupData {
+func testSetup(t *testing.T) *testSetupData {
 	// Generate a new key pair for the simulated account
 	privateKey, err := crypto.GenerateKey()
 	assert.NoError(t, err)
