@@ -17,13 +17,13 @@ import (
 // - "EVM2EVMMultiOnRamp 1.6.0-dev"
 type MessageHasherV1 struct {
 	metaDataHash        [32]byte
-	leafDomainSeparator [1]byte
+	leafDomainSeparator [32]byte
 }
 
 func NewMessageHasherV1(metaDataHash [32]byte) *MessageHasherV1 {
 	return &MessageHasherV1{
 		metaDataHash:        metaDataHash,
-		leafDomainSeparator: [1]byte{0x00},
+		leafDomainSeparator: [32]byte{},
 	}
 }
 
@@ -79,7 +79,7 @@ func (h *MessageHasherV1) Hash(_ context.Context, msg cciptypes.CCIPMsg) (ccipty
 	fixedSizeValuesHash := utils.Keccak256Fixed(packedFixedSizeValues)
 
 	packedValues, err := h.abiEncode(
-		`[{"name": "leafDomainSeparator","type":"bytes1"},
+		`[{"name": "leafDomainSeparator","type":"bytes32"},
 			{"name": "metadataHash", "type":"bytes32"},
 			{"name": "fixedSizeValuesHash", "type":"bytes32"},
 			{"name": "dataHash", "type":"bytes32"},
