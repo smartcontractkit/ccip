@@ -123,7 +123,6 @@ func (r *homeChainPoller) fetchAndSetConfigs(ctx context.Context) error {
 		r.lggr.Errorw("error converting OnChainConfigs to ChainConfig", "err", err)
 		return err
 	}
-	r.lggr.Infow("Setting ChainConfig")
 	r.setState(homeChainConfigs)
 	return nil
 }

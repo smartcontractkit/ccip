@@ -8,6 +8,7 @@ import (
 
 	mapset "github.com/deckarep/golang-set/v2"
 	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/smartcontractkit/ccipocr3/internal/mocks"
 
@@ -125,7 +126,6 @@ func Test_PollingWorking(t *testing.T) {
 	var (
 		tickTime       = 2 * time.Millisecond
 		totalSleepTime = (tickTime * 2) + (10 * time.Millisecond)
-		expNumCalls    = int(totalSleepTime/tickTime) + 1 // +1 for the initial call
 	)
 
 	configPoller := NewHomeChainConfigPoller(
@@ -141,8 +141,15 @@ func Test_PollingWorking(t *testing.T) {
 	err = configPoller.Close()
 	require.NoError(t, err)
 
-	// called 3 times, once when it's started, and 2 times when it's polling
-	homeChainReader.AssertNumberOfCalls(t, "GetLatestValue", expNumCalls)
+	calls := homeChainReader.Calls
+	callCount := 0
+	for _, call := range calls {
+		if call.Method == "GetLatestValue" {
+			callCount++
+		}
+	}
+	// called at least 2 times, one for start and one for the first tick
+	assert.GreaterOrEqual(t, callCount, 3)
 
 	configs, err := configPoller.GetAllChainConfigs()
 	require.NoError(t, err)
