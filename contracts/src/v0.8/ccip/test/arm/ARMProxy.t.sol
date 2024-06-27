@@ -21,23 +21,21 @@ contract ARMProxyTest is RMNSetup {
   function test_ARMIsCursed_Success() public {
     s_armProxy.setARM(address(s_mockRMN));
     assertFalse(IRMN(address(s_armProxy)).isCursed());
-    RMN(address(s_armProxy)).voteToCurse(makeCurseId(0), makeSubjects(0));
+    s_mockRMN.setGlobalCursed(true);
     assertTrue(IRMN(address(s_armProxy)).isCursed());
   }
 
-  // FIXME: misleading test that will pass
   function test_ARMIsBlessed_Success() public {
     s_armProxy.setARM(address(s_mockRMN));
+    s_mockRMN.setTaggedRootBlessed(IRMN.TaggedRoot({commitStore: address(0), root: bytes32(0)}), true);
     assertTrue(IRMN(address(s_armProxy)).isBlessed(IRMN.TaggedRoot({commitStore: address(0), root: bytes32(0)})));
-    RMN(address(s_armProxy)).voteToCurse(makeCurseId(0), makeSubjects(0));
-    // depends on the implementation of MockRMN which is inconsistent with ARM
-    // in the ARM contract, a vote to curse will not cause all isBlessed calls to return false
+    s_mockRMN.setTaggedRootBlessed(IRMN.TaggedRoot({commitStore: address(0), root: bytes32(0)}), false);
     assertFalse(IRMN(address(s_armProxy)).isBlessed(IRMN.TaggedRoot({commitStore: address(0), root: bytes32(0)})));
   }
 
   function test_ARMCallRevertReasonForwarded() public {
     bytes memory err = bytes("revert");
-    s_mockRMN.setRevert(err);
+    s_mockRMN.setIsCursedRevert(err);
     s_armProxy.setARM(address(s_mockRMN));
     vm.expectRevert(abi.encodeWithSelector(MockRMN.CustomError.selector, err));
     IRMN(address(s_armProxy)).isCursed();

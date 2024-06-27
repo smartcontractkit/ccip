@@ -532,7 +532,7 @@ contract RMN_voteToCurse is RMNSetup {
       GLOBAL_CURSE_SUBJECT,
       makeCurseId(123),
       weight,
-      1, // blockTimestamp
+      1234567890, // blockTimestamp
       makeCursesHash(makeCurseId(123)), // cursesHash
       weight
     );
