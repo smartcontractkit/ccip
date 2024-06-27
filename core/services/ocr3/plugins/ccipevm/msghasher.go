@@ -6,11 +6,10 @@ import (
 	"math/big"
 	"strings"
 
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
-
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
-	"golang.org/x/crypto/sha3"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 )
 
 // MessageHasherV1 implements the MessageHasher interface.
@@ -77,7 +76,7 @@ func (h *MessageHasherV1) Hash(_ context.Context, msg cciptypes.CCIPMsg) (ccipty
 	if err != nil {
 		return [32]byte{}, fmt.Errorf("abi encode fixed size values: %w", err)
 	}
-	fixedSizeValuesHash := h.keccak256Fixed(packedFixedSizeValues)
+	fixedSizeValuesHash := utils.Keccak256Fixed(packedFixedSizeValues)
 
 	packedValues, err := h.abiEncode(
 		`[{"name": "leafDomainSeparator","type":"bytes1"},
@@ -89,15 +88,15 @@ func (h *MessageHasherV1) Hash(_ context.Context, msg cciptypes.CCIPMsg) (ccipty
 		h.leafDomainSeparator,
 		h.metaDataHash,
 		fixedSizeValuesHash,
-		h.keccak256Fixed(msg.Data),
-		h.keccak256Fixed(encodedTokens),
-		h.keccak256Fixed(encodedSourceTokenData),
+		utils.Keccak256Fixed(msg.Data),
+		utils.Keccak256Fixed(encodedTokens),
+		utils.Keccak256Fixed(encodedSourceTokenData),
 	)
 	if err != nil {
 		return [32]byte{}, fmt.Errorf("abi encode packed values: %w", err)
 	}
 
-	return h.keccak256Fixed(packedValues), nil
+	return utils.Keccak256Fixed(packedValues), nil
 }
 
 func (h *MessageHasherV1) abiEncode(abiStr string, values ...interface{}) ([]byte, error) {
@@ -111,14 +110,6 @@ func (h *MessageHasherV1) abiEncode(abiStr string, values ...interface{}) ([]byt
 		return nil, err
 	}
 	return res[4:], nil
-}
-
-func (h *MessageHasherV1) keccak256Fixed(in []byte) [32]byte {
-	hash := sha3.NewLegacyKeccak256()
-	hash.Write(in)
-	var hs [32]byte
-	copy(hs[:], hash.Sum(nil))
-	return hs
 }
 
 // Interface compliance check
