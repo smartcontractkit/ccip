@@ -484,7 +484,7 @@ func TestSmokeCCIPOnRampLimits(t *testing.T) {
 			err = src.OnRamp.SetRateLimit(evm_2_evm_onramp.RateLimiterConfig{
 				IsEnabled: true,
 				Capacity:  capacityLimit,
-				Rate:      new(big.Int).Mul(capacityLimit, big.NewInt(100)), // Set a high rate to avoid it getting in the way
+				Rate:      new(big.Int).Mul(capacityLimit, big.NewInt(500)), // Set a high rate to avoid it getting in the way
 			})
 			require.NoError(t, err, "Error setting OnRamp rate limits")
 			err = src.Common.ChainClient.WaitForEvents()
@@ -527,10 +527,22 @@ func TestSmokeCCIPOnRampLimits(t *testing.T) {
 				Str("Token", aggRateToken.ContractAddress.Hex()).
 				Msg("Limited token transfer failed on source chain (a good thing in this context)")
 
+			// Set a high price for the tokens to more easily trigger aggregate rate limits
+			err = src.Common.PriceRegistry.UpdatePrices([]contracts.InternalTokenPriceUpdate{
+				{
+					SourceToken: aggRateToken.ContractAddress,
+					UsdPerToken: big.NewInt(100),
+				},
+				{
+					SourceToken: bpsAndAggToken.ContractAddress,
+					UsdPerToken: big.NewInt(100),
+				},
+			}, []contracts.InternalGasPriceUpdate{})
+			require.NoError(t, err, "Error updating prices")
 			// Enable aggregate rate limiting for the limited tokens
 			err = src.OnRamp.SetRateLimit(evm_2_evm_onramp.RateLimiterConfig{
 				IsEnabled: true,
-				Capacity:  new(big.Int).Mul(capacityLimit, big.NewInt(100)), // Set a high capacity to avoid it getting in the way
+				Capacity:  new(big.Int).Mul(capacityLimit, big.NewInt(5000)), // Set a high capacity to avoid it getting in the way
 				Rate:      big.NewInt(1),
 			})
 			require.NoError(t, err, "Error setting OnRamp rate limits")
@@ -550,25 +562,25 @@ func TestSmokeCCIPOnRampLimits(t *testing.T) {
 			// Check that aggregate rate limits are enforced on limited tokens
 			src.TransferAmount[freeTokenIndex] = big.NewInt(0)
 			src.TransferAmount[bpsTokenIndex] = big.NewInt(0)
-			src.TransferAmount[aggRateTokenIndex] = overCapacityAmount
+			src.TransferAmount[aggRateTokenIndex] = capacityLimit
 			src.TransferAmount[bpsAndAggTokenIndex] = big.NewInt(0)
 			failedTx, _, _, err = tc.lane.Source.SendRequest(tc.lane.Dest.ReceiverDapp.EthAddress, big.NewInt(actions.DefaultDestinationGasLimit))
 			require.Error(t, err, "Aggregate rate limited token transfer should immediately revert")
 			errReason, _, err = src.Common.ChainClient.RevertReasonFromTx(failedTx, evm_2_evm_onramp.EVM2EVMOnRampABI)
 			require.NoError(t, err)
-			require.Equal(t, "AggregateValueRateLimitReached", errReason, "Expected capacity limit reached error")
+			require.Equal(t, "AggregateValueRateLimitReached", errReason, "Expected aggregate rate limit reached error")
 			tc.lane.Logger.
 				Info().
 				Str("Token", aggRateToken.ContractAddress.Hex()).
 				Msg("Limited token transfer failed on source chain (a good thing in this context)")
 
-			src.TransferAmount[aggRateTokenIndex] = nil
-			src.TransferAmount[bpsAndAggTokenIndex] = overCapacityAmount
+			src.TransferAmount[aggRateTokenIndex] = big.NewInt(0)
+			src.TransferAmount[bpsAndAggTokenIndex] = capacityLimit
 			failedTx, _, _, err = tc.lane.Source.SendRequest(tc.lane.Dest.ReceiverDapp.EthAddress, big.NewInt(actions.DefaultDestinationGasLimit))
 			require.Error(t, err, "Aggregate rate limited token transfer should immediately revert")
 			errReason, _, err = src.Common.ChainClient.RevertReasonFromTx(failedTx, evm_2_evm_onramp.EVM2EVMOnRampABI)
 			require.NoError(t, err)
-			require.Equal(t, "AggregateValueRateLimitReached", errReason, "Expected capacity limit reached error")
+			require.Equal(t, "AggregateValueRateLimitReached", errReason, "Expected aggregate rate limit reached error")
 			tc.lane.Logger.
 				Info().
 				Str("Token", aggRateToken.ContractAddress.Hex()).
