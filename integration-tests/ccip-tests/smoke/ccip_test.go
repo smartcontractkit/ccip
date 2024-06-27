@@ -399,6 +399,9 @@ func TestSmokeCCIPOnRampLimits(t *testing.T) {
 
 	log := logging.GetTestLogger(t)
 	TestCfg := testsetups.NewCCIPTestConfig(t, log, testconfig.Smoke, testsetups.WithNoTokensPerMessage(4), testsetups.WithTokensPerChain(4))
+	require.False(t, pointer.GetBool(TestCfg.TestGroupInput.ExistingDeployment),
+		"This test modifies contract state. Before running it, ensure you are willing and able to do so.",
+	)
 	err := contracts.MatchContractVersionsOrAbove(map[contracts.Name]contracts.Version{
 		contracts.OffRampContract: contracts.V1_5_0_dev,
 		contracts.OnRampContract:  contracts.V1_5_0_dev,
@@ -741,6 +744,9 @@ func testOffRampRateLimits(t *testing.T, rateLimiterConfig contracts.RateLimiter
 
 	log := logging.GetTestLogger(t)
 	TestCfg := testsetups.NewCCIPTestConfig(t, log, testconfig.Smoke)
+	require.False(t, pointer.GetBool(TestCfg.TestGroupInput.ExistingDeployment),
+		"This test modifies contract state. Before running it, ensure you are willing and able to do so.",
+	)
 	err := contracts.MatchContractVersionsOrAbove(map[contracts.Name]contracts.Version{
 		contracts.OffRampContract: contracts.V1_5_0_dev,
 	})
