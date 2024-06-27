@@ -24,6 +24,8 @@ flowchart LR
   classDef outline stroke-dasharray:6,fill:none;
   class chains,products outline
 
+  chainlink/v2 --> ccipocr3
+  click ccipocr3 href "https://github.com/smartcontractkit/ccipocr3"
   chainlink/v2 --> chain-selectors
   click chain-selectors href "https://github.com/smartcontractkit/chain-selectors"
   chainlink/v2 --> chainlink-automation
@@ -50,6 +52,8 @@ flowchart LR
   click tdh2/go/tdh2 href "https://github.com/smartcontractkit/tdh2"
   chainlink/v2 --> wsrpc
   click wsrpc href "https://github.com/smartcontractkit/wsrpc"
+  ccipocr3 --> chainlink-common
+  ccipocr3 --> libocr
   chainlink-automation --> chainlink-common
   chainlink-automation --> libocr
   chainlink-common --> libocr

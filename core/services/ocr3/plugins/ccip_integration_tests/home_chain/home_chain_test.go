@@ -16,7 +16,7 @@ import (
 	ccipreader "github.com/smartcontractkit/ccipocr3/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets"
-	capcfg "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/ccip_capability_configuration"
+	capcfg "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/ccip_config"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/capabilities_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
@@ -44,7 +44,7 @@ func TestHomeChainReader(t *testing.T) {
 	cfg := evmtypes.ChainReaderConfig{
 		Contracts: map[string]evmtypes.ChainContractReader{
 			"CCIPCapabilityConfiguration": {
-				ContractABI: capcfg.CCIPCapabilityConfigurationMetaData.ABI,
+				ContractABI: capcfg.CCIPConfigMetaData.ABI,
 				Configs: map[string]*evmtypes.ChainReaderDefinition{
 					"getAllChainConfigs": {
 						ChainSpecificName: "getAllChainConfigs",
@@ -68,7 +68,7 @@ func TestHomeChainReader(t *testing.T) {
 	chainAConf := setupConfigInfo(chainA, p2pIDS, fChainA, []byte("chainA"))
 	chainBConf := setupConfigInfo(chainB, p2pIDS[1:], fChainB, []byte("chainB"))
 	chainCConf := setupConfigInfo(chainC, p2pIDS[2:], fChainC, []byte("chainC"))
-	inputConfig := []capcfg.CCIPCapabilityConfigurationChainConfigInfo{
+	inputConfig := []capcfg.CCIPConfigChainConfigInfo{
 		chainAConf,
 		chainBConf,
 		chainCConf,
@@ -113,10 +113,10 @@ func toPeerIDs(readers [][32]byte) mapset.Set[libocrtypes.PeerID] {
 	return peerIDs
 }
 
-func setupConfigInfo(chainSelector uint64, readers [][32]byte, fChain uint8, cfg []byte) capcfg.CCIPCapabilityConfigurationChainConfigInfo {
-	return capcfg.CCIPCapabilityConfigurationChainConfigInfo{
+func setupConfigInfo(chainSelector uint64, readers [][32]byte, fChain uint8, cfg []byte) capcfg.CCIPConfigChainConfigInfo {
+	return capcfg.CCIPConfigChainConfigInfo{
 		ChainSelector: chainSelector,
-		ChainConfig: capcfg.CCIPCapabilityConfigurationChainConfig{
+		ChainConfig: capcfg.CCIPConfigChainConfig{
 			Readers: readers,
 			FChain:  fChain,
 			Config:  cfg,
@@ -124,12 +124,12 @@ func setupConfigInfo(chainSelector uint64, readers [][32]byte, fChain uint8, cfg
 	}
 }
 
-func prepareCCIPCapabilityConfig(t *testing.T, backend *backends.SimulatedBackend, transactor *bind.TransactOpts, capRegAddress common.Address) (common.Address, *capcfg.CCIPCapabilityConfiguration, error) {
-	ccAddress, _, _, err := capcfg.DeployCCIPCapabilityConfiguration(transactor, backend, capRegAddress)
+func prepareCCIPCapabilityConfig(t *testing.T, backend *backends.SimulatedBackend, transactor *bind.TransactOpts, capRegAddress common.Address) (common.Address, *capcfg.CCIPConfig, error) {
+	ccAddress, _, _, err := capcfg.DeployCCIPConfig(transactor, backend, capRegAddress)
 	require.NoError(t, err)
 	backend.Commit()
 
-	contract, err := capcfg.NewCCIPCapabilityConfiguration(ccAddress, backend)
+	contract, err := capcfg.NewCCIPConfig(ccAddress, backend)
 	require.NoError(t, err)
 	backend.Commit()
 
