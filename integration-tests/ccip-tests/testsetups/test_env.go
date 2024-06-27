@@ -14,6 +14,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	ctfconfig "github.com/smartcontractkit/chainlink-testing-framework/config"
+	"github.com/smartcontractkit/chainlink-testing-framework/networks"
+	"github.com/smartcontractkit/chainlink-testing-framework/utils/conversions"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/k8s/pkg/helm/foundry"
 
@@ -257,6 +259,16 @@ func DeployLocalCluster(
 	privateEthereumNetworks := []*ctfconfig.EthereumNetworkConfig{}
 	for _, network := range testInputs.EnvInput.PrivateEthereumNetworks {
 		privateEthereumNetworks = append(privateEthereumNetworks, network)
+
+		for _, networkCfg := range networks.MustGetSelectedNetworkConfig(testInputs.EnvInput.Network) {
+			for _, key := range networkCfg.PrivateKeys {
+				address, err := conversions.PrivateKeyHexToAddress(key)
+				require.NoError(t, err, "failed to convert private key to address: %w", err)
+				network.EthereumChainConfig.AddressesToFund = append(
+					network.EthereumChainConfig.AddressesToFund, address.Hex(),
+				)
+			}
+		}
 	}
 
 	if len(selectedNetworks) > len(privateEthereumNetworks) {
@@ -334,11 +346,13 @@ func DeployLocalCluster(
 				ccipNode, err := test_env.NewClNode(
 					[]string{env.DockerNetwork.Name},
 					pointer.GetString(clNode.ChainlinkImage.Image),
-					pointer.GetString(clNode.ChainlinkImage.Version), toml,
+					pointer.GetString(clNode.ChainlinkImage.Version),
+					toml,
+					env.LogStream,
 					test_env.WithPgDBOptions(
 						ctftestenv.WithPostgresImageName(clNode.DBImage),
-						ctftestenv.WithPostgresImageVersion(clNode.DBTag)),
-					test_env.WithLogStream(env.LogStream),
+						ctftestenv.WithPostgresImageVersion(clNode.DBTag),
+					),
 				)
 				if err != nil {
 					return err
@@ -362,10 +376,12 @@ func DeployLocalCluster(
 					[]string{env.DockerNetwork.Name},
 					pointer.GetString(testInputs.EnvInput.NewCLCluster.Common.ChainlinkImage.Image),
 					pointer.GetString(testInputs.EnvInput.NewCLCluster.Common.ChainlinkImage.Version),
-					toml, test_env.WithPgDBOptions(
+					toml,
+					env.LogStream,
+					test_env.WithPgDBOptions(
 						ctftestenv.WithPostgresImageName(testInputs.EnvInput.NewCLCluster.Common.DBImage),
-						ctftestenv.WithPostgresImageVersion(testInputs.EnvInput.NewCLCluster.Common.DBTag)),
-					test_env.WithLogStream(env.LogStream),
+						ctftestenv.WithPostgresImageVersion(testInputs.EnvInput.NewCLCluster.Common.DBTag),
+					),
 				)
 				if err != nil {
 					return err
