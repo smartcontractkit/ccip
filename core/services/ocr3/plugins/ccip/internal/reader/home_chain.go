@@ -208,7 +208,8 @@ func (r *homeChainPoller) Close() error {
 	if err != nil {
 		return fmt.Errorf("failed to stop %s: %w", r.Name(), err)
 	}
-	ticker := time.NewTicker(r.pollingDuration * 2) // give it twice the polling duration to ensure the poller is caught up and stopped
+	// give it twice the polling duration to ensure the poller is caught up and stopped
+	ticker := time.NewTicker(r.pollingDuration * 2)
 	defer ticker.Stop()
 	for {
 		// Make sure it's closed gracefully, give it 2 seconds to do so or fail

@@ -5,6 +5,7 @@ WORKDIR /chainlink
 
 COPY GNUmakefile package.json ./
 COPY tools/bin/ldflags ./tools/bin/
+COPY core/services/ocr3/plugins/ccip/ ./core/services/ocr3/plugins/ccip/
 
 ADD go.mod go.sum ./
 RUN go mod download
