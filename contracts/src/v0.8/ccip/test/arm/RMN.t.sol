@@ -1056,3 +1056,13 @@ contract RMN_permaBlessing is RMNSetup {
     assertEq(s_rmn.getPermaBlessedCommitStores(), addresses());
   }
 }
+
+contract RMN_getRecordedCurseRelatedOps is RMNSetup {
+  function test_OpsPostDeployment() public {
+    // The constructor call includes a setConfig, so that's the only thing we should expect to find.
+    assertEq(s_rmn.getRecordedCurseRelatedOpsCount(), 1);
+    RMN.RecordedCurseRelatedOp[] memory recordedCurseRelatedOps = s_rmn.getRecordedCurseRelatedOps(0, type(uint256).max);
+    assertEq(recordedCurseRelatedOps.length, 1);
+    assertEq(uint8(recordedCurseRelatedOps[0].tag), uint8(RMN.RecordedCurseRelatedOpTag.SetConfig));
+  }
+}

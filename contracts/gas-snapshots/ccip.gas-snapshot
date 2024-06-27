@@ -727,6 +727,7 @@ PriceRegistry_updateTokenPriceFeeds:test_MultipleFeedUpdate_Success() (gas: 8879
 PriceRegistry_updateTokenPriceFeeds:test_SingleFeedUpdate_Success() (gas: 50733)
 PriceRegistry_updateTokenPriceFeeds:test_ZeroFeeds_Success() (gas: 12296)
 RMN_constructor:test_Constructor_Success() (gas: 48838)
+RMN_getRecordedCurseRelatedOps:test_OpsPostDeployment() (gas: 19666)
 RMN_lazyVoteToCurseUpdate_Benchmark:test_VoteToCurseLazilyRetain3VotersUponConfigChange_gas() (gas: 152152)
 RMN_ownerUnbless:test_Unbless_Success() (gas: 74699)
 RMN_ownerUnvoteToCurse:test_CanBlessAndCurseAfterGlobalCurseIsLifted() (gas: 470965)
