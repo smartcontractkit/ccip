@@ -111,8 +111,7 @@ func TestHomeChainReader(t *testing.T) {
 }
 
 func closGracefully(t *testing.T, homeChain ccipreader.HomeChain) {
-	err := homeChain.Close()
-	require.NoError(t, err)
+	require.NoError(t,  homeChain.Close())
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
 	for {
