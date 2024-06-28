@@ -309,7 +309,7 @@ func buildSingleChainReport(
 	tree, err := constructMerkleTree(ctx, hasher, report)
 	if err != nil {
 		return cciptypes.ExecutePluginReportSingleChain{}, 0,
-			fmt.Errorf("unable to constructing merkle tree from messages: %w", err)
+			fmt.Errorf("unable to construct merkle tree from messages: %w", err)
 	}
 	lggr.Debugw(
 		"constructing merkle tree",

@@ -498,7 +498,7 @@ func Test_buildSingleChainReport_Errors(t *testing.T) {
 		},
 		{
 			name:    "wrong sequence numbers",
-			wantErr: "message with sequence number 102 outside of report range [100 -> 101]",
+			wantErr: "sequence number 102 outside of report range [100 -> 101]",
 			args: args{
 				report: cciptypes.ExecutePluginCommitDataWithMessages{
 					ExecutePluginCommitData: cciptypes.ExecutePluginCommitData{
