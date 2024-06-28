@@ -4,9 +4,10 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/stretchr/testify/require"
-
+	ccipreaderpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
+	cctypes "github.com/smartcontractkit/chainlink/v2/core/services/ccipcapability/types"
 	mocktypes "github.com/smartcontractkit/chainlink/v2/core/services/ccipcapability/types/mocks"
+	"github.com/stretchr/testify/require"
 )
 
 func Test_ccipDeployment_Close(t *testing.T) {
@@ -842,88 +843,199 @@ func Test_ccipDeployment_HandleBlueGreen(t *testing.T) {
 	}
 }
 
-func Test_ccipDeployment_HasGreenCommitInstance(t *testing.T) {
-	type fields struct {
-		commit blueGreenDeployment
-		exec   blueGreenDeployment
+func Test_isNewGreenInstance(t *testing.T) {
+	type args struct {
+		pluginType     cctypes.PluginType
+		ocrConfigs     []ccipreaderpkg.OCR3ConfigWithMeta
+		prevDeployment ccipDeployment
 	}
 	tests := []struct {
-		name   string
-		fields fields
-		want   bool
+		name string
+		args args
+		want bool
 	}{
 		{
-			name: "only commit blue is present",
-			fields: fields{
-				commit: blueGreenDeployment{
-					blue: mocktypes.NewCCIPOracle(t),
+			"prev deployment only blue",
+			args{
+				pluginType: cctypes.PluginTypeCCIPCommit,
+				ocrConfigs: []ccipreaderpkg.OCR3ConfigWithMeta{
+					{}, {},
+				},
+				prevDeployment: ccipDeployment{
+					commit: blueGreenDeployment{
+						blue: mocktypes.NewCCIPOracle(t),
+					},
 				},
 			},
-			want: false,
+			true,
 		},
 		{
-			name: "both commit blue and green are present",
-			fields: fields{
-				commit: blueGreenDeployment{
-					blue:  mocktypes.NewCCIPOracle(t),
-					green: mocktypes.NewCCIPOracle(t),
+			"green -> blue promotion",
+			args{
+				pluginType: cctypes.PluginTypeCCIPCommit,
+				ocrConfigs: []ccipreaderpkg.OCR3ConfigWithMeta{
+					{},
+				},
+				prevDeployment: ccipDeployment{
+					commit: blueGreenDeployment{
+						blue:  mocktypes.NewCCIPOracle(t),
+						green: mocktypes.NewCCIPOracle(t),
+					},
 				},
 			},
-			want: true,
+			false,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c := &ccipDeployment{
-				commit: tt.fields.commit,
-				exec:   tt.fields.exec,
-			}
-			if got := c.HasGreenCommitInstance(); got != tt.want {
-				t.Errorf("ccipDeployment.HasGreenCommitInstance() = %v, want %v", got, tt.want)
+			got := isNewGreenInstance(tt.args.pluginType, tt.args.ocrConfigs, tt.args.prevDeployment)
+			require.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func Test_isPromotion(t *testing.T) {
+	type args struct {
+		pluginType     cctypes.PluginType
+		ocrConfigs     []ccipreaderpkg.OCR3ConfigWithMeta
+		prevDeployment ccipDeployment
+	}
+	tests := []struct {
+		name string
+		args args
+		want bool
+	}{
+		{
+			"prev deployment only blue",
+			args{
+				pluginType: cctypes.PluginTypeCCIPCommit,
+				ocrConfigs: []ccipreaderpkg.OCR3ConfigWithMeta{
+					{}, {},
+				},
+				prevDeployment: ccipDeployment{
+					commit: blueGreenDeployment{
+						blue: mocktypes.NewCCIPOracle(t),
+					},
+				},
+			},
+			false,
+		},
+		{
+			"green -> blue promotion",
+			args{
+				pluginType: cctypes.PluginTypeCCIPCommit,
+				ocrConfigs: []ccipreaderpkg.OCR3ConfigWithMeta{
+					{},
+				},
+				prevDeployment: ccipDeployment{
+					commit: blueGreenDeployment{
+						blue:  mocktypes.NewCCIPOracle(t),
+						green: mocktypes.NewCCIPOracle(t),
+					},
+				},
+			},
+			true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := isPromotion(tt.args.pluginType, tt.args.ocrConfigs, tt.args.prevDeployment); got != tt.want {
+				t.Errorf("isPromotion() = %v, want %v", got, tt.want)
 			}
 		})
 	}
 }
 
-func Test_ccipDeployment_NumExecInstances(t *testing.T) {
+func Test_ccipDeployment_HasGreenInstance(t *testing.T) {
 	type fields struct {
 		commit blueGreenDeployment
 		exec   blueGreenDeployment
 	}
+	type args struct {
+		pluginType cctypes.PluginType
+	}
 	tests := []struct {
 		name   string
 		fields fields
+		args   args
 		want   bool
 	}{
 		{
-			name: "only exec blue is present",
-			fields: fields{
-				exec: blueGreenDeployment{
+			"commit green present",
+			fields{
+				commit: blueGreenDeployment{
+					blue:  mocktypes.NewCCIPOracle(t),
+					green: mocktypes.NewCCIPOracle(t),
+				},
+			},
+			args{
+				pluginType: cctypes.PluginTypeCCIPCommit,
+			},
+			true,
+		},
+		{
+			"commit green not present",
+			fields{
+				commit: blueGreenDeployment{
 					blue: mocktypes.NewCCIPOracle(t),
 				},
 			},
-			want: false,
+			args{
+				pluginType: cctypes.PluginTypeCCIPCommit,
+			},
+			false,
 		},
 		{
-			name: "both exec blue and green are present",
-			fields: fields{
+			"exec green present",
+			fields{
 				exec: blueGreenDeployment{
 					blue:  mocktypes.NewCCIPOracle(t),
 					green: mocktypes.NewCCIPOracle(t),
 				},
 			},
-			want: true,
+			args{
+				pluginType: cctypes.PluginTypeCCIPExec,
+			},
+			true,
+		},
+		{
+			"exec green not present",
+			fields{
+				exec: blueGreenDeployment{
+					blue: mocktypes.NewCCIPOracle(t),
+				},
+			},
+			args{
+				pluginType: cctypes.PluginTypeCCIPExec,
+			},
+			false,
+		},
+		{
+			"invalid plugin type",
+			fields{},
+			args{
+				pluginType: cctypes.PluginType(100),
+			},
+			false,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c := &ccipDeployment{
-				commit: tt.fields.commit,
-				exec:   tt.fields.exec,
+			c := &ccipDeployment{}
+			if tt.fields.commit.blue != nil {
+				c.commit.blue = tt.fields.commit.blue
 			}
-			if got := c.HasGreenExecInstance(); got != tt.want {
-				t.Errorf("ccipDeployment.NumExecInstances() = %v, want %v", got, tt.want)
+			if tt.fields.commit.green != nil {
+				c.commit.green = tt.fields.commit.green
 			}
+			if tt.fields.exec.blue != nil {
+				c.exec.blue = tt.fields.exec.blue
+			}
+			if tt.fields.exec.green != nil {
+				c.exec.green = tt.fields.exec.green
+			}
+			got := c.HasGreenInstance(tt.args.pluginType)
+			require.Equal(t, tt.want, got)
 		})
 	}
 }

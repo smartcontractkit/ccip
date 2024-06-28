@@ -5,6 +5,7 @@ import (
 
 	"go.uber.org/multierr"
 
+	ccipreaderpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cctypes "github.com/smartcontractkit/chainlink/v2/core/services/ccipcapability/types"
 )
 
@@ -157,12 +158,21 @@ func (c *ccipDeployment) HandleBlueGreen(prevDeployment *ccipDeployment) error {
 	return err
 }
 
-// HasGreenCommitInstance returns true if and only if the green commit instance is not nil.
-func (c *ccipDeployment) HasGreenCommitInstance() bool {
-	return c.commit.green != nil
+func (c *ccipDeployment) HasGreenInstance(pluginType cctypes.PluginType) bool {
+	switch pluginType {
+	case cctypes.PluginTypeCCIPCommit:
+		return c.commit.green != nil
+	case cctypes.PluginTypeCCIPExec:
+		return c.exec.green != nil
+	default:
+		return false
+	}
 }
 
-// HasGreenExecInstance returns true if and only if the green exec instance is not nil.
-func (c *ccipDeployment) HasGreenExecInstance() bool {
-	return c.exec.green != nil
+func isNewGreenInstance(pluginType cctypes.PluginType, ocrConfigs []ccipreaderpkg.OCR3ConfigWithMeta, prevDeployment ccipDeployment) bool {
+	return len(ocrConfigs) == 2 && !prevDeployment.HasGreenInstance(pluginType)
+}
+
+func isPromotion(pluginType cctypes.PluginType, ocrConfigs []ccipreaderpkg.OCR3ConfigWithMeta, prevDeployment ccipDeployment) bool {
+	return len(ocrConfigs) == 1 && prevDeployment.HasGreenInstance(pluginType)
 }

@@ -1,10 +1,18 @@
 package types
 
 import (
-	ocr3reader "github.com/smartcontractkit/ccipocr3/pkg/reader"
+	"context"
+
+	ccipreaderpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 )
 
-type OCR3ConfigWithMeta ocr3reader.OCR3ConfigWithMeta
+type OCR3ConfigWithMeta ccipreaderpkg.OCR3ConfigWithMeta
+
+type HomeChainReader interface {
+	// GetOCRConfigs Gets the OCR3Configs for a given donID and pluginType
+	GetOCRConfigs(ctx context.Context, donID uint32, pluginType uint8) ([]ccipreaderpkg.OCR3ConfigWithMeta, error)
+	Ready() error
+}
 
 type PluginType uint8
 
@@ -26,13 +34,9 @@ type CCIPOracle interface {
 //
 //go:generate mockery --name OracleCreator --output ./mocks/ --case underscore
 type OracleCreator interface {
-	// CreateCommitOracle creates a new oracle that will run the CCIP commit plugin.
+	// CreatePlugin creates a new oracle that will run either the commit or exec ccip plugin.
 	// The oracle must be returned unstarted.
-	CreateCommitOracle(config OCR3ConfigWithMeta) (CCIPOracle, error)
-
-	// CreateExecOracle creates a new oracle that will run the CCIP exec plugin.
-	// The oracle must be returned unstarted.
-	CreateExecOracle(config OCR3ConfigWithMeta) (CCIPOracle, error)
+	CreatePluginOracle(pluginType PluginType, config OCR3ConfigWithMeta) (CCIPOracle, error)
 
 	// CreateBootstrapOracle creates a new bootstrap node with the given OCR config.
 	// The oracle must be returned unstarted.

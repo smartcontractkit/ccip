@@ -72,9 +72,9 @@ require (
 	github.com/scylladb/go-reflectx v1.0.1
 	github.com/shirou/gopsutil/v3 v3.24.3
 	github.com/shopspring/decimal v1.4.0
-	github.com/smartcontractkit/ccipocr3 v0.0.0-00000000000000-000000000000
 	github.com/smartcontractkit/chain-selectors v1.0.17
 	github.com/smartcontractkit/chainlink-automation v1.0.4
+	github.com/smartcontractkit/chainlink-ccip v0.0.0-20240701090927-2dfa43703611
 	github.com/smartcontractkit/chainlink-common v0.1.7-0.20240625074419-c278d083facf
 	github.com/smartcontractkit/chainlink-cosmos v0.4.1-0.20240524214833-c362c2ebbd2d
 	github.com/smartcontractkit/chainlink-data-streams v0.0.0-20240220203239-09be0ea34540
@@ -357,6 +357,4 @@ replace (
 	github.com/prometheus/client_golang => github.com/prometheus/client_golang v1.17.0
 	github.com/prometheus/client_model => github.com/prometheus/client_model v0.5.0
 	github.com/prometheus/common => github.com/prometheus/common v0.45.0
-
-	github.com/smartcontractkit/ccipocr3 => ./core/services/ocr3/plugins/ccip
 )

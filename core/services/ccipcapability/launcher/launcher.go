@@ -8,7 +8,7 @@ import (
 
 	"go.uber.org/multierr"
 
-	ocr3reader "github.com/smartcontractkit/ccipocr3/pkg/reader"
+	ccipreaderpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils"
 
 	kcr "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/capabilities_registry"
@@ -34,7 +34,7 @@ func New(
 	capabilityLabelledName string,
 	p2pID p2pkey.KeyV2,
 	lggr logger.Logger,
-	homeChainReader ocr3reader.HomeChain,
+	homeChainReader cctypes.HomeChainReader,
 	oracleCreator cctypes.OracleCreator,
 ) *launcher {
 	return &launcher{
@@ -61,7 +61,7 @@ type launcher struct {
 	capabilityLabelledName string
 	p2pID                  p2pkey.KeyV2
 	lggr                   logger.Logger
-	homeChainReader        ocr3reader.HomeChain
+	homeChainReader        cctypes.HomeChainReader
 	stopChan               chan struct{}
 	// latestState is the latest capability registry state received from the syncer.
 	latestState registrysyncer.State
@@ -69,6 +69,7 @@ type launcher struct {
 	regState      registrysyncer.State
 	oracleCreator cctypes.OracleCreator
 	lock          sync.RWMutex
+	wg            sync.WaitGroup
 
 	// dons is a map of CCIP DON IDs to the OCR instances that are running on them.
 	// we can have up to two OCR instances per CCIP plugin, since we are running two plugins,
@@ -95,6 +96,7 @@ func (l *launcher) Close() error {
 	return l.StartStopOnce.StopOnce("launcher", func() error {
 		// shut down the monitor goroutine.
 		close(l.stopChan)
+		l.wg.Wait()
 
 		// shut down all running oracles.
 		var err error
@@ -110,12 +112,14 @@ func (l *launcher) Close() error {
 func (l *launcher) Start(context.Context) error {
 	return l.StartOnce("launcher", func() error {
 		l.stopChan = make(chan struct{})
+		l.wg.Add(1)
 		go l.monitor()
 		return nil
 	})
 }
 
 func (l *launcher) monitor() {
+	defer l.wg.Done()
 	ticker := time.NewTicker(tickInterval)
 	for {
 		select {
@@ -160,18 +164,36 @@ func (l *launcher) tick() error {
 // for any updated OCR instances, it will restart them with the new configuration.
 func (l *launcher) processDiff(diff diffResult) error {
 	for id := range diff.removed {
-		if err := l.removeDON(id); err != nil {
-			return err
+		ceDep, ok := l.dons[id]
+		if !ok {
+			// not running this particular DON.
+			continue
 		}
 
+		if err := ceDep.Close(); err != nil {
+			return fmt.Errorf("failed to shutdown oracles for CCIP DON %d: %w", id, err)
+		}
+
+		// after a successful shutdown we can safely remove the DON deployment from the map.
+		delete(l.dons, id)
 		delete(l.regState.IDsToDONs, id)
 	}
 
 	var addedDeployments = make(map[registrysyncer.DonID]*ccipDeployment)
 	for _, don := range diff.added {
-		dep, err := l.addDON(don)
+		dep, err := createDON(
+			l.lggr,
+			l.p2pID,
+			l.homeChainReader,
+			l.oracleCreator,
+			don,
+		)
 		if err != nil {
 			return err
+		}
+		if dep == nil {
+			// not a member of this DON.
+			continue
 		}
 		addedDeployments[registrysyncer.DonID(don.Id)] = dep
 	}
@@ -191,29 +213,41 @@ func (l *launcher) processDiff(diff diffResult) error {
 	}
 
 	var updatedDeployments = make(map[registrysyncer.DonID]struct {
-		depBefore, depAfter *ccipDeployment
+		prevDeployment, futDeployment *ccipDeployment
 	})
 	for _, don := range diff.updated {
-		depBefore, depAfter, err := l.updateDON(don)
+		prevDeployment, ok := l.dons[registrysyncer.DonID(don.Id)]
+		if !ok {
+			return fmt.Errorf("invariant violation: expected to find CCIP DON %d in the map of running deployments", don.Id)
+		}
+
+		futDeployment, err := updateDON(
+			l.lggr,
+			l.p2pID,
+			l.homeChainReader,
+			l.oracleCreator,
+			*prevDeployment,
+			don,
+		)
 		if err != nil {
 			return err
 		}
 		updatedDeployments[registrysyncer.DonID(don.Id)] = struct {
-			depBefore, depAfter *ccipDeployment
+			prevDeployment, futDeployment *ccipDeployment
 		}{
-			depBefore: depBefore,
-			depAfter:  depAfter,
+			prevDeployment: prevDeployment,
+			futDeployment:  futDeployment,
 		}
 	}
 
 	for donID, depPair := range updatedDeployments {
-		if err := depPair.depAfter.HandleBlueGreen(depPair.depBefore); err != nil {
+		if err := depPair.futDeployment.HandleBlueGreen(depPair.prevDeployment); err != nil {
 			// TODO: how to handle a failed blue-green deployment?
 			return fmt.Errorf("failed to handle blue-green deployment for CCIP DON %d: %w", donID, err)
 		}
 
 		// update state.
-		l.dons[donID] = depPair.depAfter
+		l.dons[donID] = depPair.futDeployment
 		// update the state with the latest config.
 		// this way if one of the starts errors, we don't retry all of them.
 		l.regState.IDsToDONs[donID] = diff.updated[donID]
@@ -222,109 +256,104 @@ func (l *launcher) processDiff(diff diffResult) error {
 	return nil
 }
 
-func (l *launcher) removeDON(id registrysyncer.DonID) error {
-	ceDep, ok := l.dons[id]
-	if !ok {
-		// not running this particular DON.
-		return nil
-	}
-
-	if err := ceDep.Close(); err != nil {
-		return fmt.Errorf("failed to shutdown oracles for CCIP DON %d: %w", id, err)
-	}
-
-	// after a successful shutdown we can safely remove the DON deployment from the map.
-	delete(l.dons, id)
-	return nil
-}
-
-// updateDON handles the case where a DON in the capability registry has received a new configuration.
-// In the case of CCIP, which follows blue-green deployment, we either:
-// 1. Create a new oracle (the green instance) and start it.
-// 2. Shut down the blue instance, making the green instance the new blue instance.
-func (l *launcher) updateDON(don kcr.CapabilitiesRegistryDONInfo) (depBefore, depAfter *ccipDeployment, err error) {
-	if !isMemberOfDON(don, l.p2pID) {
-		l.lggr.Infow("Not a member of this DON, skipping", "donId", don.Id, "p2pId", l.p2pID.ID())
-		return nil, nil, nil
-	}
-
-	var ok bool
-	depBefore, ok = l.dons[registrysyncer.DonID(don.Id)]
-	if !ok {
-		// This should never happen.
-		return nil, nil, fmt.Errorf("no deployment found for CCIP DON %d", don.Id)
-	}
-
-	// this should be a retryable error.
-	commitOCRConfigs, err := l.homeChainReader.GetOCRConfigs(context.Background(), don.Id, uint8(cctypes.PluginTypeCCIPCommit))
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to fetch OCR configs for CCIP commit plugin (don id: %d) from home chain config contract: %w",
-			don.Id, err)
-	}
-
-	execOCRConfigs, err := l.homeChainReader.GetOCRConfigs(context.Background(), don.Id, uint8(cctypes.PluginTypeCCIPExec))
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to fetch OCR configs for CCIP exec plugin (don id: %d) from home chain config contract: %w",
-			don.Id, err)
-	}
-
-	// valid cases:
-	// a) len(commitOCRConfigs) == 2 && depBefore.NumCommitInstances() == 1: this is a new green instance.
-	// b) len(commitOCRConfigs) == 1 && depBefore.NumCommitInstances() == 2: this is a promotion of green->blue.
-	// invalid cases (enforced in the config contract):
-	// a) len(commitOCRConfigs) == 2 && depBefore.NumCommitInstances() == 2: this is an invariant violation.
-	// b) len(commitOCRConfigs) == 1 && depBefore.NumCommitInstances() == 1: this is an invariant violation.
-	// same thing applies to exec.
-	depAfter = &ccipDeployment{}
-	if len(commitOCRConfigs) == 2 && !depBefore.HasGreenCommitInstance() {
-		// this is a new green instance.
-		greenOracle, err := l.oracleCreator.CreateCommitOracle(cctypes.OCR3ConfigWithMeta(commitOCRConfigs[1]))
-		if err != nil {
-			return nil, nil, fmt.Errorf("failed to create CCIP commit oracle: %w", err)
-		}
-
-		depAfter.commit.blue = depBefore.commit.blue
-		depAfter.commit.green = greenOracle
-	} else if len(commitOCRConfigs) == 1 && depBefore.HasGreenCommitInstance() {
-		// this is a promotion of green->blue.
-		depAfter.commit.blue = depBefore.commit.green
-	} else {
-		return nil, nil, fmt.Errorf("invariant violation: expected 1 or 2 OCR configs for CCIP commit plugin (don id: %d), got %d", don.Id, len(commitOCRConfigs))
-	}
-
-	if len(execOCRConfigs) == 2 && !depBefore.HasGreenExecInstance() {
-		// this is a new green instance.
-		greenOracle, err := l.oracleCreator.CreateExecOracle(cctypes.OCR3ConfigWithMeta(execOCRConfigs[1]))
-		if err != nil {
-			return nil, nil, fmt.Errorf("failed to create CCIP exec oracle: %w", err)
-		}
-
-		depAfter.exec.blue = depBefore.exec.blue
-		depAfter.exec.green = greenOracle
-	} else if len(execOCRConfigs) == 1 && depBefore.HasGreenExecInstance() {
-		// this is a promotion of green->blue.
-		depAfter.exec.blue = depBefore.exec.green
-	} else {
-		return nil, nil, fmt.Errorf("invariant violation: expected 1 or 2 OCR configs for CCIP exec plugin (don id: %d), got %d", don.Id, len(execOCRConfigs))
-	}
-
-	return depBefore, depAfter, nil
-}
-
-func (l *launcher) addDON(don kcr.CapabilitiesRegistryDONInfo) (*ccipDeployment, error) {
-	if !isMemberOfDON(don, l.p2pID) {
-		l.lggr.Infow("Not a member of this DON, skipping", "donId", don.Id, "p2pId", l.p2pID.ID())
+// updateDON is a pure function that handles the case where a DON in the capability registry
+// has received a new configuration.
+// It returns a new ccipDeployment that can then be used to perform the blue-green deployment,
+// based on the previous deployment.
+func updateDON(
+	lggr logger.Logger,
+	p2pID p2pkey.KeyV2,
+	homeChainReader cctypes.HomeChainReader,
+	oracleCreator cctypes.OracleCreator,
+	prevDeployment ccipDeployment,
+	don kcr.CapabilitiesRegistryDONInfo,
+) (futDeployment *ccipDeployment, err error) {
+	if !isMemberOfDON(don, p2pID) {
+		lggr.Infow("Not a member of this DON, skipping", "donId", don.Id, "p2pId", p2pID.ID())
 		return nil, nil
 	}
 
 	// this should be a retryable error.
-	commitOCRConfigs, err := l.homeChainReader.GetOCRConfigs(context.Background(), don.Id, uint8(cctypes.PluginTypeCCIPCommit))
+	commitOCRConfigs, err := homeChainReader.GetOCRConfigs(context.Background(), don.Id, uint8(cctypes.PluginTypeCCIPCommit))
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch OCR configs for CCIP commit plugin (don id: %d) from home chain config contract: %w",
 			don.Id, err)
 	}
 
-	execOCRConfigs, err := l.homeChainReader.GetOCRConfigs(context.Background(), don.Id, uint8(cctypes.PluginTypeCCIPExec))
+	execOCRConfigs, err := homeChainReader.GetOCRConfigs(context.Background(), don.Id, uint8(cctypes.PluginTypeCCIPExec))
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch OCR configs for CCIP exec plugin (don id: %d) from home chain config contract: %w",
+			don.Id, err)
+	}
+
+	commitBgd, err := createFutureBlueGreenDeployment(prevDeployment, commitOCRConfigs, oracleCreator, cctypes.PluginTypeCCIPCommit)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create future blue-green deployment for CCIP commit plugin: %w, don id: %d", err, don.Id)
+	}
+
+	execBgd, err := createFutureBlueGreenDeployment(prevDeployment, execOCRConfigs, oracleCreator, cctypes.PluginTypeCCIPExec)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create future blue-green deployment for CCIP exec plugin: %w, don id: %d", err, don.Id)
+	}
+
+	return &ccipDeployment{
+		commit: commitBgd,
+		exec:   execBgd,
+	}, nil
+}
+
+// valid cases:
+// a) len(ocrConfigs) == 2 && !prevDeployment.HasGreenInstance(pluginType): this is a new green instance.
+// b) len(ocrConfigs) == 1 && prevDeployment.HasGreenInstance(): this is a promotion of green->blue.
+// All other cases are invalid. This is enforced in the ccip config contract.
+func createFutureBlueGreenDeployment(
+	prevDeployment ccipDeployment,
+	ocrConfigs []ccipreaderpkg.OCR3ConfigWithMeta,
+	oracleCreator cctypes.OracleCreator,
+	pluginType cctypes.PluginType,
+) (blueGreenDeployment, error) {
+	var deployment blueGreenDeployment
+	if isNewGreenInstance(pluginType, ocrConfigs, prevDeployment) {
+		// this is a new green instance.
+		greenOracle, err := oracleCreator.CreatePluginOracle(pluginType, cctypes.OCR3ConfigWithMeta(ocrConfigs[1]))
+		if err != nil {
+			return blueGreenDeployment{}, fmt.Errorf("failed to create CCIP commit oracle: %w", err)
+		}
+
+		deployment.blue = prevDeployment.commit.blue
+		deployment.green = greenOracle
+	} else if isPromotion(pluginType, ocrConfigs, prevDeployment) {
+		// this is a promotion of green->blue.
+		deployment.blue = prevDeployment.commit.green
+	} else {
+		return blueGreenDeployment{}, fmt.Errorf("invariant violation: expected 1 or 2 OCR configs for CCIP plugin (type: %d), got %d", pluginType, len(ocrConfigs))
+	}
+
+	return deployment, nil
+}
+
+// createDON is a pure function that handles the case where a new DON is added to the capability registry.
+// It returns a new ccipDeployment that can then be used to start the blue instance.
+func createDON(
+	lggr logger.Logger,
+	p2pID p2pkey.KeyV2,
+	homeChainReader cctypes.HomeChainReader,
+	oracleCreator cctypes.OracleCreator,
+	don kcr.CapabilitiesRegistryDONInfo,
+) (*ccipDeployment, error) {
+	if !isMemberOfDON(don, p2pID) {
+		lggr.Infow("Not a member of this DON, skipping", "donId", don.Id, "p2pId", p2pID.ID())
+		return nil, nil
+	}
+
+	// this should be a retryable error.
+	commitOCRConfigs, err := homeChainReader.GetOCRConfigs(context.Background(), don.Id, uint8(cctypes.PluginTypeCCIPCommit))
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch OCR configs for CCIP commit plugin (don id: %d) from home chain config contract: %w",
+			don.Id, err)
+	}
+
+	execOCRConfigs, err := homeChainReader.GetOCRConfigs(context.Background(), don.Id, uint8(cctypes.PluginTypeCCIPExec))
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch OCR configs for CCIP exec plugin (don id: %d) from home chain config contract: %w",
 			don.Id, err)
@@ -339,30 +368,14 @@ func (l *launcher) addDON(don kcr.CapabilitiesRegistryDONInfo) (*ccipDeployment,
 		return nil, fmt.Errorf("expected exactly one OCR config for CCIP exec plugin (don id: %d), got %d", don.Id, len(execOCRConfigs))
 	}
 
-	commitOracle, err := l.oracleCreator.CreateCommitOracle(cctypes.OCR3ConfigWithMeta(commitOCRConfigs[0]))
+	commitOracle, commitBootstrap, err := createOracle(p2pID, oracleCreator, cctypes.PluginTypeCCIPCommit, commitOCRConfigs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create CCIP commit oracle: %w", err)
 	}
 
-	var commitBootstrap cctypes.CCIPOracle
-	if isMemberOfBootstrapSubcommittee(commitOCRConfigs[0].Config.BootstrapP2PIds, l.p2pID) {
-		commitBootstrap, err = l.oracleCreator.CreateBootstrapOracle(cctypes.OCR3ConfigWithMeta(commitOCRConfigs[0]))
-		if err != nil {
-			return nil, fmt.Errorf("failed to create CCIP bootstrap oracle: %w", err)
-		}
-	}
-
-	execOracle, err := l.oracleCreator.CreateExecOracle(cctypes.OCR3ConfigWithMeta(execOCRConfigs[0]))
+	execOracle, execBootstrap, err := createOracle(p2pID, oracleCreator, cctypes.PluginTypeCCIPExec, execOCRConfigs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create CCIP exec oracle: %w", err)
-	}
-
-	var execBootstrap cctypes.CCIPOracle
-	if isMemberOfBootstrapSubcommittee(execOCRConfigs[0].Config.BootstrapP2PIds, l.p2pID) {
-		execBootstrap, err = l.oracleCreator.CreateBootstrapOracle(cctypes.OCR3ConfigWithMeta(execOCRConfigs[0]))
-		if err != nil {
-			return nil, fmt.Errorf("failed to create CCIP bootstrap oracle: %w", err)
-		}
 	}
 
 	return &ccipDeployment{
@@ -375,4 +388,25 @@ func (l *launcher) addDON(don kcr.CapabilitiesRegistryDONInfo) (*ccipDeployment,
 			bootstrapBlue: execBootstrap,
 		},
 	}, nil
+}
+
+func createOracle(
+	p2pID p2pkey.KeyV2,
+	oracleCreator cctypes.OracleCreator,
+	pluginType cctypes.PluginType,
+	ocrConfigs []ccipreaderpkg.OCR3ConfigWithMeta,
+) (pluginOracle, bootstrapOracle cctypes.CCIPOracle, err error) {
+	pluginOracle, err = oracleCreator.CreatePluginOracle(pluginType, cctypes.OCR3ConfigWithMeta(ocrConfigs[0]))
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create CCIP plugin oracle (plugintype: %d): %w", pluginType, err)
+	}
+
+	if isMemberOfBootstrapSubcommittee(ocrConfigs[0].Config.BootstrapP2PIds, p2pID) {
+		bootstrapOracle, err = oracleCreator.CreateBootstrapOracle(cctypes.OCR3ConfigWithMeta(ocrConfigs[0]))
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to create CCIP bootstrap oracle (plugintype: %d): %w", pluginType, err)
+		}
+	}
+
+	return pluginOracle, bootstrapOracle, nil
 }
