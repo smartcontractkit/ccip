@@ -33,8 +33,13 @@ package ccip
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/MaybeRevertMessageReceiver/MaybeRevertMessageReceiver.abi ../../../contracts/solc/v0.8.24/MaybeRevertMessageReceiver/MaybeRevertMessageReceiver.bin MaybeRevertMessageReceiver maybe_revert_message_receiver
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/PingPongDemo/PingPongDemo.abi ../../../contracts/solc/v0.8.24/PingPongDemo/PingPongDemo.bin PingPongDemo ping_pong_demo
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/SelfFundedPingPong/SelfFundedPingPong.abi ../../../contracts/solc/v0.8.24/SelfFundedPingPong/SelfFundedPingPong.bin SelfFundedPingPong self_funded_ping_pong
-//go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/EtherSenderReceiver/EtherSenderReceiver.abi ../../../contracts/solc/v0.8.24/EtherSenderReceiver/EtherSenderReceiver.bin EtherSenderReceiver ether_sender_receiver
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/WETH9/WETH9.abi ../../../contracts/solc/v0.8.24/WETH9/WETH9.bin WETH9 weth9
+
+// Audited Reference Contracts
+//go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/CCIPReceiver/CCIPReceiver.abi ../../../contracts/solc/v0.8.24/CCIPReceiver/CCIPReceiver.bin CCIPReceiver ccipReceiver
+//go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/CCIPClient/CCIPClient.abi ../../../contracts/solc/v0.8.24/CCIPClient/CCIPClient.bin CCIPClient ccipClient
+//go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/CCIPSender/CCIPSender.abi ../../../contracts/solc/v0.8.24/CCIPSender/CCIPSender.bin CCIPSender ccipSender
+//go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/CCIPReceiverWithAck/CCIPReceiverWithAck.abi ../../../contracts/solc/v0.8.24/CCIPReceiverWithAck/CCIPReceiverWithAck.bin CCIPReceiverWithAck ccipReceiverWithAck
 
 // Customer contracts
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/USDCTokenPool/USDCTokenPool.abi ../../../contracts/solc/v0.8.24/USDCTokenPool/USDCTokenPool.bin USDCTokenPool usdc_token_pool
