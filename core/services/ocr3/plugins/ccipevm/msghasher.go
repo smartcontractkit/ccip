@@ -21,6 +21,8 @@ type MessageHasherV1 struct {
 	metaDataHash        [32]byte
 	leafDomainSeparator [32]byte
 
+	// ABIs and types for encoding the message data similar to on-chain implementation:
+	// https://github.com/smartcontractkit/ccip/blob/54ee4f13143d3e414627b6a0b9f71d5dfade76c5/contracts/src/v0.8/ccip/libraries/Internal.sol#L135
 	bytesArrayType     abi.Type
 	tokensAbi          abi.ABI
 	fixedSizeValuesAbi abi.ABI
