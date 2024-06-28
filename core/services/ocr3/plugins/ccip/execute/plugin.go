@@ -248,32 +248,31 @@ func buildSingleChainReportMaxSize(
 		return finalReport, encodedSize, report, nil
 	}
 
-	// The full report is too large, binary search to find the maximum in-order messages which fit.
-	low := 1
-	high := len(report.Messages) - 1
-	for low <= high {
-		mid := low + ((high - low) / 2)
-
-		finalReport2, encodedSize2, err2 :=
+	var searchErr error
+	idx := sort.Search(len(report.Messages), func(mid int) bool {
+		if searchErr != nil {
+			return false
+		}
+		finalReport2, encodedSize2, err :=
 			buildSingleChainReport(ctx, lggr, hasher, tokenDataReader, encoder, report, mid)
-		if err2 != nil {
-			return cciptypes.ExecutePluginReportSingleChain{}, 0, cciptypes.ExecutePluginCommitDataWithMessages{}, fmt.Errorf(
-				"unable to build a single chain report (messages %d): %w", mid, err2)
+		if searchErr != nil {
+			searchErr = fmt.Errorf("unable to build a single chain report (messages %d): %w", mid, err)
 		}
 
 		if (encodedSize2) <= maxSizeBytes {
 			// mid is a valid report size, try something bigger next iteration.
 			finalReport = finalReport2
 			encodedSize = encodedSize2
-			low = mid + 1
-		} else {
-			// mid is invalid, try something smaller next iteration.
-			high = mid - 1
+			return false // not full
 		}
+		return true // full
+	})
+	if searchErr != nil {
+		return cciptypes.ExecutePluginReportSingleChain{}, 0, cciptypes.ExecutePluginCommitDataWithMessages{}, searchErr
 	}
 
-	if high == 0 {
-		// No messages fit into the report.
+	// No messages fit into the report.
+	if idx <= 0 {
 		return cciptypes.ExecutePluginReportSingleChain{},
 			0,
 			cciptypes.ExecutePluginCommitDataWithMessages{},
