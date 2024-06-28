@@ -501,7 +501,7 @@ func (r *Relayer) NewCCIPExecProvider(rargs commontypes.RelayArgs, pargs commont
 		return nil, err
 	}
 	subjectID := chainToUUID(configWatcher.chain.ID())
-	contractTransmitter, err := newOnChainContractTransmitterNoSignatures(ctx, r.lggr, rargs, r.ks.Eth(), configWatcher, configTransmitterOpts{
+	contractTransmitter, err := newOnChainContractTransmitterExcludeSignatures(ctx, r.lggr, rargs, r.ks.Eth(), configWatcher, configTransmitterOpts{
 		subjectID: &subjectID,
 	}, OCR2AggregatorTransmissionContractABI, fn, 0)
 	if err != nil {
@@ -745,7 +745,7 @@ func newOnChainContractTransmitter(ctx context.Context, lggr logger.Logger, rarg
 		return nil, err
 	}
 
-	return NewOCRContractTransmitterWithRetention(
+	return NewOCRContractTransmitter(
 		ctx,
 		configWatcher.contractAddress,
 		configWatcher.chain.Client(),
@@ -753,19 +753,19 @@ func newOnChainContractTransmitter(ctx context.Context, lggr logger.Logger, rarg
 		transmitter,
 		configWatcher.chain.LogPoller(),
 		lggr,
-		reportToEvmTxMeta,
-		transmissionContractRetention,
+		WithReportToEthMetadata(reportToEvmTxMeta),
+		WithRetention(transmissionContractRetention),
 	)
 }
 
-// newOnChainContractTransmitterNoSignatures creates a new contract transmitter that avoids sending the signatures as they are validated offchain.
-func newOnChainContractTransmitterNoSignatures(ctx context.Context, lggr logger.Logger, rargs commontypes.RelayArgs, ethKeystore keystore.Eth, configWatcher *configWatcher, opts configTransmitterOpts, transmissionContractABI abi.ABI, reportToEvmTxMeta ReportToEthMetadata, transmissionContractRetention time.Duration) (*contractTransmitterNoSignatures, error) {
+// newOnChainContractTransmitterExcludeSignatures creates a new contract transmitter that avoids sending the signatures as they are validated offchain.
+func newOnChainContractTransmitterExcludeSignatures(ctx context.Context, lggr logger.Logger, rargs commontypes.RelayArgs, ethKeystore keystore.Eth, configWatcher *configWatcher, opts configTransmitterOpts, transmissionContractABI abi.ABI, reportToEvmTxMeta ReportToEthMetadata, transmissionContractRetention time.Duration) (*contractTransmitter, error) {
 	transmitter, err := generateTransmitterFrom(ctx, rargs, ethKeystore, configWatcher, opts)
 	if err != nil {
 		return nil, err
 	}
 
-	return NewOCRContractTransmitterNoSignaturesWithRetention(
+	return NewOCRContractTransmitter(
 		ctx,
 		configWatcher.contractAddress,
 		configWatcher.chain.Client(),
@@ -773,8 +773,9 @@ func newOnChainContractTransmitterNoSignatures(ctx context.Context, lggr logger.
 		transmitter,
 		configWatcher.chain.LogPoller(),
 		lggr,
-		reportToEvmTxMeta,
-		transmissionContractRetention,
+		WithReportToEthMetadata(reportToEvmTxMeta),
+		WithRetention(transmissionContractRetention),
+		WithExcludeSignatures(),
 	)
 }
 

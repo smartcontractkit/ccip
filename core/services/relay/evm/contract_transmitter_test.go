@@ -55,9 +55,10 @@ func TestContractTransmitter(t *testing.T) {
 	c.On("CallContract", mock.Anything, mock.Anything, mock.Anything).Return(digestAndEpochDontScanLogs, nil).Once()
 	contractABI, _ := abi.JSON(strings.NewReader(ocr2aggregator.OCR2AggregatorMetaData.ABI))
 	lp.On("RegisterFilter", mock.Anything, mock.Anything).Return(nil)
-	ot, err := NewOCRContractTransmitter(ctx, gethcommon.Address{}, c, contractABI, &mockTransmitter{}, lp, lggr, func(b []byte) (*txmgr.TxMeta, error) {
-		return &txmgr.TxMeta{}, nil
-	})
+	ot, err := NewOCRContractTransmitter(ctx, gethcommon.Address{}, c, contractABI, &mockTransmitter{}, lp, lggr,
+		WithReportToEthMetadata(func(b []byte) (*txmgr.TxMeta, error) {
+			return &txmgr.TxMeta{}, nil
+		}))
 	require.NoError(t, err)
 	digest, epoch, err := ot.LatestConfigDigestAndEpoch(testutils.Context(t))
 	require.NoError(t, err)
@@ -96,7 +97,7 @@ func Test_contractTransmitterNoSignatures_Transmit_SignaturesAreNotTransmitted(t
 	report := types.Report{}
 	var signatures = oneSignature()
 
-	oc := contractTransmitterNoSignatures{createContractTransmitterFields(t, transmitter)}
+	oc := createContractTransmitter(t, transmitter, true)
 
 	err := oc.Transmit(ctx, reportCtx, report, signatures)
 	require.NoError(t, err)
@@ -119,7 +120,7 @@ func Test_contractTransmitter_Transmit_SignaturesAreTransmitted(t *testing.T) {
 	report := types.Report{}
 	var signatures = oneSignature()
 
-	oc := contractTransmitter{createContractTransmitterFields(t, transmitter)}
+	oc := createContractTransmitter(t, transmitter, false)
 
 	err := oc.Transmit(ctx, reportCtx, report, signatures)
 	require.NoError(t, err)
@@ -149,9 +150,9 @@ func oneSignature() []ocrtypes.AttributedOnchainSignature {
 	return []libocr.AttributedOnchainSignature{{Signature: signaturesData, Signer: commontypes.OracleID(54)}}
 }
 
-func createContractTransmitterFields(t *testing.T, transmitter Transmitter) contractTransmitterFields {
+func createContractTransmitter(t *testing.T, transmitter Transmitter, excludeSignatures bool) contractTransmitter {
 	contractABI, _ := abi.JSON(strings.NewReader(ocr2aggregator.OCR2AggregatorMetaData.ABI))
-	fields := contractTransmitterFields{
+	fields := contractTransmitter{
 		contractAddress:     gethcommon.Address{},
 		contractABI:         contractABI,
 		transmitter:         transmitter,
@@ -160,6 +161,7 @@ func createContractTransmitterFields(t *testing.T, transmitter Transmitter) cont
 		contractReader:      evmclimocks.NewClient(t),
 		lggr:                logger.TestLogger(t),
 		reportToEvmTxMeta:   reportToEvmTxMetaNoop,
+		excludeSigs:         excludeSignatures,
 	}
 	return fields
 }
