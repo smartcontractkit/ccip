@@ -58,7 +58,7 @@ compileContract ccip/applications/internal/PingPongDemo.sol
 compileContract ccip/applications/internal/SelfFundedPingPong.sol
 compileContract ccip/applications/external/CCIPClient.sol
 compileContract ccip/applications/external/CCIPReceiver.sol
-compileContract ccip/applications/external/CCIPReceiverWithAck.sol
+compileContract ccip/applications/external/CCIPReceiverWithACK.sol
 compileContract ccip/applications/external/CCIPSender.sol
 compileContract ccip/onRamp/EVM2EVMMultiOnRamp.sol
 compileContract ccip/onRamp/EVM2EVMOnRamp.sol
