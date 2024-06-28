@@ -234,7 +234,7 @@ contract EVM2EVMMultiOffRampSetup is TokenSetup, PriceRegistrySetup, MultiOCR3Ba
     });
   }
 
-  function _convertToGeneralMessage(Internal.EVM2EVMMessage memory original)
+  function _convertToGeneralMessage(Internal.Any2EVMRampMessage memory original)
     internal
     view
     returns (Client.Any2EVMMessage memory message)
@@ -253,8 +253,8 @@ contract EVM2EVMMultiOffRampSetup is TokenSetup, PriceRegistrySetup, MultiOCR3Ba
     }
 
     return Client.Any2EVMMessage({
-      messageId: original.messageId,
-      sourceChainSelector: original.sourceChainSelector,
+      messageId: original.header.messageId,
+      sourceChainSelector: original.header.sourceChainSelector,
       sender: abi.encode(original.sender),
       data: original.data,
       destTokenAmounts: destTokenAmounts
@@ -265,7 +265,7 @@ contract EVM2EVMMultiOffRampSetup is TokenSetup, PriceRegistrySetup, MultiOCR3Ba
     uint64 sourceChainSelector,
     bytes memory onRamp,
     uint64 sequenceNumber
-  ) internal view returns (Internal.EVM2EVMMessage memory) {
+  ) internal view returns (Internal.Any2EVMRampMessage memory) {
     return _generateAny2EVMMessage(sourceChainSelector, onRamp, sequenceNumber, new Client.EVMTokenAmount[](0), false);
   }
 
@@ -274,7 +274,7 @@ contract EVM2EVMMultiOffRampSetup is TokenSetup, PriceRegistrySetup, MultiOCR3Ba
     bytes memory onRamp,
     uint64 sequenceNumber,
     uint256[] memory amounts
-  ) internal view returns (Internal.EVM2EVMMessage memory) {
+  ) internal view returns (Internal.Any2EVMRampMessage memory) {
     Client.EVMTokenAmount[] memory tokenAmounts = getCastedSourceEVMTokenAmountsWithZeroAmounts();
     for (uint256 i = 0; i < tokenAmounts.length; ++i) {
       tokenAmounts[i].amount = amounts[i];
@@ -289,22 +289,22 @@ contract EVM2EVMMultiOffRampSetup is TokenSetup, PriceRegistrySetup, MultiOCR3Ba
     uint64 sequenceNumber,
     Client.EVMTokenAmount[] memory tokenAmounts,
     bool allowOutOfOrderExecution
-  ) internal view returns (Internal.EVM2EVMMessage memory) {
+  ) internal view returns (Internal.Any2EVMRampMessage memory) {
     bytes memory data = abi.encode(0);
-    Internal.EVM2EVMMessage memory message = Internal.EVM2EVMMessage({
-      sequenceNumber: sequenceNumber,
-      sender: OWNER,
-      nonce: allowOutOfOrderExecution ? 0 : sequenceNumber,
-      gasLimit: GAS_LIMIT,
-      strict: false,
-      sourceChainSelector: sourceChainSelector,
-      receiver: address(s_receiver),
+    Internal.Any2EVMRampMessage memory message = Internal.Any2EVMRampMessage({
+      header: Internal.RampMessageHeader({
+        messageId: "",
+        sourceChainSelector: sourceChainSelector,
+        destChainSelector: DEST_CHAIN_SELECTOR,
+        sequenceNumber: sequenceNumber,
+        nonce: allowOutOfOrderExecution ? 0 : sequenceNumber
+      }),
+      sender: abi.encode(OWNER),
       data: data,
+      receiver: address(s_receiver),
       tokenAmounts: tokenAmounts,
       sourceTokenData: new bytes[](tokenAmounts.length),
-      feeToken: s_destFeeToken,
-      feeTokenAmount: uint256(0),
-      messageId: ""
+      gasLimit: GAS_LIMIT
     });
 
     // Correctly set the TokenDataPayload for each token. Tokens have to be set up in the TokenSetup.
@@ -318,7 +318,7 @@ contract EVM2EVMMultiOffRampSetup is TokenSetup, PriceRegistrySetup, MultiOCR3Ba
       );
     }
 
-    message.messageId = Internal._hash(message);
+    message.header.messageId = Internal._hash(message);
 
     return message;
   }
@@ -326,8 +326,8 @@ contract EVM2EVMMultiOffRampSetup is TokenSetup, PriceRegistrySetup, MultiOCR3Ba
   function _generateSingleBasicMessage(
     uint64 sourceChainSelector,
     bytes memory onRamp
-  ) internal view returns (Internal.EVM2EVMMessage[] memory) {
-    Internal.EVM2EVMMessage[] memory messages = new Internal.EVM2EVMMessage[](1);
+  ) internal view returns (Internal.Any2EVMRampMessage[] memory) {
+    Internal.Any2EVMRampMessage[] memory messages = new Internal.Any2EVMRampMessage[](1);
     messages[0] = _generateAny2EVMMessageNoTokens(sourceChainSelector, onRamp, 1);
     return messages;
   }
@@ -335,8 +335,8 @@ contract EVM2EVMMultiOffRampSetup is TokenSetup, PriceRegistrySetup, MultiOCR3Ba
   function _generateMessagesWithTokens(
     uint64 sourceChainSelector,
     bytes memory onRamp
-  ) internal view returns (Internal.EVM2EVMMessage[] memory) {
-    Internal.EVM2EVMMessage[] memory messages = new Internal.EVM2EVMMessage[](2);
+  ) internal view returns (Internal.Any2EVMRampMessage[] memory) {
+    Internal.Any2EVMRampMessage[] memory messages = new Internal.Any2EVMRampMessage[](2);
     Client.EVMTokenAmount[] memory tokenAmounts = getCastedSourceEVMTokenAmountsWithZeroAmounts();
     tokenAmounts[0].amount = 1e18;
     tokenAmounts[1].amount = 5e18;
@@ -346,24 +346,25 @@ contract EVM2EVMMultiOffRampSetup is TokenSetup, PriceRegistrySetup, MultiOCR3Ba
     return messages;
   }
 
-  function _generateSingleRampReportFromMessages(
-    uint64 sourceChainSelector,
-    Internal.EVM2EVMMessage[] memory messages
-  ) internal pure returns (Internal.ExecutionReport memory) {
-    Internal.ExecutionReportSingleChain memory singleChainReport =
-      _generateReportFromMessages(sourceChainSelector, messages);
+  // TODO: revisit after merging in NonceManager
+  // function _generateSingleRampReportFromMessages(
+  //   uint64 sourceChainSelector,
+  //   Internal.Any2EVMRampMessage[] memory messages
+  // ) internal pure returns (Internal.ExecutionReport memory) {
+  //   Internal.ExecutionReportSingleChain memory singleChainReport =
+  //     _generateReportFromMessages(sourceChainSelector, messages);
 
-    return Internal.ExecutionReport({
-      proofs: singleChainReport.proofs,
-      proofFlagBits: singleChainReport.proofFlagBits,
-      messages: singleChainReport.messages,
-      offchainTokenData: singleChainReport.offchainTokenData
-    });
-  }
+  //   return Internal.ExecutionReport({
+  //     proofs: singleChainReport.proofs,
+  //     proofFlagBits: singleChainReport.proofFlagBits,
+  //     messages: singleChainReport.messages,
+  //     offchainTokenData: singleChainReport.offchainTokenData
+  //   });
+  // }
 
   function _generateReportFromMessages(
     uint64 sourceChainSelector,
-    Internal.EVM2EVMMessage[] memory messages
+    Internal.Any2EVMRampMessage[] memory messages
   ) internal pure returns (Internal.ExecutionReportSingleChain memory) {
     bytes[][] memory offchainTokenData = new bytes[][](messages.length);
 
@@ -382,14 +383,14 @@ contract EVM2EVMMultiOffRampSetup is TokenSetup, PriceRegistrySetup, MultiOCR3Ba
 
   function _generateBatchReportFromMessages(
     uint64 sourceChainSelector,
-    Internal.EVM2EVMMessage[] memory messages
+    Internal.Any2EVMRampMessage[] memory messages
   ) internal pure returns (Internal.ExecutionReportSingleChain[] memory) {
     Internal.ExecutionReportSingleChain[] memory reports = new Internal.ExecutionReportSingleChain[](1);
     reports[0] = _generateReportFromMessages(sourceChainSelector, messages);
     return reports;
   }
 
-  function _getGasLimitsFromMessages(Internal.EVM2EVMMessage[] memory messages)
+  function _getGasLimitsFromMessages(Internal.Any2EVMRampMessage[] memory messages)
     internal
     pure
     returns (uint256[] memory)

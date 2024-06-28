@@ -71,7 +71,7 @@ library Internal {
   /// @dev RMN depends on this struct, if changing, please notify the RMN maintainers.
   struct ExecutionReportSingleChain {
     uint64 sourceChainSelector; // Source chain selector for which the report is submitted
-    EVM2EVMMessage[] messages;
+    Any2EVMRampMessage[] messages;
     // Contains a bytes array for each message, each inner bytes array contains bytes per transferred token
     bytes[][] offchainTokenData;
     bytes32[] proofs;
@@ -106,6 +106,7 @@ library Internal {
     bytes32 messageId; //                       a hash of the message data
   }
 
+  // TODO: create new const for EVM2AnyMessage
   /// @dev EVM2EVMMessage struct has 13 fields, including 3 variable arrays.
   /// Each variable array takes 1 more slot to store its length.
   /// When abi encoded, excluding array contents,
@@ -113,6 +114,7 @@ library Internal {
   /// For structs that contain arrays, 1 more slot is added to the front, reaching a total of 17.
   uint256 public constant MESSAGE_FIXED_BYTES = 32 * 17;
 
+  // TODO: create new const for EVM2AnyMessage
   /// @dev Each token transfer adds 1 EVMTokenAmount and 1 bytes.
   /// When abiEncoded, each EVMTokenAmount takes 2 slots, each bytes takes 2 slots, excl bytes contents
   uint256 public constant MESSAGE_FIXED_BYTES_PER_TOKEN = 32 * 4;
@@ -124,6 +126,19 @@ library Internal {
     return Client.Any2EVMMessage({
       messageId: original.messageId,
       sourceChainSelector: original.sourceChainSelector,
+      sender: abi.encode(original.sender),
+      data: original.data,
+      destTokenAmounts: destTokenAmounts
+    });
+  }
+
+  function _toAny2EVMMessage(
+    Any2EVMRampMessage memory original,
+    Client.EVMTokenAmount[] memory destTokenAmounts
+  ) internal pure returns (Client.Any2EVMMessage memory message) {
+    return Client.Any2EVMMessage({
+      messageId: original.header.messageId,
+      sourceChainSelector: original.header.sourceChainSelector,
       sender: abi.encode(original.sender),
       data: original.data,
       destTokenAmounts: destTokenAmounts
@@ -158,32 +173,25 @@ library Internal {
     );
   }
 
-  // TODO: this function is incomplete and should not yet be used - it is intended for Any2EVM / EVM2Any messages
-  function _hash(EVM2EVMMessage memory original) internal pure returns (bytes32) {
+  function _hash(Any2EVMRampMessage memory original) internal pure returns (bytes32) {
     // Fixed-size message fields are included in nested hash to reduce stack pressure.
     // This hashing scheme is also used by RMN. If changing it, please notify the RMN maintainers.
     return keccak256(
       abi.encode(
         MerkleMultiProof.LEAF_DOMAIN_SEPARATOR,
-        // TODO: include prefix message hash
-        // TODO: include OnRamp address
-        // TODO: include destChainSelector
+        // Implicit metadata hash
+        keccak256(
+          // TODO: include prefix message hash
+          // TODO: include OnRamp address
+          abi.encode(original.header.sourceChainSelector, original.header.destChainSelector)
+        ),
         keccak256(
           abi.encode(
-            original.sourceChainSelector,
-            original.sender,
-            original.receiver,
-            original.sequenceNumber,
-            original.gasLimit,
-            original.strict,
-            original.nonce,
-            original.feeToken,
-            original.feeTokenAmount
+            original.sender, original.receiver, original.header.sequenceNumber, original.gasLimit, original.header.nonce
           )
         ),
         keccak256(original.data),
-        keccak256(abi.encode(original.tokenAmounts)),
-        keccak256(abi.encode(original.sourceTokenData))
+        keccak256(abi.encode(original.tokenAmounts))
       )
     );
   }
@@ -229,5 +237,26 @@ library Internal {
   enum OCRPluginType {
     Commit,
     Execution
+  }
+
+  /// @notice Family-agnostic header for OnRamp & OffRamp messages
+  struct RampMessageHeader {
+    bytes32 messageId; // Unique identifier for the message, with family-agnostic encoding (i.e. not necessarily abi.encoded)
+    uint64 sourceChainSelector; // ───────╮ the chain selector of the source chain, note: not chainId
+    uint64 destChainSelector; //          | the chain selector of the destination chain, note: not chainId
+    uint64 sequenceNumber; //             │ sequence number, not unique across lanes
+    uint64 nonce; // ─────────────────────╯ nonce for this lane for this sender, not unique across senders/lanes
+  }
+
+  /// @notice Family-agnostic message routed to an OffRamp
+  struct Any2EVMRampMessage {
+    RampMessageHeader header; // Message header
+    bytes sender; // sender address on the source chain
+    bytes data; // arbitrary data payload supplied by the message sender
+    address receiver; // receiver address on the destination chain
+    uint256 gasLimit; // user supplied maximum gas amount available for dest chain execution
+    // TODO: revisit collapsing tokenAmounts + sourceTokenData into one struct array
+    Client.EVMTokenAmount[] tokenAmounts; // array of tokens and amounts to transfer
+    bytes[] sourceTokenData; // array of token data, one per token
   }
 }
