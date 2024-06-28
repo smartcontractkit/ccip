@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"log"
 	"math/big"
 	"time"
 
@@ -255,18 +254,18 @@ func (l *l1ToL2Bridge) GetBridgePayloadAndFee(
 		// If we're sending WETH, the bridge adapter unwraps it and calls depositETHTo on the native bridge
 		DepositETHToFunction,
 		transfer.Receiver,   // 'to'
-		0,                   // 'l2Gas': hardcoded to 0 in the OptimismL1BridgeAdapter contract
+		uint32(0),           // 'l2Gas': hardcoded to 0 in the OptimismL1BridgeAdapter contract
 		transfer.BridgeData, // 'data'
 	)
 	if err != nil {
-		log.Fatalf("Failed to pack depositETHTo function call: %v", err)
+		return nil, nil, fmt.Errorf("failed to pack depositETHTo function call: %w", err)
 	}
 
 	// Estimate gas needed for the depositETHTo call issued from the L1 Bridge Adapter
 	l1StandardBridgeAddress := l.l1StandardBridge.Address()
 	gasPrice, err := l.l1Client.SuggestGasPrice(ctx)
 	if err != nil {
-		log.Fatalf("Failed to get suggested gas price: %v", err)
+		return nil, nil, fmt.Errorf("failed to get suggested gas price: %w", err)
 	}
 	gasLimit, err := l.l1Client.EstimateGas(ctx, ethereum.CallMsg{
 		From:     l.l1BridgeAdapter.Address(),
@@ -275,7 +274,7 @@ func (l *l1ToL2Bridge) GetBridgePayloadAndFee(
 		GasPrice: gasPrice,
 	})
 	if err != nil {
-		log.Fatalf("Failed to estimate gas: %v", err)
+		return nil, nil, fmt.Errorf("failed to estimate gas: %w", err)
 	}
 
 	// Scale gas limit by recommended 20% buffer to account for gas burned for L2 txn:
@@ -497,8 +496,9 @@ func (l *l1ToL2Bridge) toPendingTransfers(
 					TxHash:   transfer.Raw.TxHash,
 					LogIndex: int64(transfer.Raw.Index),
 				}].BlockTimestamp,
-				BridgeData: transfer.BridgeReturnData, // unique nonce from the OP Bridge Adapter
-				Stage:      bridgecommon.StageRebalanceConfirmed,
+				BridgeData:      transfer.BridgeReturnData, // unique nonce from the OP Bridge Adapter
+				Stage:           bridgecommon.StageRebalanceConfirmed,
+				NativeBridgeFee: ubig.NewI(0),
 			},
 			Status: models.TransferStatusNotReady,
 			ID:     fmt.Sprintf("%s-%d", transfer.Raw.TxHash.Hex(), transfer.Raw.Index),
@@ -518,8 +518,9 @@ func (l *l1ToL2Bridge) toPendingTransfers(
 					TxHash:   transfer.Raw.TxHash,
 					LogIndex: int64(transfer.Raw.Index),
 				}].BlockTimestamp,
-				BridgeData: transfer.BridgeReturnData, // unique nonce from the OP Bridge Adapter
-				Stage:      bridgecommon.StageFinalizeReady,
+				BridgeData:      transfer.BridgeReturnData, // unique nonce from the OP Bridge Adapter
+				Stage:           bridgecommon.StageFinalizeReady,
+				NativeBridgeFee: ubig.NewI(0),
 			},
 			Status: models.TransferStatusReady, // ready == finalized for L1 -> L2 transfers due to auto-finalization by the native bridge
 			ID:     fmt.Sprintf("%s-%d", transfer.Raw.TxHash.Hex(), transfer.Raw.Index),
