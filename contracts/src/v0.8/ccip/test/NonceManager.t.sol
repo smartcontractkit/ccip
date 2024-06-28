@@ -19,7 +19,7 @@ import {MockCommitStore} from "./mocks/MockCommitStore.sol";
 import {EVM2EVMMultiOffRampSetup} from "./offRamp/EVM2EVMMultiOffRampSetup.t.sol";
 import {EVM2EVMMultiOnRampSetup} from "./onRamp/EVM2EVMMultiOnRampSetup.t.sol";
 
-contract NonceManagerTest_getIncrementedOutboundNonce is BaseTest {
+contract NonceManager_NonceIncrementation is BaseTest {
   NonceManager private s_nonceManager;
 
   function setUp() public override {
@@ -35,6 +35,43 @@ contract NonceManagerTest_getIncrementedOutboundNonce is BaseTest {
 
     uint64 outboundNonce = s_nonceManager.getIncrementedOutboundNonce(DEST_CHAIN_SELECTOR, sender);
     assertEq(outboundNonce, 1);
+  }
+
+  function test_incrementInboundNonce_Success() public {
+    address sender = address(this);
+
+    s_nonceManager.incrementInboundNonce(SOURCE_CHAIN_SELECTOR, 1, abi.encode(sender));
+
+    assertEq(s_nonceManager.getInboundNonce(SOURCE_CHAIN_SELECTOR, abi.encode(sender)), 1);
+  }
+
+  function test_incrementInboundNonce_Skip() public {
+    address sender = address(this);
+    uint64 expectedNonce = 2;
+
+    vm.expectEmit();
+    emit NonceManager.SkippedIncorrectNonce(SOURCE_CHAIN_SELECTOR, expectedNonce, abi.encode(sender));
+
+    s_nonceManager.incrementInboundNonce(SOURCE_CHAIN_SELECTOR, expectedNonce, abi.encode(sender));
+
+    assertEq(s_nonceManager.getInboundNonce(SOURCE_CHAIN_SELECTOR, abi.encode(sender)), 0);
+  }
+
+  function test_incrementNoncesInboundAndOutbound_Success() public {
+    address sender = address(this);
+
+    assertEq(s_nonceManager.getOutboundNonce(DEST_CHAIN_SELECTOR, sender), 0);
+    uint64 outboundNonce = s_nonceManager.getIncrementedOutboundNonce(DEST_CHAIN_SELECTOR, sender);
+    assertEq(outboundNonce, 1);
+
+    // Inbound nonce unchanged
+    assertEq(s_nonceManager.getInboundNonce(DEST_CHAIN_SELECTOR, abi.encode(sender)), 0);
+
+    s_nonceManager.incrementInboundNonce(DEST_CHAIN_SELECTOR, 1, abi.encode(sender));
+    assertEq(s_nonceManager.getInboundNonce(DEST_CHAIN_SELECTOR, abi.encode(sender)), 1);
+
+    // Outbound nonce unchanged
+    assertEq(s_nonceManager.getOutboundNonce(DEST_CHAIN_SELECTOR, sender), 1);
   }
 }
 
@@ -110,6 +147,22 @@ contract NonceManager_applyPreviousRampsUpdates is EVM2EVMMultiOnRampSetup {
 
     previousRamps[0] =
       NonceManager.PreviousRampsArgs(DEST_CHAIN_SELECTOR, NonceManager.PreviousRamps(address(0), prevOffRamp));
+
+    vm.expectRevert(NonceManager.PreviousRampAlreadySet.selector);
+    s_outboundNonceManager.applyPreviousRampsUpdates(previousRamps);
+  }
+
+  function test_PreviousRampAlreadySetOnRampAndOffRamp_Revert() public {
+    NonceManager.PreviousRampsArgs[] memory previousRamps = new NonceManager.PreviousRampsArgs[](1);
+    address prevOnRamp = makeAddr("prevOnRamp");
+    address prevOffRamp = makeAddr("prevOffRamp");
+    previousRamps[0] =
+      NonceManager.PreviousRampsArgs(DEST_CHAIN_SELECTOR, NonceManager.PreviousRamps(prevOnRamp, prevOffRamp));
+
+    s_outboundNonceManager.applyPreviousRampsUpdates(previousRamps);
+
+    previousRamps[0] =
+      NonceManager.PreviousRampsArgs(DEST_CHAIN_SELECTOR, NonceManager.PreviousRamps(prevOnRamp, prevOffRamp));
 
     vm.expectRevert(NonceManager.PreviousRampAlreadySet.selector);
     s_outboundNonceManager.applyPreviousRampsUpdates(previousRamps);
