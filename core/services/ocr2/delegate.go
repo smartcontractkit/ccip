@@ -9,8 +9,9 @@ import (
 	"strconv"
 	"time"
 
-	chainselectors "github.com/smartcontractkit/chain-selectors"
+	nullv4 "gopkg.in/guregu/null.v4"
 
+	chainselectors "github.com/smartcontractkit/chain-selectors"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
@@ -18,12 +19,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/smartcontractkit/libocr/commontypes"
-	libocr2 "github.com/smartcontractkit/libocr/offchainreporting2plus"
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
-	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
-	"google.golang.org/grpc"
-
 	ocr2keepers20 "github.com/smartcontractkit/chainlink-automation/pkg/v2"
 	ocr2keepers20config "github.com/smartcontractkit/chainlink-automation/pkg/v2/config"
 	ocr2keepers20coordinator "github.com/smartcontractkit/chainlink-automation/pkg/v2/coordinator"
@@ -31,7 +26,6 @@ import (
 	ocr2keepers20runner "github.com/smartcontractkit/chainlink-automation/pkg/v2/runner"
 	ocr2keepers21config "github.com/smartcontractkit/chainlink-automation/pkg/v3/config"
 	ocr2keepers21 "github.com/smartcontractkit/chainlink-automation/pkg/v3/plugin"
-
 	commonlogger "github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/loop"
 	"github.com/smartcontractkit/chainlink-common/pkg/loop/reportingplugins"
@@ -40,10 +34,14 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	llotypes "github.com/smartcontractkit/chainlink-common/pkg/types/llo"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/mailbox"
-
 	"github.com/smartcontractkit/chainlink-vrf/altbn_128"
 	dkgpkg "github.com/smartcontractkit/chainlink-vrf/dkg"
 	"github.com/smartcontractkit/chainlink-vrf/ocr2vrf"
+	"github.com/smartcontractkit/libocr/commontypes"
+	libocr2 "github.com/smartcontractkit/libocr/offchainreporting2plus"
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
+	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+	"google.golang.org/grpc"
 
 	"github.com/smartcontractkit/chainlink/v2/core/bridges"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/legacyevm"
@@ -528,7 +526,7 @@ func GetEVMEffectiveTransmitterID(ctx context.Context, jb *job.Job, chain legacy
 		if len(sendingKeys) > 1 && spec.PluginType != types.OCR2VRF {
 			return "", errors.New("only ocr2 vrf should have more than 1 sending key")
 		}
-		spec.TransmitterID = null.StringFrom(sendingKeys[0])
+		spec.TransmitterID = nullv4.StringFrom(sendingKeys[0])
 	}
 
 	// effectiveTransmitterID is the transmitter address registered on the ocr contract. This is by default the EOA account on the node.
@@ -1807,7 +1805,7 @@ func (d *Delegate) newServicesOCR2Functions(
 func (d *Delegate) newServicesCCIPCommit(ctx context.Context, lggr logger.SugaredLogger, jb job.Job, bootstrapPeers []commontypes.BootstrapperLocator, kb ocr2key.KeyBundle, ocrDB *db, lc ocrtypes.LocalConfig, transmitterID string) ([]job.ServiceCtx, error) {
 	spec := jb.OCR2OracleSpec
 	if spec.Relay != relay.NetworkEVM {
-		return nil, errors.New("Non evm chains are not supported for CCIP commit")
+		return nil, fmt.Errorf("non evm chains are not supported for CCIP commit")
 	}
 	dstRid, err := spec.RelayID()
 	if err != nil {
@@ -1883,7 +1881,7 @@ func newCCIPCommitPluginBytes(isSourceProvider bool, sourceStartBlock uint64, de
 
 func (d *Delegate) ccipCommitGetDstProvider(ctx context.Context, jb job.Job, pluginJobSpecConfig ccipconfig.CommitPluginJobSpecConfig, transmitterID string) (types.CCIPCommitProvider, error) {
 	spec := jb.OCR2OracleSpec
-	if spec.Relay != types.NetworkEVM {
+	if spec.Relay != relay.NetworkEVM {
 		return nil, fmt.Errorf("non evm chains are not supported for CCIP commit")
 	}
 
@@ -2053,7 +2051,7 @@ func (d *Delegate) newServicesCCIPExecution(ctx context.Context, lggr logger.Sug
 
 func (d *Delegate) ccipExecGetDstProvider(ctx context.Context, jb job.Job, pluginJobSpecConfig ccipconfig.ExecPluginJobSpecConfig, transmitterID string) (types.CCIPExecProvider, error) {
 	spec := jb.OCR2OracleSpec
-	if spec.Relay != types.NetworkEVM {
+	if spec.Relay != relay.NetworkEVM {
 		return nil, fmt.Errorf("non evm chains are not supported for CCIP execution")
 	}
 	dstRid, err := spec.RelayID()
