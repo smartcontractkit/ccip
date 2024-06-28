@@ -173,7 +173,9 @@ library Internal {
     );
   }
 
-  function _hash(Any2EVMRampMessage memory original) internal pure returns (bytes32) {
+  bytes32 internal constant ANY_2_EVM_MESSAGE_HASH = keccak256("Any2EVMMessageHashV1");
+
+  function _hash(Any2EVMRampMessage memory original, bytes memory onRamp) internal pure returns (bytes32) {
     // Fixed-size message fields are included in nested hash to reduce stack pressure.
     // This hashing scheme is also used by RMN. If changing it, please notify the RMN maintainers.
     return keccak256(
@@ -181,9 +183,9 @@ library Internal {
         MerkleMultiProof.LEAF_DOMAIN_SEPARATOR,
         // Implicit metadata hash
         keccak256(
-          // TODO: include prefix message hash
-          // TODO: include OnRamp address
-          abi.encode(original.header.sourceChainSelector, original.header.destChainSelector)
+          abi.encode(
+            ANY_2_EVM_MESSAGE_HASH, onRamp, original.header.sourceChainSelector, original.header.destChainSelector
+          )
         ),
         keccak256(
           abi.encode(
@@ -240,6 +242,7 @@ library Internal {
   }
 
   /// @notice Family-agnostic header for OnRamp & OffRamp messages
+  // TODO: revisit if destChainSelector is required (likely sufficient to have it implicitly in the commit roots)
   struct RampMessageHeader {
     bytes32 messageId; // Unique identifier for the message, with family-agnostic encoding (i.e. not necessarily abi.encoded)
     uint64 sourceChainSelector; // ───────╮ the chain selector of the source chain, note: not chainId

@@ -342,7 +342,7 @@ contract EVM2EVMMultiOffRamp_executeSingleReport is EVM2EVMMultiOffRampSetup {
 
     messages[0].header.nonce++;
     messages[0].header.sequenceNumber++;
-    messages[0].header.messageId = Internal._hash(messages[0]);
+    messages[0].header.messageId = Internal._hash(messages[0], ON_RAMP_ADDRESS_1);
 
     vm.expectEmit();
     emit EVM2EVMMultiOffRamp.ExecutionStateChanged(
@@ -362,7 +362,7 @@ contract EVM2EVMMultiOffRamp_executeSingleReport is EVM2EVMMultiOffRampSetup {
     Internal.Any2EVMRampMessage[] memory messages =
       _generateSingleBasicMessage(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1);
     messages[0].header.nonce = 0;
-    messages[0].header.messageId = Internal._hash(messages[0]);
+    messages[0].header.messageId = Internal._hash(messages[0], ON_RAMP_ADDRESS_1);
 
     vm.expectEmit();
     emit EVM2EVMMultiOffRamp.ExecutionStateChanged(
@@ -383,7 +383,7 @@ contract EVM2EVMMultiOffRamp_executeSingleReport is EVM2EVMMultiOffRampSetup {
     );
 
     messages[0].header.sequenceNumber++;
-    messages[0].header.messageId = Internal._hash(messages[0]);
+    messages[0].header.messageId = Internal._hash(messages[0], ON_RAMP_ADDRESS_1);
 
     vm.expectEmit();
     emit EVM2EVMMultiOffRamp.ExecutionStateChanged(
@@ -437,7 +437,7 @@ contract EVM2EVMMultiOffRamp_executeSingleReport is EVM2EVMMultiOffRampSetup {
     s_reverting_receiver.setErr(realError1);
 
     messages[0].receiver = address(s_reverting_receiver);
-    messages[0].header.messageId = Internal._hash(messages[0]);
+    messages[0].header.messageId = Internal._hash(messages[0], ON_RAMP_ADDRESS_1);
 
     vm.expectEmit();
     emit EVM2EVMMultiOffRamp.ExecutionStateChanged(
@@ -461,7 +461,7 @@ contract EVM2EVMMultiOffRamp_executeSingleReport is EVM2EVMMultiOffRampSetup {
       _generateSingleBasicMessage(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1);
 
     messages[0].header.nonce++;
-    messages[0].header.messageId = Internal._hash(messages[0]);
+    messages[0].header.messageId = Internal._hash(messages[0], ON_RAMP_ADDRESS_1);
 
     vm.expectEmit();
     emit EVM2EVMMultiOffRamp.SkippedIncorrectNonce(
@@ -476,7 +476,7 @@ contract EVM2EVMMultiOffRamp_executeSingleReport is EVM2EVMMultiOffRampSetup {
       _generateMessagesWithTokens(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1);
 
     messages[1].header.nonce++;
-    messages[1].header.messageId = Internal._hash(messages[1]);
+    messages[1].header.messageId = Internal._hash(messages[1], ON_RAMP_ADDRESS_1);
 
     vm.expectEmit();
     emit EVM2EVMMultiOffRamp.ExecutionStateChanged(
@@ -520,7 +520,7 @@ contract EVM2EVMMultiOffRamp_executeSingleReport is EVM2EVMMultiOffRampSetup {
     Internal.Any2EVMRampMessage[] memory messages =
       _generateSingleBasicMessage(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1);
     messages[0].header.nonce = 0;
-    messages[0].header.messageId = Internal._hash(messages[0]);
+    messages[0].header.messageId = Internal._hash(messages[0], ON_RAMP_ADDRESS_1);
 
     vm.expectEmit();
     emit EVM2EVMMultiOffRamp.ExecutionStateChanged(
@@ -546,7 +546,7 @@ contract EVM2EVMMultiOffRamp_executeSingleReport is EVM2EVMMultiOffRampSetup {
       _generateSingleBasicMessage(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1);
     MaybeRevertMessageReceiverNo165 newReceiver = new MaybeRevertMessageReceiverNo165(true);
     messages[0].receiver = address(newReceiver);
-    messages[0].header.messageId = Internal._hash(messages[0]);
+    messages[0].header.messageId = Internal._hash(messages[0], ON_RAMP_ADDRESS_1);
 
     vm.expectEmit();
     emit EVM2EVMMultiOffRamp.ExecutionStateChanged(
@@ -586,7 +586,7 @@ contract EVM2EVMMultiOffRamp_executeSingleReport is EVM2EVMMultiOffRampSetup {
       _generateMessagesWithTokens(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1);
     // Set message 1 to use another receiver to simulate more fair gas costs
     messages[1].receiver = address(s_secondary_receiver);
-    messages[1].header.messageId = Internal._hash(messages[1]);
+    messages[1].header.messageId = Internal._hash(messages[1], ON_RAMP_ADDRESS_1);
 
     vm.expectEmit();
     emit EVM2EVMMultiOffRamp.ExecutionStateChanged(
@@ -617,7 +617,7 @@ contract EVM2EVMMultiOffRamp_executeSingleReport is EVM2EVMMultiOffRampSetup {
       _generateMessagesWithTokens(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1);
     // Set message 1 to use another receiver to simulate more fair gas costs
     messages[1].receiver = address(s_secondary_receiver);
-    messages[1].header.messageId = Internal._hash(messages[1]);
+    messages[1].header.messageId = Internal._hash(messages[1], ON_RAMP_ADDRESS_1);
 
     vm.expectEmit();
     emit EVM2EVMMultiOffRamp.ExecutionStateChanged(
@@ -659,7 +659,7 @@ contract EVM2EVMMultiOffRamp_executeSingleReport is EVM2EVMMultiOffRampSetup {
       if (orderings[i]) {
         messages[i].header.nonce = ++expectedNonce;
       }
-      messages[i].header.messageId = Internal._hash(messages[i]);
+      messages[i].header.messageId = Internal._hash(messages[i], ON_RAMP_ADDRESS_1);
 
       vm.expectEmit();
       emit EVM2EVMMultiOffRamp.ExecutionStateChanged(
@@ -699,8 +699,8 @@ contract EVM2EVMMultiOffRamp_executeSingleReport is EVM2EVMMultiOffRampSetup {
       })
     );
 
-    messages[0].header.messageId = Internal._hash(messages[0]);
-    messages[1].header.messageId = Internal._hash(messages[1]);
+    messages[0].header.messageId = Internal._hash(messages[0], ON_RAMP_ADDRESS_1);
+    messages[1].header.messageId = Internal._hash(messages[1], ON_RAMP_ADDRESS_1);
 
     vm.expectEmit();
     emit EVM2EVMMultiOffRamp.ExecutionStateChanged(
@@ -897,7 +897,7 @@ contract EVM2EVMMultiOffRamp_executeSingleReport is EVM2EVMMultiOffRampSetup {
     // gas limit too high, Router's external call should revert
     messages[0].gasLimit = 1e36;
     messages[0].receiver = address(new ConformingReceiver(address(s_destRouter), s_destFeeToken));
-    messages[0].header.messageId = Internal._hash(messages[0]);
+    messages[0].header.messageId = Internal._hash(messages[0], ON_RAMP_ADDRESS_1);
 
     Internal.ExecutionReportSingleChain memory executionReport =
       _generateReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messages);
@@ -922,7 +922,7 @@ contract EVM2EVMMultiOffRamp_executeSingleReport is EVM2EVMMultiOffRampSetup {
     s_reverting_receiver.setErr(realError1);
 
     messages[0].receiver = address(s_reverting_receiver);
-    messages[0].header.messageId = Internal._hash(messages[0]);
+    messages[0].header.messageId = Internal._hash(messages[0], ON_RAMP_ADDRESS_1);
 
     vm.expectEmit();
     emit EVM2EVMMultiOffRamp.ExecutionStateChanged(
@@ -1353,7 +1353,7 @@ contract EVM2EVMMultiOffRamp_executeSingleMessage is EVM2EVMMultiOffRampSetup {
     // Setup the receiver to a non-CCIP Receiver, which will skip the Router call (but should still perform the validation)
     MaybeRevertMessageReceiverNo165 newReceiver = new MaybeRevertMessageReceiverNo165(true);
     message.receiver = address(newReceiver);
-    message.header.messageId = Internal._hash(message);
+    message.header.messageId = Internal._hash(message, ON_RAMP_ADDRESS_1);
 
     s_inboundMessageValidator.setMessageIdValidationState(message.header.messageId, true);
     vm.expectRevert(
@@ -1565,7 +1565,7 @@ contract EVM2EVMMultiOffRamp_manuallyExecute is EVM2EVMMultiOffRampSetup {
     Internal.Any2EVMRampMessage[] memory messages =
       _generateSingleBasicMessage(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1);
     messages[0].receiver = address(s_reverting_receiver);
-    messages[0].header.messageId = Internal._hash(messages[0]);
+    messages[0].header.messageId = Internal._hash(messages[0], ON_RAMP_ADDRESS_1);
     s_offRamp.batchExecute(_generateBatchReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messages), new uint256[][](1));
 
     s_reverting_receiver.setRevert(false);
@@ -1588,7 +1588,7 @@ contract EVM2EVMMultiOffRamp_manuallyExecute is EVM2EVMMultiOffRampSetup {
     Internal.Any2EVMRampMessage[] memory messages =
       _generateSingleBasicMessage(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1);
     messages[0].receiver = address(s_reverting_receiver);
-    messages[0].header.messageId = Internal._hash(messages[0]);
+    messages[0].header.messageId = Internal._hash(messages[0], ON_RAMP_ADDRESS_1);
     s_offRamp.batchExecute(_generateBatchReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messages), new uint256[][](1));
 
     s_reverting_receiver.setRevert(false);
@@ -1613,7 +1613,7 @@ contract EVM2EVMMultiOffRamp_manuallyExecute is EVM2EVMMultiOffRampSetup {
     Internal.Any2EVMRampMessage[] memory messages =
       _generateSingleBasicMessage(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1);
     messages[0].receiver = address(s_reverting_receiver);
-    messages[0].header.messageId = Internal._hash(messages[0]);
+    messages[0].header.messageId = Internal._hash(messages[0], ON_RAMP_ADDRESS_1);
 
     assertEq(messages[0].header.nonce - 1, s_offRamp.getSenderNonce(SOURCE_CHAIN_SELECTOR_1, messages[0].sender));
 
@@ -1646,13 +1646,13 @@ contract EVM2EVMMultiOffRamp_manuallyExecute is EVM2EVMMultiOffRampSetup {
     for (uint64 i = 0; i < 3; ++i) {
       messages1[i] = _generateAny2EVMMessageNoTokens(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1, i + 1);
       messages1[i].receiver = address(s_reverting_receiver);
-      messages1[i].header.messageId = Internal._hash(messages1[i]);
+      messages1[i].header.messageId = Internal._hash(messages1[i], ON_RAMP_ADDRESS_1);
     }
 
     for (uint64 i = 0; i < 2; ++i) {
       messages2[i] = _generateAny2EVMMessageNoTokens(SOURCE_CHAIN_SELECTOR_3, ON_RAMP_ADDRESS_3, i + 1);
       messages2[i].receiver = address(s_reverting_receiver);
-      messages2[i].header.messageId = Internal._hash(messages2[i]);
+      messages2[i].header.messageId = Internal._hash(messages2[i], ON_RAMP_ADDRESS_3);
     }
 
     Internal.ExecutionReportSingleChain[] memory reports = new Internal.ExecutionReportSingleChain[](2);
@@ -1703,7 +1703,7 @@ contract EVM2EVMMultiOffRamp_manuallyExecute is EVM2EVMMultiOffRampSetup {
       messages[i] = _generateAny2EVMMessageNoTokens(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1, i + 1);
     }
     messages[1].receiver = address(s_reverting_receiver);
-    messages[1].header.messageId = Internal._hash(messages[1]);
+    messages[1].header.messageId = Internal._hash(messages[1], ON_RAMP_ADDRESS_1);
 
     vm.expectEmit();
     emit EVM2EVMMultiOffRamp.ExecutionStateChanged(
@@ -1764,7 +1764,7 @@ contract EVM2EVMMultiOffRamp_manuallyExecute is EVM2EVMMultiOffRampSetup {
       _generateSingleBasicMessage(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1);
     messages[0].gasLimit = 1;
     messages[0].receiver = address(new ConformingReceiver(address(s_destRouter), s_destFeeToken));
-    messages[0].header.messageId = Internal._hash(messages[0]);
+    messages[0].header.messageId = Internal._hash(messages[0], ON_RAMP_ADDRESS_1);
 
     vm.expectEmit();
     emit EVM2EVMMultiOffRamp.ExecutionStateChanged(
@@ -1908,7 +1908,7 @@ contract EVM2EVMMultiOffRamp_manuallyExecute is EVM2EVMMultiOffRampSetup {
       _generateSingleBasicMessage(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1);
 
     messages[0].receiver = address(s_reverting_receiver);
-    messages[0].header.messageId = Internal._hash(messages[0]);
+    messages[0].header.messageId = Internal._hash(messages[0], ON_RAMP_ADDRESS_1);
 
     s_offRamp.batchExecute(_generateBatchReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messages), new uint256[][](1));
 
@@ -1957,7 +1957,7 @@ contract EVM2EVMMultiOffRamp_manuallyExecute is EVM2EVMMultiOffRampSetup {
 
     messages[0].receiver = address(receiver);
 
-    messages[0].header.messageId = Internal._hash(messages[0]);
+    messages[0].header.messageId = Internal._hash(messages[0], ON_RAMP_ADDRESS_1);
 
     Internal.ExecutionReportSingleChain memory report = _generateReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messages);
 
@@ -2516,7 +2516,7 @@ contract EVM2EVMMultiOffRamp_trialExecute is EVM2EVMMultiOffRampSetup {
       })
     );
 
-    message.header.messageId = Internal._hash(message);
+    message.header.messageId = Internal._hash(message, ON_RAMP_ADDRESS_1);
 
     // Unhappy path, no revert but marked as failed.
     (newState, err) = s_offRamp.trialExecute(message, new bytes[](message.tokenAmounts.length));
@@ -2534,7 +2534,7 @@ contract EVM2EVMMultiOffRamp_trialExecute is EVM2EVMMultiOffRampSetup {
       })
     );
 
-    message.header.messageId = Internal._hash(message);
+    message.header.messageId = Internal._hash(message, ON_RAMP_ADDRESS_1);
 
     (newState, err) = s_offRamp.trialExecute(message, new bytes[](message.tokenAmounts.length));
 

@@ -284,8 +284,7 @@ contract EVM2EVMMultiOffRampSetup is TokenSetup, PriceRegistrySetup, MultiOCR3Ba
 
   function _generateAny2EVMMessage(
     uint64 sourceChainSelector,
-    // TODO: currently unused - but it will be required after the message struct is updated
-    bytes memory _onRamp,
+    bytes memory onRamp,
     uint64 sequenceNumber,
     Client.EVMTokenAmount[] memory tokenAmounts,
     bool allowOutOfOrderExecution
@@ -318,7 +317,7 @@ contract EVM2EVMMultiOffRampSetup is TokenSetup, PriceRegistrySetup, MultiOCR3Ba
       );
     }
 
-    message.header.messageId = Internal._hash(message);
+    message.header.messageId = Internal._hash(message, onRamp);
 
     return message;
   }

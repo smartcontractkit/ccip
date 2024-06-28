@@ -362,9 +362,7 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
     uint64 sourceChainSelector = report.sourceChainSelector;
     _whenNotCursed(sourceChainSelector);
 
-    // TODO: currently unused - but should not be removed - it will be used once the message signature changes
-    // SourceChainConfig storage sourceChainConfig = _getEnabledSourceChainConfig(sourceChainSelector);
-    _getEnabledSourceChainConfig(sourceChainSelector);
+    SourceChainConfig storage sourceChainConfig = _getEnabledSourceChainConfig(sourceChainSelector);
 
     uint256 numMsgs = report.messages.length;
     if (numMsgs == 0) revert EmptyReport();
@@ -376,9 +374,8 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
       Internal.Any2EVMRampMessage memory message = report.messages[i];
       // We do this hash here instead of in _verifyMessages to avoid two separate loops
       // over the same data, which increases gas cost
-      // TODO: verify message.onRamp == config.onRamp
       // TODO: verify message.destChainSelector == config.destChainSelector
-      hashedLeaves[i] = Internal._hash(message);
+      hashedLeaves[i] = Internal._hash(message, sourceChainConfig.onRamp);
       // TODO: revisit this - is messageID independent of the leaf hash?
       // For EVM2EVM offramps, the messageID is the leaf hash.
       // Asserting that this is true ensures we don't accidentally commit and then execute
@@ -788,6 +785,7 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
 
       // OnRamp can never be zero - if it is, then the source chain has been added for the first time
       if (currentOnRamp.length == 0) {
+        // TODO: is this check sufficient / is an all-0 check needed?
         if (newOnRamp.length == 0) {
           revert ZeroAddressNotAllowed();
         }
@@ -844,9 +842,11 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
   /// @param sourceAmount The amount of tokens to be released/minted.
   /// @param originalSender The message sender on the source chain.
   /// @param receiver The address that will receive the tokens.
+  /// @param sourceChainSelector The remote source chain selector
   /// @param sourceTokenData A struct containing the local token address, the source pool address and optional data
   /// returned from the source pool.
   /// @param offchainTokenData Data fetched offchain by the DON.
+  /// @return destTokenAmount local token address with amount
   function _releaseOrMintSingleToken(
     uint256 sourceAmount,
     bytes memory originalSender,
@@ -917,10 +917,14 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
     return Client.EVMTokenAmount({token: localToken, amount: localAmount});
   }
 
-  // TODO: add missing param comments
   /// @notice Uses pools to release or mint a number of different tokens to a receiver address.
   /// @param sourceTokenAmounts List of tokens and amount values to be released/minted.
+  /// @param originalSender The message sender on the source chain.
+  /// @param receiver The address that will receive the tokens.
+  /// @param sourceChainSelector The remote source chain selector
+  /// @param encodedSourceTokenData Encoded source token data, decoding to Internal.SourceTokenData
   /// @param offchainTokenData Array of token data fetched offchain by the DON.
+  /// @return destTokenAmounts local token addresses with amounts
   /// @dev This function wrappes the token pool call in a try catch block to gracefully handle
   /// any non-rate limiting errors that may occur. If we encounter a rate limiting related error
   /// we bubble it up. If we encounter a non-rate limiting error we wrap it in a TokenHandlingError.
