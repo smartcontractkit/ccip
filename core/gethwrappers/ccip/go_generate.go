@@ -40,7 +40,7 @@ package ccip
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/CCIPReceiver/CCIPReceiver.abi ../../../contracts/solc/v0.8.24/CCIPReceiver/CCIPReceiver.bin CCIPReceiver ccipReceiver
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/CCIPClient/CCIPClient.abi ../../../contracts/solc/v0.8.24/CCIPClient/CCIPClient.bin CCIPClient ccipClient
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/CCIPSender/CCIPSender.abi ../../../contracts/solc/v0.8.24/CCIPSender/CCIPSender.bin CCIPSender ccipSender
-//go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/CCIPReceiverWithAck/CCIPReceiverWithAck.abi ../../../contracts/solc/v0.8.24/CCIPReceiverWithAck/CCIPReceiverWithAck.bin CCIPReceiverWithAck ccipReceiverWithAck
+//go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/CCIPReceiverWithAck/CCIPReceiverWithACK.abi ../../../contracts/solc/v0.8.24/CCIPReceiverWithAck/CCIPReceiverWithACK.bin CCIPReceiverWithACK ccipReceiverWithACK
 
 // Customer contracts
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/USDCTokenPool/USDCTokenPool.abi ../../../contracts/solc/v0.8.24/USDCTokenPool/USDCTokenPool.bin USDCTokenPool usdc_token_pool
