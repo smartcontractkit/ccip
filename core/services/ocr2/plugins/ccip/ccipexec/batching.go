@@ -404,7 +404,6 @@ func getInflightAggregateRateLimit(
 }
 
 func getInflightSeqNums(inflight []InflightInternalExecutionReport) mapset.Set[uint64] {
-
 	seqNums := mapset.NewSet[uint64]()
 	for _, report := range inflight {
 		for _, msg := range report.messages {
