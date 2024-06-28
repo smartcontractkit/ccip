@@ -29,7 +29,6 @@ func NewMessageHasherV1(metaDataHash [32]byte) *MessageHasherV1 {
 	}
 }
 
-// todo: performance optimize
 func (h *MessageHasherV1) Hash(_ context.Context, msg cciptypes.CCIPMsg) (cciptypes.Bytes32, error) {
 	type tokenAmount struct {
 		Token  common.Address
