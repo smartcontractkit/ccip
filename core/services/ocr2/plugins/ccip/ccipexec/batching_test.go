@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -29,7 +28,7 @@ import (
 type testCase struct {
 	name                     string
 	reqs                     []cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta
-	inflight                 *big.Int
+	inflight                 []InflightInternalExecutionReport
 	tokenLimit, destGasPrice *big.Int
 	srcPrices, dstPrices     map[cciptypes.Address]*big.Int
 	offRampNoncesBySender    map[cciptypes.Address]uint64
@@ -37,6 +36,7 @@ type testCase struct {
 	expectedSeqNrs           []ccip.ObservedMessage
 	expectedStates           []messageExecStatus
 	statuschecker            func(m *mockstatuschecker.CCIPTransactionStatusChecker)
+	skipGasPriceEstimator    bool
 }
 
 func Test_validateSendRequests(t *testing.T) {
@@ -171,15 +171,16 @@ func TestBatchingStrategies(t *testing.T) {
 	msg5.SequenceNumber = msg5.SequenceNumber + 1
 	msg5.Nonce = msg5.Nonce + 1
 
-	msgId1 := generateMessageIDFromInt(1)
-	msgId2 := generateMessageIDFromInt(2)
-	msgId3 := generateMessageIDFromInt(3)
+	zkMsg1 := createTestMessage(1, sender1, 0, srcNative, big.NewInt(1e9), false, nil)
+	zkMsg2 := createTestMessage(2, sender1, 0, srcNative, big.NewInt(1e9), false, nil)
+	zkMsg3 := createTestMessage(3, sender1, 0, srcNative, big.NewInt(1e9), false, nil)
+	zkMsg4 := createTestMessage(4, sender1, 0, srcNative, big.NewInt(1e9), false, nil)
 
 	testCases := []testCase{
 		{
 			name:                  "single message no tokens",
 			reqs:                  []cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta{msg1},
-			inflight:              big.NewInt(0),
+			inflight:              []InflightInternalExecutionReport{},
 			tokenLimit:            big.NewInt(0),
 			destGasPrice:          big.NewInt(10),
 			srcPrices:             map[cciptypes.Address]*big.Int{srcNative: big.NewInt(1)},
@@ -191,7 +192,7 @@ func TestBatchingStrategies(t *testing.T) {
 		{
 			name:                  "gasPriceEstimator returns error",
 			reqs:                  []cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta{msg1},
-			inflight:              big.NewInt(0),
+			inflight:              []InflightInternalExecutionReport{},
 			tokenLimit:            big.NewInt(0),
 			destGasPrice:          big.NewInt(10),
 			srcPrices:             map[cciptypes.Address]*big.Int{srcNative: big.NewInt(1)},
@@ -201,52 +202,56 @@ func TestBatchingStrategies(t *testing.T) {
 		{
 			name:                  "executed non finalized messages should be skipped",
 			reqs:                  []cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta{msg2},
-			inflight:              big.NewInt(0),
+			inflight:              []InflightInternalExecutionReport{},
 			tokenLimit:            big.NewInt(0),
 			destGasPrice:          big.NewInt(10),
 			srcPrices:             map[cciptypes.Address]*big.Int{srcNative: big.NewInt(1)},
 			dstPrices:             map[cciptypes.Address]*big.Int{destNative: big.NewInt(1)},
 			offRampNoncesBySender: map[cciptypes.Address]uint64{sender1: 0},
 			expectedStates:        []messageExecStatus{newMessageExecState(msg2.SequenceNumber, msg2.MessageID, AlreadyExecuted)},
+			skipGasPriceEstimator: true,
 		},
 		{
 			name:                  "finalized executed log",
 			reqs:                  []cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta{msg3},
-			inflight:              big.NewInt(0),
+			inflight:              []InflightInternalExecutionReport{},
 			tokenLimit:            big.NewInt(0),
 			destGasPrice:          big.NewInt(10),
 			srcPrices:             map[cciptypes.Address]*big.Int{srcNative: big.NewInt(1)},
 			dstPrices:             map[cciptypes.Address]*big.Int{destNative: big.NewInt(1)},
 			offRampNoncesBySender: map[cciptypes.Address]uint64{sender1: 0},
 			expectedStates:        []messageExecStatus{newMessageExecState(msg3.SequenceNumber, msg3.MessageID, AlreadyExecuted)},
+			skipGasPriceEstimator: true,
 		},
 		{
 			name:                  "dst token price does not exist",
 			reqs:                  []cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta{msg1},
-			inflight:              big.NewInt(0),
+			inflight:              []InflightInternalExecutionReport{},
 			tokenLimit:            big.NewInt(0),
 			destGasPrice:          big.NewInt(10),
 			srcPrices:             map[cciptypes.Address]*big.Int{srcNative: big.NewInt(1)},
 			dstPrices:             map[cciptypes.Address]*big.Int{},
 			offRampNoncesBySender: map[cciptypes.Address]uint64{sender1: 0},
 			expectedStates:        []messageExecStatus{newMessageExecState(msg1.SequenceNumber, msg1.MessageID, TokenNotInDestTokenPrices)},
+			skipGasPriceEstimator: true,
 		},
 		{
 			name:                  "src token price does not exist",
 			reqs:                  []cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta{msg1},
-			inflight:              big.NewInt(0),
+			inflight:              []InflightInternalExecutionReport{},
 			tokenLimit:            big.NewInt(0),
 			destGasPrice:          big.NewInt(10),
 			srcPrices:             map[cciptypes.Address]*big.Int{},
 			dstPrices:             map[cciptypes.Address]*big.Int{destNative: big.NewInt(1)},
 			offRampNoncesBySender: map[cciptypes.Address]uint64{sender1: 0},
 			expectedStates:        []messageExecStatus{newMessageExecState(msg1.SequenceNumber, msg1.MessageID, TokenNotInSrcTokenPrices)},
+			skipGasPriceEstimator: true,
 		},
 		{
 			name:         "message with tokens is not executed if limit is reached",
 			reqs:         []cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta{msg4},
-			inflight:     big.NewInt(0),
-			tokenLimit:   big.NewInt(2),
+			inflight:     []InflightInternalExecutionReport{},
+			tokenLimit:   big.NewInt(99),
 			destGasPrice: big.NewInt(1),
 			srcPrices:    map[cciptypes.Address]*big.Int{srcNative: big.NewInt(1e18)},
 			dstPrices:    map[cciptypes.Address]*big.Int{destNative: big.NewInt(1e18)},
@@ -255,12 +260,13 @@ func TestBatchingStrategies(t *testing.T) {
 			},
 			offRampNoncesBySender: map[cciptypes.Address]uint64{sender1: 0},
 			expectedStates:        []messageExecStatus{newMessageExecState(msg4.SequenceNumber, msg4.MessageID, AggregateTokenLimitExceeded)},
+			skipGasPriceEstimator: true,
 		},
 		{
 			name:         "message with tokens is not executed if limit is reached when inflight is full",
 			reqs:         []cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta{msg5},
-			inflight:     new(big.Int).Mul(big.NewInt(1e18), big.NewInt(100)),
-			tokenLimit:   big.NewInt(19),
+			inflight:     []InflightInternalExecutionReport{{createdAt: time.Now(), messages: []cciptypes.EVM2EVMMessage{msg4.EVM2EVMMessage}}},
+			tokenLimit:   big.NewInt(50),
 			destGasPrice: big.NewInt(10),
 			srcPrices:    map[cciptypes.Address]*big.Int{srcNative: big.NewInt(1e18)},
 			dstPrices:    map[cciptypes.Address]*big.Int{destNative: big.NewInt(1e18)},
@@ -269,28 +275,31 @@ func TestBatchingStrategies(t *testing.T) {
 			},
 			offRampNoncesBySender: map[cciptypes.Address]uint64{sender1: 1},
 			expectedStates:        []messageExecStatus{newMessageExecState(msg5.SequenceNumber, msg5.MessageID, AggregateTokenLimitExceeded)},
+			skipGasPriceEstimator: true,
 		},
 		{
 			name:                  "skip when nonce doesn't match chain value",
 			reqs:                  []cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta{msg1},
-			inflight:              big.NewInt(0),
+			inflight:              []InflightInternalExecutionReport{},
 			tokenLimit:            big.NewInt(0),
 			destGasPrice:          big.NewInt(10),
 			srcPrices:             map[cciptypes.Address]*big.Int{srcNative: big.NewInt(1)},
 			dstPrices:             map[cciptypes.Address]*big.Int{destNative: big.NewInt(1)},
 			offRampNoncesBySender: map[cciptypes.Address]uint64{sender1: 123},
 			expectedStates:        []messageExecStatus{newMessageExecState(msg1.SequenceNumber, msg1.MessageID, InvalidNonce)},
+			skipGasPriceEstimator: true,
 		},
 		{
 			name:                  "skip when nonce not found",
 			reqs:                  []cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta{msg1},
-			inflight:              big.NewInt(0),
+			inflight:              []InflightInternalExecutionReport{},
 			tokenLimit:            big.NewInt(0),
 			destGasPrice:          big.NewInt(10),
 			srcPrices:             map[cciptypes.Address]*big.Int{srcNative: big.NewInt(1)},
 			dstPrices:             map[cciptypes.Address]*big.Int{destNative: big.NewInt(1)},
 			offRampNoncesBySender: map[cciptypes.Address]uint64{},
 			expectedStates:        []messageExecStatus{newMessageExecState(msg1.SequenceNumber, msg1.MessageID, MissingNonce)},
+			skipGasPriceEstimator: true,
 		},
 		{
 			name: "unordered messages",
@@ -309,7 +318,7 @@ func TestBatchingStrategies(t *testing.T) {
 					BlockTimestamp: time.Date(2010, 1, 1, 12, 12, 12, 0, time.UTC),
 				},
 			},
-			inflight:              big.NewInt(0),
+			inflight:              []InflightInternalExecutionReport{},
 			tokenLimit:            big.NewInt(0),
 			destGasPrice:          big.NewInt(10),
 			srcPrices:             map[cciptypes.Address]*big.Int{srcNative: big.NewInt(1)},
@@ -350,7 +359,7 @@ func TestBatchingStrategies(t *testing.T) {
 					BlockTimestamp: time.Date(2010, 1, 1, 12, 12, 12, 0, time.UTC),
 				},
 			},
-			inflight:              big.NewInt(0),
+			inflight:              []InflightInternalExecutionReport{},
 			tokenLimit:            big.NewInt(0),
 			destGasPrice:          big.NewInt(10),
 			srcPrices:             map[cciptypes.Address]*big.Int{srcNative: big.NewInt(1)},
@@ -408,7 +417,7 @@ func TestBatchingStrategies(t *testing.T) {
 					BlockTimestamp: time.Date(2010, 1, 1, 12, 12, 12, 0, time.UTC),
 				},
 			},
-			inflight:              big.NewInt(0),
+			inflight:              []InflightInternalExecutionReport{},
 			tokenLimit:            big.NewInt(0),
 			destGasPrice:          big.NewInt(10),
 			srcPrices:             map[cciptypes.Address]*big.Int{srcNative: big.NewInt(1)},
@@ -464,7 +473,7 @@ func TestBatchingStrategies(t *testing.T) {
 					BlockTimestamp: time.Date(2010, 1, 1, 12, 12, 12, 0, time.UTC),
 				},
 			},
-			inflight:              big.NewInt(0),
+			inflight:              []InflightInternalExecutionReport{},
 			tokenLimit:            big.NewInt(0),
 			destGasPrice:          big.NewInt(10),
 			srcPrices:             map[cciptypes.Address]*big.Int{srcNative: big.NewInt(1)},
@@ -507,7 +516,7 @@ func TestBatchingStrategies(t *testing.T) {
 					BlockTimestamp: time.Date(2010, 1, 1, 12, 12, 12, 0, time.UTC),
 				},
 			},
-			inflight:              big.NewInt(0),
+			inflight:              []InflightInternalExecutionReport{},
 			tokenLimit:            big.NewInt(0),
 			destGasPrice:          big.NewInt(10),
 			srcPrices:             map[cciptypes.Address]*big.Int{srcNative: big.NewInt(1)},
@@ -523,334 +532,205 @@ func TestBatchingStrategies(t *testing.T) {
 
 	specificZkOverflowTestCases := []testCase{
 		{
-			name: "batch size is 1",
-			reqs: []cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta{
-				{
-					EVM2EVMMessage: cciptypes.EVM2EVMMessage{
-						SequenceNumber: 10,
-						FeeTokenAmount: big.NewInt(1e9),
-						Sender:         sender1,
-						Nonce:          1,
-						GasLimit:       big.NewInt(1),
-						Data:           bytes.Repeat([]byte{'a'}, 1000),
-						FeeToken:       srcNative,
-						MessageID:      [32]byte{},
-					},
-					BlockTimestamp: time.Date(2010, 1, 1, 12, 12, 12, 0, time.UTC),
-				},
-				{
-					EVM2EVMMessage: cciptypes.EVM2EVMMessage{
-						SequenceNumber: 11,
-						FeeTokenAmount: big.NewInt(1e9),
-						Sender:         sender1,
-						Nonce:          2,
-						GasLimit:       big.NewInt(1),
-						Data:           bytes.Repeat([]byte{'a'}, 1000),
-						FeeToken:       srcNative,
-						MessageID:      [32]byte{},
-					},
-					BlockTimestamp: time.Date(2010, 1, 1, 12, 12, 12, 0, time.UTC),
-				},
-				{
-					EVM2EVMMessage: cciptypes.EVM2EVMMessage{
-						SequenceNumber: 12,
-						FeeTokenAmount: big.NewInt(1e9),
-						Sender:         sender1,
-						Nonce:          3,
-						GasLimit:       big.NewInt(1),
-						Data:           bytes.Repeat([]byte{'a'}, 1000),
-						FeeToken:       srcNative,
-						MessageID:      [32]byte{},
-					},
-					BlockTimestamp: time.Date(2010, 1, 1, 12, 12, 12, 0, time.UTC),
-				},
-			},
-			inflight:              big.NewInt(0),
+			name:                  "batch size is 1",
+			reqs:                  []cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta{zkMsg1, zkMsg2, zkMsg3},
+			inflight:              []InflightInternalExecutionReport{},
 			tokenLimit:            big.NewInt(0),
 			destGasPrice:          big.NewInt(10),
 			srcPrices:             map[cciptypes.Address]*big.Int{srcNative: big.NewInt(1)},
 			dstPrices:             map[cciptypes.Address]*big.Int{destNative: big.NewInt(1)},
 			offRampNoncesBySender: map[cciptypes.Address]uint64{sender1: 0},
-			expectedSeqNrs:        []ccip.ObservedMessage{{SeqNr: uint64(10)}},
+			expectedSeqNrs:        []ccip.ObservedMessage{{SeqNr: zkMsg1.SequenceNumber}},
 			expectedStates: []messageExecStatus{
-				newMessageExecState(10, [32]byte{}, AddedToBatch),
-			},
-		},
-		{
-			name: "snooze fatal message and return empty batch",
-			reqs: []cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta{
-				{
-					EVM2EVMMessage: cciptypes.EVM2EVMMessage{
-						SequenceNumber: 10,
-						FeeTokenAmount: big.NewInt(1e9),
-						Sender:         sender1,
-						Nonce:          0,
-						GasLimit:       big.NewInt(1),
-						Data:           bytes.Repeat([]byte{'a'}, 1000),
-						FeeToken:       srcNative,
-						MessageID:      msgId1,
-					},
-					BlockTimestamp: time.Date(2010, 1, 1, 12, 12, 12, 0, time.UTC),
-				},
-			},
-			inflight:              big.NewInt(0),
-			tokenLimit:            big.NewInt(0),
-			destGasPrice:          big.NewInt(10),
-			srcPrices:             map[cciptypes.Address]*big.Int{srcNative: big.NewInt(1)},
-			dstPrices:             map[cciptypes.Address]*big.Int{destNative: big.NewInt(1)},
-			offRampNoncesBySender: map[cciptypes.Address]uint64{sender1: 0},
-			expectedStates: []messageExecStatus{
-				newMessageExecState(10, msgId1, TXMCheckFailed),
+				newMessageExecState(zkMsg1.SequenceNumber, zkMsg1.MessageID, AddedToBatch),
 			},
 			statuschecker: func(m *mockstatuschecker.CCIPTransactionStatusChecker) {
 				m.Mock = mock.Mock{} // reset mock
-				m.On("CheckMessageStatus", mock.Anything, hexutil.Encode(msgId1[:])).Return([]types.TransactionStatus{types.Fatal}, 0, nil)
+				m.On("CheckMessageStatus", mock.Anything, mock.Anything).Return([]types.TransactionStatus{}, 0, nil)
 			},
 		},
 		{
-			name: "snooze fatal message and add next message to batch",
-			reqs: []cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta{
-				{
-					EVM2EVMMessage: cciptypes.EVM2EVMMessage{
-						SequenceNumber: 10,
-						FeeTokenAmount: big.NewInt(1e9),
-						Sender:         sender1,
-						Nonce:          0,
-						GasLimit:       big.NewInt(1),
-						Data:           bytes.Repeat([]byte{'a'}, 1000),
-						FeeToken:       srcNative,
-						MessageID:      msgId1,
-					},
-					BlockTimestamp: time.Date(2010, 1, 1, 12, 12, 12, 0, time.UTC),
-				},
-				{
-					EVM2EVMMessage: cciptypes.EVM2EVMMessage{
-						SequenceNumber: 11,
-						FeeTokenAmount: big.NewInt(1e9),
-						Sender:         sender1,
-						Nonce:          0,
-						GasLimit:       big.NewInt(1),
-						Data:           bytes.Repeat([]byte{'a'}, 1000),
-						FeeToken:       srcNative,
-						MessageID:      msgId2,
-					},
-					BlockTimestamp: time.Date(2010, 1, 1, 12, 12, 12, 0, time.UTC),
-				},
-				{
-					EVM2EVMMessage: cciptypes.EVM2EVMMessage{
-						SequenceNumber: 12,
-						FeeTokenAmount: big.NewInt(1e9),
-						Sender:         sender1,
-						Nonce:          0,
-						GasLimit:       big.NewInt(1),
-						Data:           bytes.Repeat([]byte{'a'}, 1000),
-						FeeToken:       srcNative,
-						MessageID:      msgId3,
-					},
-					BlockTimestamp: time.Date(2010, 1, 1, 12, 12, 12, 0, time.UTC),
-				},
-			},
-			inflight:              big.NewInt(0),
-			tokenLimit:            big.NewInt(0),
-			destGasPrice:          big.NewInt(10),
-			srcPrices:             map[cciptypes.Address]*big.Int{srcNative: big.NewInt(1)},
-			dstPrices:             map[cciptypes.Address]*big.Int{destNative: big.NewInt(1)},
-			offRampNoncesBySender: map[cciptypes.Address]uint64{sender1: 0},
-			expectedSeqNrs:        []ccip.ObservedMessage{{SeqNr: uint64(11)}},
-			expectedStates: []messageExecStatus{
-				newMessageExecState(10, msgId1, TXMCheckFailed),
-				newMessageExecState(11, msgId2, AddedToBatch),
-			},
-			statuschecker: func(m *mockstatuschecker.CCIPTransactionStatusChecker) {
-				m.Mock = mock.Mock{} // reset mock
-				m.On("CheckMessageStatus", mock.Anything, hexutil.Encode(msgId1[:])).Return([]types.TransactionStatus{types.Fatal}, 2, nil)
-				m.On("CheckMessageStatus", mock.Anything, hexutil.Encode(msgId2[:])).Return([]types.TransactionStatus{}, -1, nil)
-			},
-		},
-		{
-			name: "all messages are fatal and batch is empty",
-			reqs: []cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta{
-				{
-					EVM2EVMMessage: cciptypes.EVM2EVMMessage{
-						SequenceNumber: 10,
-						FeeTokenAmount: big.NewInt(1e9),
-						Sender:         sender1,
-						Nonce:          0,
-						GasLimit:       big.NewInt(1),
-						Data:           bytes.Repeat([]byte{'a'}, 1000),
-						FeeToken:       srcNative,
-						MessageID:      msgId1,
-					},
-					BlockTimestamp: time.Date(2010, 1, 1, 12, 12, 12, 0, time.UTC),
-				},
-				{
-					EVM2EVMMessage: cciptypes.EVM2EVMMessage{
-						SequenceNumber: 11,
-						FeeTokenAmount: big.NewInt(1e9),
-						Sender:         sender1,
-						Nonce:          0,
-						GasLimit:       big.NewInt(1),
-						Data:           bytes.Repeat([]byte{'a'}, 1000),
-						FeeToken:       srcNative,
-						MessageID:      msgId2,
-					},
-					BlockTimestamp: time.Date(2010, 1, 1, 12, 12, 12, 0, time.UTC),
-				},
-			},
-			inflight:              big.NewInt(0),
+			name:                  "snooze fatal message and return empty batch",
+			reqs:                  []cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta{zkMsg1},
+			inflight:              []InflightInternalExecutionReport{},
 			tokenLimit:            big.NewInt(0),
 			destGasPrice:          big.NewInt(10),
 			srcPrices:             map[cciptypes.Address]*big.Int{srcNative: big.NewInt(1)},
 			dstPrices:             map[cciptypes.Address]*big.Int{destNative: big.NewInt(1)},
 			offRampNoncesBySender: map[cciptypes.Address]uint64{sender1: 0},
 			expectedStates: []messageExecStatus{
-				newMessageExecState(10, msgId1, TXMCheckFailed),
-				newMessageExecState(11, msgId2, TXMCheckFailed),
+				newMessageExecState(zkMsg1.SequenceNumber, zkMsg1.MessageID, TXMCheckFailed),
 			},
 			statuschecker: func(m *mockstatuschecker.CCIPTransactionStatusChecker) {
 				m.Mock = mock.Mock{} // reset mock
-				m.On("CheckMessageStatus", mock.Anything, hexutil.Encode(msgId1[:])).Return([]types.TransactionStatus{types.Fatal}, 2, nil)
-				m.On("CheckMessageStatus", mock.Anything, hexutil.Encode(msgId2[:])).Return([]types.TransactionStatus{types.Fatal}, 2, nil)
+				m.On("CheckMessageStatus", mock.Anything, zkMsg1.MessageID.String()).Return([]types.TransactionStatus{types.Fatal}, 0, nil)
 			},
+			skipGasPriceEstimator: true,
 		},
 		{
-			name: "message batched when unconfrimed or failed",
-			reqs: []cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta{
-				{
-					EVM2EVMMessage: cciptypes.EVM2EVMMessage{
-						SequenceNumber: 10,
-						FeeTokenAmount: big.NewInt(1e9),
-						Sender:         sender1,
-						Nonce:          0,
-						GasLimit:       big.NewInt(1),
-						Data:           bytes.Repeat([]byte{'a'}, 1000),
-						FeeToken:       srcNative,
-						MessageID:      msgId1,
-					},
-					BlockTimestamp: time.Date(2010, 1, 1, 12, 12, 12, 0, time.UTC),
-				},
-				{
-					EVM2EVMMessage: cciptypes.EVM2EVMMessage{
-						SequenceNumber: 11,
-						FeeTokenAmount: big.NewInt(1e9),
-						Sender:         sender1,
-						Nonce:          0,
-						GasLimit:       big.NewInt(1),
-						Data:           bytes.Repeat([]byte{'a'}, 1000),
-						FeeToken:       srcNative,
-						MessageID:      msgId2,
-					},
-					BlockTimestamp: time.Date(2010, 1, 1, 12, 12, 12, 0, time.UTC),
-				},
-			},
-			inflight:              big.NewInt(0),
+			name:                  "snooze fatal message and add next message to batch",
+			reqs:                  []cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta{zkMsg1, zkMsg2},
+			inflight:              []InflightInternalExecutionReport{},
 			tokenLimit:            big.NewInt(0),
 			destGasPrice:          big.NewInt(10),
 			srcPrices:             map[cciptypes.Address]*big.Int{srcNative: big.NewInt(1)},
 			dstPrices:             map[cciptypes.Address]*big.Int{destNative: big.NewInt(1)},
 			offRampNoncesBySender: map[cciptypes.Address]uint64{sender1: 0},
-			expectedSeqNrs:        []ccip.ObservedMessage{{SeqNr: uint64(10)}},
+			expectedSeqNrs:        []ccip.ObservedMessage{{SeqNr: zkMsg2.SequenceNumber}},
 			expectedStates: []messageExecStatus{
-				newMessageExecState(10, msgId1, AddedToBatch),
+				newMessageExecState(zkMsg1.SequenceNumber, zkMsg1.MessageID, TXMCheckFailed),
+				newMessageExecState(zkMsg2.SequenceNumber, zkMsg2.MessageID, AddedToBatch),
 			},
 			statuschecker: func(m *mockstatuschecker.CCIPTransactionStatusChecker) {
 				m.Mock = mock.Mock{} // reset mock
-				m.On("CheckMessageStatus", mock.Anything, hexutil.Encode(msgId1[:])).Return([]types.TransactionStatus{types.Unconfirmed, types.Failed}, 0, nil)
+				m.On("CheckMessageStatus", mock.Anything, zkMsg1.MessageID.String()).Return([]types.TransactionStatus{types.Fatal}, 2, nil)
+				m.On("CheckMessageStatus", mock.Anything, zkMsg2.MessageID.String()).Return([]types.TransactionStatus{}, -1, nil)
 			},
 		},
 		{
-			name: "message snoozed when finalized",
-			reqs: []cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta{
-				{
-					EVM2EVMMessage: cciptypes.EVM2EVMMessage{
-						SequenceNumber: 10,
-						FeeTokenAmount: big.NewInt(1e9),
-						Sender:         sender1,
-						Nonce:          0,
-						GasLimit:       big.NewInt(1),
-						Data:           bytes.Repeat([]byte{'a'}, 1000),
-						FeeToken:       srcNative,
-						MessageID:      msgId1,
-					},
-					BlockTimestamp: time.Date(2010, 1, 1, 12, 12, 12, 0, time.UTC),
-				},
-				{
-					EVM2EVMMessage: cciptypes.EVM2EVMMessage{
-						SequenceNumber: 11,
-						FeeTokenAmount: big.NewInt(1e9),
-						Sender:         sender1,
-						Nonce:          0,
-						GasLimit:       big.NewInt(1),
-						Data:           bytes.Repeat([]byte{'a'}, 1000),
-						FeeToken:       srcNative,
-						MessageID:      msgId2,
-					},
-					BlockTimestamp: time.Date(2010, 1, 1, 12, 12, 12, 0, time.UTC),
-				},
-			},
-			inflight:              big.NewInt(0),
+			name:                  "all messages are fatal and batch is empty",
+			reqs:                  []cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta{zkMsg1, zkMsg2},
+			inflight:              []InflightInternalExecutionReport{},
 			tokenLimit:            big.NewInt(0),
 			destGasPrice:          big.NewInt(10),
 			srcPrices:             map[cciptypes.Address]*big.Int{srcNative: big.NewInt(1)},
 			dstPrices:             map[cciptypes.Address]*big.Int{destNative: big.NewInt(1)},
 			offRampNoncesBySender: map[cciptypes.Address]uint64{sender1: 0},
-			expectedSeqNrs:        []ccip.ObservedMessage{{SeqNr: uint64(11)}},
 			expectedStates: []messageExecStatus{
-				newMessageExecState(10, msgId1, TXMCheckFailed),
-				newMessageExecState(11, msgId2, AddedToBatch),
+				newMessageExecState(zkMsg1.SequenceNumber, zkMsg1.MessageID, TXMCheckFailed),
+				newMessageExecState(zkMsg2.SequenceNumber, zkMsg2.MessageID, TXMCheckFailed),
 			},
 			statuschecker: func(m *mockstatuschecker.CCIPTransactionStatusChecker) {
 				m.Mock = mock.Mock{} // reset mock
-				m.On("CheckMessageStatus", mock.Anything, hexutil.Encode(msgId1[:])).Return([]types.TransactionStatus{types.Unconfirmed, types.Failed, types.Finalized}, 2, nil)
-				m.On("CheckMessageStatus", mock.Anything, hexutil.Encode(msgId2[:])).Return([]types.TransactionStatus{}, -1, nil)
+				m.On("CheckMessageStatus", mock.Anything, zkMsg1.MessageID.String()).Return([]types.TransactionStatus{types.Fatal}, 2, nil)
+				m.On("CheckMessageStatus", mock.Anything, zkMsg2.MessageID.String()).Return([]types.TransactionStatus{types.Fatal}, 2, nil)
 			},
+			skipGasPriceEstimator: true,
 		},
 		{
-			name: "txm return error for message",
-			reqs: []cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta{
-				{
-					EVM2EVMMessage: cciptypes.EVM2EVMMessage{
-						SequenceNumber: 10,
-						FeeTokenAmount: big.NewInt(1e9),
-						Sender:         sender1,
-						Nonce:          0,
-						GasLimit:       big.NewInt(1),
-						Data:           bytes.Repeat([]byte{'a'}, 1000),
-						FeeToken:       srcNative,
-						MessageID:      msgId1,
-					},
-					BlockTimestamp: time.Date(2010, 1, 1, 12, 12, 12, 0, time.UTC),
-				},
-				{
-					EVM2EVMMessage: cciptypes.EVM2EVMMessage{
-						SequenceNumber: 11,
-						FeeTokenAmount: big.NewInt(1e9),
-						Sender:         sender1,
-						Nonce:          0,
-						GasLimit:       big.NewInt(1),
-						Data:           bytes.Repeat([]byte{'a'}, 1000),
-						FeeToken:       srcNative,
-						MessageID:      msgId2,
-					},
-					BlockTimestamp: time.Date(2010, 1, 1, 12, 12, 12, 0, time.UTC),
-				},
-			},
-			inflight:              big.NewInt(0),
+			name:                  "message batched when unconfrimed or failed",
+			reqs:                  []cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta{zkMsg1, zkMsg2},
+			inflight:              []InflightInternalExecutionReport{},
 			tokenLimit:            big.NewInt(0),
 			destGasPrice:          big.NewInt(10),
 			srcPrices:             map[cciptypes.Address]*big.Int{srcNative: big.NewInt(1)},
 			dstPrices:             map[cciptypes.Address]*big.Int{destNative: big.NewInt(1)},
 			offRampNoncesBySender: map[cciptypes.Address]uint64{sender1: 0},
-			expectedSeqNrs:        []ccip.ObservedMessage{{SeqNr: uint64(11)}},
+			expectedSeqNrs:        []ccip.ObservedMessage{{SeqNr: zkMsg1.SequenceNumber}},
 			expectedStates: []messageExecStatus{
-				newMessageExecState(10, msgId1, TXMCheckError),
-				newMessageExecState(11, msgId2, AddedToBatch),
+				newMessageExecState(zkMsg1.SequenceNumber, zkMsg1.MessageID, AddedToBatch),
 			},
 			statuschecker: func(m *mockstatuschecker.CCIPTransactionStatusChecker) {
 				m.Mock = mock.Mock{} // reset mock
-				m.On("CheckMessageStatus", mock.Anything, hexutil.Encode(msgId1[:])).Return([]types.TransactionStatus{}, -1, errors.New("dummy txm error"))
-				m.On("CheckMessageStatus", mock.Anything, hexutil.Encode(msgId2[:])).Return([]types.TransactionStatus{}, -1, nil)
+				m.On("CheckMessageStatus", mock.Anything, zkMsg1.MessageID.String()).Return([]types.TransactionStatus{types.Unconfirmed, types.Failed}, 0, nil)
 			},
+		},
+		{
+			name:                  "message snoozed when finalized",
+			reqs:                  []cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta{zkMsg1, zkMsg2},
+			inflight:              []InflightInternalExecutionReport{},
+			tokenLimit:            big.NewInt(0),
+			destGasPrice:          big.NewInt(10),
+			srcPrices:             map[cciptypes.Address]*big.Int{srcNative: big.NewInt(1)},
+			dstPrices:             map[cciptypes.Address]*big.Int{destNative: big.NewInt(1)},
+			offRampNoncesBySender: map[cciptypes.Address]uint64{sender1: 0},
+			expectedSeqNrs:        []ccip.ObservedMessage{{SeqNr: zkMsg2.SequenceNumber}},
+			expectedStates: []messageExecStatus{
+				newMessageExecState(zkMsg1.SequenceNumber, zkMsg1.MessageID, TXMCheckFailed),
+				newMessageExecState(zkMsg2.SequenceNumber, zkMsg2.MessageID, AddedToBatch),
+			},
+			statuschecker: func(m *mockstatuschecker.CCIPTransactionStatusChecker) {
+				m.Mock = mock.Mock{} // reset mock
+				m.On("CheckMessageStatus", mock.Anything, zkMsg1.MessageID.String()).Return([]types.TransactionStatus{types.Unconfirmed, types.Failed, types.Finalized}, 2, nil)
+				m.On("CheckMessageStatus", mock.Anything, zkMsg2.MessageID.String()).Return([]types.TransactionStatus{}, -1, nil)
+			},
+		},
+		{
+			name:                  "txm return error for message",
+			reqs:                  []cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta{zkMsg1, zkMsg2},
+			inflight:              []InflightInternalExecutionReport{},
+			tokenLimit:            big.NewInt(0),
+			destGasPrice:          big.NewInt(10),
+			srcPrices:             map[cciptypes.Address]*big.Int{srcNative: big.NewInt(1)},
+			dstPrices:             map[cciptypes.Address]*big.Int{destNative: big.NewInt(1)},
+			offRampNoncesBySender: map[cciptypes.Address]uint64{sender1: 0},
+			expectedSeqNrs:        []ccip.ObservedMessage{{SeqNr: zkMsg2.SequenceNumber}},
+			expectedStates: []messageExecStatus{
+				newMessageExecState(zkMsg1.SequenceNumber, zkMsg1.MessageID, TXMCheckError),
+				newMessageExecState(zkMsg2.SequenceNumber, zkMsg2.MessageID, AddedToBatch),
+			},
+			statuschecker: func(m *mockstatuschecker.CCIPTransactionStatusChecker) {
+				m.Mock = mock.Mock{} // reset mock
+				m.On("CheckMessageStatus", mock.Anything, zkMsg1.MessageID.String()).Return([]types.TransactionStatus{}, -1, errors.New("dummy txm error"))
+				m.On("CheckMessageStatus", mock.Anything, zkMsg2.MessageID.String()).Return([]types.TransactionStatus{}, -1, nil)
+			},
+		},
+		{
+			name:                  "snooze message when inflight",
+			reqs:                  []cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta{zkMsg1},
+			inflight:              createInflight(msg1),
+			tokenLimit:            big.NewInt(0),
+			destGasPrice:          big.NewInt(10),
+			srcPrices:             map[cciptypes.Address]*big.Int{srcNative: big.NewInt(1)},
+			dstPrices:             map[cciptypes.Address]*big.Int{destNative: big.NewInt(1)},
+			offRampNoncesBySender: map[cciptypes.Address]uint64{sender1: 0},
+			expectedStates: []messageExecStatus{
+				newMessageExecState(zkMsg1.SequenceNumber, zkMsg1.MessageID, SkippedInflight),
+			},
+			skipGasPriceEstimator: true,
+		},
+		{
+			name:                  "snooze when not inflight but txm returns error",
+			reqs:                  []cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta{zkMsg1},
+			inflight:              []InflightInternalExecutionReport{},
+			tokenLimit:            big.NewInt(0),
+			destGasPrice:          big.NewInt(10),
+			srcPrices:             map[cciptypes.Address]*big.Int{srcNative: big.NewInt(1)},
+			dstPrices:             map[cciptypes.Address]*big.Int{destNative: big.NewInt(1)},
+			offRampNoncesBySender: map[cciptypes.Address]uint64{sender1: 0},
+			expectedStates: []messageExecStatus{
+				newMessageExecState(zkMsg1.SequenceNumber, zkMsg1.MessageID, TXMCheckError),
+			},
+			statuschecker: func(m *mockstatuschecker.CCIPTransactionStatusChecker) {
+				m.Mock = mock.Mock{} // reset mock
+				m.On("CheckMessageStatus", mock.Anything, zkMsg1.MessageID.String()).Return([]types.TransactionStatus{}, -1, errors.New("dummy txm error"))
+			},
+			skipGasPriceEstimator: true,
+		},
+		{
+			name:                  "snooze when not inflight but txm returns final status",
+			reqs:                  []cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta{zkMsg1},
+			inflight:              []InflightInternalExecutionReport{},
+			tokenLimit:            big.NewInt(0),
+			destGasPrice:          big.NewInt(10),
+			srcPrices:             map[cciptypes.Address]*big.Int{srcNative: big.NewInt(1)},
+			dstPrices:             map[cciptypes.Address]*big.Int{destNative: big.NewInt(1)},
+			offRampNoncesBySender: map[cciptypes.Address]uint64{sender1: 0},
+			expectedStates: []messageExecStatus{
+				newMessageExecState(zkMsg1.SequenceNumber, zkMsg1.MessageID, TXMCheckFailed),
+			},
+			statuschecker: func(m *mockstatuschecker.CCIPTransactionStatusChecker) {
+				m.Mock = mock.Mock{} // reset mock
+				m.On("CheckMessageStatus", mock.Anything, zkMsg1.MessageID.String()).Return([]types.TransactionStatus{types.Unconfirmed, types.Failed, types.Finalized}, 2, nil)
+			},
+			skipGasPriceEstimator: true,
+		},
+		{
+			name:                  "snooze messages when inflight but batch valid messages",
+			reqs:                  []cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta{zkMsg1, zkMsg2, zkMsg3, zkMsg4},
+			inflight:              createInflight(zkMsg1, zkMsg2),
+			tokenLimit:            big.NewInt(0),
+			destGasPrice:          big.NewInt(10),
+			srcPrices:             map[cciptypes.Address]*big.Int{srcNative: big.NewInt(1)},
+			dstPrices:             map[cciptypes.Address]*big.Int{destNative: big.NewInt(1)},
+			offRampNoncesBySender: map[cciptypes.Address]uint64{sender1: 0},
+			expectedSeqNrs:        []ccip.ObservedMessage{{SeqNr: zkMsg3.SequenceNumber}},
+			expectedStates: []messageExecStatus{
+				newMessageExecState(zkMsg1.SequenceNumber, zkMsg1.MessageID, SkippedInflight),
+				newMessageExecState(zkMsg2.SequenceNumber, zkMsg2.MessageID, SkippedInflight),
+				newMessageExecState(zkMsg3.SequenceNumber, zkMsg3.MessageID, AddedToBatch),
+			},
+			skipGasPriceEstimator: false,
 		},
 	}
 
@@ -878,12 +758,12 @@ func runBatchingStrategyTests(t *testing.T, strategy BatchingStrategy, available
 			lggr := logger.TestLogger(t)
 
 			gasPriceEstimator := prices.NewMockGasPriceEstimatorExec(t)
-			if tc.expectedSeqNrs != nil || tc.statuschecker != nil {
-				gasPriceEstimator.On("EstimateMsgCostUSD", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(big.NewInt(0), nil)
-			}
-
-			if tc.expectedStates == nil && tc.expectedSeqNrs == nil {
-				gasPriceEstimator.On("EstimateMsgCostUSD", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(big.NewInt(0), errors.New("error"))
+			if !tc.skipGasPriceEstimator {
+				if tc.expectedSeqNrs != nil {
+					gasPriceEstimator.On("EstimateMsgCostUSD", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(big.NewInt(0), nil)
+				} else {
+					gasPriceEstimator.On("EstimateMsgCostUSD", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(big.NewInt(0), errors.New("error"))
+				}
 			}
 
 			// default case for ZKOverflowBatchingStrategy
@@ -898,6 +778,7 @@ func runBatchingStrategyTests(t *testing.T, strategy BatchingStrategy, available
 
 			batchContext := &BatchContext{
 				report:                     commitReportWithSendRequests{sendRequestsWithMeta: tc.reqs},
+				inflight:                   tc.inflight,
 				lggr:                       lggr,
 				availableDataLen:           MaxDataLenPerBatch,
 				availableGas:               availableGas,
@@ -907,7 +788,6 @@ func runBatchingStrategyTests(t *testing.T, strategy BatchingStrategy, available
 				destTokenPricesUSD:         tc.dstPrices,
 				gasPrice:                   tc.destGasPrice,
 				sourceToDestToken:          tc.srcToDestTokens,
-				inflightAggregateValue:     tc.inflight,
 				aggregateTokenLimit:        tc.tokenLimit,
 				tokenDataRemainingDuration: 5 * time.Second,
 				tokenDataWorker:            tokendata.NewBackgroundWorker(map[cciptypes.Address]tokendata.Reader{}, 10, 5*time.Second, time.Hour),
@@ -955,15 +835,28 @@ func createTestMessage(seqNr uint64, sender cciptypes.Address, nonce uint64, fee
 			Data:           data,
 			TokenAmounts:   nil,
 			FeeToken:       feeToken,
-			MessageID:      [32]byte{},
+			MessageID:      generateMessageIDFromInt(seqNr),
 		},
 		BlockTimestamp: time.Date(2010, 1, 1, 12, 12, 12, 0, time.UTC),
 		Executed:       executed,
 	}
 }
 
-func generateMessageIDFromInt(input uint32) [32]byte {
+func generateMessageIDFromInt(input uint64) [32]byte {
 	var messageID [32]byte
-	binary.LittleEndian.PutUint32(messageID[:], input)
+	binary.LittleEndian.PutUint32(messageID[:], uint32(input))
 	return messageID
+}
+
+func createInflight(msgs ...cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta) []InflightInternalExecutionReport {
+	reports := make([]InflightInternalExecutionReport, len(msgs))
+
+	for i, msg := range msgs {
+		reports[i] = InflightInternalExecutionReport{
+			messages:  []cciptypes.EVM2EVMMessage{msg.EVM2EVMMessage},
+			createdAt: msg.BlockTimestamp,
+		}
+	}
+
+	return reports
 }

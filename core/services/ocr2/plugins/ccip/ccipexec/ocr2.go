@@ -210,17 +210,11 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 				return nil, err
 			}
 
-			inflightAggregateValue, err := getInflightAggregateRateLimit(lggr, inflight, tokenExecData.destTokenPrices, tokenExecData.sourceToDestTokens)
-			if err != nil {
-				lggr.Errorw("Unexpected error computing inflight values", "err", err)
-				return []ccip.ObservedMessage{}, nil
-			}
-
 			batch, msgExecStates := r.buildBatch(
 				ctx,
+				inflight,
 				rootLggr,
 				rep,
-				inflightAggregateValue,
 				tokenExecData.rateLimiterTokenBucket.Tokens,
 				tokenExecData.sourceTokenPrices,
 				tokenExecData.destTokenPrices,
@@ -261,9 +255,9 @@ func (r *ExecutionReportingPlugin) getExecutedSeqNrsInRange(ctx context.Context,
 // profitability of execution.
 func (r *ExecutionReportingPlugin) buildBatch(
 	ctx context.Context,
+	inflight []InflightInternalExecutionReport,
 	lggr logger.Logger,
 	report commitReportWithSendRequests,
-	inflightAggregateValue *big.Int,
 	aggregateTokenLimit *big.Int,
 	sourceTokenPricesUSD map[cciptypes.Address]*big.Int,
 	destTokenPricesUSD map[cciptypes.Address]*big.Int,
@@ -283,6 +277,7 @@ func (r *ExecutionReportingPlugin) buildBatch(
 
 	batchCtx := &BatchContext{
 		report,
+		inflight,
 		lggr,
 		MaxDataLenPerBatch,
 		uint64(r.offchainConfig.BatchGasLimit),
@@ -292,7 +287,6 @@ func (r *ExecutionReportingPlugin) buildBatch(
 		destTokenPricesUSD,
 		gasPrice,
 		sourceToDestToken,
-		inflightAggregateValue,
 		aggregateTokenLimit,
 		MaximumAllowedTokenDataWaitTimePerBatch,
 		r.tokenDataWorker,
@@ -661,26 +655,6 @@ func (r *ExecutionReportingPlugin) isStaleReport(ctx context.Context, messages [
 
 func (r *ExecutionReportingPlugin) Close() error {
 	return nil
-}
-
-func getInflightAggregateRateLimit(
-	lggr logger.Logger,
-	inflight []InflightInternalExecutionReport,
-	destTokenPrices map[cciptypes.Address]*big.Int,
-	sourceToDest map[cciptypes.Address]cciptypes.Address,
-) (*big.Int, error) {
-	inflightAggregateValue := big.NewInt(0)
-
-	for _, rep := range inflight {
-		for _, message := range rep.messages {
-			msgValue, err := aggregateTokenValue(lggr, destTokenPrices, sourceToDest, message.TokenAmounts)
-			if err != nil {
-				return nil, err
-			}
-			inflightAggregateValue.Add(inflightAggregateValue, msgValue)
-		}
-	}
-	return inflightAggregateValue, nil
 }
 
 // getTokensPrices returns token prices of the given price registry,
