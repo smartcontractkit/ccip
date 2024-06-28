@@ -132,14 +132,14 @@ func (c *CommitPluginCodecV1) Decode(ctx context.Context, bytes []byte) (cciptyp
 	for _, update := range commitReport.PriceUpdates.TokenPriceUpdates {
 		tokenPriceUpdates = append(tokenPriceUpdates, cciptypes.TokenPrice{
 			TokenID: types.Account(update.SourceToken.String()),
-			Price:   cciptypes.NewBigInt(update.UsdPerToken),
+			Price:   cciptypes.NewBigInt(big.NewInt(0).Set(update.UsdPerToken)),
 		})
 	}
 
 	gasPriceUpdates := make([]cciptypes.GasPriceChain, 0, len(commitReport.PriceUpdates.GasPriceUpdates))
 	for _, update := range commitReport.PriceUpdates.GasPriceUpdates {
 		gasPriceUpdates = append(gasPriceUpdates, cciptypes.GasPriceChain{
-			GasPrice: cciptypes.NewBigInt(update.UsdPerUnitGas),
+			GasPrice: cciptypes.NewBigInt(big.NewInt(0).Set(update.UsdPerUnitGas)),
 			ChainSel: cciptypes.ChainSelector(update.DestChainSelector),
 		})
 	}
