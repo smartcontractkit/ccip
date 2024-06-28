@@ -354,18 +354,24 @@ jobs:
             os: ubuntu-latest
             file: ccip
             run: -run ^TestSmokeCCIPManuallyExecuteAfterExecutionFailingDueToInsufficientGas$
-          - name: ccip-smoke-self-serve-offramp-arl
+          - name: ccip-smoke-on-ramp-limits
             nodes: 1
             dir: ccip-tests/smoke
             os: ubuntu-latest
             file: ccip
-            run: -run ^TestSmokeCCIPSelfServeRateLimitOffRamp$
-          - name: ccip-smoke-self-serve-onramp-arl
+            run: -run ^TestSmokeCCIPOnRampLimits$
+          - name: ccip-smoke-off-ramp-capacity
             nodes: 1
             dir: ccip-tests/smoke
             os: ubuntu-latest
             file: ccip
-            run: -run ^TestSmokeCCIPSelfServeRateLimitOnRamp$
+            run: -run ^TestSmokeCCIPOffRampCapacityLimit$
+          - name: ccip-smoke-off-ramp-agg-rate-limit
+            nodes: 1
+            dir: ccip-tests/smoke
+            os: ubuntu-latest
+            file: ccip
+            run: -run ^TestSmokeCCIPOffRampAggRateLimit$
           - name: runlog
             id: runlog
             nodes: 2
@@ -633,9 +639,9 @@ jobs:
           path: ./integration-tests/smoke/traces/trace-data.json
       - name: Print failed test summary
         if: always()
-        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/show-test-summary@fc3e0df622521019f50d772726d6bf8dc919dd38 # v2.3.19
+        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/show-test-summary@1587f59bfd626b668d303abbc90fee41b12397e6 # v2.3.23
         with:
-          test_directory: ./integration-tests/smoke/
+          test_directories: ./integration-tests/smoke/,./integration-tests/ccip-tests/smoke/
 
   ### Used to check the required checks box when the matrix completes
   eth-smoke-tests:
