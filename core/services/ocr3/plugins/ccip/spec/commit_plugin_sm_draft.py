@@ -1,20 +1,55 @@
-#
-# High-level Python specification for the CCIPv2 OCR3 Commit Plugin, with a focus on RMN OffChain Blessing
-#
-# The plugin is implemented as a state machine, and moves from state to state each round. There are 3 states:
-# 1. Determining intervals to be used in the next round
-# 2. Building a report from the intervals determined in the previous round
-# 3. Checking if the most recently generated report has been committed to the dest chain
-#    - if the report has been committed, move to state 1
-#    - else, repeat step 3
-#
-# This approach leads to a clear separation of concerns and addresses the complications that can arise if a report
-# is not successfully transmitted (as we explicitly only continue once we know the previous report has been committed).
+"""
+High-level Python specification for the CCIPv2 OCR3 Commit Plugin, with a focus on RMN OffChain Blessing
 
+The plugin is implemented as a state machine, and moves from state to state each round. There are 3 states:
+1. SelectingIntervalsForReport
+      - Determine intervals to be included in the next report
+2. BuildingReport
+      - Build a report from the intervals determined in the previous round
+3. WaitingForReportTransmission
+      - Check if the maximum committed sequence numbers on the dest chain have changed since generating the most
+        recent report, i.e. check if the report has been committed.
+      - If the maximum committed sequence numbers have changed (i.e. the report has been committed) or the maximum
+        number of check attempts have been exhausted, move to the SelectingIntervalsForReport state and generate a new
+        report.
+      - If the maximum committed sequence numbers have _not_ changed (i.e. the report is still in-flight) and the
+        maximum number of check attempts are not been exhausted, move to the WaitingForReportTransmission state in order
+        to check again.
+
+This approach leads to a clear separation of concerns and addresses the complications that can arise if a report
+is not successfully transmitted (as we explicitly only continue once we know the previous report has been committed).
+In this design, full messages are no longer in the observations, only merkle roots and intervals are. This reduces the
+size of observations, which reduces bandwidth and improves performance.
+
+This is the state machine diagram. States are in boxes, outcomes are within arrows.
+
+              Start
+                |
+                V
+    -------------------------------
+    | SelectingIntervalsForReport | <---------|
+    -------------------------------           |
+                |                             |
+        ReportIntervalsSelected               |
+                |                             |
+                V                             |
+        ------------------                    |
+        | BuildingReport | -- ReportEmpty --->|
+        ------------------                    |
+                |                     ReportTransmitted
+         ReportGenerated                     or
+                |                    ReportNotTransmitted
+                V                             |
+    --------------------------------          |
+    | WaitingForReportTransmission | -------->|
+    --------------------------------
+            |           ^
+            |           |
+        ReportNotYetTransmitted
+"""
 
 from typing import List, Dict, Optional
 from dataclasses import dataclass
-from collections import defaultdict
 
 RmnNodeId = str
 ChainSelector = int
@@ -26,9 +61,6 @@ MAX_INTERVAL_LENGTH = 256
 class Interval:
     min: int
     max: int
-
-    def is_empty(self) -> bool:
-        return self.min == self.max
 
 
 @dataclass
@@ -49,16 +81,17 @@ class CcipMessage:
     seq_num: int
 
 
+# Query data types
+##################
+
 @dataclass
 class CommitQuery:
     rmn_max_seq_nums: Dict[ChainSelector, int]
     signed_intervals: Dict[ChainSelector, SignedInterval]
 
 
-@dataclass
-class MaxSourceChainSeqNumsObservation:
-    max_source_chain_seq_nums: Dict[ChainSelector, int]
-
+# Observation data types
+########################
 
 @dataclass
 class MerkleRootsObservation:
@@ -66,39 +99,104 @@ class MerkleRootsObservation:
 
 
 @dataclass
-class MaxCommittedSeqNumsObservation:
+class SequenceNumbersObservation:
     max_committed_seq_nums: Dict[ChainSelector, int]
+    max_uncommitted_seq_nums: Dict[ChainSelector, int]
 
 
-CommitObservation = MaxSourceChainSeqNumsObservation | MerkleRootsObservation | MaxCommittedSeqNumsObservation
+CommitObservation = SequenceNumbersObservation | MerkleRootsObservation
 
 
-# TODO: doc
+# Outcome data types
+####################
+
 @dataclass
-class NextIntervalsChosen:
+class ReportIntervalsSelected:
     intervals: Dict[ChainSelector, Interval]
 
 
-# TODO: doc
 @dataclass
 class ReportGenerated:
     signed_intervals: Dict[ChainSelector, SignedInterval]
 
 
-# TODO: doc
 @dataclass
-class ReportInFlight:
-    signed_intervals: Dict[ChainSelector, SignedInterval]
+class ReportNotYetTransmitted:
+    max_committed_seq_nums: Dict[ChainSelector, int]
     attempts: int
 
 
-# TODO: doc
 @dataclass
-class ReportCommitted:
-    max_committed_seq_nums: Dict[ChainSelector, int]
+class ReportTransmitted:
+    pass
 
 
-CommitOutcome = NextIntervalsChosen | ReportGenerated | ReportInFlight | ReportCommitted
+@dataclass
+class ReportNotTransmitted:
+    pass
+
+
+@dataclass
+class ReportEmpty:
+    pass
+
+
+CommitOutcome = (
+        ReportIntervalsSelected |
+        ReportGenerated |
+        ReportEmpty |
+        ReportNotYetTransmitted |
+        ReportTransmitted |
+        ReportNotTransmitted
+)
+
+
+# State data types
+##################
+
+@dataclass
+class SelectingIntervalsForReport:
+    pass
+
+
+@dataclass
+class BuildingReport:
+    intervals: Dict[ChainSelector, Interval]
+
+
+@dataclass
+class WaitingForReportTransmission:
+    previous_max_committed_seq_nums: Dict[ChainSelector, int]
+    attempts: int
+
+
+CommitState = SelectingIntervalsForReport | BuildingReport | WaitingForReportTransmission
+
+
+# Given the outcome of the previous OCR round, return the CommitState of the current round. This effectively
+# defines the state transitions of the Commit Plugin.
+def current_state(previous_outcome: Optional[CommitOutcome]) -> CommitState:
+    match previous_outcome:
+        case None:
+            return SelectingIntervalsForReport()
+
+        case ReportIntervalsSelected(intervals):
+            return BuildingReport(intervals)
+
+        case ReportGenerated(_, max_committed_seq_nums):
+            return WaitingForReportTransmission(max_committed_seq_nums, attempts=0)
+
+        case ReportEmpty():
+            return SelectingIntervalsForReport()
+
+        case ReportNotYetTransmitted(max_committed_seq_nums, attempts):
+            return WaitingForReportTransmission(max_committed_seq_nums, attempts)
+
+        case ReportTransmitted():
+            return SelectingIntervalsForReport()
+
+        case ReportNotTransmitted():
+            return SelectingIntervalsForReport()
 
 
 @dataclass
@@ -143,57 +241,34 @@ class ChainReader:
         pass
 
 
-class OffRamp:
-    def __init__(self):
-        pass
-
-    # TODO: doc
-    def get_max_seq_nums_on_dest_chain(self) -> Dict[ChainSelector, int]:
-        pass
-
-
 @dataclass
 class CommitPlugin:
     rmn_client: RmnClient
     all_source_chains: List[ChainSelector]
     dest_chain: ChainSelector
     chain_readers: Dict[ChainSelector, ChainReader]
-    off_ramp: OffRamp
     f: int
     max_check_report_persisted_attempts: int
 
-    # TODO: doc
-    def can_read_from_dest_chain(self) -> bool:
-        return self.dest_chain in self.chain_readers
+    # The OCR3 implementation of Outcome
+    def query(self, previous_outcome: Optional[CommitOutcome]) -> CommitQuery:
+        match current_state(previous_outcome):
+            # If we are choosing the next intervals this round, we need to query RMN for the max uncommitted sequence
+            # numbers it has for each source chain, so we can set appropriate upper ranges for our intervals.
+            case SelectingIntervalsForReport():
+                rmn_max_seq_nums = self.rmn_client.request_max_seq_nums(self.all_source_chains)
+                return CommitQuery(rmn_max_seq_nums, {})
 
-    # TODO: doc
-    def get_ccip_messages_from_source_chains(
-            self,
-            intervals: Dict[ChainSelector, Interval]
-    ) -> Dict[ChainSelector, List[CcipMessage]]:
-        pass
-
-    # TODO: doc
-    def query(self, previous_outcome: CommitOutcome) -> CommitQuery:
-        match previous_outcome:
-            # If the previous round choose an interval, this round we should build a report from it. We request signed
-            # intervals from RMN which need to be included in the report.
-            case NextIntervalsChosen(intervals):
+            # If we are building a report this round, we request signed intervals from RMN which need to be included
+            # in the report
+            case BuildingReport(intervals):
                 signed_intervals = self.rmn_client.request_signed_intervals(intervals)
                 return CommitQuery({}, signed_intervals)
 
-            # If the previous round generated a report or did not detect the report on the dest chain, we need to query
-            # the dest chain again to detect if the report has since been committed. In this case we don't need to make
-            # a request to RMN.
-            case ReportGenerated(_) | ReportInFlight(_, _):
+            # If we are checking for an update to the maximum committed sequence numbers this round, we don't need to
+            # make a request to RMN
+            case WaitingForReportTransmission(_, _):
                 return CommitQuery({}, {})
-
-            # If in the previous round we detected the report was committed on the dest chain, we need to determine the
-            # intervals to use to build a report in the next round. We need to query RMN for the max sequence numbers
-            # it has for each source chain, so we can set appropriate upper ranges for our intervals.
-            case ReportCommitted(_):
-                rmn_max_seq_nums = self.rmn_client.request_max_seq_nums(self.all_source_chains)
-                return CommitQuery(rmn_max_seq_nums, {})
 
     # Given a mapping from source chains to intervals, for each chain read the messages in its interval and compute
     # the merkle root. Return a mapping from chain to merkle root.
@@ -205,39 +280,30 @@ class CommitPlugin:
     def get_max_committed_seq_nums(self) -> Dict[ChainSelector, int]:
         pass
 
-    # For each source chain, return the maximum sequence number (for the dest chain) that is on the source chain's
-    # OnRamp
-    def get_source_chain_max_seq_nums(self) -> Dict[ChainSelector, int]:
-        pass
-
-    # Given intervals that have been reported, and the maximum committed sequence numbers that are actually on chain,
-    # return True if reported_intervals have been committed, False otherwise
-    def reported_intervals_are_persisted(
-            self,
-            reported_intervals: Dict[ChainSelector, Interval],
-            max_committed_seq_nums: Dict[ChainSelector, int]
-    ) -> bool:
+    # For each source chain, return the maximum sequence number (associated with the dest chain) that is on the
+    # source chain's OnRamp
+    def get_max_uncommitted_seq_nums(self) -> Dict[ChainSelector, int]:
         pass
 
     # The OCR3 implementation of Observation
-    def observation(self, previous_outcome: CommitOutcome) -> CommitObservation:
-        match previous_outcome:
-            # If the previous round choose an interval, this round we should observe the merkle roots of all intervals
-            # on all associated source chains
-            case NextIntervalsChosen(intervals):
+    def observation(self, previous_outcome: Optional[CommitOutcome]) -> CommitObservation:
+        match current_state(previous_outcome):
+            # If we are choosing the next intervals this round, observe the maximum committed and uncommitted
+            # sequence numbers
+            case SelectingIntervalsForReport():
+                return SequenceNumbersObservation(
+                    self.get_max_committed_seq_nums(),
+                    self.get_max_uncommitted_seq_nums()
+                )
+
+            # If we are building a report this round, we need to observe merkle roots
+            case BuildingReport(intervals):
                 return MerkleRootsObservation(self.get_merkle_roots(intervals))
 
-            # If the previous round generated a report or did not detect the report on the dest chain, we need to
-            # observe the maximum committed sequence numbers on the dest chain, which we will then use to determine
-            # if the most recent report has been committed.
-            case ReportGenerated(_) | ReportInFlight(_, _):
-                return MaxCommittedSeqNumsObservation(self.get_max_committed_seq_nums())
-
-            # If in the previous round we detected the report was committed on the dest chain, we need to determine the
-            # intervals to use to build the next report in the next round. Observe the maximum sequence number of
-            # messages on the source chains, which we'll use to determine the upper limit of intervals.
-            case ReportCommitted(_):
-                MaxSourceChainSeqNumsObservation(self.get_source_chain_max_seq_nums())
+            # If we are checking for an update to the maximum committed sequence numbers this round, observe these
+            # sequence numbers
+            case WaitingForReportTransmission(_, _):
+                return SequenceNumbersObservation(self.get_max_committed_seq_nums(), {})
 
     # Given a list of MerkleRootObservations, return a flattened consensus on the merkle root for each source chain
     def flatten_merkle_root_observations(self, observations: List[CommitObservation]) -> Dict[ChainSelector, bytes]:
@@ -264,7 +330,7 @@ class CommitPlugin:
     ) -> Dict[ChainSelector, SignedInterval]:
         pass
 
-    # Given a list of MaxCommittedSeqNumsObservation, return a flattened consensus on the max committed sequence number
+    # Given a list of SequenceNumbersObservation, return a flattened consensus on the max committed sequence number
     # for each source chain
     def flatten_max_committed_seq_nums_observations(
             self,
@@ -272,81 +338,56 @@ class CommitPlugin:
     ) -> Dict[ChainSelector, int]:
         pass
 
-    # Return True if a report with the given signed_intervals has been committed to dest chain (by checking against
-    # max_committed_seq_nums), return False otherwise
-    def report_has_been_committed(
+    # Given a list of SequenceNumbersObservation and the RMN max uncommitted sequence numbers for each source chain,
+    # return the intervals for the next round.
+    def choose_next_intervals(
             self,
-            signed_intervals: Dict[ChainSelector, SignedInterval],
-            max_committed_seq_nums: Dict[ChainSelector, int]
-    ) -> bool:
-        pass
-
-    # Given a list of MaxSourceChainSeqNumsObservations, return a flattened consensus on the max sequence number
-    # for each source chain
-    def flatten_max_source_chain_seq_nums_observations(
-            self,
-            observations: List[CommitObservation]
-    ) -> Dict[ChainSelector, int]:
-        pass
-
-    # Given the RMN max sequence numbers for each chain, the max committed sequence numbers on the dest chain, and the
-    # max sequence numbers on the chains' OnRamps, return the intervals for the next round.
-    def get_next_intervals(
-            self,
-            max_source_chain_seq_nums: Dict[ChainSelector, int],
-            rmn_max_seq_nums: Dict[ChainSelector, int],
-            max_committed_seq_nums: Dict[ChainSelector, int]
+            observations: List[CommitObservation],
+            rmn_max_seq_nums: Dict[ChainSelector, int]
     ) -> Dict[ChainSelector, Interval]:
+        pass
+
+    # Return True if the max committed sequence numbers observed this round are different from those observed in a
+    # previous round, return False otherwise
+    def max_committed_seq_nums_are_updated(self, max_committed_seq_nums, previous_max_committed_seq_nums) -> bool:
         pass
 
     # The OCR3 implementation of Outcome
     def outcome(
             self,
-            previous_outcome: CommitOutcome,
+            previous_outcome: Optional[CommitOutcome],
             query: CommitQuery,
             observations: List[CommitObservation]
     ) -> CommitOutcome:
-        match previous_outcome:
-            # If the previous round choose an interval, this round we observed merkle roots from the source chains
-            # and acquired RMN signed intervals. Use these values to generate a report.
-            case NextIntervalsChosen(intervals):
+        match current_state(previous_outcome):
+            # If we are choosing the next intervals this round, compute the next intervals using the
+            # SequenceNumbersObservations and max uncommitted sequence numbers returned by RMN
+            case SelectingIntervalsForReport():
+                next_intervals = self.choose_next_intervals(observations, query.rmn_max_seq_nums)
+                return ReportIntervalsSelected(next_intervals)
+
+            # If we are building a report this round, we observed merkle roots from the source chains and acquired RMN
+            # signed intervals. Use these values to generate a report.
+            case BuildingReport(intervals):
                 observed_merkle_roots = self.flatten_merkle_root_observations(observations)
                 signed_intervals = self.get_signed_intervals_to_report(intervals, query.signed_intervals,
                                                                        observed_merkle_roots)
-                return ReportGenerated(signed_intervals)
-
-            # If the previous round generated a report, this round we checked if the last report has been committed.
-            # If it has, output a ReportCommitted value with the new maximum committed sequence numbers (which will
-            # be used to construct intervals in the next round). If the report hasn't been committed yet, output a
-            # ReportInFlight value so that next round we again check if the report has been committed.
-            case ReportGenerated(signed_intervals):
-                max_committed_seq_nums = self.flatten_max_committed_seq_nums_observations(observations)
-                if self.report_has_been_committed(signed_intervals, max_committed_seq_nums):
-                    return ReportCommitted(max_committed_seq_nums)
+                if len(signed_intervals) == 0:
+                    return ReportEmpty()
                 else:
-                    return ReportInFlight(signed_intervals, 1)
+                    return ReportGenerated(signed_intervals)
 
-            # If the previous round checked if the report has been committed the dest chain, output a ReportCommitted
-            # value if in this round we confirmed that the report has been committed. Else, output a ReportInFlight
-            # so that we continue to check next round. If we exhaust attempts, we output
-            # ReportCommitted(max_committed_seq_nums) which essentially acts as retrying to build/transmit the report
-            # again.
-            case ReportInFlight(signed_intervals, attempts):
+            # If we are checking if the previously generated report has been transmitted, return ReportTransmitted
+            # if an update has been detected, return ReportNotTransmitted if our update checks have been
+            # exhausted, or return ReportNotYetTransmitted with an incremented "attempts" value otherwise
+            case WaitingForReportTransmission(previous_max_committed_seq_nums, attempts):
                 max_committed_seq_nums = self.flatten_max_committed_seq_nums_observations(observations)
-                if self.report_has_been_committed(signed_intervals, max_committed_seq_nums):
-                    return ReportCommitted(max_committed_seq_nums)
+                if self.max_committed_seq_nums_are_updated(max_committed_seq_nums, previous_max_committed_seq_nums):
+                    return ReportTransmitted()
                 elif attempts >= self.max_check_report_persisted_attempts:
-                    return ReportCommitted(max_committed_seq_nums)
+                    return ReportNotTransmitted()
                 else:
-                    return ReportInFlight(signed_intervals, attempts + 1)
-
-            # If in the previous round we detected the report was committed on the dest chain, it means in this round
-            # we constructed the intervals for next round. Output NextIntervalsChosen.
-            case ReportCommitted(max_committed_seq_nums):
-                max_source_chain_seq_nums = self.flatten_max_source_chain_seq_nums_observations(observations)
-                next_intervals = self.get_next_intervals(max_source_chain_seq_nums, query.rmn_max_seq_nums,
-                                                         max_committed_seq_nums)
-                return NextIntervalsChosen(next_intervals)
+                    return ReportNotYetTransmitted(previous_max_committed_seq_nums, attempts + 1)
 
     # The OCR3 implementation of Report
     def report(self, outcome: CommitOutcome) -> Optional[CommitReport]:
