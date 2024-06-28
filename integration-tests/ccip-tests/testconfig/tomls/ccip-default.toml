@@ -19,6 +19,10 @@ TTL = '5h'
 [CCIP.Env.Network]
 selected_networks = ['SIMULATED_1', 'SIMULATED_2']
 
+[CCIP.Env.Lane]
+LeaderLaneEnabled=false
+Leaders = [['SIMULATED_1', 'SIMULATED_2'], ['SIMULATED_2', 'SIMULATED_1']]
+
 # PrivateEthereumNetworks.NETWORK_NAME contains the configuration of private ethereum network that includes ethereum version, evm node client, chain id,
 # certain chain configurations, addresses to fund or custom docker images to be used. These are non-dev networks, but they all run just a single node.
 [CCIP.Env.PrivateEthereumNetworks.SIMULATED_1]
@@ -283,6 +287,7 @@ CCIPOwnerTokens = false # if true, the test will use deploy the tokens by the CC
 # then only random combinations of 2 lanes from the following will be considered for the test :
 # ['SIMULATED_1', 'SIMULATED_2'], ['SIMULATED_1', 'SIMULATED_3'], ['SIMULATED_2', 'SIMULATED_3']
 #MaxNoOfLanes = <no_of_lanes> # maximum number of lanes to be added in the test; mainly used for scalability tests
+
 
 [CCIP.Groups.load]
 # uncomment the following with specific values of lane combinations to be tested, if you want to run your tests to run only on these specific network pairs

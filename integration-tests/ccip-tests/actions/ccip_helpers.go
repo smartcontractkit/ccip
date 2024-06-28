@@ -44,7 +44,6 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/k8s/pkg/helm/mockserver"
 	"github.com/smartcontractkit/chainlink-testing-framework/k8s/pkg/helm/reorg"
 	"github.com/smartcontractkit/chainlink-testing-framework/networks"
-
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/contracts"
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/contracts/laneconfig"
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/testconfig"
@@ -2605,23 +2604,24 @@ func CCIPRequestFromTxHash(txHash common.Hash, chainClient blockchain.EVMClient)
 }
 
 type CCIPLane struct {
-	Test              *testing.T
-	Logger            *zerolog.Logger
-	SourceNetworkName string
-	DestNetworkName   string
-	SourceChain       blockchain.EVMClient
-	DestChain         blockchain.EVMClient
-	Source            *SourceCCIPModule
-	Dest              *DestCCIPModule
-	NumberOfReq       int
-	Reports           *testreporters.CCIPLaneStats
-	Balance           *BalanceSheet
-	SentReqs          map[common.Hash][]CCIPRequest
-	TotalFee          *big.Int // total fee for all the requests. Used for balance validation.
-	ValidationTimeout time.Duration
-	Context           context.Context
-	SrcNetworkLaneCfg *laneconfig.LaneConfig
-	DstNetworkLaneCfg *laneconfig.LaneConfig
+	Test                   *testing.T
+	Logger                 *zerolog.Logger
+	SourceNetworkName      string
+	DestNetworkName        string
+	SourceChain            blockchain.EVMClient
+	DestChain              blockchain.EVMClient
+	Source                 *SourceCCIPModule
+	Dest                   *DestCCIPModule
+	NumberOfReq            int
+	Reports                *testreporters.CCIPLaneStats
+	Balance                *BalanceSheet
+	SentReqs               map[common.Hash][]CCIPRequest
+	TotalFee               *big.Int // total fee for all the requests. Used for balance validation.
+	ValidationTimeout      time.Duration
+	Context                context.Context
+	SrcNetworkLaneCfg      *laneconfig.LaneConfig
+	DstNetworkLaneCfg      *laneconfig.LaneConfig
+	PriceReportingDisabled bool
 }
 
 func (lane *CCIPLane) TokenPricesConfig() (string, error) {
@@ -3642,6 +3642,23 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 	}
 
 	jobParams.P2PV2Bootstrappers = []string{p2pBootstrappersCommit.P2PV2Bootstrapper()}
+	if lane.PriceReportingDisabled {
+		reportingPluginConfig, err := json.Marshal([]byte(`{"PriceReportingDisabled": true,}`))
+		if err != nil {
+			return fmt.Errorf("error encoding report plugin config: %w", err)
+		}
+		if testConf.CommitOCRParams == nil {
+			bTime, err := lane.Dest.Common.AvgBlockTime(lane.Context)
+			if err != nil {
+				return fmt.Errorf("error getting block time for report plugin: %w", err)
+			}
+			OCRCommitParams := contracts.OCR2ParamsForCommit(bTime)
+			OCRCommitParams.ReportingPluginConfig = reportingPluginConfig
+			testConf.CommitOCRParams = &OCRCommitParams
+		} else {
+			testConf.CommitOCRParams.ReportingPluginConfig = reportingPluginConfig
+		}
+	}
 
 	err = SetOCR2Config(lane.Context, lane.Logger, *testConf, commitNodes, execNodes, *lane.Dest)
 	if err != nil {

@@ -68,6 +68,12 @@ type NetworkPair struct {
 	NetworkB     blockchain.EVMNetwork
 	ChainClientA blockchain.EVMClient
 	ChainClientB blockchain.EVMClient
+	Leader       Leader
+}
+
+type Leader struct {
+	BiDirectional  bool
+	UniDirectional bool
 }
 
 type CCIPTestConfig struct {
@@ -289,11 +295,42 @@ func (c *CCIPTestConfig) SetNetworkPairs(lggr zerolog.Logger) error {
 		c.NetworkPairs = c.NetworkPairs[:c.TestGroupInput.MaxNoOfLanes]
 	}
 
+	// setting leader lane details to network pairs if it is enabled
+	if c.EnvInput.Lane.LeaderLaneEnabled {
+		// the way we are doing this is to set first found network as leader bidirectionally and whichever the pair
+		//has the same network A will be uni-directionally marked as leader
+		firstNetworkA := ""
+		for idx, n := range c.NetworkPairs {
+			if firstNetworkA == "" {
+				firstNetworkA = n.NetworkA.Name
+				c.NetworkPairs[idx].Leader.BiDirectional = true
+				continue
+			}
+			if n.NetworkA.Name == firstNetworkA {
+				c.NetworkPairs[idx].Leader.UniDirectional = true
+			}
+		}
+	}
 	for _, n := range c.NetworkPairs {
-		lggr.Info().
-			Str("NetworkA", fmt.Sprintf("%s-%d", n.NetworkA.Name, n.NetworkA.ChainID)).
-			Str("NetworkB", fmt.Sprintf("%s-%d", n.NetworkB.Name, n.NetworkB.ChainID)).
-			Msg("Network Pairs")
+		if n.Leader.BiDirectional {
+			lggr.Info().
+				Str("NetworkA", fmt.Sprintf("%s-%d", n.NetworkA.Name, n.NetworkA.ChainID)).
+				Str("NetworkB", fmt.Sprintf("%s-%d", n.NetworkB.Name, n.NetworkB.ChainID)).
+				Str("Leader Lane", "Bidirectional").
+				Msg("Network Pairs")
+		} else if n.Leader.UniDirectional {
+			lggr.Info().
+				Str("NetworkA", fmt.Sprintf("%s-%d", n.NetworkA.Name, n.NetworkA.ChainID)).
+				Str("NetworkB", fmt.Sprintf("%s-%d", n.NetworkB.Name, n.NetworkB.ChainID)).
+				Str("Leader Lane", "Unidirectional").
+				Msg("Network Pairs")
+		} else {
+			lggr.Info().
+				Str("NetworkA", fmt.Sprintf("%s-%d", n.NetworkA.Name, n.NetworkA.ChainID)).
+				Str("NetworkB", fmt.Sprintf("%s-%d", n.NetworkB.Name, n.NetworkB.ChainID)).
+				Str("Leader Lane", "False").
+				Msg("Network Pairs")
+		}
 	}
 	lggr.Info().Int("Pairs", len(c.NetworkPairs)).Msg("No Of Lanes")
 
@@ -550,6 +587,7 @@ func (o *CCIPTestSetUpOutputs) AddLanesForNetworkPair(
 	lggr *zerolog.Logger,
 	networkA, networkB blockchain.EVMNetwork,
 	chainClientA, chainClientB blockchain.EVMClient,
+	leader Leader,
 ) error {
 	var (
 		t         = o.Cfg.Test
@@ -601,6 +639,10 @@ func (o *CCIPTestSetUpOutputs) AddLanesForNetworkPair(
 		TotalFee:          big.NewInt(0),
 		Balance:           o.Balance,
 		Context:           testcontext.Get(t),
+	}
+	// if it non leader lane, disable the price reporting
+	if !(leader.UniDirectional || leader.BiDirectional) {
+		ccipLaneA2B.PriceReportingDisabled = true
 	}
 	contractsA, ok := o.LaneContractsByNetwork.Load(networkA.Name)
 	if !ok {
@@ -655,6 +697,10 @@ func (o *CCIPTestSetUpOutputs) AddLanesForNetworkPair(
 			Context:           testcontext.Get(t),
 			SrcNetworkLaneCfg: ccipLaneA2B.DstNetworkLaneCfg,
 			DstNetworkLaneCfg: ccipLaneA2B.SrcNetworkLaneCfg,
+		}
+		// if it non leader lane, disable the price reporting
+		if !leader.BiDirectional {
+			ccipLaneB2A.PriceReportingDisabled = true
 		}
 		b2aLogger := lggr.With().Str("env", namespace).Str("Lane",
 			fmt.Sprintf("%s-->%s", ccipLaneB2A.SourceNetworkName, ccipLaneB2A.DestNetworkName)).Logger()
@@ -1005,7 +1051,7 @@ func CCIPDefaultTestSetUp(
 		laneAddGrp.Go(func() error {
 			return setUpArgs.AddLanesForNetworkPair(
 				lggr, n.NetworkA, n.NetworkB,
-				chainClientByChainID[n.NetworkA.ChainID], chainClientByChainID[n.NetworkB.ChainID],
+				chainClientByChainID[n.NetworkA.ChainID], chainClientByChainID[n.NetworkB.ChainID], n.Leader,
 			)
 		})
 	}
