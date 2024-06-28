@@ -90,27 +90,8 @@ func (c *CommitPluginCodecV1) Decode(ctx context.Context, bytes []byte) (cciptyp
 		return cciptypes.CommitPluginReport{}, fmt.Errorf("expected 1 argument, got %d", len(unpacked))
 	}
 
-	commitReport, is := unpacked[0].(struct {
-		PriceUpdates struct {
-			TokenPriceUpdates []struct {
-				SourceToken common.Address `json:"sourceToken"`
-				UsdPerToken *big.Int       `json:"usdPerToken"`
-			} `json:"tokenPriceUpdates"`
-			GasPriceUpdates []struct {
-				DestChainSelector uint64   `json:"destChainSelector"`
-				UsdPerUnitGas     *big.Int `json:"usdPerUnitGas"`
-			} `json:"gasPriceUpdates"`
-		} `json:"priceUpdates"`
-		MerkleRoots []struct {
-			SourceChainSelector uint64 `json:"sourceChainSelector"`
-			Interval            struct {
-				Min uint64 `json:"min"`
-				Max uint64 `json:"max"`
-			} `json:"interval"`
-			MerkleRoot [32]uint8 `json:"merkleRoot"`
-		} `json:"merkleRoots"`
-	})
-
+	commitReportRaw := abi.ConvertType(unpacked[0], new(evm_2_evm_multi_offramp.EVM2EVMMultiOffRampCommitReport))
+	commitReport, is := commitReportRaw.(*evm_2_evm_multi_offramp.EVM2EVMMultiOffRampCommitReport)
 	if !is {
 		return cciptypes.CommitPluginReport{},
 			fmt.Errorf("expected EVM2EVMMultiOffRampCommitReport, got %T", unpacked[0])
