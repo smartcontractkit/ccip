@@ -51,7 +51,6 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
   error TokenHandlingError(bytes error);
   error EmptyReport();
   error CursedByRMN(uint64 sourceChainSelector);
-  error InvalidMessageId(bytes32 messageId);
   error NotACompatiblePool(address notPool);
   error InvalidDataLength(uint256 expected, uint256 got);
   error InvalidNewState(uint64 sourceChainSelector, uint64 sequenceNumber, Internal.MessageExecutionState newState);
@@ -375,12 +374,8 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
       // We do this hash here instead of in _verifyMessages to avoid two separate loops
       // over the same data, which increases gas cost
       // TODO: verify message.destChainSelector == config.destChainSelector
+      // (alternatively, validate this in the commit() flow)
       hashedLeaves[i] = Internal._hash(message, sourceChainConfig.onRamp);
-      // TODO: revisit this - is messageID independent of the leaf hash?
-      // For EVM2EVM offramps, the messageID is the leaf hash.
-      // Asserting that this is true ensures we don't accidentally commit and then execute
-      // a message with an unexpected hash.
-      if (hashedLeaves[i] != message.header.messageId) revert InvalidMessageId(message.header.messageId);
     }
 
     // SECURITY CRITICAL CHECK

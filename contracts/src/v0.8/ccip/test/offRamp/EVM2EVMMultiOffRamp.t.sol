@@ -731,27 +731,17 @@ contract EVM2EVMMultiOffRamp_executeSingleReport is EVM2EVMMultiOffRampSetup {
 
   // Reverts
 
-  function test_InvalidMessageId_Revert() public {
-    Internal.Any2EVMRampMessage[] memory messages =
-      _generateSingleBasicMessage(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1);
-    messages[0].header.nonce++;
-    // MessageID no longer matches hash.
-    Internal.ExecutionReportSingleChain memory executionReport =
-      _generateReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messages);
-    vm.expectRevert(abi.encodeWithSelector(EVM2EVMMultiOffRamp.InvalidMessageId.selector, messages[0].header.messageId));
-    s_offRamp.executeSingleReport(executionReport, new uint256[](0));
-  }
-
-  function test_MismatchingSourceChainSelector_Revert() public {
-    Internal.Any2EVMRampMessage[] memory messages =
-      _generateSingleBasicMessage(SOURCE_CHAIN_SELECTOR_3, ON_RAMP_ADDRESS_3);
-    messages[0].header.sourceChainSelector = SOURCE_CHAIN_SELECTOR_1;
-    // MessageID no longer matches hash.
-    Internal.ExecutionReportSingleChain memory executionReport =
-      _generateReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messages);
-    vm.expectRevert(abi.encodeWithSelector(EVM2EVMMultiOffRamp.InvalidMessageId.selector, messages[0].header.messageId));
-    s_offRamp.executeSingleReport(executionReport, new uint256[](0));
-  }
+  // TODO: re-implement for mismatching dest chain selector
+  // function test_MismatchingSourceChainSelector_Revert() public {
+  //   Internal.Any2EVMRampMessage[] memory messages =
+  //     _generateSingleBasicMessage(SOURCE_CHAIN_SELECTOR_3, ON_RAMP_ADDRESS_3);
+  //   messages[0].header.sourceChainSelector = SOURCE_CHAIN_SELECTOR_1;
+  //   // MessageID no longer matches hash.
+  //   Internal.ExecutionReportSingleChain memory executionReport =
+  //     _generateReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messages);
+  //   vm.expectRevert(abi.encodeWithSelector(EVM2EVMMultiOffRamp.InvalidMessageId.selector, messages[0].header.messageId));
+  //   s_offRamp.executeSingleReport(executionReport, new uint256[](0));
+  // }
 
   // TODO: re-implement for mismatching OnRamp
   // function test_MismatchingMetadataHash_Revert() public {
