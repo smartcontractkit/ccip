@@ -54,9 +54,12 @@ compileContract () {
 # Contracts should be ordered in reverse-import-complexity-order to minimize overwrite risks.
 compileContract ccip/offRamp/EVM2EVMOffRamp.sol
 compileContract ccip/offRamp/EVM2EVMMultiOffRamp.sol
-compileContract ccip/applications/PingPongDemo.sol
-compileContract ccip/applications/SelfFundedPingPong.sol
-compileContract ccip/applications/EtherSenderReceiver.sol
+compileContract ccip/applications/internal/PingPongDemo.sol
+compileContract ccip/applications/internal/SelfFundedPingPong.sol
+compileContract ccip/applications/external/CCIPClient.sol
+compileContract ccip/applications/external/CCIPReceiver.sol
+compileContract ccip/applications/external/CCIPReceiverWithACK.sol
+compileContract ccip/applications/external/CCIPSender.sol
 compileContract ccip/onRamp/EVM2EVMMultiOnRamp.sol
 compileContract ccip/onRamp/EVM2EVMOnRamp.sol
 compileContract ccip/CommitStore.sol
@@ -76,6 +79,8 @@ compileContract ccip/ARMProxy.sol
 compileContract ccip/tokenAdminRegistry/TokenAdminRegistry.sol
 compileContract ccip/tokenAdminRegistry/RegistryModuleOwnerCustom.sol
 compileContract ccip/capability/CCIPConfig.sol
+
+
 
 # Test helpers
 compileContract ccip/test/helpers/BurnMintERC677Helper.sol
