@@ -1,6 +1,7 @@
 package execute
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"sort"
@@ -8,6 +9,8 @@ import (
 	mapset "github.com/deckarep/golang-set/v2"
 	"golang.org/x/crypto/sha3"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/hashutil"
+	"github.com/smartcontractkit/chainlink-common/pkg/merklemulti"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
@@ -331,4 +334,40 @@ func markNewMessagesExecuted(
 		func(i, j int) bool { return report.ExecutedMessages[i] < report.ExecutedMessages[j] })
 
 	return report
+}
+
+// constructMerkleTree creates the merkle tree object from the messages in the report.
+func constructMerkleTree(
+	ctx context.Context,
+	hasher cciptypes.MessageHasher,
+	report cciptypes.ExecutePluginCommitDataWithMessages,
+) (*merklemulti.Tree[[32]byte], error) {
+	// Ensure we have the expected number of messages
+	numMsgs := int(report.SequenceNumberRange.End() - report.SequenceNumberRange.Start() + 1)
+	if numMsgs != len(report.Messages) {
+		return nil, fmt.Errorf(
+			"malformed report %s, unexpected number of messages: expected %d, got %d",
+			report.MerkleRoot.String(), numMsgs, len(report.Messages))
+	}
+
+	treeLeaves := make([][32]byte, 0)
+	for _, msg := range report.Messages {
+		if !report.SequenceNumberRange.Contains(msg.SeqNum) {
+			return nil, fmt.Errorf(
+				"malformed report, message %s sequence number %d outside of report range %s",
+				report.MerkleRoot.String(), msg.SeqNum, report.SequenceNumberRange)
+		}
+		if report.SourceChain != msg.SourceChain {
+			return nil, fmt.Errorf("malformed report, message %s for unexpected source chain: expected %d, got %d",
+				report.MerkleRoot.String(), report.SourceChain, msg.SourceChain)
+		}
+		leaf, err := hasher.Hash(ctx, msg)
+		if err != nil {
+			return nil, fmt.Errorf("unable to hash message (%d, %d): %w", msg.SourceChain, msg.SeqNum, err)
+		}
+		treeLeaves = append(treeLeaves, leaf)
+	}
+
+	// TODO: Do not hard code the hash function, it should be derived from the message hasher.
+	return merklemulti.NewTree(hashutil.NewKeccak(), treeLeaves)
 }
