@@ -47,7 +47,7 @@ var randomReport = cciptypes.CommitPluginReport{
 }
 
 func TestCommitPluginCodec(t *testing.T) {
-	commitCodec := NewCommitPluginCodec()
+	commitCodec := NewCommitPluginCodecV1()
 	ctx := testutils.Context(t)
 	encodedReport, err := commitCodec.Encode(ctx, randomReport)
 	require.NoError(t, err)
@@ -57,7 +57,7 @@ func TestCommitPluginCodec(t *testing.T) {
 }
 
 func BenchmarkCommitPluginCodec_Encode(b *testing.B) {
-	commitCodec := NewCommitPluginCodec()
+	commitCodec := NewCommitPluginCodecV1()
 	ctx := testutils.Context(b)
 
 	for i := 0; i < b.N; i++ {
@@ -67,7 +67,7 @@ func BenchmarkCommitPluginCodec_Encode(b *testing.B) {
 }
 
 func BenchmarkCommitPluginCodec_Decode(b *testing.B) {
-	commitCodec := NewCommitPluginCodec()
+	commitCodec := NewCommitPluginCodecV1()
 	ctx := testutils.Context(b)
 	encodedReport, err := commitCodec.Encode(ctx, randomReport)
 	require.NoError(b, err)

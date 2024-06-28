@@ -15,23 +15,23 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 )
 
-// CommitPluginCodec is a codec for encoding and decoding commit plugin reports.
+// CommitPluginCodecV1 is a codec for encoding and decoding commit plugin reports.
 // Compatible with:
 // - "EVM2EVMMultiOffRamp 1.6.0-dev"
-type CommitPluginCodec struct {
+type CommitPluginCodecV1 struct {
 	commitReportAcceptedEventInputs abi.Arguments
 }
 
-func NewCommitPluginCodec() *CommitPluginCodec {
+func NewCommitPluginCodecV1() *CommitPluginCodecV1 {
 	abiParsed, err := abi.JSON(strings.NewReader(evm_2_evm_multi_offramp.EVM2EVMMultiOffRampABI))
 	if err != nil {
 		panic(fmt.Errorf("parse multi offramp abi: %s", err))
 	}
 	eventInputs := abihelpers.MustGetEventInputs("CommitReportAccepted", abiParsed)
-	return &CommitPluginCodec{commitReportAcceptedEventInputs: eventInputs}
+	return &CommitPluginCodecV1{commitReportAcceptedEventInputs: eventInputs}
 }
 
-func (c *CommitPluginCodec) Encode(ctx context.Context, report cciptypes.CommitPluginReport) ([]byte, error) {
+func (c *CommitPluginCodecV1) Encode(ctx context.Context, report cciptypes.CommitPluginReport) ([]byte, error) {
 	merkleRoots := make([]evm_2_evm_multi_offramp.EVM2EVMMultiOffRampMerkleRoot, 0, len(report.MerkleRoots))
 	for _, root := range report.MerkleRoots {
 		merkleRoots = append(merkleRoots, evm_2_evm_multi_offramp.EVM2EVMMultiOffRampMerkleRoot{
@@ -81,7 +81,7 @@ func (c *CommitPluginCodec) Encode(ctx context.Context, report cciptypes.CommitP
 	return c.commitReportAcceptedEventInputs.PackValues([]interface{}{evmReport})
 }
 
-func (c *CommitPluginCodec) Decode(ctx context.Context, bytes []byte) (cciptypes.CommitPluginReport, error) {
+func (c *CommitPluginCodecV1) Decode(ctx context.Context, bytes []byte) (cciptypes.CommitPluginReport, error) {
 	unpacked, err := c.commitReportAcceptedEventInputs.Unpack(bytes)
 	if err != nil {
 		return cciptypes.CommitPluginReport{}, err
@@ -154,4 +154,4 @@ func (c *CommitPluginCodec) Decode(ctx context.Context, bytes []byte) (cciptypes
 }
 
 // Ensure CommitPluginCodec implements the CommitPluginCodec interface
-var _ cciptypes.CommitPluginCodec = (*CommitPluginCodec)(nil)
+var _ cciptypes.CommitPluginCodec = (*CommitPluginCodecV1)(nil)
