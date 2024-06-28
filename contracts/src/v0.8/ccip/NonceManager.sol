@@ -103,7 +103,7 @@ contract NonceManager is INonceManager, AuthorizedCallers {
     if (inboundNonce == 0) {
       address prevOffRamp = s_previousRamps[sourceChainSelector].prevOffRamp;
       if (prevOffRamp != address(0)) {
-        // We only EVM previous offRamps here so we can safely decode the sender
+        // We only expect EVM previous offRamps here so we can safely decode the sender
         return IEVM2AnyOnRamp(prevOffRamp).getSenderNonce(abi.decode(sender, (address)));
       }
     }
