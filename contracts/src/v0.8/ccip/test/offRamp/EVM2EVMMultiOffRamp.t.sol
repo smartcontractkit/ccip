@@ -428,6 +428,53 @@ contract EVM2EVMMultiOffRamp_executeSingleReport is EVM2EVMMultiOffRampSetup {
     assertGt(s_offRamp.getSenderNonce(SOURCE_CHAIN_SELECTOR_1, messages[0].sender), nonceBefore);
   }
 
+  function test_SingleMessageNoTokensUnordered_Success() public {
+    Internal.EVM2EVMMessage[] memory messages = _generateSingleBasicMessage(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1);
+    messages[0].nonce = 0;
+    messages[0].messageId =
+      Internal._hash(messages[0], s_offRamp.metadataHash(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1));
+
+    vm.expectEmit();
+    emit EVM2EVMMultiOffRamp.ExecutionStateChanged(
+      messages[0].sourceChainSelector,
+      messages[0].sequenceNumber,
+      messages[0].messageId,
+      Internal.MessageExecutionState.SUCCESS,
+      ""
+    );
+
+    // Nonce never increments on unordered messages.
+    uint64 nonceBefore = s_offRamp.getSenderNonce(SOURCE_CHAIN_SELECTOR_1, messages[0].sender);
+    s_offRamp.executeSingleReport(_generateReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messages), new uint256[](0));
+    assertEq(
+      s_offRamp.getSenderNonce(SOURCE_CHAIN_SELECTOR_1, messages[0].sender),
+      nonceBefore,
+      "nonce must remain unchanged on unordered messages"
+    );
+
+    messages[0].sequenceNumber++;
+    messages[0].messageId =
+      Internal._hash(messages[0], s_offRamp.metadataHash(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1));
+
+    vm.expectEmit();
+    emit EVM2EVMMultiOffRamp.ExecutionStateChanged(
+      messages[0].sourceChainSelector,
+      messages[0].sequenceNumber,
+      messages[0].messageId,
+      Internal.MessageExecutionState.SUCCESS,
+      ""
+    );
+
+    // Nonce never increments on unordered messages.
+    nonceBefore = s_offRamp.getSenderNonce(SOURCE_CHAIN_SELECTOR_1, messages[0].sender);
+    s_offRamp.executeSingleReport(_generateReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messages), new uint256[](0));
+    assertEq(
+      s_offRamp.getSenderNonce(SOURCE_CHAIN_SELECTOR_1, messages[0].sender),
+      nonceBefore,
+      "nonce must remain unchanged on unordered messages"
+    );
+  }
+
   function test_SingleMessageNoTokensOtherChain_Success() public {
     Internal.EVM2EVMMessage[] memory messagesChain1 =
       _generateSingleBasicMessage(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1);
@@ -519,6 +566,29 @@ contract EVM2EVMMultiOffRamp_executeSingleReport is EVM2EVMMultiOffRampSetup {
 
   function test__execute_SkippedAlreadyExecutedMessage_Success() public {
     Internal.EVM2EVMMessage[] memory messages = _generateSingleBasicMessage(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1);
+
+    vm.expectEmit();
+    emit EVM2EVMMultiOffRamp.ExecutionStateChanged(
+      messages[0].sourceChainSelector,
+      messages[0].sequenceNumber,
+      messages[0].messageId,
+      Internal.MessageExecutionState.SUCCESS,
+      ""
+    );
+
+    s_offRamp.executeSingleReport(_generateReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messages), new uint256[](0));
+
+    vm.expectEmit();
+    emit EVM2EVMMultiOffRamp.SkippedAlreadyExecutedMessage(SOURCE_CHAIN_SELECTOR_1, messages[0].sequenceNumber);
+
+    s_offRamp.executeSingleReport(_generateReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messages), new uint256[](0));
+  }
+
+  function test__execute_SkippedAlreadyExecutedMessageUnordered_Success() public {
+    Internal.EVM2EVMMessage[] memory messages = _generateSingleBasicMessage(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1);
+    messages[0].nonce = 0;
+    messages[0].messageId =
+      Internal._hash(messages[0], s_offRamp.metadataHash(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1));
 
     vm.expectEmit();
     emit EVM2EVMMultiOffRamp.ExecutionStateChanged(
@@ -641,6 +711,49 @@ contract EVM2EVMMultiOffRamp_executeSingleReport is EVM2EVMMultiOffRampSetup {
     assertEq(uint64(2), s_offRamp.getSenderNonce(SOURCE_CHAIN_SELECTOR_1, OWNER));
   }
 
+  function test_Fuzz_InterleavingOrderedAndUnorderedMessages_Success(bool[7] memory orderings) public {
+    Internal.EVM2EVMMessage[] memory messages = new Internal.EVM2EVMMessage[](orderings.length);
+    // number of tokens needs to be capped otherwise we hit UnsupportedNumberOfTokens.
+    Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](3);
+    for (uint256 i = 0; i < 3; ++i) {
+      tokenAmounts[i].token = s_sourceTokens[i % s_sourceTokens.length];
+      tokenAmounts[i].amount = 1e18;
+    }
+    uint64 expectedNonce = 0;
+    for (uint256 i = 0; i < orderings.length; ++i) {
+      messages[i] =
+        _generateAny2EVMMessage(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1, uint64(i + 1), tokenAmounts, !orderings[i]);
+      if (orderings[i]) {
+        messages[i].nonce = ++expectedNonce;
+      }
+      messages[i].messageId =
+        Internal._hash(messages[i], s_offRamp.metadataHash(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1));
+
+      vm.expectEmit();
+      emit EVM2EVMMultiOffRamp.ExecutionStateChanged(
+        SOURCE_CHAIN_SELECTOR_1,
+        messages[i].sequenceNumber,
+        messages[i].messageId,
+        Internal.MessageExecutionState.SUCCESS,
+        ""
+      );
+    }
+
+    uint64 nonceBefore = s_offRamp.getSenderNonce(SOURCE_CHAIN_SELECTOR_1, OWNER);
+    assertEq(uint64(0), nonceBefore, "nonce before exec should be 0");
+    s_offRamp.executeSingleReport(
+      _generateReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messages), _getGasLimitsFromMessages(messages)
+    );
+    // all executions should succeed.
+    for (uint256 i = 0; i < orderings.length; ++i) {
+      assertEq(
+        uint256(s_offRamp.getExecutionState(SOURCE_CHAIN_SELECTOR_1, messages[i].sequenceNumber)),
+        uint256(Internal.MessageExecutionState.SUCCESS)
+      );
+    }
+    assertEq(nonceBefore + expectedNonce, s_offRamp.getSenderNonce(SOURCE_CHAIN_SELECTOR_1, OWNER));
+  }
+
   function test_InvalidSourcePoolAddress_Success() public {
     address fakePoolAddress = address(0x0000000000333333);
 
@@ -674,9 +787,7 @@ contract EVM2EVMMultiOffRamp_executeSingleReport is EVM2EVMMultiOffRampSetup {
   }
 
   function test_WithCurseOnAnotherSourceChain_Success() public {
-    s_mockRMN.voteToCurse(
-      0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff, bytes16(uint128(SOURCE_CHAIN_SELECTOR_2))
-    );
+    s_mockRMN.setChainCursed(SOURCE_CHAIN_SELECTOR_2, true);
     s_offRamp.executeSingleReport(
       _generateReportFromMessages(
         SOURCE_CHAIN_SELECTOR_1, _generateMessagesWithTokens(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1)
@@ -719,7 +830,7 @@ contract EVM2EVMMultiOffRamp_executeSingleReport is EVM2EVMMultiOffRampSetup {
   }
 
   function test_Unhealthy_Revert() public {
-    s_mockRMN.voteToCurse(bytes16(type(uint128).max));
+    s_mockRMN.setGlobalCursed(true);
     vm.expectRevert(abi.encodeWithSelector(EVM2EVMMultiOffRamp.CursedByRMN.selector, SOURCE_CHAIN_SELECTOR_1));
     s_offRamp.executeSingleReport(
       _generateReportFromMessages(
@@ -728,9 +839,7 @@ contract EVM2EVMMultiOffRamp_executeSingleReport is EVM2EVMMultiOffRampSetup {
       new uint256[](0)
     );
     // Uncurse should succeed
-    RMN.UnvoteToCurseRecord[] memory records = new RMN.UnvoteToCurseRecord[](1);
-    records[0] = RMN.UnvoteToCurseRecord({curseVoteAddr: OWNER, cursesHash: bytes32(uint256(0)), forceUnvote: true});
-    s_mockRMN.ownerUnvoteToCurse(records);
+    s_mockRMN.setGlobalCursed(false);
     s_offRamp.executeSingleReport(
       _generateReportFromMessages(
         SOURCE_CHAIN_SELECTOR_1, _generateMessagesWithTokens(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1)
@@ -740,8 +849,7 @@ contract EVM2EVMMultiOffRamp_executeSingleReport is EVM2EVMMultiOffRampSetup {
   }
 
   function test_UnhealthySingleChainCurse_Revert() public {
-    bytes16 subject = bytes16(uint128(SOURCE_CHAIN_SELECTOR_1));
-    s_mockRMN.voteToCurse(0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff, subject);
+    s_mockRMN.setChainCursed(SOURCE_CHAIN_SELECTOR_1, true);
     vm.expectRevert(abi.encodeWithSelector(EVM2EVMMultiOffRamp.CursedByRMN.selector, SOURCE_CHAIN_SELECTOR_1));
     s_offRamp.executeSingleReport(
       _generateReportFromMessages(
@@ -750,9 +858,7 @@ contract EVM2EVMMultiOffRamp_executeSingleReport is EVM2EVMMultiOffRampSetup {
       new uint256[](0)
     );
     // Uncurse should succeed
-    RMN.UnvoteToCurseRecord[] memory records = new RMN.UnvoteToCurseRecord[](1);
-    records[0] = RMN.UnvoteToCurseRecord({curseVoteAddr: OWNER, cursesHash: bytes32(uint256(0)), forceUnvote: true});
-    s_mockRMN.ownerUnvoteToCurse(records, subject);
+    s_mockRMN.setChainCursed(SOURCE_CHAIN_SELECTOR_1, false);
     s_offRamp.executeSingleReport(
       _generateReportFromMessages(
         SOURCE_CHAIN_SELECTOR_1, _generateMessagesWithTokens(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1)
@@ -1456,7 +1562,7 @@ contract EVM2EVMMultiOffRamp_batchExecute is EVM2EVMMultiOffRampSetup {
   }
 
   function test_Unhealthy_Revert() public {
-    s_mockRMN.voteToCurse(bytes16(type(uint128).max));
+    s_mockRMN.setGlobalCursed(true);
     vm.expectRevert(abi.encodeWithSelector(EVM2EVMMultiOffRamp.CursedByRMN.selector, SOURCE_CHAIN_SELECTOR_1));
     s_offRamp.batchExecute(
       _generateBatchReportFromMessages(
@@ -1465,9 +1571,7 @@ contract EVM2EVMMultiOffRamp_batchExecute is EVM2EVMMultiOffRampSetup {
       new uint256[][](1)
     );
     // Uncurse should succeed
-    RMN.UnvoteToCurseRecord[] memory records = new RMN.UnvoteToCurseRecord[](1);
-    records[0] = RMN.UnvoteToCurseRecord({curseVoteAddr: OWNER, cursesHash: bytes32(uint256(0)), forceUnvote: true});
-    s_mockRMN.ownerUnvoteToCurse(records);
+    s_mockRMN.setGlobalCursed(false);
     s_offRamp.batchExecute(
       _generateBatchReportFromMessages(
         SOURCE_CHAIN_SELECTOR_1, _generateMessagesWithTokens(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1)
@@ -3124,63 +3228,6 @@ contract EVM2EVMMultiOffRamp_applySourceChainConfigUpdates is EVM2EVMMultiOffRam
   }
 }
 
-contract EVM2EVMMultiOffRamp_setLatestPriceSequenceNumber is EVM2EVMMultiOffRampSetup {
-  function test_setLatestPriceSequenceNumber_Success() public {
-    uint64 latestSequenceNumber = 1782155;
-
-    vm.expectEmit();
-    emit EVM2EVMMultiOffRamp.LatestPriceSequenceNumberSet(
-      s_offRamp.getLatestPriceSequenceNumber(), latestSequenceNumber
-    );
-
-    s_offRamp.setLatestPriceSequenceNumber(latestSequenceNumber);
-    assertEq(s_offRamp.getLatestPriceSequenceNumber(), latestSequenceNumber);
-  }
-
-  function test_PriceEpochCleared_Success() public {
-    // Set latest price epoch and round to non-zero.
-    uint64 latestSequenceNumber = 1782155;
-    s_offRamp.setLatestPriceSequenceNumber(latestSequenceNumber);
-    assertEq(latestSequenceNumber, s_offRamp.getLatestPriceSequenceNumber());
-
-    MultiOCR3Base.OCRConfigArgs[] memory ocrConfigs = new MultiOCR3Base.OCRConfigArgs[](1);
-    ocrConfigs[0] = MultiOCR3Base.OCRConfigArgs({
-      ocrPluginType: uint8(Internal.OCRPluginType.Execution),
-      configDigest: s_configDigestExec,
-      F: s_F,
-      isSignatureVerificationEnabled: false,
-      signers: s_emptySigners,
-      transmitters: s_validTransmitters
-    });
-    s_offRamp.setOCR3Configs(ocrConfigs);
-
-    // Execution plugin OCR config should not clear latest epoch and round
-    assertEq(latestSequenceNumber, s_offRamp.getLatestPriceSequenceNumber());
-
-    // Commit plugin config should clear latest epoch & round
-    ocrConfigs[0] = MultiOCR3Base.OCRConfigArgs({
-      ocrPluginType: uint8(Internal.OCRPluginType.Commit),
-      configDigest: s_configDigestCommit,
-      F: s_F,
-      isSignatureVerificationEnabled: true,
-      signers: s_validSigners,
-      transmitters: s_validTransmitters
-    });
-    s_offRamp.setOCR3Configs(ocrConfigs);
-
-    // Assert cleared.
-    assertEq(0, s_offRamp.getLatestPriceSequenceNumber());
-  }
-
-  // Reverts
-
-  function test_OnlyOwner_Revert() public {
-    vm.stopPrank();
-    vm.expectRevert("Only callable by owner");
-    s_offRamp.setLatestPriceSequenceNumber(6723);
-  }
-}
-
 contract EVM2EVMMultiOffRamp_commit is EVM2EVMMultiOffRampSetup {
   uint64 internal s_maxInterval = 12;
 
@@ -3311,6 +3358,54 @@ contract EVM2EVMMultiOffRamp_commit is EVM2EVMMultiOffRampSetup {
     assertEq(s_latestSequenceNumber, s_offRamp.getLatestPriceSequenceNumber());
   }
 
+  function test_PriceSequenceNumberCleared_Success() public {
+    EVM2EVMMultiOffRamp.MerkleRoot[] memory roots = new EVM2EVMMultiOffRamp.MerkleRoot[](0);
+    EVM2EVMMultiOffRamp.CommitReport memory commitReport = EVM2EVMMultiOffRamp.CommitReport({
+      priceUpdates: getSingleTokenPriceUpdateStruct(s_sourceFeeToken, 4e18),
+      merkleRoots: roots
+    });
+
+    vm.expectEmit();
+    emit PriceRegistry.UsdPerTokenUpdated(s_sourceFeeToken, 4e18, block.timestamp);
+    _commit(commitReport, s_latestSequenceNumber);
+
+    assertEq(s_latestSequenceNumber, s_offRamp.getLatestPriceSequenceNumber());
+
+    vm.startPrank(OWNER);
+    MultiOCR3Base.OCRConfigArgs[] memory ocrConfigs = new MultiOCR3Base.OCRConfigArgs[](1);
+    ocrConfigs[0] = MultiOCR3Base.OCRConfigArgs({
+      ocrPluginType: uint8(Internal.OCRPluginType.Execution),
+      configDigest: s_configDigestExec,
+      F: s_F,
+      isSignatureVerificationEnabled: false,
+      signers: s_emptySigners,
+      transmitters: s_validTransmitters
+    });
+    s_offRamp.setOCR3Configs(ocrConfigs);
+
+    // Execution plugin OCR config should not clear latest epoch and round
+    assertEq(s_latestSequenceNumber, s_offRamp.getLatestPriceSequenceNumber());
+
+    // Commit plugin config should clear latest epoch & round
+    ocrConfigs[0] = MultiOCR3Base.OCRConfigArgs({
+      ocrPluginType: uint8(Internal.OCRPluginType.Commit),
+      configDigest: s_configDigestCommit,
+      F: s_F,
+      isSignatureVerificationEnabled: true,
+      signers: s_validSigners,
+      transmitters: s_validTransmitters
+    });
+    s_offRamp.setOCR3Configs(ocrConfigs);
+
+    assertEq(0, s_offRamp.getLatestPriceSequenceNumber());
+
+    // The same sequence number can be reported again
+    vm.expectEmit();
+    emit PriceRegistry.UsdPerTokenUpdated(s_sourceFeeToken, 4e18, block.timestamp);
+
+    _commit(commitReport, s_latestSequenceNumber);
+  }
+
   function test_ValidPriceUpdateThenStaleReportWithRoot_Success() public {
     uint64 maxSeq = 12;
     uint224 tokenPrice1 = 4e18;
@@ -3429,7 +3524,7 @@ contract EVM2EVMMultiOffRamp_commit is EVM2EVMMultiOffRampSetup {
   }
 
   function test_Unhealthy_Revert() public {
-    s_mockRMN.voteToCurse(0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff);
+    s_mockRMN.setGlobalCursed(true);
     EVM2EVMMultiOffRamp.MerkleRoot[] memory roots = new EVM2EVMMultiOffRamp.MerkleRoot[](1);
     roots[0] = EVM2EVMMultiOffRamp.MerkleRoot({
       sourceChainSelector: SOURCE_CHAIN_SELECTOR_1,

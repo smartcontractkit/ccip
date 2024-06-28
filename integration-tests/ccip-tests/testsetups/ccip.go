@@ -74,7 +74,7 @@ type CCIPTestConfig struct {
 	Test                *testing.T
 	EnvInput            *testconfig.Common
 	TestGroupInput      *testconfig.CCIPTestGroupConfig
-	VersionInput        map[string]*contracts.ContractVersion
+	VersionInput        map[contracts.Name]contracts.Version
 	ContractsInput      *testconfig.CCIPContractConfig
 	AllNetworks         map[string]blockchain.EVMNetwork
 	SelectedNetworks    []blockchain.EVMNetwork
@@ -313,22 +313,11 @@ func (c *CCIPTestConfig) SetContractVersion() error {
 		return nil
 	}
 	for contractName, version := range c.VersionInput {
-		if version != nil {
-			if _, ok := contracts.VersionMap[contractName]; !ok {
-				return fmt.Errorf("contract versioning is not supported for %s, versioning is supported for %v",
-					contractName, contracts.SupportedContracts)
-			}
-			supportedVersions, ok := contracts.SupportedContracts[contractName]
-			if !ok {
-				return fmt.Errorf("contract %s is not supported, versioning is supported for %v",
-					contractName, contracts.SupportedContracts)
-			}
-			if valid, exists := supportedVersions[*version]; !exists || !valid {
-				return fmt.Errorf("contract %s does not support version %s, versioning is supported for %v",
-					contractName, *version, supportedVersions)
-			}
-			contracts.VersionMap[contractName] = *version
+		err := contracts.CheckVersionSupported(contractName, version)
+		if err != nil {
+			return err
 		}
+		contracts.VersionMap[contractName] = version
 	}
 	return nil
 }
@@ -358,14 +347,39 @@ func (c *CCIPTestConfig) SetOCRParams() error {
 
 // TestConfigOverrideOption is a function that modifies the test config and overrides any values passed in by test files
 // This is useful for setting up test specific configurations.
+// The return should be a short, explanatory string that describes the change made by the override.
+// This is logged at the beginning of the test run.
 type TestConfigOverrideOption func(*CCIPTestConfig) string
 
-// WithCCIPOwnerTokens dictates that tokens be deployed and owned by the same account that owns all CCIP contracts.
-// With Self-Serve tokens, this is unrealistic.
-func WithCCIPOwnerTokens() TestConfigOverrideOption {
+// UseCCIPOwnerTokens defines whether all tokens are deployed by the same address as the CCIP owner
+func UseCCIPOwnerTokens(yes bool) TestConfigOverrideOption {
 	return func(c *CCIPTestConfig) string {
-		c.TestGroupInput.TokenConfig.CCIPOwnerTokens = pointer.ToBool(true)
-		return "CCIPOwnerTokens set to true"
+		c.TestGroupInput.TokenConfig.CCIPOwnerTokens = pointer.ToBool(yes)
+		return fmt.Sprintf("CCIPOwnerTokens set to %t", yes)
+	}
+}
+
+// WithTokensPerChain sets the number of tokens to deploy on each chain
+func WithTokensPerChain(count int) TestConfigOverrideOption {
+	return func(c *CCIPTestConfig) string {
+		c.TestGroupInput.TokenConfig.NoOfTokensPerChain = pointer.ToInt(count)
+		return fmt.Sprintf("NoOfTokensPerChain set to %d", count)
+	}
+}
+
+// WithMsgDetails sets the message details for the test
+func WithMsgDetails(details *testconfig.MsgDetails) TestConfigOverrideOption {
+	return func(c *CCIPTestConfig) string {
+		c.TestGroupInput.MsgDetails = details
+		return "Message set"
+	}
+}
+
+// WithNoTokensPerMessage sets how many tokens can be sent in a single message
+func WithNoTokensPerMessage(noOfTokens int) TestConfigOverrideOption {
+	return func(c *CCIPTestConfig) string {
+		c.TestGroupInput.MsgDetails.NoOfTokens = pointer.ToInt(noOfTokens)
+		return fmt.Sprintf("MsgDetails.NoOfTokens set to %d", noOfTokens)
 	}
 }
 
@@ -918,6 +932,7 @@ func CCIPDefaultTestSetUp(
 	if testConfig.useSeparateTokenDeployer() {
 		for _, net := range testConfig.AllNetworks {
 			chainClient := chainClientByChainID[net.ChainID]
+			require.NotNil(t, chainClient, "Chain client not found for chainID %d", net.ChainID)
 			require.GreaterOrEqual(t, len(chainClient.GetWallets()), 2, "The test is using a TokenAdminRegistry, and has CCIPOwnerTokens set to 'false'. The test needs a second wallet to deploy token contracts from. Please add a second wallet to the 'evm_clients' config option.")
 			tokenDeployerWallet := chainClient.GetWallets()[1]
 			// TODO: This is a total guess at how much funds we need to deploy the tokens. This could be way off, especially on live chains.
@@ -1212,8 +1227,7 @@ func (o *CCIPTestSetUpOutputs) CreateEnvironment(
 				return
 			}
 			lggr.Info().Msg("Tearing down the environment")
-			err = integrationactions.TeardownSuite(t, ccipEnv.K8Env, ccipEnv.CLNodes, o.Reporter,
-				zapcore.DPanicLevel, o.Cfg.EnvInput, chains...)
+			err = integrationactions.TeardownSuite(t, nil, ccipEnv.K8Env, ccipEnv.CLNodes, o.Reporter, zapcore.DPanicLevel, o.Cfg.EnvInput)
 			require.NoError(t, err, "Environment teardown shouldn't fail")
 		} else {
 			//just send the report

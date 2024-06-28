@@ -3,6 +3,7 @@ package models
 import (
 	"errors"
 	"fmt"
+	"math/big"
 	"slices"
 )
 
@@ -19,6 +20,11 @@ type RebalancerConfig struct {
 	Type string `json:"type"`
 }
 
+type NetworkTarget struct {
+	Network NetworkSelector `json:"network,string"`
+	Target  *big.Int        `json:"target"`
+}
+
 func ValidateRebalancerConfig(config RebalancerConfig) error {
 	if config.Type == "" {
 		return errors.New("rebalancerType must be provided")
@@ -32,6 +38,7 @@ func ValidateRebalancerConfig(config RebalancerConfig) error {
 }
 
 const (
+	RebalancerTypeTargetAndMin = "target-and-min"
 	RebalancerTypeMinLiquidity = "min-liquidity"
 	RebalancerTypePingPong     = "ping-pong"
 )

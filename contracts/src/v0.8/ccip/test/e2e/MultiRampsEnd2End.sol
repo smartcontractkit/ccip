@@ -157,6 +157,9 @@ contract MultiRampsE2E is EVM2EVMMultiOnRampSetup, EVM2EVMMultiOffRampSetup {
     _commit(report, ++s_latestSequenceNumber);
     vm.pauseGasMetering();
 
+    s_mockRMN.setTaggedRootBlessed(IRMN.TaggedRoot({commitStore: address(s_offRamp), root: merkleRoots[0]}), true);
+    s_mockRMN.setTaggedRootBlessed(IRMN.TaggedRoot({commitStore: address(s_offRamp), root: merkleRoots[1]}), true);
+
     bytes32[] memory proofs = new bytes32[](0);
     bytes32[] memory hashedLeaves = new bytes32[](1);
     hashedLeaves[0] = merkleRoots[0];
@@ -204,7 +207,7 @@ contract MultiRampsE2E is EVM2EVMMultiOnRampSetup, EVM2EVMMultiOffRampSetup {
     reports[1] = _generateReportFromMessages(SOURCE_CHAIN_SELECTOR + 1, messages2);
 
     vm.resumeGasMetering();
-    s_offRamp.batchExecute(reports, new uint256[][](0));
+    _execute(reports);
   }
 
   function _sendRequest(
@@ -223,7 +226,15 @@ contract MultiRampsE2E is EVM2EVMMultiOnRampSetup, EVM2EVMMultiOffRampSetup {
 
     message.receiver = abi.encode(address(s_receiver));
     Internal.EVM2EVMMessage memory msgEvent = _messageToEvent(
-      message, sourceChainSelector, expectedSeqNum, nonce, expectedFee, OWNER, metadataHash, tokenAdminRegistry
+      message,
+      sourceChainSelector,
+      DEST_CHAIN_SELECTOR,
+      expectedSeqNum,
+      nonce,
+      expectedFee,
+      OWNER,
+      metadataHash,
+      tokenAdminRegistry
     );
 
     vm.expectEmit();
