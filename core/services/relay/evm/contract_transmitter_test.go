@@ -55,10 +55,11 @@ func TestContractTransmitter(t *testing.T) {
 	c.On("CallContract", mock.Anything, mock.Anything, mock.Anything).Return(digestAndEpochDontScanLogs, nil).Once()
 	contractABI, _ := abi.JSON(strings.NewReader(ocr2aggregator.OCR2AggregatorMetaData.ABI))
 	lp.On("RegisterFilter", mock.Anything, mock.Anything).Return(nil)
+	reportToEvmTxMeta := func(b []byte) (*txmgr.TxMeta, error) {
+		return &txmgr.TxMeta{}, nil
+	}
 	ot, err := NewOCRContractTransmitter(ctx, gethcommon.Address{}, c, contractABI, &mockTransmitter{}, lp, lggr,
-		WithReportToEthMetadata(func(b []byte) (*txmgr.TxMeta, error) {
-			return &txmgr.TxMeta{}, nil
-		}))
+		WithReportToEthMetadata(reportToEvmTxMeta))
 	require.NoError(t, err)
 	digest, epoch, err := ot.LatestConfigDigestAndEpoch(testutils.Context(t))
 	require.NoError(t, err)

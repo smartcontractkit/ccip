@@ -56,7 +56,9 @@ func WithRetention(retention time.Duration) OCRTransmitterOption {
 
 func WithReportToEthMetadata(reportToEvmTxMeta ReportToEthMetadata) OCRTransmitterOption {
 	return func(ct *contractTransmitter) {
-		ct.reportToEvmTxMeta = reportToEvmTxMeta
+		if reportToEvmTxMeta != nil {
+			ct.reportToEvmTxMeta = reportToEvmTxMeta
+		}
 	}
 }
 
@@ -101,7 +103,7 @@ func NewOCRContractTransmitter(
 		lp:                  lp,
 		contractReader:      caller,
 		lggr:                lggr.Named("OCRContractTransmitter"),
-		reportToEvmTxMeta:   nil,
+		reportToEvmTxMeta:   reportToEvmTxMetaNoop,
 		excludeSigs:         false,
 		retention:           0,
 	}
