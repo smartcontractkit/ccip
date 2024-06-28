@@ -3,6 +3,7 @@ package ccipevm
 import (
 	"context"
 	"fmt"
+	"math/big"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
@@ -17,13 +18,19 @@ import (
 // CommitPluginCodec is a codec for encoding and decoding commit plugin reports.
 // Compatible with:
 // - "EVM2EVMMultiOffRamp 1.6.0-dev"
-type CommitPluginCodec struct{}
-
-func NewCommitPluginCodec() *CommitPluginCodec {
-	return &CommitPluginCodec{}
+type CommitPluginCodec struct {
+	commitReportAcceptedEventInputs abi.Arguments
 }
 
-// todo: performance optimize, test
+func NewCommitPluginCodec() *CommitPluginCodec {
+	abiParsed, err := abi.JSON(strings.NewReader(evm_2_evm_multi_offramp.EVM2EVMMultiOffRampABI))
+	if err != nil {
+		panic(fmt.Errorf("parse multi offramp abi: %s", err))
+	}
+	eventInputs := abihelpers.MustGetEventInputs("CommitReportAccepted", abiParsed)
+	return &CommitPluginCodec{commitReportAcceptedEventInputs: eventInputs}
+}
+
 func (c *CommitPluginCodec) Encode(ctx context.Context, report cciptypes.CommitPluginReport) ([]byte, error) {
 	merkleRoots := make([]evm_2_evm_multi_offramp.EVM2EVMMultiOffRampMerkleRoot, 0, len(report.MerkleRoots))
 	for _, root := range report.MerkleRoots {
@@ -71,23 +78,11 @@ func (c *CommitPluginCodec) Encode(ctx context.Context, report cciptypes.CommitP
 		MerkleRoots: merkleRoots,
 	}
 
-	abiParsed, err := abi.JSON(strings.NewReader(evm_2_evm_multi_offramp.EVM2EVMMultiOffRampABI))
-	if err != nil {
-		return nil, fmt.Errorf("parse ABI: %w", err)
-	}
-	eventInputs := abihelpers.MustGetEventInputs("CommitReportAccepted", abiParsed)
-	return eventInputs.PackValues([]interface{}{evmReport})
+	return c.commitReportAcceptedEventInputs.PackValues([]interface{}{evmReport})
 }
 
-// todo: performance optimize, test
 func (c *CommitPluginCodec) Decode(ctx context.Context, bytes []byte) (cciptypes.CommitPluginReport, error) {
-	abiParsed, err := abi.JSON(strings.NewReader(evm_2_evm_multi_offramp.EVM2EVMMultiOffRampABI))
-	if err != nil {
-		return cciptypes.CommitPluginReport{}, fmt.Errorf("parse ABI: %w", err)
-	}
-	eventInputs := abihelpers.MustGetEventInputs("CommitReportAccepted", abiParsed)
-
-	unpacked, err := eventInputs.Unpack(bytes)
+	unpacked, err := c.commitReportAcceptedEventInputs.Unpack(bytes)
 	if err != nil {
 		return cciptypes.CommitPluginReport{}, err
 	}
@@ -95,7 +90,27 @@ func (c *CommitPluginCodec) Decode(ctx context.Context, bytes []byte) (cciptypes
 		return cciptypes.CommitPluginReport{}, fmt.Errorf("expected 1 argument, got %d", len(unpacked))
 	}
 
-	commitReport, is := unpacked[0].(evm_2_evm_multi_offramp.EVM2EVMMultiOffRampCommitReport)
+	commitReport, is := unpacked[0].(struct {
+		PriceUpdates struct {
+			TokenPriceUpdates []struct {
+				SourceToken common.Address `json:"sourceToken"`
+				UsdPerToken *big.Int       `json:"usdPerToken"`
+			} `json:"tokenPriceUpdates"`
+			GasPriceUpdates []struct {
+				DestChainSelector uint64   `json:"destChainSelector"`
+				UsdPerUnitGas     *big.Int `json:"usdPerUnitGas"`
+			} `json:"gasPriceUpdates"`
+		} `json:"priceUpdates"`
+		MerkleRoots []struct {
+			SourceChainSelector uint64 `json:"sourceChainSelector"`
+			Interval            struct {
+				Min uint64 `json:"min"`
+				Max uint64 `json:"max"`
+			} `json:"interval"`
+			MerkleRoot [32]uint8 `json:"merkleRoot"`
+		} `json:"merkleRoots"`
+	})
+
 	if !is {
 		return cciptypes.CommitPluginReport{},
 			fmt.Errorf("expected EVM2EVMMultiOffRampCommitReport, got %T", unpacked[0])
