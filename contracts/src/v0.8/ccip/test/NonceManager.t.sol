@@ -10,6 +10,8 @@ import {RateLimiter} from "../libraries/RateLimiter.sol";
 import {EVM2EVMMultiOffRamp} from "../offRamp/EVM2EVMMultiOffRamp.sol";
 import {EVM2EVMMultiOnRamp} from "../onRamp/EVM2EVMMultiOnRamp.sol";
 import {EVM2EVMOnRamp} from "../onRamp/EVM2EVMOnRamp.sol";
+
+import {BaseTest} from "./BaseTest.t.sol";
 import {EVM2EVMMultiOnRampHelper} from "./helpers/EVM2EVMMultiOnRampHelper.sol";
 import {EVM2EVMOffRampHelper} from "./helpers/EVM2EVMOffRampHelper.sol";
 import {EVM2EVMOnRampHelper} from "./helpers/EVM2EVMOnRampHelper.sol";
@@ -17,19 +19,21 @@ import {MockCommitStore} from "./mocks/MockCommitStore.sol";
 import {EVM2EVMMultiOffRampSetup} from "./offRamp/EVM2EVMMultiOffRampSetup.t.sol";
 import {EVM2EVMMultiOnRampSetup} from "./onRamp/EVM2EVMMultiOnRampSetup.t.sol";
 
-contract NonceManagerTest_getIncrementedOutboundNonce is EVM2EVMMultiOnRampSetup, EVM2EVMMultiOffRampSetup {
-  function setUp() public override(EVM2EVMMultiOffRampSetup, EVM2EVMMultiOnRampSetup) {
-    EVM2EVMMultiOnRampSetup.setUp();
-    EVM2EVMMultiOffRampSetup.setUp();
+contract NonceManagerTest_getIncrementedOutboundNonce is BaseTest {
+  NonceManager private s_nonceManager;
+
+  function setUp() public override {
+    address[] memory authorizedCallers = new address[](1);
+    authorizedCallers[0] = address(this);
+    s_nonceManager = new NonceManager(authorizedCallers);
   }
 
   function test_getIncrementedOutboundNonce_Success() public {
-    vm.startPrank(address(s_onRamp));
     address sender = address(this);
 
-    assertEq(s_outboundNonceManager.getOutboundNonce(DEST_CHAIN_SELECTOR, sender), 0);
+    assertEq(s_nonceManager.getOutboundNonce(DEST_CHAIN_SELECTOR, sender), 0);
 
-    uint64 outboundNonce = s_outboundNonceManager.getIncrementedOutboundNonce(DEST_CHAIN_SELECTOR, sender);
+    uint64 outboundNonce = s_nonceManager.getIncrementedOutboundNonce(DEST_CHAIN_SELECTOR, sender);
     assertEq(outboundNonce, 1);
   }
 }

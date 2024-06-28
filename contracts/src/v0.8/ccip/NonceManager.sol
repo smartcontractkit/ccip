@@ -31,7 +31,7 @@ contract NonceManager is INonceManager, AuthorizedCallers {
   /// @dev The current outbound nonce per sender used on the onramp
   mapping(uint64 destChainSelector => mapping(address sender => uint64 outboundNonce)) private s_outboundNonces;
   /// @dev The current inbound nonce per sender used on the offramp
-  /// Corresponds to the outbound nonce in the source chain NonceManager, used to enforce that messages are
+  /// Eventually in sync with the outbound nonce in the remote source chain NonceManager, used to enforce that messages are
   /// executed in the same order they are sent (assuming they are DON)
   mapping(uint64 sourceChainSelector => mapping(bytes sender => uint64 inboundNonce)) private s_inboundNonces;
 
@@ -78,6 +78,8 @@ contract NonceManager is INonceManager, AuthorizedCallers {
     uint64 inboundNonce = _getInboundNonce(sourceChainSelector, sender) + 1;
 
     if (inboundNonce != expectedNonce) {
+      // If the nonce is not the expected one, this means that there are still messages in flight so we skip
+      // the nonce increment
       emit SkippedIncorrectNonce(sourceChainSelector, expectedNonce, sender);
       return false;
     }
@@ -101,6 +103,7 @@ contract NonceManager is INonceManager, AuthorizedCallers {
     if (inboundNonce == 0) {
       address prevOffRamp = s_previousRamps[sourceChainSelector].prevOffRamp;
       if (prevOffRamp != address(0)) {
+        // We only EVM previous offRamps here so we can safely decode the sender
         return IEVM2AnyOnRamp(prevOffRamp).getSenderNonce(abi.decode(sender, (address)));
       }
     }
@@ -116,7 +119,7 @@ contract NonceManager is INonceManager, AuthorizedCallers {
 
       PreviousRamps storage prevRamps = s_previousRamps[previousRampsArg.remoteChainSelector];
 
-      // If the previous onRamp is already set then it should not be updated
+      // If the previous ramps are already set then they should not be updated
       if (prevRamps.prevOnRamp != address(0) || prevRamps.prevOffRamp != address(0)) {
         revert PreviousRampAlreadySet();
       }

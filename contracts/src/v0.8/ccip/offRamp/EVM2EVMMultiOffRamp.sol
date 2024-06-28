@@ -404,18 +404,20 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
         }
       }
 
-      // Nonce changes per state transition
+      // Nonce changes per state transition (these only apply for ordered messages):
       // UNTOUCHED -> FAILURE  nonce bump
       // UNTOUCHED -> SUCCESS  nonce bump
       // FAILURE   -> FAILURE  no nonce bump
       // FAILURE   -> SUCCESS  no nonce bump
       // UNTOUCHED messages MUST be executed in order always
-      if (
-        message.nonce > 0 && originalState == Internal.MessageExecutionState.UNTOUCHED
-          && !INonceManager(i_nonceManager).incrementInboundNonce(
+      if (message.nonce > 0 && originalState == Internal.MessageExecutionState.UNTOUCHED) {
+        // If a nonce is not incremented, that means it was skipped, and we can ignore the message
+        if (
+          !INonceManager(i_nonceManager).incrementInboundNonce(
             sourceChainSelector, message.nonce, abi.encode(message.sender)
           )
-      ) continue;
+        ) continue;
+      }
 
       // Although we expect only valid messages will be committed, we check again
       // when executing as a defense in depth measure.
