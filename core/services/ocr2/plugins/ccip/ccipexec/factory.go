@@ -13,6 +13,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
+	"github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/statuschecker"
 )
 
 type ExecutionReportingPluginFactory struct {
@@ -120,7 +121,7 @@ func (rf *ExecutionReportingPluginFactory) NewReportingPluginFn(config types.Rep
 			batchingStrategy = &BestEffortBatchingStrategy{}
 		case 1:
 			batchingStrategy = &ZKOverflowBatchingStrategy{
-				// statuschecker: statuschecker.NewTransactionStatusChecker(rf.config.txManager), // TODO: uncomment after TXM changes merged + chainlink merged
+				statuschecker: statuschecker.NewTxmStatusChecker(rf.config.txManager),
 			}
 		default:
 			batchingStrategy = &BestEffortBatchingStrategy{} // Default strategy
