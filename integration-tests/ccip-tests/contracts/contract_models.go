@@ -1500,6 +1500,7 @@ type SendReqEventData struct {
 	DataLength     int
 	NoOfTokens     int
 	Raw            types.Log
+	Fee            *big.Int
 }
 
 type OnRampWrapper struct {

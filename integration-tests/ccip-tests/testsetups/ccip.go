@@ -223,8 +223,13 @@ func (c *CCIPTestConfig) SetNetworkPairs(lggr zerolog.Logger) error {
 		actualNoOfNetworks := len(c.SelectedNetworks)
 		n := c.SelectedNetworks[0]
 		var chainIDs []int64
+		existingChainIDs := make(map[uint64]struct{})
+		for _, net := range c.SelectedNetworks {
+			existingChainIDs[uint64(net.ChainID)] = struct{}{}
+		}
 		for _, id := range chainselectors.TestChainIds() {
-			if id == 2337 {
+			// if the chain id already exists in the already provided selected networks, skip it
+			if _, exists := existingChainIDs[id]; exists {
 				continue
 			}
 			chainIDs = append(chainIDs, int64(id))

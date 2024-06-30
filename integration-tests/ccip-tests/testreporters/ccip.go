@@ -88,7 +88,6 @@ func (stat *RequestStat) UpdateState(
 		SendTransactionStats: sendTransactionStats,
 	}
 
-	stat.StatusByPhase[step] = phaseDetails
 	event := lggr.Info()
 	if seqNum != 0 {
 		event.Uint64("seq num", seqNum)
@@ -99,12 +98,17 @@ func (stat *RequestStat) UpdateState(
 			SeqNum: seqNum,
 			Status: state,
 		}
+		stat.StatusByPhase[step] = phaseDetails
 		lggr.Info().
 			Str(fmt.Sprint(E2E), string(state)).
 			Msgf("reqNo %d", stat.ReqNo)
 		event.Str(string(step), string(state)).Msgf("reqNo %d", stat.ReqNo)
 	} else {
 		event.Str(string(step), string(Success)).Msgf("reqNo %d", stat.ReqNo)
+		// we don't want to save phase details for TX and CCIPSendRe to avoid redundancy if these phases are successful
+		if step != TX && step != CCIPSendRe {
+			stat.StatusByPhase[step] = phaseDetails
+		}
 		if step == Commit || step == ReportBlessed || step == ExecStateChanged {
 			stat.StatusByPhase[E2E] = PhaseStat{
 				SeqNum:   seqNum,

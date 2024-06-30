@@ -322,14 +322,7 @@ func (c *CCIPE2ELoad) Call(_ *wasp.Generator) *wasp.Response {
 		res.Data = stats.StatusByPhase
 		return res
 	}
-	stats.UpdateState(&lggr, 0, testreporters.TX, txConfirmationTime.Sub(startTime), testreporters.Success,
-		&testreporters.TransactionStats{
-			Fee:                fee.String(),
-			GasUsed:            rcpt.GasUsed,
-			TxHash:             sendTx.Hash().Hex(),
-			NoOfTokensSent:     len(msg.TokenAmounts),
-			MessageBytesLength: int64(len(msg.Data)),
-		})
+	stats.UpdateState(&lggr, 0, testreporters.TX, txConfirmationTime.Sub(startTime), testreporters.Success, nil)
 	err = c.Validate(lggr, sendTx, txConfirmationTime, []*testreporters.RequestStat{stats})
 	if err != nil {
 		res.Error = err.Error()
@@ -356,19 +349,23 @@ func (c *CCIPE2ELoad) Validate(lggr zerolog.Logger, sendTx *types.Transaction, t
 	if c.Lane.Source.Common.ChainClient.GetNetworkConfig().FinalityDepth == 0 &&
 		lstFinalizedBlock != 0 && lstFinalizedBlock > msgLogs[0].Raw.BlockNumber {
 		sourceLogFinalizedAt = c.LastFinalizedTimestamp.Load()
-		for _, stat := range stats {
+		for i, stat := range stats {
 			stat.UpdateState(&lggr, stat.SeqNum, testreporters.SourceLogFinalized,
 				sourceLogFinalizedAt.Sub(sourceLogTime), testreporters.Success,
 				&testreporters.TransactionStats{
-					TxHash:           msgLogs[0].Raw.TxHash.Hex(),
-					FinalizedByBlock: strconv.FormatUint(lstFinalizedBlock, 10),
-					FinalizedAt:      sourceLogFinalizedAt.String(),
+					TxHash:             msgLogs[i].Raw.TxHash.Hex(),
+					FinalizedByBlock:   strconv.FormatUint(lstFinalizedBlock, 10),
+					FinalizedAt:        sourceLogFinalizedAt.String(),
+					Fee:                msgLogs[i].Fee.String(),
+					NoOfTokensSent:     msgLogs[i].NoOfTokens,
+					MessageBytesLength: int64(msgLogs[i].DataLength),
+					MsgID:              fmt.Sprintf("0x%x", msgLogs[i].MessageId[:]),
 				})
 		}
 	} else {
 		var finalizingBlock uint64
 		sourceLogFinalizedAt, finalizingBlock, err = c.Lane.Source.AssertSendRequestedLogFinalized(
-			&lggr, msgLogs[0].Raw.TxHash, sourceLogTime, stats)
+			&lggr, msgLogs[0].Raw.TxHash, msgLogs, sourceLogTime, stats)
 		if err != nil {
 			return err
 		}
