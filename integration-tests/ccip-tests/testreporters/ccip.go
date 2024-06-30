@@ -57,10 +57,10 @@ type TransactionStats struct {
 }
 
 type PhaseStat struct {
-	SeqNum               uint64           `json:"seq_num,omitempty"`
-	Duration             float64          `json:"duration,omitempty"`
-	Status               Status           `json:"success"`
-	SendTransactionStats TransactionStats `json:"ccip_send_data,omitempty"`
+	SeqNum               uint64            `json:"seq_num,omitempty"`
+	Duration             float64           `json:"duration,omitempty"`
+	Status               Status            `json:"success"`
+	SendTransactionStats *TransactionStats `json:"ccip_send_data,omitempty"`
 }
 
 type RequestStat struct {
@@ -77,18 +77,17 @@ func (stat *RequestStat) UpdateState(
 	step Phase,
 	duration time.Duration,
 	state Status,
-	sendTransactionStats ...TransactionStats,
+	sendTransactionStats *TransactionStats,
 ) {
 	durationInSec := duration.Seconds()
 	stat.SeqNum = seqNum
 	phaseDetails := PhaseStat{
-		SeqNum:   seqNum,
-		Duration: durationInSec,
-		Status:   state,
+		SeqNum:               seqNum,
+		Duration:             durationInSec,
+		Status:               state,
+		SendTransactionStats: sendTransactionStats,
 	}
-	if len(sendTransactionStats) > 0 {
-		phaseDetails.SendTransactionStats = sendTransactionStats[0]
-	}
+
 	stat.StatusByPhase[step] = phaseDetails
 	event := lggr.Info()
 	if seqNum != 0 {

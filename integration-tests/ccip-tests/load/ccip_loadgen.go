@@ -264,7 +264,7 @@ func (c *CCIPE2ELoad) Call(_ *wasp.Generator) *wasp.Response {
 		sendTx, err = sourceCCIP.Common.Router.CCIPSend(destChainSelector, msg, new(big.Int).Add(big.NewInt(1e5), fee))
 	}
 	if err != nil {
-		stats.UpdateState(&lggr, 0, testreporters.TX, time.Since(startTime), testreporters.Failure)
+		stats.UpdateState(&lggr, 0, testreporters.TX, time.Since(startTime), testreporters.Failure, nil)
 		res.Error = fmt.Sprintf("ccip-send tx error %s for reqNo %d", err.Error(), msgSerialNo)
 		res.Data = stats.StatusByPhase
 		res.Failed = true
@@ -274,7 +274,7 @@ func (c *CCIPE2ELoad) Call(_ *wasp.Generator) *wasp.Response {
 	err = sourceCCIP.Common.ChainClient.MarkTxAsSentOnL2(sendTx)
 
 	if err != nil {
-		stats.UpdateState(&lggr, 0, testreporters.TX, time.Since(startTime), testreporters.Failure)
+		stats.UpdateState(&lggr, 0, testreporters.TX, time.Since(startTime), testreporters.Failure, nil)
 		res.Error = fmt.Sprintf("reqNo %d failed to mark tx as sent on L2 %s", msgSerialNo, err.Error())
 		res.Data = stats.StatusByPhase
 		res.Failed = true
@@ -306,7 +306,7 @@ func (c *CCIPE2ELoad) Call(_ *wasp.Generator) *wasp.Response {
 	lggr = lggr.With().Str("Msg Tx", sendTx.Hash().String()).Logger()
 	if rcpt.Status != types.ReceiptStatusSuccessful {
 		stats.UpdateState(&lggr, 0, testreporters.TX, txConfirmationTime.Sub(startTime), testreporters.Failure,
-			testreporters.TransactionStats{
+			&testreporters.TransactionStats{
 				Fee:                fee.String(),
 				GasUsed:            rcpt.GasUsed,
 				TxHash:             sendTx.Hash().Hex(),
@@ -323,7 +323,7 @@ func (c *CCIPE2ELoad) Call(_ *wasp.Generator) *wasp.Response {
 		return res
 	}
 	stats.UpdateState(&lggr, 0, testreporters.TX, txConfirmationTime.Sub(startTime), testreporters.Success,
-		testreporters.TransactionStats{
+		&testreporters.TransactionStats{
 			Fee:                fee.String(),
 			GasUsed:            rcpt.GasUsed,
 			TxHash:             sendTx.Hash().Hex(),
@@ -359,7 +359,7 @@ func (c *CCIPE2ELoad) Validate(lggr zerolog.Logger, sendTx *types.Transaction, t
 		for _, stat := range stats {
 			stat.UpdateState(&lggr, stat.SeqNum, testreporters.SourceLogFinalized,
 				sourceLogFinalizedAt.Sub(sourceLogTime), testreporters.Success,
-				testreporters.TransactionStats{
+				&testreporters.TransactionStats{
 					TxHash:           msgLogs[0].Raw.TxHash.Hex(),
 					FinalizedByBlock: strconv.FormatUint(lstFinalizedBlock, 10),
 					FinalizedAt:      sourceLogFinalizedAt.String(),
