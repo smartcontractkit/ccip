@@ -1,7 +1,6 @@
 package home_chain
 
 import (
-	_ "embed"
 	"fmt"
 	"math/big"
 	"testing"
