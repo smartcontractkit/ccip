@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
 	"github.com/ethereum/go-ethereum/common"
 
@@ -24,16 +23,12 @@ import (
 
 const chainID = 1337
 
-type TestSetupData[T any] struct {
-	ContractAddr common.Address
-	Contract     *T
-	SimulatedBE  *backends.SimulatedBackend
-	Auth         *bind.TransactOpts
-	ChainReader  *evm.ChainReaderService
-	ChainID      int
+type TestSetupData struct {
+	LogPoller   logpoller.LogPoller
+	ChainReader evm.ChainReaderService
 }
 
-func SetupChainReader(t *testing.T, ctx context.Context, simulatedBackend *backends.SimulatedBackend, address common.Address, chainReaderConfig evmtypes.ChainReaderConfig, contractName string) evm.ChainReaderService {
+func SetupReaderTestData(t *testing.T, ctx context.Context, simulatedBackend *backends.SimulatedBackend, address common.Address, chainReaderConfig evmtypes.ChainReaderConfig, contractName string) TestSetupData {
 	lggr := logger.TestLogger(t)
 	db := pgtest.NewSqlxDB(t)
 	lpOpts := logpoller.Opts{
@@ -63,5 +58,8 @@ func SetupChainReader(t *testing.T, ctx context.Context, simulatedBackend *backe
 			break
 		}
 	}
-	return cr
+	return TestSetupData{
+		LogPoller:   lp,
+		ChainReader: cr,
+	}
 }

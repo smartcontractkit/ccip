@@ -83,7 +83,9 @@ func TestHomeChainReader(t *testing.T) {
 	//================================Setup HomeChainReader===============================
 	//ctx := testutils.Context(t)
 	ctx, cancelFunc := context.WithCancel(context.Background())
-	chainReader := helpers.SetupChainReader(t, ctx, backend, capConfAddress, cfg, "CCIPConfig")
+	testData := helpers.SetupReaderTestData(t, ctx, backend, capConfAddress, cfg, "CCIPConfig")
+	chainReader := testData.ChainReader
+	logPoller := testData.LogPoller
 	require.NoError(t, err)
 	pollDuration := 5 * time.Millisecond
 	homeChain := ccipreader.NewHomeChainReader(chainReader, logger.TestLogger(t), pollDuration)
@@ -110,7 +112,7 @@ func TestHomeChainReader(t *testing.T) {
 	_, err = capConfContract.ApplyChainConfigUpdates(transactor, []uint64{chainC}, nil)
 	require.NoError(t, err)
 	backend.Commit()
-	time.Sleep(pollDuration * 3) // Wait for the chain reader to update
+	time.Sleep(pollDuration * 5) // Wait for the chain reader to update
 	configs, err = homeChain.GetAllChainConfigs()
 	require.NoError(t, err)
 	delete(expectedChainConfigs, cciptypes.ChainSelector(chainC))
@@ -118,6 +120,7 @@ func TestHomeChainReader(t *testing.T) {
 	//================================Close HomeChain Reader===============================
 	t.Cleanup(cancelFunc)
 	require.NoError(t, homeChain.Close())
+	require.NoError(t, logPoller.Close())
 	require.NoError(t, chainReader.Close())
 	t.Logf("homchain reader successfully closed")
 }
