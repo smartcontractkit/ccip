@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
+	"github.com/onsi/gomega"
 	"github.com/stretchr/testify/require"
 
 	ccipreader "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
@@ -330,21 +331,9 @@ func TestIntegration_Launcher(t *testing.T) {
 		p2pIDs,
 	)
 
-	ticker := time.NewTicker(5 * time.Second)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-ticker.C:
-			// check running dons from the launcher
-			runningDONs := launcher.runningDONs()
-			if len(runningDONs) == 1 {
-				t.Log("launcher has launched the correct number of dons")
-				return
-			}
-		case <-ctx.Done():
-			t.Fatal("timed out waiting for capabilities to be added")
-		}
-	}
+	gomega.NewWithT(t).Eventually(func() bool {
+		return len(launcher.runningDONs()) == 1
+	}, testutils.WaitTimeout(t), testutils.TestInterval).Should(gomega.BeTrue())
 }
 
 type oraclePrints struct {
