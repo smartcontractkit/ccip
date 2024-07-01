@@ -28,7 +28,7 @@ var (
 	_ = abi.ConvertType
 )
 
-type IOCR3ConfigEncoderOCR3Config struct {
+type TypesOCR3Config struct {
 	PluginType            uint8
 	ChainSelector         uint64
 	F                     uint8
@@ -42,7 +42,7 @@ type IOCR3ConfigEncoderOCR3Config struct {
 }
 
 var IOCR3ConfigEncoderMetaData = &bind.MetaData{
-	ABI: "[{\"inputs\":[{\"components\":[{\"internalType\":\"enumIOCR3ConfigEncoder.PluginType\",\"name\":\"pluginType\",\"type\":\"uint8\"},{\"internalType\":\"uint64\",\"name\":\"chainSelector\",\"type\":\"uint64\"},{\"internalType\":\"uint8\",\"name\":\"F\",\"type\":\"uint8\"},{\"internalType\":\"uint64\",\"name\":\"offchainConfigVersion\",\"type\":\"uint64\"},{\"internalType\":\"bytes\",\"name\":\"offrampAddress\",\"type\":\"bytes\"},{\"internalType\":\"bytes32[]\",\"name\":\"bootstrapP2PIds\",\"type\":\"bytes32[]\"},{\"internalType\":\"bytes32[]\",\"name\":\"p2pIds\",\"type\":\"bytes32[]\"},{\"internalType\":\"bytes[]\",\"name\":\"signers\",\"type\":\"bytes[]\"},{\"internalType\":\"bytes[]\",\"name\":\"transmitters\",\"type\":\"bytes[]\"},{\"internalType\":\"bytes\",\"name\":\"offchainConfig\",\"type\":\"bytes\"}],\"internalType\":\"structIOCR3ConfigEncoder.OCR3Config[]\",\"name\":\"config\",\"type\":\"tuple[]\"}],\"name\":\"exposeOCR3Config\",\"outputs\":[{\"internalType\":\"bytes\",\"name\":\"\",\"type\":\"bytes\"}],\"stateMutability\":\"view\",\"type\":\"function\"}]",
+	ABI: "[{\"inputs\":[{\"components\":[{\"internalType\":\"enumInternal.OCRPluginType\",\"name\":\"pluginType\",\"type\":\"uint8\"},{\"internalType\":\"uint64\",\"name\":\"chainSelector\",\"type\":\"uint64\"},{\"internalType\":\"uint8\",\"name\":\"F\",\"type\":\"uint8\"},{\"internalType\":\"uint64\",\"name\":\"offchainConfigVersion\",\"type\":\"uint64\"},{\"internalType\":\"bytes\",\"name\":\"offrampAddress\",\"type\":\"bytes\"},{\"internalType\":\"bytes32[]\",\"name\":\"bootstrapP2PIds\",\"type\":\"bytes32[]\"},{\"internalType\":\"bytes32[]\",\"name\":\"p2pIds\",\"type\":\"bytes32[]\"},{\"internalType\":\"bytes[]\",\"name\":\"signers\",\"type\":\"bytes[]\"},{\"internalType\":\"bytes[]\",\"name\":\"transmitters\",\"type\":\"bytes[]\"},{\"internalType\":\"bytes\",\"name\":\"offchainConfig\",\"type\":\"bytes\"}],\"internalType\":\"structTypes.OCR3Config[]\",\"name\":\"config\",\"type\":\"tuple[]\"}],\"name\":\"exposeOCR3Config\",\"outputs\":[{\"internalType\":\"bytes\",\"name\":\"\",\"type\":\"bytes\"}],\"stateMutability\":\"view\",\"type\":\"function\"}]",
 }
 
 var IOCR3ConfigEncoderABI = IOCR3ConfigEncoderMetaData.ABI
@@ -163,7 +163,7 @@ func (_IOCR3ConfigEncoder *IOCR3ConfigEncoderTransactorRaw) Transact(opts *bind.
 	return _IOCR3ConfigEncoder.Contract.contract.Transact(opts, method, params...)
 }
 
-func (_IOCR3ConfigEncoder *IOCR3ConfigEncoderCaller) ExposeOCR3Config(opts *bind.CallOpts, config []IOCR3ConfigEncoderOCR3Config) ([]byte, error) {
+func (_IOCR3ConfigEncoder *IOCR3ConfigEncoderCaller) ExposeOCR3Config(opts *bind.CallOpts, config []TypesOCR3Config) ([]byte, error) {
 	var out []interface{}
 	err := _IOCR3ConfigEncoder.contract.Call(opts, &out, "exposeOCR3Config", config)
 
@@ -177,11 +177,11 @@ func (_IOCR3ConfigEncoder *IOCR3ConfigEncoderCaller) ExposeOCR3Config(opts *bind
 
 }
 
-func (_IOCR3ConfigEncoder *IOCR3ConfigEncoderSession) ExposeOCR3Config(config []IOCR3ConfigEncoderOCR3Config) ([]byte, error) {
+func (_IOCR3ConfigEncoder *IOCR3ConfigEncoderSession) ExposeOCR3Config(config []TypesOCR3Config) ([]byte, error) {
 	return _IOCR3ConfigEncoder.Contract.ExposeOCR3Config(&_IOCR3ConfigEncoder.CallOpts, config)
 }
 
-func (_IOCR3ConfigEncoder *IOCR3ConfigEncoderCallerSession) ExposeOCR3Config(config []IOCR3ConfigEncoderOCR3Config) ([]byte, error) {
+func (_IOCR3ConfigEncoder *IOCR3ConfigEncoderCallerSession) ExposeOCR3Config(config []TypesOCR3Config) ([]byte, error) {
 	return _IOCR3ConfigEncoder.Contract.ExposeOCR3Config(&_IOCR3ConfigEncoder.CallOpts, config)
 }
 
@@ -190,7 +190,7 @@ func (_IOCR3ConfigEncoder *IOCR3ConfigEncoder) Address() common.Address {
 }
 
 type IOCR3ConfigEncoderInterface interface {
-	ExposeOCR3Config(opts *bind.CallOpts, config []IOCR3ConfigEncoderOCR3Config) ([]byte, error)
+	ExposeOCR3Config(opts *bind.CallOpts, config []TypesOCR3Config) ([]byte, error)
 
 	Address() common.Address
 }
