@@ -83,7 +83,7 @@ func TestHomeChainReader(t *testing.T) {
 	//================================Setup HomeChainReader===============================
 	//ctx := testutils.Context(t)
 	ctx, cancelFunc := context.WithCancel(context.Background())
-	testData := helpers.SetupReaderTestData(t, ctx, backend, capConfAddress, cfg, "CCIPConfig")
+	testData := helpers.SetupReaderTestData(ctx, t, backend, capConfAddress, cfg, "CCIPConfig")
 	chainReader := testData.ChainReader
 	logPoller := testData.LogPoller
 	require.NoError(t, err)

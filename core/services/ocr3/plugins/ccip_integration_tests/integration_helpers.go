@@ -28,7 +28,7 @@ type TestSetupData struct {
 	ChainReader evm.ChainReaderService
 }
 
-func SetupReaderTestData(t *testing.T, ctx context.Context, simulatedBackend *backends.SimulatedBackend, address common.Address, chainReaderConfig evmtypes.ChainReaderConfig, contractName string) TestSetupData {
+func SetupReaderTestData(ctx context.Context, t *testing.T, simulatedBackend *backends.SimulatedBackend, address common.Address, chainReaderConfig evmtypes.ChainReaderConfig, contractName string) TestSetupData {
 	lggr := logger.TestLogger(t)
 	db := pgtest.NewSqlxDB(t)
 	lpOpts := logpoller.Opts{
