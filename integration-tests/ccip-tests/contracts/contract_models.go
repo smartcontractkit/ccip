@@ -271,16 +271,6 @@ func (token *ERC20Token) Approve(onBehalf *blockchain.EthereumWallet, spender st
 	if err != nil {
 		return fmt.Errorf("failed to get balance of onBehalf: %w", err)
 	}
-	if onBehalfBalance.Cmp(amount) < 0 {
-		token.logger.Warn().
-			Str("Token", token.Address()).
-			Str("On Behalf", onBehalf.Address()).
-			Uint64("On Behalf's Balance", onBehalfBalance.Uint64()).
-			Uint64("Approve Amount", amount.Uint64()).
-			Str("Spender", spender).
-			Msg("Approving ERC20 transfer for more than balance")
-		return fmt.Errorf("onBehalf '%s' does not have enough balance to approve", onBehalf.Address())
-	}
 	currentAllowance, err := token.Allowance(onBehalf.Address(), spender)
 	if err != nil {
 		return fmt.Errorf("failed to get current allowance for '%s' on behalf of '%s': %w", spender, onBehalf.Address(), err)
