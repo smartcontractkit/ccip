@@ -505,4 +505,8 @@ replace (
 	github.com/prometheus/prometheus => github.com/prometheus/prometheus v0.47.2-0.20231010075449-4b9c19fe5510
 
 	github.com/smartcontractkit/chainlink/integration-tests => ../integration-tests
+
+	github.com/prometheus/client_golang => github.com/prometheus/client_golang v1.17.0
+	github.com/prometheus/client_model => github.com/prometheus/client_model v0.5.0
+	github.com/prometheus/common => github.com/prometheus/common v0.45.0
 )

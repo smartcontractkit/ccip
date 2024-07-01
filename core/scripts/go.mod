@@ -375,4 +375,8 @@ replace (
 	// until merged upstream: https://github.com/mwitkow/grpc-proxy/pull/69
 	github.com/mwitkow/grpc-proxy => github.com/smartcontractkit/grpc-proxy v0.0.0-20230731113816-f1be6620749f
 
+	github.com/prometheus/client_golang => github.com/prometheus/client_golang v1.17.0
+	github.com/prometheus/client_model => github.com/prometheus/client_model v0.5.0
+	github.com/prometheus/common => github.com/prometheus/common v0.45.0
+
 )

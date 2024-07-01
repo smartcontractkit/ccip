@@ -47,4 +47,9 @@ require (
 )
 
 // replicating the replace directive on cosmos SDK
-replace github.com/gogo/protobuf => github.com/regen-network/protobuf v1.3.3-alpha.regen.1
+replace (
+	github.com/gogo/protobuf => github.com/regen-network/protobuf v1.3.3-alpha.regen.1
+	github.com/prometheus/client_golang => github.com/prometheus/client_golang v1.17.0
+	github.com/prometheus/client_model => github.com/prometheus/client_model v0.5.0
+	github.com/prometheus/common => github.com/prometheus/common v0.45.0
+)

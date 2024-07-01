@@ -504,4 +504,8 @@ replace (
 	k8s.io/api => k8s.io/api v0.25.11
 	k8s.io/client-go => k8s.io/client-go v0.25.11
 	k8s.io/kube-openapi => k8s.io/kube-openapi v0.0.0-20230303024457-afdc3dddf62d
+
+	github.com/prometheus/client_golang => github.com/prometheus/client_golang v1.17.0
+	github.com/prometheus/client_model => github.com/prometheus/client_model v0.5.0
+	github.com/prometheus/common => github.com/prometheus/common v0.45.0
 )
