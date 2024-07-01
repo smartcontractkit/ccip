@@ -17,7 +17,7 @@ contract CCIPReceiverWithACK is CCIPReceiver {
   // Current feeToken
   IERC20 public s_feeToken;
 
-  bytes public constant ACKMESSAGEMAGICBYTES = "MESSAGE_ACKNOWLEDGED_";
+  bytes public constant ACK_MESSAGE_HEADER = "MESSAGE_ACKNOWLEDGED_";
 
   // mapping(bytes32 messageId => bool ackReceived) public s_messageAckReceived;
   mapping(bytes32 messageId => MessageStatus status) public s_messageStatus;
@@ -26,7 +26,7 @@ contract CCIPReceiverWithACK is CCIPReceiver {
   event MessageSent(bytes32 indexed incomingMessageId, bytes32 indexed ACKMessageId);
   event MessageAckReceived(bytes32);
 
-  error InvalidMagicBytes();
+  error InvalidAckMessageHeader();
   error MessageAlreadyAcknowledged(bytes32 messageId);
 
   event FeeTokenModified(address indexed oldToken, address indexed newToken);
@@ -53,7 +53,7 @@ contract CCIPReceiverWithACK is CCIPReceiver {
 
     // If fee token is in LINK, then approve router to transfer
     if (address(feeToken) != address(0)) {
-      feeToken.safeApprove(router, type(uint256).max);
+      feeToken.safeIncreaseAllowance(router, type(uint256).max);
     }
   }
 
@@ -72,7 +72,7 @@ contract CCIPReceiverWithACK is CCIPReceiver {
 
     // Approve the router to spend the new fee token
     if (token != address(0)) {
-      s_feeToken.safeApprove(getRouter(), type(uint256).max);
+      s_feeToken.safeIncreaseAllowance(getRouter(), type(uint256).max);
     }
 
     emit FeeTokenModified(oldFeeToken, token);
@@ -115,11 +115,11 @@ contract CCIPReceiverWithACK is CCIPReceiver {
       // If the message was outgoing, then send an ack response.
       _sendAck(message);
     } else if (payload.messageType == MessageType.ACK) {
-      // Decode message into the magic-bytes and the messageId to ensure the message is encoded correctly
-      (bytes memory magicBytes, bytes32 messageId) = abi.decode(payload.data, (bytes, bytes32));
+      // Decode message into the message header and the messageId to ensure the message is encoded correctly
+      (bytes memory messageHeader, bytes32 messageId) = abi.decode(payload.data, (bytes, bytes32));
 
-      // Ensure Ack Message contains proper magic-bytes
-      if (keccak256(magicBytes) != keccak256(ACKMESSAGEMAGICBYTES)) revert InvalidMagicBytes();
+      // Ensure Ack Message contains proper message header
+      if (keccak256(messageHeader) != keccak256(ACK_MESSAGE_HEADER)) revert InvalidAckMessageHeader();
 
       // Make sure the ACK message has not already been acknowledged
       if (s_messageStatus[messageId] == MessageStatus.ACKNOWLEDGED) revert MessageAlreadyAcknowledged(messageId);
@@ -137,9 +137,9 @@ contract CCIPReceiverWithACK is CCIPReceiver {
 
     Client.EVM2AnyMessage memory outgoingMessage = Client.EVM2AnyMessage({
       receiver: incomingMessage.sender,
-      data: abi.encode(ACKMESSAGEMAGICBYTES, incomingMessage.messageId),
+      data: abi.encode(ACK_MESSAGE_HEADER, incomingMessage.messageId),
       tokenAmounts: tokenAmounts,
-      extraArgs: s_chains[incomingMessage.sourceChainSelector].extraArgsBytes, //s_extraArgsBytes[incomingMessage.sourceChainSelector],
+      extraArgs: s_chainConfigs[incomingMessage.sourceChainSelector].extraArgsBytes,
       feeToken: address(s_feeToken)
     });
 

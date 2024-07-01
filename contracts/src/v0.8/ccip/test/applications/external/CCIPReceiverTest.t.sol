@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
+import {CCIPClientBase} from "../../../applications/external/CCIPClientBase.sol";
 import {CCIPReceiver} from "../../../applications/external/CCIPReceiver.sol";
-import {ICCIPClientBase} from "../../../interfaces/ICCIPClientBase.sol";
 
 import {Client} from "../../../libraries/Client.sol";
 import {EVM2EVMOnRampSetup} from "../../onRamp/EVM2EVMOnRampSetup.t.sol";
@@ -23,13 +23,13 @@ contract CCIPReceiverTest is EVM2EVMOnRampSetup {
     s_receiver = new CCIPReceiver(address(s_destRouter));
     s_receiver.enableChain(sourceChainSelector, abi.encode(address(1)), "");
 
-    ICCIPClientBase.approvedSenderUpdate[] memory senderUpdates = new ICCIPClientBase.approvedSenderUpdate[](1);
-    senderUpdates[0] = ICCIPClientBase.approvedSenderUpdate({
+    CCIPClientBase.approvedSenderUpdate[] memory senderUpdates = new CCIPClientBase.approvedSenderUpdate[](1);
+    senderUpdates[0] = CCIPClientBase.approvedSenderUpdate({
       destChainSelector: sourceChainSelector,
       sender: abi.encode(address(s_receiver))
     });
 
-    s_receiver.updateApprovedSenders(senderUpdates, new ICCIPClientBase.approvedSenderUpdate[](0));
+    s_receiver.updateApprovedSenders(senderUpdates, new CCIPClientBase.approvedSenderUpdate[](0));
   }
 
   function test_Recovery_with_intentional_revert() public {
@@ -71,7 +71,7 @@ contract CCIPReceiverTest is EVM2EVMOnRampSetup {
     vm.expectEmit();
     emit MessageRecovered(messageId);
 
-    s_receiver.retryFailedMessage(messageId);
+    s_receiver.retryFailedMessage(messageId, OWNER);
 
     // Assert the tokens have successfully been rescued from the contract.
     assertEq(
@@ -97,7 +97,7 @@ contract CCIPReceiverTest is EVM2EVMOnRampSetup {
 
     vm.expectEmit();
     emit MessageFailed(
-      messageId, abi.encodeWithSelector(bytes4(ICCIPClientBase.InvalidSender.selector), abi.encode(address(1)))
+      messageId, abi.encodeWithSelector(bytes4(CCIPClientBase.InvalidSender.selector), abi.encode(address(1)))
     );
 
     s_receiver.ccipReceive(
@@ -177,7 +177,7 @@ contract CCIPReceiverTest is EVM2EVMOnRampSetup {
     // The receiver contract will revert if the router is not the sender.
     vm.startPrank(address(s_destRouter));
 
-    vm.expectRevert(abi.encodeWithSelector(ICCIPClientBase.InvalidChain.selector, sourceChainSelector));
+    vm.expectRevert(abi.encodeWithSelector(CCIPClientBase.InvalidChain.selector, sourceChainSelector));
 
     s_receiver.ccipReceive(
       Client.Any2EVMMessage({
@@ -191,13 +191,13 @@ contract CCIPReceiverTest is EVM2EVMOnRampSetup {
   }
 
   function test_removeSender_from_approvedList_and_revert() public {
-    ICCIPClientBase.approvedSenderUpdate[] memory senderUpdates = new ICCIPClientBase.approvedSenderUpdate[](1);
-    senderUpdates[0] = ICCIPClientBase.approvedSenderUpdate({
+    CCIPClientBase.approvedSenderUpdate[] memory senderUpdates = new CCIPClientBase.approvedSenderUpdate[](1);
+    senderUpdates[0] = CCIPClientBase.approvedSenderUpdate({
       destChainSelector: sourceChainSelector,
       sender: abi.encode(address(s_receiver))
     });
 
-    s_receiver.updateApprovedSenders(new ICCIPClientBase.approvedSenderUpdate[](0), senderUpdates);
+    s_receiver.updateApprovedSenders(new CCIPClientBase.approvedSenderUpdate[](0), senderUpdates);
 
     // assertFalse(s_receiver.s_approvedSenders(sourceChainSelector, abi.encode(address(s_receiver))));
     assertFalse(s_receiver.isApprovedSender(sourceChainSelector, abi.encode(address(s_receiver))));
@@ -216,7 +216,7 @@ contract CCIPReceiverTest is EVM2EVMOnRampSetup {
 
     vm.expectEmit();
     emit MessageFailed(
-      messageId, abi.encodeWithSelector(bytes4(ICCIPClientBase.InvalidSender.selector), abi.encode(address(s_receiver)))
+      messageId, abi.encodeWithSelector(bytes4(CCIPClientBase.InvalidSender.selector), abi.encode(address(s_receiver)))
     );
 
     s_receiver.ccipReceive(

@@ -2,8 +2,9 @@
 pragma solidity ^0.8.0;
 
 import {CCIPClient} from "../../../applications/external/CCIPClient.sol";
+
 import {CCIPReceiverWithACK} from "../../../applications/external/CCIPClient.sol";
-import {ICCIPClientBase} from "../../../interfaces/ICCIPClientBase.sol";
+import {CCIPClientBase} from "../../../applications/external/CCIPClientBase.sol";
 import {IRouterClient} from "../../../interfaces/IRouterClient.sol";
 
 import {Client} from "../../../libraries/Client.sol";
@@ -28,13 +29,11 @@ contract CCIPClientTest is EVM2EVMOnRampSetup {
     s_sender = new CCIPClient(address(s_sourceRouter), IERC20(s_sourceFeeToken));
     s_sender.enableChain(destChainSelector, abi.encode(address(s_sender)), "");
 
-    ICCIPClientBase.approvedSenderUpdate[] memory senderUpdates = new ICCIPClientBase.approvedSenderUpdate[](1);
-    senderUpdates[0] = ICCIPClientBase.approvedSenderUpdate({
-      destChainSelector: destChainSelector,
-      sender: abi.encode(address(s_sender))
-    });
+    CCIPClientBase.approvedSenderUpdate[] memory senderUpdates = new CCIPClientBase.approvedSenderUpdate[](1);
+    senderUpdates[0] =
+      CCIPClientBase.approvedSenderUpdate({destChainSelector: destChainSelector, sender: abi.encode(address(s_sender))});
 
-    s_sender.updateApprovedSenders(senderUpdates, new ICCIPClientBase.approvedSenderUpdate[](0));
+    s_sender.updateApprovedSenders(senderUpdates, new CCIPClientBase.approvedSenderUpdate[](0));
   }
 
   function test_ccipReceiveAndSendAck() public {
@@ -57,7 +56,7 @@ contract CCIPClientTest is EVM2EVMOnRampSetup {
 
     Client.EVM2AnyMessage memory ackMessage = Client.EVM2AnyMessage({
       receiver: abi.encode(address(s_sender)),
-      data: abi.encode(s_sender.ACKMESSAGEMAGICBYTES(), messageId),
+      data: abi.encode(s_sender.ACK_MESSAGE_HEADER(), messageId),
       tokenAmounts: destTokenAmounts,
       feeToken: s_sourceFeeToken,
       extraArgs: ""
@@ -102,12 +101,8 @@ contract CCIPClientTest is EVM2EVMOnRampSetup {
     uint256 feeTokenAmount = s_sourceRouter.getFee(DEST_CHAIN_SELECTOR, message);
     uint256 feeTokenBalanceBefore = IERC20(s_sourceFeeToken).balanceOf(OWNER);
 
-    s_sender.ccipSend({
-      destChainSelector: DEST_CHAIN_SELECTOR,
-      tokenAmounts: destTokenAmounts,
-      data: "",
-      feeToken: address(s_sourceFeeToken)
-    });
+    s_sender.ccipSend({destChainSelector: DEST_CHAIN_SELECTOR, tokenAmounts: destTokenAmounts, data: ""});
+    // feeToken: address(s_sourceFeeToken)
 
     // Assert that tokens were transfered for bridging + fees
     assertEq(IERC20(token).balanceOf(OWNER), feeTokenBalanceBefore - feeTokenAmount);
@@ -122,19 +117,16 @@ contract CCIPClientTest is EVM2EVMOnRampSetup {
     // Make sure we give the receiver contract enough tokens like CCIP would.
     IERC20(token).approve(address(s_sender), type(uint256).max);
 
-    bytes32 messageId = s_sender.ccipSend({
-      destChainSelector: DEST_CHAIN_SELECTOR,
-      tokenAmounts: destTokenAmounts,
-      data: "",
-      feeToken: address(s_sourceFeeToken)
-    });
+    bytes32 messageId =
+      s_sender.ccipSend({destChainSelector: DEST_CHAIN_SELECTOR, tokenAmounts: destTokenAmounts, data: ""});
+    // feeToken: address(s_sourceFeeToken)
 
     // The receiver contract will revert if the router is not the sender.
     vm.startPrank(address(s_sourceRouter));
 
     CCIPReceiverWithACK.MessagePayload memory payload = CCIPReceiverWithACK.MessagePayload({
       version: "",
-      data: abi.encode(s_sender.ACKMESSAGEMAGICBYTES(), messageId),
+      data: abi.encode(s_sender.ACK_MESSAGE_HEADER(), messageId),
       messageType: CCIPReceiverWithACK.MessageType.ACK
     });
 
@@ -158,27 +150,27 @@ contract CCIPClientTest is EVM2EVMOnRampSetup {
     );
   }
 
-  function test_ccipSend_withNativeFeeToken_butInsufficientMsgValue_REVERT() public {
-    Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](0);
+  // function test_ccipSend_withNativeFeeToken_butInsufficientMsgValue_REVERT() public {
+  //   Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](0);
 
-    Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
-      receiver: abi.encode(address(s_sender)),
-      data: "FAKE_DATA",
-      tokenAmounts: destTokenAmounts,
-      feeToken: address(0),
-      extraArgs: ""
-    });
+  //   Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
+  //     receiver: abi.encode(address(s_sender)),
+  //     data: "FAKE_DATA",
+  //     tokenAmounts: destTokenAmounts,
+  //     feeToken: address(0),
+  //     extraArgs: ""
+  //   });
 
-    uint256 feeTokenAmount = s_sourceRouter.getFee(DEST_CHAIN_SELECTOR, message);
+  //   uint256 feeTokenAmount = s_sourceRouter.getFee(DEST_CHAIN_SELECTOR, message);
 
-    vm.expectRevert(IRouterClient.InsufficientFeeTokenAmount.selector);
-    s_sender.ccipSend{value: feeTokenAmount / 2}({
-      destChainSelector: DEST_CHAIN_SELECTOR,
-      tokenAmounts: destTokenAmounts,
-      data: "",
-      feeToken: address(0)
-    });
-  }
+  //   vm.expectRevert(IRouterClient.InsufficientFeeTokenAmount.selector);
+  //   s_sender.ccipSend{value: feeTokenAmount / 2}({
+  //     destChainSelector: DEST_CHAIN_SELECTOR,
+  //     tokenAmounts: destTokenAmounts,
+  //     data: "",
+  //     feeToken: address(0)
+  //   });
+  // }
 
   function test_send_tokens_that_are_not_feeToken() public {
     address token = s_sourceTokens[1];
@@ -204,12 +196,8 @@ contract CCIPClientTest is EVM2EVMOnRampSetup {
     uint256 tokenBalanceBefore = IERC20(token).balanceOf(OWNER);
     uint256 feeTokenBalanceBefore = IERC20(s_sourceFeeToken).balanceOf(OWNER);
 
-    s_sender.ccipSend({
-      destChainSelector: DEST_CHAIN_SELECTOR,
-      tokenAmounts: destTokenAmounts,
-      data: "",
-      feeToken: address(s_sourceFeeToken)
-    });
+    s_sender.ccipSend({destChainSelector: DEST_CHAIN_SELECTOR, tokenAmounts: destTokenAmounts, data: ""});
+    // feeToken: address(s_sourceFeeToken)
 
     // Assert that tokens were transfered for bridging + fees
     assertEq(IERC20(token).balanceOf(OWNER), tokenBalanceBefore - amount);

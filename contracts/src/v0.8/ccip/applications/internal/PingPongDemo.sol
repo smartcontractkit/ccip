@@ -49,8 +49,7 @@ contract PingPongDemo is CCIPClient {
     ccipSend({
       destChainSelector: s_counterpartChainSelector, // destChaio
       tokenAmounts: new Client.EVMTokenAmount[](0),
-      data: data,
-      feeToken: address(s_feeToken)
+      data: data
     });
   }
 
@@ -82,10 +81,10 @@ contract PingPongDemo is CCIPClient {
 
     // Approve the counterpart contract under validSender
     // s_approvedSenders[counterpartChainSelector][abi.encode(counterpartAddress)] = true;
-    s_chains[counterpartChainSelector].approvedSender[abi.encode(counterpartAddress)] = true;
+    s_chainConfigs[counterpartChainSelector].approvedSender[abi.encode(counterpartAddress)] = true;
 
     // Approve the counterpart Chain selector under validChain
-    s_chains[counterpartChainSelector].recipient = abi.encode(counterpartAddress);
+    s_chainConfigs[counterpartChainSelector].recipient = abi.encode(counterpartAddress);
   }
 
   function setCounterpartChainSelector(uint64 counterpartChainSelector) external onlyOwner {
@@ -95,7 +94,7 @@ contract PingPongDemo is CCIPClient {
   function setCounterpartAddress(address counterpartAddress) external onlyOwner {
     s_counterpartAddress = counterpartAddress;
 
-    s_chains[s_counterpartChainSelector].recipient = abi.encode(counterpartAddress);
+    s_chainConfigs[s_counterpartChainSelector].recipient = abi.encode(counterpartAddress);
   }
 
   function setPaused(bool pause) external onlyOwner {

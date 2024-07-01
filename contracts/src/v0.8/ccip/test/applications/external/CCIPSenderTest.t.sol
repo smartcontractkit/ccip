@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
+import {CCIPClientBase} from "../../../applications/external/CCIPClientBase.sol";
 import {CCIPSender} from "../../../applications/external/CCIPSender.sol";
-import {ICCIPClientBase} from "../../../interfaces/ICCIPClientBase.sol";
 
 import {Client} from "../../../libraries/Client.sol";
 import {EVM2EVMOnRampSetup} from "../../onRamp/EVM2EVMOnRampSetup.t.sol";
@@ -115,27 +115,5 @@ contract CCIPSenderTest is EVM2EVMOnRampSetup {
     // Assert that native fees are paid successfully and tokens are transferred
     assertEq(IERC20(token).balanceOf(OWNER), tokenBalanceBefore - amount);
     assertEq(OWNER.balance, nativeFeeTokenBalanceBefore - feeTokenAmount);
-  }
-
-  function test_ccipSend_withNativeFeeToken_butInsufficientMsgValue_REVERT() public {
-    Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](0);
-
-    Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
-      receiver: abi.encode(address(s_sender)),
-      data: "FAKE_DATA",
-      tokenAmounts: destTokenAmounts,
-      feeToken: address(0),
-      extraArgs: ""
-    });
-
-    uint256 feeTokenAmount = s_sourceRouter.getFee(DEST_CHAIN_SELECTOR, message);
-
-    vm.expectRevert(IRouterClient.InsufficientFeeTokenAmount.selector);
-    s_sender.ccipSend{value: feeTokenAmount / 2}({
-      destChainSelector: DEST_CHAIN_SELECTOR,
-      tokenAmounts: destTokenAmounts,
-      data: "",
-      feeToken: address(0)
-    });
   }
 }

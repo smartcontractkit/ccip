@@ -8,27 +8,31 @@ import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/tok
 import {SafeERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Address} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/Address.sol";
 
-import {ICCIPClientBase} from "../../interfaces/ICCIPClientBase.sol";
-
-abstract contract CCIPClientBase is ICCIPClientBase, OwnerIsCreator, ITypeAndVersion {
+abstract contract CCIPClientBase is OwnerIsCreator, ITypeAndVersion {
   using SafeERC20 for IERC20;
   using Address for address;
 
   address internal immutable i_ccipRouter;
 
   error ZeroAddressNotAllowed();
+  error InvalidRouter(address router);
+  error InvalidChain(uint64 chainSelector);
+  error InvalidSender(bytes sender);
+  error InvalidRecipient(bytes recipient);
 
-  struct ChainInfo {
+  struct approvedSenderUpdate {
+    uint64 destChainSelector;
+    bytes sender;
+  }
+
+  struct ChainConfig {
+    bool isDisabled;
     bytes recipient;
     bytes extraArgsBytes;
     mapping(bytes => bool) approvedSender;
   }
 
-  mapping(uint64 => ChainInfo) public s_chains;
-
-  // mapping(uint64 => mapping(bytes sender => bool)) public s_approvedSenders;
-  // mapping(uint64 => bytes) public s_chains;
-  // mapping(uint64 => bytes) public s_extraArgsBytes;
+  mapping(uint64 => ChainConfig) public s_chainConfigs;
 
   constructor(address router) {
     if (router == address(0)) revert ZeroAddressNotAllowed();
@@ -58,25 +62,23 @@ abstract contract CCIPClientBase is ICCIPClientBase, OwnerIsCreator, ITypeAndVer
     approvedSenderUpdate[] calldata removes
   ) external onlyOwner {
     for (uint256 i = 0; i < removes.length; ++i) {
-      // delete s_approvedSenders[removes[i].destChainSelector][removes[i].sender];
-      delete s_chains[removes[i].destChainSelector].approvedSender[removes[i].sender];
+      delete s_chainConfigs[removes[i].destChainSelector].approvedSender[removes[i].sender];
     }
 
     for (uint256 i = 0; i < adds.length; ++i) {
-      // s_approvedSenders[adds[i].destChainSelector][adds[i].sender] = true;
-      s_chains[adds[i].destChainSelector].approvedSender[adds[i].sender] = true;
+      s_chainConfigs[adds[i].destChainSelector].approvedSender[adds[i].sender] = true;
     }
   }
 
   function isApprovedSender(uint64 sourceChainSelector, bytes calldata senderAddr) external view returns (bool) {
-    return s_chains[sourceChainSelector].approvedSender[senderAddr];
+    return s_chainConfigs[sourceChainSelector].approvedSender[senderAddr];
   }
 
   // ================================================================
   // │                  Fee Token Management                       │
   // ===============================================================
 
-  fallback() external payable {}
+  fallback() external {}
   receive() external payable {}
 
   function withdrawNativeToken(address payable to, uint256 amount) external onlyOwner {
@@ -96,24 +98,29 @@ abstract contract CCIPClientBase is ICCIPClientBase, OwnerIsCreator, ITypeAndVer
     bytes calldata recipient,
     bytes calldata _extraArgsBytes
   ) external onlyOwner {
-    s_chains[chainSelector].recipient = recipient;
+    ChainConfig storage currentConfig = s_chainConfigs[chainSelector];
 
-    if (_extraArgsBytes.length != 0) s_chains[chainSelector].extraArgsBytes = _extraArgsBytes;
+    currentConfig.recipient = recipient;
+
+    if (_extraArgsBytes.length != 0) currentConfig.extraArgsBytes = _extraArgsBytes;
+
+    // If config was previously disabled, then re-enable it;
+    if (currentConfig.isDisabled) currentConfig.isDisabled = false;
   }
 
   function disableChain(uint64 chainSelector) external onlyOwner {
-    delete s_chains[chainSelector];
-    // delete s_extraArgsBytes[chainSelector];
+    s_chainConfigs[chainSelector].isDisabled = true;
   }
 
   modifier validChain(uint64 chainSelector) {
-    if (s_chains[chainSelector].recipient.length == 0) revert InvalidChain(chainSelector);
+    // Must be storage and not memory because the struct contains a nested mapping
+    ChainConfig storage currentConfig = s_chainConfigs[chainSelector];
+    if (currentConfig.recipient.length == 0 || currentConfig.isDisabled) revert InvalidChain(chainSelector);
     _;
   }
 
   modifier validSender(uint64 chainSelector, bytes memory sender) {
-    // if (!s_approvedSenders[chainSelector][sender]) revert InvalidSender(sender);
-    if (!s_chains[chainSelector].approvedSender[sender]) revert InvalidSender(sender);
+    if (!s_chainConfigs[chainSelector].approvedSender[sender]) revert InvalidSender(sender);
     _;
   }
 }

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
+import {CCIPClientBase} from "../../../applications/external/CCIPClientBase.sol";
 import {CCIPReceiverWithACK} from "../../../applications/external/CCIPReceiverWithACK.sol";
-import {ICCIPClientBase} from "../../../interfaces/ICCIPClientBase.sol";
 
 import {Client} from "../../../libraries/Client.sol";
 import {EVM2EVMOnRampSetup} from "../../onRamp/EVM2EVMOnRampSetup.t.sol";
@@ -26,13 +26,13 @@ contract CCIPReceiverWithAckTest is EVM2EVMOnRampSetup {
     s_receiver = new CCIPReceiverWithACK(address(s_sourceRouter), IERC20(s_sourceFeeToken));
     s_receiver.enableChain(destChainSelector, abi.encode(address(s_receiver)), "");
 
-    ICCIPClientBase.approvedSenderUpdate[] memory senderUpdates = new ICCIPClientBase.approvedSenderUpdate[](1);
-    senderUpdates[0] = ICCIPClientBase.approvedSenderUpdate({
+    CCIPClientBase.approvedSenderUpdate[] memory senderUpdates = new CCIPClientBase.approvedSenderUpdate[](1);
+    senderUpdates[0] = CCIPClientBase.approvedSenderUpdate({
       destChainSelector: destChainSelector,
       sender: abi.encode(address(s_receiver))
     });
 
-    s_receiver.updateApprovedSenders(senderUpdates, new ICCIPClientBase.approvedSenderUpdate[](0));
+    s_receiver.updateApprovedSenders(senderUpdates, new CCIPClientBase.approvedSenderUpdate[](0));
   }
 
   function test_ccipReceive_and_respond_with_ack() public {
@@ -55,7 +55,7 @@ contract CCIPReceiverWithAckTest is EVM2EVMOnRampSetup {
 
     Client.EVM2AnyMessage memory ackMessage = Client.EVM2AnyMessage({
       receiver: abi.encode(address(s_receiver)),
-      data: abi.encode(s_receiver.ACKMESSAGEMAGICBYTES(), messageId),
+      data: abi.encode(s_receiver.ACK_MESSAGE_HEADER(), messageId),
       tokenAmounts: destTokenAmounts,
       feeToken: s_sourceFeeToken,
       extraArgs: ""
@@ -91,7 +91,7 @@ contract CCIPReceiverWithAckTest is EVM2EVMOnRampSetup {
 
     CCIPReceiverWithACK.MessagePayload memory payload = CCIPReceiverWithACK.MessagePayload({
       version: "",
-      data: abi.encode(s_receiver.ACKMESSAGEMAGICBYTES(), messageId),
+      data: abi.encode(s_receiver.ACK_MESSAGE_HEADER(), messageId),
       messageType: CCIPReceiverWithACK.MessageType.ACK
     });
 
@@ -115,23 +115,23 @@ contract CCIPReceiverWithAckTest is EVM2EVMOnRampSetup {
     );
   }
 
-  function test_ccipReceiver_ack_with_invalidMagicBytes_REVERT() public {
+  function test_ccipReceiver_ack_with_invalidAckMessageHeaderBytes_REVERT() public {
     bytes32 messageId = keccak256("messageId");
     Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](0);
 
     // The receiver contract will revert if the router is not the sender.
     vm.startPrank(address(s_sourceRouter));
 
-    // Payload with incorrect magic bytes should revert
+    // Payload with incorrect ack message header should revert
     CCIPReceiverWithACK.MessagePayload memory payload = CCIPReceiverWithACK.MessagePayload({
       version: "",
       data: abi.encode("RANDOM_BYTES", messageId),
       messageType: CCIPReceiverWithACK.MessageType.ACK
     });
 
-    // Expect the processing to revert from invalid magic bytes
+    // Expect the processing to revert from invalid Ack Message Header
     vm.expectEmit();
-    emit MessageFailed(messageId, abi.encodeWithSelector(bytes4(CCIPReceiverWithACK.InvalidMagicBytes.selector)));
+    emit MessageFailed(messageId, abi.encodeWithSelector(bytes4(CCIPReceiverWithACK.InvalidAckMessageHeader.selector)));
 
     s_receiver.ccipReceive(
       Client.Any2EVMMessage({

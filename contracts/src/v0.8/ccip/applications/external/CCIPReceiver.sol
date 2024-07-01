@@ -90,36 +90,38 @@ contract CCIPReceiver is CCIPClientBase {
 
   // ================================================================
   // │                  Failed Message Processing                   |
-  // ================================================================
+  // ================== ==============================================
 
   /// @notice This function is callable by the owner when a message has failed
   /// to unblock the tokens that are associated with that message.
   /// @dev This function is only callable by the owner.
-  function retryFailedMessage(bytes32 messageId) external onlyOwner {
+  function retryFailedMessage(bytes32 messageId, address forwardingAddress) external onlyOwner {
     if (s_failedMessages.get(messageId) != uint256(ErrorCode.FAILED)) revert MessageNotFailed(messageId);
 
     // Set the error code to 0 to disallow reentry and retry the same failed message
     // multiple times.
     s_failedMessages.set(messageId, uint256(ErrorCode.RESOLVED));
 
-    // Do stuff to retry message, potentially just releasing the associated tokens
+    // Allow developer to implement arbitrary functionality on retried messages, such as just releasing the associated tokens
     Client.Any2EVMMessage memory message = s_messageContents[messageId];
 
     // Let the user override the implementation, since different workflow may be desired for retrying a merssage
-    _retryFailedMessage(message);
+    _retryFailedMessage(message, abi.encode(forwardingAddress));
 
     s_failedMessages.remove(messageId); // If retry succeeds, remove from set of failed messages.
 
     emit MessageRecovered(messageId);
   }
 
-  function _retryFailedMessage(Client.Any2EVMMessage memory message) internal virtual {
+  function _retryFailedMessage(Client.Any2EVMMessage memory message, bytes memory retryData) internal virtual {
+    (address forwardingAddress) = abi.decode(retryData, (address));
+
     // Owner rescues tokens sent with a failed message
     for (uint256 i = 0; i < message.destTokenAmounts.length; ++i) {
       uint256 amount = message.destTokenAmounts[i].amount;
       address token = message.destTokenAmounts[i].token;
 
-      IERC20(token).safeTransfer(owner(), amount);
+      IERC20(token).safeTransfer(forwardingAddress, amount);
     }
   }
 

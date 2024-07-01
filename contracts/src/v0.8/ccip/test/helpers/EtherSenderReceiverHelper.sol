@@ -26,7 +26,6 @@ contract EtherSenderReceiverHelper is CCIPSender {
 
   IWrappedNative public immutable i_weth;
 
-  // TODO: Untangle the constructor mess from trying to be both of those at the same time
   constructor(address router) CCIPSender(router) {
     i_weth = IWrappedNative(CCIPRouter(router).getWrappedNative());
     IERC20(i_weth).safeApprove(router, type(uint256).max);
