@@ -107,7 +107,6 @@ func TestCommitPluginCodec(t *testing.T) {
 			decodedReport, err := commitCodec.Decode(ctx, encodedReport)
 			require.NoError(t, err)
 			require.Equal(t, report, decodedReport)
-			return
 		})
 	}
 }
