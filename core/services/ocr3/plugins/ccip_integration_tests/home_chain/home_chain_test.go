@@ -43,7 +43,7 @@ func TestHomeChainReader(t *testing.T) {
 	// Initialize chainReader
 	cfg := evmtypes.ChainReaderConfig{
 		Contracts: map[string]evmtypes.ChainContractReader{
-			"CCIPCapabilityConfiguration": {
+			"CCIPConfig": {
 				ContractABI: capcfg.CCIPConfigMetaData.ABI,
 				Configs: map[string]*evmtypes.ChainReaderDefinition{
 					"getAllChainConfigs": {
@@ -77,7 +77,7 @@ func TestHomeChainReader(t *testing.T) {
 	require.NoError(t, err)
 	backend.Commit()
 	//================================Setup HomeChainReader===============================
-	chainReader := helpers.SetupChainReader(t, backend, capConfAddress, cfg, "CCIPCapabilityConfiguration")
+	chainReader := helpers.SetupChainReader(t, backend, capConfAddress, cfg, "CCIPConfig")
 	require.NoError(t, err)
 	homeChain := ccipreader.NewHomeChainReader(chainReader, logger.TestLogger(t), 1*time.Millisecond)
 	require.NoError(t, homeChain.Start(context.Background()))
