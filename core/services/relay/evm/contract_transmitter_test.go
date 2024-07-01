@@ -98,7 +98,7 @@ func Test_contractTransmitterNoSignatures_Transmit_SignaturesAreNotTransmitted(t
 	report := types.Report{}
 	var signatures = oneSignature()
 
-	oc := createContractTransmitter(t, transmitter, true)
+	oc := createContractTransmitter(ctx, t, transmitter, WithExcludeSignatures())
 
 	err := oc.Transmit(ctx, reportCtx, report, signatures)
 	require.NoError(t, err)
@@ -121,7 +121,7 @@ func Test_contractTransmitter_Transmit_SignaturesAreTransmitted(t *testing.T) {
 	report := types.Report{}
 	var signatures = oneSignature()
 
-	oc := createContractTransmitter(t, transmitter, false)
+	oc := createContractTransmitter(ctx, t, transmitter)
 
 	err := oc.Transmit(ctx, reportCtx, report, signatures)
 	require.NoError(t, err)
@@ -151,18 +151,21 @@ func oneSignature() []ocrtypes.AttributedOnchainSignature {
 	return []libocr.AttributedOnchainSignature{{Signature: signaturesData, Signer: commontypes.OracleID(54)}}
 }
 
-func createContractTransmitter(t *testing.T, transmitter Transmitter, excludeSignatures bool) contractTransmitter {
-	contractABI, _ := abi.JSON(strings.NewReader(ocr2aggregator.OCR2AggregatorMetaData.ABI))
-	fields := contractTransmitter{
-		contractAddress:     gethcommon.Address{},
-		contractABI:         contractABI,
-		transmitter:         transmitter,
-		transmittedEventSig: gethcommon.Hash{},
-		lp:                  lpmocks.NewLogPoller(t),
-		contractReader:      evmclimocks.NewClient(t),
-		lggr:                logger.TestLogger(t),
-		reportToEvmTxMeta:   reportToEvmTxMetaNoop,
-		excludeSigs:         excludeSignatures,
-	}
-	return fields
+func createContractTransmitter(ctx context.Context, t *testing.T, transmitter Transmitter, ops ...OCRTransmitterOption) *contractTransmitter {
+	contractABI, err := abi.JSON(strings.NewReader(ocr2aggregator.OCR2AggregatorMetaData.ABI))
+	require.NoError(t, err)
+	lp := lpmocks.NewLogPoller(t)
+	lp.On("RegisterFilter", mock.Anything, mock.Anything).Return(nil)
+	contractTransmitter, err := NewOCRContractTransmitter(
+		ctx,
+		gethcommon.Address{},
+		evmclimocks.NewClient(t),
+		contractABI,
+		transmitter,
+		lp,
+		logger.TestLogger(t),
+		ops...,
+	)
+	require.NoError(t, err)
+	return contractTransmitter
 }
