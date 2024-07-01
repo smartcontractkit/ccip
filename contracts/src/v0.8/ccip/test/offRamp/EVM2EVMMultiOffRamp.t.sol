@@ -731,28 +731,39 @@ contract EVM2EVMMultiOffRamp_executeSingleReport is EVM2EVMMultiOffRampSetup {
 
   // Reverts
 
-  // TODO: re-implement for mismatching dest chain selector
-  // function test_MismatchingSourceChainSelector_Revert() public {
-  //   Internal.Any2EVMRampMessage[] memory messages =
-  //     _generateSingleBasicMessage(SOURCE_CHAIN_SELECTOR_3, ON_RAMP_ADDRESS_3);
-  //   messages[0].header.sourceChainSelector = SOURCE_CHAIN_SELECTOR_1;
-  //   // MessageID no longer matches hash.
-  //   Internal.ExecutionReportSingleChain memory executionReport =
-  //     _generateReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messages);
-  //   vm.expectRevert(abi.encodeWithSelector(EVM2EVMMultiOffRamp.InvalidMessageId.selector, messages[0].header.messageId));
-  //   s_offRamp.executeSingleReport(executionReport, new uint256[](0));
-  // }
+  function test_MismatchingDestChainSelector_Revert() public {
+    Internal.Any2EVMRampMessage[] memory messages =
+      _generateSingleBasicMessage(SOURCE_CHAIN_SELECTOR_3, ON_RAMP_ADDRESS_3);
+    messages[0].header.destChainSelector = DEST_CHAIN_SELECTOR + 1;
 
-  // TODO: re-implement for mismatching OnRamp
-  // function test_MismatchingMetadataHash_Revert() public {
-  //   Internal.Any2EVMRampMessage[] memory messages = _generateSingleBasicMessage(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1);
-  //   messages[0].header.messageId = Internal._hash(messages[0], METADATA_HASH_2);
-  //   // MessageID no longer matches hash.
-  //   Internal.ExecutionReportSingleChain memory executionReport =
-  //     _generateReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messages);
-  //   vm.expectRevert(abi.encodeWithSelector(EVM2EVMMultiOffRamp.InvalidMessageId.selector, messages[0].header.messageId));
-  //   s_offRamp.executeSingleReport(executionReport, new uint256[](0));
-  // }
+    Internal.ExecutionReportSingleChain memory executionReport =
+      _generateReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messages);
+
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        EVM2EVMMultiOffRamp.InvalidMessageDestChainSelector.selector, messages[0].header.destChainSelector
+      )
+    );
+    s_offRamp.executeSingleReport(executionReport, new uint256[](0));
+  }
+
+  function test_MismatchingOnRampRoot_Revert() public {
+    s_offRamp.setVerifyOverrideResult(SOURCE_CHAIN_SELECTOR_1, 0);
+
+    Internal.Any2EVMRampMessage[] memory messages =
+      _generateSingleBasicMessage(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1);
+
+    EVM2EVMMultiOffRamp.CommitReport memory commitReport = _constructCommitReport(
+      // Root against mismatching on ramp
+      Internal._hash(messages[0], ON_RAMP_ADDRESS_3)
+    );
+    _commit(commitReport, s_latestSequenceNumber);
+
+    Internal.ExecutionReportSingleChain memory executionReport =
+      _generateReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messages);
+    vm.expectRevert(abi.encodeWithSelector(EVM2EVMMultiOffRamp.RootNotCommitted.selector, SOURCE_CHAIN_SELECTOR_1));
+    s_offRamp.executeSingleReport(executionReport, new uint256[](0));
+  }
 
   function test_Unhealthy_Revert() public {
     s_mockRMN.voteToCurse(bytes16(type(uint128).max));
@@ -933,6 +944,20 @@ contract EVM2EVMMultiOffRamp_executeSingleReport is EVM2EVMMultiOffRampSetup {
       )
     );
     s_offRamp.executeSingleReport(_generateReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messages), new uint256[](0));
+  }
+
+  function _constructCommitReport(bytes32 merkleRoot) internal view returns (EVM2EVMMultiOffRamp.CommitReport memory) {
+    EVM2EVMMultiOffRamp.MerkleRoot[] memory roots = new EVM2EVMMultiOffRamp.MerkleRoot[](1);
+    roots[0] = EVM2EVMMultiOffRamp.MerkleRoot({
+      sourceChainSelector: SOURCE_CHAIN_SELECTOR_1,
+      interval: EVM2EVMMultiOffRamp.Interval(1, 2),
+      merkleRoot: merkleRoot
+    });
+
+    return EVM2EVMMultiOffRamp.CommitReport({
+      priceUpdates: getSingleTokenPriceUpdateStruct(s_sourceFeeToken, 4e18),
+      merkleRoots: roots
+    });
   }
 }
 

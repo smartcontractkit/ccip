@@ -58,6 +58,7 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
   error StaleCommitReport();
   error InvalidInterval(uint64 sourceChainSelector, Interval interval);
   error ZeroAddressNotAllowed();
+  error InvalidMessageDestChainSelector(uint64 messageDestChainSelector);
 
   /// @dev Atlas depends on this event, if changing, please notify Atlas.
   event StaticConfigSet(StaticConfig staticConfig);
@@ -371,10 +372,17 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
 
     for (uint256 i = 0; i < numMsgs; ++i) {
       Internal.Any2EVMRampMessage memory message = report.messages[i];
+
+      // Commits do not verify the destChainSelector in the message, since only the root is committed,
+      // so we have to check it explicitly
+      if (message.header.destChainSelector != i_chainSelector) {
+        revert InvalidMessageDestChainSelector(message.header.destChainSelector);
+      }
+
       // We do this hash here instead of in _verifyMessages to avoid two separate loops
-      // over the same data, which increases gas cost
-      // TODO: verify message.destChainSelector == config.destChainSelector
-      // (alternatively, validate this in the commit() flow)
+      // over the same data, which increases gas cost.
+      // Hashing all of the message fields ensures that the message being executed is correct and not tampered with.
+      // Including the known OnRamp ensures that the message originates from the correct on ramp version
       hashedLeaves[i] = Internal._hash(message, sourceChainConfig.onRamp);
     }
 
