@@ -1,7 +1,6 @@
 package home_chain
 
 import (
-	"context"
 	_ "embed"
 	"fmt"
 	"math/big"
@@ -32,7 +31,7 @@ import (
 	evmtypes "github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/types"
 )
 
-var (
+const (
 	chainA  uint64 = 1
 	fChainA uint8  = 1
 
@@ -81,8 +80,7 @@ func TestHomeChainReader(t *testing.T) {
 	require.NoError(t, err)
 	backend.Commit()
 	//================================Setup HomeChainReader===============================
-	//ctx := testutils.Context(t)
-	ctx, cancelFunc := context.WithCancel(context.Background())
+	ctx := testutils.Context(t)
 	testData := helpers.SetupReaderTestData(ctx, t, backend, capConfAddress, cfg, "CCIPConfig")
 	chainReader := testData.ChainReader
 	logPoller := testData.LogPoller
@@ -118,7 +116,6 @@ func TestHomeChainReader(t *testing.T) {
 	delete(expectedChainConfigs, cciptypes.ChainSelector(chainC))
 	require.Equal(t, expectedChainConfigs, configs)
 	//================================Close HomeChain Reader===============================
-	t.Cleanup(cancelFunc)
 	require.NoError(t, homeChain.Close())
 	require.NoError(t, logPoller.Close())
 	require.NoError(t, chainReader.Close())
