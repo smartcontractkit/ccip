@@ -3,8 +3,9 @@ package mocks
 import (
 	"context"
 
-	ccipreaderpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	mock "github.com/stretchr/testify/mock"
+
+	ccipreaderpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 
 	cctypes "github.com/smartcontractkit/chainlink/v2/core/services/ccipcapability/types"
 )

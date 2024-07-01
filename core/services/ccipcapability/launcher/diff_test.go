@@ -353,8 +353,20 @@ func Test_filterCCIPDONs(t *testing.T) {
 					},
 				},
 			},
-			map[registrysyncer.DonID]kcr.CapabilitiesRegistryDONInfo{},
-			true,
+			map[registrysyncer.DonID]kcr.CapabilitiesRegistryDONInfo{
+				1: {
+					Id: 1,
+					CapabilityConfigurations: []kcr.CapabilitiesRegistryCapabilityConfiguration{
+						{
+							CapabilityId: mustHashedCapabilityId("ccip", "v1.0.0"),
+						},
+						{
+							CapabilityId: mustHashedCapabilityId("ccip", "v1.1.0"),
+						},
+					},
+				},
+			},
+			false,
 		},
 	}
 	for _, tt := range tests {

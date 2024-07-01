@@ -8,9 +8,10 @@ import (
 
 	"go.uber.org/multierr"
 
-	ccipreaderpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils"
 	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
+
+	ccipreaderpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
+	"github.com/smartcontractkit/chainlink-common/pkg/services"
 
 	kcr "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/capabilities_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
@@ -23,10 +24,6 @@ import (
 var (
 	_ job.ServiceCtx          = (*launcher)(nil)
 	_ registrysyncer.Launcher = (*launcher)(nil)
-)
-
-const (
-	defaultTickInterval = 10 * time.Second
 )
 
 func New(
@@ -57,7 +54,7 @@ func New(
 
 // launcher manages the lifecycles of the CCIP capability on all chains.
 type launcher struct {
-	utils.StartStopOnce
+	services.StateMachine
 
 	capabilityVersion      string
 	capabilityLabelledName string
@@ -95,7 +92,7 @@ func (l *launcher) getLatestState() registrysyncer.State {
 	return l.latestState
 }
 
-func (l *launcher) runningDONs() []registrysyncer.DonID {
+func (l *launcher) runningDONIDs() []registrysyncer.DonID {
 	l.lock.RLock()
 	defer l.lock.RUnlock()
 	var runningDONs []registrysyncer.DonID
@@ -107,7 +104,7 @@ func (l *launcher) runningDONs() []registrysyncer.DonID {
 
 // Close implements job.ServiceCtx.
 func (l *launcher) Close() error {
-	return l.StartStopOnce.StopOnce("launcher", func() error {
+	return l.StateMachine.StopOnce("launcher", func() error {
 		// shut down the monitor goroutine.
 		close(l.stopChan)
 		l.wg.Wait()
@@ -177,62 +174,18 @@ func (l *launcher) tick() error {
 // for any removed OCR instances, it will shut them down.
 // for any updated OCR instances, it will restart them with the new configuration.
 func (l *launcher) processDiff(diff diffResult) error {
+	err := l.processRemoved(diff.removed)
+	err = multierr.Append(err, l.processAdded(diff.added))
+	err = multierr.Append(err, l.processUpdate(diff.updated))
+
+	return err
+}
+
+func (l *launcher) processUpdate(updated map[registrysyncer.DonID]kcr.CapabilitiesRegistryDONInfo) error {
 	l.lock.Lock()
 	defer l.lock.Unlock()
 
-	for id := range diff.removed {
-		ceDep, ok := l.dons[id]
-		if !ok {
-			// not running this particular DON.
-			continue
-		}
-
-		if err := ceDep.Close(); err != nil {
-			return fmt.Errorf("failed to shutdown oracles for CCIP DON %d: %w", id, err)
-		}
-
-		// after a successful shutdown we can safely remove the DON deployment from the map.
-		delete(l.dons, id)
-		delete(l.regState.IDsToDONs, id)
-	}
-
-	var addedDeployments = make(map[registrysyncer.DonID]*ccipDeployment)
-	for _, don := range diff.added {
-		dep, err := createDON(
-			l.lggr,
-			l.p2pID,
-			l.homeChainReader,
-			l.oracleCreator,
-			don,
-		)
-		if err != nil {
-			return err
-		}
-		if dep == nil {
-			// not a member of this DON.
-			continue
-		}
-		addedDeployments[registrysyncer.DonID(don.Id)] = dep
-	}
-
-	for donID, dep := range addedDeployments {
-		if err := dep.StartBlue(); err != nil {
-			if shutdownErr := dep.CloseBlue(); shutdownErr != nil {
-				l.lggr.Errorw("Failed to shutdown blue instance after failed start", "donId", donID, "err", shutdownErr)
-			}
-			return fmt.Errorf("failed to start oracles for CCIP DON %d: %w", donID, err)
-		}
-		// update state.
-		l.dons[donID] = dep
-		// update the state with the latest config.
-		// this way if one of the starts errors, we don't retry all of them.
-		l.regState.IDsToDONs[donID] = diff.added[donID]
-	}
-
-	var updatedDeployments = make(map[registrysyncer.DonID]struct {
-		prevDeployment, futDeployment *ccipDeployment
-	})
-	for _, don := range diff.updated {
+	for donID, don := range updated {
 		prevDeployment, ok := l.dons[registrysyncer.DonID(don.Id)]
 		if !ok {
 			return fmt.Errorf("invariant violation: expected to find CCIP DON %d in the map of running deployments", don.Id)
@@ -249,25 +202,76 @@ func (l *launcher) processDiff(diff diffResult) error {
 		if err != nil {
 			return err
 		}
-		updatedDeployments[registrysyncer.DonID(don.Id)] = struct {
-			prevDeployment, futDeployment *ccipDeployment
-		}{
-			prevDeployment: prevDeployment,
-			futDeployment:  futDeployment,
-		}
-	}
-
-	for donID, depPair := range updatedDeployments {
-		if err := depPair.futDeployment.HandleBlueGreen(depPair.prevDeployment); err != nil {
+		if err := futDeployment.HandleBlueGreen(prevDeployment); err != nil {
 			// TODO: how to handle a failed blue-green deployment?
 			return fmt.Errorf("failed to handle blue-green deployment for CCIP DON %d: %w", donID, err)
 		}
 
 		// update state.
-		l.dons[donID] = depPair.futDeployment
+		l.dons[donID] = futDeployment
 		// update the state with the latest config.
 		// this way if one of the starts errors, we don't retry all of them.
-		l.regState.IDsToDONs[donID] = diff.updated[donID]
+		l.regState.IDsToDONs[donID] = updated[donID]
+	}
+
+	return nil
+}
+
+func (l *launcher) processAdded(added map[registrysyncer.DonID]kcr.CapabilitiesRegistryDONInfo) error {
+	l.lock.Lock()
+	defer l.lock.Unlock()
+
+	for donID, don := range added {
+		dep, err := createDON(
+			l.lggr,
+			l.p2pID,
+			l.homeChainReader,
+			l.oracleCreator,
+			don,
+		)
+		if err != nil {
+			return err
+		}
+		if dep == nil {
+			// not a member of this DON.
+			continue
+		}
+
+		if err := dep.StartBlue(); err != nil {
+			if shutdownErr := dep.CloseBlue(); shutdownErr != nil {
+				l.lggr.Errorw("Failed to shutdown blue instance after failed start", "donId", donID, "err", shutdownErr)
+			}
+			return fmt.Errorf("failed to start oracles for CCIP DON %d: %w", donID, err)
+		}
+
+		// update state.
+		l.dons[donID] = dep
+		// update the state with the latest config.
+		// this way if one of the starts errors, we don't retry all of them.
+		l.regState.IDsToDONs[donID] = added[donID]
+	}
+
+	return nil
+}
+
+func (l *launcher) processRemoved(removed map[registrysyncer.DonID]kcr.CapabilitiesRegistryDONInfo) error {
+	l.lock.Lock()
+	defer l.lock.Unlock()
+
+	for id := range removed {
+		ceDep, ok := l.dons[id]
+		if !ok {
+			// not running this particular DON.
+			continue
+		}
+
+		if err := ceDep.Close(); err != nil {
+			return fmt.Errorf("failed to shutdown oracles for CCIP DON %d: %w", id, err)
+		}
+
+		// after a successful shutdown we can safely remove the DON deployment from the map.
+		delete(l.dons, id)
+		delete(l.regState.IDsToDONs, id)
 	}
 
 	return nil

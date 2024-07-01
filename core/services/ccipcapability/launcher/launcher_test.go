@@ -6,10 +6,11 @@ import (
 	"reflect"
 	"testing"
 
-	ccipreaderpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+
+	ccipreaderpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 
 	kcr "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/capabilities_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"

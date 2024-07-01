@@ -163,10 +163,10 @@ func addCapabilities(
 	return p2pIDs
 }
 
-func setupConfigInfo(chainSelector uint64, readers [][32]byte, fChain uint8, cfg []byte) ccip_config.TypesChainConfigInfo {
-	return ccip_config.TypesChainConfigInfo{
+func setupConfigInfo(chainSelector uint64, readers [][32]byte, fChain uint8, cfg []byte) ccip_config.CCIPConfigTypesChainConfigInfo {
+	return ccip_config.CCIPConfigTypesChainConfigInfo{
 		ChainSelector: chainSelector,
-		ChainConfig: ccip_config.TypesChainConfig{
+		ChainConfig: ccip_config.CCIPConfigTypesChainConfig{
 			Readers: readers,
 			FChain:  fChain,
 			Config:  cfg,
@@ -230,9 +230,9 @@ func addDONToRegistry(t *testing.T,
 		transmitters = append(transmitters, testutils.NewAddress().Bytes())
 	}
 
-	var ocr3Configs []ocr3_config_encoder.TypesOCR3Config
+	var ocr3Configs []ocr3_config_encoder.CCIPConfigTypesOCR3Config
 	for _, pluginType := range []cctypes.PluginType{cctypes.PluginTypeCCIPCommit, cctypes.PluginTypeCCIPExec} {
-		ocr3Configs = append(ocr3Configs, ocr3_config_encoder.TypesOCR3Config{
+		ocr3Configs = append(ocr3Configs, ocr3_config_encoder.CCIPConfigTypesOCR3Config{
 			PluginType:            uint8(pluginType),
 			ChainSelector:         chainSelector,
 			F:                     f,
@@ -310,7 +310,7 @@ func TestIntegration_Launcher(t *testing.T) {
 	chainAConf := setupConfigInfo(chainA, p2pIDs, fChainA, []byte("chainA"))
 	chainBConf := setupConfigInfo(chainB, p2pIDs[1:], fChainB, []byte("chainB"))
 	chainCConf := setupConfigInfo(chainC, p2pIDs[2:], fChainC, []byte("chainC"))
-	inputConfig := []ccip_config.TypesChainConfigInfo{
+	inputConfig := []ccip_config.CCIPConfigTypesChainConfigInfo{
 		chainAConf,
 		chainBConf,
 		chainCConf,
@@ -335,7 +335,7 @@ func TestIntegration_Launcher(t *testing.T) {
 	)
 
 	gomega.NewWithT(t).Eventually(func() bool {
-		return len(launcher.runningDONs()) == 1
+		return len(launcher.runningDONIDs()) == 1
 	}, testutils.WaitTimeout(t), testutils.TestInterval).Should(gomega.BeTrue())
 }
 

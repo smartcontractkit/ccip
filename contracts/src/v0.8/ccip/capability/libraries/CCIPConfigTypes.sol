@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 
 import {Internal} from "../../libraries/Internal.sol";
 
-library Types {
+library CCIPConfigTypes {
   /// @notice ConfigState indicates the state of the configuration.
   /// A DON's configuration always starts out in the "Init" state - this is the starting state.
   /// The only valid transition from "Init" is to the "Running" state - this is the first ever configuration.
@@ -33,9 +33,9 @@ library Types {
   /// @notice OCR3 configuration.
   struct OCR3Config {
     Internal.OCRPluginType pluginType; // ────────╮ The plugin that the configuration is for.
-    uint64 chainSelector; //          | The (remote) chain that the configuration is for.
-    uint8 F; //                       | The "big F" parameter for the role DON.
-    uint64 offchainConfigVersion; // ─╯ The version of the offchain configuration.
+    uint64 chainSelector; //                      | The (remote) chain that the configuration is for.
+    uint8 F; //                                   | The "big F" parameter for the role DON.
+    uint64 offchainConfigVersion; // ─────────────╯ The version of the offchain configuration.
     bytes offrampAddress; // The remote chain offramp address.
     bytes32[] bootstrapP2PIds; // The bootstrap P2P IDs of the oracles that are part of the role DON.
     // len(p2pIds) == len(signers) == len(transmitters) == 3 * F + 1

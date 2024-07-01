@@ -8,7 +8,7 @@ import {ICapabilitiesRegistry} from "./interfaces/ICapabilitiesRegistry.sol";
 import {OwnerIsCreator} from "../../shared/access/OwnerIsCreator.sol";
 
 import {Internal} from "../libraries/Internal.sol";
-import {Types} from "./libraries/Types.sol";
+import {CCIPConfigTypes} from "./libraries/CCIPConfigTypes.sol";
 
 import {IERC165} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/interfaces/IERC165.sol";
 import {EnumerableSet} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/structs/EnumerableSet.sol";
@@ -24,7 +24,7 @@ contract CCIPConfig is ITypeAndVersion, ICapabilityConfiguration, OwnerIsCreator
   /// @notice Emitted when a chain's configuration is set.
   /// @param chainSelector The chain selector.
   /// @param chainConfig The chain configuration.
-  event ChainConfigSet(uint64 chainSelector, Types.ChainConfig chainConfig);
+  event ChainConfigSet(uint64 chainSelector, CCIPConfigTypes.ChainConfig chainConfig);
 
   /// @notice Emitted when a chain's configuration is removed.
   /// @param chainSelector The chain selector.
@@ -47,7 +47,9 @@ contract CCIPConfig is ITypeAndVersion, ICapabilityConfiguration, OwnerIsCreator
   error InvalidPluginType();
   error OfframpAddressCannotBeZero();
   error InvalidConfigLength(uint256 length);
-  error InvalidConfigStateTransition(Types.ConfigState currentState, Types.ConfigState proposedState);
+  error InvalidConfigStateTransition(
+    CCIPConfigTypes.ConfigState currentState, CCIPConfigTypes.ConfigState proposedState
+  );
   error NonExistentConfigTransition();
   error WrongConfigCount(uint64 got, uint64 expected);
   error WrongConfigDigest(bytes32 got, bytes32 expected);
@@ -60,7 +62,7 @@ contract CCIPConfig is ITypeAndVersion, ICapabilityConfiguration, OwnerIsCreator
   address internal immutable i_capabilitiesRegistry;
 
   /// @notice chain configuration for each chain that CCIP is deployed on.
-  mapping(uint64 chainSelector => Types.ChainConfig chainConfig) internal s_chainConfigurations;
+  mapping(uint64 chainSelector => CCIPConfigTypes.ChainConfig chainConfig) internal s_chainConfigurations;
 
   /// @notice All chains that are configured.
   EnumerableSet.UintSet internal s_remoteChainSelectors;
@@ -68,7 +70,9 @@ contract CCIPConfig is ITypeAndVersion, ICapabilityConfiguration, OwnerIsCreator
   /// @notice OCR3 configurations for each DON.
   /// Each CR DON will have a commit and execution configuration.
   /// This means that a DON can have up to 4 configurations, since we are implementing blue/green deployments.
-  mapping(uint32 donId => mapping(Internal.OCRPluginType pluginType => Types.OCR3ConfigWithMeta[] ocr3Configs)) internal s_ocr3Configs;
+  mapping(
+    uint32 donId => mapping(Internal.OCRPluginType pluginType => CCIPConfigTypes.OCR3ConfigWithMeta[] ocr3Configs)
+  ) internal s_ocr3Configs;
 
   /// @notice The DONs that have been configured.
   EnumerableSet.UintSet internal s_donIds;
@@ -94,13 +98,16 @@ contract CCIPConfig is ITypeAndVersion, ICapabilityConfiguration, OwnerIsCreator
   /// @notice Returns all the chain configurations.
   /// @return The chain configurations.
   // TODO: will this eventually hit the RPC max response size limit?
-  function getAllChainConfigs() external view returns (Types.ChainConfigInfo[] memory) {
+  function getAllChainConfigs() external view returns (CCIPConfigTypes.ChainConfigInfo[] memory) {
     uint256[] memory chainSelectors = s_remoteChainSelectors.values();
-    Types.ChainConfigInfo[] memory chainConfigs = new Types.ChainConfigInfo[](s_remoteChainSelectors.length());
+    CCIPConfigTypes.ChainConfigInfo[] memory chainConfigs =
+      new CCIPConfigTypes.ChainConfigInfo[](s_remoteChainSelectors.length());
     for (uint256 i = 0; i < chainSelectors.length; ++i) {
       uint64 chainSelector = uint64(chainSelectors[i]);
-      chainConfigs[i] =
-        Types.ChainConfigInfo({chainSelector: chainSelector, chainConfig: s_chainConfigurations[chainSelector]});
+      chainConfigs[i] = CCIPConfigTypes.ChainConfigInfo({
+        chainSelector: chainSelector,
+        chainConfig: s_chainConfigurations[chainSelector]
+      });
     }
     return chainConfigs;
   }
@@ -109,7 +116,10 @@ contract CCIPConfig is ITypeAndVersion, ICapabilityConfiguration, OwnerIsCreator
   /// @param donId The DON ID.
   /// @param pluginType The plugin type.
   /// @return The OCR3 configurations, up to 2 (blue and green).
-  function getOCRConfig(uint32 donId, Internal.OCRPluginType pluginType) external view returns (Types.OCR3ConfigWithMeta[] memory) {
+  function getOCRConfig(
+    uint32 donId,
+    Internal.OCRPluginType pluginType
+  ) external view returns (CCIPConfigTypes.OCR3ConfigWithMeta[] memory) {
     return s_ocr3Configs[donId][pluginType];
   }
 
@@ -135,8 +145,9 @@ contract CCIPConfig is ITypeAndVersion, ICapabilityConfiguration, OwnerIsCreator
       revert OnlyCapabilitiesRegistryCanCall();
     }
 
-    Types.OCR3Config[] memory ocr3Configs = abi.decode(config, (Types.OCR3Config[]));
-    (Types.OCR3Config[] memory commitConfigs, Types.OCR3Config[] memory execConfigs) = _groupByPluginType(ocr3Configs);
+    CCIPConfigTypes.OCR3Config[] memory ocr3Configs = abi.decode(config, (CCIPConfigTypes.OCR3Config[]));
+    (CCIPConfigTypes.OCR3Config[] memory commitConfigs, CCIPConfigTypes.OCR3Config[] memory execConfigs) =
+      _groupByPluginType(ocr3Configs);
     if (commitConfigs.length > 0) {
       _updatePluginConfig(donId, Internal.OCRPluginType.Commit, commitConfigs);
     }
@@ -145,17 +156,21 @@ contract CCIPConfig is ITypeAndVersion, ICapabilityConfiguration, OwnerIsCreator
     }
   }
 
-  function _updatePluginConfig(uint32 donId, Internal.OCRPluginType pluginType, Types.OCR3Config[] memory newConfig) internal {
-    Types.OCR3ConfigWithMeta[] memory currentConfig = s_ocr3Configs[donId][pluginType];
+  function _updatePluginConfig(
+    uint32 donId,
+    Internal.OCRPluginType pluginType,
+    CCIPConfigTypes.OCR3Config[] memory newConfig
+  ) internal {
+    CCIPConfigTypes.OCR3ConfigWithMeta[] memory currentConfig = s_ocr3Configs[donId][pluginType];
 
     // Validate the state transition being proposed, which is implicitly defined by the combination
     // of lengths of the current and new configurations.
-    Types.ConfigState currentState = _stateFromConfigLength(currentConfig.length);
-    Types.ConfigState proposedState = _stateFromConfigLength(newConfig.length);
+    CCIPConfigTypes.ConfigState currentState = _stateFromConfigLength(currentConfig.length);
+    CCIPConfigTypes.ConfigState proposedState = _stateFromConfigLength(newConfig.length);
     _validateConfigStateTransition(currentState, proposedState);
 
     // Build the new configuration with metadata and validate that the transition is valid.
-    Types.OCR3ConfigWithMeta[] memory newConfigWithMeta =
+    CCIPConfigTypes.OCR3ConfigWithMeta[] memory newConfigWithMeta =
       _computeNewConfigWithMeta(donId, currentConfig, newConfig, currentState, proposedState);
     _validateConfigTransition(currentConfig, newConfigWithMeta);
 
@@ -174,11 +189,11 @@ contract CCIPConfig is ITypeAndVersion, ICapabilityConfiguration, OwnerIsCreator
   /// @notice Determine the config state of the configuration from the length of the config.
   /// @param configLen The length of the configuration.
   /// @return The config state.
-  function _stateFromConfigLength(uint256 configLen) internal pure returns (Types.ConfigState) {
+  function _stateFromConfigLength(uint256 configLen) internal pure returns (CCIPConfigTypes.ConfigState) {
     if (configLen > 2) {
       revert InvalidConfigLength(configLen);
     }
-    return Types.ConfigState(configLen);
+    return CCIPConfigTypes.ConfigState(configLen);
   }
 
   // the only valid state transitions are the following:
@@ -186,7 +201,10 @@ contract CCIPConfig is ITypeAndVersion, ICapabilityConfiguration, OwnerIsCreator
   // running -> staging (blue/green proposal)
   // staging -> running (promotion)
   // everything else is invalid and should revert.
-  function _validateConfigStateTransition(Types.ConfigState currentState, Types.ConfigState newState) internal pure {
+  function _validateConfigStateTransition(
+    CCIPConfigTypes.ConfigState currentState,
+    CCIPConfigTypes.ConfigState newState
+  ) internal pure {
     // Calculate the difference between the new state and the current state
     int256 stateDiff = int256(uint256(newState)) - int256(uint256(currentState));
 
@@ -195,15 +213,15 @@ contract CCIPConfig is ITypeAndVersion, ICapabilityConfiguration, OwnerIsCreator
     // 1. currentState -> newState (where stateDiff == 1)
     //    e.g., init -> running or running -> staging
     // 2. staging -> running (where stateDiff == -1)
-    if (stateDiff == 1 || (stateDiff == -1 && currentState == Types.ConfigState.Staging)) {
+    if (stateDiff == 1 || (stateDiff == -1 && currentState == CCIPConfigTypes.ConfigState.Staging)) {
       return;
     }
     revert InvalidConfigStateTransition(currentState, newState);
   }
 
   function _validateConfigTransition(
-    Types.OCR3ConfigWithMeta[] memory currentConfig,
-    Types.OCR3ConfigWithMeta[] memory newConfigWithMeta
+    CCIPConfigTypes.OCR3ConfigWithMeta[] memory currentConfig,
+    CCIPConfigTypes.OCR3ConfigWithMeta[] memory newConfigWithMeta
   ) internal pure {
     uint256 currentConfigLen = currentConfig.length;
     uint256 newConfigLen = newConfigWithMeta.length;
@@ -248,35 +266,36 @@ contract CCIPConfig is ITypeAndVersion, ICapabilityConfiguration, OwnerIsCreator
   /// @return The new configuration with metadata.
   function _computeNewConfigWithMeta(
     uint32 donId,
-    Types.OCR3ConfigWithMeta[] memory currentConfig,
-    Types.OCR3Config[] memory newConfig,
-    Types.ConfigState currentState,
-    Types.ConfigState newState
-  ) internal view returns (Types.OCR3ConfigWithMeta[] memory) {
+    CCIPConfigTypes.OCR3ConfigWithMeta[] memory currentConfig,
+    CCIPConfigTypes.OCR3Config[] memory newConfig,
+    CCIPConfigTypes.ConfigState currentState,
+    CCIPConfigTypes.ConfigState newState
+  ) internal view returns (CCIPConfigTypes.OCR3ConfigWithMeta[] memory) {
     uint64[] memory configCounts = new uint64[](newConfig.length);
 
     // Set config counts based on the only valid state transitions.
     // Init    -> Running (first ever config)
     // Running -> Staging (blue/green proposal)
     // Staging -> Running (promotion)
-    if (currentState == Types.ConfigState.Init && newState == Types.ConfigState.Running) {
+    if (currentState == CCIPConfigTypes.ConfigState.Init && newState == CCIPConfigTypes.ConfigState.Running) {
       // First ever config starts with config count == 1.
       configCounts[0] = 1;
-    } else if (currentState == Types.ConfigState.Running && newState == Types.ConfigState.Staging) {
+    } else if (currentState == CCIPConfigTypes.ConfigState.Running && newState == CCIPConfigTypes.ConfigState.Staging) {
       // On a blue/green proposal, the config count of the green config is the blue config count + 1.
       configCounts[0] = currentConfig[0].configCount;
       configCounts[1] = currentConfig[0].configCount + 1;
-    } else if (currentState == Types.ConfigState.Staging && newState == Types.ConfigState.Running) {
+    } else if (currentState == CCIPConfigTypes.ConfigState.Staging && newState == CCIPConfigTypes.ConfigState.Running) {
       // On a promotion, the config count of the green config becomes the blue config count.
       configCounts[0] = currentConfig[1].configCount;
     } else {
       revert InvalidConfigStateTransition(currentState, newState);
     }
 
-    Types.OCR3ConfigWithMeta[] memory newConfigWithMeta = new Types.OCR3ConfigWithMeta[](newConfig.length);
+    CCIPConfigTypes.OCR3ConfigWithMeta[] memory newConfigWithMeta =
+      new CCIPConfigTypes.OCR3ConfigWithMeta[](newConfig.length);
     for (uint256 i = 0; i < configCounts.length; ++i) {
       _validateConfig(newConfig[i]);
-      newConfigWithMeta[i] = Types.OCR3ConfigWithMeta({
+      newConfigWithMeta[i] = CCIPConfigTypes.OCR3ConfigWithMeta({
         config: newConfig[i],
         configCount: configCounts[i],
         configDigest: _computeConfigDigest(donId, configCounts[i], newConfig[i])
@@ -288,10 +307,10 @@ contract CCIPConfig is ITypeAndVersion, ICapabilityConfiguration, OwnerIsCreator
 
   /// @notice Group the OCR3 configurations by plugin type for further processing.
   /// @param ocr3Configs The OCR3 configurations to group.
-  function _groupByPluginType(Types.OCR3Config[] memory ocr3Configs)
+  function _groupByPluginType(CCIPConfigTypes.OCR3Config[] memory ocr3Configs)
     internal
     pure
-    returns (Types.OCR3Config[] memory commitConfigs, Types.OCR3Config[] memory execConfigs)
+    returns (CCIPConfigTypes.OCR3Config[] memory commitConfigs, CCIPConfigTypes.OCR3Config[] memory execConfigs)
   {
     if (ocr3Configs.length > MAX_OCR3_CONFIGS_PER_DON) {
       revert TooManyOCR3Configs();
@@ -301,8 +320,8 @@ contract CCIPConfig is ITypeAndVersion, ICapabilityConfiguration, OwnerIsCreator
     // If we have less we will adjust the length later using mstore.
     // If the caller provides more than 2 configs per plugin type, we will revert due to out of bounds
     // access in the for loop below.
-    commitConfigs = new Types.OCR3Config[](MAX_OCR3_CONFIGS_PER_PLUGIN);
-    execConfigs = new Types.OCR3Config[](MAX_OCR3_CONFIGS_PER_PLUGIN);
+    commitConfigs = new CCIPConfigTypes.OCR3Config[](MAX_OCR3_CONFIGS_PER_PLUGIN);
+    execConfigs = new CCIPConfigTypes.OCR3Config[](MAX_OCR3_CONFIGS_PER_PLUGIN);
     uint256 commitCount;
     uint256 execCount;
     for (uint256 i = 0; i < ocr3Configs.length; ++i) {
@@ -324,9 +343,11 @@ contract CCIPConfig is ITypeAndVersion, ICapabilityConfiguration, OwnerIsCreator
     return (commitConfigs, execConfigs);
   }
 
-  function _validateConfig(Types.OCR3Config memory cfg) internal view {
+  function _validateConfig(CCIPConfigTypes.OCR3Config memory cfg) internal view {
     if (cfg.chainSelector == 0) revert ChainSelectorNotSet();
-    if (cfg.pluginType != Internal.OCRPluginType.Commit && cfg.pluginType != Internal.OCRPluginType.Execution) revert InvalidPluginType();
+    if (cfg.pluginType != Internal.OCRPluginType.Commit && cfg.pluginType != Internal.OCRPluginType.Execution) {
+      revert InvalidPluginType();
+    }
     // TODO: can we do more sophisticated validation than this?
     if (cfg.offrampAddress.length == 0) revert OfframpAddressCannotBeZero();
     if (!s_remoteChainSelectors.contains(cfg.chainSelector)) revert ChainSelectorNotFound(cfg.chainSelector);
@@ -369,7 +390,7 @@ contract CCIPConfig is ITypeAndVersion, ICapabilityConfiguration, OwnerIsCreator
   function _computeConfigDigest(
     uint32 donId,
     uint64 configCount,
-    Types.OCR3Config memory ocr3Config
+    CCIPConfigTypes.OCR3Config memory ocr3Config
   ) internal pure returns (bytes32) {
     uint256 h = uint256(
       keccak256(
@@ -403,7 +424,7 @@ contract CCIPConfig is ITypeAndVersion, ICapabilityConfiguration, OwnerIsCreator
   /// @param chainConfigAdds The chain configurations to add.
   function applyChainConfigUpdates(
     uint64[] calldata chainSelectorRemoves,
-    Types.ChainConfigInfo[] calldata chainConfigAdds
+    CCIPConfigTypes.ChainConfigInfo[] calldata chainConfigAdds
   ) external onlyOwner {
     // Process removals first.
     for (uint256 i = 0; i < chainSelectorRemoves.length; ++i) {
@@ -420,7 +441,7 @@ contract CCIPConfig is ITypeAndVersion, ICapabilityConfiguration, OwnerIsCreator
 
     // Process additions next.
     for (uint256 i = 0; i < chainConfigAdds.length; ++i) {
-      Types.ChainConfig memory chainConfig = chainConfigAdds[i].chainConfig;
+      CCIPConfigTypes.ChainConfig memory chainConfig = chainConfigAdds[i].chainConfig;
       bytes32[] memory readers = chainConfig.readers;
       uint64 chainSelector = chainConfigAdds[i].chainSelector;
 

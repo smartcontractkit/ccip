@@ -12,12 +12,15 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/registrysyncer"
 )
 
+// diffResult contains the added, removed and updated CCIP DONs.
+// It is determined by using the `diff` function below.
 type diffResult struct {
 	added   map[registrysyncer.DonID]kcr.CapabilitiesRegistryDONInfo
 	removed map[registrysyncer.DonID]kcr.CapabilitiesRegistryDONInfo
 	updated map[registrysyncer.DonID]kcr.CapabilitiesRegistryDONInfo
 }
 
+// diff compares the old and new state and returns the added, removed and updated CCIP DONs.
 func diff(
 	capabilityVersion,
 	capabilityLabelledName string,
@@ -48,6 +51,7 @@ func diff(
 	return diffRes, nil
 }
 
+// compareDONs compares the current and new CCIP DONs and returns the added, removed and updated DONs.
 func compareDONs(
 	currCCIPDONs,
 	newCCIPDONs map[registrysyncer.DonID]kcr.CapabilitiesRegistryDONInfo,
@@ -86,14 +90,13 @@ func compareDONs(
 	}, nil
 }
 
+// filterCCIPDONs filters the CCIP DONs from the given state.
 func filterCCIPDONs(
 	ccipCapability kcr.CapabilitiesRegistryCapabilityInfo,
 	state registrysyncer.State,
 ) (map[registrysyncer.DonID]kcr.CapabilitiesRegistryDONInfo, error) {
 	ccipDONs := make(map[registrysyncer.DonID]kcr.CapabilitiesRegistryDONInfo)
 	for _, don := range state.IDsToDONs {
-		// CCIP DONs should only have one capability, CCIP.
-		var found bool
 		for _, donCapabilities := range don.CapabilityConfigurations {
 			hid, err := hashedCapabilityId(ccipCapability.LabelledName, ccipCapability.Version)
 			if err != nil {
@@ -101,18 +104,15 @@ func filterCCIPDONs(
 			}
 			if donCapabilities.CapabilityId == hid {
 				ccipDONs[registrysyncer.DonID(don.Id)] = don
-				found = true
 			}
-		}
-		if found && len(don.CapabilityConfigurations) > 1 {
-			return nil, fmt.Errorf("found more than one capability (actual: %d) in the CCIP DON %d",
-				len(don.CapabilityConfigurations), don.Id)
 		}
 	}
 
 	return ccipDONs, nil
 }
 
+// checkCapabilityPresence checks if the capability with the given version and
+// labelled name is present in the given capability registry state.
 func checkCapabilityPresence(
 	capabilityVersion,
 	capabilityLabelledName string,
@@ -133,6 +133,7 @@ func checkCapabilityPresence(
 	return ccipCapability, nil
 }
 
+// hashedCapabilityId returns the hashed capability id in a manner equivalent to the capability registry.
 func hashedCapabilityId(capabilityLabelledName, capabilityVersion string) (r [32]byte, err error) {
 	tabi := `[{"type": "string"}, {"type": "string"}]`
 	abiEncoded, err := utils.ABIEncode(tabi, capabilityLabelledName, capabilityVersion)
@@ -145,6 +146,8 @@ func hashedCapabilityId(capabilityLabelledName, capabilityVersion string) (r [32
 	return r, nil
 }
 
+// mustHashedCapabilityId is a helper function that panics if the hashedCapabilityId function returns an error.
+// should only use in tests.
 func mustHashedCapabilityId(capabilityLabelledName, capabilityVersion string) [32]byte {
 	r, err := hashedCapabilityId(capabilityLabelledName, capabilityVersion)
 	if err != nil {
@@ -163,6 +166,7 @@ func isMemberOfDON(don kcr.CapabilitiesRegistryDONInfo, p2pID ragep2ptypes.PeerI
 	return false
 }
 
+// isMemberOfBootstrapSubcommittee returns true if and only if the given p2pID is a member of the given bootstrap subcommittee.
 func isMemberOfBootstrapSubcommittee(
 	bootstrapP2PIDs [][32]byte,
 	p2pID ragep2ptypes.PeerID,

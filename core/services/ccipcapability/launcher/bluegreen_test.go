@@ -4,10 +4,11 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	ccipreaderpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cctypes "github.com/smartcontractkit/chainlink/v2/core/services/ccipcapability/types"
 	mocktypes "github.com/smartcontractkit/chainlink/v2/core/services/ccipcapability/types/mocks"
-	"github.com/stretchr/testify/require"
 )
 
 func Test_ccipDeployment_Close(t *testing.T) {

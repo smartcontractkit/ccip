@@ -74,6 +74,7 @@ func (c *ccipDeployment) Close() error {
 	return err
 }
 
+// StartBlue starts the blue OCR instances.
 func (c *ccipDeployment) StartBlue() error {
 	var err error
 
@@ -89,6 +90,7 @@ func (c *ccipDeployment) StartBlue() error {
 	return err
 }
 
+// CloseBlue shuts down the blue OCR instances.
 func (c *ccipDeployment) CloseBlue() error {
 	var err error
 
@@ -104,29 +106,30 @@ func (c *ccipDeployment) CloseBlue() error {
 	return err
 }
 
+// HandleBlueGreen handles the blue-green deployment transition.
+// prevDeployment is the previous deployment state.
+// there are two possible cases:
+//
+// 1. both blue and green are present in prevDeployment, but only blue is present in c.
+// this is a promotion of green to blue, so we need to shut down the blue deployment
+// and make green the new blue. In this case green is already running, so there's no
+// need to start it. However, we need to shut down the blue deployment.
+//
+// 2. only blue is present in prevDeployment, both blue and green are present in c.
+// In this case, blue is already running, so there's no need to start it. We need to
+// start green.
 func (c *ccipDeployment) HandleBlueGreen(prevDeployment *ccipDeployment) error {
 	if prevDeployment == nil {
 		return fmt.Errorf("previous deployment is nil")
 	}
 
-	// two possible cases:
-	// 1. both blue and green are present in prevDeployment, only blue is present in c.
-	// this is a promotion of green to blue, so we need to shut down the blue deployment
-	// and make green the new blue.
-	// 2. only blue is present in prevDeployment, both blue and green are present in c
 	var err error
 	if prevDeployment.commit.green != nil && c.commit.green == nil {
-		// case 1
-		// green is already running so no need to start it.
-		// shutdown blue.
 		err = multierr.Append(err, prevDeployment.commit.blue.Close())
 		if prevDeployment.commit.bootstrapBlue != nil {
 			err = multierr.Append(err, prevDeployment.commit.bootstrapBlue.Close())
 		}
 	} else if prevDeployment.commit.green == nil && c.commit.green != nil {
-		// case 2
-		// blue is already running so no need to start it.
-		// start green.
 		err = multierr.Append(err, c.commit.green.Start())
 		if c.commit.bootstrapGreen != nil {
 			err = multierr.Append(err, c.commit.bootstrapGreen.Start())
@@ -136,17 +139,11 @@ func (c *ccipDeployment) HandleBlueGreen(prevDeployment *ccipDeployment) error {
 	}
 
 	if prevDeployment.exec.green != nil && c.exec.green == nil {
-		// case 1
-		// green is already running so no need to start it.
-		// shutdown blue.
 		err = multierr.Append(err, prevDeployment.exec.blue.Close())
 		if prevDeployment.exec.bootstrapBlue != nil {
 			err = multierr.Append(err, prevDeployment.exec.bootstrapBlue.Close())
 		}
 	} else if prevDeployment.exec.green == nil && c.exec.green != nil {
-		// case 2
-		// blue is already running so no need to start it.
-		// start green.
 		err = multierr.Append(err, c.exec.green.Start())
 		if c.exec.bootstrapGreen != nil {
 			err = multierr.Append(err, c.exec.bootstrapGreen.Start())
@@ -158,6 +155,8 @@ func (c *ccipDeployment) HandleBlueGreen(prevDeployment *ccipDeployment) error {
 	return err
 }
 
+// HasGreenInstance returns true if the deployment has a green instance for the
+// given plugin type.
 func (c *ccipDeployment) HasGreenInstance(pluginType cctypes.PluginType) bool {
 	switch pluginType {
 	case cctypes.PluginTypeCCIPCommit:
