@@ -189,11 +189,17 @@ library Internal {
         ),
         keccak256(
           abi.encode(
-            original.sender, original.receiver, original.header.sequenceNumber, original.gasLimit, original.header.nonce
+            original.header.messageId,
+            original.sender,
+            original.receiver,
+            original.header.sequenceNumber,
+            original.gasLimit,
+            original.header.nonce
           )
         ),
         keccak256(original.data),
-        keccak256(abi.encode(original.tokenAmounts))
+        keccak256(abi.encode(original.tokenAmounts)),
+        keccak256(abi.encode(original.sourceTokenData))
       )
     );
   }
@@ -241,10 +247,11 @@ library Internal {
     Execution
   }
 
-  /// @notice Family-agnostic header for OnRamp & OffRamp messages
+  /// @notice Family-agnostic header for OnRamp & OffRamp messages.
+  /// The messageId is not expected to match hash(message), since it may originate from another ramp family
   // TODO: revisit if destChainSelector is required (likely sufficient to have it implicitly in the commit roots)
   struct RampMessageHeader {
-    bytes32 messageId; // Unique identifier for the message, with family-agnostic encoding (i.e. not necessarily abi.encoded)
+    bytes32 messageId; // Unique identifier for the message, generated with the source chain's encoding sdcheme (i.e. not necessarily abi.encoded)
     uint64 sourceChainSelector; // ───────╮ the chain selector of the source chain, note: not chainId
     uint64 destChainSelector; //          | the chain selector of the destination chain, note: not chainId
     uint64 sequenceNumber; //             │ sequence number, not unique across lanes
@@ -252,6 +259,8 @@ library Internal {
   }
 
   /// @notice Family-agnostic message routed to an OffRamp
+  /// Note: hash(Any2EVMRampMessage) != hash(EVM2AnyRampMessage), hash(Any2EVMRampMessage) != messageId
+  /// due to encoding & parameter differences
   struct Any2EVMRampMessage {
     RampMessageHeader header; // Message header
     bytes sender; // sender address on the source chain

@@ -128,12 +128,9 @@ contract MultiRampsE2E is EVM2EVMMultiOnRampSetup, EVM2EVMMultiOffRampSetup {
     // Commit
     bytes32[] memory hashedMessages1 = new bytes32[](2);
     hashedMessages1[0] = messages1[0]._hash(abi.encode(address(s_onRamp)));
-    messages1[0].header.messageId = hashedMessages1[0];
     hashedMessages1[1] = messages1[1]._hash(abi.encode(address(s_onRamp)));
-    messages1[1].header.messageId = hashedMessages1[1];
     bytes32[] memory hashedMessages2 = new bytes32[](1);
     hashedMessages2[0] = messages2[0]._hash(abi.encode(address(s_onRamp2)));
-    messages2[0].header.messageId = hashedMessages2[0];
 
     bytes32[] memory merkleRoots = new bytes32[](2);
     merkleRoots[0] = MerkleHelper.getMerkleRoot(hashedMessages1);
