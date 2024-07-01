@@ -163,10 +163,10 @@ func addCapabilities(
 	return p2pIDs
 }
 
-func setupConfigInfo(chainSelector uint64, readers [][32]byte, fChain uint8, cfg []byte) ccip_config.CCIPConfigChainConfigInfo {
-	return ccip_config.CCIPConfigChainConfigInfo{
+func setupConfigInfo(chainSelector uint64, readers [][32]byte, fChain uint8, cfg []byte) ccip_config.TypesChainConfigInfo {
+	return ccip_config.TypesChainConfigInfo{
 		ChainSelector: chainSelector,
-		ChainConfig: ccip_config.CCIPConfigChainConfig{
+		ChainConfig: ccip_config.TypesChainConfig{
 			Readers: readers,
 			FChain:  fChain,
 			Config:  cfg,
@@ -230,9 +230,9 @@ func addDONToRegistry(t *testing.T,
 		transmitters = append(transmitters, testutils.NewAddress().Bytes())
 	}
 
-	var ocr3Configs []ocr3_config_encoder.IOCR3ConfigEncoderOCR3Config
+	var ocr3Configs []ocr3_config_encoder.TypesOCR3Config
 	for _, pluginType := range []cctypes.PluginType{cctypes.PluginTypeCCIPCommit, cctypes.PluginTypeCCIPExec} {
-		ocr3Configs = append(ocr3Configs, ocr3_config_encoder.IOCR3ConfigEncoderOCR3Config{
+		ocr3Configs = append(ocr3Configs, ocr3_config_encoder.TypesOCR3Config{
 			PluginType:            uint8(pluginType),
 			ChainSelector:         chainSelector,
 			F:                     f,
@@ -278,6 +278,7 @@ func TestIntegration_Launcher(t *testing.T) {
 	cl := client.NewSimulatedBackendClient(t, uni.backend, big.NewInt(1337))
 	lp := logpoller.NewLogPoller(logpoller.NewORM(big.NewInt(1337), db, lggr), cl, logger.NullLogger, lpOpts)
 	require.NoError(t, lp.Start(ctx))
+	t.Cleanup(func() { require.NoError(t, lp.Close()) })
 
 	uni.lp = lp
 	uni.simClient = cl
@@ -303,11 +304,13 @@ func TestIntegration_Launcher(t *testing.T) {
 
 	require.NoError(t, launcher.Start(ctx))
 	require.NoError(t, regSyncer.Start(ctx))
+	t.Cleanup(func() { require.NoError(t, regSyncer.Close()) })
+	t.Cleanup(func() { require.NoError(t, launcher.Close()) })
 
 	chainAConf := setupConfigInfo(chainA, p2pIDs, fChainA, []byte("chainA"))
 	chainBConf := setupConfigInfo(chainB, p2pIDs[1:], fChainB, []byte("chainB"))
 	chainCConf := setupConfigInfo(chainC, p2pIDs[2:], fChainC, []byte("chainC"))
-	inputConfig := []ccip_config.CCIPConfigChainConfigInfo{
+	inputConfig := []ccip_config.TypesChainConfigInfo{
 		chainAConf,
 		chainBConf,
 		chainCConf,
