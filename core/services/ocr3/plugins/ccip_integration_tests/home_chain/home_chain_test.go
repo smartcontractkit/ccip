@@ -81,15 +81,18 @@ func TestHomeChainReader(t *testing.T) {
 	require.NoError(t, err)
 	backend.Commit()
 	//================================Setup HomeChainReader===============================
-	chainReader := helpers.SetupChainReader(t, backend, capConfAddress, cfg, "CCIPConfig")
+	//ctx := testutils.Context(t)
+	ctx, cancelFunc := context.WithCancel(context.Background())
+	chainReader := helpers.SetupChainReader(t, ctx, backend, capConfAddress, cfg, "CCIPConfig")
 	require.NoError(t, err)
-	homeChain := ccipreader.NewHomeChainReader(chainReader, logger.TestLogger(t), 1*time.Millisecond)
-	require.NoError(t, homeChain.Start(context.Background()))
+	pollDuration := 5 * time.Millisecond
+	homeChain := ccipreader.NewHomeChainReader(chainReader, logger.TestLogger(t), pollDuration)
+	require.NoError(t, homeChain.Start(ctx))
 
 	gomega.NewWithT(t).Eventually(func() bool {
 		configs, _ := homeChain.GetAllChainConfigs()
 		return configs != nil
-	}, testutils.WaitTimeout(t), 10*time.Millisecond).Should(gomega.BeTrue())
+	}, testutils.WaitTimeout(t), pollDuration*5).Should(gomega.BeTrue())
 
 	t.Logf("homchain reader is ready")
 	//================================Test HomeChain Reader===============================
@@ -107,13 +110,16 @@ func TestHomeChainReader(t *testing.T) {
 	_, err = capConfContract.ApplyChainConfigUpdates(transactor, []uint64{chainC}, nil)
 	require.NoError(t, err)
 	backend.Commit()
-	time.Sleep(10 * time.Millisecond) // Wait for the chain reader to update
+	time.Sleep(pollDuration * 3) // Wait for the chain reader to update
 	configs, err = homeChain.GetAllChainConfigs()
 	require.NoError(t, err)
 	delete(expectedChainConfigs, cciptypes.ChainSelector(chainC))
 	require.Equal(t, expectedChainConfigs, configs)
 	//================================Close HomeChain Reader===============================
+	t.Cleanup(cancelFunc)
 	require.NoError(t, homeChain.Close())
+	require.NoError(t, chainReader.Close())
+	t.Logf("homchain reader successfully closed")
 }
 
 func toPeerIDs(readers [][32]byte) mapset.Set[libocrtypes.PeerID] {

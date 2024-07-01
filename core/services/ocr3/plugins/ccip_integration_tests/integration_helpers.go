@@ -16,7 +16,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
-	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils/pgtest"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay/evm"
@@ -34,7 +33,7 @@ type TestSetupData[T any] struct {
 	ChainID      int
 }
 
-func SetupChainReader(t *testing.T, simulatedBackend *backends.SimulatedBackend, address common.Address, chainReaderConfig evmtypes.ChainReaderConfig, contractName string) evm.ChainReaderService {
+func SetupChainReader(t *testing.T, ctx context.Context, simulatedBackend *backends.SimulatedBackend, address common.Address, chainReaderConfig evmtypes.ChainReaderConfig, contractName string) evm.ChainReaderService {
 	lggr := logger.TestLogger(t)
 	db := pgtest.NewSqlxDB(t)
 	lpOpts := logpoller.Opts{
@@ -46,11 +45,11 @@ func SetupChainReader(t *testing.T, simulatedBackend *backends.SimulatedBackend,
 	}
 	cl := client.NewSimulatedBackendClient(t, simulatedBackend, big.NewInt(chainID))
 	lp := logpoller.NewLogPoller(logpoller.NewORM(big.NewInt(chainID), db, lggr), cl, lggr, lpOpts)
-	require.NoError(t, lp.Start(testutils.Context(t)))
+	require.NoError(t, lp.Start(ctx))
 
-	cr, err := evm.NewChainReaderService(context.Background(), lggr, lp, cl, chainReaderConfig)
+	cr, err := evm.NewChainReaderService(ctx, lggr, lp, cl, chainReaderConfig)
 	require.NoError(t, err)
-	err = cr.Bind(context.Background(), []types2.BoundContract{
+	err = cr.Bind(ctx, []types2.BoundContract{
 		{
 			Address: address.String(),
 			Name:    contractName,
@@ -58,7 +57,7 @@ func SetupChainReader(t *testing.T, simulatedBackend *backends.SimulatedBackend,
 		},
 	})
 	require.NoError(t, err)
-	require.NoError(t, cr.Start(context.Background()))
+	require.NoError(t, cr.Start(ctx))
 	for {
 		if err := cr.Ready(); err == nil {
 			break
