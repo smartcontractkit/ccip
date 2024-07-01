@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	ccipreaderpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
+	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
@@ -20,13 +21,13 @@ import (
 )
 
 func Test_createOracle(t *testing.T) {
-	var p2pKeys []p2pkey.KeyV2
+	var p2pKeys []ragep2ptypes.PeerID
 	for i := 0; i < 3; i++ {
-		p2pKeys = append(p2pKeys, p2pkey.MustNewV2XXXTestingOnly(big.NewInt(int64(i+1))))
+		p2pKeys = append(p2pKeys, ragep2ptypes.PeerID(p2pkey.MustNewV2XXXTestingOnly(big.NewInt(int64(i+1))).PeerID()))
 	}
 	myP2PKey := p2pKeys[0]
 	type args struct {
-		p2pID         p2pkey.KeyV2
+		p2pID         ragep2ptypes.PeerID
 		oracleCreator *mockcctypes.OracleCreator
 		pluginType    cctypes.PluginType
 		ocrConfigs    []ccipreaderpkg.OCR3ConfigWithMeta
@@ -67,7 +68,7 @@ func Test_createOracle(t *testing.T) {
 				[]ccipreaderpkg.OCR3ConfigWithMeta{
 					{
 						Config: ccipreaderpkg.OCR3Config{
-							BootstrapP2PIds: [][32]byte{myP2PKey.PeerID()},
+							BootstrapP2PIds: [][32]byte{myP2PKey},
 						},
 						ConfigCount:  1,
 						ConfigDigest: testutils.Random32Byte(),
@@ -114,7 +115,7 @@ func Test_createOracle(t *testing.T) {
 				[]ccipreaderpkg.OCR3ConfigWithMeta{
 					{
 						Config: ccipreaderpkg.OCR3Config{
-							BootstrapP2PIds: [][32]byte{myP2PKey.PeerID()},
+							BootstrapP2PIds: [][32]byte{myP2PKey},
 						},
 						ConfigCount:  1,
 						ConfigDigest: testutils.Random32Byte(),
@@ -148,7 +149,7 @@ func Test_createOracle(t *testing.T) {
 func Test_createDON(t *testing.T) {
 	type args struct {
 		lggr            logger.Logger
-		p2pID           p2pkey.KeyV2
+		p2pID           ragep2ptypes.PeerID
 		homeChainReader *mockcctypes.HomeChainReader
 		oracleCreator   *mockcctypes.OracleCreator
 		don             kcr.CapabilitiesRegistryDONInfo
@@ -163,7 +164,7 @@ func Test_createDON(t *testing.T) {
 			"not a member of the DON",
 			args{
 				logger.TestLogger(t),
-				p2pkey.MustNewV2XXXTestingOnly(big.NewInt(1)),
+				ragep2ptypes.PeerID(p2pkey.MustNewV2XXXTestingOnly(big.NewInt(1)).PeerID()),
 				mockcctypes.NewHomeChainReader(t),
 				mockcctypes.NewOracleCreator(t),
 				kcr.CapabilitiesRegistryDONInfo{
@@ -181,7 +182,7 @@ func Test_createDON(t *testing.T) {
 			"success, no bootstrap",
 			args{
 				logger.TestLogger(t),
-				p2pkey.MustNewV2XXXTestingOnly(big.NewInt(1)),
+				ragep2ptypes.PeerID(p2pkey.MustNewV2XXXTestingOnly(big.NewInt(1)).PeerID()),
 				mockcctypes.NewHomeChainReader(t),
 				mockcctypes.NewOracleCreator(t),
 				kcr.CapabilitiesRegistryDONInfo{
@@ -255,7 +256,7 @@ func Test_createFutureBlueGreenDeployment(t *testing.T) {
 func Test_updateDON(t *testing.T) {
 	type args struct {
 		lggr            logger.Logger
-		p2pID           p2pkey.KeyV2
+		p2pID           ragep2ptypes.PeerID
 		homeChainReader *mockcctypes.HomeChainReader
 		oracleCreator   *mockcctypes.OracleCreator
 		prevDeployment  ccipDeployment
@@ -286,7 +287,7 @@ func Test_updateDON(t *testing.T) {
 func Test_launcher_processDiff(t *testing.T) {
 	type fields struct {
 		lggr            logger.Logger
-		p2pID           p2pkey.KeyV2
+		p2pID           ragep2ptypes.PeerID
 		homeChainReader *mockcctypes.HomeChainReader
 		oracleCreator   *mockcctypes.OracleCreator
 		dons            map[registrysyncer.DonID]*ccipDeployment
@@ -350,7 +351,7 @@ func Test_launcher_processDiff(t *testing.T) {
 			"don added success",
 			fields{
 				lggr:  logger.TestLogger(t),
-				p2pID: p2pkey.MustNewV2XXXTestingOnly(big.NewInt(1)),
+				p2pID: ragep2ptypes.PeerID(p2pkey.MustNewV2XXXTestingOnly(big.NewInt(1)).PeerID()),
 				homeChainReader: newMock(t, func(t *testing.T) *mockcctypes.HomeChainReader {
 					return mockcctypes.NewHomeChainReader(t)
 				}, func(m *mockcctypes.HomeChainReader) {
@@ -398,7 +399,7 @@ func Test_launcher_processDiff(t *testing.T) {
 			"don updated new green instance success",
 			fields{
 				lggr:  logger.TestLogger(t),
-				p2pID: p2pkey.MustNewV2XXXTestingOnly(big.NewInt(1)),
+				p2pID: ragep2ptypes.PeerID(p2pkey.MustNewV2XXXTestingOnly(big.NewInt(1)).PeerID()),
 				homeChainReader: newMock(t, func(t *testing.T) *mockcctypes.HomeChainReader {
 					return mockcctypes.NewHomeChainReader(t)
 				}, func(m *mockcctypes.HomeChainReader) {

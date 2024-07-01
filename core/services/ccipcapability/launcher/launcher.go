@@ -10,12 +10,12 @@ import (
 
 	ccipreaderpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils"
+	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
 	kcr "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/capabilities_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	cctypes "github.com/smartcontractkit/chainlink/v2/core/services/ccipcapability/types"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
-	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/p2pkey"
 	p2ptypes "github.com/smartcontractkit/chainlink/v2/core/services/p2p/types"
 	"github.com/smartcontractkit/chainlink/v2/core/services/registrysyncer"
 )
@@ -26,16 +26,17 @@ var (
 )
 
 const (
-	tickInterval = 10 * time.Second
+	defaultTickInterval = 10 * time.Second
 )
 
 func New(
 	capabilityVersion,
 	capabilityLabelledName string,
-	p2pID p2pkey.KeyV2,
+	p2pID ragep2ptypes.PeerID,
 	lggr logger.Logger,
 	homeChainReader cctypes.HomeChainReader,
 	oracleCreator cctypes.OracleCreator,
+	tickInterval time.Duration,
 ) *launcher {
 	return &launcher{
 		capabilityVersion:      capabilityVersion,
@@ -50,6 +51,7 @@ func New(
 		},
 		oracleCreator: oracleCreator,
 		dons:          make(map[registrysyncer.DonID]*ccipDeployment),
+		tickInterval:  tickInterval,
 	}
 }
 
@@ -59,7 +61,7 @@ type launcher struct {
 
 	capabilityVersion      string
 	capabilityLabelledName string
-	p2pID                  p2pkey.KeyV2
+	p2pID                  ragep2ptypes.PeerID
 	lggr                   logger.Logger
 	homeChainReader        cctypes.HomeChainReader
 	stopChan               chan struct{}
@@ -70,6 +72,7 @@ type launcher struct {
 	oracleCreator cctypes.OracleCreator
 	lock          sync.RWMutex
 	wg            sync.WaitGroup
+	tickInterval  time.Duration
 
 	// dons is a map of CCIP DON IDs to the OCR instances that are running on them.
 	// we can have up to two OCR instances per CCIP plugin, since we are running two plugins,
@@ -81,6 +84,7 @@ type launcher struct {
 func (l *launcher) Launch(ctx context.Context, state registrysyncer.State) error {
 	l.lock.Lock()
 	defer l.lock.Unlock()
+	l.lggr.Debugw("Received new state from syncer", "dons", state.IDsToDONs)
 	l.latestState = state
 	return nil
 }
@@ -89,6 +93,16 @@ func (l *launcher) getLatestState() registrysyncer.State {
 	l.lock.RLock()
 	defer l.lock.RUnlock()
 	return l.latestState
+}
+
+func (l *launcher) runningDONs() []registrysyncer.DonID {
+	l.lock.RLock()
+	defer l.lock.RUnlock()
+	var runningDONs []registrysyncer.DonID
+	for id := range l.dons {
+		runningDONs = append(runningDONs, id)
+	}
+	return runningDONs
 }
 
 // Close implements job.ServiceCtx.
@@ -120,7 +134,7 @@ func (l *launcher) Start(context.Context) error {
 
 func (l *launcher) monitor() {
 	defer l.wg.Done()
-	ticker := time.NewTicker(tickInterval)
+	ticker := time.NewTicker(l.tickInterval)
 	for {
 		select {
 		case <-l.stopChan:
@@ -163,6 +177,9 @@ func (l *launcher) tick() error {
 // for any removed OCR instances, it will shut them down.
 // for any updated OCR instances, it will restart them with the new configuration.
 func (l *launcher) processDiff(diff diffResult) error {
+	l.lock.Lock()
+	defer l.lock.Unlock()
+
 	for id := range diff.removed {
 		ceDep, ok := l.dons[id]
 		if !ok {
@@ -262,14 +279,14 @@ func (l *launcher) processDiff(diff diffResult) error {
 // based on the previous deployment.
 func updateDON(
 	lggr logger.Logger,
-	p2pID p2pkey.KeyV2,
+	p2pID ragep2ptypes.PeerID,
 	homeChainReader cctypes.HomeChainReader,
 	oracleCreator cctypes.OracleCreator,
 	prevDeployment ccipDeployment,
 	don kcr.CapabilitiesRegistryDONInfo,
 ) (futDeployment *ccipDeployment, err error) {
 	if !isMemberOfDON(don, p2pID) {
-		lggr.Infow("Not a member of this DON, skipping", "donId", don.Id, "p2pId", p2pID.ID())
+		lggr.Infow("Not a member of this DON, skipping", "donId", don.Id, "p2pId", p2pID.String())
 		return nil, nil
 	}
 
@@ -336,13 +353,13 @@ func createFutureBlueGreenDeployment(
 // It returns a new ccipDeployment that can then be used to start the blue instance.
 func createDON(
 	lggr logger.Logger,
-	p2pID p2pkey.KeyV2,
+	p2pID ragep2ptypes.PeerID,
 	homeChainReader cctypes.HomeChainReader,
 	oracleCreator cctypes.OracleCreator,
 	don kcr.CapabilitiesRegistryDONInfo,
 ) (*ccipDeployment, error) {
 	if !isMemberOfDON(don, p2pID) {
-		lggr.Infow("Not a member of this DON, skipping", "donId", don.Id, "p2pId", p2pID.ID())
+		lggr.Infow("Not a member of this DON, skipping", "donId", don.Id, "p2pId", p2pID.String())
 		return nil, nil
 	}
 
@@ -391,7 +408,7 @@ func createDON(
 }
 
 func createOracle(
-	p2pID p2pkey.KeyV2,
+	p2pID ragep2ptypes.PeerID,
 	oracleCreator cctypes.OracleCreator,
 	pluginType cctypes.PluginType,
 	ocrConfigs []ccipreaderpkg.OCR3ConfigWithMeta,

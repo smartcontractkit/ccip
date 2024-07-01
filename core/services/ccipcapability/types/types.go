@@ -21,6 +21,17 @@ const (
 	PluginTypeCCIPExec   PluginType = 1
 )
 
+func (pt PluginType) String() string {
+	switch pt {
+	case PluginTypeCCIPCommit:
+		return "CCIPCommit"
+	case PluginTypeCCIPExec:
+		return "CCIPExec"
+	default:
+		return "Unknown"
+	}
+}
+
 // CCIPOracle represents either a CCIP commit or exec oracle or a bootstrap node.
 //
 //go:generate mockery --name CCIPOracle --output ./mocks/ --case underscore

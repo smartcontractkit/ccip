@@ -5,9 +5,10 @@ import (
 
 	"github.com/ethereum/go-ethereum/crypto"
 
+	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
+
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	kcr "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/capabilities_registry"
-	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/p2pkey"
 	"github.com/smartcontractkit/chainlink/v2/core/services/registrysyncer"
 )
 
@@ -153,9 +154,9 @@ func mustHashedCapabilityId(capabilityLabelledName, capabilityVersion string) [3
 }
 
 // isMemberOfDON returns true if and only if the given p2pID is a member of the given DON.
-func isMemberOfDON(don kcr.CapabilitiesRegistryDONInfo, p2pID p2pkey.KeyV2) bool {
+func isMemberOfDON(don kcr.CapabilitiesRegistryDONInfo, p2pID ragep2ptypes.PeerID) bool {
 	for _, node := range don.NodeP2PIds {
-		if node == p2pID.PeerID() {
+		if node == p2pID {
 			return true
 		}
 	}
@@ -164,10 +165,10 @@ func isMemberOfDON(don kcr.CapabilitiesRegistryDONInfo, p2pID p2pkey.KeyV2) bool
 
 func isMemberOfBootstrapSubcommittee(
 	bootstrapP2PIDs [][32]byte,
-	p2pID p2pkey.KeyV2,
+	p2pID ragep2ptypes.PeerID,
 ) bool {
-	for _, id := range bootstrapP2PIDs {
-		if p2pID.PeerID() == id {
+	for _, bootstrapID := range bootstrapP2PIDs {
+		if bootstrapID == p2pID {
 			return true
 		}
 	}

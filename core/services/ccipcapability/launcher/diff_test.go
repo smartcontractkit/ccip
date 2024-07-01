@@ -8,6 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
+	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets"
@@ -481,8 +482,8 @@ func Test_isMemberOfDON(t *testing.T) {
 		Id:         1,
 		NodeP2PIds: p2pIDs,
 	}
-	require.True(t, isMemberOfDON(don, p2pkey.MustNewV2XXXTestingOnly(big.NewInt(1))))
-	require.False(t, isMemberOfDON(don, p2pkey.MustNewV2XXXTestingOnly(big.NewInt(5))))
+	require.True(t, isMemberOfDON(don, ragep2ptypes.PeerID(p2pkey.MustNewV2XXXTestingOnly(big.NewInt(1)).PeerID())))
+	require.False(t, isMemberOfDON(don, ragep2ptypes.PeerID(p2pkey.MustNewV2XXXTestingOnly(big.NewInt(5)).PeerID())))
 }
 
 func Test_isMemberOfBootstrapSubcommittee(t *testing.T) {
@@ -490,6 +491,6 @@ func Test_isMemberOfBootstrapSubcommittee(t *testing.T) {
 	for i := range [4]struct{}{} {
 		bootstrapKeys = append(bootstrapKeys, p2pkey.MustNewV2XXXTestingOnly(big.NewInt(int64(i+1))).PeerID())
 	}
-	require.True(t, isMemberOfBootstrapSubcommittee(bootstrapKeys, p2pkey.MustNewV2XXXTestingOnly(big.NewInt(1))))
-	require.False(t, isMemberOfBootstrapSubcommittee(bootstrapKeys, p2pkey.MustNewV2XXXTestingOnly(big.NewInt(5))))
+	require.True(t, isMemberOfBootstrapSubcommittee(bootstrapKeys, ragep2ptypes.PeerID(p2pkey.MustNewV2XXXTestingOnly(big.NewInt(1)).PeerID())))
+	require.False(t, isMemberOfBootstrapSubcommittee(bootstrapKeys, ragep2ptypes.PeerID(p2pkey.MustNewV2XXXTestingOnly(big.NewInt(5)).PeerID())))
 }
