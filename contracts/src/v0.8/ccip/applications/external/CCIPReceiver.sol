@@ -13,20 +13,20 @@ contract CCIPReceiver is CCIPClientBase {
   using EnumerableMap for EnumerableMap.Bytes32ToUintMap;
 
   error OnlySelf();
-  error ErrorCase(); // TODO remove
   error MessageNotFailed(bytes32 messageId);
 
   event MessageFailed(bytes32 indexed messageId, bytes reason);
   event MessageSucceeded(bytes32 indexed messageId);
   event MessageRecovered(bytes32 indexed messageId);
+  event MessageAbandoned(bytes32 indexed messageId, address tokenReceiver);
 
   // Example error code, could have many different error codes.
   enum ErrorCode {
-    // TODO RESOLVED + ABANDONED
     // RESOLVED is first so that the default value is resolved.
     RESOLVED,
     // Could have any number of error codes here.
-    FAILED
+    FAILED,
+    ABANDONED
   }
 
   // The message contents of failed messages are stored here.
@@ -34,9 +34,6 @@ contract CCIPReceiver is CCIPClientBase {
 
   // Contains failed messages and their state.
   EnumerableMap.Bytes32ToUintMap internal s_failedMessages;
-
-  // TODO: the contracts we ship to customers shouldn't have this by default, try refactoring this sim logic in a test helper
-  bool internal s_simRevert;
 
   constructor(address router) CCIPClientBase(router) {}
 
@@ -48,13 +45,6 @@ contract CCIPReceiver is CCIPClientBase {
   // │                  Incoming Message Processing                 |
   // ================================================================
 
-  // TODO: add comments on:
-  //  if you want custom permisionless retry logic, plus owner extracting tokens as a last resort for recovery, use this try-catch pattern in ccipReceiver
-  //  this means the message will appear as success to CCIP, and you can track the actual message state within the dapp
-  //  if you do not need custom permissionles retry logic, and you don't need owner token recovery function, then you don't need the try-catch
-  //  because you can use ccip manualExecution as a retry function
-  //
-  //
   /// @notice The entrypoint for the CCIP router to call. This function should
   /// never revert, all errors should be handled internally in this contract.
   /// @param message The message to process.
@@ -63,18 +53,21 @@ contract CCIPReceiver is CCIPClientBase {
     external
     virtual
     onlyRouter
-    validChain(message.sourceChainSelector)
+    isValidChain(message.sourceChainSelector)
   {
     try this.processMessage(message) {}
     catch (bytes memory err) {
-      // Could set different error codes based on the caught error. Each could be
-      // handled differently.
+      // Mark the message as having failed. Any failures should be tracked by individual Dapps, since CCIP
+      // will mark the message as having been successfully delivered. CCIP makes no assurances about message delivery
+      // other than invocation with proper gas limit. Any logic/execution errors should be tracked by separately.
       s_failedMessages.set(message.messageId, uint256(ErrorCode.FAILED));
 
+      // Store the message contents in case it needs to be retried or abandoned
       s_messageContents[message.messageId] = message;
 
-      // Don't revert so CCIP doesn't revert. Emit event instead.
-      // The message can be retried later without having to do manual execution of CCIP.
+      // Don't revert because CCIPRouter doesn't revert. Emit event instead.
+      // The message can be retried or abandoned later without having to do manual execution of CCIP, which should
+      // be reserved for retrying with a higher gas limit.
       emit MessageFailed(message.messageId, err);
       return;
     }
@@ -82,7 +75,6 @@ contract CCIPReceiver is CCIPClientBase {
     emit MessageSucceeded(message.messageId);
   }
 
-  
   /// @notice This function the entrypoint for this contract to process messages.
   /// @param message The message to process.
   /// @dev This example just sends the tokens to the owner of this contracts. More
@@ -92,22 +84,16 @@ contract CCIPReceiver is CCIPClientBase {
     external
     virtual
     onlySelf
-    validSender(message.sourceChainSelector, message.sender)
-  {
-    // Insert Custom logic here
-    if (s_simRevert) revert ErrorCase();
-  }
+    isValidSender(message.sourceChainSelector, message.sender)
+  {}
 
   // ================================================================
   // │                  Failed Message Processing                   |
   // ================== ==============================================
 
-  // TODO make this permissionless because the parties that want to retry the message isn't typically the owner, should make this permissionless retry
-  //
-  /// @notice This function is callable by the owner when a message has failed
-  /// to unblock the tokens that are associated with that message.
-  /// @dev This function is only callable by the owner.
-  function retryFailedMessage(bytes32 messageId, address forwardingAddress) external onlyOwner {
+  /// @notice This function is called when the initial message delivery has failed but should be attempted again with different logic
+  /// @dev By default this function is callable by anyone, and should be modified if special access control is needed.
+  function retryFailedMessage(bytes32 messageId) external {
     if (s_failedMessages.get(messageId) != uint256(ErrorCode.FAILED)) revert MessageNotFailed(messageId);
 
     // Set the error code to 0 to disallow reentry and retry the same failed message
@@ -117,43 +103,44 @@ contract CCIPReceiver is CCIPClientBase {
     // Allow developer to implement arbitrary functionality on retried messages, such as just releasing the associated tokens
     Client.Any2EVMMessage memory message = s_messageContents[messageId];
 
-    // Let the user override the implementation, since different workflow may be desired for retrying a merssage
-    _retryFailedMessage(message, abi.encode(forwardingAddress));
-
-    s_failedMessages.remove(messageId); // If retry succeeds, remove from set of failed messages.
+    // Allow the user override the implementation, since different workflow may be desired for retrying a merssage
+    _retryFailedMessage(message);
 
     emit MessageRecovered(messageId);
   }
 
-  // TODO make a owner-only recoveryAndAbandon message function with custom token receiver address
-  function _retryFailedMessage(Client.Any2EVMMessage memory message, bytes memory retryData) internal virtual {
-    (address forwardingAddress) = abi.decode(retryData, (address));
+  /// @notice Function should contain any special logic needed to "retry" processing of a previously failed message.
+  /// @dev if the owner wants to retrieve tokens without special logic, then abandonMessage() or recoverTokens() should be used instead
+  function _retryFailedMessage(Client.Any2EVMMessage memory message) internal virtual {}
 
-    // Owner rescues tokens sent with a failed message
+  /// @notice Should be used to recover tokens from a failed message, while ensuring the message cannot be retried
+  /// @notice function will send tokens to destination, but will NOT invoke any arbitrary logic afterwards.
+  /// @dev this function is only callable as the owner, and
+  function abandonMessage(bytes32 messageId, address receiver) external onlyOwner {
+    if (s_failedMessages.get(messageId) != uint256(ErrorCode.FAILED)) revert MessageNotFailed(messageId);
+
+    s_failedMessages.set(messageId, uint256(ErrorCode.ABANDONED));
+    Client.Any2EVMMessage memory message = s_messageContents[messageId];
+
     for (uint256 i = 0; i < message.destTokenAmounts.length; ++i) {
-      uint256 amount = message.destTokenAmounts[i].amount;
-      address token = message.destTokenAmounts[i].token;
-
-      IERC20(token).safeTransfer(forwardingAddress, amount);
+      IERC20(message.destTokenAmounts[i].token).safeTransfer(receiver, message.destTokenAmounts[i].amount);
     }
+
+    emit MessageAbandoned(messageId, receiver);
   }
 
   // ================================================================
   // │                  Message Tracking                            │
   // ================================================================
 
+  /// @param messageId the ID of the message delivered by the CCIP Router
   function getMessageContents(bytes32 messageId) public view returns (Client.Any2EVMMessage memory) {
     return s_messageContents[messageId];
   }
 
+  /// @param messageId the ID of the message delivered by the CCIP Router
   function getMessageStatus(bytes32 messageId) public view returns (uint256) {
     return s_failedMessages.get(messageId);
-  }
-
-  // TODO remove
-  // An example function to demonstrate recovery
-  function setSimRevert(bool simRevert) external onlyOwner {
-    s_simRevert = simRevert;
   }
 
   modifier onlySelf() {

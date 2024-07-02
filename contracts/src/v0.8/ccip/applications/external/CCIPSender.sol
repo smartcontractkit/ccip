@@ -42,7 +42,7 @@ contract CCIPSender is CCIPClientBase {
     Client.EVMTokenAmount[] calldata tokenAmounts,
     bytes calldata data,
     address feeToken
-  ) public payable validChain(destChainSelector) returns (bytes32 messageId) {
+  ) public payable isValidChain(destChainSelector) returns (bytes32 messageId) {
     Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
       receiver: s_chainConfigs[destChainSelector].recipient,
       data: data,

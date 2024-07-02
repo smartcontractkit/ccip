@@ -26,13 +26,13 @@ contract CCIPReceiverWithAckTest is EVM2EVMOnRampSetup {
     s_receiver = new CCIPReceiverWithACK(address(s_sourceRouter), IERC20(s_sourceFeeToken));
     s_receiver.enableChain(destChainSelector, abi.encode(address(s_receiver)), "");
 
-    CCIPClientBase.approvedSenderUpdate[] memory senderUpdates = new CCIPClientBase.approvedSenderUpdate[](1);
-    senderUpdates[0] = CCIPClientBase.approvedSenderUpdate({
+    CCIPClientBase.ApprovedSenderUpdate[] memory senderUpdates = new CCIPClientBase.ApprovedSenderUpdate[](1);
+    senderUpdates[0] = CCIPClientBase.ApprovedSenderUpdate({
       destChainSelector: destChainSelector,
       sender: abi.encode(address(s_receiver))
     });
 
-    s_receiver.updateApprovedSenders(senderUpdates, new CCIPClientBase.approvedSenderUpdate[](0));
+    s_receiver.updateApprovedSenders(senderUpdates, new CCIPClientBase.ApprovedSenderUpdate[](0));
   }
 
   function test_ccipReceive_and_respond_with_ack() public {

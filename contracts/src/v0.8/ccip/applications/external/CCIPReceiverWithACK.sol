@@ -14,21 +14,12 @@ contract CCIPReceiverWithACK is CCIPReceiver {
   using SafeERC20 for IERC20;
   using EnumerableMap for EnumerableMap.Bytes32ToUintMap;
 
-  // Current feeToken
-  IERC20 public s_feeToken;
-
-  bytes public constant ACK_MESSAGE_HEADER = "MESSAGE_ACKNOWLEDGED_";
-
-  // mapping(bytes32 messageId => bool ackReceived) public s_messageAckReceived;
-  mapping(bytes32 messageId => MessageStatus status) public s_messageStatus;
+  error InvalidAckMessageHeader();
+  error MessageAlreadyAcknowledged(bytes32 messageId);
 
   event MessageAckSent(bytes32 incomingMessageId);
   event MessageSent(bytes32 indexed incomingMessageId, bytes32 indexed ACKMessageId);
   event MessageAckReceived(bytes32);
-
-  error InvalidAckMessageHeader();
-  error MessageAlreadyAcknowledged(bytes32 messageId);
-
   event FeeTokenModified(address indexed oldToken, address indexed newToken);
 
   enum MessageType {
@@ -47,6 +38,13 @@ contract CCIPReceiverWithACK is CCIPReceiver {
     bytes data;
     MessageType messageType;
   }
+
+  bytes public constant ACK_MESSAGE_HEADER = "MESSAGE_ACKNOWLEDGED_";
+
+  // Current feeToken
+  IERC20 public s_feeToken;
+
+  mapping(bytes32 messageId => MessageStatus status) public s_messageStatus;
 
   constructor(address router, IERC20 feeToken) CCIPReceiver(router) {
     s_feeToken = feeToken;
@@ -86,16 +84,15 @@ contract CCIPReceiverWithACK is CCIPReceiver {
     public
     override
     onlyRouter
-    validSender(message.sourceChainSelector, message.sender)
-    validChain(message.sourceChainSelector)
+    isValidSender(message.sourceChainSelector, message.sender)
+    isValidChain(message.sourceChainSelector)
   {
     try this.processMessage(message) {}
     catch (bytes memory err) {
-      // Could set different error codes based on the caught error. Each could be
-      // handled differently.
       s_failedMessages.set(message.messageId, uint256(ErrorCode.FAILED));
       s_messageContents[message.messageId] = message;
-      // Don't revert so CCIP doesn't revert. Emit event instead.
+
+      // Don't revert so CCIPRouter doesn't revert. Emit event instead.
       // The message can be retried later without having to do manual execution of CCIP.
       emit MessageFailed(message.messageId, err);
       return;

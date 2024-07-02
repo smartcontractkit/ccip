@@ -62,8 +62,8 @@ contract PingPongDemo is CCIPClient {
     external
     override
     onlySelf
-    validSender(message.sourceChainSelector, message.sender)
-    validChain(message.sourceChainSelector)
+    isValidSender(message.sourceChainSelector, message.sender)
+    isValidChain(message.sourceChainSelector)
   {
     uint256 pingPongCount = abi.decode(message.data, (uint256));
     if (!s_isPaused) {

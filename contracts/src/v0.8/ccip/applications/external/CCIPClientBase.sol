@@ -12,25 +12,27 @@ abstract contract CCIPClientBase is OwnerIsCreator, ITypeAndVersion {
   using SafeERC20 for IERC20;
   using Address for address;
 
-  address internal immutable i_ccipRouter;
-
   error ZeroAddressNotAllowed();
   error InvalidRouter(address router);
   error InvalidChain(uint64 chainSelector);
   error InvalidSender(bytes sender);
   error InvalidRecipient(bytes recipient);
 
-  struct approvedSenderUpdate { // TODO capitalize
+  struct ApprovedSenderUpdate {
     uint64 destChainSelector;
-    bytes sender; // TODO: add spack comments on what this field is
+    bytes sender; // The address which initiated source-chain message, abi-encoded in case of a non-EVM-compatible network
   }
 
   struct ChainConfig {
-    bool isDisabled; // TODO rename: disabled
+    bool disabled;
     bytes recipient;
-    bytes extraArgsBytes; // TODO add explanas on why extraArgs is in ChainConfig, and not supposed to be supplied by sender at runtime
+    // Includes additional configs such as manual gas limit, and OOO-execution.
+    // Should not be supplied at runtime to prevent unexpected contract behavior
+    bytes extraArgsBytes;
     mapping(bytes => bool) approvedSender;
   }
+
+  address internal immutable i_ccipRouter;
 
   mapping(uint64 => ChainConfig) public s_chainConfigs;
 
@@ -42,7 +44,8 @@ abstract contract CCIPClientBase is OwnerIsCreator, ITypeAndVersion {
   // ================================================================
   // │                      Router Management                       │
   // ================================================================
-  // TODO natspec this contract
+
+  /// @notice returns the address of the CCIP Router set at contract-deployment
   function getRouter() public view virtual returns (address) {
     return i_ccipRouter;
   }
@@ -58,8 +61,8 @@ abstract contract CCIPClientBase is OwnerIsCreator, ITypeAndVersion {
   // ================================================================
 
   function updateApprovedSenders(
-    approvedSenderUpdate[] calldata adds,
-    approvedSenderUpdate[] calldata removes
+    ApprovedSenderUpdate[] calldata adds,
+    ApprovedSenderUpdate[] calldata removes
   ) external onlyOwner {
     for (uint256 i = 0; i < removes.length; ++i) {
       delete s_chainConfigs[removes[i].destChainSelector].approvedSender[removes[i].sender];
@@ -78,17 +81,14 @@ abstract contract CCIPClientBase is OwnerIsCreator, ITypeAndVersion {
   // │                  Fee Token Management                       │
   // ===============================================================
 
-  fallback() external {} // TODO confirm with Devrel why they want this; we would prefer to not have a fallback to avoid silent failures
-
-  // TODO add a comment why payable receive is in client base
+  /// @notice function is set in client base to support native-fee-token pre-funding in all children implemending CCIPSend
   receive() external payable {}
 
   function withdrawNativeToken(address payable to, uint256 amount) external onlyOwner {
     Address.sendValue(to, amount);
   }
 
-  // TODO add a warning message, this should only be used for things like withdrawing tokens that werent sent in error
-  // this should never be used for recovering tokens from a message
+  /// @notice Function should NEVER be used for transfering tokens from a failed message, only for recovering tokens sent in error
   function withdrawTokens(address token, address to, uint256 amount) external onlyOwner {
     IERC20(token).safeTransfer(to, amount);
   }
@@ -109,23 +109,21 @@ abstract contract CCIPClientBase is OwnerIsCreator, ITypeAndVersion {
     if (_extraArgsBytes.length != 0) currentConfig.extraArgsBytes = _extraArgsBytes;
 
     // If config was previously disabled, then re-enable it;
-    if (currentConfig.isDisabled) currentConfig.isDisabled = false;
+    if (currentConfig.disabled) currentConfig.disabled = false;
   }
 
   function disableChain(uint64 chainSelector) external onlyOwner {
-    s_chainConfigs[chainSelector].isDisabled = true;
+    s_chainConfigs[chainSelector].disabled = true;
   }
 
-  // TODO change to supportedChain or isValidChain
-  modifier validChain(uint64 chainSelector) { 
+  modifier isValidChain(uint64 chainSelector) {
     // Must be storage and not memory because the struct contains a nested mapping
     ChainConfig storage currentConfig = s_chainConfigs[chainSelector];
-    if (currentConfig.recipient.length == 0 || currentConfig.isDisabled) revert InvalidChain(chainSelector);
+    if (currentConfig.recipient.length == 0 || currentConfig.disabled) revert InvalidChain(chainSelector);
     _;
   }
 
-  // TODO ditto
-  modifier validSender(uint64 chainSelector, bytes memory sender) {
+  modifier isValidSender(uint64 chainSelector, bytes memory sender) {
     if (!s_chainConfigs[chainSelector].approvedSender[sender]) revert InvalidSender(sender);
     _;
   }

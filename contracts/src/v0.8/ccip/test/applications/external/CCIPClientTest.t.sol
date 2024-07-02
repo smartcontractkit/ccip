@@ -29,11 +29,11 @@ contract CCIPClientTest is EVM2EVMOnRampSetup {
     s_sender = new CCIPClient(address(s_sourceRouter), IERC20(s_sourceFeeToken));
     s_sender.enableChain(destChainSelector, abi.encode(address(s_sender)), "");
 
-    CCIPClientBase.approvedSenderUpdate[] memory senderUpdates = new CCIPClientBase.approvedSenderUpdate[](1);
+    CCIPClientBase.ApprovedSenderUpdate[] memory senderUpdates = new CCIPClientBase.ApprovedSenderUpdate[](1);
     senderUpdates[0] =
-      CCIPClientBase.approvedSenderUpdate({destChainSelector: destChainSelector, sender: abi.encode(address(s_sender))});
+      CCIPClientBase.ApprovedSenderUpdate({destChainSelector: destChainSelector, sender: abi.encode(address(s_sender))});
 
-    s_sender.updateApprovedSenders(senderUpdates, new CCIPClientBase.approvedSenderUpdate[](0));
+    s_sender.updateApprovedSenders(senderUpdates, new CCIPClientBase.ApprovedSenderUpdate[](0));
   }
 
   function test_ccipReceiveAndSendAck() public {
