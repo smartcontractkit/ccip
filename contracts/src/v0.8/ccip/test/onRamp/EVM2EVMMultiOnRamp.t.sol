@@ -41,7 +41,6 @@ contract EVM2EVMMultiOnRamp_constructor is EVM2EVMMultiOnRampSetup {
       DEST_CHAIN_SELECTOR,
       EVM2EVMMultiOnRamp.DestChainConfig({
         dynamicConfig: destChainConfigArg.dynamicConfig,
-        prevOnRamp: address(0),
         sequenceNumber: 0,
         metadataHash: ""
       })
@@ -61,7 +60,6 @@ contract EVM2EVMMultiOnRamp_constructor is EVM2EVMMultiOnRampSetup {
 
     EVM2EVMMultiOnRamp.DestChainConfig memory expectedDestChainConfig = EVM2EVMMultiOnRamp.DestChainConfig({
       dynamicConfig: destChainConfigArg.dynamicConfig,
-      prevOnRamp: address(0),
       sequenceNumber: 0,
       metadataHash: keccak256(
         abi.encode(
@@ -197,16 +195,13 @@ contract EVM2EVMMultiOnRamp_applyDestChainConfigUpdates is EVM2EVMMultiOnRampSet
     );
     bool isNewChain = true;
 
-    if (destChainConfigArgs.destChainSelector == DEST_CHAIN_SELECTOR) {
-      destChainConfigArgs.prevOnRamp = address(0);
-      isNewChain = false;
-    }
+    if (destChainConfigArgs.destChainSelector == DEST_CHAIN_SELECTOR) isNewChain = false;
+
     EVM2EVMMultiOnRamp.DestChainConfigArgs[] memory newDestChainConfigArgs =
       new EVM2EVMMultiOnRamp.DestChainConfigArgs[](1);
     newDestChainConfigArgs[0] = destChainConfigArgs;
     EVM2EVMMultiOnRamp.DestChainConfig memory expectedDestChainConfig = EVM2EVMMultiOnRamp.DestChainConfig({
       dynamicConfig: destChainConfigArgs.dynamicConfig,
-      prevOnRamp: destChainConfigArgs.prevOnRamp,
       sequenceNumber: 0,
       metadataHash: keccak256(
         abi.encode(
@@ -242,7 +237,6 @@ contract EVM2EVMMultiOnRamp_applyDestChainConfigUpdates is EVM2EVMMultiOnRampSet
 
     EVM2EVMMultiOnRamp.DestChainConfig memory expectedDestChainConfig0 = EVM2EVMMultiOnRamp.DestChainConfig({
       dynamicConfig: destChainConfigArgs[0].dynamicConfig,
-      prevOnRamp: address(0),
       sequenceNumber: 0,
       metadataHash: keccak256(
         abi.encode(
@@ -256,7 +250,6 @@ contract EVM2EVMMultiOnRamp_applyDestChainConfigUpdates is EVM2EVMMultiOnRampSet
 
     EVM2EVMMultiOnRamp.DestChainConfig memory expectedDestChainConfig1 = EVM2EVMMultiOnRamp.DestChainConfig({
       dynamicConfig: destChainConfigArgs[1].dynamicConfig,
-      prevOnRamp: address(0),
       sequenceNumber: 0,
       metadataHash: keccak256(
         abi.encode(
@@ -310,17 +303,6 @@ contract EVM2EVMMultiOnRamp_applyDestChainConfigUpdates is EVM2EVMMultiOnRampSet
     EVM2EVMMultiOnRamp.DestChainConfigArgs memory destChainConfigArg = destChainConfigArgs[0];
 
     destChainConfigArg.dynamicConfig.defaultTxGasLimit = 0;
-    vm.expectRevert(
-      abi.encodeWithSelector(EVM2EVMMultiOnRamp.InvalidDestChainConfig.selector, destChainConfigArg.destChainSelector)
-    );
-    s_onRamp.applyDestChainConfigUpdates(destChainConfigArgs);
-  }
-
-  function test_InvalidDestChainConfigNewPrevOnRampOnExistingChain_Revert() public {
-    EVM2EVMMultiOnRamp.DestChainConfigArgs[] memory destChainConfigArgs = _generateDestChainConfigArgs();
-    EVM2EVMMultiOnRamp.DestChainConfigArgs memory destChainConfigArg = destChainConfigArgs[0];
-
-    destChainConfigArg.prevOnRamp = address(1);
     vm.expectRevert(
       abi.encodeWithSelector(EVM2EVMMultiOnRamp.InvalidDestChainConfig.selector, destChainConfigArg.destChainSelector)
     );
@@ -1048,8 +1030,7 @@ contract EVM2EVMMultiOnRamp_getDataAvailabilityCost is EVM2EVMMultiOnRamp_getFee
     EVM2EVMMultiOnRamp.DestChainConfig memory destChainConfig = s_onRamp.getDestChainConfig(destChainSelector);
     destChainConfigArgs[0] = EVM2EVMMultiOnRamp.DestChainConfigArgs({
       destChainSelector: destChainSelector,
-      dynamicConfig: destChainConfig.dynamicConfig,
-      prevOnRamp: destChainConfig.prevOnRamp
+      dynamicConfig: destChainConfig.dynamicConfig
     });
     destChainConfigArgs[0].dynamicConfig.destDataAvailabilityOverheadGas = destDataAvailabilityOverheadGas;
     destChainConfigArgs[0].dynamicConfig.destGasPerDataAvailabilityByte = destGasPerDataAvailabilityByte;
@@ -1120,8 +1101,7 @@ contract EVM2EVMMultiOnRamp_getFee is EVM2EVMMultiOnRamp_getFeeSetup {
     EVM2EVMMultiOnRamp.DestChainConfig memory destChainConfig = s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR);
     destChainConfigArgs[0] = EVM2EVMMultiOnRamp.DestChainConfigArgs({
       destChainSelector: DEST_CHAIN_SELECTOR,
-      dynamicConfig: destChainConfig.dynamicConfig,
-      prevOnRamp: destChainConfig.prevOnRamp
+      dynamicConfig: destChainConfig.dynamicConfig
     });
     destChainConfigArgs[0].dynamicConfig.destDataAvailabilityMultiplierBps = 0;
     s_onRamp.applyDestChainConfigUpdates(destChainConfigArgs);

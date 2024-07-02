@@ -146,8 +146,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
   /// @dev Struct to hold the configs for a destination chain
   struct DestChainConfig {
     DestChainDynamicConfig dynamicConfig; // ──╮ Dynamic configs for a destination chain
-    address prevOnRamp; // ────────────────────╯ Address of previous-version OnRamp
-    uint64 sequenceNumber; // The last used sequence number. This is zero in the case where no messages has been sent yet.
+    uint64 sequenceNumber; // ─────────────────╯ The last used sequence number. This is zero in the case where no messages has been sent yet.
     // 0 is not a valid sequence number for any real transaction.
     /// @dev metadataHash is a lane-specific prefix for a message hash preimage which ensures global uniqueness
     /// Ensures that 2 identical messages sent to 2 different lanes will have a distinct hash.
@@ -163,7 +162,6 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
   struct DestChainConfigArgs {
     uint64 destChainSelector; // Destination chain selector
     DestChainDynamicConfig dynamicConfig; // Struct to hold the configs for a destination chain
-    address prevOnRamp; // Address of previous-version OnRamp.
   }
 
   // STATIC CONFIG
@@ -710,11 +708,9 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
       }
 
       DestChainConfig storage destChainConfig = s_destChainConfig[destChainSelector];
-      address prevOnRamp = destChainConfigArg.prevOnRamp;
 
       DestChainConfig memory newDestChainConfig = DestChainConfig({
         dynamicConfig: destChainConfigArg.dynamicConfig,
-        prevOnRamp: prevOnRamp,
         sequenceNumber: destChainConfig.sequenceNumber,
         metadataHash: destChainConfig.metadataHash
       });
@@ -725,11 +721,9 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
         newDestChainConfig.metadataHash =
           keccak256(abi.encode(Internal.EVM_2_EVM_MESSAGE_HASH, i_chainSelector, destChainSelector, address(this)));
         destChainConfig.metadataHash = newDestChainConfig.metadataHash;
-        if (prevOnRamp != address(0)) destChainConfig.prevOnRamp = prevOnRamp;
 
         emit DestChainAdded(destChainSelector, destChainConfig);
       } else {
-        if (destChainConfig.prevOnRamp != prevOnRamp) revert InvalidDestChainConfig(destChainSelector);
         if (destChainConfigArg.dynamicConfig.defaultTokenDestBytesOverhead < Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES) {
           revert InvalidDestBytesOverhead(address(0), destChainConfigArg.dynamicConfig.defaultTokenDestBytesOverhead);
         }
