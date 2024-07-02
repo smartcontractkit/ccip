@@ -8,17 +8,17 @@ library CCIPConfigArraysValidation {
     error HasDuplicates(bytes32[] array);
     error NotSubset(bytes32[] smaller, bytes32[] larger);
 
-    function checkSortedNoDuplicatesAndSubset(bytes32[] memory a, bytes32[] memory b) internal pure {
+    function _checkSortedNoDuplicatesAndSubset(bytes32[] memory a, bytes32[] memory b) internal pure {
         if (a.length == 0 || b.length == 0) {
             revert ArrayEmpty();
         }
 
-        checkSortedAndDuplicates(a);
-        checkSortedAndDuplicates(b);
+        _checkSortedAndDuplicates(a);
+        _checkSortedAndDuplicates(b);
 
         // Check if 'a' is a subset of 'b'
-        uint i = 0; // Pointer for 'a'
-        uint j = 0; // Pointer for 'b'
+        uint256 i = 0; // Pointer for 'a'
+        uint256 j = 0; // Pointer for 'b'
 
         while (i < a.length && j < b.length) {
             if (a[i] > b[j]) {
@@ -39,8 +39,8 @@ library CCIPConfigArraysValidation {
     }
 
     // Helper function to check if array is sorted and has no duplicates
-    function checkSortedAndDuplicates(bytes32[] memory array) private pure {
-        for (uint i = 1; i < array.length; ++i) {
+    function _checkSortedAndDuplicates(bytes32[] memory array) private pure {
+        for (uint256 i = 1; i < array.length; ++i) {
             if (array[i] < array[i - 1]) {
                 revert NotSorted(array);
             }
