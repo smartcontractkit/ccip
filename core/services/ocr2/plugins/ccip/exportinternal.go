@@ -104,7 +104,7 @@ func NewChainAgnosticPriceRegistry(provider ChainAgnosticPriceRegistryFactory) *
 	return &ChainAgnosticPriceRegistry{provider}
 }
 
-type JSONCommitOffchainConfig = v1_2_0.JSONCommitOffchainConfig
+type JSONCommitOffchainConfigV1_2_0 = v1_2_0.JSONCommitOffchainConfig
 type CommitOnchainConfig = ccipdata.CommitOnchainConfig
 
 func NewCommitOffchainConfig(

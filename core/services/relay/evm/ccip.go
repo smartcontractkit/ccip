@@ -26,30 +26,26 @@ var _ cciptypes.CommitStoreReader = (*IncompleteDestCommitStoreReader)(nil)
 // IncompleteSourceCommitStoreReader is an implementation of CommitStoreReader with the only valid methods being
 // GasPriceEstimator, ChangeConfig, and OffchainConfig
 type IncompleteSourceCommitStoreReader struct {
-	estimator                gas.EvmFeeEstimator
-	gasPriceEstimator        prices.DAGasPriceEstimator
-	sourceMaxGasPrice        *big.Int
-	execGasPriceDeviationPPB int64
-	daGasPriceDeviationPPB   int64
-	offchainConfig           cciptypes.CommitOffchainConfig
+	estimator         gas.EvmFeeEstimator
+	gasPriceEstimator *prices.DAGasPriceEstimator
+	sourceMaxGasPrice *big.Int
+	offchainConfig    cciptypes.CommitOffchainConfig
 }
 
-func NewIncompleteSourceCommitStoreReader(gasEstimator gas.EvmFeeEstimator, sourceMaxGasPrice *big.Int) *IncompleteSourceCommitStoreReader {
+func NewIncompleteSourceCommitStoreReader(estimator gas.EvmFeeEstimator, sourceMaxGasPrice *big.Int) *IncompleteSourceCommitStoreReader {
 	return &IncompleteSourceCommitStoreReader{
-		estimator:                gasEstimator,
-		sourceMaxGasPrice:        sourceMaxGasPrice,
-		execGasPriceDeviationPPB: 0, // This value must be updated with a ChangeConfig call
-		daGasPriceDeviationPPB:   0, // This value must be updated with a ChangeConfig call
+		estimator:         estimator,
+		sourceMaxGasPrice: sourceMaxGasPrice,
 	}
 }
 
-func (i IncompleteSourceCommitStoreReader) ChangeConfig(ctx context.Context, onchainConfig []byte, offchainConfig []byte) (cciptypes.Address, error) {
+func (i *IncompleteSourceCommitStoreReader) ChangeConfig(ctx context.Context, onchainConfig []byte, offchainConfig []byte) (cciptypes.Address, error) {
 	onchainConfigParsed, err := abihelpers.DecodeAbiStruct[ccip.CommitOnchainConfig](onchainConfig)
 	if err != nil {
 		return "", err
 	}
 
-	offchainConfigParsed, err := ccipconfig.DecodeOffchainConfig[ccip.JSONCommitOffchainConfig](offchainConfig)
+	offchainConfigParsed, err := ccipconfig.DecodeOffchainConfig[ccip.JSONCommitOffchainConfigV1_2_0](offchainConfig)
 	if err != nil {
 		return "", err
 	}
@@ -72,66 +68,66 @@ func (i IncompleteSourceCommitStoreReader) ChangeConfig(ctx context.Context, onc
 	return cciptypes.Address(onchainConfigParsed.PriceRegistry.String()), nil
 }
 
-func (i IncompleteSourceCommitStoreReader) DecodeCommitReport(ctx context.Context, report []byte) (cciptypes.CommitStoreReport, error) {
+func (i *IncompleteSourceCommitStoreReader) DecodeCommitReport(ctx context.Context, report []byte) (cciptypes.CommitStoreReport, error) {
 	return cciptypes.CommitStoreReport{}, fmt.Errorf("invalid usage of IncompleteSourceCommitStoreReader")
 }
 
-func (i IncompleteSourceCommitStoreReader) EncodeCommitReport(ctx context.Context, report cciptypes.CommitStoreReport) ([]byte, error) {
+func (i *IncompleteSourceCommitStoreReader) EncodeCommitReport(ctx context.Context, report cciptypes.CommitStoreReport) ([]byte, error) {
 	return []byte{}, fmt.Errorf("invalid usage of IncompleteSourceCommitStoreReader")
 }
 
 // GasPriceEstimator returns an ExecGasPriceEstimator to satisfy the GasPriceEstimatorCommit interface,
 // with deviationPPB values hardcoded to 0 when this implementation is first constructed.
 // When ChangeConfig is called, another call to this method must be made to fetch a GasPriceEstimator with updated values
-func (i IncompleteSourceCommitStoreReader) GasPriceEstimator(ctx context.Context) (cciptypes.GasPriceEstimatorCommit, error) {
+func (i *IncompleteSourceCommitStoreReader) GasPriceEstimator(ctx context.Context) (cciptypes.GasPriceEstimatorCommit, error) {
 	return i.gasPriceEstimator, nil
 }
 
-func (i IncompleteSourceCommitStoreReader) GetAcceptedCommitReportsGteTimestamp(ctx context.Context, ts time.Time, confirmations int) ([]cciptypes.CommitStoreReportWithTxMeta, error) {
+func (i *IncompleteSourceCommitStoreReader) GetAcceptedCommitReportsGteTimestamp(ctx context.Context, ts time.Time, confirmations int) ([]cciptypes.CommitStoreReportWithTxMeta, error) {
 	return nil, fmt.Errorf("invalid usage of IncompleteSourceCommitStoreReader")
 }
 
-func (i IncompleteSourceCommitStoreReader) GetCommitReportMatchingSeqNum(ctx context.Context, seqNum uint64, confirmations int) ([]cciptypes.CommitStoreReportWithTxMeta, error) {
+func (i *IncompleteSourceCommitStoreReader) GetCommitReportMatchingSeqNum(ctx context.Context, seqNum uint64, confirmations int) ([]cciptypes.CommitStoreReportWithTxMeta, error) {
 	return nil, fmt.Errorf("invalid usage of IncompleteSourceCommitStoreReader")
 }
 
-func (i IncompleteSourceCommitStoreReader) GetCommitStoreStaticConfig(ctx context.Context) (cciptypes.CommitStoreStaticConfig, error) {
+func (i *IncompleteSourceCommitStoreReader) GetCommitStoreStaticConfig(ctx context.Context) (cciptypes.CommitStoreStaticConfig, error) {
 	return cciptypes.CommitStoreStaticConfig{}, fmt.Errorf("invalid usage of IncompleteSourceCommitStoreReader")
 }
 
-func (i IncompleteSourceCommitStoreReader) GetExpectedNextSequenceNumber(ctx context.Context) (uint64, error) {
+func (i *IncompleteSourceCommitStoreReader) GetExpectedNextSequenceNumber(ctx context.Context) (uint64, error) {
 	return 0, fmt.Errorf("invalid usage of IncompleteSourceCommitStoreReader")
 }
 
-func (i IncompleteSourceCommitStoreReader) GetLatestPriceEpochAndRound(ctx context.Context) (uint64, error) {
+func (i *IncompleteSourceCommitStoreReader) GetLatestPriceEpochAndRound(ctx context.Context) (uint64, error) {
 	return 0, fmt.Errorf("invalid usage of IncompleteSourceCommitStoreReader")
 }
 
-func (i IncompleteSourceCommitStoreReader) IsBlessed(ctx context.Context, root [32]byte) (bool, error) {
+func (i *IncompleteSourceCommitStoreReader) IsBlessed(ctx context.Context, root [32]byte) (bool, error) {
 	return false, fmt.Errorf("invalid usage of IncompleteSourceCommitStoreReader")
 }
 
-func (i IncompleteSourceCommitStoreReader) IsDestChainHealthy(ctx context.Context) (bool, error) {
+func (i *IncompleteSourceCommitStoreReader) IsDestChainHealthy(ctx context.Context) (bool, error) {
 	return false, fmt.Errorf("invalid usage of IncompleteSourceCommitStoreReader")
 }
 
-func (i IncompleteSourceCommitStoreReader) IsDown(ctx context.Context) (bool, error) {
+func (i *IncompleteSourceCommitStoreReader) IsDown(ctx context.Context) (bool, error) {
 	return false, fmt.Errorf("invalid usage of IncompleteSourceCommitStoreReader")
 }
 
-func (i IncompleteSourceCommitStoreReader) OffchainConfig(ctx context.Context) (cciptypes.CommitOffchainConfig, error) {
+func (i *IncompleteSourceCommitStoreReader) OffchainConfig(ctx context.Context) (cciptypes.CommitOffchainConfig, error) {
 	return i.offchainConfig, nil
 }
 
-func (i IncompleteSourceCommitStoreReader) VerifyExecutionReport(ctx context.Context, report cciptypes.ExecReport) (bool, error) {
+func (i *IncompleteSourceCommitStoreReader) VerifyExecutionReport(ctx context.Context, report cciptypes.ExecReport) (bool, error) {
 	return false, fmt.Errorf("invalid usage of IncompleteSourceCommitStoreReader")
 }
 
-func (i IncompleteSourceCommitStoreReader) Close() error {
+func (i *IncompleteSourceCommitStoreReader) Close() error {
 	return fmt.Errorf("invalid usage of IncompleteSourceCommitStoreReader")
 }
 
-// [IncompleteDestCommitStoreReader] is an implementation of CommitStoreReader with all valid methods except
+// IncompleteDestCommitStoreReader is an implementation of CommitStoreReader with all valid methods except
 // GasPriceEstimator, ChangeConfig, and OffchainConfig.
 type IncompleteDestCommitStoreReader struct {
 	cs cciptypes.CommitStoreReader
@@ -148,62 +144,62 @@ func NewIncompleteDestCommitStoreReader(lggr logger.Logger, versionFinder ccip.V
 	}, nil
 }
 
-func (i IncompleteDestCommitStoreReader) ChangeConfig(ctx context.Context, onchainConfig []byte, offchainConfig []byte) (cciptypes.Address, error) {
+func (i *IncompleteDestCommitStoreReader) ChangeConfig(ctx context.Context, onchainConfig []byte, offchainConfig []byte) (cciptypes.Address, error) {
 	return "", fmt.Errorf("invalid usage of IncompleteDestCommitStoreReader")
 }
 
-func (i IncompleteDestCommitStoreReader) DecodeCommitReport(ctx context.Context, report []byte) (cciptypes.CommitStoreReport, error) {
+func (i *IncompleteDestCommitStoreReader) DecodeCommitReport(ctx context.Context, report []byte) (cciptypes.CommitStoreReport, error) {
 	return i.cs.DecodeCommitReport(ctx, report)
 }
 
-func (i IncompleteDestCommitStoreReader) EncodeCommitReport(ctx context.Context, report cciptypes.CommitStoreReport) ([]byte, error) {
+func (i *IncompleteDestCommitStoreReader) EncodeCommitReport(ctx context.Context, report cciptypes.CommitStoreReport) ([]byte, error) {
 	return i.cs.EncodeCommitReport(ctx, report)
 }
 
-func (i IncompleteDestCommitStoreReader) GasPriceEstimator(ctx context.Context) (cciptypes.GasPriceEstimatorCommit, error) {
+func (i *IncompleteDestCommitStoreReader) GasPriceEstimator(ctx context.Context) (cciptypes.GasPriceEstimatorCommit, error) {
 	return nil, fmt.Errorf("invalid usage of IncompleteDestCommitStoreReader")
 }
 
-func (i IncompleteDestCommitStoreReader) GetAcceptedCommitReportsGteTimestamp(ctx context.Context, ts time.Time, confirmations int) ([]cciptypes.CommitStoreReportWithTxMeta, error) {
+func (i *IncompleteDestCommitStoreReader) GetAcceptedCommitReportsGteTimestamp(ctx context.Context, ts time.Time, confirmations int) ([]cciptypes.CommitStoreReportWithTxMeta, error) {
 	return i.cs.GetAcceptedCommitReportsGteTimestamp(ctx, ts, confirmations)
 }
 
-func (i IncompleteDestCommitStoreReader) GetCommitReportMatchingSeqNum(ctx context.Context, seqNum uint64, confirmations int) ([]cciptypes.CommitStoreReportWithTxMeta, error) {
+func (i *IncompleteDestCommitStoreReader) GetCommitReportMatchingSeqNum(ctx context.Context, seqNum uint64, confirmations int) ([]cciptypes.CommitStoreReportWithTxMeta, error) {
 	return i.cs.GetCommitReportMatchingSeqNum(ctx, seqNum, confirmations)
 }
 
-func (i IncompleteDestCommitStoreReader) GetCommitStoreStaticConfig(ctx context.Context) (cciptypes.CommitStoreStaticConfig, error) {
+func (i *IncompleteDestCommitStoreReader) GetCommitStoreStaticConfig(ctx context.Context) (cciptypes.CommitStoreStaticConfig, error) {
 	return i.cs.GetCommitStoreStaticConfig(ctx)
 }
 
-func (i IncompleteDestCommitStoreReader) GetExpectedNextSequenceNumber(ctx context.Context) (uint64, error) {
+func (i *IncompleteDestCommitStoreReader) GetExpectedNextSequenceNumber(ctx context.Context) (uint64, error) {
 	return i.cs.GetExpectedNextSequenceNumber(ctx)
 }
 
-func (i IncompleteDestCommitStoreReader) GetLatestPriceEpochAndRound(ctx context.Context) (uint64, error) {
+func (i *IncompleteDestCommitStoreReader) GetLatestPriceEpochAndRound(ctx context.Context) (uint64, error) {
 	return i.cs.GetLatestPriceEpochAndRound(ctx)
 }
 
-func (i IncompleteDestCommitStoreReader) IsBlessed(ctx context.Context, root [32]byte) (bool, error) {
+func (i *IncompleteDestCommitStoreReader) IsBlessed(ctx context.Context, root [32]byte) (bool, error) {
 	return i.cs.IsBlessed(ctx, root)
 }
 
-func (i IncompleteDestCommitStoreReader) IsDestChainHealthy(ctx context.Context) (bool, error) {
+func (i *IncompleteDestCommitStoreReader) IsDestChainHealthy(ctx context.Context) (bool, error) {
 	return i.cs.IsDestChainHealthy(ctx)
 }
 
-func (i IncompleteDestCommitStoreReader) IsDown(ctx context.Context) (bool, error) {
+func (i *IncompleteDestCommitStoreReader) IsDown(ctx context.Context) (bool, error) {
 	return i.cs.IsDown(ctx)
 }
 
-func (i IncompleteDestCommitStoreReader) OffchainConfig(ctx context.Context) (cciptypes.CommitOffchainConfig, error) {
+func (i *IncompleteDestCommitStoreReader) OffchainConfig(ctx context.Context) (cciptypes.CommitOffchainConfig, error) {
 	return cciptypes.CommitOffchainConfig{}, fmt.Errorf("invalid usage of IncompleteDestCommitStoreReader")
 }
 
-func (i IncompleteDestCommitStoreReader) VerifyExecutionReport(ctx context.Context, report cciptypes.ExecReport) (bool, error) {
+func (i *IncompleteDestCommitStoreReader) VerifyExecutionReport(ctx context.Context, report cciptypes.ExecReport) (bool, error) {
 	return i.cs.VerifyExecutionReport(ctx, report)
 }
 
-func (i IncompleteDestCommitStoreReader) Close() error {
+func (i *IncompleteDestCommitStoreReader) Close() error {
 	return i.cs.Close()
 }
