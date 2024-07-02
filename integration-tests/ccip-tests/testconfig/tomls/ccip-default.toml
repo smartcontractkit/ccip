@@ -21,7 +21,6 @@ selected_networks = ['SIMULATED_1', 'SIMULATED_2']
 
 [CCIP.Env.Lane]
 LeaderLaneEnabled=false
-Leaders = [['SIMULATED_1', 'SIMULATED_2'], ['SIMULATED_2', 'SIMULATED_1']]
 
 # PrivateEthereumNetworks.NETWORK_NAME contains the configuration of private ethereum network that includes ethereum version, evm node client, chain id,
 # certain chain configurations, addresses to fund or custom docker images to be used. These are non-dev networks, but they all run just a single node.

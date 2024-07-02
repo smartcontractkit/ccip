@@ -459,5 +459,4 @@ func (n *Node) Merge(from *Node) {
 
 type Lane struct {
 	LeaderLaneEnabled bool
-	Leaders           [][]string `toml:",omitempty"`
 }

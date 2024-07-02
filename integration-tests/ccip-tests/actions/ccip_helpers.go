@@ -3642,25 +3642,8 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 	}
 
 	jobParams.P2PV2Bootstrappers = []string{p2pBootstrappersCommit.P2PV2Bootstrapper()}
-	if lane.PriceReportingDisabled {
-		reportingPluginConfig, err := json.Marshal([]byte(`{"PriceReportingDisabled": true,}`))
-		if err != nil {
-			return fmt.Errorf("error encoding report plugin config: %w", err)
-		}
-		if testConf.CommitOCRParams == nil {
-			bTime, err := lane.Dest.Common.AvgBlockTime(lane.Context)
-			if err != nil {
-				return fmt.Errorf("error getting block time for report plugin: %w", err)
-			}
-			OCRCommitParams := contracts.OCR2ParamsForCommit(bTime)
-			OCRCommitParams.ReportingPluginConfig = reportingPluginConfig
-			testConf.CommitOCRParams = &OCRCommitParams
-		} else {
-			testConf.CommitOCRParams.ReportingPluginConfig = reportingPluginConfig
-		}
-	}
 
-	err = SetOCR2Config(lane.Context, lane.Logger, *testConf, commitNodes, execNodes, *lane.Dest)
+	err = SetOCR2Config(lane.Context, lane.Logger, *testConf, commitNodes, execNodes, *lane.Dest, lane.PriceReportingDisabled)
 	if err != nil {
 		return fmt.Errorf("failed to set ocr2 config: %w", err)
 	}
@@ -3698,6 +3681,7 @@ func SetOCR2Config(
 	commitNodes,
 	execNodes []*client.CLNodesWithKeys,
 	destCCIP DestCCIPModule,
+	priceReportingDisabled bool,
 ) error {
 	inflightExpiryExec := commonconfig.MustNewDuration(InflightExpiryExec)
 	inflightExpiryCommit := commonconfig.MustNewDuration(InflightExpiryCommit)
@@ -3734,6 +3718,7 @@ func SetOCR2Config(
 		*commonconfig.MustNewDuration(5 * time.Second),
 		1e6,
 		*inflightExpiryCommit,
+		priceReportingDisabled,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create commit offchain config: %w", err)

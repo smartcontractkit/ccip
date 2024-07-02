@@ -68,7 +68,7 @@ type NetworkPair struct {
 	NetworkB     blockchain.EVMNetwork
 	ChainClientA blockchain.EVMClient
 	ChainClientB blockchain.EVMClient
-	Leader       Leader
+	Leader       *Leader
 }
 
 type Leader struct {
@@ -303,22 +303,20 @@ func (c *CCIPTestConfig) SetNetworkPairs(lggr zerolog.Logger) error {
 		for idx, n := range c.NetworkPairs {
 			if firstNetworkA == "" {
 				firstNetworkA = n.NetworkA.Name
-				c.NetworkPairs[idx].Leader.BiDirectional = true
-				continue
-			}
-			if n.NetworkA.Name == firstNetworkA {
-				c.NetworkPairs[idx].Leader.UniDirectional = true
+				c.NetworkPairs[idx].Leader = &Leader{BiDirectional: true}
+			} else if n.NetworkA.Name == firstNetworkA {
+				c.NetworkPairs[idx].Leader = &Leader{UniDirectional: true}
 			}
 		}
 	}
 	for _, n := range c.NetworkPairs {
-		if n.Leader.BiDirectional {
+		if n.Leader != nil && n.Leader.BiDirectional {
 			lggr.Info().
 				Str("NetworkA", fmt.Sprintf("%s-%d", n.NetworkA.Name, n.NetworkA.ChainID)).
 				Str("NetworkB", fmt.Sprintf("%s-%d", n.NetworkB.Name, n.NetworkB.ChainID)).
 				Str("Leader Lane", "Bidirectional").
 				Msg("Network Pairs")
-		} else if n.Leader.UniDirectional {
+		} else if n.Leader != nil && n.Leader.UniDirectional {
 			lggr.Info().
 				Str("NetworkA", fmt.Sprintf("%s-%d", n.NetworkA.Name, n.NetworkA.ChainID)).
 				Str("NetworkB", fmt.Sprintf("%s-%d", n.NetworkB.Name, n.NetworkB.ChainID)).
@@ -587,7 +585,7 @@ func (o *CCIPTestSetUpOutputs) AddLanesForNetworkPair(
 	lggr *zerolog.Logger,
 	networkA, networkB blockchain.EVMNetwork,
 	chainClientA, chainClientB blockchain.EVMClient,
-	leader Leader,
+	leader *Leader,
 ) error {
 	var (
 		t         = o.Cfg.Test
@@ -641,7 +639,7 @@ func (o *CCIPTestSetUpOutputs) AddLanesForNetworkPair(
 		Context:           testcontext.Get(t),
 	}
 	// if it non leader lane, disable the price reporting
-	if !(leader.UniDirectional || leader.BiDirectional) {
+	if leader != nil && !(leader.UniDirectional || leader.BiDirectional) {
 		ccipLaneA2B.PriceReportingDisabled = true
 	}
 	contractsA, ok := o.LaneContractsByNetwork.Load(networkA.Name)
@@ -699,7 +697,7 @@ func (o *CCIPTestSetUpOutputs) AddLanesForNetworkPair(
 			DstNetworkLaneCfg: ccipLaneA2B.SrcNetworkLaneCfg,
 		}
 		// if it non leader lane, disable the price reporting
-		if !leader.BiDirectional {
+		if leader != nil && !leader.BiDirectional {
 			ccipLaneB2A.PriceReportingDisabled = true
 		}
 		b2aLogger := lggr.With().Str("env", namespace).Str("Lane",
