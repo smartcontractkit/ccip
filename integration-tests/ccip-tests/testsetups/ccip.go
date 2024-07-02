@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"math/big"
-	"math/rand"
 	"os"
 	"regexp"
 	"strings"
@@ -286,11 +285,8 @@ func (c *CCIPTestConfig) SetNetworkPairs(lggr zerolog.Logger) error {
 		c.AddPairToNetworkList(c.SelectedNetworks[0], c.SelectedNetworks[1])
 	}
 
-	// if the number of lanes is lesser than the number of network pairs, choose a random subset of network pairs
+	// if the number of lanes is lesser than the number of network pairs, choose first c.TestGroupInput.MaxNoOfLanes pairs
 	if c.TestGroupInput.MaxNoOfLanes > 0 && c.TestGroupInput.MaxNoOfLanes < len(c.NetworkPairs) {
-		rand.Shuffle(len(c.NetworkPairs), func(i, j int) {
-			c.NetworkPairs[i], c.NetworkPairs[j] = c.NetworkPairs[j], c.NetworkPairs[i]
-		})
 		c.NetworkPairs = c.NetworkPairs[:c.TestGroupInput.MaxNoOfLanes]
 	}
 
