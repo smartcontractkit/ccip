@@ -251,7 +251,7 @@ library Internal {
   /// The messageId is not expected to match hash(message), since it may originate from another ramp family
   // TODO: revisit if destChainSelector is required (likely sufficient to have it implicitly in the commit roots)
   struct RampMessageHeader {
-    bytes32 messageId; // Unique identifier for the message, generated with the source chain's encoding sdcheme (i.e. not necessarily abi.encoded)
+    bytes32 messageId; // Unique identifier for the message, generated with the source chain's encoding scheme (i.e. not necessarily abi.encoded)
     uint64 sourceChainSelector; // ───────╮ the chain selector of the source chain, note: not chainId
     uint64 destChainSelector; //          | the chain selector of the destination chain, note: not chainId
     uint64 sequenceNumber; //             │ sequence number, not unique across lanes
