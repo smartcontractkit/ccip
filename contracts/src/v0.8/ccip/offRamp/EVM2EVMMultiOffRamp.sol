@@ -3,8 +3,8 @@ pragma solidity 0.8.24;
 
 import {ITypeAndVersion} from "../../shared/interfaces/ITypeAndVersion.sol";
 import {IAny2EVMMessageReceiver} from "../interfaces/IAny2EVMMessageReceiver.sol";
-import {IAny2EVMOffRamp} from "../interfaces/IAny2EVMOffRamp.sol";
 import {IMessageInterceptor} from "../interfaces/IMessageInterceptor.sol";
+import {INonceManager} from "../interfaces/INonceManager.sol";
 import {IPoolV1} from "../interfaces/IPool.sol";
 import {IPriceRegistry} from "../interfaces/IPriceRegistry.sol";
 import {IRMN} from "../interfaces/IRMN.sol";
@@ -63,8 +63,6 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
   /// @dev Atlas depends on this event, if changing, please notify Atlas.
   event StaticConfigSet(StaticConfig staticConfig);
   event DynamicConfigSet(DynamicConfig dynamicConfig);
-  event SkippedIncorrectNonce(uint64 sourceChainSelector, uint64 nonce, bytes sender);
-  event SkippedSenderWithPreviousRampMessageInflight(uint64 sourceChainSelector, uint64 nonce, bytes sender);
   /// @dev RMN depends on this event, if changing, please notify the RMN maintainers.
   event ExecutionStateChanged(
     uint64 indexed sourceChainSelector,
@@ -86,21 +84,20 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
     uint64 chainSelector; // ───╮  Destination chainSelector
     address rmnProxy; // ───────╯  RMN proxy address
     address tokenAdminRegistry; // Token admin registry address
+    address nonceManager; // Address of the nonce manager
   }
 
   /// @notice Per-chain source config (defining a lane from a Source Chain -> Dest OffRamp)
   struct SourceChainConfig {
-    bool isEnabled; // ─────────╮  Flag whether the source chain is enabled or not
-    uint64 minSeqNr; //         |  The min sequence number expected for future messages
-    address prevOffRamp; // ────╯  Address of previous-version per-lane OffRamp. Used to be able to provide seequencing continuity during a zero downtime upgrade.
+    bool isEnabled; // ──────────╮  Flag whether the source chain is enabled or not
+    uint64 minSeqNr; // ─────────╯  The min sequence number expected for future messages
     bytes onRamp; // OnRamp address on the source chain
   }
 
   /// @notice SourceChainConfig update args scoped to one source chain
   struct SourceChainConfigArgs {
     uint64 sourceChainSelector; //  ───╮  Source chain selector of the config to update
-    bool isEnabled; //                 │  Flag whether the source chain is enabled or not
-    address prevOffRamp; // ───────────╯  Address of previous-version per-lane OffRamp. Used to be able to provide sequencing continuity during a zero downtime upgrade.
+    bool isEnabled; // ────────────────╯  Flag whether the source chain is enabled or not
     bytes onRamp; // OnRamp address on the source chain
   }
 
@@ -150,6 +147,8 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
   address internal immutable i_rmnProxy;
   /// @dev The address of the token admin registry
   address internal immutable i_tokenAdminRegistry;
+  /// @dev The address of the nonce manager
+  address internal immutable i_nonceManager;
 
   // DYNAMIC CONFIG
   DynamicConfig internal s_dynamicConfig;
@@ -159,11 +158,6 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
   mapping(uint64 sourceChainSelector => SourceChainConfig sourceChainConfig) internal s_sourceChainConfigs;
 
   // STATE
-  /// @dev The expected nonce for a given sender per source chain.
-  /// Corresponds to s_senderNonce in the OnRamp for a lane, used to enforce that messages are
-  /// executed in the same order they are sent (assuming they are DON). Note that re-execution
-  /// of FAILED messages however, can be out of order.
-  mapping(uint64 sourceChainSelector => mapping(address sender => uint64 nonce)) internal s_senderNonce;
   /// @dev A mapping of sequence numbers (per source chain) to execution state using a bitmap with each execution
   /// state only taking up 2 bits of the uint256, packing 128 states into a single slot.
   /// Message state is tracked to ensure message can only be executed successfully once.
@@ -176,7 +170,10 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
   uint64 private s_latestPriceSequenceNumber;
 
   constructor(StaticConfig memory staticConfig, SourceChainConfigArgs[] memory sourceChainConfigs) MultiOCR3Base() {
-    if (staticConfig.rmnProxy == address(0) || staticConfig.tokenAdminRegistry == address(0)) {
+    if (
+      staticConfig.rmnProxy == address(0) || staticConfig.tokenAdminRegistry == address(0)
+        || staticConfig.nonceManager == address(0)
+    ) {
       revert ZeroAddressNotAllowed();
     }
 
@@ -187,6 +184,7 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
     i_chainSelector = staticConfig.chainSelector;
     i_rmnProxy = staticConfig.rmnProxy;
     i_tokenAdminRegistry = staticConfig.tokenAdminRegistry;
+    i_nonceManager = staticConfig.nonceManager;
     emit StaticConfigSet(staticConfig);
 
     _applySourceChainConfigUpdates(sourceChainConfigs);
@@ -251,34 +249,6 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
     uint64 sequenceNumber
   ) internal view returns (uint256 bitmap) {
     return s_executionStates[sourceChainSelector][sequenceNumber / 128];
-  }
-
-  function getSenderNonce(uint64 sourceChainSelector, bytes memory sender) external view returns (uint64) {
-    (uint64 nonce,) = _getSenderNonce(sourceChainSelector, sender);
-    return nonce;
-  }
-
-  /// @notice Returns the the current nonce for a receiver.
-  /// @param sourceChainSelector The source chain to retrieve the nonce for
-  /// @param sender The sender address
-  /// @return nonce The nonce value belonging to the sender address.
-  /// @return isFromPrevRamp True if the nonce was retrieved from the prevOffRamps
-  function _getSenderNonce(
-    uint64 sourceChainSelector,
-    bytes memory sender
-  ) internal view returns (uint64 nonce, bool isFromPrevRamp) {
-    uint64 senderNonce = s_senderNonce[sourceChainSelector][abi.decode(sender, (address))];
-
-    if (senderNonce == 0) {
-      address prevOffRamp = s_sourceChainConfigs[sourceChainSelector].prevOffRamp;
-      if (prevOffRamp != address(0)) {
-        // If OffRamp was upgraded, check if sender has a nonce from the previous OffRamp.
-        // NOTE: assuming prevOffRamp is always a lane-specific off ramp
-        return (IAny2EVMOffRamp(prevOffRamp).getSenderNonce(abi.decode(sender, (address))), true);
-      }
-    }
-
-    return (senderNonce, false);
   }
 
   /// @notice Manually executes a set of reports.
@@ -436,37 +406,19 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
         }
       }
 
-      if (message.header.nonce > 0) {
-        // In the scenario where we upgrade offRamps, we still want to have sequential nonces.
-        // Referencing the old offRamp to check the expected nonce if none is set for a
-        // given sender allows us to skip the current message if it would not be the next according
-        // to the old offRamp. This preserves sequencing between updates.
-        // TODO: remove after NonceManager changes
-        (uint64 prevNonce, bool isFromPrevRamp) = _getSenderNonce(sourceChainSelector, message.sender);
-        if (isFromPrevRamp) {
-          if (prevNonce + 1 != message.header.nonce) {
-            // the starting v2 onramp nonce, i.e. the 1st message nonce v2 offramp is expected to receive,
-            // is guaranteed to equal (largest v1 onramp nonce + 1).
-            // if this message's nonce isn't (v1 offramp nonce + 1), then v1 offramp nonce != largest v1 onramp nonce,
-            // it tells us there are still messages inflight for v1 offramp
-            emit SkippedSenderWithPreviousRampMessageInflight(sourceChainSelector, message.header.nonce, message.sender);
-            continue;
-          }
-          // Otherwise this nonce is indeed the "transitional nonce", that is
-          // all messages sent to v1 ramp have been executed by the DON and the sequence can resume in V2.
-          // Note if first time user in V2, then prevNonce will be 0, and message.nonce = 1, so this will be a no-op.
-          // TODO: remove after NonceManager changes
-          s_senderNonce[sourceChainSelector][abi.decode(message.sender, (address))] = prevNonce;
-        }
-
-        // UNTOUCHED messages MUST be executed in order always IF message.nonce > 0.
-        if (originalState == Internal.MessageExecutionState.UNTOUCHED) {
-          if (prevNonce + 1 != message.header.nonce) {
-            // We skip the message if the nonce is incorrect, since message.nonce > 0.
-            emit SkippedIncorrectNonce(sourceChainSelector, message.header.nonce, message.sender);
-            continue;
-          }
-        }
+      // Nonce changes per state transition (these only apply for ordered messages):
+      // UNTOUCHED -> FAILURE  nonce bump
+      // UNTOUCHED -> SUCCESS  nonce bump
+      // FAILURE   -> FAILURE  no nonce bump
+      // FAILURE   -> SUCCESS  no nonce bump
+      // UNTOUCHED messages MUST be executed in order always
+      if (message.header.nonce > 0 && originalState == Internal.MessageExecutionState.UNTOUCHED) {
+        // If a nonce is not incremented, that means it was skipped, and we can ignore the message
+        if (
+          !INonceManager(i_nonceManager).incrementInboundNonce(
+            sourceChainSelector, message.header.nonce, message.sender
+          )
+        ) continue;
       }
 
       // Although we expect only valid messages will be committed, we check again
@@ -498,20 +450,7 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
         revert InvalidNewState(sourceChainSelector, message.header.sequenceNumber, newState);
       }
 
-      // Nonce changes per state transition.
-      // These only apply for ordered messages.
-      // UNTOUCHED -> FAILURE  nonce bump
-      // UNTOUCHED -> SUCCESS  nonce bump
-      // FAILURE   -> FAILURE  no nonce bump
-      // FAILURE   -> SUCCESS  no nonce bump
-      if (message.header.nonce > 0 && originalState == Internal.MessageExecutionState.UNTOUCHED) {
-        // TODO: remove after NonceManager changes
-        s_senderNonce[sourceChainSelector][abi.decode(message.sender, (address))]++;
-      }
-
-      emit ExecutionStateChanged(
-        sourceChainSelector, message.header.sequenceNumber, message.header.messageId, newState, returnData
-      );
+      emit ExecutionStateChanged(sourceChainSelector, message.header.sequenceNumber, message.header.messageId, newState, returnData);
     }
   }
 
@@ -559,7 +498,7 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
     if (message.tokenAmounts.length > 0) {
       destTokenAmounts = _releaseOrMintTokens(
         message.tokenAmounts,
-        abi.encode(message.sender),
+        message.sender,
         message.receiver,
         message.header.sourceChainSelector,
         message.sourceTokenData,
@@ -748,8 +687,12 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
   /// @dev This function will always return the same struct as the contents is static and can never change.
   /// RMN depends on this function, if changing, please notify the RMN maintainers.
   function getStaticConfig() external view returns (StaticConfig memory) {
-    return
-      StaticConfig({chainSelector: i_chainSelector, rmnProxy: i_rmnProxy, tokenAdminRegistry: i_tokenAdminRegistry});
+    return StaticConfig({
+      chainSelector: i_chainSelector,
+      rmnProxy: i_rmnProxy,
+      tokenAdminRegistry: i_tokenAdminRegistry,
+      nonceManager: i_nonceManager
+    });
   }
 
   /// @notice Returns the current dynamic config.
@@ -788,17 +731,15 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
 
       // OnRamp can never be zero - if it is, then the source chain has been added for the first time
       if (currentOnRamp.length == 0) {
-        // TODO: is this check sufficient / is an all-0 check needed?
         if (newOnRamp.length == 0) {
           revert ZeroAddressNotAllowed();
         }
 
         currentConfig.onRamp = newOnRamp;
-        currentConfig.prevOffRamp = sourceConfigUpdate.prevOffRamp;
         currentConfig.minSeqNr = 1;
         emit SourceChainSelectorAdded(sourceChainSelector);
       } else if (
-        keccak256(currentOnRamp) != keccak256(newOnRamp) || currentConfig.prevOffRamp != sourceConfigUpdate.prevOffRamp
+        keccak256(currentOnRamp) != keccak256(newOnRamp)
       ) {
         revert InvalidStaticConfig(sourceChainSelector);
       }
