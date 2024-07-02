@@ -22,10 +22,10 @@ library CCIPConfigArraysValidation {
 
         while (i < a.length && j < b.length) {
             if (a[i] > b[j]) {
-                j++; // Move the pointer in 'b' to find a match
+                ++j; // Move the pointer in 'b' to find a match
             } else if (a[i] == b[j]) {
-                i++; // Found a match, move the pointer in 'a'
-                j++; // Also move in 'b' to continue checking
+                ++i; // Found a match, move the pointer in 'a'
+                ++j; // Also move in 'b' to continue checking
             } else {
                 // 'a[i]' is less than 'b[j]' and no match is possible moving forward
                 revert NotSubset(a, b);
@@ -40,7 +40,7 @@ library CCIPConfigArraysValidation {
 
     // Helper function to check if array is sorted and has no duplicates
     function checkSortedAndDuplicates(bytes32[] memory array) private pure {
-        for (uint i = 1; i < array.length; i++) {
+        for (uint i = 1; i < array.length; ++i) {
             if (array[i] < array[i - 1]) {
                 revert NotSorted(array);
             }
