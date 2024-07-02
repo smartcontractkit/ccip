@@ -2874,7 +2874,7 @@ func (lane *CCIPLane) Multicall(noOfRequests int, multiSendAddr common.Address) 
 func (lane *CCIPLane) SendRequests(noOfRequests int, gasLimit *big.Int) error {
 	for i := 1; i <= noOfRequests; i++ {
 		stat := testreporters.NewCCIPRequestStats(int64(lane.NumberOfReq+i), lane.SourceNetworkName, lane.DestNetworkName)
-		_, txConfirmationDur, fee, err := lane.Source.SendRequest(
+		txHash, txConfirmationDur, fee, err := lane.Source.SendRequest(
 			lane.Dest.ReceiverDapp.EthAddress,
 			gasLimit,
 		)
@@ -2894,7 +2894,10 @@ func (lane *CCIPLane) SendRequests(noOfRequests int, gasLimit *big.Int) error {
 				noOfTokens++
 			}
 		}
-
+		_, err = lane.AddToSentReqs(txHash, []*testreporters.RequestStat{stat})
+		if err != nil {
+			return err
+		}
 		stat.UpdateState(lane.Logger, 0, testreporters.TX, txConfirmationDur, testreporters.Success, nil)
 		lane.TotalFee = bigmath.Add(lane.TotalFee, fee)
 	}
