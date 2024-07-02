@@ -6,6 +6,8 @@ import {Test} from "forge-std/Test.sol";
 import {CCIPConfig} from "../../capability/CCIPConfig.sol";
 import {ICapabilitiesRegistry} from "../../capability/interfaces/ICapabilitiesRegistry.sol";
 import {CCIPConfigHelper} from "../helpers/CCIPConfigHelper.sol";
+import {CCIPConfigArraysValidation} from "../../capability/CCIPConfigArraysValidation.sol";
+import "forge-std/Console.sol";
 
 contract CCIPConfigSetup is Test {
   address public constant OWNER = 0x82ae2B4F57CA5C1CBF8f744ADbD3697aD1a35AFe;
@@ -42,11 +44,30 @@ contract CCIPConfigSetup is Test {
     return subset;
   }
 
+  function _sort(bytes32[] memory arr, int256 left, int256 right) private pure {
+    int256 i = left;
+    int256 j = right;
+    if (i == j) return;
+    bytes32 pivot = arr[uint256(left + (right - left) / 2)];
+    while (i <= j) {
+      while (arr[uint256(i)] < pivot) i++;
+      while (pivot < arr[uint256(j)]) j--;
+      if (i <= j) {
+        (arr[uint256(i)], arr[uint256(j)]) = (arr[uint256(j)], arr[uint256(i)]);
+        i++;
+        j--;
+      }
+    }
+    if (left < j) _sort(arr, left, j);
+    if (i < right) _sort(arr, i, right);
+  }
+
   function _addChainConfig(uint256 numNodes)
     internal
     returns (bytes32[] memory p2pIds, bytes[] memory signers, bytes[] memory transmitters)
   {
     p2pIds = _makeBytes32Array(numNodes, 0);
+    _sort(p2pIds,0, int(numNodes-1));
     signers = _makeBytesArray(numNodes, 10);
     transmitters = _makeBytesArray(numNodes, 20);
     for (uint256 i = 0; i < numNodes; i++) {
@@ -532,6 +553,130 @@ contract CCIPConfig_validateConfig is CCIPConfigSetup {
     });
 
     vm.expectRevert(abi.encodeWithSelector(CCIPConfig.NodeNotInRegistry.selector, nonExistentP2PId));
+    s_ccipCC.validateConfig(config);
+  }
+
+  function test__validateConfig_P2PIdsNotSorted_Reverts() public {
+    (bytes32[] memory p2pIds, bytes[] memory signers, bytes[] memory transmitters) = _addChainConfig(4);
+    // Config is for 4 nodes, so f == 1.
+
+    //swapping two adjacent p2pIds to make it unsorted
+    (p2pIds[2], p2pIds[3]) = (p2pIds[3], p2pIds[2]);
+
+    CCIPConfig.OCR3Config memory config = CCIPConfig.OCR3Config({
+      pluginType: CCIPConfig.PluginType.Commit,
+      offrampAddress: abi.encodePacked(keccak256(abi.encode("offramp"))),
+      chainSelector: 1,
+      bootstrapP2PIds: _subset(p2pIds, 0, 1),
+      p2pIds: p2pIds,
+      signers: signers,
+      transmitters: transmitters,
+      F: 1,
+      offchainConfigVersion: 30,
+      offchainConfig: bytes("offchainConfig")
+    });
+
+    vm.expectRevert(abi.encodeWithSelector(CCIPConfigArraysValidation.NotSorted.selector,p2pIds));
+    s_ccipCC.validateConfig(config);
+  }
+
+  function test__validateConfig_BootstrapP2PIdsNotSorted_Reverts() public {
+    (bytes32[] memory p2pIds, bytes[] memory signers, bytes[] memory transmitters) = _addChainConfig(4);
+    // Config is for 4 nodes, so f == 1.
+
+    bytes32[] memory bootstrapP2PIds = _subset(p2pIds, 0, 2);
+
+    //swapping bootstrapP2PIds to make it unsorted
+    (bootstrapP2PIds[0], bootstrapP2PIds[1]) = (bootstrapP2PIds[1], bootstrapP2PIds[0]);
+
+    CCIPConfig.OCR3Config memory config = CCIPConfig.OCR3Config({
+      pluginType: CCIPConfig.PluginType.Commit,
+      offrampAddress: abi.encodePacked(keccak256(abi.encode("offramp"))),
+      chainSelector: 1,
+      bootstrapP2PIds: bootstrapP2PIds,
+      p2pIds: p2pIds,
+      signers: signers,
+      transmitters: transmitters,
+      F: 1,
+      offchainConfigVersion: 30,
+      offchainConfig: bytes("offchainConfig")
+    });
+
+    vm.expectRevert(abi.encodeWithSelector(CCIPConfigArraysValidation.NotSorted.selector,bootstrapP2PIds));
+    s_ccipCC.validateConfig(config);
+  }
+
+  function test__validateConfig_P2PIdsHasDuplicates_Reverts() public {
+    (bytes32[] memory p2pIds, bytes[] memory signers, bytes[] memory transmitters) = _addChainConfig(4);
+    // Config is for 4 nodes, so f == 1.
+
+    //forcing duplicate p2pIds
+    p2pIds[1] = p2pIds[2];
+
+    CCIPConfig.OCR3Config memory config = CCIPConfig.OCR3Config({
+      pluginType: CCIPConfig.PluginType.Commit,
+      offrampAddress: abi.encodePacked(keccak256(abi.encode("offramp"))),
+      chainSelector: 1,
+      bootstrapP2PIds: _subset(p2pIds, 0, 2),
+      p2pIds: p2pIds,
+      signers: signers,
+      transmitters: transmitters,
+      F: 1,
+      offchainConfigVersion: 30,
+      offchainConfig: bytes("offchainConfig")
+    });
+
+    vm.expectRevert(abi.encodeWithSelector(CCIPConfigArraysValidation.HasDuplicates.selector,p2pIds));
+    s_ccipCC.validateConfig(config);
+  }
+
+  function test__validateConfig_BootstrapP2PIdsHasDuplicates_Reverts() public {
+    (bytes32[] memory p2pIds, bytes[] memory signers, bytes[] memory transmitters) = _addChainConfig(4);
+    // Config is for 4 nodes, so f == 1.
+
+    bytes32[] memory bootstrapP2PIds = _subset(p2pIds, 0, 2);
+    //forcing duplicate bootstrapP2PIds
+    bootstrapP2PIds[1] = bootstrapP2PIds[0];
+
+    CCIPConfig.OCR3Config memory config = CCIPConfig.OCR3Config({
+      pluginType: CCIPConfig.PluginType.Commit,
+      offrampAddress: abi.encodePacked(keccak256(abi.encode("offramp"))),
+      chainSelector: 1,
+      bootstrapP2PIds: bootstrapP2PIds,
+      p2pIds: p2pIds,
+      signers: signers,
+      transmitters: transmitters,
+      F: 1,
+      offchainConfigVersion: 30,
+      offchainConfig: bytes("offchainConfig")
+    });
+
+    vm.expectRevert(abi.encodeWithSelector(CCIPConfigArraysValidation.HasDuplicates.selector,bootstrapP2PIds));
+    s_ccipCC.validateConfig(config);
+  }
+
+  function test__validateConfig_BootstrapP2PIdsNotSubsetOfP2PIds_Reverts() public {
+    (bytes32[] memory p2pIds, bytes[] memory signers, bytes[] memory transmitters) = _addChainConfig(4);
+    // Config is for 4 nodes, so f == 1.
+
+    //forcing invalid bootstrapP2PIds where the bootstrapP2PIds is sorted, but one of the element is not in the p2pIdsSet
+    bytes32[] memory bootstrapP2PIds = _subset(p2pIds, 0, 2);
+    p2pIds[1] = bytes32(uint(p2pIds[0])+100);
+
+    CCIPConfig.OCR3Config memory config = CCIPConfig.OCR3Config({
+      pluginType: CCIPConfig.PluginType.Commit,
+      offrampAddress: abi.encodePacked(keccak256(abi.encode("offramp"))),
+      chainSelector: 1,
+      bootstrapP2PIds: bootstrapP2PIds,
+      p2pIds: p2pIds,
+      signers: signers,
+      transmitters: transmitters,
+      F: 1,
+      offchainConfigVersion: 30,
+      offchainConfig: bytes("offchainConfig")
+    });
+
+    vm.expectRevert(abi.encodeWithSelector(CCIPConfigArraysValidation.NotSubset.selector,bootstrapP2PIds,p2pIds));
     s_ccipCC.validateConfig(config);
   }
 }
