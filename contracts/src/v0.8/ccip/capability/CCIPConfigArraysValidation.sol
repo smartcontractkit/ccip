@@ -13,8 +13,8 @@ library CCIPConfigArraysValidation {
             revert ArrayEmpty();
         }
 
-        checkSortedAndDuplicates(a);
-        checkSortedAndDuplicates(b);
+        _checkSortedAndDuplicates(a);
+        _checkSortedAndDuplicates(b);
 
         // Check if 'a' is a subset of 'b'
         uint i = 0; // Pointer for 'a'
@@ -39,7 +39,7 @@ library CCIPConfigArraysValidation {
     }
 
     // Helper function to check if array is sorted and has no duplicates
-    function checkSortedAndDuplicates(bytes32[] memory array) private pure {
+    function _checkSortedAndDuplicates(bytes32[] memory array) private pure {
         for (uint i = 1; i < array.length; ++i) {
             if (array[i] < array[i - 1]) {
                 revert NotSorted(array);
