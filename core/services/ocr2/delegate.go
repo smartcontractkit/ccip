@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"time"
 
-	nullv4 "gopkg.in/guregu/null.v4"
+	"gopkg.in/guregu/null.v4"
 
 	chainselectors "github.com/smartcontractkit/chain-selectors"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
@@ -526,7 +526,7 @@ func GetEVMEffectiveTransmitterID(ctx context.Context, jb *job.Job, chain legacy
 		if len(sendingKeys) > 1 && spec.PluginType != types.OCR2VRF {
 			return "", errors.New("only ocr2 vrf should have more than 1 sending key")
 		}
-		spec.TransmitterID = nullv4.StringFrom(sendingKeys[0])
+		spec.TransmitterID = null.StringFrom(sendingKeys[0])
 	}
 
 	// effectiveTransmitterID is the transmitter address registered on the ocr contract. This is by default the EOA account on the node.
