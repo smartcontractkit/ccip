@@ -7,7 +7,6 @@ import {CCIPConfig} from "../../capability/CCIPConfig.sol";
 import {ICapabilitiesRegistry} from "../../capability/interfaces/ICapabilitiesRegistry.sol";
 import {CCIPConfigHelper} from "../helpers/CCIPConfigHelper.sol";
 import {CCIPConfigArraysValidation} from "../../capability/CCIPConfigArraysValidation.sol";
-import "forge-std/Console.sol";
 
 contract CCIPConfigSetup is Test {
   address public constant OWNER = 0x82ae2B4F57CA5C1CBF8f744ADbD3697aD1a35AFe;
