@@ -1,0 +1,6 @@
+[CCIP]
+[CCIP.Env.Lane]
+LeaderLaneEnabled=true
+
+[CCIP.Groups.smoke]
+NoOfNetworks = 3
