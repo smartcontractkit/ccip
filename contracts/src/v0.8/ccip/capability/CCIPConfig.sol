@@ -142,22 +142,30 @@ contract CCIPConfig is ITypeAndVersion, ICapabilityConfiguration, OwnerIsCreator
     return interfaceId == type(ICapabilityConfiguration).interfaceId || interfaceId == type(IERC165).interfaceId;
   }
 
+
   // ================================================================
   // │                    Config Getters                            │
   // ================================================================
 
   /// @notice Returns all the chain configurations.
-  /// @return The chain configurations.
-  // TODO: will this eventually hit the RPC max response size limit?
-  function getAllChainConfigs() external view returns (ChainConfigInfo[] memory) {
+  /// @return paginatedChainConfigs chain configurations.
+  function getAllChainConfigs(uint256 pageIndex, uint256 pageSize) external view returns (ChainConfigInfo[] memory paginatedChainConfigs) {
+    uint256 totalItems = s_remoteChainSelectors.length(); // Total number of chain selectors
+    if (pageSize == 0 || pageIndex * pageSize >= totalItems) {
+      return new ChainConfigInfo[](0); // Return an empty array if pageSize is 0 or pageIndex is out of bounds
+    }
+
+    uint256 startIndex = pageIndex * pageSize;
+    uint256 endIndex = startIndex + pageSize > totalItems ? totalItems : startIndex + pageSize;
+
+    paginatedChainConfigs = new ChainConfigInfo[](endIndex - startIndex);
+
     uint256[] memory chainSelectors = s_remoteChainSelectors.values();
-    ChainConfigInfo[] memory chainConfigs = new ChainConfigInfo[](s_remoteChainSelectors.length());
-    for (uint256 i = 0; i < chainSelectors.length; ++i) {
+    for (uint256 i = startIndex; i < endIndex; ++i) {
       uint64 chainSelector = uint64(chainSelectors[i]);
-      chainConfigs[i] =
+      paginatedChainConfigs[i - startIndex] =
         ChainConfigInfo({chainSelector: chainSelector, chainConfig: s_chainConfigurations[chainSelector]});
     }
-    return chainConfigs;
   }
 
   /// @notice Returns the OCR configuration for the given don ID and plugin type.
