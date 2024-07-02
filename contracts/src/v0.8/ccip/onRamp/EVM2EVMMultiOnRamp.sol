@@ -155,8 +155,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
     bytes32 metadataHash;
   }
 
-  /// @dev Struct to hold the dynamic configs, its destination chain selector and previous onRamp.
-  /// Same as DestChainConfig but with the destChainSelector and the prevOnRamp so that an array of these
+  /// @dev Struct to hold the dynamic configs, its destination chain selector. Same as DestChainConfig but with the destChainSelector so that an array of these
   /// can be passed in the constructor and the applyDestChainConfigUpdates function
   //solhint-disable gas-struct-packing
   struct DestChainConfigArgs {
