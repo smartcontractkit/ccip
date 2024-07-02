@@ -306,6 +306,8 @@ func (c *CCIPTestConfig) SetNetworkPairs(lggr zerolog.Logger) error {
 				c.NetworkPairs[idx].Leader = &Leader{BiDirectional: true}
 			} else if n.NetworkA.Name == firstNetworkA {
 				c.NetworkPairs[idx].Leader = &Leader{UniDirectional: true}
+			} else {
+				c.NetworkPairs[idx].Leader = &Leader{}
 			}
 		}
 	}
