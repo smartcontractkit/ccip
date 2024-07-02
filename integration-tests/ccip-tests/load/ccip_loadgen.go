@@ -204,6 +204,7 @@ func (c *CCIPE2ELoad) CCIPMsg() (router.ClientEVM2AnyMessage, *testreporters.Req
 func (c *CCIPE2ELoad) Call(_ *wasp.Generator) *wasp.Response {
 	res := &wasp.Response{}
 	sourceCCIP := c.Lane.Source
+	c.Lane.Logger.Info().Msgf("Request Duration is %s", c.SkipRequestIfAnotherRequestTriggeredWithin.String())
 	recentRequestFoundAt := sourceCCIP.IsRequestTriggeredWithinTimeframe(c.SkipRequestIfAnotherRequestTriggeredWithin)
 	c.Lane.Logger.Info().Msgf("Recent Request Found At %s", recentRequestFoundAt)
 	if recentRequestFoundAt != nil {
