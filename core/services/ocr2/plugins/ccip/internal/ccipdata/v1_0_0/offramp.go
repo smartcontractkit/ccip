@@ -24,7 +24,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/logpollerutil"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	evmtypes "github.com/smartcontractkit/chainlink/v2/core/chains/evm/types"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp_1_0_0"
@@ -147,8 +146,6 @@ type OffRamp struct {
 	Client                  client.Client
 	evmBatchCaller          rpclib.EvmBatchCaller
 	filters                 []logpoller.Filter
-	Estimator               gas.EvmFeeEstimator
-	DestMaxGasPrice         *big.Int
 	ExecutionReportArgs     abi.Arguments
 	eventIndex              int
 	eventSig                common.Hash
@@ -382,11 +379,10 @@ func (o *OffRamp) Address(ctx context.Context) (cciptypes.Address, error) {
 	return cciptypes.Address(o.addr.String()), nil
 }
 
-func (o *OffRamp) UpdateDynamicConfig(onchainConfig cciptypes.ExecOnchainConfig, offchainConfig cciptypes.ExecOffchainConfig, gasPriceEstimator prices.GasPriceEstimatorExec) {
+func (o *OffRamp) UpdateDynamicConfig(onchainConfig cciptypes.ExecOnchainConfig, offchainConfig cciptypes.ExecOffchainConfig) {
 	o.configMu.Lock()
 	o.onchainConfig = onchainConfig
 	o.offchainConfig = offchainConfig
-	o.gasPriceEstimator = gasPriceEstimator
 	o.configMu.Unlock()
 }
 
@@ -421,9 +417,8 @@ func (o *OffRamp) ChangeConfig(ctx context.Context, onchainConfigBytes []byte, o
 		PermissionLessExecutionThresholdSeconds: time.Second * time.Duration(onchainConfigParsed.PermissionLessExecutionThresholdSeconds),
 		Router:                                  cciptypes.Address(onchainConfigParsed.Router.String()),
 	}
-	gasPriceEstimator := prices.NewExecGasPriceEstimator(o.Estimator, o.DestMaxGasPrice, 0)
 
-	o.UpdateDynamicConfig(onchainConfig, offchainConfig, gasPriceEstimator)
+	o.UpdateDynamicConfig(onchainConfig, offchainConfig)
 
 	o.Logger.Infow("Starting exec plugin",
 		"offchainConfig", onchainConfigParsed,
@@ -625,7 +620,7 @@ func (o *OffRamp) RegisterFilters() error {
 	return logpollerutil.RegisterLpFilters(o.lp, o.filters)
 }
 
-func NewOffRamp(lggr logger.Logger, addr common.Address, ec client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator, destMaxGasPrice *big.Int) (*OffRamp, error) {
+func NewOffRamp(lggr logger.Logger, addr common.Address, ec client.Client, lp logpoller.LogPoller) (*OffRamp, error) {
 	offRamp, err := evm_2_evm_offramp_1_0_0.NewEVM2EVMOffRamp(addr, ec)
 	if err != nil {
 		return nil, err
@@ -661,8 +656,6 @@ func NewOffRamp(lggr logger.Logger, addr common.Address, ec client.Client, lp lo
 		Logger:              lggr,
 		lp:                  lp,
 		filters:             filters,
-		Estimator:           estimator,
-		DestMaxGasPrice:     destMaxGasPrice,
 		ExecutionReportArgs: executionReportArgs,
 		eventSig:            ExecutionStateChangedEvent,
 		eventIndex:          executionStateChangedSequenceNumberIndex,

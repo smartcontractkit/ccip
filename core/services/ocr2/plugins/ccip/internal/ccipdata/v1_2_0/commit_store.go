@@ -18,7 +18,6 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	evmtypes "github.com/smartcontractkit/chainlink/v2/core/chains/evm/types"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store_1_2_0"
@@ -40,8 +39,6 @@ type CommitStore struct {
 	lggr                      logger.Logger
 	lp                        logpoller.LogPoller
 	address                   common.Address
-	estimator                 *gas.EvmFeeEstimator
-	sourceMaxGasPrice         *big.Int
 	filters                   []logpoller.Filter
 	reportAcceptedSig         common.Hash
 	reportAcceptedMaxSeqIndex int
@@ -180,20 +177,6 @@ func (c *CommitStore) GasPriceEstimator(context.Context) (cciptypes.GasPriceEsti
 	return c.gasPriceEstimator, nil
 }
 
-func (c *CommitStore) SetGasEstimator(ctx context.Context, gpe gas.EvmFeeEstimator) error {
-	c.configMu.RLock()
-	defer c.configMu.RUnlock()
-	c.estimator = &gpe
-	return nil
-}
-
-func (c *CommitStore) SetSourceMaxGasPrice(ctx context.Context, sourceMaxGasPrice *big.Int) error {
-	c.configMu.RLock()
-	defer c.configMu.RUnlock()
-	c.sourceMaxGasPrice = sourceMaxGasPrice
-	return nil
-}
-
 // Do not change the JSON format of this struct without consulting with the RDD people first.
 type JSONCommitOffchainConfig struct {
 	SourceFinalityDepth      uint32
@@ -242,21 +225,6 @@ func (c *CommitStore) ChangeConfig(_ context.Context, onchainConfig []byte, offc
 	c.configMu.Lock()
 	defer c.configMu.Unlock()
 
-	if c.estimator == nil {
-		return "", fmt.Errorf("this CommitStore estimator is nil. SetGasEstimator should be called before ChangeConfig")
-	}
-
-	if c.sourceMaxGasPrice == nil {
-		return "", fmt.Errorf("this CommitStore sourceMaxGasPrice is nil. SetSourceMaxGasPrice should be called before ChangeConfig")
-	}
-
-	// TODO: do this in the factory
-	c.gasPriceEstimator = prices.NewDAGasPriceEstimator(
-		*c.estimator,
-		c.sourceMaxGasPrice,
-		int64(offchainConfigParsed.ExecGasPriceDeviationPPB),
-		int64(offchainConfigParsed.DAGasPriceDeviationPPB),
-	)
 	c.offchainConfig = ccipdata.NewCommitOffchainConfig(
 		offchainConfigParsed.ExecGasPriceDeviationPPB,
 		offchainConfigParsed.GasPriceHeartBeat.Duration(),

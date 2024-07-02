@@ -22,10 +22,12 @@ var _ commontypes.CCIPCommitProvider = (*SrcCommitProvider)(nil)
 var _ commontypes.CCIPCommitProvider = (*DstCommitProvider)(nil)
 
 type SrcCommitProvider struct {
-	lggr       logger.Logger
-	startBlock uint64
-	client     client.Client
-	lp         logpoller.LogPoller
+	lggr         logger.Logger
+	startBlock   uint64
+	client       client.Client
+	lp           logpoller.LogPoller
+	gasEstimator gas.EvmFeeEstimator
+	maxGasPrice  *big.Int
 }
 
 func NewSrcCommitProvider(
@@ -33,12 +35,16 @@ func NewSrcCommitProvider(
 	startBlock uint64,
 	client client.Client,
 	lp logpoller.LogPoller,
+	gasEstimator gas.EvmFeeEstimator,
+	maxGasPrice *big.Int,
 ) commontypes.CCIPCommitProvider {
 	return &SrcCommitProvider{
-		lggr:       lggr,
-		startBlock: startBlock,
-		client:     client,
-		lp:         lp,
+		lggr:         lggr,
+		startBlock:   startBlock,
+		client:       client,
+		lp:           lp,
+		gasEstimator: gasEstimator,
+		maxGasPrice:  maxGasPrice,
 	}
 }
 
@@ -190,7 +196,7 @@ func (P DstCommitProvider) NewCommitStoreReader(ctx context.Context, commitStore
 
 func (P SrcCommitProvider) NewOnRampReader(ctx context.Context, onRampAddress cciptypes.Address, sourceChainSelector uint64, destChainSelector uint64) (onRampReader cciptypes.OnRampReader, err error) {
 	versionFinder := ccip.NewEvmVersionFinder()
-	onRampReader, err = ccip.NewOnRampReader(P.lggr, versionFinder, sourceChainSelector, destChainSelector, onRampAddress, P.lp, P.client)
+	onRampReader, err = ccip.NewOnRampReader(P.lggr, versionFinder, sourceChainSelector, destChainSelector, onRampAddress, P.lp, P.client, P.gasEstimator, P.maxGasPrice)
 	return
 }
 

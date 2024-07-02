@@ -40,15 +40,15 @@ func NewCommitStoreReader(lggr logger.Logger, versionFinder VersionFinder, addre
 }
 
 func NewOffRampReader(lggr logger.Logger, versionFinder VersionFinder, addr ccip.Address, destClient client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator, destMaxGasPrice *big.Int, registerFilters bool) (ccipdata.OffRampReader, error) {
-	return factory.NewOffRampReader(lggr, versionFinder, addr, destClient, lp, estimator, destMaxGasPrice, registerFilters)
+	return factory.NewOffRampReader(lggr, versionFinder, addr, destClient, lp, registerFilters)
 }
 
 func NewEvmVersionFinder() factory.EvmVersionFinder {
 	return factory.NewEvmVersionFinder()
 }
 
-func NewOnRampReader(lggr logger.Logger, versionFinder VersionFinder, sourceSelector, destSelector uint64, onRampAddress ccip.Address, sourceLP logpoller.LogPoller, source client.Client) (ccipdata.OnRampReader, error) {
-	return factory.NewOnRampReader(lggr, versionFinder, sourceSelector, destSelector, onRampAddress, sourceLP, source)
+func NewOnRampReader(lggr logger.Logger, versionFinder VersionFinder, sourceSelector, destSelector uint64, onRampAddress ccip.Address, sourceLP logpoller.LogPoller, source client.Client, estimator gas.EvmFeeEstimator, destMaxGasPrice *big.Int) (ccipdata.OnRampReader, error) {
+	return factory.NewOnRampReader(lggr, versionFinder, sourceSelector, destSelector, onRampAddress, sourceLP, source, estimator, destMaxGasPrice)
 }
 
 type OffRampReader = ccipdata.OffRampReader

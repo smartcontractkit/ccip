@@ -33,6 +33,8 @@ type SrcExecProvider struct {
 	usdcAttestationAPITimeoutSeconds       int
 	usdcAttestationAPIIntervalMilliseconds int
 	usdcSrcMsgTransmitterAddr              common.Address
+	gasEstimator                           gas.EvmFeeEstimator
+	maxGasPrice                            *big.Int
 }
 
 func NewSrcExecProvider(
@@ -46,6 +48,8 @@ func NewSrcExecProvider(
 	usdcAttestationAPITimeoutSeconds int,
 	usdcAttestationAPIIntervalMilliseconds int,
 	usdcSrcMsgTransmitterAddr common.Address,
+	gasEstimator gas.EvmFeeEstimator,
+	maxGasPrice *big.Int,
 ) (commontypes.CCIPExecProvider, error) {
 	var usdcReader *ccip.USDCReaderImpl
 	var err error
@@ -67,6 +71,8 @@ func NewSrcExecProvider(
 		usdcAttestationAPITimeoutSeconds:       usdcAttestationAPITimeoutSeconds,
 		usdcAttestationAPIIntervalMilliseconds: usdcAttestationAPIIntervalMilliseconds,
 		usdcSrcMsgTransmitterAddr:              usdcSrcMsgTransmitterAddr,
+		gasEstimator:                           gasEstimator,
+		maxGasPrice:                            maxGasPrice,
 	}, nil
 }
 
@@ -131,7 +137,7 @@ func (s SrcExecProvider) NewOffRampReader(ctx context.Context, addr cciptypes.Ad
 
 func (s SrcExecProvider) NewOnRampReader(ctx context.Context, onRampAddress cciptypes.Address, sourceChainSelector uint64, destChainSelector uint64) (onRampReader cciptypes.OnRampReader, err error) {
 	versionFinder := ccip.NewEvmVersionFinder()
-	onRampReader, err = ccip.NewOnRampReader(s.lggr, versionFinder, sourceChainSelector, destChainSelector, onRampAddress, s.lp, s.client)
+	onRampReader, err = ccip.NewOnRampReader(s.lggr, versionFinder, sourceChainSelector, destChainSelector, onRampAddress, s.lp, s.client, s.gasEstimator, s.maxGasPrice)
 	return
 }
 

@@ -1,8 +1,8 @@
 package ccipdata
 
 import (
+	"context"
 	"github.com/ethereum/go-ethereum/core/types"
-
 	"github.com/smartcontractkit/chainlink-common/pkg/hashutil"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
 )
@@ -19,4 +19,5 @@ const (
 //go:generate mockery --quiet --name OnRampReader --filename onramp_reader_mock.go --case=underscore
 type OnRampReader interface {
 	cciptypes.OnRampReader
+	GetDAGasPriceEstimator(_ context.Context) (cciptypes.CommonGasPriceEstimator, error)
 }

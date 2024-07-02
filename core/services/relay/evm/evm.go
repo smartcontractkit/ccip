@@ -412,6 +412,8 @@ func (r *Relayer) NewCCIPCommitProvider(rargs commontypes.RelayArgs, pargs commo
 			sourceStartBlock,
 			r.chain.Client(),
 			r.chain.LogPoller(),
+			r.chain.GasEstimator(),
+			r.chain.Config().EVM().GasEstimator().PriceMax().ToInt(),
 		), nil
 	}
 
@@ -483,6 +485,8 @@ func (r *Relayer) NewCCIPExecProvider(rargs commontypes.RelayArgs, pargs commont
 			int(usdcConfig.AttestationAPITimeoutSeconds),
 			usdcConfig.AttestationAPIIntervalMilliseconds,
 			usdcConfig.SourceMessageTransmitterAddress,
+			r.chain.GasEstimator(),
+			r.chain.Config().EVM().GasEstimator().PriceMax().ToInt(),
 		)
 	}
 

@@ -2,8 +2,6 @@ package factory
 
 import (
 	"context"
-	"math/big"
-
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/pkg/errors"
@@ -11,7 +9,6 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/txmgr"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp"
@@ -26,16 +23,16 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_5_0"
 )
 
-func NewOffRampReader(lggr logger.Logger, versionFinder VersionFinder, addr cciptypes.Address, destClient client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator, destMaxGasPrice *big.Int, registerFilters bool) (ccipdata.OffRampReader, error) {
-	return initOrCloseOffRampReader(lggr, versionFinder, addr, destClient, lp, estimator, destMaxGasPrice, false, registerFilters)
+func NewOffRampReader(lggr logger.Logger, versionFinder VersionFinder, addr cciptypes.Address, destClient client.Client, lp logpoller.LogPoller, registerFilters bool) (ccipdata.OffRampReader, error) {
+	return initOrCloseOffRampReader(lggr, versionFinder, addr, destClient, lp, false, registerFilters)
 }
 
-func CloseOffRampReader(lggr logger.Logger, versionFinder VersionFinder, addr cciptypes.Address, destClient client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator, destMaxGasPrice *big.Int) error {
-	_, err := initOrCloseOffRampReader(lggr, versionFinder, addr, destClient, lp, estimator, destMaxGasPrice, true, false)
+func CloseOffRampReader(lggr logger.Logger, versionFinder VersionFinder, addr cciptypes.Address, destClient client.Client, lp logpoller.LogPoller) error {
+	_, err := initOrCloseOffRampReader(lggr, versionFinder, addr, destClient, lp, true, false)
 	return err
 }
 
-func initOrCloseOffRampReader(lggr logger.Logger, versionFinder VersionFinder, addr cciptypes.Address, destClient client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator, destMaxGasPrice *big.Int, closeReader bool, registerFilters bool) (ccipdata.OffRampReader, error) {
+func initOrCloseOffRampReader(lggr logger.Logger, versionFinder VersionFinder, addr cciptypes.Address, destClient client.Client, lp logpoller.LogPoller, closeReader bool, registerFilters bool) (ccipdata.OffRampReader, error) {
 	contractType, version, err := versionFinder.TypeAndVersion(addr, destClient)
 	if err != nil {
 		return nil, errors.Wrapf(err, "unable to read type and version")
@@ -49,11 +46,11 @@ func initOrCloseOffRampReader(lggr logger.Logger, versionFinder VersionFinder, a
 		return nil, err
 	}
 
-	lggr.Infow("Initializing OffRamp Reader", "version", version.String(), "destMaxGasPrice", destMaxGasPrice.String())
+	lggr.Infow("Initializing OffRamp Reader", "version", version.String())
 
 	switch version.String() {
 	case ccipdata.V1_0_0, ccipdata.V1_1_0:
-		offRamp, err := v1_0_0.NewOffRamp(lggr, evmAddr, destClient, lp, estimator, destMaxGasPrice)
+		offRamp, err := v1_0_0.NewOffRamp(lggr, evmAddr, destClient, lp)
 		if err != nil {
 			return nil, err
 		}
@@ -62,7 +59,7 @@ func initOrCloseOffRampReader(lggr logger.Logger, versionFinder VersionFinder, a
 		}
 		return offRamp, offRamp.RegisterFilters()
 	case ccipdata.V1_2_0:
-		offRamp, err := v1_2_0.NewOffRamp(lggr, evmAddr, destClient, lp, estimator, destMaxGasPrice)
+		offRamp, err := v1_2_0.NewOffRamp(lggr, evmAddr, destClient, lp)
 		if err != nil {
 			return nil, err
 		}
@@ -71,7 +68,7 @@ func initOrCloseOffRampReader(lggr logger.Logger, versionFinder VersionFinder, a
 		}
 		return offRamp, offRamp.RegisterFilters()
 	case ccipdata.V1_5_0:
-		offRamp, err := v1_5_0.NewOffRamp(lggr, evmAddr, destClient, lp, estimator, destMaxGasPrice)
+		offRamp, err := v1_5_0.NewOffRamp(lggr, evmAddr, destClient, lp)
 		if err != nil {
 			return nil, err
 		}

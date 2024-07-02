@@ -55,18 +55,7 @@ func NewCommitServices(ctx context.Context, ds sqlutil.DataSource, srcProvider c
 	// TODO CCIP-2493 EVM family specific behavior leaked for CommitStore, which requires access to two relayers
 	versionFinder := factory.NewEvmVersionFinder()
 	commitStoreAddress := common.HexToAddress(spec.ContractID)
-	sourceMaxGasPrice := srcChain.Config().EVM().GasEstimator().PriceMax().ToInt()
 	commitStoreReader, err := ccip.NewCommitStoreReader(lggr, versionFinder, ccipcalc.EvmAddrToGeneric(commitStoreAddress), dstChain.Client(), dstChain.LogPoller())
-	if err != nil {
-		return nil, err
-	}
-
-	err = commitStoreReader.SetGasEstimator(ctx, srcChain.GasEstimator())
-	if err != nil {
-		return nil, err
-	}
-
-	err = commitStoreReader.SetSourceMaxGasPrice(ctx, sourceMaxGasPrice)
 	if err != nil {
 		return nil, err
 	}
@@ -128,7 +117,12 @@ func NewCommitServices(ctx context.Context, ds sqlutil.DataSource, srcProvider c
 		return nil, err
 	}
 
-	onRampRouterAddr, err := onRampReader.RouterAddress(ctx)
+	ccipOnRampReader, ok := onRampReader.(ccipdata.OnRampReader)
+	if !ok {
+		return nil, fmt.Errorf("onRampReader is not a ccipdata.OnRampReader instance")
+	}
+
+	onRampRouterAddr, err := ccipOnRampReader.RouterAddress(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -137,7 +131,7 @@ func NewCommitServices(ctx context.Context, ds sqlutil.DataSource, srcProvider c
 		return nil, err
 	}
 	// Prom wrappers
-	onRampReader = observability.NewObservedOnRampReader(onRampReader, sourceChainID, ccip.CommitPluginLabel)
+	ccipOnRampReader = observability.NewObservedOnRampReader(ccipOnRampReader, sourceChainID, ccip.CommitPluginLabel)
 	commitStoreReader = observability.NewObservedCommitStoreReader(commitStoreReader, destChainID, ccip.CommitPluginLabel)
 	metricsCollector := ccip.NewPluginMetricsCollector(ccip.CommitPluginLabel, sourceChainID, destChainID)
 
@@ -150,7 +144,7 @@ func NewCommitServices(ctx context.Context, ds sqlutil.DataSource, srcProvider c
 				"commitStore", commitStoreAddress,
 				"offramp", pluginConfig.OffRamp,
 			),
-			onRampReader,
+			ccipOnRampReader,
 			commitStoreReader,
 		),
 		ccip.CommitPluginLabel,
@@ -177,7 +171,7 @@ func NewCommitServices(ctx context.Context, ds sqlutil.DataSource, srcProvider c
 
 	wrappedPluginFactory := NewCommitReportingPluginFactory(CommitPluginStaticConfig{
 		lggr:                  lggr,
-		onRampReader:          onRampReader,
+		onRampReader:          ccipOnRampReader,
 		sourceChainSelector:   staticConfig.SourceChainSelector,
 		sourceNative:          sourceNative,
 		offRamp:               offRampReader,
@@ -235,10 +229,10 @@ func UnregisterCommitPluginLpFilters(ctx context.Context, lggr logger.Logger, jb
 			return factory.CloseCommitStoreReader(lggr, versionFinder, params.commitStoreAddress, params.destChain.Client(), params.destChain.LogPoller())
 		},
 		func() error {
-			return factory.CloseOnRampReader(lggr, versionFinder, params.commitStoreStaticCfg.SourceChainSelector, params.commitStoreStaticCfg.ChainSelector, cciptypes.Address(params.commitStoreStaticCfg.OnRamp.String()), params.sourceChain.LogPoller(), params.sourceChain.Client())
+			return factory.CloseOnRampReader(lggr, versionFinder, params.commitStoreStaticCfg.SourceChainSelector, params.commitStoreStaticCfg.ChainSelector, cciptypes.Address(params.commitStoreStaticCfg.OnRamp.String()), params.sourceChain.LogPoller(), params.sourceChain.Client(), params.destChain.GasEstimator(), params.destChain.Config().EVM().GasEstimator().PriceMax().ToInt())
 		},
 		func() error {
-			return factory.CloseOffRampReader(lggr, versionFinder, params.pluginConfig.OffRamp, params.destChain.Client(), params.destChain.LogPoller(), params.destChain.GasEstimator(), params.destChain.Config().EVM().GasEstimator().PriceMax().ToInt())
+			return factory.CloseOffRampReader(lggr, versionFinder, params.pluginConfig.OffRamp, params.destChain.Client(), params.destChain.LogPoller())
 		},
 	}
 

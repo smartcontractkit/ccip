@@ -79,6 +79,11 @@ func NewExecServices(ctx context.Context, lggr logger.Logger, jb job.Job, srcPro
 		return nil, fmt.Errorf("create onRampReader: %w", err)
 	}
 
+	ccipOnRampReader, ok := onRampReader.(ccipdata.OnRampReader)
+	if !ok {
+		return nil, fmt.Errorf("onRampReader is not a ccipdata.OnRampReader instance")
+	}
+
 	dynamicOnRampConfig, err := onRampReader.GetDynamicConfig(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("get onramp dynamic config: %w", err)
@@ -93,16 +98,6 @@ func NewExecServices(ctx context.Context, lggr logger.Logger, jb job.Job, srcPro
 	commitStoreReader, err := factory.NewCommitStoreReader(lggr, versionFinder, offRampConfig.CommitStore, dstChain.Client(), dstChain.LogPoller())
 	if err != nil {
 		return nil, fmt.Errorf("could not load commitStoreReader reader: %w", err)
-	}
-
-	err = commitStoreReader.SetGasEstimator(ctx, srcChain.GasEstimator())
-	if err != nil {
-		return nil, fmt.Errorf("could not set gas estimator: %w", err)
-	}
-
-	err = commitStoreReader.SetSourceMaxGasPrice(ctx, srcChain.Config().EVM().GasEstimator().PriceMax().ToInt())
-	if err != nil {
-		return nil, fmt.Errorf("could not set source max gas price: %w", err)
 	}
 
 	tokenDataProviders := make(map[cciptypes.Address]tokendata.Reader)
@@ -122,7 +117,7 @@ func NewExecServices(ctx context.Context, lggr logger.Logger, jb job.Job, srcPro
 	}
 
 	// Prom wrappers
-	onRampReader = observability.NewObservedOnRampReader(onRampReader, srcChainID, ccip.ExecPluginLabel)
+	onRampReader = observability.NewObservedOnRampReader(ccipOnRampReader, srcChainID, ccip.ExecPluginLabel)
 	commitStoreReader = observability.NewObservedCommitStoreReader(commitStoreReader, dstChainID, ccip.ExecPluginLabel)
 	offRampReader = observability.NewObservedOffRampReader(offRampReader, dstChainID, ccip.ExecPluginLabel)
 	metricsCollector := ccip.NewPluginMetricsCollector(ccip.ExecPluginLabel, srcChainID, dstChainID)
@@ -141,7 +136,7 @@ func NewExecServices(ctx context.Context, lggr logger.Logger, jb job.Job, srcPro
 				"commitStore", offRampConfig.CommitStore,
 				"offramp", offRampAddress,
 			),
-			onRampReader,
+			ccipOnRampReader,
 			commitStoreReader,
 		),
 		ccip.ExecPluginLabel,
@@ -159,7 +154,7 @@ func NewExecServices(ctx context.Context, lggr logger.Logger, jb job.Job, srcPro
 
 	wrappedPluginFactory := NewExecutionReportingPluginFactory(ExecutionPluginStaticConfig{
 		lggr:                          lggr,
-		onRampReader:                  onRampReader,
+		onRampReader:                  ccipOnRampReader,
 		commitStoreReader:             commitStoreReader,
 		offRampReader:                 offRampReader,
 		sourcePriceRegistryProvider:   ccip.NewChainAgnosticPriceRegistry(srcProvider),
@@ -219,10 +214,10 @@ func UnregisterExecPluginLpFilters(ctx context.Context, lggr logger.Logger, jb j
 			return factory.CloseCommitStoreReader(lggr, versionFinder, params.offRampConfig.CommitStore, params.destChain.Client(), params.destChain.LogPoller())
 		},
 		func() error {
-			return factory.CloseOnRampReader(lggr, versionFinder, params.offRampConfig.SourceChainSelector, params.offRampConfig.ChainSelector, params.offRampConfig.OnRamp, params.sourceChain.LogPoller(), params.sourceChain.Client())
+			return factory.CloseOnRampReader(lggr, versionFinder, params.offRampConfig.SourceChainSelector, params.offRampConfig.ChainSelector, params.offRampConfig.OnRamp, params.sourceChain.LogPoller(), params.sourceChain.Client(), params.destChain.GasEstimator(), params.destChain.Config().EVM().GasEstimator().PriceMax().ToInt())
 		},
 		func() error {
-			return factory.CloseOffRampReader(lggr, versionFinder, offRampAddress, params.destChain.Client(), params.destChain.LogPoller(), params.destChain.GasEstimator(), params.destChain.Config().EVM().GasEstimator().PriceMax().ToInt())
+			return factory.CloseOffRampReader(lggr, versionFinder, offRampAddress, params.destChain.Client(), params.destChain.LogPoller())
 		},
 		func() error { // usdc token data reader
 			if usdcDisabled := params.pluginConfig.USDCConfig.AttestationAPI == ""; usdcDisabled {
@@ -273,7 +268,7 @@ func extractJobSpecParams(lggr logger.Logger, jb job.Job, chainSet legacyevm.Leg
 
 	versionFinder := factory.NewEvmVersionFinder()
 	offRampAddress := ccipcalc.HexToAddress(spec.ContractID)
-	offRampReader, err := factory.NewOffRampReader(lggr, versionFinder, offRampAddress, destChain.Client(), destChain.LogPoller(), destChain.GasEstimator(), destChain.Config().EVM().GasEstimator().PriceMax().ToInt(), registerFilters)
+	offRampReader, err := factory.NewOffRampReader(lggr, versionFinder, offRampAddress, destChain.Client(), destChain.LogPoller(), registerFilters)
 	if err != nil {
 		return nil, fmt.Errorf("create offRampReader: %w", err)
 	}
