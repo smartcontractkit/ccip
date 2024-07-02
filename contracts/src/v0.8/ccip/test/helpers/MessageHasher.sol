@@ -8,4 +8,8 @@ contract MessageHasher {
   function hash(Internal.EVM2EVMMessage memory message, bytes32 metadataHash) public pure returns (bytes32) {
     return Internal._hash(message, metadataHash);
   }
+
+  function hash(Internal.Any2EVMRampMessage memory message, bytes memory onRamp) public pure returns (bytes32) {
+    return Internal._hash(message, onRamp);
+  }
 }
