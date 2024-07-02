@@ -408,7 +408,7 @@ contract CCIPConfig is ITypeAndVersion, ICapabilityConfiguration, OwnerIsCreator
 
     // check for duplicate p2p ids and bootstrapP2PIds.
     // check that p2p ids in cfg.bootstrapP2PIds are included in cfg.p2pIds.
-    CCIPConfigArraysValidation.checkSortedNoDuplicatesAndSubset(cfg.bootstrapP2PIds, cfg.p2pIds);
+    CCIPConfigArraysValidation._checkSortedNoDuplicatesAndSubset(cfg.bootstrapP2PIds, cfg.p2pIds);
 
     // Check that the readers are in the capabilities registry.
     for (uint256 i = 0; i < cfg.signers.length; ++i) {

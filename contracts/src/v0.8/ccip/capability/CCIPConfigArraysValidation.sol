@@ -8,7 +8,7 @@ library CCIPConfigArraysValidation {
     error HasDuplicates(bytes32[] array);
     error NotSubset(bytes32[] smaller, bytes32[] larger);
 
-    function checkSortedNoDuplicatesAndSubset(bytes32[] memory a, bytes32[] memory b) internal pure {
+    function _checkSortedNoDuplicatesAndSubset(bytes32[] memory a, bytes32[] memory b) internal pure {
         if (a.length == 0 || b.length == 0) {
             revert ArrayEmpty();
         }
