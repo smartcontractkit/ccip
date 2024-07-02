@@ -1,19 +1,19 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {IAny2EVMMessageReceiver} from "../interfaces/IAny2EVMMessageReceiver.sol";
+import {IAny2EVMMessageReceiver} from "../../../interfaces/IAny2EVMMessageReceiver.sol";
 
-import {Client} from "../libraries/Client.sol";
+import {IERC165} from "../../../../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/introspection/IERC165.sol";
 
-import {IERC165} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/introspection/IERC165.sol";
+import {CCIPClientBase} from "../../../applications/external/CCIPClientBase.sol";
+import {Client} from "../../../libraries/Client.sol";
 
 /// @title CCIPReceiver - Base contract for CCIP applications that can receive messages.
-abstract contract CCIPReceiver is IAny2EVMMessageReceiver, IERC165 {
-  address internal immutable i_ccipRouter;
+contract CCIPReceiverBasic is CCIPClientBase, IAny2EVMMessageReceiver, IERC165 {
+  constructor(address router) CCIPClientBase(router) {}
 
-  constructor(address router) {
-    if (router == address(0)) revert InvalidRouter(address(0));
-    i_ccipRouter = router;
+  function typeAndVersion() external pure virtual returns (string memory) {
+    return "CCIPReceiverBasic 1.0.0-dev";
   }
 
   /// @notice IERC165 supports an interfaceId
@@ -37,23 +37,5 @@ abstract contract CCIPReceiver is IAny2EVMMessageReceiver, IERC165 {
 
   /// @notice Override this function in your implementation.
   /// @param message Any2EVMMessage
-  function _ccipReceive(Client.Any2EVMMessage memory message) internal virtual;
-
-  /////////////////////////////////////////////////////////////////////
-  // Plumbing
-  /////////////////////////////////////////////////////////////////////
-
-  /// @notice Return the current router
-  /// @return CCIP router address
-  function getRouter() public view virtual returns (address) {
-    return address(i_ccipRouter);
-  }
-
-  error InvalidRouter(address router);
-
-  /// @dev only calls from the set router are accepted.
-  modifier onlyRouter() {
-    if (msg.sender != getRouter()) revert InvalidRouter(msg.sender);
-    _;
-  }
+  function _ccipReceive(Client.Any2EVMMessage memory message) internal virtual {}
 }
