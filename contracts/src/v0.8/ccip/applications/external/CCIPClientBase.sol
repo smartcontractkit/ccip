@@ -20,15 +20,15 @@ abstract contract CCIPClientBase is OwnerIsCreator, ITypeAndVersion {
   error InvalidSender(bytes sender);
   error InvalidRecipient(bytes recipient);
 
-  struct approvedSenderUpdate {
+  struct approvedSenderUpdate { // TODO capitalize
     uint64 destChainSelector;
-    bytes sender;
+    bytes sender; // TODO: add spack comments on what this field is
   }
 
   struct ChainConfig {
-    bool isDisabled;
+    bool isDisabled; // TODO rename: disabled
     bytes recipient;
-    bytes extraArgsBytes;
+    bytes extraArgsBytes; // TODO add explanas on why extraArgs is in ChainConfig, and not supposed to be supplied by sender at runtime
     mapping(bytes => bool) approvedSender;
   }
 
@@ -42,7 +42,7 @@ abstract contract CCIPClientBase is OwnerIsCreator, ITypeAndVersion {
   // ================================================================
   // │                      Router Management                       │
   // ================================================================
-
+  // TODO natspec this contract
   function getRouter() public view virtual returns (address) {
     return i_ccipRouter;
   }
@@ -78,13 +78,17 @@ abstract contract CCIPClientBase is OwnerIsCreator, ITypeAndVersion {
   // │                  Fee Token Management                       │
   // ===============================================================
 
-  fallback() external {}
+  fallback() external {} // TODO confirm with Devrel why they want this; we would prefer to not have a fallback to avoid silent failures
+
+  // TODO add a comment why payable receive is in client base
   receive() external payable {}
 
   function withdrawNativeToken(address payable to, uint256 amount) external onlyOwner {
     Address.sendValue(to, amount);
   }
 
+  // TODO add a warning message, this should only be used for things like withdrawing tokens that werent sent in error
+  // this should never be used for recovering tokens from a message
   function withdrawTokens(address token, address to, uint256 amount) external onlyOwner {
     IERC20(token).safeTransfer(to, amount);
   }
@@ -112,13 +116,15 @@ abstract contract CCIPClientBase is OwnerIsCreator, ITypeAndVersion {
     s_chainConfigs[chainSelector].isDisabled = true;
   }
 
-  modifier validChain(uint64 chainSelector) {
+  // TODO change to supportedChain or isValidChain
+  modifier validChain(uint64 chainSelector) { 
     // Must be storage and not memory because the struct contains a nested mapping
     ChainConfig storage currentConfig = s_chainConfigs[chainSelector];
     if (currentConfig.recipient.length == 0 || currentConfig.isDisabled) revert InvalidChain(chainSelector);
     _;
   }
 
+  // TODO ditto
   modifier validSender(uint64 chainSelector, bytes memory sender) {
     if (!s_chainConfigs[chainSelector].approvedSender[sender]) revert InvalidSender(sender);
     _;

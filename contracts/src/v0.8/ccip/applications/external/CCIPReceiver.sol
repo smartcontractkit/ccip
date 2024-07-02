@@ -13,7 +13,7 @@ contract CCIPReceiver is CCIPClientBase {
   using EnumerableMap for EnumerableMap.Bytes32ToUintMap;
 
   error OnlySelf();
-  error ErrorCase();
+  error ErrorCase(); // TODO remove
   error MessageNotFailed(bytes32 messageId);
 
   event MessageFailed(bytes32 indexed messageId, bytes reason);
@@ -22,6 +22,7 @@ contract CCIPReceiver is CCIPClientBase {
 
   // Example error code, could have many different error codes.
   enum ErrorCode {
+    // TODO RESOLVED + ABANDONED
     // RESOLVED is first so that the default value is resolved.
     RESOLVED,
     // Could have any number of error codes here.
@@ -34,6 +35,7 @@ contract CCIPReceiver is CCIPClientBase {
   // Contains failed messages and their state.
   EnumerableMap.Bytes32ToUintMap internal s_failedMessages;
 
+  // TODO: the contracts we ship to customers shouldn't have this by default, try refactoring this sim logic in a test helper
   bool internal s_simRevert;
 
   constructor(address router) CCIPClientBase(router) {}
@@ -46,6 +48,13 @@ contract CCIPReceiver is CCIPClientBase {
   // │                  Incoming Message Processing                 |
   // ================================================================
 
+  // TODO: add comments on:
+  //  if you want custom permisionless retry logic, plus owner extracting tokens as a last resort for recovery, use this try-catch pattern in ccipReceiver
+  //  this means the message will appear as success to CCIP, and you can track the actual message state within the dapp
+  //  if you do not need custom permissionles retry logic, and you don't need owner token recovery function, then you don't need the try-catch
+  //  because you can use ccip manualExecution as a retry function
+  //
+  //
   /// @notice The entrypoint for the CCIP router to call. This function should
   /// never revert, all errors should be handled internally in this contract.
   /// @param message The message to process.
@@ -73,6 +82,7 @@ contract CCIPReceiver is CCIPClientBase {
     emit MessageSucceeded(message.messageId);
   }
 
+  
   /// @notice This function the entrypoint for this contract to process messages.
   /// @param message The message to process.
   /// @dev This example just sends the tokens to the owner of this contracts. More
@@ -92,6 +102,8 @@ contract CCIPReceiver is CCIPClientBase {
   // │                  Failed Message Processing                   |
   // ================== ==============================================
 
+  // TODO make this permissionless because the parties that want to retry the message isn't typically the owner, should make this permissionless retry
+  //
   /// @notice This function is callable by the owner when a message has failed
   /// to unblock the tokens that are associated with that message.
   /// @dev This function is only callable by the owner.
@@ -113,6 +125,7 @@ contract CCIPReceiver is CCIPClientBase {
     emit MessageRecovered(messageId);
   }
 
+  // TODO make a owner-only recoveryAndAbandon message function with custom token receiver address
   function _retryFailedMessage(Client.Any2EVMMessage memory message, bytes memory retryData) internal virtual {
     (address forwardingAddress) = abi.decode(retryData, (address));
 
@@ -137,6 +150,7 @@ contract CCIPReceiver is CCIPClientBase {
     return s_failedMessages.get(messageId);
   }
 
+  // TODO remove
   // An example function to demonstrate recovery
   function setSimRevert(bool simRevert) external onlyOwner {
     s_simRevert = simRevert;
