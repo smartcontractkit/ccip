@@ -271,9 +271,6 @@ func (token *ERC20Token) Approve(onBehalf *blockchain.EthereumWallet, spender st
 	if err != nil {
 		return fmt.Errorf("failed to get balance of onBehalf: %w", err)
 	}
-	if onBehalfBalance.Cmp(amount) < 0 {
-		return fmt.Errorf("onBehalf '%s' does not have enough balance to approve", onBehalf.Address())
-	}
 	currentAllowance, err := token.Allowance(onBehalf.Address(), spender)
 	if err != nil {
 		return fmt.Errorf("failed to get current allowance for '%s' on behalf of '%s': %w", spender, onBehalf.Address(), err)
@@ -1715,6 +1712,7 @@ func (onRamp *OnRamp) SetNops() error {
 	return onRamp.client.ProcessTransaction(tx)
 }
 
+// SetTokenTransferFeeConfig sets the token transfer fee configuration for the OnRamp
 func (onRamp *OnRamp) SetTokenTransferFeeConfig(tokenTransferFeeConfig []evm_2_evm_onramp.EVM2EVMOnRampTokenTransferFeeConfigArgs) error {
 	opts, err := onRamp.client.TransactionOpts(onRamp.client.GetDefaultWallet())
 	if err != nil {
