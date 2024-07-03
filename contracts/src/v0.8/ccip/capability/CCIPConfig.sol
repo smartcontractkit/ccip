@@ -7,9 +7,9 @@ import {ICapabilitiesRegistry} from "./interfaces/ICapabilitiesRegistry.sol";
 
 import {OwnerIsCreator} from "../../shared/access/OwnerIsCreator.sol";
 
+import {SortedSetValidationUtil} from "../../shared/util/SortedSetValidationUtil.sol";
 import {IERC165} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/interfaces/IERC165.sol";
 import {EnumerableSet} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/structs/EnumerableSet.sol";
-import {CCIPConfigArraysValidation} from "./CCIPConfigArraysValidation.sol";
 
 /// @notice CCIPConfig stores the configuration for the CCIP capability.
 /// We have two classes of configuration: chain configuration and DON (in the CapabilitiesRegistry sense) configuration.
@@ -92,7 +92,7 @@ contract CCIPConfig is ITypeAndVersion, ICapabilityConfiguration, OwnerIsCreator
     uint8 F; //                       | The "big F" parameter for the role DON.
     uint64 offchainConfigVersion; // ─╯ The version of the offchain configuration.
     bytes offrampAddress; // The remote chain offramp address.
-    //NOTE: bootstrapP2PIds and p2pIds should be sent as sorted arrays
+    // NOTE: bootstrapP2PIds and p2pIds should be sent as sorted sets
     bytes32[] bootstrapP2PIds; // The bootstrap P2P IDs of the oracles that are part of the role DON.
     // len(p2pIds) == len(signers) == len(transmitters) == 3 * F + 1
     // NOTE: indexes matter here! The p2p ID at index i corresponds to the signer at index i and the transmitter at index i.
@@ -408,7 +408,7 @@ contract CCIPConfig is ITypeAndVersion, ICapabilityConfiguration, OwnerIsCreator
 
     // check for duplicate p2p ids and bootstrapP2PIds.
     // check that p2p ids in cfg.bootstrapP2PIds are included in cfg.p2pIds.
-    CCIPConfigArraysValidation._checkSortedNoDuplicatesAndSubset(cfg.bootstrapP2PIds, cfg.p2pIds);
+    SortedSetValidationUtil._checkIsValidUniqueSubset(cfg.bootstrapP2PIds, cfg.p2pIds);
 
     // Check that the readers are in the capabilities registry.
     for (uint256 i = 0; i < cfg.signers.length; ++i) {

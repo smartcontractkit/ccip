@@ -5,7 +5,7 @@ import {Test} from "forge-std/Test.sol";
 
 import {CCIPConfig} from "../../capability/CCIPConfig.sol";
 
-import {CCIPConfigArraysValidation} from "../../capability/CCIPConfigArraysValidation.sol";
+import {SortedSetValidationUtil} from "../../../shared/util/SortedSetValidationUtil.sol";
 import {ICapabilitiesRegistry} from "../../capability/interfaces/ICapabilitiesRegistry.sol";
 import {CCIPConfigHelper} from "../helpers/CCIPConfigHelper.sol";
 
@@ -576,7 +576,7 @@ contract CCIPConfig_validateConfig is CCIPConfigSetup {
       offchainConfig: bytes("offchainConfig")
     });
 
-    vm.expectRevert(abi.encodeWithSelector(CCIPConfigArraysValidation.NotSorted.selector, p2pIds));
+    vm.expectRevert(abi.encodeWithSelector(SortedSetValidationUtil.NotASortedSet.selector, p2pIds));
     s_ccipCC.validateConfig(config);
   }
 
@@ -602,7 +602,7 @@ contract CCIPConfig_validateConfig is CCIPConfigSetup {
       offchainConfig: bytes("offchainConfig")
     });
 
-    vm.expectRevert(abi.encodeWithSelector(CCIPConfigArraysValidation.NotSorted.selector, bootstrapP2PIds));
+    vm.expectRevert(abi.encodeWithSelector(SortedSetValidationUtil.NotASortedSet.selector, bootstrapP2PIds));
     s_ccipCC.validateConfig(config);
   }
 
@@ -626,7 +626,7 @@ contract CCIPConfig_validateConfig is CCIPConfigSetup {
       offchainConfig: bytes("offchainConfig")
     });
 
-    vm.expectRevert(abi.encodeWithSelector(CCIPConfigArraysValidation.HasDuplicates.selector, p2pIds));
+    vm.expectRevert(abi.encodeWithSelector(SortedSetValidationUtil.NotASortedSet.selector, p2pIds));
     s_ccipCC.validateConfig(config);
   }
 
@@ -651,11 +651,11 @@ contract CCIPConfig_validateConfig is CCIPConfigSetup {
       offchainConfig: bytes("offchainConfig")
     });
 
-    vm.expectRevert(abi.encodeWithSelector(CCIPConfigArraysValidation.HasDuplicates.selector, bootstrapP2PIds));
+    vm.expectRevert(abi.encodeWithSelector(SortedSetValidationUtil.NotASortedSet.selector, bootstrapP2PIds));
     s_ccipCC.validateConfig(config);
   }
 
-  function test__validateConfig_BootstrapP2PIdsNotSubsetOfP2PIds_Reverts() public {
+  function test__validateConfig_BootstrapP2PIdsNotASubsetOfP2PIds_Reverts() public {
     (bytes32[] memory p2pIds, bytes[] memory signers, bytes[] memory transmitters) = _addChainConfig(4);
     // Config is for 4 nodes, so f == 1.
 
@@ -676,7 +676,7 @@ contract CCIPConfig_validateConfig is CCIPConfigSetup {
       offchainConfig: bytes("offchainConfig")
     });
 
-    vm.expectRevert(abi.encodeWithSelector(CCIPConfigArraysValidation.NotSubset.selector, bootstrapP2PIds, p2pIds));
+    vm.expectRevert(abi.encodeWithSelector(SortedSetValidationUtil.NotASubset.selector, bootstrapP2PIds, p2pIds));
     s_ccipCC.validateConfig(config);
   }
 }
