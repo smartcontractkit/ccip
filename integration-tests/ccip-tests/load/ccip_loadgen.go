@@ -24,6 +24,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/testconfig"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers"
 
@@ -315,9 +316,12 @@ func (c *CCIPE2ELoad) Call(_ *wasp.Generator) *wasp.Response {
 			})
 		errReason, v, err := c.Lane.Source.Common.ChainClient.RevertReasonFromTx(rcpt.TxHash, router.RouterABI)
 		if err != nil {
-			errReason = "could not decode"
+			errReason, v, err = c.Lane.Source.Common.ChainClient.RevertReasonFromTx(rcpt.TxHash, evm_2_evm_onramp.EVM2EVMOnRampABI)
+			if err != nil {
+				errReason = "could not decode"
+			}
 		}
-		res.Error = fmt.Sprintf("ccip-send request receipt is not successful, errReason=%s, args =%v %w", errReason, v, err)
+		res.Error = fmt.Sprintf("ccip-send request receipt is not successful, errReason=%s, args =%v %+v", errReason, v, err)
 		res.Failed = true
 		res.Data = stats.StatusByPhase
 		return res
