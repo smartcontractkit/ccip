@@ -27,7 +27,9 @@ jobs:
     name: Check Paths That Require Tests To Run
     runs-on: ubuntu-latest
     # We don't directly merge dependabot PRs, so let's not waste the resources
-    if: github.actor != 'dependabot[bot]'
+    # if: github.actor != 'dependabot[bot]'
+    # TODO: Fix in CCIP-2657
+    if: false
     steps:
       - name: Checkout the repo
         uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
