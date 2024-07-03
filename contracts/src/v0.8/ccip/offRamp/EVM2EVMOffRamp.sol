@@ -607,8 +607,8 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
     // We call the pool with exact gas to increase resistance against malicious tokens or token pools.
     // We protects against return data bombs by capping the return data size at MAX_RET_BYTES.
     (bool success, bytes memory returnData,) = CallWithExactGas._callWithExactGasSafeReturnData(
-      abi.encodeWithSelector(
-        IPoolV1.releaseOrMint.selector,
+      abi.encodeCall(
+        IPoolV1.releaseOrMint,
         Pool.ReleaseOrMintInV1({
           originalSender: originalSender,
           receiver: receiver,
@@ -638,7 +638,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
     // transfer them to the final receiver. We use the _callWithExactGasSafeReturnData function because
     // the token contracts are not considered trusted.
     (success, returnData,) = CallWithExactGas._callWithExactGasSafeReturnData(
-      abi.encodeWithSelector(IERC20.transfer.selector, receiver, localAmount),
+      abi.encodeCall(IERC20.transfer, (receiver, localAmount)),
       localToken,
       s_dynamicConfig.maxTokenTransferGas,
       Internal.GAS_FOR_CALL_EXACT_CHECK,
