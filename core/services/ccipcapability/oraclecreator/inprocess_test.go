@@ -65,6 +65,9 @@ func TestOracleCreator_CreateBootstrap(t *testing.T) {
 	require.NoError(t, peerWrapper.Start(testutils.Context(t)))
 	t.Cleanup(func() { assert.NoError(t, peerWrapper.Close()) })
 
+	// NOTE: this is a bit of a hack to get the OCR2 job created in order to use the ocr db
+	// the ocr2_contract_configs table has a foreign key constraint on ocr2_oracle_spec_id
+	// which is passed into ocr2.NewDB.
 	pipelineORM := pipeline.NewORM(db,
 		logger.NullLogger, generalConfig.JobPipeline().MaxSuccessfulRuns())
 	bridgesORM := bridges.NewORM(db)
