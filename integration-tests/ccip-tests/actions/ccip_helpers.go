@@ -1577,7 +1577,6 @@ func (sourceCCIP *SourceCCIPModule) AssertSendRequestedLogFinalized(
 	if err == nil {
 		gasUsed = receipt.GasUsed
 	}
-	prevEventAt = time.Now().UTC()
 	lggr.Info().Msg("Waiting for CCIPSendRequested event log to be finalized")
 	finalizedBlockNum, finalizedAt, err := sourceCCIP.Common.ChainClient.WaitForFinalizedTx(txHash)
 	if err != nil || finalizedBlockNum == nil {
