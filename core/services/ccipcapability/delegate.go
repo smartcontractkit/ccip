@@ -6,18 +6,17 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ethereum/go-ethereum/crypto"
 	ccipreaderpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink-common/pkg/loop"
 	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/config"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/ccip_config"
 	kcr "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/capabilities_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ccipcapability/common"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ccipcapability/launcher"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ccipcapability/oraclecreator"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
@@ -258,18 +257,6 @@ func (d *Delegate) getHomeChainContractReader(
 	return reader, nil
 }
 
-func hashedCapabilityId(capabilityLabelledName, capabilityVersion string) (r [32]byte, err error) {
-	tabi := `[{"type": "string"}, {"type": "string"}]`
-	abiEncoded, err := utils.ABIEncode(tabi, capabilityLabelledName, capabilityVersion)
-	if err != nil {
-		return r, fmt.Errorf("failed to ABI encode capability version and labelled name: %w", err)
-	}
-
-	h := crypto.Keccak256(abiEncoded)
-	copy(r[:], h)
-	return r, nil
-}
-
 func bindReader(reader types.ContractReader, capRegAddress, capabilityLabelledName, capabilityVersion string) (types.ContractReader, error) {
 	err := reader.Bind(context.Background(), []types.BoundContract{
 		{
@@ -281,7 +268,7 @@ func bindReader(reader types.ContractReader, capRegAddress, capabilityLabelledNa
 		return nil, fmt.Errorf("failed to bind home chain contract reader: %w", err)
 	}
 
-	hid, err := hashedCapabilityId(capabilityLabelledName, capabilityVersion)
+	hid, err := common.HashedCapabilityID(capabilityLabelledName, capabilityVersion)
 	if err != nil {
 		return nil, fmt.Errorf("failed to hash capability id: %w", err)
 	}
