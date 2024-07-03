@@ -7,6 +7,8 @@ import (
 	"math/big"
 	"time"
 
+	"go.uber.org/multierr"
+
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
@@ -129,18 +131,5 @@ func (p *ProviderProxyCommitStoreReader) SetSourceMaxGasPrice(ctx context.Contex
 }
 
 func (p *ProviderProxyCommitStoreReader) Close() error {
-	ok := true
-	err := p.srcCommitStoreReader.Close()
-	if err != nil {
-		ok = false
-	}
-	err2 := p.dstCommitStoreReader.Close()
-	if err2 != nil {
-		ok = false
-	}
-
-	if !ok {
-		return fmt.Errorf("failed to close commit store reader: %w or %w", err, err2)
-	}
-	return nil
+	return multierr.Append(p.srcCommitStoreReader.Close(), p.dstCommitStoreReader.Close())
 }
