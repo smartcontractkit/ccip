@@ -73,7 +73,7 @@ contract CCIPReceiverTest is EVM2EVMOnRampSetup {
     vm.expectEmit();
     emit CCIPReceiver.MessageAbandoned(messageId, OWNER);
 
-    s_receiver.abandonMessage(messageId, OWNER);
+    s_receiver.abandonFailedMessage(messageId, OWNER);
 
     // Assert the tokens have successfully been rescued from the contract.
     assertEq(
@@ -135,6 +135,59 @@ contract CCIPReceiverTest is EVM2EVMOnRampSetup {
 
     assertEq(IERC20(token).balanceOf(OWNER), tokenBalanceBefore + amount);
     assertGt(IERC20(token).balanceOf(OWNER), 0);
+  }
+
+  function test_retryFailedMessage_Success() public {
+    bytes32 messageId = keccak256("messageId");
+    address token = address(s_destFeeToken);
+    uint256 amount = 111333333777;
+    Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](1);
+    destTokenAmounts[0] = Client.EVMTokenAmount({token: token, amount: amount});
+
+    // Make sure we give the receiver contract enough tokens like CCIP would.
+    deal(token, address(s_receiver), amount);
+
+    // The receiver contract will revert if the router is not the sender.
+    vm.startPrank(address(s_destRouter));
+
+    vm.expectEmit();
+    emit MessageFailed(
+      messageId, abi.encodeWithSelector(bytes4(CCIPClientBase.InvalidSender.selector), abi.encode(address(1)))
+    );
+
+    s_receiver.ccipReceive(
+      Client.Any2EVMMessage({
+        messageId: messageId,
+        sourceChainSelector: sourceChainSelector,
+        sender: abi.encode(address(1)),
+        data: "",
+        destTokenAmounts: destTokenAmounts
+      })
+    );
+
+    vm.stopPrank();
+
+    // Check that the message was stored properly by comparing each of the fields.
+    // There's no way to check that a function internally will revert from a top-level test, so we need to check state differences
+    Client.Any2EVMMessage memory failedMessage = s_receiver.getMessageContents(messageId);
+    assertEq(failedMessage.sender, abi.encode(address(1)));
+    assertEq(failedMessage.sourceChainSelector, sourceChainSelector);
+    assertEq(failedMessage.destTokenAmounts[0].token, token);
+    assertEq(failedMessage.destTokenAmounts[0].amount, amount);
+
+    // Check that message status is failed
+    assertEq(s_receiver.getMessageStatus(messageId), 1);
+
+    uint256 tokenBalanceBefore = IERC20(token).balanceOf(OWNER);
+
+    vm.startPrank(OWNER);
+
+    vm.expectEmit();
+    emit CCIPReceiver.MessageRecovered(messageId);
+
+    s_receiver.retryFailedMessage(messageId);
+    assertEq(s_receiver.getMessageStatus(messageId), 0);
+
   }
 
   function test_HappyPath_Success() public {

@@ -18,6 +18,7 @@ contract CCIPReceiverReverting is CCIPReceiver {
   /// @dev It has to be external because of the try/catch.
   function processMessage(Client.Any2EVMMessage calldata message)
     external
+    view
     override
     onlySelf
     isValidSender(message.sourceChainSelector, message.sender)

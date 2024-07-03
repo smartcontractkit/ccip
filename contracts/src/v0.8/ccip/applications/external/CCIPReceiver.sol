@@ -93,7 +93,7 @@ contract CCIPReceiver is CCIPClientBase {
 
   /// @notice This function is called when the initial message delivery has failed but should be attempted again with different logic
   /// @dev By default this function is callable by anyone, and should be modified if special access control is needed.
-  function retryFailedMessage(bytes32 messageId) external {
+  function retryFailedMessage(bytes32 messageId) external onlyOwner {
     if (s_failedMessages.get(messageId) != uint256(ErrorCode.FAILED)) revert MessageNotFailed(messageId);
 
     // Set the error code to 0 to disallow reentry and retry the same failed message
@@ -116,7 +116,7 @@ contract CCIPReceiver is CCIPClientBase {
   /// @notice Should be used to recover tokens from a failed message, while ensuring the message cannot be retried
   /// @notice function will send tokens to destination, but will NOT invoke any arbitrary logic afterwards.
   /// @dev this function is only callable as the owner, and
-  function abandonMessage(bytes32 messageId, address receiver) external onlyOwner {
+  function abandonFailedMessage(bytes32 messageId, address receiver) external onlyOwner {
     if (s_failedMessages.get(messageId) != uint256(ErrorCode.FAILED)) revert MessageNotFailed(messageId);
 
     s_failedMessages.set(messageId, uint256(ErrorCode.ABANDONED));
