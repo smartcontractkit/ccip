@@ -317,7 +317,7 @@ func (c *CCIPE2ELoad) Call(_ *wasp.Generator) *wasp.Response {
 		if err != nil {
 			errReason = "could not decode"
 		}
-		res.Error = fmt.Sprintf("ccip-send request receipt is not successful, errReason=%s, args =%v", errReason, v)
+		res.Error = fmt.Sprintf("ccip-send request receipt is not successful, errReason=%s, args =%v %w", errReason, v, err)
 		res.Failed = true
 		res.Data = stats.StatusByPhase
 		return res
