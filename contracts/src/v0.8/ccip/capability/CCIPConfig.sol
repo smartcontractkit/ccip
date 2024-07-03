@@ -106,7 +106,10 @@ contract CCIPConfig is ITypeAndVersion, ICapabilityConfiguration, OwnerIsCreator
 
   /// @notice Returns all the chain configurations.
   /// @return paginatedChainConfigs chain configurations.
-  function getAllChainConfigs(uint256 pageIndex, uint256 pageSize) external view returns (CCIPConfigTypes.ChainConfigInfo[] memory) {
+  function getAllChainConfigs(
+    uint256 pageIndex,
+    uint256 pageSize
+  ) external view returns (CCIPConfigTypes.ChainConfigInfo[] memory) {
     uint256 totalItems = s_remoteChainSelectors.length(); // Total number of chain selectors
     if (pageSize == 0 || pageIndex * pageSize >= totalItems) {
       return new CCIPConfigTypes.ChainConfigInfo[](0); // Return an empty array if pageSize is 0 or pageIndex is out of bounds
@@ -115,13 +118,16 @@ contract CCIPConfig is ITypeAndVersion, ICapabilityConfiguration, OwnerIsCreator
     uint256 startIndex = pageIndex * pageSize;
     uint256 endIndex = startIndex + pageSize > totalItems ? totalItems : startIndex + pageSize;
 
-    CCIPConfigTypes.ChainConfigInfo[] memory paginatedChainConfigs = new CCIPConfigTypes.ChainConfigInfo[](endIndex - startIndex);
+    CCIPConfigTypes.ChainConfigInfo[] memory paginatedChainConfigs =
+      new CCIPConfigTypes.ChainConfigInfo[](endIndex - startIndex);
 
     uint256[] memory chainSelectors = s_remoteChainSelectors.values();
     for (uint256 i = startIndex; i < endIndex; ++i) {
       uint64 chainSelector = uint64(chainSelectors[i]);
-      paginatedChainConfigs[i - startIndex] =
-        CCIPConfigTypes.ChainConfigInfo({chainSelector: chainSelector, chainConfig: s_chainConfigurations[chainSelector]});
+      paginatedChainConfigs[i - startIndex] = CCIPConfigTypes.ChainConfigInfo({
+        chainSelector: chainSelector,
+        chainConfig: s_chainConfigurations[chainSelector]
+      });
     }
 
     return paginatedChainConfigs;
