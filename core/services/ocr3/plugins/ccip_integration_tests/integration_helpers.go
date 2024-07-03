@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
+
 	ccipreader "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/ccip_config"
@@ -109,8 +110,8 @@ func NewTestUniverse(ctx context.Context, t *testing.T, lggr logger.Logger) Test
 		RpcBatchSize:             10,
 		KeepFinalizedBlocksDepth: 100000,
 	}
-	cl := client.NewSimulatedBackendClient(t, backend, big.NewInt(1337))
-	lp := logpoller.NewLogPoller(logpoller.NewORM(big.NewInt(1337), db, lggr), cl, logger.NullLogger, lpOpts)
+	cl := client.NewSimulatedBackendClient(t, backend, big.NewInt(chainID))
+	lp := logpoller.NewLogPoller(logpoller.NewORM(big.NewInt(chainID), db, lggr), cl, logger.NullLogger, lpOpts)
 	require.NoError(t, lp.Start(ctx))
 	t.Cleanup(func() { require.NoError(t, lp.Close()) })
 
@@ -199,7 +200,6 @@ func (t *TestUniverse) AddCapability(p2pIDs [][32]byte) {
 		require.Equal(t.TestingT, nodeOperatorID, nodeInfo.NodeOperatorId)
 		require.Equal(t.TestingT, p2pIDs[i][:], nodeInfo.P2pId[:])
 	}
-	return
 }
 
 func NewHomeChainReader(t *testing.T, logPoller logpoller.LogPoller, client client.Client, ccAddress common.Address) ccipreader.HomeChain {

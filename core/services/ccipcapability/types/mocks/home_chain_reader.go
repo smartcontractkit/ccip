@@ -4,11 +4,13 @@ import (
 	"context"
 
 	mapset "github.com/deckarep/golang-set/v2"
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
-	"github.com/smartcontractkit/libocr/ragep2p/types"
 	"github.com/stretchr/testify/mock"
 
 	ccipreaderpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
+
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
+	"github.com/smartcontractkit/libocr/ragep2p/types"
 )
 
 var _ ccipreaderpkg.HomeChain = (*HomeChainReader)(nil)
