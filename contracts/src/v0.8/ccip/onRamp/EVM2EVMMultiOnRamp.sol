@@ -338,7 +338,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
     );
 
     // Only check token value if there are tokens
-    if (numberOfTokens > 0) {
+    if (numberOfTokens != 0) {
       address messageValidator = s_dynamicConfig.messageValidator;
       if (messageValidator != address(0)) {
         try IMessageInterceptor(messageValidator).onOutboundMessage(destChainSelector, message) {}
@@ -541,7 +541,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
     uint256 premiumFee = 0;
     uint32 tokenTransferGas = 0;
     uint32 tokenTransferBytesOverhead = 0;
-    if (message.tokenAmounts.length > 0) {
+    if (message.tokenAmounts.length != 0) {
       (premiumFee, tokenTransferGas, tokenTransferBytesOverhead) =
         _getTokenTransferCost(destChainSelector, message.feeToken, feeTokenPrice, message.tokenAmounts);
     } else {

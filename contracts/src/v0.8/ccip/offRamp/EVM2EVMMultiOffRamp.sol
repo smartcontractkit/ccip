@@ -410,7 +410,7 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
       // FAILURE   -> FAILURE  no nonce bump
       // FAILURE   -> SUCCESS  no nonce bump
       // UNTOUCHED messages MUST be executed in order always
-      if (message.nonce > 0 && originalState == Internal.MessageExecutionState.UNTOUCHED) {
+      if (message.nonce != 0 && originalState == Internal.MessageExecutionState.UNTOUCHED) {
         // If a nonce is not incremented, that means it was skipped, and we can ignore the message
         if (
           !INonceManager(i_nonceManager).incrementInboundNonce(
@@ -493,7 +493,7 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
   function executeSingleMessage(Internal.EVM2EVMMessage memory message, bytes[] memory offchainTokenData) external {
     if (msg.sender != address(this)) revert CanOnlySelfCall();
     Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](0);
-    if (message.tokenAmounts.length > 0) {
+    if (message.tokenAmounts.length != 0) {
       destTokenAmounts = _releaseOrMintTokens(
         message.tokenAmounts,
         abi.encode(message.sender),

@@ -278,7 +278,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     _validateMessage(message.data.length, extraArgs.gasLimit, numberOfTokens, extraArgs.allowOutOfOrderExecution);
 
     // Only check token value if there are tokens
-    if (numberOfTokens > 0) {
+    if (numberOfTokens != 0) {
       uint256 value;
       for (uint256 i = 0; i < numberOfTokens; ++i) {
         if (message.tokenAmounts[i].amount == 0) revert CannotSendZeroTokens();
@@ -287,7 +287,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
         }
       }
       // Rate limit on aggregated token value
-      if (value > 0) _rateLimitValue(value);
+      if (value != 0) _rateLimitValue(value);
     }
 
     // Convert feeToken to link if not already in link
@@ -526,7 +526,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     uint256 premiumFee = 0;
     uint32 tokenTransferGas = 0;
     uint32 tokenTransferBytesOverhead = 0;
-    if (message.tokenAmounts.length > 0) {
+    if (message.tokenAmounts.length != 0) {
       (premiumFee, tokenTransferGas, tokenTransferBytesOverhead) =
         _getTokenTransferCost(message.feeToken, feeTokenPrice, message.tokenAmounts);
     } else {
@@ -539,7 +539,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     uint256 dataAvailabilityCost = 0;
     // Only calculate data availability cost if data availability multiplier is non-zero.
     // The multiplier should be set to 0 if destination chain does not charge data availability cost.
-    if (s_dynamicConfig.destDataAvailabilityMultiplierBps > 0) {
+    if (s_dynamicConfig.destDataAvailabilityMultiplierBps != 0) {
       dataAvailabilityCost = _getDataAvailabilityCost(
         // Parse the data availability gas price stored in the higher-order 112 bits of the encoded gas price.
         uint112(packedGasPrice >> Internal.GAS_PRICE_BITS),

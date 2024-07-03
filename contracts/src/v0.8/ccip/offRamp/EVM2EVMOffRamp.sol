@@ -308,7 +308,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
         if (originalState != Internal.MessageExecutionState.UNTOUCHED) revert AlreadyAttempted(message.sequenceNumber);
       }
 
-      if (message.nonce > 0) {
+      if (message.nonce != 0) {
         // In the scenario where we upgrade offRamps, we still want to have sequential nonces.
         // Referencing the old offRamp to check the expected nonce if none is set for a
         // given sender allows us to skip the current message if it would not be the next according
@@ -379,7 +379,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
       // UNTOUCHED -> SUCCESS  nonce bump
       // FAILURE   -> FAILURE  no nonce bump
       // FAILURE   -> SUCCESS  no nonce bump
-      if (message.nonce > 0 && originalState == Internal.MessageExecutionState.UNTOUCHED) {
+      if (message.nonce != 0 && originalState == Internal.MessageExecutionState.UNTOUCHED) {
         s_senderNonce[message.sender]++;
       }
 
@@ -449,7 +449,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
   function executeSingleMessage(Internal.EVM2EVMMessage memory message, bytes[] memory offchainTokenData) external {
     if (msg.sender != address(this)) revert CanOnlySelfCall();
     Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](0);
-    if (message.tokenAmounts.length > 0) {
+    if (message.tokenAmounts.length != 0) {
       destTokenAmounts = _releaseOrMintTokens(
         message.tokenAmounts, abi.encode(message.sender), message.receiver, message.sourceTokenData, offchainTokenData
       );
@@ -685,7 +685,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
       }
     }
 
-    if (value > 0) _rateLimitValue(value);
+    if (value != 0) _rateLimitValue(value);
 
     return destTokenAmounts;
   }
