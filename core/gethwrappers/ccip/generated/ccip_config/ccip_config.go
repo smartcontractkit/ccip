@@ -245,28 +245,6 @@ func (_CCIPConfig *CCIPConfigCallerSession) GetCapabilityConfiguration(arg0 uint
 	return _CCIPConfig.Contract.GetCapabilityConfiguration(&_CCIPConfig.CallOpts, arg0)
 }
 
-func (_CCIPConfig *CCIPConfigCaller) GetCapabilityRegistry(opts *bind.CallOpts) (common.Address, error) {
-	var out []interface{}
-	err := _CCIPConfig.contract.Call(opts, &out, "getCapabilityRegistry")
-
-	if err != nil {
-		return *new(common.Address), err
-	}
-
-	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
-
-	return out0, err
-
-}
-
-func (_CCIPConfig *CCIPConfigSession) GetCapabilityRegistry() (common.Address, error) {
-	return _CCIPConfig.Contract.GetCapabilityRegistry(&_CCIPConfig.CallOpts)
-}
-
-func (_CCIPConfig *CCIPConfigCallerSession) GetCapabilityRegistry() (common.Address, error) {
-	return _CCIPConfig.Contract.GetCapabilityRegistry(&_CCIPConfig.CallOpts)
-}
-
 func (_CCIPConfig *CCIPConfigCaller) GetOCRConfig(opts *bind.CallOpts, donId uint32, pluginType uint8) ([]CCIPConfigTypesOCR3ConfigWithMeta, error) {
 	var out []interface{}
 	err := _CCIPConfig.contract.Call(opts, &out, "getOCRConfig", donId, pluginType)
@@ -1072,8 +1050,6 @@ type CCIPConfigInterface interface {
 	GetAllChainConfigs(opts *bind.CallOpts) ([]CCIPConfigTypesChainConfigInfo, error)
 
 	GetCapabilityConfiguration(opts *bind.CallOpts, arg0 uint32) ([]byte, error)
-
-	GetCapabilityRegistry(opts *bind.CallOpts) (common.Address, error)
 
 	GetOCRConfig(opts *bind.CallOpts, donId uint32, pluginType uint8) ([]CCIPConfigTypesOCR3ConfigWithMeta, error)
 
