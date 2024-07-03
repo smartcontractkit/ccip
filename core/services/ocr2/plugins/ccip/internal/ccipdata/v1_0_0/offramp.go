@@ -484,6 +484,10 @@ func (o *OffRamp) GetExecutionStateChangesBetweenSeqNums(ctx context.Context, se
 	return res, nil
 }
 
+func (o *OffRamp) GetExecutionStateChangesForSeqNums(ctx context.Context, seqNums []cciptypes.SequenceNumberRange, confirmations int) ([]cciptypes.ExecutionStateChangedWithTxMeta, error) {
+	return nil, nil
+}
+
 func encodeExecutionReport(args abi.Arguments, report cciptypes.ExecReport) ([]byte, error) {
 	var msgs []evm_2_evm_offramp_1_0_0.InternalEVM2EVMMessage
 	for _, msg := range report.Messages {

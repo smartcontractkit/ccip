@@ -5,8 +5,10 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
+
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	evmtypes "github.com/smartcontractkit/chainlink/v2/core/chains/evm/types"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
@@ -42,6 +44,14 @@ const (
 type Event[T any] struct {
 	Data T
 	cciptypes.TxMeta
+}
+
+func LogsConfidence(finalized bool) primitives.ConfidenceLevel {
+	if finalized {
+		return primitives.Finalized
+	}
+	return primitives.Unconfirmed
+
 }
 
 func LogsConfirmations(finalized bool) evmtypes.Confirmations {

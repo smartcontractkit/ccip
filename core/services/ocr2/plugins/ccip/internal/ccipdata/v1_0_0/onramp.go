@@ -8,9 +8,12 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/hashutil"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
+
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/arm_contract"
@@ -162,6 +165,56 @@ func (o *OnRamp) GetSendRequestsBetweenSeqNums(ctx context.Context, seqNumMin, s
 			EVM2EVMMessage: log.Data,
 		})
 	}
+	return res, nil
+}
+
+func (o *OnRamp) GetSendRequestsForSeqNums(ctx context.Context, seqNrs []cciptypes.SequenceNumberRange, finalized bool) ([]cciptypes.EVM2EVMMessageWithTxMeta, error) {
+	seqNrRanges := make([]query.Expression, 0, len(seqNrs))
+	for _, seqNr := range seqNrs {
+		seqNrRanges = append(seqNrRanges, query.And(
+			logpoller.NewEventByWordFilter(o.sendRequestedEventSig, uint8(o.sendRequestedSeqNumberWord), []primitives.ValueComparator{
+				{Value: logpoller.EvmWord(seqNr.Min).Hex(), Operator: primitives.Gte},
+			}),
+			logpoller.NewEventByWordFilter(o.sendRequestedEventSig, uint8(o.sendRequestedSeqNumberWord), []primitives.ValueComparator{
+				{Value: logpoller.EvmWord(seqNr.Max).Hex(), Operator: primitives.Lte},
+			}),
+		))
+	}
+
+	sendRequestsQuery, err := query.Where(
+		o.address.String(),
+		logpoller.NewAddressFilter(o.address),
+		logpoller.NewEventSigFilter(o.sendRequestedEventSig),
+		query.Or(seqNrRanges...),
+		query.Confidence(ccipdata.LogsConfidence(finalized)),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	logs, err := o.lp.FilteredLogs(
+		ctx,
+		sendRequestsQuery,
+		query.NewLimitAndSort(query.Limit{}, query.NewSortBySequence(query.Asc)),
+		"GetSendRequestsBetweenSeqNums",
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	parsedLogs, err := ccipdata.ParseLogs[cciptypes.EVM2EVMMessage](logs, o.lggr, o.logToMessage)
+	if err != nil {
+		return nil, err
+	}
+
+	res := make([]cciptypes.EVM2EVMMessageWithTxMeta, 0, len(logs))
+	for _, log := range parsedLogs {
+		res = append(res, cciptypes.EVM2EVMMessageWithTxMeta{
+			TxMeta:         log.TxMeta,
+			EVM2EVMMessage: log.Data,
+		})
+	}
+
 	return res, nil
 }
 
