@@ -5,7 +5,6 @@ pragma solidity ^0.8.0;
 /// @notice Provides utility functions for validating sorted sets and their subset relationships.
 /// @dev This library is used to ensure that arrays of bytes32 are sorted sets and to check subset relations.
 library SortedSetValidationUtil {
-
   /// @dev Error to be thrown when an operation is attempted on an empty set.
   error EmptySet();
   /// @dev Error to be thrown when the set is not in ascending unique order.
