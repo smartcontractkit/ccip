@@ -36,7 +36,7 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
   error AlreadyAttempted(uint64 sourceChainSelector, uint64 sequenceNumber);
   error AlreadyExecuted(uint64 sourceChainSelector, uint64 sequenceNumber);
   error ZeroChainSelectorNotAllowed();
-  error ExecutionError(bytes32 messageId, bytes error);
+  error ExecutionError(bytes32 messageId, bytes err);
   error SourceChainNotEnabled(uint64 sourceChainSelector);
   error TokenDataMismatch(uint64 sourceChainSelector, uint64 sequenceNumber);
   error UnexpectedTokenData();
@@ -47,8 +47,8 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
   error RootAlreadyCommitted(uint64 sourceChainSelector, bytes32 merkleRoot);
   error InvalidRoot();
   error CanOnlySelfCall();
-  error ReceiverError(bytes error);
-  error TokenHandlingError(bytes error);
+  error ReceiverError(bytes err);
+  error TokenHandlingError(bytes err);
   error EmptyReport();
   error CursedByRMN(uint64 sourceChainSelector);
   error InvalidMessageId(bytes32 messageId);

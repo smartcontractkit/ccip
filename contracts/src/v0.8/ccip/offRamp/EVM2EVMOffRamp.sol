@@ -38,7 +38,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
   error AlreadyExecuted(uint64 sequenceNumber);
   error ZeroAddressNotAllowed();
   error CommitStoreAlreadyInUse();
-  error ExecutionError(bytes error);
+  error ExecutionError(bytes err);
   error InvalidSourceChain(uint64 sourceChainSelector);
   error MessageTooLarge(uint256 maxSize, uint256 actualSize);
   error TokenDataMismatch(uint64 sequenceNumber);
@@ -49,8 +49,8 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
   error InvalidManualExecutionGasLimit(uint256 index, uint256 newLimit);
   error RootNotCommitted();
   error CanOnlySelfCall();
-  error ReceiverError(bytes error);
-  error TokenHandlingError(bytes error);
+  error ReceiverError(bytes err);
+  error TokenHandlingError(bytes err);
   error EmptyReport();
   error CursedByRMN();
   error InvalidMessageId();
