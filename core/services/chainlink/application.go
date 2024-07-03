@@ -27,6 +27,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/mailbox"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ccipcapability"
 	"github.com/smartcontractkit/chainlink/v2/core/services/standardcapabilities"
 	"github.com/smartcontractkit/chainlink/v2/core/static"
 
@@ -208,6 +209,7 @@ func NewApplication(opts ApplicationOpts) (Application, error) {
 
 	var externalPeerWrapper p2ptypes.PeerWrapper
 	var getLocalNode func(ctx context.Context) (pkgcapabilities.Node, error)
+	var capabilityRegistrySyncer registrysyncer.Syncer
 	if cfg.Capabilities().Peering().Enabled() {
 		externalPeer := externalp2p.NewExternalPeerWrapper(keyStore.P2P(), cfg.Capabilities().Peering(), opts.DS, globalLogger)
 		signer := externalPeer
@@ -240,6 +242,8 @@ func NewApplication(opts ApplicationOpts) (Application, error) {
 			opts.CapabilitiesRegistry,
 		)
 		registrySyncer.AddLauncher(wfLauncher)
+
+		capabilityRegistrySyncer = registrySyncer
 
 		getLocalNode = wfLauncher.LocalNode
 		srvcs = append(srvcs, dispatcher, wfLauncher, registrySyncer)
@@ -515,6 +519,18 @@ func NewApplication(opts ApplicationOpts) (Application, error) {
 			cfg.OCR2(),
 			cfg.Insecure(),
 			opts.RelayerChainInteroperators,
+		)
+		delegates[job.CCIP] = ccipcapability.NewDelegate(
+			globalLogger,
+			loopRegistrarConfig,
+			pipelineRunner,
+			opts.RelayerChainInteroperators,
+			capabilityRegistrySyncer,
+			opts.KeyStore,
+			opts.DS,
+			peerWrapper,
+			telemetryManager,
+			cfg.Capabilities(),
 		)
 	} else {
 		globalLogger.Debug("Off-chain reporting v2 disabled")

@@ -4,16 +4,17 @@ import (
 	"context"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	ccipreaderpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+
+	cctypes "github.com/smartcontractkit/chainlink/v2/core/services/ccipcapability/types"
 )
 
 type configTracker struct {
-	cfg ccipreaderpkg.OCR3ConfigWithMeta
+	cfg cctypes.OCR3ConfigWithMeta
 }
 
-func NewConfigTracker(cfg ccipreaderpkg.OCR3ConfigWithMeta) *configTracker {
+func NewConfigTracker(cfg cctypes.OCR3ConfigWithMeta) *configTracker {
 	return &configTracker{cfg: cfg}
 }
 
@@ -38,7 +39,7 @@ func (c *configTracker) LatestConfig(ctx context.Context, changedInBlock uint64)
 
 // LatestConfigDetails implements types.ContractConfigTracker.
 func (c *configTracker) LatestConfigDetails(ctx context.Context) (changedInBlock uint64, configDigest types.ConfigDigest, err error) {
-	return 0, types.ConfigDigest{}, nil
+	return 0, c.cfg.ConfigDigest, nil
 }
 
 // Notify implements types.ContractConfigTracker.
@@ -56,8 +57,8 @@ func toOnchainPublicKeys(signers [][]byte) []types.OnchainPublicKey {
 
 func toOCRAccounts(transmitters [][]byte) []types.Account {
 	accounts := make([]types.Account, len(transmitters))
-	for _, transmitter := range transmitters {
-		accounts = append(accounts, types.Account(hexutil.Encode(transmitter)))
+	for i, transmitter := range transmitters {
+		accounts[i] = types.Account(hexutil.Encode(transmitter))
 	}
 	return accounts
 }

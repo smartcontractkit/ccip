@@ -63,6 +63,7 @@ func NewDelegate(
 	ds sqlutil.DataSource,
 	peerWrapper *ocrcommon.SingletonPeerWrapper,
 	monitoringEndpointGen telemetry.MonitoringEndpointGenerator,
+	capabilityConfig config.Capabilities,
 ) *Delegate {
 	return &Delegate{
 		lggr:                  lggr,
@@ -74,6 +75,7 @@ func NewDelegate(
 		keystore:              keystore,
 		peerWrapper:           peerWrapper,
 		monitoringEndpointGen: monitoringEndpointGen,
+		capabilityConfig:      capabilityConfig,
 	}
 }
 
