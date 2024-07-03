@@ -1572,6 +1572,12 @@ func (sourceCCIP *SourceCCIPModule) AssertSendRequestedLogFinalized(
 	if len(sendReqData) != len(reqStats) {
 		return time.Time{}, 0, fmt.Errorf("sendReqData and reqStats length mismatch")
 	}
+	var gasUsed uint64
+	receipt, err := sourceCCIP.Common.ChainClient.GetTxReceipt(txHash)
+	if err == nil {
+		gasUsed = receipt.GasUsed
+	}
+	prevEventAt = time.Now().UTC()
 	lggr.Info().Msg("Waiting for CCIPSendRequested event log to be finalized")
 	finalizedBlockNum, finalizedAt, err := sourceCCIP.Common.ChainClient.WaitForFinalizedTx(txHash)
 	if err != nil || finalizedBlockNum == nil {
@@ -1585,11 +1591,6 @@ func (sourceCCIP *SourceCCIPModule) AssertSendRequestedLogFinalized(
 			})
 		}
 		return time.Time{}, 0, fmt.Errorf("error waiting for CCIPSendRequested event log to be finalized - %w", err)
-	}
-	var gasUsed uint64
-	receipt, err := sourceCCIP.Common.ChainClient.GetTxReceipt(txHash)
-	if err == nil {
-		gasUsed = receipt.GasUsed
 	}
 	for i, stat := range reqStats {
 		stat.UpdateState(lggr, stat.SeqNum, testreporters.SourceLogFinalized, finalizedAt.Sub(prevEventAt), testreporters.Success,
