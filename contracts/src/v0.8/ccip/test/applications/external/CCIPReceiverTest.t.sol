@@ -187,7 +187,6 @@ contract CCIPReceiverTest is EVM2EVMOnRampSetup {
 
     s_receiver.retryFailedMessage(messageId);
     assertEq(s_receiver.getMessageStatus(messageId), 0);
-
   }
 
   function test_HappyPath_Success() public {
