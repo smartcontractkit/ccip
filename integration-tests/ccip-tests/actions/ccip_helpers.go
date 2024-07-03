@@ -397,16 +397,9 @@ func (ccipModule *CCIPCommon) ApproveTokens() error {
 			}
 		}
 
-		allowance, err := token.Allowance(ccipModule.ChainClient.GetDefaultWallet().Address(), ccipModule.Router.Address())
+		err := token.Approve(ccipModule.ChainClient.GetDefaultWallet(), ccipModule.Router.Address(), ApprovedAmountToRouter)
 		if err != nil {
-			return fmt.Errorf("failed to get allowance for token %s: %w", token.ContractAddress.Hex(), err)
-		}
-		if allowance.Cmp(ApprovedAmountToRouter) < 0 {
-			allowanceApprovalDelta := new(big.Int).Sub(ApprovedAmountToRouter, allowance)
-			err := token.Approve(ccipModule.ChainClient.GetDefaultWallet(), ccipModule.Router.Address(), allowanceApprovalDelta)
-			if err != nil {
-				return fmt.Errorf("failed to approve token %s: %w", token.ContractAddress.Hex(), err)
-			}
+			return fmt.Errorf("failed to approve token %s: %w", token.ContractAddress.Hex(), err)
 		}
 		if token.ContractAddress == ccipModule.FeeToken.EthAddress {
 			isApproved = true
