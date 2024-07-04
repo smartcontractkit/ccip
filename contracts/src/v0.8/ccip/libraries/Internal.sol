@@ -233,7 +233,6 @@ library Internal {
         ),
         keccak256(original.data),
         keccak256(abi.encode(original.tokenAmounts)),
-        keccak256(abi.encode(original.sourceTokenData)),
         keccak256(original.extraArgs)
       )
     );
@@ -330,8 +329,6 @@ library Internal {
     bytes extraArgs; // destination-chain specific extra args, such as the gasLimit for EVM chains
     address feeToken; // fee token
     uint256 feeTokenAmount; // fee token amount
-    // TODO: revisit collapsing tokenAmounts + sourceTokenData into one struct array
-    Client.EVMTokenAmount[] tokenAmounts; // array of tokens and amounts to transfer
-    bytes[] sourceTokenData; // array of token data, one per token
+    RampTokenAmount[] tokenAmounts; // array of tokens and amounts to transfer
   }
 }

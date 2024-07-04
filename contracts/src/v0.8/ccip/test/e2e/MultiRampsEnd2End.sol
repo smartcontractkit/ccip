@@ -244,19 +244,6 @@ contract MultiRampsE2E is EVM2EVMMultiOnRampSetup, EVM2EVMMultiOffRampSetup {
       abi.decode(msgEvent.extraArgs, (Client.ExtraArgsV1)).destChainExtraArgs, (Client.EVMFamilyExtraArgsV1)
     ).gasLimit;
 
-    Internal.RampTokenAmount[] memory rampTokenAmounts = new Internal.RampTokenAmount[](msgEvent.tokenAmounts.length);
-    for (uint256 i = 0; i < msgEvent.tokenAmounts.length; ++i) {
-      Internal.SourceTokenData memory sourceTokenData =
-        abi.decode(msgEvent.sourceTokenData[i], (Internal.SourceTokenData));
-
-      rampTokenAmounts[i] = Internal.RampTokenAmount({
-        sourcePoolAddress: sourceTokenData.sourcePoolAddress,
-        destTokenAddress: sourceTokenData.destTokenAddress,
-        extraData: sourceTokenData.extraData,
-        amount: msgEvent.tokenAmounts[i].amount
-      });
-    }
-
     return Internal.Any2EVMRampMessage({
       header: Internal.RampMessageHeader({
         messageId: msgEvent.header.messageId,
@@ -269,7 +256,7 @@ contract MultiRampsE2E is EVM2EVMMultiOnRampSetup, EVM2EVMMultiOffRampSetup {
       data: msgEvent.data,
       receiver: abi.decode(msgEvent.receiver, (address)),
       gasLimit: gasLimit,
-      tokenAmounts: rampTokenAmounts
+      tokenAmounts: msgEvent.tokenAmounts
     });
   }
 }

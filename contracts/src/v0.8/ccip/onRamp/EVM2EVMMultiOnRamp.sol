@@ -292,13 +292,12 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
 
       _validateDestFamilyAddress(destChainConfig.dynamicConfig.familyTag, poolReturnData.destTokenAddress);
 
-      newMessage.sourceTokenData[i] = abi.encode(
-        Internal.SourceTokenData({
-          sourcePoolAddress: abi.encode(sourcePool),
-          destTokenAddress: poolReturnData.destTokenAddress,
-          extraData: poolReturnData.destPoolData
-        })
-      );
+      newMessage.tokenAmounts[i] = Internal.RampTokenAmount({
+        sourcePoolAddress: abi.encode(sourcePool),
+        destTokenAddress: poolReturnData.destTokenAddress,
+        extraData: poolReturnData.destPoolData,
+        amount: tokenAndAmount.amount
+      });
     }
 
     // Hash only after the sourceTokenData has been set
@@ -392,8 +391,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
       receiver: message.receiver,
       feeToken: message.feeToken,
       feeTokenAmount: feeTokenAmount,
-      tokenAmounts: message.tokenAmounts,
-      sourceTokenData: new bytes[](numberOfTokens) // should be populated after generation
+      tokenAmounts: new Internal.RampTokenAmount[](numberOfTokens) // should be populated after generation
     });
 
     return rampMessage;
