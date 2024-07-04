@@ -704,7 +704,7 @@ abstract contract RMNBase is IRMNBase, OwnerIsCreator, ITypeAndVersion {
     return page;
   }
 
-  function _validateConfig(Config memory config) internal view returns (bool) {
+  function _validateConfig(Config memory config) internal pure returns (bool) {
     if (
       config.voters.length == 0 || config.voters.length > MAX_NUM_VOTERS || config.blessWeightThreshold == 0
         || config.curseWeightThreshold == 0
