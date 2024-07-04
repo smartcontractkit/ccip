@@ -9,6 +9,7 @@ import {IRMN} from "../../interfaces/IRMN.sol";
 
 import {AuthorizedCallers} from "../../../shared/access/AuthorizedCallers.sol";
 import {RMN} from "../../RMN.sol";
+import {RMNBase} from "../../RMNBase.sol";
 import {Router} from "../../Router.sol";
 import {Client} from "../../libraries/Client.sol";
 import {Internal} from "../../libraries/Internal.sol";
@@ -473,11 +474,11 @@ contract EVM2EVMMultiOffRampSetup is TokenSetup, PriceRegistrySetup, MultiOCR3Ba
   }
 
   function _setupRealRMN() internal {
-    RMN.Voter[] memory voters = new RMN.Voter[](1);
+    RMNBase.Voter[] memory voters = new RMNBase.Voter[](1);
     voters[0] =
-      RMN.Voter({blessVoteAddr: BLESS_VOTE_ADDR, curseVoteAddr: address(9999), blessWeight: 1, curseWeight: 1});
+      RMNBase.Voter({blessVoteAddr: BLESS_VOTE_ADDR, curseVoteAddr: address(9999), blessWeight: 1, curseWeight: 1});
     // Overwrite base mock rmn with real.
-    s_realRMN = new RMN(RMN.Config({voters: voters, blessWeightThreshold: 1, curseWeightThreshold: 1}));
+    s_realRMN = new RMN(RMNBase.Config({voters: voters, blessWeightThreshold: 1, curseWeightThreshold: 1}));
   }
 
   function _commit(EVM2EVMMultiOffRamp.CommitReport memory commitReport, uint64 sequenceNumber) internal {

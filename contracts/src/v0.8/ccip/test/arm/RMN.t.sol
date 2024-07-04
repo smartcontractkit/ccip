@@ -4,6 +4,7 @@ pragma solidity 0.8.24;
 import {IRMN} from "../../interfaces/IRMN.sol";
 
 import {GLOBAL_CURSE_SUBJECT, LIFT_CURSE_VOTE_ADDR, OWNER_CURSE_VOTE_ADDR, RMN} from "../../RMN.sol";
+import {RMNBase} from "../../RMNBase.sol";
 import {RMNSetup, makeCursesHash, makeSubjects} from "./RMNSetup.t.sol";
 
 import {Test} from "forge-std/Test.sol";
@@ -11,11 +12,11 @@ import {Test} from "forge-std/Test.sol";
 bytes28 constant GARBAGE_CURSES_HASH = bytes28(keccak256("GARBAGE_CURSES_HASH"));
 
 contract ConfigCompare is Test {
-  function assertConfigEq(RMN.Config memory actualConfig, RMN.Config memory expectedConfig) public pure {
+  function assertConfigEq(RMNBase.Config memory actualConfig, RMNBase.Config memory expectedConfig) public pure {
     assertEq(actualConfig.voters.length, expectedConfig.voters.length);
     for (uint256 i = 0; i < expectedConfig.voters.length; ++i) {
-      RMN.Voter memory expectedVoter = expectedConfig.voters[i];
-      RMN.Voter memory actualVoter = actualConfig.voters[i];
+      RMNBase.Voter memory expectedVoter = expectedConfig.voters[i];
+      RMNBase.Voter memory actualVoter = actualConfig.voters[i];
       assertEq(actualVoter.blessVoteAddr, expectedVoter.blessVoteAddr);
       assertEq(actualVoter.curseVoteAddr, expectedVoter.curseVoteAddr);
       assertEq(actualVoter.blessWeight, expectedVoter.blessWeight);
@@ -28,16 +29,16 @@ contract ConfigCompare is Test {
 
 contract RMN_constructor is ConfigCompare, RMNSetup {
   function test_Constructor_Success() public view {
-    RMN.Config memory expectedConfig = rmnConstructorArgs();
-    (uint32 actualVersion,, RMN.Config memory actualConfig) = s_rmn.getConfigDetails();
+    RMNBase.Config memory expectedConfig = _rmnConstructorArgs();
+    (uint32 actualVersion,, RMNBase.Config memory actualConfig) = s_rmn.getConfigDetails();
     assertEq(actualVersion, 1);
     assertConfigEq(actualConfig, expectedConfig);
   }
 }
 
 contract RMN_voteToBless is RMNSetup {
-  function _getFirstBlessVoterAndWeight() internal pure returns (address, uint8) {
-    RMN.Config memory cfg = rmnConstructorArgs();
+  function _getFirstBlessVoterAndWeight() internal view returns (address, uint8) {
+    RMNBase.Config memory cfg = _rmnConstructorArgs();
     return (cfg.voters[0].blessVoteAddr, cfg.voters[0].blessWeight);
   }
 
@@ -79,7 +80,7 @@ contract RMN_voteToBless is RMNSetup {
   }
 
   function test_IsAlreadyBlessed_Revert() public {
-    RMN.Config memory cfg = rmnConstructorArgs();
+    RMNBase.Config memory cfg = _rmnConstructorArgs();
 
     // Bless voters 2,3,4 vote to bless
     for (uint256 i = 1; i < cfg.voters.length; i++) {
@@ -95,7 +96,7 @@ contract RMN_voteToBless is RMNSetup {
   }
 
   function test_Curse_Revert() public {
-    RMN.Config memory cfg = rmnConstructorArgs();
+    RMNBase.Config memory cfg = _rmnConstructorArgs();
 
     for (uint256 i = 0; i < cfg.voters.length; i++) {
       vm.startPrank(cfg.voters[i].curseVoteAddr);
@@ -109,14 +110,14 @@ contract RMN_voteToBless is RMNSetup {
 
   function test_UnauthorizedVoter_Revert() public {
     vm.startPrank(STRANGER);
-    vm.expectRevert(abi.encodeWithSelector(RMN.UnauthorizedVoter.selector, STRANGER));
+    vm.expectRevert(abi.encodeWithSelector(RMNBase.UnauthorizedVoter.selector, STRANGER));
     s_rmn.voteToBless(makeTaggedRootSingleton(12321));
   }
 }
 
 contract RMN_ownerUnbless is RMNSetup {
   function test_Unbless_Success() public {
-    RMN.Config memory cfg = rmnConstructorArgs();
+    RMNBase.Config memory cfg = _rmnConstructorArgs();
     for (uint256 i = 0; i < cfg.voters.length; ++i) {
       vm.startPrank(cfg.voters[i].blessVoteAddr);
       s_rmn.voteToBless(makeTaggedRootSingleton(1));
@@ -135,7 +136,7 @@ contract RMN_unvoteToCurse is RMNSetup {
 
   function setUp() public override {
     RMNSetup.setUp();
-    RMN.Config memory cfg = rmnConstructorArgs();
+    RMNBase.Config memory cfg = _rmnConstructorArgs();
 
     s_curser = 0;
     vm.startPrank(cfg.voters[s_curser].curseVoteAddr);
@@ -154,7 +155,7 @@ contract RMN_unvoteToCurse is RMNSetup {
   }
 
   function test_UnauthorizedVoter() public {
-    RMN.Config memory cfg = rmnConstructorArgs();
+    RMNBase.Config memory cfg = _rmnConstructorArgs();
     // Someone else cannot unvote to curse on the curser's behalf.
     address[] memory unauthorized = new address[](3);
     unauthorized[0] = cfg.voters[s_curser].blessVoteAddr;
@@ -162,19 +163,19 @@ contract RMN_unvoteToCurse is RMNSetup {
     unauthorized[2] = OWNER;
 
     for (uint256 i = 0; i < unauthorized.length; ++i) {
-      bytes memory expectedRevert = abi.encodeWithSelector(RMN.UnauthorizedVoter.selector, unauthorized[i]);
+      bytes memory expectedRevert = abi.encodeWithSelector(RMNBase.UnauthorizedVoter.selector, unauthorized[i]);
       vm.startPrank(unauthorized[i]);
       {
         // should fail when using the correct curses hash
-        RMN.UnvoteToCurseRequest[] memory reqs = new RMN.UnvoteToCurseRequest[](1);
-        reqs[0] = RMN.UnvoteToCurseRequest({subject: 0, cursesHash: s_cursesHash});
+        RMNBase.UnvoteToCurseRequest[] memory reqs = new RMNBase.UnvoteToCurseRequest[](1);
+        reqs[0] = RMNBase.UnvoteToCurseRequest({subject: 0, cursesHash: s_cursesHash});
         vm.expectRevert(expectedRevert);
         s_rmn.unvoteToCurse(reqs);
       }
       {
         // should fail when using garbage curses hash
-        RMN.UnvoteToCurseRequest[] memory reqs = new RMN.UnvoteToCurseRequest[](1);
-        reqs[0] = RMN.UnvoteToCurseRequest({subject: 0, cursesHash: GARBAGE_CURSES_HASH});
+        RMNBase.UnvoteToCurseRequest[] memory reqs = new RMNBase.UnvoteToCurseRequest[](1);
+        reqs[0] = RMNBase.UnvoteToCurseRequest({subject: 0, cursesHash: GARBAGE_CURSES_HASH});
         vm.expectRevert(expectedRevert);
         s_rmn.unvoteToCurse(reqs);
       }
@@ -182,53 +183,53 @@ contract RMN_unvoteToCurse is RMNSetup {
   }
 
   function test_InvalidCursesHash() public {
-    RMN.Config memory cfg = rmnConstructorArgs();
+    RMNBase.Config memory cfg = _rmnConstructorArgs();
     vm.startPrank(cfg.voters[s_curser].curseVoteAddr);
-    RMN.UnvoteToCurseRequest[] memory reqs = new RMN.UnvoteToCurseRequest[](1);
-    reqs[0] = RMN.UnvoteToCurseRequest({subject: 0, cursesHash: GARBAGE_CURSES_HASH});
-    vm.expectRevert(RMN.UnvoteToCurseNoop.selector);
+    RMNBase.UnvoteToCurseRequest[] memory reqs = new RMNBase.UnvoteToCurseRequest[](1);
+    reqs[0] = RMNBase.UnvoteToCurseRequest({subject: 0, cursesHash: GARBAGE_CURSES_HASH});
+    vm.expectRevert(RMNBase.UnvoteToCurseNoop.selector);
     s_rmn.unvoteToCurse(reqs);
   }
 
   function test_ValidCursesHash() public {
-    RMN.Config memory cfg = rmnConstructorArgs();
+    RMNBase.Config memory cfg = _rmnConstructorArgs();
     vm.startPrank(cfg.voters[s_curser].curseVoteAddr);
-    RMN.UnvoteToCurseRequest[] memory reqs = new RMN.UnvoteToCurseRequest[](1);
-    reqs[0] = RMN.UnvoteToCurseRequest({subject: 0, cursesHash: s_cursesHash});
+    RMNBase.UnvoteToCurseRequest[] memory reqs = new RMNBase.UnvoteToCurseRequest[](1);
+    reqs[0] = RMNBase.UnvoteToCurseRequest({subject: 0, cursesHash: s_cursesHash});
     s_rmn.unvoteToCurse(reqs); // succeeds
   }
 
   function test_OwnerSucceeds() public {
-    RMN.Config memory cfg = rmnConstructorArgs();
+    RMNBase.Config memory cfg = _rmnConstructorArgs();
     vm.startPrank(OWNER);
-    RMN.OwnerUnvoteToCurseRequest[] memory reqs = new RMN.OwnerUnvoteToCurseRequest[](1);
-    reqs[0] = RMN.OwnerUnvoteToCurseRequest({
+    RMNBase.OwnerUnvoteToCurseRequest[] memory reqs = new RMNBase.OwnerUnvoteToCurseRequest[](1);
+    reqs[0] = RMNBase.OwnerUnvoteToCurseRequest({
       curseVoteAddr: cfg.voters[s_curser].curseVoteAddr,
-      unit: RMN.UnvoteToCurseRequest({subject: 0, cursesHash: s_cursesHash}),
+      unit: RMNBase.UnvoteToCurseRequest({subject: 0, cursesHash: s_cursesHash}),
       forceUnvote: false
     });
     s_rmn.ownerUnvoteToCurse(reqs);
   }
 
   function test_OwnerSkips() public {
-    RMN.Config memory cfg = rmnConstructorArgs();
+    RMNBase.Config memory cfg = _rmnConstructorArgs();
     vm.startPrank(OWNER);
-    RMN.OwnerUnvoteToCurseRequest[] memory reqs = new RMN.OwnerUnvoteToCurseRequest[](1);
-    reqs[0] = RMN.OwnerUnvoteToCurseRequest({
+    RMNBase.OwnerUnvoteToCurseRequest[] memory reqs = new RMNBase.OwnerUnvoteToCurseRequest[](1);
+    reqs[0] = RMNBase.OwnerUnvoteToCurseRequest({
       curseVoteAddr: cfg.voters[s_curser].curseVoteAddr,
-      unit: RMN.UnvoteToCurseRequest({subject: 0, cursesHash: GARBAGE_CURSES_HASH}),
+      unit: RMNBase.UnvoteToCurseRequest({subject: 0, cursesHash: GARBAGE_CURSES_HASH}),
       forceUnvote: false
     });
 
     vm.expectEmit();
-    emit RMN.SkippedUnvoteToCurse(cfg.voters[s_curser].curseVoteAddr, 0, s_cursesHash, GARBAGE_CURSES_HASH);
-    vm.expectRevert(RMN.UnvoteToCurseNoop.selector);
+    emit RMNBase.SkippedUnvoteToCurse(cfg.voters[s_curser].curseVoteAddr, 0, s_cursesHash, GARBAGE_CURSES_HASH);
+    vm.expectRevert(RMNBase.UnvoteToCurseNoop.selector);
     s_rmn.ownerUnvoteToCurse(reqs);
   }
 
   function test_VotersCantLiftCurseButOwnerCan() public {
     vm.stopPrank();
-    RMN.Config memory cfg = rmnConstructorArgs();
+    RMNBase.Config memory cfg = _rmnConstructorArgs();
     // s_curser has voted to curse during setUp
     {
       (address[] memory voters, bytes28[] memory cursesHashes, uint16 accWeight, bool cursed) =
@@ -273,8 +274,8 @@ contract RMN_unvoteToCurse is RMNSetup {
     {
       for (uint256 i = 0; i < cfg.voters.length; ++i) {
         vm.prank(cfg.voters[i].curseVoteAddr);
-        RMN.UnvoteToCurseRequest[] memory reqs = new RMN.UnvoteToCurseRequest[](1);
-        reqs[0] = RMN.UnvoteToCurseRequest({subject: 0, cursesHash: makeCursesHash(makeCurseId(1))});
+        RMNBase.UnvoteToCurseRequest[] memory reqs = new RMNBase.UnvoteToCurseRequest[](1);
+        reqs[0] = RMNBase.UnvoteToCurseRequest({subject: 0, cursesHash: makeCursesHash(makeCurseId(1))});
         s_rmn.unvoteToCurse(reqs);
       }
     }
@@ -293,10 +294,10 @@ contract RMN_unvoteToCurse is RMNSetup {
     }
     // owner lifts curse
     {
-      RMN.OwnerUnvoteToCurseRequest[] memory ownerReq = new RMN.OwnerUnvoteToCurseRequest[](1);
-      ownerReq[0] = RMN.OwnerUnvoteToCurseRequest({
+      RMNBase.OwnerUnvoteToCurseRequest[] memory ownerReq = new RMNBase.OwnerUnvoteToCurseRequest[](1);
+      ownerReq[0] = RMNBase.OwnerUnvoteToCurseRequest({
         curseVoteAddr: LIFT_CURSE_VOTE_ADDR,
-        unit: RMN.UnvoteToCurseRequest({subject: 0, cursesHash: 0}),
+        unit: RMNBase.UnvoteToCurseRequest({subject: 0, cursesHash: 0}),
         forceUnvote: false
       });
       vm.prank(OWNER);
@@ -310,18 +311,20 @@ contract RMN_unvoteToCurse is RMNSetup {
 }
 
 contract RMN_voteToCurse_2 is RMNSetup {
-  function initialConfig() internal pure returns (RMN.Config memory) {
-    RMN.Config memory cfg = RMN.Config({voters: new RMN.Voter[](3), blessWeightThreshold: 1, curseWeightThreshold: 3});
+  function initialConfig() internal view returns (RMNBase.Config memory) {
+    RMNBase.Config memory cfg =
+      RMNBase.Config({voters: new RMNBase.Voter[](3), blessWeightThreshold: 1, curseWeightThreshold: 3});
     cfg.voters[0] =
-      RMN.Voter({blessVoteAddr: BLESS_VOTER_1, curseVoteAddr: CURSE_VOTER_1, blessWeight: 1, curseWeight: 1});
+      RMNBase.Voter({blessVoteAddr: s_blessVoter1, curseVoteAddr: CURSE_VOTER_1, blessWeight: 1, curseWeight: 1});
     cfg.voters[1] =
-      RMN.Voter({blessVoteAddr: BLESS_VOTER_2, curseVoteAddr: CURSE_VOTER_2, blessWeight: 1, curseWeight: 1});
+      RMNBase.Voter({blessVoteAddr: s_blessVoter2, curseVoteAddr: CURSE_VOTER_2, blessWeight: 1, curseWeight: 1});
     cfg.voters[2] =
-      RMN.Voter({blessVoteAddr: BLESS_VOTER_3, curseVoteAddr: CURSE_VOTER_3, blessWeight: 1, curseWeight: 1});
+      RMNBase.Voter({blessVoteAddr: s_blessVoter3, curseVoteAddr: CURSE_VOTER_3, blessWeight: 1, curseWeight: 1});
     return cfg;
   }
 
   function setUp() public override {
+    super.setUp();
     vm.prank(OWNER);
     s_rmn = new RMN(initialConfig());
   }
@@ -329,7 +332,7 @@ contract RMN_voteToCurse_2 is RMNSetup {
   function test_VotesAreDroppedIfSubjectIsNotCursedDuringConfigChange() public {
     // vote to curse the subject from an insufficient number of voters, one voter
     {
-      RMN.Config memory cfg = initialConfig();
+      RMNBase.Config memory cfg = initialConfig();
       vm.prank(cfg.voters[0].curseVoteAddr);
       s_rmn.voteToCurse(makeCurseId(1), makeSubjects(0));
     }
@@ -344,8 +347,8 @@ contract RMN_voteToCurse_2 is RMNSetup {
     }
     // change config to include only the first voter, i.e., initialConfig().voters[0]
     {
-      RMN.Config memory cfg = initialConfig();
-      RMN.Voter[] memory voters = cfg.voters;
+      RMNBase.Config memory cfg = initialConfig();
+      RMNBase.Voter[] memory voters = cfg.voters;
       assembly {
         mstore(voters, 1)
       }
@@ -384,7 +387,7 @@ contract RMN_voteToCurse_2 is RMNSetup {
     uint256 numVotersInitially = initialConfig().voters.length;
     // curse the subject with votes from all voters
     {
-      RMN.Config memory cfg = initialConfig();
+      RMNBase.Config memory cfg = initialConfig();
       for (uint256 i = 0; i < cfg.voters.length; ++i) {
         vm.prank(cfg.voters[i].curseVoteAddr);
         s_rmn.voteToCurse(makeCurseId(1), makeSubjects(0));
@@ -407,8 +410,8 @@ contract RMN_voteToCurse_2 is RMNSetup {
 
       // change config to include only the first #keepVoters voters, i.e., initialConfig().voters[0..keepVoters]
       {
-        RMN.Config memory cfg = initialConfig();
-        RMN.Voter[] memory voters = cfg.voters;
+        RMNBase.Config memory cfg = initialConfig();
+        RMNBase.Voter[] memory voters = cfg.voters;
         assembly {
           mstore(voters, keepVoters)
         }
@@ -439,10 +442,10 @@ contract RMN_voteToCurse_2 is RMNSetup {
       // also
       {
         for (uint256 i = 0; i < keepVoters; ++i) {
-          RMN.OwnerUnvoteToCurseRequest[] memory ownerReq = new RMN.OwnerUnvoteToCurseRequest[](1);
-          ownerReq[0] = RMN.OwnerUnvoteToCurseRequest({
+          RMNBase.OwnerUnvoteToCurseRequest[] memory ownerReq = new RMNBase.OwnerUnvoteToCurseRequest[](1);
+          ownerReq[0] = RMNBase.OwnerUnvoteToCurseRequest({
             curseVoteAddr: initialConfig().voters[i].curseVoteAddr,
-            unit: RMN.UnvoteToCurseRequest({subject: 0, cursesHash: makeCursesHash(makeCurseId(1))}),
+            unit: RMNBase.UnvoteToCurseRequest({subject: 0, cursesHash: makeCursesHash(makeCurseId(1))}),
             forceUnvote: false
           });
           vm.prank(OWNER);
@@ -453,10 +456,10 @@ contract RMN_voteToCurse_2 is RMNSetup {
       }
       // after owner unvotes for themselves, finally, the curse will be lifted
       {
-        RMN.OwnerUnvoteToCurseRequest[] memory ownerReq = new RMN.OwnerUnvoteToCurseRequest[](1);
-        ownerReq[0] = RMN.OwnerUnvoteToCurseRequest({
+        RMNBase.OwnerUnvoteToCurseRequest[] memory ownerReq = new RMNBase.OwnerUnvoteToCurseRequest[](1);
+        ownerReq[0] = RMNBase.OwnerUnvoteToCurseRequest({
           curseVoteAddr: OWNER_CURSE_VOTE_ADDR,
-          unit: RMN.UnvoteToCurseRequest({subject: 0, cursesHash: makeCursesHash(makeCurseId(1))}),
+          unit: RMNBase.UnvoteToCurseRequest({subject: 0, cursesHash: makeCursesHash(makeCurseId(1))}),
           forceUnvote: false
         });
         vm.prank(OWNER);
@@ -469,8 +472,8 @@ contract RMN_voteToCurse_2 is RMNSetup {
 }
 
 contract RMN_voteToCurse is RMNSetup {
-  function _getFirstCurseVoterAndWeight() internal pure returns (address, uint8) {
-    RMN.Config memory cfg = rmnConstructorArgs();
+  function _getFirstCurseVoterAndWeight() internal view returns (address, uint8) {
+    RMNBase.Config memory cfg = _rmnConstructorArgs();
     return (cfg.voters[0].curseVoteAddr, cfg.voters[0].curseWeight);
   }
 
@@ -480,7 +483,7 @@ contract RMN_voteToCurse is RMNSetup {
     uint256 numSubjects = 3;
     uint256 maxNumRevotes = 2;
 
-    RMN.Config memory cfg = rmnConstructorArgs();
+    RMNBase.Config memory cfg = _rmnConstructorArgs();
     bytes16[] memory subjects = new bytes16[](numSubjects);
     for (uint256 i = 0; i < numSubjects; ++i) {
       subjects[i] = bytes16(uint128(i));
@@ -526,7 +529,7 @@ contract RMN_voteToCurse is RMNSetup {
     (address voter, uint8 weight) = _getFirstCurseVoterAndWeight();
     vm.startPrank(voter);
     vm.expectEmit();
-    emit RMN.VotedToCurse(
+    emit RMNBase.VotedToCurse(
       1, // configVersion
       voter,
       GLOBAL_CURSE_SUBJECT,
@@ -547,14 +550,14 @@ contract RMN_voteToCurse is RMNSetup {
   }
 
   function test_VoteToCurse_YesCurse_Success() public {
-    RMN.Config memory cfg = rmnConstructorArgs();
+    RMNBase.Config memory cfg = _rmnConstructorArgs();
     for (uint256 i = 0; i < cfg.voters.length - 1; ++i) {
       vm.startPrank(cfg.voters[i].curseVoteAddr);
       s_rmn.voteToCurse(makeCurseId(1), makeSubjects(0));
     }
 
     vm.expectEmit();
-    emit RMN.Cursed(1, 0, uint64(block.timestamp));
+    emit RMNBase.Cursed(1, 0, uint64(block.timestamp));
 
     vm.startPrank(cfg.voters[cfg.voters.length - 1].curseVoteAddr);
     vm.resumeGasMetering();
@@ -562,7 +565,7 @@ contract RMN_voteToCurse is RMNSetup {
   }
 
   function test_EvenIfAlreadyCursed_Success() public {
-    RMN.Config memory cfg = rmnConstructorArgs();
+    RMNBase.Config memory cfg = _rmnConstructorArgs();
     uint16 weightSum = 0;
     for (uint256 i = 0; i < cfg.voters.length; ++i) {
       vm.startPrank(cfg.voters[i].curseVoteAddr);
@@ -576,7 +579,7 @@ contract RMN_voteToCurse is RMNSetup {
     assert(s_rmn.isCursed(0));
 
     vm.expectEmit();
-    emit RMN.VotedToCurse(
+    emit RMNBase.VotedToCurse(
       1, // configVersion
       cfg.voters[cfg.voters.length - 1].curseVoteAddr,
       0, // subject
@@ -595,7 +598,7 @@ contract RMN_voteToCurse is RMNSetup {
     vm.startPrank(OWNER);
     bytes28 expectedCursesHash = makeCursesHash(makeCurseId(0));
     vm.expectEmit();
-    emit RMN.VotedToCurse(
+    emit RMNBase.VotedToCurse(
       1, // configVersion
       OWNER_CURSE_VOTE_ADDR, // owner
       0, // subject
@@ -606,7 +609,7 @@ contract RMN_voteToCurse is RMNSetup {
       0 // accumulatedWeight
     );
     vm.expectEmit();
-    emit RMN.Cursed(
+    emit RMNBase.Cursed(
       1, // configVersion
       0, // subject
       uint64(block.timestamp) // blockTimestamp
@@ -627,7 +630,7 @@ contract RMN_voteToCurse is RMNSetup {
     // ownerCurse again, should cause a vote to appear and a change in curses hash
     expectedCursesHash = makeCursesHash(makeCurseId(0), makeCurseId(1));
     vm.expectEmit();
-    emit RMN.VotedToCurse(
+    emit RMNBase.VotedToCurse(
       1, // configVersion
       OWNER_CURSE_VOTE_ADDR, // owner
       0, // subject
@@ -650,14 +653,14 @@ contract RMN_voteToCurse is RMNSetup {
       assertTrue(cursed);
     }
 
-    RMN.OwnerUnvoteToCurseRequest[] memory unvoteReqs = new RMN.OwnerUnvoteToCurseRequest[](1);
-    unvoteReqs[0] = RMN.OwnerUnvoteToCurseRequest({
+    RMNBase.OwnerUnvoteToCurseRequest[] memory unvoteReqs = new RMNBase.OwnerUnvoteToCurseRequest[](1);
+    unvoteReqs[0] = RMNBase.OwnerUnvoteToCurseRequest({
       curseVoteAddr: OWNER_CURSE_VOTE_ADDR,
-      unit: RMN.UnvoteToCurseRequest({subject: 0, cursesHash: 0}),
+      unit: RMNBase.UnvoteToCurseRequest({subject: 0, cursesHash: 0}),
       forceUnvote: true // TODO: test with forceUnvote false also
     });
     vm.expectEmit();
-    emit RMN.CurseLifted(0);
+    emit RMNBase.CurseLifted(0);
     s_rmn.ownerUnvoteToCurse(unvoteReqs);
     {
       (address[] memory voters, bytes28[] memory cursesHashes, uint24 accWeight, bool cursed) =
@@ -674,7 +677,7 @@ contract RMN_voteToCurse is RMNSetup {
   function test_UnauthorizedVoter_Revert() public {
     vm.startPrank(STRANGER);
 
-    vm.expectRevert(abi.encodeWithSelector(RMN.UnauthorizedVoter.selector, STRANGER));
+    vm.expectRevert(abi.encodeWithSelector(RMNBase.UnauthorizedVoter.selector, STRANGER));
     s_rmn.voteToCurse(makeCurseId(12312), makeSubjects(0));
   }
 
@@ -683,7 +686,7 @@ contract RMN_voteToCurse is RMNSetup {
     vm.startPrank(voter);
     s_rmn.voteToCurse(makeCurseId(1), makeSubjects(0));
 
-    vm.expectRevert(abi.encodeWithSelector(RMN.ReusedCurseId.selector, voter, makeCurseId(1)));
+    vm.expectRevert(abi.encodeWithSelector(RMNBase.ReusedCurseId.selector, voter, makeCurseId(1)));
     s_rmn.voteToCurse(makeCurseId(1), makeSubjects(0));
   }
 
@@ -693,7 +696,7 @@ contract RMN_voteToCurse is RMNSetup {
 
     bytes16 subject = bytes16(uint128(1));
 
-    vm.expectRevert(RMN.SubjectsMustBeStrictlyIncreasing.selector);
+    vm.expectRevert(RMNBase.SubjectsMustBeStrictlyIncreasing.selector);
     s_rmn.voteToCurse(makeCurseId(1), makeSubjects(subject, subject));
   }
 
@@ -701,7 +704,7 @@ contract RMN_voteToCurse is RMNSetup {
     (address voter,) = _getFirstCurseVoterAndWeight();
     vm.prank(voter);
 
-    vm.expectRevert(RMN.VoteToCurseNoop.selector);
+    vm.expectRevert(RMNBase.VoteToCurseNoop.selector);
     s_rmn.voteToCurse(makeCurseId(1), new bytes16[](0));
   }
 }
@@ -738,13 +741,13 @@ contract RMN_ownerUnvoteToCurse is RMNSetup {
     s_rmn.ownerUnvoteToCurse(makeOwnerUnvoteToCurseRequests());
   }
 
-  function makeOwnerUnvoteToCurseRequests() internal pure returns (RMN.OwnerUnvoteToCurseRequest[] memory) {
+  function makeOwnerUnvoteToCurseRequests() internal pure returns (RMNBase.OwnerUnvoteToCurseRequest[] memory) {
     (address[] memory cursers,) = getCursersAndCurseCounts();
-    RMN.OwnerUnvoteToCurseRequest[] memory reqs = new RMN.OwnerUnvoteToCurseRequest[](cursers.length);
+    RMNBase.OwnerUnvoteToCurseRequest[] memory reqs = new RMNBase.OwnerUnvoteToCurseRequest[](cursers.length);
     for (uint256 i = 0; i < cursers.length; ++i) {
-      reqs[i] = RMN.OwnerUnvoteToCurseRequest({
+      reqs[i] = RMNBase.OwnerUnvoteToCurseRequest({
         curseVoteAddr: cursers[i],
-        unit: RMN.UnvoteToCurseRequest({subject: GLOBAL_CURSE_SUBJECT, cursesHash: bytes28(0)}),
+        unit: RMNBase.UnvoteToCurseRequest({subject: GLOBAL_CURSE_SUBJECT, cursesHash: bytes28(0)}),
         forceUnvote: true
       });
     }
@@ -758,7 +761,7 @@ contract RMN_ownerUnvoteToCurse is RMNSetup {
     vm.startPrank(OWNER);
 
     vm.expectEmit();
-    emit RMN.CurseLifted(GLOBAL_CURSE_SUBJECT);
+    emit RMNBase.CurseLifted(GLOBAL_CURSE_SUBJECT);
 
     vm.resumeGasMetering();
     ownerUnvoteToCurse();
@@ -777,7 +780,7 @@ contract RMN_ownerUnvoteToCurse is RMNSetup {
   function test_IsIdempotent() public {
     vm.startPrank(OWNER);
     ownerUnvoteToCurse();
-    vm.expectRevert(RMN.UnvoteToCurseNoop.selector);
+    vm.expectRevert(RMNBase.UnvoteToCurseNoop.selector);
     ownerUnvoteToCurse();
 
     assertFalse(s_rmn.isCursed());
@@ -795,14 +798,14 @@ contract RMN_ownerUnvoteToCurse is RMNSetup {
     // Owner unvotes to curse.
     vm.startPrank(OWNER);
     vm.expectEmit();
-    emit RMN.CurseLifted(GLOBAL_CURSE_SUBJECT);
+    emit RMNBase.CurseLifted(GLOBAL_CURSE_SUBJECT);
     ownerUnvoteToCurse();
 
     // Contract is now uncursed.
     assertFalse(s_rmn.isCursed());
 
     // Vote to bless should go through.
-    vm.startPrank(BLESS_VOTER_1);
+    vm.startPrank(s_blessVoter1);
     s_rmn.voteToBless(makeTaggedRootSingleton(2387489729));
 
     // Vote to curse should go through.
@@ -820,17 +823,17 @@ contract RMN_ownerUnvoteToCurse is RMNSetup {
 
   function test_UnknownVoter_Revert() public {
     vm.stopPrank();
-    RMN.OwnerUnvoteToCurseRequest[] memory reqs = new RMN.OwnerUnvoteToCurseRequest[](1);
-    reqs[0] = RMN.OwnerUnvoteToCurseRequest({
+    RMNBase.OwnerUnvoteToCurseRequest[] memory reqs = new RMNBase.OwnerUnvoteToCurseRequest[](1);
+    reqs[0] = RMNBase.OwnerUnvoteToCurseRequest({
       curseVoteAddr: STRANGER,
-      unit: RMN.UnvoteToCurseRequest({subject: GLOBAL_CURSE_SUBJECT, cursesHash: bytes28(0)}),
+      unit: RMNBase.UnvoteToCurseRequest({subject: GLOBAL_CURSE_SUBJECT, cursesHash: bytes28(0)}),
       forceUnvote: true
     });
 
     vm.prank(OWNER);
     vm.expectEmit();
-    emit RMN.SkippedUnvoteToCurse(STRANGER, GLOBAL_CURSE_SUBJECT, bytes28(0), bytes28(0));
-    vm.expectRevert(RMN.UnvoteToCurseNoop.selector);
+    emit RMNBase.SkippedUnvoteToCurse(STRANGER, GLOBAL_CURSE_SUBJECT, bytes28(0), bytes28(0));
+    vm.expectRevert(RMNBase.UnvoteToCurseNoop.selector);
     s_rmn.ownerUnvoteToCurse(reqs);
 
     // no effect on cursedness
@@ -840,21 +843,21 @@ contract RMN_ownerUnvoteToCurse is RMNSetup {
 
 contract RMN_setConfig is ConfigCompare, RMNSetup {
   /// @notice Test-specific function to use only in setConfig tests
-  function getDifferentConfigArgs() private pure returns (RMN.Config memory) {
-    RMN.Voter[] memory voters = new RMN.Voter[](2);
-    voters[0] = RMN.Voter({
-      blessVoteAddr: BLESS_VOTER_1,
+  function getDifferentConfigArgs() private view returns (RMNBase.Config memory) {
+    RMNBase.Voter[] memory voters = new RMNBase.Voter[](2);
+    voters[0] = RMNBase.Voter({
+      blessVoteAddr: s_blessVoter1,
       curseVoteAddr: CURSE_VOTER_1,
       blessWeight: WEIGHT_1,
       curseWeight: WEIGHT_1
     });
-    voters[1] = RMN.Voter({
-      blessVoteAddr: BLESS_VOTER_2,
+    voters[1] = RMNBase.Voter({
+      blessVoteAddr: s_blessVoter2,
       curseVoteAddr: CURSE_VOTER_2,
       blessWeight: WEIGHT_10,
       curseWeight: WEIGHT_10
     });
-    return RMN.Config({
+    return RMNBase.Config({
       voters: voters,
       blessWeightThreshold: WEIGHT_1 + WEIGHT_10,
       curseWeightThreshold: WEIGHT_1 + WEIGHT_10
@@ -863,7 +866,7 @@ contract RMN_setConfig is ConfigCompare, RMNSetup {
 
   function setUp() public virtual override {
     RMNSetup.setUp();
-    RMN.Config memory cfg = rmnConstructorArgs();
+    RMNBase.Config memory cfg = _rmnConstructorArgs();
 
     // Setup some partial state
     vm.startPrank(cfg.voters[0].blessVoteAddr);
@@ -876,23 +879,23 @@ contract RMN_setConfig is ConfigCompare, RMNSetup {
 
   // Success
 
-  event ConfigSet(uint32 indexed configVersion, RMN.Config config);
+  event ConfigSet(uint32 indexed configVersion, RMNBase.Config config);
 
   function test_VoteToBlessByEjectedVoter_Revert() public {
-    // Previous config included BLESS_VOTER_4. Change to new config that doesn't.
-    RMN.Config memory cfg = getDifferentConfigArgs();
+    // Previous config included s_blessVoter4. Change to new config that doesn't.
+    RMNBase.Config memory cfg = getDifferentConfigArgs();
     vm.startPrank(OWNER);
     s_rmn.setConfig(cfg);
 
-    // BLESS_VOTER_4 is not part of cfg anymore, vote to bless should revert.
-    vm.startPrank(BLESS_VOTER_4);
-    vm.expectRevert(abi.encodeWithSelector(RMN.UnauthorizedVoter.selector, BLESS_VOTER_4));
+    // s_blessVoter4 is not part of cfg anymore, vote to bless should revert.
+    vm.startPrank(s_blessVoter4);
+    vm.expectRevert(abi.encodeWithSelector(RMNBase.UnauthorizedVoter.selector, s_blessVoter4));
     s_rmn.voteToBless(makeTaggedRootSingleton(2));
   }
 
   function test_SetConfigSuccess_gas() public {
     vm.pauseGasMetering();
-    RMN.Config memory cfg = getDifferentConfigArgs();
+    RMNBase.Config memory cfg = getDifferentConfigArgs();
 
     vm.startPrank(OWNER);
     vm.expectEmit();
@@ -903,7 +906,7 @@ contract RMN_setConfig is ConfigCompare, RMNSetup {
     s_rmn.setConfig(cfg);
     vm.pauseGasMetering();
     // Assert VersionedConfig has changed correctly
-    (uint32 configVersionAfter,, RMN.Config memory configAfter) = s_rmn.getConfigDetails();
+    (uint32 configVersionAfter,, RMNBase.Config memory configAfter) = s_rmn.getConfigDetails();
     assertEq(configVersionBefore + 1, configVersionAfter);
     assertConfigEq(configAfter, cfg);
 
@@ -927,7 +930,7 @@ contract RMN_setConfig is ConfigCompare, RMNSetup {
   // Reverts
 
   function test_NonOwner_Revert() public {
-    RMN.Config memory cfg = getDifferentConfigArgs();
+    RMNBase.Config memory cfg = getDifferentConfigArgs();
 
     vm.startPrank(STRANGER);
     vm.expectRevert("Only callable by owner");
@@ -936,63 +939,71 @@ contract RMN_setConfig is ConfigCompare, RMNSetup {
 
   function test_VotersLengthIsZero_Revert() public {
     vm.startPrank(OWNER);
-    vm.expectRevert(RMN.InvalidConfig.selector);
-    s_rmn.setConfig(RMN.Config({voters: new RMN.Voter[](0), blessWeightThreshold: 1, curseWeightThreshold: 1}));
+    vm.expectRevert(RMNBase.InvalidConfig.selector);
+    s_rmn.setConfig(RMNBase.Config({voters: new RMNBase.Voter[](0), blessWeightThreshold: 1, curseWeightThreshold: 1}));
   }
 
   function test_EitherThresholdIsZero_Revert() public {
-    RMN.Config memory cfg = getDifferentConfigArgs();
+    RMNBase.Config memory cfg = getDifferentConfigArgs();
 
     vm.startPrank(OWNER);
-    vm.expectRevert(RMN.InvalidConfig.selector);
+    vm.expectRevert(RMNBase.InvalidConfig.selector);
     s_rmn.setConfig(
-      RMN.Config({voters: cfg.voters, blessWeightThreshold: ZERO, curseWeightThreshold: cfg.curseWeightThreshold})
+      RMNBase.Config({voters: cfg.voters, blessWeightThreshold: ZERO, curseWeightThreshold: cfg.curseWeightThreshold})
     );
-    vm.expectRevert(RMN.InvalidConfig.selector);
+    vm.expectRevert(RMNBase.InvalidConfig.selector);
     s_rmn.setConfig(
-      RMN.Config({voters: cfg.voters, blessWeightThreshold: cfg.blessWeightThreshold, curseWeightThreshold: ZERO})
+      RMNBase.Config({voters: cfg.voters, blessWeightThreshold: cfg.blessWeightThreshold, curseWeightThreshold: ZERO})
     );
   }
 
   function test_BlessVoterIsZeroAddress_Revert() public {
-    RMN.Config memory cfg = getDifferentConfigArgs();
+    RMNBase.Config memory cfg = getDifferentConfigArgs();
 
     vm.startPrank(OWNER);
     cfg.voters[0].blessVoteAddr = ZERO_ADDRESS;
-    vm.expectRevert(RMN.InvalidConfig.selector);
+    vm.expectRevert(RMNBase.InvalidConfig.selector);
     s_rmn.setConfig(cfg);
   }
 
   function test_WeightIsZeroAddress_Revert() public {
-    RMN.Config memory cfg = getDifferentConfigArgs();
+    RMNBase.Config memory cfg = getDifferentConfigArgs();
 
     vm.startPrank(OWNER);
     cfg.voters[0].blessWeight = ZERO;
     cfg.voters[0].curseWeight = ZERO;
-    vm.expectRevert(RMN.InvalidConfig.selector);
+    vm.expectRevert(RMNBase.InvalidConfig.selector);
     s_rmn.setConfig(cfg);
   }
 
   function test_TotalWeightsSmallerThanEachThreshold_Revert() public {
-    RMN.Config memory cfg = getDifferentConfigArgs();
+    RMNBase.Config memory cfg = getDifferentConfigArgs();
 
     vm.startPrank(OWNER);
-    vm.expectRevert(RMN.InvalidConfig.selector);
+    vm.expectRevert(RMNBase.InvalidConfig.selector);
     s_rmn.setConfig(
-      RMN.Config({voters: cfg.voters, blessWeightThreshold: WEIGHT_40, curseWeightThreshold: cfg.curseWeightThreshold})
+      RMNBase.Config({
+        voters: cfg.voters,
+        blessWeightThreshold: WEIGHT_40,
+        curseWeightThreshold: cfg.curseWeightThreshold
+      })
     );
-    vm.expectRevert(RMN.InvalidConfig.selector);
+    vm.expectRevert(RMNBase.InvalidConfig.selector);
     s_rmn.setConfig(
-      RMN.Config({voters: cfg.voters, blessWeightThreshold: cfg.blessWeightThreshold, curseWeightThreshold: WEIGHT_40})
+      RMNBase.Config({
+        voters: cfg.voters,
+        blessWeightThreshold: cfg.blessWeightThreshold,
+        curseWeightThreshold: WEIGHT_40
+      })
     );
   }
 
   function test_RepeatedAddress_Revert() public {
-    RMN.Config memory cfg = getDifferentConfigArgs();
+    RMNBase.Config memory cfg = getDifferentConfigArgs();
 
     vm.startPrank(OWNER);
     cfg.voters[0].blessVoteAddr = cfg.voters[1].curseVoteAddr;
-    vm.expectRevert(RMN.InvalidConfig.selector);
+    vm.expectRevert(RMNBase.InvalidConfig.selector);
     s_rmn.setConfig(cfg);
   }
 }
@@ -1061,8 +1072,9 @@ contract RMN_getRecordedCurseRelatedOps is RMNSetup {
   function test_OpsPostDeployment() public {
     // The constructor call includes a setConfig, so that's the only thing we should expect to find.
     assertEq(s_rmn.getRecordedCurseRelatedOpsCount(), 1);
-    RMN.RecordedCurseRelatedOp[] memory recordedCurseRelatedOps = s_rmn.getRecordedCurseRelatedOps(0, type(uint256).max);
+    RMNBase.RecordedCurseRelatedOp[] memory recordedCurseRelatedOps =
+      s_rmn.getRecordedCurseRelatedOps(0, type(uint256).max);
     assertEq(recordedCurseRelatedOps.length, 1);
-    assertEq(uint8(recordedCurseRelatedOps[0].tag), uint8(RMN.RecordedCurseRelatedOpTag.SetConfig));
+    assertEq(uint8(recordedCurseRelatedOps[0].tag), uint8(RMNBase.RecordedCurseRelatedOpTag.SetConfig));
   }
 }

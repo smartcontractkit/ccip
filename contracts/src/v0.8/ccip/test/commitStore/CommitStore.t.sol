@@ -8,6 +8,7 @@ import {AuthorizedCallers} from "../../../shared/access/AuthorizedCallers.sol";
 import {CommitStore} from "../../CommitStore.sol";
 import {PriceRegistry} from "../../PriceRegistry.sol";
 import {RMN} from "../../RMN.sol";
+import {RMNBase} from "../../RMNBase.sol";
 import {MerkleMultiProof} from "../../libraries/MerkleMultiProof.sol";
 import {OCR2Abstract} from "../../ocr/OCR2Abstract.sol";
 import {CommitStoreHelper} from "../helpers/CommitStoreHelper.sol";
@@ -54,11 +55,11 @@ contract CommitStoreRealRMNSetup is PriceRegistrySetup, OCR2BaseSetup {
     PriceRegistrySetup.setUp();
     OCR2BaseSetup.setUp();
 
-    RMN.Voter[] memory voters = new RMN.Voter[](1);
+    RMNBase.Voter[] memory voters = new RMNBase.Voter[](1);
     voters[0] =
-      RMN.Voter({blessVoteAddr: BLESS_VOTE_ADDR, curseVoteAddr: address(9999), blessWeight: 1, curseWeight: 1});
+      RMNBase.Voter({blessVoteAddr: BLESS_VOTE_ADDR, curseVoteAddr: address(9999), blessWeight: 1, curseWeight: 1});
     // Overwrite base mock rmn with real.
-    s_rmn = new RMN(RMN.Config({voters: voters, blessWeightThreshold: 1, curseWeightThreshold: 1}));
+    s_rmn = new RMN(RMNBase.Config({voters: voters, blessWeightThreshold: 1, curseWeightThreshold: 1}));
     s_commitStore = new CommitStoreHelper(
       CommitStore.StaticConfig({
         chainSelector: DEST_CHAIN_SELECTOR,

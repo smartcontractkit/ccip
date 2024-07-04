@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
+import {IAny2EVMMultiOffRamp} from "./IAny2EVMMultiOffRamp.sol";
+import {IRMNBase} from "./IRMNBase.sol";
+
 /// @notice This interface contains the only RMN-related functions that might be used on-chain by other CCIP contracts.
-interface IRMNOffChainBlessor {
+interface IRMNOffChainBlessor is IRMNBase {
   /// @notice A Merkle root tagged with the address of the commit store contract it is destined for.
   struct TaggedRoot {
     uint64 sourceChainSelector;
@@ -10,9 +13,5 @@ interface IRMNOffChainBlessor {
     bytes32 root;
   }
 
-  function isCursed() external view returns (bool);
-
-  /// @notice Iff there is an active global curse, or an active curse for `subject`, this function returns true.
-  /// @param subject To check whether a particular chain is cursed, set to bytes16(uint128(chainSelector)).
-  function isCursed(bytes16 subject) external view returns (bool);
+  function isBlessed(IAny2EVMMultiOffRamp.MerkleRoot calldata root) external view returns (bool);
 }
