@@ -168,10 +168,10 @@ func (o *OnRamp) GetSendRequestsBetweenSeqNums(ctx context.Context, seqNumMin, s
 	return res, nil
 }
 
-func (o *OnRamp) GetSendRequestsForSeqNums(ctx context.Context, seqNrs []cciptypes.SequenceNumberRange, finalized bool) ([]cciptypes.EVM2EVMMessageWithTxMeta, error) {
-	seqNrRanges := make([]query.Expression, 0, len(seqNrs))
-	for _, seqNr := range seqNrs {
-		seqNrRanges = append(seqNrRanges, query.And(
+func (o *OnRamp) GetSendRequestsForSeqNums(ctx context.Context, seqNums []cciptypes.SequenceNumberRange, finalized bool) ([]cciptypes.EVM2EVMMessageWithTxMeta, error) {
+	seqNumRanges := make([]query.Expression, 0, len(seqNums))
+	for _, seqNr := range seqNums {
+		seqNumRanges = append(seqNumRanges, query.And(
 			logpoller.NewEventByWordFilter(o.sendRequestedEventSig, uint8(o.sendRequestedSeqNumberWord), []primitives.ValueComparator{
 				{Value: logpoller.EvmWord(seqNr.Min).Hex(), Operator: primitives.Gte},
 			}),
@@ -181,11 +181,19 @@ func (o *OnRamp) GetSendRequestsForSeqNums(ctx context.Context, seqNrs []cciptyp
 		))
 	}
 
+	// TODO Move to chainlink-common, querying layer should cover cases like these
+	var seqNumsFilter query.Expression
+	if len(seqNumRanges) == 1 {
+		seqNumsFilter = seqNumRanges[0]
+	} else {
+		seqNumsFilter = query.Or(seqNumRanges...)
+	}
+
 	sendRequestsQuery, err := query.Where(
 		o.address.String(),
 		logpoller.NewAddressFilter(o.address),
 		logpoller.NewEventSigFilter(o.sendRequestedEventSig),
-		query.Or(seqNrRanges...),
+		seqNumsFilter,
 		query.Confidence(ccipdata.LogsConfidence(finalized)),
 	)
 	if err != nil {
