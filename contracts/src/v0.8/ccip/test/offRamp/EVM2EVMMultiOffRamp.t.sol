@@ -58,17 +58,11 @@ contract EVM2EVMMultiOffRamp_constructor is EVM2EVMMultiOffRampSetup {
       isEnabled: true
     });
 
-    EVM2EVMMultiOffRamp.SourceChainConfig memory expectedSourceChainConfig1 = EVM2EVMMultiOffRamp.SourceChainConfig({
-      isEnabled: true,
-      minSeqNr: 1,
-      onRamp: sourceChainConfigs[0].onRamp
-    });
+    EVM2EVMMultiOffRamp.SourceChainConfig memory expectedSourceChainConfig1 =
+      EVM2EVMMultiOffRamp.SourceChainConfig({isEnabled: true, minSeqNr: 1, onRamp: sourceChainConfigs[0].onRamp});
 
-    EVM2EVMMultiOffRamp.SourceChainConfig memory expectedSourceChainConfig2 = EVM2EVMMultiOffRamp.SourceChainConfig({
-      isEnabled: true,
-      minSeqNr: 1,
-      onRamp: sourceChainConfigs[1].onRamp
-    });
+    EVM2EVMMultiOffRamp.SourceChainConfig memory expectedSourceChainConfig2 =
+      EVM2EVMMultiOffRamp.SourceChainConfig({isEnabled: true, minSeqNr: 1, onRamp: sourceChainConfigs[1].onRamp});
 
     vm.expectEmit();
     emit EVM2EVMMultiOffRamp.StaticConfigSet(staticConfig);
@@ -169,11 +163,8 @@ contract EVM2EVMMultiOffRamp_constructor is EVM2EVMMultiOffRampSetup {
 
     EVM2EVMMultiOffRamp.SourceChainConfigArgs[] memory sourceChainConfigs =
       new EVM2EVMMultiOffRamp.SourceChainConfigArgs[](1);
-    sourceChainConfigs[0] = EVM2EVMMultiOffRamp.SourceChainConfigArgs({
-      sourceChainSelector: 0,
-      onRamp: ON_RAMP_ADDRESS_1,
-      isEnabled: true
-    });
+    sourceChainConfigs[0] =
+      EVM2EVMMultiOffRamp.SourceChainConfigArgs({sourceChainSelector: 0, onRamp: ON_RAMP_ADDRESS_1, isEnabled: true});
 
     vm.expectRevert(EVM2EVMMultiOffRamp.ZeroChainSelectorNotAllowed.selector);
 
@@ -375,9 +366,7 @@ contract EVM2EVMMultiOffRamp_executeSingleReport is EVM2EVMMultiOffRampSetup {
 
     uint64 nonceBefore = s_inboundNonceManager.getInboundNonce(SOURCE_CHAIN_SELECTOR_1, messages[0].sender);
     s_offRamp.executeSingleReport(_generateReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messages), new uint256[](0));
-    assertGt(
-      s_inboundNonceManager.getInboundNonce(SOURCE_CHAIN_SELECTOR_1, messages[0].sender), nonceBefore
-    );
+    assertGt(s_inboundNonceManager.getInboundNonce(SOURCE_CHAIN_SELECTOR_1, messages[0].sender), nonceBefore);
   }
 
   function test_SingleMessageNoTokensUnordered_Success() public {
@@ -433,8 +422,7 @@ contract EVM2EVMMultiOffRamp_executeSingleReport is EVM2EVMMultiOffRampSetup {
       _generateReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messagesChain1), new uint256[](0)
     );
 
-    uint64 nonceChain1 =
-      s_inboundNonceManager.getInboundNonce(SOURCE_CHAIN_SELECTOR_1, messagesChain1[0].sender);
+    uint64 nonceChain1 = s_inboundNonceManager.getInboundNonce(SOURCE_CHAIN_SELECTOR_1, messagesChain1[0].sender);
     assertGt(nonceChain1, 0);
 
     Internal.Any2EVMRampMessage[] memory messagesChain2 =
@@ -447,9 +435,7 @@ contract EVM2EVMMultiOffRamp_executeSingleReport is EVM2EVMMultiOffRampSetup {
     assertGt(s_inboundNonceManager.getInboundNonce(SOURCE_CHAIN_SELECTOR_3, messagesChain2[0].sender), 0);
 
     // Other chain's nonce is unaffected
-    assertEq(
-      s_inboundNonceManager.getInboundNonce(SOURCE_CHAIN_SELECTOR_1, messagesChain1[0].sender), nonceChain1
-    );
+    assertEq(s_inboundNonceManager.getInboundNonce(SOURCE_CHAIN_SELECTOR_1, messagesChain1[0].sender), nonceChain1);
   }
 
   function test_ReceiverError_Success() public {
@@ -1150,9 +1136,7 @@ contract EVM2EVMMultiOffRamp_batchExecute is EVM2EVMMultiOffRampSetup {
     uint64 nonceBefore = s_inboundNonceManager.getInboundNonce(SOURCE_CHAIN_SELECTOR_1, messages[0].sender);
     s_offRamp.batchExecute(_generateBatchReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messages), new uint256[][](1));
 
-    assertGt(
-      s_inboundNonceManager.getInboundNonce(SOURCE_CHAIN_SELECTOR_1, messages[0].sender), nonceBefore
-    );
+    assertGt(s_inboundNonceManager.getInboundNonce(SOURCE_CHAIN_SELECTOR_1, messages[0].sender), nonceBefore);
   }
 
   function test_MultipleReportsSameChain_Success() public {
@@ -1196,9 +1180,7 @@ contract EVM2EVMMultiOffRamp_batchExecute is EVM2EVMMultiOffRampSetup {
 
     uint64 nonceBefore = s_inboundNonceManager.getInboundNonce(SOURCE_CHAIN_SELECTOR_1, messages1[0].sender);
     s_offRamp.batchExecute(reports, new uint256[][](2));
-    assertGt(
-      s_inboundNonceManager.getInboundNonce(SOURCE_CHAIN_SELECTOR_1, messages1[0].sender), nonceBefore
-    );
+    assertGt(s_inboundNonceManager.getInboundNonce(SOURCE_CHAIN_SELECTOR_1, messages1[0].sender), nonceBefore);
   }
 
   function test_MultipleReportsDifferentChains_Success() public {
@@ -1379,8 +1361,7 @@ contract EVM2EVMMultiOffRamp_manuallyExecute is EVM2EVMMultiOffRampSetup {
     messages[0].header.messageId = Internal._hash(messages[0], ON_RAMP_ADDRESS_1);
 
     assertEq(
-      messages[0].header.nonce - 1,
-      s_inboundNonceManager.getInboundNonce(SOURCE_CHAIN_SELECTOR_1, messages[0].sender)
+      messages[0].header.nonce - 1, s_inboundNonceManager.getInboundNonce(SOURCE_CHAIN_SELECTOR_1, messages[0].sender)
     );
 
     s_reverting_receiver.setRevert(true);
@@ -2701,11 +2682,8 @@ contract EVM2EVMMultiOffRamp_applySourceChainConfigUpdates is EVM2EVMMultiOffRam
       isEnabled: true
     });
 
-    EVM2EVMMultiOffRamp.SourceChainConfig memory expectedSourceChainConfig = EVM2EVMMultiOffRamp.SourceChainConfig({
-      isEnabled: true,
-      minSeqNr: 1,
-      onRamp: ON_RAMP_ADDRESS_1
-    });
+    EVM2EVMMultiOffRamp.SourceChainConfig memory expectedSourceChainConfig =
+      EVM2EVMMultiOffRamp.SourceChainConfig({isEnabled: true, minSeqNr: 1, onRamp: ON_RAMP_ADDRESS_1});
 
     vm.expectEmit();
     emit EVM2EVMMultiOffRamp.SourceChainSelectorAdded(SOURCE_CHAIN_SELECTOR_1);
@@ -2730,11 +2708,8 @@ contract EVM2EVMMultiOffRamp_applySourceChainConfigUpdates is EVM2EVMMultiOffRam
     s_offRamp.applySourceChainConfigUpdates(sourceChainConfigs);
 
     sourceChainConfigs[0].isEnabled = false;
-    EVM2EVMMultiOffRamp.SourceChainConfig memory expectedSourceChainConfig = EVM2EVMMultiOffRamp.SourceChainConfig({
-      isEnabled: false,
-      minSeqNr: 1,
-      onRamp: ON_RAMP_ADDRESS_1
-    });
+    EVM2EVMMultiOffRamp.SourceChainConfig memory expectedSourceChainConfig =
+      EVM2EVMMultiOffRamp.SourceChainConfig({isEnabled: false, minSeqNr: 1, onRamp: ON_RAMP_ADDRESS_1});
 
     vm.expectEmit();
     emit EVM2EVMMultiOffRamp.SourceChainConfigSet(SOURCE_CHAIN_SELECTOR_1, expectedSourceChainConfig);
@@ -2860,11 +2835,8 @@ contract EVM2EVMMultiOffRamp_applySourceChainConfigUpdates is EVM2EVMMultiOffRam
   function test_ZeroSourceChainSelector_Revert() public {
     EVM2EVMMultiOffRamp.SourceChainConfigArgs[] memory sourceChainConfigs =
       new EVM2EVMMultiOffRamp.SourceChainConfigArgs[](1);
-    sourceChainConfigs[0] = EVM2EVMMultiOffRamp.SourceChainConfigArgs({
-      sourceChainSelector: 0,
-      onRamp: ON_RAMP_ADDRESS_1,
-      isEnabled: true
-    });
+    sourceChainConfigs[0] =
+      EVM2EVMMultiOffRamp.SourceChainConfigArgs({sourceChainSelector: 0, onRamp: ON_RAMP_ADDRESS_1, isEnabled: true});
 
     vm.expectRevert(EVM2EVMMultiOffRamp.ZeroChainSelectorNotAllowed.selector);
     s_offRamp.applySourceChainConfigUpdates(sourceChainConfigs);
