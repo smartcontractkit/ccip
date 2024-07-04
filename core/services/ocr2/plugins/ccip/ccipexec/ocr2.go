@@ -235,10 +235,10 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 // Calculates a map that indicates whether a sequence number has already been executed.
 // It doesn't matter if the execution succeeded, since we don't retry previous
 // attempts even if they failed. Value in the map indicates whether the log is finalized or not.
-func (r *ExecutionReportingPlugin) getExecutedSeqNrsInRange(ctx context.Context, min, max uint64) (map[uint64]bool, error) {
+func (r *ExecutionReportingPlugin) getExecutedSeqNrsInRange(ctx context.Context, seqNumRanges []cciptypes.SequenceNumberRange) (map[uint64]bool, error) {
 	stateChanges, err := r.offRampReader.GetExecutionStateChangesForSeqNums(
 		ctx,
-		[]cciptypes.SequenceNumberRange{{Min: min, Max: max}},
+		seqNumRanges,
 		int(r.offchainConfig.DestOptimisticConfirmations),
 	)
 	if err != nil {
@@ -471,16 +471,15 @@ func (r *ExecutionReportingPlugin) getReportsWithSendRequests(
 		return nil, nil
 	}
 
-	// find interval from all the reports
-	intervalMin := reports[0].Interval.Min
-	intervalMax := reports[0].Interval.Max
-	for _, report := range reports[1:] {
-		if report.Interval.Max > intervalMax {
-			intervalMax = report.Interval.Max
-		}
-		if report.Interval.Min < intervalMin {
-			intervalMin = report.Interval.Min
-		}
+	// There are multiple cases in which range of sequence numbers might not be continuous (e.g. permanently snoozed/skipped root,
+	// waiting for blessing, exec not able to keep up with Commit pace). Cases like these can cause fetching too many send requests
+	// when asking only based on min and max sequence numbers. Therefore, query layer is a bit smarter and it fetches by ranges
+	// Example:
+	// Root [1, 100], [101, 200], [201, 300], but [101, 200] is snoozed. We don't want messages from 1 -> 300, but
+	// rather 1 -> 100 and 201 -> 300 to make it more efficient and don't push unnecessary load to the database.
+	sequenceNumbers := make([]cciptypes.SequenceNumberRange, len(reports))
+	for i, report := range reports {
+		sequenceNumbers[i] = cciptypes.SequenceNumberRange{Min: report.Interval.Min, Max: report.Interval.Max}
 	}
 
 	// use errgroup to fetch send request logs and executed sequence numbers in parallel
@@ -489,7 +488,7 @@ func (r *ExecutionReportingPlugin) getReportsWithSendRequests(
 	var sendRequests []cciptypes.EVM2EVMMessageWithTxMeta
 	eg.Go(func() error {
 		// We don't need to double-check if logs are finalized because we already checked that in the Commit phase.
-		sendReqs, err := r.onRampReader.GetSendRequestsBetweenSeqNums(ctx, intervalMin, intervalMax, false)
+		sendReqs, err := r.onRampReader.GetSendRequestsForSeqNums(ctx, sequenceNumbers, false)
 		if err != nil {
 			return err
 		}
@@ -500,7 +499,7 @@ func (r *ExecutionReportingPlugin) getReportsWithSendRequests(
 	var executedSeqNums map[uint64]bool
 	eg.Go(func() error {
 		// get executed sequence numbers
-		executedMp, err := r.getExecutedSeqNrsInRange(ctx, intervalMin, intervalMax)
+		executedMp, err := r.getExecutedSeqNrsInRange(ctx, sequenceNumbers)
 		if err != nil {
 			return err
 		}

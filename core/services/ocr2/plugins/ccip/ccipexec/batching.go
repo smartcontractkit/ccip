@@ -22,7 +22,7 @@ func getProofData(
 	interval cciptypes.CommitStoreInterval,
 ) (sendReqsInRoot []cciptypes.EVM2EVMMessageWithTxMeta, leaves [][32]byte, tree *merklemulti.Tree[[32]byte], err error) {
 	// We don't need to double-check if logs are finalized because we already checked that in the Commit phase.
-	sendReqs, err := sourceReader.GetSendRequestsBetweenSeqNums(ctx, interval.Min, interval.Max, false)
+	sendReqs, err := sourceReader.GetSendRequestsForSeqNums(ctx, []cciptypes.SequenceNumberRange{{Min: interval.Min, Max: interval.Max}}, false)
 	if err != nil {
 		return nil, nil, nil, err
 	}

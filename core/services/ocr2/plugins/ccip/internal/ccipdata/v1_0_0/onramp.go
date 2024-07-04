@@ -140,32 +140,7 @@ func (o *OnRamp) SourcePriceRegistryAddress(ctx context.Context) (cciptypes.Addr
 }
 
 func (o *OnRamp) GetSendRequestsBetweenSeqNums(ctx context.Context, seqNumMin, seqNumMax uint64, finalized bool) ([]cciptypes.EVM2EVMMessageWithTxMeta, error) {
-	logs, err := o.lp.LogsDataWordRange(
-		ctx,
-		o.sendRequestedEventSig,
-		o.address,
-		o.sendRequestedSeqNumberWord,
-		logpoller.EvmWord(seqNumMin),
-		logpoller.EvmWord(seqNumMax),
-		ccipdata.LogsConfirmations(finalized),
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	parsedLogs, err := ccipdata.ParseLogs[cciptypes.EVM2EVMMessage](logs, o.lggr, o.logToMessage)
-	if err != nil {
-		return nil, err
-	}
-
-	res := make([]cciptypes.EVM2EVMMessageWithTxMeta, 0, len(parsedLogs))
-	for _, log := range parsedLogs {
-		res = append(res, cciptypes.EVM2EVMMessageWithTxMeta{
-			TxMeta:         log.TxMeta,
-			EVM2EVMMessage: log.Data,
-		})
-	}
-	return res, nil
+	panic("don't use me")
 }
 
 func (o *OnRamp) GetSendRequestsForSeqNums(ctx context.Context, seqNums []cciptypes.SequenceNumberRange, finalized bool) ([]cciptypes.EVM2EVMMessageWithTxMeta, error) {
