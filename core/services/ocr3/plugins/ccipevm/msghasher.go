@@ -8,31 +8,28 @@ import (
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
-	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/types"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_multi_onramp"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/message_hasher"
 )
 
-// bytes32 internal constant LEAF_DOMAIN_SEPARATOR = 0x0000000000000000000000000000000000000000000000000000000000000000;
-var leafDomainSeparator = [32]byte{}
+var (
+	// bytes32 internal constant LEAF_DOMAIN_SEPARATOR = 0x0000000000000000000000000000000000000000000000000000000000000000;
+	leafDomainSeparator = [32]byte{}
 
-// bytes32 internal constant ANY_2_EVM_MESSAGE_HASH = keccak256("Any2EVMMessageHashV1");
-var ANY_2_EVM_MESSAGE_HASH = utils.Keccak256Fixed([]byte("Any2EVMMessageHashV1"))
+	// bytes32 internal constant ANY_2_EVM_MESSAGE_HASH = keccak256("Any2EVMMessageHashV1");
+	ANY_2_EVM_MESSAGE_HASH = utils.Keccak256Fixed([]byte("Any2EVMMessageHashV1"))
+
+	messageHasherABI = types.MustGetABI(message_hasher.MessageHasherABI)
+)
 
 // MessageHasherV1 implements the MessageHasher interface.
 // Compatible with:
 // - "EVM2EVMMultiOnRamp 1.6.0-dev"
 type MessageHasherV1 struct {
-	// ABIs and types for encoding the message data similar to on-chain implementation:
-	// https://github.com/smartcontractkit/ccip/blob/54ee4f13143d3e414627b6a0b9f71d5dfade76c5/contracts/src/v0.8/ccip/libraries/Internal.sol#L135
-	bytesArrayType     abi.Type
-	tokensAbi          abi.ABI
-	fixedSizeValuesAbi abi.ABI
-	packedValuesAbi    abi.ABI
-	metaDataHashABI    abi.ABI
-
 	// TODO: move these to CCIPMsg instead?
 	destChainSelector cciptypes.ChainSelector
 	onrampAddress     []byte
@@ -42,18 +39,7 @@ func NewMessageHasherV1(
 	onrampAddress []byte,
 	destChainSelector cciptypes.ChainSelector,
 ) *MessageHasherV1 {
-	bytesArray, err := abi.NewType("bytes[]", "bytes[]", nil)
-	if err != nil {
-		panic(fmt.Sprintf("failed to create bytes[] type: %v", err))
-	}
-
 	return &MessageHasherV1{
-		bytesArrayType:     bytesArray,
-		tokensAbi:          mustParseInputsAbi(tokensABI),
-		fixedSizeValuesAbi: mustParseInputsAbi(fixedSizeValuesABI),
-		packedValuesAbi:    mustParseInputsAbi(finalHashInputABI),
-		metaDataHashABI:    mustParseInputsAbi(metaDataHashABI),
-
 		destChainSelector: destChainSelector,
 		onrampAddress:     onrampAddress,
 	}
@@ -80,19 +66,18 @@ func (h *MessageHasherV1) Hash(_ context.Context, msg cciptypes.CCIPMsg) (ccipty
 			Amount: ta.Amount,
 		}
 	}
-	encodedTokens, err := h.abiEncode(h.tokensAbi, tokenAmounts)
+	encodedTokens, err := h.abiEncode("encodeTokenAmountsHashPreimage", tokenAmounts)
 	if err != nil {
 		return [32]byte{}, fmt.Errorf("abi encode token amounts: %w", err)
 	}
 
-	encodedSourceTokenData, err := abi.Arguments{abi.Argument{Type: h.bytesArrayType}}.
-		PackValues([]interface{}{msg.SourceTokenData})
+	encodedSourceTokenData, err := h.abiEncode("encodeSourceTokenDataHashPreimage", msg.SourceTokenData)
 	if err != nil {
 		return [32]byte{}, fmt.Errorf("pack source token data: %w", err)
 	}
 
 	metaDataHashInput, err := h.abiEncode(
-		h.metaDataHashABI,
+		"encodeMetadataHashPreimage",
 		ANY_2_EVM_MESSAGE_HASH,
 		uint64(msg.SourceChain),
 		uint64(h.destChainSelector),
@@ -101,7 +86,6 @@ func (h *MessageHasherV1) Hash(_ context.Context, msg cciptypes.CCIPMsg) (ccipty
 	if err != nil {
 		return [32]byte{}, fmt.Errorf("abi encode metadata hash input: %w", err)
 	}
-	metaDataHash := utils.Keccak256Fixed(metaDataHashInput)
 
 	var msgID [32]byte
 	decoded, err := hex.DecodeString(msg.ID)
@@ -127,7 +111,7 @@ func (h *MessageHasherV1) Hash(_ context.Context, msg cciptypes.CCIPMsg) (ccipty
 		return [32]byte{}, fmt.Errorf("decode sender '%s': %w", msg.Sender, err)
 	}
 	fixedSizeFieldsEncoded, err := h.abiEncode(
-		h.fixedSizeValuesAbi,
+		"encodeFixedSizeFieldsHashPreimage",
 		msgID,
 		decodedSender,
 		common.HexToAddress(string(msg.Receiver)),
@@ -138,13 +122,12 @@ func (h *MessageHasherV1) Hash(_ context.Context, msg cciptypes.CCIPMsg) (ccipty
 	if err != nil {
 		return [32]byte{}, fmt.Errorf("abi encode fixed size values: %w", err)
 	}
-	fixedSizeFieldsHash := utils.Keccak256Fixed(fixedSizeFieldsEncoded)
 
 	packedValues, err := h.abiEncode(
-		h.packedValuesAbi,
+		"encodeFinalHashPreimage",
 		leafDomainSeparator,
-		metaDataHash,
-		fixedSizeFieldsHash,
+		utils.Keccak256Fixed(metaDataHashInput),
+		utils.Keccak256Fixed(fixedSizeFieldsEncoded),
 		utils.Keccak256Fixed(msg.Data),
 		utils.Keccak256Fixed(encodedTokens),
 		utils.Keccak256Fixed(encodedSourceTokenData),
@@ -156,21 +139,13 @@ func (h *MessageHasherV1) Hash(_ context.Context, msg cciptypes.CCIPMsg) (ccipty
 	return utils.Keccak256Fixed(packedValues), nil
 }
 
-func (h *MessageHasherV1) abiEncode(theAbi abi.ABI, values ...interface{}) ([]byte, error) {
-	res, err := theAbi.Pack("method", values...)
+func (h *MessageHasherV1) abiEncode(method string, values ...interface{}) ([]byte, error) {
+	res, err := messageHasherABI.Pack(method, values...)
 	if err != nil {
 		return nil, err
 	}
+	// trim the method selector.
 	return res[4:], nil
-}
-
-func mustParseInputsAbi(s string) abi.ABI {
-	inDef := fmt.Sprintf(`[{ "name" : "method", "type": "function", "inputs": %s}]`, s)
-	inAbi, err := abi.JSON(strings.NewReader(inDef))
-	if err != nil {
-		panic(fmt.Errorf("failed to create %s ABI: %v", s, err))
-	}
-	return inAbi
 }
 
 // Interface compliance check
