@@ -305,11 +305,6 @@ func (r *ExecutionReportingPlugin) buildBatch(
 	return r.batchingStrategy.BuildBatch(ctx, batchCtx)
 }
 
-func hasEnoughTokens(tokenLimit *big.Int, msgValue *big.Int, inflightValue *big.Int) (*big.Int, bool) {
-	tokensLeft := big.NewInt(0).Sub(tokenLimit, inflightValue)
-	return tokensLeft, tokensLeft.Cmp(msgValue) >= 0
-}
-
 func calculateMessageMaxGas(gasLimit *big.Int, numRequests, dataLen, numTokens int) (uint64, error) {
 	if !gasLimit.IsUint64() {
 		return 0, fmt.Errorf("gas limit %s cannot be casted to uint64", gasLimit)

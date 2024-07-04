@@ -370,6 +370,11 @@ func getInflightSeqNums(inflight []InflightInternalExecutionReport) mapset.Set[u
 	return seqNums
 }
 
+func hasEnoughTokens(tokenLimit *big.Int, msgValue *big.Int, inflightValue *big.Int) (*big.Int, bool) {
+	tokensLeft := big.NewInt(0).Sub(tokenLimit, inflightValue)
+	return tokensLeft, tokensLeft.Cmp(msgValue) >= 0
+}
+
 func buildExecutionReportForMessages(
 	msgsInRoot []cciptypes.EVM2EVMMessageWithTxMeta,
 	tree *merklemulti.Tree[[32]byte],
