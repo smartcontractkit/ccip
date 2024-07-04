@@ -178,8 +178,6 @@ contract CCIPReceiverTest is EVM2EVMOnRampSetup {
     // Check that message status is failed
     assertEq(s_receiver.getMessageStatus(messageId), 1);
 
-    uint256 tokenBalanceBefore = IERC20(token).balanceOf(OWNER);
-
     vm.startPrank(OWNER);
 
     vm.expectEmit();

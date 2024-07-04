@@ -37,6 +37,7 @@ contract CCIPSender is CCIPClientBase {
     return "CCIPSender 1.0.0-dev";
   }
 
+  /// @notice sends a message through CCIP to the router
   function ccipSend(
     uint64 destChainSelector,
     Client.EVMTokenAmount[] calldata tokenAmounts,
@@ -52,7 +53,7 @@ contract CCIPSender is CCIPClientBase {
     });
 
     for (uint256 i = 0; i < tokenAmounts.length; ++i) {
-      // Transfer the tokens to pay for tokens in tokenAmounts
+      // Transfer the tokens to this contract to pay the router for the tokens in tokenAmounts
       IERC20(tokenAmounts[i].token).safeTransferFrom(msg.sender, address(this), tokenAmounts[i].amount);
       IERC20(tokenAmounts[i].token).safeIncreaseAllowance(i_ccipRouter, tokenAmounts[i].amount);
     }

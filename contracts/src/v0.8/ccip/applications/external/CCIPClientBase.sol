@@ -25,16 +25,14 @@ abstract contract CCIPClientBase is OwnerIsCreator, ITypeAndVersion {
 
   struct ChainConfig {
     bool disabled;
-    bytes recipient;
-    // Includes additional configs such as manual gas limit, and OOO-execution.
-    // Should not be supplied at runtime to prevent unexpected contract behavior
-    bytes extraArgsBytes;
-    mapping(bytes => bool) approvedSender;
+    bytes recipient; // The address to send messages to on the destination-chain, abi.encode(addr) if an EVM-compatible networks
+    bytes extraArgsBytes; // Includes additional configs such as manual gas limit, and out-of-order-execution. Should not be supplied at runtime to prevent unexpected contract behavior
+    mapping(bytes recipient => bool isApproved) approvedSender;
   }
 
   address internal immutable i_ccipRouter;
 
-  mapping(uint64 => ChainConfig) public s_chainConfigs;
+  mapping(uint64 destChainSelector => ChainConfig) public s_chainConfigs;
 
   constructor(address router) {
     if (router == address(0)) revert ZeroAddressNotAllowed();
@@ -60,6 +58,8 @@ abstract contract CCIPClientBase is OwnerIsCreator, ITypeAndVersion {
   // │                  Sender/Receiver Management                  │
   // ================================================================
 
+  /// @notice modify the list of approved source-chain contracts which can send messages to this contract through CCIP
+  /// @dev removes are executed before additions, so a contract present in both will be approved at the end of execution
   function updateApprovedSenders(
     ApprovedSenderUpdate[] calldata adds,
     ApprovedSenderUpdate[] calldata removes
@@ -73,6 +73,10 @@ abstract contract CCIPClientBase is OwnerIsCreator, ITypeAndVersion {
     }
   }
 
+  /// @notice Return whether a contract on the specified source chain is authorized to send messages to this contract through CCIP
+  /// @param sourceChainSelector A unique CCIP-specific identifier for the source chain
+  /// @param senderAddr The address which sent the message on the source-chain, abi-encoded if evm-compatible
+  /// @return bool Whether the address is approved or not to invoke functions on this contract
   function isApprovedSender(uint64 sourceChainSelector, bytes calldata senderAddr) external view returns (bool) {
     return s_chainConfigs[sourceChainSelector].approvedSender[senderAddr];
   }
@@ -81,14 +85,21 @@ abstract contract CCIPClientBase is OwnerIsCreator, ITypeAndVersion {
   // │                  Fee Token Management                       │
   // ===============================================================
 
-  /// @notice function is set in client base to support native-fee-token pre-funding in all children implemending CCIPSend
+  /// @notice function support native-fee-token pre-funding in all children implementing the ccipSend function
   receive() external payable {}
 
+  /// @notice Allow the owner to recover any native-tokens sent to this contract out of error.
+  /// @dev Function should not be used to recover tokens from failed-messages, abandonFailedMessage() should be used instead
+  /// @param to A payable address to send the recovered tokens to
+  /// @param amount the amount of native tokens to recover, denominated in wei
   function withdrawNativeToken(address payable to, uint256 amount) external onlyOwner {
     Address.sendValue(to, amount);
   }
 
-  /// @notice Function should NEVER be used for transfering tokens from a failed message, only for recovering tokens sent in error
+  /// @notice Allow the owner to recover any ERC-20 tokens sent to this contract out of error.
+  /// @dev Function should not be used to recover tokens from failed-messages, abandonFailedMessage() should be used instead
+  /// @param to A payable address to send the recovered tokens to
+  /// @param amount the amount of native tokens to recover, denominated in wei  function withdrawTokens(address token, address to, uint256 amount) external onlyOwner {
   function withdrawTokens(address token, address to, uint256 amount) external onlyOwner {
     IERC20(token).safeTransfer(to, amount);
   }
@@ -97,6 +108,10 @@ abstract contract CCIPClientBase is OwnerIsCreator, ITypeAndVersion {
   // │                      Chain Management                        │
   // ================================================================
 
+  /// @notice Enable a remote-chain to send and receive messages to/from this contract via CCIP
+  /// @param chainSelector A unique CCIP-specific identifier for the source chain
+  /// @param recipient The address a message should be sent to on the destination chain. There should only be one per-chain, and is abi-encoded if EVM-compatible.
+  /// @param _extraArgsBytes additional optional ccipSend parameters. Do not need to be set unless necessary based on the application-logic
   function enableChain(
     uint64 chainSelector,
     bytes calldata recipient,
@@ -106,18 +121,21 @@ abstract contract CCIPClientBase is OwnerIsCreator, ITypeAndVersion {
 
     currentConfig.recipient = recipient;
 
+    // Set any additional args such as enabling out-of-order execution or manual gas-limit
     if (_extraArgsBytes.length != 0) currentConfig.extraArgsBytes = _extraArgsBytes;
 
     // If config was previously disabled, then re-enable it;
     if (currentConfig.disabled) currentConfig.disabled = false;
   }
 
+  /// @notice Mark a chain as not supported for sending-receiving messages to/from this contract via CCIP.
+  /// @dev If a chain needs to be re-enabled after being disabled, the owner must call enableChain() to support it again.
   function disableChain(uint64 chainSelector) external onlyOwner {
     s_chainConfigs[chainSelector].disabled = true;
   }
 
   modifier isValidChain(uint64 chainSelector) {
-    // Must be storage and not memory because the struct contains a nested mapping
+    // Must be storage and not memory because the struct contains a nested mapping which is not capable of being copied to memory
     ChainConfig storage currentConfig = s_chainConfigs[chainSelector];
     if (currentConfig.recipient.length == 0 || currentConfig.disabled) revert InvalidChain(chainSelector);
     _;

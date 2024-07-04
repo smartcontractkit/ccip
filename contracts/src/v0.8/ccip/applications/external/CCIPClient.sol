@@ -22,6 +22,7 @@ contract CCIPClient is CCIPReceiverWithACK {
     return "CCIPClient 1.0.0-dev";
   }
 
+  /// @notice sends a message through CCIP to the router
   function ccipSend(
     uint64 destChainSelector,
     Client.EVMTokenAmount[] memory tokenAmounts,
@@ -64,8 +65,8 @@ contract CCIPClient is CCIPReceiverWithACK {
     return messageId;
   }
 
-  /// CCIPReceiver processMessage to make easier to modify
-  /// @notice function requres that
+  /// @notice Implementation of arbitrary logic to be executed when a CCIP message is received
+  /// @dev is only invoked by self on CCIPReceive, and should implement arbitrary dapp-specific logic
   function processMessage(Client.Any2EVMMessage calldata message) external virtual override onlySelf {
     (MessagePayload memory payload) = abi.decode(message.data, (MessagePayload));
 

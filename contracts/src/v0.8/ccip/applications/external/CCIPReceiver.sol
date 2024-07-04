@@ -24,7 +24,6 @@ contract CCIPReceiver is CCIPClientBase {
   enum ErrorCode {
     // RESOLVED is first so that the default value is resolved.
     RESOLVED,
-    // Could have any number of error codes here.
     FAILED,
     ABANDONED
   }
@@ -75,11 +74,8 @@ contract CCIPReceiver is CCIPClientBase {
     emit MessageSucceeded(message.messageId);
   }
 
-  /// @notice This function the entrypoint for this contract to process messages.
-  /// @param message The message to process.
-  /// @dev This example just sends the tokens to the owner of this contracts. More
-  /// interesting functions could be implemented.
-  /// @dev It has to be external because of the try/catch.
+  /// @notice Contains arbitrary application-logic for incoming CCIP messages.
+  /// @dev It has to be external because of the try/catch of ccipReceive() which invokes it
   function processMessage(Client.Any2EVMMessage calldata message)
     external
     virtual
@@ -91,9 +87,11 @@ contract CCIPReceiver is CCIPClientBase {
   // │                  Failed Message Processing                   |
   // ================== ==============================================
 
-  /// @notice This function is called when the initial message delivery has failed but should be attempted again with different logic
-  /// @dev By default this function is callable by anyone, and should be modified if special access control is needed.
-  function retryFailedMessage(bytes32 messageId) external onlyOwner {
+  /// @notice Execute a message that failed initial delivery, but with different logic specifically for re-execution.
+  /// @dev Since the function invoked _retryFailedMessage(), which is marked onlyOwner, this may only be called by the Owner as well.
+  /// @dev function will revert if the messageId was not already stored as having failed its initial execution
+  /// @param messageId the unique ID of the CCIP-message which failed initial-execution.
+  function retryFailedMessage(bytes32 messageId) external {
     if (s_failedMessages.get(messageId) != uint256(ErrorCode.FAILED)) revert MessageNotFailed(messageId);
 
     // Set the error code to 0 to disallow reentry and retry the same failed message
@@ -109,9 +107,10 @@ contract CCIPReceiver is CCIPClientBase {
     emit MessageRecovered(messageId);
   }
 
-  /// @notice Function should contain any special logic needed to "retry" processing of a previously failed message.
+  /// @notice A function that should contain any special logic needed to "retry" processing of a previously failed message.
   /// @dev if the owner wants to retrieve tokens without special logic, then abandonMessage() or recoverTokens() should be used instead
-  function _retryFailedMessage(Client.Any2EVMMessage memory message) internal virtual {}
+  /// @dev function is marked onlyOwner, but is virtual. Allowing permissionless execution is not recommended but may be allowed if function is overridden
+  function _retryFailedMessage(Client.Any2EVMMessage memory message) internal virtual onlyOwner {}
 
   /// @notice Should be used to recover tokens from a failed message, while ensuring the message cannot be retried
   /// @notice function will send tokens to destination, but will NOT invoke any arbitrary logic afterwards.
@@ -134,6 +133,7 @@ contract CCIPReceiver is CCIPClientBase {
   // ================================================================
 
   /// @param messageId the ID of the message delivered by the CCIP Router
+  /// @return Any2EVMMessage a standard CCIP message for EVM-compatible networks
   function getMessageContents(bytes32 messageId) public view returns (Client.Any2EVMMessage memory) {
     return s_messageContents[messageId];
   }

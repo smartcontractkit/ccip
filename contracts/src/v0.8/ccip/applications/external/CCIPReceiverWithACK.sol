@@ -76,8 +76,7 @@ contract CCIPReceiverWithACK is CCIPReceiver {
     emit FeeTokenModified(oldFeeToken, token);
   }
 
-  /// @notice The entrypoint for the CCIP router to call. This function should
-  /// never revert, all errors should be handled internally in this contract.
+  /// @notice The entrypoint for the CCIP router to call. This function should never revert, all errors should be handled internally in this contract.
   /// @param message The message to process.
   /// @dev Extremely important to ensure only router calls this.
   function ccipReceive(Client.Any2EVMMessage calldata message)
@@ -101,15 +100,16 @@ contract CCIPReceiverWithACK is CCIPReceiver {
     emit MessageSucceeded(message.messageId);
   }
 
-  /// CCIPReceiver processMessage to make easier to modify
-  /// @notice Function does NOT require the status of an incoming ACK be "sent" because this implementation does not send, only receives
+  /// @notice Application-specific logic for incoming ccip-messages.
+  /// @dev Function does NOT require the status of an incoming ACK be "sent" because this implementation does not send, only receives
+  /// @dev Any MessageType encoding is implemented by the sender-contract, and is not natively part of CCIP-messages.
   function processMessage(Client.Any2EVMMessage calldata message) external virtual override onlySelf {
     (MessagePayload memory payload) = abi.decode(message.data, (MessagePayload));
 
     if (payload.messageType == MessageType.OUTGOING) {
       // Insert Processing workflow here.
 
-      // If the message was outgoing, then send an ack response.
+      // If the message was outgoing on the source-chain, then send an ack response.
       _sendAck(message);
     } else if (payload.messageType == MessageType.ACK) {
       // Decode message into the message header and the messageId to ensure the message is encoded correctly
@@ -132,6 +132,7 @@ contract CCIPReceiverWithACK is CCIPReceiver {
   function _sendAck(Client.Any2EVMMessage calldata incomingMessage) internal {
     Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](0);
 
+    // Build the outgoing ACK message, with no tokens, with data being the concatenation of the acknowledgement header and incoming-messageId
     Client.EVM2AnyMessage memory outgoingMessage = Client.EVM2AnyMessage({
       receiver: incomingMessage.sender,
       data: abi.encode(ACK_MESSAGE_HEADER, incomingMessage.messageId),
