@@ -193,9 +193,8 @@ contract EVM2EVMMultiOnRamp_applyDestChainConfigUpdates is EVM2EVMMultiOnRampSet
         type(uint32).max
       )
     );
-    bool isNewChain = true;
 
-    if (destChainConfigArgs.destChainSelector == DEST_CHAIN_SELECTOR) isNewChain = false;
+    bool isNewChain = destChainConfigArgs.destChainSelector != DEST_CHAIN_SELECTOR;
 
     EVM2EVMMultiOnRamp.DestChainConfigArgs[] memory newDestChainConfigArgs =
       new EVM2EVMMultiOnRamp.DestChainConfigArgs[](1);
