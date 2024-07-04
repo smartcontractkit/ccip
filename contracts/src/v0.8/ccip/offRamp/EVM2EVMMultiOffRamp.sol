@@ -415,9 +415,7 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
       if (message.header.nonce > 0 && originalState == Internal.MessageExecutionState.UNTOUCHED) {
         // If a nonce is not incremented, that means it was skipped, and we can ignore the message
         if (
-          !INonceManager(i_nonceManager).incrementInboundNonce(
-            sourceChainSelector, message.header.nonce, message.sender
-          )
+          !INonceManager(i_nonceManager).incrementInboundNonce(sourceChainSelector, message.header.nonce, message.sender)
         ) continue;
       }
 
@@ -450,7 +448,9 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
         revert InvalidNewState(sourceChainSelector, message.header.sequenceNumber, newState);
       }
 
-      emit ExecutionStateChanged(sourceChainSelector, message.header.sequenceNumber, message.header.messageId, newState, returnData);
+      emit ExecutionStateChanged(
+        sourceChainSelector, message.header.sequenceNumber, message.header.messageId, newState, returnData
+      );
     }
   }
 
@@ -738,9 +738,7 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
         currentConfig.onRamp = newOnRamp;
         currentConfig.minSeqNr = 1;
         emit SourceChainSelectorAdded(sourceChainSelector);
-      } else if (
-        keccak256(currentOnRamp) != keccak256(newOnRamp)
-      ) {
+      } else if (keccak256(currentOnRamp) != keccak256(newOnRamp)) {
         revert InvalidStaticConfig(sourceChainSelector);
       }
 
