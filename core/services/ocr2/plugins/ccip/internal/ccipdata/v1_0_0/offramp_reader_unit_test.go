@@ -312,7 +312,7 @@ func Test_LogsAreProperlyMarkedAsFinalized(t *testing.T) {
 
 			offRamp, err := NewOffRamp(logger.TestLogger(t), offrampAddress, evmclimocks.NewClient(t), lp, nil, nil)
 			require.NoError(t, err)
-			logs, err := offRamp.GetExecutionStateChangesBetweenSeqNums(testutils.Context(t), minSeqNr, maxSeqNr, 0)
+			logs, err := offRamp.GetExecutionStateChangesForSeqNums(testutils.Context(t), []cciptypes.SequenceNumberRange{{Min: minSeqNr, Max: maxSeqNr}}, 0)
 			require.NoError(t, err)
 			assert.Len(t, logs, len(inputLogs))
 

@@ -236,10 +236,9 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 // It doesn't matter if the execution succeeded, since we don't retry previous
 // attempts even if they failed. Value in the map indicates whether the log is finalized or not.
 func (r *ExecutionReportingPlugin) getExecutedSeqNrsInRange(ctx context.Context, min, max uint64) (map[uint64]bool, error) {
-	stateChanges, err := r.offRampReader.GetExecutionStateChangesBetweenSeqNums(
+	stateChanges, err := r.offRampReader.GetExecutionStateChangesForSeqNums(
 		ctx,
-		min,
-		max,
+		[]cciptypes.SequenceNumberRange{{Min: min, Max: max}},
 		int(r.offchainConfig.DestOptimisticConfirmations),
 	)
 	if err != nil {

@@ -363,7 +363,7 @@ func testOffRampReader(t *testing.T, th offRampReaderTH) {
 	require.NoError(t, err)
 	require.Equal(t, []cciptypes.Address{}, tokens.DestinationTokens)
 
-	events, err := th.reader.GetExecutionStateChangesBetweenSeqNums(ctx, 0, 10, 0)
+	events, err := th.reader.GetExecutionStateChangesForSeqNums(ctx, []cciptypes.SequenceNumberRange{{Min: 0, Max: 10}}, 0)
 	require.NoError(t, err)
 	require.Equal(t, []cciptypes.ExecutionStateChangedWithTxMeta{}, events)
 

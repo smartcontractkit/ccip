@@ -29,7 +29,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
-	evmtypes "github.com/smartcontractkit/chainlink/v2/core/chains/evm/types"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp_1_0_0"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
@@ -440,51 +439,7 @@ func (o *OffRamp) Close() error {
 }
 
 func (o *OffRamp) GetExecutionStateChangesBetweenSeqNums(ctx context.Context, seqNumMin, seqNumMax uint64, confs int) ([]cciptypes.ExecutionStateChangedWithTxMeta, error) {
-	latestBlock, err := o.lp.LatestBlock(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("get lp latest block: %w", err)
-	}
-
-	logs, err := o.lp.IndexedLogsTopicRange(
-		ctx,
-		o.eventSig,
-		o.addr,
-		o.eventIndex,
-		logpoller.EvmWord(seqNumMin),
-		logpoller.EvmWord(seqNumMax),
-		evmtypes.Confirmations(confs),
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	parsedLogs, err := ccipdata.ParseLogs[cciptypes.ExecutionStateChanged](
-		logs,
-		o.Logger,
-		func(log types.Log) (*cciptypes.ExecutionStateChanged, error) {
-			sc, err1 := o.offRampV100.ParseExecutionStateChanged(log)
-			if err1 != nil {
-				return nil, err1
-			}
-
-			return &cciptypes.ExecutionStateChanged{
-				SequenceNumber: sc.SequenceNumber,
-				Finalized:      sc.Raw.BlockNumber <= uint64(latestBlock.FinalizedBlockNumber),
-			}, nil
-		},
-	)
-	if err != nil {
-		return nil, fmt.Errorf("parse logs: %w", err)
-	}
-
-	res := make([]cciptypes.ExecutionStateChangedWithTxMeta, 0, len(parsedLogs))
-	for _, log := range parsedLogs {
-		res = append(res, cciptypes.ExecutionStateChangedWithTxMeta{
-			TxMeta:                log.TxMeta,
-			ExecutionStateChanged: log.Data,
-		})
-	}
-	return res, nil
+	panic("don't use me")
 }
 
 func (o *OffRamp) GetExecutionStateChangesForSeqNums(ctx context.Context, seqNums []cciptypes.SequenceNumberRange, confirmations int) ([]cciptypes.ExecutionStateChangedWithTxMeta, error) {
