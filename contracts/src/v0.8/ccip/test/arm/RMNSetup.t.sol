@@ -45,38 +45,43 @@ contract RMNSetup is Test {
   address internal constant OWNER = 0x00007e64E1fB0C487F25dd6D3601ff6aF8d32e4e;
   address internal constant STRANGER = address(999999);
   address internal constant ZERO_ADDRESS = address(0);
-  address internal constant BLESS_VOTER_1 = address(1);
+  address internal s_blessVoter1;
+  address internal s_blessVoter2;
+  address internal s_blessVoter3;
+  address internal s_blessVoter4;
   address internal constant CURSE_VOTER_1 = address(10);
-  address internal constant BLESS_VOTER_2 = address(2);
   address internal constant CURSE_VOTER_2 = address(12);
-  address internal constant BLESS_VOTER_3 = address(3);
   address internal constant CURSE_VOTER_3 = address(13);
-  address internal constant BLESS_VOTER_4 = address(4);
   address internal constant CURSE_VOTER_4 = address(14);
 
   // Arm
   function rmnConstructorArgs() internal pure returns (RMN.Config memory) {
+    (s_blessVoter1,) = makeAddrAndKey("voter1");
+    (s_blessVoter2,) = makeAddrAndKey("voter2");
+    (s_blessVoter3,) = makeAddrAndKey("voter3");
+    (s_blessVoter4,) = makeAddrAndKey("voter4");
+
     RMN.Voter[] memory voters = new RMN.Voter[](4);
     voters[0] = RMN.Voter({
-      blessVoteAddr: BLESS_VOTER_1,
+      blessVoteAddr: s_blessVoter1,
       curseVoteAddr: CURSE_VOTER_1,
       blessWeight: WEIGHT_1,
       curseWeight: WEIGHT_1
     });
     voters[1] = RMN.Voter({
-      blessVoteAddr: BLESS_VOTER_2,
+      blessVoteAddr: s_blessVoter2,
       curseVoteAddr: CURSE_VOTER_2,
       blessWeight: WEIGHT_10,
       curseWeight: WEIGHT_10
     });
     voters[2] = RMN.Voter({
-      blessVoteAddr: BLESS_VOTER_3,
+      blessVoteAddr: s_blessVoter2,
       curseVoteAddr: CURSE_VOTER_3,
       blessWeight: WEIGHT_20,
       curseWeight: WEIGHT_20
     });
     voters[3] = RMN.Voter({
-      blessVoteAddr: BLESS_VOTER_4,
+      blessVoteAddr: s_blessVoter2,
       curseVoteAddr: CURSE_VOTER_4,
       blessWeight: WEIGHT_40,
       curseWeight: WEIGHT_40
