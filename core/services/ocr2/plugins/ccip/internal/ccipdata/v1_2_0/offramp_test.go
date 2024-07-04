@@ -26,7 +26,7 @@ func TestExecOffchainConfig120_Encoding(t *testing.T) {
 		RelativeBoostPerWaitHour:    0.07,
 		InflightCacheExpiry:         *config.MustNewDuration(64 * time.Second),
 		RootSnoozeTime:              *config.MustNewDuration(128 * time.Minute),
-		BatchingStrategyId:          0,
+		BatchingStrategyID:          0,
 	}
 
 	tests := []struct {
@@ -83,7 +83,7 @@ func TestExecOffchainConfig120_Encoding(t *testing.T) {
 		{
 			name: "must set BatchingStrategyId",
 			want: modifyCopy(validConfig, func(c *JSONExecOffchainConfig) {
-				c.BatchingStrategyId = 1
+				c.BatchingStrategyID = 1
 			}),
 		},
 	}
@@ -156,7 +156,7 @@ func TestExecOffchainConfig120_ParseRawJson(t *testing.T) {
 					RelativeBoostPerWaitHour:    0.07,
 					InflightCacheExpiry:         *config.MustNewDuration(64 * time.Second),
 					RootSnoozeTime:              *config.MustNewDuration(128 * time.Minute),
-					BatchingStrategyId:          1, // Actual value
+					BatchingStrategyID:          1, // Actual value
 				}, decoded)
 			} else {
 				require.Equal(t, JSONExecOffchainConfig{
@@ -165,7 +165,7 @@ func TestExecOffchainConfig120_ParseRawJson(t *testing.T) {
 					RelativeBoostPerWaitHour:    0.07,
 					InflightCacheExpiry:         *config.MustNewDuration(64 * time.Second),
 					RootSnoozeTime:              *config.MustNewDuration(128 * time.Minute),
-					BatchingStrategyId:          0, // Default
+					BatchingStrategyID:          0, // Default
 				}, decoded)
 			}
 		})

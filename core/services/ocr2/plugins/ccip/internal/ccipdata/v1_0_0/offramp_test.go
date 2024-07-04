@@ -94,7 +94,7 @@ func TestExecOffchainConfig100_AllFieldsRequired(t *testing.T) {
 		RelativeBoostPerWaitHour:    0.07,
 		InflightCacheExpiry:         *config.MustNewDuration(64 * time.Second),
 		RootSnoozeTime:              *config.MustNewDuration(128 * time.Minute),
-		BatchingStrategyId:          0,
+		BatchingStrategyID:          0,
 	}
 	encoded, err := ccipconfig.EncodeOffchainConfig(&cfg)
 	require.NoError(t, err)

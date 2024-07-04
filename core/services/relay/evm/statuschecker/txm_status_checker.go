@@ -9,11 +9,11 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/txmgr"
 )
 
-//go:generate mockery --quiet --name CCIPTransactionStatusChecker --output ./mocks/ --case=underscore
-
 // CCIPTransactionStatusChecker is an interface that defines the method for checking the status of a transaction.
 // CheckMessageStatus checks the status of a transaction for a given message ID.
 // It returns a list of transaction statuses, the retry counter, and an error if any occurred during the process.
+//
+//go:generate mockery --quiet --name CCIPTransactionStatusChecker --output ./mocks/ --case=underscore
 type CCIPTransactionStatusChecker interface {
 	CheckMessageStatus(ctx context.Context, msgID string) (transactionStatuses []types.TransactionStatus, retryCounter int, err error)
 }

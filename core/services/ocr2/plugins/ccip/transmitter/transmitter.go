@@ -102,21 +102,21 @@ func NewTransmitterWithStatusChecker(
 func (t *transmitter) CreateEthTransaction(ctx context.Context, toAddress common.Address, payload []byte, txMeta *txmgr.TxMeta) error {
 	roundRobinFromAddress, err := t.keystore.GetRoundRobinAddress(ctx, t.chainID, t.fromAddresses...)
 	if err != nil {
-		return errors.Wrap(err, "skipped OCR transmission, error getting round-robin address")
+		return fmt.Errorf("skipped OCR transmission, error getting round-robin address: %w", err)
 	}
 
 	var idempotencyKey *string
 
-	// Define idempotency key for CCIP transactions
-	if len(txMeta.MessageIDs) > 0 && t.statuschecker != nil {
-		messageIds := txMeta.MessageIDs
-		_, count, err1 := t.statuschecker.CheckMessageStatus(ctx, messageIds[0])
+	// Define idempotency key for CCIP Execution Plugin
+	if len(txMeta.MessageIDs) == 1 && t.statuschecker != nil {
+		messageId := txMeta.MessageIDs[0]
+		_, count, err1 := t.statuschecker.CheckMessageStatus(ctx, messageId)
 
 		if err1 != nil {
 			return errors.Wrap(err, "skipped OCR transmission, error getting message status")
 		}
 		idempotencyKey = func() *string {
-			s := fmt.Sprintf("%s-%d", messageIds[0], count+1)
+			s := fmt.Sprintf("%s-%d", messageId, count+1)
 			return &s
 		}()
 	}

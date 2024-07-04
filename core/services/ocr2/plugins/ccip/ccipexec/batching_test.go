@@ -131,14 +131,13 @@ func TestExecutionReportingPlugin_getTokenDataWithCappedLatency(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			bs := &BaseBatchingStrategy{}
 			tokenDataWorker := delayedTokenDataWorker{delay: tc.workerLatency}
 
 			msg := cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta{
 				EVM2EVMMessage: cciptypes.EVM2EVMMessage{TokenAmounts: make([]cciptypes.TokenAmount, 1)},
 			}
 
-			_, _, err := bs.getTokenDataWithTimeout(ctx, msg, tc.allowedWaitingTime, tokenDataWorker)
+			_, _, err := getTokenDataWithTimeout(ctx, msg, tc.allowedWaitingTime, tokenDataWorker)
 			if tc.expErr {
 				assert.Error(t, err)
 				return
@@ -559,7 +558,7 @@ func TestBatchingStrategies(t *testing.T) {
 			dstPrices:             map[cciptypes.Address]*big.Int{destNative: big.NewInt(1)},
 			offRampNoncesBySender: map[cciptypes.Address]uint64{sender1: 0},
 			expectedStates: []messageExecStatus{
-				newMessageExecState(zkMsg1.SequenceNumber, zkMsg1.MessageID, TXMCheckFailed),
+				newMessageExecState(zkMsg1.SequenceNumber, zkMsg1.MessageID, TXMFatalStatus),
 			},
 			statuschecker: func(m *mockstatuschecker.CCIPTransactionStatusChecker) {
 				m.Mock = mock.Mock{} // reset mock
@@ -578,7 +577,7 @@ func TestBatchingStrategies(t *testing.T) {
 			offRampNoncesBySender: map[cciptypes.Address]uint64{sender1: 0},
 			expectedSeqNrs:        []ccip.ObservedMessage{{SeqNr: zkMsg2.SequenceNumber}},
 			expectedStates: []messageExecStatus{
-				newMessageExecState(zkMsg1.SequenceNumber, zkMsg1.MessageID, TXMCheckFailed),
+				newMessageExecState(zkMsg1.SequenceNumber, zkMsg1.MessageID, TXMFatalStatus),
 				newMessageExecState(zkMsg2.SequenceNumber, zkMsg2.MessageID, AddedToBatch),
 			},
 			statuschecker: func(m *mockstatuschecker.CCIPTransactionStatusChecker) {
@@ -597,8 +596,8 @@ func TestBatchingStrategies(t *testing.T) {
 			dstPrices:             map[cciptypes.Address]*big.Int{destNative: big.NewInt(1)},
 			offRampNoncesBySender: map[cciptypes.Address]uint64{sender1: 0},
 			expectedStates: []messageExecStatus{
-				newMessageExecState(zkMsg1.SequenceNumber, zkMsg1.MessageID, TXMCheckFailed),
-				newMessageExecState(zkMsg2.SequenceNumber, zkMsg2.MessageID, TXMCheckFailed),
+				newMessageExecState(zkMsg1.SequenceNumber, zkMsg1.MessageID, TXMFatalStatus),
+				newMessageExecState(zkMsg2.SequenceNumber, zkMsg2.MessageID, TXMFatalStatus),
 			},
 			statuschecker: func(m *mockstatuschecker.CCIPTransactionStatusChecker) {
 				m.Mock = mock.Mock{} // reset mock
@@ -626,7 +625,7 @@ func TestBatchingStrategies(t *testing.T) {
 			},
 		},
 		{
-			name:                  "message snoozed when finalized",
+			name:                  "message snoozed when multiple statuses with fatal",
 			reqs:                  []cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta{zkMsg1, zkMsg2},
 			inflight:              []InflightInternalExecutionReport{},
 			tokenLimit:            big.NewInt(0),
@@ -636,12 +635,12 @@ func TestBatchingStrategies(t *testing.T) {
 			offRampNoncesBySender: map[cciptypes.Address]uint64{sender1: 0},
 			expectedSeqNrs:        []ccip.ObservedMessage{{SeqNr: zkMsg2.SequenceNumber}},
 			expectedStates: []messageExecStatus{
-				newMessageExecState(zkMsg1.SequenceNumber, zkMsg1.MessageID, TXMCheckFailed),
+				newMessageExecState(zkMsg1.SequenceNumber, zkMsg1.MessageID, TXMFatalStatus),
 				newMessageExecState(zkMsg2.SequenceNumber, zkMsg2.MessageID, AddedToBatch),
 			},
 			statuschecker: func(m *mockstatuschecker.CCIPTransactionStatusChecker) {
 				m.Mock = mock.Mock{} // reset mock
-				m.On("CheckMessageStatus", mock.Anything, zkMsg1.MessageID.String()).Return([]types.TransactionStatus{types.Unconfirmed, types.Failed, types.Finalized}, 2, nil)
+				m.On("CheckMessageStatus", mock.Anything, zkMsg1.MessageID.String()).Return([]types.TransactionStatus{types.Unconfirmed, types.Failed, types.Fatal}, 2, nil)
 				m.On("CheckMessageStatus", mock.Anything, zkMsg2.MessageID.String()).Return([]types.TransactionStatus{}, -1, nil)
 			},
 		},
@@ -698,7 +697,7 @@ func TestBatchingStrategies(t *testing.T) {
 			skipGasPriceEstimator: true,
 		},
 		{
-			name:                  "snooze when not inflight but txm returns final status",
+			name:                  "snooze when not inflight but txm returns fatal status",
 			reqs:                  []cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta{zkMsg1},
 			inflight:              []InflightInternalExecutionReport{},
 			tokenLimit:            big.NewInt(0),
@@ -707,11 +706,11 @@ func TestBatchingStrategies(t *testing.T) {
 			dstPrices:             map[cciptypes.Address]*big.Int{destNative: big.NewInt(1)},
 			offRampNoncesBySender: map[cciptypes.Address]uint64{sender1: 0},
 			expectedStates: []messageExecStatus{
-				newMessageExecState(zkMsg1.SequenceNumber, zkMsg1.MessageID, TXMCheckFailed),
+				newMessageExecState(zkMsg1.SequenceNumber, zkMsg1.MessageID, TXMFatalStatus),
 			},
 			statuschecker: func(m *mockstatuschecker.CCIPTransactionStatusChecker) {
 				m.Mock = mock.Mock{} // reset mock
-				m.On("CheckMessageStatus", mock.Anything, zkMsg1.MessageID.String()).Return([]types.TransactionStatus{types.Unconfirmed, types.Failed, types.Finalized}, 2, nil)
+				m.On("CheckMessageStatus", mock.Anything, zkMsg1.MessageID.String()).Return([]types.TransactionStatus{types.Unconfirmed, types.Failed, types.Fatal}, 2, nil)
 			},
 			skipGasPriceEstimator: true,
 		},
