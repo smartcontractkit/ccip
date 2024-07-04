@@ -145,8 +145,8 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
 
   /// @dev Struct to hold the configs for a destination chain
   struct DestChainConfig {
-    DestChainDynamicConfig dynamicConfig; // ──╮ Dynamic configs for a destination chain
-    uint64 sequenceNumber; // ─────────────────╯ The last used sequence number. This is zero in the case where no messages has been sent yet.
+    DestChainDynamicConfig dynamicConfig; // Dynamic configs for a destination chain
+    uint64 sequenceNumber; // The last used sequence number. This is zero in the case where no messages has been sent yet.
     // 0 is not a valid sequence number for any real transaction.
     /// @dev metadataHash is a lane-specific prefix for a message hash preimage which ensures global uniqueness
     /// Ensures that 2 identical messages sent to 2 different lanes will have a distinct hash.
