@@ -3,6 +3,8 @@ pragma solidity 0.8.24;
 
 import {ITypeAndVersion} from "../../shared/interfaces/ITypeAndVersion.sol";
 import {IAny2EVMMessageReceiver} from "../interfaces/IAny2EVMMessageReceiver.sol";
+
+import {IAny2EVMMultiOffRamp} from "../interfaces/IAny2EVMMultiOffRamp.sol";
 import {IMessageInterceptor} from "../interfaces/IMessageInterceptor.sol";
 import {INonceManager} from "../interfaces/INonceManager.sol";
 import {IPoolV1} from "../interfaces/IPool.sol";
@@ -29,7 +31,7 @@ import {ERC165Checker} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts
 /// @dev MultiOCR3Base is used to store multiple OCR configs for both the OffRamp and the CommitStore.
 /// The execution plugin type has to be configured without signature verification, and the commit
 /// plugin type with verification.
-contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
+contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3Base {
   using ERC165Checker for address;
   using EnumerableMapAddresses for EnumerableMapAddresses.AddressToAddressMap;
 

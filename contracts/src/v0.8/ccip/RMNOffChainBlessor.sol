@@ -5,13 +5,7 @@ import {EnumerableSet} from "../vendor/openzeppelin-solidity/v4.8.3/contracts/ut
 import {IAny2EVMMultiOffRamp} from "./interfaces/IAny2EVMMultiOffRamp.sol";
 import {IRMNOffChainBlessor} from "./interfaces/IRMNOffChainBlessor.sol";
 
-import {
-  GLOBAL_CURSE_SUBJECT,
-  LEGACY_CURSE_SUBJECT,
-  LIFT_CURSE_VOTE_ADDR,
-  OWNER_CURSE_VOTE_ADDR,
-  RMNBase
-} from "./RMNBase.sol";
+import {RMNBase} from "./RMNBase.sol";
 
 /// @dev This contract is owned by RMN, if changing, please notify the RMN maintainers.
 // solhint-disable chainlink-solidity/explicit-returns
