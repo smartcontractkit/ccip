@@ -7,6 +7,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
+
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/rpclib"
 
 	mapset "github.com/deckarep/golang-set/v2"
@@ -485,7 +488,79 @@ func (o *OffRamp) GetExecutionStateChangesBetweenSeqNums(ctx context.Context, se
 }
 
 func (o *OffRamp) GetExecutionStateChangesForSeqNums(ctx context.Context, seqNums []cciptypes.SequenceNumberRange, confirmations int) ([]cciptypes.ExecutionStateChangedWithTxMeta, error) {
-	return nil, nil
+	latestBlock, err := o.lp.LatestBlock(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("get lp latest block: %w", err)
+	}
+
+	seqNumRanges := make([]query.Expression, 0, len(seqNums))
+	for _, seqNr := range seqNums {
+		seqNumRanges = append(seqNumRanges, query.And(
+			logpoller.NewEventByTopicFilter(uint64(o.eventIndex), []primitives.ValueComparator{
+				{Value: logpoller.EvmWord(seqNr.Min).Hex(), Operator: primitives.Gte},
+			}),
+			logpoller.NewEventByTopicFilter(uint64(o.eventIndex), []primitives.ValueComparator{
+				{Value: logpoller.EvmWord(seqNr.Max).Hex(), Operator: primitives.Lte},
+			}),
+		))
+	}
+
+	// TODO Move to chainlink-common, querying layer should cover cases like these
+	var seqNumsFilter query.Expression
+	if len(seqNumRanges) == 1 {
+		seqNumsFilter = seqNumRanges[0]
+	} else {
+		seqNumsFilter = query.Or(seqNumRanges...)
+	}
+
+	sendRequestsQuery, err := query.Where(
+		o.addr.String(),
+		logpoller.NewAddressFilter(o.addr),
+		logpoller.NewEventSigFilter(o.eventSig),
+		seqNumsFilter,
+		query.Confidence(primitives.Unconfirmed),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	logs, err := o.lp.FilteredLogs(
+		ctx,
+		sendRequestsQuery,
+		query.NewLimitAndSort(query.Limit{}, query.NewSortBySequence(query.Asc)),
+		"GetExecutionStateChangesForSeqNums",
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	parsedLogs, err := ccipdata.ParseLogs[cciptypes.ExecutionStateChanged](
+		logs,
+		o.Logger,
+		func(log types.Log) (*cciptypes.ExecutionStateChanged, error) {
+			sc, err1 := o.offRampV100.ParseExecutionStateChanged(log)
+			if err1 != nil {
+				return nil, err1
+			}
+
+			return &cciptypes.ExecutionStateChanged{
+				SequenceNumber: sc.SequenceNumber,
+				Finalized:      sc.Raw.BlockNumber <= uint64(latestBlock.FinalizedBlockNumber),
+			}, nil
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("parse logs: %w", err)
+	}
+
+	res := make([]cciptypes.ExecutionStateChangedWithTxMeta, 0, len(parsedLogs))
+	for _, log := range parsedLogs {
+		res = append(res, cciptypes.ExecutionStateChangedWithTxMeta{
+			TxMeta:                log.TxMeta,
+			ExecutionStateChanged: log.Data,
+		})
+	}
+	return res, nil
 }
 
 func encodeExecutionReport(args abi.Arguments, report cciptypes.ExecReport) ([]byte, error) {

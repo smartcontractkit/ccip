@@ -5,7 +5,9 @@ import (
 	"math/rand"
 	"slices"
 	"testing"
+	"time"
 
+	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils/pgtest"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/rpclib"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/rpclib/rpclibmocks"
 
@@ -154,14 +156,126 @@ func generateTokensAndOutputs(nbTokens uint) ([]common.Address, []common.Address
 	return srcTks, dstTks, outputs
 }
 
+func Test_GetExecutionStateChangesForSeqNums(t *testing.T) {
+	ctx := testutils.Context(t)
+	chainID := testutils.NewRandomEVMChainID()
+	orm := logpoller.NewORM(chainID, pgtest.NewSqlxDB(t), logger.TestLogger(t))
+	lpOpts := logpoller.Opts{
+		PollPeriod:               time.Hour,
+		FinalityDepth:            2,
+		BackfillBatchSize:        20,
+		RpcBatchSize:             10,
+		KeepFinalizedBlocksDepth: 1000,
+	}
+	lp := logpoller.NewLogPoller(orm, nil, logger.TestLogger(t), lpOpts)
+
+	offrampAddress := utils.RandomAddress()
+	inputLogs := []logpoller.Log{
+		CreateExecutionStateChangeEventLog(t, chainID, offrampAddress, 10, 2, 1, utils.RandomBytes32()),
+		CreateExecutionStateChangeEventLog(t, chainID, offrampAddress, 11, 3, 1, utils.RandomBytes32()),
+		CreateExecutionStateChangeEventLog(t, chainID, offrampAddress, 12, 5, 1, utils.RandomBytes32()),
+		CreateExecutionStateChangeEventLog(t, chainID, offrampAddress, 13, 5, 2, utils.RandomBytes32()),
+		CreateExecutionStateChangeEventLog(t, chainID, offrampAddress, 14, 5, 3, utils.RandomBytes32()),
+		CreateExecutionStateChangeEventLog(t, chainID, offrampAddress, 15, 8, 1, utils.RandomBytes32()),
+		CreateExecutionStateChangeEventLog(t, chainID, offrampAddress, 16, 9, 1, utils.RandomBytes32()),
+		CreateExecutionStateChangeEventLog(t, chainID, utils.RandomAddress(), 16, 9, 1, utils.RandomBytes32()),
+	}
+	require.NoError(t, orm.InsertLogsWithBlock(ctx, inputLogs, logpoller.NewLogPollerBlock(utils.RandomBytes32(), 20, time.Now(), 20)))
+
+	tests := []struct {
+		name               string
+		seqNums            []cciptypes.SequenceNumberRange
+		expectedLogsSeqNrs []uint64
+	}{
+		{
+			name: "no logs are returned",
+			seqNums: []cciptypes.SequenceNumberRange{
+				{Min: 1, Max: 9},
+			},
+			expectedLogsSeqNrs: []uint64{},
+		},
+		{
+			name: "all logs are returned",
+			seqNums: []cciptypes.SequenceNumberRange{
+				{Min: 10, Max: 16},
+			},
+			expectedLogsSeqNrs: []uint64{10, 11, 12, 13, 14, 15, 16},
+		},
+		{
+			name: "all logs are returned for wider range",
+			seqNums: []cciptypes.SequenceNumberRange{
+				{Min: 8, Max: 17},
+			},
+			expectedLogsSeqNrs: []uint64{10, 11, 12, 13, 14, 15, 16},
+		},
+		{
+			name: "some logs are returned for tighter range",
+			seqNums: []cciptypes.SequenceNumberRange{
+				{Min: 11, Max: 14},
+			},
+			expectedLogsSeqNrs: []uint64{11, 12, 13, 14},
+		},
+		{
+			name: "multiple smaller ranges",
+			seqNums: []cciptypes.SequenceNumberRange{
+				{Min: 10, Max: 11},
+				{Min: 13, Max: 14},
+			},
+			expectedLogsSeqNrs: []uint64{10, 11, 13, 14},
+		},
+		{
+			name: "single element ranges",
+			seqNums: []cciptypes.SequenceNumberRange{
+				{Min: 10, Max: 10},
+				{Min: 14, Max: 14},
+				{Min: 15, Max: 15},
+			},
+			expectedLogsSeqNrs: []uint64{10, 14, 15},
+		},
+		{
+			name: "out of order ranges returns logs in proper order",
+			seqNums: []cciptypes.SequenceNumberRange{
+				{Min: 14, Max: 14},
+				{Min: 10, Max: 11},
+				{Min: 15, Max: 16},
+			},
+			expectedLogsSeqNrs: []uint64{10, 11, 14, 15, 16},
+		},
+		{
+			name: "overlapping ranges returns logs only once",
+			seqNums: []cciptypes.SequenceNumberRange{
+				{Min: 10, Max: 14},
+				{Min: 13, Max: 15},
+				{Min: 11, Max: 12},
+			},
+			expectedLogsSeqNrs: []uint64{10, 11, 12, 13, 14, 15},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			offRamp, err1 := NewOffRamp(logger.TestLogger(t), offrampAddress, evmclimocks.NewClient(t), lp, nil, nil)
+			require.NoError(t, err1)
+
+			msgs, err1 := offRamp.GetExecutionStateChangesForSeqNums(ctx, tt.seqNums, 0)
+			require.NoError(t, err1)
+
+			assert.Len(t, msgs, len(tt.expectedLogsSeqNrs))
+			for i, msg := range msgs {
+				assert.Equal(t, tt.expectedLogsSeqNrs[i], msg.SequenceNumber)
+			}
+		})
+	}
+}
+
 func Test_LogsAreProperlyMarkedAsFinalized(t *testing.T) {
 	minSeqNr := uint64(10)
 	maxSeqNr := uint64(14)
 	inputLogs := []logpoller.Log{
-		CreateExecutionStateChangeEventLog(t, 10, 2, utils.RandomBytes32()),
-		CreateExecutionStateChangeEventLog(t, 11, 3, utils.RandomBytes32()),
-		CreateExecutionStateChangeEventLog(t, 12, 5, utils.RandomBytes32()),
-		CreateExecutionStateChangeEventLog(t, 14, 7, utils.RandomBytes32()),
+		CreateExecutionStateChangeEventLog(t, nil, utils.RandomAddress(), 10, 2, 0, utils.RandomBytes32()),
+		CreateExecutionStateChangeEventLog(t, nil, utils.RandomAddress(), 11, 3, 0, utils.RandomBytes32()),
+		CreateExecutionStateChangeEventLog(t, nil, utils.RandomAddress(), 12, 5, 0, utils.RandomBytes32()),
+		CreateExecutionStateChangeEventLog(t, nil, utils.RandomAddress(), 14, 7, 0, utils.RandomBytes32()),
 	}
 
 	tests := []struct {

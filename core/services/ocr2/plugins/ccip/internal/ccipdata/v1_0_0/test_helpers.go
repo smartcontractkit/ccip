@@ -15,9 +15,9 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
+	ubig "github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils/big"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/price_registry_1_0_0"
-	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
 )
 
@@ -60,7 +60,7 @@ func ApplyPriceRegistryUpdate(t *testing.T, user *bind.TransactOpts, addr common
 	}
 }
 
-func CreateExecutionStateChangeEventLog(t *testing.T, seqNr uint64, blockNumber int64, messageID common.Hash) logpoller.Log {
+func CreateExecutionStateChangeEventLog(t *testing.T, chainID *big.Int, address common.Address, seqNr uint64, blockNumber int64, logIndex int64, messageID common.Hash) logpoller.Log {
 	tAbi, err := evm_2_evm_offramp.EVM2EVMOffRampMetaData.GetAbi()
 	require.NoError(t, err)
 	eseEvent, ok := tAbi.Events["ExecutionStateChanged"]
@@ -80,11 +80,12 @@ func CreateExecutionStateChangeEventLog(t *testing.T, seqNr uint64, blockNumber 
 			messageID[:],
 		},
 		Data:        logData,
-		LogIndex:    1,
+		LogIndex:    logIndex,
 		BlockHash:   utils.RandomBytes32(),
 		BlockNumber: blockNumber,
 		EventSig:    topic0,
-		Address:     testutils.NewAddress(),
+		Address:     address,
 		TxHash:      utils.RandomBytes32(),
+		EvmChainId:  ubig.New(chainID),
 	}
 }
