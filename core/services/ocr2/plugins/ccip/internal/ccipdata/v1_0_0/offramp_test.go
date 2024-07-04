@@ -116,7 +116,7 @@ func TestExecOffchainConfig100_AllFieldsRequired(t *testing.T) {
 		encodedPartialConfig, err := json.Marshal(partialConfig)
 		require.NoError(t, err)
 		_, err = ccipconfig.DecodeOffchainConfig[ExecOffchainConfig](encodedPartialConfig)
-		if keyToDelete == "BatchingStrategyId" {
+		if keyToDelete == "BatchingStrategyID" {
 			require.NoError(t, err)
 		} else {
 			require.ErrorContains(t, err, keyToDelete)
