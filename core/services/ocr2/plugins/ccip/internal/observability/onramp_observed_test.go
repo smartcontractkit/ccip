@@ -35,6 +35,7 @@ func TestOnRampObservedMethods(t *testing.T) {
 	excludedMethods := []string{
 		"Address",
 		"Close",
+		"GetSendRequestsBetweenSeqNums", // It's deprecated, going to be removed soon
 	}
 
 	// Defines the overridden method calls to test.
@@ -45,9 +46,9 @@ func TestOnRampObservedMethods(t *testing.T) {
 		Arguments:  []interface{}{testutils.Context(t)},
 		Returns:    []interface{}{cciptypes.OnRampDynamicConfig{}, nil},
 	}
-	methodCalls["GetSendRequestsBetweenSeqNums"] = MethodCall{
-		MethodName: "GetSendRequestsBetweenSeqNums",
-		Arguments:  []interface{}{testutils.Context(t), uint64(0), uint64(100), true},
+	methodCalls["GetSendRequestsForSeqNums"] = MethodCall{
+		MethodName: "GetSendRequestsForSeqNums",
+		Arguments:  []interface{}{testutils.Context(t), []cciptypes.SequenceNumberRange{{Min: 0, Max: 100}}, true},
 		Returns:    []interface{}{nil, nil},
 	}
 	methodCalls["IsSourceChainHealthy"] = MethodCall{

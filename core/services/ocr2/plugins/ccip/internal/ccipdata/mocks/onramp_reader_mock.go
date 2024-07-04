@@ -119,6 +119,36 @@ func (_m *OnRampReader) GetSendRequestsBetweenSeqNums(ctx context.Context, seqNu
 	return r0, r1
 }
 
+// GetSendRequestsForSeqNums provides a mock function with given fields: ctx, seqNums, finalized
+func (_m *OnRampReader) GetSendRequestsForSeqNums(ctx context.Context, seqNums []ccip.SequenceNumberRange, finalized bool) ([]ccip.EVM2EVMMessageWithTxMeta, error) {
+	ret := _m.Called(ctx, seqNums, finalized)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetSendRequestsForSeqNums")
+	}
+
+	var r0 []ccip.EVM2EVMMessageWithTxMeta
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, []ccip.SequenceNumberRange, bool) ([]ccip.EVM2EVMMessageWithTxMeta, error)); ok {
+		return rf(ctx, seqNums, finalized)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, []ccip.SequenceNumberRange, bool) []ccip.EVM2EVMMessageWithTxMeta); ok {
+		r0 = rf(ctx, seqNums, finalized)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]ccip.EVM2EVMMessageWithTxMeta)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, []ccip.SequenceNumberRange, bool) error); ok {
+		r1 = rf(ctx, seqNums, finalized)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // IsSourceChainHealthy provides a mock function with given fields: ctx
 func (_m *OnRampReader) IsSourceChainHealthy(ctx context.Context) (bool, error) {
 	ret := _m.Called(ctx)

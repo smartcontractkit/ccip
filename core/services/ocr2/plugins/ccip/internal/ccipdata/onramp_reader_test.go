@@ -422,7 +422,7 @@ func testOnRampReader(t *testing.T, th onRampReaderTH, expectedRouterAddress com
 	require.NoError(t, err)
 	require.Equal(t, ccipcalc.EvmAddrToGeneric(expectedRouterAddress), res)
 
-	msg, err := th.reader.GetSendRequestsBetweenSeqNums(ctx, 0, 10, true)
+	msg, err := th.reader.GetSendRequestsForSeqNums(ctx, []cciptypes.SequenceNumberRange{{Min: 0, Max: 10}}, true)
 	require.NoError(t, err)
 	require.NotNil(t, msg)
 	require.Equal(t, []cciptypes.EVM2EVMMessageWithTxMeta{}, msg)

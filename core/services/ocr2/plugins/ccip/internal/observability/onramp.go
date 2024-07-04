@@ -26,9 +26,9 @@ func NewObservedOnRampReader(origin ccipdata.OnRampReader, chainID int64, plugin
 	}
 }
 
-func (o ObservedOnRampReader) GetSendRequestsBetweenSeqNums(ctx context.Context, seqNumMin, seqNumMax uint64, finalized bool) ([]cciptypes.EVM2EVMMessageWithTxMeta, error) {
-	return withObservedInteractionAndResults(o.metric, "GetSendRequestsBetweenSeqNums", func() ([]cciptypes.EVM2EVMMessageWithTxMeta, error) {
-		return o.OnRampReader.GetSendRequestsBetweenSeqNums(ctx, seqNumMin, seqNumMax, finalized)
+func (o ObservedOnRampReader) GetSendRequestsForSeqNums(ctx context.Context, seqNums []cciptypes.SequenceNumberRange, finalized bool) ([]cciptypes.EVM2EVMMessageWithTxMeta, error) {
+	return withObservedInteractionAndResults(o.metric, "GetSendRequestsForSeqNums", func() ([]cciptypes.EVM2EVMMessageWithTxMeta, error) {
+		return o.OnRampReader.GetSendRequestsForSeqNums(ctx, seqNums, finalized)
 	})
 }
 

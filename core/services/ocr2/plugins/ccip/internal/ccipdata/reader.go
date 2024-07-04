@@ -5,9 +5,9 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	evmtypes "github.com/smartcontractkit/chainlink/v2/core/chains/evm/types"
@@ -51,7 +51,6 @@ func LogsConfidence(finalized bool) primitives.ConfidenceLevel {
 		return primitives.Finalized
 	}
 	return primitives.Unconfirmed
-
 }
 
 func LogsConfirmations(finalized bool) evmtypes.Confirmations {

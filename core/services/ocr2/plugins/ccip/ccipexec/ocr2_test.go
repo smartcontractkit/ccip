@@ -168,7 +168,7 @@ func TestExecutionReportingPlugin_Observation(t *testing.T) {
 			p.tokenPoolBatchedReader = tokenPoolBatchedReader
 
 			mockOffRampReader := ccipdatamocks.NewOffRampReader(t)
-			mockOffRampReader.On("GetExecutionStateChangesBetweenSeqNums", ctx, mock.Anything, mock.Anything, 0).
+			mockOffRampReader.On("GetExecutionStateChangesForSeqNums", ctx, mock.Anything, 0).
 				Return(executionEvents, nil).Maybe()
 			mockOffRampReader.On("CurrentRateLimiterState", mock.Anything).Return(tc.rateLimiterState, nil).Maybe()
 			mockOffRampReader.On("Address", ctx).Return(cciptypes.Address(offRamp.Address().String()), nil).Maybe()
@@ -189,7 +189,7 @@ func TestExecutionReportingPlugin_Observation(t *testing.T) {
 			mockOnRampReader := ccipdatamocks.NewOnRampReader(t)
 			mockOnRampReader.On("IsSourceCursed", ctx).Return(tc.sourceChainCursed, nil).Maybe()
 			mockOnRampReader.On("IsSourceChainHealthy", ctx).Return(tc.sourceChainHealthy, nil).Maybe()
-			mockOnRampReader.On("GetSendRequestsBetweenSeqNums", ctx, mock.Anything, mock.Anything, false).
+			mockOnRampReader.On("GetSendRequestsForSeqNums", ctx, mock.Anything, false).
 				Return(tc.sendRequests, nil).Maybe()
 			sourcePriceRegistryAddress := cciptypes.Address(utils.RandomAddress().String())
 			mockOnRampReader.On("SourcePriceRegistryAddress", ctx).Return(sourcePriceRegistryAddress, nil).Maybe()
@@ -449,8 +449,12 @@ func TestExecutionReportingPlugin_buildReport(t *testing.T) {
 		}
 		sendReqs[i] = cciptypes.EVM2EVMMessageWithTxMeta{EVM2EVMMessage: msg}
 	}
-	sourceReader.On("GetSendRequestsBetweenSeqNums",
-		ctx, observations[0].SeqNr, observations[len(observations)-1].SeqNr, false).Return(sendReqs, nil)
+	sourceReader.On(
+		"GetSendRequestsForSeqNums",
+		ctx,
+		[]cciptypes.SequenceNumberRange{{Min: observations[0].SeqNr, Max: observations[len(observations)-1].SeqNr}},
+		false,
+	).Return(sendReqs, nil)
 	p.onRampReader = sourceReader
 
 	execReport, err := p.buildReport(ctx, p.lggr, observations)
@@ -857,8 +861,7 @@ func TestExecutionReportingPlugin_getReportsWithSendRequests(t *testing.T) {
 	testCases := []struct {
 		name                string
 		reports             []cciptypes.CommitStoreReport
-		expQueryMin         uint64 // expected min/max used in the query to get ccipevents
-		expQueryMax         uint64
+		expSeqNumbers       []cciptypes.SequenceNumberRange
 		onchainEvents       []cciptypes.EVM2EVMMessageWithTxMeta
 		destExecutedSeqNums []uint64
 
@@ -883,8 +886,7 @@ func TestExecutionReportingPlugin_getReportsWithSendRequests(t *testing.T) {
 					MerkleRoot: [32]byte{200},
 				},
 			},
-			expQueryMin: 1,
-			expQueryMax: 3,
+			expSeqNumbers: []cciptypes.SequenceNumberRange{{Min: 1, Max: 2}, {Min: 3, Max: 3}},
 			onchainEvents: []cciptypes.EVM2EVMMessageWithTxMeta{
 				{EVM2EVMMessage: cciptypes.EVM2EVMMessage{SequenceNumber: 1}},
 				{EVM2EVMMessage: cciptypes.EVM2EVMMessage{SequenceNumber: 2}},
@@ -939,7 +941,7 @@ func TestExecutionReportingPlugin_getReportsWithSendRequests(t *testing.T) {
 			p.offRampReader = offRampReader
 
 			sourceReader := ccipdatamocks.NewOnRampReader(t)
-			sourceReader.On("GetSendRequestsBetweenSeqNums", ctx, tc.expQueryMin, tc.expQueryMax, false).
+			sourceReader.On("GetSendRequestsForSeqNums", ctx, tc.expSeqNumbers, false).
 				Return(tc.onchainEvents, nil).Maybe()
 			p.onRampReader = sourceReader
 
@@ -959,7 +961,7 @@ func TestExecutionReportingPlugin_getReportsWithSendRequests(t *testing.T) {
 					},
 				})
 			}
-			offRampReader.On("GetExecutionStateChangesBetweenSeqNums", ctx, tc.expQueryMin, tc.expQueryMax, 0).Return(executedEvents, nil).Maybe()
+			offRampReader.On("GetExecutionStateChangesForSeqNums", ctx, tc.expSeqNumbers, 0).Return(executedEvents, nil).Maybe()
 
 			populatedReports, err := p.getReportsWithSendRequests(ctx, tc.reports)
 			if tc.expErr {

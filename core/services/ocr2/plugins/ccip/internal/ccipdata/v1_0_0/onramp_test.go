@@ -1,18 +1,24 @@
-package v1_0_0
+package v1_0_0_test
 
 import (
+	"math/big"
 	"testing"
 	"time"
 
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
+
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
+	ubig "github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils/big"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp_1_0_0"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils/pgtest"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_0_0"
 )
 
 func TestOnRamp_GetSendRequestsForSeqNums(t *testing.T) {
@@ -30,14 +36,14 @@ func TestOnRamp_GetSendRequestsForSeqNums(t *testing.T) {
 
 	onrampAddress := utils.RandomAddress()
 	inputLogs := []logpoller.Log{
-		CreateCCIPSenRequestedLog(t, chainID, onrampAddress, 10, 2, 1, utils.RandomBytes32()),
-		CreateCCIPSenRequestedLog(t, chainID, onrampAddress, 11, 3, 1, utils.RandomBytes32()),
-		CreateCCIPSenRequestedLog(t, chainID, onrampAddress, 12, 5, 1, utils.RandomBytes32()),
-		CreateCCIPSenRequestedLog(t, chainID, onrampAddress, 13, 5, 2, utils.RandomBytes32()),
-		CreateCCIPSenRequestedLog(t, chainID, onrampAddress, 14, 5, 3, utils.RandomBytes32()),
-		CreateCCIPSenRequestedLog(t, chainID, onrampAddress, 15, 8, 1, utils.RandomBytes32()),
-		CreateCCIPSenRequestedLog(t, chainID, onrampAddress, 16, 9, 1, utils.RandomBytes32()),
-		CreateCCIPSenRequestedLog(t, chainID, utils.RandomAddress(), 16, 9, 1, utils.RandomBytes32()),
+		createCCIPSenRequestedLog(t, chainID, onrampAddress, 10, 2, 1, utils.RandomBytes32()),
+		createCCIPSenRequestedLog(t, chainID, onrampAddress, 11, 3, 1, utils.RandomBytes32()),
+		createCCIPSenRequestedLog(t, chainID, onrampAddress, 12, 5, 1, utils.RandomBytes32()),
+		createCCIPSenRequestedLog(t, chainID, onrampAddress, 13, 5, 2, utils.RandomBytes32()),
+		createCCIPSenRequestedLog(t, chainID, onrampAddress, 14, 5, 3, utils.RandomBytes32()),
+		createCCIPSenRequestedLog(t, chainID, onrampAddress, 15, 8, 1, utils.RandomBytes32()),
+		createCCIPSenRequestedLog(t, chainID, onrampAddress, 16, 9, 1, utils.RandomBytes32()),
+		createCCIPSenRequestedLog(t, chainID, utils.RandomAddress(), 16, 9, 1, utils.RandomBytes32()),
 	}
 	require.NoError(t, orm.InsertLogsWithBlock(ctx, inputLogs, logpoller.NewLogPollerBlock(utils.RandomBytes32(), 20, time.Now(), 5)))
 
@@ -132,7 +138,7 @@ func TestOnRamp_GetSendRequestsForSeqNums(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			onRamp, err1 := NewOnRamp(logger.TestLogger(t), uint64(123), uint64(123), onrampAddress, lp, nil)
+			onRamp, err1 := v1_0_0.NewOnRamp(logger.TestLogger(t), uint64(123), uint64(123), onrampAddress, lp, nil)
 			require.NoError(t, err1)
 
 			msgs, err1 := onRamp.GetSendRequestsForSeqNums(ctx, tt.seqNums, tt.finalized)
@@ -143,5 +149,46 @@ func TestOnRamp_GetSendRequestsForSeqNums(t *testing.T) {
 				assert.Equal(t, tt.expectedLogsSeqNrs[i], msg.SequenceNumber)
 			}
 		})
+	}
+}
+
+func createCCIPSenRequestedLog(t *testing.T, chainID *big.Int, address common.Address, seqNr uint64, blockNumber int64, logIndex int64, messageID common.Hash) logpoller.Log {
+	tAbi, err := evm_2_evm_onramp_1_0_0.EVM2EVMOnRampMetaData.GetAbi()
+	require.NoError(t, err)
+	eseEvent, ok := tAbi.Events["CCIPSendRequested"]
+	require.True(t, ok)
+
+	message := evm_2_evm_onramp_1_0_0.InternalEVM2EVMMessage{
+		SourceChainSelector: 123,
+		Sender:              utils.RandomAddress(),
+		Receiver:            utils.RandomAddress(),
+		SequenceNumber:      seqNr,
+		GasLimit:            big.NewInt(100),
+		Strict:              false,
+		Nonce:               1337,
+		FeeToken:            utils.RandomAddress(),
+		FeeTokenAmount:      big.NewInt(1),
+		Data:                []byte{},
+		TokenAmounts:        []evm_2_evm_onramp_1_0_0.ClientEVMTokenAmount{},
+		MessageId:           messageID,
+	}
+
+	logData, err := eseEvent.Inputs.Pack(message)
+	require.NoError(t, err)
+
+	topic0 := evm_2_evm_onramp_1_0_0.EVM2EVMOnRampCCIPSendRequested{}.Topic()
+
+	return logpoller.Log{
+		Topics: [][]byte{
+			topic0[:],
+		},
+		Data:        logData,
+		LogIndex:    logIndex,
+		BlockHash:   utils.RandomBytes32(),
+		BlockNumber: blockNumber,
+		EventSig:    topic0,
+		Address:     address,
+		TxHash:      utils.RandomBytes32(),
+		EvmChainId:  ubig.New(chainID),
 	}
 }

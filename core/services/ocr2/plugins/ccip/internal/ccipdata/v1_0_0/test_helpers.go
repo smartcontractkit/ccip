@@ -1,7 +1,6 @@
 package v1_0_0
 
 import (
-	"encoding/binary"
 	"math/big"
 	"testing"
 
@@ -13,11 +12,6 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
-	ubig "github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils/big"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp_1_0_0"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp_1_0_0"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/price_registry_1_0_0"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
 )
@@ -58,76 +52,5 @@ func ApplyPriceRegistryUpdate(t *testing.T, user *bind.TransactOpts, addr common
 			UsdPerUnitGas:     gas,
 		})
 		require.NoError(t, err)
-	}
-}
-
-func CreateCCIPSenRequestedLog(t *testing.T, chainID *big.Int, address common.Address, seqNr uint64, blockNumber int64, logIndex int64, messageID common.Hash) logpoller.Log {
-	tAbi, err := evm_2_evm_onramp_1_0_0.EVM2EVMOnRampMetaData.GetAbi()
-	require.NoError(t, err)
-	eseEvent, ok := tAbi.Events["CCIPSendRequested"]
-	require.True(t, ok)
-
-	message := evm_2_evm_onramp_1_0_0.InternalEVM2EVMMessage{
-		SourceChainSelector: 123,
-		Sender:              utils.RandomAddress(),
-		Receiver:            utils.RandomAddress(),
-		SequenceNumber:      seqNr,
-		GasLimit:            big.NewInt(100),
-		Strict:              false,
-		Nonce:               1337,
-		FeeToken:            utils.RandomAddress(),
-		FeeTokenAmount:      big.NewInt(1),
-		Data:                []byte{},
-		TokenAmounts:        []evm_2_evm_onramp_1_0_0.ClientEVMTokenAmount{},
-		MessageId:           messageID,
-	}
-
-	logData, err := eseEvent.Inputs.Pack(message)
-	require.NoError(t, err)
-
-	topic0 := evm_2_evm_onramp_1_0_0.EVM2EVMOnRampCCIPSendRequested{}.Topic()
-
-	return logpoller.Log{
-		Topics: [][]byte{
-			topic0[:],
-		},
-		Data:        logData,
-		LogIndex:    logIndex,
-		BlockHash:   utils.RandomBytes32(),
-		BlockNumber: blockNumber,
-		EventSig:    topic0,
-		Address:     address,
-		TxHash:      utils.RandomBytes32(),
-		EvmChainId:  ubig.New(chainID),
-	}
-}
-
-func CreateExecutionStateChangeEventLog(t *testing.T, chainID *big.Int, address common.Address, seqNr uint64, blockNumber int64, logIndex int64, messageID common.Hash) logpoller.Log {
-	tAbi, err := evm_2_evm_offramp_1_0_0.EVM2EVMOffRampMetaData.GetAbi()
-	require.NoError(t, err)
-	eseEvent, ok := tAbi.Events["ExecutionStateChanged"]
-	require.True(t, ok)
-
-	logData, err := eseEvent.Inputs.NonIndexed().Pack(uint8(1), []byte("some return data"))
-	require.NoError(t, err)
-	seqNrBytes := make([]byte, 8)
-	binary.BigEndian.PutUint64(seqNrBytes, seqNr)
-	seqNrTopic := common.BytesToHash(seqNrBytes)
-	topic0 := evm_2_evm_offramp_1_0_0.EVM2EVMOffRampExecutionStateChanged{}.Topic()
-
-	return logpoller.Log{
-		Topics: [][]byte{
-			topic0[:],
-			seqNrTopic[:],
-			messageID[:],
-		},
-		Data:        logData,
-		LogIndex:    logIndex,
-		BlockHash:   utils.RandomBytes32(),
-		BlockNumber: blockNumber,
-		EventSig:    topic0,
-		Address:     address,
-		TxHash:      utils.RandomBytes32(),
-		EvmChainId:  ubig.New(chainID),
 	}
 }

@@ -270,6 +270,36 @@ func (_m *OffRampReader) GetExecutionStateChangesBetweenSeqNums(ctx context.Cont
 	return r0, r1
 }
 
+// GetExecutionStateChangesForSeqNums provides a mock function with given fields: ctx, seqNums, confirmations
+func (_m *OffRampReader) GetExecutionStateChangesForSeqNums(ctx context.Context, seqNums []ccip.SequenceNumberRange, confirmations int) ([]ccip.ExecutionStateChangedWithTxMeta, error) {
+	ret := _m.Called(ctx, seqNums, confirmations)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetExecutionStateChangesForSeqNums")
+	}
+
+	var r0 []ccip.ExecutionStateChangedWithTxMeta
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, []ccip.SequenceNumberRange, int) ([]ccip.ExecutionStateChangedWithTxMeta, error)); ok {
+		return rf(ctx, seqNums, confirmations)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, []ccip.SequenceNumberRange, int) []ccip.ExecutionStateChangedWithTxMeta); ok {
+		r0 = rf(ctx, seqNums, confirmations)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]ccip.ExecutionStateChangedWithTxMeta)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, []ccip.SequenceNumberRange, int) error); ok {
+		r1 = rf(ctx, seqNums, confirmations)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetRouter provides a mock function with given fields: ctx
 func (_m *OffRampReader) GetRouter(ctx context.Context) (ccip.Address, error) {
 	ret := _m.Called(ctx)
