@@ -65,7 +65,7 @@ contract EVM2EVMMultiOnRamp_constructor is EVM2EVMMultiOnRampSetup {
       sequenceNumber: 0,
       metadataHash: keccak256(
         abi.encode(
-          Internal.EVM_2_EVM_MESSAGE_HASH, SOURCE_CHAIN_SELECTOR, destChainConfigArg.destChainSelector, address(s_onRamp)
+          Internal.EVM_2_ANY_MESSAGE_HASH, SOURCE_CHAIN_SELECTOR, destChainConfigArg.destChainSelector, address(s_onRamp)
         )
         )
     });
@@ -210,7 +210,7 @@ contract EVM2EVMMultiOnRamp_applyDestChainConfigUpdates is EVM2EVMMultiOnRampSet
       sequenceNumber: 0,
       metadataHash: keccak256(
         abi.encode(
-          Internal.EVM_2_EVM_MESSAGE_HASH, SOURCE_CHAIN_SELECTOR, destChainConfigArgs.destChainSelector, address(s_onRamp)
+          Internal.EVM_2_ANY_MESSAGE_HASH, SOURCE_CHAIN_SELECTOR, destChainConfigArgs.destChainSelector, address(s_onRamp)
         )
         )
     });
@@ -246,7 +246,7 @@ contract EVM2EVMMultiOnRamp_applyDestChainConfigUpdates is EVM2EVMMultiOnRampSet
       sequenceNumber: 0,
       metadataHash: keccak256(
         abi.encode(
-          Internal.EVM_2_EVM_MESSAGE_HASH,
+          Internal.EVM_2_ANY_MESSAGE_HASH,
           SOURCE_CHAIN_SELECTOR,
           destChainConfigArgs[0].destChainSelector,
           address(s_onRamp)
@@ -260,7 +260,7 @@ contract EVM2EVMMultiOnRamp_applyDestChainConfigUpdates is EVM2EVMMultiOnRampSet
       sequenceNumber: 0,
       metadataHash: keccak256(
         abi.encode(
-          Internal.EVM_2_EVM_MESSAGE_HASH,
+          Internal.EVM_2_ANY_MESSAGE_HASH,
           SOURCE_CHAIN_SELECTOR,
           destChainConfigArgs[1].destChainSelector,
           address(s_onRamp)
@@ -576,7 +576,7 @@ contract EVM2EVMMultiOnRamp_forwardFromRouter is EVM2EVMMultiOnRampSetup {
     // Make sure the tokens are in the contract
     deal(s_sourceFeeToken, address(s_onRamp), feeTokenAmount);
 
-    Internal.EVM2EVMMessage memory expectedEvent = _messageToEvent(message, 1, 1, feeTokenAmount, originalSender);
+    Internal.EVM2AnyRampMessage memory expectedEvent = _messageToEvent(message, 1, 1, feeTokenAmount, originalSender);
 
     vm.expectEmit();
     emit EVM2EVMMultiOnRamp.FeePaid(s_sourceFeeToken, feeTokenAmount);
@@ -585,7 +585,8 @@ contract EVM2EVMMultiOnRamp_forwardFromRouter is EVM2EVMMultiOnRampSetup {
 
     // Assert the message Id is correct
     assertEq(
-      expectedEvent.messageId, s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, feeTokenAmount, originalSender)
+      expectedEvent.header.messageId,
+      s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, feeTokenAmount, originalSender)
     );
   }
 
@@ -968,7 +969,7 @@ contract EVM2EVMMultiOnRamp_getDataAvailabilityCost is EVM2EVMMultiOnRamp_getFee
       s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR).dynamicConfig;
 
     uint256 dataAvailabilityGas = destChainDynamicConfig.destDataAvailabilityOverheadGas
-      + destChainDynamicConfig.destGasPerDataAvailabilityByte * Internal.MESSAGE_FIXED_BYTES;
+      + destChainDynamicConfig.destGasPerDataAvailabilityByte * Internal.ANY_2_EVM_MESSAGE_FIXED_BYTES;
     uint256 expectedDataAvailabilityCostUSD = USD_PER_DATA_AVAILABILITY_GAS * dataAvailabilityGas
       * destChainDynamicConfig.destDataAvailabilityMultiplierBps * 1e14;
 
@@ -989,7 +990,7 @@ contract EVM2EVMMultiOnRamp_getDataAvailabilityCost is EVM2EVMMultiOnRamp_getFee
     uint256 dataAvailabilityCostUSD2 =
       s_onRamp.getDataAvailabilityCost(DEST_CHAIN_SELECTOR + 1, USD_PER_DATA_AVAILABILITY_GAS, 0, 0, 0);
     dataAvailabilityGas = destChainDynamicConfig.destDataAvailabilityOverheadGas
-      + destChainDynamicConfig.destGasPerDataAvailabilityByte * Internal.MESSAGE_FIXED_BYTES;
+      + destChainDynamicConfig.destGasPerDataAvailabilityByte * Internal.ANY_2_EVM_MESSAGE_FIXED_BYTES;
     expectedDataAvailabilityCostUSD = USD_PER_DATA_AVAILABILITY_GAS * dataAvailabilityGas
       * destChainDynamicConfig.destDataAvailabilityMultiplierBps * 1e14;
 
@@ -1005,7 +1006,7 @@ contract EVM2EVMMultiOnRamp_getDataAvailabilityCost is EVM2EVMMultiOnRamp_getFee
       s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR).dynamicConfig;
 
     uint256 dataAvailabilityLengthBytes =
-      Internal.MESSAGE_FIXED_BYTES + 100 + (5 * Internal.MESSAGE_FIXED_BYTES_PER_TOKEN) + 50;
+      Internal.ANY_2_EVM_MESSAGE_FIXED_BYTES + 100 + (5 * Internal.ANY_2_EVM_MESSAGE_FIXED_BYTES_PER_TOKEN) + 50;
     uint256 dataAvailabilityGas = destChainDynamicConfig.destDataAvailabilityOverheadGas
       + destChainDynamicConfig.destGasPerDataAvailabilityByte * dataAvailabilityLengthBytes;
     uint256 expectedDataAvailabilityCostUSD = USD_PER_DATA_AVAILABILITY_GAS * dataAvailabilityGas
@@ -1066,8 +1067,8 @@ contract EVM2EVMMultiOnRamp_getDataAvailabilityCost is EVM2EVMMultiOnRamp_getFee
       tokenTransferBytesOverhead
     );
 
-    uint256 dataAvailabilityLengthBytes = Internal.MESSAGE_FIXED_BYTES + messageDataLength
-      + (numberOfTokens * Internal.MESSAGE_FIXED_BYTES_PER_TOKEN) + tokenTransferBytesOverhead;
+    uint256 dataAvailabilityLengthBytes = Internal.ANY_2_EVM_MESSAGE_FIXED_BYTES + messageDataLength
+      + (numberOfTokens * Internal.ANY_2_EVM_MESSAGE_FIXED_BYTES_PER_TOKEN) + tokenTransferBytesOverhead;
 
     uint256 dataAvailabilityGas =
       destDataAvailabilityOverheadGas + destGasPerDataAvailabilityByte * dataAvailabilityLengthBytes;

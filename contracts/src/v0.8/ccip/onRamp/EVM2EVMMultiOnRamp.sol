@@ -28,6 +28,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
 
   error CannotSendZeroTokens();
   error InvalidExtraArgsTag();
+  error InvalidFamilyTag(bytes4 familyTag);
   error ExtraArgOutOfOrderExecutionMustBeTrue();
   error OnlyCallableByOwnerOrAdmin();
   error MessageTooLarge(uint256 maxSize, uint256 actualSize);
@@ -56,7 +57,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
   );
   event TokenTransferFeeConfigDeleted(uint64 indexed destChainSelector, address indexed token);
   /// RMN depends on this event, if changing, please notify the RMN maintainers.
-  event CCIPSendRequested(uint64 indexed destChainSelector, Internal.EVM2EVMMessage message);
+  event CCIPSendRequested(uint64 indexed destChainSelector, Internal.EVM2AnyRampMessage message);
   event DestChainAdded(uint64 indexed destChainSelector, DestChainConfig destChainConfig);
   event DestChainDynamicConfigUpdated(uint64 indexed destChainSelector, DestChainDynamicConfig dynamicConfig);
 
@@ -140,7 +141,8 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
     uint64 defaultTxGasLimit; //                 │ Default gas limit for a tx
     uint64 gasMultiplierWeiPerEth; //            │ Multiplier for gas costs, 1e18 based so 11e17 = 10% extra cost.
     uint32 networkFeeUSDCents; //                │ Flat network fee to charge for messages,  multiples of 0.01 USD
-    bool enforceOutOfOrder; // ──────────────────╯ Whether to enforce the allowOutOfOrderExecution extraArg value to be true.
+    bool enforceOutOfOrder; //                   │ Whether to enforce the allowOutOfOrderExecution extraArg value to be true.
+    bytes4 familyTag; // ────────────────────────╯ Tag that identifies the ramp family. Used to determine the correct validations to perform for the family.
   }
 
   /// @dev Struct to hold the configs for a destination chain
@@ -249,7 +251,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
     address originalSender
   ) external returns (bytes32) {
     DestChainConfig storage destChainConfig = s_destChainConfig[destChainSelector];
-    Internal.EVM2EVMMessage memory newMessage =
+    Internal.EVM2AnyRampMessage memory newMessage =
       _generateNewMessage(destChainConfig, destChainSelector, message, feeTokenAmount, originalSender);
 
     // Lock the tokens as last step. TokenPools may not always be trusted.
@@ -287,8 +289,8 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
       ) {
         revert SourceTokenDataTooLarge(tokenAndAmount.token);
       }
-      // We validate the token address to ensure it is a valid EVM address
-      Internal._validateEVMAddress(poolReturnData.destTokenAddress);
+
+      _validateDestFamilyAddress(destChainConfig.dynamicConfig.familyTag, poolReturnData.destTokenAddress);
 
       newMessage.sourceTokenData[i] = abi.encode(
         Internal.SourceTokenData({
@@ -300,13 +302,13 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
     }
 
     // Hash only after the sourceTokenData has been set
-    newMessage.messageId = Internal._hash(newMessage, destChainConfig.metadataHash);
+    newMessage.header.messageId = Internal._hash(newMessage, destChainConfig.metadataHash);
 
     // Emit message request
     // This must happen after any pool events as some tokens (e.g. USDC) emit events that we expect to precede this
     // event in the offchain code.
     emit CCIPSendRequested(destChainSelector, newMessage);
-    return newMessage.messageId;
+    return newMessage.header.messageId;
   }
 
   /// @notice Helper function to relieve stack pressure from `forwardFromRouter`
@@ -321,7 +323,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
     Client.EVM2AnyMessage calldata message,
     uint256 feeTokenAmount,
     address originalSender
-  ) internal returns (Internal.EVM2EVMMessage memory) {
+  ) internal returns (Internal.EVM2AnyRampMessage memory) {
     if (IRMN(i_rmnProxy).isCursed(bytes16(uint128(destChainSelector)))) revert CursedByRMN(destChainSelector);
     // Validate message sender is set and allowed. Not validated in `getFee` since it is not user-driven.
     if (originalSender == address(0)) revert RouterMustSetOriginalSender();
@@ -329,12 +331,20 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
     if (msg.sender != s_dynamicConfig.router) revert MustBeCalledByRouter();
     if (!destChainConfig.dynamicConfig.isEnabled) revert DestinationChainNotEnabled(destChainSelector);
 
-    Client.EVMExtraArgsV2 memory extraArgs =
-      _extraArgsFromBytes(message.extraArgs, destChainConfig.dynamicConfig.defaultTxGasLimit);
+    Client.ExtraArgsV1 memory extraArgs = _extraArgsFromBytes(
+      message.extraArgs, destChainConfig.dynamicConfig.familyTag, destChainConfig.dynamicConfig.defaultTxGasLimit
+    );
     // Validate the message with various checks
     uint256 numberOfTokens = message.tokenAmounts.length;
+    // TODO: optimization - consider removing this call, since the Router calls into getFee -> _validateMessage
     _validateMessage(
-      destChainSelector, message.data.length, extraArgs.gasLimit, numberOfTokens, extraArgs.allowOutOfOrderExecution
+      destChainSelector,
+      message.data.length,
+      numberOfTokens,
+      extraArgs.allowOutOfOrderExecution,
+      message.receiver,
+      destChainConfig.dynamicConfig.maxPerMsgGasLimit,
+      extraArgs
     );
 
     // Only check token value if there are tokens
@@ -361,28 +371,32 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
 
     if (msgFeeJuels > i_maxFeeJuelsPerMsg) revert MessageFeeTooHigh(msgFeeJuels, i_maxFeeJuelsPerMsg);
 
-    // We need the next available sequence number so we increment before we use the value
-    return Internal.EVM2EVMMessage({
-      sourceChainSelector: i_chainSelector,
+    Internal.EVM2AnyRampMessage memory rampMessage = Internal.EVM2AnyRampMessage({
+      header: Internal.RampMessageHeader({
+        // Should be generated after the message is complete
+        messageId: "",
+        sourceChainSelector: i_chainSelector,
+        destChainSelector: destChainSelector,
+        // We need the next available sequence number so we increment before we use the value
+        sequenceNumber: ++destChainConfig.sequenceNumber,
+        // Only bump nonce for messages that specify allowOutOfOrderExecution == false. Otherwise, we
+        // may block ordered message nonces, which is not what we want.
+        nonce: extraArgs.allowOutOfOrderExecution
+          ? 0
+          : INonceManager(i_nonceManager).getIncrementedOutboundNonce(destChainSelector, originalSender)
+      }),
       sender: originalSender,
-      // EVM destination addresses should be abi encoded and therefore always 32 bytes long
-      // Not duplicately validated in `getFee`. Invalid address is uncommon, gas cost outweighs UX gain.
-      receiver: Internal._validateEVMAddress(message.receiver),
-      sequenceNumber: ++destChainConfig.sequenceNumber,
-      gasLimit: extraArgs.gasLimit,
-      strict: false,
-      // Only bump nonce for messages that specify allowOutOfOrderExecution == false. Otherwise, we
-      // may block ordered message nonces, which is not what we want.
-      nonce: extraArgs.allowOutOfOrderExecution
-        ? 0
-        : INonceManager(i_nonceManager).getIncrementedOutboundNonce(destChainSelector, originalSender),
+      data: message.data,
+      // Pass in the entire ExtraArgsV1 to include both args version + args data
+      extraArgs: abi.encode(extraArgs),
+      receiver: message.receiver,
       feeToken: message.feeToken,
       feeTokenAmount: feeTokenAmount,
-      data: message.data,
       tokenAmounts: message.tokenAmounts,
-      sourceTokenData: new bytes[](numberOfTokens), // will be populated below
-      messageId: ""
+      sourceTokenData: new bytes[](numberOfTokens) // should be populated after generation
     });
+
+    return rampMessage;
   }
 
   /// @dev Convert the extra args bytes into a struct
@@ -390,19 +404,48 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
   /// @return EVMExtraArgs the extra args struct
   function _extraArgsFromBytes(
     bytes calldata extraArgs,
+    bytes4 familyTag,
+    // TODO: replace the below with more generic bytes input?
     uint64 defaultTxGasLimit
-  ) internal pure returns (Client.EVMExtraArgsV2 memory) {
+  ) internal pure returns (Client.ExtraArgsV1 memory) {
     if (extraArgs.length == 0) {
-      return Client.EVMExtraArgsV2({gasLimit: defaultTxGasLimit, allowOutOfOrderExecution: false});
+      // If extra args are empty, generate default values
+
+      if (familyTag == Client.EVM_FAMILY_TAG) {
+        return Client.ExtraArgsV1({
+          allowOutOfOrderExecution: false,
+          destChainArgsVersion: Client.V1_TAG,
+          destChainExtraArgs: abi.encode(Client.EVMFamilyExtraArgsV1({gasLimit: defaultTxGasLimit}))
+        });
+      }
+
+      revert InvalidFamilyTag(familyTag);
     }
 
     bytes4 extraArgsTag = bytes4(extraArgs);
-    if (extraArgsTag == Client.EVM_EXTRA_ARGS_V2_TAG) {
-      return abi.decode(extraArgs[4:], (Client.EVMExtraArgsV2));
-    } else if (extraArgsTag == Client.EVM_EXTRA_ARGS_V1_TAG) {
-      // EVMExtraArgsV1 originally included a second boolean (strict) field which has been deprecated.
-      // Clients may still include it but it will be ignored.
-      return Client.EVMExtraArgsV2({gasLimit: abi.decode(extraArgs[4:], (uint256)), allowOutOfOrderExecution: false});
+    bytes memory argsData = extraArgs[4:];
+
+    if (extraArgsTag == Client.EXTRA_ARGS_V1_TAG) {
+      return abi.decode(argsData, (Client.ExtraArgsV1));
+    } else if (familyTag == Client.EVM_FAMILY_TAG) {
+      // Backwards compatibility for EVM-only extra args
+      if (extraArgsTag == Client.EVM_EXTRA_ARGS_V2_TAG) {
+        Client.EVMExtraArgsV2 memory evmExtraArgs = abi.decode(argsData, (Client.EVMExtraArgsV2));
+
+        return Client.ExtraArgsV1({
+          allowOutOfOrderExecution: evmExtraArgs.allowOutOfOrderExecution,
+          destChainArgsVersion: Client.V1_TAG,
+          destChainExtraArgs: abi.encode(Client.EVMFamilyExtraArgsV1({gasLimit: evmExtraArgs.gasLimit}))
+        });
+      } else if (extraArgsTag == Client.EVM_EXTRA_ARGS_V1_TAG) {
+        // EVMExtraArgsV1 originally included a second boolean (strict) field which has been deprecated.
+        // Clients may still include it but it will be ignored.
+        return Client.ExtraArgsV1({
+          allowOutOfOrderExecution: false,
+          destChainArgsVersion: Client.V1_TAG,
+          destChainExtraArgs: abi.encode(Client.EVMFamilyExtraArgsV1({gasLimit: abi.decode(argsData, (uint256))}))
+        });
+      }
     }
 
     revert InvalidExtraArgsTag();
@@ -413,24 +456,44 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
   /// only common user-driven mistakes are validated here to minimize duplicate validation cost.
   /// @param destChainSelector The destination chain selector.
   /// @param dataLength The length of the data field of the message.
-  /// @param gasLimit The gasLimit set in message for destination execution.
   /// @param numberOfTokens The number of tokens to be sent.
   function _validateMessage(
     uint64 destChainSelector,
     uint256 dataLength,
-    uint256 gasLimit,
     uint256 numberOfTokens,
-    bool allowOutOfOrderExecution
+    bool allowOutOfOrderExecution,
+    bytes memory receiver,
+    // TODO: replace the below with more generic bytes input?
+    uint32 maxPerMsgGasLimit,
+    Client.ExtraArgsV1 memory extraArgs
   ) internal view {
     // Check that payload is formed correctly
     DestChainDynamicConfig storage destChainDynamicConfig = s_destChainConfig[destChainSelector].dynamicConfig;
     if (dataLength > uint256(destChainDynamicConfig.maxDataBytes)) {
       revert MessageTooLarge(uint256(destChainDynamicConfig.maxDataBytes), dataLength);
     }
-    if (gasLimit > uint256(destChainDynamicConfig.maxPerMsgGasLimit)) revert MessageGasLimitTooHigh();
     if (numberOfTokens > uint256(destChainDynamicConfig.maxNumberOfTokensPerMsg)) revert UnsupportedNumberOfTokens();
     if (destChainDynamicConfig.enforceOutOfOrder && !allowOutOfOrderExecution) {
       revert ExtraArgOutOfOrderExecutionMustBeTrue();
+    }
+
+    _validateDestFamilyAddress(destChainDynamicConfig.familyTag, receiver);
+
+    // Validate extraArgs
+    if (destChainDynamicConfig.familyTag == Client.EVM_FAMILY_TAG) {
+      Client.EVMFamilyExtraArgsV1 memory evmExtraArgs =
+        abi.decode(extraArgs.destChainExtraArgs, (Client.EVMFamilyExtraArgsV1));
+      if (evmExtraArgs.gasLimit > uint256(maxPerMsgGasLimit)) revert MessageGasLimitTooHigh();
+    }
+  }
+
+  /// @notice Validates that the destAddress matches the expected format of the family.
+  /// @param familyTag Tag to identify the target family
+  /// @param destAddress Dest address to validate
+  /// @dev precondition - assumes the family tag is correct and validated
+  function _validateDestFamilyAddress(bytes4 familyTag, bytes memory destAddress) internal pure {
+    if (familyTag == Client.EVM_FAMILY_TAG) {
+      Internal._validateEVMAddress(destAddress);
     }
   }
 
@@ -515,15 +578,17 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
 
     if (!destChainDynamicConfig.isEnabled) revert DestinationChainNotEnabled(destChainSelector);
 
-    Client.EVMExtraArgsV2 memory extraArgs =
-      _extraArgsFromBytes(message.extraArgs, destChainDynamicConfig.defaultTxGasLimit);
+    Client.ExtraArgsV1 memory extraArgs =
+      _extraArgsFromBytes(message.extraArgs, destChainDynamicConfig.familyTag, destChainDynamicConfig.defaultTxGasLimit);
     // Validate the message with various checks
     _validateMessage(
       destChainSelector,
       message.data.length,
-      extraArgs.gasLimit,
       message.tokenAmounts.length,
-      extraArgs.allowOutOfOrderExecution
+      extraArgs.allowOutOfOrderExecution,
+      message.receiver,
+      destChainDynamicConfig.maxPerMsgGasLimit,
+      extraArgs
     );
 
     uint64 premiumMultiplierWeiPerEth = s_premiumMultiplierWeiPerEth[message.feeToken];
@@ -569,11 +634,17 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
     // We add the message gas limit, the overhead gas, the gas of passing message data to receiver, and token transfer gas together.
     // We then multiply this gas total with the gas multiplier and gas price, converting it into USD with 36 decimals.
     // uint112(packedGasPrice) = executionGasPrice
-    uint256 executionCost = uint112(packedGasPrice)
-      * (
-        extraArgs.gasLimit + destChainDynamicConfig.destGasOverhead
-          + (message.data.length * destChainDynamicConfig.destGasPerPayloadByte) + tokenTransferGas
-      ) * destChainDynamicConfig.gasMultiplierWeiPerEth;
+
+    // TODO: revisit how generic this logic can be for non-EVM chains
+
+    uint256 executionGasCost = destChainDynamicConfig.destGasOverhead
+      + (message.data.length * destChainDynamicConfig.destGasPerPayloadByte) + tokenTransferGas;
+
+    if (destChainDynamicConfig.familyTag == Client.EVM_FAMILY_TAG) {
+      executionGasCost += abi.decode(extraArgs.destChainExtraArgs, (Client.EVMFamilyExtraArgsV1)).gasLimit;
+    }
+
+    uint256 executionCost = uint112(packedGasPrice) * executionGasCost * destChainDynamicConfig.gasMultiplierWeiPerEth;
 
     // Calculate number of fee tokens to charge.
     // Total USD fee is in 36 decimals, feeTokenPrice is in 18 decimals USD for 1e18 smallest token denominations.
@@ -598,8 +669,8 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
   ) internal view returns (uint256 dataAvailabilityCostUSD36Decimal) {
     // dataAvailabilityLengthBytes sums up byte lengths of fixed message fields and dynamic message fields.
     // Fixed message fields do account for the offset and length slot of the dynamic fields.
-    uint256 dataAvailabilityLengthBytes = Internal.MESSAGE_FIXED_BYTES + messageDataLength
-      + (numberOfTokens * Internal.MESSAGE_FIXED_BYTES_PER_TOKEN) + tokenTransferBytesOverhead;
+    uint256 dataAvailabilityLengthBytes = Internal.ANY_2_EVM_MESSAGE_FIXED_BYTES + messageDataLength
+      + (numberOfTokens * Internal.ANY_2_EVM_MESSAGE_FIXED_BYTES_PER_TOKEN) + tokenTransferBytesOverhead;
 
     DestChainDynamicConfig storage destChainDynamicConfig = s_destChainConfig[destChainSelector].dynamicConfig;
     // destDataAvailabilityOverheadGas is a separate config value for flexibility to be updated independently of message cost.
@@ -723,7 +794,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
 
       if (destChainConfig.metadataHash == 0) {
         newDestChainConfig.metadataHash =
-          keccak256(abi.encode(Internal.EVM_2_EVM_MESSAGE_HASH, i_chainSelector, destChainSelector, address(this)));
+          keccak256(abi.encode(Internal.EVM_2_ANY_MESSAGE_HASH, i_chainSelector, destChainSelector, address(this)));
         destChainConfig.metadataHash = newDestChainConfig.metadataHash;
         if (prevOnRamp != address(0)) destChainConfig.prevOnRamp = prevOnRamp;
 
