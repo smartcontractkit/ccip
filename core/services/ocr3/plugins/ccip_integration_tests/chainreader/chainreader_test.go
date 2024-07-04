@@ -18,6 +18,8 @@ import (
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/stretchr/testify/assert"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/codec"
 	types2 "github.com/smartcontractkit/chainlink-common/pkg/types"
 	query2 "github.com/smartcontractkit/chainlink-common/pkg/types/query"
@@ -28,7 +30,6 @@ import (
 	logger2 "github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay/evm"
 	evmtypes "github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/types"
-	"github.com/stretchr/testify/assert"
 )
 
 const chainID = 1337
@@ -77,6 +78,9 @@ func TestChainReader(t *testing.T) {
 	cfg := evmtypes.ChainReaderConfig{
 		Contracts: map[string]evmtypes.ChainContractReader{
 			ContractNameAlias: {
+				ContractPollingFilter: evmtypes.ContractPollingFilter{
+					GenericEventNames: []string{EventNameAlias},
+				},
 				ContractABI: ChainreaderMetaData.ABI,
 				Configs: map[string]*evmtypes.ChainReaderDefinition{
 					EventNameAlias: {
