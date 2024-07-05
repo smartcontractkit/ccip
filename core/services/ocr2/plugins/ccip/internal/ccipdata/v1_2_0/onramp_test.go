@@ -11,10 +11,12 @@ import (
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
 
+	evmclimocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/client/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	ubig "github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils/big"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp_1_2_0"
+	"github.com/smartcontractkit/chainlink/v2/core/internal/cltest/heavyweight"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils/pgtest"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
@@ -152,7 +154,88 @@ func TestOnRamp_GetSendRequestsForSeqNums(t *testing.T) {
 	}
 }
 
-func createCCIPSenRequestedLog(t *testing.T, chainID *big.Int, address common.Address, seqNr uint64, blockNumber int64, logIndex int64, messageID common.Hash) logpoller.Log {
+// Scenario 1
+// Benchmark_FilteredLogsQuery
+// Benchmark_FilteredLogsQuery-12    	      50	  24661219 ns/op
+// Benchmark_FilteredLogsQuery-12    	      49	  24392641 ns/op
+// Benchmark_FilteredLogsQuery-12    	      50	  25084857 ns/op
+// Benchmark_FilteredLogsQuery-12    	      54	  28100956 ns/op
+//
+// Scenario 2
+// Benchmark_FilteredLogsQuery
+// Benchmark_FilteredLogsQuery-12    	      51	  24117666 ns/op
+// Benchmark_FilteredLogsQuery-12    	      51	  24520130 ns/op
+// Benchmark_FilteredLogsQuery-12    	      52	  23826061 ns/op
+// Benchmark_FilteredLogsQuery-12    	      56	  22766220 ns/op
+//
+// Scenario 3
+// Benchmark_FilteredLogsQuery
+// Benchmark_FilteredLogsQuery-12    	      79	  17122976 ns/op
+// Benchmark_FilteredLogsQuery-12    	      78	  17512757 ns/op
+// Benchmark_FilteredLogsQuery-12    	      80	  83212702 ns/op
+// Benchmark_FilteredLogsQuery-12    	      76	  16195331 ns/op
+// Benchmark_FilteredLogsQuery-12    	      79	  15901089 ns/op
+func Benchmark_FilteredLogsQuery(b *testing.B) {
+	ctx := testutils.Context(b)
+	_, db := heavyweight.FullTestDBV2(b, nil)
+	chainID := testutils.NewRandomEVMChainID()
+	orm := logpoller.NewORM(chainID, db, logger.TestLogger(b))
+	lpOpts := logpoller.Opts{
+		PollPeriod:               time.Hour,
+		FinalityDepth:            2,
+		BackfillBatchSize:        20,
+		RpcBatchSize:             10,
+		KeepFinalizedBlocksDepth: 1000,
+	}
+	lp := logpoller.NewLogPoller(orm, nil, logger.TestLogger(b), lpOpts)
+
+	onrampAddress := utils.RandomAddress()
+
+	for j := 1; j <= 100; j++ {
+		var logs []logpoller.Log
+		for i := 0; i < 1_000; i++ {
+			logs = append(
+				logs,
+				createCCIPSenRequestedLog(
+					b,
+					chainID,
+					onrampAddress,
+					uint64(j*1000+i),
+					int64(j*1000+i),
+					int64(j),
+					utils.RandomBytes32(),
+				),
+			)
+		}
+		require.NoError(b, orm.InsertLogs(ctx, logs))
+		require.NoError(b, orm.InsertBlock(ctx, utils.RandomHash(), int64((j+1)*1000-1), time.Now(), 0))
+	}
+
+	onRamp, err := v1_2_0.NewOnRamp(logger.TestLogger(b), uint64(1), uint64(2), onrampAddress, lp, evmclimocks.NewClient(b))
+	require.NoError(b, err)
+
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		// Scenario 1
+		//logs, err1 := onRamp.GetSendRequestsBetweenSeqNums(testutils.Context(b), 1024, 2047, false)
+		// Scenario 2
+		//logs, err1 := onRamp.GetSendRequestsForSeqNums(testutils.Context(b), []cciptypes.SequenceNumberRange{{Min: 1024, Max: 2047}}, false)
+		//require.NoError(b, err1)
+		//assert.Len(b, logs, 1024)
+		// Scenario 3
+		logs, err1 := onRamp.GetSendRequestsForSeqNums(testutils.Context(b), []cciptypes.SequenceNumberRange{
+			{Min: 1000, Max: 1099},
+			{Min: 1200, Max: 1299},
+			{Min: 1800, Max: 1999},
+			{Min: 2200, Max: 2499},
+		}, false)
+		require.NoError(b, err1)
+		assert.Len(b, logs, 700)
+	}
+}
+
+func createCCIPSenRequestedLog(t testing.TB, chainID *big.Int, address common.Address, seqNr uint64, blockNumber int64, logIndex int64, messageID common.Hash) logpoller.Log {
 	tAbi, err := evm_2_evm_onramp_1_2_0.EVM2EVMOnRampMetaData.GetAbi()
 	require.NoError(t, err)
 	eseEvent, ok := tAbi.Events["CCIPSendRequested"]

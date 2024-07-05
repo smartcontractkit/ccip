@@ -448,6 +448,8 @@ func (o *OffRamp) GetExecutionStateChangesForSeqNums(ctx context.Context, seqNum
 		return nil, fmt.Errorf("get lp latest block: %w", err)
 	}
 
+	// TODO There are some cases that could be simplified, e.g. getting logs for continuous range could be replaced with a single condition
+	// GetExecutionStateChangesForSeqNums([1:10], [11:20], [21:30]) -> GetExecutionStateChangesForSeqNums([1:30])
 	seqNumRanges := make([]query.Expression, 0, len(seqNums))
 	for _, seqNr := range seqNums {
 		seqNumRanges = append(seqNumRanges, query.And(
