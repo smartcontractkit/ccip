@@ -132,19 +132,6 @@ library Internal {
     });
   }
 
-  function _toAny2EVMMessage(
-    Any2EVMRampMessage memory original,
-    Client.EVMTokenAmount[] memory destTokenAmounts
-  ) internal pure returns (Client.Any2EVMMessage memory message) {
-    return Client.Any2EVMMessage({
-      messageId: original.header.messageId,
-      sourceChainSelector: original.header.sourceChainSelector,
-      sender: abi.encode(original.sender),
-      data: original.data,
-      destTokenAmounts: destTokenAmounts
-    });
-  }
-
   bytes32 internal constant EVM_2_EVM_MESSAGE_HASH = keccak256("EVM2EVMMessageHashV2");
 
   function _hash(EVM2EVMMessage memory original, bytes32 metadataHash) internal pure returns (bytes32) {
