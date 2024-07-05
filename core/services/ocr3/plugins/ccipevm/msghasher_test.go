@@ -34,11 +34,11 @@ func TestMessageHasher_e2e(t *testing.T) {
 	// low budget "fuzz" test.
 	// TODO: should actually write a real fuzz test.
 	for i := 0; i < 5; i++ {
-		testHasher(t, ctx, d)
+		testHasher(ctx, t, d)
 	}
 }
 
-func testHasher(t *testing.T, ctx context.Context, d *testSetupData) {
+func testHasher(ctx context.Context, t *testing.T, d *testSetupData) {
 	destChainSelector := rand.Uint64()
 	onRampAddress := testutils.NewAddress().Bytes()
 	ccipMsg := createCCIPMsg(t)
