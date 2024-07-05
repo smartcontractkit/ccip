@@ -204,19 +204,26 @@ func (m *MsgProfile) Validate() error {
 	return nil
 }
 
+type LoadFrequency struct {
+	RequestPerUnitTime []int64            `toml:",omitempty"`
+	TimeUnit           *config.Duration   `toml:",omitempty"`
+	StepDuration       []*config.Duration `toml:",omitempty"`
+}
+
 type LoadProfile struct {
-	MsgProfile                                 *MsgProfile        `toml:",omitempty"`
-	RequestPerUnitTime                         []int64            `toml:",omitempty"`
-	TimeUnit                                   *config.Duration   `toml:",omitempty"`
-	StepDuration                               []*config.Duration `toml:",omitempty"`
-	TestDuration                               *config.Duration   `toml:",omitempty"`
-	NetworkChaosDelay                          *config.Duration   `toml:",omitempty"`
-	WaitBetweenChaosDuringLoad                 *config.Duration   `toml:",omitempty"`
-	SkipRequestIfAnotherRequestTriggeredWithin *config.Duration   `toml:",omitempty"`
-	OptimizeSpace                              *bool              `toml:",omitempty"`
-	FailOnFirstErrorInLoad                     *bool              `toml:",omitempty"`
-	SendMaxDataInEveryMsgCount                 *int64             `toml:",omitempty"`
-	TestRunName                                string             `toml:",omitempty"`
+	MsgProfile                                 *MsgProfile               `toml:",omitempty"`
+	FrequencyByDestination                     map[string]*LoadFrequency `toml:",omitempty"`
+	RequestPerUnitTime                         []int64                   `toml:",omitempty"`
+	TimeUnit                                   *config.Duration          `toml:",omitempty"`
+	StepDuration                               []*config.Duration        `toml:",omitempty"`
+	TestDuration                               *config.Duration          `toml:",omitempty"`
+	NetworkChaosDelay                          *config.Duration          `toml:",omitempty"`
+	WaitBetweenChaosDuringLoad                 *config.Duration          `toml:",omitempty"`
+	SkipRequestIfAnotherRequestTriggeredWithin *config.Duration          `toml:",omitempty"`
+	OptimizeSpace                              *bool                     `toml:",omitempty"`
+	FailOnFirstErrorInLoad                     *bool                     `toml:",omitempty"`
+	SendMaxDataInEveryMsgCount                 *int64                    `toml:",omitempty"`
+	TestRunName                                string                    `toml:",omitempty"`
 }
 
 func (l *LoadProfile) Validate() error {
