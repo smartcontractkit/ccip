@@ -134,6 +134,12 @@ library Internal {
 
   bytes32 internal constant EVM_2_EVM_MESSAGE_HASH = keccak256("EVM2EVMMessageHashV2");
 
+  /// @dev Used to hash messages for single-lane ramps.
+  /// OnRamp hash(EVM2EVMMessage) = OffRamp hash(EVM2EVMMessage)
+  /// The EVM2EVMMessage's messageId is expected to be the output of this hash function
+  /// @param original Message to hash
+  /// @param metadataHash Immutable metadata hash representing a lane with a fixed OnRamp
+  /// @return hashedMessage hashed message as a keccak256
   function _hash(EVM2EVMMessage memory original, bytes32 metadataHash) internal pure returns (bytes32) {
     // Fixed-size message fields are included in nested hash to reduce stack pressure.
     // This hashing scheme is also used by RMN. If changing it, please notify the RMN maintainers.
@@ -162,6 +168,12 @@ library Internal {
 
   bytes32 internal constant ANY_2_EVM_MESSAGE_HASH = keccak256("Any2EVMMessageHashV1");
 
+  /// @dev Used to hash messages for multi-lane family-agnostic OffRamps.
+  /// OnRamp hash(EVM2AnyMessage) != Any2EVMRampMessage.messageId
+  /// OnRamp hash(EVM2AnyMessage) != OffRamp hash(Any2EVMRampMessage)
+  /// @param original OffRamp message to hash
+  /// @param onRamp OnRamp to hash the message with - used to compute the metadataHash
+  /// @return hashedMessage hashed message as a keccak256
   function _hash(Any2EVMRampMessage memory original, bytes memory onRamp) internal pure returns (bytes32) {
     // Fixed-size message fields are included in nested hash to reduce stack pressure.
     // This hashing scheme is also used by RMN. If changing it, please notify the RMN maintainers.
