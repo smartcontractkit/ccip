@@ -145,6 +145,10 @@ func (d *DynamicPriceGetter) performBatchCall(ctx context.Context, chainID uint6
 
 	results, err := evmCaller.BatchCall(ctx, 0, calls)
 
+	if err != nil {
+		return fmt.Errorf("batch call on chain %d failed: %w", chainID, err)
+	}
+
 	// Extract results.
 	decimals := make([]uint8, 0, nbDecimalCalls)
 	latestRounds := make([]*big.Int, 0, nbLatestRoundDataCalls)
