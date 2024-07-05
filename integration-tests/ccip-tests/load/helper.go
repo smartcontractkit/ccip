@@ -34,6 +34,9 @@ type ChaosConfig struct {
 	WaitBetweenChaos time.Duration
 }
 
+// WaspSchedule calculates the load schedule based on the provided request per unit time and duration
+// if multiple step durations are provided, it will calculate the schedule based on the step duration and
+// corresponding request per unit time by matching the index of the request per unit time and step duration slice
 func WaspSchedule(rps []int64, duration *config.Duration, steps []*config.Duration) []*wasp.Segment {
 	var segments []*wasp.Segment
 	var segmentDuration time.Duration
@@ -47,9 +50,8 @@ func WaspSchedule(rps []int64, duration *config.Duration, steps []*config.Durati
 		totalDuration := duration.Duration()
 		repeatTimes := totalDuration.Seconds() / segmentDuration.Seconds()
 		return wasp.CombineAndRepeat(int(math.Round(repeatTimes)), segments)
-	} else {
-		return wasp.Plain(rps[0], duration.Duration())
 	}
+	return wasp.Plain(rps[0], duration.Duration())
 }
 
 type LoadArgs struct {
