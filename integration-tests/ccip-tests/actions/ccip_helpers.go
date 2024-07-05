@@ -184,6 +184,15 @@ type CCIPCommon struct {
 	tokenPriceUpdateWatcher   map[common.Address]*big.Int // key - token; value - timestamp of update
 	gasUpdateWatcherMu        *sync.Mutex
 	gasUpdateWatcher          map[uint64]*big.Int // key - destchain id; value - timestamp of update
+	GasUpdater                []gasUpdateInfo
+}
+
+type gasUpdateInfo struct {
+	Sender        string
+	Tx            string
+	Value         *big.Int
+	DestChain     uint64
+	ChainSelector uint64
 }
 
 // FreeUpUnusedSpace sets nil to various elements of ccipModule which are only used
@@ -555,13 +564,21 @@ func (ccipModule *CCIPCommon) WatchForPriceUpdates(ctx context.Context, lggr *ze
 	if tokenUpdateSub == nil {
 		return fmt.Errorf("no event subscription found")
 	}
-	processEvent := func(timestamp *big.Int, destChainSelector uint64) error {
+	processEvent := func(value, timestamp *big.Int, destChainSelector uint64, raw types.Log) error {
 		destChain, err := chainselectors.ChainIdFromSelector(destChainSelector)
 		if err != nil {
 			return err
 		}
 		ccipModule.gasUpdateWatcherMu.Lock()
 		ccipModule.gasUpdateWatcher[destChain] = timestamp
+
+		ccipModule.GasUpdater = append(ccipModule.GasUpdater, gasUpdateInfo{
+			Sender:        raw.Address.Hex(),
+			Tx:            raw.TxHash.Hex(),
+			Value:         value,
+			DestChain:     destChain,
+			ChainSelector: destChainSelector,
+		})
 		ccipModule.gasUpdateWatcherMu.Unlock()
 		lggr.Info().
 			Uint64("chainSelector", destChainSelector).
@@ -578,13 +595,14 @@ func (ccipModule *CCIPCommon) WatchForPriceUpdates(ctx context.Context, lggr *ze
 			tokenUpdateSub.Unsubscribe()
 			ccipModule.gasUpdateWatcher = nil
 			ccipModule.gasUpdateWatcherMu = nil
+			ccipModule.GasUpdater = nil
 			ccipModule.tokenPriceUpdateWatcher = nil
 			ccipModule.tokenPriceUpdateWatcherMu = nil
 		}()
 		for {
 			select {
 			case e := <-gasUpdateEventLatest:
-				err := processEvent(e.Timestamp, e.DestChain)
+				err := processEvent(e.Value, e.Timestamp, e.DestChain, e.Raw)
 				if err != nil {
 					continue
 				}
