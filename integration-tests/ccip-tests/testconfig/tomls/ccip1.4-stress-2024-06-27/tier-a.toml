@@ -7,7 +7,7 @@
 ##
 ## make test_load_ccip testimage=795953128386.dkr.ecr.us-west-2.amazonaws.com/chainlink-ccip-tests:ccip-develop \
 ##      testname=TestLoadCCIPStableRequestTriggeringWithNetworkChaos \
-##      override_toml=./testconfig/tomls/baseline.toml \
+##      override_toml=./testconfig/tomls/ccip1.4-stress-2024-06-27/tier-a.toml \
 ##      secret_toml=./testconfig/tomls/secrets.toml
 
 [CCIP]
@@ -192,10 +192,22 @@ CCIPOwnerTokens = true
 
 [CCIP.Groups.load.LoadProfile]
 TestDuration = '4h'
-TimeUnit = '5s'
-RequestPerUnitTime = [1]
 OptimizeSpace = true
 NetworkChaosDelay = '100ms'
+TimeUnit = '5s'
+RequestPerUnitTime = [1]
+
+[CCIP.Groups.load.LoadProfile.LoadFrequency.slow-chain-1]
+TimeUnit = '10s'
+RequestPerUnitTime = [1]
+
+[CCIP.Groups.load.LoadProfile.LoadFrequency.slow-chain-2]
+TimeUnit = '10s'
+RequestPerUnitTime = [1]
+
+[CCIP.Groups.load.LoadProfile.LoadFrequency.slow-chain-3]
+TimeUnit = '10s'
+RequestPerUnitTime = [1]
 
 # to represent 20%, 60%, 15%, 5% of the total messages
 [CCIP.Groups.load.LoadProfile.MsgProfile]
