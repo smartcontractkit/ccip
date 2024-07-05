@@ -280,12 +280,13 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
       // Since the DON has to pay for the extraData to be included on the destination chain, we cap the length of the
       // extraData. This prevents gas bomb attacks on the NOPs. As destBytesOverhead accounts for both
       // extraData and offchainData, this caps the worst case abuse to the number of bytes reserved for offchainData.
-      if (
-        poolReturnData.destPoolData.length > Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES
-          && poolReturnData.destPoolData.length
+      if (poolReturnData.destPoolData.length > Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES) {
+        if (
+          poolReturnData.destPoolData.length
             > s_tokenTransferFeeConfig[destChainSelector][tokenAndAmount.token].destBytesOverhead
-      ) {
-        revert SourceTokenDataTooLarge(tokenAndAmount.token);
+        ) {
+          revert SourceTokenDataTooLarge(tokenAndAmount.token);
+        }
       }
       // We validate the token address to ensure it is a valid EVM address
       Internal._validateEVMAddress(poolReturnData.destTokenAddress);
@@ -429,8 +430,10 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
     }
     if (gasLimit > uint256(destChainDynamicConfig.maxPerMsgGasLimit)) revert MessageGasLimitTooHigh();
     if (numberOfTokens > uint256(destChainDynamicConfig.maxNumberOfTokensPerMsg)) revert UnsupportedNumberOfTokens();
-    if (destChainDynamicConfig.enforceOutOfOrder && !allowOutOfOrderExecution) {
-      revert ExtraArgOutOfOrderExecutionMustBeTrue();
+    if (!allowOutOfOrderExecution) {
+      if (destChainDynamicConfig.enforceOutOfOrder) {
+        revert ExtraArgOutOfOrderExecutionMustBeTrue();
+      }
     }
   }
 
