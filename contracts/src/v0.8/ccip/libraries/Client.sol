@@ -53,32 +53,6 @@ library Client {
     return abi.encodeWithSelector(EVM_EXTRA_ARGS_V2_TAG, extraArgs);
   }
 
-  // Common tag to indicate a v1 version
-  bytes4 public constant V1_TAG = 0x00000001;
-
-  // TODO: pre-store constant
-  bytes4 public constant EXTRA_ARGS_V1_TAG = bytes4(keccak256("CCIP ExtraArgsV1"));
-
-  /// @notice Family-agonstic extra args struct that contains dest-chain specific data in bytes format
-  /// @param allowOutOfOrderExecution: if true, it indicates that the message can be executed in any order relative to other messages from the same sender.
-  /// @param destChainArgsVersion: used to distinguish between different versions of the destChainExtraArgs
-  /// @param destChainExtraArgs: extra args to send to the dest chain
-  struct ExtraArgsV1 {
-    bool allowOutOfOrderExecution;
-    bytes4 destChainArgsVersion;
-    bytes destChainExtraArgs;
-  }
-
-  function _argsToBytes(ExtraArgsV1 memory extraArgs) internal pure returns (bytes memory bts) {
-    return abi.encodeWithSelector(EXTRA_ARGS_V1_TAG, extraArgs);
-  }
-
   // TODO: pre-optimize by storing the const value
   bytes4 public constant EVM_FAMILY_TAG = bytes4(keccak256("CCIP EVM Family"));
-
-  /// @notice EVM-specific args for ExtraArgs struct destChainExtraArgs input
-  /// @param gasLimit: gas limit for the callback on the destination chain.
-  struct EVMFamilyExtraArgsV1 {
-    uint256 gasLimit;
-  }
 }

@@ -330,21 +330,10 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
     if (msg.sender != s_dynamicConfig.router) revert MustBeCalledByRouter();
     if (!destChainConfig.dynamicConfig.isEnabled) revert DestinationChainNotEnabled(destChainSelector);
 
-    Client.ExtraArgsV1 memory extraArgs = _extraArgsFromBytes(
-      message.extraArgs, destChainConfig.dynamicConfig.familyTag, destChainConfig.dynamicConfig.defaultTxGasLimit
-    );
     // Validate the message with various checks
     uint256 numberOfTokens = message.tokenAmounts.length;
     // TODO: optimization - consider removing this call, since the Router calls into getFee -> _validateMessage
-    _validateMessage(
-      destChainSelector,
-      message.data.length,
-      numberOfTokens,
-      extraArgs.allowOutOfOrderExecution,
-      message.receiver,
-      destChainConfig.dynamicConfig.maxPerMsgGasLimit,
-      extraArgs
-    );
+    _validateMessage(destChainSelector, message.data.length, numberOfTokens, message.receiver);
 
     // Only check token value if there are tokens
     if (numberOfTokens > 0) {
@@ -370,6 +359,17 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
 
     if (msgFeeJuels > i_maxFeeJuelsPerMsg) revert MessageFeeTooHigh(msgFeeJuels, i_maxFeeJuelsPerMsg);
 
+    // Assumes strict ordering, unless the chain is of the EVM family and the extra args indicate out of order execution
+    uint64 nonce = 0;
+    if (
+      destChainConfig.dynamicConfig.familyTag != Client.EVM_FAMILY_TAG
+        || !_parseEVMExtraArgsFromBytes(message.extraArgs, destChainConfig.dynamicConfig).allowOutOfOrderExecution
+    ) {
+      // Only bump nonce for messages that specify allowOutOfOrderExecution == false. Otherwise, we
+      // may block ordered message nonces, which is not what we want.
+      nonce = INonceManager(i_nonceManager).getIncrementedOutboundNonce(destChainSelector, originalSender);
+    }
+
     Internal.EVM2AnyRampMessage memory rampMessage = Internal.EVM2AnyRampMessage({
       header: Internal.RampMessageHeader({
         // Should be generated after the message is complete
@@ -378,16 +378,11 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
         destChainSelector: destChainSelector,
         // We need the next available sequence number so we increment before we use the value
         sequenceNumber: ++destChainConfig.sequenceNumber,
-        // Only bump nonce for messages that specify allowOutOfOrderExecution == false. Otherwise, we
-        // may block ordered message nonces, which is not what we want.
-        nonce: extraArgs.allowOutOfOrderExecution
-          ? 0
-          : INonceManager(i_nonceManager).getIncrementedOutboundNonce(destChainSelector, originalSender)
+        nonce: nonce
       }),
       sender: originalSender,
       data: message.data,
-      // Pass in the entire ExtraArgsV1 to include both args version + args data
-      extraArgs: abi.encode(extraArgs),
+      extraArgs: _parseExtraArgsFromBytes(message.extraArgs, destChainConfig.dynamicConfig),
       receiver: message.receiver,
       feeToken: message.feeToken,
       feeTokenAmount: feeTokenAmount,
@@ -397,53 +392,64 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
     return rampMessage;
   }
 
+  /// @dev Parses extraArgs dest chain config family tag validation, and conversion to the latest arguments version.
+  /// Used to generate an EVM2AnyRampMessage with the accurate representation of the parsed extraArgs.
+  /// @param extraArgs The extra args bytes
+  /// @param destChainDynamicConfig Dest chain config to validate against
+  /// @return encodedExtraArgs the parsed & encoded extra args
+  function _parseExtraArgsFromBytes(
+    bytes calldata extraArgs,
+    DestChainDynamicConfig memory destChainDynamicConfig
+  ) internal pure returns (bytes memory) {
+    bytes4 familyTag = destChainDynamicConfig.familyTag;
+    if (familyTag == Client.EVM_FAMILY_TAG) {
+      return abi.encode(_parseEVMExtraArgsFromBytes(extraArgs, destChainDynamicConfig));
+    }
+
+    revert InvalidFamilyTag(destChainDynamicConfig.familyTag);
+  }
+
+  /// @dev Convert the extra args bytes into a struct with validations against the dest chain config
+  /// @param extraArgs The extra args bytes
+  /// @param destChainDynamicConfig Dest chain config to validate against
+  /// @return EVMExtraArgs the extra args struct (latest version)
+  function _parseEVMExtraArgsFromBytes(
+    bytes calldata extraArgs,
+    DestChainDynamicConfig memory destChainDynamicConfig
+  ) internal pure returns (Client.EVMExtraArgsV2 memory) {
+    Client.EVMExtraArgsV2 memory evmExtraArgs =
+      _parseUnvalidatedEVMExtraArgsFromBytes(extraArgs, destChainDynamicConfig.defaultTxGasLimit);
+
+    if (evmExtraArgs.gasLimit > uint256(destChainDynamicConfig.maxPerMsgGasLimit)) revert MessageGasLimitTooHigh();
+    if (destChainDynamicConfig.enforceOutOfOrder && !evmExtraArgs.allowOutOfOrderExecution) {
+      revert ExtraArgOutOfOrderExecutionMustBeTrue();
+    }
+
+    return evmExtraArgs;
+  }
+
   /// @dev Convert the extra args bytes into a struct
   /// @param extraArgs The extra args bytes
-  /// @return EVMExtraArgs the extra args struct
-  function _extraArgsFromBytes(
+  /// @param defaultTxGasLimit default tx gas limit to use in the absence of extra args
+  /// @return EVMExtraArgs the extra args struct (latest version)
+  function _parseUnvalidatedEVMExtraArgsFromBytes(
     bytes calldata extraArgs,
-    bytes4 familyTag,
-    // TODO: replace the below with more generic bytes input?
     uint64 defaultTxGasLimit
-  ) internal pure returns (Client.ExtraArgsV1 memory) {
+  ) private pure returns (Client.EVMExtraArgsV2 memory) {
     if (extraArgs.length == 0) {
       // If extra args are empty, generate default values
-
-      if (familyTag == Client.EVM_FAMILY_TAG) {
-        return Client.ExtraArgsV1({
-          allowOutOfOrderExecution: false,
-          destChainArgsVersion: Client.V1_TAG,
-          destChainExtraArgs: abi.encode(Client.EVMFamilyExtraArgsV1({gasLimit: defaultTxGasLimit}))
-        });
-      }
-
-      revert InvalidFamilyTag(familyTag);
+      return Client.EVMExtraArgsV2({gasLimit: defaultTxGasLimit, allowOutOfOrderExecution: false});
     }
 
     bytes4 extraArgsTag = bytes4(extraArgs);
     bytes memory argsData = extraArgs[4:];
 
-    if (extraArgsTag == Client.EXTRA_ARGS_V1_TAG) {
-      return abi.decode(argsData, (Client.ExtraArgsV1));
-    } else if (familyTag == Client.EVM_FAMILY_TAG) {
-      // Backwards compatibility for EVM-only extra args
-      if (extraArgsTag == Client.EVM_EXTRA_ARGS_V2_TAG) {
-        Client.EVMExtraArgsV2 memory evmExtraArgs = abi.decode(argsData, (Client.EVMExtraArgsV2));
-
-        return Client.ExtraArgsV1({
-          allowOutOfOrderExecution: evmExtraArgs.allowOutOfOrderExecution,
-          destChainArgsVersion: Client.V1_TAG,
-          destChainExtraArgs: abi.encode(Client.EVMFamilyExtraArgsV1({gasLimit: evmExtraArgs.gasLimit}))
-        });
-      } else if (extraArgsTag == Client.EVM_EXTRA_ARGS_V1_TAG) {
-        // EVMExtraArgsV1 originally included a second boolean (strict) field which has been deprecated.
-        // Clients may still include it but it will be ignored.
-        return Client.ExtraArgsV1({
-          allowOutOfOrderExecution: false,
-          destChainArgsVersion: Client.V1_TAG,
-          destChainExtraArgs: abi.encode(Client.EVMFamilyExtraArgsV1({gasLimit: abi.decode(argsData, (uint256))}))
-        });
-      }
+    if (extraArgsTag == Client.EVM_EXTRA_ARGS_V2_TAG) {
+      return abi.decode(argsData, (Client.EVMExtraArgsV2));
+    } else if (extraArgsTag == Client.EVM_EXTRA_ARGS_V1_TAG) {
+      // EVMExtraArgsV1 originally included a second boolean (strict) field which has been deprecated.
+      // Clients may still include it but it will be ignored.
+      return Client.EVMExtraArgsV2({gasLimit: abi.decode(argsData, (uint256)), allowOutOfOrderExecution: false});
     }
 
     revert InvalidExtraArgsTag();
@@ -459,11 +465,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
     uint64 destChainSelector,
     uint256 dataLength,
     uint256 numberOfTokens,
-    bool allowOutOfOrderExecution,
-    bytes memory receiver,
-    // TODO: replace the below with more generic bytes input?
-    uint32 maxPerMsgGasLimit,
-    Client.ExtraArgsV1 memory extraArgs
+    bytes memory receiver
   ) internal view {
     // Check that payload is formed correctly
     DestChainDynamicConfig storage destChainDynamicConfig = s_destChainConfig[destChainSelector].dynamicConfig;
@@ -471,18 +473,8 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
       revert MessageTooLarge(uint256(destChainDynamicConfig.maxDataBytes), dataLength);
     }
     if (numberOfTokens > uint256(destChainDynamicConfig.maxNumberOfTokensPerMsg)) revert UnsupportedNumberOfTokens();
-    if (destChainDynamicConfig.enforceOutOfOrder && !allowOutOfOrderExecution) {
-      revert ExtraArgOutOfOrderExecutionMustBeTrue();
-    }
 
     _validateDestFamilyAddress(destChainDynamicConfig.familyTag, receiver);
-
-    // Validate extraArgs
-    if (destChainDynamicConfig.familyTag == Client.EVM_FAMILY_TAG) {
-      Client.EVMFamilyExtraArgsV1 memory evmExtraArgs =
-        abi.decode(extraArgs.destChainExtraArgs, (Client.EVMFamilyExtraArgsV1));
-      if (evmExtraArgs.gasLimit > uint256(maxPerMsgGasLimit)) revert MessageGasLimitTooHigh();
-    }
   }
 
   /// @notice Validates that the destAddress matches the expected format of the family.
@@ -576,18 +568,8 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
 
     if (!destChainDynamicConfig.isEnabled) revert DestinationChainNotEnabled(destChainSelector);
 
-    Client.ExtraArgsV1 memory extraArgs =
-      _extraArgsFromBytes(message.extraArgs, destChainDynamicConfig.familyTag, destChainDynamicConfig.defaultTxGasLimit);
     // Validate the message with various checks
-    _validateMessage(
-      destChainSelector,
-      message.data.length,
-      message.tokenAmounts.length,
-      extraArgs.allowOutOfOrderExecution,
-      message.receiver,
-      destChainDynamicConfig.maxPerMsgGasLimit,
-      extraArgs
-    );
+    _validateMessage(destChainSelector, message.data.length, message.tokenAmounts.length, message.receiver);
 
     uint64 premiumMultiplierWeiPerEth = s_premiumMultiplierWeiPerEth[message.feeToken];
 
@@ -639,7 +621,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
       + (message.data.length * destChainDynamicConfig.destGasPerPayloadByte) + tokenTransferGas;
 
     if (destChainDynamicConfig.familyTag == Client.EVM_FAMILY_TAG) {
-      executionGasCost += abi.decode(extraArgs.destChainExtraArgs, (Client.EVMFamilyExtraArgsV1)).gasLimit;
+      executionGasCost += _parseEVMExtraArgsFromBytes(message.extraArgs, destChainDynamicConfig).gasLimit;
     }
 
     uint256 executionCost = uint112(packedGasPrice) * executionGasCost * destChainDynamicConfig.gasMultiplierWeiPerEth;

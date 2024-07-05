@@ -192,7 +192,7 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
     bytes32 metadataHash,
     TokenAdminRegistry tokenAdminRegistry
   ) internal view returns (Internal.EVM2AnyRampMessage memory) {
-    Client.ExtraArgsV1 memory extraArgs = s_onRamp.extraArgsFromBytes(message.extraArgs, destChainSelector);
+    Client.EVMExtraArgsV2 memory extraArgs = s_onRamp.parseEVMExtraArgsFromBytes(message.extraArgs, destChainSelector);
 
     Internal.EVM2AnyRampMessage memory messageEvent = Internal.EVM2AnyRampMessage({
       header: Internal.RampMessageHeader({
