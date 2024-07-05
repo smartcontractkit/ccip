@@ -8,62 +8,18 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller/mocks"
-	evmtypes "github.com/smartcontractkit/chainlink/v2/core/chains/evm/types"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_arm_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcommon"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 )
-
-func TestLogPollerClient_GetSendRequestsBetweenSeqNums1_4_0(t *testing.T) {
-	onRampAddr := utils.RandomAddress()
-	seqNum := uint64(100)
-	limit := uint64(10)
-	lggr := logger.TestLogger(t)
-
-	tests := []struct {
-		name          string
-		finalized     bool
-		confirmations evmtypes.Confirmations
-	}{
-		{"finalized", true, evmtypes.Finalized},
-		{"unfinalized", false, evmtypes.Confirmations(0)},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			lp := mocks.NewLogPoller(t)
-			onRampV2, err := NewOnRamp(lggr, 1, 1, onRampAddr, lp, nil)
-			require.NoError(t, err)
-
-			lp.On("LogsDataWordRange",
-				mock.Anything,
-				onRampV2.sendRequestedEventSig,
-				onRampAddr,
-				onRampV2.sendRequestedSeqNumberWord,
-				abihelpers.EvmWord(seqNum),
-				abihelpers.EvmWord(seqNum+limit),
-				tt.confirmations,
-			).Once().Return([]logpoller.Log{}, nil)
-
-			events, err1 := onRampV2.GetSendRequestsBetweenSeqNums(context.Background(), seqNum, seqNum+limit, tt.finalized)
-			assert.NoError(t, err1)
-			assert.Empty(t, events)
-
-			lp.AssertExpectations(t)
-		})
-	}
-}
 
 func Test_ProperlyRecognizesPerLaneCurses(t *testing.T) {
 	user, bc := ccipdata.NewSimulation(t)

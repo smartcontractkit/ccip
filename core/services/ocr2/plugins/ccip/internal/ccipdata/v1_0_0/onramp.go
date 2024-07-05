@@ -179,7 +179,7 @@ func (o *OnRamp) GetSendRequestsForSeqNums(ctx context.Context, seqNums []ccipty
 		ctx,
 		sendRequestsQuery,
 		query.NewLimitAndSort(query.Limit{}, query.NewSortBySequence(query.Asc)),
-		"GetSendRequestsBetweenSeqNums",
+		"GetSendRequestsForSeqNums",
 	)
 	if err != nil {
 		return nil, err

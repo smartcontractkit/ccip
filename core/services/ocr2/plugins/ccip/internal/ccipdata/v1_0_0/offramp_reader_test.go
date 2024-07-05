@@ -19,6 +19,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	ubig "github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils/big"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp_1_0_0"
+	"github.com/smartcontractkit/chainlink/v2/core/internal/cltest/heavyweight"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils/pgtest"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
@@ -221,7 +222,104 @@ func Test_LogsAreProperlyMarkedAsFinalized(t *testing.T) {
 	}
 }
 
-func createExecutionStateChangeEventLog(t *testing.T, chainID *big.Int, address common.Address, seqNr uint64, blockNumber int64, logIndex int64, messageID common.Hash) logpoller.Log {
+// Scenario 1: Using previous LogPoller query for fetching based on min/max
+//
+// offRamp.GetExecutionStateChangesBetweenSeqNums(testutils.Context(b), 1024, 2047, 0)
+//
+// Benchmark_FilteredLogsQuery
+// Benchmark_FilteredLogsQuery-12    	      38	  33244664 ns/op
+// Benchmark_FilteredLogsQuery-12    	      37	  31802605 ns/op
+// Benchmark_FilteredLogsQuery-12    	      37	  33733635 ns/op
+// Benchmark_FilteredLogsQuery-12    	      33	  33035030 ns/op
+// Benchmark_FilteredLogsQuery-12    	      38	  31528083 ns/op
+//
+// Scenario 2: Using query built with FilteredLogs but using single range
+//
+// offRamp.GetExecutionStateChangesForSeqNums(testutils.Context(b), []cciptypes.SequenceNumberRange{{Min: 1024, Max: 2047}}, 0)
+//
+// Benchmark_FilteredLogsQuery
+// Benchmark_FilteredLogsQuery-12    	      34	  33821957 ns/op
+// Benchmark_FilteredLogsQuery-12    	      33	  33094408 ns/op
+// Benchmark_FilteredLogsQuery-12    	      33	  32995907 ns/op
+// Benchmark_FilteredLogsQuery-12    	      30	  39200622 ns/op
+// Benchmark_FilteredLogsQuery-12    	      30	  38383450 ns/op
+//
+// Scenario 3: Using new query but with more sophisticated case and multiple ranges passed (on average ~10ms to the query time)
+//
+//	logs, err1 := offRamp.GetExecutionStateChangesForSeqNums(testutils.Context(b), []cciptypes.SequenceNumberRange{
+//		{Min: 1000, Max: 1099},
+//		{Min: 1200, Max: 1299},
+//		{Min: 1800, Max: 1999},
+//		{Min: 2200, Max: 2499},
+//	}, 0)
+//
+// Benchmark_FilteredLogsQuery
+// Benchmark_FilteredLogsQuery-12    	     259	  47371107 ns/op
+// Benchmark_FilteredLogsQuery-12    	     246	  47616777 ns/op
+// Benchmark_FilteredLogsQuery-12    	      76	  47426643 ns/op
+// Benchmark_FilteredLogsQuery-12    	      73	  46377761 ns/op
+// Benchmark_FilteredLogsQuery-12    	      80	  46935801 ns/op
+func Benchmark_FilteredLogsQuery(b *testing.B) {
+	ctx := testutils.Context(b)
+	_, db := heavyweight.FullTestDBV2(b, nil)
+	chainID := testutils.NewRandomEVMChainID()
+	orm := logpoller.NewORM(chainID, db, logger.TestLogger(b))
+	lpOpts := logpoller.Opts{
+		PollPeriod:               time.Hour,
+		FinalityDepth:            2,
+		BackfillBatchSize:        20,
+		RpcBatchSize:             10,
+		KeepFinalizedBlocksDepth: 1000,
+	}
+	lp := logpoller.NewLogPoller(orm, nil, logger.TestLogger(b), lpOpts)
+
+	offrampAddress := utils.RandomAddress()
+
+	for j := 1; j <= 100; j++ {
+		var logs []logpoller.Log
+		for i := 0; i < 1_000; i++ {
+			logs = append(
+				logs,
+				createExecutionStateChangeEventLog(
+					b,
+					chainID,
+					offrampAddress,
+					uint64(j*1000+i),
+					int64(j*1000+i),
+					int64(j),
+					utils.RandomBytes32(),
+				),
+			)
+		}
+		require.NoError(b, orm.InsertLogs(ctx, logs))
+		require.NoError(b, orm.InsertBlock(ctx, utils.RandomHash(), int64((j+1)*1000-1), time.Now(), 0))
+	}
+
+	offRamp, err := v1_0_0.NewOffRamp(logger.TestLogger(b), offrampAddress, evmclimocks.NewClient(b), lp, nil, nil)
+	require.NoError(b, err)
+
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		// Scenario 1
+		// logs, err1 := offRamp.GetExecutionStateChangesBetweenSeqNums(testutils.Context(b), 1024, 2047, 0)
+		// Scenario 2
+		// logs, err1 := offRamp.GetExecutionStateChangesForSeqNums(testutils.Context(b), []cciptypes.SequenceNumberRange{{Min: 1024, Max: 2047}}, 0)
+		// require.NoError(b, err1)
+		// assert.Len(b, logs, 1024)
+		// Scenario 3
+		logs, err1 := offRamp.GetExecutionStateChangesForSeqNums(testutils.Context(b), []cciptypes.SequenceNumberRange{
+			{Min: 1000, Max: 1099},
+			{Min: 1200, Max: 1299},
+			{Min: 1800, Max: 1999},
+			{Min: 2200, Max: 2499},
+		}, 0)
+		require.NoError(b, err1)
+		assert.Len(b, logs, 700)
+	}
+}
+
+func createExecutionStateChangeEventLog(t testing.TB, chainID *big.Int, address common.Address, seqNr uint64, blockNumber int64, logIndex int64, messageID common.Hash) logpoller.Log {
 	tAbi, err := evm_2_evm_offramp_1_0_0.EVM2EVMOffRampMetaData.GetAbi()
 	require.NoError(t, err)
 	eseEvent, ok := tAbi.Events["ExecutionStateChanged"]
