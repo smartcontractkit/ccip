@@ -595,14 +595,16 @@ This is only valid if the tests are run on remote runners in k8s. If set to true
 ### CCIP.Groups.[testgroup].LoadProfile
 Specifies the load profile for the test. Only valid if the testgroup is 'load'. 
 
+### CCIP.Groups.[testgroup].LoadProfile.LoadFrequency.[DestNetworkName]
+
 #### CCIP.Groups.[testgroup].LoadProfile.RequestPerUnitTime
-Specifies the number of requests to be sent per unit time.
+Specifies the number of requests to be sent per unit time. This is applicable to all networks if [LoadFrequency](#ccipgroupstestgrouploadprofileloadfrequencydestnetworkname) is not specified for a destination network.
 
 #### CCIP.Groups.[testgroup].LoadProfile.TimeUnit
-Specifies the unit of time for the load profile.
+Specifies the unit of time for the load profile. This is applicable to all networks if [LoadFrequency](#ccipgroupstestgrouploadprofileloadfrequencydestnetworkname) is not specified for a destination network.
 
 #### CCIP.Groups.[testgroup].LoadProfile.StepDuration
-Specifies the duration for each step in the load profile.
+Specifies the duration for each step in the load profile. This is applicable to all networks if [LoadFrequency](#ccipgroupstestgrouploadprofileloadfrequencydestnetworkname) is not specified for a destination network.
 
 #### CCIP.Groups.[testgroup].LoadProfile.TestDuration
 Specifies the total duration for the load test.
