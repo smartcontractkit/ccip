@@ -251,9 +251,11 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   function getSenderNonce(address sender) external view returns (uint64) {
     uint256 senderNonce = s_senderNonce[sender];
 
-    if (senderNonce == 0 && i_prevOnRamp != address(0)) {
-      // If OnRamp was upgraded, check if sender has a nonce from the previous OnRamp.
-      return IEVM2AnyOnRamp(i_prevOnRamp).getSenderNonce(sender);
+    if (i_prevOnRamp != address(0)) {
+      if (senderNonce == 0) {
+        // If OnRamp was upgraded, check if sender has a nonce from the previous OnRamp.
+        return IEVM2AnyOnRamp(i_prevOnRamp).getSenderNonce(sender);
+      }
     }
     return uint64(senderNonce);
   }
@@ -278,7 +280,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     _validateMessage(message.data.length, extraArgs.gasLimit, numberOfTokens, extraArgs.allowOutOfOrderExecution);
 
     // Only check token value if there are tokens
-    if (numberOfTokens > 0) {
+    if (numberOfTokens != 0) {
       uint256 value;
       for (uint256 i = 0; i < numberOfTokens; ++i) {
         if (message.tokenAmounts[i].amount == 0) revert CannotSendZeroTokens();
@@ -287,7 +289,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
         }
       }
       // Rate limit on aggregated token value
-      if (value > 0) _rateLimitValue(value);
+      if (value != 0) _rateLimitValue(value);
     }
 
     // Convert feeToken to link if not already in link
@@ -302,10 +304,12 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     }
     if (s_nopFeesJuels > i_maxNopFeesJuels) revert MaxFeeBalanceReached();
 
-    if (s_senderNonce[originalSender] == 0 && i_prevOnRamp != address(0)) {
-      // If this is first time send for a sender in new OnRamp, check if they have a nonce
-      // from the previous OnRamp and start from there instead of zero.
-      s_senderNonce[originalSender] = IEVM2AnyOnRamp(i_prevOnRamp).getSenderNonce(originalSender);
+    if (i_prevOnRamp != address(0)) {
+      if (s_senderNonce[originalSender] == 0) {
+        // If this is first time send for a sender in new OnRamp, check if they have a nonce
+        // from the previous OnRamp and start from there instead of zero.
+        s_senderNonce[originalSender] = IEVM2AnyOnRamp(i_prevOnRamp).getSenderNonce(originalSender);
+      }
     }
 
     // We need the next available sequence number so we increment before we use the value
@@ -354,11 +358,10 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
       // Since the DON has to pay for the extraData to be included on the destination chain, we cap the length of the
       // extraData. This prevents gas bomb attacks on the NOPs. As destBytesOverhead accounts for both
       // extraData and offchainData, this caps the worst case abuse to the number of bytes reserved for offchainData.
-      if (
-        poolReturnData.destPoolData.length > Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES
-          && poolReturnData.destPoolData.length > s_tokenTransferFeeConfig[tokenAndAmount.token].destBytesOverhead
-      ) {
-        revert SourceTokenDataTooLarge(tokenAndAmount.token);
+      if (poolReturnData.destPoolData.length > Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES) {
+        if (poolReturnData.destPoolData.length > s_tokenTransferFeeConfig[tokenAndAmount.token].destBytesOverhead) {
+          revert SourceTokenDataTooLarge(tokenAndAmount.token);
+        }
       }
       // We validate the token address to ensure it is a valid EVM address
       Internal._validateEVMAddress(poolReturnData.destTokenAddress);
@@ -418,7 +421,11 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     if (dataLength > maxDataBytes) revert MessageTooLarge(maxDataBytes, dataLength);
     if (gasLimit > uint256(s_dynamicConfig.maxPerMsgGasLimit)) revert MessageGasLimitTooHigh();
     if (numberOfTokens > uint256(s_dynamicConfig.maxNumberOfTokensPerMsg)) revert UnsupportedNumberOfTokens();
-    if (s_dynamicConfig.enforceOutOfOrder && !allowOutOfOrderExecution) revert ExtraArgOutOfOrderExecutionMustBeTrue();
+    if (!allowOutOfOrderExecution) {
+      if (s_dynamicConfig.enforceOutOfOrder) {
+        revert ExtraArgOutOfOrderExecutionMustBeTrue();
+      }
+    }
   }
 
   // ================================================================
@@ -526,7 +533,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     uint256 premiumFee = 0;
     uint32 tokenTransferGas = 0;
     uint32 tokenTransferBytesOverhead = 0;
-    if (message.tokenAmounts.length > 0) {
+    if (message.tokenAmounts.length != 0) {
       (premiumFee, tokenTransferGas, tokenTransferBytesOverhead) =
         _getTokenTransferCost(message.feeToken, feeTokenPrice, message.tokenAmounts);
     } else {
@@ -539,7 +546,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     uint256 dataAvailabilityCost = 0;
     // Only calculate data availability cost if data availability multiplier is non-zero.
     // The multiplier should be set to 0 if destination chain does not charge data availability cost.
-    if (s_dynamicConfig.destDataAvailabilityMultiplierBps > 0) {
+    if (s_dynamicConfig.destDataAvailabilityMultiplierBps != 0) {
       dataAvailabilityCost = _getDataAvailabilityCost(
         // Parse the data availability gas price stored in the higher-order 112 bits of the encoded gas price.
         uint112(packedGasPrice >> Internal.GAS_PRICE_BITS),
@@ -795,8 +802,10 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     // Make sure all nops have been paid before removing nops
     // We only have to pay when there are nops and there is enough
     // outstanding NOP balance to trigger a payment.
-    if (s_nopWeightsTotal > 0 && s_nopFeesJuels >= s_nopWeightsTotal) {
-      payNops();
+    if (s_nopWeightsTotal > 0) {
+      if (s_nopFeesJuels >= s_nopWeightsTotal) {
+        payNops();
+      }
     }
 
     // Remove all previous nops, move from end to start to avoid shifting
@@ -829,8 +838,12 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   /// of the weight of all nops. Since nop weights are uint16s and we can have at
   /// most MAX_NUMBER_OF_NOPS NOPs, the highest possible value is 2**22 or 0.04 gjuels.
   function payNops() public {
-    if (msg.sender != owner() && msg.sender != s_admin && !s_nops.contains(msg.sender)) {
-      revert OnlyCallableByOwnerOrAdminOrNop();
+    if (msg.sender != owner()) {
+      if (msg.sender != s_admin) {
+        if (!s_nops.contains(msg.sender)) {
+          revert OnlyCallableByOwnerOrAdminOrNop();
+        }
+      }
     }
     uint256 weightsTotal = s_nopWeightsTotal;
     if (weightsTotal == 0) revert NoNopsToPay();
@@ -894,6 +907,10 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   /// @dev Require that the sender is the owner or the fee admin
   /// Not a modifier to save on contract size
   function _onlyOwnerOrAdmin() internal view {
-    if (msg.sender != owner() && msg.sender != s_admin) revert OnlyCallableByOwnerOrAdmin();
+    if (msg.sender != owner()) {
+      if (msg.sender != s_admin) {
+        revert OnlyCallableByOwnerOrAdmin();
+      }
+    }
   }
 }
