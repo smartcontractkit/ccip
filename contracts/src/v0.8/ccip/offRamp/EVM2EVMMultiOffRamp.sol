@@ -512,7 +512,13 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
       );
     }
 
-    Client.Any2EVMMessage memory any2EvmMessage = Internal._toAny2EVMMessage(message, destTokenAmounts);
+    Client.Any2EVMMessage memory any2EvmMessage = Client.Any2EVMMessage({
+      messageId: message.messageId,
+      sourceChainSelector: message.sourceChainSelector,
+      sender: abi.encode(message.sender),
+      data: message.data,
+      destTokenAmounts: destTokenAmounts
+    });
 
     address messageValidator = s_dynamicConfig.messageValidator;
     if (messageValidator != address(0)) {

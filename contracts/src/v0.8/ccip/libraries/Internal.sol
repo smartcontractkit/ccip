@@ -117,19 +117,6 @@ library Internal {
   /// When abiEncoded, each EVMTokenAmount takes 2 slots, each bytes takes 2 slots, excl bytes contents
   uint256 public constant MESSAGE_FIXED_BYTES_PER_TOKEN = 32 * 4;
 
-  function _toAny2EVMMessage(
-    EVM2EVMMessage memory original,
-    Client.EVMTokenAmount[] memory destTokenAmounts
-  ) internal pure returns (Client.Any2EVMMessage memory message) {
-    return Client.Any2EVMMessage({
-      messageId: original.messageId,
-      sourceChainSelector: original.sourceChainSelector,
-      sender: abi.encode(original.sender),
-      data: original.data,
-      destTokenAmounts: destTokenAmounts
-    });
-  }
-
   bytes32 internal constant EVM_2_EVM_MESSAGE_HASH = keccak256("EVM2EVMMessageHashV2");
 
   function _hash(EVM2EVMMessage memory original, bytes32 metadataHash) internal pure returns (bytes32) {

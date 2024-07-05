@@ -483,7 +483,13 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
     ) return;
 
     (bool success, bytes memory returnData,) = IRouter(s_dynamicConfig.router).routeMessage(
-      Internal._toAny2EVMMessage(message, destTokenAmounts),
+      Client.Any2EVMMessage({
+        messageId: message.messageId,
+        sourceChainSelector: message.sourceChainSelector,
+        sender: abi.encode(message.sender),
+        data: message.data,
+        destTokenAmounts: destTokenAmounts
+      }),
       Internal.GAS_FOR_CALL_EXACT_CHECK,
       message.gasLimit,
       message.receiver
