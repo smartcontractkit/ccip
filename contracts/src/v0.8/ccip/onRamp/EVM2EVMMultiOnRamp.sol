@@ -359,12 +359,10 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
 
     if (msgFeeJuels > i_maxFeeJuelsPerMsg) revert MessageFeeTooHigh(msgFeeJuels, i_maxFeeJuelsPerMsg);
 
+    // NOTE: when supporting non-EVM chains, revisit this and parse non-EVM args
     // Assumes strict ordering, unless the chain is of the EVM family and the extra args indicate out of order execution
     uint64 nonce = 0;
-    if (
-      destChainConfig.dynamicConfig.familyTag != Client.EVM_FAMILY_TAG
-        || !_parseEVMExtraArgsFromBytes(message.extraArgs, destChainConfig.dynamicConfig).allowOutOfOrderExecution
-    ) {
+    if (!_parseEVMExtraArgsFromBytes(message.extraArgs, destChainConfig.dynamicConfig).allowOutOfOrderExecution) {
       // Only bump nonce for messages that specify allowOutOfOrderExecution == false. Otherwise, we
       // may block ordered message nonces, which is not what we want.
       nonce = INonceManager(i_nonceManager).getIncrementedOutboundNonce(destChainSelector, originalSender);
@@ -382,7 +380,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
       }),
       sender: originalSender,
       data: message.data,
-      extraArgs: _parseExtraArgsFromBytes(message.extraArgs, destChainConfig.dynamicConfig),
+      extraArgs: _convertParsedExtraArgs(message.extraArgs, destChainConfig.dynamicConfig),
       receiver: message.receiver,
       feeToken: message.feeToken,
       feeTokenAmount: feeTokenAmount,
@@ -392,12 +390,12 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
     return rampMessage;
   }
 
-  /// @dev Parses extraArgs dest chain config family tag validation, and conversion to the latest arguments version.
+  /// @dev Parses extraArgs with dest chain config family tag validation, and re-encodes the args to the latest arguments version.
   /// Used to generate an EVM2AnyRampMessage with the accurate representation of the parsed extraArgs.
   /// @param extraArgs The extra args bytes
   /// @param destChainDynamicConfig Dest chain config to validate against
   /// @return encodedExtraArgs the parsed & encoded extra args
-  function _parseExtraArgsFromBytes(
+  function _convertParsedExtraArgs(
     bytes calldata extraArgs,
     DestChainDynamicConfig memory destChainDynamicConfig
   ) internal pure returns (bytes memory) {
@@ -620,9 +618,8 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
     uint256 executionGasCost = destChainDynamicConfig.destGasOverhead
       + (message.data.length * destChainDynamicConfig.destGasPerPayloadByte) + tokenTransferGas;
 
-    if (destChainDynamicConfig.familyTag == Client.EVM_FAMILY_TAG) {
-      executionGasCost += _parseEVMExtraArgsFromBytes(message.extraArgs, destChainDynamicConfig).gasLimit;
-    }
+    // NOTE: when supporting non-EVM chains, revisit this and parse non-EVM args
+    executionGasCost += _parseEVMExtraArgsFromBytes(message.extraArgs, destChainDynamicConfig).gasLimit;
 
     uint256 executionCost = uint112(packedGasPrice) * executionGasCost * destChainDynamicConfig.gasMultiplierWeiPerEth;
 
