@@ -89,21 +89,18 @@ func NewExecServices(ctx context.Context, lggr logger.Logger, jb job.Job, srcPro
 		return nil, fmt.Errorf("get source wrapped native token: %w", err)
 	}
 
-	versionFinder := ccip.NewEvmVersionFinder()
-	commitStoreReader, err := factory.NewCommitStoreReader(lggr, versionFinder, offRampConfig.CommitStore, dstChain.Client(), dstChain.LogPoller())
+	srcCommitStore, err := srcProvider.NewCommitStoreReader(ctx, offRampConfig.CommitStore)
 	if err != nil {
-		return nil, fmt.Errorf("could not load commitStoreReader reader: %w", err)
+		return nil, fmt.Errorf("could not create src commitStoreReader reader: %w", err)
 	}
 
-	err = commitStoreReader.SetGasEstimator(ctx, srcChain.GasEstimator())
+	dstCommitStore, err := dstProvider.NewCommitStoreReader(ctx, offRampConfig.CommitStore)
 	if err != nil {
-		return nil, fmt.Errorf("could not set gas estimator: %w", err)
+		return nil, fmt.Errorf("could not create dst commitStoreReader reader: %w", err)
 	}
 
-	err = commitStoreReader.SetSourceMaxGasPrice(ctx, srcChain.Config().EVM().GasEstimator().PriceMax().ToInt())
-	if err != nil {
-		return nil, fmt.Errorf("could not set source max gas price: %w", err)
-	}
+	var commitStoreReader ccipdata.CommitStoreReader
+	commitStoreReader = ccip.NewProviderProxyCommitStoreReader(srcCommitStore, dstCommitStore)
 
 	tokenDataProviders := make(map[cciptypes.Address]tokendata.Reader)
 	// init usdc token data provider
