@@ -7,6 +7,8 @@ import (
 	"math/big"
 	"strings"
 
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/rpclib"
+
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 
@@ -15,7 +17,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/internal/gethwrappers2/generated/offchainaggregator"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/rpclib"
 )
 
 const decimalsMethodName = "decimals"
@@ -143,6 +144,9 @@ func (d *DynamicPriceGetter) performBatchCall(ctx context.Context, chainID uint6
 	calls = append(calls, batchCalls.latestRoundDataCalls...)
 
 	results, err := evmCaller.BatchCall(ctx, 0, calls)
+	if err != nil {
+		return fmt.Errorf("batch call on chain %d failed: %w", chainID, err)
+	}
 
 	// Extract results.
 	decimals := make([]uint8, 0, nbDecimalCalls)

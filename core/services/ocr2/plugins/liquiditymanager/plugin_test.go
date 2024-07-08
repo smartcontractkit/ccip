@@ -30,9 +30,9 @@ import (
 	liquiditymanagermocks "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/chain/evm/mocks"
 	discoverermocks "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/discoverer/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/graph"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/liquidityrebalancer"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/models"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/rebalalgo"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/testhelpers"
 )
 
@@ -289,7 +289,7 @@ func TestPlugin_Observation(t *testing.T) {
 			for sourceDest, bridgeFn := range tc.bridges {
 				br, err2 := bridgeFn(t)
 				p.bridgeFactory.
-					On("NewBridge", sourceDest[0], sourceDest[1]).
+					On("NewBridge", ctx, sourceDest[0], sourceDest[1]).
 					Return(br, err2)
 			}
 
@@ -660,7 +660,7 @@ func TestPlugin_Outcome(t *testing.T) {
 			for sourceDest, bridgeFn := range tc.bridges {
 				br, err := bridgeFn(t)
 				p.bridgeFactory.
-					On("NewBridge", sourceDest[0], sourceDest[1]).
+					On("GetBridge", sourceDest[0], sourceDest[1]).
 					Return(br, err)
 			}
 
@@ -1135,7 +1135,8 @@ func TestPlugin_E2EWithMocks(t *testing.T) {
 					for _, edge := range edges {
 						br, ok := n.bridges[[2]models.NetworkSelector{edge.Source, edge.Dest}]
 						require.True(t, ok, "the test case is wrong, bridge is not defined %d->%d", edge.Source, edge.Dest)
-						n.bridgeFactory.On("NewBridge", edge.Source, edge.Dest).Return(br, nil).Maybe()
+						n.bridgeFactory.On("NewBridge", mock.Anything /* cancelContext */, edge.Source, edge.Dest).Return(br, nil).Maybe()
+						n.bridgeFactory.On("GetBridge", edge.Source, edge.Dest).Return(br, nil).Maybe()
 
 						pendingTransfers := make([]models.PendingTransfer, 0)
 						for _, tr := range round.pendingTransfersPerNode[i] {
@@ -1563,7 +1564,7 @@ func newNode(t *testing.T, lggr logger.Logger, f int) node {
 	// discovererMock.On("Discover", mock.Anything).Return(g, nil).Maybe()
 	discovererFactory.On("NewDiscoverer", mock.Anything, mock.Anything).Return(discovererMock, nil).Maybe()
 	bridgeFactory := bridgemocks.NewFactory(t)
-	rebalancerAlg := liquidityrebalancer.NewPingPong()
+	rebalancerAlg := rebalalgo.NewPingPong()
 
 	node1 := NewPlugin(
 		f,
@@ -1603,7 +1604,7 @@ type pluginWithMocks struct {
 	lmFactory         *mocks.Factory
 	discovererFactory *discoverermocks.Factory
 	bridgeFactory     *bridgemocks.Factory
-	rebalancerAlg     *liquidityrebalancer.PingPong
+	rebalancerAlg     *rebalalgo.PingPong
 }
 
 func newPluginWithMocksAndDefaults(t *testing.T) *pluginWithMocks {
@@ -1625,7 +1626,7 @@ func newPluginWithMocks(
 	discovererMock := discoverermocks.NewDiscoverer(t)
 	discovererFactory.On("NewDiscoverer", mock.Anything, mock.Anything).Return(discovererMock, nil).Maybe()
 	bridgeFactory := bridgemocks.NewFactory(t)
-	rebalancerAlg := liquidityrebalancer.NewPingPong()
+	rebalancerAlg := rebalalgo.NewPingPong()
 	return &pluginWithMocks{
 		plugin: NewPlugin(
 			f,

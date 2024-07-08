@@ -10,7 +10,7 @@ SOLC_VERSION="0.8.24"
 OPTIMIZE_RUNS=26000
 OPTIMIZE_RUNS_OFFRAMP=18000
 OPTIMIZE_RUNS_ONRAMP=3600
-OPTIMIZE_RUNS_MULTI_OFFRAMP=1800
+OPTIMIZE_RUNS_MULTI_OFFRAMP=2400
 
 
 SCRIPTPATH="$( cd "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
@@ -75,13 +75,15 @@ compileContract ccip/RMN.sol
 compileContract ccip/ARMProxy.sol
 compileContract ccip/tokenAdminRegistry/TokenAdminRegistry.sol
 compileContract ccip/tokenAdminRegistry/RegistryModuleOwnerCustom.sol
-compileContract ccip/capability/CCIPCapabilityConfiguration.sol
+compileContract ccip/capability/CCIPConfig.sol
+compileContract ccip/capability/interfaces/IOCR3ConfigEncoder.sol
 
 # Test helpers
 compileContract ccip/test/helpers/BurnMintERC677Helper.sol
 compileContract ccip/test/helpers/CommitStoreHelper.sol
+compileContract ccip/test/helpers/MessageHasher.sol
 compileContract ccip/test/helpers/receivers/MaybeRevertMessageReceiver.sol
-compileContract ccip/test/mocks/MockRMN.sol
+compileContract ccip/test/mocks/MockRMN1_0.sol
 compileContract ccip/test/mocks/MockE2EUSDCTokenMessenger.sol
 compileContract ccip/test/mocks/MockE2EUSDCTransmitter.sol
 compileContract ccip/test/WETH9.sol

@@ -84,6 +84,7 @@ const (
 
 	defaultUSDCDestBytesOverhead = 640
 	defaultUSDCDestGasOverhead   = 120_000
+	DefaultDestinationGasLimit   = 600_000
 	// DefaultResubscriptionTimeout denotes the max backoff duration for resubscription for various watch events
 	// if the subscription keeps failing even after this duration, the test will fail
 	DefaultResubscriptionTimeout = 2 * time.Hour
@@ -396,15 +397,9 @@ func (ccipModule *CCIPCommon) ApproveTokens() error {
 			}
 		}
 
-		allowance, err := token.Allowance(ccipModule.ChainClient.GetDefaultWallet().Address(), ccipModule.Router.Address())
+		err := token.Approve(ccipModule.ChainClient.GetDefaultWallet(), ccipModule.Router.Address(), ApprovedAmountToRouter)
 		if err != nil {
-			return fmt.Errorf("failed to get allowance for token %s: %w", token.ContractAddress.Hex(), err)
-		}
-		if allowance.Cmp(ApprovedAmountToRouter) < 0 {
-			err := token.Approve(ccipModule.ChainClient.GetDefaultWallet(), ccipModule.Router.Address(), ApprovedAmountToRouter)
-			if err != nil {
-				return fmt.Errorf("failed to approve token %s: %w", token.ContractAddress.Hex(), err)
-			}
+			return fmt.Errorf("failed to approve token %s: %w", token.ContractAddress.Hex(), err)
 		}
 		if token.ContractAddress == ccipModule.FeeToken.EthAddress {
 			isApproved = true
@@ -1502,6 +1497,9 @@ func (sourceCCIP *SourceCCIPModule) UpdateBalance(
 ) {
 	if len(sourceCCIP.TransferAmount) > 0 {
 		for i := range sourceCCIP.TransferAmount {
+			if sourceCCIP.TransferAmount[i] == nil { // nil transfer amount means no transfer for this token
+				continue
+			}
 			// if length of sourceCCIP.TransferAmount is more than available bridge token use first bridge token
 			token := sourceCCIP.Common.BridgeTokens[0]
 			if i < len(sourceCCIP.Common.BridgeTokens) {
@@ -1560,23 +1558,43 @@ func (sourceCCIP *SourceCCIPModule) UpdateBalance(
 func (sourceCCIP *SourceCCIPModule) AssertSendRequestedLogFinalized(
 	lggr *zerolog.Logger,
 	txHash common.Hash,
+	sendReqData []*contracts.SendReqEventData,
 	prevEventAt time.Time,
 	reqStats []*testreporters.RequestStat,
 ) (time.Time, uint64, error) {
+	if len(sendReqData) != len(reqStats) {
+		return time.Time{}, 0, fmt.Errorf("sendReqData and reqStats length mismatch")
+	}
+	var gasUsed uint64
+	receipt, err := sourceCCIP.Common.ChainClient.GetTxReceipt(txHash)
+	if err == nil {
+		gasUsed = receipt.GasUsed
+	}
 	lggr.Info().Msg("Waiting for CCIPSendRequested event log to be finalized")
 	finalizedBlockNum, finalizedAt, err := sourceCCIP.Common.ChainClient.WaitForFinalizedTx(txHash)
 	if err != nil || finalizedBlockNum == nil {
-		for _, stat := range reqStats {
-			stat.UpdateState(lggr, stat.SeqNum, testreporters.SourceLogFinalized, time.Since(prevEventAt), testreporters.Failure)
+		for i, stat := range reqStats {
+			stat.UpdateState(lggr, stat.SeqNum, testreporters.SourceLogFinalized, time.Since(prevEventAt), testreporters.Failure, &testreporters.TransactionStats{
+				MsgID:              fmt.Sprintf("0x%x", sendReqData[i].MessageId[:]),
+				Fee:                sendReqData[i].Fee.String(),
+				NoOfTokensSent:     sendReqData[i].NoOfTokens,
+				MessageBytesLength: int64(sendReqData[i].DataLength),
+				TxHash:             txHash.Hex(),
+			})
 		}
 		return time.Time{}, 0, fmt.Errorf("error waiting for CCIPSendRequested event log to be finalized - %w", err)
 	}
-	for _, stat := range reqStats {
+	for i, stat := range reqStats {
 		stat.UpdateState(lggr, stat.SeqNum, testreporters.SourceLogFinalized, finalizedAt.Sub(prevEventAt), testreporters.Success,
-			testreporters.TransactionStats{
-				TxHash:           txHash.Hex(),
-				FinalizedByBlock: finalizedBlockNum.String(),
-				FinalizedAt:      finalizedAt.String(),
+			&testreporters.TransactionStats{
+				MsgID:              fmt.Sprintf("0x%x", sendReqData[i].MessageId[:]),
+				Fee:                sendReqData[i].Fee.String(),
+				GasUsed:            gasUsed,
+				NoOfTokensSent:     sendReqData[i].NoOfTokens,
+				MessageBytesLength: int64(sendReqData[i].DataLength),
+				TxHash:             txHash.Hex(),
+				FinalizedByBlock:   finalizedBlockNum.String(),
+				FinalizedAt:        finalizedAt.String(),
 			})
 	}
 	return finalizedAt, finalizedBlockNum.Uint64(), nil
@@ -1632,16 +1650,10 @@ func (sourceCCIP *SourceCCIPModule) AssertEventCCIPSendRequested(
 						seqNum := sendRequestedEvent.SequenceNumber
 						lggr = ptr.Ptr(lggr.With().
 							Uint64("SequenceNumber", seqNum).
-							Str("msgId ", fmt.Sprintf("0x%x", sendRequestedEvent.MessageId[:])).
+							Str("MsgID", fmt.Sprintf("0x%x", sendRequestedEvent.MessageId[:])).
 							Logger())
 						// prevEventAt is the time when the message was successful, this should be same as the time when the event was emitted
-						reqStat[i].UpdateState(lggr, seqNum, testreporters.CCIPSendRe, 0, testreporters.Success,
-							testreporters.TransactionStats{
-								MsgID:              fmt.Sprintf("0x%x", sendRequestedEvent.MessageId[:]),
-								TxHash:             "",
-								NoOfTokensSent:     sendRequestedEvent.NoOfTokens,
-								MessageBytesLength: int64(sendRequestedEvent.DataLength),
-							})
+						reqStat[i].UpdateState(lggr, seqNum, testreporters.CCIPSendRe, 0, testreporters.Success, nil)
 					}
 					var err error
 					if len(sendRequestedEvents) == 0 {
@@ -1655,7 +1667,10 @@ func (sourceCCIP *SourceCCIPModule) AssertEventCCIPSendRequested(
 			if sourceCCIP.Common.IsConnectionRestoredRecently != nil && !sourceCCIP.Common.IsConnectionRestoredRecently.Load() {
 				if resetTimer > 2 {
 					for _, stat := range reqStat {
-						stat.UpdateState(lggr, 0, testreporters.CCIPSendRe, time.Since(prevEventAt), testreporters.Failure)
+						stat.UpdateState(lggr, 0, testreporters.CCIPSendRe, time.Since(prevEventAt), testreporters.Failure,
+							&testreporters.TransactionStats{
+								TxHash: txHash,
+							})
 					}
 					return nil, time.Now(), fmt.Errorf("possible RPC issue - CCIPSendRequested event is not found for tx %s", txHash)
 				}
@@ -1665,7 +1680,10 @@ func (sourceCCIP *SourceCCIPModule) AssertEventCCIPSendRequested(
 				continue
 			}
 			for _, stat := range reqStat {
-				stat.UpdateState(lggr, 0, testreporters.CCIPSendRe, time.Since(prevEventAt), testreporters.Failure)
+				stat.UpdateState(lggr, 0, testreporters.CCIPSendRe, time.Since(prevEventAt), testreporters.Failure,
+					&testreporters.TransactionStats{
+						TxHash: txHash,
+					})
 			}
 			return nil, time.Now(), fmt.Errorf("CCIPSendRequested event is not found for tx %s", txHash)
 		}
@@ -1691,6 +1709,9 @@ func (sourceCCIP *SourceCCIPModule) CCIPMsg(
 
 	tokenAndAmounts := []router.ClientEVMTokenAmount{}
 	for i, amount := range sourceCCIP.TransferAmount {
+		if amount == nil { // make nil transfer amount 0 to avoid panics
+			sourceCCIP.TransferAmount[i] = big.NewInt(0)
+		}
 		token := sourceCCIP.Common.BridgeTokens[0]
 		// if length of sourceCCIP.TransferAmount is more than available bridge token use first bridge token
 		if i < len(sourceCCIP.Common.BridgeTokens) {
@@ -2285,7 +2306,7 @@ func (destCCIP *DestCCIPModule) AssertEventExecutionStateChanged(
 						lggr.Info().Int64("seqNum", int64(seqNum)).Uint8("ExecutionState", e.State).Msg("ExecutionStateChanged event received")
 						reqStat.UpdateState(lggr, seqNum, testreporters.ExecStateChanged, receivedAt.Sub(timeNow),
 							testreporters.Success,
-							testreporters.TransactionStats{
+							&testreporters.TransactionStats{
 								TxHash:  vLogs.TxHash.Hex(),
 								MsgID:   fmt.Sprintf("0x%x", e.MessageId[:]),
 								GasUsed: gasUsed,
@@ -2293,7 +2314,7 @@ func (destCCIP *DestCCIPModule) AssertEventExecutionStateChanged(
 						)
 						return e.State, nil
 					}
-					reqStat.UpdateState(lggr, seqNum, testreporters.ExecStateChanged, time.Since(timeNow), testreporters.Failure)
+					reqStat.UpdateState(lggr, seqNum, testreporters.ExecStateChanged, time.Since(timeNow), testreporters.Failure, nil)
 					return e.State, fmt.Errorf("ExecutionStateChanged event state - expected %d actual - %d with data %x for seq num %v for lane %d-->%d",
 						execState, testhelpers.MessageExecutionState(e.State), e.ReturnData, seqNum, destCCIP.SourceChainId, destCCIP.Common.ChainClient.GetChainID())
 				}
@@ -2303,7 +2324,7 @@ func (destCCIP *DestCCIPModule) AssertEventExecutionStateChanged(
 			if destCCIP.Common.IsConnectionRestoredRecently != nil && !destCCIP.Common.IsConnectionRestoredRecently.Load() {
 				// if timer already has been reset 2 times we fail with warning
 				if resetTimer > 2 {
-					reqStat.UpdateState(lggr, seqNum, testreporters.ExecStateChanged, time.Since(timeNow), testreporters.Failure)
+					reqStat.UpdateState(lggr, seqNum, testreporters.ExecStateChanged, time.Since(timeNow), testreporters.Failure, nil)
 					return 0, fmt.Errorf("possible RPC issues - ExecutionStateChanged event not found for seq num %d for lane %d-->%d",
 						seqNum, destCCIP.SourceChainId, destCCIP.Common.ChainClient.GetChainID())
 				}
@@ -2312,7 +2333,7 @@ func (destCCIP *DestCCIPModule) AssertEventExecutionStateChanged(
 				lggr.Info().Int("count of reset", resetTimer).Msg("Resetting timer to validate ExecutionStateChanged event")
 				continue
 			}
-			reqStat.UpdateState(lggr, seqNum, testreporters.ExecStateChanged, time.Since(timeNow), testreporters.Failure)
+			reqStat.UpdateState(lggr, seqNum, testreporters.ExecStateChanged, time.Since(timeNow), testreporters.Failure, nil)
 			return 0, fmt.Errorf("ExecutionStateChanged event not found for seq num %d for lane %d-->%d",
 				seqNum, destCCIP.SourceChainId, destCCIP.Common.ChainClient.GetChainID())
 		}
@@ -2370,7 +2391,7 @@ func (destCCIP *DestCCIPModule) AssertEventReportAccepted(
 						gasUsed = receipt.GasUsed
 					}
 					reqStat.UpdateState(lggr, seqNum, testreporters.Commit, totalTime, testreporters.Success,
-						testreporters.TransactionStats{
+						&testreporters.TransactionStats{
 							GasUsed:    gasUsed,
 							TxHash:     reportAccepted.Raw.TxHash.String(),
 							CommitRoot: fmt.Sprintf("%x", reportAccepted.MerkleRoot),
@@ -2382,7 +2403,7 @@ func (destCCIP *DestCCIPModule) AssertEventReportAccepted(
 			// if there is connection issue reset the context :
 			if destCCIP.Common.IsConnectionRestoredRecently != nil && !destCCIP.Common.IsConnectionRestoredRecently.Load() {
 				if resetTimerCount > 2 {
-					reqStat.UpdateState(lggr, seqNum, testreporters.Commit, time.Since(prevEventAt), testreporters.Failure)
+					reqStat.UpdateState(lggr, seqNum, testreporters.Commit, time.Since(prevEventAt), testreporters.Failure, nil)
 					return nil, time.Now().UTC(), fmt.Errorf("possible RPC issue - ReportAccepted is not found for seq num %d lane %d-->%d",
 						seqNum, destCCIP.SourceChainId, destCCIP.Common.ChainClient.GetChainID())
 				}
@@ -2391,7 +2412,7 @@ func (destCCIP *DestCCIPModule) AssertEventReportAccepted(
 				lggr.Info().Int("count of reset", resetTimerCount).Msg("Resetting timer to validate ReportAccepted event")
 				continue
 			}
-			reqStat.UpdateState(lggr, seqNum, testreporters.Commit, time.Since(prevEventAt), testreporters.Failure)
+			reqStat.UpdateState(lggr, seqNum, testreporters.Commit, time.Since(prevEventAt), testreporters.Failure, nil)
 			return nil, time.Now().UTC(), fmt.Errorf("ReportAccepted is not found for seq num %d lane %d-->%d",
 				seqNum, destCCIP.SourceChainId, destCCIP.Common.ChainClient.GetChainID())
 		}
@@ -2464,7 +2485,7 @@ func (destCCIP *DestCCIPModule) AssertReportBlessed(
 						gasUsed = receipt.GasUsed
 					}
 					reqStat.UpdateState(lggr, seqNum, testreporters.ReportBlessed, receivedAt.Sub(prevEventAt), testreporters.Success,
-						testreporters.TransactionStats{
+						&testreporters.TransactionStats{
 							GasUsed:    gasUsed,
 							TxHash:     vLogs.TxHash.String(),
 							CommitRoot: fmt.Sprintf("%x", CommitReport.MerkleRoot),
@@ -2476,7 +2497,7 @@ func (destCCIP *DestCCIPModule) AssertReportBlessed(
 			// if there is connection issue reset the context :
 			if destCCIP.Common.IsConnectionRestoredRecently != nil && !destCCIP.Common.IsConnectionRestoredRecently.Load() {
 				if resetTimerCount > 2 {
-					reqStat.UpdateState(lggr, seqNum, testreporters.ReportBlessed, time.Since(prevEventAt), testreporters.Failure)
+					reqStat.UpdateState(lggr, seqNum, testreporters.ReportBlessed, time.Since(prevEventAt), testreporters.Failure, nil)
 					return time.Now().UTC(), fmt.Errorf("possible RPC issue - ReportBlessed is not found for interval min - %d max - %d lane %d-->%d",
 						CommitReport.Min, CommitReport.Max, destCCIP.SourceChainId, destCCIP.Common.ChainClient.GetChainID())
 				}
@@ -2485,7 +2506,7 @@ func (destCCIP *DestCCIPModule) AssertReportBlessed(
 				lggr.Info().Int("count of reset", resetTimerCount).Msg("Resetting timer to validate ReportBlessed event")
 				continue
 			}
-			reqStat.UpdateState(lggr, seqNum, testreporters.ReportBlessed, time.Since(prevEventAt), testreporters.Failure)
+			reqStat.UpdateState(lggr, seqNum, testreporters.ReportBlessed, time.Since(prevEventAt), testreporters.Failure, nil)
 			return time.Now().UTC(), fmt.Errorf("ReportBlessed is not found for interval min - %d max - %d lane %d-->%d",
 				CommitReport.Min, CommitReport.Max, destCCIP.SourceChainId, destCCIP.Common.ChainClient.GetChainID())
 		}
@@ -2524,7 +2545,7 @@ func (destCCIP *DestCCIPModule) AssertSeqNumberExecuted(
 			// if there is connection issue reset the context :
 			if destCCIP.Common.IsConnectionRestoredRecently != nil && !destCCIP.Common.IsConnectionRestoredRecently.Load() {
 				if resetTimerCount > 2 {
-					reqStat.UpdateState(lggr, seqNumberBefore, testreporters.Commit, time.Since(timeNow), testreporters.Failure)
+					reqStat.UpdateState(lggr, seqNumberBefore, testreporters.Commit, time.Since(timeNow), testreporters.Failure, nil)
 					return fmt.Errorf("possible RPC issue - sequence number is not increased for seq num %d lane %d-->%d",
 						seqNumberBefore, destCCIP.SourceChainId, destCCIP.Common.ChainClient.GetChainID())
 				}
@@ -2533,7 +2554,7 @@ func (destCCIP *DestCCIPModule) AssertSeqNumberExecuted(
 				lggr.Info().Int("count of reset", resetTimerCount).Msg("Resetting timer to validate seqnumber increase in commit store")
 				continue
 			}
-			reqStat.UpdateState(lggr, seqNumberBefore, testreporters.Commit, time.Since(timeNow), testreporters.Failure)
+			reqStat.UpdateState(lggr, seqNumberBefore, testreporters.Commit, time.Since(timeNow), testreporters.Failure, nil)
 			return fmt.Errorf("sequence number is not increased for seq num %d lane %d-->%d",
 				seqNumberBefore, destCCIP.SourceChainId, destCCIP.Common.ChainClient.GetChainID())
 		}
@@ -2732,7 +2753,7 @@ func (lane *CCIPLane) AddToSentReqs(txHash common.Hash, reqStats []*testreporter
 	request, rcpt, err := CCIPRequestFromTxHash(txHash, lane.Source.Common.ChainClient)
 	if err != nil {
 		for _, stat := range reqStats {
-			stat.UpdateState(lane.Logger, 0, testreporters.TX, 0, testreporters.Failure)
+			stat.UpdateState(lane.Logger, 0, testreporters.TX, 0, testreporters.Failure, nil)
 		}
 		return rcpt, fmt.Errorf("could not get request from tx hash %s: %w", txHash.Hex(), err)
 	}
@@ -2755,7 +2776,7 @@ func (lane *CCIPLane) AddToSentReqs(txHash common.Hash, reqStats []*testreporter
 func (lane *CCIPLane) Multicall(noOfRequests int, multiSendAddr common.Address) error {
 	var ccipMultipleMsg []contracts.CCIPMsgData
 	feeToken := common.HexToAddress(lane.Source.Common.FeeToken.Address())
-	genericMsg, err := lane.Source.CCIPMsg(lane.Dest.ReceiverDapp.EthAddress, big.NewInt(600_000))
+	genericMsg, err := lane.Source.CCIPMsg(lane.Dest.ReceiverDapp.EthAddress, big.NewInt(DefaultDestinationGasLimit))
 	if err != nil {
 		return fmt.Errorf("failed to form the ccip message: %w", err)
 	}
@@ -2764,7 +2785,7 @@ func (lane *CCIPLane) Multicall(noOfRequests int, multiSendAddr common.Address) 
 		return fmt.Errorf("failed getting the chain selector: %w", err)
 	}
 	var reqStats []*testreporters.RequestStat
-	var txstats []testreporters.TransactionStats
+	var txstats []*testreporters.TransactionStats
 	for i := 1; i <= noOfRequests; i++ {
 		// form the message for transfer
 		msg := genericMsg
@@ -2800,7 +2821,7 @@ func (lane *CCIPLane) Multicall(noOfRequests int, multiSendAddr common.Address) 
 			}
 		}
 		stat := testreporters.NewCCIPRequestStats(int64(lane.NumberOfReq+i), lane.SourceNetworkName, lane.DestNetworkName)
-		txstats = append(txstats, testreporters.TransactionStats{
+		txstats = append(txstats, &testreporters.TransactionStats{
 			Fee:                fee.String(),
 			NoOfTokensSent:     len(msg.TokenAmounts),
 			MessageBytesLength: int64(len(msg.Data)),
@@ -2821,7 +2842,7 @@ func (lane *CCIPLane) Multicall(noOfRequests int, multiSendAddr common.Address) 
 	if err != nil {
 		// update the stats as failure for all the requests in the multicall tx
 		for _, stat := range reqStats {
-			stat.UpdateState(lane.Logger, 0, testreporters.TX, 0, testreporters.Failure)
+			stat.UpdateState(lane.Logger, 0, testreporters.TX, 0, testreporters.Failure, nil)
 		}
 		return fmt.Errorf("failed to send the multicall: %w", err)
 	}
@@ -2852,12 +2873,12 @@ func (lane *CCIPLane) SendRequests(noOfRequests int, gasLimit *big.Int) error {
 			gasLimit,
 		)
 		if err != nil {
-			stat.UpdateState(lane.Logger, 0, testreporters.TX, txConfirmationDur, testreporters.Failure)
+			stat.UpdateState(lane.Logger, 0, testreporters.TX, txConfirmationDur, testreporters.Failure, nil)
 			return fmt.Errorf("could not send request: %w", err)
 		}
 		err = lane.Source.Common.ChainClient.WaitForEvents()
 		if err != nil {
-			stat.UpdateState(lane.Logger, 0, testreporters.TX, txConfirmationDur, testreporters.Failure)
+			stat.UpdateState(lane.Logger, 0, testreporters.TX, txConfirmationDur, testreporters.Failure, nil)
 			return fmt.Errorf("could not send request: %w", err)
 		}
 
@@ -2867,22 +2888,11 @@ func (lane *CCIPLane) SendRequests(noOfRequests int, gasLimit *big.Int) error {
 				noOfTokens++
 			}
 		}
-		rcpt, err := lane.AddToSentReqs(txHash, []*testreporters.RequestStat{stat})
+		_, err = lane.AddToSentReqs(txHash, []*testreporters.RequestStat{stat})
 		if err != nil {
 			return err
 		}
-		var gasUsed uint64
-		if rcpt != nil {
-			gasUsed = rcpt.GasUsed
-		}
-		stat.UpdateState(lane.Logger, 0,
-			testreporters.TX, txConfirmationDur, testreporters.Success, testreporters.TransactionStats{
-				Fee:                fee.String(),
-				GasUsed:            gasUsed,
-				TxHash:             rcpt.TxHash.Hex(),
-				NoOfTokensSent:     noOfTokens,
-				MessageBytesLength: lane.Source.MsgDataLength,
-			})
+		stat.UpdateState(lane.Logger, 0, testreporters.TX, txConfirmationDur, testreporters.Success, nil)
 		lane.TotalFee = bigmath.Add(lane.TotalFee, fee)
 	}
 
@@ -2984,7 +2994,7 @@ func (lane *CCIPLane) ExecuteManually(options ...ManualExecutionOption) error {
 				OnRamp:           lane.Source.OnRamp.Address(),
 				OffRamp:          lane.Dest.OffRamp.Address(),
 				SendReqLogIndex:  logIndex,
-				GasLimit:         big.NewInt(600_000),
+				GasLimit:         big.NewInt(DefaultDestinationGasLimit),
 			}
 			timeNow := time.Now().UTC()
 			tx, err := args.ExecuteManually()
@@ -3086,7 +3096,6 @@ func ExpectPhaseToFail(phase testreporters.Phase, phaseSpecificOptions ...PhaseS
 // If not, just pass in nil.
 func (lane *CCIPLane) ValidateRequests(validationOptionFuncs ...ValidationOptionFunc) {
 	var opts validationOptions
-	require.LessOrEqual(lane.Test, len(validationOptionFuncs), 1, "only one validation option function can be passed in to ValidateRequests")
 	for _, f := range validationOptionFuncs {
 		if f != nil {
 			f(lane.Logger, &opts)
@@ -3137,13 +3146,13 @@ func (lane *CCIPLane) ValidateRequestByTxHash(txHash common.Hash, opts validatio
 		return phaseErr
 	}
 
-	sourceLogFinalizedAt, _, err := lane.Source.AssertSendRequestedLogFinalized(lane.Logger, txHash, ccipSendReqGenAt, reqStats)
+	sourceLogFinalizedAt, _, err := lane.Source.AssertSendRequestedLogFinalized(lane.Logger, txHash, msgLogs, ccipSendReqGenAt, reqStats)
 	if shouldReturn, phaseErr := isPhaseValid(lane.Logger, testreporters.SourceLogFinalized, opts, err); shouldReturn {
 		return phaseErr
 	}
 	for _, msgLog := range msgLogs {
 		seqNumber := msgLog.SequenceNumber
-		lane.Logger = ptr.Ptr(lane.Logger.With().Str("msgId ", fmt.Sprintf("0x%x", msgLog.MessageId[:])).Logger())
+		lane.Logger = ptr.Ptr(lane.Logger.With().Str("msgId", fmt.Sprintf("0x%x", msgLog.MessageId[:])).Logger())
 		var reqStat *testreporters.RequestStat
 		for _, stat := range reqStats {
 			if stat.SeqNum == seqNumber {
@@ -3325,6 +3334,7 @@ func (lane *CCIPLane) StartEventWatchers() error {
 							DataLength:     len(e.Message.Data),
 							NoOfTokens:     len(e.Message.TokenAmounts),
 							Raw:            e.Raw,
+							Fee:            e.Message.FeeTokenAmount,
 						}))
 				} else {
 					lane.Source.CCIPSendRequestedWatcher.Store(e.Raw.TxHash.Hex(), []*contracts.SendReqEventData{
@@ -3334,6 +3344,7 @@ func (lane *CCIPLane) StartEventWatchers() error {
 							DataLength:     len(e.Message.Data),
 							NoOfTokens:     len(e.Message.TokenAmounts),
 							Raw:            e.Raw,
+							Fee:            e.Message.FeeTokenAmount,
 						},
 					})
 				}

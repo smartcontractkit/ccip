@@ -3,6 +3,7 @@ package models
 import (
 	"errors"
 	"fmt"
+	"math/big"
 	"slices"
 )
 
@@ -16,7 +17,10 @@ type PluginConfig struct {
 }
 
 type RebalancerConfig struct {
-	Type string `json:"type"`
+	Type          string   `json:"type"`
+	DefaultTarget *big.Int `json:"defaultTarget"`
+	// NetworkTargetOverrides is a map of NetworkSelector to big Int amounts
+	NetworkTargetOverrides map[NetworkSelector]*big.Int `json:"networkTargetOverrides"`
 }
 
 func ValidateRebalancerConfig(config RebalancerConfig) error {
@@ -41,6 +45,7 @@ var (
 	AllRebalancerTypes = []string{
 		RebalancerTypePingPong,
 		RebalancerTypeMinLiquidity,
+		RebalancerTypeTargetAndMin,
 	}
 )
 
