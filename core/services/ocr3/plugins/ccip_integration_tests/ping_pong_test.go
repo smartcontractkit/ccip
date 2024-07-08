@@ -5,13 +5,19 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/arm_proxy_contract"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_multi_offramp"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_multi_onramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_arm_contract"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/price_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/token_admin_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/weth9"
+	kcr "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/capabilities_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/stretchr/testify/require"
 
@@ -25,24 +31,38 @@ var (
 )
 
 func TestPingPong(t *testing.T) {
-	owner, chainA := createChain(t)
-	_, chainB := createChain(t)
+	//ownerA, chainA := createChain(t)
+	//ownerB, chainB := createChain(t)
+	owner, chains := createChains(t, 4)
 
 	//====================================================InitializeContracts========================================
-	pingPongA := initializeChainContracts(t, chainAID, owner, chainA)
-	pingPongB := initializeChainContracts(t, chainBID, owner, chainB)
+	//pingPongA := initializeChainContracts(t, chainAID, ownerA, chainA)
+	//pingPongB := initializeChainContracts(t, chainBID, ownerB, chainB)
+	homeChainUni, universes := deployContracts(t, owner, chains)
+	fullyConnectCCIPContracts(t, owner, universes)
+	_, err := homeChainUni.capabilityRegistry.AddCapabilities(owner, []kcr.CapabilitiesRegistryCapability{
+		{
+			LabelledName:          "ccip",
+			Version:               "v1.0.0",
+			CapabilityType:        2, // consensus. not used (?)
+			ResponseType:          0, // report. not used (?)
+			ConfigurationContract: homeChainUni.ccipConfigContract,
+		},
+	})
+	require.NoError(t, err, "failed to add capabilities to the capability registry")
+	homeChainUni.backend.Commit()
 
 	//====================================================Prepare PingPongs========================================
-	_, err := pingPongA.SetCounterpart(owner, chainBID, pingPongB.Address())
-	require.NoError(t, err)
-	_, err = pingPongB.SetCounterpart(owner, chainAID, pingPongA.Address())
-	require.NoError(t, err)
-
-	//====================================================Start PingPong========================================
-	_, err = pingPongA.StartPingPong(owner)
-	require.NoError(t, err)
-	_, err = pingPongB.StartPingPong(owner)
-	require.NoError(t, err)
+	//_, err := pingPongA.SetCounterpart(ownerA, chainBID, pingPongB.Address())
+	//require.NoError(t, err)
+	//_, err = pingPongB.SetCounterpart(ownerB, chainAID, pingPongA.Address())
+	//require.NoError(t, err)
+	//
+	////====================================================Start PingPong========================================
+	//_, err = pingPongA.StartPingPong(ownerA)
+	//require.NoError(t, err)
+	//_, err = pingPongB.StartPingPong(ownerB)
+	//require.NoError(t, err)
 }
 
 func createChain(t *testing.T) (*bind.TransactOpts, *backends.SimulatedBackend) {
@@ -101,6 +121,69 @@ func initializeChainContracts(t *testing.T,
 	rout, err := router.NewRouter(routerAddr, backend)
 	require.NoError(t, err)
 	require.NotEqual(t, rout, nil)
+	priceRegistryAddr, _, _, err := price_registry.DeployPriceRegistry(owner, backend, []common.Address{}, []common.Address{
+		linkToken.Address(),
+	}, 24*60*60, []price_registry.PriceRegistryTokenPriceFeedUpdate{})
+	require.NoError(t, err, "failed to deploy price registry on chain id %d", chainID)
+	backend.Commit()
+
+	priceRegistry, err := price_registry.NewPriceRegistry(priceRegistryAddr, backend)
+	require.NoError(t, err)
+	require.NotEqual(t, priceRegistry, nil)
+
+	tarAddr, _, _, err := token_admin_registry.DeployTokenAdminRegistry(owner, backend)
+	require.NoErrorf(t, err, "failed to deploy token admin registry on chain id %d", chainID)
+	backend.Commit()
+
+	tokenAdminRegistry, err := token_admin_registry.NewTokenAdminRegistry(tarAddr, backend)
+	require.NoError(t, err)
+	require.NotEqual(t, tokenAdminRegistry, nil)
+
+	chainSelector, ok := chainsel.EvmChainIdToChainSelector()[uint64(chainID)]
+	require.Truef(t, ok, "chain selector for chain id %d not found", chainID)
+
+	onrampAddr, _, _, err := evm_2_evm_multi_onramp.DeployEVM2EVMMultiOnRamp(
+		owner,
+		backend,
+		evm_2_evm_multi_onramp.EVM2EVMMultiOnRampStaticConfig{
+			LinkToken:     linkAddr,
+			ChainSelector: chainSelector,
+			RmnProxy:      rmnProxyAddr,
+		},
+		evm_2_evm_multi_onramp.EVM2EVMMultiOnRampDynamicConfig{
+			Router:        routerAddr,
+			PriceRegistry: priceRegistryAddr,
+		},
+		// can set this later once all chains are deployed
+		[]evm_2_evm_multi_onramp.EVM2EVMMultiOnRampDestChainConfigArgs{},
+		// disabled for simplicity
+		[]evm_2_evm_multi_onramp.EVM2EVMMultiOnRampPremiumMultiplierWeiPerEthArgs{},
+		[]evm_2_evm_multi_onramp.EVM2EVMMultiOnRampTokenTransferFeeConfigArgs{},
+	)
+	require.NoErrorf(t, err, "failed to deploy onramp on chain id %d", chainID)
+	backend.Commit()
+
+	onramp, err := evm_2_evm_multi_onramp.NewEVM2EVMMultiOnRamp(onrampAddr, backend)
+	require.NoError(t, err)
+	require.NotEqual(t, onramp, nil)
+
+	offrampAddr, _, _, err := evm_2_evm_multi_offramp.DeployEVM2EVMMultiOffRamp(
+		owner,
+		backend,
+		evm_2_evm_multi_offramp.EVM2EVMMultiOffRampStaticConfig{
+			ChainSelector:      chainSelector,
+			RmnProxy:           rmnProxyAddr,
+			TokenAdminRegistry: tarAddr,
+		},
+		// can fill this in later once all chains are deployed
+		[]evm_2_evm_multi_offramp.EVM2EVMMultiOffRampSourceChainConfigArgs{},
+	)
+	require.NoErrorf(t, err, "failed to deploy offramp on chain id %d", chainID)
+	backend.Commit()
+
+	offramp, err := evm_2_evm_multi_offramp.NewEVM2EVMMultiOffRamp(offrampAddr, backend)
+	require.NoError(t, err)
+	require.NotEqual(t, offramp, nil)
 
 	pingPongAddr, _, _, err := pp.DeployPingPongDemo(owner, backend, routerAddr, linkAddr)
 	require.NoError(t, err)
