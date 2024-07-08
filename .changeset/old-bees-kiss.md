@@ -2,4 +2,4 @@
 "ccip": patch
 ---
 
-Consolidated FinalityDepth setting #changed
+Consolidated FinalityDepth setting #internal
