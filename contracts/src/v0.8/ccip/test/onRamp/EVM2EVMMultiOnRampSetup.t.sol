@@ -275,7 +275,7 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
         gasMultiplierWeiPerEth: 5e17,
         networkFeeUSDCents: 1_00,
         enforceOutOfOrder: false,
-        familyTag: Client.EVM_FAMILY_TAG
+        chainFamilySelector: Internal.CHAIN_FAMILY_SELECTOR_EVM
       }),
       prevOnRamp: address(0)
     });

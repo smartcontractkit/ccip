@@ -117,7 +117,7 @@ library Internal {
   /// When abiEncoded, each EVMTokenAmount takes 2 slots, each bytes takes 2 slots, excl bytes contents
   uint256 public constant MESSAGE_FIXED_BYTES_PER_TOKEN = 32 * 4;
 
-  /// @dev AnyEVMMessage struct has 10 fields, including 3 variable arrays.
+  /// @dev Any2EVMRampMessage struct has 10 fields, including 3 variable arrays.
   /// Each variable array takes 1 more slot to store its length.
   /// When abi encoded, excluding array contents,
   /// Any2EVMMessage takes up a fixed number of 13 slots, 32 bytes each.
@@ -318,7 +318,7 @@ library Internal {
     RampTokenAmount[] tokenAmounts; // array of tokens and amounts to transfer
   }
 
-  /// @notice Family-agnostic message sent to an OnRamp
+  /// @notice Family-agnostic message emitted from the OnRamp
   /// Note: hash(Any2EVMRampMessage) != hash(EVM2AnyRampMessage) due to encoding & parameter differences
   /// messageId = hash(EVM2AnyRampMessage) using the source EVM chain's encoding format
   struct EVM2AnyRampMessage {
@@ -331,4 +331,7 @@ library Internal {
     uint256 feeTokenAmount; // fee token amount
     RampTokenAmount[] tokenAmounts; // array of tokens and amounts to transfer
   }
+
+  // bytes4(keccak256("CCIP ChainFamilySelector EVM"))
+  bytes4 public constant CHAIN_FAMILY_SELECTOR_EVM = 0x2812d52c;
 }

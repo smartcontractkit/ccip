@@ -28,7 +28,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
 
   error CannotSendZeroTokens();
   error InvalidExtraArgsTag();
-  error InvalidFamilyTag(bytes4 familyTag);
+  error InvalidChainFamilySelector(bytes4 chainFamilySelector);
   error ExtraArgOutOfOrderExecutionMustBeTrue();
   error OnlyCallableByOwnerOrAdmin();
   error MessageTooLarge(uint256 maxSize, uint256 actualSize);
@@ -142,7 +142,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
     uint64 gasMultiplierWeiPerEth; //            │ Multiplier for gas costs, 1e18 based so 11e17 = 10% extra cost.
     uint32 networkFeeUSDCents; //                │ Flat network fee to charge for messages,  multiples of 0.01 USD
     bool enforceOutOfOrder; //                   │ Whether to enforce the allowOutOfOrderExecution extraArg value to be true.
-    bytes4 familyTag; // ────────────────────────╯ Tag that identifies the ramp family. Used to determine the correct validations to perform for the family.
+    bytes4 chainFamilySelector; // ──────────────╯ Selector that identifies the destination chain's family. Used to determine the correct validations to perform for the dest chain.
   }
 
   /// @dev Struct to hold the configs for a destination chain
@@ -290,7 +290,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
         revert SourceTokenDataTooLarge(tokenAndAmount.token);
       }
 
-      _validateDestFamilyAddress(destChainConfig.dynamicConfig.familyTag, poolReturnData.destTokenAddress);
+      _validateDestFamilyAddress(destChainConfig.dynamicConfig.chainFamilySelector, poolReturnData.destTokenAddress);
 
       newMessage.tokenAmounts[i] = Internal.RampTokenAmount({
         sourcePoolAddress: abi.encode(sourcePool),
@@ -399,12 +399,12 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
     bytes calldata extraArgs,
     DestChainDynamicConfig memory destChainDynamicConfig
   ) internal pure returns (bytes memory) {
-    bytes4 familyTag = destChainDynamicConfig.familyTag;
-    if (familyTag == Client.EVM_FAMILY_TAG) {
+    bytes4 chainFamilySelector = destChainDynamicConfig.chainFamilySelector;
+    if (chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_EVM) {
       return abi.encode(_parseEVMExtraArgsFromBytes(extraArgs, destChainDynamicConfig));
     }
 
-    revert InvalidFamilyTag(destChainDynamicConfig.familyTag);
+    revert InvalidChainFamilySelector(destChainDynamicConfig.chainFamilySelector);
   }
 
   /// @dev Convert the extra args bytes into a struct with validations against the dest chain config
@@ -463,7 +463,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
     uint64 destChainSelector,
     uint256 dataLength,
     uint256 numberOfTokens,
-    bytes memory receiver
+    bytes calldata receiver
   ) internal view {
     // Check that payload is formed correctly
     DestChainDynamicConfig storage destChainDynamicConfig = s_destChainConfig[destChainSelector].dynamicConfig;
@@ -472,15 +472,15 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
     }
     if (numberOfTokens > uint256(destChainDynamicConfig.maxNumberOfTokensPerMsg)) revert UnsupportedNumberOfTokens();
 
-    _validateDestFamilyAddress(destChainDynamicConfig.familyTag, receiver);
+    _validateDestFamilyAddress(destChainDynamicConfig.chainFamilySelector, receiver);
   }
 
   /// @notice Validates that the destAddress matches the expected format of the family.
-  /// @param familyTag Tag to identify the target family
+  /// @param chainFamilySelector Tag to identify the target family
   /// @param destAddress Dest address to validate
   /// @dev precondition - assumes the family tag is correct and validated
-  function _validateDestFamilyAddress(bytes4 familyTag, bytes memory destAddress) internal pure {
-    if (familyTag == Client.EVM_FAMILY_TAG) {
+  function _validateDestFamilyAddress(bytes4 chainFamilySelector, bytes memory destAddress) internal pure {
+    if (chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_EVM) {
       Internal._validateEVMAddress(destAddress);
     }
   }

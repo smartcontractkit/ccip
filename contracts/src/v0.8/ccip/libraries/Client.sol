@@ -52,7 +52,4 @@ library Client {
   function _argsToBytes(EVMExtraArgsV2 memory extraArgs) internal pure returns (bytes memory bts) {
     return abi.encodeWithSelector(EVM_EXTRA_ARGS_V2_TAG, extraArgs);
   }
-
-  // TODO: pre-optimize by storing the const value
-  bytes4 public constant EVM_FAMILY_TAG = bytes4(keccak256("CCIP EVM Family"));
 }
