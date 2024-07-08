@@ -476,6 +476,7 @@ func (ccipModule *CCIPCommon) WaitForPriceUpdates(
 			Uint64("dest chain", destChainId).
 			Str("source chain", ccipModule.ChainClient.GetNetworkName()).
 			Msg("Price already updated")
+		ccipModule.priceUpdateFound <- struct{}{}
 		return nil
 	}
 	// if not, wait for price update

@@ -476,6 +476,12 @@ func DeployEnvironments(
 			// if anvilconfig is specified for a network addhelm for anvil
 			if anvilConfig, exists := testInputs.EnvInput.Network.AnvilConfigs[strings.ToUpper(network.Name)]; exists {
 				charts = append(charts, foundry.ChartName)
+				if anvilConfig.BaseFee == nil {
+					anvilConfig.BaseFee = pointer.ToInt64(1000000)
+				}
+				if anvilConfig.BlockGaslimit == nil {
+					anvilConfig.BlockGaslimit = pointer.ToInt64(100000000)
+				}
 				testEnvironment.
 					AddHelm(foundry.New(&foundry.Props{
 						NetworkName: network.Name,
@@ -491,10 +497,10 @@ func DeployEnvironments(
 								"forkComputeUnitsPerSecond": anvilConfig.ComputePerSecond,
 								"forkNoRateLimit":           anvilConfig.RateLimitDisabled,
 								"blocksToKeepInMemory":      anvilConfig.BlocksToKeepInMem,
-								"blockGasLimit":             anvilConfig.BlockGaslimit,
-								"baseFee":                   anvilConfig.BaseFee,
+								"blockGasLimit":             fmt.Sprintf("%d", pointer.GetInt64(anvilConfig.BlockGaslimit)),
+								"baseFee":                   fmt.Sprintf("%d", pointer.GetInt64(anvilConfig.BaseFee)),
 							},
-							"resources": testInputs.GethResourceProfile,
+							"resources": AnvilResourceProfile,
 						},
 					}))
 				selectedNetworks[i].Simulated = true
