@@ -2,13 +2,16 @@
 pragma solidity ^0.8.0;
 
 import {Client} from "../../libraries/Client.sol";
-import {CCIPClientBase} from "./CCIPClientBase.sol";
+import {CCIPBase} from "./CCIPBase.sol";
 
 import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
 import {EnumerableMap} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/structs/EnumerableMap.sol";
 
-contract CCIPReceiver is CCIPClientBase {
+/// @title CCIPReceiver
+/// @notice This contract is capable of receiving incoming messages from the CCIP-Router.
+/// @dev This contract implements various "defensive" measures to enhance security and efficiency. These include the ability to implement custom-retry logic and ownership-based token-recovery functions.
+contract CCIPReceiver is CCIPBase {
   using SafeERC20 for IERC20;
   using EnumerableMap for EnumerableMap.Bytes32ToUintMap;
 
@@ -20,13 +23,12 @@ contract CCIPReceiver is CCIPClientBase {
   event MessageRecovered(bytes32 indexed messageId);
   event MessageAbandoned(bytes32 indexed messageId, address tokenReceiver);
 
-  // Example error code, could have many different error codes.
   enum ErrorCode {
-    // RESOLVED is first so that the default value is resolved.
-    RESOLVED,
-    FAILED,
-    // TODO comment
-    ABANDONED
+    RESOLVED, // RESOLVED is the default status for any incoming message, unless execution fails and it is marked as FAILED.
+    FAILED, // FAILED messages are messages which reverted during execution of processMessage() as part of the ccipReceive() try catch loop.
+    ABANDONED // ABANDONED messages are ones which cannot be properly processed, but any sent tokens are recoverable, and can only be triggered by the contract owner.
+      // Only a message that was previously marked as FAILED can be abandoned.
+
   }
 
   // The message contents of failed messages are stored here.
@@ -35,18 +37,14 @@ contract CCIPReceiver is CCIPClientBase {
   // Contains failed messages and their state.
   EnumerableMap.Bytes32ToUintMap internal s_failedMessages;
 
-  constructor(address router) CCIPClientBase(router) {}
-
-  function typeAndVersion() external pure virtual returns (string memory) {
-    return "CCIPReceiver 1.0.0-dev";
-  }
+  constructor(address router) CCIPBase(router) {}
 
   // ================================================================
   // │                  Incoming Message Processing                 |
   // ================================================================
 
   /// @notice The entrypoint for the CCIP router to call. This function should
-  /// never revert, all errors should be handled internally in this contract.
+  /// not revert, all errors should be handled internally in this contract.
   /// @param message The message to process.
   /// @dev Extremely important to ensure only router calls this.
   function ccipReceive(Client.Any2EVMMessage calldata message)
@@ -57,19 +55,11 @@ contract CCIPReceiver is CCIPClientBase {
   {
     try this.processMessage(message) {}
     catch (bytes memory err) {
-      // TODO kinda dangerous comments here. 
-      //  The original suggestion was:
-      //  if you want custom retry logic, plus owner extracting tokens as a last resort for recovery, use this try-catch pattern in ccipReceiver
-      //  this means the message will appear as success to CCIP, and you can track the actual message state within the dapp
-      //  if you do not need custom retry logic, and you don't need owner token recovery function, then you don't need the try-catch here
-      //  because you can use ccip manualExecution as a retry function
-      //
-      // we should not phrase it such that "Any failures should be tracked by individual Dapps", it's only the case if they want custom retry pattern
-      // as opposed to default manual exec, or they want token recovery feature.
+      //  If custom retry logic is desired, plus granting the owner the ability to extract tokens as a last resort for recovery, use this try-catch pattern in ccipReceiver.
+      //  This make the message appear as a success to CCIP, and actual message state and any residual errors can be tracked within the dapp with greater granularity.
+      //  If custom retry logic and token recovery functions are not needed, then this try-catch can be removed,
+      //  and ccip manualExecution can be used a retry function instead.
 
-      // Mark the message as having failed. Any failures should be tracked by individual Dapps, since CCIP
-      // will mark the message as having been successfully delivered. CCIP makes no assurances about message delivery
-      // other than invocation with proper gas limit. Any logic/execution errors should be tracked by separately.
       s_failedMessages.set(message.messageId, uint256(ErrorCode.FAILED));
 
       // Store the message contents in case it needs to be retried or abandoned
@@ -98,10 +88,9 @@ contract CCIPReceiver is CCIPClientBase {
   // │                  Failed Message Processing                   |
   // ================== ==============================================
 
-  // TODO we don't do new @dev on every new line, same for @notice, when in doubt check other contracts.
-  /// @notice Execute a message that failed initial delivery, but with different logic specifically for re-execution.
+  /// @notice Executes a message that failed initial delivery, but with different logic specifically for re-execution.
   /// @dev Since the function invoked _retryFailedMessage(), which is marked onlyOwner, this may only be called by the Owner as well.
-  /// @dev function will revert if the messageId was not already stored as having failed its initial execution
+  /// @dev Function will revert if the messageId was not already stored as having failed its initial execution
   /// @param messageId the unique ID of the CCIP-message which failed initial-execution.
   function retryFailedMessage(bytes32 messageId) external {
     if (s_failedMessages.get(messageId) != uint256(ErrorCode.FAILED)) revert MessageNotFailed(messageId);
@@ -120,17 +109,15 @@ contract CCIPReceiver is CCIPClientBase {
   }
 
   /// @notice A function that should contain any special logic needed to "retry" processing of a previously failed message.
-  /// TODO these funtions do not exist
-  /// @dev If the owner wants to retrieve tokens without special logic, then abandonMessage() or recoverTokens() should be used instead
-  /// @dev function is marked onlyOwner, but is virtual. Allowing permissionless execution is not recommended but may be allowed if function is overridden
+  /// @dev If the owner wants to retrieve tokens without special logic, then abandonFailedMessage(), withdrawNativeTokens(), or withdrawTokens() should be used instead
+  /// @dev This function is marked onlyOwner, but is virtual. Allowing permissionless execution is not recommended but may be allowed if function is overridden
   function _retryFailedMessage(Client.Any2EVMMessage memory message) internal virtual onlyOwner {
     // TODO how about we add a default implementation that calls `processMessage`, and comments for overrides
   }
 
-  // TODO double notices
   /// @notice Should be used to recover tokens from a failed message, while ensuring the message cannot be retried
-  /// @notice function will send tokens to destination, but will NOT invoke any arbitrary logic afterwards.
-  /// @dev this function is only callable as the owner, and
+  /// @dev function will send tokens to destination, but will NOT invoke any arbitrary logic afterwards.
+  /// @dev function is only callable by the contract owner
   function abandonFailedMessage(bytes32 messageId, address receiver) external onlyOwner {
     if (s_failedMessages.get(messageId) != uint256(ErrorCode.FAILED)) revert MessageNotFailed(messageId);
 

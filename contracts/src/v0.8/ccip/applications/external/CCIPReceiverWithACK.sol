@@ -10,6 +10,7 @@ import {SafeERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/
 
 import {EnumerableMap} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/structs/EnumerableMap.sol";
 
+/// @title CCIPReceiverWithACK
 contract CCIPReceiverWithACK is CCIPReceiver {
   using SafeERC20 for IERC20;
   using EnumerableMap for EnumerableMap.Bytes32ToUintMap;
@@ -39,7 +40,7 @@ contract CCIPReceiverWithACK is CCIPReceiver {
     MessageType messageType;
   }
 
-  bytes public constant ACK_MESSAGE_HEADER = "MESSAGE_ACKNOWLEDGED_";
+  string public constant ACK_MESSAGE_HEADER = "MESSAGE_ACKNOWLEDGED_";
 
   // Current feeToken
   IERC20 public s_feeToken;
@@ -53,10 +54,6 @@ contract CCIPReceiverWithACK is CCIPReceiver {
     if (address(feeToken) != address(0)) {
       feeToken.safeIncreaseAllowance(router, type(uint256).max);
     }
-  }
-
-  function typeAndVersion() external pure virtual override returns (string memory) {
-    return "CCIPReceiverWithACK 1.0.0-dev";
   }
 
   function modifyFeeToken(address token) external onlyOwner {
@@ -109,14 +106,16 @@ contract CCIPReceiverWithACK is CCIPReceiver {
     if (payload.messageType == MessageType.OUTGOING) {
       // Insert Processing workflow here.
 
-      // If the message was outgoing on the source-chain, then send an ack response.
+      // If the message was outgoing on the source chain, then send an ack response.
       _sendAck(message);
     } else if (payload.messageType == MessageType.ACK) {
       // Decode message into the message header and the messageId to ensure the message is encoded correctly
-      (bytes memory messageHeader, bytes32 messageId) = abi.decode(payload.data, (bytes, bytes32));
+      (string memory messageHeader, bytes32 messageId) = abi.decode(payload.data, (string, bytes32));
 
-      // Ensure Ack Message contains proper message header
-      if (keccak256(messageHeader) != keccak256(ACK_MESSAGE_HEADER)) revert InvalidAckMessageHeader();
+      // Ensure Ack Message contains proper message header. Must abi.encode() before hashing since its of the string type
+      if (keccak256(abi.encode(messageHeader)) != keccak256(abi.encode(ACK_MESSAGE_HEADER))) {
+        revert InvalidAckMessageHeader();
+      }
 
       // Make sure the ACK message has not already been acknowledged
       if (s_messageStatus[messageId] == MessageStatus.ACKNOWLEDGED) revert MessageAlreadyAcknowledged(messageId);
@@ -141,9 +140,9 @@ contract CCIPReceiverWithACK is CCIPReceiver {
       feeToken: address(s_feeToken)
     });
 
-    uint256 feeAmount = IRouterClient(i_ccipRouter).getFee(incomingMessage.sourceChainSelector, outgoingMessage);
+    uint256 feeAmount = IRouterClient(s_ccipRouter).getFee(incomingMessage.sourceChainSelector, outgoingMessage);
 
-    bytes32 ACKmessageId = IRouterClient(i_ccipRouter).ccipSend{
+    bytes32 ACKmessageId = IRouterClient(s_ccipRouter).ccipSend{
       value: address(s_feeToken) == address(0) ? feeAmount : 0
     }(incomingMessage.sourceChainSelector, outgoingMessage);
 

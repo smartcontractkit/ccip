@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {CCIPClient} from "../../../applications/external/CCIPClient.sol";
+import {CCIPClientWithACK} from "../../../applications/external/CCIPClientWithACK.sol";
 
-import {CCIPReceiverWithACK} from "../../../applications/external/CCIPClient.sol";
-import {CCIPClientBase} from "../../../applications/external/CCIPClientBase.sol";
+import {CCIPBase} from "../../../applications/external/CCIPBase.sol";
+import {CCIPReceiverWithACK} from "../../../applications/external/CCIPReceiverWithACK.sol";
 import {IRouterClient} from "../../../interfaces/IRouterClient.sol";
 
 import {Client} from "../../../libraries/Client.sol";
@@ -20,23 +20,32 @@ contract CCIPClientTest is EVM2EVMOnRampSetup {
   event MessageAckSent(bytes32 incomingMessageId);
   event MessageAckReceived(bytes32);
 
-  CCIPClient internal s_sender;
+  CCIPClientWithACK internal s_sender;
   uint64 internal destChainSelector = DEST_CHAIN_SELECTOR;
 
   function setUp() public virtual override {
     EVM2EVMOnRampSetup.setUp();
 
-    s_sender = new CCIPClient(address(s_sourceRouter), IERC20(s_sourceFeeToken));
-    s_sender.enableChain(destChainSelector, abi.encode(address(s_sender)), "");
+    s_sender = new CCIPClientWithACK(address(s_sourceRouter), IERC20(s_sourceFeeToken));
 
-    CCIPClientBase.ApprovedSenderUpdate[] memory senderUpdates = new CCIPClientBase.ApprovedSenderUpdate[](1);
+    CCIPBase.ChainUpdate[] memory chainUpdates = new CCIPBase.ChainUpdate[](1);
+    chainUpdates[0] = CCIPBase.ChainUpdate({
+      chainSelector: destChainSelector,
+      allowed: true,
+      recipient: abi.encode(address(s_sender)),
+      extraArgsBytes: ""
+    });
+
+    s_sender.applyChainUpdates(chainUpdates);
+
+    CCIPBase.ApprovedSenderUpdate[] memory senderUpdates = new CCIPBase.ApprovedSenderUpdate[](1);
     senderUpdates[0] =
-      CCIPClientBase.ApprovedSenderUpdate({destChainSelector: destChainSelector, sender: abi.encode(address(s_sender))});
+      CCIPBase.ApprovedSenderUpdate({destChainSelector: destChainSelector, sender: abi.encode(address(s_sender))});
 
-    s_sender.updateApprovedSenders(senderUpdates, new CCIPClientBase.ApprovedSenderUpdate[](0));
+    s_sender.updateApprovedSenders(senderUpdates, new CCIPBase.ApprovedSenderUpdate[](0));
   }
 
-  function test_ccipReceiveAndSendAck() public {
+  function test_ccipReceiveAndSendAck_Success() public {
     bytes32 messageId = keccak256("messageId");
     bytes32 ackMessageId = 0x37ddbb21a51d4e07877b0de816905ea806b958e7607d951d307030631db076bd;
     address token = address(s_sourceFeeToken);
@@ -83,7 +92,7 @@ contract CCIPClientTest is EVM2EVMOnRampSetup {
     assertEq(IERC20(s_sourceFeeToken).balanceOf(address(s_sender)), receiverBalanceBefore - feeTokenAmount);
   }
 
-  function test_ccipSend_withNonNativeFeetoken_andNoDestTokens() public {
+  function test_ccipSend_withNonNativeFeetoken_andNoDestTokens_Success() public {
     address token = address(s_sourceFeeToken);
     Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](0);
 
@@ -108,7 +117,7 @@ contract CCIPClientTest is EVM2EVMOnRampSetup {
     assertEq(IERC20(token).balanceOf(OWNER), feeTokenBalanceBefore - feeTokenAmount);
   }
 
-  function test_ccipSendAndReceiveAck_in_return() public {
+  function test_ccipSendAndReceiveAck_in_return_Success() public {
     address token = address(s_sourceFeeToken);
     uint256 amount = 111333333777;
     Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](1);
@@ -150,36 +159,13 @@ contract CCIPClientTest is EVM2EVMOnRampSetup {
     );
   }
 
-  // function test_ccipSend_withNativeFeeToken_butInsufficientMsgValue_REVERT() public {
-  //   Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](0);
-
-  //   Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
-  //     receiver: abi.encode(address(s_sender)),
-  //     data: "FAKE_DATA",
-  //     tokenAmounts: destTokenAmounts,
-  //     feeToken: address(0),
-  //     extraArgs: ""
-  //   });
-
-  //   uint256 feeTokenAmount = s_sourceRouter.getFee(DEST_CHAIN_SELECTOR, message);
-
-  //   vm.expectRevert(IRouterClient.InsufficientFeeTokenAmount.selector);
-  //   s_sender.ccipSend{value: feeTokenAmount / 2}({
-  //     destChainSelector: DEST_CHAIN_SELECTOR,
-  //     tokenAmounts: destTokenAmounts,
-  //     data: "",
-  //     feeToken: address(0)
-  //   });
-  // }
-
-  function test_send_tokens_that_are_not_feeToken() public {
+  function test_send_tokens_that_are_not_feeToken_Success() public {
     address token = s_sourceTokens[1];
     uint256 amount = 111333333777;
     Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](1);
     destTokenAmounts[0] = Client.EVMTokenAmount({token: token, amount: amount});
 
     // Make sure we give the receiver contract enough tokens like CCIP would.
-
     IERC20(token).approve(address(s_sender), type(uint256).max);
     IERC20(s_sourceFeeToken).approve(address(s_sender), type(uint256).max);
     deal(token, address(this), 1e24);
@@ -197,7 +183,6 @@ contract CCIPClientTest is EVM2EVMOnRampSetup {
     uint256 feeTokenBalanceBefore = IERC20(s_sourceFeeToken).balanceOf(OWNER);
 
     s_sender.ccipSend({destChainSelector: DEST_CHAIN_SELECTOR, tokenAmounts: destTokenAmounts, data: ""});
-    // feeToken: address(s_sourceFeeToken)
 
     // Assert that tokens were transfered for bridging + fees
     assertEq(IERC20(token).balanceOf(OWNER), tokenBalanceBefore - amount);

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {CCIPClientBase} from "../../../applications/external/CCIPClientBase.sol";
+import {CCIPBase} from "../../../applications/external/CCIPBase.sol";
 
 import {CCIPReceiver} from "../../../applications/external/CCIPReceiver.sol";
 import {CCIPReceiverReverting} from "../../helpers/receivers/CCIPReceiverReverting.sol";
@@ -23,18 +23,24 @@ contract CCIPReceiverTest is EVM2EVMOnRampSetup {
     EVM2EVMOnRampSetup.setUp();
 
     s_receiver = new CCIPReceiverReverting(address(s_destRouter));
-    s_receiver.enableChain(sourceChainSelector, abi.encode(address(1)), "");
 
-    CCIPClientBase.ApprovedSenderUpdate[] memory senderUpdates = new CCIPClientBase.ApprovedSenderUpdate[](1);
-    senderUpdates[0] = CCIPClientBase.ApprovedSenderUpdate({
-      destChainSelector: sourceChainSelector,
-      sender: abi.encode(address(s_receiver))
+    CCIPBase.ChainUpdate[] memory chainUpdates = new CCIPBase.ChainUpdate[](1);
+    chainUpdates[0] = CCIPBase.ChainUpdate({
+      chainSelector: sourceChainSelector,
+      allowed: true,
+      recipient: abi.encode(address(s_receiver)),
+      extraArgsBytes: ""
     });
+    s_receiver.applyChainUpdates(chainUpdates);
 
-    s_receiver.updateApprovedSenders(senderUpdates, new CCIPClientBase.ApprovedSenderUpdate[](0));
+    CCIPBase.ApprovedSenderUpdate[] memory senderUpdates = new CCIPBase.ApprovedSenderUpdate[](1);
+    senderUpdates[0] =
+      CCIPBase.ApprovedSenderUpdate({destChainSelector: sourceChainSelector, sender: abi.encode(address(s_receiver))});
+
+    s_receiver.updateApprovedSenders(senderUpdates, new CCIPBase.ApprovedSenderUpdate[](0));
   }
 
-  function test_Recovery_with_intentional_revert() public {
+  function test_Recovery_with_intentional_Revert() public {
     bytes32 messageId = keccak256("messageId");
     address token = address(s_destFeeToken);
     uint256 amount = 111333333777;
@@ -84,7 +90,7 @@ contract CCIPReceiverTest is EVM2EVMOnRampSetup {
     );
   }
 
-  function test_Recovery_from_invalid_sender() public {
+  function test_Recovery_from_invalid_sender_Success() public {
     bytes32 messageId = keccak256("messageId");
     address token = address(s_destFeeToken);
     uint256 amount = 111333333777;
@@ -99,7 +105,7 @@ contract CCIPReceiverTest is EVM2EVMOnRampSetup {
 
     vm.expectEmit();
     emit MessageFailed(
-      messageId, abi.encodeWithSelector(bytes4(CCIPClientBase.InvalidSender.selector), abi.encode(address(1)))
+      messageId, abi.encodeWithSelector(bytes4(CCIPBase.InvalidSender.selector), abi.encode(address(1)))
     );
 
     s_receiver.ccipReceive(
@@ -152,7 +158,7 @@ contract CCIPReceiverTest is EVM2EVMOnRampSetup {
 
     vm.expectEmit();
     emit MessageFailed(
-      messageId, abi.encodeWithSelector(bytes4(CCIPClientBase.InvalidSender.selector), abi.encode(address(1)))
+      messageId, abi.encodeWithSelector(bytes4(CCIPBase.InvalidSender.selector), abi.encode(address(1)))
     );
 
     s_receiver.ccipReceive(
@@ -214,8 +220,19 @@ contract CCIPReceiverTest is EVM2EVMOnRampSetup {
     );
   }
 
-  function test_disableChain_andRevert_onccipReceive_REVERT() public {
-    s_receiver.disableChain(sourceChainSelector);
+  function test_disableChain_andRevert_onccipReceive_Revert() public {
+    CCIPBase.ChainUpdate[] memory chainUpdates = new CCIPBase.ChainUpdate[](1);
+    chainUpdates[0] = CCIPBase.ChainUpdate({
+      chainSelector: sourceChainSelector,
+      allowed: false,
+      recipient: abi.encode(address(s_receiver)),
+      extraArgsBytes: ""
+    });
+
+    vm.expectEmit();
+    emit CCIPBase.ChainRemoved(sourceChainSelector);
+
+    s_receiver.applyChainUpdates(chainUpdates);
 
     bytes32 messageId = keccak256("messageId");
     address token = address(s_destFeeToken);
@@ -229,7 +246,7 @@ contract CCIPReceiverTest is EVM2EVMOnRampSetup {
     // The receiver contract will revert if the router is not the sender.
     vm.startPrank(address(s_destRouter));
 
-    vm.expectRevert(abi.encodeWithSelector(CCIPClientBase.InvalidChain.selector, sourceChainSelector));
+    vm.expectRevert(abi.encodeWithSelector(CCIPBase.InvalidChain.selector, sourceChainSelector));
 
     s_receiver.ccipReceive(
       Client.Any2EVMMessage({
@@ -242,14 +259,26 @@ contract CCIPReceiverTest is EVM2EVMOnRampSetup {
     );
   }
 
-  function test_removeSender_from_approvedList_and_revert() public {
-    CCIPClientBase.ApprovedSenderUpdate[] memory senderUpdates = new CCIPClientBase.ApprovedSenderUpdate[](1);
-    senderUpdates[0] = CCIPClientBase.ApprovedSenderUpdate({
-      destChainSelector: sourceChainSelector,
-      sender: abi.encode(address(s_receiver))
-    });
+  function test_modifyRouter_Success() public {
+    vm.expectRevert(abi.encodeWithSelector(CCIPBase.ZeroAddressNotAllowed.selector));
+    s_receiver.modifyRouter(address(0));
 
-    s_receiver.updateApprovedSenders(new CCIPClientBase.ApprovedSenderUpdate[](0), senderUpdates);
+    address newRouter = address(0x1234);
+
+    vm.expectEmit();
+    emit CCIPBase.CCIPRouterModified(address(s_destRouter), newRouter);
+
+    s_receiver.modifyRouter(newRouter);
+
+    assertEq(s_receiver.getRouter(), newRouter, "Router Address not set correctly to the new router");
+  }
+
+  function test_removeSender_from_approvedList_and_revert_Success() public {
+    CCIPBase.ApprovedSenderUpdate[] memory senderUpdates = new CCIPBase.ApprovedSenderUpdate[](1);
+    senderUpdates[0] =
+      CCIPBase.ApprovedSenderUpdate({destChainSelector: sourceChainSelector, sender: abi.encode(address(s_receiver))});
+
+    s_receiver.updateApprovedSenders(new CCIPBase.ApprovedSenderUpdate[](0), senderUpdates);
 
     // assertFalse(s_receiver.s_approvedSenders(sourceChainSelector, abi.encode(address(s_receiver))));
     assertFalse(s_receiver.isApprovedSender(sourceChainSelector, abi.encode(address(s_receiver))));
@@ -268,7 +297,7 @@ contract CCIPReceiverTest is EVM2EVMOnRampSetup {
 
     vm.expectEmit();
     emit MessageFailed(
-      messageId, abi.encodeWithSelector(bytes4(CCIPClientBase.InvalidSender.selector), abi.encode(address(s_receiver)))
+      messageId, abi.encodeWithSelector(bytes4(CCIPBase.InvalidSender.selector), abi.encode(address(s_receiver)))
     );
 
     s_receiver.ccipReceive(
@@ -282,7 +311,7 @@ contract CCIPReceiverTest is EVM2EVMOnRampSetup {
     );
   }
 
-  function test_withdraw_nativeToken_to_owner() public {
+  function test_withdraw_nativeToken_to_owner_Success() public {
     uint256 amount = 100 ether;
     deal(address(s_receiver), amount);
 

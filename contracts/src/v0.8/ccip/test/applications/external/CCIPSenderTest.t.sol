@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {CCIPClientBase} from "../../../applications/external/CCIPClientBase.sol";
+import {CCIPBase} from "../../../applications/external/CCIPBase.sol";
 import {CCIPSender} from "../../../applications/external/CCIPSender.sol";
 
 import {Client} from "../../../libraries/Client.sol";
@@ -21,7 +21,15 @@ contract CCIPSenderTest is EVM2EVMOnRampSetup {
     EVM2EVMOnRampSetup.setUp();
 
     s_sender = new CCIPSender(address(s_sourceRouter));
-    s_sender.enableChain(DEST_CHAIN_SELECTOR, abi.encode(address(s_sender)), "");
+
+    CCIPBase.ChainUpdate[] memory chainUpdates = new CCIPBase.ChainUpdate[](1);
+    chainUpdates[0] = CCIPBase.ChainUpdate({
+      chainSelector: DEST_CHAIN_SELECTOR,
+      allowed: true,
+      recipient: abi.encode(address(s_sender)),
+      extraArgsBytes: ""
+    });
+    s_sender.applyChainUpdates(chainUpdates);
   }
 
   function test_ccipSend_withNonNativeFeetoken_andDestTokens() public {

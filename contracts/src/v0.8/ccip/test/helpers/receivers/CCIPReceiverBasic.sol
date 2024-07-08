@@ -5,12 +5,12 @@ import {IAny2EVMMessageReceiver} from "../../../interfaces/IAny2EVMMessageReceiv
 
 import {IERC165} from "../../../../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/introspection/IERC165.sol";
 
-import {CCIPClientBase} from "../../../applications/external/CCIPClientBase.sol";
+import {CCIPBase} from "../../../applications/external/CCIPBase.sol";
 import {Client} from "../../../libraries/Client.sol";
 
 /// @title CCIPReceiver - Base contract for CCIP applications that can receive messages.
-contract CCIPReceiverBasic is CCIPClientBase, IAny2EVMMessageReceiver, IERC165 {
-  constructor(address router) CCIPClientBase(router) {}
+contract CCIPReceiverBasic is CCIPBase, IAny2EVMMessageReceiver, IERC165 {
+  constructor(address router) CCIPBase(router) {}
 
   function typeAndVersion() external pure virtual returns (string memory) {
     return "CCIPReceiverBasic 1.0.0-dev";

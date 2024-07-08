@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {CCIPClientBase} from "../../../applications/external/CCIPClientBase.sol";
+import {CCIPBase} from "../../../applications/external/CCIPBase.sol";
 import {CCIPReceiverWithACK} from "../../../applications/external/CCIPReceiverWithACK.sol";
 
 import {Client} from "../../../libraries/Client.sol";
@@ -24,18 +24,24 @@ contract CCIPReceiverWithAckTest is EVM2EVMOnRampSetup {
     EVM2EVMOnRampSetup.setUp();
 
     s_receiver = new CCIPReceiverWithACK(address(s_sourceRouter), IERC20(s_sourceFeeToken));
-    s_receiver.enableChain(destChainSelector, abi.encode(address(s_receiver)), "");
 
-    CCIPClientBase.ApprovedSenderUpdate[] memory senderUpdates = new CCIPClientBase.ApprovedSenderUpdate[](1);
-    senderUpdates[0] = CCIPClientBase.ApprovedSenderUpdate({
-      destChainSelector: destChainSelector,
-      sender: abi.encode(address(s_receiver))
+    CCIPBase.ChainUpdate[] memory chainUpdates = new CCIPBase.ChainUpdate[](1);
+    chainUpdates[0] = CCIPBase.ChainUpdate({
+      chainSelector: destChainSelector,
+      allowed: true,
+      recipient: abi.encode(address(s_receiver)),
+      extraArgsBytes: ""
     });
+    s_receiver.applyChainUpdates(chainUpdates);
 
-    s_receiver.updateApprovedSenders(senderUpdates, new CCIPClientBase.ApprovedSenderUpdate[](0));
+    CCIPBase.ApprovedSenderUpdate[] memory senderUpdates = new CCIPBase.ApprovedSenderUpdate[](1);
+    senderUpdates[0] =
+      CCIPBase.ApprovedSenderUpdate({destChainSelector: destChainSelector, sender: abi.encode(address(s_receiver))});
+
+    s_receiver.updateApprovedSenders(senderUpdates, new CCIPBase.ApprovedSenderUpdate[](0));
   }
 
-  function test_ccipReceive_and_respond_with_ack() public {
+  function test_ccipReceive_and_respond_with_ack_Success() public {
     bytes32 messageId = keccak256("messageId");
     bytes32 ackMessageId = 0x37ddbb21a51d4e07877b0de816905ea806b958e7607d951d307030631db076bd;
     address token = address(s_sourceFeeToken);
@@ -82,7 +88,7 @@ contract CCIPReceiverWithAckTest is EVM2EVMOnRampSetup {
     assertEq(IERC20(s_sourceFeeToken).balanceOf(address(s_receiver)), receiverBalanceBefore - feeTokenAmount);
   }
 
-  function test_ccipReceive_ack_message() public {
+  function test_ccipReceive_ack_message_Success() public {
     bytes32 messageId = keccak256("messageId");
     Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](0);
 
@@ -115,7 +121,7 @@ contract CCIPReceiverWithAckTest is EVM2EVMOnRampSetup {
     );
   }
 
-  function test_ccipReceiver_ack_with_invalidAckMessageHeaderBytes_REVERT() public {
+  function test_ccipReceiver_ack_with_invalidAckMessageHeaderBytes_Revert() public {
     bytes32 messageId = keccak256("messageId");
     Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](0);
 
@@ -147,7 +153,7 @@ contract CCIPReceiverWithAckTest is EVM2EVMOnRampSetup {
     assertEq(s_receiver.getMessageStatus(messageId), 1);
   }
 
-  function test_modifyFeeToken() public {
+  function test_modifyFeeToken_Success() public {
     // WETH is used as a placeholder for any ERC20 token
     address WETH = s_sourceRouter.getWrappedNative();
 
@@ -165,7 +171,7 @@ contract CCIPReceiverWithAckTest is EVM2EVMOnRampSetup {
     assertEq(IERC20(s_sourceFeeToken).allowance(address(s_receiver), address(s_sourceRouter)), 0);
   }
 
-  function test_feeTokenApproval_in_constructor() public {
+  function test_feeTokenApproval_in_constructor_Success() public {
     CCIPReceiverWithACK newReceiver = new CCIPReceiverWithACK(address(s_sourceRouter), IERC20(s_sourceFeeToken));
 
     assertEq(IERC20(s_sourceFeeToken).allowance(address(newReceiver), address(s_sourceRouter)), type(uint256).max);

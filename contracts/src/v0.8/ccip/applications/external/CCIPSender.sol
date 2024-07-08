@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 import {IRouterClient} from "../../interfaces/IRouterClient.sol";
 
 import {Client} from "../../libraries/Client.sol";
-import {CCIPClientBase} from "./CCIPClientBase.sol";
+import {CCIPBase} from "./CCIPBase.sol";
 
 import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -22,7 +22,7 @@ import {SafeERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/
 /// like the example below will inherit the trust properties of CCIP (i.e. the oracle network).
 /// @dev The receiver's are encoded offchain and passed as direct arguments to permit supporting
 /// new chain family receivers (e.g. a solana encoded receiver address) without upgrading.
-contract CCIPSender is CCIPClientBase {
+contract CCIPSender is CCIPBase {
   using SafeERC20 for IERC20;
 
   error InvalidConfig();
@@ -31,11 +31,7 @@ contract CCIPSender is CCIPClientBase {
   event MessageSent(bytes32 messageId);
   event MessageReceived(bytes32 messageId);
 
-  constructor(address router) CCIPClientBase(router) {}
-
-  function typeAndVersion() external pure virtual override returns (string memory) {
-    return "CCIPSender 1.0.0-dev";
-  }
+  constructor(address router) CCIPBase(router) {}
 
   /// @notice sends a message through CCIP to the router
   function ccipSend(
@@ -55,18 +51,18 @@ contract CCIPSender is CCIPClientBase {
     for (uint256 i = 0; i < tokenAmounts.length; ++i) {
       // Transfer the tokens to this contract to pay the router for the tokens in tokenAmounts
       IERC20(tokenAmounts[i].token).safeTransferFrom(msg.sender, address(this), tokenAmounts[i].amount);
-      IERC20(tokenAmounts[i].token).safeIncreaseAllowance(i_ccipRouter, tokenAmounts[i].amount);
+      IERC20(tokenAmounts[i].token).safeIncreaseAllowance(s_ccipRouter, tokenAmounts[i].amount);
     }
 
-    uint256 fee = IRouterClient(i_ccipRouter).getFee(destChainSelector, message);
+    uint256 fee = IRouterClient(s_ccipRouter).getFee(destChainSelector, message);
 
     if (feeToken != address(0)) {
       IERC20(feeToken).safeTransferFrom(msg.sender, address(this), fee);
-      IERC20(feeToken).safeIncreaseAllowance(i_ccipRouter, fee);
+      IERC20(feeToken).safeIncreaseAllowance(s_ccipRouter, fee);
     }
 
     messageId =
-      IRouterClient(i_ccipRouter).ccipSend{value: feeToken == address(0) ? fee : 0}(destChainSelector, message);
+      IRouterClient(s_ccipRouter).ccipSend{value: feeToken == address(0) ? fee : 0}(destChainSelector, message);
 
     emit MessageSent(messageId);
 
