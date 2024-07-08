@@ -873,7 +873,7 @@ func (o *CCIPTestSetUpOutputs) CheckGasUpdateTransaction() error {
 	txCount := make(map[string]map[uint64]string)
 	for _, lanes := range o.ReadLanes() {
 		lanes := lanes
-		for _, g := range lanes.ForwardLane.Source.Common.GasUpdater {
+		for _, g := range lanes.ForwardLane.Source.Common.GasUpdateEvents {
 			if g.Value == nil {
 				return fmt.Errorf("gas update value should not be nil for chain selected %s in tx %s", g.ChainSelector, g.Tx)
 			}
@@ -890,13 +890,12 @@ func (o *CCIPTestSetUpOutputs) CheckGasUpdateTransaction() error {
 				Str("Sender", g.Sender).
 				Str("Tx Hash", g.Tx).
 				Uint64("Dest", g.DestChain).
-				Bool("PR disabled", lanes.ForwardLane.PriceReportingDisabled).
 				Uint64("ChainSelector", g.ChainSelector).
 				Str("Value", g.Value.String()).
 				Msg("Gas price Updater details")
 		}
 		if lanes.ReverseLane != nil {
-			for _, g := range lanes.ReverseLane.Source.Common.GasUpdater {
+			for _, g := range lanes.ReverseLane.Source.Common.GasUpdateEvents {
 				if g.Value == nil {
 					return fmt.Errorf("gas update value should not be nil for chain selected %s in tx %s", g.ChainSelector, g.Tx)
 				}
@@ -912,7 +911,6 @@ func (o *CCIPTestSetUpOutputs) CheckGasUpdateTransaction() error {
 					Str("Sender", g.Sender).
 					Str("Tx Hash", g.Tx).
 					Uint64("Dest", g.DestChain).
-					Bool("PR disabled", lanes.ReverseLane.PriceReportingDisabled).
 					Uint64("ChainSelector", g.ChainSelector).
 					Str("Value", g.Value.String()).
 					Msg("Gas price Updater details")
