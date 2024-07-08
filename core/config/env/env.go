@@ -28,6 +28,7 @@ var (
 	MercuryPlugin  = NewPlugin("mercury")
 	SolanaPlugin   = NewPlugin("solana")
 	StarknetPlugin = NewPlugin("starknet")
+	CCIPExecPlugin = NewPlugin("ccip-exec")
 	// PrometheusDiscoveryHostName is the externally accessible hostname
 	// published by the node in the `/discovery` endpoint. Generally, it is expected to match
 	// the public hostname of node.

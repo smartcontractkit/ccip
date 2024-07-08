@@ -8,6 +8,12 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/smartcontractkit/chainlink/v2/plugins"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/loop"
+
+	"github.com/smartcontractkit/chainlink/v2/core/config/env"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 
 	"github.com/Masterminds/semver/v3"
@@ -46,10 +52,31 @@ var (
 
 var defaultNewReportingPluginRetryConfig = ccipdata.RetryConfig{InitialDelay: time.Second, MaxDelay: 5 * time.Minute}
 
-func NewExecServices(ctx context.Context, lggr logger.Logger, jb job.Job, sourceTokenAddress string, srcProvider types.CCIPExecProvider, dstProvider types.CCIPExecProvider, srcChainID int64, dstChainID int64, new bool, argsNoPlugin libocr2.OCR2OracleArgs, logError func(string)) ([]job.ServiceCtx, error) {
-	wrappedPluginFactory, err := NewExecutionReportingPluginFactoryV2(ctx, lggr, sourceTokenAddress, srcChainID, dstChainID, srcProvider, dstProvider)
-	if err != nil {
-		return nil, err
+func NewExecServices(ctx context.Context, lggr logger.Logger, cfg plugins.RegistrarConfig, jb job.Job, sourceTokenAddress string, srcProvider types.CCIPExecProvider, dstProvider types.CCIPExecProvider, srcChainID int64, dstChainID int64, new bool, argsNoPlugin libocr2.OCR2OracleArgs, logError func(string)) ([]job.ServiceCtx, error) {
+	loopCmd := env.CCIPExecPlugin.Cmd.Get()
+	loopEnabled := loopCmd != ""
+
+	var wrappedPluginFactory *ExecutionReportingPluginFactory
+	var err error
+	if loopEnabled {
+		// find loop command
+		envVars, err := plugins.ParseEnvFile(env.CCIPExecPlugin.Env.Get())
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse ccip exec env file: %w", err)
+		}
+		cmdFn, grpcOpts, err := cfg.RegisterLOOP(plugins.CmdConfig{
+			ID:  "ccip-exec",
+			Cmd: loopCmd,
+			Env: envVars,
+		})
+		// get reporting plugin factory from loop
+		factoryServer := loop.NewExecutionService(lggr, grpcOpts, cmdFn, srcProvider, dstProvider, uint32(srcChainID), uint32(dstChainID), sourceTokenAddress)
+		// wrap into ExecutionReportingPluginFactory
+	} else {
+		wrappedPluginFactory, err = NewExecutionReportingPluginFactoryV2(ctx, lggr, sourceTokenAddress, srcChainID, dstChainID, srcProvider, dstProvider)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	argsNoPlugin.ReportingPluginFactory = promwrapper.NewPromFactory(wrappedPluginFactory, "CCIPExecution", jb.OCR2OracleSpec.Relay, big.NewInt(0).SetInt64(dstChainID))
