@@ -54,7 +54,7 @@ func (rf *ExecutionReportingPluginFactory) HealthReport() map[string]error {
 	panic("implement me")
 }
 
-func NewExecutionReportingPluginFactoryV2(ctx context.Context, lggr logger.Logger, srcChainID int64, dstChainID int64, srcProvider commontypes.CCIPExecProvider, dstProvider commontypes.CCIPExecProvider) (*ExecutionReportingPluginFactory, error) {
+func NewExecutionReportingPluginFactoryV2(ctx context.Context, lggr logger.Logger, sourceTokenAddress string, srcChainID int64, dstChainID int64, srcProvider commontypes.CCIPExecProvider, dstProvider commontypes.CCIPExecProvider) (*ExecutionReportingPluginFactory, error) {
 	// TODO: common logger is a subset of core logger.
 	// what's the golden path for passing a logger through from the plugin to the LOOP reporting plugin factory?
 	if lggr == nil {
@@ -104,19 +104,11 @@ func NewExecutionReportingPluginFactoryV2(ctx context.Context, lggr logger.Logge
 
 	tokenDataProviders := make(map[cciptypes.Address]tokendata.Reader)
 	// init usdc token data provider
-	if pluginConfig.USDCConfig.AttestationAPI != "" {
-		lggr.Infof("USDC token data provider enabled")
-		err2 := pluginConfig.USDCConfig.ValidateUSDCConfig()
-		if err2 != nil {
-			return nil, err2
-		}
-
-		usdcReader, err2 := srcProvider.NewTokenDataReader(ctx, ccip.EvmAddrToGeneric(pluginConfig.USDCConfig.SourceTokenAddress))
-		if err2 != nil {
-			return nil, fmt.Errorf("new usdc reader: %w", err2)
-		}
-		tokenDataProviders[cciptypes.Address(pluginConfig.USDCConfig.SourceTokenAddress.String())] = usdcReader
+	usdcReader, err2 := srcProvider.NewTokenDataReader(ctx, "")
+	if err2 != nil {
+		return nil, fmt.Errorf("new usdc reader: %w", err2)
 	}
+	tokenDataProviders[cciptypes.Address(sourceTokenAddress)] = usdcReader
 
 	// Prom wrappers
 	onRampReader = observability.NewObservedOnRampReader(onRampReader, srcChainID, ccip.ExecPluginLabel)
@@ -124,7 +116,7 @@ func NewExecutionReportingPluginFactoryV2(ctx context.Context, lggr logger.Logge
 	offRampReader = observability.NewObservedOffRampReader(offRampReader, dstChainID, ccip.ExecPluginLabel)
 	metricsCollector := ccip.NewPluginMetricsCollector(ccip.ExecPluginLabel, srcChainID, dstChainID)
 
-	tokenPoolBatchedReader, err := dstProvider.NewTokenPoolBatchedReader(ctx, offRampAddress, srcChainSelector)
+	tokenPoolBatchedReader, err := dstProvider.NewTokenPoolBatchedReader(ctx, "", srcChainSelector)
 	if err != nil {
 		return nil, fmt.Errorf("new token pool batched reader: %w", err)
 	}
@@ -136,7 +128,6 @@ func NewExecutionReportingPluginFactoryV2(ctx context.Context, lggr logger.Logge
 			lggr.With(
 				"onramp", offRampConfig.OnRamp,
 				"commitStore", offRampConfig.CommitStore,
-				"offramp", offRampAddress,
 			),
 			onRampReader,
 			commitStoreReader,

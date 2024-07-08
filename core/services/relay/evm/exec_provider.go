@@ -32,6 +32,7 @@ type SrcExecProvider struct {
 	maxGasPrice                            *big.Int
 	usdcReader                             *ccip.USDCReaderImpl
 	usdcAttestationAPI                     string
+	usdcSourceTokenAddress                 string
 	usdcAttestationAPITimeoutSeconds       int
 	usdcAttestationAPIIntervalMilliseconds int
 	usdcSrcMsgTransmitterAddr              common.Address
@@ -47,6 +48,7 @@ func NewSrcExecProvider(
 	startBlock uint64,
 	jobID string,
 	usdcAttestationAPI string,
+	usdcSourceTokenAddress string,
 	usdcAttestationAPITimeoutSeconds int,
 	usdcAttestationAPIIntervalMilliseconds int,
 	usdcSrcMsgTransmitterAddr common.Address,
@@ -70,6 +72,7 @@ func NewSrcExecProvider(
 		startBlock:                             startBlock,
 		usdcReader:                             usdcReader,
 		usdcAttestationAPI:                     usdcAttestationAPI,
+		usdcSourceTokenAddress:                 usdcSourceTokenAddress,
 		usdcAttestationAPITimeoutSeconds:       usdcAttestationAPITimeoutSeconds,
 		usdcAttestationAPIIntervalMilliseconds: usdcAttestationAPIIntervalMilliseconds,
 		usdcSrcMsgTransmitterAddr:              usdcSrcMsgTransmitterAddr,
@@ -147,12 +150,12 @@ func (s SrcExecProvider) NewPriceRegistryReader(ctx context.Context, addr ccipty
 	return
 }
 
-func (s SrcExecProvider) NewTokenDataReader(ctx context.Context, tokenAddress cciptypes.Address) (tokenDataReader cciptypes.TokenDataReader, err error) {
+func (s SrcExecProvider) NewTokenDataReader(ctx context.Context, _ cciptypes.Address) (tokenDataReader cciptypes.TokenDataReader, err error) {
 	attestationURI, err2 := url.ParseRequestURI(s.usdcAttestationAPI)
 	if err2 != nil {
 		return nil, fmt.Errorf("failed to parse USDC attestation API: %w", err2)
 	}
-	tokenAddr, err2 := ccip.GenericAddrToEvm(tokenAddress)
+	tokenAddr, err2 := ccip.GenericAddrToEvm(cciptypes.Address(s.usdcSourceTokenAddress))
 	if err2 != nil {
 		return nil, fmt.Errorf("failed to parse token address: %w", err2)
 	}
@@ -296,7 +299,7 @@ func (d DstExecProvider) NewTokenDataReader(ctx context.Context, tokenAddress cc
 	return nil, fmt.Errorf("invalid: NewTokenDataReader called on DstExecProvider. It should only be called on SrcExecProvider")
 }
 
-func (d DstExecProvider) NewTokenPoolBatchedReader(ctx context.Context, offRampAddress cciptypes.Address, sourceChainSelector uint64) (tokenPoolBatchedReader cciptypes.TokenPoolBatchedReader, err error) {
+func (d DstExecProvider) NewTokenPoolBatchedReader(ctx context.Context, _ cciptypes.Address, sourceChainSelector uint64) (tokenPoolBatchedReader cciptypes.TokenPoolBatchedReader, err error) {
 	batchCaller := ccip.NewDynamicLimitedBatchCaller(
 		d.lggr,
 		d.client,
@@ -305,7 +308,7 @@ func (d DstExecProvider) NewTokenPoolBatchedReader(ctx context.Context, offRampA
 		uint(ccip.DefaultMaxParallelRpcCalls),
 	)
 
-	tokenPoolBatchedReader, err = ccip.NewEVMTokenPoolBatchedReader(d.lggr, sourceChainSelector, offRampAddress, batchCaller)
+	tokenPoolBatchedReader, err = ccip.NewEVMTokenPoolBatchedReader(d.lggr, sourceChainSelector, d.offRampAddress, batchCaller)
 	if err != nil {
 		return nil, fmt.Errorf("new token pool batched reader: %w", err)
 	}

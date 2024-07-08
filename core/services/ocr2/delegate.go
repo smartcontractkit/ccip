@@ -43,6 +43,7 @@ import (
 	"github.com/smartcontractkit/chainlink-vrf/altbn_128"
 	dkgpkg "github.com/smartcontractkit/chainlink-vrf/dkg"
 	"github.com/smartcontractkit/chainlink-vrf/ocr2vrf"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
 
 	"github.com/smartcontractkit/chainlink/v2/core/bridges"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/legacyevm"
@@ -1970,12 +1971,27 @@ func (d *Delegate) ccipCommitGetSrcProvider(ctx context.Context, jb job.Job, plu
 }
 
 func (d *Delegate) newServicesCCIPExecution(ctx context.Context, lggr logger.SugaredLogger, jb job.Job, bootstrapPeers []commontypes.BootstrapperLocator, kb ocr2key.KeyBundle, ocrDB *db, lc ocrtypes.LocalConfig, transmitterID string) ([]job.ServiceCtx, error) {
+	if jb.OCR2OracleSpec == nil {
+		return nil, fmt.Errorf("spec is nil")
+	}
 	spec := jb.OCR2OracleSpec
 	if spec.Relay != relay.NetworkEVM {
 		return nil, fmt.Errorf("non evm chains are not supported for CCIP execution")
 	}
-	dstRid, err := spec.RelayID()
+	var pluginJobSpecConfig ccipconfig.ExecPluginJobSpecConfig
+	err := json.Unmarshal(spec.PluginConfig.Bytes(), &pluginJobSpecConfig)
+	if err != nil {
+		return nil, err
+	}
 
+	err = pluginJobSpecConfig.USDCConfig.ValidateUSDCConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	sourceTokenAddress := ccip.EvmAddrToGeneric(pluginJobSpecConfig.USDCConfig.SourceTokenAddress)
+
+	dstRid, err := spec.RelayID()
 	if err != nil {
 		return nil, ErrJobSpecNoRelayer{Err: err, PluginName: string(spec.PluginType)}
 	}
@@ -1986,12 +2002,6 @@ func (d *Delegate) newServicesCCIPExecution(ctx context.Context, lggr logger.Sug
 
 	// PROVIDER BASED ARG CONSTRUCTION
 	// Write PluginConfig bytes to send source/dest relayer provider + info outside of top level rargs/pargs over the wire
-	var pluginJobSpecConfig ccipconfig.ExecPluginJobSpecConfig
-	err = json.Unmarshal(spec.PluginConfig.Bytes(), &pluginJobSpecConfig)
-	if err != nil {
-		return nil, err
-	}
-
 	dstChainID, err := strconv.ParseInt(dstRid.ChainID, 10, 64)
 	if err != nil {
 		return nil, err
@@ -2026,7 +2036,7 @@ func (d *Delegate) newServicesCCIPExecution(ctx context.Context, lggr logger.Sug
 		MetricsRegisterer:      prometheus.WrapRegistererWith(map[string]string{"job_name": jb.Name.ValueOrZero()}, prometheus.DefaultRegisterer),
 	}
 
-	return ccipexec.NewExecServices(ctx, lggr, jb, srcProvider, dstProvider, int64(srcChainID), dstChainID, d.isNewlyCreatedJob, oracleArgsNoPlugin2, logError)
+	return ccipexec.NewExecServices(ctx, lggr, jb, string(sourceTokenAddress), srcProvider, dstProvider, int64(srcChainID), dstChainID, d.isNewlyCreatedJob, oracleArgsNoPlugin2, logError)
 }
 
 func (d *Delegate) ccipExecGetDstProvider(ctx context.Context, jb job.Job, pluginJobSpecConfig ccipconfig.ExecPluginJobSpecConfig, transmitterID string) (types.CCIPExecProvider, error) {
