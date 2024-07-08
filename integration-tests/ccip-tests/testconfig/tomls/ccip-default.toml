@@ -20,6 +20,7 @@ TTL = '5h'
 selected_networks = ['SIMULATED_1', 'SIMULATED_2']
 
 [CCIP.Env.Lane]
+# To enable the leader lane feature. This setting is only applicable for new deployments.
 LeaderLaneEnabled=false
 
 # PrivateEthereumNetworks.NETWORK_NAME contains the configuration of private ethereum network that includes ethereum version, evm node client, chain id,

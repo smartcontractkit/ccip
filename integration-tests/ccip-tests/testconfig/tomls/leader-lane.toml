@@ -1,5 +1,6 @@
 [CCIP]
 [CCIP.Env.Lane]
+# To enable the leader lane feature. This setting is only applicable for new deployments.
 LeaderLaneEnabled=true
 
 [CCIP.Groups.smoke]

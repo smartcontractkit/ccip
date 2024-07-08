@@ -296,10 +296,11 @@ func (c *CCIPTestConfig) SetNetworkPairs(lggr zerolog.Logger) error {
 		c.NetworkPairs = c.NetworkPairs[:c.TestGroupInput.MaxNoOfLanes]
 	}
 
-	// setting leader lane details to network pairs if it is enabled
-	if c.EnvInput.Lane.LeaderLaneEnabled {
-		// the way we are doing this is to set first found network as leader bidirectionally and whichever the pair
-		//has the same network A will be uni-directionally marked as leader
+	// setting leader lane details to network pairs if it is enabled and only in simulated environments
+	if c.EnvInput.Lane.LeaderLaneEnabled && !pointer.GetBool(c.TestGroupInput.ExistingDeployment) {
+		// the way we are doing this is to set first found network pair as leader lanes (ex: A - B) in both the direction
+		// and any network pair has same network (A) will be uni-directionally marked as leader. Like, A - C, A - D.
+		// by this we will make sure all required leader lanes will be defined.
 		firstNetworkA := ""
 		for idx, n := range c.NetworkPairs {
 			if firstNetworkA == "" {
@@ -870,23 +871,22 @@ func (o *CCIPTestSetUpOutputs) WaitForPriceUpdates() {
 }
 
 func (o *CCIPTestSetUpOutputs) CheckGasUpdateTransaction() error {
-	txCount := make(map[string]map[uint64]string)
-	for _, lanes := range o.ReadLanes() {
-		lanes := lanes
-		for _, g := range lanes.ForwardLane.Source.Common.GasUpdateEvents {
+	transactions := make(map[string]map[uint64]string)
+	readGasUpdateTx := func(lane *actions.CCIPLane) error {
+		for _, g := range lane.Source.Common.GasUpdateEvents {
 			if g.Value == nil {
 				return fmt.Errorf("gas update value should not be nil for chain selected %s in tx %s", g.ChainSelector, g.Tx)
 			}
-			if v, ok := txCount[g.Tx]; ok {
+			if v, ok := transactions[g.Tx]; ok {
 				v[g.ChainSelector] = g.Value.String()
-				txCount[g.Tx] = v
+				transactions[g.Tx] = v
 			} else {
-				txCount[g.Tx] = map[uint64]string{
+				transactions[g.Tx] = map[uint64]string{
 					g.ChainSelector: g.Value.String(),
 				}
 			}
 
-			lanes.ForwardLane.Logger.Debug().
+			lane.Logger.Debug().
 				Str("Sender", g.Sender).
 				Str("Tx Hash", g.Tx).
 				Uint64("Dest", g.DestChain).
@@ -894,42 +894,33 @@ func (o *CCIPTestSetUpOutputs) CheckGasUpdateTransaction() error {
 				Str("Value", g.Value.String()).
 				Msg("Gas price Updater details")
 		}
-		if lanes.ReverseLane != nil {
-			for _, g := range lanes.ReverseLane.Source.Common.GasUpdateEvents {
-				if g.Value == nil {
-					return fmt.Errorf("gas update value should not be nil for chain selected %s in tx %s", g.ChainSelector, g.Tx)
-				}
-				if v, ok := txCount[g.Tx]; ok {
-					v[g.ChainSelector] = g.Value.String()
-					txCount[g.Tx] = v
-				} else {
-					txCount[g.Tx] = map[uint64]string{
-						g.ChainSelector: g.Value.String(),
-					}
-				}
-				lanes.ReverseLane.Logger.Debug().
-					Str("Sender", g.Sender).
-					Str("Tx Hash", g.Tx).
-					Uint64("Dest", g.DestChain).
-					Uint64("ChainSelector", g.ChainSelector).
-					Str("Value", g.Value.String()).
-					Msg("Gas price Updater details")
-			}
+		return nil
+	}
+	for _, lanes := range o.ReadLanes() {
+		lanes := lanes
+		if err := readGasUpdateTx(lanes.ForwardLane); err != nil {
+			return err
 		}
+		if lanes.ReverseLane != nil {
+			if err := readGasUpdateTx(lanes.ReverseLane); err != nil {
+				return err
+			}
 	}
-	// when leader lane setup is enabled, number of transaction should match the number of network and each transaction
-	// should have number of network - 1 chain selectors and corresponding gas values
-	if len(txCount) != len(o.Cfg.AllNetworks) {
+	// when leader lane setup is enabled, number of transaction should match the number of network.
+	// Say we have 3 networks, then we expect 3 transactions in total from six events.
+	if len(transactions) != len(o.Cfg.AllNetworks) {
 		return fmt.Errorf("transaction count %d shouldn't be more than the number of networks %d when "+
-			"leader lane feature is on", len(txCount), len(o.Cfg.AllNetworks))
+			"leader lane feature is on", len(transactions), len(o.Cfg.AllNetworks))
 	}
-	for _, v := range txCount {
+	// each transaction should have number of network - 1 chain selectors and corresponding gas values.
+	// Say we have 3 networks, then we have expect every transaction to have 2 chain selectors
+	for _, v := range transactions {
 		if len(v) != len(o.Cfg.AllNetworks)-1 {
 			return fmt.Errorf("number of chain selector count %d shouldn't be more than the number of "+
 				"all networks minus one %d", len(v), len(o.Cfg.AllNetworks)-1)
 		}
 	}
-	log.Info().Interface("Token list", txCount).Msg("List of transaction hash:")
+	log.Debug().Interface("Gas update transactions", transactions).Msg("List of transaction hash:")
 	return nil
 }
 
@@ -1135,7 +1126,7 @@ func CCIPDefaultTestSetUp(
 		require.NoError(t, setUpArgs.JobAddGrp.Wait(), "Creating jobs shouldn't fail")
 		// wait for price updates to be available
 		setUpArgs.WaitForPriceUpdates()
-		if setUpArgs.Cfg.EnvInput.Lane.LeaderLaneEnabled {
+		if setUpArgs.Cfg.EnvInput.Lane.LeaderLaneEnabled && !pointer.GetBool(setUpArgs.Cfg.TestGroupInput.ExistingDeployment) {
 			require.NoError(t, setUpArgs.CheckGasUpdateTransaction(), "gas update transaction check shouldn't fail")
 		}
 		// if dynamic price update is required
