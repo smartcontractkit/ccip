@@ -117,11 +117,12 @@ library Internal {
   /// When abiEncoded, each EVMTokenAmount takes 2 slots, each bytes takes 2 slots, excl bytes contents
   uint256 public constant MESSAGE_FIXED_BYTES_PER_TOKEN = 32 * 4;
 
-  /// @dev Any2EVMRampMessage struct has 10 fields, including 3 variable arrays.
+  /// @dev Any2EVMRampMessage struct has 10 fields, including 3 variable unnested arrays (data, receiver and tokenAmounts).
   /// Each variable array takes 1 more slot to store its length.
   /// When abi encoded, excluding array contents,
   /// Any2EVMMessage takes up a fixed number of 13 slots, 32 bytes each.
   /// For structs that contain arrays, 1 more slot is added to the front, reaching a total of 14.
+  /// The fixed bytes does not cover struct data (this is represented by ANY_2_EVM_MESSAGE_FIXED_BYTES_PER_TOKEN)
   uint256 public constant ANY_2_EVM_MESSAGE_FIXED_BYTES = 32 * 14;
 
   /// @dev Each token transfer adds 1 RampTokenAmount
