@@ -491,6 +491,8 @@ func DeployEnvironments(
 								"forkComputeUnitsPerSecond": anvilConfig.ComputePerSecond,
 								"forkNoRateLimit":           anvilConfig.RateLimitDisabled,
 								"blocksToKeepInMemory":      anvilConfig.BlocksToKeepInMem,
+								"blockGasLimit":             anvilConfig.BlockGaslimit,
+								"baseFee":                   anvilConfig.BaseFee,
 							},
 							"resources": testInputs.GethResourceProfile,
 						},
