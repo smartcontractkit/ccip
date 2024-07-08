@@ -500,7 +500,7 @@ func DeployEnvironments(
 								"blockGasLimit":             fmt.Sprintf("%d", pointer.GetInt64(anvilConfig.BlockGaslimit)),
 								"baseFee":                   fmt.Sprintf("%d", pointer.GetInt64(anvilConfig.BaseFee)),
 							},
-							"resources": testInputs.GethResourceProfile,
+							"resources": AnvilResourceProfile,
 						},
 					}))
 				selectedNetworks[i].Simulated = true
