@@ -10,6 +10,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
+	evmtypes "github.com/smartcontractkit/chainlink/v2/core/chains/evm/types"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/rpclib"
 
 	mapset "github.com/deckarep/golang-set/v2"
@@ -475,7 +476,7 @@ func (o *OffRamp) GetExecutionStateChangesForSeqNums(ctx context.Context, seqNum
 		logpoller.NewAddressFilter(o.addr),
 		logpoller.NewEventSigFilter(o.eventSig),
 		seqNumsFilter,
-		query.Confidence(primitives.Unconfirmed),
+		logpoller.NewConfirmationsFilter(evmtypes.Confirmations(confirmations)),
 	)
 	if err != nil {
 		return nil, err

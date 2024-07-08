@@ -78,6 +78,7 @@ func Test_GetExecutionStateChangesForSeqNums(t *testing.T) {
 	tests := []struct {
 		name               string
 		seqNums            []cciptypes.SequenceNumberRange
+		confirmations      int
 		expectedLogsSeqNrs []uint64
 	}{
 		{
@@ -143,6 +144,32 @@ func Test_GetExecutionStateChangesForSeqNums(t *testing.T) {
 			},
 			expectedLogsSeqNrs: []uint64{10, 11, 12, 13, 14, 15},
 		},
+		{
+			name: "confirmations are respected when querying large range ",
+			seqNums: []cciptypes.SequenceNumberRange{
+				{Min: 10, Max: 16},
+			},
+			confirmations:      16,
+			expectedLogsSeqNrs: []uint64{10, 11},
+		},
+		{
+			name: "returns empty data set when confirmations are too high",
+			seqNums: []cciptypes.SequenceNumberRange{
+				{Min: 10, Max: 16},
+			},
+			confirmations:      20,
+			expectedLogsSeqNrs: []uint64{},
+		},
+		{
+			name: "single element ranges with confirmations",
+			seqNums: []cciptypes.SequenceNumberRange{
+				{Min: 10, Max: 10},
+				{Min: 14, Max: 14},
+				{Min: 15, Max: 15},
+			},
+			confirmations:      16,
+			expectedLogsSeqNrs: []uint64{10},
+		},
 	}
 
 	for _, tt := range tests {
@@ -150,10 +177,10 @@ func Test_GetExecutionStateChangesForSeqNums(t *testing.T) {
 			offRamp, err1 := v1_0_0.NewOffRamp(logger.TestLogger(t), offrampAddress, evmclimocks.NewClient(t), lp, nil, nil)
 			require.NoError(t, err1)
 
-			msgs, err1 := offRamp.GetExecutionStateChangesForSeqNums(ctx, tt.seqNums, 0)
+			msgs, err1 := offRamp.GetExecutionStateChangesForSeqNums(ctx, tt.seqNums, tt.confirmations)
 			require.NoError(t, err1)
 
-			assert.Len(t, msgs, len(tt.expectedLogsSeqNrs))
+			require.Len(t, msgs, len(tt.expectedLogsSeqNrs))
 			for i, msg := range msgs {
 				assert.Equal(t, tt.expectedLogsSeqNrs[i], msg.SequenceNumber)
 			}
