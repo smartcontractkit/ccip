@@ -1212,9 +1212,11 @@ func NewCCIPCommonFromConfig(
 	if err != nil {
 		return nil, err
 	}
-	newCCIPModule.PriceRegistry, err = newCCIPModule.Deployer.NewPriceRegistry(common.HexToAddress(newCCIPModule.PriceRegistry.Address()))
-	if err != nil {
-		return nil, err
+	if newCCIPModule.PriceRegistry != nil {
+		newCCIPModule.PriceRegistry, err = newCCIPModule.Deployer.NewPriceRegistry(common.HexToAddress(newCCIPModule.PriceRegistry.Address()))
+		if err != nil {
+			return nil, err
+		}
 	}
 	newCCIPModule.Router, err = newCCIPModule.Deployer.NewRouter(common.HexToAddress(newCCIPModule.Router.Address()))
 	if err != nil {
