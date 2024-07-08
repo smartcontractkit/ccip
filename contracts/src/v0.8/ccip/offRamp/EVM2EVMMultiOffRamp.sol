@@ -3,9 +3,8 @@ pragma solidity 0.8.24;
 
 import {ITypeAndVersion} from "../../shared/interfaces/ITypeAndVersion.sol";
 import {IAny2EVMMessageReceiver} from "../interfaces/IAny2EVMMessageReceiver.sol";
-import {IAny2EVMMultiOffRamp} from "../interfaces/IAny2EVMMultiOffRamp.sol";
-import {IAny2EVMOffRamp} from "../interfaces/IAny2EVMOffRamp.sol";
 import {IMessageInterceptor} from "../interfaces/IMessageInterceptor.sol";
+import {INonceManager} from "../interfaces/INonceManager.sol";
 import {IPoolV1} from "../interfaces/IPool.sol";
 import {IPriceRegistry} from "../interfaces/IPriceRegistry.sol";
 import {IRMN} from "../interfaces/IRMN.sol";
@@ -25,12 +24,12 @@ import {ERC165Checker} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts
 
 /// @notice EVM2EVMOffRamp enables OCR networks to execute multiple messages
 /// in an OffRamp in a single transaction.
-/// @dev The EVM2EVMOnRamp, CommitStore and EVM2EVMOffRamp form an xchain upgradeable unit. Any change to one of them
-/// results an onchain upgrade of all 3.
+/// @dev The EVM2EVMMultiOnRamp and EVM2EVMMultiOffRamp form an xchain upgradeable unit. Any change to one of them
+/// results an onchain upgrade of both contracts.
 /// @dev MultiOCR3Base is used to store multiple OCR configs for both the OffRamp and the CommitStore.
 /// The execution plugin type has to be configured without signature verification, and the commit
 /// plugin type with verification.
-contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3Base {
+contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
   using ERC165Checker for address;
   using EnumerableMapAddresses for EnumerableMapAddresses.AddressToAddressMap;
 
@@ -52,7 +51,6 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
   error TokenHandlingError(bytes error);
   error EmptyReport();
   error CursedByRMN(uint64 sourceChainSelector);
-  error InvalidMessageId(bytes32 messageId);
   error NotACompatiblePool(address notPool);
   error InvalidDataLength(uint256 expected, uint256 got);
   error InvalidNewState(uint64 sourceChainSelector, uint64 sequenceNumber, Internal.MessageExecutionState newState);
@@ -60,12 +58,11 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
   error StaleCommitReport();
   error InvalidInterval(uint64 sourceChainSelector, Interval interval);
   error ZeroAddressNotAllowed();
+  error InvalidMessageDestChainSelector(uint64 messageDestChainSelector);
 
   /// @dev Atlas depends on this event, if changing, please notify Atlas.
   event StaticConfigSet(StaticConfig staticConfig);
   event DynamicConfigSet(DynamicConfig dynamicConfig);
-  event SkippedIncorrectNonce(uint64 sourceChainSelector, uint64 nonce, address sender);
-  event SkippedSenderWithPreviousRampMessageInflight(uint64 sourceChainSelector, uint64 nonce, address sender);
   /// @dev RMN depends on this event, if changing, please notify the RMN maintainers.
   event ExecutionStateChanged(
     uint64 indexed sourceChainSelector,
@@ -87,26 +84,21 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
     uint64 chainSelector; // ───╮  Destination chainSelector
     address rmnProxy; // ───────╯  RMN proxy address
     address tokenAdminRegistry; // Token admin registry address
+    address nonceManager; // Address of the nonce manager
   }
 
   /// @notice Per-chain source config (defining a lane from a Source Chain -> Dest OffRamp)
   struct SourceChainConfig {
-    bool isEnabled; // ─────────╮  Flag whether the source chain is enabled or not
-    uint64 minSeqNr; //         |  The min sequence number expected for future messages
-    address prevOffRamp; // ────╯  Address of previous-version per-lane OffRamp. Used to be able to provide sequencing continuity during a zero downtime upgrade.
-    address onRamp; //             OnRamp address on the source chain
-    /// @dev Ensures that 2 identical messages sent to 2 different lanes will have a distinct hash.
-    /// Must match the metadataHash used in computing leaf hashes offchain for the root committed in
-    /// the commitStore and i_metadataHash in the onRamp.
-    bytes32 metadataHash; //      Source-chain specific message hash preimage to ensure global uniqueness
+    bool isEnabled; // ──────────╮  Flag whether the source chain is enabled or not
+    uint64 minSeqNr; // ─────────╯  The min sequence number expected for future messages
+    bytes onRamp; // OnRamp address on the source chain
   }
 
   /// @notice SourceChainConfig update args scoped to one source chain
   struct SourceChainConfigArgs {
     uint64 sourceChainSelector; //  ───╮  Source chain selector of the config to update
-    bool isEnabled; //                 │  Flag whether the source chain is enabled or not
-    address prevOffRamp; // ───────────╯  Address of previous-version per-lane OffRamp. Used to be able to provide sequencing continuity during a zero downtime upgrade.
-    address onRamp; //                    OnRamp address on the source chain
+    bool isEnabled; // ────────────────╯  Flag whether the source chain is enabled or not
+    bytes onRamp; // OnRamp address on the source chain
   }
 
   /// @notice Dynamic offRamp config
@@ -155,6 +147,8 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
   address internal immutable i_rmnProxy;
   /// @dev The address of the token admin registry
   address internal immutable i_tokenAdminRegistry;
+  /// @dev The address of the nonce manager
+  address internal immutable i_nonceManager;
 
   // DYNAMIC CONFIG
   DynamicConfig internal s_dynamicConfig;
@@ -164,11 +158,6 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
   mapping(uint64 sourceChainSelector => SourceChainConfig sourceChainConfig) internal s_sourceChainConfigs;
 
   // STATE
-  /// @dev The expected nonce for a given sender per source chain.
-  /// Corresponds to s_senderNonce in the OnRamp for a lane, used to enforce that messages are
-  /// executed in the same order they are sent (assuming they are DON). Note that re-execution
-  /// of FAILED messages however, can be out of order.
-  mapping(uint64 sourceChainSelector => mapping(address sender => uint64 nonce)) internal s_senderNonce;
   /// @dev A mapping of sequence numbers (per source chain) to execution state using a bitmap with each execution
   /// state only taking up 2 bits of the uint256, packing 128 states into a single slot.
   /// Message state is tracked to ensure message can only be executed successfully once.
@@ -181,7 +170,10 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
   uint64 private s_latestPriceSequenceNumber;
 
   constructor(StaticConfig memory staticConfig, SourceChainConfigArgs[] memory sourceChainConfigs) MultiOCR3Base() {
-    if (staticConfig.rmnProxy == address(0) || staticConfig.tokenAdminRegistry == address(0)) {
+    if (
+      staticConfig.rmnProxy == address(0) || staticConfig.tokenAdminRegistry == address(0)
+        || staticConfig.nonceManager == address(0)
+    ) {
       revert ZeroAddressNotAllowed();
     }
 
@@ -192,6 +184,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
     i_chainSelector = staticConfig.chainSelector;
     i_rmnProxy = staticConfig.rmnProxy;
     i_tokenAdminRegistry = staticConfig.tokenAdminRegistry;
+    i_nonceManager = staticConfig.nonceManager;
     emit StaticConfigSet(staticConfig);
 
     _applySourceChainConfigUpdates(sourceChainConfigs);
@@ -256,35 +249,6 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
     uint64 sequenceNumber
   ) internal view returns (uint256 bitmap) {
     return s_executionStates[sourceChainSelector][sequenceNumber / 128];
-  }
-
-  /// @inheritdoc IAny2EVMMultiOffRamp
-  function getSenderNonce(uint64 sourceChainSelector, address sender) external view returns (uint64) {
-    (uint64 nonce,) = _getSenderNonce(sourceChainSelector, sender);
-    return nonce;
-  }
-
-  /// @notice Returns the the current nonce for a receiver.
-  /// @param sourceChainSelector The source chain to retrieve the nonce for
-  /// @param sender The sender address
-  /// @return nonce The nonce value belonging to the sender address.
-  /// @return isFromPrevRamp True if the nonce was retrieved from the prevOffRamps
-  function _getSenderNonce(
-    uint64 sourceChainSelector,
-    address sender
-  ) internal view returns (uint64 nonce, bool isFromPrevRamp) {
-    uint64 senderNonce = s_senderNonce[sourceChainSelector][sender];
-
-    if (senderNonce == 0) {
-      address prevOffRamp = s_sourceChainConfigs[sourceChainSelector].prevOffRamp;
-      if (prevOffRamp != address(0)) {
-        // If OffRamp was upgraded, check if sender has a nonce from the previous OffRamp.
-        // NOTE: assuming prevOffRamp is always a lane-specific off ramp
-        return (IAny2EVMOffRamp(prevOffRamp).getSenderNonce(sender), true);
-      }
-    }
-
-    return (senderNonce, false);
   }
 
   /// @notice Manually executes a set of reports.
@@ -377,14 +341,19 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
     bytes32[] memory hashedLeaves = new bytes32[](numMsgs);
 
     for (uint256 i = 0; i < numMsgs; ++i) {
-      Internal.EVM2EVMMessage memory message = report.messages[i];
+      Internal.Any2EVMRampMessage memory message = report.messages[i];
+
+      // Commits do not verify the destChainSelector in the message, since only the root is committed,
+      // so we have to check it explicitly
+      if (message.header.destChainSelector != i_chainSelector) {
+        revert InvalidMessageDestChainSelector(message.header.destChainSelector);
+      }
+
       // We do this hash here instead of in _verifyMessages to avoid two separate loops
-      // over the same data, which increases gas cost
-      hashedLeaves[i] = Internal._hash(message, sourceChainConfig.metadataHash);
-      // For EVM2EVM offramps, the messageID is the leaf hash.
-      // Asserting that this is true ensures we don't accidentally commit and then execute
-      // a message with an unexpected hash.
-      if (hashedLeaves[i] != message.messageId) revert InvalidMessageId(message.messageId);
+      // over the same data, which increases gas cost.
+      // Hashing all of the message fields ensures that the message being executed is correct and not tampered with.
+      // Including the known OnRamp ensures that the message originates from the correct on ramp version
+      hashedLeaves[i] = Internal._hash(message, sourceChainConfig.onRamp);
     }
 
     // SECURITY CRITICAL CHECK
@@ -395,14 +364,15 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
     // Execute messages
     bool manualExecution = manualExecGasLimits.length != 0;
     for (uint256 i = 0; i < numMsgs; ++i) {
-      Internal.EVM2EVMMessage memory message = report.messages[i];
+      Internal.Any2EVMRampMessage memory message = report.messages[i];
 
-      Internal.MessageExecutionState originalState = getExecutionState(sourceChainSelector, message.sequenceNumber);
+      Internal.MessageExecutionState originalState =
+        getExecutionState(sourceChainSelector, message.header.sequenceNumber);
       if (originalState == Internal.MessageExecutionState.SUCCESS) {
         // If the message has already been executed, we skip it.  We want to not revert on race conditions between
         // executing parties. This will allow us to open up manual exec while also attempting with the DON, without
         // reverting an entire DON batch when a user manually executes while the tx is inflight.
-        emit SkippedAlreadyExecutedMessage(sourceChainSelector, message.sequenceNumber);
+        emit SkippedAlreadyExecutedMessage(sourceChainSelector, message.header.sequenceNumber);
         continue;
       }
       // Two valid cases here, we either have never touched this message before, or we tried to execute
@@ -413,7 +383,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
           originalState == Internal.MessageExecutionState.UNTOUCHED
             || originalState == Internal.MessageExecutionState.FAILURE
         )
-      ) revert AlreadyExecuted(sourceChainSelector, message.sequenceNumber);
+      ) revert AlreadyExecuted(sourceChainSelector, message.header.sequenceNumber);
 
       if (manualExecution) {
         bool isOldCommitReport =
@@ -432,51 +402,33 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
         // DON can only execute a message once
         // Acceptable state transitions: UNTOUCHED->SUCCESS, UNTOUCHED->FAILURE
         if (originalState != Internal.MessageExecutionState.UNTOUCHED) {
-          revert AlreadyAttempted(sourceChainSelector, message.sequenceNumber);
+          revert AlreadyAttempted(sourceChainSelector, message.header.sequenceNumber);
         }
       }
 
-      if (message.nonce > 0) {
-        // In the scenario where we upgrade offRamps, we still want to have sequential nonces.
-        // Referencing the old offRamp to check the expected nonce if none is set for a
-        // given sender allows us to skip the current message if it would not be the next according
-        // to the old offRamp. This preserves sequencing between updates.
-        (uint64 prevNonce, bool isFromPrevRamp) = _getSenderNonce(sourceChainSelector, message.sender);
-        if (isFromPrevRamp) {
-          if (prevNonce + 1 != message.nonce) {
-            // the starting v2 onramp nonce, i.e. the 1st message nonce v2 offramp is expected to receive,
-            // is guaranteed to equal (largest v1 onramp nonce + 1).
-            // if this message's nonce isn't (v1 offramp nonce + 1), then v1 offramp nonce != largest v1 onramp nonce,
-            // it tells us there are still messages inflight for v1 offramp
-            emit SkippedSenderWithPreviousRampMessageInflight(sourceChainSelector, message.nonce, message.sender);
-            continue;
-          }
-          // Otherwise this nonce is indeed the "transitional nonce", that is
-          // all messages sent to v1 ramp have been executed by the DON and the sequence can resume in V2.
-          // Note if first time user in V2, then prevNonce will be 0, and message.nonce = 1, so this will be a no-op.
-          s_senderNonce[sourceChainSelector][message.sender] = prevNonce;
-        }
-
-        // UNTOUCHED messages MUST be executed in order always IF message.nonce > 0.
-        if (originalState == Internal.MessageExecutionState.UNTOUCHED) {
-          if (prevNonce + 1 != message.nonce) {
-            // We skip the message if the nonce is incorrect, since message.nonce > 0.
-            emit SkippedIncorrectNonce(sourceChainSelector, message.nonce, message.sender);
-            continue;
-          }
-        }
+      // Nonce changes per state transition (these only apply for ordered messages):
+      // UNTOUCHED -> FAILURE  nonce bump
+      // UNTOUCHED -> SUCCESS  nonce bump
+      // FAILURE   -> FAILURE  no nonce bump
+      // FAILURE   -> SUCCESS  no nonce bump
+      // UNTOUCHED messages MUST be executed in order always
+      if (message.header.nonce > 0 && originalState == Internal.MessageExecutionState.UNTOUCHED) {
+        // If a nonce is not incremented, that means it was skipped, and we can ignore the message
+        if (
+          !INonceManager(i_nonceManager).incrementInboundNonce(sourceChainSelector, message.header.nonce, message.sender)
+        ) continue;
       }
 
       // Although we expect only valid messages will be committed, we check again
       // when executing as a defense in depth measure.
       bytes[] memory offchainTokenData = report.offchainTokenData[i];
       if (message.tokenAmounts.length != offchainTokenData.length) {
-        revert TokenDataMismatch(sourceChainSelector, message.sequenceNumber);
+        revert TokenDataMismatch(sourceChainSelector, message.header.sequenceNumber);
       }
 
-      _setExecutionState(sourceChainSelector, message.sequenceNumber, Internal.MessageExecutionState.IN_PROGRESS);
+      _setExecutionState(sourceChainSelector, message.header.sequenceNumber, Internal.MessageExecutionState.IN_PROGRESS);
       (Internal.MessageExecutionState newState, bytes memory returnData) = _trialExecute(message, offchainTokenData);
-      _setExecutionState(sourceChainSelector, message.sequenceNumber, newState);
+      _setExecutionState(sourceChainSelector, message.header.sequenceNumber, newState);
 
       // Since it's hard to estimate whether manual execution will succeed, we
       // revert the entire transaction if it fails. This will show the user if
@@ -487,36 +439,28 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
       ) {
         // If manual execution fails, we revert the entire transaction, unless the originalState is UNTOUCHED as we
         // would still be making progress by changing the state from UNTOUCHED to FAILURE.
-        revert ExecutionError(message.messageId, returnData);
+        revert ExecutionError(message.header.messageId, returnData);
       }
 
       // The only valid prior states are UNTOUCHED and FAILURE (checked above)
       // The only valid post states are FAILURE and SUCCESS (checked below)
       if (newState != Internal.MessageExecutionState.FAILURE && newState != Internal.MessageExecutionState.SUCCESS) {
-        revert InvalidNewState(sourceChainSelector, message.sequenceNumber, newState);
+        revert InvalidNewState(sourceChainSelector, message.header.sequenceNumber, newState);
       }
 
-      // Nonce changes per state transition.
-      // These only apply for ordered messages.
-      // UNTOUCHED -> FAILURE  nonce bump
-      // UNTOUCHED -> SUCCESS  nonce bump
-      // FAILURE   -> FAILURE  no nonce bump
-      // FAILURE   -> SUCCESS  no nonce bump
-      if (message.nonce > 0 && originalState == Internal.MessageExecutionState.UNTOUCHED) {
-        s_senderNonce[sourceChainSelector][message.sender]++;
-      }
-
-      emit ExecutionStateChanged(sourceChainSelector, message.sequenceNumber, message.messageId, newState, returnData);
+      emit ExecutionStateChanged(
+        sourceChainSelector, message.header.sequenceNumber, message.header.messageId, newState, returnData
+      );
     }
   }
 
   /// @notice Try executing a message.
-  /// @param message Internal.EVM2EVMMessage memory message.
+  /// @param message Internal.Any2EVMRampMessage memory message.
   /// @param offchainTokenData Data provided by the DON for token transfers.
   /// @return the new state of the message, being either SUCCESS or FAILURE.
   /// @return revert data in bytes if CCIP receiver reverted during execution.
   function _trialExecute(
-    Internal.EVM2EVMMessage memory message,
+    Internal.Any2EVMRampMessage memory message,
     bytes[] memory offchainTokenData
   ) internal returns (Internal.MessageExecutionState, bytes memory) {
     try this.executeSingleMessage(message, offchainTokenData) {}
@@ -534,7 +478,7 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
         return (Internal.MessageExecutionState.FAILURE, err);
       } else {
         // If revert is not caused by CCIP receiver, it is unexpected, bubble up the revert.
-        revert ExecutionError(message.messageId, err);
+        revert ExecutionError(message.header.messageId, err);
       }
     }
     // If message execution succeeded, no CCIP receiver return data is expected, return with empty bytes.
@@ -548,21 +492,27 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
   /// its execution and enforce atomicity among successful message processing and token transfer.
   /// @dev We use ERC-165 to check for the ccipReceive interface to permit sending tokens to contracts
   /// (for example smart contract wallets) without an associated message.
-  function executeSingleMessage(Internal.EVM2EVMMessage memory message, bytes[] memory offchainTokenData) external {
+  function executeSingleMessage(Internal.Any2EVMRampMessage memory message, bytes[] memory offchainTokenData) external {
     if (msg.sender != address(this)) revert CanOnlySelfCall();
     Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](0);
     if (message.tokenAmounts.length > 0) {
       destTokenAmounts = _releaseOrMintTokens(
         message.tokenAmounts,
-        abi.encode(message.sender),
+        message.sender,
         message.receiver,
-        message.sourceChainSelector,
+        message.header.sourceChainSelector,
         message.sourceTokenData,
         offchainTokenData
       );
     }
 
-    Client.Any2EVMMessage memory any2EvmMessage = Internal._toAny2EVMMessage(message, destTokenAmounts);
+    Client.Any2EVMMessage memory any2EvmMessage = Client.Any2EVMMessage({
+      messageId: message.header.messageId,
+      sourceChainSelector: message.header.sourceChainSelector,
+      sender: abi.encode(message.sender),
+      data: message.data,
+      destTokenAmounts: destTokenAmounts
+    });
 
     address messageValidator = s_dynamicConfig.messageValidator;
     if (messageValidator != address(0)) {
@@ -591,11 +541,6 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
     );
     // If CCIP receiver execution is not successful, revert the call including token transfers
     if (!success) revert ReceiverError(returnData);
-  }
-
-  /// @notice creates a unique hash to be used in message hashing.
-  function _metadataHash(uint64 sourceChainSelector, address onRamp, bytes32 prefix) internal view returns (bytes32) {
-    return keccak256(abi.encode(prefix, sourceChainSelector, i_chainSelector, onRamp));
   }
 
   // ================================================================
@@ -748,8 +693,12 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
   /// @dev This function will always return the same struct as the contents is static and can never change.
   /// RMN depends on this function, if changing, please notify the RMN maintainers.
   function getStaticConfig() external view returns (StaticConfig memory) {
-    return
-      StaticConfig({chainSelector: i_chainSelector, rmnProxy: i_rmnProxy, tokenAdminRegistry: i_tokenAdminRegistry});
+    return StaticConfig({
+      chainSelector: i_chainSelector,
+      rmnProxy: i_rmnProxy,
+      tokenAdminRegistry: i_tokenAdminRegistry,
+      nonceManager: i_nonceManager
+    });
   }
 
   /// @notice Returns the current dynamic config.
@@ -782,24 +731,20 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
         revert ZeroChainSelectorNotAllowed();
       }
 
-      if (sourceConfigUpdate.onRamp == address(0)) {
-        revert ZeroAddressNotAllowed();
-      }
-
       SourceChainConfig storage currentConfig = s_sourceChainConfigs[sourceChainSelector];
+      bytes memory currentOnRamp = currentConfig.onRamp;
+      bytes memory newOnRamp = sourceConfigUpdate.onRamp;
 
       // OnRamp can never be zero - if it is, then the source chain has been added for the first time
-      if (currentConfig.onRamp == address(0)) {
-        currentConfig.metadataHash =
-          _metadataHash(sourceChainSelector, sourceConfigUpdate.onRamp, Internal.EVM_2_EVM_MESSAGE_HASH);
-        currentConfig.onRamp = sourceConfigUpdate.onRamp;
-        currentConfig.prevOffRamp = sourceConfigUpdate.prevOffRamp;
-        currentConfig.minSeqNr = 1;
+      if (currentOnRamp.length == 0) {
+        if (newOnRamp.length == 0) {
+          revert ZeroAddressNotAllowed();
+        }
 
+        currentConfig.onRamp = newOnRamp;
+        currentConfig.minSeqNr = 1;
         emit SourceChainSelectorAdded(sourceChainSelector);
-      } else if (
-        currentConfig.onRamp != sourceConfigUpdate.onRamp || currentConfig.prevOffRamp != sourceConfigUpdate.prevOffRamp
-      ) {
+      } else if (keccak256(currentOnRamp) != keccak256(newOnRamp)) {
         revert InvalidStaticConfig(sourceChainSelector);
       }
 
@@ -845,9 +790,11 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
   /// @param sourceAmount The amount of tokens to be released/minted.
   /// @param originalSender The message sender on the source chain.
   /// @param receiver The address that will receive the tokens.
+  /// @param sourceChainSelector The remote source chain selector
   /// @param sourceTokenData A struct containing the local token address, the source pool address and optional data
   /// returned from the source pool.
   /// @param offchainTokenData Data fetched offchain by the DON.
+  /// @return destTokenAmount local token address with amount
   function _releaseOrMintSingleToken(
     uint256 sourceAmount,
     bytes memory originalSender,
@@ -920,8 +867,12 @@ contract EVM2EVMMultiOffRamp is IAny2EVMMultiOffRamp, ITypeAndVersion, MultiOCR3
 
   /// @notice Uses pools to release or mint a number of different tokens to a receiver address.
   /// @param sourceTokenAmounts List of tokens and amount values to be released/minted.
-  /// @param encodedSourceTokenData Array of token data returned by token pools on the source chain.
+  /// @param originalSender The message sender on the source chain.
+  /// @param receiver The address that will receive the tokens.
+  /// @param sourceChainSelector The remote source chain selector
+  /// @param encodedSourceTokenData Encoded source token data, decoding to Internal.SourceTokenData
   /// @param offchainTokenData Array of token data fetched offchain by the DON.
+  /// @return destTokenAmounts local token addresses with amounts
   /// @dev This function wrappes the token pool call in a try catch block to gracefully handle
   /// any non-rate limiting errors that may occur. If we encounter a rate limiting related error
   /// we bubble it up. If we encounter a non-rate limiting error we wrap it in a TokenHandlingError.
