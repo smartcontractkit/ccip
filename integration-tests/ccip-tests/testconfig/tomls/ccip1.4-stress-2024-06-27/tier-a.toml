@@ -173,6 +173,7 @@ DeltaReconcile = '5s'
 
 [CCIP.Groups]
 [CCIP.Groups.load]
+DenselyConnectedNetworkChainIds = ['90000001', '90000002', '1337']
 KeepEnvAlive = true
 NoOfCommitNodes = 16
 PhaseTimeout = '40m'

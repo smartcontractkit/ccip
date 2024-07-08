@@ -304,28 +304,32 @@ func (c *CCIPTestConfig) SetNetworkPairs(lggr zerolog.Logger) error {
 		var covered map[string]struct{}
 		// if densely connected networks are provided, choose all the network pairs containing the networks mentioned in the list for DenselyConnectedNetworkChainIds
 		if c.TestGroupInput.DenselyConnectedNetworkChainIds != nil && len(c.TestGroupInput.DenselyConnectedNetworkChainIds) > 0 {
-			var networkPairForDenselyConnected []NetworkPair
 			denselyConnectedNetworks := map[string]struct{}{}
 			for _, n := range c.TestGroupInput.DenselyConnectedNetworkChainIds {
 				denselyConnectedNetworks[n] = struct{}{}
 			}
 			for _, pair := range c.NetworkPairs {
 				if _, exists := denselyConnectedNetworks[pair.ChainClientA.GetChainID().String()]; exists {
-					networkPairForDenselyConnected = append(networkPairForDenselyConnected, pair)
+					newNetworkPairs = append(newNetworkPairs, pair)
 					covered[pair.NetworkA.Name] = struct{}{}
 				}
 			}
-			newNetworkPairs = networkPairForDenselyConnected
 		}
+		// shuffle the network pairs, we want to randomly distribute the network pairs among all available networks
 		rand.Shuffle(len(c.NetworkPairs), func(i, j int) {
 			c.NetworkPairs[i], c.NetworkPairs[j] = c.NetworkPairs[j], c.NetworkPairs[i]
 		})
-		// now add the remaining network pairs by randomly selecting the network pairs
-		for i := len(newNetworkPairs); i < c.TestGroupInput.MaxNoOfLanes; i++ {
+		// now add the remaining network pairs by skipping the already covered networks
+		// and adding the remaining pair from the shuffled list
+		i := len(newNetworkPairs)
+		j := 0
+		for i < c.TestGroupInput.MaxNoOfLanes {
 			// if the network is already covered, skip it
-			if _, exists := covered[c.NetworkPairs[i].NetworkA.Name]; !exists {
+			if _, exists := covered[c.NetworkPairs[j].NetworkA.Name]; !exists {
 				newNetworkPairs = append(newNetworkPairs, c.NetworkPairs[i])
+				i++
 			}
+			j++
 		}
 		c.NetworkPairs = newNetworkPairs
 	}
