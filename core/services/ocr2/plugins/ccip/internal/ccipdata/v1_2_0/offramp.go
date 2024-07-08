@@ -95,7 +95,7 @@ type JSONExecOffchainConfig struct {
 	// See [ccipdata.ExecOffchainConfig.RootSnoozeTime]
 	RootSnoozeTime config.Duration
 	// See [ccipdata.ExecOffchainConfig.BatchingStrategyID]
-	BatchingStrategyID uint8
+	BatchingStrategyID uint32
 	// See [ccipdata.ExecOffchainConfig.MessageVisibilityInterval]
 	MessageVisibilityInterval config.Duration
 }
@@ -174,7 +174,7 @@ func (o *OffRamp) ChangeConfig(ctx context.Context, onchainConfigBytes []byte, o
 		InflightCacheExpiry:         offchainConfigParsed.InflightCacheExpiry,
 		RootSnoozeTime:              offchainConfigParsed.RootSnoozeTime,
 		MessageVisibilityInterval:   offchainConfigParsed.MessageVisibilityInterval,
-		// BatchingStrategyID:          offchainConfigParsed.BatchingStrategyID, // TODO: uncomment when the field is added to the config
+		BatchingStrategyID:          offchainConfigParsed.BatchingStrategyID,
 	}
 	onchainConfig := cciptypes.ExecOnchainConfig{
 		PermissionLessExecutionThresholdSeconds: time.Second * time.Duration(onchainConfigParsed.PermissionLessExecutionThresholdSeconds),

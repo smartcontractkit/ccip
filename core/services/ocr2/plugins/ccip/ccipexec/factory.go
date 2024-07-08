@@ -112,11 +112,9 @@ func (rf *ExecutionReportingPluginFactory) NewReportingPluginFn(config types.Rep
 			return reportingPluginAndInfo{}, fmt.Errorf("get onchain config from offramp: %w", err)
 		}
 
-		// TODO: add to ExecOffchainConfig (chainlink-common) a BatchingStrategyID field
-		// BatchingStrategyID := offchainConfig.BatchingStrategyID
-		BatchingStrategyID := 0 // TODO: remove this line when the above TODO is done
 		var batchingStrategy BatchingStrategy
-		switch BatchingStrategyID {
+		batchingStrategyID := offchainConfig.BatchingStrategyID
+		switch batchingStrategyID {
 		case 0:
 			batchingStrategy = &BestEffortBatchingStrategy{}
 		case 1:
