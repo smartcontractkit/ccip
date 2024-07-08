@@ -15,6 +15,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil"
+
 	evmtypes "github.com/smartcontractkit/chainlink/v2/core/chains/evm/types"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/types"
@@ -36,6 +37,7 @@ type ORM interface {
 	DeleteBlocksBefore(ctx context.Context, end int64, limit int64) (int64, error)
 	DeleteLogsAndBlocksAfter(ctx context.Context, start int64) error
 	DeleteExpiredLogs(ctx context.Context, limit int64) (int64, error)
+	DeleteExcessLogs(ctx context.Context, limit int64) (int64, error)
 
 	GetBlocksRange(ctx context.Context, start int64, end int64) ([]LogPollerBlock, error)
 	SelectBlockByNumber(ctx context.Context, blockNumber int64) (*LogPollerBlock, error)
@@ -342,6 +344,38 @@ func (o *DSORM) DeleteExpiredLogs(ctx context.Context, limit int64) (int64, erro
 			AND l.block_timestamp <= STATEMENT_TIMESTAMP() - (r.retention / 10^9 * interval '1 second')`, // retention is in nanoseconds (time.Duration aka BIGINT)
 			ubig.New(o.chainID))
 	}
+
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+// DeleteExcessLogs deletes any logs old enough that MaxLogsKept has been exceeded for every filter they match.
+func (o *DSORM) DeleteExcessLogs(ctx context.Context, limit int64) (int64, error) {
+	var rowIds []struct {
+		BlockNumber uint64
+		LogIndex    uint64
+	}
+
+	var limitClause string
+	if limit > 0 {
+		limitClause = fmt.Sprintf(" LIMIT %d", limit)
+	}
+
+	query := `
+		SELECT block_number, log_index FROM (
+			SELECT max_logs_kept != 0 AND ROW_NUMBER() OVER(PARTITION BY f.id ORDER BY block_number, log_index DESC) > max_logs_kept AS old, block_number, log_index
+    		FROM evm.log_poller_filters f JOIN evm.logs l
+        		ON f.evm_chain_id = l.evm_chain_id AND f.address = l.address AND f.event = l.event_sig WHERE f.evm_chain_id=$1
+		) x GROUP BY block_number, log_index HAVING BOOL_AND(old)` + limitClause
+
+	err := o.ds.SelectContext(ctx, &rowIds, query, ubig.New(o.chainID))
+	if err != nil {
+		return 0, err
+	}
+
+	result, err := o.ds.ExecContext(ctx, `DELETE FROM evm.logs WHERE evm_chain_id = :evm_chain_id AND (block_number, log_index) IN rowIds`, rowIds)
 
 	if err != nil {
 		return 0, err

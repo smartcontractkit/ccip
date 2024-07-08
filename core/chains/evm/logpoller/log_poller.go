@@ -658,11 +658,13 @@ func (lp *logPoller) backgroundWorkerRun() {
 			}
 		case <-logPruneTick:
 			logPruneTick = time.After(utils.WithJitter(lp.pollPeriod * 2401)) // = 7^5 avoids common factors with 1000
-			if allRemoved, err := lp.PruneExpiredLogs(ctx); err != nil {
-				lp.lggr.Errorw("Unable to prune expired logs", "err", err)
-			} else if !allRemoved {
+			allRemoved, err := lp.PruneExpiredLogs(ctx)
+			if !allRemoved {
 				// Tick faster when cleanup can't keep up with the pace of new logs
 				logPruneTick = time.After(utils.WithJitter(lp.pollPeriod * 241))
+			}
+			if err != nil {
+				lp.lggr.Errorw("Unable to prune expired logs", "err", err)
 			}
 		}
 	}
@@ -1093,7 +1095,11 @@ func (lp *logPoller) PruneOldBlocks(ctx context.Context) (bool, error) {
 // Returns whether all logs eligible for pruning were removed. If logPrunePageSize is set to 0, it will always return true.
 func (lp *logPoller) PruneExpiredLogs(ctx context.Context) (bool, error) {
 	rowsRemoved, err := lp.orm.DeleteExpiredLogs(ctx, lp.logPrunePageSize)
-	return lp.logPrunePageSize == 0 || rowsRemoved < lp.logPrunePageSize, err
+	if err != nil || rowsRemoved < lp.logPrunePageSize {
+		return true, err
+	}
+	rowsRemoved, err = lp.orm.DeleteExcessLogs(ctx, lp.logPrunePageSize)
+	return lp.logPrunePageSize == 0 || err != nil || rowsRemoved < lp.logPrunePageSize, err
 }
 
 // Logs returns logs matching topics and address (exactly) in the given block range,

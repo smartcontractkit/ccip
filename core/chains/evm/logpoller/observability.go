@@ -142,6 +142,12 @@ func (o *ObservedORM) DeleteExpiredLogs(ctx context.Context, limit int64) (int64
 	})
 }
 
+func (o *ObservedORM) DeleteExcessLogs(ctx context.Context, limit int64) (int64, error) {
+	return withObservedExecAndRowsAffected(o, "DeleteExcessLogs", del, func() (int64, error) {
+		return o.ORM.DeleteExcessLogs(ctx, limit)
+	})
+}
+
 func (o *ObservedORM) SelectBlockByNumber(ctx context.Context, n int64) (*LogPollerBlock, error) {
 	return withObservedQuery(o, "SelectBlockByNumber", func() (*LogPollerBlock, error) {
 		return o.ORM.SelectBlockByNumber(ctx, n)

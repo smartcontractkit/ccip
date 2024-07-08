@@ -2050,7 +2050,7 @@ func Benchmark_LogsDataWordBetween(b *testing.B) {
 	}
 }
 
-func Benchmark_DeleteExpiredLogs(b *testing.B) {
+func Benchmark_LogPruning(b *testing.B) {
 	chainId := big.NewInt(137)
 	_, db := heavyweight.FullTestDBV2(b, nil)
 	o := logpoller.NewORM(chainId, db, logger.Test(b))
@@ -2090,18 +2090,31 @@ func Benchmark_DeleteExpiredLogs(b *testing.B) {
 		require.NoError(b, o.InsertLogs(ctx, dbLogs))
 	}
 
-	b.ResetTimer()
+	runBenchmarking := func(name string, callPruneMethod func(context.Context) (int64, error)) {
+		var rowsDeleted int64
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			tx, err1 := db.Beginx()
+			require.NoError(b, err1)
 
-	for i := 0; i < b.N; i++ {
-		tx, err1 := db.Beginx()
-		assert.NoError(b, err1)
+			rd, err1 := callPruneMethod(ctx)
+			require.NoError(b, err1)
+			rowsDeleted += rd
+			b.ReportMetric(float64(rowsDeleted)/float64(b.N), "rowsDeleted/op")
 
-		_, err1 = o.DeleteExpiredLogs(ctx, 0)
-		assert.NoError(b, err1)
-
-		err1 = tx.Rollback()
-		assert.NoError(b, err1)
+			err1 = tx.Rollback()
+			require.NoError(b, err1)
+		}
 	}
+	runBenchmarking("DeleteExpiredLogsNoPaging", func(ctx context.Context) (int64, error) {
+		return o.DeleteExpiredLogs(ctx, 0)
+	})
+	runBenchmarking("DeleteExpiredLogsLimit1000", func(ctx context.Context) (int64, error) {
+		return o.DeleteExpiredLogs(ctx, 1000)
+	})
+	runBenchmarking("DeleteExcessLogs", func(ctx context.Context) (int64, error) {
+		return o.DeleteExcessLogs(ctx, 0)
+	})
 }
 
 func TestSelectOldestBlock(t *testing.T) {
