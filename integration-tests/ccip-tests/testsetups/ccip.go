@@ -304,7 +304,7 @@ func (c *CCIPTestConfig) SetNetworkPairs(lggr zerolog.Logger) error {
 		var covered map[string]struct{}
 		// if densely connected networks are provided, choose all the network pairs containing the networks mentioned in the list for DenselyConnectedNetworkChainIds
 		if c.TestGroupInput.DenselyConnectedNetworkChainIds != nil && len(c.TestGroupInput.DenselyConnectedNetworkChainIds) > 0 {
-			denselyConnectedNetworks := map[string]struct{}{}
+			denselyConnectedNetworks := make(map[string]struct{})
 			for _, n := range c.TestGroupInput.DenselyConnectedNetworkChainIds {
 				denselyConnectedNetworks[n] = struct{}{}
 			}
