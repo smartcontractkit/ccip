@@ -7,6 +7,7 @@ import (
 	"math/rand"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -301,17 +302,15 @@ func (c *CCIPTestConfig) SetNetworkPairs(lggr zerolog.Logger) error {
 	// if the number of lanes is lesser than the number of network pairs, choose first c.TestGroupInput.MaxNoOfLanes pairs
 	if c.TestGroupInput.MaxNoOfLanes > 0 && c.TestGroupInput.MaxNoOfLanes < len(c.NetworkPairs) {
 		var newNetworkPairs []NetworkPair
-		var covered map[string]struct{}
+		denselyConnectedNetworks := make(map[string]struct{})
 		// if densely connected networks are provided, choose all the network pairs containing the networks mentioned in the list for DenselyConnectedNetworkChainIds
 		if c.TestGroupInput.DenselyConnectedNetworkChainIds != nil && len(c.TestGroupInput.DenselyConnectedNetworkChainIds) > 0 {
-			denselyConnectedNetworks := make(map[string]struct{})
 			for _, n := range c.TestGroupInput.DenselyConnectedNetworkChainIds {
 				denselyConnectedNetworks[n] = struct{}{}
 			}
 			for _, pair := range c.NetworkPairs {
-				if _, exists := denselyConnectedNetworks[pair.ChainClientA.GetChainID().String()]; exists {
+				if _, exists := denselyConnectedNetworks[strconv.FormatInt(pair.NetworkA.ChainID, 10)]; exists {
 					newNetworkPairs = append(newNetworkPairs, pair)
-					covered[pair.NetworkA.Name] = struct{}{}
 				}
 			}
 		}
@@ -324,9 +323,10 @@ func (c *CCIPTestConfig) SetNetworkPairs(lggr zerolog.Logger) error {
 		i := len(newNetworkPairs)
 		j := 0
 		for i < c.TestGroupInput.MaxNoOfLanes {
+			pair := c.NetworkPairs[j]
 			// if the network is already covered, skip it
-			if _, exists := covered[c.NetworkPairs[j].NetworkA.Name]; !exists {
-				newNetworkPairs = append(newNetworkPairs, c.NetworkPairs[i])
+			if _, exists := denselyConnectedNetworks[strconv.FormatInt(pair.NetworkA.ChainID, 10)]; !exists {
+				newNetworkPairs = append(newNetworkPairs, pair)
 				i++
 			}
 			j++
