@@ -90,15 +90,20 @@ evm_finality_depth = 1
 
 [CCIP.Env.Network.AnvilConfigs.PRIVATE-CHAIN-1]
 block_time = 1
+block_gaslimit = 100000000
+
 #
 [CCIP.Env.Network.AnvilConfigs.SLOW-CHAIN-1]
 block_time = 12
+block_gaslimit = 100000000
 
 [CCIP.Env.Network.AnvilConfigs.SLOW-CHAIN-2]
 block_time = 12
+block_gaslimit = 100000000
 
 [CCIP.Env.Network.AnvilConfigs.SLOW-CHAIN-3]
 block_time = 12
+block_gaslimit = 100000000
 
 [CCIP.Env.NewCLCluster]
 NoOfNodes = 17
@@ -187,7 +192,7 @@ BatchGasLimit = 11000000
 TimeoutForPriceUpdate = '15m'
 NoOfTokensPerChain = 60
 NoOfTokensWithDynamicPrice = 15
-DynamicPriceUpdateInterval ='15s'
+DynamicPriceUpdateInterval ='5m'
 CCIPOwnerTokens = true
 
 [CCIP.Groups.load.LoadProfile]
