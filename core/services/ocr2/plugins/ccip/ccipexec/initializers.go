@@ -20,20 +20,16 @@ import (
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
 
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/txmgr"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/legacyevm"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/factory"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/observability"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/oraclelib"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/tokendata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/promwrapper"
 )
 
@@ -51,124 +47,10 @@ var (
 var defaultNewReportingPluginRetryConfig = ccipdata.RetryConfig{InitialDelay: time.Second, MaxDelay: 5 * time.Minute}
 
 func NewExecServices(ctx context.Context, lggr logger.Logger, jb job.Job, srcProvider types.CCIPExecProvider, dstProvider types.CCIPExecProvider, srcChainID int64, dstChainID int64, new bool, argsNoPlugin libocr2.OCR2OracleArgs, logError func(string)) ([]job.ServiceCtx, error) {
-	if jb.OCR2OracleSpec == nil {
-		return nil, fmt.Errorf("spec is nil")
-	}
-	spec := jb.OCR2OracleSpec
-	var pluginConfig ccipconfig.ExecPluginJobSpecConfig
-	err := json.Unmarshal(spec.PluginConfig.Bytes(), &pluginConfig)
+	wrappedPluginFactory, err := NewExecutionReportingPluginFactoryV2(ctx, lggr, srcChainID, dstChainID, srcProvider, dstProvider)
 	if err != nil {
 		return nil, err
 	}
-
-	offRampAddress := ccipcalc.HexToAddress(spec.ContractID)
-	offRampReader, err := dstProvider.NewOffRampReader(ctx, offRampAddress)
-	if err != nil {
-		return nil, fmt.Errorf("create offRampReader: %w", err)
-	}
-
-	offRampConfig, err := offRampReader.GetStaticConfig(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("get offRamp static config: %w", err)
-	}
-
-	srcChainSelector := offRampConfig.SourceChainSelector
-	dstChainSelector := offRampConfig.ChainSelector
-	onRampReader, err := srcProvider.NewOnRampReader(ctx, offRampConfig.OnRamp, srcChainSelector, dstChainSelector)
-	if err != nil {
-		return nil, fmt.Errorf("create onRampReader: %w", err)
-	}
-
-	dynamicOnRampConfig, err := onRampReader.GetDynamicConfig(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("get onramp dynamic config: %w", err)
-	}
-
-	sourceWrappedNative, err := srcProvider.SourceNativeToken(ctx, dynamicOnRampConfig.Router)
-	if err != nil {
-		return nil, fmt.Errorf("get source wrapped native token: %w", err)
-	}
-
-	srcCommitStore, err := srcProvider.NewCommitStoreReader(ctx, offRampConfig.CommitStore)
-	if err != nil {
-		return nil, fmt.Errorf("could not create src commitStoreReader reader: %w", err)
-	}
-
-	dstCommitStore, err := dstProvider.NewCommitStoreReader(ctx, offRampConfig.CommitStore)
-	if err != nil {
-		return nil, fmt.Errorf("could not create dst commitStoreReader reader: %w", err)
-	}
-
-	var commitStoreReader ccipdata.CommitStoreReader
-	commitStoreReader = ccip.NewProviderProxyCommitStoreReader(srcCommitStore, dstCommitStore)
-
-	tokenDataProviders := make(map[cciptypes.Address]tokendata.Reader)
-	// init usdc token data provider
-	if pluginConfig.USDCConfig.AttestationAPI != "" {
-		lggr.Infof("USDC token data provider enabled")
-		err2 := pluginConfig.USDCConfig.ValidateUSDCConfig()
-		if err2 != nil {
-			return nil, err2
-		}
-
-		usdcReader, err2 := srcProvider.NewTokenDataReader(ctx, ccip.EvmAddrToGeneric(pluginConfig.USDCConfig.SourceTokenAddress))
-		if err2 != nil {
-			return nil, fmt.Errorf("new usdc reader: %w", err2)
-		}
-		tokenDataProviders[cciptypes.Address(pluginConfig.USDCConfig.SourceTokenAddress.String())] = usdcReader
-	}
-
-	// Prom wrappers
-	onRampReader = observability.NewObservedOnRampReader(onRampReader, srcChainID, ccip.ExecPluginLabel)
-	commitStoreReader = observability.NewObservedCommitStoreReader(commitStoreReader, dstChainID, ccip.ExecPluginLabel)
-	offRampReader = observability.NewObservedOffRampReader(offRampReader, dstChainID, ccip.ExecPluginLabel)
-	metricsCollector := ccip.NewPluginMetricsCollector(ccip.ExecPluginLabel, srcChainID, dstChainID)
-
-	tokenPoolBatchedReader, err := dstProvider.NewTokenPoolBatchedReader(ctx, offRampAddress, srcChainSelector)
-	if err != nil {
-		return nil, fmt.Errorf("new token pool batched reader: %w", err)
-	}
-
-	chainHealthcheck := cache.NewObservedChainHealthCheck(
-		cache.NewChainHealthcheck(
-			// Adding more details to Logger to make healthcheck logs more informative
-			// It's safe because healthcheck logs only in case of unhealthy state
-			lggr.With(
-				"onramp", offRampConfig.OnRamp,
-				"commitStore", offRampConfig.CommitStore,
-				"offramp", offRampAddress,
-			),
-			onRampReader,
-			commitStoreReader,
-		),
-		ccip.ExecPluginLabel,
-		srcChainID,
-		dstChainID,
-		offRampConfig.OnRamp,
-	)
-
-	tokenBackgroundWorker := tokendata.NewBackgroundWorker(
-		tokenDataProviders,
-		tokenDataWorkerNumWorkers,
-		tokenDataWorkerTimeout,
-		2*tokenDataWorkerTimeout,
-	)
-
-	wrappedPluginFactory := NewExecutionReportingPluginFactory(ExecutionPluginStaticConfig{
-		lggr:                          lggr,
-		onRampReader:                  onRampReader,
-		commitStoreReader:             commitStoreReader,
-		offRampReader:                 offRampReader,
-		sourcePriceRegistryProvider:   ccip.NewChainAgnosticPriceRegistry(srcProvider),
-		sourceWrappedNativeToken:      sourceWrappedNative,
-		destChainSelector:             dstChainSelector,
-		priceRegistryProvider:         ccip.NewChainAgnosticPriceRegistry(dstProvider),
-		tokenPoolBatchedReader:        tokenPoolBatchedReader,
-		tokenDataWorker:               tokenBackgroundWorker,
-		metricsCollector:              metricsCollector,
-		chainHealthcheck:              chainHealthcheck,
-		newReportingPluginRetryConfig: defaultNewReportingPluginRetryConfig,
-	})
 
 	argsNoPlugin.ReportingPluginFactory = promwrapper.NewPromFactory(wrappedPluginFactory, "CCIPExecution", jb.OCR2OracleSpec.Relay, big.NewInt(0).SetInt64(dstChainID))
 	argsNoPlugin.Logger = commonlogger.NewOCRWrapper(lggr, true, logError)
@@ -185,14 +67,14 @@ func NewExecServices(ctx context.Context, lggr logger.Logger, jb job.Job, srcPro
 				dstProvider,
 				job.NewServiceAdapter(oracle),
 			),
-			chainHealthcheck,
-			tokenBackgroundWorker,
+			wrappedPluginFactory.config.chainHealthcheck,
+			wrappedPluginFactory.config.tokenDataWorker,
 		}, nil
 	}
 	return []job.ServiceCtx{
 		job.NewServiceAdapter(oracle),
-		chainHealthcheck,
-		tokenBackgroundWorker,
+		wrappedPluginFactory.config.chainHealthcheck,
+		wrappedPluginFactory.config.tokenDataWorker,
 	}, nil
 }
 

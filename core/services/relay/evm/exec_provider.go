@@ -198,6 +198,7 @@ type DstExecProvider struct {
 	configWatcher       *configWatcher
 	gasEstimator        gas.EvmFeeEstimator
 	maxGasPrice         big.Int
+	offRampAddress      cciptypes.Address
 }
 
 func NewDstExecProvider(
@@ -210,6 +211,7 @@ func NewDstExecProvider(
 	configWatcher *configWatcher,
 	gasEstimator gas.EvmFeeEstimator,
 	maxGasPrice big.Int,
+	offRampAddress cciptypes.Address,
 ) (commontypes.CCIPExecProvider, error) {
 	return &DstExecProvider{
 		lggr:                lggr,
@@ -221,6 +223,7 @@ func NewDstExecProvider(
 		configWatcher:       configWatcher,
 		gasEstimator:        gasEstimator,
 		maxGasPrice:         maxGasPrice,
+		offRampAddress:      offRampAddress,
 	}, nil
 }
 
@@ -274,8 +277,8 @@ func (d DstExecProvider) NewCommitStoreReader(ctx context.Context, addr cciptype
 	return
 }
 
-func (d DstExecProvider) NewOffRampReader(ctx context.Context, offRampAddress cciptypes.Address) (offRampReader cciptypes.OffRampReader, err error) {
-	offRampReader, err = ccip.NewOffRampReader(d.lggr, d.versionFinder, offRampAddress, d.client, d.lp, d.gasEstimator, &d.maxGasPrice, true)
+func (d DstExecProvider) NewOffRampReader(ctx context.Context, _ cciptypes.Address) (offRampReader cciptypes.OffRampReader, err error) {
+	offRampReader, err = ccip.NewOffRampReader(d.lggr, d.versionFinder, d.offRampAddress, d.client, d.lp, d.gasEstimator, &d.maxGasPrice, true)
 	return
 }
 
