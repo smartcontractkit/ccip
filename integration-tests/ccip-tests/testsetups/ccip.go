@@ -905,6 +905,7 @@ func (o *CCIPTestSetUpOutputs) CheckGasUpdateTransaction() error {
 			if err := readGasUpdateTx(lanes.ReverseLane); err != nil {
 				return err
 			}
+		}
 	}
 	// when leader lane setup is enabled, number of transaction should match the number of network.
 	// Say we have 3 networks, then we expect 3 transactions in total from six events.
