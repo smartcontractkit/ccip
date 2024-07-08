@@ -875,7 +875,7 @@ func (o *CCIPTestSetUpOutputs) CheckGasUpdateTransaction() error {
 	readGasUpdateTx := func(lane *actions.CCIPLane) error {
 		for _, g := range lane.Source.Common.GasUpdateEvents {
 			if g.Value == nil {
-				return fmt.Errorf("gas update value should not be nil for chain selected %s in tx %s", g.ChainSelector, g.Tx)
+				return fmt.Errorf("gas update value should not be nil for chain selected %v in tx %s", g.ChainSelector, g.Tx)
 			}
 			if v, ok := transactions[g.Tx]; ok {
 				v[g.ChainSelector] = g.Value.String()
