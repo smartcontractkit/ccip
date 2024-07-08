@@ -16,7 +16,6 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/networks"
 	"github.com/smartcontractkit/chainlink-testing-framework/utils/ptr"
 	"github.com/smartcontractkit/chainlink-testing-framework/utils/testcontext"
-
 	"github.com/smartcontractkit/chainlink/integration-tests/actions"
 	vrfcommon "github.com/smartcontractkit/chainlink/integration-tests/actions/vrf/common"
 	"github.com/smartcontractkit/chainlink/integration-tests/actions/vrf/vrfv2"
@@ -29,10 +28,12 @@ import (
 	tc "github.com/smartcontractkit/chainlink/integration-tests/testconfig"
 )
 
-var labels = map[string]string{
-	"branch": "vrfv2_healthcheck",
-	"commit": "vrfv2_healthcheck",
-}
+var (
+	labels = map[string]string{
+		"branch": "vrfv2_healthcheck",
+		"commit": "vrfv2_healthcheck",
+	}
+)
 
 func TestVRFV2Performance(t *testing.T) {
 	var (
@@ -45,7 +46,7 @@ func TestVRFV2Performance(t *testing.T) {
 	l := logging.GetTestLogger(t)
 	testType, err := tc.GetConfigurationNameFromEnv()
 	require.NoError(t, err)
-	testConfig, err := tc.GetConfig(testType, tc.VRFv2)
+	testConfig, err := tc.GetChainAndTestTypeSpecificConfig(testType, tc.VRFv2)
 	require.NoError(t, err)
 	cfgl := testConfig.Logging.Loki
 
@@ -86,7 +87,7 @@ func TestVRFV2Performance(t *testing.T) {
 			}
 		}
 		if !*vrfv2Config.General.UseExistingEnv {
-			if err := testEnv.Cleanup(test_env.CleanupOpts{TestName: t.Name()}); err != nil {
+			if err := testEnv.Cleanup(test_env.CleanupOpts{}); err != nil {
 				l.Error().Err(err).Msg("Error cleaning up test environment")
 			}
 		}
@@ -163,7 +164,7 @@ func TestVRFV2Performance(t *testing.T) {
 
 		var wg sync.WaitGroup
 		wg.Add(1)
-		// todo - timeout should be configurable depending on the perf test type
+		//todo - timeout should be configurable depending on the perf test type
 		requestCount, fulfilmentCount, err := vrfcommon.WaitForRequestCountEqualToFulfilmentCount(testcontext.Get(t), vrfContracts.VRFV2Consumers[0], 2*time.Minute, &wg)
 		require.NoError(t, err)
 		wg.Wait()
@@ -187,7 +188,7 @@ func TestVRFV2BHSPerformance(t *testing.T) {
 
 	testType, err := tc.GetConfigurationNameFromEnv()
 	require.NoError(t, err)
-	testConfig, err := tc.GetConfig(testType, tc.VRFv2)
+	testConfig, err := tc.GetChainAndTestTypeSpecificConfig(testType, tc.VRFv2)
 	require.NoError(t, err)
 	vrfv2Config := testConfig.VRFv2
 	testReporter := &testreporters.VRFV2TestReporter{}
@@ -227,7 +228,7 @@ func TestVRFV2BHSPerformance(t *testing.T) {
 			}
 		}
 		if !*vrfv2Config.General.UseExistingEnv {
-			if err := testEnv.Cleanup(test_env.CleanupOpts{TestName: t.Name()}); err != nil {
+			if err := testEnv.Cleanup(test_env.CleanupOpts{}); err != nil {
 				l.Error().Err(err).Msg("Error cleaning up test environment")
 			}
 		}
@@ -249,7 +250,7 @@ func TestVRFV2BHSPerformance(t *testing.T) {
 
 	t.Run("vrfv2 and bhs performance test", func(t *testing.T) {
 		configCopy := testConfig.MustCopy().(tc.TestConfig)
-		// Underfund Subscription
+		//Underfund Subscription
 		configCopy.VRFv2.General.SubscriptionFundingAmountLink = ptr.Ptr(float64(0))
 
 		underfundedSubIDs, consumers, err := vrfv2.SetupSubsAndConsumersForExistingEnv(
@@ -348,7 +349,6 @@ func TestVRFV2BHSPerformance(t *testing.T) {
 			Msg("Final Request/Fulfilment Stats")
 	})
 }
-
 func teardown(
 	t *testing.T,
 	consumer contracts.VRFv2LoadTestConsumer,
@@ -358,10 +358,10 @@ func teardown(
 	testType string,
 	testConfig *tc.TestConfig,
 ) {
-	// send final results to Loki
+	//send final results to Loki
 	metrics := GetLoadTestMetrics(testcontext.Get(t), consumer)
 	SendMetricsToLoki(metrics, lc, updatedLabels)
-	// set report data for Slack notification
+	//set report data for Slack notification
 	testReporter.SetReportData(
 		testType,
 		testreporters.VRFLoadTestMetrics{

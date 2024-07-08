@@ -26,7 +26,6 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/utils/conversions"
 	"github.com/smartcontractkit/chainlink-testing-framework/utils/ptr"
 	"github.com/smartcontractkit/chainlink-testing-framework/utils/testcontext"
-
 	"github.com/smartcontractkit/chainlink/integration-tests/actions"
 	vrfcommon "github.com/smartcontractkit/chainlink/integration-tests/actions/vrf/common"
 	"github.com/smartcontractkit/chainlink/integration-tests/actions/vrf/vrfv2"
@@ -53,7 +52,7 @@ func TestVRFv2Basic(t *testing.T) {
 	)
 	l := logging.GetTestLogger(t)
 
-	config, err := tc.GetConfig("Smoke", tc.VRFv2)
+	config, err := tc.GetChainAndTestTypeSpecificConfig("Smoke", tc.VRFv2)
 	require.NoError(t, err, "Error getting config")
 	vrfv2Config := config.VRFv2
 	chainID := networks.MustGetSelectedNetworkConfig(config.GetNetworkConfig())[0].ChainID
@@ -570,7 +569,7 @@ func TestVRFv2MultipleSendingKeys(t *testing.T) {
 	)
 	l := logging.GetTestLogger(t)
 
-	config, err := tc.GetConfig("Smoke", tc.VRFv2)
+	config, err := tc.GetChainAndTestTypeSpecificConfig("Smoke", tc.VRFv2)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -678,7 +677,7 @@ func TestVRFOwner(t *testing.T) {
 	)
 	l := logging.GetTestLogger(t)
 
-	config, err := tc.GetConfig("Smoke", tc.VRFv2)
+	config, err := tc.GetChainAndTestTypeSpecificConfig("Smoke", tc.VRFv2)
 	require.NoError(t, err, "Error getting config")
 	chainID := networks.MustGetSelectedNetworkConfig(config.GetNetworkConfig())[0].ChainID
 	vrfv2Config := config.VRFv2
@@ -814,7 +813,7 @@ func TestVRFV2WithBHS(t *testing.T) {
 	)
 	l := logging.GetTestLogger(t)
 
-	config, err := tc.GetConfig("Smoke", tc.VRFv2)
+	config, err := tc.GetChainAndTestTypeSpecificConfig("Smoke", tc.VRFv2)
 	require.NoError(t, err, "Error getting config")
 	vrfv2Config := config.VRFv2
 	chainID := networks.MustGetSelectedNetworkConfig(config.GetNetworkConfig())[0].ChainID
@@ -1032,7 +1031,7 @@ func TestVRFV2NodeReorg(t *testing.T) {
 	)
 	l := logging.GetTestLogger(t)
 
-	config, err := tc.GetConfig("Smoke", tc.VRFv2)
+	config, err := tc.GetChainAndTestTypeSpecificConfig("Smoke", tc.VRFv2)
 	require.NoError(t, err, "Error getting config")
 	vrfv2Config := config.VRFv2
 	network := networks.MustGetSelectedNetworkConfig(config.GetNetworkConfig())[0]
@@ -1211,7 +1210,7 @@ func TestVRFv2BatchFulfillmentEnabledDisabled(t *testing.T) {
 	)
 	l := logging.GetTestLogger(t)
 
-	config, err := tc.GetConfig("Smoke", tc.VRFv2)
+	config, err := tc.GetChainAndTestTypeSpecificConfig("Smoke", tc.VRFv2)
 	require.NoError(t, err, "Error getting config")
 	vrfv2Config := config.VRFv2
 	network := networks.MustGetSelectedNetworkConfig(config.GetNetworkConfig())[0]

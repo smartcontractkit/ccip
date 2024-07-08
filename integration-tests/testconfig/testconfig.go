@@ -13,6 +13,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/pelletier/go-toml/v2"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 
@@ -81,12 +82,18 @@ type TestConfig struct {
 	LogPoller  *lp_config.Config        `toml:"LogPoller"`
 	OCR        *ocr_config.Config       `toml:"OCR"`
 	OCR2       *ocr_config.Config       `toml:"OCR2"`
-	OCR2VRF    *ocr_config.Config       `toml:"OCRR2VRF"`
 	VRF        *vrf_config.Config       `toml:"VRF"`
 	VRFv2      *vrfv2_config.Config     `toml:"VRFv2"`
 	VRFv2Plus  *vrfv2plus_config.Config `toml:"VRFv2Plus"`
+	CRIB       *CRIB                    `toml:"CRIB"`
 
-	ConfigurationName string `toml:"-"`
+	ConfigurationNames []string `toml:"-"`
+}
+
+type CRIB struct {
+	Namespace   string `toml:"namespace"`
+	NetworkName string `toml:"network_name"`
+	CLNodesNum  int    `toml:"nodes"`
 }
 
 var embeddedConfigs embed.FS
@@ -198,8 +205,8 @@ func (c TestConfig) GetOCRConfig() *ocr_config.Config {
 	return c.OCR
 }
 
-func (c TestConfig) GetConfigurationName() string {
-	return c.ConfigurationName
+func (c TestConfig) GetConfigurationNames() []string {
+	return c.ConfigurationNames
 }
 
 func (c TestConfig) GetSethConfig() *seth.Config {
@@ -211,11 +218,7 @@ func (c TestConfig) GetActiveOCRConfig() *ocr_config.Config {
 		return c.OCR
 	}
 
-	if c.OCR2 != nil {
-		return c.OCR2
-	}
-
-	return c.OCR2VRF
+	return c.OCR2
 }
 
 func (c *TestConfig) AsBase64() (string, error) {
@@ -253,7 +256,6 @@ const (
 	Node          Product = "node"
 	OCR           Product = "ocr"
 	OCR2          Product = "ocr2"
-	OCR2VRF       Product = "ocr2vrf"
 	RunLog        Product = "runlog"
 	VRF           Product = "vrf"
 	VRFv2         Product = "vrfv2"
@@ -273,15 +275,23 @@ func GetConfigurationNameFromEnv() (string, error) {
 
 const (
 	Base64OverrideEnvVarName = k8s_config.EnvBase64ConfigOverride
-	NoKey                    = "NO_KEY"
 )
 
-func GetConfig(configurationName string, product Product) (TestConfig, error) {
+func GetConfig(configurationNames []string, product Product) (TestConfig, error) {
 	logger := logging.GetTestLogger(nil)
 
-	configurationName = strings.ReplaceAll(configurationName, "/", "_")
-	configurationName = strings.ReplaceAll(configurationName, " ", "_")
-	configurationName = cases.Title(language.English, cases.NoLower).String(configurationName)
+	for idx, configurationName := range configurationNames {
+		configurationNames[idx] = strings.ReplaceAll(configurationName, "/", "_")
+		configurationNames[idx] = strings.ReplaceAll(configurationName, " ", "_")
+		configurationNames[idx] = cases.Title(language.English, cases.NoLower).String(configurationName)
+	}
+
+	// add unnamed (default) configuration as the first one to be read
+	configurationNamesCopy := make([]string, len(configurationNames))
+	copy(configurationNamesCopy, configurationNames)
+
+	configurationNames = append([]string{""}, configurationNamesCopy...)
+
 	fileNames := []string{
 		"default.toml",
 		fmt.Sprintf("%s.toml", product),
@@ -289,8 +299,9 @@ func GetConfig(configurationName string, product Product) (TestConfig, error) {
 	}
 
 	testConfig := TestConfig{}
-	testConfig.ConfigurationName = configurationName
-	logger.Debug().Msgf("Will apply configuration named '%s' if it is found in any of the configs", configurationName)
+	testConfig.ConfigurationNames = configurationNames
+
+	logger.Debug().Msgf("Will apply configurations named '%s' if they are found in any of the configs", strings.Join(configurationNames, ","))
 
 	// read embedded configs is build tag "embed" is set
 	// this makes our life much easier when using a binary
@@ -306,9 +317,11 @@ func GetConfig(configurationName string, product Product) (TestConfig, error) {
 				return TestConfig{}, errors.Wrapf(err, "error reading embedded config")
 			}
 
-			err = ctf_config.BytesToAnyTomlStruct(logger, fileName, configurationName, &testConfig, file)
-			if err != nil {
-				return TestConfig{}, errors.Wrapf(err, "error unmarshalling embedded config")
+			for _, configurationName := range configurationNames {
+				err = ctf_config.BytesToAnyTomlStruct(logger, fileName, configurationName, &testConfig, file)
+				if err != nil {
+					return TestConfig{}, errors.Wrapf(err, "error unmarshalling embedded config %s", embeddedFiles)
+				}
 			}
 		}
 	} else {
@@ -330,9 +343,11 @@ func GetConfig(configurationName string, product Product) (TestConfig, error) {
 				return TestConfig{}, errors.Wrapf(err, "error reading file %s", filePath)
 			}
 
-			err = ctf_config.BytesToAnyTomlStruct(logger, fileName, configurationName, &testConfig, content)
-			if err != nil {
-				return TestConfig{}, errors.Wrapf(err, "error reading file %s", filePath)
+			for _, configurationName := range configurationNames {
+				err = ctf_config.BytesToAnyTomlStruct(logger, fileName, configurationName, &testConfig, content)
+				if err != nil {
+					return TestConfig{}, errors.Wrapf(err, "error reading file %s", filePath)
+				}
 			}
 		}
 	}
@@ -346,9 +361,11 @@ func GetConfig(configurationName string, product Product) (TestConfig, error) {
 			return TestConfig{}, err
 		}
 
-		err = ctf_config.BytesToAnyTomlStruct(logger, Base64OverrideEnvVarName, configurationName, &testConfig, decoded)
-		if err != nil {
-			return TestConfig{}, errors.Wrapf(err, "error unmarshaling base64 config")
+		for _, configurationName := range configurationNames {
+			err = ctf_config.BytesToAnyTomlStruct(logger, Base64OverrideEnvVarName, configurationName, &testConfig, decoded)
+			if err != nil {
+				return TestConfig{}, errors.Wrapf(err, "error unmarshaling base64 config")
+			}
 		}
 	} else {
 		logger.Debug().Msg("Base64 config override from environment variable not found")
@@ -372,27 +389,34 @@ func GetConfig(configurationName string, product Product) (TestConfig, error) {
 		testConfig.Common = &Common{}
 	}
 
+	testConfig.logRiskySettings(logger)
+
+	logger.Debug().Msg("Correct test config constructed successfully")
+	return testConfig, nil
+}
+
+func (c *TestConfig) logRiskySettings(logger zerolog.Logger) {
 	isAnySimulated := false
-	for _, network := range testConfig.Network.SelectedNetworks {
+	for _, network := range c.Network.SelectedNetworks {
 		if strings.Contains(strings.ToUpper(network), "SIMULATED") {
 			isAnySimulated = true
 			break
 		}
 	}
 
-	if testConfig.Seth != nil && !isAnySimulated && (testConfig.Seth.EphemeralAddrs != nil && *testConfig.Seth.EphemeralAddrs != 0) {
-		testConfig.Seth.EphemeralAddrs = new(int64)
+	if c.Seth != nil && !isAnySimulated && (c.Seth.EphemeralAddrs != nil && *c.Seth.EphemeralAddrs != 0) {
+		c.Seth.EphemeralAddrs = new(int64)
 		logger.Warn().
 			Msg("Ephemeral addresses were enabled, but test was setup to run on a live network. Ephemeral addresses will be disabled.")
 	}
 
-	if testConfig.Seth != nil && (testConfig.Seth.EphemeralAddrs != nil && *testConfig.Seth.EphemeralAddrs != 0) {
-		rootBuffer := testConfig.Seth.RootKeyFundsBuffer
+	if c.Seth != nil && (c.Seth.EphemeralAddrs != nil && *c.Seth.EphemeralAddrs != 0) {
+		rootBuffer := c.Seth.RootKeyFundsBuffer
 		zero := int64(0)
 		if rootBuffer == nil {
 			rootBuffer = &zero
 		}
-		clNodeFunding := testConfig.Common.ChainlinkNodeFunding
+		clNodeFunding := c.Common.ChainlinkNodeFunding
 		if clNodeFunding == nil {
 			zero := 0.0
 			clNodeFunding = &zero
@@ -419,8 +443,20 @@ root_key_funds_buffer = 1_000
 		}
 	}
 
-	logger.Debug().Msg("Correct test config constructed successfully")
-	return testConfig, nil
+	var customChainSettings []string
+	for _, network := range networks.MustGetSelectedNetworkConfig(c.Network) {
+		if c.NodeConfig != nil && len(c.NodeConfig.ChainConfigTOMLByChainID) > 0 {
+			if _, ok := c.NodeConfig.ChainConfigTOMLByChainID[fmt.Sprint(network.ChainID)]; ok {
+				logger.Warn().Msgf("You have provided custom Chainlink Node configuration for network '%s' (chain id: %d). Chainlink Node's default settings won't be used", network.Name, network.ChainID)
+				customChainSettings = append(customChainSettings, fmt.Sprint(network.ChainID))
+			}
+		}
+	}
+
+	if len(customChainSettings) == 0 && c.NodeConfig != nil && c.NodeConfig.CommonChainConfigTOML != "" {
+		logger.Warn().Msg("***** You have provided your own default Chainlink Node configuration for all networks. Chainlink Node's default settings for selected networks won't be used *****")
+	}
+
 }
 
 func (c *TestConfig) readNetworkConfiguration() error {
@@ -441,17 +477,6 @@ func (c *TestConfig) readNetworkConfiguration() error {
 		c.PrivateEthereumNetwork.EthereumChainConfig.GenerateGenesisTimestamp()
 	}
 
-	for _, network := range networks.MustGetSelectedNetworkConfig(c.Network) {
-		for _, key := range network.PrivateKeys {
-			address, err := conversions.PrivateKeyHexToAddress(key)
-			if err != nil {
-				return errors.Wrapf(err, "error converting private key to address")
-			}
-			c.PrivateEthereumNetwork.EthereumChainConfig.AddressesToFund = append(
-				c.PrivateEthereumNetwork.EthereumChainConfig.AddressesToFund, address.Hex(),
-			)
-		}
-	}
 	return nil
 }
 
@@ -554,12 +579,6 @@ func (c *TestConfig) Validate() error {
 	if c.OCR2 != nil {
 		if err := c.OCR2.Validate(); err != nil {
 			return errors.Wrapf(err, "OCR2 config validation failed")
-		}
-	}
-
-	if c.OCR2VRF != nil {
-		if err := c.OCR2VRF.Validate(); err != nil {
-			return errors.Wrapf(err, "OCR2VRF config validation failed")
 		}
 	}
 

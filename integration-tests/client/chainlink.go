@@ -93,11 +93,6 @@ func (c *ChainlinkClient) URL() string {
 	return c.Config.URL
 }
 
-func (c *ChainlinkClient) WithRetryCount(retryCount int) *ChainlinkClient {
-	c.APIClient.SetRetryCount(retryCount)
-	return c
-}
-
 // Health returns all statuses health info
 func (c *ChainlinkClient) Health() (*HealthResponse, *http.Response, error) {
 	respBody := &HealthResponse{}
@@ -846,62 +841,6 @@ func (c *ChainlinkClient) ImportVRFKey(vrfExportKey *VRFExportKey) (*VRFKey, *ht
 		return nil, nil, err
 	}
 	return vrfKey, resp.RawResponse, err
-}
-
-// MustCreateDkgSignKey creates a DKG Sign key on the Chainlink node
-// and returns error if the request is unsuccessful
-func (c *ChainlinkClient) MustCreateDkgSignKey() (*DKGSignKey, error) {
-	dkgSignKey := &DKGSignKey{}
-	c.l.Info().Str(NodeURL, c.Config.URL).Msg("Creating DKG Sign Key")
-	resp, err := c.APIClient.R().
-		SetResult(dkgSignKey).
-		Post("/v2/keys/dkgsign")
-	if err == nil {
-		err = VerifyStatusCode(resp.StatusCode(), http.StatusOK)
-	}
-	return dkgSignKey, err
-}
-
-// MustCreateDkgEncryptKey creates a DKG Encrypt key on the Chainlink node
-// and returns error if the request is unsuccessful
-func (c *ChainlinkClient) MustCreateDkgEncryptKey() (*DKGEncryptKey, error) {
-	dkgEncryptKey := &DKGEncryptKey{}
-	c.l.Info().Str(NodeURL, c.Config.URL).Msg("Creating DKG Encrypt Key")
-	resp, err := c.APIClient.R().
-		SetResult(dkgEncryptKey).
-		Post("/v2/keys/dkgencrypt")
-	if err == nil {
-		err = VerifyStatusCode(resp.StatusCode(), http.StatusOK)
-	}
-	return dkgEncryptKey, err
-}
-
-// MustReadDKGSignKeys reads all DKG Sign Keys from the Chainlink node returns err if response not 200
-func (c *ChainlinkClient) MustReadDKGSignKeys() (*DKGSignKeys, error) {
-	dkgSignKeys := &DKGSignKeys{}
-	c.l.Info().Str(NodeURL, c.Config.URL).Msg("Reading DKG Sign Keys")
-	resp, err := c.APIClient.R().
-		SetResult(dkgSignKeys).
-		Get("/v2/keys/dkgsign")
-	if err != nil {
-		return nil, err
-	}
-	err = VerifyStatusCode(resp.StatusCode(), http.StatusOK)
-	return dkgSignKeys, err
-}
-
-// MustReadDKGEncryptKeys reads all DKG Encrypt Keys from the Chainlink node returns err if response not 200
-func (c *ChainlinkClient) MustReadDKGEncryptKeys() (*DKGEncryptKeys, error) {
-	dkgEncryptKeys := &DKGEncryptKeys{}
-	c.l.Info().Str(NodeURL, c.Config.URL).Msg("Reading DKG Encrypt Keys")
-	resp, err := c.APIClient.R().
-		SetResult(dkgEncryptKeys).
-		Get("/v2/keys/dkgencrypt")
-	if err != nil {
-		return nil, err
-	}
-	err = VerifyStatusCode(resp.StatusCode(), http.StatusOK)
-	return dkgEncryptKeys, err
 }
 
 // CreateCSAKey creates a CSA key on the Chainlink node, only 1 CSA key per noe
