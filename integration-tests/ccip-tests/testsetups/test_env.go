@@ -480,7 +480,7 @@ func DeployEnvironments(
 					anvilConfig.BaseFee = pointer.ToInt64(1000000)
 				}
 				if anvilConfig.BlockGaslimit == nil {
-					anvilConfig.BlockGaslimit = pointer.ToInt64(40000000)
+					anvilConfig.BlockGaslimit = pointer.ToInt64(100000000)
 				}
 				testEnvironment.
 					AddHelm(foundry.New(&foundry.Props{
