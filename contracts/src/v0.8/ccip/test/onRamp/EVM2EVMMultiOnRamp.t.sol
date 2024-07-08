@@ -195,6 +195,8 @@ contract EVM2EVMMultiOnRamp_applyDestChainConfigUpdates is EVM2EVMMultiOnRampSet
         type(uint32).max
       )
     );
+    destChainConfigArgs.dynamicConfig.chainFamilySelector = Internal.CHAIN_FAMILY_SELECTOR_EVM;
+
     bool isNewChain = true;
 
     if (destChainConfigArgs.destChainSelector == DEST_CHAIN_SELECTOR) {
@@ -1056,6 +1058,7 @@ contract EVM2EVMMultiOnRamp_getDataAvailabilityCost is EVM2EVMMultiOnRamp_getFee
     destChainConfigArgs[0].dynamicConfig.destGasPerDataAvailabilityByte = destGasPerDataAvailabilityByte;
     destChainConfigArgs[0].dynamicConfig.destDataAvailabilityMultiplierBps = destDataAvailabilityMultiplierBps;
     destChainConfigArgs[0].dynamicConfig.defaultTxGasLimit = GAS_LIMIT;
+    destChainConfigArgs[0].dynamicConfig.chainFamilySelector = Internal.CHAIN_FAMILY_SELECTOR_EVM;
 
     s_onRamp.applyDestChainConfigUpdates(destChainConfigArgs);
 

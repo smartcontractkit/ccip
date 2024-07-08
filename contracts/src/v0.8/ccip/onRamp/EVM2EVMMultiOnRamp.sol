@@ -28,7 +28,6 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
 
   error CannotSendZeroTokens();
   error InvalidExtraArgsTag();
-  error InvalidChainFamilySelector(bytes4 chainFamilySelector);
   error ExtraArgOutOfOrderExecutionMustBeTrue();
   error OnlyCallableByOwnerOrAdmin();
   error MessageTooLarge(uint256 maxSize, uint256 actualSize);
@@ -398,13 +397,12 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
   function _convertParsedExtraArgs(
     bytes calldata extraArgs,
     DestChainDynamicConfig memory destChainDynamicConfig
-  ) internal pure returns (bytes memory) {
+  ) internal pure returns (bytes memory encodedExtraArgs) {
     bytes4 chainFamilySelector = destChainDynamicConfig.chainFamilySelector;
     if (chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_EVM) {
       return abi.encode(_parseEVMExtraArgsFromBytes(extraArgs, destChainDynamicConfig));
     }
-
-    revert InvalidChainFamilySelector(destChainDynamicConfig.chainFamilySelector);
+    // Invalid chain family selectors cannot be configured - ignore invalid cases
   }
 
   /// @dev Convert the extra args bytes into a struct with validations against the dest chain config
@@ -753,7 +751,11 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
       DestChainConfigArgs memory destChainConfigArg = destChainConfigArgs[i];
       uint64 destChainSelector = destChainConfigArgs[i].destChainSelector;
 
-      if (destChainSelector == 0 || destChainConfigArg.dynamicConfig.defaultTxGasLimit == 0) {
+      // NOTE: when supporting non-EVM chains, update chainFamilySelector validations
+      if (
+        destChainSelector == 0 || destChainConfigArg.dynamicConfig.defaultTxGasLimit == 0
+          || destChainConfigArg.dynamicConfig.chainFamilySelector != Internal.CHAIN_FAMILY_SELECTOR_EVM
+      ) {
         revert InvalidDestChainConfig(destChainSelector);
       }
 
