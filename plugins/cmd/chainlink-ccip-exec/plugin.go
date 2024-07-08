@@ -20,6 +20,6 @@ func NewPlugin(lggr logger.Logger) *Plugin {
 	return &Plugin{Plugin: loop.Plugin{Logger: lggr}, stop: make(services.StopChan)}
 }
 
-func (p *Plugin) NewExecutionFactory(ctx context.Context, srcChainID int64, dstChainID int64, srcProvider types.CCIPExecProvider, dstProvider types.CCIPExecProvider) (types.ReportingPluginFactory, error) {
+func (p *Plugin) NewExecutionFactory(ctx context.Context, srcProvider types.CCIPExecProvider, dstProvider types.CCIPExecProvider, srcChainID int64, dstChainID int64) (types.ReportingPluginFactory, error) {
 	return ccipexec.NewExecutionReportingPluginFactoryV2(ctx, nil, srcChainID, dstChainID, srcProvider, dstProvider)
 }
