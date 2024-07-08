@@ -11,7 +11,6 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core"
 	gethtypes "github.com/ethereum/go-ethereum/core/types"
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
@@ -44,7 +43,7 @@ func setupNodeOCR3(
 	t *testing.T,
 	owner *bind.TransactOpts,
 	port int,
-	chainIDToBackend map[int64]*backends.SimulatedBackend,
+	chainIDToBackend map[uint64]*backends.SimulatedBackend,
 ) *ocr3Node {
 	// Do not want to load fixtures as they contain a dummy chainID.
 	config, db := heavyweight.FullTestDBNoFixturesV2(t, func(c *chainlink.Config, s *chainlink.Secrets) {
@@ -70,7 +69,7 @@ func setupNodeOCR3(
 
 		var chains v2toml.EVMConfigs
 		for chainID := range chainIDToBackend {
-			chains = append(chains, createConfigV2Chain(big.NewInt(chainID)))
+			chains = append(chains, createConfigV2Chain(big.NewInt(int64(chainID))))
 		}
 		c.EVM = chains
 		c.OCR2.ContractPollInterval = config.MustNewDuration(5 * time.Second)
@@ -79,10 +78,12 @@ func setupNodeOCR3(
 	lggr := logger.TestLogger(t)
 	lggr.SetLogLevel(zapcore.InfoLevel)
 	ctx := testutils.Context(t)
-	clients := make(map[int64]client.Client)
+	clients := make(map[uint64]client.Client)
 
 	for chainID, backend := range chainIDToBackend {
-		clients[chainID] = client.NewSimulatedBackendClient(t, backend, big.NewInt(chainID))
+		cID := big.Int{}
+		cID.SetUint64(chainID)
+		clients[chainID] = client.NewSimulatedBackendClient(t, backend, &cID)
 	}
 
 	master := keystore.New(db, utils.FastScryptParams, lggr)
@@ -100,7 +101,7 @@ func setupNodeOCR3(
 			AppConfig: config,
 			GenEthClient: func(i *big.Int) client.Client {
 				t.Log("genning eth client for chain id:", i.String())
-				client, ok := clients[i.Int64()]
+				client, ok := clients[i.Uint64()]
 				if !ok {
 					t.Fatal("no backend for chainID", i)
 				}
@@ -145,9 +146,11 @@ func setupNodeOCR3(
 	peerID := p2pIDs[0].PeerID()
 
 	// create a transmitter for each chain
-	transmitters := make(map[int64]common.Address)
+	transmitters := make(map[uint64]common.Address)
 	for chainID, backend := range chainIDToBackend {
-		addrs, err2 := app.GetKeyStore().Eth().EnabledAddressesForChain(testutils.Context(t), big.NewInt(chainID))
+		var cID big.Int
+		cID.SetUint64(chainID)
+		addrs, err2 := app.GetKeyStore().Eth().EnabledAddressesForChain(testutils.Context(t), &cID)
 		require.NoError(t, err2)
 		if len(addrs) == 1 {
 			// just fund the address
@@ -155,9 +158,9 @@ func setupNodeOCR3(
 			transmitters[chainID] = addrs[0]
 		} else {
 			// create key and fund it
-			_, err3 := app.GetKeyStore().Eth().Create(testutils.Context(t), big.NewInt(chainID))
+			_, err3 := app.GetKeyStore().Eth().Create(testutils.Context(t), &cID)
 			require.NoError(t, err3, "failed to create key for chain", chainID)
-			sendingKeys, err3 := app.GetKeyStore().Eth().EnabledAddressesForChain(testutils.Context(t), big.NewInt(chainID))
+			sendingKeys, err3 := app.GetKeyStore().Eth().EnabledAddressesForChain(testutils.Context(t), &cID)
 			require.NoError(t, err3)
 			require.Len(t, sendingKeys, 1)
 			fundAddress(t, owner, sendingKeys[0], assets.Ether(10).ToInt(), backend)
@@ -178,30 +181,6 @@ func setupNodeOCR3(
 		keybundle:    keybundle,
 		db:           db,
 	}
-}
-
-func createChains(t *testing.T, numChains int) (owner *bind.TransactOpts, chains map[int64]*backends.SimulatedBackend) {
-	owner = testutils.MustNewSimTransactor(t)
-	chains = make(map[int64]*backends.SimulatedBackend)
-
-	chains[homeChainID] = backends.NewSimulatedBackend(core.GenesisAlloc{
-		owner.From: core.GenesisAccount{
-			Balance: assets.Ether(10_000).ToInt(),
-		},
-	}, 30e6)
-
-	for chainID := int64(chainsel.TEST_90000001.EvmChainID); chainID < int64(chainsel.TEST_90000020.EvmChainID); chainID++ {
-		chains[chainID] = backends.NewSimulatedBackend(core.GenesisAlloc{
-			owner.From: core.GenesisAccount{
-				Balance: assets.Ether(10000).ToInt(),
-			},
-		}, 30e6)
-
-		if len(chains) == numChains {
-			break
-		}
-	}
-	return
 }
 
 func ptr[T any](v T) *T { return &v }

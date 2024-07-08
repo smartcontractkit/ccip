@@ -7,8 +7,10 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core"
 	"github.com/jmoiron/sqlx"
 	chainsel "github.com/smartcontractkit/chain-selectors"
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/arm_proxy_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_multi_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_multi_onramp"
@@ -28,13 +30,13 @@ import (
 )
 
 var (
-	homeChainID = int64(chainsel.GETH_TESTNET.EvmChainID)
+	homeChainID = chainsel.GETH_TESTNET.EvmChainID
 )
 
 type ocr3Node struct {
 	app          chainlink.Application
 	peerID       string
-	transmitters map[int64]common.Address
+	transmitters map[uint64]common.Address
 	keybundle    ocr2key.KeyBundle
 	db           *sqlx.DB
 }
@@ -63,8 +65,8 @@ type onchainUniverse struct {
 func deployContracts(
 	t *testing.T,
 	owner *bind.TransactOpts,
-	chains map[int64]*backends.SimulatedBackend,
-) (homeChainUni homeChain, universes map[int64]onchainUniverse) {
+	chains map[uint64]*backends.SimulatedBackend,
+) (homeChainUni homeChain, universes map[uint64]onchainUniverse) {
 	require.Len(t, chains, 4, "must have 4 chains total, 1 home chain and 3 non-home-chains")
 
 	// deploy the capability registry on the home chain
@@ -79,7 +81,7 @@ func deployContracts(
 	require.NoError(t, err)
 
 	// deploy the ccip contracts on the non-home-chain chains (total of 3).
-	universes = make(map[int64]onchainUniverse)
+	universes = make(map[uint64]onchainUniverse)
 	for chainID, backend := range chains {
 		if chainID == homeChainID {
 			continue
@@ -205,7 +207,7 @@ func deployContracts(
 
 		universes[chainID] = onchainUniverse{
 			backend:            backend,
-			chainID:            uint64(chainID),
+			chainID:            chainID,
 			linkToken:          linkToken,
 			weth:               weth,
 			router:             rout,
@@ -220,7 +222,7 @@ func deployContracts(
 
 	return homeChain{
 		backend:            homeChainBackend,
-		chainID:            uint64(homeChainID),
+		chainID:            homeChainID,
 		capabilityRegistry: capabilityRegistry,
 	}, universes
 }
@@ -228,28 +230,28 @@ func deployContracts(
 func fullyConnectCCIPContracts(
 	t *testing.T,
 	owner *bind.TransactOpts,
-	universes map[int64]onchainUniverse,
+	universes map[uint64]onchainUniverse,
 ) {
 	chainIDs := maps.Keys(universes)
-	for chainID, uni := range universes {
-		chainsToConnectTo := filter(chainIDs, func(chainIDArg int64) bool {
-			return chainIDArg != chainID
+	for sourceChainID, uni := range universes {
+		chainsToConnectTo := filter(chainIDs, func(chainIDArg uint64) bool {
+			return chainIDArg != sourceChainID
 		})
 
 		// we are forming a fully-connected graph, so in each iteration we connect
-		// the current chain (referenced by chainID) to all other chains that are not
+		// the current chain (referenced by sourceChainID) to all other chains that are not
 		// ourselves.
 		var (
-			onrampDestChainConfigArgs    []evm_2_evm_multi_onramp.EVM2EVMMultiOnRampDestChainConfigArgs
-			routerOnrampUpdates          []router.RouterOnRamp
-			routerOfframpUpdates         []router.RouterOffRamp
-			offrampSourceChainConfigArgs []evm_2_evm_multi_offramp.EVM2EVMMultiOffRampSourceChainConfigArgs
+			onrampDestChainConfigArgs             []evm_2_evm_multi_onramp.EVM2EVMMultiOnRampDestChainConfigArgs
+			routerOnrampUpdates                   []router.RouterOnRamp
+			routerOfframpUpdates                  []router.RouterOffRamp
+			offrampSourceChainConfigArgs          []evm_2_evm_multi_offramp.EVM2EVMMultiOffRampSourceChainConfigArgs
+			premiumMultiplierWeiPerEthUpdatesArgs []evm_2_evm_multi_onramp.EVM2EVMMultiOnRampPremiumMultiplierWeiPerEthArgs
+			priceUpdates                          price_registry.InternalPriceUpdates
 		)
-		for _, chainToConnect := range chainsToConnectTo {
-			chainSelector, ok := chainsel.EvmChainIdToChainSelector()[uint64(chainToConnect)]
-			require.Truef(t, ok, "chain selector not found for chain id %d", chainToConnect)
+		for _, destChainID := range chainsToConnectTo {
 			onrampDestChainConfigArgs = append(onrampDestChainConfigArgs, evm_2_evm_multi_onramp.EVM2EVMMultiOnRampDestChainConfigArgs{
-				DestChainSelector: chainSelector,
+				DestChainSelector: destChainID,
 				DynamicConfig: evm_2_evm_multi_onramp.EVM2EVMMultiOnRampDestChainDynamicConfig{
 					IsEnabled:                         true,
 					MaxNumberOfTokensPerMsg:           10,
@@ -269,37 +271,64 @@ func fullyConnectCCIPContracts(
 				},
 			})
 
-			remoteUni, ok := universes[chainID]
-			require.Truef(t, ok, "could not find universe for chain id %d", chainID)
+			remoteUni, ok := universes[destChainID]
+			require.Truef(t, ok, "could not find universe for chain id %d", destChainID)
 
 			offrampSourceChainConfigArgs = append(offrampSourceChainConfigArgs, evm_2_evm_multi_offramp.EVM2EVMMultiOffRampSourceChainConfigArgs{
-				SourceChainSelector: chainSelector,
+				SourceChainSelector: sourceChainID,
 				IsEnabled:           true,
 				OnRamp:              remoteUni.onramp.Address(),
 			})
 
+			premiumMultiplierWeiPerEthUpdatesArgs = append(premiumMultiplierWeiPerEthUpdatesArgs,
+				evm_2_evm_multi_onramp.EVM2EVMMultiOnRampPremiumMultiplierWeiPerEthArgs{
+					PremiumMultiplierWeiPerEth: 2e18,
+					Token:                      remoteUni.linkToken.Address(),
+				})
+
 			// onramps are multi-dest and offramps are multi-source.
 			// so set the same ramp for all the chain selectors.
 			routerOnrampUpdates = append(routerOnrampUpdates, router.RouterOnRamp{
-				DestChainSelector: chainSelector,
-				OnRamp:            uni.onramp.Address(),
+				DestChainSelector: destChainID,
+				OnRamp:            remoteUni.onramp.Address(),
 			})
 			routerOfframpUpdates = append(routerOfframpUpdates, router.RouterOffRamp{
-				SourceChainSelector: chainSelector,
+				SourceChainSelector: sourceChainID,
 				OffRamp:             uni.offramp.Address(),
+			})
+
+			priceUpdates.GasPriceUpdates = append(priceUpdates.GasPriceUpdates, price_registry.InternalGasPriceUpdate{
+				DestChainSelector: destChainID,
+				UsdPerUnitGas:     big.NewInt(1e18),
+			})
+
+			priceUpdates.TokenPriceUpdates = append(priceUpdates.TokenPriceUpdates, price_registry.InternalTokenPriceUpdate{
+				SourceToken: uni.linkToken.Address(),
+				UsdPerToken: big.NewInt(1e18),
 			})
 		}
 
+		//===========================OnRamp=====================================
 		_, err := uni.onramp.ApplyDestChainConfigUpdates(owner, onrampDestChainConfigArgs)
-		require.NoErrorf(t, err, "failed to apply dest chain config updates on onramp on chain id %d", chainID)
+		require.NoErrorf(t, err, "failed to apply dest chain config updates on onramp on chain id %d", sourceChainID)
+		uni.backend.Commit()
+		_, err = uni.onramp.ApplyPremiumMultiplierWeiPerEthUpdates(owner, premiumMultiplierWeiPerEthUpdatesArgs)
+		require.NoErrorf(t, err, "failed to apply premium multiplier wei per eth updates on onramp on chain id %d", sourceChainID)
 		uni.backend.Commit()
 
+		//===========================OffRamp=====================================
 		_, err = uni.offramp.ApplySourceChainConfigUpdates(owner, offrampSourceChainConfigArgs)
-		require.NoErrorf(t, err, "failed to apply source chain config updates on offramp on chain id %d", chainID)
+		require.NoErrorf(t, err, "failed to apply source chain config updates on offramp on chain id %d", sourceChainID)
 		uni.backend.Commit()
 
+		//===========================RouterRamp=====================================
 		_, err = uni.router.ApplyRampUpdates(owner, routerOnrampUpdates, []router.RouterOffRamp{}, routerOfframpUpdates)
-		require.NoErrorf(t, err, "failed to apply ramp updates on router on chain id %d", chainID)
+		require.NoErrorf(t, err, "failed to apply ramp updates on router on chain id %d", sourceChainID)
+		uni.backend.Commit()
+
+		//===========================PriceRegistry=====================================
+		_, err = uni.priceRegistry.UpdatePrices(owner, priceUpdates)
+		require.NoErrorf(t, err, "failed to apply price registry updates on chain id %d", sourceChainID)
 		uni.backend.Commit()
 	}
 }
@@ -308,6 +337,30 @@ func filter[T any](s []T, cond func(arg T) bool) (r []T) {
 	for _, v := range s {
 		if cond(v) {
 			r = append(r, v)
+		}
+	}
+	return
+}
+
+func createChains(t *testing.T, numChains int) (owner *bind.TransactOpts, chains map[uint64]*backends.SimulatedBackend) {
+	owner = testutils.MustNewSimTransactor(t)
+	chains = make(map[uint64]*backends.SimulatedBackend)
+
+	chains[homeChainID] = backends.NewSimulatedBackend(core.GenesisAlloc{
+		owner.From: core.GenesisAccount{
+			Balance: assets.Ether(10_000).ToInt(),
+		},
+	}, 30e6)
+
+	for chainID := uint64(chainsel.TEST_90000001.EvmChainID); chainID < uint64(chainsel.TEST_90000020.EvmChainID); chainID++ {
+		chains[chainID] = backends.NewSimulatedBackend(core.GenesisAlloc{
+			owner.From: core.GenesisAccount{
+				Balance: assets.Ether(10000).ToInt(),
+			},
+		}, 30e6)
+
+		if len(chains) == numChains {
+			break
 		}
 	}
 	return
