@@ -303,12 +303,13 @@ jobs:
       fail-fast: false
       matrix:
         product:
-          - name: ccip-lm-smoke
-            nodes: 1
-            os: ubuntu-latest
-            file: lm
-            dir: ccip-tests/smoke
-            run: -run ^TestLmBasic$
+# LM Smoke Test is disabled since project is paused
+#          - name: ccip-lm-smoke
+#            nodes: 1
+#            os: ubuntu-latest
+#            file: lm
+#            dir: ccip-tests/smoke
+#            run: -run ^TestLmBasic$
           - name: ccip-smoke
             nodes: 1
             os: ubuntu-latest
@@ -342,6 +343,12 @@ jobs:
             os: ubuntu-latest
             file: ccip
             run: -run ^TestSmokeCCIPRateLimit$
+          - name: ccip-smoke-rate-limit
+            nodes: 1
+            dir: ccip-tests/smoke
+            os: ubuntu-latest
+            file: ccip
+            run: -run ^TestSmokeCCIPTokenPoolRateLimits$
           - name: ccip-smoke-multicall
             nodes: 1
             dir: ccip-tests/smoke
@@ -354,18 +361,24 @@ jobs:
             os: ubuntu-latest
             file: ccip
             run: -run ^TestSmokeCCIPManuallyExecuteAfterExecutionFailingDueToInsufficientGas$
-          - name: ccip-smoke-self-serve-offramp-arl
+          - name: ccip-smoke-on-ramp-limits
             nodes: 1
             dir: ccip-tests/smoke
             os: ubuntu-latest
             file: ccip
-            run: -run ^TestSmokeCCIPSelfServeRateLimitOffRamp$
-          - name: ccip-smoke-self-serve-onramp-arl
+            run: -run ^TestSmokeCCIPOnRampLimits$
+          - name: ccip-smoke-off-ramp-capacity
             nodes: 1
             dir: ccip-tests/smoke
             os: ubuntu-latest
             file: ccip
-            run: -run ^TestSmokeCCIPSelfServeRateLimitOnRamp$
+            run: -run ^TestSmokeCCIPOffRampCapacityLimit$
+          - name: ccip-smoke-off-ramp-agg-rate-limit
+            nodes: 1
+            dir: ccip-tests/smoke
+            os: ubuntu-latest
+            file: ccip
+            run: -run ^TestSmokeCCIPOffRampAggRateLimit$
           - name: runlog
             id: runlog
             nodes: 2

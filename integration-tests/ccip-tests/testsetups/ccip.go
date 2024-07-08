@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"math/big"
-	"math/rand"
 	"os"
 	"regexp"
 	"strings"
@@ -223,8 +222,13 @@ func (c *CCIPTestConfig) SetNetworkPairs(lggr zerolog.Logger) error {
 		actualNoOfNetworks := len(c.SelectedNetworks)
 		n := c.SelectedNetworks[0]
 		var chainIDs []int64
+		existingChainIDs := make(map[uint64]struct{})
+		for _, net := range c.SelectedNetworks {
+			existingChainIDs[uint64(net.ChainID)] = struct{}{}
+		}
 		for _, id := range chainselectors.TestChainIds() {
-			if id == 2337 {
+			// if the chain id already exists in the already provided selected networks, skip it
+			if _, exists := existingChainIDs[id]; exists {
 				continue
 			}
 			chainIDs = append(chainIDs, int64(id))
@@ -281,11 +285,8 @@ func (c *CCIPTestConfig) SetNetworkPairs(lggr zerolog.Logger) error {
 		c.AddPairToNetworkList(c.SelectedNetworks[0], c.SelectedNetworks[1])
 	}
 
-	// if the number of lanes is lesser than the number of network pairs, choose a random subset of network pairs
+	// if the number of lanes is lesser than the number of network pairs, choose first c.TestGroupInput.MaxNoOfLanes pairs
 	if c.TestGroupInput.MaxNoOfLanes > 0 && c.TestGroupInput.MaxNoOfLanes < len(c.NetworkPairs) {
-		rand.Shuffle(len(c.NetworkPairs), func(i, j int) {
-			c.NetworkPairs[i], c.NetworkPairs[j] = c.NetworkPairs[j], c.NetworkPairs[i]
-		})
 		c.NetworkPairs = c.NetworkPairs[:c.TestGroupInput.MaxNoOfLanes]
 	}
 
@@ -347,14 +348,39 @@ func (c *CCIPTestConfig) SetOCRParams() error {
 
 // TestConfigOverrideOption is a function that modifies the test config and overrides any values passed in by test files
 // This is useful for setting up test specific configurations.
+// The return should be a short, explanatory string that describes the change made by the override.
+// This is logged at the beginning of the test run.
 type TestConfigOverrideOption func(*CCIPTestConfig) string
 
-// WithCCIPOwnerTokens dictates that tokens be deployed and owned by the same account that owns all CCIP contracts.
-// With Self-Serve tokens, this is unrealistic.
-func WithCCIPOwnerTokens() TestConfigOverrideOption {
+// UseCCIPOwnerTokens defines whether all tokens are deployed by the same address as the CCIP owner
+func UseCCIPOwnerTokens(yes bool) TestConfigOverrideOption {
 	return func(c *CCIPTestConfig) string {
-		c.TestGroupInput.TokenConfig.CCIPOwnerTokens = pointer.ToBool(true)
-		return "CCIPOwnerTokens set to true"
+		c.TestGroupInput.TokenConfig.CCIPOwnerTokens = pointer.ToBool(yes)
+		return fmt.Sprintf("CCIPOwnerTokens set to %t", yes)
+	}
+}
+
+// WithTokensPerChain sets the number of tokens to deploy on each chain
+func WithTokensPerChain(count int) TestConfigOverrideOption {
+	return func(c *CCIPTestConfig) string {
+		c.TestGroupInput.TokenConfig.NoOfTokensPerChain = pointer.ToInt(count)
+		return fmt.Sprintf("NoOfTokensPerChain set to %d", count)
+	}
+}
+
+// WithMsgDetails sets the message details for the test
+func WithMsgDetails(details *testconfig.MsgDetails) TestConfigOverrideOption {
+	return func(c *CCIPTestConfig) string {
+		c.TestGroupInput.MsgDetails = details
+		return "Message set"
+	}
+}
+
+// WithNoTokensPerMessage sets how many tokens can be sent in a single message
+func WithNoTokensPerMessage(noOfTokens int) TestConfigOverrideOption {
+	return func(c *CCIPTestConfig) string {
+		c.TestGroupInput.MsgDetails.NoOfTokens = pointer.ToInt(noOfTokens)
+		return fmt.Sprintf("MsgDetails.NoOfTokens set to %d", noOfTokens)
 	}
 }
 
