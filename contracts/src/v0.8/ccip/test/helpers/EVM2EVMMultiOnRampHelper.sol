@@ -48,4 +48,15 @@ contract EVM2EVMMultiOnRampHelper is EVM2EVMMultiOnRamp, IgnoreContractSize {
   ) external view returns (Client.EVMExtraArgsV2 memory) {
     return _parseEVMExtraArgsFromBytes(extraArgs, s_destChainConfig[destChainSelector].dynamicConfig);
   }
+
+  function validateDestFamilyAddress(bytes4 chainFamilySelector, bytes memory destAddress) external pure {
+    _validateDestFamilyAddress(chainFamilySelector, destAddress);
+  }
+
+  function convertParsedExtraArgs(
+    bytes calldata extraArgs,
+    DestChainDynamicConfig memory destChainDynamicConfig
+  ) external pure returns (bytes memory encodedExtraArgs) {
+    return _convertParsedExtraArgs(extraArgs, destChainDynamicConfig);
+  }
 }

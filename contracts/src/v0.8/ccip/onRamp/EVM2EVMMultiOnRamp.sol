@@ -403,6 +403,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
       return abi.encode(_parseEVMExtraArgsFromBytes(extraArgs, destChainDynamicConfig));
     }
     // Invalid chain family selectors cannot be configured - ignore invalid cases
+    return encodedExtraArgs;
   }
 
   /// @dev Convert the extra args bytes into a struct with validations against the dest chain config

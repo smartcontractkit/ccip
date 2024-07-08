@@ -296,6 +296,8 @@ contract EVM2EVMMultiOnRamp_applyDestChainConfigUpdates is EVM2EVMMultiOnRampSet
     assertEq(vm.getRecordedLogs().length, 0);
   }
 
+  // Reverts
+
   function test_InvalidDestChainConfigDestChainSelectorEqZero_Revert() public {
     EVM2EVMMultiOnRamp.DestChainConfigArgs[] memory destChainConfigArgs = _generateDestChainConfigArgs();
     EVM2EVMMultiOnRamp.DestChainConfigArgs memory destChainConfigArg = destChainConfigArgs[0];
@@ -307,7 +309,7 @@ contract EVM2EVMMultiOnRamp_applyDestChainConfigUpdates is EVM2EVMMultiOnRampSet
     s_onRamp.applyDestChainConfigUpdates(destChainConfigArgs);
   }
 
-  function test_applyDestChainConfigUpdatesDefaultTxGasLimitEqZero() public {
+  function test_applyDestChainConfigUpdatesDefaultTxGasLimitEqZero_Revert() public {
     EVM2EVMMultiOnRamp.DestChainConfigArgs[] memory destChainConfigArgs = _generateDestChainConfigArgs();
     EVM2EVMMultiOnRamp.DestChainConfigArgs memory destChainConfigArg = destChainConfigArgs[0];
 
@@ -343,6 +345,18 @@ contract EVM2EVMMultiOnRamp_applyDestChainConfigUpdates is EVM2EVMMultiOnRampSet
       )
     );
 
+    s_onRamp.applyDestChainConfigUpdates(destChainConfigArgs);
+  }
+
+  function test_InvalidChainFamilySelector_Revert() public {
+    EVM2EVMMultiOnRamp.DestChainConfigArgs[] memory destChainConfigArgs = _generateDestChainConfigArgs();
+    EVM2EVMMultiOnRamp.DestChainConfigArgs memory destChainConfigArg = destChainConfigArgs[0];
+
+    destChainConfigArg.dynamicConfig.chainFamilySelector = bytes4(uint32(1));
+
+    vm.expectRevert(
+      abi.encodeWithSelector(EVM2EVMMultiOnRamp.InvalidDestChainConfig.selector, destChainConfigArg.destChainSelector)
+    );
     s_onRamp.applyDestChainConfigUpdates(destChainConfigArgs);
   }
 }
@@ -738,7 +752,7 @@ contract EVM2EVMMultiOnRamp_forwardFromRouter is EVM2EVMMultiOnRampSetup {
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 1, OWNER);
   }
 
-  function test_InvalidAddress_Revert() public {
+  function test_InvalidEVMAddress_Revert() public {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
     message.receiver = abi.encode(type(uint208).max);
 
@@ -854,6 +868,41 @@ contract EVM2EVMMultiOnRamp_forwardFromRouter is EVM2EVMMultiOnRampSetup {
 
     vm.startPrank(address(s_sourceRouter));
     vm.expectRevert(abi.encodeWithSelector(EVM2EVMMultiOnRamp.SourceTokenDataTooLarge.selector, sourceETH));
+    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 0, OWNER);
+  }
+
+  function test_InvalidEVMAddressDestToken_Revert() public {
+    address sourceETH = s_sourceTokens[1];
+    vm.stopPrank();
+    vm.startPrank(OWNER);
+
+    MaybeRevertingBurnMintTokenPool newPool = new MaybeRevertingBurnMintTokenPool(
+      BurnMintERC677(sourceETH), new address[](0), address(s_mockRMN), address(s_sourceRouter)
+    );
+    BurnMintERC677(sourceETH).grantMintAndBurnRoles(address(newPool));
+    deal(address(sourceETH), address(newPool), type(uint256).max);
+
+    // Add TokenPool to OnRamp
+    s_tokenAdminRegistry.setPool(sourceETH, address(newPool));
+
+    bytes memory nonEvmAddress = abi.encode(type(uint208).max);
+
+    // Allow chain in TokenPool
+    TokenPool.ChainUpdate[] memory chainUpdates = new TokenPool.ChainUpdate[](1);
+    chainUpdates[0] = TokenPool.ChainUpdate({
+      remoteChainSelector: DEST_CHAIN_SELECTOR,
+      remotePoolAddress: abi.encode(s_destTokenPool),
+      remoteTokenAddress: nonEvmAddress,
+      allowed: true,
+      outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
+      inboundRateLimiterConfig: getInboundRateLimiterConfig()
+    });
+    newPool.applyChainUpdates(chainUpdates);
+
+    Client.EVM2AnyMessage memory message = _generateSingleTokenMessage(address(sourceETH), 1000);
+
+    vm.startPrank(address(s_sourceRouter));
+    vm.expectRevert(abi.encodeWithSelector(Internal.InvalidEVMAddress.selector, nonEvmAddress));
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 0, OWNER);
   }
 
@@ -1720,7 +1769,7 @@ contract EVM2EVMMultiOnRamp_withdrawFeeTokens is EVM2EVMMultiOnRampSetup {
   }
 }
 
-contract EVM2EVMOnRamp_applyPremiumMultiplierWeiPerEthUpdates is EVM2EVMMultiOnRampSetup {
+contract EVM2EVMMultiOnRamp_applyPremiumMultiplierWeiPerEthUpdates is EVM2EVMMultiOnRampSetup {
   function test_Fuzz_applyPremiumMultiplierWeiPerEthUpdates_Success(
     EVM2EVMMultiOnRamp.PremiumMultiplierWeiPerEthArgs memory premiumMultiplierWeiPerEthArg
   ) public {
@@ -1996,5 +2045,96 @@ contract EVM2EVMMultiOnRamp_getTokenPool is EVM2EVMMultiOnRampSetup {
     address nonExistentPool = address(s_onRamp.getPoolBySourceToken(DEST_CHAIN_SELECTOR, IERC20(wrongToken)));
 
     assertEq(address(0), nonExistentPool);
+  }
+}
+
+contract EVM2EVMMultiOnRamp_validateDestFamilyAddress is EVM2EVMMultiOnRampSetup {
+  function test_ValidEVMAddress_Success() public view {
+    bytes memory encodedAddress = abi.encode(address(10000));
+    s_onRamp.validateDestFamilyAddress(Internal.CHAIN_FAMILY_SELECTOR_EVM, encodedAddress);
+  }
+
+  function test_ValidNonEVMAddress_Success() public view {
+    s_onRamp.validateDestFamilyAddress(bytes4(uint32(1)), abi.encode(type(uint208).max));
+  }
+
+  // Reverts
+
+  function test_InvalidEVMAddress_Revert() public {
+    bytes memory invalidAddress = abi.encode(type(uint208).max);
+    vm.expectRevert(abi.encodeWithSelector(Internal.InvalidEVMAddress.selector, invalidAddress));
+    s_onRamp.validateDestFamilyAddress(Internal.CHAIN_FAMILY_SELECTOR_EVM, invalidAddress);
+  }
+}
+
+contract EVM2EVMMultiOnRamp_convertParsedExtraArgs is EVM2EVMMultiOnRampSetup {
+  EVM2EVMMultiOnRamp.DestChainDynamicConfig private s_destChainDynamicConfig;
+
+  function setUp() public virtual override {
+    super.setUp();
+    s_destChainDynamicConfig = _generateDestChainConfigArgs()[0].dynamicConfig;
+  }
+
+  function test_EVMExtraArgsV1_Success() public view {
+    Client.EVMExtraArgsV1 memory inputArgs = Client.EVMExtraArgsV1({gasLimit: GAS_LIMIT});
+    bytes memory inputExtraArgs = Client._argsToBytes(inputArgs);
+    Client.EVMExtraArgsV2 memory expectedOutputArgs =
+      Client.EVMExtraArgsV2({gasLimit: GAS_LIMIT, allowOutOfOrderExecution: false});
+
+    vm.assertEq(
+      s_onRamp.convertParsedExtraArgs(inputExtraArgs, s_destChainDynamicConfig), abi.encode(expectedOutputArgs)
+    );
+  }
+
+  function test_EVMExtraArgsV2_Success() public view {
+    Client.EVMExtraArgsV2 memory inputArgs =
+      Client.EVMExtraArgsV2({gasLimit: GAS_LIMIT, allowOutOfOrderExecution: true});
+    bytes memory inputExtraArgs = Client._argsToBytes(inputArgs);
+
+    vm.assertEq(s_onRamp.convertParsedExtraArgs(inputExtraArgs, s_destChainDynamicConfig), abi.encode(inputArgs));
+  }
+
+  function test_EVMExtraArgsDefault_Success() public view {
+    Client.EVMExtraArgsV2 memory expectedOutputArgs =
+      Client.EVMExtraArgsV2({gasLimit: s_destChainDynamicConfig.defaultTxGasLimit, allowOutOfOrderExecution: false});
+
+    vm.assertEq(s_onRamp.convertParsedExtraArgs("", s_destChainDynamicConfig), abi.encode(expectedOutputArgs));
+  }
+
+  function test_EmptyExtraArgs_Success() public {
+    s_destChainDynamicConfig.chainFamilySelector = bytes4(uint32(1));
+    vm.assertEq(s_onRamp.convertParsedExtraArgs("", s_destChainDynamicConfig), "");
+  }
+
+  // Reverts
+
+  function test_EVMExtraArgsInvalidExtraArgsTag_Revert() public {
+    Client.EVMExtraArgsV2 memory inputArgs =
+      Client.EVMExtraArgsV2({gasLimit: GAS_LIMIT, allowOutOfOrderExecution: true});
+    bytes memory inputExtraArgs = Client._argsToBytes(inputArgs);
+    // Invalidate selector
+    inputExtraArgs[0] = bytes1(uint8(0));
+
+    vm.expectRevert(EVM2EVMMultiOnRamp.InvalidExtraArgsTag.selector);
+    s_onRamp.convertParsedExtraArgs(inputExtraArgs, s_destChainDynamicConfig);
+  }
+
+  function test_EVMExtraArgsEnforceOutOfOrder_Revert() public {
+    Client.EVMExtraArgsV2 memory inputArgs =
+      Client.EVMExtraArgsV2({gasLimit: GAS_LIMIT, allowOutOfOrderExecution: false});
+    bytes memory inputExtraArgs = Client._argsToBytes(inputArgs);
+    s_destChainDynamicConfig.enforceOutOfOrder = true;
+
+    vm.expectRevert(EVM2EVMMultiOnRamp.ExtraArgOutOfOrderExecutionMustBeTrue.selector);
+    s_onRamp.convertParsedExtraArgs(inputExtraArgs, s_destChainDynamicConfig);
+  }
+
+  function test_EVMExtraArgsGasLimitTooHigh_Revert() public {
+    Client.EVMExtraArgsV2 memory inputArgs =
+      Client.EVMExtraArgsV2({gasLimit: s_destChainDynamicConfig.maxPerMsgGasLimit + 1, allowOutOfOrderExecution: true});
+    bytes memory inputExtraArgs = Client._argsToBytes(inputArgs);
+
+    vm.expectRevert(EVM2EVMMultiOnRamp.MessageGasLimitTooHigh.selector);
+    s_onRamp.convertParsedExtraArgs(inputExtraArgs, s_destChainDynamicConfig);
   }
 }
