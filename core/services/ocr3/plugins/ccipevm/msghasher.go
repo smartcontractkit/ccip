@@ -95,7 +95,7 @@ func (h *MessageHasherV1) Hash(_ context.Context, msg cciptypes.Message) (ccipty
 		common.BytesToAddress(msg.Receiver),
 		uint64(msg.Header.SequenceNumber),
 		gasLimit,
-		uint64(msg.Header.Nonce),
+		msg.Header.Nonce,
 	)
 	if err != nil {
 		return [32]byte{}, fmt.Errorf("abi encode fixed size values: %w", err)
