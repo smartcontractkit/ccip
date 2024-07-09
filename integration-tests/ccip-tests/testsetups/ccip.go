@@ -67,12 +67,11 @@ type NetworkPair struct {
 	NetworkB     blockchain.EVMNetwork
 	ChainClientA blockchain.EVMClient
 	ChainClientB blockchain.EVMClient
-	Leader       *Leader
 }
 
-type Leader struct {
-	BiDirectional  bool
-	UniDirectional bool
+type LeaderLane struct {
+	source string
+	dest   string
 }
 
 type CCIPTestConfig struct {
@@ -84,6 +83,7 @@ type CCIPTestConfig struct {
 	AllNetworks         map[string]blockchain.EVMNetwork
 	SelectedNetworks    []blockchain.EVMNetwork
 	NetworkPairs        []NetworkPair
+	LeaderLanes         []LeaderLane
 	GethResourceProfile map[string]interface{}
 }
 
@@ -298,45 +298,61 @@ func (c *CCIPTestConfig) SetNetworkPairs(lggr zerolog.Logger) error {
 
 	// setting leader lane details to network pairs if it is enabled and only in simulated environments
 	if c.EnvInput.Lane.LeaderLaneEnabled && !pointer.GetBool(c.TestGroupInput.ExistingDeployment) {
-		// the way we are doing this is to set first found network pair as leader lanes (ex: A - B) in both the direction
-		// and any network pair has same network (A) will be uni-directionally marked as leader. Like, A - C, A - D.
-		// by this we will make sure all required leader lanes will be defined.
-		firstNetworkA := ""
-		for idx, n := range c.NetworkPairs {
-			if firstNetworkA == "" {
-				firstNetworkA = n.NetworkA.Name
-				c.NetworkPairs[idx].Leader = &Leader{BiDirectional: true}
-			} else if n.NetworkA.Name == firstNetworkA {
-				c.NetworkPairs[idx].Leader = &Leader{UniDirectional: true}
-			} else {
-				c.NetworkPairs[idx].Leader = &Leader{}
-			}
-		}
+		c.DefineLeaderLanes()
 	}
 	for _, n := range c.NetworkPairs {
-		if n.Leader != nil && n.Leader.BiDirectional {
-			lggr.Info().
-				Str("NetworkA", fmt.Sprintf("%s-%d", n.NetworkA.Name, n.NetworkA.ChainID)).
-				Str("NetworkB", fmt.Sprintf("%s-%d", n.NetworkB.Name, n.NetworkB.ChainID)).
-				Str("Leader Lane", "Bidirectional").
-				Msg("Network Pairs")
-		} else if n.Leader != nil && n.Leader.UniDirectional {
-			lggr.Info().
-				Str("NetworkA", fmt.Sprintf("%s-%d", n.NetworkA.Name, n.NetworkA.ChainID)).
-				Str("NetworkB", fmt.Sprintf("%s-%d", n.NetworkB.Name, n.NetworkB.ChainID)).
-				Str("Leader Lane", "Unidirectional").
-				Msg("Network Pairs")
-		} else {
-			lggr.Info().
-				Str("NetworkA", fmt.Sprintf("%s-%d", n.NetworkA.Name, n.NetworkA.ChainID)).
-				Str("NetworkB", fmt.Sprintf("%s-%d", n.NetworkB.Name, n.NetworkB.ChainID)).
-				Str("Leader Lane", "False").
-				Msg("Network Pairs")
-		}
+		lggr.Info().
+			Str("NetworkA", fmt.Sprintf("%s-%d", n.NetworkA.Name, n.NetworkA.ChainID)).
+			Str("NetworkB", fmt.Sprintf("%s-%d", n.NetworkB.Name, n.NetworkB.ChainID)).
+			Msg("Network Pairs")
+	}
+	for _, lane := range c.LeaderLanes {
+		lggr.Info().
+			Str("Source", lane.source).
+			Str("Destination", lane.dest).
+			Msg("Leader Lane: ")
 	}
 	lggr.Info().Int("Pairs", len(c.NetworkPairs)).Msg("No Of Lanes")
 
 	return allError
+}
+
+func (c *CCIPTestConfig) DefineLeaderLanes() {
+	// the way we are doing this is by creating a map with key as destination network name and value as list of source network name.
+	// Once map is available, picking every first source network name from the list to form the leader lanes
+	sourceLanes := make(map[string][]string)
+	for _, n := range c.NetworkPairs {
+		if val, ok := sourceLanes[n.NetworkB.Name]; ok {
+			sourceLanes[n.NetworkB.Name] = append(val, n.NetworkA.Name)
+		} else {
+			sourceLanes[n.NetworkB.Name] = []string{n.NetworkA.Name}
+		}
+		if pointer.GetBool(c.TestGroupInput.BiDirectionalLane) {
+			if val, ok := sourceLanes[n.NetworkA.Name]; ok {
+				sourceLanes[n.NetworkA.Name] = append(val, n.NetworkB.Name)
+			} else {
+				sourceLanes[n.NetworkA.Name] = []string{n.NetworkB.Name}
+			}
+		}
+	}
+	for k, v := range sourceLanes {
+		c.LeaderLanes = append(c.LeaderLanes, LeaderLane{
+			source: v[0],
+			dest:   k,
+		})
+	}
+}
+
+func (c *CCIPTestConfig) isLeaderLane(lane *actions.CCIPLane) bool {
+	if len(c.LeaderLanes) == 0 {
+		return false
+	}
+	for _, leader := range c.LeaderLanes {
+		if leader.source == lane.SourceNetworkName && leader.dest == lane.DestNetworkName {
+			return true
+		}
+	}
+	return false
 }
 
 func (c *CCIPTestConfig) FormNetworkPairCombinations() {
@@ -589,7 +605,6 @@ func (o *CCIPTestSetUpOutputs) AddLanesForNetworkPair(
 	lggr *zerolog.Logger,
 	networkA, networkB blockchain.EVMNetwork,
 	chainClientA, chainClientB blockchain.EVMClient,
-	leader *Leader,
 ) error {
 	var (
 		t         = o.Cfg.Test
@@ -643,7 +658,7 @@ func (o *CCIPTestSetUpOutputs) AddLanesForNetworkPair(
 		Context:           testcontext.Get(t),
 	}
 	// if it non leader lane, disable the price reporting
-	if leader != nil && !(leader.UniDirectional || leader.BiDirectional) {
+	if !o.Cfg.isLeaderLane(ccipLaneA2B) {
 		ccipLaneA2B.PriceReportingDisabled = true
 	}
 	contractsA, ok := o.LaneContractsByNetwork.Load(networkA.Name)
@@ -701,7 +716,7 @@ func (o *CCIPTestSetUpOutputs) AddLanesForNetworkPair(
 			DstNetworkLaneCfg: ccipLaneA2B.SrcNetworkLaneCfg,
 		}
 		// if it non leader lane, disable the price reporting
-		if leader != nil && !leader.BiDirectional {
+		if !o.Cfg.isLeaderLane(ccipLaneB2A) {
 			ccipLaneB2A.PriceReportingDisabled = true
 		}
 		b2aLogger := lggr.With().Str("env", namespace).Str("Lane",
@@ -907,18 +922,17 @@ func (o *CCIPTestSetUpOutputs) CheckGasUpdateTransaction() error {
 			}
 		}
 	}
-	// when leader lane setup is enabled, number of transaction should match the number of network.
-	// Say we have 3 networks, then we expect 3 transactions in total from six events.
-	if len(transactions) != len(o.Cfg.AllNetworks) {
-		return fmt.Errorf("transaction count %d shouldn't be more than the number of networks %d when "+
-			"leader lane feature is on", len(transactions), len(o.Cfg.AllNetworks))
+	// when leader lane setup is enabled, number of transaction should match the number of leader lanes defined.
+	if len(transactions) != len(o.Cfg.LeaderLanes) {
+		return fmt.Errorf("transaction count %d should match the number of leader lanes %d",
+			len(transactions), len(o.Cfg.LeaderLanes))
 	}
 	// each transaction should have number of network - 1 chain selectors and corresponding gas values.
 	// Say we have 3 networks, then we have expect every transaction to have 2 chain selectors
 	for _, v := range transactions {
-		if len(v) != len(o.Cfg.AllNetworks)-1 {
-			return fmt.Errorf("number of chain selector count %d shouldn't be more than the number of "+
-				"all networks minus one %d", len(v), len(o.Cfg.AllNetworks)-1)
+		if len(v) != o.Cfg.TestGroupInput.NoOfNetworks-1 {
+			return fmt.Errorf("number of chain selector count %d should match the number of "+
+				"networks minus one %d", len(v), o.Cfg.TestGroupInput.NoOfNetworks-1)
 		}
 	}
 	log.Debug().Interface("Gas update transactions", transactions).Msg("List of transaction hash:")
@@ -1108,7 +1122,7 @@ func CCIPDefaultTestSetUp(
 		laneAddGrp.Go(func() error {
 			return setUpArgs.AddLanesForNetworkPair(
 				lggr, n.NetworkA, n.NetworkB,
-				chainClientByChainID[n.NetworkA.ChainID], chainClientByChainID[n.NetworkB.ChainID], n.Leader,
+				chainClientByChainID[n.NetworkA.ChainID], chainClientByChainID[n.NetworkB.ChainID],
 			)
 		})
 	}

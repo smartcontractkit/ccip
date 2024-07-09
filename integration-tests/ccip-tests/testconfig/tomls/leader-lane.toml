@@ -4,4 +4,5 @@
 LeaderLaneEnabled=true
 
 [CCIP.Groups.smoke]
-NoOfNetworks = 3
+NoOfNetworks = 4
+NoOfRoutersPerPair = 2
