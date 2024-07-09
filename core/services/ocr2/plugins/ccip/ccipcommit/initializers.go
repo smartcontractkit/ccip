@@ -6,19 +6,19 @@ import (
 	"fmt"
 	"math/big"
 	"strings"
+	"time"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
-	chainselectors "github.com/smartcontractkit/chain-selectors"
-	libocr2 "github.com/smartcontractkit/libocr/offchainreporting2plus"
 	"go.uber.org/multierr"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil"
+	chainselectors "github.com/smartcontractkit/chain-selectors"
+	libocr2 "github.com/smartcontractkit/libocr/offchainreporting2plus"
 
 	commonlogger "github.com/smartcontractkit/chainlink-common/pkg/logger"
-
+	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
 
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store"
@@ -45,6 +45,8 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/promwrapper"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pipeline"
 )
+
+var defaultNewReportingPluginRetryConfig = ccipdata.RetryConfig{InitialDelay: time.Second, MaxDelay: 5 * time.Minute}
 
 func NewCommitServices(ctx context.Context, ds sqlutil.DataSource, lggr logger.Logger, jb job.Job, chainSet legacyevm.LegacyChainContainer, new bool, pr pipeline.Runner, argsNoPlugin libocr2.OCR2OracleArgs, logError func(string)) ([]job.ServiceCtx, error) {
 	orm, err := cciporm.NewORM(ds)
@@ -271,8 +273,8 @@ func jobSpecToCommitPluginConfig(ctx context.Context, orm cciporm.ORM, lggr logg
 		"sourceNative", sourceNative,
 		"sourceRouter", sourceRouter.Address())
 	return &CommitPluginStaticConfig{
-			lggr:                  commitLggr,
-			onRampReader:          onRampReader,
+			lggr:                          commitLggr,
+			newReportingPluginRetryConfig: defaultNewReportingPluginRetryConfig, onRampReader: onRampReader,
 			offRamp:               offRampReader,
 			sourceNative:          ccipcalc.EvmAddrToGeneric(sourceNative),
 			sourceChainSelector:   params.commitStoreStaticCfg.SourceChainSelector,
