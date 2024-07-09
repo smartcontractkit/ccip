@@ -7,6 +7,7 @@ import (
 	"math/rand"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -223,8 +224,13 @@ func (c *CCIPTestConfig) SetNetworkPairs(lggr zerolog.Logger) error {
 		actualNoOfNetworks := len(c.SelectedNetworks)
 		n := c.SelectedNetworks[0]
 		var chainIDs []int64
+		existingChainIDs := make(map[uint64]struct{})
+		for _, net := range c.SelectedNetworks {
+			existingChainIDs[uint64(net.ChainID)] = struct{}{}
+		}
 		for _, id := range chainselectors.TestChainIds() {
-			if id == 2337 {
+			// if the chain id already exists in the already provided selected networks, skip it
+			if _, exists := existingChainIDs[id]; exists {
 				continue
 			}
 			chainIDs = append(chainIDs, int64(id))
@@ -281,12 +287,39 @@ func (c *CCIPTestConfig) SetNetworkPairs(lggr zerolog.Logger) error {
 		c.AddPairToNetworkList(c.SelectedNetworks[0], c.SelectedNetworks[1])
 	}
 
-	// if the number of lanes is lesser than the number of network pairs, choose a random subset of network pairs
+	// if the number of lanes is lesser than the number of network pairs, choose first c.TestGroupInput.MaxNoOfLanes pairs
 	if c.TestGroupInput.MaxNoOfLanes > 0 && c.TestGroupInput.MaxNoOfLanes < len(c.NetworkPairs) {
+		var newNetworkPairs []NetworkPair
+		denselyConnectedNetworks := make(map[string]struct{})
+		// if densely connected networks are provided, choose all the network pairs containing the networks mentioned in the list for DenselyConnectedNetworkChainIds
+		if c.TestGroupInput.DenselyConnectedNetworkChainIds != nil && len(c.TestGroupInput.DenselyConnectedNetworkChainIds) > 0 {
+			for _, n := range c.TestGroupInput.DenselyConnectedNetworkChainIds {
+				denselyConnectedNetworks[n] = struct{}{}
+			}
+			for _, pair := range c.NetworkPairs {
+				if _, exists := denselyConnectedNetworks[strconv.FormatInt(pair.NetworkA.ChainID, 10)]; exists {
+					newNetworkPairs = append(newNetworkPairs, pair)
+				}
+			}
+		}
+		// shuffle the network pairs, we want to randomly distribute the network pairs among all available networks
 		rand.Shuffle(len(c.NetworkPairs), func(i, j int) {
 			c.NetworkPairs[i], c.NetworkPairs[j] = c.NetworkPairs[j], c.NetworkPairs[i]
 		})
-		c.NetworkPairs = c.NetworkPairs[:c.TestGroupInput.MaxNoOfLanes]
+		// now add the remaining network pairs by skipping the already covered networks
+		// and adding the remaining pair from the shuffled list
+		i := len(newNetworkPairs)
+		j := 0
+		for i < c.TestGroupInput.MaxNoOfLanes {
+			pair := c.NetworkPairs[j]
+			// if the network is already covered, skip it
+			if _, exists := denselyConnectedNetworks[strconv.FormatInt(pair.NetworkA.ChainID, 10)]; !exists {
+				newNetworkPairs = append(newNetworkPairs, pair)
+				i++
+			}
+			j++
+		}
+		c.NetworkPairs = newNetworkPairs
 	}
 
 	for _, n := range c.NetworkPairs {
@@ -1239,9 +1272,9 @@ func (o *CCIPTestSetUpOutputs) CreateEnvironment(
 
 func createEnvironmentConfig(t *testing.T, envName string, testConfig *CCIPTestConfig, reportPath string) *environment.Config {
 	envConfig := &environment.Config{
-		NamespacePrefix:    envName,
-		Test:               t,
-		PreventPodEviction: true,
+		NamespacePrefix: envName,
+		Test:            t,
+		//	PreventPodEviction: true, //TODO: enable this once we have a way to handle pod eviction
 	}
 	if pointer.GetBool(testConfig.TestGroupInput.StoreLaneConfig) {
 		envConfig.ReportPath = reportPath
