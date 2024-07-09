@@ -51,7 +51,8 @@ type update struct {
 }
 
 type CommitPluginStaticConfig struct {
-	lggr logger.Logger
+	lggr                          logger.Logger
+	newReportingPluginRetryConfig ccipdata.RetryConfig
 	// Source
 	onRampReader        ccipdata.OnRampReader
 	sourceChainSelector uint64

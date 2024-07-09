@@ -12,6 +12,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcommon"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 )
 
@@ -64,35 +65,60 @@ func (rf *CommitReportingPluginFactory) UpdateDynamicReaders(ctx context.Context
 	return nil
 }
 
+type reportingPluginAndInfo struct {
+	plugin     types.ReportingPlugin
+	pluginInfo types.ReportingPluginInfo
+}
+
 // NewReportingPlugin returns the ccip CommitReportingPlugin and satisfies the ReportingPluginFactory interface.
 func (rf *CommitReportingPluginFactory) NewReportingPlugin(config types.ReportingPluginConfig) (types.ReportingPlugin, types.ReportingPluginInfo, error) {
-	ctx := context.Background() // todo: consider adding some timeout
+	initialRetryDelay := rf.config.newReportingPluginRetryConfig.InitialDelay
+	maxDelay := rf.config.newReportingPluginRetryConfig.MaxDelay
 
-	destPriceReg, err := rf.config.commitStore.ChangeConfig(ctx, config.OnchainConfig, config.OffchainConfig)
+	pluginAndInfo, err := ccipcommon.RetryUntilSuccess(
+		rf.NewReportingPluginFn(config),
+		initialRetryDelay,
+		maxDelay,
+	)
 	if err != nil {
 		return nil, types.ReportingPluginInfo{}, err
 	}
+	return pluginAndInfo.plugin, pluginAndInfo.pluginInfo, nil
+}
 
-	priceRegEvmAddr, err := ccipcalc.GenericAddrToEvm(destPriceReg)
-	if err != nil {
-		return nil, types.ReportingPluginInfo{}, err
-	}
-	if err = rf.UpdateDynamicReaders(ctx, priceRegEvmAddr); err != nil {
-		return nil, types.ReportingPluginInfo{}, err
-	}
+// NewReportingPluginFn implements the NewReportingPlugin logic. It is defined as a function so that it can easily be
+// retried via RetryUntilSuccess. NewReportingPlugin must return successfully in order for the Commit plugin to
+// function, hence why we can only keep retrying it until it succeeds.
+func (rf *CommitReportingPluginFactory) NewReportingPluginFn(config types.ReportingPluginConfig) func() (reportingPluginAndInfo, error) {
+	return func() (reportingPluginAndInfo, error) {
+		ctx := context.Background() // todo: consider adding some timeout
 
-	pluginOffChainConfig, err := rf.config.commitStore.OffchainConfig(ctx)
-	if err != nil {
-		return nil, types.ReportingPluginInfo{}, err
-	}
+		destPriceReg, err := rf.config.commitStore.ChangeConfig(ctx, config.OnchainConfig, config.OffchainConfig)
+		if err != nil {
+			return reportingPluginAndInfo{}, err
+		}
 
-	gasPriceEstimator, err := rf.config.commitStore.GasPriceEstimator(ctx)
-	if err != nil {
-		return nil, types.ReportingPluginInfo{}, err
-	}
+		priceRegEvmAddr, err := ccipcalc.GenericAddrToEvm(destPriceReg)
+		if err != nil {
+			return reportingPluginAndInfo{}, err
+		}
+		if err = rf.UpdateDynamicReaders(ctx, priceRegEvmAddr); err != nil {
+			return reportingPluginAndInfo{}, err
+		}
 
-	lggr := rf.config.lggr.Named("CommitReportingPlugin")
-	return &CommitReportingPlugin{
+		pluginOffChainConfig, err := rf.config.commitStore.OffchainConfig(ctx)
+		if err != nil {
+			return reportingPluginAndInfo{}, err
+		}
+
+		gasPriceEstimator, err := rf.config.commitStore.GasPriceEstimator(ctx)
+		if err != nil {
+			return reportingPluginAndInfo{}, err
+		}
+
+		lggr := rf.config.lggr.Named("CommitReportingPlugin")
+
+		plugin := &CommitReportingPlugin{
 			sourceChainSelector:     rf.config.sourceChainSelector,
 			sourceNative:            rf.config.sourceNative,
 			onRampReader:            rf.config.onRampReader,
@@ -106,8 +132,9 @@ func (rf *CommitReportingPluginFactory) NewReportingPlugin(config types.Reportin
 			offchainConfig:          pluginOffChainConfig,
 			metricsCollector:        rf.config.metricsCollector,
 			chainHealthcheck:        rf.config.chainHealthcheck,
-		},
-		types.ReportingPluginInfo{
+		}
+
+		pluginInfo := types.ReportingPluginInfo{
 			Name:          "CCIPCommit",
 			UniqueReports: false, // See comment in CommitStore constructor.
 			Limits: types.ReportingPluginLimits{
@@ -115,5 +142,8 @@ func (rf *CommitReportingPluginFactory) NewReportingPlugin(config types.Reportin
 				MaxObservationLength: ccip.MaxObservationLength,
 				MaxReportLength:      MaxCommitReportLength,
 			},
-		}, nil
+		}
+
+		return reportingPluginAndInfo{plugin, pluginInfo}, nil
+	}
 }
