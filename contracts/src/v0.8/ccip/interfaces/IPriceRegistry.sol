@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
+import {Client} from "../libraries/Client.sol";
 import {Internal} from "../libraries/Internal.sol";
 
 interface IPriceRegistry {
@@ -71,4 +72,10 @@ interface IPriceRegistry {
   /// @notice Get the list of fee tokens.
   /// @return The tokens set as fee tokens.
   function getFeeTokens() external view returns (address[] memory);
+
+  // TODO: docs
+  function getFee(
+    uint64 destChainSelector,
+    Client.EVM2AnyMessage calldata message
+  ) external view returns (uint256 feeTokenAmount);
 }
