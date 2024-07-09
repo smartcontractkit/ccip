@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/big"
 	"strings"
+	"time"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -42,6 +43,11 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/promwrapper"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pipeline"
 )
+
+var defaultNewReportingPluginRetryConfig = ccipdata.RetryConfig{
+	InitialDelay: time.Second,
+	MaxDelay:     5 * time.Minute,
+}
 
 func NewCommitServices(ctx context.Context, lggr logger.Logger, jb job.Job, chainSet legacyevm.LegacyChainContainer, new bool, pr pipeline.Runner, argsNoPlugin libocr2.OCR2OracleArgs, logError func(string)) ([]job.ServiceCtx, error) {
 	pluginConfig, backfillArgs, chainHealthcheck, err := jobSpecToCommitPluginConfig(ctx, lggr, jb, pr, chainSet)
@@ -235,21 +241,22 @@ func jobSpecToCommitPluginConfig(ctx context.Context, lggr logger.Logger, jb job
 		"pluginConfig", params.pluginConfig,
 		"staticConfig", params.commitStoreStaticCfg,
 		// TODO bring back
-		//"dynamicOnRampConfig", dynamicOnRampConfig,
+		// "dynamicOnRampConfig", dynamicOnRampConfig,
 		"sourceNative", sourceNative,
 		"sourceRouter", sourceRouter.Address())
 	return &CommitPluginStaticConfig{
-			lggr:                  commitLggr,
-			onRampReader:          onRampReader,
-			offRamp:               offRampReader,
-			sourceNative:          ccipcalc.EvmAddrToGeneric(sourceNative),
-			priceGetter:           priceGetter,
-			sourceChainSelector:   params.commitStoreStaticCfg.SourceChainSelector,
-			destChainSelector:     params.commitStoreStaticCfg.ChainSelector,
-			commitStore:           commitStoreReader,
-			priceRegistryProvider: ccipdataprovider.NewEvmPriceRegistry(params.destChain.LogPoller(), params.destChain.Client(), commitLggr, ccip.CommitPluginLabel),
-			metricsCollector:      metricsCollector,
-			chainHealthcheck:      chainHealthcheck,
+			lggr:                          commitLggr,
+			newReportingPluginRetryConfig: defaultNewReportingPluginRetryConfig,
+			onRampReader:                  onRampReader,
+			offRamp:                       offRampReader,
+			sourceNative:                  ccipcalc.EvmAddrToGeneric(sourceNative),
+			priceGetter:                   priceGetter,
+			sourceChainSelector:           params.commitStoreStaticCfg.SourceChainSelector,
+			destChainSelector:             params.commitStoreStaticCfg.ChainSelector,
+			commitStore:                   commitStoreReader,
+			priceRegistryProvider:         ccipdataprovider.NewEvmPriceRegistry(params.destChain.LogPoller(), params.destChain.Client(), commitLggr, ccip.CommitPluginLabel),
+			metricsCollector:              metricsCollector,
+			chainHealthcheck:              chainHealthcheck,
 		}, &ccipcommon.BackfillArgs{
 			SourceLP:         params.sourceChain.LogPoller(),
 			DestLP:           params.destChain.LogPoller(),
