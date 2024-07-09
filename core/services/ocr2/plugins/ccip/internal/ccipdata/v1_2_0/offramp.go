@@ -320,8 +320,16 @@ func (o *OffRamp) DecodeExecutionReport(ctx context.Context, report []byte) (cci
 	return DecodeExecReport(ctx, o.ExecutionReportArgs, report)
 }
 
-func NewOffRamp(lggr logger.Logger, addr common.Address, ec client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator, destMaxGasPrice *big.Int) (*OffRamp, error) {
-	v100, err := v1_0_0.NewOffRamp(lggr, addr, ec, lp, estimator, destMaxGasPrice)
+func NewOffRamp(
+	lggr logger.Logger,
+	addr common.Address,
+	ec client.Client,
+	lp logpoller.LogPoller,
+	estimator gas.EvmFeeEstimator,
+	destMaxGasPrice *big.Int,
+	dacc ccipdata.DAConfigCacheReader,
+) (*OffRamp, error) {
+	v100, err := v1_0_0.NewOffRamp(lggr, addr, ec, lp, estimator, destMaxGasPrice, dacc)
 	if err != nil {
 		return nil, err
 	}

@@ -166,8 +166,16 @@ func (o *OffRamp) ChangeConfig(ctx context.Context, onchainConfigBytes []byte, o
 		cciptypes.Address(destWrappedNative.String()), nil
 }
 
-func NewOffRamp(lggr logger.Logger, addr common.Address, ec client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator, destMaxGasPrice *big.Int) (*OffRamp, error) {
-	v120, err := v1_2_0.NewOffRamp(lggr, addr, ec, lp, estimator, destMaxGasPrice)
+func NewOffRamp(
+	lggr logger.Logger,
+	addr common.Address,
+	ec client.Client,
+	lp logpoller.LogPoller,
+	estimator gas.EvmFeeEstimator,
+	destMaxGasPrice *big.Int,
+	dacc ccipdata.DAConfigCacheReader,
+) (*OffRamp, error) {
+	v120, err := v1_2_0.NewOffRamp(lggr, addr, ec, lp, estimator, destMaxGasPrice, dacc)
 	if err != nil {
 		return nil, err
 	}

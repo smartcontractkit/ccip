@@ -65,9 +65,10 @@ type OnRamp struct {
 	// The only way to change that is through the contract's constructor (redeployment)
 	cachedStaticConfig cache.OnceCtxFunction[evm_2_evm_onramp.EVM2EVMOnRampStaticConfig]
 	cachedRmnContract  cache.OnceCtxFunction[*rmn_contract.RMNContract]
+	daConfigCache      ccipdata.DAConfigCacheWriter
 }
 
-func NewOnRamp(lggr logger.Logger, sourceSelector, destSelector uint64, onRampAddress common.Address, sourceLP logpoller.LogPoller, source client.Client) (*OnRamp, error) {
+func NewOnRamp(lggr logger.Logger, sourceSelector, destSelector uint64, onRampAddress common.Address, sourceLP logpoller.LogPoller, source client.Client, daConfigCache ccipdata.DAConfigCacheWriter) (*OnRamp, error) {
 	onRamp, err := evm_2_evm_onramp.NewEVM2EVMOnRamp(onRampAddress, source)
 	if err != nil {
 		return nil, err
@@ -119,6 +120,7 @@ func NewOnRamp(lggr logger.Logger, sourceSelector, destSelector uint64, onRampAd
 		),
 		cachedStaticConfig: cache.CallOnceOnNoError(cachedStaticConfig),
 		cachedRmnContract:  cache.CallOnceOnNoError(cachedRmnContract),
+		daConfigCache:      daConfigCache,
 	}, nil
 }
 
@@ -134,6 +136,13 @@ func (o *OnRamp) GetDynamicConfig(context.Context) (cciptypes.OnRampDynamicConfi
 	if err != nil {
 		return cciptypes.OnRampDynamicConfig{}, fmt.Errorf("get dynamic config v1.5: %w", err)
 	}
+
+	o.daConfigCache.Set(
+		int64(config.DestDataAvailabilityOverheadGas),
+		int64(config.DestGasPerDataAvailabilityByte),
+		int64(config.DestDataAvailabilityMultiplierBps),
+	)
+
 	return cciptypes.OnRampDynamicConfig{
 		Router:                            ccipcalc.EvmAddrToGeneric(config.Router),
 		MaxNumberOfTokensPerMsg:           config.MaxNumberOfTokensPerMsg,
