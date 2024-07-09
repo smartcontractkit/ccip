@@ -22,17 +22,20 @@ abstract contract CCIPBase is OwnerIsCreator {
 
   event CCIPRouterModified(address indexed oldRouter, address indexed newRouter);
   event TokensWithdrawnByOwner(address indexed token, address indexed to, uint256 amount);
+
+  // TODO 2 events, add/remove
+  // TODO comment on the tradeoffs, short comment on why prefer indexed
   event ApprovedSenderModified(uint64 indexed destChainSelector, bytes indexed recipient, bool isBeingApproved);
 
-  event ChainAdded(uint64 remoteChainSelector, bytes recipient, bytes extraArgsBytes);
-  event ChainRemoved(uint64 removeChainSelector);
+  event ChainAdded(uint64 indexed remoteChainSelector, bytes indexed recipient, bytes extraArgsBytes);
+  event ChainRemoved(uint64 indexed removeChainSelector);
 
   struct ApprovedSenderUpdate {
     uint64 destChainSelector; // Chainselector for a source chain that is allowed to call this dapp
     bytes sender; //             The sender address on source chain that is allowed to call, ABI encoded in the case of a remote EVM chain
   }
 
-  struct ChainUpdate {
+  struct ChainUpdate { // TODO comments
     uint64 chainSelector;
     bool allowed;
     bytes recipient;
@@ -138,6 +141,8 @@ abstract contract CCIPBase is OwnerIsCreator {
   // │                      Chain Management                        │
   // ================================================================
 
+  // TODO comments
+  // TODO name as updateRouter
   function modifyRouter(address newRouter) external onlyOwner {
     if (newRouter == address(0)) revert ZeroAddressNotAllowed();
 
@@ -172,6 +177,7 @@ abstract contract CCIPBase is OwnerIsCreator {
     }
   }
 
+  // TODO comments
   modifier isValidChain(uint64 chainSelector) {
     // Must be storage and not memory because the struct contains a nested mapping which is not capable of being copied to memory
     ChainConfig storage currentConfig = s_chainConfigs[chainSelector];

@@ -12,12 +12,14 @@ import {SafeERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/
 /// @title CCIPClient
 /// @notice This contract implements logic for sending and receiving CCIP Messages. It utilizes CCIPReceiver's defensive patterns by default.
 /// @dev CCIPReceiver and CCIPSender cannot be simultaneously imported due to similar parents so CCIPSender functionality has been duplicated
+// TODO make CCIPClient inherit from CCIPReceiver
 contract CCIPClient is CCIPReceiverWithACK {
   using SafeERC20 for IERC20;
 
   constructor(address router, IERC20 feeToken) CCIPReceiverWithACK(router, feeToken) {}
 
   /// @notice sends a message through CCIP to the router
+  // TODO really beef up the comments here
   function ccipSend(
     uint64 destChainSelector,
     Client.EVMTokenAmount[] memory tokenAmounts,
@@ -48,6 +50,8 @@ contract CCIPClient is CCIPReceiverWithACK {
       IERC20(s_feeToken).safeTransferFrom(msg.sender, address(this), fee);
     }
 
+    // TODO comment we only have messageId after calling ccipSend, so brekaing CEI is necessary
+    // messageId clac lives in OnRamp, which can be upgradaed, this it should be abstracted away from client impl
     messageId = IRouterClient(s_ccipRouter).ccipSend{value: address(s_feeToken) == address(0) ? fee : 0}(
       destChainSelector, message
     );
