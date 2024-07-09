@@ -159,10 +159,6 @@ func (i *inprocessOracleCreator) CreatePluginOracle(pluginType cctypes.PluginTyp
 
 		contractReaders[cciptypes.ChainSelector(chainSelector)] = cr
 	}
-	// TODO: metadataHash?
-	// Think we need a different hasher for each source, since the metadata hash is different for each source.
-	msgHasher := ccipevm.NewMessageHasherV1([32]byte{})
-	reportEncoder := ccipevm.NewCommitPluginCodecV1()
 
 	// Assuming that the chain selector is referring to an evm chain for now.
 	// TODO: add an api that returns chain family.
@@ -222,8 +218,8 @@ func (i *inprocessOracleCreator) CreatePluginOracle(pluginType cctypes.PluginTyp
 				Named(destRelayID.String()).
 				Named(hexutil.Encode(config.Config.OfframpAddress)),
 			ccipreaderpkg.OCR3ConfigWithMeta(config),
-			reportEncoder,
-			msgHasher,
+			ccipevm.NewCommitPluginCodecV1(),
+			ccipevm.NewMessageHasherV1(),
 			i.homeChainReader,
 			contractReaders,
 		),
