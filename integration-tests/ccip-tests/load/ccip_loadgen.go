@@ -268,7 +268,6 @@ func (c *CCIPE2ELoad) Call(_ *wasp.Generator) *wasp.Response {
 	}
 
 	txConfirmationTime := time.Now().UTC()
-	// wait for the tx to be mined, timeout is set to 10 minutes
 	lggr.Info().Str("tx", sendTx.Hash().Hex()).Msg("waiting for tx to be mined")
 	lggr = lggr.With().Str("Msg Tx", sendTx.Hash().String()).Logger()
 
