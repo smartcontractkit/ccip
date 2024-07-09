@@ -31,6 +31,7 @@ import (
 
 var (
 	homeChainID = chainsel.GETH_TESTNET.EvmChainID
+	Link        = func(amount int64) *big.Int { return new(big.Int).Mul(big.NewInt(1e18), big.NewInt(amount)) }
 )
 
 type ocr3Node struct {
@@ -131,6 +132,7 @@ func deployContracts(
 
 		priceRegistryAddr, _, _, err := price_registry.DeployPriceRegistry(owner, backend, []common.Address{}, []common.Address{
 			linkToken.Address(),
+			wethAddr,
 		}, 24*60*60, []price_registry.PriceRegistryTokenPriceFeedUpdate{})
 		require.NoError(t, err, "failed to deploy price registry on chain id %d", chainID)
 		backend.Commit()
@@ -280,11 +282,18 @@ func fullyConnectCCIPContracts(
 				OnRamp:              remoteUni.onramp.Address(),
 			})
 
+			// 1e18 Jule = 1 LINK
+			// 1e18 Wei = 1 ETH
 			premiumMultiplierWeiPerEthUpdatesArgs = append(premiumMultiplierWeiPerEthUpdatesArgs,
 				evm_2_evm_multi_onramp.EVM2EVMMultiOnRampPremiumMultiplierWeiPerEthArgs{
-					PremiumMultiplierWeiPerEth: 2e18,
+					PremiumMultiplierWeiPerEth: 9e17, //0.9 ETH
 					Token:                      remoteUni.linkToken.Address(),
-				})
+				},
+				evm_2_evm_multi_onramp.EVM2EVMMultiOnRampPremiumMultiplierWeiPerEthArgs{
+					PremiumMultiplierWeiPerEth: 1e18,
+					Token:                      remoteUni.weth.Address(),
+				},
+			)
 
 			// onramps are multi-dest and offramps are multi-source.
 			// so set the same ramp for all the chain selectors.
@@ -297,19 +306,35 @@ func fullyConnectCCIPContracts(
 				OffRamp:             uni.offramp.Address(),
 			})
 
-			priceUpdates.GasPriceUpdates = append(priceUpdates.GasPriceUpdates, price_registry.InternalGasPriceUpdate{
-				DestChainSelector: destChainID,
-				UsdPerUnitGas:     big.NewInt(1e18),
-			})
+			priceUpdates.GasPriceUpdates = append(priceUpdates.GasPriceUpdates,
+				price_registry.InternalGasPriceUpdate{
+					DestChainSelector: destChainID,
+					UsdPerUnitGas:     big.NewInt(20000e9),
+				},
+			)
 
-			priceUpdates.TokenPriceUpdates = append(priceUpdates.TokenPriceUpdates, price_registry.InternalTokenPriceUpdate{
-				SourceToken: uni.linkToken.Address(),
-				UsdPerToken: big.NewInt(1e18),
-			})
+			priceUpdates.TokenPriceUpdates = append(priceUpdates.TokenPriceUpdates,
+				price_registry.InternalTokenPriceUpdate{
+					SourceToken: uni.linkToken.Address(),
+					UsdPerToken: Link(20),
+				},
+				price_registry.InternalTokenPriceUpdate{
+					SourceToken: uni.weth.Address(),
+					UsdPerToken: new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1)),
+				},
+			)
 		}
 
+		//======================Mint Link to owner==============================
+		_, err := uni.linkToken.GrantMintRole(owner, owner.From)
+		require.NoError(t, err)
+		_, err = uni.linkToken.Mint(owner, owner.From, Link(1000))
+		uni.backend.Commit()
+		//_, err = uni.linkToken.Approve(owner, uni.router.Address(), Link(1000))
+		//require.NoError(t, err)
+
 		//===========================OnRamp=====================================
-		_, err := uni.onramp.ApplyDestChainConfigUpdates(owner, onrampDestChainConfigArgs)
+		_, err = uni.onramp.ApplyDestChainConfigUpdates(owner, onrampDestChainConfigArgs)
 		require.NoErrorf(t, err, "failed to apply dest chain config updates on onramp on chain id %d", sourceChainID)
 		uni.backend.Commit()
 		_, err = uni.onramp.ApplyPremiumMultiplierWeiPerEthUpdates(owner, premiumMultiplierWeiPerEthUpdatesArgs)

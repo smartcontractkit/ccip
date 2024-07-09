@@ -36,23 +36,9 @@ func TestPingPong(t *testing.T) {
 
 	pingPongs := initializePingPongContracts(t, owner, universes)
 	for chainID, universe := range universes {
-		//backend := universe.backend
-		//simClient := client.NewSimulatedBackendClient(t, backend, big.NewInt(chainID))
 		for otherChain, pingPong := range pingPongs[chainID] {
 			println(otherChain)
-			//chainSel, err := pingPong.GetCounterpartChainSelector(&bind.CallOpts{})
-			//require.NoError(t, err)
-			//require.Equal(t, chainSel, otherChain)
-			//
-			//otherChainSel, err := pingPongs[otherChain][chainID].GetCounterpartChainSelector(&bind.CallOpts{})
-			//require.NoError(t, err)
-			//require.Equal(t, otherChainSel, chainID)
-			//
-			//routerAddr, err := pingPong.GetRouter(&bind.CallOpts{})
-			//require.NoError(t, err)
-			//require.NotEqual(t, routerAddr, nil)
-
-			_, err := pingPong.StartPingPong(owner)
+			_, err = pingPong.StartPingPong(owner)
 			require.NoError(t, err)
 			universe.backend.Commit()
 		}
@@ -82,7 +68,10 @@ func initializePingPongContracts(
 			pingPong, err := pp.NewPingPongDemo(pingPongAddr, backend)
 			require.NoError(t, err)
 			universe.backend.Commit()
-
+			// Fund the ping pong contract with LINK
+			_, err = universe.linkToken.Transfer(owner, pingPong.Address(), Link(10))
+			universe.backend.Commit()
+			require.NoError(t, err)
 			pingPongs[chainID][chainToConnect] = pingPong
 		}
 	}
