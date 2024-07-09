@@ -101,16 +101,6 @@ func (h *MessageHasherV1) Hash(_ context.Context, msg cciptypes.Message) (ccipty
 		return [32]byte{}, fmt.Errorf("abi encode fixed size values: %w", err)
 	}
 
-	metaDataHash := utils.Keccak256Fixed(metaDataHashInput)
-	fixedSizeFieldsHash := utils.Keccak256Fixed(fixedSizeFieldsEncoded)
-	messageDataHash := utils.Keccak256Fixed(msg.Data)
-	encodedRampTokenAmountsHash := utils.Keccak256Fixed(encodedRampTokenAmounts)
-	fmt.Printf("metaDataHash: %x\n", metaDataHash[:])
-	fmt.Printf("fixedSizeFieldsHash: %x\n", fixedSizeFieldsHash[:])
-	fmt.Printf("messageDataHash: %x\n", messageDataHash[:])
-	fmt.Printf("encodedRampTokenAmountsHash: %x\n", encodedRampTokenAmountsHash[:])
-	fmt.Printf("gasLimit: %s\n", gasLimit.String())
-
 	packedValues, err := abiEncode(
 		"encodeFinalHashPreimage",
 		leafDomainSeparator,
