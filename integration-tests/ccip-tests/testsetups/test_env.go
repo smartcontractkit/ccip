@@ -483,7 +483,7 @@ func DeployEnvironments(
 					anvilConfig.BlockGaslimit = pointer.ToInt64(100000000)
 				}
 				testEnvironment.
-					AddHelm(foundry.New(&foundry.Props{
+					AddHelm(foundry.NewVersioned("0.1.9", &foundry.Props{
 						NetworkName: network.Name,
 						Values: map[string]interface{}{
 							"fullnameOverride": actions.NetworkName(network.Name),
