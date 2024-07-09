@@ -45,6 +45,38 @@ contract CCIPClientTest is EVM2EVMOnRampSetup {
     s_sender.updateApprovedSenders(senderUpdates, new CCIPBase.ApprovedSenderUpdate[](0));
   }
 
+  function test_ccipReceiver_ack_with_invalidAckMessageHeaderBytes_Revert() public {
+    bytes32 messageId = keccak256("messageId");
+    Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](0);
+
+    // The receiver contract will revert if the router is not the sender.
+    vm.startPrank(address(s_sourceRouter));
+
+    // Payload with incorrect ack message header should revert
+    CCIPReceiverWithACK.MessagePayload memory payload = CCIPReceiverWithACK.MessagePayload({
+      version: "",
+      data: abi.encode("RANDOM_BYTES", messageId),
+      messageType: CCIPReceiverWithACK.MessageType.ACK
+    });
+
+    // Expect the processing to revert from invalid Ack Message Header
+    vm.expectEmit();
+    emit MessageFailed(messageId, abi.encodeWithSelector(bytes4(CCIPReceiverWithACK.InvalidAckMessageHeader.selector)));
+
+    s_sender.ccipReceive(
+      Client.Any2EVMMessage({
+        messageId: messageId,
+        sourceChainSelector: destChainSelector,
+        sender: abi.encode(address(s_sender)),
+        data: abi.encode(payload),
+        destTokenAmounts: destTokenAmounts
+      })
+    );
+
+    // Check that message status is failed
+    assertEq(s_sender.getMessageStatus(messageId), 1);
+  }
+
   function test_ccipReceiveAndSendAck_Success() public {
     bytes32 messageId = keccak256("messageId");
     bytes32 ackMessageId = 0x37ddbb21a51d4e07877b0de816905ea806b958e7607d951d307030631db076bd;

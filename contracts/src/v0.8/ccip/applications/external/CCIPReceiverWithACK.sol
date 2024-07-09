@@ -24,7 +24,7 @@ contract CCIPReceiverWithACK is CCIPReceiver {
   event MessageSent(bytes32 indexed incomingMessageId, bytes32 indexed ACKMessageId);
 
   event MessageAckReceived(bytes32 messageId);
-  event FeeTokenModified(address indexed oldToken, address indexed newToken);
+  event FeeTokenUpdated(address indexed oldToken, address indexed newToken);
 
   enum MessageType {
     OUTGOING, // Indicates that a message is being sent for the first time to its recipient.
@@ -61,7 +61,7 @@ contract CCIPReceiverWithACK is CCIPReceiver {
     }
   }
 
-  function modifyFeeToken(address token) external onlyOwner {
+  function updateFeeToken(address token) external onlyOwner {
     // If the current fee token is not-native, zero out the allowance to the router for safety
     if (address(s_feeToken) != address(0)) {
       s_feeToken.safeApprove(getRouter(), 0);
@@ -75,7 +75,7 @@ contract CCIPReceiverWithACK is CCIPReceiver {
       s_feeToken.safeIncreaseAllowance(getRouter(), type(uint256).max);
     }
 
-    emit FeeTokenModified(oldFeeToken, token);
+    emit FeeTokenUpdated(oldFeeToken, token);
   }
 
   /// @notice Application-specific logic for incoming ccip messages.

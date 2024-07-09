@@ -18,9 +18,12 @@ contract CCIPClient is CCIPReceiver {
   IERC20 public s_feeToken;
 
   event MessageSent(bytes32 messageId);
+  event FeeTokenUpdated(address oldFeeToken, address newFeeToken);
 
   constructor(address router, IERC20 feeToken) CCIPReceiver(router) {
     s_feeToken = feeToken;
+
+    IERC20(s_feeToken).safeApprove(s_ccipRouter, type(uint256).max);
   }
 
   /// @notice sends a message through CCIP to the router
@@ -79,4 +82,21 @@ contract CCIPClient is CCIPReceiver {
     isValidSender(message.sourceChainSelector, message.sender)
     isValidChain(message.sourceChainSelector)
   {}
+
+  function updateFeeToken(address token) external onlyOwner {
+    // If the current fee token is not-native, zero out the allowance to the router for safety
+    if (address(s_feeToken) != address(0)) {
+      s_feeToken.safeApprove(getRouter(), 0);
+    }
+
+    address oldFeeToken = address(s_feeToken);
+    s_feeToken = IERC20(token);
+
+    // Approve the router to spend the new fee token
+    if (token != address(0)) {
+      s_feeToken.safeIncreaseAllowance(getRouter(), type(uint256).max);
+    }
+
+    emit FeeTokenUpdated(oldFeeToken, token);
+  }
 }

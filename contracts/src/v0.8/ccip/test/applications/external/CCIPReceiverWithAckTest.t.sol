@@ -161,9 +161,9 @@ contract CCIPReceiverWithAckTest is EVM2EVMOnRampSetup {
     emit IERC20.Approval(address(s_receiver), address(s_sourceRouter), 0);
 
     vm.expectEmit();
-    emit CCIPReceiverWithACK.FeeTokenModified(s_sourceFeeToken, WETH);
+    emit CCIPReceiverWithACK.FeeTokenUpdated(s_sourceFeeToken, WETH);
 
-    s_receiver.modifyFeeToken(WETH);
+    s_receiver.updateFeeToken(WETH);
 
     IERC20 newFeeToken = s_receiver.s_feeToken();
     assertEq(address(newFeeToken), WETH);

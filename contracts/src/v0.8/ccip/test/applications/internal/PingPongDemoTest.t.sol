@@ -120,4 +120,8 @@ contract PingPong_example_plumbing is PingPongDappSetup {
 
     assertTrue(s_pingPong.isPaused());
   }
+
+  function test_typeAndVersion() public view {
+    assertEq(s_pingPong.typeAndVersion(), "PingPongDemo 1.3.0");
+  }
 }
