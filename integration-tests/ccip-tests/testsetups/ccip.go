@@ -700,7 +700,7 @@ func (o *CCIPTestSetUpOutputs) AddLanesForNetworkPair(
 
 		ccipLaneB2A = &actions.CCIPLane{
 			Test:              t,
-			SourceNetworkName: actions.NetworkName(networkB.Name),t
+			SourceNetworkName: actions.NetworkName(networkB.Name),
 			DestNetworkName:   actions.NetworkName(networkA.Name),
 			SourceChain:       sourceChainClientB2A,
 			DestChain:         destChainClientB2A,
