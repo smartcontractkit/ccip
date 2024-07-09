@@ -532,6 +532,9 @@ func (ccipModule *CCIPCommon) WaitForPriceUpdates(
 	}
 }
 
+// WatchForPriceUpdates helps to ensure the price updates are happening in price registry by subscribing to a couple
+// of price update events and add the event details to watchers. It subscribes to 'UsdPerUnitGasUpdated'
+// and 'UsdPerTokenUpdated' event.
 func (ccipModule *CCIPCommon) WatchForPriceUpdates(ctx context.Context, lggr *zerolog.Logger) error {
 	gasUpdateEventLatest := make(chan *price_registry.PriceRegistryUsdPerUnitGasUpdated)
 	tokenUpdateEvent := make(chan *price_registry.PriceRegistryUsdPerTokenUpdated)

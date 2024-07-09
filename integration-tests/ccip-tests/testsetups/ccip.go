@@ -71,6 +71,7 @@ type NetworkPair struct {
 	ChainClientB blockchain.EVMClient
 }
 
+// LeaderLane is to hold the details of leader lane source and destination network
 type LeaderLane struct {
 	source string
 	dest   string
@@ -329,8 +330,8 @@ func (c *CCIPTestConfig) SetNetworkPairs(lggr zerolog.Logger) error {
 	}
 
 	// setting leader lane details to network pairs if it is enabled and only in simulated environments
-	if c.EnvInput.Lane.LeaderLaneEnabled && !pointer.GetBool(c.TestGroupInput.ExistingDeployment) {
-		c.DefineLeaderLanes()
+	if !pointer.GetBool(c.TestGroupInput.ExistingDeployment) {
+		c.defineLeaderLanes(lggr)
 	}
 	for _, n := range c.NetworkPairs {
 		lggr.Info().
@@ -339,7 +340,7 @@ func (c *CCIPTestConfig) SetNetworkPairs(lggr zerolog.Logger) error {
 			Msg("Network Pairs")
 	}
 	for _, lane := range c.LeaderLanes {
-		lggr.Info().
+		lggr.Debug().
 			Str("Source", lane.source).
 			Str("Destination", lane.dest).
 			Msg("Leader Lane: ")
@@ -349,35 +350,41 @@ func (c *CCIPTestConfig) SetNetworkPairs(lggr zerolog.Logger) error {
 	return allError
 }
 
-func (c *CCIPTestConfig) DefineLeaderLanes() {
-	// the way we are doing this is by creating a map with key as destination network name and value as list of source network name.
+// defineLeaderLanes goes over the available network pairs and define one leader lane per destination
+func (c *CCIPTestConfig) defineLeaderLanes(lggr zerolog.Logger) {
+	// the way we are doing this is by creating a map with key as destination network name and value as source network name.
 	// Once map is available, picking every first source network name from the list to form the leader lanes
-	sourceLanes := make(map[string][]string)
+	if err := contracts.MatchContractVersionsOrAbove(map[contracts.Name]contracts.Version{
+		contracts.OffRampContract: contracts.V1_2_0,
+		contracts.OnRampContract:  contracts.V1_2_0,
+	}); err != nil {
+		lggr.Info().Str("Required contract version", contracts.V1_2_0.String()).Msg("Leader lane feature is not enabled")
+		return
+	}
+
+	leaderLanes := make(map[string]string)
 	for _, n := range c.NetworkPairs {
-		if val, ok := sourceLanes[n.NetworkB.Name]; ok {
-			sourceLanes[n.NetworkB.Name] = append(val, n.NetworkA.Name)
-		} else {
-			sourceLanes[n.NetworkB.Name] = []string{n.NetworkA.Name}
+		if _, ok := leaderLanes[n.NetworkB.Name]; !ok {
+			leaderLanes[n.NetworkB.Name] = n.NetworkA.Name
 		}
 		if pointer.GetBool(c.TestGroupInput.BiDirectionalLane) {
-			if val, ok := sourceLanes[n.NetworkA.Name]; ok {
-				sourceLanes[n.NetworkA.Name] = append(val, n.NetworkB.Name)
-			} else {
-				sourceLanes[n.NetworkA.Name] = []string{n.NetworkB.Name}
+			if _, ok := leaderLanes[n.NetworkA.Name]; !ok {
+				leaderLanes[n.NetworkA.Name] = n.NetworkB.Name
 			}
 		}
 	}
-	for k, v := range sourceLanes {
+	for k, v := range leaderLanes {
 		c.LeaderLanes = append(c.LeaderLanes, LeaderLane{
-			source: v[0],
+			source: v,
 			dest:   k,
 		})
 	}
 }
 
-func (c *CCIPTestConfig) isLeaderLane(lane *actions.CCIPLane) bool {
+// isLeaderLane checks the given lane is leader lane and return boolean accordingly
+func (c *CCIPTestConfig) isLeaderLane(source, dest string) bool {
 	for _, leader := range c.LeaderLanes {
-		if leader.source == lane.SourceNetworkName && leader.dest == lane.DestNetworkName {
+		if leader.source == source && leader.dest == dest {
 			return true
 		}
 	}
@@ -687,7 +694,7 @@ func (o *CCIPTestSetUpOutputs) AddLanesForNetworkPair(
 		Context:           testcontext.Get(t),
 	}
 	// if it non leader lane, disable the price reporting
-	if len(o.Cfg.LeaderLanes) > 0 && !o.Cfg.isLeaderLane(ccipLaneA2B) {
+	if len(o.Cfg.LeaderLanes) > 0 && !o.Cfg.isLeaderLane(ccipLaneA2B.SourceNetworkName, ccipLaneA2B.DestNetworkName) {
 		ccipLaneA2B.PriceReportingDisabled = true
 	}
 	contractsA, ok := o.LaneContractsByNetwork.Load(networkA.Name)
@@ -745,7 +752,8 @@ func (o *CCIPTestSetUpOutputs) AddLanesForNetworkPair(
 			DstNetworkLaneCfg: ccipLaneA2B.SrcNetworkLaneCfg,
 		}
 		// if it non leader lane, disable the price reporting
-		if len(o.Cfg.LeaderLanes) > 0 && !o.Cfg.isLeaderLane(ccipLaneB2A) {
+		if len(o.Cfg.LeaderLanes) > 0 &&
+			!o.Cfg.isLeaderLane(ccipLaneB2A.SourceNetworkName, ccipLaneB2A.DestNetworkName) {
 			ccipLaneB2A.PriceReportingDisabled = true
 		}
 		b2aLogger := lggr.With().Str("env", namespace).Str("Lane",
@@ -941,7 +949,6 @@ func (o *CCIPTestSetUpOutputs) CheckGasUpdateTransaction() error {
 		return nil
 	}
 	for _, lanes := range o.ReadLanes() {
-		lanes := lanes
 		if err := readGasUpdateTx(lanes.ForwardLane); err != nil {
 			return err
 		}
@@ -957,14 +964,14 @@ func (o *CCIPTestSetUpOutputs) CheckGasUpdateTransaction() error {
 			len(transactions), len(o.Cfg.LeaderLanes))
 	}
 	// each transaction should have number of network - 1 chain selectors and corresponding gas values.
-	// Say we have 3 networks, then we have expect every transaction to have 2 chain selectors
+	// Say we have 3 networks, then we have expected every transaction to have 2 chain selectors
 	for _, v := range transactions {
 		if len(v) != o.Cfg.TestGroupInput.NoOfNetworks-1 {
 			return fmt.Errorf("number of chain selector count %d should match the number of "+
 				"networks minus one %d", len(v), o.Cfg.TestGroupInput.NoOfNetworks-1)
 		}
 	}
-	log.Debug().Interface("Gas update transactions", transactions).Msg("List of transaction hash:")
+	log.Debug().Interface("Tx hashes", transactions).Msg("Checked Gas Update Transactions")
 	return nil
 }
 
@@ -1170,7 +1177,10 @@ func CCIPDefaultTestSetUp(
 		require.NoError(t, setUpArgs.JobAddGrp.Wait(), "Creating jobs shouldn't fail")
 		// wait for price updates to be available
 		setUpArgs.WaitForPriceUpdates()
-		if setUpArgs.Cfg.EnvInput.Lane.LeaderLaneEnabled && !pointer.GetBool(setUpArgs.Cfg.TestGroupInput.ExistingDeployment) {
+		if err := contracts.MatchContractVersionsOrAbove(map[contracts.Name]contracts.Version{
+			contracts.OffRampContract: contracts.V1_2_0,
+			contracts.OnRampContract:  contracts.V1_2_0,
+		}); err != nil && !pointer.GetBool(setUpArgs.Cfg.TestGroupInput.ExistingDeployment) {
 			require.NoError(t, setUpArgs.CheckGasUpdateTransaction(), "gas update transaction check shouldn't fail")
 		}
 		// if dynamic price update is required

@@ -172,7 +172,6 @@ type Common struct {
 	Mockserver              *string                                     `toml:",omitempty"`
 	NewCLCluster            *ChainlinkDeployment                        `toml:",omitempty"` // NewCLCluster is the new chainlink cluster to create, if specified along with ExistingCLCluster this will be ignored
 	Network                 *ctfconfig.NetworkConfig                    `toml:",omitempty"`
-	Lane                    *Lane                                       `toml:",omitempty"`
 	PrivateEthereumNetworks map[string]*ctfconfig.EthereumNetworkConfig `toml:",omitempty"`
 	Logging                 *ctfconfig.LoggingConfig                    `toml:",omitempty"`
 }
@@ -455,8 +454,4 @@ func (n *Node) Merge(from *Node) {
 			}
 		}
 	}
-}
-
-type Lane struct {
-	LeaderLaneEnabled bool
 }
