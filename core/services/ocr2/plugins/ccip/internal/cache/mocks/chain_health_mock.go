@@ -31,6 +31,26 @@ func (_m *ChainHealthcheck) Close() error {
 	return r0
 }
 
+// HealthReport provides a mock function with given fields:
+func (_m *ChainHealthcheck) HealthReport() map[string]error {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for HealthReport")
+	}
+
+	var r0 map[string]error
+	if rf, ok := ret.Get(0).(func() map[string]error); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(map[string]error)
+		}
+	}
+
+	return r0
+}
+
 // IsHealthy provides a mock function with given fields: ctx
 func (_m *ChainHealthcheck) IsHealthy(ctx context.Context) (bool, error) {
 	ret := _m.Called(ctx)
@@ -57,6 +77,42 @@ func (_m *ChainHealthcheck) IsHealthy(ctx context.Context) (bool, error) {
 	}
 
 	return r0, r1
+}
+
+// Name provides a mock function with given fields:
+func (_m *ChainHealthcheck) Name() string {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for Name")
+	}
+
+	var r0 string
+	if rf, ok := ret.Get(0).(func() string); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+
+	return r0
+}
+
+// Ready provides a mock function with given fields:
+func (_m *ChainHealthcheck) Ready() error {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for Ready")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func() error); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
 }
 
 // Start provides a mock function with given fields: _a0

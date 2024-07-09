@@ -56,7 +56,7 @@ func NewExecServices(ctx context.Context, lggr logger.Logger, cfg plugins.Regist
 	loopCmd := env.CCIPExecPlugin.Cmd.Get()
 	loopEnabled := loopCmd != ""
 
-	var wrappedPluginFactory *ExecutionReportingPluginFactory
+	var pluginFactory types.ReportingPluginFactory
 	var err error
 	if loopEnabled {
 		// find loop command
@@ -71,15 +71,15 @@ func NewExecServices(ctx context.Context, lggr logger.Logger, cfg plugins.Regist
 		})
 		// get reporting plugin factory from loop
 		factoryServer := loop.NewExecutionService(lggr, grpcOpts, cmdFn, srcProvider, dstProvider, uint32(srcChainID), uint32(dstChainID), sourceTokenAddress)
-		// wrap into ExecutionReportingPluginFactory
+		pluginFactory = factoryServer
 	} else {
-		wrappedPluginFactory, err = NewExecutionReportingPluginFactoryV2(ctx, lggr, sourceTokenAddress, srcChainID, dstChainID, srcProvider, dstProvider)
+		pluginFactory, err = NewExecutionReportingPluginFactoryV2(ctx, lggr, sourceTokenAddress, srcChainID, dstChainID, srcProvider, dstProvider)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	argsNoPlugin.ReportingPluginFactory = promwrapper.NewPromFactory(wrappedPluginFactory, "CCIPExecution", jb.OCR2OracleSpec.Relay, big.NewInt(0).SetInt64(dstChainID))
+	argsNoPlugin.ReportingPluginFactory = promwrapper.NewPromFactory(pluginFactory, "CCIPExecution", jb.OCR2OracleSpec.Relay, big.NewInt(0).SetInt64(dstChainID))
 	argsNoPlugin.Logger = commonlogger.NewOCRWrapper(lggr, true, logError)
 	oracle, err := libocr2.NewOracle(argsNoPlugin)
 	if err != nil {
@@ -94,14 +94,10 @@ func NewExecServices(ctx context.Context, lggr logger.Logger, cfg plugins.Regist
 				dstProvider,
 				job.NewServiceAdapter(oracle),
 			),
-			wrappedPluginFactory.config.chainHealthcheck,
-			wrappedPluginFactory.config.tokenDataWorker,
 		}, nil
 	}
 	return []job.ServiceCtx{
 		job.NewServiceAdapter(oracle),
-		wrappedPluginFactory.config.chainHealthcheck,
-		wrappedPluginFactory.config.tokenDataWorker,
 	}, nil
 }
 

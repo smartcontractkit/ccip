@@ -12,7 +12,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
-	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 )
 
@@ -33,7 +32,7 @@ import (
 //
 //go:generate mockery --quiet --name ChainHealthcheck --filename chain_health_mock.go --case=underscore
 type ChainHealthcheck interface {
-	job.ServiceCtx
+	services.Service
 	IsHealthy(ctx context.Context) (bool, error)
 }
 
@@ -62,6 +61,16 @@ type chainHealthcheck struct {
 	wg               *sync.WaitGroup
 	backgroundCtx    context.Context //nolint:containedctx
 	backgroundCancel context.CancelFunc
+}
+
+func (c *chainHealthcheck) HealthReport() map[string]error {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (c *chainHealthcheck) Name() string {
+	//TODO implement me
+	panic("implement me")
 }
 
 func NewChainHealthcheck(lggr logger.Logger, onRamp ccipdata.OnRampReader, commitStore ccipdata.CommitStoreReader) *chainHealthcheck {

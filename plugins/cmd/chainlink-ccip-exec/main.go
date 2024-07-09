@@ -23,7 +23,7 @@ func main() {
 	defer close(stop)
 
 	plugin.Serve(&plugin.ServeConfig{
-		HandshakeConfig: loop.PluginMedianHandshakeConfig(),
+		HandshakeConfig: loop.PluginCCIPExecutionHandshakeConfig(),
 		Plugins: map[string]plugin.Plugin{
 			loop.CCIPExecutionLOOPName: &loop.ExecutionLoop{
 				PluginServer: p,

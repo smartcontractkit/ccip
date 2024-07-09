@@ -280,6 +280,9 @@ func (d DstExecProvider) NewCommitStoreReader(ctx context.Context, addr cciptype
 	return
 }
 
+// NewOffRampReader constructs a reader for the offramp contract on the dest chain.
+// The offramp address is known when the provider is constructed - by consuming it from the provider instead of at runtime
+// we save ourselves wiring it through the execution reporting plugin factory grpc server + client
 func (d DstExecProvider) NewOffRampReader(ctx context.Context, _ cciptypes.Address) (offRampReader cciptypes.OffRampReader, err error) {
 	offRampReader, err = ccip.NewOffRampReader(d.lggr, d.versionFinder, d.offRampAddress, d.client, d.lp, d.gasEstimator, &d.maxGasPrice, true)
 	return
@@ -299,6 +302,9 @@ func (d DstExecProvider) NewTokenDataReader(ctx context.Context, tokenAddress cc
 	return nil, fmt.Errorf("invalid: NewTokenDataReader called on DstExecProvider. It should only be called on SrcExecProvider")
 }
 
+// NewTokenPoolBatchedReader constructs a batched caller to read token prices from the destination pool.
+// The offramp address is known when the provider is constructed - by consuming it from the provider instead of at runtime
+// we save ourselves wiring it through the execution reporting plugin factory grpc server + client
 func (d DstExecProvider) NewTokenPoolBatchedReader(ctx context.Context, _ cciptypes.Address, sourceChainSelector uint64) (tokenPoolBatchedReader cciptypes.TokenPoolBatchedReader, err error) {
 	batchCaller := ccip.NewDynamicLimitedBatchCaller(
 		d.lggr,

@@ -5,6 +5,10 @@ import (
 	"fmt"
 	"sync"
 
+	"go.uber.org/multierr"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/services"
+
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/observability"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/tokendata"
@@ -27,6 +31,8 @@ type ExecutionReportingPluginFactory struct {
 	destPriceRegReader ccipdata.PriceRegistryReader
 	destPriceRegAddr   cciptypes.Address
 	readersMu          *sync.Mutex
+
+	services []services.Service
 }
 
 func (rf *ExecutionReportingPluginFactory) Name() string {
@@ -34,14 +40,28 @@ func (rf *ExecutionReportingPluginFactory) Name() string {
 	panic("implement me")
 }
 
-func (rf *ExecutionReportingPluginFactory) Start(ctx context.Context) error {
-	//TODO implement me
-	panic("implement me")
+// Start is used to run chainHealthcheck and tokenDataWorker, which were previously passed
+// back to the delegate as top level job.ServiceCtx to be managed in core alongside the reporting
+// plugin factory
+func (rf *ExecutionReportingPluginFactory) Start(ctx context.Context) (err error) {
+	rf.readersMu.Lock()
+	defer rf.readersMu.Unlock()
+	for _, service := range rf.services {
+		serviceErr := service.Start(ctx)
+		err = multierr.Append(err, serviceErr)
+	}
+	return
 }
 
-func (rf *ExecutionReportingPluginFactory) Close() error {
-	//TODO implement me
-	panic("implement me")
+func (rf *ExecutionReportingPluginFactory) Close() (err error) {
+	rf.readersMu.Lock()
+	defer rf.readersMu.Unlock()
+	for _, service := range rf.services {
+		closeErr := service.Close()
+		err = multierr.Append(err, closeErr)
+	}
+
+	return
 }
 
 func (rf *ExecutionReportingPluginFactory) Ready() error {
@@ -161,6 +181,7 @@ func NewExecutionReportingPluginFactoryV2(ctx context.Context, lggr logger.Logge
 			chainHealthcheck:              chainHealthcheck,
 			newReportingPluginRetryConfig: defaultNewReportingPluginRetryConfig,
 		},
+		services:  []services.Service{chainHealthcheck, tokenBackgroundWorker},
 		readersMu: &sync.Mutex{},
 
 		// the fields below are initially empty and populated on demand
@@ -180,7 +201,7 @@ func NewExecutionReportingPluginFactory(config ExecutionPluginStaticConfig) *Exe
 	}
 }
 
-func (rf *ExecutionReportingPluginFactory) UpdateDynamicReaders(ctx context.Context, newPriceRegAddr cciptypes.Address) error {
+func (rf *ExecutionReportingPluginFactory) UpdateDynamicReaders(_ context.Context, newPriceRegAddr cciptypes.Address) error {
 	rf.readersMu.Lock()
 	defer rf.readersMu.Unlock()
 	// TODO: Investigate use of Close() to cleanup.
@@ -216,7 +237,7 @@ func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.Repor
 	initialRetryDelay := rf.config.newReportingPluginRetryConfig.InitialDelay
 	maxDelay := rf.config.newReportingPluginRetryConfig.MaxDelay
 
-	pluginAndInfo, err := ccipcommon.RetryUntilSuccess(rf.NewReportingPluginFn(config), initialRetryDelay, maxDelay)
+	pluginAndInfo, err := ccipcommon.RetryUntilSuccess(rf.newReportingPluginFn(config), initialRetryDelay, maxDelay)
 	if err != nil {
 		return nil, types.ReportingPluginInfo{}, err
 	}
@@ -226,9 +247,14 @@ func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.Repor
 // NewReportingPluginFn implements the NewReportingPlugin logic. It is defined as a function so that it can easily be
 // retried via RetryUntilSuccess. NewReportingPlugin must return successfully in order for the Exec plugin to function,
 // hence why we can only keep retrying it until it succeeds.
-func (rf *ExecutionReportingPluginFactory) NewReportingPluginFn(config types.ReportingPluginConfig) func() (reportingPluginAndInfo, error) {
+func (rf *ExecutionReportingPluginFactory) newReportingPluginFn(config types.ReportingPluginConfig) func() (reportingPluginAndInfo, error) {
 	return func() (reportingPluginAndInfo, error) {
 		ctx := context.Background() // todo: consider setting a timeout
+
+		// Start the chainHealthcheck and tokenDataWorker services
+		// Using Start, while a bit more obtuse, allows us to manage these services
+		// in the same process as the plugin factory in LOOP mode
+		err := rf.Start(ctx)
 
 		destPriceRegistry, destWrappedNative, err := rf.config.offRampReader.ChangeConfig(ctx, config.OnchainConfig, config.OffchainConfig)
 		if err != nil {

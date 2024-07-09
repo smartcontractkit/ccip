@@ -29,6 +29,21 @@ type ObservedChainHealthcheck struct {
 	laneHealthStatus *prometheus.GaugeVec
 }
 
+func (o *ObservedChainHealthcheck) Ready() error {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (o *ObservedChainHealthcheck) HealthReport() map[string]error {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (o *ObservedChainHealthcheck) Name() string {
+	//TODO implement me
+	panic("implement me")
+}
+
 func NewObservedChainHealthCheck(
 	chainHealthcheck ChainHealthcheck,
 	plugin string,
