@@ -340,7 +340,7 @@ func (c *CCIPTestConfig) SetNetworkPairs(lggr zerolog.Logger) error {
 			Msg("Network Pairs")
 	}
 	for _, lane := range c.LeaderLanes {
-		lggr.Debug().
+		lggr.Info().
 			Str("Source", lane.source).
 			Str("Destination", lane.dest).
 			Msg("Leader Lane: ")
@@ -696,6 +696,10 @@ func (o *CCIPTestSetUpOutputs) AddLanesForNetworkPair(
 	// if it non leader lane, disable the price reporting
 	if len(o.Cfg.LeaderLanes) > 0 && !o.Cfg.isLeaderLane(ccipLaneA2B.SourceNetworkName, ccipLaneA2B.DestNetworkName) {
 		ccipLaneA2B.PriceReportingDisabled = true
+		lggr.Info().
+			Str("Source", ccipLaneA2B.SourceNetworkName).
+			Str("Destination", ccipLaneA2B.DestNetworkName).
+			Msg("Non-leader lane")
 	}
 	contractsA, ok := o.LaneContractsByNetwork.Load(networkA.Name)
 	if !ok {
@@ -755,6 +759,10 @@ func (o *CCIPTestSetUpOutputs) AddLanesForNetworkPair(
 		if len(o.Cfg.LeaderLanes) > 0 &&
 			!o.Cfg.isLeaderLane(ccipLaneB2A.SourceNetworkName, ccipLaneB2A.DestNetworkName) {
 			ccipLaneB2A.PriceReportingDisabled = true
+			lggr.Info().
+				Str("Source", ccipLaneB2A.SourceNetworkName).
+				Str("Destination", ccipLaneB2A.DestNetworkName).
+				Msg("Non-leader lane")
 		}
 		b2aLogger := lggr.With().Str("env", namespace).Str("Lane",
 			fmt.Sprintf("%s-->%s", ccipLaneB2A.SourceNetworkName, ccipLaneB2A.DestNetworkName)).Logger()
@@ -971,7 +979,7 @@ func (o *CCIPTestSetUpOutputs) CheckGasUpdateTransaction() error {
 				"networks minus one %d", len(v), o.Cfg.TestGroupInput.NoOfNetworks-1)
 		}
 	}
-	log.Debug().Interface("Tx hashes", transactions).Msg("Checked Gas Update Transactions")
+	log.Info().Interface("Tx hashes", transactions).Msg("Checked Gas Update Transactions")
 	return nil
 }
 
