@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -13,10 +14,15 @@ import (
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
 
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
+	ubig "github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils/big"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store_1_2_0"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
+	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils/pgtest"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 )
 
@@ -220,5 +226,93 @@ func TestCommitStoreV120ffchainConfigDecodingCompatibility(t *testing.T) {
 				PriceReportingDisabled:   tc.priceReportingDisabled,
 			}, decoded)
 		})
+	}
+}
+
+func Test_CommitReportAccepted(t *testing.T) {
+	ctx := testutils.Context(t)
+	chainID := testutils.NewRandomEVMChainID()
+	orm := logpoller.NewORM(chainID, pgtest.NewSqlxDB(t), logger.TestLogger(t))
+	lpOpts := logpoller.Opts{
+		PollPeriod:               time.Hour,
+		FinalityDepth:            2,
+		BackfillBatchSize:        20,
+		RpcBatchSize:             10,
+		KeepFinalizedBlocksDepth: 1000,
+	}
+	lp := logpoller.NewLogPoller(orm, nil, logger.TestLogger(t), nil, lpOpts)
+
+	commitStoreAddr := utils.RandomAddress()
+	merkleRoot := [32]byte{123}
+	inputLogs := []logpoller.Log{
+		createReportAcceptedLog(t, chainID, commitStoreAddr, 2, 1, merkleRoot),
+		createReportAcceptedLog(t, chainID, commitStoreAddr, 3, 1, merkleRoot),
+		createReportAcceptedLog(t, chainID, commitStoreAddr, 5, 1, merkleRoot),
+		createReportAcceptedLog(t, chainID, commitStoreAddr, 5, 2, utils.RandomBytes32()),
+		createReportAcceptedLog(t, chainID, commitStoreAddr, 5, 3, utils.RandomBytes32()),
+		createReportAcceptedLog(t, chainID, commitStoreAddr, 8, 1, utils.RandomBytes32()),
+		createReportAcceptedLog(t, chainID, commitStoreAddr, 9, 1, utils.RandomBytes32()),
+		createReportAcceptedLog(t, chainID, utils.RandomAddress(), 9, 1, utils.RandomBytes32()),
+	}
+	require.NoError(t, orm.InsertLogsWithBlock(ctx, inputLogs, logpoller.NewLogPollerBlock(utils.RandomBytes32(), 20, time.Now(), 5)))
+
+	commitStoreABI := abihelpers.MustParseABI(commit_store_1_2_0.CommitStoreABI)
+	eventSig := abihelpers.MustGetEventID("ReportAccepted", commitStoreABI)
+
+	logs, err := lp.Logs(ctx, 0, 100, eventSig, commitStoreAddr)
+	require.NoError(t, err)
+	require.Len(t, logs, 7)
+
+	logs, err = lp.LogsDataWordRange(ctx, eventSig, commitStoreAddr, 4, merkleRoot, merkleRoot, 0)
+	require.NoError(t, err)
+	require.Len(t, logs, 3)
+}
+
+func createReportAcceptedLog(t testing.TB, chainID *big.Int, address common.Address, blockNumber int64, logIndex int64, merkleRoot common.Hash) logpoller.Log {
+	tAbi, err := commit_store_1_2_0.CommitStoreMetaData.GetAbi()
+	require.NoError(t, err)
+	eseEvent, ok := tAbi.Events["ReportAccepted"]
+	require.True(t, ok)
+
+	gasPriceUpdates := make([]commit_store_1_2_0.InternalGasPriceUpdate, 100)
+	tokenPriceUpdates := make([]commit_store_1_2_0.InternalTokenPriceUpdate, 100)
+
+	for i := 0; i < 100; i++ {
+		gasPriceUpdates[i] = commit_store_1_2_0.InternalGasPriceUpdate{
+			DestChainSelector: uint64(i),
+			UsdPerUnitGas:     big.NewInt(int64(i)),
+		}
+		tokenPriceUpdates[i] = commit_store_1_2_0.InternalTokenPriceUpdate{
+			SourceToken: utils.RandomAddress(),
+			UsdPerToken: big.NewInt(int64(i)),
+		}
+	}
+
+	message := commit_store_1_2_0.CommitStoreCommitReport{
+		PriceUpdates: commit_store_1_2_0.InternalPriceUpdates{
+			TokenPriceUpdates: tokenPriceUpdates,
+			GasPriceUpdates:   gasPriceUpdates,
+		},
+		Interval:   commit_store_1_2_0.CommitStoreInterval{Min: 1, Max: 10},
+		MerkleRoot: merkleRoot,
+	}
+
+	logData, err := eseEvent.Inputs.Pack(message)
+	require.NoError(t, err)
+
+	topic0 := commit_store_1_2_0.CommitStoreReportAccepted{}.Topic()
+
+	return logpoller.Log{
+		Topics: [][]byte{
+			topic0[:],
+		},
+		Data:        logData,
+		LogIndex:    logIndex,
+		BlockHash:   utils.RandomBytes32(),
+		BlockNumber: blockNumber,
+		EventSig:    topic0,
+		Address:     address,
+		TxHash:      utils.RandomBytes32(),
+		EvmChainId:  ubig.New(chainID),
 	}
 }
