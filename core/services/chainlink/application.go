@@ -524,7 +524,7 @@ func NewApplication(opts ApplicationOpts) (Application, error) {
 			globalLogger,
 			loopRegistrarConfig,
 			pipelineRunner,
-			opts.RelayerChainInteroperators,
+			opts.RelayerChainInteroperators.LegacyEVMChains(),
 			capabilityRegistrySyncer,
 			opts.KeyStore,
 			opts.DS,

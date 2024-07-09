@@ -3,7 +3,6 @@ package oraclecreator
 import (
 	"context"
 	"fmt"
-	"strconv"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -18,8 +17,8 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/loop"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
+	"github.com/smartcontractkit/chainlink/v2/core/chains/legacyevm"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ccipcapability/crconfigs"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ccipcapability/ocrimpls"
@@ -29,6 +28,9 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/ocr2key"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr3/plugins/ccipevm"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocrcommon"
+	"github.com/smartcontractkit/chainlink/v2/core/services/relay"
+	"github.com/smartcontractkit/chainlink/v2/core/services/relay/evm"
+	evmrelaytypes "github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/types"
 	"github.com/smartcontractkit/chainlink/v2/core/services/synchronization"
 	"github.com/smartcontractkit/chainlink/v2/core/services/telemetry"
 )
@@ -38,9 +40,9 @@ var _ cctypes.OracleCreator = &inprocessOracleCreator{}
 // inprocessOracleCreator creates oracles that reference plugins running
 // in the same process as the chainlink node, i.e not LOOPPs.
 type inprocessOracleCreator struct {
-	ocrKeyBundles         map[chaintype.ChainType]ocr2key.KeyBundle
+	ocrKeyBundles         map[string]ocr2key.KeyBundle
 	transmitters          map[types.RelayID][]string
-	relayers              map[types.RelayID]loop.Relayer
+	chains                legacyevm.LegacyChainContainer
 	peerWrapper           *ocrcommon.SingletonPeerWrapper
 	externalJobID         uuid.UUID
 	jobID                 int32
@@ -54,9 +56,9 @@ type inprocessOracleCreator struct {
 }
 
 func New(
-	ocrKeyBundles map[chaintype.ChainType]ocr2key.KeyBundle,
+	ocrKeyBundles map[string]ocr2key.KeyBundle,
 	transmitters map[types.RelayID][]string,
-	relayers map[types.RelayID]loop.Relayer,
+	chains legacyevm.LegacyChainContainer,
 	peerWrapper *ocrcommon.SingletonPeerWrapper,
 	externalJobID uuid.UUID,
 	jobID int32,
@@ -70,7 +72,7 @@ func New(
 	return &inprocessOracleCreator{
 		ocrKeyBundles:         ocrKeyBundles,
 		transmitters:          transmitters,
-		relayers:              relayers,
+		chains:                chains,
 		peerWrapper:           peerWrapper,
 		externalJobID:         externalJobID,
 		jobID:                 jobID,
@@ -141,23 +143,42 @@ func (i *inprocessOracleCreator) CreateBootstrapOracle(config cctypes.OCR3Config
 func (i *inprocessOracleCreator) CreatePluginOracle(pluginType cctypes.PluginType, config cctypes.OCR3ConfigWithMeta) (cctypes.CCIPOracle, error) {
 	// this is so that we can use the msg hasher and report encoder from that dest chain relayer's provider.
 	contractReaders := make(map[cciptypes.ChainSelector]types.ContractReader)
-	for relayID, relayer := range i.relayers {
-		cr, err := relayer.NewContractReader(context.Background(), crconfigs.MustCCIPReaderConfig())
+	chainWriters := make(map[cciptypes.ChainSelector]types.ChainWriter)
+	for _, chain := range i.chains.Slice() {
+		cr, err := evm.NewChainReaderService(
+			context.Background(),
+			i.lggr.
+				Named("EVMChainReaderService").
+				Named(chain.ID().String()).
+				Named(pluginType.String()),
+			chain.LogPoller(),
+			chain.Client(),
+			crconfigs.CCIPReaderConfigRaw(),
+		)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create contract reader for relay %s: %w", relayID, err)
+			return nil, fmt.Errorf("failed to create contract reader for chain %s: %w", chain.ID(), err)
 		}
 
-		chainID, err := strconv.ParseUint(relayID.ChainID, 10, 64)
+		cw, err := evm.NewChainWriterService(
+			i.lggr.Named("EVMChainWriterService").
+				Named(chain.ID().String()).
+				Named(pluginType.String()),
+			chain.Client(),
+			chain.TxManager(),
+			chain.GasEstimator(),
+			evmrelaytypes.ChainWriterConfig{}, // TODO: pass in config
+		)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse chain ID %s: %w", relayID.ChainID, err)
+			return nil, fmt.Errorf("failed to create chain writer for chain %s: %w", chain.ID(), err)
 		}
 
-		chainSelector, ok := chainsel.EvmChainIdToChainSelector()[chainID]
+		chainSelector, ok := chainsel.EvmChainIdToChainSelector()[chain.ID().Uint64()]
 		if !ok {
-			return nil, fmt.Errorf("failed to get chain selector from chain ID %d", chainID)
+			return nil, fmt.Errorf("failed to get chain selector from chain ID %s", chain.ID())
 		}
 
 		contractReaders[cciptypes.ChainSelector(chainSelector)] = cr
+		chainWriters[cciptypes.ChainSelector(chainSelector)] = cw
 	}
 
 	// Assuming that the chain selector is referring to an evm chain for now.
@@ -166,8 +187,8 @@ func (i *inprocessOracleCreator) CreatePluginOracle(pluginType cctypes.PluginTyp
 	if err != nil {
 		return nil, fmt.Errorf("failed to get chain ID from selector: %w", err)
 	}
-	destChainFamily := chaintype.EVM
-	destRelayID := types.NewRelayID(string(destChainFamily), fmt.Sprintf("%d", destChainID))
+	destChainFamily := relay.NetworkEVM
+	destRelayID := types.NewRelayID(destChainFamily, fmt.Sprintf("%d", destChainID))
 
 	// build the onchain keyring. it will be the signing key for the destination chain family.
 	keybundle, ok := i.ocrKeyBundles[destChainFamily]
@@ -176,12 +197,26 @@ func (i *inprocessOracleCreator) CreatePluginOracle(pluginType cctypes.PluginTyp
 	}
 	onchainKeyring := ocrcommon.NewOCR3OnchainKeyringAdapter(keybundle)
 
+	// build the contract transmitter
+	// assume that we are using the first account in the keybundle as the from account
+	// and that we are able to transmit to the dest chain.
+	destChainWriter, ok := chainWriters[cciptypes.ChainSelector(config.Config.ChainSelector)]
+	if !ok {
+		return nil, fmt.Errorf("no chain writer found for dest chain selector %d, can't create contract transmitter",
+			config.Config.ChainSelector)
+	}
+	destFromAccount, ok := i.transmitters[destRelayID]
+	if !ok {
+		return nil, fmt.Errorf("no transmitter found for dest relay ID %s, can't create contract transmitter", destRelayID)
+	}
+
 	oracleArgs := libocr3.OCR3OracleArgs[[]byte]{
 		BinaryNetworkEndpointFactory: i.peerWrapper.Peer2,
 		Database:                     i.db,
 		V2Bootstrappers:              i.bootstrapperLocators,
 		ContractConfigTracker:        ocrimpls.NewConfigTracker(config),
-		ContractTransmitter:          nil, // TODO
+		ContractTransmitter: ocrimpls.NewContractTransmitter(destChainWriter,
+			ocrtypes.Account(destFromAccount[0])),
 		LocalConfig: ocrtypes.LocalConfig{
 			BlockchainTimeout: 10 * time.Second,
 			// Config tracking is handled by the launcher, since we're doing blue-green
