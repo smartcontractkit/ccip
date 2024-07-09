@@ -344,9 +344,6 @@ func (c *CCIPTestConfig) DefineLeaderLanes() {
 }
 
 func (c *CCIPTestConfig) isLeaderLane(lane *actions.CCIPLane) bool {
-	if len(c.LeaderLanes) == 0 {
-		return false
-	}
 	for _, leader := range c.LeaderLanes {
 		if leader.source == lane.SourceNetworkName && leader.dest == lane.DestNetworkName {
 			return true
@@ -658,7 +655,7 @@ func (o *CCIPTestSetUpOutputs) AddLanesForNetworkPair(
 		Context:           testcontext.Get(t),
 	}
 	// if it non leader lane, disable the price reporting
-	if !o.Cfg.isLeaderLane(ccipLaneA2B) {
+	if len(o.Cfg.LeaderLanes) > 0 && !o.Cfg.isLeaderLane(ccipLaneA2B) {
 		ccipLaneA2B.PriceReportingDisabled = true
 	}
 	contractsA, ok := o.LaneContractsByNetwork.Load(networkA.Name)
@@ -703,7 +700,7 @@ func (o *CCIPTestSetUpOutputs) AddLanesForNetworkPair(
 
 		ccipLaneB2A = &actions.CCIPLane{
 			Test:              t,
-			SourceNetworkName: actions.NetworkName(networkB.Name),
+			SourceNetworkName: actions.NetworkName(networkB.Name),t
 			DestNetworkName:   actions.NetworkName(networkA.Name),
 			SourceChain:       sourceChainClientB2A,
 			DestChain:         destChainClientB2A,
@@ -716,7 +713,7 @@ func (o *CCIPTestSetUpOutputs) AddLanesForNetworkPair(
 			DstNetworkLaneCfg: ccipLaneA2B.SrcNetworkLaneCfg,
 		}
 		// if it non leader lane, disable the price reporting
-		if !o.Cfg.isLeaderLane(ccipLaneB2A) {
+		if len(o.Cfg.LeaderLanes) > 0 && !o.Cfg.isLeaderLane(ccipLaneB2A) {
 			ccipLaneB2A.PriceReportingDisabled = true
 		}
 		b2aLogger := lggr.With().Str("env", namespace).Str("Lane",
