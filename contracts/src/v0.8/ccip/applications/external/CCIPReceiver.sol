@@ -28,6 +28,7 @@ contract CCIPReceiver is CCIPBase {
     FAILED, // FAILED messages are messages which reverted during execution of processMessage() as part of the ccipReceive() try catch loop.
     ABANDONED // ABANDONED messages are ones which cannot be properly processed, but any sent tokens are recoverable, and can only be triggered by the contract owner.
       // Only a message that was previously marked as FAILED can be abandoned.
+
   }
 
   // The message contents of failed messages are stored here.
@@ -50,7 +51,7 @@ contract CCIPReceiver is CCIPBase {
     external
     virtual
     onlyRouter
-    isValidChain(message.sourceChainSelector) // TODO should it validate sender as well?
+    isValidChain(message.sourceChainSelector)
   {
     try this.processMessage(message) {}
     catch (bytes memory err) {
@@ -111,8 +112,7 @@ contract CCIPReceiver is CCIPBase {
   /// @dev If the owner wants to retrieve tokens without special logic, then abandonFailedMessage(), withdrawNativeTokens(), or withdrawTokens() should be used instead
   /// This function is marked onlyOwner, but is virtual. Allowing permissionless execution is not recommended but may be allowed if function is overridden
   function _retryFailedMessage(Client.Any2EVMMessage memory message) internal virtual onlyOwner {
-    // TODO how about we add a default implementation that calls `processMessage`, and comments for overrides
-    // The idea is to vend an example that works somewhat well out of the box
+    this.processMessage(message);
   }
 
   /// @notice Should be used to recover tokens from a failed message, while ensuring the message cannot be retried

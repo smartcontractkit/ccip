@@ -11,7 +11,8 @@ import {SafeERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/
 import {EnumerableMap} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/structs/EnumerableMap.sol";
 
 /// @title CCIPReceiverWithACK
-/// TODO Beef this up
+/// @notice Acts as a CCIP receiver, but upon receiving an incoming message, attempts to send a response back to the sender with an ACK packet indicating they received and processed the initial correspondence correctly.
+/// @dev Messages received by this contract must be of special formatting in which any arbitrary data is first wrapped inside a MessagePayload struct, and must be processed first to ensure conformity.
 contract CCIPReceiverWithACK is CCIPReceiver {
   using SafeERC20 for IERC20;
   using EnumerableMap for EnumerableMap.Bytes32ToUintMap;
@@ -21,29 +22,27 @@ contract CCIPReceiverWithACK is CCIPReceiver {
 
   event MessageAckSent(bytes32 incomingMessageId);
   event MessageSent(bytes32 indexed incomingMessageId, bytes32 indexed ACKMessageId);
-  // TODO named var
-  event MessageAckReceived(bytes32);
+
+  event MessageAckReceived(bytes32 messageId);
   event FeeTokenModified(address indexed oldToken, address indexed newToken);
 
-  // TODO comments on OUTGOING vs. ACK, and OUTGOING is set in a child
-  // TODO consider moving this to CCIPClienWithACK because CCIPReceiver does not need to be aware of send/receives
-  // it is only concerned about receiving
   enum MessageType {
-    OUTGOING,
-    ACK
+    OUTGOING, // Indicates that a message is being sent for the first time to its recipient.
+    ACK // Indicates that another message of type "OUTGOING" has already been received, and an acknowledgement is being returned to the original sender, by the original recipient.
+
   }
 
-  // TODO comments
   enum MessageStatus {
-    QUIET,
-    SENT,
-    ACKNOWLEDGED
+    QUIET, // A message which has not been sent yet, the default status for any messageId
+    SENT, // Indicates a message has been sent through CCIP but not yet received an ACK response from the recipient
+    ACKNOWLEDGED // The original SENT message was received and processed by the recipient, and confirmation of reception was received by this via the returned ACK message sent in response.
+
   }
 
   struct MessagePayload {
-    bytes version;
-    bytes data;
-    MessageType messageType;
+    bytes version; // An optional byte string which can be used to denote the ACK version formatting or how to decode the remaining arbitrary data.
+    bytes data; // The Arbitrary data initially meant to be received by this contract and sent from the source chain.
+    MessageType messageType; // Denotes whether the incoming message is being received for the first time, or is an acknowledgement that the initial outgoing correspondence was successfully received.
   }
 
   string public constant ACK_MESSAGE_HEADER = "MESSAGE_ACKNOWLEDGED_";
@@ -79,38 +78,18 @@ contract CCIPReceiverWithACK is CCIPReceiver {
     emit FeeTokenModified(oldFeeToken, token);
   }
 
-  // TODO review if this just be inherited
-  /// @notice The entrypoint for the CCIP router to call. This function should never revert, all errors should be handled internally in this contract.
-  /// @param message The message to process.
-  /// @dev Extremely important to ensure only router calls this.
-  function ccipReceive(Client.Any2EVMMessage calldata message)
-    public
-    override
-    onlyRouter
-    isValidSender(message.sourceChainSelector, message.sender)
-    isValidChain(message.sourceChainSelector)
-  {
-    try this.processMessage(message) {}
-    catch (bytes memory err) {
-      s_failedMessages.set(message.messageId, uint256(ErrorCode.FAILED));
-      s_messageContents[message.messageId] = message;
-
-      // Don't revert so CCIPRouter doesn't revert. Emit event instead.
-      // The message can be retried later without having to do manual execution of CCIP.
-      emit MessageFailed(message.messageId, err);
-      return;
-    }
-
-    emit MessageSucceeded(message.messageId);
-  }
-
   /// @notice Application-specific logic for incoming ccip messages.
   /// @dev Function does NOT require the status of an incoming ACK be "sent" because this implementation does not send, only receives
   /// Any MessageType encoding is implemented by the sender contract, and is not natively part of CCIP messages.
-  function processMessage(Client.Any2EVMMessage calldata message) external virtual override onlySelf {
+  function processMessage(Client.Any2EVMMessage calldata message)
+    external
+    virtual
+    override
+    onlySelf
+    isValidSender(message.sourceChainSelector, message.sender)
+  {
     (MessagePayload memory payload) = abi.decode(message.data, (MessagePayload));
 
-    // TODO CCIReceiverWithACK can just ack without message type checks
     // message type is a concept with ClientWithACK
     if (payload.messageType == MessageType.OUTGOING) {
       // Insert processing workflow here.

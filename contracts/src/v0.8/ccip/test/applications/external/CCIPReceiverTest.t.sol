@@ -186,6 +186,14 @@ contract CCIPReceiverTest is EVM2EVMOnRampSetup {
 
     vm.startPrank(OWNER);
 
+    // The message failed initially because the sender was not approved. Now we approve it and retry processing. Because retryFailedMessage() calls processMessage normally, it should execute successfully now.
+    CCIPBase.ApprovedSenderUpdate[] memory senderUpdates = new CCIPBase.ApprovedSenderUpdate[](1);
+
+    senderUpdates[0] =
+      CCIPBase.ApprovedSenderUpdate({destChainSelector: sourceChainSelector, sender: abi.encode(address(1))});
+
+    s_receiver.updateApprovedSenders(senderUpdates, new CCIPBase.ApprovedSenderUpdate[](0));
+
     vm.expectEmit();
     emit CCIPReceiver.MessageRecovered(messageId);
 
@@ -261,14 +269,14 @@ contract CCIPReceiverTest is EVM2EVMOnRampSetup {
 
   function test_modifyRouter_Success() public {
     vm.expectRevert(abi.encodeWithSelector(CCIPBase.ZeroAddressNotAllowed.selector));
-    s_receiver.modifyRouter(address(0));
+    s_receiver.updateRouter(address(0));
 
     address newRouter = address(0x1234);
 
     vm.expectEmit();
     emit CCIPBase.CCIPRouterModified(address(s_destRouter), newRouter);
 
-    s_receiver.modifyRouter(newRouter);
+    s_receiver.updateRouter(newRouter);
 
     assertEq(s_receiver.getRouter(), newRouter, "Router Address not set correctly to the new router");
   }

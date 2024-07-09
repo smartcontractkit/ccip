@@ -23,9 +23,11 @@ abstract contract CCIPBase is OwnerIsCreator {
   event CCIPRouterModified(address indexed oldRouter, address indexed newRouter);
   event TokensWithdrawnByOwner(address indexed token, address indexed to, uint256 amount);
 
-  // TODO 2 events, add/remove
-  // TODO comment on the tradeoffs, short comment on why prefer indexed
-  event ApprovedSenderModified(uint64 indexed destChainSelector, bytes indexed recipient, bool isBeingApproved);
+  // Parameters are indexed to simplyify indexing of cross-chain dapps where contracts may be deployed with the same address.
+  // Since the updateApprovedSenders() function should be used sparingly by the contract owner, the additional gas cost should be negligible. If this function is needed to be used constantly, or with a large number of
+  // contracts, then an alternative and more gas-efficient method should be implemented instead, e.g. with merkle trees or indexing the parameters can be removed.
+  event ApprovedSenderAdded(uint64 indexed destChainSelector, bytes indexed recipient);
+  event ApprovedSenderRemoved(uint64 indexed destChainSelector, bytes indexed recipient);
 
   event ChainAdded(uint64 indexed remoteChainSelector, bytes indexed recipient, bytes extraArgsBytes);
   event ChainRemoved(uint64 indexed removeChainSelector);
@@ -35,16 +37,16 @@ abstract contract CCIPBase is OwnerIsCreator {
     bytes sender; //             The sender address on source chain that is allowed to call, ABI encoded in the case of a remote EVM chain
   }
 
-  struct ChainUpdate { // TODO comments
-    uint64 chainSelector;
-    bool allowed;
-    bytes recipient;
-    bytes extraArgsBytes;
+  struct ChainUpdate {
+    uint64 chainSelector; // ──╮ The unique identifier for a chain to send/receive messages
+    bool allowed; // ──╯ Whether the chain should be enabled
+    bytes recipient; //     Address on the remote chain which should receive incoming messages from this. The should only be one per-chain
+    bytes extraArgsBytes; //     Additional arguments to pass with the message including manually specifying gas limit and and whether to allow out-of-order execution
   }
 
   struct ChainConfig {
     bytes recipient; //      The address to send messages to on the destination chain, ABI encoded in the case of a remote EVM chain.
-    bytes extraArgsBytes; // Specifies extraArgs to pass into ccipSend, includes configs such as gas limit, and OOO execution.
+    bytes extraArgsBytes; // Specifies extraArgs to pass into ccipSend, includes configs such as gas limit, and out-of-order execution.
     mapping(bytes recipient => bool isApproved) approvedSender; // Mapping is nested to support work-flows where Dapps may need to receive messages from one-or-more contracts on a source chain, or to support one-sided dapp upgrades.
   }
 
@@ -81,19 +83,19 @@ abstract contract CCIPBase is OwnerIsCreator {
   function updateApprovedSenders(
     ApprovedSenderUpdate[] calldata adds,
     ApprovedSenderUpdate[] calldata removes
-  ) external onlyOwner {
+  ) external virtual onlyOwner {
     for (uint256 i = 0; i < removes.length; ++i) {
       delete s_chainConfigs[removes[i].destChainSelector].approvedSender[removes[i].sender];
 
       // Third parameter is false to indicate that the sender's previous approval is being revoked, to improve off-chain event indexing
-      emit ApprovedSenderModified(removes[i].destChainSelector, removes[i].sender, false);
+      emit ApprovedSenderRemoved(removes[i].destChainSelector, removes[i].sender);
     }
 
     for (uint256 i = 0; i < adds.length; ++i) {
       s_chainConfigs[adds[i].destChainSelector].approvedSender[adds[i].sender] = true;
 
       // Third parameter is true to indicate that the sender is being approved, to improve off-chain event indexing
-      emit ApprovedSenderModified(adds[i].destChainSelector, adds[i].sender, true);
+      emit ApprovedSenderAdded(adds[i].destChainSelector, adds[i].sender);
     }
   }
 
@@ -141,9 +143,10 @@ abstract contract CCIPBase is OwnerIsCreator {
   // │                      Chain Management                        │
   // ================================================================
 
-  // TODO comments
-  // TODO name as updateRouter
-  function modifyRouter(address newRouter) external onlyOwner {
+  /// @notice Updates the address of the CCIP router to send/receive messages.
+  /// @dev function will can only be called by the owner, and should only be used in emergencies if the current CCIP Router is deprecated.
+  /// @param newRouter the address of the new router, cannot be the zero address.
+  function updateRouter(address newRouter) external onlyOwner {
     if (newRouter == address(0)) revert ZeroAddressNotAllowed();
 
     // Store the old router in memory to emit event
@@ -177,7 +180,8 @@ abstract contract CCIPBase is OwnerIsCreator {
     }
   }
 
-  // TODO comments
+  /// @notice Reverts if the specified chainSelector is not approved to send/receive messages to/from this contract
+  /// @param chainSelector the CCIP specific chain selector for a given remote-chain.
   modifier isValidChain(uint64 chainSelector) {
     // Must be storage and not memory because the struct contains a nested mapping which is not capable of being copied to memory
     ChainConfig storage currentConfig = s_chainConfigs[chainSelector];
@@ -185,6 +189,10 @@ abstract contract CCIPBase is OwnerIsCreator {
     _;
   }
 
+  /// @notice Ensures if the specified chain is not enabled, or if the sender of an incoming message has not been approved by contract owner
+  /// @param chainSelector the CCIP specific chain selector for a given remote-chain.
+  /// @param sender the address of the sender of the message on the source-chain.
+  /// @dev The modifier will revert if either the sender is not approved OR if the relevant chain is currently disabled.
   modifier isValidSender(uint64 chainSelector, bytes memory sender) {
     // If the chain is disabled, then short-circuit trigger a revert because no sender should be valid
     if (s_chainConfigs[chainSelector].recipient.length == 0 || !s_chainConfigs[chainSelector].approvedSender[sender]) {
