@@ -57,7 +57,6 @@ func NewExecServices(ctx context.Context, lggr logger.Logger, cfg plugins.Regist
 	loopEnabled := loopCmd != ""
 
 	var pluginFactory types.ReportingPluginFactory
-	var err error
 	if loopEnabled {
 		// find loop command
 		envVars, err := plugins.ParseEnvFile(env.CCIPExecPlugin.Env.Get())
@@ -73,9 +72,10 @@ func NewExecServices(ctx context.Context, lggr logger.Logger, cfg plugins.Regist
 		factoryServer := loop.NewExecutionService(lggr, grpcOpts, cmdFn, srcProvider, dstProvider, uint32(srcChainID), uint32(dstChainID), sourceTokenAddress)
 		pluginFactory = factoryServer
 	} else {
-		pluginFactory, err = NewExecutionReportingPluginFactoryV2(ctx, lggr, sourceTokenAddress, srcChainID, dstChainID, srcProvider, dstProvider)
-		if err != nil {
-			return nil, err
+		var err2 error
+		pluginFactory, err2 = NewExecutionReportingPluginFactoryV2(ctx, lggr, sourceTokenAddress, srcChainID, dstChainID, srcProvider, dstProvider)
+		if err2 != nil {
+			return nil, err2
 		}
 	}
 

@@ -125,11 +125,10 @@ func NewExecutionReportingPluginFactoryV2(ctx context.Context, lggr logger.Logge
 		// when the provider is created. In some cases the attestation API can be nil, which means we
 		// don't want any token data providers. This should not cause creating the job to fail, so we
 		// give an empty map and move on.
-		if err2.Error() == "empty USDC attestation API" {
-			tokenDataProviders = make(map[cciptypes.Address]tokendata.Reader)
-		} else {
+		if err2.Error() != "empty USDC attestation API" {
 			return nil, fmt.Errorf("new usdc reader: %w", err2)
 		}
+		tokenDataProviders = make(map[cciptypes.Address]tokendata.Reader)
 	}
 
 	// Prom wrappers
@@ -256,6 +255,9 @@ func (rf *ExecutionReportingPluginFactory) newReportingPluginFn(config types.Rep
 		// Using Start, while a bit more obtuse, allows us to manage these services
 		// in the same process as the plugin factory in LOOP mode
 		err := rf.Start(ctx)
+		if err != nil {
+			return reportingPluginAndInfo{}, err
+		}
 
 		destPriceRegistry, destWrappedNative, err := rf.config.offRampReader.ChangeConfig(ctx, config.OnchainConfig, config.OffchainConfig)
 		if err != nil {
