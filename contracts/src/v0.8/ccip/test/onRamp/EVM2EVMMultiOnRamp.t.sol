@@ -775,7 +775,6 @@ contract EVM2EVMMultiOnRamp_getFee is EVM2EVMMultiOnRampSetup {
     for (uint256 i = 0; i < feeTokenPrices.length; ++i) {
       Client.EVM2AnyMessage memory message = _generateEmptyMessage();
       message.feeToken = testTokens[i];
-      uint64 premiumMultiplierWeiPerEth = s_priceRegistry.getPremiumMultiplierWeiPerEth(message.feeToken);
 
       uint256 feeAmount = s_onRamp.getFee(DEST_CHAIN_SELECTOR, message);
       uint256 expectedFeeAmount = s_priceRegistry.getValidatedFee(DEST_CHAIN_SELECTOR, message);

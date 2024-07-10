@@ -244,7 +244,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
       });
     }
 
-    (uint256 msgFeeJuels, bool isOutOfOrderExecution) =
+    (uint256 msgFeeJuels, bool isOutOfOrderExecution, bytes memory convertedExtraArgs) =
       IPriceRegistry(s_dynamicConfig.priceRegistry).getValidatedRampMessageParams(rampMessage, message.tokenAmounts);
     emit FeePaid(message.feeToken, msgFeeJuels);
 
@@ -263,6 +263,8 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
       }
     }
 
+    // Override extraArgs with latest version
+    rampMessage.extraArgs = convertedExtraArgs;
     // Hash only after all fields have been set
     rampMessage.header.messageId = Internal._hash(rampMessage, destChainConfig.metadataHash);
 

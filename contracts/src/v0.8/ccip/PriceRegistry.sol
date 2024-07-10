@@ -791,7 +791,7 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
     Internal.EVM2AnyRampMessage calldata message,
     // TODO: evaluate gas cost of creating an array of addresses and passing it in
     Client.EVMTokenAmount[] calldata sourceTokenAmounts
-  ) external view returns (uint256 msgFeeJuels, bool isOutOfOrderExecution) {
+  ) external view returns (uint256 msgFeeJuels, bool isOutOfOrderExecution, bytes memory convertedExtraArgs) {
     uint64 destChainSelector = message.header.destChainSelector;
     DestChainDynamicConfig storage destChainDynamicConfig = s_destChainDynamicConfigs[destChainSelector];
 
@@ -822,10 +822,10 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
     if (msgFeeJuels > i_maxFeeJuelsPerMsg) revert MessageFeeTooHigh(msgFeeJuels, i_maxFeeJuelsPerMsg);
 
     // NOTE: when supporting non-EVM chains, revisit this and parse non-EVM args
-    isOutOfOrderExecution =
-      _parseEVMExtraArgsFromBytes(message.extraArgs, destChainDynamicConfig).allowOutOfOrderExecution;
+    Client.EVMExtraArgsV2 memory extraArgs = _parseEVMExtraArgsFromBytes(message.extraArgs, destChainDynamicConfig);
+    isOutOfOrderExecution = extraArgs.allowOutOfOrderExecution;
 
-    return (msgFeeJuels, isOutOfOrderExecution);
+    return (msgFeeJuels, isOutOfOrderExecution, abi.encode(extraArgs));
   }
 
   // TODO: docs

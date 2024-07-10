@@ -87,8 +87,9 @@ interface IPriceRegistry {
   /// @param sourceTokenAmounts Source token amounts that match the message tokenAmounts
   /// @return msgFeeJuels message fee in juels
   /// @return isOutOfOrderExecution true if the message should be executed out of order
+  /// @return convertedExtraArgs extra args converted to the latest family-specific args version
   function getValidatedRampMessageParams(
     Internal.EVM2AnyRampMessage memory message,
     Client.EVMTokenAmount[] memory sourceTokenAmounts
-  ) external view returns (uint256 msgFeeJuels, bool isOutOfOrderExecution);
+  ) external view returns (uint256 msgFeeJuels, bool isOutOfOrderExecution, bytes memory convertedExtraArgs);
 }
