@@ -20,7 +20,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/legacyevm"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ccipcapability/crconfigs"
+	evmconfigs "github.com/smartcontractkit/chainlink/v2/core/services/ccipcapability/configs/evm"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ccipcapability/ocrimpls"
 	cctypes "github.com/smartcontractkit/chainlink/v2/core/services/ccipcapability/types"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
@@ -141,10 +141,25 @@ func (i *inprocessOracleCreator) CreateBootstrapOracle(config cctypes.OCR3Config
 
 // CreatePluginOracle implements types.OracleCreator.
 func (i *inprocessOracleCreator) CreatePluginOracle(pluginType cctypes.PluginType, config cctypes.OCR3ConfigWithMeta) (cctypes.CCIPOracle, error) {
+	// Assuming that the chain selector is referring to an evm chain for now.
+	// TODO: add an api that returns chain family.
+	destChainID, err := chainsel.ChainIdFromSelector(uint64(config.Config.ChainSelector))
+	if err != nil {
+		return nil, fmt.Errorf("failed to get chain ID from selector %d: %w", config.Config.ChainSelector, err)
+	}
+	destChainFamily := relay.NetworkEVM
+	destRelayID := types.NewRelayID(destChainFamily, fmt.Sprintf("%d", destChainID))
+
 	// this is so that we can use the msg hasher and report encoder from that dest chain relayer's provider.
 	contractReaders := make(map[cciptypes.ChainSelector]types.ContractReader)
 	chainWriters := make(map[cciptypes.ChainSelector]types.ChainWriter)
 	for _, chain := range i.chains.Slice() {
+		var chainReaderConfig evmrelaytypes.ChainReaderConfig
+		if chain.ID().Uint64() == destChainID {
+			chainReaderConfig = evmconfigs.DestReaderConfig()
+		} else {
+			chainReaderConfig = evmconfigs.SourceReaderConfig()
+		}
 		cr, err := evm.NewChainReaderService(
 			context.Background(),
 			i.lggr.
@@ -153,12 +168,14 @@ func (i *inprocessOracleCreator) CreatePluginOracle(pluginType cctypes.PluginTyp
 				Named(pluginType.String()),
 			chain.LogPoller(),
 			chain.Client(),
-			crconfigs.CCIPReaderConfigRaw(),
+			chainReaderConfig,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create contract reader for chain %s: %w", chain.ID(), err)
 		}
 
+		// Even though we only write to the dest chain, we need to create chain writers for all chains
+		// we know about in order to post gas prices on the dest.
 		cw, err := evm.NewChainWriterService(
 			i.lggr.Named("EVMChainWriterService").
 				Named(chain.ID().String()).
@@ -180,15 +197,6 @@ func (i *inprocessOracleCreator) CreatePluginOracle(pluginType cctypes.PluginTyp
 		contractReaders[cciptypes.ChainSelector(chainSelector)] = cr
 		chainWriters[cciptypes.ChainSelector(chainSelector)] = cw
 	}
-
-	// Assuming that the chain selector is referring to an evm chain for now.
-	// TODO: add an api that returns chain family.
-	destChainID, err := chainsel.ChainIdFromSelector(uint64(config.Config.ChainSelector))
-	if err != nil {
-		return nil, fmt.Errorf("failed to get chain ID from selector: %w", err)
-	}
-	destChainFamily := relay.NetworkEVM
-	destRelayID := types.NewRelayID(destChainFamily, fmt.Sprintf("%d", destChainID))
 
 	// build the onchain keyring. it will be the signing key for the destination chain family.
 	keybundle, ok := i.ocrKeyBundles[destChainFamily]
