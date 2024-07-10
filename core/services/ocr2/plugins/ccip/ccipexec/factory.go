@@ -119,10 +119,18 @@ func NewExecutionReportingPluginFactoryV2(ctx context.Context, lggr logger.Logge
 	tokenDataProviders := make(map[cciptypes.Address]tokendata.Reader)
 	// init usdc token data provider
 	usdcReader, err2 := srcProvider.NewTokenDataReader(ctx, "")
-	if err2 != nil {
-		return nil, fmt.Errorf("new usdc reader: %w", err2)
-	}
 	tokenDataProviders[cciptypes.Address(sourceTokenAddress)] = usdcReader
+	if err2 != nil {
+		// in order to not wire the attestation API through this factory, we wire it through the provider
+		// when the provider is created. In some cases the attestation API can be nil, which means we
+		// don't want any token data providers. This should not cause creating the job to fail, so we
+		// give an empty map and move on.
+		if err2.Error() == "empty USDC attestation API" {
+			tokenDataProviders = make(map[cciptypes.Address]tokendata.Reader)
+		} else {
+			return nil, fmt.Errorf("new usdc reader: %w", err2)
+		}
+	}
 
 	// Prom wrappers
 	onRampReader = observability.NewObservedOnRampReader(onRampReader, srcChainID, ccip.ExecPluginLabel)

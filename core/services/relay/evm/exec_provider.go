@@ -151,6 +151,9 @@ func (s SrcExecProvider) NewPriceRegistryReader(ctx context.Context, addr ccipty
 }
 
 func (s SrcExecProvider) NewTokenDataReader(ctx context.Context, _ cciptypes.Address) (tokenDataReader cciptypes.TokenDataReader, err error) {
+	if s.usdcAttestationAPI == "" {
+		return nil, fmt.Errorf("empty USDC attestation API")
+	}
 	attestationURI, err2 := url.ParseRequestURI(s.usdcAttestationAPI)
 	if err2 != nil {
 		return nil, fmt.Errorf("failed to parse USDC attestation API: %w", err2)

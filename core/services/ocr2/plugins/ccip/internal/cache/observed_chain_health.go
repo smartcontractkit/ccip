@@ -30,18 +30,15 @@ type ObservedChainHealthcheck struct {
 }
 
 func (o *ObservedChainHealthcheck) Ready() error {
-	//TODO implement me
-	panic("implement me")
+	return nil
 }
 
 func (o *ObservedChainHealthcheck) HealthReport() map[string]error {
-	//TODO implement me
-	panic("implement me")
+	return make(map[string]error)
 }
 
 func (o *ObservedChainHealthcheck) Name() string {
-	//TODO implement me
-	panic("implement me")
+	return "ObservedChainHealthcheck"
 }
 
 func NewObservedChainHealthCheck(

@@ -1981,7 +1981,9 @@ func (d *Delegate) newServicesCCIPExecution(ctx context.Context, lggr logger.Sug
 		return nil, err
 	}
 
-	err = pluginJobSpecConfig.USDCConfig.ValidateUSDCConfig()
+	if pluginJobSpecConfig.USDCConfig.AttestationAPI != "" {
+		err = pluginJobSpecConfig.USDCConfig.ValidateUSDCConfig()
+	}
 	if err != nil {
 		return nil, err
 	}
