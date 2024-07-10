@@ -510,7 +510,7 @@ func DeployEnvironments(
 							"volumeMounts": []map[string]interface{}{
 								{
 									"name":      "state-storage",
-									"mountPath": "/home/foundry/.foundry/anvil",
+									"mountPath": "/home",
 								},
 							},
 						},
