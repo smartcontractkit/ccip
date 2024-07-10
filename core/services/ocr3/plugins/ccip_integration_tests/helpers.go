@@ -29,23 +29,19 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils/pgtest"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
-	"github.com/smartcontractkit/chainlink/v2/core/services/chainlink"
-	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/ocr2key"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/exp/maps"
 )
 
 var (
 	homeChainID = chainsel.GETH_TESTNET.EvmChainID
-	Link        = func(amount int64) *big.Int { return new(big.Int).Mul(big.NewInt(1e18), big.NewInt(amount)) }
+	e18Mult     = func(amount uint64) *big.Int {
+		return new(big.Int).Mul(UintBigInt(1e18), UintBigInt(amount))
+	}
 )
 
-type ocr3Node struct {
-	app          chainlink.Application
-	peerID       string
-	transmitters map[uint64]common.Address
-	keybundle    ocr2key.KeyBundle
-	db           *sqlx.DB
+func UintBigInt(i uint64) *big.Int {
+	return new(big.Int).SetUint64(i)
 }
 
 type homeChain struct {
@@ -69,32 +65,6 @@ type onchainUniverse struct {
 	priceRegistry      *price_registry.PriceRegistry
 	tokenAdminRegistry *token_admin_registry.TokenAdminRegistry
 	nonceManager       *nonce_manager.NonceManager
-}
-
-func createLogPoller(t *testing.T, backend *backends.SimulatedBackend, db *sqlx.DB, chainID uint64) logpoller.LogPollerTest {
-	lpOpts := logpoller.Opts{
-		PollPeriod:               time.Millisecond,
-		FinalityDepth:            0,
-		BackfillBatchSize:        10,
-		RpcBatchSize:             10,
-		KeepFinalizedBlocksDepth: 100000,
-	}
-	lggr := logger.TestLogger(t)
-	chainIDBigInt := new(big.Int).SetUint64(chainID)
-	cl := client.NewSimulatedBackendClient(t, backend, chainIDBigInt)
-	lp := logpoller.NewLogPoller(logpoller.NewORM(chainIDBigInt, db, lggr), cl, logger.NullLogger, lpOpts)
-	require.NoError(t, lp.Start(context.Background()))
-	t.Cleanup(func() { require.NoError(t, lp.Close()) })
-
-	return lp
-}
-
-func newContract(contractAddress common.Address, backend *backends.SimulatedBackend, newFunc func(common.Address, *backends.SimulatedBackend) (interface{}, error)) (interface{}, error) {
-	contract, err := newFunc(contractAddress, backend)
-	if err != nil {
-		return nil, err
-	}
-	return contract, nil
 }
 
 /**
@@ -139,22 +109,66 @@ func setupUniverses(
 		tokenAdminRegistry := deployTokenAdminRegistry(t, owner, backend, chainID)
 		nonceManager := deployNonceManager(t, owner, backend, chainID)
 
-		onRamp := deployOnRamp(t, owner, backend, linkToken.Address(), rmnProxy.Address(), rout.Address(), priceRegistry.Address(), nonceManager.Address(), tokenAdminRegistry.Address(), chainID)
+		//======================================================================
+		//===========================OnRamp=====================================
+		//======================================================================
+		//`withdrawFeeTokens` onRamp function is not part of the message flow
+		// so we can set this to any address
+		feeAggregator := testutils.NewAddress()
+		onRampAddr, _, _, err := evm_2_evm_multi_onramp.DeployEVM2EVMMultiOnRamp(
+			owner,
+			backend,
+			evm_2_evm_multi_onramp.EVM2EVMMultiOnRampStaticConfig{
+				LinkToken:          linkToken.Address(),
+				ChainSelector:      chainID,
+				RmnProxy:           rmnProxy.Address(),
+				MaxFeeJuelsPerMsg:  big.NewInt(1e18),
+				NonceManager:       nonceManager.Address(),
+				TokenAdminRegistry: tokenAdminRegistry.Address(),
+			},
+			evm_2_evm_multi_onramp.EVM2EVMMultiOnRampDynamicConfig{
+				Router:        rout.Address(),
+				PriceRegistry: priceRegistry.Address(),
+				FeeAggregator: feeAggregator,
+			},
+			[]evm_2_evm_multi_onramp.EVM2EVMMultiOnRampDestChainConfigArgs{},
+			[]evm_2_evm_multi_onramp.EVM2EVMMultiOnRampPremiumMultiplierWeiPerEthArgs{},
+			[]evm_2_evm_multi_onramp.EVM2EVMMultiOnRampTokenTransferFeeConfigArgs{},
+		)
+		require.NoErrorf(t, err, "failed to deploy onramp on chain id %d", chainID)
+		backend.Commit()
+		onramp, err := evm_2_evm_multi_onramp.NewEVM2EVMMultiOnRamp(onRampAddr, backend)
+		require.NoError(t, err)
+		//======================================================================
+		//===========================OffRamp=====================================
+		//======================================================================
+		offrampAddr, _, _, err := evm_2_evm_multi_offramp.DeployEVM2EVMMultiOffRamp(
+			owner,
+			backend,
+			evm_2_evm_multi_offramp.EVM2EVMMultiOffRampStaticConfig{
+				ChainSelector:      chainID,
+				RmnProxy:           rmnProxy.Address(),
+				TokenAdminRegistry: tokenAdminRegistry.Address(),
+				NonceManager:       nonceManager.Address(),
+			},
+			[]evm_2_evm_multi_offramp.EVM2EVMMultiOffRampSourceChainConfigArgs{},
+		)
+		require.NoErrorf(t, err, "failed to deploy offramp on chain id %d", chainID)
+		backend.Commit()
+		offramp, err := evm_2_evm_multi_offramp.NewEVM2EVMMultiOffRamp(offrampAddr, backend)
+		require.NoError(t, err)
 
-		offRamp := deployOffRamp(t, owner, backend, rmnProxy.Address(), tokenAdminRegistry.Address(), nonceManager.Address(), chainID)
-
-		lp := createLogPoller(t, backend, db, chainID)
 		universes[chainID] = onchainUniverse{
 			backend:            backend,
 			chainID:            chainID,
-			logPoller:          lp,
+			logPoller:          createLogPoller(t, backend, db, chainID),
 			linkToken:          linkToken,
 			weth:               weth,
 			router:             rout,
 			rmnProxy:           rmnProxy,
 			rmn:                rmn,
-			onramp:             onRamp,
-			offramp:            offRamp,
+			onramp:             onramp,
+			offramp:            offramp,
 			priceRegistry:      priceRegistry,
 			tokenAdminRegistry: tokenAdminRegistry,
 			nonceManager:       nonceManager,
@@ -168,11 +182,27 @@ func setupUniverses(
 	}, universes
 }
 
-func fullyConnectCCIPContracts(
+func setupInitialConfigs(
 	t *testing.T,
 	owner *bind.TransactOpts,
 	universes map[uint64]onchainUniverse,
+	homeChainUniverse homeChain,
 ) {
+
+	// Setup the capability registry on the home chain
+	_, err := homeChainUniverse.capabilityRegistry.AddCapabilities(owner, []kcr.CapabilitiesRegistryCapability{
+		{
+			LabelledName:          "ccip",
+			Version:               "v1.0.0",
+			CapabilityType:        2, // consensus. not used (?)
+			ResponseType:          0, // report. not used (?)
+			ConfigurationContract: homeChainUniverse.ccipConfigContract,
+		},
+	})
+	require.NoError(t, err, "failed to add capabilities to the capability registry")
+	homeChainUniverse.backend.Commit()
+
+	// Initial configs for contracts on non-home chain
 	chainIDs := maps.Keys(universes)
 	for sourceChainID, uni := range universes {
 		chainsToConnectTo := filter(chainIDs, func(chainIDArg uint64) bool {
@@ -182,6 +212,10 @@ func fullyConnectCCIPContracts(
 		// we are forming a fully-connected graph, so in each iteration we connect
 		// the current chain (referenced by sourceChainID) to all other chains that are not
 		// ourselves.
+		// To be fully connected we need to update:
+		// each onRamp with the destChainConfigs for all other chains
+		// each offRamp with the sourceChainConfigs for all other chains
+		// the router with the onRamp and offRamp addresses
 		var (
 			onrampDestChainConfigArgs             []evm_2_evm_multi_onramp.EVM2EVMMultiOnRampDestChainConfigArgs
 			routerOnrampUpdates                   []router.RouterOnRamp
@@ -193,23 +227,7 @@ func fullyConnectCCIPContracts(
 		for _, destChainID := range chainsToConnectTo {
 			onrampDestChainConfigArgs = append(onrampDestChainConfigArgs, evm_2_evm_multi_onramp.EVM2EVMMultiOnRampDestChainConfigArgs{
 				DestChainSelector: destChainID,
-				DynamicConfig: evm_2_evm_multi_onramp.EVM2EVMMultiOnRampDestChainDynamicConfig{
-					IsEnabled:                         true,
-					MaxNumberOfTokensPerMsg:           10,
-					MaxDataBytes:                      256,
-					MaxPerMsgGasLimit:                 3_000_000,
-					DestGasOverhead:                   50_000,
-					DefaultTokenFeeUSDCents:           1,
-					DestGasPerPayloadByte:             10,
-					DestDataAvailabilityOverheadGas:   0,
-					DestGasPerDataAvailabilityByte:    100,
-					DestDataAvailabilityMultiplierBps: 1,
-					DefaultTokenDestGasOverhead:       50_000,
-					DefaultTokenDestBytesOverhead:     32,
-					DefaultTxGasLimit:                 200_000,
-					GasMultiplierWeiPerEth:            1,
-					NetworkFeeUSDCents:                1,
-				},
+				DynamicConfig:     defaultOnRampDynamicConfig(),
 			})
 
 			remoteUni, ok := universes[destChainID]
@@ -234,8 +252,6 @@ func fullyConnectCCIPContracts(
 				},
 			)
 
-			// onramps are multi-dest and offramps are multi-source.
-			// so set the same ramp for all the chain selectors.
 			routerOnrampUpdates = append(routerOnrampUpdates, router.RouterOnRamp{
 				DestChainSelector: destChainID,
 				OnRamp:            remoteUni.onramp.Address(),
@@ -248,31 +264,32 @@ func fullyConnectCCIPContracts(
 			priceUpdates.GasPriceUpdates = append(priceUpdates.GasPriceUpdates,
 				price_registry.InternalGasPriceUpdate{
 					DestChainSelector: destChainID,
-					UsdPerUnitGas:     big.NewInt(20000e9),
+					UsdPerUnitGas:     big.NewInt(2e12),
 				},
 			)
 
 			priceUpdates.TokenPriceUpdates = append(priceUpdates.TokenPriceUpdates,
 				price_registry.InternalTokenPriceUpdate{
 					SourceToken: uni.linkToken.Address(),
-					UsdPerToken: Link(20),
+					UsdPerToken: e18Mult(20),
 				},
 				price_registry.InternalTokenPriceUpdate{
 					SourceToken: uni.weth.Address(),
-					UsdPerToken: new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1)),
+					UsdPerToken: e18Mult(4000),
 				},
 			)
 		}
 
-		//======================Mint Link to owner==============================
+		//======================Mint e18Mult to owner==============================
 		_, err := uni.linkToken.GrantMintRole(owner, owner.From)
 		require.NoError(t, err)
-		_, err = uni.linkToken.Mint(owner, owner.From, Link(1000))
+		_, err = uni.linkToken.Mint(owner, owner.From, e18Mult(1000))
 		uni.backend.Commit()
 		//===========================OnRamp=====================================
 		_, err = uni.onramp.ApplyDestChainConfigUpdates(owner, onrampDestChainConfigArgs)
 		require.NoErrorf(t, err, "failed to apply dest chain config updates on onramp on chain id %d", sourceChainID)
 		uni.backend.Commit()
+		//PremiumMultiplier is always needed if the onramp is enabled
 		_, err = uni.onramp.ApplyPremiumMultiplierWeiPerEthUpdates(owner, premiumMultiplierWeiPerEthUpdatesArgs)
 		require.NoErrorf(t, err, "failed to apply premium multiplier wei per eth updates on onramp on chain id %d", sourceChainID)
 		uni.backend.Commit()
@@ -300,30 +317,30 @@ func fullyConnectCCIPContracts(
 		_, err = uni.nonceManager.ApplyAuthorizedCallerUpdates(owner, authorizedCallersAuthorizedCallerArgs)
 		require.NoError(t, err)
 		uni.backend.Commit()
-		//==============================LogPoller Filter Registration================================
-		// This is to assert that the CCIPSendRequested event is emitted by the onramp contract
-		// We can add as many filters needed for the tests here.
-		err = uni.logPoller.RegisterFilter(testutils.Context(t),
-			logpoller.Filter{
-				Name: "CCIPSendRequested",
-				EventSigs: []common.Hash{
-					evm_2_evm_multi_onramp.EVM2EVMMultiOnRampCCIPSendRequested{}.Topic(),
-				}, Addresses: []common.Address{uni.onramp.Address()},
-			})
-		require.NoError(t, err)
+		//=============================================================================
+		//===========================RegisterPollerFilters============================
+		registerPollerFilters(t, uni)
+		//=============================================================================
 	}
 }
 
-func registerPollerFilters(t *testing.T, universes map[uint64]onchainUniverse) {
-	for _, uni := range universes {
-		err := uni.logPoller.RegisterFilter(testutils.Context(t),
-			logpoller.Filter{
-				Name: "CCIPSendRequested",
-				EventSigs: []common.Hash{
-					evm_2_evm_multi_onramp.EVM2EVMMultiOnRampCCIPSendRequested{}.Topic(),
-				}, Addresses: []common.Address{uni.onramp.Address()},
-			})
-		require.NoError(t, err)
+func defaultOnRampDynamicConfig() evm_2_evm_multi_onramp.EVM2EVMMultiOnRampDestChainDynamicConfig {
+	return evm_2_evm_multi_onramp.EVM2EVMMultiOnRampDestChainDynamicConfig{
+		IsEnabled:                         true,
+		MaxNumberOfTokensPerMsg:           10,
+		MaxDataBytes:                      256,
+		MaxPerMsgGasLimit:                 3_000_000,
+		DestGasOverhead:                   50_000,
+		DefaultTokenFeeUSDCents:           1,
+		DestGasPerPayloadByte:             10,
+		DestDataAvailabilityOverheadGas:   0,
+		DestGasPerDataAvailabilityByte:    100,
+		DestDataAvailabilityMultiplierBps: 1,
+		DefaultTokenDestGasOverhead:       50_000,
+		DefaultTokenDestBytesOverhead:     32,
+		DefaultTxGasLimit:                 200_000,
+		GasMultiplierWeiPerEth:            1,
+		NetworkFeeUSDCents:                1,
 	}
 }
 
@@ -346,7 +363,7 @@ func createChains(t *testing.T, numChains int) (owner *bind.TransactOpts, chains
 		},
 	}, 30e6)
 
-	for chainID := uint64(chainsel.TEST_90000001.EvmChainID); chainID < uint64(chainsel.TEST_90000020.EvmChainID); chainID++ {
+	for chainID := chainsel.TEST_90000001.EvmChainID; chainID < chainsel.TEST_90000020.EvmChainID; chainID++ {
 		chains[chainID] = backends.NewSimulatedBackend(core.GenesisAlloc{
 			owner.From: core.GenesisAccount{
 				Balance: assets.Ether(10000).ToInt(),
@@ -358,6 +375,35 @@ func createChains(t *testing.T, numChains int) (owner *bind.TransactOpts, chains
 		}
 	}
 	return
+}
+
+func createLogPoller(t *testing.T, backend *backends.SimulatedBackend, db *sqlx.DB, chainID uint64) logpoller.LogPollerTest {
+	lpOpts := logpoller.Opts{
+		PollPeriod:               time.Millisecond,
+		FinalityDepth:            0,
+		BackfillBatchSize:        10,
+		RpcBatchSize:             10,
+		KeepFinalizedBlocksDepth: 100000,
+	}
+	lggr := logger.TestLogger(t)
+	chainIDBigInt := UintBigInt(chainID)
+	cl := client.NewSimulatedBackendClient(t, backend, chainIDBigInt)
+	lp := logpoller.NewLogPoller(logpoller.NewORM(chainIDBigInt, db, lggr), cl, logger.NullLogger, lpOpts)
+	require.NoError(t, lp.Start(context.Background()))
+	t.Cleanup(func() { require.NoError(t, lp.Close()) })
+	return lp
+}
+
+// We can add as many filters needed for the tests here.
+func registerPollerFilters(t *testing.T, universe onchainUniverse) {
+	err := universe.logPoller.RegisterFilter(testutils.Context(t),
+		logpoller.Filter{
+			Name: "CCIPSendRequested",
+			EventSigs: []common.Hash{
+				evm_2_evm_multi_onramp.EVM2EVMMultiOnRampCCIPSendRequested{}.Topic(),
+			}, Addresses: []common.Address{universe.onramp.Address()},
+		})
+	require.NoError(t, err)
 }
 
 func deployLinkToken(t *testing.T, owner *bind.TransactOpts, backend *backends.SimulatedBackend, chainID uint64) *link_token.LinkToken {
@@ -430,54 +476,4 @@ func deployNonceManager(t *testing.T, owner *bind.TransactOpts, backend *backend
 	nonceManager, err := nonce_manager.NewNonceManager(nonceManagerAddr, backend)
 	require.NoError(t, err)
 	return nonceManager
-}
-
-func deployOnRamp(t *testing.T, owner *bind.TransactOpts, backend *backends.SimulatedBackend, linkAddr, rmnProxyAddr, routerAddr, priceRegistryAddr, nonceManagerAddr, tarAddr common.Address, chainID uint64) *evm_2_evm_multi_onramp.EVM2EVMMultiOnRamp {
-	//`withdrawFeeTokens` onRamp function is not part of the message flow
-	// so we can set this to any address
-	feeAggregator := testutils.NewAddress()
-	onrampAddr, _, _, err := evm_2_evm_multi_onramp.DeployEVM2EVMMultiOnRamp(
-		owner,
-		backend,
-		evm_2_evm_multi_onramp.EVM2EVMMultiOnRampStaticConfig{
-			LinkToken:          linkAddr,
-			ChainSelector:      chainID,
-			RmnProxy:           rmnProxyAddr,
-			MaxFeeJuelsPerMsg:  big.NewInt(1e18),
-			NonceManager:       nonceManagerAddr,
-			TokenAdminRegistry: tarAddr,
-		},
-		evm_2_evm_multi_onramp.EVM2EVMMultiOnRampDynamicConfig{
-			Router:        routerAddr,
-			PriceRegistry: priceRegistryAddr,
-			FeeAggregator: feeAggregator,
-		},
-		[]evm_2_evm_multi_onramp.EVM2EVMMultiOnRampDestChainConfigArgs{},
-		[]evm_2_evm_multi_onramp.EVM2EVMMultiOnRampPremiumMultiplierWeiPerEthArgs{},
-		[]evm_2_evm_multi_onramp.EVM2EVMMultiOnRampTokenTransferFeeConfigArgs{},
-	)
-	require.NoErrorf(t, err, "failed to deploy onramp on chain id %d", chainID)
-	backend.Commit()
-	onramp, err := evm_2_evm_multi_onramp.NewEVM2EVMMultiOnRamp(onrampAddr, backend)
-	require.NoError(t, err)
-	return onramp
-}
-
-func deployOffRamp(t *testing.T, owner *bind.TransactOpts, backend *backends.SimulatedBackend, rmnProxyAddr, tarAddr, nonceManagerAddr common.Address, chainID uint64) *evm_2_evm_multi_offramp.EVM2EVMMultiOffRamp {
-	offrampAddr, _, _, err := evm_2_evm_multi_offramp.DeployEVM2EVMMultiOffRamp(
-		owner,
-		backend,
-		evm_2_evm_multi_offramp.EVM2EVMMultiOffRampStaticConfig{
-			ChainSelector:      chainID,
-			RmnProxy:           rmnProxyAddr,
-			TokenAdminRegistry: tarAddr,
-			NonceManager:       nonceManagerAddr,
-		},
-		[]evm_2_evm_multi_offramp.EVM2EVMMultiOffRampSourceChainConfigArgs{},
-	)
-	require.NoErrorf(t, err, "failed to deploy offramp on chain id %d", chainID)
-	backend.Commit()
-	offramp, err := evm_2_evm_multi_offramp.NewEVM2EVMMultiOffRamp(offrampAddr, backend)
-	require.NoError(t, err)
-	return offramp
 }
