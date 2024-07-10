@@ -191,6 +191,16 @@ func setupUniverses(
 	return homeChainUniverse, universes
 }
 
+// setupInitialConfigs sets up the initial configurations for the CCIP contracts for all chains.
+// This function has 2 main purposes:
+// 1. Set up the capability registry and capability config on the home chain
+// 2. Set up the initial configurations for the contracts on the non-home chains
+//   - configurations involve connecting each chain to all other chains by updating the onRamp, offRamp, Router contracts
+//   - setting up the price registry with gas prices and token prices
+//   - setting up the premium multiplier for each token
+//   - setting up the dynamic config for each onRamp
+//   - setting up the source chain config for each offRamp
+//   - setting up the authorized callers for the nonce manager
 func setupInitialConfigs(
 	t *testing.T,
 	owner *bind.TransactOpts,
@@ -213,17 +223,7 @@ func setupInitialConfigs(
 	// Initial configs for contracts on non-home chain
 	chainIDs := maps.Keys(universes)
 	for sourceChainID, uni := range universes {
-		chainsToConnectTo := filter(chainIDs, func(chainIDArg uint64) bool {
-			return chainIDArg != sourceChainID
-		})
 
-		// we are forming a fully-connected graph, so in each iteration we connect
-		// the current chain (referenced by sourceChainID) to all other chains that are not
-		// ourselves.
-		// To be fully connected we need to update:
-		// each onRamp with the destChainConfigs for all other chains
-		// each offRamp with the sourceChainConfigs for all other chains
-		// the router with the onRamp and offRamp addresses
 		var (
 			onrampDestChainConfigArgs             []evm_2_evm_multi_onramp.EVM2EVMMultiOnRampDestChainConfigArgs
 			routerOnrampUpdates                   []router.RouterOnRamp
@@ -232,7 +232,10 @@ func setupInitialConfigs(
 			premiumMultiplierWeiPerEthUpdatesArgs []evm_2_evm_multi_onramp.EVM2EVMMultiOnRampPremiumMultiplierWeiPerEthArgs
 			priceUpdates                          price_registry.InternalPriceUpdates
 		)
-		for _, destChainID := range chainsToConnectTo {
+		for _, destChainID := range chainIDs {
+			if destChainID == sourceChainID {
+				continue
+			}
 			onrampDestChainConfigArgs = append(onrampDestChainConfigArgs, evm_2_evm_multi_onramp.EVM2EVMMultiOnRampDestChainConfigArgs{
 				DestChainSelector: destChainID,
 				DynamicConfig:     defaultOnRampDynamicConfig(t),
@@ -242,7 +245,7 @@ func setupInitialConfigs(
 			require.Truef(t, ok, "could not find universe for chain id %d", destChainID)
 
 			offrampSourceChainConfigArgs = append(offrampSourceChainConfigArgs, evm_2_evm_multi_offramp.EVM2EVMMultiOffRampSourceChainConfigArgs{
-				SourceChainSelector: sourceChainID,
+				SourceChainSelector: destChainID, // for each destination chain, add a source chain config
 				IsEnabled:           true,
 				OnRamp:              remoteUni.onramp.Address().Bytes(),
 			})
@@ -265,8 +268,8 @@ func setupInitialConfigs(
 				OnRamp:            remoteUni.onramp.Address(),
 			})
 			routerOfframpUpdates = append(routerOfframpUpdates, router.RouterOffRamp{
-				SourceChainSelector: sourceChainID,
-				OffRamp:             uni.offramp.Address(),
+				SourceChainSelector: destChainID,
+				OffRamp:             remoteUni.offramp.Address(),
 			})
 
 			priceUpdates.GasPriceUpdates = append(priceUpdates.GasPriceUpdates,
@@ -343,7 +346,7 @@ func setupInitialConfigs(
 }
 
 func defaultOnRampDynamicConfig(t *testing.T) evm_2_evm_multi_onramp.EVM2EVMMultiOnRampDestChainDynamicConfig {
-	// https://github.com/smartcontractkit/ccip/blob/integration_test%2Fnew_contracts/contracts/src/v0.8/ccip/libraries/Internal.sol#L337-L337
+	// https://github.com/smartcontractkit/ccip/blob/c4856b64bd766f1ddbaf5d13b42d3c4b12efde3a/contracts/src/v0.8/ccip/libraries/Internal.sol#L337-L337
 	/*
 		```Solidity
 			// bytes4(keccak256("CCIP ChainFamilySelector EVM"))
