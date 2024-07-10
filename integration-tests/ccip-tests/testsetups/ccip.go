@@ -930,6 +930,8 @@ func (o *CCIPTestSetUpOutputs) WaitForPriceUpdates() {
 	require.NoError(t, priceUpdateGrp.Wait())
 }
 
+// CheckGasUpdateTransaction checks the gas update transactions count, and it has required number of
+// events as per leader lane definitions.
 func (o *CCIPTestSetUpOutputs) CheckGasUpdateTransaction() error {
 	transactions := make(map[string]map[uint64]string)
 	readGasUpdateTx := func(lane *actions.CCIPLane) error {
