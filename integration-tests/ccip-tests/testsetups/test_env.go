@@ -506,6 +506,7 @@ func DeployEnvironments(
 								"baseFee":                   fmt.Sprintf("%d", pointer.GetInt64(anvilConfig.BaseFee)),
 							},
 							"resources": GethResourceProfile,
+							"capacity":  "100Gi",
 						},
 					}))
 				selectedNetworks[i].Simulated = true
