@@ -1,8 +1,10 @@
 package ccip_integration_tests
 
 import (
+	"context"
 	"math/big"
 	"testing"
+	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
@@ -11,6 +13,8 @@ import (
 	"github.com/jmoiron/sqlx"
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets"
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/arm_proxy_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_multi_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_multi_onramp"
@@ -23,6 +27,8 @@ import (
 	kcr "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/capabilities_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/link_token"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
+	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils/pgtest"
+	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/chainlink"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/ocr2key"
 	"github.com/stretchr/testify/require"
@@ -51,6 +57,7 @@ type homeChain struct {
 
 type onchainUniverse struct {
 	backend            *backends.SimulatedBackend
+	logPoller          logpoller.LogPollerTest
 	chainID            uint64
 	linkToken          *link_token.LinkToken
 	weth               *weth9.WETH9
@@ -64,7 +71,7 @@ type onchainUniverse struct {
 	nonceManager       *nonce_manager.NonceManager
 }
 
-func deployContracts(
+func setupUniverses(
 	t *testing.T,
 	owner *bind.TransactOpts,
 	chains map[uint64]*backends.SimulatedBackend,
@@ -82,12 +89,27 @@ func deployContracts(
 	capabilityRegistry, err := kcr.NewCapabilitiesRegistry(addr, homeChainBackend)
 	require.NoError(t, err)
 
+	db := pgtest.NewSqlxDB(t)
 	// deploy the ccip contracts on the non-home-chain chains (total of 3).
 	universes = make(map[uint64]onchainUniverse)
 	for chainID, backend := range chains {
 		if chainID == homeChainID {
 			continue
 		}
+
+		lpOpts := logpoller.Opts{
+			PollPeriod:               time.Millisecond,
+			FinalityDepth:            0,
+			BackfillBatchSize:        10,
+			RpcBatchSize:             10,
+			KeepFinalizedBlocksDepth: 100000,
+		}
+		lggr := logger.TestLogger(t)
+		chainIDBigInt := new(big.Int).SetUint64(chainID)
+		cl := client.NewSimulatedBackendClient(t, backend, chainIDBigInt)
+		lp := logpoller.NewLogPoller(logpoller.NewORM(chainIDBigInt, db, lggr), cl, logger.NullLogger, lpOpts)
+		require.NoError(t, lp.Start(context.Background()))
+		t.Cleanup(func() { require.NoError(t, lp.Close()) })
 
 		// contracts to deploy:
 		// 0. link token
@@ -196,6 +218,15 @@ func deployContracts(
 		require.NoError(t, err)
 		backend.Commit()
 
+		err = lp.RegisterFilter(testutils.Context(t),
+			logpoller.Filter{
+				Name: "CCIPSendRequested",
+				EventSigs: []common.Hash{
+					evm_2_evm_multi_onramp.EVM2EVMMultiOnRampCCIPSendRequested{}.Topic(),
+				}, Addresses: []common.Address{onrampAddr},
+			})
+		require.NoError(t, err)
+
 		offrampAddr, _, _, err := evm_2_evm_multi_offramp.DeployEVM2EVMMultiOffRamp(
 			owner,
 			backend,
@@ -217,6 +248,7 @@ func deployContracts(
 		universes[chainID] = onchainUniverse{
 			backend:            backend,
 			chainID:            chainID,
+			logPoller:          lp,
 			linkToken:          linkToken,
 			weth:               weth,
 			router:             rout,

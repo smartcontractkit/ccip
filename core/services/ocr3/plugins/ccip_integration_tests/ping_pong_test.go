@@ -5,7 +5,9 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	chainsel "github.com/smartcontractkit/chain-selectors"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_multi_onramp"
 	kcr "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/capabilities_registry"
+	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/exp/maps"
 
@@ -20,7 +22,7 @@ var (
 func TestPingPong(t *testing.T) {
 	owner, chains := createChains(t, 4)
 
-	homeChainUni, universes := deployContracts(t, owner, chains)
+	homeChainUni, universes := setupUniverses(t, owner, chains)
 	fullyConnectCCIPContracts(t, owner, universes)
 	_, err := homeChainUni.capabilityRegistry.AddCapabilities(owner, []kcr.CapabilitiesRegistryCapability{
 		{
@@ -37,10 +39,20 @@ func TestPingPong(t *testing.T) {
 	pingPongs := initializePingPongContracts(t, owner, universes)
 	for chainID, universe := range universes {
 		for otherChain, pingPong := range pingPongs[chainID] {
-			println(otherChain)
+			println("From: ", chainID, " To: ", otherChain)
 			_, err = pingPong.StartPingPong(owner)
 			require.NoError(t, err)
-			universe.backend.Commit()
+			nCommits := 100
+			// Give time for the logPoller to catch up
+			for i := 0; i < nCommits; i++ {
+				universe.backend.Commit()
+			}
+			block, err := universe.logPoller.LatestBlock(testutils.Context(t))
+			require.NoError(t, err)
+			logs, err := universe.logPoller.Logs(testutils.Context(t), block.BlockNumber-int64(nCommits), block.BlockNumber,
+				evm_2_evm_multi_onramp.EVM2EVMMultiOnRampCCIPSendRequested{}.Topic(), universe.onramp.Address())
+			require.NoError(t, err)
+			require.Len(t, logs, 1)
 		}
 	}
 }
@@ -79,7 +91,6 @@ func initializePingPongContracts(
 	// Connect each ping pong contract to its counterpart on the other chain
 	for chainID, universe := range chainUniverses {
 		for chainToConnect, pingPong := range pingPongs[chainID] {
-			println("Setting counterpart ping pong contract on chain", chainID, "to chain", chainToConnect)
 			_, err := pingPong.SetCounterpart(
 				owner,
 				chainUniverses[chainToConnect].chainID,
