@@ -52,7 +52,6 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
   error MessageTooLarge(uint256 maxSize, uint256 actualSize);
   error UnsupportedNumberOfTokens();
 
-  // TODO: add DestChainAdded event
   event PriceUpdaterSet(address indexed priceUpdater);
   event PriceUpdaterRemoved(address indexed priceUpdater);
   event FeeTokenAdded(address indexed feeToken);
@@ -67,6 +66,7 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
   event TokenTransferFeeConfigDeleted(uint64 indexed destChainSelector, address indexed token);
   event PremiumMultiplierWeiPerEthUpdated(address indexed token, uint64 premiumMultiplierWeiPerEth);
   event DestChainDynamicConfigUpdated(uint64 indexed destChainSelector, DestChainDynamicConfig dynamicConfig);
+  event DestChainAdded(uint64 indexed destChainSelector, DestChainDynamicConfig dynamicConfig);
 
   /// @dev Struct to hold the dynamic fee & validation configs for a destination chain
   struct DestChainDynamicConfig {
@@ -788,9 +788,7 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
   /// @inheritdoc IPriceRegistry
   /// @dev precondition - message.tokenAmounts and sourceTokenAmounts lengths must be equal
   function getValidatedRampMessageParams(
-    // TODO: evaluate calldata gas overhead of passing full tokenAmounts
     Internal.EVM2AnyRampMessage calldata message,
-    // TODO: evaluate gas cost of creating an array of addresses and passing it in
     Client.EVMTokenAmount[] calldata sourceTokenAmounts
   ) external view returns (uint256 msgFeeJuels, bool isOutOfOrderExecution, bytes memory convertedExtraArgs) {
     uint64 destChainSelector = message.header.destChainSelector;
@@ -829,7 +827,9 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
     return (msgFeeJuels, isOutOfOrderExecution, abi.encode(extraArgs));
   }
 
-  // TODO: docs
+  /// @notice Returns the configured dynamic config for the dest chain selector
+  /// @param destChainSelector destination chain selector to fetch config for
+  /// @return destChainDynamicConfig Dynamic config for the dest chain
   function getDestChainDynamicConfig(uint64 destChainSelector) external view returns (DestChainDynamicConfig memory) {
     return s_destChainDynamicConfigs[destChainSelector];
   }
@@ -845,17 +845,24 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
     for (uint256 i = 0; i < destChainConfigArgs.length; ++i) {
       DestChainDynamicConfigArgs memory destChainConfigArg = destChainConfigArgs[i];
       uint64 destChainSelector = destChainConfigArgs[i].destChainSelector;
+      DestChainDynamicConfig memory destChainDynamicConfigArg = destChainConfigArg.dynamicConfig;
 
       // NOTE: when supporting non-EVM chains, update chainFamilySelector validations
       if (
-        destChainSelector == 0 || destChainConfigArg.dynamicConfig.defaultTxGasLimit == 0
-          || destChainConfigArg.dynamicConfig.chainFamilySelector != Internal.CHAIN_FAMILY_SELECTOR_EVM
+        destChainSelector == 0 || destChainDynamicConfigArg.defaultTxGasLimit == 0
+          || destChainDynamicConfigArg.chainFamilySelector != Internal.CHAIN_FAMILY_SELECTOR_EVM
       ) {
         revert InvalidDestChainConfig(destChainSelector);
       }
 
-      s_destChainDynamicConfigs[destChainSelector] = destChainConfigArg.dynamicConfig;
-      emit DestChainDynamicConfigUpdated(destChainSelector, destChainConfigArg.dynamicConfig);
+      // The chain family selector cannot be zero - indicates that it is a new chain
+      if (s_destChainDynamicConfigs[destChainSelector].chainFamilySelector == 0) {
+        emit DestChainAdded(destChainSelector, destChainDynamicConfigArg);
+      } else {
+        emit DestChainDynamicConfigUpdated(destChainSelector, destChainDynamicConfigArg);
+      }
+
+      s_destChainDynamicConfigs[destChainSelector] = destChainDynamicConfigArg;
     }
   }
 

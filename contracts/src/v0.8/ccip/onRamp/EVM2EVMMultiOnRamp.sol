@@ -34,7 +34,6 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
   error UnsupportedToken(address token);
   error MustBeCalledByRouter();
   error RouterMustSetOriginalSender();
-  // TODO: rename to InvalidStaticConfig
   error InvalidConfig();
   error CursedByRMN(uint64 sourceChainSelector);
   error GetSupportedTokensFunctionalityRemovedCheckAdminRegistry();
@@ -165,7 +164,6 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
         messageId: "",
         sourceChainSelector: i_chainSelector,
         destChainSelector: destChainSelector,
-        // TODO: verify if this actually increments in storage
         // We need the next available sequence number so we increment before we use the value
         sequenceNumber: ++s_destChainSequenceNumbers[destChainSelector],
         nonce: 0
@@ -239,8 +237,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
     // Hash only after all fields have been set
     rampMessage.header.messageId = Internal._hash(
       rampMessage,
-      // TODO: move this to _hash function?
-      // Implicit metadata hash preimage to ensure global uniqueness, ensuring 2 identical messages sent to 2 different
+      // Metadata hash preimage to ensure global uniqueness, ensuring 2 identical messages sent to 2 different
       // lanes will have a distinct hash.
       keccak256(abi.encode(Internal.EVM_2_ANY_MESSAGE_HASH, i_chainSelector, destChainSelector, address(this)))
     );
