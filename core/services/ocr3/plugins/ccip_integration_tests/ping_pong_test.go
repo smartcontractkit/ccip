@@ -11,6 +11,14 @@ import (
 	pp "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/ping_pong_demo"
 )
 
+/*
+* Test is setting up 3 chains (let's call them A, B, C), each chain deploys and starts 2 ping pong contracts for the other 2.
+* A ---deploy+start---> (pingPongB, pingPongC)
+* B ---deploy+start---> (pingPongA, pingPongC)
+* C ---deploy+start---> (pingPongA, pingPongB)
+* and then checks that each ping pong contract emitted `CCIPSendRequested` event from the expected source to destination.
+* Test fails if any wiring between contracts is not correct.
+ */
 func TestPingPong(t *testing.T) {
 	owner, chains := createChains(t, 4)
 
