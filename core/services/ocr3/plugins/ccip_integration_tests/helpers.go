@@ -236,6 +236,8 @@ func setupInitialConfigs(
 			if destChainID == sourceChainID {
 				continue
 			}
+
+			//===============================OnRamp=====================================
 			onrampDestChainConfigArgs = append(onrampDestChainConfigArgs, evm_2_evm_multi_onramp.EVM2EVMMultiOnRampDestChainConfigArgs{
 				DestChainSelector: destChainID,
 				DynamicConfig:     defaultOnRampDynamicConfig(t),
@@ -244,12 +246,24 @@ func setupInitialConfigs(
 			remoteUni, ok := universes[destChainID]
 			require.Truef(t, ok, "could not find universe for chain id %d", destChainID)
 
+			//================================OffRamp====================================
 			offrampSourceChainConfigArgs = append(offrampSourceChainConfigArgs, evm_2_evm_multi_offramp.EVM2EVMMultiOffRampSourceChainConfigArgs{
 				SourceChainSelector: destChainID, // for each destination chain, add a source chain config
 				IsEnabled:           true,
 				OnRamp:              remoteUni.onramp.Address().Bytes(),
 			})
 
+			//==================================Router==================================
+			routerOnrampUpdates = append(routerOnrampUpdates, router.RouterOnRamp{
+				DestChainSelector: destChainID,
+				OnRamp:            remoteUni.onramp.Address(),
+			})
+			routerOfframpUpdates = append(routerOfframpUpdates, router.RouterOffRamp{
+				SourceChainSelector: destChainID,
+				OffRamp:             remoteUni.offramp.Address(),
+			})
+
+			//==============================premiumMultiplier======================================
 			// This multiplier is used to calculate the premium/fees
 			// Some tokens like LINK will have a discounted fee
 			premiumMultiplierWeiPerEthUpdatesArgs = append(premiumMultiplierWeiPerEthUpdatesArgs,
@@ -263,15 +277,7 @@ func setupInitialConfigs(
 				},
 			)
 
-			routerOnrampUpdates = append(routerOnrampUpdates, router.RouterOnRamp{
-				DestChainSelector: destChainID,
-				OnRamp:            remoteUni.onramp.Address(),
-			})
-			routerOfframpUpdates = append(routerOfframpUpdates, router.RouterOffRamp{
-				SourceChainSelector: destChainID,
-				OffRamp:             remoteUni.offramp.Address(),
-			})
-
+			//===============================PriceRegistry=====================================
 			priceUpdates.GasPriceUpdates = append(priceUpdates.GasPriceUpdates,
 				price_registry.InternalGasPriceUpdate{
 					DestChainSelector: destChainID,
