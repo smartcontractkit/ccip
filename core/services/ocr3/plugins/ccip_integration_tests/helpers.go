@@ -25,6 +25,7 @@ import (
 	kcr "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/capabilities_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/link_token"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
+
 	"github.com/stretchr/testify/require"
 	"golang.org/x/exp/maps"
 )

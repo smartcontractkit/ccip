@@ -5,7 +5,9 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+
 	"github.com/stretchr/testify/require"
+
 	"golang.org/x/exp/maps"
 
 	pp "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/ping_pong_demo"
