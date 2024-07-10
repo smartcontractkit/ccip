@@ -71,8 +71,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
 
   /// @dev Struct to hold the configs for a destination chain
   struct DestChainConfig {
-    address prevOnRamp; // ────────────────────╮ Address of previous-version OnRamp
-    uint64 sequenceNumber; // ─────────────────╯ The last used sequence number. This is zero in the case where no messages has been sent yet.
+    uint64 sequenceNumber; // The last used sequence number. This is zero in the case where no messages has been sent yet.
     // 0 is not a valid sequence number for any real transaction.
     /// @dev metadataHash is a lane-specific prefix for a message hash preimage which ensures global uniqueness
     /// Ensures that 2 identical messages sent to 2 different lanes will have a distinct hash.
@@ -81,13 +80,11 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
     bytes32 metadataHash;
   }
 
-  /// @dev Struct to hold the dynamic configs, its destination chain selector and previous onRamp.
-  /// Same as DestChainConfig but with the destChainSelector and the prevOnRamp so that an array of these
+  /// @dev Struct to hold the dynamic configs, its destination chain selector. Same as DestChainConfig but with the destChainSelector so that an array of these
   /// can be passed in the constructor and the applyDestChainConfigUpdates function
   //solhint-disable gas-struct-packing
   struct DestChainConfigArgs {
-    uint64 destChainSelector; // ─────────╮ Destination chain selector
-    address prevOnRamp; // ───────────────╯ Address of previous-version OnRamp.
+    uint64 destChainSelector; // Destination chain selector
   }
 
   // STATIC CONFIG
@@ -373,7 +370,6 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
 
       if (destChainConfig.metadataHash == 0) {
         DestChainConfig memory newDestChainConfig = DestChainConfig({
-          prevOnRamp: destChainConfigArg.prevOnRamp,
           // Sequence numbers start at 0 for newly configured chains
           sequenceNumber: 0,
           metadataHash: keccak256(

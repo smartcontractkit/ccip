@@ -169,7 +169,7 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistryFeeSetup {
   function _generateDestChainConfigArgs() internal pure returns (EVM2EVMMultiOnRamp.DestChainConfigArgs[] memory) {
     EVM2EVMMultiOnRamp.DestChainConfigArgs[] memory destChainConfigs = new EVM2EVMMultiOnRamp.DestChainConfigArgs[](1);
     destChainConfigs[0] =
-      EVM2EVMMultiOnRamp.DestChainConfigArgs({destChainSelector: DEST_CHAIN_SELECTOR, prevOnRamp: address(0)});
+      EVM2EVMMultiOnRamp.DestChainConfigArgs({destChainSelector: DEST_CHAIN_SELECTOR});
     return destChainConfigs;
   }
 
@@ -228,7 +228,6 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistryFeeSetup {
     EVM2EVMMultiOnRamp.DestChainConfig memory a,
     EVM2EVMMultiOnRamp.DestChainConfig memory b
   ) internal pure {
-    assertEq(a.prevOnRamp, b.prevOnRamp);
     assertEq(a.sequenceNumber, b.sequenceNumber);
     assertEq(a.metadataHash, b.metadataHash);
   }

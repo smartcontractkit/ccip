@@ -37,7 +37,7 @@ contract EVM2EVMMultiOnRamp_constructor is EVM2EVMMultiOnRampSetup {
     vm.expectEmit(true, false, false, false);
     emit EVM2EVMMultiOnRamp.DestChainAdded(
       DEST_CHAIN_SELECTOR,
-      EVM2EVMMultiOnRamp.DestChainConfig({prevOnRamp: address(0), sequenceNumber: 0, metadataHash: ""})
+      EVM2EVMMultiOnRamp.DestChainConfig({ sequenceNumber: 0, metadataHash: ""})
     );
 
     _deployOnRamp(
@@ -45,7 +45,6 @@ contract EVM2EVMMultiOnRamp_constructor is EVM2EVMMultiOnRampSetup {
     );
 
     EVM2EVMMultiOnRamp.DestChainConfig memory expectedDestChainConfig = EVM2EVMMultiOnRamp.DestChainConfig({
-      prevOnRamp: address(0),
       sequenceNumber: 0,
       metadataHash: keccak256(
         abi.encode(
@@ -138,7 +137,6 @@ contract EVM2EVMMultiOnRamp_applyDestChainConfigUpdates is EVM2EVMMultiOnRampSet
       new EVM2EVMMultiOnRamp.DestChainConfigArgs[](1);
     newDestChainConfigArgs[0] = destChainConfigArgs;
     EVM2EVMMultiOnRamp.DestChainConfig memory expectedDestChainConfig = EVM2EVMMultiOnRamp.DestChainConfig({
-      prevOnRamp: destChainConfigArgs.prevOnRamp,
       sequenceNumber: 0,
       metadataHash: keccak256(
         abi.encode(
@@ -176,7 +174,6 @@ contract EVM2EVMMultiOnRamp_applyDestChainConfigUpdates is EVM2EVMMultiOnRampSet
     destChainConfigArgs[1].destChainSelector = DEST_CHAIN_SELECTOR + 2;
 
     EVM2EVMMultiOnRamp.DestChainConfig memory expectedDestChainConfig1 = EVM2EVMMultiOnRamp.DestChainConfig({
-      prevOnRamp: address(0),
       sequenceNumber: 0,
       metadataHash: keccak256(
         abi.encode(
@@ -189,7 +186,6 @@ contract EVM2EVMMultiOnRamp_applyDestChainConfigUpdates is EVM2EVMMultiOnRampSet
     });
 
     EVM2EVMMultiOnRamp.DestChainConfig memory expectedDestChainConfig2 = EVM2EVMMultiOnRamp.DestChainConfig({
-      prevOnRamp: address(0),
       sequenceNumber: 0,
       metadataHash: keccak256(
         abi.encode(
