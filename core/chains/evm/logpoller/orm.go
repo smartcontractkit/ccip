@@ -15,6 +15,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil"
+
 	evmtypes "github.com/smartcontractkit/chainlink/v2/core/chains/evm/types"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/types"
@@ -990,6 +991,8 @@ func (o *DSORM) FilteredLogs(ctx context.Context, filter query.KeyFilter, limitA
 		return nil, err
 	}
 
+	fmt.Println("FilteredLogs query: ", query)
+	fmt.Println("FilteredLogs args: ", sqlArgs)
 	return logs, nil
 }
 

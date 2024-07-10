@@ -415,32 +415,30 @@ func (c *CommitStore) VerifyExecutionReport(ctx context.Context, report cciptype
 }
 
 func (c *CommitStore) GetCommitReportsForExecution(ctx context.Context, logsAge time.Duration, ignoredRoots [][32]byte) ([]cciptypes.CommitStoreReportWithTxMeta, error) {
-	ignoredRootsExpression := make([]query.Expression, 0, len(ignoredRoots))
-	for _, root := range ignoredRoots {
-		ignoredRootsExpression = append(ignoredRootsExpression, query.And(
-			logpoller.NewEventByWordFilter(c.reportAcceptedSig, c.reportAcceptedMerkleRootIndex, []primitives.ValueComparator{
-				{Value: hexutil.Encode(root[:]), Operator: primitives.Neq},
-			}),
-		))
-	}
-
-	// TODO Move to chainlink-common, querying layer should cover cases like these
-	var ignoredRootsFilter query.Expression
-	if len(ignoredRootsExpression) == 1 {
-		ignoredRootsFilter = ignoredRootsExpression[0]
-	} else {
-		ignoredRootsFilter = query.Or(ignoredRootsExpression...)
-	}
-
 	logsTimestamp := time.Now().Add(-logsAge).Unix()
-
-	sendRequestsQuery, err := query.Where(
-		c.address.String(),
+	expressions := []query.Expression{
 		logpoller.NewAddressFilter(c.address),
 		logpoller.NewEventSigFilter(c.reportAcceptedSig),
 		query.Timestamp(uint64(logsTimestamp), primitives.Gte),
-		ignoredRootsFilter,
-		logpoller.NewConfirmationsFilter(evmtypes.Confirmations(0)),
+		query.Confidence(primitives.Unconfirmed),
+	}
+
+	ignoredRootsExpression := make([]query.Expression, 0, len(ignoredRoots))
+	for _, root := range ignoredRoots {
+		ignoredRootsExpression = append(ignoredRootsExpression,
+			logpoller.NewEventByWordFilter(c.reportAcceptedSig, c.reportAcceptedMerkleRootIndex, []primitives.ValueComparator{
+				{Value: hexutil.Encode(root[:]), Operator: primitives.Neq},
+			}),
+		)
+	}
+
+	if len(ignoredRootsExpression) >= 1 {
+		expressions = append(expressions, ignoredRootsExpression...)
+	}
+
+	sendRequestsQuery, err := query.Where(
+		c.address.String(),
+		expressions...,
 	)
 	if err != nil {
 		return nil, err
@@ -452,7 +450,6 @@ func (c *CommitStore) GetCommitReportsForExecution(ctx context.Context, logsAge 
 		query.NewLimitAndSort(query.Limit{}, query.NewSortBySequence(query.Asc)),
 		"GetCommitReportsForExecution",
 	)
-
 	if err != nil {
 		return nil, err
 	}

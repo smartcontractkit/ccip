@@ -22,7 +22,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils/pgtest"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 )
 
@@ -229,7 +228,7 @@ func TestCommitStoreV120ffchainConfigDecodingCompatibility(t *testing.T) {
 	}
 }
 
-func Test_CommitReportAccepted(t *testing.T) {
+func Test_GetCommitReportsForExecution(t *testing.T) {
 	ctx := testutils.Context(t)
 	chainID := testutils.NewRandomEVMChainID()
 	orm := logpoller.NewORM(chainID, pgtest.NewSqlxDB(t), logger.TestLogger(t))
@@ -243,32 +242,100 @@ func Test_CommitReportAccepted(t *testing.T) {
 	lp := logpoller.NewLogPoller(orm, nil, logger.TestLogger(t), nil, lpOpts)
 
 	commitStoreAddr := utils.RandomAddress()
-	merkleRoot := [32]byte{123}
+
+	block1 := time.Now().Add(-10 * time.Hour)
+	block2 := time.Now().Add(-5 * time.Hour)
+	block3 := time.Now().Add(-1 * time.Hour)
+
+	root1 := utils.RandomBytes32()
+	root2 := utils.RandomBytes32()
+	root3 := utils.RandomBytes32()
+	root4 := utils.RandomBytes32()
+	root5 := utils.RandomBytes32()
+
 	inputLogs := []logpoller.Log{
-		createReportAcceptedLog(t, chainID, commitStoreAddr, 2, 1, merkleRoot),
-		createReportAcceptedLog(t, chainID, commitStoreAddr, 3, 1, merkleRoot),
-		createReportAcceptedLog(t, chainID, commitStoreAddr, 5, 1, merkleRoot),
-		createReportAcceptedLog(t, chainID, commitStoreAddr, 5, 2, utils.RandomBytes32()),
-		createReportAcceptedLog(t, chainID, commitStoreAddr, 5, 3, utils.RandomBytes32()),
-		createReportAcceptedLog(t, chainID, commitStoreAddr, 8, 1, utils.RandomBytes32()),
-		createReportAcceptedLog(t, chainID, commitStoreAddr, 9, 1, utils.RandomBytes32()),
-		createReportAcceptedLog(t, chainID, utils.RandomAddress(), 9, 1, utils.RandomBytes32()),
+		createReportAcceptedLog(t, chainID, commitStoreAddr, 2, 1, root1, block1),
+		createReportAcceptedLog(t, chainID, commitStoreAddr, 3, 1, root2, block1),
+		createReportAcceptedLog(t, chainID, commitStoreAddr, 5, 1, root3, block1),
+		createReportAcceptedLog(t, chainID, commitStoreAddr, 5, 3, root4, block2),
+		createReportAcceptedLog(t, chainID, utils.RandomAddress(), 6, 1, utils.RandomBytes32(), block2),
+		createReportAcceptedLog(t, chainID, commitStoreAddr, 7, 1, root5, block3),
 	}
 	require.NoError(t, orm.InsertLogsWithBlock(ctx, inputLogs, logpoller.NewLogPollerBlock(utils.RandomBytes32(), 20, time.Now(), 5)))
 
-	commitStoreABI := abihelpers.MustParseABI(commit_store_1_2_0.CommitStoreABI)
-	eventSig := abihelpers.MustGetEventID("ReportAccepted", commitStoreABI)
-
-	logs, err := lp.Logs(ctx, 0, 100, eventSig, commitStoreAddr)
+	commitStore, err := NewCommitStore(logger.TestLogger(t), commitStoreAddr, nil, lp)
 	require.NoError(t, err)
-	require.Len(t, logs, 7)
 
-	logs, err = lp.LogsDataWordRange(ctx, eventSig, commitStoreAddr, 4, merkleRoot, merkleRoot, 0)
-	require.NoError(t, err)
-	require.Len(t, logs, 3)
+	tests := []struct {
+		name          string
+		logsAge       time.Duration
+		ignoredRoots  [][32]byte
+		expectedRoots [][32]byte
+	}{
+		{
+			name:          "all logs are returned for entire duration",
+			logsAge:       12 * time.Hour,
+			ignoredRoots:  nil,
+			expectedRoots: [][32]byte{root1, root2, root3, root4, root5},
+		},
+		{
+			name:          "randomly snoozed roots don't impact returned datasset",
+			logsAge:       12 * time.Hour,
+			ignoredRoots:  [][32]byte{utils.RandomBytes32(), utils.RandomBytes32()},
+			expectedRoots: [][32]byte{root1, root2, root3, root4, root5},
+		},
+		{
+			name:          "no roots snoozed but only 6 hours old logs",
+			logsAge:       6 * time.Hour,
+			ignoredRoots:  nil,
+			expectedRoots: [][32]byte{root4, root5},
+		},
+		{
+			name:          "no roots snoozed but only 2 hours old logs",
+			logsAge:       2 * time.Hour,
+			ignoredRoots:  nil,
+			expectedRoots: [][32]byte{root5},
+		},
+		{
+			name:          "some roots are snoozed for the entire duration",
+			logsAge:       12 * time.Hour,
+			ignoredRoots:  [][32]byte{root1, root3},
+			expectedRoots: [][32]byte{root2, root4, root5},
+		},
+		{
+			name:          "everything is snoozed",
+			logsAge:       12 * time.Hour,
+			ignoredRoots:  [][32]byte{root1, root3, root2, root4, root5},
+			expectedRoots: [][32]byte{},
+		},
+		{
+			name:          "everything younger than 6 hours is snoozed",
+			logsAge:       6 * time.Hour,
+			ignoredRoots:  [][32]byte{root4, root5},
+			expectedRoots: [][32]byte{},
+		},
+		{
+			name:          "some of the logs younger than 6 hours are snoozed",
+			logsAge:       6 * time.Hour,
+			ignoredRoots:  [][32]byte{root4},
+			expectedRoots: [][32]byte{root5},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			logs, err1 := commitStore.GetCommitReportsForExecution(ctx, test.logsAge, test.ignoredRoots)
+			require.NoError(t, err1)
+
+			require.Len(t, logs, len(test.expectedRoots))
+			for i, log := range logs {
+				require.Equal(t, test.expectedRoots[i], log.MerkleRoot)
+			}
+		})
+	}
 }
 
-func createReportAcceptedLog(t testing.TB, chainID *big.Int, address common.Address, blockNumber int64, logIndex int64, merkleRoot common.Hash) logpoller.Log {
+func createReportAcceptedLog(t testing.TB, chainID *big.Int, address common.Address, blockNumber int64, logIndex int64, merkleRoot common.Hash, blockTimestamp time.Time) logpoller.Log {
 	tAbi, err := commit_store_1_2_0.CommitStoreMetaData.GetAbi()
 	require.NoError(t, err)
 	eseEvent, ok := tAbi.Events["ReportAccepted"]
@@ -306,13 +373,14 @@ func createReportAcceptedLog(t testing.TB, chainID *big.Int, address common.Addr
 		Topics: [][]byte{
 			topic0[:],
 		},
-		Data:        logData,
-		LogIndex:    logIndex,
-		BlockHash:   utils.RandomBytes32(),
-		BlockNumber: blockNumber,
-		EventSig:    topic0,
-		Address:     address,
-		TxHash:      utils.RandomBytes32(),
-		EvmChainId:  ubig.New(chainID),
+		Data:           logData,
+		LogIndex:       logIndex,
+		BlockHash:      utils.RandomBytes32(),
+		BlockNumber:    blockNumber,
+		BlockTimestamp: blockTimestamp,
+		EventSig:       topic0,
+		Address:        address,
+		TxHash:         utils.RandomBytes32(),
+		EvmChainId:     ubig.New(chainID),
 	}
 }
