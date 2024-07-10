@@ -59,11 +59,11 @@ func initializePingPongContracts(
 	chainIDs := maps.Keys(chainUniverses)
 	// For each chain initialize N ping pong contracts, where N is the (number of chains - 1)
 	for chainID, universe := range chainUniverses {
-		chainsToConnectTo := filter(chainIDs, func(chainIDArg uint64) bool {
-			return chainIDArg != chainID
-		})
 		pingPongs[chainID] = make(map[uint64]*pp.PingPongDemo)
-		for _, chainToConnect := range chainsToConnectTo {
+		for _, chainToConnect := range chainIDs {
+			if chainToConnect == chainID {
+				continue // don't connect chain to itself
+			}
 			backend := universe.backend
 			pingPongAddr, _, _, err := pp.DeployPingPongDemo(owner, backend, universe.router.Address(), universe.linkToken.Address())
 			require.NoError(t, err)
