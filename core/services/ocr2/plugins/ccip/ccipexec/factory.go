@@ -9,7 +9,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 
-	"github.com/smartcontractkit/chainlink/v2/core/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/observability"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/tokendata"
 
@@ -75,13 +75,7 @@ func (rf *ExecutionReportingPluginFactory) HealthReport() map[string]error {
 }
 
 func NewExecutionReportingPluginFactoryV2(ctx context.Context, lggr logger.Logger, sourceTokenAddress string, srcChainID int64, dstChainID int64, srcProvider commontypes.CCIPExecProvider, dstProvider commontypes.CCIPExecProvider) (*ExecutionReportingPluginFactory, error) {
-	// TODO: common logger is a subset of core logger.
-	// what's the golden path for passing a logger through from the plugin to the LOOP reporting plugin factory?
-	if lggr == nil {
-		lggr, _ = logger.NewLogger()
-	}
-
-	// TODO: NewOffRampReader doesn't need addr param when provided in job spec
+	// NewOffRampReader doesn't need addr param when provided in job spec
 	offRampReader, err := dstProvider.NewOffRampReader(ctx, "")
 	if err != nil {
 		return nil, fmt.Errorf("create offRampReader: %w", err)
@@ -145,8 +139,7 @@ func NewExecutionReportingPluginFactoryV2(ctx context.Context, lggr logger.Logge
 		cache.NewChainHealthcheck(
 			// Adding more details to Logger to make healthcheck logs more informative
 			// It's safe because healthcheck logs only in case of unhealthy state
-			lggr.With(
-				"onramp", offRampConfig.OnRamp,
+			logger.With(lggr, "onramp", offRampConfig.OnRamp,
 				"commitStore", offRampConfig.CommitStore,
 			),
 			onRampReader,
@@ -167,7 +160,7 @@ func NewExecutionReportingPluginFactoryV2(ctx context.Context, lggr logger.Logge
 
 	return &ExecutionReportingPluginFactory{
 		config: ExecutionPluginStaticConfig{
-			lggr:                          lggr,
+			lggr:                          logger.Sugared(lggr),
 			onRampReader:                  onRampReader,
 			commitStoreReader:             commitStoreReader,
 			offRampReader:                 offRampReader,

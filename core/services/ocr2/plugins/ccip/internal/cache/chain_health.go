@@ -9,9 +9,9 @@ import (
 	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 
-	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 )
 
@@ -53,7 +53,7 @@ type chainHealthcheck struct {
 	globalStatusExpiration   time.Duration
 	rmnStatusRefreshInterval time.Duration
 
-	lggr        logger.Logger
+	lggr        logger.SugaredLogger
 	onRamp      ccipdata.OnRampReader
 	commitStore ccipdata.CommitStoreReader
 
@@ -84,7 +84,7 @@ func NewChainHealthcheck(lggr logger.Logger, onRamp ccipdata.OnRampReader, commi
 		globalStatusExpiration:   defaultGlobalStatusExpirationDuration,
 		rmnStatusRefreshInterval: defaultRMNStateRefreshInterval,
 
-		lggr:        lggr,
+		lggr:        logger.Sugared(lggr),
 		onRamp:      onRamp,
 		commitStore: commitStore,
 
@@ -106,7 +106,7 @@ func newChainHealthcheckWithCustomEviction(lggr logger.Logger, onRamp ccipdata.O
 		globalStatusExpiration:   globalStatusDuration,
 		rmnStatusRefreshInterval: rmnStatusRefreshInterval,
 
-		lggr:        lggr,
+		lggr:        logger.Sugared(lggr),
 		onRamp:      onRamp,
 		commitStore: commitStore,
 

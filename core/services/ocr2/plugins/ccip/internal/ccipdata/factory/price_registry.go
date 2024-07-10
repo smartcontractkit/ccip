@@ -28,7 +28,7 @@ func ClosePriceRegistryReader(ctx context.Context, lggr logger.Logger, versionFi
 	return err
 }
 
-func initOrClosePriceRegistryReader(ctx context.Context, lggr logger.Logger, versionFinder VersionFinder, priceRegistryAddress cciptypes.Address, lp logpoller.LogPoller, cl client.Client, closeReader bool) (ccipdata.PriceRegistryReader, error) {
+func initOrClosePriceRegistryReader(_ context.Context, lggr logger.Logger, versionFinder VersionFinder, priceRegistryAddress cciptypes.Address, lp logpoller.LogPoller, cl client.Client, closeReader bool) (ccipdata.PriceRegistryReader, error) {
 	registerFilters := !closeReader
 
 	priceRegistryEvmAddr, err := ccipcalc.GenericAddrToEvm(priceRegistryAddress)

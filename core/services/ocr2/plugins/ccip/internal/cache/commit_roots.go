@@ -8,7 +8,7 @@ import (
 	"github.com/patrickmn/go-cache"
 	orderedmap "github.com/wk8/go-ordered-map/v2"
 
-	"github.com/smartcontractkit/chainlink/v2/core/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 )
 
 const (
