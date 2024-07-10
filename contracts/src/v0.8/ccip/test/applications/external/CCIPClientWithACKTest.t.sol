@@ -12,7 +12,7 @@ import {EVM2EVMOnRampSetup} from "../../onRamp/EVM2EVMOnRampSetup.t.sol";
 
 import {IERC20} from "../../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 
-contract CCIPClientTest is EVM2EVMOnRampSetup {
+contract CCIPClientWithACKTest is EVM2EVMOnRampSetup {
   event MessageFailed(bytes32 indexed messageId, bytes reason);
   event MessageSucceeded(bytes32 indexed messageId);
   event MessageRecovered(bytes32 indexed messageId);
