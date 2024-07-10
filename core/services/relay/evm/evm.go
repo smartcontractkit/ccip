@@ -412,6 +412,8 @@ func (r *Relayer) NewCCIPCommitProvider(rargs commontypes.RelayArgs, pargs commo
 			sourceStartBlock,
 			r.chain.Client(),
 			r.chain.LogPoller(),
+			r.chain.GasEstimator(),
+			r.chain.Config().EVM().GasEstimator().PriceMax().ToInt(),
 		), nil
 	}
 
@@ -476,6 +478,8 @@ func (r *Relayer) NewCCIPExecProvider(rargs commontypes.RelayArgs, pargs commont
 			r.lggr,
 			versionFinder,
 			r.chain.Client(),
+			r.chain.GasEstimator(),
+			r.chain.Config().EVM().GasEstimator().PriceMax().ToInt(),
 			r.chain.LogPoller(),
 			execPluginConfig.SourceStartBlock,
 			execPluginConfig.JobID,
@@ -564,7 +568,7 @@ func (r *Relayer) NewLLOProvider(rargs commontypes.RelayArgs, pargs commontypes.
 	var transmitter llo.Transmitter
 	if lloCfg.BenchmarkMode {
 		r.lggr.Info("Benchmark mode enabled, using dummy transmitter. NOTE: THIS WILL NOT TRANSMIT ANYTHING")
-		transmitter = bm.NewTransmitter(r.lggr, privKey.PublicKey)
+		transmitter = bm.NewTransmitter(r.lggr, fmt.Sprintf("%x", privKey.PublicKey))
 	} else {
 		var client wsrpc.Client
 		client, err = r.mercuryPool.Checkout(context.Background(), privKey, lloCfg.ServerPubKey, lloCfg.ServerURL())
@@ -831,6 +835,15 @@ func newOnChainContractTransmitter(ctx context.Context, lggr logger.Logger, rarg
 		reportToEvmTxMeta,
 		transmissionContractRetention,
 	)
+}
+
+func (r *Relayer) NewChainWriter(_ context.Context, config []byte) (commontypes.ChainWriter, error) {
+	var cfg types.ChainWriterConfig
+	if err := json.Unmarshal(config, &cfg); err != nil {
+		return nil, fmt.Errorf("failed to unmarshall chain writer config err: %s", err)
+	}
+
+	return NewChainWriterService(r.lggr, r.chain.Client(), r.chain.TxManager(), r.chain.GasEstimator(), cfg)
 }
 
 func (r *Relayer) NewContractReader(chainReaderConfig []byte) (commontypes.ContractReader, error) {
