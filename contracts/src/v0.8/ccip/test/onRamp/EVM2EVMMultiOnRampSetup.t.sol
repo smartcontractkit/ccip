@@ -166,13 +166,6 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistryFeeSetup {
     return result;
   }
 
-  function _generateDestChainConfigArgs() internal pure returns (EVM2EVMMultiOnRamp.DestChainConfigArgs[] memory) {
-    EVM2EVMMultiOnRamp.DestChainConfigArgs[] memory destChainConfigs = new EVM2EVMMultiOnRamp.DestChainConfigArgs[](1);
-    destChainConfigs[0] =
-      EVM2EVMMultiOnRamp.DestChainConfigArgs({destChainSelector: DEST_CHAIN_SELECTOR});
-    return destChainConfigs;
-  }
-
   function _deployOnRamp(
     uint64 sourceChainSelector,
     address sourceRouter,
@@ -186,8 +179,7 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistryFeeSetup {
         nonceManager: nonceManager,
         tokenAdminRegistry: tokenAdminRegistry
       }),
-      _generateDynamicMultiOnRampConfig(sourceRouter, address(s_priceRegistry)),
-      _generateDestChainConfigArgs()
+      _generateDynamicMultiOnRampConfig(sourceRouter, address(s_priceRegistry))
     );
 
     address[] memory authorizedCallers = new address[](1);
@@ -222,14 +214,6 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistryFeeSetup {
       vm.stopPrank();
       vm.startPrank(msgSender);
     }
-  }
-
-  function _assertDestChainConfigsEqual(
-    EVM2EVMMultiOnRamp.DestChainConfig memory a,
-    EVM2EVMMultiOnRamp.DestChainConfig memory b
-  ) internal pure {
-    assertEq(a.sequenceNumber, b.sequenceNumber);
-    assertEq(a.metadataHash, b.metadataHash);
   }
 
   function _assertStaticConfigsEqual(

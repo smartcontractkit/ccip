@@ -7,7 +7,6 @@ import {IgnoreContractSize} from "./IgnoreContractSize.sol";
 contract EVM2EVMMultiOnRampHelper is EVM2EVMMultiOnRamp, IgnoreContractSize {
   constructor(
     StaticConfig memory staticConfig,
-    DynamicConfig memory dynamicConfig,
-    DestChainConfigArgs[] memory destChainConfigs
-  ) EVM2EVMMultiOnRamp(staticConfig, dynamicConfig, destChainConfigs) {}
+    DynamicConfig memory dynamicConfig
+  ) EVM2EVMMultiOnRamp(staticConfig, dynamicConfig) {}
 }

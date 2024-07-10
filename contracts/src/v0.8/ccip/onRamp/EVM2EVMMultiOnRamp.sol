@@ -38,9 +38,6 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
   error InvalidConfig();
   error CursedByRMN(uint64 sourceChainSelector);
   error GetSupportedTokensFunctionalityRemovedCheckAdminRegistry();
-  error InvalidDestChainConfig(uint64 destChainSelector);
-  error DestChainAlreadyConfigured(uint64 destChainSelector);
-  error DestinationChainNotEnabled(uint64 destChainSelector);
 
   event AdminSet(address newAdmin);
   event ConfigSet(StaticConfig staticConfig, DynamicConfig dynamicConfig);
@@ -48,7 +45,6 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
   event FeeTokenWithdrawn(address indexed feeAggregator, address indexed feeToken, uint256 amount);
   /// RMN depends on this event, if changing, please notify the RMN maintainers.
   event CCIPSendRequested(uint64 indexed destChainSelector, Internal.EVM2AnyRampMessage message);
-  event DestChainAdded(uint64 indexed destChainSelector, DestChainConfig destChainConfig);
 
   /// @dev Struct that contains the static configuration
   /// RMN depends on this struct, if changing, please notify the RMN maintainers.
@@ -69,24 +65,6 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
     address feeAggregator; // Fee aggregator address
   }
 
-  /// @dev Struct to hold the configs for a destination chain
-  struct DestChainConfig {
-    uint64 sequenceNumber; // The last used sequence number. This is zero in the case where no messages has been sent yet.
-    // 0 is not a valid sequence number for any real transaction.
-    /// @dev metadataHash is a lane-specific prefix for a message hash preimage which ensures global uniqueness
-    /// Ensures that 2 identical messages sent to 2 different lanes will have a distinct hash.
-    /// Must match the metadataHash used in computing leaf hashes offchain for the root committed in
-    /// the commitStore and i_metadataHash in the offRamp.
-    bytes32 metadataHash;
-  }
-
-  /// @dev Struct to hold the dynamic configs, its destination chain selector. Same as DestChainConfig but with the destChainSelector so that an array of these
-  /// can be passed in the constructor and the applyDestChainConfigUpdates function
-  //solhint-disable gas-struct-packing
-  struct DestChainConfigArgs {
-    uint64 destChainSelector; // Destination chain selector
-  }
-
   // STATIC CONFIG
   string public constant override typeAndVersion = "EVM2EVMMultiOnRamp 1.6.0-dev";
   /// @dev The chain ID of the source chain that this contract is deployed to
@@ -105,8 +83,10 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
   /// @dev The config for the onRamp
   DynamicConfig internal s_dynamicConfig;
 
-  /// @dev The destination chain specific configs
-  mapping(uint64 destChainSelector => DestChainConfig destChainConfig) internal s_destChainConfig;
+  /// @dev Last used sequence number per destination chain.
+  /// This is zero in the case where no messages have been sent yet.
+  /// 0 is not a valid sequence number for any real transaction.
+  mapping(uint64 destChainSelector => uint64 sequenceNumber) internal s_destChainSequenceNumbers;
 
   // STATE
   /// @dev The amount of LINK available to pay NOPS
@@ -114,11 +94,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
   /// @dev The combined weight of all NOPs weights
   uint32 internal s_nopWeightsTotal;
 
-  constructor(
-    StaticConfig memory staticConfig,
-    DynamicConfig memory dynamicConfig,
-    DestChainConfigArgs[] memory destChainConfigArgs
-  ) {
+  constructor(StaticConfig memory staticConfig, DynamicConfig memory dynamicConfig) {
     if (
       staticConfig.chainSelector == 0 || staticConfig.rmnProxy == address(0) || staticConfig.nonceManager == address(0)
         || staticConfig.tokenAdminRegistry == address(0)
@@ -132,7 +108,6 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
     i_tokenAdminRegistry = staticConfig.tokenAdminRegistry;
 
     _setDynamicConfig(dynamicConfig);
-    _applyDestChainConfigUpdates(destChainConfigArgs);
   }
 
   // ================================================================
@@ -143,7 +118,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
   /// @param destChainSelector The destination chain selector
   /// @return the next sequence number to be used
   function getExpectedNextSequenceNumber(uint64 destChainSelector) external view returns (uint64) {
-    return s_destChainConfig[destChainSelector].sequenceNumber + 1;
+    return s_destChainSequenceNumbers[destChainSelector] + 1;
   }
 
   /// @inheritdoc IEVM2AnyOnRampClient
@@ -153,10 +128,9 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
     uint256 feeTokenAmount,
     address originalSender
   ) external returns (bytes32) {
-    DestChainConfig storage destChainConfig = s_destChainConfig[destChainSelector];
     // TODO: inline generateNewMessage
     Internal.EVM2AnyRampMessage memory newMessage =
-      _generateNewMessage(destChainConfig, destChainSelector, message, feeTokenAmount, originalSender);
+      _generateNewMessage(destChainSelector, message, feeTokenAmount, originalSender);
 
     // Emit message request
     // This must happen after any pool events as some tokens (e.g. USDC) emit events that we expect to precede this
@@ -166,13 +140,11 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
   }
 
   /// @notice Helper function to relieve stack pressure from `forwardFromRouter`
-  /// @param destChainConfig The destination chain config storage pointer
   /// @param destChainSelector The destination chain selector
   /// @param message Message struct to send
   /// @param feeTokenAmount Amount of fee tokens for payment
   /// @param originalSender The original initiator of the CCIP request
   function _generateNewMessage(
-    DestChainConfig storage destChainConfig,
     uint64 destChainSelector,
     Client.EVM2AnyMessage calldata message,
     uint256 feeTokenAmount,
@@ -193,8 +165,9 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
         messageId: "",
         sourceChainSelector: i_chainSelector,
         destChainSelector: destChainSelector,
+        // TODO: verify if this actually increments in storage
         // We need the next available sequence number so we increment before we use the value
-        sequenceNumber: ++destChainConfig.sequenceNumber,
+        sequenceNumber: ++s_destChainSequenceNumbers[destChainSelector],
         nonce: 0
       }),
       sender: originalSender,
@@ -262,8 +235,15 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
 
     // Override extraArgs with latest version
     rampMessage.extraArgs = convertedExtraArgs;
+
     // Hash only after all fields have been set
-    rampMessage.header.messageId = Internal._hash(rampMessage, destChainConfig.metadataHash);
+    rampMessage.header.messageId = Internal._hash(
+      rampMessage,
+      // TODO: move this to _hash function?
+      // Implicit metadata hash preimage to ensure global uniqueness, ensuring 2 identical messages sent to 2 different
+      // lanes will have a distinct hash.
+      keccak256(abi.encode(Internal.EVM_2_ANY_MESSAGE_HASH, i_chainSelector, destChainSelector, address(this)))
+    );
 
     return rampMessage;
   }
@@ -342,55 +322,8 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
     Client.EVM2AnyMessage calldata message
   ) external view returns (uint256 feeTokenAmount) {
     if (IRMN(i_rmnProxy).isCursed(bytes16(uint128(destChainSelector)))) revert CursedByRMN(destChainSelector);
-    if (s_destChainConfig[destChainSelector].metadataHash == bytes32("")) {
-      revert DestinationChainNotEnabled(destChainSelector);
-    }
 
     return IPriceRegistry(s_dynamicConfig.priceRegistry).getValidatedFee(destChainSelector, message);
-  }
-
-  // TODO: revisit removing dest chain configs (fetch through PriceRegistry)
-  /// @notice Updates the destination chain specific config.
-  /// @param destChainConfigArgs Array of source chain specific configs.
-  function applyDestChainConfigUpdates(DestChainConfigArgs[] memory destChainConfigArgs) external onlyOwner {
-    _applyDestChainConfigUpdates(destChainConfigArgs);
-  }
-
-  /// @notice Internal version of applyDestChainConfigUpdates.
-  function _applyDestChainConfigUpdates(DestChainConfigArgs[] memory destChainConfigArgs) internal {
-    for (uint256 i = 0; i < destChainConfigArgs.length; ++i) {
-      DestChainConfigArgs memory destChainConfigArg = destChainConfigArgs[i];
-      uint64 destChainSelector = destChainConfigArg.destChainSelector;
-
-      if (destChainSelector == 0) {
-        revert InvalidDestChainConfig(destChainSelector);
-      }
-
-      DestChainConfig storage destChainConfig = s_destChainConfig[destChainSelector];
-
-      if (destChainConfig.metadataHash == 0) {
-        DestChainConfig memory newDestChainConfig = DestChainConfig({
-          // Sequence numbers start at 0 for newly configured chains
-          sequenceNumber: 0,
-          metadataHash: keccak256(
-            abi.encode(Internal.EVM_2_ANY_MESSAGE_HASH, i_chainSelector, destChainSelector, address(this))
-            )
-        });
-
-        s_destChainConfig[destChainSelector] = newDestChainConfig;
-
-        emit DestChainAdded(destChainSelector, newDestChainConfig);
-      } else {
-        revert DestChainAlreadyConfigured(destChainSelector);
-      }
-    }
-  }
-
-  /// @notice Returns the destination chain config for given destination chain selector.
-  /// @param destChainSelector The destination chain selector.
-  /// @return The destination chain config.
-  function getDestChainConfig(uint64 destChainSelector) external view returns (DestChainConfig memory) {
-    return s_destChainConfig[destChainSelector];
   }
 
   /// @notice Withdraws the outstanding fee token balances to the fee aggregator.

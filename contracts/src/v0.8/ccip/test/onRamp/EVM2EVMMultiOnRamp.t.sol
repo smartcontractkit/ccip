@@ -28,30 +28,12 @@ contract EVM2EVMMultiOnRamp_constructor is EVM2EVMMultiOnRampSetup {
     EVM2EVMMultiOnRamp.DynamicConfig memory dynamicConfig =
       _generateDynamicMultiOnRampConfig(address(s_sourceRouter), address(s_priceRegistry));
 
-    EVM2EVMMultiOnRamp.DestChainConfigArgs[] memory destChainConfigArgs = _generateDestChainConfigArgs();
-    EVM2EVMMultiOnRamp.DestChainConfigArgs memory destChainConfigArg = destChainConfigArgs[0];
-
     vm.expectEmit();
     emit EVM2EVMMultiOnRamp.ConfigSet(staticConfig, dynamicConfig);
-    // We ignore the DestChainConfig values as metadataHash is reliant on contract address.
-    vm.expectEmit(true, false, false, false);
-    emit EVM2EVMMultiOnRamp.DestChainAdded(
-      DEST_CHAIN_SELECTOR,
-      EVM2EVMMultiOnRamp.DestChainConfig({ sequenceNumber: 0, metadataHash: ""})
-    );
 
     _deployOnRamp(
       SOURCE_CHAIN_SELECTOR, address(s_sourceRouter), address(s_outboundNonceManager), address(s_tokenAdminRegistry)
     );
-
-    EVM2EVMMultiOnRamp.DestChainConfig memory expectedDestChainConfig = EVM2EVMMultiOnRamp.DestChainConfig({
-      sequenceNumber: 0,
-      metadataHash: keccak256(
-        abi.encode(
-          Internal.EVM_2_ANY_MESSAGE_HASH, SOURCE_CHAIN_SELECTOR, destChainConfigArg.destChainSelector, address(s_onRamp)
-        )
-        )
-    });
 
     EVM2EVMMultiOnRamp.StaticConfig memory gotStaticConfig = s_onRamp.getStaticConfig();
     _assertStaticConfigsEqual(staticConfig, gotStaticConfig);
@@ -59,13 +41,10 @@ contract EVM2EVMMultiOnRamp_constructor is EVM2EVMMultiOnRampSetup {
     EVM2EVMMultiOnRamp.DynamicConfig memory gotDynamicConfig = s_onRamp.getDynamicConfig();
     _assertDynamicConfigsEqual(dynamicConfig, gotDynamicConfig);
 
-    EVM2EVMMultiOnRamp.DestChainConfig memory gotDestChainConfig = s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR);
-    _assertDestChainConfigsEqual(expectedDestChainConfig, gotDestChainConfig);
-
     // Initial values
     assertEq("EVM2EVMMultiOnRamp 1.6.0-dev", s_onRamp.typeAndVersion());
     assertEq(OWNER, s_onRamp.owner());
-    assertEq(1, s_onRamp.getExpectedNextSequenceNumber(destChainConfigArg.destChainSelector));
+    assertEq(1, s_onRamp.getExpectedNextSequenceNumber(DEST_CHAIN_SELECTOR));
   }
 
   function test_Constructor_InvalidConfigChainSelectorEqZero_Revert() public {
@@ -77,8 +56,7 @@ contract EVM2EVMMultiOnRamp_constructor is EVM2EVMMultiOnRampSetup {
         nonceManager: address(s_outboundNonceManager),
         tokenAdminRegistry: address(s_tokenAdminRegistry)
       }),
-      _generateDynamicMultiOnRampConfig(address(s_sourceRouter), address(s_priceRegistry)),
-      _generateDestChainConfigArgs()
+      _generateDynamicMultiOnRampConfig(address(s_sourceRouter), address(s_priceRegistry))
     );
   }
 
@@ -91,8 +69,7 @@ contract EVM2EVMMultiOnRamp_constructor is EVM2EVMMultiOnRampSetup {
         nonceManager: address(s_outboundNonceManager),
         tokenAdminRegistry: address(s_tokenAdminRegistry)
       }),
-      _generateDynamicMultiOnRampConfig(address(s_sourceRouter), address(s_priceRegistry)),
-      _generateDestChainConfigArgs()
+      _generateDynamicMultiOnRampConfig(address(s_sourceRouter), address(s_priceRegistry))
     );
   }
 
@@ -105,8 +82,7 @@ contract EVM2EVMMultiOnRamp_constructor is EVM2EVMMultiOnRampSetup {
         nonceManager: address(0),
         tokenAdminRegistry: address(s_tokenAdminRegistry)
       }),
-      _generateDynamicMultiOnRampConfig(address(s_sourceRouter), address(s_priceRegistry)),
-      _generateDestChainConfigArgs()
+      _generateDynamicMultiOnRampConfig(address(s_sourceRouter), address(s_priceRegistry))
     );
   }
 
@@ -119,134 +95,8 @@ contract EVM2EVMMultiOnRamp_constructor is EVM2EVMMultiOnRampSetup {
         nonceManager: address(s_outboundNonceManager),
         tokenAdminRegistry: address(0)
       }),
-      _generateDynamicMultiOnRampConfig(address(s_sourceRouter), address(s_priceRegistry)),
-      _generateDestChainConfigArgs()
+      _generateDynamicMultiOnRampConfig(address(s_sourceRouter), address(s_priceRegistry))
     );
-  }
-}
-
-contract EVM2EVMMultiOnRamp_applyDestChainConfigUpdates is EVM2EVMMultiOnRampSetup {
-  function test_Fuzz_applyDestChainConfigUpdates_Success(
-    EVM2EVMMultiOnRamp.DestChainConfigArgs memory destChainConfigArgs
-  ) public {
-    vm.assume(destChainConfigArgs.destChainSelector != 0);
-
-    bool isNewChain = destChainConfigArgs.destChainSelector != DEST_CHAIN_SELECTOR;
-
-    EVM2EVMMultiOnRamp.DestChainConfigArgs[] memory newDestChainConfigArgs =
-      new EVM2EVMMultiOnRamp.DestChainConfigArgs[](1);
-    newDestChainConfigArgs[0] = destChainConfigArgs;
-    EVM2EVMMultiOnRamp.DestChainConfig memory expectedDestChainConfig = EVM2EVMMultiOnRamp.DestChainConfig({
-      sequenceNumber: 0,
-      metadataHash: keccak256(
-        abi.encode(
-          Internal.EVM_2_ANY_MESSAGE_HASH, SOURCE_CHAIN_SELECTOR, destChainConfigArgs.destChainSelector, address(s_onRamp)
-        )
-        )
-    });
-
-    if (isNewChain) {
-      vm.expectEmit();
-      emit EVM2EVMMultiOnRamp.DestChainAdded(destChainConfigArgs.destChainSelector, expectedDestChainConfig);
-    } else {
-      vm.expectRevert(
-        abi.encodeWithSelector(
-          EVM2EVMMultiOnRamp.DestChainAlreadyConfigured.selector, destChainConfigArgs.destChainSelector
-        )
-      );
-    }
-
-    s_onRamp.applyDestChainConfigUpdates(newDestChainConfigArgs);
-
-    if (isNewChain) {
-      _assertDestChainConfigsEqual(
-        expectedDestChainConfig, s_onRamp.getDestChainConfig(destChainConfigArgs.destChainSelector)
-      );
-    }
-  }
-
-  function test_applyDestChainConfigUpdates_Success() public {
-    EVM2EVMMultiOnRamp.DestChainConfigArgs[] memory destChainConfigArgs =
-      new EVM2EVMMultiOnRamp.DestChainConfigArgs[](2);
-    destChainConfigArgs[0] = _generateDestChainConfigArgs()[0];
-    destChainConfigArgs[0].destChainSelector = DEST_CHAIN_SELECTOR + 1;
-    destChainConfigArgs[1] = _generateDestChainConfigArgs()[0];
-    destChainConfigArgs[1].destChainSelector = DEST_CHAIN_SELECTOR + 2;
-
-    EVM2EVMMultiOnRamp.DestChainConfig memory expectedDestChainConfig1 = EVM2EVMMultiOnRamp.DestChainConfig({
-      sequenceNumber: 0,
-      metadataHash: keccak256(
-        abi.encode(
-          Internal.EVM_2_ANY_MESSAGE_HASH,
-          SOURCE_CHAIN_SELECTOR,
-          destChainConfigArgs[0].destChainSelector,
-          address(s_onRamp)
-        )
-        )
-    });
-
-    EVM2EVMMultiOnRamp.DestChainConfig memory expectedDestChainConfig2 = EVM2EVMMultiOnRamp.DestChainConfig({
-      sequenceNumber: 0,
-      metadataHash: keccak256(
-        abi.encode(
-          Internal.EVM_2_ANY_MESSAGE_HASH,
-          SOURCE_CHAIN_SELECTOR,
-          destChainConfigArgs[1].destChainSelector,
-          address(s_onRamp)
-        )
-        )
-    });
-
-    vm.expectEmit();
-    emit EVM2EVMMultiOnRamp.DestChainAdded(DEST_CHAIN_SELECTOR + 1, expectedDestChainConfig1);
-    vm.expectEmit();
-    emit EVM2EVMMultiOnRamp.DestChainAdded(DEST_CHAIN_SELECTOR + 2, expectedDestChainConfig2);
-
-    vm.recordLogs();
-    s_onRamp.applyDestChainConfigUpdates(destChainConfigArgs);
-
-    EVM2EVMMultiOnRamp.DestChainConfig memory gotDestChainConfig1 = s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR + 1);
-    EVM2EVMMultiOnRamp.DestChainConfig memory gotDestChainConfig2 = s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR + 2);
-
-    assertEq(vm.getRecordedLogs().length, 2);
-    _assertDestChainConfigsEqual(expectedDestChainConfig1, gotDestChainConfig1);
-    _assertDestChainConfigsEqual(expectedDestChainConfig2, gotDestChainConfig2);
-  }
-
-  function test_applyDestChainConfigUpdatesZeroInput_Success() public {
-    EVM2EVMMultiOnRamp.DestChainConfigArgs[] memory destChainConfigArgs =
-      new EVM2EVMMultiOnRamp.DestChainConfigArgs[](0);
-
-    vm.recordLogs();
-    s_onRamp.applyDestChainConfigUpdates(destChainConfigArgs);
-
-    assertEq(vm.getRecordedLogs().length, 0);
-  }
-
-  // Reverts
-
-  function test_applyDestChainConfigUpdatesExistingChain_Revert() public {
-    EVM2EVMMultiOnRamp.DestChainConfigArgs[] memory destChainConfigArgs =
-      new EVM2EVMMultiOnRamp.DestChainConfigArgs[](1);
-    destChainConfigArgs[0] = _generateDestChainConfigArgs()[0];
-
-    vm.expectRevert(
-      abi.encodeWithSelector(
-        EVM2EVMMultiOnRamp.DestChainAlreadyConfigured.selector, destChainConfigArgs[0].destChainSelector
-      )
-    );
-    s_onRamp.applyDestChainConfigUpdates(destChainConfigArgs);
-  }
-
-  function test_InvalidDestChainConfigDestChainSelectorEqZero_Revert() public {
-    EVM2EVMMultiOnRamp.DestChainConfigArgs[] memory destChainConfigArgs = _generateDestChainConfigArgs();
-    EVM2EVMMultiOnRamp.DestChainConfigArgs memory destChainConfigArg = destChainConfigArgs[0];
-
-    destChainConfigArg.destChainSelector = 0;
-    vm.expectRevert(
-      abi.encodeWithSelector(EVM2EVMMultiOnRamp.InvalidDestChainConfig.selector, destChainConfigArg.destChainSelector)
-    );
-    s_onRamp.applyDestChainConfigUpdates(destChainConfigArgs);
   }
 }
 
@@ -353,7 +203,7 @@ contract EVM2EVMMultiOnRamp_forwardFromRouter is EVM2EVMMultiOnRampSetup {
 
     for (uint64 i = 1; i < 4; ++i) {
       uint64 nonceBefore = s_outboundNonceManager.getOutboundNonce(DEST_CHAIN_SELECTOR, OWNER);
-      uint64 sequenceNumberBefore = s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR).sequenceNumber;
+      uint64 sequenceNumberBefore = s_onRamp.getExpectedNextSequenceNumber(DEST_CHAIN_SELECTOR) - 1;
 
       vm.expectEmit();
       emit EVM2EVMMultiOnRamp.CCIPSendRequested(DEST_CHAIN_SELECTOR, _messageToEvent(message, i, i, 0, OWNER));
@@ -361,7 +211,7 @@ contract EVM2EVMMultiOnRamp_forwardFromRouter is EVM2EVMMultiOnRampSetup {
       s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 0, OWNER);
 
       uint64 nonceAfter = s_outboundNonceManager.getOutboundNonce(DEST_CHAIN_SELECTOR, OWNER);
-      uint64 sequenceNumberAfter = s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR).sequenceNumber;
+      uint64 sequenceNumberAfter = s_onRamp.getExpectedNextSequenceNumber(DEST_CHAIN_SELECTOR) - 1;
       assertEq(nonceAfter, nonceBefore + 1);
       assertEq(sequenceNumberAfter, sequenceNumberBefore + 1);
     }
@@ -375,7 +225,7 @@ contract EVM2EVMMultiOnRamp_forwardFromRouter is EVM2EVMMultiOnRampSetup {
 
     for (uint64 i = 1; i < 4; ++i) {
       uint64 nonceBefore = s_outboundNonceManager.getOutboundNonce(DEST_CHAIN_SELECTOR, OWNER);
-      uint64 sequenceNumberBefore = s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR).sequenceNumber;
+      uint64 sequenceNumberBefore = s_onRamp.getExpectedNextSequenceNumber(DEST_CHAIN_SELECTOR) - 1;
 
       vm.expectEmit();
       emit EVM2EVMMultiOnRamp.CCIPSendRequested(DEST_CHAIN_SELECTOR, _messageToEvent(message, i, i, 0, OWNER));
@@ -383,7 +233,7 @@ contract EVM2EVMMultiOnRamp_forwardFromRouter is EVM2EVMMultiOnRampSetup {
       s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 0, OWNER);
 
       uint64 nonceAfter = s_outboundNonceManager.getOutboundNonce(DEST_CHAIN_SELECTOR, OWNER);
-      uint64 sequenceNumberAfter = s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR).sequenceNumber;
+      uint64 sequenceNumberAfter = s_onRamp.getExpectedNextSequenceNumber(DEST_CHAIN_SELECTOR) - 1;
       assertEq(nonceAfter, nonceBefore);
       assertEq(sequenceNumberAfter, sequenceNumberBefore + 1);
     }
@@ -796,13 +646,6 @@ contract EVM2EVMMultiOnRamp_getFee is EVM2EVMMultiOnRampSetup {
   }
 
   // Reverts
-
-  function test_DestinationChainNotEnabled_Revert() public {
-    vm.expectRevert(
-      abi.encodeWithSelector(EVM2EVMMultiOnRamp.DestinationChainNotEnabled.selector, DEST_CHAIN_SELECTOR + 1)
-    );
-    s_onRamp.getFee(DEST_CHAIN_SELECTOR + 1, _generateEmptyMessage());
-  }
 
   function test_Unhealthy_Revert() public {
     s_mockRMN.setGlobalCursed(true);
