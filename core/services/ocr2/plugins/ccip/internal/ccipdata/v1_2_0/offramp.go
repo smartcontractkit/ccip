@@ -123,7 +123,8 @@ func (c JSONExecOffchainConfig) Validate() error {
 // OffRamp In 1.2 we have a different estimator impl
 type OffRamp struct {
 	*v1_0_0.OffRamp
-	offRampV120 evm_2_evm_offramp_1_2_0.EVM2EVMOffRampInterface
+	offRampV120   evm_2_evm_offramp_1_2_0.EVM2EVMOffRampInterface
+	daConfigCache ccipdata.DAConfigCacheReader
 }
 
 func (o *OffRamp) CurrentRateLimiterState(ctx context.Context) (cciptypes.TokenBucketRateLimit, error) {
@@ -180,7 +181,7 @@ func (o *OffRamp) ChangeConfig(ctx context.Context, onchainConfigBytes []byte, o
 		PermissionLessExecutionThresholdSeconds: time.Second * time.Duration(onchainConfigParsed.PermissionLessExecutionThresholdSeconds),
 		Router:                                  cciptypes.Address(onchainConfigParsed.Router.String()),
 	}
-	priceEstimator := prices.NewDAGasPriceEstimator(o.Estimator, o.DestMaxGasPrice, 0, 0)
+	priceEstimator := prices.NewDAGasPriceEstimator(o.Estimator, o.DestMaxGasPrice, 0, 0, o.daConfigCache)
 
 	o.UpdateDynamicConfig(onchainConfig, offchainConfig, priceEstimator)
 
@@ -342,7 +343,8 @@ func NewOffRamp(
 	v100.ExecutionReportArgs = abihelpers.MustGetMethodInputs("manuallyExecute", abiOffRamp)[:1]
 
 	return &OffRamp{
-		OffRamp:     v100,
-		offRampV120: offRamp,
+		OffRamp:       v100,
+		offRampV120:   offRamp,
+		daConfigCache: dacc,
 	}, nil
 }

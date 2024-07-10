@@ -1,6 +1,7 @@
 package prices
 
 import (
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"math/big"
 
 	"github.com/Masterminds/semver/v3"
@@ -45,14 +46,16 @@ func NewGasPriceEstimatorForCommitPlugin(
 	commitStoreVersion semver.Version,
 	estimator gas.EvmFeeEstimator,
 	maxExecGasPrice *big.Int,
+
 	daDeviationPPB int64,
 	execDeviationPPB int64,
+	dacc ccipdata.DAConfigCacheReader,
 ) (GasPriceEstimatorCommit, error) {
 	switch commitStoreVersion.String() {
 	case "1.0.0", "1.1.0":
 		return NewExecGasPriceEstimator(estimator, maxExecGasPrice, execDeviationPPB), nil
 	case "1.2.0":
-		return NewDAGasPriceEstimator(estimator, maxExecGasPrice, execDeviationPPB, daDeviationPPB), nil
+		return NewDAGasPriceEstimator(estimator, maxExecGasPrice, execDeviationPPB, daDeviationPPB, dacc), nil
 	default:
 		return nil, errors.Errorf("Invalid commitStore version: %s", commitStoreVersion)
 	}

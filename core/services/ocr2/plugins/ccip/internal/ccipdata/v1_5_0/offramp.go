@@ -70,6 +70,7 @@ type OffRamp struct {
 	*v1_2_0.OffRamp
 	offRampV150           evm_2_evm_offramp.EVM2EVMOffRampInterface
 	cachedRateLimitTokens cache.AutoSync[cciptypes.OffRampTokens]
+	daConfigCache         ccipdata.DAConfigCacheReader
 }
 
 // GetTokens Returns no data as the offRamps no longer have this information.
@@ -155,7 +156,7 @@ func (o *OffRamp) ChangeConfig(ctx context.Context, onchainConfigBytes []byte, o
 		PermissionLessExecutionThresholdSeconds: time.Second * time.Duration(onchainConfigParsed.PermissionLessExecutionThresholdSeconds),
 		Router:                                  cciptypes.Address(onchainConfigParsed.Router.String()),
 	}
-	priceEstimator := prices.NewDAGasPriceEstimator(o.Estimator, o.DestMaxGasPrice, 0, 0)
+	priceEstimator := prices.NewDAGasPriceEstimator(o.Estimator, o.DestMaxGasPrice, 0, 0, o.daConfigCache)
 
 	o.UpdateDynamicConfig(onchainConfig, offchainConfig, priceEstimator)
 
@@ -188,8 +189,9 @@ func NewOffRamp(
 	v120.ExecutionReportArgs = abihelpers.MustGetMethodInputs("manuallyExecute", abiOffRamp)[:1]
 
 	return &OffRamp{
-		OffRamp:     v120,
-		offRampV150: offRamp,
+		daConfigCache: dacc,
+		OffRamp:       v120,
+		offRampV150:   offRamp,
 		cachedRateLimitTokens: cache.NewLogpollerEventsBased[cciptypes.OffRampTokens](
 			lp,
 			[]common.Hash{RateLimitTokenAddedEvent, RateLimitTokenRemovedEvent},

@@ -3,6 +3,7 @@ package evm
 import (
 	"context"
 	"fmt"
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/types"
 	"math/big"
 	"net/url"
 	"time"
@@ -23,7 +24,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/dataavailability"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/tokendata/usdc"
 )
 
@@ -41,7 +41,7 @@ type SrcExecProvider struct {
 	usdcAttestationAPIIntervalMilliseconds int
 	usdcSrcMsgTransmitterAddr              common.Address
 
-	dacc *dataavailability.DAConfigCache
+	daConfigCache types.DAConfigProvider
 
 	// these values are nil and are updated for Close()
 	seenOnRampAddress       *cciptypes.Address
@@ -62,7 +62,7 @@ func NewSrcExecProvider(
 	usdcAttestationAPITimeoutSeconds int,
 	usdcAttestationAPIIntervalMilliseconds int,
 	usdcSrcMsgTransmitterAddr common.Address,
-	dacc *dataavailability.DAConfigCache,
+	dacc types.DAConfigProvider,
 ) (commontypes.CCIPExecProvider, error) {
 	var usdcReader *ccip.USDCReaderImpl
 	var err error
@@ -86,7 +86,7 @@ func NewSrcExecProvider(
 		usdcAttestationAPITimeoutSeconds:       usdcAttestationAPITimeoutSeconds,
 		usdcAttestationAPIIntervalMilliseconds: usdcAttestationAPIIntervalMilliseconds,
 		usdcSrcMsgTransmitterAddr:              usdcSrcMsgTransmitterAddr,
-		dacc:                                   dacc,
+		daConfigCache:                          dacc,
 	}, nil
 }
 
@@ -180,7 +180,8 @@ func (s *SrcExecProvider) NewOnRampReader(ctx context.Context, onRampAddress cci
 	s.seenOnRampAddress = &onRampAddress
 
 	versionFinder := ccip.NewEvmVersionFinder()
-	onRampReader, err = ccip.NewOnRampReader(s.lggr, versionFinder, sourceChainSelector, destChainSelector, onRampAddress, s.lp, s.client, s.dacc)
+	onRampReader, err = ccip.NewOnRampReader(s.lggr, versionFinder, sourceChainSelector, destChainSelector, onRampAddress, s.lp, s.client)
+	s.daConfigCache.SetOnRampReader(onRampReader)
 	return
 }
 
@@ -241,7 +242,7 @@ type DstExecProvider struct {
 	configWatcher       *configWatcher
 	gasEstimator        gas.EvmFeeEstimator
 	maxGasPrice         big.Int
-	dacc                *dataavailability.DAConfigCache
+	daConfigCache       types.DAConfigProvider
 	txm                 txmgr.TxManager
 	offRampAddress      cciptypes.Address
 
@@ -259,7 +260,7 @@ func NewDstExecProvider(
 	configWatcher *configWatcher,
 	gasEstimator gas.EvmFeeEstimator,
 	maxGasPrice big.Int,
-	dacc *dataavailability.DAConfigCache,
+	dacc types.DAConfigProvider,
 	txm txmgr.TxManager,
 	offRampAddress cciptypes.Address,
 ) (commontypes.CCIPExecProvider, error) {
@@ -273,7 +274,7 @@ func NewDstExecProvider(
 		configWatcher:       configWatcher,
 		gasEstimator:        gasEstimator,
 		maxGasPrice:         maxGasPrice,
-		dacc:                dacc,
+		daConfigCache:       dacc,
 		txm:                 txm,
 		offRampAddress:      offRampAddress,
 	}, nil
@@ -359,7 +360,7 @@ func (d *DstExecProvider) NewCommitStoreReader(ctx context.Context, addr cciptyp
 }
 
 func (d *DstExecProvider) NewOffRampReader(ctx context.Context, offRampAddress cciptypes.Address) (offRampReader cciptypes.OffRampReader, err error) {
-	offRampReader, err = ccip.NewOffRampReader(d.lggr, d.versionFinder, offRampAddress, d.client, d.lp, d.gasEstimator, &d.maxGasPrice, true, d.dacc)
+	offRampReader, err = ccip.NewOffRampReader(d.lggr, d.versionFinder, offRampAddress, d.client, d.lp, d.gasEstimator, &d.maxGasPrice, true, d.daConfigCache)
 	return
 }
 

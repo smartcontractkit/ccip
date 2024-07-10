@@ -1,9 +1,9 @@
 package ccipdata
 
-type DAConfigCacheWriter interface {
-	Set(destDataAvailabilityOverheadGas, destGasPerDataAvailabilityByte, destDataAvailabilityMultiplierBps int64)
-}
+import (
+	"context"
+)
 
 type DAConfigCacheReader interface {
-	Get() (destDataAvailabilityOverheadGas, destGasPerDataAvailabilityByte, destDataAvailabilityMultiplierBps int64)
+	Get(ctx context.Context) (destDAOverheadGas, destGasPerDAByte, destDAMultiplierBps int64, err error)
 }

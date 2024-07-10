@@ -96,6 +96,9 @@ func NewExecServices(ctx context.Context, lggr logger.Logger, jb job.Job, srcPro
 		return nil, fmt.Errorf("get source wrapped native token: %w", err)
 	}
 
+	dacc := dataavailability.NewDAConfigCache()
+	dacc.SetOnRampReader(onRampReader)
+
 	srcCommitStore, err := srcProvider.NewCommitStoreReader(ctx, offRampConfig.CommitStore)
 	if err != nil {
 		return nil, fmt.Errorf("could not create src commitStoreReader reader: %w", err)

@@ -2,6 +2,7 @@ package v1_5_0
 
 import (
 	"context"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -41,8 +42,14 @@ func (c *CommitStore) IsDown(ctx context.Context) (bool, error) {
 	return !unPausedAndNotCursed, nil
 }
 
-func NewCommitStore(lggr logger.Logger, addr common.Address, ec client.Client, lp logpoller.LogPoller) (*CommitStore, error) {
-	v120, err := v1_2_0.NewCommitStore(lggr, addr, ec, lp)
+func NewCommitStore(
+	lggr logger.Logger,
+	addr common.Address,
+	ec client.Client,
+	lp logpoller.LogPoller,
+	dacc ccipdata.DAConfigCacheReader,
+) (*CommitStore, error) {
+	v120, err := v1_2_0.NewCommitStore(lggr, addr, ec, lp, dacc)
 	if err != nil {
 		return nil, err
 	}

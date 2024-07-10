@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/dataavailability"
 	"math/big"
 	"math/rand"
 	"slices"
@@ -410,7 +411,9 @@ func TestCommitReportingPlugin_Report(t *testing.T) {
 
 			evmEstimator := mocks.NewEvmFeeEstimator(t)
 			evmEstimator.On("L1Oracle").Return(nil)
-			gasPriceEstimator := prices.NewDAGasPriceEstimator(evmEstimator, nil, 2e9, 2e9) // 200% deviation
+
+			daConfigCache := dataavailability.NewDAConfigCache()
+			gasPriceEstimator := prices.NewDAGasPriceEstimator(evmEstimator, nil, 2e9, 2e9, daConfigCache) // 200% deviation
 
 			var destTokens []cciptypes.Address
 			for tk := range tc.tokenDecimals {
@@ -434,7 +437,7 @@ func TestCommitReportingPlugin_Report(t *testing.T) {
 			})).Return(destDecimals, nil).Maybe()
 
 			lp := mocks2.NewLogPoller(t)
-			commitStoreReader, err := v1_2_0.NewCommitStore(logger.TestLogger(t), utils.RandomAddress(), nil, lp)
+			commitStoreReader, err := v1_2_0.NewCommitStore(logger.TestLogger(t), utils.RandomAddress(), nil, lp, daConfigCache)
 			assert.NoError(t, err)
 
 			healthCheck := ccipcachemocks.NewChainHealthcheck(t)
@@ -1532,6 +1535,7 @@ func TestCommitReportingPlugin_calculatePriceUpdates(t *testing.T) {
 				nil,
 				tc.daGasPriceDeviationPPB,
 				tc.execGasPriceDeviationPPB,
+				dataavailability.NewDAConfigCache(),
 			)
 
 			r := &CommitReportingPlugin{

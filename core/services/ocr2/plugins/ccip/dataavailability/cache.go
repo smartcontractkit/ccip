@@ -1,21 +1,37 @@
 package dataavailability
 
+import (
+	"context"
+	"errors"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
+	"sync"
+)
+
 type DAConfigCache struct {
-	destDataAvailabilityOverheadGas   int64 //    Extra data availability gas charged on top of the message, e.g. for OCR
-	destGasPerDataAvailabilityByte    int64 //     Amount of gas to charge per byte of message data that needs availability
-	destDataAvailabilityMultiplierBps int64 // Multiplier for data availability gas, multiples of bps, or 0.0001
+	onRampReader ccip.OnRampReader
+	once         sync.Once
 }
 
 func NewDAConfigCache() *DAConfigCache {
 	return &DAConfigCache{}
 }
 
-func (c *DAConfigCache) Set(destDataAvailabilityOverheadGas, destGasPerDataAvailabilityByte, destDataAvailabilityMultiplierBps int64) {
-	c.destGasPerDataAvailabilityByte = destGasPerDataAvailabilityByte
-	c.destDataAvailabilityOverheadGas = destDataAvailabilityOverheadGas
-	c.destDataAvailabilityMultiplierBps = destDataAvailabilityMultiplierBps
+func (c *DAConfigCache) SetOnRampReader(reader ccip.OnRampReader) {
+	c.onRampReader = reader
 }
 
-func (c *DAConfigCache) Get() (destDataAvailabilityOverheadGas, destGasPerDataAvailabilityByte, destDataAvailabilityMultiplierBps int64) {
-	return c.destDataAvailabilityOverheadGas, c.destGasPerDataAvailabilityByte, c.destDataAvailabilityMultiplierBps
+func (c *DAConfigCache) Get(ctx context.Context) (destDataAvailabilityOverheadGas, destGasPerDataAvailabilityByte, destDataAvailabilityMultiplierBps int64, err error) {
+	if c.onRampReader == nil {
+		return 0, 0, 0, errors.New("no OnRampReader has been configured")
+	}
+
+	cfg, err := c.onRampReader.GetDynamicConfig(ctx)
+	if err != nil {
+		return 0, 0, 0, err
+	}
+
+	return int64(cfg.DestDataAvailabilityOverheadGas),
+		int64(cfg.DestGasPerDataAvailabilityByte),
+		int64(cfg.DestDataAvailabilityMultiplierBps),
+		err
 }

@@ -1,8 +1,10 @@
 package types
 
 import (
+	"context"
 	"database/sql/driver"
 	"encoding/json"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
 	"log/slog"
 	"math/big"
 	"os"
@@ -415,4 +417,9 @@ func (h *HashArray) Scan(src interface{}) error {
 		*h = append(*h, hash)
 	}
 	return err
+}
+
+type DAConfigProvider interface {
+	SetOnRampReader(reader ccip.OnRampReader)
+	Get(ctx context.Context) (destDataAvailabilityOverheadGas, destGasPerDataAvailabilityByte, destDataAvailabilityMultiplierBps int64, err error)
 }

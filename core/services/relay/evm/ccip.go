@@ -3,6 +3,7 @@ package evm
 import (
 	"context"
 	"fmt"
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/types"
 	"math/big"
 	"time"
 
@@ -30,12 +31,14 @@ type IncompleteSourceCommitStoreReader struct {
 	gasPriceEstimator *prices.DAGasPriceEstimator
 	sourceMaxGasPrice *big.Int
 	offchainConfig    cciptypes.CommitOffchainConfig
+	daConfigCache     types.DAConfigProvider
 }
 
-func NewIncompleteSourceCommitStoreReader(estimator gas.EvmFeeEstimator, sourceMaxGasPrice *big.Int) *IncompleteSourceCommitStoreReader {
+func NewIncompleteSourceCommitStoreReader(estimator gas.EvmFeeEstimator, sourceMaxGasPrice *big.Int, dacc types.DAConfigProvider) *IncompleteSourceCommitStoreReader {
 	return &IncompleteSourceCommitStoreReader{
 		estimator:         estimator,
 		sourceMaxGasPrice: sourceMaxGasPrice,
+		daConfigCache:     dacc,
 	}
 }
 
@@ -55,6 +58,7 @@ func (i *IncompleteSourceCommitStoreReader) ChangeConfig(ctx context.Context, on
 		i.sourceMaxGasPrice,
 		int64(offchainConfigParsed.ExecGasPriceDeviationPPB),
 		int64(offchainConfigParsed.DAGasPriceDeviationPPB),
+		i.daConfigCache,
 	)
 	i.offchainConfig = ccip.NewCommitOffchainConfig(
 		offchainConfigParsed.ExecGasPriceDeviationPPB,
@@ -133,8 +137,15 @@ type IncompleteDestCommitStoreReader struct {
 	cs cciptypes.CommitStoreReader
 }
 
-func NewIncompleteDestCommitStoreReader(lggr logger.Logger, versionFinder ccip.VersionFinder, address cciptypes.Address, ec client.Client, lp logpoller.LogPoller) (*IncompleteDestCommitStoreReader, error) {
-	cs, err := ccip.NewCommitStoreReader(lggr, versionFinder, address, ec, lp)
+func NewIncompleteDestCommitStoreReader(
+	lggr logger.Logger,
+	versionFinder ccip.VersionFinder,
+	address cciptypes.Address,
+	ec client.Client,
+	lp logpoller.LogPoller,
+	dacc types.DAConfigProvider,
+) (*IncompleteDestCommitStoreReader, error) {
+	cs, err := ccip.NewCommitStoreReader(lggr, versionFinder, address, ec, lp, dacc)
 	if err != nil {
 		return nil, err
 	}

@@ -37,8 +37,8 @@ func NewEvmPriceRegistry(lp logpoller.LogPoller, ec client.Client, lggr logger.L
 
 type VersionFinder = factory.VersionFinder
 
-func NewCommitStoreReader(lggr logger.Logger, versionFinder VersionFinder, address ccip.Address, ec client.Client, lp logpoller.LogPoller) (ccipdata.CommitStoreReader, error) {
-	return factory.NewCommitStoreReader(lggr, versionFinder, address, ec, lp)
+func NewCommitStoreReader(lggr logger.Logger, versionFinder VersionFinder, address ccip.Address, ec client.Client, lp logpoller.LogPoller, dacc ccipdata.DAConfigCacheReader) (ccipdata.CommitStoreReader, error) {
+	return factory.NewCommitStoreReader(lggr, versionFinder, address, ec, lp, dacc)
 }
 
 func CloseCommitStoreReader(lggr logger.Logger, versionFinder VersionFinder, address ccip.Address, ec client.Client, lp logpoller.LogPoller) error {
@@ -57,8 +57,8 @@ func NewEvmVersionFinder() factory.EvmVersionFinder {
 	return factory.NewEvmVersionFinder()
 }
 
-func NewOnRampReader(lggr logger.Logger, versionFinder VersionFinder, sourceSelector, destSelector uint64, onRampAddress ccip.Address, sourceLP logpoller.LogPoller, source client.Client, dacc ccipdata.DAConfigCacheWriter) (ccipdata.OnRampReader, error) {
-	return factory.NewOnRampReader(lggr, versionFinder, sourceSelector, destSelector, onRampAddress, sourceLP, source, dacc)
+func NewOnRampReader(lggr logger.Logger, versionFinder VersionFinder, sourceSelector, destSelector uint64, onRampAddress ccip.Address, sourceLP logpoller.LogPoller, source client.Client) (ccipdata.OnRampReader, error) {
+	return factory.NewOnRampReader(lggr, versionFinder, sourceSelector, destSelector, onRampAddress, sourceLP, source)
 }
 
 func CloseOnRampReader(lggr logger.Logger, versionFinder VersionFinder, sourceSelector, destSelector uint64, onRampAddress ccip.Address, sourceLP logpoller.LogPoller, source client.Client) error {
