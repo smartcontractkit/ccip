@@ -168,7 +168,7 @@ func (s *SrcExecProvider) GetTransactionStatus(ctx context.Context, transactionI
 }
 
 func (s *SrcExecProvider) NewCommitStoreReader(ctx context.Context, addr cciptypes.Address) (commitStoreReader cciptypes.CommitStoreReader, err error) {
-	commitStoreReader = NewIncompleteSourceCommitStoreReader(s.estimator, s.maxGasPrice)
+	commitStoreReader = NewIncompleteSourceCommitStoreReader(s.estimator, s.maxGasPrice, s.daConfigCache)
 	return
 }
 
@@ -355,7 +355,7 @@ func (d *DstExecProvider) NewCommitStoreReader(ctx context.Context, addr cciptyp
 	d.seenCommitStoreAddr = &addr
 
 	versionFinder := ccip.NewEvmVersionFinder()
-	commitStoreReader, err = NewIncompleteDestCommitStoreReader(d.lggr, versionFinder, addr, d.client, d.lp)
+	commitStoreReader, err = NewIncompleteDestCommitStoreReader(d.lggr, versionFinder, addr, d.client, d.lp, d.daConfigCache)
 	return
 }
 
