@@ -343,6 +343,11 @@ func (c *CommitStore) GetCommitReportMatchingSeqNum(ctx context.Context, seqNr u
 }
 
 func (c *CommitStore) GetAcceptedCommitReportsGteTimestamp(ctx context.Context, ts time.Time, confs int) ([]cciptypes.CommitStoreReportWithTxMeta, error) {
+	latestBlock, err := c.lp.LatestBlock(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	logs, err := c.lp.LogsCreatedAfter(
 		ctx,
 		c.reportAcceptedSig,
@@ -362,7 +367,7 @@ func (c *CommitStore) GetAcceptedCommitReportsGteTimestamp(ctx context.Context, 
 	res := make([]cciptypes.CommitStoreReportWithTxMeta, 0, len(parsedLogs))
 	for _, log := range parsedLogs {
 		res = append(res, cciptypes.CommitStoreReportWithTxMeta{
-			TxMeta:            log.TxMeta,
+			TxMeta:            log.TxMeta.UpdateFinalityStatus(uint64(latestBlock.FinalizedBlockNumber)),
 			CommitStoreReport: log.Data,
 		})
 	}

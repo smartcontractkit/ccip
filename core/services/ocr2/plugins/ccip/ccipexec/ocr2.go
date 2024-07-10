@@ -708,39 +708,13 @@ func (r *ExecutionReportingPlugin) getUnexpiredCommitReports(
 	commitStoreReader ccipdata.CommitStoreReader,
 	lggr logger.Logger,
 ) ([]cciptypes.CommitStoreReport, error) {
-	createdAfterTimestamp := r.commitRootsCache.OldestRootTimestamp()
-	lggr.Infow("Fetching unexpired commit roots from database", "createdAfterTimestamp", createdAfterTimestamp)
-	acceptedReports, err := commitStoreReader.GetAcceptedCommitReportsGteTimestamp(
-		ctx,
-		createdAfterTimestamp,
-		0,
-	)
+	eligibleRootsForExec, err := r.commitRootsCache.RootsEligibleForExecution(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	var reports []cciptypes.CommitStoreReport
-	for _, acceptedReport := range acceptedReports {
-		reports = append(reports, acceptedReport.CommitStoreReport)
-		r.commitRootsCache.AppendUnexecutedRoot(acceptedReport.MerkleRoot, time.UnixMilli(acceptedReport.TxMeta.BlockTimestampUnixMilli))
-	}
-
-	notSnoozedReports := make([]cciptypes.CommitStoreReport, 0)
-	for _, report := range reports {
-		if r.commitRootsCache.IsSkipped(report.MerkleRoot) {
-			lggr.Debugw("Skipping snoozed root",
-				"minSeqNr", report.Interval.Min,
-				"maxSeqNr", report.Interval.Max,
-				"root", hex.EncodeToString(report.MerkleRoot[:]),
-			)
-			continue
-		}
-		notSnoozedReports = append(notSnoozedReports, report)
-	}
-
-	r.metricsCollector.UnexpiredCommitRoots(len(notSnoozedReports))
-	lggr.Infow("Unexpired roots", "all", len(reports), "notSnoozed", len(notSnoozedReports))
-	return notSnoozedReports, nil
+	r.metricsCollector.UnexpiredCommitRoots(len(eligibleRootsForExec))
+	return eligibleRootsForExec, nil
 }
 
 type execTokenData struct {
