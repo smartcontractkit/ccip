@@ -506,7 +506,13 @@ func DeployEnvironments(
 								"baseFee":                   fmt.Sprintf("%d", pointer.GetInt64(anvilConfig.BaseFee)),
 							},
 							"resources": GethResourceProfile,
-							"capacity":  "100Gi",
+							"capacity":  "150Gi",
+							"volumeMounts": []map[string]interface{}{
+								{
+									"name":      "state-storage",
+									"mountPath": "/home/foundry/.foundry/anvil",
+								},
+							},
 						},
 					}))
 				selectedNetworks[i].Simulated = true
