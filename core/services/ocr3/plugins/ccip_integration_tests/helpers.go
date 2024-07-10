@@ -61,6 +61,7 @@ type onchainUniverse struct {
 	offramp            *evm_2_evm_multi_offramp.EVM2EVMMultiOffRamp
 	priceRegistry      *price_registry.PriceRegistry
 	tokenAdminRegistry *token_admin_registry.TokenAdminRegistry
+	nonceManager       *nonce_manager.NonceManager
 }
 
 func deployContracts(
@@ -188,6 +189,12 @@ func deployContracts(
 
 		onramp, err := evm_2_evm_multi_onramp.NewEVM2EVMMultiOnRamp(onrampAddr, backend)
 		require.NoError(t, err)
+		authorizedCallersAuthorizedCallerArgs := nonce_manager.AuthorizedCallersAuthorizedCallerArgs{
+			AddedCallers: []common.Address{onrampAddr},
+		}
+		_, err = nonceManager.ApplyAuthorizedCallerUpdates(owner, authorizedCallersAuthorizedCallerArgs)
+		require.NoError(t, err)
+		backend.Commit()
 
 		offrampAddr, _, _, err := evm_2_evm_multi_offramp.DeployEVM2EVMMultiOffRamp(
 			owner,
@@ -219,6 +226,7 @@ func deployContracts(
 			offramp:            offramp,
 			priceRegistry:      priceRegistry,
 			tokenAdminRegistry: tokenAdminRegistry,
+			nonceManager:       nonceManager,
 		}
 	}
 

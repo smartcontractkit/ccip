@@ -77,6 +77,8 @@ compileContract ccip/tokenAdminRegistry/TokenAdminRegistry.sol
 compileContract ccip/tokenAdminRegistry/RegistryModuleOwnerCustom.sol
 compileContract ccip/capability/CCIPConfig.sol
 compileContract ccip/capability/interfaces/IOCR3ConfigEncoder.sol
+compileContract ccip/interfaces/INonceManager.sol
+compileContract ccip/NonceManager.sol
 
 # Test helpers
 compileContract ccip/test/helpers/BurnMintERC677Helper.sol
