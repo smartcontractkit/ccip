@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
+import {Client} from "../libraries/Client.sol";
 import {Internal} from "../libraries/Internal.sol";
 
 interface IPriceRegistry {
@@ -71,4 +72,24 @@ interface IPriceRegistry {
   /// @notice Get the list of fee tokens.
   /// @return The tokens set as fee tokens.
   function getFeeTokens() external view returns (address[] memory);
+
+  /// @notice Validates the ccip message & returns the fee
+  /// @param destChainSelector The destination chain selector.
+  /// @param message The message to get quote for.
+  /// @return feeTokenAmount The amount of fee token needed for the fee, in smallest denomination of the fee token.
+  function getValidatedFee(
+    uint64 destChainSelector,
+    Client.EVM2AnyMessage calldata message
+  ) external view returns (uint256 feeTokenAmount);
+
+  /// @notice Validates the message that is emitted from an OnRamp, and returns the converted message fee in juels
+  /// @param message OnRamp message to validate
+  /// @param sourceTokenAmounts Source token amounts that match the message tokenAmounts
+  /// @return msgFeeJuels message fee in juels
+  /// @return isOutOfOrderExecution true if the message should be executed out of order
+  /// @return convertedExtraArgs extra args converted to the latest family-specific args version
+  function getValidatedRampMessageParams(
+    Internal.EVM2AnyRampMessage memory message,
+    Client.EVMTokenAmount[] memory sourceTokenAmounts
+  ) external view returns (uint256 msgFeeJuels, bool isOutOfOrderExecution, bytes memory convertedExtraArgs);
 }
