@@ -9,7 +9,9 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
+
 	chainsel "github.com/smartcontractkit/chain-selectors"
+
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/arm_proxy_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_multi_offramp"
@@ -179,7 +181,6 @@ func setupInitialConfigs(
 	universes map[uint64]onchainUniverse,
 	homeChainUniverse homeChain,
 ) {
-
 	// Setup the capability registry on the home chain
 	_, err := homeChainUniverse.capabilityRegistry.AddCapabilities(owner, []kcr.CapabilitiesRegistryCapability{
 		{
@@ -275,6 +276,7 @@ func setupInitialConfigs(
 		_, err := uni.linkToken.GrantMintRole(owner, owner.From)
 		require.NoError(t, err)
 		_, err = uni.linkToken.Mint(owner, owner.From, e18Mult(1000))
+		require.NoError(t, err)
 		uni.backend.Commit()
 		//===========================OnRamp=====================================
 		_, err = uni.onramp.ApplyDestChainConfigUpdates(owner, onrampDestChainConfigArgs)
