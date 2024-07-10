@@ -9,6 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/ccip_config"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
 
@@ -33,11 +34,11 @@ import (
 var (
 	homeChainID = chainsel.GETH_TESTNET.EvmChainID
 	e18Mult     = func(amount uint64) *big.Int {
-		return new(big.Int).Mul(UintBigInt(1e18), UintBigInt(amount))
+		return new(big.Int).Mul(uintBigInt(amount), uintBigInt(1e18))
 	}
 )
 
-func UintBigInt(i uint64) *big.Int {
+func uintBigInt(i uint64) *big.Int {
 	return new(big.Int).SetUint64(i)
 }
 
@@ -45,7 +46,7 @@ type homeChain struct {
 	backend            *backends.SimulatedBackend
 	chainID            uint64
 	capabilityRegistry *kcr.CapabilitiesRegistry
-	ccipConfigContract common.Address // TODO: deploy
+	ccipConfigContract common.Address
 }
 
 type onchainUniverse struct {
@@ -63,6 +64,31 @@ type onchainUniverse struct {
 	nonceManager       *nonce_manager.NonceManager
 }
 
+func setupHomeChain(t *testing.T, owner *bind.TransactOpts, homeChainBackend *backends.SimulatedBackend) homeChain {
+	// deploy the capability registry on the home chain
+	addr, _, _, err := kcr.DeployCapabilitiesRegistry(owner, homeChainBackend)
+	require.NoError(t, err, "failed to deploy capability registry on home chain")
+	homeChainBackend.Commit()
+
+	capabilityRegistry, err := kcr.NewCapabilitiesRegistry(addr, homeChainBackend)
+	require.NoError(t, err)
+
+	ccAddress, _, _, err := ccip_config.DeployCCIPConfig(owner, homeChainBackend, addr)
+	require.NoError(t, err)
+	homeChainBackend.Commit()
+
+	capabilityConfig, err := ccip_config.NewCCIPConfig(ccAddress, homeChainBackend)
+	require.NoError(t, err)
+
+	return homeChain{
+		backend:            homeChainBackend,
+		chainID:            homeChainID,
+		capabilityRegistry: capabilityRegistry,
+		ccipConfigContract: capabilityConfig.Address(),
+	}
+
+}
+
 /**
 * setupUniverses deploys the CCIP contracts on the home chain and the non-home chains.
 * All the contracts are deployed on the non-home chains.
@@ -75,20 +101,13 @@ func setupUniverses(
 ) (homeChainUni homeChain, universes map[uint64]onchainUniverse) {
 	require.Len(t, chains, 4, "must have 4 chains total, 1 home chain and 3 non-home-chains")
 
-	// deploy the capability registry on the home chain
 	homeChainBackend, ok := chains[homeChainID]
 	require.True(t, ok, "home chain backend not available")
-
-	addr, _, _, err := kcr.DeployCapabilitiesRegistry(owner, homeChainBackend)
-	require.NoError(t, err, "failed to deploy capability registry on home chain")
-	homeChainBackend.Commit()
-
-	capabilityRegistry, err := kcr.NewCapabilitiesRegistry(addr, homeChainBackend)
-	require.NoError(t, err)
+	// Set up home chain first
+	homeChainUniverse := setupHomeChain(t, owner, homeChainBackend)
 
 	// deploy the ccip contracts on the non-home-chain chains (total of 3).
 	universes = make(map[uint64]onchainUniverse)
-
 	for chainID, backend := range chains {
 		if chainID == homeChainID {
 			continue
@@ -169,11 +188,7 @@ func setupUniverses(
 		}
 	}
 
-	return homeChain{
-		backend:            homeChainBackend,
-		chainID:            homeChainID,
-		capabilityRegistry: capabilityRegistry,
-	}, universes
+	return homeChainUniverse, universes
 }
 
 func setupInitialConfigs(
@@ -232,8 +247,8 @@ func setupInitialConfigs(
 				OnRamp:              remoteUni.onramp.Address().Bytes(),
 			})
 
-			// 1e18 Jule = 1 LINK
-			// 1e18 Wei = 1 ETH
+			// This multiplier is used to calculate the premium/fees
+			// Some tokens like LINK will have a discounted fee
 			premiumMultiplierWeiPerEthUpdatesArgs = append(premiumMultiplierWeiPerEthUpdatesArgs,
 				evm_2_evm_multi_onramp.EVM2EVMMultiOnRampPremiumMultiplierWeiPerEthArgs{
 					PremiumMultiplierWeiPerEth: 9e17, //0.9 ETH
@@ -273,13 +288,18 @@ func setupInitialConfigs(
 			)
 		}
 
-		//======================Mint e18Mult to owner==============================
+		//=============================================================================
+		//							Mint 1000 LINK to owner
+		//=============================================================================
 		_, err := uni.linkToken.GrantMintRole(owner, owner.From)
 		require.NoError(t, err)
 		_, err = uni.linkToken.Mint(owner, owner.From, e18Mult(1000))
 		require.NoError(t, err)
 		uni.backend.Commit()
-		//===========================OnRamp=====================================
+
+		//=============================================================================
+		//							 	OnRamp
+		//=============================================================================
 		_, err = uni.onramp.ApplyDestChainConfigUpdates(owner, onrampDestChainConfigArgs)
 		require.NoErrorf(t, err, "failed to apply dest chain config updates on onramp on chain id %d", sourceChainID)
 		uni.backend.Commit()
@@ -287,36 +307,49 @@ func setupInitialConfigs(
 		_, err = uni.onramp.ApplyPremiumMultiplierWeiPerEthUpdates(owner, premiumMultiplierWeiPerEthUpdatesArgs)
 		require.NoErrorf(t, err, "failed to apply premium multiplier wei per eth updates on onramp on chain id %d", sourceChainID)
 		uni.backend.Commit()
+
 		//=============================================================================
-		//===========================OffRamp=====================================
+		//							 	OffRamp
+		//=============================================================================
 		_, err = uni.offramp.ApplySourceChainConfigUpdates(owner, offrampSourceChainConfigArgs)
 		require.NoErrorf(t, err, "failed to apply source chain config updates on offramp on chain id %d", sourceChainID)
 		uni.backend.Commit()
+
 		//=============================================================================
-		//===========================RouterRamp=====================================
+		//							 	Router
+		//=============================================================================
 		_, err = uni.router.ApplyRampUpdates(owner, routerOnrampUpdates, []router.RouterOffRamp{}, routerOfframpUpdates)
 		require.NoErrorf(t, err, "failed to apply ramp updates on router on chain id %d", sourceChainID)
 		uni.backend.Commit()
+
 		//=============================================================================
-		//===========================PriceRegistry=====================================
+		//							 	PriceRegistry
+		//=============================================================================
 		_, err = uni.priceRegistry.UpdatePrices(owner, priceUpdates)
 		require.NoErrorf(t, err, "failed to apply price registry updates on chain id %d", sourceChainID)
 		uni.backend.Commit()
+
 		//=============================================================================
-		//===========================Authorize OnRamp on NonceManager==================
-		//Otherwise the onramp will not be able to call the nonceManager to get next Nonce
+		//						Authorize OnRamp on NonceManager
+		//	Otherwise the onramp will not be able to call the nonceManager to get next Nonce
+		//=============================================================================
 		authorizedCallersAuthorizedCallerArgs := nonce_manager.AuthorizedCallersAuthorizedCallerArgs{
 			AddedCallers: []common.Address{uni.onramp.Address()},
 		}
 		_, err = uni.nonceManager.ApplyAuthorizedCallerUpdates(owner, authorizedCallersAuthorizedCallerArgs)
 		require.NoError(t, err)
 		uni.backend.Commit()
-		//=============================================================================
 	}
 }
 
 func defaultOnRampDynamicConfig(t *testing.T) evm_2_evm_multi_onramp.EVM2EVMMultiOnRampDestChainDynamicConfig {
 	// https://github.com/smartcontractkit/ccip/blob/integration_test%2Fnew_contracts/contracts/src/v0.8/ccip/libraries/Internal.sol#L337-L337
+	/*
+		```Solidity
+			// bytes4(keccak256("CCIP ChainFamilySelector EVM"))
+			bytes4 public constant CHAIN_FAMILY_SELECTOR_EVM = 0x2812d52c;
+		```
+	*/
 	evmFamilySelector, err := hex.DecodeString("2812d52c")
 	require.NoError(t, err)
 	return evm_2_evm_multi_onramp.EVM2EVMMultiOnRampDestChainDynamicConfig{
@@ -358,16 +391,12 @@ func createChains(t *testing.T, numChains int) (owner *bind.TransactOpts, chains
 		},
 	}, 30e6)
 
-	for chainID := chainsel.TEST_90000001.EvmChainID; chainID < chainsel.TEST_90000020.EvmChainID; chainID++ {
+	for chainID := chainsel.TEST_90000001.EvmChainID; len(chains) < numChains && chainID < chainsel.TEST_90000020.EvmChainID; chainID++ {
 		chains[chainID] = backends.NewSimulatedBackend(core.GenesisAlloc{
 			owner.From: core.GenesisAccount{
 				Balance: assets.Ether(10000).ToInt(),
 			},
 		}, 30e6)
-
-		if len(chains) == numChains {
-			break
-		}
 	}
 	return
 }
