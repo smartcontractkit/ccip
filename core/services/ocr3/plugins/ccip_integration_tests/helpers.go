@@ -1,20 +1,16 @@
 package ccip_integration_tests
 
 import (
-	"context"
+	"encoding/hex"
 	"math/big"
 	"testing"
-	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
-	"github.com/jmoiron/sqlx"
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets"
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/arm_proxy_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_multi_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_multi_onramp"
@@ -27,8 +23,6 @@ import (
 	kcr "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/capabilities_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/link_token"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
-	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils/pgtest"
-	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/exp/maps"
 )
@@ -53,7 +47,6 @@ type homeChain struct {
 
 type onchainUniverse struct {
 	backend            *backends.SimulatedBackend
-	logPoller          logpoller.LogPollerTest
 	chainID            uint64
 	linkToken          *link_token.LinkToken
 	weth               *weth9.WETH9
@@ -90,7 +83,6 @@ func setupUniverses(
 	capabilityRegistry, err := kcr.NewCapabilitiesRegistry(addr, homeChainBackend)
 	require.NoError(t, err)
 
-	db := pgtest.NewSqlxDB(t)
 	// deploy the ccip contracts on the non-home-chain chains (total of 3).
 	universes = make(map[uint64]onchainUniverse)
 
@@ -161,7 +153,6 @@ func setupUniverses(
 		universes[chainID] = onchainUniverse{
 			backend:            backend,
 			chainID:            chainID,
-			logPoller:          createLogPoller(t, backend, db, chainID),
 			linkToken:          linkToken,
 			weth:               weth,
 			router:             rout,
@@ -227,7 +218,7 @@ func setupInitialConfigs(
 		for _, destChainID := range chainsToConnectTo {
 			onrampDestChainConfigArgs = append(onrampDestChainConfigArgs, evm_2_evm_multi_onramp.EVM2EVMMultiOnRampDestChainConfigArgs{
 				DestChainSelector: destChainID,
-				DynamicConfig:     defaultOnRampDynamicConfig(),
+				DynamicConfig:     defaultOnRampDynamicConfig(t),
 			})
 
 			remoteUni, ok := universes[destChainID]
@@ -236,7 +227,7 @@ func setupInitialConfigs(
 			offrampSourceChainConfigArgs = append(offrampSourceChainConfigArgs, evm_2_evm_multi_offramp.EVM2EVMMultiOffRampSourceChainConfigArgs{
 				SourceChainSelector: sourceChainID,
 				IsEnabled:           true,
-				OnRamp:              remoteUni.onramp.Address(),
+				OnRamp:              remoteUni.onramp.Address().Bytes(),
 			})
 
 			// 1e18 Jule = 1 LINK
@@ -318,13 +309,13 @@ func setupInitialConfigs(
 		require.NoError(t, err)
 		uni.backend.Commit()
 		//=============================================================================
-		//===========================RegisterPollerFilters============================
-		registerPollerFilters(t, uni)
-		//=============================================================================
 	}
 }
 
-func defaultOnRampDynamicConfig() evm_2_evm_multi_onramp.EVM2EVMMultiOnRampDestChainDynamicConfig {
+func defaultOnRampDynamicConfig(t *testing.T) evm_2_evm_multi_onramp.EVM2EVMMultiOnRampDestChainDynamicConfig {
+	// https://github.com/smartcontractkit/ccip/blob/integration_test%2Fnew_contracts/contracts/src/v0.8/ccip/libraries/Internal.sol#L337-L337
+	evmFamilySelector, err := hex.DecodeString("2812d52c")
+	require.NoError(t, err)
 	return evm_2_evm_multi_onramp.EVM2EVMMultiOnRampDestChainDynamicConfig{
 		IsEnabled:                         true,
 		MaxNumberOfTokensPerMsg:           10,
@@ -341,6 +332,7 @@ func defaultOnRampDynamicConfig() evm_2_evm_multi_onramp.EVM2EVMMultiOnRampDestC
 		DefaultTxGasLimit:                 200_000,
 		GasMultiplierWeiPerEth:            1,
 		NetworkFeeUSDCents:                1,
+		ChainFamilySelector:               [4]byte(evmFamilySelector),
 	}
 }
 
@@ -375,35 +367,6 @@ func createChains(t *testing.T, numChains int) (owner *bind.TransactOpts, chains
 		}
 	}
 	return
-}
-
-func createLogPoller(t *testing.T, backend *backends.SimulatedBackend, db *sqlx.DB, chainID uint64) logpoller.LogPollerTest {
-	lpOpts := logpoller.Opts{
-		PollPeriod:               time.Millisecond,
-		FinalityDepth:            0,
-		BackfillBatchSize:        10,
-		RpcBatchSize:             10,
-		KeepFinalizedBlocksDepth: 100000,
-	}
-	lggr := logger.TestLogger(t)
-	chainIDBigInt := UintBigInt(chainID)
-	cl := client.NewSimulatedBackendClient(t, backend, chainIDBigInt)
-	lp := logpoller.NewLogPoller(logpoller.NewORM(chainIDBigInt, db, lggr), cl, logger.NullLogger, lpOpts)
-	require.NoError(t, lp.Start(context.Background()))
-	t.Cleanup(func() { require.NoError(t, lp.Close()) })
-	return lp
-}
-
-// We can add as many filters needed for the tests here.
-func registerPollerFilters(t *testing.T, universe onchainUniverse) {
-	err := universe.logPoller.RegisterFilter(testutils.Context(t),
-		logpoller.Filter{
-			Name: "CCIPSendRequested",
-			EventSigs: []common.Hash{
-				evm_2_evm_multi_onramp.EVM2EVMMultiOnRampCCIPSendRequested{}.Topic(),
-			}, Addresses: []common.Address{universe.onramp.Address()},
-		})
-	require.NoError(t, err)
 }
 
 func deployLinkToken(t *testing.T, owner *bind.TransactOpts, backend *backends.SimulatedBackend, chainID uint64) *link_token.LinkToken {

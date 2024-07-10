@@ -1,11 +1,10 @@
 package ccip_integration_tests
 
 import (
+	"bytes"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_multi_onramp"
-	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/exp/maps"
 
@@ -24,17 +23,17 @@ func TestPingPong(t *testing.T) {
 			println("PingPong From: ", chainID, " To: ", otherChain)
 			_, err := pingPong.StartPingPong(owner)
 			require.NoError(t, err)
-			nCommits := 100
-			// Give time for the logPoller to catch up
-			for i := 0; i < nCommits; i++ {
-				universe.backend.Commit()
+			universe.backend.Commit()
+
+			logIter, err := universe.onramp.FilterCCIPSendRequested(&bind.FilterOpts{Start: 0}, nil)
+			require.NoError(t, err)
+			// Iterate until latest event
+			for logIter.Next() {
 			}
-			block, err := universe.logPoller.LatestBlock(testutils.Context(t))
-			require.NoError(t, err)
-			logs, err := universe.logPoller.Logs(testutils.Context(t), block.BlockNumber-int64(nCommits), block.BlockNumber,
-				evm_2_evm_multi_onramp.EVM2EVMMultiOnRampCCIPSendRequested{}.Topic(), universe.onramp.Address())
-			require.NoError(t, err)
-			require.Len(t, logs, 1)
+			log := logIter.Event
+			require.Equal(t, log.DestChainSelector, otherChain)
+			require.Equal(t, log.Message.Sender, pingPong.Address())
+			require.Equal(t, bytes.TrimLeft(log.Message.Receiver, "\x00"), pingPongs[otherChain][chainID].Address().Bytes())
 		}
 	}
 }
