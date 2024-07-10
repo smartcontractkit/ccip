@@ -932,7 +932,7 @@ func (o *CCIPTestSetUpOutputs) WaitForPriceUpdates() {
 
 // CheckGasUpdateTransaction checks the gas update transactions count, and it has required number of
 // events as per leader lane definitions.
-func (o *CCIPTestSetUpOutputs) CheckGasUpdateTransaction() error {
+func (o *CCIPTestSetUpOutputs) CheckGasUpdateTransaction(lggr *zerolog.Logger) error {
 	transactions := make(map[string]map[uint64]string)
 	readGasUpdateTx := func(lane *actions.CCIPLane) error {
 		for _, g := range lane.Source.Common.GasUpdateEvents {
@@ -972,16 +972,27 @@ func (o *CCIPTestSetUpOutputs) CheckGasUpdateTransaction() error {
 	if len(transactions) != len(o.Cfg.LeaderLanes) {
 		return fmt.Errorf("transaction count %d should match the number of leader lanes %d",
 			len(transactions), len(o.Cfg.LeaderLanes))
+	} else {
+		lggr.Info().
+			Int("Tx hashes", len(transactions)).
+			Int("Leader lanes count", len(o.Cfg.LeaderLanes)).
+			Msg("Checked Gas Update transactions count matches")
 	}
 	// each transaction should have number of network - 1 chain selectors and corresponding gas values.
 	// Say we have 3 networks, then we have expected every transaction to have 2 chain selectors
-	for _, v := range transactions {
+	for k, v := range transactions {
 		if len(v) != o.Cfg.TestGroupInput.NoOfNetworks-1 {
 			return fmt.Errorf("number of chain selector count %d should match the number of "+
 				"networks minus one %d", len(v), o.Cfg.TestGroupInput.NoOfNetworks-1)
+		} else {
+			lggr.Info().
+				Str("Tx hash", k).
+				Interface("Chain selectors", v).
+				Int("Event emitted count", len(v)).
+				Msg("Checked Gas Update transaction events count")
 		}
 	}
-	log.Info().Interface("Tx hashes", transactions).Msg("Checked Gas Update Transactions")
+	lggr.Info().Interface("Tx hashes", transactions).Msg("Checked Gas Update Transactions")
 	return nil
 }
 
@@ -1190,8 +1201,8 @@ func CCIPDefaultTestSetUp(
 		if err := contracts.MatchContractVersionsOrAbove(map[contracts.Name]contracts.Version{
 			contracts.OffRampContract: contracts.V1_2_0,
 			contracts.OnRampContract:  contracts.V1_2_0,
-		}); err != nil && !pointer.GetBool(setUpArgs.Cfg.TestGroupInput.ExistingDeployment) {
-			require.NoError(t, setUpArgs.CheckGasUpdateTransaction(), "gas update transaction check shouldn't fail")
+		}); err == nil && !pointer.GetBool(setUpArgs.Cfg.TestGroupInput.ExistingDeployment) {
+			require.NoError(t, setUpArgs.CheckGasUpdateTransaction(lggr), "gas update transaction check shouldn't fail")
 		}
 		// if dynamic price update is required
 		if setUpArgs.Cfg.TestGroupInput.TokenConfig.IsDynamicPriceUpdate() {
