@@ -10,6 +10,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	commitocr3 "github.com/smartcontractkit/chainlink-ccip/commit"
+	execocr3 "github.com/smartcontractkit/chainlink-ccip/execute"
 	ccipreaderpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/libocr/commontypes"
@@ -208,6 +209,7 @@ func (i *inprocessOracleCreator) CreatePluginOracle(pluginType cctypes.PluginTyp
 	// build the contract transmitter
 	// assume that we are using the first account in the keybundle as the from account
 	// and that we are able to transmit to the dest chain.
+	// TODO: revisit this in the future, since not all oracles will be able to transmit to the dest chain.
 	destChainWriter, ok := chainWriters[cciptypes.ChainSelector(config.Config.ChainSelector)]
 	if !ok {
 		return nil, fmt.Errorf("no chain writer found for dest chain selector %d, can't create contract transmitter",
@@ -216,6 +218,37 @@ func (i *inprocessOracleCreator) CreatePluginOracle(pluginType cctypes.PluginTyp
 	destFromAccount, ok := i.transmitters[destRelayID]
 	if !ok {
 		return nil, fmt.Errorf("no transmitter found for dest relay ID %s, can't create contract transmitter", destRelayID)
+	}
+
+	var factory ocr3types.ReportingPluginFactory[[]byte]
+	if config.Config.PluginType == uint8(cctypes.PluginTypeCCIPCommit) {
+		factory = commitocr3.NewPluginFactory(
+			i.lggr.
+				Named("CCIPCommitPlugin").
+				Named(destRelayID.String()).
+				Named(hexutil.Encode(config.Config.OfframpAddress)),
+			ccipreaderpkg.OCR3ConfigWithMeta(config),
+			ccipevm.NewCommitPluginCodecV1(),
+			ccipevm.NewMessageHasherV1(),
+			i.homeChainReader,
+			contractReaders,
+			chainWriters,
+		)
+	} else if config.Config.PluginType == uint8(cctypes.PluginTypeCCIPExec) {
+		factory = execocr3.NewPluginFactory(
+			i.lggr.
+				Named("CCIPExecPlugin").
+				Named(destRelayID.String()).
+				Named(hexutil.Encode(config.Config.OfframpAddress)),
+			ccipreaderpkg.OCR3ConfigWithMeta(config),
+			nil, // TODO: ccipevm.NewExecutePluginCodecV1(),
+			ccipevm.NewMessageHasherV1(),
+			i.homeChainReader,
+			contractReaders,
+			chainWriters,
+		)
+	} else {
+		return nil, fmt.Errorf("unsupported plugin type %d", config.Config.PluginType)
 	}
 
 	oracleArgs := libocr3.OCR3OracleArgs[[]byte]{
@@ -255,17 +288,7 @@ func (i *inprocessOracleCreator) CreatePluginOracle(pluginType cctypes.PluginTyp
 		OffchainConfigDigester: ocrimpls.NewConfigDigester(config.ConfigDigest),
 		OffchainKeyring:        keybundle,
 		OnchainKeyring:         onchainKeyring,
-		ReportingPluginFactory: commitocr3.NewPluginFactory(
-			i.lggr.
-				Named("CCIPCommitPlugin").
-				Named(destRelayID.String()).
-				Named(hexutil.Encode(config.Config.OfframpAddress)),
-			ccipreaderpkg.OCR3ConfigWithMeta(config),
-			ccipevm.NewCommitPluginCodecV1(),
-			ccipevm.NewMessageHasherV1(),
-			i.homeChainReader,
-			contractReaders,
-		),
+		ReportingPluginFactory: factory,
 	}
 	oracle, err := libocr3.NewOracle(oracleArgs)
 	if err != nil {
