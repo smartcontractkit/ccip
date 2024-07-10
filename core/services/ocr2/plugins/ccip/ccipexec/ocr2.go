@@ -143,10 +143,11 @@ func (r *ExecutionReportingPlugin) Observation(ctx context.Context, timestamp ty
 }
 
 func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context, lggr logger.Logger, inflight []InflightInternalExecutionReport) ([]ccip.ObservedMessage, error) {
-	unexpiredReports, err := r.getUnexpiredCommitReports(ctx, r.commitStoreReader, lggr)
+	unexpiredReports, err := r.commitRootsCache.RootsEligibleForExecution(ctx)
 	if err != nil {
 		return nil, err
 	}
+	r.metricsCollector.UnexpiredCommitRoots(len(unexpiredReports))
 
 	if len(unexpiredReports) == 0 {
 		return []ccip.ObservedMessage{}, nil
@@ -701,20 +702,6 @@ func getTokensPrices(ctx context.Context, priceRegistry ccipdata.PriceRegistryRe
 	}
 
 	return tokenPrices, nil
-}
-
-func (r *ExecutionReportingPlugin) getUnexpiredCommitReports(
-	ctx context.Context,
-	commitStoreReader ccipdata.CommitStoreReader,
-	lggr logger.Logger,
-) ([]cciptypes.CommitStoreReport, error) {
-	eligibleRootsForExec, err := r.commitRootsCache.RootsEligibleForExecution(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	r.metricsCollector.UnexpiredCommitRoots(len(eligibleRootsForExec))
-	return eligibleRootsForExec, nil
 }
 
 type execTokenData struct {

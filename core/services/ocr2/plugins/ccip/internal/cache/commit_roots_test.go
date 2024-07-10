@@ -36,11 +36,11 @@ func Test_RootsEligibleForExecution(t *testing.T) {
 
 	commitStoreAddr := utils.RandomAddress()
 
-	block1 := time.Now().Add(-8 * time.Hour)
-	block2 := time.Now().Add(-5 * time.Hour)
-	block25 := time.Now().Add(-4 * time.Hour)
-	block3 := time.Now().Add(-1 * time.Hour)
-	block4 := time.Now()
+	block2 := time.Now().Add(-8 * time.Hour)
+	block3 := time.Now().Add(-5 * time.Hour)
+	block4 := time.Now().Add(-1 * time.Hour)
+	newBlock4 := time.Now().Add(-2 * time.Hour)
+	block5 := time.Now()
 
 	root1 := utils.RandomBytes32()
 	root2 := utils.RandomBytes32()
@@ -49,8 +49,8 @@ func Test_RootsEligibleForExecution(t *testing.T) {
 	root5 := utils.RandomBytes32()
 
 	inputLogs := []logpoller.Log{
-		createReportAcceptedLog(t, chainID, commitStoreAddr, 2, 1, root1, block1),
-		createReportAcceptedLog(t, chainID, commitStoreAddr, 2, 2, root2, block1),
+		createReportAcceptedLog(t, chainID, commitStoreAddr, 2, 1, root1, block2),
+		createReportAcceptedLog(t, chainID, commitStoreAddr, 2, 2, root2, block2),
 	}
 	require.NoError(t, orm.InsertLogsWithBlock(ctx, inputLogs, logpoller.NewLogPollerBlock(utils.RandomBytes32(), 2, time.Now(), 1)))
 
@@ -91,9 +91,9 @@ func Test_RootsEligibleForExecution(t *testing.T) {
 	assertRoots(t, roots, root2)
 
 	inputLogs = []logpoller.Log{
-		createReportAcceptedLog(t, chainID, commitStoreAddr, 3, 1, root3, block2),
-		createReportAcceptedLog(t, chainID, commitStoreAddr, 4, 1, root4, block3),
-		createReportAcceptedLog(t, chainID, commitStoreAddr, 5, 1, root5, block4),
+		createReportAcceptedLog(t, chainID, commitStoreAddr, 3, 1, root3, block3),
+		createReportAcceptedLog(t, chainID, commitStoreAddr, 4, 1, root4, block4),
+		createReportAcceptedLog(t, chainID, commitStoreAddr, 5, 1, root5, block5),
 	}
 	require.NoError(t, orm.InsertLogsWithBlock(ctx, inputLogs, logpoller.NewLogPollerBlock(utils.RandomBytes32(), 5, time.Now(), 3)))
 	roots, err = rootsCache.RootsEligibleForExecution(ctx)
@@ -112,9 +112,9 @@ func Test_RootsEligibleForExecution(t *testing.T) {
 	require.NoError(t, err)
 	assertRoots(t, roots, root2)
 
-	// Root4 comes back but in the
+	// Root4 comes back but with the different block_timestamp (before the reorged block)
 	inputLogs = []logpoller.Log{
-		createReportAcceptedLog(t, chainID, commitStoreAddr, 4, 1, root4, block25),
+		createReportAcceptedLog(t, chainID, commitStoreAddr, 4, 1, root4, newBlock4),
 	}
 	require.NoError(t, orm.InsertLogsWithBlock(ctx, inputLogs, logpoller.NewLogPollerBlock(utils.RandomBytes32(), 5, time.Now(), 3)))
 	roots, err = rootsCache.RootsEligibleForExecution(ctx)
@@ -146,7 +146,8 @@ func Test_RootsEligibleForExecutionWithReorgs(t *testing.T) {
 
 	block1 := time.Now().Add(-8 * time.Hour)
 	block2 := time.Now().Add(-5 * time.Hour)
-	block3 := time.Now().Add(-1 * time.Hour)
+	block3 := time.Now().Add(-2 * time.Hour)
+	block4 := time.Now().Add(-1 * time.Hour)
 
 	root1 := utils.RandomBytes32()
 	root2 := utils.RandomBytes32()
@@ -155,9 +156,9 @@ func Test_RootsEligibleForExecutionWithReorgs(t *testing.T) {
 	// Genesis block
 	require.NoError(t, orm.InsertBlock(ctx, utils.RandomBytes32(), 1, block1, 1))
 	inputLogs := []logpoller.Log{
-		createReportAcceptedLog(t, chainID, commitStoreAddr, 2, 1, root1, block1),
-		createReportAcceptedLog(t, chainID, commitStoreAddr, 2, 2, root2, block1),
-		createReportAcceptedLog(t, chainID, commitStoreAddr, 3, 1, root3, block2),
+		createReportAcceptedLog(t, chainID, commitStoreAddr, 2, 1, root1, block2),
+		createReportAcceptedLog(t, chainID, commitStoreAddr, 2, 2, root2, block2),
+		createReportAcceptedLog(t, chainID, commitStoreAddr, 3, 1, root3, block3),
 	}
 	require.NoError(t, orm.InsertLogsWithBlock(ctx, inputLogs, logpoller.NewLogPollerBlock(utils.RandomBytes32(), 3, time.Now(), 1)))
 
@@ -179,9 +180,9 @@ func Test_RootsEligibleForExecutionWithReorgs(t *testing.T) {
 
 	// Reinsert the logs, mark first one as finalized
 	inputLogs = []logpoller.Log{
-		createReportAcceptedLog(t, chainID, commitStoreAddr, 3, 1, root1, block1),
-		createReportAcceptedLog(t, chainID, commitStoreAddr, 4, 2, root2, block2),
-		createReportAcceptedLog(t, chainID, commitStoreAddr, 5, 1, root3, block3),
+		createReportAcceptedLog(t, chainID, commitStoreAddr, 3, 1, root1, block3),
+		createReportAcceptedLog(t, chainID, commitStoreAddr, 4, 1, root2, block4),
+		createReportAcceptedLog(t, chainID, commitStoreAddr, 4, 2, root3, block4),
 	}
 	require.NoError(t, orm.InsertLogsWithBlock(ctx, inputLogs, logpoller.NewLogPollerBlock(utils.RandomBytes32(), 5, time.Now(), 3)))
 	roots, err = rootsCache.RootsEligibleForExecution(ctx)
@@ -211,12 +212,12 @@ func Test_BlocksWithTheSameTimestamps(t *testing.T) {
 
 	commitStoreAddr := utils.RandomAddress()
 
-	block1 := time.Now().Add(-1 * time.Hour).Truncate(time.Second)
+	block := time.Now().Add(-1 * time.Hour).Truncate(time.Second)
 	root1 := utils.RandomBytes32()
 	root2 := utils.RandomBytes32()
 
 	inputLogs := []logpoller.Log{
-		createReportAcceptedLog(t, chainID, commitStoreAddr, 2, 1, root1, block1),
+		createReportAcceptedLog(t, chainID, commitStoreAddr, 2, 1, root1, block),
 	}
 	require.NoError(t, orm.InsertLogsWithBlock(ctx, inputLogs, logpoller.NewLogPollerBlock(utils.RandomBytes32(), 2, time.Now(), 2)))
 
@@ -229,7 +230,7 @@ func Test_BlocksWithTheSameTimestamps(t *testing.T) {
 	assertRoots(t, roots, root1)
 
 	inputLogs = []logpoller.Log{
-		createReportAcceptedLog(t, chainID, commitStoreAddr, 3, 1, root2, block1),
+		createReportAcceptedLog(t, chainID, commitStoreAddr, 3, 1, root2, block),
 	}
 	require.NoError(t, orm.InsertLogsWithBlock(ctx, inputLogs, logpoller.NewLogPollerBlock(utils.RandomBytes32(), 3, time.Now(), 3)))
 
