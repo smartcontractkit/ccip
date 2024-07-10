@@ -755,11 +755,13 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
   }
 
   /// @notice Sets the dynamic config.
+  /// @param dynamicConfig The new dynamic config.
   function setDynamicConfig(DynamicConfig memory dynamicConfig) external onlyOwner {
     _setDynamicConfig(dynamicConfig);
   }
 
   /// @notice Sets the dynamic config.
+  /// @param dynamicConfig The dynamic config.
   function _setDynamicConfig(DynamicConfig memory dynamicConfig) internal {
     if (dynamicConfig.priceRegistry == address(0) || dynamicConfig.router == address(0)) {
       revert ZeroAddressNotAllowed();
