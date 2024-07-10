@@ -6,7 +6,9 @@ import {IPriceRegistry} from "./interfaces/IPriceRegistry.sol";
 
 import {AuthorizedCallers} from "../shared/access/AuthorizedCallers.sol";
 import {AggregatorV3Interface} from "./../shared/interfaces/AggregatorV3Interface.sol";
+import {Client} from "./libraries/Client.sol";
 import {Internal} from "./libraries/Internal.sol";
+import {Pool} from "./libraries/Pool.sol";
 import {USDPriceWith18Decimals} from "./libraries/USDPriceWith18Decimals.sol";
 
 import {EnumerableSet} from "../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/structs/EnumerableSet.sol";
@@ -24,11 +26,31 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
     IPriceRegistry.TokenPriceFeedConfig feedConfig; // Feed config update data
   }
 
+  /// @dev Struct that contains the static configuration
+  /// RMN depends on this struct, if changing, please notify the RMN maintainers.
+  // solhint-disable-next-line gas-struct-packing
+  struct StaticConfig {
+    uint96 maxFeeJuelsPerMsg; // ─╮ Maximum fee that can be charged for a message
+    address linkToken; // ────────╯ LINK token address
+  }
+
   error TokenNotSupported(address token);
   error ChainNotSupported(uint64 chain);
   error StaleGasPrice(uint64 destChainSelector, uint256 threshold, uint256 timePassed);
   error InvalidStalenessThreshold();
   error DataFeedValueOutOfUint224Range();
+  error NotAFeeToken(address token);
+  error InvalidDestBytesOverhead(address token, uint32 destBytesOverhead);
+  error MessageGasLimitTooHigh();
+  error DestinationChainNotEnabled(uint64 destChainSelector);
+  error ExtraArgOutOfOrderExecutionMustBeTrue();
+  error InvalidExtraArgsTag();
+  error SourceTokenDataTooLarge(address token);
+  error InvalidDestChainConfig(uint64 destChainSelector);
+  error MessageFeeTooHigh(uint256 msgFeeJuels, uint256 maxFeeJuelsPerMsg);
+  error InvalidStaticConfig();
+  error MessageTooLarge(uint256 maxSize, uint256 actualSize);
+  error UnsupportedNumberOfTokens();
 
   event PriceUpdaterSet(address indexed priceUpdater);
   event PriceUpdaterRemoved(address indexed priceUpdater);
@@ -37,6 +59,86 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
   event UsdPerUnitGasUpdated(uint64 indexed destChain, uint256 value, uint256 timestamp);
   event UsdPerTokenUpdated(address indexed token, uint256 value, uint256 timestamp);
   event PriceFeedPerTokenUpdated(address indexed token, IPriceRegistry.TokenPriceFeedConfig priceFeedConfig);
+
+  event TokenTransferFeeConfigUpdated(
+    uint64 indexed destChainSelector, address indexed token, TokenTransferFeeConfig tokenTransferFeeConfig
+  );
+  event TokenTransferFeeConfigDeleted(uint64 indexed destChainSelector, address indexed token);
+  event PremiumMultiplierWeiPerEthUpdated(address indexed token, uint64 premiumMultiplierWeiPerEth);
+  event DestChainDynamicConfigUpdated(uint64 indexed destChainSelector, DestChainDynamicConfig dynamicConfig);
+  event DestChainAdded(uint64 indexed destChainSelector, DestChainDynamicConfig dynamicConfig);
+
+  /// @dev Struct to hold the dynamic fee & validation configs for a destination chain
+  struct DestChainDynamicConfig {
+    bool isEnabled; // ──────────────────────────╮ Whether this destination chain is enabled
+    uint16 maxNumberOfTokensPerMsg; //           │ Maximum number of distinct ERC20 token transferred per message
+    uint32 maxDataBytes; //                      │ Maximum payload data size in bytes
+    uint32 maxPerMsgGasLimit; //                 │ Maximum gas limit for messages targeting EVMs
+    uint32 destGasOverhead; //                   │ Gas charged on top of the gasLimit to cover destination chain costs
+    uint16 destGasPerPayloadByte; //             │ Destination chain gas charged for passing each byte of `data` payload to receiver
+    uint32 destDataAvailabilityOverheadGas; //   | Extra data availability gas charged on top of the message, e.g. for OCR
+    uint16 destGasPerDataAvailabilityByte; //    | Amount of gas to charge per byte of message data that needs availability
+    uint16 destDataAvailabilityMultiplierBps; // │ Multiplier for data availability gas, multiples of bps, or 0.0001
+    // The following three properties are defaults, they can be overridden by setting the TokenTransferFeeConfig for a token
+    uint16 defaultTokenFeeUSDCents; //           │ Default token fee charged per token transfer
+    uint32 defaultTokenDestGasOverhead; // ──────╯ Default gas charged to execute the token transfer on the destination chain
+    uint32 defaultTokenDestBytesOverhead; // ────╮ Default extra data availability bytes charged per token transfer
+    uint64 defaultTxGasLimit; //                 │ Default gas limit for a tx
+    uint64 gasMultiplierWeiPerEth; //            │ Multiplier for gas costs, 1e18 based so 11e17 = 10% extra cost.
+    uint32 networkFeeUSDCents; //                │ Flat network fee to charge for messages,  multiples of 0.01 USD
+    bool enforceOutOfOrder; //                   │ Whether to enforce the allowOutOfOrderExecution extraArg value to be true.
+    bytes4 chainFamilySelector; // ──────────────╯ Selector that identifies the destination chain's family. Used to determine the correct validations to perform for the dest chain.
+  }
+
+  /// @dev Struct to hold the dynamic configs and its destination chain selector
+  /// Same as DestChainConfig but with the destChainSelector so that an array of these
+  /// can be passed in the constructor and the applyDestChainDynamicConfigUpdates function
+  //solhint-disable gas-struct-packing
+  struct DestChainDynamicConfigArgs {
+    uint64 destChainSelector; // Destination chain selector
+    DestChainDynamicConfig dynamicConfig; // Dynamic config to update for the chain selector
+  }
+
+  /// @dev Struct to hold the transfer fee configuration for token transfers
+  struct TokenTransferFeeConfig {
+    uint32 minFeeUSDCents; // ──────────╮ Minimum fee to charge per token transfer, multiples of 0.01 USD
+    uint32 maxFeeUSDCents; //           │ Maximum fee to charge per token transfer, multiples of 0.01 USD
+    uint16 deciBps; //                  │ Basis points charged on token transfers, multiples of 0.1bps, or 1e-5
+    uint32 destGasOverhead; //          │ Gas charged to execute the token transfer on the destination chain
+    //                                  │ Extra data availability bytes that are returned from the source pool and sent
+    uint32 destBytesOverhead; //        │ to the destination pool. Must be >= Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES
+    bool isEnabled; // ─────────────────╯ Whether this token has custom transfer fees
+  }
+
+  /// @dev Struct to hold the token transfer fee configurations for a token, same as TokenTransferFeeConfig but with the token address included so
+  /// that an array of these can be passed in the TokenTransferFeeConfigArgs struct to set the mapping
+  struct TokenTransferFeeConfigSingleTokenArgs {
+    address token; // Token address
+    TokenTransferFeeConfig tokenTransferFeeConfig; // struct to hold the transfer fee configuration for token transfers
+  }
+
+  /// @dev Struct to hold the token transfer fee configurations for a destination chain and a set of tokens. Same as TokenTransferFeeConfigSingleTokenArgs
+  /// but with the destChainSelector and an array of TokenTransferFeeConfigSingleTokenArgs included so that an array of these can be passed in the constructor
+  /// and the applyTokenTransferFeeConfigUpdates function
+  struct TokenTransferFeeConfigArgs {
+    uint64 destChainSelector; // Destination chain selector
+    TokenTransferFeeConfigSingleTokenArgs[] tokenTransferFeeConfigs; // Array of token transfer fee configurations
+  }
+
+  /// @dev Struct to hold a pair of destination chain selector and token address so that an array of these can be passed in the
+  /// applyTokenTransferFeeConfigUpdates function to remove the token transfer fee configuration for a token
+  struct TokenTransferFeeConfigRemoveArgs {
+    uint64 destChainSelector; // ─╮ Destination chain selector
+    address token; // ────────────╯ Token address
+  }
+
+  /// @dev Struct to hold the fee token configuration for a token, same as the s_premiumMultiplierWeiPerEth but with
+  /// the token address included so that an array of these can be passed in the constructor and
+  /// applyPremiumMultiplierWeiPerEthUpdates to set the mapping
+  struct PremiumMultiplierWeiPerEthArgs {
+    address token; // // ───────────────────╮ Token address
+    uint64 premiumMultiplierWeiPerEth; // ──╯ Multiplier for destination chain specific premiums. Should never be 0 so can be used as an isEnabled flag
+  }
 
   string public constant override typeAndVersion = "PriceRegistry 1.6.0-dev";
 
@@ -61,6 +163,22 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
   /// @dev Stores the price data feed configurations per token.
   mapping(address token => IPriceRegistry.TokenPriceFeedConfig dataFeedAddress) private s_usdPriceFeedsPerToken;
 
+  /// @dev The multiplier for destination chain specific premiums that can be set by the owner or fee admin
+  /// This should never be 0 once set, so it can be used as an isEnabled flag
+  mapping(address token => uint64 premiumMultiplierWeiPerEth) internal s_premiumMultiplierWeiPerEth;
+
+  /// @dev The destination chain specific fee configs
+  mapping(uint64 destChainSelector => DestChainDynamicConfig destChainDynamicConfig) internal s_destChainDynamicConfigs;
+
+  /// @dev The token transfer fee config that can be set by the owner or fee admin
+  mapping(uint64 destChainSelector => mapping(address token => TokenTransferFeeConfig tranferFeeConfig)) internal
+    s_tokenTransferFeeConfig;
+
+  /// @dev Maximum fee that can be charged for a message. This is a guard to prevent massively overcharging due to misconfiguation.
+  uint96 internal immutable i_maxFeeJuelsPerMsg;
+  /// @dev The link token address
+  address internal immutable i_linkToken;
+
   // Price updaters are allowed to update the prices.
   EnumerableSet.AddressSet private s_priceUpdaters;
   // Subset of tokens which prices tracked by this registry which are fee tokens.
@@ -69,15 +187,29 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
   uint32 private immutable i_stalenessThreshold;
 
   constructor(
+    StaticConfig memory staticConfig,
     address[] memory priceUpdaters,
     address[] memory feeTokens,
     uint32 stalenessThreshold,
-    TokenPriceFeedUpdate[] memory tokenPriceFeeds
+    TokenPriceFeedUpdate[] memory tokenPriceFeeds,
+    TokenTransferFeeConfigArgs[] memory tokenTransferFeeConfigArgs,
+    PremiumMultiplierWeiPerEthArgs[] memory premiumMultiplierWeiPerEthArgs,
+    DestChainDynamicConfigArgs[] memory destChainConfigArgs
   ) AuthorizedCallers(priceUpdaters) {
+    if (staticConfig.linkToken == address(0) || staticConfig.maxFeeJuelsPerMsg == 0) {
+      revert InvalidStaticConfig();
+    }
+
+    i_linkToken = staticConfig.linkToken;
+    i_maxFeeJuelsPerMsg = staticConfig.maxFeeJuelsPerMsg;
+    i_stalenessThreshold = stalenessThreshold;
+
     _applyFeeTokensUpdates(feeTokens, new address[](0));
     _updateTokenPriceFeeds(tokenPriceFeeds);
     if (stalenessThreshold == 0) revert InvalidStalenessThreshold();
-    i_stalenessThreshold = stalenessThreshold;
+    _applyDestChainConfigUpdates(destChainConfigArgs);
+    _applyPremiumMultiplierWeiPerEthUpdates(premiumMultiplierWeiPerEthArgs);
+    _applyTokenTransferFeeConfigUpdates(tokenTransferFeeConfigArgs, new TokenTransferFeeConfigRemoveArgs[](0));
   }
 
   // ================================================================
@@ -144,7 +276,7 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
   function getTokenAndGasPrices(
     address token,
     uint64 destChainSelector
-  ) external view override returns (uint224 tokenPrice, uint224 gasPriceValue) {
+  ) public view override returns (uint224 tokenPrice, uint224 gasPriceValue) {
     Internal.TimestampedPackedUint224 memory gasPrice = s_usdPerUnitGasByDestChainSelector[destChainSelector];
     // We do allow a gas price of 0, but no stale or unset gas prices
     if (gasPrice.timestamp == 0) revert ChainNotSupported(destChainSelector);
@@ -162,7 +294,7 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
     address fromToken,
     uint256 fromTokenAmount,
     address toToken
-  ) external view override returns (uint256) {
+  ) public view override returns (uint256) {
     /// Example:
     /// fromTokenAmount:   1e18      // 1 ETH
     /// ETH:               2_000e18
@@ -309,6 +441,436 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
       s_usdPriceFeedsPerToken[sourceToken] = tokenPriceFeedConfig;
       emit PriceFeedPerTokenUpdated(sourceToken, tokenPriceFeedConfig);
     }
+  }
+
+  // ================================================================
+  // │                       Fee quoting                            │
+  // ================================================================
+
+  /// @inheritdoc IPriceRegistry
+  function getValidatedFee(
+    uint64 destChainSelector,
+    Client.EVM2AnyMessage calldata message
+  ) external view returns (uint256 feeTokenAmount) {
+    // Verify that the config is present (a 0 family chain selector impleis an unconfigured dest chain)
+    DestChainDynamicConfig storage destChainDynamicConfig = s_destChainDynamicConfigs[destChainSelector];
+
+    if (!destChainDynamicConfig.isEnabled) revert DestinationChainNotEnabled(destChainSelector);
+
+    uint256 numberOfTokens = message.tokenAmounts.length;
+    _validateMessage(destChainDynamicConfig, message.data.length, numberOfTokens, message.receiver);
+
+    uint64 premiumMultiplierWeiPerEth = s_premiumMultiplierWeiPerEth[message.feeToken];
+
+    // premiumMultiplierWeiPerEth should never be 0 so it can be used as an isEnabled flag
+    if (premiumMultiplierWeiPerEth == 0) revert NotAFeeToken(message.feeToken);
+
+    (uint224 feeTokenPrice, uint224 packedGasPrice) = getTokenAndGasPrices(message.feeToken, destChainSelector);
+
+    // Calculate premiumFee in USD with 18 decimals precision first.
+    // If message-only and no token transfers, a flat network fee is charged.
+    // If there are token transfers, premiumFee is calculated from token transfer fee.
+    // If there are both token transfers and message, premiumFee is only calculated from token transfer fee.
+    uint256 premiumFee = 0;
+    uint32 tokenTransferGas = 0;
+    uint32 tokenTransferBytesOverhead = 0;
+    if (numberOfTokens > 0) {
+      (premiumFee, tokenTransferGas, tokenTransferBytesOverhead) =
+        _getTokenTransferCost(destChainSelector, message.feeToken, feeTokenPrice, message.tokenAmounts);
+    } else {
+      // Convert USD cents with 2 decimals to 18 decimals.
+      premiumFee = uint256(destChainDynamicConfig.networkFeeUSDCents) * 1e16;
+    }
+
+    // Calculate data availability cost in USD with 36 decimals. Data availability cost exists on rollups that need to post
+    // transaction calldata onto another storage layer, e.g. Eth mainnet, incurring additional storage gas costs.
+    uint256 dataAvailabilityCost = 0;
+
+    // Only calculate data availability cost if data availability multiplier is non-zero.
+    // The multiplier should be set to 0 if destination chain does not charge data availability cost.
+    if (destChainDynamicConfig.destDataAvailabilityMultiplierBps > 0) {
+      dataAvailabilityCost = _getDataAvailabilityCost(
+        destChainSelector,
+        // Parse the data availability gas price stored in the higher-order 112 bits of the encoded gas price.
+        uint112(packedGasPrice >> Internal.GAS_PRICE_BITS),
+        message.data.length,
+        numberOfTokens,
+        tokenTransferBytesOverhead
+      );
+    }
+
+    // Calculate execution gas fee on destination chain in USD with 36 decimals.
+    // We add the message gas limit, the overhead gas, the gas of passing message data to receiver, and token transfer gas together.
+    // We then multiply this gas total with the gas multiplier and gas price, converting it into USD with 36 decimals.
+    // uint112(packedGasPrice) = executionGasPrice
+
+    // NOTE: when supporting non-EVM chains, revisit how generic this fee logic can be
+
+    uint256 executionGasCost = destChainDynamicConfig.destGasOverhead
+      + (message.data.length * destChainDynamicConfig.destGasPerPayloadByte) + tokenTransferGas;
+
+    // NOTE: when supporting non-EVM chains, revisit this and parse non-EVM args
+    executionGasCost += _parseEVMExtraArgsFromBytes(message.extraArgs, destChainDynamicConfig).gasLimit;
+
+    uint256 executionCost = uint112(packedGasPrice) * executionGasCost * destChainDynamicConfig.gasMultiplierWeiPerEth;
+
+    // Calculate number of fee tokens to charge.
+    // Total USD fee is in 36 decimals, feeTokenPrice is in 18 decimals USD for 1e18 smallest token denominations.
+    // Result of the division is the number of smallest token denominations.
+    return ((premiumFee * premiumMultiplierWeiPerEth) + executionCost + dataAvailabilityCost) / feeTokenPrice;
+  }
+
+  /// @notice Sets the fee configuration for a token
+  /// @param premiumMultiplierWeiPerEthArgs Array of PremiumMultiplierWeiPerEthArgs structs.
+  function applyPremiumMultiplierWeiPerEthUpdates(
+    PremiumMultiplierWeiPerEthArgs[] memory premiumMultiplierWeiPerEthArgs
+  ) external onlyOwner {
+    _applyPremiumMultiplierWeiPerEthUpdates(premiumMultiplierWeiPerEthArgs);
+  }
+
+  /// @dev Set the fee config.
+  /// @param premiumMultiplierWeiPerEthArgs The multiplier for destination chain specific premiums.
+  function _applyPremiumMultiplierWeiPerEthUpdates(
+    PremiumMultiplierWeiPerEthArgs[] memory premiumMultiplierWeiPerEthArgs
+  ) internal {
+    for (uint256 i = 0; i < premiumMultiplierWeiPerEthArgs.length; ++i) {
+      address token = premiumMultiplierWeiPerEthArgs[i].token;
+      uint64 premiumMultiplierWeiPerEth = premiumMultiplierWeiPerEthArgs[i].premiumMultiplierWeiPerEth;
+      s_premiumMultiplierWeiPerEth[token] = premiumMultiplierWeiPerEth;
+
+      emit PremiumMultiplierWeiPerEthUpdated(token, premiumMultiplierWeiPerEth);
+    }
+  }
+
+  /// @notice Gets the fee configuration for a token.
+  /// @param token The token to get the fee configuration for.
+  /// @return premiumMultiplierWeiPerEth The multiplier for destination chain specific premiums.
+  function getPremiumMultiplierWeiPerEth(address token) external view returns (uint64 premiumMultiplierWeiPerEth) {
+    return s_premiumMultiplierWeiPerEth[token];
+  }
+
+  /// @notice Returns the token transfer cost parameters.
+  /// A basis point fee is calculated from the USD value of each token transfer.
+  /// For each individual transfer, this fee is between [minFeeUSD, maxFeeUSD].
+  /// Total transfer fee is the sum of each individual token transfer fee.
+  /// @dev Assumes that tokenAmounts are validated to be listed tokens elsewhere.
+  /// @dev Splitting one token transfer into multiple transfers is discouraged,
+  /// as it will result in a transferFee equal or greater than the same amount aggregated/de-duped.
+  /// @param destChainSelector the destination chain selector.
+  /// @param feeToken address of the feeToken.
+  /// @param feeTokenPrice price of feeToken in USD with 18 decimals.
+  /// @param tokenAmounts token transfers in the message.
+  /// @return tokenTransferFeeUSDWei total token transfer bps fee in USD with 18 decimals.
+  /// @return tokenTransferGas total execution gas of the token transfers.
+  /// @return tokenTransferBytesOverhead additional token transfer data passed to destination, e.g. USDC attestation.
+  function _getTokenTransferCost(
+    // TODO: pass in dynamic config instead?
+    uint64 destChainSelector,
+    address feeToken,
+    uint224 feeTokenPrice,
+    Client.EVMTokenAmount[] calldata tokenAmounts
+  ) internal view returns (uint256 tokenTransferFeeUSDWei, uint32 tokenTransferGas, uint32 tokenTransferBytesOverhead) {
+    uint256 numberOfTokens = tokenAmounts.length;
+
+    for (uint256 i = 0; i < numberOfTokens; ++i) {
+      Client.EVMTokenAmount memory tokenAmount = tokenAmounts[i];
+      TokenTransferFeeConfig memory transferFeeConfig = s_tokenTransferFeeConfig[destChainSelector][tokenAmount.token];
+
+      // If the token has no specific overrides configured, we use the global defaults.
+      if (!transferFeeConfig.isEnabled) {
+        DestChainDynamicConfig storage destChainDynamicConfig = s_destChainDynamicConfigs[destChainSelector];
+        tokenTransferFeeUSDWei += uint256(destChainDynamicConfig.defaultTokenFeeUSDCents) * 1e16;
+        tokenTransferGas += destChainDynamicConfig.defaultTokenDestGasOverhead;
+        tokenTransferBytesOverhead += destChainDynamicConfig.defaultTokenDestBytesOverhead;
+        continue;
+      }
+
+      uint256 bpsFeeUSDWei = 0;
+      // Only calculate bps fee if ratio is greater than 0. Ratio of 0 means no bps fee for a token.
+      // Useful for when the PriceRegistry cannot return a valid price for the token.
+      if (transferFeeConfig.deciBps > 0) {
+        uint224 tokenPrice = 0;
+        if (tokenAmount.token != feeToken) {
+          tokenPrice = _getValidatedTokenPrice(tokenAmount.token);
+        } else {
+          tokenPrice = feeTokenPrice;
+        }
+
+        // Calculate token transfer value, then apply fee ratio
+        // ratio represents multiples of 0.1bps, or 1e-5
+        bpsFeeUSDWei = (tokenPrice._calcUSDValueFromTokenAmount(tokenAmount.amount) * transferFeeConfig.deciBps) / 1e5;
+      }
+
+      tokenTransferGas += transferFeeConfig.destGasOverhead;
+      tokenTransferBytesOverhead += transferFeeConfig.destBytesOverhead;
+
+      // Bps fees should be kept within range of [minFeeUSD, maxFeeUSD].
+      // Convert USD values with 2 decimals to 18 decimals.
+      uint256 minFeeUSDWei = uint256(transferFeeConfig.minFeeUSDCents) * 1e16;
+      if (bpsFeeUSDWei < minFeeUSDWei) {
+        tokenTransferFeeUSDWei += minFeeUSDWei;
+        continue;
+      }
+
+      uint256 maxFeeUSDWei = uint256(transferFeeConfig.maxFeeUSDCents) * 1e16;
+      if (bpsFeeUSDWei > maxFeeUSDWei) {
+        tokenTransferFeeUSDWei += maxFeeUSDWei;
+        continue;
+      }
+
+      tokenTransferFeeUSDWei += bpsFeeUSDWei;
+    }
+
+    return (tokenTransferFeeUSDWei, tokenTransferGas, tokenTransferBytesOverhead);
+  }
+
+  /// @notice Returns the estimated data availability cost of the message.
+  /// @dev To save on gas, we use a single destGasPerDataAvailabilityByte value for both zero and non-zero bytes.
+  /// @param destChainSelector the destination chain selector.
+  /// @param dataAvailabilityGasPrice USD per data availability gas in 18 decimals.
+  /// @param messageDataLength length of the data field in the message.
+  /// @param numberOfTokens number of distinct token transfers in the message.
+  /// @param tokenTransferBytesOverhead additional token transfer data passed to destination, e.g. USDC attestation.
+  /// @return dataAvailabilityCostUSD36Decimal total data availability cost in USD with 36 decimals.
+  function _getDataAvailabilityCost(
+    // TODO: pass in dynamic config instead?
+    uint64 destChainSelector,
+    uint112 dataAvailabilityGasPrice,
+    uint256 messageDataLength,
+    uint256 numberOfTokens,
+    uint32 tokenTransferBytesOverhead
+  ) internal view returns (uint256 dataAvailabilityCostUSD36Decimal) {
+    // dataAvailabilityLengthBytes sums up byte lengths of fixed message fields and dynamic message fields.
+    // Fixed message fields do account for the offset and length slot of the dynamic fields.
+    uint256 dataAvailabilityLengthBytes = Internal.ANY_2_EVM_MESSAGE_FIXED_BYTES + messageDataLength
+      + (numberOfTokens * Internal.ANY_2_EVM_MESSAGE_FIXED_BYTES_PER_TOKEN) + tokenTransferBytesOverhead;
+
+    DestChainDynamicConfig storage destChainDynamicConfig = s_destChainDynamicConfigs[destChainSelector];
+    // destDataAvailabilityOverheadGas is a separate config value for flexibility to be updated independently of message cost.
+    // Its value is determined by CCIP lane implementation, e.g. the overhead data posted for OCR.
+    uint256 dataAvailabilityGas = (dataAvailabilityLengthBytes * destChainDynamicConfig.destGasPerDataAvailabilityByte)
+      + destChainDynamicConfig.destDataAvailabilityOverheadGas;
+
+    // dataAvailabilityGasPrice is in 18 decimals, destDataAvailabilityMultiplierBps is in 4 decimals
+    // We pad 14 decimals to bring the result to 36 decimals, in line with token bps and execution fee.
+    return ((dataAvailabilityGas * dataAvailabilityGasPrice) * destChainDynamicConfig.destDataAvailabilityMultiplierBps)
+      * 1e14;
+  }
+
+  /// @notice Gets the transfer fee config for a given token.
+  /// @param destChainSelector The destination chain selector.
+  /// @param token The token address.
+  function getTokenTransferFeeConfig(
+    uint64 destChainSelector,
+    address token
+  ) external view returns (TokenTransferFeeConfig memory tokenTransferFeeConfig) {
+    return s_tokenTransferFeeConfig[destChainSelector][token];
+  }
+
+  /// @notice Sets the transfer fee config.
+  /// @dev only callable by the owner or admin.
+  function applyTokenTransferFeeConfigUpdates(
+    TokenTransferFeeConfigArgs[] memory tokenTransferFeeConfigArgs,
+    TokenTransferFeeConfigRemoveArgs[] memory tokensToUseDefaultFeeConfigs
+  ) external onlyOwner {
+    _applyTokenTransferFeeConfigUpdates(tokenTransferFeeConfigArgs, tokensToUseDefaultFeeConfigs);
+  }
+
+  /// @notice internal helper to set the token transfer fee config.
+  function _applyTokenTransferFeeConfigUpdates(
+    TokenTransferFeeConfigArgs[] memory tokenTransferFeeConfigArgs,
+    TokenTransferFeeConfigRemoveArgs[] memory tokensToUseDefaultFeeConfigs
+  ) internal {
+    for (uint256 i = 0; i < tokenTransferFeeConfigArgs.length; ++i) {
+      TokenTransferFeeConfigArgs memory tokenTransferFeeConfigArg = tokenTransferFeeConfigArgs[i];
+      uint64 destChainSelector = tokenTransferFeeConfigArg.destChainSelector;
+
+      for (uint256 j = 0; j < tokenTransferFeeConfigArg.tokenTransferFeeConfigs.length; ++j) {
+        TokenTransferFeeConfig memory tokenTransferFeeConfig =
+          tokenTransferFeeConfigArg.tokenTransferFeeConfigs[j].tokenTransferFeeConfig;
+        address token = tokenTransferFeeConfigArg.tokenTransferFeeConfigs[j].token;
+
+        if (tokenTransferFeeConfig.destBytesOverhead < Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES) {
+          revert InvalidDestBytesOverhead(token, tokenTransferFeeConfig.destBytesOverhead);
+        }
+
+        s_tokenTransferFeeConfig[destChainSelector][token] = tokenTransferFeeConfig;
+
+        emit TokenTransferFeeConfigUpdated(destChainSelector, token, tokenTransferFeeConfig);
+      }
+    }
+
+    // Remove the custom fee configs for the tokens that are in the tokensToUseDefaultFeeConfigs array
+    for (uint256 i = 0; i < tokensToUseDefaultFeeConfigs.length; ++i) {
+      uint64 destChainSelector = tokensToUseDefaultFeeConfigs[i].destChainSelector;
+      address token = tokensToUseDefaultFeeConfigs[i].token;
+      delete s_tokenTransferFeeConfig[destChainSelector][token];
+      emit TokenTransferFeeConfigDeleted(destChainSelector, token);
+    }
+  }
+
+  /// @notice Validates that the destAddress matches the expected format of the family.
+  /// @param chainFamilySelector Tag to identify the target family
+  /// @param destAddress Dest address to validate
+  /// @dev precondition - assumes the family tag is correct and validated
+  function _validateDestFamilyAddress(bytes4 chainFamilySelector, bytes memory destAddress) internal pure {
+    if (chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_EVM) {
+      Internal._validateEVMAddress(destAddress);
+    }
+  }
+
+  /// @dev Convert the extra args bytes into a struct with validations against the dest chain config
+  /// @param extraArgs The extra args bytes
+  /// @param destChainDynamicConfig Dest chain config to validate against
+  /// @return EVMExtraArgs the extra args struct (latest version)
+  function _parseEVMExtraArgsFromBytes(
+    bytes calldata extraArgs,
+    DestChainDynamicConfig memory destChainDynamicConfig
+  ) internal pure returns (Client.EVMExtraArgsV2 memory) {
+    Client.EVMExtraArgsV2 memory evmExtraArgs =
+      _parseUnvalidatedEVMExtraArgsFromBytes(extraArgs, destChainDynamicConfig.defaultTxGasLimit);
+
+    if (evmExtraArgs.gasLimit > uint256(destChainDynamicConfig.maxPerMsgGasLimit)) revert MessageGasLimitTooHigh();
+    if (destChainDynamicConfig.enforceOutOfOrder && !evmExtraArgs.allowOutOfOrderExecution) {
+      revert ExtraArgOutOfOrderExecutionMustBeTrue();
+    }
+
+    return evmExtraArgs;
+  }
+
+  /// @dev Convert the extra args bytes into a struct
+  /// @param extraArgs The extra args bytes
+  /// @param defaultTxGasLimit default tx gas limit to use in the absence of extra args
+  /// @return EVMExtraArgs the extra args struct (latest version)
+  function _parseUnvalidatedEVMExtraArgsFromBytes(
+    bytes calldata extraArgs,
+    uint64 defaultTxGasLimit
+  ) private pure returns (Client.EVMExtraArgsV2 memory) {
+    if (extraArgs.length == 0) {
+      // If extra args are empty, generate default values
+      return Client.EVMExtraArgsV2({gasLimit: defaultTxGasLimit, allowOutOfOrderExecution: false});
+    }
+
+    bytes4 extraArgsTag = bytes4(extraArgs);
+    bytes memory argsData = extraArgs[4:];
+
+    if (extraArgsTag == Client.EVM_EXTRA_ARGS_V2_TAG) {
+      return abi.decode(argsData, (Client.EVMExtraArgsV2));
+    } else if (extraArgsTag == Client.EVM_EXTRA_ARGS_V1_TAG) {
+      // EVMExtraArgsV1 originally included a second boolean (strict) field which has been deprecated.
+      // Clients may still include it but it will be ignored.
+      return Client.EVMExtraArgsV2({gasLimit: abi.decode(argsData, (uint256)), allowOutOfOrderExecution: false});
+    }
+
+    revert InvalidExtraArgsTag();
+  }
+
+  /// @notice Validate the forwarded message to ensure it matches the configuration limits (message length, number of tokens)
+  /// and family-specific expectations (address format)
+  /// @param destChainDynamicConfig Dest chain config
+  /// @param dataLength The length of the data field of the message.
+  /// @param numberOfTokens The number of tokens to be sent.
+  /// @param receiver Message receiver on the dest chain
+  function _validateMessage(
+    DestChainDynamicConfig memory destChainDynamicConfig,
+    uint256 dataLength,
+    uint256 numberOfTokens,
+    bytes memory receiver
+  ) internal pure {
+    // Check that payload is formed correctly
+    if (dataLength > uint256(destChainDynamicConfig.maxDataBytes)) {
+      revert MessageTooLarge(uint256(destChainDynamicConfig.maxDataBytes), dataLength);
+    }
+    if (numberOfTokens > uint256(destChainDynamicConfig.maxNumberOfTokensPerMsg)) revert UnsupportedNumberOfTokens();
+    _validateDestFamilyAddress(destChainDynamicConfig.chainFamilySelector, receiver);
+  }
+
+  /// @inheritdoc IPriceRegistry
+  /// @dev precondition - message.tokenAmounts and sourceTokenAmounts lengths must be equal
+  function getValidatedRampMessageParams(
+    Internal.EVM2AnyRampMessage calldata message,
+    Client.EVMTokenAmount[] calldata sourceTokenAmounts
+  ) external view returns (uint256 msgFeeJuels, bool isOutOfOrderExecution, bytes memory convertedExtraArgs) {
+    uint64 destChainSelector = message.header.destChainSelector;
+    DestChainDynamicConfig storage destChainDynamicConfig = s_destChainDynamicConfigs[destChainSelector];
+
+    for (uint256 i = 0; i < message.tokenAmounts.length; ++i) {
+      address sourceToken = sourceTokenAmounts[i].token;
+
+      // Since the DON has to pay for the extraData to be included on the destination chain, we cap the length of the
+      // extraData. This prevents gas bomb attacks on the NOPs. As destBytesOverhead accounts for both
+      // extraData and offchainData, this caps the worst case abuse to the number of bytes reserved for offchainData.
+      uint256 destPoolDataLength = message.tokenAmounts[i].extraData.length;
+      if (
+        destPoolDataLength > Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES
+          && destPoolDataLength > s_tokenTransferFeeConfig[destChainSelector][sourceToken].destBytesOverhead
+      ) {
+        revert SourceTokenDataTooLarge(sourceToken);
+      }
+
+      _validateDestFamilyAddress(destChainDynamicConfig.chainFamilySelector, message.tokenAmounts[i].destTokenAddress);
+    }
+
+    // Convert feeToken to link if not already in link
+    if (message.feeToken == i_linkToken) {
+      msgFeeJuels = message.feeTokenAmount;
+    } else {
+      msgFeeJuels = convertTokenAmount(message.feeToken, message.feeTokenAmount, i_linkToken);
+    }
+
+    if (msgFeeJuels > i_maxFeeJuelsPerMsg) revert MessageFeeTooHigh(msgFeeJuels, i_maxFeeJuelsPerMsg);
+
+    // NOTE: when supporting non-EVM chains, revisit this and parse non-EVM args
+    Client.EVMExtraArgsV2 memory extraArgs = _parseEVMExtraArgsFromBytes(message.extraArgs, destChainDynamicConfig);
+    isOutOfOrderExecution = extraArgs.allowOutOfOrderExecution;
+
+    return (msgFeeJuels, isOutOfOrderExecution, abi.encode(extraArgs));
+  }
+
+  /// @notice Returns the configured dynamic config for the dest chain selector
+  /// @param destChainSelector destination chain selector to fetch config for
+  /// @return destChainDynamicConfig Dynamic config for the dest chain
+  function getDestChainDynamicConfig(uint64 destChainSelector) external view returns (DestChainDynamicConfig memory) {
+    return s_destChainDynamicConfigs[destChainSelector];
+  }
+
+  /// @notice Updates the destination chain specific config.
+  /// @param destChainConfigArgs Array of source chain specific configs.
+  function applyDestChainConfigUpdates(DestChainDynamicConfigArgs[] memory destChainConfigArgs) external onlyOwner {
+    _applyDestChainConfigUpdates(destChainConfigArgs);
+  }
+
+  /// @notice Internal version of applyDestChainConfigUpdates.
+  function _applyDestChainConfigUpdates(DestChainDynamicConfigArgs[] memory destChainConfigArgs) internal {
+    for (uint256 i = 0; i < destChainConfigArgs.length; ++i) {
+      DestChainDynamicConfigArgs memory destChainConfigArg = destChainConfigArgs[i];
+      uint64 destChainSelector = destChainConfigArgs[i].destChainSelector;
+      DestChainDynamicConfig memory destChainDynamicConfigArg = destChainConfigArg.dynamicConfig;
+
+      // NOTE: when supporting non-EVM chains, update chainFamilySelector validations
+      if (
+        destChainSelector == 0 || destChainDynamicConfigArg.defaultTxGasLimit == 0
+          || destChainDynamicConfigArg.chainFamilySelector != Internal.CHAIN_FAMILY_SELECTOR_EVM
+      ) {
+        revert InvalidDestChainConfig(destChainSelector);
+      }
+
+      // The chain family selector cannot be zero - indicates that it is a new chain
+      if (s_destChainDynamicConfigs[destChainSelector].chainFamilySelector == 0) {
+        emit DestChainAdded(destChainSelector, destChainDynamicConfigArg);
+      } else {
+        emit DestChainDynamicConfigUpdated(destChainSelector, destChainDynamicConfigArg);
+      }
+
+      s_destChainDynamicConfigs[destChainSelector] = destChainDynamicConfigArg;
+    }
+  }
+
+  /// @notice Returns the static PriceRegistry config.
+  /// @dev RMN depends on this function, if changing, please notify the RMN maintainers.
+  /// @return the configuration.
+  function getStaticConfig() external view returns (StaticConfig memory) {
+    return StaticConfig({maxFeeJuelsPerMsg: i_maxFeeJuelsPerMsg, linkToken: i_linkToken});
   }
 
   // ================================================================
