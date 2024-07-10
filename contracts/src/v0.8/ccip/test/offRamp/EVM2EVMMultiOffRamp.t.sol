@@ -915,9 +915,7 @@ contract EVM2EVMMultiOffRamp_executeSingleReport is EVM2EVMMultiOffRampSetup {
       messages[0].header.sequenceNumber,
       messages[0].header.messageId,
       Internal.MessageExecutionState.FAILURE,
-      abi.encodeWithSelector(
-        CallWithExactGas.NotEnoughGasForCall.selector
-      )
+      abi.encodeWithSelector(CallWithExactGas.NotEnoughGasForCall.selector)
     );
     s_offRamp.executeSingleReport(executionReport, new uint256[](0));
   }
