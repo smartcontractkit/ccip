@@ -14,7 +14,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 )
 
-var randomReport = func() cciptypes.CommitPluginReport {
+var randomCommitReport = func() cciptypes.CommitPluginReport {
 	return cciptypes.CommitPluginReport{
 		MerkleRoots: []cciptypes.MerkleRootChain{
 			{
@@ -95,7 +95,7 @@ func TestCommitPluginCodecV1(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			report := tc.report(randomReport())
+			report := tc.report(randomCommitReport())
 			commitCodec := NewCommitPluginCodecV1()
 			ctx := testutils.Context(t)
 			encodedReport, err := commitCodec.Encode(ctx, report)
@@ -115,7 +115,7 @@ func BenchmarkCommitPluginCodecV1_Encode(b *testing.B) {
 	commitCodec := NewCommitPluginCodecV1()
 	ctx := testutils.Context(b)
 
-	rep := randomReport()
+	rep := randomCommitReport()
 	for i := 0; i < b.N; i++ {
 		_, err := commitCodec.Encode(ctx, rep)
 		require.NoError(b, err)
@@ -125,7 +125,7 @@ func BenchmarkCommitPluginCodecV1_Encode(b *testing.B) {
 func BenchmarkCommitPluginCodecV1_Decode(b *testing.B) {
 	commitCodec := NewCommitPluginCodecV1()
 	ctx := testutils.Context(b)
-	encodedReport, err := commitCodec.Encode(ctx, randomReport())
+	encodedReport, err := commitCodec.Encode(ctx, randomCommitReport())
 	require.NoError(b, err)
 
 	for i := 0; i < b.N; i++ {
