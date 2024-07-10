@@ -50,7 +50,7 @@ var randomReport = func() cciptypes.CommitPluginReport {
 	}
 }
 
-func TestCommitPluginCodec(t *testing.T) {
+func TestCommitPluginCodecV1(t *testing.T) {
 	testCases := []struct {
 		name   string
 		report func(report cciptypes.CommitPluginReport) cciptypes.CommitPluginReport
@@ -111,7 +111,7 @@ func TestCommitPluginCodec(t *testing.T) {
 	}
 }
 
-func BenchmarkCommitPluginCodec_Encode(b *testing.B) {
+func BenchmarkCommitPluginCodecV1_Encode(b *testing.B) {
 	commitCodec := NewCommitPluginCodecV1()
 	ctx := testutils.Context(b)
 
@@ -122,7 +122,7 @@ func BenchmarkCommitPluginCodec_Encode(b *testing.B) {
 	}
 }
 
-func BenchmarkCommitPluginCodec_Decode(b *testing.B) {
+func BenchmarkCommitPluginCodecV1_Decode(b *testing.B) {
 	commitCodec := NewCommitPluginCodecV1()
 	ctx := testutils.Context(b)
 	encodedReport, err := commitCodec.Encode(ctx, randomReport())
