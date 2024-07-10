@@ -149,7 +149,7 @@ func TestExecutionReportingPlugin_Observation(t *testing.T) {
 			for root, blessed := range tc.blessedRoots {
 				commitStoreReader.On("IsBlessed", mock.Anything, root).Return(blessed, nil).Maybe()
 			}
-			commitStoreReader.On("GetAcceptedCommitReportsGteTimestamp", ctx, mock.Anything, 0).
+			commitStoreReader.On("GetCommitReportsForExecution", ctx, mock.Anything, mock.Anything).
 				Return(tc.unexpiredReports, nil).Maybe()
 			p.commitStoreReader = commitStoreReader
 

@@ -127,6 +127,10 @@ func (i *IncompleteSourceCommitStoreReader) Close() error {
 	return fmt.Errorf("invalid usage of IncompleteSourceCommitStoreReader")
 }
 
+func (i *IncompleteSourceCommitStoreReader) GetCommitReportsForExecution(ctx context.Context, logsAge time.Duration, ignoredRoots [][32]byte) ([]cciptypes.CommitStoreReportWithTxMeta, error) {
+	return nil, fmt.Errorf("invalid usage of GetCommitReportsForExecution")
+}
+
 // IncompleteDestCommitStoreReader is an implementation of CommitStoreReader with all valid methods except
 // GasPriceEstimator, ChangeConfig, and OffchainConfig.
 type IncompleteDestCommitStoreReader struct {
@@ -202,4 +206,8 @@ func (i *IncompleteDestCommitStoreReader) VerifyExecutionReport(ctx context.Cont
 
 func (i *IncompleteDestCommitStoreReader) Close() error {
 	return i.cs.Close()
+}
+
+func (i *IncompleteDestCommitStoreReader) GetCommitReportsForExecution(ctx context.Context, logsAge time.Duration, ignoredRoots [][32]byte) ([]cciptypes.CommitStoreReportWithTxMeta, error) {
+	return i.cs.GetCommitReportsForExecution(ctx, logsAge, ignoredRoots)
 }

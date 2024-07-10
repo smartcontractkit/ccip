@@ -10,8 +10,11 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/pkg/errors"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
 
@@ -36,16 +39,17 @@ var _ ccipdata.CommitStoreReader = &CommitStore{}
 
 type CommitStore struct {
 	// Static config
-	commitStore               *commit_store_1_2_0.CommitStore
-	lggr                      logger.Logger
-	lp                        logpoller.LogPoller
-	address                   common.Address
-	estimator                 *gas.EvmFeeEstimator
-	sourceMaxGasPrice         *big.Int
-	filters                   []logpoller.Filter
-	reportAcceptedSig         common.Hash
-	reportAcceptedMaxSeqIndex int
-	commitReportArgs          abi.Arguments
+	commitStore                   *commit_store_1_2_0.CommitStore
+	lggr                          logger.Logger
+	lp                            logpoller.LogPoller
+	address                       common.Address
+	estimator                     *gas.EvmFeeEstimator
+	sourceMaxGasPrice             *big.Int
+	filters                       []logpoller.Filter
+	reportAcceptedSig             common.Hash
+	reportAcceptedMaxSeqIndex     int
+	reportAcceptedMerkleRootIndex uint8
+	commitReportArgs              abi.Arguments
 
 	// Dynamic config
 	configMu          sync.RWMutex
@@ -410,6 +414,64 @@ func (c *CommitStore) VerifyExecutionReport(ctx context.Context, report cciptype
 	return true, nil
 }
 
+func (c *CommitStore) GetCommitReportsForExecution(ctx context.Context, logsAge time.Duration, ignoredRoots [][32]byte) ([]cciptypes.CommitStoreReportWithTxMeta, error) {
+	ignoredRootsExpression := make([]query.Expression, 0, len(ignoredRoots))
+	for _, root := range ignoredRoots {
+		ignoredRootsExpression = append(ignoredRootsExpression, query.And(
+			logpoller.NewEventByWordFilter(c.reportAcceptedSig, c.reportAcceptedMerkleRootIndex, []primitives.ValueComparator{
+				{Value: hexutil.Encode(root[:]), Operator: primitives.Neq},
+			}),
+		))
+	}
+
+	// TODO Move to chainlink-common, querying layer should cover cases like these
+	var ignoredRootsFilter query.Expression
+	if len(ignoredRootsExpression) == 1 {
+		ignoredRootsFilter = ignoredRootsExpression[0]
+	} else {
+		ignoredRootsFilter = query.Or(ignoredRootsExpression...)
+	}
+
+	logsTimestamp := time.Now().Add(-logsAge).Unix()
+
+	sendRequestsQuery, err := query.Where(
+		c.address.String(),
+		logpoller.NewAddressFilter(c.address),
+		logpoller.NewEventSigFilter(c.reportAcceptedSig),
+		query.Timestamp(uint64(logsTimestamp), primitives.Gte),
+		ignoredRootsFilter,
+		logpoller.NewConfirmationsFilter(evmtypes.Confirmations(0)),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	logs, err := c.lp.FilteredLogs(
+		ctx,
+		sendRequestsQuery,
+		query.NewLimitAndSort(query.Limit{}, query.NewSortBySequence(query.Asc)),
+		"GetCommitReportsForExecution",
+	)
+
+	if err != nil {
+		return nil, err
+	}
+
+	parsedLogs, err := ccipdata.ParseLogs[cciptypes.CommitStoreReport](logs, c.lggr, c.parseReport)
+	if err != nil {
+		return nil, fmt.Errorf("parse logs: %w", err)
+	}
+
+	res := make([]cciptypes.CommitStoreReportWithTxMeta, 0, len(parsedLogs))
+	for _, log := range parsedLogs {
+		res = append(res, cciptypes.CommitStoreReportWithTxMeta{
+			TxMeta:            log.TxMeta,
+			CommitStoreReport: log.Data,
+		})
+	}
+	return res, nil
+}
+
 func (c *CommitStore) RegisterFilters() error {
 	return logpollerutil.RegisterLpFilters(c.lp, c.filters)
 }
@@ -443,8 +505,9 @@ func NewCommitStore(lggr logger.Logger, addr common.Address, ec client.Client, l
 		commitReportArgs:  commitReportArgs,
 		reportAcceptedSig: eventSig,
 		// offset || priceUpdatesOffset || minSeqNum || maxSeqNum || merkleRoot
-		reportAcceptedMaxSeqIndex: 3,
-		configMu:                  sync.RWMutex{},
+		reportAcceptedMaxSeqIndex:     3,
+		reportAcceptedMerkleRootIndex: 4,
+		configMu:                      sync.RWMutex{},
 
 		// The fields below are initially empty and set on ChangeConfig method
 		offchainConfig:    cciptypes.CommitOffchainConfig{},

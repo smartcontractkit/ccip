@@ -49,6 +49,7 @@ type IncompleteDestCommitStoreReader interface {
 	IsDestChainHealthy(ctx context.Context) (bool, error)
 	IsDown(ctx context.Context) (bool, error)
 	VerifyExecutionReport(ctx context.Context, report cciptypes.ExecReport) (bool, error)
+	GetCommitReportsForExecution(ctx context.Context, logsAge time.Duration, ignoredRoots [][32]byte) ([]cciptypes.CommitStoreReportWithTxMeta, error)
 	io.Closer
 }
 
@@ -116,6 +117,10 @@ func (p *ProviderProxyCommitStoreReader) OffchainConfig(ctx context.Context) (cc
 
 func (p *ProviderProxyCommitStoreReader) VerifyExecutionReport(ctx context.Context, report cciptypes.ExecReport) (bool, error) {
 	return p.dstCommitStoreReader.VerifyExecutionReport(ctx, report)
+}
+
+func (p *ProviderProxyCommitStoreReader) GetCommitReportsForExecution(ctx context.Context, logsAge time.Duration, ignoredRoots [][32]byte) ([]cciptypes.CommitStoreReportWithTxMeta, error) {
+	return p.dstCommitStoreReader.GetCommitReportsForExecution(ctx, logsAge, ignoredRoots)
 }
 
 // SetGasEstimator is invalid on ProviderProxyCommitStoreReader. The provider based impl's do not have SetGasEstimator

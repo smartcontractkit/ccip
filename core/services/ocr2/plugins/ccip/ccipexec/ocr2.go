@@ -72,6 +72,7 @@ type ExecutionReportingPlugin struct {
 	offchainConfig   cciptypes.ExecOffchainConfig
 	tokenDataWorker  tokendata.Worker
 	metricsCollector ccip.PluginMetricsCollector
+
 	// Source
 	gasPriceEstimator           prices.GasPriceEstimatorExec
 	sourcePriceRegistry         ccipdata.PriceRegistryReader
@@ -79,14 +80,15 @@ type ExecutionReportingPlugin struct {
 	sourcePriceRegistryLock     sync.RWMutex
 	sourceWrappedNativeToken    cciptypes.Address
 	onRampReader                ccipdata.OnRampReader
-	// Dest
 
-	commitStoreReader      ccipdata.CommitStoreReader
-	destPriceRegistry      ccipdata.PriceRegistryReader
-	destWrappedNative      cciptypes.Address
-	onchainConfig          cciptypes.ExecOnchainConfig
-	offRampReader          ccipdata.OffRampReader
-	tokenPoolBatchedReader batchreader.TokenPoolBatchedReader
+	// Dest
+	commitStoreReader         ccipdata.CommitStoreReader
+	destPriceRegistry         ccipdata.PriceRegistryReader
+	destWrappedNative         cciptypes.Address
+	onchainConfig             cciptypes.ExecOnchainConfig
+	offRampReader             ccipdata.OffRampReader
+	tokenPoolBatchedReader    batchreader.TokenPoolBatchedReader
+	messageVisibilityInterval time.Duration
 
 	// State
 	inflightReports  *inflightExecReportsContainer
@@ -140,7 +142,7 @@ func (r *ExecutionReportingPlugin) Observation(ctx context.Context, timestamp ty
 }
 
 func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context, lggr logger.Logger, inflight []InflightInternalExecutionReport) ([]ccip.ObservedMessage, error) {
-	unexpiredReports, err := r.getUnexpiredCommitReports(ctx, r.commitStoreReader, lggr)
+	unexpiredReports, err := r.getUnexpiredCommitReports(ctx, lggr)
 	if err != nil {
 		return nil, err
 	}
@@ -860,44 +862,26 @@ func getTokensPrices(ctx context.Context, priceRegistry ccipdata.PriceRegistryRe
 	return tokenPrices, nil
 }
 
-func (r *ExecutionReportingPlugin) getUnexpiredCommitReports(
-	ctx context.Context,
-	commitStoreReader ccipdata.CommitStoreReader,
-	lggr logger.Logger,
-) ([]cciptypes.CommitStoreReport, error) {
-	createdAfterTimestamp := r.commitRootsCache.OldestRootTimestamp()
-	lggr.Infow("Fetching unexpired commit roots from database", "createdAfterTimestamp", createdAfterTimestamp)
-	acceptedReports, err := commitStoreReader.GetAcceptedCommitReportsGteTimestamp(
+func (r *ExecutionReportingPlugin) getUnexpiredCommitReports(ctx context.Context, lggr logger.Logger) ([]cciptypes.CommitStoreReport, error) {
+	snoozeRoots := r.commitRootsCache.GetSnoozedRoots()
+	lggr.Debugw("Ignoring following snoozed commit roots this round", "snoozedRoots", snoozeRoots)
+
+	commitStoreReportsLogs, err := r.commitStoreReader.GetCommitReportsForExecution(
 		ctx,
-		createdAfterTimestamp,
-		0,
+		r.messageVisibilityInterval,
+		snoozeRoots,
 	)
 	if err != nil {
 		return nil, err
 	}
 
 	var reports []cciptypes.CommitStoreReport
-	for _, acceptedReport := range acceptedReports {
-		reports = append(reports, acceptedReport.CommitStoreReport)
-		r.commitRootsCache.AppendUnexecutedRoot(acceptedReport.MerkleRoot, time.UnixMilli(acceptedReport.TxMeta.BlockTimestampUnixMilli))
+	for _, report := range commitStoreReportsLogs {
+		reports = append(reports, report.CommitStoreReport)
 	}
 
-	notSnoozedReports := make([]cciptypes.CommitStoreReport, 0)
-	for _, report := range reports {
-		if r.commitRootsCache.IsSkipped(report.MerkleRoot) {
-			lggr.Debugw("Skipping snoozed root",
-				"minSeqNr", report.Interval.Min,
-				"maxSeqNr", report.Interval.Max,
-				"root", hex.EncodeToString(report.MerkleRoot[:]),
-			)
-			continue
-		}
-		notSnoozedReports = append(notSnoozedReports, report)
-	}
-
-	r.metricsCollector.UnexpiredCommitRoots(len(notSnoozedReports))
-	lggr.Infow("Unexpired roots", "all", len(reports), "notSnoozed", len(notSnoozedReports))
-	return notSnoozedReports, nil
+	r.metricsCollector.UnexpiredCommitRoots(len(reports))
+	return reports, nil
 }
 
 type execTokenData struct {
