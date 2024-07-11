@@ -49,20 +49,6 @@ func setupReorgSuite(t *testing.T, loadArgs *LoadArgs) *ch.ReorgSuite {
 	return rs
 }
 
-func setupGasSuite(t *testing.T, loadArgs *LoadArgs) *ch.GasSuite {
-	rs, err := ch.NewGasSuite(t, &ch.GasSuiteConfig{
-		SrcGethHTTPURL: loadArgs.TestSetupArgs.Env.K8Env.URLs["source-chain_http"][0],
-		DstGethHTTPURL: loadArgs.TestSetupArgs.Env.K8Env.URLs["dest-chain_http"][0],
-		GrafanaConfig: &ch.GrafanaConfig{
-			GrafanaURL:   *loadArgs.TestCfg.EnvInput.Logging.Grafana.BaseUrl,
-			GrafanaToken: *loadArgs.TestCfg.EnvInput.Logging.Grafana.BearerToken,
-			DashboardURL: *loadArgs.TestCfg.EnvInput.Logging.Grafana.DashboardUrl,
-		},
-	})
-	require.NoError(t, err)
-	return rs
-}
-
 // TestLoadCCIPStableRPS clean and stable load test
 func TestLoadCCIPStableRPS(t *testing.T) {
 	t.Parallel()
@@ -141,50 +127,6 @@ func TestLoadCCIPStableRPSReorgsAboveFinality(t *testing.T) {
 		lggr.Info().Any("FinalityViolatedResponses", violatedResponses).Send()
 		return violatedResponses == len(clNodes)
 	}, 3*time.Minute, 20*time.Second, "not all the nodes report finality violation")
-}
-
-func TestLoadCCIPStableRPSGasSpike(t *testing.T) {
-	t.Parallel()
-	lggr := logging.GetTestLogger(t)
-	testArgs := NewLoadArgs(t, lggr)
-	testArgs.Setup()
-	// if the test runs on remote runner
-	if len(testArgs.TestSetupArgs.Lanes) == 0 {
-		return
-	}
-	t.Cleanup(func() {
-		log.Info().Msg("Tearing down the environment")
-		require.NoError(t, testArgs.TestSetupArgs.TearDown())
-	})
-
-	chcfg := testArgs.TestCfg.TestGroupInput.ChaosGasProfile
-	gs := setupGasSuite(t, testArgs)
-	gs.ChangeBlockGasBaseFee(chcfg.TargetChain, chcfg.StartGasPrice, chcfg.GasRaisePercentage, chcfg.Duration.Duration(), chcfg.Spike)
-
-	testArgs.TriggerLoadByLane()
-	testArgs.Wait()
-}
-
-func TestLoadCCIPStableRPSChangeBlockGasLimit(t *testing.T) {
-	t.Parallel()
-	lggr := logging.GetTestLogger(t)
-	testArgs := NewLoadArgs(t, lggr)
-	testArgs.Setup()
-	// if the test runs on remote runner
-	if len(testArgs.TestSetupArgs.Lanes) == 0 {
-		return
-	}
-	t.Cleanup(func() {
-		log.Info().Msg("Tearing down the environment")
-		require.NoError(t, testArgs.TestSetupArgs.TearDown())
-	})
-
-	chcfg := testArgs.TestCfg.TestGroupInput.ChaosGasLimitProfile
-	gs := setupGasSuite(t, testArgs)
-	gs.ChangeNextBlockGasLimit(1*time.Minute, 1*time.Minute, chcfg.TargetChain, chcfg.BlockGasLimitPercentage)
-
-	testArgs.TriggerLoadByLane()
-	testArgs.Wait()
 }
 
 // TestLoadCCIPWithUpgradeNodeVersion starts all nodes with a specific version, triggers load and then upgrades the node version as the load is running

@@ -9,10 +9,6 @@ import (
 	"github.com/pelletier/go-toml/v2"
 	"github.com/rs/zerolog"
 
-	ctfK8config "github.com/smartcontractkit/chainlink-testing-framework/k8s/config"
-
-	testutils "github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/utils"
-
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
 	ctfconfig "github.com/smartcontractkit/chainlink-testing-framework/config"
 	ctfK8config "github.com/smartcontractkit/chainlink-testing-framework/k8s/config"
@@ -294,7 +290,7 @@ type CCIPTestGroupConfig struct {
 	CommitInflightExpiry            *config.Duration                      `toml:",omitempty"`
 	StoreLaneConfig                 *bool                                 `toml:",omitempty"`
 	LoadProfile                     *LoadProfile                          `toml:",omitempty"`
-	ChaosReorgProfile         *ChaosReorgProfile                    `toml:",omitempty"`
+	ChaosReorgProfile               *ChaosReorgProfile                    `toml:",omitempty"`
 }
 
 func (c *CCIPTestGroupConfig) Validate() error {
