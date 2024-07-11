@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 
 	"github.com/stretchr/testify/require"
 
@@ -40,19 +41,10 @@ func TestPingPong(t *testing.T) {
 			require.Equal(t, log.Message.Sender, pingPong.Address())
 			chainPingPongAddr := pingPongs[otherChain][chainID].Address().Bytes()
 			// With chain agnostic addresses we need to pad the address to the correct length if the receiver is zero prefixed
-			paddedAddr := LeftPadByteArray(chainPingPongAddr, len(log.Message.Receiver))
+			paddedAddr := gethcommon.LeftPadBytes(chainPingPongAddr, len(log.Message.Receiver))
 			require.Equal(t, log.Message.Receiver, paddedAddr)
 		}
 	}
-}
-
-func LeftPadByteArray(arr []byte, length int) []byte {
-	if len(arr) >= length {
-		return arr
-	}
-	padded := make([]byte, length)
-	copy(padded[length-len(arr):], arr)
-	return padded
 }
 
 // InitializeContracts initializes ping pong contracts on all chains and
