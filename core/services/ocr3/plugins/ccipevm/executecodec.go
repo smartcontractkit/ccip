@@ -16,7 +16,7 @@ import (
 // Compatible with:
 // - "EVM2EVMMultiOffRamp 1.6.0-dev"
 type ExecutePluginCodecV1 struct {
-	executeReportEventInputs abi.Arguments
+	executeReportMethodInputs abi.Arguments
 }
 
 func NewExecutePluginCodecV1() *ExecutePluginCodecV1 {
@@ -24,13 +24,13 @@ func NewExecutePluginCodecV1() *ExecutePluginCodecV1 {
 	if err != nil {
 		panic(fmt.Errorf("parse multi offramp abi: %s", err))
 	}
-	eventInputs := abihelpers.MustGetMethodInputs("manuallyExecute", abiParsed)
-	if len(eventInputs) == 0 {
+	methodInputs := abihelpers.MustGetMethodInputs("manuallyExecute", abiParsed)
+	if len(methodInputs) == 0 {
 		panic("no inputs found for method: manuallyExecute")
 	}
 
 	return &ExecutePluginCodecV1{
-		executeReportEventInputs: eventInputs[:1],
+		executeReportMethodInputs: methodInputs[:1],
 	}
 }
 
@@ -96,11 +96,11 @@ func (e *ExecutePluginCodecV1) Encode(ctx context.Context, report cciptypes.Exec
 		evmReport = append(evmReport, evmChainReport)
 	}
 
-	return e.executeReportEventInputs.PackValues([]interface{}{&evmReport})
+	return e.executeReportMethodInputs.PackValues([]interface{}{&evmReport})
 }
 
 func (e *ExecutePluginCodecV1) Decode(ctx context.Context, encodedReport []byte) (cciptypes.ExecutePluginReport, error) {
-	unpacked, err := e.executeReportEventInputs.Unpack(encodedReport)
+	unpacked, err := e.executeReportMethodInputs.Unpack(encodedReport)
 	if err != nil {
 		return cciptypes.ExecutePluginReport{}, fmt.Errorf("unpack encoded report: %w", err)
 	}
